@@ -1,85 +1,31 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri,  8 Jul 2016 22:33:42 +0800
-Subject: [PATCH v5 7/7] ARM: dts: sun9i: Switch to the AC100 RTC clock outputs
- for osc32k
-In-Reply-To: <1467988422-17934-1-git-send-email-wens@csie.org>
-References: <1467988422-17934-1-git-send-email-wens@csie.org>
-Message-ID: <1467988422-17934-8-git-send-email-wens@csie.org>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 8 Jul 2016 16:35:48 +0200
+Subject: [PATCH v5 1/3] Documentation: dt: Add Broadcom iproc pwm
+ controller binding
+In-Reply-To: <1467698426-27600-2-git-send-email-yendapally.reddy@broadcom.com>
+References: <1467698426-27600-1-git-send-email-yendapally.reddy@broadcom.com>
+ <1467698426-27600-2-git-send-email-yendapally.reddy@broadcom.com>
+Message-ID: <20160708143548.GA1151@ulmo.ba.sec>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The 32.768 kHz clock inside the A80 SoC is fed from an external source,
-typically the AC100 RTC module.
+On Tue, Jul 05, 2016 at 02:00:24AM -0400, Yendapally Reddy Dhananjaya Reddy wrote:
+> Add a binding for Broadcom iproc pwm controller
+> 
+> Signed-off-by: Yendapally Reddy Dhananjaya Reddy <yendapally.reddy@broadcom.com>
+> Acked-by: Rob Herring <robh@kernel.org>
+> ---
+>  .../devicetree/bindings/pwm/brcm,iproc-pwm.txt      | 21 +++++++++++++++++++++
+>  1 file changed, 21 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/pwm/brcm,iproc-pwm.txt
 
-Make the osc32k placeholder a fixed-factor clock so board dts files can
-specify its source.
+Applied, thanks.
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
-Changes since v4: none
-Changes since v3: none
-Changes since v2: none
-Changes since v1: none
----
- arch/arm/boot/dts/sun9i-a80-cubieboard4.dts | 5 +++++
- arch/arm/boot/dts/sun9i-a80-optimus.dts     | 5 +++++
- arch/arm/boot/dts/sun9i-a80.dtsi            | 9 +++------
- 3 files changed, 13 insertions(+), 6 deletions(-)
-
-diff --git a/arch/arm/boot/dts/sun9i-a80-cubieboard4.dts b/arch/arm/boot/dts/sun9i-a80-cubieboard4.dts
-index cf2f4b72a841..04b014603659 100644
---- a/arch/arm/boot/dts/sun9i-a80-cubieboard4.dts
-+++ b/arch/arm/boot/dts/sun9i-a80-cubieboard4.dts
-@@ -103,6 +103,11 @@
- 	allwinner,drive = <SUN4I_PINCTRL_40_MA>;
- };
- 
-+&osc32k {
-+	/* osc32k input is from AC100 */
-+	clocks = <&ac100_rtc 0>;
-+};
-+
- &pio {
- 	led_pins_cubieboard4: led-pins at 0 {
- 		allwinner,pins = "PH6", "PH17";
-diff --git a/arch/arm/boot/dts/sun9i-a80-optimus.dts b/arch/arm/boot/dts/sun9i-a80-optimus.dts
-index e35c06c162a7..fd874ded890e 100644
---- a/arch/arm/boot/dts/sun9i-a80-optimus.dts
-+++ b/arch/arm/boot/dts/sun9i-a80-optimus.dts
-@@ -152,6 +152,11 @@
- 	status = "okay";
- };
- 
-+&osc32k {
-+	/* osc32k input is from AC100 */
-+	clocks = <&ac100_rtc 0>;
-+};
-+
- &pio {
- 	led_pins_optimus: led-pins at 0 {
- 		allwinner,pins = "PH0", "PH1";
-diff --git a/arch/arm/boot/dts/sun9i-a80.dtsi b/arch/arm/boot/dts/sun9i-a80.dtsi
-index f68b3242b33a..dd11115ec087 100644
---- a/arch/arm/boot/dts/sun9i-a80.dtsi
-+++ b/arch/arm/boot/dts/sun9i-a80.dtsi
-@@ -148,15 +148,12 @@
- 
- 		/*
- 		 * The 32k clock is from an external source, normally the
--		 * AC100 codec/RTC chip. This clock is by default enabled
--		 * and clocked at 32768 Hz, from the oscillator connected
--		 * to the AC100. It is configurable, but no such driver or
--		 * bindings exist yet.
-+		 * AC100 codec/RTC chip. This serves as a placeholder for
-+		 * board dts files to specify the source.
- 		 */
- 		osc32k: osc32k_clk {
- 			#clock-cells = <0>;
--			compatible = "fixed-clock";
--			clock-frequency = <32768>;
-+			compatible = "fixed-factor-clock";
- 			clock-output-names = "osc32k";
- 		};
- 
--- 
-2.8.1
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160708/649d0280/attachment-0001.sig>
