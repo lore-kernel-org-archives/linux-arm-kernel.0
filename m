@@ -1,38 +1,37 @@
-From: zyw@rock-chips.com (Chris Zhong)
-Date: Fri,  8 Jul 2016 17:05:01 +0800
-Subject: [PATCH 7/7] drm/rockchip: dw-mipi: fix insufficient bandwidth of some
- panel
-In-Reply-To: <1467968701-15620-1-git-send-email-zyw@rock-chips.com>
-References: <1467968701-15620-1-git-send-email-zyw@rock-chips.com>
-Message-ID: <1467968701-15620-8-git-send-email-zyw@rock-chips.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri,  8 Jul 2016 11:11:58 +0200
+Subject: [PATCH 0/4] soc: qcom: add EBI2 support and do ethernet
+Message-ID: <1467969122-6552-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Set the lanes bps to 1 / 0.9 times of pclk, the margin is not enough
-for some panel, it will cause the screen display is not normal, so
-increases the badnwidth to 1 / 0.8.
+This set of patches (in additions to some orthogonal patches sent ot
+netdev for the smsc911x) enables ethernet on the APQ8060 Dragonboard.
 
-Signed-off-by: Chris Zhong <zyw@rock-chips.com>
+Ethernet uses the mysterious (yes that is the right word) EBI2 external
+bus interface that only have sparse references in documentation and
+some quite opaque code fragments here and there to support it.
 
----
+If any of you can help me with documentation on this beast, I'd be
+happy. The XMEMC bitfields especially.
 
- drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+The target for the patches is Kernel v4.9 or so, don't stress.
 
-diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-index 8401185..fca7dde 100644
---- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-+++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-@@ -503,8 +503,8 @@ static int dw_mipi_dsi_get_lane_bps(struct dw_mipi_dsi *dsi)
- 
- 	mpclk = DIV_ROUND_UP(dsi->mode->clock, MSEC_PER_SEC);
- 	if (mpclk) {
--		/* take 1 / 0.9, since mbps must big than bandwidth of RGB */
--		tmp = mpclk * (bpp / dsi->lanes) * 10 / 9;
-+		/* take 1 / 0.8, since mbps must big than bandwidth of RGB */
-+		tmp = mpclk * (bpp / dsi->lanes) * 10 / 8;
- 		if (tmp < max_mbps)
- 			target_mbps = tmp;
- 		else
+Linus Walleij (4):
+  soc: qcom: add an EBI2 device tree bindings
+  soc: qcom: add EBI2 driver
+  ARM: dts: add EBI2 to the Qualcomm MSM8660 DTSI
+  ARM: dts: add SMSC ethernet on the APQ8060 Dragonboard
+
+ .../devicetree/bindings/soc/qcom/qcom,ebi2.txt     | 134 ++++++++
+ arch/arm/boot/dts/qcom-apq8060-dragonboard.dts     | 130 ++++++++
+ arch/arm/boot/dts/qcom-msm8660.dtsi                |  12 +
+ drivers/soc/qcom/Kconfig                           |   8 +
+ drivers/soc/qcom/Makefile                          |   1 +
+ drivers/soc/qcom/ebi2.c                            | 371 +++++++++++++++++++++
+ 6 files changed, 656 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/soc/qcom/qcom,ebi2.txt
+ create mode 100644 drivers/soc/qcom/ebi2.c
+
 -- 
-2.6.3
+2.7.4
