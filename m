@@ -1,33 +1,29 @@
-From: jorge.ramirez-ortiz@linaro.org (Jorge Ramirez-Ortiz)
-Date: Fri,  8 Jul 2016 10:11:07 +0200
-Subject: [PATCH 2/2] arm64: dts: set UART1 clock frequency to 150MHz
-In-Reply-To: <1467965467-28180-1-git-send-email-jorge.ramirez-ortiz@linaro.org>
-References: <1467965467-28180-1-git-send-email-jorge.ramirez-ortiz@linaro.org>
-Message-ID: <1467965467-28180-2-git-send-email-jorge.ramirez-ortiz@linaro.org>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Fri, 8 Jul 2016 10:11:39 +0200
+Subject: ARM: mediatek: dts 32 bits updates for v4.8
+In-Reply-To: <5397983.gq5uGZu7nI@wuerfel>
+References: <94a90d0c-f459-296c-4290-739515b4ac5b@gmail.com>
+ <98233d90-47ef-88f7-e474-c1fa04a65c04@gmail.com> <5397983.gq5uGZu7nI@wuerfel>
+Message-ID: <577F603B.1050405@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable support for higher baud rates (up to 3Mbps) in UART1 - required
-for bluetooth transfers.
 
-Signed-off-by: Jorge Ramirez-Ortiz <jorge.ramirez-ortiz@linaro.org>
-Tested-by: Jorge Ramirez-Ortiz <jorge.ramirez-ortiz@linaro.org>
----
- arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts | 2 ++
- 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
-index e92a30c..27be812 100644
---- a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
-+++ b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
-@@ -55,6 +55,8 @@
- 		};
- 
- 		uart1: uart at f7111000 {
-+			assigned-clocks = <&sys_ctrl HI6220_UART1_SRC>;
-+			assigned-clock-rates = <150000000>;
- 			status = "ok";
- 		};
- 
--- 
-2.7.4
+On 07/07/16 14:01, Arnd Bergmann wrote:
+> On Sunday, July 3, 2016 9:08:40 PM CEST Matthias Brugger wrote:
+>> On 07/03/2016 08:49 AM, Matthias Brugger wrote:
+>>> Hi all,
+>>>
+>>> Please take into account the following dts patch for arm 32 bits.
+>>>
+>>
+>> The patch causes a compilation error, please don't pull this branch.
+>
+> Ok, I don't see a replacement branch though, still working on it?
+>
+
+There was just one patch which got dropped. So no replacement branch at all.
+
+Thanks for asking,
+Matthias
