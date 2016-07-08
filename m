@@ -1,49 +1,57 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Fri, 8 Jul 2016 14:50:26 +0100
-Subject: [PATCH v6 00/10] acpi, clocksource: add GTDT driver and GTDT
- support in arm_arch_timer
-In-Reply-To: <20160708132201.GD3784@red-moon>
-References: <1467224153-22873-1-git-send-email-fu.wei@linaro.org>
- <1890708.ZTyM2PUGdP@vostro.rjw.lan> <20160707134023.GA655@red-moon>
- <1603704.EGiVTcCxLR@vostro.rjw.lan> <20160708132201.GD3784@red-moon>
-Message-ID: <577FAFA2.6040509@arm.com>
+From: john@metanate.com (John Keeping)
+Date: Fri, 8 Jul 2016 14:52:11 +0100
+Subject: [PATCH 5/7] drm/rockchip: dw-mipi: support HPD poll
+In-Reply-To: <1467968701-15620-6-git-send-email-zyw@rock-chips.com>
+References: <1467968701-15620-1-git-send-email-zyw@rock-chips.com>
+ <1467968701-15620-6-git-send-email-zyw@rock-chips.com>
+Message-ID: <20160708145211.6bf83d8f.john@metanate.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri,  8 Jul 2016 17:04:59 +0800, Chris Zhong wrote:
 
+> At the first time of bind, there is no any panel attach in mipi. Add a
+> DRM_CONNECTOR_POLL_HPD porperty to detect the panel status, when panel
+> probe, the dw_mipi_dsi_host_attach would be called, then mipi-dsi will
+> trigger a event to notify the drm framework.
+> 
+> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
 
-On 08/07/16 14:22, Lorenzo Pieralisi wrote:
-> On Thu, Jul 07, 2016 at 03:58:04PM +0200, Rafael J. Wysocki wrote:
->
-> [...]
->
->>> Anyway let's avoid these petty arguments, I agree there must be some
->>> sort of ARM64 ACPI maintainership for the reasons you mentioned above.
->>
->> To avoid confusion on who's going to push stuff to Linus, I can do
->> that, but it must be clear whose ACKs are needed for that to happen.
->> That may be one person or all of you, whatever you decide.
->
-> I think the reasoning is the same, to avoid confusion and avoid stepping
-> on each other toes it is best to have a single gatekeeper (still
-> multiple maintainer entries to keep patches reviewed correctly), if no
-> one complains I will do that and a) provide ACKs (I will definitely
-> require and request Hanjun and Sudeep ones too appropriately on a per
-> patch basis) and b) send you pull requests.
->
-> Having a maintainer per file would be farcical, I really do not
-> expect that amount of traffic for drivers/acpi/arm64 therefore
+Can we do something like this instead?  We know that the panel must
+always be attached and this has the advantage that the display size will
+be known when the framebuffer console loads.
 
-I agree.
+-- >8 --
+Subject: [PATCH] drm/rockchip: dw-mipi-dsi: defer probe if panel is not loaded
 
-> I really doubt there is any risk of me slowing things down.
->
-> Does this sound reasonable ? Comments/complaints welcome, please
-> manifest yourselves.
->
+This ensures that the output resolution is known before fbcon loads.
 
-Yes sounds good to me.
+Signed-off-by: John Keeping <john@metanate.com>
+---
+ drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 11 +++++++++--
+ 1 file changed, 9 insertions(+), 2 deletions(-)
 
--- 
-Regards,
-Sudeep
+diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+index 6ef5f3be8468..c0499266d116 100644
+--- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
++++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+@@ -1154,10 +1154,17 @@ static int dw_mipi_dsi_bind(struct device *dev, struct device *master,
+ 
+ 	dsi->dsi_host.ops = &dw_mipi_dsi_host_ops;
+ 	dsi->dsi_host.dev = dev;
+-	return mipi_dsi_host_register(&dsi->dsi_host);
++	ret = mipi_dsi_host_register(&dsi->dsi_host);
++	if (!ret && !dsi->panel) {
++		mipi_dsi_host_unregister(&dsi->dsi_host);
++		drm_encoder_cleanup(&dsi->encoder);
++		drm_connector_cleanup(&dsi->connector);
++		ret = -EPROBE_DEFER;
++	}
+ 
+ err_pllref:
+-	clk_disable_unprepare(dsi->pllref_clk);
++	if (ret)
++		clk_disable_unprepare(dsi->pllref_clk);
+ 	return ret;
+ }
+ 
