@@ -1,53 +1,52 @@
-From: mturquette@baylibre.com (Michael Turquette)
-Date: Thu, 07 Jul 2016 20:07:08 -0700
-Subject: [PATCH v2] clk: gxbb: expose CLKID_MMC_PCLK
-In-Reply-To: <20160707033837.20029-1-khilman@baylibre.com>
-References: <20160707033837.20029-1-khilman@baylibre.com>
-Message-ID: <146794722863.73491.474750140948566962@resonance>
+From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
+Date: Fri, 8 Jul 2016 03:18:25 +0000
+Subject: [PATCH v2] clkdev: add devm_of_clk_get()
+In-Reply-To: <146794140875.73491.7115209079607438738@resonance>
+References: <87wpl2yyuw.wl%kuninori.morimoto.gx@renesas.com>
+ <146785219147.73491.2827268663638530377@resonance>
+ <87ziptixv7.wl%kuninori.morimoto.gx@renesas.com>
+ <20160707122636.GP1041@n2100.armlinux.org.uk>
+ <8760shgfzu.wl%kuninori.morimoto.gx@renesas.com>
+ <146794140875.73491.7115209079607438738@resonance>
+Message-ID: <871t34hlin.wl%kuninori.morimoto.gx@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Kevin Hilman (2016-07-06 20:38:37)
-> The MMC_PCLK is needed for the SD/eMMC driver, expose to DT (and comment
-> out in clk driver)
-> 
-> Signed-off-by: Kevin Hilman <khilman@baylibre.com>
 
-Applied to the same clk-s905 branch if you need to re-pull it as a
-dependency.
+Hi Michael
 
-Regards,
-Mike
+Thank you for your feedback
 
-> ---
->  drivers/clk/meson/gxbb.h              | 2 +-
->  include/dt-bindings/clock/gxbb-clkc.h | 1 +
->  2 files changed, 2 insertions(+), 1 deletion(-)
+> > struct clk *clk_get(struct device *dev, const char *con_id)
+> > {
+> >         ...
+> >         if (dev) {
+> >                 clk = __of_clk_get_by_name(dev->of_node, dev_id, con_id);
+> >                                            ~~~~~~~~~~~~
+> >                 ...
+> >         }
+> > }
+> > 
+> > I would like to select specific device_node.
 > 
-> diff --git a/drivers/clk/meson/gxbb.h b/drivers/clk/meson/gxbb.h
-> index a2adf3448b59..8355ecd27b81 100644
-> --- a/drivers/clk/meson/gxbb.h
-> +++ b/drivers/clk/meson/gxbb.h
-> @@ -234,7 +234,7 @@
->  #define CLKID_HDMI_PCLK                  63
->  #define CLKID_USB1_DDR_BRIDGE    64
->  #define CLKID_USB0_DDR_BRIDGE    65
-> -#define CLKID_MMC_PCLK           66
-> +/* CLKID_MMC_PCLK */          
->  #define CLKID_DVIN               67
->  #define CLKID_UART2              68
->  #define CLKID_SANA               69
-> diff --git a/include/dt-bindings/clock/gxbb-clkc.h b/include/dt-bindings/clock/gxbb-clkc.h
-> index f889d80246cb..5eb69ec74f6b 100644
-> --- a/include/dt-bindings/clock/gxbb-clkc.h
-> +++ b/include/dt-bindings/clock/gxbb-clkc.h
-> @@ -8,5 +8,6 @@
->  #define CLKID_CPUCLK           1
->  #define CLKID_CLK81            12
->  #define CLKID_ETH              36
-> +#define CLKID_MMC_PCLK         66
->  
->  #endif /* __GXBB_CLKC_H */
-> -- 
-> 2.9.0
-> 
+> Do you have access to the struct device that you want to target? Can you
+> pass that device into either clk_get or devm_clk_get?
+
+If my understanding was correct, I think I can't.
+In below case, "sound_soc" has its *dev, but "cpu" and "codec" doesn't
+have *dev, it has node only. Thus, we are using of_clk_get() for these now.
+
+	clk = of_clk_get(cpu, xxx);
+	clk = of_clk_get(codec, xxx);
+
+	sound_soc {
+		...
+		cpu {
+			...
+=>			clocks = <&xxx>;
+		};
+		codec {
+			...
+=>			clocks = <&xxx>;
+		};
+	};
