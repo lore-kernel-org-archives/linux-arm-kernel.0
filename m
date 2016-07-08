@@ -1,134 +1,84 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Fri,  8 Jul 2016 22:09:05 +0200
-Subject: [PATCH 1/3] usb: gadget: pxa27x: add phy notifier event handler
-Message-ID: <1468008547-10925-1-git-send-email-robert.jarzmik@free.fr>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Fri,  8 Jul 2016 22:17:03 +0200
+Subject: [PATCH] arm64: defconfig: Enable more IP blocks for Exynos7 and
+ Exynos5433
+Message-ID: <1468009023-25758-1-git-send-email-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the legacy behavior, and USB phy, upon detection a VBus signal, was
-calling usb_gadget_vbus_(dis)connect().
+Enable more drivers for IP blocks for existing Exynos7 and upcoming
+Exynos5433:
+1. SPI,
+2. Watchdog,
+3. USB: DWC3, Exynos EHCI and OHCI,
+4. Exynos ADC,
+5. Samsung PWM.
 
-This model doesn't work if the phy is generic and doesn't have an
-adherence to the gadget API.
+These are already used by Exynos7 Espresso board or will be used by
+Exynos5433 based board.
 
-Instead of relying on the phy to call the gadget API, hook up the phy
-notifier to report the VBus event, and upon it call the usb gadget API
-ourselves.
+Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
 
-This brings a new ordering problem, as before even if the usb_get_phy()
-was failing because the UDC was probed before the phy, the phy would
-call the gadget anyway, making the VBus connection event forwarded to
-the gadget. Now we rely on the notifier, we have to ensure the
-xxx_get_phy() does indeed work.
-
-In order to cope with this, it is assumed that :
- - for legacy platform_data machine, as the ordering cannot be ensured,
-   the phy must call usb_gadget_vbus_(dis)connect, such as
-   phy-gpio-vbus-usb.c
- - for new devicetree platforms, we'll rely on the probe deferral, and
-   the phy can be gadget API agnostic.
-
-Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
 ---
- drivers/usb/gadget/udc/pxa27x_udc.c | 51 +++++++++++++++++++++++++++++++++++--
- 1 file changed, 49 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/usb/gadget/udc/pxa27x_udc.c b/drivers/usb/gadget/udc/pxa27x_udc.c
-index 001a3b74a993..79643e25a5bb 100644
---- a/drivers/usb/gadget/udc/pxa27x_udc.c
-+++ b/drivers/usb/gadget/udc/pxa27x_udc.c
-@@ -33,6 +33,7 @@
- #include <linux/usb.h>
- #include <linux/usb/ch9.h>
- #include <linux/usb/gadget.h>
-+#include <linux/usb/phy.h>
- 
- #include "pxa27x_udc.h"
- 
-@@ -1655,6 +1656,37 @@ static int pxa_udc_vbus_draw(struct usb_gadget *_gadget, unsigned mA)
- 	return -EOPNOTSUPP;
- }
- 
-+/**
-+ * pxa_udc_phy_event - Called by phy upon VBus event
-+ * @nb: notifier block
-+ * @action: phy action, is vbus connect or disconnect
-+ * @data: the usb_gadget structure in pxa_udc
-+ *
-+ * Called by the USB Phy when a cable connect or disconnect is sensed.
-+ *
-+ * Returns 0
-+ */
-+static int pxa_udc_phy_event(struct notifier_block *nb, unsigned long action,
-+			     void *data)
-+{
-+	struct usb_gadget *gadget = data;
-+
-+	switch (action) {
-+	case USB_EVENT_VBUS:
-+		usb_gadget_vbus_connect(gadget);
-+		return NOTIFY_OK;
-+	case USB_EVENT_NONE:
-+		usb_gadget_vbus_disconnect(gadget);
-+		return NOTIFY_OK;
-+	default:
-+		return NOTIFY_DONE;
-+	}
-+}
-+
-+static struct notifier_block pxa27x_udc_phy = {
-+	.notifier_call = pxa_udc_phy_event,
-+};
-+
- static int pxa27x_udc_start(struct usb_gadget *g,
- 		struct usb_gadget_driver *driver);
- static int pxa27x_udc_stop(struct usb_gadget *g);
-@@ -2435,7 +2467,14 @@ static int pxa_udc_probe(struct platform_device *pdev)
- 		return udc->irq;
- 
- 	udc->dev = &pdev->dev;
--	udc->transceiver = usb_get_phy(USB_PHY_TYPE_USB2);
-+	if (of_have_populated_dt()) {
-+		udc->transceiver =
-+			devm_usb_get_phy_by_phandle(udc->dev, "phys", 0);
-+		if (IS_ERR(udc->transceiver))
-+			return PTR_ERR(udc->transceiver);
-+	} else {
-+		udc->transceiver = usb_get_phy(USB_PHY_TYPE_USB2);
-+	}
- 
- 	if (IS_ERR(udc->gpiod)) {
- 		dev_err(&pdev->dev, "Couldn't find or request D+ gpio : %ld\n",
-@@ -2468,14 +2507,20 @@ static int pxa_udc_probe(struct platform_device *pdev)
- 		goto err;
- 	}
- 
-+	if (!IS_ERR_OR_NULL(udc->transceiver))
-+		usb_register_notifier(udc->transceiver, &pxa27x_udc_phy);
- 	retval = usb_add_gadget_udc(&pdev->dev, &udc->gadget);
- 	if (retval)
--		goto err;
-+		goto err_add_gadget;
- 
- 	pxa_init_debugfs(udc);
- 	if (should_enable_udc(udc))
- 		udc_enable(udc);
- 	return 0;
-+
-+err_add_gadget:
-+	if (!IS_ERR_OR_NULL(udc->transceiver))
-+		usb_unregister_notifier(udc->transceiver, &pxa27x_udc_phy);
- err:
- 	clk_unprepare(udc->clk);
- 	return retval;
-@@ -2492,6 +2537,8 @@ static int pxa_udc_remove(struct platform_device *_dev)
- 	usb_del_gadget_udc(&udc->gadget);
- 	pxa_cleanup_debugfs(udc);
- 
-+	if (!IS_ERR_OR_NULL(udc->transceiver))
-+		usb_unregister_notifier(udc->transceiver, &pxa27x_udc_phy);
- 	usb_put_phy(udc->transceiver);
- 
- 	udc->transceiver = NULL;
+If there are no objections, I can take it through Samsung SoC tree.
+---
+ arch/arm64/configs/defconfig | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
+
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index c05b8badec2c..fe6d6c34323a 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -183,6 +183,7 @@ CONFIG_SPI_ORION=y
+ CONFIG_SPI_PL022=y
+ CONFIG_SPI_QUP=y
+ CONFIG_SPI_SPIDEV=m
++CONFIG_SPI_S3C64XX=y
+ CONFIG_SPMI=y
+ CONFIG_PINCTRL_SINGLE=y
+ CONFIG_PINCTRL_MSM8916=y
+@@ -202,6 +203,7 @@ CONFIG_THERMAL_EMULATION=y
+ CONFIG_EXYNOS_THERMAL=y
+ CONFIG_WATCHDOG=y
+ CONFIG_RENESAS_WDT=y
++CONFIG_S3C2410_WATCHDOG=y
+ CONFIG_MFD_SPMI_PMIC=y
+ CONFIG_MFD_SEC_CORE=y
+ CONFIG_MFD_HI655X_PMIC=y
+@@ -221,18 +223,22 @@ CONFIG_SOUND=y
+ CONFIG_SND=y
+ CONFIG_SND_SOC=y
+ CONFIG_SND_SOC_RCAR=y
++CONFIG_SND_SOC_SAMSUNG=y
+ CONFIG_SND_SOC_AK4613=y
+ CONFIG_USB=y
+ CONFIG_USB_OTG=y
+ CONFIG_USB_XHCI_HCD=y
+ CONFIG_USB_XHCI_RCAR=y
++CONFIG_USB_EHCI_EXYNOS=y
+ CONFIG_USB_EHCI_HCD=y
+ CONFIG_USB_EHCI_MSM=y
+ CONFIG_USB_EHCI_HCD_PLATFORM=y
++CONFIG_USB_OHCI_EXYNOS=y
+ CONFIG_USB_OHCI_HCD=y
+ CONFIG_USB_OHCI_HCD_PLATFORM=y
+ CONFIG_USB_STORAGE=y
+ CONFIG_USB_DWC2=y
++CONFIG_USB_DWC3=y
+ CONFIG_USB_CHIPIDEA=y
+ CONFIG_USB_CHIPIDEA_UDC=y
+ CONFIG_USB_CHIPIDEA_HOST=y
+@@ -304,6 +310,10 @@ CONFIG_PHY_HI6220_USB=y
+ CONFIG_PHY_XGENE=y
+ CONFIG_ARM_SCPI_PROTOCOL=y
+ CONFIG_ACPI=y
++CONFIG_IIO=y
++CONFIG_EXYNOS_ADC=y
++CONFIG_PWM=y
++CONFIG_PWM_SAMSUNG=y
+ CONFIG_EXT2_FS=y
+ CONFIG_EXT3_FS=y
+ CONFIG_FANOTIFY=y
 -- 
-2.1.4
+2.7.4
