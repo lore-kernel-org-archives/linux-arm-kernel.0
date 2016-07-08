@@ -1,40 +1,48 @@
-From: cmetcalf@mellanox.com (Chris Metcalf)
-Date: Fri, 8 Jul 2016 12:11:56 -0400
-Subject: [PATCH]: arm64: factor work_pending state machine to C
-In-Reply-To: <20160708154901.GF6493@arm.com>
-References: <1459877922-15512-1-git-send-email-cmetcalf@mellanox.com>
- <1459877922-15512-13-git-send-email-cmetcalf@mellanox.com>
- <e19d6de0-c754-d53b-3420-16d460a4cb33@mellanox.com>
- <20160708154901.GF6493@arm.com>
-Message-ID: <6e652143-841d-a73d-0184-a7be417cecd5@mellanox.com>
+From: mturquette@baylibre.com (Michael Turquette)
+Date: Fri, 08 Jul 2016 09:13:32 -0700
+Subject: [PATCH v2 5/7] spi: s3c64xx: add exynos5433 compatible for ioclk
+ handling
+In-Reply-To: <1467989201-14661-6-git-send-email-andi.shyti@samsung.com>
+References: <1467989201-14661-1-git-send-email-andi.shyti@samsung.com>
+ <1467989201-14661-6-git-send-email-andi.shyti@samsung.com>
+Message-ID: <146799441227.73491.13833003558807352160@resonance>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7/8/2016 11:49 AM, Will Deacon wrote:
-> Hi Chris,
->
-> On Fri, Jul 08, 2016 at 11:43:50AM -0400, Chris Metcalf wrote:
->> Ping!
->>
->> I am hopeful that this patch [1] can be picked up for the 4.8 merge window
->> in the arm64 tree.  As I mentioned in my last patch series that included
->> this patch [2], I'm hopeful that this version addresses the performance
->> issues that were seen with Mark's original patch.  This version tests the
->> TIF flags prior to calling out to the loop in C code.
-> I still need to get round to measuring that again. This might also
-> conflict with a late fix I just sent for 4.7.
->
-> Is your task isolation series all ready apart from this? It seems like
-> there's still discussion over there.
+Quoting Andi Shyti (2016-07-08 07:46:39)
+> @@ -1147,6 +1150,21 @@ static int s3c64xx_spi_probe(struct platform_device *pdev)
+>                 goto err_disable_clk;
+>         }
+>  
+> +       if (sdd->port_conf->clk_ioclk) {
+> +               sdd->ioclk = devm_clk_get(&pdev->dev, "spi_ioclk");
+> +               if (IS_ERR(sdd->ioclk)) {
+> +                       dev_err(&pdev->dev, "Unable to acquire 'ioclk'\n");
+> +                       ret = PTR_ERR(sdd->ioclk);
+> +                       goto err_disable_src_clk;
+> +               }
+> +
+> +               ret = clk_prepare_enable(sdd->ioclk);
+> +               if (ret) {
+> +                       dev_err(&pdev->dev, "Couldn't enable clock 'ioclk'\n");
+> +                       goto err_disable_src_clk;
+> +               }
+> +       }
+> +
+>         pm_runtime_set_autosuspend_delay(&pdev->dev, AUTOSUSPEND_TIMEOUT);
+>         pm_runtime_use_autosuspend(&pdev->dev);
+>         pm_runtime_set_active(&pdev->dev);
+> @@ -1193,6 +1211,8 @@ err_pm_put:
+>         pm_runtime_disable(&pdev->dev);
+>         pm_runtime_set_suspended(&pdev->dev);
+>  
+> +       clk_disable_unprepare(sdd->ioclk);
+> +err_disable_src_clk:
+>         clk_disable_unprepare(sdd->src_clk);
+>  err_disable_clk:
+>         clk_disable_unprepare(sdd->clk);
 
-No, discussion of task isolation is still ongoing.  Alas :-)
+Why aren't these clocks enabled/disabled by calls to pm_runtime_get/put?
 
-I'm trying to pick off low-hanging fruit where possible - I think this refactoring
-is independently good for arm64 regardless of whether task isolation makes it in for
-the 4.8 merge window or not, so figured I'd break it out.
-
-If you get a chance to remeasure, that will be great.  Thanks!
-
--- 
-Chris Metcalf, Mellanox Technologies
-http://www.mellanox.com
+Regards,
+Mike
