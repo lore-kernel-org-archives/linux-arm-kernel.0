@@ -1,33 +1,37 @@
-From: weiyj_lk@163.com (weiyj_lk at 163.com)
-Date: Fri,  8 Jul 2016 13:41:33 +0000
-Subject: [PATCH -next] ASoC: mediatek: mt2701: cHECK-fix non static symbol
- warning
-Message-ID: <1467985293-9041-1-git-send-email-weiyj_lk@163.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 8 Jul 2016 14:44:17 +0100
+Subject: [PATCH 2/2] i2c: versatile: Convert to use resource managed
+ devm_* APIs
+In-Reply-To: <1467640573.23717.3.camel@arm.com>
+References: <1460644236.6039.2.camel@ingics.com>
+ <1460644306.6039.3.camel@ingics.com>
+ <CAFRkauAarcYw6tCvM0_1VL-Wpf_OeLY=LEiR33DnQ1Q+2_C_KQ@mail.gmail.com>
+ <1467640573.23717.3.camel@arm.com>
+Message-ID: <20160708134417.GF3784@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+On Mon, Jul 04, 2016 at 02:56:13PM +0100, Pawel Moll wrote:
+> Dnia 2016-06-25, Sat o godzinie 09:41 +0800, Axel Lin pisze:
+> > 2016-04-14 22:31 GMT+08:00 Axel Lin <axel.lin@ingics.com>:
+> > > Use devm_* APIs to simplify the code a bit.
+> > > This patch also fixes the memory leak when unload the module.
+> > > 
+> > > Signed-off-by: Axel Lin <axel.lin@ingics.com>
+> > > ---
+> > > Hi,
+> > > I don't have this h/w, I'd appreciate if someone can test this
+> > > patch.
+> > 
+> > Obviously the module unload path has memory leak.
+> > Just wondering if anyone can review/test this patch.
+> 
+> Gentlemen? (referring to the VE maintainers here)
+> 
+> Original thread: thread.gmane.org/gmane.linux.drivers.i2c/27277
 
-Fixes the following sparse warning:
+We weren't CC'ed, thanks for the heads-up anyway we will have a
+look and test shortly (@Axel next time please CC us if you want
+us to test your patches, thanks).
 
-sound/soc/mediatek/mt2701/mt2701-afe-pcm.c:72:5: warning:
- symbol 'mt2701_dai_num_to_i2s' was not declared. Should it be static?
-
-Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
----
- sound/soc/mediatek/mt2701/mt2701-afe-pcm.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c b/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c
-index 15522c0..34a6123 100644
---- a/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c
-+++ b/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c
-@@ -69,7 +69,7 @@ static const struct mt2701_afe_rate mt2701_afe_i2s_rates[] = {
- 	{ .rate = 352800, .regvalue = 24 },
- };
- 
--int mt2701_dai_num_to_i2s(struct mtk_base_afe *afe, int num)
-+static int mt2701_dai_num_to_i2s(struct mtk_base_afe *afe, int num)
- {
- 	int val = num - MT2701_IO_I2S;
- 
+Lorenzo
