@@ -1,30 +1,33 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 8 Jul 2016 22:23:49 +0200
-Subject: [PATCH v2 1/7] bindings: spi-samsung: add exynos5433 spi
- compatible
-In-Reply-To: <1467989201-14661-2-git-send-email-andi.shyti@samsung.com>
-References: <1467989201-14661-1-git-send-email-andi.shyti@samsung.com>
- <1467989201-14661-2-git-send-email-andi.shyti@samsung.com>
-Message-ID: <20160708202349.GA25980@kozik-lap>
+From: duwe@lst.de (Torsten Duwe)
+Date: Fri, 8 Jul 2016 22:24:55 +0200
+Subject: [PATCH v2 1/2] arm64: implement FTRACE_WITH_REGS
+In-Reply-To: <20160708115710.5c657b5f@gandalf.local.home>
+References: <20160627151500.2247A68D20@newverein.lst.de>
+ <20160627151717.BD25468D26@newverein.lst.de>
+ <20160708145800.GE3556@pathway.suse.cz>
+ <20160708150709.GA8979@lst.de>
+ <20160708152421.GG3556@pathway.suse.cz>
+ <20160708154824.ikq45dgk2auigqn7@treble>
+ <20160708115710.5c657b5f@gandalf.local.home>
+Message-ID: <20160708202455.GA4580@lst.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 08, 2016 at 11:46:35PM +0900, Andi Shyti wrote:
-> The samsung,exynos5433-spi has some peculiarities that bring the
-> need of creating a new compatible in the binding.
-> 
-> One of those is the 3-clocks controller management where the spi
-> is fed with three clocks: "spi", "busclkN" and "ioclk".
-> 
-> By adding the exynos5433-spi, we deprecate the exynos7 compatible
-> and discourage its use.
-> 
-> Signed-off-by: Andi Shyti <andi.shyti@samsung.com>
-> ---
->  Documentation/devicetree/bindings/spi/spi-samsung.txt | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
+On Fri, Jul 08, 2016 at 11:57:10AM -0400, Steven Rostedt wrote:
+> On Fri, 8 Jul 2016 10:48:24 -0500
+> Josh Poimboeuf <jpoimboe@redhat.com> wrote:
+> > 
+> > Here, with -fprolog-pad, it's already a nop, so no change is needed.
+> > 
 
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Yes, exactly.
 
-Best regards,
-Krzysztof
+> That's what I was thinking. But as I stated in another email (probably
+> in the air when you wrote this), the call to ftrace_modify_code() may be
+> completely circumvented by ftrace_make_nop() if the addr is MCOUNT_ADDR.
+
+Only on the _first_ invocation. Later on, tracing can be switched on and off,
+and then the instructions need to be changed just like with fentry (or
+profile-kernel ;-)
+
+	Torsten
