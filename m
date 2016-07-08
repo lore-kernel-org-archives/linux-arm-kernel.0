@@ -1,70 +1,111 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 8 Jul 2016 18:06:42 +0100
-Subject: [PATCH v4 1/8] arm64: mm: change IOMMU notifier action to attach
- DMA ops
-In-Reply-To: <20160708145521.GD6493@arm.com>
-References: <cover.1467388950.git.robin.murphy@arm.com>
- <06d430a86f5d7f461308a9278bf25f40fb50d93c.1467388950.git.robin.murphy@arm.com>
- <20160708145521.GD6493@arm.com>
-Message-ID: <20160708170642.GD22099@e104818-lin.cambridge.arm.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Fri,  8 Jul 2016 18:07:51 +0100
+Subject: [PATCH v9 0/7] ACPI / processor_idle: Add ACPI v6.0 LPI support
+Message-ID: <1467997678-7107-1-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 08, 2016 at 03:55:21PM +0100, Will Deacon wrote:
-> On Fri, Jul 01, 2016 at 05:50:10PM +0100, Robin Murphy wrote:
-> > From: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > 
-> > Current bus notifier in ARM64 (__iommu_attach_notifier)
-> > attempts to attach dma_ops to a device on BUS_NOTIFY_ADD_DEVICE
-> > action notification.
-> > 
-> > This will cause issues on ACPI based systems, where PCI devices
-> > can be added before the IOMMUs the devices are attached to
-> > had a chance to be probed, causing failures on attempts to
-> > attach dma_ops in that the domain for the respective IOMMU
-> > may not be set-up yet by the time the bus notifier is run.
-> > 
-> > Devices dma_ops do not require to be set-up till the matching
-> > device drivers are probed. This means that instead of running
-> > the notifier attaching dma_ops to devices (__iommu_attach_notifier)
-> > on BUS_NOTIFY_ADD_DEVICE action, it can be run just before the
-> > device driver is bound to the device in question (on action
-> > BUS_NOTIFY_BIND_DRIVER) so that it is certain that its IOMMU
-> > group and domain are set-up accordingly at the time the
-> > notifier is triggered.
-> > 
-> > This patch changes the notifier action upon which dma_ops
-> > are attached to devices and defer it to driver binding time,
-> > so that IOMMU devices have a chance to be probed and to register
-> > their bus notifiers before the dma_ops attach sequence for a
-> > device is actually carried out.
-> > 
-> > As a result we also no longer need worry about racing with
-> > iommu_bus_notifier(), or about retrying the queue in case devices
-> > were added too early on DT-based systems, so clean up the notifier
-> > itself plus the additional workaround from 722ec35f7fae ("arm64:
-> > dma-mapping: fix handling of devices registered before arch_initcall")
-> > 
-> > Cc: Will Deacon <will.deacon@arm.com>
-> > Cc: Catalin Marinas <catalin.marinas@arm.com>
-> > Cc: Marek Szyprowski <m.szyprowski@samsung.com>
-> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > [rm: get rid of other now-redundant bits]
-> > Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-> > ---
-> > 
-> > v4: No change.
-> > 
-> >  arch/arm64/mm/dma-mapping.c | 22 +++++-----------------
-> >  1 file changed, 5 insertions(+), 17 deletions(-)
-> 
-> Whilst this series is unlikely to make it for 4.8, this patch is
-> independent and it would be good to see it queued in the arm64 tree for
-> 4.8, if possible. It shouldn't change anything on its own, but it's a
-> prerequisite for this series and anything on the IORT side from Lorenzo,
-> so it makes sense to me to keep the delta down if we can.
+ACPI 6.0 introduced LPI(Low Power Idle) states that provides an alternate
+method to describe processor idle states. It extends the specification
+to allow the expression of idle states like C-states selectable by the
+OSPM when a processor goes idle, but may affect more than one processor,
+and may affect other system components.
 
-I queued it for 4.8. Thanks.
+LPI extensions leverages the processor container device(again introduced
+in ACPI 6.0) allowing to express which parts of the system are affected
+by a given LPI state. It defines the local power states for each node
+in a hierarchical processor topology. The OSPM can use _LPI object to
+select a local power state for each level of processor hierarchy in the
+system. They used to produce a composite power state request that is
+presented to the platform by the OSPM.
+
+Since multiple processors affect the idle state for any non-leaf hierarchy
+node, coordination of idle state requests between the processors is
+required. ACPI supports two different coordination schemes: Platform
+coordinated and  OS initiated.
+
+This series aims at providing basic and initial support for platform
+coordinated LPI states.
+
+v8[8]->v9:
+	- Split the psci and arm64 changes into separate patches as
+	  suggested by Lorenzo and added his ACKs
+	- Renamed CPU_IDLE_ENTER_WRAPPED to CPU_PM_CPU_IDLE_ENTER
+
+v7[7]->v8:
+	- Replaced HAVE_GENERIC_CPUIDLE_ENTER with CPU_IDLE_ENTER_WRAPPED
+	  macro, which is more cleaner and definately less confusing :)
+	  (Thanks to Rafael for the suggestion)
+
+v6[6]->v7:
+	- Removed cpuidle-arm.h and introduced HAVE_GENERIC_CPUIDLE_ENTER
+	  and move the common code to cpuidle_generic_enter{,_state}
+	- Factored out common code between psci_{dt,acpi}_cpu_init_idle
+
+v5[5]->v6:
+	- Added support for autopromotable state by not flattening them
+	- Moved arm_enter_idle_state to cpuidle-arm.h as it can be reused
+	  in ARM64 backend for ACPI LPI
+	- Other review comments(mainly for ARM64 from Lorenzo)
+	- Dropped support for skipping PM notifier as it needs to be fixed
+	  in GICv3 code(will be done separately)
+
+v4[4]->v5:
+	- Addressed all the comments from Rafael
+	- Added support for retention mode(Prashant)
+	- Handled acpi_processor_get_power_info return value correctly(Vikas)
+	- Dropped __init from arm_cpuidle_init
+	- Merged psci prepartory patch into arm64 lpi support
+
+v3[3]->v4:
+	- Dropped the preparatory patches that are merged already
+	- Added ARM64 arch specific callback implementations
+	- Addressed most of the review comments from Rafael
+
+v2[2]->v3:
+        - rebased against v4.4-rc3
+        - fixed couple of issues reported by Prashanth and review comments
+          from Ashwin
+
+v1[1]->v2[2]:
+        - Fixed support for ACPI0010 processor container
+        - moved sleep state code out of processor_idle
+
+Code is also available @[9]
+
+Regards,
+Sudeep
+
+[1] http://marc.info/?l=linux-acpi&m=143871041601132&w=2
+[2] http://marc.info/?l=linux-acpi&m=144241209800788&w=2
+[3] http://marc.info/?l=linux-acpi&m=144906557814813&w=2
+[4] http://marc.info/?l=linux-acpi&m=146106902731359&w=2
+[5] http://marc.info/?l=linux-acpi&m=146298107608349&w=2
+[6] http://marc.info/?l=linux-acpi&m=146591573516602&w=2
+[7] http://marc.info/?l=linux-acpi&m=146712226917361&w=2
+[8] http://marc.info/?l=linux-acpi&m=146791146605094&w=2
+[9] git://git.kernel.org/pub/scm/linux/kernel/git/sudeep.holla/linux.git for_review/arm64_lpi
+
+Sudeep Holla (7):
+  ACPI / processor_idle: introduce ACPI_PROCESSOR_CSTATE
+  ACPI / processor_idle: Add support for Low Power Idle(LPI) states
+  arm64: cpuidle: drop __init section marker to arm_cpuidle_init
+  cpuidle: introduce CPU_PM_CPU_IDLE_ENTER macro for ARM{32,64}
+  drivers: firmware: psci: initialise idle states using ACPI LPI
+  arm64: add support for ACPI Low Power Idle(LPI)
+  ACPI : enable ACPI_PROCESSOR_IDLE on ARM64
+
+ arch/arm64/kernel/cpuidle.c     |  20 +-
+ drivers/acpi/Kconfig            |   6 +-
+ drivers/acpi/bus.c              |  14 +-
+ drivers/acpi/processor_driver.c |   2 +-
+ drivers/acpi/processor_idle.c   | 544 ++++++++++++++++++++++++++++++++++------
+ drivers/cpuidle/cpuidle-arm.c   |  26 +-
+ drivers/firmware/psci.c         |  66 ++++-
+ include/acpi/processor.h        |  26 +-
+ include/linux/acpi.h            |   4 +
+ include/linux/cpuidle.h         |  18 ++
+ 10 files changed, 611 insertions(+), 115 deletions(-)
 
 -- 
-Catalin
+2.7.4
