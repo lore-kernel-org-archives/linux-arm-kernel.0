@@ -1,159 +1,98 @@
 From: dave.long@linaro.org (David Long)
-Date: Fri,  8 Jul 2016 12:35:46 -0400
-Subject: [PATCH v15 02/10] arm64: Add more test functions to insn.c
+Date: Fri,  8 Jul 2016 12:35:50 -0400
+Subject: [PATCH v15 06/10] arm64: Treat all entry code as non-kprobe-able
 In-Reply-To: <1467995754-32508-1-git-send-email-dave.long@linaro.org>
 References: <1467995754-32508-1-git-send-email-dave.long@linaro.org>
-Message-ID: <1467995754-32508-3-git-send-email-dave.long@linaro.org>
+Message-ID: <1467995754-32508-7-git-send-email-dave.long@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "David A. Long" <dave.long@linaro.org>
+From: Pratyush Anand <panand@redhat.com>
 
-Certain instructions are hard to execute correctly out-of-line (as in
-kprobes).  Test functions are added to insn.[hc] to identify these.  The
-instructions include any that use PC-relative addressing, change the PC,
-or change interrupt masking. For efficiency and simplicity test
-functions are also added for small collections of related instructions.
+Entry symbols are not kprobe safe. So blacklist them for kprobing.
 
+Signed-off-by: Pratyush Anand <panand@redhat.com>
 Signed-off-by: David A. Long <dave.long@linaro.org>
 Acked-by: Masami Hiramatsu <mhiramat@kernel.org>
 ---
- arch/arm64/include/asm/insn.h | 36 ++++++++++++++++++++++++++++++++++++
- arch/arm64/kernel/insn.c      | 34 ++++++++++++++++++++++++++++++++++
- 2 files changed, 70 insertions(+)
+ arch/arm64/kernel/entry.S          |  3 +++
+ arch/arm64/kernel/probes/kprobes.c | 26 ++++++++++++++++++++++++++
+ arch/arm64/kernel/vmlinux.lds.S    |  1 +
+ 3 files changed, 30 insertions(+)
 
-diff --git a/arch/arm64/include/asm/insn.h b/arch/arm64/include/asm/insn.h
-index 30e50eb..497f7a2 100644
---- a/arch/arm64/include/asm/insn.h
-+++ b/arch/arm64/include/asm/insn.h
-@@ -120,6 +120,29 @@ enum aarch64_insn_register {
- 	AARCH64_INSN_REG_SP = 31  /* Stack pointer: as load/store base reg */
- };
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index 12e8d2b..7d99bed 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -243,6 +243,7 @@ tsk	.req	x28		// current thread_info
+  * Exception vectors.
+  */
  
-+enum aarch64_insn_special_register {
-+	AARCH64_INSN_SPCLREG_SPSR_EL1	= 0xC200,
-+	AARCH64_INSN_SPCLREG_ELR_EL1	= 0xC201,
-+	AARCH64_INSN_SPCLREG_SP_EL0	= 0xC208,
-+	AARCH64_INSN_SPCLREG_SPSEL	= 0xC210,
-+	AARCH64_INSN_SPCLREG_CURRENTEL	= 0xC212,
-+	AARCH64_INSN_SPCLREG_DAIF	= 0xDA11,
-+	AARCH64_INSN_SPCLREG_NZCV	= 0xDA10,
-+	AARCH64_INSN_SPCLREG_FPCR	= 0xDA20,
-+	AARCH64_INSN_SPCLREG_DSPSR_EL0	= 0xDA28,
-+	AARCH64_INSN_SPCLREG_DLR_EL0	= 0xDA29,
-+	AARCH64_INSN_SPCLREG_SPSR_EL2	= 0xE200,
-+	AARCH64_INSN_SPCLREG_ELR_EL2	= 0xE201,
-+	AARCH64_INSN_SPCLREG_SP_EL1	= 0xE208,
-+	AARCH64_INSN_SPCLREG_SPSR_INQ	= 0xE218,
-+	AARCH64_INSN_SPCLREG_SPSR_ABT	= 0xE219,
-+	AARCH64_INSN_SPCLREG_SPSR_UND	= 0xE21A,
-+	AARCH64_INSN_SPCLREG_SPSR_FIQ	= 0xE21B,
-+	AARCH64_INSN_SPCLREG_SPSR_EL3	= 0xF200,
-+	AARCH64_INSN_SPCLREG_ELR_EL3	= 0xF201,
-+	AARCH64_INSN_SPCLREG_SP_EL2	= 0xF210
-+};
++	.pushsection ".entry.text", "ax"
+ 	.align	11
+ ENTRY(vectors)
+ 	ventry	el1_sync_invalid		// Synchronous EL1t
+@@ -781,3 +782,5 @@ ENTRY(sys_rt_sigreturn_wrapper)
+ 	mov	x0, sp
+ 	b	sys_rt_sigreturn
+ ENDPROC(sys_rt_sigreturn_wrapper)
 +
- enum aarch64_insn_variant {
- 	AARCH64_INSN_VARIANT_32BIT,
- 	AARCH64_INSN_VARIANT_64BIT
-@@ -223,8 +246,13 @@ static __always_inline bool aarch64_insn_is_##abbr(u32 code) \
- static __always_inline u32 aarch64_insn_get_##abbr##_value(void) \
- { return (val); }
++	.popsection
+diff --git a/arch/arm64/kernel/probes/kprobes.c b/arch/arm64/kernel/probes/kprobes.c
+index 4496801..0fe2b65 100644
+--- a/arch/arm64/kernel/probes/kprobes.c
++++ b/arch/arm64/kernel/probes/kprobes.c
+@@ -30,6 +30,7 @@
+ #include <asm/insn.h>
+ #include <asm/uaccess.h>
+ #include <asm/irq.h>
++#include <asm-generic/sections.h>
  
-+__AARCH64_INSN_FUNCS(adr_adrp,	0x1F000000, 0x10000000)
-+__AARCH64_INSN_FUNCS(prfm_lit,	0xFF000000, 0xD8000000)
- __AARCH64_INSN_FUNCS(str_reg,	0x3FE0EC00, 0x38206800)
- __AARCH64_INSN_FUNCS(ldr_reg,	0x3FE0EC00, 0x38606800)
-+__AARCH64_INSN_FUNCS(ldr_lit,	0xBF000000, 0x18000000)
-+__AARCH64_INSN_FUNCS(ldrsw_lit,	0xFF000000, 0x98000000)
-+__AARCH64_INSN_FUNCS(exclusive,	0x3F800000, 0x08000000)
- __AARCH64_INSN_FUNCS(stp_post,	0x7FC00000, 0x28800000)
- __AARCH64_INSN_FUNCS(ldp_post,	0x7FC00000, 0x28C00000)
- __AARCH64_INSN_FUNCS(stp_pre,	0x7FC00000, 0x29800000)
-@@ -273,10 +301,15 @@ __AARCH64_INSN_FUNCS(svc,	0xFFE0001F, 0xD4000001)
- __AARCH64_INSN_FUNCS(hvc,	0xFFE0001F, 0xD4000002)
- __AARCH64_INSN_FUNCS(smc,	0xFFE0001F, 0xD4000003)
- __AARCH64_INSN_FUNCS(brk,	0xFFE0001F, 0xD4200000)
-+__AARCH64_INSN_FUNCS(exception,	0xFF000000, 0xD4000000)
- __AARCH64_INSN_FUNCS(hint,	0xFFFFF01F, 0xD503201F)
- __AARCH64_INSN_FUNCS(br,	0xFFFFFC1F, 0xD61F0000)
- __AARCH64_INSN_FUNCS(blr,	0xFFFFFC1F, 0xD63F0000)
- __AARCH64_INSN_FUNCS(ret,	0xFFFFFC1F, 0xD65F0000)
-+__AARCH64_INSN_FUNCS(eret,	0xFFFFFFFF, 0xD69F03E0)
-+__AARCH64_INSN_FUNCS(mrs,	0xFFF00000, 0xD5300000)
-+__AARCH64_INSN_FUNCS(msr_imm,	0xFFF8F01F, 0xD500401F)
-+__AARCH64_INSN_FUNCS(msr_reg,	0xFFF00000, 0xD5100000)
+ #include "decode-insn.h"
  
- #undef	__AARCH64_INSN_FUNCS
- 
-@@ -286,6 +319,8 @@ bool aarch64_insn_is_branch_imm(u32 insn);
- int aarch64_insn_read(void *addr, u32 *insnp);
- int aarch64_insn_write(void *addr, u32 insn);
- enum aarch64_insn_encoding_class aarch64_get_insn_class(u32 insn);
-+bool aarch64_insn_uses_literal(u32 insn);
-+bool aarch64_insn_is_branch(u32 insn);
- u64 aarch64_insn_decode_immediate(enum aarch64_insn_imm_type type, u32 insn);
- u32 aarch64_insn_encode_immediate(enum aarch64_insn_imm_type type,
- 				  u32 insn, u64 imm);
-@@ -367,6 +402,7 @@ bool aarch32_insn_is_wide(u32 insn);
- #define A32_RT_OFFSET	12
- #define A32_RT2_OFFSET	 0
- 
-+u32 aarch64_insn_extract_system_reg(u32 insn);
- u32 aarch32_insn_extract_reg_num(u32 insn, int offset);
- u32 aarch32_insn_mcr_extract_opc2(u32 insn);
- u32 aarch32_insn_mcr_extract_crm(u32 insn);
-diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
-index 368c082..28c6110f 100644
---- a/arch/arm64/kernel/insn.c
-+++ b/arch/arm64/kernel/insn.c
-@@ -162,6 +162,32 @@ static bool __kprobes __aarch64_insn_hotpatch_safe(u32 insn)
- 		aarch64_insn_is_nop(insn);
+@@ -519,6 +520,31 @@ int __kprobes longjmp_break_handler(struct kprobe *p, struct pt_regs *regs)
+ 	return 1;
  }
  
-+bool __kprobes aarch64_insn_uses_literal(u32 insn)
++bool arch_within_kprobe_blacklist(unsigned long addr)
 +{
-+	/* ldr/ldrsw (literal), prfm */
++	extern char __idmap_text_start[], __idmap_text_end[];
++	extern char __hyp_idmap_text_start[], __hyp_idmap_text_end[];
 +
-+	return aarch64_insn_is_ldr_lit(insn) ||
-+		aarch64_insn_is_ldrsw_lit(insn) ||
-+		aarch64_insn_is_adr_adrp(insn) ||
-+		aarch64_insn_is_prfm_lit(insn);
++	if ((addr >= (unsigned long)__kprobes_text_start &&
++	    addr < (unsigned long)__kprobes_text_end) ||
++	    (addr >= (unsigned long)__entry_text_start &&
++	    addr < (unsigned long)__entry_text_end) ||
++	    (addr >= (unsigned long)__idmap_text_start &&
++	    addr < (unsigned long)__idmap_text_end) ||
++	    !!search_exception_tables(addr))
++		return true;
++
++	if (!is_kernel_in_hyp_mode()) {
++		if ((addr >= (unsigned long)__hyp_text_start &&
++		    addr < (unsigned long)__hyp_text_end) ||
++		    (addr >= (unsigned long)__hyp_idmap_text_start &&
++		    addr < (unsigned long)__hyp_idmap_text_end))
++			return true;
++	}
++
++	return false;
 +}
 +
-+bool __kprobes aarch64_insn_is_branch(u32 insn)
-+{
-+	/* b, bl, cb*, tb*, b.cond, br, blr */
-+
-+	return aarch64_insn_is_b(insn) ||
-+		aarch64_insn_is_bl(insn) ||
-+		aarch64_insn_is_cbz(insn) ||
-+		aarch64_insn_is_cbnz(insn) ||
-+		aarch64_insn_is_tbz(insn) ||
-+		aarch64_insn_is_tbnz(insn) ||
-+		aarch64_insn_is_ret(insn) ||
-+		aarch64_insn_is_br(insn) ||
-+		aarch64_insn_is_blr(insn) ||
-+		aarch64_insn_is_bcond(insn);
-+}
-+
- /*
-  * ARM Architecture Reference Manual for ARMv8 Profile-A, Issue A.a
-  * Section B2.6.5 "Concurrent modification and execution of instructions":
-@@ -1175,6 +1201,14 @@ u32 aarch64_set_branch_offset(u32 insn, s32 offset)
- 	BUG();
- }
- 
-+/*
-+ * Extract the Op/CR data from a msr/mrs instruction.
-+ */
-+u32 aarch64_insn_extract_system_reg(u32 insn)
-+{
-+	return (insn & 0x1FFFE0) >> 5;
-+}
-+
- bool aarch32_insn_is_wide(u32 insn)
+ int __init arch_init_kprobes(void)
  {
- 	return insn >= 0xe800;
+ 	return 0;
+diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
+index 075ce32..9f59394 100644
+--- a/arch/arm64/kernel/vmlinux.lds.S
++++ b/arch/arm64/kernel/vmlinux.lds.S
+@@ -118,6 +118,7 @@ SECTIONS
+ 			__exception_text_end = .;
+ 			IRQENTRY_TEXT
+ 			SOFTIRQENTRY_TEXT
++			ENTRY_TEXT
+ 			TEXT_TEXT
+ 			SCHED_TEXT
+ 			LOCK_TEXT
 -- 
 2.5.0
