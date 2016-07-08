@@ -1,18 +1,59 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Fri, 8 Jul 2016 11:12:12 -0700
-Subject: [PATCH v2 6/6] dt-bindings: net: bgmac: add bindings
- documentation for bgmac
-In-Reply-To: <1467932938-21819-7-git-send-email-jon.mason@broadcom.com>
-References: <1467932938-21819-1-git-send-email-jon.mason@broadcom.com>
- <1467932938-21819-7-git-send-email-jon.mason@broadcom.com>
-Message-ID: <577FECFC.7040706@gmail.com>
+From: mingo@kernel.org (Ingo Molnar)
+Date: Fri, 8 Jul 2016 20:23:44 +0200
+Subject: [PATCH 0/9] mm: Hardened usercopy
+In-Reply-To: <CA+55aFzv4kQitzhWgxRAi5XXM30f70d4dbTGkr7t=fZSh4r3Ow@mail.gmail.com>
+References: <1467843928-29351-1-git-send-email-keescook@chromium.org>
+ <20160708084639.GA4562@gmail.com>
+ <CA+55aFzv4kQitzhWgxRAi5XXM30f70d4dbTGkr7t=fZSh4r3Ow@mail.gmail.com>
+Message-ID: <20160708182344.GC4429@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/07/2016 04:08 PM, Jon Mason wrote:
-> Signed-off-by: Jon Mason <jon.mason@broadcom.com>
 
-Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
-Tested-by: Florian Fainelli <f.fainelli@gmail.com>
--- 
-Florian
+* Linus Torvalds <torvalds@linux-foundation.org> wrote:
+
+> On Fri, Jul 8, 2016 at 1:46 AM, Ingo Molnar <mingo@kernel.org> wrote:
+> >
+> > Could you please try to find some syscall workload that does many small user
+> > copies and thus excercises this code path aggressively?
+> 
+> Any stat()-heavy path will hit cp_new_stat() very heavily. Think the
+> usual kind of "traverse the whole tree looking for something". "git
+> diff" will do it, just checking that everything is up-to-date.
+> 
+> That said, other things tend to dominate.
+
+So I think a cached 'find /usr >/dev/null' might be a good one as well:
+
+ triton:~/tip> strace -c find /usr >/dev/null
+ % time     seconds  usecs/call     calls    errors syscall
+ ------ ----------- ----------- --------- --------- ----------------
+  47.09    0.006518           0    254697           newfstatat
+  26.20    0.003627           0    254795           getdents
+  14.45    0.002000           0   1147411           fcntl
+   7.33    0.001014           0    509811           close
+   3.28    0.000454           0    128220         1 openat
+   1.52    0.000210           0    128230           fstat
+   0.27    0.000016           0     12810           write
+   0.00    0.000000           0        10           read
+
+ triton:~/tip> perf stat --repeat 3 -e cycles:u,cycles:k,cycles find /usr >/dev/null
+
+ Performance counter stats for 'find /usr' (3 runs):
+
+     1,594,437,143      cycles:u                                                      ( +-  2.76% )
+     2,570,544,009      cycles:k                                                      ( +-  2.50% )
+     4,164,981,152      cycles                                                        ( +-  2.59% )
+
+       0.929883686 seconds time elapsed                                          ( +-  2.57% )
+
+... and it's dominated by kernel overhead, with a fair amount of memcpy overhead 
+as well:
+
+   1.22%  find     [kernel.kallsyms]   [k] copy_user_enhanced_fast_string                                                                                                            
+
+But maybe there are simple shell commands that are even more user-memcpy intense? 
+
+Thanks,
+
+	Ingo
