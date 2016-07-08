@@ -1,209 +1,242 @@
 From: dave.long@linaro.org (David Long)
-Date: Fri,  8 Jul 2016 12:35:47 -0400
-Subject: [PATCH v15 03/10] arm64: add conditional instruction simulation
- support
+Date: Fri,  8 Jul 2016 12:35:45 -0400
+Subject: [PATCH v15 01/10] arm64: Add HAVE_REGS_AND_STACK_ACCESS_API feature
 In-Reply-To: <1467995754-32508-1-git-send-email-dave.long@linaro.org>
 References: <1467995754-32508-1-git-send-email-dave.long@linaro.org>
-Message-ID: <1467995754-32508-4-git-send-email-dave.long@linaro.org>
+Message-ID: <1467995754-32508-2-git-send-email-dave.long@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: "David A. Long" <dave.long@linaro.org>
 
-Cease using the arm32 arm_check_condition() function and replace it with
-a local version for use in deprecated instruction support on arm64. Also
-make the function table used by this available for future use by kprobes
-and/or uprobes.
+Add HAVE_REGS_AND_STACK_ACCESS_API feature for arm64, including supporting
+functions and defines.
 
-This function is derived from code written by Sandeepa Prabhu.
-
-Signed-off-by: Sandeepa Prabhu <sandeepa.s.prabhu@gmail.com>
 Signed-off-by: David A. Long <dave.long@linaro.org>
 Acked-by: Masami Hiramatsu <mhiramat@kernel.org>
 ---
- arch/arm64/include/asm/insn.h        |  3 ++
- arch/arm64/kernel/Makefile           |  3 +-
- arch/arm64/kernel/armv8_deprecated.c | 19 ++++++-
- arch/arm64/kernel/insn.c             | 98 ++++++++++++++++++++++++++++++++++++
- 4 files changed, 119 insertions(+), 4 deletions(-)
+ arch/arm64/Kconfig              |   1 +
+ arch/arm64/include/asm/ptrace.h |  52 ++++++++++++++++++
+ arch/arm64/kernel/ptrace.c      | 118 ++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 171 insertions(+)
 
-diff --git a/arch/arm64/include/asm/insn.h b/arch/arm64/include/asm/insn.h
-index 497f7a2..a44abbd 100644
---- a/arch/arm64/include/asm/insn.h
-+++ b/arch/arm64/include/asm/insn.h
-@@ -406,6 +406,9 @@ u32 aarch64_insn_extract_system_reg(u32 insn);
- u32 aarch32_insn_extract_reg_num(u32 insn, int offset);
- u32 aarch32_insn_mcr_extract_opc2(u32 insn);
- u32 aarch32_insn_mcr_extract_crm(u32 insn);
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 5a0a691..fab133c 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -85,6 +85,7 @@ config ARM64
+ 	select HAVE_PERF_EVENTS
+ 	select HAVE_PERF_REGS
+ 	select HAVE_PERF_USER_STACK_DUMP
++	select HAVE_REGS_AND_STACK_ACCESS_API
+ 	select HAVE_RCU_TABLE_FREE
+ 	select HAVE_SYSCALL_TRACEPOINTS
+ 	select IOMMU_DMA if IOMMU_SUPPORT
+diff --git a/arch/arm64/include/asm/ptrace.h b/arch/arm64/include/asm/ptrace.h
+index a307eb6..6c0c7d3 100644
+--- a/arch/arm64/include/asm/ptrace.h
++++ b/arch/arm64/include/asm/ptrace.h
+@@ -74,6 +74,7 @@
+ #define COMPAT_PT_DATA_ADDR		0x10004
+ #define COMPAT_PT_TEXT_END_ADDR		0x10008
+ #ifndef __ASSEMBLY__
++#include <linux/bug.h>
+ 
+ /* sizeof(struct user) for AArch32 */
+ #define COMPAT_USER_SZ	296
+@@ -119,6 +120,8 @@ struct pt_regs {
+ 	u64 syscallno;
+ };
+ 
++#define MAX_REG_OFFSET offsetof(struct pt_regs, pstate)
 +
-+typedef bool (pstate_check_t)(unsigned long);
-+extern pstate_check_t * const aarch32_opcode_cond_checks[16];
- #endif /* __ASSEMBLY__ */
+ #define arch_has_single_step()	(1)
  
- #endif	/* __ASM_INSN_H */
-diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-index 2173149..4653aca 100644
---- a/arch/arm64/kernel/Makefile
-+++ b/arch/arm64/kernel/Makefile
-@@ -26,8 +26,7 @@ $(obj)/%.stub.o: $(obj)/%.o FORCE
- 	$(call if_changed,objcopy)
+ #ifdef CONFIG_COMPAT
+@@ -147,6 +150,55 @@ struct pt_regs {
+ #define user_stack_pointer(regs) \
+ 	(!compat_user_mode(regs) ? (regs)->sp : (regs)->compat_sp)
  
- arm64-obj-$(CONFIG_COMPAT)		+= sys32.o kuser32.o signal32.o 	\
--					   sys_compat.o entry32.o		\
--					   ../../arm/kernel/opcodes.o
-+					   sys_compat.o entry32.o
- arm64-obj-$(CONFIG_FUNCTION_TRACER)	+= ftrace.o entry-ftrace.o
- arm64-obj-$(CONFIG_MODULES)		+= arm64ksyms.o module.o
- arm64-obj-$(CONFIG_ARM64_MODULE_PLTS)	+= module-plts.o
-diff --git a/arch/arm64/kernel/armv8_deprecated.c b/arch/arm64/kernel/armv8_deprecated.c
-index c37202c..2934894 100644
---- a/arch/arm64/kernel/armv8_deprecated.c
-+++ b/arch/arm64/kernel/armv8_deprecated.c
-@@ -366,6 +366,21 @@ static int emulate_swpX(unsigned int address, unsigned int *data,
- 	return res;
- }
- 
-+#define	ARM_OPCODE_CONDITION_UNCOND	0xf
++extern int regs_query_register_offset(const char *name);
++extern const char *regs_query_register_name(unsigned int offset);
++extern bool regs_within_kernel_stack(struct pt_regs *regs, unsigned long addr);
++extern unsigned long regs_get_kernel_stack_nth(struct pt_regs *regs,
++					       unsigned int n);
 +
-+static unsigned int __kprobes aarch32_check_condition(u32 opcode, u32 psr)
++/**
++ * regs_get_register() - get register value from its offset
++ * @regs:	   pt_regs from which register value is gotten
++ * @offset:    offset of the register.
++ *
++ * regs_get_register returns the value of a register whose offset from @regs.
++ * The @offset is the offset of the register in struct pt_regs.
++ * If @offset is bigger than MAX_REG_OFFSET, this returns 0.
++ */
++static inline u64 regs_get_register(struct pt_regs *regs,
++					      unsigned int offset)
 +{
-+	u32 cc_bits  = opcode >> 28;
++	u64 val = 0;
 +
-+	if (cc_bits != ARM_OPCODE_CONDITION_UNCOND) {
-+		if ((*aarch32_opcode_cond_checks[cc_bits])(psr))
-+			return ARM_OPCODE_CONDTEST_PASS;
-+		else
-+			return ARM_OPCODE_CONDTEST_FAIL;
++	WARN_ON(offset & 7);
++
++	offset >>= 3;
++	switch (offset) {
++	case	0 ... 30:
++		val = regs->regs[offset];
++		break;
++	case offsetof(struct pt_regs, sp) >> 3:
++		val = regs->sp;
++		break;
++	case offsetof(struct pt_regs, pc) >> 3:
++		val = regs->pc;
++		break;
++	case offsetof(struct pt_regs, pstate) >> 3:
++		val = regs->pstate;
++		break;
++	default:
++		val = 0;
 +	}
-+	return ARM_OPCODE_CONDTEST_UNCOND;
++
++	return val;
++}
++
++/* Valid only for Kernel mode traps. */
++static inline unsigned long kernel_stack_pointer(struct pt_regs *regs)
++{
++	return regs->sp;
++}
++
+ static inline unsigned long regs_return_value(struct pt_regs *regs)
+ {
+ 	return regs->regs[0];
+diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
+index 3f6cd5c..2c88c33 100644
+--- a/arch/arm64/kernel/ptrace.c
++++ b/arch/arm64/kernel/ptrace.c
+@@ -48,6 +48,124 @@
+ #define CREATE_TRACE_POINTS
+ #include <trace/events/syscalls.h>
+ 
++struct pt_regs_offset {
++	const char *name;
++	int offset;
++};
++
++#define REG_OFFSET_NAME(r) {.name = #r, .offset = offsetof(struct pt_regs, r)}
++#define REG_OFFSET_END {.name = NULL, .offset = 0}
++#define	GPR_OFFSET_NAME(r)	\
++	{.name = "x" #r, .offset = offsetof(struct pt_regs, regs[r])}
++
++static const struct pt_regs_offset regoffset_table[] = {
++	GPR_OFFSET_NAME(0),
++	GPR_OFFSET_NAME(1),
++	GPR_OFFSET_NAME(2),
++	GPR_OFFSET_NAME(3),
++	GPR_OFFSET_NAME(4),
++	GPR_OFFSET_NAME(5),
++	GPR_OFFSET_NAME(6),
++	GPR_OFFSET_NAME(7),
++	GPR_OFFSET_NAME(8),
++	GPR_OFFSET_NAME(9),
++	GPR_OFFSET_NAME(10),
++	GPR_OFFSET_NAME(11),
++	GPR_OFFSET_NAME(12),
++	GPR_OFFSET_NAME(13),
++	GPR_OFFSET_NAME(14),
++	GPR_OFFSET_NAME(15),
++	GPR_OFFSET_NAME(16),
++	GPR_OFFSET_NAME(17),
++	GPR_OFFSET_NAME(18),
++	GPR_OFFSET_NAME(19),
++	GPR_OFFSET_NAME(20),
++	GPR_OFFSET_NAME(21),
++	GPR_OFFSET_NAME(22),
++	GPR_OFFSET_NAME(23),
++	GPR_OFFSET_NAME(24),
++	GPR_OFFSET_NAME(25),
++	GPR_OFFSET_NAME(26),
++	GPR_OFFSET_NAME(27),
++	GPR_OFFSET_NAME(28),
++	GPR_OFFSET_NAME(29),
++	GPR_OFFSET_NAME(30),
++	{.name = "lr", .offset = offsetof(struct pt_regs, regs[30])},
++	REG_OFFSET_NAME(sp),
++	REG_OFFSET_NAME(pc),
++	REG_OFFSET_NAME(pstate),
++	REG_OFFSET_END,
++};
++
++/**
++ * regs_query_register_offset() - query register offset from its name
++ * @name:	the name of a register
++ *
++ * regs_query_register_offset() returns the offset of a register in struct
++ * pt_regs from its name. If the name is invalid, this returns -EINVAL;
++ */
++int regs_query_register_offset(const char *name)
++{
++	const struct pt_regs_offset *roff;
++
++	for (roff = regoffset_table; roff->name != NULL; roff++)
++		if (!strcmp(roff->name, name))
++			return roff->offset;
++	return -EINVAL;
++}
++
++/**
++ * regs_query_register_name() - query register name from its offset
++ * @offset:	the offset of a register in struct pt_regs.
++ *
++ * regs_query_register_name() returns the name of a register from its
++ * offset in struct pt_regs. If the @offset is invalid, this returns NULL;
++ */
++const char *regs_query_register_name(unsigned int offset)
++{
++	const struct pt_regs_offset *roff;
++
++	for (roff = regoffset_table; roff->name != NULL; roff++)
++		if (roff->offset == offset)
++			return roff->name;
++	return NULL;
++}
++
++/**
++ * regs_within_kernel_stack() - check the address in the stack
++ * @regs:      pt_regs which contains kernel stack pointer.
++ * @addr:      address which is checked.
++ *
++ * regs_within_kernel_stack() checks @addr is within the kernel stack page(s).
++ * If @addr is within the kernel stack, it returns true. If not, returns false.
++ */
++bool regs_within_kernel_stack(struct pt_regs *regs, unsigned long addr)
++{
++	return ((addr & ~(THREAD_SIZE - 1))  ==
++		(kernel_stack_pointer(regs) & ~(THREAD_SIZE - 1))) ||
++		on_irq_stack(addr, raw_smp_processor_id());
++}
++
++/**
++ * regs_get_kernel_stack_nth() - get Nth entry of the stack
++ * @regs:	pt_regs which contains kernel stack pointer.
++ * @n:		stack entry number.
++ *
++ * regs_get_kernel_stack_nth() returns @n th entry of the kernel stack which
++ * is specified by @regs. If the @n th entry is NOT in the kernel stack,
++ * this returns 0.
++ */
++unsigned long regs_get_kernel_stack_nth(struct pt_regs *regs, unsigned int n)
++{
++	unsigned long *addr = (unsigned long *)kernel_stack_pointer(regs);
++
++	addr += n;
++	if (regs_within_kernel_stack(regs, (unsigned long)addr))
++		return *addr;
++	else
++		return 0;
 +}
 +
  /*
-  * swp_handler logs the id of calling process, dissects the instruction, sanity
-  * checks the memory location, calls emulate_swpX for the actual operation and
-@@ -380,7 +395,7 @@ static int swp_handler(struct pt_regs *regs, u32 instr)
- 
- 	type = instr & TYPE_SWPB;
- 
--	switch (arm_check_condition(instr, regs->pstate)) {
-+	switch (aarch32_check_condition(instr, regs->pstate)) {
- 	case ARM_OPCODE_CONDTEST_PASS:
- 		break;
- 	case ARM_OPCODE_CONDTEST_FAIL:
-@@ -461,7 +476,7 @@ static int cp15barrier_handler(struct pt_regs *regs, u32 instr)
- {
- 	perf_sw_event(PERF_COUNT_SW_EMULATION_FAULTS, 1, regs, regs->pc);
- 
--	switch (arm_check_condition(instr, regs->pstate)) {
-+	switch (aarch32_check_condition(instr, regs->pstate)) {
- 	case ARM_OPCODE_CONDTEST_PASS:
- 		break;
- 	case ARM_OPCODE_CONDTEST_FAIL:
-diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
-index 28c6110f..5cb2f3d 100644
---- a/arch/arm64/kernel/insn.c
-+++ b/arch/arm64/kernel/insn.c
-@@ -1234,3 +1234,101 @@ u32 aarch32_insn_mcr_extract_crm(u32 insn)
- {
- 	return insn & CRM_MASK;
- }
-+
-+static bool __kprobes __check_eq(unsigned long pstate)
-+{
-+	return (pstate & PSR_Z_BIT) != 0;
-+}
-+
-+static bool __kprobes __check_ne(unsigned long pstate)
-+{
-+	return (pstate & PSR_Z_BIT) == 0;
-+}
-+
-+static bool __kprobes __check_cs(unsigned long pstate)
-+{
-+	return (pstate & PSR_C_BIT) != 0;
-+}
-+
-+static bool __kprobes __check_cc(unsigned long pstate)
-+{
-+	return (pstate & PSR_C_BIT) == 0;
-+}
-+
-+static bool __kprobes __check_mi(unsigned long pstate)
-+{
-+	return (pstate & PSR_N_BIT) != 0;
-+}
-+
-+static bool __kprobes __check_pl(unsigned long pstate)
-+{
-+	return (pstate & PSR_N_BIT) == 0;
-+}
-+
-+static bool __kprobes __check_vs(unsigned long pstate)
-+{
-+	return (pstate & PSR_V_BIT) != 0;
-+}
-+
-+static bool __kprobes __check_vc(unsigned long pstate)
-+{
-+	return (pstate & PSR_V_BIT) == 0;
-+}
-+
-+static bool __kprobes __check_hi(unsigned long pstate)
-+{
-+	pstate &= ~(pstate >> 1);	/* PSR_C_BIT &= ~PSR_Z_BIT */
-+	return (pstate & PSR_C_BIT) != 0;
-+}
-+
-+static bool __kprobes __check_ls(unsigned long pstate)
-+{
-+	pstate &= ~(pstate >> 1);	/* PSR_C_BIT &= ~PSR_Z_BIT */
-+	return (pstate & PSR_C_BIT) == 0;
-+}
-+
-+static bool __kprobes __check_ge(unsigned long pstate)
-+{
-+	pstate ^= (pstate << 3);	/* PSR_N_BIT ^= PSR_V_BIT */
-+	return (pstate & PSR_N_BIT) == 0;
-+}
-+
-+static bool __kprobes __check_lt(unsigned long pstate)
-+{
-+	pstate ^= (pstate << 3);	/* PSR_N_BIT ^= PSR_V_BIT */
-+	return (pstate & PSR_N_BIT) != 0;
-+}
-+
-+static bool __kprobes __check_gt(unsigned long pstate)
-+{
-+	/*PSR_N_BIT ^= PSR_V_BIT */
-+	unsigned long temp = pstate ^ (pstate << 3);
-+
-+	temp |= (pstate << 1);	/*PSR_N_BIT |= PSR_Z_BIT */
-+	return (temp & PSR_N_BIT) == 0;
-+}
-+
-+static bool __kprobes __check_le(unsigned long pstate)
-+{
-+	/*PSR_N_BIT ^= PSR_V_BIT */
-+	unsigned long temp = pstate ^ (pstate << 3);
-+
-+	temp |= (pstate << 1);	/*PSR_N_BIT |= PSR_Z_BIT */
-+	return (temp & PSR_N_BIT) != 0;
-+}
-+
-+static bool __kprobes __check_al(unsigned long pstate)
-+{
-+	return true;
-+}
-+
-+/*
-+ * Note that the ARMv8 ARM calls condition code 0b1111 "nv", but states that
-+ * it behaves identically to 0b1110 ("al").
-+ */
-+pstate_check_t * const aarch32_opcode_cond_checks[16] = {
-+	__check_eq, __check_ne, __check_cs, __check_cc,
-+	__check_mi, __check_pl, __check_vs, __check_vc,
-+	__check_hi, __check_ls, __check_ge, __check_lt,
-+	__check_gt, __check_le, __check_al, __check_al
-+};
+  * TODO: does not yet catch signals sent when the child dies.
+  * in exit.c or in signal.c.
 -- 
 2.5.0
