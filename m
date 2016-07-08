@@ -1,34 +1,33 @@
 From: andi.shyti@samsung.com (Andi Shyti)
-Date: Fri, 08 Jul 2016 21:18:22 +0900
-Subject: [PATCH 2/4] bindings: spi-samsung: add exynos5433 spi compatible
+Date: Fri, 08 Jul 2016 21:18:24 +0900
+Subject: [PATCH 4/4] spi: s3c64xx: restore removed comments
 In-Reply-To: <1467980304-14093-1-git-send-email-andi.shyti@samsung.com>
 References: <1467980304-14093-1-git-send-email-andi.shyti@samsung.com>
-Message-ID: <1467980304-14093-3-git-send-email-andi.shyti@samsung.com>
+Message-ID: <1467980304-14093-5-git-send-email-andi.shyti@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The samsung,exynos5433-spi has some peculiarities that bring the
-need of creating a new compatible in the binding.
-
-One of those is the 3-clocks controller management where the spi
-is fed with three clocks: "spi", "busclkN" and "ioclk".
+Patch a9e93e8 has erroneously removed some comments which are
+important to understand why the bus frequency is multiplied by
+two during the spi transfer.
 
 Signed-off-by: Andi Shyti <andi.shyti@samsung.com>
 ---
- Documentation/devicetree/bindings/spi/spi-samsung.txt | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/spi/spi-s3c64xx.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/spi/spi-samsung.txt b/Documentation/devicetree/bindings/spi/spi-samsung.txt
-index 6dbdeb3..d4294c7 100644
---- a/Documentation/devicetree/bindings/spi/spi-samsung.txt
-+++ b/Documentation/devicetree/bindings/spi/spi-samsung.txt
-@@ -10,6 +10,7 @@ Required SoC Specific Properties:
-     - samsung,s3c6410-spi: for s3c6410 platforms
-     - samsung,s5pv210-spi: for s5pv210 and s5pc110 platforms
-     - samsung,exynos7-spi: for exynos7 platforms
-+    - samsung,exynos5433-spi: for exynos5433 compatible controllers
+diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
+index 1874bc5..d1fe100 100644
+--- a/drivers/spi/spi-s3c64xx.c
++++ b/drivers/spi/spi-s3c64xx.c
+@@ -639,6 +639,8 @@ static void s3c64xx_spi_config(struct s3c64xx_spi_driver_data *sdd)
+ 	writel(val, regs + S3C64XX_SPI_MODE_CFG);
  
- - reg: physical base address of the controller and length of memory mapped
-   region.
+ 	if (sdd->port_conf->clk_from_cmu) {
++		/* Configure Clock */
++		/* There is half-multiplier before the SPI */
+ 		clk_set_rate(sdd->src_clk, sdd->cur_speed * 2);
+ 	} else {
+ 		/* Configure Clock */
 -- 
 2.8.1
