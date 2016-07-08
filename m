@@ -1,40 +1,74 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 8 Jul 2016 22:39:27 +0200
-Subject: [PATCH v2 5/7] spi: s3c64xx: add exynos5433 compatible for ioclk
- handling
-In-Reply-To: <1467989201-14661-6-git-send-email-andi.shyti@samsung.com>
-References: <1467989201-14661-1-git-send-email-andi.shyti@samsung.com>
- <1467989201-14661-6-git-send-email-andi.shyti@samsung.com>
-Message-ID: <20160708203927.GB26626@kozik-lap>
+From: keescook@chromium.org (Kees Cook)
+Date: Fri, 8 Jul 2016 16:48:38 -0400
+Subject: [kernel-hardening] Re: [PATCH 9/9] mm: SLUB hardened usercopy
+ support
+In-Reply-To: <CAGXu5j+UdkQA+k39GNLe5CwBPVD5ZbRGTCQLqS8VF=kWx+PtsQ@mail.gmail.com>
+References: <577f7e55.4668420a.84f17.5cb9SMTPIN_ADDED_MISSING@mx.google.com>
+ <alpine.DEB.2.20.1607080844370.3379@east.gentwo.org>
+ <CAGXu5jKE=h32tHVLsDeaPN1GfC+BB3YbFvC+5TE5TK1oR-xU3A@mail.gmail.com>
+ <alpine.DEB.2.20.1607081119170.6192@east.gentwo.org>
+ <CAGXu5j+UdkQA+k39GNLe5CwBPVD5ZbRGTCQLqS8VF=kWx+PtsQ@mail.gmail.com>
+Message-ID: <CAGXu5jKxw3RxWNKLX4XVCwJ6x_zA=_RwiU9jLDm2+VRO79G7+w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 08, 2016 at 11:46:39PM +0900, Andi Shyti wrote:
-> The new compatible is related to the Samsung Exynos5433 SoC. The
-> difference between the previous is that in the exynos5433 the SPI
-> controller is driven by three clocks instead of only one.
-> 
-> The new clock (ioclk) is controlling the input/output clock
-> whenever the controller is slave or master.
-> 
-> The presence of the clock line is detected from the compatibility
-> structure (exynos5433_spi_port_config) as a boolean value.
-> 
-> The probe function checks whether the ioclk is present and if so,
-> it acquires.
-> 
-> The runtime suspend and resume functions will handle the clock
-> enabling and disabling as well.
-> 
-> Signed-off-by: Andi Shyti <andi.shyti@samsung.com>
-> ---
->  drivers/spi/spi-s3c64xx.c | 57 ++++++++++++++++++++++++++++++++++++++++++-----
->  1 file changed, 52 insertions(+), 5 deletions(-)
+On Fri, Jul 8, 2016 at 1:41 PM, Kees Cook <keescook@chromium.org> wrote:
+> On Fri, Jul 8, 2016 at 12:20 PM, Christoph Lameter <cl@linux.com> wrote:
+>> On Fri, 8 Jul 2016, Kees Cook wrote:
+>>
+>>> Is check_valid_pointer() making sure the pointer is within the usable
+>>> size? It seemed like it was checking that it was within the slub
+>>> object (checks against s->size, wants it above base after moving
+>>> pointer to include redzone, etc).
+>>
+>> check_valid_pointer verifies that a pointer is pointing to the start of an
+>> object. It is used to verify the internal points that SLUB used and
+>> should not be modified to do anything different.
 >
+> Yup, no worries -- I won't touch it. :) I just wanted to verify my
+> understanding.
+>
+> And after playing a bit more, I see that the only thing to the left is
+> padding and redzone. SLUB layout, from what I saw:
+>
+> offset: what's there
+> -------
+> start: padding, redzone
+> red_left_pad: object itself
+> inuse: rest of metadata
+> size: start of next slub object
+>
+> (and object_size == inuse - red_left_pad)
+>
+> i.e. a pointer must be between red_left_pad and inuse, which is the
+> same as pointer - ref_left_pad being less than object_size.
+>
+> So, as found already, the position in the usercopy check needs to be
+> bumped down by red_left_pad, which is what Michael's fix does, so I'll
+> include it in the next version.
 
-Looks fine to me, thanks for updates.
+Actually, after some offline chats, I think this is better, since it
+makes sure the ptr doesn't end up somewhere weird before we start the
+calculations. This leaves the pointer as-is, but explicitly handles
+the redzone on the offset instead, with no wrapping, etc:
 
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+        /* Find offset within object. */
+        offset = (ptr - page_address(page)) % s->size;
 
-Best regards,
-Krzysztof
++       /* Adjust for redzone and reject if within the redzone. */
++       if (s->flags & SLAB_RED_ZONE) {
++               if (offset < s->red_left_pad)
++                       return s->name;
++               offset -= s->red_left_pad;
++       }
++
+        /* Allow address range falling entirely within object size. */
+        if (offset <= s->object_size && n <= s->object_size - offset)
+                return NULL;
+
+-Kees
+
+
+-- 
+Kees Cook
+Chrome OS & Brillo Security
