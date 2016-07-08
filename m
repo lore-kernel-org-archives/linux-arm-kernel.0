@@ -1,52 +1,46 @@
-From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Fri, 8 Jul 2016 03:18:25 +0000
-Subject: [PATCH v2] clkdev: add devm_of_clk_get()
-In-Reply-To: <146794140875.73491.7115209079607438738@resonance>
-References: <87wpl2yyuw.wl%kuninori.morimoto.gx@renesas.com>
- <146785219147.73491.2827268663638530377@resonance>
- <87ziptixv7.wl%kuninori.morimoto.gx@renesas.com>
- <20160707122636.GP1041@n2100.armlinux.org.uk>
- <8760shgfzu.wl%kuninori.morimoto.gx@renesas.com>
- <146794140875.73491.7115209079607438738@resonance>
-Message-ID: <871t34hlin.wl%kuninori.morimoto.gx@renesas.com>
+From: thunder.leizhen@huawei.com (Leizhen (ThunderTown))
+Date: Fri, 8 Jul 2016 11:36:57 +0800
+Subject: [PATCH 1/1] arm64/hugetlb: clear PG_dcache_clean if the page is
+ dirty when munmap
+In-Reply-To: <20160707153741.GC27180@e104818-lin.cambridge.arm.com>
+References: <1467893344-8352-1-git-send-email-thunder.leizhen@huawei.com>
+ <20160707153741.GC27180@e104818-lin.cambridge.arm.com>
+Message-ID: <577F1FD9.1040205@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-Hi Michael
 
-Thank you for your feedback
-
-> > struct clk *clk_get(struct device *dev, const char *con_id)
-> > {
-> >         ...
-> >         if (dev) {
-> >                 clk = __of_clk_get_by_name(dev->of_node, dev_id, con_id);
-> >                                            ~~~~~~~~~~~~
-> >                 ...
-> >         }
-> > }
-> > 
-> > I would like to select specific device_node.
+On 2016/7/7 23:37, Catalin Marinas wrote:
+> On Thu, Jul 07, 2016 at 08:09:04PM +0800, Zhen Lei wrote:
+>> At present, PG_dcache_clean is only cleared when the related huge page
+>> is about to be freed. But sometimes, there maybe a process is in charge
+>> to copy binary codes into a shared memory, and notifies other processes
+>> to execute base on that. For the first time, there is no problem, because
+>> the default value of page->flags is PG_dcache_clean cleared. So the cache
+>> will be maintained at the time of set_pte_at for other processes. But if
+>> the content of the shared memory have been updated again, there is no
+>> cache operations, because the PG_dcache_clean is still set.
+>>
+>> For example:
+>> Process A
+>> 	open a hugetlbfs file
+>> 	mmap it as a shared memory
+>> 	copy some binary codes into it
+>> 	munmap
+>>
+>> Process B
+>> 	open the hugetlbfs file
+>> 	mmap it as a shared memory, executable
+>> 	invoke the functions in the shared memory
+>> 	munmap
+>>
+>> repeat the above steps.
 > 
-> Do you have access to the struct device that you want to target? Can you
-> pass that device into either clk_get or devm_clk_get?
+> Does this work as you would expect with small pages (and for example
+> shared file mmap)? I don't want to have a different behaviour between
+> small and huge pages.
 
-If my understanding was correct, I think I can't.
-In below case, "sound_soc" has its *dev, but "cpu" and "codec" doesn't
-have *dev, it has node only. Thus, we are using of_clk_get() for these now.
+The small pages also have this problem, I will try to fix it too.
 
-	clk = of_clk_get(cpu, xxx);
-	clk = of_clk_get(codec, xxx);
-
-	sound_soc {
-		...
-		cpu {
-			...
-=>			clocks = <&xxx>;
-		};
-		codec {
-			...
-=>			clocks = <&xxx>;
-		};
-	};
+> 
