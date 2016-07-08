@@ -1,46 +1,41 @@
-From: thunder.leizhen@huawei.com (Leizhen (ThunderTown))
-Date: Fri, 8 Jul 2016 11:36:57 +0800
-Subject: [PATCH 1/1] arm64/hugetlb: clear PG_dcache_clean if the page is
- dirty when munmap
-In-Reply-To: <20160707153741.GC27180@e104818-lin.cambridge.arm.com>
-References: <1467893344-8352-1-git-send-email-thunder.leizhen@huawei.com>
- <20160707153741.GC27180@e104818-lin.cambridge.arm.com>
-Message-ID: <577F1FD9.1040205@huawei.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 7 Jul 2016 20:41:41 -0700
+Subject: [GIT PULL] pxa-dt for v4.7
+In-Reply-To: <8760uyrj09.fsf@belgarion.home>
+References: <8760uyrj09.fsf@belgarion.home>
+Message-ID: <20160708034141.GA18763@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 2016/7/7 23:37, Catalin Marinas wrote:
-> On Thu, Jul 07, 2016 at 08:09:04PM +0800, Zhen Lei wrote:
->> At present, PG_dcache_clean is only cleared when the related huge page
->> is about to be freed. But sometimes, there maybe a process is in charge
->> to copy binary codes into a shared memory, and notifies other processes
->> to execute base on that. For the first time, there is no problem, because
->> the default value of page->flags is PG_dcache_clean cleared. So the cache
->> will be maintained at the time of set_pte_at for other processes. But if
->> the content of the shared memory have been updated again, there is no
->> cache operations, because the PG_dcache_clean is still set.
->>
->> For example:
->> Process A
->> 	open a hugetlbfs file
->> 	mmap it as a shared memory
->> 	copy some binary codes into it
->> 	munmap
->>
->> Process B
->> 	open the hugetlbfs file
->> 	mmap it as a shared memory, executable
->> 	invoke the functions in the shared memory
->> 	munmap
->>
->> repeat the above steps.
+On Sat, Apr 30, 2016 at 09:31:18PM +0200, Robert Jarzmik wrote:
+> Hi Arnd, Kevin, and Olof,
 > 
-> Does this work as you would expect with small pages (and for example
-> shared file mmap)? I don't want to have a different behaviour between
-> small and huge pages.
-
-The small pages also have this problem, I will try to fix it too.
-
+> This is the pxa pull request for 4.7 device-tree. It is a tiny collection of
+> fixes and pin control addition. Can you please consider pulling ?
 > 
+> The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
+> 
+>   Linux 4.6-rc1 (2016-03-26 16:03:24 -0700)
+> 
+> are available in the git repository at:
+> 
+>   https://github.com/rjarzmik/linux.git tags/pxa-dt-4.7
+> 
+> for you to fetch changes up to fca43c3f7e6fe421194e9b21eabc72604edac16c:
+> 
+>   ARM: dts: pxa3xx: add pincontrol helpers (2016-04-20 20:20:26 +0200)
+> 
+> ----------------------------------------------------------------
+> This device-tree pxa update brings :
+>  - pin control nodes for pxa2xx and pxa3xx
+>  - the LCD controller for pxa2xx
+>  - the missing pxa3xx pulse width modulator nodes
+>  - an USB Host fix for pxa3xx
+
+Looks like we missed this branch when it was sent.
+
+I've merged it for 4.8 now. Apologies about that, and please hassle us
+if this happens in the future.
+
+
+-Olof
