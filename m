@@ -1,60 +1,77 @@
-From: mturquette@baylibre.com (Michael Turquette)
-Date: Fri, 08 Jul 2016 11:40:03 -0700
-Subject: [PATCH v2 2/9] clk: imx: vf610: Disable automatic clock gating for
- lpuart in LPSTOP mode
-In-Reply-To: <20160628053235.5114-3-bhuvanchandra.dv@toradex.com>
-References: <20160628053235.5114-1-bhuvanchandra.dv@toradex.com>
- <20160628053235.5114-3-bhuvanchandra.dv@toradex.com>
-Message-ID: <146800320338.73491.1283261070387404973@resonance>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Fri,  8 Jul 2016 11:48:54 -0700
+Subject: [PATCH 2/2] ARM: dts: NSP: Add BCM958625HR switch ports
+In-Reply-To: <1468003735-26895-1-git-send-email-f.fainelli@gmail.com>
+References: <1468003735-26895-1-git-send-email-f.fainelli@gmail.com>
+Message-ID: <1468003735-26895-5-git-send-email-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Bhuvanchandra DV (2016-06-27 22:32:28)
-> From: Stefan Agner <stefan@agner.ch>
-> 
-> In order to allow wake support in STOP sleep mode, clocks are needed. Use
-> imx_clk_gate2_cgr to disable automatic clock gating in low power mode STOP.
-> This allows to enable wake by UART using:
-> echo enabled > /sys/class/tty/ttyLP0/power/wakeup
-> 
-> However, if wake is not enabled, the driver should disable the clocks explicitly
-> to save power.
-> 
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
-> Signed-off-by: Bhuvanchandra DV <bhuvanchandra.dv@toradex.com>
+Add the layout of the switch ports found on the BCM958625HR reference
+board. The CPU port is hooked up to the AMAC0 Ethernet controlelr
+adapter, so we also enable it.
 
-Applied.
+Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+---
+ arch/arm/boot/dts/bcm958625hr.dts | 49 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 49 insertions(+)
 
-Regards,
-Mike
-
-> ---
->  drivers/clk/imx/clk-vf610.c | 12 ++++++------
->  1 file changed, 6 insertions(+), 6 deletions(-)
-> 
-> diff --git a/drivers/clk/imx/clk-vf610.c b/drivers/clk/imx/clk-vf610.c
-> index 3a1f244..0476353 100644
-> --- a/drivers/clk/imx/clk-vf610.c
-> +++ b/drivers/clk/imx/clk-vf610.c
-> @@ -315,12 +315,12 @@ static void __init vf610_clocks_init(struct device_node *ccm_node)
->  
->         clk[VF610_CLK_PIT] = imx_clk_gate2("pit", "ipg_bus", CCM_CCGR1, CCM_CCGRx_CGn(7));
->  
-> -       clk[VF610_CLK_UART0] = imx_clk_gate2("uart0", "ipg_bus", CCM_CCGR0, CCM_CCGRx_CGn(7));
-> -       clk[VF610_CLK_UART1] = imx_clk_gate2("uart1", "ipg_bus", CCM_CCGR0, CCM_CCGRx_CGn(8));
-> -       clk[VF610_CLK_UART2] = imx_clk_gate2("uart2", "ipg_bus", CCM_CCGR0, CCM_CCGRx_CGn(9));
-> -       clk[VF610_CLK_UART3] = imx_clk_gate2("uart3", "ipg_bus", CCM_CCGR0, CCM_CCGRx_CGn(10));
-> -       clk[VF610_CLK_UART4] = imx_clk_gate2("uart4", "ipg_bus", CCM_CCGR6, CCM_CCGRx_CGn(9));
-> -       clk[VF610_CLK_UART5] = imx_clk_gate2("uart5", "ipg_bus", CCM_CCGR6, CCM_CCGRx_CGn(10));
-> +       clk[VF610_CLK_UART0] = imx_clk_gate2_cgr("uart0", "ipg_bus", CCM_CCGR0, CCM_CCGRx_CGn(7), 0x2);
-> +       clk[VF610_CLK_UART1] = imx_clk_gate2_cgr("uart1", "ipg_bus", CCM_CCGR0, CCM_CCGRx_CGn(8), 0x2);
-> +       clk[VF610_CLK_UART2] = imx_clk_gate2_cgr("uart2", "ipg_bus", CCM_CCGR0, CCM_CCGRx_CGn(9), 0x2);
-> +       clk[VF610_CLK_UART3] = imx_clk_gate2_cgr("uart3", "ipg_bus", CCM_CCGR0, CCM_CCGRx_CGn(10), 0x2);
-> +       clk[VF610_CLK_UART4] = imx_clk_gate2_cgr("uart4", "ipg_bus", CCM_CCGR6, CCM_CCGRx_CGn(9), 0x2);
-> +       clk[VF610_CLK_UART5] = imx_clk_gate2_cgr("uart5", "ipg_bus", CCM_CCGR6, CCM_CCGRx_CGn(10), 0x2);
->  
->         clk[VF610_CLK_I2C0] = imx_clk_gate2("i2c0", "ipg_bus", CCM_CCGR4, CCM_CCGRx_CGn(6));
->         clk[VF610_CLK_I2C1] = imx_clk_gate2("i2c1", "ipg_bus", CCM_CCGR4, CCM_CCGRx_CGn(7));
-> -- 
-> 2.9.0
-> 
+diff --git a/arch/arm/boot/dts/bcm958625hr.dts b/arch/arm/boot/dts/bcm958625hr.dts
+index 03b8bbeb694f..4239e58cf97f 100644
+--- a/arch/arm/boot/dts/bcm958625hr.dts
++++ b/arch/arm/boot/dts/bcm958625hr.dts
+@@ -109,3 +109,52 @@
+ 		groups = "nand_grp";
+ 	};
+ };
++
++&amac0 {
++	status = "okay";
++};
++
++&srab {
++	compatible = "brcm,bcm58625-srab", "brcm,nsp-srab";
++	status = "okay";
++
++	ports {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		port at 0 {
++			label = "port0";
++			reg = <0>;
++		};
++
++		port at 1 {
++			label = "port1";
++			reg = <1>;
++		};
++
++		port at 2 {
++			label = "port2";
++			reg = <2>;
++		};
++
++		port at 3 {
++			label = "port3";
++			reg = <3>;
++		};
++
++		port at 4 {
++			label = "port4";
++			reg = <4>;
++		};
++
++		port at 5 {
++			ethernet = <&amac0>;
++			label = "cpu";
++			reg = <5>;
++			fixed-link {
++				speed = <1000>;
++				full-duplex;
++			};
++		};
++	};
++};
+-- 
+2.7.4
