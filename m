@@ -1,48 +1,126 @@
 From: andi.shyti@samsung.com (Andi Shyti)
-Date: Fri, 08 Jul 2016 23:46:38 +0900
-Subject: [PATCH v2 4/7] spi: s3c64xx: use error code from clk_prepare_enable()
+Date: Fri, 08 Jul 2016 23:46:37 +0900
+Subject: [PATCH v2 3/7] spi: s3c64xx: rename goto labels to meaningful names
 In-Reply-To: <1467989201-14661-1-git-send-email-andi.shyti@samsung.com>
 References: <1467989201-14661-1-git-send-email-andi.shyti@samsung.com>
-Message-ID: <1467989201-14661-5-git-send-email-andi.shyti@samsung.com>
+Message-ID: <1467989201-14661-4-git-send-email-andi.shyti@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If clk_prepare_enable() fails do not return -EBUSY but use the
-value provided by the function itself.
+The goto labels of the style of
 
-Suggested-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+  err4:
+  err3:
+  err2:
+  err1:
+
+are complex to insert in between new errors without renaming all
+the goto statements. Replace the errX naming style to meaningful
+names in order to make it easier to insert new goto exit points.
+
 Signed-off-by: Andi Shyti <andi.shyti@samsung.com>
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 ---
- drivers/spi/spi-s3c64xx.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ drivers/spi/spi-s3c64xx.c | 24 ++++++++++++------------
+ 1 file changed, 12 insertions(+), 12 deletions(-)
 
 diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
-index 0784a4d..3a65adf 100644
+index 6f2e91a..0784a4d 100644
 --- a/drivers/spi/spi-s3c64xx.c
 +++ b/drivers/spi/spi-s3c64xx.c
-@@ -1126,9 +1126,9 @@ static int s3c64xx_spi_probe(struct platform_device *pdev)
- 		goto err_deref_master;
+@@ -1071,7 +1071,7 @@ static int s3c64xx_spi_probe(struct platform_device *pdev)
+ 		if (ret < 0) {
+ 			dev_err(&pdev->dev, "failed to get alias id, errno %d\n",
+ 				ret);
+-			goto err0;
++			goto err_deref_master;
+ 		}
+ 		sdd->port_id = ret;
+ 	} else {
+@@ -1109,13 +1109,13 @@ static int s3c64xx_spi_probe(struct platform_device *pdev)
+ 	sdd->regs = devm_ioremap_resource(&pdev->dev, mem_res);
+ 	if (IS_ERR(sdd->regs)) {
+ 		ret = PTR_ERR(sdd->regs);
+-		goto err0;
++		goto err_deref_master;
  	}
  
--	if (clk_prepare_enable(sdd->clk)) {
-+	ret = clk_prepare_enable(sdd->clk);
-+	if (ret) {
+ 	if (sci->cfg_gpio && sci->cfg_gpio()) {
+ 		dev_err(&pdev->dev, "Unable to config gpio\n");
+ 		ret = -EBUSY;
+-		goto err0;
++		goto err_deref_master;
+ 	}
+ 
+ 	/* Setup clocks */
+@@ -1123,13 +1123,13 @@ static int s3c64xx_spi_probe(struct platform_device *pdev)
+ 	if (IS_ERR(sdd->clk)) {
+ 		dev_err(&pdev->dev, "Unable to acquire clock 'spi'\n");
+ 		ret = PTR_ERR(sdd->clk);
+-		goto err0;
++		goto err_deref_master;
+ 	}
+ 
+ 	if (clk_prepare_enable(sdd->clk)) {
  		dev_err(&pdev->dev, "Couldn't enable clock 'spi'\n");
--		ret = -EBUSY;
- 		goto err_deref_master;
+ 		ret = -EBUSY;
+-		goto err0;
++		goto err_deref_master;
  	}
  
-@@ -1141,9 +1141,9 @@ static int s3c64xx_spi_probe(struct platform_device *pdev)
- 		goto err_disable_clk;
+ 	sprintf(clk_name, "spi_busclk%d", sci->src_clk_nr);
+@@ -1138,13 +1138,13 @@ static int s3c64xx_spi_probe(struct platform_device *pdev)
+ 		dev_err(&pdev->dev,
+ 			"Unable to acquire clock '%s'\n", clk_name);
+ 		ret = PTR_ERR(sdd->src_clk);
+-		goto err2;
++		goto err_disable_clk;
  	}
  
--	if (clk_prepare_enable(sdd->src_clk)) {
-+	ret = clk_prepare_enable(sdd->src_clk);
-+	if (ret) {
+ 	if (clk_prepare_enable(sdd->src_clk)) {
  		dev_err(&pdev->dev, "Couldn't enable clock '%s'\n", clk_name);
--		ret = -EBUSY;
- 		goto err_disable_clk;
+ 		ret = -EBUSY;
+-		goto err2;
++		goto err_disable_clk;
  	}
  
+ 	pm_runtime_set_autosuspend_delay(&pdev->dev, AUTOSUSPEND_TIMEOUT);
+@@ -1164,7 +1164,7 @@ static int s3c64xx_spi_probe(struct platform_device *pdev)
+ 	if (ret != 0) {
+ 		dev_err(&pdev->dev, "Failed to request IRQ %d: %d\n",
+ 			irq, ret);
+-		goto err3;
++		goto err_pm_put;
+ 	}
+ 
+ 	writel(S3C64XX_SPI_INT_RX_OVERRUN_EN | S3C64XX_SPI_INT_RX_UNDERRUN_EN |
+@@ -1174,7 +1174,7 @@ static int s3c64xx_spi_probe(struct platform_device *pdev)
+ 	ret = devm_spi_register_master(&pdev->dev, master);
+ 	if (ret != 0) {
+ 		dev_err(&pdev->dev, "cannot register SPI master: %d\n", ret);
+-		goto err3;
++		goto err_pm_put;
+ 	}
+ 
+ 	dev_dbg(&pdev->dev, "Samsung SoC SPI Driver loaded for Bus SPI-%d with %d Slaves attached\n",
+@@ -1188,15 +1188,15 @@ static int s3c64xx_spi_probe(struct platform_device *pdev)
+ 
+ 	return 0;
+ 
+-err3:
++err_pm_put:
+ 	pm_runtime_put_noidle(&pdev->dev);
+ 	pm_runtime_disable(&pdev->dev);
+ 	pm_runtime_set_suspended(&pdev->dev);
+ 
+ 	clk_disable_unprepare(sdd->src_clk);
+-err2:
++err_disable_clk:
+ 	clk_disable_unprepare(sdd->clk);
+-err0:
++err_deref_master:
+ 	spi_master_put(master);
+ 
+ 	return ret;
 -- 
 2.8.1
