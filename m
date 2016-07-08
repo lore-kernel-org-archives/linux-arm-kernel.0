@@ -1,54 +1,24 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 8 Jul 2016 16:59:46 +0100
-Subject: [GIT PULL] iommu/arm-smmu: Updates for 4.8
-Message-ID: <20160708155946.GG6493@arm.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Fri,  8 Jul 2016 18:05:41 +0200
+Subject: [PATCH 00/15] ARM: dts: sunxi: Add reference-design-tablet.dtsi files
+ + 2 new tablets
+Message-ID: <1467993956-19535-1-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joerg,
+Hi Maxime, Chen-Yu,
 
-Please pull these arm-smmu updates for 4.8. There's really not a lot
-here, but the highlight is the fix to iova_to_phys which really improves
-our VFIO teardown performance, where we previously did everything on a
-page-by-page basis.
+Here is a series based on Chen-Yu's suggestion to add a
+reference-design-tablet.dtsi file. This works out quite
+nicely, resulting in much simpler tablet .dts files, as
+well as enabling a bunch of extra features on some tablets,
+showing that having to add the same dts bits over and over
+again for all model tablets is not a good idea.
 
-Whilst Robin had an SMMUv3 series in good shape for the default domain
-stuff (and of_xlate binding), it's not quite ready for 4.8, so we'll
-spend the extra time to get it in for 4.9.
+This also includes a v2 submission of the new tablet dts
+files which sparked the reference-design-tablet.dtsi
+discussion.
 
-Cheers,
+Regards,
 
-Will
-
---->8
-
-The following changes since commit af8c34ce6ae32addda3788d54a7e340cad22516b:
-
-  Linux 4.7-rc2 (2016-06-05 14:31:26 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git for-joerg/arm-smmu/updates
-
-for you to fetch changes up to bee140044579fbfdad5fd98717c0405d7b492226:
-
-  iommu/arm-smmu: Use devm_request_irq and devm_free_irq (2016-07-06 18:31:51 +0100)
-
-----------------------------------------------------------------
-Andrea Gelmini (1):
-      iommu/arm-smmu: Fix typo in devicetree binding introductory text
-
-Peng Fan (1):
-      iommu/arm-smmu: Use devm_request_irq and devm_free_irq
-
-Wei Chen (1):
-      iommu/arm-smmu: request pcie devices to enable ACS
-
-Will Deacon (1):
-      iommu/io-pgtable-arm: Fix iova_to_phys for block entries
-
- .../devicetree/bindings/iommu/arm,smmu-v3.txt      |  2 +-
- drivers/iommu/arm-smmu-v3.c                        |  2 ++
- drivers/iommu/arm-smmu.c                           | 28 ++++++++++------------
- drivers/iommu/io-pgtable-arm.c                     |  2 +-
- 4 files changed, 17 insertions(+), 17 deletions(-)
+Hans
