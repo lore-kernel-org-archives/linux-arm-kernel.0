@@ -1,75 +1,55 @@
-From: mturquette@baylibre.com (Michael Turquette)
-Date: Thu, 07 Jul 2016 18:48:23 -0700
-Subject: [PATCH v2 2/2] clk: hi6220: initialize UART1 clock to 150MHz
-In-Reply-To: <577E18E9.5060308@linaro.org>
-References: <1467189955-21694-1-git-send-email-guodong.xu@linaro.org>
- <1467189955-21694-2-git-send-email-guodong.xu@linaro.org>
- <146784139106.73491.6417383579004254897@resonance>
- <577DF73A.1030701@linaro.org> <577E18E9.5060308@linaro.org>
-Message-ID: <146794250343.73491.5529591541364046694@resonance>
+From: hzpeterchen@gmail.com (Peter Chen)
+Date: Fri, 8 Jul 2016 09:54:47 +0800
+Subject: [PATCH 5/6] usb: chipidea: host: let the hcd know's parent
+ device node
+In-Reply-To: <146793221122.31330.7571458363004882365@sboyd-linaro>
+References: <1467882892-27589-1-git-send-email-peter.chen@nxp.com>
+ <1467882892-27589-6-git-send-email-peter.chen@nxp.com>
+ <146793221122.31330.7571458363004882365@sboyd-linaro>
+Message-ID: <20160708015447.GB27779@shlinux2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Jorge Ramirez (2016-07-07 01:55:05)
-> On 07/07/2016 08:31 AM, Jorge Ramirez wrote:
-> > On 07/06/2016 11:43 PM, Michael Turquette wrote:
-> >> Quoting Guodong Xu (2016-06-29 01:45:55)
-> >>> >From: Jorge Ramirez-Ortiz<jorge.ramirez-ortiz@linaro.org>
-> >>> >
-> >>> >Early at boot, during the sys_clk initialization, make sure UART1 uses
-> >>> >the higher frequency clock, 150MHz.
-> >>> >
-> >>> >This enables support for higher baud rates (up to 3Mbps) in UART1, 
-> >>> which
-> >>> >is required by faster bluetooth transfers.
-> >>> >
-> >>> >v2: use clk_set_rate() to propergate clock settings.
-> >>> >
-> >>> >Signed-off-by: Jorge Ramirez-Ortiz<jorge.ramirez-ortiz@linaro.org>
-> >>> >Signed-off-by: Guodong Xu<guodong.xu@linaro.org>
-> >>> >---
-> >>> >  drivers/clk/hisilicon/clk-hi6220.c | 4 ++++
-> >>> >  1 file changed, 4 insertions(+)
-> >>> >
-> >>> >diff --git a/drivers/clk/hisilicon/clk-hi6220.c 
-> >>> b/drivers/clk/hisilicon/clk-hi6220.c
-> >>> >index a36ffcb..631c56f 100644
-> >>> >--- a/drivers/clk/hisilicon/clk-hi6220.c
-> >>> >+++ b/drivers/clk/hisilicon/clk-hi6220.c
-> >>> >@@ -12,6 +12,7 @@
-> >>> >  >  #include <linux/kernel.h>
-> >>> >  #include <linux/clk-provider.h>
-> >>> >+#include <linux/clk.h>
-> >>> >  #include <linux/clkdev.h>
-> >>> >  #include <linux/io.h>
-> >>> >  #include <linux/of.h>
-> >>> >@@ -192,6 +193,9 @@ static void __init hi6220_clk_sys_init(struct 
-> >>> device_node *np)
-> >>> >  > hi6220_clk_register_divider(hi6220_div_clks_sys,
-> >>> >                         ARRAY_SIZE(hi6220_div_clks_sys), clk_data);
-> >>> >+
-> >>> >+       if (clk_set_rate(clk_data->clk_data.clks[HI6220_UART1_SRC], 
-> >>> 150000000))
-> >>> >+               pr_err("failed to set uart1 clock rate\n");
-> >> Why doesn't the UART driver call clk_get and then clk_set_rate on this
-> >> clock? Why do it in the clk provider driver?
-> >
-> > yes that was my initial choice as well; in the end I opted to do it in 
-> > the clock driver because of it being a value that will not have to 
-> > ever change for the SoC and - maybe more importantly- because of not 
-> > having a DT property available for the primecell pl011 uart where to  
-> > specify the value (so I thought this was a less intrusive 
-> > implementation).
-> >
-> >
-> I have v3 ready (changes done in amba-pl011.c and devicetree/bindings)
-> please let me know if I should send those instead.
+On Thu, Jul 07, 2016 at 03:56:51PM -0700, Stephen Boyd wrote:
+> Quoting Peter Chen (2016-07-07 02:14:51)
+> > diff --git a/drivers/usb/chipidea/host.c b/drivers/usb/chipidea/host.c
+> > index 053bac9..55120ef 100644
+> > --- a/drivers/usb/chipidea/host.c
+> > +++ b/drivers/usb/chipidea/host.c
+> > @@ -109,15 +109,25 @@ static int host_start(struct ci_hdrc *ci)
+> >         struct ehci_hcd *ehci;
+> >         struct ehci_ci_priv *priv;
+> >         int ret;
+> > +       struct device *dev = ci->dev;
+> >  
+> > -       if (usb_disabled())
+> > +       if (usb_disabled() || !dev)
+> 
+> Does that ever happen?
 
-Yes, please do. Are you using the clock-assigned-rates property?
-
-Regards,
-Mike
+I don't think so, will delete it.
 
 > 
+> >                 return -ENODEV;
+> >  
+> > -       hcd = usb_create_hcd(&ci_ehci_hc_driver, ci->dev, dev_name(ci->dev));
+> > +       /*
+> > +        * USB Core will try to get child node under roothub,
+> > +        * but chipidea core has no of_node, and the child node
+> > +        * for controller is located at glue layer's node which
+> > +        * is chipidea core's parent.
+> > +        */
+> > +       if (dev->parent && dev->parent->of_node)
+> > +               dev->of_node = dev->parent->of_node;
 > 
+> Why not do this during the ci device probe? How is host special for
+> having an of_node for the child device.
 > 
+
+Good idea. I did this when I added USB device DT support, but did not
+consider potential gadget/phy use cases.
+
+-- 
+
+Best Regards,
+Peter Chen
