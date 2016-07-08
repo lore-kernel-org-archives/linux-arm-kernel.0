@@ -1,66 +1,30 @@
-From: jon.mason@broadcom.com (Jon Mason)
-Date: Fri,  8 Jul 2016 11:56:02 -0400
-Subject: [PATCH 7/7] ARM: dts: NSP: Add bgmac entries
-Message-ID: <1467993362-13229-1-git-send-email-jon.mason@broadcom.com>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Fri, 8 Jul 2016 11:57:10 -0400
+Subject: [PATCH v2 1/2] arm64: implement FTRACE_WITH_REGS
+In-Reply-To: <20160708154824.ikq45dgk2auigqn7@treble>
+References: <20160627151500.2247A68D20@newverein.lst.de>
+ <20160627151717.BD25468D26@newverein.lst.de>
+ <20160708145800.GE3556@pathway.suse.cz>
+ <20160708150709.GA8979@lst.de>
+ <20160708152421.GG3556@pathway.suse.cz>
+ <20160708154824.ikq45dgk2auigqn7@treble>
+Message-ID: <20160708115710.5c657b5f@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add device tree entries for the ethernet devices present on the
-Broadcom Northstar Plus SoCs
+On Fri, 8 Jul 2016 10:48:24 -0500
+Josh Poimboeuf <jpoimboe@redhat.com> wrote:
 
-Signed-off-by: Jon Mason <jon.mason@broadcom.com>
----
- arch/arm/boot/dts/bcm-nsp.dtsi   | 18 ++++++++++++++++++
- arch/arm/boot/dts/bcm958625k.dts |  8 ++++++++
- 2 files changed, 26 insertions(+)
 
-diff --git a/arch/arm/boot/dts/bcm-nsp.dtsi b/arch/arm/boot/dts/bcm-nsp.dtsi
-index def9e78..f6d5abe 100644
---- a/arch/arm/boot/dts/bcm-nsp.dtsi
-+++ b/arch/arm/boot/dts/bcm-nsp.dtsi
-@@ -192,6 +192,24 @@
- 			status = "disabled";
- 		};
- 
-+		amac0: ethernet at 22000 {
-+			compatible = "brcm,nsp-amac";
-+			reg = <0x022000 0x1000>,
-+			      <0x110000 0x1000>;
-+			reg-names = "amac_base", "idm_base";
-+			interrupts = <GIC_SPI 147 IRQ_TYPE_LEVEL_HIGH>;
-+			status = "disabled";
-+		};
-+
-+		amac1: ethernet at 23000 {
-+			compatible = "brcm,nsp-amac";
-+			reg = <0x023000 0x1000>,
-+			      <0x111000 0x1000>;
-+			reg-names = "amac_base", "idm_base";
-+			interrupts = <GIC_SPI 148 IRQ_TYPE_LEVEL_HIGH>;
-+			status = "disabled";
-+		};
-+
- 		nand: nand at 26000 {
- 			compatible = "brcm,nand-iproc", "brcm,brcmnand-v6.1";
- 			reg = <0x026000 0x600>,
-diff --git a/arch/arm/boot/dts/bcm958625k.dts b/arch/arm/boot/dts/bcm958625k.dts
-index e298450..f41a13b 100644
---- a/arch/arm/boot/dts/bcm958625k.dts
-+++ b/arch/arm/boot/dts/bcm958625k.dts
-@@ -56,6 +56,14 @@
- 	status = "okay";
- };
- 
-+&amac0 {
-+	status = "okay";
-+};
-+
-+&amac1 {
-+	status = "okay";
-+};
-+
- &pcie0 {
- 	status = "okay";
- };
--- 
-1.9.1
+> My understanding is that other arches don't need this check because they
+> use -mfentry, so they have to modify the "call fentry" instruction to a
+> nop on startup.
+> 
+> Here, with -fprolog-pad, it's already a nop, so no change is needed.
+> 
+
+That's what I was thinking. But as I stated in another email (probably
+in the air when you wrote this), the call to ftrace_modify_code() may be
+completely circumvented by ftrace_make_nop() if the addr is MCOUNT_ADDR.
+
+-- Steve
