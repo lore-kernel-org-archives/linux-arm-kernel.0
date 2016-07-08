@@ -1,95 +1,131 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 8 Jul 2016 17:43:02 +0200
-Subject: [PATCH v3 12/14] regulator: pwm: Retrieve correct voltage
-In-Reply-To: <1465895602-31008-13-git-send-email-boris.brezillon@free-electrons.com>
-References: <1465895602-31008-1-git-send-email-boris.brezillon@free-electrons.com>
- <1465895602-31008-13-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20160708154302.GC1151@ulmo.ba.sec>
+From: cmetcalf@mellanox.com (Chris Metcalf)
+Date: Fri, 8 Jul 2016 11:43:50 -0400
+Subject: [PATCH]: arm64: factor work_pending state machine to C
+In-Reply-To: <1459877922-15512-13-git-send-email-cmetcalf@mellanox.com>
+References: <1459877922-15512-1-git-send-email-cmetcalf@mellanox.com>
+ <1459877922-15512-13-git-send-email-cmetcalf@mellanox.com>
+Message-ID: <e19d6de0-c754-d53b-3420-16d460a4cb33@mellanox.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 14, 2016 at 11:13:20AM +0200, Boris Brezillon wrote:
-> The continuous PWM voltage regulator is caching the voltage value in
-> the ->volt_uV field. While most of the time this value should reflect the
-> real voltage, sometime it can be sightly different if the PWM device
-> rounded the set_duty_cycle request.
-> Moreover, this value is not valid until someone has modified the regulator
-> output.
-> 
-> Remove the ->volt_uV field and always rely on the PWM state to calculate
-> the regulator output.
-> 
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> Reviewed-by: Brian Norris <briannorris@chromium.org>
-> Tested-by: Brian Norris <briannorris@chromium.org>
-> Tested-by: Heiko Stuebner <heiko@sntech.de>
+Ping!
+
+I am hopeful that this patch [1] can be picked up for the 4.8 merge window
+in the arm64 tree.  As I mentioned in my last patch series that included
+this patch [2], I'm hopeful that this version addresses the performance
+issues that were seen with Mark's original patch.  This version tests the
+TIF flags prior to calling out to the loop in C code.
+
+It makes more sense for it go via the arm64 tree than to wait and go
+through the nohz_full tree, I suspect.
+
+Thanks!
+
+[1] https://lkml.kernel.org/g/1459877922-15512-13-git-send-email-cmetcalf at mellanox.com
+[2] https://lkml.kernel.org/g/56E9A3CE.2040209 at mellanox.com
+
+On 4/5/2016 1:38 PM, Chris Metcalf wrote:
+> Currently ret_fast_syscall, work_pending, and ret_to_user form an ad-hoc
+> state machine that can be difficult to reason about due to duplicated
+> code and a large number of branch targets.
+>
+> This patch factors the common logic out into the existing
+> do_notify_resume function, converting the code to C in the process,
+> making the code more legible.
+>
+> This patch tries to closely mirror the existing behaviour while using
+> the usual C control flow primitives. As local_irq_{disable,enable} may
+> be instrumented, we balance exception entry (where we will almost most
+> likely enable IRQs) with a call to trace_hardirqs_on just before the
+> return to userspace.
+>
+> Signed-off-by: Chris Metcalf <cmetcalf@mellanox.com>
 > ---
-> Mark,
-> 
-> I know you already added your Tested-by/Acked-by tags on this patch
-> but this version has slightly change and is now making use of the
-> pwm_get_relative_duty_cycle() helper instead of manually converting
-> the absolute duty_cycle value into a relative one.
-> ---
->  drivers/regulator/pwm-regulator.c | 12 ++++++------
->  1 file changed, 6 insertions(+), 6 deletions(-)
-> 
-> diff --git a/drivers/regulator/pwm-regulator.c b/drivers/regulator/pwm-regulator.c
-> index 2000118..80d083f 100644
-> --- a/drivers/regulator/pwm-regulator.c
-> +++ b/drivers/regulator/pwm-regulator.c
-> @@ -35,9 +35,6 @@ struct pwm_regulator_data {
->  	struct regulator_ops ops;
->  
->  	int state;
+>   arch/arm64/kernel/entry.S  | 12 ++++--------
+>   arch/arm64/kernel/signal.c | 36 ++++++++++++++++++++++++++----------
+>   2 files changed, 30 insertions(+), 18 deletions(-)
+>
+> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+> index 12e8d2bcb3f9..d70a9e44b7d6 100644
+> --- a/arch/arm64/kernel/entry.S
+> +++ b/arch/arm64/kernel/entry.S
+> @@ -674,18 +674,13 @@ ret_fast_syscall_trace:
+>    * Ok, we need to do extra processing, enter the slow path.
+>    */
+>   work_pending:
+> -	tbnz	x1, #TIF_NEED_RESCHED, work_resched
+> -	/* TIF_SIGPENDING, TIF_NOTIFY_RESUME or TIF_FOREIGN_FPSTATE case */
+>   	mov	x0, sp				// 'regs'
+> -	enable_irq				// enable interrupts for do_notify_resume()
+>   	bl	do_notify_resume
+> -	b	ret_to_user
+> -work_resched:
+>   #ifdef CONFIG_TRACE_IRQFLAGS
+> -	bl	trace_hardirqs_off		// the IRQs are off here, inform the tracing code
+> +	bl	trace_hardirqs_on		// enabled while in userspace
+>   #endif
+> -	bl	schedule
 > -
-> -	/* Continuous voltage */
-> -	int volt_uV;
->  };
->  
->  struct pwm_voltages {
-> @@ -135,8 +132,13 @@ static int pwm_regulator_is_enabled(struct regulator_dev *dev)
->  static int pwm_regulator_get_voltage(struct regulator_dev *rdev)
->  {
->  	struct pwm_regulator_data *drvdata = rdev_get_drvdata(rdev);
-> +	int min_uV = rdev->constraints->min_uV;
-> +	int diff = rdev->constraints->max_uV - min_uV;
-> +	struct pwm_state pstate;
->  
-> -	return drvdata->volt_uV;
-> +	pwm_get_state(drvdata->pwm, &pstate);
+> +	ldr	x1, [tsk, #TI_FLAGS]		// re-check for single-step
+> +	b	finish_ret_to_user
+>   /*
+>    * "slow" syscall return path.
+>    */
+> @@ -694,6 +689,7 @@ ret_to_user:
+>   	ldr	x1, [tsk, #TI_FLAGS]
+>   	and	x2, x1, #_TIF_WORK_MASK
+>   	cbnz	x2, work_pending
+> +finish_ret_to_user:
+>   	enable_step_tsk x1, x2
+>   	kernel_exit 0
+>   ENDPROC(ret_to_user)
+> diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
+> index a8eafdbc7cb8..404dd67080b9 100644
+> --- a/arch/arm64/kernel/signal.c
+> +++ b/arch/arm64/kernel/signal.c
+> @@ -402,15 +402,31 @@ static void do_signal(struct pt_regs *regs)
+>   asmlinkage void do_notify_resume(struct pt_regs *regs,
+>   				 unsigned int thread_flags)
+>   {
+> -	if (thread_flags & _TIF_SIGPENDING)
+> -		do_signal(regs);
+> -
+> -	if (thread_flags & _TIF_NOTIFY_RESUME) {
+> -		clear_thread_flag(TIF_NOTIFY_RESUME);
+> -		tracehook_notify_resume(regs);
+> -	}
+> -
+> -	if (thread_flags & _TIF_FOREIGN_FPSTATE)
+> -		fpsimd_restore_current_state();
+> +	/*
+> +	 * The assembly code enters us with IRQs off, but it hasn't
+> +	 * informed the tracing code of that for efficiency reasons.
+> +	 * Update the trace code with the current status.
+> +	 */
+> +	trace_hardirqs_off();
+> +	do {
+> +		if (thread_flags & _TIF_NEED_RESCHED) {
+> +			schedule();
+> +		} else {
+> +			local_irq_enable();
 > +
-> +	return min_uV + pwm_get_relative_duty_cycle(&pstate, diff);
->  }
->  
->  static int pwm_regulator_set_voltage(struct regulator_dev *rdev,
-> @@ -162,8 +164,6 @@ static int pwm_regulator_set_voltage(struct regulator_dev *rdev,
->  		return ret;
->  	}
->  
-> -	drvdata->volt_uV = min_uV;
-> -
->  	/* Delay required by PWM regulator to settle to the new voltage */
->  	usleep_range(ramp_delay, ramp_delay + 1000);
->  
+> +			if (thread_flags & _TIF_SIGPENDING)
+> +				do_signal(regs);
+> +
+> +			if (thread_flags & _TIF_NOTIFY_RESUME) {
+> +				clear_thread_flag(TIF_NOTIFY_RESUME);
+> +				tracehook_notify_resume(regs);
+> +			}
+> +
+> +			if (thread_flags & _TIF_FOREIGN_FPSTATE)
+> +				fpsimd_restore_current_state();
+> +		}
+>   
+> +		local_irq_disable();
+> +		thread_flags = READ_ONCE(current_thread_info()->flags);
+> +	} while (thread_flags & _TIF_WORK_MASK);
+>   }
 
-This hunk has a minor conflict with the regulator tree and the commit
-830583004e61 ("regulator: pwm: Drop unneeded pwm_enable() call") that
-it contains.
-
-Mark, do you want me to provide a stable branch with the PWM regulator
-patches and resolve that conflict in your tree? Or would you rather take
-the whole set based on a stable branch from the PWM tree? Or maybe yet
-another possibility would be to base the PWM tree on a stable branch
-from the regulator tree containing the above commit.
-
-Or we can let Linus sort out the conflict, it's really quite trivial.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160708/5532d28a/attachment-0001.sig>
+-- 
+Chris Metcalf, Mellanox Technologies
+http://www.mellanox.com
