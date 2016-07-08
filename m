@@ -1,57 +1,50 @@
-From: john@metanate.com (John Keeping)
-Date: Fri, 8 Jul 2016 14:52:11 +0100
-Subject: [PATCH 5/7] drm/rockchip: dw-mipi: support HPD poll
-In-Reply-To: <1467968701-15620-6-git-send-email-zyw@rock-chips.com>
-References: <1467968701-15620-1-git-send-email-zyw@rock-chips.com>
- <1467968701-15620-6-git-send-email-zyw@rock-chips.com>
-Message-ID: <20160708145211.6bf83d8f.john@metanate.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Fri, 08 Jul 2016 15:50:58 +0200
+Subject: [PATCH v2] arm: collie_defconfig: convert to use libata PATA drivers
+Message-ID: <1467985859-23500-1-git-send-email-b.zolnierkie@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri,  8 Jul 2016 17:04:59 +0800, Chris Zhong wrote:
+IDE subsystem has been deprecated since 2009 and the majority
+(if not all) of Linux distributions have switched to use
+libata for ATA support exclusively.  However there are still
+some users (mostly old or/and embedded non-x86 systems) that
+have not converted from using IDE subsystem to libata PATA
+drivers.  This doesn't seem to be good thing in the long-term
+for Linux as while there is less and less PATA systems left
+in use:
 
-> At the first time of bind, there is no any panel attach in mipi. Add a
-> DRM_CONNECTOR_POLL_HPD porperty to detect the panel status, when panel
-> probe, the dw_mipi_dsi_host_attach would be called, then mipi-dsi will
-> trigger a event to notify the drm framework.
-> 
-> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
+* testing efforts are divided between two subsystems
 
-Can we do something like this instead?  We know that the panel must
-always be attached and this has the advantage that the display size will
-be known when the framebuffer console loads.
+* having duplicate drivers for same hardware confuses users
 
--- >8 --
-Subject: [PATCH] drm/rockchip: dw-mipi-dsi: defer probe if panel is not loaded
+This patch converts collie_defconfig to use libata PATA
+drivers.
 
-This ensures that the output resolution is known before fbcon loads.
-
-Signed-off-by: John Keeping <john@metanate.com>
+Acked-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 ---
- drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 11 +++++++++--
- 1 file changed, 9 insertions(+), 2 deletions(-)
+v2:
+- added Acked-by tag from Dmitry
 
-diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-index 6ef5f3be8468..c0499266d116 100644
---- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-+++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-@@ -1154,10 +1154,17 @@ static int dw_mipi_dsi_bind(struct device *dev, struct device *master,
- 
- 	dsi->dsi_host.ops = &dw_mipi_dsi_host_ops;
- 	dsi->dsi_host.dev = dev;
--	return mipi_dsi_host_register(&dsi->dsi_host);
-+	ret = mipi_dsi_host_register(&dsi->dsi_host);
-+	if (!ret && !dsi->panel) {
-+		mipi_dsi_host_unregister(&dsi->dsi_host);
-+		drm_encoder_cleanup(&dsi->encoder);
-+		drm_connector_cleanup(&dsi->connector);
-+		ret = -EPROBE_DEFER;
-+	}
- 
- err_pllref:
--	clk_disable_unprepare(dsi->pllref_clk);
-+	if (ret)
-+		clk_disable_unprepare(dsi->pllref_clk);
- 	return ret;
- }
- 
+ arch/arm/configs/collie_defconfig | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/configs/collie_defconfig b/arch/arm/configs/collie_defconfig
+index 6c56ad0..4e6b68f 100644
+--- a/arch/arm/configs/collie_defconfig
++++ b/arch/arm/configs/collie_defconfig
+@@ -43,8 +43,9 @@ CONFIG_MTD_SA1100=y
+ CONFIG_BLK_DEV_LOOP=y
+ CONFIG_BLK_DEV_RAM=y
+ CONFIG_BLK_DEV_RAM_SIZE=1024
+-CONFIG_IDE=y
+-CONFIG_BLK_DEV_IDECS=y
++CONFIG_BLK_DEV_SD=y
++CONFIG_ATA=y
++CONFIG_PATA_PCMCIA=y
+ # CONFIG_INPUT_MOUSEDEV is not set
+ CONFIG_INPUT_EVDEV=y
+ # CONFIG_KEYBOARD_ATKBD is not set
+-- 
+1.9.1
