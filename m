@@ -1,75 +1,66 @@
 From: jon.mason@broadcom.com (Jon Mason)
-Date: Fri, 8 Jul 2016 11:52:42 -0400
-Subject: [PATCH v2 0/6] net: ethernet: bgmac: Add platform device support
-In-Reply-To: <1467932938-21819-1-git-send-email-jon.mason@broadcom.com>
-References: <1467932938-21819-1-git-send-email-jon.mason@broadcom.com>
-Message-ID: <CAC3K-4r6wsL++uO8KZWYf75KNCrEGi3VB9vbWbWT_yVUP7TgWg@mail.gmail.com>
+Date: Fri,  8 Jul 2016 11:56:02 -0400
+Subject: [PATCH 7/7] ARM: dts: NSP: Add bgmac entries
+Message-ID: <1467993362-13229-1-git-send-email-jon.mason@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 7, 2016 at 7:08 PM, Jon Mason <jon.mason@broadcom.com> wrote:
-> David Miller, Please consider including patches 1-5 in net-next
->
-> Florian Fainelli, Please consider including patches 6 & 7 in
->   devicetree/next
+Add device tree entries for the ethernet devices present on the
+Broadcom Northstar Plus SoCs
 
-Oops.  I didn't send out the 7th patch in this series.  Sending out
-shortly as 7/7.
+Signed-off-by: Jon Mason <jon.mason@broadcom.com>
+---
+ arch/arm/boot/dts/bcm-nsp.dtsi   | 18 ++++++++++++++++++
+ arch/arm/boot/dts/bcm958625k.dts |  8 ++++++++
+ 2 files changed, 26 insertions(+)
 
-Thanks,
-Jon
-
-> Changes in v2:
-> * Made device tree binding changes suggested by Sergei Shtylyov,
->   Ray Jui, Rob Herring, Florian Fainelli, and Arnd Bergmann
-> * Removed devm_* error paths in the bgmac_platform.c suggested by
->   Florian Fainelli
-> * Added Arnd Bergmann's Acked-by to the first 5 (there were changes
->   outlined in the bullets above, but I believe them to be minor enough
->   for him to not revoke his acks)
->
->
-> This patch series adds support for other, non-bcma iProc SoC's to the
-> bgmac driver.  This series only adds NSP support, but we are interested
-> in adding support for the Cygnus and NS2 families (with more possible
-> down the road).
->
-> To support non-bcma enabled SoCs, we need to add the standard device
-> tree "platform device" support.  Unfortunately, this driver is very
-> tighly coupled with the bcma bus and much unwinding is needed.  I tried
-> to break this up into a number of patches to make it more obvious what
-> was being done to add platform device support.  I was able to verify
-> that the bcma code still works using a 53012K board (NS SoC), and that
-> the platform code works using a 58625K board (NSP SoC).
->
-> Thanks,
-> Jon
->
->
-> Jon Mason (6):
->   net: ethernet: bgmac: change bgmac_* prints to dev_* prints
->   net: ethernet: bgmac: add dma_dev pointer
->   net: ethernet: bgmac: move BCMA MDIO Phy code into a separate file
->   net: ethernet: bgmac: convert to feature flags
->   net: ethernet: bgmac: Add platform device support
->   dt-bindings: net: bgmac: add bindings documentation for bgmac
->
->  .../devicetree/bindings/net/brcm,amac.txt          |  24 +
->  .../devicetree/bindings/net/brcm,bgmac-nsp.txt     |  24 +
->  drivers/net/ethernet/broadcom/Kconfig              |  23 +-
->  drivers/net/ethernet/broadcom/Makefile             |   2 +
->  drivers/net/ethernet/broadcom/bgmac-bcma-mdio.c    | 266 +++++++++
->  drivers/net/ethernet/broadcom/bgmac-bcma.c         | 315 ++++++++++
->  drivers/net/ethernet/broadcom/bgmac-platform.c     | 189 ++++++
->  drivers/net/ethernet/broadcom/bgmac.c              | 658 +++++----------------
->  drivers/net/ethernet/broadcom/bgmac.h              | 112 +++-
->  9 files changed, 1097 insertions(+), 516 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/net/brcm,amac.txt
->  create mode 100644 Documentation/devicetree/bindings/net/brcm,bgmac-nsp.txt
->  create mode 100644 drivers/net/ethernet/broadcom/bgmac-bcma-mdio.c
->  create mode 100644 drivers/net/ethernet/broadcom/bgmac-bcma.c
->  create mode 100644 drivers/net/ethernet/broadcom/bgmac-platform.c
->
-> --
-> 1.9.1
->
+diff --git a/arch/arm/boot/dts/bcm-nsp.dtsi b/arch/arm/boot/dts/bcm-nsp.dtsi
+index def9e78..f6d5abe 100644
+--- a/arch/arm/boot/dts/bcm-nsp.dtsi
++++ b/arch/arm/boot/dts/bcm-nsp.dtsi
+@@ -192,6 +192,24 @@
+ 			status = "disabled";
+ 		};
+ 
++		amac0: ethernet at 22000 {
++			compatible = "brcm,nsp-amac";
++			reg = <0x022000 0x1000>,
++			      <0x110000 0x1000>;
++			reg-names = "amac_base", "idm_base";
++			interrupts = <GIC_SPI 147 IRQ_TYPE_LEVEL_HIGH>;
++			status = "disabled";
++		};
++
++		amac1: ethernet at 23000 {
++			compatible = "brcm,nsp-amac";
++			reg = <0x023000 0x1000>,
++			      <0x111000 0x1000>;
++			reg-names = "amac_base", "idm_base";
++			interrupts = <GIC_SPI 148 IRQ_TYPE_LEVEL_HIGH>;
++			status = "disabled";
++		};
++
+ 		nand: nand at 26000 {
+ 			compatible = "brcm,nand-iproc", "brcm,brcmnand-v6.1";
+ 			reg = <0x026000 0x600>,
+diff --git a/arch/arm/boot/dts/bcm958625k.dts b/arch/arm/boot/dts/bcm958625k.dts
+index e298450..f41a13b 100644
+--- a/arch/arm/boot/dts/bcm958625k.dts
++++ b/arch/arm/boot/dts/bcm958625k.dts
+@@ -56,6 +56,14 @@
+ 	status = "okay";
+ };
+ 
++&amac0 {
++	status = "okay";
++};
++
++&amac1 {
++	status = "okay";
++};
++
+ &pcie0 {
+ 	status = "okay";
+ };
+-- 
+1.9.1
