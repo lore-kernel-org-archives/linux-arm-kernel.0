@@ -1,37 +1,69 @@
-From: mark.yao@rock-chips.com (Mark yao)
-Date: Fri, 8 Jul 2016 09:01:58 +0800
-Subject: iommu/rockchip: Fix bugs and enable on ARM64
-In-Reply-To: <20160627125751.GN11432@8bytes.org>
-References: <1466734413-7453-1-git-send-email-zhengsq@rock-chips.com>
- <20160627125751.GN11432@8bytes.org>
-Message-ID: <577EFB86.1060502@rock-chips.com>
+From: mturquette@baylibre.com (Michael Turquette)
+Date: Thu, 07 Jul 2016 18:30:09 -0700
+Subject: [PATCH v2] clkdev: add devm_of_clk_get()
+In-Reply-To: <8760shgfzu.wl%kuninori.morimoto.gx@renesas.com>
+References: <87wpl2yyuw.wl%kuninori.morimoto.gx@renesas.com>
+ <146785219147.73491.2827268663638530377@resonance>
+ <87ziptixv7.wl%kuninori.morimoto.gx@renesas.com>
+ <20160707122636.GP1041@n2100.armlinux.org.uk>
+ <8760shgfzu.wl%kuninori.morimoto.gx@renesas.com>
+Message-ID: <146794140875.73491.7115209079607438738@resonance>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016?06?27? 20:57, Joerg Roedel wrote:
-> On Fri, Jun 24, 2016 at 10:13:25AM +0800, Shunqian Zheng wrote:
->>   drivers/gpu/drm/rockchip/rockchip_drm_drv.c | 100 +++++++------
->>   drivers/gpu/drm/rockchip/rockchip_drm_drv.h |   3 +
->>   drivers/gpu/drm/rockchip/rockchip_drm_gem.c | 221 ++++++++++++++++++++++++++--
->>   drivers/gpu/drm/rockchip/rockchip_drm_gem.h |   9 ++
->>   drivers/iommu/Kconfig                       |   2 +-
->>   drivers/iommu/rockchip-iommu.c              | 181 +++++++++++++++++------
->>   6 files changed, 413 insertions(+), 103 deletions(-)
-> Applied the IOMMU patches, thanks.
->
->
-> 	Joerg
->
->
->
->
+Quoting Kuninori Morimoto (2016-07-07 17:03:00)
+> 
+> Hi Russell
+> 
+> > > > > +struct clk *devm_of_clk_get(struct device *dev,
+> > > > > +                           struct device_node *np, int index)
+> > > > 
+> > > > Any reason not to use devm_clk_get? Why do we need this helper?
+> > > 
+> > > Because of_clk_get() can parse "clocks", "#clock-cells" on DT.
+> > 
+> > clk_get() should also work just fine.  clk_get() uses
+> > __of_clk_get_by_name() internally, which uses "clock-names" to
+> > locate the index if a connection id is given.  of_clk_get() allows
+> > lookup of a clock by index only, omitting the name, which means
+> > you need to coordinate the order of clocks in DT with the order
+> > that the driver wants... which sounds error prone to me.
+> 
+> Thanks.
+> 
+> But, I have 1 issue on [devm_]clk_get().
+> It can't select device_node on [devm_]clk_get(), it uses dev->of_node directly.
+> 
+> struct clk *clk_get(struct device *dev, const char *con_id)
+> {
+>         ...
+>         if (dev) {
+>                 clk = __of_clk_get_by_name(dev->of_node, dev_id, con_id);
+>                                            ~~~~~~~~~~~~
+>                 ...
+>         }
+> }
+> 
+> I would like to select specific device_node.
 
-Hi Joerg
+Do you have access to the struct device that you want to target? Can you
+pass that device into either clk_get or devm_clk_get?
 
-The drm rockchip patches are dependent on iommu/rockchip patches, can 
-you also apply these patches together? So that can avoid compile problem.
+Regards,
+Mike
 
-Thanks.
-
--- 
-?ark Yao
+> 
+>         sound_soc {
+>                 ...
+>                 cpu {
+>                         ...
+> =>                      clocks = <&xxx>;
+>                 };
+> 
+>                 codec {
+>                         ...
+> =>                      clocks = <&xxx>;
+>                 };
+>         };
+> 
+> But, of_clk_get_by_name() / of_clk_get() doesn't have devm_xxx version
