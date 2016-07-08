@@ -1,126 +1,50 @@
 From: andi.shyti@samsung.com (Andi Shyti)
-Date: Fri, 08 Jul 2016 23:46:37 +0900
-Subject: [PATCH v2 3/7] spi: s3c64xx: rename goto labels to meaningful names
+Date: Fri, 08 Jul 2016 23:46:41 +0900
+Subject: [PATCH v2 7/7] clk: exynos5433: remove CLK_IGNORE_UNUSED flag from SPI
+ clocks
 In-Reply-To: <1467989201-14661-1-git-send-email-andi.shyti@samsung.com>
 References: <1467989201-14661-1-git-send-email-andi.shyti@samsung.com>
-Message-ID: <1467989201-14661-4-git-send-email-andi.shyti@samsung.com>
+Message-ID: <1467989201-14661-8-git-send-email-andi.shyti@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The goto labels of the style of
+Because the Exynos5433 SPI driver supports the ioclk handling and
+the following patch:
 
-  err4:
-  err3:
-  err2:
-  err1:
+  http://marc.info/?l=linux-kernel&m=146787645626318&w=2
 
-are complex to insert in between new errors without renaming all
-the goto statements. Replace the errX naming style to meaningful
-names in order to make it easier to insert new goto exit points.
+fixes a synchronus abort issue, none of the SPI clocks require
+any critical handling: remove, then, the CLK_IGNORE_UNUSED flag
+for the SPI related clocks.
 
 Signed-off-by: Andi Shyti <andi.shyti@samsung.com>
 Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 ---
- drivers/spi/spi-s3c64xx.c | 24 ++++++++++++------------
- 1 file changed, 12 insertions(+), 12 deletions(-)
+ drivers/clk/samsung/clk-exynos5433.c | 5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
-index 6f2e91a..0784a4d 100644
---- a/drivers/spi/spi-s3c64xx.c
-+++ b/drivers/spi/spi-s3c64xx.c
-@@ -1071,7 +1071,7 @@ static int s3c64xx_spi_probe(struct platform_device *pdev)
- 		if (ret < 0) {
- 			dev_err(&pdev->dev, "failed to get alias id, errno %d\n",
- 				ret);
--			goto err0;
-+			goto err_deref_master;
- 		}
- 		sdd->port_id = ret;
- 	} else {
-@@ -1109,13 +1109,13 @@ static int s3c64xx_spi_probe(struct platform_device *pdev)
- 	sdd->regs = devm_ioremap_resource(&pdev->dev, mem_res);
- 	if (IS_ERR(sdd->regs)) {
- 		ret = PTR_ERR(sdd->regs);
--		goto err0;
-+		goto err_deref_master;
- 	}
- 
- 	if (sci->cfg_gpio && sci->cfg_gpio()) {
- 		dev_err(&pdev->dev, "Unable to config gpio\n");
- 		ret = -EBUSY;
--		goto err0;
-+		goto err_deref_master;
- 	}
- 
- 	/* Setup clocks */
-@@ -1123,13 +1123,13 @@ static int s3c64xx_spi_probe(struct platform_device *pdev)
- 	if (IS_ERR(sdd->clk)) {
- 		dev_err(&pdev->dev, "Unable to acquire clock 'spi'\n");
- 		ret = PTR_ERR(sdd->clk);
--		goto err0;
-+		goto err_deref_master;
- 	}
- 
- 	if (clk_prepare_enable(sdd->clk)) {
- 		dev_err(&pdev->dev, "Couldn't enable clock 'spi'\n");
- 		ret = -EBUSY;
--		goto err0;
-+		goto err_deref_master;
- 	}
- 
- 	sprintf(clk_name, "spi_busclk%d", sci->src_clk_nr);
-@@ -1138,13 +1138,13 @@ static int s3c64xx_spi_probe(struct platform_device *pdev)
- 		dev_err(&pdev->dev,
- 			"Unable to acquire clock '%s'\n", clk_name);
- 		ret = PTR_ERR(sdd->src_clk);
--		goto err2;
-+		goto err_disable_clk;
- 	}
- 
- 	if (clk_prepare_enable(sdd->src_clk)) {
- 		dev_err(&pdev->dev, "Couldn't enable clock '%s'\n", clk_name);
- 		ret = -EBUSY;
--		goto err2;
-+		goto err_disable_clk;
- 	}
- 
- 	pm_runtime_set_autosuspend_delay(&pdev->dev, AUTOSUSPEND_TIMEOUT);
-@@ -1164,7 +1164,7 @@ static int s3c64xx_spi_probe(struct platform_device *pdev)
- 	if (ret != 0) {
- 		dev_err(&pdev->dev, "Failed to request IRQ %d: %d\n",
- 			irq, ret);
--		goto err3;
-+		goto err_pm_put;
- 	}
- 
- 	writel(S3C64XX_SPI_INT_RX_OVERRUN_EN | S3C64XX_SPI_INT_RX_UNDERRUN_EN |
-@@ -1174,7 +1174,7 @@ static int s3c64xx_spi_probe(struct platform_device *pdev)
- 	ret = devm_spi_register_master(&pdev->dev, master);
- 	if (ret != 0) {
- 		dev_err(&pdev->dev, "cannot register SPI master: %d\n", ret);
--		goto err3;
-+		goto err_pm_put;
- 	}
- 
- 	dev_dbg(&pdev->dev, "Samsung SoC SPI Driver loaded for Bus SPI-%d with %d Slaves attached\n",
-@@ -1188,15 +1188,15 @@ static int s3c64xx_spi_probe(struct platform_device *pdev)
- 
- 	return 0;
- 
--err3:
-+err_pm_put:
- 	pm_runtime_put_noidle(&pdev->dev);
- 	pm_runtime_disable(&pdev->dev);
- 	pm_runtime_set_suspended(&pdev->dev);
- 
- 	clk_disable_unprepare(sdd->src_clk);
--err2:
-+err_disable_clk:
- 	clk_disable_unprepare(sdd->clk);
--err0:
-+err_deref_master:
- 	spi_master_put(master);
- 
- 	return ret;
+diff --git a/drivers/clk/samsung/clk-exynos5433.c b/drivers/clk/samsung/clk-exynos5433.c
+index c3a5318..fb19525 100644
+--- a/drivers/clk/samsung/clk-exynos5433.c
++++ b/drivers/clk/samsung/clk-exynos5433.c
+@@ -1661,8 +1661,7 @@ static struct samsung_gate_clock peric_gate_clks[] __initdata = {
+ 	GATE(CLK_SCLK_IOCLK_SPI2, "sclk_ioclk_spi2", "ioclk_spi2_clk_in",
+ 			ENABLE_SCLK_PERIC, 13, CLK_SET_RATE_PARENT, 0),
+ 	GATE(CLK_SCLK_IOCLK_SPI1, "sclk_ioclk_spi1", "ioclk_spi1_clk_in",
+-			ENABLE_SCLK_PERIC, 12,
+-			CLK_IGNORE_UNUSED | CLK_SET_RATE_PARENT, 0),
++			ENABLE_SCLK_PERIC, 12, CLK_SET_RATE_PARENT, 0),
+ 	GATE(CLK_SCLK_IOCLK_SPI0, "sclk_ioclk_spi0", "ioclk_spi0_clk_in",
+ 			ENABLE_SCLK_PERIC, 11, CLK_SET_RATE_PARENT, 0),
+ 	GATE(CLK_SCLK_IOCLK_I2S1_BCLK, "sclk_ioclk_i2s1_bclk",
+@@ -1677,7 +1676,7 @@ static struct samsung_gate_clock peric_gate_clks[] __initdata = {
+ 	GATE(CLK_SCLK_SPI2, "sclk_spi2", "sclk_spi2_peric", ENABLE_SCLK_PERIC,
+ 			5, CLK_SET_RATE_PARENT, 0),
+ 	GATE(CLK_SCLK_SPI1, "sclk_spi1", "sclk_spi1_peric", ENABLE_SCLK_PERIC,
+-			4, CLK_IGNORE_UNUSED | CLK_SET_RATE_PARENT, 0),
++			4, CLK_SET_RATE_PARENT, 0),
+ 	GATE(CLK_SCLK_SPI0, "sclk_spi0", "sclk_spi0_peric", ENABLE_SCLK_PERIC,
+ 			3, CLK_SET_RATE_PARENT, 0),
+ 	GATE(CLK_SCLK_UART2, "sclk_uart2", "sclk_uart2_peric",
 -- 
 2.8.1
