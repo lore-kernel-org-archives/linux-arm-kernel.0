@@ -1,33 +1,33 @@
 From: shh.xie@gmail.com (shh.xie at gmail.com)
-Date: Fri, 8 Jul 2016 18:15:39 +0800
-Subject: [PATCH 0/5] arm64: dts: add QorIQ LS1046A SoC and boards support
-Message-ID: <1467972944-12293-1-git-send-email-shh.xie@gmail.com>
+Date: Fri, 8 Jul 2016 18:15:41 +0800
+Subject: [PATCH 2/5] Documentation: DT: Add entry for QorIQ LS1046A-RDB board
+In-Reply-To: <1467972944-12293-1-git-send-email-shh.xie@gmail.com>
+References: <1467972944-12293-1-git-send-email-shh.xie@gmail.com>
+Message-ID: <1467972944-12293-3-git-send-email-shh.xie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Shaohui Xie <Shaohui.Xie@nxp.com>
 
-This patchest adds support for QorIQ LS1046A SoC which is based on ARMv8
-architecture, also adds LS1046A-RDB and LS1046A-QDS board support.
+Signed-off-by: Shaohui Xie <Shaohui.Xie@nxp.com>
+---
+ Documentation/devicetree/bindings/arm/fsl.txt | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-Mingkai Hu (2):
-  arm64: dts: add QorIQ LS1046A SoC support
-  arm64: dts: add LS1046A-RDB board support
-
-Shaohui Xie (3):
-  Documentation: DT: Add entry for QorIQ LS1046A-RDB board
-  Documentation: DT: Add entry for QorIQ LS1046A-QDS board
-  arm64: dts: add LS1046A-QDS board support
-
- Documentation/devicetree/bindings/arm/fsl.txt     |   8 +
- arch/arm64/boot/dts/freescale/Makefile            |   2 +
- arch/arm64/boot/dts/freescale/fsl-ls1046a-qds.dts | 209 ++++++++
- arch/arm64/boot/dts/freescale/fsl-ls1046a-rdb.dts | 138 ++++++
- arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi    | 549 ++++++++++++++++++++++
- 5 files changed, 906 insertions(+)
- create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls1046a-qds.dts
- create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls1046a-rdb.dts
- create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
-
+diff --git a/Documentation/devicetree/bindings/arm/fsl.txt b/Documentation/devicetree/bindings/arm/fsl.txt
+index dbbc095..cabd575 100644
+--- a/Documentation/devicetree/bindings/arm/fsl.txt
++++ b/Documentation/devicetree/bindings/arm/fsl.txt
+@@ -139,6 +139,10 @@ LS1043A ARMv8 based QDS Board
+ Required root node properties:
+     - compatible = "fsl,ls1043a-qds", "fsl,ls1043a";
+ 
++LS1046A ARMv8 based RDB Board
++Required root node properties:
++    - compatible = "fsl,ls1046a-rdb", "fsl,ls1046a";
++
+ LS2080A ARMv8 based Simulator model
+ Required root node properties:
+     - compatible = "fsl,ls2080a-simu", "fsl,ls2080a";
 -- 
 2.1.0.27.g96db324
