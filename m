@@ -1,33 +1,31 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Fri, 08 Jul 2016 17:24:49 +0200
-Subject: [RESEND PATCH] arm: shannon_defconfig: disable IDE subsystem
-In-Reply-To: <1467991490-24895-1-git-send-email-b.zolnierkie@samsung.com>
-References: <1467991490-24895-1-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <1467991490-24895-9-git-send-email-b.zolnierkie@samsung.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 8 Jul 2016 17:26:16 +0200
+Subject: [PATCH] ARM: dts: armada388-clearfog: number LAN ports properly
+In-Reply-To: <E1bLWIh-0001ZK-Ai@rmk-PC.armlinux.org.uk>
+References: <E1bLWIh-0001ZK-Ai@rmk-PC.armlinux.org.uk>
+Message-ID: <20160708152616.GF8426@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch disables deprecated IDE subsystem in shannon_defconfig
-(no IDE host drivers are selected in this config so there is no
-valid reason to enable IDE subsystem itself).
+On Fri, Jul 08, 2016 at 02:58:39PM +0100, Russell King wrote:
+> Currently, the ports as seen from the rear number as:
+> 
+> 	eth0 sfp lan5 lan4 lan3 lan2 lan1 lan6
+> 
+> which is illogical - this came about because the rev 2.0 boards have the
+> LEDs on the front for the DSA switch (lan5-1) reversed.  Rev 2.1 boards
+> fixed the LED issue, and the Clearfog case numbers the lan ports
+> increasing from left to right.
+> 
+> Maintaining this illogical numbering causes confusion, with reports that
+> "my link isn't coming up" and "my connection negotiates 10base-Half"
+> both of which are due to people thinking that the port next to the SFP
+> is lan1.
+> 
+> Fix this by renumbering the ports to match people's expectations.
+> 
+> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 
-Cc: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
-Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
----
- arch/arm/configs/shannon_defconfig | 1 -
- 1 file changed, 1 deletion(-)
+Reviewed-by: Andrew Lunn <andrew@lunn.ch>
 
-diff --git a/arch/arm/configs/shannon_defconfig b/arch/arm/configs/shannon_defconfig
-index b0b9694..e523956 100644
---- a/arch/arm/configs/shannon_defconfig
-+++ b/arch/arm/configs/shannon_defconfig
-@@ -25,7 +25,6 @@ CONFIG_MTD_CFI_AMDSTD=y
- CONFIG_MTD_SA1100=y
- CONFIG_BLK_DEV_RAM=y
- CONFIG_BLK_DEV_RAM_SIZE=8192
--CONFIG_IDE=m
- CONFIG_NETDEVICES=y
- CONFIG_NET_ETHERNET=y
- CONFIG_NET_PCMCIA=y
--- 
-1.9.1
+    Andrew
