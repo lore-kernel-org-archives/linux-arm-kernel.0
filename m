@@ -1,46 +1,25 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Fri,  8 Jul 2016 11:48:53 -0700
-Subject: [PATCH 2/3] ARM: dts: BCM5301X: Add SRAB interrupts
-In-Reply-To: <1468003735-26895-1-git-send-email-f.fainelli@gmail.com>
-References: <1468003735-26895-1-git-send-email-f.fainelli@gmail.com>
-Message-ID: <1468003735-26895-4-git-send-email-f.fainelli@gmail.com>
+Date: Fri,  8 Jul 2016 11:49:27 -0700
+Subject: [PATCH 0/2] ARM: dts: NSP: Add built-in Ethernet switch nodes
+Message-ID: <1468003769-26959-1-git-send-email-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add interrupt mapping for the Switch Register Access Block. Only 12
-interrupts are usable at the moment even though up to 32 are dedicated
-to the SRAB.
+This patch series is based on Broadcom/stblinux/devicetree/next which
+contains proper support for the BCM958625HR board. To get working
+Ethernet switch and CPU Ethernet support, the following dependencies
+based on David Miller's net-next tree are required:
 
-Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
----
- arch/arm/boot/dts/bcm5301x.dtsi | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+- Jon Mason's BGMAC/AMAC support: https://marc.info/?t=146793308300002&r=1&w=3
+- dsa/b53 support for NSP switch: https://marc.info/?l=linux-netdev&m=146800324531914&w=3
 
-diff --git a/arch/arm/boot/dts/bcm5301x.dtsi b/arch/arm/boot/dts/bcm5301x.dtsi
-index 9fb565841004..a20ebd2ac9a2 100644
---- a/arch/arm/boot/dts/bcm5301x.dtsi
-+++ b/arch/arm/boot/dts/bcm5301x.dtsi
-@@ -153,6 +153,21 @@
- 			/* ChipCommon */
- 			<0x00000000 0 &gic GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>,
- 
-+			/* Switch Register Access Block */
-+			<0x00007000 0 &gic GIC_SPI 95 IRQ_TYPE_LEVEL_HIGH>,
-+			<0x00007000 1 &gic GIC_SPI 96 IRQ_TYPE_LEVEL_HIGH>,
-+			<0x00007000 2 &gic GIC_SPI 97 IRQ_TYPE_LEVEL_HIGH>,
-+			<0x00007000 3 &gic GIC_SPI 98 IRQ_TYPE_LEVEL_HIGH>,
-+			<0x00007000 4 &gic GIC_SPI 99 IRQ_TYPE_LEVEL_HIGH>,
-+			<0x00007000 5 &gic GIC_SPI 100 IRQ_TYPE_LEVEL_HIGH>,
-+			<0x00007000 6 &gic GIC_SPI 101 IRQ_TYPE_LEVEL_HIGH>,
-+			<0x00007000 7 &gic GIC_SPI 102 IRQ_TYPE_LEVEL_HIGH>,
-+			<0x00007000 8 &gic GIC_SPI 103 IRQ_TYPE_LEVEL_HIGH>,
-+			<0x00007000 9 &gic GIC_SPI 104 IRQ_TYPE_LEVEL_HIGH>,
-+			<0x00007000 10 &gic GIC_SPI 105 IRQ_TYPE_LEVEL_HIGH>,
-+			<0x00007000 11 &gic GIC_SPI 106 IRQ_TYPE_LEVEL_HIGH>,
-+			<0x00007000 12 &gic GIC_SPI 107 IRQ_TYPE_LEVEL_HIGH>,
-+
- 			/* PCIe Controller 0 */
- 			<0x00012000 0 &gic GIC_SPI 126 IRQ_TYPE_LEVEL_HIGH>,
- 			<0x00012000 1 &gic GIC_SPI 127 IRQ_TYPE_LEVEL_HIGH>,
+Florian Fainelli (2):
+  ARM: dts: NSP: Add Switch Register Access Block node
+  ARM: dts: NSP: Add BCM958625HR switch ports
+
+ arch/arm/boot/dts/bcm-nsp.dtsi    | 11 +++++++++
+ arch/arm/boot/dts/bcm958625hr.dts | 49 +++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 60 insertions(+)
+
 -- 
 2.7.4
