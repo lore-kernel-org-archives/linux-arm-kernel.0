@@ -1,41 +1,35 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Fri,  8 Jul 2016 18:05:44 +0200
-Subject: [PATCH 03/15] ARM: dts: sun5i: Rename sun5i-q8-common.dtsi
- sun5i-reference-design-tablet.dtsi
+Date: Fri,  8 Jul 2016 18:05:45 +0200
+Subject: [PATCH 04/15] ARM: dts: sun5i: reference-design-tablet: Set lradc
+ vref to avcc
 In-Reply-To: <1467993956-19535-1-git-send-email-hdegoede@redhat.com>
 References: <1467993956-19535-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1467993956-19535-4-git-send-email-hdegoede@redhat.com>
+Message-ID: <1467993956-19535-5-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rename sun5i-q8-common.dtsi to sun5i-reference-design-tablet.dtsi. This
-is part of renaming all the sun?i-q8-common.dtsi files to
-sun?i-reference-design-tablet.dtsi since most of the hw-config in there
-is shared by all sunxi tablets.
+Set lradc vref to the actual avcc ldo, rather then to the fixed 3v0
+regulator from common-regulators.dtsi.
 
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
- arch/arm/boot/dts/sun5i-a13-q8-tablet.dts                               | 2 +-
- .../dts/{sun5i-q8-common.dtsi => sun5i-reference-design-tablet.dtsi}    | 0
- 2 files changed, 1 insertion(+), 1 deletion(-)
- rename arch/arm/boot/dts/{sun5i-q8-common.dtsi => sun5i-reference-design-tablet.dtsi} (100%)
+ arch/arm/boot/dts/sun5i-reference-design-tablet.dtsi | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun5i-a13-q8-tablet.dts b/arch/arm/boot/dts/sun5i-a13-q8-tablet.dts
-index afe14f7..a89f29fa 100644
---- a/arch/arm/boot/dts/sun5i-a13-q8-tablet.dts
-+++ b/arch/arm/boot/dts/sun5i-a13-q8-tablet.dts
-@@ -42,7 +42,7 @@
+diff --git a/arch/arm/boot/dts/sun5i-reference-design-tablet.dtsi b/arch/arm/boot/dts/sun5i-reference-design-tablet.dtsi
+index ca5d0c4..e78452c 100644
+--- a/arch/arm/boot/dts/sun5i-reference-design-tablet.dtsi
++++ b/arch/arm/boot/dts/sun5i-reference-design-tablet.dtsi
+@@ -92,6 +92,10 @@
  
- /dts-v1/;
- #include "sun5i-a13.dtsi"
--#include "sun5i-q8-common.dtsi"
-+#include "sun5i-reference-design-tablet.dtsi"
+ #include "axp209.dtsi"
  
- / {
- 	model = "Q8 A13 Tablet";
-diff --git a/arch/arm/boot/dts/sun5i-q8-common.dtsi b/arch/arm/boot/dts/sun5i-reference-design-tablet.dtsi
-similarity index 100%
-rename from arch/arm/boot/dts/sun5i-q8-common.dtsi
-rename to arch/arm/boot/dts/sun5i-reference-design-tablet.dtsi
++&lradc {
++	vref-supply = <&reg_ldo2>;
++};
++
+ &mmc0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_q8>;
 -- 
 2.7.4
