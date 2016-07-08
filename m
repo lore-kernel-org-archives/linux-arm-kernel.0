@@ -1,112 +1,52 @@
 From: hzpeterchen@gmail.com (Peter Chen)
-Date: Fri, 8 Jul 2016 17:14:57 +0800
-Subject: [PATCH v2 04/22] usb: chipidea: Only read/write OTGSC from one
- place
-In-Reply-To: <20160707222114.1673-5-stephen.boyd@linaro.org>
+Date: Fri, 8 Jul 2016 17:25:35 +0800
+Subject: [PATCH v2 06/22] usb: chipidea: Add platform flag for wrapper
+ phy management
+In-Reply-To: <20160707222114.1673-7-stephen.boyd@linaro.org>
 References: <20160707222114.1673-1-stephen.boyd@linaro.org>
- <20160707222114.1673-5-stephen.boyd@linaro.org>
-Message-ID: <20160708091456.GC20485@shlinux2>
+ <20160707222114.1673-7-stephen.boyd@linaro.org>
+Message-ID: <20160708092535.GD20485@shlinux2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 07, 2016 at 03:20:55PM -0700, Stephen Boyd wrote:
-> With the id and vbus detection done via extcon we need to make
-> sure we poll the status of OTGSC properly by considering what the
-> extcon is saying, and not just what the register is saying. Let's
-> move this hw_wait_reg() function to the only place it's used and
-> simplify it for polling the OTGSC register. Then we can make
-> certain we only use the hw_read_otgsc() API to read OTGSC, which
-> will make sure we properly handle extcon events.
+On Thu, Jul 07, 2016 at 03:20:57PM -0700, Stephen Boyd wrote:
+> The ULPI phy on qcom platforms needs to be initialized and
+> powered on after a USB reset and before we toggle the run/stop
+> bit. Otherwise, the phy locks up and doesn't work properly.
+> Therefore, add a flag to skip any phy power management in the
+> core layer, leaving it up to the glue driver to manage.
 > 
 > Cc: Peter Chen <peter.chen@nxp.com>
 > Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Cc: "Ivan T. Ivanov" <iivanov.xz@gmail.com>
-> Fixes: 3ecb3e09b042 ("usb: chipidea: Use extcon framework for VBUS and ID detect")
 > Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
 > ---
->  drivers/usb/chipidea/ci.h   |  3 ---
->  drivers/usb/chipidea/core.c | 32 --------------------------------
->  drivers/usb/chipidea/otg.c  | 34 ++++++++++++++++++++++++++++++----
->  3 files changed, 30 insertions(+), 39 deletions(-)
+>  drivers/usb/chipidea/core.c  | 6 ++++++
+>  include/linux/usb/chipidea.h | 1 +
+>  2 files changed, 7 insertions(+)
 > 
-> diff --git a/drivers/usb/chipidea/ci.h b/drivers/usb/chipidea/ci.h
-> index cd414559040f..05bc4d631cb9 100644
-> --- a/drivers/usb/chipidea/ci.h
-> +++ b/drivers/usb/chipidea/ci.h
-> @@ -428,9 +428,6 @@ int hw_port_test_set(struct ci_hdrc *ci, u8 mode);
->  
->  u8 hw_port_test_get(struct ci_hdrc *ci);
->  
-> -int hw_wait_reg(struct ci_hdrc *ci, enum ci_hw_regs reg, u32 mask,
-> -				u32 value, unsigned int timeout_ms);
-> -
->  void ci_platform_configure(struct ci_hdrc *ci);
->  
->  int dbg_create_files(struct ci_hdrc *ci);
 > diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
-> index 69426e644d17..01390e02ee53 100644
+> index 01390e02ee53..532085a096d9 100644
 > --- a/drivers/usb/chipidea/core.c
 > +++ b/drivers/usb/chipidea/core.c
-> @@ -516,38 +516,6 @@ int hw_device_reset(struct ci_hdrc *ci)
->  	return 0;
->  }
->  
-> -/**
-> - * hw_wait_reg: wait the register value
-> - *
-> - * Sometimes, it needs to wait register value before going on.
-> - * Eg, when switch to device mode, the vbus value should be lower
-> - * than OTGSC_BSV before connects to host.
-> - *
-> - * @ci: the controller
-> - * @reg: register index
-> - * @mask: mast bit
-> - * @value: the bit value to wait
-> - * @timeout_ms: timeout in millisecond
-> - *
-> - * This function returns an error code if timeout
-> - */
-> -int hw_wait_reg(struct ci_hdrc *ci, enum ci_hw_regs reg, u32 mask,
-> -				u32 value, unsigned int timeout_ms)
-> -{
-> -	unsigned long elapse = jiffies + msecs_to_jiffies(timeout_ms);
-> -
-> -	while (hw_read(ci, reg, mask) != value) {
-> -		if (time_after(jiffies, elapse)) {
-> -			dev_err(ci->dev, "timeout waiting for %08x in %d\n",
-> -					mask, reg);
-> -			return -ETIMEDOUT;
-> -		}
-> -		msleep(20);
-> -	}
-> -
-> -	return 0;
-> -}
-> -
->  static irqreturn_t ci_irq(int irq, void *data)
+> @@ -361,6 +361,9 @@ static int _ci_usb_phy_init(struct ci_hdrc *ci)
+>   */
+>  static void ci_usb_phy_exit(struct ci_hdrc *ci)
 >  {
->  	struct ci_hdrc *ci = data;
-> diff --git a/drivers/usb/chipidea/otg.c b/drivers/usb/chipidea/otg.c
-> index 03b6743461d1..a6fc60934297 100644
-> --- a/drivers/usb/chipidea/otg.c
-> +++ b/drivers/usb/chipidea/otg.c
-> @@ -104,7 +104,31 @@ void ci_handle_vbus_change(struct ci_hdrc *ci)
->  		usb_gadget_vbus_disconnect(&ci->gadget);
->  }
+> +	if (ci->platdata->flags & CI_HDRC_OVERRIDE_PHY_CONTROL)
+> +		return;
+> +
+>  	if (ci->phy) {
+>  		phy_power_off(ci->phy);
+>  		phy_exit(ci->phy);
+> @@ -379,6 +382,9 @@ static int ci_usb_phy_init(struct ci_hdrc *ci)
+>  {
+>  	int ret;
 >  
-> -#define CI_VBUS_STABLE_TIMEOUT_MS 5000
-> +/**
-> + * When we switch to device mode, the vbus value should be lower
-> + * than OTGSC_BSV before connecting to host.
-> + *
-> + * @ci: the controller
-> + *
-> + * This function returns an error code if timeout
-> + */
-> +static int hw_wait_otgsc_bsv(struct ci_hdrc *ci)
+> +	if (ci->platdata->flags & CI_HDRC_OVERRIDE_PHY_CONTROL)
+> +		return 0;
+> +
 
-I think the function name should reflect "we wait for vbus lower than bsv"
-Care to change one?
+How you handle the code for PHY getting at probe?
 
 -- 
 
