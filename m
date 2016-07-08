@@ -1,105 +1,43 @@
-From: hzpeterchen@gmail.com (Peter Chen)
-Date: Fri, 8 Jul 2016 17:04:58 +0800
-Subject: [PATCH v2 03/22] usb: ulpi: Support device discovery via device
- properties
-In-Reply-To: <20160707222114.1673-4-stephen.boyd@linaro.org>
-References: <20160707222114.1673-1-stephen.boyd@linaro.org>
- <20160707222114.1673-4-stephen.boyd@linaro.org>
-Message-ID: <20160708090458.GB20485@shlinux2>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri,  8 Jul 2016 11:12:01 +0200
+Subject: [PATCH 3/4] ARM: dts: add EBI2 to the Qualcomm MSM8660 DTSI
+In-Reply-To: <1467969122-6552-1-git-send-email-linus.walleij@linaro.org>
+References: <1467969122-6552-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <1467969122-6552-4-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 07, 2016 at 03:20:54PM -0700, Stephen Boyd wrote:
-> @@ -39,6 +42,10 @@ static int ulpi_match(struct device *dev, struct device_driver *driver)
->  	struct ulpi *ulpi = to_ulpi_dev(dev);
->  	const struct ulpi_device_id *id;
->  
-> +	/* Some ULPI devices don't have a product id so rely on OF match */
-> +	if (ulpi->id.product == 0)
-> +		return of_driver_match_device(dev, driver);
-> +
+This adds the external bus interface EBI2 to the MSM8660 device
+tree, albeit with status = "disabled" so that devices actually
+using EBI2 can turn it on if needed.
 
-How about using vendor id? It can't be 0, but pid may be 0.
-See: http://www.linux-usb.org/usb.ids
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/boot/dts/qcom-msm8660.dtsi | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-> +static int ulpi_of_register(struct ulpi *ulpi)
-> +{
-> +	struct device_node *np = NULL, *child;
-> +
-> +	/* Find a ulpi bus underneath the parent or the parent of the parent */
-> +	if (ulpi->dev.parent->of_node)
-> +		np = of_find_node_by_name(ulpi->dev.parent->of_node, "ulpi");
-> +	else if (ulpi->dev.parent->parent && ulpi->dev.parent->parent->of_node)
-> +		np = of_find_node_by_name(ulpi->dev.parent->parent->of_node,
-> +					  "ulpi");
-> +	if (!np)
-> +		return 0;
-> +
-> +	child = of_get_next_available_child(np, NULL);
-> +	if (!child)
-> +		return -EINVAL;
-
-You may need to call of_node_put on parent (np), not on child node
-below.
-
-> +
-> +	ulpi->dev.of_node = child;
-> +
-> +	return 0;
-> +}
-> +
-> +static int ulpi_read_id(struct ulpi *ulpi)
->  {
->  	int ret;
->  
-> @@ -174,14 +218,39 @@ static int ulpi_register(struct device *dev, struct ulpi *ulpi)
->  	ulpi->id.product = ulpi_read(ulpi, ULPI_PRODUCT_ID_LOW);
->  	ulpi->id.product |= ulpi_read(ulpi, ULPI_PRODUCT_ID_HIGH) << 8;
->  
-> +	return 0;
-> +}
-> +
-
-What does this API for? Why it still needs to be called after
-vid/pid gets from firmware?
-
-> +static int ulpi_register(struct device *dev, struct ulpi *ulpi)
-> +{
-> +	int ret;
-> +
->  	ulpi->dev.parent = dev;
->  	ulpi->dev.bus = &ulpi_bus;
->  	ulpi->dev.type = &ulpi_dev_type;
->  	dev_set_name(&ulpi->dev, "%s.ulpi", dev_name(dev));
->  
-> +	if (IS_ENABLED(CONFIG_OF)) {
-> +		ret = ulpi_of_register(ulpi);
-> +		if (ret)
-> +			return ret;
-> +	}
-> +
->  	ACPI_COMPANION_SET(&ulpi->dev, ACPI_COMPANION(dev));
->  
-> -	request_module("ulpi:v%04xp%04x", ulpi->id.vendor, ulpi->id.product);
-> +	ret = device_property_read_u16(&ulpi->dev, "ulpi-vendor",
-> +				       &ulpi->id.vendor);
-> +	ret |= device_property_read_u16(&ulpi->dev, "ulpi-product",
-> +					&ulpi->id.product);
-> +	if (ret) {
-> +		ret = ulpi_read_id(ulpi);
-> +		if (ret)
-> +			return ret;
-> +	}
-> +
-[...]
-
->  void ulpi_unregister_interface(struct ulpi *ulpi)
->  {
-> +	of_node_put(ulpi->dev.of_node);
-
-[...]
-
+diff --git a/arch/arm/boot/dts/qcom-msm8660.dtsi b/arch/arm/boot/dts/qcom-msm8660.dtsi
+index acbe71febe13..c7cb4a7a84dd 100644
+--- a/arch/arm/boot/dts/qcom-msm8660.dtsi
++++ b/arch/arm/boot/dts/qcom-msm8660.dtsi
+@@ -140,6 +140,18 @@
+ 			};
+ 		};
+ 
++		ebi2 at 1a100000 {
++			compatible = "qcom,ebi2";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges;
++			reg = <0x1a100000 0x1000>, <0x1a110000 0x1000>;
++			reg-names = "ebi2", "xmem";
++			clocks = <&gcc EBI2_2X_CLK>, <&gcc EBI2_CLK>;
++			clock-names = "ebi2x", "ebi2";
++			status = "disabled";
++		};
++
+ 		qcom,ssbi at 500000 {
+ 			compatible = "qcom,ssbi";
+ 			reg = <0x500000 0x1000>;
 -- 
-
-Best Regards,
-Peter Chen
+2.7.4
