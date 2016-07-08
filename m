@@ -1,61 +1,35 @@
-From: radioconfusion@gmail.com (radioconfusion at gmail.com)
-Date: Fri, 08 Jul 2016 12:55:12 +0300
-Subject: [crypto] [marvell-cesa] Driver hangs on Armada 385 device
-Message-ID: <577f7881.c90f190a.7312d.03c2@mx.google.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 08 Jul 2016 12:06:06 +0200
+Subject: [PATCH] ARM: davinci: remove unused davinci-i2s pdata
+In-Reply-To: <575AB71B.9070007@ti.com>
+References: <1462802388-25088-1-git-send-email-petr@barix.com>
+ <575AB71B.9070007@ti.com>
+Message-ID: <5213058.cGsNedsgWG@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Thu, 7 Jul 2016 15:43:14 +0200, thomas.petazzoni at free-electrons.com wrote:
-
-> > > > My Armada 385 -device hangs when using marvell-cesa -driver.
-> > > > I'm using Linux 4.4.10 and armada-385-db-ap.dts.
-> > > > I have also tried with the driver version of Linux 4.7-rc3.
-> > > > 
-> > > > Please see https://bugzilla.kernel.org/show_bug.cgi?id=120111 for details.  
+On Friday, June 10, 2016 6:18:27 PM CEST Sekhar Nori wrote:
+> On Monday 09 May 2016 07:29 PM, Petr Kulhavy wrote:
+> > The davinci-i2s driver ("davinci-mcbsp") does not use platform
+> > data any longer. Remove the dummy pdata provided by the board
+> > drivers dm355, dm365, dm644x and neuros-osd2.
 > > 
-> > > Can you try with
-> > > http://git.infradead.org/linux-mvebu.git/commitdiff/c5379ba8fccd99d5f99632c789f0393d84a57805
-> > > applied ?  
-> > 
-> > Thanks Thomas.
-> > Your patch seems to fix a random hang during crypto operations.
->
-> OK, great.
->
-> > Unfortunately it seems to hit the crypto performance too.
-> > The command "cryptsetup benchmark --cipher aes-cbc"
-> > gives me around 35 MiB/s instead of 50 MiB/s.
-> > 
-> > The patch did not fix the hanging which appears instantly after enabling tdma
-> > in the driver and running some crypto operation.
->
-> I don't understand. Above you're saying that it fixes the problem, and
-> now you're saying that it doesn't.
+> > Signed-off-by: Petr Kulhavy <petr@barix.com>
+> > Reviewed-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> 
+> Applied to v4.8/cleanup
 
-I'm sorry that ambiguity.
-As I wrote to bugzilla (link above), there might be two different problems.
+This caused a randconfig failure:
 
-1. Without patching (Linux 4.4.10 -version):
-"Cryptsetup benchmark never completes and the device locks up."
-This happens always and instantly.
+arch/arm/mach-davinci/board-dm365-evm.c: In function 'dm365_evm_init':
+arch/arm/mach-davinci/board-dm365-evm.c:764:17: error: 'dm365_evm_snd_data' undeclared (first use in this function)
+  dm365_init_vc(&dm365_evm_snd_data);
+                 ^~~~~~~~~~~~~~~~~~
+arch/arm/mach-davinci/board-dm365-evm.c:764:17: note: each undeclared identifier is reported only once for each function it appears in
 
-I found a workaround for this first problem. If I disable tdma on driver,
-I can run successfully some crypto tasks (with quite poor performance),
-including cryptsetup benchmark. Then I found the second problem.
+clearly, the dm365_evm_snd_data is still passed as platform_data
+into the voicecodec. However, I cannot see where it gets used,
+my interpretation of the git log is that it never was, so we should
+remove that too.
 
-2. After disabling tdma (patch provided on bugzilla):
-"The device still hangs after a couple of crypto tasks, e.g. when writing a few
-hundred MiB of data to btrfs which is on top of luks."
-
-Your c5379ba8 -commit fixed the second problem for me.
-Still I have the first problem when tdma is enabled.
-
-> Could you test with the latest 4.7-rc kernel + the patch I provided?
-
-Yes, I will.
-
-Thanks,
-
-Jussi
+	Arnd
