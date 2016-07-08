@@ -1,231 +1,95 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Fri, 8 Jul 2016 16:41:46 +0100
-Subject: [PATCH v4 3/5] nvmem: core: Add consumer API to get nvmem cell
- from node
-In-Reply-To: <20160707134811.GA2692@Sanchayan-Arch.localdomain>
-References: <cover.1467872014.git.maitysanchayan@gmail.com>
- <0e6294d931bf181376a6f4e1a86df3f6c6a5d575.1467872014.git.maitysanchayan@gmail.com>
- <577E1E79.4090809@linaro.org>
- <20160707123350.GA18563@Sanchayan-Arch.localdomain>
- <577E5634.7020805@linaro.org>
- <20160707134811.GA2692@Sanchayan-Arch.localdomain>
-Message-ID: <577FC9BA.2020402@linaro.org>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 8 Jul 2016 17:43:02 +0200
+Subject: [PATCH v3 12/14] regulator: pwm: Retrieve correct voltage
+In-Reply-To: <1465895602-31008-13-git-send-email-boris.brezillon@free-electrons.com>
+References: <1465895602-31008-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1465895602-31008-13-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20160708154302.GC1151@ulmo.ba.sec>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Jun 14, 2016 at 11:13:20AM +0200, Boris Brezillon wrote:
+> The continuous PWM voltage regulator is caching the voltage value in
+> the ->volt_uV field. While most of the time this value should reflect the
+> real voltage, sometime it can be sightly different if the PWM device
+> rounded the set_duty_cycle request.
+> Moreover, this value is not valid until someone has modified the regulator
+> output.
+> 
+> Remove the ->volt_uV field and always rely on the PWM state to calculate
+> the regulator output.
+> 
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> Reviewed-by: Brian Norris <briannorris@chromium.org>
+> Tested-by: Brian Norris <briannorris@chromium.org>
+> Tested-by: Heiko Stuebner <heiko@sntech.de>
+> ---
+> Mark,
+> 
+> I know you already added your Tested-by/Acked-by tags on this patch
+> but this version has slightly change and is now making use of the
+> pwm_get_relative_duty_cycle() helper instead of manually converting
+> the absolute duty_cycle value into a relative one.
+> ---
+>  drivers/regulator/pwm-regulator.c | 12 ++++++------
+>  1 file changed, 6 insertions(+), 6 deletions(-)
+> 
+> diff --git a/drivers/regulator/pwm-regulator.c b/drivers/regulator/pwm-regulator.c
+> index 2000118..80d083f 100644
+> --- a/drivers/regulator/pwm-regulator.c
+> +++ b/drivers/regulator/pwm-regulator.c
+> @@ -35,9 +35,6 @@ struct pwm_regulator_data {
+>  	struct regulator_ops ops;
+>  
+>  	int state;
+> -
+> -	/* Continuous voltage */
+> -	int volt_uV;
+>  };
+>  
+>  struct pwm_voltages {
+> @@ -135,8 +132,13 @@ static int pwm_regulator_is_enabled(struct regulator_dev *dev)
+>  static int pwm_regulator_get_voltage(struct regulator_dev *rdev)
+>  {
+>  	struct pwm_regulator_data *drvdata = rdev_get_drvdata(rdev);
+> +	int min_uV = rdev->constraints->min_uV;
+> +	int diff = rdev->constraints->max_uV - min_uV;
+> +	struct pwm_state pstate;
+>  
+> -	return drvdata->volt_uV;
+> +	pwm_get_state(drvdata->pwm, &pstate);
+> +
+> +	return min_uV + pwm_get_relative_duty_cycle(&pstate, diff);
+>  }
+>  
+>  static int pwm_regulator_set_voltage(struct regulator_dev *rdev,
+> @@ -162,8 +164,6 @@ static int pwm_regulator_set_voltage(struct regulator_dev *rdev,
+>  		return ret;
+>  	}
+>  
+> -	drvdata->volt_uV = min_uV;
+> -
+>  	/* Delay required by PWM regulator to settle to the new voltage */
+>  	usleep_range(ramp_delay, ramp_delay + 1000);
+>  
 
+This hunk has a minor conflict with the regulator tree and the commit
+830583004e61 ("regulator: pwm: Drop unneeded pwm_enable() call") that
+it contains.
 
-On 07/07/16 14:48, maitysanchayan at gmail.com wrote:
-> Hello Srinivas,
->
-> On 16-07-07 14:16:36, Srinivas Kandagatla wrote:
->>
->>
->> On 07/07/16 13:33, maitysanchayan at gmail.com wrote:
->>> Hello Srinivas,
->>>
->>> On 16-07-07 10:18:49, Srinivas Kandagatla wrote:
->>>>
->>>>
->>>> On 07/07/16 07:39, Sanchayan Maity wrote:
->>>>> From: Stefan Agner <stefan@agner.ch>
->>>>>
->>>>> The existing NVMEM consumer API's do not allow to get a
->>>>> NVMEM cell directly given a device tree node. This patch
->>>>> adds a function to provide this functionality.
->>>>>
->>>>> Assuming the nvmem cell id name is known, this can be used
->>>>> as follows
->>>>>
->>>>> struct device_node *cell_np;
->>>>> struct nvmem_cell *foo_cell;
->>>>>
->>>>> cell_np = of_find_node_by_name(parent, "foo");
->>>>> foo_cell = of_nvmem_cell_get_direct(cell_np);
->>>>
->>>> I don't see a real gain in adding this new api,
->>>> This will encourage people to use non-standard nvmem bindings.
->>>>
->>>> why not just use standard nvmem bindings.. and use
->>>>
->>>> of_nvmem_cell_get(np, "foo");
->>>>
->>>> which should work in your case.
->>>
->>> It will not work in our case. I believe what you are referring to will
->>> work if I were to pass the device node pointer which was a NVMEM consumer
->>> containing the nvmem-cells property. In our case, we pass the device node
->>> pointer pointing to /soc which is not a nvmem consumer. In this case it
->>> will not have nvmem-cells property causing of_nvmem_cell_get to return
->>> EINVAL when it calls of_parse_phandle with "nvmem-cells".
->>
->> I could not see any bindings/ dt patches or dt examples for this this
->> series.. so Am guessing your node would look like:
->>
->> soc {
->> 	cfg0: cfg0 {
->> 		...
->> 	};
->> 	cfg1: cfg1 {
->> 		...
->> 	};
->> };
->>
->> If this is not how it looks, can you share the details.
->>
->> What Am saying is that why not have:
->>
->> soc {
->> 	nvmem-cells = <&cfg0>, <&cfg1>;
->> 	nvmem-cell-names = "cfg0", "cfg1";
->>
->> 	cfg0: cfg0 {
->> 		...
->> 	};
->>
->> 	cfg1: cfg1 {
->> 		...
->> 	};
->> };
->>
->>>
->>> Our requirement is to be able to pass the soc node pointer and then
->>> be able to get a nvmem cell by specifying it's name. So for our case
->>
->> Why?
->
-> Sorry for not providing the background directly. The patches before this
-> series used that approach. In the previous discussions it has been pointed
-> out that it is not acceptable to have additional device tree bindings for
-> providing data that the driver wants at the SoC node level or to have bindings
-> just for the SoC bus driver alone since we aren't really describing the
-> hardware.
->
-SOC driver seems to search for an arbitrary node by its name, which is 
-not a binding and can break anytime in cases If the scope of nvmem 
-provider is out of soc node or if the nvmem cells are not named as 
-expected. That looks very fragile.
+Mark, do you want me to provide a stable branch with the PWM regulator
+patches and resolve that conflict in your tree? Or would you rather take
+the whole set based on a stable branch from the PWM tree? Or maybe yet
+another possibility would be to base the PWM tree on a stable branch
+from the regulator tree containing the above commit.
 
-If the soc node is actual consumer of nvmem cells, I see no reason why 
-we should not use proper nvmem bindings?
+Or we can let Linus sort out the conflict, it's really quite trivial.
 
-Given the fact that the patch is potentially bypassing the nvmem 
-bindings, am not happy to take it!
-
-thanks,
-srini
-
-> For the discussion,
-> https://lkml.org/lkml/2016/5/23/573
-> https://lkml.org/lkml/2016/5/2/71
->
-> Regards,
-> Sanchayan.
->
->
->>
->>> ocotp node has cfg0 and cfg1 which we want but we cannot use existing
->>> nvmem consumer API since that requires having the nvmem consumer properties
->>> in the node we are binding to viz. is a direct nvmem consumer.
->>>
->>> Regards,
->>> Sanchayan.
->>>
->>>>
->>>> thanks,
->>>> srini
->>>>>
->>>>> Parent node can also be the of_node of the main SoC device
->>>>> node.
->>>>>
->>>>> Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
->>>>> ---
->>>>>     drivers/nvmem/core.c           | 44 +++++++++++++++++++++++++++++-------------
->>>>>     include/linux/nvmem-consumer.h |  1 +
->>>>>     2 files changed, 32 insertions(+), 13 deletions(-)
->>>>>
->>>>> diff --git a/drivers/nvmem/core.c b/drivers/nvmem/core.c
->>>>> index 965911d..470abee 100644
->>>>> --- a/drivers/nvmem/core.c
->>>>> +++ b/drivers/nvmem/core.c
->>>>> @@ -743,29 +743,21 @@ static struct nvmem_cell *nvmem_cell_get_from_list(const char *cell_id)
->>>>>
->>>>>     #if IS_ENABLED(CONFIG_NVMEM) && IS_ENABLED(CONFIG_OF)
->>>>>     /**
->>>>> - * of_nvmem_cell_get() - Get a nvmem cell from given device node and cell id
->>>>> + * of_nvmem_cell_get_direct() - Get a nvmem cell from given device node
->>>>>      *
->>>>> - * @dev node: Device tree node that uses the nvmem cell
->>>>> - * @id: nvmem cell name from nvmem-cell-names property.
->>>>> + * @dev node: Device tree node that uses nvmem cell
->>>>>      *
->>>>>      * Return: Will be an ERR_PTR() on error or a valid pointer
->>>>>      * to a struct nvmem_cell.  The nvmem_cell will be freed by the
->>>>>      * nvmem_cell_put().
->>>>>      */
->>>>> -struct nvmem_cell *of_nvmem_cell_get(struct device_node *np,
->>>>> -					    const char *name)
->>>>> +struct nvmem_cell *of_nvmem_cell_get_direct(struct device_node *cell_np)
->>>>>     {
->>>>> -	struct device_node *cell_np, *nvmem_np;
->>>>> +	struct device_node *nvmem_np;
->>>>>     	struct nvmem_cell *cell;
->>>>>     	struct nvmem_device *nvmem;
->>>>>     	const __be32 *addr;
->>>>> -	int rval, len, index;
->>>>> -
->>>>> -	index = of_property_match_string(np, "nvmem-cell-names", name);
->>>>> -
->>>>> -	cell_np = of_parse_phandle(np, "nvmem-cells", index);
->>>>> -	if (!cell_np)
->>>>> -		return ERR_PTR(-EINVAL);
->>>>> +	int rval, len;
->>>>>
->>>>>     	nvmem_np = of_get_next_parent(cell_np);
->>>>>     	if (!nvmem_np)
->>>>> @@ -824,6 +816,32 @@ err_mem:
->>>>>
->>>>>     	return ERR_PTR(rval);
->>>>>     }
->>>>> +EXPORT_SYMBOL_GPL(of_nvmem_cell_get_direct);
->>>>> +
->>>>> +/**
->>>>> + * of_nvmem_cell_get() - Get a nvmem cell from given device node and cell id
->>>>> + *
->>>>> + * @dev node: Device tree node that uses the nvmem cell
->>>>> + * @id: nvmem cell name from nvmem-cell-names property.
->>>>> + *
->>>>> + * Return: Will be an ERR_PTR() on error or a valid pointer
->>>>> + * to a struct nvmem_cell.  The nvmem_cell will be freed by the
->>>>> + * nvmem_cell_put().
->>>>> + */
->>>>> +struct nvmem_cell *of_nvmem_cell_get(struct device_node *np,
->>>>> +					    const char *name)
->>>>> +{
->>>>> +	struct device_node *cell_np;
->>>>> +	int index;
->>>>> +
->>>>> +	index = of_property_match_string(np, "nvmem-cell-names", name);
->>>>> +
->>>>> +	cell_np = of_parse_phandle(np, "nvmem-cells", index);
->>>>> +	if (!cell_np)
->>>>> +		return ERR_PTR(-EINVAL);
->>>>> +
->>>>> +	return of_nvmem_cell_get_direct(cell_np);
->>>>> +}
->>>>>     EXPORT_SYMBOL_GPL(of_nvmem_cell_get);
->>>>>     #endif
->>>>>
->>>>> diff --git a/include/linux/nvmem-consumer.h b/include/linux/nvmem-consumer.h
->>>>> index 9bb77d3..bf879fc 100644
->>>>> --- a/include/linux/nvmem-consumer.h
->>>>> +++ b/include/linux/nvmem-consumer.h
->>>>> @@ -136,6 +136,7 @@ static inline int nvmem_device_write(struct nvmem_device *nvmem,
->>>>>     #endif /* CONFIG_NVMEM */
->>>>>
->>>>>     #if IS_ENABLED(CONFIG_NVMEM) && IS_ENABLED(CONFIG_OF)
->>>>> +struct nvmem_cell *of_nvmem_cell_get_direct(struct device_node *cell_np);
->>>>>     struct nvmem_cell *of_nvmem_cell_get(struct device_node *np,
->>>>>     				     const char *name);
->>>>>     struct nvmem_device *of_nvmem_device_get(struct device_node *np,
->>>>>
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160708/5532d28a/attachment-0001.sig>
