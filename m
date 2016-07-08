@@ -1,82 +1,35 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 08 Jul 2016 11:22:28 +0200
-Subject: [PATCH 1/9] mm: Hardened usercopy
-In-Reply-To: <CAGXu5jLyBfqXJKxohHiZgztRVrFyqwbta1W_Dw6KyyGM3LzshQ@mail.gmail.com>
-References: <1467843928-29351-1-git-send-email-keescook@chromium.org>
- <3418914.byvl8Wuxlf@wuerfel>
- <CAGXu5jLyBfqXJKxohHiZgztRVrFyqwbta1W_Dw6KyyGM3LzshQ@mail.gmail.com>
-Message-ID: <9920033.q6Ud9av8s4@wuerfel>
+From: julien.grall@arm.com (Julien Grall)
+Date: Fri, 8 Jul 2016 10:21:44 +0100
+Subject: [Xen-devel] [PATCH v2] xen/arm: register clocks used by the
+ hypervisor
+In-Reply-To: <373bf006-1a5e-0b2b-278d-d5ec0d8737fd@de.bosch.com>
+References: <1467282752-14053-1-git-send-email-dirk.behme@de.bosch.com>
+ <146776885213.35356.11565744417822933094@resonance>
+ <577D035C.7090504@arm.com> <146783774807.35356.6362595927321996311@resonance>
+ <dad950db-4c02-e5a2-0ce9-682a40cd12d7@de.bosch.com>
+ <146794625655.73491.13497001485518368066@resonance>
+ <373bf006-1a5e-0b2b-278d-d5ec0d8737fd@de.bosch.com>
+Message-ID: <577F70A8.7020406@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, July 7, 2016 1:37:43 PM CEST Kees Cook wrote:
-> >
-> >> +     /* Allow kernel bss region (if not marked as Reserved). */
-> >> +     if (ptr >= (const void *)__bss_start &&
-> >> +         end <= (const void *)__bss_stop)
-> >> +             return NULL;
-> >
-> > accesses to .data/.rodata/.bss are probably not performance critical,
-> > so we could go further here and check the kallsyms table to ensure
-> > that we are not spanning multiple symbols here.
-> 
-> Oh, interesting! Yeah, would you be willing to put together that patch
-> and test it?
+Hi Dirk,
 
-Not at the moment, sorry.
+On 08/07/16 06:51, Dirk Behme wrote:
+> On 08.07.2016 04:50, Michael Turquette wrote:
+>> Quoting Dirk Behme (2016-07-07 00:32:34)
+>> The two issues to resolve are:
+>>
+>> 1) does consuming these hardware resources from the Linux kernel fit
+>> correctly with the Xen model?
+>
+>
+> I think so. Julien, what do you think?
 
-I've given it a closer look and unfortunately realized that kallsyms
-today only covers .text and .init.text, so it's currently useless because
-those sections are already disallowed.
+I don't think it fits the Xen model. I will give more details on the v3 
+as your commit message give an example with is contradictory to the model.
 
-We could extend kallsyms to also cover all other sections, but doing
-that right will likely cause a number of problems (most likely
-kallsyms size mismatch) that will have to be debugged first.\
+Regards,
 
-I think it's doable but time-consuming. The check function should
-actually be trivial:
-
-static bool usercopy_spans_multiple_symbols(void *ptr, size_t len)
-{
-	unsigned long size, offset;	
-
-	if (kallsyms_lookup_size_offset((unsigned long)ptr, &size, &offset))
-		return 0; /* no symbol found or kallsyms disabled */
-
-	if (size - offset <= len)
-		return 0; /* range is within one symbol */
-
-	return 1;
-}
-
-This part would also be trivial:
-
-diff --git a/scripts/kallsyms.c b/scripts/kallsyms.c
-index 1f22a186c18c..e0f37212e2a9 100644
---- a/scripts/kallsyms.c
-+++ b/scripts/kallsyms.c
-@@ -50,6 +50,11 @@ static struct addr_range text_ranges[] = {
- 	{ "_sinittext", "_einittext" },
- 	{ "_stext_l1",  "_etext_l1"  },	/* Blackfin on-chip L1 inst SRAM */
- 	{ "_stext_l2",  "_etext_l2"  },	/* Blackfin on-chip L2 SRAM */
-+#ifdef CONFIG_HARDENED_USERCOPY
-+	{ "_sdata",	"_edata"     },
-+	{ "__bss_start", "__bss_stop" },
-+	{ "__start_rodata", "__end_rodata" },
-+#endif
- };
- #define text_range_text     (&text_ranges[0])
- #define text_range_inittext (&text_ranges[1])
-
-but I fear that if you actually try that, things start falling apart
-in a big way, so I didn't try ;-)
-
-> I wonder if there are any cases where there are
-> legitimate usercopys across multiple symbols.
-
-The only possible use case I can think of is for reading out the entire
-kernel memory from /dev/kmem, but your other checks in here already
-define that as illegitimate. On that subject, we probably want to
-make CONFIG_DEVKMEM mutually exclusive with CONFIG_HARDENED_USERCOPY.
-
-	Arnd
+-- 
+Julien Grall
