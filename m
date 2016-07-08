@@ -1,72 +1,116 @@
-From: m.chehab@samsung.com (Mauro Carvalho Chehab)
-Date: Thu, 07 Jul 2016 21:34:21 -0300
-Subject: [GIT PULL 1/2] omap ir-rx51 driver fixes for multiarch for v4.8
- merge window
-In-Reply-To: <pull-1467702709-538742@samsung.com>
-References: <pull-1467702709-538742@samsung.com>
-Message-ID: <20160707213421.07a886ac.m.chehab@samsung.com>
+From: jmcnicol@redhat.com (Jeremy McNicoll)
+Date: Thu,  7 Jul 2016 17:41:03 -0700
+Subject: [RFC] msm8992/msm8994: Google Nexus 5X/6P initial board support
+Message-ID: <1467938467-21607-1-git-send-email-jmcnicol@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em Tue, 05 Jul 2016 00:56:52 -0700
-Tony Lindgren <tony@atomide.com> escreveu:
 
-> The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
-> 
->   Linux 4.7-rc1 (2016-05-29 09:29:24 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.8/ir-rx51-signed
-> 
-> for you to fetch changes up to 79cdad3635b3a253d712aba115fa274ef94a8c6b:
-> 
->   ir-rx51: use hrtimer instead of dmtimer (2016-06-29 21:54:35 -0700)
-> 
-> ----------------------------------------------------------------
-> Fix a long time regression for ir-rx51 driver for n900 device tree
-> booting.
+[RFC] msm8992/msm8994: Google Nexus 5X/6P initial board support
 
-Acked-by: Mauro Carvalho Chehab <mchehab@s-opensource.com>
+This is a pure msm8992/msm8994 SOC (BullHead/Angler) forward port from [1].
+Only 1 CPU of 6(5X)/8(6P) is supported currently, running an initrd[4].  Serial
+console output is fully functional through the earjack debug cable on both. [3]
+This will allow others to start testing and porting other pieces of the SOC.
+Myself and others are planning on submitting more functionality as more
+common SOC components are mainlined and have been tested.  Gotta start some where!
 
-(sorry for taking too long to ack on that... got some VPN issues
-that were solved only today)
+Now that the initial basic board port is complete it should make it easier
+for others to be able to help with additional functionality and testing.
 
-> 
-> This driver has been unusable with multiarch because of the hardware
-> timer access. With the recent PWM changes, we can finally fix the
-> driver for multiarch and device tree support. And naturally there
-> is no rush for these for the -rc cycle, these can wait for the
-> merge window.
-> 
-> The PWM changes have been acked by Thierry. For the media changes
-> I did not get an ack from Mauro but he was Cc'd in the discussion
-> and these changes do not conflict with other media changes.
-> 
-> After this series we can drop the remaining omap3 legacy booting
-> board files finally.
-> 
-> ----------------------------------------------------------------
-> Ivaylo Dimitrov (5):
->       ir-rx51: Fix build after multiarch changes broke it
->       pwm: omap-dmtimer: Allow for setting dmtimer clock source
->       ir-rx51: use PWM framework instead of OMAP dmtimer
->       ir-rx51: add DT support to driver
->       ir-rx51: use hrtimer instead of dmtimer
-> 
->  .../devicetree/bindings/media/nokia,n900-ir        |  20 ++
->  .../devicetree/bindings/pwm/pwm-omap-dmtimer.txt   |   4 +
->  arch/arm/mach-omap2/board-rx51-peripherals.c       |   5 -
->  arch/arm/mach-omap2/pdata-quirks.c                 |  10 +-
->  drivers/media/rc/Kconfig                           |   2 +-
->  drivers/media/rc/ir-rx51.c                         | 229 +++++++--------------
->  drivers/pwm/pwm-omap-dmtimer.c                     |  12 +-
->  include/linux/platform_data/media/ir-rx51.h        |   3 -
->  8 files changed, 111 insertions(+), 174 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/media/nokia,n900-ir
-> 
+Global clock is common between both msm8992 and msm8994. 
 
+Layout and structure of the original 3.10 DTS was maintained and only changes
+needed for mainline were made everything else got stripped out as it was
+not validated.  Further more there were no bindings and thus would not
+function as expected.
+
+The initrd/image creation instructions used for testing is available here [4].
+
+Maintainers file update was omitted and will be updated once we get acceptance of
+these changes. 
+
+Updates and additions were made in boot/dts/lge rather than boot/dts/lg as this
+was the location for 3.10.
+
+Alternatively the original 3.10 DTS SOC changes could have gone through
+gregKH's staging tree as is, followed by a number of patches to make it
+work correctly.   But greg's tree is for drivers only, not SOCs. ;-(
+
+
+SOC info:
+---------
+(Nexus 5X/bullhead):
+       msm8992, msm808 [see 2 below]
+tested CPU: AArch64 Processor [410fd033] revision 3
+
+(Nexus 6P/Angler):
+	msm8994, msm810 [see 5 below]
+tested CPU: AArch64 Processor [410fd032] revision 2
+
+
+================
+
+[1] https://android.googlesource.com/kernel/msm.git
+(Nexus 5X) branch: android-msm-bullhead-3.10-marshmallow-dr1.6 
+           Change-Id: I3d1ca38d518e5705b653487bfa95085873247f1c
+(Nexus 6P) branch: android-msm-angler-3.10-marshmallow-mr1
+	   Commit ID: 3a7f5a4e9c0f5fd4f8ee7bc3f3a204bba9dab60a
+
+[2] http://system-on-a-chip.specout.com/l/1107/Qualcomm-Snapdragon-808-MSM8992
+
+[3] http://people.redhat.com/jmcnicol/nexus_debug/
+
+[4] http://people.redhat.com/~jmcnicol/InitRD.txt
+
+[5] http://system-on-a-chip.specout.com/l/1106/Qualcomm-Snapdragon-810-MSM8994
+
+================
+
+
+Bastian K?cher (2):
+  msm8994 clocks: global clock support Global clock support for the
+    msm8994 SOC.
+  arm64: dts: msm8994 SoC and Huawei Angler (Nexus 6P) support
+
+Jeremy McNicoll (2):
+  arm64: dts: msm8992 SoC and LG Bullhead (Nexus 5X) support
+  arm64: dts: msm8992 default serial config
+
+ .../devicetree/bindings/clock/qcom,gcc.txt         |    2 +
+ arch/arm64/Kconfig.platforms                       |   25 +
+ arch/arm64/boot/dts/Makefile                       |    2 +
+ arch/arm64/boot/dts/huawei/Makefile                |    5 +
+ .../boot/dts/huawei/msm8994-angler-rev-101.dts     |   41 +
+ arch/arm64/boot/dts/lge/Makefile                   |    5 +
+ .../boot/dts/lge/msm8992-bullhead-rev-101.dts      |   41 +
+ arch/arm64/boot/dts/qcom/msm8992-pins.dtsi         |   38 +
+ arch/arm64/boot/dts/qcom/msm8992.dtsi              |  221 ++
+ arch/arm64/boot/dts/qcom/msm8994-pins.dtsi         |   38 +
+ arch/arm64/boot/dts/qcom/msm8994-v2.0.dtsi         |   31 +
+ arch/arm64/boot/dts/qcom/msm8994.dtsi              |  237 ++
+ arch/arm64/configs/angler_defconfig                |  666 ++++++
+ arch/arm64/configs/bullhead_defconfig              |  377 +++
+ arch/arm64/configs/msm8992_defconfig               |    5 +
+ drivers/clk/qcom/Kconfig                           |    9 +
+ drivers/clk/qcom/Makefile                          |    1 +
+ drivers/clk/qcom/gcc-msm8994.c                     | 2501 ++++++++++++++++++++
+ include/dt-bindings/clock/qcom,gcc-msm8994.h       |  145 ++
+ 19 files changed, 4390 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/huawei/Makefile
+ create mode 100644 arch/arm64/boot/dts/huawei/msm8994-angler-rev-101.dts
+ create mode 100644 arch/arm64/boot/dts/lge/Makefile
+ create mode 100644 arch/arm64/boot/dts/lge/msm8992-bullhead-rev-101.dts
+ create mode 100644 arch/arm64/boot/dts/qcom/msm8992-pins.dtsi
+ create mode 100644 arch/arm64/boot/dts/qcom/msm8992.dtsi
+ create mode 100644 arch/arm64/boot/dts/qcom/msm8994-pins.dtsi
+ create mode 100644 arch/arm64/boot/dts/qcom/msm8994-v2.0.dtsi
+ create mode 100644 arch/arm64/boot/dts/qcom/msm8994.dtsi
+ create mode 100644 arch/arm64/configs/angler_defconfig
+ create mode 100644 arch/arm64/configs/bullhead_defconfig
+ create mode 100644 arch/arm64/configs/msm8992_defconfig
+ create mode 100644 drivers/clk/qcom/gcc-msm8994.c
+ create mode 100644 include/dt-bindings/clock/qcom,gcc-msm8994.h
 
 -- 
-Thanks,
-Mauro
+2.6.1
