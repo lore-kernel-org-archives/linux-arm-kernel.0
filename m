@@ -1,79 +1,75 @@
 From: mturquette@baylibre.com (Michael Turquette)
-Date: Thu, 07 Jul 2016 18:43:33 -0700
-Subject: [RESEND PATCH v2 02/13] drivers: clk: st: Simplify clock binding
- of STiH4xx platforms
-In-Reply-To: <20160619150458.GA26824@rob-hp-laptop>
-References: <1466068833-5055-1-git-send-email-gabriel.fernandez@linaro.org>
- <1466068833-5055-3-git-send-email-gabriel.fernandez@linaro.org>
- <20160619150458.GA26824@rob-hp-laptop>
-Message-ID: <146794221378.73491.2803164814485320331@resonance>
+Date: Thu, 07 Jul 2016 18:48:23 -0700
+Subject: [PATCH v2 2/2] clk: hi6220: initialize UART1 clock to 150MHz
+In-Reply-To: <577E18E9.5060308@linaro.org>
+References: <1467189955-21694-1-git-send-email-guodong.xu@linaro.org>
+ <1467189955-21694-2-git-send-email-guodong.xu@linaro.org>
+ <146784139106.73491.6417383579004254897@resonance>
+ <577DF73A.1030701@linaro.org> <577E18E9.5060308@linaro.org>
+Message-ID: <146794250343.73491.5529591541364046694@resonance>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Rob Herring (2016-06-19 08:04:58)
-> On Thu, Jun 16, 2016 at 11:20:22AM +0200, Gabriel Fernandez wrote:
-> > This patch reworks the clock binding to avoid too much detail in DT.
-> > Now we have only compatible string per type of clock
-> > (remark from Rob https://lkml.org/lkml/2016/5/25/492)
+Quoting Jorge Ramirez (2016-07-07 01:55:05)
+> On 07/07/2016 08:31 AM, Jorge Ramirez wrote:
+> > On 07/06/2016 11:43 PM, Michael Turquette wrote:
+> >> Quoting Guodong Xu (2016-06-29 01:45:55)
+> >>> >From: Jorge Ramirez-Ortiz<jorge.ramirez-ortiz@linaro.org>
+> >>> >
+> >>> >Early at boot, during the sys_clk initialization, make sure UART1 uses
+> >>> >the higher frequency clock, 150MHz.
+> >>> >
+> >>> >This enables support for higher baud rates (up to 3Mbps) in UART1, 
+> >>> which
+> >>> >is required by faster bluetooth transfers.
+> >>> >
+> >>> >v2: use clk_set_rate() to propergate clock settings.
+> >>> >
+> >>> >Signed-off-by: Jorge Ramirez-Ortiz<jorge.ramirez-ortiz@linaro.org>
+> >>> >Signed-off-by: Guodong Xu<guodong.xu@linaro.org>
+> >>> >---
+> >>> >  drivers/clk/hisilicon/clk-hi6220.c | 4 ++++
+> >>> >  1 file changed, 4 insertions(+)
+> >>> >
+> >>> >diff --git a/drivers/clk/hisilicon/clk-hi6220.c 
+> >>> b/drivers/clk/hisilicon/clk-hi6220.c
+> >>> >index a36ffcb..631c56f 100644
+> >>> >--- a/drivers/clk/hisilicon/clk-hi6220.c
+> >>> >+++ b/drivers/clk/hisilicon/clk-hi6220.c
+> >>> >@@ -12,6 +12,7 @@
+> >>> >  >  #include <linux/kernel.h>
+> >>> >  #include <linux/clk-provider.h>
+> >>> >+#include <linux/clk.h>
+> >>> >  #include <linux/clkdev.h>
+> >>> >  #include <linux/io.h>
+> >>> >  #include <linux/of.h>
+> >>> >@@ -192,6 +193,9 @@ static void __init hi6220_clk_sys_init(struct 
+> >>> device_node *np)
+> >>> >  > hi6220_clk_register_divider(hi6220_div_clks_sys,
+> >>> >                         ARRAY_SIZE(hi6220_div_clks_sys), clk_data);
+> >>> >+
+> >>> >+       if (clk_set_rate(clk_data->clk_data.clks[HI6220_UART1_SRC], 
+> >>> 150000000))
+> >>> >+               pr_err("failed to set uart1 clock rate\n");
+> >> Why doesn't the UART driver call clk_get and then clk_set_rate on this
+> >> clock? Why do it in the clk provider driver?
 > >
-> 
-> I have no idea what the clock trees and clock controller in these chips 
-> look like, so it's hard to say if the changes here are good. It still 
-> looks like things are somewhat fine grained clocks in DT. I'll leave 
-> it up to the platform maintainers to decide...
+> > yes that was my initial choice as well; in the end I opted to do it in 
+> > the clock driver because of it being a value that will not have to 
+> > ever change for the SoC and - maybe more importantly- because of not 
+> > having a DT property available for the primecell pl011 uart where to  
+> > specify the value (so I thought this was a less intrusive 
+> > implementation).
+> >
+> >
+> I have v3 ready (changes done in amba-pl011.c and devicetree/bindings)
+> please let me know if I should send those instead.
 
-Is this series breaking ABI? If yes, why not do what Maxime did for the
-Allwinner/sunxi clocks and just fully convert over to a
-one-node-per-clock-controller binding? This one-node-per-clock stuff is
-pretty unfortunate, and if we're deprecating platforms (patch #1) then
-now might be a good time to re-evaluate the whole thing.
+Yes, please do. Are you using the clock-assigned-rates property?
 
 Regards,
 Mike
 
->  
-> > Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
-> > ---
-> >  .../devicetree/bindings/clock/st/st,clkgen-mux.txt |  2 +-
-> >  .../devicetree/bindings/clock/st/st,clkgen-pll.txt | 11 ++--
-> >  .../devicetree/bindings/clock/st/st,clkgen.txt     |  2 +-
-> >  .../devicetree/bindings/clock/st/st,quadfs.txt     |  6 +--
-> >  drivers/clk/st/clkgen-fsyn.c                       | 41 ++++++--------
-> >  drivers/clk/st/clkgen-mux.c                        | 28 ++++------
-> >  drivers/clk/st/clkgen-pll.c                        | 62 ++++++++++------------
-> >  7 files changed, 65 insertions(+), 87 deletions(-)
-> > 
-> > diff --git a/Documentation/devicetree/bindings/clock/st/st,clkgen-mux.txt b/Documentation/devicetree/bindings/clock/st/st,clkgen-mux.txt
-> > index 4d277d6..9a46cb1d7 100644
-> > --- a/Documentation/devicetree/bindings/clock/st/st,clkgen-mux.txt
-> > +++ b/Documentation/devicetree/bindings/clock/st/st,clkgen-mux.txt
-> > @@ -10,7 +10,7 @@ This binding uses the common clock binding[1].
-> >  Required properties:
-> >  
-> >  - compatible : shall be:
-> > -     "st,stih407-clkgen-a9-mux",     "st,clkgen-mux"
-> > +     "st,stih407-clkgen-a9-mux"
-> >  
-> >  - #clock-cells : from common clock binding; shall be set to 0.
-> >  
-> > diff --git a/Documentation/devicetree/bindings/clock/st/st,clkgen-pll.txt b/Documentation/devicetree/bindings/clock/st/st,clkgen-pll.txt
-> > index c9fd674..be0b043 100644
-> > --- a/Documentation/devicetree/bindings/clock/st/st,clkgen-pll.txt
-> > +++ b/Documentation/devicetree/bindings/clock/st/st,clkgen-pll.txt
-> > @@ -9,11 +9,10 @@ Base address is located to the parent node. See clock binding[2]
-> >  Required properties:
-> >  
-> >  - compatible : shall be:
-> > -     "st,stih407-plls-c32-a0",       "st,clkgen-plls-c32"
-> > -     "st,stih407-plls-c32-a9",       "st,clkgen-plls-c32"
-> > -     "sst,plls-c32-cx_0",            "st,clkgen-plls-c32"
-> > -     "sst,plls-c32-cx_1",            "st,clkgen-plls-c32"
-> > -     "st,stih418-plls-c28-a9",       "st,clkgen-plls-c32"
 > 
-> > +     "st,clkgen-pll0"
-> > +     "st,clkgen-pll0"
 > 
-> Repeated. Supposed to be 0 and 1? This seems a bit generic, too.
 > 
-> > +     "st,stih407-clkgen-plla9"
-> > +     "st,stih418-clkgen-plla9"
