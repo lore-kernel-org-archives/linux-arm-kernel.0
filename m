@@ -1,265 +1,209 @@
 From: dave.long@linaro.org (David Long)
-Date: Fri,  8 Jul 2016 12:35:44 -0400
-Subject: [PATCH v15 00/10] arm64: Add kernel probes (kprobes) support
-Message-ID: <1467995754-32508-1-git-send-email-dave.long@linaro.org>
+Date: Fri,  8 Jul 2016 12:35:47 -0400
+Subject: [PATCH v15 03/10] arm64: add conditional instruction simulation
+ support
+In-Reply-To: <1467995754-32508-1-git-send-email-dave.long@linaro.org>
+References: <1467995754-32508-1-git-send-email-dave.long@linaro.org>
+Message-ID: <1467995754-32508-4-git-send-email-dave.long@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: "David A. Long" <dave.long@linaro.org>
 
-This patchset is heavily based on Sandeepa Prabhu's ARM v8 kprobes patches,
-first seen in October 2013. This version attempts to address concerns
-raised by reviewers and also fixes problems discovered during testing.
+Cease using the arm32 arm_check_condition() function and replace it with
+a local version for use in deprecated instruction support on arm64. Also
+make the function table used by this available for future use by kprobes
+and/or uprobes.
 
-This patchset adds support for kernel probes(kprobes), jump probes(jprobes)
-and return probes(kretprobes) support for ARM64.
+This function is derived from code written by Sandeepa Prabhu.
 
-The kprobes mechanism makes use of software breakpoint and single stepping
-support available in the ARM v8 kernel.
+Signed-off-by: Sandeepa Prabhu <sandeepa.s.prabhu@gmail.com>
+Signed-off-by: David A. Long <dave.long@linaro.org>
+Acked-by: Masami Hiramatsu <mhiramat@kernel.org>
+---
+ arch/arm64/include/asm/insn.h        |  3 ++
+ arch/arm64/kernel/Makefile           |  3 +-
+ arch/arm64/kernel/armv8_deprecated.c | 19 ++++++-
+ arch/arm64/kernel/insn.c             | 98 ++++++++++++++++++++++++++++++++++++
+ 4 files changed, 119 insertions(+), 4 deletions(-)
 
-Changes since v2 include:
-
-1) Removal of NOP padding in kprobe XOL slots. Slots are now exactly one
-instruction long.
-2) Disabling of interrupts during execution in single-step mode.
-3) Fixing of numerous problems in instruction simulation code (mostly
-thanks to Will Cohen).
-4) Support for the HAVE_REGS_AND_STACK_ACCESS_API feature is added, to
-allow access to kprobes through debugfs.
-5) kprobes is *not* enabled in defconfig.
-6) Numerous complaints from checkpatch have been cleaned up, although a
-couple remain as removing the function pointer typedefs results in ugly
-code.
-
-Changes since v3 include:
-
-1) Remove table-driven instruction parsing and replace with an if statement
-calling out to old and new instruction test functions in insn.c.
-2) I removed the addition of orig_x0 to ptrace.h.
-3) Reorder the patches.
-4) Replace the previous interrupt disabling (from Will Cohen) with
-an improved solution (from Steve Capper).
-
-Changes since v4 include:
-
-1) Added insn.c functions to detect exception instructions and DAIF
-   read/write instructions, and use them to reject probing same.
-2) Changed adr detect function to also recognize adrp. Reject both.
-3) Added missing __kprobes for some new functions.
-4) Added call to kprobes_fault_handler from mm do_page_fault.
-5) Reject all non-simulated branch/ret instructions, not just those
-   that use an immediate offset.
-6) Moved software breakpoint definitions into debug-monitors.h.
-7) Removed "!XIP_KERNEL" from Kconfig.
-8) changed kprobes_condition_check_t and kprobes_prepare_t to probes_*,
-   for future sharing with uprobes.
-9) Removed bogus call to kprobes_restore_local_irqflag() from 
-   trampoline_probe_handler().
-
-Changes since v5 include:
-
-1) Replaced installation of breakpoint hook with direct call from the
-handlers in debug-monitors.c, as requested.
-2) Reject probing of instructions that read the interrupt mask, in
-addition to instructions that set it.
-3) Cleaned up comments describing usage of Debug Mask.
-4) Added KPROBE_REENTER case in reenter_kprobe.
-5) Corrected the ifdef'd definitions for notify_page_fault() to be
-consistent when KPROBES is not configed.
-6) Changed "cpsr" to "pstate" for HAVE_REGS_AND_STACK_ACCESS_API feature.
-7) Added back in missing new files in previous patch.
-8) Changed two instances of pr_warning() to pr_warn().
-
-Note that there seems to be at least a potential issue with kprobes
-on multiple (possibly all) platforms having to do with use of kfree
-inside of the kretprobes trampoline handler.  This has manifested
-occasionally in systemtap testing on arm64.  There does not appear to
-be an simple solution to the problem.
-
-Changes since v6 include:
-
-1) New trampoline code from Will Cohen fixes the occasional failure seen
-when processing kretprobes by replacing the software breakpoint with
-assembly code to implement the return to the original execution stream.
-2) Changed ip0, ip1, fp, and lr to plain numbered registers for purposes
-of recognizing them as an ascii string in the stack/reg access code.
-3) Removed orig_x0.
-4) Moved ARM_x* defines from arch/arm64/include/uapi/asm/ptrace.h to
-arch/arm64/kernel/ptrace.c.
-
-Changes since v7 include:
-
-1) Move trampoline entry/return code into separate ".S" file instead
-of making it a macro in a header file.
-2) Add missing register name definitions in asm-offsets.c and use them
-in place of hard-coded integer offsets in the trampoline code.
-3) Correct the values used to decode MSR immediate instructions, in insn.h.
-4) Remove the currently unused simulate_none() function.
-
-Changes since v8 include:
-
-1) Replaced use of REG_OFFSET_NAME with GPR_OFFSET_NAME for numbered
-registers.
-2) Added an alias for "lr" in the register name lookup table, which perf
-tools need to be able to recognize.
-3) Changed the code for checking instruction types for probeability and
-steppability as per review feedback.
-4) Fixed the size of cache being flushed when filling single-step slot.
-5) Fixed big-endian issues.
-6) Blacklisted copy_to/from_user to avoid aborts while single-stepping.
-7) Record conditional instructions that fail the conditional test just
-like any other probed (non-conditional) instruction.
-8) Removed use of magic number for detecting jprobe return and just
-check the breakpoint address instead.
-9) Got rid of the unnecessary arch/arm64/kprobes.h.
-10) The PSTATE and SP are now properly saved in the kretprobe trampoline
-code.
-11) This patch no longer depends on the "Consolidate redundant
-register/stack access code" patch set.
-12) Remove call to fixup_exception from kprobe_fault_handler.
-
-Changes since v9 include:
-
-1) Remove arch/arm/opcodes.c from the arm64 build and move the renamed
-arm64_check_condition() function to armv8_deprecated.c. Remove the
-asmlinkage.
-2) Various other type and style changes suggested by Marc Zyngier.
-3) Put back the call to fixup_exception from kprobe_fault_handler.
-It proved to be necessary for correct operation.
-
-Changes since v10 include:
-
-1) Rename arm64_check_condition() to arm32_check_condition().
-2) Remove redundant define of ARM_OPCODE_CONDITION_UNCOND.
-3) Use a accessor functions to read and write registers by number
-in the simulation code, to avoid accidentally overriding parts of
-the pt_regs structure (e.g.: when the reg is xzr).
-4) Remove unused register offset defines.
-5) Replace instance of "(void *) 0" with NULL.
-6) Rewrite the kretprobe trampoline code using arch/arm64/kvm/hyp/entry.S
-as an example. Construct a more complete saved PSTATE in this code.
-
-Changes since v11 include:
-
-1) Add check for address within irq stack, in regs_within_kernel_stack()
-2) Replaced inappropriate use of user_pt_regs with pt_regs.
-3) Added comments to opcode_condition_checks table explaining equivalence
-of "nv" and "al" condition codes.
-4) Cleaned up some subtle problems in the instruction simulation code.
-5) Readability improvements in kprobes_trampoline.S.
-6) Additional blacklisting for entry code, exception handling code, and
-select debug functions.
-7) Check address to be probed for proper alignment.
-8) Add rodata section to areas where kprobes may not be placed.
-
-Changes since v12 include:
-
-1) Changed regs_get_register() to expicitly reference pt_regs structure
-fields instead of just using an address offset.
-2) Reject probing of eret.
-3) Correctly handle addresses on the interrupt stack
-4) Add kprobe_ctlblk argument to static irqflag handling functions to avoid
-doing extra calls to get_kprobe_ctlblk().
-5) Removed a couple of logically redundant assignments to kprobe_status.
-6) Added calls to pause_graph_tracing/unpause_graph_tracing to avoid
-disaster when kprobe'ing and tracing at the same time.
-7) Added idmap and hypervisor text sections to blacklisted regions
-8) Numerous additional comments, formatting changes, and rearranging
-of if-else statements.
-
-Changes since v13 include:
-
-1) Fixed regs_get_register() from previous version to correctly calculate
-the offset of registers in struct pt_regs.
-2) I removed the removal of the typecast inside the instruction_pointer()
-define in ptrace.h, and added a define for instruction_pointer_set(). This
-was necessary to correct warnings that were being emitted when compiling
-kgdb code.
-3) Removed a redundant/bogus "NOKPROBE_SYMBOL(do_debug_exception)"
-statement.
-4) Fixed aarch64_insn_extract_system_reg() from previous version to use the
-correct name "aarch64_insn_extract_system_reg()".
-5) Changed opcode_condition_checks[] to aarch32_opcode_cond_checks[] and
-arm32_check_condition() to aarch32_check_condition().
-6) I switched the order of the main kprobes patch and the symbol function
-blacklisting patch back to the order they were done in the earlier patches.
-7) I got rid of struct kprobe_pc_restore and now just use a non-zero saved
-PC as the flag to restore the PC.
-8) I changed the names of some of the arm64 kprobes source files and moved
-then into their own "kprobes" subdirectory under arch/arm64/kernel.
-9) I moved the INSN_GOOD_NO_SLOT enum value to the later commit that makes
-use of it.
-10) I added kernel_disable_single_stap() and spsr_set_debug_flag() calls in
-kprobe_fault_handler() for the KPROBE_REENTER case.
-11) I brought trampoline_probe_handler() up to date with x86 sources to
-pick up a fix from Syuhei (commit 737480a0d525).
-12) I changed samples/kprobes/kprobe_example.c modifications to more
-closely match what is currently done for other architectures.
-
-Changes since v14:
-
-1) Change the name of arch/arm64/kernel/kprobes to
-arch/arm64/kernel/probes/ and fix the name in the Makefile and comments.
-2) Include include/linux/asm-generic/ptrace.h in
-arch/arm64/include/asm/ptrace.h, add the required definitions in the latter
-to make this work, and add a couple typecasts in
-arch/arm64/kernel/probes/kprobes.c to accomodate this.
-3) added Ack's to commits.
-
-David A. Long (3):
-  arm64: Add HAVE_REGS_AND_STACK_ACCESS_API feature
-  arm64: Add more test functions to insn.c
-  arm64: add conditional instruction simulation support
-
-Pratyush Anand (2):
-  arm64: Blacklist non-kprobe-able symbol
-  arm64: Treat all entry code as non-kprobe-able
-
-Sandeepa Prabhu (4):
-  arm64: Kprobes with single stepping support
-  arm64: kprobes instruction simulation support
-  arm64: Add kernel return probes support (kretprobes)
-  kprobes: Add arm64 case in kprobe example module
-
-William Cohen (1):
-  arm64: Add trampoline code for kretprobes
-
- arch/arm64/Kconfig                            |   3 +
- arch/arm64/include/asm/debug-monitors.h       |   5 +
- arch/arm64/include/asm/insn.h                 |  41 ++
- arch/arm64/include/asm/kprobes.h              |  62 +++
- arch/arm64/include/asm/probes.h               |  35 ++
- arch/arm64/include/asm/ptrace.h               |  66 ++-
- arch/arm64/kernel/Makefile                    |   5 +-
- arch/arm64/kernel/arm64ksyms.c                |   2 +
- arch/arm64/kernel/armv8_deprecated.c          |  19 +-
- arch/arm64/kernel/asm-offsets.c               |  11 +
- arch/arm64/kernel/debug-monitors.c            |  33 +-
- arch/arm64/kernel/entry.S                     |   3 +
- arch/arm64/kernel/hw_breakpoint.c             |   8 +
- arch/arm64/kernel/insn.c                      | 133 +++++
- arch/arm64/kernel/kgdb.c                      |   4 +
- arch/arm64/kernel/probes/Makefile             |   3 +
- arch/arm64/kernel/probes/decode-insn.c        | 174 +++++++
- arch/arm64/kernel/probes/decode-insn.h        |  35 ++
- arch/arm64/kernel/probes/kprobes.c            | 675 ++++++++++++++++++++++++++
- arch/arm64/kernel/probes/kprobes_trampoline.S |  85 ++++
- arch/arm64/kernel/probes/simulate-insn.c      | 218 +++++++++
- arch/arm64/kernel/probes/simulate-insn.h      |  28 ++
- arch/arm64/kernel/ptrace.c                    | 118 +++++
- arch/arm64/kernel/vmlinux.lds.S               |   2 +
- arch/arm64/mm/fault.c                         |  26 +
- samples/kprobes/kprobe_example.c              |   9 +
- 26 files changed, 1794 insertions(+), 9 deletions(-)
- create mode 100644 arch/arm64/include/asm/kprobes.h
- create mode 100644 arch/arm64/include/asm/probes.h
- create mode 100644 arch/arm64/kernel/probes/Makefile
- create mode 100644 arch/arm64/kernel/probes/decode-insn.c
- create mode 100644 arch/arm64/kernel/probes/decode-insn.h
- create mode 100644 arch/arm64/kernel/probes/kprobes.c
- create mode 100644 arch/arm64/kernel/probes/kprobes_trampoline.S
- create mode 100644 arch/arm64/kernel/probes/simulate-insn.c
- create mode 100644 arch/arm64/kernel/probes/simulate-insn.h
-
+diff --git a/arch/arm64/include/asm/insn.h b/arch/arm64/include/asm/insn.h
+index 497f7a2..a44abbd 100644
+--- a/arch/arm64/include/asm/insn.h
++++ b/arch/arm64/include/asm/insn.h
+@@ -406,6 +406,9 @@ u32 aarch64_insn_extract_system_reg(u32 insn);
+ u32 aarch32_insn_extract_reg_num(u32 insn, int offset);
+ u32 aarch32_insn_mcr_extract_opc2(u32 insn);
+ u32 aarch32_insn_mcr_extract_crm(u32 insn);
++
++typedef bool (pstate_check_t)(unsigned long);
++extern pstate_check_t * const aarch32_opcode_cond_checks[16];
+ #endif /* __ASSEMBLY__ */
+ 
+ #endif	/* __ASM_INSN_H */
+diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+index 2173149..4653aca 100644
+--- a/arch/arm64/kernel/Makefile
++++ b/arch/arm64/kernel/Makefile
+@@ -26,8 +26,7 @@ $(obj)/%.stub.o: $(obj)/%.o FORCE
+ 	$(call if_changed,objcopy)
+ 
+ arm64-obj-$(CONFIG_COMPAT)		+= sys32.o kuser32.o signal32.o 	\
+-					   sys_compat.o entry32.o		\
+-					   ../../arm/kernel/opcodes.o
++					   sys_compat.o entry32.o
+ arm64-obj-$(CONFIG_FUNCTION_TRACER)	+= ftrace.o entry-ftrace.o
+ arm64-obj-$(CONFIG_MODULES)		+= arm64ksyms.o module.o
+ arm64-obj-$(CONFIG_ARM64_MODULE_PLTS)	+= module-plts.o
+diff --git a/arch/arm64/kernel/armv8_deprecated.c b/arch/arm64/kernel/armv8_deprecated.c
+index c37202c..2934894 100644
+--- a/arch/arm64/kernel/armv8_deprecated.c
++++ b/arch/arm64/kernel/armv8_deprecated.c
+@@ -366,6 +366,21 @@ static int emulate_swpX(unsigned int address, unsigned int *data,
+ 	return res;
+ }
+ 
++#define	ARM_OPCODE_CONDITION_UNCOND	0xf
++
++static unsigned int __kprobes aarch32_check_condition(u32 opcode, u32 psr)
++{
++	u32 cc_bits  = opcode >> 28;
++
++	if (cc_bits != ARM_OPCODE_CONDITION_UNCOND) {
++		if ((*aarch32_opcode_cond_checks[cc_bits])(psr))
++			return ARM_OPCODE_CONDTEST_PASS;
++		else
++			return ARM_OPCODE_CONDTEST_FAIL;
++	}
++	return ARM_OPCODE_CONDTEST_UNCOND;
++}
++
+ /*
+  * swp_handler logs the id of calling process, dissects the instruction, sanity
+  * checks the memory location, calls emulate_swpX for the actual operation and
+@@ -380,7 +395,7 @@ static int swp_handler(struct pt_regs *regs, u32 instr)
+ 
+ 	type = instr & TYPE_SWPB;
+ 
+-	switch (arm_check_condition(instr, regs->pstate)) {
++	switch (aarch32_check_condition(instr, regs->pstate)) {
+ 	case ARM_OPCODE_CONDTEST_PASS:
+ 		break;
+ 	case ARM_OPCODE_CONDTEST_FAIL:
+@@ -461,7 +476,7 @@ static int cp15barrier_handler(struct pt_regs *regs, u32 instr)
+ {
+ 	perf_sw_event(PERF_COUNT_SW_EMULATION_FAULTS, 1, regs, regs->pc);
+ 
+-	switch (arm_check_condition(instr, regs->pstate)) {
++	switch (aarch32_check_condition(instr, regs->pstate)) {
+ 	case ARM_OPCODE_CONDTEST_PASS:
+ 		break;
+ 	case ARM_OPCODE_CONDTEST_FAIL:
+diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
+index 28c6110f..5cb2f3d 100644
+--- a/arch/arm64/kernel/insn.c
++++ b/arch/arm64/kernel/insn.c
+@@ -1234,3 +1234,101 @@ u32 aarch32_insn_mcr_extract_crm(u32 insn)
+ {
+ 	return insn & CRM_MASK;
+ }
++
++static bool __kprobes __check_eq(unsigned long pstate)
++{
++	return (pstate & PSR_Z_BIT) != 0;
++}
++
++static bool __kprobes __check_ne(unsigned long pstate)
++{
++	return (pstate & PSR_Z_BIT) == 0;
++}
++
++static bool __kprobes __check_cs(unsigned long pstate)
++{
++	return (pstate & PSR_C_BIT) != 0;
++}
++
++static bool __kprobes __check_cc(unsigned long pstate)
++{
++	return (pstate & PSR_C_BIT) == 0;
++}
++
++static bool __kprobes __check_mi(unsigned long pstate)
++{
++	return (pstate & PSR_N_BIT) != 0;
++}
++
++static bool __kprobes __check_pl(unsigned long pstate)
++{
++	return (pstate & PSR_N_BIT) == 0;
++}
++
++static bool __kprobes __check_vs(unsigned long pstate)
++{
++	return (pstate & PSR_V_BIT) != 0;
++}
++
++static bool __kprobes __check_vc(unsigned long pstate)
++{
++	return (pstate & PSR_V_BIT) == 0;
++}
++
++static bool __kprobes __check_hi(unsigned long pstate)
++{
++	pstate &= ~(pstate >> 1);	/* PSR_C_BIT &= ~PSR_Z_BIT */
++	return (pstate & PSR_C_BIT) != 0;
++}
++
++static bool __kprobes __check_ls(unsigned long pstate)
++{
++	pstate &= ~(pstate >> 1);	/* PSR_C_BIT &= ~PSR_Z_BIT */
++	return (pstate & PSR_C_BIT) == 0;
++}
++
++static bool __kprobes __check_ge(unsigned long pstate)
++{
++	pstate ^= (pstate << 3);	/* PSR_N_BIT ^= PSR_V_BIT */
++	return (pstate & PSR_N_BIT) == 0;
++}
++
++static bool __kprobes __check_lt(unsigned long pstate)
++{
++	pstate ^= (pstate << 3);	/* PSR_N_BIT ^= PSR_V_BIT */
++	return (pstate & PSR_N_BIT) != 0;
++}
++
++static bool __kprobes __check_gt(unsigned long pstate)
++{
++	/*PSR_N_BIT ^= PSR_V_BIT */
++	unsigned long temp = pstate ^ (pstate << 3);
++
++	temp |= (pstate << 1);	/*PSR_N_BIT |= PSR_Z_BIT */
++	return (temp & PSR_N_BIT) == 0;
++}
++
++static bool __kprobes __check_le(unsigned long pstate)
++{
++	/*PSR_N_BIT ^= PSR_V_BIT */
++	unsigned long temp = pstate ^ (pstate << 3);
++
++	temp |= (pstate << 1);	/*PSR_N_BIT |= PSR_Z_BIT */
++	return (temp & PSR_N_BIT) != 0;
++}
++
++static bool __kprobes __check_al(unsigned long pstate)
++{
++	return true;
++}
++
++/*
++ * Note that the ARMv8 ARM calls condition code 0b1111 "nv", but states that
++ * it behaves identically to 0b1110 ("al").
++ */
++pstate_check_t * const aarch32_opcode_cond_checks[16] = {
++	__check_eq, __check_ne, __check_cs, __check_cc,
++	__check_mi, __check_pl, __check_vs, __check_vc,
++	__check_hi, __check_ls, __check_ge, __check_lt,
++	__check_gt, __check_le, __check_al, __check_al
++};
 -- 
 2.5.0
