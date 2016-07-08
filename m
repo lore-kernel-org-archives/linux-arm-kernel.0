@@ -1,58 +1,75 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Fri, 08 Jul 2016 15:50:59 +0200
-Subject: [PATCH v2] arm: omap1_defconfig: convert to use libata PATA drivers
-In-Reply-To: <1467985859-23500-1-git-send-email-b.zolnierkie@samsung.com>
-References: <1467985859-23500-1-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <1467985859-23500-2-git-send-email-b.zolnierkie@samsung.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 8 Jul 2016 14:54:47 +0100
+Subject: [PATCH 1/1] arm64/hugetlb: clear PG_dcache_clean if the page is
+ dirty when munmap
+In-Reply-To: <577F1FD9.1040205@huawei.com>
+References: <1467893344-8352-1-git-send-email-thunder.leizhen@huawei.com>
+ <20160707153741.GC27180@e104818-lin.cambridge.arm.com>
+ <577F1FD9.1040205@huawei.com>
+Message-ID: <20160708135447.GB22099@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-IDE subsystem has been deprecated since 2009 and the majority
-(if not all) of Linux distributions have switched to use
-libata for ATA support exclusively.  However there are still
-some users (mostly old or/and embedded non-x86 systems) that
-have not converted from using IDE subsystem to libata PATA
-drivers.  This doesn't seem to be good thing in the long-term
-for Linux as while there is less and less PATA systems left
-in use:
+On Fri, Jul 08, 2016 at 11:36:57AM +0800, Leizhen (ThunderTown) wrote:
+> On 2016/7/7 23:37, Catalin Marinas wrote:
+> > On Thu, Jul 07, 2016 at 08:09:04PM +0800, Zhen Lei wrote:
+> >> At present, PG_dcache_clean is only cleared when the related huge page
+> >> is about to be freed. But sometimes, there maybe a process is in charge
+> >> to copy binary codes into a shared memory, and notifies other processes
+> >> to execute base on that. For the first time, there is no problem, because
+> >> the default value of page->flags is PG_dcache_clean cleared. So the cache
+> >> will be maintained at the time of set_pte_at for other processes. But if
+> >> the content of the shared memory have been updated again, there is no
+> >> cache operations, because the PG_dcache_clean is still set.
+> >>
+> >> For example:
+> >> Process A
+> >> 	open a hugetlbfs file
+> >> 	mmap it as a shared memory
+> >> 	copy some binary codes into it
+> >> 	munmap
+> >>
+> >> Process B
+> >> 	open the hugetlbfs file
+> >> 	mmap it as a shared memory, executable
+> >> 	invoke the functions in the shared memory
+> >> 	munmap
+> >>
+> >> repeat the above steps.
+> > 
+> > Does this work as you would expect with small pages (and for example
+> > shared file mmap)? I don't want to have a different behaviour between
+> > small and huge pages.
+> 
+> The small pages also have this problem, I will try to fix it too.
 
-* testing efforts are divided between two subsystems
+Have you run the above tests on a standard file (with small pages)? It's
+strange that we haven't hit this so far with gcc or something else
+generating code (unless they don't use mmap but just sequential writes).
 
-* having duplicate drivers for same hardware confuses users
+If both cases need solving, we might better move the fix in the
+__sync_icache_dcache() function. Untested:
 
-This patch converts omap1_defconfig to use libata PATA
-drivers.
+------------8<----------------
+diff --git a/arch/arm64/mm/flush.c b/arch/arm64/mm/flush.c
+index dbd12ea8ce68..c753fa804165 100644
+--- a/arch/arm64/mm/flush.c
++++ b/arch/arm64/mm/flush.c
+@@ -75,7 +75,8 @@ void __sync_icache_dcache(pte_t pte, unsigned long addr)
+ 	if (!page_mapping(page))
+ 		return;
+ 
+-	if (!test_and_set_bit(PG_dcache_clean, &page->flags))
++	if (!test_and_set_bit(PG_dcache_clean, &page->flags) ||
++	    PageDirty(page))
+ 		sync_icache_aliases(page_address(page),
+ 				    PAGE_SIZE << compound_order(page));
+ 	else if (icache_is_aivivt())
+----------------8<---------------------
 
-Cc: linux-omap at vger.kernel.org
-Acked-by: Tony Lindgren <tony@atomide.com>
-Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
----
-v2:
-- added Acked-by tag from Tony
+BTW, can you make your tests (source) available somewhere?
 
- arch/arm/configs/omap1_defconfig | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Thanks.
 
-diff --git a/arch/arm/configs/omap1_defconfig b/arch/arm/configs/omap1_defconfig
-index 0c8a787..6ffc984 100644
---- a/arch/arm/configs/omap1_defconfig
-+++ b/arch/arm/configs/omap1_defconfig
-@@ -96,14 +96,14 @@ CONFIG_BLK_DEV_LOOP=y
- CONFIG_BLK_DEV_RAM=y
- CONFIG_BLK_DEV_RAM_COUNT=2
- CONFIG_BLK_DEV_RAM_SIZE=8192
--CONFIG_IDE=m
--CONFIG_BLK_DEV_IDECS=m
- CONFIG_SCSI=y
- # CONFIG_SCSI_PROC_FS is not set
- CONFIG_BLK_DEV_SD=y
- CONFIG_CHR_DEV_ST=y
- CONFIG_BLK_DEV_SR=y
- CONFIG_CHR_DEV_SG=y
-+CONFIG_ATA=m
-+CONFIG_PATA_PCMCIA=m
- CONFIG_NETDEVICES=y
- CONFIG_TUN=y
- CONFIG_PHYLIB=y
 -- 
-1.9.1
+Catalin
