@@ -1,69 +1,102 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri,  8 Jul 2016 10:40:39 +0800
-Subject: [PATCH] ARM: dts: sun8i-h3: Rename sinovoip-bpi-m2-plus to
- bananapi-m2-plus
-Message-ID: <1467945639-12844-1-git-send-email-wens@csie.org>
+From: hzpeterchen@gmail.com (Peter Chen)
+Date: Fri, 8 Jul 2016 10:37:17 +0800
+Subject: [PATCH 1/6] binding-doc: power: pwrseq-generic: add binding doc
+ for generic power sequence library
+In-Reply-To: <1467884834.4236.36.camel@pengutronix.de>
+References: <1467882892-27589-1-git-send-email-peter.chen@nxp.com>
+ <1467882892-27589-2-git-send-email-peter.chen@nxp.com>
+ <1467884834.4236.36.camel@pengutronix.de>
+Message-ID: <20160708023717.GC27779@shlinux2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Banana Pi series is a well known series of single board computers.
-The manufacturer, Sinovoip, is less well known. Moreover, the board
-markings do not mention Sinovoip, but only the Banana Pi logo, and
-the BPI-M* model name.
+On Thu, Jul 07, 2016 at 11:47:14AM +0200, Philipp Zabel wrote:
+> Am Donnerstag, den 07.07.2016, 17:14 +0800 schrieb Peter Chen:
+> > Add binding doc for generic power sequence library.
+> > 
+> > Signed-off-by: Peter Chen <peter.chen@nxp.com>
+> > ---
+> >  .../bindings/power/pwrseq/pwrseq-generic.txt       | 56 ++++++++++++++++++++++
+> >  1 file changed, 56 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/power/pwrseq/pwrseq-generic.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/power/pwrseq/pwrseq-generic.txt b/Documentation/devicetree/bindings/power/pwrseq/pwrseq-generic.txt
+> > new file mode 100644
+> > index 0000000..4b23834
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/power/pwrseq/pwrseq-generic.txt
+> > @@ -0,0 +1,56 @@
+> > +The generic power sequence library
+> > +
+> > +Some hard-wired USB/MMC devices need to do power sequence to let the
+> > +device work normally, the typical power sequence like: enable USB
+> > +PHY clock, toggle reset pin, etc. But current Linux USB driver
+> > +lacks of such code to do it, it may cause some hard-wired USB devices
+> > +works abnormal or can't be recognized by controller at all. The
+> > +power sequence will be done before this device can be found at USB
+> > +bus.
+> > +
+> > +The power sequence properties is under the device node.
+> > +
+> > +Required properties:
+> > +- power-sequence: this device needs to do power sequence before enumeration
+> > +
+> > +Optional properties:
+> > +- clocks: the input clock for device.
+> > +- clock-name: must be "pwrseq-clk"
+> 
+> The "-clk" in the clock name is redundant.
+> 
+> > +- pwrseq-reset-gpios: Should specify the GPIO for reset.
+> > +- pwrseq-reset-duration-us: the duration in microsecond for assert reset signal.
+> 
+> I understand you want to make it explicit that this GPIO is for the
+> pwrseq library, but are we really gaining anything over just calling
+> these reset-gpios and reset-duration-us?
+> The same applies to the clock name above.
+> 
+> > +Below is the example of USB power sequence properties on USB device
+> > +nodes which have two level USB hubs.
+> > +
+> > +&usbotg1 {
+> > +	vbus-supply = <&reg_usb_otg1_vbus>;
+> > +	pinctrl-names = "default";
+> > +	pinctrl-0 = <&pinctrl_usb_otg1_id>;
+> > +	status = "okay";
+> > +
+> > +	#address-cells = <1>;
+> > +	#size-cells = <0>;
+> > +	hub: genesys at 1 {
+> > +		compatible = "usb5e3,608";
+> > +		reg = <1>;
+> > +
+> > +		power-sequence;
+> > +		clocks = <&clks IMX6SX_CLK_CKO>;
+> > +		clock-names = "pwrseq-clk";
+> > +		pwrseq-reset-gpios = <&gpio4 5 GPIO_ACTIVE_LOW>; /* hub reset pin */
+> > +		pwrseq-reset-duration-us = <10>;
+> > +
+> > +		#address-cells = <1>;
+> > +		#size-cells = <0>;
+> > +		ethernet: asix at 1 {
+> > +			compatible = "usbb95,1708";
+> > +			reg = <1>;
+> > +
+> > +			power-sequence;
+> > +			clocks = <&clks IMX6SX_CLK_IPG>;
+> > +			clock-names = "pwrseq-clk";
+> > +			pwrseq-reset-gpios = <&gpio4 6 GPIO_ACTIVE_LOW>; /* ethernet_rst */
+> > +			pwrseq-reset-duration-us = <15>;
+> > +		};
+> 
+> This looks weird. The hub and ethernet chips don't have "pwrseq" clock
+> and reset input pins. I'd remove the clock-names and pwrseq- reset
+> prefix.
+> 
 
-Rename the dts file to use the more well known name. Also fix up
-some of the model names and labels to match other Banana Pi boards.
+I agree with you, and will keep property name like last version [1].
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- arch/arm/boot/dts/Makefile                                          | 2 +-
- ...8i-h3-sinovoip-bpi-m2-plus.dts => sun8i-h3-bananapi-m2-plus.dts} | 6 +++---
- 2 files changed, 4 insertions(+), 4 deletions(-)
- rename arch/arm/boot/dts/{sun8i-h3-sinovoip-bpi-m2-plus.dts => sun8i-h3-bananapi-m2-plus.dts} (97%)
-
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index e9fcd25701a0..b18a26925fa5 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -764,11 +764,11 @@ dtb-$(CONFIG_MACH_SUN8I) += \
- 	sun8i-a33-sinlinx-sina33.dtb \
- 	sun8i-a83t-allwinner-h8homlet-v2.dtb \
- 	sun8i-a83t-cubietruck-plus.dtb \
-+	sun8i-h3-bananapi-m2-plus.dtb \
- 	sun8i-h3-orangepi-2.dtb \
- 	sun8i-h3-orangepi-one.dtb \
- 	sun8i-h3-orangepi-pc.dtb \
- 	sun8i-h3-orangepi-plus.dtb \
--	sun8i-h3-sinovoip-bpi-m2-plus.dtb \
- 	sun8i-r16-parrot.dtb
- dtb-$(CONFIG_MACH_SUN9I) += \
- 	sun9i-a80-optimus.dtb \
-diff --git a/arch/arm/boot/dts/sun8i-h3-sinovoip-bpi-m2-plus.dts b/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts
-similarity index 97%
-rename from arch/arm/boot/dts/sun8i-h3-sinovoip-bpi-m2-plus.dts
-rename to arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts
-index d21bc57ce140..f3b1d5f6dbd2 100644
---- a/arch/arm/boot/dts/sun8i-h3-sinovoip-bpi-m2-plus.dts
-+++ b/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts
-@@ -49,8 +49,8 @@
- #include <dt-bindings/pinctrl/sun4i-a10.h>
- 
- / {
--	model = "Sinovoip BPI-M2+";
--	compatible = "sinovoip,bpi-m2+", "allwinner,sun8i-h3";
-+	model = "Banana Pi BPI-M2-Plus";
-+	compatible = "sinovoip,bpi-m2-plus", "allwinner,sun8i-h3";
- 
- 	aliases {
- 		serial0 = &uart0;
-@@ -67,7 +67,7 @@
- 		pinctrl-0 = <&pwr_led_bpi_m2p>;
- 
- 		pwr_led {
--			label = "bpi-m2+:red:pwr";
-+			label = "bananapi-m2-plus:red:pwr";
- 			gpios = <&r_pio 0 10 GPIO_ACTIVE_HIGH>; /* PL10 */
- 			default-state = "on";
- 		};
 -- 
-2.8.1
+
+Best Regards,
+Peter Chen
