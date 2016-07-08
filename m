@@ -1,47 +1,33 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Fri, 8 Jul 2016 12:23:11 +0200
-Subject: [PATCH v3 3/9] DocBook/v4l: Add compressed video formats used on
- MT8173 codec driver
-In-Reply-To: <1464611363-14936-4-git-send-email-tiffany.lin@mediatek.com>
-References: <1464611363-14936-1-git-send-email-tiffany.lin@mediatek.com>
- <1464611363-14936-2-git-send-email-tiffany.lin@mediatek.com>
- <1464611363-14936-3-git-send-email-tiffany.lin@mediatek.com>
- <1464611363-14936-4-git-send-email-tiffany.lin@mediatek.com>
-Message-ID: <5a793171-24a7-4e9e-8bfd-f668c789f8e0@xs4all.nl>
+From: shh.xie@gmail.com (shh.xie at gmail.com)
+Date: Fri, 8 Jul 2016 18:15:39 +0800
+Subject: [PATCH 0/5] arm64: dts: add QorIQ LS1046A SoC and boards support
+Message-ID: <1467972944-12293-1-git-send-email-shh.xie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/30/2016 02:29 PM, Tiffany Lin wrote:
-> Add V4L2_PIX_FMT_MT21 documentation
-> 
-> Signed-off-by: Tiffany Lin <tiffany.lin@mediatek.com>
-> ---
->  Documentation/DocBook/media/v4l/pixfmt.xml |    6 ++++++
->  1 file changed, 6 insertions(+)
-> 
-> diff --git a/Documentation/DocBook/media/v4l/pixfmt.xml b/Documentation/DocBook/media/v4l/pixfmt.xml
-> index 5a08aee..d40e0ce 100644
-> --- a/Documentation/DocBook/media/v4l/pixfmt.xml
-> +++ b/Documentation/DocBook/media/v4l/pixfmt.xml
-> @@ -1980,6 +1980,12 @@ array. Anything what's in between the UYVY lines is JPEG data and should be
->  concatenated to form the JPEG stream. </para>
->  </entry>
->  	  </row>
-> +	  <row id="V4L2_PIX_FMT_MT21">
-> +	    <entry><constant>V4L2_PIX_FMT_MT21</constant></entry>
-> +	    <entry>'MT21'</entry>
-> +	    <entry>Compressed two-planar YVU420 format used by Mediatek MT8173
-> +	    codec driver.</entry>
+From: Shaohui Xie <Shaohui.Xie@nxp.com>
 
-Can you give a few more details? The encoder driver doesn't seem to produce this
-format, so who is creating this? Where is this format documented?
+This patchest adds support for QorIQ LS1046A SoC which is based on ARMv8
+architecture, also adds LS1046A-RDB and LS1046A-QDS board support.
 
-Regards,
+Mingkai Hu (2):
+  arm64: dts: add QorIQ LS1046A SoC support
+  arm64: dts: add LS1046A-RDB board support
 
-	Hans
+Shaohui Xie (3):
+  Documentation: DT: Add entry for QorIQ LS1046A-RDB board
+  Documentation: DT: Add entry for QorIQ LS1046A-QDS board
+  arm64: dts: add LS1046A-QDS board support
 
-> +	  </row>
->  	</tbody>
->        </tgroup>
->      </table>
-> 
+ Documentation/devicetree/bindings/arm/fsl.txt     |   8 +
+ arch/arm64/boot/dts/freescale/Makefile            |   2 +
+ arch/arm64/boot/dts/freescale/fsl-ls1046a-qds.dts | 209 ++++++++
+ arch/arm64/boot/dts/freescale/fsl-ls1046a-rdb.dts | 138 ++++++
+ arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi    | 549 ++++++++++++++++++++++
+ 5 files changed, 906 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls1046a-qds.dts
+ create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls1046a-rdb.dts
+ create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
+
+-- 
+2.1.0.27.g96db324
