@@ -1,42 +1,40 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Fri,  8 Jul 2016 18:05:49 +0200
-Subject: [PATCH 08/15] ARM: dts: Copy sun8i-q8-common.dtsi
- sun8i-reference-design-tablet.dtsi
+Date: Fri,  8 Jul 2016 18:05:51 +0200
+Subject: [PATCH 10/15] ARM: dts: sun8i: Use sun8i-reference-design-tablet for
+ polaroid mid2809pxe04
 In-Reply-To: <1467993956-19535-1-git-send-email-hdegoede@redhat.com>
 References: <1467993956-19535-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1467993956-19535-9-git-send-email-hdegoede@redhat.com>
+Message-ID: <1467993956-19535-11-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Copy sun8i-q8-common.dtsi to sun8i-reference-design-tablet.dtsi. This
-is part of renaming all the sun?i-q8-common.dtsi files to
-sun?i-reference-design-tablet.dtsi since most of the hw-config in there
-is shared by all sunxi tablets.
-
-Note that in this case we keep sun5i-q8-common.dtsi as it is shared
-between a23 / a33 q8 tablets. Also we leave the usb-wifi config in
-there (rather then in sun8i-reference-design-tablet.dtsi) as most
-sun8i tablets use sdio wifi rather then usb wifi.
+This results in quite a nice cleanup for this dts file.
 
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
- arch/arm/boot/dts/sun8i-q8-common.dtsi             | 171 +--------------------
- ...mon.dtsi => sun8i-reference-design-tablet.dtsi} |  13 +-
- 2 files changed, 5 insertions(+), 179 deletions(-)
- copy arch/arm/boot/dts/{sun8i-q8-common.dtsi => sun8i-reference-design-tablet.dtsi} (96%)
+ .../boot/dts/sun8i-a23-polaroid-mid2809pxe04.dts   | 207 +--------------------
+ 1 file changed, 1 insertion(+), 206 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sun8i-q8-common.dtsi b/arch/arm/boot/dts/sun8i-q8-common.dtsi
-index 0b85ea4..60fa958 100644
---- a/arch/arm/boot/dts/sun8i-q8-common.dtsi
-+++ b/arch/arm/boot/dts/sun8i-q8-common.dtsi
-@@ -40,181 +40,12 @@
-  *     OTHER DEALINGS IN THE SOFTWARE.
-  */
- #include "sunxi-reference-design-tablet.dtsi"
+diff --git a/arch/arm/boot/dts/sun8i-a23-polaroid-mid2809pxe04.dts b/arch/arm/boot/dts/sun8i-a23-polaroid-mid2809pxe04.dts
+index e8c3f21..6d06e24 100644
+--- a/arch/arm/boot/dts/sun8i-a23-polaroid-mid2809pxe04.dts
++++ b/arch/arm/boot/dts/sun8i-a23-polaroid-mid2809pxe04.dts
+@@ -42,214 +42,9 @@
+ 
+ /dts-v1/;
+ #include "sun8i-a23.dtsi"
+-#include "sunxi-common-regulators.dtsi"
 -
+-#include <dt-bindings/gpio/gpio.h>
+-#include <dt-bindings/input/input.h>
+-#include <dt-bindings/pinctrl/sun4i-a10.h>
 -#include <dt-bindings/pwm/pwm.h>
++#include "sun8i-reference-design-tablet.dtsi"
+ 
+ / {
+ 	model = "Polaroid MID2809PXE04 tablet";
+ 	compatible = "polaroid,mid2809pxe04", "allwinner,sun8i-a23";
 -
--/ {
 -	aliases {
 -		serial0 = &r_uart;
 -	};
@@ -44,7 +42,7 @@ index 0b85ea4..60fa958 100644
 -	backlight: backlight {
 -		compatible = "pwm-backlight";
 -		pinctrl-names = "default";
--		pinctrl-0 = <&bl_en_pin_q8>;
+-		pinctrl-0 = <&bl_en_pin_mid2809>;
 -		pwms = <&pwm 0 50000 PWM_POLARITY_INVERTED>;
 -		brightness-levels = <0 10 20 30 40 50 60 70 80 90 100>;
 -		default-brightness-level = <8>;
@@ -55,15 +53,41 @@ index 0b85ea4..60fa958 100644
 -		stdout-path = "serial0:115200n8";
 -	};
 -};
-+#include "sun8i-reference-design-tablet.dtsi"
- 
- &ehci0 {
- 	status  = "okay";
- };
- 
+-
+-&i2c0 {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&i2c0_pins_a>;
+-	status = "okay";
+-};
+-
+-&i2c1 {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&i2c1_pins_a>;
+-	status = "okay";
+-};
+-
+-&lradc {
+-	vref-supply = <&reg_vcc3v0>;
+-	status = "okay";
+-
+-	button at 200 {
+-		label = "Volume Up";
+-		linux,code = <KEY_VOLUMEUP>;
+-		channel = <0>;
+-		voltage = <200000>;
+-	};
+-
+-	button at 400 {
+-		label = "Volume Down";
+-		linux,code = <KEY_VOLUMEDOWN>;
+-		channel = <0>;
+-		voltage = <400000>;
+-	};
+-};
+-
 -&mmc0 {
 -	pinctrl-names = "default";
--	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_q8>;
+-	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_mid2809>;
 -	vmmc-supply = <&reg_dcdc1>;
 -	bus-width = <4>;
 -	cd-gpios = <&pio 1 4 GPIO_ACTIVE_HIGH>; /* PB4 */
@@ -72,14 +96,14 @@ index 0b85ea4..60fa958 100644
 -};
 -
 -&pio {
--	bl_en_pin_q8: bl_en_pin at 0 {
+-	bl_en_pin_mid2809: bl_en_pin at 0 {
 -		allwinner,pins = "PH6";
 -		allwinner,function = "gpio_in";
 -		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
 -		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
 -	};
 -
--	mmc0_cd_pin_q8: mmc0_cd_pin at 0 {
+-	mmc0_cd_pin_mid2809: mmc0_cd_pin at 0 {
 -		allwinner,pins = "PB4";
 -		allwinner,function = "gpio_in";
 -		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
@@ -94,6 +118,12 @@ index 0b85ea4..60fa958 100644
 -	};
 -};
 -
+-&pwm {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&pwm0_pins>;
+-	status = "okay";
+-};
+-
 -&r_rsb {
 -	status = "okay";
 -
@@ -105,6 +135,12 @@ index 0b85ea4..60fa958 100644
 -		eldoin-supply = <&reg_dcdc1>;
 -		x-powers,drive-vbus-en;
 -	};
+-};
+-
+-&r_uart {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&r_uart_pins_a>;
+-	status = "okay";
 -};
 -
 -#include "axp22x.dtsi"
@@ -169,12 +205,6 @@ index 0b85ea4..60fa958 100644
 -	regulator-name = "vcc-dram";
 -};
 -
--&reg_dldo1 {
--	regulator-min-microvolt = <3300000>;
--	regulator-max-microvolt = <3300000>;
--	regulator-name = "vcc-wifi";
--};
--
 -&reg_drivevbus {
 -	regulator-name = "usb0-vbus";
 -	status = "okay";
@@ -182,12 +212,6 @@ index 0b85ea4..60fa958 100644
 -
 -&reg_rtc_ldo {
 -	regulator-name = "vcc-rtc";
--};
--
--&r_uart {
--	pinctrl-names = "default";
--	pinctrl-0 = <&r_uart_pins_a>;
--	status = "okay";
 -};
 -
 -&simplefb_lcd {
@@ -203,69 +227,13 @@ index 0b85ea4..60fa958 100644
 -	status = "okay";
 -};
 -
- &usbphy {
+-&usbphy {
 -	pinctrl-names = "default";
 -	pinctrl-0 = <&usb0_id_detect_pin>;
 -	usb0_id_det-gpio = <&pio 7 8 GPIO_ACTIVE_HIGH>; /* PH8 */
 -	usb0_vbus_power-supply = <&usb_power_supply>;
 -	usb0_vbus-supply = <&reg_drivevbus>;
- 	usb1_vbus-supply = <&reg_dldo1>;
 -	status = "okay";
- };
-diff --git a/arch/arm/boot/dts/sun8i-q8-common.dtsi b/arch/arm/boot/dts/sun8i-reference-design-tablet.dtsi
-similarity index 96%
-copy from arch/arm/boot/dts/sun8i-q8-common.dtsi
-copy to arch/arm/boot/dts/sun8i-reference-design-tablet.dtsi
-index 0b85ea4..b8546ef 100644
---- a/arch/arm/boot/dts/sun8i-q8-common.dtsi
-+++ b/arch/arm/boot/dts/sun8i-reference-design-tablet.dtsi
-@@ -51,7 +51,7 @@
- 	backlight: backlight {
- 		compatible = "pwm-backlight";
- 		pinctrl-names = "default";
--		pinctrl-0 = <&bl_en_pin_q8>;
-+		pinctrl-0 = <&bl_en_pin>;
- 		pwms = <&pwm 0 50000 PWM_POLARITY_INVERTED>;
- 		brightness-levels = <0 10 20 30 40 50 60 70 80 90 100>;
- 		default-brightness-level = <8>;
-@@ -63,13 +63,9 @@
- 	};
- };
- 
--&ehci0 {
--	status  = "okay";
--};
--
- &mmc0 {
- 	pinctrl-names = "default";
--	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_q8>;
-+	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin>;
- 	vmmc-supply = <&reg_dcdc1>;
- 	bus-width = <4>;
- 	cd-gpios = <&pio 1 4 GPIO_ACTIVE_HIGH>; /* PB4 */
-@@ -78,14 +74,14 @@
- };
- 
- &pio {
--	bl_en_pin_q8: bl_en_pin at 0 {
-+	bl_en_pin: bl_en_pin at 0 {
- 		allwinner,pins = "PH6";
- 		allwinner,function = "gpio_in";
- 		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
- 		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 	};
- 
--	mmc0_cd_pin_q8: mmc0_cd_pin at 0 {
-+	mmc0_cd_pin: mmc0_cd_pin at 0 {
- 		allwinner,pins = "PB4";
- 		allwinner,function = "gpio_in";
- 		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-@@ -215,6 +211,5 @@
- 	usb0_id_det-gpio = <&pio 7 8 GPIO_ACTIVE_HIGH>; /* PH8 */
- 	usb0_vbus_power-supply = <&usb_power_supply>;
- 	usb0_vbus-supply = <&reg_drivevbus>;
--	usb1_vbus-supply = <&reg_dldo1>;
- 	status = "okay";
  };
 -- 
 2.7.4
