@@ -1,28 +1,64 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Fri, 8 Jul 2016 10:46:24 +0200
-Subject: [RFC] [PATCH v3 1/4] spi: omap2-mcspi: Add comments for RX only
- DMA buffer workaround
-In-Reply-To: <1467911871-4508-2-git-send-email-fcooper@ti.com>
-References: <1467911871-4508-1-git-send-email-fcooper@ti.com>
- <1467911871-4508-2-git-send-email-fcooper@ti.com>
-Message-ID: <20160708084624.GS6247@sirena.org.uk>
+Date: Fri, 08 Jul 2016 10:49:15 +0200
+Subject: Applied "spi: omap2-mcspi: Select SPI_SPLIT" to the spi tree
+In-Reply-To: <1467911871-4508-3-git-send-email-fcooper@ti.com>
+Message-ID: <E1bLRTH-0004lu-Mz@finisterre>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 07, 2016 at 12:17:48PM -0500, Franklin S Cooper Jr wrote:
-> OMAP35x and OMAP37x mentions in the McSPI End-of-Transfer Sequences section
-> that if the McSPI is configured as a Master and only DMA RX is being
-> performed then the DMA transfer size needs to be reduced by 1 or 2.
+The patch
 
-Please do not submit new versions of already applied patches, please
-submit incremental updates to the existing code.  Modifying existing
-commits creates problems for other users building on top of those
-commits so it's best practice to only change pubished git commits if
-absolutely essential.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160708/992c6637/attachment.sig>
+   spi: omap2-mcspi: Select SPI_SPLIT
+
+has been applied to the spi tree at
+
+   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/spi.git 
+
+All being well this means that it will be integrated into the linux-next
+tree (usually sometime in the next 24 hours) and sent to Linus during
+the next merge window (or sooner if it is a bug fix), however if
+problems are discovered then the patch may be dropped or reverted.  
+
+You may get further e-mails resulting from automated or manual testing
+and review of the tree, please engage with people reporting problems and
+send followup patches addressing any issues that are reported if needed.
+
+If any updates are required or you are submitting further changes they
+should be sent as incremental updates against current git, existing
+patches will not be replaced.
+
+Please add any relevant lists and maintainers to the CCs when replying
+to this mail.
+
+Thanks,
+Mark
+
+>From 2b32e987c48c65a1a40b3b4294435f761e063b6b Mon Sep 17 00:00:00 2001
+From: Franklin S Cooper Jr <fcooper@ti.com>
+Date: Thu, 7 Jul 2016 12:17:49 -0500
+Subject: [PATCH] spi: omap2-mcspi: Select SPI_SPLIT
+
+The function sg_split will be used by spi-omap2-mcspi to handle a SoC
+workaround in the SPI driver. Therefore, select SG_SPLIT so this function
+is available to the driver.
+
+Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
+Signed-off-by: Mark Brown <broonie@kernel.org>
+---
+ drivers/spi/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/spi/Kconfig b/drivers/spi/Kconfig
+index 4b931ec8d90b..d6fb8d4b7786 100644
+--- a/drivers/spi/Kconfig
++++ b/drivers/spi/Kconfig
+@@ -411,6 +411,7 @@ config SPI_OMAP24XX
+ 	tristate "McSPI driver for OMAP"
+ 	depends on HAS_DMA
+ 	depends on ARCH_OMAP2PLUS || COMPILE_TEST
++	select SG_SPLIT
+ 	help
+ 	  SPI master controller for OMAP24XX and later Multichannel SPI
+ 	  (McSPI) modules.
+-- 
+2.8.1
