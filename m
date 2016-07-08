@@ -1,123 +1,70 @@
-From: mturquette@baylibre.com (Michael Turquette)
-Date: Fri, 08 Jul 2016 10:06:25 -0700
-Subject: [PATCH v3] xen/arm: enable clocks used by the hypervisor
-In-Reply-To: <577F73B3.8090807@arm.com>
-References: <1467963871-31556-1-git-send-email-dirk.behme@de.bosch.com>
- <577F73B3.8090807@arm.com>
-Message-ID: <146799758568.73491.4432005583661196579@resonance>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 8 Jul 2016 18:06:42 +0100
+Subject: [PATCH v4 1/8] arm64: mm: change IOMMU notifier action to attach
+ DMA ops
+In-Reply-To: <20160708145521.GD6493@arm.com>
+References: <cover.1467388950.git.robin.murphy@arm.com>
+ <06d430a86f5d7f461308a9278bf25f40fb50d93c.1467388950.git.robin.murphy@arm.com>
+ <20160708145521.GD6493@arm.com>
+Message-ID: <20160708170642.GD22099@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Julien Grall (2016-07-08 02:34:43)
-> Hi Dirk,
-> 
-> On 08/07/16 08:44, Dirk Behme wrote:
-> > Xen hypervisor drivers might replace native OS drivers. The result is
-> > that some important clocks that are enabled by the OS in the non-Xen
-> > case are not properly enabled in the presence of Xen. The clocks
-> > property enumerates the clocks that must be enabled by the Xen clock
-> > consumer.
-> >
-> > An example is a serial driver enabled by the hypervisor. Xen must
-> 
-> I would say "An example is the UART used by the hypervisor."
-> 
-> > consume and enable these clocks in the OS to ensure behavior continues
-> > after firmware configures the UART hardware and corresponding clock
-> > harder.
-> 
-> What do you mean by "harder"?
-> 
-> Also, relying on DOM0 to enable the clock looks very wrong to me and you 
-> give an example which prove that. The UART will be used before hand by 
-> Xen, however it will not be possible to use it if you expect DOM0 to 
-> enable the clock (or even modify the clock frequency).
-> 
-> The clock should be enabled either by the firmware or Xen. But not DOM0. 
-> DOM0 should not touch this clock at all.
-> 
-> Furthermore, this property could be used for clock associated to device 
-> that will be passthrough-ed to a guest. In this case, the clock would be 
-> enabled even if the device is not in use which will result more power 
-> consumption.
-
-Is there a need to pass clock references through to guests? If so the
-unmerged CLK_ENABLE_HAND_OFF[0] feature might be useful to you? If this
-flag is set on a given clk, it will be enabled at the time it is
-registered by the clk provider driver, and it's enable_count reference
-counter will be "handed off" to the first consumer that calls clk_get()
-and clk_prepare_enable() on it. This means the clock CAN be gated by
-it's proper driver, but it will be enabled at boot time as well.
-
-This is useful for use cases like splash screens where the bootloader
-configures the display and plays some animation, and we want the linux
-kernel to take over the display controller hardware without cutting
-clocks, blanking or reseting it. Handing off the clock reference count
-helps achieve this.
-
-[0] lkml.kernel.org/g/1455225554-13267-1-git-send-email-mturquette at baylibre.com
-
-Regards,
-Mike
-
-> 
-> >
-> > Up to now, the workaround for this has been to use the Linux kernel
-> > command line parameter 'clk_ignore_unused'. See Xen bug
-> >
-> > http://bugs.xenproject.org/xen/bug/45
-> >
-> > too.
-> >
-> > To fix this, we will add the "unused" clocks in Xen to the hypervisor
-> > node. The OS has to consume and enable the clocks from the hypervisor
-> > node, then.
-> >
-> > Therefore, check if there is a "clocks" entry in the hypervisor node
-> > and if so consume and enable the given clocks. This prevents the clocks
-> > from being disabled by the OS.
-> >
-> > Signed-off-by: Dirk Behme <dirk.behme@de.bosch.com>
+On Fri, Jul 08, 2016 at 03:55:21PM +0100, Will Deacon wrote:
+> On Fri, Jul 01, 2016 at 05:50:10PM +0100, Robin Murphy wrote:
+> > From: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> > 
+> > Current bus notifier in ARM64 (__iommu_attach_notifier)
+> > attempts to attach dma_ops to a device on BUS_NOTIFY_ADD_DEVICE
+> > action notification.
+> > 
+> > This will cause issues on ACPI based systems, where PCI devices
+> > can be added before the IOMMUs the devices are attached to
+> > had a chance to be probed, causing failures on attempts to
+> > attach dma_ops in that the domain for the respective IOMMU
+> > may not be set-up yet by the time the bus notifier is run.
+> > 
+> > Devices dma_ops do not require to be set-up till the matching
+> > device drivers are probed. This means that instead of running
+> > the notifier attaching dma_ops to devices (__iommu_attach_notifier)
+> > on BUS_NOTIFY_ADD_DEVICE action, it can be run just before the
+> > device driver is bound to the device in question (on action
+> > BUS_NOTIFY_BIND_DRIVER) so that it is certain that its IOMMU
+> > group and domain are set-up accordingly at the time the
+> > notifier is triggered.
+> > 
+> > This patch changes the notifier action upon which dma_ops
+> > are attached to devices and defer it to driver binding time,
+> > so that IOMMU devices have a chance to be probed and to register
+> > their bus notifiers before the dma_ops attach sequence for a
+> > device is actually carried out.
+> > 
+> > As a result we also no longer need worry about racing with
+> > iommu_bus_notifier(), or about retrying the queue in case devices
+> > were added too early on DT-based systems, so clean up the notifier
+> > itself plus the additional workaround from 722ec35f7fae ("arm64:
+> > dma-mapping: fix handling of devices registered before arch_initcall")
+> > 
+> > Cc: Will Deacon <will.deacon@arm.com>
+> > Cc: Catalin Marinas <catalin.marinas@arm.com>
+> > Cc: Marek Szyprowski <m.szyprowski@samsung.com>
+> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> > [rm: get rid of other now-redundant bits]
+> > Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 > > ---
-> > Changes in v3: Use the xen.txt description proposed by Michael. Thanks!
-> >
-> > Changes in v2: Drop the Linux implementation details like clk_disable_unused
-> >              in xen.txt.
-> >
-> >   Documentation/devicetree/bindings/arm/xen.txt | 13 ++++++++
-> >   arch/arm/xen/enlighten.c                      | 47 +++++++++++++++++++++++++++
-> >   2 files changed, 60 insertions(+)
-> >
-> > diff --git a/Documentation/devicetree/bindings/arm/xen.txt b/Documentation/devicetree/bindings/arm/xen.txt
-> > index c9b9321..00f2165 100644
-> > --- a/Documentation/devicetree/bindings/arm/xen.txt
-> > +++ b/Documentation/devicetree/bindings/arm/xen.txt
-> > @@ -17,6 +17,19 @@ the following properties:
-> >     A GIC node is also required.
-> >     This property is unnecessary when booting Dom0 using ACPI.
-> >
-> > +Optional properties:
-> > +
-> > +clocks: one or more clocks to be enabled
-> > +  Xen hypervisor drivers might replace native OS drivers. The result is
+> > 
+> > v4: No change.
+> > 
+> >  arch/arm64/mm/dma-mapping.c | 22 +++++-----------------
+> >  1 file changed, 5 insertions(+), 17 deletions(-)
 > 
-> "native OS" has no meaning on Xen. This seems to be a cumbersome way to 
-> say that the device will be used by the hypervisor and hidden to DOM0 
-> (aka hardware domain).
-> 
-> > +  that some important clocks that are enabled by the OS in the non-Xen
-> > +  case are not properly enabled in the presence of Xen. The clocks
-> > +  property enumerates the clocks that must be enabled by the Xen clock
-> > +  consumer.
-> > +  An example is a serial driver enabled by the hypervisor. Xen must
-> > +  consume and enable these clocks in the OS to ensure behavior continues
-> > +  after firmware configures the UART hardware and corresponding clock
-> > +  harder.
-> > +
-> >   To support UEFI on Xen ARM virtual platforms, Xen populates the FDT "uefi" node
-> >   under /hypervisor with following parameters:
-> 
-> Regards,
-> 
-> -- 
-> Julien Grall
+> Whilst this series is unlikely to make it for 4.8, this patch is
+> independent and it would be good to see it queued in the arm64 tree for
+> 4.8, if possible. It shouldn't change anything on its own, but it's a
+> prerequisite for this series and anything on the IORT side from Lorenzo,
+> so it makes sense to me to keep the delta down if we can.
+
+I queued it for 4.8. Thanks.
+
+-- 
+Catalin
