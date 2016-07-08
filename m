@@ -1,76 +1,108 @@
-From: scott.branden@broadcom.com (Scott Branden)
-Date: Fri, 8 Jul 2016 09:14:17 -0700
-Subject: [PATCH 7/7] ARM: dts: NSP: Add bgmac entries
-In-Reply-To: <1467993362-13229-1-git-send-email-jon.mason@broadcom.com>
-References: <1467993362-13229-1-git-send-email-jon.mason@broadcom.com>
-Message-ID: <577FD159.7000905@broadcom.com>
+From: mturquette@baylibre.com (Michael Turquette)
+Date: Fri, 08 Jul 2016 09:08:24 -0700
+Subject: [RESEND PATCH v2 02/13] drivers: clk: st: Simplify clock binding
+ of STiH4xx platforms
+In-Reply-To: <577F6E83.3080006@st.com>
+References: <1466068833-5055-1-git-send-email-gabriel.fernandez@linaro.org>
+ <1466068833-5055-3-git-send-email-gabriel.fernandez@linaro.org>
+ <20160619150458.GA26824@rob-hp-laptop>
+ <146794221378.73491.2803164814485320331@resonance> <577F6E83.3080006@st.com>
+Message-ID: <146799410307.73491.9408637761157902031@resonance>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jon,
+Quoting Gabriel Fernandez (2016-07-08 02:12:35)
+> Hi Mike,
+> 
+> On 07/08/2016 03:43 AM, Michael Turquette wrote:
+> > Quoting Rob Herring (2016-06-19 08:04:58)
+> >> On Thu, Jun 16, 2016 at 11:20:22AM +0200, Gabriel Fernandez wrote:
+> >>> This patch reworks the clock binding to avoid too much detail in DT.
+> >>> Now we have only compatible string per type of clock
+> >>> (remark from Rob https://lkml.org/lkml/2016/5/25/492)
+> >>>
+> >> I have no idea what the clock trees and clock controller in these chips
+> >> look like, so it's hard to say if the changes here are good. It still
+> >> looks like things are somewhat fine grained clocks in DT. I'll leave
+> >> it up to the platform maintainers to decide...
+> > Is this series breaking ABI? If yes, why not do what Maxime did for the
+> > Allwinner/sunxi clocks and just fully convert over to a
+> > one-node-per-clock-controller binding? This one-node-per-clock stuff is
+> > pretty unfortunate, and if we're deprecating platforms (patch #1) then
+> > now might be a good time to re-evaluate the whole thing.
+> 
+> The goal of my patchset was to be aligned with DRM / KMS development and 
+> to offer
+> the possibility to make a correct video playback on STiH407/STiH410 
+> platform.
+> Our milestone is the 4.8 for that.
+> 
+> Currently people need these patches to work.
+> I'm not sure it's a good time to re-evaluate the whole thing.
+> 
+> Is it possible to re-evaluate later ?
 
-In Subject line, you mean add amac entries.
+Are you OK to break ABI later? Or at a minimum, deprecate the current
+binding (maintain it forever for legacy platforms) and create a new
+clock controller binding description that supersedes the legacy binding
+for all new platforms?
 
-
-On 16-07-08 08:56 AM, Jon Mason wrote:
-> Add device tree entries for the ethernet devices present on the
-> Broadcom Northstar Plus SoCs
->
-> Signed-off-by: Jon Mason <jon.mason@broadcom.com>
-> ---
->   arch/arm/boot/dts/bcm-nsp.dtsi   | 18 ++++++++++++++++++
->   arch/arm/boot/dts/bcm958625k.dts |  8 ++++++++
->   2 files changed, 26 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/bcm-nsp.dtsi b/arch/arm/boot/dts/bcm-nsp.dtsi
-> index def9e78..f6d5abe 100644
-> --- a/arch/arm/boot/dts/bcm-nsp.dtsi
-> +++ b/arch/arm/boot/dts/bcm-nsp.dtsi
-> @@ -192,6 +192,24 @@
->   			status = "disabled";
->   		};
->
-> +		amac0: ethernet at 22000 {
-> +			compatible = "brcm,nsp-amac";
-> +			reg = <0x022000 0x1000>,
-> +			      <0x110000 0x1000>;
-> +			reg-names = "amac_base", "idm_base";
-> +			interrupts = <GIC_SPI 147 IRQ_TYPE_LEVEL_HIGH>;
-> +			status = "disabled";
-> +		};
-> +
-> +		amac1: ethernet at 23000 {
-> +			compatible = "brcm,nsp-amac";
-> +			reg = <0x023000 0x1000>,
-> +			      <0x111000 0x1000>;
-> +			reg-names = "amac_base", "idm_base";
-> +			interrupts = <GIC_SPI 148 IRQ_TYPE_LEVEL_HIGH>;
-> +			status = "disabled";
-> +		};
-> +
->   		nand: nand at 26000 {
->   			compatible = "brcm,nand-iproc", "brcm,brcmnand-v6.1";
->   			reg = <0x026000 0x600>,
-> diff --git a/arch/arm/boot/dts/bcm958625k.dts b/arch/arm/boot/dts/bcm958625k.dts
-> index e298450..f41a13b 100644
-> --- a/arch/arm/boot/dts/bcm958625k.dts
-> +++ b/arch/arm/boot/dts/bcm958625k.dts
-> @@ -56,6 +56,14 @@
->   	status = "okay";
->   };
->
-> +&amac0 {
-> +	status = "okay";
-> +};
-> +
-> +&amac1 {
-> +	status = "okay";
-> +};
-> +
->   &pcie0 {
->   	status = "okay";
->   };
->
+If the answer to either question is "yes", then I'm OK to put it aside
+for now. But if the answer to both is "no", and this patch series is
+breaking ABI, then we really should fix it now.
 
 Regards,
-  Scott
+Mike
+
+> 
+> Best regards,
+> Gabriel
+> 
+> > Regards,
+> > Mike
+> >
+> >>   
+> >>> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
+> >>> ---
+> >>>   .../devicetree/bindings/clock/st/st,clkgen-mux.txt |  2 +-
+> >>>   .../devicetree/bindings/clock/st/st,clkgen-pll.txt | 11 ++--
+> >>>   .../devicetree/bindings/clock/st/st,clkgen.txt     |  2 +-
+> >>>   .../devicetree/bindings/clock/st/st,quadfs.txt     |  6 +--
+> >>>   drivers/clk/st/clkgen-fsyn.c                       | 41 ++++++--------
+> >>>   drivers/clk/st/clkgen-mux.c                        | 28 ++++------
+> >>>   drivers/clk/st/clkgen-pll.c                        | 62 ++++++++++------------
+> >>>   7 files changed, 65 insertions(+), 87 deletions(-)
+> >>>
+> >>> diff --git a/Documentation/devicetree/bindings/clock/st/st,clkgen-mux.txt b/Documentation/devicetree/bindings/clock/st/st,clkgen-mux.txt
+> >>> index 4d277d6..9a46cb1d7 100644
+> >>> --- a/Documentation/devicetree/bindings/clock/st/st,clkgen-mux.txt
+> >>> +++ b/Documentation/devicetree/bindings/clock/st/st,clkgen-mux.txt
+> >>> @@ -10,7 +10,7 @@ This binding uses the common clock binding[1].
+> >>>   Required properties:
+> >>>   
+> >>>   - compatible : shall be:
+> >>> -     "st,stih407-clkgen-a9-mux",     "st,clkgen-mux"
+> >>> +     "st,stih407-clkgen-a9-mux"
+> >>>   
+> >>>   - #clock-cells : from common clock binding; shall be set to 0.
+> >>>   
+> >>> diff --git a/Documentation/devicetree/bindings/clock/st/st,clkgen-pll.txt b/Documentation/devicetree/bindings/clock/st/st,clkgen-pll.txt
+> >>> index c9fd674..be0b043 100644
+> >>> --- a/Documentation/devicetree/bindings/clock/st/st,clkgen-pll.txt
+> >>> +++ b/Documentation/devicetree/bindings/clock/st/st,clkgen-pll.txt
+> >>> @@ -9,11 +9,10 @@ Base address is located to the parent node. See clock binding[2]
+> >>>   Required properties:
+> >>>   
+> >>>   - compatible : shall be:
+> >>> -     "st,stih407-plls-c32-a0",       "st,clkgen-plls-c32"
+> >>> -     "st,stih407-plls-c32-a9",       "st,clkgen-plls-c32"
+> >>> -     "sst,plls-c32-cx_0",            "st,clkgen-plls-c32"
+> >>> -     "sst,plls-c32-cx_1",            "st,clkgen-plls-c32"
+> >>> -     "st,stih418-plls-c28-a9",       "st,clkgen-plls-c32"
+> >>> +     "st,clkgen-pll0"
+> >>> +     "st,clkgen-pll0"
+> >> Repeated. Supposed to be 0 and 1? This seems a bit generic, too.
+> >>
+> >>> +     "st,stih407-clkgen-plla9"
+> >>> +     "st,stih418-clkgen-plla9"
+> 
