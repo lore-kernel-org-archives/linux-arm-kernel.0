@@ -1,135 +1,286 @@
-From: dirk.behme@de.bosch.com (Dirk Behme)
-Date: Fri, 8 Jul 2016 09:44:31 +0200
-Subject: [PATCH v3] xen/arm: enable clocks used by the hypervisor
-Message-ID: <1467963871-31556-1-git-send-email-dirk.behme@de.bosch.com>
+From: kwangwoo.lee@sk.com (Kwangwoo Lee)
+Date: Fri,  8 Jul 2016 16:51:38 +0900
+Subject: [PATCH v2] pmem: add pmem support codes on ARM64
+Message-ID: <1467964298-29241-1-git-send-email-kwangwoo.lee@sk.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Xen hypervisor drivers might replace native OS drivers. The result is
-that some important clocks that are enabled by the OS in the non-Xen
-case are not properly enabled in the presence of Xen. The clocks
-property enumerates the clocks that must be enabled by the Xen clock
-consumer.
+v2)
+rewrite functions under the mapping information MEMREMAP_WB.
+rewrite the comments for ARM64 in pmem.h
+add __clean_dcache_area() to clean data in PoC.
 
-An example is a serial driver enabled by the hypervisor. Xen must
-consume and enable these clocks in the OS to ensure behavior continues
-after firmware configures the UART hardware and corresponding clock
-harder.
+v1)
+The PMEM driver on top of NVDIMM(Non-Volatile DIMM) has already been
+supported on X86_64 and there exist several ARM64 platforms which support
+DIMM type memories.
 
-Up to now, the workaround for this has been to use the Linux kernel
-command line parameter 'clk_ignore_unused'. See Xen bug
+This patch set enables the PMEM driver on ARM64 (AArch64) architecture
+on top of NVDIMM. While developing this patch set, QEMU 2.6.50 with NVDIMM
+emulation for ARM64 has also been developed and tested on it.
 
-http://bugs.xenproject.org/xen/bug/45
+$ dmesg
+[    0.000000] Booting Linux on physical CPU 0x0
+[    0.000000] Linux version 4.6.0-rc2kw-dirty (kwangwoo at VBox15) (gcc version 5.2.1 20151010 (Ubuntu 5.2.1-22ubuntu1) ) #10 SMP Tue Jul 5 11:30:33 KST 2016
+[    0.000000] Boot CPU: AArch64 Processor [411fd070]
+[    0.000000] efi: Getting EFI parameters from FDT:
+[    0.000000] EFI v2.60 by EDK II
+[    0.000000] efi:  SMBIOS 3.0=0x58710000  ACPI 2.0=0x589b0000
+[    0.000000] ACPI: Early table checksum verification disabled
+[    0.000000] ACPI: RSDP 0x00000000589B0000 000024 (v02 BOCHS )
+[    0.000000] ACPI: XSDT 0x00000000589A0000 00005C (v01 BOCHS  BXPCFACP 00000001      01000013)
+[    0.000000] ACPI: FACP 0x0000000058620000 00010C (v05 BOCHS  BXPCFACP 00000001 BXPC 00000001)
+[    0.000000] ACPI: DSDT 0x0000000058630000 00108F (v02 BOCHS  BXPCDSDT 00000001 BXPC 00000001)
+[    0.000000] ACPI: APIC 0x0000000058610000 0000A8 (v03 BOCHS  BXPCAPIC 00000001 BXPC 00000001)
+[    0.000000] ACPI: GTDT 0x0000000058600000 000060 (v02 BOCHS  BXPCGTDT 00000001 BXPC 00000001)
+[    0.000000] ACPI: MCFG 0x00000000585F0000 00003C (v01 BOCHS  BXPCMCFG 00000001 BXPC 00000001)
+[    0.000000] ACPI: SPCR 0x00000000585E0000 000050 (v02 BOCHS  BXPCSPCR 00000001 BXPC 00000001)
+[    0.000000] ACPI: NFIT 0x00000000585D0000 0000E0 (v01 BOCHS  BXPCNFIT 00000001 BXPC 00000001)
+[    0.000000] ACPI: SSDT 0x00000000585C0000 000131 (v01 BOCHS  NVDIMM 00000001 BXPC 00000001)
+...
+[    5.386743] pmem0: detected capacity change from 0 to 1073741824
+...
+[  531.952466] EXT4-fs (pmem0): DAX enabled. Warning: EXPERIMENTAL, use at your own risk
+[  531.961073] EXT4-fs (pmem0): mounted filesystem with ordered data mode. Opts: dax
 
-too.
+$ mount
+rootfs on / type rootfs (rw,size=206300k,nr_inodes=51575)
+...
+/dev/pmem0 on /mnt/mem type ext4 (rw,relatime,dax,data=ordered)
 
-To fix this, we will add the "unused" clocks in Xen to the hypervisor
-node. The OS has to consume and enable the clocks from the hypervisor
-node, then.
+$ df -h
+Filesystem                Size      Used Available Use% Mounted on
+...
+/dev/pmem0              975.9M      1.3M    907.4M   0% /mnt/mem
 
-Therefore, check if there is a "clocks" entry in the hypervisor node
-and if so consume and enable the given clocks. This prevents the clocks
-from being disabled by the OS.
-
-Signed-off-by: Dirk Behme <dirk.behme@de.bosch.com>
+Signed-off-by: Kwangwoo Lee <kwangwoo.lee@sk.com>
 ---
-Changes in v3: Use the xen.txt description proposed by Michael. Thanks!
+ arch/arm64/Kconfig                  |   2 +
+ arch/arm64/include/asm/cacheflush.h |   3 +
+ arch/arm64/include/asm/pmem.h       | 151 ++++++++++++++++++++++++++++++++++++
+ arch/arm64/mm/cache.S               |  18 +++++
+ 4 files changed, 174 insertions(+)
+ create mode 100644 arch/arm64/include/asm/pmem.h
 
-Changes in v2: Drop the Linux implementation details like clk_disable_unused
-	       in xen.txt.
-
- Documentation/devicetree/bindings/arm/xen.txt | 13 ++++++++
- arch/arm/xen/enlighten.c                      | 47 +++++++++++++++++++++++++++
- 2 files changed, 60 insertions(+)
-
-diff --git a/Documentation/devicetree/bindings/arm/xen.txt b/Documentation/devicetree/bindings/arm/xen.txt
-index c9b9321..00f2165 100644
---- a/Documentation/devicetree/bindings/arm/xen.txt
-+++ b/Documentation/devicetree/bindings/arm/xen.txt
-@@ -17,6 +17,19 @@ the following properties:
-   A GIC node is also required.
-   This property is unnecessary when booting Dom0 using ACPI.
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 4f43622..ee1d679 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -15,6 +15,8 @@ config ARM64
+ 	select ARCH_WANT_COMPAT_IPC_PARSE_VERSION
+ 	select ARCH_WANT_FRAME_POINTERS
+ 	select ARCH_HAS_UBSAN_SANITIZE_ALL
++	select ARCH_HAS_PMEM_API
++	select ARCH_HAS_MMIO_FLUSH
+ 	select ARM_AMBA
+ 	select ARM_ARCH_TIMER
+ 	select ARM_GIC
+diff --git a/arch/arm64/include/asm/cacheflush.h b/arch/arm64/include/asm/cacheflush.h
+index c64268d..fba18e4 100644
+--- a/arch/arm64/include/asm/cacheflush.h
++++ b/arch/arm64/include/asm/cacheflush.h
+@@ -68,6 +68,7 @@
+ extern void flush_cache_range(struct vm_area_struct *vma, unsigned long start, unsigned long end);
+ extern void flush_icache_range(unsigned long start, unsigned long end);
+ extern void __flush_dcache_area(void *addr, size_t len);
++extern void __clean_dcache_area(void *addr, size_t len);
+ extern void __clean_dcache_area_pou(void *addr, size_t len);
+ extern long __flush_cache_user_range(unsigned long start, unsigned long end);
  
-+Optional properties:
+@@ -133,6 +134,8 @@ static inline void __flush_icache_all(void)
+  */
+ #define flush_icache_page(vma,page)	do { } while (0)
+ 
++#define mmio_flush_range(addr, size)	__flush_dcache_area(addr, size)
 +
-+clocks: one or more clocks to be enabled
-+  Xen hypervisor drivers might replace native OS drivers. The result is
-+  that some important clocks that are enabled by the OS in the non-Xen
-+  case are not properly enabled in the presence of Xen. The clocks
-+  property enumerates the clocks that must be enabled by the Xen clock
-+  consumer.
-+  An example is a serial driver enabled by the hypervisor. Xen must
-+  consume and enable these clocks in the OS to ensure behavior continues
-+  after firmware configures the UART hardware and corresponding clock
-+  harder.
-+
- To support UEFI on Xen ARM virtual platforms, Xen populates the FDT "uefi" node
- under /hypervisor with following parameters:
- 
-diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-index 47acb36..5c546d0 100644
---- a/arch/arm/xen/enlighten.c
-+++ b/arch/arm/xen/enlighten.c
-@@ -24,6 +24,7 @@
- #include <linux/of_fdt.h>
- #include <linux/of_irq.h>
- #include <linux/of_address.h>
-+#include <linux/clk-provider.h>
- #include <linux/cpuidle.h>
- #include <linux/cpufreq.h>
- #include <linux/cpu.h>
-@@ -444,6 +445,52 @@ static int __init xen_pm_init(void)
- }
- late_initcall(xen_pm_init);
- 
+ /*
+  * Not required on AArch64 (PIPT or VIPT non-aliasing D-cache).
+  */
+diff --git a/arch/arm64/include/asm/pmem.h b/arch/arm64/include/asm/pmem.h
+new file mode 100644
+index 0000000..7504b2b
+--- /dev/null
++++ b/arch/arm64/include/asm/pmem.h
+@@ -0,0 +1,151 @@
 +/*
-+ * Check if we want to register some clocks, that they
-+ * are not freed because unused by clk_disable_unused().
-+ * E.g. the serial console clock.
++ * Based on arch/x86/include/asm/pmem.h
++ *
++ * Copyright(c) 2016 SK hynix Inc. Kwangwoo Lee <kwangwoo.lee@sk.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of version 2 of the GNU General Public License as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful, but
++ * WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * General Public License for more details.
 + */
-+static int __init xen_arm_register_clks(void)
++#ifndef __ASM_PMEM_H__
++#define __ASM_PMEM_H__
++
++#ifdef CONFIG_ARCH_HAS_PMEM_API
++#include <linux/uaccess.h>
++#include <asm/cacheflush.h>
++
++/**
++ * arch_memcpy_to_pmem - copy data to persistent memory
++ * @dst: destination buffer for the copy
++ * @src: source buffer for the copy
++ * @n: length of the copy in bytes
++ *
++ * Copy data to persistent memory media. if ARCH_HAS_PMEM_API is defined,
++ * then MEMREMAP_WB is used to memremap() during probe. A subsequent
++ * arch_wmb_pmem() need to guarantee durability.
++ */
++static inline void arch_memcpy_to_pmem(void __pmem *dst, const void *src,
++		size_t n)
 +{
-+	struct clk *clk;
-+	struct device_node *xen_node;
-+	unsigned int i, count;
-+	int ret = 0;
++	int unwritten;
 +
-+	xen_node = of_find_compatible_node(NULL, NULL, "xen,xen");
-+	if (!xen_node) {
-+		pr_err("Xen support was detected before, but it has disappeared\n");
-+		return -EINVAL;
-+	}
++	unwritten = __copy_from_user_inatomic((void __force *) dst,
++			(void __user *) src, n);
++	if (WARN(unwritten, "%s: fault copying %p <- %p unwritten: %d\n",
++				__func__, dst, src, unwritten))
++		BUG();
 +
-+	count = of_clk_get_parent_count(xen_node);
-+	if (!count)
-+		goto out;
-+
-+	for (i = 0; i < count; i++) {
-+		clk = of_clk_get(xen_node, i);
-+		if (IS_ERR(clk)) {
-+			pr_err("Xen failed to register clock %i. Error: %li\n",
-+			       i, PTR_ERR(clk));
-+			ret = PTR_ERR(clk);
-+			goto out;
-+		}
-+
-+		ret = clk_prepare_enable(clk);
-+		if (ret < 0) {
-+			pr_err("Xen failed to enable clock %i. Error: %i\n",
-+			       i, ret);
-+			goto out;
-+		}
-+	}
-+
-+	ret = 0;
-+
-+out:
-+	of_node_put(xen_node);
-+	return ret;
++	__flush_dcache_area(dst, n);
 +}
-+late_initcall(xen_arm_register_clks);
++
++static inline int arch_memcpy_from_pmem(void *dst, const void __pmem *src,
++		size_t n)
++{
++	memcpy(dst, (void __force *) src, n);
++	return 0;
++}
++
++/**
++ * arch_wmb_pmem - synchronize writes to persistent memory
++ *
++ * After a series of arch_memcpy_to_pmem() operations this need to be called to
++ * ensure that written data is durable on persistent memory media.
++ */
++static inline void arch_wmb_pmem(void)
++{
++	/*
++	 * We've already arranged for pmem writes to avoid the cache in
++	 * arch_memcpy_to_pmem()
++	 */
++	wmb();
++
++	/*
++	 * pcommit_sfence() on X86 has been removed and will be replaced with
++	 * a function after ARMv8.2 which will support DC CVAP to ensure
++	 * Point-of-Persistency. Until then, mark here with a comment to keep
++	 * the point for __clean_dcache_area_pop().
++	 */
++}
++
++/**
++ * arch_wb_cache_pmem - write back a cache range
++ * @vaddr:	virtual start address
++ * @size:	number of bytes to write back
++ *
++ * Write back a cache range. Leave data in cache for performance of next access.
++ * This function requires explicit ordering with an arch_wmb_pmem() call.
++ */
++static inline void arch_wb_cache_pmem(void __pmem *addr, size_t size)
++{
++	/* cache clean PoC */
++	__clean_dcache_area(addr, size);
++}
++
++/**
++ * arch_copy_from_iter_pmem - copy data from an iterator to PMEM
++ * @addr:	PMEM destination address
++ * @bytes:	number of bytes to copy
++ * @i:		iterator with source data
++ *
++ * Copy data from the iterator 'i' to the PMEM buffer starting at 'addr'.
++ * This function requires explicit ordering with an arch_wmb_pmem() call.
++ */
++static inline size_t arch_copy_from_iter_pmem(void __pmem *addr, size_t bytes,
++		struct iov_iter *i)
++{
++	void *vaddr = (void __force *)addr;
++	size_t len;
++
++	/*
++	 * ARCH_HAS_NOCACHE_UACCESS is not defined and the default mapping is
++	 * MEMREMAP_WB. Instead of using copy_from_iter_nocache(), use cacheable
++	 * version and call arch_wb_cache_pmem().
++	 */
++	len = copy_from_iter(vaddr, bytes, i);
++
++	arch_wb_cache_pmem(addr, bytes);
++
++	return len;
++}
++
++/**
++ * arch_clear_pmem - zero a PMEM memory range
++ * @addr:	virtual start address
++ * @size:	number of bytes to zero
++ *
++ * Write zeros into the memory range starting@'addr' for 'size' bytes.
++ * This function requires explicit ordering with an arch_wmb_pmem() call.
++ */
++static inline void arch_clear_pmem(void __pmem *addr, size_t size)
++{
++	void *vaddr = (void __force *)addr;
++
++	memset(vaddr, 0, size);
++	arch_wb_cache_pmem(addr, size);
++}
++
++/**
++ * arch_invalidate_pmem - invalidate a PMEM memory range
++ * @addr:	virtual start address
++ * @size:	number of bytes to zero
++ *
++ * After finishing ARS(Address Range Scrubbing), clean and invalidate the
++ * address range.
++ */
++static inline void arch_invalidate_pmem(void __pmem *addr, size_t size)
++{
++	__flush_dcache_area(addr, size);
++}
++
++static inline bool __arch_has_wmb_pmem(void)
++{
++	/* return false until arch_wmb_pmem() guarantee PoP on ARMv8.2. */
++	return false;
++}
++#endif /* CONFIG_ARCH_HAS_PMEM_API */
++#endif /* __ASM_PMEM_H__ */
+diff --git a/arch/arm64/mm/cache.S b/arch/arm64/mm/cache.S
+index 6df0706..5a350e4 100644
+--- a/arch/arm64/mm/cache.S
++++ b/arch/arm64/mm/cache.S
+@@ -93,6 +93,24 @@ ENTRY(__flush_dcache_area)
+ ENDPIPROC(__flush_dcache_area)
  
- /* empty stubs */
- void xen_arch_pre_suspend(void) { }
+ /*
++ *	__clean_dcache_area(kaddr, size)
++ *
++ * 	Ensure that any D-cache lines for the interval [kaddr, kaddr+size)
++ * 	are cleaned to the PoC.
++ *
++ *	- kaddr   - kernel address
++ *	- size    - size in question
++ */
++ENTRY(__clean_dcache_area)
++alternative_if_not ARM64_WORKAROUND_CLEAN_CACHE
++	dcache_by_line_op cvac, sy, x0, x1, x2, x3
++alternative_else
++	dcache_by_line_op civac, sy, x0, x1, x2, x3
++alternative_endif
++	ret
++ENDPROC(__clean_dcache_area)
++
++/*
+  *	__clean_dcache_area_pou(kaddr, size)
+  *
+  * 	Ensure that any D-cache lines for the interval [kaddr, kaddr+size)
 -- 
-2.8.0
+2.5.0
