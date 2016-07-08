@@ -1,41 +1,30 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 7 Jul 2016 20:41:41 -0700
-Subject: [GIT PULL] pxa-dt for v4.7
-In-Reply-To: <8760uyrj09.fsf@belgarion.home>
-References: <8760uyrj09.fsf@belgarion.home>
-Message-ID: <20160708034141.GA18763@localhost>
+Date: Thu, 7 Jul 2016 20:42:47 -0700
+Subject: [PATCH] ARM: configs: lpc18xx: enable adc and dac iio drivers
+In-Reply-To: <1462708539-9222-1-git-send-email-manabian@gmail.com>
+References: <1462708539-9222-1-git-send-email-manabian@gmail.com>
+Message-ID: <20160708034247.GB18763@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 30, 2016 at 09:31:18PM +0200, Robert Jarzmik wrote:
-> Hi Arnd, Kevin, and Olof,
+On Sun, May 08, 2016 at 01:55:39PM +0200, Joachim Eastwood wrote:
+> Enable ADC and DAC IIO drivers for LPC18xx/43xx SoCs.
 > 
-> This is the pxa pull request for 4.7 device-tree. It is a tiny collection of
-> fixes and pin control addition. Can you please consider pulling ?
+> Signed-off-by: Joachim Eastwood <manabian@gmail.com>
+> ---
+> Hi arm-soc team,
 > 
-> The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
+> Only one simple defconfig update for lpc18xx this cycle. So please
+> apply this one directly. Thanks!
 > 
->   Linux 4.6-rc1 (2016-03-26 16:03:24 -0700)
 > 
-> are available in the git repository at:
+> regards,
+> Joachim Eastwood
 > 
->   https://github.com/rjarzmik/linux.git tags/pxa-dt-4.7
-> 
-> for you to fetch changes up to fca43c3f7e6fe421194e9b21eabc72604edac16c:
-> 
->   ARM: dts: pxa3xx: add pincontrol helpers (2016-04-20 20:20:26 +0200)
-> 
-> ----------------------------------------------------------------
-> This device-tree pxa update brings :
->  - pin control nodes for pxa2xx and pxa3xx
->  - the LCD controller for pxa2xx
->  - the missing pxa3xx pulse width modulator nodes
->  - an USB Host fix for pxa3xx
+>  arch/arm/configs/lpc18xx_defconfig | 2 ++
+>  1 file changed, 2 insertions(+)
 
-Looks like we missed this branch when it was sent.
-
-I've merged it for 4.8 now. Apologies about that, and please hassle us
-if this happens in the future.
+Applied, thanks!
 
 
 -Olof
