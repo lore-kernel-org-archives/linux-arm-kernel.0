@@ -1,32 +1,26 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Fri, 8 Jul 2016 14:17:29 +0800
-Subject: [PATCH v4 2/2] ARM: cpuidle: make arm_cpuidle_suspend() a bit
- more efficient
-In-Reply-To: <20160707134628.GB20553@linaro.org>
-References: <1467785755-3488-1-git-send-email-jszhang@marvell.com>
- <1467785755-3488-3-git-send-email-jszhang@marvell.com>
- <20160707134628.GB20553@linaro.org>
-Message-ID: <20160708141729.3fa61c10@xhacker>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Fri, 08 Jul 2016 08:34:53 +0200
+Subject: [GIT PULL] pxa-dt for v4.7
+In-Reply-To: <20160708034141.GA18763@localhost> (Olof Johansson's message of
+ "Thu, 7 Jul 2016 20:41:41 -0700")
+References: <8760uyrj09.fsf@belgarion.home> <20160708034141.GA18763@localhost>
+Message-ID: <87eg747i42.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Daniel,
+Olof Johansson <olof@lixom.net> writes:
 
-On Thu, 7 Jul 2016 15:46:28 +0200 Daniel Lezcano wrote:
+> Looks like we missed this branch when it was sent.
+>
+> I've merged it for 4.8 now. Apologies about that, and please hassle us
+> if this happens in the future.
 
-> On Wed, Jul 06, 2016 at 02:15:55PM +0800, Jisheng Zhang wrote:
-> > Currently, we check cpuidle_ops.suspend every time when entering a
-> > low-power idle state. But this check could be avoided in this hot path
-> > by moving it into arm_cpuidle_read_ops() to reduce arm_cpuidle_suspend
-> > overhead a bit.
-> > 
-> > Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
-> > ---  
-> 
-> Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+Thanks for remembering, I was going to respin a pull request for v4.8, but I got
+lost in professional concerns. And no need to worry about missing one merge
+window, it's not as if anything like "time to market" was meaning anything to me
+:)
 
-I'm not sure the upstream merging path this patch should follow, Per my
-understanding, I need to put it into Russell's PATCH system.
+Cheers.
 
-Thanks in advance,
-Jisheng
+-- 
+Robert
