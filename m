@@ -1,341 +1,231 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 8 Jul 2016 08:40:23 -0700
-Subject: [PATCH v8 08/17] KVM: arm64: handle ITS related GICv3
- redistributor registers
-In-Reply-To: <20160705112309.28877-9-andre.przywara@arm.com>
-References: <20160705112309.28877-1-andre.przywara@arm.com>
- <20160705112309.28877-9-andre.przywara@arm.com>
-Message-ID: <20160708154023.GA1305@lvm>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Fri, 8 Jul 2016 16:41:46 +0100
+Subject: [PATCH v4 3/5] nvmem: core: Add consumer API to get nvmem cell
+ from node
+In-Reply-To: <20160707134811.GA2692@Sanchayan-Arch.localdomain>
+References: <cover.1467872014.git.maitysanchayan@gmail.com>
+ <0e6294d931bf181376a6f4e1a86df3f6c6a5d575.1467872014.git.maitysanchayan@gmail.com>
+ <577E1E79.4090809@linaro.org>
+ <20160707123350.GA18563@Sanchayan-Arch.localdomain>
+ <577E5634.7020805@linaro.org>
+ <20160707134811.GA2692@Sanchayan-Arch.localdomain>
+Message-ID: <577FC9BA.2020402@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 05, 2016 at 12:23:00PM +0100, Andre Przywara wrote:
-> In the GICv3 redistributor there are the PENDBASER and PROPBASER
-> registers which we did not emulate so far, as they only make sense
-> when having an ITS. In preparation for that emulate those MMIO
-> accesses by storing the 64-bit data written into it into a variable
-> which we later read in the ITS emulation.
-> We also sanitise the registers, making sure RES0 regions are respected
-> and checking for valid memory attributes.
-> 
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> ---
->  include/kvm/arm_vgic.h           |  13 ++++
->  virt/kvm/arm/vgic/vgic-mmio-v3.c | 143 ++++++++++++++++++++++++++++++++++++++-
->  virt/kvm/arm/vgic/vgic-mmio.h    |   8 +++
->  virt/kvm/arm/vgic/vgic-v3.c      |  11 ++-
->  4 files changed, 171 insertions(+), 4 deletions(-)
-> 
-> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-> index 450b4da..f6f860d 100644
-> --- a/include/kvm/arm_vgic.h
-> +++ b/include/kvm/arm_vgic.h
-> @@ -146,6 +146,14 @@ struct vgic_dist {
->  	struct vgic_irq		*spis;
->  
->  	struct vgic_io_device	dist_iodev;
-> +
-> +	/*
-> +	 * Contains the address of the LPI configuration table.
-
-Is this field the address or the actual format of the GICR_PROPBASER ?
-
-If the former, the type should potentially be gpa_t, if the latter, you
-shouldn't say that this is just the address :)
-
-> +	 * Since we report GICR_TYPER.CommonLPIAff as 0b00, we can share
-> +	 * one address across all redistributors.
-> +	 * GICv3 spec: 6.1.2 "LPI Configuration tables"
-> +	 */
-> +	u64			propbaser;
->  };
->  
->  struct vgic_v2_cpu_if {
-> @@ -200,6 +208,11 @@ struct vgic_cpu {
->  	 */
->  	struct vgic_io_device	rd_iodev;
->  	struct vgic_io_device	sgi_iodev;
-> +
-> +	/* Points to the LPI pending tables for the redistributor */
-> +	u64 pendbaser;
-
-ditto
-
-> +
-> +	bool lpis_enabled;
->  };
->  
->  int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write);
-> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-> index bfcafbd..9dd8632 100644
-> --- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
-> +++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-> @@ -29,6 +29,19 @@ static unsigned long extract_bytes(unsigned long data, unsigned int offset,
->  	return (data >> (offset * 8)) & GENMASK_ULL(num * 8 - 1, 0);
->  }
->  
-> +/* allows updates of any half of a 64-bit register (or the whole thing) */
-
-when I see this function I have to read the bit fiddling to understand
-the parameters and semantics.
-
-actually, I'm not sure I read this correctly, but could you mean:
-
-  /*
-   * Update @len bytes at @offset bytes offset in @reg from the least
-   * significant bytes in @val?
-   */
-
-Also, I don't get why this would be limited to either halfs or the whole
-of a 64-bit register, but maybe I'm reading the code wrong.
-
-Didn't we have a reviewed function for the vgic that was called
-update_bytes or inser_bytes before, that we could use or did we never
-actually review that?
 
 
-> +static u64 update_64bit_reg(u64 reg, unsigned int offset, unsigned int len,
-> +			    unsigned long val)
-> +{
-> +	int lower = (offset & 4) * 8;
-> +	int upper = lower + 8 * len - 1;
-> +
-> +	reg &= ~GENMASK_ULL(upper, lower);
-> +	val &= GENMASK_ULL(len * 8 - 1, 0);
-> +
-> +	return reg | ((u64)val << lower);
+On 07/07/16 14:48, maitysanchayan at gmail.com wrote:
+> Hello Srinivas,
+>
+> On 16-07-07 14:16:36, Srinivas Kandagatla wrote:
+>>
+>>
+>> On 07/07/16 13:33, maitysanchayan at gmail.com wrote:
+>>> Hello Srinivas,
+>>>
+>>> On 16-07-07 10:18:49, Srinivas Kandagatla wrote:
+>>>>
+>>>>
+>>>> On 07/07/16 07:39, Sanchayan Maity wrote:
+>>>>> From: Stefan Agner <stefan@agner.ch>
+>>>>>
+>>>>> The existing NVMEM consumer API's do not allow to get a
+>>>>> NVMEM cell directly given a device tree node. This patch
+>>>>> adds a function to provide this functionality.
+>>>>>
+>>>>> Assuming the nvmem cell id name is known, this can be used
+>>>>> as follows
+>>>>>
+>>>>> struct device_node *cell_np;
+>>>>> struct nvmem_cell *foo_cell;
+>>>>>
+>>>>> cell_np = of_find_node_by_name(parent, "foo");
+>>>>> foo_cell = of_nvmem_cell_get_direct(cell_np);
+>>>>
+>>>> I don't see a real gain in adding this new api,
+>>>> This will encourage people to use non-standard nvmem bindings.
+>>>>
+>>>> why not just use standard nvmem bindings.. and use
+>>>>
+>>>> of_nvmem_cell_get(np, "foo");
+>>>>
+>>>> which should work in your case.
+>>>
+>>> It will not work in our case. I believe what you are referring to will
+>>> work if I were to pass the device node pointer which was a NVMEM consumer
+>>> containing the nvmem-cells property. In our case, we pass the device node
+>>> pointer pointing to /soc which is not a nvmem consumer. In this case it
+>>> will not have nvmem-cells property causing of_nvmem_cell_get to return
+>>> EINVAL when it calls of_parse_phandle with "nvmem-cells".
+>>
+>> I could not see any bindings/ dt patches or dt examples for this this
+>> series.. so Am guessing your node would look like:
+>>
+>> soc {
+>> 	cfg0: cfg0 {
+>> 		...
+>> 	};
+>> 	cfg1: cfg1 {
+>> 		...
+>> 	};
+>> };
+>>
+>> If this is not how it looks, can you share the details.
+>>
+>> What Am saying is that why not have:
+>>
+>> soc {
+>> 	nvmem-cells = <&cfg0>, <&cfg1>;
+>> 	nvmem-cell-names = "cfg0", "cfg1";
+>>
+>> 	cfg0: cfg0 {
+>> 		...
+>> 	};
+>>
+>> 	cfg1: cfg1 {
+>> 		...
+>> 	};
+>> };
+>>
+>>>
+>>> Our requirement is to be able to pass the soc node pointer and then
+>>> be able to get a nvmem cell by specifying it's name. So for our case
+>>
+>> Why?
+>
+> Sorry for not providing the background directly. The patches before this
+> series used that approach. In the previous discussions it has been pointed
+> out that it is not acceptable to have additional device tree bindings for
+> providing data that the driver wants at the SoC node level or to have bindings
+> just for the SoC bus driver alone since we aren't really describing the
+> hardware.
+>
+SOC driver seems to search for an arbitrary node by its name, which is 
+not a binding and can break anytime in cases If the scope of nvmem 
+provider is out of soc node or if the nvmem cells are not named as 
+expected. That looks very fragile.
 
-this casting is weird.  Why is val not either a u64 or a u32?  Or the
-whole lot could be unsigned long/unsigned int like extract_bytes.
+If the soc node is actual consumer of nvmem cells, I see no reason why 
+we should not use proper nvmem bindings?
 
-> +}
-> +
->  static unsigned long vgic_mmio_read_v3_misc(struct kvm_vcpu *vcpu,
->  					    gpa_t addr, unsigned int len)
->  {
-> @@ -152,6 +165,132 @@ static unsigned long vgic_mmio_read_v3_idregs(struct kvm_vcpu *vcpu,
->  	return 0;
->  }
->  
-> +/* We want to avoid outer shareable. */
-> +u64 vgic_sanitise_shareability(u64 reg)
-> +{
-> +	switch (reg & GIC_BASER_SHAREABILITY_MASK) {
-> +	case GIC_BASER_OuterShareable:
-> +		return GIC_BASER_InnerShareable;
-> +	default:
-> +		return reg;
-> +	}
-> +}
-> +
-> +/* Non-cacheable or same-as-inner are OK. */
-> +u64 vgic_sanitise_outer_cacheability(u64 reg)
-> +{
-> +	switch (reg & GIC_BASER_CACHE_MASK) {
-> +	case GIC_BASER_CACHE_SameAsInner:
-> +	case GIC_BASER_CACHE_nC:
-> +		return reg;
-> +	default:
-> +		return GIC_BASER_CACHE_nC;
-> +	}
-> +}
-> +
-> +/* Avoid any inner non-cacheable mapping. */
-> +u64 vgic_sanitise_inner_cacheability(u64 reg)
-> +{
-> +	switch (reg & GIC_BASER_CACHE_MASK) {
-> +	case GIC_BASER_CACHE_nCnB:
-> +	case GIC_BASER_CACHE_nC:
-> +		return GIC_BASER_CACHE_RaWb;
-> +	default:
-> +		return reg;
-> +	}
-> +}
+Given the fact that the patch is potentially bypassing the nvmem 
+bindings, am not happy to take it!
 
-nit: My OCD sets in here because the functions above are not ordered
-similarly to the calls below :)
+thanks,
+srini
 
-also, why do you need to apply the mask in the sanitize functions when
-you've just applied it in the callers?  It would make more sense to me
-if you didn't and named the parameters @field instead of @reg in the
-sanitize functions.
-
-> +
-> +u64 vgic_sanitise_field(u64 reg, int field_shift, u64 field_mask,
-> +			u64 (*sanitise_fn)(u64))
-> +{
-> +	u64 field = (reg >> field_shift) & field_mask;
-> +
-> +	field = sanitise_fn(field) << field_shift;
-> +	return (reg & ~(field_mask << field_shift)) | field;
-> +}
-> +
-> +static u64 vgic_sanitise_pendbaser(u64 reg)
-> +{
-> +	reg = vgic_sanitise_field(reg, GICR_PENDBASER_SHAREABILITY_SHIFT,
-> +				  GIC_BASER_SHAREABILITY_MASK,
-> +				  vgic_sanitise_shareability);
-> +	reg = vgic_sanitise_field(reg, GICR_PENDBASER_INNER_CACHEABILITY_SHIFT,
-> +				  GIC_BASER_CACHE_MASK,
-> +				  vgic_sanitise_inner_cacheability);
-> +	reg = vgic_sanitise_field(reg, GICR_PENDBASER_OUTER_CACHEABILITY_SHIFT,
-> +				  GIC_BASER_CACHE_MASK,
-> +				  vgic_sanitise_outer_cacheability);
-> +	return reg;
-> +}
-> +
-> +static u64 vgic_sanitise_propbaser(u64 reg)
-> +{
-> +	reg = vgic_sanitise_field(reg, GICR_PROPBASER_SHAREABILITY_SHIFT,
-> +				  GIC_BASER_SHAREABILITY_MASK,
-> +				  vgic_sanitise_shareability);
-> +	reg = vgic_sanitise_field(reg, GICR_PROPBASER_INNER_CACHEABILITY_SHIFT,
-> +				  GIC_BASER_CACHE_MASK,
-> +				  vgic_sanitise_inner_cacheability);
-> +	reg = vgic_sanitise_field(reg, GICR_PROPBASER_OUTER_CACHEABILITY_SHIFT,
-> +				  GIC_BASER_CACHE_MASK,
-> +				  vgic_sanitise_outer_cacheability);
-> +	return reg;
-> +}
-
-assuming the defines themselves are correct (I didn't check) this looks
-good otherwise.
-
-> +
-> +#define PROPBASER_RES0_MASK						\
-> +	(GENMASK_ULL(63, 59) | GENMASK_ULL(55, 52) | GENMASK_ULL(6, 5))
-
-Why is the middle one for bits 55:52?  is it not 55:48?  Perhaps larger
-physical addresses compared to the revision of the GICv3 spec I have at
-hand?
-
-> +#define PENDBASER_RES0_MASK						\
-> +	(BIT_ULL(63) | GENMASK_ULL(61, 59) | GENMASK_ULL(55, 52) |	\
-> +	 GENMASK_ULL(15, 12) | GENMASK_ULL(6, 0))
-> +
-> +static unsigned long vgic_mmio_read_propbase(struct kvm_vcpu *vcpu,
-> +					     gpa_t addr, unsigned int len)
-> +{
-> +	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
-> +
-> +	return extract_bytes(dist->propbaser, addr & 7, len);
-> +}
-> +
-> +static void vgic_mmio_write_propbase(struct kvm_vcpu *vcpu,
-> +				     gpa_t addr, unsigned int len,
-> +				     unsigned long val)
-> +{
-> +	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
-> +	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
-> +
-> +	/* Storing a value with LPIs already enabled is undefined */
-> +	if (vgic_cpu->lpis_enabled)
-> +		return;
-> +
-> +	dist->propbaser = update_64bit_reg(dist->propbaser, addr & 4, len, val);
-> +	dist->propbaser &= ~PROPBASER_RES0_MASK;
-> +	dist->propbaser = vgic_sanitise_propbaser(dist->propbaser);
-
-what prevents multiple writers messing with dist->propbaser or the
-lips_enabled being set in the middle of us fiddling with dist_propbaser?
-
-> +}
-> +
-> +static unsigned long vgic_mmio_read_pendbase(struct kvm_vcpu *vcpu,
-> +					     gpa_t addr, unsigned int len)
-> +{
-> +	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
-> +
-> +	return extract_bytes(vgic_cpu->pendbaser, addr & 7, len);
-> +}
-> +
-> +static void vgic_mmio_write_pendbase(struct kvm_vcpu *vcpu,
-> +				     gpa_t addr, unsigned int len,
-> +				     unsigned long val)
-> +{
-> +	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
-> +
-> +	/* Storing a value with LPIs already enabled is undefined */
-> +	if (vgic_cpu->lpis_enabled)
-> +		return;
-> +
-> +	vgic_cpu->pendbaser = update_64bit_reg(vgic_cpu->pendbaser,
-> +					       addr & 4, len, val);
-> +	vgic_cpu->pendbaser &= ~PENDBASER_RES0_MASK;
-> +	vgic_cpu->pendbaser = vgic_sanitise_pendbaser(vgic_cpu->pendbaser);
-> +}
-> +
->  /*
->   * The GICv3 per-IRQ registers are split to control PPIs and SGIs in the
->   * redistributors, while SPIs are covered by registers in the distributor
-> @@ -232,10 +371,10 @@ static const struct vgic_register_region vgic_v3_rdbase_registers[] = {
->  		vgic_mmio_read_v3r_typer, vgic_mmio_write_wi, 8,
->  		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
->  	REGISTER_DESC_WITH_LENGTH(GICR_PROPBASER,
-> -		vgic_mmio_read_raz, vgic_mmio_write_wi, 8,
-> +		vgic_mmio_read_propbase, vgic_mmio_write_propbase, 8,
->  		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
->  	REGISTER_DESC_WITH_LENGTH(GICR_PENDBASER,
-> -		vgic_mmio_read_raz, vgic_mmio_write_wi, 8,
-> +		vgic_mmio_read_pendbase, vgic_mmio_write_pendbase, 8,
->  		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
->  	REGISTER_DESC_WITH_LENGTH(GICR_IDREGS,
->  		vgic_mmio_read_v3_idregs, vgic_mmio_write_wi, 48,
-> diff --git a/virt/kvm/arm/vgic/vgic-mmio.h b/virt/kvm/arm/vgic/vgic-mmio.h
-> index 8509014..e863ccc 100644
-> --- a/virt/kvm/arm/vgic/vgic-mmio.h
-> +++ b/virt/kvm/arm/vgic/vgic-mmio.h
-> @@ -147,4 +147,12 @@ unsigned int vgic_v2_init_dist_iodev(struct vgic_io_device *dev);
->  
->  unsigned int vgic_v3_init_dist_iodev(struct vgic_io_device *dev);
->  
-> +#ifdef CONFIG_KVM_ARM_VGIC_V3
-> +u64 vgic_sanitise_outer_cacheability(u64 reg);
-> +u64 vgic_sanitise_inner_cacheability(u64 reg);
-> +u64 vgic_sanitise_shareability(u64 reg);
-> +u64 vgic_sanitise_field(u64 reg, int field_shift, u64 field_mask,
-> +			u64 (*sanitise_fn)(u64));
-> +#endif
-> +
->  #endif
-> diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
-> index f0ac064..6f8f31f 100644
-> --- a/virt/kvm/arm/vgic/vgic-v3.c
-> +++ b/virt/kvm/arm/vgic/vgic-v3.c
-> @@ -191,6 +191,11 @@ void vgic_v3_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
->  	vmcrp->pmr  = (vmcr & ICH_VMCR_PMR_MASK) >> ICH_VMCR_PMR_SHIFT;
->  }
->  
-> +#define INITIAL_PENDBASER_VALUE						  \
-> +	(GIC_BASER_CACHEABILITY(GICR_PENDBASER, INNER, RaWb)		| \
-> +	GIC_BASER_CACHEABILITY(GICR_PENDBASER, OUTER, SameAsInner)	| \
-> +	GIC_BASER_SHAREABILITY(GICR_PENDBASER, InnerShareable))
-> +
->  void vgic_v3_enable(struct kvm_vcpu *vcpu)
->  {
->  	struct vgic_v3_cpu_if *vgic_v3 = &vcpu->arch.vgic_cpu.vgic_v3;
-> @@ -208,10 +213,12 @@ void vgic_v3_enable(struct kvm_vcpu *vcpu)
->  	 * way, so we force SRE to 1 to demonstrate this to the guest.
->  	 * This goes with the spec allowing the value to be RAO/WI.
->  	 */
-> -	if (vcpu->kvm->arch.vgic.vgic_model == KVM_DEV_TYPE_ARM_VGIC_V3)
-> +	if (vcpu->kvm->arch.vgic.vgic_model == KVM_DEV_TYPE_ARM_VGIC_V3) {
->  		vgic_v3->vgic_sre = ICC_SRE_EL1_SRE;
-> -	else
-> +		vcpu->arch.vgic_cpu.pendbaser = INITIAL_PENDBASER_VALUE;
-
-why is pendbaser initialized, but not propbaser?  Do I have an outdated
-spec?  Both seem to not have any predefined reset value.
-
-> +	} else {
->  		vgic_v3->vgic_sre = 0;
-> +	}
->  
->  	/* Get the show on the road... */
->  	vgic_v3->vgic_hcr = ICH_HCR_EN;
-> -- 
-> 2.9.0
-> 
-
-Thanks,
--Christoffer
+> For the discussion,
+> https://lkml.org/lkml/2016/5/23/573
+> https://lkml.org/lkml/2016/5/2/71
+>
+> Regards,
+> Sanchayan.
+>
+>
+>>
+>>> ocotp node has cfg0 and cfg1 which we want but we cannot use existing
+>>> nvmem consumer API since that requires having the nvmem consumer properties
+>>> in the node we are binding to viz. is a direct nvmem consumer.
+>>>
+>>> Regards,
+>>> Sanchayan.
+>>>
+>>>>
+>>>> thanks,
+>>>> srini
+>>>>>
+>>>>> Parent node can also be the of_node of the main SoC device
+>>>>> node.
+>>>>>
+>>>>> Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
+>>>>> ---
+>>>>>     drivers/nvmem/core.c           | 44 +++++++++++++++++++++++++++++-------------
+>>>>>     include/linux/nvmem-consumer.h |  1 +
+>>>>>     2 files changed, 32 insertions(+), 13 deletions(-)
+>>>>>
+>>>>> diff --git a/drivers/nvmem/core.c b/drivers/nvmem/core.c
+>>>>> index 965911d..470abee 100644
+>>>>> --- a/drivers/nvmem/core.c
+>>>>> +++ b/drivers/nvmem/core.c
+>>>>> @@ -743,29 +743,21 @@ static struct nvmem_cell *nvmem_cell_get_from_list(const char *cell_id)
+>>>>>
+>>>>>     #if IS_ENABLED(CONFIG_NVMEM) && IS_ENABLED(CONFIG_OF)
+>>>>>     /**
+>>>>> - * of_nvmem_cell_get() - Get a nvmem cell from given device node and cell id
+>>>>> + * of_nvmem_cell_get_direct() - Get a nvmem cell from given device node
+>>>>>      *
+>>>>> - * @dev node: Device tree node that uses the nvmem cell
+>>>>> - * @id: nvmem cell name from nvmem-cell-names property.
+>>>>> + * @dev node: Device tree node that uses nvmem cell
+>>>>>      *
+>>>>>      * Return: Will be an ERR_PTR() on error or a valid pointer
+>>>>>      * to a struct nvmem_cell.  The nvmem_cell will be freed by the
+>>>>>      * nvmem_cell_put().
+>>>>>      */
+>>>>> -struct nvmem_cell *of_nvmem_cell_get(struct device_node *np,
+>>>>> -					    const char *name)
+>>>>> +struct nvmem_cell *of_nvmem_cell_get_direct(struct device_node *cell_np)
+>>>>>     {
+>>>>> -	struct device_node *cell_np, *nvmem_np;
+>>>>> +	struct device_node *nvmem_np;
+>>>>>     	struct nvmem_cell *cell;
+>>>>>     	struct nvmem_device *nvmem;
+>>>>>     	const __be32 *addr;
+>>>>> -	int rval, len, index;
+>>>>> -
+>>>>> -	index = of_property_match_string(np, "nvmem-cell-names", name);
+>>>>> -
+>>>>> -	cell_np = of_parse_phandle(np, "nvmem-cells", index);
+>>>>> -	if (!cell_np)
+>>>>> -		return ERR_PTR(-EINVAL);
+>>>>> +	int rval, len;
+>>>>>
+>>>>>     	nvmem_np = of_get_next_parent(cell_np);
+>>>>>     	if (!nvmem_np)
+>>>>> @@ -824,6 +816,32 @@ err_mem:
+>>>>>
+>>>>>     	return ERR_PTR(rval);
+>>>>>     }
+>>>>> +EXPORT_SYMBOL_GPL(of_nvmem_cell_get_direct);
+>>>>> +
+>>>>> +/**
+>>>>> + * of_nvmem_cell_get() - Get a nvmem cell from given device node and cell id
+>>>>> + *
+>>>>> + * @dev node: Device tree node that uses the nvmem cell
+>>>>> + * @id: nvmem cell name from nvmem-cell-names property.
+>>>>> + *
+>>>>> + * Return: Will be an ERR_PTR() on error or a valid pointer
+>>>>> + * to a struct nvmem_cell.  The nvmem_cell will be freed by the
+>>>>> + * nvmem_cell_put().
+>>>>> + */
+>>>>> +struct nvmem_cell *of_nvmem_cell_get(struct device_node *np,
+>>>>> +					    const char *name)
+>>>>> +{
+>>>>> +	struct device_node *cell_np;
+>>>>> +	int index;
+>>>>> +
+>>>>> +	index = of_property_match_string(np, "nvmem-cell-names", name);
+>>>>> +
+>>>>> +	cell_np = of_parse_phandle(np, "nvmem-cells", index);
+>>>>> +	if (!cell_np)
+>>>>> +		return ERR_PTR(-EINVAL);
+>>>>> +
+>>>>> +	return of_nvmem_cell_get_direct(cell_np);
+>>>>> +}
+>>>>>     EXPORT_SYMBOL_GPL(of_nvmem_cell_get);
+>>>>>     #endif
+>>>>>
+>>>>> diff --git a/include/linux/nvmem-consumer.h b/include/linux/nvmem-consumer.h
+>>>>> index 9bb77d3..bf879fc 100644
+>>>>> --- a/include/linux/nvmem-consumer.h
+>>>>> +++ b/include/linux/nvmem-consumer.h
+>>>>> @@ -136,6 +136,7 @@ static inline int nvmem_device_write(struct nvmem_device *nvmem,
+>>>>>     #endif /* CONFIG_NVMEM */
+>>>>>
+>>>>>     #if IS_ENABLED(CONFIG_NVMEM) && IS_ENABLED(CONFIG_OF)
+>>>>> +struct nvmem_cell *of_nvmem_cell_get_direct(struct device_node *cell_np);
+>>>>>     struct nvmem_cell *of_nvmem_cell_get(struct device_node *np,
+>>>>>     				     const char *name);
+>>>>>     struct nvmem_device *of_nvmem_device_get(struct device_node *np,
+>>>>>
