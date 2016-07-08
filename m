@@ -1,29 +1,67 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 8 Jul 2016 16:49:01 +0100
-Subject: [PATCH]: arm64: factor work_pending state machine to C
-In-Reply-To: <e19d6de0-c754-d53b-3420-16d460a4cb33@mellanox.com>
-References: <1459877922-15512-1-git-send-email-cmetcalf@mellanox.com>
- <1459877922-15512-13-git-send-email-cmetcalf@mellanox.com>
- <e19d6de0-c754-d53b-3420-16d460a4cb33@mellanox.com>
-Message-ID: <20160708154901.GF6493@arm.com>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Fri, 8 Jul 2016 11:49:38 -0400
+Subject: [PATCH v2 1/2] arm64: implement FTRACE_WITH_REGS
+In-Reply-To: <20160708152421.GG3556@pathway.suse.cz>
+References: <20160627151500.2247A68D20@newverein.lst.de>
+ <20160627151717.BD25468D26@newverein.lst.de>
+ <20160708145800.GE3556@pathway.suse.cz>
+ <20160708150709.GA8979@lst.de>
+ <20160708152421.GG3556@pathway.suse.cz>
+Message-ID: <20160708114938.49052cee@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chris,
+On Fri, 8 Jul 2016 17:24:21 +0200
+Petr Mladek <pmladek@suse.com> wrote:
 
-On Fri, Jul 08, 2016 at 11:43:50AM -0400, Chris Metcalf wrote:
-> Ping!
+> On Fri 2016-07-08 17:07:09, Torsten Duwe wrote:
+> > On Fri, Jul 08, 2016 at 04:58:00PM +0200, Petr Mladek wrote:  
+> > > On Mon 2016-06-27 17:17:17, Torsten Duwe wrote:  
+> > > > Once gcc is enhanced to optionally generate NOPs at the beginning
+> > > > of each function, like the concept proven in
+> > > > https://gcc.gnu.org/ml/gcc-patches/2016-04/msg01671.html
+> > > > (sans the "fprintf (... pad_size);", which spoils the data structure
+> > > > for kernel use), the generated pads can nicely be used to reroute
+> > > > function calls for tracing/profiling, or live patching.
+> > > > diff --git a/arch/arm64/kernel/ftrace.c b/arch/arm64/kernel/ftrace.c
+> > > > index ebecf9a..917065c 100644
+> > > > --- a/arch/arm64/kernel/ftrace.c
+> > > > +++ b/arch/arm64/kernel/ftrace.c
+> > > > @@ -39,6 +39,12 @@ static int ftrace_modify_code(unsigned long pc, u32 old, u32 new,
+> > > >  		if (aarch64_insn_read((void *)pc, &replaced))
+> > > >  			return -EFAULT;
+> > > >  
+> > > > +		/* If we already have what we'll finally want,
+> > > > +		 * report success. This is needed on startup.
+> > > > +		 */
+> > > > +		if (replaced == new)
+> > > > +			return 0;  
+> > > 
+> > > This looks strange. I wonder if it actually hides a real bug that we
+> > > modify the code twice or so.  
+> > 
+> > Not at all. All "profilers" we abused so far generate code that needs to
+> > be disabled on boot first. prolog-pad generates nops, initially.  
 > 
-> I am hopeful that this patch [1] can be picked up for the 4.8 merge window
-> in the arm64 tree.  As I mentioned in my last patch series that included
-> this patch [2], I'm hopeful that this version addresses the performance
-> issues that were seen with Mark's original patch.  This version tests the
-> TIF flags prior to calling out to the loop in C code.
+> Yeah, but I cannot find this kind of check in other architectures.
+> I checked arch/x86/kernel/ftrace.c, arch/s390/kernel/ftrace.c, and
+> arch/powerpc/kernel/ftrace.c. These all support ftrace with
+> regs and livepatching.
 
-I still need to get round to measuring that again. This might also
-conflict with a late fix I just sent for 4.7.
+I guess the question is, with this approach, there's no call to mcount
+or fentry at compile time? Just nops are added? In this case perhaps the
+if statement should be more defined:
 
-Is your task isolation series all ready apart from this? It seems like
-there's still discussion over there.
+	/*
+	 * On boot, with the prologue code, the code will already
+	 * be a nop.
+	 */
+	if (replace == new && new == NOP)
+		return 0;
 
-Will
+And perhaps you can even pass in addr and check if it equals the nop
+address. Maybe even not call this code then? That is, if addr ==
+MCOUNT_ADDR passed in by ftrace_code_disable() have ftrace_make_nop()
+simple return 0 without doing anything.
+
+-- Steve
