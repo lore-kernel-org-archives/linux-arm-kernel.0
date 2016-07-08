@@ -1,58 +1,104 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Fri,  8 Jul 2016 18:05:54 +0200
-Subject: [PATCH 13/15] ARM: dts: sun8i: Add dt node for rtl8703as wifi chip on
- ga10h
+Date: Fri,  8 Jul 2016 18:05:56 +0200
+Subject: [PATCH 15/15] ARM: dts: sun8i: Add dts file for inet86dz board
 In-Reply-To: <1467993956-19535-1-git-send-email-hdegoede@redhat.com>
 References: <1467993956-19535-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1467993956-19535-14-git-send-email-hdegoede@redhat.com>
+Message-ID: <1467993956-19535-16-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ga10h tablet has a rtl8703as wifi chip, add a dt node describing it.
+The inet86dz board is a board used in 7" tablets from various oems.
 
-This enables usage of wifi on this tablet (together with the out of
-tree rtl8732bs driver).
+These tablets are a23 based 7" tablets featuring a 1024x600 LCD,
+512MB RAM, 4G NAND, rtl8188etv usb wifi, gsl1680 touchschreen,
+micro-sd slot, 3.5mm headphone jack and a micro-usb otg connector
+which doubles as charging port.
 
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
- arch/arm/boot/dts/sun8i-a33-ga10h-v1.1.dts | 18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
+Changes in v2:
+-Use sun8i-reference-design-tablet.dtsi
+---
+ arch/arm/boot/dts/Makefile               |  1 +
+ arch/arm/boot/dts/sun8i-a23-inet86dz.dts | 58 ++++++++++++++++++++++++++++++++
+ 2 files changed, 59 insertions(+)
+ create mode 100644 arch/arm/boot/dts/sun8i-a23-inet86dz.dts
 
-diff --git a/arch/arm/boot/dts/sun8i-a33-ga10h-v1.1.dts b/arch/arm/boot/dts/sun8i-a33-ga10h-v1.1.dts
-index 6566032..de6269d 100644
---- a/arch/arm/boot/dts/sun8i-a33-ga10h-v1.1.dts
-+++ b/arch/arm/boot/dts/sun8i-a33-ga10h-v1.1.dts
-@@ -47,6 +47,11 @@
- / {
- 	model = "Allwinner GA10H Quad Core Tablet (v1.1)";
- 	compatible = "allwinner,ga10h-v1.1", "allwinner,sun8i-a33";
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index fca6811..92eb004 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -753,6 +753,7 @@ dtb-$(CONFIG_MACH_SUN7I) += \
+ dtb-$(CONFIG_MACH_SUN8I) += \
+ 	sun8i-a23-evb.dtb \
+ 	sun8i-a23-gt90h-v4.dtb \
++	sun8i-a23-inet86dz.dtb \
+ 	sun8i-a23-ippo-q8h-v5.dtb \
+ 	sun8i-a23-ippo-q8h-v1.2.dtb \
+ 	sun8i-a23-polaroid-mid2407pxe03.dtb \
+diff --git a/arch/arm/boot/dts/sun8i-a23-inet86dz.dts b/arch/arm/boot/dts/sun8i-a23-inet86dz.dts
+new file mode 100644
+index 0000000..0f9f71b
+--- /dev/null
++++ b/arch/arm/boot/dts/sun8i-a23-inet86dz.dts
+@@ -0,0 +1,58 @@
++/*
++ * Copyright 2016 Hans de Goede <hdegoede@redhat.com>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
 +
-+	aliases {
-+		/* Make u-boot set mac-address for rtl8703as (no eeprom) */
-+		ethernet0 = &rtl8703as;
-+	};
- };
- 
- &ehci0 {
-@@ -62,6 +67,19 @@
- 	};
- };
- 
-+&mmc1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc1_pins_a>;
-+	vmmc-supply = <&reg_dldo1>;
-+	bus-width = <4>;
-+	non-removable;
-+	status = "okay";
++/dts-v1/;
++#include "sun8i-a23.dtsi"
++#include "sun8i-reference-design-tablet.dtsi"
 +
-+	rtl8703as: sdio_wifi at 1 {
-+		reg = <1>;
-+	};
++/ {
++	model = "INet-86DZ Rev 01";
++	compatible = "primux,inet86dz", "allwinner,sun8i-a23";
 +};
 +
- &ohci0 {
- 	status = "okay";
- };
++&ehci0 {
++	status = "okay";
++};
++
++&usbphy {
++	usb1_vbus-supply = <&reg_dldo1>;
++};
 -- 
 2.7.4
