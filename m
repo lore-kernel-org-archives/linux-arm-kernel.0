@@ -1,132 +1,73 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Fri, 8 Jul 2016 13:44:41 +0200
-Subject: [PATCH v3 0/9] Add MT8173 Video Decoder Driver
-In-Reply-To: <1467886612.21382.18.camel@mtksdaap41>
-References: <1464611363-14936-1-git-send-email-tiffany.lin@mediatek.com>
- <577D0576.2050706@xs4all.nl> <1467886612.21382.18.camel@mtksdaap41>
-Message-ID: <e2952cc2-3abd-894e-9481-b91a45cf7891@xs4all.nl>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 08 Jul 2016 14:00:12 +0200
+Subject: [PATCH 1/5] arm64: dts: add QorIQ LS1046A SoC support
+In-Reply-To: <1467972944-12293-2-git-send-email-shh.xie@gmail.com>
+References: <1467972944-12293-1-git-send-email-shh.xie@gmail.com>
+ <1467972944-12293-2-git-send-email-shh.xie@gmail.com>
+Message-ID: <1984740.gmAYAJ1bIT@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/07/2016 12:16 PM, tiffany lin wrote:
-> Hi Hans,
-> 
-> 
-> On Wed, 2016-07-06 at 15:19 +0200, Hans Verkuil wrote:
->> Hi Tiffany,
->>
->> I plan to review this patch series on Friday, but one obvious question is
->> what the reason for these failures is:
->>
->>> Input/Output configuration ioctls:
->>>         test VIDIOC_ENUM/G/S/QUERY_STD: OK (Not Supported)
->>>         test VIDIOC_ENUM/G/S/QUERY_DV_TIMINGS: OK (Not Supported)
->>>         test VIDIOC_DV_TIMINGS_CAP: OK (Not Supported)
->>>         test VIDIOC_G/S_EDID: OK (Not Supported)
->>>
->>>         Control ioctls:
->>>                 test VIDIOC_QUERYCTRL/MENU: OK
->>>                 fail: ../../../v4l-utils-1.6.0/utils/v4l2-compliance/v4l2-test-controls.cpp(357): g_ctrl returned an error (11)
->>>                 test VIDIOC_G/S_CTRL: FAIL
->>>                 fail: ../../../v4l-utils-1.6.0/utils/v4l2-compliance/v4l2-test-controls.cpp(579): g_ext_ctrls returned an error (11)
->>>                 test VIDIOC_G/S/TRY_EXT_CTRLS: FAIL
-> These fails are because VIDIOC_G_CTRL and VIDIOC_G_EXT_CTRLS return
-> V4L2_CID_MIN_BUFFERS_FOR_CAPTURE only when dirver in MTK_STATE_HEADER
-> state, or it will return EAGAIN.
-> This could help user space get correct value, not default value that may
-> changed base on media content.
+On Friday, July 8, 2016 6:15:40 PM CEST shh.xie at gmail.com wrote:
+> +
+> +	memory at 80000000 {
+> +		device_type = "memory";
+> +		reg = <0x0 0x80000000 0 0x80000000>;
+> +		      /* DRAM space 1, size: 2GiB DRAM */
+> +	};
 
-OK, I really don't like this. I also looked what the s5p-mfc-dec driver does (the only other
-driver currently implementing this), and that returns -EINVAL.
+The memory size is usually in the .dts file, unless this is on-chip
+eDRAM.
+> +		clockgen: clocking at 1ee1000 {
+> +			compatible = "fsl,ls1046a-clockgen";
 
-My proposal would be to change this. If this information isn't known yet, why not
-just return 0 as the value? The doc would have to be updated and (preferably) also
-the s5p-mfc-dec driver. I've added Samsung devs to the Cc list, let me know what you
-think.
+> +		scfg: scfg at 1570000 {
+> +			compatible = "fsl,ls1046a-scfg", "syscon";
+ 
+> +		dcfg: dcfg at 1ee0000 {
+> +			compatible = "fsl,ls1046a-dcfg", "syscon";
 
-> 
->>>                 fail: ../../../v4l-utils-1.6.0/utils/v4l2-compliance/v4l2-test-controls.cpp(721): subscribe event for control 'User Controls' failed
->>>                 test VIDIOC_(UN)SUBSCRIBE_EVENT/DQEVENT: FAIL
-> Driver do not support subscribe event for control 'User Controls' for
-> now.
-> Do we need to support this?
+None of the fsl,ls1046a-* devices seem to have any binding documentation.
 
-I don't see why this would fail. It's OK to subscribe to such controls, although
-you'll never get an event.
+> +		wdog0: wdog at 2ad0000 {
 
->>>                 test VIDIOC_G/S_JPEGCOMP: OK (Not Supported)
->>>                 Standard Controls: 2 Private Controls: 0
->>>
->>>         Format ioctls:
->>>                 test VIDIOC_ENUM_FMT/FRAMESIZES/FRAMEINTERVALS: OK
->>>                 test VIDIOC_G/S_PARM: OK (Not Supported)
->>>                 test VIDIOC_G_FBUF: OK (Not Supported)
->>>                 fail: ../../../v4l-utils-1.6.0/utils/v4l2-compliance/v4l2-test-formats.cpp(405): expected EINVAL, but got 11 when getting format for buftype 9
->>>                 test VIDIOC_G_FMT: FAIL
-> This is because vidioc_vdec_g_fmt only succeed when context is in
-> MTK_STATE_HEADER state, or user space cannot get correct format data
-> using this function.
+watchdog at 2ad0000
 
-Comparing this to s5p-mfc-dec I see that -EINVAL is returned in that case.
+> +		usb0: usb3 at 2f00000 {
 
-I am not opposed to using EAGAIN in s5p-mfc-dec as well. Marek, Kamil, what is
-your opinion?
+usb at 2f00000
 
-> 
->>>                 test VIDIOC_TRY_FMT: OK (Not Supported)
->>>                 test VIDIOC_S_FMT: OK (Not Supported)
->>>                 test VIDIOC_G_SLICED_VBI_CAP: OK (Not Supported)
->>>
->>>         Codec ioctls:
->>>                 test VIDIOC_(TRY_)ENCODER_CMD: OK (Not Supported)
->>>                 test VIDIOC_G_ENC_INDEX: OK (Not Supported)
->>>                 test VIDIOC_(TRY_)DECODER_CMD: OK (Not Supported)
->>>
->>>         Buffer ioctls:
->>>                 test VIDIOC_REQBUFS/CREATE_BUFS/QUERYBUF: OK
->>>                 fail: ../../../v4l-utils-1.6.0/utils/v4l2-compliance/v4l2-test-buffers.cpp(500): q.has_expbuf(node)
-> Our OUTPUT and CAPTURE queue support both VB2_DMABUF and VB2_MMAP, user
-> space can select which to use in runtime.
-> So our driver default support v4l2_m2m_ioctl_expbuf functionality.
-> In v4l2-compliance test, it will check v4l2_m2m_ioctl_expbuf only valid
-> when node->valid_memorytype is V4L2_MEMORY_MMAP.
-> So when go through node->valid_memorytype is V4L2_MEMORY_DMABUF, it
-> fail.
+> +		pcie at 3400000 {
+> +			compatible = "fsl,ls1046a-pcie", "snps,dw-pcie";
+> +			reg = <0x00 0x03400000 0x0 0x00100000   /* controller registers */
+> +			       0x40 0x00000000 0x0 0x00002000>; /* configuration space */
+> +			reg-names = "regs", "config";
+> +			interrupts = <0 118 0x4>, /* controller interrupt */
+> +				     <0 117 0x4>; /* PME interrupt */
+> +			interrupt-names = "intr", "pme";
+> +			#address-cells = <3>;
+> +			#size-cells = <2>;
+> +			device_type = "pci";
+> +			num-lanes = <4>;
+> +			bus-range = <0x0 0xff>;
+> +			ranges = <0x81000000 0x0 0x00000000 0x40 0x00010000 0x0 0x00010000   /* downstream I/O */
+> +				  0x82000000 0x0 0x40000000 0x40 0x40000000 0x0 0x40000000>; /* non-prefetchable memory */
 
-valid_memorytype should have both MMAP and DMABUF flags.
+No prefetchable memory area?
 
-But v4l-utils-1.6.0 is way too old to be certain it isn't some v4l2-compliance bug
-that has since been fixed.
+> +			msi-parent = <&msi>;
 
-Regards,
+You seem to have a gic-400, could you use that as the MSI sink instead?
 
-	Hans
+> +			#interrupt-cells = <1>;
+> +			interrupt-map-mask = <0 0 0 7>;
+> +			interrupt-map = <0000 0 0 1 &gic 0 110 0x4>,
+> +					<0000 0 0 2 &gic 0 110 0x4>,
+> +					<0000 0 0 3 &gic 0 110 0x4>,
+> +					<0000 0 0 4 &gic 0 110 0x4>;
+> +		};
+>
 
-> 
-> 
-> best regards,
-> Tiffany
-> 
-> 
-> 
->>>                 test VIDIOC_EXPBUF: FAIL
->>>
->>>
->>> Total: 38, Succeeded: 33, Failed: 5, Warnings: 0
->>
->> If it is due to a bug in v4l2-compliance, then let me know and I'll fix it. If not,
->> then it should be fixed in the driver.
->>
->> Frankly, it was the presence of these failures that made me think this patch series
->> wasn't final. Before a v4l2 driver can be accepted in the kernel, v4l2-compliance must pass.
->>
->> Regards,
->>
->> 	Hans
-> 
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-media" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+If the four interrupts are all the same, why do you have separate entries?
+
+	Arnd
