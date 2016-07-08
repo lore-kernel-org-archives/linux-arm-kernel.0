@@ -1,77 +1,35 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Fri,  8 Jul 2016 11:49:29 -0700
-Subject: [PATCH 2/2] ARM: dts: NSP: Add BCM958625HR switch ports
-In-Reply-To: <1468003769-26959-1-git-send-email-f.fainelli@gmail.com>
-References: <1468003769-26959-1-git-send-email-f.fainelli@gmail.com>
-Message-ID: <1468003769-26959-3-git-send-email-f.fainelli@gmail.com>
+Date: Fri, 8 Jul 2016 11:52:04 -0700
+Subject: [PATCH 0/2] ARM: dts: NSP: Add built-in Ethernet switch nodes
+In-Reply-To: <1468003735-26895-1-git-send-email-f.fainelli@gmail.com>
+References: <1468003735-26895-1-git-send-email-f.fainelli@gmail.com>
+Message-ID: <577FF654.9050305@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the layout of the switch ports found on the BCM958625HR reference
-board. The CPU port is hooked up to the AMAC0 Ethernet controlelr
-adapter, so we also enable it.
+On 07/08/2016 11:48 AM, Florian Fainelli wrote:
+> This patch series is based on Broadcom/stblinux/devicetree/next which
+> contains proper support for the BCM958625HR board. To get working
+> Ethernet switch and CPU Ethernet support, the following dependencies
+> based on David Miller's net-next tree are required:
+> 
+> - Jon Mason's BGMAC/AMAC support: https://marc.info/?t=146793308300002&r=1&w=3
+> - dsa/b53 support for NSP switch: https://marc.info/?l=linux-netdev&m=146800324531914&w=3
 
-Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
----
- arch/arm/boot/dts/bcm958625hr.dts | 49 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 49 insertions(+)
+Please ignore this series, it contained patches from a previous
+submission, see this one instead:
+1468003769-26959-1-git-send-email-f.fainelli at gmail.com>
 
-diff --git a/arch/arm/boot/dts/bcm958625hr.dts b/arch/arm/boot/dts/bcm958625hr.dts
-index 03b8bbeb694f..4239e58cf97f 100644
---- a/arch/arm/boot/dts/bcm958625hr.dts
-+++ b/arch/arm/boot/dts/bcm958625hr.dts
-@@ -109,3 +109,52 @@
- 		groups = "nand_grp";
- 	};
- };
-+
-+&amac0 {
-+	status = "okay";
-+};
-+
-+&srab {
-+	compatible = "brcm,bcm58625-srab", "brcm,nsp-srab";
-+	status = "okay";
-+
-+	ports {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		port at 0 {
-+			label = "port0";
-+			reg = <0>;
-+		};
-+
-+		port at 1 {
-+			label = "port1";
-+			reg = <1>;
-+		};
-+
-+		port at 2 {
-+			label = "port2";
-+			reg = <2>;
-+		};
-+
-+		port at 3 {
-+			label = "port3";
-+			reg = <3>;
-+		};
-+
-+		port at 4 {
-+			label = "port4";
-+			reg = <4>;
-+		};
-+
-+		port at 5 {
-+			ethernet = <&amac0>;
-+			label = "cpu";
-+			reg = <5>;
-+			fixed-link {
-+				speed = <1000>;
-+				full-duplex;
-+			};
-+		};
-+	};
-+};
+> 
+> Florian Fainelli (2):
+>   ARM: dts: NSP: Add Switch Register Access Block node
+>   ARM: dts: NSP: Add BCM958625HR switch ports
+> 
+>  arch/arm/boot/dts/bcm-nsp.dtsi    | 11 +++++++++
+>  arch/arm/boot/dts/bcm958625hr.dts | 49 +++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 60 insertions(+)
+> 
+
+
 -- 
-2.7.4
+Florian
