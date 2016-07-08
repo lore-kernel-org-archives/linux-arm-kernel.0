@@ -1,49 +1,56 @@
 From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Fri,  8 Jul 2016 22:09:06 +0200
-Subject: [PATCH 2/3] usb: phy: generic: cope with initial state
+Date: Fri,  8 Jul 2016 22:09:07 +0200
+Subject: [PATCH 3/3] usb: phy: generic: remove the vbus dependency
 In-Reply-To: <1468008547-10925-1-git-send-email-robert.jarzmik@free.fr>
 References: <1468008547-10925-1-git-send-email-robert.jarzmik@free.fr>
-Message-ID: <1468008547-10925-2-git-send-email-robert.jarzmik@free.fr>
+Message-ID: <1468008547-10925-3-git-send-email-robert.jarzmik@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the gpio based case, the status of the phy is known at start by
-reading the VBus gpio.
+As the last known user, ie. pxa27x_udc relying on calls to
+usb_gadget_xxx() was amended to use the phy notifier, remove a bit the
+USB stack adherence.
 
-Actually, this is a fix, as this initial state, when not set up,
-prevents a gadget to answer to the enumeration phase, as there is no
-notification in this case (the VBus is already high when kernel boots)
-so no interrupt is triggered, and the flow is :
- - gadget initializes
- - gadget gets its phy-generic with a xxx_get_phy_xxx() call type
- - gadget does a "set_peripheral()" call type
-   => here if the otg->state is correctly filled, the proper vbus
-   handling will be called, and the gadget will be aware it should
-   answer enumeration and go forth
-
-Without this fix, the USB cable must be removed and replugged for any
-gadget relying on phy-generic and its gpio vbus handling to work.
-
-The problem was seen on a pxa27x architecture based board on a
-devicetree build.
+Actually the driver still uses the gadget API for structures definition,
+but the implementation of USB gadget specific function usb_gadget_*() is
+not necessary anymore.
 
 Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
 ---
- drivers/usb/phy/phy-generic.c | 2 ++
- 1 file changed, 2 insertions(+)
+ drivers/usb/phy/phy-generic.c | 7 ++-----
+ 1 file changed, 2 insertions(+), 5 deletions(-)
 
 diff --git a/drivers/usb/phy/phy-generic.c b/drivers/usb/phy/phy-generic.c
-index 980c9dee09eb..41b8aff9b925 100644
+index 41b8aff9b925..c14e767a3fbf 100644
 --- a/drivers/usb/phy/phy-generic.c
 +++ b/drivers/usb/phy/phy-generic.c
-@@ -322,6 +322,8 @@ static int usb_phy_generic_probe(struct platform_device *pdev)
- 				gpiod_to_irq(nop->gpiod_vbus), err);
- 			return err;
- 		}
-+		nop->phy.otg->state = gpiod_get_value(nop->gpiod_vbus) ?
-+			OTG_STATE_B_PERIPHERAL : OTG_STATE_B_IDLE;
- 	}
+@@ -118,8 +118,6 @@ static irqreturn_t nop_gpio_vbus_thread(int irq, void *data)
+ 		status = USB_EVENT_VBUS;
+ 		otg->state = OTG_STATE_B_PERIPHERAL;
+ 		nop->phy.last_event = status;
+-		if (otg->gadget)
+-			usb_gadget_vbus_connect(otg->gadget);
  
- 	nop->phy.init		= usb_gen_phy_init;
+ 		/* drawing a "unit load" is *always* OK, except for OTG */
+ 		nop_set_vbus_draw(nop, 100);
+@@ -129,8 +127,6 @@ static irqreturn_t nop_gpio_vbus_thread(int irq, void *data)
+ 	} else {
+ 		nop_set_vbus_draw(nop, 0);
+ 
+-		if (otg->gadget)
+-			usb_gadget_vbus_disconnect(otg->gadget);
+ 		status = USB_EVENT_NONE;
+ 		otg->state = OTG_STATE_B_IDLE;
+ 		nop->phy.last_event = status;
+@@ -187,7 +183,8 @@ static int nop_set_peripheral(struct usb_otg *otg, struct usb_gadget *gadget)
+ 
+ 	otg->gadget = gadget;
+ 	if (otg->state == OTG_STATE_B_PERIPHERAL)
+-		usb_gadget_vbus_connect(gadget);
++		atomic_notifier_call_chain(&otg->usb_phy->notifier,
++					   USB_EVENT_VBUS, otg->gadget);
+ 	else
+ 		otg->state = OTG_STATE_B_IDLE;
+ 	return 0;
 -- 
 2.1.4
