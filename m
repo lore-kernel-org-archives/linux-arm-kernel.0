@@ -1,85 +1,69 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Fri, 8 Jul 2016 10:11:18 +0800
-Subject: [PATCH v2] serial: amba-pl011: complete support to ZTE uart
-In-Reply-To: <20160707152802.GR1041@n2100.armlinux.org.uk>
-References: <1458717126-20814-1-git-send-email-jun.nie@linaro.org>
- <CABymUCN_Os0gxoWjfwB_8V4kEkwBqKcrCCRjH8+-gm-Xt3-tYQ@mail.gmail.com>
- <570CF1B3.8080305@linaro.org>
- <CABymUCPvayLkc5h-3e0671pEEO_SshNJazk7W0B_oAUfL-6r0w@mail.gmail.com>
- <20160428201106.GA2924@kroah.com>
- <CABymUCPH1CwxhBxGq5_epgn-19j9WrfrxxG8zuzpZnXk26Ps9A@mail.gmail.com>
- <20160707095453.GA10000@tiger> <20160707150107.GA20896@tiger>
- <20160707152802.GR1041@n2100.armlinux.org.uk>
-Message-ID: <20160708021118.GB20896@tiger>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri,  8 Jul 2016 10:40:39 +0800
+Subject: [PATCH] ARM: dts: sun8i-h3: Rename sinovoip-bpi-m2-plus to
+ bananapi-m2-plus
+Message-ID: <1467945639-12844-1-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 07, 2016 at 04:28:02PM +0100, Russell King - ARM Linux wrote:
-> So, if I were to do this, there wouldn't be any objection?
-> 
-> An alternative would be to use the real hardware ID if it exists, add
-> a compatible to DT, and use of_device_is_compatible() in the driver
-> to discover if it's a zte device.
+The Banana Pi series is a well known series of single board computers.
+The manufacturer, Sinovoip, is less well known. Moreover, the board
+markings do not mention Sinovoip, but only the Banana Pi logo, and
+the BPI-M* model name.
 
-Comparing to this, I think the "official" pseudo-ID approach is cleaner.
-I will send a patch to incorporate the suggested changes below.
+Rename the dts file to use the more well known name. Also fix up
+some of the model names and labels to match other Banana Pi boards.
 
-Thanks, Russell.
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ arch/arm/boot/dts/Makefile                                          | 2 +-
+ ...8i-h3-sinovoip-bpi-m2-plus.dts => sun8i-h3-bananapi-m2-plus.dts} | 6 +++---
+ 2 files changed, 4 insertions(+), 4 deletions(-)
+ rename arch/arm/boot/dts/{sun8i-h3-sinovoip-bpi-m2-plus.dts => sun8i-h3-bananapi-m2-plus.dts} (97%)
 
-Shawn
-
-> 
-> 8<====
-> Subject: [PATCH] amba: make ZTE pseudo-ID more "official"
-> 
-> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
-> ---
->  drivers/tty/serial/amba-pl011.c | 4 ++--
->  include/linux/amba/bus.h        | 5 +++++
->  2 files changed, 7 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-> index 77b05f5bf866..2dbe5776ac56 100644
-> --- a/drivers/tty/serial/amba-pl011.c
-> +++ b/drivers/tty/serial/amba-pl011.c
-> @@ -2659,8 +2659,8 @@ static struct amba_id pl011_ids[] = {
->  		.data	= &vendor_st,
->  	},
->  	{
-> -		.id	= 0xfefefe,
-> -		.mask	= 0xffffff,
-> +		.id	= AMBA_LINUX_ID(0x00, 0xf, 0xefe),
-> +		.mask	= 0x00ffffff,
->  		.data	= &vendor_zte,
->  	},
->  	{ 0, 0 },
-> diff --git a/include/linux/amba/bus.h b/include/linux/amba/bus.h
-> index 3d8dcdd1aeae..dc29d504b4fc 100644
-> --- a/include/linux/amba/bus.h
-> +++ b/include/linux/amba/bus.h
-> @@ -53,8 +53,13 @@ enum amba_vendor {
->  	AMBA_VENDOR_ST = 0x80,
->  	AMBA_VENDOR_QCOM = 0x51,
->  	AMBA_VENDOR_LSI = 0xb6,
-> +	AMBA_VENDOR_LINUX = 0xef,	/* This value is not official */
->  };
->  
-> +#define AMBA_LINUX_ID(conf, rev, part) \
-> +	(((conf) & 0xff) << 24 | ((rev) & 0xf) << 20 | \
-> +	 AMBA_VENDOR_LINUX << 12 | ((part) & 0xfff))
-> +
->  extern struct bus_type amba_bustype;
->  
->  #define to_amba_device(d)	container_of(d, struct amba_device, dev)
-> -- 
-> 2.1.0
-> 
-> -- 
-> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-> FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-> according to speedtest.net.
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index e9fcd25701a0..b18a26925fa5 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -764,11 +764,11 @@ dtb-$(CONFIG_MACH_SUN8I) += \
+ 	sun8i-a33-sinlinx-sina33.dtb \
+ 	sun8i-a83t-allwinner-h8homlet-v2.dtb \
+ 	sun8i-a83t-cubietruck-plus.dtb \
++	sun8i-h3-bananapi-m2-plus.dtb \
+ 	sun8i-h3-orangepi-2.dtb \
+ 	sun8i-h3-orangepi-one.dtb \
+ 	sun8i-h3-orangepi-pc.dtb \
+ 	sun8i-h3-orangepi-plus.dtb \
+-	sun8i-h3-sinovoip-bpi-m2-plus.dtb \
+ 	sun8i-r16-parrot.dtb
+ dtb-$(CONFIG_MACH_SUN9I) += \
+ 	sun9i-a80-optimus.dtb \
+diff --git a/arch/arm/boot/dts/sun8i-h3-sinovoip-bpi-m2-plus.dts b/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts
+similarity index 97%
+rename from arch/arm/boot/dts/sun8i-h3-sinovoip-bpi-m2-plus.dts
+rename to arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts
+index d21bc57ce140..f3b1d5f6dbd2 100644
+--- a/arch/arm/boot/dts/sun8i-h3-sinovoip-bpi-m2-plus.dts
++++ b/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts
+@@ -49,8 +49,8 @@
+ #include <dt-bindings/pinctrl/sun4i-a10.h>
+ 
+ / {
+-	model = "Sinovoip BPI-M2+";
+-	compatible = "sinovoip,bpi-m2+", "allwinner,sun8i-h3";
++	model = "Banana Pi BPI-M2-Plus";
++	compatible = "sinovoip,bpi-m2-plus", "allwinner,sun8i-h3";
+ 
+ 	aliases {
+ 		serial0 = &uart0;
+@@ -67,7 +67,7 @@
+ 		pinctrl-0 = <&pwr_led_bpi_m2p>;
+ 
+ 		pwr_led {
+-			label = "bpi-m2+:red:pwr";
++			label = "bananapi-m2-plus:red:pwr";
+ 			gpios = <&r_pio 0 10 GPIO_ACTIVE_HIGH>; /* PL10 */
+ 			default-state = "on";
+ 		};
+-- 
+2.8.1
