@@ -1,30 +1,45 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Fri, 8 Jul 2016 11:57:10 -0400
-Subject: [PATCH v2 1/2] arm64: implement FTRACE_WITH_REGS
-In-Reply-To: <20160708154824.ikq45dgk2auigqn7@treble>
-References: <20160627151500.2247A68D20@newverein.lst.de>
- <20160627151717.BD25468D26@newverein.lst.de>
- <20160708145800.GE3556@pathway.suse.cz>
- <20160708150709.GA8979@lst.de>
- <20160708152421.GG3556@pathway.suse.cz>
- <20160708154824.ikq45dgk2auigqn7@treble>
-Message-ID: <20160708115710.5c657b5f@gandalf.local.home>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Fri,  8 Jul 2016 17:58:42 +0200
+Subject: [PATCH] ARM: Kconfig: select GENERIC_CLOCKEVENTS_BROADCAST also on UP
+Message-ID: <1467993522-9176-1-git-send-email-l.stach@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 8 Jul 2016 10:48:24 -0500
-Josh Poimboeuf <jpoimboe@redhat.com> wrote:
+Quite a few systems have deeper idle states where the local timer tick
+stops to fire, that rely on the GENERIC_CLOCKEVENTS_BROADCAST
+infrastructure to switch to a global (non-stopping) clockevent device.
+This is also true on UP systems, so select GENERIC_CLOCKEVENTS_BROADCAST
+unconditionally.
 
+Instead only select ARCH_HAS_TICK_BROADCAST if SMP is present, as this
+is only implemented for SMP systems.
 
-> My understanding is that other arches don't need this check because they
-> use -mfentry, so they have to modify the "call fentry" instruction to a
-> nop on startup.
-> 
-> Here, with -fprolog-pad, it's already a nop, so no change is needed.
-> 
+Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+---
+ arch/arm/Kconfig | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-That's what I was thinking. But as I stated in another email (probably
-in the air when you wrote this), the call to ftrace_modify_code() may be
-completely circumvented by ftrace_make_nop() if the addr is MCOUNT_ADDR.
-
--- Steve
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 90542db1220d..745843ea769c 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -4,7 +4,7 @@ config ARM
+ 	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
+ 	select ARCH_HAS_DEVMEM_IS_ALLOWED
+ 	select ARCH_HAS_ELF_RANDOMIZE
+-	select ARCH_HAS_TICK_BROADCAST if GENERIC_CLOCKEVENTS_BROADCAST
++	select ARCH_HAS_TICK_BROADCAST if GENERIC_CLOCKEVENTS_BROADCAST && SMP
+ 	select ARCH_HAVE_CUSTOM_GPIO_H
+ 	select ARCH_HAS_GCOV_PROFILE_ALL
+ 	select ARCH_MIGHT_HAVE_PC_PARPORT
+@@ -20,7 +20,7 @@ config ARM
+ 	select EDAC_ATOMIC_SCRUB
+ 	select GENERIC_ALLOCATOR
+ 	select GENERIC_ATOMIC64 if (CPU_V7M || CPU_V6 || !CPU_32v6K || !AEABI)
+-	select GENERIC_CLOCKEVENTS_BROADCAST if SMP
++	select GENERIC_CLOCKEVENTS_BROADCAST
+ 	select GENERIC_EARLY_IOREMAP
+ 	select GENERIC_IDLE_POLL_SETUP
+ 	select GENERIC_IRQ_PROBE
+-- 
+2.8.1
