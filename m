@@ -1,279 +1,132 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Fri,  8 Jul 2016 12:37:18 +0100
-Subject: [PATCH 8/8] arm64: Work around systems with mismatched cache line
- sizes
-In-Reply-To: <1467977839-27543-1-git-send-email-suzuki.poulose@arm.com>
-References: <1467977839-27543-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1467977839-27543-10-git-send-email-suzuki.poulose@arm.com>
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Fri, 8 Jul 2016 13:44:41 +0200
+Subject: [PATCH v3 0/9] Add MT8173 Video Decoder Driver
+In-Reply-To: <1467886612.21382.18.camel@mtksdaap41>
+References: <1464611363-14936-1-git-send-email-tiffany.lin@mediatek.com>
+ <577D0576.2050706@xs4all.nl> <1467886612.21382.18.camel@mtksdaap41>
+Message-ID: <e2952cc2-3abd-894e-9481-b91a45cf7891@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Systems with differing CPU i-cache/d-cache line sizes can cause
-problems with the cache management by software when the execution
-is migrated from one to another. Usually, the application reads
-the cache size on a CPU and then uses that length to perform cache
-operations. However, if it gets migrated to another CPU with a smaller
-cache line size, things could go completely wrong. To prevent such
-cases, always use the smallest cache line size among the CPUs. The
-kernel CPU feature infrastructure already keeps track of the safe
-value for all CPUID registers including CTR. This patch works around
-the problem by :
+On 07/07/2016 12:16 PM, tiffany lin wrote:
+> Hi Hans,
+> 
+> 
+> On Wed, 2016-07-06 at 15:19 +0200, Hans Verkuil wrote:
+>> Hi Tiffany,
+>>
+>> I plan to review this patch series on Friday, but one obvious question is
+>> what the reason for these failures is:
+>>
+>>> Input/Output configuration ioctls:
+>>>         test VIDIOC_ENUM/G/S/QUERY_STD: OK (Not Supported)
+>>>         test VIDIOC_ENUM/G/S/QUERY_DV_TIMINGS: OK (Not Supported)
+>>>         test VIDIOC_DV_TIMINGS_CAP: OK (Not Supported)
+>>>         test VIDIOC_G/S_EDID: OK (Not Supported)
+>>>
+>>>         Control ioctls:
+>>>                 test VIDIOC_QUERYCTRL/MENU: OK
+>>>                 fail: ../../../v4l-utils-1.6.0/utils/v4l2-compliance/v4l2-test-controls.cpp(357): g_ctrl returned an error (11)
+>>>                 test VIDIOC_G/S_CTRL: FAIL
+>>>                 fail: ../../../v4l-utils-1.6.0/utils/v4l2-compliance/v4l2-test-controls.cpp(579): g_ext_ctrls returned an error (11)
+>>>                 test VIDIOC_G/S/TRY_EXT_CTRLS: FAIL
+> These fails are because VIDIOC_G_CTRL and VIDIOC_G_EXT_CTRLS return
+> V4L2_CID_MIN_BUFFERS_FOR_CAPTURE only when dirver in MTK_STATE_HEADER
+> state, or it will return EAGAIN.
+> This could help user space get correct value, not default value that may
+> changed base on media content.
 
-For kernel, dynamically patch the kernel to read the cache size
-from the system wide copy of CTR_EL0.
+OK, I really don't like this. I also looked what the s5p-mfc-dec driver does (the only other
+driver currently implementing this), and that returns -EINVAL.
 
-For applications, trap read accesses to CTR_EL0 (by clearing the SCTLR.UCT)
-and emulate the mrs instruction to return the system wide safe value
-of CTR_EL0.
+My proposal would be to change this. If this information isn't known yet, why not
+just return 0 as the value? The doc would have to be updated and (preferably) also
+the s5p-mfc-dec driver. I've added Samsung devs to the Cc list, let me know what you
+think.
 
-For faster access (i.e, avoiding to lookup the system wide value of CTR_EL0
-via read_system_reg), we keep track of the pointer to table entry for
-CTR_EL0 in the CPU feature infrastructure.
+> 
+>>>                 fail: ../../../v4l-utils-1.6.0/utils/v4l2-compliance/v4l2-test-controls.cpp(721): subscribe event for control 'User Controls' failed
+>>>                 test VIDIOC_(UN)SUBSCRIBE_EVENT/DQEVENT: FAIL
+> Driver do not support subscribe event for control 'User Controls' for
+> now.
+> Do we need to support this?
 
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Andre Przywara <andre.przywara@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
----
- arch/arm64/include/asm/assembler.h  | 25 +++++++++++++++++++++++--
- arch/arm64/include/asm/cpufeature.h |  4 +++-
- arch/arm64/include/asm/esr.h        |  8 ++++++++
- arch/arm64/include/asm/sysreg.h     |  1 +
- arch/arm64/kernel/asm-offsets.c     |  2 ++
- arch/arm64/kernel/cpu_errata.c      | 22 ++++++++++++++++++++++
- arch/arm64/kernel/cpufeature.c      |  9 +++++++++
- arch/arm64/kernel/traps.c           | 14 ++++++++++++++
- 8 files changed, 82 insertions(+), 3 deletions(-)
+I don't see why this would fail. It's OK to subscribe to such controls, although
+you'll never get an event.
 
-diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
-index a4bb3f5..1902ee7 100644
---- a/arch/arm64/include/asm/assembler.h
-+++ b/arch/arm64/include/asm/assembler.h
-@@ -216,6 +216,21 @@ lr	.req	x30		// link register
- 	.macro	mmid, rd, rn
- 	ldr	\rd, [\rn, #MM_CONTEXT_ID]
- 	.endm
-+/*
-+ * read_safe_ctr - read system wide safe CTR_EL0. If the system has
-+ * mismatched cache line sizes, provide the system wide safe value.
-+ */
-+	.macro	read_safe_ctr, reg
-+alternative_if_not ARM64_MISMATCHED_CACHE_LINE_SIZE
-+	mrs	\reg, ctr_el0			// read CTR
-+	nop
-+	nop
-+alternative_else
-+	ldr_l	\reg, sys_ctr_ftr		// Read system wide safe CTR value
-+	ldr	\reg, [\reg, #ARM64_FTR_SYSVAL] // from sys_ctr_ftr->sys_val
-+alternative_endif
-+	.endm
-+
- 
- /*
-  * raw_dcache_line_size - get the minimum D-cache line size on this CPU
-@@ -232,7 +247,10 @@ lr	.req	x30		// link register
-  * dcache_line_size - get the safe D-cache line size across all CPUs
-  */
- 	.macro	dcache_line_size, reg, tmp
--	raw_dcache_line_size	\reg, \tmp
-+	read_safe_ctr	\tmp
-+	ubfm		\tmp, \tmp, #16, #19	// cache line size encoding
-+	mov		\reg, #4		// bytes per word
-+	lsl		\reg, \reg, \tmp	// actual cache line size
- 	.endm
- 
- /*
-@@ -250,7 +268,10 @@ lr	.req	x30		// link register
-  * icache_line_size - get the safe I-cache line size across all CPUs
-  */
- 	.macro	icache_line_size, reg, tmp
--	raw_icache_line_size	\reg, \tmp
-+	read_safe_ctr	\tmp
-+	and		\tmp, \tmp, #0xf	// cache line size encoding
-+	mov		\reg, #4		// bytes per word
-+	lsl		\reg, \reg, \tmp	// actual cache line size
- 	.endm
- 
- /*
-diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-index 1442b45..b1f963c 100644
---- a/arch/arm64/include/asm/cpufeature.h
-+++ b/arch/arm64/include/asm/cpufeature.h
-@@ -36,8 +36,9 @@
- #define ARM64_HAS_VIRT_HOST_EXTN		11
- #define ARM64_WORKAROUND_CAVIUM_27456		12
- #define ARM64_HAS_32BIT_EL0			13
-+#define ARM64_MISMATCHED_CACHE_LINE_SIZE	14
- 
--#define ARM64_NCAPS				14
-+#define ARM64_NCAPS				15
- 
- #ifndef __ASSEMBLY__
- 
-@@ -108,6 +109,7 @@ struct arm64_cpu_capabilities {
- };
- 
- extern DECLARE_BITMAP(cpu_hwcaps, ARM64_NCAPS);
-+extern struct arm64_ftr_reg *sys_ctr_ftr;
- 
- bool this_cpu_has_cap(unsigned int cap);
- 
-diff --git a/arch/arm64/include/asm/esr.h b/arch/arm64/include/asm/esr.h
-index 2a8f6c3..51aea89 100644
---- a/arch/arm64/include/asm/esr.h
-+++ b/arch/arm64/include/asm/esr.h
-@@ -139,6 +139,9 @@
- 					 ((Op2) << ESR_ELx_SYS64_ISS_Op2_SHIFT) | \
- 					 ((CRn) << ESR_ELx_SYS64_ISS_CRn_SHIFT) | \
- 					 ((CRm) << ESR_ELx_SYS64_ISS_CRm_SHIFT))
-+
-+#define ESR_ELx_SYS64_ISS_SYS_OP_MASK	(ESR_ELx_SYS64_ISS_SYS_MASK | \
-+					 ESR_ELx_SYS64_ISS_DIR_MASK)
- /*
-  * User space cache operations have the following sysreg encoding
-  * in System instructions.
-@@ -157,6 +160,11 @@
- #define ESR_ELx_SYS64_ISS_U_CACHE_OP_VAL \
- 				(ESR_ELx_SYS64_ISS_SYS_VAL(1, 3, 1, 7, 0) | \
- 				 ESR_ELx_SYS64_ISS_DIR_WRITE)
-+
-+#define ESR_ELx_SYS64_ISS_SYS_CTR	ESR_ELx_SYS64_ISS_SYS_VAL(3, 3, 1, 0, 0)
-+#define ESR_ELx_SYS64_ISS_SYS_CTR_READ	(ESR_ELx_SYS64_ISS_SYS_CTR | \
-+					 ESR_ELx_SYS64_ISS_DIR_READ)
-+
- #ifndef __ASSEMBLY__
- #include <asm/types.h>
- 
-diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-index cc06794..4f26ad5 100644
---- a/arch/arm64/include/asm/sysreg.h
-+++ b/arch/arm64/include/asm/sysreg.h
-@@ -100,6 +100,7 @@
- /* SCTLR_EL1 specific flags. */
- #define SCTLR_EL1_UCI		(1 << 26)
- #define SCTLR_EL1_SPAN		(1 << 23)
-+#define SCTLR_EL1_UCT		(1 << 15)
- #define SCTLR_EL1_SED		(1 << 8)
- #define SCTLR_EL1_CP15BEN	(1 << 5)
- 
-diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
-index f8e5d47..3a9d48e 100644
---- a/arch/arm64/kernel/asm-offsets.c
-+++ b/arch/arm64/kernel/asm-offsets.c
-@@ -23,6 +23,7 @@
- #include <linux/dma-mapping.h>
- #include <linux/kvm_host.h>
- #include <linux/suspend.h>
-+#include <asm/cpufeature.h>
- #include <asm/thread_info.h>
- #include <asm/memory.h>
- #include <asm/smp_plat.h>
-@@ -129,5 +130,6 @@ int main(void)
-   DEFINE(HIBERN_PBE_ORIG,	offsetof(struct pbe, orig_address));
-   DEFINE(HIBERN_PBE_ADDR,	offsetof(struct pbe, address));
-   DEFINE(HIBERN_PBE_NEXT,	offsetof(struct pbe, next));
-+  DEFINE(ARM64_FTR_SYSVAL,	offsetof(struct arm64_ftr_reg, sys_val));
-   return 0;
- }
-diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-index f0fd6a2c..f182190 100644
---- a/arch/arm64/kernel/cpu_errata.c
-+++ b/arch/arm64/kernel/cpu_errata.c
-@@ -30,6 +30,21 @@ is_affected_midr_range(const struct arm64_cpu_capabilities *entry, int scope)
- 				       entry->midr_range_max);
- }
- 
-+static bool
-+has_mismatched_cache_line_size(const struct arm64_cpu_capabilities *entry,
-+				int scope)
-+{
-+	WARN_ON(scope != SCOPE_LOCAL_CPU || preemptible());
-+	return (read_cpuid_cachetype() & sys_ctr_ftr->strict_mask) !=
-+		 (sys_ctr_ftr->sys_val & sys_ctr_ftr->strict_mask);
-+}
-+
-+static void cpu_enable_trap_ctr_access(void *__unused)
-+{
-+	/* Clear SCTLR_EL1.UCT */
-+	config_sctlr_el1(SCTLR_EL1_UCT, 0);
-+}
-+
- #define MIDR_RANGE(model, min, max) \
- 	.def_scope = SCOPE_LOCAL_CPU, \
- 	.matches = is_affected_midr_range, \
-@@ -102,6 +117,13 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
- 	},
- #endif
- 	{
-+		.desc = "Mismatched cache line size",
-+		.capability = ARM64_MISMATCHED_CACHE_LINE_SIZE,
-+		.matches = has_mismatched_cache_line_size,
-+		.def_scope = SCOPE_LOCAL_CPU,
-+		.enable = cpu_enable_trap_ctr_access,
-+	},
-+	{
- 	}
- };
- 
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index fb57c99..f428655 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -46,6 +46,13 @@ unsigned int compat_elf_hwcap2 __read_mostly;
- 
- DECLARE_BITMAP(cpu_hwcaps, ARM64_NCAPS);
- 
-+/*
-+ * If we have mismatched cache line sizes, we need to emulate access to
-+ * CTRL_EL0. To avoid a lookup everytime (via read_system_reg()), cache
-+ * the table entry for CTR_EL0.
-+ */
-+struct arm64_ftr_reg *sys_ctr_ftr;
-+
- #define __ARM64_FTR_BITS(SIGNED, STRICT, TYPE, SHIFT, WIDTH, SAFE_VAL) \
- 	{						\
- 		.sign = SIGNED,				\
-@@ -461,6 +468,8 @@ void __init init_cpu_features(struct cpuinfo_arm64 *info)
- 		init_cpu_ftr_reg(SYS_MVFR2_EL1, info->reg_mvfr2);
- 	}
- 
-+	/* Keep track of the CTR feature register */
-+	sys_ctr_ftr = get_arm64_ftr_reg(SYS_CTR_EL0);
- }
- 
- static void update_cpu_ftr_reg(struct arm64_ftr_reg *reg, u64 new)
-diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-index 93c5287..db2d6cb 100644
---- a/arch/arm64/kernel/traps.c
-+++ b/arch/arm64/kernel/traps.c
-@@ -480,6 +480,14 @@ static void user_cache_maint_handler(unsigned int esr, struct pt_regs *regs)
- 		regs->pc += 4;
- }
- 
-+static void ctr_read_handler(unsigned int esr, struct pt_regs *regs)
-+{
-+	int rt = (esr & ESR_ELx_SYS64_ISS_RT_MASK) >> ESR_ELx_SYS64_ISS_RT_SHIFT;
-+
-+	regs->regs[rt] = sys_ctr_ftr->sys_val;
-+	regs->pc += 4;
-+}
-+
- struct sys64_hook {
- 	unsigned int esr_mask;
- 	unsigned int esr_val;
-@@ -492,6 +500,12 @@ static struct sys64_hook sys64_hooks[] = {
- 		.esr_val = ESR_ELx_SYS64_ISS_U_CACHE_OP_VAL,
- 		.handler = user_cache_maint_handler,
- 	},
-+	{
-+		/* Trap read access to CTR_EL0 */
-+		.esr_mask = ESR_ELx_SYS64_ISS_SYS_OP_MASK,
-+		.esr_val = ESR_ELx_SYS64_ISS_SYS_CTR_READ,
-+		.handler = ctr_read_handler,
-+	},
- 	{},
- };
- 
--- 
-2.7.4
+>>>                 test VIDIOC_G/S_JPEGCOMP: OK (Not Supported)
+>>>                 Standard Controls: 2 Private Controls: 0
+>>>
+>>>         Format ioctls:
+>>>                 test VIDIOC_ENUM_FMT/FRAMESIZES/FRAMEINTERVALS: OK
+>>>                 test VIDIOC_G/S_PARM: OK (Not Supported)
+>>>                 test VIDIOC_G_FBUF: OK (Not Supported)
+>>>                 fail: ../../../v4l-utils-1.6.0/utils/v4l2-compliance/v4l2-test-formats.cpp(405): expected EINVAL, but got 11 when getting format for buftype 9
+>>>                 test VIDIOC_G_FMT: FAIL
+> This is because vidioc_vdec_g_fmt only succeed when context is in
+> MTK_STATE_HEADER state, or user space cannot get correct format data
+> using this function.
+
+Comparing this to s5p-mfc-dec I see that -EINVAL is returned in that case.
+
+I am not opposed to using EAGAIN in s5p-mfc-dec as well. Marek, Kamil, what is
+your opinion?
+
+> 
+>>>                 test VIDIOC_TRY_FMT: OK (Not Supported)
+>>>                 test VIDIOC_S_FMT: OK (Not Supported)
+>>>                 test VIDIOC_G_SLICED_VBI_CAP: OK (Not Supported)
+>>>
+>>>         Codec ioctls:
+>>>                 test VIDIOC_(TRY_)ENCODER_CMD: OK (Not Supported)
+>>>                 test VIDIOC_G_ENC_INDEX: OK (Not Supported)
+>>>                 test VIDIOC_(TRY_)DECODER_CMD: OK (Not Supported)
+>>>
+>>>         Buffer ioctls:
+>>>                 test VIDIOC_REQBUFS/CREATE_BUFS/QUERYBUF: OK
+>>>                 fail: ../../../v4l-utils-1.6.0/utils/v4l2-compliance/v4l2-test-buffers.cpp(500): q.has_expbuf(node)
+> Our OUTPUT and CAPTURE queue support both VB2_DMABUF and VB2_MMAP, user
+> space can select which to use in runtime.
+> So our driver default support v4l2_m2m_ioctl_expbuf functionality.
+> In v4l2-compliance test, it will check v4l2_m2m_ioctl_expbuf only valid
+> when node->valid_memorytype is V4L2_MEMORY_MMAP.
+> So when go through node->valid_memorytype is V4L2_MEMORY_DMABUF, it
+> fail.
+
+valid_memorytype should have both MMAP and DMABUF flags.
+
+But v4l-utils-1.6.0 is way too old to be certain it isn't some v4l2-compliance bug
+that has since been fixed.
+
+Regards,
+
+	Hans
+
+> 
+> 
+> best regards,
+> Tiffany
+> 
+> 
+> 
+>>>                 test VIDIOC_EXPBUF: FAIL
+>>>
+>>>
+>>> Total: 38, Succeeded: 33, Failed: 5, Warnings: 0
+>>
+>> If it is due to a bug in v4l2-compliance, then let me know and I'll fix it. If not,
+>> then it should be fixed in the driver.
+>>
+>> Frankly, it was the presence of these failures that made me think this patch series
+>> wasn't final. Before a v4l2 driver can be accepted in the kernel, v4l2-compliance must pass.
+>>
+>> Regards,
+>>
+>> 	Hans
+> 
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-media" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
