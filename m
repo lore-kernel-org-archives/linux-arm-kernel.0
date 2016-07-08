@@ -1,65 +1,37 @@
-From: mturquette@baylibre.com (Michael Turquette)
-Date: Fri, 08 Jul 2016 10:14:30 -0700
-Subject: [PATCH 1/2] tty: amba-pl011: add support for clock frequency
- setting via dt
-In-Reply-To: <1467965467-28180-1-git-send-email-jorge.ramirez-ortiz@linaro.org>
-References: <1467965467-28180-1-git-send-email-jorge.ramirez-ortiz@linaro.org>
-Message-ID: <146799807004.73491.2602277598493203375@resonance>
+From: andy.gross@linaro.org (Andy Gross)
+Date: Fri, 8 Jul 2016 12:20:58 -0500
+Subject: [PATCH] pinctrl: qcom: establish proper EBI2 pin groups
+In-Reply-To: <1467933329-2854-1-git-send-email-linus.walleij@linaro.org>
+References: <1467933329-2854-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <20160708172058.GA7896@hector.attlocal.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Jorge Ramirez-Ortiz (2016-07-08 01:11:06)
-> Allow to specify the clock frequency for any given port via the
-> assigned-clock-rates device tree property.
+On Fri, Jul 08, 2016 at 01:15:29AM +0200, Linus Walleij wrote:
+> After some digging around I found documentation (!) of the APQ8060
+> EBI2 pin groups. It turns out I first need to split the group in
+> two: ebi2cs and ebi2 proper. The chip select pins are kind of
+> orthogonal to the other EBI2 pins since CS1B and CS2B can be muxed
+> over address bits 7 and 6 (don't know why, but they can). This
+> is good to fix up before we add users.
 > 
-> Signed-off-by: Jorge Ramirez-Ortiz <jorge.ramirez-ortiz@linaro.org>
-> Tested-by: Jorge Ramirez-Ortiz <jorge.ramirez-ortiz@linaro.org>
+> Also found what the "holes" in the assignment all the way up to
+> gpio158 was actually for.
+> 
+> All mux documentation comes from "Snapdragon(TM) S3 APQ8060-based
+> DragonBoard(TM) GPIO User Guide Rev. E August 10, 2012", published
+> by Bsquare Corporation.
+> 
+> As the documentation seems a bit hard to come by I put some comments
+> in the group definitions so that it is clear to all readers what
+> is going on here and what the lines are used for.
+> 
+> Cc: Bj?rn Andersson <bjorn.andersson@linaro.org>
+> Cc: Stephen Boyd <sboyd@codeaurora.org>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 > ---
->  drivers/tty/serial/amba-pl011.c | 5 +++++
->  1 file changed, 5 insertions(+)
-> 
-> diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-> index 1b7331e..51867ab 100644
-> --- a/drivers/tty/serial/amba-pl011.c
-> +++ b/drivers/tty/serial/amba-pl011.c
-> @@ -55,6 +55,7 @@
->  #include <linux/types.h>
->  #include <linux/of.h>
->  #include <linux/of_device.h>
-> +#include <linux/clk/clk-conf.h>
->  #include <linux/pinctrl/consumer.h>
->  #include <linux/sizes.h>
->  #include <linux/io.h>
-> @@ -2472,6 +2473,10 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
->         if (IS_ERR(uap->clk))
->                 return PTR_ERR(uap->clk);
->  
-> +       ret = of_clk_set_defaults(dev->dev.of_node, false);
 
-Change looks good to me, but with one question: should this change be
-put into more generic code instead of in this specific driver? For
-instance, we call of_clk_set_defaults from the following files:
+Seems reasonable.  I'd presume the Documentation needs updating too for the new
+groups.
 
-drivers/base/platform.c
-drivers/i2c/i2c-core.c
-drivers/spi/spi.c
-
-And Stephen posted a patch to do this for devices on the AMBA bus:
-
-https://patchwork.kernel.org/patch/6501691/
-
-Does Stephen's patch mean that you do not need patch #1? Stephen, any
-update on what happened to this patch?
-
-Thanks,
-Mike
-
-> +       if (ret < 0)
-> +               return ret;
-> +
->         uap->reg_offset = vendor->reg_offset;
->         uap->vendor = vendor;
->         uap->fifosize = vendor->get_fifosize(dev);
-> -- 
-> 2.7.4
-> 
+Reviewed-by: Andy Gross <andy.gross@linaro.org>
