@@ -1,54 +1,67 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 8 Jul 2016 15:49:00 +0100
-Subject: [GIT PULL] arm64: fixes for -rc7
-Message-ID: <20160708144859.GC6493@arm.com>
+Date: Fri, 8 Jul 2016 15:55:21 +0100
+Subject: [PATCH v4 1/8] arm64: mm: change IOMMU notifier action to attach
+ DMA ops
+In-Reply-To: <06d430a86f5d7f461308a9278bf25f40fb50d93c.1467388950.git.robin.murphy@arm.com>
+References: <cover.1467388950.git.robin.murphy@arm.com>
+ <06d430a86f5d7f461308a9278bf25f40fb50d93c.1467388950.git.robin.murphy@arm.com>
+Message-ID: <20160708145521.GD6493@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Hi Catalin,
 
-A couple of late fixes here, but one that we've been sitting on for a
-few weeks while the details were worked out. Specifically, we now
-enforce USER_DS on taking exceptions whilst in the kernel, which avoids
-leaking kernel data to userspace through things like perf. The other
-patch is an update to a workaround for a hardware erratum on some Cavium
-SoCs.
+On Fri, Jul 01, 2016 at 05:50:10PM +0100, Robin Murphy wrote:
+> From: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> 
+> Current bus notifier in ARM64 (__iommu_attach_notifier)
+> attempts to attach dma_ops to a device on BUS_NOTIFY_ADD_DEVICE
+> action notification.
+> 
+> This will cause issues on ACPI based systems, where PCI devices
+> can be added before the IOMMUs the devices are attached to
+> had a chance to be probed, causing failures on attempts to
+> attach dma_ops in that the domain for the respective IOMMU
+> may not be set-up yet by the time the bus notifier is run.
+> 
+> Devices dma_ops do not require to be set-up till the matching
+> device drivers are probed. This means that instead of running
+> the notifier attaching dma_ops to devices (__iommu_attach_notifier)
+> on BUS_NOTIFY_ADD_DEVICE action, it can be run just before the
+> device driver is bound to the device in question (on action
+> BUS_NOTIFY_BIND_DRIVER) so that it is certain that its IOMMU
+> group and domain are set-up accordingly at the time the
+> notifier is triggered.
+> 
+> This patch changes the notifier action upon which dma_ops
+> are attached to devices and defer it to driver binding time,
+> so that IOMMU devices have a chance to be probed and to register
+> their bus notifiers before the dma_ops attach sequence for a
+> device is actually carried out.
+> 
+> As a result we also no longer need worry about racing with
+> iommu_bus_notifier(), or about retrying the queue in case devices
+> were added too early on DT-based systems, so clean up the notifier
+> itself plus the additional workaround from 722ec35f7fae ("arm64:
+> dma-mapping: fix handling of devices registered before arch_initcall")
+> 
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Marek Szyprowski <m.szyprowski@samsung.com>
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> [rm: get rid of other now-redundant bits]
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> ---
+> 
+> v4: No change.
+> 
+>  arch/arm64/mm/dma-mapping.c | 22 +++++-----------------
+>  1 file changed, 5 insertions(+), 17 deletions(-)
 
-Please pull,
+Whilst this series is unlikely to make it for 4.8, this patch is
+independent and it would be good to see it queued in the arm64 tree for
+4.8, if possible. It shouldn't change anything on its own, but it's a
+prerequisite for this series and anything on the IORT side from Lorenzo,
+so it makes sense to me to keep the delta down if we can.
 
 Will
-
---->8
-
-The following changes since commit 4c2e07c6a29e0129e975727b9f57eede813eea85:
-
-  Linux 4.7-rc5 (2016-06-26 17:52:03 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git tags/arm64-fixes
-
-for you to fetch changes up to 47c459beabe969c6751e2ea8d1f85c5fa1652d6c:
-
-  arm64: Enable workaround for Cavium erratum 27456 on thunderx-81xx (2016-07-07 18:35:21 +0100)
-
-----------------------------------------------------------------
-arm64 fixes:
-
-- Enforce USER_DS on exception entry from EL1
-- Apply workaround for Cavium errata #27456 on Thunderx-81xx parts
-
-----------------------------------------------------------------
-Ganapatrao Kulkarni (1):
-      arm64: Enable workaround for Cavium erratum 27456 on thunderx-81xx
-
-James Morse (1):
-      arm64: kernel: Save and restore UAO and addr_limit on exception entry
-
- arch/arm64/include/asm/cputype.h |  2 ++
- arch/arm64/include/asm/ptrace.h  |  2 ++
- arch/arm64/kernel/asm-offsets.c  |  1 +
- arch/arm64/kernel/cpu_errata.c   |  6 ++++++
- arch/arm64/kernel/entry.S        | 19 +++++++++++++++++--
- arch/arm64/mm/fault.c            |  3 ++-
- 6 files changed, 30 insertions(+), 3 deletions(-)
