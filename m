@@ -1,47 +1,69 @@
-From: ayaka@soulik.info (Randy Li)
-Date: Sat,  9 Jul 2016 17:23:46 +0800
-Subject: [PATCH 3/3] ARM: dts: exynos: correct the rtc compatible value for
- exynos5
-In-Reply-To: <1468056226-19128-1-git-send-email-ayaka@soulik.info>
-References: <1468056226-19128-1-git-send-email-ayaka@soulik.info>
-Message-ID: <1468056226-19128-4-git-send-email-ayaka@soulik.info>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Sat, 9 Jul 2016 11:28:11 +0200
+Subject: [PATCH 05/15] ARM: dts: sun5i: reference-design-tablet: Remove
+ mention of q8
+In-Reply-To: <CAGb2v67S9s5PifX4JOjp6DK57Q3aVRrKMdf7y75vna2rdrASFA@mail.gmail.com>
+References: <1467993956-19535-1-git-send-email-hdegoede@redhat.com>
+ <1467993956-19535-6-git-send-email-hdegoede@redhat.com>
+ <CAGb2v67S9s5PifX4JOjp6DK57Q3aVRrKMdf7y75vna2rdrASFA@mail.gmail.com>
+Message-ID: <c62ce392-f965-1f44-dd9b-1d784969803b@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Those platforms are reported to use the same rtc IP core
-as exynos3250's.
+Hi,
 
-Signed-off-by: Randy Li <ayaka@soulik.info>
----
- arch/arm/boot/dts/exynos3250.dtsi | 2 +-
- arch/arm/boot/dts/exynos5.dtsi    | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+On 09-07-16 05:53, Chen-Yu Tsai wrote:
+> On Sat, Jul 9, 2016 at 12:05 AM, Hans de Goede <hdegoede@redhat.com> wrote:
+>> Remove all mention of q8 from sun5i-reference-design-tablet.dtsi.
+>>
+>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>> ---
+>>  arch/arm/boot/dts/sun5i-reference-design-tablet.dtsi | 4 ++--
+>>  1 file changed, 2 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/sun5i-reference-design-tablet.dtsi b/arch/arm/boot/dts/sun5i-reference-design-tablet.dtsi
+>> index e78452c..20cc940 100644
+>> --- a/arch/arm/boot/dts/sun5i-reference-design-tablet.dtsi
+>> +++ b/arch/arm/boot/dts/sun5i-reference-design-tablet.dtsi
+>> @@ -98,7 +98,7 @@
+>>
+>>  &mmc0 {
+>>         pinctrl-names = "default";
+>> -       pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_q8>;
+>> +       pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin>;
+>>         vmmc-supply = <&reg_vcc3v0>;
+>>         bus-width = <4>;
+>>         cd-gpios = <&pio 6 0 GPIO_ACTIVE_HIGH>; /* PG0 */
+>> @@ -118,7 +118,7 @@
+>>                 allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+>>         };
+>>
+>> -       mmc0_cd_pin_q8: mmc0_cd_pin at 0 {
+>> +       mmc0_cd_pin: mmc0_cd_pin at 0 {
+>
+> We could name this mmc0_cd_pin_reference_design and put it in
+> sun5i-a13.dtsi. We already do this for A10/A20.
 
-diff --git a/arch/arm/boot/dts/exynos3250.dtsi b/arch/arm/boot/dts/exynos3250.dtsi
-index 62f3dcd..cdd69a0 100644
---- a/arch/arm/boot/dts/exynos3250.dtsi
-+++ b/arch/arm/boot/dts/exynos3250.dtsi
-@@ -208,7 +208,7 @@
- 		};
- 
- 		rtc: rtc at 10070000 {
--			compatible = "samsung,s3c6410-rtc";
-+			compatible = "samsung,exynos3250-rtc";
- 			reg = <0x10070000 0x100>;
- 			interrupts = <0 73 0>, <0 74 0>;
- 			interrupt-parent = <&pmu_system_controller>;
-diff --git a/arch/arm/boot/dts/exynos5.dtsi b/arch/arm/boot/dts/exynos5.dtsi
-index d5c0f18..71a1ad2 100644
---- a/arch/arm/boot/dts/exynos5.dtsi
-+++ b/arch/arm/boot/dts/exynos5.dtsi
-@@ -88,7 +88,7 @@
- 	};
- 
- 	rtc: rtc at 101E0000 {
--		compatible = "samsung,s3c6410-rtc";
-+		compatible = "samsung,exynos3250-rtc";
- 		reg = <0x101E0000 0x100>;
- 		interrupts = <0 43 0>, <0 44 0>;
- 		status = "disabled";
--- 
-2.7.4
+I would prefer to keep this this way, I was never really fond
+of the A10/A20 solution, in retrospect we should have done
+a sun4i-a10-reference-design.dtsi defining a lot more stuff
+then just the cd_pin.
+
+> This works equally well though.
+>
+> Acked-by: Chen-Yu Tsai <wens@csie.org>
+
+Thanks.
+
+Regards,
+
+Hans
+
+
+>
+>>                 allwinner,pins = "PG0";
+>>                 allwinner,function = "gpio_in";
+>>                 allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+>> --
+>> 2.7.4
+>>
