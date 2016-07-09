@@ -1,79 +1,37 @@
-From: jorge.ramirez-ortiz@linaro.org (Jorge Ramirez)
-Date: Sat, 9 Jul 2016 08:42:30 +0200
-Subject: [PATCH 1/2] tty: amba-pl011: add support for clock frequency
- setting via dt
-In-Reply-To: <57804897.1080101@codeaurora.org>
-References: <1467965467-28180-1-git-send-email-jorge.ramirez-ortiz@linaro.org>
- <146799807004.73491.2602277598493203375@resonance>
- <57801DA6.5010506@linaro.org>
- <146802378337.73491.10770797315435166004@resonance>
- <57804897.1080101@codeaurora.org>
-Message-ID: <57809CD6.2090004@linaro.org>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Sat, 09 Jul 2016 09:45:52 +0200
+Subject: [PATCH 5/5] rtc: v3020: move rtc-v3020.h to platform_data
+In-Reply-To: <1466978583-13310-5-git-send-email-alexandre.belloni@free-electrons.com>
+ (Alexandre Belloni's message of "Mon, 27 Jun 2016 00:03:03 +0200")
+References: <1466978583-13310-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1466978583-13310-5-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <87bn2745lb.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/09/2016 02:43 AM, Stephen Boyd wrote:
-> On 07/08/2016 05:23 PM, Michael Turquette wrote:
->> Quoting Jorge Ramirez (2016-07-08 14:39:50)
->>> On 07/08/2016 07:14 PM, Michael Turquette wrote:
->>>> Quoting Jorge Ramirez-Ortiz (2016-07-08 01:11:06)
->>>>> Allow to specify the clock frequency for any given port via the
->>>>> assigned-clock-rates device tree property.
->>>>>
->>>>> Signed-off-by: Jorge Ramirez-Ortiz <jorge.ramirez-ortiz@linaro.org>
->>>>> Tested-by: Jorge Ramirez-Ortiz <jorge.ramirez-ortiz@linaro.org>
->>>>> ---
->>>>>    drivers/tty/serial/amba-pl011.c | 5 +++++
->>>>>    1 file changed, 5 insertions(+)
->>>>>
->>>>> diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
->>>>> index 1b7331e..51867ab 100644
->>>>> --- a/drivers/tty/serial/amba-pl011.c
->>>>> +++ b/drivers/tty/serial/amba-pl011.c
->>>>> @@ -55,6 +55,7 @@
->>>>>    #include <linux/types.h>
->>>>>    #include <linux/of.h>
->>>>>    #include <linux/of_device.h>
->>>>> +#include <linux/clk/clk-conf.h>
->>>>>    #include <linux/pinctrl/consumer.h>
->>>>>    #include <linux/sizes.h>
->>>>>    #include <linux/io.h>
->>>>> @@ -2472,6 +2473,10 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
->>>>>           if (IS_ERR(uap->clk))
->>>>>                   return PTR_ERR(uap->clk);
->>>>>    
->>>>> +       ret = of_clk_set_defaults(dev->dev.of_node, false);
->>>> Change looks good to me, but with one question: should this change be
->>>> put into more generic code instead of in this specific driver? For
->>>> instance, we call of_clk_set_defaults from the following files:
->>>>
->>>> drivers/base/platform.c
->>>> drivers/i2c/i2c-core.c
->>>> drivers/spi/spi.c
->>>>
->>>> And Stephen posted a patch to do this for devices on the AMBA bus:
->>>>
->>>> https://patchwork.kernel.org/patch/6501691/
->>>>
->>>> Does Stephen's patch mean that you do not need patch #1?
->>> I did a quick test (replaced my changes with the patch above) and the
->>> console broke and the BT stack couldn't communicate to the device over
->>> the uart...I guess something else needs doing on top of Stephen's change.
->>>
->> Let's give Stephen a chance to respond. If he doesn't soon then I'm OK
->> to merge your two patches.
->>
->
-> Yeah we need to restart that patch. It's been in my "pending" list for a
-> year now it seems.
->
-> Curious why it broke things, perhaps device probe is failing when it
-> didn't fail before?
->
+Alexandre Belloni <alexandre.belloni@free-electrons.com> writes:
 
-um, I retested again this morning and it is all good - I was also a bit 
-surprised when things failed yesterday  (it seems one of the wires on my 
-board was loose, sorry).
+> rtc-v3020.h belongs to include/linux/platform_data/
+>
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> ---
+> Cc: Daniel Mack <daniel@zonque.org>
+> Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
+> Cc: Robert Jarzmik <robert.jarzmik@free.fr>
+> Cc: linux-arm-kernel at lists.infradead.org
+>  arch/arm/mach-pxa/cm-x270.c                   | 2 +-
+>  arch/arm/mach-pxa/cm-x300.c                   | 2 +-
+>  arch/arm/mach-pxa/em-x270.c                   | 2 +-
+>  drivers/rtc/rtc-v3020.c                       | 2 +-
+>  include/linux/{ => platform_data}/rtc-v3020.h | 0
+>  5 files changed, 4 insertions(+), 4 deletions(-)
+>  rename include/linux/{ => platform_data}/rtc-v3020.h (100%)
+For mach-pxa :
+Acked-by: Robert Jarzmik <robert.jarzmik@free.fr>
 
-So AFAIC your patch addresses the issue in a much generic (better) way 
-and there are no regressions on a HiKey board running a 4.4 kernel.
+Is this going through your rtc tree, or should I pick it up through the pxa one ?
+
+Cheers.
+
+--
+Robert
