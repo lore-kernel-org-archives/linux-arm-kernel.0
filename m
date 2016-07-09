@@ -1,28 +1,35 @@
-From: appana.durga.rao@xilinx.com (Appana Durga Kedareswara Rao)
-Date: Sat, 9 Jul 2016 08:06:11 +0000
-Subject: [PATCH v12 1/2] Documentation: DT: dma: Add Xilinx zynqmp dma
- device tree binding documentation
-In-Reply-To: <20160708055813.GQ12591@localhost>
-References: <1467373026-27768-1-git-send-email-appanad@xilinx.com>
- <20160708055813.GQ12591@localhost>
-Message-ID: <C246CAC1457055469EF09E3A7AC4E11A4A5BC73B@XAP-PVEXMBX01.xlnx.xilinx.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sat, 9 Jul 2016 10:11:28 +0200
+Subject: [PATCH] ARM: dts: sun8i-h3: Rename sinovoip-bpi-m2-plus to
+ bananapi-m2-plus
+In-Reply-To: <1467945639-12844-1-git-send-email-wens@csie.org>
+References: <1467945639-12844-1-git-send-email-wens@csie.org>
+Message-ID: <20160709081128.GE4522@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vinod,
-
-> On Fri, Jul 01, 2016 at 05:07:05PM +0530, Kedareswara rao Appana wrote:
-> > Device-tree binding documentation for Xilinx zynqmp dma engine used in
-> > Zynq UltraScale+ MPSoC.
+On Fri, Jul 08, 2016 at 10:40:39AM +0800, Chen-Yu Tsai wrote:
+> The Banana Pi series is a well known series of single board computers.
+> The manufacturer, Sinovoip, is less well known. Moreover, the board
+> markings do not mention Sinovoip, but only the Banana Pi logo, and
+> the BPI-M* model name.
 > 
-> And I missed the cleanup part, so both applied  now
-
-Thanks for applying the patches will send patch for the cleanup part
-On top of this patch...
-
-Regards,
-Kedar.
-
+> Rename the dts file to use the more well known name. Also fix up
+> some of the model names and labels to match other Banana Pi boards.
 > 
-> --
-> ~Vinod
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+
+Applied, thanks!
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160709/bca2df22/attachment.sig>
