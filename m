@@ -1,59 +1,79 @@
-From: Valdis.Kletnieks@vt.edu (Valdis.Kletnieks at vt.edu)
-Date: Sat, 09 Jul 2016 02:17:17 -0400
-Subject: [kernel-hardening] Re: [PATCH 9/9] mm: SLUB hardened usercopy
- support
-In-Reply-To: <57809299.84b3370a.5390c.ffff9e58SMTPIN_ADDED_BROKEN@mx.google.com>
-References: <577f7e55.4668420a.84f17.5cb9SMTPIN_ADDED_MISSING@mx.google.com>
- <alpine.DEB.2.20.1607080844370.3379@east.gentwo.org>
- <CAGXu5jKE=h32tHVLsDeaPN1GfC+BB3YbFvC+5TE5TK1oR-xU3A@mail.gmail.com>
- <alpine.DEB.2.20.1607081119170.6192@east.gentwo.org>
- <CAGXu5j+UdkQA+k39GNLe5CwBPVD5ZbRGTCQLqS8VF=kWx+PtsQ@mail.gmail.com>
- <CAGXu5jKxw3RxWNKLX4XVCwJ6x_zA=_RwiU9jLDm2+VRO79G7+w@mail.gmail.com>
- <57809299.84b3370a.5390c.ffff9e58SMTPIN_ADDED_BROKEN@mx.google.com>
-Message-ID: <24451.1468045037@turing-police.cc.vt.edu>
+From: jorge.ramirez-ortiz@linaro.org (Jorge Ramirez)
+Date: Sat, 9 Jul 2016 08:42:30 +0200
+Subject: [PATCH 1/2] tty: amba-pl011: add support for clock frequency
+ setting via dt
+In-Reply-To: <57804897.1080101@codeaurora.org>
+References: <1467965467-28180-1-git-send-email-jorge.ramirez-ortiz@linaro.org>
+ <146799807004.73491.2602277598493203375@resonance>
+ <57801DA6.5010506@linaro.org>
+ <146802378337.73491.10770797315435166004@resonance>
+ <57804897.1080101@codeaurora.org>
+Message-ID: <57809CD6.2090004@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 09 Jul 2016 15:58:20 +1000, Michael Ellerman said:
-
-> I then get two hits, which may or may not be valid:
+On 07/09/2016 02:43 AM, Stephen Boyd wrote:
+> On 07/08/2016 05:23 PM, Michael Turquette wrote:
+>> Quoting Jorge Ramirez (2016-07-08 14:39:50)
+>>> On 07/08/2016 07:14 PM, Michael Turquette wrote:
+>>>> Quoting Jorge Ramirez-Ortiz (2016-07-08 01:11:06)
+>>>>> Allow to specify the clock frequency for any given port via the
+>>>>> assigned-clock-rates device tree property.
+>>>>>
+>>>>> Signed-off-by: Jorge Ramirez-Ortiz <jorge.ramirez-ortiz@linaro.org>
+>>>>> Tested-by: Jorge Ramirez-Ortiz <jorge.ramirez-ortiz@linaro.org>
+>>>>> ---
+>>>>>    drivers/tty/serial/amba-pl011.c | 5 +++++
+>>>>>    1 file changed, 5 insertions(+)
+>>>>>
+>>>>> diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+>>>>> index 1b7331e..51867ab 100644
+>>>>> --- a/drivers/tty/serial/amba-pl011.c
+>>>>> +++ b/drivers/tty/serial/amba-pl011.c
+>>>>> @@ -55,6 +55,7 @@
+>>>>>    #include <linux/types.h>
+>>>>>    #include <linux/of.h>
+>>>>>    #include <linux/of_device.h>
+>>>>> +#include <linux/clk/clk-conf.h>
+>>>>>    #include <linux/pinctrl/consumer.h>
+>>>>>    #include <linux/sizes.h>
+>>>>>    #include <linux/io.h>
+>>>>> @@ -2472,6 +2473,10 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
+>>>>>           if (IS_ERR(uap->clk))
+>>>>>                   return PTR_ERR(uap->clk);
+>>>>>    
+>>>>> +       ret = of_clk_set_defaults(dev->dev.of_node, false);
+>>>> Change looks good to me, but with one question: should this change be
+>>>> put into more generic code instead of in this specific driver? For
+>>>> instance, we call of_clk_set_defaults from the following files:
+>>>>
+>>>> drivers/base/platform.c
+>>>> drivers/i2c/i2c-core.c
+>>>> drivers/spi/spi.c
+>>>>
+>>>> And Stephen posted a patch to do this for devices on the AMBA bus:
+>>>>
+>>>> https://patchwork.kernel.org/patch/6501691/
+>>>>
+>>>> Does Stephen's patch mean that you do not need patch #1?
+>>> I did a quick test (replaced my changes with the patch above) and the
+>>> console broke and the BT stack couldn't communicate to the device over
+>>> the uart...I guess something else needs doing on top of Stephen's change.
+>>>
+>> Let's give Stephen a chance to respond. If he doesn't soon then I'm OK
+>> to merge your two patches.
+>>
 >
-> [    2.309556] usercopy: kernel memory overwrite attempt detected to d000000003510028 (kernfs_node_cache) (64 bytes)
-> [    2.309995] CPU: 7 PID: 2241 Comm: wait-for-root Not tainted 4.7.0-rc3-00099-g97872fc89d41 #64
-> [    2.310480] Call Trace:
-> [    2.310556] [c0000001f4773bf0] [c0000000009bdbe8] dump_stack+0xb0/0xf0 (unreliable)
-> [    2.311016] [c0000001f4773c30] [c00000000029cf44] __check_object_size+0x74/0x320
-> [    2.311472] [c0000001f4773cb0] [c00000000005d4d0] copy_from_user+0x60/0xd4
-> [    2.311873] [c0000001f4773cf0] [c0000000008b38f4] __get_filter+0x74/0x160
-> [    2.312230] [c0000001f4773d30] [c0000000008b408c] sk_attach_filter+0x2c/0xc0
-> [    2.312596] [c0000001f4773d60] [c000000000871c34] sock_setsockopt+0x954/0xc00
-> [    2.313021] [c0000001f4773dd0] [c00000000086ac44] SyS_setsockopt+0x134/0x150
-> [    2.313380] [c0000001f4773e30] [c000000000009260] system_call+0x38/0x108
+> Yeah we need to restart that patch. It's been in my "pending" list for a
+> year now it seems.
+>
+> Curious why it broke things, perhaps device probe is failing when it
+> didn't fail before?
+>
 
-Yeah, 'ping' dies with a similar traceback going to rawv6_setsockopt(),
-and 'trinity' dies a horrid death during initialization because it creates
-some sctp sockets to fool around with.  The problem in all these cases is that
-setsockopt uses copy_from_user() to pull in the option value, and the allocation
-isn't tagged with USERCOPY to whitelist it.
+um, I retested again this morning and it is all good - I was also a bit 
+surprised when things failed yesterday  (it seems one of the wires on my 
+board was loose, sorry).
 
-Unfortunately, I haven't been able to track down where in net/ the memory is
-allocated, nor is there any good hint in the grsecurity patch that I can find
-where they do the tagging.
-
-And the fact that so far, I'm only had ping and trinity killed in setsockopt()
-hints that *most* setsockopt() calls must be going through a code path that
-does allocate suitable memory, and these two have different paths.  I can't
-believe they're the only two binaries that call setsockopt().....
-
-Just saw your second mail, now I'm wondering why *my* laptop doesn't die a
-horrid death when systemd starts up.  Mine is
-systemd-230-3.gitea68351.fc25.x86_64 - maybe there's something
-release-dependent going on?
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 848 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160709/c8bed600/attachment.sig>
+So AFAIC your patch addresses the issue in a much generic (better) way 
+and there are no regressions on a HiKey board running a 4.4 kernel.
