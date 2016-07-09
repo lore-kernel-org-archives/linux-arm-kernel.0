@@ -1,46 +1,47 @@
-From: appana.durga.rao@xilinx.com (Appana Durga Kedareswara Rao)
-Date: Sat, 9 Jul 2016 08:36:05 +0000
-Subject: [PATCH v12 2/2] dmaengine: Add Xilinx zynqmp dma engine driver
- support
-In-Reply-To: <20160708055328.GP12591@localhost>
-References: <1467373026-27768-1-git-send-email-appanad@xilinx.com>
- <1467373026-27768-2-git-send-email-appanad@xilinx.com>
- <20160708055328.GP12591@localhost>
-Message-ID: <C246CAC1457055469EF09E3A7AC4E11A4A5BC756@XAP-PVEXMBX01.xlnx.xilinx.com>
+From: appana.durga.rao@xilinx.com (Kedareswara rao Appana)
+Date: Sat, 9 Jul 2016 14:09:48 +0530
+Subject: [PATCH] dmaengine: xilinx: Fix race condition in axi dma cyclic dma
+ mode
+Message-ID: <1468053588-18357-1-git-send-email-appanad@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vinod,
+In cyclic DMA mode need to link the tail bd segment
+with the head bd segment to process bd's in cyclic.
 
-	Thanks for the review...
+Current driver is doing this only for tx channel
+needs to update the same for rx channel case also.
 
-> > +
-> > +	chan->is_dmacoherent =  of_property_read_bool(node, "dma-
-> coherent");
-> > +	zdev->chan = chan;
-> > +	tasklet_init(&chan->tasklet, zynqmp_dma_do_tasklet, (ulong)chan);
-> 
-> where is this killed?
+This patch fixes the same.
 
-This is killed in the zynqmp_dma_chan_remove() API.
+Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
+---
+ drivers/dma/xilinx/xilinx_dma.c |    9 +++++----
+ 1 files changed, 5 insertions(+), 4 deletions(-)
 
-> 
-> > +	spin_lock_init(&chan->lock);
-> > +	INIT_LIST_HEAD(&chan->active_list);
-> > +	INIT_LIST_HEAD(&chan->pending_list);
-> > +	INIT_LIST_HEAD(&chan->done_list);
-> > +	INIT_LIST_HEAD(&chan->free_list);
-> > +	zynqmp_dma_init(chan);
-> > +	chan->irq = platform_get_irq(pdev, 0);
-> > +	if (chan->irq < 0)
-> > +		return -ENXIO;
-> > +	err = devm_request_irq(&pdev->dev, chan->irq,
-> zynqmp_dma_irq_handler, 0,
-> > +			       "zynqmp-dma", chan);
-> 
-> this needs to be freed/diabled in remove, dont see that
-
-It is freed in the zynqmp_dma_chan_remove() API.
-
-Regards,
-Kedar.
+diff --git a/drivers/dma/xilinx/xilinx_dma.c b/drivers/dma/xilinx/xilinx_dma.c
+index cf47347..4e223d0 100644
+--- a/drivers/dma/xilinx/xilinx_dma.c
++++ b/drivers/dma/xilinx/xilinx_dma.c
+@@ -1895,14 +1895,15 @@ static struct dma_async_tx_descriptor *xilinx_dma_prep_dma_cyclic(
+ 	reg |= XILINX_DMA_CR_CYCLIC_BD_EN_MASK;
+ 	dma_ctrl_write(chan, XILINX_DMA_REG_DMACR, reg);
+ 
++	segment = list_last_entry(&desc->segments,
++				  struct xilinx_axidma_tx_segment,
++				  node);
++	segment->hw.next_desc = (u32) head_segment->phys;
++
+ 	/* For the last DMA_MEM_TO_DEV transfer, set EOP */
+ 	if (direction == DMA_MEM_TO_DEV) {
+ 		head_segment->hw.control |= XILINX_DMA_BD_SOP;
+-		segment = list_last_entry(&desc->segments,
+-					  struct xilinx_axidma_tx_segment,
+-					  node);
+ 		segment->hw.control |= XILINX_DMA_BD_EOP;
+-		segment->hw.next_desc = (u32) head_segment->phys;
+ 	}
+ 
+ 	return &desc->async_tx;
+-- 
+1.7.1
