@@ -1,52 +1,47 @@
 From: ayaka@soulik.info (Randy Li)
-Date: Sat,  9 Jul 2016 17:23:45 +0800
-Subject: [PATCH 2/3] rtc: s3c: add device data for samsung,exynos3250-rtc
+Date: Sat,  9 Jul 2016 17:23:46 +0800
+Subject: [PATCH 3/3] ARM: dts: exynos: correct the rtc compatible value for
+ exynos5
 In-Reply-To: <1468056226-19128-1-git-send-email-ayaka@soulik.info>
 References: <1468056226-19128-1-git-send-email-ayaka@soulik.info>
-Message-ID: <1468056226-19128-3-git-send-email-ayaka@soulik.info>
+Message-ID: <1468056226-19128-4-git-send-email-ayaka@soulik.info>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The device data for samsung,exynos3250-rtc and samsung,s3c6410-rtc
-are just have a difference, but keeping using the same device data
-would cause the platform using the other IP core not work.
+Those platforms are reported to use the same rtc IP core
+as exynos3250's.
 
 Signed-off-by: Randy Li <ayaka@soulik.info>
 ---
- drivers/rtc/rtc-s3c.c | 14 +++++++++++++-
- 1 file changed, 13 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/exynos3250.dtsi | 2 +-
+ arch/arm/boot/dts/exynos5.dtsi    | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/rtc/rtc-s3c.c b/drivers/rtc/rtc-s3c.c
-index 5dc18ca..e9f6151 100644
---- a/drivers/rtc/rtc-s3c.c
-+++ b/drivers/rtc/rtc-s3c.c
-@@ -810,6 +810,18 @@ static struct s3c_rtc_data const s3c6410_rtc_data = {
- 	.disable		= s3c6410_rtc_disable,
- };
+diff --git a/arch/arm/boot/dts/exynos3250.dtsi b/arch/arm/boot/dts/exynos3250.dtsi
+index 62f3dcd..cdd69a0 100644
+--- a/arch/arm/boot/dts/exynos3250.dtsi
++++ b/arch/arm/boot/dts/exynos3250.dtsi
+@@ -208,7 +208,7 @@
+ 		};
  
-+static struct s3c_rtc_data const exynos3250_rtc_data = {
-+	.max_user_freq		= 32768,
-+	.needs_src_clk          = true,
-+	.irq_handler		= s3c6410_rtc_irq,
-+	.set_freq		= s3c6410_rtc_setfreq,
-+	.enable_tick		= s3c6410_rtc_enable_tick,
-+	.save_tick_cnt		= s3c6410_rtc_save_tick_cnt,
-+	.restore_tick_cnt	= s3c6410_rtc_restore_tick_cnt,
-+	.enable			= s3c24xx_rtc_enable,
-+	.disable		= s3c6410_rtc_disable,
-+};
-+
- static const struct of_device_id s3c_rtc_dt_match[] = {
- 	{
- 		.compatible = "samsung,s3c2410-rtc",
-@@ -825,7 +837,7 @@ static const struct of_device_id s3c_rtc_dt_match[] = {
- 		.data = (void *)&s3c6410_rtc_data,
- 	}, {
- 		.compatible = "samsung,exynos3250-rtc",
--		.data = (void *)&s3c6410_rtc_data,
-+		.data = (void *)&exynos3250_rtc_data,
- 	},
- 	{ /* sentinel */ },
- };
+ 		rtc: rtc at 10070000 {
+-			compatible = "samsung,s3c6410-rtc";
++			compatible = "samsung,exynos3250-rtc";
+ 			reg = <0x10070000 0x100>;
+ 			interrupts = <0 73 0>, <0 74 0>;
+ 			interrupt-parent = <&pmu_system_controller>;
+diff --git a/arch/arm/boot/dts/exynos5.dtsi b/arch/arm/boot/dts/exynos5.dtsi
+index d5c0f18..71a1ad2 100644
+--- a/arch/arm/boot/dts/exynos5.dtsi
++++ b/arch/arm/boot/dts/exynos5.dtsi
+@@ -88,7 +88,7 @@
+ 	};
+ 
+ 	rtc: rtc at 101E0000 {
+-		compatible = "samsung,s3c6410-rtc";
++		compatible = "samsung,exynos3250-rtc";
+ 		reg = <0x101E0000 0x100>;
+ 		interrupts = <0 43 0>, <0 44 0>;
+ 		status = "disabled";
 -- 
 2.7.4
