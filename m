@@ -1,32 +1,32 @@
 From: mitchelh@codeaurora.org (Mitchel Humpherys)
-Date: Fri, 08 Jul 2016 19:09:13 -0700
-Subject: [PATCH 0/3] Add support for privileged mappings
-In-Reply-To: <20160707205820.GA752@jcrouse-lnx.qualcomm.com> (Jordan Crouse's
- message of "Thu, 7 Jul 2016 14:58:21 -0600")
-References: <20160706235136.27854-1-mitchelh@codeaurora.org>
- <20160707170026.GG20682@arm.com>
- <20160707205820.GA752@jcrouse-lnx.qualcomm.com>
-Message-ID: <vnkwmvlrtvee.fsf@codeaurora.org>
+Date: Fri,  8 Jul 2016 19:09:14 -0700
+Subject: [PATCH v2 1/6] iommu: add IOMMU_PRIV attribute
+In-Reply-To: <20160709020919.6760-1-mitchelh@codeaurora.org>
+References: <20160709020919.6760-1-mitchelh@codeaurora.org>
+Message-ID: <20160709020919.6760-2-mitchelh@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 07 2016 at 02:58:21 PM, Jordan Crouse <jcrouse@codeaurora.org> wrote:
->> Whilst this series is a step in the right direction for fixing that, I
->> don't think you can claim that only low-level users need this, given that
->> we have in-tree code which would break without it. Perhaps you just need
->> to extend things slightly more to expose this to the DMA API as well (or,
->> alternatively, hack the PL330 driver some how).
->
-> I agree that hacking the DMA api would be the best long term solution but there
-> be dragons there. Perhaps a workable compromise might be to white-list
-> privileged aware devices via the device tree.
+Add the IOMMU_PRIV attribute, which is used to indicate privileged
+mappings.
 
-I'm sending a v2 with an attempt at plumbing this through the DMA layer.
-Hopefully avoiding dragons while I'm at it :)
+Signed-off-by: Mitchel Humpherys <mitchelh@codeaurora.org>
+---
+ include/linux/iommu.h | 1 +
+ 1 file changed, 1 insertion(+)
 
-
--Mitch
-
+diff --git a/include/linux/iommu.h b/include/linux/iommu.h
+index 664683aedcce..01c9f2667f2b 100644
+--- a/include/linux/iommu.h
++++ b/include/linux/iommu.h
+@@ -31,6 +31,7 @@
+ #define IOMMU_CACHE	(1 << 2) /* DMA cache coherency */
+ #define IOMMU_NOEXEC	(1 << 3)
+ #define IOMMU_MMIO	(1 << 4) /* e.g. things like MSI doorbells */
++#define IOMMU_PRIV	(1 << 5)
+ 
+ struct iommu_ops;
+ struct iommu_group;
 -- 
 Qualcomm Innovation Center, Inc.
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
