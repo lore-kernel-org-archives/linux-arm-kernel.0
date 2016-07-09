@@ -1,55 +1,87 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Sat, 9 Jul 2016 11:00:07 +0800
-Subject: [PATCH v6 00/10] acpi, clocksource: add GTDT driver and GTDT
- support in arm_arch_timer
-In-Reply-To: <1603704.EGiVTcCxLR@vostro.rjw.lan>
-References: <1467224153-22873-1-git-send-email-fu.wei@linaro.org>
- <1890708.ZTyM2PUGdP@vostro.rjw.lan> <20160707134023.GA655@red-moon>
- <1603704.EGiVTcCxLR@vostro.rjw.lan>
-Message-ID: <2f0f9522-2d91-4f2f-e4bb-9c63f7676e78@linaro.org>
+From: vw@iommu.org (Wan Zongshun)
+Date: Sat, 9 Jul 2016 11:25:19 +0800
+Subject: [PATCH 4/6] irqchip: add irqchip driver for nuc900
+In-Reply-To: <8706947.5rzUDVsB2F@wuerfel>
+References: <1466851042-22239-1-git-send-email-vw@iommu.org>
+ <1466851042-22239-5-git-send-email-vw@iommu.org> <8706947.5rzUDVsB2F@wuerfel>
+Message-ID: <57806E9F.3020407@iommu.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016/7/7 21:58, Rafael J. Wysocki wrote:
-> On Thursday, July 07, 2016 02:40:23 PM Lorenzo Pieralisi wrote:
->> [+Sudeep]
->>
->> On Thu, Jul 07, 2016 at 02:03:17PM +0200, Rafael J. Wysocki wrote:
->>
->> [...]
->>
->>>>>> So is this a documentation issue in which case Fu Wei can add that to
->>>>>> the file to explain its limited to ARM64. Or we could even rename the
->>>>>> file acpi_arm64_gtdt.c
->>>>>>
->>>>>> It seems a pity as the comment on this series were minors to block
->>>>>> things on a filename/location.
->>>>>
->>>>> Let me repeat what I said above:
->>>>>
->>>>> I'm mostly concerned about how (and by whom) that code is going to be
->>>>> maintained going forward.
->>>>>
->>>>> This is not about documentation, it is about responsibility.
->>>>>
->>>>> Honestly, I don't think I'm the right maintainer to apply the patch
->>>>> introducing this code and then handle bug reports regarding it and so
->>>>> on.  That has to be done by somebody else.
->>>>
->>>> I'm working on ACPI for years and upstreamed the ARM64 ACPI core
->>>> support (with lots of people's help), I'm willing to maintain the ARM64
->>>> ACPI code under drivers/acpi/ if no objections.
->>>
->>> OK
->>
->> I would ask you please to add Sudeep and myself for the ARM64 specific
->> ACPI code maintainership too.
->
-> OK
->
->>> Can the ARM64-specific code go under drivers/acpi/arm64/ then, for clarity?
 
-I'm fine with it as it helps for maintain.
 
-Thanks
-Hanjun
+On 2016?06?29? 23:27, Arnd Bergmann wrote:
+> On Saturday, June 25, 2016 6:37:20 PM CEST Wan Zongshun wrote:
+>> +#define IRQ_WDT		W90X900_IRQ(1)
+>> +#define IRQ_WWDT	W90X900_IRQ(2)
+>> +#define IRQ_LVD		W90X900_IRQ(3)
+>> +#define IRQ_EXT0	W90X900_IRQ(4)
+>> +#define IRQ_EXT1	W90X900_IRQ(5)
+>> +#define IRQ_EXT2	W90X900_IRQ(6)
+>> +#define IRQ_EXT3	W90X900_IRQ(7)
+>> +#define IRQ_EXT4	W90X900_IRQ(8)
+>> +#define IRQ_EXT5	W90X900_IRQ(9)
+>> +#define IRQ_EXT6	W90X900_IRQ(10)
+>
+> I'd suggest dropping the list, the contents are now in the dts.
+
+Arnd, I will drop this file later, since old w90x900 plat still need it.
+but I will remove the Macros related to nuc970 and avoid nuc970 
+interrupt using those Macro.
+
+But I still need hack this irqs.h like below, since here NR_IRQS defined 
+and it is need for nuc970 irqchip driver.
+
+#if !defined(CONFIG_SOC_NUC900)
+#define NR_IRQS		(IRQ_ADC+1)
+#else
+#define NR_IRQS		62
+#endif
+
+>
+>> diff --git a/arch/arm/mach-w90x900/include/mach/nuc970-regs-aic.h b/arch/arm/mach-w90x900/include/mach/nuc970-regs-aic.h
+>> new file mode 100644
+>> index 0000000..7a77016
+>> --- /dev/null
+>> +++ b/arch/arm/mach-w90x900/include/mach/nuc970-regs-aic.h
+>> @@ -0,0 +1,53 @@
+>> +#ifndef __ASM_ARCH_REGS_AIC_H
+>> +#define __ASM_ARCH_REGS_AIC_H
+>> +
+>> +/*NUC970 AIC regs*/
+>> +
+>> +#define	REG_AIC_SCR1	0x00
+>> +#define	REG_AIC_SCR2	0x04
+>> +#define	REG_AIC_SCR3	0x08
+>> +#define	REG_AIC_SCR4	0x0C
+>> +#define	REG_AIC_SCR5	0x10
+>
+> And like the clk driver, these should all be in the irqchip driver instead
+> of a separate header.
+>
+>> +
+>> +static void __iomem *aic_base;
+>> +static struct irq_domain *aic_domain;
+>> +#define MAKE_HWIRQ(irqnum)	(irqnum)
+>
+> The macro appears to be unused.
+>
+>> +static void nuc970_irq_mask(struct irq_data *d)
+>> +{
+>> +	if (d->irq < 32)
+>> +		__raw_writel(1 << (d->irq), aic_base + REG_AIC_MDCR);
+>> +	else
+>> +		__raw_writel(1 << (d->irq - 32), aic_base + REG_AIC_MDCRH);
+>> +}
+>
+> writel()
+>
+> 	Arnd
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
+>
