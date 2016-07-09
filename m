@@ -1,63 +1,130 @@
 From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Sat, 9 Jul 2016 19:34:59 -0400
-Subject: [PATCH v2 2/6] clk: mvebu: Add the xtal clock for Armada 3700 SoC
-In-Reply-To: <1467931071-31004-3-git-send-email-gregory.clement@free-electrons.com>
-References: <1467931071-31004-1-git-send-email-gregory.clement@free-electrons.com>
- <1467931071-31004-3-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <CAP=VYLoZdyqP7vLa_pCx3mNpFuYCRaNgkT-STtk571U0KAgdLw@mail.gmail.com>
+Date: Sat, 9 Jul 2016 19:45:07 -0400
+Subject: [PATCH V2 04/10] firmware: tegra: add IVC library
+In-Reply-To: <20160705090431.5852-5-josephl@nvidia.com>
+References: <20160705090431.5852-1-josephl@nvidia.com>
+ <20160705090431.5852-5-josephl@nvidia.com>
+Message-ID: <CAP=VYLoX5CkXGFrXtMFYYuJUs_+_9zzzus1o+_7twvf4rkU_Og@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 7, 2016 at 6:37 PM, Gregory CLEMENT
-<gregory.clement@free-electrons.com> wrote:
-> This clock is the parent of all the Armada 3700 clocks. It is a fixed
-> rate clock which depends on the gpio configuration read when resetting
-> the SoC.
+On Tue, Jul 5, 2016 at 5:04 AM, Joseph Lo <josephl@nvidia.com> wrote:
+> The Inter-VM communication (IVC) is a communication protocol, which is
+> designed for interprocessor communication (IPC) or the communication
+> between the hypervisor and the virtual machine with a guest OS on it. So
+> it can be translated as inter-virtual memory or inter-virtual machine
+> communication. The message channels are maintained on the DRAM or SRAM
+> and the data coherency should be considered. Or the data could be
+> corrupted or out of date when the remote client checking it.
 >
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> Inside the IVC, it maintains memory-based descriptors for the TX/RX
+> channels and the coherency issue of the counter and payloads. So the
+> clients can use it to send/receive messages to/from remote ones.
+>
+> We introduce it as a library for the firmware drivers, which can use it
+> for IPC.
+>
+> Based-on-the-work-by:
+> Peter Newman <pnewman@nvidia.com>
+>
+> Signed-off-by: Joseph Lo <josephl@nvidia.com>
 > ---
->  drivers/clk/mvebu/Kconfig            |  3 ++
->  drivers/clk/mvebu/Makefile           |  1 +
->  drivers/clk/mvebu/armada-37xx-xtal.c | 98 ++++++++++++++++++++++++++++++++++++
->  3 files changed, 102 insertions(+)
->  create mode 100644 drivers/clk/mvebu/armada-37xx-xtal.c
+> Changes in V2:
+> - None
+> ---
+>  drivers/firmware/Kconfig        |   1 +
+>  drivers/firmware/Makefile       |   1 +
+>  drivers/firmware/tegra/Kconfig  |  13 +
+>  drivers/firmware/tegra/Makefile |   1 +
+>  drivers/firmware/tegra/ivc.c    | 659 ++++++++++++++++++++++++++++++++++++++++
+>  include/soc/tegra/ivc.h         | 102 +++++++
+>  6 files changed, 777 insertions(+)
+>  create mode 100644 drivers/firmware/tegra/Kconfig
+>  create mode 100644 drivers/firmware/tegra/Makefile
+>  create mode 100644 drivers/firmware/tegra/ivc.c
+>  create mode 100644 include/soc/tegra/ivc.h
 >
-> diff --git a/drivers/clk/mvebu/Kconfig b/drivers/clk/mvebu/Kconfig
-> index 3165da77d525..fddc8ac5faff 100644
-> --- a/drivers/clk/mvebu/Kconfig
-> +++ b/drivers/clk/mvebu/Kconfig
-> @@ -24,6 +24,9 @@ config ARMADA_39X_CLK
->         bool
->         select MVEBU_CLK_COMMON
+> diff --git a/drivers/firmware/Kconfig b/drivers/firmware/Kconfig
+> index 5e618058defe..bbd64ae8c4c6 100644
+> --- a/drivers/firmware/Kconfig
+> +++ b/drivers/firmware/Kconfig
+> @@ -200,5 +200,6 @@ config HAVE_ARM_SMCCC
+>  source "drivers/firmware/broadcom/Kconfig"
+>  source "drivers/firmware/google/Kconfig"
+>  source "drivers/firmware/efi/Kconfig"
+> +source "drivers/firmware/tegra/Kconfig"
 >
-> +config ARMADA_37XX_CLK
-> +       bool
+>  endmenu
+> diff --git a/drivers/firmware/Makefile b/drivers/firmware/Makefile
+> index 474bada56fcd..9a4df8171cc4 100644
+> --- a/drivers/firmware/Makefile
+> +++ b/drivers/firmware/Makefile
+> @@ -24,3 +24,4 @@ obj-y                         += broadcom/
+>  obj-$(CONFIG_GOOGLE_FIRMWARE)  += google/
+>  obj-$(CONFIG_EFI)              += efi/
+>  obj-$(CONFIG_UEFI_CPER)                += efi/
+> +obj-y                          += tegra/
+> diff --git a/drivers/firmware/tegra/Kconfig b/drivers/firmware/tegra/Kconfig
+> new file mode 100644
+> index 000000000000..1fa3e4e136a5
+> --- /dev/null
+> +++ b/drivers/firmware/tegra/Kconfig
+> @@ -0,0 +1,13 @@
+> +menu "Tegra firmware driver"
 > +
+> +config TEGRA_IVC
+> +       bool "Tegra IVC protocol"
 
-Since the driver is not tristate, can you please remove all modular
-references from it?   With the author and license etc. at the top you
-can just delete the last three lines, the DEVICE_TABLE and register
-with builtin_platform_driver, and then no need for module.h either.
+If this driver is not tristate, then why does the driver include the
+module.h header below?
 
-Either that, or change it to a tristate, if that use case makes sense.
+> +       depends on ARCH_TEGRA
+> +       help
+> +         IVC (Inter-VM Communication) protocol is part of the IPC
+> +         (Inter Processor Communication) framework on Tegra. It maintains the
+> +         data and the different commuication channels in SysRAM or RAM and
+> +         keeps the content is synchronization between host CPU and remote
+> +         processors.
+> +
+> +endmenu
+> diff --git a/drivers/firmware/tegra/Makefile b/drivers/firmware/tegra/Makefile
+> new file mode 100644
+> index 000000000000..92e2153e8173
+> --- /dev/null
+> +++ b/drivers/firmware/tegra/Makefile
+> @@ -0,0 +1 @@
+> +obj-$(CONFIG_TEGRA_IVC)                += ivc.o
+> diff --git a/drivers/firmware/tegra/ivc.c b/drivers/firmware/tegra/ivc.c
+> new file mode 100644
+> index 000000000000..3e736bb9915a
+> --- /dev/null
+> +++ b/drivers/firmware/tegra/ivc.c
+> @@ -0,0 +1,659 @@
+> +/*
+> + * Copyright (c) 2014-2016, NVIDIA CORPORATION.  All rights reserved.
+> + *
+> + * This program is free software; you can redistribute it and/or modify it
+> + * under the terms and conditions of the GNU General Public License,
+> + * version 2, as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope it will be useful, but WITHOUT
+> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+> + * more details.
+> + */
+> +
+> +#include <linux/module.h>
+ ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+I'm sure it "works" since module.h includes nearly everything else,
+but that is less than ideal for exactly the same reason.
 
 Thanks,
 Paul.
 --
 
-
->  config ARMADA_XP_CLK
->         bool
->         select MVEBU_CLK_COMMON
-> diff --git a/drivers/clk/mvebu/Makefile b/drivers/clk/mvebu/Makefile
-> index 7172ef65693d..4257a36d0219 100644
-> --- a/drivers/clk/mvebu/Makefile
-> +++ b/drivers/clk/mvebu/Makefile
-> @@ -6,6 +6,7 @@ obj-$(CONFIG_ARMADA_370_CLK)    += armada-370.o
->  obj-$(CONFIG_ARMADA_375_CLK)   += armada-375.o
->  obj-$(CONFIG_ARMADA_38X_CLK)   += armada-38x.o
->  obj-$(CONFIG_ARMADA_39X_CLK)   += armada-39x.o
-> +obj-$(CONFIG_ARMADA_37XX_CLK)  += armada-37xx-xtal.o
->  obj-$(CONFIG_ARMADA_XP_
-
-[...]
+> +
+> +#include <soc/tegra/ivc.h>
+> +
+> +#define IVC_ALIGN 64
+> +
