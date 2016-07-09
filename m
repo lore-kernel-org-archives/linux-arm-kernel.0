@@ -1,58 +1,57 @@
 From: mitchelh@codeaurora.org (Mitchel Humpherys)
-Date: Fri,  8 Jul 2016 19:09:17 -0700
-Subject: [PATCH v2 4/6] common: DMA-mapping: add
- DMA_ATTR_PRIVILEGED_EXECUTABLE attribute
+Date: Fri,  8 Jul 2016 19:09:15 -0700
+Subject: [PATCH v2 2/6] iommu/io-pgtable-arm: add support for the IOMMU_PRIV
+ flag
 In-Reply-To: <20160709020919.6760-1-mitchelh@codeaurora.org>
 References: <20160709020919.6760-1-mitchelh@codeaurora.org>
-Message-ID: <20160709020919.6760-5-mitchelh@codeaurora.org>
+Message-ID: <20160709020919.6760-3-mitchelh@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the DMA_ATTR_PRIVILEGED_EXECUTABLE attribute to the
-DMA-mapping subsystem.
+From: Jeremy Gebben <jgebben@codeaurora.org>
 
-Some architectures require that writable mappings also be non-executable at
-lesser-privileged levels of execution.  This attribute is used to indicate
-to the DMA-mapping subsystem that it should do whatever is necessary to
-ensure that the buffer is executable at an elevated privilege level (by
-making it read-only at the lesser-privileged levels, for example).
+Allow the creation of privileged mode mappings, for stage 1 only.
 
-Cc: linux-doc at vger.kernel.org
-Signed-off-by: Mitchel Humpherys <mitchelh@codeaurora.org>
+Signed-off-by: Jeremy Gebben <jgebben@codeaurora.org>
 ---
- Documentation/DMA-attributes.txt | 9 +++++++++
- include/linux/dma-attrs.h        | 1 +
- 2 files changed, 10 insertions(+)
+ drivers/iommu/io-pgtable-arm.c | 16 +++++++++++-----
+ 1 file changed, 11 insertions(+), 5 deletions(-)
 
-diff --git a/Documentation/DMA-attributes.txt b/Documentation/DMA-attributes.txt
-index e8cf9cf873b3..6a22d4307008 100644
---- a/Documentation/DMA-attributes.txt
-+++ b/Documentation/DMA-attributes.txt
-@@ -126,3 +126,12 @@ means that we won't try quite as hard to get them.
+diff --git a/drivers/iommu/io-pgtable-arm.c b/drivers/iommu/io-pgtable-arm.c
+index a1ed1b73fed4..e9e7dd179708 100644
+--- a/drivers/iommu/io-pgtable-arm.c
++++ b/drivers/iommu/io-pgtable-arm.c
+@@ -101,8 +101,10 @@
+ 					 ARM_LPAE_PTE_ATTR_HI_MASK)
  
- NOTE: At the moment DMA_ATTR_ALLOC_SINGLE_PAGES is only implemented on ARM,
- though ARM64 patches will likely be posted soon.
-+
-+DMA_ATTR_PRIVILEGED_EXECUTABLE
-+------------------------------
-+
-+Some architectures require that writable mappings also be non-executable at
-+lesser-privileged levels of execution.  This attribute is used to indicate
-+to the DMA-mapping subsystem that it should do whatever is necessary to
-+ensure that the buffer is executable at an elevated privilege level (by
-+making it read-only at the lesser-privileged levels, for example).
-diff --git a/include/linux/dma-attrs.h b/include/linux/dma-attrs.h
-index 5246239a4953..8cf4dff6185b 100644
---- a/include/linux/dma-attrs.h
-+++ b/include/linux/dma-attrs.h
-@@ -19,6 +19,7 @@ enum dma_attr {
- 	DMA_ATTR_SKIP_CPU_SYNC,
- 	DMA_ATTR_FORCE_CONTIGUOUS,
- 	DMA_ATTR_ALLOC_SINGLE_PAGES,
-+	DMA_ATTR_PRIVILEGED_EXECUTABLE,
- 	DMA_ATTR_MAX,
- };
+ /* Stage-1 PTE */
+-#define ARM_LPAE_PTE_AP_UNPRIV		(((arm_lpae_iopte)1) << 6)
+-#define ARM_LPAE_PTE_AP_RDONLY		(((arm_lpae_iopte)2) << 6)
++#define ARM_LPAE_PTE_AP_PRIV_RW		(((arm_lpae_iopte)0) << 6)
++#define ARM_LPAE_PTE_AP_RW		(((arm_lpae_iopte)1) << 6)
++#define ARM_LPAE_PTE_AP_PRIV_RO		(((arm_lpae_iopte)2) << 6)
++#define ARM_LPAE_PTE_AP_RO		(((arm_lpae_iopte)3) << 6)
+ #define ARM_LPAE_PTE_ATTRINDX_SHIFT	2
+ #define ARM_LPAE_PTE_nG			(((arm_lpae_iopte)1) << 11)
  
+@@ -350,10 +352,14 @@ static arm_lpae_iopte arm_lpae_prot_to_pte(struct arm_lpae_io_pgtable *data,
+ 
+ 	if (data->iop.fmt == ARM_64_LPAE_S1 ||
+ 	    data->iop.fmt == ARM_32_LPAE_S1) {
+-		pte = ARM_LPAE_PTE_AP_UNPRIV | ARM_LPAE_PTE_nG;
++		pte = ARM_LPAE_PTE_nG;
+ 
+-		if (!(prot & IOMMU_WRITE) && (prot & IOMMU_READ))
+-			pte |= ARM_LPAE_PTE_AP_RDONLY;
++		if (prot & IOMMU_WRITE)
++			pte |= (prot & IOMMU_PRIV) ? ARM_LPAE_PTE_AP_PRIV_RW
++					: ARM_LPAE_PTE_AP_RW;
++		else
++			pte |= (prot & IOMMU_PRIV) ? ARM_LPAE_PTE_AP_PRIV_RO
++					: ARM_LPAE_PTE_AP_RO;
+ 
+ 		if (prot & IOMMU_MMIO)
+ 			pte |= (ARM_LPAE_MAIR_ATTR_IDX_DEV
 -- 
 Qualcomm Innovation Center, Inc.
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
