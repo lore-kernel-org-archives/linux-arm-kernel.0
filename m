@@ -1,47 +1,63 @@
-From: pageexec@freemail.hu (PaX Team)
-Date: Sun, 10 Jul 2016 01:16:36 +0200
-Subject: [PATCH 0/9] mm: Hardened usercopy
-In-Reply-To: <CALCETrU5Emr7jZNH5bh7Z+C8fLOcAah9SzeJbDjqW7N-xWGxHA@mail.gmail.com>
-References: <1467843928-29351-1-git-send-email-keescook@chromium.org>,
- <CALCETrU5Emr7jZNH5bh7Z+C8fLOcAah9SzeJbDjqW7N-xWGxHA@mail.gmail.com>
-Message-ID: <578185D4.29090.242668C8@pageexec.freemail.hu>
+From: paul.gortmaker@windriver.com (Paul Gortmaker)
+Date: Sat, 9 Jul 2016 19:34:59 -0400
+Subject: [PATCH v2 2/6] clk: mvebu: Add the xtal clock for Armada 3700 SoC
+In-Reply-To: <1467931071-31004-3-git-send-email-gregory.clement@free-electrons.com>
+References: <1467931071-31004-1-git-send-email-gregory.clement@free-electrons.com>
+ <1467931071-31004-3-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <CAP=VYLoZdyqP7vLa_pCx3mNpFuYCRaNgkT-STtk571U0KAgdLw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9 Jul 2016 at 14:27, Andy Lutomirski wrote:
+On Thu, Jul 7, 2016 at 6:37 PM, Gregory CLEMENT
+<gregory.clement@free-electrons.com> wrote:
+> This clock is the parent of all the Armada 3700 clocks. It is a fixed
+> rate clock which depends on the gpio configuration read when resetting
+> the SoC.
+>
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> ---
+>  drivers/clk/mvebu/Kconfig            |  3 ++
+>  drivers/clk/mvebu/Makefile           |  1 +
+>  drivers/clk/mvebu/armada-37xx-xtal.c | 98 ++++++++++++++++++++++++++++++++++++
+>  3 files changed, 102 insertions(+)
+>  create mode 100644 drivers/clk/mvebu/armada-37xx-xtal.c
+>
+> diff --git a/drivers/clk/mvebu/Kconfig b/drivers/clk/mvebu/Kconfig
+> index 3165da77d525..fddc8ac5faff 100644
+> --- a/drivers/clk/mvebu/Kconfig
+> +++ b/drivers/clk/mvebu/Kconfig
+> @@ -24,6 +24,9 @@ config ARMADA_39X_CLK
+>         bool
+>         select MVEBU_CLK_COMMON
+>
+> +config ARMADA_37XX_CLK
+> +       bool
+> +
 
-> On Jul 6, 2016 6:25 PM, "Kees Cook" <keescook@chromium.org> wrote:
-> >
-> > Hi,
-> >
-> > This is a start of the mainline port of PAX_USERCOPY[1]. After I started
-> > writing tests (now in lkdtm in -next) for Casey's earlier port[2], I
-> > kept tweaking things further and further until I ended up with a whole
-> > new patch series. To that end, I took Rik's feedback and made a number
-> > of other changes and clean-ups as well.
-> >
-> 
-> I like the series, but I have one minor nit to pick.  The effect of
-> this series is to harden usercopy, but most of the code is really
-> about infrastructure to validate that a pointed-to object is valid.
+Since the driver is not tristate, can you please remove all modular
+references from it?   With the author and license etc. at the top you
+can just delete the last three lines, the DEVICE_TABLE and register
+with builtin_platform_driver, and then no need for module.h either.
 
-actually USERCOPY has never been about validating pointers. its sole purpose
-is to validate the *size* argument of copy*user calls, a very specific form
-of runtime bounds checking. it's only really relevant for slab objects and the
-pointer checks (that one might mistake for being a part of the defense mechanism)
-are only there to determine whether the kernel pointer refers to a slab object
-or not (the stack part is a small bonus and was never the main goal either).
+Either that, or change it to a tristate, if that use case makes sense.
 
-> Might it make sense to call the infrastructure part something else?
+Thanks,
+Paul.
+--
 
-yes, more bikeshedding will surely help, like the renaming of .data..read_only
-to .data..ro_after_init which also had nothing to do with init but everything
-to do with objects being conceptually read-only...
 
-> After all, this could be extended in the future for memcpy or even for
-> some GCC plugin to check pointers passed to ordinary (non-allocator)
-> functions.
+>  config ARMADA_XP_CLK
+>         bool
+>         select MVEBU_CLK_COMMON
+> diff --git a/drivers/clk/mvebu/Makefile b/drivers/clk/mvebu/Makefile
+> index 7172ef65693d..4257a36d0219 100644
+> --- a/drivers/clk/mvebu/Makefile
+> +++ b/drivers/clk/mvebu/Makefile
+> @@ -6,6 +6,7 @@ obj-$(CONFIG_ARMADA_370_CLK)    += armada-370.o
+>  obj-$(CONFIG_ARMADA_375_CLK)   += armada-375.o
+>  obj-$(CONFIG_ARMADA_38X_CLK)   += armada-38x.o
+>  obj-$(CONFIG_ARMADA_39X_CLK)   += armada-39x.o
+> +obj-$(CONFIG_ARMADA_37XX_CLK)  += armada-37xx-xtal.o
+>  obj-$(CONFIG_ARMADA_XP_
 
-what kind of checks are you thinking of here? and more fundamentally, against
-what kind of threats? as for memcpy, it's the standard mandated memory copying
-function, what security related properties can it check on its pointer arguments?
+[...]
