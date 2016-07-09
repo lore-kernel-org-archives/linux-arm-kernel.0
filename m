@@ -1,36 +1,58 @@
-From: davem@davemloft.net (David Miller)
-Date: Fri, 08 Jul 2016 23:45:18 -0400 (EDT)
-Subject: [PATCH net] net: mvneta: set real interrupt per packet for tx_done
-In-Reply-To: <1467771538-31811-1-git-send-email-mw@semihalf.com>
-References: <1467771538-31811-1-git-send-email-mw@semihalf.com>
-Message-ID: <20160708.234518.1265002080156810187.davem@davemloft.net>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Sat, 9 Jul 2016 11:44:47 +0800
+Subject: [PATCH v6 00/10] acpi, clocksource: add GTDT driver and GTDT
+ support in arm_arch_timer
+In-Reply-To: <20160708132201.GD3784@red-moon>
+References: <1467224153-22873-1-git-send-email-fu.wei@linaro.org>
+ <1890708.ZTyM2PUGdP@vostro.rjw.lan> <20160707134023.GA655@red-moon>
+ <1603704.EGiVTcCxLR@vostro.rjw.lan> <20160708132201.GD3784@red-moon>
+Message-ID: <21ec2b0d-cde9-f86a-c39a-0fba5d02fd03@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marcin Wojtas <mw@semihalf.com>
-Date: Wed,  6 Jul 2016 04:18:58 +0200
+On 2016/7/8 21:22, Lorenzo Pieralisi wrote:
+> On Thu, Jul 07, 2016 at 03:58:04PM +0200, Rafael J. Wysocki wrote:
+>
+> [...]
+>
+>>> Anyway let's avoid these petty arguments, I agree there must be some
+>>> sort of ARM64 ACPI maintainership for the reasons you mentioned above.
+>>
+>> To avoid confusion on who's going to push stuff to Linus, I can do
+>> that, but it must be clear whose ACKs are needed for that to happen.
+>> That may be one person or all of you, whatever you decide.
+>
+> I think the reasoning is the same, to avoid confusion and avoid stepping
+> on each other toes it is best to have a single gatekeeper (still
+> multiple maintainer entries to keep patches reviewed correctly), if no
+> one complains I will do that and a) provide ACKs (I will definitely
+> require and request Hanjun and Sudeep ones too appropriately on a per
+> patch basis) and b) send you pull requests.
 
-> From: Dmitri Epshtein <dima@marvell.com>
-> 
-> Commit aebea2ba0f74 ("net: mvneta: fix Tx interrupt delay") intended to
-> set coalescing threshold to a value guaranteeing interrupt generation
-> per each sent packet, so that buffers can be released with no delay.
-> 
-> In fact setting threshold to '1' was wrong, because it causes interrupt
-> every two packets. According to the documentation a reason behind it is
-> following - interrupt occurs once sent buffers counter reaches a value,
-> which is higher than one specified in MVNETA_TXQ_SIZE_REG(q). This
-> behavior was confirmed during tests. Also when testing the SoC working
-> as a NAS device, better performance was observed with int-per-packet,
-> as it strongly depends on the fact that all transmitted packets are
-> released immediately.
-> 
-> This commit enables NETA controller work in interrupt per sent packet mode
-> by setting coalescing threshold to 0.
-> 
-> Signed-off-by: Dmitri Epshtein <dima@marvell.com>
-> Signed-off-by: Marcin Wojtas <mw@semihalf.com>
-> Cc: <stable@vger.kernel.org> # v3.10+
-> Fixes aebea2ba0f74 ("net: mvneta: fix Tx interrupt delay")
+Fine to me.
 
-Applied, thanks.
+>
+> Having a maintainer per file would be farcical, I really do not
+
+Agree, but having three of us in maintainer entries in MAINTAINERS
+file will help the patches be reviewed correctly with more eyes.
+
+> expect that amount of traffic for drivers/acpi/arm64 therefore I
+> really doubt there is any risk of me slowing things down.
+>
+> Does this sound reasonable ? Comments/complaints welcome, please
+> manifest yourselves.
+
+Fair enough. What I'm concern most is land ACPI on ARM64 soundly,
+let's do that :)
+
+OK, let's back to this patch set, Fuwei already prepared a new version
+of patches [1] (moving acpi_gtdt.c to drivers/acpi/arm64/ and add a
+maintainer entries patch), shall we review and comment on this patch
+set for now, or just let Fuwei send out the new version?
+
+[1]: 
+https://git.linaro.org/people/fu.wei/linux.git/shortlog/refs/heads/topic-gtdt-wakeup-timer_upstream_v7_devel
+
+Thanks
+Hanjun
