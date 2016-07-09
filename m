@@ -1,52 +1,88 @@
-From: mitchelh@codeaurora.org (Mitchel Humpherys)
-Date: Fri,  8 Jul 2016 19:09:19 -0700
-Subject: [PATCH v2 6/6] dmaengine: pl330: Make sure microcode is
- privileged-executable
-In-Reply-To: <20160709020919.6760-1-mitchelh@codeaurora.org>
-References: <20160709020919.6760-1-mitchelh@codeaurora.org>
-Message-ID: <20160709020919.6760-7-mitchelh@codeaurora.org>
+From: riel@redhat.com (Rik van Riel)
+Date: Fri, 08 Jul 2016 22:44:03 -0400
+Subject: [PATCH 0/9] mm: Hardened usercopy
+In-Reply-To: <b113b487-acc6-24b8-d58c-425d3c884f4c@redhat.com>
+References: <1467843928-29351-1-git-send-email-keescook@chromium.org>
+ <b113b487-acc6-24b8-d58c-425d3c884f4c@redhat.com>
+Message-ID: <1468032243.13253.59.camel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PL330 can perform privileged instruction fetches.  This can result
-in SMMU permission faults on SMMUs that implement the ARMv8 VMSA, which
-specifies that mappings that are writeable at one execution level shall
-not be executable at any higher-privileged level.  Fix this by using the
-DMA_ATTR_PRIVILEGED_EXECUTABLE attribute, which will ensure that the
-microcode IOMMU mapping is not writeable.
+On Fri, 2016-07-08 at 19:22 -0700, Laura Abbott wrote:
+>?
+> Even with the SLUB fixup I'm still seeing this blow up on my arm64
+> system. This is a
+> Fedora rawhide kernel + the patches
+> 
+> [????0.666700] usercopy: kernel memory exposure attempt detected from
+> fffffc0008b4dd58 (<kernel text>) (8 bytes)
+> [????0.666720] CPU: 2 PID: 79 Comm: modprobe Tainted:
+> G????????W???????4.7.0-0.rc6.git1.1.hardenedusercopy.fc25.aarch64 #1
+> [????0.666733] Hardware name: AppliedMicro Mustang/Mustang, BIOS
+> 1.1.0 Nov 24 2015
+> [????0.666744] Call trace:
+> [????0.666756] [<fffffc0008088a20>] dump_backtrace+0x0/0x1e8
+> [????0.666765] [<fffffc0008088c2c>] show_stack+0x24/0x30
+> [????0.666775] [<fffffc0008455344>] dump_stack+0xa4/0xe0
+> [????0.666785] [<fffffc000828d874>] __check_object_size+0x6c/0x230
+> [????0.666795] [<fffffc00083a5748>] create_elf_tables+0x74/0x420
+> [????0.666805] [<fffffc00082fb1f0>] load_elf_binary+0x828/0xb70
+> [????0.666814] [<fffffc0008298b4c>] search_binary_handler+0xb4/0x240
+> [????0.666823] [<fffffc0008299864>] do_execveat_common+0x63c/0x950
+> [????0.666832] [<fffffc0008299bb4>] do_execve+0x3c/0x50
+> [????0.666841] [<fffffc00080e3720>]
+> call_usermodehelper_exec_async+0xe8/0x148
+> [????0.666850] [<fffffc0008084a80>] ret_from_fork+0x10/0x50
+> 
+> This happens on every call to execve. This seems to be the first
+> copy_to_user in
+> create_elf_tables. I didn't get a chance to debug and I'm going out
+> of town
+> all of next week so all I have is the report unfortunately. config
+> attached.
 
-Cc: Dan Williams <dan.j.williams@intel.com>
-Cc: Jassi Brar <jassi.brar@samsung.com>
-Signed-off-by: Mitchel Humpherys <mitchelh@codeaurora.org>
----
- drivers/dma/pl330.c | 7 +++++--
- 1 file changed, 5 insertions(+), 2 deletions(-)
+That's odd, this should be copying a piece of kernel data (not text)
+to userspace.
 
-diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
-index 372b4359da97..25bc49d47c45 100644
---- a/drivers/dma/pl330.c
-+++ b/drivers/dma/pl330.c
-@@ -1854,14 +1854,17 @@ static int dmac_alloc_resources(struct pl330_dmac *pl330)
- {
- 	int chans = pl330->pcfg.num_chan;
- 	int ret;
-+	DEFINE_DMA_ATTRS(attrs);
- 
-+	dma_set_attr(DMA_ATTR_PRIVILEGED_EXECUTABLE, &attrs);
- 	/*
- 	 * Alloc MicroCode buffer for 'chans' Channel threads.
- 	 * A channel's buffer offset is (Channel_Id * MCODE_BUFF_PERCHAN)
- 	 */
--	pl330->mcode_cpu = dma_alloc_coherent(pl330->ddma.dev,
-+	pl330->mcode_cpu = dma_alloc_attrs(pl330->ddma.dev,
- 				chans * pl330->mcbufsz,
--				&pl330->mcode_bus, GFP_KERNEL);
-+				&pl330->mcode_bus, GFP_KERNEL,
-+				&attrs);
- 	if (!pl330->mcode_cpu) {
- 		dev_err(pl330->ddma.dev, "%s:%d Can't allocate memory!\n",
- 			__func__, __LINE__);
--- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+from fs/binfmt_elf.c
+
+? ? ? ? const char *k_platform = ELF_PLATFORM;
+
+...
+? ? ? ? ? ? ? ? size_t len = strlen(k_platform) + 1;
+		
+? ? ? ? ? ? ? ? u_platform = (elf_addr_t __user *)STACK_ALLOC(p, len);
+????????????????if (__copy_to_user(u_platform, k_platform, len))
+????????????????????????return -EFAULT;
+
+from arch/arm/include/asm/elf.h:
+
+#define ELF_PLATFORM_SIZE 8
+#define ELF_PLATFORM????(elf_platform)
+
+extern char elf_platform[];
+
+from arch/arm/kernel/setup.c:
+
+char elf_platform[ELF_PLATFORM_SIZE];
+EXPORT_SYMBOL(elf_platform);
+
+...
+
+????????snprintf(elf_platform, ELF_PLATFORM_SIZE, "%s%c",
+?????????????????list->elf_name, ENDIANNESS);
+
+How does that end up in the .text section of the
+image, instead of in one of the various data sections?
+
+What kind of linker oddity is going on with ARM?
+
+--?		
+All Rights Reversed.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160708/488a1f5e/attachment.sig>
