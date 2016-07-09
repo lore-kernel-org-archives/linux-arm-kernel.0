@@ -1,59 +1,73 @@
-From: luisbg@osg.samsung.com (Luis de Bethencourt)
-Date: Sat, 09 Jul 2016 11:29:42 +0100
-Subject: [PATCH] media: s5p-mfc fix invalid memory access from
- s5p_mfc_release()
-In-Reply-To: <1468016965-10880-1-git-send-email-shuahkh@osg.samsung.com>
-References: <1468016965-10880-1-git-send-email-shuahkh@osg.samsung.com>
-Message-ID: <5780D216.9000604@osg.samsung.com>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Sat, 9 Jul 2016 20:38:06 +0800
+Subject: [arm64:for-next/core 32/34] arch/arm64/include/asm/vdso.h:30:36:
+ fatal error: generated/vdso-offsets.h: No such file or directory
+Message-ID: <201607092002.eGpxGqQ0%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/07/16 23:29, Shuah Khan wrote:
-> If s5p_mfc_release() runs after s5p_mfc_remove(), the former will access
-> invalid s5p_mfc_dev pointer saved in the s5p_mfc_ctx and runs into kernel
-> paging request errors.
-> 
-> Clear ctx dev pointer in s5p_mfc_remove() and change s5p_mfc_release() to
-> avoid work that requires ctx->dev.
-> 
-> odroid kernel: Unable to handle kernel paging request at virtual address
->     f17c1104
-> odroid kernel: pgd = ebca4000
-> odroid kernel: [f17c1104] *pgd=6e23d811, *pte=00000000, *ppte=00000000
-> odroid kernel: Internal error: Oops: 807 [#1] PREEMPT SMP ARM
-> odroid kernel: Modules linked in: cpufreq_userspace cpufreq_powersave
->     cpufreq_conservative s5p_mfc s5p_jpeg v4l2_mem2mem
->     videobuf2_dma_contig videobuf2_memops videobuf2_v4l2 videobuf2_core
->     v4l2_common videodev media
-> odroid kernel: Hardware name: SAMSUNG EXYNOS (Flattened Device Tree)
-> odroid kernel: task: c2241400 ti: e7018000 task.ti: e7018000
-> odroid kernel: PC is at s5p_mfc_reset+0x40/0x28c [s5p_mfc]
-> odroid kernel: LR is at s5p_mfc_reset+0x34/0x28c [s5p_mfc]
-> odroid kernel: pc : [<bf15bfbc>]    lr : [<bf15bfb0>] psr: 60010013
-> odroid kernel: [<bf15bfbc>] (s5p_mfc_reset [s5p_mfc]) from [<bf15c62c>]
->     (s5p_mfc_deinit_hw+0x14/0x3c [s5p_mfc])
-> odroid kernel: [<bf15c62c>] (s5p_mfc_deinit_hw [s5p_mfc]) from [<bf155958>]
->     (s5p_mfc_release+0xac/0x1c4 [s5p_mfc])
-> odroid kernel: [<bf155958>] (s5p_mfc_release [s5p_mfc]) from [<bf021344>]
->     (v4l2_release+0x38/0x74 [videodev])
-> odroid kernel: [<bf021344>] (v4l2_release [videodev]) from [<c01e4274>]
->     (__fput+0x80/0x1c8)
-> odroid kernel: [<c01e4274>] (__fput) from [<c0135c58>]
->     (task_work_run+0x94/0xc8)
-> odroid kernel: [<c0135c58>] (task_work_run) from [<c010a9d4>]
->     (do_work_pending+0x7c/0xa4)
-> odroid kernel: [<c010a9d4>] (do_work_pending) from [<c0107794>]
->     (slow_work_pending+0xc/0x20)
-> odroid kernel: Code: eb3edacc e5953078 e3a06000 e2833c11 (e5836004)
-> 
-> Signed-off-by: Shuah Khan <shuahkh@osg.samsung.com>
-> ---
+tree:   https://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git for-next/core
+head:   16c11325cc44f0614a45e584d439e195059c3f5a
+commit: 90f777beb788d08300f4a1482cb4fd37a401b472 [32/34] arm64: Fix vdso-offsets.h dependency
+config: arm64-alldefconfig (attached as .config)
+compiler: aarch64-linux-gnu-gcc (Debian 5.3.1-8) 5.3.1 20160205
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout 90f777beb788d08300f4a1482cb4fd37a401b472
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm64 
 
-Thanks Shuah.
+Note: the arm64/for-next/core HEAD 16c11325cc44f0614a45e584d439e195059c3f5a builds fine.
+      It only hurts bisectibility.
 
-I've been following this while playing with an ODROID XU4 to fix some issues
-in v4l2 usage in GStreamer. So I offered Shuah to test this for her.
+All errors (new ones prefixed by >>):
 
-Looks good :)
+   In file included from arch/arm64/kernel/signal.c:36:0:
+>> arch/arm64/include/asm/vdso.h:30:36: fatal error: generated/vdso-offsets.h: No such file or directory
+   compilation terminated.
 
-Tested-by: Luis de Bethencourt <luisbg@osg.samsung.com>
+vim +30 arch/arm64/include/asm/vdso.h
+
+9031fefd Will Deacon 2012-03-05  14   * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+9031fefd Will Deacon 2012-03-05  15   */
+9031fefd Will Deacon 2012-03-05  16  #ifndef __ASM_VDSO_H
+9031fefd Will Deacon 2012-03-05  17  #define __ASM_VDSO_H
+9031fefd Will Deacon 2012-03-05  18  
+9031fefd Will Deacon 2012-03-05  19  #ifdef __KERNEL__
+9031fefd Will Deacon 2012-03-05  20  
+9031fefd Will Deacon 2012-03-05  21  /*
+9031fefd Will Deacon 2012-03-05  22   * Default link address for the vDSO.
+9031fefd Will Deacon 2012-03-05  23   * Since we randomise the VDSO mapping, there's little point in trying
+9031fefd Will Deacon 2012-03-05  24   * to prelink this.
+9031fefd Will Deacon 2012-03-05  25   */
+9031fefd Will Deacon 2012-03-05  26  #define VDSO_LBASE	0x0
+9031fefd Will Deacon 2012-03-05  27  
+9031fefd Will Deacon 2012-03-05  28  #ifndef __ASSEMBLY__
+9031fefd Will Deacon 2012-03-05  29  
+9031fefd Will Deacon 2012-03-05 @30  #include <generated/vdso-offsets.h>
+9031fefd Will Deacon 2012-03-05  31  
+9031fefd Will Deacon 2012-03-05  32  #define VDSO_SYMBOL(base, name)						   \
+9031fefd Will Deacon 2012-03-05  33  ({									   \
+9031fefd Will Deacon 2012-03-05  34  	(void *)(vdso_offset_##name - VDSO_LBASE + (unsigned long)(base)); \
+9031fefd Will Deacon 2012-03-05  35  })
+9031fefd Will Deacon 2012-03-05  36  
+9031fefd Will Deacon 2012-03-05  37  #endif /* !__ASSEMBLY__ */
+9031fefd Will Deacon 2012-03-05  38  
+
+:::::: The code at line 30 was first introduced by commit
+:::::: 9031fefde6f2ac1d1e5e0f8f4b22db4a091229bb arm64: VDSO support
+
+:::::: TO: Will Deacon <will.deacon@arm.com>
+:::::: CC: Catalin Marinas <catalin.marinas@arm.com>
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 8248 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160709/09c733db/attachment-0001.obj>
