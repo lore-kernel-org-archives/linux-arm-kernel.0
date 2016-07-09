@@ -1,70 +1,58 @@
 From: mitchelh@codeaurora.org (Mitchel Humpherys)
-Date: Fri,  8 Jul 2016 19:09:13 -0700
-Subject: [PATCH v2 0/6] Add support for privileged mappings
-Message-ID: <20160709020919.6760-1-mitchelh@codeaurora.org>
+Date: Fri,  8 Jul 2016 19:09:17 -0700
+Subject: [PATCH v2 4/6] common: DMA-mapping: add
+ DMA_ATTR_PRIVILEGED_EXECUTABLE attribute
+In-Reply-To: <20160709020919.6760-1-mitchelh@codeaurora.org>
+References: <20160709020919.6760-1-mitchelh@codeaurora.org>
+Message-ID: <20160709020919.6760-5-mitchelh@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following patch to the ARM SMMU driver:
+This patch adds the DMA_ATTR_PRIVILEGED_EXECUTABLE attribute to the
+DMA-mapping subsystem.
 
-    commit d346180e70b91b3d5a1ae7e5603e65593d4622bc
-    Author: Robin Murphy <robin.murphy@arm.com>
-    Date:   Tue Jan 26 18:06:34 2016 +0000
-    
-        iommu/arm-smmu: Treat all device transactions as unprivileged
+Some architectures require that writable mappings also be non-executable at
+lesser-privileged levels of execution.  This attribute is used to indicate
+to the DMA-mapping subsystem that it should do whatever is necessary to
+ensure that the buffer is executable at an elevated privilege level (by
+making it read-only at the lesser-privileged levels, for example).
 
-started forcing all SMMU transactions to come through as "unprivileged".
-The rationale given was that:
+Cc: linux-doc at vger.kernel.org
+Signed-off-by: Mitchel Humpherys <mitchelh@codeaurora.org>
+---
+ Documentation/DMA-attributes.txt | 9 +++++++++
+ include/linux/dma-attrs.h        | 1 +
+ 2 files changed, 10 insertions(+)
 
-  (1) There is no way in the IOMMU API to even request privileged mappings.
-
-  (2) It's difficult to implement a DMA mapper that correctly models the
-      ARM VMSAv8 behavior of unprivileged-writeable =>
-      privileged-execute-never.
-
-This series rectifies (1) by introducing an IOMMU API for privileged
-mappings and implements it in io-pgtable-arm.
-
-This series rectifies (2) by introducing a new dma attribute
-(DMA_ATTR_PRIVILEGED_EXECUTABLE) for users of the DMA API that need
-privileged, executable mappings, and implements it in the arm64 IOMMU DMA
-mapper.  The one known user (pl330.c) is converted over to the new
-attribute.
-
-Jordan and Jeremy can provide more info on the use case if needed, but the
-high level is that it's a security feature to prevent attacks such as [1].
-
-[1] https://github.com/robclark/kilroy
-
-Changelog:
-
-  v1..v2
-
-    - Added a new DMA attribute to make executable privileged mappings
-      work, and use that in the pl330 driver (suggested by Will).
-
-
-Jeremy Gebben (1):
-  iommu/io-pgtable-arm: add support for the IOMMU_PRIV flag
-
-Mitchel Humpherys (5):
-  iommu: add IOMMU_PRIV attribute
-  Revert "iommu/arm-smmu: Treat all device transactions as unprivileged"
-  common: DMA-mapping: add DMA_ATTR_PRIVILEGED_EXECUTABLE attribute
-  arm64/dma-mapping: Implement DMA_ATTR_PRIVILEGED_EXECUTABLE
-  dmaengine: pl330: Make sure microcode is privileged-executable
-
- Documentation/DMA-attributes.txt |  9 +++++++++
- arch/arm64/mm/dma-mapping.c      |  6 +++---
- drivers/dma/pl330.c              |  7 +++++--
- drivers/iommu/arm-smmu.c         |  5 +----
- drivers/iommu/dma-iommu.c        | 15 +++++++++++----
- drivers/iommu/io-pgtable-arm.c   | 16 +++++++++++-----
- include/linux/dma-attrs.h        |  1 +
- include/linux/dma-iommu.h        |  3 ++-
- include/linux/iommu.h            |  1 +
- 9 files changed, 44 insertions(+), 19 deletions(-)
-
+diff --git a/Documentation/DMA-attributes.txt b/Documentation/DMA-attributes.txt
+index e8cf9cf873b3..6a22d4307008 100644
+--- a/Documentation/DMA-attributes.txt
++++ b/Documentation/DMA-attributes.txt
+@@ -126,3 +126,12 @@ means that we won't try quite as hard to get them.
+ 
+ NOTE: At the moment DMA_ATTR_ALLOC_SINGLE_PAGES is only implemented on ARM,
+ though ARM64 patches will likely be posted soon.
++
++DMA_ATTR_PRIVILEGED_EXECUTABLE
++------------------------------
++
++Some architectures require that writable mappings also be non-executable at
++lesser-privileged levels of execution.  This attribute is used to indicate
++to the DMA-mapping subsystem that it should do whatever is necessary to
++ensure that the buffer is executable at an elevated privilege level (by
++making it read-only at the lesser-privileged levels, for example).
+diff --git a/include/linux/dma-attrs.h b/include/linux/dma-attrs.h
+index 5246239a4953..8cf4dff6185b 100644
+--- a/include/linux/dma-attrs.h
++++ b/include/linux/dma-attrs.h
+@@ -19,6 +19,7 @@ enum dma_attr {
+ 	DMA_ATTR_SKIP_CPU_SYNC,
+ 	DMA_ATTR_FORCE_CONTIGUOUS,
+ 	DMA_ATTR_ALLOC_SINGLE_PAGES,
++	DMA_ATTR_PRIVILEGED_EXECUTABLE,
+ 	DMA_ATTR_MAX,
+ };
+ 
 -- 
 Qualcomm Innovation Center, Inc.
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
