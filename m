@@ -1,61 +1,59 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Sat, 9 Jul 2016 11:47:18 +0200
-Subject: [PATCH v3 12/14] regulator: pwm: Retrieve correct voltage
-In-Reply-To: <20160708154302.GC1151@ulmo.ba.sec>
-References: <1465895602-31008-1-git-send-email-boris.brezillon@free-electrons.com>
- <1465895602-31008-13-git-send-email-boris.brezillon@free-electrons.com>
- <20160708154302.GC1151@ulmo.ba.sec>
-Message-ID: <20160709094718.GB6247@sirena.org.uk>
+From: luisbg@osg.samsung.com (Luis de Bethencourt)
+Date: Sat, 09 Jul 2016 11:29:42 +0100
+Subject: [PATCH] media: s5p-mfc fix invalid memory access from
+ s5p_mfc_release()
+In-Reply-To: <1468016965-10880-1-git-send-email-shuahkh@osg.samsung.com>
+References: <1468016965-10880-1-git-send-email-shuahkh@osg.samsung.com>
+Message-ID: <5780D216.9000604@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 08, 2016 at 05:43:02PM +0200, Thierry Reding wrote:
+On 08/07/16 23:29, Shuah Khan wrote:
+> If s5p_mfc_release() runs after s5p_mfc_remove(), the former will access
+> invalid s5p_mfc_dev pointer saved in the s5p_mfc_ctx and runs into kernel
+> paging request errors.
+> 
+> Clear ctx dev pointer in s5p_mfc_remove() and change s5p_mfc_release() to
+> avoid work that requires ctx->dev.
+> 
+> odroid kernel: Unable to handle kernel paging request at virtual address
+>     f17c1104
+> odroid kernel: pgd = ebca4000
+> odroid kernel: [f17c1104] *pgd=6e23d811, *pte=00000000, *ppte=00000000
+> odroid kernel: Internal error: Oops: 807 [#1] PREEMPT SMP ARM
+> odroid kernel: Modules linked in: cpufreq_userspace cpufreq_powersave
+>     cpufreq_conservative s5p_mfc s5p_jpeg v4l2_mem2mem
+>     videobuf2_dma_contig videobuf2_memops videobuf2_v4l2 videobuf2_core
+>     v4l2_common videodev media
+> odroid kernel: Hardware name: SAMSUNG EXYNOS (Flattened Device Tree)
+> odroid kernel: task: c2241400 ti: e7018000 task.ti: e7018000
+> odroid kernel: PC is at s5p_mfc_reset+0x40/0x28c [s5p_mfc]
+> odroid kernel: LR is at s5p_mfc_reset+0x34/0x28c [s5p_mfc]
+> odroid kernel: pc : [<bf15bfbc>]    lr : [<bf15bfb0>] psr: 60010013
+> odroid kernel: [<bf15bfbc>] (s5p_mfc_reset [s5p_mfc]) from [<bf15c62c>]
+>     (s5p_mfc_deinit_hw+0x14/0x3c [s5p_mfc])
+> odroid kernel: [<bf15c62c>] (s5p_mfc_deinit_hw [s5p_mfc]) from [<bf155958>]
+>     (s5p_mfc_release+0xac/0x1c4 [s5p_mfc])
+> odroid kernel: [<bf155958>] (s5p_mfc_release [s5p_mfc]) from [<bf021344>]
+>     (v4l2_release+0x38/0x74 [videodev])
+> odroid kernel: [<bf021344>] (v4l2_release [videodev]) from [<c01e4274>]
+>     (__fput+0x80/0x1c8)
+> odroid kernel: [<c01e4274>] (__fput) from [<c0135c58>]
+>     (task_work_run+0x94/0xc8)
+> odroid kernel: [<c0135c58>] (task_work_run) from [<c010a9d4>]
+>     (do_work_pending+0x7c/0xa4)
+> odroid kernel: [<c010a9d4>] (do_work_pending) from [<c0107794>]
+>     (slow_work_pending+0xc/0x20)
+> odroid kernel: Code: eb3edacc e5953078 e3a06000 e2833c11 (e5836004)
+> 
+> Signed-off-by: Shuah Khan <shuahkh@osg.samsung.com>
+> ---
 
-> Mark, do you want me to provide a stable branch with the PWM regulator
-> patches and resolve that conflict in your tree? Or would you rather take
-> the whole set based on a stable branch from the PWM tree? Or maybe yet
-> another possibility would be to base the PWM tree on a stable branch
-> from the regulator tree containing the above commit.
+Thanks Shuah.
 
-Probably easiest to use this signed tag and resolve it in your tree:
+I've been following this while playing with an ODROID XU4 to fix some issues
+in v4l2 usage in GStreamer. So I offered Shuah to test this for her.
 
-The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
+Looks good :)
 
-  Linux 4.7-rc1 (2016-05-29 09:29:24 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/broonie/regulator.git tags/pwm-modernization
-
-for you to fetch changes up to c2588393e6315ab68207323d37d2a73713d6bc81:
-
-  regulator: pwm: Fix regulator ramp delay for continuous mode (2016-07-07 11:45:06 +0200)
-
-----------------------------------------------------------------
-regulator: Provide a branch for moderninzation of the PWM code
-
-There's a new, improved PWM API which allows a lot of improvements in
-the PWM regulator driver.  Since the bulk of the changes are in the PWM
-API this is being managed in the PWM tree, merge pending regulator API
-changes to allow this to be resolved more easily.
-
-----------------------------------------------------------------
-Alexandre Courbot (1):
-      regulator: pwm: Support for enable GPIO
-
-Boris Brezillon (1):
-      regulator: pwm: Drop unneeded pwm_enable() call
-
-Douglas Anderson (1):
-      regulator: pwm: Fix regulator ramp delay for continuous mode
-
- .../bindings/regulator/pwm-regulator.txt           |  7 +++-
- drivers/regulator/pwm-regulator.c                  | 40 ++++++++++++++++++----
- 2 files changed, 39 insertions(+), 8 deletions(-)
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160709/44648b05/attachment.sig>
+Tested-by: Luis de Bethencourt <luisbg@osg.samsung.com>
