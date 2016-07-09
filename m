@@ -1,69 +1,132 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sat, 9 Jul 2016 10:18:27 +0200
-Subject: [PATCH 8/9] ARM: dts: sun7i: bananapi-m1-plus: Add PMIC
- regulators and OPPs for cpufreq
-In-Reply-To: <1467796250-22010-9-git-send-email-wens@csie.org>
-References: <1467796250-22010-1-git-send-email-wens@csie.org>
- <1467796250-22010-9-git-send-email-wens@csie.org>
-Message-ID: <20160709081827.GF4522@lukather>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Sat, 9 Jul 2016 10:25:00 +0200
+Subject: [PATCH 0/9] mm: Hardened usercopy
+In-Reply-To: <b113b487-acc6-24b8-d58c-425d3c884f4c@redhat.com>
+References: <1467843928-29351-1-git-send-email-keescook@chromium.org>
+ <b113b487-acc6-24b8-d58c-425d3c884f4c@redhat.com>
+Message-ID: <CAKv+Gu_F03ncqT2wWFte2bFWQ7tSruL0ZaxTBLT9_NEs-1SioQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 9 July 2016 at 04:22, Laura Abbott <labbott@redhat.com> wrote:
+> On 07/06/2016 03:25 PM, Kees Cook wrote:
+>>
+>> Hi,
+>>
+>> This is a start of the mainline port of PAX_USERCOPY[1]. After I started
+>> writing tests (now in lkdtm in -next) for Casey's earlier port[2], I
+>> kept tweaking things further and further until I ended up with a whole
+>> new patch series. To that end, I took Rik's feedback and made a number
+>> of other changes and clean-ups as well.
+>>
+>> Based on my understanding, PAX_USERCOPY was designed to catch a few
+>> classes of flaws around the use of copy_to_user()/copy_from_user(). These
+>> changes don't touch get_user() and put_user(), since these operate on
+>> constant sized lengths, and tend to be much less vulnerable. There
+>> are effectively three distinct protections in the whole series,
+>> each of which I've given a separate CONFIG, though this patch set is
+>> only the first of the three intended protections. (Generally speaking,
+>> PAX_USERCOPY covers what I'm calling CONFIG_HARDENED_USERCOPY (this) and
+>> CONFIG_HARDENED_USERCOPY_WHITELIST (future), and PAX_USERCOPY_SLABS covers
+>> CONFIG_HARDENED_USERCOPY_SPLIT_KMALLOC (future).)
+>>
+>> This series, which adds CONFIG_HARDENED_USERCOPY, checks that objects
+>> being copied to/from userspace meet certain criteria:
+>> - if address is a heap object, the size must not exceed the object's
+>>   allocated size. (This will catch all kinds of heap overflow flaws.)
+>> - if address range is in the current process stack, it must be within the
+>>   current stack frame (if such checking is possible) or at least entirely
+>>   within the current process's stack. (This could catch large lengths that
+>>   would have extended beyond the current process stack, or overflows if
+>>   their length extends back into the original stack.)
+>> - if the address range is part of kernel data, rodata, or bss, allow it.
+>> - if address range is page-allocated, that it doesn't span multiple
+>>   allocations.
+>> - if address is within the kernel text, reject it.
+>> - everything else is accepted
+>>
+>> The patches in the series are:
+>> - The core copy_to/from_user() checks, without the slab object checks:
+>>         1- mm: Hardened usercopy
+>> - Per-arch enablement of the protection:
+>>         2- x86/uaccess: Enable hardened usercopy
+>>         3- ARM: uaccess: Enable hardened usercopy
+>>         4- arm64/uaccess: Enable hardened usercopy
+>>         5- ia64/uaccess: Enable hardened usercopy
+>>         6- powerpc/uaccess: Enable hardened usercopy
+>>         7- sparc/uaccess: Enable hardened usercopy
+>> - The heap allocator implementation of object size checking:
+>>         8- mm: SLAB hardened usercopy support
+>>         9- mm: SLUB hardened usercopy support
+>>
+>> Some notes:
+>>
+>> - This is expected to apply on top of -next which contains fixes for the
+>>   position of _etext on both arm and arm64.
+>>
+>> - I couldn't detect a measurable performance change with these features
+>>   enabled. Kernel build times were unchanged, hackbench was unchanged,
+>>   etc. I think we could flip this to "on by default" at some point.
+>>
+>> - The SLOB support extracted from grsecurity seems entirely broken. I
+>>   have no idea what's going on there, I spent my time testing SLAB and
+>>   SLUB. Having someone else look at SLOB would be nice, but this series
+>>   doesn't depend on it.
+>>
+>> Additional features that would be nice, but aren't blocking this series:
+>>
+>> - Needs more architecture support for stack frame checking (only x86 now).
+>>
+>>
+>
+> Even with the SLUB fixup I'm still seeing this blow up on my arm64 system.
+> This is a
+> Fedora rawhide kernel + the patches
+>
+> [ 0.666700] usercopy: kernel memory exposure attempt detected from
+> fffffc0008b4dd58 (<kernel text>) (8 bytes)
+> [ 0.666720] CPU: 2 PID: 79 Comm: modprobe Tainted: G        W
+> 4.7.0-0.rc6.git1.1.hardenedusercopy.fc25.aarch64 #1
+> [ 0.666733] Hardware name: AppliedMicro Mustang/Mustang, BIOS 1.1.0 Nov 24
+> 2015
+> [ 0.666744] Call trace:
+> [ 0.666756] [<fffffc0008088a20>] dump_backtrace+0x0/0x1e8
+> [ 0.666765] [<fffffc0008088c2c>] show_stack+0x24/0x30
+> [ 0.666775] [<fffffc0008455344>] dump_stack+0xa4/0xe0
+> [ 0.666785] [<fffffc000828d874>] __check_object_size+0x6c/0x230
+> [ 0.666795] [<fffffc00083a5748>] create_elf_tables+0x74/0x420
+> [ 0.666805] [<fffffc00082fb1f0>] load_elf_binary+0x828/0xb70
+> [ 0.666814] [<fffffc0008298b4c>] search_binary_handler+0xb4/0x240
+> [ 0.666823] [<fffffc0008299864>] do_execveat_common+0x63c/0x950
+> [ 0.666832] [<fffffc0008299bb4>] do_execve+0x3c/0x50
+> [ 0.666841] [<fffffc00080e3720>] call_usermodehelper_exec_async+0xe8/0x148
+> [ 0.666850] [<fffffc0008084a80>] ret_from_fork+0x10/0x50
+>
+> This happens on every call to execve. This seems to be the first
+> copy_to_user in
+> create_elf_tables. I didn't get a chance to debug and I'm going out of town
+> all of next week so all I have is the report unfortunately. config attached.
+>
 
-On Wed, Jul 06, 2016 at 05:10:49PM +0800, Chen-Yu Tsai wrote:
-> The Bananapi M1+, like other Allwinner A20 based boards, uses the AXP209
-> PMIC to supply its power. The vendor FEX file's DVFS table suggests the
-> board's CPU power rail has a voltage drop of 25 ~ 50 mV.
-> 
-> Add the PMIC regulator nodes and copy the DVFS table from the FEX file.
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> ---
->  arch/arm/boot/dts/sun7i-a20-bananapi-m1-plus.dts | 48 ++++++++++++++++++++++--
->  1 file changed, 44 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/sun7i-a20-bananapi-m1-plus.dts b/arch/arm/boot/dts/sun7i-a20-bananapi-m1-plus.dts
-> index ba5bca0fe997..7bb418bd1b6e 100644
-> --- a/arch/arm/boot/dts/sun7i-a20-bananapi-m1-plus.dts
-> +++ b/arch/arm/boot/dts/sun7i-a20-bananapi-m1-plus.dts
-> @@ -105,6 +105,22 @@
->  	status = "okay";
->  };
->  
-> +&cpu0 {
-> +	cpu-supply = <&reg_dcdc2>;
-> +
-> +	/* The custom DVFS table suggests a voltage drop of 25 ~ 50 mV */
-> +	operating-points = <
-> +		/* kHz    uV */
-> +		1080000	1450000
-> +		912000	1425000
-> +		864000	1350000
-> +		720000	1250000
-> +		528000	1150000
-> +		312000	1100000
-> +		144000	1050000
-> +		>;
-> +};
-> +
+This is a known issue, and a fix is already queued for v4.8 in the arm64 tree:
 
-We've always tried to not use all the non-sense OPPs coming from the
-FEX files. Have you experienced any issues with the default ones?
+9fdc14c55c arm64: mm: fix location of _etext [0]
 
-The other patches have been queued either for 4.8 as fixes, or 4.9.
+which moves _etext up in the linker script so that it does not cover .rodata
 
-Thanks!
-Maxime
+ARM was suffering from the same problem, and Kees proposed a fix for
+it. I don't know what the status of that patch is, though.
+
+Note that on arm64, we have
+
+  #define ELF_PLATFORM            ("aarch64")
+
+which explains why k_platform points into .rodata in this case. On
+ARM, it points to a writable string (as the code quoted by Rik shows),
+so there it will likely explode elsewhere without the linker script
+fix.
+
+[0] https://git.kernel.org/cgit/linux/kernel/git/arm64/linux.git/commit/?h=for-next/core&id=9fdc14c55c
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160709/476f1ea7/attachment.sig>
+Ard.
