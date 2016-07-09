@@ -1,58 +1,52 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Sat, 9 Jul 2016 11:44:47 +0800
-Subject: [PATCH v6 00/10] acpi, clocksource: add GTDT driver and GTDT
- support in arm_arch_timer
-In-Reply-To: <20160708132201.GD3784@red-moon>
-References: <1467224153-22873-1-git-send-email-fu.wei@linaro.org>
- <1890708.ZTyM2PUGdP@vostro.rjw.lan> <20160707134023.GA655@red-moon>
- <1603704.EGiVTcCxLR@vostro.rjw.lan> <20160708132201.GD3784@red-moon>
-Message-ID: <21ec2b0d-cde9-f86a-c39a-0fba5d02fd03@linaro.org>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Sat, 9 Jul 2016 11:53:06 +0800
+Subject: [PATCH 05/15] ARM: dts: sun5i: reference-design-tablet: Remove
+ mention of q8
+In-Reply-To: <1467993956-19535-6-git-send-email-hdegoede@redhat.com>
+References: <1467993956-19535-1-git-send-email-hdegoede@redhat.com>
+ <1467993956-19535-6-git-send-email-hdegoede@redhat.com>
+Message-ID: <CAGb2v67S9s5PifX4JOjp6DK57Q3aVRrKMdf7y75vna2rdrASFA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016/7/8 21:22, Lorenzo Pieralisi wrote:
-> On Thu, Jul 07, 2016 at 03:58:04PM +0200, Rafael J. Wysocki wrote:
+On Sat, Jul 9, 2016 at 12:05 AM, Hans de Goede <hdegoede@redhat.com> wrote:
+> Remove all mention of q8 from sun5i-reference-design-tablet.dtsi.
 >
-> [...]
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> ---
+>  arch/arm/boot/dts/sun5i-reference-design-tablet.dtsi | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 >
->>> Anyway let's avoid these petty arguments, I agree there must be some
->>> sort of ARM64 ACPI maintainership for the reasons you mentioned above.
->>
->> To avoid confusion on who's going to push stuff to Linus, I can do
->> that, but it must be clear whose ACKs are needed for that to happen.
->> That may be one person or all of you, whatever you decide.
+> diff --git a/arch/arm/boot/dts/sun5i-reference-design-tablet.dtsi b/arch/arm/boot/dts/sun5i-reference-design-tablet.dtsi
+> index e78452c..20cc940 100644
+> --- a/arch/arm/boot/dts/sun5i-reference-design-tablet.dtsi
+> +++ b/arch/arm/boot/dts/sun5i-reference-design-tablet.dtsi
+> @@ -98,7 +98,7 @@
 >
-> I think the reasoning is the same, to avoid confusion and avoid stepping
-> on each other toes it is best to have a single gatekeeper (still
-> multiple maintainer entries to keep patches reviewed correctly), if no
-> one complains I will do that and a) provide ACKs (I will definitely
-> require and request Hanjun and Sudeep ones too appropriately on a per
-> patch basis) and b) send you pull requests.
-
-Fine to me.
-
+>  &mmc0 {
+>         pinctrl-names = "default";
+> -       pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_q8>;
+> +       pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin>;
+>         vmmc-supply = <&reg_vcc3v0>;
+>         bus-width = <4>;
+>         cd-gpios = <&pio 6 0 GPIO_ACTIVE_HIGH>; /* PG0 */
+> @@ -118,7 +118,7 @@
+>                 allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+>         };
 >
-> Having a maintainer per file would be farcical, I really do not
+> -       mmc0_cd_pin_q8: mmc0_cd_pin at 0 {
+> +       mmc0_cd_pin: mmc0_cd_pin at 0 {
 
-Agree, but having three of us in maintainer entries in MAINTAINERS
-file will help the patches be reviewed correctly with more eyes.
+We could name this mmc0_cd_pin_reference_design and put it in
+sun5i-a13.dtsi. We already do this for A10/A20.
 
-> expect that amount of traffic for drivers/acpi/arm64 therefore I
-> really doubt there is any risk of me slowing things down.
+This works equally well though.
+
+Acked-by: Chen-Yu Tsai <wens@csie.org>
+
+>                 allwinner,pins = "PG0";
+>                 allwinner,function = "gpio_in";
+>                 allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+> --
+> 2.7.4
 >
-> Does this sound reasonable ? Comments/complaints welcome, please
-> manifest yourselves.
-
-Fair enough. What I'm concern most is land ACPI on ARM64 soundly,
-let's do that :)
-
-OK, let's back to this patch set, Fuwei already prepared a new version
-of patches [1] (moving acpi_gtdt.c to drivers/acpi/arm64/ and add a
-maintainer entries patch), shall we review and comment on this patch
-set for now, or just let Fuwei send out the new version?
-
-[1]: 
-https://git.linaro.org/people/fu.wei/linux.git/shortlog/refs/heads/topic-gtdt-wakeup-timer_upstream_v7_devel
-
-Thanks
-Hanjun
