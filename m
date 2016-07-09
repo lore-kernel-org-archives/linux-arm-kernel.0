@@ -1,58 +1,46 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 21 Jul 2016 11:50:42 +0100
-Subject: [PATCH v1 3/4] arm64: Add arm64 kexec support
-In-Reply-To: <20160721103120.GB20559@leverpostej>
-References: <cover.1468970114.git.geoff@infradead.org>
- <9ed513fd44a19b2f49b4da99477cedfff7341bf0.1468970114.git.geoff@infradead.org>
- <20160720153859.GG24691@leverpostej> <1469042361.2977.90.camel@infradead.org>
- <20160721103120.GB20559@leverpostej>
-Message-ID: <5790A902.6070601@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 09 Jul 2016 22:17:06 +0200
+Subject: [PATCH 4/6] irqchip: add irqchip driver for nuc900
+In-Reply-To: <57806E9F.3020407@iommu.org>
+References: <1466851042-22239-1-git-send-email-vw@iommu.org>
+ <8706947.5rzUDVsB2F@wuerfel> <57806E9F.3020407@iommu.org>
+Message-ID: <7701071.Nr6sCmDkjL@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/07/16 11:31, Mark Rutland wrote:
-[...]
->>>> +
->>>> +> > 	> > if (*p == 0)
->>>> +> > 	> > 	> > return 0;
->>>> +
->>>> +> > 	> > errno = 0;
->>>> +
->>>> +> > 	> > v = strtoull(p, NULL, 0);
->>>> +
->>>> +> > 	> > if (errno)
->>>> +> > 	> > 	> > return 0;
->>>> +
->>>> +> > 	> > return v;
->>>> +}
->>>
->>> It looks like the purgatory code expects angel SWI as the earlycon,
->>
->> Maybe you saw the debug_brk macro in entry.S?  I should remove
->> that and just loop.
+On Saturday, July 9, 2016 11:25:19 AM CEST Wan Zongshun wrote:
+> On 2016?06?29? 23:27, Arnd Bergmann wrote:
+> > On Saturday, June 25, 2016 6:37:20 PM CEST Wan Zongshun wrote:
+> >> +#define IRQ_WDT             W90X900_IRQ(1)
+> >> +#define IRQ_WWDT    W90X900_IRQ(2)
+> >> +#define IRQ_LVD             W90X900_IRQ(3)
+> >> +#define IRQ_EXT0    W90X900_IRQ(4)
+> >> +#define IRQ_EXT1    W90X900_IRQ(5)
+> >> +#define IRQ_EXT2    W90X900_IRQ(6)
+> >> +#define IRQ_EXT3    W90X900_IRQ(7)
+> >> +#define IRQ_EXT4    W90X900_IRQ(8)
+> >> +#define IRQ_EXT5    W90X900_IRQ(9)
+> >> +#define IRQ_EXT6    W90X900_IRQ(10)
+> >
+> > I'd suggest dropping the list, the contents are now in the dts.
 > 
-> Ah, sorry. For some reason I got that confused with the sink code. My
-> bad.
-> 
-> Now I see that's assuming an 8-bit MMIO register.
-> 
->>> whereas many other earlycons exist (with pl011 being extremely popular).
->>> Regardless, if we assume a particular UART type, we should explicitly
->>> verify that here. Otherwise the purgatory code will likely bring down
->>> the system, and it will be very painful to debug.
->>>
->>> Please explicitly check for the supported earlycon name.
->>
->> Purgatory just writes bytes to the address given.  Are there
->> UARTs that don't have TX as the first port?
-> 
-> I'm not sure, but it's certainly possible. The generic earlycon binding
-> doesn't guarantee that the first address is a TX register. Even if they
-> don't exist today, they could in a month's time, so I don't think we
-> should assume anything.
+> Arnd, I will drop this file later, since old w90x900 plat still need it.
 
-The Exynos UART (drivers/tty/serial/samsung.c) is one which comes to
-mind as definitely existing, and on arm64 systems to boot. The TX
-register is at offset 0x20 there.
+Sure.
 
-Robin.
+> but I will remove the Macros related to nuc970 and avoid nuc970 
+> interrupt using those Macro.
+> 
+> But I still need hack this irqs.h like below, since here NR_IRQS defined 
+> and it is need for nuc970 irqchip driver.
+> 
+> #if !defined(CONFIG_SOC_NUC900)
+> #define NR_IRQS         (IRQ_ADC+1)
+> #else
+> #define NR_IRQS         62
+> #endif
+
+Have you considered using CONFIG_SPARSE_IRQ? That would avoid the need
+for setting NR_IRQS entirely, but may also require more work elsewhere.
+
+	Arnd
