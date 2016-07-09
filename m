@@ -1,47 +1,67 @@
-From: appana.durga.rao@xilinx.com (Kedareswara rao Appana)
-Date: Sat, 9 Jul 2016 14:09:48 +0530
-Subject: [PATCH] dmaengine: xilinx: Fix race condition in axi dma cyclic dma
- mode
-Message-ID: <1468053588-18357-1-git-send-email-appanad@xilinx.com>
+From: duwe@lst.de (Torsten Duwe)
+Date: Sat, 9 Jul 2016 11:06:32 +0200
+Subject: [PATCH v2 1/2] arm64: implement FTRACE_WITH_REGS
+In-Reply-To: <20160708170808.1ab70ce3@gandalf.local.home>
+References: <20160627151500.2247A68D20@newverein.lst.de>
+ <20160627151717.BD25468D26@newverein.lst.de>
+ <20160708145800.GE3556@pathway.suse.cz>
+ <20160708150709.GA8979@lst.de>
+ <20160708152421.GG3556@pathway.suse.cz>
+ <20160708154824.ikq45dgk2auigqn7@treble>
+ <20160708115710.5c657b5f@gandalf.local.home>
+ <20160708202455.GA4580@lst.de>
+ <20160708170808.1ab70ce3@gandalf.local.home>
+Message-ID: <20160709090632.GA2598@lst.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In cyclic DMA mode need to link the tail bd segment
-with the head bd segment to process bd's in cyclic.
+On Fri, Jul 08, 2016 at 05:08:08PM -0400, Steven Rostedt wrote:
+> On Fri, 8 Jul 2016 22:24:55 +0200
+> Torsten Duwe <duwe@lst.de> wrote:
+> 
+> > On Fri, Jul 08, 2016 at 11:57:10AM -0400, Steven Rostedt wrote:
+> > > On Fri, 8 Jul 2016 10:48:24 -0500
+> > > Josh Poimboeuf <jpoimboe@redhat.com> wrote:  
+> > > > 
+> > > > Here, with -fprolog-pad, it's already a nop, so no change is needed.
+> > > >   
+> > 
+> > Yes, exactly.
+> > 
+> > > That's what I was thinking. But as I stated in another email (probably
+> > > in the air when you wrote this), the call to ftrace_modify_code() may be
+> > > completely circumvented by ftrace_make_nop() if the addr is MCOUNT_ADDR.  
+> > 
+> > Only on the _first_ invocation. Later on, tracing can be switched on and off,
+> > and then the instructions need to be changed just like with fentry (or
+> > profile-kernel ;-)
+> > 
+> 
+> Understood, but ftrace_modify_code() will only receive addr ==
+> MCOUNT_ADDR on boot up or when a module is loaded. In both cases, with
+> -fprolog-pad it will already be a nop, hence no need to call
+> ftrace_modify_code(), in those cases.
+> 
+> In all other cases, addr will point to a ftrace trampoline.
 
-Current driver is doing this only for tx channel
-needs to update the same for rx channel case also.
+Maybe the code in question can be replaced with the change below, now that
+there is a preprocessor define in V2?
+(untested)
 
-This patch fixes the same.
-
-Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
----
- drivers/dma/xilinx/xilinx_dma.c |    9 +++++----
- 1 files changed, 5 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/dma/xilinx/xilinx_dma.c b/drivers/dma/xilinx/xilinx_dma.c
-index cf47347..4e223d0 100644
---- a/drivers/dma/xilinx/xilinx_dma.c
-+++ b/drivers/dma/xilinx/xilinx_dma.c
-@@ -1895,14 +1895,15 @@ static struct dma_async_tx_descriptor *xilinx_dma_prep_dma_cyclic(
- 	reg |= XILINX_DMA_CR_CYCLIC_BD_EN_MASK;
- 	dma_ctrl_write(chan, XILINX_DMA_REG_DMACR, reg);
+diff --git a/kernel/trace/ftrace.c b/kernel/trace/ftrace.c
+index 3f743b1..695a646 100644
+--- a/kernel/trace/ftrace.c
++++ b/kernel/trace/ftrace.c
+@@ -2423,6 +2423,12 @@ ftrace_code_disable(struct module *mod, struct dyn_ftrace *rec)
+ 	if (unlikely(ftrace_disabled))
+ 		return 0;
  
-+	segment = list_last_entry(&desc->segments,
-+				  struct xilinx_axidma_tx_segment,
-+				  node);
-+	segment->hw.next_desc = (u32) head_segment->phys;
-+
- 	/* For the last DMA_MEM_TO_DEV transfer, set EOP */
- 	if (direction == DMA_MEM_TO_DEV) {
- 		head_segment->hw.control |= XILINX_DMA_BD_SOP;
--		segment = list_last_entry(&desc->segments,
--					  struct xilinx_axidma_tx_segment,
--					  node);
- 		segment->hw.control |= XILINX_DMA_BD_EOP;
--		segment->hw.next_desc = (u32) head_segment->phys;
- 	}
- 
- 	return &desc->async_tx;
--- 
-1.7.1
++#ifdef CC_USING_PROLOG_PAD
++	/* If the compiler already generated NOPs instead of
++	 * calls to mcount, we're done here.
++	*/
++	return 1;
++#endif
+ 	ret = ftrace_make_nop(mod, rec, MCOUNT_ADDR);
+ 	if (ret) {
+ 		ftrace_bug(ret, rec);
