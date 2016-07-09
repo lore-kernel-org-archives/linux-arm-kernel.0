@@ -1,67 +1,24 @@
-From: duwe@lst.de (Torsten Duwe)
-Date: Sat, 9 Jul 2016 11:06:32 +0200
-Subject: [PATCH v2 1/2] arm64: implement FTRACE_WITH_REGS
-In-Reply-To: <20160708170808.1ab70ce3@gandalf.local.home>
-References: <20160627151500.2247A68D20@newverein.lst.de>
- <20160627151717.BD25468D26@newverein.lst.de>
- <20160708145800.GE3556@pathway.suse.cz>
- <20160708150709.GA8979@lst.de>
- <20160708152421.GG3556@pathway.suse.cz>
- <20160708154824.ikq45dgk2auigqn7@treble>
- <20160708115710.5c657b5f@gandalf.local.home>
- <20160708202455.GA4580@lst.de>
- <20160708170808.1ab70ce3@gandalf.local.home>
-Message-ID: <20160709090632.GA2598@lst.de>
+From: ayaka@soulik.info (Randy Li)
+Date: Sat,  9 Jul 2016 17:23:43 +0800
+Subject: [PATCH 0/3] making rtc cores from s3c6410 and exynos3250 both work
+Message-ID: <1468056226-19128-1-git-send-email-ayaka@soulik.info>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 08, 2016 at 05:08:08PM -0400, Steven Rostedt wrote:
-> On Fri, 8 Jul 2016 22:24:55 +0200
-> Torsten Duwe <duwe@lst.de> wrote:
-> 
-> > On Fri, Jul 08, 2016 at 11:57:10AM -0400, Steven Rostedt wrote:
-> > > On Fri, 8 Jul 2016 10:48:24 -0500
-> > > Josh Poimboeuf <jpoimboe@redhat.com> wrote:  
-> > > > 
-> > > > Here, with -fprolog-pad, it's already a nop, so no change is needed.
-> > > >   
-> > 
-> > Yes, exactly.
-> > 
-> > > That's what I was thinking. But as I stated in another email (probably
-> > > in the air when you wrote this), the call to ftrace_modify_code() may be
-> > > completely circumvented by ftrace_make_nop() if the addr is MCOUNT_ADDR.  
-> > 
-> > Only on the _first_ invocation. Later on, tracing can be switched on and off,
-> > and then the instructions need to be changed just like with fentry (or
-> > profile-kernel ;-)
-> > 
-> 
-> Understood, but ftrace_modify_code() will only receive addr ==
-> MCOUNT_ADDR on boot up or when a module is loaded. In both cases, with
-> -fprolog-pad it will already be a nop, hence no need to call
-> ftrace_modify_code(), in those cases.
-> 
-> In all other cases, addr will point to a ftrace trampoline.
+The 8792f7772f4f40ffc68bad5f28311205584b734d would just make those
+platform using rtc core from exynos3250 work but have a huge 
+effect on those platforms using the rtc core from s3c6410.
+These patches would fix this problem.
 
-Maybe the code in question can be replaced with the change below, now that
-there is a preprocessor define in V2?
-(untested)
+Randy Li (3):
+  Revert "drivers/rtc/rtc-s3c.c: add .needs_src_clk to s3c6410 RTC data"
+  rtc: s3c: add device data for samsung,exynos3250-rtc
+  ARM: dts: exynos: correct the rtc compatible value for exynos5
 
-diff --git a/kernel/trace/ftrace.c b/kernel/trace/ftrace.c
-index 3f743b1..695a646 100644
---- a/kernel/trace/ftrace.c
-+++ b/kernel/trace/ftrace.c
-@@ -2423,6 +2423,12 @@ ftrace_code_disable(struct module *mod, struct dyn_ftrace *rec)
- 	if (unlikely(ftrace_disabled))
- 		return 0;
- 
-+#ifdef CC_USING_PROLOG_PAD
-+	/* If the compiler already generated NOPs instead of
-+	 * calls to mcount, we're done here.
-+	*/
-+	return 1;
-+#endif
- 	ret = ftrace_make_nop(mod, rec, MCOUNT_ADDR);
- 	if (ret) {
- 		ftrace_bug(ret, rec);
+ arch/arm/boot/dts/exynos3250.dtsi |  2 +-
+ arch/arm/boot/dts/exynos5.dtsi    |  2 +-
+ drivers/rtc/rtc-s3c.c             | 15 +++++++++++++--
+ 3 files changed, 15 insertions(+), 4 deletions(-)
+
+-- 
+2.7.4
