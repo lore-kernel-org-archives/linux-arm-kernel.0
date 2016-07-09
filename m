@@ -1,27 +1,15 @@
-From: luto@amacapital.net (Andy Lutomirski)
-Date: Sat, 9 Jul 2016 14:27:25 -0700
-Subject: [PATCH 0/9] mm: Hardened usercopy
-In-Reply-To: <1467843928-29351-1-git-send-email-keescook@chromium.org>
-References: <1467843928-29351-1-git-send-email-keescook@chromium.org>
-Message-ID: <CALCETrU5Emr7jZNH5bh7Z+C8fLOcAah9SzeJbDjqW7N-xWGxHA@mail.gmail.com>
+From: davem@davemloft.net (David Miller)
+Date: Sat, 09 Jul 2016 18:11:30 -0400 (EDT)
+Subject: [PATCH v2 0/6] net: ethernet: bgmac: Add platform device support
+In-Reply-To: <1467932938-21819-1-git-send-email-jon.mason@broadcom.com>
+References: <1467932938-21819-1-git-send-email-jon.mason@broadcom.com>
+Message-ID: <20160709.181130.926608541405466184.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Jul 6, 2016 6:25 PM, "Kees Cook" <keescook@chromium.org> wrote:
->
-> Hi,
->
-> This is a start of the mainline port of PAX_USERCOPY[1]. After I started
-> writing tests (now in lkdtm in -next) for Casey's earlier port[2], I
-> kept tweaking things further and further until I ended up with a whole
-> new patch series. To that end, I took Rik's feedback and made a number
-> of other changes and clean-ups as well.
->
+From: Jon Mason <jon.mason@broadcom.com>
+Date: Thu,  7 Jul 2016 19:08:52 -0400
 
-I like the series, but I have one minor nit to pick.  The effect of
-this series is to harden usercopy, but most of the code is really
-about infrastructure to validate that a pointed-to object is valid.
-Might it make sense to call the infrastructure part something else?
-After all, this could be extended in the future for memcpy or even for
-some GCC plugin to check pointers passed to ordinary (non-allocator)
-functions.
+> David Miller, Please consider including patches 1-5 in net-next
+
+Done.
