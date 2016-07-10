@@ -1,551 +1,138 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Sun, 10 Jul 2016 11:24:02 +0200
-Subject: [PATCH v2 1/4] pwm: Add support for Meson PWM Controller
-In-Reply-To: <1468142645-4360-1-git-send-email-narmstrong@baylibre.com>
-References: <1468142645-4360-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1468142645-4360-2-git-send-email-narmstrong@baylibre.com>
+From: uwe@kleine-koenig.org (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Sun, 10 Jul 2016 12:07:40 +0200
+Subject: [PATCH 0/6] ARM: dts: imx cleanups
+Message-ID: <1468145266-7567-1-git-send-email-uwe@kleine-koenig.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for the PWM controller found in the Amlogic SoCs.
-This driver supports the Meson8b and GXBB SoCs.
+Hello Shawn,
 
-Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
----
- drivers/pwm/Kconfig     |   9 +
- drivers/pwm/Makefile    |   1 +
- drivers/pwm/pwm-meson.c | 491 ++++++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 501 insertions(+)
- create mode 100644 drivers/pwm/pwm-meson.c
+I put the patches I sent in the last time in a single series here because they
+conflict each other. IMHO this is merge window material because according to the
+documentation writing to reserved bits doesn't have an effect and the other patches
+are non-critical, too. It also splits the fec gpio patch I sent before in two as
+the first submission contained some unrelated changes as was pointed out by Fabio.
 
-diff --git a/drivers/pwm/Kconfig b/drivers/pwm/Kconfig
-index c182efc..cad5286 100644
---- a/drivers/pwm/Kconfig
-+++ b/drivers/pwm/Kconfig
-@@ -245,6 +245,15 @@ config PWM_LPSS_PLATFORM
- 	  To compile this driver as a module, choose M here: the module
- 	  will be called pwm-lpss-platform.
- 
-+config PWM_MESON
-+	tristate "Amlogic Meson PWM driver"
-+	depends on ARCH_MESON
-+	help
-+	  The platform driver for Amlogic Meson PWM controller.
-+
-+	  To compile this driver as a module, choose M here: the module
-+	  will be called pwm-meson.
-+
- config PWM_MTK_DISP
- 	tristate "MediaTek display PWM driver"
- 	depends on ARCH_MEDIATEK || COMPILE_TEST
-diff --git a/drivers/pwm/Makefile b/drivers/pwm/Makefile
-index dd35bc1..3c8843e 100644
---- a/drivers/pwm/Makefile
-+++ b/drivers/pwm/Makefile
-@@ -22,6 +22,7 @@ obj-$(CONFIG_PWM_LPC32XX)	+= pwm-lpc32xx.o
- obj-$(CONFIG_PWM_LPSS)		+= pwm-lpss.o
- obj-$(CONFIG_PWM_LPSS_PCI)	+= pwm-lpss-pci.o
- obj-$(CONFIG_PWM_LPSS_PLATFORM)	+= pwm-lpss-platform.o
-+obj-$(CONFIG_PWM_MESON)		+= pwm-meson.o
- obj-$(CONFIG_PWM_MTK_DISP)	+= pwm-mtk-disp.o
- obj-$(CONFIG_PWM_MXS)		+= pwm-mxs.o
- obj-$(CONFIG_PWM_OMAP_DMTIMER)	+= pwm-omap-dmtimer.o
-diff --git a/drivers/pwm/pwm-meson.c b/drivers/pwm/pwm-meson.c
-new file mode 100644
-index 0000000..9e7ecf5
---- /dev/null
-+++ b/drivers/pwm/pwm-meson.c
-@@ -0,0 +1,491 @@
-+/*
-+ * This file is provided under a dual BSD/GPLv2 license.  When using or
-+ * redistributing this file, you may do so under either license.
-+ *
-+ * GPL LICENSE SUMMARY
-+ *
-+ * Copyright (c) 2016 BayLibre, SAS.
-+ * Author: Neil Armstrong <narmstrong@baylibre.com>
-+ * Copyright (C) 2014 Amlogic, Inc.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of version 2 of the GNU General Public License as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful, but
-+ * WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-+ * General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, see <http://www.gnu.org/licenses/>.
-+ * The full GNU General Public License is included in this distribution
-+ * in the file called COPYING.
-+ *
-+ * BSD LICENSE
-+ *
-+ * Copyright (c) 2016 BayLibre, SAS.
-+ * Author: Neil Armstrong <narmstrong@baylibre.com>
-+ * Copyright (C) 2014 Amlogic, Inc.
-+ *
-+ * Redistribution and use in source and binary forms, with or without
-+ * modification, are permitted provided that the following conditions
-+ * are met:
-+ *
-+ *   * Redistributions of source code must retain the above copyright
-+ *     notice, this list of conditions and the following disclaimer.
-+ *   * Redistributions in binary form must reproduce the above copyright
-+ *     notice, this list of conditions and the following disclaimer in
-+ *     the documentation and/or other materials provided with the
-+ *     distribution.
-+ *   * Neither the name of Intel Corporation nor the names of its
-+ *     contributors may be used to endorse or promote products derived
-+ *     from this software without specific prior written permission.
-+ *
-+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-+ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-+ * OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-+ * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-+ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-+ * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-+ */
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/clk-provider.h>
-+#include <linux/platform_device.h>
-+#include <linux/spinlock.h>
-+#include <linux/slab.h>
-+#include <linux/clk.h>
-+#include <linux/err.h>
-+#include <linux/pwm.h>
-+#include <linux/io.h>
-+#include <linux/clk.h>
-+#include <linux/of.h>
-+
-+#define REG_PWM_A	0x0
-+#define REG_PWM_B	0x4
-+#define PWM_HIGH_SHIFT	16
-+
-+#define REG_MISC_AB	0x8
-+#define MISC_B_CLK_EN	BIT(23)
-+#define MISC_A_CLK_EN	BIT(15)
-+#define MISC_CLK_DIV_MASK	0x7f
-+#define MISC_B_CLK_DIV_SHIFT	16
-+#define MISC_A_CLK_DIV_SHIFT	8
-+#define MISC_B_CLK_SEL_SHIFT	6
-+#define MISC_A_CLK_SEL_SHIFT	4
-+#define MISC_CLK_SEL_WIDTH	2
-+#define MISC_B_EN	BIT(1)
-+#define MISC_A_EN	BIT(0)
-+
-+#define PWM_NUM		2
-+
-+static const unsigned int mux_reg_shifts[PWM_NUM] = {
-+	MISC_A_CLK_SEL_SHIFT, MISC_B_CLK_SEL_SHIFT
-+};
-+
-+static const char * const pwm_parents[] = {
-+	"xtal", "vid_pll", "fclk_div4", "fclk_div3", NULL
-+};
-+
-+enum pwm_channel {
-+	PWM_A = 0,
-+	PWM_B,
-+};
-+
-+struct meson_pwm_channel {
-+	unsigned int pwm_hi;
-+	unsigned int pwm_lo;
-+	u8 pwm_pre_div;
-+	int period;
-+	int duty;
-+};
-+
-+struct meson_pwm_chip {
-+	struct platform_device *pdev;
-+	struct pwm_chip chip;
-+	void __iomem *base;
-+	u8 inverter_mask;
-+	spinlock_t lock;
-+	struct clk *clk_parents[PWM_NUM];
-+	struct clk_mux mux[PWM_NUM];
-+	struct clk *clk[PWM_NUM];
-+};
-+
-+#define to_meson_pwm_chip(chip) \
-+	container_of(chip, struct meson_pwm_chip, chip)
-+
-+static int meson_pwm_calc(struct meson_pwm_chip *chip,
-+			       struct meson_pwm_channel *pwm_chan,
-+			       unsigned int id,
-+			       int duty_ns, unsigned int period_ns)
-+{
-+	unsigned int pwm_pre_div;
-+	unsigned int pwm_cnt;
-+	unsigned int pwm_duty_cnt;
-+	unsigned long fin_freq = -1;
-+	unsigned long fin_ns;
-+	unsigned int i = 0;
-+
-+	if (duty_ns > period_ns)
-+		return -EINVAL;
-+
-+	switch (id) {
-+	case PWM_A:
-+		fin_freq = clk_get_rate(chip->clk[0]);
-+		break;
-+	case PWM_B:
-+		fin_freq = clk_get_rate(chip->clk[1]);
-+		break;
-+	}
-+	if (fin_freq <= 0) {
-+		dev_err(chip->chip.dev, "invalid source clock frequency\n");
-+		return -EINVAL;
-+	}
-+	dev_dbg(chip->chip.dev, "fin_freq: %luHz\n", fin_freq);
-+	fin_ns = NSEC_PER_SEC / fin_freq;
-+
-+	/* Calc pre_div with the period */
-+	for (i = 0; i < MISC_CLK_DIV_MASK; i++) {
-+		pwm_pre_div = i;
-+		pwm_cnt = DIV_ROUND_CLOSEST(period_ns,
-+				fin_ns * (pwm_pre_div + 1));
-+		dev_dbg(chip->chip.dev, "fin_ns=%lu pre_div=%d cnt=%d\n",
-+				fin_ns, pwm_pre_div, pwm_cnt);
-+		if (pwm_cnt <= 0xffff)
-+			break;
-+	}
-+	if (i == MISC_CLK_DIV_MASK) {
-+		dev_err(chip->chip.dev, "Unable to get period pre_div");
-+		return -EINVAL;
-+	}
-+	dev_dbg(chip->chip.dev, "period_ns=%d pre_div=%d pwm_cnt=%d\n",
-+		period_ns, pwm_pre_div, pwm_cnt);
-+
-+	if (duty_ns == period_ns) {
-+		pwm_chan->pwm_pre_div = pwm_pre_div;
-+		pwm_chan->pwm_hi = pwm_cnt;
-+		pwm_chan->pwm_lo = 0;
-+	} else if (duty_ns == 0) {
-+		pwm_chan->pwm_pre_div = pwm_pre_div;
-+		pwm_chan->pwm_hi = 0;
-+		pwm_chan->pwm_lo = pwm_cnt;
-+	} else {
-+		/* Then check is we can have the duty with the same pre_div */
-+		pwm_duty_cnt = DIV_ROUND_CLOSEST(duty_ns,
-+					fin_ns * (pwm_pre_div + 1));
-+		if (pwm_cnt > 0xffff) {
-+			dev_err(chip->chip.dev, "Unable to get duty period, differences are too high");
-+			return -EINVAL;
-+		}
-+		dev_dbg(chip->chip.dev, "duty_ns=%d pre_div=%d pwm_cnt=%d\n",
-+			duty_ns, pwm_pre_div, pwm_duty_cnt);
-+
-+		pwm_chan->pwm_pre_div = pwm_pre_div;
-+		pwm_chan->pwm_hi = pwm_duty_cnt;
-+		pwm_chan->pwm_lo = pwm_cnt - pwm_chan->pwm_hi;
-+	}
-+
-+	return 0;
-+}
-+
-+static int meson_pwm_request(struct pwm_chip *chip,
-+				  struct pwm_device *pwm)
-+{
-+	struct meson_pwm_channel *pwm_chan;
-+
-+	pwm_chan = devm_kzalloc(chip->dev, sizeof(*pwm_chan), GFP_KERNEL);
-+	if (!pwm_chan)
-+		return -ENOMEM;
-+
-+	pwm_set_chip_data(pwm, pwm_chan);
-+
-+	return 0;
-+}
-+
-+static void meson_pwm_free(struct pwm_chip *chip,
-+				struct pwm_device *pwm)
-+{
-+	devm_kfree(chip->dev, pwm_get_chip_data(pwm));
-+	pwm_set_chip_data(pwm, NULL);
-+}
-+
-+static int meson_pwm_enable(struct pwm_chip *chip,
-+				 struct pwm_device *pwm)
-+{
-+	struct meson_pwm_chip *pwm_data = to_meson_pwm_chip(chip);
-+	unsigned int id = pwm->hwpwm;
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&pwm_data->lock, flags);
-+	switch (id) {
-+	case PWM_A:
-+		writel(readl(pwm_data->base + REG_MISC_AB) | MISC_A_EN,
-+			pwm_data->base + REG_MISC_AB);
-+		break;
-+
-+	case PWM_B:
-+		writel(readl(pwm_data->base + REG_MISC_AB) | MISC_B_EN,
-+			pwm_data->base + REG_MISC_AB);
-+		break;
-+
-+	default:
-+		break;
-+	}
-+	spin_unlock_irqrestore(&pwm_data->lock, flags);
-+
-+	return 0;
-+}
-+
-+static void meson_pwm_disable(struct pwm_chip *chip,
-+				   struct pwm_device *pwm)
-+{
-+	struct meson_pwm_chip *pwm_data = to_meson_pwm_chip(chip);
-+	unsigned int id = pwm->hwpwm;
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&pwm_data->lock, flags);
-+	switch (id) {
-+	case PWM_A:
-+		writel(readl(pwm_data->base + REG_MISC_AB) & ~MISC_A_EN,
-+			pwm_data->base + REG_MISC_AB);
-+		break;
-+
-+	case PWM_B:
-+		writel(readl(pwm_data->base + REG_MISC_AB) & ~MISC_B_EN,
-+			pwm_data->base + REG_MISC_AB);
-+		break;
-+
-+	default:
-+		break;
-+	}
-+	spin_unlock_irqrestore(&pwm_data->lock, flags);
-+}
-+
-+static int meson_pwm_config(struct pwm_chip *chip,
-+				 struct pwm_device *pwm,
-+				 int duty_ns,
-+				 int period_ns)
-+{
-+	struct meson_pwm_chip *pwm_data = to_meson_pwm_chip(chip);
-+	struct meson_pwm_channel *pwm_chan = pwm_get_chip_data(pwm);
-+	unsigned int id = pwm->hwpwm;
-+	int ret;
-+
-+	if ((~(pwm_data->inverter_mask >> id) & 0x1))
-+		duty_ns = period_ns - duty_ns;
-+
-+	if (period_ns == pwm_chan->period && duty_ns == pwm_chan->duty)
-+		return 0;
-+
-+	ret = meson_pwm_calc(pwm_data, pwm_chan, id, duty_ns, period_ns);
-+	if (ret) {
-+		dev_err(chip->dev, "error while calculating pwm parameters\n");
-+		return ret;
-+	}
-+
-+	switch (id) {
-+	case PWM_A:
-+		writel((readl(pwm_data->base + REG_MISC_AB) &
-+			~(MISC_CLK_DIV_MASK << MISC_A_CLK_DIV_SHIFT)) |
-+			((pwm_chan->pwm_pre_div << MISC_A_CLK_DIV_SHIFT) |
-+			 MISC_A_CLK_EN),
-+			pwm_data->base + REG_MISC_AB);
-+
-+		writel((pwm_chan->pwm_hi << PWM_HIGH_SHIFT) |
-+		       (pwm_chan->pwm_lo),
-+		       pwm_data->base + REG_PWM_A);
-+		break;
-+
-+	case PWM_B:
-+		writel((readl(pwm_data->base + REG_MISC_AB) &
-+			~(MISC_CLK_DIV_MASK << MISC_B_CLK_DIV_SHIFT)) |
-+			((pwm_chan->pwm_pre_div << MISC_B_CLK_DIV_SHIFT) |
-+			 MISC_B_CLK_EN),
-+			pwm_data->base + REG_MISC_AB);
-+
-+		writel((pwm_chan->pwm_hi << PWM_HIGH_SHIFT) |
-+		       (pwm_chan->pwm_lo),
-+		       pwm_data->base + REG_PWM_B);
-+		break;
-+
-+	default:
-+		break;
-+	}
-+
-+	pwm_chan->period = period_ns;
-+	pwm_chan->duty = duty_ns;
-+
-+	return 0;
-+}
-+
-+static int meson_pwm_set_polarity(struct pwm_chip *chip,
-+				    struct pwm_device *pwm,
-+				    enum pwm_polarity polarity)
-+{
-+	struct meson_pwm_chip *pwm_data = to_meson_pwm_chip(chip);
-+	struct meson_pwm_channel *pwm_chan = pwm_get_chip_data(pwm);
-+	bool invert = (polarity == PWM_POLARITY_NORMAL);
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&pwm_data->lock, flags);
-+
-+	if (invert)
-+		pwm_data->inverter_mask |= BIT(pwm->hwpwm);
-+	else
-+		pwm_data->inverter_mask &= ~BIT(pwm->hwpwm);
-+
-+	meson_pwm_config(chip, pwm, pwm_chan->duty, pwm_chan->period);
-+
-+	spin_unlock_irqrestore(&pwm_data->lock, flags);
-+
-+	return 0;
-+}
-+
-+static const struct pwm_ops meson_pwm_ops = {
-+	.request	= meson_pwm_request,
-+	.free		= meson_pwm_free,
-+	.enable		= meson_pwm_enable,
-+	.disable	= meson_pwm_disable,
-+	.config		= meson_pwm_config,
-+	.set_polarity	= meson_pwm_set_polarity,
-+	.owner		= THIS_MODULE,
-+};
-+
-+static const struct of_device_id meson_pwm_matches[] = {
-+	{ .compatible = "amlogic,meson8b-pwm", },
-+	{ .compatible = "amlogic,meson-gxbb-pwm", },
-+	{},
-+};
-+MODULE_DEVICE_TABLE(of, meson_pwm_matches);
-+
-+static int meson_pwm_mux_init(struct meson_pwm_chip *chip)
-+{
-+	struct device *dev = &chip->pdev->dev;
-+	struct clk_init_data init;
-+	char clk_name[255];
-+	int ret;
-+	int i;
-+
-+	for (i = 0 ; i < PWM_NUM ; ++i) {
-+		sprintf(clk_name, "%s#mux%d",
-+				of_node_full_name(dev->of_node), i);
-+
-+		init.name = devm_kstrdup(dev, clk_name, GFP_KERNEL);
-+		init.ops = &clk_mux_ops;
-+		init.flags = CLK_IS_BASIC;
-+		init.parent_names = pwm_parents;
-+		init.num_parents = 1 << MISC_CLK_SEL_WIDTH;
-+
-+		chip->mux[i].reg = chip->base + REG_MISC_AB;
-+		chip->mux[i].shift = mux_reg_shifts[i];
-+		chip->mux[i].mask = BIT(MISC_CLK_SEL_WIDTH) - 1;
-+		chip->mux[i].flags = 0;
-+		chip->mux[i].lock = &chip->lock;
-+		chip->mux[i].table = NULL;
-+		chip->mux[i].hw.init = &init;
-+
-+		chip->clk[i] = devm_clk_register(dev, &chip->mux[i].hw);
-+		if (IS_ERR(chip->clk[i])) {
-+			dev_err(dev, "Failed to register %s\n", clk_name);
-+			return PTR_ERR(chip->clk[i]);
-+		}
-+
-+		if (chip->clk_parents[i]) {
-+			ret = clk_set_parent(chip->clk[i],
-+					     chip->clk_parents[i]);
-+			if (ret) {
-+				dev_err(dev, "Failed to set %s parent\n",
-+					clk_name);
-+				return ret;
-+			}
-+		}
-+	}
-+
-+	return 0;
-+}
-+
-+static int meson_pwm_probe(struct platform_device *pdev)
-+{
-+	struct device *dev = &pdev->dev;
-+	struct meson_pwm_chip *chip;
-+	struct resource *res;
-+	int ret;
-+
-+	chip = devm_kzalloc(&pdev->dev, sizeof(*chip), GFP_KERNEL);
-+	if (chip == NULL)
-+		return -ENOMEM;
-+
-+	chip->pdev = pdev;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	chip->base = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(chip->base))
-+		return PTR_ERR(chip->base);
-+
-+	chip->clk_parents[0] = devm_clk_get(dev, "clkin0");
-+	if (IS_ERR(chip->clk_parents[0])) {
-+		if (PTR_ERR(chip->clk_parents[0]) == -EPROBE_DEFER)
-+			return PTR_ERR(chip->clk_parents[0]);
-+		chip->clk_parents[0] = NULL;
-+	}
-+
-+	chip->clk_parents[1] = devm_clk_get(dev, "clkin1");
-+	if (IS_ERR(chip->clk_parents[1])) {
-+		if (PTR_ERR(chip->clk_parents[1]) == -EPROBE_DEFER)
-+			return PTR_ERR(chip->clk_parents[1]);
-+		chip->clk_parents[1] = NULL;
-+	}
-+
-+	ret = meson_pwm_mux_init(chip);
-+	if (ret)
-+		return ret;
-+
-+	clk_prepare_enable(chip->clk[0]);
-+	clk_prepare_enable(chip->clk[1]);
-+
-+	chip->chip.dev = dev;
-+	chip->chip.ops = &meson_pwm_ops;
-+	chip->chip.base = -1;
-+	chip->chip.npwm = PWM_NUM;
-+	chip->chip.of_xlate = of_pwm_xlate_with_flags;
-+	chip->chip.of_pwm_n_cells = 3;
-+	chip->inverter_mask = BIT(PWM_NUM) - 1;
-+
-+	ret = pwmchip_add(&chip->chip);
-+	if (ret < 0) {
-+		dev_err(dev, "failed to register PWM chip\n");
-+		return ret;
-+	}
-+
-+	platform_set_drvdata(pdev, chip);
-+
-+	return 0;
-+}
-+
-+static int meson_pwm_remove(struct platform_device *pdev)
-+{
-+	struct meson_pwm_chip *chip = platform_get_drvdata(pdev);
-+
-+	return pwmchip_remove(&chip->chip);
-+}
-+
-+static struct platform_driver meson_pwm_driver = {
-+	.driver		= {
-+		.name	= "meson-pwm",
-+		.of_match_table = of_match_ptr(meson_pwm_matches),
-+	},
-+	.probe		= meson_pwm_probe,
-+	.remove		= meson_pwm_remove,
-+};
-+module_platform_driver(meson_pwm_driver);
-+
-+MODULE_ALIAS("platform:meson-pwm");
-+MODULE_DESCRIPTION("Amlogic Meson PWM Generator driver");
-+MODULE_AUTHOR("Neil Armstrong <narmstrong@baylibre.com>");
-+MODULE_LICENSE("Dual BSD/GPL");
+The first patch was trimmed to use diff -b. This has the downside that it's not
+possible to apply. But this way it makes it to the list at least.
+
+You can also pull the series from
+
+	git://git.kleine-koenig.org/git/linux.git imx-dt-cleanups
+
+(which then obviously contains the full 1st patch) based on v4.7-rc6.
+
+Best regards
+Uwe
+
+Uwe Kleine-K?nig (6):
+  ARM: dts: drop function device nodes for pinctrl-imx nodes
+  ARM: dts: imx25: don't configure reserved pad settings
+  ARM: dts: imx25: substitute NO_PAD_CTL by the respective reset value
+  ARM: dts: imx6q: don't configure reserved pad settings
+  ARM: dts: imx: fix polarity of fec reset gpios
+  ARM: dts: imx6-wandboard: substitute NO_PAD_CTL by the respective
+    reset value
+
+ arch/arm/boot/dts/imx1-ads.dts                     | 100 ++--
+ arch/arm/boot/dts/imx1-apf9328.dts                 |  92 ++--
+ arch/arm/boot/dts/imx25-eukrea-cpuimx25.dtsi       |  38 +-
+ .../imx25-eukrea-mbimxsd25-baseboard-cmo-qvga.dts  |   6 +-
+ .../boot/dts/imx25-eukrea-mbimxsd25-baseboard.dts  | 134 +++---
+ arch/arm/boot/dts/imx25-karo-tx25.dts              |  55 +--
+ arch/arm/boot/dts/imx25-pdk.dts                    | 192 ++++----
+ arch/arm/boot/dts/imx27-apf27.dts                  |  56 ++-
+ arch/arm/boot/dts/imx27-apf27dev.dts               | 194 ++++----
+ arch/arm/boot/dts/imx27-eukrea-cpuimx27.dtsi       | 228 +++++-----
+ .../boot/dts/imx27-eukrea-mbimxsd27-baseboard.dts  | 194 ++++----
+ arch/arm/boot/dts/imx27-pdk.dts                    | 132 +++---
+ arch/arm/boot/dts/imx27-phytec-phycard-s-rdk.dts   |  92 ++--
+ arch/arm/boot/dts/imx27-phytec-phycard-s-som.dtsi  |  78 ++--
+ arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts     | 206 +++++----
+ arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi    | 154 ++++---
+ arch/arm/boot/dts/imx35-eukrea-cpuimx35.dtsi       |  62 ++-
+ .../boot/dts/imx35-eukrea-mbimxsd35-baseboard.dts  |  88 ++--
+ arch/arm/boot/dts/imx35-pdk.dts                    |  36 +-
+ arch/arm/boot/dts/imx50-evk.dts                    |  67 +--
+ arch/arm/boot/dts/imx51-apf51.dts                  |  58 ++-
+ arch/arm/boot/dts/imx51-apf51dev.dts               | 176 ++++---
+ arch/arm/boot/dts/imx51-babbage.dts                | 418 +++++++++--------
+ arch/arm/boot/dts/imx51-digi-connectcore-jsk.dts   |  78 ++--
+ arch/arm/boot/dts/imx51-digi-connectcore-som.dtsi  | 266 ++++++-----
+ arch/arm/boot/dts/imx51-eukrea-cpuimx51.dtsi       |  68 ++-
+ .../boot/dts/imx51-eukrea-mbimxsd51-baseboard.dts  | 192 ++++----
+ arch/arm/boot/dts/imx53-ard.dts                    | 116 +++--
+ arch/arm/boot/dts/imx53-m53.dtsi                   |  64 ++-
+ arch/arm/boot/dts/imx53-m53evk.dts                 | 268 ++++++-----
+ arch/arm/boot/dts/imx53-mba53.dts                  | 116 +++--
+ arch/arm/boot/dts/imx53-qsb-common.dtsi            | 246 +++++-----
+ arch/arm/boot/dts/imx53-qsrb.dts                   |  10 +-
+ arch/arm/boot/dts/imx53-smd.dts                    | 198 ++++----
+ arch/arm/boot/dts/imx53-tqma53.dtsi                | 246 +++++-----
+ arch/arm/boot/dts/imx53-tx53-x03x.dts              | 112 +++--
+ arch/arm/boot/dts/imx53-tx53-x13x.dts              |  74 ++-
+ arch/arm/boot/dts/imx53-tx53.dtsi                  | 438 +++++++++---------
+ arch/arm/boot/dts/imx53-voipac-bsb.dts             | 106 +++--
+ arch/arm/boot/dts/imx53-voipac-dmm-668.dtsi        | 126 +++--
+ arch/arm/boot/dts/imx6dl-riotboard.dts             | 362 ++++++++-------
+ arch/arm/boot/dts/imx6q-arm2.dts                   | 198 ++++----
+ arch/arm/boot/dts/imx6q-ba16.dtsi                  |  24 +-
+ arch/arm/boot/dts/imx6q-cm-fx6.dts                 |  94 ++--
+ arch/arm/boot/dts/imx6q-dmo-edmqmx6.dts            | 234 +++++-----
+ arch/arm/boot/dts/imx6q-evi.dts                    |  26 +-
+ arch/arm/boot/dts/imx6q-gk802.dts                  |  92 ++--
+ arch/arm/boot/dts/imx6q-gw5400-a.dts               | 217 +++++----
+ arch/arm/boot/dts/imx6q-marsboard.dts              |  25 +-
+ arch/arm/boot/dts/imx6q-novena.dts                 |  14 +-
+ arch/arm/boot/dts/imx6q-sbc6x.dts                  |  82 ++--
+ arch/arm/boot/dts/imx6q-tbs2910.dts                |  24 +-
+ arch/arm/boot/dts/imx6qdl-apalis.dtsi              |  24 +-
+ arch/arm/boot/dts/imx6qdl-apf6.dtsi                | 112 +++--
+ arch/arm/boot/dts/imx6qdl-apf6dev.dtsi             | 306 +++++++------
+ arch/arm/boot/dts/imx6qdl-aristainetos.dtsi        | 406 ++++++++---------
+ arch/arm/boot/dts/imx6qdl-aristainetos2.dtsi       |   2 +-
+ arch/arm/boot/dts/imx6qdl-cubox-i.dtsi             | 136 +++---
+ arch/arm/boot/dts/imx6qdl-dfi-fs700-m60.dtsi       | 176 ++++---
+ arch/arm/boot/dts/imx6qdl-gw51xx.dtsi              | 238 +++++-----
+ arch/arm/boot/dts/imx6qdl-gw52xx.dtsi              | 348 +++++++-------
+ arch/arm/boot/dts/imx6qdl-gw53xx.dtsi              | 334 +++++++-------
+ arch/arm/boot/dts/imx6qdl-gw54xx.dtsi              | 356 +++++++--------
+ arch/arm/boot/dts/imx6qdl-gw551x.dtsi              | 162 ++++---
+ arch/arm/boot/dts/imx6qdl-gw552x.dtsi              | 154 ++++---
+ arch/arm/boot/dts/imx6qdl-hummingboard.dtsi        | 152 +++----
+ arch/arm/boot/dts/imx6qdl-icore-rqs.dtsi           |  24 +-
+ arch/arm/boot/dts/imx6qdl-microsom-ar8035.dtsi     |  86 ++--
+ arch/arm/boot/dts/imx6qdl-microsom.dtsi            |  98 ++--
+ arch/arm/boot/dts/imx6qdl-nit6xlite.dtsi           | 378 ++++++++-------
+ arch/arm/boot/dts/imx6qdl-nitrogen6_max.dtsi       | 506 ++++++++++-----------
+ arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi          | 400 ++++++++--------
+ arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi       | 288 ++++++------
+ arch/arm/boot/dts/imx6qdl-rex.dtsi                 | 264 ++++++-----
+ arch/arm/boot/dts/imx6qdl-sabreauto.dtsi           | 412 +++++++++--------
+ arch/arm/boot/dts/imx6qdl-sabrelite.dtsi           | 360 ++++++++-------
+ arch/arm/boot/dts/imx6qdl-sabresd.dtsi             | 296 ++++++------
+ arch/arm/boot/dts/imx6qdl-tx6.dtsi                 |   2 +-
+ arch/arm/boot/dts/imx6qdl-udoo.dtsi                | 186 ++++----
+ arch/arm/boot/dts/imx6qdl-wandboard-revb1.dtsi     |  32 +-
+ arch/arm/boot/dts/imx6qdl-wandboard-revc1.dtsi     |  34 +-
+ arch/arm/boot/dts/imx6qdl-wandboard.dtsi           | 193 ++++----
+ arch/arm/boot/dts/imx6qp-sabreauto.dts             |  40 +-
+ arch/arm/boot/dts/imx6qp-sabresd.dts               |  56 ++-
+ arch/arm/boot/dts/imx6sl-evk.dts                   | 460 ++++++++++---------
+ arch/arm/boot/dts/imx6sl-warp.dts                  | 208 +++++----
+ arch/arm/boot/dts/imx6sx-sabreauto.dts             | 134 +++---
+ arch/arm/boot/dts/imx6sx-sdb.dtsi                  | 482 ++++++++++----------
+ arch/arm/boot/dts/imx6ul-tx6ul-mainboard.dts       |   2 +-
+ arch/arm/boot/dts/imx6ul-tx6ul.dtsi                |   4 +-
+ arch/arm/boot/dts/imx7d-sdb.dts                    | 351 +++++++-------
+ arch/arm/boot/dts/vf-colibri-eval-v3.dtsi          |  10 +-
+ arch/arm/boot/dts/vf-colibri.dtsi                  | 334 +++++++-------
+ arch/arm/boot/dts/vf500-colibri.dtsi               |  44 +-
+ arch/arm/boot/dts/vf610-cosmic.dts                 |  60 ++-
+ arch/arm/boot/dts/vf610-twr.dts                    | 228 +++++-----
+ arch/arm/boot/dts/vf610m4-colibri.dts              |  16 +-
+ arch/arm/boot/dts/vf610m4-cosmic.dts               |  12 +-
+ 98 files changed, 7851 insertions(+), 8027 deletions(-)
+
 -- 
-2.7.0
+2.8.1
