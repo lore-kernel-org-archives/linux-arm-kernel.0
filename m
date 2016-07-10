@@ -1,101 +1,180 @@
 From: vw@iommu.org (Wan Zongshun)
-Date: Sun, 10 Jul 2016 15:42:22 +0800
-Subject: [PATCH v2 10/10] nuc900: add nuc970 platform defconfig file
+Date: Sun, 10 Jul 2016 15:42:21 +0800
+Subject: [PATCH v2 09/10] Documentation: devicetree: Add dts description for
+ nuc900
 In-Reply-To: <1468136542-2656-1-git-send-email-vw@iommu.org>
 References: <1468136542-2656-1-git-send-email-vw@iommu.org>
-Message-ID: <1468136542-2656-3-git-send-email-vw@iommu.org>
+Message-ID: <1468136542-2656-2-git-send-email-vw@iommu.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add nuc970_defconfig file support.
+This patch is to add dts description for nuc900 platform.
 
 Signed-off-by: Wan Zongshun <mcuos.com@gmail.com>
 ---
- arch/arm/configs/nuc970_defconfig | 76 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 76 insertions(+)
- create mode 100644 arch/arm/configs/nuc970_defconfig
+ .../devicetree/bindings/arm/nuvoton/nuc970.txt     | 12 ++++++++++++
+ .../bindings/clock/nuvoton,nuc970-clk.txt          | 13 +++++++++++++
+ .../interrupt-controller/nuvoton,nuc900-aic.txt    | 15 +++++++++++++++
+ .../bindings/reset/nuvoton,nuc900-reset.txt        | 12 ++++++++++++
+ .../devicetree/bindings/serial/nuc970-uart.txt     | 22 ++++++++++++++++++++++
+ .../bindings/soc/nuvoton/nuvoton,nuc900-soc.txt    | 12 ++++++++++++
+ .../bindings/timer/nuvoton,nuc970-tmr.txt          | 20 ++++++++++++++++++++
+ 7 files changed, 106 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/nuvoton/nuc970.txt
+ create mode 100644 Documentation/devicetree/bindings/clock/nuvoton,nuc970-clk.txt
+ create mode 100644 Documentation/devicetree/bindings/interrupt-controller/nuvoton,nuc900-aic.txt
+ create mode 100644 Documentation/devicetree/bindings/reset/nuvoton,nuc900-reset.txt
+ create mode 100644 Documentation/devicetree/bindings/serial/nuc970-uart.txt
+ create mode 100644 Documentation/devicetree/bindings/soc/nuvoton/nuvoton,nuc900-soc.txt
+ create mode 100644 Documentation/devicetree/bindings/timer/nuvoton,nuc970-tmr.txt
 
-diff --git a/arch/arm/configs/nuc970_defconfig b/arch/arm/configs/nuc970_defconfig
+diff --git a/Documentation/devicetree/bindings/arm/nuvoton/nuc970.txt b/Documentation/devicetree/bindings/arm/nuvoton/nuc970.txt
 new file mode 100644
-index 0000000..b39a406
+index 0000000..0872f6f
 --- /dev/null
-+++ b/arch/arm/configs/nuc970_defconfig
-@@ -0,0 +1,76 @@
-+# CONFIG_LOCALVERSION_AUTO is not set
-+CONFIG_SYSVIPC=y
-+# CONFIG_CROSS_MEMORY_ATTACH is not set
-+CONFIG_NO_HZ=y
-+CONFIG_HIGH_RES_TIMERS=y
-+CONFIG_BSD_PROCESS_ACCT=y
-+CONFIG_BSD_PROCESS_ACCT_V3=y
-+CONFIG_CGROUPS=y
-+CONFIG_CGROUP_SCHED=y
-+CONFIG_RT_GROUP_SCHED=y
-+CONFIG_CGROUP_FREEZER=y
-+CONFIG_CPUSETS=y
-+CONFIG_CGROUP_DEVICE=y
-+CONFIG_CGROUP_CPUACCT=y
-+CONFIG_CGROUP_PERF=y
-+CONFIG_BLK_DEV_INITRD=y
-+CONFIG_INITRAMFS_SOURCE="../rootfs"
-+CONFIG_PERF_EVENTS=y
-+# CONFIG_COMPAT_BRK is not set
-+CONFIG_MODULES=y
-+CONFIG_MODULE_UNLOAD=y
-+CONFIG_ARCH_W90X900=y
-+CONFIG_SOC_NUC970=y
-+# CONFIG_MACH_W90P910EVB is not set
-+CONFIG_PREEMPT=y
-+CONFIG_AEABI=y
-+CONFIG_OABI_COMPAT=y
-+CONFIG_ARM_APPENDED_DTB=y
-+CONFIG_CMDLINE="root=/dev/ram0 console=ttyS0,115200n8 rdinit=/sbin/init mem=64M"
-+CONFIG_KEXEC=y
-+CONFIG_FPE_NWFPE=y
-+# CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
-+# CONFIG_SUSPEND is not set
-+CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
-+CONFIG_DEVTMPFS=y
-+CONFIG_DEVTMPFS_MOUNT=y
-+# CONFIG_STANDALONE is not set
-+# CONFIG_PREVENT_FIRMWARE_BUILD is not set
-+# CONFIG_FIRMWARE_IN_KERNEL is not set
-+CONFIG_BLK_DEV_RAM=y
-+CONFIG_BLK_DEV_RAM_SIZE=16384
-+CONFIG_SCSI=y
-+# CONFIG_SCSI_PROC_FS is not set
-+CONFIG_BLK_DEV_SD=y
-+# CONFIG_SCSI_LOWLEVEL is not set
-+# CONFIG_INPUT_MOUSEDEV is not set
-+# CONFIG_INPUT_KEYBOARD is not set
-+# CONFIG_INPUT_MOUSE is not set
-+# CONFIG_SERIO is not set
-+CONFIG_VT_HW_CONSOLE_BINDING=y
-+# CONFIG_LEGACY_PTYS is not set
-+CONFIG_SERIAL_NUC970=y
-+CONFIG_SERIAL_NUC970_CONSOLE=y
-+# CONFIG_HW_RANDOM is not set
-+CONFIG_POWER_RESET=y
-+CONFIG_POWER_RESET_NUC900=y
-+# CONFIG_HWMON is not set
-+# CONFIG_HID is not set
-+# CONFIG_USB_SUPPORT is not set
-+# CONFIG_IOMMU_SUPPORT is not set
-+# CONFIG_DNOTIFY is not set
-+# CONFIG_INOTIFY_USER is not set
-+CONFIG_MSDOS_FS=y
-+CONFIG_VFAT_FS=y
-+CONFIG_TMPFS=y
-+CONFIG_TMPFS_POSIX_ACL=y
-+CONFIG_ROMFS_FS=y
-+CONFIG_NLS_CODEPAGE_437=y
-+CONFIG_NLS_ISO8859_1=y
-+CONFIG_MESSAGE_LOGLEVEL_DEFAULT=7
-+# CONFIG_ENABLE_WARN_DEPRECATED is not set
-+# CONFIG_ENABLE_MUST_CHECK is not set
-+CONFIG_DEBUG_FS=y
-+CONFIG_RCU_CPU_STALL_TIMEOUT=300
-+CONFIG_STRICT_DEVMEM=y
-+# CONFIG_ARM_UNWIND is not set
++++ b/Documentation/devicetree/bindings/arm/nuvoton/nuc970.txt
+@@ -0,0 +1,12 @@
++Nuvoton NUC970 SoC platform Device Tree Bindings
++------------------------------------------
++
++Boards with the NUC970 SoC shall have the following properties:
++
++Root node required properties:
++- compatible: Should be "syscon" or "nuvoton,nuc970-gcr"
++
++GCR register required properties:
++- compatible: Should be "nuvoton,nuc970-gcr"
++- reg: Should contain registers location and length
++
+diff --git a/Documentation/devicetree/bindings/clock/nuvoton,nuc970-clk.txt b/Documentation/devicetree/bindings/clock/nuvoton,nuc970-clk.txt
+new file mode 100644
+index 0000000..82fcf32
+--- /dev/null
++++ b/Documentation/devicetree/bindings/clock/nuvoton,nuc970-clk.txt
+@@ -0,0 +1,13 @@
++NUC970 Clock Controller
++
++Clock required properties:
++- compatible: Should be "nuvoton,nuc970-clk"
++- reg: Should contain registers location and length
++
++Examples:
++
++clks: clk at b0000200 {
++	compatible = "nuvoton,nuc970-clk";
++	reg = <0xb0000200 0x200>;
++	#clock-cells = <1>;
++};
+diff --git a/Documentation/devicetree/bindings/interrupt-controller/nuvoton,nuc900-aic.txt b/Documentation/devicetree/bindings/interrupt-controller/nuvoton,nuc900-aic.txt
+new file mode 100644
+index 0000000..f265095
+--- /dev/null
++++ b/Documentation/devicetree/bindings/interrupt-controller/nuvoton,nuc900-aic.txt
+@@ -0,0 +1,15 @@
++NUC900 interrupt Controller
++
++Interrupt-controller required properties
++- compatible: Should be "nuvoton,nuc900-aic"
++- reg: Should contain registers location and length
++- interrupt-cells: set to 1
++
++Examples:
++
++aic: interrupt-controller at b8002000 {
++	compatible = "nuvoton,nuc900-aic";
++	interrupt-controller;
++	#interrupt-cells = <1>;
++	reg = <0xb8002000 0x1000>;
++};
+diff --git a/Documentation/devicetree/bindings/reset/nuvoton,nuc900-reset.txt b/Documentation/devicetree/bindings/reset/nuvoton,nuc900-reset.txt
+new file mode 100644
+index 0000000..ab6056a
+--- /dev/null
++++ b/Documentation/devicetree/bindings/reset/nuvoton,nuc900-reset.txt
+@@ -0,0 +1,12 @@
++. Nuvoton NUC900 series, reset controller binding.
++
++Required properties:
++- compatible : Should be "nuvoton,nuc900-reset"
++- syscon : Reference to gcr controller.
++
++Example:
++
++reset {
++	compatible = "nuvoton,nuc900-reset";
++	syscon = <&gcr>;
++};
+diff --git a/Documentation/devicetree/bindings/serial/nuc970-uart.txt b/Documentation/devicetree/bindings/serial/nuc970-uart.txt
+new file mode 100644
+index 0000000..a143a5e
+--- /dev/null
++++ b/Documentation/devicetree/bindings/serial/nuc970-uart.txt
+@@ -0,0 +1,22 @@
++NUC970 UART Controller
++
++Uart required properties:
++- compatible: Should be "nuvoton,nuc970-uart"
++- reg: Should contain registers location and length
++
++Examples:
++
++aliases {
++	serial0 = &uart0;
++};
++
++uart0: serial at b8000000 {
++	compatible = "nuvoton,nuc970-uart";
++	reg = <0xb8000000 0x1000>;
++	interrupts = <36>;
++	clocks = <&clks UART0_GATE>,
++		 <&clks UART0_ECLK_GATE>;
++	clock-names = "uart0", "uart0_eclk";
++	clock-frequency = <12000000>;
++	status = "disabled";
++};
+diff --git a/Documentation/devicetree/bindings/soc/nuvoton/nuvoton,nuc900-soc.txt b/Documentation/devicetree/bindings/soc/nuvoton/nuvoton,nuc900-soc.txt
+new file mode 100644
+index 0000000..0284edf
+--- /dev/null
++++ b/Documentation/devicetree/bindings/soc/nuvoton/nuvoton,nuc900-soc.txt
+@@ -0,0 +1,12 @@
++. Nuvoton NUC900 series, Soc specific driver binding.
++
++Required properties:
++- compatible : Should be "nuvoton,nuc900-soc"
++- syscon : Reference to gcr controller.
++
++Example:
++
++reset {
++	compatible = "nuvoton,nuc900-soc";
++	syscon = <&gcr>;
++};
+diff --git a/Documentation/devicetree/bindings/timer/nuvoton,nuc970-tmr.txt b/Documentation/devicetree/bindings/timer/nuvoton,nuc970-tmr.txt
+new file mode 100644
+index 0000000..4d74615
+--- /dev/null
++++ b/Documentation/devicetree/bindings/timer/nuvoton,nuc970-tmr.txt
+@@ -0,0 +1,20 @@
++. Nuvoton NUC900 series, NUC970 SoC timer
++
++The NUC900 family has several general-purpose 32 bits timers.
++
++Required properties:
++- compatible : Should be "nuvoton,nuc970-tmr"
++- reg : Address and length of the register set
++- clocks : Reference on the timer input clock
++- interrupts : Reference to the timer interrupt
++
++Example:
++
++tmr at 0xb8001000 {
++	compatible = "nuvoton,nuc970-tmr";
++	reg = <0xb8001000 0x1000>;
++	interrupts = <16>;
++	clocks = <&clks TIMER0_GATE>,
++	<&clks TIMER1_GATE>;
++	clock-names = "timer0", "timer1";
++};
 -- 
 2.7.4
