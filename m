@@ -1,180 +1,166 @@
 From: vw@iommu.org (Wan Zongshun)
-Date: Sun, 10 Jul 2016 15:42:21 +0800
-Subject: [PATCH v2 09/10] Documentation: devicetree: Add dts description for
- nuc900
-In-Reply-To: <1468136542-2656-1-git-send-email-vw@iommu.org>
-References: <1468136542-2656-1-git-send-email-vw@iommu.org>
-Message-ID: <1468136542-2656-2-git-send-email-vw@iommu.org>
+Date: Sun, 10 Jul 2016 15:42:20 +0800
+Subject: [PATCH v2 08/10] ARM: dts: nuc900: Add nuc970 dts files
+Message-ID: <1468136542-2656-1-git-send-email-vw@iommu.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch is to add dts description for nuc900 platform.
+This patch is to add dts support for nuc970 platform.
 
 Signed-off-by: Wan Zongshun <mcuos.com@gmail.com>
 ---
- .../devicetree/bindings/arm/nuvoton/nuc970.txt     | 12 ++++++++++++
- .../bindings/clock/nuvoton,nuc970-clk.txt          | 13 +++++++++++++
- .../interrupt-controller/nuvoton,nuc900-aic.txt    | 15 +++++++++++++++
- .../bindings/reset/nuvoton,nuc900-reset.txt        | 12 ++++++++++++
- .../devicetree/bindings/serial/nuc970-uart.txt     | 22 ++++++++++++++++++++++
- .../bindings/soc/nuvoton/nuvoton,nuc900-soc.txt    | 12 ++++++++++++
- .../bindings/timer/nuvoton,nuc970-tmr.txt          | 20 ++++++++++++++++++++
- 7 files changed, 106 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/nuvoton/nuc970.txt
- create mode 100644 Documentation/devicetree/bindings/clock/nuvoton,nuc970-clk.txt
- create mode 100644 Documentation/devicetree/bindings/interrupt-controller/nuvoton,nuc900-aic.txt
- create mode 100644 Documentation/devicetree/bindings/reset/nuvoton,nuc900-reset.txt
- create mode 100644 Documentation/devicetree/bindings/serial/nuc970-uart.txt
- create mode 100644 Documentation/devicetree/bindings/soc/nuvoton/nuvoton,nuc900-soc.txt
- create mode 100644 Documentation/devicetree/bindings/timer/nuvoton,nuc970-tmr.txt
+ arch/arm/boot/dts/Makefile       |  1 +
+ arch/arm/boot/dts/nuc970-evb.dts | 34 ++++++++++++++++
+ arch/arm/boot/dts/nuc970.dtsi    | 88 ++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 123 insertions(+)
+ create mode 100644 arch/arm/boot/dts/nuc970-evb.dts
+ create mode 100644 arch/arm/boot/dts/nuc970.dtsi
 
-diff --git a/Documentation/devicetree/bindings/arm/nuvoton/nuc970.txt b/Documentation/devicetree/bindings/arm/nuvoton/nuc970.txt
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 414b427..557477d 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -892,6 +892,7 @@ dtb-$(CONFIG_ARCH_MEDIATEK) += \
+ dtb-$(CONFIG_ARCH_ZX) += zx296702-ad1.dtb
+ dtb-$(CONFIG_ARCH_ASPEED) += aspeed-bmc-opp-palmetto.dtb \
+ 	aspeed-ast2500-evb.dtb
++dtb-$(CONFIG_SOC_NUC970) += nuc970-evb.dtb
+ endif
+ 
+ dtstree		:= $(srctree)/$(src)
+diff --git a/arch/arm/boot/dts/nuc970-evb.dts b/arch/arm/boot/dts/nuc970-evb.dts
 new file mode 100644
-index 0000000..0872f6f
+index 0000000..ae3fe90
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/nuvoton/nuc970.txt
-@@ -0,0 +1,12 @@
-+Nuvoton NUC970 SoC platform Device Tree Bindings
-+------------------------------------------
++++ b/arch/arm/boot/dts/nuc970-evb.dts
+@@ -0,0 +1,34 @@
++/*
++ * Copyright 2016 Wan Zongshun <mcuos.com@gmail.com>
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
 +
-+Boards with the NUC970 SoC shall have the following properties:
++/dts-v1/;
++#include "nuc970.dtsi"
 +
-+Root node required properties:
-+- compatible: Should be "syscon" or "nuvoton,nuc970-gcr"
++/ {
++	model = "Nuvoton NUC970 Development Board";
++	compatible = "nuvoton,nuc970";
 +
-+GCR register required properties:
-+- compatible: Should be "nuvoton,nuc970-gcr"
-+- reg: Should contain registers location and length
++	aliases {
++		serial0 = &uart0;
++	};
 +
-diff --git a/Documentation/devicetree/bindings/clock/nuvoton,nuc970-clk.txt b/Documentation/devicetree/bindings/clock/nuvoton,nuc970-clk.txt
-new file mode 100644
-index 0000000..82fcf32
---- /dev/null
-+++ b/Documentation/devicetree/bindings/clock/nuvoton,nuc970-clk.txt
-@@ -0,0 +1,13 @@
-+NUC970 Clock Controller
++	memory {
++		reg = <0x00000000 0x04000000>;
++	};
 +
-+Clock required properties:
-+- compatible: Should be "nuvoton,nuc970-clk"
-+- reg: Should contain registers location and length
-+
-+Examples:
-+
-+clks: clk at b0000200 {
-+	compatible = "nuvoton,nuc970-clk";
-+	reg = <0xb0000200 0x200>;
-+	#clock-cells = <1>;
++	soc {
++		apb at b8000000 {
++			uart0: serial at b8000000 {
++				status = "okay";
++			};
++		};
++	};
 +};
-diff --git a/Documentation/devicetree/bindings/interrupt-controller/nuvoton,nuc900-aic.txt b/Documentation/devicetree/bindings/interrupt-controller/nuvoton,nuc900-aic.txt
+diff --git a/arch/arm/boot/dts/nuc970.dtsi b/arch/arm/boot/dts/nuc970.dtsi
 new file mode 100644
-index 0000000..f265095
+index 0000000..d476abd
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/interrupt-controller/nuvoton,nuc900-aic.txt
-@@ -0,0 +1,15 @@
-+NUC900 interrupt Controller
++++ b/arch/arm/boot/dts/nuc970.dtsi
+@@ -0,0 +1,88 @@
++/*
++ * Copyright 2016 Wan Zongshun <mcuos.com@gmail.com>
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
 +
-+Interrupt-controller required properties
-+- compatible: Should be "nuvoton,nuc900-aic"
-+- reg: Should contain registers location and length
-+- interrupt-cells: set to 1
++#include "skeleton.dtsi"
++#include <dt-bindings/clock/nuc970-clock.h>
 +
-+Examples:
++/ {
++	soc {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		compatible = "simple-bus";
++		interrupt-parent = <&aic>;
++		ranges;
 +
-+aic: interrupt-controller at b8002000 {
-+	compatible = "nuvoton,nuc900-aic";
-+	interrupt-controller;
-+	#interrupt-cells = <1>;
-+	reg = <0xb8002000 0x1000>;
-+};
-diff --git a/Documentation/devicetree/bindings/reset/nuvoton,nuc900-reset.txt b/Documentation/devicetree/bindings/reset/nuvoton,nuc900-reset.txt
-new file mode 100644
-index 0000000..ab6056a
---- /dev/null
-+++ b/Documentation/devicetree/bindings/reset/nuvoton,nuc900-reset.txt
-@@ -0,0 +1,12 @@
-+. Nuvoton NUC900 series, reset controller binding.
++		ahb at b0000000 {
++			compatible = "simple-bus";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges;
 +
-+Required properties:
-+- compatible : Should be "nuvoton,nuc900-reset"
-+- syscon : Reference to gcr controller.
++			gcr: syscon at b0000000 {
++				compatible = "syscon", "nuvoton,nuc970-gcr";
++				reg = <0xb0000000 0x200>;
++			};
 +
-+Example:
++			soc {
++				compatible = "nuvoton,nuc900-soc";
++				syscon = <&gcr>;
++			};
 +
-+reset {
-+	compatible = "nuvoton,nuc900-reset";
-+	syscon = <&gcr>;
-+};
-diff --git a/Documentation/devicetree/bindings/serial/nuc970-uart.txt b/Documentation/devicetree/bindings/serial/nuc970-uart.txt
-new file mode 100644
-index 0000000..a143a5e
---- /dev/null
-+++ b/Documentation/devicetree/bindings/serial/nuc970-uart.txt
-@@ -0,0 +1,22 @@
-+NUC970 UART Controller
++			reset {
++				compatible = "nuvoton,nuc900-reset";
++				syscon = <&gcr>;
++			};
 +
-+Uart required properties:
-+- compatible: Should be "nuvoton,nuc970-uart"
-+- reg: Should contain registers location and length
++			clks: clk at b0000200 {
++				compatible = "nuvoton,nuc970-clk";
++				reg = <0xb0000200 0x200>;
++				#clock-cells = <1>;
++			};
 +
-+Examples:
++		};
 +
-+aliases {
-+	serial0 = &uart0;
-+};
++		apb at b8000000 {
++			compatible = "simple-bus";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges;
 +
-+uart0: serial at b8000000 {
-+	compatible = "nuvoton,nuc970-uart";
-+	reg = <0xb8000000 0x1000>;
-+	interrupts = <36>;
-+	clocks = <&clks UART0_GATE>,
-+		 <&clks UART0_ECLK_GATE>;
-+	clock-names = "uart0", "uart0_eclk";
-+	clock-frequency = <12000000>;
-+	status = "disabled";
-+};
-diff --git a/Documentation/devicetree/bindings/soc/nuvoton/nuvoton,nuc900-soc.txt b/Documentation/devicetree/bindings/soc/nuvoton/nuvoton,nuc900-soc.txt
-new file mode 100644
-index 0000000..0284edf
---- /dev/null
-+++ b/Documentation/devicetree/bindings/soc/nuvoton/nuvoton,nuc900-soc.txt
-@@ -0,0 +1,12 @@
-+. Nuvoton NUC900 series, Soc specific driver binding.
++			aic: interrupt-controller at b8002000 {
++				compatible = "nuvoton,nuc900-aic";
++				interrupt-controller;
++				#interrupt-cells = <1>;
++				reg = <0xb8002000 0x1000>;
++			};
 +
-+Required properties:
-+- compatible : Should be "nuvoton,nuc900-soc"
-+- syscon : Reference to gcr controller.
 +
-+Example:
++			tmr at 0xb8001000 {
++				compatible = "nuvoton,nuc970-tmr";
++				reg = <0xb8001000 0x1000>;
++				interrupts = <16>;
++				clocks = <&clks TIMER0_GATE>,
++					 <&clks TIMER1_GATE>;
++				clock-names = "timer0", "timer1";
 +
-+reset {
-+	compatible = "nuvoton,nuc900-soc";
-+	syscon = <&gcr>;
-+};
-diff --git a/Documentation/devicetree/bindings/timer/nuvoton,nuc970-tmr.txt b/Documentation/devicetree/bindings/timer/nuvoton,nuc970-tmr.txt
-new file mode 100644
-index 0000000..4d74615
---- /dev/null
-+++ b/Documentation/devicetree/bindings/timer/nuvoton,nuc970-tmr.txt
-@@ -0,0 +1,20 @@
-+. Nuvoton NUC900 series, NUC970 SoC timer
++			};
 +
-+The NUC900 family has several general-purpose 32 bits timers.
-+
-+Required properties:
-+- compatible : Should be "nuvoton,nuc970-tmr"
-+- reg : Address and length of the register set
-+- clocks : Reference on the timer input clock
-+- interrupts : Reference to the timer interrupt
-+
-+Example:
-+
-+tmr at 0xb8001000 {
-+	compatible = "nuvoton,nuc970-tmr";
-+	reg = <0xb8001000 0x1000>;
-+	interrupts = <16>;
-+	clocks = <&clks TIMER0_GATE>,
-+	<&clks TIMER1_GATE>;
-+	clock-names = "timer0", "timer1";
++			uart0: serial at b8000000 {
++				compatible = "nuvoton,nuc970-uart";
++				reg = <0xb8000000 0x1000>;
++				interrupts = <36>;
++				clocks = <&clks UART0_GATE>,
++					 <&clks UART0_ECLK_GATE>;
++				clock-names = "uart0", "uart0_eclk";
++				clock-frequency = <12000000>;
++				status = "disabled";
++			};
++		};
++	};
 +};
 -- 
 2.7.4
