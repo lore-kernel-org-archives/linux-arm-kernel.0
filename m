@@ -1,59 +1,98 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Sun, 10 Jul 2016 03:26:49 +0200
-Subject: [PATCH v6 00/10] acpi,
- clocksource: add GTDT driver and GTDT support in arm_arch_timer
-In-Reply-To: <21ec2b0d-cde9-f86a-c39a-0fba5d02fd03@linaro.org>
-References: <1467224153-22873-1-git-send-email-fu.wei@linaro.org>
- <20160708132201.GD3784@red-moon>
- <21ec2b0d-cde9-f86a-c39a-0fba5d02fd03@linaro.org>
-Message-ID: <3119857.QuQfKUSRGs@vostro.rjw.lan>
+From: vw@iommu.org (Wan Zongshun)
+Date: Sun, 10 Jul 2016 15:27:20 +0800
+Subject: [PATCH v2 00/10] ARM: NUC900: Add NUC970 SoC support
+Message-ID: <1468135649-19980-1-git-send-email-vw@iommu.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday, July 09, 2016 11:44:47 AM Hanjun Guo wrote:
-> On 2016/7/8 21:22, Lorenzo Pieralisi wrote:
-> > On Thu, Jul 07, 2016 at 03:58:04PM +0200, Rafael J. Wysocki wrote:
-> >
-> > [...]
-> >
-> >>> Anyway let's avoid these petty arguments, I agree there must be some
-> >>> sort of ARM64 ACPI maintainership for the reasons you mentioned above.
-> >>
-> >> To avoid confusion on who's going to push stuff to Linus, I can do
-> >> that, but it must be clear whose ACKs are needed for that to happen.
-> >> That may be one person or all of you, whatever you decide.
-> >
-> > I think the reasoning is the same, to avoid confusion and avoid stepping
-> > on each other toes it is best to have a single gatekeeper (still
-> > multiple maintainer entries to keep patches reviewed correctly), if no
-> > one complains I will do that and a) provide ACKs (I will definitely
-> > require and request Hanjun and Sudeep ones too appropriately on a per
-> > patch basis) and b) send you pull requests.
-> 
-> Fine to me.
-> 
-> >
-> > Having a maintainer per file would be farcical, I really do not
-> 
-> Agree, but having three of us in maintainer entries in MAINTAINERS
-> file will help the patches be reviewed correctly with more eyes.
-> 
-> > expect that amount of traffic for drivers/acpi/arm64 therefore I
-> > really doubt there is any risk of me slowing things down.
-> >
-> > Does this sound reasonable ? Comments/complaints welcome, please
-> > manifest yourselves.
-> 
-> Fair enough. What I'm concern most is land ACPI on ARM64 soundly,
-> let's do that :)
-> 
-> OK, let's back to this patch set, Fuwei already prepared a new version
-> of patches [1] (moving acpi_gtdt.c to drivers/acpi/arm64/ and add a
-> maintainer entries patch), shall we review and comment on this patch
-> set for now, or just let Fuwei send out the new version?
+Hi,
 
-Frankly, I don't see a point in discussing the old version only if a new
-one is available already.  Post it, please.
+This patch series added Nuvoton new SoC NUC970 development board
+support, this nuc970 belongs to nuc900 series, but many features are
+not compatible with old nuc900 SoCs like nuc910, nuc920.
 
-Thanks,
-Rafael
+Those patches are basing on old w90x900 codes, and are using standard
+linux subsystem interface, such as dts, driver/clk, driver/clocksource
+, driver/irqchip drivers.
+
+The old w90x900 plat such as nuc910,nuc960 codes will also be changed
+to new style according to nuc970 codes after those patches was accepted.
+
+PATCH V2:
+The V2 patches change some code style, re-archtect some drivers and add reset
+and soc drivers, split some dts patches according to maillist's comments.
+
+Wan Zongshun (10):
+  ARM: NUC900: Add nuc970 machine support
+  irqchip: add irqchip driver for nuc900
+  Clocksource: add nuc970 clocksource driver
+  clk: add Clock driver for nuc970
+  power/reset: Add reset driver support for nuc900
+  soc: Add SoC specific driver support for nuc900
+  ARM: dts: Add clock header file into dt-bindings
+  ARM: dts: nuc900: Add nuc970 dts files
+  Documentation: devicetree: Add dts description for nuc900
+  nuc900: add nuc970 platform defconfig file
+
+ .../devicetree/bindings/arm/nuvoton/nuc970.txt     |  12 +
+ .../bindings/clock/nuvoton,nuc970-clk.txt          |  13 +
+ .../interrupt-controller/nuvoton,nuc900-aic.txt    |  15 +
+ .../bindings/reset/nuvoton,nuc900-reset.txt        |  12 +
+ .../devicetree/bindings/serial/nuc970-uart.txt     |  22 +
+ .../bindings/soc/nuvoton/nuvoton,nuc900-soc.txt    |  12 +
+ .../bindings/timer/nuvoton,nuc970-tmr.txt          |  20 +
+ arch/arm/boot/dts/Makefile                         |   1 +
+ arch/arm/boot/dts/nuc970-evb.dts                   |  34 +
+ arch/arm/boot/dts/nuc970.dtsi                      |  88 ++
+ arch/arm/configs/nuc970_defconfig                  |  76 ++
+ arch/arm/mach-w90x900/Kconfig                      |  20 +
+ arch/arm/mach-w90x900/Makefile                     |   3 +
+ arch/arm/mach-w90x900/include/mach/irqs.h          |   5 +
+ arch/arm/mach-w90x900/nuc900.c                     |  41 +
+ drivers/clk/Makefile                               |   1 +
+ drivers/clk/nuc900/Makefile                        |   6 +
+ drivers/clk/nuc900/clk-apll.c                      | 168 ++++
+ drivers/clk/nuc900/clk-ccf.h                       |  53 ++
+ drivers/clk/nuc900/clk-nuc970.c                    | 925 +++++++++++++++++++++
+ drivers/clk/nuc900/clk-upll.c                      |  83 ++
+ drivers/clocksource/Kconfig                        |   8 +
+ drivers/clocksource/Makefile                       |   1 +
+ drivers/clocksource/timer-nuc900.c                 | 305 +++++++
+ drivers/irqchip/Makefile                           |   1 +
+ drivers/irqchip/irq-nuc900.c                       | 150 ++++
+ drivers/power/reset/Kconfig                        |   7 +
+ drivers/power/reset/Makefile                       |   1 +
+ drivers/power/reset/nuc900-reset.c                 |  93 +++
+ drivers/soc/Kconfig                                |   1 +
+ drivers/soc/Makefile                               |   1 +
+ drivers/soc/nuvoton/Kconfig                        |  10 +
+ drivers/soc/nuvoton/Makefile                       |   1 +
+ drivers/soc/nuvoton/soc-nuc900.c                   | 100 +++
+ include/dt-bindings/clock/nuc970-clock.h           | 233 ++++++
+ 35 files changed, 2522 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/nuvoton/nuc970.txt
+ create mode 100644 Documentation/devicetree/bindings/clock/nuvoton,nuc970-clk.txt
+ create mode 100644 Documentation/devicetree/bindings/interrupt-controller/nuvoton,nuc900-aic.txt
+ create mode 100644 Documentation/devicetree/bindings/reset/nuvoton,nuc900-reset.txt
+ create mode 100644 Documentation/devicetree/bindings/serial/nuc970-uart.txt
+ create mode 100644 Documentation/devicetree/bindings/soc/nuvoton/nuvoton,nuc900-soc.txt
+ create mode 100644 Documentation/devicetree/bindings/timer/nuvoton,nuc970-tmr.txt
+ create mode 100644 arch/arm/boot/dts/nuc970-evb.dts
+ create mode 100644 arch/arm/boot/dts/nuc970.dtsi
+ create mode 100644 arch/arm/configs/nuc970_defconfig
+ create mode 100644 arch/arm/mach-w90x900/nuc900.c
+ create mode 100644 drivers/clk/nuc900/Makefile
+ create mode 100644 drivers/clk/nuc900/clk-apll.c
+ create mode 100644 drivers/clk/nuc900/clk-ccf.h
+ create mode 100644 drivers/clk/nuc900/clk-nuc970.c
+ create mode 100644 drivers/clk/nuc900/clk-upll.c
+ create mode 100644 drivers/clocksource/timer-nuc900.c
+ create mode 100644 drivers/irqchip/irq-nuc900.c
+ create mode 100644 drivers/power/reset/nuc900-reset.c
+ create mode 100644 drivers/soc/nuvoton/Kconfig
+ create mode 100644 drivers/soc/nuvoton/Makefile
+ create mode 100644 drivers/soc/nuvoton/soc-nuc900.c
+ create mode 100644 include/dt-bindings/clock/nuc970-clock.h
+
+-- 
+2.7.4
