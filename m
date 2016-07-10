@@ -1,48 +1,59 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Sat, 9 Jul 2016 17:56:14 -0700
-Subject: [PATCH 2/2] mtd: nand: omap2: Add check for old elm binding
-In-Reply-To: <1467711150-23356-2-git-send-email-t.remmet@phytec.de>
-References: <1467711150-23356-1-git-send-email-t.remmet@phytec.de>
- <1467711150-23356-2-git-send-email-t.remmet@phytec.de>
-Message-ID: <20160710005614.GB29572@localhost>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Sun, 10 Jul 2016 03:26:49 +0200
+Subject: [PATCH v6 00/10] acpi,
+ clocksource: add GTDT driver and GTDT support in arm_arch_timer
+In-Reply-To: <21ec2b0d-cde9-f86a-c39a-0fba5d02fd03@linaro.org>
+References: <1467224153-22873-1-git-send-email-fu.wei@linaro.org>
+ <20160708132201.GD3784@red-moon>
+ <21ec2b0d-cde9-f86a-c39a-0fba5d02fd03@linaro.org>
+Message-ID: <3119857.QuQfKUSRGs@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 05, 2016 at 11:32:30AM +0200, Teresa Remmet wrote:
-> commit c9711ec5250b ("mtd: nand: omap: Clean up device tree support")
-> removes the check for the old elm phandle binding.
-
-That seems like a silly breakage of backwards compatibility. Must have
-overlooked that one, sorry.
-
-> Add it again to keep backward compatibility.
+On Saturday, July 09, 2016 11:44:47 AM Hanjun Guo wrote:
+> On 2016/7/8 21:22, Lorenzo Pieralisi wrote:
+> > On Thu, Jul 07, 2016 at 03:58:04PM +0200, Rafael J. Wysocki wrote:
+> >
+> > [...]
+> >
+> >>> Anyway let's avoid these petty arguments, I agree there must be some
+> >>> sort of ARM64 ACPI maintainership for the reasons you mentioned above.
+> >>
+> >> To avoid confusion on who's going to push stuff to Linus, I can do
+> >> that, but it must be clear whose ACKs are needed for that to happen.
+> >> That may be one person or all of you, whatever you decide.
+> >
+> > I think the reasoning is the same, to avoid confusion and avoid stepping
+> > on each other toes it is best to have a single gatekeeper (still
+> > multiple maintainer entries to keep patches reviewed correctly), if no
+> > one complains I will do that and a) provide ACKs (I will definitely
+> > require and request Hanjun and Sudeep ones too appropriately on a per
+> > patch basis) and b) send you pull requests.
 > 
-> Signed-off-by: Teresa Remmet <t.remmet@phytec.de>
-
-I think we should probably take this for v4.7, since the breaking commit
-was only merged in v4.7-rc1. OMAP folks, any comment?
-
-Brian
-
-> ---
->  drivers/mtd/nand/omap2.c | 4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
+> Fine to me.
 > 
-> diff --git a/drivers/mtd/nand/omap2.c b/drivers/mtd/nand/omap2.c
-> index 08e1588..d788663 100644
-> --- a/drivers/mtd/nand/omap2.c
-> +++ b/drivers/mtd/nand/omap2.c
-> @@ -1658,7 +1658,9 @@ static int omap_get_dt_info(struct device *dev, struct omap_nand_info *info)
->  	/* detect availability of ELM module. Won't be present pre-OMAP4 */
->  	info->elm_of_node = of_parse_phandle(child, "ti,elm-id", 0);
->  	if (!info->elm_of_node)
-> -		dev_dbg(dev, "ti,elm-id not in DT\n");
-> +		info->elm_of_node = of_parse_phandle(child, "elm_id", 0);
-> +		if (!info->elm_of_node)
-> +			dev_dbg(dev, "ti,elm-id not in DT\n");
->  
->  	/* select ecc-scheme for NAND */
->  	if (of_property_read_string(child, "ti,nand-ecc-opt", &s)) {
-> -- 
-> 1.9.1
+> >
+> > Having a maintainer per file would be farcical, I really do not
 > 
+> Agree, but having three of us in maintainer entries in MAINTAINERS
+> file will help the patches be reviewed correctly with more eyes.
+> 
+> > expect that amount of traffic for drivers/acpi/arm64 therefore I
+> > really doubt there is any risk of me slowing things down.
+> >
+> > Does this sound reasonable ? Comments/complaints welcome, please
+> > manifest yourselves.
+> 
+> Fair enough. What I'm concern most is land ACPI on ARM64 soundly,
+> let's do that :)
+> 
+> OK, let's back to this patch set, Fuwei already prepared a new version
+> of patches [1] (moving acpi_gtdt.c to drivers/acpi/arm64/ and add a
+> maintainer entries patch), shall we review and comment on this patch
+> set for now, or just let Fuwei send out the new version?
+
+Frankly, I don't see a point in discussing the old version only if a new
+one is available already.  Post it, please.
+
+Thanks,
+Rafael
