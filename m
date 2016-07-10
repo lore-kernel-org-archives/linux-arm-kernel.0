@@ -1,57 +1,69 @@
 From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Sun, 10 Jul 2016 17:51:48 -0400
-Subject: [PATCH v2 02/10] irqchip: add irqchip driver for nuc900
-In-Reply-To: <1468135649-19980-3-git-send-email-vw@iommu.org>
+Date: Sun, 10 Jul 2016 17:56:22 -0400
+Subject: [PATCH v2 05/10] power/reset: Add reset driver support for nuc900
+In-Reply-To: <1468135649-19980-6-git-send-email-vw@iommu.org>
 References: <1468135649-19980-1-git-send-email-vw@iommu.org>
- <1468135649-19980-3-git-send-email-vw@iommu.org>
-Message-ID: <CAP=VYLoAQ-0bNAHZFU0Bu9+1to6QFojyEY8YFoHxyP9QZgE5LQ@mail.gmail.com>
+ <1468135649-19980-6-git-send-email-vw@iommu.org>
+Message-ID: <CAP=VYLrb5ujiLTPXnPxzPHsdbHft9R45JB3LbbvRnaZ4rUAJoA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 10, 2016 at 3:27 AM, Wan Zongshun <vw@iommu.org> wrote:
-> This patch is to add irqchip driver support for nuc900 plat,
-> current this driver only supports nuc970 SoC.
+On Sun, Jul 10, 2016 at 3:27 AM, Wan Zongshun <vw@iommu.org> wrote
+> This driver is to add reset support for nuc900 series,
+> currently, it only supports nuc970 SoC reset.
 >
 > Signed-off-by: Wan Zongshun <mcuos.com@gmail.com>
 > ---
->  arch/arm/mach-w90x900/include/mach/irqs.h |   5 +
->  drivers/irqchip/Makefile                  |   1 +
->  drivers/irqchip/irq-nuc900.c              | 150 ++++++++++++++++++++++++++++++
->  3 files changed, 156 insertions(+)
->  create mode 100644 drivers/irqchip/irq-nuc900.c
+>  drivers/power/reset/Kconfig        |  7 +++
+>  drivers/power/reset/Makefile       |  1 +
+>  drivers/power/reset/nuc900-reset.c | 93 ++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 101 insertions(+)
+>  create mode 100644 drivers/power/reset/nuc900-reset.c
 >
-> diff --git a/arch/arm/mach-w90x900/include/mach/irqs.h b/arch/arm/mach-w90x900/include/mach/irqs.h
-> index 9d5cba3..3b035c6 100644
-> --- a/arch/arm/mach-w90x900/include/mach/irqs.h
-> +++ b/arch/arm/mach-w90x900/include/mach/irqs.h
-> @@ -59,7 +59,12 @@
->  #define IRQ_KPI                W90X900_IRQ(29)
->  #define IRQ_P2SGROUP   W90X900_IRQ(30)
->  #define IRQ_ADC                W90X900_IRQ(31)
+> diff --git a/drivers/power/reset/Kconfig b/drivers/power/reset/Kconfig
+> index 9bb2622..8c84892 100644
+> --- a/drivers/power/reset/Kconfig
+> +++ b/drivers/power/reset/Kconfig
+> @@ -94,6 +94,13 @@ config POWER_RESET_MSM
+>         help
+>           Power off and restart support for Qualcomm boards.
+>
+> +config POWER_RESET_NUC900
+> +       bool "Nuc900 restart driver"
+
+If this driver is bool and not tristate, then please remove all references
+to MODULE_<xyz> and then the module.h include as well.
+
+Thanks,
+Paul.
+--
+
+> +       depends on ARCH_W90X900
+> +       help
+> +         Power off and restart support for Nuvoton NUC900 family of
+> +         reference boards.
 > +
-> +#if !defined(CONFIG_SOC_NUC900)
->  #define NR_IRQS                (IRQ_ADC+1)
-> +#else
-> +#define NR_IRQS                62
-> +#endif
->
->  /*for irq group*/
->
-> diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
-> index 38853a1..9ccd5af8a 100644
-> --- a/drivers/irqchip/Makefile
-> +++ b/drivers/irqchip/Makefile
-> @@ -69,3 +69,4 @@ obj-$(CONFIG_PIC32_EVIC)              += irq-pic32-evic.o
->  obj-$(CONFIG_MVEBU_ODMI)               += irq-mvebu-odmi.o
->  obj-$(CONFIG_LS_SCFG_MSI)              += irq-ls-scfg-msi.o
->  obj-$(CONFIG_EZNPS_GIC)                        += irq-eznps.o
-> +obj-$(CONFIG_SOC_NUC970)               += irq-nuc900.o
-> diff --git a/drivers/irqchip/irq-nuc900.c b/drivers/irqchip/irq-nuc900.c
+>  config POWER_RESET_LTC2952
+>         bool "LTC2952 PowerPath power-off driver"
+>         depends on OF_GPIO
+> diff --git a/drivers/power/reset/Makefile b/drivers/power/reset/Makefile
+> index ab7aa86..d4df889 100644
+> --- a/drivers/power/reset/Makefile
+> +++ b/drivers/power/reset/Makefile
+> @@ -9,6 +9,7 @@ obj-$(CONFIG_POWER_RESET_GPIO_RESTART) += gpio-restart.o
+>  obj-$(CONFIG_POWER_RESET_HISI) += hisi-reboot.o
+>  obj-$(CONFIG_POWER_RESET_IMX) += imx-snvs-poweroff.o
+>  obj-$(CONFIG_POWER_RESET_MSM) += msm-poweroff.o
+> +obj-$(CONFIG_POWER_RESET_NUC900) += nuc900-reset.o
+>  obj-$(CONFIG_POWER_RESET_LTC2952) += ltc2952-poweroff.o
+>  obj-$(CONFIG_POWER_RESET_QNAP) += qnap-poweroff.o
+>  obj-$(CONFIG_POWER_RESET_RESTART) += restart-poweroff.o
+> diff --git a/drivers/power/reset/nuc900-reset.c b/drivers/power/reset/nuc900-reset.c
 > new file mode 100644
-> index 0000000..c4b2e39
+> index 0000000..49986b7
 > --- /dev/null
-> +++ b/drivers/irqchip/irq-nuc900.c
-> @@ -0,0 +1,150 @@
+> +++ b/drivers/power/reset/nuc900-reset.c
+> @@ -0,0 +1,93 @@
 > +/*
 > + * Copyright 2016 Wan Zongshun <mcuos.com@gmail.com>
 > + *
@@ -62,26 +74,17 @@ On Sun, Jul 10, 2016 at 3:27 AM, Wan Zongshun <vw@iommu.org> wrote:
 > + * http://www.opensource.org/licenses/gpl-license.html
 > + * http://www.gnu.org/copyleft/gpl.html
 > + */
-> +
-> +#include <linux/module.h>
-
-Why do you include module.h when I don't see anything modular in
-this driver?
-
-Paul.
---
-
 > +#include <linux/init.h>
-> +#include <linux/irq.h>
-> +#include <linux/irqchip.h>
-> +#include <linux/irqdomain.h>
+> +#include <linux/err.h>
 > +#include <linux/io.h>
-> +#include <linux/ioport.h>
-> +#include <linux/of_address.h>
-> +#include <linux/of_irq.h>
-> +
-> +#include <asm/exception.h>
-> +#include <asm/hardirq.h>
-> +
+> +#include <linux/kernel.h>
+> +#include <linux/mfd/syscon.h>
+> +#include <linux/module.h>
+> +#include <linux/notifier.h>
+> +#include <linux/of.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/reboot.h>
+> +#include <linux/regmap.h>
+>
 
 [...]
