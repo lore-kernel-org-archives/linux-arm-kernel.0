@@ -1,90 +1,53 @@
-From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Sun, 10 Jul 2016 17:56:22 -0400
-Subject: [PATCH v2 05/10] power/reset: Add reset driver support for nuc900
-In-Reply-To: <1468135649-19980-6-git-send-email-vw@iommu.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 11 Jul 2016 00:11:31 +0200
+Subject: [PATCH v2 01/10] ARM: NUC900: Add nuc970 machine support
+In-Reply-To: <1468135649-19980-2-git-send-email-vw@iommu.org>
 References: <1468135649-19980-1-git-send-email-vw@iommu.org>
- <1468135649-19980-6-git-send-email-vw@iommu.org>
-Message-ID: <CAP=VYLrb5ujiLTPXnPxzPHsdbHft9R45JB3LbbvRnaZ4rUAJoA@mail.gmail.com>
+ <1468135649-19980-2-git-send-email-vw@iommu.org>
+Message-ID: <4947302.8IpnGALVQ9@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 10, 2016 at 3:27 AM, Wan Zongshun <vw@iommu.org> wrote
-> This driver is to add reset support for nuc900 series,
-> currently, it only supports nuc970 SoC reset.
->
-> Signed-off-by: Wan Zongshun <mcuos.com@gmail.com>
-> ---
->  drivers/power/reset/Kconfig        |  7 +++
->  drivers/power/reset/Makefile       |  1 +
->  drivers/power/reset/nuc900-reset.c | 93 ++++++++++++++++++++++++++++++++++++++
->  3 files changed, 101 insertions(+)
->  create mode 100644 drivers/power/reset/nuc900-reset.c
->
-> diff --git a/drivers/power/reset/Kconfig b/drivers/power/reset/Kconfig
-> index 9bb2622..8c84892 100644
-> --- a/drivers/power/reset/Kconfig
-> +++ b/drivers/power/reset/Kconfig
-> @@ -94,6 +94,13 @@ config POWER_RESET_MSM
->         help
->           Power off and restart support for Qualcomm boards.
->
-> +config POWER_RESET_NUC900
-> +       bool "Nuc900 restart driver"
-
-If this driver is bool and not tristate, then please remove all references
-to MODULE_<xyz> and then the module.h include as well.
-
-Thanks,
-Paul.
---
-
-> +       depends on ARCH_W90X900
-> +       help
-> +         Power off and restart support for Nuvoton NUC900 family of
-> +         reference boards.
+On Sunday, July 10, 2016 3:27:21 PM CEST Wan Zongshun wrote:
 > +
->  config POWER_RESET_LTC2952
->         bool "LTC2952 PowerPath power-off driver"
->         depends on OF_GPIO
-> diff --git a/drivers/power/reset/Makefile b/drivers/power/reset/Makefile
-> index ab7aa86..d4df889 100644
-> --- a/drivers/power/reset/Makefile
-> +++ b/drivers/power/reset/Makefile
-> @@ -9,6 +9,7 @@ obj-$(CONFIG_POWER_RESET_GPIO_RESTART) += gpio-restart.o
->  obj-$(CONFIG_POWER_RESET_HISI) += hisi-reboot.o
->  obj-$(CONFIG_POWER_RESET_IMX) += imx-snvs-poweroff.o
->  obj-$(CONFIG_POWER_RESET_MSM) += msm-poweroff.o
-> +obj-$(CONFIG_POWER_RESET_NUC900) += nuc900-reset.o
->  obj-$(CONFIG_POWER_RESET_LTC2952) += ltc2952-poweroff.o
->  obj-$(CONFIG_POWER_RESET_QNAP) += qnap-poweroff.o
->  obj-$(CONFIG_POWER_RESET_RESTART) += restart-poweroff.o
-> diff --git a/drivers/power/reset/nuc900-reset.c b/drivers/power/reset/nuc900-reset.c
-> new file mode 100644
-> index 0000000..49986b7
-> --- /dev/null
-> +++ b/drivers/power/reset/nuc900-reset.c
-> @@ -0,0 +1,93 @@
-> +/*
-> + * Copyright 2016 Wan Zongshun <mcuos.com@gmail.com>
-> + *
-> + * The code contained herein is licensed under the GNU General Public
-> + * License. You may obtain a copy of the GNU General Public License
-> + * Version 2 or later at the following locations:
-> + *
-> + * http://www.opensource.org/licenses/gpl-license.html
-> + * http://www.gnu.org/copyleft/gpl.html
-> + */
-> +#include <linux/init.h>
-> +#include <linux/err.h>
-> +#include <linux/io.h>
-> +#include <linux/kernel.h>
-> +#include <linux/mfd/syscon.h>
-> +#include <linux/module.h>
-> +#include <linux/notifier.h>
-> +#include <linux/of.h>
 > +#include <linux/platform_device.h>
+> +#include <linux/clk.h>
+> +#include <linux/clkdev.h>
+> +#include <linux/delay.h>
+> +#include <linux/err.h>
+> +#include <linux/gpio.h>
+> +#include <linux/init.h>
 > +#include <linux/reboot.h>
-> +#include <linux/regmap.h>
->
+> +#include <linux/of_address.h>
+> +#include <linux/of_platform.h>
+> +#include <linux/sys_soc.h>
+> +#include <linux/semaphore.h>
+> +
+> +#include <asm/system_misc.h>
+> +#include <asm/mach/arch.h>
+> +
+> +static void __init nuc900_machine_init(void)
+> +{
+> +       of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+> +}
 
-[...]
+
+This is the default for .init_machine, so you can leave the function
+undefined.
+
+> +static const char *nuc900_dt_compat[] __initconst = {
+> +       "nuvoton,nuc970",
+> +       NULL,
+> +};
+> +
+> +DT_MACHINE_START(nuc900_dt, "Nuvoton NUC900 (Device Tree Support)")
+> +       .init_machine   = nuc900_machine_init,
+> +       .dt_compat      = nuc900_dt_compat,
+> +MACHINE_END
+> 
+
+After that, you can probably remove most of the #include statements.
+The file is still needed for now, until you move to ARCH_MULTIPLATFORM,
+at which point the entire machine descriptor is redundant.
+
+	Arnd
