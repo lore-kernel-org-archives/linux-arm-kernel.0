@@ -1,55 +1,89 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Sun, 10 Jul 2016 11:11:03 +0200
-Subject: [PATCH v3 0/3] watchdog: Add Amlogic Meson GXBB Watchdog Timer driver
-Message-ID: <1468141867-4172-1-git-send-email-narmstrong@baylibre.com>
+From: mingo@kernel.org (Ingo Molnar)
+Date: Sun, 10 Jul 2016 11:16:32 +0200
+Subject: [PATCH 0/9] mm: Hardened usercopy
+In-Reply-To: <578185D4.29090.242668C8@pageexec.freemail.hu>
+References: <1467843928-29351-1-git-send-email-keescook@chromium.org>
+ <CALCETrU5Emr7jZNH5bh7Z+C8fLOcAah9SzeJbDjqW7N-xWGxHA@mail.gmail.com>
+ <578185D4.29090.242668C8@pageexec.freemail.hu>
+Message-ID: <20160710091632.GA14172@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds support for the Amlogic Meson GXBB SoC Watchdog Timer.
-It differs from the meson6/meson8b HW, so need for a separate driver.
-The HW provides a divider capable of having a 1ms timebase thus simplifying
-the counter update.
-The restart call is not provided even if the HW is capable of triggering a
-system reset immediately because of the PSCI firmare having such functionnality.
-The watchdog is not expected to be running at boot time since there is a separate
-system-level watchdog running from the SCPI co-processor, but this case would be
-handle in a next driver update.
 
-Changes since v2 at http://lkml.kernel.org/r/1464943007-18000-1-git-send-email-narmstrong at baylibre.com :
-- Fix set_timeout behaviour
+* PaX Team <pageexec@freemail.hu> wrote:
 
-Changes since v1 at http://lkml.kernel.org/r/1464614948-28247-1-git-send-email-narmstrong at baylibre.com :
-- Update default timeout to 30sec
-- Add separate CONFIG_
-- Remove unused defines & functions
-- Fix indentation
-- Check set_timeout max value
-- Reorder includes alphabetically
-- Switch to human identify string
-- clk_disable_unprepare on probe failure or removal
+> On 9 Jul 2016 at 14:27, Andy Lutomirski wrote:
+> 
+> > I like the series, but I have one minor nit to pick.  The effect of this 
+> > series is to harden usercopy, but most of the code is really about 
+> > infrastructure to validate that a pointed-to object is valid.
+> 
+> actually USERCOPY has never been about validating pointers. its sole purpose is 
+> to validate the *size* argument of copy*user calls, a very specific form of 
+> runtime bounds checking.
 
-Changes since RFC version at http://lkml.kernel.org/r/1464249112-13658-1-git-send-email-narmstrong at baylibre.com :
-- Remove status callback, will re-introduce it later to managed the already-running use case
-- Fix registers defines indentation
-- Fix space between operators
-- Make all callbacks static functions
-- Fix bindings with missing clocks attribute
-- Do not stop/start watchdog on a timeout setup
-- Fix probe device configuration
+What this code has been about originally is largely immaterial, unless you can 
+formulate it into a technical argument.
 
-Neil Armstrong (3):
-  watchdog: Add Meson GXBB Watchdog Driver
-  dt-bindings: watchdog: Add Meson GXBB Watchdog bindings
-  ARM64: dts: amlogic: meson-gxbb: Add watchdog node
+There are a number of cheap tests we can do and there are a number of ways how a 
+'pointer' can be validated runtime, without any 'size' information:
 
- .../bindings/watchdog/meson-gxbb-wdt.txt           |  16 ++
- arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi        |   6 +
- drivers/watchdog/Kconfig                           |  10 +
- drivers/watchdog/Makefile                          |   1 +
- drivers/watchdog/meson_gxbb_wdt.c                  | 270 +++++++++++++++++++++
- 5 files changed, 303 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/watchdog/meson-gxbb-wdt.txt
- create mode 100644 drivers/watchdog/meson_gxbb_wdt.c
+ - for example if a pointer points into a red zone straight away then we know it's
+   bogus.
 
--- 
-2.7.0
+ - or if a kernel pointer is points outside the valid kernel virtual memory range
+   we know it's bogus as well.
+
+So while only doing a bounds check might have been the original purpose of the 
+patch set, Andy's point is that it might make sense to treat this facility as a 
+more generic 'object validation' code of (pointer,size) object and not limit it to 
+'runtime bounds checking'. That kind of extended purpose behind a facility should 
+be reflected in the naming.
+
+Confusing names are often the source of misunderstandings and bugs.
+
+The 9-patch series as submitted here is neither just 'bounds checking' nor just 
+pure 'pointer checking', it's about validating that a (pointer,size) range of 
+memory passed to a (user) memory copy function is fully within a valid object the 
+kernel might know about (in an fast to check fashion).
+
+This necessary means:
+
+ - the start of the range points to a valid object to begin with (if known)
+
+ - the range itself does not point beyond the end of the object (if known)
+
+ - even if the kernel does not know anything about the pointed to object it can 
+   do a pointer check (for example is it pointing inside kernel virtual memory) 
+   and do a bounds check on the size.
+
+Do you disagree with that?
+
+> > Might it make sense to call the infrastructure part something else?
+> 
+> yes, more bikeshedding will surely help, [...]
+
+Insulting and ridiculing a reviewer who explicitly qualified his comments with 
+"one minor nit to pick" sure does not help upstream integration either. (Unless 
+the goal is to prevent upstream integration.)
+
+> [...] like the renaming of .data..read_only to .data..ro_after_init which also 
+> had nothing to do with init but everything to do with objects being conceptually 
+> read-only...
+
+.data..ro_after_init objects get written to during bootup so it's conceptually 
+quite confusing to name it "read-only" without any clear qualifiers.
+
+That it's named consistently with its role of "read-write before init and read 
+only after init" on the other hand is not confusing at all. Not sure what your 
+problem is with the new name.
+
+Names within submitted patches get renamed on a routine basis during review. It's 
+often only minor improvements in naming (which you can consider bike shedding), 
+but in this particular case the rename was clearly useful in not just improving 
+the name but in avoiding an actively confusing name. So I disagree not just with 
+the hostile tone of your reply but with your underlying technical point as well.
+
+Thanks,
+
+	Ingo
