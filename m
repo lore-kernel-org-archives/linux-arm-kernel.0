@@ -1,77 +1,48 @@
-From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Sat, 9 Jul 2016 20:00:42 -0400
-Subject: [PATCH v7 3/4] perf: xgene: Add APM X-Gene SoC Performance
- Monitoring Unit driver
-In-Reply-To: <1467850045-10584-4-git-send-email-ttnguyen@apm.com>
-References: <1467850045-10584-1-git-send-email-ttnguyen@apm.com>
- <1467850045-10584-4-git-send-email-ttnguyen@apm.com>
-Message-ID: <CAP=VYLrsfOTgJmMBz-R_pQ+GXa4UEb2a=jH7TJBwcHz6UTxGKQ@mail.gmail.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Sat, 9 Jul 2016 17:56:14 -0700
+Subject: [PATCH 2/2] mtd: nand: omap2: Add check for old elm binding
+In-Reply-To: <1467711150-23356-2-git-send-email-t.remmet@phytec.de>
+References: <1467711150-23356-1-git-send-email-t.remmet@phytec.de>
+ <1467711150-23356-2-git-send-email-t.remmet@phytec.de>
+Message-ID: <20160710005614.GB29572@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 6, 2016 at 8:07 PM, Tai Nguyen <ttnguyen@apm.com> wrote:
-> Signed-off-by: Tai Nguyen <ttnguyen@apm.com>
+On Tue, Jul 05, 2016 at 11:32:30AM +0200, Teresa Remmet wrote:
+> commit c9711ec5250b ("mtd: nand: omap: Clean up device tree support")
+> removes the check for the old elm phandle binding.
+
+That seems like a silly breakage of backwards compatibility. Must have
+overlooked that one, sorry.
+
+> Add it again to keep backward compatibility.
+> 
+> Signed-off-by: Teresa Remmet <t.remmet@phytec.de>
+
+I think we should probably take this for v4.7, since the breaking commit
+was only merged in v4.7-rc1. OMAP folks, any comment?
+
+Brian
+
 > ---
->  Documentation/perf/xgene-pmu.txt |   48 ++
->  drivers/perf/Kconfig             |    7 +
->  drivers/perf/Makefile            |    1 +
->  drivers/perf/xgene_pmu.c         | 1398 ++++++++++++++++++++++++++++++++++++++
->  4 files changed, 1454 insertions(+)
->  create mode 100644 Documentation/perf/xgene-pmu.txt
->  create mode 100644 drivers/perf/xgene_pmu.c
->
-
-[...]
-
-> diff --git a/drivers/perf/Kconfig b/drivers/perf/Kconfig
-> index 04e2653..4d5c5f9 100644
-> --- a/drivers/perf/Kconfig
-> +++ b/drivers/perf/Kconfig
-> @@ -12,4 +12,11 @@ config ARM_PMU
->           Say y if you want to use CPU performance monitors on ARM-based
->           systems.
->
-> +config XGENE_PMU
-> +        depends on PERF_EVENTS && ARCH_XGENE
-> +        bool "APM X-Gene SoC PMU"
-
-If the driver is bool, then please avoid using module.h and anything from
-within it.  They are either no-ops when built in, or there are non-modular
-equivalents available, so it is entirely avoidable, and makes for smaller
-and better code.
-
-> +        default n
-> +        help
-> +          Say y if you want to use APM X-Gene SoC performance monitors.
-> +
->  endmenu
-> diff --git a/drivers/perf/Makefile b/drivers/perf/Makefile
-> index acd2397..b116e98 100644
-> --- a/drivers/perf/Makefile
-> +++ b/drivers/perf/Makefile
-> @@ -1 +1,2 @@
->  obj-$(CONFIG_ARM_PMU) += arm_pmu.o
-> +obj-$(CONFIG_XGENE_PMU) += xgene_pmu.o
-
-[...]
-                    ver = {
-> +               .name           = "xgene-pmu",
-> +               .of_match_table = xgene_pmu_of_match,
-> +               .acpi_match_table = ACPI_PTR(xgene_pmu_acpi_match),
-> +       },
-> +};
-> +
-> +module_platform_driver(xgene_pmu_driver);
-
-builtin_platform_driver
-
-> +
-> +MODULE_DESCRIPTION("APM X-Gene SoC PMU driver");
-> +MODULE_AUTHOR("Hoan Tran <hotran@apm.com>");
-> +MODULE_AUTHOR("Tai Nguyen <ttnguyen@apm.com>");
-> +MODULE_LICENSE("GPL");
-
-As long as this information is at the top of the file, then these can
-go away too -- just like MODULE_DEVICE_TABLE they are no-op.
-
-Paul.
+>  drivers/mtd/nand/omap2.c | 4 +++-
+>  1 file changed, 3 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/mtd/nand/omap2.c b/drivers/mtd/nand/omap2.c
+> index 08e1588..d788663 100644
+> --- a/drivers/mtd/nand/omap2.c
+> +++ b/drivers/mtd/nand/omap2.c
+> @@ -1658,7 +1658,9 @@ static int omap_get_dt_info(struct device *dev, struct omap_nand_info *info)
+>  	/* detect availability of ELM module. Won't be present pre-OMAP4 */
+>  	info->elm_of_node = of_parse_phandle(child, "ti,elm-id", 0);
+>  	if (!info->elm_of_node)
+> -		dev_dbg(dev, "ti,elm-id not in DT\n");
+> +		info->elm_of_node = of_parse_phandle(child, "elm_id", 0);
+> +		if (!info->elm_of_node)
+> +			dev_dbg(dev, "ti,elm-id not in DT\n");
+>  
+>  	/* select ecc-scheme for NAND */
+>  	if (of_property_read_string(child, "ti,nand-ecc-opt", &s)) {
+> -- 
+> 1.9.1
+> 
