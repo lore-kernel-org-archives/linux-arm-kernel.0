@@ -1,130 +1,77 @@
 From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Sat, 9 Jul 2016 19:45:07 -0400
-Subject: [PATCH V2 04/10] firmware: tegra: add IVC library
-In-Reply-To: <20160705090431.5852-5-josephl@nvidia.com>
-References: <20160705090431.5852-1-josephl@nvidia.com>
- <20160705090431.5852-5-josephl@nvidia.com>
-Message-ID: <CAP=VYLoX5CkXGFrXtMFYYuJUs_+_9zzzus1o+_7twvf4rkU_Og@mail.gmail.com>
+Date: Sat, 9 Jul 2016 20:00:42 -0400
+Subject: [PATCH v7 3/4] perf: xgene: Add APM X-Gene SoC Performance
+ Monitoring Unit driver
+In-Reply-To: <1467850045-10584-4-git-send-email-ttnguyen@apm.com>
+References: <1467850045-10584-1-git-send-email-ttnguyen@apm.com>
+ <1467850045-10584-4-git-send-email-ttnguyen@apm.com>
+Message-ID: <CAP=VYLrsfOTgJmMBz-R_pQ+GXa4UEb2a=jH7TJBwcHz6UTxGKQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 5, 2016 at 5:04 AM, Joseph Lo <josephl@nvidia.com> wrote:
-> The Inter-VM communication (IVC) is a communication protocol, which is
-> designed for interprocessor communication (IPC) or the communication
-> between the hypervisor and the virtual machine with a guest OS on it. So
-> it can be translated as inter-virtual memory or inter-virtual machine
-> communication. The message channels are maintained on the DRAM or SRAM
-> and the data coherency should be considered. Or the data could be
-> corrupted or out of date when the remote client checking it.
->
-> Inside the IVC, it maintains memory-based descriptors for the TX/RX
-> channels and the coherency issue of the counter and payloads. So the
-> clients can use it to send/receive messages to/from remote ones.
->
-> We introduce it as a library for the firmware drivers, which can use it
-> for IPC.
->
-> Based-on-the-work-by:
-> Peter Newman <pnewman@nvidia.com>
->
-> Signed-off-by: Joseph Lo <josephl@nvidia.com>
+On Wed, Jul 6, 2016 at 8:07 PM, Tai Nguyen <ttnguyen@apm.com> wrote:
+> Signed-off-by: Tai Nguyen <ttnguyen@apm.com>
 > ---
-> Changes in V2:
-> - None
-> ---
->  drivers/firmware/Kconfig        |   1 +
->  drivers/firmware/Makefile       |   1 +
->  drivers/firmware/tegra/Kconfig  |  13 +
->  drivers/firmware/tegra/Makefile |   1 +
->  drivers/firmware/tegra/ivc.c    | 659 ++++++++++++++++++++++++++++++++++++++++
->  include/soc/tegra/ivc.h         | 102 +++++++
->  6 files changed, 777 insertions(+)
->  create mode 100644 drivers/firmware/tegra/Kconfig
->  create mode 100644 drivers/firmware/tegra/Makefile
->  create mode 100644 drivers/firmware/tegra/ivc.c
->  create mode 100644 include/soc/tegra/ivc.h
+>  Documentation/perf/xgene-pmu.txt |   48 ++
+>  drivers/perf/Kconfig             |    7 +
+>  drivers/perf/Makefile            |    1 +
+>  drivers/perf/xgene_pmu.c         | 1398 ++++++++++++++++++++++++++++++++++++++
+>  4 files changed, 1454 insertions(+)
+>  create mode 100644 Documentation/perf/xgene-pmu.txt
+>  create mode 100644 drivers/perf/xgene_pmu.c
 >
-> diff --git a/drivers/firmware/Kconfig b/drivers/firmware/Kconfig
-> index 5e618058defe..bbd64ae8c4c6 100644
-> --- a/drivers/firmware/Kconfig
-> +++ b/drivers/firmware/Kconfig
-> @@ -200,5 +200,6 @@ config HAVE_ARM_SMCCC
->  source "drivers/firmware/broadcom/Kconfig"
->  source "drivers/firmware/google/Kconfig"
->  source "drivers/firmware/efi/Kconfig"
-> +source "drivers/firmware/tegra/Kconfig"
+
+[...]
+
+> diff --git a/drivers/perf/Kconfig b/drivers/perf/Kconfig
+> index 04e2653..4d5c5f9 100644
+> --- a/drivers/perf/Kconfig
+> +++ b/drivers/perf/Kconfig
+> @@ -12,4 +12,11 @@ config ARM_PMU
+>           Say y if you want to use CPU performance monitors on ARM-based
+>           systems.
 >
+> +config XGENE_PMU
+> +        depends on PERF_EVENTS && ARCH_XGENE
+> +        bool "APM X-Gene SoC PMU"
+
+If the driver is bool, then please avoid using module.h and anything from
+within it.  They are either no-ops when built in, or there are non-modular
+equivalents available, so it is entirely avoidable, and makes for smaller
+and better code.
+
+> +        default n
+> +        help
+> +          Say y if you want to use APM X-Gene SoC performance monitors.
+> +
 >  endmenu
-> diff --git a/drivers/firmware/Makefile b/drivers/firmware/Makefile
-> index 474bada56fcd..9a4df8171cc4 100644
-> --- a/drivers/firmware/Makefile
-> +++ b/drivers/firmware/Makefile
-> @@ -24,3 +24,4 @@ obj-y                         += broadcom/
->  obj-$(CONFIG_GOOGLE_FIRMWARE)  += google/
->  obj-$(CONFIG_EFI)              += efi/
->  obj-$(CONFIG_UEFI_CPER)                += efi/
-> +obj-y                          += tegra/
-> diff --git a/drivers/firmware/tegra/Kconfig b/drivers/firmware/tegra/Kconfig
-> new file mode 100644
-> index 000000000000..1fa3e4e136a5
-> --- /dev/null
-> +++ b/drivers/firmware/tegra/Kconfig
-> @@ -0,0 +1,13 @@
-> +menu "Tegra firmware driver"
+> diff --git a/drivers/perf/Makefile b/drivers/perf/Makefile
+> index acd2397..b116e98 100644
+> --- a/drivers/perf/Makefile
+> +++ b/drivers/perf/Makefile
+> @@ -1 +1,2 @@
+>  obj-$(CONFIG_ARM_PMU) += arm_pmu.o
+> +obj-$(CONFIG_XGENE_PMU) += xgene_pmu.o
+
+[...]
+                    ver = {
+> +               .name           = "xgene-pmu",
+> +               .of_match_table = xgene_pmu_of_match,
+> +               .acpi_match_table = ACPI_PTR(xgene_pmu_acpi_match),
+> +       },
+> +};
 > +
-> +config TEGRA_IVC
-> +       bool "Tegra IVC protocol"
+> +module_platform_driver(xgene_pmu_driver);
 
-If this driver is not tristate, then why does the driver include the
-module.h header below?
+builtin_platform_driver
 
-> +       depends on ARCH_TEGRA
-> +       help
-> +         IVC (Inter-VM Communication) protocol is part of the IPC
-> +         (Inter Processor Communication) framework on Tegra. It maintains the
-> +         data and the different commuication channels in SysRAM or RAM and
-> +         keeps the content is synchronization between host CPU and remote
-> +         processors.
 > +
-> +endmenu
-> diff --git a/drivers/firmware/tegra/Makefile b/drivers/firmware/tegra/Makefile
-> new file mode 100644
-> index 000000000000..92e2153e8173
-> --- /dev/null
-> +++ b/drivers/firmware/tegra/Makefile
-> @@ -0,0 +1 @@
-> +obj-$(CONFIG_TEGRA_IVC)                += ivc.o
-> diff --git a/drivers/firmware/tegra/ivc.c b/drivers/firmware/tegra/ivc.c
-> new file mode 100644
-> index 000000000000..3e736bb9915a
-> --- /dev/null
-> +++ b/drivers/firmware/tegra/ivc.c
-> @@ -0,0 +1,659 @@
-> +/*
-> + * Copyright (c) 2014-2016, NVIDIA CORPORATION.  All rights reserved.
-> + *
-> + * This program is free software; you can redistribute it and/or modify it
-> + * under the terms and conditions of the GNU General Public License,
-> + * version 2, as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope it will be useful, but WITHOUT
-> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-> + * more details.
-> + */
-> +
-> +#include <linux/module.h>
- ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> +MODULE_DESCRIPTION("APM X-Gene SoC PMU driver");
+> +MODULE_AUTHOR("Hoan Tran <hotran@apm.com>");
+> +MODULE_AUTHOR("Tai Nguyen <ttnguyen@apm.com>");
+> +MODULE_LICENSE("GPL");
 
-I'm sure it "works" since module.h includes nearly everything else,
-but that is less than ideal for exactly the same reason.
+As long as this information is at the top of the file, then these can
+go away too -- just like MODULE_DEVICE_TABLE they are no-op.
 
-Thanks,
 Paul.
---
-
-> +
-> +#include <soc/tegra/ivc.h>
-> +
-> +#define IVC_ALIGN 64
-> +
