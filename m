@@ -1,179 +1,101 @@
 From: vw@iommu.org (Wan Zongshun)
-Date: Sun, 10 Jul 2016 15:27:26 +0800
-Subject: [PATCH v2 06/10] soc: Add SoC specific driver support for nuc900
-In-Reply-To: <1468135649-19980-1-git-send-email-vw@iommu.org>
-References: <1468135649-19980-1-git-send-email-vw@iommu.org>
-Message-ID: <1468135649-19980-7-git-send-email-vw@iommu.org>
+Date: Sun, 10 Jul 2016 15:42:22 +0800
+Subject: [PATCH v2 10/10] nuc900: add nuc970 platform defconfig file
+In-Reply-To: <1468136542-2656-1-git-send-email-vw@iommu.org>
+References: <1468136542-2656-1-git-send-email-vw@iommu.org>
+Message-ID: <1468136542-2656-3-git-send-email-vw@iommu.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch is to add SoC specific driver for nuc970 SoC,
-it is for getting nuc970 version id and chip id.
+Add nuc970_defconfig file support.
 
 Signed-off-by: Wan Zongshun <mcuos.com@gmail.com>
 ---
- drivers/soc/Kconfig              |   1 +
- drivers/soc/Makefile             |   1 +
- drivers/soc/nuvoton/Kconfig      |  10 ++++
- drivers/soc/nuvoton/Makefile     |   1 +
- drivers/soc/nuvoton/soc-nuc900.c | 100 +++++++++++++++++++++++++++++++++++++++
- 5 files changed, 113 insertions(+)
- create mode 100644 drivers/soc/nuvoton/Kconfig
- create mode 100644 drivers/soc/nuvoton/Makefile
- create mode 100644 drivers/soc/nuvoton/soc-nuc900.c
+ arch/arm/configs/nuc970_defconfig | 76 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 76 insertions(+)
+ create mode 100644 arch/arm/configs/nuc970_defconfig
 
-diff --git a/drivers/soc/Kconfig b/drivers/soc/Kconfig
-index cb58ef0..2119733 100644
---- a/drivers/soc/Kconfig
-+++ b/drivers/soc/Kconfig
-@@ -4,6 +4,7 @@ source "drivers/soc/bcm/Kconfig"
- source "drivers/soc/brcmstb/Kconfig"
- source "drivers/soc/fsl/qe/Kconfig"
- source "drivers/soc/mediatek/Kconfig"
-+source "drivers/soc/nuvoton/Kconfig"
- source "drivers/soc/qcom/Kconfig"
- source "drivers/soc/rockchip/Kconfig"
- source "drivers/soc/samsung/Kconfig"
-diff --git a/drivers/soc/Makefile b/drivers/soc/Makefile
-index 380230f..bb1bfba 100644
---- a/drivers/soc/Makefile
-+++ b/drivers/soc/Makefile
-@@ -8,6 +8,7 @@ obj-$(CONFIG_ARCH_DOVE)		+= dove/
- obj-$(CONFIG_MACH_DOVE)		+= dove/
- obj-y				+= fsl/
- obj-$(CONFIG_ARCH_MEDIATEK)	+= mediatek/
-+obj-$(CONFIG_SOC_NUC900)	+= nuvoton/
- obj-$(CONFIG_ARCH_QCOM)		+= qcom/
- obj-$(CONFIG_ARCH_RENESAS)	+= renesas/
- obj-$(CONFIG_ARCH_ROCKCHIP)	+= rockchip/
-diff --git a/drivers/soc/nuvoton/Kconfig b/drivers/soc/nuvoton/Kconfig
+diff --git a/arch/arm/configs/nuc970_defconfig b/arch/arm/configs/nuc970_defconfig
 new file mode 100644
-index 0000000..53c106c
+index 0000000..b39a406
 --- /dev/null
-+++ b/drivers/soc/nuvoton/Kconfig
-@@ -0,0 +1,10 @@
-+#
-+# ARM Versatile SoC drivers
-+#
-+config SOC_NUC900
-+	bool "SoC bus device for the nuvoton NUC900 platforms"
-+	depends on ARCH_W90X900
-+	select SOC_BUS
-+	help
-+	  Include support for the SoC bus on the NUC900 platforms
-+	  providing some sysfs information about the ASIC variant.
-diff --git a/drivers/soc/nuvoton/Makefile b/drivers/soc/nuvoton/Makefile
-new file mode 100644
-index 0000000..88f9b7e
---- /dev/null
-+++ b/drivers/soc/nuvoton/Makefile
-@@ -0,0 +1 @@
-+obj-$(CONFIG_SOC_NUC900)	+= soc-nuc900.o
-diff --git a/drivers/soc/nuvoton/soc-nuc900.c b/drivers/soc/nuvoton/soc-nuc900.c
-new file mode 100644
-index 0000000..034ef94
---- /dev/null
-+++ b/drivers/soc/nuvoton/soc-nuc900.c
-@@ -0,0 +1,100 @@
-+/*
-+ * Copyright 2016 Wan Zongshun <mcuos.com@gmail.com>
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+#include <linux/init.h>
-+#include <linux/io.h>
-+#include <linux/slab.h>
-+#include <linux/sys_soc.h>
-+#include <linux/platform_device.h>
-+#include <linux/mfd/syscon.h>
-+#include <linux/regmap.h>
-+#include <linux/of.h>
-+
-+/* System ID in syscon */
-+#define GCR_CHIPID		0x00
-+#define GCR_CHIPID_MASK		0x00ffffff
-+
-+static const struct of_device_id nuc900_soc_of_match[] = {
-+	{ .compatible = "nuvoton,nuc900-soc",	},
-+	{ }
-+};
-+
-+static u32 nuc900_chipid;
-+
-+static ssize_t nuc900_get_chipid(struct device *dev,
-+				 struct device_attribute *attr,
-+				 char *buf)
-+{
-+	return sprintf(buf, "0x%x\n", nuc900_chipid & GCR_CHIPID_MASK);
-+}
-+
-+static struct device_attribute nuc900_chipid_attr =
-+	__ATTR(manufacturer,  S_IRUGO, nuc900_get_chipid,  NULL);
-+
-+static ssize_t nuc900_get_versionid(struct device *dev,
-+			      struct device_attribute *attr,
-+			      char *buf)
-+{
-+	return sprintf(buf, "0x%x\n", (nuc900_chipid >> 24) & 0xff);
-+}
-+
-+static struct device_attribute nuc900_version_attr =
-+	__ATTR(board,  S_IRUGO, nuc900_get_versionid,  NULL);
-+
-+static int nuc900_soc_probe(struct platform_device *pdev)
-+{
-+	static struct regmap *syscon_regmap;
-+	struct soc_device *soc_dev;
-+	struct soc_device_attribute *soc_dev_attr;
-+	struct device_node *np = pdev->dev.of_node;
-+	int ret;
-+
-+	syscon_regmap = syscon_regmap_lookup_by_phandle(np, "syscon");
-+	if (IS_ERR(syscon_regmap))
-+		return PTR_ERR(syscon_regmap);
-+
-+	soc_dev_attr = kzalloc(sizeof(*soc_dev_attr), GFP_KERNEL);
-+	if (!soc_dev_attr)
-+		return -ENOMEM;
-+
-+	ret = of_property_read_string(np, "compatible", &soc_dev_attr->soc_id);
-+	if (ret)
-+		return -EINVAL;
-+
-+	soc_dev_attr->machine = "NUC900EVB";
-+	soc_dev_attr->family = "NUC900";
-+	soc_dev = soc_device_register(soc_dev_attr);
-+	if (IS_ERR(soc_dev)) {
-+		kfree(soc_dev_attr);
-+		return -ENODEV;
-+	}
-+
-+	ret = regmap_read(syscon_regmap, GCR_CHIPID, &nuc900_chipid);
-+	if (ret)
-+		return -ENODEV;
-+
-+	device_create_file(soc_device_to_device(soc_dev), &nuc900_chipid_attr);
-+	device_create_file(soc_device_to_device(soc_dev), &nuc900_version_attr);
-+
-+	dev_info(&pdev->dev, "Nuvoton Chip ID: 0x%x, Version ID:0x%x\n",
-+		 nuc900_chipid & GCR_CHIPID_MASK,
-+		 (nuc900_chipid >> 24) & 0xff);
-+
-+	return 0;
-+}
-+
-+static struct platform_driver nuc900_soc_driver = {
-+	.probe = nuc900_soc_probe,
-+	.driver = {
-+		.name = "nuc900-soc",
-+		.of_match_table = nuc900_soc_of_match,
-+	},
-+};
-+builtin_platform_driver(nuc900_soc_driver);
++++ b/arch/arm/configs/nuc970_defconfig
+@@ -0,0 +1,76 @@
++# CONFIG_LOCALVERSION_AUTO is not set
++CONFIG_SYSVIPC=y
++# CONFIG_CROSS_MEMORY_ATTACH is not set
++CONFIG_NO_HZ=y
++CONFIG_HIGH_RES_TIMERS=y
++CONFIG_BSD_PROCESS_ACCT=y
++CONFIG_BSD_PROCESS_ACCT_V3=y
++CONFIG_CGROUPS=y
++CONFIG_CGROUP_SCHED=y
++CONFIG_RT_GROUP_SCHED=y
++CONFIG_CGROUP_FREEZER=y
++CONFIG_CPUSETS=y
++CONFIG_CGROUP_DEVICE=y
++CONFIG_CGROUP_CPUACCT=y
++CONFIG_CGROUP_PERF=y
++CONFIG_BLK_DEV_INITRD=y
++CONFIG_INITRAMFS_SOURCE="../rootfs"
++CONFIG_PERF_EVENTS=y
++# CONFIG_COMPAT_BRK is not set
++CONFIG_MODULES=y
++CONFIG_MODULE_UNLOAD=y
++CONFIG_ARCH_W90X900=y
++CONFIG_SOC_NUC970=y
++# CONFIG_MACH_W90P910EVB is not set
++CONFIG_PREEMPT=y
++CONFIG_AEABI=y
++CONFIG_OABI_COMPAT=y
++CONFIG_ARM_APPENDED_DTB=y
++CONFIG_CMDLINE="root=/dev/ram0 console=ttyS0,115200n8 rdinit=/sbin/init mem=64M"
++CONFIG_KEXEC=y
++CONFIG_FPE_NWFPE=y
++# CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
++# CONFIG_SUSPEND is not set
++CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
++CONFIG_DEVTMPFS=y
++CONFIG_DEVTMPFS_MOUNT=y
++# CONFIG_STANDALONE is not set
++# CONFIG_PREVENT_FIRMWARE_BUILD is not set
++# CONFIG_FIRMWARE_IN_KERNEL is not set
++CONFIG_BLK_DEV_RAM=y
++CONFIG_BLK_DEV_RAM_SIZE=16384
++CONFIG_SCSI=y
++# CONFIG_SCSI_PROC_FS is not set
++CONFIG_BLK_DEV_SD=y
++# CONFIG_SCSI_LOWLEVEL is not set
++# CONFIG_INPUT_MOUSEDEV is not set
++# CONFIG_INPUT_KEYBOARD is not set
++# CONFIG_INPUT_MOUSE is not set
++# CONFIG_SERIO is not set
++CONFIG_VT_HW_CONSOLE_BINDING=y
++# CONFIG_LEGACY_PTYS is not set
++CONFIG_SERIAL_NUC970=y
++CONFIG_SERIAL_NUC970_CONSOLE=y
++# CONFIG_HW_RANDOM is not set
++CONFIG_POWER_RESET=y
++CONFIG_POWER_RESET_NUC900=y
++# CONFIG_HWMON is not set
++# CONFIG_HID is not set
++# CONFIG_USB_SUPPORT is not set
++# CONFIG_IOMMU_SUPPORT is not set
++# CONFIG_DNOTIFY is not set
++# CONFIG_INOTIFY_USER is not set
++CONFIG_MSDOS_FS=y
++CONFIG_VFAT_FS=y
++CONFIG_TMPFS=y
++CONFIG_TMPFS_POSIX_ACL=y
++CONFIG_ROMFS_FS=y
++CONFIG_NLS_CODEPAGE_437=y
++CONFIG_NLS_ISO8859_1=y
++CONFIG_MESSAGE_LOGLEVEL_DEFAULT=7
++# CONFIG_ENABLE_WARN_DEPRECATED is not set
++# CONFIG_ENABLE_MUST_CHECK is not set
++CONFIG_DEBUG_FS=y
++CONFIG_RCU_CPU_STALL_TIMEOUT=300
++CONFIG_STRICT_DEVMEM=y
++# CONFIG_ARM_UNWIND is not set
 -- 
 2.7.4
