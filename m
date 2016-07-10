@@ -1,59 +1,80 @@
 From: vw@iommu.org (Wan Zongshun)
-Date: Sun, 10 Jul 2016 15:27:25 +0800
-Subject: [PATCH v2 05/10] power/reset: Add reset driver support for nuc900
+Date: Sun, 10 Jul 2016 15:27:21 +0800
+Subject: [PATCH v2 01/10] ARM: NUC900: Add nuc970 machine support
 In-Reply-To: <1468135649-19980-1-git-send-email-vw@iommu.org>
 References: <1468135649-19980-1-git-send-email-vw@iommu.org>
-Message-ID: <1468135649-19980-6-git-send-email-vw@iommu.org>
+Message-ID: <1468135649-19980-2-git-send-email-vw@iommu.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This driver is to add reset support for nuc900 series,
-currently, it only supports nuc970 SoC reset.
+NUC970 is a new SoC of Nuvoton nuc900 series, this patch is
+to add machine file support for it.
 
 Signed-off-by: Wan Zongshun <mcuos.com@gmail.com>
 ---
- drivers/power/reset/Kconfig        |  7 +++
- drivers/power/reset/Makefile       |  1 +
- drivers/power/reset/nuc900-reset.c | 93 ++++++++++++++++++++++++++++++++++++++
- 3 files changed, 101 insertions(+)
- create mode 100644 drivers/power/reset/nuc900-reset.c
+ arch/arm/mach-w90x900/Kconfig  | 20 ++++++++++++++++++++
+ arch/arm/mach-w90x900/Makefile |  3 +++
+ arch/arm/mach-w90x900/nuc900.c | 41 +++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 64 insertions(+)
+ create mode 100644 arch/arm/mach-w90x900/nuc900.c
 
-diff --git a/drivers/power/reset/Kconfig b/drivers/power/reset/Kconfig
-index 9bb2622..8c84892 100644
---- a/drivers/power/reset/Kconfig
-+++ b/drivers/power/reset/Kconfig
-@@ -94,6 +94,13 @@ config POWER_RESET_MSM
+diff --git a/arch/arm/mach-w90x900/Kconfig b/arch/arm/mach-w90x900/Kconfig
+index 69bab32..80ab00c 100644
+--- a/arch/arm/mach-w90x900/Kconfig
++++ b/arch/arm/mach-w90x900/Kconfig
+@@ -15,6 +15,26 @@ config CPU_NUC960
  	help
- 	  Power off and restart support for Qualcomm boards.
+ 	  Support for NUCP960 of Nuvoton NUC900 CPUs.
  
-+config POWER_RESET_NUC900
-+	bool "Nuc900 restart driver"
-+	depends on ARCH_W90X900
++config SOC_NUC970
++	bool "Nuvoton NUC970 SoC support"
++	select COMMON_CLK
++	select GENERIC_IRQ_CHIP
++	select HAVE_CLK_PREPARE
++	select IRQ_DOMAIN
++	select MULTI_IRQ_HANDLER
++	select MFD_SYSCON
++	select NUC900_TIMER
++	select SOC_NUC900
++	select USE_OF
 +	help
-+	  Power off and restart support for Nuvoton NUC900 family of
-+	  reference boards.
++	  Support for NUC970 of Nuvoton NUC900 SoCs.
++	  The NUC970 series runs up to 300 MHz, with 16 KB I-cache,
++	  16 KB D-cache and MMU, 56KB embedded SRAM and 16 KB Internal
++	  Boot ROM for booting from USB, NAND and SPI FLASH.
++	  Detailed information please check the following link:
++	  https://github.com/zswan/nuc900-document/blob/master/
++	  NUC970_TechnicalReferenceManual_EN_Rev1.30.pdf
 +
- config POWER_RESET_LTC2952
- 	bool "LTC2952 PowerPath power-off driver"
- 	depends on OF_GPIO
-diff --git a/drivers/power/reset/Makefile b/drivers/power/reset/Makefile
-index ab7aa86..d4df889 100644
---- a/drivers/power/reset/Makefile
-+++ b/drivers/power/reset/Makefile
-@@ -9,6 +9,7 @@ obj-$(CONFIG_POWER_RESET_GPIO_RESTART) += gpio-restart.o
- obj-$(CONFIG_POWER_RESET_HISI) += hisi-reboot.o
- obj-$(CONFIG_POWER_RESET_IMX) += imx-snvs-poweroff.o
- obj-$(CONFIG_POWER_RESET_MSM) += msm-poweroff.o
-+obj-$(CONFIG_POWER_RESET_NUC900) += nuc900-reset.o
- obj-$(CONFIG_POWER_RESET_LTC2952) += ltc2952-poweroff.o
- obj-$(CONFIG_POWER_RESET_QNAP) += qnap-poweroff.o
- obj-$(CONFIG_POWER_RESET_RESTART) += restart-poweroff.o
-diff --git a/drivers/power/reset/nuc900-reset.c b/drivers/power/reset/nuc900-reset.c
+ menu "W90P910 Machines"
+ 
+ config MACH_W90P910EVB
+diff --git a/arch/arm/mach-w90x900/Makefile b/arch/arm/mach-w90x900/Makefile
+index 828c032..d13ba5a 100644
+--- a/arch/arm/mach-w90x900/Makefile
++++ b/arch/arm/mach-w90x900/Makefile
+@@ -4,8 +4,10 @@
+ 
+ # Object file lists.
+ 
++ifeq ($(CONFIG_SOC_NUC970),)
+ obj-y				:= irq.o time.o mfp.o gpio.o clock.o
+ obj-y				+= clksel.o dev.o cpu.o
++endif
+ # W90X900 CPU support files
+ 
+ obj-$(CONFIG_CPU_W90P910)	+= nuc910.o
+@@ -17,3 +19,4 @@ obj-$(CONFIG_CPU_NUC960)	+= nuc960.o
+ obj-$(CONFIG_MACH_W90P910EVB)	+= mach-nuc910evb.o
+ obj-$(CONFIG_MACH_W90P950EVB)	+= mach-nuc950evb.o
+ obj-$(CONFIG_MACH_W90N960EVB)	+= mach-nuc960evb.o
++obj-$(CONFIG_SOC_NUC970)	+= nuc900.o
+diff --git a/arch/arm/mach-w90x900/nuc900.c b/arch/arm/mach-w90x900/nuc900.c
 new file mode 100644
-index 0000000..49986b7
+index 0000000..309c332
 --- /dev/null
-+++ b/drivers/power/reset/nuc900-reset.c
-@@ -0,0 +1,93 @@
++++ b/arch/arm/mach-w90x900/nuc900.c
+@@ -0,0 +1,41 @@
 +/*
 + * Copyright 2016 Wan Zongshun <mcuos.com@gmail.com>
 + *
@@ -64,88 +85,36 @@ index 0000000..49986b7
 + * http://www.opensource.org/licenses/gpl-license.html
 + * http://www.gnu.org/copyleft/gpl.html
 + */
-+#include <linux/init.h>
-+#include <linux/err.h>
-+#include <linux/io.h>
-+#include <linux/kernel.h>
-+#include <linux/mfd/syscon.h>
-+#include <linux/module.h>
-+#include <linux/notifier.h>
-+#include <linux/of.h>
++
 +#include <linux/platform_device.h>
++#include <linux/clk.h>
++#include <linux/clkdev.h>
++#include <linux/delay.h>
++#include <linux/err.h>
++#include <linux/gpio.h>
++#include <linux/init.h>
 +#include <linux/reboot.h>
-+#include <linux/regmap.h>
++#include <linux/of_address.h>
++#include <linux/of_platform.h>
++#include <linux/sys_soc.h>
++#include <linux/semaphore.h>
 +
-+#define REG_WRPRTR	0x1fc
-+#define REG_AHBIPRST	0x060
++#include <asm/system_misc.h>
++#include <asm/mach/arch.h>
 +
-+static struct regmap *syscon;
-+
-+static int nuc900_restart_handler(struct notifier_block *this,
-+				  unsigned long mode, void *cmd)
++static void __init nuc900_machine_init(void)
 +{
-+	/*0:register protect enable*/
-+	int write_protect = 0;
-+
-+	/*register protection disable*/
-+	do {
-+		regmap_read(syscon, REG_WRPRTR, &write_protect);
-+
-+		if (write_protect != 1) {
-+			regmap_write(syscon, REG_WRPRTR, 0x59);
-+			regmap_write(syscon, REG_WRPRTR, 0x16);
-+			regmap_write(syscon, REG_WRPRTR, 0x88);
-+		}
-+
-+	} while (write_protect != 1);
-+
-+	/*trigger reset*/
-+	regmap_write(syscon, REG_AHBIPRST, 0x01);
-+
-+	return NOTIFY_DONE;
++	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
 +}
 +
-+static struct notifier_block nuc900_restart_nb = {
-+	.notifier_call = nuc900_restart_handler,
-+	.priority = 128,
++static const char *nuc900_dt_compat[] __initconst = {
++	"nuvoton,nuc970",
++	NULL,
 +};
 +
-+static int nuc900_reset_probe(struct platform_device *pdev)
-+{
-+	struct device *dev = &pdev->dev;
-+	int err;
-+
-+	syscon = syscon_regmap_lookup_by_phandle(dev->of_node, "syscon");
-+	if (IS_ERR(syscon)) {
-+		pr_err("%s: syscon lookup failed\n", dev->of_node->name);
-+		return PTR_ERR(syscon);
-+	}
-+
-+	err = register_restart_handler(&nuc900_restart_nb);
-+	if (err)
-+		dev_err(dev, "cannot register restart handler (err=%d)\n", err);
-+
-+	return err;
-+}
-+
-+static const struct of_device_id of_nuc900_reset_match[] = {
-+	{ .compatible = "nuvoton,nuc900-reset", },
-+	{},
-+};
-+MODULE_DEVICE_TABLE(of, of_nuc900_reset_match);
-+
-+static struct platform_driver nuc900_reset_driver = {
-+	.probe = nuc900_reset_probe,
-+	.driver = {
-+		.name = "nuc900-reset",
-+		.of_match_table = of_match_ptr(of_nuc900_reset_match),
-+	},
-+};
-+
-+static int __init nuc900_reset_init(void)
-+{
-+	return platform_driver_register(&nuc900_reset_driver);
-+}
-+device_initcall(nuc900_reset_init);
++DT_MACHINE_START(nuc900_dt, "Nuvoton NUC900 (Device Tree Support)")
++	.init_machine	= nuc900_machine_init,
++	.dt_compat	= nuc900_dt_compat,
++MACHINE_END
 -- 
 2.7.4
