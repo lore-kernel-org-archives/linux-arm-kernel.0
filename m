@@ -1,47 +1,33 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sun, 10 Jul 2016 09:50:40 +0200
-Subject: [PATCH] ARM: pxa: remove devicetree boards from pxa_defconfig
-In-Reply-To: <1464985766-20754-1-git-send-email-robert.jarzmik@free.fr>
- (Robert Jarzmik's message of "Fri, 3 Jun 2016 22:29:26 +0200")
-References: <1464985766-20754-1-git-send-email-robert.jarzmik@free.fr>
-Message-ID: <877fcu3p9r.fsf@belgarion.home>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Sun, 10 Jul 2016 11:11:06 +0200
+Subject: [PATCH v3 3/3] ARM64: dts: amlogic: meson-gxbb: Add watchdog node
+In-Reply-To: <1468141867-4172-1-git-send-email-narmstrong@baylibre.com>
+References: <1468141867-4172-1-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1468141867-4172-4-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Robert Jarzmik <robert.jarzmik@free.fr> writes:
+Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+---
+ arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-> If both legacy and device-tree machines are mixed in the same defconfig,
-> the legacy boards don't boot up anymore with gpio request deferral
-> errors.
->
-> This is seen when attempting to run akita, borzoi, spitz, terrier, or
-> tosa in qemu with pxa_defconfig.
->
-> The real reason behind is that gpio handling for pxa in its current
-> state cannot be built for _both_ a devicetree machine (ie. pxa-dt.c) and
-> a non devicetree machine (ie. corgi, tosa, ...).
->
-> This is turn is because for devicetree a pinctrl is enforced for the
-> machine, and a pinctrl driver is required. If it's not available,
-> pxa_gpio_request() fails on pinctrl_request_gpio() and returns
-> -EPROBE_DEFER.  It was introduced by commit f806dac5938b
-> ("ARM: pxa: activate pinctrl for device-tree machines").
->
-> Now the true chicken and egg problem is than machine files,
-> ie. arch/arm/mach-pxa/xxx.c are using gpio before the drivers are
-> probed, in the init_machine() function, and that's why pinctrl/gpio for
-> legacy machine files is a bit difficult.
->
-> As for now, to keep the compilation coverage and testing of legacy
-> machines, this patch removes the 2 devicetree machines from
-> pxa_defconfig.
->
-> Reported-by: Guenter Roeck <linux@roeck-us.net>
-> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
-> Tested-by: Guenter Roeck <linux@roeck-us.net>
-Applied to pxa/for-next, with a huge delay.
-
-Cheers.
-
---
-Robert
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+index 832815d..bcca82f 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+@@ -136,6 +136,12 @@
+ 				clocks = <&xtal>;
+ 				status = "disabled";
+ 			};
++
++			watchdog at 98d0 {
++				compatible = "amlogic,meson-gxbb-wdt";
++				reg = <0x0 0x098d0 0x0 0x10>;
++				clocks = <&xtal>;
++			};
+ 		};
+ 
+ 		gic: interrupt-controller at c4301000 {
+-- 
+2.7.0
