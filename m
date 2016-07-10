@@ -1,40 +1,39 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 11 Jul 2016 00:22:09 +0200
-Subject: [PATCH v2 09/10] Documentation: devicetree: Add dts description
- for nuc900
-In-Reply-To: <1468136542-2656-2-git-send-email-vw@iommu.org>
-References: <1468136542-2656-1-git-send-email-vw@iommu.org>
- <1468136542-2656-2-git-send-email-vw@iommu.org>
-Message-ID: <1618088.N8H7ez3XRZ@wuerfel>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 11 Jul 2016 00:27:43 +0200
+Subject: [PATCH] ARM: dts: armada-388-clearfog: remove duplicate mdio entry
+In-Reply-To: <20160710204546.GS1041@n2100.armlinux.org.uk>
+References: <E1bMGdu-00005c-Dy@rmk-PC.armlinux.org.uk>
+ <20160710203751.GB26397@lunn.ch>
+ <20160710204546.GS1041@n2100.armlinux.org.uk>
+Message-ID: <20160710222743.GN8426@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday, July 10, 2016 3:42:21 PM CEST Wan Zongshun wrote:
-> diff --git a/Documentation/devicetree/bindings/soc/nuvoton/nuvoton,nuc900-soc.txt b/Documentation/devicetree/bindings/soc/nuvoton/nuvoton,nuc900-soc.txt
-> new file mode 100644
-> index 0000000..0284edf
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/soc/nuvoton/nuvoton,nuc900-soc.txt
-> @@ -0,0 +1,12 @@
-> +. Nuvoton NUC900 series, Soc specific driver binding.
-> +
-> +Required properties:
-> +- compatible : Should be "nuvoton,nuc900-soc"
-> +- syscon : Reference to gcr controller.
-> +
-> +Example:
-> +
-> +reset {
-> +       compatible = "nuvoton,nuc900-soc";
-> +       syscon = <&gcr>;
-> +};
+On Sun, Jul 10, 2016 at 09:45:46PM +0100, Russell King - ARM Linux wrote:
+> On Sun, Jul 10, 2016 at 10:37:51PM +0200, Andrew Lunn wrote:
+> > The armada-38x.dtsi has
+> > 
+> >                                 ref_clk0_pins: ref-clk-pins-0 {
+> >                                         marvell,pins = "mpp45";
+> >                                         marvell,function = "ref";
+> >                                 };
+> > 
+> > which you could reference rather then defining it yourself.
+> 
+> Weren't these going to be deleted from the main SoC dtsi files,
+> eventually?  I thought that was the idea, to prevent cluttering
+> up the .dtb files with nodes which aren't ever used.
 
-I think this one should be dropped: Instead of modeling the DT based on what
-is convenient for the current Linux driver implementation, we only want to
-list devices in the dts that are physically present, and the "soc" is really
-the sum of all the on-chip devices.
+I've not heard they are going to be removed....
 
-Better change the soc_device driver to bind directly to the "nuvoton,nuc970-gcr"
-device.
+Having work on mvebu, and a Freescale Vybrid board, i see two
+different styles. mvebu defines all the common pinctrl values in the
+.dtsi file, so making the .dts file pretty minimalist. For the vybrid
+board there was nothing in the .dtsi file, the dts file is huge, and i
+made at least one error, missing at required pin which took me a while
+to debug.
 
-	Arnd
+I would also say cluttered .dtb because of unused nodes it a compiler
+issue. Why does it not optimise them out?
+
+   Andrew
