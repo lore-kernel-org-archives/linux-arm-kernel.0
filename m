@@ -1,98 +1,151 @@
 From: vw@iommu.org (Wan Zongshun)
-Date: Sun, 10 Jul 2016 15:27:20 +0800
-Subject: [PATCH v2 00/10] ARM: NUC900: Add NUC970 SoC support
-Message-ID: <1468135649-19980-1-git-send-email-vw@iommu.org>
+Date: Sun, 10 Jul 2016 15:27:25 +0800
+Subject: [PATCH v2 05/10] power/reset: Add reset driver support for nuc900
+In-Reply-To: <1468135649-19980-1-git-send-email-vw@iommu.org>
+References: <1468135649-19980-1-git-send-email-vw@iommu.org>
+Message-ID: <1468135649-19980-6-git-send-email-vw@iommu.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This driver is to add reset support for nuc900 series,
+currently, it only supports nuc970 SoC reset.
 
-This patch series added Nuvoton new SoC NUC970 development board
-support, this nuc970 belongs to nuc900 series, but many features are
-not compatible with old nuc900 SoCs like nuc910, nuc920.
-
-Those patches are basing on old w90x900 codes, and are using standard
-linux subsystem interface, such as dts, driver/clk, driver/clocksource
-, driver/irqchip drivers.
-
-The old w90x900 plat such as nuc910,nuc960 codes will also be changed
-to new style according to nuc970 codes after those patches was accepted.
-
-PATCH V2:
-The V2 patches change some code style, re-archtect some drivers and add reset
-and soc drivers, split some dts patches according to maillist's comments.
-
-Wan Zongshun (10):
-  ARM: NUC900: Add nuc970 machine support
-  irqchip: add irqchip driver for nuc900
-  Clocksource: add nuc970 clocksource driver
-  clk: add Clock driver for nuc970
-  power/reset: Add reset driver support for nuc900
-  soc: Add SoC specific driver support for nuc900
-  ARM: dts: Add clock header file into dt-bindings
-  ARM: dts: nuc900: Add nuc970 dts files
-  Documentation: devicetree: Add dts description for nuc900
-  nuc900: add nuc970 platform defconfig file
-
- .../devicetree/bindings/arm/nuvoton/nuc970.txt     |  12 +
- .../bindings/clock/nuvoton,nuc970-clk.txt          |  13 +
- .../interrupt-controller/nuvoton,nuc900-aic.txt    |  15 +
- .../bindings/reset/nuvoton,nuc900-reset.txt        |  12 +
- .../devicetree/bindings/serial/nuc970-uart.txt     |  22 +
- .../bindings/soc/nuvoton/nuvoton,nuc900-soc.txt    |  12 +
- .../bindings/timer/nuvoton,nuc970-tmr.txt          |  20 +
- arch/arm/boot/dts/Makefile                         |   1 +
- arch/arm/boot/dts/nuc970-evb.dts                   |  34 +
- arch/arm/boot/dts/nuc970.dtsi                      |  88 ++
- arch/arm/configs/nuc970_defconfig                  |  76 ++
- arch/arm/mach-w90x900/Kconfig                      |  20 +
- arch/arm/mach-w90x900/Makefile                     |   3 +
- arch/arm/mach-w90x900/include/mach/irqs.h          |   5 +
- arch/arm/mach-w90x900/nuc900.c                     |  41 +
- drivers/clk/Makefile                               |   1 +
- drivers/clk/nuc900/Makefile                        |   6 +
- drivers/clk/nuc900/clk-apll.c                      | 168 ++++
- drivers/clk/nuc900/clk-ccf.h                       |  53 ++
- drivers/clk/nuc900/clk-nuc970.c                    | 925 +++++++++++++++++++++
- drivers/clk/nuc900/clk-upll.c                      |  83 ++
- drivers/clocksource/Kconfig                        |   8 +
- drivers/clocksource/Makefile                       |   1 +
- drivers/clocksource/timer-nuc900.c                 | 305 +++++++
- drivers/irqchip/Makefile                           |   1 +
- drivers/irqchip/irq-nuc900.c                       | 150 ++++
- drivers/power/reset/Kconfig                        |   7 +
- drivers/power/reset/Makefile                       |   1 +
- drivers/power/reset/nuc900-reset.c                 |  93 +++
- drivers/soc/Kconfig                                |   1 +
- drivers/soc/Makefile                               |   1 +
- drivers/soc/nuvoton/Kconfig                        |  10 +
- drivers/soc/nuvoton/Makefile                       |   1 +
- drivers/soc/nuvoton/soc-nuc900.c                   | 100 +++
- include/dt-bindings/clock/nuc970-clock.h           | 233 ++++++
- 35 files changed, 2522 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/nuvoton/nuc970.txt
- create mode 100644 Documentation/devicetree/bindings/clock/nuvoton,nuc970-clk.txt
- create mode 100644 Documentation/devicetree/bindings/interrupt-controller/nuvoton,nuc900-aic.txt
- create mode 100644 Documentation/devicetree/bindings/reset/nuvoton,nuc900-reset.txt
- create mode 100644 Documentation/devicetree/bindings/serial/nuc970-uart.txt
- create mode 100644 Documentation/devicetree/bindings/soc/nuvoton/nuvoton,nuc900-soc.txt
- create mode 100644 Documentation/devicetree/bindings/timer/nuvoton,nuc970-tmr.txt
- create mode 100644 arch/arm/boot/dts/nuc970-evb.dts
- create mode 100644 arch/arm/boot/dts/nuc970.dtsi
- create mode 100644 arch/arm/configs/nuc970_defconfig
- create mode 100644 arch/arm/mach-w90x900/nuc900.c
- create mode 100644 drivers/clk/nuc900/Makefile
- create mode 100644 drivers/clk/nuc900/clk-apll.c
- create mode 100644 drivers/clk/nuc900/clk-ccf.h
- create mode 100644 drivers/clk/nuc900/clk-nuc970.c
- create mode 100644 drivers/clk/nuc900/clk-upll.c
- create mode 100644 drivers/clocksource/timer-nuc900.c
- create mode 100644 drivers/irqchip/irq-nuc900.c
+Signed-off-by: Wan Zongshun <mcuos.com@gmail.com>
+---
+ drivers/power/reset/Kconfig        |  7 +++
+ drivers/power/reset/Makefile       |  1 +
+ drivers/power/reset/nuc900-reset.c | 93 ++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 101 insertions(+)
  create mode 100644 drivers/power/reset/nuc900-reset.c
- create mode 100644 drivers/soc/nuvoton/Kconfig
- create mode 100644 drivers/soc/nuvoton/Makefile
- create mode 100644 drivers/soc/nuvoton/soc-nuc900.c
- create mode 100644 include/dt-bindings/clock/nuc970-clock.h
 
+diff --git a/drivers/power/reset/Kconfig b/drivers/power/reset/Kconfig
+index 9bb2622..8c84892 100644
+--- a/drivers/power/reset/Kconfig
++++ b/drivers/power/reset/Kconfig
+@@ -94,6 +94,13 @@ config POWER_RESET_MSM
+ 	help
+ 	  Power off and restart support for Qualcomm boards.
+ 
++config POWER_RESET_NUC900
++	bool "Nuc900 restart driver"
++	depends on ARCH_W90X900
++	help
++	  Power off and restart support for Nuvoton NUC900 family of
++	  reference boards.
++
+ config POWER_RESET_LTC2952
+ 	bool "LTC2952 PowerPath power-off driver"
+ 	depends on OF_GPIO
+diff --git a/drivers/power/reset/Makefile b/drivers/power/reset/Makefile
+index ab7aa86..d4df889 100644
+--- a/drivers/power/reset/Makefile
++++ b/drivers/power/reset/Makefile
+@@ -9,6 +9,7 @@ obj-$(CONFIG_POWER_RESET_GPIO_RESTART) += gpio-restart.o
+ obj-$(CONFIG_POWER_RESET_HISI) += hisi-reboot.o
+ obj-$(CONFIG_POWER_RESET_IMX) += imx-snvs-poweroff.o
+ obj-$(CONFIG_POWER_RESET_MSM) += msm-poweroff.o
++obj-$(CONFIG_POWER_RESET_NUC900) += nuc900-reset.o
+ obj-$(CONFIG_POWER_RESET_LTC2952) += ltc2952-poweroff.o
+ obj-$(CONFIG_POWER_RESET_QNAP) += qnap-poweroff.o
+ obj-$(CONFIG_POWER_RESET_RESTART) += restart-poweroff.o
+diff --git a/drivers/power/reset/nuc900-reset.c b/drivers/power/reset/nuc900-reset.c
+new file mode 100644
+index 0000000..49986b7
+--- /dev/null
++++ b/drivers/power/reset/nuc900-reset.c
+@@ -0,0 +1,93 @@
++/*
++ * Copyright 2016 Wan Zongshun <mcuos.com@gmail.com>
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++#include <linux/init.h>
++#include <linux/err.h>
++#include <linux/io.h>
++#include <linux/kernel.h>
++#include <linux/mfd/syscon.h>
++#include <linux/module.h>
++#include <linux/notifier.h>
++#include <linux/of.h>
++#include <linux/platform_device.h>
++#include <linux/reboot.h>
++#include <linux/regmap.h>
++
++#define REG_WRPRTR	0x1fc
++#define REG_AHBIPRST	0x060
++
++static struct regmap *syscon;
++
++static int nuc900_restart_handler(struct notifier_block *this,
++				  unsigned long mode, void *cmd)
++{
++	/*0:register protect enable*/
++	int write_protect = 0;
++
++	/*register protection disable*/
++	do {
++		regmap_read(syscon, REG_WRPRTR, &write_protect);
++
++		if (write_protect != 1) {
++			regmap_write(syscon, REG_WRPRTR, 0x59);
++			regmap_write(syscon, REG_WRPRTR, 0x16);
++			regmap_write(syscon, REG_WRPRTR, 0x88);
++		}
++
++	} while (write_protect != 1);
++
++	/*trigger reset*/
++	regmap_write(syscon, REG_AHBIPRST, 0x01);
++
++	return NOTIFY_DONE;
++}
++
++static struct notifier_block nuc900_restart_nb = {
++	.notifier_call = nuc900_restart_handler,
++	.priority = 128,
++};
++
++static int nuc900_reset_probe(struct platform_device *pdev)
++{
++	struct device *dev = &pdev->dev;
++	int err;
++
++	syscon = syscon_regmap_lookup_by_phandle(dev->of_node, "syscon");
++	if (IS_ERR(syscon)) {
++		pr_err("%s: syscon lookup failed\n", dev->of_node->name);
++		return PTR_ERR(syscon);
++	}
++
++	err = register_restart_handler(&nuc900_restart_nb);
++	if (err)
++		dev_err(dev, "cannot register restart handler (err=%d)\n", err);
++
++	return err;
++}
++
++static const struct of_device_id of_nuc900_reset_match[] = {
++	{ .compatible = "nuvoton,nuc900-reset", },
++	{},
++};
++MODULE_DEVICE_TABLE(of, of_nuc900_reset_match);
++
++static struct platform_driver nuc900_reset_driver = {
++	.probe = nuc900_reset_probe,
++	.driver = {
++		.name = "nuc900-reset",
++		.of_match_table = of_match_ptr(of_nuc900_reset_match),
++	},
++};
++
++static int __init nuc900_reset_init(void)
++{
++	return platform_driver_register(&nuc900_reset_driver);
++}
++device_initcall(nuc900_reset_init);
 -- 
 2.7.4
