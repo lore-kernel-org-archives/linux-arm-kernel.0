@@ -1,58 +1,31 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 11 Jul 2016 08:39:09 +0200
-Subject: [PATCH 13/15] ARM: dts: sun8i: Add dt node for rtl8703as wifi
- chip on ga10h
-In-Reply-To: <1467993956-19535-14-git-send-email-hdegoede@redhat.com>
+Date: Mon, 11 Jul 2016 08:39:59 +0200
+Subject: [PATCH 00/15] ARM: dts: sunxi: Add reference-design-tablet.dtsi
+ files + 2 new tablets
+In-Reply-To: <1467993956-19535-1-git-send-email-hdegoede@redhat.com>
 References: <1467993956-19535-1-git-send-email-hdegoede@redhat.com>
- <1467993956-19535-14-git-send-email-hdegoede@redhat.com>
-Message-ID: <20160711063909.GA4589@lukather>
+Message-ID: <20160711063959.GB4589@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Jul 08, 2016 at 06:05:41PM +0200, Hans de Goede wrote:
+> Hi Maxime, Chen-Yu,
+> 
+> Here is a series based on Chen-Yu's suggestion to add a
+> reference-design-tablet.dtsi file. This works out quite
+> nicely, resulting in much simpler tablet .dts files, as
+> well as enabling a bunch of extra features on some tablets,
+> showing that having to add the same dts bits over and over
+> again for all model tablets is not a good idea.
+> 
+> This also includes a v2 submission of the new tablet dts
+> files which sparked the reference-design-tablet.dtsi
+> discussion.
 
-On Fri, Jul 08, 2016 at 06:05:54PM +0200, Hans de Goede wrote:
-> The ga10h tablet has a rtl8703as wifi chip, add a dt node describing it.
-> 
-> This enables usage of wifi on this tablet (together with the out of
-> tree rtl8732bs driver).
-> 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> ---
->  arch/arm/boot/dts/sun8i-a33-ga10h-v1.1.dts | 18 ++++++++++++++++++
->  1 file changed, 18 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/sun8i-a33-ga10h-v1.1.dts b/arch/arm/boot/dts/sun8i-a33-ga10h-v1.1.dts
-> index 6566032..de6269d 100644
-> --- a/arch/arm/boot/dts/sun8i-a33-ga10h-v1.1.dts
-> +++ b/arch/arm/boot/dts/sun8i-a33-ga10h-v1.1.dts
-> @@ -47,6 +47,11 @@
->  / {
->  	model = "Allwinner GA10H Quad Core Tablet (v1.1)";
->  	compatible = "allwinner,ga10h-v1.1", "allwinner,sun8i-a33";
-> +
-> +	aliases {
-> +		/* Make u-boot set mac-address for rtl8703as (no eeprom) */
-> +		ethernet0 = &rtl8703as;
-> +	};
->  };
->  
->  &ehci0 {
-> @@ -62,6 +67,19 @@
->  	};
->  };
->  
-> +&mmc1 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&mmc1_pins_a>;
-> +	vmmc-supply = <&reg_dldo1>;
-> +	bus-width = <4>;
-> +	non-removable;
-> +	status = "okay";
-> +
-> +	rtl8703as: sdio_wifi at 1 {
+Beside the minor comment on patch 13, applied everything.
 
-Shouldn't that need a compatible ?
+Thanks, this is a very nice cleanup.
+Maxime
 
 -- 
 Maxime Ripard, Free Electrons
@@ -64,4 +37,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160711/fd1e428f/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160711/2d0840eb/attachment-0001.sig>
