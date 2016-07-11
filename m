@@ -1,125 +1,38 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 11 Jul 2016 10:38:37 -0700
-Subject: FPGA manager user space interface
-In-Reply-To: <alpine.DEB.2.02.1607111014500.11060@linuxheads99>
-References: <5782BE1A.9090905@gmail.com>
- <alpine.DEB.2.02.1607111014500.11060@linuxheads99>
-Message-ID: <5783D99D.2090402@gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 11 Jul 2016 18:42:25 +0100
+Subject: [PATCH 1/2] arm64: Refactor vDSO time functions
+In-Reply-To: <a3eda01b-b835-c20c-a39d-efc8853b00f8@arm.com>
+References: <1462797421-33103-1-git-send-email-kevin.brodsky@arm.com>
+ <1462797421-33103-2-git-send-email-kevin.brodsky@arm.com>
+ <20160708141143.GB6493@arm.com>
+ <a3eda01b-b835-c20c-a39d-efc8853b00f8@arm.com>
+Message-ID: <20160711174224.GA21493@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alan,
+On Mon, Jul 11, 2016 at 06:31:16PM +0100, Kevin Brodsky wrote:
+> On 08/07/16 15:11, Will Deacon wrote:
+> >Fixup patch below. If you fold it in, then:
+> >
+> >Acked-by: Will Deacon <will.deacon@arm.com>
+> >
+> >for the series.
+> 
+> I just have one small concern with your fixup patch: the ALIGN macro from
+> linkage.h (not the one from kernel.h, which is for C, not assembly) uses
+> 0x90 as padding, which apparently is NOP on x86 but does not make much sense
+> on ARM64 (or ARM for that matter). It is not currently used in arm{,64}. I
+> am not sure if it could decode to a valid instruction on ARM64, but maybe
+> using simply 0x0 as a padding byte would be less arbitrary. I also don't
+> like this ALIGN macro too much, because the "4" argument means something
+> different depending on the architecture (4 bytes on x86, 2^4 on arm*:
+> https://sourceware.org/binutils/docs/as/Align.html).
 
-On 07/11/2016 09:59 AM, atull wrote:
-> On Sun, 10 Jul 2016, Florian Fainelli wrote:
-> 
-> Hi Florian,
-> 
-> I'm in the process of upstreaming FPGA Regions support which
-> allows reprogramming by applying Device Tree Overlays.  If you
-> want to see a tree which has the latest patches for that, I have
-> all that in our github tree.
-> 
-> https://github.com/altera-opensource/linux-socfpga/tree/socfpga-4.6
-> 
-> The documentation for the DT overlays is in
->  Documentation/devicetree/bindings/fpga/fpga-region.txt
-> 
-> Documentation for the DT configfs interface is in
->  Documentation/devicetree/configfs-overlays.txt
-> 
-> The idea here is explained at legnth in the doc, but basically
-> the user can use the configfs interface to apply a DT
-> overlay that causes the FPGA to be reprogrammed and child
-> devices to get added and probed.
-> 
-> I like DT overlays a lot, but I do not expect that (or anything
-> else) will be a good interface for every use case.  The FPGA
-> Manager Framework went through a legnthy discussion on the
-> mailing list where several people wanted the interface to match
-> what they were already using.  Interfaces similar to what you
-> suggest below were proposed and shot down.  My conclusion from
-> all that was to implement the kernel API functions such that
-> people could add whatever interfaces they needed for their use
-> case.
+ALIGN expands to __ALIGN which is defined in
+arch/arm64/include/asm/linkage.h as .align 4.
 
-While I agree that the current state of the FPGA manager is completely
-sane, and people making products including a FPGA will want something
-(kernel driver or user-space scripts) that load a given set of bistreams
-(under version control), it still feels like there is a small bit of
-debugging and or use cases where it is desireable to have a way, from
-user-space to load an arbitrary FPGA bitstream which is not set in stone
-from e.g: a Linux kernel driver. More than being able to change
-something on the filesystem, it's about being able to reload the
-bitstream from user-space that seems to be critically missing imho.
+You're 4 years late ;)
 
-Do you have links to the original discussion so I could get an idea of
-what were the different points back then?
+http://git.kernel.org/linus/aeed41a9371e
 
-Thanks!
-
-> 
-> 
->> Hi all,
->>
->> I just wrote a FPGA manager driver for the TS-7300 board which features
->> an Altera Cyclone II on board. While the finished solution is my case
->> might be something like the MFD driver for the FPGA devices requesting
->> the bitstream load and registering the different devices it exposes,
->> during development it is nice to exercise the FPGA manager driver to
->> load something:
-> 
-> It sounds like your goal is to use the FPGA Manager API inside
-> the kernel, but it would be helpful to have an easy userspace
-> interface during development.  Is that right?
-> 
->>
->> - a quick way is to add a pair of sysfs attributes to define the
->> bitstream filename and to trigger the load
->>
->> - offer a more consistent and robust interface through e.g; a character
->> device that you can write/read/poll to see the loading progress about
-> 
-> Sysfs and char driver interfaces have been proposed and shot down
-> a few times already.
-> 
-> The first version of the FPGA Manager Framework was a char
-> driver.  To program the FPGA, the user had to do 'cat
-> bitstream-file > /dev/fpga0'.  Bridge support was a separate
-> thing that was also controlled by sysfs.  It was messy and if
-> userspace could easily do the wrong thing and crash the system.
-> 
->>
->> - have the driver exposing FPGA peripherals be exposing an user space
->> interface to trigger a (re)load/(re)/configuration, although that's
->> really something that belongs in the FPGA manager it seems
-> 
-> If you use the device tree configfs interface, you can do that.
-> It might not be exactly what you are thinking of.  And there is
-> a learning curve in getting the overlays right.
-> 
->>
->> I am mostly curious if these were taken into account during the initial
->> design and it is agreed upon that yes these are some of options and that
->> userspace loading is just anecdotal we do not need any userspace
->> interface, or if this is just missing and we want one?
-> 
-> There will be use cases that will need various userspace interfaces.
-> It's been hard to get people who are already using FPGAs to agree
-> on using any one interface because they would have to change the
-> code they already have running.
-> 
->> Either way, I
->> don't mind submitting what I came up with for the TS-7300 board.
-> 
-> Yes, that would be great.
-> 
->>
->> Thanks!
->> --
->> Florian
->>
-
-
--- 
-Florian
+Will
