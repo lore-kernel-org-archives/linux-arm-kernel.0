@@ -1,45 +1,73 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 11 Jul 2016 14:50:09 -0700
-Subject: [PATCH 3/3] regulator: qcom_smd: Avoid overlapping linear voltage
- ranges
+Date: Mon, 11 Jul 2016 14:50:07 -0700
+Subject: [PATCH 1/3] regulator: qcom_smd: Fix voltage ranges for pm8x41
 In-Reply-To: <20160711215009.4519-1-sboyd@codeaurora.org>
 References: <20160711215009.4519-1-sboyd@codeaurora.org>
-Message-ID: <20160711215009.4519-4-sboyd@codeaurora.org>
+Message-ID: <20160711215009.4519-2-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The pm8x41_hfsmps ranges overlap. The first range is from 375000
-to 1562500:
+The voltage ranges listed here are wrong. The correct ranges can
+be seen in the "native" spmi regulator driver
+qcom_spmi-regulator.c at pldo_ranges[], ftsmps_ranges[] and
+boost_ranges[] for the pldo, ftsmps, and boost type regulators.
+Port these ranges over to the RPM SMD regulator driver so that we
+list the appropriate set of supported voltages on pldos.
 
- 375000 + (95 * 12500) == 1562500
-
-and the second range starts at 1550000. Interestingly, the second
-range ends at the correct value when it's set to be the
-appropriate start value, 1575000:
-
- 1575000 + ((158 - 96) * 25000) == 3125000
+Doing this allows us to specify a voltage like 3075000 for l24,
+whereas before that wasn't a supported voltage.
 
 Cc: Andy Gross <andy.gross@linaro.org>
 Cc: Bjorn Andersson <bjorn.andersson@linaro.org>
 Fixes: da65e367b67e ("regulator: Regulator driver for the Qualcomm RPM")
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- drivers/regulator/qcom_smd-regulator.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/regulator/qcom_smd-regulator.c | 17 +++++++++--------
+ 1 file changed, 9 insertions(+), 8 deletions(-)
 
 diff --git a/drivers/regulator/qcom_smd-regulator.c b/drivers/regulator/qcom_smd-regulator.c
-index 891ae44a49c2..8ed46a9a55c8 100644
+index 6c7fe4778793..6aa6435b3922 100644
 --- a/drivers/regulator/qcom_smd-regulator.c
 +++ b/drivers/regulator/qcom_smd-regulator.c
-@@ -212,7 +212,7 @@ static const struct regulator_desc pma8084_switch = {
- static const struct regulator_desc pm8x41_hfsmps = {
+@@ -221,29 +221,30 @@ static const struct regulator_desc pm8x41_hfsmps = {
+ static const struct regulator_desc pm8841_ftsmps = {
  	.linear_ranges = (struct regulator_linear_range[]) {
- 		REGULATOR_LINEAR_RANGE( 375000,  0,  95, 12500),
--		REGULATOR_LINEAR_RANGE(1550000, 96, 158, 25000),
-+		REGULATOR_LINEAR_RANGE(1575000, 96, 158, 25000),
+ 		REGULATOR_LINEAR_RANGE(350000,  0, 184, 5000),
+-		REGULATOR_LINEAR_RANGE(700000, 185, 339, 10000),
++		REGULATOR_LINEAR_RANGE(1280000, 185, 261, 10000),
  	},
  	.n_linear_ranges = 2,
- 	.n_voltages = 159,
+-	.n_voltages = 340,
++	.n_voltages = 262,
+ 	.ops = &rpm_smps_ldo_ops,
+ };
+ 
+ static const struct regulator_desc pm8941_boost = {
+ 	.linear_ranges = (struct regulator_linear_range[]) {
+-		REGULATOR_LINEAR_RANGE(4000000, 0, 15, 100000),
++		REGULATOR_LINEAR_RANGE(4000000, 0, 30, 50000),
+ 	},
+ 	.n_linear_ranges = 1,
+-	.n_voltages = 16,
++	.n_voltages = 31,
+ 	.ops = &rpm_smps_ldo_ops,
+ };
+ 
+ static const struct regulator_desc pm8941_pldo = {
+ 	.linear_ranges = (struct regulator_linear_range[]) {
+-		REGULATOR_LINEAR_RANGE( 750000,  0,  30, 25000),
+-		REGULATOR_LINEAR_RANGE(1500000, 31, 99, 50000),
++		REGULATOR_LINEAR_RANGE( 750000,  0,  63, 12500),
++		REGULATOR_LINEAR_RANGE(1550000, 64, 126, 25000),
++		REGULATOR_LINEAR_RANGE(3100000, 127, 163, 50000),
+ 	},
+-	.n_linear_ranges = 2,
+-	.n_voltages = 100,
++	.n_linear_ranges = 3,
++	.n_voltages = 164,
+ 	.ops = &rpm_smps_ldo_ops,
+ };
+ 
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 a Linux Foundation Collaborative Project
