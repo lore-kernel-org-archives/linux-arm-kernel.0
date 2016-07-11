@@ -1,68 +1,84 @@
-From: kesavan.abhilash@gmail.com (Abhilash Kesavan)
-Date: Mon, 11 Jul 2016 16:44:30 +0200
-Subject: [PATCH v3 1/2] clk: samsung: cpu: Prepare for addition for
- Exynos7 CPU clocks
-In-Reply-To: <2318982.ZLuIVQzhgE@amdc1976>
-References: <1467750561-13957-1-git-send-email-a.kesavan@samsung.com>
- <1467750561-13957-2-git-send-email-a.kesavan@samsung.com>
- <577E32E5.4010902@samsung.com> <2318982.ZLuIVQzhgE@amdc1976>
-Message-ID: <CAM4voamm5-upxvwYG0b-WpgO3OpJR+ZswVzjwRO89fjQqovFbw@mail.gmail.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Mon, 11 Jul 2016 15:46:21 +0100
+Subject: [PATCH v2 4/6] common: DMA-mapping: add
+ DMA_ATTR_PRIVILEGED_EXECUTABLE attribute
+In-Reply-To: <20160709020919.6760-5-mitchelh@codeaurora.org>
+References: <20160709020919.6760-1-mitchelh@codeaurora.org>
+ <20160709020919.6760-5-mitchelh@codeaurora.org>
+Message-ID: <5783B13D.5010404@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bartlomiej,
+On 09/07/16 03:09, Mitchel Humpherys wrote:
+> This patch adds the DMA_ATTR_PRIVILEGED_EXECUTABLE attribute to the
+> DMA-mapping subsystem.
 
-Thanks for the comments.
+DMA_ATTR_PRIVILEGED. We can worry about the (much bigger) executable vs.
+NX issue some other time.
 
-On Thu, Jul 7, 2016 at 1:17 PM, Bartlomiej Zolnierkiewicz
-<b.zolnierkie@samsung.com> wrote:
->
-> Hi
->
-> On Thursday, July 07, 2016 12:45:57 PM Sylwester Nawrocki wrote:
->> On 07/05/2016 10:29 PM, Abhilash Kesavan wrote:
->> > Exynos7 has the same CPU clock registers layout as that present
->
-> Please precise for which Exynos7 SoC this change is needed
-> (all three of them?).
+> Some architectures require that writable mappings also be non-executable at
+> lesser-privileged levels of execution.  This attribute is used to indicate
 
-As mentioned in my recently posted PMU series, the exynos7 is a quad
-core A57 based SoC and not meant to be a SoC family.
-I have reviewed various exynos7xxx UMs in terms of the CPU CMU. Both
-exynos7580 and exynos7420 have a similar CMU register layout along
-with the same mux stat bits as exynos7. Exynos7870 on the other hand
-is quite different.
+I don't think "architectures" is really an appropriate fit here - for
+what we're addressing, maybe something like "Some advanced peripherals
+such as remote processors and GPUs perform accesses to DMA buffers in
+both privileged "supervisor" and unprivileged "user" modes."
 
-Please let me know what naming convention you would prefer that I use
-E7/E7420/E7580 ?
+> to the DMA-mapping subsystem that it should do whatever is necessary to
+> ensure that the buffer is executable at an elevated privilege level (by
+> making it read-only at the lesser-privileged levels, for example).
 
->
->> > in Exynos5433 except for the bits in the MUX_STAT* registers.
->> > Add a new CLK_CPU_HAS_MODIFIED_MUX_STAT flag to handle this change.
->>
->> > --- a/drivers/clk/samsung/clk-cpu.h
->> > +++ b/drivers/clk/samsung/clk-cpu.h
->> > @@ -63,6 +63,8 @@ struct exynos_cpuclk {
->> >  /* The CPU clock registers have Exynos5433-compatible layout */
->> >  #define CLK_CPU_HAS_E5433_REGS_LAYOUT      (1 << 2)
->>
->> > +/* Exynos5433-compatible layout with different MUX_STAT register bits */
->> > +#define CLK_CPU_HAS_MODIFIED_MUX_STAT      (1 << 3)
->>
->> It's getting a bit messy, what if there comes another SoC version
->> which has some other modification of exynos5433 registers structure?
->> We would need another variant of HAS_MODIFIED_MUX_STAT flag and we
->> could easily get lost while trying to determine which modification
->> is which. How about indicating explicitly it's an exynos7 bits
->> layout and renaming the flag to something like
->>
->> #define CLK_CPU_HAS_E7_MUX_STAT       (1 << 16) ?
->
-> ditto
->
-> Best regards,
-> --
-> Bartlomiej Zolnierkiewicz
-> Samsung R&D Institute Poland
-> Samsung Electronics
->
+and correspondingly "...the buffer is fully accessible at the elevated
+privilege level (and ideally inaccessible or at least read-only at the
+lesser-privileged levels)". What do you think?
+
+I'm not sure what the latest status of Krzysztof's dma_attrs
+coversion[1] is, but if you weren't aware of it this is just a heads-up
+that there might need to be some coordination there.
+
+What would be really cool if we could somehow remember which buffers
+were allocated as privileged and refuse to expose them to userspace in
+dma_mmap_attrs(), but I don't a feasible way to implement that without
+impractically massive changes.
+
+Robin.
+
+[1]:http://thread.gmane.org/gmane.comp.freedesktop.xorg.drivers.freedreno/164
+
+> Cc: linux-doc at vger.kernel.org
+> Signed-off-by: Mitchel Humpherys <mitchelh@codeaurora.org>
+> ---
+>  Documentation/DMA-attributes.txt | 9 +++++++++
+>  include/linux/dma-attrs.h        | 1 +
+>  2 files changed, 10 insertions(+)
+> 
+> diff --git a/Documentation/DMA-attributes.txt b/Documentation/DMA-attributes.txt
+> index e8cf9cf873b3..6a22d4307008 100644
+> --- a/Documentation/DMA-attributes.txt
+> +++ b/Documentation/DMA-attributes.txt
+> @@ -126,3 +126,12 @@ means that we won't try quite as hard to get them.
+>  
+>  NOTE: At the moment DMA_ATTR_ALLOC_SINGLE_PAGES is only implemented on ARM,
+>  though ARM64 patches will likely be posted soon.
+> +
+> +DMA_ATTR_PRIVILEGED_EXECUTABLE
+> +------------------------------
+> +
+> +Some architectures require that writable mappings also be non-executable at
+> +lesser-privileged levels of execution.  This attribute is used to indicate
+> +to the DMA-mapping subsystem that it should do whatever is necessary to
+> +ensure that the buffer is executable at an elevated privilege level (by
+> +making it read-only at the lesser-privileged levels, for example).
+> diff --git a/include/linux/dma-attrs.h b/include/linux/dma-attrs.h
+> index 5246239a4953..8cf4dff6185b 100644
+> --- a/include/linux/dma-attrs.h
+> +++ b/include/linux/dma-attrs.h
+> @@ -19,6 +19,7 @@ enum dma_attr {
+>  	DMA_ATTR_SKIP_CPU_SYNC,
+>  	DMA_ATTR_FORCE_CONTIGUOUS,
+>  	DMA_ATTR_ALLOC_SINGLE_PAGES,
+> +	DMA_ATTR_PRIVILEGED_EXECUTABLE,
+>  	DMA_ATTR_MAX,
+>  };
+>  
+> 
