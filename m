@@ -1,57 +1,56 @@
-From: andi.shyti@samsung.com (Andi Shyti)
-Date: Mon, 11 Jul 2016 11:36:21 +0900
-Subject: [PATCH v3] bindings: spi-samsung: document the clocks and the
- clock-name property
-In-Reply-To: <20160708203207.GB25980@kozik-lap>
-References: <20160708203207.GB25980@kozik-lap>
-Message-ID: <1468204581-16873-1-git-send-email-andi.shyti@samsung.com>
+From: hs.liao@mediatek.com (Horng-Shyang Liao)
+Date: Mon, 11 Jul 2016 10:55:05 +0800
+Subject: [PATCH v9 1/4] dt-bindings: soc: Add documentation for the
+ MediaTek GCE unit
+In-Reply-To: <1467973066.2472.238.camel@pengutronix.de>
+References: <1467270883-1407-1-git-send-email-hs.liao@mediatek.com>
+ <1467270883-1407-2-git-send-email-hs.liao@mediatek.com>
+ <1467973066.2472.238.camel@pengutronix.de>
+Message-ID: <1468205705.11509.15.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These two properties were not documented but used in the spi
-dts. Add the related documentation.
+Hi Jan,
 
-Suggested-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Signed-off-by: Andi Shyti <andi.shyti@samsung.com>
-Reviewed-by: Michael Turquette <mturquette@baylibre.com>
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
----
-Hi,
+On Fri, 2016-07-08 at 12:17 +0200, Jan L?bbe wrote:
+> On Do, 2016-06-30 at 15:14 +0800, HS Liao wrote:
+> [...]
+> > +Required properties:
+> > +- compatible: Must be "mediatek,mt8173-gce"
+> > +- reg: Address range of the GCE unit
+> > +- interrupts: The interrupt signal from the GCE block
+> > +- clock: Clocks according to the common clock binding
+> > +- clock-names: Must be "gce" to stand for GCE clock
+> > +- #mbox-cells: Should be 1
+> [...]
+> > +		#mbox-cells = <1>;
+> [...]
+> > +		mediatek,gce = <&gce>;
+> > +		mboxes = <&gce 0 1 /* main display with merging wfe */
+> > +			  &gce 1 1>; /* sub display with merging wfe */
+> 
+> It seems that you use two cells instead of one as you declared above.
+> This should be consistent.
 
-Changelog related only to this patch:
+Will correct it as 2.
 
-V1 -> V2: [new] added the clocks and clock-name documentation
-   in the bindings
+> Also, why do you need an explicit phandle to the gce if you already use
+> mailboxes?
 
-V2 -> V3: reworded the 'clock-names' as suggested by Krzysztof,
-   added Mike's and Krzysztof's review and Krzysztof's
-   suggested-by.
+"mediatek,gce" should be added to all clients which ask gce to access 
+their registers.
+
+"mboxes" should be added to all clients which will communicate with gce
+via mailbox.
+
+For example, if mmsys send cmdq tasks to ask gce to write registers of 
+mmsys and ovl, mmsys should have "mediatek,gce" and "mboxes", and ovl
+should have "mediatek,gce".
+
+I will explain their difference in GCE's device tree document.
+
+> Best regards,
+> Jan L?bbe
 
 Thanks,
-Andi
-
- Documentation/devicetree/bindings/spi/spi-samsung.txt | 9 +++++++++
- 1 file changed, 9 insertions(+)
-
-diff --git a/Documentation/devicetree/bindings/spi/spi-samsung.txt b/Documentation/devicetree/bindings/spi/spi-samsung.txt
-index 57d5539..f45c6eb 100644
---- a/Documentation/devicetree/bindings/spi/spi-samsung.txt
-+++ b/Documentation/devicetree/bindings/spi/spi-samsung.txt
-@@ -24,6 +24,15 @@ Required SoC Specific Properties:
- - dma-names: Names for the dma channels. There must be at least one channel
-   named "tx" for transmit and named "rx" for receive.
- 
-+- clocks: specifies the clock IDs provided to the SPI controller; they are
-+  required for interacting with the controller itself, for synchronizing the bus
-+  and as I/O clock (the latter is required by exynos5433 and exynos7).
-+
-+- clock-names: string names of the clocks in the 'clocks' property; for all the
-+  the devices the names must be "spi", "spi_busclkN" (where N is determined by
-+  "samsung,spi-src-clk"), while Exynos5433 should specify a third clock
-+  "spi_ioclk" for the I/O clock.
-+
- Required Board Specific Properties:
- 
- - #address-cells: should be 1.
--- 
-2.8.1
+HS
