@@ -1,46 +1,36 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Mon, 11 Jul 2016 12:33:42 +0200
-Subject: [PATCH v2 6/7] spi: s3c64xx: restore removed comments
-In-Reply-To: <146799464881.73491.7507792367941552864@resonance>
-References: <1467989201-14661-1-git-send-email-andi.shyti@samsung.com>
- <1467989201-14661-7-git-send-email-andi.shyti@samsung.com>
- <146799464881.73491.7507792367941552864@resonance>
-Message-ID: <57837606.8050906@samsung.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 11 Jul 2016 11:38:30 +0100
+Subject: [PATCH] iommu: arm-smmu: use devm_request_irq and devm_free_irq
+In-Reply-To: <578375D7.7090609@arm.com>
+References: <1467625102-9755-1-git-send-email-van.freenix@gmail.com>
+ <578375D7.7090609@arm.com>
+Message-ID: <20160711103829.GB17735@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/08/2016 06:17 PM, Michael Turquette wrote:
-> Quoting Andi Shyti (2016-07-08 07:46:40)
-
->> diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
->> index 6da663f..32b66f0 100644
->> --- a/drivers/spi/spi-s3c64xx.c
->> +++ b/drivers/spi/spi-s3c64xx.c
->> @@ -639,6 +639,7 @@ static void s3c64xx_spi_config(struct s3c64xx_spi_driver_data *sdd)
->>         writel(val, regs + S3C64XX_SPI_MODE_CFG);
->>  
->>         if (sdd->port_conf->clk_from_cmu) {
->> +               /* There is half-multiplier before the SPI */
->>                 clk_set_rate(sdd->src_clk, sdd->cur_speed * 2);
+On Mon, Jul 11, 2016 at 11:32:55AM +0100, Robin Murphy wrote:
+> On 04/07/16 10:38, Peng Fan wrote:
+> > Use devm_request_irq to simplify error handling path,
+> > when probe smmu device.
+> > 
+> > Also devm_{request|free}_irq when init or destroy domain context.
+> > 
+> > Signed-off-by: Peng Fan <van.freenix@gmail.com>
+> > Cc: Will Deacon <will.deacon@arm.com>
+> > Cc: Robin Murphy <robin.murphy@arm.com>
+> > ---
+> [...]
+> > @@ -2050,7 +2046,7 @@ static int arm_smmu_device_remove(struct platform_device *pdev)
+> >  		dev_err(dev, "removing device with active domains!\n");
+> >  
+> >  	for (i = 0; i < smmu->num_global_irqs; ++i)
+> > -		free_irq(smmu->irqs[i], smmu);
+> > +		devm_free_irq(smmu->dev, smmu->irqs[i], smmu);
 > 
-> Just a small comment, but if the fixed-factor divide-by-two clock was
-> modeled in Linux, then this driver could call clk_set_rate on that clock
-> with the "correct" rate.
-> 
-> I guess that this driver would be the provider of that clock?
+> There shouldn't be any need for this at all, since the very next thing
+> called after drv->remove() is devres_release_all().
 
-Good point, however I'm not sure if it is worth to model this divider
-with a clk object.  It is an internal divider and the clock it provides
-is only used internally within the SPI controller.  Thus the spi-s3c64xx
-driver would be provider on the only consumer of this clock.
+I already sent a pull request for this, so any further changes will need
+to be sent as incremental patches.
 
-Additionally, the "There is half-multiplier before the SPI" comment
-seems to be obfuscating how the hardware really looks like to me.
-It talks about multiplier (which reminds me of PLLs with a divider
-in the feedback loop) while there is a simple divider which should
-be considered as an integral part of the controller IP block.
-
-While we are at it, I'd propose to change this comment to something
-like:
-
-/* The SCLK_SPI clock is divided internally by 2 */
+Will
