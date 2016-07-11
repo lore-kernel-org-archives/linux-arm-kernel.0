@@ -1,80 +1,40 @@
-From: weiqing.kong@mediatek.com (Weiqing Kong)
-Date: Mon, 11 Jul 2016 16:18:09 +0800
-Subject: [PATCH V2 3/3] dts: Add disp bls dtsi and dts config for MT2701
-In-Reply-To: <1468225089-28576-1-git-send-email-weiqing.kong@mediatek.com>
-References: <1468225089-28576-1-git-send-email-weiqing.kong@mediatek.com>
-Message-ID: <1468225089-28576-4-git-send-email-weiqing.kong@mediatek.com>
+From: patrice.chotard@st.com (Patrice Chotard)
+Date: Mon, 11 Jul 2016 10:29:44 +0200
+Subject: [GIT PULL v2] STi defconfig updates for v4.8
+Message-ID: <578358F8.3070303@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add disp_bls node in dtsi for CCF, add backlight_lcd
-in dts for backlight subsystem driver, and init pwm gpio mode.
+Hi Olof, Arnd and Kevin,
 
-Signed-off-by: Weiqing Kong <weiqing.kong@mediatek.com>
----
- arch/arm/boot/dts/mt2701-evb.dts | 29 +++++++++++++++++++++++++++++
- arch/arm/boot/dts/mt2701.dtsi    |  9 +++++++++
- 2 files changed, 38 insertions(+)
+Please consider this first round of multi_v7_defconfig updates for v4.8:
 
-diff --git a/arch/arm/boot/dts/mt2701-evb.dts b/arch/arm/boot/dts/mt2701-evb.dts
-index 082ca88..6d572f4 100644
---- a/arch/arm/boot/dts/mt2701-evb.dts
-+++ b/arch/arm/boot/dts/mt2701-evb.dts
-@@ -22,6 +22,35 @@
- 	memory {
- 		reg = <0 0x80000000 0 0x40000000>;
- 	};
-+
-+	backlight_lcd: backlight_lcd {
-+		compatible = "pwm-backlight";
-+		pwms = <&disp_bls 0 100000>;
-+		brightness-levels = <
-+			  0  16  32  48  64  80  96 112
-+			128 144 160 176 192 208 224 240
-+			255
-+		>;
-+		default-brightness-level = <9>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pwm_bls_gpio>;
-+	};
-+};
-+
-+&disp_bls {
-+	status = "okay";
-+};
-+
-+&mmsys {
-+	status = "okay";
-+};
-+
-+&pio {
-+	pwm_bls_gpio: pwm_bls_gpio {
-+		pins_cmd_dat {
-+			pinmux = <MT2701_PIN_208_AUD_EXT_CK1__FUNC_DISP_PWM>;
-+		};
-+	};
- };
- 
- &uart0 {
-diff --git a/arch/arm/boot/dts/mt2701.dtsi b/arch/arm/boot/dts/mt2701.dtsi
-index 42d5a37..49b8767 100644
---- a/arch/arm/boot/dts/mt2701.dtsi
-+++ b/arch/arm/boot/dts/mt2701.dtsi
-@@ -234,6 +234,15 @@
- 		status = "disabled";
- 	};
- 
-+	disp_bls: dispsys at 1400a000 {
-+		compatible = "mediatek,mt2701-disp-pwm";
-+		reg = <0 0x1400a000 0 0x1000>;
-+		#pwm-cells = <2>;
-+		clocks = <&mmsys CLK_MM_MDP_BLS_26M>, <&mmsys CLK_MM_DISP_BLS>;
-+		clock-names = "main", "mm";
-+		status = "disabled";
-+	};
-+
- 	imgsys: syscon at 15000000 {
- 		compatible = "mediatek,mt2701-imgsys", "syscon";
- 		reg = <0 0x15000000 0 0x1000>;
--- 
-1.8.1.1.dirty
+The following changes since commit 5edb56491d4812c42175980759da53388e5d86f5:
+
+   Linux 4.7-rc3 (2016-06-12 07:20:35 -0700)
+
+are available in the git repository at:
+
+   git://git.kernel.org/pub/scm/linux/kernel/git/pchotard/sti.git 
+tags/sti-defconfig-for-v4.8
+
+for you to fetch changes up to afd9dc4562c5838323a3909cc717a8617307c253:
+
+   ARM: multi_v7_defconfig: enable STMicroelectronics DRM Support 
+(2016-07-11 09:42:59 +0200)
+
+----------------------------------------------------------------
+warning: refname 'sti-defconfig-for-v4.8' is ambiguous.
+Highlights:
+-----------
+- Enable DRM_STI for STMicroelectronics DRM Support
+- VIDEO_STI_BDISP for STMicroelectronics BDISP 2D
+
+----------------------------------------------------------------
+Patrice Chotard (2):
+       ARM: multi_v7_defconfig: enable STMicroelectronics BDISP 2D 
+blitter driver
+       ARM: multi_v7_defconfig: enable STMicroelectronics DRM Support
+
+  arch/arm/configs/multi_v7_defconfig | 2 ++
+  1 file changed, 2 insertions(+)
