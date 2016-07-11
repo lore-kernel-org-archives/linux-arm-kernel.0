@@ -1,119 +1,159 @@
 From: anna-maria@linutronix.de (Anna-Maria Gleixner)
-Date: Mon, 11 Jul 2016 12:28:49 -0000
-Subject: [patch 38/66] clocksource/arm_global_timer: Convert to hotplug state
- machine.
+Date: Mon, 11 Jul 2016 12:29:01 -0000
+Subject: [patch 55/66] hwtracing: coresight-etm4x: Convert to hotplug state
+ machine
 References: <20160711122450.923603742@linutronix.de>
-Message-ID: <20160711122533.836621791@linutronix.de>
+Message-ID: <20160711122535.280919206@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Richard Cochran <rcochran@linutronix.de>
+From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 
-Install the callbacks via the state machine and let the core invoke
-the callbacks on the already online CPUs.
+This driver has an asymmetry of ONLINE code without any corresponding tear
+down code. Otherwise, this is a straightforward conversion.
 
-Signed-off-by: Richard Cochran <rcochran@linutronix.de>
-Reviewed-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
-Cc: Srinivas Kandagatla <srinivas.kandagatla@gmail.com>
-Cc: Maxime Coquelin <maxime.coquelin@st.com>
-Cc: Patrice Chotard <patrice.chotard@st.com>
-Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
 Cc: linux-arm-kernel at lists.infradead.org
-Cc: kernel at stlinux.com
 Signed-off-by: Anna-Maria Gleixner <anna-maria@linutronix.de>
-
 ---
- drivers/clocksource/arm_global_timer.c |   41 ++++++++-------------------------
- include/linux/cpuhotplug.h             |    1 
- 2 files changed, 11 insertions(+), 31 deletions(-)
+ drivers/hwtracing/coresight/coresight-etm4x.c |   93 ++++++++++++++------------
+ include/linux/cpuhotplug.h                    |    1 
+ 2 files changed, 53 insertions(+), 41 deletions(-)
 
---- a/drivers/clocksource/arm_global_timer.c
-+++ b/drivers/clocksource/arm_global_timer.c
-@@ -165,9 +165,9 @@ static irqreturn_t gt_clockevent_interru
- 	return IRQ_HANDLED;
+--- a/drivers/hwtracing/coresight/coresight-etm4x.c
++++ b/drivers/hwtracing/coresight/coresight-etm4x.c
+@@ -673,53 +673,52 @@ void etm4_config_trace_mode(struct etmv4
+ 	config->addr_acc[ETM_DEFAULT_ADDR_COMP + 1] = addr_acc;
  }
  
--static int gt_clockevents_init(struct clock_event_device *clk)
-+static int gt_starting_cpu(unsigned int cpu)
+-static int etm4_cpu_callback(struct notifier_block *nfb, unsigned long action,
+-			    void *hcpu)
++static int etm4_online_cpu(unsigned int cpu)
  {
--	int cpu = smp_processor_id();
-+	struct clock_event_device *clk = this_cpu_ptr(gt_evt);
- 
- 	clk->name = "arm_global_timer";
- 	clk->features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT |
-@@ -186,10 +186,13 @@ static int gt_clockevents_init(struct cl
- 	return 0;
- }
- 
--static void gt_clockevents_stop(struct clock_event_device *clk)
-+static int gt_dying_cpu(unsigned int cpu)
- {
-+	struct clock_event_device *clk = this_cpu_ptr(gt_evt);
+-	unsigned int cpu = (unsigned long)hcpu;
++	if (!etmdrvdata[cpu])
++		return 0;
 +
- 	gt_clockevent_shutdown(clk);
- 	disable_percpu_irq(clk->irq);
++	if (etmdrvdata[cpu]->boot_enable && !etmdrvdata[cpu]->sticky_enable)
++		coresight_enable(etmdrvdata[cpu]->csdev);
 +	return 0;
- }
++}
++
++static int etm4_starting_cpu(unsigned int cpu)
++{
++	if (!etmdrvdata[cpu])
++		return 0;
++
++	spin_lock(&etmdrvdata[cpu]->spinlock);
++	if (!etmdrvdata[cpu]->os_unlock) {
++		etm4_os_unlock(etmdrvdata[cpu]);
++		etmdrvdata[cpu]->os_unlock = true;
++	}
  
- static cycle_t gt_clocksource_read(struct clocksource *cs)
-@@ -252,24 +255,6 @@ static void __init gt_clocksource_init(v
- 	clocksource_register_hz(&gt_clocksource, gt_clk_rate);
- }
++	if (local_read(&etmdrvdata[cpu]->mode))
++		etm4_enable_hw(etmdrvdata[cpu]);
++	spin_unlock(&etmdrvdata[cpu]->spinlock);
++	return 0;
++}
++
++static int etm4_dying_cpu(unsigned int cpu)
++{
+ 	if (!etmdrvdata[cpu])
+-		goto out;
++		return 0;
  
--static int gt_cpu_notify(struct notifier_block *self, unsigned long action,
--			 void *hcpu)
--{
--	switch (action & ~CPU_TASKS_FROZEN) {
+-	switch (action & (~CPU_TASKS_FROZEN)) {
 -	case CPU_STARTING:
--		gt_clockevents_init(this_cpu_ptr(gt_evt));
+-		spin_lock(&etmdrvdata[cpu]->spinlock);
+-		if (!etmdrvdata[cpu]->os_unlock) {
+-			etm4_os_unlock(etmdrvdata[cpu]);
+-			etmdrvdata[cpu]->os_unlock = true;
+-		}
+-
+-		if (local_read(&etmdrvdata[cpu]->mode))
+-			etm4_enable_hw(etmdrvdata[cpu]);
+-		spin_unlock(&etmdrvdata[cpu]->spinlock);
 -		break;
+-
+-	case CPU_ONLINE:
+-		if (etmdrvdata[cpu]->boot_enable &&
+-			!etmdrvdata[cpu]->sticky_enable)
+-			coresight_enable(etmdrvdata[cpu]->csdev);
+-		break;
+-
 -	case CPU_DYING:
--		gt_clockevents_stop(this_cpu_ptr(gt_evt));
+-		spin_lock(&etmdrvdata[cpu]->spinlock);
+-		if (local_read(&etmdrvdata[cpu]->mode))
+-			etm4_disable_hw(etmdrvdata[cpu]);
+-		spin_unlock(&etmdrvdata[cpu]->spinlock);
 -		break;
 -	}
--
+-out:
 -	return NOTIFY_OK;
 -}
--static struct notifier_block gt_cpu_nb = {
--	.notifier_call = gt_cpu_notify,
+-
+-static struct notifier_block etm4_cpu_notifier = {
+-	.notifier_call = etm4_cpu_callback,
 -};
--
- static void __init global_timer_of_register(struct device_node *np)
++	spin_lock(&etmdrvdata[cpu]->spinlock);
++	if (local_read(&etmdrvdata[cpu]->mode))
++		etm4_disable_hw(etmdrvdata[cpu]);
++	spin_unlock(&etmdrvdata[cpu]->spinlock);
++	return 0;
++}
+ 
+ static void etm4_init_trace_id(struct etmv4_drvdata *drvdata)
  {
- 	struct clk *gt_clk;
-@@ -325,21 +310,15 @@ static void __init global_timer_of_regis
- 		goto out_free;
- 	}
+ 	drvdata->trcid = coresight_get_trace_id(drvdata->cpu);
+ }
  
--	err = register_cpu_notifier(&gt_cpu_nb);
--	if (err) {
--		pr_warn("global-timer: unable to register cpu notifier.\n");
--		goto out_irq;
--	}
--
--	/* Immediately configure the timer on the boot CPU */
-+	/* Register and immediately configure the timer on the boot CPU */
- 	gt_clocksource_init();
--	gt_clockevents_init(this_cpu_ptr(gt_evt));
-+	cpuhp_setup_state(CPUHP_AP_ARM_GLOBAL_TIMER_STARTING,
-+			  "AP_ARM_GLOBAL_TIMER_STARTING", gt_starting_cpu,
-+			  gt_dying_cpu);
- 	gt_delay_timer_init();
++static enum cpuhp_state hp_online;
++
+ static int etm4_probe(struct amba_device *adev, const struct amba_id *id)
+ {
+ 	int ret;
+@@ -767,8 +766,17 @@ static int etm4_probe(struct amba_device
+ 				etm4_init_arch_data,  drvdata, 1))
+ 		dev_err(dev, "ETM arch init failed\n");
  
- 	return;
+-	if (!etm4_count++)
+-		register_hotcpu_notifier(&etm4_cpu_notifier);
++	if (!etm4_count++) {
++		cpuhp_setup_state_nocalls(CPUHP_AP_ARM_CORESIGHT4_STARTING,
++					  "AP_ARM_CORESIGHT4_STARTING",
++					  etm4_starting_cpu, etm4_dying_cpu);
++		ret = cpuhp_setup_state_nocalls(CPUHP_AP_ONLINE_DYN,
++						"AP_ARM_CORESIGHT4_ONLINE",
++						etm4_online_cpu, NULL);
++		if (ret < 0)
++			goto err_arch_supported;
++		hp_online = ret;
++	}
  
--out_irq:
--	free_percpu_irq(gt_ppi, gt_evt);
- out_free:
- 	free_percpu(gt_evt);
- out_clk:
+ 	put_online_cpus();
+ 
+@@ -809,8 +817,11 @@ static int etm4_probe(struct amba_device
+ 	return 0;
+ 
+ err_arch_supported:
+-	if (--etm4_count == 0)
+-		unregister_hotcpu_notifier(&etm4_cpu_notifier);
++	if (--etm4_count == 0) {
++		cpuhp_remove_state_nocalls(CPUHP_AP_ARM_CORESIGHT4_STARTING);
++		if (hp_online)
++			cpuhp_remove_state_nocalls(hp_online);
++	}
+ 	return ret;
+ }
+ 
 --- a/include/linux/cpuhotplug.h
 +++ b/include/linux/cpuhotplug.h
-@@ -38,6 +38,7 @@ enum cpuhp_state {
- 	CPUHP_AP_ARM_VFP_STARTING,
- 	CPUHP_AP_PERF_ARM_STARTING,
- 	CPUHP_AP_ARM_ARCH_TIMER_STARTING,
-+	CPUHP_AP_ARM_GLOBAL_TIMER_STARTING,
- 	CPUHP_AP_KVM_STARTING,
+@@ -55,6 +55,7 @@ enum cpuhp_state {
+ 	CPUHP_AP_KVM_ARM_TIMER_STARTING,
+ 	CPUHP_AP_ARM_XEN_STARTING,
+ 	CPUHP_AP_ARM_CORESIGHT_STARTING,
++	CPUHP_AP_ARM_CORESIGHT4_STARTING,
+ 	CPUHP_AP_LEDTRIG_STARTING,
  	CPUHP_AP_NOTIFY_STARTING,
  	CPUHP_AP_ONLINE,
