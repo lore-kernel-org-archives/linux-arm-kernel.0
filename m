@@ -1,79 +1,177 @@
 From: anna-maria@linutronix.de (Anna-Maria Gleixner)
-Date: Mon, 11 Jul 2016 12:28:58 -0000
-Subject: [patch 50/66] arm: l2c: Convert to hotplug state machine
+Date: Mon, 11 Jul 2016 12:29:01 -0000
+Subject: [patch 54/66] hwtracing: coresight-etm3x: Convert to hotplug state
+ machine
 References: <20160711122450.923603742@linutronix.de>
-Message-ID: <20160711122534.845045890@linutronix.de>
+Message-ID: <20160711122535.193489034@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Richard Cochran <rcochran@linutronix.de>
 
-Install the callbacks via the state machine and let the core invoke
-the callbacks on the already online CPUs.
+This driver has an asymmetry of ONLINE code without any corresponding tear
+down code. Otherwise, this is a straightforward conversion.
 
 Signed-off-by: Richard Cochran <rcochran@linutronix.de>
 Reviewed-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Marek Szyprowski <m.szyprowski@samsung.com>
+Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
 Cc: linux-arm-kernel at lists.infradead.org
 Signed-off-by: Anna-Maria Gleixner <anna-maria@linutronix.de>
 
 ---
- arch/arm/mm/cache-l2x0.c   |   27 +++++++++++++--------------
- include/linux/cpuhotplug.h |    1 +
- 2 files changed, 14 insertions(+), 14 deletions(-)
+ drivers/hwtracing/coresight/coresight-etm3x.c |   90 ++++++++++++++------------
+ include/linux/cpuhotplug.h                    |    1 
+ 2 files changed, 50 insertions(+), 41 deletions(-)
 
---- a/arch/arm/mm/cache-l2x0.c
-+++ b/arch/arm/mm/cache-l2x0.c
-@@ -597,17 +597,16 @@ static void l2c310_configure(void __iome
- 			      L310_POWER_CTRL);
- }
+--- a/drivers/hwtracing/coresight/coresight-etm3x.c
++++ b/drivers/hwtracing/coresight/coresight-etm3x.c
+@@ -481,8 +481,7 @@ static int etm_enable_sysfs(struct cores
  
--static int l2c310_cpu_enable_flz(struct notifier_block *nb, unsigned long act, void *data)
-+static int l2c310_starting_cpu(unsigned int cpu)
+ 	/*
+ 	 * Configure the ETM only if the CPU is online.  If it isn't online
+-	 * hw configuration will take place when 'CPU_STARTING' is received
+-	 * in @etm_cpu_callback.
++	 * hw configuration will take place on the local CPU during bring up.
+ 	 */
+ 	if (cpu_online(drvdata->cpu)) {
+ 		ret = smp_call_function_single(drvdata->cpu,
+@@ -641,47 +640,44 @@ static const struct coresight_ops etm_cs
+ 	.source_ops	= &etm_source_ops,
+ };
+ 
+-static int etm_cpu_callback(struct notifier_block *nfb, unsigned long action,
+-			    void *hcpu)
++static int etm_online_cpu(unsigned int cpu)
  {
--	switch (act & ~CPU_TASKS_FROZEN) {
+-	unsigned int cpu = (unsigned long)hcpu;
+-
+ 	if (!etmdrvdata[cpu])
+-		goto out;
++		return 0;
+ 
+-	switch (action & (~CPU_TASKS_FROZEN)) {
 -	case CPU_STARTING:
--		set_auxcr(get_auxcr() | BIT(3) | BIT(2) | BIT(1));
+-		spin_lock(&etmdrvdata[cpu]->spinlock);
+-		if (!etmdrvdata[cpu]->os_unlock) {
+-			etm_os_unlock(etmdrvdata[cpu]);
+-			etmdrvdata[cpu]->os_unlock = true;
+-		}
+-
+-		if (local_read(&etmdrvdata[cpu]->mode))
+-			etm_enable_hw(etmdrvdata[cpu]);
+-		spin_unlock(&etmdrvdata[cpu]->spinlock);
 -		break;
--	case CPU_DYING:
--		set_auxcr(get_auxcr() & ~(BIT(3) | BIT(2) | BIT(1)));
--		break;
--	}
--	return NOTIFY_OK;
-+	set_auxcr(get_auxcr() | BIT(3) | BIT(2) | BIT(1));
++	if (etmdrvdata[cpu]->boot_enable && !etmdrvdata[cpu]->sticky_enable)
++		coresight_enable(etmdrvdata[cpu]->csdev);
 +	return 0;
 +}
-+
-+static int l2c310_dying_cpu(unsigned int cpu)
+ 
+-	case CPU_ONLINE:
+-		if (etmdrvdata[cpu]->boot_enable &&
+-		    !etmdrvdata[cpu]->sticky_enable)
+-			coresight_enable(etmdrvdata[cpu]->csdev);
+-		break;
++static int etm_starting_cpu(unsigned int cpu)
 +{
-+	set_auxcr(get_auxcr() & ~(BIT(3) | BIT(2) | BIT(1)));
++	if (!etmdrvdata[cpu])
++		return 0;
+ 
+-	case CPU_DYING:
+-		spin_lock(&etmdrvdata[cpu]->spinlock);
+-		if (local_read(&etmdrvdata[cpu]->mode))
+-			etm_disable_hw(etmdrvdata[cpu]);
+-		spin_unlock(&etmdrvdata[cpu]->spinlock);
+-		break;
++	spin_lock(&etmdrvdata[cpu]->spinlock);
++	if (!etmdrvdata[cpu]->os_unlock) {
++		etm_os_unlock(etmdrvdata[cpu]);
++		etmdrvdata[cpu]->os_unlock = true;
+ 	}
+-out:
+-	return NOTIFY_OK;
++
++	if (local_read(&etmdrvdata[cpu]->mode))
++		etm_enable_hw(etmdrvdata[cpu]);
++	spin_unlock(&etmdrvdata[cpu]->spinlock);
 +	return 0;
  }
  
- static void __init l2c310_enable(void __iomem *base, unsigned num_lock)
-@@ -678,10 +677,10 @@ static void __init l2c310_enable(void __
- 			power_ctrl & L310_STNDBY_MODE_EN ? "en" : "dis");
- 	}
+-static struct notifier_block etm_cpu_notifier = {
+-	.notifier_call = etm_cpu_callback,
+-};
++static int etm_dying_cpu(unsigned int cpu)
++{
++	if (!etmdrvdata[cpu])
++		return 0;
++
++	spin_lock(&etmdrvdata[cpu]->spinlock);
++	if (local_read(&etmdrvdata[cpu]->mode))
++		etm_disable_hw(etmdrvdata[cpu]);
++	spin_unlock(&etmdrvdata[cpu]->spinlock);
++	return 0;
++}
  
--	if (aux & L310_AUX_CTRL_FULL_LINE_ZERO) {
--		set_auxcr(get_auxcr() | BIT(3) | BIT(2) | BIT(1));
--		cpu_notifier(l2c310_cpu_enable_flz, 0);
--	}
-+	if (aux & L310_AUX_CTRL_FULL_LINE_ZERO)
-+		cpuhp_setup_state(CPUHP_AP_ARM_L2X0_STARTING,
-+				  "AP_ARM_L2X0_STARTING", l2c310_starting_cpu,
-+				  l2c310_dying_cpu);
+ static bool etm_arch_supported(u8 arch)
+ {
+@@ -750,6 +746,8 @@ static void etm_init_trace_id(struct etm
+ 	drvdata->traceid = coresight_get_trace_id(drvdata->cpu);
  }
  
- static void __init l2c310_fixup(void __iomem *base, u32 cache_id,
++static enum cpuhp_state hp_online;
++
+ static int etm_probe(struct amba_device *adev, const struct amba_id *id)
+ {
+ 	int ret;
+@@ -806,9 +804,17 @@ static int etm_probe(struct amba_device
+ 				     etm_init_arch_data,  drvdata, 1))
+ 		dev_err(dev, "ETM arch init failed\n");
+ 
+-	if (!etm_count++)
+-		register_hotcpu_notifier(&etm_cpu_notifier);
+-
++	if (!etm_count++) {
++		cpuhp_setup_state_nocalls(CPUHP_AP_ARM_CORESIGHT_STARTING,
++					  "AP_ARM_CORESIGHT_STARTING",
++					  etm_starting_cpu, etm_dying_cpu);
++		ret = cpuhp_setup_state_nocalls(CPUHP_AP_ONLINE_DYN,
++						"AP_ARM_CORESIGHT_ONLINE",
++						etm_online_cpu, NULL);
++		if (ret < 0)
++			goto err_arch_supported;
++		hp_online = ret;
++	}
+ 	put_online_cpus();
+ 
+ 	if (etm_arch_supported(drvdata->arch) == false) {
+@@ -839,7 +845,6 @@ static int etm_probe(struct amba_device
+ 
+ 	pm_runtime_put(&adev->dev);
+ 	dev_info(dev, "%s initialized\n", (char *)id->data);
+-
+ 	if (boot_enable) {
+ 		coresight_enable(drvdata->csdev);
+ 		drvdata->boot_enable = true;
+@@ -848,8 +853,11 @@ static int etm_probe(struct amba_device
+ 	return 0;
+ 
+ err_arch_supported:
+-	if (--etm_count == 0)
+-		unregister_hotcpu_notifier(&etm_cpu_notifier);
++	if (--etm_count == 0) {
++		cpuhp_remove_state_nocalls(CPUHP_AP_ARM_CORESIGHT_STARTING);
++		if (hp_online)
++			cpuhp_remove_state_nocalls(hp_online);
++	}
+ 	return ret;
+ }
+ 
 --- a/include/linux/cpuhotplug.h
 +++ b/include/linux/cpuhotplug.h
-@@ -38,6 +38,7 @@ enum cpuhp_state {
- 	CPUHP_AP_PERF_METAG_STARTING,
- 	CPUHP_AP_ARM_VFP_STARTING,
- 	CPUHP_AP_PERF_ARM_STARTING,
-+	CPUHP_AP_ARM_L2X0_STARTING,
- 	CPUHP_AP_ARM_ARCH_TIMER_STARTING,
- 	CPUHP_AP_ARM_GLOBAL_TIMER_STARTING,
- 	CPUHP_AP_DUMMY_TIMER_STARTING,
+@@ -54,6 +54,7 @@ enum cpuhp_state {
+ 	CPUHP_AP_KVM_ARM_VGIC_STARTING,
+ 	CPUHP_AP_KVM_ARM_TIMER_STARTING,
+ 	CPUHP_AP_ARM_XEN_STARTING,
++	CPUHP_AP_ARM_CORESIGHT_STARTING,
+ 	CPUHP_AP_LEDTRIG_STARTING,
+ 	CPUHP_AP_NOTIFY_STARTING,
+ 	CPUHP_AP_ONLINE,
