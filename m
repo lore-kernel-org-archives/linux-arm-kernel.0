@@ -1,103 +1,92 @@
-From: a0393675@ti.com (Keerthy)
-Date: Mon, 11 Jul 2016 14:39:26 +0530
-Subject: [PATCH 3/3] arm: dts: thermal: add thermal/auxadc node.
-In-Reply-To: <1468227415.15776.34.camel@mtksdaap41>
-References: <1467882386-40544-1-git-send-email-dawei.chien@mediatek.com>
- <1467882386-40544-4-git-send-email-dawei.chien@mediatek.com>
- <577E465D.8070004@ti.com> <1468227415.15776.34.camel@mtksdaap41>
-Message-ID: <57836246.3010800@ti.com>
+From: john@metanate.com (John Keeping)
+Date: Mon, 11 Jul 2016 10:20:53 +0100
+Subject: [PATCH 5/7] drm/rockchip: dw-mipi: support HPD poll
+In-Reply-To: <5782EC7D.3080202@rock-chips.com>
+References: <1467968701-15620-1-git-send-email-zyw@rock-chips.com>
+ <1467968701-15620-6-git-send-email-zyw@rock-chips.com>
+ <20160708145211.6bf83d8f.john@metanate.com>
+ <5782EC7D.3080202@rock-chips.com>
+Message-ID: <20160711102053.12b32be1.john@metanate.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, 11 Jul 2016 08:46:53 +0800, Mark yao wrote:
 
+> On 2016?07?08? 21:52, John Keeping wrote:
+> > On Fri,  8 Jul 2016 17:04:59 +0800, Chris Zhong wrote:
+> >  
+> >> At the first time of bind, there is no any panel attach in mipi. Add a
+> >> DRM_CONNECTOR_POLL_HPD porperty to detect the panel status, when panel
+> >> probe, the dw_mipi_dsi_host_attach would be called, then mipi-dsi will
+> >> trigger a event to notify the drm framework.
+> >>
+> >> Signed-off-by: Chris Zhong <zyw@rock-chips.com>  
+> > Can we do something like this instead?  We know that the panel must
+> > always be attached and this has the advantage that the display size will
+> > be known when the framebuffer console loads.
+> >  
+> > -- >8 --  
+> > Subject: [PATCH] drm/rockchip: dw-mipi-dsi: defer probe if panel is not loaded
+> >
+> > This ensures that the output resolution is known before fbcon loads.
+> >
+> > Signed-off-by: John Keeping <john@metanate.com>
+> > ---
+> >   drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 11 +++++++++--
+> >   1 file changed, 9 insertions(+), 2 deletions(-)
+> >
+> > diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+> > index 6ef5f3be8468..c0499266d116 100644
+> > --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+> > +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+> > @@ -1154,10 +1154,17 @@ static int dw_mipi_dsi_bind(struct device *dev, struct device *master,
+> >   
+> >   	dsi->dsi_host.ops = &dw_mipi_dsi_host_ops;
+> >   	dsi->dsi_host.dev = dev;
+> > -	return mipi_dsi_host_register(&dsi->dsi_host);
+> > +	ret = mipi_dsi_host_register(&dsi->dsi_host);
+> > +	if (!ret && !dsi->panel) {
+> > +		mipi_dsi_host_unregister(&dsi->dsi_host);
+> > +		drm_encoder_cleanup(&dsi->encoder);
+> > +		drm_connector_cleanup(&dsi->connector);
+> > +		ret = -EPROBE_DEFER;  
+> 
+> Do you verify this patch? I do the similar change before, but found 
+> panel can't probe.
+> 
+> mipi_dsi_host_register will call device_add, I think the panel probe 
+> need this.
+> 
+> Seems that mipi panel probe request mipi_dsi_host_register, 
+> mipi_dsi_host_register request panel on your patch, endless loop.
 
-On Monday 11 July 2016 02:26 PM, dawei chien wrote:
-> Dear Keerthy,
->
-> On Thu, 2016-07-07 at 17:39 +0530, Keerthy wrote:
->>
->> On Thursday 07 July 2016 02:36 PM, Dawei Chien wrote:
->>> This adds the thermal controller and auxadc nodes
->>> to the Mediatek MT2701 dtsi file.
->>>
->>> Signed-off-by: Dawei Chien <dawei.chien@mediatek.com>
->>> ---
->>> This patch depned on:
->>> https://patchwork.kernel.org/patch/9213545/
->>> ---
->>>    arch/arm/boot/dts/mt2701.dtsi |   43 +++++++++++++++++++++++++++++++++++++++++
->>>    1 file changed, 43 insertions(+)
->>>
->>> diff --git a/arch/arm/boot/dts/mt2701.dtsi b/arch/arm/boot/dts/mt2701.dtsi
->>> index 2ac8b50..0834a23 100644
->>> --- a/arch/arm/boot/dts/mt2701.dtsi
->>> +++ b/arch/arm/boot/dts/mt2701.dtsi
->>> @@ -77,6 +77,36 @@
->>>    		#clock-cells = <0>;
->>>    	};
->>>
->>> +	thermal-zones {
->>> +		cpu_thermal: cpu_thermal {
->>> +			polling-delay-passive = <1000>; /* milliseconds */
->>> +			polling-delay = <1000>; /* milliseconds */
->>> +
->>> +			thermal-sensors = <&thermal 0>;
->>> +			sustainable-power = <1000>;
->>> +
->>> +			trips {
->>> +				threshold: trip-point at 0 {
->>> +					temperature = <68000>;
->>> +					hysteresis = <2000>;
->>> +					type = "passive";
->>> +				};
->>> +
->>> +				target: trip-point at 1 {
->>> +					temperature = <85000>;
->>> +					hysteresis = <2000>;
->>> +					type = "passive";
->>> +				};
->>> +
->>> +				cpu_crit: cpu_crit at 0 {
->>> +					temperature = <115000>;
->>> +					hysteresis = <2000>;
->>> +					type = "critical";
->>> +				};
->>> +			};
->>> +		};
->>> +	};
->>> +
->>
->> are there any corresponding cooling-maps?
->
-> Since MT2701 does not register CPUFREQ cooling device and its' own
-> device node, I could not add cooling-maps so far.
-> Could we add cooling map after CPUFREQ ready, thank you.
+Yes, I've been running this patch for months.  It's possible that I have
+another patch that is needed to get this to work correctly (I have a
+whole set of Rockchip MIPI patches that I need to find time to submit,
+for now I've pushed a branch to Github [1]).
 
-Okay. I was curious to know about the cooling agents.
+I don't know what you mean about the panel probe requesting
+mipi_dsi_host_register, the panel probe calls mipi_dsi_attach() and is
+itself called from mipi_dsi_host_register().  My patch doesn't change
+this at all, the only change is that if the panel driver is not
+available, then the probe fails.  Later, once the panel driver has been
+registered the probe will succeed.  This is no different from the
+current behaviour if the order of probing drivers happens to load the
+panel before dw-mipi-dsi.
 
->
->>
->>>    	timer {
->>>    		compatible = "arm,armv7-timer";
->>>    		interrupt-parent = <&gic>;
->>> @@ -183,4 +213,17 @@
->>>    		clocks = <&uart_clk>;
->>>    		status = "disabled";
->>>    	};
->>> +
->>> +	thermal: thermal at 1100b000 {
->>> +		#thermal-sensor-cells = <0>;
->>> +		compatible = "mediatek,mt2701-thermal";
->>> +		reg = <0 0x1100b000 0 0x1000>;
->>> +		interrupts = <GIC_SPI 70 IRQ_TYPE_LEVEL_LOW>;
->>> +		clocks = <&pericfg CLK_PERI_THERM>, <&pericfg CLK_PERI_AUXADC>;
->>> +		clock-names = "therm", "auxadc";
->>> +		resets = <&pericfg 0x10>;
->>> +		reset-names = "therm";
->>> +		mediatek,auxadc = <&auxadc>;
->>> +		mediatek,apmixedsys = <&apmixedsys>;
->>> +	};
->>>    };
->>>
->
->
+[1] https://github.com/johnkeeping/linux/commits/topic/rockchip-mipi
+
+> > +	}
+> >   
+> >   err_pllref:
+> > -	clk_disable_unprepare(dsi->pllref_clk);
+> > +	if (ret)
+> > +		clk_disable_unprepare(dsi->pllref_clk);
+> >   	return ret;
+> >   }
+> >   
+> >
+> >
+> >  
+> 
+> 
