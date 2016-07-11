@@ -1,44 +1,35 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 11 Jul 2016 14:08:52 -0700
-Subject: [PATCH] amba: Support clk parents and rates assigned in DT
-Message-ID: <20160711210852.31553-1-sboyd@codeaurora.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 11 Jul 2016 22:12:35 +0100
+Subject: [PATCH V8 2/2] regulator: mt6323: Add support for MT6323 regulator
+In-Reply-To: <1468240179-7558-2-git-send-email-john@phrozen.org>
+References: <1468240179-7558-1-git-send-email-john@phrozen.org>
+ <1468240179-7558-2-git-send-email-john@phrozen.org>
+Message-ID: <20160711211235.GB9976@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the call to of_clk_set_defaults() into the amba probe path so
-that devices on the amba bus can use the assigned rates and
-parents feature of the common clock framework.
+On Mon, Jul 11, 2016 at 02:29:39PM +0200, John Crispin wrote:
 
-Cc: Michael Turquette <mturquette@baylibre.com>
-Cc: Jorge Ramirez Ortiz <jorge.ramirez-ortiz@linaro.org>
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- drivers/amba/bus.c | 5 +++++
- 1 file changed, 5 insertions(+)
+> +static const struct of_device_id mt6323_of_match[] = {
+> +	{ .compatible = "mediatek,mt6323-regulator", },
+> +	{ /* sentinel */ },
+> +};
+> +MODULE_DEVICE_TABLE(of, mt6323_of_match);
 
-diff --git a/drivers/amba/bus.c b/drivers/amba/bus.c
-index a5b5c87e2114..a56fa2a1e9aa 100644
---- a/drivers/amba/bus.c
-+++ b/drivers/amba/bus.c
-@@ -19,6 +19,7 @@
- #include <linux/amba/bus.h>
- #include <linux/sizes.h>
- #include <linux/limits.h>
-+#include <linux/clk/clk-conf.h>
- 
- #include <asm/irq.h>
- 
-@@ -237,6 +238,10 @@ static int amba_probe(struct device *dev)
- 	int ret;
- 
- 	do {
-+		ret = of_clk_set_defaults(dev->of_node, false);
-+		if (ret < 0)
-+			break;
-+
- 		ret = dev_pm_domain_attach(dev, true);
- 		if (ret == -EPROBE_DEFER)
- 			break;
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+This may have been answered last time but I don't remember - why is
+there a compatible string for this device in the DT?  Surely we already
+know that the regulators for the mt6323 are present by virtue of the
+fact that we know that the core mt6323 is present in the system?
+Indeed, looking at the now merged MFD code it appears that this is
+in fact the case so we could just not have a compatible and perhaps this
+was just an oversight.  This is good because it means we're not encoding
+the specific way Linux instantiates devices into the DT.
+
+Otherwise this does look good.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160711/d17f5c40/attachment.sig>
