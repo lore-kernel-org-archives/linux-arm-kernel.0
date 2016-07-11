@@ -1,522 +1,374 @@
-From: dawei.chien@mediatek.com (dawei chien)
-Date: Mon, 11 Jul 2016 16:56:00 +0800
-Subject: [PATCH 2/3] thermal: Add Mediatek thermal driver for mt2701.
-In-Reply-To: <577E4300.406@ti.com>
-References: <1467882386-40544-1-git-send-email-dawei.chien@mediatek.com>
- <1467882386-40544-3-git-send-email-dawei.chien@mediatek.com>
- <577E4300.406@ti.com>
-Message-ID: <1468227360.15776.33.camel@mtksdaap41>
+From: jamesjj.liao@mediatek.com (James Liao)
+Date: Mon, 11 Jul 2016 16:56:30 +0800
+Subject: [PATCH v7 1/4] soc: mediatek: Refine scpsys to support multiple
+ platform
+In-Reply-To: <577E3AE9.5080202@gmail.com>
+References: <1463390894-32062-1-git-send-email-jamesjj.liao@mediatek.com>
+ <1463390894-32062-2-git-send-email-jamesjj.liao@mediatek.com>
+ <6762e420-0d68-0376-b584-bfc878b5e95f@gmail.com>
+ <1467783564.26485.22.camel@mtksdaap41> <577E3AE9.5080202@gmail.com>
+Message-ID: <1468227390.31247.20.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Keerthy,
+Hi Matthias,
 
-On Thu, 2016-07-07 at 17:24 +0530, Keerthy wrote:
-> Hi Dawei Chien,
+On Thu, 2016-07-07 at 13:20 +0200, Matthias Brugger wrote:
 > 
+> On 06/07/16 07:39, James Liao wrote:
+> > Hi Matthias,
+> >
+> > On Sat, 2016-07-02 at 18:33 +0200, Matthias Brugger wrote:
+> >>
+> >> On 05/16/2016 11:28 AM, James Liao wrote:
+> >>> Refine scpsys driver common code to support multiple SoC / platform.
+> >>>
+> >>> Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
+> >>> Reviewed-by: Kevin Hilman <khilman@baylibre.com>
+> >>> ---
+> >>>   drivers/soc/mediatek/mtk-scpsys.c | 363 +++++++++++++++++++++++---------------
+> >>>   1 file changed, 220 insertions(+), 143 deletions(-)
+> >>>
+> >>> diff --git a/drivers/soc/mediatek/mtk-scpsys.c b/drivers/soc/mediatek/mtk-scpsys.c
+> >>> index 57e781c..5870a24 100644
+> >>> --- a/drivers/soc/mediatek/mtk-scpsys.c
+> >>> +++ b/drivers/soc/mediatek/mtk-scpsys.c
+> >>> @@ -11,17 +11,15 @@
+> >>>    * GNU General Public License for more details.
+> >>>    */
+> >>>   #include <linux/clk.h>
+> >>> -#include <linux/delay.h>
+> >>> +#include <linux/init.h>
+> >>>   #include <linux/io.h>
+> >>> -#include <linux/kernel.h>
+> >>>   #include <linux/mfd/syscon.h>
+> >>> -#include <linux/init.h>
+> >>>   #include <linux/of_device.h>
+> >>>   #include <linux/platform_device.h>
+> >>>   #include <linux/pm_domain.h>
+> >>> -#include <linux/regmap.h>
+> >>> -#include <linux/soc/mediatek/infracfg.h>
+> >>>   #include <linux/regulator/consumer.h>
+> >>> +#include <linux/soc/mediatek/infracfg.h>
+> >>> +
+> >>>   #include <dt-bindings/power/mt8173-power.h>
+> >>>
+> >>>   #define SPM_VDE_PWR_CON			0x0210
+> >>> @@ -34,6 +32,7 @@
+> >>>   #define SPM_MFG_2D_PWR_CON		0x02c0
+> >>>   #define SPM_MFG_ASYNC_PWR_CON		0x02c4
+> >>>   #define SPM_USB_PWR_CON			0x02cc
+> >>> +
+> >>>   #define SPM_PWR_STATUS			0x060c
+> >>>   #define SPM_PWR_STATUS_2ND		0x0610
+> >>>
+> >>> @@ -55,12 +54,12 @@
+> >>>   #define PWR_STATUS_USB			BIT(25)
+> >>>
+> >>>   enum clk_id {
+> >>> -	MT8173_CLK_NONE,
+> >>> -	MT8173_CLK_MM,
+> >>> -	MT8173_CLK_MFG,
+> >>> -	MT8173_CLK_VENC,
+> >>> -	MT8173_CLK_VENC_LT,
+> >>> -	MT8173_CLK_MAX,
+> >>> +	CLK_NONE,
+> >>> +	CLK_MM,
+> >>> +	CLK_MFG,
+> >>> +	CLK_VENC,
+> >>> +	CLK_VENC_LT,
+> >>> +	CLK_MAX,
+> >>>   };
+> >>>
+> >>>   #define MAX_CLKS	2
+> >>> @@ -76,98 +75,6 @@ struct scp_domain_data {
+> >>>   	bool active_wakeup;
+> >>>   };
+> >>>
+> >>> -static const struct scp_domain_data scp_domain_data[] = {
+> >>> -	[MT8173_POWER_DOMAIN_VDEC] = {
+> >>> -		.name = "vdec",
+> >>> -		.sta_mask = PWR_STATUS_VDEC,
+> >>> -		.ctl_offs = SPM_VDE_PWR_CON,
+> >>> -		.sram_pdn_bits = GENMASK(11, 8),
+> >>> -		.sram_pdn_ack_bits = GENMASK(12, 12),
+> >>> -		.clk_id = {MT8173_CLK_MM},
+> >>> -	},
+> >>> -	[MT8173_POWER_DOMAIN_VENC] = {
+> >>> -		.name = "venc",
+> >>> -		.sta_mask = PWR_STATUS_VENC,
+> >>> -		.ctl_offs = SPM_VEN_PWR_CON,
+> >>> -		.sram_pdn_bits = GENMASK(11, 8),
+> >>> -		.sram_pdn_ack_bits = GENMASK(15, 12),
+> >>> -		.clk_id = {MT8173_CLK_MM, MT8173_CLK_VENC},
+> >>> -	},
+> >>> -	[MT8173_POWER_DOMAIN_ISP] = {
+> >>> -		.name = "isp",
+> >>> -		.sta_mask = PWR_STATUS_ISP,
+> >>> -		.ctl_offs = SPM_ISP_PWR_CON,
+> >>> -		.sram_pdn_bits = GENMASK(11, 8),
+> >>> -		.sram_pdn_ack_bits = GENMASK(13, 12),
+> >>> -		.clk_id = {MT8173_CLK_MM},
+> >>> -	},
+> >>> -	[MT8173_POWER_DOMAIN_MM] = {
+> >>> -		.name = "mm",
+> >>> -		.sta_mask = PWR_STATUS_DISP,
+> >>> -		.ctl_offs = SPM_DIS_PWR_CON,
+> >>> -		.sram_pdn_bits = GENMASK(11, 8),
+> >>> -		.sram_pdn_ack_bits = GENMASK(12, 12),
+> >>> -		.clk_id = {MT8173_CLK_MM},
+> >>> -		.bus_prot_mask = MT8173_TOP_AXI_PROT_EN_MM_M0 |
+> >>> -			MT8173_TOP_AXI_PROT_EN_MM_M1,
+> >>> -	},
+> >>> -	[MT8173_POWER_DOMAIN_VENC_LT] = {
+> >>> -		.name = "venc_lt",
+> >>> -		.sta_mask = PWR_STATUS_VENC_LT,
+> >>> -		.ctl_offs = SPM_VEN2_PWR_CON,
+> >>> -		.sram_pdn_bits = GENMASK(11, 8),
+> >>> -		.sram_pdn_ack_bits = GENMASK(15, 12),
+> >>> -		.clk_id = {MT8173_CLK_MM, MT8173_CLK_VENC_LT},
+> >>> -	},
+> >>> -	[MT8173_POWER_DOMAIN_AUDIO] = {
+> >>> -		.name = "audio",
+> >>> -		.sta_mask = PWR_STATUS_AUDIO,
+> >>> -		.ctl_offs = SPM_AUDIO_PWR_CON,
+> >>> -		.sram_pdn_bits = GENMASK(11, 8),
+> >>> -		.sram_pdn_ack_bits = GENMASK(15, 12),
+> >>> -		.clk_id = {MT8173_CLK_NONE},
+> >>> -	},
+> >>> -	[MT8173_POWER_DOMAIN_USB] = {
+> >>> -		.name = "usb",
+> >>> -		.sta_mask = PWR_STATUS_USB,
+> >>> -		.ctl_offs = SPM_USB_PWR_CON,
+> >>> -		.sram_pdn_bits = GENMASK(11, 8),
+> >>> -		.sram_pdn_ack_bits = GENMASK(15, 12),
+> >>> -		.clk_id = {MT8173_CLK_NONE},
+> >>> -		.active_wakeup = true,
+> >>> -	},
+> >>> -	[MT8173_POWER_DOMAIN_MFG_ASYNC] = {
+> >>> -		.name = "mfg_async",
+> >>> -		.sta_mask = PWR_STATUS_MFG_ASYNC,
+> >>> -		.ctl_offs = SPM_MFG_ASYNC_PWR_CON,
+> >>> -		.sram_pdn_bits = GENMASK(11, 8),
+> >>> -		.sram_pdn_ack_bits = 0,
+> >>> -		.clk_id = {MT8173_CLK_MFG},
+> >>> -	},
+> >>> -	[MT8173_POWER_DOMAIN_MFG_2D] = {
+> >>> -		.name = "mfg_2d",
+> >>> -		.sta_mask = PWR_STATUS_MFG_2D,
+> >>> -		.ctl_offs = SPM_MFG_2D_PWR_CON,
+> >>> -		.sram_pdn_bits = GENMASK(11, 8),
+> >>> -		.sram_pdn_ack_bits = GENMASK(13, 12),
+> >>> -		.clk_id = {MT8173_CLK_NONE},
+> >>> -	},
+> >>> -	[MT8173_POWER_DOMAIN_MFG] = {
+> >>> -		.name = "mfg",
+> >>> -		.sta_mask = PWR_STATUS_MFG,
+> >>> -		.ctl_offs = SPM_MFG_PWR_CON,
+> >>> -		.sram_pdn_bits = GENMASK(13, 8),
+> >>> -		.sram_pdn_ack_bits = GENMASK(21, 16),
+> >>> -		.clk_id = {MT8173_CLK_NONE},
+> >>> -		.bus_prot_mask = MT8173_TOP_AXI_PROT_EN_MFG_S |
+> >>> -			MT8173_TOP_AXI_PROT_EN_MFG_M0 |
+> >>> -			MT8173_TOP_AXI_PROT_EN_MFG_M1 |
+> >>> -			MT8173_TOP_AXI_PROT_EN_MFG_SNOOP_OUT,
+> >>> -	},
+> >>> -};
+> >>> -
+> >>> -#define NUM_DOMAINS	ARRAY_SIZE(scp_domain_data)
+> >>> -
+> >>>   struct scp;
+> >>>
+> >>>   struct scp_domain {
+> >>> @@ -179,7 +86,7 @@ struct scp_domain {
+> >>>   };
+> >>>
+> >>>   struct scp {
+> >>> -	struct scp_domain domains[NUM_DOMAINS];
+> >>> +	struct scp_domain *domains;
+> >>>   	struct genpd_onecell_data pd_data;
+> >>>   	struct device *dev;
+> >>>   	void __iomem *base;
+> >>> @@ -408,57 +315,69 @@ static bool scpsys_active_wakeup(struct device *dev)
+> >>>   	return scpd->data->active_wakeup;
+> >>>   }
+> >>>
+> >>> -static int scpsys_probe(struct platform_device *pdev)
+> >>> +static void init_clks(struct platform_device *pdev, struct clk *clk[CLK_MAX])
+> >>> +{
+> >>> +	enum clk_id clk_ids[] = {
+> >>> +		CLK_MM,
+> >>> +		CLK_MFG,
+> >>> +		CLK_VENC,
+> >>> +		CLK_VENC_LT
+> >>> +	};
+> >>> +
+> >>> +	static const char * const clk_names[] = {
+> >>> +		"mm",
+> >>> +		"mfg",
+> >>> +		"venc",
+> >>> +		"venc_lt",
+> >>> +	};
+> >>> +
+> >>> +	int i;
+> >>> +
+> >>> +	for (i = 0; i < ARRAY_SIZE(clk_ids); i++)
+> >>> +		clk[clk_ids[i]] = devm_clk_get(&pdev->dev, clk_names[i]);
+> >>
+> >> We can use the global enum clk_id and stat with i = 1, right?
+> >
+> > You are right. I'll change the start value with i = CLK_NONE + 1 in next
+> > patch.
+> >
+> >>> +}
+> >>> +
+> >>> +static struct scp *init_scp(struct platform_device *pdev,
+> >>> +			const struct scp_domain_data *scp_domain_data, int num)
+> >>>   {
+> >>>   	struct genpd_onecell_data *pd_data;
+> >>>   	struct resource *res;
+> >>> -	int i, j, ret;
+> >>> +	int i, j;
+> >>>   	struct scp *scp;
+> >>> -	struct clk *clk[MT8173_CLK_MAX];
+> >>> +	struct clk *clk[CLK_MAX];
+> >>>
+> >>>   	scp = devm_kzalloc(&pdev->dev, sizeof(*scp), GFP_KERNEL);
+> >>>   	if (!scp)
+> >>> -		return -ENOMEM;
+> >>> +		return ERR_PTR(-ENOMEM);
+> >>>
+> >>>   	scp->dev = &pdev->dev;
+> >>>
+> >>>   	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> >>>   	scp->base = devm_ioremap_resource(&pdev->dev, res);
+> >>>   	if (IS_ERR(scp->base))
+> >>> -		return PTR_ERR(scp->base);
+> >>> -
+> >>> -	pd_data = &scp->pd_data;
+> >>> -
+> >>> -	pd_data->domains = devm_kzalloc(&pdev->dev,
+> >>> -			sizeof(*pd_data->domains) * NUM_DOMAINS, GFP_KERNEL);
+> >>> -	if (!pd_data->domains)
+> >>> -		return -ENOMEM;
+> >>> -
+> >>> -	clk[MT8173_CLK_MM] = devm_clk_get(&pdev->dev, "mm");
+> >>> -	if (IS_ERR(clk[MT8173_CLK_MM]))
+> >>> -		return PTR_ERR(clk[MT8173_CLK_MM]);
+> >>> -
+> >>> -	clk[MT8173_CLK_MFG] = devm_clk_get(&pdev->dev, "mfg");
+> >>> -	if (IS_ERR(clk[MT8173_CLK_MFG]))
+> >>> -		return PTR_ERR(clk[MT8173_CLK_MFG]);
+> >>> -
+> >>> -	clk[MT8173_CLK_VENC] = devm_clk_get(&pdev->dev, "venc");
+> >>> -	if (IS_ERR(clk[MT8173_CLK_VENC]))
+> >>> -		return PTR_ERR(clk[MT8173_CLK_VENC]);
+> >>> -
+> >>> -	clk[MT8173_CLK_VENC_LT] = devm_clk_get(&pdev->dev, "venc_lt");
+> >>> -	if (IS_ERR(clk[MT8173_CLK_VENC_LT]))
+> >>> -		return PTR_ERR(clk[MT8173_CLK_VENC_LT]);
+> >>> +		return ERR_CAST(scp->base);
+> >>>
+> >>>   	scp->infracfg = syscon_regmap_lookup_by_phandle(pdev->dev.of_node,
+> >>>   			"infracfg");
+> >>>   	if (IS_ERR(scp->infracfg)) {
+> >>>   		dev_err(&pdev->dev, "Cannot find infracfg controller: %ld\n",
+> >>>   				PTR_ERR(scp->infracfg));
+> >>> -		return PTR_ERR(scp->infracfg);
+> >>> +		return ERR_CAST(scp->infracfg);
+> >>>   	}
+> >>>
+> >>> -	for (i = 0; i < NUM_DOMAINS; i++) {
+> >>> +	scp->domains = devm_kzalloc(&pdev->dev,
+> >>> +				sizeof(*scp->domains) * num, GFP_KERNEL);
+> >>> +	if (!scp->domains)
+> >>> +		return ERR_PTR(-ENOMEM);
+> >>> +
+> >>> +	pd_data = &scp->pd_data;
+> >>> +
+> >>> +	pd_data->domains = devm_kzalloc(&pdev->dev,
+> >>> +			sizeof(*pd_data->domains) * num, GFP_KERNEL);
+> >>> +	if (!pd_data->domains)
+> >>> +		return ERR_PTR(-ENOMEM);
+> >>> +
+> >>> +	for (i = 0; i < num; i++) {
+> >>>   		struct scp_domain *scpd = &scp->domains[i];
+> >>>   		const struct scp_domain_data *data = &scp_domain_data[i];
+> >>>
+> >>> @@ -467,28 +386,54 @@ static int scpsys_probe(struct platform_device *pdev)
+> >>>   			if (PTR_ERR(scpd->supply) == -ENODEV)
+> >>>   				scpd->supply = NULL;
+> >>>   			else
+> >>> -				return PTR_ERR(scpd->supply);
+> >>> +				return ERR_CAST(scpd->supply);
+> >>>   		}
+> >>>   	}
+> >>>
+> >>> -	pd_data->num_domains = NUM_DOMAINS;
+> >>> +	pd_data->num_domains = num;
+> >>>
+> >>> -	for (i = 0; i < NUM_DOMAINS; i++) {
+> >>> +	init_clks(pdev, clk);
+> >>> +
+> >>> +	for (i = 0; i < num; i++) {
+> >>>   		struct scp_domain *scpd = &scp->domains[i];
+> >>>   		struct generic_pm_domain *genpd = &scpd->genpd;
+> >>>   		const struct scp_domain_data *data = &scp_domain_data[i];
+> >>>
+> >>> +		for (j = 0; j < MAX_CLKS && data->clk_id[j]; j++) {
+> >>> +			struct clk *c = clk[data->clk_id[j]];
+> >>> +
+> >>> +			if (IS_ERR(c)) {
+> >>> +				dev_err(&pdev->dev, "%s: clk unavailable\n",
+> >>> +					data->name);
+> >>> +				return ERR_CAST(c);
+> >>> +			}
+> >>> +
+> >>> +			scpd->clk[j] = c;
+> >>
+> >> Put this in the else branch. Apart from that is there any reason you
+> >
+> > Do you mean to change like this?
+> >
+> > 	if (IS_ERR(c)) {
+> > 		...
+> > 		return ERR_CAST(c);
+> > 	} else {
+> > 		scpd->clk[j] = c;
+> > 	}
+> >
+> > checkpatch.pl will warn for above code due to it returns in 'if' branch.
+> >
 > 
-> On Thursday 07 July 2016 02:36 PM, Dawei Chien wrote:
-> > This patch adds support for mt2701 chip to mtk_thermal.c,
-> > and integrate both mt8173 and mt2701 on the same driver.
-> > MT8173 has four banks and five sensors, and MT2701 has
-> > only one bank and three sensors.
-> >
-> > Signed-off-by: Dawei Chien <dawei.chien@mediatek.com>
-> > ---
-> >   drivers/thermal/mtk_thermal.c |  258 ++++++++++++++++++++++++++---------------
-> >   1 file changed, 165 insertions(+), 93 deletions(-)
-> >
-> > diff --git a/drivers/thermal/mtk_thermal.c b/drivers/thermal/mtk_thermal.c
-> > index 262ab0a..860f2e2 100644
-> > --- a/drivers/thermal/mtk_thermal.c
-> > +++ b/drivers/thermal/mtk_thermal.c
-> > @@ -2,6 +2,7 @@
-> >    * Copyright (c) 2015 MediaTek Inc.
-> >    * Author: Hanyi Wu <hanyi.wu@mediatek.com>
-> >    *         Sascha Hauer <s.hauer@pengutronix.de>
-> > + *         Dawei Chien <dawei.chien@mediatek.com>
-> >    *
-> >    * This program is free software; you can redistribute it and/or modify
-> >    * it under the terms of the GNU General Public License version 2 as
-> > @@ -21,6 +22,7 @@
-> >   #include <linux/nvmem-consumer.h>
-> >   #include <linux/of.h>
-> >   #include <linux/of_address.h>
-> > +#include <linux/of_device.h>
-> >   #include <linux/platform_device.h>
-> >   #include <linux/slab.h>
-> >   #include <linux/io.h>
-> > @@ -88,6 +90,7 @@
-> >   #define TEMP_ADCVALIDMASK_VALID_HIGH		BIT(5)
-> >   #define TEMP_ADCVALIDMASK_VALID_POS(bit)	(bit)
-> >
-> > +/* MT8173 thermal sensors */
-> >   #define MT8173_TS1	0
-> >   #define MT8173_TS2	1
-> >   #define MT8173_TS3	2
-> > @@ -97,35 +100,62 @@
-> >   /* AUXADC channel 11 is used for the temperature sensors */
-> >   #define MT8173_TEMP_AUXADC_CHANNEL	11
-> >
-> > -/* The total number of temperature sensors in the MT8173 */
-> > -#define MT8173_NUM_SENSORS		5
-> > -
-> > -/* The number of banks in the MT8173 */
-> > -#define MT8173_NUM_ZONES		4
-> > -
-> > -/* The number of sensing points per bank */
-> > -#define MT8173_NUM_SENSORS_PER_ZONE	4
-> > -
-> >   /* Layout of the fuses providing the calibration data */
-> > -#define MT8173_CALIB_BUF0_VALID		BIT(0)
-> > -#define MT8173_CALIB_BUF1_ADC_GE(x)	(((x) >> 22) & 0x3ff)
-> > -#define MT8173_CALIB_BUF0_VTS_TS1(x)	(((x) >> 17) & 0x1ff)
-> > -#define MT8173_CALIB_BUF0_VTS_TS2(x)	(((x) >> 8) & 0x1ff)
-> > -#define MT8173_CALIB_BUF1_VTS_TS3(x)	(((x) >> 0) & 0x1ff)
-> > -#define MT8173_CALIB_BUF2_VTS_TS4(x)	(((x) >> 23) & 0x1ff)
-> > -#define MT8173_CALIB_BUF2_VTS_TSABB(x)	(((x) >> 14) & 0x1ff)
-> > -#define MT8173_CALIB_BUF0_DEGC_CALI(x)	(((x) >> 1) & 0x3f)
-> > -#define MT8173_CALIB_BUF0_O_SLOPE(x)	(((x) >> 26) & 0x3f)
-> > +#define CALIB_BUF0_VALID		BIT(0)
-> > +#define CALIB_BUF1_ADC_GE(x)	(((x) >> 22) & 0x3ff)
-> > +#define CALIB_BUF0_VTS_TS1(x)	(((x) >> 17) & 0x1ff)
-> > +#define CALIB_BUF0_VTS_TS2(x)	(((x) >> 8) & 0x1ff)
-> > +#define CALIB_BUF1_VTS_TS3(x)	(((x) >> 0) & 0x1ff)
-> > +#define CALIB_BUF2_VTS_TS4(x)	(((x) >> 23) & 0x1ff)
-> > +#define CALIB_BUF2_VTS_TS5(x)	(((x) >> 14) & 0x1ff)
-> > +#define CALIB_BUF0_DEGC_CALI(x)	(((x) >> 1) & 0x3f)
-> > +#define CALIB_BUF0_O_SLOPE(x)	(((x) >> 26) & 0x3f)
-> > +
-> 
-> IMHO the above changes from defining CALIB_BUF1_ADC_GE(x) to 
-> CALIB_BUF0_O_SLOPE(x) can be avoided. We are just renaming the same 
-> defines to a generic name. Instead the macro starting with MT8173 can 
-> only be used wherever needed commonly both by 8173 instance and for
-> 2701 instance.
-> 
+> I tried that on top of next-20160706 and it checkpatch didn't throw any 
+> warning. Which kernel version are based on?
 
-I would have a try to keep MT8173 original one and add some comment for
-the macro starting on next version.
+I don't remember which version of checkpatch warn on this pattern. This
+patch series develop across several kernel versions.
 
-> > +#define NVMEM_TS1	0
-> > +#define NVMEM_TS2	1
-> > +#define NVMEM_TS3	2
-> > +#define NVMEM_TS4	3
-> > +#define NVMEM_TS5	4
-> > +
+So do you prefer to put "scpd->clk[j] = c;" into 'else' branch?
 
-Does these need to keep the old one
-MT8173_TS1/MT8173_TS2/MT8173_TS3/MT8173_TS4/MT8173_TSABB
+> >> moved the for up in the function? If not, I would prefer not to move it,
+> >> to make it easier to read the diff.
+> >
+> > The new 'for' block are far different from original one. And I think
+> > it's easy to read if we keep simple assign statements in the same block.
+> >
+> 
+> It's different in the sense that it checks if struct clk *c is an error.
+> I don't see the reason why we need to move it up in the file.
+> It's not too important but I would prefer not to move it if there is no 
+> reason.
+
+I think I may misunderstand your comments. Which 'for' block did you
+mention for? 'for (i = 0; i < num ...' or 'for (j = 0; j < MAX_CLKS
+&& ...' ?
+
+The 'for(i)' exists in original code, this patch just change its counter
+from 'NUM_DOMAINS' to 'num'. The 'for(j)' is a new for-block, so it was
+not moved from other blocks.
 
 
-> > +/* MT2701 thermal sensors */
-> > +#define MT2701_TS1	0
-> > +#define MT2701_TS2	1
-> > +#define MT2701_TSABB	2
-> > +
-> > +/* AUXADC channel 11 is used for the temperature sensors */
-> > +#define MT2701_TEMP_AUXADC_CHANNEL	11
-> >
-> >   #define THERMAL_NAME    "mtk-thermal"
-> >
-> > +/* Maximum support banks */
-> > +#define MAX_NUM_BANK		5
-> 
-> Why is this 5?
-> Commit message states: MT8173 has four banks and five sensors, and 
-> MT2701 has only one bank and three sensors. Am i missing something here?
-> 
+Best regards,
 
-This is my miss, it should be 4, but it line might remove since I would
-depend on SoC type to assign array for next version.
-
-> > +
-> >   struct mtk_thermal;
-> >
-> > +struct thermal_bank_cfg {
-> > +	unsigned int num_sensors;
-> > +	unsigned int sensors[MAX_NUM_BANK];
-> > +};
-> > +
-> >   struct mtk_thermal_bank {
-> >   	struct mtk_thermal *mt;
-> >   	int id;
-> >   };
-> >
-> > +struct mtk_thermal_sense_point {
-> > +	int msr;
-> > +	int adcpnp;
-> > +};
-> > +
-> > +struct mtk_thermal_data {
-> > +	struct thermal_bank_cfg bank_data[MAX_NUM_BANK];
-> 
-> So for MT8173 we are allocating one bank extra and for MT2701 we are 
-> allocating 4 banks extra right? Why not do something like this:
-> 
-> struct thermal_bank *banks_data
-> Assign the array based on the SoC type?
-> 
-
-Yes, I agree with you, I would update it on next version.
-
-> > +	struct mtk_thermal_sense_point sensing_points[MAX_NUM_BANK];
-> > +	int sensor_mux_values[MAX_NUM_BANK];
-> > +	s32 num_banks;
-> > +	s32 num_sensors;
-> > +	s32 auxadc_channel;
-> > +};
-> > +
-> >   struct mtk_thermal {
-> >   	struct device *dev;
-> >   	void __iomem *thermal_base;
-> > @@ -133,27 +163,20 @@ struct mtk_thermal {
-> >   	struct clk *clk_peri_therm;
-> >   	struct clk *clk_auxadc;
-> >
-> > -	struct mtk_thermal_bank banks[MT8173_NUM_ZONES];
-> > -
-> > +	struct mtk_thermal_bank banks[MAX_NUM_BANK];
-> 
-> Here again some extra memory allocation.
-> 
-> Why not keep a pointer which points to the desired array?
-> 
-> > +	const struct mtk_thermal_data *conf;
-> >   	/* lock: for getting and putting banks */
-> >   	struct mutex lock;
-> > +	struct thermal_zone_device *tzd;
-> >
-> >   	/* Calibration values */
-> >   	s32 adc_ge;
-> >   	s32 degc_cali;
-> >   	s32 o_slope;
-> > -	s32 vts[MT8173_NUM_SENSORS];
-> > -
-> > -};
-> > -
-> > -struct mtk_thermal_bank_cfg {
-> > -	unsigned int num_sensors;
-> > -	unsigned int sensors[MT8173_NUM_SENSORS_PER_ZONE];
-> > +	s32 vts[MAX_NUM_BANK];
-> >   };
-> >
-> > -static const int sensor_mux_values[MT8173_NUM_SENSORS] = { 0, 1, 2, 3, 16 };
-> > -
-> > -/*
-> > +/**
-> >    * The MT8173 thermal controller has four banks. Each bank can read up to
-> >    * four temperature sensors simultaneously. The MT8173 has a total of 5
-> >    * temperature sensors. We use each bank to measure a certain area of the
-> > @@ -166,42 +189,76 @@ static const int sensor_mux_values[MT8173_NUM_SENSORS] = { 0, 1, 2, 3, 16 };
-> >    * data, and this indeed needs the temperatures of the individual banks
-> >    * for making better decisions.
-> >    */
-> > -static const struct mtk_thermal_bank_cfg bank_data[] = {
-> > -	{
-> > -		.num_sensors = 2,
-> > -		.sensors = { MT8173_TS2, MT8173_TS3 },
-> > -	}, {
-> > -		.num_sensors = 2,
-> > -		.sensors = { MT8173_TS2, MT8173_TS4 },
-> > -	}, {
-> > -		.num_sensors = 3,
-> > -		.sensors = { MT8173_TS1, MT8173_TS2, MT8173_TSABB },
-> > -	}, {
-> > -		.num_sensors = 1,
-> > -		.sensors = { MT8173_TS2 },
-> > +static const struct mtk_thermal_data mt8173_thermal_data = {
-> > +	.auxadc_channel = MT8173_TEMP_AUXADC_CHANNEL,
-> > +	.num_banks = 4,
-> > +	.num_sensors = 5,
-> > +	.bank_data = {
-> > +		{
-> > +			.num_sensors = 2,
-> > +			.sensors = { MT8173_TS2, MT8173_TS3 },
-> > +		}, {
-> > +			.num_sensors = 2,
-> > +			.sensors = { MT8173_TS2, MT8173_TS4 },
-> > +		}, {
-> > +			.num_sensors = 3,
-> > +			.sensors = { MT8173_TS1, MT8173_TS2, MT8173_TSABB },
-> > +		}, {
-> > +			.num_sensors = 1,
-> > +			.sensors = { MT8173_TS2 },
-> > +		},
-> >   	},
-> > +	.sensing_points = {
-> > +		{
-> > +			.msr = TEMP_MSR0,
-> > +			.adcpnp = TEMP_ADCPNP0,
-> > +		}, {
-> > +			.msr = TEMP_MSR1,
-> > +			.adcpnp = TEMP_ADCPNP1,
-> > +		}, {
-> > +			.msr = TEMP_MSR2,
-> > +			.adcpnp = TEMP_ADCPNP2,
-> > +		}, {
-> > +			.msr = TEMP_MSR3,
-> > +			.adcpnp = TEMP_ADCPNP3,
-> > +		},
-> > +	},
-> > +	.sensor_mux_values = { 0, 1, 2, 3, 16 },
-> >   };
-> >
-> > -struct mtk_thermal_sense_point {
-> > -	int msr;
-> > -	int adcpnp;
-> > -};
-> > -
-> > -static const struct mtk_thermal_sense_point
-> > -		sensing_points[MT8173_NUM_SENSORS_PER_ZONE] = {
-> > -	{
-> > -		.msr = TEMP_MSR0,
-> > -		.adcpnp = TEMP_ADCPNP0,
-> > -	}, {
-> > -		.msr = TEMP_MSR1,
-> > -		.adcpnp = TEMP_ADCPNP1,
-> > -	}, {
-> > -		.msr = TEMP_MSR2,
-> > -		.adcpnp = TEMP_ADCPNP2,
-> > -	}, {
-> > -		.msr = TEMP_MSR3,
-> > -		.adcpnp = TEMP_ADCPNP3,
-> > +/**
-> > + * The MT2701 thermal controller has one bank, which can read up to
-> > + * three temperature sensors simultaneously. The MT2701 has a total of 3
-> > + * temperature sensors.
-> > + *
-> > + * The thermal core only gets the maximum temperature of this one bank,
-> > + * so the bank concept wouldn't be necessary here. However, the SVS (Smart
-> > + * Voltage Scaling) unit makes its decisions based on the same bank
-> > + * data.
-> > + */
-> > +static const struct mtk_thermal_data mt2701_thermal_data = {
-> > +	.auxadc_channel = MT2701_TEMP_AUXADC_CHANNEL,
-> > +	.num_banks = 1,
-> > +	.num_sensors = 3,
-> > +	.bank_data = {
-> > +		{
-> > +			.num_sensors = 3,
-> > +			.sensors = { MT2701_TS1, MT2701_TS2, MT2701_TSABB },
-> > +		},
-> >   	},
-> > +	.sensing_points = {
-> > +		{
-> > +			.msr = TEMP_MSR0,
-> > +			.adcpnp = TEMP_ADCPNP0,
-> > +		}, {
-> > +			.msr = TEMP_MSR1,
-> > +			.adcpnp = TEMP_ADCPNP1,
-> > +		}, {
-> > +			.msr = TEMP_MSR2,
-> > +			.adcpnp = TEMP_ADCPNP2,
-> > +		},
-> > +	},
-> > +	.sensor_mux_values = { 0, 1, 16},
-> >   };
-> >
-> >   /**
-> > @@ -270,13 +327,15 @@ static void mtk_thermal_put_bank(struct mtk_thermal_bank *bank)
-> >   static int mtk_thermal_bank_temperature(struct mtk_thermal_bank *bank)
-> >   {
-> >   	struct mtk_thermal *mt = bank->mt;
-> > +	const struct mtk_thermal_data *conf = mt->conf;
-> >   	int i, temp = INT_MIN, max = INT_MIN;
-> >   	u32 raw;
-> >
-> > -	for (i = 0; i < bank_data[bank->id].num_sensors; i++) {
-> > -		raw = readl(mt->thermal_base + sensing_points[i].msr);
-> > +	for (i = 0; i < conf->bank_data[bank->id].num_sensors; i++) {
-> > +		raw = readl(mt->thermal_base + conf->sensing_points[i].msr);
-> >
-> > -		temp = raw_to_mcelsius(mt, bank_data[bank->id].sensors[i], raw);
-> > +		temp = raw_to_mcelsius(mt, conf->bank_data[bank->id].sensors[i],
-> > +				       raw);
-> >
-> >   		/*
-> >   		 * The first read of a sensor often contains very high bogus
-> > @@ -299,7 +358,7 @@ static int mtk_read_temp(void *data, int *temperature)
-> >   	int i;
-> >   	int tempmax = INT_MIN;
-> >
-> > -	for (i = 0; i < MT8173_NUM_ZONES; i++) {
-> > +	for (i = 0; i < mt->conf->num_banks; i++) {
-> >   		struct mtk_thermal_bank *bank = &mt->banks[i];
-> >
-> >   		mtk_thermal_get_bank(bank);
-> > @@ -322,7 +381,7 @@ static void mtk_thermal_init_bank(struct mtk_thermal *mt, int num,
-> >   				  u32 apmixed_phys_base, u32 auxadc_phys_base)
-> >   {
-> >   	struct mtk_thermal_bank *bank = &mt->banks[num];
-> > -	const struct mtk_thermal_bank_cfg *cfg = &bank_data[num];
-> > +	const struct mtk_thermal_data *conf = mt->conf;
-> >   	int i;
-> >
-> >   	bank->id = num;
-> > @@ -368,7 +427,7 @@ static void mtk_thermal_init_bank(struct mtk_thermal *mt, int num,
-> >   	 * this value will be stored to TEMP_PNPMUXADDR (TEMP_SPARE0)
-> >   	 * automatically by hw
-> >   	 */
-> > -	writel(BIT(MT8173_TEMP_AUXADC_CHANNEL), mt->thermal_base + TEMP_ADCMUX);
-> > +	writel(BIT(conf->auxadc_channel), mt->thermal_base + TEMP_ADCMUX);
-> >
-> >   	/* AHB address for auxadc mux selection */
-> >   	writel(auxadc_phys_base + AUXADC_CON1_CLR_V,
-> > @@ -379,18 +438,18 @@ static void mtk_thermal_init_bank(struct mtk_thermal *mt, int num,
-> >   	       mt->thermal_base + TEMP_PNPMUXADDR);
-> >
-> >   	/* AHB value for auxadc enable */
-> > -	writel(BIT(MT8173_TEMP_AUXADC_CHANNEL), mt->thermal_base + TEMP_ADCEN);
-> > +	writel(BIT(conf->auxadc_channel), mt->thermal_base + TEMP_ADCEN);
-> >
-> >   	/* AHB address for auxadc enable (channel 0 immediate mode selected) */
-> >   	writel(auxadc_phys_base + AUXADC_CON1_SET_V,
-> >   	       mt->thermal_base + TEMP_ADCENADDR);
-> >
-> >   	/* AHB address for auxadc valid bit */
-> > -	writel(auxadc_phys_base + AUXADC_DATA(MT8173_TEMP_AUXADC_CHANNEL),
-> > +	writel(auxadc_phys_base + AUXADC_DATA(conf->auxadc_channel),
-> >   	       mt->thermal_base + TEMP_ADCVALIDADDR);
-> >
-> >   	/* AHB address for auxadc voltage output */
-> > -	writel(auxadc_phys_base + AUXADC_DATA(MT8173_TEMP_AUXADC_CHANNEL),
-> > +	writel(auxadc_phys_base + AUXADC_DATA(conf->auxadc_channel),
-> >   	       mt->thermal_base + TEMP_ADCVOLTADDR);
-> >
-> >   	/* read valid & voltage are at the same register */
-> > @@ -407,11 +466,12 @@ static void mtk_thermal_init_bank(struct mtk_thermal *mt, int num,
-> >   	writel(TEMP_ADCWRITECTRL_ADC_MUX_WRITE,
-> >   	       mt->thermal_base + TEMP_ADCWRITECTRL);
-> >
-> > -	for (i = 0; i < cfg->num_sensors; i++)
-> > -		writel(sensor_mux_values[cfg->sensors[i]],
-> > -		       mt->thermal_base + sensing_points[i].adcpnp);
-> > +	for (i = 0; i < conf->bank_data[num].num_sensors; i++)
-> > +		writel(conf->sensor_mux_values[conf->bank_data[num].sensors[i]],
-> > +		       mt->thermal_base + conf->sensing_points[i].adcpnp);
-> >
-> > -	writel((1 << cfg->num_sensors) - 1, mt->thermal_base + TEMP_MONCTL0);
-> > +	writel((1 << conf->bank_data[num].num_sensors) - 1,
-> > +	       mt->thermal_base + TEMP_MONCTL0);
-> >
-> >   	writel(TEMP_ADCWRITECTRL_ADC_PNP_WRITE |
-> >   	       TEMP_ADCWRITECTRL_ADC_MUX_WRITE,
-> > @@ -442,7 +502,7 @@ static int mtk_thermal_get_calibration_data(struct device *dev,
-> >
-> >   	/* Start with default values */
-> >   	mt->adc_ge = 512;
-> > -	for (i = 0; i < MT8173_NUM_SENSORS; i++)
-> > +	for (i = 0; i < mt->conf->num_sensors; i++)
-> >   		mt->vts[i] = 260;
-> >   	mt->degc_cali = 40;
-> >   	mt->o_slope = 0;
-> > @@ -467,15 +527,15 @@ static int mtk_thermal_get_calibration_data(struct device *dev,
-> >   		goto out;
-> >   	}
-> >
-> > -	if (buf[0] & MT8173_CALIB_BUF0_VALID) {
-> > -		mt->adc_ge = MT8173_CALIB_BUF1_ADC_GE(buf[1]);
-> > -		mt->vts[MT8173_TS1] = MT8173_CALIB_BUF0_VTS_TS1(buf[0]);
-> > -		mt->vts[MT8173_TS2] = MT8173_CALIB_BUF0_VTS_TS2(buf[0]);
-> > -		mt->vts[MT8173_TS3] = MT8173_CALIB_BUF1_VTS_TS3(buf[1]);
-> > -		mt->vts[MT8173_TS4] = MT8173_CALIB_BUF2_VTS_TS4(buf[2]);
-> > -		mt->vts[MT8173_TSABB] = MT8173_CALIB_BUF2_VTS_TSABB(buf[2]);
-> > -		mt->degc_cali = MT8173_CALIB_BUF0_DEGC_CALI(buf[0]);
-> > -		mt->o_slope = MT8173_CALIB_BUF0_O_SLOPE(buf[0]);
-> > +	if (buf[0] & CALIB_BUF0_VALID) {
-> > +		mt->adc_ge = CALIB_BUF1_ADC_GE(buf[1]);
-> > +		mt->vts[NVMEM_TS1] = CALIB_BUF0_VTS_TS1(buf[0]);
-> > +		mt->vts[NVMEM_TS2] = CALIB_BUF0_VTS_TS2(buf[0]);
-> > +		mt->vts[NVMEM_TS3] = CALIB_BUF1_VTS_TS3(buf[1]);
-> > +		mt->vts[NVMEM_TS4] = CALIB_BUF2_VTS_TS4(buf[1]);
-> > +		mt->vts[NVMEM_TS5] = CALIB_BUF2_VTS_TS5(buf[2]);
-> > +		mt->degc_cali = CALIB_BUF0_DEGC_CALI(buf[0]);
-> > +		mt->o_slope = CALIB_BUF0_O_SLOPE(buf[0]);
-> 
-> I guess even the above code changes can be avoided if we just retain 
-> macros starting with MT8173?
-> 
-> Best Regards,
-> Keerthy
-> 
-
-Yes, I think so, only different on the array size for vts since sensors
-number different between MT8173 & MT2701, I might separate it by SoC
-type on next version.
-
-BR,
-Dawei
-
-> >   	} else {
-> >   		dev_info(dev, "Device not calibrated, using default calibration values\n");
-> >   	}
-> > @@ -486,18 +546,36 @@ out:
-> >   	return ret;
-> >   }
-> >
-> > +static const struct of_device_id mtk_thermal_of_match[] = {
-> > +	{
-> > +		.compatible = "mediatek,mt8173-thermal",
-> > +		.data = (void *)&mt8173_thermal_data,
-> > +	},
-> > +	{
-> > +		.compatible = "mediatek,mt2701-thermal",
-> > +		.data = (void *)&mt2701_thermal_data,
-> > +	}, {
-> > +	},
-> > +};
-> > +MODULE_DEVICE_TABLE(of, mtk_thermal_of_match);
-> > +
-> >   static int mtk_thermal_probe(struct platform_device *pdev)
-> >   {
-> >   	int ret, i;
-> >   	struct device_node *auxadc, *apmixedsys, *np = pdev->dev.of_node;
-> >   	struct mtk_thermal *mt;
-> >   	struct resource *res;
-> > +	const struct of_device_id *of_id;
-> >   	u64 auxadc_phys_base, apmixed_phys_base;
-> >
-> >   	mt = devm_kzalloc(&pdev->dev, sizeof(*mt), GFP_KERNEL);
-> >   	if (!mt)
-> >   		return -ENOMEM;
-> >
-> > +	of_id = of_match_device(mtk_thermal_of_match, &pdev->dev);
-> > +	if (of_id)
-> > +		mt->conf = (const struct mtk_thermal_data *)of_id->data;
-> > +
-> >   	mt->clk_peri_therm = devm_clk_get(&pdev->dev, "therm");
-> >   	if (IS_ERR(mt->clk_peri_therm))
-> >   		return PTR_ERR(mt->clk_peri_therm);
-> > @@ -565,7 +643,7 @@ static int mtk_thermal_probe(struct platform_device *pdev)
-> >   		goto err_disable_clk_auxadc;
-> >   	}
-> >
-> > -	for (i = 0; i < MT8173_NUM_ZONES; i++)
-> > +	for (i = 0; i < mt->conf->num_banks; i++)
-> >   		mtk_thermal_init_bank(mt, i, apmixed_phys_base,
-> >   				      auxadc_phys_base);
-> >
-> > @@ -592,13 +670,6 @@ static int mtk_thermal_remove(struct platform_device *pdev)
-> >   	return 0;
-> >   }
-> >
-> > -static const struct of_device_id mtk_thermal_of_match[] = {
-> > -	{
-> > -		.compatible = "mediatek,mt8173-thermal",
-> > -	}, {
-> > -	},
-> > -};
-> > -
-> >   static struct platform_driver mtk_thermal_driver = {
-> >   	.probe = mtk_thermal_probe,
-> >   	.remove = mtk_thermal_remove,
-> > @@ -610,6 +681,7 @@ static struct platform_driver mtk_thermal_driver = {
-> >
-> >   module_platform_driver(mtk_thermal_driver);
-> >
-> > +MODULE_AUTHOR("Dawei Chien <dawei.chien@mediatek.com>");
-> >   MODULE_AUTHOR("Sascha Hauer <s.hauer@pengutronix.de>");
-> >   MODULE_AUTHOR("Hanyi Wu <hanyi.wu@mediatek.com>");
-> >   MODULE_DESCRIPTION("Mediatek thermal driver");
-> >
+James
