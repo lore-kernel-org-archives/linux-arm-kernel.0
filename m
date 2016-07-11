@@ -1,71 +1,74 @@
-From: nava.manne@xilinx.com (Nava kishore Manne)
-Date: Mon, 11 Jul 2016 10:07:31 +0000
-Subject: [PATCH v4] Axi-usb: Add support for 64-bit addressing.
-References: <1464626798-1334-1-git-send-email-navam@xilinx.com>
- <20160602225815.GA5508@rob-hp-laptop>
-Message-ID: <C89496FEAE474D468F30D558A9468D9F26CF8BC0@XAP-PVEXMBX01.xlnx.xilinx.com>
+From: mcuos.com@gmail.com (Wan ZongShun)
+Date: Mon, 11 Jul 2016 18:28:57 +0800
+Subject: [PATCH v2 06/10] soc: Add SoC specific driver support for nuc900
+In-Reply-To: <1606219.BzcByuFgJm@wuerfel>
+References: <1468135649-19980-1-git-send-email-vw@iommu.org>
+ <4765191.NGpMC1JR46@wuerfel> <578361B5.7010803@iommu.org>
+ <1606219.BzcByuFgJm@wuerfel>
+Message-ID: <CAKT61h_vxcvVqqaDOn2XgtF7cBEpziSjfHRaY3eCWmM1ATfDXw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ping!!
-
-> -----Original Message-----
-> From: Nava kishore Manne
-> Sent: Monday, June 27, 2016 6:18 PM
-> To: 'Rob Herring' <robh@kernel.org>
-> Cc: pawel.moll at arm.com; mark.rutland at arm.com;
-> ijc+devicetree at hellion.org.uk; galak at codeaurora.org; Michal Simek
-> <michals@xilinx.com>; Soren Brinkmann <sorenb@xilinx.com>;
-> balbi at ti.com; gregkh at linuxfoundation.org; Hyun Kwon
-> <hyunk@xilinx.com>; Radhey Shyam Pandey <radheys@xilinx.com>;
-> devicetree at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
-> kernel at vger.kernel.org
-> Subject: RE: [PATCH v4] Axi-usb: Add support for 64-bit addressing.
+2016-07-11 18:24 GMT+08:00 Arnd Bergmann <arnd@arndb.de>:
+> On Monday, July 11, 2016 5:07:01 PM CEST Wan Zongshun wrote:
+>>
+>> On 2016?07?11? 16:03, Arnd Bergmann wrote:
+>> > On Sunday, July 10, 2016 3:27:26 PM CEST Wan Zongshun wrote:
+>> >> +       ret = of_property_read_string(np, "compatible", &soc_dev_attr->soc_id);
+>> >> +       if (ret)
+>> >>                return -EINVAL;
+>> >> +
+>> >> +       soc_dev_attr->machine = "NUC900EVB";
+>> >> +       soc_dev_attr->family = "NUC900";
+>> >> +       soc_dev = soc_device_register(soc_dev_attr);
+>> >> +       if (IS_ERR(soc_dev)) {
+>> >> +               kfree(soc_dev_attr);
+>> >> +               return -ENODEV;
+>> >> +       }
+>> >> +
+>> >> +       ret = regmap_read(syscon_regmap, GCR_CHIPID, &nuc900_chipid);
+>> >> +       if (ret)
+>> >> +               return -ENODEV;
+>> >> +
+>> >> +       device_create_file(soc_device_to_device(soc_dev), &nuc900_chipid_attr);
+>> >> +       device_create_file(soc_device_to_device(soc_dev), &nuc900_version_attr);
+>> >> +
+>> >> +       dev_info(&pdev->dev, "Nuvoton Chip ID: 0x%x, Version ID:0x%x\n",
+>> >> +                nuc900_chipid & GCR_CHIPID_MASK,
+>> >> +                (nuc900_chipid >> 24) & 0xff);
+>> >
+>> > I'm still a bit unsure about the set of attributes here.
+>> >
+>> > - The "soc_id" is read from the device tree from the field that contains
+>> >    the board name, I think for consistency you should try to map the
+>> >    GCR_CHIPID to the name of the SoC and assign that here
+>>
+>> I will try to get chipid and map it to soc name like: ?nuc970?, "nuc910".
+>>
+>> And I will set this soc name to soc_id, ok?
 >
-> Ping!!
+> Ok.
+
+Maybe I also can set versionid as soc name partly, like
+nuc970-version1,nuc970-version2? and then set the to soc_id, make
+sense?
+
+
 >
-> > -----Original Message-----
-> > From: Rob Herring [mailto:robh at kernel.org]
-> > Sent: Friday, June 03, 2016 4:28 AM
-> > To: Nava kishore Manne <navam@xilinx.com>
-> > Cc: pawel.moll at arm.com; mark.rutland at arm.com;
-> > ijc+devicetree at hellion.org.uk; galak at codeaurora.org; Michal Simek
-> > <michals@xilinx.com>; Soren Brinkmann <sorenb@xilinx.com>;
-> > balbi at ti.com; gregkh at linuxfoundation.org; Hyun Kwon
-> > <hyunk@xilinx.com>; Nava kishore Manne <navam@xilinx.com>; Radhey
-> > Shyam Pandey <radheys@xilinx.com>; devicetree at vger.kernel.org; linux-
-> > arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org
-> > Subject: Re: [PATCH v4] Axi-usb: Add support for 64-bit addressing.
-> >
-> > On Mon, May 30, 2016 at 10:16:38PM +0530, Nava kishore Manne wrote:
-> > > This patch updates the driver to support 64-bit DMA addressing.
-> > >
-> > > Signed-off-by: Nava kishore Manne <navam@xilinx.com>
-> > > ---
-> > > Changes for v4:
-> > >           -Used boolen property insted of addrwith property in the DT
-> > >            as suggested by Arnd Bergmann.
-> > >           -Adopt the DT relevant changes into the driver.
-> > >
-> > > Changes for v3:
-> > >                 -Added new compatable string for 5.00 IP version as suggested by
-> > >                  Arnd Bergmann.
-> > >                 -Used write_fn() insted of lo_hi_writeq() as suggested by
-> > >                  Arnd Bergmann.
-> > >
-> > > Changes for v2:
-> > >                 -Added dma-ranges property in device tree as
-> > > suggested by Arnd
-> > Bergmann.
-> > >                 -Modified the driver code based on the xlnx,addrwidth.
-> > >
-> > >  .../devicetree/bindings/usb/udc-xilinx.txt         |  5 ++-
-> >
-> > Acked-by: Rob Herring <robh@kernel.org>
-> >
-> > >  drivers/usb/gadget/udc/udc-xilinx.c                | 52
-> > +++++++++++++++++++++-
-> > >  2 files changed, 54 insertions(+), 3 deletions(-)
+>> > - The "machine" is hardcoded to "NUC900EVB", which in turn looks like
+>> >    a particular board but not the one you are running on. Maybe read
+>> >    that from the DT instead?
+>>
+>> Should I read nuc970-evb.dts's "model" or "compatible" properties?
+>
+> I think "model" is best here, but see what the others do.
+>
+>         Arnd
+>
 
 
-This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
+
+-- 
+---
+Vincent Wan(Zongshun)
+www.mcuos.com
