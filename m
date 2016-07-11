@@ -1,103 +1,21 @@
-From: thunder.leizhen@huawei.com (Leizhen (ThunderTown))
-Date: Mon, 11 Jul 2016 20:43:32 +0800
-Subject: [PATCH 1/1] arm64/hugetlb: clear PG_dcache_clean if the page is
- dirty when munmap
-In-Reply-To: <20160708161347.GC22099@e104818-lin.cambridge.arm.com>
-References: <1467893344-8352-1-git-send-email-thunder.leizhen@huawei.com>
- <20160707153741.GC27180@e104818-lin.cambridge.arm.com>
- <577F1FD9.1040205@huawei.com>
- <20160708135447.GB22099@e104818-lin.cambridge.arm.com>
- <577FC5AA.5010709@huawei.com>
- <20160708161347.GC22099@e104818-lin.cambridge.arm.com>
-Message-ID: <57839474.6030203@huawei.com>
+From: daniel@0x0f.com (Daniel Palmer)
+Date: Mon, 11 Jul 2016 22:03:38 +0900
+Subject: sh-eth.c writes to non-existent register on RZ/A1
+In-Reply-To: <KL1PR06MB1749BFFCB144EE55402339968A3F0@KL1PR06MB1749.apcprd06.prod.outlook.com>
+References: <CAFr9PXniO=qPUpok1dVHzjrEpKVo6t3koc2n=UCjWrdD_DL+5A@mail.gmail.com>
+ <KL1PR06MB1749BFFCB144EE55402339968A3F0@KL1PR06MB1749.apcprd06.prod.outlook.com>
+Message-ID: <CAFr9PX=h4ftOUu3+0fOC9VHyjQNzLVZPHj8b260G_VUCq7-8qw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 11 July 2016 at 21:27, Chris Brandt <Chris.Brandt@renesas.com> wrote:
+> You might have better luck posting Renesas device questions to the Renesas mailing list.
+>
+> http://vger.kernel.org/vger-lists.html#linux-renesas-soc
 
+Ok, I will forward my original mail there.
 
-On 2016/7/9 0:13, Catalin Marinas wrote:
-> On Fri, Jul 08, 2016 at 11:24:26PM +0800, Leizhen (ThunderTown) wrote:
->> On 2016/7/8 21:54, Catalin Marinas wrote:
->>> On Fri, Jul 08, 2016 at 11:36:57AM +0800, Leizhen (ThunderTown) wrote:
->>>> On 2016/7/7 23:37, Catalin Marinas wrote:
->>>>> On Thu, Jul 07, 2016 at 08:09:04PM +0800, Zhen Lei wrote:
->>>>>> At present, PG_dcache_clean is only cleared when the related huge page
->>>>>> is about to be freed. But sometimes, there maybe a process is in charge
->>>>>> to copy binary codes into a shared memory, and notifies other processes
->>>>>> to execute base on that. For the first time, there is no problem, because
->>>>>> the default value of page->flags is PG_dcache_clean cleared. So the cache
->>>>>> will be maintained at the time of set_pte_at for other processes. But if
->>>>>> the content of the shared memory have been updated again, there is no
->>>>>> cache operations, because the PG_dcache_clean is still set.
->>>>>>
->>>>>> For example:
->>>>>> Process A
->>>>>> 	open a hugetlbfs file
->>>>>> 	mmap it as a shared memory
->>>>>> 	copy some binary codes into it
->>>>>> 	munmap
->>>>>>
->>>>>> Process B
->>>>>> 	open the hugetlbfs file
->>>>>> 	mmap it as a shared memory, executable
->>>>>> 	invoke the functions in the shared memory
->>>>>> 	munmap
->>>>>>
->>>>>> repeat the above steps.
->>>>>
->>>>> Does this work as you would expect with small pages (and for example
->>>>> shared file mmap)? I don't want to have a different behaviour between
->>>>> small and huge pages.
->>>>
->>>> The small pages also have this problem, I will try to fix it too.
-> [...]
->>> If both cases need solving, we might better move the fix in the
->>> __sync_icache_dcache() function. Untested:
->>
->> At first I also want to fix it as below. But I'm not sure which time the PageDirty
->> will be cleared, and if two or more processes mmap it as executable, cache operations
->> will be duplicated. At present, I really have not found any good place to clear
->> PG_dcache_clean. So the below modification may be the best choice, concisely and clearly.
->>
->>> ------------8<----------------
->>> diff --git a/arch/arm64/mm/flush.c b/arch/arm64/mm/flush.c
->>> index dbd12ea8ce68..c753fa804165 100644
->>> --- a/arch/arm64/mm/flush.c
->>> +++ b/arch/arm64/mm/flush.c
->>> @@ -75,7 +75,8 @@ void __sync_icache_dcache(pte_t pte, unsigned long addr)
->>>  	if (!page_mapping(page))
->>>  		return;
->>>  
->>> -	if (!test_and_set_bit(PG_dcache_clean, &page->flags))
->>> +	if (!test_and_set_bit(PG_dcache_clean, &page->flags) ||
->>> +	    PageDirty(page))
->>>  		sync_icache_aliases(page_address(page),
->>>  				    PAGE_SIZE << compound_order(page));
->>>  	else if (icache_is_aivivt())
->>> ----------------8<---------------------
->>>
->>> BTW, can you make your tests (source) available somewhere?
->>
->> Both cases worked well with this patch.
-> 
-> Now I'm even more confused ;). IIUC, after an msync() in user space we
-> should flush the pages to disk via write_cache_pages(). This function
-> calls clear_page_dirty_for_io() after which PageDirty() is no longer
-> true. I can't tell how a subsequent mmap() can see the written pages as
-> dirty.
-> 
+> It's on my list of things to do in the next couple months to push in all the RZ/A1 BSP driver changes back upstream. After I got the XIP_LINUX fixes in earlier this year, I got a bit side tracked on other projects.
 
-As my tracing, both cases invoked empty function.
-
-int vfs_fsync_range(struct file *file, loff_t start, loff_t end, int datasync)
-	......
-	return file->f_op->fsync(file, start, end, datasync);
-}
-
-const struct file_operations hugetlbfs_file_operations = {
-	.fsync			= noop_fsync,
-
-static const struct file_operations shmem_file_operations = {
-	.mmap		= shmem_mmap,
-#ifdef CONFIG_TMPFS
-	.fsync		= noop_fsync,
+I have hacked up versions of the BSP PFC, ADC, RTC, DMAC and USB
+drivers running on top of 4.7rc6. :)
