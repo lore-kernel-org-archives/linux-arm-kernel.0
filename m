@@ -1,33 +1,42 @@
 From: patrice.chotard@st.com (Patrice Chotard)
-Date: Mon, 11 Jul 2016 09:38:24 +0200
-Subject: [GIT PULL v2] STi SoC changes for v4.8
-In-Reply-To: <11314287.lfBJrM5UFT@wuerfel>
-References: <577E01B5.2030206@st.com> <11314287.lfBJrM5UFT@wuerfel>
-Message-ID: <57834CF0.9090508@st.com>
+Date: Mon, 11 Jul 2016 09:41:17 +0200
+Subject: [GIT PULL v3] STi SoC changes for v4.8
+Message-ID: <57834D9D.4070900@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Olof, Arnd and Kevin,
 
+Please consider this first round of STi SoC updates for v4.8:
 
-On 07/07/2016 03:23 PM, Arnd Bergmann wrote:
-> On Thursday, July 7, 2016 9:16:05 AM CEST Patrice Chotard wrote:
->> Highlights:
->> -----------
->> - Add a dummy L2 cache's write_sec callback as in non secure mode execution,
->>     we can't get access to L2 cache secure registers
->> - Cosmetics change, in case of dump_stack, update the hardware name with a
->>     more generic for the STi SoCs family
->>
-> This is also based on -rc5, please send a third version rebased to -rc3 or
-> earlier.
+The following changes since commit 5edb56491d4812c42175980759da53388e5d86f5:
 
-Hi Arnd
+   Linux 4.7-rc3 (2016-06-12 07:20:35 -0700)
 
-V3 will be send shortly
+are available in the git repository at:
 
-Thanks
+   git://git.kernel.org/pub/scm/linux/kernel/git/pchotard/sti.git 
+tags/sti-soc-for-v4.8
 
-Patrice
+for you to fetch changes up to 7b8e0188fa717cd9abc4fb52587445b421835c2a:
 
->
-> 	Arnd
+   ARM: sti: Implement dummy L2 cache's write_sec (2016-07-11 09:15:44 
++0200)
+
+----------------------------------------------------------------
+Highlights:
+-----------
+- Add a dummy L2 cache's write_sec callback as in non secure mode execution,
+    we can't get access to L2 cache secure registers
+- Cosmetics change, in case of dump_stack, update the hardware name with a
+    more generic for the STi SoCs family
+
+----------------------------------------------------------------
+Patrice Chotard (1):
+       ARM: sti: Implement dummy L2 cache's write_sec
+
+Peter Griffin (1):
+       ARM: STi: Update machine _namestr to be more generic.
+
+  arch/arm/mach-sti/board-dt.c | 11 ++++++++++-
+  1 file changed, 10 insertions(+), 1 deletion(-)
