@@ -1,69 +1,38 @@
-From: mbenes@suse.cz (Miroslav Benes)
-Date: Mon, 11 Jul 2016 16:03:08 +0200 (CEST)
-Subject: [PATCH v2 2/2] arm64: implement live patching
-In-Reply-To: <20160627151722.B81C968D29@newverein.lst.de>
-References: <20160627151500.2247A68D20@newverein.lst.de>
- <20160627151722.B81C968D29@newverein.lst.de>
-Message-ID: <alpine.LNX.2.00.1607111556320.27989@pobox.suse.cz>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Mon, 11 Jul 2016 15:08:06 +0100
+Subject: [PATCH v2 1/6] iommu: add IOMMU_PRIV attribute
+In-Reply-To: <20160709020919.6760-2-mitchelh@codeaurora.org>
+References: <20160709020919.6760-1-mitchelh@codeaurora.org>
+ <20160709020919.6760-2-mitchelh@codeaurora.org>
+Message-ID: <5783A846.1050601@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 27 Jun 2016, Torsten Duwe wrote:
+On 09/07/16 03:09, Mitchel Humpherys wrote:
+> Add the IOMMU_PRIV attribute, which is used to indicate privileged
+> mappings.
+> 
+> Signed-off-by: Mitchel Humpherys <mitchelh@codeaurora.org>
+> ---
+>  include/linux/iommu.h | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/include/linux/iommu.h b/include/linux/iommu.h
+> index 664683aedcce..01c9f2667f2b 100644
+> --- a/include/linux/iommu.h
+> +++ b/include/linux/iommu.h
+> @@ -31,6 +31,7 @@
+>  #define IOMMU_CACHE	(1 << 2) /* DMA cache coherency */
+>  #define IOMMU_NOEXEC	(1 << 3)
+>  #define IOMMU_MMIO	(1 << 4) /* e.g. things like MSI doorbells */
+> +#define IOMMU_PRIV	(1 << 5)
 
-> diff --git a/arch/arm64/include/asm/livepatch.h b/arch/arm64/include/asm/livepatch.h
-> new file mode 100644
-> index 0000000..6b9a3d1
-> --- /dev/null
-> +++ b/arch/arm64/include/asm/livepatch.h
-> @@ -0,0 +1,37 @@
-> +/*
-> + * livepatch.h - arm64-specific Kernel Live Patching Core
-> + *
-> + * Copyright (C) 2016 SUSE
-> + *
-> + * This program is free software; you can redistribute it and/or
-> + * modify it under the terms of the GNU General Public License
-> + * as published by the Free Software Foundation; either version 2
-> + * of the License, or (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program; if not, see <http://www.gnu.org/licenses/>.
-> + */
-> +#ifndef _ASM_ARM64_LIVEPATCH_H
-> +#define _ASM_ARM64_LIVEPATCH_H
-> +
-> +#include <linux/module.h>
-> +#include <linux/ftrace.h>
-> +
-> +#ifdef CONFIG_LIVEPATCH
+I agree on the IOMMU_PRIV name, but can't help thinking it might be
+worth a brief comment to make it abundantly clear@a glance that it
+isn't "private" or "priority 5" or whatever ;)
 
-A nit but we removed such guards in the other header files.
+Robin.
 
-> +static inline int klp_check_compiler_support(void)
-> +{
-> +	return 0;
-> +}
-> +
-> +static inline void klp_arch_set_pc(struct pt_regs *regs, unsigned long ip)
-> +{
-> +	regs->pc = ip;
-> +}
-> +#endif /* CONFIG_LIVEPATCH */
-
-I also checked mod_arch_specific structure because of the way we deal 
-with relocations. It is defined only if CONFIG_ARM64_MODULE_PLTS is 
-enabled and there is a pointer to 'struct elf64_shdr' called plt. It is 
-used indirectly in apply_relocate_add() so we need it to stay. However it 
-points to an existing Elf section and SHF_ALLOC is added to its sh_flags 
-in module_frob_arch_sections() (arch/arm64/kernel/module-plts.c). 
-Therefore we should be ok.
-
-Jessica, could you check it as well, please?
-
-Thanks,
-Miroslav
+>  struct iommu_ops;
+>  struct iommu_group;
+> 
