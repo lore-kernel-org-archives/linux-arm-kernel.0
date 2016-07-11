@@ -1,190 +1,35 @@
-From: hzpeterchen@gmail.com (Peter Chen)
-Date: Mon, 11 Jul 2016 13:38:56 +0800
-Subject: [PATCH v2 19/22] usb: chipidea: msm: Handle phy power states
-In-Reply-To: <20160707222114.1673-20-stephen.boyd@linaro.org>
-References: <20160707222114.1673-1-stephen.boyd@linaro.org>
- <20160707222114.1673-20-stephen.boyd@linaro.org>
-Message-ID: <20160711053856.GC31647@shlinux2>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Mon, 11 Jul 2016 07:46:40 +0200
+Subject: [PATCH 0/3] making rtc cores from s3c6410 and exynos3250 both work
+In-Reply-To: <1468056226-19128-1-git-send-email-ayaka@soulik.info>
+References: <1468056226-19128-1-git-send-email-ayaka@soulik.info>
+Message-ID: <578332C0.4010601@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 07, 2016 at 03:21:10PM -0700, Stephen Boyd wrote:
-> The ULPI phy on qcom platforms needs to be initialized and
-> powered on after a USB reset and before we toggle the run/stop
-> bit. Otherwise, the phy locks up and doesn't work properly. Hook
-> the phy initialization into the RESET event and the phy power off
-> into the STOPPED event.
+On 07/09/2016 11:23 AM, Randy Li wrote:
+> The 8792f7772f4f40ffc68bad5f28311205584b734d would just make those
+> platform using rtc core from exynos3250 work but have a huge 
+> effect on those platforms using the rtc core from s3c6410.
+> These patches would fix this problem.
 > 
-> Cc: Peter Chen <peter.chen@nxp.com>
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> ---
->  drivers/usb/chipidea/ci_hdrc_msm.c | 40 +++++++++++++++++++-------------------
->  drivers/usb/chipidea/core.c        |  8 ++++++--
->  drivers/usb/chipidea/host.c        |  8 ++++++--
->  include/linux/usb/chipidea.h       |  2 +-
->  4 files changed, 33 insertions(+), 25 deletions(-)
+
+Which problem? What huge effect? On which platforms? You didn't describe
+it...
+
+Your change breaks the ABI and is not compatible with current bindings
+documentation.
+
+Best regards,
+Krzysztof
+
+> Randy Li (3):
+>   Revert "drivers/rtc/rtc-s3c.c: add .needs_src_clk to s3c6410 RTC data"
+>   rtc: s3c: add device data for samsung,exynos3250-rtc
+>   ARM: dts: exynos: correct the rtc compatible value for exynos5
 > 
-> diff --git a/drivers/usb/chipidea/ci_hdrc_msm.c b/drivers/usb/chipidea/ci_hdrc_msm.c
-> index ab6a7713ee5c..5c486c15e043 100644
-> --- a/drivers/usb/chipidea/ci_hdrc_msm.c
-> +++ b/drivers/usb/chipidea/ci_hdrc_msm.c
-> @@ -75,20 +75,33 @@ static const struct reset_control_ops ci_hdrc_msm_reset_ops = {
->  	.reset = ci_hdrc_msm_por_reset,
->  };
->  
-> -static void ci_hdrc_msm_notify_event(struct ci_hdrc *ci, unsigned event)
-> +static int ci_hdrc_msm_notify_event(struct ci_hdrc *ci, unsigned event)
->  {
->  	struct device *dev = ci->dev->parent;
->  	struct ci_hdrc_msm *msm_ci = dev_get_drvdata(dev);
-> +	int ret;
->  
->  	switch (event) {
->  	case CI_HDRC_CONTROLLER_RESET_EVENT:
->  		dev_dbg(dev, "CI_HDRC_CONTROLLER_RESET_EVENT received\n");
-> +
-> +		hw_phymode_configure(ci);
->  		if (msm_ci->secondary_phy) {
->  			u32 val = readl_relaxed(msm_ci->base + HS_PHY_SEC_CTRL);
->  			val |= HS_PHY_DIG_CLAMP_N;
->  			writel_relaxed(val, msm_ci->base + HS_PHY_SEC_CTRL);
->  		}
->  
-> +		ret = phy_init(ci->phy);
-> +		if (ret)
-> +			return ret;
-> +
-> +		ret = phy_power_on(ci->phy);
-> +		if (ret) {
-> +			phy_exit(ci->phy);
-> +			return ret;
-> +		}
-> +
->  		/* use AHB transactor, allow posted data writes */
->  		hw_write_id_reg(ci, HS_PHY_AHB_MODE, 0xffffffff, 0x8);
->  
-> @@ -108,21 +121,18 @@ static void ci_hdrc_msm_notify_event(struct ci_hdrc *ci, unsigned event)
->  				 HSPHY_SESS_VLD_CTRL);
->  
->  		}
-> -
-> -		usb_phy_init(ci->usb_phy);
->  		break;
->  	case CI_HDRC_CONTROLLER_STOPPED_EVENT:
->  		dev_dbg(dev, "CI_HDRC_CONTROLLER_STOPPED_EVENT received\n");
-> -		/*
-> -		 * Put the phy in non-driving mode. Otherwise host
-> -		 * may not detect soft-disconnection.
-> -		 */
-> -		usb_phy_notify_disconnect(ci->usb_phy, USB_SPEED_UNKNOWN);
-> +		phy_power_off(ci->phy);
-> +		phy_exit(ci->phy);
->  		break;
->  	default:
->  		dev_dbg(dev, "unknown ci_hdrc event\n");
->  		break;
->  	}
-> +
-> +	return 0;
->  }
->  
->  static int ci_hdrc_msm_mux_phy(struct ci_hdrc_msm *ci,
-> @@ -162,7 +172,6 @@ static int ci_hdrc_msm_probe(struct platform_device *pdev)
->  {
->  	struct ci_hdrc_msm *ci;
->  	struct platform_device *plat_ci;
-> -	struct usb_phy *phy;
->  	struct clk *clk;
->  	struct reset_control *reset;
->  	struct resource *res;
-> @@ -176,21 +185,12 @@ static int ci_hdrc_msm_probe(struct platform_device *pdev)
->  		return -ENOMEM;
->  	platform_set_drvdata(pdev, ci);
->  
-> -	/*
-> -	 * OTG(PHY) driver takes care of PHY initialization, clock management,
-> -	 * powering up VBUS, mapping of registers address space and power
-> -	 * management.
-> -	 */
-> -	phy = devm_usb_get_phy_by_phandle(&pdev->dev, "usb-phy", 0);
-> -	if (IS_ERR(phy))
-> -		return PTR_ERR(phy);
-> -
->  	ci->pdata.name = "ci_hdrc_msm";
->  	ci->pdata.capoffset = DEF_CAPOFFSET;
->  	ci->pdata.flags	= CI_HDRC_REGS_SHARED | CI_HDRC_DISABLE_STREAMING |
-> -			  CI_HDRC_OVERRIDE_AHB_BURST;
-> +			  CI_HDRC_OVERRIDE_AHB_BURST |
-> +			  CI_HDRC_OVERRIDE_PHY_CONTROL;
->  	ci->pdata.notify_event = ci_hdrc_msm_notify_event;
-> -	ci->pdata.usb_phy = phy;
->  
->  	reset = devm_reset_control_get(&pdev->dev, "core");
->  	if (IS_ERR(reset))
-> diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
-> index f144e1bbcc82..0866c03d66df 100644
-> --- a/drivers/usb/chipidea/core.c
-> +++ b/drivers/usb/chipidea/core.c
-> @@ -327,6 +327,7 @@ void hw_phymode_configure(struct ci_hdrc *ci)
->  			hw_write(ci, OP_PORTSC, PORTSC_STS, PORTSC_STS);
->  	}
->  }
-> +EXPORT_SYMBOL_GPL(hw_phymode_configure);
->  
->  /**
->   * _ci_usb_phy_init: initialize phy taking in account both phy and usb_phy
-> @@ -503,9 +504,12 @@ int hw_device_reset(struct ci_hdrc *ci)
->  		return ret;
->  	}
->  
-> -	if (ci->platdata->notify_event)
-> -		ci->platdata->notify_event(ci,
-> +	if (ci->platdata->notify_event) {
-> +		ret = ci->platdata->notify_event(ci,
->  			CI_HDRC_CONTROLLER_RESET_EVENT);
-> +		if (ret)
-> +			return ret;
-> +	}
->  
->  	/* USBMODE should be configured step by step */
->  	hw_write(ci, OP_USBMODE, USBMODE_CM, USBMODE_CM_IDLE);
-> diff --git a/drivers/usb/chipidea/host.c b/drivers/usb/chipidea/host.c
-> index a1d8551ca79d..844be1d02d38 100644
-> --- a/drivers/usb/chipidea/host.c
-> +++ b/drivers/usb/chipidea/host.c
-> @@ -87,8 +87,12 @@ static int ehci_ci_reset(struct usb_hcd *hcd)
->  	if (ret)
->  		return ret;
->  
-> -	if (ci->platdata->notify_event)
-> -		ci->platdata->notify_event(ci, CI_HDRC_CONTROLLER_RESET_EVENT);
-> +	if (ci->platdata->notify_event) {
-> +		ret = ci->platdata->notify_event(ci,
-> +				CI_HDRC_CONTROLLER_RESET_EVENT);
-> +		if (ret)
-> +			return ret;
-> +	}
->  
->  	ci_platform_configure(ci);
->  
-> diff --git a/include/linux/usb/chipidea.h b/include/linux/usb/chipidea.h
-> index d07b162073f7..5e76552c81e9 100644
-> --- a/include/linux/usb/chipidea.h
-> +++ b/include/linux/usb/chipidea.h
-> @@ -61,7 +61,7 @@ struct ci_hdrc_platform_data {
->  	enum usb_dr_mode	dr_mode;
->  #define CI_HDRC_CONTROLLER_RESET_EVENT		0
->  #define CI_HDRC_CONTROLLER_STOPPED_EVENT	1
-> -	void	(*notify_event) (struct ci_hdrc *ci, unsigned event);
-> +	int	(*notify_event) (struct ci_hdrc *ci, unsigned event);
->  	struct regulator	*reg_vbus;
->  	struct usb_otg_caps	ci_otg_caps;
->  	bool			tpl_support;
-> -- 
-
-Acked-by: Peter Chen <peter.chen@nxp.com>
-
--- 
-
-Best Regards,
-Peter Chen
+>  arch/arm/boot/dts/exynos3250.dtsi |  2 +-
+>  arch/arm/boot/dts/exynos5.dtsi    |  2 +-
+>  drivers/rtc/rtc-s3c.c             | 15 +++++++++++++--
+>  3 files changed, 15 insertions(+), 4 deletions(-)
+> 
