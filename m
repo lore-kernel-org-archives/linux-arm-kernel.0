@@ -1,28 +1,29 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Mon, 11 Jul 2016 07:48:14 -0700
-Subject: [PATCH 1/3] dt/bindings: Add bindings for JC-42.4 compatible
- temperature sensors
-In-Reply-To: <20160711143025.GA6312@rob-hp-laptop>
-References: <1467737073-7949-1-git-send-email-linux@roeck-us.net>
- <20160711143025.GA6312@rob-hp-laptop>
-Message-ID: <5783B1AE.90400@roeck-us.net>
+From: alexandre.torgue@st.com (Alexandre TORGUE)
+Date: Mon, 11 Jul 2016 16:55:19 +0200
+Subject: [PATCH] pinctrl: stm32f429: driver init call change
+Message-ID: <1468248919-6061-1-git-send-email-alexandre.torgue@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/11/2016 07:30 AM, Rob Herring wrote:
-> On Tue, Jul 05, 2016 at 09:44:31AM -0700, Guenter Roeck wrote:
->> Provide generic bindings for all Jedec JC-42.4 compatible temperature
->> sensor chips.
->>
->> Signed-off-by: Guenter Roeck <linux@roeck-us.net>
->> ---
->>   Documentation/devicetree/bindings/hwmon/jc42.txt | 42 ++++++++++++++++++++++++
->>   1 file changed, 42 insertions(+)
->>   create mode 100644 Documentation/devicetree/bindings/hwmon/jc42.txt
->
-> Acked-by: Rob Herring <robh@kernel.org>
-> --
+As nothing special is done in driver init then device_initcall() can be
+changed in builtin_platform_driver() call.
 
-Thanks!
+Signed-off-by: Alexandre TORGUE <alexandre.torgue@st.com>
 
-Guenter
+diff --git a/drivers/pinctrl/stm32/pinctrl-stm32f429.c b/drivers/pinctrl/stm32/pinctrl-stm32f429.c
+index e9b15dc..a5d50ca 100644
+--- a/drivers/pinctrl/stm32/pinctrl-stm32f429.c
++++ b/drivers/pinctrl/stm32/pinctrl-stm32f429.c
+@@ -1583,9 +1583,4 @@ static struct platform_driver stm32f429_pinctrl_driver = {
+ 		.of_match_table = stm32f429_pctrl_match,
+ 	},
+ };
+-
+-static int __init stm32f429_pinctrl_init(void)
+-{
+-	return platform_driver_register(&stm32f429_pinctrl_driver);
+-}
+-device_initcall(stm32f429_pinctrl_init);
++builtin_platform_driver(stm32f429_pinctrl_driver);
+-- 
+1.9.1
