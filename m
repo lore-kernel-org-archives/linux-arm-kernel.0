@@ -1,21 +1,24 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 11 Jul 2016 09:30:25 -0500
-Subject: [PATCH 1/3] dt/bindings: Add bindings for JC-42.4 compatible
- temperature sensors
-In-Reply-To: <1467737073-7949-1-git-send-email-linux@roeck-us.net>
-References: <1467737073-7949-1-git-send-email-linux@roeck-us.net>
-Message-ID: <20160711143025.GA6312@rob-hp-laptop>
+Date: Mon, 11 Jul 2016 09:34:14 -0500
+Subject: [PATCH 1/3] net: stmmac: dwmac-rk: add rk3366 & rk3399-specific
+ data
+In-Reply-To: <1467802291-6487-2-git-send-email-roger.chen@rock-chips.com>
+References: <1467802291-6487-1-git-send-email-roger.chen@rock-chips.com>
+ <1467802291-6487-2-git-send-email-roger.chen@rock-chips.com>
+Message-ID: <20160711143414.GA8707@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 05, 2016 at 09:44:31AM -0700, Guenter Roeck wrote:
-> Provide generic bindings for all Jedec JC-42.4 compatible temperature
-> sensor chips.
+On Wed, Jul 06, 2016 at 06:51:29PM +0800, Roger Chen wrote:
+> Add constants and callback functions for the dwmac on rk3368 socs.
+> As can be seen, the base structure is the same, only registers and
+> the bits in them moved slightly.
 > 
-> Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+> Signed-off-by: Roger Chen <roger.chen@rock-chips.com>
 > ---
->  Documentation/devicetree/bindings/hwmon/jc42.txt | 42 ++++++++++++++++++++++++
->  1 file changed, 42 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/hwmon/jc42.txt
+>  .../devicetree/bindings/net/rockchip-dwmac.txt     |   3 +-
 
 Acked-by: Rob Herring <robh@kernel.org>
+
+>  drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c     | 226 +++++++++++++++++++++
+>  2 files changed, 228 insertions(+), 1 deletion(-)
