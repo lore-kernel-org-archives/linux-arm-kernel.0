@@ -1,59 +1,42 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 11 Jul 2016 16:23:53 +0100
-Subject: [PATCH v2 6/6] dmaengine: pl330: Make sure microcode is
- privileged-executable
-In-Reply-To: <20160709020919.6760-7-mitchelh@codeaurora.org>
-References: <20160709020919.6760-1-mitchelh@codeaurora.org>
- <20160709020919.6760-7-mitchelh@codeaurora.org>
-Message-ID: <5783BA09.1020303@arm.com>
+From: fcooper@ti.com (Franklin S Cooper Jr.)
+Date: Mon, 11 Jul 2016 10:24:28 -0500
+Subject: [PATCH] ARM: dts: da850: Add new ECAP and EPWM bindings
+In-Reply-To: <577A5AD0.7070906@ti.com>
+References: <1467036842-20913-1-git-send-email-fcooper@ti.com>
+ <577A5AD0.7070906@ti.com>
+Message-ID: <5783BA2C.7030905@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/07/16 03:09, Mitchel Humpherys wrote:
-> The PL330 can perform privileged instruction fetches.  This can result
 
-Nit: "can" is a bit of an understatement. Instruction fetches on both
-the manager and channel threads have the "privileged" and "instruction"
-AxPROT bits hard-coded whether you like it or not. It's only the data
-accesses by the channel threads which are in any way configurable.
 
-Robin.
-
-> in SMMU permission faults on SMMUs that implement the ARMv8 VMSA, which
-> specifies that mappings that are writeable at one execution level shall
-> not be executable at any higher-privileged level.  Fix this by using the
-> DMA_ATTR_PRIVILEGED_EXECUTABLE attribute, which will ensure that the
-> microcode IOMMU mapping is not writeable.
+On 07/04/2016 07:47 AM, Sekhar Nori wrote:
+> On Monday 27 June 2016 07:44 PM, Franklin S Cooper Jr wrote:
+>> From: "Cooper Jr., Franklin" <fcooper@ti.com>
+>>
+>> Switch to a new ECAP and EPWM bindings that doesn't depend on hwmod to
+>> provide the various required clocks.
 > 
-> Cc: Dan Williams <dan.j.williams@intel.com>
-> Cc: Jassi Brar <jassi.brar@samsung.com>
-> Signed-off-by: Mitchel Humpherys <mitchelh@codeaurora.org>
-> ---
->  drivers/dma/pl330.c | 7 +++++--
->  1 file changed, 5 insertions(+), 2 deletions(-)
+> there is nothing called hwmod on da850, so this need rewording to make
+> sense for that platform.
+
+Sorry will fix.
 > 
-> diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
-> index 372b4359da97..25bc49d47c45 100644
-> --- a/drivers/dma/pl330.c
-> +++ b/drivers/dma/pl330.c
-> @@ -1854,14 +1854,17 @@ static int dmac_alloc_resources(struct pl330_dmac *pl330)
->  {
->  	int chans = pl330->pcfg.num_chan;
->  	int ret;
-> +	DEFINE_DMA_ATTRS(attrs);
->  
-> +	dma_set_attr(DMA_ATTR_PRIVILEGED_EXECUTABLE, &attrs);
->  	/*
->  	 * Alloc MicroCode buffer for 'chans' Channel threads.
->  	 * A channel's buffer offset is (Channel_Id * MCODE_BUFF_PERCHAN)
->  	 */
-> -	pl330->mcode_cpu = dma_alloc_coherent(pl330->ddma.dev,
-> +	pl330->mcode_cpu = dma_alloc_attrs(pl330->ddma.dev,
->  				chans * pl330->mcbufsz,
-> -				&pl330->mcode_bus, GFP_KERNEL);
-> +				&pl330->mcode_bus, GFP_KERNEL,
-> +				&attrs);
->  	if (!pl330->mcode_cpu) {
->  		dev_err(pl330->ddma.dev, "%s:%d Can't allocate memory!\n",
->  			__func__, __LINE__);
+>>
+>> Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
+>> Acked-by: Rob Herring <robh@kernel.org>
+> 
+> Also, documentation needs update as well since it says:
+> 
+> "
+> for da850  - compatible = "ti,da850-ehrpwm", "ti,am33xx-ehrpwm"
+> "
+> 
+
+The original patch that Tony pulled in already includes this
+documentation update for the new bindings. This patch just handles the
+DA850 DT changes that didn't apply when Tony pulled in the original patch.
+
+> Thanks,
+> Sekhar
 > 
