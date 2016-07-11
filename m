@@ -1,41 +1,41 @@
 From: zhiyong.tao@mediatek.com (Zhiyong Tao)
-Date: Mon, 11 Jul 2016 11:09:54 +0800
-Subject: [PATCH v3 0/2] AUXADC: Mediatek auxadc driver 
-Message-ID: <1468206596-13792-1-git-send-email-zhiyong.tao@mediatek.com>
+Date: Mon, 11 Jul 2016 11:09:55 +0800
+Subject: [PATCH v3 1/2] dt-bindings: auxadc: Add binding document for Mediatek
+ auxadc.
+In-Reply-To: <1468206596-13792-1-git-send-email-zhiyong.tao@mediatek.com>
+References: <1468206596-13792-1-git-send-email-zhiyong.tao@mediatek.com>
+Message-ID: <1468206596-13792-2-git-send-email-zhiyong.tao@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series includes three patches:
-1.Change the device tree binding documentation.
-2.Add auxadc driver based on linux iio.
-3.Add auxadc nodes in the mediatek MT2701 dtsi file.
+The commit adds the device tree binding documentation for the mediatek
+auxadc found on Mediatek MT2701.
+Thermal gets auxadc sample data by iio device.
+So the commit changes auxadc device tree binding documentation from
+/soc/mediatek/auxadc.txt to /iio/adc/mt65xx_auxadc.txt.
 
-changes in patch v3:
-1).Add '#' before 'io-channel-cells' and change 'auxadc@' to 'adc@' in auxadc binding document.
-2).Fix CONFIG_MEDIATEK_MT65XX_AUXADC sequence as alphabetical order.
-3).Change the prefix 'MT65XX' to 'MT6577' to match auxadc driver name.
-4).Remove the delays stored in 'mt6577_auxadc_device' and use the defined delay directly.
-5).Use '-ETIMEDOUT' instead of '-EINVAL'.
-6).Return value directly in 'mt6577_auxadc_read_raw'.
-7).Add power off and unprepare clock if 'iio_device_register' failed.
-8).Change 'Registers' to 'Register'.
+Signed-off-by: Zhiyong Tao <zhiyong.tao@mediatek.com>
+---
+ .../devicetree/bindings/iio/adc/mt65xx_auxadc.txt  |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-changes in patch v2:
-1).Change the file name mt65xx_auxadc.c to mt6577_auxadc.c.
-2).Add 'depends on ARCH_MEDIATEK || COMPILE_TEST and HAS_IOMEM' for MEDIATEK_MT65XX_AUXADC config.
-3).Add check case for return value of 'readl_poll_timeout'.
-4).Remove returning 1 and 0 for SCALE and OFFSET. use channel type 'IIO_CHAN_INFO_PROCESSED' instead of 'IIO_CHAN_INFO_RAW'.
-5).Remove 'IIO_CHAN_INFO_OFFSET' and 'IIO_CHAN_INFO_SCALE' in 'MT65XX_AUXADC_CHANNEL' channel type.
-6).Add check case when auxadc power on failure. if auxadc power on failure, clk_disable_unprepare should be executed.
-7).Put 'platform_set_drvdata' before 'iio_device_register'.
-8).Fix coding style and spelling error.
-
-Zhiyong Tao (2):
-  dt-bindings: auxadc: Add binding document for Mediatek auxadc.
-  iio: adc: mt2701: Add Mediatek auxadc driver for mt2701.
-
- .../devicetree/bindings/iio/adc/mt65xx_auxadc.txt  |    4 +-
- drivers/iio/adc/Kconfig                            |   26 +--
- drivers/iio/adc/Makefile                           |    2 +-
- drivers/iio/adc/mt6577_auxadc.c                    |  186 ++++++++++----------
- 4 files changed, 106 insertions(+), 112 deletions(-)
+diff --git a/Documentation/devicetree/bindings/iio/adc/mt65xx_auxadc.txt b/Documentation/devicetree/bindings/iio/adc/mt65xx_auxadc.txt
+index 47fcd1b..bc23792 100644
+--- a/Documentation/devicetree/bindings/iio/adc/mt65xx_auxadc.txt
++++ b/Documentation/devicetree/bindings/iio/adc/mt65xx_auxadc.txt
+@@ -14,11 +14,11 @@ Required properties:
+   - reg: Address range of the AUXADC unit.
+   - clocks: Should contain a clock specifier for each entry in clock-names
+   - clock-names: Should contain "main".
+-  - io-channel-cells: Should be 1, see ../iio-bindings.txt
++  - #io-channel-cells: Should be 1, see ../iio-bindings.txt
+ 
+ Example:
+ 
+-auxadc: auxadc at 11001000 {
++auxadc: adc at 11001000 {
+ 	compatible = "mediatek,mt2701-auxadc";
+ 	reg = <0 0x11001000 0 0x1000>;
+ 	clocks = <&pericfg CLK_PERI_AUXADC>;
+-- 
+1.7.9.5
