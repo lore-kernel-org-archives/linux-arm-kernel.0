@@ -1,80 +1,37 @@
-From: fcooper@ti.com (Franklin S Cooper Jr)
-Date: Mon, 11 Jul 2016 14:11:46 -0500
-Subject: [PATCH v2] ARM: dts: da850: Add new ECAP and EPWM bindings
-Message-ID: <1468264306-3806-1-git-send-email-fcooper@ti.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 11 Jul 2016 20:22:11 +0100
+Subject: [PATCH V8 1/2] regulator: Add document for MT6323 regulator
+In-Reply-To: <cef78bd8-9a4a-e848-d7cb-13a27127f11e@phrozen.org>
+References: <1468240179-7558-1-git-send-email-john@phrozen.org>
+ <20160711180805.GG3701@sirena.org.uk>
+ <cef78bd8-9a4a-e848-d7cb-13a27127f11e@phrozen.org>
+Message-ID: <20160711192211.GI3701@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Cooper Jr., Franklin" <fcooper@ti.com>
+On Mon, Jul 11, 2016 at 08:55:24PM +0200, John Crispin wrote:
+> On 11/07/2016 20:08, Mark Brown wrote:
+> > On Mon, Jul 11, 2016 at 02:29:38PM +0200, John Crispin wrote:
 
-For some devices, the PWMSS is a parent of eCAP and ePWM and provided the
-functional clocks for those submodules. The ti,am33xx-ecap and
-ti,am33xx-ehrpwm were based on this parent child relationship where the
-functional clock would be grabbed from the module's parent.
+> >> This is a resend as V7 was dropped due to a merge order conflict.
 
-However, DA850 doesn't have a PWMSS and the eCAP and ePWM provides their
-functional clock themselves. Therefore, prefer the new binding that doesn't
-assume this parent child relationship.
+> > What were the dependencies and why will simply resending this resolve
+> > them?
 
-Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
-Acked-by: Rob Herring <robh@kernel.org>
----
-v2 changes:
-Fix commit message
+> the dependency was the mt6323 support inside the mt6397 MFD device [1]
+> and the headers that it included. this has been merged so the regulator
+> driver is good to go for 4.8
 
-This patch handles the da850 portion that wouldn't apply from the
-following patch that has been accepted:
-https://patchwork.kernel.org/patch/9005661/
-
-
- arch/arm/boot/dts/da850.dtsi | 15 ++++++++++-----
- 1 file changed, 10 insertions(+), 5 deletions(-)
-
-diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
-index 25f0f8e..09cf663 100644
---- a/arch/arm/boot/dts/da850.dtsi
-+++ b/arch/arm/boot/dts/da850.dtsi
-@@ -274,31 +274,36 @@
- 			status = "disabled";
- 		};
- 		ehrpwm0: pwm at 300000 {
--			compatible = "ti,da850-ehrpwm", "ti,am33xx-ehrpwm";
-+			compatible = "ti,da850-ehrpwm", "ti,am3352-ehrpwm",
-+				     "ti,am33xx-ehrpwm";
- 			#pwm-cells = <3>;
- 			reg = <0x300000 0x2000>;
- 			status = "disabled";
- 		};
- 		ehrpwm1: pwm at 302000 {
--			compatible = "ti,da850-ehrpwm", "ti,am33xx-ehrpwm";
-+			compatible = "ti,da850-ehrpwm", "ti,am3352-ehrpwm",
-+				     "ti,am33xx-ehrpwm";
- 			#pwm-cells = <3>;
- 			reg = <0x302000 0x2000>;
- 			status = "disabled";
- 		};
- 		ecap0: ecap at 306000 {
--			compatible = "ti,da850-ecap", "ti,am33xx-ecap";
-+			compatible = "ti,da850-ecap", "ti,am3352-ecap",
-+				     "ti,am33xx-ecap";
- 			#pwm-cells = <3>;
- 			reg = <0x306000 0x80>;
- 			status = "disabled";
- 		};
- 		ecap1: ecap at 307000 {
--			compatible = "ti,da850-ecap", "ti,am33xx-ecap";
-+			compatible = "ti,da850-ecap", "ti,am3352-ecap",
-+				     "ti,am33xx-ecap";
- 			#pwm-cells = <3>;
- 			reg = <0x307000 0x80>;
- 			status = "disabled";
- 		};
- 		ecap2: ecap at 308000 {
--			compatible = "ti,da850-ecap", "ti,am33xx-ecap";
-+			compatible = "ti,da850-ecap", "ti,am3352-ecap",
-+				     "ti,am33xx-ecap";
- 			#pwm-cells = <3>;
- 			reg = <0x308000 0x80>;
- 			status = "disabled";
--- 
-2.7.0
+No, that's not resolving the dependencies - if I apply these patches
+without the dependencies in the regulator tree that will still break the
+build for my tree until after the merge window.  It'll also break Linus'
+tree if (as is normal) I send my pull requests early on.  I'd need to
+merge the MFD commits into my tree which would need coordination with
+Lee, he'd need to make a tag for me to pull in.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160711/dca08830/attachment.sig>
