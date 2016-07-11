@@ -1,64 +1,52 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 11 Jul 2016 15:14:07 +0100
-Subject: [PATCH v2 2/6] iommu/io-pgtable-arm: add support for the
- IOMMU_PRIV flag
-In-Reply-To: <20160709020919.6760-3-mitchelh@codeaurora.org>
-References: <20160709020919.6760-1-mitchelh@codeaurora.org>
- <20160709020919.6760-3-mitchelh@codeaurora.org>
-Message-ID: <5783A9AF.3060700@arm.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 11 Jul 2016 09:14:07 -0500
+Subject: [PATCH V2 01/10] Documentation: dt-bindings: mailbox: tegra: Add
+ binding for HSP mailbox
+In-Reply-To: <577EA0D6.9020308@wwwdotorg.org>
+References: <20160705090431.5852-1-josephl@nvidia.com>
+ <20160705090431.5852-2-josephl@nvidia.com>
+ <20160707181356.GA6864@kickseed.nvidia.com>
+ <577EA0D6.9020308@wwwdotorg.org>
+Message-ID: <20160711141407.GA25042@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/07/16 03:09, Mitchel Humpherys wrote:
-> From: Jeremy Gebben <jgebben@codeaurora.org>
+On Thu, Jul 07, 2016 at 12:35:02PM -0600, Stephen Warren wrote:
+> On 07/07/2016 12:13 PM, Sivaram Nair wrote:
+> >On Tue, Jul 05, 2016 at 05:04:22PM +0800, Joseph Lo wrote:
+> >>Add DT binding for the Hardware Synchronization Primitives (HSP). The
+> >>HSP is designed for the processors to share resources and communicate
+> >>together. It provides a set of hardware synchronization primitives for
+> >>interprocessor communication. So the interprocessor communication (IPC)
+> >>protocols can use hardware synchronization primitive, when operating
+> >>between two processors not in an SMP relationship.
 > 
-> Allow the creation of privileged mode mappings, for stage 1 only.
+> >>diff --git a/include/dt-bindings/mailbox/tegra186-hsp.h b/include/dt-bindings/mailbox/tegra186-hsp.h
 > 
-> Signed-off-by: Jeremy Gebben <jgebben@codeaurora.org>
-> ---
->  drivers/iommu/io-pgtable-arm.c | 16 +++++++++++-----
->  1 file changed, 11 insertions(+), 5 deletions(-)
+> >>+#define HSP_MBOX_TYPE_DB 0x0
+> >>+#define HSP_MBOX_TYPE_SM 0x1
+> >>+#define HSP_MBOX_TYPE_SS 0x2
+> >>+#define HSP_MBOX_TYPE_AS 0x3
+> >>+
+> >>+#define HSP_DB_MASTER_CCPLEX 17
+> >>+#define HSP_DB_MASTER_BPMP 19
+> >>+
+> >>+#define HSP_MBOX_ID(type, ID) \
+> >>+		(HSP_MBOX_TYPE_##type << 16 | ID)
+> >
+> >It will be nicer if you avoid the macro glue magic '##' for 'type'. I
+> >would also suggest to use braces around 'type' and 'ID'.
 > 
-> diff --git a/drivers/iommu/io-pgtable-arm.c b/drivers/iommu/io-pgtable-arm.c
-> index a1ed1b73fed4..e9e7dd179708 100644
-> --- a/drivers/iommu/io-pgtable-arm.c
-> +++ b/drivers/iommu/io-pgtable-arm.c
-> @@ -101,8 +101,10 @@
->  					 ARM_LPAE_PTE_ATTR_HI_MASK)
->  
->  /* Stage-1 PTE */
-> -#define ARM_LPAE_PTE_AP_UNPRIV		(((arm_lpae_iopte)1) << 6)
-> -#define ARM_LPAE_PTE_AP_RDONLY		(((arm_lpae_iopte)2) << 6)
-> +#define ARM_LPAE_PTE_AP_PRIV_RW		(((arm_lpae_iopte)0) << 6)
-> +#define ARM_LPAE_PTE_AP_RW		(((arm_lpae_iopte)1) << 6)
-> +#define ARM_LPAE_PTE_AP_PRIV_RO		(((arm_lpae_iopte)2) << 6)
-> +#define ARM_LPAE_PTE_AP_RO		(((arm_lpae_iopte)3) << 6)
+> This technique been used without issue in quite a few other places without
+> issue, and has the benefit of simplifying the text wherever the macro is
+> used. What issue do you foresee?
 
-I'd much rather keep the existing per-bit definitions and compose them
-in the code below (which by the look of it should then become a simple
-one-liner of making the OR-ing in of AP_UNPRIV conditional.)
+I'm not a fan of using the macros to begin with and less so anything 
+more complex than a single constant value. I'd rather see 2 cells here 
+with the first being the id and the 2nd being the type. 
 
-Robin.
+An issue with token pasting is grepping for DB, SM, etc. in kernel tree 
+is probably noisy. Not such a big deal here, but a major PIA when you 
+have more complex sets of includes.
 
->  #define ARM_LPAE_PTE_ATTRINDX_SHIFT	2
->  #define ARM_LPAE_PTE_nG			(((arm_lpae_iopte)1) << 11)
->  
-> @@ -350,10 +352,14 @@ static arm_lpae_iopte arm_lpae_prot_to_pte(struct arm_lpae_io_pgtable *data,
->  
->  	if (data->iop.fmt == ARM_64_LPAE_S1 ||
->  	    data->iop.fmt == ARM_32_LPAE_S1) {
-> -		pte = ARM_LPAE_PTE_AP_UNPRIV | ARM_LPAE_PTE_nG;
-> +		pte = ARM_LPAE_PTE_nG;
->  
-> -		if (!(prot & IOMMU_WRITE) && (prot & IOMMU_READ))
-> -			pte |= ARM_LPAE_PTE_AP_RDONLY;
-> +		if (prot & IOMMU_WRITE)
-> +			pte |= (prot & IOMMU_PRIV) ? ARM_LPAE_PTE_AP_PRIV_RW
-> +					: ARM_LPAE_PTE_AP_RW;
-> +		else
-> +			pte |= (prot & IOMMU_PRIV) ? ARM_LPAE_PTE_AP_PRIV_RO
-> +					: ARM_LPAE_PTE_AP_RO;
->  
->  		if (prot & IOMMU_MMIO)
->  			pte |= (ARM_LPAE_MAIR_ATTR_IDX_DEV
-> 
+Rob
