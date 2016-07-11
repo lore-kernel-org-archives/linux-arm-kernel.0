@@ -1,36 +1,55 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 11 Jul 2016 13:15:11 +0200
-Subject: [PATCH] ARM: s3c64xx: avoid warning about 'struct device_node'
-In-Reply-To: <57710F1F.8090304@samsung.com>
-References: <20160627110303.3391769-1-arnd@arndb.de>
- <57710F1F.8090304@samsung.com>
-Message-ID: <1807726.lxvlsY5ymW@wuerfel>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Mon, 11 Jul 2016 13:11:59 +0200
+Subject: [PATCH v5 1/3] clk: imx6: Mask mmdc_ch1 handshake for periph2_sel and
+ mmdc_ch1_axi_podf
+Message-ID: <1468235521-3163-1-git-send-email-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, June 27, 2016 1:33:51 PM CEST Krzysztof Kozlowski wrote:
-> On 06/27/2016 01:02 PM, Arnd Bergmann wrote:
-> > The change to simplify of_platform_populate() had an unintended
-> > side-effect of introducing a build warning on s3c64xx:
-> > 
-> > In file included from arch/arm/mach-s3c64xx/mach-s3c64xx-dt.c:18:0:
-> > arch/arm/mach-s3c64xx/common.h:27:30: error: 'struct device_node' declared inside parameter list will not be visible outside of this definition or declaration [-Werror]
-> > 
-> > This adds a forward-declaration for the structure name in the
-> > header to avoid the warning.
-> > 
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > Fixes: 850bea2335e4 ("arm: Remove unnecessary of_platform_populate with default match table")
-> > ---
-> > Rob, can you apply this on top of the devicetree git so we don't
-> > have to coordinate the merges?
-> 
-> Acked-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+MMDC CH1 is not used on i.MX6Q, so the handshake needed to change the
+parent of periph2_sel or the divider of mmdc_ch1_axi_podf will never
+succeed.
+Disable the handshake mechanism to allow changing the frequency of
+mmdc_ch1_axi, allowing to use it as a possible source for the LDB DI
+clock.
 
-Hi Rob,
+Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+---
+ drivers/clk/imx/clk-imx6q.c | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
 
-I still get the warning in every linux-next build, do you plan to pick
-up the fix for the commit you merged, or should I try to work around it
-in arm-soc and leave this as a bisection problem?
-
-	Arnd
+diff --git a/drivers/clk/imx/clk-imx6q.c b/drivers/clk/imx/clk-imx6q.c
+index ba1c1ae..dd33ebc 100644
+--- a/drivers/clk/imx/clk-imx6q.c
++++ b/drivers/clk/imx/clk-imx6q.c
+@@ -156,6 +156,19 @@ static struct clk ** const uart_clks[] __initconst = {
+ 	NULL
+ };
+ 
++#define CCM_CCDR		0x04
++
++#define CCDR_MMDC_CH1_MASK	BIT(16)
++
++static void __init imx6q_mmdc_ch1_mask_handshake(void __iomem *ccm_base)
++{
++	unsigned int reg;
++
++	reg = readl_relaxed(ccm_base + CCM_CCDR);
++	reg |= CCDR_MMDC_CH1_MASK;
++	writel_relaxed(reg, ccm_base + CCM_CCDR);
++}
++
+ static void __init imx6q_clocks_init(struct device_node *ccm_node)
+ {
+ 	struct device_node *np;
+@@ -297,6 +310,8 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
+ 	base = of_iomap(np, 0);
+ 	WARN_ON(!base);
+ 
++	imx6q_mmdc_ch1_mask_handshake(base);
++
+ 	/*                                              name                reg       shift width parent_names     num_parents */
+ 	clk[IMX6QDL_CLK_STEP]             = imx_clk_mux("step",	            base + 0xc,  8,  1, step_sels,	   ARRAY_SIZE(step_sels));
+ 	clk[IMX6QDL_CLK_PLL1_SW]          = imx_clk_mux("pll1_sw",	    base + 0xc,  2,  1, pll1_sw_sels,      ARRAY_SIZE(pll1_sw_sels));
+-- 
+2.8.1
