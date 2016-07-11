@@ -1,87 +1,57 @@
-From: jeyu@redhat.com (Jessica Yu)
-Date: Mon, 11 Jul 2016 17:58:07 -0400
-Subject: arm64: implement live patching
-In-Reply-To: <alpine.LNX.2.00.1607111556320.27989@pobox.suse.cz>
-References: <20160627151500.2247A68D20@newverein.lst.de>
- <20160627151722.B81C968D29@newverein.lst.de>
- <alpine.LNX.2.00.1607111556320.27989@pobox.suse.cz>
-Message-ID: <20160711215807.GA23097@packer-debian-8-amd64.digitalocean.com>
+From: stephen.boyd@linaro.org (Stephen Boyd)
+Date: Mon, 11 Jul 2016 15:02:16 -0700
+Subject: [PATCH v2 10/22] usb: chipidea: Add support for ULPI PHY bus
+In-Reply-To: <20160711031003.GC30448@shlinux2>
+References: <20160707222114.1673-1-stephen.boyd@linaro.org>
+ <20160707222114.1673-11-stephen.boyd@linaro.org>
+ <20160711031003.GC30448@shlinux2>
+Message-ID: <CAJOFmgxWM+9UaDC+QoBM5xutj1vPtSHmwiU8=cf2G5zSB8RRNg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+++ Miroslav Benes [11/07/16 16:03 +0200]:
->On Mon, 27 Jun 2016, Torsten Duwe wrote:
->
->> diff --git a/arch/arm64/include/asm/livepatch.h b/arch/arm64/include/asm/livepatch.h
->> new file mode 100644
->> index 0000000..6b9a3d1
->> --- /dev/null
->> +++ b/arch/arm64/include/asm/livepatch.h
->> @@ -0,0 +1,37 @@
->> +/*
->> + * livepatch.h - arm64-specific Kernel Live Patching Core
->> + *
->> + * Copyright (C) 2016 SUSE
->> + *
->> + * This program is free software; you can redistribute it and/or
->> + * modify it under the terms of the GNU General Public License
->> + * as published by the Free Software Foundation; either version 2
->> + * of the License, or (at your option) any later version.
->> + *
->> + * This program is distributed in the hope that it will be useful,
->> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + * GNU General Public License for more details.
->> + *
->> + * You should have received a copy of the GNU General Public License
->> + * along with this program; if not, see <http://www.gnu.org/licenses/>.
->> + */
->> +#ifndef _ASM_ARM64_LIVEPATCH_H
->> +#define _ASM_ARM64_LIVEPATCH_H
+On 10 July 2016 at 20:10, Peter Chen <hzpeterchen@gmail.com> wrote:
+> On Thu, Jul 07, 2016 at 03:21:01PM -0700, Stephen Boyd wrote:
+>> @@ -418,6 +427,17 @@ static inline bool ci_otg_is_fsm_mode(struct ci_hdrc *ci)
+>>  #endif
+>>  }
+>>
+>> +#if IS_ENABLED(CONFIG_USB_CHIPIDEA_ULPI)
+>> +int ci_ulpi_init(struct ci_hdrc *ci);
+>> +void ci_ulpi_exit(struct ci_hdrc *ci);
+>> +int ci_ulpi_resume(struct ci_hdrc *ci);
+>> +#else
+>> +static inline int ci_ulpi_init(struct ci_hdrc *ci) { return 0; }
+>> +static inline void ci_ulpi_exit(struct ci_hdrc *ci) { }
+>> +static inline int ci_ulpi_resume(struct ci_hdrc *ci) { return 0; }
+>> +#endif
 >> +
->> +#include <linux/module.h>
->> +#include <linux/ftrace.h>
 >> +
->> +#ifdef CONFIG_LIVEPATCH
 >
->A nit but we removed such guards in the other header files.
+> One more blank line
 >
->> +static inline int klp_check_compiler_support(void)
->> +{
->> +	return 0;
->> +}
->> +
->> +static inline void klp_arch_set_pc(struct pt_regs *regs, unsigned long ip)
->> +{
->> +	regs->pc = ip;
->> +}
->> +#endif /* CONFIG_LIVEPATCH */
+
+Fixed.
+
+>> @@ -911,11 +918,15 @@ static int ci_hdrc_probe(struct platform_device *pdev)
+>>
+>>               /* if both generic PHY and USB PHY layers aren't enabled */
+>>               if (PTR_ERR(ci->phy) == -ENOSYS &&
+>> -                             PTR_ERR(ci->usb_phy) == -ENXIO)
+>> -                     return -ENXIO;
+>> +                             PTR_ERR(ci->usb_phy) == -ENXIO) {
+>> +                     ret = -ENXIO;
+>> +                     goto ulpi_exit;
+>> +             }
+>>
+>> -             if (IS_ERR(ci->phy) && IS_ERR(ci->usb_phy))
+>> -                     return -EPROBE_DEFER;
+>> +             if (IS_ERR(ci->phy) && IS_ERR(ci->usb_phy)) {
+>> +                     ret = -EPROBE_DEFER;
+>> +                     goto ulpi_exit;
+>> +             }
 >
->I also checked mod_arch_specific structure because of the way we deal
->with relocations. It is defined only if CONFIG_ARM64_MODULE_PLTS is
->enabled and there is a pointer to 'struct elf64_shdr' called plt. It is
->used indirectly in apply_relocate_add() so we need it to stay. However it
->points to an existing Elf section and SHF_ALLOC is added to its sh_flags
->in module_frob_arch_sections() (arch/arm64/kernel/module-plts.c).
->Therefore we should be ok.
->
->Jessica, could you check it as well, please?
+> Just confirm, you try to get PHY through:
+>         ci->phy = devm_phy_get(dev->parent, "usb-phy");
+> right?
 
-That sounds right, the plt will remain in module core memory, so we
-are fine there.
-
-However I think the plt->sh_size calculation will be incorrect for
-livepatch modules. In calculating mod->arch.plt_max_entries (see:
-module-plts.c), count_plts() is called for every rela section.
-For livepatch modules, this means count_plts() will also be called for
-our .klp.rela sections, which is correct behavior. However,
-count_plts() only considers relas referring to SHN_UNDEF symbols, and
-since every rela in a klp rela section refers to a SHN_LIVEPATCH
-symbol, these are all ignored. So count_plts() may return an incorrect
-value for a klp rela section.
-
-Miroslav, can you confirm the issue? I think the fix would be easy
-though; we can just add an additional check for SHN_LIVEPATCH in
-count_plts(). 
-
-Jessica
+Yes.
