@@ -1,49 +1,44 @@
-From: andy.gross@linaro.org (Andy Gross)
-Date: Mon, 11 Jul 2016 17:38:27 -0500
-Subject: [PATCH 2/3] regulator: qcom_smd: Fix voltage ranges for pma8084
- ftsmps and pldo
-In-Reply-To: <20160711215009.4519-3-sboyd@codeaurora.org>
-References: <20160711215009.4519-1-sboyd@codeaurora.org>
- <20160711215009.4519-3-sboyd@codeaurora.org>
-Message-ID: <20160711223827.GA6053@hector.attlocal.net>
+From: shuahkh@osg.samsung.com (Shuah Khan)
+Date: Mon, 11 Jul 2016 16:39:00 -0600
+Subject: [PATCH] media: s5p-mfc Fix misspelled error message and checkpatch
+ errors
+Message-ID: <1468276740-1591-1-git-send-email-shuahkh@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 11, 2016 at 02:50:08PM -0700, Stephen Boyd wrote:
-> The voltage ranges listed here are wrong. The pma8084 pldo
-> supports three different overlapping voltage ranges with
-> differing step sizes and the pma8084 ftsmps supports two. These
-> ranges can be seen in the "native" spmi regulator driver
-> (qcom_spmi-regulator.c) at pldo_ranges[] and ftsmps_ranges[]
-> respectively. Port these ranges over to the RPM SMD regulator
-> driver so that we list the appropriate set of supported voltages
-> on these types of regulators.
-> 
-> Cc: Andy Gross <andy.gross@linaro.org>
-> Cc: Bjorn Andersson <bjorn.andersson@linaro.org>
-> Fixes: ee01d0c91ef1 ("regulator: qcom-smd: Add support for PMA8084")
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+Fix misspelled error message and existing checkpatch errors in the
+error message conditional.
 
-<snip>
+WARNING: suspect code indent for conditional statements (8, 24)
+ 	if (ctx->state != MFCINST_HEAD_PARSED &&
+[...]
++               mfc_err("Can not get crop information\n");
 
->  static const struct regulator_desc pma8084_pldo = {
->  	.linear_ranges = (struct regulator_linear_range[]) {
-> -		REGULATOR_LINEAR_RANGE(750000,  0,  30, 25000),
-> -		REGULATOR_LINEAR_RANGE(1500000, 31, 99, 50000),
-> +		REGULATOR_LINEAR_RANGE( 750000,  0,  63, 12500),
+Signed-off-by: Shuah Khan <shuahkh@osg.samsung.com>
+---
+ drivers/media/platform/s5p-mfc/s5p_mfc_dec.c | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
 
-It was my understanding that the PMOS ldos only support 25mV and 50mV
-incremements.
-
-> +		REGULATOR_LINEAR_RANGE(1550000, 64, 126, 25000),
-> +		REGULATOR_LINEAR_RANGE(3100000, 127, 163, 50000),
->  	},
-> -	.n_linear_ranges = 2,
-> -	.n_voltages = 100,
-> +	.n_linear_ranges = 3,
-> +	.n_voltages = 164,
->  	.ops = &rpm_smps_ldo_ops,
-
-Regards,
-
-Andy
+diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
+index a01a373..06061c4 100644
+--- a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
++++ b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
+@@ -775,11 +775,11 @@ static int vidioc_g_crop(struct file *file, void *priv,
+ 	u32 left, right, top, bottom;
+ 
+ 	if (ctx->state != MFCINST_HEAD_PARSED &&
+-	ctx->state != MFCINST_RUNNING && ctx->state != MFCINST_FINISHING
+-					&& ctx->state != MFCINST_FINISHED) {
+-			mfc_err("Cannont set crop\n");
+-			return -EINVAL;
+-		}
++	    ctx->state != MFCINST_RUNNING && ctx->state != MFCINST_FINISHING
++	    && ctx->state != MFCINST_FINISHED) {
++		mfc_err("Can not get crop information\n");
++		return -EINVAL;
++	}
+ 	if (ctx->src_fmt->fourcc == V4L2_PIX_FMT_H264) {
+ 		left = s5p_mfc_hw_call(dev->mfc_ops, get_crop_info_h, ctx);
+ 		right = left >> S5P_FIMV_SHARED_CROP_RIGHT_SHIFT;
+-- 
+2.7.4
