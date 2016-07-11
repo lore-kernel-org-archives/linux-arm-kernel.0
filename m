@@ -1,30 +1,72 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 11 Jul 2016 17:46:34 +0200
-Subject: [PATCH v2 02/10] irqchip: add irqchip driver for nuc900
-In-Reply-To: <1468135649-19980-3-git-send-email-vw@iommu.org>
-References: <1468135649-19980-1-git-send-email-vw@iommu.org>
- <1468135649-19980-3-git-send-email-vw@iommu.org>
-Message-ID: <1761342.TGgYi16yul@wuerfel>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Mon, 11 Jul 2016 16:43:47 +0100
+Subject: Tegra baseline test results for v4.7-rc7
+Message-ID: <5783BEB3.7010204@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday, July 10, 2016 3:27:22 PM CEST Wan Zongshun wrote:
-> +
-> +#if !defined(CONFIG_SOC_NUC900)
->  #define NR_IRQS                (IRQ_ADC+1)
-> +#else
-> +#define NR_IRQS                62
-> +#endif
->  
+Here are some basic Tegra test results for Linux v4.7-rc7.
+Logs and other details at:
 
-The Kconfig symbols are a bit confusing here: CONFIG_SOC_NUC900
-controls the compilation of the soc_device driver, but I guess
-what you actually mean here is CONFIG_SOC_NUC970, which is the
-support for the actual chip.
+    https://nvtb.github.io//linux/test_v4.7-rc7/20160710210103/
 
-Maybe rename the former to something less confusing and change
-this to CONFIG_SOC_NUC970?
 
-Ideally, this should just go away once we use SPARSE_IRQ.
+Test summary
+------------
 
-	Arnd
+Build: zImage:
+    Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
+
+Build: Image:
+    Pass: ( 1/ 1): defconfig
+
+Boot to userspace: defconfig:
+    Pass: ( 4/ 4): qemu-vexpress64, tegra132-norrin,
+		   tegra210-p2371-0000, tegra210-smaug
+
+Boot to userspace: multi_v7_defconfig:
+    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+
+Boot to userspace: tegra_defconfig:
+    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+
+PM: System suspend: multi_v7_defconfig:
+    FAIL: ( 1/ 5): tegra30-beaver
+    Pass: ( 4/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra124-nyan-big, tegra20-trimslice
+
+PM: System suspend: tegra_defconfig:
+    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+
+
+vmlinux object size
+(delta in bytes from test_v4.7-rc6 (a99cde438de0c4c0cecc1d1af1a55a75b10bfdef)):
+   text     data      bss    total  kernel
+   +261     +128        0     +389  defconfig
+  +1353      +64        0    +1417  multi_v7_defconfig
+  +1289        0        0    +1289  tegra_defconfig
+
+
+Boot-time memory difference
+(delta in bytes from test_v4.7-rc6 (a99cde438de0c4c0cecc1d1af1a55a75b10bfdef))
+    avail    rsrvd     high    freed                board              kconfig                  dtb
+        .        .        .        .      qemu-vexpress64            defconfig           __internal
+        .        .        .        . tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
+        .        .        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
+        .        .        .        .  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
+        .        .        .        .  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
+        .        .        .        .    tegra124-nyan-big   multi_v7_defconfig    tegra124-nyan-big
+        .        .        .        .    tegra124-nyan-big      tegra_defconfig    tegra124-nyan-big
+        .        .        .        .      tegra132-norrin            defconfig      tegra132-norrin
+        .        .        .        .    tegra20-trimslice   multi_v7_defconfig    tegra20-trimslice
+        .        .        .        .    tegra20-trimslice      tegra_defconfig    tegra20-trimslice
+        .        .        .        .  tegra210-p2371-0000            defconfig  tegra210-p2371-0000
+        .        .        .        .       tegra210-smaug            defconfig       tegra210-smaug
+        .        .        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
+        .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
+
+--
+nvpublic
