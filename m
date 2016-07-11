@@ -1,101 +1,71 @@
-From: atull@opensource.altera.com (atull)
-Date: Mon, 11 Jul 2016 11:59:08 -0500
-Subject: FPGA manager user space interface
-In-Reply-To: <5782BE1A.9090905@gmail.com>
-References: <5782BE1A.9090905@gmail.com>
-Message-ID: <alpine.DEB.2.02.1607111014500.11060@linuxheads99>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 11 Jul 2016 19:08:13 +0200
+Subject: [PATCH] RFC: ARM: fix the uaccess crash on PB11MPCore
+Message-ID: <1468256893-12811-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 10 Jul 2016, Florian Fainelli wrote:
+The following patch was sketched by Russell in response to my
+crashes on the PB11MPCore after the patch for software-based
+priviledged no access support for ARMv8.1. See this thread:
+http://marc.info/?l=linux-arm-kernel&m=144051749807214&w=2
 
-Hi Florian,
+I am unsure what is going on, I suspect everyone involved in
+the discussion is. I just want to repost this to get the
+discussion restarted, as I still have to apply this patch
+with every kernel iteration to get my PB11MPCore Realview
+running.
 
-I'm in the process of upstreaming FPGA Regions support which
-allows reprogramming by applying Device Tree Overlays.  If you
-want to see a tree which has the latest patches for that, I have
-all that in our github tree.
+I also know that Oxnas has actual, mass-deployed NAS (PogoPlug
+Pro variants) using PB11MPCore, and that they may or may not
+be seeing the same issue so I want their feedback on this: do
+you or do you not see this with mainline, or have you not even
+tested?
 
-https://github.com/altera-opensource/linux-socfpga/tree/socfpga-4.6
+Cc: Russell King <linux@armlinux.org.uk>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Neil Armstrong <narmstrong@baylibre.com>
+Fixes: a5e090acbf54 ("ARM: software-based priviledged-no-access support")
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/kernel/smp_tlb.c | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-The documentation for the DT overlays is in
- Documentation/devicetree/bindings/fpga/fpga-region.txt
-
-Documentation for the DT configfs interface is in
- Documentation/devicetree/configfs-overlays.txt
-
-The idea here is explained at legnth in the doc, but basically
-the user can use the configfs interface to apply a DT
-overlay that causes the FPGA to be reprogrammed and child
-devices to get added and probed.
-
-I like DT overlays a lot, but I do not expect that (or anything
-else) will be a good interface for every use case.  The FPGA
-Manager Framework went through a legnthy discussion on the
-mailing list where several people wanted the interface to match
-what they were already using.  Interfaces similar to what you
-suggest below were proposed and shot down.  My conclusion from
-all that was to implement the kernel API functions such that
-people could add whatever interfaces they needed for their use
-case.
-
-
-> Hi all,
-> 
-> I just wrote a FPGA manager driver for the TS-7300 board which features
-> an Altera Cyclone II on board. While the finished solution is my case
-> might be something like the MFD driver for the FPGA devices requesting
-> the bitstream load and registering the different devices it exposes,
-> during development it is nice to exercise the FPGA manager driver to
-> load something:
-
-It sounds like your goal is to use the FPGA Manager API inside
-the kernel, but it would be helpful to have an easy userspace
-interface during development.  Is that right?
-
-> 
-> - a quick way is to add a pair of sysfs attributes to define the
-> bitstream filename and to trigger the load
-> 
-> - offer a more consistent and robust interface through e.g; a character
-> device that you can write/read/poll to see the loading progress about
-
-Sysfs and char driver interfaces have been proposed and shot down
-a few times already.
-
-The first version of the FPGA Manager Framework was a char
-driver.  To program the FPGA, the user had to do 'cat
-bitstream-file > /dev/fpga0'.  Bridge support was a separate
-thing that was also controlled by sysfs.  It was messy and if
-userspace could easily do the wrong thing and crash the system.
-
-> 
-> - have the driver exposing FPGA peripherals be exposing an user space
-> interface to trigger a (re)load/(re)/configuration, although that's
-> really something that belongs in the FPGA manager it seems
-
-If you use the device tree configfs interface, you can do that.
-It might not be exactly what you are thinking of.  And there is
-a learning curve in getting the overlays right.
-
-> 
-> I am mostly curious if these were taken into account during the initial
-> design and it is agreed upon that yes these are some of options and that
-> userspace loading is just anecdotal we do not need any userspace
-> interface, or if this is just missing and we want one?
-
-There will be use cases that will need various userspace interfaces.
-It's been hard to get people who are already using FPGAs to agree
-on using any one interface because they would have to change the
-code they already have running.
-
-> Either way, I
-> don't mind submitting what I came up with for the TS-7300 board.
-
-Yes, that would be great.
-
-> 
-> Thanks!
-> --
-> Florian
-> 
+diff --git a/arch/arm/kernel/smp_tlb.c b/arch/arm/kernel/smp_tlb.c
+index 2e72be4f623e..7cb079e74010 100644
+--- a/arch/arm/kernel/smp_tlb.c
++++ b/arch/arm/kernel/smp_tlb.c
+@@ -9,6 +9,7 @@
+  */
+ #include <linux/preempt.h>
+ #include <linux/smp.h>
++#include <linux/uaccess.h>
+ 
+ #include <asm/smp_plat.h>
+ #include <asm/tlbflush.h>
+@@ -40,8 +41,11 @@ static inline void ipi_flush_tlb_mm(void *arg)
+ static inline void ipi_flush_tlb_page(void *arg)
+ {
+ 	struct tlb_args *ta = (struct tlb_args *)arg;
++	unsigned int __ua_flags = uaccess_save_and_enable();
+ 
+ 	local_flush_tlb_page(ta->ta_vma, ta->ta_start);
++
++	uaccess_restore(__ua_flags);
+ }
+ 
+ static inline void ipi_flush_tlb_kernel_page(void *arg)
+@@ -54,8 +58,11 @@ static inline void ipi_flush_tlb_kernel_page(void *arg)
+ static inline void ipi_flush_tlb_range(void *arg)
+ {
+ 	struct tlb_args *ta = (struct tlb_args *)arg;
++	unsigned int __ua_flags = uaccess_save_and_enable();
+ 
+ 	local_flush_tlb_range(ta->ta_vma, ta->ta_start, ta->ta_end);
++
++	uaccess_restore(__ua_flags);
+ }
+ 
+ static inline void ipi_flush_tlb_kernel_range(void *arg)
+-- 
+2.7.4
