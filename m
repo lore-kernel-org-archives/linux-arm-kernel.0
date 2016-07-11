@@ -1,29 +1,33 @@
-From: k.kozlowski.k@gmail.com (Krzysztof Kozlowski)
-Date: Mon, 11 Jul 2016 17:47:19 +0200
-Subject: [PATCH] ARM: s3c64xx: smartq: Avoid sparse warnings
-In-Reply-To: <20160711084836.12835-1-thierry.reding@gmail.com>
-References: <20160711084836.12835-1-thierry.reding@gmail.com>
-Message-ID: <20160711154719.GA7702@kozik-lap>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Mon, 11 Jul 2016 17:50:16 +0200
+Subject: [PATCH v8 4/4] serial: pl011: add console matching function
+In-Reply-To: <5783AFDE.1090408@gmail.com>
+References: <1463749405-11640-1-git-send-email-aleksey.makarov@linaro.org>
+ <1463749405-11640-5-git-send-email-aleksey.makarov@linaro.org>
+ <20160622121813.GA20023@yury-N73SV>
+ <7CC4D455-323E-4B33-A931-2104E2DDDC0D@hurleysoftware.com>
+ <20160622204548.GB28766@yury-N73SV> <5783AFDE.1090408@gmail.com>
+Message-ID: <5783C038.5070504@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 11, 2016 at 10:48:36AM +0200, Thierry Reding wrote:
-> From: Thierry Reding <treding@nvidia.com>
-> 
-> The smartq_map_io() and smartq_machine_init() functions are used by both
-> SmartQ 5 and SmartQ 7 machines and exported via the mach-smartq.h header
-> file. However that header file is not included by the mach-smartq.c file
-> that implements them, causing sparse warnings.
-> 
-> Include mach-smartq.h from mach-smartq.c to fix these warnings.
-> 
-> Signed-off-by: Thierry Reding <treding@nvidia.com>
-> ---
->  arch/arm/mach-s3c64xx/mach-smartq.c | 1 +
->  1 file changed, 1 insertion(+)
+
+
+On 11/07/16 16:40, Matthias Brugger wrote:
+
+>
+> I tried to apply these patches against linux-next. They needed some
+> changes to apply, which is quite normal after such a long time. Apart
+> from that the DBG2 subtype patch didn't end up in mainline, so this
+> patches do not compile.
+>
+> I followed up on that on the corresponding thread. Please don't forget
+> to pin-point in the introduction mail to any other series which is
+> needed for your patches to compile/work.
 >
 
-Thanks, applied.
+Ok, I sorted out, that the DBG2 subtypes actually are part of mainline 
+and that I screwed up my branches.
 
-Best regards,
-Krzysztof
+Sorry for the noise.
+Matthias
