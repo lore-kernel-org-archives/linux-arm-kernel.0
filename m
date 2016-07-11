@@ -1,112 +1,122 @@
-From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Mon, 11 Jul 2016 10:05:39 -0500
-Subject: [PATCH 08/11] arm64: pmu: Provide cpumask attribute for PMU
-In-Reply-To: <20160707162103.GD9270@leverpostej>
-References: <1466529109-21715-1-git-send-email-jeremy.linton@arm.com>
- <1466529109-21715-9-git-send-email-jeremy.linton@arm.com>
- <20160707162103.GD9270@leverpostej>
-Message-ID: <5783B5C3.8090000@arm.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Mon, 11 Jul 2016 16:06:54 +0100
+Subject: [PATCH v2 5/6] arm64/dma-mapping: Implement
+ DMA_ATTR_PRIVILEGED_EXECUTABLE
+In-Reply-To: <20160709020919.6760-6-mitchelh@codeaurora.org>
+References: <20160709020919.6760-1-mitchelh@codeaurora.org>
+ <20160709020919.6760-6-mitchelh@codeaurora.org>
+Message-ID: <5783B60E.3050907@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 09/07/16 03:09, Mitchel Humpherys wrote:
+> The newly added DMA_ATTR_PRIVILEGED_EXECUTABLE is useful for creating
+> mappings that are executable by privileged DMA engines.  Implement it in
+> dma-iommu.c so that the ARM64 DMA IOMMU mapper can make use of it.
+> 
+> Signed-off-by: Mitchel Humpherys <mitchelh@codeaurora.org>
+> ---
+>  arch/arm64/mm/dma-mapping.c |  6 +++---
+>  drivers/iommu/dma-iommu.c   | 15 +++++++++++----
+>  include/linux/dma-iommu.h   |  3 ++-
+>  3 files changed, 16 insertions(+), 8 deletions(-)
+> 
+> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+> index c566ec83719f..44f676268df6 100644
+> --- a/arch/arm64/mm/dma-mapping.c
+> +++ b/arch/arm64/mm/dma-mapping.c
+> @@ -543,7 +543,7 @@ static void *__iommu_alloc_attrs(struct device *dev, size_t size,
+>  				 struct dma_attrs *attrs)
+>  {
+>  	bool coherent = is_device_dma_coherent(dev);
+> -	int ioprot = dma_direction_to_prot(DMA_BIDIRECTIONAL, coherent);
+> +	int ioprot = dma_direction_to_prot(DMA_BIDIRECTIONAL, coherent, attrs);
+>  	size_t iosize = size;
+>  	void *addr;
+>  
+> @@ -697,7 +697,7 @@ static dma_addr_t __iommu_map_page(struct device *dev, struct page *page,
+>  				   struct dma_attrs *attrs)
+>  {
+>  	bool coherent = is_device_dma_coherent(dev);
+> -	int prot = dma_direction_to_prot(dir, coherent);
+> +	int prot = dma_direction_to_prot(dir, coherent, attrs);
+>  	dma_addr_t dev_addr = iommu_dma_map_page(dev, page, offset, size, prot);
+>  
+>  	if (!iommu_dma_mapping_error(dev, dev_addr) &&
+> @@ -755,7 +755,7 @@ static int __iommu_map_sg_attrs(struct device *dev, struct scatterlist *sgl,
+>  		__iommu_sync_sg_for_device(dev, sgl, nelems, dir);
+>  
+>  	return iommu_dma_map_sg(dev, sgl, nelems,
+> -			dma_direction_to_prot(dir, coherent));
+> +			dma_direction_to_prot(dir, coherent, attrs));
+>  }
+>  
+>  static void __iommu_unmap_sg_attrs(struct device *dev,
+> diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
+> index ea5a9ebf0f78..ccc6219da228 100644
+> --- a/drivers/iommu/dma-iommu.c
+> +++ b/drivers/iommu/dma-iommu.c
+> @@ -132,23 +132,30 @@ EXPORT_SYMBOL(iommu_dma_init_domain);
+>   * dma_direction_to_prot - Translate DMA API directions to IOMMU API page flags
 
-On 07/07/2016 11:21 AM, Mark Rutland wrote:
-> Hi Jeremy,
->
-> Apologies for the late reply on this.
->
-> On Tue, Jun 21, 2016 at 12:11:46PM -0500, Jeremy Linton wrote:
->> With heterogeneous PMUs its helpful to know which PMUs are bound
->> to each CPU. Provide that information with a cpumask sysfs entry
->> similar to other PMUs.
->
-> Have you tested trying to stat on a particular PMU? e.g.
->
-> $ perf stat -e armv8_cortex_a53/cpu_cycles/ ls
->
-> I found that the presence of a cpumask file would cause (at least some
-> versions) of perf-stat to hang, and was holding off adding a cpumask
-> until we had a solution to that.
+Privilege really isn't a direction :(
 
-Nice!
+If we're going to cram more into this function it really wants renaming
+and redocumenting.
 
-I guess that is more proof that any tiny change can break things.. 
-Another "fix" is to make the cpumap_print_to_pagebuf's first parameter 
-false which apparently keeps perf from understanding the cpu mask and 
-forces the user to use numactl, which is ugly because numactrl doesn't 
-understand the mask in that format either.
+>   * @dir: Direction of DMA transfer
+>   * @coherent: Is the DMA master cache-coherent?
+> + * @attrs: DMA attributes for the mapping
+>   *
+>   * Return: corresponding IOMMU API page protection flags
+>   */
+> -int dma_direction_to_prot(enum dma_data_direction dir, bool coherent)
+> +int dma_direction_to_prot(enum dma_data_direction dir, bool coherent,
+> +			  struct dma_attrs *attrs)
+>  {
+>  	int prot = coherent ? IOMMU_CACHE : 0;
+>  
+>  	switch (dir) {
+>  	case DMA_BIDIRECTIONAL:
+> -		return prot | IOMMU_READ | IOMMU_WRITE;
+> +		prot |= IOMMU_READ | IOMMU_WRITE;
+>  	case DMA_TO_DEVICE:
+> -		return prot | IOMMU_READ;
+> +		prot |= IOMMU_READ;
+>  	case DMA_FROM_DEVICE:
+> -		return prot | IOMMU_WRITE;
+> +		prot |= IOMMU_WRITE;
+>  	default:
+>  		return 0;
+>  	}
+> +	if (dma_get_attr(DMA_ATTR_PRIVILEGED_EXECUTABLE, attrs)) {
+> +		prot &= ~IOMMU_WRITE;
 
-I guess fixing perf is probably the best bet here...
+Hey, we didn't say anything anywhere about anything being privileged
+read-only! Frankly, I think this is going to create more problems that
+it solves. Implementing IOMMU_PRIV as simply unprivileged no-access
+should be sufficient.
 
+Robin.
 
-
->
-> See [1,2] for more details on that.
->
->> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
->> ---
->>   arch/arm64/kernel/perf_event.c | 21 +++++++++++++++++++++
->>   1 file changed, 21 insertions(+)
->
-> This should be generic across the arm-pmu code, and so should live under
-> drivers/perf/.
-
-Which is where i had it initially, but (IIRC) getting to work there 
-required some core pmu changes that seemed a little ugly. I guess I 
-didn't like the idea of reallocating the per pmu attr group or tweaking 
-the pmu core code.. So I just moved it into perf_event where it fit more 
-naturally.
-
-
-
->
-> Thanks,
-> Mark.
->
-> [1] http://lkml.kernel.org/r/1467907474-3290-1-git-send-email-mark.rutland at arm.com
-> [2] http://lkml.kernel.org/r/1467907474-3290-2-git-send-email-mark.rutland at arm.com
->
->> diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
->> index 356fa6c..dae73ea 100644
->> --- a/arch/arm64/kernel/perf_event.c
->> +++ b/arch/arm64/kernel/perf_event.c
->> @@ -533,6 +533,26 @@ static struct attribute_group armv8_pmuv3_events_attr_group = {
->>
->>   PMU_FORMAT_ATTR(event, "config:0-9");
->>
->> +static ssize_t
->> +cpumask_show(struct device *dev, struct device_attribute *attr, char *page)
->> +{
->> +	struct pmu *pmu = dev_get_drvdata(dev);
->> +	struct arm_pmu *cpu_pmu = container_of(pmu, struct arm_pmu, pmu);
->> +
->> +	return cpumap_print_to_pagebuf(true, page, &cpu_pmu->supported_cpus);
->> +}
->> +static DEVICE_ATTR_RO(cpumask);
->> +
->> +static struct attribute *armv8_pmuv3_attrs[] = {
->> +	 &dev_attr_cpumask.attr,
->> +	 NULL,
->> +};
->> +
->> +static struct attribute_group armv8_pmuv3_attr_group = {
->> +	.attrs = armv8_pmuv3_attrs,
->> +};
->> +
->> +
->>   static struct attribute *armv8_pmuv3_format_attrs[] = {
->>   	&format_attr_event.attr,
->>   	NULL,
->> @@ -544,6 +564,7 @@ static struct attribute_group armv8_pmuv3_format_attr_group = {
->>   };
->>
->>   static const struct attribute_group *armv8_pmuv3_attr_groups[] = {
->> +	&armv8_pmuv3_attr_group,
->>   	&armv8_pmuv3_events_attr_group,
->>   	&armv8_pmuv3_format_attr_group,
->>   	NULL,
->> --
->> 2.5.5
->>
->
+> +		prot |= IOMMU_PRIV;
+> +	}
+> +	return prot;
+>  }
+>  
+>  static struct iova *__alloc_iova(struct iova_domain *iovad, size_t size,
+> diff --git a/include/linux/dma-iommu.h b/include/linux/dma-iommu.h
+> index 8443bbb5c071..d5a37e58d29b 100644
+> --- a/include/linux/dma-iommu.h
+> +++ b/include/linux/dma-iommu.h
+> @@ -32,7 +32,8 @@ void iommu_put_dma_cookie(struct iommu_domain *domain);
+>  int iommu_dma_init_domain(struct iommu_domain *domain, dma_addr_t base, u64 size);
+>  
+>  /* General helpers for DMA-API <-> IOMMU-API interaction */
+> -int dma_direction_to_prot(enum dma_data_direction dir, bool coherent);
+> +int dma_direction_to_prot(enum dma_data_direction dir, bool coherent,
+> +			  struct dma_attrs *attrs);
+>  
+>  /*
+>   * These implement the bulk of the relevant DMA mapping callbacks, but require
+> 
