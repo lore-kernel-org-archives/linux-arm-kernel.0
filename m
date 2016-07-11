@@ -1,28 +1,24 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 11 Jul 2016 09:54:05 +0200
-Subject: [PATCH] pinctrl: uniphier: add Ethernet pin-mux settings
-In-Reply-To: <1467817932-7034-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1467817932-7034-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <CACRpkdaSLbPRwCuZiUaM5E9WUtQtCjDrtjfXWh-tqQ6Ne2od0w@mail.gmail.com>
+Date: Mon, 11 Jul 2016 09:55:35 +0200
+Subject: [PATCH -next] pinctrl: nsp: remove redundant dev_err call in
+ nsp_pinmux_probe()
+In-Reply-To: <1467806571-23811-1-git-send-email-weiyj_lk@163.com>
+References: <1467806571-23811-1-git-send-email-weiyj_lk@163.com>
+Message-ID: <CACRpkdbcqjUFfThB_6mT0fYQca6VsLRAk1c1nTCEwptvPfqMjQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 6, 2016 at 5:12 PM, Masahiro Yamada
-<yamada.masahiro@socionext.com> wrote:
+On Wed, Jul 6, 2016 at 2:02 PM,  <weiyj_lk@163.com> wrote:
 
-> Add the following Ethernet interfaces:
+> From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 >
->   PH1-LD4: MII, RMII
->   PH1-Pro4: MII, RMII, RGMII
->   PH1-sLD8: MII, RMII (Built-in PHY is also supported)
->   ProXstream2: MII, RMII, RGMII
->   PH1-LD6b: RMII, RGMII
->   PH1-LD11: RMII (Built-in PHY is also supported)
->   PH1-LD20: RMII, RGMII
+> There is a error message within devm_ioremap_resource
+> already, so remove the dev_err call to avoid redundant
+> error message.
 >
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 
-Patch applied.
+Patch applied with Ray's ACK.
 
 Yours,
 Linus Walleij
