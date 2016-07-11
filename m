@@ -1,73 +1,65 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 11 Jul 2016 14:50:07 -0700
-Subject: [PATCH 1/3] regulator: qcom_smd: Fix voltage ranges for pm8x41
-In-Reply-To: <20160711215009.4519-1-sboyd@codeaurora.org>
-References: <20160711215009.4519-1-sboyd@codeaurora.org>
-Message-ID: <20160711215009.4519-2-sboyd@codeaurora.org>
+From: d-gerlach@ti.com (Dave Gerlach)
+Date: Mon, 11 Jul 2016 16:50:12 -0500
+Subject: [PATCH] Revert "ARM: AM33xx: fix module_wait_ready without
+ clkctrl register"
+In-Reply-To: <578412ED.7020707@ti.com>
+References: <20160711213938.28385-1-d-gerlach@ti.com> <578412ED.7020707@ti.com>
+Message-ID: <57841494.5040401@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The voltage ranges listed here are wrong. The correct ranges can
-be seen in the "native" spmi regulator driver
-qcom_spmi-regulator.c at pldo_ranges[], ftsmps_ranges[] and
-boost_ranges[] for the pldo, ftsmps, and boost type regulators.
-Port these ranges over to the RPM SMD regulator driver so that we
-list the appropriate set of supported voltages on pldos.
+On 07/11/2016 04:43 PM, Dave Gerlach wrote:
+> Hi,
+> On 07/11/2016 04:39 PM, Dave Gerlach wrote:
+>> This reverts commit 183e2077d007aa4b697efba095ecfea7244a6107.
+>>
+>
+> This is a fix for an external abort seen on am335x platforms during boot
+> on next-20160711. The offending patch was merged to next on
+> next-20160705 and I haven't seen any ill effects from reverting it with
+> this patch, and the external abort goes away entirely with it reverted.
+>
 
-Doing this allows us to specify a voltage like 3075000 for l24,
-whereas before that wasn't a supported voltage.
+Failure can be seen here [1].
 
-Cc: Andy Gross <andy.gross@linaro.org>
-Cc: Bjorn Andersson <bjorn.andersson@linaro.org>
-Fixes: da65e367b67e ("regulator: Regulator driver for the Qualcomm RPM")
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- drivers/regulator/qcom_smd-regulator.c | 17 +++++++++--------
- 1 file changed, 9 insertions(+), 8 deletions(-)
+Regards,
+Dave
 
-diff --git a/drivers/regulator/qcom_smd-regulator.c b/drivers/regulator/qcom_smd-regulator.c
-index 6c7fe4778793..6aa6435b3922 100644
---- a/drivers/regulator/qcom_smd-regulator.c
-+++ b/drivers/regulator/qcom_smd-regulator.c
-@@ -221,29 +221,30 @@ static const struct regulator_desc pm8x41_hfsmps = {
- static const struct regulator_desc pm8841_ftsmps = {
- 	.linear_ranges = (struct regulator_linear_range[]) {
- 		REGULATOR_LINEAR_RANGE(350000,  0, 184, 5000),
--		REGULATOR_LINEAR_RANGE(700000, 185, 339, 10000),
-+		REGULATOR_LINEAR_RANGE(1280000, 185, 261, 10000),
- 	},
- 	.n_linear_ranges = 2,
--	.n_voltages = 340,
-+	.n_voltages = 262,
- 	.ops = &rpm_smps_ldo_ops,
- };
- 
- static const struct regulator_desc pm8941_boost = {
- 	.linear_ranges = (struct regulator_linear_range[]) {
--		REGULATOR_LINEAR_RANGE(4000000, 0, 15, 100000),
-+		REGULATOR_LINEAR_RANGE(4000000, 0, 30, 50000),
- 	},
- 	.n_linear_ranges = 1,
--	.n_voltages = 16,
-+	.n_voltages = 31,
- 	.ops = &rpm_smps_ldo_ops,
- };
- 
- static const struct regulator_desc pm8941_pldo = {
- 	.linear_ranges = (struct regulator_linear_range[]) {
--		REGULATOR_LINEAR_RANGE( 750000,  0,  30, 25000),
--		REGULATOR_LINEAR_RANGE(1500000, 31, 99, 50000),
-+		REGULATOR_LINEAR_RANGE( 750000,  0,  63, 12500),
-+		REGULATOR_LINEAR_RANGE(1550000, 64, 126, 25000),
-+		REGULATOR_LINEAR_RANGE(3100000, 127, 163, 50000),
- 	},
--	.n_linear_ranges = 2,
--	.n_voltages = 100,
-+	.n_linear_ranges = 3,
-+	.n_voltages = 164,
- 	.ops = &rpm_smps_ldo_ops,
- };
- 
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+[1] 
+https://storage.kernelci.org/next/next-20160711/arm-omap2plus_defconfig/lab-baylibre-seattle/boot-am335x-boneblack.html
+
+> Regards,
+> Dave
+>
+>> The original patch added a check to am33xx_cm_wait_module_ready for a
+>> clkctrl offset of 0 as an invalid case, however, clkctrl offset of 0 is
+>> perfectly valid for hwmods, in particular the rtc.
+>>
+>> Without reverting this patch sometimes external aborts are seen on
+>> am335x during boot. This is due to the am33xx_cm_wait_module_ready
+>> function immediately returning 0 rather than waiting for the RTC_CLKCTRL
+>> register to indicate it is actually ready before rtc register accesses
+>> happen.
+>>
+>> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+>> ---
+>>   arch/arm/mach-omap2/cm33xx.c | 3 ---
+>>   1 file changed, 3 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-omap2/cm33xx.c b/arch/arm/mach-omap2/cm33xx.c
+>> index c073fb57dd13..7b181f929525 100644
+>> --- a/arch/arm/mach-omap2/cm33xx.c
+>> +++ b/arch/arm/mach-omap2/cm33xx.c
+>> @@ -220,9 +220,6 @@ static int am33xx_cm_wait_module_ready(u8 part,
+>> s16 inst, u16 clkctrl_offs,
+>>   {
+>>       int i = 0;
+>>
+>> -    if (!clkctrl_offs)
+>> -        return 0;
+>> -
+>>       omap_test_timeout(_is_module_ready(inst, clkctrl_offs),
+>>                 MAX_MODULE_READY_TIME, i);
+>>
+>>
+>
