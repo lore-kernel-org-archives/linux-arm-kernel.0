@@ -1,47 +1,46 @@
-From: dawei.chien@mediatek.com (dawei chien)
-Date: Mon, 11 Jul 2016 16:52:04 +0800
-Subject: [PATCH 1/3] dt-bindings: thermal: Add binding document for
- Mediatek thermal controller
-In-Reply-To: <577E385C.9080501@ti.com>
-References: <1467882386-40544-1-git-send-email-dawei.chien@mediatek.com>
- <1467882386-40544-2-git-send-email-dawei.chien@mediatek.com>
- <577E385C.9080501@ti.com>
-Message-ID: <1468227124.15776.29.camel@mtksdaap41>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 11 Jul 2016 10:55:23 +0200
+Subject: [PATCH v2 1/3] pwm: lpc32xx: Set PWM_PIN_LEVEL bit to default
+ value
+In-Reply-To: <1467032997-5340-2-git-send-email-slemieux.tyco@gmail.com>
+References: <1467032997-5340-1-git-send-email-slemieux.tyco@gmail.com>
+ <1467032997-5340-2-git-send-email-slemieux.tyco@gmail.com>
+Message-ID: <20160711085523.GC5823@ulmo.ba.sec>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Keerthy,
-
-On Thu, 2016-07-07 at 16:39 +0530, Keerthy wrote:
+On Mon, Jun 27, 2016 at 09:09:55AM -0400, Sylvain Lemieux wrote:
+> From: Sylvain Lemieux <slemieux@tycoint.com>
 > 
-> On Thursday 07 July 2016 02:36 PM, Dawei Chien wrote:
-> > This adds the device tree binding documentation for the mediatek thermal
-> > controller found on Mediatek MT2701.
-> >
-> > Signed-off-by: Dawei Chien <dawei.chien@mediatek.com>
-> > ---
-> >   .../bindings/thermal/mediatek-thermal.txt          |    2 +-
-> >   1 file changed, 1 insertion(+), 1 deletion(-)
-> >
-> > diff --git a/Documentation/devicetree/bindings/thermal/mediatek-thermal.txt b/Documentation/devicetree/bindings/thermal/mediatek-thermal.txt
-> > index 81f9a51..bb55e79 100644
-> > --- a/Documentation/devicetree/bindings/thermal/mediatek-thermal.txt
-> > +++ b/Documentation/devicetree/bindings/thermal/mediatek-thermal.txt
-> > @@ -8,7 +8,7 @@ apmixedsys register space via AHB bus accesses, so a phandle to the APMIXEDSYS
-> >   is also needed.
-> >
-> >   Required properties:
-> > -- compatible: "mediatek,mt8173-thermal"
-> > +- compatible: "mediatek,mt8173-thermal" or "mediatek,mt2701-thermal"
+> The PWM_PIN_LEVEL bit is leave unset by the kernel PWM driver.
 > 
-> - compatible :
->   - "mediatek,mt8173-thermal" : For MT8173 family of SoCs
->   - "mediatek,mt2701-thermal" : For MT2701 family of SoCs
-
-Thank you, I will update it on next version.
-
+> Prior to commit 08ee77b5a5de27ad63c92262ebcb4efe0da93b58,
+> the PWM_PIN_LEVEL bit was always clear when the PWM was disable
+> and a 0 logic level was apply to the output.
 > 
-> >   - reg: Address range of the thermal controller
-> >   - interrupts: IRQ for the thermal controller
-> >   - clocks, clock-names: Clocks needed for the thermal controller. required
-> >
+> According to the LPC32x0 User Manual [1],
+> the default value for bit 30 (PWM_PIN_LEVEL) is 0.
+> 
+> This change initialize the pin level to 0 (default value) and
+> update the register value accordingly.
+> 
+> [1] http://www.nxp.com/documents/user_manual/UM10326.pdf
+> 
+> Signed-off-by: Sylvain Lemieux <slemieux@tycoint.com>
+> ---
+> Changes from v1 to v2:
+> * Only setup the "PWMx_PIN_LEVEL" once on probe.
+> 
+>  drivers/pwm/pwm-lpc32xx.c | 7 +++++++
+>  1 file changed, 7 insertions(+)
+
+Applied, thanks.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160711/1096e082/attachment.sig>
