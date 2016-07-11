@@ -1,27 +1,33 @@
 From: weiqing.kong@mediatek.com (Weiqing Kong)
-Date: Mon, 11 Jul 2016 16:18:06 +0800
-Subject: [PATCH V2 0/3] Support Mediatek Soc MT2701 disp pwm
-Message-ID: <1468225089-28576-1-git-send-email-weiqing.kong@mediatek.com>
+Date: Mon, 11 Jul 2016 16:18:07 +0800
+Subject: [PATCH V2 1/3] dt-bindings: pwm: Add MediaTek display PWM bindings
+In-Reply-To: <1468225089-28576-1-git-send-email-weiqing.kong@mediatek.com>
+References: <1468225089-28576-1-git-send-email-weiqing.kong@mediatek.com>
+Message-ID: <1468225089-28576-2-git-send-email-weiqing.kong@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These series patches modify pwm-mtk-disp.c
-and dts/dtsi config to support MT2701 disp pwm.
+Add MT2701 compatible string.
 
-Changes since v1:
-- Change dtsi compatible string "mediatek,mt2701-disp-bls" into "mediatek,mt2701-disp-pwm"
-- Change some macros into struct mtk_pwm_data
+Signed-off-by: Weiqing Kong <weiqing.kong@mediatek.com>
+---
+ Documentation/devicetree/bindings/pwm/pwm-mtk-disp.txt | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-Weiqing Kong (3):
-  dt-bindings: pwm: Add MediaTek display PWM bindings
-  pwm: Add MediaTek MT2701 display PWM driver support
-  dts: Add disp bls dtsi and dts config for MT2701
-
- .../devicetree/bindings/pwm/pwm-mtk-disp.txt       |  3 +-
- arch/arm/boot/dts/mt2701-evb.dts                   | 29 +++++++
- arch/arm/boot/dts/mt2701.dtsi                      |  9 ++
- drivers/pwm/pwm-mtk-disp.c                         | 99 +++++++++++++++++-----
- 4 files changed, 120 insertions(+), 20 deletions(-)
-
+diff --git a/Documentation/devicetree/bindings/pwm/pwm-mtk-disp.txt b/Documentation/devicetree/bindings/pwm/pwm-mtk-disp.txt
+index f8f59ba..6f8af2b 100644
+--- a/Documentation/devicetree/bindings/pwm/pwm-mtk-disp.txt
++++ b/Documentation/devicetree/bindings/pwm/pwm-mtk-disp.txt
+@@ -2,8 +2,9 @@ MediaTek display PWM controller
+ 
+ Required properties:
+  - compatible: should be "mediatek,<name>-disp-pwm":
+-   - "mediatek,mt8173-disp-pwm": found on mt8173 SoC.
++   - "mediatek,mt2701-disp-pwm": found on mt2701 SoC.
+    - "mediatek,mt6595-disp-pwm": found on mt6595 SoC.
++   - "mediatek,mt8173-disp-pwm": found on mt8173 SoC.
+  - reg: physical base address and length of the controller's registers.
+  - #pwm-cells: must be 2. See pwm.txt in this directory for a description of
+    the cell format.
 -- 
 1.8.1.1.dirty
