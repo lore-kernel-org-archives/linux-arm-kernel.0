@@ -1,34 +1,44 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 11 Jul 2016 22:07:54 +0100
-Subject: [PATCH V8 1/2] regulator: Add document for MT6323 regulator
-In-Reply-To: <c1acbf13-93a0-4257-ee48-4885a87fede5@phrozen.org>
-References: <1468240179-7558-1-git-send-email-john@phrozen.org>
- <20160711180805.GG3701@sirena.org.uk>
- <cef78bd8-9a4a-e848-d7cb-13a27127f11e@phrozen.org>
- <20160711192211.GI3701@sirena.org.uk>
- <c1acbf13-93a0-4257-ee48-4885a87fede5@phrozen.org>
-Message-ID: <20160711210754.GA9976@sirena.org.uk>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 11 Jul 2016 14:08:52 -0700
+Subject: [PATCH] amba: Support clk parents and rates assigned in DT
+Message-ID: <20160711210852.31553-1-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 11, 2016 at 10:31:45PM +0200, John Crispin wrote:
+Add the call to of_clk_set_defaults() into the amba probe path so
+that devices on the amba bus can use the assigned rates and
+parents feature of the common clock framework.
 
-> maybe i am missing something here, but i can see the dependencies inside
-> the for-next branch of
-> git://git.kernel.org/pub/scm/linux/kernel/git/broonie/regulator.git. is
-> this not the tree i should base patches on for v4.8 ?
+Cc: Michael Turquette <mturquette@baylibre.com>
+Cc: Jorge Ramirez Ortiz <jorge.ramirez-ortiz@linaro.org>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ drivers/amba/bus.c | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-Oh, so these aren't things that Lee just applied but rather things that
-have propagated through?  You didn't say what commits you were talking
-about, you linked to a long gitweb URL that would have been difficult to
-paste due to wrapping.  This sort of thing is why it's really helpful to
-make your e-mails directly human readable, saying something like "these
-depend on change X which is in Linus' tree now" would've made this
-clear.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160711/84baa243/attachment.sig>
+diff --git a/drivers/amba/bus.c b/drivers/amba/bus.c
+index a5b5c87e2114..a56fa2a1e9aa 100644
+--- a/drivers/amba/bus.c
++++ b/drivers/amba/bus.c
+@@ -19,6 +19,7 @@
+ #include <linux/amba/bus.h>
+ #include <linux/sizes.h>
+ #include <linux/limits.h>
++#include <linux/clk/clk-conf.h>
+ 
+ #include <asm/irq.h>
+ 
+@@ -237,6 +238,10 @@ static int amba_probe(struct device *dev)
+ 	int ret;
+ 
+ 	do {
++		ret = of_clk_set_defaults(dev->of_node, false);
++		if (ret < 0)
++			break;
++
+ 		ret = dev_pm_domain_attach(dev, true);
+ 		if (ret == -EPROBE_DEFER)
+ 			break;
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
