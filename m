@@ -1,28 +1,36 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Mon, 11 Jul 2016 12:58:28 +0200
-Subject: [PATCH v2 7/7] clk: exynos5433: remove CLK_IGNORE_UNUSED flag from
- SPI clocks
-In-Reply-To: <1467989201-14661-8-git-send-email-andi.shyti@samsung.com>
-References: <1467989201-14661-1-git-send-email-andi.shyti@samsung.com>
- <1467989201-14661-8-git-send-email-andi.shyti@samsung.com>
-Message-ID: <57837BD4.5030602@samsung.com>
+From: ykk@rock-chips.com (Yakir Yang)
+Date: Mon, 11 Jul 2016 19:04:39 +0800
+Subject: [PATCH v1 0/6] Add RK3399 HDMI Support
+Message-ID: <1468235079-29152-1-git-send-email-ykk@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/08/2016 04:46 PM, Andi Shyti wrote:
-> Because the Exynos5433 SPI driver supports the ioclk handling and
-> the following patch:
-> 
->   http://marc.info/?l=linux-kernel&m=146787645626318&w=2
-> 
-> fixes a synchronus abort issue, none of the SPI clocks require
-s/synchronus/synchronous
+Mark,
 
-> any critical handling: remove, then, the CLK_IGNORE_UNUSED flag
-> for the SPI related clocks.
-> 
-> Signed-off-by: Andi Shyti <andi.shyti@samsung.com>
-> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+RK3399 and RK3288 shared the same HDMI IP controller, only some
+light difference with GRF configure, and an external VPLL clock
+need to configure.
 
-In case this goes through the spi tree:
-Acked-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+Thanks,
+- Yakir
+
+
+Douglas Anderson (2):
+  drm/rockchip: dw_hdmi: Set cur_ctr to 0 always
+  drm/rockchip: dw_hdmi: Use auto-generated tables
+
+Yakir Yang (4):
+  drm/rockchip: dw_hdmi: adjust cklvl & txlvl for RF/EMI
+  drm/rockchip: dw_hdmi: add RK3399 HDMI support
+  drm/rockchip: dw_hdmi: introduce the VPLL clock setting
+  drm/rockchip: dw_hdmi: introduce the pclk for grf
+
+ .../devicetree/bindings/display/bridge/dw_hdmi.txt |   1 +
+ .../bindings/display/rockchip/dw_hdmi-rockchip.txt |   7 +-
+ drivers/gpu/drm/bridge/dw-hdmi.c                   |   2 +-
+ drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c        | 238 +++++++++++++--------
+ include/drm/bridge/dw_hdmi.h                       |   6 +
+ 5 files changed, 167 insertions(+), 87 deletions(-)
+
+-- 
+1.9.1
