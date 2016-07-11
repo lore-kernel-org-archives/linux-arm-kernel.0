@@ -1,31 +1,108 @@
-From: elizabethbunkers@wellsfargo.com (=?UTF-8?Q?Elizabeth_Bunkers?=)
-Date: Wed, 6 Jul 2016 03:06:56 +0400
-Subject: =?UTF-8?Q?Re=3bRemittance?=
-Message-ID: <8e141e7a94b739119e4a0b305b0f4a08@www.batarey.net>
+From: vw@iommu.org (Wan Zongshun)
+Date: Mon, 11 Jul 2016 10:30:35 +0800
+Subject: [PATCH v2 05/10] power/reset: Add reset driver support for nuc900
+In-Reply-To: <CAP=VYLrb5ujiLTPXnPxzPHsdbHft9R45JB3LbbvRnaZ4rUAJoA@mail.gmail.com>
+References: <1468135649-19980-1-git-send-email-vw@iommu.org>
+ <1468135649-19980-6-git-send-email-vw@iommu.org>
+ <CAP=VYLrb5ujiLTPXnPxzPHsdbHft9R45JB3LbbvRnaZ4rUAJoA@mail.gmail.com>
+Message-ID: <578304CB.8050604@iommu.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
 
-In response to the payment request we received from your client, we wish to notify you that payment has now been processed to your bank details on file through our intermediary bank.
 
-Wire Confirmation No: BOA9022263891NBC.
-Transaction Status: Completed.
-Further Details: On Payment Receipt
+On 2016?07?11? 05:56, Paul Gortmaker wrote:
+> On Sun, Jul 10, 2016 at 3:27 AM, Wan Zongshun <vw@iommu.org> wrote
+>> This driver is to add reset support for nuc900 series,
+>> currently, it only supports nuc970 SoC reset.
+>>
+>> Signed-off-by: Wan Zongshun <mcuos.com@gmail.com>
+>> ---
+>>   drivers/power/reset/Kconfig        |  7 +++
+>>   drivers/power/reset/Makefile       |  1 +
+>>   drivers/power/reset/nuc900-reset.c | 93 ++++++++++++++++++++++++++++++++++++++
+>>   3 files changed, 101 insertions(+)
+>>   create mode 100644 drivers/power/reset/nuc900-reset.c
+>>
+>> diff --git a/drivers/power/reset/Kconfig b/drivers/power/reset/Kconfig
+>> index 9bb2622..8c84892 100644
+>> --- a/drivers/power/reset/Kconfig
+>> +++ b/drivers/power/reset/Kconfig
+>> @@ -94,6 +94,13 @@ config POWER_RESET_MSM
+>>          help
+>>            Power off and restart support for Qualcomm boards.
+>>
+>> +config POWER_RESET_NUC900
+>> +       bool "Nuc900 restart driver"
+>
+> If this driver is bool and not tristate, then please remove all references
+> to MODULE_<xyz> and then the module.h include as well.
 
-Attached to this email is the secure remittance advice. To access the receipt and further details relating to this transaction.
+I will remove the following codes in my reset.c driver.
 
-You will be required to download and authenticate your email client on the Microsoft Secure File Access attached for security purposes.
+MODULE_DEVICE_TABLE(of, of_nuc900_reset_match);
+#include <linux/module.h>
 
-If you are unable to view the file, do not hesitate to contact me.
 
-Regards
-Elizabeth Bunkers
-Accounts Payable
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: Secure Remittance Advice.htm
-Type: application/octet-stream
-Size: 8946 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160706/90a1f29e/attachment.obj>
+>
+> Thanks,
+> Paul.
+> --
+>
+>> +       depends on ARCH_W90X900
+>> +       help
+>> +         Power off and restart support for Nuvoton NUC900 family of
+>> +         reference boards.
+>> +
+>>   config POWER_RESET_LTC2952
+>>          bool "LTC2952 PowerPath power-off driver"
+>>          depends on OF_GPIO
+>> diff --git a/drivers/power/reset/Makefile b/drivers/power/reset/Makefile
+>> index ab7aa86..d4df889 100644
+>> --- a/drivers/power/reset/Makefile
+>> +++ b/drivers/power/reset/Makefile
+>> @@ -9,6 +9,7 @@ obj-$(CONFIG_POWER_RESET_GPIO_RESTART) += gpio-restart.o
+>>   obj-$(CONFIG_POWER_RESET_HISI) += hisi-reboot.o
+>>   obj-$(CONFIG_POWER_RESET_IMX) += imx-snvs-poweroff.o
+>>   obj-$(CONFIG_POWER_RESET_MSM) += msm-poweroff.o
+>> +obj-$(CONFIG_POWER_RESET_NUC900) += nuc900-reset.o
+>>   obj-$(CONFIG_POWER_RESET_LTC2952) += ltc2952-poweroff.o
+>>   obj-$(CONFIG_POWER_RESET_QNAP) += qnap-poweroff.o
+>>   obj-$(CONFIG_POWER_RESET_RESTART) += restart-poweroff.o
+>> diff --git a/drivers/power/reset/nuc900-reset.c b/drivers/power/reset/nuc900-reset.c
+>> new file mode 100644
+>> index 0000000..49986b7
+>> --- /dev/null
+>> +++ b/drivers/power/reset/nuc900-reset.c
+>> @@ -0,0 +1,93 @@
+>> +/*
+>> + * Copyright 2016 Wan Zongshun <mcuos.com@gmail.com>
+>> + *
+>> + * The code contained herein is licensed under the GNU General Public
+>> + * License. You may obtain a copy of the GNU General Public License
+>> + * Version 2 or later at the following locations:
+>> + *
+>> + * http://www.opensource.org/licenses/gpl-license.html
+>> + * http://www.gnu.org/copyleft/gpl.html
+>> + */
+>> +#include <linux/init.h>
+>> +#include <linux/err.h>
+>> +#include <linux/io.h>
+>> +#include <linux/kernel.h>
+>> +#include <linux/mfd/syscon.h>
+>> +#include <linux/module.h>
+>> +#include <linux/notifier.h>
+>> +#include <linux/of.h>
+>> +#include <linux/platform_device.h>
+>> +#include <linux/reboot.h>
+>> +#include <linux/regmap.h>
+>>
+>
+> [...]
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
+>
