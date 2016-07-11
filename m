@@ -1,92 +1,33 @@
-From: john@metanate.com (John Keeping)
-Date: Mon, 11 Jul 2016 10:20:53 +0100
-Subject: [PATCH 5/7] drm/rockchip: dw-mipi: support HPD poll
-In-Reply-To: <5782EC7D.3080202@rock-chips.com>
-References: <1467968701-15620-1-git-send-email-zyw@rock-chips.com>
- <1467968701-15620-6-git-send-email-zyw@rock-chips.com>
- <20160708145211.6bf83d8f.john@metanate.com>
- <5782EC7D.3080202@rock-chips.com>
-Message-ID: <20160711102053.12b32be1.john@metanate.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 11 Jul 2016 11:55:52 +0200
+Subject: [PATCH v8 3/9] pwm: pwm-tiehrpwm: Update dt binding document to
+ use generic node name
+In-Reply-To: <1462291015-1919-4-git-send-email-fcooper@ti.com>
+References: <1462291015-1919-1-git-send-email-fcooper@ti.com>
+ <1462291015-1919-4-git-send-email-fcooper@ti.com>
+Message-ID: <20160711095552.GH5823@ulmo.ba.sec>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 11 Jul 2016 08:46:53 +0800, Mark yao wrote:
-
-> On 2016?07?08? 21:52, John Keeping wrote:
-> > On Fri,  8 Jul 2016 17:04:59 +0800, Chris Zhong wrote:
-> >  
-> >> At the first time of bind, there is no any panel attach in mipi. Add a
-> >> DRM_CONNECTOR_POLL_HPD porperty to detect the panel status, when panel
-> >> probe, the dw_mipi_dsi_host_attach would be called, then mipi-dsi will
-> >> trigger a event to notify the drm framework.
-> >>
-> >> Signed-off-by: Chris Zhong <zyw@rock-chips.com>  
-> > Can we do something like this instead?  We know that the panel must
-> > always be attached and this has the advantage that the display size will
-> > be known when the framebuffer console loads.
-> >  
-> > -- >8 --  
-> > Subject: [PATCH] drm/rockchip: dw-mipi-dsi: defer probe if panel is not loaded
-> >
-> > This ensures that the output resolution is known before fbcon loads.
-> >
-> > Signed-off-by: John Keeping <john@metanate.com>
-> > ---
-> >   drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 11 +++++++++--
-> >   1 file changed, 9 insertions(+), 2 deletions(-)
-> >
-> > diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> > index 6ef5f3be8468..c0499266d116 100644
-> > --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> > +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> > @@ -1154,10 +1154,17 @@ static int dw_mipi_dsi_bind(struct device *dev, struct device *master,
-> >   
-> >   	dsi->dsi_host.ops = &dw_mipi_dsi_host_ops;
-> >   	dsi->dsi_host.dev = dev;
-> > -	return mipi_dsi_host_register(&dsi->dsi_host);
-> > +	ret = mipi_dsi_host_register(&dsi->dsi_host);
-> > +	if (!ret && !dsi->panel) {
-> > +		mipi_dsi_host_unregister(&dsi->dsi_host);
-> > +		drm_encoder_cleanup(&dsi->encoder);
-> > +		drm_connector_cleanup(&dsi->connector);
-> > +		ret = -EPROBE_DEFER;  
+On Tue, May 03, 2016 at 10:56:49AM -0500, Franklin S Cooper Jr wrote:
+> Now that the node name has been changed from ehrpwm to pwm the document
+> should show this proper usage. Change the unit address in the example
+> from 0 to the proper physical address value that should be used. Also
+> insure that the unit address matches to the reg property.
 > 
-> Do you verify this patch? I do the similar change before, but found 
-> panel can't probe.
-> 
-> mipi_dsi_host_register will call device_add, I think the panel probe 
-> need this.
-> 
-> Seems that mipi panel probe request mipi_dsi_host_register, 
-> mipi_dsi_host_register request panel on your patch, endless loop.
+> Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
+> Acked-by: Rob Herring <robh@kernel.org>
+> ---
+>  Documentation/devicetree/bindings/pwm/pwm-tiehrpwm.txt | 8 ++++----
+>  1 file changed, 4 insertions(+), 4 deletions(-)
 
-Yes, I've been running this patch for months.  It's possible that I have
-another patch that is needed to get this to work correctly (I have a
-whole set of Rockchip MIPI patches that I need to find time to submit,
-for now I've pushed a branch to Github [1]).
+I applied this long ago, but never replied: Applied, thanks.
 
-I don't know what you mean about the panel probe requesting
-mipi_dsi_host_register, the panel probe calls mipi_dsi_attach() and is
-itself called from mipi_dsi_host_register().  My patch doesn't change
-this at all, the only change is that if the panel driver is not
-available, then the probe fails.  Later, once the panel driver has been
-registered the probe will succeed.  This is no different from the
-current behaviour if the order of probing drivers happens to load the
-panel before dw-mipi-dsi.
-
-[1] https://github.com/johnkeeping/linux/commits/topic/rockchip-mipi
-
-> > +	}
-> >   
-> >   err_pllref:
-> > -	clk_disable_unprepare(dsi->pllref_clk);
-> > +	if (ret)
-> > +		clk_disable_unprepare(dsi->pllref_clk);
-> >   	return ret;
-> >   }
-> >   
-> >
-> >
-> >  
-> 
-> 
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160711/cd4bbaf3/attachment.sig>
