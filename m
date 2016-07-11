@@ -1,33 +1,40 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Mon, 11 Jul 2016 13:14:36 +0200
-Subject: [PATCH v4 3/3] ARM: imx6: Fix procedure to switch the parent of
- LDB_DI_CLK
-In-Reply-To: <57801951.30305@timesys.com>
-References: <1456476714-11351-1-git-send-email-p.zabel@pengutronix.de>
- <1456476714-11351-4-git-send-email-p.zabel@pengutronix.de>
- <56D60C90.7080703@timesys.com>
- <CACrMeVAtLMdx6FhhmvxOq=_q=HztU_2nqVwzbL3dYBHd-PWKUg@mail.gmail.com>
- <CAOMZO5DJ=2xo3ciDDoC1KVwHpxagEjNHq5hEkS7StBzaXrk-pQ@mail.gmail.com>
- <56F9855B.9060009@timesys.com>
- <CAOMZO5CsCfprq_br-omNyeE_T7XC7Do+Z0qOT68msZSu9QedqA@mail.gmail.com>
- <1459354720.2505.98.camel@pengutronix.de>
- <CAOMZO5C3eu6W2hHF40giuTgRaP8y9KAZOihr+7kPn627vCkVhA@mail.gmail.com>
- <57801951.30305@timesys.com>
-Message-ID: <1468235676.3048.23.camel@pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 11 Jul 2016 13:40:45 +0200
+Subject: [PATCH] ARM: s3c64xx: avoid warning about 'struct device_node'
+In-Reply-To: <1807726.lxvlsY5ymW@wuerfel>
+References: <20160627110303.3391769-1-arnd@arndb.de>
+ <57710F1F.8090304@samsung.com> <1807726.lxvlsY5ymW@wuerfel>
+Message-ID: <4080443.gtvsF1A0TV@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, den 08.07.2016, 17:21 -0400 schrieb Akshay Bhat:
-> NXP has updated the EB821 document and made it public. As per the 
-> updated document your v4 patch matches the NXP recommendation for the 
-> clock switch. The only change I see is allowing to switch to any new 
-> parent (when starting at a value other than 3). Is it possible for you 
-> to resubmit this useful patch after reviewing the EB821 document?
+On Monday, July 11, 2016 1:15:11 PM CEST Arnd Bergmann wrote:
+> On Monday, June 27, 2016 1:33:51 PM CEST Krzysztof Kozlowski wrote:
+> > On 06/27/2016 01:02 PM, Arnd Bergmann wrote:
+> > > The change to simplify of_platform_populate() had an unintended
+> > > side-effect of introducing a build warning on s3c64xx:
+> > > 
+> > > In file included from arch/arm/mach-s3c64xx/mach-s3c64xx-dt.c:18:0:
+> > > arch/arm/mach-s3c64xx/common.h:27:30: error: 'struct device_node' declared inside parameter list will not be visible outside of this definition or declaration [-Werror]
+> > > 
+> > > This adds a forward-declaration for the structure name in the
+> > > header to avoid the warning.
+> > > 
+> > > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> > > Fixes: 850bea2335e4 ("arm: Remove unnecessary of_platform_populate with default match table")
+> > > ---
+> > > Rob, can you apply this on top of the devicetree git so we don't
+> > > have to coordinate the merges?
+> > 
+> > Acked-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 > 
-> http://www.nxp.com/files/32bit/doc/eng_bulletin/EB821.pdf?fasp=1&WT_TYPE=Engineering%20Bulletins&WT_VENDOR=FREESCALE&WT_FILE_FORMAT=pdf&WT_ASSET=Documentation&fileExt=.pdf
+> Hi Rob,
+> 
+> I still get the warning in every linux-next build, do you plan to pick
+> up the fix for the commit you merged, or should I try to work around it
+> in arm-soc and leave this as a bisection problem?
+> 
 
-Thanks, I had a look at the document and resent the patchset with the
-PLL3->x limit lifted.
+Now with Rob back on Cc.
 
-regards
-Philipp
+	Arnd
