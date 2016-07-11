@@ -1,79 +1,57 @@
-From: hzpeterchen@gmail.com (Peter Chen)
-Date: Mon, 11 Jul 2016 10:25:43 +0800
-Subject: [PATCH v2 09/22] usb: chipidea: Kick OTG state machine for AVVIS
- with vbus extcon
-In-Reply-To: <20160707222114.1673-10-stephen.boyd@linaro.org>
-References: <20160707222114.1673-1-stephen.boyd@linaro.org>
- <20160707222114.1673-10-stephen.boyd@linaro.org>
-Message-ID: <20160711022543.GB30448@shlinux2>
+From: andi.shyti@samsung.com (Andi Shyti)
+Date: Mon, 11 Jul 2016 11:36:21 +0900
+Subject: [PATCH v3] bindings: spi-samsung: document the clocks and the
+ clock-name property
+In-Reply-To: <20160708203207.GB25980@kozik-lap>
+References: <20160708203207.GB25980@kozik-lap>
+Message-ID: <1468204581-16873-1-git-send-email-andi.shyti@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 07, 2016 at 03:21:00PM -0700, Stephen Boyd wrote:
-> Force the OTG state machine to go forward when we're using an
-> extcon for vbus detection. In this case, the controller may never
-> raise an interrupt for AVVIS, so we need to simulate the event by
-> toggling the appropriate OTG fsm bits and kicking the state
-> machine again.
-> 
-> Cc: Peter Chen <peter.chen@nxp.com>
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
-> ---
-> 
-> I think this was rejected last time around but I've kept it in the
-> series to continue discussion on how we're supposed to be emulating
-> vbus an id pin interrupts and the otgsc register.
-> 
->  drivers/usb/chipidea/otg_fsm.c | 17 +++++++++++++++++
->  1 file changed, 17 insertions(+)
-> 
-> diff --git a/drivers/usb/chipidea/otg_fsm.c b/drivers/usb/chipidea/otg_fsm.c
-> index de8e22ec3902..aab076fc4d82 100644
-> --- a/drivers/usb/chipidea/otg_fsm.c
-> +++ b/drivers/usb/chipidea/otg_fsm.c
-> @@ -475,6 +475,14 @@ static void ci_otg_drv_vbus(struct otg_fsm *fsm, int on)
->  				return;
->  			}
->  		}
-> +		/*
-> +		 * Force state machine forward if we use extcon
-> +		 * to detect vbus state (i.e. simulate AVVIS event)
-> +		 */
-> +		if (!IS_ERR(ci->platdata->vbus_extcon.edev)) {
-> +			fsm->a_vbus_vld = 1;
-> +			ci_otg_queue_work(ci);
-> +		}
->  		/* Disable data pulse irq */
->  		hw_write_otgsc(ci, OTGSC_DPIE, 0);
->  
-> @@ -486,6 +494,15 @@ static void ci_otg_drv_vbus(struct otg_fsm *fsm, int on)
->  
->  		fsm->a_bus_drop = 1;
->  		fsm->a_bus_req = 0;
-> +		/*
-> +		 * Force state machine forward if we use extcon
-> +		 * to detect vbus state (i.e. simulate AVVIS event)
-> +		 */
-> +		if (!IS_ERR(ci->platdata->vbus_extcon.edev)) {
-> +			fsm->a_vbus_vld = 0;
-> +			fsm->b_conn = 0;
-> +			ci_otg_queue_work(ci);
-> +		}
->  	}
->  }
->  
+These two properties were not documented but used in the spi
+dts. Add the related documentation.
 
-Well, if we don't have a_valid, we can't know a_vbus_err state at
-A device side if vbus is error (eg, less than 4.4v), and B device
-will NOT be disconnect if vbus is still larger than BSV.
+Suggested-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Signed-off-by: Andi Shyti <andi.shyti@samsung.com>
+Reviewed-by: Michael Turquette <mturquette@baylibre.com>
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+---
+Hi,
 
-Do you really need OTG FSM? If you can pass the OTG test described at
-Documentation/usb/chipidea.txt, I can accept it, I find the OTG
-compliance test does not test ~a_vbus_vld either, see
-otgeh_compliance_plan_1_2, ch6.7.12.2 Paths not tested.
+Changelog related only to this patch:
 
+V1 -> V2: [new] added the clocks and clock-name documentation
+   in the bindings
+
+V2 -> V3: reworded the 'clock-names' as suggested by Krzysztof,
+   added Mike's and Krzysztof's review and Krzysztof's
+   suggested-by.
+
+Thanks,
+Andi
+
+ Documentation/devicetree/bindings/spi/spi-samsung.txt | 9 +++++++++
+ 1 file changed, 9 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/spi/spi-samsung.txt b/Documentation/devicetree/bindings/spi/spi-samsung.txt
+index 57d5539..f45c6eb 100644
+--- a/Documentation/devicetree/bindings/spi/spi-samsung.txt
++++ b/Documentation/devicetree/bindings/spi/spi-samsung.txt
+@@ -24,6 +24,15 @@ Required SoC Specific Properties:
+ - dma-names: Names for the dma channels. There must be at least one channel
+   named "tx" for transmit and named "rx" for receive.
+ 
++- clocks: specifies the clock IDs provided to the SPI controller; they are
++  required for interacting with the controller itself, for synchronizing the bus
++  and as I/O clock (the latter is required by exynos5433 and exynos7).
++
++- clock-names: string names of the clocks in the 'clocks' property; for all the
++  the devices the names must be "spi", "spi_busclkN" (where N is determined by
++  "samsung,spi-src-clk"), while Exynos5433 should specify a third clock
++  "spi_ioclk" for the I/O clock.
++
+ Required Board Specific Properties:
+ 
+ - #address-cells: should be 1.
 -- 
-
-Best Regards,
-Peter Chen
+2.8.1
