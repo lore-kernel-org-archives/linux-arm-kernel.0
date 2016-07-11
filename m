@@ -1,37 +1,58 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 11 Jul 2016 12:06:29 +0200
-Subject: [PATCH v8 4/9] pwm: pwm-tiecap: Update dt binding document to
- use proper unit address
-In-Reply-To: <20160711095623.GI5823@ulmo.ba.sec>
-References: <1462291015-1919-1-git-send-email-fcooper@ti.com>
- <1462291015-1919-5-git-send-email-fcooper@ti.com>
- <20160711095623.GI5823@ulmo.ba.sec>
-Message-ID: <20160711100629.GJ5823@ulmo.ba.sec>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 11 Jul 2016 12:24:21 +0200
+Subject: [PATCH v2 06/10] soc: Add SoC specific driver support for nuc900
+In-Reply-To: <578361B5.7010803@iommu.org>
+References: <1468135649-19980-1-git-send-email-vw@iommu.org>
+ <4765191.NGpMC1JR46@wuerfel> <578361B5.7010803@iommu.org>
+Message-ID: <1606219.BzcByuFgJm@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 11, 2016 at 11:56:23AM +0200, Thierry Reding wrote:
-> On Tue, May 03, 2016 at 10:56:50AM -0500, Franklin S Cooper Jr wrote:
-> > Replace unit address from 0 to the proper physical address. Also insure
-> > that the unit address matches the reg property address.
-> > 
-> > Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
-> > ---
-> >  Documentation/devicetree/bindings/pwm/pwm-tiecap.txt | 8 ++++----
-> >  1 file changed, 4 insertions(+), 4 deletions(-)
+On Monday, July 11, 2016 5:07:01 PM CEST Wan Zongshun wrote:
 > 
-> I applied this long ago but never let you know: Applied, thanks.
+> On 2016?07?11? 16:03, Arnd Bergmann wrote:
+> > On Sunday, July 10, 2016 3:27:26 PM CEST Wan Zongshun wrote:
+> >> +       ret = of_property_read_string(np, "compatible", &soc_dev_attr->soc_id);
+> >> +       if (ret)
+> >>                return -EINVAL;
+> >> +
+> >> +       soc_dev_attr->machine = "NUC900EVB";
+> >> +       soc_dev_attr->family = "NUC900";
+> >> +       soc_dev = soc_device_register(soc_dev_attr);
+> >> +       if (IS_ERR(soc_dev)) {
+> >> +               kfree(soc_dev_attr);
+> >> +               return -ENODEV;
+> >> +       }
+> >> +
+> >> +       ret = regmap_read(syscon_regmap, GCR_CHIPID, &nuc900_chipid);
+> >> +       if (ret)
+> >> +               return -ENODEV;
+> >> +
+> >> +       device_create_file(soc_device_to_device(soc_dev), &nuc900_chipid_attr);
+> >> +       device_create_file(soc_device_to_device(soc_dev), &nuc900_version_attr);
+> >> +
+> >> +       dev_info(&pdev->dev, "Nuvoton Chip ID: 0x%x, Version ID:0x%x\n",
+> >> +                nuc900_chipid & GCR_CHIPID_MASK,
+> >> +                (nuc900_chipid >> 24) & 0xff);
+> >
+> > I'm still a bit unsure about the set of attributes here.
+> >
+> > - The "soc_id" is read from the device tree from the field that contains
+> >    the board name, I think for consistency you should try to map the
+> >    GCR_CHIPID to the name of the SoC and assign that here
+> 
+> I will try to get chipid and map it to soc name like: ?nuc970?, "nuc910".
+> 
+> And I will set this soc name to soc_id, ok?
 
-Actually I didn't. And it seems the reason is that it doesn't apply
-cleanly. For some reason my tree doesn't have an entry for the ecap
-example on am437x. Am I missing a patch? Can you resend whatever is
-not in linux-next yet?
+Ok.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160711/73c7bc03/attachment.sig>
+> > - The "machine" is hardcoded to "NUC900EVB", which in turn looks like
+> >    a particular board but not the one you are running on. Maybe read
+> >    that from the DT instead?
+> 
+> Should I read nuc970-evb.dts's "model" or "compatible" properties?
+
+I think "model" is best here, but see what the others do.
+
+	Arnd
