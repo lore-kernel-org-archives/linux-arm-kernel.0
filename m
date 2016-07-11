@@ -1,728 +1,233 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 11 Jul 2016 18:17:33 +0100
-Subject: [PATCH v8 15/17] KVM: arm64: implement ITS command queue command
- handlers
-In-Reply-To: <20160705112309.28877-16-andre.przywara@arm.com>
-References: <20160705112309.28877-1-andre.przywara@arm.com>
- <20160705112309.28877-16-andre.przywara@arm.com>
-Message-ID: <5783D4AD.30206@arm.com>
+From: kevin.brodsky@arm.com (Kevin Brodsky)
+Date: Mon, 11 Jul 2016 18:31:16 +0100
+Subject: [PATCH 1/2] arm64: Refactor vDSO time functions
+In-Reply-To: <20160708141143.GB6493@arm.com>
+References: <1462797421-33103-1-git-send-email-kevin.brodsky@arm.com>
+ <1462797421-33103-2-git-send-email-kevin.brodsky@arm.com>
+ <20160708141143.GB6493@arm.com>
+Message-ID: <a3eda01b-b835-c20c-a39d-efc8853b00f8@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/07/16 12:23, Andre Przywara wrote:
-> The connection between a device, an event ID, the LPI number and the
-> allocated CPU is stored in in-memory tables in a GICv3, but their
-> format is not specified by the spec. Instead software uses a command
-> queue in a ring buffer to let the ITS implementation use their own
-> format.
-> Implement handlers for the various ITS commands and let them store
-> the requested relation into our own data structures. Those data
-> structures are protected by the its_lock mutex.
-> Our internal ring buffer read and write pointers are protected by the
-> its_cmd mutex, so that at most one VCPU per ITS can handle commands at
-> any given time.
-> Error handling is very basic at the moment, as we don't have a good
-> way of communicating errors to the guest (usually a SError).
-> The INT command handler is missing at this point, as we gain the
-> capability of actually injecting MSIs into the guest only later on.
-> 
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> ---
->  virt/kvm/arm/vgic/vgic-its.c | 609 ++++++++++++++++++++++++++++++++++++++++++-
->  1 file changed, 605 insertions(+), 4 deletions(-)
-> 
-> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-> index 5de71bd..432daed 100644
-> --- a/virt/kvm/arm/vgic/vgic-its.c
-> +++ b/virt/kvm/arm/vgic/vgic-its.c
-> @@ -58,6 +58,43 @@ out_unlock:
->  	return irq;
->  }
->  
-> +/*
-> + * Creates a new (reference to a) struct vgic_irq for a given LPI.
-> + * If this LPI is already mapped on another ITS, we increase its refcount
-> + * and return a pointer to the existing structure.
-> + * If this is a "new" LPI, we allocate and initialize a new struct vgic_irq.
-> + * This function returns a pointer to the _unlocked_ structure.
-> + */
-> +static struct vgic_irq *vgic_add_lpi(struct kvm *kvm, u32 intid)
-> +{
-> +	struct vgic_dist *dist = &kvm->arch.vgic;
-> +	struct vgic_irq *irq = vgic_its_get_lpi(kvm, intid);
+Hi Will,
 
-So this thing doesn't return with any lock held...
 
-> +
-> +	/* In this case there is no put, since we keep the reference. */
-> +	if (irq)
-> +		return irq;
-> +
-> +	irq = kzalloc(sizeof(struct vgic_irq), GFP_KERNEL);
-> +
-> +	if (!irq)
-> +		return NULL;
-> +
-> +	INIT_LIST_HEAD(&irq->lpi_entry);
-> +	INIT_LIST_HEAD(&irq->ap_list);
-> +	spin_lock_init(&irq->irq_lock);
-> +
-> +	irq->config = VGIC_CONFIG_EDGE;
-> +	kref_init(&irq->refcount);
-> +	irq->intid = intid;
+On 08/07/16 15:11, Will Deacon wrote:
+> Hi Kevin,
+>
+> On Mon, May 09, 2016 at 01:37:00PM +0100, Kevin Brodsky wrote:
+>> Time functions are directly implemented in assembly in arm64, and it
+>> is desirable to keep it this way for performance reasons (everything
+>> fits in registers, so that the stack is not used at all). However, the
+>> current implementation is quite difficult to read and understand (even
+>> considering it's assembly).  Additionally, due to the structure of
+>> __kernel_clock_gettime, which heavily uses conditional branches to
+>> share code between the different clocks, it is difficult to support a
+>> new clock without making the branches even harder to follow.
+>>
+>> This commit completely refactors the structure of clock_gettime (and
+>> gettimeofday along the way) while keeping exactly the same algorithms.
+>> We no longer try to share code; instead, macros provide common
+>> operations. This new approach comes with a number of advantages:
+>> - In clock_gettime, clock implementations are no longer interspersed,
+>>    making them much more readable. Additionally, macros only use
+>>    registers passed as arguments or reserved with .req, this way it is
+>>    easy to make sure that registers are properly allocated. To avoid a
+>>    large number of branches in a given execution path, a jump table is
+>>    used; a normal execution uses 3 unconditional branches.
+>> - __do_get_tspec has been replaced with 2 macros (get_ts_clock_mono,
+>>    get_clock_shifted_nsec) and explicit loading of data from the vDSO
+>>    page. Consequently, clock_gettime and gettimeofday are now leaf
+>>    functions, and saving x30 (lr) is no longer necessary.
+>> - Variables protected by tb_seq_count are now loaded all at once,
+>>    allowing to merge the seqcnt_read macro into seqcnt_check.
+>> - For CLOCK_REALTIME_COARSE, removed an unused load of the wall to
+>>    monotonic timespec.
+>> - For CLOCK_MONOTONIC_COARSE, removed a few shift instructions.
+>>
+>> Obviously, the downside of sharing less code is an increase in code
+>> size. However since the vDSO has its own code page, this does not
+>> really matter, as long as the size of the DSO remains below 4 kB. For
+>> now this should be all right:
+>>                      Before  After
+>>    vdso.so size (B)  2776    2936
+>>
+>> Cc: Will Deacon <will.deacon@arm.com>
+>> Cc: Dave Martin <dave.martin@arm.com>
+>> Signed-off-by: Kevin Brodsky <kevin.brodsky@arm.com>
+>> ---
+>>   arch/arm64/kernel/vdso/gettimeofday.S | 282 +++++++++++++++++++---------------
+>>   1 file changed, 162 insertions(+), 120 deletions(-)
+> This patch is really hard to read, but after applying it the resulting
+> code looks really good. Thanks! Just a couple of minor comments inline.
 
-which means that two callers can allocate their own irq structure...
+Thanks for taking a look at this! Yes the diff is almost unreadable, it's bound to
+happen when modifying most of the file.
 
-> +
-> +	spin_lock(&dist->lpi_list_lock);
-> +	list_add_tail(&irq->lpi_entry, &dist->lpi_list_head);
-> +	dist->lpi_list_count++;
-> +	spin_unlock(&dist->lpi_list_lock);
+>
+>>   ENTRY(__kernel_clock_gettime)
+>>      .cfi_startproc
+>> -    cmp     w0, #CLOCK_REALTIME
+>> -    ccmp    w0, #CLOCK_MONOTONIC, #0x4, ne
+>> -    b.ne    2f
+>> +    cmp     w0, #JUMPSLOT_MAX
+>> +    b.hi    syscall
+>> +    adr     vdso_data, _vdso_data
+>> +    adr     x_tmp, jumptable
+>> +    add     x_tmp, x_tmp, w0, uxtw #2
+>> +    br      x_tmp
+>> +
+>> +jumptable:
+>> +    jump_slot jumptable, CLOCK_REALTIME, realtime
+>> +    jump_slot jumptable, CLOCK_MONOTONIC, monotonic
+>> +    b       syscall
+>> +    b       syscall
+>> +    b       syscall
+>> +    jump_slot jumptable, CLOCK_REALTIME_COARSE, realtime_coarse
+>> +    jump_slot jumptable, CLOCK_MONOTONIC_COARSE, monotonic_coarse
+> The branchiness of this code (into __kernel_clock_gettime, then not taking
+> the b.hi, the br following by the b in the jumptable) is likely to hurt
+> most branch predictors. I found that aligning the jumptable and its
+> subsequent targets helped a bit here.
 
-and insert it. Not too bad if they are different LPIs, but leading to
-Armageddon if they are the same. You absolutely need to check for the
-the presence of the interrupt in this list *while holding the lock*.
+That sounds perfectly sensible, there are a lot of branches indeed (fortunately,
+mostly unconditional).
 
-> +
-> +	return irq;
-> +}
-> +
->  struct its_device {
->  	struct list_head dev_list;
->  
-> @@ -87,6 +124,43 @@ struct its_itte {
->  	u32 event_id;
->  };
->  
-> +/*
-> + * Find and returns a device in the device table for an ITS.
-> + * Must be called with the its_lock held.
-> + */
-> +static struct its_device *find_its_device(struct vgic_its *its, u32 device_id)
-> +{
-> +	struct its_device *device;
-> +
-> +	list_for_each_entry(device, &its->device_list, dev_list)
-> +		if (device_id == device->device_id)
-> +			return device;
-> +
-> +	return NULL;
-> +}
-> +
-> +/*
-> + * Find and returns an interrupt translation table entry (ITTE) for a given
-> + * Device ID/Event ID pair on an ITS.
-> + * Must be called with the its_lock held.
-> + */
-> +static struct its_itte *find_itte(struct vgic_its *its, u32 device_id,
-> +				  u32 event_id)
-> +{
-> +	struct its_device *device;
-> +	struct its_itte *itte;
-> +
-> +	device = find_its_device(its, device_id);
-> +	if (device == NULL)
-> +		return NULL;
-> +
-> +	list_for_each_entry(itte, &device->itt_head, itte_list)
-> +		if (itte->event_id == event_id)
-> +			return itte;
-> +
-> +	return NULL;
-> +}
-> +
->  /* To be used as an iterator this macro misses the enclosing parentheses */
->  #define for_each_lpi_its(dev, itte, its) \
->  	list_for_each_entry(dev, &(its)->device_list, dev_list) \
-> @@ -98,6 +172,22 @@ struct its_itte {
->  
->  #define GIC_LPI_OFFSET 8192
->  
-> +/*
-> + * Finds and returns a collection in the ITS collection table.
-> + * Must be called with the its_lock held.
-> + */
-> +static struct its_collection *find_collection(struct vgic_its *its, int coll_id)
-> +{
-> +	struct its_collection *collection;
-> +
-> +	list_for_each_entry(collection, &its->collection_list, coll_list) {
-> +		if (coll_id == collection->collection_id)
-> +			return collection;
-> +	}
-> +
-> +	return NULL;
-> +}
-> +
->  #define LPI_PROP_ENABLE_BIT(p)	((p) & LPI_PROP_ENABLED)
->  #define LPI_PROP_PRIORITY(p)	((p) & 0xfc)
->  
-> @@ -135,7 +225,7 @@ static int update_lpi_config_filtered(struct kvm *kvm, struct vgic_irq *irq,
->  }
->  
->  /* Updates the priority and enable bit for a given LPI. */
-> -int update_lpi_config(struct kvm *kvm, struct vgic_irq *irq)
-> +static int update_lpi_config(struct kvm *kvm, struct vgic_irq *irq)
->  {
->  	return update_lpi_config_filtered(kvm, irq, NULL);
->  }
-> @@ -174,6 +264,48 @@ static int vgic_its_copy_lpi_list(struct kvm *kvm, u32 **intid_ptr)
->  }
->  
->  /*
-> + * Promotes the ITS view of affinity of an ITTE (which redistributor this LPI
-> + * is targeting) to the VGIC's view, which deals with target VCPUs.
-> + * Needs to be called whenever either the collection for a LPIs has
-> + * changed or the collection itself got retargeted.
-> + */
-> +static void update_affinity_itte(struct kvm *kvm, struct its_itte *itte)
-> +{
-> +	struct kvm_vcpu *vcpu;
-> +
-> +	vcpu = kvm_get_vcpu(kvm, itte->collection->target_addr);
-> +
-> +	spin_lock(&itte->irq->irq_lock);
-> +	itte->irq->target_vcpu = vcpu;
-> +	spin_unlock(&itte->irq->irq_lock);
-> +}
-> +
-> +/*
-> + * Updates the target VCPU for every LPI targeting this collection.
-> + * Must be called with the its_lock held.
-> + */
-> +static void update_affinity_collection(struct kvm *kvm, struct vgic_its *its,
-> +				       struct its_collection *coll)
-> +{
-> +	struct its_device *device;
-> +	struct its_itte *itte;
-> +
-> +	for_each_lpi_its(device, itte, its) {
-> +		if (!itte->collection || coll != itte->collection)
-> +			continue;
-> +
-> +		update_affinity_itte(kvm, itte);
-> +	}
-> +}
-> +
-> +static u32 max_lpis_propbaser(u64 propbaser)
-> +{
-> +	int nr_idbits = (propbaser & 0x1f) + 1;
-> +
-> +	return 1U << min(nr_idbits, INTERRUPT_ID_BITS_ITS);
-> +}
-> +
-> +/*
->   * Scan the whole LPI pending table and sync the pending bit in there
->   * with our own data structures. This relies on the LPI being
->   * mapped before.
-> @@ -299,10 +431,479 @@ static void its_free_itte(struct kvm *kvm, struct its_itte *itte)
->  	kfree(itte);
->  }
->  
-> -static int vits_handle_command(struct kvm *kvm, struct vgic_its *its,
-> +static u64 its_cmd_mask_field(u64 *its_cmd, int word, int shift, int size)
-> +{
-> +	return (le64_to_cpu(its_cmd[word]) >> shift) & (BIT_ULL(size) - 1);
-> +}
-> +
-> +#define its_cmd_get_command(cmd)	its_cmd_mask_field(cmd, 0,  0,  8)
-> +#define its_cmd_get_deviceid(cmd)	its_cmd_mask_field(cmd, 0, 32, 32)
-> +#define its_cmd_get_id(cmd)		its_cmd_mask_field(cmd, 1,  0, 32)
-> +#define its_cmd_get_physical_id(cmd)	its_cmd_mask_field(cmd, 1, 32, 32)
-> +#define its_cmd_get_collection(cmd)	its_cmd_mask_field(cmd, 2,  0, 16)
-> +#define its_cmd_get_target_addr(cmd)	its_cmd_mask_field(cmd, 2, 16, 32)
-> +#define its_cmd_get_validbit(cmd)	its_cmd_mask_field(cmd, 2, 63,  1)
-> +
-> +/* The DISCARD command frees an Interrupt Translation Table Entry (ITTE). */
-> +static int vgic_its_cmd_handle_discard(struct kvm *kvm, struct vgic_its *its,
-> +				   u64 *its_cmd)
-> +{
-> +	u32 device_id;
-> +	u32 event_id;
-> +	struct its_itte *itte;
-> +	int ret = E_ITS_DISCARD_UNMAPPED_INTERRUPT;
-> +
-> +	device_id = its_cmd_get_deviceid(its_cmd);
-> +	event_id = its_cmd_get_id(its_cmd);
-> +
-> +	mutex_lock(&its->its_lock);
-> +	itte = find_itte(its, device_id, event_id);
-> +	if (itte && itte->collection) {
-> +		/*
-> +		 * Though the spec talks about removing the pending state, we
-> +		 * don't bother here since we clear the ITTE anyway and the
-> +		 * pending state is a property of the ITTE struct.
-> +		 */
-> +		its_free_itte(kvm, itte);
-> +		ret = 0;
-> +	}
-> +
-> +	mutex_unlock(&its->its_lock);
-> +	return ret;
-> +}
-> +
-> +/* The MOVI command moves an ITTE to a different collection. */
-> +static int vgic_its_cmd_handle_movi(struct kvm *kvm, struct vgic_its *its,
-> +				u64 *its_cmd)
-> +{
-> +	u32 device_id = its_cmd_get_deviceid(its_cmd);
-> +	u32 event_id = its_cmd_get_id(its_cmd);
-> +	u32 coll_id = its_cmd_get_collection(its_cmd);
-> +	struct kvm_vcpu *vcpu;
-> +	struct its_itte *itte;
-> +	struct its_collection *collection;
-> +	int ret = 0;
-> +
-> +	mutex_lock(&its->its_lock);
-> +	itte = find_itte(its, device_id, event_id);
-> +	if (!itte) {
-> +		ret = E_ITS_MOVI_UNMAPPED_INTERRUPT;
-> +		goto out_unlock;
-> +	}
-> +	if (!its_is_collection_mapped(itte->collection)) {
-> +		ret = E_ITS_MOVI_UNMAPPED_COLLECTION;
-> +		goto out_unlock;
-> +	}
-> +
-> +	collection = find_collection(its, coll_id);
-> +	if (!its_is_collection_mapped(collection)) {
-> +		ret = E_ITS_MOVI_UNMAPPED_COLLECTION;
-> +		goto out_unlock;
-> +	}
-> +
-> +	itte->collection = collection;
-> +	vcpu = kvm_get_vcpu(kvm, collection->target_addr);
-> +
-> +	spin_lock(&itte->irq->irq_lock);
-> +	itte->irq->target_vcpu = vcpu;
-> +	spin_unlock(&itte->irq->irq_lock);
-> +
-> +out_unlock:
-> +	mutex_unlock(&its->its_lock);
-> +	return ret;
-> +}
-> +
-> +static void vgic_its_init_collection(struct vgic_its *its,
-> +				 struct its_collection *collection,
-> +				 u32 coll_id)
-> +{
-> +	collection->collection_id = coll_id;
-> +	collection->target_addr = COLLECTION_NOT_MAPPED;
-> +
-> +	list_add_tail(&collection->coll_list, &its->collection_list);
-> +}
-> +
-> +/* The MAPTI and MAPI commands map LPIs to ITTEs. */
-> +static int vgic_its_cmd_handle_mapi(struct kvm *kvm, struct vgic_its *its,
-> +				u64 *its_cmd, u8 subcmd)
-> +{
-> +	u32 device_id = its_cmd_get_deviceid(its_cmd);
-> +	u32 event_id = its_cmd_get_id(its_cmd);
-> +	u32 coll_id = its_cmd_get_collection(its_cmd);
-> +	struct its_itte *itte;
-> +	struct its_device *device;
-> +	struct its_collection *collection, *new_coll = NULL;
-> +	int lpi_nr;
-> +	int ret = 0;
-> +
-> +	mutex_lock(&its->its_lock);
-> +
-> +	device = find_its_device(its, device_id);
-> +	if (!device) {
-> +		ret = E_ITS_MAPTI_UNMAPPED_DEVICE;
-> +		goto out_unlock;
-> +	}
-> +
-> +	collection = find_collection(its, coll_id);
-> +	if (!collection) {
-> +		new_coll = kzalloc(sizeof(struct its_collection), GFP_KERNEL);
-> +		if (!new_coll) {
-> +			ret = -ENOMEM;
-> +			goto out_unlock;
-> +		}
-> +	}
-> +
-> +	if (subcmd == GITS_CMD_MAPTI)
-> +		lpi_nr = its_cmd_get_physical_id(its_cmd);
-> +	else
-> +		lpi_nr = event_id;
-> +	if (lpi_nr < GIC_LPI_OFFSET ||
-> +	    lpi_nr >= max_lpis_propbaser(kvm->arch.vgic.propbaser))
-> +		return E_ITS_MAPTI_PHYSICALID_OOR;
-> +
-> +	itte = find_itte(its, device_id, event_id);
-> +	if (!itte) {
-> +		itte = kzalloc(sizeof(struct its_itte), GFP_KERNEL);
-> +		if (!itte) {
-> +			kfree(new_coll);
-> +			ret = -ENOMEM;
-> +			goto out_unlock;
-> +		}
-> +
-> +		itte->event_id	= event_id;
-> +		list_add_tail(&itte->itte_list, &device->itt_head);
-> +	}
-> +
-> +	if (!collection) {
-> +		collection = new_coll;
-> +		vgic_its_init_collection(its, collection, coll_id);
-> +	}
-> +
-> +	itte->collection = collection;
-> +	itte->lpi = lpi_nr;
-> +	itte->irq = vgic_add_lpi(kvm, lpi_nr);
-> +	update_affinity_itte(kvm, itte);
-> +
-> +	/*
-> +	 * We "cache" the configuration table entries in out struct vgic_irq's.
-> +	 * However we only have those structs for mapped IRQs, so we read in
-> +	 * the respective config data from memory here upon mapping the LPI.
-> +	 */
-> +	update_lpi_config(kvm, itte->irq);
-> +
-> +out_unlock:
-> +	mutex_unlock(&its->its_lock);
-> +
-> +	return 0;
-> +}
-> +
-> +/* Requires the its_lock to be held. */
-> +static void vgic_its_unmap_device(struct kvm *kvm, struct its_device *device)
-> +{
-> +	struct its_itte *itte, *temp;
-> +
-> +	/*
-> +	 * The spec says that unmapping a device with still valid
-> +	 * ITTEs associated is UNPREDICTABLE. We remove all ITTEs,
-> +	 * since we cannot leave the memory unreferenced.
-> +	 */
-> +	list_for_each_entry_safe(itte, temp, &device->itt_head, itte_list)
-> +		its_free_itte(kvm, itte);
-> +
-> +	list_del(&device->dev_list);
-> +	kfree(device);
-> +}
-> +
-> +/* MAPD maps or unmaps a device ID to Interrupt Translation Tables (ITTs). */
-> +static int vgic_its_cmd_handle_mapd(struct kvm *kvm, struct vgic_its *its,
-> +				u64 *its_cmd)
-> +{
-> +	bool valid = its_cmd_get_validbit(its_cmd);
-> +	u32 device_id = its_cmd_get_deviceid(its_cmd);
-> +	struct its_device *device;
-> +	int ret = 0;
-> +
-> +	mutex_lock(&its->its_lock);
-> +
-> +	device = find_its_device(its, device_id);
-> +	if (device)
-> +		vgic_its_unmap_device(kvm, device);
-> +
-> +	/*
-> +	 * The spec does not say whether unmapping a not-mapped device
-> +	 * is an error, so we are done in any case.
-> +	 */
-> +	if (!valid)
-> +		goto out_unlock;
-> +
-> +	device = kzalloc(sizeof(struct its_device), GFP_KERNEL);
-> +	if (!device) {
-> +		ret = -ENOMEM;
-> +		goto out_unlock;
-> +	}
-> +
-> +	device->device_id = device_id;
-> +	INIT_LIST_HEAD(&device->itt_head);
-> +
-> +	list_add_tail(&device->dev_list, &its->device_list);
-> +
-> +out_unlock:
-> +	mutex_unlock(&its->its_lock);
-> +	return ret;
-> +}
-> +
-> +/* The MAPC command maps collection IDs to redistributors. */
-> +static int vgic_its_cmd_handle_mapc(struct kvm *kvm, struct vgic_its *its,
-> +				u64 *its_cmd)
-> +{
-> +	u16 coll_id;
-> +	u32 target_addr;
-> +	struct its_collection *collection;
-> +	bool valid;
-> +	int ret = 0;
-> +
-> +	valid = its_cmd_get_validbit(its_cmd);
-> +	coll_id = its_cmd_get_collection(its_cmd);
-> +	target_addr = its_cmd_get_target_addr(its_cmd);
-> +
-> +	if (target_addr >= atomic_read(&kvm->online_vcpus))
-> +		return E_ITS_MAPC_PROCNUM_OOR;
-> +
-> +	mutex_lock(&its->its_lock);
-> +
-> +	collection = find_collection(its, coll_id);
-> +
-> +	if (!valid) {
-> +		struct its_device *device;
-> +		struct its_itte *itte;
-> +		/*
-> +		 * Clearing the mapping for that collection ID removes the
-> +		 * entry from the list. If there wasn't any before, we can
-> +		 * go home early.
-> +		 */
-> +		if (!collection)
-> +			goto out_unlock;
-> +
-> +		for_each_lpi_its(device, itte, its)
-> +			if (itte->collection &&
-> +			    itte->collection->collection_id == coll_id)
-> +				itte->collection = NULL;
-> +
-> +		list_del(&collection->coll_list);
-> +		kfree(collection);
-> +	} else {
-> +		if (!collection) {
-> +			collection = kzalloc(sizeof(struct its_collection),
-> +					     GFP_KERNEL);
-> +			if (!collection) {
-> +				ret = -ENOMEM;
-> +				goto out_unlock;
-> +			}
-> +
-> +			vgic_its_init_collection(its, collection, coll_id);
-> +			collection->target_addr = target_addr;
-> +		} else {
-> +			collection->target_addr = target_addr;
-> +			update_affinity_collection(kvm, its, collection);
-> +		}
-> +	}
-> +
-> +out_unlock:
-> +	mutex_unlock(&its->its_lock);
-> +
-> +	return ret;
-> +}
-> +
-> +/* The CLEAR command removes the pending state for a particular LPI. */
-> +static int vgic_its_cmd_handle_clear(struct kvm *kvm, struct vgic_its *its,
-> +				 u64 *its_cmd)
-> +{
-> +	u32 device_id;
-> +	u32 event_id;
-> +	struct its_itte *itte;
-> +	int ret = 0;
-> +
-> +	device_id = its_cmd_get_deviceid(its_cmd);
-> +	event_id = its_cmd_get_id(its_cmd);
-> +
-> +	mutex_lock(&its->its_lock);
-> +
-> +	itte = find_itte(its, device_id, event_id);
-> +	if (!itte) {
-> +		ret = E_ITS_CLEAR_UNMAPPED_INTERRUPT;
-> +		goto out_unlock;
-> +	}
-> +
-> +	itte->irq->pending = false;
-> +
-> +out_unlock:
-> +	mutex_unlock(&its->its_lock);
-> +	return ret;
-> +}
-> +
-> +/* The INV command syncs the configuration bits from the memory table. */
-> +static int vgic_its_cmd_handle_inv(struct kvm *kvm, struct vgic_its *its,
-> +			       u64 *its_cmd)
-> +{
-> +	u32 device_id;
-> +	u32 event_id;
-> +	struct its_itte *itte;
-> +	int ret;
-> +
-> +	device_id = its_cmd_get_deviceid(its_cmd);
-> +	event_id = its_cmd_get_id(its_cmd);
-> +
-> +	mutex_lock(&its->its_lock);
-> +
-> +	itte = find_itte(its, device_id, event_id);
-> +	if (!itte) {
-> +		ret = E_ITS_INV_UNMAPPED_INTERRUPT;
-> +		goto out_unlock;
-> +	}
-> +
-> +	ret = update_lpi_config(kvm, itte->irq);
-> +
-> +out_unlock:
-> +	mutex_unlock(&its->its_lock);
-> +	return ret;
-> +}
-> +
-> +/*
-> + * The INVALL command requests flushing of all IRQ data in this collection.
-> + * Find the VCPU mapped to that collection, then iterate over the VM's list
-> + * of mapped LPIs and update the configuration for each IRQ which targets
-> + * the specified vcpu. The configuration will be read from the in-memory
-> + * configuration table.
-> + */
-> +static int vgic_its_cmd_handle_invall(struct kvm *kvm, struct vgic_its *its,
-> +				  u64 *its_cmd)
-> +{
-> +	u32 coll_id = its_cmd_get_collection(its_cmd);
-> +	struct its_collection *collection;
-> +	struct kvm_vcpu *vcpu;
-> +	struct vgic_irq *irq;
-> +	u32 *intids;
-> +	int irq_count, i;
-> +
-> +	mutex_lock(&its->its_lock);
-> +
-> +	collection = find_collection(its, coll_id);
-> +	if (!its_is_collection_mapped(collection))
-> +		return E_ITS_INVALL_UNMAPPED_COLLECTION;
-> +
-> +	vcpu = kvm_get_vcpu(kvm, collection->target_addr);
-> +
-> +	irq_count = vgic_its_copy_lpi_list(kvm, &intids);
-> +	if (irq_count < 0)
-> +		return irq_count;
-> +
-> +	for (i = 0; i < irq_count; i++) {
-> +		irq = vgic_get_irq(kvm, NULL, intids[i]);
-> +		if (!irq)
-> +			continue;
-> +		update_lpi_config_filtered(kvm, irq, vcpu);
-> +		vgic_put_irq_locked(kvm, irq);
+>
+>> +shift_store:
+>>      lsr     x11, x11, x12
+>> +store:
+>>      stp     x10, x11, [x1, #TSPEC_TV_SEC]
+>>      mov     x0, xzr
+>>      ret
+> I think it's simpler just to macroise this, which also avoids some of
+> the branches given that it ends in a ret anyway.
 
-Where is the lpi_list_lock taken? And why would we need it since we've
-copied everything already? By the look of it, this vgic_put_irq_locked
-should not exist at all, as the only other use case is quite dubious.
+Sounds good too, while we're at macroising things we might as well go all the way ;)
 
-> +	}
-> +
-> +	kfree(intids);
-> +
-> +	mutex_unlock(&its->its_lock);
-> +
-> +	return 0;
-> +}
-> +
-> +/*
-> + * The MOVALL command moves the pending state of all IRQs targeting one
-> + * redistributor to another. We don't hold the pending state in the VCPUs,
-> + * but in the IRQs instead, so there is really not much to do for us here.
-> + * However the spec says that no IRQ must target the old redistributor
-> + * afterwards, so we make sure that no LPI is using the associated target_vcpu.
-> + * This command affects all LPIs in the system.
-> + */
-> +static int vgic_its_cmd_handle_movall(struct kvm *kvm, struct vgic_its *its,
-> +				  u64 *its_cmd)
-> +{
-> +	struct vgic_dist *dist = &kvm->arch.vgic;
-> +	u32 target1_addr = its_cmd_get_target_addr(its_cmd);
-> +	u32 target2_addr = its_cmd_mask_field(its_cmd, 3, 16, 32);
-> +	struct kvm_vcpu *vcpu1, *vcpu2;
-> +	struct vgic_irq *irq;
-> +
-> +	if (target1_addr >= atomic_read(&kvm->online_vcpus) ||
-> +	    target2_addr >= atomic_read(&kvm->online_vcpus))
-> +		return E_ITS_MOVALL_PROCNUM_OOR;
-> +
-> +	if (target1_addr == target2_addr)
-> +		return 0;
-> +
-> +	vcpu1 = kvm_get_vcpu(kvm, target1_addr);
-> +	vcpu2 = kvm_get_vcpu(kvm, target2_addr);
-> +
-> +	spin_lock(&dist->lpi_list_lock);
-> +
-> +	list_for_each_entry(irq, &dist->lpi_list_head, lpi_entry) {
-> +		spin_lock(&irq->irq_lock);
-> +
-> +		if (irq->target_vcpu == vcpu1)
-> +			irq->target_vcpu = vcpu2;
-> +
-> +		spin_unlock(&irq->irq_lock);
-> +	}
-> +
-> +	spin_unlock(&dist->lpi_list_lock);
-> +
-> +	return 0;
-> +}
-> +
-> +/*
-> + * This function is called with the its_cmd lock held, but the ITS data
-> + * structure lock dropped. It is within the responsibility of the actual
-> + * command handlers to take care of proper locking when needed.
-> + */
-> +static int vgic_its_handle_command(struct kvm *kvm, struct vgic_its *its,
->  			       u64 *its_cmd)
->  {
-> -	return -ENODEV;
-> +	u8 cmd = its_cmd_get_command(its_cmd);
-> +	int ret = -ENODEV;
-> +
-> +	switch (cmd) {
-> +	case GITS_CMD_MAPD:
-> +		ret = vgic_its_cmd_handle_mapd(kvm, its, its_cmd);
-> +		break;
-> +	case GITS_CMD_MAPC:
-> +		ret = vgic_its_cmd_handle_mapc(kvm, its, its_cmd);
-> +		break;
-> +	case GITS_CMD_MAPI:
-> +		ret = vgic_its_cmd_handle_mapi(kvm, its, its_cmd, cmd);
-> +		break;
-> +	case GITS_CMD_MAPTI:
-> +		ret = vgic_its_cmd_handle_mapi(kvm, its, its_cmd, cmd);
-> +		break;
-> +	case GITS_CMD_MOVI:
-> +		ret = vgic_its_cmd_handle_movi(kvm, its, its_cmd);
-> +		break;
-> +	case GITS_CMD_DISCARD:
-> +		ret = vgic_its_cmd_handle_discard(kvm, its, its_cmd);
-> +		break;
-> +	case GITS_CMD_CLEAR:
-> +		ret = vgic_its_cmd_handle_clear(kvm, its, its_cmd);
-> +		break;
-> +	case GITS_CMD_MOVALL:
-> +		ret = vgic_its_cmd_handle_movall(kvm, its, its_cmd);
-> +		break;
-> +	case GITS_CMD_INV:
-> +		ret = vgic_its_cmd_handle_inv(kvm, its, its_cmd);
-> +		break;
-> +	case GITS_CMD_INVALL:
-> +		ret = vgic_its_cmd_handle_invall(kvm, its, its_cmd);
-> +		break;
-> +	case GITS_CMD_SYNC:
-> +		/* we ignore this command: we are in sync all of the time */
-> +		ret = 0;
-> +		break;
-> +	}
+> Fixup patch below. If you fold it in, then:
+>
+> Acked-by: Will Deacon <will.deacon@arm.com>
+>
+> for the series.
 
-Given that most commands do take the its mutex, it would make a lot of
-sense to move the locking here, and remove it from all of the other
-commands. This will streamline the code.
-
-> +
-> +	return ret;
->  }
->  
->  static u64 vgic_sanitise_its_baser(u64 reg)
-> @@ -403,7 +1004,7 @@ static void vgic_mmio_write_its_cwriter(struct kvm *kvm, struct vgic_its *its,
->  		 * We just ignore that command then.
->  		 */
->  		if (!ret)
-> -			vits_handle_command(kvm, its, cmd_buf);
-> +			vgic_its_handle_command(kvm, its, cmd_buf);
-
-Care to solve this function renaming nit?
-
->  
->  		its->creadr += ITS_CMD_SIZE;
->  		if (its->creadr == ITS_CMD_BUFFER_SIZE(its->cbaser))
-> 
+I just have one small concern with your fixup patch: the ALIGN macro from linkage.h
+(not the one from kernel.h, which is for C, not assembly) uses 0x90 as padding, which
+apparently is NOP on x86 but does not make much sense on ARM64 (or ARM for that
+matter). It is not currently used in arm{,64}. I am not sure if it could decode to a
+valid instruction on ARM64, but maybe using simply 0x0 as a padding byte would be
+less arbitrary. I also don't like this ALIGN macro too much, because the "4" argument
+means something different depending on the architecture (4 bytes on x86, 2^4 on arm*:
+https://sourceware.org/binutils/docs/as/Align.html).
 
 Thanks,
+Kevin
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+>
+> Will
+>
+> --->8
+>
+> diff --git a/arch/arm64/kernel/vdso/gettimeofday.S b/arch/arm64/kernel/vdso/gettimeofday.S
+> index f49b6755058a..85969cd2b2f7 100644
+> --- a/arch/arm64/kernel/vdso/gettimeofday.S
+> +++ b/arch/arm64/kernel/vdso/gettimeofday.S
+> @@ -115,6 +115,15 @@ x_tmp            .req    x8
+>   9998:
+>       .endm
+>
+> +     .macro clock_gettime_return, shift=0
+> +     .if \shift == 1
+> +     lsr     x11, x11, x12
+> +     .endif
+> +     stp     x10, x11, [x1, #TSPEC_TV_SEC]
+> +     mov     x0, xzr
+> +     ret
+> +     .endm
+> +
+>       .macro jump_slot jumptable, index, label
+>       .if (. - \jumptable) != 4 * (\index)
+>               .error "Jump slot index mismatch"
+> @@ -180,6 +189,7 @@ ENTRY(__kernel_clock_gettime)
+>       add     x_tmp, x_tmp, w0, uxtw #2
+>       br      x_tmp
+>
+> +     ALIGN
+>   jumptable:
+>       jump_slot jumptable, CLOCK_REALTIME, realtime
+>       jump_slot jumptable, CLOCK_MONOTONIC, monotonic
+> @@ -193,6 +203,7 @@ jumptable:
+>       .error  "Wrong jumptable size"
+>       .endif
+>
+> +     ALIGN
+>   realtime:
+>       seqcnt_acquire
+>       syscall_check fail=syscall
+> @@ -209,9 +220,9 @@ realtime:
+>       get_clock_shifted_nsec res=x15, cycle_last=x10, mult=x11
+>       get_ts_realtime res_sec=x10, res_nsec=x11, \
+>               clock_nsec=x15, xtime_sec=x13, xtime_nsec=x14, nsec_to_sec=x9
+> +     clock_gettime_return, shift=1
+>
+> -     b shift_store
+> -
+> +     ALIGN
+>   monotonic:
+>       seqcnt_acquire
+>       syscall_check fail=syscall
+> @@ -232,9 +243,9 @@ monotonic:
+>               clock_nsec=x15, xtime_sec=x13, xtime_nsec=x14, nsec_to_sec=x9
+>
+>       add_ts sec=x10, nsec=x11, ts_sec=x3, ts_nsec=x4, nsec_to_sec=x9
+> +     clock_gettime_return, shift=1
+>
+> -     b shift_store
+> -
+> +     ALIGN
+>   monotonic_raw:
+>       seqcnt_acquire
+>       syscall_check fail=syscall
+> @@ -254,16 +265,16 @@ monotonic_raw:
+>               clock_nsec=x15, nsec_to_sec=x9
+>
+>       add_ts sec=x10, nsec=x11, ts_sec=x13, ts_nsec=x14, nsec_to_sec=x9
+> +     clock_gettime_return, shift=1
+>
+> -     b shift_store
+> -
+> +     ALIGN
+>   realtime_coarse:
+>       seqcnt_acquire
+>       ldp     x10, x11, [vdso_data, #VDSO_XTIME_CRS_SEC]
+>       seqcnt_check fail=realtime_coarse
+> +     clock_gettime_return
+>
+> -     b store
+> -
+> +     ALIGN
+>   monotonic_coarse:
+>       seqcnt_acquire
+>       ldp     x10, x11, [vdso_data, #VDSO_XTIME_CRS_SEC]
+> @@ -273,16 +284,9 @@ monotonic_coarse:
+>       /* Computations are done in (non-shifted) nsecs. */
+>       get_nsec_per_sec res=x9
+>       add_ts sec=x10, nsec=x11, ts_sec=x13, ts_nsec=x14, nsec_to_sec=x9
+> +     clock_gettime_return
+>
+> -     b store
+> -
+> -shift_store:
+> -     lsr     x11, x11, x12
+> -store:
+> -     stp     x10, x11, [x1, #TSPEC_TV_SEC]
+> -     mov     x0, xzr
+> -     ret
+> -
+> +     ALIGN
+>   syscall: /* Syscall fallback. */
+>       mov     x8, #__NR_clock_gettime
+>       svc     #0
+>
+
+IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
