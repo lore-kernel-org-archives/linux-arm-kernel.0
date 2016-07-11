@@ -1,65 +1,17 @@
-From: d-gerlach@ti.com (Dave Gerlach)
-Date: Mon, 11 Jul 2016 16:50:12 -0500
-Subject: [PATCH] Revert "ARM: AM33xx: fix module_wait_ready without
- clkctrl register"
-In-Reply-To: <578412ED.7020707@ti.com>
-References: <20160711213938.28385-1-d-gerlach@ti.com> <578412ED.7020707@ti.com>
-Message-ID: <57841494.5040401@ti.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 12 Jul 2016 00:50:16 +0300
+Subject: [PATCH 0/2] R8A7792 clock fixes
+Message-ID: <1529351.Fac5N2tKoF@wasted.cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/11/2016 04:43 PM, Dave Gerlach wrote:
-> Hi,
-> On 07/11/2016 04:39 PM, Dave Gerlach wrote:
->> This reverts commit 183e2077d007aa4b697efba095ecfea7244a6107.
->>
->
-> This is a fix for an external abort seen on am335x platforms during boot
-> on next-20160711. The offending patch was merged to next on
-> next-20160705 and I haven't seen any ill effects from reverting it with
-> this patch, and the external abort goes away entirely with it reverted.
->
+Hello.
 
-Failure can be seen here [1].
+   Here's the set of 2 patches against Simon Horman's 'renesas.git' repo,
+'renesas-devel-20160711-v4.7-rc7' tag. I've found a couple of issues in the
+R8A7792 DT clock descriptions, so these patches are targeted as fixes for 4.8.
 
-Regards,
-Dave
+[1/2] ARM: dts: r8a7792: add PLL1 divided by 2 clock
+[2/2] ARM: dts: r8a7792: remove ADSP clock
 
-[1] 
-https://storage.kernelci.org/next/next-20160711/arm-omap2plus_defconfig/lab-baylibre-seattle/boot-am335x-boneblack.html
-
-> Regards,
-> Dave
->
->> The original patch added a check to am33xx_cm_wait_module_ready for a
->> clkctrl offset of 0 as an invalid case, however, clkctrl offset of 0 is
->> perfectly valid for hwmods, in particular the rtc.
->>
->> Without reverting this patch sometimes external aborts are seen on
->> am335x during boot. This is due to the am33xx_cm_wait_module_ready
->> function immediately returning 0 rather than waiting for the RTC_CLKCTRL
->> register to indicate it is actually ready before rtc register accesses
->> happen.
->>
->> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
->> ---
->>   arch/arm/mach-omap2/cm33xx.c | 3 ---
->>   1 file changed, 3 deletions(-)
->>
->> diff --git a/arch/arm/mach-omap2/cm33xx.c b/arch/arm/mach-omap2/cm33xx.c
->> index c073fb57dd13..7b181f929525 100644
->> --- a/arch/arm/mach-omap2/cm33xx.c
->> +++ b/arch/arm/mach-omap2/cm33xx.c
->> @@ -220,9 +220,6 @@ static int am33xx_cm_wait_module_ready(u8 part,
->> s16 inst, u16 clkctrl_offs,
->>   {
->>       int i = 0;
->>
->> -    if (!clkctrl_offs)
->> -        return 0;
->> -
->>       omap_test_timeout(_is_module_ready(inst, clkctrl_offs),
->>                 MAX_MODULE_READY_TIME, i);
->>
->>
->
+WBR, Sergei
