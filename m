@@ -1,79 +1,99 @@
-From: dianders@google.com (Doug Anderson)
-Date: Mon, 11 Jul 2016 09:53:12 -0700
-Subject: [PATCH v3 12/14] regulator: pwm: Retrieve correct voltage
-In-Reply-To: <20160711070251.GA5823@ulmo.ba.sec>
-References: <1465895602-31008-1-git-send-email-boris.brezillon@free-electrons.com>
- <1465895602-31008-13-git-send-email-boris.brezillon@free-electrons.com>
- <20160708154302.GC1151@ulmo.ba.sec> <20160709094718.GB6247@sirena.org.uk>
- <20160711070251.GA5823@ulmo.ba.sec>
-Message-ID: <CAD=FV=WoUi4kNHW1h6XCezJyYUXbWLXj3yPYg+W-qhMAjpPn4A@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 11 Jul 2016 17:59:09 +0100
+Subject: [PATCH v8 14/17] KVM: arm64: allow updates of LPI configuration
+ table
+In-Reply-To: <20160705112309.28877-15-andre.przywara@arm.com>
+References: <20160705112309.28877-1-andre.przywara@arm.com>
+ <20160705112309.28877-15-andre.przywara@arm.com>
+Message-ID: <5783D05D.10508@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 05/07/16 12:23, Andre Przywara wrote:
+> The (system-wide) LPI configuration table is held in a table in
+> (guest) memory. To achieve reasonable performance, we cache this data
+> in our struct vgic_irq. If the guest updates the configuration data
+> (which consists of the enable bit and the priority value), it issues
+> an INV or INVALL command to allow us to update our information.
+> Provide functions that update that information for one LPI or all LPIs
+> mapped to a specific collection.
+> 
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> ---
+>  virt/kvm/arm/vgic/vgic-its.c | 45 ++++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 45 insertions(+)
+> 
+> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+> index 29bb4fe..5de71bd 100644
+> --- a/virt/kvm/arm/vgic/vgic-its.c
+> +++ b/virt/kvm/arm/vgic/vgic-its.c
+> @@ -94,6 +94,51 @@ struct its_itte {
+>  
+>  #define CBASER_ADDRESS(x)	((x) & GENMASK_ULL(51, 12))
+>  #define PENDBASER_ADDRESS(x)	((x) & GENMASK_ULL(51, 16))
+> +#define PROPBASER_ADDRESS(x)	((x) & GENMASK_ULL(51, 12))
 
-On Mon, Jul 11, 2016 at 12:02 AM, Thierry Reding
-<thierry.reding@gmail.com> wrote:
-> On Sat, Jul 09, 2016 at 11:47:18AM +0200, Mark Brown wrote:
->> On Fri, Jul 08, 2016 at 05:43:02PM +0200, Thierry Reding wrote:
->>
->> > Mark, do you want me to provide a stable branch with the PWM regulator
->> > patches and resolve that conflict in your tree? Or would you rather take
->> > the whole set based on a stable branch from the PWM tree? Or maybe yet
->> > another possibility would be to base the PWM tree on a stable branch
->> > from the regulator tree containing the above commit.
->>
->> Probably easiest to use this signed tag and resolve it in your tree:
->>
->> The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
->>
->>   Linux 4.7-rc1 (2016-05-29 09:29:24 -0700)
->>
->> are available in the git repository at:
->>
->>   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/regulator.git tags/pwm-modernization
->>
->> for you to fetch changes up to c2588393e6315ab68207323d37d2a73713d6bc81:
->>
->>   regulator: pwm: Fix regulator ramp delay for continuous mode (2016-07-07 11:45:06 +0200)
->>
->> ----------------------------------------------------------------
->> regulator: Provide a branch for moderninzation of the PWM code
->>
->> There's a new, improved PWM API which allows a lot of improvements in
->> the PWM regulator driver.  Since the bulk of the changes are in the PWM
->> API this is being managed in the PWM tree, merge pending regulator API
->> changes to allow this to be resolved more easily.
->>
->> ----------------------------------------------------------------
->> Alexandre Courbot (1):
->>       regulator: pwm: Support for enable GPIO
->>
->> Boris Brezillon (1):
->>       regulator: pwm: Drop unneeded pwm_enable() call
->>
->> Douglas Anderson (1):
->>       regulator: pwm: Fix regulator ramp delay for continuous mode
->>
->>  .../bindings/regulator/pwm-regulator.txt           |  7 +++-
->>  drivers/regulator/pwm-regulator.c                  | 40 ++++++++++++++++++----
->>  2 files changed, 39 insertions(+), 8 deletions(-)
->
-> Merged into for-4.8/regulator of the PWM tree and rebased Boris'
-> pwm-regulator patches on top.
->
-> Boris, everything looks right to me, but can you take a quick look to
-> see if it all matches up with what you expect?
+52 bits...
 
-As I mentioned in the other thread about the linuxnext conflict,
-pwm_regulator_set_voltage() is wrong.
+> +
+> +#define GIC_LPI_OFFSET 8192
+> +
+> +#define LPI_PROP_ENABLE_BIT(p)	((p) & LPI_PROP_ENABLED)
+> +#define LPI_PROP_PRIORITY(p)	((p) & 0xfc)
+> +
+> +/*
+> + * Reads the configuration data for a given LPI from guest memory and
+> + * updates the fields in struct vgic_irq.
+> + * If filter_vcpu is not NULL, applies only if the IRQ is targeting this
+> + * VCPU. Unconditionally applies if filter_vcpu is NULL.
+> + */
+> +static int update_lpi_config_filtered(struct kvm *kvm, struct vgic_irq *irq,
+> +				      struct kvm_vcpu *filter_vcpu)
+> +{
+> +	u64 propbase = PROPBASER_ADDRESS(kvm->arch.vgic.propbaser);
+> +	u8 prop;
+> +	int ret;
+> +
+> +	ret = kvm_read_guest(kvm, propbase + irq->intid - GIC_LPI_OFFSET,
+> +			     &prop, 1);
+> +
+> +	if (ret)
+> +		return ret;
+> +
+> +	spin_lock(&irq->irq_lock);
+> +
+> +	if (!filter_vcpu || filter_vcpu == irq->target_vcpu) {
+> +		irq->priority = LPI_PROP_PRIORITY(prop);
+> +		irq->enabled = LPI_PROP_ENABLE_BIT(prop);
+> +
+> +		vgic_queue_irq_unlock(kvm, irq);
+> +	} else {
+> +		spin_unlock(&irq->irq_lock);
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +/* Updates the priority and enable bit for a given LPI. */
+> +int update_lpi_config(struct kvm *kvm, struct vgic_irq *irq)
 
-You have:
+static?
 
-  ramp_delay = DIV_ROUND_UP(abs(min_uV - old_uV), ramp_delay);
+> +{
+> +	return update_lpi_config_filtered(kvm, irq, NULL);
+> +}
 
-You should have:
+I think you can drop the "_filtered" thing, and just have a
+update_lpi_config() that takes a vcpu parameter. The comment at the top
+is clear enough about the use case.
 
-  ramp_delay = DIV_ROUND_UP(abs(req_min_uV - old_uV), ramp_delay);
+>  
+>  static int vgic_its_copy_lpi_list(struct kvm *kvm, u32 **intid_ptr)
+>  {
+> 
 
--Doug
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
