@@ -1,58 +1,74 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Mon, 11 Jul 2016 16:19:35 +0900
-Subject: [RFC] arm64: kexec_file_load support
-In-Reply-To: <11139482.zLvCKVycQr@hactar>
-References: <20160701051111.GL20774@linaro.org>
- <20160705080355.GQ20774@linaro.org>
- <20160707061245.GA18459@dhcp-128-65.nay.redhat.com>
- <11139482.zLvCKVycQr@hactar>
-Message-ID: <20160711071934.GZ20774@linaro.org>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Mon, 11 Jul 2016 09:20:24 +0200
+Subject: [PATCH v3 12/14] regulator: pwm: Retrieve correct voltage
+In-Reply-To: <20160711070251.GA5823@ulmo.ba.sec>
+References: <1465895602-31008-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1465895602-31008-13-git-send-email-boris.brezillon@free-electrons.com>
+ <20160708154302.GC1151@ulmo.ba.sec>
+ <20160709094718.GB6247@sirena.org.uk>
+ <20160711070251.GA5823@ulmo.ba.sec>
+Message-ID: <20160711092024.6cbd1c88@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 08, 2016 at 11:48:44AM -0300, Thiago Jung Bauermann wrote:
-> Am Donnerstag, 07 Juli 2016, 14:12:45 schrieb Dave Young:
-> > If so maybe change a bit from your precious mentioned 7 args proposal like
-> > below?
+On Mon, 11 Jul 2016 09:02:51 +0200
+Thierry Reding <thierry.reding@gmail.com> wrote:
+
+> On Sat, Jul 09, 2016 at 11:47:18AM +0200, Mark Brown wrote:
+> > On Fri, Jul 08, 2016 at 05:43:02PM +0200, Thierry Reding wrote:
+> >   
+> > > Mark, do you want me to provide a stable branch with the PWM regulator
+> > > patches and resolve that conflict in your tree? Or would you rather take
+> > > the whole set based on a stable branch from the PWM tree? Or maybe yet
+> > > another possibility would be to base the PWM tree on a stable branch
+> > > from the regulator tree containing the above commit.  
 > > 
-> > struct kexec_file_fd {
-> > 	enum kexec_file_type;
-> > 	int fd;
-> > }
+> > Probably easiest to use this signed tag and resolve it in your tree:
 > > 
-> > struct kexec_fdset {
-> > 	int nr_fd;
-> > 	struct kexec_file_fd fd[0];
-> > }
+> > The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
 > > 
-> > int kexec_file_load(int kernel_fd, int initrd_fd,
-> > 		    unsigned long cmdline_len, const char *cmdline_ptr,
-> > 		    unsigned long flags, struct kexec_fdset *extra_fds);
+> >   Linux 4.7-rc1 (2016-05-29 09:29:24 -0700)
+> > 
+> > are available in the git repository at:
+> > 
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/regulator.git tags/pwm-modernization
+> > 
+> > for you to fetch changes up to c2588393e6315ab68207323d37d2a73713d6bc81:
+> > 
+> >   regulator: pwm: Fix regulator ramp delay for continuous mode (2016-07-07 11:45:06 +0200)
+> > 
+> > ----------------------------------------------------------------
+> > regulator: Provide a branch for moderninzation of the PWM code
+> > 
+> > There's a new, improved PWM API which allows a lot of improvements in
+> > the PWM regulator driver.  Since the bulk of the changes are in the PWM
+> > API this is being managed in the PWM tree, merge pending regulator API
+> > changes to allow this to be resolved more easily.
+> > 
+> > ----------------------------------------------------------------
+> > Alexandre Courbot (1):
+> >       regulator: pwm: Support for enable GPIO
+> > 
+> > Boris Brezillon (1):
+> >       regulator: pwm: Drop unneeded pwm_enable() call
+> > 
+> > Douglas Anderson (1):
+> >       regulator: pwm: Fix regulator ramp delay for continuous mode
+> > 
+> >  .../bindings/regulator/pwm-regulator.txt           |  7 +++-
+> >  drivers/regulator/pwm-regulator.c                  | 40 ++++++++++++++++++----
+> >  2 files changed, 39 insertions(+), 8 deletions(-)  
 > 
+> Merged into for-4.8/regulator of the PWM tree and rebased Boris'
+> pwm-regulator patches on top.
 > 
-> Is there a way for the kernel to distinguish whether the process passed 5 or 
-> 6 arguments? How can it know whether extra_fds is a valid argument or just 
-> garbage? I think we have to define a new flag KEXEC_FILE_EXTRA_FDS so that 
-> the process can signal that it is using the new interface.
+> Boris, everything looks right to me, but can you take a quick look to
+> see if it all matches up with what you expect?
 
-Good point. What I had in my mind is "open" system call.
-Glibc's implementation of open() checks for the second argument, flags,
-to determine whether or not the third argument, mode, is required.
-
-So our current consensus is that, for the time being, we will extend
-the existing system call interface to allow extra file descriptors,
-and *if* we really need a different type of parameters in the future,
-we will add another system call.
-
-If we all agree, I can post a kernel patch for this change as a RFC.
-(I've already verified it with my prototype of kexec_file_load support
-on arm64.)
+It looks good, but I won't be able to test it on real hardware until
+next week.
+Heiko, Brian, can you try this pwm/for-4.8/regulator branch?
 
 Thanks,
--Takahiro AKASHI
 
-> -- 
-> []'s
-> Thiago Jung Bauermann
-> IBM Linux Technology Center
-> 
+Boris
