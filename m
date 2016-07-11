@@ -1,59 +1,192 @@
 From: ykk@rock-chips.com (Yakir Yang)
-Date: Mon, 11 Jul 2016 19:05:39 +0800
-Subject: [PATCH v1 2/6] drm/rockchip: dw_hdmi: adjust cklvl & txlvl for RF/EMI
+Date: Mon, 11 Jul 2016 19:05:42 +0800
+Subject: [PATCH v1 3/6] drm/rockchip: dw_hdmi: Use auto-generated tables
 In-Reply-To: <1468235079-29152-1-git-send-email-ykk@rock-chips.com>
 References: <1468235079-29152-1-git-send-email-ykk@rock-chips.com>
-Message-ID: <1468235139-29460-1-git-send-email-ykk@rock-chips.com>
+Message-ID: <1468235142-29503-1-git-send-email-ykk@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dut to the high HDMI signal voltage driver, Mickey have meet
-a serious RF/EMI problem, so we decided to reduce HDMI signal
-voltage to a proper value.
+From: Douglas Anderson <dianders@chromium.org>
 
-The default params for phy is cklvl = 20 & txlvl = 13 (RF/EMI failed)
-  ck: lvl = 13, term=100, vlo = 2.71, vhi=3.14, vswing = 0.43
-  tx: lvl = 20, term=100, vlo = 2.81, vhi=3.16, vswing = 0.35
+The previous tables for mpll_cfg and curr_ctrl were created using the
+20-pages of example settings provided by the PHY vendor.  Those
+example settings weren't particularly dense, so there were places
+where we were guessing what the settings would be for 10-bit and
+12-bit (not that we use those anyway).  It was also always a lot of
+extra work every time we wanted to add a new clock rate since we had
+to cross-reference several tables.
 
-1. We decided to reduce voltage value to lower, but VSwing still
-keep high, RF/EMI have been improved but still failed.
-   ck: lvl =  6, term=100, vlo = 2.61, vhi=3.11, vswing = 0.50
-   tx: lvl =  6, term=100, vlo = 2.61, vhi=3.11, vswing = 0.50
+In <http://crosreview.com/285855> I've gone through the work to figure
+out how to generate this table automatically.  Let's now use the
+automatically generated table and then we'll never need to look at it
+again.
 
-2. We try to keep voltage value and vswing both lower, then RF/EMI
-test all passed  ;)
-   ck: lvl = 11, term= 66, vlo = 2.68, vhi=3.09, vswing = 0.40
-   tx: lvl = 11, term= 66, vlo = 2.68, vhi=3.09, vswing = 0.40
-When we back to run HDMI different test and single-end test, we see
-different test passed, but signle-end test failed. The oscilloscope
-show that simgle-end clock's VL value is 1.78v (which remind LowLimit
-should not lower then 2.6v).
+We only support 8-bit mode right now and only support a small number
+of clock rates and and I've verified that the only 8-bit rate that was
+affected was 148.5.  That mode appears to have been wrong in the old
+table.
 
-3. That's to say there are some different between PHY document and
-measure value. And according to experiment 2 results, we need to
-higher clock voltage and lower data voltage, then we can keep RF/EMI
-satisfied and single-end & differen test passed.
-  ck: lvl =  9, term=100, vlo = 2.65, vhi=3.12, vswing = 0.47
-  tx: lvl = 16, term=100, vlo = 2.75, vhi=3.15, vswing = 0.39
-
+Signed-off-by: Douglas Anderson <dianders@chromium.org>
 Signed-off-by: Yakir Yang <ykk@rock-chips.com>
-Reviewed-by: Douglas Anderson <dianders@chromium.org>
+Reviewed-by: St?phane Marchesin <marcheu@chromium.org>
 ---
- drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c | 130 +++++++++++++++-------------
+ 1 file changed, 69 insertions(+), 61 deletions(-)
 
 diff --git a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
-index a621118..cdb63ac 100644
+index cdb63ac..8cb9ed2 100644
 --- a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
 +++ b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
-@@ -124,7 +124,7 @@ static const struct dw_hdmi_curr_ctrl rockchip_cur_ctr[] = {
- static const struct dw_hdmi_phy_config rockchip_phy_config[] = {
- 	/*pixelclk   symbol   term   vlev*/
- 	{ 74250000,  0x8009, 0x0004, 0x0272},
--	{ 148500000, 0x802b, 0x0004, 0x028d},
-+	{ 165000000, 0x802b, 0x0004, 0x0209},
- 	{ 297000000, 0x8039, 0x0005, 0x028d},
- 	{ ~0UL,	     0x0000, 0x0000, 0x0000}
+@@ -34,80 +34,88 @@ struct rockchip_hdmi {
+ 
+ static const struct dw_hdmi_mpll_config rockchip_mpll_cfg[] = {
+ 	{
+-		27000000, {
+-			{ 0x00b3, 0x0000},
+-			{ 0x2153, 0x0000},
+-			{ 0x40f3, 0x0000}
++		30666000, {
++			{ 0x00b3, 0x0000 },
++			{ 0x2153, 0x0000 },
++			{ 0x40f3, 0x0000 },
+ 		},
+-	}, {
+-		36000000, {
+-			{ 0x00b3, 0x0000},
+-			{ 0x2153, 0x0000},
+-			{ 0x40f3, 0x0000}
++	},  {
++		36800000, {
++			{ 0x00b3, 0x0000 },
++			{ 0x2153, 0x0000 },
++			{ 0x40a2, 0x0001 },
+ 		},
+-	}, {
+-		40000000, {
+-			{ 0x00b3, 0x0000},
+-			{ 0x2153, 0x0000},
+-			{ 0x40f3, 0x0000}
++	},  {
++		46000000, {
++			{ 0x00b3, 0x0000 },
++			{ 0x2142, 0x0001 },
++			{ 0x40a2, 0x0001 },
+ 		},
+-	}, {
+-		54000000, {
+-			{ 0x0072, 0x0001},
+-			{ 0x2142, 0x0001},
+-			{ 0x40a2, 0x0001},
++	},  {
++		61333000, {
++			{ 0x0072, 0x0001 },
++			{ 0x2142, 0x0001 },
++			{ 0x40a2, 0x0001 },
+ 		},
+-	}, {
+-		65000000, {
+-			{ 0x0072, 0x0001},
+-			{ 0x2142, 0x0001},
+-			{ 0x40a2, 0x0001},
++	},  {
++		73600000, {
++			{ 0x0072, 0x0001 },
++			{ 0x2142, 0x0001 },
++			{ 0x4061, 0x0002 },
+ 		},
+-	}, {
+-		66000000, {
+-			{ 0x013e, 0x0003},
+-			{ 0x217e, 0x0002},
+-			{ 0x4061, 0x0002}
++	},  {
++		92000000, {
++			{ 0x0072, 0x0001 },
++			{ 0x2145, 0x0002 },
++			{ 0x4061, 0x0002 },
++		},
++	},  {
++		122666000, {
++			{ 0x0051, 0x0002 },
++			{ 0x2145, 0x0002 },
++			{ 0x4061, 0x0002 },
+ 		},
+-	}, {
+-		74250000, {
+-			{ 0x0072, 0x0001},
+-			{ 0x2145, 0x0002},
+-			{ 0x4061, 0x0002}
++	},  {
++		147200000, {
++			{ 0x0051, 0x0002 },
++			{ 0x2145, 0x0002 },
++			{ 0x4064, 0x0003 },
+ 		},
+-	}, {
+-		83500000, {
+-			{ 0x0072, 0x0001},
++	},  {
++		184000000, {
++			{ 0x0051, 0x0002 },
++			{ 0x214c, 0x0003 },
++			{ 0x4064, 0x0003 },
+ 		},
+-	}, {
+-		108000000, {
+-			{ 0x0051, 0x0002},
+-			{ 0x2145, 0x0002},
+-			{ 0x4061, 0x0002}
++	},  {
++		226666000, {
++			{ 0x0040, 0x0003 },
++			{ 0x214c, 0x0003 },
++			{ 0x4064, 0x0003 },
+ 		},
+-	}, {
+-		106500000, {
+-			{ 0x0051, 0x0002},
+-			{ 0x2145, 0x0002},
+-			{ 0x4061, 0x0002}
++	},  {
++		272000000, {
++			{ 0x0040, 0x0003 },
++			{ 0x214c, 0x0003 },
++			{ 0x5a64, 0x0003 },
+ 		},
+-	}, {
+-		146250000, {
+-			{ 0x0051, 0x0002},
+-			{ 0x2145, 0x0002},
+-			{ 0x4061, 0x0002}
++	},  {
++		340000000, {
++			{ 0x0040, 0x0003 },
++			{ 0x3b4c, 0x0003 },
++			{ 0x5a64, 0x0003 },
+ 		},
+-	}, {
+-		148500000, {
+-			{ 0x0051, 0x0003},
+-			{ 0x214c, 0x0003},
+-			{ 0x4064, 0x0003}
++	},  {
++		600000000, {
++			{ 0x1a40, 0x0003 },
++			{ 0x3b4c, 0x0003 },
++			{ 0x5a64, 0x0003 },
+ 		},
+-	}, {
++	},  {
+ 		~0UL, {
+-			{ 0x00a0, 0x000a },
+-			{ 0x2001, 0x000f },
+-			{ 0x4002, 0x000f },
++			{ 0x0000, 0x0000 },
++			{ 0x0000, 0x0000 },
++			{ 0x0000, 0x0000 },
+ 		},
+ 	}
  };
 -- 
 1.9.1
