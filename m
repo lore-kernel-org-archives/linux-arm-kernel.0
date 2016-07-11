@@ -1,68 +1,49 @@
-From: mturquette@baylibre.com (Michael Turquette)
-Date: Mon, 11 Jul 2016 15:20:10 -0700
-Subject: [PATCH v8 1/9] clk: ti: am335x/am4372: Add tbclk to pwm node
-In-Reply-To: <1462291015-1919-2-git-send-email-fcooper@ti.com>
-References: <1462291015-1919-1-git-send-email-fcooper@ti.com>
- <1462291015-1919-2-git-send-email-fcooper@ti.com>
-Message-ID: <146827561017.73491.3564276289319851088@resonance>
+From: andy.gross@linaro.org (Andy Gross)
+Date: Mon, 11 Jul 2016 17:38:27 -0500
+Subject: [PATCH 2/3] regulator: qcom_smd: Fix voltage ranges for pma8084
+ ftsmps and pldo
+In-Reply-To: <20160711215009.4519-3-sboyd@codeaurora.org>
+References: <20160711215009.4519-1-sboyd@codeaurora.org>
+ <20160711215009.4519-3-sboyd@codeaurora.org>
+Message-ID: <20160711223827.GA6053@hector.attlocal.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Franklin S Cooper Jr (2016-05-03 08:56:47)
-> Add tblck to the pwm nodes. This insures that the ehrpwm driver has access
+On Mon, Jul 11, 2016 at 02:50:08PM -0700, Stephen Boyd wrote:
+> The voltage ranges listed here are wrong. The pma8084 pldo
+> supports three different overlapping voltage ranges with
+> differing step sizes and the pma8084 ftsmps supports two. These
+> ranges can be seen in the "native" spmi regulator driver
+> (qcom_spmi-regulator.c) at pldo_ranges[] and ftsmps_ranges[]
+> respectively. Port these ranges over to the RPM SMD regulator
+> driver so that we list the appropriate set of supported voltages
+> on these types of regulators.
+> 
+> Cc: Andy Gross <andy.gross@linaro.org>
+> Cc: Bjorn Andersson <bjorn.andersson@linaro.org>
+> Fixes: ee01d0c91ef1 ("regulator: qcom-smd: Add support for PMA8084")
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 
-s/tblck/tbclk/
+<snip>
 
-I see you have acks already. What tree should this patch go through?
+>  static const struct regulator_desc pma8084_pldo = {
+>  	.linear_ranges = (struct regulator_linear_range[]) {
+> -		REGULATOR_LINEAR_RANGE(750000,  0,  30, 25000),
+> -		REGULATOR_LINEAR_RANGE(1500000, 31, 99, 50000),
+> +		REGULATOR_LINEAR_RANGE( 750000,  0,  63, 12500),
+
+It was my understanding that the PMOS ldos only support 25mV and 50mV
+incremements.
+
+> +		REGULATOR_LINEAR_RANGE(1550000, 64, 126, 25000),
+> +		REGULATOR_LINEAR_RANGE(3100000, 127, 163, 50000),
+>  	},
+> -	.n_linear_ranges = 2,
+> -	.n_voltages = 100,
+> +	.n_linear_ranges = 3,
+> +	.n_voltages = 164,
+>  	.ops = &rpm_smps_ldo_ops,
 
 Regards,
-Mike
 
-> to the time-based clk.
-> 
-> Do not remove similar entries for ehrpwm node. Later patches will switch
-> from using ehrpwm node name to pwm. But to maintain ABI compatibility we
-> shouldn't remove the old entries.
-> 
-> Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
-> Acked-by: Stephen Boyd <sboyd@codeaurora.org>
-> Acked-by: Tero Kristo <t-kristo@ti.com>
-> ---
->  drivers/clk/ti/clk-33xx.c | 3 +++
->  drivers/clk/ti/clk-43xx.c | 6 ++++++
->  2 files changed, 9 insertions(+)
-> 
-> diff --git a/drivers/clk/ti/clk-33xx.c b/drivers/clk/ti/clk-33xx.c
-> index ef2ec64..0e47d95 100644
-> --- a/drivers/clk/ti/clk-33xx.c
-> +++ b/drivers/clk/ti/clk-33xx.c
-> @@ -108,6 +108,9 @@ static struct ti_dt_clk am33xx_clks[] = {
->         DT_CLK("48300200.ehrpwm", "tbclk", "ehrpwm0_tbclk"),
->         DT_CLK("48302200.ehrpwm", "tbclk", "ehrpwm1_tbclk"),
->         DT_CLK("48304200.ehrpwm", "tbclk", "ehrpwm2_tbclk"),
-> +       DT_CLK("48300200.pwm", "tbclk", "ehrpwm0_tbclk"),
-> +       DT_CLK("48302200.pwm", "tbclk", "ehrpwm1_tbclk"),
-> +       DT_CLK("48304200.pwm", "tbclk", "ehrpwm2_tbclk"),
->         { .node_name = NULL },
->  };
->  
-> diff --git a/drivers/clk/ti/clk-43xx.c b/drivers/clk/ti/clk-43xx.c
-> index 097fc90..7255aa8 100644
-> --- a/drivers/clk/ti/clk-43xx.c
-> +++ b/drivers/clk/ti/clk-43xx.c
-> @@ -115,6 +115,12 @@ static struct ti_dt_clk am43xx_clks[] = {
->         DT_CLK("48306200.ehrpwm", "tbclk", "ehrpwm3_tbclk"),
->         DT_CLK("48308200.ehrpwm", "tbclk", "ehrpwm4_tbclk"),
->         DT_CLK("4830a200.ehrpwm", "tbclk", "ehrpwm5_tbclk"),
-> +       DT_CLK("48300200.pwm", "tbclk", "ehrpwm0_tbclk"),
-> +       DT_CLK("48302200.pwm", "tbclk", "ehrpwm1_tbclk"),
-> +       DT_CLK("48304200.pwm", "tbclk", "ehrpwm2_tbclk"),
-> +       DT_CLK("48306200.pwm", "tbclk", "ehrpwm3_tbclk"),
-> +       DT_CLK("48308200.pwm", "tbclk", "ehrpwm4_tbclk"),
-> +       DT_CLK("4830a200.pwm", "tbclk", "ehrpwm5_tbclk"),
->         { .node_name = NULL },
->  };
->  
-> -- 
-> 2.7.0
-> 
+Andy
