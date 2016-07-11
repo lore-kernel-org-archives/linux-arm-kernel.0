@@ -1,27 +1,34 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 11 Jul 2016 14:05:19 -0700
-Subject: [PATCH] firmware: qcom: scm: Change initcall to subsys
-In-Reply-To: <1467433214-7667-1-git-send-email-andy.gross@linaro.org>
-References: <1467433214-7667-1-git-send-email-andy.gross@linaro.org>
-Message-ID: <20160711210519.GB16764@codeaurora.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 11 Jul 2016 22:07:54 +0100
+Subject: [PATCH V8 1/2] regulator: Add document for MT6323 regulator
+In-Reply-To: <c1acbf13-93a0-4257-ee48-4885a87fede5@phrozen.org>
+References: <1468240179-7558-1-git-send-email-john@phrozen.org>
+ <20160711180805.GG3701@sirena.org.uk>
+ <cef78bd8-9a4a-e848-d7cb-13a27127f11e@phrozen.org>
+ <20160711192211.GI3701@sirena.org.uk>
+ <c1acbf13-93a0-4257-ee48-4885a87fede5@phrozen.org>
+Message-ID: <20160711210754.GA9976@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/01, Andy Gross wrote:
-> The patch changes the initcall for SCM to use subsys_initcall
-> instead of arch_initcall.  This corrects the order so that we don't
-> probe defer when trying to get clks which causes issues later when
-> the spm driver makes calls to qcom_set_warm_boot_addr().
-> 
-> The order became an issue due to the changes to use arch_initcall_sync
-> for of_platform_default_populate_init().
-> 
-> Signed-off-by: Andy Gross <andy.gross@linaro.org>
-> ---
+On Mon, Jul 11, 2016 at 10:31:45PM +0200, John Crispin wrote:
 
-Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
-Tested-by: Stephen Boyd <sboyd@codeaurora.org>
+> maybe i am missing something here, but i can see the dependencies inside
+> the for-next branch of
+> git://git.kernel.org/pub/scm/linux/kernel/git/broonie/regulator.git. is
+> this not the tree i should base patches on for v4.8 ?
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Oh, so these aren't things that Lee just applied but rather things that
+have propagated through?  You didn't say what commits you were talking
+about, you linked to a long gitweb URL that would have been difficult to
+paste due to wrapping.  This sort of thing is why it's really helpful to
+make your e-mails directly human readable, saying something like "these
+depend on change X which is in Linus' tree now" would've made this
+clear.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160711/84baa243/attachment.sig>
