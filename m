@@ -1,108 +1,85 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Mon, 11 Jul 2016 14:14:39 +0100
-Subject: [RFC PATCH 6/8] PM / Domains: Remove a provider by referencing
- the data pointer
-In-Reply-To: <5769455C.9010809@nvidia.com>
-References: <1457090634-14785-1-git-send-email-jonathanh@nvidia.com>
- <1457090634-14785-7-git-send-email-jonathanh@nvidia.com>
- <CAPDyKFpLcnLvQmpQgzhOExq67XrbaW9Nf1Gk2Y+CND8dn_cmyA@mail.gmail.com>
- <5769455C.9010809@nvidia.com>
-Message-ID: <57839BBF.30102@nvidia.com>
+From: anna-maria@linutronix.de (Anna-Maria Gleixner)
+Date: Mon, 11 Jul 2016 12:29:02 -0000
+Subject: [patch 56/66] arm64: armv8 deprecated: Convert to hotplug state
+ machine
+References: <20160711122450.923603742@linutronix.de>
+Message-ID: <20160711122535.363008443@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ulf,
+From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 
-On 21/06/16 14:47, Jon Hunter wrote:
-> 
-> On 15/06/16 15:38, Ulf Hansson wrote:
->> On 4 March 2016 at 12:23, Jon Hunter <jonathanh@nvidia.com> wrote:
->>> To remove a PM domain from the system, it is necessary to ensure
->>> that any PM domain providers associated with the PM domain have
->>> been removed. Otherwise it could be possible to obtain a pointer
->>> to a PM domain structure that has been removed.
->>>
->>> PM domains now have a reference to the pointer for the PM domain
->>> provider's data variable. Add a function so that a PM domain can
->>> remove a PM domain provider by referencing the data pointer.
->>>
->>> Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
->>> ---
->>>  drivers/base/power/domain.c | 24 ++++++++++++++++++++++++
->>>  include/linux/pm_domain.h   |  2 ++
->>>  2 files changed, 26 insertions(+)
->>>
->>> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
->>> index 72055fef6256..438885f2455f 100644
->>> --- a/drivers/base/power/domain.c
->>> +++ b/drivers/base/power/domain.c
->>> @@ -1738,6 +1738,30 @@ void of_genpd_del_provider(struct device_node *np)
->>>  EXPORT_SYMBOL_GPL(of_genpd_del_provider);
->>>
->>>  /**
->>> + * of_genpd_del_provider_by_data() - Remove a registered PM domain provider
->>> + * @data: Pointer to the data associated with the PM domain provider
->>> + *
->>> + * Look up a PM domain provider based upon a pointer to it's data and
->>> + * remove the PM domain provider from the list of providers.
->>> + */
->>> +void of_genpd_del_provider_by_data(void *data)
->>> +{
->>> +       struct of_genpd_provider *c, *cp;
->>> +
->>> +       mutex_lock(&of_genpd_mutex);
->>> +       list_for_each_entry_safe(cp, c, &of_genpd_providers, link) {
->>> +               if (cp->data == data) {
->>> +                       list_del(&cp->link);
->>> +                       of_node_put(cp->node);
->>> +                       kfree(cp);
->>> +                       break;
->>> +               }
->>> +       }
->>> +       mutex_unlock(&of_genpd_mutex);
->>> +}
->>> +EXPORT_SYMBOL_GPL(of_genpd_del_provider_by_data);
->>> +
->>> +/**
->>>   * of_genpd_get_from_provider() - Look-up PM domain
->>>   * @genpdspec: OF phandle args to use for look-up
->>>   *
->>> diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
->>> index bed84413546f..7b7921a65cb0 100644
->>> --- a/include/linux/pm_domain.h
->>> +++ b/include/linux/pm_domain.h
->>> @@ -199,6 +199,7 @@ int of_genpd_add_provider_simple(struct device_node *np,
->>>  int of_genpd_add_provider_onecell(struct device_node *np,
->>>                                   struct genpd_onecell_data *data);
->>>  void of_genpd_del_provider(struct device_node *np);
->>
->> There's currently only one user of of_genpd_del_provider().
->>
->> Could this patch just convert that user to the new API, so we don't
->> need to keep both the legacy and new one?
->>
->> I guess we could then just stick to the name "of_genpd_del_provider()".
-> 
-> I had a look at this and to do that we would end up with
-> of_genpd_del_provider(struct device_node *np, void *data) where the user
-> should only pass one of the arguments. It seems a bit odd. However,
-> unless I have forgotten something, I wonder if we should just make
-> of_genpd_del_provider_by_name() a local function and not export this at
-> all? It seems more natural for users to delete a provider by the
-> device_node than by name rather than the data argument.
-> 
-> The only problem I see with making of_genpd_del_provider_by_name() local
-> is that I need to add a prototype for the function at the top of the
-> domain.c source file so that it builds because __pm_genpd_remove() is
-> defined above it. Yes I could move __pm_genpd_remove() to the bottom of
-> the file but then it is not located next to pm_genpd_init() which seems odd.
-> 
-> Let me know what you think.
+Install the callbacks via the state machine.
 
-Any response on this? This is the last item that we need to sort out?
+Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Signed-off-by: Anna-Maria Gleixner <anna-maria@linutronix.de>
+---
+ arch/arm64/kernel/armv8_deprecated.c |   22 +++++-----------------
+ include/linux/cpuhotplug.h           |    1 +
+ 2 files changed, 6 insertions(+), 17 deletions(-)
 
-Cheers
-Jon
-
--- 
-nvpublic
+--- a/arch/arm64/kernel/armv8_deprecated.c
++++ b/arch/arm64/kernel/armv8_deprecated.c
+@@ -121,7 +121,7 @@ static int run_all_cpu_set_hw_mode(struc
+  *  0 		- If all the hooks ran successfully.
+  * -EINVAL	- At least one hook is not supported by the CPU.
+  */
+-static int run_all_insn_set_hw_mode(unsigned long cpu)
++static int run_all_insn_set_hw_mode(unsigned int cpu)
+ {
+ 	int rc = 0;
+ 	unsigned long flags;
+@@ -131,7 +131,7 @@ static int run_all_insn_set_hw_mode(unsi
+ 	list_for_each_entry(insn, &insn_emulation, node) {
+ 		bool enable = (insn->current_mode == INSN_HW);
+ 		if (insn->ops->set_hw_mode && insn->ops->set_hw_mode(enable)) {
+-			pr_warn("CPU[%ld] cannot support the emulation of %s",
++			pr_warn("CPU[%u] cannot support the emulation of %s",
+ 				cpu, insn->ops->name);
+ 			rc = -EINVAL;
+ 		}
+@@ -617,20 +617,6 @@ static struct insn_emulation_ops setend_
+ 	.set_hw_mode = setend_set_hw_mode,
+ };
+ 
+-static int insn_cpu_hotplug_notify(struct notifier_block *b,
+-			      unsigned long action, void *hcpu)
+-{
+-	int rc = 0;
+-	if ((action & ~CPU_TASKS_FROZEN) == CPU_STARTING)
+-		rc = run_all_insn_set_hw_mode((unsigned long)hcpu);
+-
+-	return notifier_from_errno(rc);
+-}
+-
+-static struct notifier_block insn_cpu_hotplug_notifier = {
+-	.notifier_call = insn_cpu_hotplug_notify,
+-};
+-
+ /*
+  * Invoked as late_initcall, since not needed before init spawned.
+  */
+@@ -649,7 +635,9 @@ static int __init armv8_deprecated_init(
+ 			pr_info("setend instruction emulation is not supported on the system");
+ 	}
+ 
+-	register_cpu_notifier(&insn_cpu_hotplug_notifier);
++	cpuhp_setup_state_nocalls(CPUHP_AP_ARM64_ISNDEP_STARTING,
++				  "AP_ARM64_ISNDEP_STARTING",
++				  run_all_insn_set_hw_mode, NULL);
+ 	register_insn_emulation_sysctl(ctl_abi);
+ 
+ 	return 0;
+--- a/include/linux/cpuhotplug.h
++++ b/include/linux/cpuhotplug.h
+@@ -56,6 +56,7 @@ enum cpuhp_state {
+ 	CPUHP_AP_ARM_XEN_STARTING,
+ 	CPUHP_AP_ARM_CORESIGHT_STARTING,
+ 	CPUHP_AP_ARM_CORESIGHT4_STARTING,
++	CPUHP_AP_ARM64_ISNDEP_STARTING,
+ 	CPUHP_AP_LEDTRIG_STARTING,
+ 	CPUHP_AP_NOTIFY_STARTING,
+ 	CPUHP_AP_ONLINE,
