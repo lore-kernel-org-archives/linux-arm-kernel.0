@@ -1,45 +1,44 @@
-From: hzpeterchen@gmail.com (Peter Chen)
-Date: Mon, 11 Jul 2016 13:39:54 +0800
-Subject: [PATCH v2 20/22] usb: chipidea: msm: Be silent on probe defer
- errors
-In-Reply-To: <20160707222114.1673-21-stephen.boyd@linaro.org>
-References: <20160707222114.1673-1-stephen.boyd@linaro.org>
- <20160707222114.1673-21-stephen.boyd@linaro.org>
-Message-ID: <20160711053954.GD31647@shlinux2>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Mon, 11 Jul 2016 07:48:29 +0200
+Subject: [PATCH 1/3] Revert
+ "drivers/rtc/rtc-s3c.c: add .needs_src_clk to s3c6410 RTC data"
+In-Reply-To: <1468056226-19128-2-git-send-email-ayaka@soulik.info>
+References: <1468056226-19128-1-git-send-email-ayaka@soulik.info>
+ <1468056226-19128-2-git-send-email-ayaka@soulik.info>
+Message-ID: <5783332D.7010809@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 07, 2016 at 03:21:11PM -0700, Stephen Boyd wrote:
-> If something fails in ci_hdrc_add_device() due to probe defer, we
-> shouldn't print an error message. Be silent in this case as we'll
-> try probe again later.
+On 07/09/2016 11:23 AM, Randy Li wrote:
+> This reverts commit 8792f7772f4f40ffc68bad5f28311205584b734d.
+> The s3c6410 rtc don't use rtc_src property, that property is designed
+> for Exynos5250 and Exynos5440. The problem reported in the commit
+> I mentioned should be fixed in the other way.
+
+... so you break in this commit all the newer platforms because the
+rtc_src clock won't be enabled.
+
+Does not look right.
+
+Best regards,
+Krzysztof
+
 > 
-> Cc: Peter Chen <peter.chen@nxp.com>
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
+> Signed-off-by: Randy Li <ayaka@soulik.info>
 > ---
->  drivers/usb/chipidea/ci_hdrc_msm.c | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
+>  drivers/rtc/rtc-s3c.c | 1 -
+>  1 file changed, 1 deletion(-)
 > 
-> diff --git a/drivers/usb/chipidea/ci_hdrc_msm.c b/drivers/usb/chipidea/ci_hdrc_msm.c
-> index 5c486c15e043..d4cc45f8e65e 100644
-> --- a/drivers/usb/chipidea/ci_hdrc_msm.c
-> +++ b/drivers/usb/chipidea/ci_hdrc_msm.c
-> @@ -257,8 +257,9 @@ static int ci_hdrc_msm_probe(struct platform_device *pdev)
->  	plat_ci = ci_hdrc_add_device(&pdev->dev, pdev->resource,
->  				     pdev->num_resources, &ci->pdata);
->  	if (IS_ERR(plat_ci)) {
-> -		dev_err(&pdev->dev, "ci_hdrc_add_device failed!\n");
->  		ret = PTR_ERR(plat_ci);
-> +		if (ret != -EPROBE_DEFER)
-> +			dev_err(&pdev->dev, "ci_hdrc_add_device failed!\n");
->  		goto err_mux;
->  	}
+> diff --git a/drivers/rtc/rtc-s3c.c b/drivers/rtc/rtc-s3c.c
+> index d01ad7e..5dc18ca 100644
+> --- a/drivers/rtc/rtc-s3c.c
+> +++ b/drivers/rtc/rtc-s3c.c
+> @@ -801,7 +801,6 @@ static struct s3c_rtc_data const s3c2443_rtc_data = {
 >  
-
-Acked-by: Peter Chen <peter.chen@nxp.com>
-
--- 
-
-Best Regards,
-Peter Chen
+>  static struct s3c_rtc_data const s3c6410_rtc_data = {
+>  	.max_user_freq		= 32768,
+> -	.needs_src_clk		= true,
+>  	.irq_handler		= s3c6410_rtc_irq,
+>  	.set_freq		= s3c6410_rtc_setfreq,
+>  	.enable_tick		= s3c6410_rtc_enable_tick,
+> 
