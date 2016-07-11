@@ -1,30 +1,47 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 11 Jul 2016 13:19:53 +0100
-Subject: [PATCH]: arm64: factor work_pending state machine to C
-In-Reply-To: <20160711114237.GE17735@arm.com>
-References: <1459877922-15512-1-git-send-email-cmetcalf@mellanox.com>
- <1459877922-15512-13-git-send-email-cmetcalf@mellanox.com>
- <e19d6de0-c754-d53b-3420-16d460a4cb33@mellanox.com>
- <20160708154901.GF6493@arm.com> <20160711114237.GE17735@arm.com>
-Message-ID: <20160711121953.GH31221@leverpostej>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Mon, 11 Jul 2016 14:20:15 +0200
+Subject: FPGA manager user space interface
+In-Reply-To: <5782BE1A.9090905@gmail.com>
+References: <5782BE1A.9090905@gmail.com>
+Message-ID: <57838EFF.50200@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 11, 2016 at 12:42:37PM +0100, Will Deacon wrote:
-> On Fri, Jul 08, 2016 at 04:49:01PM +0100, Will Deacon wrote:
-> > On Fri, Jul 08, 2016 at 11:43:50AM -0400, Chris Metcalf wrote:
-> > > I am hopeful that this patch [1] can be picked up for the 4.8 merge window
-> > > in the arm64 tree.  As I mentioned in my last patch series that included
-> > > this patch [2], I'm hopeful that this version addresses the performance
-> > > issues that were seen with Mark's original patch.  This version tests the
-> > > TIF flags prior to calling out to the loop in C code.
-> > 
-> > I still need to get round to measuring that again. This might also
-> > conflict with a late fix I just sent for 4.7.
+Hi Florian,
+
+I didn't follow all stuff regarding FPGA manager and I can't remember
+the reasons against user interfaces.  Alan probably knows.
+
+Thanks,
+Michal
+
+On 10.7.2016 23:28, Florian Fainelli wrote:
+> Hi all,
 > 
-> FWIW, I've failed to measure any performance overhead from this change,
-> so it certainly looks better thsn Mark's original patch from that angle.
-
-FWIW, likewise, with perf bench sched atop of v4.7-rc6.
-
-Mark.
+> I just wrote a FPGA manager driver for the TS-7300 board which features
+> an Altera Cyclone II on board. While the finished solution is my case
+> might be something like the MFD driver for the FPGA devices requesting
+> the bitstream load and registering the different devices it exposes,
+> during development it is nice to exercise the FPGA manager driver to
+> load something:
+> 
+> - a quick way is to add a pair of sysfs attributes to define the
+> bitstream filename and to trigger the load
+> 
+> - offer a more consistent and robust interface through e.g; a character
+> device that you can write/read/poll to see the loading progress about
+> 
+> - have the driver exposing FPGA peripherals be exposing an user space
+> interface to trigger a (re)load/(re)/configuration, although that's
+> really something that belongs in the FPGA manager it seems
+> 
+> I am mostly curious if these were taken into account during the initial
+> design and it is agreed upon that yes these are some of options and that
+> userspace loading is just anecdotal we do not need any userspace
+> interface, or if this is just missing and we want one? Either way, I
+> don't mind submitting what I came up with for the TS-7300 board.
+> 
+> Thanks!
+> --
+> Florian
+> 
