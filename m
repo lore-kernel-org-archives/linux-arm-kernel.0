@@ -1,160 +1,160 @@
 From: hzpeterchen@gmail.com (Peter Chen)
-Date: Mon, 11 Jul 2016 12:32:49 +0800
-Subject: [PATCH v2 14/22] usb: chipidea: msm: Add proper clk and reset
- support
-In-Reply-To: <20160707222114.1673-15-stephen.boyd@linaro.org>
+Date: Mon, 11 Jul 2016 12:43:27 +0800
+Subject: [PATCH v2 15/22] usb: chipidea: msm: Mux over secondary phy at
+ the right time
+In-Reply-To: <20160707222114.1673-16-stephen.boyd@linaro.org>
 References: <20160707222114.1673-1-stephen.boyd@linaro.org>
- <20160707222114.1673-15-stephen.boyd@linaro.org>
-Message-ID: <20160711043249.GF30448@shlinux2>
+ <20160707222114.1673-16-stephen.boyd@linaro.org>
+Message-ID: <20160711044327.GG30448@shlinux2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 07, 2016 at 03:21:05PM -0700, Stephen Boyd wrote:
-> The msm chipidea controller uses two main clks, an AHB clk to
-> read/write the MMIO registers and a core clk called the system
-> clk that drives the controller itself. Add support for these clks
-> as they're required in all designs.
-> 
-> Also add support for an optional third clk that we need to turn
-> on to reset the controller and wrapper logic and other
-> "housekeeping" things. This clk was removed in later revisions of
-> the hardware because the reset methodology no longer required
-> clks to be enabled to propagate resets.
+On Thu, Jul 07, 2016 at 03:21:06PM -0700, Stephen Boyd wrote:
+> We need to pick the correct phy at runtime based on how the SoC
+> has been wired onto the board. If the secondary phy is used, take
+> it out of reset and mux over to it by writing into the TCSR
+> register. Make sure to do this on reset too, because this
+> register is reset to the default value (primary phy) after the
+> RESET bit is set in USBCMD.
 > 
 > Cc: Peter Chen <peter.chen@nxp.com>
 > Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 > Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
 > ---
->  drivers/usb/chipidea/ci_hdrc_msm.c | 72 +++++++++++++++++++++++++++++++++++---
->  1 file changed, 68 insertions(+), 4 deletions(-)
+>  drivers/usb/chipidea/ci_hdrc_msm.c | 67 +++++++++++++++++++++++++++++++++++---
+>  1 file changed, 62 insertions(+), 5 deletions(-)
 > 
 > diff --git a/drivers/usb/chipidea/ci_hdrc_msm.c b/drivers/usb/chipidea/ci_hdrc_msm.c
-> index b282a717bf8c..7e870a253f55 100644
+> index 7e870a253f55..7708bee3ff3e 100644
 > --- a/drivers/usb/chipidea/ci_hdrc_msm.c
 > +++ b/drivers/usb/chipidea/ci_hdrc_msm.c
-> @@ -10,11 +10,20 @@
+> @@ -8,29 +8,44 @@
+>  #include <linux/module.h>
+>  #include <linux/platform_device.h>
 >  #include <linux/pm_runtime.h>
->  #include <linux/usb/gadget.h>
+> -#include <linux/usb/gadget.h>
 >  #include <linux/usb/chipidea.h>
-> +#include <linux/clk.h>
-> +#include <linux/reset.h>
+>  #include <linux/clk.h>
+>  #include <linux/reset.h>
+> +#include <linux/mfd/syscon.h>
+> +#include <linux/regmap.h>
+> +#include <linux/io.h>
 >  
 >  #include "ci.h"
 >  
 >  #define HS_PHY_AHB_MODE			0x0098
 >  
-> +struct ci_hdrc_msm {
-> +	struct platform_device *ci;
-> +	struct clk *core_clk;
-> +	struct clk *iface_clk;
-> +	struct clk *fs_clk;
-> +};
+> +/* Vendor base starts at 0x200 beyond CI base */
+> +#define HS_PHY_SEC_CTRL			0x0078
+> +#define HS_PHY_DIG_CLAMP_N		BIT(16)
 > +
+
+Keep alignment
+
+>  struct ci_hdrc_msm {
+>  	struct platform_device *ci;
+>  	struct clk *core_clk;
+>  	struct clk *iface_clk;
+>  	struct clk *fs_clk;
+> +	bool secondary_phy;
+> +	void __iomem *base;
+>  };
+>  
 >  static void ci_hdrc_msm_notify_event(struct ci_hdrc *ci, unsigned event)
 >  {
->  	struct device *dev = ci->gadget.dev.parent;
-> @@ -52,11 +61,20 @@ static struct ci_hdrc_platform_data ci_hdrc_msm_platdata = {
+> -	struct device *dev = ci->gadget.dev.parent;
+> +	struct device *dev = ci->dev->parent;
+> +	struct ci_hdrc_msm *msm_ci = dev_get_drvdata(dev);
 >  
->  static int ci_hdrc_msm_probe(struct platform_device *pdev)
->  {
-> +	struct ci_hdrc_msm *ci;
->  	struct platform_device *plat_ci;
->  	struct usb_phy *phy;
-> +	struct clk *clk;
-> +	struct reset_control *reset;
+>  	switch (event) {
+>  	case CI_HDRC_CONTROLLER_RESET_EVENT:
+>  		dev_dbg(dev, "CI_HDRC_CONTROLLER_RESET_EVENT received\n");
+> +		if (msm_ci->secondary_phy) {
+> +			u32 val = readl_relaxed(msm_ci->base + HS_PHY_SEC_CTRL);
+> +			val |= HS_PHY_DIG_CLAMP_N;
+> +			writel_relaxed(val, msm_ci->base + HS_PHY_SEC_CTRL);
+> +		}
+> +
+>  		/* use AHB transactor, allow posted data writes */
+>  		hw_write_id_reg(ci, HS_PHY_AHB_MODE, 0xffffffff, 0x8);
+>  		usb_phy_init(ci->usb_phy);
+> @@ -59,6 +74,39 @@ static struct ci_hdrc_platform_data ci_hdrc_msm_platdata = {
+>  	.notify_event		= ci_hdrc_msm_notify_event,
+>  };
+>  
+> +static int ci_hdrc_msm_mux_phy(struct ci_hdrc_msm *ci,
+> +			       struct platform_device *pdev)
+> +{
+> +	struct regmap *regmap;
+> +	struct device *dev = &pdev->dev;
+> +	struct of_phandle_args args;
+> +	u32 val;
 > +	int ret;
->  
->  	dev_dbg(&pdev->dev, "ci_hdrc_msm_probe\n");
->  
-> +	ci = devm_kzalloc(&pdev->dev, sizeof(*ci), GFP_KERNEL);
-> +	if (!ci)
-> +		return -ENOMEM;
-> +	platform_set_drvdata(pdev, ci);
 > +
->  	/*
->  	 * OTG(PHY) driver takes care of PHY initialization, clock management,
->  	 * powering up VBUS, mapping of registers address space and power
-> @@ -68,29 +86,75 @@ static int ci_hdrc_msm_probe(struct platform_device *pdev)
->  
->  	ci_hdrc_msm_platdata.usb_phy = phy;
->  
-> +	reset = devm_reset_control_get(&pdev->dev, "core");
-> +	if (IS_ERR(reset))
-> +		return PTR_ERR(reset);
+> +	ret = of_parse_phandle_with_fixed_args(dev->of_node, "phy-select", 2, 0,
+> +					       &args);
+> +	if (ret)
+> +		return 0;
 > +
-> +	ci->core_clk = clk = devm_clk_get(&pdev->dev, "core");
-> +	if (IS_ERR(clk))
-> +		return PTR_ERR(clk);
+> +	regmap = syscon_node_to_regmap(args.np);
+> +	of_node_put(args.np);
+> +	if (IS_ERR(regmap))
+> +		return PTR_ERR(regmap);
 > +
-> +	ci->iface_clk = clk = devm_clk_get(&pdev->dev, "iface");
-> +	if (IS_ERR(clk))
-> +		return PTR_ERR(clk);
+> +	ret = regmap_write(regmap, args.args[0], args.args[1]);
+> +	if (ret)
+> +		return ret;
 > +
-> +	ci->fs_clk = clk = devm_clk_get(&pdev->dev, "fs");
-> +	if (IS_ERR(clk)) {
-> +		if (PTR_ERR(clk) == -EPROBE_DEFER)
-> +			return -EPROBE_DEFER;
-> +		ci->fs_clk = NULL;
+> +	ci->secondary_phy = !!args.args[1];
+> +	if (ci->secondary_phy) {
+> +		val = readl_relaxed(ci->base + HS_PHY_SEC_CTRL);
+> +		val |= HS_PHY_DIG_CLAMP_N;
+> +		writel_relaxed(val, ci->base + HS_PHY_SEC_CTRL);
 > +	}
 > +
-> +	ret = clk_prepare_enable(ci->fs_clk);
-> +	if (ret)
-> +		return ret;
+> +	return 0;
+> +}
 > +
-> +	reset_control_assert(reset);
-> +	usleep_range(10000, 12000);
-> +	reset_control_deassert(reset);
-> +
-> +	clk_disable_unprepare(ci->fs_clk);
-> +
-> +	ret = clk_prepare_enable(ci->core_clk);
-> +	if (ret)
-> +		return ret;
-> +
-> +	ret = clk_prepare_enable(ci->iface_clk);
-> +	if (ret)
-> +		goto err_iface;
-> +
->  	plat_ci = ci_hdrc_add_device(&pdev->dev,
->  				pdev->resource, pdev->num_resources,
->  				&ci_hdrc_msm_platdata);
->  	if (IS_ERR(plat_ci)) {
->  		dev_err(&pdev->dev, "ci_hdrc_add_device failed!\n");
-> -		return PTR_ERR(plat_ci);
-> +		ret = PTR_ERR(plat_ci);
-> +		goto err_mux;
+>  static int ci_hdrc_msm_probe(struct platform_device *pdev)
+>  {
+>  	struct ci_hdrc_msm *ci;
+> @@ -66,6 +114,7 @@ static int ci_hdrc_msm_probe(struct platform_device *pdev)
+>  	struct usb_phy *phy;
+>  	struct clk *clk;
+>  	struct reset_control *reset;
+> +	struct resource *res;
+>  	int ret;
+>  
+>  	dev_dbg(&pdev->dev, "ci_hdrc_msm_probe\n");
+> @@ -105,6 +154,11 @@ static int ci_hdrc_msm_probe(struct platform_device *pdev)
+>  		ci->fs_clk = NULL;
 >  	}
 >  
-> -	platform_set_drvdata(pdev, plat_ci);
-> +	ci->ci = plat_ci;
->  
->  	pm_runtime_set_active(&pdev->dev);
->  	pm_runtime_no_callbacks(&pdev->dev);
->  	pm_runtime_enable(&pdev->dev);
->  
->  	return 0;
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+> +	ci->base = devm_ioremap_resource(&pdev->dev, res);
+> +	if (!ci->base)
+> +		return -ENOMEM;
 > +
-> +err_mux:
-> +	clk_disable_unprepare(ci->iface_clk);
-> +err_iface:
-> +	clk_disable_unprepare(ci->core_clk);
-> +	return ret;
->  }
+>  	ret = clk_prepare_enable(ci->fs_clk);
+>  	if (ret)
+>  		return ret;
+> @@ -123,9 +177,12 @@ static int ci_hdrc_msm_probe(struct platform_device *pdev)
+>  	if (ret)
+>  		goto err_iface;
 >  
->  static int ci_hdrc_msm_remove(struct platform_device *pdev)
->  {
-> -	struct platform_device *plat_ci = platform_get_drvdata(pdev);
-> +	struct ci_hdrc_msm *ci = platform_get_drvdata(pdev);
->  
->  	pm_runtime_disable(&pdev->dev);
-> -	ci_hdrc_remove_device(plat_ci);
-> +	ci_hdrc_remove_device(ci->ci);
-> +	clk_disable_unprepare(ci->iface_clk);
-> +	clk_disable_unprepare(ci->core_clk);
->  
->  	return 0;
->  }
-> -- 
+> -	plat_ci = ci_hdrc_add_device(&pdev->dev,
+> -				pdev->resource, pdev->num_resources,
+> -				&ci_hdrc_msm_platdata);
+> +	ret = ci_hdrc_msm_mux_phy(ci, pdev);
+> +	if (ret)
+> +		goto err_mux;
+> +
+> +	plat_ci = ci_hdrc_add_device(&pdev->dev, pdev->resource,
+> +				     pdev->num_resources, &ci_hdrc_msm_platdata);
+
+The above line has not changed.
+
+After fixing above, you can add my ack.
 
 Acked-by: Peter Chen <peter.chen@nxp.com>
 
