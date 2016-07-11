@@ -1,65 +1,145 @@
-From: hzpeterchen@gmail.com (Peter Chen)
-Date: Mon, 11 Jul 2016 11:24:08 +0800
-Subject: [PATCH v2 12/22] usb: chipidea: msm: Rely on core to override
- AHBBURST
-In-Reply-To: <20160707222114.1673-13-stephen.boyd@linaro.org>
-References: <20160707222114.1673-1-stephen.boyd@linaro.org>
- <20160707222114.1673-13-stephen.boyd@linaro.org>
-Message-ID: <20160711032408.GE30448@shlinux2>
+From: tiffany.lin@mediatek.com (tiffany lin)
+Date: Mon, 11 Jul 2016 11:58:49 +0800
+Subject: [PATCH v3 0/9] Add MT8173 Video Decoder Driver
+In-Reply-To: <e2952cc2-3abd-894e-9481-b91a45cf7891@xs4all.nl>
+References: <1464611363-14936-1-git-send-email-tiffany.lin@mediatek.com>
+ <577D0576.2050706@xs4all.nl> <1467886612.21382.18.camel@mtksdaap41>
+ <e2952cc2-3abd-894e-9481-b91a45cf7891@xs4all.nl>
+Message-ID: <1468209529.3725.25.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 07, 2016 at 03:21:03PM -0700, Stephen Boyd wrote:
-> The core framework already handles setting this parameter with a
-> platform quirk. Add the appropriate flag so that we always set
-> AHBBURST to 0. Technically DT should be doing this, but we always
-> do it for msm chipidea devices so setting the flag in the driver
-> works just as well.
+Hi Hans,
 
-You may need to mention if the platform needs to set value rather
-than 0, it needs to "ahb-burst-config" at dts, others are ok.
-
-Acked-by: Peter Chen <peter.chen@nxp.com>
-
+On Fri, 2016-07-08 at 13:44 +0200, Hans Verkuil wrote:
+> On 07/07/2016 12:16 PM, tiffany lin wrote:
+> > Hi Hans,
+> > 
+> > 
+> > On Wed, 2016-07-06 at 15:19 +0200, Hans Verkuil wrote:
+> >> Hi Tiffany,
+> >>
+> >> I plan to review this patch series on Friday, but one obvious question is
+> >> what the reason for these failures is:
+> >>
+> >>> Input/Output configuration ioctls:
+> >>>         test VIDIOC_ENUM/G/S/QUERY_STD: OK (Not Supported)
+> >>>         test VIDIOC_ENUM/G/S/QUERY_DV_TIMINGS: OK (Not Supported)
+> >>>         test VIDIOC_DV_TIMINGS_CAP: OK (Not Supported)
+> >>>         test VIDIOC_G/S_EDID: OK (Not Supported)
+> >>>
+> >>>         Control ioctls:
+> >>>                 test VIDIOC_QUERYCTRL/MENU: OK
+> >>>                 fail: ../../../v4l-utils-1.6.0/utils/v4l2-compliance/v4l2-test-controls.cpp(357): g_ctrl returned an error (11)
+> >>>                 test VIDIOC_G/S_CTRL: FAIL
+> >>>                 fail: ../../../v4l-utils-1.6.0/utils/v4l2-compliance/v4l2-test-controls.cpp(579): g_ext_ctrls returned an error (11)
+> >>>                 test VIDIOC_G/S/TRY_EXT_CTRLS: FAIL
+> > These fails are because VIDIOC_G_CTRL and VIDIOC_G_EXT_CTRLS return
+> > V4L2_CID_MIN_BUFFERS_FOR_CAPTURE only when dirver in MTK_STATE_HEADER
+> > state, or it will return EAGAIN.
+> > This could help user space get correct value, not default value that may
+> > changed base on media content.
 > 
-> Cc: Peter Chen <peter.chen@nxp.com>
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
-> ---
->  drivers/usb/chipidea/ci_hdrc_msm.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+> OK, I really don't like this. I also looked what the s5p-mfc-dec driver does (the only other
+> driver currently implementing this), and that returns -EINVAL.
 > 
-> diff --git a/drivers/usb/chipidea/ci_hdrc_msm.c b/drivers/usb/chipidea/ci_hdrc_msm.c
-> index 89c1a02d69b5..719b20caf88e 100644
-> --- a/drivers/usb/chipidea/ci_hdrc_msm.c
-> +++ b/drivers/usb/chipidea/ci_hdrc_msm.c
-> @@ -24,7 +24,6 @@ static void ci_hdrc_msm_notify_event(struct ci_hdrc *ci, unsigned event)
->  	switch (event) {
->  	case CI_HDRC_CONTROLLER_RESET_EVENT:
->  		dev_dbg(dev, "CI_HDRC_CONTROLLER_RESET_EVENT received\n");
-> -		writel(0, USB_AHBBURST);
->  		/* use AHB transactor, allow posted data writes */
->  		writel(0x8, USB_AHBMODE);
->  		usb_phy_init(ci->usb_phy);
-> @@ -47,7 +46,8 @@ static struct ci_hdrc_platform_data ci_hdrc_msm_platdata = {
->  	.name			= "ci_hdrc_msm",
->  	.capoffset		= DEF_CAPOFFSET,
->  	.flags			= CI_HDRC_REGS_SHARED |
-> -				  CI_HDRC_DISABLE_STREAMING,
-> +				  CI_HDRC_DISABLE_STREAMING |
-> +				  CI_HDRC_OVERRIDE_AHB_BURST,
->  
->  	.notify_event		= ci_hdrc_msm_notify_event,
->  };
-> -- 
-> 2.9.0.rc2.8.ga28705d
+> My proposal would be to change this. If this information isn't known yet, why not
+> just return 0 as the value? The doc would have to be updated and (preferably) also
+> the s5p-mfc-dec driver. I've added Samsung devs to the Cc list, let me know what you
+> think.
 > 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-usb" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Got it. We will return 0 as the value instead EAGAIN.
 
--- 
+> > 
+> >>>                 fail: ../../../v4l-utils-1.6.0/utils/v4l2-compliance/v4l2-test-controls.cpp(721): subscribe event for control 'User Controls' failed
+> >>>                 test VIDIOC_(UN)SUBSCRIBE_EVENT/DQEVENT: FAIL
+> > Driver do not support subscribe event for control 'User Controls' for
+> > now.
+> > Do we need to support this?
+> 
+> I don't see why this would fail. It's OK to subscribe to such controls, although
+> you'll never get an event.
+> 
+Got it. I will rerun using latest v4l2-compliance test check this.
 
-Best Regards,
-Peter Chen
+> >>>                 test VIDIOC_G/S_JPEGCOMP: OK (Not Supported)
+> >>>                 Standard Controls: 2 Private Controls: 0
+> >>>
+> >>>         Format ioctls:
+> >>>                 test VIDIOC_ENUM_FMT/FRAMESIZES/FRAMEINTERVALS: OK
+> >>>                 test VIDIOC_G/S_PARM: OK (Not Supported)
+> >>>                 test VIDIOC_G_FBUF: OK (Not Supported)
+> >>>                 fail: ../../../v4l-utils-1.6.0/utils/v4l2-compliance/v4l2-test-formats.cpp(405): expected EINVAL, but got 11 when getting format for buftype 9
+> >>>                 test VIDIOC_G_FMT: FAIL
+> > This is because vidioc_vdec_g_fmt only succeed when context is in
+> > MTK_STATE_HEADER state, or user space cannot get correct format data
+> > using this function.
+> 
+> Comparing this to s5p-mfc-dec I see that -EINVAL is returned in that case.
+> 
+> I am not opposed to using EAGAIN in s5p-mfc-dec as well. Marek, Kamil, what is
+> your opinion?
+> 
+> > 
+> >>>                 test VIDIOC_TRY_FMT: OK (Not Supported)
+> >>>                 test VIDIOC_S_FMT: OK (Not Supported)
+> >>>                 test VIDIOC_G_SLICED_VBI_CAP: OK (Not Supported)
+> >>>
+> >>>         Codec ioctls:
+> >>>                 test VIDIOC_(TRY_)ENCODER_CMD: OK (Not Supported)
+> >>>                 test VIDIOC_G_ENC_INDEX: OK (Not Supported)
+> >>>                 test VIDIOC_(TRY_)DECODER_CMD: OK (Not Supported)
+> >>>
+> >>>         Buffer ioctls:
+> >>>                 test VIDIOC_REQBUFS/CREATE_BUFS/QUERYBUF: OK
+> >>>                 fail: ../../../v4l-utils-1.6.0/utils/v4l2-compliance/v4l2-test-buffers.cpp(500): q.has_expbuf(node)
+> > Our OUTPUT and CAPTURE queue support both VB2_DMABUF and VB2_MMAP, user
+> > space can select which to use in runtime.
+> > So our driver default support v4l2_m2m_ioctl_expbuf functionality.
+> > In v4l2-compliance test, it will check v4l2_m2m_ioctl_expbuf only valid
+> > when node->valid_memorytype is V4L2_MEMORY_MMAP.
+> > So when go through node->valid_memorytype is V4L2_MEMORY_DMABUF, it
+> > fail.
+> 
+> valid_memorytype should have both MMAP and DMABUF flags.
+> 
+> But v4l-utils-1.6.0 is way too old to be certain it isn't some v4l2-compliance bug
+> that has since been fixed.
+> 
+Got it. I will rerun using master branch to check this.
+
+best regards,
+Tiffany
+
+> Regards,
+> 
+> 	Hans
+> 
+> > 
+> > 
+> > best regards,
+> > Tiffany
+> > 
+> > 
+> > 
+> >>>                 test VIDIOC_EXPBUF: FAIL
+> >>>
+> >>>
+> >>> Total: 38, Succeeded: 33, Failed: 5, Warnings: 0
+> >>
+> >> If it is due to a bug in v4l2-compliance, then let me know and I'll fix it. If not,
+> >> then it should be fixed in the driver.
+> >>
+> >> Frankly, it was the presence of these failures that made me think this patch series
+> >> wasn't final. Before a v4l2 driver can be accepted in the kernel, v4l2-compliance must pass.
+> >>
+> >> Regards,
+> >>
+> >> 	Hans
+> > 
+> > 
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe linux-media" in
+> > the body of a message to majordomo at vger.kernel.org
+> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> > 
