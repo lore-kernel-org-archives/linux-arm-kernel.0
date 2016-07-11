@@ -1,53 +1,39 @@
-From: d-gerlach@ti.com (Dave Gerlach)
-Date: Mon, 11 Jul 2016 16:43:09 -0500
-Subject: [PATCH] Revert "ARM: AM33xx: fix module_wait_ready without
- clkctrl register"
-In-Reply-To: <20160711213938.28385-1-d-gerlach@ti.com>
-References: <20160711213938.28385-1-d-gerlach@ti.com>
-Message-ID: <578412ED.7020707@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 11 Jul 2016 23:46:09 +0200
+Subject: [PATCH] dmaengine: zynqmp: avoid cast warning
+Message-ID: <20160711214642.2610193-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-On 07/11/2016 04:39 PM, Dave Gerlach wrote:
-> This reverts commit 183e2077d007aa4b697efba095ecfea7244a6107.
->
+The newly added zynqmp_dma driver produces a warning on 32-bit architectures
+when dma_addr_t is 64-bit wide:
 
-This is a fix for an external abort seen on am335x platforms during boot 
-on next-20160711. The offending patch was merged to next on 
-next-20160705 and I haven't seen any ill effects from reverting it with 
-this patch, and the external abort goes away entirely with it reverted.
+drivers/dma/xilinx/zynqmp_dma.c: In function 'zynqmp_dma_config_sg_ll_desc':
+drivers/dma/xilinx/zynqmp_dma.c:321:9: error: cast from pointer to integer of different size [-Werror=pointer-to-int-cast]
+        ((dma_addr_t)sdesc - (dma_addr_t)chan->desc_pool_v);
+         ^
+drivers/dma/xilinx/zynqmp_dma.c:321:29: error: cast from pointer to integer of different size [-Werror=pointer-to-int-cast]
+        ((dma_addr_t)sdesc - (dma_addr_t)chan->desc_pool_v);
 
-Regards,
-Dave
+This changes the cast to the more appropriate uintptr_t.
 
-> The original patch added a check to am33xx_cm_wait_module_ready for a
-> clkctrl offset of 0 as an invalid case, however, clkctrl offset of 0 is
-> perfectly valid for hwmods, in particular the rtc.
->
-> Without reverting this patch sometimes external aborts are seen on
-> am335x during boot. This is due to the am33xx_cm_wait_module_ready
-> function immediately returning 0 rather than waiting for the RTC_CLKCTRL
-> register to indicate it is actually ready before rtc register accesses
-> happen.
->
-> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
-> ---
->   arch/arm/mach-omap2/cm33xx.c | 3 ---
->   1 file changed, 3 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/cm33xx.c b/arch/arm/mach-omap2/cm33xx.c
-> index c073fb57dd13..7b181f929525 100644
-> --- a/arch/arm/mach-omap2/cm33xx.c
-> +++ b/arch/arm/mach-omap2/cm33xx.c
-> @@ -220,9 +220,6 @@ static int am33xx_cm_wait_module_ready(u8 part, s16 inst, u16 clkctrl_offs,
->   {
->   	int i = 0;
->
-> -	if (!clkctrl_offs)
-> -		return 0;
-> -
->   	omap_test_timeout(_is_module_ready(inst, clkctrl_offs),
->   			  MAX_MODULE_READY_TIME, i);
->
->
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ drivers/dma/xilinx/zynqmp_dma.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/dma/xilinx/zynqmp_dma.c b/drivers/dma/xilinx/zynqmp_dma.c
+index 59bc1f730a48..f777a5bc0db8 100644
+--- a/drivers/dma/xilinx/zynqmp_dma.c
++++ b/drivers/dma/xilinx/zynqmp_dma.c
+@@ -318,7 +318,7 @@ static void zynqmp_dma_config_sg_ll_desc(struct zynqmp_dma_chan *chan,
+ 
+ 	if (prev) {
+ 		dma_addr_t addr = chan->desc_pool_p +
+-			    ((dma_addr_t)sdesc - (dma_addr_t)chan->desc_pool_v);
++			    ((uintptr_t)sdesc - (uintptr_t)chan->desc_pool_v);
+ 		ddesc = prev + 1;
+ 		prev->nxtdscraddr = addr;
+ 		ddesc->nxtdscraddr = addr + ZYNQMP_DMA_DESC_SIZE(chan);
+-- 
+2.9.0
