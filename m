@@ -1,52 +1,42 @@
 From: kesavan.abhilash@gmail.com (Abhilash Kesavan)
-Date: Mon, 11 Jul 2016 16:44:12 +0200
-Subject: [PATCH 1/2] soc: samsung: Change type of PMU configuration
- register value to u32
-In-Reply-To: <CAJKOXPdPa7vCqetd5EUb3ebz7rB741ua=9wbdx-MkFh+G-=CJA@mail.gmail.com>
-References: <1467750507-13853-1-git-send-email-a.kesavan@samsung.com>
- <1467750507-13853-2-git-send-email-a.kesavan@samsung.com>
- <CAJKOXPdPa7vCqetd5EUb3ebz7rB741ua=9wbdx-MkFh+G-=CJA@mail.gmail.com>
-Message-ID: <CAM4voan0X5ejdCAWwbRa-RtBsgpWHAFFex1soh153Zy8PdngRw@mail.gmail.com>
+Date: Mon, 11 Jul 2016 16:44:21 +0200
+Subject: [PATCH v3 1/2] clk: samsung: cpu: Prepare for addition for
+ Exynos7 CPU clocks
+In-Reply-To: <577E32E5.4010902@samsung.com>
+References: <1467750561-13957-1-git-send-email-a.kesavan@samsung.com>
+ <1467750561-13957-2-git-send-email-a.kesavan@samsung.com>
+ <577E32E5.4010902@samsung.com>
+Message-ID: <CAM4voamJsK7aotk7WP64-64L4EAtDsxkEQW+b1VVTHNDYxq9GA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krzysztof,
+Hi Sylwester,
 
-On Wed, Jul 6, 2016 at 8:47 AM, Krzysztof Kozlowski
-<k.kozlowski@samsung.com> wrote:
-> On Tue, Jul 5, 2016 at 10:28 PM, Abhilash Kesavan <a.kesavan@samsung.com> wrote:
->> Exynos7 has certain PMU registers that needs to be configured with
->> u32 values.
->>
->> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
->> ---
->>  drivers/soc/samsung/exynos-pmu.h | 2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/drivers/soc/samsung/exynos-pmu.h b/drivers/soc/samsung/exynos-pmu.h
->> index a469e36..1bdc506 100644
->> --- a/drivers/soc/samsung/exynos-pmu.h
->> +++ b/drivers/soc/samsung/exynos-pmu.h
->> @@ -18,7 +18,7 @@
->>
->>  struct exynos_pmu_conf {
->>         unsigned int offset;
->> -       u8 val[NUM_SYS_POWERDOWN];
->> +       unsigned int val[NUM_SYS_POWERDOWN];
+On Thu, Jul 7, 2016 at 12:45 PM, Sylwester Nawrocki
+<s.nawrocki@samsung.com> wrote:
+> On 07/05/2016 10:29 PM, Abhilash Kesavan wrote:
+>> Exynos7 has the same CPU clock registers layout as that present
+>> in Exynos5433 except for the bits in the MUX_STAT* registers.
+>> Add a new CLK_CPU_HAS_MODIFIED_MUX_STAT flag to handle this change.
 >
-> You mentioned u32 but I see unsigned int here. This should be u32.
-Will change.
+>> --- a/drivers/clk/samsung/clk-cpu.h
+>> +++ b/drivers/clk/samsung/clk-cpu.h
+>> @@ -63,6 +63,8 @@ struct exynos_cpuclk {
+>>  /* The CPU clock registers have Exynos5433-compatible layout */
+>>  #define CLK_CPU_HAS_E5433_REGS_LAYOUT        (1 << 2)
 >
-> BTW, none of your emails reached my samsung inbox. I got them only
-> from the lists. Please investigate why this couldn't be delivered to
-> samsung.com address.
-
-Not quite sure why that happened even after I added you as a
-recipient. I'll be posting some patches soon, let's see if the same
-occurs again or if it was a one-off case.
+>> +/* Exynos5433-compatible layout with different MUX_STAT register bits */
+>> +#define CLK_CPU_HAS_MODIFIED_MUX_STAT        (1 << 3)
+>
+> It's getting a bit messy, what if there comes another SoC version
+> which has some other modification of exynos5433 registers structure?
+> We would need another variant of HAS_MODIFIED_MUX_STAT flag and we
+> could easily get lost while trying to determine which modification
+> is which. How about indicating explicitly it's an exynos7 bits
+> layout and renaming the flag to something like
+>
+> #define CLK_CPU_HAS_E7_MUX_STAT (1 << 16) ?
+Will rename the flag to make it SoC specific as per your suggestion.
 
 Regards,
 Abhilash
->
-> Best regards,
-> Krzysztof
