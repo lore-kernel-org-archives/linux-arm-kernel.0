@@ -1,75 +1,61 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 15 Jul 2016 12:02:55 +0200
-Subject: [PATCH v2 02/10] irqchip: add irqchip driver for nuc900
-In-Reply-To: <CAKT61h8EkOOkDHou65Uc7NNomJ6Nowvw8o6JnWxNyc0S_=x_JA@mail.gmail.com>
-References: <1468135649-19980-1-git-send-email-vw@iommu.org>
- <16178876.fFBuoBSjbd@wuerfel>
- <CAKT61h8EkOOkDHou65Uc7NNomJ6Nowvw8o6JnWxNyc0S_=x_JA@mail.gmail.com>
-Message-ID: <1885052.EkH2ZADWZS@wuerfel>
+Date: Mon, 11 Jul 2016 09:46:50 +0200
+Subject: [PATCH v2 09/10] Documentation: devicetree: Add dts description
+ for nuc900
+In-Reply-To: <578300E2.5000405@iommu.org>
+References: <1468136542-2656-1-git-send-email-vw@iommu.org>
+ <1850749.ap1S8Xq0fA@wuerfel> <578300E2.5000405@iommu.org>
+Message-ID: <1644086.jqpXDrkuq8@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, July 15, 2016 5:44:50 PM CEST Wan ZongShun wrote:
-> 2016-07-15 15:00 GMT+08:00 Arnd Bergmann <arnd@arndb.de>:
-> > On Friday, July 15, 2016 1:15:58 PM CEST Wan Zongshun wrote:
-> >>
-> >> Actually, I have two choice to implement this function:
-> >>
-> >> option1:
-> >>
-> >> void __exception_irq_entry aic_handle_irq(struct pt_regs *regs)
-> >> {
-> >>         u32 hwirq;
-> >>
-> >>         (void)readl(aic_base + REG_AIC_IPER);
-> >>         hwirq = readl(aic_base + REG_AIC_ISNR);
-> >>
-> >>         handle_IRQ((irq_find_mapping(aic_domain, hwirq)), regs);
-> >> }
-> >
-> > (side note: I think you want handle_domain_irq())
-> >
-> >> option2:
-> >>
-> >> void __exception_irq_entry aic_handle_irq(struct pt_regs *regs)
-> >> {
-> >>         u32 hwirq;
-> >>
-> >>         hwirq = readl(aic_base + REG_AIC_IPER);
-> >>         hwirq <<= 2;
-> >>
-> >>         handle_IRQ((irq_find_mapping(aic_domain, hwirq)), regs);
-> >> }
-> >>
-> >> Though the option2 do shift for hwirq, but it seems better than do io
-> >> operation by readl,so I prefer to option2, agree?
-> >
-> > That will only return an irq number that is a multiple of four, which
-> > seems wrong since the numbers are not that. Did you mean to write
-> >
-> >         hwirq = ilog2(hwirq);   ?
+On Monday, July 11, 2016 10:13:54 AM CEST Wan Zongshun wrote:
 > 
-> Sorry, my fault, I mean hwirq >>= 2, bit[7:2] indicates which irq is triggering.
-> so I have to do right shift 2 for IPER value.
-
-Ok, got it.
-
-> > That assumes that REG_AIC_IPER contains a 32-bit value with one single
-> > bit set to indicate which IRQ was triggered.
+> On 2016?07?11? 06:17, Arnd Bergmann wrote:
+> > On Sunday, July 10, 2016 3:42:21 PM CEST Wan Zongshun wrote:
+> >> +
+> >> +Required properties:
+> >> +- compatible : Should be "nuvoton,nuc970-tmr"
+> >> +- reg : Address and length of the register set
+> >> +- clocks : Reference on the timer input clock
+> >> +- interrupts : Reference to the timer interrupt
+> >> +
+> >> +Example:
+> >> +
+> >> +tmr at 0xb8001000 {
 > >
-> > If the difference is only in performance, you could try measuring which
-> > of the two ends up being faster.
+> > The name should be "timer", not "tmr", and the address should
+> > not contain a leading "0x".
 > 
-> It seems hard to measure. I think Do IO operation should be slower
-> than shift 2. 
+> Ok, so all dts addresses has no need contain a leading "0x"?
 
-It depends on how fast that particular I/O path is. A lot of readl()
-operations are awfully slow, but the hardware design for the interrupt
-controller may in fact have optimized this to be reasonably fast.
+In properties, you need the leading 0x for hexadecimal numbers,
+in the node name the portion after the "@" depends on the bus,
+but is usually just the value of the address in hexadecimal
+without the leading 0x.
 
-Another option would be to avoid the shift and just use the raw value
-of the REG_AIC_IPER register as the hwirq, with a custom map()
-callback that turns shifts the number read from the DT two bits
-so it matches the register value.
+> >
+> >> +       compatible = "nuvoton,nuc970-tmr";
+> >> +       reg = <0xb8001000 0x1000>;
+> >> +       interrupts = <16>;
+> >> +       clocks = <&clks TIMER0_GATE>,
+> >> +       <&clks TIMER1_GATE>;
+> >> +       clock-names = "timer0", "timer1";
+> >> +};
+> >
+> > The clocks/clock-names description does not match the example:
+> > you only define a single clock in the required properties, but
+> > have two separate inputs in the example. Please fix one or the
+> > other.
+> 
+> Two clocks are necessary, so I only need modify this description like?
+> 
+> Required properties:
+>    clocks : Reference on the timer input clock, This list should be 2
+> 	   clocks, the order is timer0 , timer1.
+> 
+> Is it ok?
+
+Yes, looks good.
 
 	Arnd
