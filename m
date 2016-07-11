@@ -1,30 +1,38 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 11 Jul 2016 22:34:48 +0200
-Subject: [PATCH 2/2] clk: sunxi-ng: h3: Fix Kconfig symbol typo
-In-Reply-To: <20160711203448.18062-1-maxime.ripard@free-electrons.com>
-References: <20160711203448.18062-1-maxime.ripard@free-electrons.com>
-Message-ID: <20160711203448.18062-2-maxime.ripard@free-electrons.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 11 Jul 2016 14:03:32 -0700
+Subject: [PATCH 1/2] tty: amba-pl011: add support for clock frequency
+ setting via dt
+In-Reply-To: <CAPPM39Zy2ii4-9ABTr+WtN5zdBjTFomQjzJfdSfrvYC9vhqd1w@mail.gmail.com>
+References: <1467965467-28180-1-git-send-email-jorge.ramirez-ortiz@linaro.org>
+ <146799807004.73491.2602277598493203375@resonance>
+ <57801DA6.5010506@linaro.org>
+ <146802378337.73491.10770797315435166004@resonance>
+ <57804897.1080101@codeaurora.org> <57809CD6.2090004@linaro.org>
+ <CAPPM39Zy2ii4-9ABTr+WtN5zdBjTFomQjzJfdSfrvYC9vhqd1w@mail.gmail.com>
+Message-ID: <20160711210332.GA16764@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Kconfig symbol for the sun8i SoC family was mistyped. Fix that.
+On 07/10, Jorge Ramirez Ortiz wrote:
+> On 9 July 2016 at 08:42, Jorge Ramirez <jorge.ramirez-ortiz@linaro.org>
+> > um, I retested again this morning and it is all good - I was also a bit
+> > surprised when things failed yesterday  (it seems one of the wires on my
+> > board was loose, sorry).
+> >
+> > So AFAIC your patch addresses the issue in a much generic (better) way and
+> > there are no regressions on a HiKey board running a 4.4 kernel.
+> >
+> >
+> >
+> 
+> Stephen, will you post your patch again? how do we progress the change set
+> (ie your patch & the hikey device tree change)?
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- drivers/clk/sunxi-ng/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Yes I'll post it again today and put it in Russell's patch
+tracker soon after that. I assume there isn't any concern with
+the patch and it works for you so it would be good to have your
+Tested-by too.
 
-diff --git a/drivers/clk/sunxi-ng/Kconfig b/drivers/clk/sunxi-ng/Kconfig
-index 41e53e8d4d41..2afcbd39e41e 100644
---- a/drivers/clk/sunxi-ng/Kconfig
-+++ b/drivers/clk/sunxi-ng/Kconfig
-@@ -60,6 +60,6 @@ config SUN8I_H3_CCU
- 	select SUNXI_CCU_NM
- 	select SUNXI_CCU_MP
- 	select SUNXI_CCU_PHASE
--	default ARCH_SUN8I
-+	default MACH_SUN8I
- 
- endif
 -- 
-2.9.0
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
