@@ -1,40 +1,55 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 11 Jul 2016 17:25:12 +0200
-Subject: [GIT PULL 4/4] arm64: tegra: Default configuration updates for
- v4.8-rc1
-In-Reply-To: <20160711152512.11731-1-thierry.reding@gmail.com>
-References: <20160711152512.11731-1-thierry.reding@gmail.com>
-Message-ID: <20160711152512.11731-4-thierry.reding@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 11 Jul 2016 17:36:13 +0200
+Subject: [PATCH v2 03/10] Clocksource: add nuc970 clocksource driver
+In-Reply-To: <1468135649-19980-4-git-send-email-vw@iommu.org>
+References: <1468135649-19980-1-git-send-email-vw@iommu.org>
+ <1468135649-19980-4-git-send-email-vw@iommu.org>
+Message-ID: <3277576.eNgdG7zPqq@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM SoC maintainers,
+On Sunday, July 10, 2016 3:27:23 PM CEST Wan Zongshun wrote:
+> 
+> +config NUC900_TIMER
+> +        bool "Clocksource timer for nuc900 platform" if COMPILE_TEST
+> +        depends on ARM
+> +        select CLKSRC_OF if OF
+> +        select CLKSRC_MMIO
+> +        help
+> +          Enables the clocksource for the NUC900 platform.
+> 
 
-The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
+I have put this patch into my randconfig build system and found that
+it lacks a dependency:
 
-  Linux 4.7-rc1 (2016-05-29 09:29:24 -0700)
 
-are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.8-arm64-defconfig
+diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+index e18ef32776a3..59b9251eef37 100644
+--- a/drivers/clocksource/Kconfig
++++ b/drivers/clocksource/Kconfig
+@@ -523,7 +523,7 @@ config CLKSRC_ST_LPC
+ 
+ config NUC900_TIMER
+         bool "Clocksource timer for nuc900 platform" if COMPILE_TEST
+-        depends on ARM
++        depends on ARM && GENERIC_CLOCKEVENTS
+         select CLKSRC_OF if OF
+         select CLKSRC_MMIO
+         help
+	
 
-for you to fetch changes up to 10a7b37b5b969d9998912e50946f7a03111037eb:
+Also the init function has changed its return type in linux-next:
 
-  arm64: Update default configuration (2016-07-11 16:50:20 +0200)
+> +static void __init nuc970_timer_of_init(struct device_node *node)
 
-Thanks,
-Thierry
+This now needs to return an error code or we get:
 
-----------------------------------------------------------------
-arm64: tegra: Default configuration updates for v4.8-rc1
+../include/linux/of.h:1004:20: error: comparison of distinct pointer types lacks a cast [-Werror]
+        .data = (fn == (fn_type)NULL) ? fn : fn  }
 
-Enable a bunch of configuration options to enable PMIC, regulators, DSI,
-HDMI, XUSB and the GPU on Jetson TX1 as well as a few new features that
-are now functional on the Google Pixel C.
+Daniel Lezcano seems to have implemented a migration strategy, but I
+can't see what you are supposed to do here, since the
+CLOCKSOURCE_OF_DECLARE_RET macro is no longer part of linux-next.
 
-----------------------------------------------------------------
-Thierry Reding (1):
-      arm64: Update default configuration
-
- arch/arm64/configs/defconfig | 25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
+	Arnd
