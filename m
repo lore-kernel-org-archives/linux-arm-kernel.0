@@ -1,41 +1,90 @@
-From: d-gerlach@ti.com (Dave Gerlach)
-Date: Mon, 11 Jul 2016 16:39:38 -0500
-Subject: [PATCH] Revert "ARM: AM33xx: fix module_wait_ready without clkctrl
- register"
-Message-ID: <20160711213938.28385-1-d-gerlach@ti.com>
+From: mturquette@baylibre.com (Michael Turquette)
+Date: Mon, 11 Jul 2016 14:41:23 -0700
+Subject: [PATCH v3 13/14] clk: sunxi-ng: Add H3 clocks
+In-Reply-To: <20160711202632.GG4589@lukather>
+References: <20160629190535.11855-1-maxime.ripard@free-electrons.com>
+ <20160629190535.11855-14-maxime.ripard@free-electrons.com>
+ <146785878822.73491.15164592643568518865@resonance>
+ <20160708213506.GD4522@lukather>
+ <146802703641.73491.4992163597821488987@resonance>
+ <20160711202632.GG4589@lukather>
+Message-ID: <146827328342.73491.9092592988312446585@resonance>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This reverts commit 183e2077d007aa4b697efba095ecfea7244a6107.
+Quoting Maxime Ripard (2016-07-11 13:26:32)
+> Hi Mike,
+> 
+> On Fri, Jul 08, 2016 at 06:17:16PM -0700, Michael Turquette wrote:
+> > Quoting Maxime Ripard (2016-07-08 14:35:06)
+> > > Hi Mike,
+> > > 
+> > > On Wed, Jul 06, 2016 at 07:33:08PM -0700, Michael Turquette wrote:
+> > > > Hi Maxime,
+> > > > 
+> > > > Quoting Maxime Ripard (2016-06-29 12:05:34)
+> > > > > +static void __init sun8i_h3_ccu_setup(struct device_node *node)
+> > > > > +{
+> > > > > +       void __iomem *reg;
+> > > > > +       u32 val;
+> > > > > +
+> > > > > +       reg = of_io_request_and_map(node, 0, of_node_full_name(node));
+> > > > > +       if (IS_ERR(reg)) {
+> > > > > +               pr_err("%s: Could not map the clock registers\n",
+> > > > > +                      of_node_full_name(node));
+> > > > > +               return;
+> > > > > +       }
+> > > > > +
+> > > > > +       /* Force the PLL-Audio-1x divider to 4 */
+> > > > > +       val = readl(reg + SUN8I_H3_PLL_AUDIO_REG);
+> > > > > +       val &= ~GENMASK(4, 0);
+> > > > > +       writel(val | 3, reg + SUN8I_H3_PLL_AUDIO_REG);
+> > > > > +
+> > > > > +       sunxi_ccu_probe(node, reg, &sun8i_h3_ccu_desc);
+> > > > > +}
+> > > > > +CLK_OF_DECLARE(sun8i_h3_ccu, "allwinner,sun8i-h3-ccu",
+> > > > > +              sun8i_h3_ccu_setup);
+> > > > 
+> > > > There are several examples of drivers that split the clocks between
+> > > > "early" CLK_OF_DECLARE clocks and "late" module clocks. If you really
+> > > > need early clocks (which is less likely on a 64-bit platform with
+> > > > architected timers), it would be nice to pair that with a proper
+> > > > platform_driver (using builtin_platform_driver most likely).
+> > > 
+> > > I think we discussed that already, but yeah, we do have timers that
+> > > are not the architected ones (and this is a ARMv7 platform). I have
+> > > the feeling that splitting the two doesn't really bring any benefit,
+> > > but complexify a lot the driver.
+> > 
+> > Cool. I've pushed patches 1-13 to the clk tree under a shared, immutable
+> > branch: clk-sunxi-ng
+> > 
+> > I've merged this branch into clk-next to get some soak testing.
+> > 
+> > I did not merge patch #14. Feel free to add my reviewed-by to that
+> > patch.
+> 
+> Thanks for merging the other patches, but can you merge patch 14 too?
+> Merging it through my tree would break bisectability, and it should
+> apply properly on your tree.
 
-The original patch added a check to am33xx_cm_wait_module_ready for a
-clkctrl offset of 0 as an invalid case, however, clkctrl offset of 0 is
-perfectly valid for hwmods, in particular the rtc.
+Applied.
 
-Without reverting this patch sometimes external aborts are seen on
-am335x during boot. This is due to the am33xx_cm_wait_module_ready
-function immediately returning 0 rather than waiting for the RTC_CLKCTRL
-register to indicate it is actually ready before rtc register accesses
-happen.
+Regards,
+Mike
 
-Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
----
- arch/arm/mach-omap2/cm33xx.c | 3 ---
- 1 file changed, 3 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/cm33xx.c b/arch/arm/mach-omap2/cm33xx.c
-index c073fb57dd13..7b181f929525 100644
---- a/arch/arm/mach-omap2/cm33xx.c
-+++ b/arch/arm/mach-omap2/cm33xx.c
-@@ -220,9 +220,6 @@ static int am33xx_cm_wait_module_ready(u8 part, s16 inst, u16 clkctrl_offs,
- {
- 	int i = 0;
- 
--	if (!clkctrl_offs)
--		return 0;
--
- 	omap_test_timeout(_is_module_ready(inst, clkctrl_offs),
- 			  MAX_MODULE_READY_TIME, i);
- 
--- 
-2.9.0
+> 
+> > Were you going to spin another version? If so I can replace v3 with v4
+> > when it is ready. Thanks again for your hard work on this! Very happy to
+> > see the binding be reworked :-)
+> 
+> I'll send another patch to fix the bug found by Jean-Francois, and one
+> to fix a typo. Feel free to squash them in.
+> 
+> Thanks!
+> Maxime
+> 
+> -- 
+> Maxime Ripard, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
