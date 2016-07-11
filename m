@@ -1,37 +1,89 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 11 Jul 2016 20:22:11 +0100
-Subject: [PATCH V8 1/2] regulator: Add document for MT6323 regulator
-In-Reply-To: <cef78bd8-9a4a-e848-d7cb-13a27127f11e@phrozen.org>
-References: <1468240179-7558-1-git-send-email-john@phrozen.org>
- <20160711180805.GG3701@sirena.org.uk>
- <cef78bd8-9a4a-e848-d7cb-13a27127f11e@phrozen.org>
-Message-ID: <20160711192211.GI3701@sirena.org.uk>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 11 Jul 2016 22:26:32 +0200
+Subject: [PATCH v3 13/14] clk: sunxi-ng: Add H3 clocks
+In-Reply-To: <146802703641.73491.4992163597821488987@resonance>
+References: <20160629190535.11855-1-maxime.ripard@free-electrons.com>
+ <20160629190535.11855-14-maxime.ripard@free-electrons.com>
+ <146785878822.73491.15164592643568518865@resonance>
+ <20160708213506.GD4522@lukather>
+ <146802703641.73491.4992163597821488987@resonance>
+Message-ID: <20160711202632.GG4589@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 11, 2016 at 08:55:24PM +0200, John Crispin wrote:
-> On 11/07/2016 20:08, Mark Brown wrote:
-> > On Mon, Jul 11, 2016 at 02:29:38PM +0200, John Crispin wrote:
+Hi Mike,
 
-> >> This is a resend as V7 was dropped due to a merge order conflict.
+On Fri, Jul 08, 2016 at 06:17:16PM -0700, Michael Turquette wrote:
+> Quoting Maxime Ripard (2016-07-08 14:35:06)
+> > Hi Mike,
+> > 
+> > On Wed, Jul 06, 2016 at 07:33:08PM -0700, Michael Turquette wrote:
+> > > Hi Maxime,
+> > > 
+> > > Quoting Maxime Ripard (2016-06-29 12:05:34)
+> > > > +static void __init sun8i_h3_ccu_setup(struct device_node *node)
+> > > > +{
+> > > > +       void __iomem *reg;
+> > > > +       u32 val;
+> > > > +
+> > > > +       reg = of_io_request_and_map(node, 0, of_node_full_name(node));
+> > > > +       if (IS_ERR(reg)) {
+> > > > +               pr_err("%s: Could not map the clock registers\n",
+> > > > +                      of_node_full_name(node));
+> > > > +               return;
+> > > > +       }
+> > > > +
+> > > > +       /* Force the PLL-Audio-1x divider to 4 */
+> > > > +       val = readl(reg + SUN8I_H3_PLL_AUDIO_REG);
+> > > > +       val &= ~GENMASK(4, 0);
+> > > > +       writel(val | 3, reg + SUN8I_H3_PLL_AUDIO_REG);
+> > > > +
+> > > > +       sunxi_ccu_probe(node, reg, &sun8i_h3_ccu_desc);
+> > > > +}
+> > > > +CLK_OF_DECLARE(sun8i_h3_ccu, "allwinner,sun8i-h3-ccu",
+> > > > +              sun8i_h3_ccu_setup);
+> > > 
+> > > There are several examples of drivers that split the clocks between
+> > > "early" CLK_OF_DECLARE clocks and "late" module clocks. If you really
+> > > need early clocks (which is less likely on a 64-bit platform with
+> > > architected timers), it would be nice to pair that with a proper
+> > > platform_driver (using builtin_platform_driver most likely).
+> > 
+> > I think we discussed that already, but yeah, we do have timers that
+> > are not the architected ones (and this is a ARMv7 platform). I have
+> > the feeling that splitting the two doesn't really bring any benefit,
+> > but complexify a lot the driver.
+> 
+> Cool. I've pushed patches 1-13 to the clk tree under a shared, immutable
+> branch: clk-sunxi-ng
+> 
+> I've merged this branch into clk-next to get some soak testing.
+> 
+> I did not merge patch #14. Feel free to add my reviewed-by to that
+> patch.
 
-> > What were the dependencies and why will simply resending this resolve
-> > them?
+Thanks for merging the other patches, but can you merge patch 14 too?
+Merging it through my tree would break bisectability, and it should
+apply properly on your tree.
 
-> the dependency was the mt6323 support inside the mt6397 MFD device [1]
-> and the headers that it included. this has been merged so the regulator
-> driver is good to go for 4.8
+> Were you going to spin another version? If so I can replace v3 with v4
+> when it is ready. Thanks again for your hard work on this! Very happy to
+> see the binding be reworked :-)
 
-No, that's not resolving the dependencies - if I apply these patches
-without the dependencies in the regulator tree that will still break the
-build for my tree until after the merge window.  It'll also break Linus'
-tree if (as is normal) I send my pull requests early on.  I'd need to
-merge the MFD commits into my tree which would need coordination with
-Lee, he'd need to make a tag for me to pull in.
+I'll send another patch to fix the bug found by Jean-Francois, and one
+to fix a typo. Feel free to squash them in.
+
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 473 bytes
+Size: 819 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160711/dca08830/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160711/9e114058/attachment.sig>
