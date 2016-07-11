@@ -1,47 +1,35 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Mon, 11 Jul 2016 14:20:15 +0200
-Subject: FPGA manager user space interface
-In-Reply-To: <5782BE1A.9090905@gmail.com>
-References: <5782BE1A.9090905@gmail.com>
-Message-ID: <57838EFF.50200@xilinx.com>
+From: Chris.Brandt@renesas.com (Chris Brandt)
+Date: Mon, 11 Jul 2016 12:27:01 +0000
+Subject: sh-eth.c writes to non-existent register on RZ/A1
+In-Reply-To: <CAFr9PXniO=qPUpok1dVHzjrEpKVo6t3koc2n=UCjWrdD_DL+5A@mail.gmail.com>
+References: <CAFr9PXniO=qPUpok1dVHzjrEpKVo6t3koc2n=UCjWrdD_DL+5A@mail.gmail.com>
+Message-ID: <KL1PR06MB1749BFFCB144EE55402339968A3F0@KL1PR06MB1749.apcprd06.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Florian,
+Daniel,
 
-I didn't follow all stuff regarding FPGA manager and I can't remember
-the reasons against user interfaces.  Alan probably knows.
+You might have better luck posting Renesas device questions to the Renesas mailing list.
 
-Thanks,
-Michal
+http://vger.kernel.org/vger-lists.html#linux-renesas-soc
 
-On 10.7.2016 23:28, Florian Fainelli wrote:
-> Hi all,
-> 
-> I just wrote a FPGA manager driver for the TS-7300 board which features
-> an Altera Cyclone II on board. While the finished solution is my case
-> might be something like the MFD driver for the FPGA devices requesting
-> the bitstream load and registering the different devices it exposes,
-> during development it is nice to exercise the FPGA manager driver to
-> load something:
-> 
-> - a quick way is to add a pair of sysfs attributes to define the
-> bitstream filename and to trigger the load
-> 
-> - offer a more consistent and robust interface through e.g; a character
-> device that you can write/read/poll to see the loading progress about
-> 
-> - have the driver exposing FPGA peripherals be exposing an user space
-> interface to trigger a (re)load/(re)/configuration, although that's
-> really something that belongs in the FPGA manager it seems
-> 
-> I am mostly curious if these were taken into account during the initial
-> design and it is agreed upon that yes these are some of options and that
-> userspace loading is just anecdotal we do not need any userspace
-> interface, or if this is just missing and we want one? Either way, I
-> don't mind submitting what I came up with for the TS-7300 board.
-> 
-> Thanks!
-> --
-> Florian
-> 
+
+
+
+> There seem to be a few different controllers that are roughly the same and used in Renesas...
+
+Yes, that base Ethernet IP block has been used in many SH4 and Renesas-ARM devices over the years and has many variations. Makes it easy for code reuse.
+
+
+> The controller in the RZ/A1 has a tsu but is missing one of the registers that is
+> called "TSU_POST1" in the tables for other chips.
+
+That is because this feature (POST) is dealing with relaying frames between two Ethernet ports, and as you know...the RZ/A1 only has 1 Ethernet controller. So it makes sense that this register isn't included.
+
+
+> and I considered submitting a patch with the contents of sh_eth_tsu_enable_cam_entry_post() wrapped with if(sh_eth_is...)
+
+It's on my list of things to do in the next couple months to push in all the RZ/A1 BSP driver changes back upstream. After I got the XIP_LINUX fixes in earlier this year, I got a bit side tracked on other projects.
+
+
+Chris
