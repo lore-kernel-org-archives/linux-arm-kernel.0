@@ -1,90 +1,89 @@
-From: ykk@rock-chips.com (Yakir Yang)
-Date: Mon, 11 Jul 2016 19:05:52 +0800
-Subject: [PATCH v1 6/6] drm/rockchip: dw_hdmi: introduce the pclk for grf
-In-Reply-To: <1468235079-29152-1-git-send-email-ykk@rock-chips.com>
-References: <1468235079-29152-1-git-send-email-ykk@rock-chips.com>
-Message-ID: <1468235152-29683-1-git-send-email-ykk@rock-chips.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Mon, 11 Jul 2016 12:07:34 +0100
+Subject: [PATCH v4 5/8] iommu/of: Introduce iommu_fwspec
+In-Reply-To: <20160707165631.GB2685@red-moon>
+References: <cover.1467388950.git.robin.murphy@arm.com>
+ <7947dbaa0e0d4ace8eebe8de1fe5810fe05f7734.1467388950.git.robin.murphy@arm.com>
+ <20160707165631.GB2685@red-moon>
+Message-ID: <57837DF6.5060504@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For RK3399's GRF module, if we want to operate the graphic related grf
-registers, we need to enable the pclk_vio_grf which supply power for VIO
-GRF IOs, so it's better to introduce an optional grf clock in driver.
+On 07/07/16 17:56, Lorenzo Pieralisi wrote:
+> On Fri, Jul 01, 2016 at 05:50:14PM +0100, Robin Murphy wrote:
+> 
+> [...]
+> 
+>> +int iommu_fwspec_add_ids(struct device *dev, u32 *ids, int num_ids)
+>> +{
+>> +	struct iommu_fwspec *fwspec = dev->archdata.iommu;
+>> +	size_t size;
+>> +
+>> +	if (!fwspec)
+>> +		return -EINVAL;
+>> +
+>> +	size = offsetof(struct iommu_fwspec, ids[fwspec->num_ids + 1]);
+> 								^^^^
+> 
+> + num_ids ?
 
-Signed-off-by: Yakir Yang <ykk@rock-chips.com>
----
- .../bindings/display/rockchip/dw_hdmi-rockchip.txt   |  3 ++-
- drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c          | 20 ++++++++++++++++++++
- 2 files changed, 22 insertions(+), 1 deletion(-)
+Oops, quite right. Thanks!
 
-diff --git a/Documentation/devicetree/bindings/display/rockchip/dw_hdmi-rockchip.txt b/Documentation/devicetree/bindings/display/rockchip/dw_hdmi-rockchip.txt
-index 4e23ca4..e22d70f 100644
---- a/Documentation/devicetree/bindings/display/rockchip/dw_hdmi-rockchip.txt
-+++ b/Documentation/devicetree/bindings/display/rockchip/dw_hdmi-rockchip.txt
-@@ -18,7 +18,8 @@ Required properties:
- Optional properties
- - ddc-i2c-bus: phandle of an I2C controller used for DDC EDID probing
- - clocks, clock-names: phandle to the HDMI CEC clock, name should be "cec",
--		       phandle to the VPLL clock, name should be "vpll".
-+		       phandle to the VPLL clock, name should be "vpll",
-+		       phandle to the GRF clock, name should be "grf".
- 
- Example:
- hdmi: hdmi at ff980000 {
-diff --git a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
-index 701bb73..69e6efb 100644
---- a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
-+++ b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
-@@ -36,6 +36,7 @@ struct rockchip_hdmi {
- 	struct drm_encoder encoder;
- 	enum dw_hdmi_devtype dev_type;
- 	struct clk *vpll_clk;
-+	struct clk *grf_clk;
- };
- 
- #define to_rockchip_hdmi(x)	container_of(x, struct rockchip_hdmi, x)
-@@ -166,6 +167,16 @@ static int rockchip_hdmi_parse_dt(struct rockchip_hdmi *hdmi)
- 		return PTR_ERR(hdmi->vpll_clk);
- 	}
- 
-+	hdmi->grf_clk = devm_clk_get(hdmi->dev, "grf");
-+	if (PTR_ERR(hdmi->grf_clk) == -ENOENT) {
-+		hdmi->grf_clk = NULL;
-+	} else if (PTR_ERR(hdmi->grf_clk) == -EPROBE_DEFER) {
-+		return -EPROBE_DEFER;
-+	} else if (IS_ERR(hdmi->grf_clk)) {
-+		dev_err(hdmi->dev, "failed to get grf clock\n");
-+		return PTR_ERR(hdmi->grf_clk);
-+	}
-+
- 	ret = clk_prepare_enable(hdmi->vpll_clk);
- 	if (ret) {
- 		dev_err(hdmi->dev, "Failed to enable HDMI vpll: %d\n", ret);
-@@ -225,6 +236,7 @@ static void dw_hdmi_rockchip_encoder_enable(struct drm_encoder *encoder)
- 	u32 lcdsel_grf_reg, lcdsel_mask;
- 	u32 val;
- 	int mux;
-+	int ret;
- 
- 	switch (hdmi->dev_type) {
- 	case RK3288_HDMI:
-@@ -245,9 +257,17 @@ static void dw_hdmi_rockchip_encoder_enable(struct drm_encoder *encoder)
- 	else
- 		val = HIWORD_UPDATE(0, lcdsel_mask);
- 
-+	ret = clk_prepare_enable(hdmi->grf_clk);
-+	if (ret < 0) {
-+		dev_err(hdmi->dev, "failed to enable grfclk %d\n", ret);
-+		return;
-+	}
-+
- 	regmap_write(hdmi->regmap, lcdsel_grf_reg, val);
- 	dev_dbg(hdmi->dev, "vop %s output to hdmi\n",
- 		(mux) ? "LIT" : "BIG");
-+
-+	clk_disable_unprepare(hdmi->grf_clk);
- }
- 
- static int
--- 
-1.9.1
+Robin.
+
+> Lorenzo
+> 
+>> +	fwspec = krealloc(dev->archdata.iommu, size, GFP_KERNEL);
+>> +	if (!fwspec)
+>> +		return -ENOMEM;
+>> +
+>> +	while (num_ids--)
+>> +		fwspec->ids[fwspec->num_ids++] = *ids++;
+>> +
+>> +	dev->archdata.iommu = fwspec;
+>> +	return 0;
+>> +}
+>> +
+>> +inline struct iommu_fwspec *dev_iommu_fwspec(struct device *dev)
+>> +{
+>> +	return dev->archdata.iommu;
+>> +}
+>> diff --git a/include/linux/of_iommu.h b/include/linux/of_iommu.h
+>> index bd02b44902d0..308791fca32d 100644
+>> --- a/include/linux/of_iommu.h
+>> +++ b/include/linux/of_iommu.h
+>> @@ -15,6 +15,14 @@ extern void of_iommu_init(void);
+>>  extern const struct iommu_ops *of_iommu_configure(struct device *dev,
+>>  					struct device_node *master_np);
+>>  
+>> +struct iommu_fwspec {
+>> +	const struct iommu_ops	*iommu_ops;
+>> +	struct device_node	*iommu_np;
+>> +	void			*iommu_priv;
+>> +	unsigned int		num_ids;
+>> +	u32			ids[];
+>> +};
+>> +
+>>  #else
+>>  
+>>  static inline int of_get_dma_window(struct device_node *dn, const char *prefix,
+>> @@ -31,8 +39,15 @@ static inline const struct iommu_ops *of_iommu_configure(struct device *dev,
+>>  	return NULL;
+>>  }
+>>  
+>> +struct iommu_fwspec;
+>> +
+>>  #endif	/* CONFIG_OF_IOMMU */
+>>  
+>> +int iommu_fwspec_init(struct device *dev, struct device_node *iommu_np);
+>> +void iommu_fwspec_free(struct device *dev);
+>> +int iommu_fwspec_add_ids(struct device *dev, u32 *ids, int num_ids);
+>> +struct iommu_fwspec *dev_iommu_fwspec(struct device *dev);
+>> +
+>>  void of_iommu_set_ops(struct device_node *np, const struct iommu_ops *ops);
+>>  const struct iommu_ops *of_iommu_get_ops(struct device_node *np);
+>>  
+>> -- 
+>> 2.8.1.dirty
+>>
+> 
