@@ -1,47 +1,61 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 11 Jul 2016 12:31:06 +0200
-Subject: [PATCH v5 2/3] pwm: iproc: Add support for Broadcom iproc pwm
- controller
-In-Reply-To: <CAL2FKYkH86zhPOrEZQ8Q=WeKUV=2KFfxfA-JTrxiqMnCceQ87g@mail.gmail.com>
-References: <CAL2FKYkH86zhPOrEZQ8Q=WeKUV=2KFfxfA-JTrxiqMnCceQ87g@mail.gmail.com>
-Message-ID: <20160711103106.GA5503@ulmo.ba.sec>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 11 Jul 2016 12:36:16 +0200
+Subject: [PATCH v2 06/10] soc: Add SoC specific driver support for nuc900
+In-Reply-To: <CAKT61h_vxcvVqqaDOn2XgtF7cBEpziSjfHRaY3eCWmM1ATfDXw@mail.gmail.com>
+References: <1468135649-19980-1-git-send-email-vw@iommu.org>
+ <1606219.BzcByuFgJm@wuerfel>
+ <CAKT61h_vxcvVqqaDOn2XgtF7cBEpziSjfHRaY3eCWmM1ATfDXw@mail.gmail.com>
+Message-ID: <3879062.QodNaKgPKS@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 11, 2016 at 12:22:38PM +0530, Yendapally Reddy Dhananjaya Reddy wrote:
-> Hi Thierry,
-> 
-> On Fri, Jul 8, 2016 at 8:46 PM, Thierry Reding <thierry.reding@gmail.com> wrote:
-> > On Tue, Jul 05, 2016 at 02:00:25AM -0400, Yendapally Reddy Dhananjaya Reddy wrote:
-> >> Add support for the PWM controller present in Broadcom's iProc
-> >> family of SoCs.It has been tested on the  Northstar+ bcm958625HR board.
+On Monday, July 11, 2016 6:28:57 PM CEST Wan ZongShun wrote:
+> 2016-07-11 18:24 GMT+08:00 Arnd Bergmann <arnd@arndb.de>:
+> > On Monday, July 11, 2016 5:07:01 PM CEST Wan Zongshun wrote:
 > >>
-> >> Signed-off-by: Yendapally Reddy Dhananjaya Reddy <yendapally.reddy@broadcom.com>
-> >> ---
-> >>  drivers/pwm/Kconfig         |  10 ++
-> >>  drivers/pwm/Makefile        |   1 +
-> >>  drivers/pwm/pwm-bcm-iproc.c | 268 ++++++++++++++++++++++++++++++++++++++++++++
-> >>  3 files changed, 279 insertions(+)
-> >>  create mode 100644 drivers/pwm/pwm-bcm-iproc.c
+> >> On 2016?07?11? 16:03, Arnd Bergmann wrote:
+> >> > On Sunday, July 10, 2016 3:27:26 PM CEST Wan Zongshun wrote:
+> >> >> +       ret = of_property_read_string(np, "compatible", &soc_dev_attr->soc_id);
+> >> >> +       if (ret)
+> >> >>                return -EINVAL;
+> >> >> +
+> >> >> +       soc_dev_attr->machine = "NUC900EVB";
+> >> >> +       soc_dev_attr->family = "NUC900";
+> >> >> +       soc_dev = soc_device_register(soc_dev_attr);
+> >> >> +       if (IS_ERR(soc_dev)) {
+> >> >> +               kfree(soc_dev_attr);
+> >> >> +               return -ENODEV;
+> >> >> +       }
+> >> >> +
+> >> >> +       ret = regmap_read(syscon_regmap, GCR_CHIPID, &nuc900_chipid);
+> >> >> +       if (ret)
+> >> >> +               return -ENODEV;
+> >> >> +
+> >> >> +       device_create_file(soc_device_to_device(soc_dev), &nuc900_chipid_attr);
+> >> >> +       device_create_file(soc_device_to_device(soc_dev), &nuc900_version_attr);
+> >> >> +
+> >> >> +       dev_info(&pdev->dev, "Nuvoton Chip ID: 0x%x, Version ID:0x%x\n",
+> >> >> +                nuc900_chipid & GCR_CHIPID_MASK,
+> >> >> +                (nuc900_chipid >> 24) & 0xff);
+> >> >
+> >> > I'm still a bit unsure about the set of attributes here.
+> >> >
+> >> > - The "soc_id" is read from the device tree from the field that contains
+> >> >    the board name, I think for consistency you should try to map the
+> >> >    GCR_CHIPID to the name of the SoC and assign that here
+> >>
+> >> I will try to get chipid and map it to soc name like: ?nuc970?, "nuc910".
+> >>
+> >> And I will set this soc name to soc_id, ok?
 > >
-> > I've applied this, but I had to make a couple of changes for coding
-> > style and to squash compiler warnings. Please check the PWM tree's
-> > for-next branch to see if it still works for you.
-> >
+> > Ok.
 > 
->   Thanks. It is working fine for me. A small change is required here,
-> NSEC_PER_SEC
-> instead of USEC_PER_SEC in two places.
+> Maybe I also can set versionid as soc name partly, like
+> nuc970-version1,nuc970-version2? and then set the to soc_id, make
+> sense?
+> 
 
-Ah yes, I had mixed those up when converting from literal to symbolic.
-Should be fixed now.
+I didn't exactly understand what the suggestion is, maybe send that
+as code so I see what you mean.
 
-Thanks,
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160711/b1d1a522/attachment.sig>
+	Arnd
