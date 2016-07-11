@@ -1,24 +1,132 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 11 Jul 2016 09:34:14 -0500
-Subject: [PATCH 1/3] net: stmmac: dwmac-rk: add rk3366 & rk3399-specific
- data
-In-Reply-To: <1467802291-6487-2-git-send-email-roger.chen@rock-chips.com>
-References: <1467802291-6487-1-git-send-email-roger.chen@rock-chips.com>
- <1467802291-6487-2-git-send-email-roger.chen@rock-chips.com>
-Message-ID: <20160711143414.GA8707@rob-hp-laptop>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 11 Jul 2016 15:34:03 +0100
+Subject: [PATCH v2] pmem: add pmem support codes on ARM64
+In-Reply-To: <1467964298-29241-1-git-send-email-kwangwoo.lee@sk.com>
+References: <1467964298-29241-1-git-send-email-kwangwoo.lee@sk.com>
+Message-ID: <20160711143402.GA7691@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 06, 2016 at 06:51:29PM +0800, Roger Chen wrote:
-> Add constants and callback functions for the dwmac on rk3368 socs.
-> As can be seen, the base structure is the same, only registers and
-> the bits in them moved slightly.
-> 
-> Signed-off-by: Roger Chen <roger.chen@rock-chips.com>
-> ---
->  .../devicetree/bindings/net/rockchip-dwmac.txt     |   3 +-
+Hi,
 
-Acked-by: Rob Herring <robh@kernel.org>
+On Fri, Jul 08, 2016 at 04:51:38PM +0900, Kwangwoo Lee wrote:
+> +/**
+> + * arch_memcpy_to_pmem - copy data to persistent memory
+> + * @dst: destination buffer for the copy
+> + * @src: source buffer for the copy
+> + * @n: length of the copy in bytes
+> + *
+> + * Copy data to persistent memory media. if ARCH_HAS_PMEM_API is defined,
+> + * then MEMREMAP_WB is used to memremap() during probe. A subsequent
+> + * arch_wmb_pmem() need to guarantee durability.
+> + */
+> +static inline void arch_memcpy_to_pmem(void __pmem *dst, const void *src,
+> +		size_t n)
+> +{
+> +	int unwritten;
+> +
+> +	unwritten = __copy_from_user_inatomic((void __force *) dst,
+> +			(void __user *) src, n);
+> +	if (WARN(unwritten, "%s: fault copying %p <- %p unwritten: %d\n",
+> +				__func__, dst, src, unwritten))
+> +		BUG();
+> +
+> +	__flush_dcache_area(dst, n);
+> +}
 
->  drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c     | 226 +++++++++++++++++++++
->  2 files changed, 228 insertions(+), 1 deletion(-)
+I still don't understand why we use a access helper here.
+
+I see that default_memcpy_from_pmem is just a memcpy, and no surrounding
+framework seems to set_fs first. So this looks very suspicious.
+
+Why are we trying to handle faults on kernel memory here? Especially as
+we're going to BUG() if that happens anyway?
+
+> +static inline int arch_memcpy_from_pmem(void *dst, const void __pmem *src,
+> +		size_t n)
+> +{
+> +	memcpy(dst, (void __force *) src, n);
+> +	return 0;
+> +}
+
+Similarly, I still don't understand why this isn't a mirror image of
+arch_memcpy_to_pmem().
+
+> +
+> +/**
+> + * arch_wmb_pmem - synchronize writes to persistent memory
+> + *
+> + * After a series of arch_memcpy_to_pmem() operations this need to be called to
+> + * ensure that written data is durable on persistent memory media.
+> + */
+> +static inline void arch_wmb_pmem(void)
+> +{
+> +	/*
+> +	 * We've already arranged for pmem writes to avoid the cache in
+> +	 * arch_memcpy_to_pmem()
+> +	 */
+
+This comment is not true. We first copied, potentially hitting and/or
+allocating in cache(s), then subsequently cleaned (and invalidated)
+those.
+
+> +	wmb();
+> +
+> +	/*
+> +	 * pcommit_sfence() on X86 has been removed and will be replaced with
+> +	 * a function after ARMv8.2 which will support DC CVAP to ensure
+> +	 * Point-of-Persistency. Until then, mark here with a comment to keep
+> +	 * the point for __clean_dcache_area_pop().
+> +	 */
+> +}
+
+This comment is confusing. There's no need to mention x86 here.
+
+As I mentioned on v1, in the absence of the ARMv8.2 extensions for
+persistent memory, I am not sure whether the above is sufficient. There
+could be caches after the PoC which data sits in, such that even after a
+call to __flush_dcache_area() said data has not been written back to
+persistent memory.
+
+> +/**
+> + * arch_invalidate_pmem - invalidate a PMEM memory range
+> + * @addr:	virtual start address
+> + * @size:	number of bytes to zero
+> + *
+> + * After finishing ARS(Address Range Scrubbing), clean and invalidate the
+> + * address range.
+> + */
+> +static inline void arch_invalidate_pmem(void __pmem *addr, size_t size)
+> +{
+> +	__flush_dcache_area(addr, size);
+> +}
+
+As with my prior concern, I'm not sure that this is guaranteed to make
+persistent data visible to the CPU, if there are caches after the PoC.
+
+It looks like this is used to clear poison on x86, and I don't know
+whether the ARM behaviour is comparable.
+
+>  /*
+> + *	__clean_dcache_area(kaddr, size)
+> + *
+> + * 	Ensure that any D-cache lines for the interval [kaddr, kaddr+size)
+> + * 	are cleaned to the PoC.
+> + *
+> + *	- kaddr   - kernel address
+> + *	- size    - size in question
+> + */
+> +ENTRY(__clean_dcache_area)
+> +alternative_if_not ARM64_WORKAROUND_CLEAN_CACHE
+> +	dcache_by_line_op cvac, sy, x0, x1, x2, x3
+> +alternative_else
+> +	dcache_by_line_op civac, sy, x0, x1, x2, x3
+> +alternative_endif
+> +	ret
+> +ENDPROC(__clean_dcache_area)
+
+This looks correct per my understanding of the errata that use this
+capability.
+
+Thanks,
+Mark.
