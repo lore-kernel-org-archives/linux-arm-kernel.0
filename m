@@ -1,9 +1,9 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Mon, 11 Jul 2016 18:41:17 +0200
-Subject: [GIT PULL 3/4] arm64: dts: exynos: Minor fix for v4.8, last round
+Date: Mon, 11 Jul 2016 18:41:18 +0200
+Subject: [GIT PULL 4/4] arm64: defconfig: Stuff for exynos for v4.8, last round
 In-Reply-To: <1468255278-32162-1-git-send-email-k.kozlowski@samsung.com>
 References: <1468255278-32162-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1468255278-32162-3-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1468255278-32162-4-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -21,19 +21,25 @@ The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-dt64-4.8-2
+  git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-defconfig64-4.8
 
-for you to fetch changes up to a1924466b784fbb64f10eeb213d335e3d1728b8b:
+for you to fetch changes up to 426f754be0bc258c269524bce162ae0ca1cb8927:
 
-  arm64: dts: exynos: Modify the voltage range for BUCK2 for exynos7 (2016-07-06 09:43:42 +0200)
-
-----------------------------------------------------------------
-Samsung DeviceTree changes for ARM64 for v4.8:
-1. Adjust the voltage of CPU buck regulator so scaling could work.
+  arm64: defconfig: Enable more IP blocks for Exynos7 and Exynos5433 (2016-07-11 08:06:54 +0200)
 
 ----------------------------------------------------------------
-Abhilash Kesavan (1):
-      arm64: dts: exynos: Modify the voltage range for BUCK2 for exynos7
+Samsung defconfig updates for ARM64 - enable drivers for
+Exynos7 and Exynos5433 based boards:
+1. S2MPS clock driver,
+2. SoC: RTC, SPI, watchdog, EHCI, OHCI, DWC3, ADC and PWM,
+3. Enable Samsung SoC sound.
 
- arch/arm64/boot/dts/exynos/exynos7-espresso.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+----------------------------------------------------------------
+Alim Akhtar (1):
+      arm64: defconfig: Enable S2MPS11 clock and S3C RTC driver
+
+Krzysztof Kozlowski (1):
+      arm64: defconfig: Enable more IP blocks for Exynos7 and Exynos5433
+
+ arch/arm64/configs/defconfig | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
