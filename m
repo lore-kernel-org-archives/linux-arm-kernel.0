@@ -1,35 +1,47 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 11 Jul 2016 10:48:36 +0200
-Subject: [PATCH] ARM: s3c64xx: smartq: Avoid sparse warnings
-Message-ID: <20160711084836.12835-1-thierry.reding@gmail.com>
+From: dawei.chien@mediatek.com (dawei chien)
+Date: Mon, 11 Jul 2016 16:52:04 +0800
+Subject: [PATCH 1/3] dt-bindings: thermal: Add binding document for
+ Mediatek thermal controller
+In-Reply-To: <577E385C.9080501@ti.com>
+References: <1467882386-40544-1-git-send-email-dawei.chien@mediatek.com>
+ <1467882386-40544-2-git-send-email-dawei.chien@mediatek.com>
+ <577E385C.9080501@ti.com>
+Message-ID: <1468227124.15776.29.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thierry Reding <treding@nvidia.com>
+Dear Keerthy,
 
-The smartq_map_io() and smartq_machine_init() functions are used by both
-SmartQ 5 and SmartQ 7 machines and exported via the mach-smartq.h header
-file. However that header file is not included by the mach-smartq.c file
-that implements them, causing sparse warnings.
+On Thu, 2016-07-07 at 16:39 +0530, Keerthy wrote:
+> 
+> On Thursday 07 July 2016 02:36 PM, Dawei Chien wrote:
+> > This adds the device tree binding documentation for the mediatek thermal
+> > controller found on Mediatek MT2701.
+> >
+> > Signed-off-by: Dawei Chien <dawei.chien@mediatek.com>
+> > ---
+> >   .../bindings/thermal/mediatek-thermal.txt          |    2 +-
+> >   1 file changed, 1 insertion(+), 1 deletion(-)
+> >
+> > diff --git a/Documentation/devicetree/bindings/thermal/mediatek-thermal.txt b/Documentation/devicetree/bindings/thermal/mediatek-thermal.txt
+> > index 81f9a51..bb55e79 100644
+> > --- a/Documentation/devicetree/bindings/thermal/mediatek-thermal.txt
+> > +++ b/Documentation/devicetree/bindings/thermal/mediatek-thermal.txt
+> > @@ -8,7 +8,7 @@ apmixedsys register space via AHB bus accesses, so a phandle to the APMIXEDSYS
+> >   is also needed.
+> >
+> >   Required properties:
+> > -- compatible: "mediatek,mt8173-thermal"
+> > +- compatible: "mediatek,mt8173-thermal" or "mediatek,mt2701-thermal"
+> 
+> - compatible :
+>   - "mediatek,mt8173-thermal" : For MT8173 family of SoCs
+>   - "mediatek,mt2701-thermal" : For MT2701 family of SoCs
 
-Include mach-smartq.h from mach-smartq.c to fix these warnings.
+Thank you, I will update it on next version.
 
-Signed-off-by: Thierry Reding <treding@nvidia.com>
----
- arch/arm/mach-s3c64xx/mach-smartq.c | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/mach-s3c64xx/mach-smartq.c b/arch/arm/mach-s3c64xx/mach-smartq.c
-index 936a63fc68d5..e0e1a729ef98 100644
---- a/arch/arm/mach-s3c64xx/mach-smartq.c
-+++ b/arch/arm/mach-s3c64xx/mach-smartq.c
-@@ -43,6 +43,7 @@
- #include <plat/samsung-time.h>
- 
- #include "common.h"
-+#include "mach-smartq.h"
- #include "regs-modem.h"
- 
- #define UCON S3C2410_UCON_DEFAULT
--- 
-2.8.3
+> 
+> >   - reg: Address range of the thermal controller
+> >   - interrupts: IRQ for the thermal controller
+> >   - clocks, clock-names: Clocks needed for the thermal controller. required
+> >
