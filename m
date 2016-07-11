@@ -1,70 +1,56 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 11 Jul 2016 10:05:50 -0600
-Subject: [PATCH V2 03/10] Documentation: dt-bindings: firmware: tegra: add
- bindings of the BPMP
-In-Reply-To: <20160711142238.GA30600@rob-hp-laptop>
+Date: Mon, 11 Jul 2016 10:08:08 -0600
+Subject: [PATCH V2 01/10] Documentation: dt-bindings: mailbox: tegra: Add
+ binding for HSP mailbox
+In-Reply-To: <20160711141407.GA25042@rob-hp-laptop>
 References: <20160705090431.5852-1-josephl@nvidia.com>
- <20160705090431.5852-4-josephl@nvidia.com>
- <20160711142238.GA30600@rob-hp-laptop>
-Message-ID: <5783C3DE.3080708@wwwdotorg.org>
+ <20160705090431.5852-2-josephl@nvidia.com>
+ <20160707181356.GA6864@kickseed.nvidia.com> <577EA0D6.9020308@wwwdotorg.org>
+ <20160711141407.GA25042@rob-hp-laptop>
+Message-ID: <5783C468.2030708@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/11/2016 08:22 AM, Rob Herring wrote:
-> On Tue, Jul 05, 2016 at 05:04:24PM +0800, Joseph Lo wrote:
->> The BPMP is a specific processor in Tegra chip, which is designed for
->> booting process handling and offloading the power management, clock
->> management, and reset control tasks from the CPU. The binding document
->> defines the resources that would be used by the BPMP firmware driver,
->> which can create the interprocessor communication (IPC) between the CPU
->> and BPMP.
-
->> diff --git a/Documentation/devicetree/bindings/firmware/nvidia,tegra186-bpmp.txt b/Documentation/devicetree/bindings/firmware/nvidia,tegra186-bpmp.txt
-
->> +NVIDIA Tegra Boot and Power Management Processor (BPMP)
->> +
->> +The BPMP is a specific processor in Tegra chip, which is designed for
->> +booting process handling and offloading the power management, clock
->> +management, and reset control tasks from the CPU. The binding document
->> +defines the resources that would be used by the BPMP firmware driver,
->> +which can create the interprocessor communication (IPC) between the CPU
->> +and BPMP.
->> +
->> +Required properties:
->> +- name : Should be bpmp
->> +- compatible
->> +    Array of strings
->> +    One of:
->> +    - "nvidia,tegra186-bpmp"
->> +- mboxes : The phandle of mailbox controller and the mailbox specifier.
->> +- shmem : List of the phandle of the TX and RX shared memory area that
->> +	  the IPC between CPU and BPMP is based on.
+On 07/11/2016 08:14 AM, Rob Herring wrote:
+> On Thu, Jul 07, 2016 at 12:35:02PM -0600, Stephen Warren wrote:
+>> On 07/07/2016 12:13 PM, Sivaram Nair wrote:
+>>> On Tue, Jul 05, 2016 at 05:04:22PM +0800, Joseph Lo wrote:
+>>>> Add DT binding for the Hardware Synchronization Primitives (HSP). The
+>>>> HSP is designed for the processors to share resources and communicate
+>>>> together. It provides a set of hardware synchronization primitives for
+>>>> interprocessor communication. So the interprocessor communication (IPC)
+>>>> protocols can use hardware synchronization primitive, when operating
+>>>> between two processors not in an SMP relationship.
+>>
+>>>> diff --git a/include/dt-bindings/mailbox/tegra186-hsp.h b/include/dt-bindings/mailbox/tegra186-hsp.h
+>>
+>>>> +#define HSP_MBOX_TYPE_DB 0x0
+>>>> +#define HSP_MBOX_TYPE_SM 0x1
+>>>> +#define HSP_MBOX_TYPE_SS 0x2
+>>>> +#define HSP_MBOX_TYPE_AS 0x3
+>>>> +
+>>>> +#define HSP_DB_MASTER_CCPLEX 17
+>>>> +#define HSP_DB_MASTER_BPMP 19
+>>>> +
+>>>> +#define HSP_MBOX_ID(type, ID) \
+>>>> +		(HSP_MBOX_TYPE_##type << 16 | ID)
+>>>
+>>> It will be nicer if you avoid the macro glue magic '##' for 'type'. I
+>>> would also suggest to use braces around 'type' and 'ID'.
+>>
+>> This technique been used without issue in quite a few other places without
+>> issue, and has the benefit of simplifying the text wherever the macro is
+>> used. What issue do you foresee?
 >
-> I think you can use memory-region here.
-
-Isn't memory-region intended for references into the /reserved-memory 
-node. If so, that isn't appropriate in this case since this property 
-typically points at on-chip SRAM that isn't included in the OS's view of 
-"system RAM".
-
-Or, should /reserved-memory be used even for (e.g. non-DRAM) memory 
-regions that aren't represented by the /memory/reg property?
-
->> diff --git a/include/dt-bindings/clock/tegra186-clock.h b/include/dt-bindings/clock/tegra186-clock.h
-
->> +/** @file */
->> +
->> +#ifndef _MACH_T186_CLK_T186_H
->> +#define _MACH_T186_CLK_T186_H
->> +
->> +/**
->> + * @defgroup clock_ids Clock Identifiers
+> I'm not a fan of using the macros to begin with and less so anything
+> more complex than a single constant value. I'd rather see 2 cells here
+> with the first being the id and the 2nd being the type.
 >
-> Aren't these doxygen markup? Does that work with docbook? If not,
-> remove.
+> An issue with token pasting is grepping for DB, SM, etc. in kernel tree
+> is probably noisy. Not such a big deal here, but a major PIA when you
+> have more complex sets of includes.
 
-These headers are part of the BPMP FW release. It's preferable not to 
-edit them when incorporating them into the Linux kernel (or any other SW 
-stack) to simplify integration of any updated versions of the header, by 
-removing the need to edit the file when doing so. Given that, do you 
-still object?
+Is that a NAK or simply a suggestion? Having a single cell makes DT 
+parsing a bit simpler, since pretty much every SW stack provides a 
+default "one-cell" of_xlate implementation, whereas >1 cell means custom 
+code for of_xlate.
