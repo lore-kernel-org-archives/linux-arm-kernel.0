@@ -1,119 +1,41 @@
-From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Sun, 10 Jul 2016 22:58:04 -0400
-Subject: [PATCH v2 05/10] power/reset: Add reset driver support for nuc900
-In-Reply-To: <578304CB.8050604@iommu.org>
-References: <1468135649-19980-1-git-send-email-vw@iommu.org>
- <1468135649-19980-6-git-send-email-vw@iommu.org>
- <CAP=VYLrb5ujiLTPXnPxzPHsdbHft9R45JB3LbbvRnaZ4rUAJoA@mail.gmail.com>
- <578304CB.8050604@iommu.org>
-Message-ID: <20160711025804.GG30853@windriver.com>
+From: zhiyong.tao@mediatek.com (Zhiyong Tao)
+Date: Mon, 11 Jul 2016 11:09:54 +0800
+Subject: [PATCH v3 0/2] AUXADC: Mediatek auxadc driver 
+Message-ID: <1468206596-13792-1-git-send-email-zhiyong.tao@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Re: [PATCH v2 05/10] power/reset: Add reset driver support for nuc900] On 11/07/2016 (Mon 10:30) Wan Zongshun wrote:
+This series includes three patches:
+1.Change the device tree binding documentation.
+2.Add auxadc driver based on linux iio.
+3.Add auxadc nodes in the mediatek MT2701 dtsi file.
 
-> 
-> 
-> On 2016?07?11? 05:56, Paul Gortmaker wrote:
-> >On Sun, Jul 10, 2016 at 3:27 AM, Wan Zongshun <vw@iommu.org> wrote
-> >>This driver is to add reset support for nuc900 series,
-> >>currently, it only supports nuc970 SoC reset.
-> >>
-> >>Signed-off-by: Wan Zongshun <mcuos.com@gmail.com>
-> >>---
-> >>  drivers/power/reset/Kconfig        |  7 +++
-> >>  drivers/power/reset/Makefile       |  1 +
-> >>  drivers/power/reset/nuc900-reset.c | 93 ++++++++++++++++++++++++++++++++++++++
-> >>  3 files changed, 101 insertions(+)
-> >>  create mode 100644 drivers/power/reset/nuc900-reset.c
-> >>
-> >>diff --git a/drivers/power/reset/Kconfig b/drivers/power/reset/Kconfig
-> >>index 9bb2622..8c84892 100644
-> >>--- a/drivers/power/reset/Kconfig
-> >>+++ b/drivers/power/reset/Kconfig
-> >>@@ -94,6 +94,13 @@ config POWER_RESET_MSM
-> >>         help
-> >>           Power off and restart support for Qualcomm boards.
-> >>
-> >>+config POWER_RESET_NUC900
-> >>+       bool "Nuc900 restart driver"
-> >
-> >If this driver is bool and not tristate, then please remove all references
-> >to MODULE_<xyz> and then the module.h include as well.
-> 
-> I will remove the following codes in my reset.c driver.
-> 
-> MODULE_DEVICE_TABLE(of, of_nuc900_reset_match);
-> #include <linux/module.h>
+changes in patch v3:
+1).Add '#' before 'io-channel-cells' and change 'auxadc@' to 'adc@' in auxadc binding document.
+2).Fix CONFIG_MEDIATEK_MT65XX_AUXADC sequence as alphabetical order.
+3).Change the prefix 'MT65XX' to 'MT6577' to match auxadc driver name.
+4).Remove the delays stored in 'mt6577_auxadc_device' and use the defined delay directly.
+5).Use '-ETIMEDOUT' instead of '-EINVAL'.
+6).Return value directly in 'mt6577_auxadc_read_raw'.
+7).Add power off and unprepare clock if 'iio_device_register' failed.
+8).Change 'Registers' to 'Register'.
 
-Thanks -- it is not a specific criticism of your driver, but just a
-mistake that we have consistently copied from one driver to the next,
-and I hope we can stop doing that with the right reviews.
+changes in patch v2:
+1).Change the file name mt65xx_auxadc.c to mt6577_auxadc.c.
+2).Add 'depends on ARCH_MEDIATEK || COMPILE_TEST and HAS_IOMEM' for MEDIATEK_MT65XX_AUXADC config.
+3).Add check case for return value of 'readl_poll_timeout'.
+4).Remove returning 1 and 0 for SCALE and OFFSET. use channel type 'IIO_CHAN_INFO_PROCESSED' instead of 'IIO_CHAN_INFO_RAW'.
+5).Remove 'IIO_CHAN_INFO_OFFSET' and 'IIO_CHAN_INFO_SCALE' in 'MT65XX_AUXADC_CHANNEL' channel type.
+6).Add check case when auxadc power on failure. if auxadc power on failure, clk_disable_unprepare should be executed.
+7).Put 'platform_set_drvdata' before 'iio_device_register'.
+8).Fix coding style and spelling error.
 
-P.
---
+Zhiyong Tao (2):
+  dt-bindings: auxadc: Add binding document for Mediatek auxadc.
+  iio: adc: mt2701: Add Mediatek auxadc driver for mt2701.
 
-> 
-> 
-> >
-> >Thanks,
-> >Paul.
-> >--
-> >
-> >>+       depends on ARCH_W90X900
-> >>+       help
-> >>+         Power off and restart support for Nuvoton NUC900 family of
-> >>+         reference boards.
-> >>+
-> >>  config POWER_RESET_LTC2952
-> >>         bool "LTC2952 PowerPath power-off driver"
-> >>         depends on OF_GPIO
-> >>diff --git a/drivers/power/reset/Makefile b/drivers/power/reset/Makefile
-> >>index ab7aa86..d4df889 100644
-> >>--- a/drivers/power/reset/Makefile
-> >>+++ b/drivers/power/reset/Makefile
-> >>@@ -9,6 +9,7 @@ obj-$(CONFIG_POWER_RESET_GPIO_RESTART) += gpio-restart.o
-> >>  obj-$(CONFIG_POWER_RESET_HISI) += hisi-reboot.o
-> >>  obj-$(CONFIG_POWER_RESET_IMX) += imx-snvs-poweroff.o
-> >>  obj-$(CONFIG_POWER_RESET_MSM) += msm-poweroff.o
-> >>+obj-$(CONFIG_POWER_RESET_NUC900) += nuc900-reset.o
-> >>  obj-$(CONFIG_POWER_RESET_LTC2952) += ltc2952-poweroff.o
-> >>  obj-$(CONFIG_POWER_RESET_QNAP) += qnap-poweroff.o
-> >>  obj-$(CONFIG_POWER_RESET_RESTART) += restart-poweroff.o
-> >>diff --git a/drivers/power/reset/nuc900-reset.c b/drivers/power/reset/nuc900-reset.c
-> >>new file mode 100644
-> >>index 0000000..49986b7
-> >>--- /dev/null
-> >>+++ b/drivers/power/reset/nuc900-reset.c
-> >>@@ -0,0 +1,93 @@
-> >>+/*
-> >>+ * Copyright 2016 Wan Zongshun <mcuos.com@gmail.com>
-> >>+ *
-> >>+ * The code contained herein is licensed under the GNU General Public
-> >>+ * License. You may obtain a copy of the GNU General Public License
-> >>+ * Version 2 or later at the following locations:
-> >>+ *
-> >>+ * http://www.opensource.org/licenses/gpl-license.html
-> >>+ * http://www.gnu.org/copyleft/gpl.html
-> >>+ */
-> >>+#include <linux/init.h>
-> >>+#include <linux/err.h>
-> >>+#include <linux/io.h>
-> >>+#include <linux/kernel.h>
-> >>+#include <linux/mfd/syscon.h>
-> >>+#include <linux/module.h>
-> >>+#include <linux/notifier.h>
-> >>+#include <linux/of.h>
-> >>+#include <linux/platform_device.h>
-> >>+#include <linux/reboot.h>
-> >>+#include <linux/regmap.h>
-> >>
-> >
-> >[...]
-> >
-> >_______________________________________________
-> >linux-arm-kernel mailing list
-> >linux-arm-kernel at lists.infradead.org
-> >http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> >
-> >
+ .../devicetree/bindings/iio/adc/mt65xx_auxadc.txt  |    4 +-
+ drivers/iio/adc/Kconfig                            |   26 +--
+ drivers/iio/adc/Makefile                           |    2 +-
+ drivers/iio/adc/mt6577_auxadc.c                    |  186 ++++++++++----------
+ 4 files changed, 106 insertions(+), 112 deletions(-)
