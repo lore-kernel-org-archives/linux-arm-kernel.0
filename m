@@ -1,77 +1,64 @@
-From: iamjoonsoo.kim@lge.com (Joonsoo Kim)
-Date: Mon, 11 Jul 2016 15:08:29 +0900
-Subject: [kernel-hardening] Re: [PATCH 9/9] mm: SLUB hardened usercopy
- support
-In-Reply-To: <CAGXu5jKxw3RxWNKLX4XVCwJ6x_zA=_RwiU9jLDm2+VRO79G7+w@mail.gmail.com>
-References: <577f7e55.4668420a.84f17.5cb9SMTPIN_ADDED_MISSING@mx.google.com>
- <alpine.DEB.2.20.1607080844370.3379@east.gentwo.org>
- <CAGXu5jKE=h32tHVLsDeaPN1GfC+BB3YbFvC+5TE5TK1oR-xU3A@mail.gmail.com>
- <alpine.DEB.2.20.1607081119170.6192@east.gentwo.org>
- <CAGXu5j+UdkQA+k39GNLe5CwBPVD5ZbRGTCQLqS8VF=kWx+PtsQ@mail.gmail.com>
- <CAGXu5jKxw3RxWNKLX4XVCwJ6x_zA=_RwiU9jLDm2+VRO79G7+w@mail.gmail.com>
-Message-ID: <20160711060829.GB14107@js1304-P5Q-DELUXE>
+From: zhengxing@rock-chips.com (Xing Zheng)
+Date: Mon, 11 Jul 2016 14:20:01 +0800
+Subject: [PATCH v6] ASoC: rockchip: Add machine driver for RK3399 GRU
+ Boards
+In-Reply-To: <20160620130812.GA24614@rob-hp-laptop>
+References: <1466080858-29565-1-git-send-email-zhengxing@rock-chips.com>
+ <20160620130812.GA24614@rob-hp-laptop>
+Message-ID: <57833A91.7090109@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 08, 2016 at 04:48:38PM -0400, Kees Cook wrote:
-> On Fri, Jul 8, 2016 at 1:41 PM, Kees Cook <keescook@chromium.org> wrote:
-> > On Fri, Jul 8, 2016 at 12:20 PM, Christoph Lameter <cl@linux.com> wrote:
-> >> On Fri, 8 Jul 2016, Kees Cook wrote:
-> >>
-> >>> Is check_valid_pointer() making sure the pointer is within the usable
-> >>> size? It seemed like it was checking that it was within the slub
-> >>> object (checks against s->size, wants it above base after moving
-> >>> pointer to include redzone, etc).
-> >>
-> >> check_valid_pointer verifies that a pointer is pointing to the start of an
-> >> object. It is used to verify the internal points that SLUB used and
-> >> should not be modified to do anything different.
-> >
-> > Yup, no worries -- I won't touch it. :) I just wanted to verify my
-> > understanding.
-> >
-> > And after playing a bit more, I see that the only thing to the left is
-> > padding and redzone. SLUB layout, from what I saw:
-> >
-> > offset: what's there
-> > -------
-> > start: padding, redzone
-> > red_left_pad: object itself
-> > inuse: rest of metadata
-> > size: start of next slub object
-> >
-> > (and object_size == inuse - red_left_pad)
-> >
-> > i.e. a pointer must be between red_left_pad and inuse, which is the
-> > same as pointer - ref_left_pad being less than object_size.
-> >
-> > So, as found already, the position in the usercopy check needs to be
-> > bumped down by red_left_pad, which is what Michael's fix does, so I'll
-> > include it in the next version.
-> 
-> Actually, after some offline chats, I think this is better, since it
-> makes sure the ptr doesn't end up somewhere weird before we start the
-> calculations. This leaves the pointer as-is, but explicitly handles
-> the redzone on the offset instead, with no wrapping, etc:
-> 
->         /* Find offset within object. */
->         offset = (ptr - page_address(page)) % s->size;
-> 
-> +       /* Adjust for redzone and reject if within the redzone. */
-> +       if (s->flags & SLAB_RED_ZONE) {
-> +               if (offset < s->red_left_pad)
-> +                       return s->name;
-> +               offset -= s->red_left_pad;
-> +       }
-> +
->         /* Allow address range falling entirely within object size. */
->         if (offset <= s->object_size && n <= s->object_size - offset)
->                 return NULL;
-> 
-
-As Christoph saids, please use slab_ksize() rather than
-s->object_size.
-
-Otherwise, looks good to me.
+Hi Mark,
+     In your opinion, is there anything needs to be optimized in this patch?
 
 Thanks.
+
+On 2016?06?20? 21:08, Rob Herring wrote:
+> On Thu, Jun 16, 2016 at 08:40:58PM +0800, Xing Zheng wrote:
+>> Because we need to support the multiple codecs (MAX98357A/RT5514/DA7219)
+>> on the RK3399 GRU boards, this patch can help us to support these codecs.
+>>
+>> Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
+>> ---
+>>
+>> Changes in v6:
+>> - remove enable/disable dapm pins, and to switch codecs via user space
+>> - fix "Speaker" dapm route for max98357a
+>> - add SND_JACK_LINEOUT flag for da7219 jack detection
+>>
+>> Changes in v5:
+>> - fix the build warning for missing I2C/CLKDEV_LOOKUP dependency
+>>
+>> Changes in v4:
+>> - the compatible name needs to be based on a single reference design,
+>>    and the name of the board is called "GRU"
+>> - use one i2sX card "rockchip,cpu = <&i2s0>" instead of array that is
+>>    based on GRU
+>> - rename DOC to rockchip,rk3399-gru-sound.txt
+>> - rename compatible to rockchip,rk3399-gru-sound
+>> - rename source code to rk3399_gru_sound.c
+>>
+>> Changes in v3:
+>> - rename DOC to rockchip,rk3399-max98357a-rt5514-da7219.txt
+>> - rename compatible to rockchip,rk3399-max98357a-rt5514-da7219
+>> - rename source code to rk3399_max98357a_rt5514_da7219.c
+>>
+>> Changes in v2:
+>> - use the FS 256 to set mclks of the max98357a and rt5514 danamically
+>> - add more sample rate for da7219
+>>
+>>   .../bindings/sound/rockchip,rk3399-gru-sound.txt   |   15 +
+> Acked-by: Rob Herring <robh@kernel.org>
+>
+>>   sound/soc/rockchip/Kconfig                         |   11 +
+>>   sound/soc/rockchip/Makefile                        |    2 +
+>>   sound/soc/rockchip/rk3399_gru_sound.c              |  322 ++++++++++++++++++++
+>>   4 files changed, 350 insertions(+)
+>>   create mode 100644 Documentation/devicetree/bindings/sound/rockchip,rk3399-gru-sound.txt
+>>   create mode 100644 sound/soc/rockchip/rk3399_gru_sound.c
+>
+>
+
+-- 
+- Xing Zheng
