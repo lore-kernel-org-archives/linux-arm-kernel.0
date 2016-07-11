@@ -1,30 +1,55 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 11 Jul 2016 11:56:23 +0200
-Subject: [PATCH v8 4/9] pwm: pwm-tiecap: Update dt binding document to
- use proper unit address
-In-Reply-To: <1462291015-1919-5-git-send-email-fcooper@ti.com>
-References: <1462291015-1919-1-git-send-email-fcooper@ti.com>
- <1462291015-1919-5-git-send-email-fcooper@ti.com>
-Message-ID: <20160711095623.GI5823@ulmo.ba.sec>
+From: sunil.kovvuri@gmail.com (sunil.kovvuri at gmail.com)
+Date: Mon, 11 Jul 2016 15:31:42 +0530
+Subject: [PATCH 00/15] net: thunderx: Add support for 81xx and 83xx 
+Message-ID: <1468231317-24023-1-git-send-email-sunil.kovvuri@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 03, 2016 at 10:56:50AM -0500, Franklin S Cooper Jr wrote:
-> Replace unit address from 0 to the proper physical address. Also insure
-> that the unit address matches the reg property address.
-> 
-> Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
-> ---
->  Documentation/devicetree/bindings/pwm/pwm-tiecap.txt | 8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
+From: Sunil Goutham <sgoutham@cavium.com>
 
-I applied this long ago but never let you know: Applied, thanks.
+This patch series adds support for VNIC on 81xx and 83xx SOCs. 
+81xx/83xx is different from 88xx in terms of capabilities and different 
+types of interfaces supported (eg: QSGMII, RGMII) and have DLMs instead
+of QLMs which allows single BGX to have interfaces of different LMAC types. 
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160711/ec249f32/attachment-0001.sig>
+Also included some patches which are common for all 88xx/81xx/83xx
+SOCs like using netdev's name while registering irqs, reset receive
+queue stats and some cleanup changes.
+
+Jerin Jacob (1):
+  net: thunderx: Reset RXQ HW stats when interface is brought down
+
+Radoslaw Biernacki (1):
+  net: thunderx: Improvement for MBX interface debug messages
+
+Sunil Goutham (13):
+  net: thunderx: Moved HW capability info from macros to structure
+  net: thunderx: Add VNIC's PCI devid on future chips
+  net: thunderx: Add support for 81xx and 83xx chips
+  net: thunderx: Set queue count based on number of CPUs
+  net: thunderx: Enable CQE_RX desc's extension fields
+  net: thunderx: Enable mailbox interrupts on 81xx/83xx
+  net: thunderx: Support for different LMAC types within BGX
+  net: thunderx: Add 81xx support to BGX driver
+  net: thunderx: Add QSGMII interface type support
+  net: thunderx: Add RGMII interface type support
+  net: thunderx: Use netdev's name for naming VF's interrupts
+  net: thunderx: Use skb_add_rx_frag() for split buffer Rx pkts
+  net: thunderx: Don't set mac address for secondary Qset VFs
+
+ drivers/net/ethernet/cavium/Kconfig                |  10 +
+ drivers/net/ethernet/cavium/thunder/Makefile       |   1 +
+ drivers/net/ethernet/cavium/thunder/nic.h          |  85 +++--
+ drivers/net/ethernet/cavium/thunder/nic_main.c     | 351 ++++++++++++++----
+ drivers/net/ethernet/cavium/thunder/nic_reg.h      |   2 +
+ drivers/net/ethernet/cavium/thunder/nicvf_main.c   |  51 ++-
+ drivers/net/ethernet/cavium/thunder/nicvf_queues.c |  59 +--
+ drivers/net/ethernet/cavium/thunder/nicvf_queues.h |   5 +-
+ drivers/net/ethernet/cavium/thunder/thunder_bgx.c  | 410 ++++++++++++++-------
+ drivers/net/ethernet/cavium/thunder/thunder_bgx.h  |  28 +-
+ drivers/net/ethernet/cavium/thunder/thunder_xcv.c  | 237 ++++++++++++
+ 11 files changed, 939 insertions(+), 300 deletions(-)
+ create mode 100644 drivers/net/ethernet/cavium/thunder/thunder_xcv.c
+
+-- 
+2.7.4
