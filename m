@@ -1,42 +1,49 @@
-From: fcooper@ti.com (Franklin S Cooper Jr.)
-Date: Mon, 11 Jul 2016 10:24:28 -0500
-Subject: [PATCH] ARM: dts: da850: Add new ECAP and EPWM bindings
-In-Reply-To: <577A5AD0.7070906@ti.com>
-References: <1467036842-20913-1-git-send-email-fcooper@ti.com>
- <577A5AD0.7070906@ti.com>
-Message-ID: <5783BA2C.7030905@ti.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 11 Jul 2016 17:25:09 +0200
+Subject: [GIT PULL 1/4] ARM: tegra: Core SoC changes for v4.8-rc1
+Message-ID: <20160711152512.11731-1-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi ARM SoC maintainers,
 
+The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
 
-On 07/04/2016 07:47 AM, Sekhar Nori wrote:
-> On Monday 27 June 2016 07:44 PM, Franklin S Cooper Jr wrote:
->> From: "Cooper Jr., Franklin" <fcooper@ti.com>
->>
->> Switch to a new ECAP and EPWM bindings that doesn't depend on hwmod to
->> provide the various required clocks.
-> 
-> there is nothing called hwmod on da850, so this need rewording to make
-> sense for that platform.
+  Linux 4.7-rc1 (2016-05-29 09:29:24 -0700)
 
-Sorry will fix.
-> 
->>
->> Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
->> Acked-by: Rob Herring <robh@kernel.org>
-> 
-> Also, documentation needs update as well since it says:
-> 
-> "
-> for da850  - compatible = "ti,da850-ehrpwm", "ti,am33xx-ehrpwm"
-> "
-> 
+are available in the git repository at:
 
-The original patch that Tony pulled in already includes this
-documentation update for the new bindings. This patch just handles the
-DA850 DT changes that didn't apply when Tony pulled in the original patch.
+  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.8-arm-soc
 
-> Thanks,
-> Sekhar
-> 
+for you to fetch changes up to da35cbcafad3d46daa96a6f01022f11842e8e7b6:
+
+  ARM: tegra: Remove board_init_funcs array (2016-07-11 16:47:53 +0200)
+
+Thanks,
+Thierry
+
+----------------------------------------------------------------
+ARM: tegra: Core SoC changes for v4.8-rc1
+
+Some cleanups to eliminate sparse warnings and a section mismatch.
+
+----------------------------------------------------------------
+Arnd Bergmann (1):
+      ARM: tegra: Remove board_init_funcs array
+
+Thierry Reding (4):
+      ARM: tegra: hotplug: Include missing common.h
+      ARM: tegra: cpuidle: Add missing cpuidle.h include
+      ARM: tegra: irq: Add missing irq.h include
+      ARM: tegra: pm: Add tegra_cpu_do_idle() prototype
+
+ arch/arm/mach-tegra/common.h           | 22 ++++++++++++++++++++++
+ arch/arm/mach-tegra/cpuidle-tegra114.c |  1 +
+ arch/arm/mach-tegra/cpuidle-tegra20.c  |  1 +
+ arch/arm/mach-tegra/cpuidle-tegra30.c  |  1 +
+ arch/arm/mach-tegra/cpuidle.h          |  2 ++
+ arch/arm/mach-tegra/hotplug.c          |  1 +
+ arch/arm/mach-tegra/irq.c              |  1 +
+ arch/arm/mach-tegra/pm.h               |  2 +-
+ arch/arm/mach-tegra/tegra.c            | 24 +++---------------------
+ 9 files changed, 33 insertions(+), 22 deletions(-)
