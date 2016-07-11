@@ -1,58 +1,68 @@
 From: mturquette@baylibre.com (Michael Turquette)
-Date: Mon, 11 Jul 2016 15:17:31 -0700
-Subject: [PATCH v2 6/7] spi: s3c64xx: restore removed comments
-In-Reply-To: <57837606.8050906@samsung.com>
-References: <1467989201-14661-1-git-send-email-andi.shyti@samsung.com>
- <1467989201-14661-7-git-send-email-andi.shyti@samsung.com>
- <146799464881.73491.7507792367941552864@resonance>
- <57837606.8050906@samsung.com>
-Message-ID: <146827545163.73491.5083923656346798965@resonance>
+Date: Mon, 11 Jul 2016 15:20:10 -0700
+Subject: [PATCH v8 1/9] clk: ti: am335x/am4372: Add tbclk to pwm node
+In-Reply-To: <1462291015-1919-2-git-send-email-fcooper@ti.com>
+References: <1462291015-1919-1-git-send-email-fcooper@ti.com>
+ <1462291015-1919-2-git-send-email-fcooper@ti.com>
+Message-ID: <146827561017.73491.3564276289319851088@resonance>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Sylwester Nawrocki (2016-07-11 03:33:42)
-> On 07/08/2016 06:17 PM, Michael Turquette wrote:
-> > Quoting Andi Shyti (2016-07-08 07:46:40)
-> 
-> >> diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
-> >> index 6da663f..32b66f0 100644
-> >> --- a/drivers/spi/spi-s3c64xx.c
-> >> +++ b/drivers/spi/spi-s3c64xx.c
-> >> @@ -639,6 +639,7 @@ static void s3c64xx_spi_config(struct s3c64xx_spi_driver_data *sdd)
-> >>         writel(val, regs + S3C64XX_SPI_MODE_CFG);
-> >>  
-> >>         if (sdd->port_conf->clk_from_cmu) {
-> >> +               /* There is half-multiplier before the SPI */
-> >>                 clk_set_rate(sdd->src_clk, sdd->cur_speed * 2);
-> > 
-> > Just a small comment, but if the fixed-factor divide-by-two clock was
-> > modeled in Linux, then this driver could call clk_set_rate on that clock
-> > with the "correct" rate.
-> > 
-> > I guess that this driver would be the provider of that clock?
-> 
-> Good point, however I'm not sure if it is worth to model this divider
-> with a clk object.  It is an internal divider and the clock it provides
-> is only used internally within the SPI controller.  Thus the spi-s3c64xx
-> driver would be provider on the only consumer of this clock.
+Quoting Franklin S Cooper Jr (2016-05-03 08:56:47)
+> Add tblck to the pwm nodes. This insures that the ehrpwm driver has access
 
-Sure, but it's only a few lines of code to this, and there are examples
-in the kernel already.
+s/tblck/tbclk/
 
-> 
-> Additionally, the "There is half-multiplier before the SPI" comment
-> seems to be obfuscating how the hardware really looks like to me.
-> It talks about multiplier (which reminds me of PLLs with a divider
-> in the feedback loop) while there is a simple divider which should
-> be considered as an integral part of the controller IP block.
-> 
-> While we are at it, I'd propose to change this comment to something
-> like:
-> 
-> /* The SCLK_SPI clock is divided internally by 2 */
-
-It's your choice, but debug output would benefit from showing the real
-clock frequency at some point.
+I see you have acks already. What tree should this patch go through?
 
 Regards,
 Mike
+
+> to the time-based clk.
+> 
+> Do not remove similar entries for ehrpwm node. Later patches will switch
+> from using ehrpwm node name to pwm. But to maintain ABI compatibility we
+> shouldn't remove the old entries.
+> 
+> Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
+> Acked-by: Stephen Boyd <sboyd@codeaurora.org>
+> Acked-by: Tero Kristo <t-kristo@ti.com>
+> ---
+>  drivers/clk/ti/clk-33xx.c | 3 +++
+>  drivers/clk/ti/clk-43xx.c | 6 ++++++
+>  2 files changed, 9 insertions(+)
+> 
+> diff --git a/drivers/clk/ti/clk-33xx.c b/drivers/clk/ti/clk-33xx.c
+> index ef2ec64..0e47d95 100644
+> --- a/drivers/clk/ti/clk-33xx.c
+> +++ b/drivers/clk/ti/clk-33xx.c
+> @@ -108,6 +108,9 @@ static struct ti_dt_clk am33xx_clks[] = {
+>         DT_CLK("48300200.ehrpwm", "tbclk", "ehrpwm0_tbclk"),
+>         DT_CLK("48302200.ehrpwm", "tbclk", "ehrpwm1_tbclk"),
+>         DT_CLK("48304200.ehrpwm", "tbclk", "ehrpwm2_tbclk"),
+> +       DT_CLK("48300200.pwm", "tbclk", "ehrpwm0_tbclk"),
+> +       DT_CLK("48302200.pwm", "tbclk", "ehrpwm1_tbclk"),
+> +       DT_CLK("48304200.pwm", "tbclk", "ehrpwm2_tbclk"),
+>         { .node_name = NULL },
+>  };
+>  
+> diff --git a/drivers/clk/ti/clk-43xx.c b/drivers/clk/ti/clk-43xx.c
+> index 097fc90..7255aa8 100644
+> --- a/drivers/clk/ti/clk-43xx.c
+> +++ b/drivers/clk/ti/clk-43xx.c
+> @@ -115,6 +115,12 @@ static struct ti_dt_clk am43xx_clks[] = {
+>         DT_CLK("48306200.ehrpwm", "tbclk", "ehrpwm3_tbclk"),
+>         DT_CLK("48308200.ehrpwm", "tbclk", "ehrpwm4_tbclk"),
+>         DT_CLK("4830a200.ehrpwm", "tbclk", "ehrpwm5_tbclk"),
+> +       DT_CLK("48300200.pwm", "tbclk", "ehrpwm0_tbclk"),
+> +       DT_CLK("48302200.pwm", "tbclk", "ehrpwm1_tbclk"),
+> +       DT_CLK("48304200.pwm", "tbclk", "ehrpwm2_tbclk"),
+> +       DT_CLK("48306200.pwm", "tbclk", "ehrpwm3_tbclk"),
+> +       DT_CLK("48308200.pwm", "tbclk", "ehrpwm4_tbclk"),
+> +       DT_CLK("4830a200.pwm", "tbclk", "ehrpwm5_tbclk"),
+>         { .node_name = NULL },
+>  };
+>  
+> -- 
+> 2.7.0
+> 
