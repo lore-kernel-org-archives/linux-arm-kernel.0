@@ -1,45 +1,51 @@
-From: garlic.tseng@mediatek.com (Garlic Tseng)
-Date: Mon, 11 Jul 2016 09:31:25 +0800
-Subject: [alsa-devel] [PATCH -next v2] ASoC: mediatek: mt2701: fix non
- static symbol warning
-In-Reply-To: <1467985621-13755-1-git-send-email-weiyj_lk@163.com>
-References: <1467985293-9041-1-git-send-email-weiyj_lk@163.com>
- <1467985621-13755-1-git-send-email-weiyj_lk@163.com>
-Message-ID: <1468200685.32731.1.camel@mtksdaap41>
+From: tiffany.lin@mediatek.com (tiffany lin)
+Date: Mon, 11 Jul 2016 10:04:42 +0800
+Subject: [PATCH v2 2/9] [media] : v4l: add Mediatek compressed video
+ block format
+In-Reply-To: <78c9f4a1-e2b8-69ef-acc5-d24984497b33@xs4all.nl>
+References: <1463052250-38262-1-git-send-email-tiffany.lin@mediatek.com>
+ <1463052250-38262-2-git-send-email-tiffany.lin@mediatek.com>
+ <1463052250-38262-3-git-send-email-tiffany.lin@mediatek.com>
+ <78c9f4a1-e2b8-69ef-acc5-d24984497b33@xs4all.nl>
+Message-ID: <1468202682.3725.0.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2016-07-08 at 13:47 +0000, weiyj_lk at 163.com wrote:
-> From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
-> 
-> Fixes the following sparse warning:
-> 
-> sound/soc/mediatek/mt2701/mt2701-afe-pcm.c:72:5: warning:
->  symbol 'mt2701_dai_num_to_i2s' was not declared. Should it be static?
-> 
-> Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+Hi Hans,
 
-Acked-by: Garlic Tseng <garlic.tseng@mediatek.com>
+On Fri, 2016-07-08 at 12:18 +0200, Hans Verkuil wrote:
+> On 05/12/2016 01:24 PM, Tiffany Lin wrote:
+> > Add V4L2_PIX_FMT_MT21 format used on MT8173 driver.
+> > It is compressed format and need MT8173 MDP driver to transfer to other 
+> > standard format.
+> > 
+> > Signed-off-by: Tiffany Lin <tiffany.lin@mediatek.com>
+> > ---
+> >  include/uapi/linux/videodev2.h |    1 +
+> >  1 file changed, 1 insertion(+)
+> > 
+> > diff --git a/include/uapi/linux/videodev2.h b/include/uapi/linux/videodev2.h
+> > index 8f95191..52feea6 100644
+> > --- a/include/uapi/linux/videodev2.h
+> > +++ b/include/uapi/linux/videodev2.h
+> > @@ -625,6 +625,7 @@ struct v4l2_pix_format {
+> >  #define V4L2_PIX_FMT_Y8I      v4l2_fourcc('Y', '8', 'I', ' ') /* Greyscale 8-bit L/R interleaved */
+> >  #define V4L2_PIX_FMT_Y12I     v4l2_fourcc('Y', '1', '2', 'I') /* Greyscale 12-bit L/R interleaved */
+> >  #define V4L2_PIX_FMT_Z16      v4l2_fourcc('Z', '1', '6', ' ') /* Depth data 16-bit */
+> > +#define V4L2_PIX_FMT_MT21     v4l2_fourcc('M', 'T', '2', '1') /* Mediatek compressed block mode  */
+> 
+> v4l2-ioctl.c should be modified as well so the correct description string is filled in.
+> 
+Got it. I will fix this.
 
-> ---
->  sound/soc/mediatek/mt2701/mt2701-afe-pcm.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+best regards,
+Tiffany
+
+> Regards,
 > 
-> diff --git a/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c b/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c
-> index 15522c0..34a6123 100644
-> --- a/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c
-> +++ b/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c
-> @@ -69,7 +69,7 @@ static const struct mt2701_afe_rate mt2701_afe_i2s_rates[] = {
->  	{ .rate = 352800, .regvalue = 24 },
->  };
->  
-> -int mt2701_dai_num_to_i2s(struct mtk_base_afe *afe, int num)
-> +static int mt2701_dai_num_to_i2s(struct mtk_base_afe *afe, int num)
->  {
->  	int val = num - MT2701_IO_I2S;
+> 	Hans
 > 
-> 
-> _______________________________________________
-> Alsa-devel mailing list
-> Alsa-devel at alsa-project.org
-> http://mailman.alsa-project.org/mailman/listinfo/alsa-devel
+> >  
+> >  /* SDR formats - used only for Software Defined Radio devices */
+> >  #define V4L2_SDR_FMT_CU8          v4l2_fourcc('C', 'U', '0', '8') /* IQ u8 */
+> > 
