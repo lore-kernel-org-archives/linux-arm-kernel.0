@@ -1,86 +1,65 @@
-From: zhiyong.tao@mediatek.com (Zhiyong Tao)
-Date: Mon, 11 Jul 2016 14:39:55 +0800
-Subject: [PATCH v4 1/3] dt-bindings: auxadc: Add binding document for Mediatek
- auxadc.
-In-Reply-To: <1468219197-9572-1-git-send-email-zhiyong.tao@mediatek.com>
-References: <1468219197-9572-1-git-send-email-zhiyong.tao@mediatek.com>
-Message-ID: <1468219197-9572-2-git-send-email-zhiyong.tao@mediatek.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 11 Jul 2016 08:50:42 +0200
+Subject: [PATCH v5 7/7] ARM: dts: sun9i: Switch to the AC100 RTC clock
+ outputs for osc32k
+In-Reply-To: <1467988422-17934-8-git-send-email-wens@csie.org>
+References: <1467988422-17934-1-git-send-email-wens@csie.org>
+ <1467988422-17934-8-git-send-email-wens@csie.org>
+Message-ID: <20160711065042.GC4589@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The commit adds the device tree binding documentation for the mediatek
-auxadc found on Mediatek MT2701.
-Thermal gets auxadc sample data by iio device.
-So the commit changes auxadc device tree binding documentation from
-/soc/mediatek/auxadc.txt to /iio/adc/mt6577_auxadc.txt.
+Hi,
 
-Signed-off-by: Zhiyong Tao <zhiyong.tao@mediatek.com>
----
- .../devicetree/bindings/iio/adc/mt6577_auxadc.txt  |   27 ++++++++++++++++++++
- .../devicetree/bindings/soc/mediatek/auxadc.txt    |   21 ---------------
- 2 files changed, 27 insertions(+), 21 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/iio/adc/mt6577_auxadc.txt
- delete mode 100644 Documentation/devicetree/bindings/soc/mediatek/auxadc.txt
+On Fri, Jul 08, 2016 at 10:33:42PM +0800, Chen-Yu Tsai wrote:
+> The 32.768 kHz clock inside the A80 SoC is fed from an external source,
+> typically the AC100 RTC module.
+> 
+> Make the osc32k placeholder a fixed-factor clock so board dts files can
+> specify its source.
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> ---
+> Changes since v4: none
+> Changes since v3: none
+> Changes since v2: none
+> Changes since v1: none
+> ---
+>  arch/arm/boot/dts/sun9i-a80-cubieboard4.dts | 5 +++++
+>  arch/arm/boot/dts/sun9i-a80-optimus.dts     | 5 +++++
+>  arch/arm/boot/dts/sun9i-a80.dtsi            | 9 +++------
+>  3 files changed, 13 insertions(+), 6 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/sun9i-a80-cubieboard4.dts b/arch/arm/boot/dts/sun9i-a80-cubieboard4.dts
+> index cf2f4b72a841..04b014603659 100644
+> --- a/arch/arm/boot/dts/sun9i-a80-cubieboard4.dts
+> +++ b/arch/arm/boot/dts/sun9i-a80-cubieboard4.dts
+> @@ -103,6 +103,11 @@
+>  	allwinner,drive = <SUN4I_PINCTRL_40_MA>;
+>  };
+>  
+> +&osc32k {
+> +	/* osc32k input is from AC100 */
+> +	clocks = <&ac100_rtc 0>;
+> +};
+> +
 
-diff --git a/Documentation/devicetree/bindings/iio/adc/mt6577_auxadc.txt b/Documentation/devicetree/bindings/iio/adc/mt6577_auxadc.txt
-new file mode 100644
-index 0000000..bc23792
---- /dev/null
-+++ b/Documentation/devicetree/bindings/iio/adc/mt6577_auxadc.txt
-@@ -0,0 +1,27 @@
-+* Mediatek AUXADC - Analog to Digital Converter on Mediatek mobile soc (mt65xx/mt81xx/mt27xx)
-+===============
-+
-+The Auxiliary Analog/Digital Converter (AUXADC) is an ADC found
-+in some Mediatek SoCs which among other things measures the temperatures
-+in the SoC. It can be used directly with register accesses, but it is also
-+used by thermal controller which reads the temperatures from the AUXADC
-+directly via its own bus interface. See
-+Documentation/devicetree/bindings/thermal/mediatek-thermal.txt
-+for the Thermal Controller which holds a phandle to the AUXADC.
-+
-+Required properties:
-+  - compatible: "mediatek,mt2701-auxadc" or "mediatek,mt8173-auxadc"
-+  - reg: Address range of the AUXADC unit.
-+  - clocks: Should contain a clock specifier for each entry in clock-names
-+  - clock-names: Should contain "main".
-+  - #io-channel-cells: Should be 1, see ../iio-bindings.txt
-+
-+Example:
-+
-+auxadc: adc at 11001000 {
-+	compatible = "mediatek,mt2701-auxadc";
-+	reg = <0 0x11001000 0 0x1000>;
-+	clocks = <&pericfg CLK_PERI_AUXADC>;
-+	clock-names = "main";
-+	#io-channel-cells = <1>;
-+};
-diff --git a/Documentation/devicetree/bindings/soc/mediatek/auxadc.txt b/Documentation/devicetree/bindings/soc/mediatek/auxadc.txt
-deleted file mode 100644
-index bdb7829..0000000
---- a/Documentation/devicetree/bindings/soc/mediatek/auxadc.txt
-+++ /dev/null
-@@ -1,21 +0,0 @@
--MediaTek AUXADC
--===============
--
--The Auxiliary Analog/Digital Converter (AUXADC) is an ADC found
--in some Mediatek SoCs which among other things measures the temperatures
--in the SoC. It can be used directly with register accesses, but it is also
--used by thermal controller which reads the temperatures from the AUXADC
--directly via its own bus interface. See
--Documentation/devicetree/bindings/thermal/mediatek-thermal.txt
--for the Thermal Controller which holds a phandle to the AUXADC.
--
--Required properties:
--- compatible: Must be "mediatek,mt8173-auxadc"
--- reg: Address range of the AUXADC unit
--
--Example:
--
--auxadc: auxadc at 11001000 {
--	compatible = "mediatek,mt8173-auxadc";
--	reg = <0 0x11001000 0 0x1000>;
--};
+I'm guessing that an unresolved dependency when the driver has not
+loaded yet, or is not even compiled ?
+
+How is it working then?
+
+Thanks,
+Maxime
+
 -- 
-1.7.9.5
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160711/a5567557/attachment-0001.sig>
