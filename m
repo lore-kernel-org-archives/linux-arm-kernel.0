@@ -1,43 +1,56 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Mon, 11 Jul 2016 12:11:40 -0400
-Subject: [RESEND PATCH] drm/exynos: Use VIDEO_SAMSUNG_EXYNOS_GSC=n as GSC
- Kconfig dependency
-Message-ID: <1468253500-27335-1-git-send-email-javier@osg.samsung.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 11 Jul 2016 18:12:22 +0200
+Subject: [PATCH v2 1/6] dt-bindings: clock: add DT binding for the Xtal
+ clock on Armada 3700
+In-Reply-To: <20160708093156.4f235b85@free-electrons.com> (Thomas Petazzoni's
+ message of "Fri, 8 Jul 2016 09:31:56 +0200")
+References: <1467931071-31004-1-git-send-email-gregory.clement@free-electrons.com>
+ <1467931071-31004-2-git-send-email-gregory.clement@free-electrons.com>
+ <20160708093156.4f235b85@free-electrons.com>
+Message-ID: <87a8hotaqh.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit aeefb36832e5 ("drm/exynos: gsc: add device tree support and remove
-usage of static mappings") made the DRM_EXYNOS_GSC Kconfig symbol to only
-be selectable if the exynos-gsc V4L2 driver isn't enabled, since both use
-the same HW IP block.
-
-But added the dependency as depends on !VIDEO_SAMSUNG_EXYNOS_GSC which is
-not correct since Kconfig expressions are not boolean but tristate. So it
-will only evaluate to 'n' if VIDEO_SAMSUNG_EXYNOS_GSC=y but will evaluate
-to 'm' if VIDEO_SAMSUNG_S5P_G2D=m.
-
-This means that both the V4L2 and DRM drivers can be enabled if the former
-is enabled as a module, which is not what we want.
-
-Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
-
----
-
- drivers/gpu/drm/exynos/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/gpu/drm/exynos/Kconfig b/drivers/gpu/drm/exynos/Kconfig
-index d814b3048ee5..ec2dcc5e4962 100644
---- a/drivers/gpu/drm/exynos/Kconfig
-+++ b/drivers/gpu/drm/exynos/Kconfig
-@@ -119,7 +119,7 @@ config DRM_EXYNOS_ROTATOR
+Hi Thomas,
  
- config DRM_EXYNOS_GSC
- 	bool "GScaler"
--	depends on DRM_EXYNOS_IPP && ARCH_EXYNOS5 && !VIDEO_SAMSUNG_EXYNOS_GSC
-+	depends on DRM_EXYNOS_IPP && ARCH_EXYNOS5 && VIDEO_SAMSUNG_EXYNOS_GSC=n
- 	help
- 	  Choose this option if you want to use Exynos GSC for DRM.
- 
+ On ven., juil. 08 2016, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
+
+> Hello,
+>
+> On Fri,  8 Jul 2016 00:37:46 +0200, Gregory CLEMENT wrote:
+>
+>> +gpio1: gpio at 13800 {
+>> +	compatible = "marvell,mvebu-gpio-3700",	"syscon", "simple-mfd";
+>
+> I find this compatible string not very consistent with what we do for
+> other drivers, it should have been:
+>
+> 	marvell,armada-3700-gpio
+
+Thanks for pointing this. We missed it during the last review. I agree
+that using marvell,armada-3700-gpio is more appropriate, especially
+because the gpio controller on Armada 37xx seems to be different that
+the ones used on the other mvebu SoCs.
+
+Gregory
+
+>
+> or something like that.
+>
+>
+>> +	xtalclk: xtal-clk {
+>> +		compatible = "marvell,armada-3700-xtal-clock";
+>
+> See here for example.
+>
+> Thomas
+> -- 
+> Thomas Petazzoni, CTO, Free Electrons
+> Embedded Linux, Kernel and Android engineering
+> http://free-electrons.com
+
 -- 
-2.5.5
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
