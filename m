@@ -1,70 +1,112 @@
-From: jcrouse@codeaurora.org (Jordan Crouse)
-Date: Mon, 11 Jul 2016 09:00:34 -0600
-Subject: [PATCH v2 0/6] Add support for privileged mappings
-In-Reply-To: <5783A6F0.7040903@arm.com>
-References: <20160709020919.6760-1-mitchelh@codeaurora.org>
- <5783A6F0.7040903@arm.com>
-Message-ID: <20160711150034.GA6526@jcrouse-lnx.qualcomm.com>
+From: jeremy.linton@arm.com (Jeremy Linton)
+Date: Mon, 11 Jul 2016 10:05:39 -0500
+Subject: [PATCH 08/11] arm64: pmu: Provide cpumask attribute for PMU
+In-Reply-To: <20160707162103.GD9270@leverpostej>
+References: <1466529109-21715-1-git-send-email-jeremy.linton@arm.com>
+ <1466529109-21715-9-git-send-email-jeremy.linton@arm.com>
+ <20160707162103.GD9270@leverpostej>
+Message-ID: <5783B5C3.8090000@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 11, 2016 at 03:02:24PM +0100, Robin Murphy wrote:
-> Hey Mitch,
-> 
-> Thanks for having the necessary go at the DMA API - I think the series
-> looks broadly workable now.
-> 
-> On 09/07/16 03:09, Mitchel Humpherys wrote:
-> > The following patch to the ARM SMMU driver:
-> > 
-> >     commit d346180e70b91b3d5a1ae7e5603e65593d4622bc
-> >     Author: Robin Murphy <robin.murphy@arm.com>
-> >     Date:   Tue Jan 26 18:06:34 2016 +0000
-> >     
-> >         iommu/arm-smmu: Treat all device transactions as unprivileged
-> > 
-> > started forcing all SMMU transactions to come through as "unprivileged".
-> > The rationale given was that:
-> > 
-> >   (1) There is no way in the IOMMU API to even request privileged mappings.
-> > 
-> >   (2) It's difficult to implement a DMA mapper that correctly models the
-> >       ARM VMSAv8 behavior of unprivileged-writeable =>
-> >       privileged-execute-never.
-> > 
-> > This series rectifies (1) by introducing an IOMMU API for privileged
-> > mappings and implements it in io-pgtable-arm.
-> > 
-> > This series rectifies (2) by introducing a new dma attribute
-> > (DMA_ATTR_PRIVILEGED_EXECUTABLE) for users of the DMA API that need
-> > privileged, executable mappings, and implements it in the arm64 IOMMU DMA
-> > mapper.  The one known user (pl330.c) is converted over to the new
-> > attribute.
-> > 
-> > Jordan and Jeremy can provide more info on the use case if needed, but the
-> > high level is that it's a security feature to prevent attacks such as [1].
-> 
-> My understanding of that hack is that it involves switching the GPU into
-> privileged mode to get at the mapping of the IOMMU registers in the
-> first place, so I don't see at a glance how having privileged mappings
-> defends against that. What it clearly does do, however, is get us _to_
-> the point where it's necessary to do such a privilege switch in the
-> first place, as opposed to everything being trivially wide-open, which
-> is no bad thing.
+Hi,
 
-It was a two pronged attack.  First the attacker had to use the GPU to construct
-a new pagetable and some various GPU command buffers and then they could switch
-the context to the new pagetable to complete the attack.
+On 07/07/2016 11:21 AM, Mark Rutland wrote:
+> Hi Jeremy,
+>
+> Apologies for the late reply on this.
+>
+> On Tue, Jun 21, 2016 at 12:11:46PM -0500, Jeremy Linton wrote:
+>> With heterogeneous PMUs its helpful to know which PMUs are bound
+>> to each CPU. Provide that information with a cpumask sysfs entry
+>> similar to other PMUs.
+>
+> Have you tested trying to stat on a particular PMU? e.g.
+>
+> $ perf stat -e armv8_cortex_a53/cpu_cycles/ ls
+>
+> I found that the presence of a cpumask file would cause (at least some
+> versions) of perf-stat to hang, and was holding off adding a cpumask
+> until we had a solution to that.
 
-The first part was made possible by vast tracts of read/write memory that is
-mapped globally and accessible to all users so it was easy and legal to write
-whatever the user wished including a pusedo-pagetable.
+Nice!
 
-As you said, while the actual fix for the exploit was blocking access to the SMMU
-registers it isn't a bad thing if we get in the habit of assuming that we shouldn't
-leave a bunch of scratch memory around for somebody clever to take advantage of.
+I guess that is more proof that any tiny change can break things.. 
+Another "fix" is to make the cpumap_print_to_pagebuf's first parameter 
+false which apparently keeps perf from understanding the cpu mask and 
+forces the user to use numactl, which is ugly because numactrl doesn't 
+understand the mask in that format either.
 
-Jordan
--- 
-The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+I guess fixing perf is probably the best bet here...
+
+
+
+>
+> See [1,2] for more details on that.
+>
+>> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+>> ---
+>>   arch/arm64/kernel/perf_event.c | 21 +++++++++++++++++++++
+>>   1 file changed, 21 insertions(+)
+>
+> This should be generic across the arm-pmu code, and so should live under
+> drivers/perf/.
+
+Which is where i had it initially, but (IIRC) getting to work there 
+required some core pmu changes that seemed a little ugly. I guess I 
+didn't like the idea of reallocating the per pmu attr group or tweaking 
+the pmu core code.. So I just moved it into perf_event where it fit more 
+naturally.
+
+
+
+>
+> Thanks,
+> Mark.
+>
+> [1] http://lkml.kernel.org/r/1467907474-3290-1-git-send-email-mark.rutland at arm.com
+> [2] http://lkml.kernel.org/r/1467907474-3290-2-git-send-email-mark.rutland at arm.com
+>
+>> diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
+>> index 356fa6c..dae73ea 100644
+>> --- a/arch/arm64/kernel/perf_event.c
+>> +++ b/arch/arm64/kernel/perf_event.c
+>> @@ -533,6 +533,26 @@ static struct attribute_group armv8_pmuv3_events_attr_group = {
+>>
+>>   PMU_FORMAT_ATTR(event, "config:0-9");
+>>
+>> +static ssize_t
+>> +cpumask_show(struct device *dev, struct device_attribute *attr, char *page)
+>> +{
+>> +	struct pmu *pmu = dev_get_drvdata(dev);
+>> +	struct arm_pmu *cpu_pmu = container_of(pmu, struct arm_pmu, pmu);
+>> +
+>> +	return cpumap_print_to_pagebuf(true, page, &cpu_pmu->supported_cpus);
+>> +}
+>> +static DEVICE_ATTR_RO(cpumask);
+>> +
+>> +static struct attribute *armv8_pmuv3_attrs[] = {
+>> +	 &dev_attr_cpumask.attr,
+>> +	 NULL,
+>> +};
+>> +
+>> +static struct attribute_group armv8_pmuv3_attr_group = {
+>> +	.attrs = armv8_pmuv3_attrs,
+>> +};
+>> +
+>> +
+>>   static struct attribute *armv8_pmuv3_format_attrs[] = {
+>>   	&format_attr_event.attr,
+>>   	NULL,
+>> @@ -544,6 +564,7 @@ static struct attribute_group armv8_pmuv3_format_attr_group = {
+>>   };
+>>
+>>   static const struct attribute_group *armv8_pmuv3_attr_groups[] = {
+>> +	&armv8_pmuv3_attr_group,
+>>   	&armv8_pmuv3_events_attr_group,
+>>   	&armv8_pmuv3_format_attr_group,
+>>   	NULL,
+>> --
+>> 2.5.5
+>>
+>
