@@ -1,19 +1,17 @@
 From: mturquette@baylibre.com (Michael Turquette)
-Date: Mon, 11 Jul 2016 14:36:34 -0700
-Subject: [PATCH 1/2] clk: sunxi-ng: h3: Fix audio clock divider offset
-In-Reply-To: <20160711203448.18062-1-maxime.ripard@free-electrons.com>
+Date: Mon, 11 Jul 2016 14:36:44 -0700
+Subject: [PATCH 2/2] clk: sunxi-ng: h3: Fix Kconfig symbol typo
+In-Reply-To: <20160711203448.18062-2-maxime.ripard@free-electrons.com>
 References: <20160711203448.18062-1-maxime.ripard@free-electrons.com>
-Message-ID: <146827299405.73491.10992289511594199294@resonance>
+ <20160711203448.18062-2-maxime.ripard@free-electrons.com>
+Message-ID: <146827300441.73491.7304040389172798052@resonance>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Maxime Ripard (2016-07-11 13:34:47)
-> The code had a typo and got the wrong offset for the hardcoded divider, fix
-> that.
+Quoting Maxime Ripard (2016-07-11 13:34:48)
+> The Kconfig symbol for the sun8i SoC family was mistyped. Fix that.
 > 
 > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Reported-by: Jean-Francois Moine <moinejf@free.fr>
-> Reported-by: Chen-Yu Tsai <wens@csie.org>
 
 Applied.
 
@@ -21,24 +19,21 @@ Regards,
 Mike
 
 > ---
->  drivers/clk/sunxi-ng/ccu-sun8i-h3.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+>  drivers/clk/sunxi-ng/Kconfig | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> diff --git a/drivers/clk/sunxi-ng/ccu-sun8i-h3.c b/drivers/clk/sunxi-ng/ccu-sun8i-h3.c
-> index bcc0a95549d3..9af359544110 100644
-> --- a/drivers/clk/sunxi-ng/ccu-sun8i-h3.c
-> +++ b/drivers/clk/sunxi-ng/ccu-sun8i-h3.c
-> @@ -817,8 +817,8 @@ static void __init sun8i_h3_ccu_setup(struct device_node *node)
+> diff --git a/drivers/clk/sunxi-ng/Kconfig b/drivers/clk/sunxi-ng/Kconfig
+> index 41e53e8d4d41..2afcbd39e41e 100644
+> --- a/drivers/clk/sunxi-ng/Kconfig
+> +++ b/drivers/clk/sunxi-ng/Kconfig
+> @@ -60,6 +60,6 @@ config SUN8I_H3_CCU
+>         select SUNXI_CCU_NM
+>         select SUNXI_CCU_MP
+>         select SUNXI_CCU_PHASE
+> -       default ARCH_SUN8I
+> +       default MACH_SUN8I
 >  
->         /* Force the PLL-Audio-1x divider to 4 */
->         val = readl(reg + SUN8I_H3_PLL_AUDIO_REG);
-> -       val &= ~GENMASK(4, 0);
-> -       writel(val | 3, reg + SUN8I_H3_PLL_AUDIO_REG);
-> +       val &= ~GENMASK(19, 16);
-> +       writel(val | (3 << 16), reg + SUN8I_H3_PLL_AUDIO_REG);
->  
->         sunxi_ccu_probe(node, reg, &sun8i_h3_ccu_desc);
->  }
+>  endif
 > -- 
 > 2.9.0
 > 
