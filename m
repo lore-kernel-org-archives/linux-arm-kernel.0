@@ -1,46 +1,23 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 12 Jul 2016 00:52:43 +0300
-Subject: [PATCH 2/2] ARM: dts: r8a7792: remove ADSP clock
-In-Reply-To: <1529351.Fac5N2tKoF@wasted.cogentembedded.com>
-References: <1529351.Fac5N2tKoF@wasted.cogentembedded.com>
-Message-ID: <6927311.Po2EPBmxEp@wasted.cogentembedded.com>
+From: geoff@infradead.org (Geoff Levand)
+Date: Mon, 11 Jul 2016 14:55:54 -0700
+Subject: [PATCH 6/8] arm64: Introduce raw_{d,i}cache_line_size
+In-Reply-To: <1467977839-27543-8-git-send-email-suzuki.poulose@arm.com>
+References: <1467977839-27543-1-git-send-email-suzuki.poulose@arm.com>
+ <1467977839-27543-8-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1468274154.2977.1.camel@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Simon Horman told  me  that R8A7792 had ADSP clock (based on the most recent
-R-Car gen2 manual) but when I  got that manual as well, this claim proved
-to be false: R8A7792 is the only gen2 SoC that doesn't  have ADSP at all.
-Remove that  clock  for good...
+On Fri, 2016-07-08 at 12:37 +0100, Suzuki K Poulose wrote:
+> On systems with mismatched i/d cache min line sizes, we need to use
+> the smallest size possible across all CPUs. This will be done by fetching
+> the system wide safe value from CPU feature infrastructure.
+> However the some special users(e.g kexec, hibernate) would need the line
+> size on the CPU (rather than the system wide), when the system wide
+> feature may not be accessible. Provide another helper which will fetch
+> cache line size on the current CPU.
+> 
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Looks OK for what kexec needs.
 
----
- arch/arm/boot/dts/r8a7792.dtsi            |    2 +-
- include/dt-bindings/clock/r8a7792-clock.h |    1 -
- 2 files changed, 1 insertion(+), 2 deletions(-)
-
-Index: renesas/arch/arm/boot/dts/r8a7792.dtsi
-===================================================================
---- renesas.orig/arch/arm/boot/dts/r8a7792.dtsi
-+++ renesas/arch/arm/boot/dts/r8a7792.dtsi
-@@ -464,7 +464,7 @@
- 			clocks = <&extal_clk>;
- 			#clock-cells = <1>;
- 			clock-output-names = "main", "pll0", "pll1", "pll3",
--					     "lb", "qspi", "z", "adsp";
-+					     "lb", "qspi", "z";
- 			#power-domain-cells = <0>;
- 		};
- 
-Index: renesas/include/dt-bindings/clock/r8a7792-clock.h
-===================================================================
---- renesas.orig/include/dt-bindings/clock/r8a7792-clock.h
-+++ renesas/include/dt-bindings/clock/r8a7792-clock.h
-@@ -18,7 +18,6 @@
- #define R8A7792_CLK_LB			4
- #define R8A7792_CLK_QSPI		5
- #define R8A7792_CLK_Z			6
--#define R8A7792_CLK_ADSP		7
- 
- /* MSTP0 */
- #define R8A7792_CLK_MSIOF0		0
+Acked-by: Geoff Levand <geoff@infradead.org>
