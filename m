@@ -1,42 +1,78 @@
-From: patrice.chotard@st.com (Patrice Chotard)
-Date: Mon, 11 Jul 2016 09:41:17 +0200
-Subject: [GIT PULL v3] STi SoC changes for v4.8
-Message-ID: <57834D9D.4070900@st.com>
+From: frank.wang@rock-chips.com (Frank Wang)
+Date: Mon, 11 Jul 2016 15:43:03 +0800
+Subject: [PATCH] arm64: dts: rockchip: support the usb2phy for rk3399 evb
+In-Reply-To: <2150255.RfISFviJKP@phil>
+References: <1467866800-24794-1-git-send-email-wxt@rock-chips.com>
+ <2150255.RfISFviJKP@phil>
+Message-ID: <cd9056c1-6fff-d02c-3fc0-3d48d9850504@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Arnd and Kevin,
+Hi Heiko,
 
-Please consider this first round of STi SoC updates for v4.8:
+On 2016/7/7 18:11, Heiko Stuebner wrote:
+> Hi,
+>
+> Am Donnerstag, 7. Juli 2016, 12:46:40 schrieb Caesar Wang:
+>> From: Frank Wang <frank.wang@rock-chips.com>
+>>
+>> This patch adds the usb2phy needed dts node information for rk3399.
+>>
+>> USB2.0 PHY is comprised of one Host port and one OTG port.
+>> Host Port is for USB2.0 host controller; OTG port is for USB2.0 part of
+>> USB3.0 OTG controller, and as a part to construct a fully feature TypeC
+>> subsystem.
+>>
+>> The USB2.0 vbus gpio is board specific, it's no same with all rk3399
+>> boards, so move it into evb voard.
+>>
+>> Signed-off-by: Frank Wang <frank.wang@rock-chips.com>
+>> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+>> ---
+>>
+>>   arch/arm64/boot/dts/rockchip/rk3399-evb.dts |  4 ++++
+>>   arch/arm64/boot/dts/rockchip/rk3399.dtsi    | 19 +++++++++++++++++++
+>>   2 files changed, 23 insertions(+)
+>>
+>> diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+>> b/arch/arm64/boot/dts/rockchip/rk3399.dtsi index 4c84229..21d147f 100644
+>> --- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+>> +++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+>> @@ -242,6 +242,25 @@
+>>   		status = "disabled";
+>>   	};
+>>
+>> +	usb2phy: usb2phy {
+>> +		compatible = "rockchip,rk3399-usb-phy";
+>> +		rockchip,grf = <&grf>;
+>> +		#address-cells = <1>;
+>> +		#size-cells = <0>;
+>> +
+>> +		usb2phy0: usb2-phy0 {
+>> +			#phy-cells = <0>;
+>> +			#clock-cells = <0>;
+>> +			reg = <0xe458>;
+>> +		};
+>> +
+>> +		usb2phy1: usb2-phy1 {
+>> +			#phy-cells = <0>;
+>> +			#clock-cells = <0>;
+>> +			reg = <0xe468>;
+>> +		};
+>> +	};
+>> +
+> The rk3399 uses the innosilicon usb2 phy and the binding we've come up for
+> it looks a lot different than the above. So I'm not sure where this is
+> coming from, especially as I haven't seen the driver part for the rk3399 at
+> all yet. So far Frank was always working on te rk3366 variant, which seemed
+> to be the most complete.
 
-The following changes since commit 5edb56491d4812c42175980759da53388e5d86f5:
+Yeah, rk3399 is ready for using the new driver and the binding which I 
+have handed out earlier, but it seems that they have not applied yet, so 
+shall we send out the new patches for rk3399 until they will be applied?
 
-   Linux 4.7-rc3 (2016-06-12 07:20:35 -0700)
+BR.
+Frank
 
-are available in the git repository at:
-
-   git://git.kernel.org/pub/scm/linux/kernel/git/pchotard/sti.git 
-tags/sti-soc-for-v4.8
-
-for you to fetch changes up to 7b8e0188fa717cd9abc4fb52587445b421835c2a:
-
-   ARM: sti: Implement dummy L2 cache's write_sec (2016-07-11 09:15:44 
-+0200)
-
-----------------------------------------------------------------
-Highlights:
------------
-- Add a dummy L2 cache's write_sec callback as in non secure mode execution,
-    we can't get access to L2 cache secure registers
-- Cosmetics change, in case of dump_stack, update the hardware name with a
-    more generic for the STi SoCs family
-
-----------------------------------------------------------------
-Patrice Chotard (1):
-       ARM: sti: Implement dummy L2 cache's write_sec
-
-Peter Griffin (1):
-       ARM: STi: Update machine _namestr to be more generic.
-
-  arch/arm/mach-sti/board-dt.c | 11 ++++++++++-
-  1 file changed, 10 insertions(+), 1 deletion(-)
+> Heiko
+>
