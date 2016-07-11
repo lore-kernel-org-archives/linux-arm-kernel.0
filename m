@@ -1,57 +1,60 @@
 From: stephen.boyd@linaro.org (Stephen Boyd)
-Date: Mon, 11 Jul 2016 15:02:16 -0700
-Subject: [PATCH v2 10/22] usb: chipidea: Add support for ULPI PHY bus
-In-Reply-To: <20160711031003.GC30448@shlinux2>
+Date: Mon, 11 Jul 2016 15:03:37 -0700
+Subject: [PATCH v2 15/22] usb: chipidea: msm: Mux over secondary phy at
+ the right time
+In-Reply-To: <20160711044327.GG30448@shlinux2>
 References: <20160707222114.1673-1-stephen.boyd@linaro.org>
- <20160707222114.1673-11-stephen.boyd@linaro.org>
- <20160711031003.GC30448@shlinux2>
-Message-ID: <CAJOFmgxWM+9UaDC+QoBM5xutj1vPtSHmwiU8=cf2G5zSB8RRNg@mail.gmail.com>
+ <20160707222114.1673-16-stephen.boyd@linaro.org>
+ <20160711044327.GG30448@shlinux2>
+Message-ID: <CAJOFmgzxYutvxhBbmmYyuDd9PTgpDskzHTvCUGteATPEFTU31g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 July 2016 at 20:10, Peter Chen <hzpeterchen@gmail.com> wrote:
-> On Thu, Jul 07, 2016 at 03:21:01PM -0700, Stephen Boyd wrote:
->> @@ -418,6 +427,17 @@ static inline bool ci_otg_is_fsm_mode(struct ci_hdrc *ci)
->>  #endif
->>  }
+On 10 July 2016 at 21:43, Peter Chen <hzpeterchen@gmail.com> wrote:
+> On Thu, Jul 07, 2016 at 03:21:06PM -0700, Stephen Boyd wrote:
+>> diff --git a/drivers/usb/chipidea/ci_hdrc_msm.c b/drivers/usb/chipidea/ci_hdrc_msm.c
+>> index 7e870a253f55..7708bee3ff3e 100644
+>> --- a/drivers/usb/chipidea/ci_hdrc_msm.c
+>> +++ b/drivers/usb/chipidea/ci_hdrc_msm.c
+>> @@ -8,29 +8,44 @@
+>>  #include <linux/module.h>
+>>  #include <linux/platform_device.h>
+>>  #include <linux/pm_runtime.h>
+>> -#include <linux/usb/gadget.h>
+>>  #include <linux/usb/chipidea.h>
+>>  #include <linux/clk.h>
+>>  #include <linux/reset.h>
+>> +#include <linux/mfd/syscon.h>
+>> +#include <linux/regmap.h>
+>> +#include <linux/io.h>
 >>
->> +#if IS_ENABLED(CONFIG_USB_CHIPIDEA_ULPI)
->> +int ci_ulpi_init(struct ci_hdrc *ci);
->> +void ci_ulpi_exit(struct ci_hdrc *ci);
->> +int ci_ulpi_resume(struct ci_hdrc *ci);
->> +#else
->> +static inline int ci_ulpi_init(struct ci_hdrc *ci) { return 0; }
->> +static inline void ci_ulpi_exit(struct ci_hdrc *ci) { }
->> +static inline int ci_ulpi_resume(struct ci_hdrc *ci) { return 0; }
->> +#endif
->> +
+>>  #include "ci.h"
+>>
+>>  #define HS_PHY_AHB_MODE                      0x0098
+>>
+>> +/* Vendor base starts at 0x200 beyond CI base */
+>> +#define HS_PHY_SEC_CTRL                      0x0078
+>> +#define HS_PHY_DIG_CLAMP_N           BIT(16)
 >> +
 >
-> One more blank line
+> Keep alignment
+
+It's aligned in my editor, tabs vs. spaces problem?
+
+>> @@ -123,9 +177,12 @@ static int ci_hdrc_msm_probe(struct platform_device *pdev)
+>>       if (ret)
+>>               goto err_iface;
+>>
+>> -     plat_ci = ci_hdrc_add_device(&pdev->dev,
+>> -                             pdev->resource, pdev->num_resources,
+>> -                             &ci_hdrc_msm_platdata);
+>> +     ret = ci_hdrc_msm_mux_phy(ci, pdev);
+>> +     if (ret)
+>> +             goto err_mux;
+>> +
+>> +     plat_ci = ci_hdrc_add_device(&pdev->dev, pdev->resource,
+>> +                                  pdev->num_resources, &ci_hdrc_msm_platdata);
 >
+> The above line has not changed.
 
 Fixed.
-
->> @@ -911,11 +918,15 @@ static int ci_hdrc_probe(struct platform_device *pdev)
->>
->>               /* if both generic PHY and USB PHY layers aren't enabled */
->>               if (PTR_ERR(ci->phy) == -ENOSYS &&
->> -                             PTR_ERR(ci->usb_phy) == -ENXIO)
->> -                     return -ENXIO;
->> +                             PTR_ERR(ci->usb_phy) == -ENXIO) {
->> +                     ret = -ENXIO;
->> +                     goto ulpi_exit;
->> +             }
->>
->> -             if (IS_ERR(ci->phy) && IS_ERR(ci->usb_phy))
->> -                     return -EPROBE_DEFER;
->> +             if (IS_ERR(ci->phy) && IS_ERR(ci->usb_phy)) {
->> +                     ret = -EPROBE_DEFER;
->> +                     goto ulpi_exit;
->> +             }
->
-> Just confirm, you try to get PHY through:
->         ci->phy = devm_phy_get(dev->parent, "usb-phy");
-> right?
-
-Yes.
