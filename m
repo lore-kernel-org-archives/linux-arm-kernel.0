@@ -1,92 +1,164 @@
-From: alim.akhtar@samsung.com (Alim Akhtar)
-Date: Mon, 11 Jul 2016 09:46:32 +0530
-Subject: [PATCH] arm64: defconfig: Enable more IP blocks for Exynos7 and
- Exynos5433
-In-Reply-To: <1468009023-25758-1-git-send-email-krzk@kernel.org>
-References: <1468009023-25758-1-git-send-email-krzk@kernel.org>
-Message-ID: <57831DA0.707@samsung.com>
+From: hzpeterchen@gmail.com (Peter Chen)
+Date: Mon, 11 Jul 2016 12:32:49 +0800
+Subject: [PATCH v2 14/22] usb: chipidea: msm: Add proper clk and reset
+ support
+In-Reply-To: <20160707222114.1673-15-stephen.boyd@linaro.org>
+References: <20160707222114.1673-1-stephen.boyd@linaro.org>
+ <20160707222114.1673-15-stephen.boyd@linaro.org>
+Message-ID: <20160711043249.GF30448@shlinux2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krzysztof,
-
-On 07/09/2016 01:47 AM, Krzysztof Kozlowski wrote:
-> Enable more drivers for IP blocks for existing Exynos7 and upcoming
-> Exynos5433:
-> 1. SPI,
-> 2. Watchdog,
-> 3. USB: DWC3, Exynos EHCI and OHCI,
-> 4. Exynos ADC,
-> 5. Samsung PWM.
->
-> These are already used by Exynos7 Espresso board or will be used by
-> Exynos5433 based board.
->
-> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
->
-Thanks for posting this patch.
-
-Reviewed-by: Alim Akhtar <alim.akhtar@samsung.com>
-
+On Thu, Jul 07, 2016 at 03:21:05PM -0700, Stephen Boyd wrote:
+> The msm chipidea controller uses two main clks, an AHB clk to
+> read/write the MMIO registers and a core clk called the system
+> clk that drives the controller itself. Add support for these clks
+> as they're required in all designs.
+> 
+> Also add support for an optional third clk that we need to turn
+> on to reset the controller and wrapper logic and other
+> "housekeeping" things. This clk was removed in later revisions of
+> the hardware because the reset methodology no longer required
+> clks to be enabled to propagate resets.
+> 
+> Cc: Peter Chen <peter.chen@nxp.com>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
 > ---
->
-> If there are no objections, I can take it through Samsung SoC tree.
-> ---
->   arch/arm64/configs/defconfig | 10 ++++++++++
->   1 file changed, 10 insertions(+)
->
-> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-> index c05b8badec2c..fe6d6c34323a 100644
-> --- a/arch/arm64/configs/defconfig
-> +++ b/arch/arm64/configs/defconfig
-> @@ -183,6 +183,7 @@ CONFIG_SPI_ORION=y
->   CONFIG_SPI_PL022=y
->   CONFIG_SPI_QUP=y
->   CONFIG_SPI_SPIDEV=m
-> +CONFIG_SPI_S3C64XX=y
->   CONFIG_SPMI=y
->   CONFIG_PINCTRL_SINGLE=y
->   CONFIG_PINCTRL_MSM8916=y
-> @@ -202,6 +203,7 @@ CONFIG_THERMAL_EMULATION=y
->   CONFIG_EXYNOS_THERMAL=y
->   CONFIG_WATCHDOG=y
->   CONFIG_RENESAS_WDT=y
-> +CONFIG_S3C2410_WATCHDOG=y
->   CONFIG_MFD_SPMI_PMIC=y
->   CONFIG_MFD_SEC_CORE=y
->   CONFIG_MFD_HI655X_PMIC=y
-> @@ -221,18 +223,22 @@ CONFIG_SOUND=y
->   CONFIG_SND=y
->   CONFIG_SND_SOC=y
->   CONFIG_SND_SOC_RCAR=y
-> +CONFIG_SND_SOC_SAMSUNG=y
->   CONFIG_SND_SOC_AK4613=y
->   CONFIG_USB=y
->   CONFIG_USB_OTG=y
->   CONFIG_USB_XHCI_HCD=y
->   CONFIG_USB_XHCI_RCAR=y
-> +CONFIG_USB_EHCI_EXYNOS=y
->   CONFIG_USB_EHCI_HCD=y
->   CONFIG_USB_EHCI_MSM=y
->   CONFIG_USB_EHCI_HCD_PLATFORM=y
-> +CONFIG_USB_OHCI_EXYNOS=y
->   CONFIG_USB_OHCI_HCD=y
->   CONFIG_USB_OHCI_HCD_PLATFORM=y
->   CONFIG_USB_STORAGE=y
->   CONFIG_USB_DWC2=y
-> +CONFIG_USB_DWC3=y
->   CONFIG_USB_CHIPIDEA=y
->   CONFIG_USB_CHIPIDEA_UDC=y
->   CONFIG_USB_CHIPIDEA_HOST=y
-> @@ -304,6 +310,10 @@ CONFIG_PHY_HI6220_USB=y
->   CONFIG_PHY_XGENE=y
->   CONFIG_ARM_SCPI_PROTOCOL=y
->   CONFIG_ACPI=y
-> +CONFIG_IIO=y
-> +CONFIG_EXYNOS_ADC=y
-> +CONFIG_PWM=y
-> +CONFIG_PWM_SAMSUNG=y
->   CONFIG_EXT2_FS=y
->   CONFIG_EXT3_FS=y
->   CONFIG_FANOTIFY=y
->
+>  drivers/usb/chipidea/ci_hdrc_msm.c | 72 +++++++++++++++++++++++++++++++++++---
+>  1 file changed, 68 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/usb/chipidea/ci_hdrc_msm.c b/drivers/usb/chipidea/ci_hdrc_msm.c
+> index b282a717bf8c..7e870a253f55 100644
+> --- a/drivers/usb/chipidea/ci_hdrc_msm.c
+> +++ b/drivers/usb/chipidea/ci_hdrc_msm.c
+> @@ -10,11 +10,20 @@
+>  #include <linux/pm_runtime.h>
+>  #include <linux/usb/gadget.h>
+>  #include <linux/usb/chipidea.h>
+> +#include <linux/clk.h>
+> +#include <linux/reset.h>
+>  
+>  #include "ci.h"
+>  
+>  #define HS_PHY_AHB_MODE			0x0098
+>  
+> +struct ci_hdrc_msm {
+> +	struct platform_device *ci;
+> +	struct clk *core_clk;
+> +	struct clk *iface_clk;
+> +	struct clk *fs_clk;
+> +};
+> +
+>  static void ci_hdrc_msm_notify_event(struct ci_hdrc *ci, unsigned event)
+>  {
+>  	struct device *dev = ci->gadget.dev.parent;
+> @@ -52,11 +61,20 @@ static struct ci_hdrc_platform_data ci_hdrc_msm_platdata = {
+>  
+>  static int ci_hdrc_msm_probe(struct platform_device *pdev)
+>  {
+> +	struct ci_hdrc_msm *ci;
+>  	struct platform_device *plat_ci;
+>  	struct usb_phy *phy;
+> +	struct clk *clk;
+> +	struct reset_control *reset;
+> +	int ret;
+>  
+>  	dev_dbg(&pdev->dev, "ci_hdrc_msm_probe\n");
+>  
+> +	ci = devm_kzalloc(&pdev->dev, sizeof(*ci), GFP_KERNEL);
+> +	if (!ci)
+> +		return -ENOMEM;
+> +	platform_set_drvdata(pdev, ci);
+> +
+>  	/*
+>  	 * OTG(PHY) driver takes care of PHY initialization, clock management,
+>  	 * powering up VBUS, mapping of registers address space and power
+> @@ -68,29 +86,75 @@ static int ci_hdrc_msm_probe(struct platform_device *pdev)
+>  
+>  	ci_hdrc_msm_platdata.usb_phy = phy;
+>  
+> +	reset = devm_reset_control_get(&pdev->dev, "core");
+> +	if (IS_ERR(reset))
+> +		return PTR_ERR(reset);
+> +
+> +	ci->core_clk = clk = devm_clk_get(&pdev->dev, "core");
+> +	if (IS_ERR(clk))
+> +		return PTR_ERR(clk);
+> +
+> +	ci->iface_clk = clk = devm_clk_get(&pdev->dev, "iface");
+> +	if (IS_ERR(clk))
+> +		return PTR_ERR(clk);
+> +
+> +	ci->fs_clk = clk = devm_clk_get(&pdev->dev, "fs");
+> +	if (IS_ERR(clk)) {
+> +		if (PTR_ERR(clk) == -EPROBE_DEFER)
+> +			return -EPROBE_DEFER;
+> +		ci->fs_clk = NULL;
+> +	}
+> +
+> +	ret = clk_prepare_enable(ci->fs_clk);
+> +	if (ret)
+> +		return ret;
+> +
+> +	reset_control_assert(reset);
+> +	usleep_range(10000, 12000);
+> +	reset_control_deassert(reset);
+> +
+> +	clk_disable_unprepare(ci->fs_clk);
+> +
+> +	ret = clk_prepare_enable(ci->core_clk);
+> +	if (ret)
+> +		return ret;
+> +
+> +	ret = clk_prepare_enable(ci->iface_clk);
+> +	if (ret)
+> +		goto err_iface;
+> +
+>  	plat_ci = ci_hdrc_add_device(&pdev->dev,
+>  				pdev->resource, pdev->num_resources,
+>  				&ci_hdrc_msm_platdata);
+>  	if (IS_ERR(plat_ci)) {
+>  		dev_err(&pdev->dev, "ci_hdrc_add_device failed!\n");
+> -		return PTR_ERR(plat_ci);
+> +		ret = PTR_ERR(plat_ci);
+> +		goto err_mux;
+>  	}
+>  
+> -	platform_set_drvdata(pdev, plat_ci);
+> +	ci->ci = plat_ci;
+>  
+>  	pm_runtime_set_active(&pdev->dev);
+>  	pm_runtime_no_callbacks(&pdev->dev);
+>  	pm_runtime_enable(&pdev->dev);
+>  
+>  	return 0;
+> +
+> +err_mux:
+> +	clk_disable_unprepare(ci->iface_clk);
+> +err_iface:
+> +	clk_disable_unprepare(ci->core_clk);
+> +	return ret;
+>  }
+>  
+>  static int ci_hdrc_msm_remove(struct platform_device *pdev)
+>  {
+> -	struct platform_device *plat_ci = platform_get_drvdata(pdev);
+> +	struct ci_hdrc_msm *ci = platform_get_drvdata(pdev);
+>  
+>  	pm_runtime_disable(&pdev->dev);
+> -	ci_hdrc_remove_device(plat_ci);
+> +	ci_hdrc_remove_device(ci->ci);
+> +	clk_disable_unprepare(ci->iface_clk);
+> +	clk_disable_unprepare(ci->core_clk);
+>  
+>  	return 0;
+>  }
+> -- 
+
+Acked-by: Peter Chen <peter.chen@nxp.com>
+
+-- 
+
+Best Regards,
+Peter Chen
