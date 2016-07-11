@@ -1,36 +1,24 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 11 Jul 2016 11:38:30 +0100
-Subject: [PATCH] iommu: arm-smmu: use devm_request_irq and devm_free_irq
-In-Reply-To: <578375D7.7090609@arm.com>
-References: <1467625102-9755-1-git-send-email-van.freenix@gmail.com>
- <578375D7.7090609@arm.com>
-Message-ID: <20160711103829.GB17735@arm.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Mon, 11 Jul 2016 12:49:30 +0200
+Subject: [PATCH v2 1/7] bindings: spi-samsung: add exynos5433 spi
+ compatible
+In-Reply-To: <1467989201-14661-2-git-send-email-andi.shyti@samsung.com>
+References: <1467989201-14661-1-git-send-email-andi.shyti@samsung.com>
+ <1467989201-14661-2-git-send-email-andi.shyti@samsung.com>
+Message-ID: <578379BA.3090501@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 11, 2016 at 11:32:55AM +0100, Robin Murphy wrote:
-> On 04/07/16 10:38, Peng Fan wrote:
-> > Use devm_request_irq to simplify error handling path,
-> > when probe smmu device.
-> > 
-> > Also devm_{request|free}_irq when init or destroy domain context.
-> > 
-> > Signed-off-by: Peng Fan <van.freenix@gmail.com>
-> > Cc: Will Deacon <will.deacon@arm.com>
-> > Cc: Robin Murphy <robin.murphy@arm.com>
-> > ---
-> [...]
-> > @@ -2050,7 +2046,7 @@ static int arm_smmu_device_remove(struct platform_device *pdev)
-> >  		dev_err(dev, "removing device with active domains!\n");
-> >  
-> >  	for (i = 0; i < smmu->num_global_irqs; ++i)
-> > -		free_irq(smmu->irqs[i], smmu);
-> > +		devm_free_irq(smmu->dev, smmu->irqs[i], smmu);
+On 07/08/2016 04:46 PM, Andi Shyti wrote:
+> The samsung,exynos5433-spi has some peculiarities that bring the
+> need of creating a new compatible in the binding.
 > 
-> There shouldn't be any need for this at all, since the very next thing
-> called after drv->remove() is devres_release_all().
+> One of those is the 3-clocks controller management where the spi
+> is fed with three clocks: "spi", "busclkN" and "ioclk".
+> 
+> By adding the exynos5433-spi, we deprecate the exynos7 compatible
+> and discourage its use.
+> 
+> Signed-off-by: Andi Shyti <andi.shyti@samsung.com>
 
-I already sent a pull request for this, so any further changes will need
-to be sent as incremental patches.
-
-Will
+Reviewed-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
