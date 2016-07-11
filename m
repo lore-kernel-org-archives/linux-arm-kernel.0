@@ -1,87 +1,86 @@
-From: anna-maria@linutronix.de (Anna-Maria Gleixner)
-Date: Mon, 11 Jul 2016 12:28:45 -0000
-Subject: [patch 33/66] arm: Convert VFP hotplug notifiers to state machine
-References: <20160711122450.923603742@linutronix.de>
-Message-ID: <20160711122533.391066007@linutronix.de>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Mon, 11 Jul 2016 15:02:24 +0100
+Subject: [PATCH v2 0/6] Add support for privileged mappings
+In-Reply-To: <20160709020919.6760-1-mitchelh@codeaurora.org>
+References: <20160709020919.6760-1-mitchelh@codeaurora.org>
+Message-ID: <5783A6F0.7040903@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thomas Gleixner <tglx@linutronix.de>
+Hey Mitch,
 
-Straight forward conversion plus commentary why code which is executed
-in hotplug callbacks needs to be invoked before installing them.
+Thanks for having the necessary go at the DMA API - I think the series
+looks broadly workable now.
 
-Signed-off-by: Anna-Maria Gleixner <anna-maria@linutronix.de>
-Reviewed-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: linux-arm-kernel at lists.infradead.org
+On 09/07/16 03:09, Mitchel Humpherys wrote:
+> The following patch to the ARM SMMU driver:
+> 
+>     commit d346180e70b91b3d5a1ae7e5603e65593d4622bc
+>     Author: Robin Murphy <robin.murphy@arm.com>
+>     Date:   Tue Jan 26 18:06:34 2016 +0000
+>     
+>         iommu/arm-smmu: Treat all device transactions as unprivileged
+> 
+> started forcing all SMMU transactions to come through as "unprivileged".
+> The rationale given was that:
+> 
+>   (1) There is no way in the IOMMU API to even request privileged mappings.
+> 
+>   (2) It's difficult to implement a DMA mapper that correctly models the
+>       ARM VMSAv8 behavior of unprivileged-writeable =>
+>       privileged-execute-never.
+> 
+> This series rectifies (1) by introducing an IOMMU API for privileged
+> mappings and implements it in io-pgtable-arm.
+> 
+> This series rectifies (2) by introducing a new dma attribute
+> (DMA_ATTR_PRIVILEGED_EXECUTABLE) for users of the DMA API that need
+> privileged, executable mappings, and implements it in the arm64 IOMMU DMA
+> mapper.  The one known user (pl330.c) is converted over to the new
+> attribute.
+> 
+> Jordan and Jeremy can provide more info on the use case if needed, but the
+> high level is that it's a security feature to prevent attacks such as [1].
 
----
- arch/arm/vfp/vfpmodule.c   |   28 +++++++++++++++++-----------
- include/linux/cpuhotplug.h |    1 +
- 2 files changed, 18 insertions(+), 11 deletions(-)
+My understanding of that hack is that it involves switching the GPU into
+privileged mode to get at the mapping of the IOMMU registers in the
+first place, so I don't see at a glance how having privileged mappings
+defends against that. What it clearly does do, however, is get us _to_
+the point where it's necessary to do such a privilege switch in the
+first place, as opposed to everything being trivially wide-open, which
+is no bad thing.
 
---- a/arch/arm/vfp/vfpmodule.c
-+++ b/arch/arm/vfp/vfpmodule.c
-@@ -643,19 +643,19 @@ int vfp_restore_user_hwstate(struct user
-  * hardware state at every thread switch.  We clear our held state when
-  * a CPU has been killed, indicating that the VFP hardware doesn't contain
-  * a threads VFP state.  When a CPU starts up, we re-enable access to the
-- * VFP hardware.
-- *
-- * Both CPU_DYING and CPU_STARTING are called on the CPU which
-+ * VFP hardware. The callbacks below are called on the CPU which
-  * is being offlined/onlined.
-  */
--static int vfp_hotplug(struct notifier_block *b, unsigned long action,
--	void *hcpu)
-+static int vfp_dying_cpu(unsigned int cpu)
- {
--	if (action == CPU_DYING || action == CPU_DYING_FROZEN)
--		vfp_current_hw_state[(long)hcpu] = NULL;
--	else if (action == CPU_STARTING || action == CPU_STARTING_FROZEN)
--		vfp_enable(NULL);
--	return NOTIFY_OK;
-+	vfp_force_reload(cpu, current_thread_info());
-+	return 0;
-+}
-+
-+static int vfp_starting_cpu(unsigned int unused)
-+{
-+	vfp_enable(NULL);
-+	return 0;
- }
- 
- void vfp_kmode_exception(void)
-@@ -732,6 +732,10 @@ static int __init vfp_init(void)
- 	unsigned int vfpsid;
- 	unsigned int cpu_arch = cpu_architecture();
- 
-+	/*
-+	 * Enable the access to the VFP on all online CPUs so the
-+	 * following test on FPSID will succeed.
-+	 */
- 	if (cpu_arch >= CPU_ARCH_ARMv6)
- 		on_each_cpu(vfp_enable, NULL, 1);
- 
-@@ -794,7 +798,9 @@ static int __init vfp_init(void)
- 		VFP_arch = (vfpsid & FPSID_ARCH_MASK) >> FPSID_ARCH_BIT;
- 	}
- 
--	hotcpu_notifier(vfp_hotplug, 0);
-+	cpuhp_setup_state_nocalls(CPUHP_AP_ARM_VFP_STARTING,
-+				  "AP_ARM_VFP_STARTING", vfp_starting_cpu,
-+				  vfp_dying_cpu);
- 
- 	vfp_vector = vfp_support_entry;
- 
---- a/include/linux/cpuhotplug.h
-+++ b/include/linux/cpuhotplug.h
-@@ -35,6 +35,7 @@ enum cpuhp_state {
- 	CPUHP_AP_PERF_X86_CQM_STARTING,
- 	CPUHP_AP_PERF_X86_CSTATE_STARTING,
- 	CPUHP_AP_PERF_XTENSA_STARTING,
-+	CPUHP_AP_ARM_VFP_STARTING,
- 	CPUHP_AP_NOTIFY_STARTING,
- 	CPUHP_AP_ONLINE,
- 	CPUHP_TEARDOWN_CPU,
+Robin.
+
+> 
+> [1] https://github.com/robclark/kilroy
+> 
+> Changelog:
+> 
+>   v1..v2
+> 
+>     - Added a new DMA attribute to make executable privileged mappings
+>       work, and use that in the pl330 driver (suggested by Will).
+> 
+> 
+> Jeremy Gebben (1):
+>   iommu/io-pgtable-arm: add support for the IOMMU_PRIV flag
+> 
+> Mitchel Humpherys (5):
+>   iommu: add IOMMU_PRIV attribute
+>   Revert "iommu/arm-smmu: Treat all device transactions as unprivileged"
+>   common: DMA-mapping: add DMA_ATTR_PRIVILEGED_EXECUTABLE attribute
+>   arm64/dma-mapping: Implement DMA_ATTR_PRIVILEGED_EXECUTABLE
+>   dmaengine: pl330: Make sure microcode is privileged-executable
+> 
+>  Documentation/DMA-attributes.txt |  9 +++++++++
+>  arch/arm64/mm/dma-mapping.c      |  6 +++---
+>  drivers/dma/pl330.c              |  7 +++++--
+>  drivers/iommu/arm-smmu.c         |  5 +----
+>  drivers/iommu/dma-iommu.c        | 15 +++++++++++----
+>  drivers/iommu/io-pgtable-arm.c   | 16 +++++++++++-----
+>  include/linux/dma-attrs.h        |  1 +
+>  include/linux/dma-iommu.h        |  3 ++-
+>  include/linux/iommu.h            |  1 +
+>  9 files changed, 44 insertions(+), 19 deletions(-)
+> 
