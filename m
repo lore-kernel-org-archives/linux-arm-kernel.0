@@ -1,120 +1,108 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Mon, 11 Jul 2016 15:10:59 +0200
-Subject: [PATCH v7 1/4] soc: mediatek: Refine scpsys to support multiple
- platform
-In-Reply-To: <1468227390.31247.20.camel@mtksdaap41>
-References: <1463390894-32062-1-git-send-email-jamesjj.liao@mediatek.com>
- <1463390894-32062-2-git-send-email-jamesjj.liao@mediatek.com>
- <6762e420-0d68-0376-b584-bfc878b5e95f@gmail.com>
- <1467783564.26485.22.camel@mtksdaap41> <577E3AE9.5080202@gmail.com>
- <1468227390.31247.20.camel@mtksdaap41>
-Message-ID: <57839AE3.2070103@gmail.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Mon, 11 Jul 2016 14:14:39 +0100
+Subject: [RFC PATCH 6/8] PM / Domains: Remove a provider by referencing
+ the data pointer
+In-Reply-To: <5769455C.9010809@nvidia.com>
+References: <1457090634-14785-1-git-send-email-jonathanh@nvidia.com>
+ <1457090634-14785-7-git-send-email-jonathanh@nvidia.com>
+ <CAPDyKFpLcnLvQmpQgzhOExq67XrbaW9Nf1Gk2Y+CND8dn_cmyA@mail.gmail.com>
+ <5769455C.9010809@nvidia.com>
+Message-ID: <57839BBF.30102@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Ulf,
 
-
-On 11/07/16 10:56, James Liao wrote:
-
-[...]
-
->>>>> @@ -467,28 +386,54 @@ static int scpsys_probe(struct platform_device *pdev)
->>>>>    			if (PTR_ERR(scpd->supply) == -ENODEV)
->>>>>    				scpd->supply = NULL;
->>>>>    			else
->>>>> -				return PTR_ERR(scpd->supply);
->>>>> +				return ERR_CAST(scpd->supply);
->>>>>    		}
->>>>>    	}
->>>>>
->>>>> -	pd_data->num_domains = NUM_DOMAINS;
->>>>> +	pd_data->num_domains = num;
->>>>>
->>>>> -	for (i = 0; i < NUM_DOMAINS; i++) {
->>>>> +	init_clks(pdev, clk);
->>>>> +
->>>>> +	for (i = 0; i < num; i++) {
->>>>>    		struct scp_domain *scpd = &scp->domains[i];
->>>>>    		struct generic_pm_domain *genpd = &scpd->genpd;
->>>>>    		const struct scp_domain_data *data = &scp_domain_data[i];
->>>>>
->>>>> +		for (j = 0; j < MAX_CLKS && data->clk_id[j]; j++) {
->>>>> +			struct clk *c = clk[data->clk_id[j]];
->>>>> +
->>>>> +			if (IS_ERR(c)) {
->>>>> +				dev_err(&pdev->dev, "%s: clk unavailable\n",
->>>>> +					data->name);
->>>>> +				return ERR_CAST(c);
->>>>> +			}
->>>>> +
->>>>> +			scpd->clk[j] = c;
->>>>
->>>> Put this in the else branch. Apart from that is there any reason you
+On 21/06/16 14:47, Jon Hunter wrote:
+> 
+> On 15/06/16 15:38, Ulf Hansson wrote:
+>> On 4 March 2016 at 12:23, Jon Hunter <jonathanh@nvidia.com> wrote:
+>>> To remove a PM domain from the system, it is necessary to ensure
+>>> that any PM domain providers associated with the PM domain have
+>>> been removed. Otherwise it could be possible to obtain a pointer
+>>> to a PM domain structure that has been removed.
 >>>
->>> Do you mean to change like this?
+>>> PM domains now have a reference to the pointer for the PM domain
+>>> provider's data variable. Add a function so that a PM domain can
+>>> remove a PM domain provider by referencing the data pointer.
 >>>
->>> 	if (IS_ERR(c)) {
->>> 		...
->>> 		return ERR_CAST(c);
->>> 	} else {
->>> 		scpd->clk[j] = c;
->>> 	}
+>>> Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
+>>> ---
+>>>  drivers/base/power/domain.c | 24 ++++++++++++++++++++++++
+>>>  include/linux/pm_domain.h   |  2 ++
+>>>  2 files changed, 26 insertions(+)
 >>>
->>> checkpatch.pl will warn for above code due to it returns in 'if' branch.
+>>> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+>>> index 72055fef6256..438885f2455f 100644
+>>> --- a/drivers/base/power/domain.c
+>>> +++ b/drivers/base/power/domain.c
+>>> @@ -1738,6 +1738,30 @@ void of_genpd_del_provider(struct device_node *np)
+>>>  EXPORT_SYMBOL_GPL(of_genpd_del_provider);
 >>>
+>>>  /**
+>>> + * of_genpd_del_provider_by_data() - Remove a registered PM domain provider
+>>> + * @data: Pointer to the data associated with the PM domain provider
+>>> + *
+>>> + * Look up a PM domain provider based upon a pointer to it's data and
+>>> + * remove the PM domain provider from the list of providers.
+>>> + */
+>>> +void of_genpd_del_provider_by_data(void *data)
+>>> +{
+>>> +       struct of_genpd_provider *c, *cp;
+>>> +
+>>> +       mutex_lock(&of_genpd_mutex);
+>>> +       list_for_each_entry_safe(cp, c, &of_genpd_providers, link) {
+>>> +               if (cp->data == data) {
+>>> +                       list_del(&cp->link);
+>>> +                       of_node_put(cp->node);
+>>> +                       kfree(cp);
+>>> +                       break;
+>>> +               }
+>>> +       }
+>>> +       mutex_unlock(&of_genpd_mutex);
+>>> +}
+>>> +EXPORT_SYMBOL_GPL(of_genpd_del_provider_by_data);
+>>> +
+>>> +/**
+>>>   * of_genpd_get_from_provider() - Look-up PM domain
+>>>   * @genpdspec: OF phandle args to use for look-up
+>>>   *
+>>> diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
+>>> index bed84413546f..7b7921a65cb0 100644
+>>> --- a/include/linux/pm_domain.h
+>>> +++ b/include/linux/pm_domain.h
+>>> @@ -199,6 +199,7 @@ int of_genpd_add_provider_simple(struct device_node *np,
+>>>  int of_genpd_add_provider_onecell(struct device_node *np,
+>>>                                   struct genpd_onecell_data *data);
+>>>  void of_genpd_del_provider(struct device_node *np);
 >>
->> I tried that on top of next-20160706 and it checkpatch didn't throw any
->> warning. Which kernel version are based on?
->
-> I don't remember which version of checkpatch warn on this pattern. This
-> patch series develop across several kernel versions.
-
-We as the kernel community develop against master or linux-next. We only 
-care about older kernel version in the sense that we intent hard not to 
-break any userspace/kernel or firmware/kernel interfaces. Apart from 
-that it's up to every individual to backport patches from mainline 
-kernel to his respective version. But that's nothing the community as a 
-hole can take care of.
-
->
-> So do you prefer to put "scpd->clk[j] = c;" into 'else' branch?
->
-
-Yes please :)
-
->>>> moved the for up in the function? If not, I would prefer not to move it,
->>>> to make it easier to read the diff.
->>>
->>> The new 'for' block are far different from original one. And I think
->>> it's easy to read if we keep simple assign statements in the same block.
->>>
+>> There's currently only one user of of_genpd_del_provider().
 >>
->> It's different in the sense that it checks if struct clk *c is an error.
->> I don't see the reason why we need to move it up in the file.
->> It's not too important but I would prefer not to move it if there is no
->> reason.
->
-> I think I may misunderstand your comments. Which 'for' block did you
-> mention for? 'for (i = 0; i < num ...' or 'for (j = 0; j < MAX_CLKS
-> && ...' ?
->
-> The 'for(i)' exists in original code, this patch just change its counter
-> from 'NUM_DOMAINS' to 'num'. The 'for(j)' is a new for-block, so it was
-> not moved from other blocks.
->
+>> Could this patch just convert that user to the new API, so we don't
+>> need to keep both the legacy and new one?
+>>
+>> I guess we could then just stick to the name "of_genpd_del_provider()".
+> 
+> I had a look at this and to do that we would end up with
+> of_genpd_del_provider(struct device_node *np, void *data) where the user
+> should only pass one of the arguments. It seems a bit odd. However,
+> unless I have forgotten something, I wonder if we should just make
+> of_genpd_del_provider_by_name() a local function and not export this at
+> all? It seems more natural for users to delete a provider by the
+> device_node than by name rather than the data argument.
+> 
+> The only problem I see with making of_genpd_del_provider_by_name() local
+> is that I need to add a prototype for the function at the top of the
+> domain.c source file so that it builds because __pm_genpd_remove() is
+> defined above it. Yes I could move __pm_genpd_remove() to the bottom of
+> the file but then it is not located next to pm_genpd_init() which seems odd.
+> 
+> Let me know what you think.
 
-for (j = 0; j < MAX_CLKS... is present in the actual scpsys_probe in 
-linux-next (line 485 as of today). This patch moves this for a few lines 
-up, to be precise before executing this code sequence:
-<code>
-pd_data->domains[i] = genpd;
-scpd->scp = scp;
+Any response on this? This is the last item that we need to sort out?
 
-scpd->data = data;
-</code>
+Cheers
+Jon
 
-AFAIK there is no reason to do so. It adds unnecessary complexity to the 
-patch. So please fix this together with the other comments you got.
-
-Thanks a lot,
-Matthias
+-- 
+nvpublic
