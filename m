@@ -1,184 +1,105 @@
 From: ykk@rock-chips.com (Yakir Yang)
-Date: Mon, 11 Jul 2016 19:05:46 +0800
-Subject: [PATCH v1 4/6] drm/rockchip: dw_hdmi: add RK3399 HDMI support
+Date: Mon, 11 Jul 2016 19:05:49 +0800
+Subject: [PATCH v1 5/6] drm/rockchip: dw_hdmi: introduce the VPLL clock setting
 In-Reply-To: <1468235079-29152-1-git-send-email-ykk@rock-chips.com>
 References: <1468235079-29152-1-git-send-email-ykk@rock-chips.com>
-Message-ID: <1468235146-29575-1-git-send-email-ykk@rock-chips.com>
+Message-ID: <1468235149-29625-1-git-send-email-ykk@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-RK3399 and RK3288 shared the same HDMI IP controller, only some light
-difference with GRF configure.
+For RK3399 HDMI, there is an external clock need for HDMI PHY,
+and it should keep the same clock rate with VOP DCLK.
+
+VPLL have supported the clock for HDMI PHY, but there is no
+clock divider bewteen VPLL and HDMI PHY. So we need to set the
+VPLL rate manually in HDMI driver.
 
 Signed-off-by: Yakir Yang <ykk@rock-chips.com>
 ---
- .../devicetree/bindings/display/bridge/dw_hdmi.txt |  1 +
- .../bindings/display/rockchip/dw_hdmi-rockchip.txt |  3 +-
- drivers/gpu/drm/bridge/dw-hdmi.c                   |  2 +-
- drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c        | 45 ++++++++++++++++++----
- include/drm/bridge/dw_hdmi.h                       |  6 +++
- 5 files changed, 48 insertions(+), 9 deletions(-)
+ .../bindings/display/rockchip/dw_hdmi-rockchip.txt |  3 ++-
+ drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c        | 25 +++++++++++++++++++++-
+ 2 files changed, 26 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/display/bridge/dw_hdmi.txt b/Documentation/devicetree/bindings/display/bridge/dw_hdmi.txt
-index dc1452f..f50d4d5 100644
---- a/Documentation/devicetree/bindings/display/bridge/dw_hdmi.txt
-+++ b/Documentation/devicetree/bindings/display/bridge/dw_hdmi.txt
-@@ -6,6 +6,7 @@ Required properties:
-    * "fsl,imx6q-hdmi"
-    * "fsl,imx6dl-hdmi"
-    * "rockchip,rk3288-dw-hdmi"
-+   * "rockchip,rk3399-dw-hdmi"
- - reg: Physical base address and length of the controller's registers.
- - interrupts: The HDMI interrupt number
- - clocks, clock-names : must have the phandles to the HDMI iahb and isfr clocks,
 diff --git a/Documentation/devicetree/bindings/display/rockchip/dw_hdmi-rockchip.txt b/Documentation/devicetree/bindings/display/rockchip/dw_hdmi-rockchip.txt
-index 668091f..4e573d2 100644
+index 4e573d2..4e23ca4 100644
 --- a/Documentation/devicetree/bindings/display/rockchip/dw_hdmi-rockchip.txt
 +++ b/Documentation/devicetree/bindings/display/rockchip/dw_hdmi-rockchip.txt
-@@ -2,7 +2,8 @@ Rockchip specific extensions to the Synopsys Designware HDMI
- ================================
+@@ -17,7 +17,8 @@ Required properties:
  
- Required properties:
--- compatible: "rockchip,rk3288-dw-hdmi";
-+- compatible: "rockchip,rk3288-dw-hdmi",
-+	      "rockchip,rk3399-dw-hdmi";
- - reg: Physical base address and length of the controller's registers.
- - clocks: phandle to hdmi iahb and isfr clocks.
- - clock-names: should be "iahb" "isfr"
-diff --git a/drivers/gpu/drm/bridge/dw-hdmi.c b/drivers/gpu/drm/bridge/dw-hdmi.c
-index 70b1f7d..29f855a 100644
---- a/drivers/gpu/drm/bridge/dw-hdmi.c
-+++ b/drivers/gpu/drm/bridge/dw-hdmi.c
-@@ -833,7 +833,7 @@ static int hdmi_phy_configure(struct dw_hdmi *hdmi, unsigned char prep,
- 	dw_hdmi_phy_gen2_txpwron(hdmi, 1);
- 	dw_hdmi_phy_gen2_pddq(hdmi, 0);
+ Optional properties
+ - ddc-i2c-bus: phandle of an I2C controller used for DDC EDID probing
+-- clocks, clock-names: phandle to the HDMI CEC clock, name should be "cec"
++- clocks, clock-names: phandle to the HDMI CEC clock, name should be "cec",
++		       phandle to the VPLL clock, name should be "vpll".
  
--	if (hdmi->dev_type == RK3288_HDMI)
-+	if (is_rockchip(hdmi->dev_type))
- 		dw_hdmi_phy_enable_spare(hdmi, 1);
- 
- 	/*Wait for PHY PLL lock */
+ Example:
+ hdmi: hdmi at ff980000 {
 diff --git a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
-index 8cb9ed2..329099b 100644
+index 329099b..701bb73 100644
 --- a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
 +++ b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
-@@ -21,13 +21,18 @@
- #include "rockchip_drm_drv.h"
- #include "rockchip_drm_vop.h"
+@@ -7,10 +7,12 @@
+  * (at your option) any later version.
+  */
  
--#define GRF_SOC_CON6                    0x025c
--#define HDMI_SEL_VOP_LIT                (1 << 4)
-+#define RK3288_GRF_SOC_CON6		0x025C
-+#define RK3288_HDMI_LCDC_SEL		BIT(4)
-+#define RK3399_GRF_SOC_CON20		0x6250
-+#define RK3399_HDMI_LCDC_SEL		BIT(6)
++#include <linux/clk.h>
++#include <linux/mfd/syscon.h>
+ #include <linux/module.h>
+ #include <linux/platform_device.h>
+-#include <linux/mfd/syscon.h>
+ #include <linux/regmap.h>
 +
-+#define HIWORD_UPDATE(val, mask)	(val | (mask) << 16)
- 
- struct rockchip_hdmi {
- 	struct device *dev;
+ #include <drm/drm_of.h>
+ #include <drm/drmP.h>
+ #include <drm/drm_crtc_helper.h>
+@@ -33,6 +35,7 @@ struct rockchip_hdmi {
  	struct regmap *regmap;
  	struct drm_encoder encoder;
-+	enum dw_hdmi_devtype dev_type;
+ 	enum dw_hdmi_devtype dev_type;
++	struct clk *vpll_clk;
  };
  
  #define to_rockchip_hdmi(x)	container_of(x, struct rockchip_hdmi, x)
-@@ -194,16 +199,30 @@ static void dw_hdmi_rockchip_encoder_mode_set(struct drm_encoder *encoder,
- static void dw_hdmi_rockchip_encoder_enable(struct drm_encoder *encoder)
+@@ -145,6 +148,7 @@ static const struct dw_hdmi_phy_config rockchip_phy_config[] = {
+ static int rockchip_hdmi_parse_dt(struct rockchip_hdmi *hdmi)
  {
- 	struct rockchip_hdmi *hdmi = to_rockchip_hdmi(encoder);
-+	u32 lcdsel_grf_reg, lcdsel_mask;
- 	u32 val;
- 	int mux;
+ 	struct device_node *np = hdmi->dev->of_node;
++	int ret;
  
-+	switch (hdmi->dev_type) {
-+	case RK3288_HDMI:
-+		lcdsel_grf_reg = RK3288_GRF_SOC_CON6;
-+		lcdsel_mask = RK3288_HDMI_LCDC_SEL;
-+		break;
-+	case RK3399_HDMI:
-+		lcdsel_grf_reg = RK3399_GRF_SOC_CON20;
-+		lcdsel_mask = RK3399_HDMI_LCDC_SEL;
-+		break;
-+	default:
-+		return;
-+	};
+ 	hdmi->regmap = syscon_regmap_lookup_by_phandle(np, "rockchip,grf");
+ 	if (IS_ERR(hdmi->regmap)) {
+@@ -152,6 +156,22 @@ static int rockchip_hdmi_parse_dt(struct rockchip_hdmi *hdmi)
+ 		return PTR_ERR(hdmi->regmap);
+ 	}
+ 
++	hdmi->vpll_clk = devm_clk_get(hdmi->dev, "vpll");
++	if (PTR_ERR(hdmi->vpll_clk) == -ENOENT) {
++		hdmi->vpll_clk = NULL;
++	} else if (PTR_ERR(hdmi->vpll_clk) == -EPROBE_DEFER) {
++		return -EPROBE_DEFER;
++	} else if (IS_ERR(hdmi->vpll_clk)) {
++		dev_err(hdmi->dev, "failed to get grf clock\n");
++		return PTR_ERR(hdmi->vpll_clk);
++	}
 +
- 	mux = drm_of_encoder_active_endpoint_id(hdmi->dev->of_node, encoder);
- 	if (mux)
--		val = HDMI_SEL_VOP_LIT | (HDMI_SEL_VOP_LIT << 16);
-+		val = HIWORD_UPDATE(lcdsel_mask, lcdsel_mask);
- 	else
--		val = HDMI_SEL_VOP_LIT << 16;
-+		val = HIWORD_UPDATE(0, lcdsel_mask);
- 
--	regmap_write(hdmi->regmap, GRF_SOC_CON6, val);
-+	regmap_write(hdmi->regmap, lcdsel_grf_reg, val);
- 	dev_dbg(hdmi->dev, "vop %s output to hdmi\n",
- 		(mux) ? "LIT" : "BIG");
++	ret = clk_prepare_enable(hdmi->vpll_clk);
++	if (ret) {
++		dev_err(hdmi->dev, "Failed to enable HDMI vpll: %d\n", ret);
++		return ret;
++	}
++
+ 	return 0;
  }
-@@ -229,7 +248,7 @@ static const struct drm_encoder_helper_funcs dw_hdmi_rockchip_encoder_helper_fun
- 	.atomic_check = dw_hdmi_rockchip_encoder_atomic_check,
- };
  
--static const struct dw_hdmi_plat_data rockchip_hdmi_drv_data = {
-+static const struct dw_hdmi_plat_data rk3288_hdmi_drv_data = {
- 	.mode_valid = dw_hdmi_rockchip_mode_valid,
- 	.mpll_cfg   = rockchip_mpll_cfg,
- 	.cur_ctr    = rockchip_cur_ctr,
-@@ -237,9 +256,20 @@ static const struct dw_hdmi_plat_data rockchip_hdmi_drv_data = {
- 	.dev_type   = RK3288_HDMI,
- };
- 
-+static const struct dw_hdmi_plat_data rk3399_hdmi_drv_data = {
-+	.mode_valid = dw_hdmi_rockchip_mode_valid,
-+	.mpll_cfg   = rockchip_mpll_cfg,
-+	.cur_ctr    = rockchip_cur_ctr,
-+	.phy_config = rockchip_phy_config,
-+	.dev_type   = RK3399_HDMI,
-+};
+@@ -194,6 +214,9 @@ static void dw_hdmi_rockchip_encoder_mode_set(struct drm_encoder *encoder,
+ 					      struct drm_display_mode *mode,
+ 					      struct drm_display_mode *adj_mode)
+ {
++	struct rockchip_hdmi *hdmi = to_rockchip_hdmi(encoder);
 +
- static const struct of_device_id dw_hdmi_rockchip_dt_ids[] = {
- 	{ .compatible = "rockchip,rk3288-dw-hdmi",
--	  .data = &rockchip_hdmi_drv_data
-+	  .data = &rk3288_hdmi_drv_data
-+	},
-+	{ .compatible = "rockchip,rk3399-dw-hdmi",
-+	  .data = &rk3399_hdmi_drv_data
- 	},
- 	{},
- };
-@@ -268,6 +298,7 @@ static int dw_hdmi_rockchip_bind(struct device *dev, struct device *master,
- 	match = of_match_node(dw_hdmi_rockchip_dt_ids, pdev->dev.of_node);
- 	plat_data = match->data;
- 	hdmi->dev = &pdev->dev;
-+	hdmi->dev_type = plat_data->dev_type;
- 	encoder = &hdmi->encoder;
++	clk_set_rate(hdmi->vpll_clk, adj_mode->clock * 1000);
+ }
  
- 	irq = platform_get_irq(pdev, 0);
-diff --git a/include/drm/bridge/dw_hdmi.h b/include/drm/bridge/dw_hdmi.h
-index bae79f3..26c06d5 100644
---- a/include/drm/bridge/dw_hdmi.h
-+++ b/include/drm/bridge/dw_hdmi.h
-@@ -25,6 +25,7 @@ enum dw_hdmi_devtype {
- 	IMX6Q_HDMI,
- 	IMX6DL_HDMI,
- 	RK3288_HDMI,
-+	RK3399_HDMI,
- };
- 
- struct dw_hdmi_mpll_config {
-@@ -56,6 +57,11 @@ struct dw_hdmi_plat_data {
- 					   struct drm_display_mode *mode);
- };
- 
-+static inline bool is_rockchip(enum dw_hdmi_devtype dev_type)
-+{
-+	return dev_type == RK3288_HDMI || dev_type == RK3399_HDMI;
-+}
-+
- void dw_hdmi_unbind(struct device *dev, struct device *master, void *data);
- int dw_hdmi_bind(struct device *dev, struct device *master,
- 		 void *data, struct drm_encoder *encoder,
+ static void dw_hdmi_rockchip_encoder_enable(struct drm_encoder *encoder)
 -- 
 1.9.1
