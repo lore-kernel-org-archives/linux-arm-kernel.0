@@ -1,86 +1,69 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 11 Jul 2016 15:02:24 +0100
-Subject: [PATCH v2 0/6] Add support for privileged mappings
-In-Reply-To: <20160709020919.6760-1-mitchelh@codeaurora.org>
-References: <20160709020919.6760-1-mitchelh@codeaurora.org>
-Message-ID: <5783A6F0.7040903@arm.com>
+From: mbenes@suse.cz (Miroslav Benes)
+Date: Mon, 11 Jul 2016 16:03:08 +0200 (CEST)
+Subject: [PATCH v2 2/2] arm64: implement live patching
+In-Reply-To: <20160627151722.B81C968D29@newverein.lst.de>
+References: <20160627151500.2247A68D20@newverein.lst.de>
+ <20160627151722.B81C968D29@newverein.lst.de>
+Message-ID: <alpine.LNX.2.00.1607111556320.27989@pobox.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey Mitch,
+On Mon, 27 Jun 2016, Torsten Duwe wrote:
 
-Thanks for having the necessary go at the DMA API - I think the series
-looks broadly workable now.
+> diff --git a/arch/arm64/include/asm/livepatch.h b/arch/arm64/include/asm/livepatch.h
+> new file mode 100644
+> index 0000000..6b9a3d1
+> --- /dev/null
+> +++ b/arch/arm64/include/asm/livepatch.h
+> @@ -0,0 +1,37 @@
+> +/*
+> + * livepatch.h - arm64-specific Kernel Live Patching Core
+> + *
+> + * Copyright (C) 2016 SUSE
+> + *
+> + * This program is free software; you can redistribute it and/or
+> + * modify it under the terms of the GNU General Public License
+> + * as published by the Free Software Foundation; either version 2
+> + * of the License, or (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program; if not, see <http://www.gnu.org/licenses/>.
+> + */
+> +#ifndef _ASM_ARM64_LIVEPATCH_H
+> +#define _ASM_ARM64_LIVEPATCH_H
+> +
+> +#include <linux/module.h>
+> +#include <linux/ftrace.h>
+> +
+> +#ifdef CONFIG_LIVEPATCH
 
-On 09/07/16 03:09, Mitchel Humpherys wrote:
-> The following patch to the ARM SMMU driver:
-> 
->     commit d346180e70b91b3d5a1ae7e5603e65593d4622bc
->     Author: Robin Murphy <robin.murphy@arm.com>
->     Date:   Tue Jan 26 18:06:34 2016 +0000
->     
->         iommu/arm-smmu: Treat all device transactions as unprivileged
-> 
-> started forcing all SMMU transactions to come through as "unprivileged".
-> The rationale given was that:
-> 
->   (1) There is no way in the IOMMU API to even request privileged mappings.
-> 
->   (2) It's difficult to implement a DMA mapper that correctly models the
->       ARM VMSAv8 behavior of unprivileged-writeable =>
->       privileged-execute-never.
-> 
-> This series rectifies (1) by introducing an IOMMU API for privileged
-> mappings and implements it in io-pgtable-arm.
-> 
-> This series rectifies (2) by introducing a new dma attribute
-> (DMA_ATTR_PRIVILEGED_EXECUTABLE) for users of the DMA API that need
-> privileged, executable mappings, and implements it in the arm64 IOMMU DMA
-> mapper.  The one known user (pl330.c) is converted over to the new
-> attribute.
-> 
-> Jordan and Jeremy can provide more info on the use case if needed, but the
-> high level is that it's a security feature to prevent attacks such as [1].
+A nit but we removed such guards in the other header files.
 
-My understanding of that hack is that it involves switching the GPU into
-privileged mode to get at the mapping of the IOMMU registers in the
-first place, so I don't see at a glance how having privileged mappings
-defends against that. What it clearly does do, however, is get us _to_
-the point where it's necessary to do such a privilege switch in the
-first place, as opposed to everything being trivially wide-open, which
-is no bad thing.
+> +static inline int klp_check_compiler_support(void)
+> +{
+> +	return 0;
+> +}
+> +
+> +static inline void klp_arch_set_pc(struct pt_regs *regs, unsigned long ip)
+> +{
+> +	regs->pc = ip;
+> +}
+> +#endif /* CONFIG_LIVEPATCH */
 
-Robin.
+I also checked mod_arch_specific structure because of the way we deal 
+with relocations. It is defined only if CONFIG_ARM64_MODULE_PLTS is 
+enabled and there is a pointer to 'struct elf64_shdr' called plt. It is 
+used indirectly in apply_relocate_add() so we need it to stay. However it 
+points to an existing Elf section and SHF_ALLOC is added to its sh_flags 
+in module_frob_arch_sections() (arch/arm64/kernel/module-plts.c). 
+Therefore we should be ok.
 
-> 
-> [1] https://github.com/robclark/kilroy
-> 
-> Changelog:
-> 
->   v1..v2
-> 
->     - Added a new DMA attribute to make executable privileged mappings
->       work, and use that in the pl330 driver (suggested by Will).
-> 
-> 
-> Jeremy Gebben (1):
->   iommu/io-pgtable-arm: add support for the IOMMU_PRIV flag
-> 
-> Mitchel Humpherys (5):
->   iommu: add IOMMU_PRIV attribute
->   Revert "iommu/arm-smmu: Treat all device transactions as unprivileged"
->   common: DMA-mapping: add DMA_ATTR_PRIVILEGED_EXECUTABLE attribute
->   arm64/dma-mapping: Implement DMA_ATTR_PRIVILEGED_EXECUTABLE
->   dmaengine: pl330: Make sure microcode is privileged-executable
-> 
->  Documentation/DMA-attributes.txt |  9 +++++++++
->  arch/arm64/mm/dma-mapping.c      |  6 +++---
->  drivers/dma/pl330.c              |  7 +++++--
->  drivers/iommu/arm-smmu.c         |  5 +----
->  drivers/iommu/dma-iommu.c        | 15 +++++++++++----
->  drivers/iommu/io-pgtable-arm.c   | 16 +++++++++++-----
->  include/linux/dma-attrs.h        |  1 +
->  include/linux/dma-iommu.h        |  3 ++-
->  include/linux/iommu.h            |  1 +
->  9 files changed, 44 insertions(+), 19 deletions(-)
-> 
+Jessica, could you check it as well, please?
+
+Thanks,
+Miroslav
