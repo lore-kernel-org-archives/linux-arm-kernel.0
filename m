@@ -1,176 +1,45 @@
-From: sunil.kovvuri@gmail.com (sunil.kovvuri at gmail.com)
-Date: Mon, 11 Jul 2016 15:31:56 +0530
-Subject: [PATCH 14/15] net: thunderx: Reset RXQ HW stats when interface is
- brought down
-In-Reply-To: <1468231317-24023-1-git-send-email-sunil.kovvuri@gmail.com>
-References: <1468231317-24023-1-git-send-email-sunil.kovvuri@gmail.com>
-Message-ID: <1468231317-24023-15-git-send-email-sunil.kovvuri@gmail.com>
+From: xuwei5@hisilicon.com (Wei Xu)
+Date: Mon, 11 Jul 2016 10:53:15 +0100
+Subject: [PATCH 2/2] arm64: dts: set UART1 clock frequency to 150MHz
+In-Reply-To: <1467965467-28180-2-git-send-email-jorge.ramirez-ortiz@linaro.org>
+References: <1467965467-28180-1-git-send-email-jorge.ramirez-ortiz@linaro.org>
+ <1467965467-28180-2-git-send-email-jorge.ramirez-ortiz@linaro.org>
+Message-ID: <57836C8B.6020509@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jerin Jacob <jerin.jacob@caviumnetworks.com>
+Hi Jorge,
 
-When SQ/TXQ is reclaimed i.e reset it's stats also automatically reset
-by HW. This is not the case with RQ. Also VF doesn't have write access
-to statistics counter registers. Hence a new Mbox msg is introduced which
-supports resetting RQ, SQ and full Qset stats. Currently only RQ stats
-are being reset using this mbox message.
+On 08/07/2016 09:11, Jorge Ramirez-Ortiz wrote:
+> Enable support for higher baud rates (up to 3Mbps) in UART1 - required
+> for bluetooth transfers.
+> 
+> Signed-off-by: Jorge Ramirez-Ortiz <jorge.ramirez-ortiz@linaro.org>
+> Tested-by: Jorge Ramirez-Ortiz <jorge.ramirez-ortiz@linaro.org>
 
-Signed-off-by: Jerin Jacob <jerin.jacob@caviumnetworks.com>
-Signed-off-by: Sunil Goutham <sgoutham@cavium.com>
----
- drivers/net/ethernet/cavium/thunder/nic.h          | 27 +++++++++++++
- drivers/net/ethernet/cavium/thunder/nic_main.c     | 45 ++++++++++++++++++++++
- drivers/net/ethernet/cavium/thunder/nicvf_queues.c | 15 ++++++++
- 3 files changed, 87 insertions(+)
+Fine to me.
+Thanks!
 
-diff --git a/drivers/net/ethernet/cavium/thunder/nic.h b/drivers/net/ethernet/cavium/thunder/nic.h
-index 136db2a..dd63f96 100644
---- a/drivers/net/ethernet/cavium/thunder/nic.h
-+++ b/drivers/net/ethernet/cavium/thunder/nic.h
-@@ -347,6 +347,7 @@ struct nicvf {
- #define	NIC_MBOX_MSG_PNICVF_PTR		0x14	/* Get primary qset nicvf ptr */
- #define	NIC_MBOX_MSG_SNICVF_PTR		0x15	/* Send sqet nicvf ptr to PVF */
- #define	NIC_MBOX_MSG_LOOPBACK		0x16	/* Set interface in loopback */
-+#define	NIC_MBOX_MSG_RESET_STAT_COUNTER 0x17	/* Reset statistics counters */
- #define	NIC_MBOX_MSG_CFG_DONE		0xF0	/* VF configuration done */
- #define	NIC_MBOX_MSG_SHUTDOWN		0xF1	/* VF is being shutdown */
- 
-@@ -463,6 +464,31 @@ struct set_loopback {
- 	bool  enable;
- };
- 
-+/* Reset statistics counters */
-+struct reset_stat_cfg {
-+	u8    msg;
-+	/* Bitmap to select NIC_PF_VNIC(vf_id)_RX_STAT(0..13) */
-+	u16   rx_stat_mask;
-+	/* Bitmap to select NIC_PF_VNIC(vf_id)_TX_STAT(0..4) */
-+	u8    tx_stat_mask;
-+	/* Bitmap to select NIC_PF_QS(0..127)_RQ(0..7)_STAT(0..1)
-+	 * bit14, bit15 NIC_PF_QS(vf_id)_RQ7_STAT(0..1)
-+	 * bit12, bit13 NIC_PF_QS(vf_id)_RQ6_STAT(0..1)
-+	 * ..
-+	 * bit2, bit3 NIC_PF_QS(vf_id)_RQ1_STAT(0..1)
-+	 * bit0, bit1 NIC_PF_QS(vf_id)_RQ0_STAT(0..1)
-+	 */
-+	u16   rq_stat_mask;
-+	/* Bitmap to select NIC_PF_QS(0..127)_SQ(0..7)_STAT(0..1)
-+	 * bit14, bit15 NIC_PF_QS(vf_id)_SQ7_STAT(0..1)
-+	 * bit12, bit13 NIC_PF_QS(vf_id)_SQ6_STAT(0..1)
-+	 * ..
-+	 * bit2, bit3 NIC_PF_QS(vf_id)_SQ1_STAT(0..1)
-+	 * bit0, bit1 NIC_PF_QS(vf_id)_SQ0_STAT(0..1)
-+	 */
-+	u16   sq_stat_mask;
-+};
-+
- /* 128 bit shared memory between PF and each VF */
- union nic_mbx {
- 	struct { u8 msg; }	msg;
-@@ -480,6 +506,7 @@ union nic_mbx {
- 	struct sqs_alloc        sqs_alloc;
- 	struct nicvf_ptr	nicvf;
- 	struct set_loopback	lbk;
-+	struct reset_stat_cfg	reset_stat;
- };
- 
- #define NIC_NODE_ID_MASK	0x03
-diff --git a/drivers/net/ethernet/cavium/thunder/nic_main.c b/drivers/net/ethernet/cavium/thunder/nic_main.c
-index 3cb086b..6524cfc 100644
---- a/drivers/net/ethernet/cavium/thunder/nic_main.c
-+++ b/drivers/net/ethernet/cavium/thunder/nic_main.c
-@@ -771,6 +771,48 @@ static int nic_config_loopback(struct nicpf *nic, struct set_loopback *lbk)
- 	return 0;
- }
- 
-+/* Reset statistics counters */
-+static int nic_reset_stat_counters(struct nicpf *nic,
-+				   int vf, struct reset_stat_cfg *cfg)
-+{
-+	int i, stat, qnum;
-+	u64 reg_addr;
-+
-+	for (i = 0; i < RX_STATS_ENUM_LAST; i++) {
-+		if (cfg->rx_stat_mask & BIT(i)) {
-+			reg_addr = NIC_PF_VNIC_0_127_RX_STAT_0_13 |
-+				   (vf << NIC_QS_ID_SHIFT) |
-+				   (i << 3);
-+			nic_reg_write(nic, reg_addr, 0);
-+		}
-+	}
-+
-+	for (i = 0; i < TX_STATS_ENUM_LAST; i++) {
-+		if (cfg->tx_stat_mask & BIT(i)) {
-+			reg_addr = NIC_PF_VNIC_0_127_TX_STAT_0_4 |
-+				   (vf << NIC_QS_ID_SHIFT) |
-+				   (i << 3);
-+			nic_reg_write(nic, reg_addr, 0);
-+		}
-+	}
-+
-+	for (i = 0; i <= 15; i++) {
-+		qnum = i >> 1;
-+		stat = i & 1 ? 1 : 0;
-+		reg_addr = (vf << NIC_QS_ID_SHIFT) |
-+			   (qnum << NIC_Q_NUM_SHIFT) | (stat << 3);
-+		if (cfg->rq_stat_mask & BIT(i)) {
-+			reg_addr |= NIC_PF_QSET_0_127_RQ_0_7_STAT_0_1;
-+			nic_reg_write(nic, reg_addr, 0);
-+		}
-+		if (cfg->sq_stat_mask & BIT(i)) {
-+			reg_addr |= NIC_PF_QSET_0_127_SQ_0_7_STAT_0_1;
-+			nic_reg_write(nic, reg_addr, 0);
-+		}
-+	}
-+	return 0;
-+}
-+
- static void nic_enable_vf(struct nicpf *nic, int vf, bool enable)
- {
- 	int bgx, lmac;
-@@ -920,6 +962,9 @@ static void nic_handle_mbx_intr(struct nicpf *nic, int vf)
- 	case NIC_MBOX_MSG_LOOPBACK:
- 		ret = nic_config_loopback(nic, &mbx.lbk);
- 		break;
-+	case NIC_MBOX_MSG_RESET_STAT_COUNTER:
-+		ret = nic_reset_stat_counters(nic, vf, &mbx.reset_stat);
-+		break;
- 	default:
- 		dev_err(&nic->pdev->dev,
- 			"Invalid msg from VF%d, msg 0x%x\n", vf, mbx.msg.msg);
-diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_queues.c b/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
-index ed2fe72..415fdde 100644
---- a/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
-+++ b/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
-@@ -479,6 +479,16 @@ void nicvf_config_vlan_stripping(struct nicvf *nic, netdev_features_t features)
- 					      NIC_QSET_RQ_GEN_CFG, 0, rq_cfg);
- }
- 
-+static void nicvf_reset_rcv_queue_stats(struct nicvf *nic)
-+{
-+	union nic_mbx mbx = {};
-+
-+	/* Reset all RXQ's stats */
-+	mbx.reset_stat.msg = NIC_MBOX_MSG_RESET_STAT_COUNTER;
-+	mbx.reset_stat.rq_stat_mask = 0xFFFF;
-+	nicvf_send_msg_to_pf(nic, &mbx);
-+}
-+
- /* Configures receive queue */
- static void nicvf_rcv_queue_config(struct nicvf *nic, struct queue_set *qs,
- 				   int qidx, bool enable)
-@@ -809,6 +819,11 @@ int nicvf_config_data_transfer(struct nicvf *nic, bool enable)
- 		for (qidx = 0; qidx < qs->cq_cnt; qidx++)
- 			nicvf_cmp_queue_config(nic, qs, qidx, disable);
- 
-+		/* Reset RXQ's stats.
-+		 * SQ's stats will get reset automatically once SQ is reset.
-+		 */
-+		nicvf_reset_rcv_queue_stats(nic);
-+
- 		nicvf_free_resources(nic);
- 	}
- 
--- 
-2.7.4
+Acked-by: Wei Xu <xuwei5@hisilicon.com>
+
+Best Regards,
+Wei
+
+> ---
+>  arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+> index e92a30c..27be812 100644
+> --- a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+> +++ b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+> @@ -55,6 +55,8 @@
+>  		};
+>  
+>  		uart1: uart at f7111000 {
+> +			assigned-clocks = <&sys_ctrl HI6220_UART1_SRC>;
+> +			assigned-clock-rates = <150000000>;
+>  			status = "ok";
+>  		};
+>  
+> 
