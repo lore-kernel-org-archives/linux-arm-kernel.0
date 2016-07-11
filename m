@@ -1,26 +1,38 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 11 Jul 2016 18:04:35 +0200
-Subject: [PATCH v2 01/10] ARM: NUC900: Add nuc970 machine support
-In-Reply-To: <1468135649-19980-2-git-send-email-vw@iommu.org>
-References: <1468135649-19980-1-git-send-email-vw@iommu.org>
- <1468135649-19980-2-git-send-email-vw@iommu.org>
-Message-ID: <18260150.aRRy8ybKlm@wuerfel>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 11 Jul 2016 18:05:44 +0200
+Subject: [PATCH] ARM: dts: armada-388-clearfog: remove duplicate mdio entry
+In-Reply-To: <20160710203220.GA26397@lunn.ch> (Andrew Lunn's message of "Sun,
+ 10 Jul 2016 22:32:20 +0200")
+References: <E1bMGdu-00005c-Dy@rmk-PC.armlinux.org.uk>
+ <20160710203220.GA26397@lunn.ch>
+Message-ID: <87eg70tb1j.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday, July 10, 2016 3:27:21 PM CEST Wan Zongshun wrote:
-> +ifeq ($(CONFIG_SOC_NUC970),)
->  obj-y                          := irq.o time.o mfp.o gpio.o clock.o
->  obj-y                          += clksel.o dev.o cpu.o
-> +endif
->  # W90X900 CPU support files
+Hi Russell,
+ 
+ On dim., juil. 10 2016, Andrew Lunn <andrew@lunn.ch> wrote:
 
-When mfp.o is disabled like this, I get a link error in two drivers
-using the exported interface:
+> On Sun, Jul 10, 2016 at 04:27:38PM +0100, Russell King wrote:
+>> The clearfog DTS should not be defining the on-board phy, this device
+>> is located on the microsom.  Remove the duplicated definition.
+>> 
+>> Reported-by: Jon Nettleton <jon@solid-run.com>
+>> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+>
+> Reviewed-by: Andrew Lunn <andrew@lunn.ch>
 
-ERROR: "mfp_set_groupg" [drivers/spi/spi-nuc900.ko] undefined!
-ERROR: "mfp_set_groupi" [drivers/input/keyboard/w90p910_keypad.ko] undefined!
+Applied on mvebu/dt
 
-Any idea for a better migration strategy?
+Thanks,
 
-	Arnd
+Gregory
+
+>
+>     Andrew
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
