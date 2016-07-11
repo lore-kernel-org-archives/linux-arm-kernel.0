@@ -1,39 +1,41 @@
-From: mturquette@baylibre.com (Michael Turquette)
-Date: Mon, 11 Jul 2016 14:36:44 -0700
-Subject: [PATCH 2/2] clk: sunxi-ng: h3: Fix Kconfig symbol typo
-In-Reply-To: <20160711203448.18062-2-maxime.ripard@free-electrons.com>
-References: <20160711203448.18062-1-maxime.ripard@free-electrons.com>
- <20160711203448.18062-2-maxime.ripard@free-electrons.com>
-Message-ID: <146827300441.73491.7304040389172798052@resonance>
+From: d-gerlach@ti.com (Dave Gerlach)
+Date: Mon, 11 Jul 2016 16:39:38 -0500
+Subject: [PATCH] Revert "ARM: AM33xx: fix module_wait_ready without clkctrl
+ register"
+Message-ID: <20160711213938.28385-1-d-gerlach@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Maxime Ripard (2016-07-11 13:34:48)
-> The Kconfig symbol for the sun8i SoC family was mistyped. Fix that.
-> 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+This reverts commit 183e2077d007aa4b697efba095ecfea7244a6107.
 
-Applied.
+The original patch added a check to am33xx_cm_wait_module_ready for a
+clkctrl offset of 0 as an invalid case, however, clkctrl offset of 0 is
+perfectly valid for hwmods, in particular the rtc.
 
-Regards,
-Mike
+Without reverting this patch sometimes external aborts are seen on
+am335x during boot. This is due to the am33xx_cm_wait_module_ready
+function immediately returning 0 rather than waiting for the RTC_CLKCTRL
+register to indicate it is actually ready before rtc register accesses
+happen.
 
-> ---
->  drivers/clk/sunxi-ng/Kconfig | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/clk/sunxi-ng/Kconfig b/drivers/clk/sunxi-ng/Kconfig
-> index 41e53e8d4d41..2afcbd39e41e 100644
-> --- a/drivers/clk/sunxi-ng/Kconfig
-> +++ b/drivers/clk/sunxi-ng/Kconfig
-> @@ -60,6 +60,6 @@ config SUN8I_H3_CCU
->         select SUNXI_CCU_NM
->         select SUNXI_CCU_MP
->         select SUNXI_CCU_PHASE
-> -       default ARCH_SUN8I
-> +       default MACH_SUN8I
->  
->  endif
-> -- 
-> 2.9.0
-> 
+Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+---
+ arch/arm/mach-omap2/cm33xx.c | 3 ---
+ 1 file changed, 3 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/cm33xx.c b/arch/arm/mach-omap2/cm33xx.c
+index c073fb57dd13..7b181f929525 100644
+--- a/arch/arm/mach-omap2/cm33xx.c
++++ b/arch/arm/mach-omap2/cm33xx.c
+@@ -220,9 +220,6 @@ static int am33xx_cm_wait_module_ready(u8 part, s16 inst, u16 clkctrl_offs,
+ {
+ 	int i = 0;
+ 
+-	if (!clkctrl_offs)
+-		return 0;
+-
+ 	omap_test_timeout(_is_module_ready(inst, clkctrl_offs),
+ 			  MAX_MODULE_READY_TIME, i);
+ 
+-- 
+2.9.0
