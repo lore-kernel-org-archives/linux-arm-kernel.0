@@ -1,62 +1,47 @@
-From: mturquette@baylibre.com (Michael Turquette)
-Date: Tue, 12 Jul 2016 15:17:27 -0700
-Subject: [PATCH v3 7/7] clk: exynos5433: remove CLK_IGNORE_UNUSED flag
- from SPI clocks
-In-Reply-To: <1468317736-18841-8-git-send-email-andi.shyti@samsung.com>
-References: <1468317736-18841-1-git-send-email-andi.shyti@samsung.com>
- <1468317736-18841-8-git-send-email-andi.shyti@samsung.com>
-Message-ID: <146836184696.73491.9452469757415968654@resonance>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 12 Jul 2016 23:18:05 +0100
+Subject: [RFC 0/3] extend kexec_file_load system call
+In-Reply-To: <20160712225805.0d27fe5d@hananiah.suse.cz>
+References: <20160712014201.11456-1-takahiro.akashi@linaro.org>
+ <87furf7ztv.fsf@x220.int.ebiederm.org> <50662781.Utjsnse3nb@hactar>
+ <20160712225805.0d27fe5d@hananiah.suse.cz>
+Message-ID: <20160712221804.GV1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Andi Shyti (2016-07-12 03:02:16)
-> Because the Exynos5433 SPI driver supports the ioclk handling and
-> the following patch:
-> 
->   http://marc.info/?l=linux-kernel&m=146787645626318&w=2
-> 
-> fixes a synchronus abort issue, none of the SPI clocks require
-> any critical handling: remove, then, the CLK_IGNORE_UNUSED flag
-> for the SPI related clocks.
-> 
-> Signed-off-by: Andi Shyti <andi.shyti@samsung.com>
-> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> Reviewed-by: Michael Turquette <mturquette@baylibre.com>
-> Acked-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+On Tue, Jul 12, 2016 at 10:58:05PM +0200, Petr Tesarik wrote:
+> I'm not an expert on DTB, so I can't provide an example of code
+> execution, but you have already mentioned the /chosen/linux,stdout-path
+> property. If an attacker redirects the bootloader to an insecure
+> console, they may get access to the system that would otherwise be
+> impossible.
 
-Do you want these patches to go through same tree? If not, I can take
-this patch into clk-next.
+I fail to see how kexec connects with the boot loader - the DTB image
+that's being talked about is one which is passed from the currently
+running kernel to the to-be-kexec'd kernel.  For ARM (and I suspect
+also ARM64) that's a direct call chain which doesn't involve any
+boot loader or firmware, and certainly none that would involve the
+passed DTB image.
 
-Regards,
-Mike
+However, your point is valid as an attacker can redirect the console
+and/or mounted root on the to-be-kexec'd kernel if they can modify
+the DTB - and there's a whole host of subtle ways to do that, not
+necessarily just modification of the kernel command line.
 
-> ---
->  drivers/clk/samsung/clk-exynos5433.c | 5 ++---
->  1 file changed, 2 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/clk/samsung/clk-exynos5433.c b/drivers/clk/samsung/clk-exynos5433.c
-> index c3a5318..fb19525 100644
-> --- a/drivers/clk/samsung/clk-exynos5433.c
-> +++ b/drivers/clk/samsung/clk-exynos5433.c
-> @@ -1661,8 +1661,7 @@ static struct samsung_gate_clock peric_gate_clks[] __initdata = {
->         GATE(CLK_SCLK_IOCLK_SPI2, "sclk_ioclk_spi2", "ioclk_spi2_clk_in",
->                         ENABLE_SCLK_PERIC, 13, CLK_SET_RATE_PARENT, 0),
->         GATE(CLK_SCLK_IOCLK_SPI1, "sclk_ioclk_spi1", "ioclk_spi1_clk_in",
-> -                       ENABLE_SCLK_PERIC, 12,
-> -                       CLK_IGNORE_UNUSED | CLK_SET_RATE_PARENT, 0),
-> +                       ENABLE_SCLK_PERIC, 12, CLK_SET_RATE_PARENT, 0),
->         GATE(CLK_SCLK_IOCLK_SPI0, "sclk_ioclk_spi0", "ioclk_spi0_clk_in",
->                         ENABLE_SCLK_PERIC, 11, CLK_SET_RATE_PARENT, 0),
->         GATE(CLK_SCLK_IOCLK_I2S1_BCLK, "sclk_ioclk_i2s1_bclk",
-> @@ -1677,7 +1676,7 @@ static struct samsung_gate_clock peric_gate_clks[] __initdata = {
->         GATE(CLK_SCLK_SPI2, "sclk_spi2", "sclk_spi2_peric", ENABLE_SCLK_PERIC,
->                         5, CLK_SET_RATE_PARENT, 0),
->         GATE(CLK_SCLK_SPI1, "sclk_spi1", "sclk_spi1_peric", ENABLE_SCLK_PERIC,
-> -                       4, CLK_IGNORE_UNUSED | CLK_SET_RATE_PARENT, 0),
-> +                       4, CLK_SET_RATE_PARENT, 0),
->         GATE(CLK_SCLK_SPI0, "sclk_spi0", "sclk_spi0_peric", ENABLE_SCLK_PERIC,
->                         3, CLK_SET_RATE_PARENT, 0),
->         GATE(CLK_SCLK_UART2, "sclk_uart2", "sclk_uart2_peric",
-> -- 
-> 2.8.1
-> 
+> In general, tampering with the hardware inventory of a machine opens up
+> a security hole, and one must be very cautious which modifications are
+> allowed. You're giving this power to an (unsigned, hence untrusted)
+> userspace application; Eric argues that only the kernel should have
+> this power.
+
+Given that, how does crashdump work in this scenario?
+
+crashdump works by adding an elfcorehdr=address argument to the
+crash-booted kernel's command line.  If you can add to the kernel
+command line, you can redirect the console and do all sorts of
+other stuff like specifying a different filesystem to mount, etc.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
