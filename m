@@ -1,47 +1,42 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 12 Jul 2016 11:13:15 +0100
-Subject: [PATCH] iommu: arm-smmu: drop devm_free_irq when driver detach
-In-Reply-To: <1468287224-12036-1-git-send-email-van.freenix@gmail.com>
-References: <1468287224-12036-1-git-send-email-van.freenix@gmail.com>
-Message-ID: <5784C2BB.4000503@arm.com>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Tue, 12 Jul 2016 12:13:52 +0200
+Subject: [PATCH 2/2 v16] drm/bridge: Add I2C based driver for ps8640 bridge
+In-Reply-To: <CAGS+omDsDS5tx=+Efq8LWNd3-asU4r2h=-AE6vdKgfG-p6vdAA@mail.gmail.com>
+References: <1464861445-11086-1-git-send-email-jitao.shi@mediatek.com>
+ <1464861445-11086-2-git-send-email-jitao.shi@mediatek.com>
+ <CACvgo53002XCPLufbJHQLC1uL1nNS7_0gh=napedetmvT6FoSw@mail.gmail.com>
+ <CAGS+omDsDS5tx=+Efq8LWNd3-asU4r2h=-AE6vdKgfG-p6vdAA@mail.gmail.com>
+Message-ID: <CAKMK7uEkUOq1CB3tj_1Qx50fBpw9B39+c3asX6MPNexT=dv9fA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/07/16 02:33, Peng Fan wrote:
-> There is no need to call devm_free_irq when driver detach.
-> devres_release_all which is called after 'drv->remove' will
-> release all managed resources.
-> 
-> Signed-off-by: Peng Fan <van.freenix@gmail.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Robin Murphy <robin.murphy@arm.com>
+On Wed, Jun 29, 2016 at 6:31 AM, Daniel Kurtz <djkurtz@chromium.org> wrote:
+> On Fri, Jun 17, 2016 at 3:14 AM, Emil Velikov <emil.l.velikov@gmail.com> wrote:
+>>> +static ssize_t ps8640_update_fw_store(struct device *dev,
+>>> +                                     struct device_attribute *attr,
+>>> +                                     const char *buf, size_t count)
+>>> +{
+>>> +       struct i2c_client *client = to_i2c_client(dev);
+>>> +       struct ps8640 *ps_bridge = i2c_get_clientdata(client);
+>>> +       const struct firmware *fw;
+>>> +       int error;
+>>> +
+>>> +       error = request_firmware(&fw, PS_FW_NAME, dev);
+>> Can the device operate without a firmware ? If not, why is the
+>> firmware loaded so later/after user interaction (via sysfs) ? I don't
+>> recall any other driver in DRM to use such an approach.
+>
+> The PS8640 has internal flash, so it should always already have a
+> working firmware.
+> This sysfs interface is useful for user space initiated field firmware updates.
 
-drivers/iommu/arm-smmu.c: In function 'arm_smmu_device_remove':
-drivers/iommu/arm-smmu.c:2021:6: warning: unused variable 'i'
-[-Wunused-variable]
-  int i;
-      ^
-
-With that addressed:
-
-Reviewed-by: Robin Murphy <robin.murphy@arm.com>
-
-> ---
->  drivers/iommu/arm-smmu.c | 3 ---
->  1 file changed, 3 deletions(-)
-> 
-> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-> index 860652e..5837391c 100644
-> --- a/drivers/iommu/arm-smmu.c
-> +++ b/drivers/iommu/arm-smmu.c
-> @@ -2045,9 +2045,6 @@ static int arm_smmu_device_remove(struct platform_device *pdev)
->  	if (!bitmap_empty(smmu->context_map, ARM_SMMU_MAX_CBS))
->  		dev_err(dev, "removing device with active domains!\n");
->  
-> -	for (i = 0; i < smmu->num_global_irqs; ++i)
-> -		devm_free_irq(smmu->dev, smmu->irqs[i], smmu);
-> -
->  	/* Turn the thing off */
->  	writel(sCR0_CLIENTPD, ARM_SMMU_GR0_NS(smmu) + ARM_SMMU_GR0_sCR0);
->  	return 0;
-> 
+Might be better to just do a request_firmware on driver load, and
+simply proceed if it's not there. Adding a sysfs interface (which is
+abi) seems way too much overkill for this imo. If you want to upgrade
+the firmware you can then just drop it into the right directory, with
+no further interaction needed.
+-Daniel
+-- 
+Daniel Vetter
+Software Engineer, Intel Corporation
++41 (0) 79 365 57 48 - http://blog.ffwll.ch
