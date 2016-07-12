@@ -1,74 +1,75 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 12 Jul 2016 15:49:47 -0500
-Subject: [PATCH v2 2/2] spi: add DT binding for clps711x SPI
-In-Reply-To: <20160707094952.4111577-2-arnd@arndb.de>
-References: <20160707094952.4111577-1-arnd@arndb.de>
- <20160707094952.4111577-2-arnd@arndb.de>
-Message-ID: <20160712204947.GA6182@rob-hp-laptop>
+From: ptesarik@suse.cz (Petr Tesarik)
+Date: Tue, 12 Jul 2016 22:58:05 +0200
+Subject: [RFC 0/3] extend kexec_file_load system call
+In-Reply-To: <50662781.Utjsnse3nb@hactar>
+References: <20160712014201.11456-1-takahiro.akashi@linaro.org>
+ <87furf7ztv.fsf@x220.int.ebiederm.org> <50662781.Utjsnse3nb@hactar>
+Message-ID: <20160712225805.0d27fe5d@hananiah.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 07, 2016 at 11:49:46AM +0200, Arnd Bergmann wrote:
-> This documents the binding used by Alexander Shiyan's DT support for
-> the clps711x SPI controller.
-> 
-> I've left the file name to match the ARM platform port name "clps711x"
-> for consistency with the other bindings, even though the compatible
-> string refers to the later ep7309 chip.
-> 
-> Linux no longer supports the old clps711x and ep72xx product lines,
-> but we still use the name. The entire family is now discontinued
-> by the manufacturer.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Alexander Shiyan <shc_work@mail.ru>
-> ---
->  .../devicetree/bindings/spi/spi-clps711x.txt       | 33 ++++++++++++++++++++++
->  1 file changed, 33 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/spi/spi-clps711x.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/spi/spi-clps711x.txt b/Documentation/devicetree/bindings/spi/spi-clps711x.txt
-> new file mode 100644
-> index 000000000000..4c3ec13f423f
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/spi/spi-clps711x.txt
-> @@ -0,0 +1,33 @@
-> +Serial Peripheral Interface on Cirrus Logic CL-PS71xx, EP72xx, EP73xx
-> +
-> +Required properties
-> +- #address-cells: must be <1>
-> +- #size-cells: must be <0>
-> +- compatible: should include "cirrus,ep7209-spi"
-> +- reg: Address and length of one register range
-> +- interrupts: one interrupt line
-> +- clocks: One entry, refers to the SPI bus clock
-> +- cs-gpios: Specifies the gpio pins to be used for chipselects.
-> +	    See: Documentation/devicetree/bindings/spi/spi-bus.txt
-> +
-> +An additional register is present in the system controller,
-> +which is assumed to be in the same device tree, with and marked
-> +as compatible with "cirrus,ep7209-syscon3".
-> +
-> +Example:
-> +
-> +spi at 80000500 {
-> +	#address-cells = <1>;
-> +	#size-cells = <0>;
-> +	compatible = "cirrus,ep7209-spi";
-> +	reg = <0x80000500 0x4>;
-> +	interrupts = <15>;
-> +	clocks = <&clks CLPS711X_CLK_SPI>;
-> +	status = "disabled";
-> +};
-> +
-> +syscon3: syscon at 80002200 {
+On Tue, 12 Jul 2016 13:25:11 -0300
+Thiago Jung Bauermann <bauerman@linux.vnet.ibm.com> wrote:
 
-This looks like it shouldn't be here.
-
-> +	compatible = "cirrus,ep7209-syscon3", "syscon";
-> +	reg = <0x80002200 0x40>;
-> +};
-> +
-> -- 
-> 2.9.0
+> Hi Eric,
 > 
+> I'm trying to understand your concerns leading to your nack. I hope you 
+> don't mind expanding your thoughts on them a bit.
+> 
+> Am Dienstag, 12 Juli 2016, 08:25:48 schrieb Eric W. Biederman:
+> > AKASHI Takahiro <takahiro.akashi@linaro.org> writes:
+> > > Device tree blob must be passed to a second kernel on DTB-capable
+> > > archs, like powerpc and arm64, but the current kernel interface
+> > > lacks this support.
+> > > 
+> > > This patch extends kexec_file_load system call by adding an extra
+> > > argument to this syscall so that an arbitrary number of file descriptors
+> > > can be handed out from user space to the kernel.
+> > > 
+> > > See the background [1].
+> > > 
+> > > Please note that the new interface looks quite similar to the current
+> > > system call, but that it won't always mean that it provides the "binary
+> > > compatibility."
+> > > 
+> > > [1] http://lists.infradead.org/pipermail/kexec/2016-June/016276.html
+> > 
+> > So this design is wrong.  The kernel already has the device tree blob,
+> > you should not be extracting it from the kernel munging it, and then
+> > reinserting it in the kernel if you want signatures and everything to
+> > pass.
+> 
+> I don't understand how the kernel signature will be invalidated. 
+> 
+> There are some types of boot images that can embed a device tree blob in 
+> them, but the kernel can also be handed a separate device tree blob from 
+> firmware, the boot loader, or kexec. This latter case is what we are 
+> discussing, so we are not talking about modifying an embedded blob in the 
+> kernel image.
+> 
+> > What x86 does is pass it's equivalent of the device tree blob from one
+> > kernel to another directly and behind the scenes.  It does not go
+> > through userspace for this.
+> > 
+> > Until a persuasive case can be made for going around the kernel and
+> > probably adding a feature (like code execution) that can be used to
+> > defeat the signature scheme I am going to nack this.
+> 
+> I also don't understand what you mean by code execution. How does passing a 
+> device tree blob via kexec enables code execution? How can the signature 
+> scheme be defeated?
+
+I'm not an expert on DTB, so I can't provide an example of code
+execution, but you have already mentioned the /chosen/linux,stdout-path
+property. If an attacker redirects the bootloader to an insecure
+console, they may get access to the system that would otherwise be
+impossible.
+
+In general, tampering with the hardware inventory of a machine opens up
+a security hole, and one must be very cautious which modifications are
+allowed. You're giving this power to an (unsigned, hence untrusted)
+userspace application; Eric argues that only the kernel should have
+this power.
+
+Just my two cents,
+Petr T
