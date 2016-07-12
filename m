@@ -1,49 +1,54 @@
 From: d-gerlach@ti.com (Dave Gerlach)
-Date: Tue, 12 Jul 2016 12:50:30 -0500
-Subject: [PATCH 0/4] ARM: OMAP2+: Fix AM335x RTC External Abort
-Message-ID: <20160712175034.743-1-d-gerlach@ti.com>
+Date: Tue, 12 Jul 2016 12:50:33 -0500
+Subject: [PATCH 3/4] ARM: OMAP4+: Have _omap4_wait_target_* check for valid
+ clkctrl_offs
+In-Reply-To: <20160712175034.743-1-d-gerlach@ti.com>
+References: <20160712175034.743-1-d-gerlach@ti.com>
+Message-ID: <20160712175034.743-4-d-gerlach@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-With next-20160711 there is an external abort during boot on am335x
-platforms from the RTC which is caused by commit 183e2077d007 ("ARM:
-AM33xx: fix module_wait_ready without clkctrl register"), log is here [1].
-The RTC hwmod is unique in that it has a clkctrl_offs of 0 which is
-invalid normally, all other hwmods have non-zero offsets. Because of this,
-we need to flag the hwmod so 0 actually gets used for the offset
-instead of the just returning 0 and doing nothing.
+Previously the low-level CM call internal to the
+_omap4_wait_target_ready/disable calls was responsible for checking for
+a valid clkctrl_offs. Now we must also consider the value of the
+prcm.omap4.flags because if HWMOD_OMAP4_ZERO_CLKCTRL_OFFSET is set in
+the flags then clkctrl_offs of 0 is valid.
 
-This series adds a HWMOD_OMAP4_ZERO_CLKCTRL_OFFSET flag and moves the check
-for validity of the clkctrl_offs value to the omap_hwmod code so that we are
-able to check both the flag and clkctrl_offs values. This code is shared by
-all OMAP4+ platforms but shoudl have no affect for anything but RTC on
-am335x but still boot tested on the following platforms:
+Let's move this check into the _omap4_wait_target_ready/disable where we
+have access to both the clkctrl_offs and the flags values and simply
+return 0 without calling the low level CM call at all, which would have
+returned 0 anyway if the clktrl_offs was zero.
 
-AM335x GP EVM:		Pass http://pastebin.ubuntu.com/19186160/
-Beaglebone Black:	Pass http://pastebin.ubuntu.com/19186862/
-AM437x GP EVM:		Pass http://pastebin.ubuntu.com/19186555/
-OMAP4 Panda ES:		Pass http://pastebin.ubuntu.com/19186711/
-OMAP5 uEVM:		Pass http://pastebin.ubuntu.com/19186925/
+Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+---
+ arch/arm/mach-omap2/omap_hwmod.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-Regards,
-Dave
-
-[1] https://storage.kernelci.org/next/next-20160711/arm-omap2plus_defconfig/lab-baylibre-seattle/boot-am335x-boneblack.html
-
-Dave Gerlach (4):
-  ARM: OMAP4+: hwmod: Add hwmod flag for HWMOD_OMAP4_ZERO_CLKCTRL_OFFSET
-  ARM: OMAP2+: AM33XX: Add HWMOD_OMAP4_ZERO_CLKCTRL_OFFSET flag to rtc
-    hwmod
-  ARM: OMAP4+: Have _omap4_wait_target_* check for valid clkctrl_offs
-  ARM: OMAP4+: CM: Remove redundant checks for clkctrl_offs of zero
-
- arch/arm/mach-omap2/cm33xx.c                            | 6 ------
- arch/arm/mach-omap2/cminst44xx.c                        | 6 ------
- arch/arm/mach-omap2/omap_hwmod.c                        | 8 ++++++++
- arch/arm/mach-omap2/omap_hwmod.h                        | 4 ++++
- arch/arm/mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c | 2 ++
- 5 files changed, 14 insertions(+), 12 deletions(-)
-
+diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+index 5b709383381c..1052b29697b8 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -1053,6 +1053,10 @@ static int _omap4_wait_target_disable(struct omap_hwmod *oh)
+ 	if (oh->flags & HWMOD_NO_IDLEST)
+ 		return 0;
+ 
++	if (!oh->prcm.omap4.clkctrl_offs &&
++	    !(oh->prcm.omap4.flags & HWMOD_OMAP4_ZERO_CLKCTRL_OFFSET))
++		return 0;
++
+ 	return omap_cm_wait_module_idle(oh->clkdm->prcm_partition,
+ 					oh->clkdm->cm_inst,
+ 					oh->prcm.omap4.clkctrl_offs, 0);
+@@ -2971,6 +2975,10 @@ static int _omap4_wait_target_ready(struct omap_hwmod *oh)
+ 	if (!_find_mpu_rt_port(oh))
+ 		return 0;
+ 
++	if (!oh->prcm.omap4.clkctrl_offs &&
++	    !(oh->prcm.omap4.flags & HWMOD_OMAP4_ZERO_CLKCTRL_OFFSET))
++		return 0;
++
+ 	/* XXX check module SIDLEMODE, hardreset status */
+ 
+ 	return omap_cm_wait_module_ready(oh->clkdm->prcm_partition,
 -- 
 2.9.0
