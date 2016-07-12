@@ -1,47 +1,38 @@
-From: vw@iommu.org (Wan Zongshun)
-Date: Tue, 12 Jul 2016 15:04:42 +0800
-Subject: [PATCH v2 02/10] irqchip: add irqchip driver for nuc900
-In-Reply-To: <1761342.TGgYi16yul@wuerfel>
-References: <1468135649-19980-1-git-send-email-vw@iommu.org>
- <1468135649-19980-3-git-send-email-vw@iommu.org> <1761342.TGgYi16yul@wuerfel>
-Message-ID: <5784968A.7080007@iommu.org>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 12 Jul 2016 09:10:48 +0200
+Subject: [PATCH v4 0/4] dmaengine driver for Marvell XOR v2 engine
+In-Reply-To: <20160712044248.GQ9681@localhost>
+References: <1466080116-26777-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20160628143850.GD14945@localhost>
+ <20160707224248.71511ecd@free-electrons.com>
+ <20160712044248.GQ9681@localhost>
+Message-ID: <20160712091048.681b727b@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello,
 
+On Tue, 12 Jul 2016 10:12:48 +0530, Vinod Koul wrote:
 
-On 2016?07?11? 23:46, Arnd Bergmann wrote:
-> On Sunday, July 10, 2016 3:27:22 PM CEST Wan Zongshun wrote:
->> +
->> +#if !defined(CONFIG_SOC_NUC900)
->>   #define NR_IRQS                (IRQ_ADC+1)
->> +#else
->> +#define NR_IRQS                62
->> +#endif
->>
->
-> The Kconfig symbols are a bit confusing here: CONFIG_SOC_NUC900
-> controls the compilation of the soc_device driver, but I guess
-> what you actually mean here is CONFIG_SOC_NUC970, which is the
-> support for the actual chip.
->
-> Maybe rename the former to something less confusing and change
-> this to CONFIG_SOC_NUC970?
+> > Now that the two ARM patches have been taken by the ARM mvebu
+> > maintainer, do you think you could merge the DT binding and driver
+> > patches (PATCH 1/2 and PATCH 2/2 of this series) ?  
+> 
+> Sorry for bit delay, I have applied them now :)
 
-You are right, it should _NUC970. Many thanks!
+Thanks a lot!
 
->
-> Ideally, this should just go away once we use SPARSE_IRQ.
+> I modified commit of patch 2 for correcting subsystem name
+> 
+> While applying notice git warned of empty newline in the new file, have
+> remove that as well
 
-This platform also can use SPARSE_IRQ? this just a simple irq map and no 
-more irq number in this Soc.
+Thanks for those last minute fixes.
 
->
-> 	Arnd
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
->
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
