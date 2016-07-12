@@ -1,56 +1,61 @@
-From: shuahkh@osg.samsung.com (Shuah Khan)
-Date: Tue, 12 Jul 2016 08:42:49 -0600
-Subject: [PATCH] media: s5p-mfc Fix misspelled error message and
- checkpatch errors
-In-Reply-To: <1468332418.8745.11.camel@perches.com>
-References: <1468276740-1591-1-git-send-email-shuahkh@osg.samsung.com>
- <1468332418.8745.11.camel@perches.com>
-Message-ID: <578501E9.6090008@osg.samsung.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 12 Jul 2016 15:49:44 +0100
+Subject: [GIT PULL] STi late updates for v4.8
+In-Reply-To: <5784F935.9050000@st.com>
+References: <5784F935.9050000@st.com>
+Message-ID: <20160712144944.GG1611@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/12/2016 08:06 AM, Joe Perches wrote:
-> On Mon, 2016-07-11 at 16:39 -0600, Shuah Khan wrote:
->> Fix misspelled error message and existing checkpatch errors in the
->> error message conditional.
-> []
->> diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
-> []
->> @@ -775,11 +775,11 @@ static int vidioc_g_crop(struct file *file, void *priv,
->>  	u32 left, right, top, bottom;
->>  
->>  	if (ctx->state != MFCINST_HEAD_PARSED &&
->> -	ctx->state != MFCINST_RUNNING && ctx->state != MFCINST_FINISHING
->> -					&& ctx->state != MFCINST_FINISHED) {
->> -			mfc_err("Cannont set crop\n");
->> -			return -EINVAL;
->> -		}
->> +	    ctx->state != MFCINST_RUNNING && ctx->state != MFCINST_FINISHING
->> +	    && ctx->state != MFCINST_FINISHED) {
->> +		mfc_err("Can not get crop information\n");
->> +		return -EINVAL;
->> +	}
+On Tue, 12 Jul 2016, Patrice Chotard wrote:
+
+> Hi Olof, Arnd and Kevin,
 > 
-> is it a set or a get?
-
-vidioc_g_crop is a get routine.
-
-> 
-> It'd be nicer for humans to read if the alignment was consistent
-
-Are you okay with this alignment change or would you like it
-changed? checkpatch stopped complaining with the code as follows:
-
-> 
-> 	if (ctx->state != MFCINST_HEAD_PARSED &&
-> 	    ctx->state != MFCINST_RUNNING &&
-> 	    ctx->state != MFCINST_FINISHING &&
-> 	    ctx->state != MFCINST_FINISHED) {
-> 		mfc_err("Can not get crop information\n");
-> 		return -EINVAL;
-> 	}
+> Please consider this first round of STi late updates for v4.8:
 > 
 > 
+> The following changes since commit 6ca59e6e1fc3a8d7ccbf85ff036bd6ff40847c1a:
+> 
+>   clk: st: clkgen-pll: Detect critical clocks (2016-06-30 12:17:11 -0700)
 
-thanks,
--- Shuah
+This should be one of the -rcs.
+
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/pchotard/sti.git tags/sti-late-v4.8
+> 
+> for you to fetch changes up to cf4b5ceb95b1e8842bc4f061a8ba8c395b5dbc6d:
+> 
+>   spi: st-ssc4: Remove 'no clocking' hack (2016-07-12 13:22:55 +0200)
+> 
+> ----------------------------------------------------------------
+> Highlights:
+> -----------
+> - Add STi DT critical clocks declaration
+> - Remove SPI hack wich has dependecy with critical clocks
+> 
+> These 2 STi DT patches and SPI hack MUST be applied after patches
+> contained into Stephen Boyd's branch clk-next/clk-st-critical.
+> This to ensure not to break SPI.
+
+Okay, good.
+
+> ----------------------------------------------------------------
+> Lee Jones (3):
+>       ARM: sti: stih407-family: Supply defines for CLOCKGEN A0
+>       ARM: sti: stih410-clocks: Identify critical clocks
+>       spi: st-ssc4: Remove 'no clocking' hack
+
+Doh!  Both this and the diff below need to contain the driver/clk
+patches, as Olof already mentioned.
+
+>  arch/arm/boot/dts/stih410-clock.dtsi     |  9 ++++++++
+>  drivers/spi/spi-st-ssc4.c                | 36 +++++---------------------------
+>  include/dt-bindings/clock/stih407-clks.h |  4 ++++
+>  3 files changed, 18 insertions(+), 31 deletions(-)
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
