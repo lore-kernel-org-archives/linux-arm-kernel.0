@@ -1,111 +1,60 @@
-From: yingjoe.chen@mediatek.com (Yingjoe Chen)
-Date: Tue, 12 Jul 2016 09:52:01 +0800
-Subject: [PATCH v7 1/4] soc: mediatek: Refine scpsys to support multiple
- platform
-In-Reply-To: <57839AE3.2070103@gmail.com>
-References: <1463390894-32062-1-git-send-email-jamesjj.liao@mediatek.com>
- <1463390894-32062-2-git-send-email-jamesjj.liao@mediatek.com>
- <6762e420-0d68-0376-b584-bfc878b5e95f@gmail.com>
- <1467783564.26485.22.camel@mtksdaap41> <577E3AE9.5080202@gmail.com>
- <1468227390.31247.20.camel@mtksdaap41> <57839AE3.2070103@gmail.com>
-Message-ID: <1468288321.21217.2.camel@mtksdaap41>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 12 Jul 2016 10:02:55 +0800
+Subject: [PATCH v5 7/7] ARM: dts: sun9i: Switch to the AC100 RTC clock
+ outputs for osc32k
+In-Reply-To: <20160711065042.GC4589@lukather>
+References: <1467988422-17934-1-git-send-email-wens@csie.org>
+ <1467988422-17934-8-git-send-email-wens@csie.org>
+ <20160711065042.GC4589@lukather>
+Message-ID: <CAGb2v66OhH=C5CqB56jN=T4c8TDgyuC=F0689d7=GBhy_rEonA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2016-07-11 at 15:10 +0200, Matthias Brugger wrote:
-> 
-> On 11/07/16 10:56, James Liao wrote:
-> 
-> [...]
-> 
-> >>>>> @@ -467,28 +386,54 @@ static int scpsys_probe(struct platform_device *pdev)
-> >>>>>    			if (PTR_ERR(scpd->supply) == -ENODEV)
-> >>>>>    				scpd->supply = NULL;
-> >>>>>    			else
-> >>>>> -				return PTR_ERR(scpd->supply);
-> >>>>> +				return ERR_CAST(scpd->supply);
-> >>>>>    		}
-> >>>>>    	}
-> >>>>>
-> >>>>> -	pd_data->num_domains = NUM_DOMAINS;
-> >>>>> +	pd_data->num_domains = num;
-> >>>>>
-> >>>>> -	for (i = 0; i < NUM_DOMAINS; i++) {
-> >>>>> +	init_clks(pdev, clk);
-> >>>>> +
-> >>>>> +	for (i = 0; i < num; i++) {
-> >>>>>    		struct scp_domain *scpd = &scp->domains[i];
-> >>>>>    		struct generic_pm_domain *genpd = &scpd->genpd;
-> >>>>>    		const struct scp_domain_data *data = &scp_domain_data[i];
-> >>>>>
-> >>>>> +		for (j = 0; j < MAX_CLKS && data->clk_id[j]; j++) {
-> >>>>> +			struct clk *c = clk[data->clk_id[j]];
-> >>>>> +
-> >>>>> +			if (IS_ERR(c)) {
-> >>>>> +				dev_err(&pdev->dev, "%s: clk unavailable\n",
-> >>>>> +					data->name);
-> >>>>> +				return ERR_CAST(c);
-> >>>>> +			}
-> >>>>> +
-> >>>>> +			scpd->clk[j] = c;
-> >>>>
-> >>>> Put this in the else branch. Apart from that is there any reason you
-> >>>
-> >>> Do you mean to change like this?
-> >>>
-> >>> 	if (IS_ERR(c)) {
-> >>> 		...
-> >>> 		return ERR_CAST(c);
-> >>> 	} else {
-> >>> 		scpd->clk[j] = c;
-> >>> 	}
-> >>>
-> >>> checkpatch.pl will warn for above code due to it returns in 'if' branch.
-> >>>
-> >>
-> >> I tried that on top of next-20160706 and it checkpatch didn't throw any
-> >> warning. Which kernel version are based on?
-> >
-> > I don't remember which version of checkpatch warn on this pattern. This
-> > patch series develop across several kernel versions.
-> 
-> We as the kernel community develop against master or linux-next. We only 
-> care about older kernel version in the sense that we intent hard not to 
-> break any userspace/kernel or firmware/kernel interfaces. Apart from 
-> that it's up to every individual to backport patches from mainline 
-> kernel to his respective version. But that's nothing the community as a 
-> hole can take care of.
-> 
-> >
-> > So do you prefer to put "scpd->clk[j] = c;" into 'else' branch?
-> >
-> 
-> Yes please :)
+On Mon, Jul 11, 2016 at 2:50 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Hi,
+>
+> On Fri, Jul 08, 2016 at 10:33:42PM +0800, Chen-Yu Tsai wrote:
+>> The 32.768 kHz clock inside the A80 SoC is fed from an external source,
+>> typically the AC100 RTC module.
+>>
+>> Make the osc32k placeholder a fixed-factor clock so board dts files can
+>> specify its source.
+>>
+>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>> ---
+>> Changes since v4: none
+>> Changes since v3: none
+>> Changes since v2: none
+>> Changes since v1: none
+>> ---
+>>  arch/arm/boot/dts/sun9i-a80-cubieboard4.dts | 5 +++++
+>>  arch/arm/boot/dts/sun9i-a80-optimus.dts     | 5 +++++
+>>  arch/arm/boot/dts/sun9i-a80.dtsi            | 9 +++------
+>>  3 files changed, 13 insertions(+), 6 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/sun9i-a80-cubieboard4.dts b/arch/arm/boot/dts/sun9i-a80-cubieboard4.dts
+>> index cf2f4b72a841..04b014603659 100644
+>> --- a/arch/arm/boot/dts/sun9i-a80-cubieboard4.dts
+>> +++ b/arch/arm/boot/dts/sun9i-a80-cubieboard4.dts
+>> @@ -103,6 +103,11 @@
+>>       allwinner,drive = <SUN4I_PINCTRL_40_MA>;
+>>  };
+>>
+>> +&osc32k {
+>> +     /* osc32k input is from AC100 */
+>> +     clocks = <&ac100_rtc 0>;
+>> +};
+>> +
+>
+> I'm guessing that an unresolved dependency when the driver has not
+> loaded yet, or is not even compiled ?
+>
+> How is it working then?
 
+I assume the clk framework will leave it unresolved and unusable.
+Also it seems that none of existing clks use it as a parent by
+default. I will need to check the remaining unimplemented ones
+though.
 
-Hi,
-
-I just got next-20160711 and change this chunk to:
-
-+		for (j = 0; j < MAX_CLKS && data->clk_id[j]; j++) {
-+			struct clk *c = clk[data->clk_id[j]];
-+
-+			if (IS_ERR(c)) {
-+				dev_err(&pdev->dev, "%s: clk unavailable\n",
-+					data->name);
-+				return ERR_CAST(c);
-+			} else {
-+				scpd->clk[j] = c;
-+			}
-+		}
-+
-
-
-and checkpatch give me this warning:
-
-WARNING: else is not generally useful after a break or return
-#313: FILE: drivers/soc/mediatek/mtk-scpsys.c:409:
-+                               return ERR_CAST(c);
-+                       } else {
-
-Joe.C
+ChenYu
