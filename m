@@ -1,57 +1,24 @@
-From: mturquette@baylibre.com (Michael Turquette)
-Date: Tue, 12 Jul 2016 11:07:53 -0700
-Subject: [PATCH v3 6/7] spi: s3c64xx: restore removed comments
-In-Reply-To: <1468306444-18512-1-git-send-email-andi.shyti@samsung.com>
-References: <57837606.8050906@samsung.com>
- <1468306444-18512-1-git-send-email-andi.shyti@samsung.com>
-Message-ID: <146834687302.73491.6686338412638288829@resonance>
+From: davem@davemloft.net (David Miller)
+Date: Tue, 12 Jul 2016 11:08:18 -0700 (PDT)
+Subject: [PATCH -next] net: mediatek: fix non static symbol warnings
+In-Reply-To: <1468323404-2193-1-git-send-email-weiyj_lk@163.com>
+References: <1468323404-2193-1-git-send-email-weiyj_lk@163.com>
+Message-ID: <20160712.110818.2218245588469646537.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Andi Shyti (2016-07-11 23:54:04)
-> Patch a9e93e8 has erroneously removed some comments which are
-> important to understand why the bus frequency is multiplied by
-> two during the spi transfer.
-> 
-> Reword the previous comment to a more appropriate message.
-> 
-> Suggested-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> Signed-off-by: Andi Shyti <andi.shyti@samsung.com>
-> Reviewed-by: Michael Turquette <mturquette@baylibre.com>
-> ---
-> Hi,
-> 
-> despite Mike's comments I'm sending the patch as it was
-> originally meant. I think that fixing the exact clk where to set
-> the rate should anyway go in a different patch.
+From: weiyj_lk@163.com
+Date: Tue, 12 Jul 2016 11:36:44 +0000
 
-That sounds fair.
+> From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+> 
+> Fixes the following sparse warnings:
+> 
+> drivers/net/ethernet/mediatek/mtk_eth_soc.c:79:5: warning:
+>  symbol '_mtk_mdio_write' was not declared. Should it be static?
+> drivers/net/ethernet/mediatek/mtk_eth_soc.c:98:5: warning:
+>  symbol '_mtk_mdio_read' was not declared. Should it be static?
+> 
+> Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 
-Regards,
-Mike
-
-> 
-> V2->V3
-> The comment has been reworded as Sylwester recommended.
-> 
-> Thanks,
-> Andi
-> 
->  drivers/spi/spi-s3c64xx.c | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
-> index 6da663f..5bedafc 100644
-> --- a/drivers/spi/spi-s3c64xx.c
-> +++ b/drivers/spi/spi-s3c64xx.c
-> @@ -639,6 +639,7 @@ static void s3c64xx_spi_config(struct s3c64xx_spi_driver_data *sdd)
->         writel(val, regs + S3C64XX_SPI_MODE_CFG);
->  
->         if (sdd->port_conf->clk_from_cmu) {
-> +               /* The src_clk clock is divided internally by 2 */
->                 clk_set_rate(sdd->src_clk, sdd->cur_speed * 2);
->         } else {
->                 /* Configure Clock */
-> -- 
-> 2.8.1
-> 
+Applied.
