@@ -1,19 +1,49 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 12 Jul 2016 19:19:50 -0300
-Subject: [PATCH v2] clk: imx7d: do not set parent of ethernet time/ref
- clocks
-In-Reply-To: <146836168743.73491.12016987181408783347@resonance>
-References: <20160703174813.13970-1-stefan@agner.ch>
- <146785281774.73491.10999943518898018619@resonance>
- <CAOMZO5CuLshhk9R3dJh9RjEG2FphV5Z+sALpb2FitmRkKrFPZA@mail.gmail.com>
- <146836168743.73491.12016987181408783347@resonance>
-Message-ID: <CAOMZO5BgbXDoW4zSYk2Md0eqkvdfj38Gwtjmrr5ec8Mbf3YS6A@mail.gmail.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 12 Jul 2016 23:20:29 +0100
+Subject: [PATCH 2/2] fpga-manager: Add Socfpga Arria10 support
+In-Reply-To: <CAAtXAHfSBzLisqBgF4Vry0vrcL3+DB4b1ctMOrTdOq5ue4D7JQ@mail.gmail.com>
+References: <20160712190709.5964-1-atull@opensource.altera.com>
+ <20160712190709.5964-3-atull@opensource.altera.com>
+ <CAAtXAHfSBzLisqBgF4Vry0vrcL3+DB4b1ctMOrTdOq5ue4D7JQ@mail.gmail.com>
+Message-ID: <20160712222029.GW1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 12, 2016 at 7:14 PM, Michael Turquette
-<mturquette@baylibre.com> wrote:
+On Tue, Jul 12, 2016 at 02:31:05PM -0700, Moritz Fischer wrote:
+> On Tue, Jul 12, 2016 at 12:07 PM, Alan Tull <atull@opensource.altera.com> wrote:
+> > +       priv->clk = devm_clk_get(dev, NULL);
+> > +       if (IS_ERR(priv->clk)) {
+> > +               dev_err(dev, "no clock specified\n");
+> > +               return PTR_ERR(priv->clk);
+> > +       }
+> > +
+> > +       ret = clk_prepare_enable(priv->clk);
+> > +       if (ret) {
+> > +               dev_err(dev, "could not enable clock\n");
+> > +               clk_put(priv->clk);
+> 
+> Seen that you used devm_clk_get() is this one necessary?
 
-> It should show up now on the mirror.
+That's actually a bug.  Never clk_put() a devm_clk_get()'d clock.
+devm_clk_put() is what you want if provided.  However, I think
+this clk_put() call is useless here.
 
-Yes, it is there now. Thanks!
+> > +static int socfpga_a10_fpga_remove(struct platform_device *pdev)
+> > +{
+> > +       struct fpga_manager *mgr = platform_get_drvdata(pdev);
+> > +       struct a10_fpga_priv *priv = mgr->priv;
+> > +
+> > +       fpga_mgr_unregister(&pdev->dev);
+> > +       clk_disable_unprepare(priv->clk);
+> > +       clk_put(priv->clk);
+> 
+> Same here, if needed at all shouldn't it be devm_clk_put() ?
+
+And also useless here, as the whole point of the devm_* stuff is to
+clean up the resources that were claimed on probe failure or when
+the device is unbound from its driver.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
