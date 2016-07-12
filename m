@@ -1,32 +1,40 @@
-From: weiyj_lk@163.com (weiyj_lk at 163.com)
-Date: Tue, 12 Jul 2016 11:02:59 +0000
-Subject: [PATCH -next] [media] mtk-vcodec: remove redundant dev_err call in
- mtk_vcodec_probe()
-Message-ID: <1468321379-16133-1-git-send-email-weiyj_lk@163.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 12 Jul 2016 12:08:28 +0100
+Subject: [PATCH v9] arm64: cpuinfo: Expose MIDR_EL1 and REVIDR_EL1 to sysfs
+In-Reply-To: <1467990073-27462-1-git-send-email-suzuki.poulose@arm.com>
+References: <1467990073-27462-1-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <20160712110827.GB18408@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+On Fri, Jul 08, 2016 at 04:01:13PM +0100, Suzuki K Poulose wrote:
+> From: Steve Capper <steve.capper@linaro.org>
+> 
+> It can be useful for JIT software to be aware of MIDR_EL1 and
+> REVIDR_EL1 to ascertain the presence of any core errata that could
+> affect code generation.
+> 
+> This patch exposes these registers through sysfs:
+> 
+> /sys/devices/system/cpu/cpu$ID/regs/identification/midr_el1
+> /sys/devices/system/cpu/cpu$ID/regs/identification/revidr_el1
+> 
+> where $ID is the cpu number. For big.LITTLE systems, one can have a
+> mixture of cores (e.g. Cortex A53 and Cortex A57), thus all CPUs need
+> to be enumerated.
+> 
+> If the kernel does not have valid information to populate these entries
+> with, an empty string is returned to userspace.
+> 
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Signed-off-by: Steve Capper <steve.capper@linaro.org>
+> [ ABI documentation updates, hotplug notifiers, kobject changes ]
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 
-There is a error message within devm_ioremap_resource
-already, so remove the dev_err call to avoid redundant
-error message.
+Looks good to me, thanks for sticking with it:
 
-Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
----
- drivers/media/platform/mtk-vcodec/mtk_vcodec_enc_drv.c | 2 --
- 1 file changed, 2 deletions(-)
+Reviewed-by: Will Deacon <will.deacon@arm.com>
 
-diff --git a/drivers/media/platform/mtk-vcodec/mtk_vcodec_enc_drv.c b/drivers/media/platform/mtk-vcodec/mtk_vcodec_enc_drv.c
-index 9c10cc2..b33a931 100644
---- a/drivers/media/platform/mtk-vcodec/mtk_vcodec_enc_drv.c
-+++ b/drivers/media/platform/mtk-vcodec/mtk_vcodec_enc_drv.c
-@@ -279,8 +279,6 @@ static int mtk_vcodec_probe(struct platform_device *pdev)
- 		}
- 		dev->reg_base[i] = devm_ioremap_resource(&pdev->dev, res);
- 		if (IS_ERR((__force void *)dev->reg_base[i])) {
--			dev_err(&pdev->dev,
--				"devm_ioremap_resource %d failed.", i);
- 			ret = PTR_ERR((__force void *)dev->reg_base[i]);
- 			goto err_res;
- 		}
+Will
