@@ -1,44 +1,38 @@
-From: weiyj_lk@163.com (weiyj_lk at 163.com)
-Date: Tue, 12 Jul 2016 11:36:44 +0000
-Subject: [PATCH -next] net: mediatek: fix non static symbol warnings
-Message-ID: <1468323404-2193-1-git-send-email-weiyj_lk@163.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 12 Jul 2016 12:42:06 +0100
+Subject: [PATCH v9 0/7] ACPI / processor_idle: Add ACPI v6.0 LPI support
+In-Reply-To: <1467997678-7107-1-git-send-email-sudeep.holla@arm.com>
+References: <1467997678-7107-1-git-send-email-sudeep.holla@arm.com>
+Message-ID: <5784D78E.7010409@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 
-Fixes the following sparse warnings:
 
-drivers/net/ethernet/mediatek/mtk_eth_soc.c:79:5: warning:
- symbol '_mtk_mdio_write' was not declared. Should it be static?
-drivers/net/ethernet/mediatek/mtk_eth_soc.c:98:5: warning:
- symbol '_mtk_mdio_read' was not declared. Should it be static?
+On 08/07/16 18:07, Sudeep Holla wrote:
+> ACPI 6.0 introduced LPI(Low Power Idle) states that provides an alternate
+> method to describe processor idle states. It extends the specification
+> to allow the expression of idle states like C-states selectable by the
+> OSPM when a processor goes idle, but may affect more than one processor,
+> and may affect other system components.
+>
+> LPI extensions leverages the processor container device(again introduced
+> in ACPI 6.0) allowing to express which parts of the system are affected
+> by a given LPI state. It defines the local power states for each node
+> in a hierarchical processor topology. The OSPM can use _LPI object to
+> select a local power state for each level of processor hierarchy in the
+> system. They used to produce a composite power state request that is
+> presented to the platform by the OSPM.
+>
+> Since multiple processors affect the idle state for any non-leaf hierarchy
+> node, coordination of idle state requests between the processors is
+> required. ACPI supports two different coordination schemes: Platform
+> coordinated and  OS initiated.
+>
 
-Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
----
- drivers/net/ethernet/mediatek/mtk_eth_soc.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+I was hoping to get this in v4.8 now that merge window is
+delayed/extended if you have no further comments on this series.
 
-diff --git a/drivers/net/ethernet/mediatek/mtk_eth_soc.c b/drivers/net/ethernet/mediatek/mtk_eth_soc.c
-index 682797e..6f597eb 100644
---- a/drivers/net/ethernet/mediatek/mtk_eth_soc.c
-+++ b/drivers/net/ethernet/mediatek/mtk_eth_soc.c
-@@ -76,8 +76,8 @@ static int mtk_mdio_busy_wait(struct mtk_eth *eth)
- 	return -1;
- }
- 
--u32 _mtk_mdio_write(struct mtk_eth *eth, u32 phy_addr,
--		    u32 phy_register, u32 write_data)
-+static u32 _mtk_mdio_write(struct mtk_eth *eth, u32 phy_addr,
-+			   u32 phy_register, u32 write_data)
- {
- 	if (mtk_mdio_busy_wait(eth))
- 		return -1;
-@@ -95,7 +95,7 @@ u32 _mtk_mdio_write(struct mtk_eth *eth, u32 phy_addr,
- 	return 0;
- }
- 
--u32 _mtk_mdio_read(struct mtk_eth *eth, int phy_addr, int phy_reg)
-+static u32 _mtk_mdio_read(struct mtk_eth *eth, int phy_addr, int phy_reg)
- {
- 	u32 d;
+-- 
+Regards,
+Sudeep
