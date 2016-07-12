@@ -1,58 +1,75 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 12 Jul 2016 12:15:47 -0300
-Subject: [PATCH 3/6] ARM: dts: imx25: substitute NO_PAD_CTL by the
- respective reset value
-In-Reply-To: <20160712073859.GQ16643@pengutronix.de>
-References: <1468145266-7567-1-git-send-email-uwe@kleine-koenig.org>
- <1468145266-7567-4-git-send-email-uwe@kleine-koenig.org>
- <CAOMZO5A=6HLPacwp0seBn_s+AVF7zaUjUO8wOb1WoyvU1JrH7A@mail.gmail.com>
- <20160711073721.GM16643@pengutronix.de>
- <CAOMZO5ASsA88TQLAPdyit0xr3Lqh8e+8C_ZgoUa7w2rZxTb-ag@mail.gmail.com>
- <20160712073859.GQ16643@pengutronix.de>
-Message-ID: <CAOMZO5B+grtejgSMKrZMT9inEdh+bL0smZKE52qtcQD1NCHrqQ@mail.gmail.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Tue, 12 Jul 2016 18:18:01 +0300
+Subject: [PATCHv3 2/7] clk: ti: add clkdev get helper
+In-Reply-To: <20160712102228.GE5783@n2100.arm.linux.org.uk>
+References: <1467296018-25086-1-git-send-email-t-kristo@ti.com>
+ <1467296018-25086-3-git-send-email-t-kristo@ti.com>
+ <20160712102228.GE5783@n2100.arm.linux.org.uk>
+Message-ID: <57850A29.4010806@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
+On 12/07/16 13:22, Russell King - ARM Linux wrote:
+> On Thu, Jun 30, 2016 at 05:13:33PM +0300, Tero Kristo wrote:
+>>   /**
+>> + * ti_clk_get - lookup a TI clock handle
+>> + * @dev_id: device to lookup clock for
+>> + * @con_id: connection ID to find
+>> + *
+>> + * Searches for a TI clock handle based on the DT node name.
+>> + * Returns the pointer to the clock handle, or ERR_PTR in failure.
+>> + */
+>> +static struct clk *ti_clk_get(const char *dev_id, const char *con_id)
+>> +{
+>> +	struct of_phandle_args clkspec;
+>> +	struct device_node *node;
+>> +	struct clk *clk;
+>> +
+>> +	/* Only check for cases of type clk_get_sys(NULL, "xyz") */
+>> +	if (dev_id || !con_id)
+>> +		return ERR_PTR(-ENOENT);
+>> +
+>> +	if (of_have_populated_dt()) {
+>> +		node = of_find_node_by_name(NULL, con_id);
+>> +		clkspec.np = node;
+>> +		clk = of_clk_get_from_provider(&clkspec);
+>> +
+>> +		if (!IS_ERR(clk))
+>> +			return clk;
+>> +	}
+>> +
+>> +	return ERR_PTR(-ENOENT);
+>> +}
+>
+> I _really_ don't like this.  This takes us back to the totally broken
+> idea, that's already been proven to be greatly harmful in OMAP land,
+> that the "con_id" is not a _DEVICE SPECIFIC CONNECTION NAME_ but is a
+> CLOCK NAME.  The connection ID is supposed to be a static string in
+> the requestor of the clock, not some random string picked out from
+> DT.
 
-On Tue, Jul 12, 2016 at 4:38 AM, Uwe Kleine-K?nig
-<u.kleine-koenig@pengutronix.de> wrote:
+What is the harm in that actually? I have most likely missed some 
+discussion but please educate me. The problem is, we are already using 
+this convention all over the place in the kernel (not only OMAPs), and 
+trying to clean up the kernel requires some intermediate steps being 
+taken, otherwise we end up doing all the clean-ups in a single massive 
+patch I fear (change all the hwmod data + clock data + any 
+implementations related to these at the same time.)
 
-> I don't have access to these, but I took a look in the U-boot sources.
->
-> So on top of my patch I'd suggest the following change:
->
-> diff --git a/arch/arm/boot/dts/imx25-pdk.dts b/arch/arm/boot/dts/imx25-pdk.dts
-> index cf41b726e2de..08caba550ee6 100644
-> --- a/arch/arm/boot/dts/imx25-pdk.dts
-> +++ b/arch/arm/boot/dts/imx25-pdk.dts
-> @@ -171,7 +171,7 @@
->                         MX25_PAD_SD1_DATA2__SD1_DATA2           0x000000d1
->                         MX25_PAD_SD1_DATA3__SD1_DATA3           0x000000d1
->                         MX25_PAD_A14__GPIO_2_0                  0x00000080
-> -                       MX25_PAD_A15__GPIO_2_1                  0x00000080
-> +                       MX25_PAD_A15__GPIO_2_1                  0x00000000
->                 >;
->         };
->
-> @@ -187,14 +187,14 @@
->                         MX25_PAD_FEC_RX_DV__FEC_RX_DV           0x000000c0
->                         MX25_PAD_FEC_TX_CLK__FEC_TX_CLK         0x000001c0
->                         MX25_PAD_A17__GPIO_2_3                  0x00000000
-> -                       MX25_PAD_D12__GPIO_4_8                  0x000000a1
-> +                       MX25_PAD_D12__GPIO_4_8                  0x00000000
->                 >;
->         };
->
->         pinctrl_i2c1: i2c1grp {
->                 fsl,pins = <
-> -                       MX25_PAD_I2C1_CLK__I2C1_CLK             0x000000a8
-> -                       MX25_PAD_I2C1_DAT__I2C1_DAT             0x000000a8
-> +                       MX25_PAD_I2C1_CLK__I2C1_CLK             0x000001e8
-> +                       MX25_PAD_I2C1_DAT__I2C1_DAT             0x000001e8
->                 >;
->         };
->
-> Did I miss anything?
+This specific implementation should be possible to deprecate later once 
+the hwmod database is gone btw, and is mostly required for hwmod data 
+only (+ OMAP timer implementation, maybe some others.) The biggest 
+abuser of clk_get interface atm is omap-hwmod.
 
-I will try to get access to a mx25pdk and will confirm soon. Thanks
+>
+> This series started out with the assertion that the new clkdev hook
+> was to avoid registering lots of clock aliases, but it seems with
+> this patch we're going to end up with lots of specifically named
+> nodes in DT instead.  It's just moving the problem to somewhere else.
+
+That is true, it will end up adding new DT nodes. However, as OMAP 
+already is doing this extensively, I wonder what would be the 
+alternative. Maybe move all the clock data back to kernel space to 
+increase the size of multi-v7 builds?
+
+-Tero
