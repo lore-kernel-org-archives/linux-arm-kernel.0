@@ -1,84 +1,119 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 12 Jul 2016 12:43:38 +0200
-Subject: [PATCH v2 2/6] clk: mvebu: Add the xtal clock for Armada 3700 SoC
-In-Reply-To: <CAP=VYLoZdyqP7vLa_pCx3mNpFuYCRaNgkT-STtk571U0KAgdLw@mail.gmail.com>
- (Paul Gortmaker's message of "Sat, 9 Jul 2016 19:34:59 -0400")
-References: <1467931071-31004-1-git-send-email-gregory.clement@free-electrons.com>
- <1467931071-31004-3-git-send-email-gregory.clement@free-electrons.com>
- <CAP=VYLoZdyqP7vLa_pCx3mNpFuYCRaNgkT-STtk571U0KAgdLw@mail.gmail.com>
-Message-ID: <87vb0brvad.fsf@free-electrons.com>
+From: julien.grall@arm.com (Julien Grall)
+Date: Tue, 12 Jul 2016 11:48:33 +0100
+Subject: [PATCH 2/4] Xen: Support adding DT nodes
+In-Reply-To: <20160620150934.1729-3-andre.przywara@arm.com>
+References: <20160620150934.1729-1-andre.przywara@arm.com>
+ <20160620150934.1729-3-andre.przywara@arm.com>
+Message-ID: <5784CB01.9080600@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
- 
- On dim., juil. 10 2016, Paul Gortmaker <paul.gortmaker@windriver.com> wrote:
+Hi Andre,
 
-> On Thu, Jul 7, 2016 at 6:37 PM, Gregory CLEMENT
-> <gregory.clement@free-electrons.com> wrote:
->> This clock is the parent of all the Armada 3700 clocks. It is a fixed
->> rate clock which depends on the gpio configuration read when resetting
->> the SoC.
->>
->> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
->> ---
->>  drivers/clk/mvebu/Kconfig            |  3 ++
->>  drivers/clk/mvebu/Makefile           |  1 +
->>  drivers/clk/mvebu/armada-37xx-xtal.c | 98 ++++++++++++++++++++++++++++++++++++
->>  3 files changed, 102 insertions(+)
->>  create mode 100644 drivers/clk/mvebu/armada-37xx-xtal.c
->>
->> diff --git a/drivers/clk/mvebu/Kconfig b/drivers/clk/mvebu/Kconfig
->> index 3165da77d525..fddc8ac5faff 100644
->> --- a/drivers/clk/mvebu/Kconfig
->> +++ b/drivers/clk/mvebu/Kconfig
->> @@ -24,6 +24,9 @@ config ARMADA_39X_CLK
->>         bool
->>         select MVEBU_CLK_COMMON
->>
->> +config ARMADA_37XX_CLK
->> +       bool
->> +
+On 20/06/16 16:09, Andre Przywara wrote:
+> From: Christoffer Dall <christoffer.dall@linaro.org>
 >
-> Since the driver is not tristate, can you please remove all modular
-> references from it?   With the author and license etc. at the top you
-> can just delete the last three lines, the DEVICE_TABLE and register
-> with builtin_platform_driver, and then no need for module.h either.
+> Support adding xen,xen-bootargs node via --with-xen-bootargs to the
+> configure script and automatically add the Dom0 node to the DT as well.
 >
-> Either that, or change it to a tristate, if that use case makes sense.
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> ---
+>   Makefile.am  | 34 +++++++++++++++++++++-------------
+>   configure.ac |  9 +++++++++
+>   2 files changed, 30 insertions(+), 13 deletions(-)
+>
+> diff --git a/Makefile.am b/Makefile.am
+> index 1a801c0..d83b417 100644
+> --- a/Makefile.am
+> +++ b/Makefile.am
+> @@ -93,24 +93,32 @@ FILESYSTEM_END	:= $(shell echo $$(($(FILESYSTEM_START) + $(FILESYSTEM_SIZE))))
+>
+>   FDT_OFFSET	:= 0x08000000
+>
+> +if XEN
+> +XEN		:= -DXEN=$(XEN_IMAGE)
+> +XEN_OFFSET	:= 0x08200000
+> +KERNEL_SIZE	:= $(shell stat -Lc %s $(KERNEL_IMAGE) 2>/dev/null || echo 0)
+> +DOM0_OFFSET	:= $(shell echo $$(($(PHYS_OFFSET) + $(KERNEL_OFFSET))))
+> +XEN_BOOTARGS	:= xen,xen-bootargs = \"$(BOOTARGS)\";			\
 
-Indeed having these clock drivers as module is not very useful. Let's
-remove the modular reference.
+I would prefer BOOTARGS with XEN_ to avoid confusion.
 
-Thanks,
+> +		   \#address-cells = <2>;				\
+> +		   \#size-cells = <2>;					\
+> +		   module at 1 {						\
+> +			compatible = \"xen,linux-zimage\", \"xen,multiboot-module\"; \
+> +			reg = <0x0 $(DOM0_OFFSET) 0x0 $(KERNEL_SIZE)>;	\
+> +		   };
+> +endif
+> +
+> +
+>   if INITRD
+>   INITRD_FLAGS	:= -DUSE_INITRD
+> +INITRD_CHOSEN   := linux,initrd-start = <$(FILESYSTEM_START)>;	\
+> +		   linux,initrd-end = <$(FILESYSTEM_END)>;
+> +endif
+> +
+>   CHOSEN_NODE	:= chosen {						\
+>   			bootargs = \"$(CMDLINE)\";			\
+> -			linux,initrd-start = <$(FILESYSTEM_START)>;	\
+> -			linux,initrd-end = <$(FILESYSTEM_END)>;		\
+> -		   };
+> -else
+> -INITRD_FLAGS	:=
+> -CHOSEN_NODE	:= chosen {						\
+> -			bootargs = \"$(CMDLINE)\";			\
+> +			$(INITRD_CHOSEN)				\
+> +			$(XEN_BOOTARGS)					\
+>   		   };
+> -endif
+> -
+> -if XEN
+> -XEN		:= -DXEN=$(XEN_IMAGE)
+> -XEN_OFFSET	:= 0x08200000
+> -endif
 
-Gregory
-
+This code was added in the previous patch. Can you add the code in the 
+correct place directly in patch #1?
 
 >
-> Thanks,
-> Paul.
-> --
+>   CPPFLAGS	+= $(INITRD_FLAGS)
+>   CFLAGS		+= -Iinclude/ -I$(ARCH_SRC)/include/
+> diff --git a/configure.ac b/configure.ac
+> index 2441f8b..b001939 100644
+> --- a/configure.ac
+> +++ b/configure.ac
+> @@ -95,6 +95,12 @@ AC_ARG_WITH([cmdline],
+>   	[C_CMDLINE=$withval])
+>   AC_SUBST([CMDLINE], [$C_CMDLINE])
 >
+> +X_BOOTARGS="console=dtuart dtuart=serial0 no-bootscrub"
+> +AC_ARG_WITH([xen-bootargs],
+
+I would name the option xen-cmdline to stay inline with the kernel one.
+
+> +	AS_HELP_STRING([--with-xen-bootargs], [set Xen bootargs]),
+> +	[X_BOOTARGS=$withval])
+> +AC_SUBST([BOOTARGS], [$X_BOOTARGS])
+> +
+>   # Allow a user to pass --enable-gicv3
+>   AC_ARG_ENABLE([gicv3],
+>   	AS_HELP_STRING([--enable-gicv3], [enable GICv3 instead of GICv2]),
+> @@ -133,4 +139,7 @@ echo "  Use GICv3?                         ${USE_GICV3}"
+>   echo "  Boot-wrapper execution state:      AArch${BOOTWRAPPER_ES}"
+>   echo "  Kernel execution state:            AArch${KERNEL_ES}"
+>   echo "  Xen image                          ${X_IMAGE:-NONE}"
+> +if test "x${X_IMAGE}" != "x"; then
+> +echo "  Xen Bootargs:                      ${X_BOOTARGS}"
+
+Same suggestion here "Xen command line".
+
+> +fi
+>   echo ""
 >
->>  config ARMADA_XP_CLK
->>         bool
->>         select MVEBU_CLK_COMMON
->> diff --git a/drivers/clk/mvebu/Makefile b/drivers/clk/mvebu/Makefile
->> index 7172ef65693d..4257a36d0219 100644
->> --- a/drivers/clk/mvebu/Makefile
->> +++ b/drivers/clk/mvebu/Makefile
->> @@ -6,6 +6,7 @@ obj-$(CONFIG_ARMADA_370_CLK)    += armada-370.o
->>  obj-$(CONFIG_ARMADA_375_CLK)   += armada-375.o
->>  obj-$(CONFIG_ARMADA_38X_CLK)   += armada-38x.o
->>  obj-$(CONFIG_ARMADA_39X_CLK)   += armada-39x.o
->> +obj-$(CONFIG_ARMADA_37XX_CLK)  += armada-37xx-xtal.o
->>  obj-$(CONFIG_ARMADA_XP_
->
-> [...]
+
+Regards,
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Julien Grall
