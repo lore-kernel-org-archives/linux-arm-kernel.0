@@ -1,127 +1,68 @@
-From: dirk.behme@de.bosch.com (Dirk Behme)
-Date: Tue, 12 Jul 2016 09:46:45 +0200
-Subject: [PATCH v4] xen/arm: Add a clock property
-Message-ID: <1468309605-19522-1-git-send-email-dirk.behme@de.bosch.com>
+From: aisheng.dong@nxp.com (Dong Aisheng)
+Date: Tue, 12 Jul 2016 15:46:09 +0800
+Subject: [PATCH V2 00/15] a few sdhci/imx clean up and fix patches
+Message-ID: <1468309584-3591-1-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Clocks described by this property are reserved for use by Xen, and the OS
-must not alter their state any way, such as disabling or gating a clock,
-or modifying its rate. Ensuring this may impose constraints on parent
-clocks or other resources used by the clock tree.
+Patch 1~10 are mainly sdhci cleanup patches while patch 7,9,10
+are fixes which seems needed for stable tree as well.
 
-This property is used to proxy clocks for devices Xen has taken ownership
-of, such as UARTs, for which the associated clock controller(s) remain
-under the control of Dom0.
+The main work is:
+1) using more robust mmc_regulator_set_vqmmc 
+2) add auto retune support
+3) improve sdhci-esdhc-imx stability
+4) add state save and restore for low power mode
 
-Up to now, the workaround for this has been to use the Linux kernel
-command line parameter 'clk_ignore_unused'. See Xen bug
+Change Log:
+v1->v2:
+ * address all Andrian's comments
+ * below patches are dropped
+  mmc: sdhci: move sdhci_get_cd() forward to avoid declaration
+  mmc: core: fix a comment typo
+  mmc: sdhci: re-factor sdhci_start_signal_voltage()
+  mmc: core: mmc_regulator_set_vqmmc not return error if vqmmc/vmmc not
+    exist
+  mmc: sdhci: check SDHCI_QUIRK2_NO_1_8_V when do voltage switch
+  mmc: sdhci: rename quirk SDHCI_QUIRK_MULTIBLOCK_READ_ACMD12
+	Above clean up is not needed so far according to Andrian.
 
-http://bugs.xenproject.org/xen/bug/45
+  mmc: sdhci: fix incorrect get data interrupt during no data transfer
+	This one is not needed anymore cause Andrian had another fix
+	already in tree.
+	(commit 0e0a35d2d4058 mmc: sdhci: Track whether a reset is pending)
 
-too.
+  mmc: core: disable auto retune during card detection process
+	This one will sent out in another patch series to fix in CORE.
 
-Signed-off-by: Dirk Behme <dirk.behme@de.bosch.com>
----
-Changes in v4: Switch to the xen.txt description proposed by Mark:
-               https://www.spinics.net/lists/arm-kernel/msg516158.html
+v1:
+http://www.spinics.net/lists/linux-mmc/msg36316.html
 
-Changes in v3: Use the xen.txt description proposed by Michael. Thanks!
+Dong Aisheng (15):
+  mmc: sdhci: using common mmc_regulator_set_vqmmc()
+  mmc: sdhci-esdhc-imx: remove SDHCI_QUIRK_BROKEN_TIMEOUT_VAL
+  mmc: sdhci-esdhc-imx: add esdhc specific suspend resume callback
+  mmc: sdhci-esdhc-imx: restore watermark level setting after resume
+  mmc: sdhci-esdhci-imx: disable DLL delay line settings explicitly
+  mmc: sdhci-esdhc-imx: support setting tuning start point
+  doc: dt: fsl-imx-esdhc: add set tuning start point binding
+  mmc: sdhci: add standard hw auto retuning support
+  mmc: sdhci-esdhc-imx: enable hw auto retuning for STD_TUNING
+  mmc: sdhci-esdhc-imx: enable hw auto retuning for MAN_TUNING
+  mmc: sdhci-esdhc-imx: fix strobe DLL lock wrong clock issue
+  mmc: sdhci-esdhc-imx: factor out hw related initialization into
+    function
+  mmc: sdhci-esdhc-imx: move tuning static configuration into hwinit
+    function
+  mmc: sdhci-esdhci-imx: re-initialize hw state after resume
+  mmc: sdhci-esdhc-imx: clear tuning bits during driver probe
 
-Changes in v2: Drop the Linux implementation details like clk_disable_unused
-	       in xen.txt.
+ .../devicetree/bindings/mmc/fsl-imx-esdhc.txt      |   2 +
+ drivers/mmc/host/sdhci-esdhc-imx.c                 | 149 ++++++++++++++-------
+ drivers/mmc/host/sdhci.c                           |  24 ++--
+ drivers/mmc/host/sdhci.h                           |   3 +
+ include/linux/platform_data/mmc-esdhc-imx.h        |   1 +
+ 5 files changed, 122 insertions(+), 57 deletions(-)
 
- Documentation/devicetree/bindings/arm/xen.txt | 12 +++++++
- arch/arm/xen/enlighten.c                      | 47 +++++++++++++++++++++++++++
- 2 files changed, 59 insertions(+)
-
-diff --git a/Documentation/devicetree/bindings/arm/xen.txt b/Documentation/devicetree/bindings/arm/xen.txt
-index c9b9321..437e50b 100644
---- a/Documentation/devicetree/bindings/arm/xen.txt
-+++ b/Documentation/devicetree/bindings/arm/xen.txt
-@@ -17,6 +17,18 @@ the following properties:
-   A GIC node is also required.
-   This property is unnecessary when booting Dom0 using ACPI.
- 
-+Optional properties:
-+
-+- clocks: a list of phandle + clock-specifier pairs
-+  Clocks described by this property are reserved for use by Xen, and the
-+  OS must not alter their state any way, such as disabling or gating a
-+  clock, or modifying its rate. Ensuring this may impose constraints on
-+  parent clocks or other resources used by the clock tree.
-+
-+  Note: this property is used to proxy clocks for devices Xen has taken
-+  ownership of, such as UARTs, for which the associated clock
-+  controller(s) remain under the control of Dom0.
-+
- To support UEFI on Xen ARM virtual platforms, Xen populates the FDT "uefi" node
- under /hypervisor with following parameters:
- 
-diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-index 47acb36..5c546d0 100644
---- a/arch/arm/xen/enlighten.c
-+++ b/arch/arm/xen/enlighten.c
-@@ -24,6 +24,7 @@
- #include <linux/of_fdt.h>
- #include <linux/of_irq.h>
- #include <linux/of_address.h>
-+#include <linux/clk-provider.h>
- #include <linux/cpuidle.h>
- #include <linux/cpufreq.h>
- #include <linux/cpu.h>
-@@ -444,6 +445,52 @@ static int __init xen_pm_init(void)
- }
- late_initcall(xen_pm_init);
- 
-+/*
-+ * Check if we want to register some clocks, that they
-+ * are not freed because unused by clk_disable_unused().
-+ * E.g. the serial console clock.
-+ */
-+static int __init xen_arm_register_clks(void)
-+{
-+	struct clk *clk;
-+	struct device_node *xen_node;
-+	unsigned int i, count;
-+	int ret = 0;
-+
-+	xen_node = of_find_compatible_node(NULL, NULL, "xen,xen");
-+	if (!xen_node) {
-+		pr_err("Xen support was detected before, but it has disappeared\n");
-+		return -EINVAL;
-+	}
-+
-+	count = of_clk_get_parent_count(xen_node);
-+	if (!count)
-+		goto out;
-+
-+	for (i = 0; i < count; i++) {
-+		clk = of_clk_get(xen_node, i);
-+		if (IS_ERR(clk)) {
-+			pr_err("Xen failed to register clock %i. Error: %li\n",
-+			       i, PTR_ERR(clk));
-+			ret = PTR_ERR(clk);
-+			goto out;
-+		}
-+
-+		ret = clk_prepare_enable(clk);
-+		if (ret < 0) {
-+			pr_err("Xen failed to enable clock %i. Error: %i\n",
-+			       i, ret);
-+			goto out;
-+		}
-+	}
-+
-+	ret = 0;
-+
-+out:
-+	of_node_put(xen_node);
-+	return ret;
-+}
-+late_initcall(xen_arm_register_clks);
- 
- /* empty stubs */
- void xen_arch_pre_suspend(void) { }
 -- 
-2.8.0
+1.9.1
