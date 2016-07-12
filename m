@@ -1,47 +1,50 @@
 From: julien.grall@arm.com (Julien Grall)
-Date: Tue, 12 Jul 2016 11:31:34 +0100
-Subject: [PATCH 0/4] boot-wrapper: arm64: Xen support
-In-Reply-To: <20160620150934.1729-1-andre.przywara@arm.com>
+Date: Tue, 12 Jul 2016 11:40:28 +0100
+Subject: [PATCH 1/4] Support for building in a Xen binary
+In-Reply-To: <20160620150934.1729-2-andre.przywara@arm.com>
 References: <20160620150934.1729-1-andre.przywara@arm.com>
-Message-ID: <5784C706.1040007@arm.com>
+ <20160620150934.1729-2-andre.przywara@arm.com>
+Message-ID: <5784C91C.30709@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Andre,
 
 On 20/06/16 16:09, Andre Przywara wrote:
-> These patches allow to include a Xen hypervisor binary into a boot-wrapper
-> ELF file, so that a Foundation Platform or a Fast Model can boot a Xen
-> system (including a Dom0 kernel).
-> This has been floating around for a while, I just updated the patches
-> to apply on the latest boot-wrapper tree. Also I increased Xen's load
-> address to accomodate for Dom0 kernels bigger than 16 MB.
-> For testing this just add: "--with-xen=/path/to/xen/xen/xen" to the
-> ./configure command line and feed the resulting xen-system.axf file to
-> the model.
+> diff --git a/Makefile.am b/Makefile.am
+> index 692d2cc..1a801c0 100644
+> --- a/Makefile.am
+> +++ b/Makefile.am
+> @@ -85,7 +85,6 @@ TEXT_LIMIT	:= 0x80080000
+>   endif
+>
+>   LD_SCRIPT	:= model.lds.S
+> -IMAGE		:= linux-system.axf
+>
+>   FS_OFFSET	:= 0x10000000
+>   FILESYSTEM_START:= $(shell echo $$(($(PHYS_OFFSET) + $(FS_OFFSET))))
+> @@ -108,6 +107,11 @@ CHOSEN_NODE	:= chosen {						\
+>   		   };
+>   endif
+>
+> +if XEN
+> +XEN		:= -DXEN=$(XEN_IMAGE)
+> +XEN_OFFSET	:= 0x08200000
+> +endif
+> +
+>   CPPFLAGS	+= $(INITRD_FLAGS)
+>   CFLAGS		+= -Iinclude/ -I$(ARCH_SRC)/include/
+>   CFLAGS		+= -Wall -fomit-frame-pointer
+> @@ -117,11 +121,11 @@ LDFLAGS		+= --gc-sections
+>   OFILES		+= boot_common.o bakery_lock.o platform.o $(GIC) cache.o lib.o
+>   OFILES		+= $(addprefix $(ARCH_SRC),boot.o stack.o $(BOOTMETHOD) utils.o)
+>
+> -all: $(IMAGE)
+> +all: $(IMAGE) $(XIMAGE)
 
-Tested-by: Julien Grall <julien.grall@arm.com>
+I cannot find where XIMAGE is set. What XIMAGE is used for?
 
 Regards,
-
-> Cheers,
-> Andre.
->
-> Christoffer Dall (3):
->    Support for building in a Xen binary
->    Xen: Support adding DT nodes
->    Explicitly clean linux-system.axf and xen-system.axf
->
-> Ian Campbell (1):
->    Xen: Select correct dom0 console
->
->   .gitignore    |  1 +
->   Makefile.am   | 38 +++++++++++++++++++++++++-------------
->   boot_common.c |  4 ++--
->   configure.ac  | 26 +++++++++++++++++++++++++-
->   model.lds.S   | 14 ++++++++++++++
->   5 files changed, 67 insertions(+), 16 deletions(-)
->
 
 -- 
 Julien Grall
