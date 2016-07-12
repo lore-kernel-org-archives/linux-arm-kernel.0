@@ -1,117 +1,93 @@
 From: atull@opensource.altera.com (Alan Tull)
-Date: Tue, 12 Jul 2016 14:36:43 -0500
-Subject: [PATCH v18 4/6] fpga: add fpga bridge framework
+Date: Tue, 12 Jul 2016 14:36:44 -0500
+Subject: [PATCH v18 5/6] fpga: fpga-region: device tree control for FPGA
 In-Reply-To: <20160712193645.9098-1-atull@opensource.altera.com>
 References: <20160712193645.9098-1-atull@opensource.altera.com>
-Message-ID: <20160712193645.9098-5-atull@opensource.altera.com>
+Message-ID: <20160712193645.9098-6-atull@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This framework adds API functions for enabling/
-disabling FPGA bridges under kernel control.
-
-This allows the Linux kernel to disable FPGA bridges
-during FPGA reprogramming and to enable FPGA bridges
-when FPGA reprogramming is done.  This framework is
-be manufacturer-agnostic, allowing it to be used in
-interfaces that use the FPGA Manager Framework to
-reprogram FPGA's.
-
-The functions are:
-* of_fpga_bridge_get
-* fpga_bridge_put
-   Get/put an exclusive reference to a FPGA bridge.
-
-* fpga_bridge_enable
-* fpga_bridge_disable
-   Enable/Disable traffic through a bridge.
-
-* fpga_bridge_register
-* fpga_bridge_unregister
-   Register/unregister a device-specific low level FPGA
-   Bridge driver.
-
-Get an exclusive reference to a bridge and add it to a list:
-* fpga_bridge_get_to_list
-
-To enable/disable/put a set of bridges that are on a list:
-* fpga_bridges_enable
-* fpga_bridges_disable
-* fpga_bridges_put
+FPGA Regions support programming FPGA under control of the Device
+Tree.
 
 Signed-off-by: Alan Tull <atull@opensource.altera.com>
 ---
-v2:  Minor cleanup
-v12: Bump version to line up with simple fpga bus
-     Remove sysfs
-     Improve get/put functions, get the low level driver too.
-     Clean up class implementation
-     Add kernel doc documentation
-     Rename (un)register_fpga_bridge -> fpga_bridge_(un)register
-v13: Add inlined empty functions for if not CONFIG_FPGA_BRIDGE
-     Clean up debugging
-     Remove unneeded #include in .h
-     Remove unnecessary prints
-     Remove 'label' DT binding.
-     Document the mutex
-v14: Allow bridges with no ops
-     *const* struct fpga_bridge_ops
-     Add functions to git/put/enable/disable list of bridges
-     Add list node to struct fpga_bridge
-     Do of_node_get/put in of_fpga_bridge_get()
-     Add r/o attributes: name and state
-v15: No change in this patch for v15 of this patch set
-v16: Remove of_get_fpga_bus function
-v17: No change to this patch in v17 of patch set
+v9:  initial version (this patch added during rest of patchset's v9)
+v10: request deferral if fpga mgr or bridges not available yet
+     cleanup as fpga manager core goes into the real kernel
+     Don't assume bridges are disabled before programming FPGA
+     Don't hang onto reference for fpga manager
+     Move to staging/simple-fpga-bus
+v11: No change in this patch for v11 of the patch set
+v12: Moved out of staging.
+     Use fpga bridges framework.
+v13: If no bridges are specified, assume we don't need any.
+     Clean up debug messages
+     Some dev_info -> dev_dbg
+     Remove unneeded #include
+     Fix size of array of pointers
+     Don't need to specify .owner
+     Use common binding: firmware-name
+v14: OK it's not a simple bus.  Call it "FPGA Area"
+     Remove bindings that specify FPGA manager and FPGA bridges
+     Use parent FPGA bridge and bridges that are its peers
+     Use ancestor FPGA Manager
+v15: Add altr,fpga-bus implementation
+     Change compatible string "fpga-area" -> "altr,fpga-area"
+v16: Much changes as FPGA Areas and Busses become FPGA Regions
+     Add reconfig notifier, don't rely on simple-bus
+v17: Use new overlay notifier instead of reconfig notifier
+     Add external_fpga_config property used in u-boot
+     Change partial-reconfig binding to partial-fpga-config to be
+       similar to *-fpga-config bindings used in u-boot
 v18: No change to this patch in v18 of patch set
 ---
- drivers/fpga/Kconfig             |   7 +
- drivers/fpga/Makefile            |   3 +
- drivers/fpga/fpga-bridge.c       | 388 +++++++++++++++++++++++++++++++++++++++
- include/linux/fpga/fpga-bridge.h |  55 ++++++
- 4 files changed, 453 insertions(+)
- create mode 100644 drivers/fpga/fpga-bridge.c
- create mode 100644 include/linux/fpga/fpga-bridge.h
+ drivers/fpga/Kconfig          |   7 +
+ drivers/fpga/Makefile         |   3 +
+ drivers/fpga/fpga-region.c    | 555 ++++++++++++++++++++++++++++++++++++++++++
+ include/linux/fpga/fpga-mgr.h |   2 +
+ 4 files changed, 567 insertions(+)
+ create mode 100644 drivers/fpga/fpga-region.c
 
 diff --git a/drivers/fpga/Kconfig b/drivers/fpga/Kconfig
-index d614102..46e20af 100644
+index 46e20af..ec81e21 100644
 --- a/drivers/fpga/Kconfig
 +++ b/drivers/fpga/Kconfig
-@@ -25,6 +25,13 @@ config FPGA_MGR_ZYNQ_FPGA
- 	help
- 	  FPGA manager driver support for Xilinx Zynq FPGAs.
+@@ -13,6 +13,13 @@ config FPGA
  
-+config FPGA_BRIDGE
-+       bool "FPGA Bridge Framework"
+ if FPGA
+ 
++config FPGA_REGION
++       bool "FPGA Region"
 +       depends on OF
 +       help
-+         Say Y here if you want to support bridges connected between host
-+	 processors and FPGAs or between FPGAs.
++	 FPGA Regions allow loading FPGA images under control of
++	 the Device Tree.
 +
- endif # FPGA
- 
- endmenu
+ config FPGA_MGR_SOCFPGA
+ 	tristate "Altera SOCFPGA FPGA Manager"
+ 	depends on ARCH_SOCFPGA
 diff --git a/drivers/fpga/Makefile b/drivers/fpga/Makefile
-index 8d83fc6..4baef00 100644
+index 4baef00..8d746c3 100644
 --- a/drivers/fpga/Makefile
 +++ b/drivers/fpga/Makefile
-@@ -8,3 +8,6 @@ obj-$(CONFIG_FPGA)			+= fpga-mgr.o
- # FPGA Manager Drivers
- obj-$(CONFIG_FPGA_MGR_SOCFPGA)		+= socfpga.o
- obj-$(CONFIG_FPGA_MGR_ZYNQ_FPGA)	+= zynq-fpga.o
+@@ -11,3 +11,6 @@ obj-$(CONFIG_FPGA_MGR_ZYNQ_FPGA)	+= zynq-fpga.o
+ 
+ # FPGA Bridge Drivers
+ obj-$(CONFIG_FPGA_BRIDGE)		+= fpga-bridge.o
 +
-+# FPGA Bridge Drivers
-+obj-$(CONFIG_FPGA_BRIDGE)		+= fpga-bridge.o
-diff --git a/drivers/fpga/fpga-bridge.c b/drivers/fpga/fpga-bridge.c
++# High Level Interfaces
++obj-$(CONFIG_FPGA_REGION)		+= fpga-region.o
+diff --git a/drivers/fpga/fpga-region.c b/drivers/fpga/fpga-region.c
 new file mode 100644
-index 0000000..5119d8e
+index 0000000..62b1799
 --- /dev/null
-+++ b/drivers/fpga/fpga-bridge.c
-@@ -0,0 +1,388 @@
++++ b/drivers/fpga/fpga-region.c
+@@ -0,0 +1,555 @@
 +/*
-+ * FPGA Bridge Framework Driver
++ * FPGA Region - Device Tree support for FPGA programming under Linux
 + *
-+ *  Copyright (C) 2013-2015 Altera Corporation, All Rights Reserved.
++ *  Copyright (C) 2013-2016 Altera Corporation
 + *
 + * This program is free software; you can redistribute it and/or modify it
 + * under the terms and conditions of the GNU General Public License,
@@ -125,437 +101,558 @@ index 0000000..5119d8e
 + * You should have received a copy of the GNU General Public License along with
 + * this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
++
 +#include <linux/fpga/fpga-bridge.h>
++#include <linux/fpga/fpga-mgr.h>
 +#include <linux/idr.h>
 +#include <linux/kernel.h>
++#include <linux/list.h>
 +#include <linux/module.h>
 +#include <linux/of_platform.h>
 +#include <linux/slab.h>
 +#include <linux/spinlock.h>
 +
-+static DEFINE_IDA(fpga_bridge_ida);
-+static struct class *fpga_bridge_class;
++/**
++ * struct fpga_region - FPGA Region structure
++ * @dev: FPGA Region device
++ * @mutex: enforces exclusive reference to region
++ * @bridge_list: list of FPGA bridges specified in region
++ */
++struct fpga_region {
++	struct device dev;
++	struct mutex mutex; /* for exclusive reference to region */
++	struct list_head bridge_list;
++};
 +
-+/* Lock for adding/removing bridges to linked lists*/
-+spinlock_t bridge_list_lock;
++#define to_fpga_region(d) container_of(d, struct fpga_region, dev)
 +
-+static int fpga_bridge_of_node_match(struct device *dev, const void *data)
++static DEFINE_IDA(fpga_region_ida);
++static struct class *fpga_region_class;
++
++static const struct of_device_id fpga_region_of_match[] = {
++	{ .compatible = "fpga-region", },
++	{},
++};
++MODULE_DEVICE_TABLE(of, fpga_region_of_match);
++
++static int fpga_region_of_node_match(struct device *dev, const void *data)
 +{
 +	return dev->of_node == data;
 +}
 +
 +/**
-+ * fpga_bridge_enable - Enable transactions on the bridge
-+ *
-+ * @bridge: FPGA bridge
-+ *
-+ * Return: 0 for success, error code otherwise.
++ * fpga_region_find - find FPGA region
++ * @np: device node of FPGA Region
++ * Caller will need to put_device(&region->dev) when done.
++ * Returns FPGA Region struct or NULL
 + */
-+int fpga_bridge_enable(struct fpga_bridge *bridge)
-+{
-+	dev_dbg(&bridge->dev, "enable\n");
-+
-+	if (bridge->br_ops && bridge->br_ops->enable_set)
-+		return bridge->br_ops->enable_set(bridge, 1);
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(fpga_bridge_enable);
-+
-+/**
-+ * fpga_bridge_disable - Disable transactions on the bridge
-+ *
-+ * @bridge: FPGA bridge
-+ *
-+ * Return: 0 for success, error code otherwise.
-+ */
-+int fpga_bridge_disable(struct fpga_bridge *bridge)
-+{
-+	dev_dbg(&bridge->dev, "disable\n");
-+
-+	if (bridge->br_ops && bridge->br_ops->enable_set)
-+		return bridge->br_ops->enable_set(bridge, 0);
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(fpga_bridge_disable);
-+
-+/**
-+ * of_fpga_bridge_get - get an exclusive reference to a fpga bridge
-+ *
-+ * @np: node pointer of a FPGA bridge
-+ *
-+ * Return fpga_bridge struct if successful.
-+ * Return -EBUSY if someone already has a reference to the bridge.
-+ * Return -ENODEV if @np is not a FPGA Bridge.
-+ */
-+struct fpga_bridge *of_fpga_bridge_get(struct device_node *np)
++static struct fpga_region *fpga_region_find(struct device_node *np)
 +{
 +	struct device *dev;
-+	struct fpga_bridge *bridge;
-+	int ret = -ENODEV;
++
++	dev = class_find_device(fpga_region_class, NULL, np,
++				fpga_region_of_node_match);
++	if (!dev) {
++		pr_err("%s did not find FPGA Region in class: %s\n", __func__,
++		       np->full_name);
++		return NULL;
++	}
++
++	return to_fpga_region(dev);
++}
++
++/**
++ * fpga_region_get - get an exclusive reference to a fpga region
++ * @region: FPGA Region struct
++ *
++ * Caller should call fpga_region_put() when done with region.
++ *
++ * Return fpga_region struct if successful.
++ * Return -EBUSY if someone already has a reference to the region.
++ * Return -ENODEV if @np is not a FPGA Region.
++ */
++static struct fpga_region *fpga_region_get(struct fpga_region *region)
++{
++	struct device *dev = &region->dev;
++
++	if (!mutex_trylock(&region->mutex)) {
++		dev_dbg(dev, "%s: FPGA Region already in use\n", __func__);
++		return ERR_PTR(-EBUSY);
++	}
++
++	get_device(dev);
++	of_node_get(dev->of_node);
++	if (!try_module_get(dev->parent->driver->owner)) {
++		of_node_put(dev->of_node);
++		put_device(dev);
++		mutex_unlock(&region->mutex);
++		return ERR_PTR(-ENODEV);
++	}
++
++	dev_dbg(&region->dev, "get\n");
++
++	return region;
++}
++
++/**
++ * fpga_region_put - release a reference to a region
++ *
++ * @region: FPGA region
++ */
++static void fpga_region_put(struct fpga_region *region)
++{
++	struct device *dev = &region->dev;
++
++	dev_dbg(&region->dev, "put\n");
++
++	module_put(dev->parent->driver->owner);
++	of_node_put(dev->of_node);
++	put_device(dev);
++	mutex_unlock(&region->mutex);
++}
++
++/**
++ * fpga_region_get_manager - get exclusive reference for FPGA manager
++ * @region: FPGA region
++ *
++ * Get FPGA Manager from "fpga-mgr" property or from ancestor region.
++ *
++ * Caller should call fpga_mgr_put() when done with manager.
++ *
++ * Return: fpga manager struct or IS_ERR() condition containing error code.
++ */
++static struct fpga_manager *fpga_region_get_manager(struct fpga_region *region)
++{
++	struct device *dev = &region->dev;
++	struct device_node *np = dev->of_node;
++	struct device_node  *mgr_node;
++	struct fpga_manager *mgr;
 +
 +	of_node_get(np);
-+
-+	dev = class_find_device(fpga_bridge_class, NULL, np,
-+				fpga_bridge_of_node_match);
-+	if (!dev)
-+		goto err_dev;
-+
-+	bridge = to_fpga_bridge(dev);
-+	if (!bridge)
-+		goto err_dev;
-+
-+	if (!mutex_trylock(&bridge->mutex)) {
-+		ret = -EBUSY;
-+		goto err_dev;
++	while (np) {
++		if (of_device_is_compatible(np, "fpga-region")) {
++			mgr_node = of_parse_phandle(np, "fpga-mgr", 0);
++			if (mgr_node) {
++				mgr = of_fpga_mgr_get(mgr_node);
++				of_node_put(np);
++				return mgr;
++			}
++		}
++		np = of_get_next_parent(np);
 +	}
-+
-+	if (!try_module_get(dev->parent->driver->owner))
-+		goto err_ll_mod;
-+
-+	dev_dbg(&bridge->dev, "get\n");
-+
-+	return bridge;
-+
-+err_ll_mod:
-+	mutex_unlock(&bridge->mutex);
-+err_dev:
-+	put_device(dev);
 +	of_node_put(np);
-+	return ERR_PTR(ret);
++
++	return ERR_PTR(-EINVAL);
 +}
-+EXPORT_SYMBOL_GPL(of_fpga_bridge_get);
 +
 +/**
-+ * fpga_bridge_put - release a reference to a bridge
++ * fpga_region_get_bridges - create a list of bridges
++ * @region: FPGA region
 + *
-+ * @bridge: FPGA bridge
++ * Create a list of bridges specified by "fpga-bridges" property.
++ * If no bridges are specified, list will be empty.  Note that the
++ * fpga_bridges_enable/disable/put functions are all fine with an empty list.
++ *
++ * Caller should call fpga_bridges_put(&region->bridge_list) when
++ * done with the bridges.
++ *
++ * Return 0 for success (even if there are no bridges specified)
++ * or -EBUSY if any of the bridges are in use.
 + */
-+void fpga_bridge_put(struct fpga_bridge *bridge)
++static int fpga_region_get_bridges(struct fpga_region *region)
 +{
-+	dev_dbg(&bridge->dev, "put\n");
++	struct device *dev = &region->dev;
++	struct device_node *np = dev->of_node;
++	struct device_node *br_node;
++	int i, ret;
 +
-+	module_put(bridge->dev.parent->driver->owner);
-+	mutex_unlock(&bridge->mutex);
-+	put_device(&bridge->dev);
++	for (i = 0; ; i++) {
++		br_node = of_parse_phandle(np, "fpga-bridges", i);
++		if (!br_node)
++			break;
++
++		/* If node is a bridge, get it and add to list */
++		ret = fpga_bridge_get_to_list(br_node, &region->bridge_list);
++
++		/* If any of the bridges are in use, give up */
++		if (ret == -EBUSY) {
++			fpga_bridges_put(&region->bridge_list);
++			return -EBUSY;
++		}
++	}
++
++	return 0;
 +}
-+EXPORT_SYMBOL_GPL(fpga_bridge_put);
 +
 +/**
-+ * fpga_bridges_enable - enable bridges in a list
-+ * @bridge_list: list of FPGA bridges
-+ *
-+ * Enable each bridge in the list.  If list is empty, do nothing.
-+ *
-+ * Return 0 for success or empty bridge list; return error code otherwise.
++ * fpga_region_program_fpga - program FPGA
++ * @region: FPGA region
++ * @firmware_name: name of FPGA image firmware file
++ * @flags: flags for FPGA programming mode
++ * Program an FPGA using information in the device tree.
++ * Function assumes that there is a firmware-name property.
++ * Return 0 for success or negative error code.
 + */
-+int fpga_bridges_enable(struct list_head *bridge_list)
++static int fpga_region_program_fpga(struct fpga_region *region,
++				    const char *firmware_name,
++				    unsigned long flags)
 +{
-+	struct fpga_bridge *bridge;
-+	struct list_head *node;
++	struct fpga_manager *mgr;
 +	int ret;
 +
-+	list_for_each(node, bridge_list) {
-+		bridge = list_entry(node, struct fpga_bridge, node);
-+		ret = fpga_bridge_enable(bridge);
-+		if (ret)
-+			return ret;
-+	}
++	region = fpga_region_get(region);
++	if (IS_ERR(region))
++		return PTR_ERR(region);
 +
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(fpga_bridges_enable);
++	mgr = fpga_region_get_manager(region);
++	if (IS_ERR(mgr))
++		return PTR_ERR(mgr);
 +
-+/**
-+ * fpga_bridges_disable - disable bridges in a list
-+ *
-+ * @bridge_list: list of FPGA bridges
-+ *
-+ * Disable each bridge in the list.  If list is empty, do nothing.
-+ *
-+ * Return 0 for success or empty bridge list; return error code otherwise.
-+ */
-+int fpga_bridges_disable(struct list_head *bridge_list)
-+{
-+	struct fpga_bridge *bridge;
-+	struct list_head *node;
-+	int ret;
-+
-+	list_for_each(node, bridge_list) {
-+		bridge = list_entry(node, struct fpga_bridge, node);
-+		ret = fpga_bridge_disable(bridge);
-+		if (ret)
-+			return ret;
-+	}
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(fpga_bridges_disable);
-+
-+/**
-+ * fpga_bridges_put - put bridges
-+ *
-+ * @bridge_list: list of FPGA bridges
-+ *
-+ * For each bridge in the list, put the bridge and remove it from the list.
-+ * If list is empty, do nothing.
-+ */
-+void fpga_bridges_put(struct list_head *bridge_list)
-+{
-+	struct fpga_bridge *bridge;
-+	struct list_head *node, *next;
-+	unsigned long flags;
-+
-+	list_for_each_safe(node, next, bridge_list) {
-+		bridge = list_entry(node, struct fpga_bridge, node);
-+
-+		fpga_bridge_put(bridge);
-+
-+		spin_lock_irqsave(&bridge_list_lock, flags);
-+		list_del(&bridge->node);
-+		spin_unlock_irqrestore(&bridge_list_lock, flags);
-+	}
-+}
-+EXPORT_SYMBOL_GPL(fpga_bridges_put);
-+
-+/**
-+ * fpga_bridges_get_to_list - get a bridge, add it to a list
-+ *
-+ * @np: node pointer of a FPGA bridge
-+ * @bridge_list: list of FPGA bridges
-+ *
-+ * Get an exclusive reference to the bridge and and it to the list.
-+ *
-+ * Return 0 for success, error code from of_fpga_bridge_get() othewise.
-+ */
-+int fpga_bridge_get_to_list(struct device_node *np,
-+			    struct list_head *bridge_list)
-+{
-+	struct fpga_bridge *bridge;
-+	unsigned long flags;
-+
-+	bridge = of_fpga_bridge_get(np);
-+	if (IS_ERR(bridge))
-+		return PTR_ERR(bridge);
-+
-+	spin_lock_irqsave(&bridge_list_lock, flags);
-+	list_add(&bridge->node, bridge_list);
-+	spin_unlock_irqrestore(&bridge_list_lock, flags);
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(fpga_bridge_get_to_list);
-+
-+static ssize_t name_show(struct device *dev,
-+			 struct device_attribute *attr, char *buf)
-+{
-+	struct fpga_bridge *bridge = to_fpga_bridge(dev);
-+
-+	return sprintf(buf, "%s\n", bridge->name);
-+}
-+
-+static ssize_t state_show(struct device *dev,
-+			  struct device_attribute *attr, char *buf)
-+{
-+	struct fpga_bridge *bridge = to_fpga_bridge(dev);
-+	int enable = 1;
-+
-+	if (bridge->br_ops && bridge->br_ops->enable_show)
-+		enable = bridge->br_ops->enable_show(bridge);
-+
-+	return sprintf(buf, "%s\n", enable ? "enabled" : "disabled");
-+}
-+
-+static DEVICE_ATTR_RO(name);
-+static DEVICE_ATTR_RO(state);
-+
-+static struct attribute *fpga_bridge_attrs[] = {
-+	&dev_attr_name.attr,
-+	&dev_attr_state.attr,
-+	NULL,
-+};
-+ATTRIBUTE_GROUPS(fpga_bridge);
-+
-+/**
-+ * fpga_bridge_register - register a fpga bridge driver
-+ * @dev:	FPGA bridge device from pdev
-+ * @name:	FPGA bridge name
-+ * @br_ops:	pointer to structure of fpga bridge ops
-+ * @priv:	FPGA bridge private data
-+ *
-+ * Return: 0 for success, error code otherwise.
-+ */
-+int fpga_bridge_register(struct device *dev, const char *name,
-+			 const struct fpga_bridge_ops *br_ops, void *priv)
-+{
-+	struct fpga_bridge *bridge;
-+	int id, ret = 0;
-+
-+	if (!name || !strlen(name)) {
-+		dev_err(dev, "Attempt to register with no name!\n");
-+		return -EINVAL;
-+	}
-+
-+	bridge = kzalloc(sizeof(*bridge), GFP_KERNEL);
-+	if (!bridge)
-+		return -ENOMEM;
-+
-+	id = ida_simple_get(&fpga_bridge_ida, 0, 0, GFP_KERNEL);
-+	if (id < 0) {
-+		ret = id;
-+		goto error_kfree;
-+	}
-+
-+	mutex_init(&bridge->mutex);
-+	INIT_LIST_HEAD(&bridge->node);
-+
-+	bridge->name = name;
-+	bridge->br_ops = br_ops;
-+	bridge->priv = priv;
-+
-+	device_initialize(&bridge->dev);
-+	bridge->dev.class = fpga_bridge_class;
-+	bridge->dev.parent = dev;
-+	bridge->dev.of_node = dev->of_node;
-+	bridge->dev.id = id;
-+	dev_set_drvdata(dev, bridge);
-+
-+	ret = dev_set_name(&bridge->dev, "br%d", id);
++	ret = fpga_region_get_bridges(region);
 +	if (ret)
-+		goto error_device;
++		goto err_put_mgr;
 +
-+	ret = device_add(&bridge->dev);
++	ret = fpga_bridges_disable(&region->bridge_list);
 +	if (ret)
-+		goto error_device;
++		goto err_put_br;
 +
-+	dev_info(bridge->dev.parent, "fpga bridge [%s] registered\n",
-+		 bridge->name);
++	ret = fpga_mgr_firmware_load(mgr, flags, firmware_name);
++	if (ret)
++		goto err_put_br;
++
++	ret = fpga_bridges_enable(&region->bridge_list);
++	if (ret)
++		goto err_put_br;
++
++	fpga_mgr_put(mgr);
++	fpga_region_put(region);
 +
 +	return 0;
 +
-+error_device:
-+	ida_simple_remove(&fpga_bridge_ida, id);
-+error_kfree:
-+	kfree(bridge);
++err_put_br:
++	fpga_bridges_put(&region->bridge_list);
++err_put_mgr:
++	fpga_mgr_put(mgr);
++	fpga_region_put(region);
 +
 +	return ret;
 +}
-+EXPORT_SYMBOL_GPL(fpga_bridge_register);
 +
 +/**
-+ * fpga_bridge_unregister - unregister a fpga bridge driver
-+ * @dev: FPGA bridge device from pdev
++ * child_regions_with_firmware
++ * @overlay: device node of the overlay
++ *
++ * If the overlay adds child FPGA regions, they are not allowed to have
++ * firmware-name property.
++ *
++ * Return 0 for OK or -EINVAL if child FPGA region adds firmware-name.
 + */
-+void fpga_bridge_unregister(struct device *dev)
++static int child_regions_with_firmware(struct device_node *overlay)
 +{
-+	struct fpga_bridge *bridge = dev_get_drvdata(dev);
++	struct device_node *child_region;
++	const char *child_firmware_name;
++	int ret = 0;
 +
-+	/*
-+	 * If the low level driver provides a method for putting bridge into
-+	 * a desired state upon unregister, do it.
-+	 */
-+	if (bridge->br_ops && bridge->br_ops->fpga_bridge_remove)
-+		bridge->br_ops->fpga_bridge_remove(bridge);
++	of_node_get(overlay);
 +
-+	device_unregister(&bridge->dev);
++	child_region = of_find_matching_node(overlay, fpga_region_of_match);
++	while (child_region) {
++		if (!of_property_read_string(child_region, "firmware-name",
++					     &child_firmware_name)) {
++			ret = -EINVAL;
++			break;
++		}
++		child_region = of_find_matching_node(child_region,
++						     fpga_region_of_match);
++	}
++
++	of_node_put(child_region);
++
++	if (ret)
++		pr_err("firmware-name not allowed in child FPGA region: %s",
++		       child_region->full_name);
++
++	return ret;
 +}
-+EXPORT_SYMBOL_GPL(fpga_bridge_unregister);
 +
-+static void fpga_bridge_dev_release(struct device *dev)
++/**
++ * fpga_region_notify_pre_apply - pre-apply overlay notification
++ *
++ * @region: FPGA region that the overlay was applied to
++ * @nd: overlay notification data
++ *
++ * Called after when an overlay targeted to a FPGA Region is about to be
++ * applied.  Function will check the properties that will be added to the FPGA
++ * region.  If the checks pass, it will program the FPGA.
++ *
++ * The checks are:
++ * The overlay must add either firmware-name or external-fpga-config property
++ * to the FPGA Region.
++ *
++ *   firmware-name        : program the FPGA
++ *   external-fpga-config : FPGA is already programmed
++ *
++ * The overlay can add other FPGA regions, but child FPGA regions cannot have a
++ * firmware-name property since those regions don't exist yet.
++ *
++ * If the overlay that breaks the rules, notifier returns an error and the
++ * overlay is rejected before it goes into the main tree.
++ *
++ * Returns 0 for success or negative error code for failure.
++ */
++static int fpga_region_notify_pre_apply(struct fpga_region *region,
++					struct of_overlay_notify_data *nd)
 +{
-+	struct fpga_bridge *bridge = to_fpga_bridge(dev);
++	const char *firmware_name = NULL;
++	unsigned long flags = 0;
++	int ret;
 +
-+	ida_simple_remove(&fpga_bridge_ida, bridge->dev.id);
-+	kfree(bridge);
++	/* Reject overlay if child FPGA Regions have firmware-name property */
++	ret = child_regions_with_firmware(nd->overlay);
++	if (ret)
++		return ret;
++
++	/* Read FPGA region properties from the overlay */
++	if (of_property_read_bool(nd->overlay, "partial-fpga-config"))
++		flags |= FPGA_MGR_PARTIAL_RECONFIG;
++
++	if (of_property_read_bool(nd->overlay, "external-fpga-config"))
++		flags |= FPGA_MGR_EXTERNAL_CONFIG;
++
++	of_property_read_string(nd->overlay, "firmware-name", &firmware_name);
++
++	/* If FPGA was externally programmed, don't specify firmware */
++	if ((flags & FPGA_MGR_EXTERNAL_CONFIG) && firmware_name) {
++		pr_err("error: specified firmware and external-fpga-config");
++		return -EINVAL;
++	}
++
++	/* FPGA is already configured externally.  We're done. */
++	if (flags & FPGA_MGR_EXTERNAL_CONFIG)
++		return 0;
++
++	/* If we got this far, we should be programming the FPGA */
++	if (!firmware_name) {
++		pr_err("should specify firmware-name or external-fpga-config\n");
++		return -EINVAL;
++	}
++
++	return fpga_region_program_fpga(region, firmware_name, flags);
 +}
 +
-+static int __init fpga_bridge_dev_init(void)
++/**
++ * fpga_region_notify_post_remove - post-remove overlay notification
++ *
++ * @region: FPGA region that was targeted by the overlay that was removed
++ * @nd: overlay notification data
++ *
++ * Called after an overlay has been removed if the overlay's target was a
++ * FPGA region.
++ */
++static void fpga_region_notify_post_remove(struct fpga_region *region,
++					   struct of_overlay_notify_data *nd)
 +{
-+	spin_lock_init(&bridge_list_lock);
++	fpga_bridges_disable(&region->bridge_list);
++	fpga_bridges_put(&region->bridge_list);
++}
 +
-+	fpga_bridge_class = class_create(THIS_MODULE, "fpga_bridge");
-+	if (IS_ERR(fpga_bridge_class))
-+		return PTR_ERR(fpga_bridge_class);
++/**
++ * of_fpga_region_notify - reconfig notifier for dynamic DT changes
++ * @nb:		notifier block
++ * @action:	notifier action
++ * @arg:	reconfig data
++ *
++ * This notifier handles programming a FPGA when a "firmware-name" property is
++ * added to a fpga-region.
++ *
++ * Returns NOTIFY_OK or error if FPGA programming fails.
++ */
++static int of_fpga_region_notify(struct notifier_block *nb,
++				 unsigned long action, void *arg)
++{
++	struct of_overlay_notify_data *nd = arg;
++	struct fpga_region *region;
++	int ret;
 +
-+	fpga_bridge_class->dev_groups = fpga_bridge_groups;
-+	fpga_bridge_class->dev_release = fpga_bridge_dev_release;
++	switch (action) {
++	case OF_OVERLAY_PRE_APPLY:
++		pr_debug("%s OF_OVERLAY_PRE_APPLY\n", __func__);
++		break;
++	case OF_OVERLAY_POST_APPLY:
++		pr_debug("%s OF_OVERLAY_POST_APPLY\n", __func__);
++		return NOTIFY_OK;       /* not for us */
++	case OF_OVERLAY_PRE_REMOVE:
++		pr_debug("%s OF_OVERLAY_PRE_REMOVE\n", __func__);
++		return NOTIFY_OK;       /* not for us */
++	case OF_OVERLAY_POST_REMOVE:
++		pr_debug("%s OF_OVERLAY_POST_REMOVE\n", __func__);
++		break;
++	default:			/* should not happen */
++		return NOTIFY_OK;
++	}
++
++	region = fpga_region_find(nd->target);
++	if (!region)
++		return NOTIFY_OK;
++
++	ret = 0;
++	switch (action) {
++	case OF_OVERLAY_PRE_APPLY:
++		ret = fpga_region_notify_pre_apply(region, nd);
++		break;
++
++	case OF_OVERLAY_POST_REMOVE:
++		fpga_region_notify_post_remove(region, nd);
++		break;
++	}
++
++	put_device(&region->dev);
++
++	if (ret)
++		return notifier_from_errno(ret);
++
++	return NOTIFY_OK;
++}
++
++static struct notifier_block fpga_region_of_nb = {
++	.notifier_call = of_fpga_region_notify,
++};
++
++static int fpga_region_probe(struct platform_device *pdev)
++{
++	struct device *dev = &pdev->dev;
++	struct device_node *np = dev->of_node;
++	struct fpga_region *region;
++	int id, ret = 0;
++
++	region = kzalloc(sizeof(*region), GFP_KERNEL);
++	if (!region)
++		return -ENOMEM;
++
++	id = ida_simple_get(&fpga_region_ida, 0, 0, GFP_KERNEL);
++	if (id < 0) {
++		ret = id;
++		goto err_kfree;
++	}
++
++	mutex_init(&region->mutex);
++	INIT_LIST_HEAD(&region->bridge_list);
++
++	device_initialize(&region->dev);
++	region->dev.class = fpga_region_class;
++	region->dev.parent = dev;
++	region->dev.of_node = np;
++	region->dev.id = id;
++	dev_set_drvdata(dev, region);
++
++	ret = dev_set_name(&region->dev, "region%d", id);
++	if (ret)
++		goto err_remove;
++
++	ret = device_add(&region->dev);
++	if (ret)
++		goto err_remove;
++
++	of_platform_populate(np, fpga_region_of_match, NULL, &region->dev);
++
++	dev_info(dev, "FPGA Region probed\n");
++
++	return 0;
++
++err_remove:
++	ida_simple_remove(&fpga_region_ida, id);
++err_kfree:
++	kfree(region);
++
++	return ret;
++}
++
++static int fpga_region_remove(struct platform_device *pdev)
++{
++	struct fpga_region *region = platform_get_drvdata(pdev);
++
++	device_unregister(&region->dev);
 +
 +	return 0;
 +}
 +
-+static void __exit fpga_bridge_dev_exit(void)
++static struct platform_driver fpga_region_driver = {
++	.probe = fpga_region_probe,
++	.remove = fpga_region_remove,
++	.driver = {
++		.name	= "fpga-region",
++		.of_match_table = of_match_ptr(fpga_region_of_match),
++	},
++};
++
++static void fpga_region_dev_release(struct device *dev)
 +{
-+	class_destroy(fpga_bridge_class);
-+	ida_destroy(&fpga_bridge_ida);
++	struct fpga_region *region = to_fpga_region(dev);
++
++	ida_simple_remove(&fpga_region_ida, region->dev.id);
++	kfree(region);
 +}
 +
-+MODULE_DESCRIPTION("FPGA Bridge Driver");
++/**
++ * fpga_region_init - init function for fpga_region class
++ * Creates the fpga_region class and registers a reconfig notifier.
++ */
++static int __init fpga_region_init(void)
++{
++	int ret;
++
++	fpga_region_class = class_create(THIS_MODULE, "fpga_region");
++	if (IS_ERR(fpga_region_class))
++		return PTR_ERR(fpga_region_class);
++
++	fpga_region_class->dev_release = fpga_region_dev_release;
++
++	ret = of_overlay_notifier_register(&fpga_region_of_nb);
++	if (ret)
++		goto err_class;
++
++	ret = platform_driver_register(&fpga_region_driver);
++	if (ret)
++		goto err_plat;
++
++	return 0;
++
++err_plat:
++	of_overlay_notifier_unregister(&fpga_region_of_nb);
++err_class:
++	class_destroy(fpga_region_class);
++	ida_destroy(&fpga_region_ida);
++	return ret;
++}
++
++static void __exit fpga_region_exit(void)
++{
++	platform_driver_unregister(&fpga_region_driver);
++	of_overlay_notifier_unregister(&fpga_region_of_nb);
++	class_destroy(fpga_region_class);
++	ida_destroy(&fpga_region_ida);
++}
++
++module_init(fpga_region_init);
++module_exit(fpga_region_exit);
++
++MODULE_DESCRIPTION("FPGA Region");
 +MODULE_AUTHOR("Alan Tull <atull@opensource.altera.com>");
 +MODULE_LICENSE("GPL v2");
-+
-+subsys_initcall(fpga_bridge_dev_init);
-+module_exit(fpga_bridge_dev_exit);
-diff --git a/include/linux/fpga/fpga-bridge.h b/include/linux/fpga/fpga-bridge.h
-new file mode 100644
-index 0000000..1a96934
---- /dev/null
-+++ b/include/linux/fpga/fpga-bridge.h
-@@ -0,0 +1,55 @@
-+#include <linux/device.h>
-+
-+#ifndef _LINUX_FPGA_BRIDGE_H
-+#define _LINUX_FPGA_BRIDGE_H
-+
-+struct fpga_bridge;
-+
-+/**
-+ * struct fpga_bridge_ops - ops for low level FPGA bridge drivers
-+ * @enable_show: returns the FPGA bridge's status
-+ * @enable_set: set a FPGA bridge as enabled or disabled
-+ * @fpga_bridge_remove: set FPGA into a specific state during driver remove
-+ */
-+struct fpga_bridge_ops {
-+	int (*enable_show)(struct fpga_bridge *bridge);
-+	int (*enable_set)(struct fpga_bridge *bridge, bool enable);
-+	void (*fpga_bridge_remove)(struct fpga_bridge *bridge);
-+};
-+
-+/**
-+ * struct fpga_bridge - FPGA bridge structure
-+ * @name: name of low level FPGA bridge
-+ * @dev: FPGA bridge device
-+ * @mutex: enforces exclusive reference to bridge
-+ * @br_ops: pointer to struct of FPGA bridge ops
-+ * @node: FPGA bridge list node
-+ * @priv: low level driver private date
-+ */
-+struct fpga_bridge {
-+	const char *name;
-+	struct device dev;
-+	struct mutex mutex; /* for exclusive reference to bridge */
-+	const struct fpga_bridge_ops *br_ops;
-+	struct list_head node;
-+	void *priv;
-+};
-+
-+#define to_fpga_bridge(d) container_of(d, struct fpga_bridge, dev)
-+
-+struct fpga_bridge *of_fpga_bridge_get(struct device_node *node);
-+void fpga_bridge_put(struct fpga_bridge *bridge);
-+int fpga_bridge_enable(struct fpga_bridge *bridge);
-+int fpga_bridge_disable(struct fpga_bridge *bridge);
-+
-+int fpga_bridges_enable(struct list_head *bridge_list);
-+int fpga_bridges_disable(struct list_head *bridge_list);
-+void fpga_bridges_put(struct list_head *bridge_list);
-+int fpga_bridge_get_to_list(struct device_node *np,
-+			    struct list_head *bridge_list);
-+
-+int fpga_bridge_register(struct device *dev, const char *name,
-+			 const struct fpga_bridge_ops *br_ops, void *priv);
-+void fpga_bridge_unregister(struct device *dev);
-+
-+#endif /* _LINUX_FPGA_BRIDGE_H */
+diff --git a/include/linux/fpga/fpga-mgr.h b/include/linux/fpga/fpga-mgr.h
+index 0940bf4..36107c0 100644
+--- a/include/linux/fpga/fpga-mgr.h
++++ b/include/linux/fpga/fpga-mgr.h
+@@ -65,8 +65,10 @@ enum fpga_mgr_states {
+ /*
+  * FPGA Manager flags
+  * FPGA_MGR_PARTIAL_RECONFIG: do partial reconfiguration if supported
++ * FPGA_MGR_EXTERNAL_CONFIG: FPGA has been configured prior to Linux booting
+  */
+ #define FPGA_MGR_PARTIAL_RECONFIG	BIT(0)
++#define FPGA_MGR_EXTERNAL_CONFIG	BIT(1)
+ 
+ /**
+  * struct fpga_manager_ops - ops for low level fpga manager drivers
 -- 
 2.9.1
