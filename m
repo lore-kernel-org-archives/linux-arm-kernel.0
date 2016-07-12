@@ -1,35 +1,58 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 12 Jul 2016 16:23:19 +0100
-Subject: [PATCH v9 3/7] arm64: cpuidle: drop __init section marker to
- arm_cpuidle_init
-In-Reply-To: <1467997678-7107-4-git-send-email-sudeep.holla@arm.com>
-References: <1467997678-7107-1-git-send-email-sudeep.holla@arm.com>
- <1467997678-7107-4-git-send-email-sudeep.holla@arm.com>
-Message-ID: <20160712152319.GG22183@e104818-lin.cambridge.arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 12 Jul 2016 16:28:01 +0100
+Subject: [PATCH 1/2] arm64: localise Image objcopy flags
+In-Reply-To: <1468337282-14527-1-git-send-email-mark.rutland@arm.com>
+References: <1468337282-14527-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <1468337282-14527-2-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 08, 2016 at 06:07:54PM +0100, Sudeep Holla wrote:
-> Commit ea389daa7fd9 ("arm64: cpuidle: add __init section marker to
-> arm_cpuidle_init") added the __init annotation to arm_cpuidle_init
-> as it was not needed after booting which was correct at that time.
-> 
-> However with the introduction of ACPI LPI support, this will be used
-> from cpuhotplug path in ACPI processor driver.
-> 
-> This patch drops the __init annotation from arm_cpuidle_init to avoid
-> the following warning:
-> 
-> WARNING: vmlinux.o(.text+0x113c8): Section mismatch in reference from the
-> 	function acpi_processor_ffh_lpi_probe() to the function
-> 	.init.text:arm_cpuidle_init()
-> The function acpi_processor_ffh_lpi_probe() references
-> the function __init arm_cpuidle_init().
-> This is often because acpi_processor_ffh_lpi_probe lacks a __init
-> annotation or the annotation of arm_cpuidle_init is wrong.
-> 
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+We currently define OBJCOPYFLAGS in the top-level arm64 Makefile, and
+thus these flags will be passed to all uses of objcopy, kernel-wide, for
+which they are not explicitly overridden. The flags we set are intended
+for converting vmlinux (and ELF) into Image (a raw binary), and thus the
+flags chosen are problematic for some other uses which do not expect a
+raw binary result, e.g. the upcoming lkdtm rodata test:
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+  http://www.openwall.com/lists/kernel-hardening/2016/06/08/2
+
+This patch localises the objcopy flags such that they are only used for
+the vmlinux -> Image conversion.
+
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Kees Cook <keescook@chromium.org>
+Cc: Laura Abbott <labbott@redhat.com>
+Cc: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/Makefile      | 1 -
+ arch/arm64/boot/Makefile | 2 ++
+ 2 files changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
+index 7085e32..af6d2d2 100644
+--- a/arch/arm64/Makefile
++++ b/arch/arm64/Makefile
+@@ -12,7 +12,6 @@
+ 
+ LDFLAGS_vmlinux	:=-p --no-undefined -X
+ CPPFLAGS_vmlinux.lds = -DTEXT_OFFSET=$(TEXT_OFFSET)
+-OBJCOPYFLAGS	:=-O binary -R .note -R .note.gnu.build-id -R .comment -S
+ GZFLAGS		:=-9
+ 
+ ifneq ($(CONFIG_RELOCATABLE),)
+diff --git a/arch/arm64/boot/Makefile b/arch/arm64/boot/Makefile
+index 305c552..1f012c5 100644
+--- a/arch/arm64/boot/Makefile
++++ b/arch/arm64/boot/Makefile
+@@ -14,6 +14,8 @@
+ # Based on the ia64 boot/Makefile.
+ #
+ 
++OBJCOPYFLAGS_Image :=-O binary -R .note -R .note.gnu.build-id -R .comment -S
++
+ targets := Image Image.gz
+ 
+ $(obj)/Image: vmlinux FORCE
+-- 
+1.9.1
