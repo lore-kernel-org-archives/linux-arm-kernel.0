@@ -1,60 +1,74 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 12 Jul 2016 10:02:55 +0800
-Subject: [PATCH v5 7/7] ARM: dts: sun9i: Switch to the AC100 RTC clock
- outputs for osc32k
-In-Reply-To: <20160711065042.GC4589@lukather>
-References: <1467988422-17934-1-git-send-email-wens@csie.org>
- <1467988422-17934-8-git-send-email-wens@csie.org>
- <20160711065042.GC4589@lukather>
-Message-ID: <CAGb2v66OhH=C5CqB56jN=T4c8TDgyuC=F0689d7=GBhy_rEonA@mail.gmail.com>
+Date: Tue, 12 Jul 2016 10:12:46 +0800
+Subject: [PATCH 8/9] ARM: dts: sun7i: bananapi-m1-plus: Add PMIC
+ regulators and OPPs for cpufreq
+In-Reply-To: <20160709081827.GF4522@lukather>
+References: <1467796250-22010-1-git-send-email-wens@csie.org>
+ <1467796250-22010-9-git-send-email-wens@csie.org>
+ <20160709081827.GF4522@lukather>
+Message-ID: <CAGb2v655vL=U7MyzTY_Khx-bCWorb-WbQCaFm_e-yH8+dGhddQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 11, 2016 at 2:50 PM, Maxime Ripard
+Hi,
+
+On Sat, Jul 9, 2016 at 4:18 PM, Maxime Ripard
 <maxime.ripard@free-electrons.com> wrote:
 > Hi,
 >
-> On Fri, Jul 08, 2016 at 10:33:42PM +0800, Chen-Yu Tsai wrote:
->> The 32.768 kHz clock inside the A80 SoC is fed from an external source,
->> typically the AC100 RTC module.
+> On Wed, Jul 06, 2016 at 05:10:49PM +0800, Chen-Yu Tsai wrote:
+>> The Bananapi M1+, like other Allwinner A20 based boards, uses the AXP209
+>> PMIC to supply its power. The vendor FEX file's DVFS table suggests the
+>> board's CPU power rail has a voltage drop of 25 ~ 50 mV.
 >>
->> Make the osc32k placeholder a fixed-factor clock so board dts files can
->> specify its source.
+>> Add the PMIC regulator nodes and copy the DVFS table from the FEX file.
 >>
 >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 >> ---
->> Changes since v4: none
->> Changes since v3: none
->> Changes since v2: none
->> Changes since v1: none
->> ---
->>  arch/arm/boot/dts/sun9i-a80-cubieboard4.dts | 5 +++++
->>  arch/arm/boot/dts/sun9i-a80-optimus.dts     | 5 +++++
->>  arch/arm/boot/dts/sun9i-a80.dtsi            | 9 +++------
->>  3 files changed, 13 insertions(+), 6 deletions(-)
+>>  arch/arm/boot/dts/sun7i-a20-bananapi-m1-plus.dts | 48 ++++++++++++++++++++++--
+>>  1 file changed, 44 insertions(+), 4 deletions(-)
 >>
->> diff --git a/arch/arm/boot/dts/sun9i-a80-cubieboard4.dts b/arch/arm/boot/dts/sun9i-a80-cubieboard4.dts
->> index cf2f4b72a841..04b014603659 100644
->> --- a/arch/arm/boot/dts/sun9i-a80-cubieboard4.dts
->> +++ b/arch/arm/boot/dts/sun9i-a80-cubieboard4.dts
->> @@ -103,6 +103,11 @@
->>       allwinner,drive = <SUN4I_PINCTRL_40_MA>;
+>> diff --git a/arch/arm/boot/dts/sun7i-a20-bananapi-m1-plus.dts b/arch/arm/boot/dts/sun7i-a20-bananapi-m1-plus.dts
+>> index ba5bca0fe997..7bb418bd1b6e 100644
+>> --- a/arch/arm/boot/dts/sun7i-a20-bananapi-m1-plus.dts
+>> +++ b/arch/arm/boot/dts/sun7i-a20-bananapi-m1-plus.dts
+>> @@ -105,6 +105,22 @@
+>>       status = "okay";
 >>  };
 >>
->> +&osc32k {
->> +     /* osc32k input is from AC100 */
->> +     clocks = <&ac100_rtc 0>;
+>> +&cpu0 {
+>> +     cpu-supply = <&reg_dcdc2>;
+>> +
+>> +     /* The custom DVFS table suggests a voltage drop of 25 ~ 50 mV */
+>> +     operating-points = <
+>> +             /* kHz    uV */
+>> +             1080000 1450000
+>> +             912000  1425000
+>> +             864000  1350000
+>> +             720000  1250000
+>> +             528000  1150000
+>> +             312000  1100000
+>> +             144000  1050000
+>> +             >;
 >> +};
 >> +
 >
-> I'm guessing that an unresolved dependency when the driver has not
-> loaded yet, or is not even compiled ?
->
-> How is it working then?
+> We've always tried to not use all the non-sense OPPs coming from the
+> FEX files. Have you experienced any issues with the default ones?
 
-I assume the clk framework will leave it unresolved and unusable.
-Also it seems that none of existing clks use it as a parent by
-default. I will need to check the remaining unimplemented ones
-though.
+I'll find some time to run a stress test on it.
+
+> The other patches have been queued either for 4.8 as fixes, or 4.9.
+
+Thanks!
 
 ChenYu
+
+>
+> Thanks!
+> Maxime
+>
+> --
+> Maxime Ripard, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
