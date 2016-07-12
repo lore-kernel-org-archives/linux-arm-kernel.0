@@ -1,34 +1,39 @@
-From: van.freenix@gmail.com (Peng Fan)
-Date: Tue, 12 Jul 2016 09:33:44 +0800
-Subject: [PATCH] iommu: arm-smmu: drop devm_free_irq when driver detach
-Message-ID: <1468287224-12036-1-git-send-email-van.freenix@gmail.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Tue, 12 Jul 2016 10:41:58 +0900
+Subject: [RFC 0/3] extend kexec_file_load system call
+Message-ID: <20160712014201.11456-1-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is no need to call devm_free_irq when driver detach.
-devres_release_all which is called after 'drv->remove' will
-release all managed resources.
+Device tree blob must be passed to a second kernel on DTB-capable
+archs, like powerpc and arm64, but the current kernel interface
+lacks this support.
+  
+This patch extends kexec_file_load system call by adding an extra
+argument to this syscall so that an arbitrary number of file descriptors
+can be handed out from user space to the kernel.
 
-Signed-off-by: Peng Fan <van.freenix@gmail.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Robin Murphy <robin.murphy@arm.com>
----
- drivers/iommu/arm-smmu.c | 3 ---
- 1 file changed, 3 deletions(-)
+See the background [1].
 
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index 860652e..5837391c 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -2045,9 +2045,6 @@ static int arm_smmu_device_remove(struct platform_device *pdev)
- 	if (!bitmap_empty(smmu->context_map, ARM_SMMU_MAX_CBS))
- 		dev_err(dev, "removing device with active domains!\n");
- 
--	for (i = 0; i < smmu->num_global_irqs; ++i)
--		devm_free_irq(smmu->dev, smmu->irqs[i], smmu);
--
- 	/* Turn the thing off */
- 	writel(sCR0_CLIENTPD, ARM_SMMU_GR0_NS(smmu) + ARM_SMMU_GR0_sCR0);
- 	return 0;
+Please note that the new interface looks quite similar to the current
+system call, but that it won't always mean that it provides the "binary
+compatibility."
+
+[1] http://lists.infradead.org/pipermail/kexec/2016-June/016276.html
+
+
+AKASHI Takahiro (3):
+  syscall: add kexec_file_load to generic unistd.h
+  kexec: add dtb info to struct kimage
+  kexec: extend kexec_file_load system call
+
+ include/linux/fs.h                |  1 +
+ include/linux/kexec.h             |  5 +++-
+ include/linux/syscalls.h          |  4 ++-
+ include/uapi/asm-generic/unistd.h |  8 ++++-
+ include/uapi/linux/kexec.h        | 17 +++++++++++
+ kernel/kexec_file.c               | 62 ++++++++++++++++++++++++++++++++++-----
+ 6 files changed, 87 insertions(+), 10 deletions(-)
+
 -- 
-2.6.2
+2.9.0
