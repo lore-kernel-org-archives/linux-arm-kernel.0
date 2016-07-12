@@ -1,33 +1,46 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 13 Jul 2016 00:45:05 +0200
-Subject: [PATCH 1/4] ARM: dts: at91: sama5d3_xplained: fix regulator name
-Message-ID: <1468363508-23843-1-git-send-email-alexandre.belloni@free-electrons.com>
+Date: Wed, 13 Jul 2016 00:45:07 +0200
+Subject: [PATCH 3/4] ARM: dts: at91: sama5d4_ma5d4: fix regulator names
+In-Reply-To: <1468363508-23843-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1468363508-23843-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1468363508-23843-3-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-vcc_mmc0_reg is a fixed regulator and doesn't need a reg property. Remove
-its unit-address.
+vcc_3v3_reg and vcc_mmc1_reg are fixed regulators and don't need a
+reg property. Remove their unit-address.
 
 Solves:
 Warning (unit_address_vs_reg): Node /fixedregulator at 0 has a unit name, but no reg property
+Warning (unit_address_vs_reg): Node /fixedregulator at 1 has a unit name, but no reg property
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/boot/dts/at91-sama5d3_xplained.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Cc: Marek Vasut <marex@denx.de>
+ arch/arm/boot/dts/at91-sama5d4_ma5d4.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/at91-sama5d3_xplained.dts b/arch/arm/boot/dts/at91-sama5d3_xplained.dts
-index f3e2b96c06a3..c51fc652f6c7 100644
---- a/arch/arm/boot/dts/at91-sama5d3_xplained.dts
-+++ b/arch/arm/boot/dts/at91-sama5d3_xplained.dts
-@@ -297,7 +297,7 @@
+diff --git a/arch/arm/boot/dts/at91-sama5d4_ma5d4.dtsi b/arch/arm/boot/dts/at91-sama5d4_ma5d4.dtsi
+index e7b2109fc85a..d9ca7f214677 100644
+--- a/arch/arm/boot/dts/at91-sama5d4_ma5d4.dtsi
++++ b/arch/arm/boot/dts/at91-sama5d4_ma5d4.dtsi
+@@ -106,7 +106,7 @@
  		};
  	};
  
--	vcc_mmc0_reg: fixedregulator at 0 {
+-	vcc_3v3_reg: fixedregulator at 0 {
++	vcc_3v3_reg: fixedregulator_3v3 {
+ 		compatible = "regulator-fixed";
+ 		regulator-name = "VCC 3V3";
+ 		regulator-min-microvolt = <3300000>;
+@@ -115,7 +115,7 @@
+ 		regulator-always-on;
+ 	};
+ 
+-	vcc_mmc0_reg: fixedregulator at 1 {
 +	vcc_mmc0_reg: fixedregulator_mmc0 {
  		compatible = "regulator-fixed";
- 		gpio = <&pioE 2 GPIO_ACTIVE_LOW>;
- 		regulator-name = "mmc0-card-supply";
+ 		gpio = <&pioE 15 GPIO_ACTIVE_HIGH>;
+ 		regulator-name = "RST_n MCI0";
 -- 
 2.8.1
