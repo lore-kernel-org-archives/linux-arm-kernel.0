@@ -1,48 +1,75 @@
-From: ebiederm@xmission.com (Eric W. Biederman)
-Date: Tue, 12 Jul 2016 08:25:48 -0500
-Subject: [RFC 0/3] extend kexec_file_load system call
-In-Reply-To: <20160712014201.11456-1-takahiro.akashi@linaro.org> (AKASHI
- Takahiro's message of "Tue, 12 Jul 2016 10:41:58 +0900")
-References: <20160712014201.11456-1-takahiro.akashi@linaro.org>
-Message-ID: <87furf7ztv.fsf@x220.int.ebiederm.org>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Tue, 12 Jul 2016 15:44:03 +0200
+Subject: [PATCH v3 1/2] clk: samsung: cpu: Prepare for addition for Exynos7
+ CPU clocks
+In-Reply-To: <CAM4voamm5-upxvwYG0b-WpgO3OpJR+ZswVzjwRO89fjQqovFbw@mail.gmail.com>
+References: <1467750561-13957-1-git-send-email-a.kesavan@samsung.com>
+ <2318982.ZLuIVQzhgE@amdc1976>
+ <CAM4voamm5-upxvwYG0b-WpgO3OpJR+ZswVzjwRO89fjQqovFbw@mail.gmail.com>
+Message-ID: <1893441.PNypKdntnt@amdc1976>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-AKASHI Takahiro <takahiro.akashi@linaro.org> writes:
+On Monday, July 11, 2016 04:44:30 PM Abhilash Kesavan wrote:
+> Hi Bartlomiej,
 
-> Device tree blob must be passed to a second kernel on DTB-capable
-> archs, like powerpc and arm64, but the current kernel interface
-> lacks this support.
->   
-> This patch extends kexec_file_load system call by adding an extra
-> argument to this syscall so that an arbitrary number of file descriptors
-> can be handed out from user space to the kernel.
->
-> See the background [1].
->
-> Please note that the new interface looks quite similar to the current
-> system call, but that it won't always mean that it provides the "binary
-> compatibility."
->
-> [1] http://lists.infradead.org/pipermail/kexec/2016-June/016276.html
+Hi Abhilash,
 
-So this design is wrong.  The kernel already has the device tree blob,
-you should not be extracting it from the kernel munging it, and then
-reinserting it in the kernel if you want signatures and everything to
-pass.
+> Thanks for the comments.
+> 
+> On Thu, Jul 7, 2016 at 1:17 PM, Bartlomiej Zolnierkiewicz
+> <b.zolnierkie@samsung.com> wrote:
+> >
+> > Hi
+> >
+> > On Thursday, July 07, 2016 12:45:57 PM Sylwester Nawrocki wrote:
+> >> On 07/05/2016 10:29 PM, Abhilash Kesavan wrote:
+> >> > Exynos7 has the same CPU clock registers layout as that present
+> >
+> > Please precise for which Exynos7 SoC this change is needed
+> > (all three of them?).
+> 
+> As mentioned in my recently posted PMU series, the exynos7 is a quad
+> core A57 based SoC and not meant to be a SoC family.
 
-What x86 does is pass it's equivalent of the device tree blob from one
-kernel to another directly and behind the scenes.  It does not go
-through userspace for this.
+I suppose that it will get some more meaningful name once released
+officially (I couldn't find anything about this SoC on the net).
 
-Until a persuasive case can be made for going around the kernel and
-probably adding a feature (like code execution) that can be used to
-defeat the signature scheme I am going to nack this.
+> I have reviewed various exynos7xxx UMs in terms of the CPU CMU. Both
+> exynos7580 and exynos7420 have a similar CMU register layout along
+> with the same mux stat bits as exynos7. Exynos7870 on the other hand
+> is quite different.
+> 
+> Please let me know what naming convention you would prefer that I use
+> E7/E7420/E7580 ?
 
-Nacked-by: "Eric W. Biederman" <ebiederm@xmission.com>
+I would prefer using E7420 naming.
+ 
+> >> > in Exynos5433 except for the bits in the MUX_STAT* registers.
+> >> > Add a new CLK_CPU_HAS_MODIFIED_MUX_STAT flag to handle this change.
+> >>
+> >> > --- a/drivers/clk/samsung/clk-cpu.h
+> >> > +++ b/drivers/clk/samsung/clk-cpu.h
+> >> > @@ -63,6 +63,8 @@ struct exynos_cpuclk {
+> >> >  /* The CPU clock registers have Exynos5433-compatible layout */
+> >> >  #define CLK_CPU_HAS_E5433_REGS_LAYOUT      (1 << 2)
+> >>
+> >> > +/* Exynos5433-compatible layout with different MUX_STAT register bits */
+> >> > +#define CLK_CPU_HAS_MODIFIED_MUX_STAT      (1 << 3)
+> >>
+> >> It's getting a bit messy, what if there comes another SoC version
+> >> which has some other modification of exynos5433 registers structure?
+> >> We would need another variant of HAS_MODIFIED_MUX_STAT flag and we
+> >> could easily get lost while trying to determine which modification
+> >> is which. How about indicating explicitly it's an exynos7 bits
+> >> layout and renaming the flag to something like
+> >>
+> >> #define CLK_CPU_HAS_E7_MUX_STAT       (1 << 16) ?
+> >
+> > ditto
 
-I am happy to see support for other architectures, but for the sake of
-not moving some code in the kernel let's not build an attackable
-infrastructure.
-
-Eric
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
