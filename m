@@ -1,58 +1,61 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 12 Jul 2016 14:00:56 -0300
-Subject: [PATCH v5 3/3] clk: imx6: Fix procedure to switch the parent of
- LDB_DI_CLK
-In-Reply-To: <1468235521-3163-3-git-send-email-p.zabel@pengutronix.de>
-References: <1468235521-3163-1-git-send-email-p.zabel@pengutronix.de>
- <1468235521-3163-3-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <CAOMZO5AwUXOY5sE6=B60A68h7FNFNkkvsNBvBMVS5dDQSc+J4A@mail.gmail.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Tue, 12 Jul 2016 13:03:27 -0400
+Subject: [PATCH 0/2] arm/arm64: localise objcopy flags
+In-Reply-To: <1468337282-14527-1-git-send-email-mark.rutland@arm.com>
+References: <1468337282-14527-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <CAGXu5jLiZo18+=MDOUODVV2tJsV-okX5jtLNjG5tUs9A_3=Wpw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sean,
-
-On Mon, Jul 11, 2016 at 8:12 AM, Philipp Zabel <p.zabel@pengutronix.de> wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
+On Tue, Jul 12, 2016 at 11:28 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+> Hi,
 >
-> Due to incorrect placement of the clock gate cell in the ldb_di[x]_clk
-> tree, the glitchy parent mux of ldb_di[x]_clk can cause a glitch to
-> enter the ldb_di_ipu_div divider. If the divider gets locked up, no
-> ldb_di[x]_clk is generated, and the LVDS display will hang when the
-> ipu_di_clk is sourced from ldb_di_clk.
+> Typically, architectures (including arm and arm64) define OBJCOPYFLAGS in their
+> top-level makefile, for the purpose of generating a raw binaries suitable for
+> booting, including Image, zImage, vmlinux.bin, etc.
 >
-> To fix the problem, both the new and current parent of the ldb_di_clk
-> should be disabled before the switch. This patch ensures that correct
-> steps are followed when ldb_di_clk parent is switched in the beginning
-> of boot. The glitchy muxes are then registered as read-only. The clock
-> parent can be selected using the assigned-clocks and
-> assigned-clock-parents properties of the ccm device tree node:
+> As this top-level arch makefile is included by the top-level kernel makefile,
+> these flags are passed to other invocations of objcopy tree-wide. This can
+> result in unexpected and inconsistent behaviour across architectures (e.g.
+> generation of a raw binary rather than an ELF [1]).
 >
->         &clks {
->                 assigned-clocks = <&clks IMX6QDL_CLK_LDB_DI0_SEL>,
->                                   <&clks IMX6QDL_CLK_LDB_DI1_SEL>;
->                 assigned-clock-parents = <&clks IMX6QDL_CLK_MMDC_CH1_AXI>,
->                                          <&clks IMX6QDL_CLK_PLL5_VIDEO_DIV>;
->         };
+> Rather than force each new user of objcopy to specially clear OBJCOPYFLAGS,
+> this patch moves the existing OBJCOPYFLAGS variable definitions such that they
+> only affects the cases we require them for today, leaving the global namespace
+> clear.
 >
-> The issue is explained in detail in EB821 ("LDB Clock Switch Procedure &
-> i.MX6 Asynchronous Clock Switching Guidelines") [1].
+> Other architectures will likely need similar treatment.
+
+Oh excellent, thanks for doing this! I made an attempt at this back
+when I ran into it with lkdtm, but I wasn't sure it was working as
+intended. :)
+
+Acked-by: Kees Cook <keescook@chromium.org>
+
+-Kees
+
 >
-> [1] http://www.nxp.com/files/32bit/doc/eng_bulletin/EB821.pdf
+> Thanks,
+> Mark.
 >
-> Signed-off-by: Ranjani Vaidyanathan <Ranjani.Vaidyanathan@freescale.com>
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+> [1] http://www.openwall.com/lists/kernel-hardening/2016/06/08/2
+>
+> Mark Rutland (2):
+>   arm64: localise Image objcopy flags
+>   arm: localise objcopy flags
+>
+>  arch/arm/Makefile        | 1 -
+>  arch/arm/boot/Makefile   | 2 ++
+>  arch/arm64/Makefile      | 1 -
+>  arch/arm64/boot/Makefile | 2 ++
+>  4 files changed, 4 insertions(+), 2 deletions(-)
+>
+> --
+> 1.9.1
+>
 
-On a previous version of the patch you reported issues on Novena:
-http://www.spinics.net/lists/arm-kernel/msg476324.html
 
-Does v5 work fine on your board?
 
-Christian,
-
-I remember you had an automated way of testing this LDB glitch
-problem. Would it be possible to run v5 through your test setup?
-
-Thanks,
-
-Fabio Estevam
+-- 
+Kees Cook
+Chrome OS & Brillo Security
