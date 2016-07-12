@@ -1,82 +1,120 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Tue, 12 Jul 2016 14:05:14 +0900
-Subject: [PATCH v22 8/8] Documentation: dt: chosen properties for arm64 kdump
-In-Reply-To: <20160712050514.22307-1-takahiro.akashi@linaro.org>
-References: <20160712050514.22307-1-takahiro.akashi@linaro.org>
-Message-ID: <20160712050514.22307-9-takahiro.akashi@linaro.org>
+From: guodong.xu@linaro.org (Guodong Xu)
+Date: Tue, 12 Jul 2016 13:31:03 +0800
+Subject: [PATCH 1/2] Bluetooth: Add LED triggers for HCI frames tx and rx
+In-Reply-To: <1466657923-5776-1-git-send-email-guodong.xu@linaro.org>
+References: <1466657923-5776-1-git-send-email-guodong.xu@linaro.org>
+Message-ID: <CAFGCpxxZthBfxD2kK7CAWZwhGPx9Td8i=YDvaC4RbQZQEMSKMQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: James Morse <james.morse@arm.com>
+Dear maintainers,
 
-Add documentation for
-	linux,crashkernel-base and crashkernel-size,
-	linux,usable-memory-range, and
-	linux,elfcorehdr
-used by arm64 kexec/kdump to decribe the kdump reserved area, and
-the elfcorehdr's location within it.
+Would you have a review on this?
 
-Signed-off-by: James Morse <james.morse@arm.com>
-[takahiro.akashi at linaro.org:
-    renamed "usable-memory" to "usable-memory-range",
-    added "linux,crashkernel-base" and "-size" ]
-Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
----
- Documentation/devicetree/bindings/chosen.txt | 45 ++++++++++++++++++++++++++++
- 1 file changed, 45 insertions(+)
+-Guodong
 
-diff --git a/Documentation/devicetree/bindings/chosen.txt b/Documentation/devicetree/bindings/chosen.txt
-index 6ae9d82..d7a3a86 100644
---- a/Documentation/devicetree/bindings/chosen.txt
-+++ b/Documentation/devicetree/bindings/chosen.txt
-@@ -52,3 +52,48 @@ This property is set (currently only on PowerPC, and only needed on
- book3e) by some versions of kexec-tools to tell the new kernel that it
- is being booted by kexec, as the booting environment may differ (e.g.
- a different secondary CPU release mechanism)
-+
-+linux,crashkernel-base
-+linux,crashkernel-size
-+----------------------
-+These properties are set (on PowerPC and arm64) during kdump to tell
-+use-space tools, like kexec-tools, the base address of the crash-dump
-+kernel's reserved area of memory and the size. e.g.
-+
-+/ {
-+	chosen {
-+		linux,crashkernel-base = <0x9 0xf0000000>;
-+		linux,crashkernel-size = <0x0 0x10000000>;
-+	};
-+};
-+
-+linux,usable-memory-range
-+-------------------------
-+
-+This property is set (currently only on arm64) during kdump to tell
-+the crash-dump kernel the base address of its reserved area of memory,
-+and the size. e.g.
-+
-+/ {
-+	chosen {
-+		linux,usable-memory-range = <0x9 0xf0000000 0x0 0x10000000>;
-+	};
-+};
-+
-+Please note that, if this property is present, any memory regions under
-+"memory" nodes will be ignored.
-+
-+linux,elfcorehdr
-+----------------
-+
-+This property is set (currently only on arm64) during kdump to tell
-+the crash-dump kernel the address and size of the elfcorehdr that describes
-+the old kernel's memory as an elf file. This memory must reside within
-+the area described by 'linux,usable-memory-range'. e.g.
-+
-+/ {
-+	chosen {
-+		linux,usable-memory = <0x9 0xf0000000 0x0 0x10000000>;
-+		linux,elfcorehdr = <0x9 0xfffff000 0x0 0x800>;
-+	};
-+};
--- 
-2.9.0
+On 23 June 2016 at 12:58, Guodong Xu <guodong.xu@linaro.org> wrote:
+> Two LED triggers are defined: tx_led and rx_led. Upon frames
+> available in HCI core layer, for tx or for rx, the combined LED
+> can blink.
+>
+> Verified on HiKey, 96boards. It uses hi6220 SoC and TI WL1835 combo
+> chip.
+>
+> Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
+> ---
+>  include/net/bluetooth/hci_core.h |  1 +
+>  net/bluetooth/hci_core.c         |  3 +++
+>  net/bluetooth/leds.c             | 15 +++++++++++++++
+>  net/bluetooth/leds.h             |  2 ++
+>  4 files changed, 21 insertions(+)
+>
+> diff --git a/include/net/bluetooth/hci_core.h b/include/net/bluetooth/hci_core.h
+> index dc71473..37b8dd9 100644
+> --- a/include/net/bluetooth/hci_core.h
+> +++ b/include/net/bluetooth/hci_core.h
+> @@ -398,6 +398,7 @@ struct hci_dev {
+>         bdaddr_t                rpa;
+>
+>         struct led_trigger      *power_led;
+> +       struct led_trigger      *tx_led, *rx_led;
+>
+>         int (*open)(struct hci_dev *hdev);
+>         int (*close)(struct hci_dev *hdev);
+> diff --git a/net/bluetooth/hci_core.c b/net/bluetooth/hci_core.c
+> index 45a9fc6..c6e1210 100644
+> --- a/net/bluetooth/hci_core.c
+> +++ b/net/bluetooth/hci_core.c
+> @@ -3248,6 +3248,7 @@ int hci_recv_frame(struct hci_dev *hdev, struct sk_buff *skb)
+>         skb_queue_tail(&hdev->rx_q, skb);
+>         queue_work(hdev->workqueue, &hdev->rx_work);
+>
+> +       hci_leds_blink_oneshot(hdev->rx_led);
+>         return 0;
+>  }
+>  EXPORT_SYMBOL(hci_recv_frame);
+> @@ -3325,6 +3326,8 @@ static void hci_send_frame(struct hci_dev *hdev, struct sk_buff *skb)
+>                 BT_ERR("%s sending frame failed (%d)", hdev->name, err);
+>                 kfree_skb(skb);
+>         }
+> +
+> +       hci_leds_blink_oneshot(hdev->tx_led);
+>  }
+>
+>  /* Send HCI command */
+> diff --git a/net/bluetooth/leds.c b/net/bluetooth/leds.c
+> index 8319c84..c4825d5 100644
+> --- a/net/bluetooth/leds.c
+> +++ b/net/bluetooth/leds.c
+> @@ -19,6 +19,8 @@ struct hci_basic_led_trigger {
+>  #define to_hci_basic_led_trigger(arg) container_of(arg, \
+>                         struct hci_basic_led_trigger, led_trigger)
+>
+> +#define BLUETOOTH_BLINK_DELAY  50 /* ms */
+> +
+>  void hci_leds_update_powered(struct hci_dev *hdev, bool enabled)
+>  {
+>         if (hdev->power_led)
+> @@ -37,6 +39,15 @@ static void power_activate(struct led_classdev *led_cdev)
+>         led_trigger_event(led_cdev->trigger, powered ? LED_FULL : LED_OFF);
+>  }
+>
+> +void hci_leds_blink_oneshot(struct led_trigger *trig)
+> +{
+> +       unsigned long led_delay = BLUETOOTH_BLINK_DELAY;
+> +
+> +       if (!trig)
+> +               return;
+> +       led_trigger_blink_oneshot(trig, &led_delay, &led_delay, 0);
+> +}
+> +
+>  static struct led_trigger *led_allocate_basic(struct hci_dev *hdev,
+>                         void (*activate)(struct led_classdev *led_cdev),
+>                         const char *name)
+> @@ -71,4 +82,8 @@ void hci_leds_init(struct hci_dev *hdev)
+>  {
+>         /* initialize power_led */
+>         hdev->power_led = led_allocate_basic(hdev, power_activate, "power");
+> +       /* initialize tx_led */
+> +       hdev->tx_led = led_allocate_basic(hdev, NULL, "tx");
+> +       /* initialize rx_led */
+> +       hdev->rx_led = led_allocate_basic(hdev, NULL, "rx");
+>  }
+> diff --git a/net/bluetooth/leds.h b/net/bluetooth/leds.h
+> index a9c4d6e..9b1cccd 100644
+> --- a/net/bluetooth/leds.h
+> +++ b/net/bluetooth/leds.h
+> @@ -9,8 +9,10 @@
+>  #if IS_ENABLED(CONFIG_BT_LEDS)
+>  void hci_leds_update_powered(struct hci_dev *hdev, bool enabled);
+>  void hci_leds_init(struct hci_dev *hdev);
+> +void hci_leds_blink_oneshot(struct led_trigger *trig);
+>  #else
+>  static inline void hci_leds_update_powered(struct hci_dev *hdev,
+>                                            bool enabled) {}
+>  static inline void hci_leds_init(struct hci_dev *hdev) {}
+> +static inline void hci_leds_blink_oneshot(struct led_trigger *trig) {}
+>  #endif
+> --
+> 1.9.1
+>
