@@ -1,51 +1,55 @@
 From: hzpeterchen@gmail.com (Peter Chen)
-Date: Tue, 12 Jul 2016 09:07:25 +0800
-Subject: [PATCH v2 15/22] usb: chipidea: msm: Mux over secondary phy at
- the right time
-In-Reply-To: <CAJOFmgzxYutvxhBbmmYyuDd9PTgpDskzHTvCUGteATPEFTU31g@mail.gmail.com>
+Date: Tue, 12 Jul 2016 09:09:38 +0800
+Subject: [PATCH v2 18/22] usb: chipidea: msm: Add reset controller for
+ PHY POR bit
+In-Reply-To: <CAJOFmgxHQPTm-aq3-e_8SGe2kw8R6TAQKDp2Jn8DXfMykcSS8w@mail.gmail.com>
 References: <20160707222114.1673-1-stephen.boyd@linaro.org>
- <20160707222114.1673-16-stephen.boyd@linaro.org>
- <20160711044327.GG30448@shlinux2>
- <CAJOFmgzxYutvxhBbmmYyuDd9PTgpDskzHTvCUGteATPEFTU31g@mail.gmail.com>
-Message-ID: <20160712010725.GK31647@shlinux2>
+ <20160707222114.1673-19-stephen.boyd@linaro.org>
+ <20160711053228.GB31647@shlinux2>
+ <CAJOFmgxHQPTm-aq3-e_8SGe2kw8R6TAQKDp2Jn8DXfMykcSS8w@mail.gmail.com>
+Message-ID: <20160712010938.GL31647@shlinux2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 11, 2016 at 03:03:37PM -0700, Stephen Boyd wrote:
-> On 10 July 2016 at 21:43, Peter Chen <hzpeterchen@gmail.com> wrote:
-> > On Thu, Jul 07, 2016 at 03:21:06PM -0700, Stephen Boyd wrote:
-> >> diff --git a/drivers/usb/chipidea/ci_hdrc_msm.c b/drivers/usb/chipidea/ci_hdrc_msm.c
-> >> index 7e870a253f55..7708bee3ff3e 100644
-> >> --- a/drivers/usb/chipidea/ci_hdrc_msm.c
-> >> +++ b/drivers/usb/chipidea/ci_hdrc_msm.c
-> >> @@ -8,29 +8,44 @@
-> >>  #include <linux/module.h>
-> >>  #include <linux/platform_device.h>
-> >>  #include <linux/pm_runtime.h>
-> >> -#include <linux/usb/gadget.h>
-> >>  #include <linux/usb/chipidea.h>
-> >>  #include <linux/clk.h>
-> >>  #include <linux/reset.h>
-> >> +#include <linux/mfd/syscon.h>
-> >> +#include <linux/regmap.h>
-> >> +#include <linux/io.h>
+On Mon, Jul 11, 2016 at 03:07:24PM -0700, Stephen Boyd wrote:
+> On 10 July 2016 at 22:32, Peter Chen <hzpeterchen@gmail.com> wrote:
+> > On Thu, Jul 07, 2016 at 03:21:09PM -0700, Stephen Boyd wrote:
+> >> @@ -40,11 +43,38 @@ struct ci_hdrc_msm {
+> >>       struct clk *iface_clk;
+> >>       struct clk *fs_clk;
+> >>       struct ci_hdrc_platform_data pdata;
+> >> +     struct reset_controller_dev rcdev;
+> >>       bool secondary_phy;
+> >>       bool hsic;
+> >>       void __iomem *base;
+> >>  };
 > >>
-> >>  #include "ci.h"
-> >>
-> >>  #define HS_PHY_AHB_MODE                      0x0098
-> >>
-> >> +/* Vendor base starts at 0x200 beyond CI base */
-> >> +#define HS_PHY_SEC_CTRL				0x0078
-> >> +#define HS_PHY_DIG_CLAMP_				BIT(16)
+> >> +static int
+> >> +ci_hdrc_msm_por_reset(struct reset_controller_dev *r, unsigned long id)
+> >> +{
+> >> +     struct ci_hdrc_msm *ci_msm = container_of(r, struct ci_hdrc_msm, rcdev);
+> >> +     void __iomem *addr = ci_msm->base;
+> >> +     u32 val;
 > >> +
+> >> +     if (id)
+> >> +             addr += HS_PHY_SEC_CTRL;
+> >> +     else
+> >> +             addr += HS_PHY_CTRL;
+> >> +
+> >> +     val = readl_relaxed(addr);
+> >> +     val |= HS_PHY_POR_ASSERT;
+> >> +     writel(val, addr);
+> >> +     udelay(12);
 > >
-> > Keep alignment
+> > Does this delay is reference manual defines or experienced value?
+> > Do you need to comment it?
+> >
 > 
-> It's aligned in my editor, tabs vs. spaces problem?
-> 
+> 10us comes from the manual but we add two more from experience. I can
+> add a comment to that effect similar to the one above udelay(12) in
+> phy-msm-usb.c?
 
-You can always align with tab, I just see it does not align for each
-line at both my mutt and web gmail.
+Yes, you can move that comments from there.
 
 -- 
 
