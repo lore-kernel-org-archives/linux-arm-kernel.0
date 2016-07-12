@@ -1,83 +1,97 @@
-From: julien.grall@arm.com (Julien Grall)
-Date: Tue, 12 Jul 2016 10:21:12 +0100
-Subject: [PATCH v3] xen/arm: enable clocks used by the hypervisor
-In-Reply-To: <146799758568.73491.4432005583661196579@resonance>
-References: <1467963871-31556-1-git-send-email-dirk.behme@de.bosch.com>
- <577F73B3.8090807@arm.com> <146799758568.73491.4432005583661196579@resonance>
-Message-ID: <5784B688.7050903@arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 12 Jul 2016 10:24:48 +0100
+Subject: [GIT PULL] STi DT updates for v4.8
+In-Reply-To: <9427724.UUV0z7XpPd@wuerfel>
+References: <5776701A.1000808@st.com> <20160707052827.GL32389@localhost>
+ <577E0734.2070206@st.com> <9427724.UUV0z7XpPd@wuerfel>
+Message-ID: <20160712092448.GE1611@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+On Thu, 07 Jul 2016, Arnd Bergmann wrote:
 
-On 08/07/16 18:06, Michael Turquette wrote:
-> Quoting Julien Grall (2016-07-08 02:34:43)
->> Hi Dirk,
->>
->> On 08/07/16 08:44, Dirk Behme wrote:
->>> Xen hypervisor drivers might replace native OS drivers. The result is
->>> that some important clocks that are enabled by the OS in the non-Xen
->>> case are not properly enabled in the presence of Xen. The clocks
->>> property enumerates the clocks that must be enabled by the Xen clock
->>> consumer.
->>>
->>> An example is a serial driver enabled by the hypervisor. Xen must
->>
->> I would say "An example is the UART used by the hypervisor."
->>
->>> consume and enable these clocks in the OS to ensure behavior continues
->>> after firmware configures the UART hardware and corresponding clock
->>> harder.
->>
->> What do you mean by "harder"?
->>
->> Also, relying on DOM0 to enable the clock looks very wrong to me and you
->> give an example which prove that. The UART will be used before hand by
->> Xen, however it will not be possible to use it if you expect DOM0 to
->> enable the clock (or even modify the clock frequency).
->>
->> The clock should be enabled either by the firmware or Xen. But not DOM0.
->> DOM0 should not touch this clock at all.
->>
->> Furthermore, this property could be used for clock associated to device
->> that will be passthrough-ed to a guest. In this case, the clock would be
->> enabled even if the device is not in use which will result more power
->> consumption.
->
-> Is there a need to pass clock references through to guests? If so the
-> unmerged CLK_ENABLE_HAND_OFF[0] feature might be useful to you? If this
-> flag is set on a given clk, it will be enabled at the time it is
-> registered by the clk provider driver, and it's enable_count reference
-> counter will be "handed off" to the first consumer that calls clk_get()
-> and clk_prepare_enable() on it. This means the clock CAN be gated by
-> it's proper driver, but it will be enabled at boot time as well.
+> On Thursday, July 7, 2016 9:39:32 AM CEST Patrice Chotard wrote:
+> > On 07/07/2016 07:28 AM, Olof Johansson wrote:
+> > > On Fri, Jul 01, 2016 at 03:28:58PM +0200, Patrice Chotard wrote:
+> > >> ----------------------------------------------------------------
+> > >> Highlights:
+> > >> -----------
+> > >>   -add STi critical clocks
+> > >> - as discussed on IRC with Lee Jones, remove SPI hack wich has dependecy
+> > >> with critical clocks
+> > >>
+> > >> ----------------------------------------------------------------
+> > >> Lee Jones (3):
+> > >>        ARM: sti: stih407-family: Supply defines for CLOCKGEN A0
+> > >>        ARM: sti: stih410-clocks: Identify critical clocks
+> > >>        spi: st-ssc4: Remove 'no clocking' hack
+> > > THere are more patches than this in this branch -- there are three clock
+> > > branches that by the look of it have been applied by Stephen Boyd.
+> > >
+> > > However, since they have been brought in without doing a merge, it's hard for
+> > > us to tell where they came form, and/or if they're in a shared branch
+> > > somewhere. Therefore, I recommend doing a --no-ff merge of the branch, so it's
+> > > obvious from the merge commit where they came form. They also need to be part
+> > > of the diffstat.
+> > >
+> > > Finally, the clk patch doesn't really belong in the DT branch here. It's
+> > > probably a suitable patch to send to the clk maintainers after the DT changes
+> > > have gone in, i.e. for 4.9.
+> > >
+> > > Please respin this pull request and we'll take another look!
+> > 
+> > There was a discussion on IRC armlinux's channel between Lee Jones, Arnd 
+> > Bergman
+> > and Mark Brown about the way to proceed with this pull request.
+> > 
+> > As there are dependencies between the 3 critical clocks patches on 
+> > Stephen Boyd's
+> > branch clk-next/clk-st-critical, our STi DT and our SPI drivers which 
+> > remove a temporary
+> > clock hack, the decision was taken to put our DT STi fixes on top of 
+> > Stephen Boyd critical clk
+> >   branch and our SPI patches on the top.
+> > 
+> > For more details i put in attachment the IRC exchange about this.
+> 
+> This information belongs into the tag description, it's required for
+> us to make the decision whether the branch is can be merged or not.
+> 
+> In particular, you need to spell out the specific dependency that
+> exists between the clk patches and the dt patches.
+> 
+> What I understood from Lee before is that there is no such dependency
+> at all and the only thing that needs the clk changes is the spi
+> patch, while the DT patches and the clk patches are independent.
+> 
+> However, Lee's explanation was a bit ambiguous and could be interpreted
+> as meaning that there is another dependency here, which was simply
+> not explained.
 
-Some driver requires to have the clock in hand to be able to configure 
-the clock (such as setting the rate). So we would have to find a way to 
-let the guest using the clock either by assigning the clock or some PV 
-clock driver.
+I don't see any ambiguity?
 
-However, platform device passthrough (i.e non-pci device) cannot be done 
-generically. The user has to provide a lots of information manually 
-(such as MMIO, IRQ, device tree node...). So I am not sure if we want to 
-have a generic solution here.
+<lag> arnd: The SPI patch depends on them both landing ... before it does
+<broonie> But why not just merge all three bits via the same path with the dependencies sorted out in git?
+<arnd> that would work too. lag, can you easily separate out the dt changes for this thing from the other dt changes? then the three clk changes, the respective dt changes  and the bugfix can all go into arm-soc/next/late together
+<lag> broonie: That's what I suggested to start with
+<lag> arnd: That works for me too
+<lag> pchotard: Are you happy do to that?
 
-I though it would be worth to mention it because we may (or not) use 
-this clock to tell DOM0 (don't touch it).
+... then I went on to describe to Patrice how this would look.
 
-> This is useful for use cases like splash screens where the bootloader
-> configures the display and plays some animation, and we want the linux
-> kernel to take over the display controller hardware without cutting
-> clocks, blanking or reseting it. Handing off the clock reference count
-> helps achieve this.
+To recap:
 
- From my understanding, any device used by Xen would be in a similar 
-situation, although there will be no driver in Linux. The current patch 
-(as well as the v4) is calling clk_prepare_enable for each clock used by 
-Xen. Could enabling the clock create unexpected behavior such as the 
-UART loosing/dropping characters?
+Patrice would submit his normal 'machine', 'device tree' and
+'defconfig' pull-requests.  None of these branches would have any
+critical clock related patches contained.  He would also submit a
+'late' branch, which would contain all of the critical clock
+enablement.  The idea being that you would have this branch merged
+late in the cycle.
 
-Regards,
+Where is the confusion?
 
 -- 
-Julien Grall
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
