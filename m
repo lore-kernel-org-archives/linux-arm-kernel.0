@@ -1,64 +1,31 @@
-From: nwatters@codeaurora.org (Nate Watterson)
-Date: Tue, 12 Jul 2016 14:19:20 -0400
-Subject: [PATCH v2] iommu/arm-smmu-v3: limit use of 2-level stream tables
-In-Reply-To: <1468260059-10759-1-git-send-email-nwatters@codeaurora.org>
-References: <1468260059-10759-1-git-send-email-nwatters@codeaurora.org>
-Message-ID: <1468347560-29924-1-git-send-email-nwatters@codeaurora.org>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 12 Jul 2016 15:32:54 -0300
+Subject: [PATCH 3/6] ARM: dts: imx25: substitute NO_PAD_CTL by the
+ respective reset value
+In-Reply-To: <CAOMZO5B+grtejgSMKrZMT9inEdh+bL0smZKE52qtcQD1NCHrqQ@mail.gmail.com>
+References: <1468145266-7567-1-git-send-email-uwe@kleine-koenig.org>
+ <1468145266-7567-4-git-send-email-uwe@kleine-koenig.org>
+ <CAOMZO5A=6HLPacwp0seBn_s+AVF7zaUjUO8wOb1WoyvU1JrH7A@mail.gmail.com>
+ <20160711073721.GM16643@pengutronix.de>
+ <CAOMZO5ASsA88TQLAPdyit0xr3Lqh8e+8C_ZgoUa7w2rZxTb-ag@mail.gmail.com>
+ <20160712073859.GQ16643@pengutronix.de>
+ <CAOMZO5B+grtejgSMKrZMT9inEdh+bL0smZKE52qtcQD1NCHrqQ@mail.gmail.com>
+Message-ID: <CAOMZO5D2E_G4ySUnj=yadziSunwMBSVZs-Rw=EvNybFKs2iD3w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the current arm-smmu-v3 driver, all smmus that support 2-level
-stream tables are being forced to use them. This is suboptimal for
-smmus that support fewer stream id bits than would fill in a single
-second level table. This patch limits the use of 2-level tables to
-smmus that both support the feature and whose first level table can
-possibly contain more than a single entry.
+Hi Uwe,
 
-Signed-off-by: Nate Watterson <nwatters@codeaurora.org>
----
- drivers/iommu/arm-smmu-v3.c | 21 ++++++++++-----------
- 1 file changed, 10 insertions(+), 11 deletions(-)
+On Tue, Jul 12, 2016 at 12:15 PM, Fabio Estevam <festevam@gmail.com> wrote:
 
-diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index 5f6b3bc..f27b8dc 100644
---- a/drivers/iommu/arm-smmu-v3.c
-+++ b/drivers/iommu/arm-smmu-v3.c
-@@ -2033,17 +2033,9 @@ static int arm_smmu_init_strtab_2lvl(struct arm_smmu_device *smmu)
- 	u32 size, l1size;
- 	struct arm_smmu_strtab_cfg *cfg = &smmu->strtab_cfg;
- 
--	/*
--	 * If we can resolve everything with a single L2 table, then we
--	 * just need a single L1 descriptor. Otherwise, calculate the L1
--	 * size, capped to the SIDSIZE.
--	 */
--	if (smmu->sid_bits < STRTAB_SPLIT) {
--		size = 0;
--	} else {
--		size = STRTAB_L1_SZ_SHIFT - (ilog2(STRTAB_L1_DESC_DWORDS) + 3);
--		size = min(size, smmu->sid_bits - STRTAB_SPLIT);
--	}
-+	/* Calculate the L1 size, capped to the SIDSIZE. */
-+	size = STRTAB_L1_SZ_SHIFT - (ilog2(STRTAB_L1_DESC_DWORDS) + 3);
-+	size = min(size, smmu->sid_bits - STRTAB_SPLIT);
- 	cfg->num_l1_ents = 1 << size;
- 
- 	size += STRTAB_SPLIT;
-@@ -2531,6 +2523,13 @@ static int arm_smmu_device_probe(struct arm_smmu_device *smmu)
- 	smmu->ssid_bits = reg >> IDR1_SSID_SHIFT & IDR1_SSID_MASK;
- 	smmu->sid_bits = reg >> IDR1_SID_SHIFT & IDR1_SID_MASK;
- 
-+	/*
-+	 * If the SMMU supports fewer bits than would fill a single L2 stream
-+	 * table, use a linear table instead.
-+	 */
-+	if (smmu->sid_bits <= STRTAB_SPLIT)
-+		smmu->features &= ~ARM_SMMU_FEAT_2_LVL_STRTAB;
-+
- 	/* IDR5 */
- 	reg = readl_relaxed(smmu->base + ARM_SMMU_IDR5);
- 
--- 
-Qualcomm Datacenter Technologies, Inc. on behalf of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux
-Foundation Collaborative Project.
+> I will try to get access to a mx25pdk and will confirm soon. Thanks
+
+Please find attached the patch after reading all the PAD_CTL
+registers. Feel free to submit it as part of your series.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0001-mx25iomuxc.patch
+Type: text/x-patch
+Size: 4099 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160712/0e160fd7/attachment-0001.bin>
