@@ -1,92 +1,48 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 12 Jul 2016 13:39:42 +0100
-Subject: [PATCH v8 13/17] KVM: arm64: read initial LPI pending table
-In-Reply-To: <152d1107-febf-3aa4-ab85-e6cc8c8aa840@arm.com>
-References: <20160705112309.28877-1-andre.przywara@arm.com>
- <20160705112309.28877-14-andre.przywara@arm.com> <5783CE67.2070202@arm.com>
- <152d1107-febf-3aa4-ab85-e6cc8c8aa840@arm.com>
-Message-ID: <5784E50E.3050309@arm.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 12 Jul 2016 13:59:23 +0100
+Subject: [PATCH v9 0/7] ACPI / processor_idle: Add ACPI v6.0 LPI support
+In-Reply-To: <2164074.OnkmXO2GSJ@vostro.rjw.lan>
+References: <1467997678-7107-1-git-send-email-sudeep.holla@arm.com>
+ <5784D78E.7010409@arm.com> <2164074.OnkmXO2GSJ@vostro.rjw.lan>
+Message-ID: <5784E9AB.1070507@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/07/16 12:33, Andre Przywara wrote:
-> Hi,
-> 
-> On 11/07/16 17:50, Marc Zyngier wrote:
->> On 05/07/16 12:23, Andre Przywara wrote:
->>> The LPI pending status for a GICv3 redistributor is held in a table
->>> in (guest) memory. To achieve reasonable performance, we cache this
->>> data in our struct vgic_irq. The initial pending state must be read
->>> from guest memory upon enabling LPIs for this redistributor.
+
+
+On 12/07/16 13:09, Rafael J. Wysocki wrote:
+> On Tuesday, July 12, 2016 12:42:06 PM Sudeep Holla wrote:
+>>
+>> On 08/07/16 18:07, Sudeep Holla wrote:
+>>> ACPI 6.0 introduced LPI(Low Power Idle) states that provides an alternate
+>>> method to describe processor idle states. It extends the specification
+>>> to allow the expression of idle states like C-states selectable by the
+>>> OSPM when a processor goes idle, but may affect more than one processor,
+>>> and may affect other system components.
 >>>
->>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
->>> ---
->>>  virt/kvm/arm/vgic/vgic-its.c | 81 ++++++++++++++++++++++++++++++++++++++++++++
->>>  virt/kvm/arm/vgic/vgic.h     |  6 ++++
->>>  2 files changed, 87 insertions(+)
+>>> LPI extensions leverages the processor container device(again introduced
+>>> in ACPI 6.0) allowing to express which parts of the system are affected
+>>> by a given LPI state. It defines the local power states for each node
+>>> in a hierarchical processor topology. The OSPM can use _LPI object to
+>>> select a local power state for each level of processor hierarchy in the
+>>> system. They used to produce a composite power state request that is
+>>> presented to the platform by the OSPM.
 >>>
->>> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
->>> index 1e2e649..29bb4fe 100644
->>> --- a/virt/kvm/arm/vgic/vgic-its.c
->>> +++ b/virt/kvm/arm/vgic/vgic-its.c
->>> @@ -93,6 +93,81 @@ struct its_itte {
->>>  		list_for_each_entry(itte, &(dev)->itt_head, itte_list)
->>>  
->>>  #define CBASER_ADDRESS(x)	((x) & GENMASK_ULL(51, 12))
->>> +#define PENDBASER_ADDRESS(x)	((x) & GENMASK_ULL(51, 16))
+>>> Since multiple processors affect the idle state for any non-leaf hierarchy
+>>> node, coordination of idle state requests between the processors is
+>>> required. ACPI supports two different coordination schemes: Platform
+>>> coordinated and  OS initiated.
+>>>
 >>
->> 52 bits again. Pick a side!
->>
->>> +
->>> +static int vgic_its_copy_lpi_list(struct kvm *kvm, u32 **intid_ptr)
->>> +{
->>> +	struct vgic_dist *dist = &kvm->arch.vgic;
->>> +	struct vgic_irq *irq;
->>> +	u32 *intids;
->>> +	int irq_count = dist->lpi_list_count, i = 0;
->>> +
->>> +	/*
->>> +	 * We use the current value of the list length, which may change
->>> +	 * after the kmalloc. We don't care, because the guest shouldn't
->>> +	 * change anything while the command handling is still running,
->>> +	 * and in the worst case we would miss a new IRQ, which one wouldn't
->>> +	 * expect to be covered by this command anyway.
->>> +	 */
->>> +	intids = kmalloc_array(irq_count, sizeof(intids[0]), GFP_KERNEL);
->>> +	if (!intids)
->>> +		return -ENOMEM;
->>> +
->>> +	spin_lock(&dist->lpi_list_lock);
->>> +	list_for_each_entry(irq, &dist->lpi_list_head, lpi_entry) {
->>> +		if (kref_get_unless_zero(&irq->refcount)) {
->>> +			intids[i] = irq->intid;
->>> +			vgic_put_irq_locked(kvm, irq);
->>
->> This is ugly. You know you're not going to free the irq, since it was at
->> least one when you did kref_get_unless_zero(). Why not doing a simple
->> kref_put (possibly in a macro so that you can hide the dummy release
->> function)?
-> 
-> I think I don't need the get and put at all, which would allow to
-> totally drop the vgic_put_irq_locked version:
-> 1) We have the lpi_list_lock, so if we find the IRQ in the list, it's
-> still valid (we free it only after having it removed).
-> 2) It can't be removed without dropping the lock.
-> 3) We just store the number, not the pointer.
-> 4) An LPI can be unmapped anyway after we dropped the lock and before we
-> actually use the copy. We take care of that already by calling get again
-> and coping with a NULL return.
-> 
-> So is it feasible to remove the get and put here completely or is that
-> dodgy since we technically use the reference?
-> Shall I document that one doesn't need get and put if holding the
-> lpi_list_lock?
+>> I was hoping to get this in v4.8 now that merge window is
+>> delayed/extended if you have no further comments on this series.
+>
+> I'll get to it in the next couple of days.  If it looks all good and there are
+> no comments, I'll queue it up.
+>
 
-Yes please. Also put a comment in here, as this is the only place (I
-think) where we are iterating the list without using refcounts.
+Thanks for the update.
 
-Thanks,
-
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Regards,
+Sudeep
