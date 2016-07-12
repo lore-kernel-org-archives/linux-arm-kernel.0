@@ -1,40 +1,42 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Tue, 12 Jul 2016 15:59:04 +0200
-Subject: next-20160707 build: 1 failures 6 warnings (next-20160707)
-In-Reply-To: <20160707153237.GF11467@suse.de>
-References: <E1bL5XI-0004Z9-EP@optimist> <20160707122219.GO6247@sirena.org.uk>
- <CAAFQd5DacKar+T1Fj62NvAZOT_QWBhahftZJXGq40Z19n-Z4Hg@mail.gmail.com>
- <20160707153237.GF11467@suse.de>
-Message-ID: <20160712135904.GJ23520@phenom.ffwll.local>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 12 Jul 2016 15:59:07 +0200
+Subject: [PATCH V2 07/15] doc: dt: fsl-imx-esdhc: add set tuning start
+ point binding
+In-Reply-To: <1468309584-3591-8-git-send-email-aisheng.dong@nxp.com>
+References: <1468309584-3591-1-git-send-email-aisheng.dong@nxp.com>
+ <1468309584-3591-8-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <20160712135907.GA30437@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 07, 2016 at 05:32:37PM +0200, Joerg Roedel wrote:
-> On Thu, Jul 07, 2016 at 10:18:02PM +0900, Tomasz Figa wrote:
-> > This is probably because we missed this hidden dependency and decided
-> > to push the IOMMU part separately through the IOMMU tree. I guess we
-> > can remove the offending patch from the IOMMU tree and let the DRM
-> > tree include it based on a topic branch from Joerg.
-> > 
-> > Joerg, David, Mark Yao, what do you think?
+On Tue, Jul 12, 2016 at 03:46:16PM +0800, Dong Aisheng wrote:
+> add tuning start point binding
 > 
-> Will the DRM patches go upstream soon, or is there still discussion
-> around them? For now I am going to remove/revert that patch in my tree.
-
-drm is pretty much done for 4.8, but as usual there's some driver
-maintainers who are rather late. I'd say unlikely it lands in 4.8,
-postpone to 4.9 seems more reasonable given the trouble it just caused.
--Daniel
-
+> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+> ---
+>  Documentation/devicetree/bindings/mmc/fsl-imx-esdhc.txt | 2 ++
+>  1 file changed, 2 insertions(+)
 > 
-> 
-> 	Joerg
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+> diff --git a/Documentation/devicetree/bindings/mmc/fsl-imx-esdhc.txt b/Documentation/devicetree/bindings/mmc/fsl-imx-esdhc.txt
+> index dca56d6248f5..3e29050ec769 100644
+> --- a/Documentation/devicetree/bindings/mmc/fsl-imx-esdhc.txt
+> +++ b/Documentation/devicetree/bindings/mmc/fsl-imx-esdhc.txt
+> @@ -28,6 +28,8 @@ Optional properties:
+>    transparent level shifters on the outputs of the controller. Two cells are
+>    required, first cell specifies minimum slot voltage (mV), second cell
+>    specifies maximum slot voltage (mV). Several ranges could be specified.
+> +- fsl,tuning-start-tap: Specify the start dealy cell point when send first CMD19
+> +  in tuning procedure.
+>  - fsl,tuning-step: Specify the increasing delay cell steps in tuning procedure.
+>    The uSDHC use one delay cell as default increasing step to do tuning process.
+>    This property allows user to change the tuning step to more than one delay
 
--- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-http://blog.ffwll.ch
+Hi Dong
+
+You say this is a patch which should be part of stable. How does it
+fulfil the requirements listed in
+
+Linux/Documentation/stable_kernel_rules.txt
+
+Thanks
+	Andrew
