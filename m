@@ -1,66 +1,48 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Tue, 12 Jul 2016 09:27:37 +0300
-Subject: [PATCH] Revert "ARM: AM33xx: fix module_wait_ready without
- clkctrl register"
-In-Reply-To: <5784653C.30502@ti.com>
-References: <20160711213938.28385-1-d-gerlach@ti.com> <5784653C.30502@ti.com>
-Message-ID: <57848DD9.5070400@ti.com>
+From: andi.shyti@samsung.com (Andi Shyti)
+Date: Tue, 12 Jul 2016 15:54:04 +0900
+Subject: [PATCH v3 6/7] spi: s3c64xx: restore removed comments
+In-Reply-To: <57837606.8050906@samsung.com>
+References: <57837606.8050906@samsung.com>
+Message-ID: <1468306444-18512-1-git-send-email-andi.shyti@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/07/16 06:34, Lokesh Vutla wrote:
->
->
-> On Tuesday 12 July 2016 03:09 AM, Dave Gerlach wrote:
->> This reverts commit 183e2077d007aa4b697efba095ecfea7244a6107.
->>
->> The original patch added a check to am33xx_cm_wait_module_ready for a
->> clkctrl offset of 0 as an invalid case, however, clkctrl offset of 0 is
->> perfectly valid for hwmods, in particular the rtc.
->
-> Looks like a similar check is present for am33xx_cm_wait_module_idle.
-> Shouldn't that also be removed?
+Patch a9e93e8 has erroneously removed some comments which are
+important to understand why the bus frequency is multiplied by
+two during the spi transfer.
 
-Oh this is annoying, I didn't notice that RTC had mutant register when I 
-did the patch to add the check in place, and didn't face this issue 
-either during testing. However, this check must be in there to avoid any 
-issues with the transition to the hwmod clock data, as all the clkctrl 
-offsets will be removed from hwmod data.
+Reword the previous comment to a more appropriate message.
 
-I think for RTC we probably need to add some sort of HWMOD flag, and add 
-a check within the hwmod code itself against this. Just reverting this 
-patch is wrong approach, as you need to fix it some other way then.
+Suggested-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+Signed-off-by: Andi Shyti <andi.shyti@samsung.com>
+Reviewed-by: Michael Turquette <mturquette@baylibre.com>
+---
+Hi,
 
--Tero
+despite Mike's comments I'm sending the patch as it was
+originally meant. I think that fixing the exact clk where to set
+the rate should anyway go in a different patch.
 
->
-> Thanks and regards,
-> Lokesh
->
->>
->> Without reverting this patch sometimes external aborts are seen on
->> am335x during boot. This is due to the am33xx_cm_wait_module_ready
->> function immediately returning 0 rather than waiting for the RTC_CLKCTRL
->> register to indicate it is actually ready before rtc register accesses
->> happen.
->>
->> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
->> ---
->>   arch/arm/mach-omap2/cm33xx.c | 3 ---
->>   1 file changed, 3 deletions(-)
->>
->> diff --git a/arch/arm/mach-omap2/cm33xx.c b/arch/arm/mach-omap2/cm33xx.c
->> index c073fb57dd13..7b181f929525 100644
->> --- a/arch/arm/mach-omap2/cm33xx.c
->> +++ b/arch/arm/mach-omap2/cm33xx.c
->> @@ -220,9 +220,6 @@ static int am33xx_cm_wait_module_ready(u8 part, s16 inst, u16 clkctrl_offs,
->>   {
->>   	int i = 0;
->>
->> -	if (!clkctrl_offs)
->> -		return 0;
->> -
->>   	omap_test_timeout(_is_module_ready(inst, clkctrl_offs),
->>   			  MAX_MODULE_READY_TIME, i);
->>
->>
+V2->V3
+The comment has been reworded as Sylwester recommended.
+
+Thanks,
+Andi
+
+ drivers/spi/spi-s3c64xx.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
+index 6da663f..5bedafc 100644
+--- a/drivers/spi/spi-s3c64xx.c
++++ b/drivers/spi/spi-s3c64xx.c
+@@ -639,6 +639,7 @@ static void s3c64xx_spi_config(struct s3c64xx_spi_driver_data *sdd)
+ 	writel(val, regs + S3C64XX_SPI_MODE_CFG);
+ 
+ 	if (sdd->port_conf->clk_from_cmu) {
++		/* The src_clk clock is divided internally by 2 */
+ 		clk_set_rate(sdd->src_clk, sdd->cur_speed * 2);
+ 	} else {
+ 		/* Configure Clock */
+-- 
+2.8.1
