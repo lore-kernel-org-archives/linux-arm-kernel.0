@@ -1,61 +1,61 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 12 Jul 2016 15:49:44 +0100
-Subject: [GIT PULL] STi late updates for v4.8
-In-Reply-To: <5784F935.9050000@st.com>
-References: <5784F935.9050000@st.com>
-Message-ID: <20160712144944.GG1611@dell>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 12 Jul 2016 15:50:10 +0100
+Subject: [RFC 0/3] extend kexec_file_load system call
+In-Reply-To: <293705810.hBL93OOmOz@wuerfel>
+References: <20160712014201.11456-1-takahiro.akashi@linaro.org>
+ <1911992.H2WpLRr2Fi@wuerfel> <20160712141810.GB30181@redhat.com>
+ <293705810.hBL93OOmOz@wuerfel>
+Message-ID: <20160712145010.GA8447@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 12 Jul 2016, Patrice Chotard wrote:
+On Tue, Jul 12, 2016 at 04:24:10PM +0200, Arnd Bergmann wrote:
+> On Tuesday, July 12, 2016 10:18:11 AM CEST Vivek Goyal wrote:
+> > > 
+> > > On Open Firmware, the DT is extracted from running firmware and copied
+> > > into dynamically allocated data structures. After a kexec, the runtime
+> > > interface to the firmware is not available, so the flattened DT format
+> > > was created as a way to pass the same data in a binary blob to the new
+> > > kernel in a format that can be read from the kernel by walking the
+> > > directories in /proc/device-tree/*.
+> > 
+> > So this DT is available inside kernel and running kernel can still
+> > retrieve it and pass it to second kernel?
+> 
+> The kernel only uses the flattened DT blob at boot time and converts
+> it into the runtime data structures (struct device_node). The original
+> dtb is typically overwritten later.
 
-> Hi Olof, Arnd and Kevin,
-> 
-> Please consider this first round of STi late updates for v4.8:
-> 
-> 
-> The following changes since commit 6ca59e6e1fc3a8d7ccbf85ff036bd6ff40847c1a:
-> 
->   clk: st: clkgen-pll: Detect critical clocks (2016-06-30 12:17:11 -0700)
+On arm64 we deliberately preserved the DTB, so we can take that and
+build a new DTB from that kernel-side.
 
-This should be one of the -rcs.
-
-> are available in the git repository at:
+> > > - we typically ship devicetree sources for embedded machines with the
+> > >   kernel sources. As more hardware of the system gets enabled, the
+> > >   devicetree gains extra nodes and properties that describe the hardware
+> > >   more completely, so we need to use the latest DT blob to use all
+> > >   the drivers
+> > > 
+> > > - in some cases, kernels will fail to boot at all with an older version
+> > >   of the DT, or fail to use the devices that were working on the
+> > >   earlier kernel. This is usually considered a bug, but it's not rare
+> > > 
+> > > - In some cases, the kernel can update its DT at runtime, and the new
+> > >   settings are expected to be available in the new kernel too, though
+> > >   there are cases where you actually don't want the modified contents.
+> > 
+> > I am assuming that modified DT and unmodifed one both are accessible to
+> > kernel. And if user space can make decisions which modfied fields to use
+> > for new kernels and which ones not, then same can be done in kernel too?
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/pchotard/sti.git tags/sti-late-v4.8
-> 
-> for you to fetch changes up to cf4b5ceb95b1e8842bc4f061a8ba8c395b5dbc6d:
-> 
->   spi: st-ssc4: Remove 'no clocking' hack (2016-07-12 13:22:55 +0200)
-> 
-> ----------------------------------------------------------------
-> Highlights:
-> -----------
-> - Add STi DT critical clocks declaration
-> - Remove SPI hack wich has dependecy with critical clocks
-> 
-> These 2 STi DT patches and SPI hack MUST be applied after patches
-> contained into Stephen Boyd's branch clk-next/clk-st-critical.
-> This to ensure not to break SPI.
+> The unmodified DT can typically be found on disk next to the kernel binary.
+> The option you have is to either read it from /proc/devicetree or to
+> read it from from /boot/*.dtb.
 
-Okay, good.
+/proc/devicetree (aka /sys/firmware/devicetree) is a filesystem derived
+from the raw DTB (which is exposed at /sys/firmware/fdt).
 
-> ----------------------------------------------------------------
-> Lee Jones (3):
->       ARM: sti: stih407-family: Supply defines for CLOCKGEN A0
->       ARM: sti: stih410-clocks: Identify critical clocks
->       spi: st-ssc4: Remove 'no clocking' hack
+The blob that was handed to the kernel at boot time is exposed at
+/sys/firmware/fdt.
 
-Doh!  Both this and the diff below need to contain the driver/clk
-patches, as Olof already mentioned.
-
->  arch/arm/boot/dts/stih410-clock.dtsi     |  9 ++++++++
->  drivers/spi/spi-st-ssc4.c                | 36 +++++---------------------------
->  include/dt-bindings/clock/stih407-clks.h |  4 ++++
->  3 files changed, 18 insertions(+), 31 deletions(-)
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Thanks,
+Mark.
