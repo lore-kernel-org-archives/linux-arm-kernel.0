@@ -1,244 +1,47 @@
-From: kevin.brodsky@arm.com (Kevin Brodsky)
-Date: Tue, 12 Jul 2016 11:24:00 +0100
-Subject: [PATCH v2 2/2] arm64: Add support for CLOCK_MONOTONIC_RAW in
- clock_gettime() vDSO
-In-Reply-To: <20160712102400.6904-1-kevin.brodsky@arm.com>
-References: <20160712102400.6904-1-kevin.brodsky@arm.com>
-Message-ID: <20160712102400.6904-3-kevin.brodsky@arm.com>
+From: julien.grall@arm.com (Julien Grall)
+Date: Tue, 12 Jul 2016 11:31:34 +0100
+Subject: [PATCH 0/4] boot-wrapper: arm64: Xen support
+In-Reply-To: <20160620150934.1729-1-andre.przywara@arm.com>
+References: <20160620150934.1729-1-andre.przywara@arm.com>
+Message-ID: <5784C706.1040007@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-So far the arm64 clock_gettime() vDSO implementation only supported
-the following clocks, falling back to the syscall for the others:
-- CLOCK_REALTIME{,_COARSE}
-- CLOCK_MONOTONIC{,_COARSE}
+Hi Andre,
 
-This patch adds support for the CLOCK_MONOTONIC_RAW clock, taking
-advantage of the recent refactoring of the vDSO time functions. Like
-the non-_COARSE clocks, this only works when the "arch_sys_counter"
-clocksource is in use (allowing us to read the current time from the
-virtual counter register), otherwise we also have to fall back to the
-syscall.
+On 20/06/16 16:09, Andre Przywara wrote:
+> These patches allow to include a Xen hypervisor binary into a boot-wrapper
+> ELF file, so that a Foundation Platform or a Fast Model can boot a Xen
+> system (including a Dom0 kernel).
+> This has been floating around for a while, I just updated the patches
+> to apply on the latest boot-wrapper tree. Also I increased Xen's load
+> address to accomodate for Dom0 kernels bigger than 16 MB.
+> For testing this just add: "--with-xen=/path/to/xen/xen/xen" to the
+> ./configure command line and feed the resulting xen-system.axf file to
+> the model.
 
-Most of the data is shared with CLOCK_MONOTONIC, and the algorithm is
-similar. The reference implementation in kernel/time/timekeeping.c
-shows that:
-- CLOCK_MONOTONIC = tk->wall_to_monotonic + tk->xtime_sec +
-  timekeeping_get_ns(&tk->tkr_mono)
-- CLOCK_MONOTONIC_RAW = tk->raw_time + timekeeping_get_ns(&tk->tkr_raw)
-- tkr_mono and tkr_raw are identical (in particular, same
-  clocksource), except these members:
-  * mult (only mono's multiplier is NTP-adjusted)
-  * xtime_nsec (always 0 for raw)
+Tested-by: Julien Grall <julien.grall@arm.com>
 
-Therefore, tk->raw_time and tkr_raw->mult are now also stored in the
-vDSO data page.
+Regards,
 
-Cc: Ali Saidi <ali.saidi@arm.com>
-Signed-off-by: Kevin Brodsky <kevin.brodsky@arm.com>
-Reviewed-by: Dave Martin <dave.martin@arm.com>
-Acked-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/include/asm/vdso_datapage.h |  8 +++--
- arch/arm64/kernel/asm-offsets.c        |  6 +++-
- arch/arm64/kernel/vdso.c               |  8 ++++-
- arch/arm64/kernel/vdso/gettimeofday.S  | 57 +++++++++++++++++++++++++++-------
- 4 files changed, 64 insertions(+), 15 deletions(-)
+> Cheers,
+> Andre.
+>
+> Christoffer Dall (3):
+>    Support for building in a Xen binary
+>    Xen: Support adding DT nodes
+>    Explicitly clean linux-system.axf and xen-system.axf
+>
+> Ian Campbell (1):
+>    Xen: Select correct dom0 console
+>
+>   .gitignore    |  1 +
+>   Makefile.am   | 38 +++++++++++++++++++++++++-------------
+>   boot_common.c |  4 ++--
+>   configure.ac  | 26 +++++++++++++++++++++++++-
+>   model.lds.S   | 14 ++++++++++++++
+>   5 files changed, 67 insertions(+), 16 deletions(-)
+>
 
-diff --git a/arch/arm64/include/asm/vdso_datapage.h b/arch/arm64/include/asm/vdso_datapage.h
-index de66199673d7..2b9a63771eda 100644
---- a/arch/arm64/include/asm/vdso_datapage.h
-+++ b/arch/arm64/include/asm/vdso_datapage.h
-@@ -22,6 +22,8 @@
- 
- struct vdso_data {
- 	__u64 cs_cycle_last;	/* Timebase at clocksource init */
-+	__u64 raw_time_sec;	/* Raw time */
-+	__u64 raw_time_nsec;
- 	__u64 xtime_clock_sec;	/* Kernel time */
- 	__u64 xtime_clock_nsec;
- 	__u64 xtime_coarse_sec;	/* Coarse time */
-@@ -29,8 +31,10 @@ struct vdso_data {
- 	__u64 wtm_clock_sec;	/* Wall to monotonic time */
- 	__u64 wtm_clock_nsec;
- 	__u32 tb_seq_count;	/* Timebase sequence counter */
--	__u32 cs_mult;		/* Clocksource multiplier */
--	__u32 cs_shift;		/* Clocksource shift */
-+	/* cs_* members must be adjacent and in this order (ldp accesses) */
-+	__u32 cs_mono_mult;	/* NTP-adjusted clocksource multiplier */
-+	__u32 cs_shift;		/* Clocksource shift (mono = raw) */
-+	__u32 cs_raw_mult;	/* Raw clocksource multiplier */
- 	__u32 tz_minuteswest;	/* Whacky timezone stuff */
- 	__u32 tz_dsttime;
- 	__u32 use_syscall;
-diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
-index 2f4ba774488a..c88508b95f87 100644
---- a/arch/arm64/kernel/asm-offsets.c
-+++ b/arch/arm64/kernel/asm-offsets.c
-@@ -78,6 +78,7 @@ int main(void)
-   BLANK();
-   DEFINE(CLOCK_REALTIME,	CLOCK_REALTIME);
-   DEFINE(CLOCK_MONOTONIC,	CLOCK_MONOTONIC);
-+  DEFINE(CLOCK_MONOTONIC_RAW,	CLOCK_MONOTONIC_RAW);
-   DEFINE(CLOCK_REALTIME_RES,	MONOTONIC_RES_NSEC);
-   DEFINE(CLOCK_REALTIME_COARSE,	CLOCK_REALTIME_COARSE);
-   DEFINE(CLOCK_MONOTONIC_COARSE,CLOCK_MONOTONIC_COARSE);
-@@ -85,6 +86,8 @@ int main(void)
-   DEFINE(NSEC_PER_SEC,		NSEC_PER_SEC);
-   BLANK();
-   DEFINE(VDSO_CS_CYCLE_LAST,	offsetof(struct vdso_data, cs_cycle_last));
-+  DEFINE(VDSO_RAW_TIME_SEC,	offsetof(struct vdso_data, raw_time_sec));
-+  DEFINE(VDSO_RAW_TIME_NSEC,	offsetof(struct vdso_data, raw_time_nsec));
-   DEFINE(VDSO_XTIME_CLK_SEC,	offsetof(struct vdso_data, xtime_clock_sec));
-   DEFINE(VDSO_XTIME_CLK_NSEC,	offsetof(struct vdso_data, xtime_clock_nsec));
-   DEFINE(VDSO_XTIME_CRS_SEC,	offsetof(struct vdso_data, xtime_coarse_sec));
-@@ -92,7 +95,8 @@ int main(void)
-   DEFINE(VDSO_WTM_CLK_SEC,	offsetof(struct vdso_data, wtm_clock_sec));
-   DEFINE(VDSO_WTM_CLK_NSEC,	offsetof(struct vdso_data, wtm_clock_nsec));
-   DEFINE(VDSO_TB_SEQ_COUNT,	offsetof(struct vdso_data, tb_seq_count));
--  DEFINE(VDSO_CS_MULT,		offsetof(struct vdso_data, cs_mult));
-+  DEFINE(VDSO_CS_MONO_MULT,	offsetof(struct vdso_data, cs_mono_mult));
-+  DEFINE(VDSO_CS_RAW_MULT,	offsetof(struct vdso_data, cs_raw_mult));
-   DEFINE(VDSO_CS_SHIFT,		offsetof(struct vdso_data, cs_shift));
-   DEFINE(VDSO_TZ_MINWEST,	offsetof(struct vdso_data, tz_minuteswest));
-   DEFINE(VDSO_TZ_DSTTIME,	offsetof(struct vdso_data, tz_dsttime));
-diff --git a/arch/arm64/kernel/vdso.c b/arch/arm64/kernel/vdso.c
-index 9fefb005812a..076312b17d4f 100644
---- a/arch/arm64/kernel/vdso.c
-+++ b/arch/arm64/kernel/vdso.c
-@@ -214,10 +214,16 @@ void update_vsyscall(struct timekeeper *tk)
- 	vdso_data->wtm_clock_nsec		= tk->wall_to_monotonic.tv_nsec;
- 
- 	if (!use_syscall) {
-+		/* tkr_mono.cycle_last == tkr_raw.cycle_last */
- 		vdso_data->cs_cycle_last	= tk->tkr_mono.cycle_last;
-+		vdso_data->raw_time_sec		= tk->raw_time.tv_sec;
-+		vdso_data->raw_time_nsec	= tk->raw_time.tv_nsec;
- 		vdso_data->xtime_clock_sec	= tk->xtime_sec;
- 		vdso_data->xtime_clock_nsec	= tk->tkr_mono.xtime_nsec;
--		vdso_data->cs_mult		= tk->tkr_mono.mult;
-+		/* tkr_raw.xtime_nsec == 0 */
-+		vdso_data->cs_mono_mult		= tk->tkr_mono.mult;
-+		vdso_data->cs_raw_mult		= tk->tkr_raw.mult;
-+		/* tkr_mono.shift == tkr_raw.shift */
- 		vdso_data->cs_shift		= tk->tkr_mono.shift;
- 	}
- 
-diff --git a/arch/arm64/kernel/vdso/gettimeofday.S b/arch/arm64/kernel/vdso/gettimeofday.S
-index c06919ee29e1..e00b4671bd7c 100644
---- a/arch/arm64/kernel/vdso/gettimeofday.S
-+++ b/arch/arm64/kernel/vdso/gettimeofday.S
-@@ -87,6 +87,15 @@ x_tmp		.req	x8
- 	msub	\res_nsec, x_tmp, \nsec_to_sec, \res_nsec
- 	.endm
- 
-+	/*
-+	 * Returns in res_{sec,nsec} the timespec based on the clock_raw delta,
-+	 * used for CLOCK_MONOTONIC_RAW.
-+	 */
-+	.macro	get_ts_clock_raw res_sec, res_nsec, clock_nsec, nsec_to_sec
-+	udiv	\res_sec, \clock_nsec, \nsec_to_sec
-+	msub	\res_nsec, \res_sec, \nsec_to_sec, \clock_nsec
-+	.endm
-+
- 	/* sec and nsec are modified in place. */
- 	.macro add_ts sec, nsec, ts_sec, ts_nsec, nsec_to_sec
- 	/* Add timespec. */
-@@ -135,7 +144,8 @@ ENTRY(__kernel_gettimeofday)
- 1:	seqcnt_acquire
- 	syscall_check fail=4f
- 	ldr	x10, [vdso_data, #VDSO_CS_CYCLE_LAST]
--	ldp	w11, w12, [vdso_data, #VDSO_CS_MULT]
-+	/* w11 = cs_mono_mult, w12 = cs_shift */
-+	ldp	w11, w12, [vdso_data, #VDSO_CS_MONO_MULT]
- 	ldp	x13, x14, [vdso_data, #VDSO_XTIME_CLK_SEC]
- 	seqcnt_check fail=1b
- 
-@@ -172,20 +182,20 @@ ENDPROC(__kernel_gettimeofday)
- /* int __kernel_clock_gettime(clockid_t clock_id, struct timespec *tp); */
- ENTRY(__kernel_clock_gettime)
- 	.cfi_startproc
--	cmp 	w0, #JUMPSLOT_MAX
--	b.hi 	syscall
-+	cmp	w0, #JUMPSLOT_MAX
-+	b.hi	syscall
- 	adr	vdso_data, _vdso_data
--	adr 	x_tmp, jumptable
--	add 	x_tmp, x_tmp, w0, uxtw #2
--	br 	x_tmp
-+	adr	x_tmp, jumptable
-+	add	x_tmp, x_tmp, w0, uxtw #2
-+	br	x_tmp
- 
- 	ALIGN
- jumptable:
- 	jump_slot jumptable, CLOCK_REALTIME, realtime
- 	jump_slot jumptable, CLOCK_MONOTONIC, monotonic
--	b 	syscall
--	b 	syscall
--	b 	syscall
-+	b	syscall
-+	b	syscall
-+	jump_slot jumptable, CLOCK_MONOTONIC_RAW, monotonic_raw
- 	jump_slot jumptable, CLOCK_REALTIME_COARSE, realtime_coarse
- 	jump_slot jumptable, CLOCK_MONOTONIC_COARSE, monotonic_coarse
- 
-@@ -198,7 +208,8 @@ realtime:
- 	seqcnt_acquire
- 	syscall_check fail=syscall
- 	ldr	x10, [vdso_data, #VDSO_CS_CYCLE_LAST]
--	ldp	w11, w12, [vdso_data, #VDSO_CS_MULT]
-+	/* w11 = cs_mono_mult, w12 = cs_shift */
-+	ldp	w11, w12, [vdso_data, #VDSO_CS_MONO_MULT]
- 	ldp	x13, x14, [vdso_data, #VDSO_XTIME_CLK_SEC]
- 	seqcnt_check fail=realtime
- 
-@@ -216,7 +227,8 @@ monotonic:
- 	seqcnt_acquire
- 	syscall_check fail=syscall
- 	ldr	x10, [vdso_data, #VDSO_CS_CYCLE_LAST]
--	ldp	w11, w12, [vdso_data, #VDSO_CS_MULT]
-+	/* w11 = cs_mono_mult, w12 = cs_shift */
-+	ldp	w11, w12, [vdso_data, #VDSO_CS_MONO_MULT]
- 	ldp	x13, x14, [vdso_data, #VDSO_XTIME_CLK_SEC]
- 	ldp	x3, x4, [vdso_data, #VDSO_WTM_CLK_SEC]
- 	seqcnt_check fail=monotonic
-@@ -234,6 +246,28 @@ monotonic:
- 	clock_gettime_return, shift=1
- 
- 	ALIGN
-+monotonic_raw:
-+	seqcnt_acquire
-+	syscall_check fail=syscall
-+	ldr	x10, [vdso_data, #VDSO_CS_CYCLE_LAST]
-+	/* w11 = cs_raw_mult, w12 = cs_shift */
-+	ldp	w12, w11, [vdso_data, #VDSO_CS_SHIFT]
-+	ldp	x13, x14, [vdso_data, #VDSO_RAW_TIME_SEC]
-+	seqcnt_check fail=monotonic_raw
-+
-+	/* All computations are done with left-shifted nsecs. */
-+	lsl	x14, x14, x12
-+	get_nsec_per_sec res=x9
-+	lsl	x9, x9, x12
-+
-+	get_clock_shifted_nsec res=x15, cycle_last=x10, mult=x11
-+	get_ts_clock_raw res_sec=x10, res_nsec=x11, \
-+		clock_nsec=x15, nsec_to_sec=x9
-+
-+	add_ts sec=x10, nsec=x11, ts_sec=x13, ts_nsec=x14, nsec_to_sec=x9
-+	clock_gettime_return, shift=1
-+
-+	ALIGN
- realtime_coarse:
- 	seqcnt_acquire
- 	ldp	x10, x11, [vdso_data, #VDSO_XTIME_CRS_SEC]
-@@ -265,6 +299,7 @@ ENTRY(__kernel_clock_getres)
- 	.cfi_startproc
- 	cmp	w0, #CLOCK_REALTIME
- 	ccmp	w0, #CLOCK_MONOTONIC, #0x4, ne
-+	ccmp	w0, #CLOCK_MONOTONIC_RAW, #0x4, ne
- 	b.ne	1f
- 
- 	ldr	x2, 5f
 -- 
-2.9.0
+Julien Grall
