@@ -1,75 +1,75 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Tue, 12 Jul 2016 15:44:03 +0200
-Subject: [PATCH v3 1/2] clk: samsung: cpu: Prepare for addition for Exynos7
- CPU clocks
-In-Reply-To: <CAM4voamm5-upxvwYG0b-WpgO3OpJR+ZswVzjwRO89fjQqovFbw@mail.gmail.com>
-References: <1467750561-13957-1-git-send-email-a.kesavan@samsung.com>
- <2318982.ZLuIVQzhgE@amdc1976>
- <CAM4voamm5-upxvwYG0b-WpgO3OpJR+ZswVzjwRO89fjQqovFbw@mail.gmail.com>
-Message-ID: <1893441.PNypKdntnt@amdc1976>
+From: fcooper@ti.com (Franklin S Cooper Jr.)
+Date: Tue, 12 Jul 2016 08:45:46 -0500
+Subject: [PATCH v8 1/9] clk: ti: am335x/am4372: Add tbclk to pwm node
+In-Reply-To: <146827561017.73491.3564276289319851088@resonance>
+References: <1462291015-1919-1-git-send-email-fcooper@ti.com>
+ <1462291015-1919-2-git-send-email-fcooper@ti.com>
+ <146827561017.73491.3564276289319851088@resonance>
+Message-ID: <5784F48A.50805@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, July 11, 2016 04:44:30 PM Abhilash Kesavan wrote:
-> Hi Bartlomiej,
 
-Hi Abhilash,
 
-> Thanks for the comments.
+On 07/11/2016 05:20 PM, Michael Turquette wrote:
+> Quoting Franklin S Cooper Jr (2016-05-03 08:56:47)
+>> Add tblck to the pwm nodes. This insures that the ehrpwm driver has access
 > 
-> On Thu, Jul 7, 2016 at 1:17 PM, Bartlomiej Zolnierkiewicz
-> <b.zolnierkie@samsung.com> wrote:
-> >
-> > Hi
-> >
-> > On Thursday, July 07, 2016 12:45:57 PM Sylwester Nawrocki wrote:
-> >> On 07/05/2016 10:29 PM, Abhilash Kesavan wrote:
-> >> > Exynos7 has the same CPU clock registers layout as that present
-> >
-> > Please precise for which Exynos7 SoC this change is needed
-> > (all three of them?).
+> s/tblck/tbclk/
 > 
-> As mentioned in my recently posted PMU series, the exynos7 is a quad
-> core A57 based SoC and not meant to be a SoC family.
+> I see you have acks already. What tree should this patch go through?
 
-I suppose that it will get some more meaningful name once released
-officially (I couldn't find anything about this SoC on the net).
 
-> I have reviewed various exynos7xxx UMs in terms of the CPU CMU. Both
-> exynos7580 and exynos7420 have a similar CMU register layout along
-> with the same mux stat bits as exynos7. Exynos7870 on the other hand
-> is quite different.
+I believe it went through Tero's tree. I currently see it in linux-next.
 > 
-> Please let me know what naming convention you would prefer that I use
-> E7/E7420/E7580 ?
-
-I would prefer using E7420 naming.
- 
-> >> > in Exynos5433 except for the bits in the MUX_STAT* registers.
-> >> > Add a new CLK_CPU_HAS_MODIFIED_MUX_STAT flag to handle this change.
-> >>
-> >> > --- a/drivers/clk/samsung/clk-cpu.h
-> >> > +++ b/drivers/clk/samsung/clk-cpu.h
-> >> > @@ -63,6 +63,8 @@ struct exynos_cpuclk {
-> >> >  /* The CPU clock registers have Exynos5433-compatible layout */
-> >> >  #define CLK_CPU_HAS_E5433_REGS_LAYOUT      (1 << 2)
-> >>
-> >> > +/* Exynos5433-compatible layout with different MUX_STAT register bits */
-> >> > +#define CLK_CPU_HAS_MODIFIED_MUX_STAT      (1 << 3)
-> >>
-> >> It's getting a bit messy, what if there comes another SoC version
-> >> which has some other modification of exynos5433 registers structure?
-> >> We would need another variant of HAS_MODIFIED_MUX_STAT flag and we
-> >> could easily get lost while trying to determine which modification
-> >> is which. How about indicating explicitly it's an exynos7 bits
-> >> layout and renaming the flag to something like
-> >>
-> >> #define CLK_CPU_HAS_E7_MUX_STAT       (1 << 16) ?
-> >
-> > ditto
-
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+> Regards,
+> Mike
+> 
+>> to the time-based clk.
+>>
+>> Do not remove similar entries for ehrpwm node. Later patches will switch
+>> from using ehrpwm node name to pwm. But to maintain ABI compatibility we
+>> shouldn't remove the old entries.
+>>
+>> Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
+>> Acked-by: Stephen Boyd <sboyd@codeaurora.org>
+>> Acked-by: Tero Kristo <t-kristo@ti.com>
+>> ---
+>>  drivers/clk/ti/clk-33xx.c | 3 +++
+>>  drivers/clk/ti/clk-43xx.c | 6 ++++++
+>>  2 files changed, 9 insertions(+)
+>>
+>> diff --git a/drivers/clk/ti/clk-33xx.c b/drivers/clk/ti/clk-33xx.c
+>> index ef2ec64..0e47d95 100644
+>> --- a/drivers/clk/ti/clk-33xx.c
+>> +++ b/drivers/clk/ti/clk-33xx.c
+>> @@ -108,6 +108,9 @@ static struct ti_dt_clk am33xx_clks[] = {
+>>         DT_CLK("48300200.ehrpwm", "tbclk", "ehrpwm0_tbclk"),
+>>         DT_CLK("48302200.ehrpwm", "tbclk", "ehrpwm1_tbclk"),
+>>         DT_CLK("48304200.ehrpwm", "tbclk", "ehrpwm2_tbclk"),
+>> +       DT_CLK("48300200.pwm", "tbclk", "ehrpwm0_tbclk"),
+>> +       DT_CLK("48302200.pwm", "tbclk", "ehrpwm1_tbclk"),
+>> +       DT_CLK("48304200.pwm", "tbclk", "ehrpwm2_tbclk"),
+>>         { .node_name = NULL },
+>>  };
+>>  
+>> diff --git a/drivers/clk/ti/clk-43xx.c b/drivers/clk/ti/clk-43xx.c
+>> index 097fc90..7255aa8 100644
+>> --- a/drivers/clk/ti/clk-43xx.c
+>> +++ b/drivers/clk/ti/clk-43xx.c
+>> @@ -115,6 +115,12 @@ static struct ti_dt_clk am43xx_clks[] = {
+>>         DT_CLK("48306200.ehrpwm", "tbclk", "ehrpwm3_tbclk"),
+>>         DT_CLK("48308200.ehrpwm", "tbclk", "ehrpwm4_tbclk"),
+>>         DT_CLK("4830a200.ehrpwm", "tbclk", "ehrpwm5_tbclk"),
+>> +       DT_CLK("48300200.pwm", "tbclk", "ehrpwm0_tbclk"),
+>> +       DT_CLK("48302200.pwm", "tbclk", "ehrpwm1_tbclk"),
+>> +       DT_CLK("48304200.pwm", "tbclk", "ehrpwm2_tbclk"),
+>> +       DT_CLK("48306200.pwm", "tbclk", "ehrpwm3_tbclk"),
+>> +       DT_CLK("48308200.pwm", "tbclk", "ehrpwm4_tbclk"),
+>> +       DT_CLK("4830a200.pwm", "tbclk", "ehrpwm5_tbclk"),
+>>         { .node_name = NULL },
+>>  };
+>>  
+>> -- 
+>> 2.7.0
+>>
