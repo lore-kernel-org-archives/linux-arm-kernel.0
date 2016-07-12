@@ -1,82 +1,54 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 12 Jul 2016 10:49:00 +0200
-Subject: [PATCH 2/2] soc: samsung: Add support for Exynos7 PMU
-In-Reply-To: <CAM4voanpvkQJ5GcKeXoLcpmTMXkh7f8aznQHDS-0O5YeaVpeuw@mail.gmail.com>
+Date: Tue, 12 Jul 2016 10:49:57 +0200
+Subject: [PATCH 1/2] soc: samsung: Change type of PMU configuration
+ register value to u32
+In-Reply-To: <CAM4voan0X5ejdCAWwbRa-RtBsgpWHAFFex1soh153Zy8PdngRw@mail.gmail.com>
 References: <1467750507-13853-1-git-send-email-a.kesavan@samsung.com>
- <1467750507-13853-3-git-send-email-a.kesavan@samsung.com>
- <CAJKOXPc=RZEe_zQvnmxXRttppJfGJwyjmkF0XxAnV0YnGxvcyA@mail.gmail.com>
- <CAM4voanpvkQJ5GcKeXoLcpmTMXkh7f8aznQHDS-0O5YeaVpeuw@mail.gmail.com>
-Message-ID: <5784AEFC.7040406@samsung.com>
+ <1467750507-13853-2-git-send-email-a.kesavan@samsung.com>
+ <CAJKOXPdPa7vCqetd5EUb3ebz7rB741ua=9wbdx-MkFh+G-=CJA@mail.gmail.com>
+ <CAM4voan0X5ejdCAWwbRa-RtBsgpWHAFFex1soh153Zy8PdngRw@mail.gmail.com>
+Message-ID: <5784AF35.9080302@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 07/11/2016 04:44 PM, Abhilash Kesavan wrote:
 > Hi Krzysztof,
 > 
-> [...]
->>> diff --git a/drivers/soc/samsung/exynos-pmu.c b/drivers/soc/samsung/exynos-pmu.c
->>> index 0acdfd8..7cda8fb 100644
->>> --- a/drivers/soc/samsung/exynos-pmu.c
->>> +++ b/drivers/soc/samsung/exynos-pmu.c
->>> @@ -88,6 +88,9 @@ static const struct of_device_id exynos_pmu_of_device_ids[] = {
->>>         }, {
->>>                 .compatible = "samsung,exynos5420-pmu",
->>>                 .data = &exynos5420_pmu_data,
->>> +       }, {
->>> +               .compatible = "samsung,exynos7-pmu",
->>> +               .data = &exynos7_pmu_data,
+> On Wed, Jul 6, 2016 at 8:47 AM, Krzysztof Kozlowski
+> <k.kozlowski@samsung.com> wrote:
+>> On Tue, Jul 5, 2016 at 10:28 PM, Abhilash Kesavan <a.kesavan@samsung.com> wrote:
+>>> Exynos7 has certain PMU registers that needs to be configured with
+>>> u32 values.
+>>>
+>>> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+>>> ---
+>>>  drivers/soc/samsung/exynos-pmu.h | 2 +-
+>>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>>
+>>> diff --git a/drivers/soc/samsung/exynos-pmu.h b/drivers/soc/samsung/exynos-pmu.h
+>>> index a469e36..1bdc506 100644
+>>> --- a/drivers/soc/samsung/exynos-pmu.h
+>>> +++ b/drivers/soc/samsung/exynos-pmu.h
+>>> @@ -18,7 +18,7 @@
+>>>
+>>>  struct exynos_pmu_conf {
+>>>         unsigned int offset;
+>>> -       u8 val[NUM_SYS_POWERDOWN];
+>>> +       unsigned int val[NUM_SYS_POWERDOWN];
 >>
->> Hi,
+>> You mentioned u32 but I see unsigned int here. This should be u32.
+> Will change.
 >>
->> Thanks for the patch. Few comments:
+>> BTW, none of your emails reached my samsung inbox. I got them only
+>> from the lists. Please investigate why this couldn't be delivered to
+>> samsung.com address.
 > 
-> Thanks for the review.
->>
->> You set here compatible for Exynos7. However there are at least three
->> publicly known Exynos7 chipsets (7420, 7580, 7870 -
->> https://en.wikipedia.org/wiki/Exynos). My questions are:
->> 1. Are all of these share the same PMU configuration?
->> 2. New different Exynos7 may be released, right?
-> 
-> Exynos7 is a Quad Core A57 based SoC that pre-dates all the above
-> mentioned SoCs. It is the closest to the exynos7420 in terms of the
-> IPs present.
+> Not quite sure why that happened even after I added you as a
+> recipient. I'll be posting some patches soon, let's see if the same
+> occurs again or if it was a one-off case.
 
-Hmm, okay... It is confusing because Samsung Semiconductors calls both
-7420 and 5433 as "Exynos 7 Octa":
-http://www.samsung.com/semiconductor/minisite/Exynos/w/solution/mobile_ap/7420/
-The marketing uses term "Exynos7" for a generation of SoCs.
-
-However if there is really a design called Exynos7 and a board with it
-(Espresso), then I don't mind. Let it be Exynos7 but keeping in mind
-that this is a specific SoC, not a calls of products.
-
-> The PMU configuration between exynos7 and exynos7420 is
-> identical except for the extra A53 configuration required in case of
-> the 7420.
-
-That is additional argument in favor of "Exynos7" naming.
-
-> The PMU configuration for 7580 and 7870 differ from that of
-> eynos7 and 7420 in terms of  the registers offsets, number of
-> registers being configured and some extra configurations. So, while
-> sharing of some functions is possible across the SoCs, each SoC should
-> ideally have its own PMU file. The posted patch adds PMU support for
-> only the exynos7 SoC.
-
-Thanks for explanation.
-
->>
->> The exynos7 compatible is already spread all over DTS... but probably
->> it is safer to use a specific SoC revision. Unless you are sure that
->> all Exynos7 SoCs will be 100% compatible here and there won't be
->> another exynos7xxx-pmu.
-> Please let me know if I can continue to use the exynos7 compatible
-> since it is a distinct SoC and not indicative of a series. However, if
-> you feel strongly about it then I can change the compatible to use
-> 7420 since they are quite similar.
-
-Exynos7 is fine. Thanks for the details!
+No problem with these mails so either this was one time issue or it was
+caused by git-send-email and company's SMTP server.
 
 Best regards,
 Krzysztof
