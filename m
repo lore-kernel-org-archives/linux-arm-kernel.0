@@ -1,91 +1,64 @@
-From: mturquette@baylibre.com (Michael Turquette)
-Date: Tue, 12 Jul 2016 11:11:30 -0700
-Subject: [PATCH v3] xen/arm: enable clocks used by the hypervisor
-In-Reply-To: <5784B688.7050903@arm.com>
-References: <1467963871-31556-1-git-send-email-dirk.behme@de.bosch.com>
- <577F73B3.8090807@arm.com> <146799758568.73491.4432005583661196579@resonance>
- <5784B688.7050903@arm.com>
-Message-ID: <146834709006.73491.4165577782297554867@resonance>
+From: nwatters@codeaurora.org (Nate Watterson)
+Date: Tue, 12 Jul 2016 14:19:20 -0400
+Subject: [PATCH v2] iommu/arm-smmu-v3: limit use of 2-level stream tables
+In-Reply-To: <1468260059-10759-1-git-send-email-nwatters@codeaurora.org>
+References: <1468260059-10759-1-git-send-email-nwatters@codeaurora.org>
+Message-ID: <1468347560-29924-1-git-send-email-nwatters@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Julien Grall (2016-07-12 02:21:12)
-> Hi Mike,
-> 
-> On 08/07/16 18:06, Michael Turquette wrote:
-> > Quoting Julien Grall (2016-07-08 02:34:43)
-> >> Hi Dirk,
-> >>
-> >> On 08/07/16 08:44, Dirk Behme wrote:
-> >>> Xen hypervisor drivers might replace native OS drivers. The result is
-> >>> that some important clocks that are enabled by the OS in the non-Xen
-> >>> case are not properly enabled in the presence of Xen. The clocks
-> >>> property enumerates the clocks that must be enabled by the Xen clock
-> >>> consumer.
-> >>>
-> >>> An example is a serial driver enabled by the hypervisor. Xen must
-> >>
-> >> I would say "An example is the UART used by the hypervisor."
-> >>
-> >>> consume and enable these clocks in the OS to ensure behavior continues
-> >>> after firmware configures the UART hardware and corresponding clock
-> >>> harder.
-> >>
-> >> What do you mean by "harder"?
-> >>
-> >> Also, relying on DOM0 to enable the clock looks very wrong to me and you
-> >> give an example which prove that. The UART will be used before hand by
-> >> Xen, however it will not be possible to use it if you expect DOM0 to
-> >> enable the clock (or even modify the clock frequency).
-> >>
-> >> The clock should be enabled either by the firmware or Xen. But not DOM0.
-> >> DOM0 should not touch this clock at all.
-> >>
-> >> Furthermore, this property could be used for clock associated to device
-> >> that will be passthrough-ed to a guest. In this case, the clock would be
-> >> enabled even if the device is not in use which will result more power
-> >> consumption.
-> >
-> > Is there a need to pass clock references through to guests? If so the
-> > unmerged CLK_ENABLE_HAND_OFF[0] feature might be useful to you? If this
-> > flag is set on a given clk, it will be enabled at the time it is
-> > registered by the clk provider driver, and it's enable_count reference
-> > counter will be "handed off" to the first consumer that calls clk_get()
-> > and clk_prepare_enable() on it. This means the clock CAN be gated by
-> > it's proper driver, but it will be enabled at boot time as well.
-> 
-> Some driver requires to have the clock in hand to be able to configure 
-> the clock (such as setting the rate). So we would have to find a way to 
-> let the guest using the clock either by assigning the clock or some PV 
-> clock driver.
-> 
-> However, platform device passthrough (i.e non-pci device) cannot be done 
-> generically. The user has to provide a lots of information manually 
-> (such as MMIO, IRQ, device tree node...). So I am not sure if we want to 
-> have a generic solution here.
-> 
-> I though it would be worth to mention it because we may (or not) use 
-> this clock to tell DOM0 (don't touch it).
-> 
-> > This is useful for use cases like splash screens where the bootloader
-> > configures the display and plays some animation, and we want the linux
-> > kernel to take over the display controller hardware without cutting
-> > clocks, blanking or reseting it. Handing off the clock reference count
-> > helps achieve this.
-> 
->  From my understanding, any device used by Xen would be in a similar 
-> situation, although there will be no driver in Linux. The current patch 
-> (as well as the v4) is calling clk_prepare_enable for each clock used by 
-> Xen. Could enabling the clock create unexpected behavior such as the 
-> UART loosing/dropping characters?
+In the current arm-smmu-v3 driver, all smmus that support 2-level
+stream tables are being forced to use them. This is suboptimal for
+smmus that support fewer stream id bits than would fill in a single
+second level table. This patch limits the use of 2-level tables to
+smmus that both support the feature and whose first level table can
+possibly contain more than a single entry.
 
-In general, no, it will not cause any bad side effect.
+Signed-off-by: Nate Watterson <nwatters@codeaurora.org>
+---
+ drivers/iommu/arm-smmu-v3.c | 21 ++++++++++-----------
+ 1 file changed, 10 insertions(+), 11 deletions(-)
 
-Regards,
-Mike
-
-> 
-> Regards,
-> 
-> -- 
-> Julien Grall
+diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+index 5f6b3bc..f27b8dc 100644
+--- a/drivers/iommu/arm-smmu-v3.c
++++ b/drivers/iommu/arm-smmu-v3.c
+@@ -2033,17 +2033,9 @@ static int arm_smmu_init_strtab_2lvl(struct arm_smmu_device *smmu)
+ 	u32 size, l1size;
+ 	struct arm_smmu_strtab_cfg *cfg = &smmu->strtab_cfg;
+ 
+-	/*
+-	 * If we can resolve everything with a single L2 table, then we
+-	 * just need a single L1 descriptor. Otherwise, calculate the L1
+-	 * size, capped to the SIDSIZE.
+-	 */
+-	if (smmu->sid_bits < STRTAB_SPLIT) {
+-		size = 0;
+-	} else {
+-		size = STRTAB_L1_SZ_SHIFT - (ilog2(STRTAB_L1_DESC_DWORDS) + 3);
+-		size = min(size, smmu->sid_bits - STRTAB_SPLIT);
+-	}
++	/* Calculate the L1 size, capped to the SIDSIZE. */
++	size = STRTAB_L1_SZ_SHIFT - (ilog2(STRTAB_L1_DESC_DWORDS) + 3);
++	size = min(size, smmu->sid_bits - STRTAB_SPLIT);
+ 	cfg->num_l1_ents = 1 << size;
+ 
+ 	size += STRTAB_SPLIT;
+@@ -2531,6 +2523,13 @@ static int arm_smmu_device_probe(struct arm_smmu_device *smmu)
+ 	smmu->ssid_bits = reg >> IDR1_SSID_SHIFT & IDR1_SSID_MASK;
+ 	smmu->sid_bits = reg >> IDR1_SID_SHIFT & IDR1_SID_MASK;
+ 
++	/*
++	 * If the SMMU supports fewer bits than would fill a single L2 stream
++	 * table, use a linear table instead.
++	 */
++	if (smmu->sid_bits <= STRTAB_SPLIT)
++		smmu->features &= ~ARM_SMMU_FEAT_2_LVL_STRTAB;
++
+ 	/* IDR5 */
+ 	reg = readl_relaxed(smmu->base + ARM_SMMU_IDR5);
+ 
+-- 
+Qualcomm Datacenter Technologies, Inc. on behalf of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux
+Foundation Collaborative Project.
