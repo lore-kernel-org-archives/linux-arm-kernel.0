@@ -1,150 +1,85 @@
-From: moritz.fischer@ettus.com (Moritz Fischer)
-Date: Tue, 12 Jul 2016 14:31:05 -0700
-Subject: [PATCH 2/2] fpga-manager: Add Socfpga Arria10 support
-In-Reply-To: <20160712190709.5964-3-atull@opensource.altera.com>
-References: <20160712190709.5964-1-atull@opensource.altera.com>
- <20160712190709.5964-3-atull@opensource.altera.com>
-Message-ID: <CAAtXAHfSBzLisqBgF4Vry0vrcL3+DB4b1ctMOrTdOq5ue4D7JQ@mail.gmail.com>
+From: ebiederm@xmission.com (Eric W. Biederman)
+Date: Tue, 12 Jul 2016 16:22:07 -0500
+Subject: [RFC 0/3] extend kexec_file_load system call
+In-Reply-To: <20160712225805.0d27fe5d@hananiah.suse.cz> (Petr Tesarik's
+ message of "Tue, 12 Jul 2016 22:58:05 +0200")
+References: <20160712014201.11456-1-takahiro.akashi@linaro.org>
+ <87furf7ztv.fsf@x220.int.ebiederm.org> <50662781.Utjsnse3nb@hactar>
+ <20160712225805.0d27fe5d@hananiah.suse.cz>
+Message-ID: <87a8hm1ri8.fsf@x220.int.ebiederm.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alan,
+Petr Tesarik <ptesarik@suse.cz> writes:
 
-couple of nits inline below.
+> On Tue, 12 Jul 2016 13:25:11 -0300
+> Thiago Jung Bauermann <bauerman@linux.vnet.ibm.com> wrote:
+>
+>> Hi Eric,
+>> 
+>> I'm trying to understand your concerns leading to your nack. I hope you 
+>> don't mind expanding your thoughts on them a bit.
+>> 
+>> Am Dienstag, 12 Juli 2016, 08:25:48 schrieb Eric W. Biederman:
+>> > AKASHI Takahiro <takahiro.akashi@linaro.org> writes:
+>> > > Device tree blob must be passed to a second kernel on DTB-capable
+>> > > archs, like powerpc and arm64, but the current kernel interface
+>> > > lacks this support.
+>> > > 
+>> > > This patch extends kexec_file_load system call by adding an extra
+>> > > argument to this syscall so that an arbitrary number of file descriptors
+>> > > can be handed out from user space to the kernel.
+>> > > 
+>> > > See the background [1].
+>> > > 
+>> > > Please note that the new interface looks quite similar to the current
+>> > > system call, but that it won't always mean that it provides the "binary
+>> > > compatibility."
+>> > > 
+>> > > [1] http://lists.infradead.org/pipermail/kexec/2016-June/016276.html
+>> > 
+>> > So this design is wrong.  The kernel already has the device tree blob,
+>> > you should not be extracting it from the kernel munging it, and then
+>> > reinserting it in the kernel if you want signatures and everything to
+>> > pass.
+>> 
+>> I don't understand how the kernel signature will be invalidated. 
+>> 
+>> There are some types of boot images that can embed a device tree blob in 
+>> them, but the kernel can also be handed a separate device tree blob from 
+>> firmware, the boot loader, or kexec. This latter case is what we are 
+>> discussing, so we are not talking about modifying an embedded blob in the 
+>> kernel image.
+>> 
+>> > What x86 does is pass it's equivalent of the device tree blob from one
+>> > kernel to another directly and behind the scenes.  It does not go
+>> > through userspace for this.
+>> > 
+>> > Until a persuasive case can be made for going around the kernel and
+>> > probably adding a feature (like code execution) that can be used to
+>> > defeat the signature scheme I am going to nack this.
+>> 
+>> I also don't understand what you mean by code execution. How does passing a 
+>> device tree blob via kexec enables code execution? How can the signature 
+>> scheme be defeated?
+>
+> I'm not an expert on DTB, so I can't provide an example of code
+> execution, but you have already mentioned the /chosen/linux,stdout-path
+> property. If an attacker redirects the bootloader to an insecure
+> console, they may get access to the system that would otherwise be
+> impossible.
+>
+> In general, tampering with the hardware inventory of a machine opens up
+> a security hole, and one must be very cautious which modifications are
+> allowed. You're giving this power to an (unsigned, hence untrusted)
+> userspace application; Eric argues that only the kernel should have
+> this power.
 
-On Tue, Jul 12, 2016 at 12:07 PM, Alan Tull <atull@opensource.altera.com> wrote:
+At the very least it should be signed.  And of course the more signed
+images we have in different combinations the more easily someone can
+find a combination that does things the people performing the signing
+didn't realizing they were allowing.
 
-> +static int socfpga_a10_fpga_write_complete(struct fpga_manager *mgr, u32 flags)
-> +{
-> +       struct a10_fpga_priv *priv = mgr->priv;
-> +       u32 reg;
-> +       int ret;
-> +
-> +       /* Wait for pr_done */
-> +       ret = socfpga_a10_fpga_wait_for_pr_done(priv);
-> +
-> +       /* Clear pr_request */
-> +       regmap_update_bits(priv->regmap, A10_FPGAMGR_IMGCFG_CTL_01_OFST,
-> +                          A10_FPGAMGR_IMGCFG_CTL_01_S2F_PR_REQUEST, 0);
-> +
-> +       /* Send some clocks to clear out any errors */
-> +       socfpga_a10_fpga_generate_dclks(priv, 256);
-> +
-> +       /* Disable s2f dclk and data */
-> +       regmap_update_bits(priv->regmap, A10_FPGAMGR_IMGCFG_CTL_02_OFST,
-> +                          A10_FPGAMGR_IMGCFG_CTL_02_EN_CFG_CTRL, 0);
+So if we can not add an extra variable into the mix it would be good.
 
-Maybe replace 0 with named constant.
-> +
-> +       /* Deassert chip select */
-> +       regmap_update_bits(priv->regmap, A10_FPGAMGR_IMGCFG_CTL_01_OFST,
-> +                          A10_FPGAMGR_IMGCFG_CTL_01_S2F_NCE,
-> +                          A10_FPGAMGR_IMGCFG_CTL_01_S2F_NCE);
-> +
-> +       /* Disable data, dclk, nce, and pr_request override to CSS */
-> +       regmap_update_bits(priv->regmap, A10_FPGAMGR_IMGCFG_CTL_01_OFST,
-> +                          A10_FPGAMGR_IMGCFG_CTL_01_S2F_NENABLE_CONFIG,
-> +                          A10_FPGAMGR_IMGCFG_CTL_01_S2F_NENABLE_CONFIG);
-> +
-> +       /* Return any errors regarding pr_done or pr_error */
-> +       if (ret)
-> +               return ret;
-> +
-> +       /* Final check */
-> +       reg = socfpga_a10_fpga_read_stat(priv);
-> +
-> +       if (((reg & A10_FPGAMGR_IMGCFG_STAT_F2S_USERMODE) == 0) ||
-> +           ((reg & A10_FPGAMGR_IMGCFG_STAT_F2S_CONDONE_PIN) == 0) ||
-> +           ((reg & A10_FPGAMGR_IMGCFG_STAT_F2S_NSTATUS_PIN) == 0)) {
-> +               dev_dbg(&mgr->dev,
-> +                       "Timeout in final check. Status=%08xf\n", reg);
-> +               return -ETIMEDOUT;
-> +       }
-> +
-> +       return 0;
-> +}
-> +
-> +static enum fpga_mgr_states socfpga_a10_fpga_state(struct fpga_manager *mgr)
-> +{
-> +       struct a10_fpga_priv *priv = mgr->priv;
-> +       u32 reg = socfpga_a10_fpga_read_stat(priv);
-> +
-> +       if (reg & A10_FPGAMGR_IMGCFG_STAT_F2S_USERMODE)
-> +               return FPGA_MGR_STATE_OPERATING;
-> +
-> +       if (reg & A10_FPGAMGR_IMGCFG_STAT_F2S_PR_READY)
-> +               return FPGA_MGR_STATE_WRITE;
-> +
-> +       if (reg & A10_FPGAMGR_IMGCFG_STAT_F2S_CRC_ERROR)
-> +               return FPGA_MGR_STATE_WRITE_COMPLETE_ERR;
-> +
-> +       if ((reg & A10_FPGAMGR_IMGCFG_STAT_F2S_NSTATUS_PIN) == 0)
-> +               return FPGA_MGR_STATE_RESET;
-> +
-> +       return FPGA_MGR_STATE_UNKNOWN;
-> +}
-> +
-> +static const struct fpga_manager_ops socfpga_a10_fpga_mgr_ops = {
-> +       .state = socfpga_a10_fpga_state,
-> +       .write_init = socfpga_a10_fpga_write_init,
-> +       .write = socfpga_a10_fpga_write,
-> +       .write_complete = socfpga_a10_fpga_write_complete,
-> +};
-> +
-> +static int socfpga_a10_fpga_probe(struct platform_device *pdev)
-> +{
-> +       struct device *dev = &pdev->dev;
-> +       struct a10_fpga_priv *priv;
-> +       void __iomem *reg_base;
-> +       struct resource *res;
-> +       int ret;
-> +
-> +       priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
-> +       if (!priv)
-> +               return -ENOMEM;
-> +
-> +       /* First mmio base is for register access */
-> +       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +       reg_base = devm_ioremap_resource(dev, res);
-> +       if (IS_ERR(reg_base))
-> +               return PTR_ERR(reg_base);
-> +
-> +       /* Second mmio base is for writing FPGA image data */
-> +       res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-> +       priv->fpga_data_addr = devm_ioremap_resource(dev, res);
-> +       if (IS_ERR(priv->fpga_data_addr))
-> +               return PTR_ERR(priv->fpga_data_addr);
-> +
-> +       /* regmap for register access */
-> +       priv->regmap = devm_regmap_init_mmio(dev, reg_base,
-> +                                            &socfpga_a10_fpga_regmap_config);
-> +       if (IS_ERR(priv->regmap))
-> +               return -ENODEV;
-> +
-> +       priv->clk = devm_clk_get(dev, NULL);
-> +       if (IS_ERR(priv->clk)) {
-> +               dev_err(dev, "no clock specified\n");
-> +               return PTR_ERR(priv->clk);
-> +       }
-> +
-> +       ret = clk_prepare_enable(priv->clk);
-> +       if (ret) {
-> +               dev_err(dev, "could not enable clock\n");
-> +               clk_put(priv->clk);
-
-Seen that you used devm_clk_get() is this one necessary?
-
-> +static int socfpga_a10_fpga_remove(struct platform_device *pdev)
-> +{
-> +       struct fpga_manager *mgr = platform_get_drvdata(pdev);
-> +       struct a10_fpga_priv *priv = mgr->priv;
-> +
-> +       fpga_mgr_unregister(&pdev->dev);
-> +       clk_disable_unprepare(priv->clk);
-> +       clk_put(priv->clk);
-
-Same here, if needed at all shouldn't it be devm_clk_put() ?
-
-Cheers,
-
-Moritz
+Eric
