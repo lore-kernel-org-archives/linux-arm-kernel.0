@@ -1,26 +1,29 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 12 Jul 2016 09:22:56 +0100
-Subject: [PATCH v3 6/7] spi: s3c64xx: restore removed comments
-In-Reply-To: <1468306444-18512-1-git-send-email-andi.shyti@samsung.com>
-References: <57837606.8050906@samsung.com>
- <1468306444-18512-1-git-send-email-andi.shyti@samsung.com>
-Message-ID: <20160712082256.GD9976@sirena.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 12 Jul 2016 10:26:28 +0200
+Subject: [PATCH v2 02/10] irqchip: add irqchip driver for nuc900
+In-Reply-To: <5784968A.7080007@iommu.org>
+References: <1468135649-19980-1-git-send-email-vw@iommu.org>
+ <1761342.TGgYi16yul@wuerfel> <5784968A.7080007@iommu.org>
+Message-ID: <5434334.4rKzx80y6W@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 12, 2016 at 03:54:04PM +0900, Andi Shyti wrote:
-> Patch a9e93e8 has erroneously removed some comments which are
-> important to understand why the bus frequency is multiplied by
-> two during the spi transfer.
+On Tuesday, July 12, 2016 3:04:42 PM CEST Wan Zongshun wrote:
+> >
+> > Ideally, this should just go away once we use SPARSE_IRQ.
+> 
+> This platform also can use SPARSE_IRQ? this just a simple irq map and no 
+> more irq number in this Soc.
+> 
 
-Please don't bury patches in the middle of old threads, it makes it very
-confusing trying to figure out what's going on especially when you do
-this one patch at a time in a series.  Submit new patches as a complete
-series, ideally not threaded in with anything else (at least for me).
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160712/e32d1a91/attachment.sig>
+SPARSE_IRQ is implied by ARCH_MULTIPLATFORM, so we will have to
+use it once that gets enabled.
+
+Your new irqchip driver already handles IRQ domains, so it will
+work out of the box with SPARSE_IRQ, but you have to change the
+reference to "NR_IRQS" into something else.
+
+I've prototyped a patch series to enable ARCH_MULTIPLATFORM,
+I hope you can start working from what I have and get it to run.
+
+	Arnd
