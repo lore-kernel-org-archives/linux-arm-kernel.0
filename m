@@ -1,41 +1,56 @@
 From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Tue, 12 Jul 2016 10:41:59 +0900
-Subject: [RFC 1/3] syscall: add kexec_file_load to generic unistd.h
+Date: Tue, 12 Jul 2016 10:42:00 +0900
+Subject: [RFC 2/3] kexec: add dtb info to struct kimage
 In-Reply-To: <20160712014201.11456-1-takahiro.akashi@linaro.org>
 References: <20160712014201.11456-1-takahiro.akashi@linaro.org>
-Message-ID: <20160712014201.11456-2-takahiro.akashi@linaro.org>
+Message-ID: <20160712014201.11456-3-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently kexec_file_load is supported only on x86, but it will be
-supported on powerpc and arm64 in near future. Since both archs
-use asm-generic/unistd.h, this patch adds the entry to this file.
+Device tree blob must be passed to a second kernel on DTB-capable
+archs, like powerpc and arm64, but the current kernel interface
+lacks this support.
+
+This patch adds dtb buffer information to struct kimage.
+When users don't specify dtb explicitly and the one used for the current
+kernel can be re-used, this change will be good enough for implementing
+kexec_file_load feature.
 
 Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
 ---
- include/uapi/asm-generic/unistd.h | 8 +++++++-
- 1 file changed, 7 insertions(+), 1 deletion(-)
+ include/linux/kexec.h | 3 +++
+ kernel/kexec_file.c   | 5 +++++
+ 2 files changed, 8 insertions(+)
 
-diff --git a/include/uapi/asm-generic/unistd.h b/include/uapi/asm-generic/unistd.h
-index a26415b..9ead10f 100644
---- a/include/uapi/asm-generic/unistd.h
-+++ b/include/uapi/asm-generic/unistd.h
-@@ -724,9 +724,15 @@ __SYSCALL(__NR_copy_file_range, sys_copy_file_range)
- __SC_COMP(__NR_preadv2, sys_preadv2, compat_sys_preadv2)
- #define __NR_pwritev2 287
- __SC_COMP(__NR_pwritev2, sys_pwritev2, compat_sys_pwritev2)
-+#define __NR_kexec_file_load 288
-+#ifdef CONFIG_KEXEC_FILE
-+__SYSCALL(__NR_kexec_file_load, sys_kexec_file_load)
-+#else
-+__SYSCALL(__NR_kexec_file_load, sys_ni_syscall)
-+#endif /* CONFIG_KEXEC_FILE */
+diff --git a/include/linux/kexec.h b/include/linux/kexec.h
+index e8acb2b..554c848 100644
+--- a/include/linux/kexec.h
++++ b/include/linux/kexec.h
+@@ -190,6 +190,9 @@ struct kimage {
+ 	char *cmdline_buf;
+ 	unsigned long cmdline_buf_len;
  
- #undef __NR_syscalls
--#define __NR_syscalls 288
-+#define __NR_syscalls 289
++	void *dtb_buf;
++	unsigned long dtb_buf_len;
++
+ 	/* File operations provided by image loader */
+ 	struct kexec_file_ops *fops;
  
- /*
-  * All syscalls below here should go away really,
+diff --git a/kernel/kexec_file.c b/kernel/kexec_file.c
+index 9891464..7278329 100644
+--- a/kernel/kexec_file.c
++++ b/kernel/kexec_file.c
+@@ -96,6 +96,11 @@ void kimage_file_post_load_cleanup(struct kimage *image)
+ 		image->initrd_buf = NULL;
+ 	}
+ 
++	if (image->dtb_buf) {
++		vfree(image->dtb_buf);
++		image->dtb_buf = NULL;
++	}
++
+ 	if (image->cmdline_buf) {
+ 		kfree(image->cmdline_buf);
+ 		image->cmdline_buf = NULL;
 -- 
 2.9.0
