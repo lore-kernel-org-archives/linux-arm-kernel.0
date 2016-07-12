@@ -1,57 +1,43 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 12 Jul 2016 11:22:28 +0100
-Subject: [PATCHv3 2/7] clk: ti: add clkdev get helper
-In-Reply-To: <1467296018-25086-3-git-send-email-t-kristo@ti.com>
-References: <1467296018-25086-1-git-send-email-t-kristo@ti.com>
- <1467296018-25086-3-git-send-email-t-kristo@ti.com>
-Message-ID: <20160712102228.GE5783@n2100.arm.linux.org.uk>
+From: kevin.brodsky@arm.com (Kevin Brodsky)
+Date: Tue, 12 Jul 2016 11:23:58 +0100
+Subject: [PATCH v2 0/2] arm64: Add support for CLOCK_MONOTONIC_RAW in
+ clock_gettime() vDSO
+Message-ID: <20160712102400.6904-1-kevin.brodsky@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 30, 2016 at 05:13:33PM +0300, Tero Kristo wrote:
->  /**
-> + * ti_clk_get - lookup a TI clock handle
-> + * @dev_id: device to lookup clock for
-> + * @con_id: connection ID to find
-> + *
-> + * Searches for a TI clock handle based on the DT node name.
-> + * Returns the pointer to the clock handle, or ERR_PTR in failure.
-> + */
-> +static struct clk *ti_clk_get(const char *dev_id, const char *con_id)
-> +{
-> +	struct of_phandle_args clkspec;
-> +	struct device_node *node;
-> +	struct clk *clk;
-> +
-> +	/* Only check for cases of type clk_get_sys(NULL, "xyz") */
-> +	if (dev_id || !con_id)
-> +		return ERR_PTR(-ENOENT);
-> +
-> +	if (of_have_populated_dt()) {
-> +		node = of_find_node_by_name(NULL, con_id);
-> +		clkspec.np = node;
-> +		clk = of_clk_get_from_provider(&clkspec);
-> +
-> +		if (!IS_ERR(clk))
-> +			return clk;
-> +	}
-> +
-> +	return ERR_PTR(-ENOENT);
-> +}
+Hi,
 
-I _really_ don't like this.  This takes us back to the totally broken
-idea, that's already been proven to be greatly harmful in OMAP land,
-that the "con_id" is not a _DEVICE SPECIFIC CONNECTION NAME_ but is a
-CLOCK NAME.  The connection ID is supposed to be a static string in
-the requestor of the clock, not some random string picked out from
-DT.
+This small series adds support for CLOCK_MONOTONIC_RAW to
+clock_gettime() (and clock_getres()) in the arm64 vDSO. This should make
+calls to clock_gettime() with CLOCK_MONOTONIC_RAW just as fast as
+CLOCK_MONOTONIC and suchlike, instead of falling back to the significantly
+slower syscall.
 
-This series started out with the assertion that the new clkdev hook
-was to avoid registering lots of clock aliases, but it seems with
-this patch we're going to end up with lots of specifically named
-nodes in DT instead.  It's just moving the problem to somewhere else.
+Given that gettimeofday.S is already quite difficult to understand, and
+directly adding MONOTONIC_RAW support makes it even more so, the first
+patch refactors it to make it simpler, and save a few instructions along
+the way. The second patch actually adds support for MONOTONIC_RAW, which
+is made quite easy by the refactoring.
+
+Thanks,
+Kevin
+
+Changelog v1..v2:
+* As proposed by Will Deacon, align main labels to be nicer to branch
+  predictors. Also replace the "store" exit point of
+  __kernel_clock_gettime with a macro, making it slightly easier to read
+  and removing a branch.
+
+Kevin Brodsky (2):
+  arm64: Refactor vDSO time functions
+  arm64: Add support for CLOCK_MONOTONIC_RAW in clock_gettime() vDSO
+
+ arch/arm64/include/asm/vdso_datapage.h |   8 +-
+ arch/arm64/kernel/asm-offsets.c        |   6 +-
+ arch/arm64/kernel/vdso.c               |   8 +-
+ arch/arm64/kernel/vdso/gettimeofday.S  | 331 ++++++++++++++++++++-------------
+ 4 files changed, 224 insertions(+), 129 deletions(-)
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+2.9.0
