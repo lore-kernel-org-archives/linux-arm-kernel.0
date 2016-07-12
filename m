@@ -1,74 +1,48 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 12 Jul 2016 10:12:46 +0800
-Subject: [PATCH 8/9] ARM: dts: sun7i: bananapi-m1-plus: Add PMIC
- regulators and OPPs for cpufreq
-In-Reply-To: <20160709081827.GF4522@lukather>
-References: <1467796250-22010-1-git-send-email-wens@csie.org>
- <1467796250-22010-9-git-send-email-wens@csie.org>
- <20160709081827.GF4522@lukather>
-Message-ID: <CAGb2v655vL=U7MyzTY_Khx-bCWorb-WbQCaFm_e-yH8+dGhddQ@mail.gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 11 Jul 2016 23:15:54 -0300
+Subject: [PATCH v2] clk: imx7d: do not set parent of ethernet time/ref
+ clocks
+In-Reply-To: <146785281774.73491.10999943518898018619@resonance>
+References: <20160703174813.13970-1-stefan@agner.ch>
+ <146785281774.73491.10999943518898018619@resonance>
+Message-ID: <CAOMZO5CuLshhk9R3dJh9RjEG2FphV5Z+sALpb2FitmRkKrFPZA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Mike,
 
-On Sat, Jul 9, 2016 at 4:18 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Hi,
->
-> On Wed, Jul 06, 2016 at 05:10:49PM +0800, Chen-Yu Tsai wrote:
->> The Bananapi M1+, like other Allwinner A20 based boards, uses the AXP209
->> PMIC to supply its power. The vendor FEX file's DVFS table suggests the
->> board's CPU power rail has a voltage drop of 25 ~ 50 mV.
+On Wed, Jul 6, 2016 at 9:53 PM, Michael Turquette
+<mturquette@baylibre.com> wrote:
+> Quoting Stefan Agner (2016-07-03 10:48:13)
+>> All device trees currently in mainline specify the time clock parent
+>> using the assigned-clocks/assigned-clock-parents method, there is no
+>> need to statically assign the parent in the core clock driver.
+>> Also all current boards provide an Ethernet reference clock for the
+>> PHY externally, hence configuring the internal PHY reference clock.
 >>
->> Add the PMIC regulator nodes and copy the DVFS table from the FEX file.
+>> Furthermore, and the actual driver of this patch, specify ethernet
+>> related parents at that early point in boot leads to a warning:
+>> bad: scheduling from the idle thread!
 >>
->> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->> ---
->>  arch/arm/boot/dts/sun7i-a20-bananapi-m1-plus.dts | 48 ++++++++++++++++++++++--
->>  1 file changed, 44 insertions(+), 4 deletions(-)
+>> The reason for the warning is that setting the parent enables the ENET
+>> PLL since we are using CLK_OPS_PARENT_ENABLE. Enabling the ENET PLL can
+>> cause clk_pllv3_wait_lock to sleep. See also:
+>> commit fc8726a2c021 ("clk: core: support clocks which requires parents
+>> enable (part 2)").
 >>
->> diff --git a/arch/arm/boot/dts/sun7i-a20-bananapi-m1-plus.dts b/arch/arm/boot/dts/sun7i-a20-bananapi-m1-plus.dts
->> index ba5bca0fe997..7bb418bd1b6e 100644
->> --- a/arch/arm/boot/dts/sun7i-a20-bananapi-m1-plus.dts
->> +++ b/arch/arm/boot/dts/sun7i-a20-bananapi-m1-plus.dts
->> @@ -105,6 +105,22 @@
->>       status = "okay";
->>  };
+>> Note that setting the ENET AXI root clock parent also requires ENET
+>> PLL to be enabled. However, U-Boot typically leaves the ENET PLL on,
+>> hence when the framework sets the parent of the first clock, it does
+>> not need to wait for the PLL to come up. But because there is currently
+>> no user of that clock, the PLL gets disabled after setting the parent.
+>> Therefore, subsequent reparenting calls of any clock which somehow rely
+>> on the ENET PLL, need to reenable the ENET PLL which leads to a sleep.
+>> Removing those subsequent reparenting calls works around this issue.
 >>
->> +&cpu0 {
->> +     cpu-supply = <&reg_dcdc2>;
->> +
->> +     /* The custom DVFS table suggests a voltage drop of 25 ~ 50 mV */
->> +     operating-points = <
->> +             /* kHz    uV */
->> +             1080000 1450000
->> +             912000  1425000
->> +             864000  1350000
->> +             720000  1250000
->> +             528000  1150000
->> +             312000  1100000
->> +             144000  1050000
->> +             >;
->> +};
->> +
+>> Also remove comments. The code is really verbose enough.
+>>
+>> Signed-off-by: Stefan Agner <stefan@agner.ch>
 >
-> We've always tried to not use all the non-sense OPPs coming from the
-> FEX files. Have you experienced any issues with the default ones?
+> Applied.
 
-I'll find some time to run a stress test on it.
-
-> The other patches have been queued either for 4.8 as fixes, or 4.9.
-
-Thanks!
-
-ChenYu
-
->
-> Thanks!
-> Maxime
->
-> --
-> Maxime Ripard, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
+I still don't see this patch applied in clk-next.
