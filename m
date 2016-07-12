@@ -1,48 +1,41 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 12 Jul 2016 13:59:23 +0100
-Subject: [PATCH v9 0/7] ACPI / processor_idle: Add ACPI v6.0 LPI support
-In-Reply-To: <2164074.OnkmXO2GSJ@vostro.rjw.lan>
-References: <1467997678-7107-1-git-send-email-sudeep.holla@arm.com>
- <5784D78E.7010409@arm.com> <2164074.OnkmXO2GSJ@vostro.rjw.lan>
-Message-ID: <5784E9AB.1070507@arm.com>
+From: shankerd@codeaurora.org (Shanker Donthineni)
+Date: Tue, 12 Jul 2016 08:32:56 -0500
+Subject: [PATCH] irqchip/gicv3-its: Enable cacheable attribute
+ Read-allocate hints
+In-Reply-To: <5784A5C8.4080103@arm.com>
+References: <1468294608-30619-1-git-send-email-shankerd@codeaurora.org>
+ <5784A5C8.4080103@arm.com>
+Message-ID: <5784F188.3010609@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Marc,
 
-
-On 12/07/16 13:09, Rafael J. Wysocki wrote:
-> On Tuesday, July 12, 2016 12:42:06 PM Sudeep Holla wrote:
->>
->> On 08/07/16 18:07, Sudeep Holla wrote:
->>> ACPI 6.0 introduced LPI(Low Power Idle) states that provides an alternate
->>> method to describe processor idle states. It extends the specification
->>> to allow the expression of idle states like C-states selectable by the
->>> OSPM when a processor goes idle, but may affect more than one processor,
->>> and may affect other system components.
->>>
->>> LPI extensions leverages the processor container device(again introduced
->>> in ACPI 6.0) allowing to express which parts of the system are affected
->>> by a given LPI state. It defines the local power states for each node
->>> in a hierarchical processor topology. The OSPM can use _LPI object to
->>> select a local power state for each level of processor hierarchy in the
->>> system. They used to produce a composite power state request that is
->>> presented to the platform by the OSPM.
->>>
->>> Since multiple processors affect the idle state for any non-leaf hierarchy
->>> node, coordination of idle state requests between the processors is
->>> required. ACPI supports two different coordination schemes: Platform
->>> coordinated and  OS initiated.
->>>
->>
->> I was hoping to get this in v4.8 now that merge window is
->> delayed/extended if you have no further comments on this series.
+On 07/12/2016 03:09 AM, Marc Zyngier wrote:
+> Hi Shanker,
 >
-> I'll get to it in the next couple of days.  If it looks all good and there are
-> no comments, I'll queue it up.
->
+> On 12/07/16 04:36, Shanker Donthineni wrote:
+>> Read-allocation hints are not enabled for both the GIC-ITS and GICR
+>> tables. This forces the hardware to always read the table contents
+>> from an external memory (DDR) which is slow compared to cache memory.
+>> Most of the tables are often read by hardware. So, it's better to
+>> enable Read-allocate hints in addition to Write-allocate hints in
+>> order to improve the GICR_PEND, GICR_PROP, Collection, Device, and
+>> vCPU tables lookup time.
+> While I'm not opposed to such a change, I'd like to see some evidence
+> that this actually makes a difference. Have you measured an improvement
+> on a particular implementation? If so, could you share your benchmarking
+> method so that it could be be measured on others as well?
+I have seen at least 5% performance gain when I was testing direct VLPI 
+feature
+on Qualcomm emulation platforms. On Silicon, this gain is not noticeable.
 
-Thanks for the update.
+
+> Thanks,
+>
+> 	M.
 
 -- 
-Regards,
-Sudeep
+Shanker Donthineni
+Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
