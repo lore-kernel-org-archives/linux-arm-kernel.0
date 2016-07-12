@@ -1,40 +1,33 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 12 Jul 2016 12:08:28 +0100
-Subject: [PATCH v9] arm64: cpuinfo: Expose MIDR_EL1 and REVIDR_EL1 to sysfs
-In-Reply-To: <1467990073-27462-1-git-send-email-suzuki.poulose@arm.com>
-References: <1467990073-27462-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <20160712110827.GB18408@arm.com>
+From: weiyj_lk@163.com (weiyj_lk at 163.com)
+Date: Tue, 12 Jul 2016 11:08:42 +0000
+Subject: [PATCH -next] spi: s3c64xx: fix reference leak to master in
+ s3c64xx_spi_remove()
+Message-ID: <1468321722-16568-1-git-send-email-weiyj_lk@163.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 08, 2016 at 04:01:13PM +0100, Suzuki K Poulose wrote:
-> From: Steve Capper <steve.capper@linaro.org>
-> 
-> It can be useful for JIT software to be aware of MIDR_EL1 and
-> REVIDR_EL1 to ascertain the presence of any core errata that could
-> affect code generation.
-> 
-> This patch exposes these registers through sysfs:
-> 
-> /sys/devices/system/cpu/cpu$ID/regs/identification/midr_el1
-> /sys/devices/system/cpu/cpu$ID/regs/identification/revidr_el1
-> 
-> where $ID is the cpu number. For big.LITTLE systems, one can have a
-> mixture of cores (e.g. Cortex A53 and Cortex A57), thus all CPUs need
-> to be enumerated.
-> 
-> If the kernel does not have valid information to populate these entries
-> with, an empty string is returned to userspace.
-> 
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Signed-off-by: Steve Capper <steve.capper@linaro.org>
-> [ ABI documentation updates, hotplug notifiers, kobject changes ]
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 
-Looks good to me, thanks for sticking with it:
+Once a spi_master_get() call succeeds, we need an additional
+spi_master_put() call to free the memory, otherwise we will
+leak a reference to master. Fix by removing the unnecessary
+spi_master_get() call.
 
-Reviewed-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+---
+ drivers/spi/spi-s3c64xx.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Will
+diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
+index df88fa1..001c9eb 100644
+--- a/drivers/spi/spi-s3c64xx.c
++++ b/drivers/spi/spi-s3c64xx.c
+@@ -1211,7 +1211,7 @@ err0:
+ 
+ static int s3c64xx_spi_remove(struct platform_device *pdev)
+ {
+-	struct spi_master *master = spi_master_get(platform_get_drvdata(pdev));
++	struct spi_master *master = platform_get_drvdata(pdev);
+ 	struct s3c64xx_spi_driver_data *sdd = spi_master_get_devdata(master);
+ 
+ 	pm_runtime_get_sync(&pdev->dev);
