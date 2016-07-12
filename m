@@ -1,39 +1,41 @@
 From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Tue, 12 Jul 2016 10:41:58 +0900
-Subject: [RFC 0/3] extend kexec_file_load system call
-Message-ID: <20160712014201.11456-1-takahiro.akashi@linaro.org>
+Date: Tue, 12 Jul 2016 10:41:59 +0900
+Subject: [RFC 1/3] syscall: add kexec_file_load to generic unistd.h
+In-Reply-To: <20160712014201.11456-1-takahiro.akashi@linaro.org>
+References: <20160712014201.11456-1-takahiro.akashi@linaro.org>
+Message-ID: <20160712014201.11456-2-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Device tree blob must be passed to a second kernel on DTB-capable
-archs, like powerpc and arm64, but the current kernel interface
-lacks this support.
-  
-This patch extends kexec_file_load system call by adding an extra
-argument to this syscall so that an arbitrary number of file descriptors
-can be handed out from user space to the kernel.
+Currently kexec_file_load is supported only on x86, but it will be
+supported on powerpc and arm64 in near future. Since both archs
+use asm-generic/unistd.h, this patch adds the entry to this file.
 
-See the background [1].
+Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+---
+ include/uapi/asm-generic/unistd.h | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
 
-Please note that the new interface looks quite similar to the current
-system call, but that it won't always mean that it provides the "binary
-compatibility."
-
-[1] http://lists.infradead.org/pipermail/kexec/2016-June/016276.html
-
-
-AKASHI Takahiro (3):
-  syscall: add kexec_file_load to generic unistd.h
-  kexec: add dtb info to struct kimage
-  kexec: extend kexec_file_load system call
-
- include/linux/fs.h                |  1 +
- include/linux/kexec.h             |  5 +++-
- include/linux/syscalls.h          |  4 ++-
- include/uapi/asm-generic/unistd.h |  8 ++++-
- include/uapi/linux/kexec.h        | 17 +++++++++++
- kernel/kexec_file.c               | 62 ++++++++++++++++++++++++++++++++++-----
- 6 files changed, 87 insertions(+), 10 deletions(-)
-
+diff --git a/include/uapi/asm-generic/unistd.h b/include/uapi/asm-generic/unistd.h
+index a26415b..9ead10f 100644
+--- a/include/uapi/asm-generic/unistd.h
++++ b/include/uapi/asm-generic/unistd.h
+@@ -724,9 +724,15 @@ __SYSCALL(__NR_copy_file_range, sys_copy_file_range)
+ __SC_COMP(__NR_preadv2, sys_preadv2, compat_sys_preadv2)
+ #define __NR_pwritev2 287
+ __SC_COMP(__NR_pwritev2, sys_pwritev2, compat_sys_pwritev2)
++#define __NR_kexec_file_load 288
++#ifdef CONFIG_KEXEC_FILE
++__SYSCALL(__NR_kexec_file_load, sys_kexec_file_load)
++#else
++__SYSCALL(__NR_kexec_file_load, sys_ni_syscall)
++#endif /* CONFIG_KEXEC_FILE */
+ 
+ #undef __NR_syscalls
+-#define __NR_syscalls 288
++#define __NR_syscalls 289
+ 
+ /*
+  * All syscalls below here should go away really,
 -- 
 2.9.0
