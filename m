@@ -1,57 +1,46 @@
-From: hzpeterchen@gmail.com (Peter Chen)
-Date: Tue, 12 Jul 2016 09:09:38 +0800
-Subject: [PATCH v2 18/22] usb: chipidea: msm: Add reset controller for
- PHY POR bit
-In-Reply-To: <CAJOFmgxHQPTm-aq3-e_8SGe2kw8R6TAQKDp2Jn8DXfMykcSS8w@mail.gmail.com>
-References: <20160707222114.1673-1-stephen.boyd@linaro.org>
- <20160707222114.1673-19-stephen.boyd@linaro.org>
- <20160711053228.GB31647@shlinux2>
- <CAJOFmgxHQPTm-aq3-e_8SGe2kw8R6TAQKDp2Jn8DXfMykcSS8w@mail.gmail.com>
-Message-ID: <20160712010938.GL31647@shlinux2>
+From: van.freenix@gmail.com (Peng Fan)
+Date: Tue, 12 Jul 2016 09:24:15 +0800
+Subject: [PATCH] iommu: arm-smmu: use devm_request_irq and devm_free_irq
+In-Reply-To: <578375D7.7090609@arm.com>
+References: <1467625102-9755-1-git-send-email-van.freenix@gmail.com>
+ <578375D7.7090609@arm.com>
+Message-ID: <20160712012412.GA11832@linux-7smt.suse>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 11, 2016 at 03:07:24PM -0700, Stephen Boyd wrote:
-> On 10 July 2016 at 22:32, Peter Chen <hzpeterchen@gmail.com> wrote:
-> > On Thu, Jul 07, 2016 at 03:21:09PM -0700, Stephen Boyd wrote:
-> >> @@ -40,11 +43,38 @@ struct ci_hdrc_msm {
-> >>       struct clk *iface_clk;
-> >>       struct clk *fs_clk;
-> >>       struct ci_hdrc_platform_data pdata;
-> >> +     struct reset_controller_dev rcdev;
-> >>       bool secondary_phy;
-> >>       bool hsic;
-> >>       void __iomem *base;
-> >>  };
-> >>
-> >> +static int
-> >> +ci_hdrc_msm_por_reset(struct reset_controller_dev *r, unsigned long id)
-> >> +{
-> >> +     struct ci_hdrc_msm *ci_msm = container_of(r, struct ci_hdrc_msm, rcdev);
-> >> +     void __iomem *addr = ci_msm->base;
-> >> +     u32 val;
-> >> +
-> >> +     if (id)
-> >> +             addr += HS_PHY_SEC_CTRL;
-> >> +     else
-> >> +             addr += HS_PHY_CTRL;
-> >> +
-> >> +     val = readl_relaxed(addr);
-> >> +     val |= HS_PHY_POR_ASSERT;
-> >> +     writel(val, addr);
-> >> +     udelay(12);
-> >
-> > Does this delay is reference manual defines or experienced value?
-> > Do you need to comment it?
-> >
-> 
-> 10us comes from the manual but we add two more from experience. I can
-> add a comment to that effect similar to the one above udelay(12) in
-> phy-msm-usb.c?
+Hi Robin,
+On Mon, Jul 11, 2016 at 11:32:55AM +0100, Robin Murphy wrote:
+>On 04/07/16 10:38, Peng Fan wrote:
+>> Use devm_request_irq to simplify error handling path,
+>> when probe smmu device.
+>> 
+>> Also devm_{request|free}_irq when init or destroy domain context.
+>> 
+>> Signed-off-by: Peng Fan <van.freenix@gmail.com>
+>> Cc: Will Deacon <will.deacon@arm.com>
+>> Cc: Robin Murphy <robin.murphy@arm.com>
+>> ---
+>[...]
+>> @@ -2050,7 +2046,7 @@ static int arm_smmu_device_remove(struct platform_device *pdev)
+>>  		dev_err(dev, "removing device with active domains!\n");
+>>  
+>>  	for (i = 0; i < smmu->num_global_irqs; ++i)
+>> -		free_irq(smmu->irqs[i], smmu);
+>> +		devm_free_irq(smmu->dev, smmu->irqs[i], smmu);
+>
+>There shouldn't be any need for this at all, since the very next thing
+>called after drv->remove() is devres_release_all().
 
-Yes, you can move that comments from there.
+Thanks for comments. I'll fix this with a new patch.
 
--- 
+Thanks,
+Peng.
 
-Best Regards,
-Peter Chen
+>
+>Robin.
+>
+>>  
+>>  	/* Turn the thing off */
+>>  	writel(sCR0_CLIENTPD, ARM_SMMU_GR0_NS(smmu) + ARM_SMMU_GR0_sCR0);
+>> 
+>
