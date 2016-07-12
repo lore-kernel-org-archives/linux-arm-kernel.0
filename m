@@ -1,58 +1,40 @@
-From: bauerman@linux.vnet.ibm.com (Thiago Jung Bauermann)
-Date: Tue, 12 Jul 2016 10:58:09 -0300
-Subject: [RFC 0/3] extend kexec_file_load system call
-In-Reply-To: <87furf7ztv.fsf@x220.int.ebiederm.org>
-References: <20160712014201.11456-1-takahiro.akashi@linaro.org>
- <87furf7ztv.fsf@x220.int.ebiederm.org>
-Message-ID: <2675986.6AfrV5PCe0@hactar>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Tue, 12 Jul 2016 15:59:04 +0200
+Subject: next-20160707 build: 1 failures 6 warnings (next-20160707)
+In-Reply-To: <20160707153237.GF11467@suse.de>
+References: <E1bL5XI-0004Z9-EP@optimist> <20160707122219.GO6247@sirena.org.uk>
+ <CAAFQd5DacKar+T1Fj62NvAZOT_QWBhahftZJXGq40Z19n-Z4Hg@mail.gmail.com>
+ <20160707153237.GF11467@suse.de>
+Message-ID: <20160712135904.GJ23520@phenom.ffwll.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Eric,
-
-Am Dienstag, 12 Juli 2016, 08:25:48 schrieb Eric W. Biederman:
-> AKASHI Takahiro <takahiro.akashi@linaro.org> writes:
-> > Device tree blob must be passed to a second kernel on DTB-capable
-> > archs, like powerpc and arm64, but the current kernel interface
-> > lacks this support.
+On Thu, Jul 07, 2016 at 05:32:37PM +0200, Joerg Roedel wrote:
+> On Thu, Jul 07, 2016 at 10:18:02PM +0900, Tomasz Figa wrote:
+> > This is probably because we missed this hidden dependency and decided
+> > to push the IOMMU part separately through the IOMMU tree. I guess we
+> > can remove the offending patch from the IOMMU tree and let the DRM
+> > tree include it based on a topic branch from Joerg.
 > > 
-> > This patch extends kexec_file_load system call by adding an extra
-> > argument to this syscall so that an arbitrary number of file descriptors
-> > can be handed out from user space to the kernel.
-> > 
-> > See the background [1].
-> > 
-> > Please note that the new interface looks quite similar to the current
-> > system call, but that it won't always mean that it provides the "binary
-> > compatibility."
-> > 
-> > [1] http://lists.infradead.org/pipermail/kexec/2016-June/016276.html
+> > Joerg, David, Mark Yao, what do you think?
 > 
-> So this design is wrong.  The kernel already has the device tree blob,
-> you should not be extracting it from the kernel munging it, and then
-> reinserting it in the kernel if you want signatures and everything to
-> pass.
-> 
-> What x86 does is pass it's equivalent of the device tree blob from one
-> kernel to another directly and behind the scenes.  It does not go
-> through userspace for this.
-> 
-> Until a persuasive case can be made for going around the kernel and
-> probably adding a feature (like code execution) that can be used to
-> defeat the signature scheme I am going to nack this.
+> Will the DRM patches go upstream soon, or is there still discussion
+> around them? For now I am going to remove/revert that patch in my tree.
 
-There are situations where userspace needs to change things in the device 
-tree to be used by the next kernel.
+drm is pretty much done for 4.8, but as usual there's some driver
+maintainers who are rather late. I'd say unlikely it lands in 4.8,
+postpone to 4.9 seems more reasonable given the trouble it just caused.
+-Daniel
 
-For example, Petitboot (the boot loader used in OpenPOWER machines) is a 
-userspace application running in an intermediary Linux instance and uses 
-kexec to load the target OS. It has to modify the device tree that will be 
-used by the next kernel so that the next kernel uses the same console that 
-petitboot was configured to use (i.e., set the /chosen/linux,stdout-path 
-property). It also modifies the device tree to allow the kernel to inherit 
-Petitboot's Openfirmware framebuffer.
+> 
+> 
+> 	Joerg
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
 
 -- 
-[]'s
-Thiago Jung Bauermann
-IBM Linux Technology Center
+Daniel Vetter
+Software Engineer, Intel Corporation
+http://blog.ffwll.ch
