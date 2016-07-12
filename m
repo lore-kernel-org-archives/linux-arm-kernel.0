@@ -1,49 +1,35 @@
-From: julien.grall@arm.com (Julien Grall)
-Date: Tue, 12 Jul 2016 11:58:42 +0100
-Subject: [PATCH 4/4] Explicitly clean linux-system.axf and xen-system.axf
-In-Reply-To: <20160620150934.1729-5-andre.przywara@arm.com>
-References: <20160620150934.1729-1-andre.przywara@arm.com>
- <20160620150934.1729-5-andre.przywara@arm.com>
-Message-ID: <5784CD62.8040507@arm.com>
+From: weiyj_lk@163.com (weiyj_lk at 163.com)
+Date: Tue, 12 Jul 2016 11:00:55 +0000
+Subject: [PATCH -next] [media] VPU: mediatek: fix return value check in
+ mtk_vpu_probe()
+Message-ID: <1468321255-15840-1-git-send-email-weiyj_lk@163.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andre,
+From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 
-On 20/06/16 16:09, Andre Przywara wrote:
-> From: Christoffer Dall <christoffer.dall@linaro.org>
->
-> When doing a make clean, only the output image currently configured to
-> build is being removed.  However, one would expect all build artifacts
-> to be removed when doing a 'make clean' and when switching between Xen
-> and Linux builds, it is easy to accidentally run an older build than
-> intended.  Simply hardcode the axf image file names.
->
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+In case of error, the function devm_clk_get() returns ERR_PTR()
+and not returns NULL. The NULL test in the return value check
+should be replaced with IS_ERR().
 
-Reviewed-by: Julien Grall <julien.grall@arm.com>
+Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+---
+ drivers/media/platform/mtk-vpu/mtk_vpu.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Regards,
-
-> ---
->   Makefile.am | 2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/Makefile.am b/Makefile.am
-> index d83b417..cd022e9 100644
-> --- a/Makefile.am
-> +++ b/Makefile.am
-> @@ -131,7 +131,7 @@ OFILES		+= $(addprefix $(ARCH_SRC),boot.o stack.o $(BOOTMETHOD) utils.o)
->
->   all: $(IMAGE) $(XIMAGE)
->
-> -CLEANFILES = $(IMAGE) $(OFILES) model.lds fdt.dtb
-> +CLEANFILES = $(IMAGE) linux-system.axf xen-system.axf $(OFILES) model.lds fdt.dtb
->
->   $(IMAGE): $(OFILES) model.lds fdt.dtb $(KERNEL_IMAGE) $(FILESYSTEM) $(XEN_IMAGE)
->   	$(LD) $(LDFLAGS) $(OFILES) -o $@ --script=model.lds
->
-
--- 
-Julien Grall
+diff --git a/drivers/media/platform/mtk-vpu/mtk_vpu.c b/drivers/media/platform/mtk-vpu/mtk_vpu.c
+index b60d02c..c8b2c72 100644
+--- a/drivers/media/platform/mtk-vpu/mtk_vpu.c
++++ b/drivers/media/platform/mtk-vpu/mtk_vpu.c
+@@ -788,9 +788,9 @@ static int mtk_vpu_probe(struct platform_device *pdev)
+ 
+ 	/* Get VPU clock */
+ 	vpu->clk = devm_clk_get(dev, "main");
+-	if (!vpu->clk) {
++	if (IS_ERR(vpu->clk)) {
+ 		dev_err(dev, "get vpu clock failed\n");
+-		return -EINVAL;
++		return PTR_ERR(vpu->clk);
+ 	}
+ 
+ 	platform_set_drvdata(pdev, vpu);
