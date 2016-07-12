@@ -1,127 +1,116 @@
-From: andi.shyti@samsung.com (Andi Shyti)
-Date: Tue, 12 Jul 2016 19:02:12 +0900
-Subject: [PATCH v3 3/7] spi: s3c64xx: rename goto labels to meaningful names
-In-Reply-To: <1468317736-18841-1-git-send-email-andi.shyti@samsung.com>
-References: <1468317736-18841-1-git-send-email-andi.shyti@samsung.com>
-Message-ID: <1468317736-18841-4-git-send-email-andi.shyti@samsung.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 12 Jul 2016 11:07:45 +0100
+Subject: [PATCH v22 8/8] Documentation: dt: chosen properties for arm64
+ kdump
+In-Reply-To: <20160712050514.22307-9-takahiro.akashi@linaro.org>
+References: <20160712050514.22307-1-takahiro.akashi@linaro.org>
+ <20160712050514.22307-9-takahiro.akashi@linaro.org>
+Message-ID: <20160712100745.GA21909@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The goto labels of the style of
+Hi,
 
-  err4:
-  err3:
-  err2:
-  err1:
+Apologies for the delay on this.
 
-are complex to insert in between new errors without renaming all
-the goto statements. Replace the errX naming style to meaningful
-names in order to make it easier to insert new goto exit points.
+On Tue, Jul 12, 2016 at 02:05:14PM +0900, AKASHI Takahiro wrote:
+> From: James Morse <james.morse@arm.com>
+> 
+> Add documentation for
+> 	linux,crashkernel-base and crashkernel-size,
+> 	linux,usable-memory-range, and
+> 	linux,elfcorehdr
+> used by arm64 kexec/kdump to decribe the kdump reserved area, and
+> the elfcorehdr's location within it.
+> 
+> Signed-off-by: James Morse <james.morse@arm.com>
+> [takahiro.akashi at linaro.org:
+>     renamed "usable-memory" to "usable-memory-range",
+>     added "linux,crashkernel-base" and "-size" ]
+> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> ---
+>  Documentation/devicetree/bindings/chosen.txt | 45 ++++++++++++++++++++++++++++
+>  1 file changed, 45 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/chosen.txt b/Documentation/devicetree/bindings/chosen.txt
+> index 6ae9d82..d7a3a86 100644
+> --- a/Documentation/devicetree/bindings/chosen.txt
+> +++ b/Documentation/devicetree/bindings/chosen.txt
+> @@ -52,3 +52,48 @@ This property is set (currently only on PowerPC, and only needed on
+>  book3e) by some versions of kexec-tools to tell the new kernel that it
+>  is being booted by kexec, as the booting environment may differ (e.g.
+>  a different secondary CPU release mechanism)
+> +
+> +linux,crashkernel-base
+> +linux,crashkernel-size
+> +----------------------
+> +These properties are set (on PowerPC and arm64) during kdump to tell
+> +use-space tools, like kexec-tools, the base address of the crash-dump
+> +kernel's reserved area of memory and the size. e.g.
 
-Signed-off-by: Andi Shyti <andi.shyti@samsung.com>
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Reviewed-by: Michael Turquette <mturquette@baylibre.com>
----
- drivers/spi/spi-s3c64xx.c | 24 ++++++++++++------------
- 1 file changed, 12 insertions(+), 12 deletions(-)
+No need to mention what consumes this. Just state what it describes,
+e.g.
 
-diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
-index 6f2e91a..0784a4d 100644
---- a/drivers/spi/spi-s3c64xx.c
-+++ b/drivers/spi/spi-s3c64xx.c
-@@ -1071,7 +1071,7 @@ static int s3c64xx_spi_probe(struct platform_device *pdev)
- 		if (ret < 0) {
- 			dev_err(&pdev->dev, "failed to get alias id, errno %d\n",
- 				ret);
--			goto err0;
-+			goto err_deref_master;
- 		}
- 		sdd->port_id = ret;
- 	} else {
-@@ -1109,13 +1109,13 @@ static int s3c64xx_spi_probe(struct platform_device *pdev)
- 	sdd->regs = devm_ioremap_resource(&pdev->dev, mem_res);
- 	if (IS_ERR(sdd->regs)) {
- 		ret = PTR_ERR(sdd->regs);
--		goto err0;
-+		goto err_deref_master;
- 	}
- 
- 	if (sci->cfg_gpio && sci->cfg_gpio()) {
- 		dev_err(&pdev->dev, "Unable to config gpio\n");
- 		ret = -EBUSY;
--		goto err0;
-+		goto err_deref_master;
- 	}
- 
- 	/* Setup clocks */
-@@ -1123,13 +1123,13 @@ static int s3c64xx_spi_probe(struct platform_device *pdev)
- 	if (IS_ERR(sdd->clk)) {
- 		dev_err(&pdev->dev, "Unable to acquire clock 'spi'\n");
- 		ret = PTR_ERR(sdd->clk);
--		goto err0;
-+		goto err_deref_master;
- 	}
- 
- 	if (clk_prepare_enable(sdd->clk)) {
- 		dev_err(&pdev->dev, "Couldn't enable clock 'spi'\n");
- 		ret = -EBUSY;
--		goto err0;
-+		goto err_deref_master;
- 	}
- 
- 	sprintf(clk_name, "spi_busclk%d", sci->src_clk_nr);
-@@ -1138,13 +1138,13 @@ static int s3c64xx_spi_probe(struct platform_device *pdev)
- 		dev_err(&pdev->dev,
- 			"Unable to acquire clock '%s'\n", clk_name);
- 		ret = PTR_ERR(sdd->src_clk);
--		goto err2;
-+		goto err_disable_clk;
- 	}
- 
- 	if (clk_prepare_enable(sdd->src_clk)) {
- 		dev_err(&pdev->dev, "Couldn't enable clock '%s'\n", clk_name);
- 		ret = -EBUSY;
--		goto err2;
-+		goto err_disable_clk;
- 	}
- 
- 	pm_runtime_set_autosuspend_delay(&pdev->dev, AUTOSUSPEND_TIMEOUT);
-@@ -1164,7 +1164,7 @@ static int s3c64xx_spi_probe(struct platform_device *pdev)
- 	if (ret != 0) {
- 		dev_err(&pdev->dev, "Failed to request IRQ %d: %d\n",
- 			irq, ret);
--		goto err3;
-+		goto err_pm_put;
- 	}
- 
- 	writel(S3C64XX_SPI_INT_RX_OVERRUN_EN | S3C64XX_SPI_INT_RX_UNDERRUN_EN |
-@@ -1174,7 +1174,7 @@ static int s3c64xx_spi_probe(struct platform_device *pdev)
- 	ret = devm_spi_register_master(&pdev->dev, master);
- 	if (ret != 0) {
- 		dev_err(&pdev->dev, "cannot register SPI master: %d\n", ret);
--		goto err3;
-+		goto err_pm_put;
- 	}
- 
- 	dev_dbg(&pdev->dev, "Samsung SoC SPI Driver loaded for Bus SPI-%d with %d Slaves attached\n",
-@@ -1188,15 +1188,15 @@ static int s3c64xx_spi_probe(struct platform_device *pdev)
- 
- 	return 0;
- 
--err3:
-+err_pm_put:
- 	pm_runtime_put_noidle(&pdev->dev);
- 	pm_runtime_disable(&pdev->dev);
- 	pm_runtime_set_suspended(&pdev->dev);
- 
- 	clk_disable_unprepare(sdd->src_clk);
--err2:
-+err_disable_clk:
- 	clk_disable_unprepare(sdd->clk);
--err0:
-+err_deref_master:
- 	spi_master_put(master);
- 
- 	return ret;
--- 
-2.8.1
+	These properties describe the base and size of the crash-dump
+	kernel's reserved area of memory. Valid for PowerPC and arm64.
+
+> +
+> +/ {
+> +	chosen {
+> +		linux,crashkernel-base = <0x9 0xf0000000>;
+> +		linux,crashkernel-size = <0x0 0x10000000>;
+> +	};
+> +};
+> +
+> +linux,usable-memory-range
+> +-------------------------
+> +
+> +This property is set (currently only on arm64) during kdump to tell
+> +the crash-dump kernel the base address of its reserved area of memory,
+> +and the size. e.g.
+
+The description sounds like this duplicates linux,crashkernel-*. What is
+the difference between the two?
+
+On powerpc it looks like there's a linux,usable-memory property (without
+the -range suffix). How do these differ?
+
+> +
+> +/ {
+> +	chosen {
+> +		linux,usable-memory-range = <0x9 0xf0000000 0x0 0x10000000>;
+> +	};
+> +};
+> +
+> +Please note that, if this property is present, any memory regions under
+> +"memory" nodes will be ignored.
+
+What exactly do you mean by "ignored"?
+
+Do we truly ignore this property, or do we map that memory at some
+point, even if not used for general allocation?
+
+> +
+> +linux,elfcorehdr
+> +----------------
+> +
+> +This property is set (currently only on arm64) during kdump to tell
+> +the crash-dump kernel the address and size of the elfcorehdr that describes
+> +the old kernel's memory as an elf file. This memory must reside within
+> +the area described by 'linux,usable-memory-range'. e.g.
+
+
+As with the linux,crashkernel-* properties, just state what this
+describes, e.g.
+
+	This property describes the base and size of the ELF core
+	header, which describes the old kernel's memory as an ELF file.
+	This memory must reside within the range described by
+	linux,usable-memory-range.
+
+That said, this falling within usable-memory feels very odd, because
+it's not actually usable for general purposes. Why can the kernel not
+memremap this, such that it need not be in usable-memory?
+
+Thanks,
+Mark.
