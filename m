@@ -1,68 +1,18 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 12 Jul 2016 16:35:36 +0100
-Subject: [PATCH 1/1] arm64/hugetlb: clear PG_dcache_clean if the page is
- dirty when munmap
-In-Reply-To: <57839474.6030203@huawei.com>
-References: <1467893344-8352-1-git-send-email-thunder.leizhen@huawei.com>
- <20160707153741.GC27180@e104818-lin.cambridge.arm.com>
- <577F1FD9.1040205@huawei.com>
- <20160708135447.GB22099@e104818-lin.cambridge.arm.com>
- <577FC5AA.5010709@huawei.com>
- <20160708161347.GC22099@e104818-lin.cambridge.arm.com>
- <57839474.6030203@huawei.com>
-Message-ID: <20160712153535.GH22183@e104818-lin.cambridge.arm.com>
+From: afzal.mohd.ma@gmail.com (Afzal Mohammed)
+Date: Tue, 12 Jul 2016 21:09:10 +0530
+Subject: [PATCH v2 08/10] ARM: dts: nuc900: Add nuc970 dts files
+In-Reply-To: <1468136542-2656-1-git-send-email-vw@iommu.org>
+References: <1468136542-2656-1-git-send-email-vw@iommu.org>
+Message-ID: <20160712153910.GA3507@afzalpc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 11, 2016 at 08:43:32PM +0800, Leizhen (ThunderTown) wrote:
-> On 2016/7/9 0:13, Catalin Marinas wrote:
-> > On Fri, Jul 08, 2016 at 11:24:26PM +0800, Leizhen (ThunderTown) wrote:
-> >> On 2016/7/8 21:54, Catalin Marinas wrote:
-> >>> ------------8<----------------
-> >>> diff --git a/arch/arm64/mm/flush.c b/arch/arm64/mm/flush.c
-> >>> index dbd12ea8ce68..c753fa804165 100644
-> >>> --- a/arch/arm64/mm/flush.c
-> >>> +++ b/arch/arm64/mm/flush.c
-> >>> @@ -75,7 +75,8 @@ void __sync_icache_dcache(pte_t pte, unsigned long addr)
-> >>>  	if (!page_mapping(page))
-> >>>  		return;
-> >>>  
-> >>> -	if (!test_and_set_bit(PG_dcache_clean, &page->flags))
-> >>> +	if (!test_and_set_bit(PG_dcache_clean, &page->flags) ||
-> >>> +	    PageDirty(page))
-> >>>  		sync_icache_aliases(page_address(page),
-> >>>  				    PAGE_SIZE << compound_order(page));
-> >>>  	else if (icache_is_aivivt())
-> >>> ----------------8<---------------------
-> >>>
-> >>> BTW, can you make your tests (source) available somewhere?
-> >>
-> >> Both cases worked well with this patch.
-> > 
-> > Now I'm even more confused ;). IIUC, after an msync() in user space we
-> > should flush the pages to disk via write_cache_pages(). This function
-> > calls clear_page_dirty_for_io() after which PageDirty() is no longer
-> > true. I can't tell how a subsequent mmap() can see the written pages as
-> > dirty.
-> 
-> As my tracing, both cases invoked empty function.
-> 
-> int vfs_fsync_range(struct file *file, loff_t start, loff_t end, int datasync)
-> 	......
-> 	return file->f_op->fsync(file, start, end, datasync);
-> }
-> 
-> const struct file_operations hugetlbfs_file_operations = {
-> 	.fsync			= noop_fsync,
-> 
-> static const struct file_operations shmem_file_operations = {
-> 	.mmap		= shmem_mmap,
-> #ifdef CONFIG_TMPFS
-> 	.fsync		= noop_fsync,
+Hi,
 
-I was referring to standard filesystem (e.g. ext4) writes where, IIUC,
-the PageDirty() status is cleared after I/O but it's not necessarily
-removed from the page cache.
+On Sun, Jul 10, 2016 at 03:42:20PM +0800, Wan Zongshun wrote:
+> This patch is to add dts support for nuc970 platform.
 
--- 
-Catalin
+cpu ! in soc ? lost in fab ? ;)
+
+Regards
+afzal
