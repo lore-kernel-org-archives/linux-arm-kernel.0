@@ -1,288 +1,47 @@
-From: fabio.estevam@nxp.com (Fabio Estevam)
-Date: Tue, 12 Jul 2016 11:19:06 -0300
-Subject: [PATCH] ARM: dts: imx7s-warp: Add initial support
-Message-ID: <1468333146-26680-1-git-send-email-fabio.estevam@nxp.com>
+From: weiyj_lk@163.com (weiyj_lk at 163.com)
+Date: Tue, 12 Jul 2016 14:19:45 +0000
+Subject: [PATCH -next] pinctrl: ns2: remove redundant dev_err call in
+ ns2_pinmux_probe()
+Message-ID: <1468333185-8047-1-git-send-email-weiyj_lk@163.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the initial support for the Warp7 board.
+From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 
-For more information about this reference design, please visit:
+There is a error message within devm_ioremap_resource
+already, so remove the dev_err call to avoid redundant
+error message.
 
-https://www.element14.com/community/docs/DOC-79058/l/warp-7-the-next-generation-wearable-reference-platform
-
-Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 ---
- arch/arm/boot/dts/Makefile       |   3 +-
- arch/arm/boot/dts/imx7s-warp.dts | 246 +++++++++++++++++++++++++++++++++++++++
- 2 files changed, 248 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/imx7s-warp.dts
+ drivers/pinctrl/bcm/pinctrl-ns2-mux.c | 8 ++------
+ 1 file changed, 2 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 7df2446..c159ced 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -416,7 +416,8 @@ dtb-$(CONFIG_SOC_IMX7D) += \
- 	imx7d-nitrogen7.dtb \
- 	imx7d-sbc-imx7.dtb \
- 	imx7d-sdb.dtb \
--	imx7s-colibri-eval-v3.dtb
-+	imx7s-colibri-eval-v3.dtb \
-+	imx7s-warp.dtb
- dtb-$(CONFIG_SOC_LS1021A) += \
- 	ls1021a-qds.dtb \
- 	ls1021a-twr.dtb
-diff --git a/arch/arm/boot/dts/imx7s-warp.dts b/arch/arm/boot/dts/imx7s-warp.dts
-new file mode 100644
-index 0000000..e318c98
---- /dev/null
-+++ b/arch/arm/boot/dts/imx7s-warp.dts
-@@ -0,0 +1,246 @@
-+/*
-+ * Copyright (C) 2016 NXP Semiconductors.
-+ * Author: Fabio Estevam <fabio.estevam@nxp.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+
-+#include <dt-bindings/input/input.h>
-+#include "imx7s.dtsi"
-+
-+/ {
-+	model = "Warp i.MX7 Board";
-+	compatible = "warp,imx7s-warp", "fsl,imx7s";
-+
-+	memory {
-+		reg = <0x80000000 0x20000000>;
-+	};
-+};
-+
-+&cpu0 {
-+	arm-supply = <&sw1a_reg>;
-+};
-+
-+&i2c1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c1>;
-+	status = "okay";
-+
-+	pmic: pfuze3000 at 08 {
-+		compatible = "fsl,pfuze3000";
-+		reg = <0x08>;
-+
-+		regulators {
-+			sw1a_reg: sw1a {
-+				regulator-min-microvolt = <700000>;
-+				regulator-max-microvolt = <1475000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+				regulator-ramp-delay = <6250>;
-+			};
-+
-+			/* use sw1c_reg to align with pfuze100/pfuze200 */
-+			sw1c_reg: sw1b {
-+				regulator-min-microvolt = <700000>;
-+				regulator-max-microvolt = <1475000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+				regulator-ramp-delay = <6250>;
-+			};
-+
-+			sw2_reg: sw2 {
-+				regulator-min-microvolt = <1500000>;
-+				regulator-max-microvolt = <1850000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			sw3a_reg: sw3 {
-+				regulator-min-microvolt = <900000>;
-+				regulator-max-microvolt = <1650000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			swbst_reg: swbst {
-+				regulator-min-microvolt = <5000000>;
-+				regulator-max-microvolt = <5150000>;
-+			};
-+
-+			snvs_reg: vsnvs {
-+				regulator-min-microvolt = <1000000>;
-+				regulator-max-microvolt = <3000000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			vref_reg: vrefddr {
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			vgen1_reg: vldo1 {
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
-+			};
-+
-+			vgen2_reg: vldo2 {
-+				regulator-min-microvolt = <800000>;
-+				regulator-max-microvolt = <1550000>;
-+			};
-+
-+			vgen3_reg: vccsd {
-+				regulator-min-microvolt = <2850000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
-+			};
-+
-+			vgen4_reg: v33 {
-+				regulator-min-microvolt = <2850000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
-+			};
-+
-+			vgen5_reg: vldo3 {
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
-+			};
-+
-+			vgen6_reg: vldo4 {
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
-+			};
-+		};
-+	};
-+};
-+
-+&uart1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart1>;
-+	assigned-clocks = <&clks IMX7D_UART1_ROOT_SRC>;
-+	assigned-clock-parents = <&clks IMX7D_PLL_SYS_MAIN_240M_CLK>;
-+	status = "okay";
-+};
-+
-+&usbotg1 {
-+	dr_mode = "peripheral";
-+	status = "okay";
-+};
-+
-+&usdhc3 {
-+	pinctrl-names = "default", "state_100mhz", "state_200mhz";
-+	pinctrl-0 = <&pinctrl_usdhc3>;
-+	pinctrl-1 = <&pinctrl_usdhc3_100mhz>;
-+	pinctrl-2 = <&pinctrl_usdhc3_200mhz>;
-+	assigned-clocks = <&clks IMX7D_USDHC3_ROOT_CLK>;
-+	assigned-clock-rates = <400000000>;
-+	bus-width = <8>;
-+	fsl,tuning-step = <2>;
-+	non-removable;
-+	status = "okay";
-+};
-+
-+&iomuxc {
-+	pinctrl_i2c1: i2c1grp {
-+		fsl,pins = <
-+			MX7D_PAD_I2C1_SDA__I2C1_SDA		0x4000007f
-+			MX7D_PAD_I2C1_SCL__I2C1_SCL		0x4000007f
-+		>;
-+	};
-+
-+	pinctrl_uart1: uart1grp {
-+		fsl,pins = <
-+			MX7D_PAD_UART1_TX_DATA__UART1_DCE_TX	0x79
-+			MX7D_PAD_UART1_RX_DATA__UART1_DCE_RX	0x79
-+		>;
-+	};
-+
-+	pinctrl_usdhc3: usdhc3grp {
-+		fsl,pins = <
-+			MX7D_PAD_SD3_CMD__SD3_CMD		0x59
-+			MX7D_PAD_SD3_CLK__SD3_CLK		0x19
-+			MX7D_PAD_SD3_DATA0__SD3_DATA0		0x59
-+			MX7D_PAD_SD3_DATA1__SD3_DATA1		0x59
-+			MX7D_PAD_SD3_DATA2__SD3_DATA2		0x59
-+			MX7D_PAD_SD3_DATA3__SD3_DATA3		0x59
-+			MX7D_PAD_SD3_DATA4__SD3_DATA4		0x59
-+			MX7D_PAD_SD3_DATA5__SD3_DATA5		0x59
-+			MX7D_PAD_SD3_DATA6__SD3_DATA6		0x59
-+			MX7D_PAD_SD3_DATA7__SD3_DATA7		0x59
-+			MX7D_PAD_SD3_RESET_B__SD3_RESET_B	0x19
-+		>;
-+	};
-+
-+	pinctrl_usdhc3_100mhz: usdhc3grp_100mhz {
-+		fsl,pins = <
-+			MX7D_PAD_SD3_CMD__SD3_CMD		0x5a
-+			MX7D_PAD_SD3_CLK__SD3_CLK		0x1a
-+			MX7D_PAD_SD3_DATA0__SD3_DATA0		0x5a
-+			MX7D_PAD_SD3_DATA1__SD3_DATA1		0x5a
-+			MX7D_PAD_SD3_DATA2__SD3_DATA2		0x5a
-+			MX7D_PAD_SD3_DATA3__SD3_DATA3		0x5a
-+			MX7D_PAD_SD3_DATA4__SD3_DATA4		0x5a
-+			MX7D_PAD_SD3_DATA5__SD3_DATA5		0x5a
-+			MX7D_PAD_SD3_DATA6__SD3_DATA6		0x5a
-+			MX7D_PAD_SD3_DATA7__SD3_DATA7		0x5a
-+			MX7D_PAD_SD3_RESET_B__SD3_RESET_B	0x1a
-+		>;
-+	};
-+
-+	pinctrl_usdhc3_200mhz: usdhc3grp_200mhz {
-+		fsl,pins = <
-+			MX7D_PAD_SD3_CMD__SD3_CMD		0x5b
-+			MX7D_PAD_SD3_CLK__SD3_CLK		0x1b
-+			MX7D_PAD_SD3_DATA0__SD3_DATA0		0x5b
-+			MX7D_PAD_SD3_DATA1__SD3_DATA1		0x5b
-+			MX7D_PAD_SD3_DATA2__SD3_DATA2		0x5b
-+			MX7D_PAD_SD3_DATA3__SD3_DATA3		0x5b
-+			MX7D_PAD_SD3_DATA4__SD3_DATA4		0x5b
-+			MX7D_PAD_SD3_DATA5__SD3_DATA5		0x5b
-+			MX7D_PAD_SD3_DATA6__SD3_DATA6		0x5b
-+			MX7D_PAD_SD3_DATA7__SD3_DATA7		0x5b
-+			MX7D_PAD_SD3_RESET_B__SD3_RESET_B	0x1b
-+		>;
-+	};
-+};
--- 
-1.9.1
+diff --git a/drivers/pinctrl/bcm/pinctrl-ns2-mux.c b/drivers/pinctrl/bcm/pinctrl-ns2-mux.c
+index 7e5f7b7..ca81789 100644
+--- a/drivers/pinctrl/bcm/pinctrl-ns2-mux.c
++++ b/drivers/pinctrl/bcm/pinctrl-ns2-mux.c
+@@ -1044,10 +1044,8 @@ static int ns2_pinmux_probe(struct platform_device *pdev)
+ 
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	pinctrl->base0 = devm_ioremap_resource(&pdev->dev, res);
+-	if (IS_ERR(pinctrl->base0)) {
+-		dev_err(&pdev->dev, "unable to map I/O space\n");
++	if (IS_ERR(pinctrl->base0))
+ 		return PTR_ERR(pinctrl->base0);
+-	}
+ 
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+ 	pinctrl->base1 = devm_ioremap_nocache(&pdev->dev, res->start,
+@@ -1059,10 +1057,8 @@ static int ns2_pinmux_probe(struct platform_device *pdev)
+ 
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 2);
+ 	pinctrl->pinconf_base = devm_ioremap_resource(&pdev->dev, res);
+-	if (IS_ERR(pinctrl->pinconf_base)) {
+-		dev_err(&pdev->dev, "unable to map I/O space\n");
++	if (IS_ERR(pinctrl->pinconf_base))
+ 		return PTR_ERR(pinctrl->pinconf_base);
+-	}
+ 
+ 	ret = ns2_mux_log_init(pinctrl);
+ 	if (ret) {
