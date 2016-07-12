@@ -1,24 +1,25 @@
 From: vinod.koul@intel.com (Vinod Koul)
-Date: Tue, 12 Jul 2016 10:03:46 +0530
-Subject: [PATCH] dmaengine: zynqmp: avoid cast warning
-In-Reply-To: <20160711214642.2610193-1-arnd@arndb.de>
-References: <20160711214642.2610193-1-arnd@arndb.de>
-Message-ID: <20160712043346.GO9681@localhost>
+Date: Tue, 12 Jul 2016 10:05:16 +0530
+Subject: [PATCH] dmaengine: pxa_dma: implement device_synchronize
+In-Reply-To: <1468187449-19466-1-git-send-email-robert.jarzmik@free.fr>
+References: <1468187449-19466-1-git-send-email-robert.jarzmik@free.fr>
+Message-ID: <20160712043516.GP9681@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 11, 2016 at 11:46:09PM +0200, Arnd Bergmann wrote:
-> The newly added zynqmp_dma driver produces a warning on 32-bit architectures
-> when dma_addr_t is 64-bit wide:
+On Sun, Jul 10, 2016 at 11:50:49PM +0200, Robert Jarzmik wrote:
+> Implement the function which wait until a dma channel is stopped to have
+> a synchronization point.
 > 
-> drivers/dma/xilinx/zynqmp_dma.c: In function 'zynqmp_dma_config_sg_ll_desc':
-> drivers/dma/xilinx/zynqmp_dma.c:321:9: error: cast from pointer to integer of different size [-Werror=pointer-to-int-cast]
->         ((dma_addr_t)sdesc - (dma_addr_t)chan->desc_pool_v);
->          ^
-> drivers/dma/xilinx/zynqmp_dma.c:321:29: error: cast from pointer to integer of different size [-Werror=pointer-to-int-cast]
->         ((dma_addr_t)sdesc - (dma_addr_t)chan->desc_pool_v);
-> 
-> This changes the cast to the more appropriate uintptr_t.
+> This also protects the pxad_remove() from races, such as spurious
+> interrupts while removing the driver, because :
+>  - as long as there is one dma channel requested, ie. dma_chan_get() but
+>    no dma_chan_put(), the try_module_get() of dma_chan_get() prevents
+>    the remove() routine from running
+>  - when the last channel is released, ie. the last dma_chan_put() is
+>    called, if there is a running DMA, pxad_synchronize() is called
+>  - pxad_synchronize() waits for the channel to stop, which in turn
+>    ensures on pxa architecture that the interrupt cannot be fired anymore
 
 Applied, thanks
 
