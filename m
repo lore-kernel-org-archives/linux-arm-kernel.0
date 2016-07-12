@@ -1,36 +1,58 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 12 Jul 2016 17:19:25 +0100
-Subject: [PATCH 0/2] core: Ensure drivers are given a chance to re-probe()
- late-on
-Message-ID: <20160712161927.7521-1-lee.jones@linaro.org>
+Date: Tue, 12 Jul 2016 17:19:26 +0100
+Subject: [PATCH 1/2] driver-core: Add externally callable function to trigger
+ deferred probes
+In-Reply-To: <20160712161927.7521-1-lee.jones@linaro.org>
+References: <20160712161927.7521-1-lee.jones@linaro.org>
+Message-ID: <20160712161927.7521-2-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If a driver's resources are not available at probe() time, it is
-common practice to defer probe (return -EPROBE_DEFER) until a time
-where the required dependencies have been satisfied.  However, if a
-driver's resources are not provided by other drivers probe()ing
-e.g. in a case where a driver is waiting for initramfs or rootfs to
-be mounted in order to retrieve firmware located within, then
-eventually we will run out of binding drivers (the trigger to re-run
-deferred driver's probe()), and another re-probe() opportunity will
-not be given.
+Deferred probes are currently only re-executed if new drivers are successfully
+registered and probed.  Drivers which defer their probes based on things like
+missing firmware located on rootfs will sometimes only be re-probed if kernel
+modules are found.  Unfortunately, this is fragile and can not be guaranteed
+or relied upon.  This call allows us to trigger probe re-execution at any
+point during boot.  For instance after rootfs is mounted in order to collect
+firmwares in rootfs.
 
-This patch ensures that all drivers still on the deferred list are
-given at least one more shot at probe()ing very late on in boot.  This
-ensures drivers who find themselves in the position explained in the
-aforementioned example are able to locate their resources, resulting
-in a successful probe().
-
-Lee Jones (2):
-  driver-core: Add externally callable function to trigger deferred
-    probes
-  init/main: Trigger re-execution of deferred deferred probe()s
-
+Tested-by: Peter Griffin <peter.griffin@linaro.org>
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
  drivers/base/dd.c      | 8 ++++++++
  include/linux/device.h | 1 +
- init/main.c            | 1 +
- 3 files changed, 10 insertions(+)
+ 2 files changed, 9 insertions(+)
 
+diff --git a/drivers/base/dd.c b/drivers/base/dd.c
+index 16688f5..ab20851 100644
+--- a/drivers/base/dd.c
++++ b/drivers/base/dd.c
+@@ -203,6 +203,14 @@ void device_unblock_probing(void)
+ }
+ 
+ /**
++ * deferred_probe_tigger() - Trigger a deferred probe
++ */
++void deferred_probe_trigger(void)
++{
++	driver_deferred_probe_trigger();
++}
++
++/**
+  * deferred_probe_initcall() - Enable probing of deferred devices
+  *
+  * We don't want to get in the way when the bulk of drivers are getting probed.
+diff --git a/include/linux/device.h b/include/linux/device.h
+index 38f0281..d441471 100644
+--- a/include/linux/device.h
++++ b/include/linux/device.h
+@@ -293,6 +293,7 @@ extern struct device_driver *driver_find(const char *name,
+ 					 struct bus_type *bus);
+ extern int driver_probe_done(void);
+ extern void wait_for_device_probe(void);
++extern void deferred_probe_trigger(void);
+ 
+ 
+ /* sysfs interface for exporting driver attributes */
 -- 
 2.9.0
