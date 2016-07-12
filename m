@@ -1,120 +1,66 @@
-From: guodong.xu@linaro.org (Guodong Xu)
-Date: Tue, 12 Jul 2016 13:31:03 +0800
-Subject: [PATCH 1/2] Bluetooth: Add LED triggers for HCI frames tx and rx
-In-Reply-To: <1466657923-5776-1-git-send-email-guodong.xu@linaro.org>
-References: <1466657923-5776-1-git-send-email-guodong.xu@linaro.org>
-Message-ID: <CAFGCpxxZthBfxD2kK7CAWZwhGPx9Td8i=YDvaC4RbQZQEMSKMQ@mail.gmail.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Tue, 12 Jul 2016 09:27:37 +0300
+Subject: [PATCH] Revert "ARM: AM33xx: fix module_wait_ready without
+ clkctrl register"
+In-Reply-To: <5784653C.30502@ti.com>
+References: <20160711213938.28385-1-d-gerlach@ti.com> <5784653C.30502@ti.com>
+Message-ID: <57848DD9.5070400@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear maintainers,
+On 12/07/16 06:34, Lokesh Vutla wrote:
+>
+>
+> On Tuesday 12 July 2016 03:09 AM, Dave Gerlach wrote:
+>> This reverts commit 183e2077d007aa4b697efba095ecfea7244a6107.
+>>
+>> The original patch added a check to am33xx_cm_wait_module_ready for a
+>> clkctrl offset of 0 as an invalid case, however, clkctrl offset of 0 is
+>> perfectly valid for hwmods, in particular the rtc.
+>
+> Looks like a similar check is present for am33xx_cm_wait_module_idle.
+> Shouldn't that also be removed?
 
-Would you have a review on this?
+Oh this is annoying, I didn't notice that RTC had mutant register when I 
+did the patch to add the check in place, and didn't face this issue 
+either during testing. However, this check must be in there to avoid any 
+issues with the transition to the hwmod clock data, as all the clkctrl 
+offsets will be removed from hwmod data.
 
--Guodong
+I think for RTC we probably need to add some sort of HWMOD flag, and add 
+a check within the hwmod code itself against this. Just reverting this 
+patch is wrong approach, as you need to fix it some other way then.
 
-On 23 June 2016 at 12:58, Guodong Xu <guodong.xu@linaro.org> wrote:
-> Two LED triggers are defined: tx_led and rx_led. Upon frames
-> available in HCI core layer, for tx or for rx, the combined LED
-> can blink.
+-Tero
+
 >
-> Verified on HiKey, 96boards. It uses hi6220 SoC and TI WL1835 combo
-> chip.
+> Thanks and regards,
+> Lokesh
 >
-> Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
-> ---
->  include/net/bluetooth/hci_core.h |  1 +
->  net/bluetooth/hci_core.c         |  3 +++
->  net/bluetooth/leds.c             | 15 +++++++++++++++
->  net/bluetooth/leds.h             |  2 ++
->  4 files changed, 21 insertions(+)
->
-> diff --git a/include/net/bluetooth/hci_core.h b/include/net/bluetooth/hci_core.h
-> index dc71473..37b8dd9 100644
-> --- a/include/net/bluetooth/hci_core.h
-> +++ b/include/net/bluetooth/hci_core.h
-> @@ -398,6 +398,7 @@ struct hci_dev {
->         bdaddr_t                rpa;
->
->         struct led_trigger      *power_led;
-> +       struct led_trigger      *tx_led, *rx_led;
->
->         int (*open)(struct hci_dev *hdev);
->         int (*close)(struct hci_dev *hdev);
-> diff --git a/net/bluetooth/hci_core.c b/net/bluetooth/hci_core.c
-> index 45a9fc6..c6e1210 100644
-> --- a/net/bluetooth/hci_core.c
-> +++ b/net/bluetooth/hci_core.c
-> @@ -3248,6 +3248,7 @@ int hci_recv_frame(struct hci_dev *hdev, struct sk_buff *skb)
->         skb_queue_tail(&hdev->rx_q, skb);
->         queue_work(hdev->workqueue, &hdev->rx_work);
->
-> +       hci_leds_blink_oneshot(hdev->rx_led);
->         return 0;
->  }
->  EXPORT_SYMBOL(hci_recv_frame);
-> @@ -3325,6 +3326,8 @@ static void hci_send_frame(struct hci_dev *hdev, struct sk_buff *skb)
->                 BT_ERR("%s sending frame failed (%d)", hdev->name, err);
->                 kfree_skb(skb);
->         }
-> +
-> +       hci_leds_blink_oneshot(hdev->tx_led);
->  }
->
->  /* Send HCI command */
-> diff --git a/net/bluetooth/leds.c b/net/bluetooth/leds.c
-> index 8319c84..c4825d5 100644
-> --- a/net/bluetooth/leds.c
-> +++ b/net/bluetooth/leds.c
-> @@ -19,6 +19,8 @@ struct hci_basic_led_trigger {
->  #define to_hci_basic_led_trigger(arg) container_of(arg, \
->                         struct hci_basic_led_trigger, led_trigger)
->
-> +#define BLUETOOTH_BLINK_DELAY  50 /* ms */
-> +
->  void hci_leds_update_powered(struct hci_dev *hdev, bool enabled)
->  {
->         if (hdev->power_led)
-> @@ -37,6 +39,15 @@ static void power_activate(struct led_classdev *led_cdev)
->         led_trigger_event(led_cdev->trigger, powered ? LED_FULL : LED_OFF);
->  }
->
-> +void hci_leds_blink_oneshot(struct led_trigger *trig)
-> +{
-> +       unsigned long led_delay = BLUETOOTH_BLINK_DELAY;
-> +
-> +       if (!trig)
-> +               return;
-> +       led_trigger_blink_oneshot(trig, &led_delay, &led_delay, 0);
-> +}
-> +
->  static struct led_trigger *led_allocate_basic(struct hci_dev *hdev,
->                         void (*activate)(struct led_classdev *led_cdev),
->                         const char *name)
-> @@ -71,4 +82,8 @@ void hci_leds_init(struct hci_dev *hdev)
->  {
->         /* initialize power_led */
->         hdev->power_led = led_allocate_basic(hdev, power_activate, "power");
-> +       /* initialize tx_led */
-> +       hdev->tx_led = led_allocate_basic(hdev, NULL, "tx");
-> +       /* initialize rx_led */
-> +       hdev->rx_led = led_allocate_basic(hdev, NULL, "rx");
->  }
-> diff --git a/net/bluetooth/leds.h b/net/bluetooth/leds.h
-> index a9c4d6e..9b1cccd 100644
-> --- a/net/bluetooth/leds.h
-> +++ b/net/bluetooth/leds.h
-> @@ -9,8 +9,10 @@
->  #if IS_ENABLED(CONFIG_BT_LEDS)
->  void hci_leds_update_powered(struct hci_dev *hdev, bool enabled);
->  void hci_leds_init(struct hci_dev *hdev);
-> +void hci_leds_blink_oneshot(struct led_trigger *trig);
->  #else
->  static inline void hci_leds_update_powered(struct hci_dev *hdev,
->                                            bool enabled) {}
->  static inline void hci_leds_init(struct hci_dev *hdev) {}
-> +static inline void hci_leds_blink_oneshot(struct led_trigger *trig) {}
->  #endif
-> --
-> 1.9.1
->
+>>
+>> Without reverting this patch sometimes external aborts are seen on
+>> am335x during boot. This is due to the am33xx_cm_wait_module_ready
+>> function immediately returning 0 rather than waiting for the RTC_CLKCTRL
+>> register to indicate it is actually ready before rtc register accesses
+>> happen.
+>>
+>> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+>> ---
+>>   arch/arm/mach-omap2/cm33xx.c | 3 ---
+>>   1 file changed, 3 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-omap2/cm33xx.c b/arch/arm/mach-omap2/cm33xx.c
+>> index c073fb57dd13..7b181f929525 100644
+>> --- a/arch/arm/mach-omap2/cm33xx.c
+>> +++ b/arch/arm/mach-omap2/cm33xx.c
+>> @@ -220,9 +220,6 @@ static int am33xx_cm_wait_module_ready(u8 part, s16 inst, u16 clkctrl_offs,
+>>   {
+>>   	int i = 0;
+>>
+>> -	if (!clkctrl_offs)
+>> -		return 0;
+>> -
+>>   	omap_test_timeout(_is_module_ready(inst, clkctrl_offs),
+>>   			  MAX_MODULE_READY_TIME, i);
+>>
+>>
