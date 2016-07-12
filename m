@@ -1,84 +1,44 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Tue, 12 Jul 2016 12:33:34 +0100
-Subject: [PATCH v8 13/17] KVM: arm64: read initial LPI pending table
-In-Reply-To: <5783CE67.2070202@arm.com>
-References: <20160705112309.28877-1-andre.przywara@arm.com>
- <20160705112309.28877-14-andre.przywara@arm.com> <5783CE67.2070202@arm.com>
-Message-ID: <152d1107-febf-3aa4-ab85-e6cc8c8aa840@arm.com>
+From: weiyj_lk@163.com (weiyj_lk at 163.com)
+Date: Tue, 12 Jul 2016 11:36:44 +0000
+Subject: [PATCH -next] net: mediatek: fix non static symbol warnings
+Message-ID: <1468323404-2193-1-git-send-email-weiyj_lk@163.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 
-On 11/07/16 17:50, Marc Zyngier wrote:
-> On 05/07/16 12:23, Andre Przywara wrote:
->> The LPI pending status for a GICv3 redistributor is held in a table
->> in (guest) memory. To achieve reasonable performance, we cache this
->> data in our struct vgic_irq. The initial pending state must be read
->> from guest memory upon enabling LPIs for this redistributor.
->>
->> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
->> ---
->>  virt/kvm/arm/vgic/vgic-its.c | 81 ++++++++++++++++++++++++++++++++++++++++++++
->>  virt/kvm/arm/vgic/vgic.h     |  6 ++++
->>  2 files changed, 87 insertions(+)
->>
->> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
->> index 1e2e649..29bb4fe 100644
->> --- a/virt/kvm/arm/vgic/vgic-its.c
->> +++ b/virt/kvm/arm/vgic/vgic-its.c
->> @@ -93,6 +93,81 @@ struct its_itte {
->>  		list_for_each_entry(itte, &(dev)->itt_head, itte_list)
->>  
->>  #define CBASER_ADDRESS(x)	((x) & GENMASK_ULL(51, 12))
->> +#define PENDBASER_ADDRESS(x)	((x) & GENMASK_ULL(51, 16))
-> 
-> 52 bits again. Pick a side!
-> 
->> +
->> +static int vgic_its_copy_lpi_list(struct kvm *kvm, u32 **intid_ptr)
->> +{
->> +	struct vgic_dist *dist = &kvm->arch.vgic;
->> +	struct vgic_irq *irq;
->> +	u32 *intids;
->> +	int irq_count = dist->lpi_list_count, i = 0;
->> +
->> +	/*
->> +	 * We use the current value of the list length, which may change
->> +	 * after the kmalloc. We don't care, because the guest shouldn't
->> +	 * change anything while the command handling is still running,
->> +	 * and in the worst case we would miss a new IRQ, which one wouldn't
->> +	 * expect to be covered by this command anyway.
->> +	 */
->> +	intids = kmalloc_array(irq_count, sizeof(intids[0]), GFP_KERNEL);
->> +	if (!intids)
->> +		return -ENOMEM;
->> +
->> +	spin_lock(&dist->lpi_list_lock);
->> +	list_for_each_entry(irq, &dist->lpi_list_head, lpi_entry) {
->> +		if (kref_get_unless_zero(&irq->refcount)) {
->> +			intids[i] = irq->intid;
->> +			vgic_put_irq_locked(kvm, irq);
-> 
-> This is ugly. You know you're not going to free the irq, since it was at
-> least one when you did kref_get_unless_zero(). Why not doing a simple
-> kref_put (possibly in a macro so that you can hide the dummy release
-> function)?
+Fixes the following sparse warnings:
 
-I think I don't need the get and put at all, which would allow to
-totally drop the vgic_put_irq_locked version:
-1) We have the lpi_list_lock, so if we find the IRQ in the list, it's
-still valid (we free it only after having it removed).
-2) It can't be removed without dropping the lock.
-3) We just store the number, not the pointer.
-4) An LPI can be unmapped anyway after we dropped the lock and before we
-actually use the copy. We take care of that already by calling get again
-and coping with a NULL return.
+drivers/net/ethernet/mediatek/mtk_eth_soc.c:79:5: warning:
+ symbol '_mtk_mdio_write' was not declared. Should it be static?
+drivers/net/ethernet/mediatek/mtk_eth_soc.c:98:5: warning:
+ symbol '_mtk_mdio_read' was not declared. Should it be static?
 
-So is it feasible to remove the get and put here completely or is that
-dodgy since we technically use the reference?
-Shall I document that one doesn't need get and put if holding the
-lpi_list_lock?
+Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+---
+ drivers/net/ethernet/mediatek/mtk_eth_soc.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-Cheers,
-Andre.
+diff --git a/drivers/net/ethernet/mediatek/mtk_eth_soc.c b/drivers/net/ethernet/mediatek/mtk_eth_soc.c
+index 682797e..6f597eb 100644
+--- a/drivers/net/ethernet/mediatek/mtk_eth_soc.c
++++ b/drivers/net/ethernet/mediatek/mtk_eth_soc.c
+@@ -76,8 +76,8 @@ static int mtk_mdio_busy_wait(struct mtk_eth *eth)
+ 	return -1;
+ }
+ 
+-u32 _mtk_mdio_write(struct mtk_eth *eth, u32 phy_addr,
+-		    u32 phy_register, u32 write_data)
++static u32 _mtk_mdio_write(struct mtk_eth *eth, u32 phy_addr,
++			   u32 phy_register, u32 write_data)
+ {
+ 	if (mtk_mdio_busy_wait(eth))
+ 		return -1;
+@@ -95,7 +95,7 @@ u32 _mtk_mdio_write(struct mtk_eth *eth, u32 phy_addr,
+ 	return 0;
+ }
+ 
+-u32 _mtk_mdio_read(struct mtk_eth *eth, int phy_addr, int phy_reg)
++static u32 _mtk_mdio_read(struct mtk_eth *eth, int phy_addr, int phy_reg)
+ {
+ 	u32 d;
