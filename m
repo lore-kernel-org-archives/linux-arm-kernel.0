@@ -1,45 +1,41 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 12 Jul 2016 13:53:04 +0200
-Subject: [PATCH] RFC: ARM: fix the uaccess crash on PB11MPCore
-In-Reply-To: <CAA3gFWsZJ3BV+FncGHnHvXSDnxbg_2FnugtgVnanPmmaqKOJAQ@mail.gmail.com>
-References: <1468256893-12811-1-git-send-email-linus.walleij@linaro.org>
- <CAA3gFWsZJ3BV+FncGHnHvXSDnxbg_2FnugtgVnanPmmaqKOJAQ@mail.gmail.com>
-Message-ID: <5959782.fqYxkarPT3@wuerfel>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Tue, 12 Jul 2016 14:09:32 +0200
+Subject: [PATCH v9 0/7] ACPI / processor_idle: Add ACPI v6.0 LPI support
+In-Reply-To: <5784D78E.7010409@arm.com>
+References: <1467997678-7107-1-git-send-email-sudeep.holla@arm.com>
+ <5784D78E.7010409@arm.com>
+Message-ID: <2164074.OnkmXO2GSJ@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, July 12, 2016 1:27:11 PM CEST Neil Armstrong wrote:
-> 2016-07-11 19:08 GMT+02:00 Linus Walleij <linus.walleij@linaro.org>:
-> > The following patch was sketched by Russell in response to my
-> > crashes on the PB11MPCore after the patch for software-based
-> > priviledged no access support for ARMv8.1. See this thread:
-> > http://marc.info/?l=linux-arm-kernel&m=144051749807214&w=2
+On Tuesday, July 12, 2016 12:42:06 PM Sudeep Holla wrote:
+> 
+> On 08/07/16 18:07, Sudeep Holla wrote:
+> > ACPI 6.0 introduced LPI(Low Power Idle) states that provides an alternate
+> > method to describe processor idle states. It extends the specification
+> > to allow the expression of idle states like C-states selectable by the
+> > OSPM when a processor goes idle, but may affect more than one processor,
+> > and may affect other system components.
 > >
-> > I am unsure what is going on, I suspect everyone involved in
-> > the discussion is. I just want to repost this to get the
-> > discussion restarted, as I still have to apply this patch
-> > with every kernel iteration to get my PB11MPCore Realview
-> > running.
+> > LPI extensions leverages the processor container device(again introduced
+> > in ACPI 6.0) allowing to express which parts of the system are affected
+> > by a given LPI state. It defines the local power states for each node
+> > in a hierarchical processor topology. The OSPM can use _LPI object to
+> > select a local power state for each level of processor hierarchy in the
+> > system. They used to produce a composite power state request that is
+> > presented to the platform by the OSPM.
 > >
-> > I also know that Oxnas has actual, mass-deployed NAS (PogoPlug
-> > Pro variants) using PB11MPCore, and that they may or may not
-> > be seeing the same issue so I want their feedback on this: do
-> > you or do you not see this with mainline, or have you not even
-> > tested?
+> > Since multiple processors affect the idle state for any non-leaf hierarchy
+> > node, coordination of idle state requests between the processors is
+> > required. ACPI supports two different coordination schemes: Platform
+> > coordinated and  OS initiated.
+> >
 > 
-> Hi Linus,
-> 
-> Actually the last off-tree support of the OX820 is on 4.4, and I do
-> not personally own a OX820 based device,
-> but I'm in he process of finding one to achieve upstream support along
-> the Ox810.
-> 
+> I was hoping to get this in v4.8 now that merge window is
+> delayed/extended if you have no further comments on this series.
 
-The Aldi NAS boxes (NAS-212) are widely available on ebay in Germany,
-there is even a shop that sells both the Pogoplug and the Medion
-machine with Debian preinstalled: http://www.ebay.de/sch/it-shop-rm/m.html
+I'll get to it in the next couple of days.  If it looks all good and there are
+no comments, I'll queue it up.
 
-If you need help getting one, you can send it to me and I forward
-it to your French address.
-
-	Arnd
+Thanks,
+Rafael
