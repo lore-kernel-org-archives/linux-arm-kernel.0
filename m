@@ -1,93 +1,68 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Wed, 13 Jul 2016 12:01:41 +0200
-Subject: [PATCH 1/4] ARM: dts: sun8i: Extend Orange Pi PC dt to also
- handle the PC Plus
-In-Reply-To: <20160713084505.GE4761@lukather>
-References: <1468095718-18515-1-git-send-email-hdegoede@redhat.com>
- <20160713084505.GE4761@lukather>
-Message-ID: <bce2b340-a930-8771-4560-dc61bf5828d5@redhat.com>
+Date: Wed, 13 Jul 2016 12:20:04 +0200
+Subject: [PATCH] dt: bindings: Add a generic ethernet device binding
+Message-ID: <1468405204-5845-1-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On some boards (android tablets) different batches use different sdio
+wifi modules. This is not a problem since sdio is a discoverable bus,
+so we only need to describe and activate the mmc controller in dt and
+then the kernel will automatically load the right driver.
 
-On 13-07-16 10:45, Maxime Ripard wrote:
-> On Sat, Jul 09, 2016 at 10:21:55PM +0200, Hans de Goede wrote:
->> There is a new Orange Pi PC Plus available now, rather then adding
->> yet another dts file for this variant, extend the existing
->> Orange Pi PC to support the sdio wifi and emmc found on this variant.
->>
->> Downside of this approach is the following messages in dmesg when run
->> on the non Plus Orange Pi PC:
->>
->> sunxi-mmc 1c10000.mmc: fatal err update clk timeout
->> sunxi-mmc 1c11000.mmc: smc 2 err, cmd 8, RTO !!
->> sunxi-mmc 1c11000.mmc: smc 2 err, cmd 55, RTO !!
->> sunxi-mmc 1c11000.mmc: smc 2 err, cmd 55, RTO !!
->> sunxi-mmc 1c11000.mmc: smc 2 err, cmd 55, RTO !!
->> sunxi-mmc 1c11000.mmc: smc 2 err, cmd 55, RTO !!
->> sunxi-mmc 1c11000.mmc: smc 2 err, cmd 1, RTO !!
->>
->> Note these are completely harmless and there is no adverse effect
->> to the functioning of the non Plus Orange Pi PC.
->>
->> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->> ---
->>  arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts | 40 +++++++++++++++++++++++++++++-
->>  1 file changed, 39 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
->> index b8340f7..f9bf260 100644
->> --- a/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
->> +++ b/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
->> @@ -49,11 +49,13 @@
->>  #include <dt-bindings/pinctrl/sun4i-a10.h>
->>
->>  / {
->> -	model = "Xunlong Orange Pi PC";
->> +	model = "Xunlong Orange Pi PC / PC Plus";
->>  	compatible = "xunlong,orangepi-pc", "allwinner,sun8i-h3";
->>
->>  	aliases {
->>  		serial0 = &uart0;
->> +		/* ethernet0 is the H3 emac, defined in sun8i-h3.dtsi */
->> +		ethernet1 = &rtl8189ftv;
->>  	};
->>
->>  	chosen {
->> @@ -118,6 +120,42 @@
->>  	status = "okay";
->>  };
->>
->> +/* Note only present on orangepi pc *plus* */
->> +&mmc1 {
->> +	pinctrl-names = "default";
->> +	pinctrl-0 = <&mmc1_pins_a>;
->> +	vmmc-supply = <&reg_vcc3v3>;
->> +	bus-width = <4>;
->> +	non-removable;
->> +	status = "okay";
->> +
->> +	/*
->> +	 * Explicitly define the sdio device, so that we can add an ethernet
->> +	 * alias for it (which e.g. makes u-boot set a mac-address).
->> +	 */
->> +	rtl8189ftv: sdio_wifi at 1 {
->> +		reg = <1>;
->> +	};
->> +};
->
-> Nothing prevents you from including the orange pi pc dts, from the
-> orange pi plus dts.
->
-> It prevents the duplication you were trying to avoid, and it doesn't
-> create all those spurious errors and devices.
+But sometimes it is useful to specify certain ethernet properties for
+these "unknown" sdio devices, specifically we want the boot-loader
+to be able to set "local-mac-address" as some of these sdio wifi
+modules come without an eeprom / without a factory programmed mac
+address.
 
-That would solve the copy paste problem on the kernel side, but that
-would still mean adding a new u-boot defconfig for this, which means that
-all the distro's which ship with prebuild u-boot binaries need to build
-for yet another board, something which I would like to avoid.
+Since the exact device is unknown (differs per batch) we cannot use
+a wifi-chip specific compatible. This commit adds a new
+"generic,ethernet" binding for use in dt-nodes describing such an
+unknown ethernet device.
 
-Regards,
+Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+ Documentation/devicetree/bindings/net/generic.txt | 30 +++++++++++++++++++++++
+ 1 file changed, 30 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/net/generic.txt
 
-Hans
+diff --git a/Documentation/devicetree/bindings/net/generic.txt b/Documentation/devicetree/bindings/net/generic.txt
+new file mode 100644
+index 0000000..2325709
+--- /dev/null
++++ b/Documentation/devicetree/bindings/net/generic.txt
+@@ -0,0 +1,30 @@
++* Generic ethernet controller
++
++This binding is for ethernet devices which need a dt node so that certain
++standard properties, e.g. a mac-address can be specified via dt, but
++otherwise can be detected automatically as they are on a discoverable bus.
++
++Required properties:
++- compatible: should be "generic,ethernet"
++
++Optional properties:
++- See bindings/ethernet.txt
++
++Example:
++
++/ {
++	aliases {
++		/* Make u-boot set mac-address for the sdio-wifi (no eeprom) */
++		ethernet0 = &sdio_wifi;
++	};
++};
++
++&mmc1 {
++	non-removable;
++	status = "okay";
++
++	sdio_wifi: sdio_wifi at 1 {
++		compatible = "generic,ethernet"
++		reg = <1>;
++	};
++};
+-- 
+2.7.4
