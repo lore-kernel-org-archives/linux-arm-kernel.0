@@ -1,83 +1,59 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 13 Jul 2016 17:10:37 +0100
+From: agraf@suse.de (Alexander Graf)
+Date: Wed, 13 Jul 2016 18:14:11 +0200
 Subject: [PATCH] arm64: Add config to limit user space to 47bits
-In-Reply-To: <1468424567-15925-1-git-send-email-agraf@suse.de>
+In-Reply-To: <CAKv+Gu_QH=sZi--FVqHebd1P+6UMzEqWQQ1u3Y170B7cND8Kgw@mail.gmail.com>
 References: <1468424567-15925-1-git-send-email-agraf@suse.de>
-Message-ID: <20160713160828.GA28666@leverpostej>
+ <CAKv+Gu_QH=sZi--FVqHebd1P+6UMzEqWQQ1u3Y170B7cND8Kgw@mail.gmail.com>
+Message-ID: <578668D3.6010406@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 13, 2016 at 05:42:47PM +0200, Alexander Graf wrote:
-> Some user space applications are known to break with 48 bits virtual
-> address space. As interim step until the world is healed and everyone
-> embraces correct code, this patch allows to only expose 47 bits of
-> virtual address space to user space.
+On 07/13/2016 05:59 PM, Ard Biesheuvel wrote:
+> On 13 July 2016 at 17:42, Alexander Graf <agraf@suse.de> wrote:
+>> Some user space applications are known to break with 48 bits virtual
+> known by whom? At least I wasn't aware of it, so could you please
+> share some examples?
 
-These applications have *always* been broken with 48-bit VA.
+Sure! Known to me so far are:
 
-Per Documentation/arm64/tagged-pointers.txt, the *only* upper bits that
-an application can assume will be zero (and therefore use for tags) are
-bits 63:56.
+   * mozjs17
+   * mozjs24
+   * mozjs38
+   * js-1.8.5
+   * java-1.7 (older JITs, fixed in newer ones)
 
-The clear architectural intent here is that bits 55:0 can be valid
-pointer bits, and it seems likely that the kernel will expand to use
-bits 55:48 in future, e.g. with 52-bit VAs as part of ARMv8.2 [1]. I
-hope those applications are being fixed to leave bits 55:48 well alone
-also.
+I'm not sure if there are more, but the fact that I've run into this 
+problem more than once doesn't make me incredibly happy :).
 
-For this as a config option, NAK. It removes any incentive to actually
-fix the problem, and perpetuates the idea that it's the kernel's
-responsibility to bodge around things that never worked in the first
-place. It works directly against the goal of a single kernel Image.
+>
+>> address space. As interim step until the world is healed and everyone
+>> embraces correct code, this patch allows to only expose 47 bits of
+>> virtual address space to user space.
+>>
+> Is this a code generation/toolchain issue?
 
-[1] https://community.arm.com/groups/processors/blog/2016/01/05/armv8-a-architecture-evolution
+mozjs uses a single 64bit value to combine doubles, ints and pointers 
+into a single variable. It is very smart and uses the upper 17 bits for 
+metadata such as "which type of variable is this". Coincidentally those 
+bits happen to overlap the "double is an infinite number" bits, so that 
+you can also express a NaN with it. When using such a value, the upper 
+17 bits get masked out.
 
-Thanks,
-Mark.
+That one was fixed upstream by force allocating the javascript heap 
+starting at a fixed location which is below 47 bits.
 
-> 
-> Signed-off-by: Alexander Graf <agraf@suse.de>
-> ---
->  arch/arm64/Kconfig              | 9 +++++++++
->  arch/arm64/include/asm/memory.h | 4 ++++
->  2 files changed, 13 insertions(+)
-> 
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 5a0a691..9ff5a74 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -538,6 +538,15 @@ config ARM64_VA_BITS
->  	default 47 if ARM64_VA_BITS_47
->  	default 48 if ARM64_VA_BITS_48
->  
-> +config ARM64_USER_VA_BITS_47
-> +	bool "Limit user space to 47 bits address space"
-> +	depends on ARM64_VA_BITS_48
-> +	help
-> +	  Some user space applications are known to break with 48 bits virtual
-> +	  address space. As interim step until the world is healed and everyone
-> +	  embraces correct code, this option allows to only expose 47 bits of
-> +	  virtual address space to user space. If unsure say N here.
-> +
->  config CPU_BIG_ENDIAN
->         bool "Build big-endian kernel"
->         help
-> diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
-> index 31b7322..ef268c6 100644
-> --- a/arch/arm64/include/asm/memory.h
-> +++ b/arch/arm64/include/asm/memory.h
-> @@ -74,7 +74,11 @@
->  #define PCI_IO_END		(VMEMMAP_START - SZ_2M)
->  #define PCI_IO_START		(PCI_IO_END - PCI_IO_SIZE)
->  #define FIXADDR_TOP		(PCI_IO_START - SZ_2M)
-> +#ifdef CONFIG_ARM64_USER_VA_BITS_47
-> +#define TASK_SIZE_64		(UL(1) << (VA_BITS - 1))
-> +#else
->  #define TASK_SIZE_64		(UL(1) << VA_BITS)
-> +#endif
->  
->  #ifdef CONFIG_COMPAT
->  #define TASK_SIZE_32		UL(0x100000000)
-> -- 
-> 1.8.5.6
-> 
+js-1.8.5 has the same as above, but also uses pointers to .rodata as 
+javascript pointers, so it doesn't only use the heap, it also uses 
+pointers to the library itself, which gets mapped high up the address 
+space. I don't have a solution for that one yet.
+
+IcedTea for java-1.7 had a bug where it incorrectly caused an overflow 
+when trying to calculating a relative adrp offset from <address high up> 
+to <address really low>, so that the resulting pointer had the upper 
+bits set as 1s. That one is long fixed upstream, we only ran into it 
+because we used an ancient IcedTea snapshot.
+
+My main concern however is with code that I do not know is broken today.
+
+
+Alex
