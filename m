@@ -1,75 +1,40 @@
-From: tiffany.lin@mediatek.com (tiffany lin)
-Date: Wed, 13 Jul 2016 10:00:09 +0800
-Subject: [PATCH v3 3/9] DocBook/v4l: Add compressed video formats used
- on MT8173 codec driver
-In-Reply-To: <1468350842.8843.18.camel@gmail.com>
-References: <1464611363-14936-1-git-send-email-tiffany.lin@mediatek.com>
- <1464611363-14936-2-git-send-email-tiffany.lin@mediatek.com>
- <1464611363-14936-3-git-send-email-tiffany.lin@mediatek.com>
- <1464611363-14936-4-git-send-email-tiffany.lin@mediatek.com>
- <5a793171-24a7-4e9e-8bfd-f668c789f8e0@xs4all.nl>
- <1468205771.3725.8.camel@mtksdaap41>
- <CAOMLVLiZU3D587dSyp2b2v4DV+MS9vh85bA4BoG7ddK6556rbA@mail.gmail.com>
- <1468350511.8843.16.camel@gmail.com> <1468350842.8843.18.camel@gmail.com>
-Message-ID: <1468375209.2462.20.camel@mtksdaap41>
+From: andi.shyti@samsung.com (Andi Shyti)
+Date: Wed, 13 Jul 2016 11:08:52 +0900
+Subject: [PATCH v3 7/7] clk: exynos5433: remove CLK_IGNORE_UNUSED flag from
+ SPI clocks
+In-Reply-To: <146836184696.73491.9452469757415968654@resonance>
+References: <1468317736-18841-1-git-send-email-andi.shyti@samsung.com>
+ <1468317736-18841-8-git-send-email-andi.shyti@samsung.com>
+ <CGME20160712221734epcas1p2e2069af657e3afa912bea5bf7217e08a@epcas1p2.samsung.com>
+ <146836184696.73491.9452469757415968654@resonance>
+Message-ID: <20160713020852.GH18237@samsunx.samsung>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nicolas,
+Hi Mike,
 
-On Tue, 2016-07-12 at 15:14 -0400, Nicolas Dufresne wrote:
-> Le mardi 12 juillet 2016 ? 15:08 -0400, Nicolas Dufresne a ?crit :
-> > Le mardi 12 juillet 2016 ? 16:16 +0800, Wu-Cheng Li (???) a ?crit :
-> > > Decoder hardware produces MT21 (compressed). Image processor can
-> > > convert it to a format that can be input of display driver.
-> > > Tiffany.
-> > > When do you plan to upstream image processor (mtk-mdp)?
-> > > > 
-> > > > It can be as input format for encoder, MDP and display drivers in
-> > > our
-> > > > platform.
-> > > I remember display driver can only accept uncompressed MT21. Right?
-> > > Basically V4L2_PIX_FMT_MT21 is compressed and is like an opaque
-> > > format. It's not usable until it's decompressed and converted by
-> > > image
-> > > processor.
+> > Because the Exynos5433 SPI driver supports the ioclk handling and
+> > the following patch:
 > > 
-> > Previously it was described as MediaTek block mode, and now as a
-> > MediaTek compressed format. It makes me think you have no idea what
-> > this pixel format really is. Is that right ?
+> >   http://marc.info/?l=linux-kernel&m=146787645626318&w=2
 > > 
-> > The main reason why I keep asking, is that we often find similarities
-> > between what vendor like to call their proprietary formats. Doing the
-> > proper research helps not creating a mess like in Android where you
-> > have a lot of formats that all point to the same format. I believe
-> > there was the same concern when Samsung wanted to introduce their Z-
-> > flip-Z NV12 tile format. In the end they simply provided sufficient
-> > documentation so we could document it and implement software
-> > converters
-> > for test and validation purpose.
+> > fixes a synchronus abort issue, none of the SPI clocks require
+> > any critical handling: remove, then, the CLK_IGNORE_UNUSED flag
+> > for the SPI related clocks.
+> > 
+> > Signed-off-by: Andi Shyti <andi.shyti@samsung.com>
+> > Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> > Reviewed-by: Michael Turquette <mturquette@baylibre.com>
+> > Acked-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
 > 
-> Here's the kind of information we want in the documentation.
-> 
-> https://chromium.googlesource.com/chromium/src/media/+/master/base/vide
-> o_types.h#40
-> 
->   // MediaTek proprietary format. MT21 is similar to NV21 except the memory
->   // layout and pixel layout (swizzles). 12bpp with Y plane followed by a 2x2
->   // interleaved VU plane. Each image contains two buffers -- Y plane and VU
->   // plane. Two planes can be non-contiguous in memory. The starting addresses
->   // of Y plane and VU plane are 4KB alignment.
->   // Suppose image dimension is (width, height). For both Y plane and VU plane:
->   // Row pitch = ((width+15)/16) * 16.
->   // Plane size = Row pitch * (((height+31)/32)*32)
-> 
-> Now obviously this is incomplete, as the swizzling need to be documented of course.
-> 
-Because it's finally a compressed format from our codec hw, we cannot
-describe its swizzling.
+> Do you want these patches to go through same tree? If not, I can take
+> this patch into clk-next.
 
-best regards,
-Tiffany
+I think this patchset doesn't apply in your repository, but in
+Mark Brown's spi/topic/s3c64xx branch. So that I guess Mark
+should take this patchset.
 
-> > 
-> > regards,
-> > Nicolas
+Sorry, I should have specified it in the cover letter.
+
+Thanks,
+Andi
