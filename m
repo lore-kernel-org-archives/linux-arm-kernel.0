@@ -1,40 +1,36 @@
-From: jeyu@redhat.com (Jessica Yu)
-Date: Tue, 12 Jul 2016 20:11:14 -0400
-Subject: [PATCH] arm64: take SHN_LIVEPATCH syms into account when calculating
- plt_max_entries
-In-Reply-To: <alpine.LNX.2.00.1607121141480.16277@pobox.suse.cz>
-References: <20160627151500.2247A68D20@newverein.lst.de>
- <20160627151722.B81C968D29@newverein.lst.de>
- <alpine.LNX.2.00.1607111556320.27989@pobox.suse.cz>
- <20160711215807.GA23097@packer-debian-8-amd64.digitalocean.com>
- <alpine.LNX.2.00.1607121141480.16277@pobox.suse.cz>
-Message-ID: <20160713001113.GA30925@packer-debian-8-amd64.digitalocean.com>
+From: shuahkh@osg.samsung.com (Shuah Khan)
+Date: Tue, 12 Jul 2016 18:33:58 -0600
+Subject: [PATCH] media: s5p-mfc remove unnecessary error messages
+Message-ID: <1468370038-5364-1-git-send-email-shuahkh@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-SHN_LIVEPATCH symbols are technically a subset of SHN_UNDEF/undefined
-symbols, except that their addresses are resolved by livepatch at runtime.
-Therefore, when calculating the upper-bound for the number of plt entries
-to allocate, make sure to take livepatch symbols into account as well.
+Removing unnecessary error messages as appropriate error code is returned.
 
-Signed-off-by: Jessica Yu <jeyu@redhat.com>
+Signed-off-by: Shuah Khan <shuahkh@osg.samsung.com>
 ---
- arch/arm64/kernel/module-plts.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ drivers/media/platform/s5p-mfc/s5p_mfc.c | 2 --
+ 1 file changed, 2 deletions(-)
 
-diff --git a/arch/arm64/kernel/module-plts.c b/arch/arm64/kernel/module-plts.c
-index 1ce90d8..1e95dc1 100644
---- a/arch/arm64/kernel/module-plts.c
-+++ b/arch/arm64/kernel/module-plts.c
-@@ -122,7 +122,8 @@ static unsigned int count_plts(Elf64_Sym *syms, Elf64_Rela *rela, int num)
-                         * as well, so modules can never grow beyond that limit.
-                         */
-                        s = syms + ELF64_R_SYM(rela[i].r_info);
--                       if (s->st_shndx != SHN_UNDEF)
-+                       if (s->st_shndx != SHN_UNDEF &&
-+                           s->st_shndx != SHN_LIVEPATCH)
-                                break;
-
-                        /*
+diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc.c b/drivers/media/platform/s5p-mfc/s5p_mfc.c
+index b6fde20..906f80c 100644
+--- a/drivers/media/platform/s5p-mfc/s5p_mfc.c
++++ b/drivers/media/platform/s5p-mfc/s5p_mfc.c
+@@ -759,7 +759,6 @@ static int s5p_mfc_open(struct file *file)
+ 	/* Allocate memory for context */
+ 	ctx = kzalloc(sizeof(*ctx), GFP_KERNEL);
+ 	if (!ctx) {
+-		mfc_err("Not enough memory\n");
+ 		ret = -ENOMEM;
+ 		goto err_alloc;
+ 	}
+@@ -776,7 +775,6 @@ static int s5p_mfc_open(struct file *file)
+ 	while (dev->ctx[ctx->num]) {
+ 		ctx->num++;
+ 		if (ctx->num >= MFC_NUM_CONTEXTS) {
+-			mfc_err("Too many open contexts\n");
+ 			ret = -EBUSY;
+ 			goto err_no_ctx;
+ 		}
 -- 
-2.5.5
+2.7.4
