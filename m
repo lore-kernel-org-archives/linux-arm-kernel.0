@@ -1,39 +1,73 @@
-From: appana.durga.rao@xilinx.com (Kedareswara rao Appana)
-Date: Wed, 13 Jul 2016 16:12:16 +0530
-Subject: [PATCH] dmaengine: zynqmp_dma: Fix static checker warning
-Message-ID: <1468406536-6350-1-git-send-email-appanad@xilinx.com>
+From: pochun.lin@mediatek.com (pochun lin)
+Date: Wed, 13 Jul 2016 18:52:43 +0800
+Subject: [PATCH v2] [media] mtk-vcodec: fix more type mismatches
+In-Reply-To: <20160713084916.2765651-1-arnd@arndb.de>
+References: <20160713084916.2765651-1-arnd@arndb.de>
+Message-ID: <1468407163.3555.1.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes the below static checker warning
-drivers/dma/xilinx/zynqmp_dma.c:973 zynqmp_dma_chan_probe()
-	warn: was && intended here instead of ||?
+Hi Arnd,
 
-Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
-Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
----
- drivers/dma/xilinx/zynqmp_dma.c |    9 +++++++--
- 1 files changed, 7 insertions(+), 2 deletions(-)
+On Wed, 2016-07-13 at 10:47 +0200, Arnd Bergmann wrote:
+> The newly added mtk-vcodec driver produces a number of warnings in an ARM
+> allmodconfig build, mainly since it assumes that dma_addr_t is 32-bit wide:
+> 
+> mtk-vcodec/venc/venc_vp8_if.c: In function 'vp8_enc_alloc_work_buf':
+> mtk-vcodec/venc/venc_vp8_if.c:212:191: error: cast to pointer from integer of different size [-Werror=int-to-pointer-cast]
+> mtk-vcodec/venc/venc_h264_if.c: In function 'h264_enc_alloc_work_buf':
+> mtk-vcodec/venc/venc_h264_if.c:297:190: error: cast to pointer from integer of different size [-Werror=int-to-pointer-cast]
+> 
+> This rearranges the format strings and type casts to what they should have been
+> in order to avoid the warnings. e0f80d8d62f5 ("[media] mtk-vcodec: fix two compiler
+> warnings") fixed some of the problems that were introduced at the same time, but
+> missed two others.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>  drivers/media/platform/mtk-vcodec/venc/venc_h264_if.c | 4 ++--
+>  drivers/media/platform/mtk-vcodec/venc/venc_vp8_if.c  | 4 ++--
+>  2 files changed, 4 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/media/platform/mtk-vcodec/venc/venc_h264_if.c b/drivers/media/platform/mtk-vcodec/venc/venc_h264_if.c
+> index f4e18bb44cb9..9a600525b3c1 100644
+> --- a/drivers/media/platform/mtk-vcodec/venc/venc_h264_if.c
+> +++ b/drivers/media/platform/mtk-vcodec/venc/venc_h264_if.c
+> @@ -295,9 +295,9 @@ static int h264_enc_alloc_work_buf(struct venc_h264_inst *inst)
+>  		wb[i].iova = inst->work_bufs[i].dma_addr;
+>  
+>  		mtk_vcodec_debug(inst,
+> -				 "work_buf[%d] va=0x%p iova=0x%p size=%zu",
+> +				 "work_buf[%d] va=0x%p iova=%pad size=%zu",
+>  				 i, inst->work_bufs[i].va,
+> -				 (void *)inst->work_bufs[i].dma_addr,
+> +				 &inst->work_bufs[i].dma_addr,
+>  				 inst->work_bufs[i].size);
+>  	}
+>  
 
-diff --git a/drivers/dma/xilinx/zynqmp_dma.c b/drivers/dma/xilinx/zynqmp_dma.c
-index f777a5b..2248704 100644
---- a/drivers/dma/xilinx/zynqmp_dma.c
-+++ b/drivers/dma/xilinx/zynqmp_dma.c
-@@ -970,8 +970,13 @@ static int zynqmp_dma_chan_probe(struct zynqmp_dma_device *zdev,
- 	chan->dst_burst_len = ZYNQMP_DMA_AWLEN_RST_VAL;
- 	chan->src_burst_len = ZYNQMP_DMA_ARLEN_RST_VAL;
- 	err = of_property_read_u32(node, "xlnx,bus-width", &chan->bus_width);
--	if ((err < 0) && ((chan->bus_width != ZYNQMP_DMA_BUS_WIDTH_64) ||
--			  (chan->bus_width != ZYNQMP_DMA_BUS_WIDTH_128))) {
-+	if (err < 0) {
-+		dev_err(&pdev->dev, "missing xlnx,bus-width property\n");
-+		return err;
-+	}
-+
-+	if ((chan->bus_width != ZYNQMP_DMA_BUS_WIDTH_64) ||
-+	    (chan->bus_width != ZYNQMP_DMA_BUS_WIDTH_128)) {
- 		dev_err(zdev->dev, "invalid bus-width value");
- 		return err;
- 	}
--- 
-1.7.1
+This modified will dump dma_addr's address, not dma_addr value.
+In actually, we need to dump dma_addr value.
+Thanks.
+
+> diff --git a/drivers/media/platform/mtk-vcodec/venc/venc_vp8_if.c b/drivers/media/platform/mtk-vcodec/venc/venc_vp8_if.c
+> index 5b4ef0f1740c..60bbcd2a0510 100644
+> --- a/drivers/media/platform/mtk-vcodec/venc/venc_vp8_if.c
+> +++ b/drivers/media/platform/mtk-vcodec/venc/venc_vp8_if.c
+> @@ -210,9 +210,9 @@ static int vp8_enc_alloc_work_buf(struct venc_vp8_inst *inst)
+>  		wb[i].iova = inst->work_bufs[i].dma_addr;
+>  
+>  		mtk_vcodec_debug(inst,
+> -				 "work_bufs[%d] va=0x%p,iova=0x%p,size=%zu",
+> +				 "work_bufs[%d] va=0x%p,iova=%pad,size=%zu",
+>  				 i, inst->work_bufs[i].va,
+> -				 (void *)inst->work_bufs[i].dma_addr,
+> +				 &inst->work_bufs[i].dma_addr,
+>  				 inst->work_bufs[i].size);
+>  	}
+>  
+
+The same as above.
+
+Best Regards
+PoChun
