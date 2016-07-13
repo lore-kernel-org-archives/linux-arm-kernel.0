@@ -1,25 +1,34 @@
-From: diana.craciun@nxp.com (Diana Madalina Craciun)
-Date: Wed, 13 Jul 2016 07:57:21 +0000
-Subject: [PATCH v9 00/17] KVM: arm64: GICv3 ITS emulation
-References: <20160713015909.28793-1-andre.przywara@arm.com>
-Message-ID: <HE1PR04MB1321470CDA673EDB88B8930DFF310@HE1PR04MB1321.eurprd04.prod.outlook.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 13 Jul 2016 09:59:06 +0200
+Subject: [PATCH 2/2] [media] s5p-g2d: Replace old driver with DRM version
+In-Reply-To: <20160712200202.7496445e@recife.lan>
+References: <1464096493-13378-1-git-send-email-k.kozlowski@samsung.com>
+ <1464096493-13378-2-git-send-email-k.kozlowski@samsung.com>
+ <20160712200202.7496445e@recife.lan>
+Message-ID: <5785F4CA.8070908@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andre,
+On 07/13/2016 01:02 AM, Mauro Carvalho Chehab wrote:
+> I suspect that you'll be applying this one via DRM tree, so:
+> 
+> Em Tue, 24 May 2016 15:28:13 +0200
+> Krzysztof Kozlowski <k.kozlowski@samsung.com> escreveu:
+> 
+>> Remove the old non-DRM driver because it is now entirely supported by
+>> exynos_drm_g2d driver.
+>>
+>> Cc: Kyungmin Park <kyungmin.park@samsung.com>
+>> Cc: Kamil Debski <k.debski@samsung.com>
+>> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> 
+> Acked-by: Mauro Carvalho Chehab <mchehab@s-opensource.com>
+> 
+> PS.: If you prefer to apply this one via my tree, I'm ok too. Just
+> let me know when the first patch gets merged upstream.
 
-On 07/13/2016 04:59 AM, Andre Przywara wrote:
-> To test this you can use the kvmtool patches available in the "its-v6"
-> branch here [2].
-> Start a guest with: "$ lkvm run --irqchip=gicv3-its --force-pci"
-> and see the ITS being used for instance by the virtio devices.
->
-> [1]: git://linux-arm.org/linux-ap.git
->      http://www.linux-arm.org/git?p=linux-ap.git;a=log;h=refs/heads/its-emul/v9
-> [2]: git://linux-arm.org/kvmtool.git
+This patchset was insufficient and I didn't came up with follow up.
+Please ignore it for now.
 
-It seems that its/emul/v9 branch does not exist.
-
-Thanks,
-
-Diana
+Best regards,
+Krzysztof
