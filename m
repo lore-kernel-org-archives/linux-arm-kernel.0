@@ -1,9 +1,8 @@
 From: anna-maria@linutronix.de (Anna-Maria Gleixner)
-Date: Wed, 13 Jul 2016 17:17:04 -0000
-Subject: [patch V2 62/67] [PATCH] clocksource: arm_global_timer: Convert to
- hotplug state machine.
+Date: Wed, 13 Jul 2016 17:16:52 -0000
+Subject: [patch V2 49/67] arm/xen: Convert to hotplug state machine
 References: <20160713153219.128052238@linutronix.de>
-Message-ID: <20160713153338.062741642@linutronix.de>
+Message-ID: <20160713153336.971559670@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,104 +11,119 @@ From: Richard Cochran <rcochran@linutronix.de>
 Install the callbacks via the state machine and let the core invoke
 the callbacks on the already online CPUs.
 
+The get_cpu() in xen_starting_cpu() boils down to preempt_disable() since
+we already know the CPU we run on. Disabling preemption shouldn't be required
+here from what I see since it we don't switch CPUs while invoking the function.
+
 Signed-off-by: Richard Cochran <rcochran@linutronix.de>
 Reviewed-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
-Cc: Srinivas Kandagatla <srinivas.kandagatla@gmail.com>
-Cc: Maxime Coquelin <maxime.coquelin@st.com>
-Cc: Patrice Chotard <patrice.chotard@st.com>
-Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+Cc: Linus Torvalds <torvalds@linux-foundation.org>
+Cc: Peter Zijlstra <peterz@infradead.org>
+Cc: Russell King <linux@armlinux.org.uk>
+Cc: Stefano Stabellini <sstabellini@kernel.org>
+Cc: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+Cc: Thomas Gleixner <tglx@linutronix.de>
 Cc: linux-arm-kernel at lists.infradead.org
-Cc: kernel at stlinux.com
+Cc: xen-devel at lists.xenproject.org
 Signed-off-by: Anna-Maria Gleixner <anna-maria@linutronix.de>
 ---
- drivers/clocksource/arm_global_timer.c |   39 ++++++++-------------------------
- include/linux/cpuhotplug.h             |    1 
- 2 files changed, 11 insertions(+), 29 deletions(-)
+ arch/arm/xen/enlighten.c   | 41 +++++++++++------------------------------
+ include/linux/cpuhotplug.h |  1 +
+ 2 files changed, 12 insertions(+), 30 deletions(-)
 
---- a/drivers/clocksource/arm_global_timer.c
-+++ b/drivers/clocksource/arm_global_timer.c
-@@ -165,9 +165,9 @@ static irqreturn_t gt_clockevent_interru
- 	return IRQ_HANDLED;
- }
+diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
+index 75cd734..d822e23 100644
+--- a/arch/arm/xen/enlighten.c
++++ b/arch/arm/xen/enlighten.c
+@@ -161,12 +161,11 @@ static struct notifier_block xen_pvclock_gtod_notifier = {
+ 	.notifier_call = xen_pvclock_gtod_notify,
+ };
  
--static int gt_clockevents_init(struct clock_event_device *clk)
-+static int gt_starting_cpu(unsigned int cpu)
+-static void xen_percpu_init(void)
++static int xen_starting_cpu(unsigned int cpu)
  {
--	int cpu = smp_processor_id();
-+	struct clock_event_device *clk = this_cpu_ptr(gt_evt);
+ 	struct vcpu_register_vcpu_info info;
+ 	struct vcpu_info *vcpup;
+ 	int err;
+-	int cpu = get_cpu();
  
- 	clk->name = "arm_global_timer";
- 	clk->features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT |
-@@ -186,10 +186,13 @@ static int gt_clockevents_init(struct cl
- 	return 0;
- }
+ 	/* 
+ 	 * VCPUOP_register_vcpu_info cannot be called twice for the same
+@@ -190,7 +189,13 @@ static void xen_percpu_init(void)
  
--static void gt_clockevents_stop(struct clock_event_device *clk)
-+static int gt_dying_cpu(unsigned int cpu)
- {
-+	struct clock_event_device *clk = this_cpu_ptr(gt_evt);
+ after_register_vcpu_info:
+ 	enable_percpu_irq(xen_events_irq, 0);
+-	put_cpu();
++	return 0;
++}
 +
- 	gt_clockevent_shutdown(clk);
- 	disable_percpu_irq(clk->irq);
++static int xen_dying_cpu(unsigned int cpu)
++{
++	disable_percpu_irq(xen_events_irq);
 +	return 0;
  }
  
- static cycle_t gt_clocksource_read(struct clocksource *cs)
-@@ -252,24 +255,6 @@ static int __init gt_clocksource_init(vo
- 	return clocksource_register_hz(&gt_clocksource, gt_clk_rate);
+ static void xen_restart(enum reboot_mode reboot_mode, const char *cmd)
+@@ -209,28 +214,6 @@ static void xen_power_off(void)
+ 	BUG_ON(rc);
  }
  
--static int gt_cpu_notify(struct notifier_block *self, unsigned long action,
--			 void *hcpu)
+-static int xen_cpu_notification(struct notifier_block *self,
+-				unsigned long action,
+-				void *hcpu)
 -{
--	switch (action & ~CPU_TASKS_FROZEN) {
+-	switch (action) {
 -	case CPU_STARTING:
--		gt_clockevents_init(this_cpu_ptr(gt_evt));
+-		xen_percpu_init();
 -		break;
 -	case CPU_DYING:
--		gt_clockevents_stop(this_cpu_ptr(gt_evt));
+-		disable_percpu_irq(xen_events_irq);
+-		break;
+-	default:
 -		break;
 -	}
 -
 -	return NOTIFY_OK;
 -}
--static struct notifier_block gt_cpu_nb = {
--	.notifier_call = gt_cpu_notify,
+-
+-static struct notifier_block xen_cpu_notifier = {
+-	.notifier_call = xen_cpu_notification,
 -};
 -
- static int __init global_timer_of_register(struct device_node *np)
+ static irqreturn_t xen_arm_callback(int irq, void *arg)
  {
- 	struct clk *gt_clk;
-@@ -325,18 +310,14 @@ static int __init global_timer_of_regist
- 		goto out_free;
+ 	xen_hvm_evtchn_do_upcall();
+@@ -351,16 +334,14 @@ static int __init xen_guest_init(void)
+ 		return -EINVAL;
  	}
  
--	err = register_cpu_notifier(&gt_cpu_nb);
--	if (err) {
--		pr_warn("global-timer: unable to register cpu notifier.\n");
--		goto out_irq;
--	}
+-	xen_percpu_init();
 -
--	/* Immediately configure the timer on the boot CPU */
-+	/* Register and immediately configure the timer on the boot CPU */
- 	err = gt_clocksource_init();
- 	if (err)
- 		goto out_irq;
- 	
--	err = gt_clockevents_init(this_cpu_ptr(gt_evt));
-+	err = cpuhp_setup_state(CPUHP_AP_ARM_GLOBAL_TIMER_STARTING,
-+				"AP_ARM_GLOBAL_TIMER_STARTING",
-+				gt_starting_cpu, gt_dying_cpu);
- 	if (err)
- 		goto out_irq;
+-	register_cpu_notifier(&xen_cpu_notifier);
+-
+ 	pv_time_ops.steal_clock = xen_stolen_accounting;
+ 	static_key_slow_inc(&paravirt_steal_enabled);
+ 	if (xen_initial_domain())
+ 		pvclock_gtod_register_notifier(&xen_pvclock_gtod_notifier);
  
+-	return 0;
++	return cpuhp_setup_state(CPUHP_AP_ARM_XEN_STARTING,
++				 "AP_ARM_XEN_STARTING", xen_starting_cpu,
++				 xen_dying_cpu);
+ }
+ early_initcall(xen_guest_init);
+ 
+diff --git a/include/linux/cpuhotplug.h b/include/linux/cpuhotplug.h
+index 86ac982..f986963 100644
 --- a/include/linux/cpuhotplug.h
 +++ b/include/linux/cpuhotplug.h
 @@ -48,6 +48,7 @@ enum cpuhp_state {
- 	CPUHP_AP_PERF_ARM_STARTING,
- 	CPUHP_AP_ARM_L2X0_STARTING,
- 	CPUHP_AP_ARM_ARCH_TIMER_STARTING,
-+	CPUHP_AP_ARM_GLOBAL_TIMER_STARTING,
- 	CPUHP_AP_DUMMY_TIMER_STARTING,
- 	CPUHP_AP_ARM_TWD_STARTING,
- 	CPUHP_AP_METAG_TIMER_STARTING,
+ 	CPUHP_AP_KVM_STARTING,
+ 	CPUHP_AP_KVM_ARM_VGIC_STARTING,
+ 	CPUHP_AP_KVM_ARM_TIMER_STARTING,
++	CPUHP_AP_ARM_XEN_STARTING,
+ 	CPUHP_AP_LEDTRIG_STARTING,
+ 	CPUHP_AP_NOTIFY_STARTING,
+ 	CPUHP_AP_ONLINE,
+-- 
+2.8.1
