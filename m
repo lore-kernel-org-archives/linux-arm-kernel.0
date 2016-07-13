@@ -1,60 +1,145 @@
-From: tiffany.lin@mediatek.com (tiffany lin)
-Date: Wed, 13 Jul 2016 09:50:54 +0800
-Subject: [PATCH v3 3/9] DocBook/v4l: Add compressed video formats used
- on MT8173 codec driver
-In-Reply-To: <1468350511.8843.16.camel@gmail.com>
-References: <1464611363-14936-1-git-send-email-tiffany.lin@mediatek.com>
- <1464611363-14936-2-git-send-email-tiffany.lin@mediatek.com>
- <1464611363-14936-3-git-send-email-tiffany.lin@mediatek.com>
- <1464611363-14936-4-git-send-email-tiffany.lin@mediatek.com>
- <5a793171-24a7-4e9e-8bfd-f668c789f8e0@xs4all.nl>
- <1468205771.3725.8.camel@mtksdaap41>
- <CAOMLVLiZU3D587dSyp2b2v4DV+MS9vh85bA4BoG7ddK6556rbA@mail.gmail.com>
- <1468350511.8843.16.camel@gmail.com>
-Message-ID: <1468374654.2462.17.camel@mtksdaap41>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Wed, 13 Jul 2016 02:58:54 +0100
+Subject: [PATCH v9 02/17] KVM: arm/arm64: check return value for
+ kvm_register_vgic_device
+In-Reply-To: <20160713015909.28793-1-andre.przywara@arm.com>
+References: <20160713015909.28793-1-andre.przywara@arm.com>
+Message-ID: <20160713015909.28793-3-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nicolas,
+kvm_register_device_ops() can return an error, so lets check its return
+value and propagate this up the call chain.
 
-On Tue, 2016-07-12 at 15:08 -0400, Nicolas Dufresne wrote:
-> Le mardi 12 juillet 2016 ? 16:16 +0800, Wu-Cheng Li (???) a ?crit :
-> > Decoder hardware produces MT21 (compressed). Image processor can
-> > convert it to a format that can be input of display driver. Tiffany.
-> > When do you plan to upstream image processor (mtk-mdp)?
-> > >
-> > > It can be as input format for encoder, MDP and display drivers in
-> > our
-> > > platform.
-> > I remember display driver can only accept uncompressed MT21. Right?
-> > Basically V4L2_PIX_FMT_MT21 is compressed and is like an opaque
-> > format. It's not usable until it's decompressed and converted by
-> > image
-> > processor.
-> 
-> Previously it was described as MediaTek block mode, and now as a
-> MediaTek compressed format. It makes me think you have no idea what
-> this pixel format really is. Is that right ?
-> 
-That's not right.
-Its a compressed format as I document in "[PATCH v3 3/9] DocBook/v4l:
-Add compressed video formats used on MT8173 codec driver."
-In MT8173 platform, when using this format, we need Image Processor to
-cover it to standard format as wucheng mentioned.
-To prevent this ambiguous, I will change it to V4L2_PIX_FMT_M21C, it
-means its compressed data. Is it ok?
+Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+---
+ virt/kvm/arm/vgic/vgic-kvm-device.c | 15 +++++++++------
+ virt/kvm/arm/vgic/vgic-v2.c         | 11 ++++++++---
+ virt/kvm/arm/vgic/vgic-v3.c         | 15 +++++++++++++--
+ virt/kvm/arm/vgic/vgic.h            |  2 +-
+ 4 files changed, 31 insertions(+), 12 deletions(-)
 
-best regards,
-Tiffany
-
-> The main reason why I keep asking, is that we often find similarities
-> between what vendor like to call their proprietary formats. Doing the
-> proper research helps not creating a mess like in Android where you
-> have a lot of formats that all point to the same format. I believe
-> there was the same concern when Samsung wanted to introduce their Z-
-> flip-Z NV12 tile format. In the end they simply provided sufficient
-> documentation so we could document it and implement software converters
-> for test and validation purpose.
-> 
-> regards,
-> Nicolas
+diff --git a/virt/kvm/arm/vgic/vgic-kvm-device.c b/virt/kvm/arm/vgic/vgic-kvm-device.c
+index 0130c4b..2f24f13 100644
+--- a/virt/kvm/arm/vgic/vgic-kvm-device.c
++++ b/virt/kvm/arm/vgic/vgic-kvm-device.c
+@@ -210,20 +210,24 @@ static void vgic_destroy(struct kvm_device *dev)
+ 	kfree(dev);
+ }
+ 
+-void kvm_register_vgic_device(unsigned long type)
++int kvm_register_vgic_device(unsigned long type)
+ {
++	int ret = -ENODEV;
++
+ 	switch (type) {
+ 	case KVM_DEV_TYPE_ARM_VGIC_V2:
+-		kvm_register_device_ops(&kvm_arm_vgic_v2_ops,
+-					KVM_DEV_TYPE_ARM_VGIC_V2);
++		ret = kvm_register_device_ops(&kvm_arm_vgic_v2_ops,
++					      KVM_DEV_TYPE_ARM_VGIC_V2);
+ 		break;
+ #ifdef CONFIG_KVM_ARM_VGIC_V3
+ 	case KVM_DEV_TYPE_ARM_VGIC_V3:
+-		kvm_register_device_ops(&kvm_arm_vgic_v3_ops,
+-					KVM_DEV_TYPE_ARM_VGIC_V3);
++		ret = kvm_register_device_ops(&kvm_arm_vgic_v3_ops,
++					      KVM_DEV_TYPE_ARM_VGIC_V3);
+ 		break;
+ #endif
+ 	}
++
++	return ret;
+ }
+ 
+ /** vgic_attr_regs_access: allows user space to read/write VGIC registers
+@@ -428,4 +432,3 @@ struct kvm_device_ops kvm_arm_vgic_v3_ops = {
+ };
+ 
+ #endif /* CONFIG_KVM_ARM_VGIC_V3 */
+-
+diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
+index e31405e..079bf67 100644
+--- a/virt/kvm/arm/vgic/vgic-v2.c
++++ b/virt/kvm/arm/vgic/vgic-v2.c
+@@ -332,20 +332,25 @@ int vgic_v2_probe(const struct gic_kvm_info *info)
+ 	vtr = readl_relaxed(kvm_vgic_global_state.vctrl_base + GICH_VTR);
+ 	kvm_vgic_global_state.nr_lr = (vtr & 0x3f) + 1;
+ 
++	ret = kvm_register_vgic_device(KVM_DEV_TYPE_ARM_VGIC_V2);
++	if (ret) {
++		kvm_err("Cannot register GICv2 KVM device\n");
++		iounmap(kvm_vgic_global_state.vctrl_base);
++		return ret;
++	}
++
+ 	ret = create_hyp_io_mappings(kvm_vgic_global_state.vctrl_base,
+ 				     kvm_vgic_global_state.vctrl_base +
+ 					 resource_size(&info->vctrl),
+ 				     info->vctrl.start);
+-
+ 	if (ret) {
+ 		kvm_err("Cannot map VCTRL into hyp\n");
++		kvm_unregister_device_ops(KVM_DEV_TYPE_ARM_VGIC_V2);
+ 		iounmap(kvm_vgic_global_state.vctrl_base);
+ 		return ret;
+ 	}
+ 
+ 	kvm_vgic_global_state.can_emulate_gicv2 = true;
+-	kvm_register_vgic_device(KVM_DEV_TYPE_ARM_VGIC_V2);
+-
+ 	kvm_vgic_global_state.vcpu_base = info->vcpu.start;
+ 	kvm_vgic_global_state.type = VGIC_V2;
+ 	kvm_vgic_global_state.max_gic_vcpus = VGIC_V2_MAX_CPUS;
+diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
+index 346b4ad..e48a22e 100644
+--- a/virt/kvm/arm/vgic/vgic-v3.c
++++ b/virt/kvm/arm/vgic/vgic-v3.c
+@@ -296,6 +296,7 @@ out:
+ int vgic_v3_probe(const struct gic_kvm_info *info)
+ {
+ 	u32 ich_vtr_el2 = kvm_call_hyp(__vgic_v3_get_ich_vtr_el2);
++	int ret;
+ 
+ 	/*
+ 	 * The ListRegs field is 5 bits, but there is a architectural
+@@ -319,12 +320,22 @@ int vgic_v3_probe(const struct gic_kvm_info *info)
+ 	} else {
+ 		kvm_vgic_global_state.vcpu_base = info->vcpu.start;
+ 		kvm_vgic_global_state.can_emulate_gicv2 = true;
+-		kvm_register_vgic_device(KVM_DEV_TYPE_ARM_VGIC_V2);
++		ret = kvm_register_vgic_device(KVM_DEV_TYPE_ARM_VGIC_V2);
++		if (ret) {
++			kvm_err("Cannot register GICv2 KVM device.\n");
++			return ret;
++		}
+ 		kvm_info("vgic-v2@%llx\n", info->vcpu.start);
+ 	}
++	ret = kvm_register_vgic_device(KVM_DEV_TYPE_ARM_VGIC_V3);
++	if (ret) {
++		kvm_err("Cannot register GICv3 KVM device.\n");
++		kvm_unregister_device_ops(KVM_DEV_TYPE_ARM_VGIC_V2);
++		return ret;
++	}
++
+ 	if (kvm_vgic_global_state.vcpu_base == 0)
+ 		kvm_info("disabling GICv2 emulation\n");
+-	kvm_register_vgic_device(KVM_DEV_TYPE_ARM_VGIC_V3);
+ 
+ 	kvm_vgic_global_state.vctrl_base = NULL;
+ 	kvm_vgic_global_state.type = VGIC_V3;
+diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
+index 7b300ca..c752152 100644
+--- a/virt/kvm/arm/vgic/vgic.h
++++ b/virt/kvm/arm/vgic/vgic.h
+@@ -124,7 +124,7 @@ static inline int vgic_register_redist_iodevs(struct kvm *kvm,
+ }
+ #endif
+ 
+-void kvm_register_vgic_device(unsigned long type);
++int kvm_register_vgic_device(unsigned long type);
+ int vgic_lazy_init(struct kvm *kvm);
+ int vgic_init(struct kvm *kvm);
+ 
+-- 
+2.9.0
