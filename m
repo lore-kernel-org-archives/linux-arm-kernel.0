@@ -1,89 +1,81 @@
-From: johan@kernel.org (Johan Hovold)
-Date: Wed, 13 Jul 2016 15:14:12 +0200
-Subject: [PATCH] gpio: document how to order GPIO controllers
-In-Reply-To: <CACRpkdZhx3yTbtuj-ZTP+mtUSr4uxL4bHtu8jVZOoxrUy6=iYw@mail.gmail.com>
-References: <1467355333-8813-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <20160705140546.GA10601@rob-hp-laptop>
- <20160705180447.GP16643@pengutronix.de>
- <CACRpkdbH+KRXbxFdfyAE44fBNctK4cWV+KRLwQBTzSGLvLMEDg@mail.gmail.com>
- <20160706102750.GH23470@localhost>
- <CACRpkdZhx3yTbtuj-ZTP+mtUSr4uxL4bHtu8jVZOoxrUy6=iYw@mail.gmail.com>
-Message-ID: <20160713131412.GO6442@localhost>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 13 Jul 2016 15:13:42 +0200
+Subject: [RFC 0/3] extend kexec_file_load system call
+In-Reply-To: <20160713094127.GC14522@leverpostej>
+References: <20160712014201.11456-1-takahiro.akashi@linaro.org>
+ <5352106.oQ0Ff9gWJA@wuerfel> <20160713094127.GC14522@leverpostej>
+Message-ID: <7352796.seiSnHrYPy@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 06, 2016 at 02:34:39PM +0200, Linus Walleij wrote:
-> On Wed, Jul 6, 2016 at 12:27 PM, Johan Hovold <johan@kernel.org> wrote:
-> > On Wed, Jul 06, 2016 at 11:34:37AM +0200, Linus Walleij wrote:
+On Wednesday, July 13, 2016 10:41:28 AM CEST Mark Rutland wrote:
+> On Wed, Jul 13, 2016 at 10:01:33AM +0200, Arnd Bergmann wrote:
+> > On Wednesday, July 13, 2016 10:36:14 AM CEST Dave Young wrote:
+> > > On 07/12/16 at 03:50pm, Mark Rutland wrote:
+> > > > On Tue, Jul 12, 2016 at 04:24:10PM +0200, Arnd Bergmann wrote:
+> > > > > On Tuesday, July 12, 2016 10:18:11 AM CEST Vivek Goyal wrote:
+> > > > 
+> > > > /proc/devicetree (aka /sys/firmware/devicetree) is a filesystem derived
+> > > > from the raw DTB (which is exposed at /sys/firmware/fdt).
+> > > > 
+> > > > The blob that was handed to the kernel at boot time is exposed at
+> > > > /sys/firmware/fdt.
+> > > 
+> > > I believe the blob can be read and passed to kexec kernel in kernel code without
+> > > the extra fd.
+> > > 
+> > > But consider we can kexec to a different kernel and a different initrd so there
+> > > will be use cases to pass a total different dtb as well. From my understanding
+> > > it is reasonable but yes I think we should think carefully about the design.
+> > 
+> > Ok, I can see four interesting use cases here:
+> > 
+> > - Using the dtb that the kernel has saved at boot time. Ideally this should not
+> >   require an additional step of signing it, since the running kernel already
+> >   trusts it.
 > 
-> >> I *THINK* the view of the device core maintainers is that udev
-> >> and sysfs hierarchies should be used to uniquely identify a certain
-> >> device, and that relying on device numbering is too fragile.
-> >
-> > I thought the whole idea (or at least a large part of) the new
-> > user-space interface was to allow lookups by line names precisely in
-> > order not to have to rely on gpio numbers, which may not only change
-> > between boots, but also between hardware revisions, etc.
-> 
-> That is true for the individual pins, but not the device names.
-> Devices are just names gpiochipN where N is the instance
-> number. Topological info on the device can be found in sysfs.
-> 
-> The discussion here pertaining to the new chardev is just about
-> the intuitiveness of the number N, whether it should be
-> "whatever" or something predictable.
-> 
-> For the purpose of picking a certain named GPIO line (see below)
-> knowing this number is unnecessary. To that mechanism all gpio
-> chips are equal and the instance number does not matter.
+> We have sufficient information from the existing kexec_file_load syscall
+> prototype to do this in-kernel.
 
-My point was that with gpio line names (and possibly topological
-information to resolve duplicates), the N number should not matter
-anymore.
+Ok.
 
-[ It was also a comment to a comment made earlier in the thread were the
-use case was said to be to "control GPIO48 with /sys/class/gpio/gpio48".
-And it seems we are in agreement there. ]
-
-If one needs to look up a particular gpiochip based on some hardware
-naming convention, why not associate a name with the chip instead of
-trying to shoehorn the dynamic gpiochip range in there?
-
-> > What's wrong with naming the pins in DT and use that for lookups?
+> > - A dtb blob from the file system that was produced along with the kernel image.
+> >   If we require a signature on the kernel, the the same requirement should be
+> >   made on the dtb. Whoever signs the kernel can also sign the dtb.
+> >   The tricky part here is the kernel command line that is part of the dtb
+> >   and that may need to be modified.
 > 
-> That works. It relies on the developers using sane naming conventions
-> though. (This problem is prevalent everywhere I guess, a human problem,
-> not a technical one.) I made this patch:
-> http://marc.info/?l=linux-arm-kernel&m=146672328215354&w=2
-> 
-> There is a standard document for these boards (96board) specifying
-> the names of the GPIO lines to be "GPIO-A" thru "GPIO-L".
-> 
-> So a user can iterate across the gpiochips (as is done in lsgpio)
-> and pick the lines with the right names.
-> 
-> This works fine, given you have such conventions or equal.
-> 
-> I.e. the person writing the DTS file naming the lines must not
-> be a complete lunatic.
+> I suspect that for this case, following the example of the existing
+> sycall, we'd allow the kernel to modify bootargs and initrd properties
+> after verfiying the signature of the DTB.
 
-Again, it seems we're on the same page here.
+Makes sense.
+ 
+> The big question is whether this is a realistic case on a secure boot
+> system.
 
-> I can think of scenarios where bad use can make things problematic:
-> i.e. name two lines the same thing, albeit on different GPIO chips.
-> That is currently allowed, and if that happens, the user must
-> use topological information about the gpiochip (from sysfs) to
-> uniquely identify the GPIO line.
+What does x86 do here? I assume changes to the command line are also
+limited.
+
+> > - Modifying the dtb at for any of the reasons I listed: This should always
+> >   be possible when we do not use secure boot, just like booting an unsigned
+> >   kernel is.
 > 
-> I wouldn't recommend that since it is essentially inventing a
-> problem for oneself to solve, but I don't know what reasons
-> people may have to do something like that. There is no technical
-> problem with it.
+> This is possible with the existing kexec_load syscall, for the non
+> secure boot case.
 
-And this may even be unavoidable with dynamic buses such as USB or
-greybus, where you can have multiple devices associating the same name
-with a pin. That's fine as long as the user-space interface allows for a
-way to distinguish them (e.g. through topological information).
+Ok, let's skip that then.
 
-Thanks,
-Johan
+> > - kboot/petitboot with all of the user space being part of the trusted boot
+> >   chain: it would be good to allow these to modify the dtb as needed without
+> >   breaking the trust chain, just like we allow grub or u-boot to modify the dtb
+> >   before passing it to the kernel.
+> 
+> It depends on *what* we need to modify here. We can modify the bootargs
+> and initrd properties as part of the kexec_file_load syscall, so what
+> else would we want to alter?
+
+I guess petitboot can also just use kexec_load() instead of kexec_file_load(),
+as long as the initramfs containing petitboot is trusted by the kernel.
+
+	Arnd
