@@ -1,55 +1,94 @@
-From: pochun.lin@mediatek.com (pochun lin)
-Date: Wed, 13 Jul 2016 21:22:35 +0800
-Subject: [PATCH v2] [media] mtk-vcodec: fix more type mismatches
-In-Reply-To: <9022784.B8ChAA686D@wuerfel>
-References: <20160713084916.2765651-1-arnd@arndb.de>
- <1468407163.3555.1.camel@mtksdaap41> <9022784.B8ChAA686D@wuerfel>
-Message-ID: <1468416155.20788.2.camel@mtksdaap41>
+From: vgoyal@redhat.com (Vivek Goyal)
+Date: Wed, 13 Jul 2016 09:25:35 -0400
+Subject: [RFC 0/3] extend kexec_file_load system call
+In-Reply-To: <87a8hmpgp8.fsf@linux.vnet.ibm.com>
+References: <20160712014201.11456-1-takahiro.akashi@linaro.org>
+ <87furf7ztv.fsf@x220.int.ebiederm.org> <50662781.Utjsnse3nb@hactar>
+ <20160712225805.0d27fe5d@hananiah.suse.cz>
+ <87a8hmpgp8.fsf@linux.vnet.ibm.com>
+Message-ID: <20160713132535.GC16900@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On Wed, Jul 13, 2016 at 09:41:39AM +1000, Stewart Smith wrote:
+> Petr Tesarik <ptesarik@suse.cz> writes:
+> > On Tue, 12 Jul 2016 13:25:11 -0300
+> > Thiago Jung Bauermann <bauerman@linux.vnet.ibm.com> wrote:
+> >
+> >> Hi Eric,
+> >> 
+> >> I'm trying to understand your concerns leading to your nack. I hope you 
+> >> don't mind expanding your thoughts on them a bit.
+> >> 
+> >> Am Dienstag, 12 Juli 2016, 08:25:48 schrieb Eric W. Biederman:
+> >> > AKASHI Takahiro <takahiro.akashi@linaro.org> writes:
+> >> > > Device tree blob must be passed to a second kernel on DTB-capable
+> >> > > archs, like powerpc and arm64, but the current kernel interface
+> >> > > lacks this support.
+> >> > > 
+> >> > > This patch extends kexec_file_load system call by adding an extra
+> >> > > argument to this syscall so that an arbitrary number of file descriptors
+> >> > > can be handed out from user space to the kernel.
+> >> > > 
+> >> > > See the background [1].
+> >> > > 
+> >> > > Please note that the new interface looks quite similar to the current
+> >> > > system call, but that it won't always mean that it provides the "binary
+> >> > > compatibility."
+> >> > > 
+> >> > > [1] http://lists.infradead.org/pipermail/kexec/2016-June/016276.html
+> >> > 
+> >> > So this design is wrong.  The kernel already has the device tree blob,
+> >> > you should not be extracting it from the kernel munging it, and then
+> >> > reinserting it in the kernel if you want signatures and everything to
+> >> > pass.
+> >> 
+> >> I don't understand how the kernel signature will be invalidated. 
+> >> 
+> >> There are some types of boot images that can embed a device tree blob in 
+> >> them, but the kernel can also be handed a separate device tree blob from 
+> >> firmware, the boot loader, or kexec. This latter case is what we are 
+> >> discussing, so we are not talking about modifying an embedded blob in the 
+> >> kernel image.
+> >> 
+> >> > What x86 does is pass it's equivalent of the device tree blob from one
+> >> > kernel to another directly and behind the scenes.  It does not go
+> >> > through userspace for this.
+> >> > 
+> >> > Until a persuasive case can be made for going around the kernel and
+> >> > probably adding a feature (like code execution) that can be used to
+> >> > defeat the signature scheme I am going to nack this.
+> >> 
+> >> I also don't understand what you mean by code execution. How does passing a 
+> >> device tree blob via kexec enables code execution? How can the signature 
+> >> scheme be defeated?
+> >
+> > I'm not an expert on DTB, so I can't provide an example of code
+> > execution, but you have already mentioned the /chosen/linux,stdout-path
+> > property. If an attacker redirects the bootloader to an insecure
+> > console, they may get access to the system that would otherwise be
+> > impossible.
+> 
+> In this case, the user is sitting at the (or one of the) console(s) of
+> the machine. There could be petitboot UIs running on the VGA display,
+> IPMI serial over lan, local serial port. The logic behind setting
+> /chosen/linux,stdout-path is (currently) mostly to set it for the kernel
+> to what the user is interacting with. i.e. if you select an OS installer
+> to boot from the VGA console, you get a graphical installer running and
+> if you selected it from a text console, you get a text installer running
+> (on the appropriate console).
+> 
+> So the bootloader (petitboot) needs to work out which console is being
+> interacted with in order to set up /chosen/linux,stdout-path correctly.
+> 
+> This specific option could be passed as a kernel command line to the
+> next kernel, yes. However, isn't the kernel command line also an attack
+> vector? Is *every* command line option safe?
 
-On Wed, 2016-07-13 at 15:17 +0200, Arnd Bergmann wrote:
-> On Wednesday, July 13, 2016 6:52:43 PM CEST pochun lin wrote:
-> > > diff --git a/drivers/media/platform/mtk-vcodec/venc/venc_h264_if.c b/drivers/media/platform/mtk-vcodec/venc/venc_h264_if.c
-> > > index f4e18bb44cb9..9a600525b3c1 100644
-> > > --- a/drivers/media/platform/mtk-vcodec/venc/venc_h264_if.c
-> > > +++ b/drivers/media/platform/mtk-vcodec/venc/venc_h264_if.c
-> > > @@ -295,9 +295,9 @@ static int h264_enc_alloc_work_buf(struct venc_h264_inst *inst)
-> > >               wb[i].iova = inst->work_bufs[i].dma_addr;
-> > >  
-> > >               mtk_vcodec_debug(inst,
-> > > -                              "work_buf[%d] va=0x%p iova=0x%p size=%zu",
-> > > +                              "work_buf[%d] va=0x%p iova=%pad size=%zu",
-> > >                                i, inst->work_bufs[i].va,
-> > > -                              (void *)inst->work_bufs[i].dma_addr,
-> > > +                              &inst->work_bufs[i].dma_addr,
-> > >                                inst->work_bufs[i].size);
-> > >       }
-> > >  
-> > 
-> > This modified will dump dma_addr's address, not dma_addr value.
-> > In actually, we need to dump dma_addr value.
-> 
-> According to Documentation/printk-formats.txt, it gets passed by
-> reference:
-> 
-> | DMA addresses types dma_addr_t:
-> |
-> |        %pad    0x01234567 or 0x0123456789abcdef
-> |
-> |        For printing a dma_addr_t type which can vary based on build options,
-> |        regardless of the width of the CPU data path. Passed by reference.
-> 
-> The whole point of the %pad/%pr/%pM/... format strings is to print
-> something that cannot be passed by value because the type is not
-> a fixed-size integer.
-> 
-> 	Arnd
+I don't think kernel command line is signed. And we will have to define
+what is considered *unsafe*. I am working on the assumption that a
+user should not be able to force execution of unsigned code at provileged
+level. And passing console on kernel command line should be safe in
+that respect?
 
-Got it. And sorry I was wrong.
-Thanks your explain clearly.
-
-Best Regards
-PoChun
+Vivek
