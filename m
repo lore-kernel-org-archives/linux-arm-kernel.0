@@ -1,73 +1,50 @@
-From: pochun.lin@mediatek.com (pochun lin)
-Date: Wed, 13 Jul 2016 18:52:43 +0800
-Subject: [PATCH v2] [media] mtk-vcodec: fix more type mismatches
-In-Reply-To: <20160713084916.2765651-1-arnd@arndb.de>
-References: <20160713084916.2765651-1-arnd@arndb.de>
-Message-ID: <1468407163.3555.1.camel@mtksdaap41>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Wed, 13 Jul 2016 12:59:23 +0200
+Subject: [RESEND PATCH] arm: assabet_defconfig: disable IDE subsystem
+In-Reply-To: <2773873.Jjn1O47GXr@wuerfel>
+References: <1467991490-24895-1-git-send-email-b.zolnierkie@samsung.com>
+ <2773873.Jjn1O47GXr@wuerfel>
+Message-ID: <4818149.nzRaU7vJQE@amdc1976>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
 
-On Wed, 2016-07-13 at 10:47 +0200, Arnd Bergmann wrote:
-> The newly added mtk-vcodec driver produces a number of warnings in an ARM
-> allmodconfig build, mainly since it assumes that dma_addr_t is 32-bit wide:
+Hi,
+
+On Friday, July 08, 2016 10:23:48 PM Arnd Bergmann wrote:
+> On Friday, July 8, 2016 5:24:41 PM CEST Bartlomiej Zolnierkiewicz wrote:
+> > This patch disables deprecated IDE subsystem in assabet_defconfig
+> > (no IDE host drivers are selected in this config so there is no
+> > valid reason to enable IDE subsystem itself).
+> > 
+> > Cc: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+> > Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 > 
-> mtk-vcodec/venc/venc_vp8_if.c: In function 'vp8_enc_alloc_work_buf':
-> mtk-vcodec/venc/venc_vp8_if.c:212:191: error: cast to pointer from integer of different size [-Werror=int-to-pointer-cast]
-> mtk-vcodec/venc/venc_h264_if.c: In function 'h264_enc_alloc_work_buf':
-> mtk-vcodec/venc/venc_h264_if.c:297:190: error: cast to pointer from integer of different size [-Werror=int-to-pointer-cast]
-> 
-> This rearranges the format strings and type casts to what they should have been
-> in order to avoid the warnings. e0f80d8d62f5 ("[media] mtk-vcodec: fix two compiler
-> warnings") fixed some of the problems that were introduced at the same time, but
-> missed two others.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
->  drivers/media/platform/mtk-vcodec/venc/venc_h264_if.c | 4 ++--
->  drivers/media/platform/mtk-vcodec/venc/venc_vp8_if.c  | 4 ++--
->  2 files changed, 4 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/media/platform/mtk-vcodec/venc/venc_h264_if.c b/drivers/media/platform/mtk-vcodec/venc/venc_h264_if.c
-> index f4e18bb44cb9..9a600525b3c1 100644
-> --- a/drivers/media/platform/mtk-vcodec/venc/venc_h264_if.c
-> +++ b/drivers/media/platform/mtk-vcodec/venc/venc_h264_if.c
-> @@ -295,9 +295,9 @@ static int h264_enc_alloc_work_buf(struct venc_h264_inst *inst)
->  		wb[i].iova = inst->work_bufs[i].dma_addr;
->  
->  		mtk_vcodec_debug(inst,
-> -				 "work_buf[%d] va=0x%p iova=0x%p size=%zu",
-> +				 "work_buf[%d] va=0x%p iova=%pad size=%zu",
->  				 i, inst->work_bufs[i].va,
-> -				 (void *)inst->work_bufs[i].dma_addr,
-> +				 &inst->work_bufs[i].dma_addr,
->  				 inst->work_bufs[i].size);
->  	}
->  
+> I think the series makes a lot of sense. I have checked your assertions
+> in the changelogs and found no flaws in your logic, so I think we should
+> take them all through arm-soc unless there are other concerns.
 
-This modified will dump dma_addr's address, not dma_addr value.
-In actually, we need to dump dma_addr value.
-Thanks.
+Thank you.
 
-> diff --git a/drivers/media/platform/mtk-vcodec/venc/venc_vp8_if.c b/drivers/media/platform/mtk-vcodec/venc/venc_vp8_if.c
-> index 5b4ef0f1740c..60bbcd2a0510 100644
-> --- a/drivers/media/platform/mtk-vcodec/venc/venc_vp8_if.c
-> +++ b/drivers/media/platform/mtk-vcodec/venc/venc_vp8_if.c
-> @@ -210,9 +210,9 @@ static int vp8_enc_alloc_work_buf(struct venc_vp8_inst *inst)
->  		wb[i].iova = inst->work_bufs[i].dma_addr;
->  
->  		mtk_vcodec_debug(inst,
-> -				 "work_bufs[%d] va=0x%p,iova=0x%p,size=%zu",
-> +				 "work_bufs[%d] va=0x%p,iova=%pad,size=%zu",
->  				 i, inst->work_bufs[i].va,
-> -				 (void *)inst->work_bufs[i].dma_addr,
-> +				 &inst->work_bufs[i].dma_addr,
->  				 inst->work_bufs[i].size);
->  	}
->  
+Should I resend everything or just patches that were not reposted yet
+(the ones that were marked as RFT initially and got no feedback)?
 
-The same as above.
+> Do you have a list of ARM defconfigs that keep using CONFIG_IDE and
+> how you determined that they need it?
 
-Best Regards
-PoChun
+The only such defconfig is davinci_all_defconfig which uses
+palm_bk3710 host driver (CONFIG_BLK_DEV_PALMCHIP_BK3710).
+
+> I know that ARCH_RPC/ARCH_ACORN has a couple of special drivers that
+> have no libata replacement, are there any others like that, or are
+> they all platforms that should in theory work with libata but need
+> testing?
+
+All platforms except ARCH_ACORN, ARCH_DAVINCI & ARCH_RPC should work
+with libata.
+
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
