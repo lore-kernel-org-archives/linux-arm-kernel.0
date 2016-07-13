@@ -1,71 +1,55 @@
 From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 13 Jul 2016 18:40:10 +0100
-Subject: [RFC 0/3] extend kexec_file_load system call
-In-Reply-To: <20160713130338.GB16900@redhat.com>
-References: <20160712014201.11456-1-takahiro.akashi@linaro.org>
- <87furf7ztv.fsf@x220.int.ebiederm.org> <50662781.Utjsnse3nb@hactar>
- <20160712225805.0d27fe5d@hananiah.suse.cz>
- <20160712221804.GV1041@n2100.armlinux.org.uk>
- <87twfunneg.fsf@linux.vnet.ibm.com>
- <20160713073657.GX1041@n2100.armlinux.org.uk>
- <87poqinf9m.fsf@linux.vnet.ibm.com>
- <20160713082639.GZ1041@n2100.armlinux.org.uk>
- <20160713130338.GB16900@redhat.com>
-Message-ID: <20160713174009.GA1041@n2100.armlinux.org.uk>
+Date: Wed, 13 Jul 2016 18:45:12 +0100
+Subject: [RESEND PATCH] arm: assabet_defconfig: disable IDE subsystem
+In-Reply-To: <4264651.gPKphdYuCx@wuerfel>
+References: <1467991490-24895-1-git-send-email-b.zolnierkie@samsung.com>
+ <2773873.Jjn1O47GXr@wuerfel> <4818149.nzRaU7vJQE@amdc1976>
+ <4264651.gPKphdYuCx@wuerfel>
+Message-ID: <20160713174512.GB1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 13, 2016 at 09:03:38AM -0400, Vivek Goyal wrote:
-> On Wed, Jul 13, 2016 at 09:26:39AM +0100, Russell King - ARM Linux wrote:
-> > Indeed - maybe Eric knows better, but I can't see any situation where
-> > the dtb we load via kexec should ever affect "the bootloader", unless
-> > the "kernel" that's being loaded into kexec is "the bootloader".
+On Wed, Jul 13, 2016 at 04:37:31PM +0200, Arnd Bergmann wrote:
+> On Wednesday, July 13, 2016 12:59:23 PM CEST Bartlomiej Zolnierkiewicz wrote:
 > > 
-> > Now, going back to the more fundamental issue raised in my first reply,
-> > about the kernel command line.
+> > On Friday, July 08, 2016 10:23:48 PM Arnd Bergmann wrote:
+> > > On Friday, July 8, 2016 5:24:41 PM CEST Bartlomiej Zolnierkiewicz wrote:
+> > > > This patch disables deprecated IDE subsystem in assabet_defconfig
+> > > > (no IDE host drivers are selected in this config so there is no
+> > > > valid reason to enable IDE subsystem itself).
+> > > > 
+> > > > Cc: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+> > > > Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> > > 
+> > > I think the series makes a lot of sense. I have checked your assertions
+> > > in the changelogs and found no flaws in your logic, so I think we should
+> > > take them all through arm-soc unless there are other concerns.
 > > 
-> > On x86, I can see that it _is_ possible for userspace to specify a
-> > command line, and the kernel loading the image provides the command
-> > line to the to-be-kexeced kernel with very little checking.  So, if
-> > your kernel is signed, what stops the "insecure userspace" loading
-> > a signed kernel but giving it an insecure rootfs and/or console?
+> > Thank you.
+> > 
+> > Should I resend everything or just patches that were not reposted yet
+> > (the ones that were marked as RFT initially and got no feedback)?
 > 
-> It is not kexec specific. I could do this for regular boot too, right?
-> 
-> Command line options are not signed. I thought idea behind secureboot
-> was to execute only trusted code and command line options don't enforce
-> you to execute unsigned code.
-> 
-> So it sounds like different class of security problems which you are
-> referring to and not necessarily covered by secureboot or signed
-> kernel.
+> I'd be fine with just getting a pull request with all the patches that
+> had no negative feedback and that were not already applied (if any).
 
-Let me give you an example.
+I'd actually say be very careful about this - there's a big difference
+between the ATA subsystem and IDE subsystem.  I've had situations with
+old platforms where stuff works with IDE and not ATA.
 
-You have a secure boot setup, where the firmware/ROM validates the boot
-loader.  Good, the boot loader hasn't been tampered with.
+For example, using the CY82C693 driver used to work with the IDE
+subsystem before it got broken on ARM systems with DMA disabled (because
+the CY82C693 deadlocks the PCI bus on any BM-DMA).  From what I remember,
+ATA provided no easy way to disable DMA on such interfaces.
 
-You interrupt the boot loader and are able to modify the command line
-for the booted kernel.
+I also looked at using ATA on EBSA110, and it was far from trivial due
+to munged address lines and access size problems: with IDE, it was
+easy to work around by redirecting the in*/out* appropriately on a
+per-driver basis.  I forget exactly why ATA didn't work, but it didn't
+and I came to the conclusion that it was not feasible to fix.
 
-The boot loader loads the kernel and verifies the kernel's signature.
-Good, the kernel hasn't been tampered with.  The kernel starts running.
-
-You've plugged in a USB drive to the device, and specified a partition
-containing a root filesystem that you control to the kernel.  The
-validated kernel finds the USB drive, and mounts it, and executes
-your own binaries on the USB drive.
-
-You run a shell on the console.  You now have control of the system,
-and can mount the real rootfs, inspect it, and work out what it does,
-etc.
-
-At this point, what use was all the validation that the secure boot
-has done?  Absolutely useless.
-
-If you can change the command line arguments given to the kernel, you
-have no security, no matter how much you verify signatures.  It's
-the illusion of security, nothing more, nothing less.
+So, please don't assume that ATA can be simply slotted in instead of
+IDE.
 
 -- 
 RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
