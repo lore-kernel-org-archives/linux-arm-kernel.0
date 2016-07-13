@@ -1,62 +1,113 @@
-From: tiffany.lin@mediatek.com (tiffany lin)
-Date: Wed, 13 Jul 2016 21:55:21 +0800
-Subject: [PATCH] [media] mtk-vcodec: fix type mismatches
-In-Reply-To: <4915511.9pXBipIRF8@wuerfel>
-References: <20160711213959.2481081-1-arnd@arndb.de>
- <1468403786.32454.16.camel@mtksdaap41> <4915511.9pXBipIRF8@wuerfel>
-Message-ID: <1468418121.32454.19.camel@mtksdaap41>
+From: nicolas@ndufresne.ca (Nicolas Dufresne)
+Date: Wed, 13 Jul 2016 09:55:57 -0400
+Subject: [PATCH v3 3/9] DocBook/v4l: Add compressed video formats used
+ on MT8173 codec driver
+In-Reply-To: <1468375209.2462.20.camel@mtksdaap41>
+References: <1464611363-14936-1-git-send-email-tiffany.lin@mediatek.com>
+ <1464611363-14936-2-git-send-email-tiffany.lin@mediatek.com>
+ <1464611363-14936-3-git-send-email-tiffany.lin@mediatek.com>
+ <1464611363-14936-4-git-send-email-tiffany.lin@mediatek.com>
+ <5a793171-24a7-4e9e-8bfd-f668c789f8e0@xs4all.nl>
+ <1468205771.3725.8.camel@mtksdaap41>
+ <CAOMLVLiZU3D587dSyp2b2v4DV+MS9vh85bA4BoG7ddK6556rbA@mail.gmail.com>
+ <1468350511.8843.16.camel@gmail.com> <1468350842.8843.18.camel@gmail.com>
+ <1468375209.2462.20.camel@mtksdaap41>
+Message-ID: <1468418157.2867.12.camel@ndufresne.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
-
-On Wed, 2016-07-13 at 15:08 +0200, Arnd Bergmann wrote:
-> On Wednesday, July 13, 2016 5:56:26 PM CEST tiffany lin wrote:
-> > > diff --git a/drivers/media/platform/mtk-vcodec/mtk_vcodec_enc.c b/drivers/media/platform/mtk-vcodec/mtk_vcodec_enc.c
-> > > index 6dcae0a0a1f2..0b25a8700877 100644
-> > > --- a/drivers/media/platform/mtk-vcodec/mtk_vcodec_enc.c
-> > > +++ b/drivers/media/platform/mtk-vcodec/mtk_vcodec_enc.c
-> > > @@ -1028,15 +1028,15 @@ static void mtk_venc_worker(struct work_struct *work)
-> > >       bs_buf.size = (size_t)dst_buf->planes[0].length;
-> > >  
-> > >       mtk_v4l2_debug(2,
-> > > -                     "Framebuf VA=%p PA=%llx Size=0x%lx;VA=%p PA=0x%llx Size=0x%lx;VA=%p PA=0x%llx Size=%zu",
-> > > +                     "Framebuf VA=%p PA=%pad Size=0x%zx;VA=%p PA=%pad Size=0x%zx;VA=%p PA=%pad Size=0x%zx",
-> > >                       frm_buf.fb_addr[0].va,
-> > > -                     (u64)frm_buf.fb_addr[0].dma_addr,
-> > > +                     &frm_buf.fb_addr[0].dma_addr,
-> > >                       frm_buf.fb_addr[0].size,
-> > >                       frm_buf.fb_addr[1].va,
-> > > -                     (u64)frm_buf.fb_addr[1].dma_addr,
-> > > +                     &frm_buf.fb_addr[1].dma_addr,
-> > >                       frm_buf.fb_addr[1].size,
-> > >                       frm_buf.fb_addr[2].va,
-> > > -                     (u64)frm_buf.fb_addr[2].dma_addr,
-> > > +                     &frm_buf.fb_addr[2].dma_addr,
-> > >                       frm_buf.fb_addr[2].size);
-> > This change will make debug message dump address of dma_addr field but
-> > not the value of the dma_addr we want.
-> > How about change it from
-> > PA=%llx -> PA=%u
-> > (u64)frm_buf.fb_addr[0].dma_addr -> (u32)frm_buf.fb_addr[0].dma_addr,
-> > 
+Le mercredi 13 juillet 2016 ? 10:00 +0800, tiffany lin a ?crit?:
+> Hi Nicolas,
 > 
-> The %llx works fine with the cast to u64, the change above is mainly for the "%lx"
-> on a size_t causing a warning.
-> 
-> The change to %pad is done in order to use a consistent output for the
-> dma_addr_t, which had a leading "0x" in two cases but not in the first
-> one.
-> 
-> printk interprets %pad as a pointer to a dma_addr_t and prints the
-> address, not the pointer to it, see Documentation/printk-formats.txt,
-> which lets you avoid the type cast as well as the 0x.
-> 
-I understood now, I will check Documentation/printk-formats.txt.
-Thanks for your explanation.
+> On Tue, 2016-07-12 at 15:14 -0400, Nicolas Dufresne wrote:
+> > Le mardi 12 juillet 2016 ? 15:08 -0400, Nicolas Dufresne a ?crit :
+> > > Le mardi 12 juillet 2016 ? 16:16 +0800, Wu-Cheng Li (???) a ?crit
+> :
+> > > > Decoder hardware produces MT21 (compressed). Image processor
+> can
+> > > > convert it to a format that can be input of display driver.
+> > > > Tiffany.
+> > > > When do you plan to upstream image processor (mtk-mdp)?
+> > > > >?
+> > > > > It can be as input format for encoder, MDP and display
+> drivers in
+> > > > our
+> > > > > platform.
+> > > > I remember display driver can only accept uncompressed MT21.
+> Right?
+> > > > Basically V4L2_PIX_FMT_MT21 is compressed and is like an opaque
+> > > > format. It's not usable until it's decompressed and converted
+> by
+> > > > image
+> > > > processor.
+> > >?
+> > > Previously it was described as MediaTek block mode, and now as a
+> > > MediaTek compressed format. It makes me think you have no idea
+> what
+> > > this pixel format really is. Is that right ?
+> > >?
+> > > The main reason why I keep asking, is that we often find
+> similarities
+> > > between what vendor like to call their proprietary formats. Doing
+> the
+> > > proper research helps not creating a mess like in Android where
+> you
+> > > have a lot of formats that all point to the same format. I
+> believe
+> > > there was the same concern when Samsung wanted to introduce their
+> Z-
+> > > flip-Z NV12 tile format. In the end they simply provided
+> sufficient
+> > > documentation so we could document it and implement software
+> > > converters
+> > > for test and validation purpose.
+> >?
+> > Here's the kind of information we want in the documentation.
+> >?
+> > https://chromium.googlesource.com/chromium/src/media/+/master/base/
+> vide
+> > o_types.h#40
+> >?
+> >?? // MediaTek proprietary format. MT21 is similar to NV21 except
+> the memory
+> >?? // layout and pixel layout (swizzles). 12bpp with Y plane
+> followed by a 2x2
+> >?? // interleaved VU plane. Each image contains two buffers -- Y
+> plane and VU
+> >?? // plane. Two planes can be non-contiguous in memory. The
+> starting addresses
+> >?? // of Y plane and VU plane are 4KB alignment.
+> >?? // Suppose image dimension is (width, height). For both Y plane
+> and VU plane:
+> >?? // Row pitch = ((width+15)/16) * 16.
+> >?? // Plane size = Row pitch * (((height+31)/32)*32)
+> >?
+> > Now obviously this is incomplete, as the swizzling need to be
+> documented of course.
+> >?
+> Because it's finally a compressed format from our codec hw, we cannot
+> describe its swizzling.
 
+Can you clarify why it cannot be described ? I don't buy any argument
+that it's impossible to convert without hardware. Intel did document
+their compressed formats.
 
-best regards,
-Tiffany
+Debugging an integration with such format that we have literally
+decided to no make public is a pain. A lot of decoder got abandoned or
+never used because of that.
 
-> 	Arnd
+It would be nice to explain the architecture you are suggesting to make
+this decoder useful. How will userspace application be able to use your
+decoder. Will the image processor usable outside the display path ?
+People might want to do transcoding, or other relatively common task
+that does not imply a display.
+
+regards,
+Nicolas
+
+p.s.
+A small note to Wu-Cheng, the definition of the DRM format in your
+Chromium branch is not correct. DRM uses format modifier, such that the
+format is the family, in your case it's most likely NV21, and the
+modifier is the compression or tiling algorithm in place (or both as
+needed).
