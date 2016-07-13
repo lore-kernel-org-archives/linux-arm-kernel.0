@@ -1,80 +1,93 @@
 From: anna-maria@linutronix.de (Anna-Maria Gleixner)
-Date: Wed, 13 Jul 2016 17:16:08 -0000
-Subject: [patch V2 08/67] ARM: mvebu: Convert to hotplug state machine
+Date: Wed, 13 Jul 2016 17:16:35 -0000
+Subject: [patch V2 34/67] arm: Convert VFP hotplug notifiers to state machine
 References: <20160713153219.128052238@linutronix.de>
-Message-ID: <20160713153333.503198935@linutronix.de>
+Message-ID: <20160713153335.713612993@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+From: Thomas Gleixner <tglx@linutronix.de>
 
-Install the callbacks via the state machine.
+Straight forward conversion plus commentary why code which is executed
+in hotplug callbacks needs to be invoked before installing them.
 
-Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
-Cc: Andrew Lunn <andrew@lunn.ch>
-Cc: Gregory Clement <gregory.clement@free-electrons.com>
-Cc: Jason Cooper <jason@lakedaemon.net>
+Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+Reviewed-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Cc: Linus Torvalds <torvalds@linux-foundation.org>
 Cc: Peter Zijlstra <peterz@infradead.org>
-Cc: Russell King <linux@armlinux.org.uk>
-Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Russell King <linux@arm.linux.org.uk>
 Cc: linux-arm-kernel at lists.infradead.org
 Signed-off-by: Anna-Maria Gleixner <anna-maria@linutronix.de>
 ---
- arch/arm/mach-mvebu/coherency.c | 19 ++++++-------------
- include/linux/cpuhotplug.h      |  1 +
- 2 files changed, 7 insertions(+), 13 deletions(-)
+ arch/arm/vfp/vfpmodule.c   | 28 +++++++++++++++++-----------
+ include/linux/cpuhotplug.h |  1 +
+ 2 files changed, 18 insertions(+), 11 deletions(-)
 
-diff --git a/arch/arm/mach-mvebu/coherency.c b/arch/arm/mach-mvebu/coherency.c
-index 7e989d6..77aaa52 100644
---- a/arch/arm/mach-mvebu/coherency.c
-+++ b/arch/arm/mach-mvebu/coherency.c
-@@ -111,20 +111,12 @@ static struct notifier_block mvebu_hwcc_pci_nb __maybe_unused = {
- 	.notifier_call = mvebu_hwcc_notifier,
- };
- 
--static int armada_xp_clear_shared_l2_notifier_func(struct notifier_block *nfb,
--					unsigned long action, void *hcpu)
-+static int armada_xp_clear_l2_starting(unsigned int cpu)
+diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
+index 73085d3..da0b33d 100644
+--- a/arch/arm/vfp/vfpmodule.c
++++ b/arch/arm/vfp/vfpmodule.c
+@@ -643,19 +643,19 @@ int vfp_restore_user_hwstate(struct user_vfp __user *ufp,
+  * hardware state at every thread switch.  We clear our held state when
+  * a CPU has been killed, indicating that the VFP hardware doesn't contain
+  * a threads VFP state.  When a CPU starts up, we re-enable access to the
+- * VFP hardware.
+- *
+- * Both CPU_DYING and CPU_STARTING are called on the CPU which
++ * VFP hardware. The callbacks below are called on the CPU which
+  * is being offlined/onlined.
+  */
+-static int vfp_hotplug(struct notifier_block *b, unsigned long action,
+-	void *hcpu)
++static int vfp_dying_cpu(unsigned int cpu)
  {
--	if (action == CPU_STARTING || action == CPU_STARTING_FROZEN)
--		armada_xp_clear_shared_l2();
--
+-	if (action == CPU_DYING || action == CPU_DYING_FROZEN)
+-		vfp_current_hw_state[(long)hcpu] = NULL;
+-	else if (action == CPU_STARTING || action == CPU_STARTING_FROZEN)
+-		vfp_enable(NULL);
 -	return NOTIFY_OK;
-+	armada_xp_clear_shared_l2();
++	vfp_force_reload(cpu, current_thread_info());
++	return 0;
++}
++
++static int vfp_starting_cpu(unsigned int unused)
++{
++	vfp_enable(NULL);
 +	return 0;
  }
  
--static struct notifier_block armada_xp_clear_shared_l2_notifier = {
--	.notifier_call = armada_xp_clear_shared_l2_notifier_func,
--	.priority = 100,
--};
--
- static void __init armada_370_coherency_init(struct device_node *np)
- {
- 	struct resource res;
-@@ -155,8 +147,9 @@ static void __init armada_370_coherency_init(struct device_node *np)
+ void vfp_kmode_exception(void)
+@@ -732,6 +732,10 @@ static int __init vfp_init(void)
+ 	unsigned int vfpsid;
+ 	unsigned int cpu_arch = cpu_architecture();
  
- 	of_node_put(cpu_config_np);
++	/*
++	 * Enable the access to the VFP on all online CPUs so the
++	 * following test on FPSID will succeed.
++	 */
+ 	if (cpu_arch >= CPU_ARCH_ARMv6)
+ 		on_each_cpu(vfp_enable, NULL, 1);
  
--	register_cpu_notifier(&armada_xp_clear_shared_l2_notifier);
--
-+	cpuhp_setup_state_nocalls(CPUHP_AP_ARM_MVEBU_COHERENCY,
-+				  "AP_ARM_MVEBU_COHERENCY",
-+				  armada_xp_clear_l2_starting, NULL);
- exit:
- 	set_cpu_coherent();
- }
+@@ -794,7 +798,9 @@ static int __init vfp_init(void)
+ 		VFP_arch = (vfpsid & FPSID_ARCH_MASK) >> FPSID_ARCH_BIT;
+ 	}
+ 
+-	hotcpu_notifier(vfp_hotplug, 0);
++	cpuhp_setup_state_nocalls(CPUHP_AP_ARM_VFP_STARTING,
++				  "AP_ARM_VFP_STARTING", vfp_starting_cpu,
++				  vfp_dying_cpu);
+ 
+ 	vfp_vector = vfp_support_entry;
+ 
 diff --git a/include/linux/cpuhotplug.h b/include/linux/cpuhotplug.h
-index 420cfcf..d769ec9 100644
+index e8d1b84..2e227b6 100644
 --- a/include/linux/cpuhotplug.h
 +++ b/include/linux/cpuhotplug.h
-@@ -15,6 +15,7 @@ enum cpuhp_state {
- 	CPUHP_AP_IRQ_ARMADA_XP_STARTING,
- 	CPUHP_AP_IRQ_ARMADA_CASC_STARTING,
- 	CPUHP_AP_IRQ_BCM2836_STARTING,
-+	CPUHP_AP_ARM_MVEBU_COHERENCY,
+@@ -35,6 +35,7 @@ enum cpuhp_state {
+ 	CPUHP_AP_PERF_X86_CQM_STARTING,
+ 	CPUHP_AP_PERF_X86_CSTATE_STARTING,
+ 	CPUHP_AP_PERF_XTENSA_STARTING,
++	CPUHP_AP_ARM_VFP_STARTING,
  	CPUHP_AP_NOTIFY_STARTING,
  	CPUHP_AP_ONLINE,
  	CPUHP_TEARDOWN_CPU,
