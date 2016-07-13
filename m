@@ -1,67 +1,25 @@
-From: stewart@linux.vnet.ibm.com (Stewart Smith)
-Date: Wed, 13 Jul 2016 17:55:33 +1000
-Subject: [RFC 0/3] extend kexec_file_load system call
-In-Reply-To: <20160713073657.GX1041@n2100.armlinux.org.uk>
-References: <20160712014201.11456-1-takahiro.akashi@linaro.org>
- <87furf7ztv.fsf@x220.int.ebiederm.org> <50662781.Utjsnse3nb@hactar>
- <20160712225805.0d27fe5d@hananiah.suse.cz>
- <20160712221804.GV1041@n2100.armlinux.org.uk>
- <87twfunneg.fsf@linux.vnet.ibm.com>
- <20160713073657.GX1041@n2100.armlinux.org.uk>
-Message-ID: <87poqinf9m.fsf@linux.vnet.ibm.com>
+From: diana.craciun@nxp.com (Diana Madalina Craciun)
+Date: Wed, 13 Jul 2016 07:57:21 +0000
+Subject: [PATCH v9 00/17] KVM: arm64: GICv3 ITS emulation
+References: <20160713015909.28793-1-andre.przywara@arm.com>
+Message-ID: <HE1PR04MB1321470CDA673EDB88B8930DFF310@HE1PR04MB1321.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux <linux@armlinux.org.uk> writes:
-> On Wed, Jul 13, 2016 at 02:59:51PM +1000, Stewart Smith wrote:
->> Russell King - ARM Linux <linux@armlinux.org.uk> writes:
->> > On Tue, Jul 12, 2016 at 10:58:05PM +0200, Petr Tesarik wrote:
->> >> I'm not an expert on DTB, so I can't provide an example of code
->> >> execution, but you have already mentioned the /chosen/linux,stdout-path
->> >> property. If an attacker redirects the bootloader to an insecure
->> >> console, they may get access to the system that would otherwise be
->> >> impossible.
->> >
->> > I fail to see how kexec connects with the boot loader - the DTB image
->> > that's being talked about is one which is passed from the currently
->> > running kernel to the to-be-kexec'd kernel.  For ARM (and I suspect
->> > also ARM64) that's a direct call chain which doesn't involve any
->> > boot loader or firmware, and certainly none that would involve the
->> > passed DTB image.
->> 
->> For OpenPOWER machines, kexec is the bootloader. Our bootloader is a
->> linux kernel and initramfs with a UI (petitboot) - this means we never
->> have to write a device driver twice: write a kernel one and you're done
->> (for booting from the device and using it in your OS).
->
-> I think you misunderstood my point.
->
-> On ARM, we do not go:
->
-> 	kernel (kexec'd from) -> boot loader -> kernel (kexec'd to)
->
-> but we go:
->
-> 	kernel (kexec'd from) -> kernel (kexec'd to)
->
-> There's no intermediate step involving any bootloader.
->
-> Hence, my point is that the dtb loaded by kexec is _only_ used by the
-> kernel which is being kexec'd to, not by the bootloader, nor indeed
-> the kernel which it is loaded into.
->
-> Moreover, if you read the bit that I quoted (which is what I was
-> replying to), you'll notice that it is talking about the DTB loaded
-> by kexec somehow causing the _bootloader_ to be redirected to an
-> alternative console.  This point is wholely false on ARM.
+Hi Andre,
 
-Ahh.. I missed the bootloader bit there.
+On 07/13/2016 04:59 AM, Andre Przywara wrote:
+> To test this you can use the kvmtool patches available in the "its-v6"
+> branch here [2].
+> Start a guest with: "$ lkvm run --irqchip=gicv3-its --force-pci"
+> and see the ITS being used for instance by the virtio devices.
+>
+> [1]: git://linux-arm.org/linux-ap.git
+>      http://www.linux-arm.org/git?p=linux-ap.git;a=log;h=refs/heads/its-emul/v9
+> [2]: git://linux-arm.org/kvmtool.git
 
-In which case, we're the same on OpenPOWER, there is no intermediate
-bootloader - in our case we have linux (with kexec) taking on what uboot
-or grub is typically used for on other platforms.
+It seems that its/emul/v9 branch does not exist.
 
+Thanks,
 
--- 
-Stewart Smith
-OPAL Architect, IBM.
+Diana
