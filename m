@@ -1,140 +1,51 @@
-From: adrian.hunter@intel.com (Adrian Hunter)
-Date: Wed, 13 Jul 2016 14:40:54 +0300
-Subject: [PATCH RESEND 1/2] perf tools: making coresight PMU listable
-In-Reply-To: <1466182922-14426-2-git-send-email-mathieu.poirier@linaro.org>
-References: <1466182922-14426-1-git-send-email-mathieu.poirier@linaro.org>
- <1466182922-14426-2-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <578628C6.5020204@intel.com>
+From: appana.durga.rao@xilinx.com (Appana Durga Kedareswara Rao)
+Date: Wed, 13 Jul 2016 12:00:56 +0000
+Subject: [PATCH] dmaengine: zynqmp_dma: Fix static checker warning
+In-Reply-To: <20160713113101.GU32247@mwanda>
+References: <1468406536-6350-1-git-send-email-appanad@xilinx.com>
+ <20160713113101.GU32247@mwanda>
+Message-ID: <C246CAC1457055469EF09E3A7AC4E11A4A5BD930@XAP-PVEXMBX01.xlnx.xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/06/16 20:02, Mathieu Poirier wrote:
-> Adding the required mechanic allowing 'perf list pmu' to
-> discover coresight ETM/PTM tracers.
+Hi Dan,
+
+	Thanks for the review...
+
+> On Wed, Jul 13, 2016 at 04:12:16PM +0530, Kedareswara rao Appana wrote:
+> > diff --git a/drivers/dma/xilinx/zynqmp_dma.c
+> > b/drivers/dma/xilinx/zynqmp_dma.c index f777a5b..2248704 100644
+> > --- a/drivers/dma/xilinx/zynqmp_dma.c
+> > +++ b/drivers/dma/xilinx/zynqmp_dma.c
+> > @@ -970,8 +970,13 @@ static int zynqmp_dma_chan_probe(struct
+> zynqmp_dma_device *zdev,
+> >  	chan->dst_burst_len = ZYNQMP_DMA_AWLEN_RST_VAL;
+> >  	chan->src_burst_len = ZYNQMP_DMA_ARLEN_RST_VAL;
+> >  	err = of_property_read_u32(node, "xlnx,bus-width", &chan-
+> >bus_width);
+> > -	if ((err < 0) && ((chan->bus_width != ZYNQMP_DMA_BUS_WIDTH_64) ||
+> > -			  (chan->bus_width !=
+> ZYNQMP_DMA_BUS_WIDTH_128))) {
+> > +	if (err < 0) {
+> > +		dev_err(&pdev->dev, "missing xlnx,bus-width property\n");
+> > +		return err;
+> > +	}
+> > +
+> > +	if ((chan->bus_width != ZYNQMP_DMA_BUS_WIDTH_64) ||
 > 
-> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+> This has to be an && because it can never be both widths.  You didn't test this
+> patch.  Also too many parenthesis (you're thinking of LISP).
 
-A couple of comments below but otherwise:
+Will fix in the next version...
 
-Acked-by: Adrian Hunter <adrian.hunter@intel.com>
-
-> ---
->  MAINTAINERS                    |  1 +
->  tools/perf/MANIFEST            |  1 +
->  tools/perf/arch/arm/util/Build |  2 ++
->  tools/perf/arch/arm/util/pmu.c | 34 ++++++++++++++++++++++++++++++++++
->  tools/perf/config/Makefile     | 11 ++++++++---
->  5 files changed, 46 insertions(+), 3 deletions(-)
->  create mode 100644 tools/perf/arch/arm/util/pmu.c
 > 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 7304d2e37a98..d3451007718b 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -1085,6 +1085,7 @@ F:	drivers/hwtracing/coresight/*
->  F:	Documentation/trace/coresight.txt
->  F:	Documentation/devicetree/bindings/arm/coresight.txt
->  F:	Documentation/ABI/testing/sysfs-bus-coresight-devices-*
-> +F:	tools/perf/arch/arm/util/pmu.c
->  
->  ARM/CORGI MACHINE SUPPORT
->  M:	Richard Purdie <rpurdie@rpsys.net>
-> diff --git a/tools/perf/MANIFEST b/tools/perf/MANIFEST
-> index 8c8c6b9ce915..c6683e60e603 100644
-> --- a/tools/perf/MANIFEST
-> +++ b/tools/perf/MANIFEST
-> @@ -64,6 +64,7 @@ include/asm-generic/bitops/const_hweight.h
->  include/asm-generic/bitops/fls64.h
->  include/asm-generic/bitops/__fls.h
->  include/asm-generic/bitops/fls.h
-> +include/linux/coresight-pmu.h
+> > +	    (chan->bus_width != ZYNQMP_DMA_BUS_WIDTH_128)) {
+> >  		dev_err(zdev->dev, "invalid bus-width value");
+> >  		return err;
+> 
+> This has to be a negative error code.
 
-tools/perf/MANIFEST has changed so you need to re-base
+Will fix in the next version...
 
->  include/linux/perf_event.h
->  include/linux/list.h
->  include/linux/hash.h
-> diff --git a/tools/perf/arch/arm/util/Build b/tools/perf/arch/arm/util/Build
-> index d22e3d07de3d..66ab0b05549c 100644
-> --- a/tools/perf/arch/arm/util/Build
-> +++ b/tools/perf/arch/arm/util/Build
-> @@ -2,3 +2,5 @@ libperf-$(CONFIG_DWARF) += dwarf-regs.o
->  
->  libperf-$(CONFIG_LIBUNWIND)          += unwind-libunwind.o
->  libperf-$(CONFIG_LIBDW_DWARF_UNWIND) += unwind-libdw.o
-> +
-> +libperf-$(CONFIG_AUXTRACE) += pmu.o
-> diff --git a/tools/perf/arch/arm/util/pmu.c b/tools/perf/arch/arm/util/pmu.c
-> new file mode 100644
-> index 000000000000..af9fb666b44f
-> --- /dev/null
-> +++ b/tools/perf/arch/arm/util/pmu.c
-> @@ -0,0 +1,34 @@
-> +/*
-> + * Copyright(C) 2015 Linaro Limited. All rights reserved.
-> + * Author: Mathieu Poirier <mathieu.poirier@linaro.org>
-> + *
-> + * This program is free software; you can redistribute it and/or modify it
-> + * under the terms of the GNU General Public License version 2 as published by
-> + * the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful, but WITHOUT
-> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-> + * more details.
-> + *
-> + * You should have received a copy of the GNU General Public License along with
-> + * this program.  If not, see <http://www.gnu.org/licenses/>.
-> + */
-> +
-> +#include <string.h>
-> +#include <linux/coresight-pmu.h>
-> +#include <linux/perf_event.h>
-> +
-> +#include "../../util/pmu.h"
-> +
-> +struct perf_event_attr
-> +*perf_pmu__get_default_config(struct perf_pmu *pmu __maybe_unused)
-> +{
-> +#ifdef HAVE_AUXTRACE_SUPPORT
-> +	if (!strcmp(pmu->name, CORESIGHT_ETM_PMU_NAME)) {
-> +		/* add ETM default config here */
-> +		pmu->selectable = true;
-> +	}
-> +#endif
-> +	return NULL;
-> +}
-> diff --git a/tools/perf/config/Makefile b/tools/perf/config/Makefile
-> index 5ad0255f8756..494a672aa11d 100644
-> --- a/tools/perf/config/Makefile
-> +++ b/tools/perf/config/Makefile
-> @@ -681,9 +681,14 @@ ifdef LIBBABELTRACE
->  endif
->  
->  ifndef NO_AUXTRACE
-> -  ifeq ($(feature-get_cpuid), 0)
-> -    msg := $(warning Your gcc lacks the __get_cpuid() builtin, disables support for auxtrace/Intel PT, please install a newer gcc);
-> -    NO_AUXTRACE := 1
-> +  ifeq ($(ARCH),x86)
-> +    ifeq ($(feature-get_cpuid), 0)
-> +      msg := $(warning Your gcc lacks the __get_cpuid() builtin, disables support for auxtrace/Intel PT, please install a newer gcc);
-> +      NO_AUXTRACE := 1
-> +    else
-> +      $(call detected,CONFIG_AUXTRACE)
-> +      CFLAGS += -DHAVE_AUXTRACE_SUPPORT
-> +    endif
-
-Maybe slightly neater to avoid duplicating lines e.g.
-
-ifndef NO_AUXTRACE
-  ifeq ($(ARCH),x86)
-    ifeq ($(feature-get_cpuid), 0)
-      msg := $(warning Your gcc lacks the __get_cpuid() builtin, disables support for auxtrace/Intel PT, please install a newer gcc);
-      NO_AUXTRACE := 1
-    endif
-  endif
-  ifndef NO_AUXTRACE
-    $(call detected,CONFIG_AUXTRACE)
-    CFLAGS += -DHAVE_AUXTRACE_SUPPORT
-  endif
-endif
+Regards,
+Kedar.
