@@ -1,82 +1,132 @@
 From: keescook@chromium.org (Kees Cook)
-Date: Wed, 13 Jul 2016 14:56:04 -0700
-Subject: [PATCH v2 11/11] mm: SLUB hardened usercopy support
+Date: Wed, 13 Jul 2016 14:55:54 -0700
+Subject: [PATCH v2 01/11] mm: Implement stack frame object validation
 In-Reply-To: <1468446964-22213-1-git-send-email-keescook@chromium.org>
 References: <1468446964-22213-1-git-send-email-keescook@chromium.org>
-Message-ID: <1468446964-22213-12-git-send-email-keescook@chromium.org>
+Message-ID: <1468446964-22213-2-git-send-email-keescook@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Under CONFIG_HARDENED_USERCOPY, this adds object size checking to the
-SLUB allocator to catch any copies that may span objects. Includes a
-redzone handling fix from Michael Ellerman.
+This creates per-architecture function arch_within_stack_frames() that
+should validate if a given object is contained by a kernel stack frame.
+Initial implementation is on x86.
 
-Based on code from PaX and grsecurity.
+This is based on code from PaX.
 
 Signed-off-by: Kees Cook <keescook@chromium.org>
 ---
- init/Kconfig |  1 +
- mm/slub.c    | 36 ++++++++++++++++++++++++++++++++++++
- 2 files changed, 37 insertions(+)
+ arch/Kconfig                       |  9 ++++++++
+ arch/x86/Kconfig                   |  1 +
+ arch/x86/include/asm/thread_info.h | 44 ++++++++++++++++++++++++++++++++++++++
+ include/linux/thread_info.h        |  9 ++++++++
+ 4 files changed, 63 insertions(+)
 
-diff --git a/init/Kconfig b/init/Kconfig
-index 798c2020ee7c..1c4711819dfd 100644
---- a/init/Kconfig
-+++ b/init/Kconfig
-@@ -1765,6 +1765,7 @@ config SLAB
+diff --git a/arch/Kconfig b/arch/Kconfig
+index d794384a0404..5e2776562035 100644
+--- a/arch/Kconfig
++++ b/arch/Kconfig
+@@ -424,6 +424,15 @@ config CC_STACKPROTECTOR_STRONG
  
- config SLUB
- 	bool "SLUB (Unqueued Allocator)"
-+	select HAVE_HARDENED_USERCOPY_ALLOCATOR
+ endchoice
+ 
++config HAVE_ARCH_WITHIN_STACK_FRAMES
++	bool
++	help
++	  An architecture should select this if it can walk the kernel stack
++	  frames to determine if an object is part of either the arguments
++	  or local variables (i.e. that it excludes saved return addresses,
++	  and similar) by implementing an inline arch_within_stack_frames(),
++	  which is used by CONFIG_HARDENED_USERCOPY.
++
+ config HAVE_CONTEXT_TRACKING
+ 	bool
  	help
- 	   SLUB is a slab allocator that minimizes cache line usage
- 	   instead of managing queues of cached objects (SLAB approach).
-diff --git a/mm/slub.c b/mm/slub.c
-index 825ff4505336..7dee3d9a5843 100644
---- a/mm/slub.c
-+++ b/mm/slub.c
-@@ -3614,6 +3614,42 @@ void *__kmalloc_node(size_t size, gfp_t flags, int node)
- EXPORT_SYMBOL(__kmalloc_node);
+diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
+index 0a7b885964ba..4407f596b72c 100644
+--- a/arch/x86/Kconfig
++++ b/arch/x86/Kconfig
+@@ -91,6 +91,7 @@ config X86
+ 	select HAVE_ARCH_SOFT_DIRTY		if X86_64
+ 	select HAVE_ARCH_TRACEHOOK
+ 	select HAVE_ARCH_TRANSPARENT_HUGEPAGE
++	select HAVE_ARCH_WITHIN_STACK_FRAMES
+ 	select HAVE_EBPF_JIT			if X86_64
+ 	select HAVE_CC_STACKPROTECTOR
+ 	select HAVE_CMPXCHG_DOUBLE
+diff --git a/arch/x86/include/asm/thread_info.h b/arch/x86/include/asm/thread_info.h
+index 30c133ac05cd..ab386f1336f2 100644
+--- a/arch/x86/include/asm/thread_info.h
++++ b/arch/x86/include/asm/thread_info.h
+@@ -180,6 +180,50 @@ static inline unsigned long current_stack_pointer(void)
+ 	return sp;
+ }
+ 
++/*
++ * Walks up the stack frames to make sure that the specified object is
++ * entirely contained by a single stack frame.
++ *
++ * Returns:
++ *		 1 if within a frame
++ *		-1 if placed across a frame boundary (or outside stack)
++ *		 0 unable to determine (no frame pointers, etc)
++ */
++static inline int arch_within_stack_frames(const void * const stack,
++					   const void * const stackend,
++					   const void *obj, unsigned long len)
++{
++#if defined(CONFIG_FRAME_POINTER)
++	const void *frame = NULL;
++	const void *oldframe;
++
++	oldframe = __builtin_frame_address(1);
++	if (oldframe)
++		frame = __builtin_frame_address(2);
++	/*
++	 * low ----------------------------------------------> high
++	 * [saved bp][saved ip][args][local vars][saved bp][saved ip]
++	 *                     ^----------------^
++	 *               allow copies only within here
++	 */
++	while (stack <= frame && frame < stackend) {
++		/*
++		 * If obj + len extends past the last frame, this
++		 * check won't pass and the next frame will be 0,
++		 * causing us to bail out and correctly report
++		 * the copy as invalid.
++		 */
++		if (obj + len <= frame)
++			return obj >= oldframe + 2 * sizeof(void *) ? 1 : -1;
++		oldframe = frame;
++		frame = *(const void * const *)frame;
++	}
++	return -1;
++#else
++	return 0;
++#endif
++}
++
+ #else /* !__ASSEMBLY__ */
+ 
+ #ifdef CONFIG_X86_64
+diff --git a/include/linux/thread_info.h b/include/linux/thread_info.h
+index b4c2a485b28a..3d5c80b4391d 100644
+--- a/include/linux/thread_info.h
++++ b/include/linux/thread_info.h
+@@ -146,6 +146,15 @@ static inline bool test_and_clear_restore_sigmask(void)
+ #error "no set_restore_sigmask() provided and default one won't work"
  #endif
  
-+#ifdef CONFIG_HARDENED_USERCOPY
-+/*
-+ * Rejects objects that are incorrectly sized.
-+ *
-+ * Returns NULL if check passes, otherwise const char * to name of cache
-+ * to indicate an error.
-+ */
-+const char *__check_heap_object(const void *ptr, unsigned long n,
-+				struct page *page)
++#ifndef CONFIG_HAVE_ARCH_WITHIN_STACK_FRAMES
++static inline int arch_within_stack_frames(const void * const stack,
++					   const void * const stackend,
++					   const void *obj, unsigned long len)
 +{
-+	struct kmem_cache *s;
-+	unsigned long offset;
-+	size_t object_size;
-+
-+	/* Find object and usable object size. */
-+	s = page->slab_cache;
-+	object_size = slab_ksize(s);
-+
-+	/* Find offset within object. */
-+	offset = (ptr - page_address(page)) % s->size;
-+
-+	/* Adjust for redzone and reject if within the redzone. */
-+	if (kmem_cache_debug(s) && s->flags & SLAB_RED_ZONE) {
-+		if (offset < s->red_left_pad)
-+			return s->name;
-+		offset -= s->red_left_pad;
-+	}
-+
-+	/* Allow address range falling entirely within object size. */
-+	if (offset <= object_size && n <= object_size - offset)
-+		return NULL;
-+
-+	return s->name;
++	return 0;
 +}
-+#endif /* CONFIG_HARDENED_USERCOPY */
++#endif
 +
- static size_t __ksize(const void *object)
- {
- 	struct page *page;
+ #endif	/* __KERNEL__ */
+ 
+ #endif /* _LINUX_THREAD_INFO_H */
 -- 
 2.7.4
