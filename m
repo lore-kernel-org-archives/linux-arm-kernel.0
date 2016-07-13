@@ -1,93 +1,82 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Wed, 13 Jul 2016 23:43:39 +0200
-Subject: [PATCH v7 4/9] acpi/arm64: Add GTDT table parse driver
-In-Reply-To: <20160713210857.GA9500@roeck-us.net>
-References: <1468432402-4872-1-git-send-email-fu.wei@linaro.org>
- <1468432402-4872-5-git-send-email-fu.wei@linaro.org>
- <CAJZ5v0i-1NysCiDFX4ST_uBBeYF2YNzWztgDP=u9a4S1OdpWuw@mail.gmail.com>
- <20160713210857.GA9500@roeck-us.net>
-Message-ID: <CAJZ5v0jnNqjpcY1CGkHxbJFwX1MuRi-U=jTCKWavMdEH4bKR3g@mail.gmail.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Wed, 13 Jul 2016 14:56:04 -0700
+Subject: [PATCH v2 11/11] mm: SLUB hardened usercopy support
+In-Reply-To: <1468446964-22213-1-git-send-email-keescook@chromium.org>
+References: <1468446964-22213-1-git-send-email-keescook@chromium.org>
+Message-ID: <1468446964-22213-12-git-send-email-keescook@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 13, 2016 at 11:08 PM, Guenter Roeck <linux@roeck-us.net> wrote:
-> On Wed, Jul 13, 2016 at 10:30:37PM +0200, Rafael J. Wysocki wrote:
->> On Wed, Jul 13, 2016 at 7:53 PM,  <fu.wei@linaro.org> wrote:
->> > From: Fu Wei <fu.wei@linaro.org>
->> >
->> > This patch adds support for parsing arch timer in GTDT,
->> > provides some kernel APIs to parse all the PPIs and
->> > always-on info in GTDT and export them.
->> >
->> > By this driver, we can simplify arm_arch_timer drivers, and
->> > separate the ACPI GTDT knowledge from it.
->> >
->> > Signed-off-by: Fu Wei <fu.wei@linaro.org>
->> > Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
->> > ---
->> >  drivers/acpi/Kconfig           |   5 ++
->> >  drivers/acpi/Makefile          |   1 +
->> >  drivers/acpi/arm64/Kconfig     |  15 ++++
->> >  drivers/acpi/arm64/Makefile    |   1 +
->> >  drivers/acpi/arm64/acpi_gtdt.c | 170 +++++++++++++++++++++++++++++++++++++++++
->> >  include/linux/acpi.h           |   6 ++
->> >  6 files changed, 198 insertions(+)
->> >
->> > diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
->> > index b7e2e77..1cdc7d2 100644
->> > --- a/drivers/acpi/Kconfig
->> > +++ b/drivers/acpi/Kconfig
->> > @@ -521,4 +521,9 @@ config XPOWER_PMIC_OPREGION
->> >
->> >  endif
->> >
->> > +if ARM64
->> > +source "drivers/acpi/arm64/Kconfig"
->> > +
->> > +endif
->> > +
->> >  endif  # ACPI
->> > diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
->> > index 251ce85..1a94ff7 100644
->> > --- a/drivers/acpi/Makefile
->> > +++ b/drivers/acpi/Makefile
->> > @@ -99,5 +99,6 @@ obj-$(CONFIG_ACPI_EXTLOG)     += acpi_extlog.o
->> >  obj-$(CONFIG_PMIC_OPREGION)    += pmic/intel_pmic.o
->> >  obj-$(CONFIG_CRC_PMIC_OPREGION) += pmic/intel_pmic_crc.o
->> >  obj-$(CONFIG_XPOWER_PMIC_OPREGION) += pmic/intel_pmic_xpower.o
->> > +obj-$(CONFIG_ARM64)    += arm64/
->> >
->> >  video-objs                     += acpi_video.o video_detect.o
->> > diff --git a/drivers/acpi/arm64/Kconfig b/drivers/acpi/arm64/Kconfig
->> > new file mode 100644
->> > index 0000000..ff5c253
->> > --- /dev/null
->> > +++ b/drivers/acpi/arm64/Kconfig
->> > @@ -0,0 +1,15 @@
->> > +#
->> > +# ACPI Configuration for ARM64
->> > +#
->> > +
->> > +menu "The ARM64-specific ACPI Support"
->> > +
->> > +config ACPI_GTDT
->> > +       bool "ACPI GTDT table Support"
->>
->> This should depend on ARM64.
->>
->> Also I wonder if it needs to be user-selectable?  Wouldn't it be
->> better to enable it by default when building for ARM64 with ACPI?
->>
-> It is currently selected in patch 9, in the watchdog driver's Kconfig
-> entry.
+Under CONFIG_HARDENED_USERCOPY, this adds object size checking to the
+SLUB allocator to catch any copies that may span objects. Includes a
+redzone handling fix from Michael Ellerman.
 
-Well, it still doesn't have to be user-selectable for that. :-)
+Based on code from PaX and grsecurity.
 
-> Not sure if I like that; maybe the watchdog driver should depend
-> on it instead ?
+Signed-off-by: Kees Cook <keescook@chromium.org>
+---
+ init/Kconfig |  1 +
+ mm/slub.c    | 36 ++++++++++++++++++++++++++++++++++++
+ 2 files changed, 37 insertions(+)
 
-If the watchdog is not the only user of it (and I don't think it is),
-it would be better to arrange things this way.
-
-Thanks,
-Rafael
+diff --git a/init/Kconfig b/init/Kconfig
+index 798c2020ee7c..1c4711819dfd 100644
+--- a/init/Kconfig
++++ b/init/Kconfig
+@@ -1765,6 +1765,7 @@ config SLAB
+ 
+ config SLUB
+ 	bool "SLUB (Unqueued Allocator)"
++	select HAVE_HARDENED_USERCOPY_ALLOCATOR
+ 	help
+ 	   SLUB is a slab allocator that minimizes cache line usage
+ 	   instead of managing queues of cached objects (SLAB approach).
+diff --git a/mm/slub.c b/mm/slub.c
+index 825ff4505336..7dee3d9a5843 100644
+--- a/mm/slub.c
++++ b/mm/slub.c
+@@ -3614,6 +3614,42 @@ void *__kmalloc_node(size_t size, gfp_t flags, int node)
+ EXPORT_SYMBOL(__kmalloc_node);
+ #endif
+ 
++#ifdef CONFIG_HARDENED_USERCOPY
++/*
++ * Rejects objects that are incorrectly sized.
++ *
++ * Returns NULL if check passes, otherwise const char * to name of cache
++ * to indicate an error.
++ */
++const char *__check_heap_object(const void *ptr, unsigned long n,
++				struct page *page)
++{
++	struct kmem_cache *s;
++	unsigned long offset;
++	size_t object_size;
++
++	/* Find object and usable object size. */
++	s = page->slab_cache;
++	object_size = slab_ksize(s);
++
++	/* Find offset within object. */
++	offset = (ptr - page_address(page)) % s->size;
++
++	/* Adjust for redzone and reject if within the redzone. */
++	if (kmem_cache_debug(s) && s->flags & SLAB_RED_ZONE) {
++		if (offset < s->red_left_pad)
++			return s->name;
++		offset -= s->red_left_pad;
++	}
++
++	/* Allow address range falling entirely within object size. */
++	if (offset <= object_size && n <= object_size - offset)
++		return NULL;
++
++	return s->name;
++}
++#endif /* CONFIG_HARDENED_USERCOPY */
++
+ static size_t __ksize(const void *object)
+ {
+ 	struct page *page;
+-- 
+2.7.4
