@@ -1,95 +1,159 @@
 From: anna-maria@linutronix.de (Anna-Maria Gleixner)
-Date: Wed, 13 Jul 2016 17:16:35 -0000
-Subject: [patch V2 34/67] arm: Convert VFP hotplug notifiers to state machine
+Date: Wed, 13 Jul 2016 17:16:55 -0000
+Subject: [patch V2 52/67] hwtracing/coresight-etm4x: Convert to hotplug state
+ machine
 References: <20160713153219.128052238@linutronix.de>
-Message-ID: <20160713153335.713612993@linutronix.de>
+Message-ID: <20160713153337.228918408@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thomas Gleixner <tglx@linutronix.de>
+From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 
-Straight forward conversion plus commentary why code which is executed
-in hotplug callbacks needs to be invoked before installing them.
+This driver has an asymmetry of ONLINE code without any corresponding tear
+down code. Otherwise, this is a straightforward conversion.
 
-Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
-Reviewed-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+Acked-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 Cc: Linus Torvalds <torvalds@linux-foundation.org>
 Cc: Peter Zijlstra <peterz@infradead.org>
-Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Thomas Gleixner <tglx@linutronix.de>
 Cc: linux-arm-kernel at lists.infradead.org
 Signed-off-by: Anna-Maria Gleixner <anna-maria@linutronix.de>
 ---
- arch/arm/vfp/vfpmodule.c   | 28 +++++++++++++++++-----------
- include/linux/cpuhotplug.h |  1 +
- 2 files changed, 18 insertions(+), 11 deletions(-)
+ drivers/hwtracing/coresight/coresight-etm4x.c |   85 ++++++++++++++------------
+ include/linux/cpuhotplug.h                    |    1 
+ 2 files changed, 49 insertions(+), 37 deletions(-)
 
-diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
-index 73085d3..da0b33d 100644
---- a/arch/arm/vfp/vfpmodule.c
-+++ b/arch/arm/vfp/vfpmodule.c
-@@ -643,19 +643,19 @@ int vfp_restore_user_hwstate(struct user_vfp __user *ufp,
-  * hardware state at every thread switch.  We clear our held state when
-  * a CPU has been killed, indicating that the VFP hardware doesn't contain
-  * a threads VFP state.  When a CPU starts up, we re-enable access to the
-- * VFP hardware.
-- *
-- * Both CPU_DYING and CPU_STARTING are called on the CPU which
-+ * VFP hardware. The callbacks below are called on the CPU which
-  * is being offlined/onlined.
-  */
--static int vfp_hotplug(struct notifier_block *b, unsigned long action,
--	void *hcpu)
-+static int vfp_dying_cpu(unsigned int cpu)
+--- a/drivers/hwtracing/coresight/coresight-etm4x.c
++++ b/drivers/hwtracing/coresight/coresight-etm4x.c
+@@ -48,6 +48,8 @@ static int etm4_count;
+ static struct etmv4_drvdata *etmdrvdata[NR_CPUS];
+ static void etm4_set_default(struct etmv4_config *config);
+ 
++static enum cpuhp_state hp_online;
++
+ static void etm4_os_unlock(struct etmv4_drvdata *drvdata)
  {
--	if (action == CPU_DYING || action == CPU_DYING_FROZEN)
--		vfp_current_hw_state[(long)hcpu] = NULL;
--	else if (action == CPU_STARTING || action == CPU_STARTING_FROZEN)
--		vfp_enable(NULL);
--	return NOTIFY_OK;
-+	vfp_force_reload(cpu, current_thread_info());
+ 	/* Writing any value to ETMOSLAR unlocks the trace registers */
+@@ -673,47 +675,44 @@ void etm4_config_trace_mode(struct etmv4
+ 	config->addr_acc[ETM_DEFAULT_ADDR_COMP + 1] = addr_acc;
+ }
+ 
+-static int etm4_cpu_callback(struct notifier_block *nfb, unsigned long action,
+-			    void *hcpu)
++static int etm4_online_cpu(unsigned int cpu)
+ {
+-	unsigned int cpu = (unsigned long)hcpu;
+-
+ 	if (!etmdrvdata[cpu])
+-		goto out;
++		return 0;
+ 
+-	switch (action & (~CPU_TASKS_FROZEN)) {
+-	case CPU_STARTING:
+-		spin_lock(&etmdrvdata[cpu]->spinlock);
+-		if (!etmdrvdata[cpu]->os_unlock) {
+-			etm4_os_unlock(etmdrvdata[cpu]);
+-			etmdrvdata[cpu]->os_unlock = true;
+-		}
+-
+-		if (local_read(&etmdrvdata[cpu]->mode))
+-			etm4_enable_hw(etmdrvdata[cpu]);
+-		spin_unlock(&etmdrvdata[cpu]->spinlock);
+-		break;
++	if (etmdrvdata[cpu]->boot_enable && !etmdrvdata[cpu]->sticky_enable)
++		coresight_enable(etmdrvdata[cpu]->csdev);
 +	return 0;
 +}
-+
-+static int vfp_starting_cpu(unsigned int unused)
+ 
+-	case CPU_ONLINE:
+-		if (etmdrvdata[cpu]->boot_enable &&
+-			!etmdrvdata[cpu]->sticky_enable)
+-			coresight_enable(etmdrvdata[cpu]->csdev);
+-		break;
++static int etm4_starting_cpu(unsigned int cpu)
 +{
-+	vfp_enable(NULL);
++	if (!etmdrvdata[cpu])
++		return 0;
+ 
+-	case CPU_DYING:
+-		spin_lock(&etmdrvdata[cpu]->spinlock);
+-		if (local_read(&etmdrvdata[cpu]->mode))
+-			etm4_disable_hw(etmdrvdata[cpu]);
+-		spin_unlock(&etmdrvdata[cpu]->spinlock);
+-		break;
++	spin_lock(&etmdrvdata[cpu]->spinlock);
++	if (!etmdrvdata[cpu]->os_unlock) {
++		etm4_os_unlock(etmdrvdata[cpu]);
++		etmdrvdata[cpu]->os_unlock = true;
+ 	}
+-out:
+-	return NOTIFY_OK;
++
++	if (local_read(&etmdrvdata[cpu]->mode))
++		etm4_enable_hw(etmdrvdata[cpu]);
++	spin_unlock(&etmdrvdata[cpu]->spinlock);
 +	return 0;
  }
  
- void vfp_kmode_exception(void)
-@@ -732,6 +732,10 @@ static int __init vfp_init(void)
- 	unsigned int vfpsid;
- 	unsigned int cpu_arch = cpu_architecture();
+-static struct notifier_block etm4_cpu_notifier = {
+-	.notifier_call = etm4_cpu_callback,
+-};
++static int etm4_dying_cpu(unsigned int cpu)
++{
++	if (!etmdrvdata[cpu])
++		return 0;
++
++	spin_lock(&etmdrvdata[cpu]->spinlock);
++	if (local_read(&etmdrvdata[cpu]->mode))
++		etm4_disable_hw(etmdrvdata[cpu]);
++	spin_unlock(&etmdrvdata[cpu]->spinlock);
++	return 0;
++}
  
-+	/*
-+	 * Enable the access to the VFP on all online CPUs so the
-+	 * following test on FPSID will succeed.
-+	 */
- 	if (cpu_arch >= CPU_ARCH_ARMv6)
- 		on_each_cpu(vfp_enable, NULL, 1);
+ static void etm4_init_trace_id(struct etmv4_drvdata *drvdata)
+ {
+@@ -767,8 +766,17 @@ static int etm4_probe(struct amba_device
+ 				etm4_init_arch_data,  drvdata, 1))
+ 		dev_err(dev, "ETM arch init failed\n");
  
-@@ -794,7 +798,9 @@ static int __init vfp_init(void)
- 		VFP_arch = (vfpsid & FPSID_ARCH_MASK) >> FPSID_ARCH_BIT;
- 	}
+-	if (!etm4_count++)
+-		register_hotcpu_notifier(&etm4_cpu_notifier);
++	if (!etm4_count++) {
++		cpuhp_setup_state_nocalls(CPUHP_AP_ARM_CORESIGHT4_STARTING,
++					  "AP_ARM_CORESIGHT4_STARTING",
++					  etm4_starting_cpu, etm4_dying_cpu);
++		ret = cpuhp_setup_state_nocalls(CPUHP_AP_ONLINE_DYN,
++						"AP_ARM_CORESIGHT4_ONLINE",
++						etm4_online_cpu, NULL);
++		if (ret < 0)
++			goto err_arch_supported;
++		hp_online = ret;
++	}
  
--	hotcpu_notifier(vfp_hotplug, 0);
-+	cpuhp_setup_state_nocalls(CPUHP_AP_ARM_VFP_STARTING,
-+				  "AP_ARM_VFP_STARTING", vfp_starting_cpu,
-+				  vfp_dying_cpu);
+ 	put_online_cpus();
  
- 	vfp_vector = vfp_support_entry;
+@@ -809,8 +817,11 @@ static int etm4_probe(struct amba_device
+ 	return 0;
  
-diff --git a/include/linux/cpuhotplug.h b/include/linux/cpuhotplug.h
-index e8d1b84..2e227b6 100644
+ err_arch_supported:
+-	if (--etm4_count == 0)
+-		unregister_hotcpu_notifier(&etm4_cpu_notifier);
++	if (--etm4_count == 0) {
++		cpuhp_remove_state_nocalls(CPUHP_AP_ARM_CORESIGHT4_STARTING);
++		if (hp_online)
++			cpuhp_remove_state_nocalls(hp_online);
++	}
+ 	return ret;
+ }
+ 
 --- a/include/linux/cpuhotplug.h
 +++ b/include/linux/cpuhotplug.h
-@@ -35,6 +35,7 @@ enum cpuhp_state {
- 	CPUHP_AP_PERF_X86_CQM_STARTING,
- 	CPUHP_AP_PERF_X86_CSTATE_STARTING,
- 	CPUHP_AP_PERF_XTENSA_STARTING,
-+	CPUHP_AP_ARM_VFP_STARTING,
+@@ -51,6 +51,7 @@ enum cpuhp_state {
+ 	CPUHP_AP_KVM_ARM_TIMER_STARTING,
+ 	CPUHP_AP_ARM_XEN_STARTING,
+ 	CPUHP_AP_ARM_CORESIGHT_STARTING,
++	CPUHP_AP_ARM_CORESIGHT4_STARTING,
+ 	CPUHP_AP_LEDTRIG_STARTING,
  	CPUHP_AP_NOTIFY_STARTING,
  	CPUHP_AP_ONLINE,
- 	CPUHP_TEARDOWN_CPU,
--- 
-2.8.1
