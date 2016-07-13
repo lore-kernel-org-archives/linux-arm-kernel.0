@@ -1,49 +1,44 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Wed, 13 Jul 2016 16:48:32 -0400
-Subject: [PATCH V8 7/9] vfio, platform: make reset driver a requirement by
- default
-In-Reply-To: <20160623125955.647008cb@t450s.home>
-References: <1466437879-32182-1-git-send-email-okaya@codeaurora.org>
- <1466437879-32182-8-git-send-email-okaya@codeaurora.org>
- <20160623125955.647008cb@t450s.home>
-Message-ID: <eeb13445-a4bb-9230-527c-d85ab4da4c3e@codeaurora.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 13 Jul 2016 22:52:40 +0200
+Subject: [PATCH] clk: sunxi: Add CSI (camera's Sensors Interface) module
+ clock driver for sun[457]i
+In-Reply-To: <CAJeuY78Mt-286pWvCVqPFnPixp3cQ+C=SHekCkMfAd7Lf_t1+w@mail.gmail.com>
+References: <1458204222-31149-1-git-send-email-yassinjaffer@gmail.com>
+ <1458204222-31149-2-git-send-email-yassinjaffer@gmail.com>
+ <20160319235905.GA16539@rob-hp-laptop>
+ <20160402011436.GA18567@codeaurora.org>
+ <20160404212450.GP4227@lukather>
+ <CAJeuY78Mt-286pWvCVqPFnPixp3cQ+C=SHekCkMfAd7Lf_t1+w@mail.gmail.com>
+Message-ID: <20160713205240.GN4761@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/23/2016 2:59 PM, Alex Williamson wrote:
->> -static void vfio_platform_get_reset(struct vfio_platform_device *vdev)
->> > +static int vfio_platform_get_reset(struct vfio_platform_device *vdev)
->> >  {
->> >  	if (vdev->acpihid)
->> > -		return;
->> > +		return vfio_platform_acpi_has_reset(vdev) ? 0 : -ENOENT;
->> >  
->> >  	vdev->of_reset = vfio_platform_lookup_reset(vdev->compat,
->> >  						    &vdev->reset_module);
->> > @@ -140,6 +140,8 @@ static void vfio_platform_get_reset(struct vfio_platform_device *vdev)
->> >  		vdev->of_reset = vfio_platform_lookup_reset(vdev->compat,
->> >  							&vdev->reset_module);
->> >  	}
->> > +
->> > +	return vdev->of_reset ? 0 : -ENOENT;
->> >  }
-> nit, this looks more like a:
-> 
-> static bool vfio_platform_has_reset(...)
-> 	...
-> 		return vfio_platform_acpi_has_reset() == 0;
-> 
-> 	...
-> 
-> 	return vdev->of_reset != NULL
-> 
+Hi,
 
-Sorry, I didn't understand this comment. The code has get and put functions for DT.
-These functions are not useful for ACPI. This is the reason for the above change. 
+On Mon, Jul 11, 2016 at 01:07:26AM +0800, Hao Zhang wrote:
+> Hi all
+> I am developing a media codec driver(using bt656) for cubieboard
+> one(allwinner a10 processor), i want to use DT to banding csi. after i get
+> some reference on
+> Documentation/devicetree/bindings/media/video-interfaces.txt, i have some
+> question about whether the csi driver for cubieboard one support to parse
+> the DT node just like in the reference document? if not, whether someone
+> is developing it or should i necessary to complete it together (What's the
+> progress of it) ?
 
-Can you be more specific?
+There's no driver for it yet. We're currently working on it, so it's
+probably going to be done soon, but it's not there yet.
+
+Maxime
 
 -- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160713/6d4659d3/attachment.sig>
