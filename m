@@ -1,57 +1,97 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 13 Jul 2016 18:45:12 +0100
-Subject: [RESEND PATCH] arm: assabet_defconfig: disable IDE subsystem
-In-Reply-To: <4264651.gPKphdYuCx@wuerfel>
-References: <1467991490-24895-1-git-send-email-b.zolnierkie@samsung.com>
- <2773873.Jjn1O47GXr@wuerfel> <4818149.nzRaU7vJQE@amdc1976>
- <4264651.gPKphdYuCx@wuerfel>
-Message-ID: <20160713174512.GB1041@n2100.armlinux.org.uk>
+From: fu.wei@linaro.org (fu.wei at linaro.org)
+Date: Thu, 14 Jul 2016 01:53:13 +0800
+Subject: [PATCH v7 0/9] acpi,
+ clocksource: add GTDT driver and GTDT support in arm_arch_timer
+Message-ID: <1468432402-4872-1-git-send-email-fu.wei@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 13, 2016 at 04:37:31PM +0200, Arnd Bergmann wrote:
-> On Wednesday, July 13, 2016 12:59:23 PM CEST Bartlomiej Zolnierkiewicz wrote:
-> > 
-> > On Friday, July 08, 2016 10:23:48 PM Arnd Bergmann wrote:
-> > > On Friday, July 8, 2016 5:24:41 PM CEST Bartlomiej Zolnierkiewicz wrote:
-> > > > This patch disables deprecated IDE subsystem in assabet_defconfig
-> > > > (no IDE host drivers are selected in this config so there is no
-> > > > valid reason to enable IDE subsystem itself).
-> > > > 
-> > > > Cc: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
-> > > > Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> > > 
-> > > I think the series makes a lot of sense. I have checked your assertions
-> > > in the changelogs and found no flaws in your logic, so I think we should
-> > > take them all through arm-soc unless there are other concerns.
-> > 
-> > Thank you.
-> > 
-> > Should I resend everything or just patches that were not reposted yet
-> > (the ones that were marked as RFT initially and got no feedback)?
-> 
-> I'd be fine with just getting a pull request with all the patches that
-> had no negative feedback and that were not already applied (if any).
+From: Fu Wei <fu.wei@linaro.org>
 
-I'd actually say be very careful about this - there's a big difference
-between the ATA subsystem and IDE subsystem.  I've had situations with
-old platforms where stuff works with IDE and not ATA.
+This patchset:
+    (1)Preparation for adding GTDT support in arm_arch_timer
+        1. Move some enums and marcos to header file
+        2. Add a new enum for spi type.
+        3. Improve printk relevant code
 
-For example, using the CY82C693 driver used to work with the IDE
-subsystem before it got broken on ARM systems with DMA disabled (because
-the CY82C693 deadlocks the PCI bus on any BM-DMA).  From what I remember,
-ATA provided no easy way to disable DMA on such interfaces.
+    (2)Introduce ACPI GTDT parser: drivers/acpi/gtdt.c
+    Parse all kinds of timer in GTDT table of ACPI:arch timer,
+    memory-mapped timer and SBSA Generic Watchdog timer.
+    This driver can help to simplify all the relevant timer drivers,
+    and separate all the ACPI GTDT knowledge from them.
+    Also add add the ARM64-specific ACPI Support maintainers in MAINTAINERS.
 
-I also looked at using ATA on EBSA110, and it was far from trivial due
-to munged address lines and access size problems: with IDE, it was
-easy to work around by redirecting the in*/out* appropriately on a
-per-driver basis.  I forget exactly why ATA didn't work, but it didn't
-and I came to the conclusion that it was not feasible to fix.
+    (3)Simplify ACPI code for arm_arch_timer
 
-So, please don't assume that ATA can be simply slotted in instead of
-IDE.
+    (4)Add GTDT support for ARM memory-mapped timer
+
+This patchset has been tested on the following platforms:
+    (1)ARM Foundation v8 model
+
+Changelog:
+v7: Move the GTDT driver to drivers/acpi/arm64
+    Add add the ARM64-specific ACPI Support maintainers in MAINTAINERS
+    Merge 3 patches of GTDT parser driver.
+    Fix the for_each_platform_timer bug.
+
+v6: https://lkml.org/lkml/2016/6/29/580
+    split the GTDT driver to 4 parts: basic, arch_timer, memory-mapped timer,
+    and SBSA Generic Watchdog timer
+    Improve driver by suggestions and example code from Daniel Lezcano
+
+v5: https://lkml.org/lkml/2016/5/24/356
+    Sorting out all patches, simplify the API of GTDT driver:
+    GTDT driver just fills the data struct for arm_arch_timer driver.
+
+v4: https://lists.linaro.org/pipermail/linaro-acpi/2016-March/006667.html
+    Delete the kvm relevant patches
+    Separate two patches for sorting out the code for arm_arch_timer.
+    Improve irq info export code to allow missing irq info in GTDT table.
+
+v3: https://lkml.org/lkml/2016/2/1/658
+    Improve GTDT driver code:
+      (1)improve pr_* by defining pr_fmt(fmt)
+      (2)simplify gtdt_sbsa_gwdt_init
+      (3)improve gtdt_arch_timer_data_init, if table is NULL, it will try
+      to get GTDT table.
+    Move enum ppi_nr to arm_arch_timer.h, and add enum spi_nr.
+    Add arm_arch_timer get ppi from DT and GTDT support for kvm.
+
+v2: https://lkml.org/lkml/2015/12/2/10
+    Rebase to latest kernel version(4.4-rc3).
+    Fix the bug about the config problem,
+    use CONFIG_ACPI_GTDT instead of CONFIG_ACPI in arm_arch_timer.c
+
+v1: The first upstreaming version: https://lkml.org/lkml/2015/10/28/553
+
+Fu Wei (9):
+  clocksource/drivers/arm_arch_timer: Move enums and defines to header
+    file
+  clocksource/drivers/arm_arch_timer: Add a new enum for spi type
+  clocksource/drivers/arm_arch_timer: Improve printk relevant code
+  acpi/arm64: Add GTDT table parse driver
+  MAINTAINERS / ACPI: add the ARM64-specific ACPI Support maintainers
+  clocksource/drivers/arm_arch_timer: Simplify ACPI support code.
+  acpi/arm64: Add memory-mapped timer support in GTDT driver
+  clocksource/drivers/arm_arch_timer: Add GTDT support for memory-mapped
+    timer
+  acpi/arm64: Add SBSA Generic Watchdog support in GTDT driver
+
+ MAINTAINERS                          |   8 +
+ drivers/acpi/Kconfig                 |   5 +
+ drivers/acpi/Makefile                |   1 +
+ drivers/acpi/arm64/Kconfig           |  15 ++
+ drivers/acpi/arm64/Makefile          |   1 +
+ drivers/acpi/arm64/acpi_gtdt.c       | 343 +++++++++++++++++++++++++++++++++++
+ drivers/clocksource/Kconfig          |   1 +
+ drivers/clocksource/arm_arch_timer.c | 228 ++++++++++++++++-------
+ drivers/watchdog/Kconfig             |   1 +
+ include/clocksource/arm_arch_timer.h |  32 ++++
+ include/linux/acpi.h                 |   7 +
+ 11 files changed, 575 insertions(+), 67 deletions(-)
+ create mode 100644 drivers/acpi/arm64/Kconfig
+ create mode 100644 drivers/acpi/arm64/Makefile
+ create mode 100644 drivers/acpi/arm64/acpi_gtdt.c
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+2.5.5
