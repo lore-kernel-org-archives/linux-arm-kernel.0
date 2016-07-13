@@ -1,18 +1,22 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 13 Jul 2016 03:20:49 +0200
-Subject: [PATCH 1/2] ARM: dts: r8a7792: add PLL1 divided by 2 clock
-In-Reply-To: <40786877.3MNoIeTZcz@wasted.cogentembedded.com>
+Date: Wed, 13 Jul 2016 03:23:10 +0200
+Subject: [PATCH 2/2] ARM: dts: r8a7792: remove ADSP clock
+In-Reply-To: <6927311.Po2EPBmxEp@wasted.cogentembedded.com>
 References: <1529351.Fac5N2tKoF@wasted.cogentembedded.com>
- <40786877.3MNoIeTZcz@wasted.cogentembedded.com>
-Message-ID: <CAMuHMdVaj=gnPXR4vDzGScRbJf-54=kbAJ4TWEJm7-atmSAg2g@mail.gmail.com>
+ <6927311.Po2EPBmxEp@wasted.cogentembedded.com>
+Message-ID: <CAMuHMdVkWPrfA0dc_pS1w2C7AB9mO+D59RiL1RLcFBg9W_tecQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 11, 2016 at 11:51 PM, Sergei Shtylyov
+On Mon, Jul 11, 2016 at 11:52 PM, Sergei Shtylyov
 <sergei.shtylyov@cogentembedded.com> wrote:
-> Despite the QSPI clock has PLL1/VCOx1/4 clock as a parent, the latter
-> hasn't been added to the R8A7792 device tree  -- fix this overlook at
-> last...
+> Simon Horman told  me  that R8A7792 had ADSP clock (based on the most recent
+
+... based on a probably incorrect table in ...
+
+> R-Car gen2 manual) but when I  got that manual as well, this claim proved
+> to be false: R8A7792 is the only gen2 SoC that doesn't  have ADSP at all.
+> Remove that  clock  for good...
 >
 > Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
