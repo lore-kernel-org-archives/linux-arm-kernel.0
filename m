@@ -1,48 +1,28 @@
-From: sr@denx.de (Stefan Roese)
-Date: Wed, 13 Jul 2016 11:48:35 +0200
-Subject: [PATCH 1/3 v2] arm: mvebu: Add SPI1 pinctrl defines for Armada XP
-Message-ID: <20160713094837.25956-1-sr@denx.de>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 13 Jul 2016 11:54:52 +0200
+Subject: [PATCH v3 7/7] clk: exynos5433: remove CLK_IGNORE_UNUSED flag from
+ SPI clocks
+In-Reply-To: <578607FD.6050705@samsung.com>
+References: <1468317736-18841-1-git-send-email-andi.shyti@samsung.com>
+ <1468317736-18841-8-git-send-email-andi.shyti@samsung.com>
+ <146836184696.73491.9452469757415968654@resonance>
+ <578607FD.6050705@samsung.com>
+Message-ID: <57860FEC.3090004@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch defines and uses common Armada XP pinctrl settings in
-armada-xp.dtsi for the SPI1 interface (MPP13,14,16,17).
+On 07/13/2016 11:21 AM, Sylwester Nawrocki wrote:
+> On 07/13/2016 12:17 AM, Michael Turquette wrote:
+>>
+>> Do you want these patches to go through same tree? If not, I can take
+>> this patch into clk-next.
+> 
+> I think this patch can safely go separately through the clk tree,
+> we just need to ensure whole series is merged for same release
+> to avoid regressions. There should be no problems with git bisect
+> since there is no exynos5433 based board dts in mainline yet.
 
-Signed-off-by: Stefan Roese <sr@denx.de>
-Reviewed-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
-v2:
-- Added to this dts SPI node move patchset. No functional change.
+Ack.
 
- arch/arm/boot/dts/armada-xp.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
-
-diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
-index 553349c..4033790 100644
---- a/arch/arm/boot/dts/armada-xp.dtsi
-+++ b/arch/arm/boot/dts/armada-xp.dtsi
-@@ -94,6 +94,8 @@
- 			spi1: spi at 10680 {
- 				compatible = "marvell,armada-xp-spi",
- 						"marvell,orion-spi";
-+				pinctrl-0 = <&spi1_pins>;
-+				pinctrl-names = "default";
- 			};
- 
- 
-@@ -362,6 +364,12 @@
- 		marvell,function = "spi0";
- 	};
- 
-+	spi1_pins: spi1-pins {
-+		marvell,pins = "mpp13", "mpp14",
-+			       "mpp16", "mpp17";
-+		marvell,function = "spi1";
-+	};
-+
- 	uart2_pins: uart2-pins {
- 		marvell,pins = "mpp42", "mpp43";
- 		marvell,function = "uart2";
--- 
-2.9.1
+Best regards,
+Krzysztof
