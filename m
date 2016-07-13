@@ -1,127 +1,96 @@
 From: anna-maria@linutronix.de (Anna-Maria Gleixner)
-Date: Wed, 13 Jul 2016 17:16:52 -0000
-Subject: [patch V2 49/67] arm/xen: Convert to hotplug state machine
+Date: Wed, 13 Jul 2016 17:16:56 -0000
+Subject: [patch V2 53/67] arm64/armv8 deprecated: Convert to hotplug state
+ machine
 References: <20160713153219.128052238@linutronix.de>
-Message-ID: <20160713153336.971559670@linutronix.de>
+Message-ID: <20160713153337.311115906@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Richard Cochran <rcochran@linutronix.de>
+From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 
-Install the callbacks via the state machine and let the core invoke
-the callbacks on the already online CPUs.
+Install the callbacks via the state machine.
 
-The get_cpu() in xen_starting_cpu() boils down to preempt_disable() since
-we already know the CPU we run on. Disabling preemption shouldn't be required
-here from what I see since it we don't switch CPUs while invoking the function.
-
-Signed-off-by: Richard Cochran <rcochran@linutronix.de>
-Reviewed-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: James Morse <james.morse@arm.com>
+Cc: Jisheng Zhang <jszhang@marvell.com>
 Cc: Linus Torvalds <torvalds@linux-foundation.org>
 Cc: Peter Zijlstra <peterz@infradead.org>
-Cc: Russell King <linux@armlinux.org.uk>
-Cc: Stefano Stabellini <sstabellini@kernel.org>
-Cc: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+Cc: Shengjiu Wang <shengjiu.wang@freescale.com>
 Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Will Deacon <will.deacon@arm.com>
 Cc: linux-arm-kernel at lists.infradead.org
-Cc: xen-devel at lists.xenproject.org
 Signed-off-by: Anna-Maria Gleixner <anna-maria@linutronix.de>
 ---
- arch/arm/xen/enlighten.c   | 41 +++++++++++------------------------------
- include/linux/cpuhotplug.h |  1 +
- 2 files changed, 12 insertions(+), 30 deletions(-)
+ arch/arm64/kernel/armv8_deprecated.c | 22 +++++-----------------
+ include/linux/cpuhotplug.h           |  1 +
+ 2 files changed, 6 insertions(+), 17 deletions(-)
 
-diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-index 75cd734..d822e23 100644
---- a/arch/arm/xen/enlighten.c
-+++ b/arch/arm/xen/enlighten.c
-@@ -161,12 +161,11 @@ static struct notifier_block xen_pvclock_gtod_notifier = {
- 	.notifier_call = xen_pvclock_gtod_notify,
+diff --git a/arch/arm64/kernel/armv8_deprecated.c b/arch/arm64/kernel/armv8_deprecated.c
+index c37202c..9668c23 100644
+--- a/arch/arm64/kernel/armv8_deprecated.c
++++ b/arch/arm64/kernel/armv8_deprecated.c
+@@ -121,7 +121,7 @@ static int run_all_cpu_set_hw_mode(struct insn_emulation *insn, bool enable)
+  *  0 		- If all the hooks ran successfully.
+  * -EINVAL	- At least one hook is not supported by the CPU.
+  */
+-static int run_all_insn_set_hw_mode(unsigned long cpu)
++static int run_all_insn_set_hw_mode(unsigned int cpu)
+ {
+ 	int rc = 0;
+ 	unsigned long flags;
+@@ -131,7 +131,7 @@ static int run_all_insn_set_hw_mode(unsigned long cpu)
+ 	list_for_each_entry(insn, &insn_emulation, node) {
+ 		bool enable = (insn->current_mode == INSN_HW);
+ 		if (insn->ops->set_hw_mode && insn->ops->set_hw_mode(enable)) {
+-			pr_warn("CPU[%ld] cannot support the emulation of %s",
++			pr_warn("CPU[%u] cannot support the emulation of %s",
+ 				cpu, insn->ops->name);
+ 			rc = -EINVAL;
+ 		}
+@@ -617,20 +617,6 @@ static struct insn_emulation_ops setend_ops = {
+ 	.set_hw_mode = setend_set_hw_mode,
  };
  
--static void xen_percpu_init(void)
-+static int xen_starting_cpu(unsigned int cpu)
- {
- 	struct vcpu_register_vcpu_info info;
- 	struct vcpu_info *vcpup;
- 	int err;
--	int cpu = get_cpu();
- 
- 	/* 
- 	 * VCPUOP_register_vcpu_info cannot be called twice for the same
-@@ -190,7 +189,13 @@ static void xen_percpu_init(void)
- 
- after_register_vcpu_info:
- 	enable_percpu_irq(xen_events_irq, 0);
--	put_cpu();
-+	return 0;
-+}
-+
-+static int xen_dying_cpu(unsigned int cpu)
-+{
-+	disable_percpu_irq(xen_events_irq);
-+	return 0;
- }
- 
- static void xen_restart(enum reboot_mode reboot_mode, const char *cmd)
-@@ -209,28 +214,6 @@ static void xen_power_off(void)
- 	BUG_ON(rc);
- }
- 
--static int xen_cpu_notification(struct notifier_block *self,
--				unsigned long action,
--				void *hcpu)
+-static int insn_cpu_hotplug_notify(struct notifier_block *b,
+-			      unsigned long action, void *hcpu)
 -{
--	switch (action) {
--	case CPU_STARTING:
--		xen_percpu_init();
--		break;
--	case CPU_DYING:
--		disable_percpu_irq(xen_events_irq);
--		break;
--	default:
--		break;
--	}
+-	int rc = 0;
+-	if ((action & ~CPU_TASKS_FROZEN) == CPU_STARTING)
+-		rc = run_all_insn_set_hw_mode((unsigned long)hcpu);
 -
--	return NOTIFY_OK;
+-	return notifier_from_errno(rc);
 -}
 -
--static struct notifier_block xen_cpu_notifier = {
--	.notifier_call = xen_cpu_notification,
+-static struct notifier_block insn_cpu_hotplug_notifier = {
+-	.notifier_call = insn_cpu_hotplug_notify,
 -};
 -
- static irqreturn_t xen_arm_callback(int irq, void *arg)
- {
- 	xen_hvm_evtchn_do_upcall();
-@@ -351,16 +334,14 @@ static int __init xen_guest_init(void)
- 		return -EINVAL;
+ /*
+  * Invoked as late_initcall, since not needed before init spawned.
+  */
+@@ -649,7 +635,9 @@ static int __init armv8_deprecated_init(void)
+ 			pr_info("setend instruction emulation is not supported on the system");
  	}
  
--	xen_percpu_init();
--
--	register_cpu_notifier(&xen_cpu_notifier);
--
- 	pv_time_ops.steal_clock = xen_stolen_accounting;
- 	static_key_slow_inc(&paravirt_steal_enabled);
- 	if (xen_initial_domain())
- 		pvclock_gtod_register_notifier(&xen_pvclock_gtod_notifier);
+-	register_cpu_notifier(&insn_cpu_hotplug_notifier);
++	cpuhp_setup_state_nocalls(CPUHP_AP_ARM64_ISNDEP_STARTING,
++				  "AP_ARM64_ISNDEP_STARTING",
++				  run_all_insn_set_hw_mode, NULL);
+ 	register_insn_emulation_sysctl(ctl_abi);
  
--	return 0;
-+	return cpuhp_setup_state(CPUHP_AP_ARM_XEN_STARTING,
-+				 "AP_ARM_XEN_STARTING", xen_starting_cpu,
-+				 xen_dying_cpu);
- }
- early_initcall(xen_guest_init);
- 
+ 	return 0;
 diff --git a/include/linux/cpuhotplug.h b/include/linux/cpuhotplug.h
-index 86ac982..f986963 100644
+index 9f9098e..da94513 100644
 --- a/include/linux/cpuhotplug.h
 +++ b/include/linux/cpuhotplug.h
-@@ -48,6 +48,7 @@ enum cpuhp_state {
- 	CPUHP_AP_KVM_STARTING,
- 	CPUHP_AP_KVM_ARM_VGIC_STARTING,
- 	CPUHP_AP_KVM_ARM_TIMER_STARTING,
-+	CPUHP_AP_ARM_XEN_STARTING,
+@@ -52,6 +52,7 @@ enum cpuhp_state {
+ 	CPUHP_AP_ARM_XEN_STARTING,
+ 	CPUHP_AP_ARM_CORESIGHT_STARTING,
+ 	CPUHP_AP_ARM_CORESIGHT4_STARTING,
++	CPUHP_AP_ARM64_ISNDEP_STARTING,
  	CPUHP_AP_LEDTRIG_STARTING,
  	CPUHP_AP_NOTIFY_STARTING,
  	CPUHP_AP_ONLINE,
