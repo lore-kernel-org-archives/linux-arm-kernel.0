@@ -1,79 +1,50 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Wed, 13 Jul 2016 11:01:35 +0200
-Subject: [PATCH RFC] serial: imx: support an enable-gpio
-Message-ID: <1468400495-10471-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: pmeerw@pmeerw.net (Peter Meerwald-Stadler)
+Date: Wed, 13 Jul 2016 11:02:28 +0200 (CEST)
+Subject: sama5d4, configure pck1 with dt?
+In-Reply-To: <20160707091512.387ea113@bbrezillon>
+References: <alpine.DEB.2.02.1607062239210.12243@pmeerw.net>
+ <20160707091512.387ea113@bbrezillon>
+Message-ID: <alpine.DEB.2.02.1607131054080.10743@pmeerw.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A part of my machine looks as follows (simplified):
+Hallo Boris,
 
-,------------------------.
-| ,---------.            |
-| |  imx25  o--RX----?---o---
-| |         o--GPIO--'   |
-| `---------'            |
-`------------------------'
+> > how do I configure pck1 using devicetree to be used as the master 
+> > clock for an audio codec?
+> > 
+> > in particular how do I choose the clock source and frequency for pck1?
+> > is there a way to do this using devicetree?
+> > 
+> > or is the code in at91sam9g20ek_audio_probe() the way to go?
+> > i.e mclk=clk_get(0, "pck1"); pllb=clk_get(0, "pllb"); clk_set_parent(mclk, 
+> > pllb); clk_set_rate(mclk, 12000000);
+> 
+> It's as simple as that:
+> mclk = clk_get(<your-device>, "<audio-clk-name>");
+> clk_set_rate(mclk, <rate>);
 
-that is, there is a driver on the RX line that must be enabled before
-the UART can be used. (That is necessary because the default mux of the
-RX pad after reset is an output.)
+thank you for your advise; it almost works :)
+my issue is/was that CLK_SET_PARENT_GATE is set, so the clock cannot
+reparent when prepared
 
-To represent this in the device tree I do:
+the audio codec driver I am trying to use (da7213) enables the mclk in 
+BIAS_STANDBY pretty much before doing anything else (without knowing the 
+actual clock rate), later-on setting the actual rate fails...
 
-	pinctrl_uart5: uart5 {
-		fsl,pins = <
-			...
-			MX25_PAD_LBA__UART5_RXD		0x00000000
-			MX25_PAD_CS5__GPIO_3_21		0x00002001
-			...
-	};
+the issue is within ALSA and/or the codec driver, not the SAMA5D4 clock 
+implementation
 
-	&uart5 {
-		pinctrl-names = "default";
-		pinctrl-0 = <&pinctrl_uart5>;
+> <your-device> should not be NULL, <audio-clk-name> should not be pck1
+> (see the DT binding doc), and you should not manually re-parent the mclk
+> clk (the driver select the best parent when clk_set_rate() is
+> called).
 
-		enable-gpio = <&gpio3 21 GPIO_ACTIVE_LOW>;
-		...
-	};
+yep, understood, doing so now
 
-This way it's ensured that the gpio is only enabled when the LBA pad is
-muxed as RX (together with the bootloader that sets the GPIO high).
+thanks, regards, p.
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
-Hello,
-
-I'm not sure about the naming. Do you have a better suggestion how to handle
-this situation?
-
-Best regards
-Uwe
-
- drivers/tty/serial/imx.c | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
-index 0df2b1c091ae..56eaa18aa5be 100644
---- a/drivers/tty/serial/imx.c
-+++ b/drivers/tty/serial/imx.c
-@@ -39,6 +39,7 @@
- #include <linux/of_device.h>
- #include <linux/io.h>
- #include <linux/dma-mapping.h>
-+#include <linux/gpio/consumer.h>
- 
- #include <asm/irq.h>
- #include <linux/platform_data/serial-imx.h>
-@@ -1987,7 +1988,9 @@ static int serial_imx_probe_dt(struct imx_port *sport,
- 	if (of_get_property(np, "fsl,dte-mode", NULL))
- 		sport->dte_mode = 1;
- 
--	return 0;
-+	ret = PTR_ERR_OR_ZERO(devm_gpiod_get_optional(&pdev->dev, "enable", GPIOD_OUT_HIGH));
-+	dev_info(&pdev->dev, "Tralala: ret = %d\n", ret);
-+	return ret;
- }
- #else
- static inline int serial_imx_probe_dt(struct imx_port *sport,
 -- 
-2.8.1
+
+Peter Meerwald-Stadler
++43-664-2444418 (mobile)
