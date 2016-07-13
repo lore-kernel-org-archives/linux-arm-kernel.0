@@ -1,81 +1,46 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 13 Jul 2016 15:13:42 +0200
-Subject: [RFC 0/3] extend kexec_file_load system call
-In-Reply-To: <20160713094127.GC14522@leverpostej>
-References: <20160712014201.11456-1-takahiro.akashi@linaro.org>
- <5352106.oQ0Ff9gWJA@wuerfel> <20160713094127.GC14522@leverpostej>
-Message-ID: <7352796.seiSnHrYPy@wuerfel>
+Date: Wed, 13 Jul 2016 15:17:17 +0200
+Subject: [PATCH v2] [media] mtk-vcodec: fix more type mismatches
+In-Reply-To: <1468407163.3555.1.camel@mtksdaap41>
+References: <20160713084916.2765651-1-arnd@arndb.de>
+ <1468407163.3555.1.camel@mtksdaap41>
+Message-ID: <9022784.B8ChAA686D@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, July 13, 2016 10:41:28 AM CEST Mark Rutland wrote:
-> On Wed, Jul 13, 2016 at 10:01:33AM +0200, Arnd Bergmann wrote:
-> > On Wednesday, July 13, 2016 10:36:14 AM CEST Dave Young wrote:
-> > > On 07/12/16 at 03:50pm, Mark Rutland wrote:
-> > > > On Tue, Jul 12, 2016 at 04:24:10PM +0200, Arnd Bergmann wrote:
-> > > > > On Tuesday, July 12, 2016 10:18:11 AM CEST Vivek Goyal wrote:
-> > > > 
-> > > > /proc/devicetree (aka /sys/firmware/devicetree) is a filesystem derived
-> > > > from the raw DTB (which is exposed at /sys/firmware/fdt).
-> > > > 
-> > > > The blob that was handed to the kernel at boot time is exposed at
-> > > > /sys/firmware/fdt.
-> > > 
-> > > I believe the blob can be read and passed to kexec kernel in kernel code without
-> > > the extra fd.
-> > > 
-> > > But consider we can kexec to a different kernel and a different initrd so there
-> > > will be use cases to pass a total different dtb as well. From my understanding
-> > > it is reasonable but yes I think we should think carefully about the design.
-> > 
-> > Ok, I can see four interesting use cases here:
-> > 
-> > - Using the dtb that the kernel has saved at boot time. Ideally this should not
-> >   require an additional step of signing it, since the running kernel already
-> >   trusts it.
+On Wednesday, July 13, 2016 6:52:43 PM CEST pochun lin wrote:
+> > diff --git a/drivers/media/platform/mtk-vcodec/venc/venc_h264_if.c b/drivers/media/platform/mtk-vcodec/venc/venc_h264_if.c
+> > index f4e18bb44cb9..9a600525b3c1 100644
+> > --- a/drivers/media/platform/mtk-vcodec/venc/venc_h264_if.c
+> > +++ b/drivers/media/platform/mtk-vcodec/venc/venc_h264_if.c
+> > @@ -295,9 +295,9 @@ static int h264_enc_alloc_work_buf(struct venc_h264_inst *inst)
+> >               wb[i].iova = inst->work_bufs[i].dma_addr;
+> >  
+> >               mtk_vcodec_debug(inst,
+> > -                              "work_buf[%d] va=0x%p iova=0x%p size=%zu",
+> > +                              "work_buf[%d] va=0x%p iova=%pad size=%zu",
+> >                                i, inst->work_bufs[i].va,
+> > -                              (void *)inst->work_bufs[i].dma_addr,
+> > +                              &inst->work_bufs[i].dma_addr,
+> >                                inst->work_bufs[i].size);
+> >       }
+> >  
 > 
-> We have sufficient information from the existing kexec_file_load syscall
-> prototype to do this in-kernel.
+> This modified will dump dma_addr's address, not dma_addr value.
+> In actually, we need to dump dma_addr value.
 
-Ok.
+According to Documentation/printk-formats.txt, it gets passed by
+reference:
 
-> > - A dtb blob from the file system that was produced along with the kernel image.
-> >   If we require a signature on the kernel, the the same requirement should be
-> >   made on the dtb. Whoever signs the kernel can also sign the dtb.
-> >   The tricky part here is the kernel command line that is part of the dtb
-> >   and that may need to be modified.
-> 
-> I suspect that for this case, following the example of the existing
-> sycall, we'd allow the kernel to modify bootargs and initrd properties
-> after verfiying the signature of the DTB.
+| DMA addresses types dma_addr_t:
+|
+|        %pad    0x01234567 or 0x0123456789abcdef
+|
+|        For printing a dma_addr_t type which can vary based on build options,
+|        regardless of the width of the CPU data path. Passed by reference.
 
-Makes sense.
- 
-> The big question is whether this is a realistic case on a secure boot
-> system.
-
-What does x86 do here? I assume changes to the command line are also
-limited.
-
-> > - Modifying the dtb at for any of the reasons I listed: This should always
-> >   be possible when we do not use secure boot, just like booting an unsigned
-> >   kernel is.
-> 
-> This is possible with the existing kexec_load syscall, for the non
-> secure boot case.
-
-Ok, let's skip that then.
-
-> > - kboot/petitboot with all of the user space being part of the trusted boot
-> >   chain: it would be good to allow these to modify the dtb as needed without
-> >   breaking the trust chain, just like we allow grub or u-boot to modify the dtb
-> >   before passing it to the kernel.
-> 
-> It depends on *what* we need to modify here. We can modify the bootargs
-> and initrd properties as part of the kexec_file_load syscall, so what
-> else would we want to alter?
-
-I guess petitboot can also just use kexec_load() instead of kexec_file_load(),
-as long as the initramfs containing petitboot is trusted by the kernel.
+The whole point of the %pad/%pr/%pM/... format strings is to print
+something that cannot be passed by value because the type is not
+a fixed-size integer.
 
 	Arnd
