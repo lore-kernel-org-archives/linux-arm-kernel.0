@@ -1,113 +1,393 @@
-From: nicolas@ndufresne.ca (Nicolas Dufresne)
-Date: Wed, 13 Jul 2016 09:55:57 -0400
-Subject: [PATCH v3 3/9] DocBook/v4l: Add compressed video formats used
- on MT8173 codec driver
-In-Reply-To: <1468375209.2462.20.camel@mtksdaap41>
-References: <1464611363-14936-1-git-send-email-tiffany.lin@mediatek.com>
- <1464611363-14936-2-git-send-email-tiffany.lin@mediatek.com>
- <1464611363-14936-3-git-send-email-tiffany.lin@mediatek.com>
- <1464611363-14936-4-git-send-email-tiffany.lin@mediatek.com>
- <5a793171-24a7-4e9e-8bfd-f668c789f8e0@xs4all.nl>
- <1468205771.3725.8.camel@mtksdaap41>
- <CAOMLVLiZU3D587dSyp2b2v4DV+MS9vh85bA4BoG7ddK6556rbA@mail.gmail.com>
- <1468350511.8843.16.camel@gmail.com> <1468350842.8843.18.camel@gmail.com>
- <1468375209.2462.20.camel@mtksdaap41>
-Message-ID: <1468418157.2867.12.camel@ndufresne.ca>
+From: suzuki.poulose@arm.com (Suzuki K Poulose)
+Date: Wed, 13 Jul 2016 14:59:32 +0100
+Subject: [PATCH] coresight: Use local coresight_desc instances
+Message-ID: <1468418372-30797-1-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le mercredi 13 juillet 2016 ? 10:00 +0800, tiffany lin a ?crit?:
-> Hi Nicolas,
-> 
-> On Tue, 2016-07-12 at 15:14 -0400, Nicolas Dufresne wrote:
-> > Le mardi 12 juillet 2016 ? 15:08 -0400, Nicolas Dufresne a ?crit :
-> > > Le mardi 12 juillet 2016 ? 16:16 +0800, Wu-Cheng Li (???) a ?crit
-> :
-> > > > Decoder hardware produces MT21 (compressed). Image processor
-> can
-> > > > convert it to a format that can be input of display driver.
-> > > > Tiffany.
-> > > > When do you plan to upstream image processor (mtk-mdp)?
-> > > > >?
-> > > > > It can be as input format for encoder, MDP and display
-> drivers in
-> > > > our
-> > > > > platform.
-> > > > I remember display driver can only accept uncompressed MT21.
-> Right?
-> > > > Basically V4L2_PIX_FMT_MT21 is compressed and is like an opaque
-> > > > format. It's not usable until it's decompressed and converted
-> by
-> > > > image
-> > > > processor.
-> > >?
-> > > Previously it was described as MediaTek block mode, and now as a
-> > > MediaTek compressed format. It makes me think you have no idea
-> what
-> > > this pixel format really is. Is that right ?
-> > >?
-> > > The main reason why I keep asking, is that we often find
-> similarities
-> > > between what vendor like to call their proprietary formats. Doing
-> the
-> > > proper research helps not creating a mess like in Android where
-> you
-> > > have a lot of formats that all point to the same format. I
-> believe
-> > > there was the same concern when Samsung wanted to introduce their
-> Z-
-> > > flip-Z NV12 tile format. In the end they simply provided
-> sufficient
-> > > documentation so we could document it and implement software
-> > > converters
-> > > for test and validation purpose.
-> >?
-> > Here's the kind of information we want in the documentation.
-> >?
-> > https://chromium.googlesource.com/chromium/src/media/+/master/base/
-> vide
-> > o_types.h#40
-> >?
-> >?? // MediaTek proprietary format. MT21 is similar to NV21 except
-> the memory
-> >?? // layout and pixel layout (swizzles). 12bpp with Y plane
-> followed by a 2x2
-> >?? // interleaved VU plane. Each image contains two buffers -- Y
-> plane and VU
-> >?? // plane. Two planes can be non-contiguous in memory. The
-> starting addresses
-> >?? // of Y plane and VU plane are 4KB alignment.
-> >?? // Suppose image dimension is (width, height). For both Y plane
-> and VU plane:
-> >?? // Row pitch = ((width+15)/16) * 16.
-> >?? // Plane size = Row pitch * (((height+31)/32)*32)
-> >?
-> > Now obviously this is incomplete, as the swizzling need to be
-> documented of course.
-> >?
-> Because it's finally a compressed format from our codec hw, we cannot
-> describe its swizzling.
+Each coresight device prepares a description for coresight_register()
+in struct coresight_desc. Once we register the device, the description is
+useless and can be freed. The coresight_desc is small enough (48bytes on 64bit)
+to be allocated on the stack. Hence use an automatic variable to avoid a
+needless dynamic allocation and wasting the memory(which will only be free'd
+when the device is destroyed).
 
-Can you clarify why it cannot be described ? I don't buy any argument
-that it's impossible to convert without hardware. Intel did document
-their compressed formats.
+Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+---
+ drivers/hwtracing/coresight/coresight-etb10.c      | 20 ++++++---------
+ drivers/hwtracing/coresight/coresight-etm3x.c      | 20 ++++++---------
+ drivers/hwtracing/coresight/coresight-etm4x.c      | 20 ++++++---------
+ drivers/hwtracing/coresight/coresight-funnel.c     | 20 ++++++---------
+ .../coresight/coresight-replicator-qcom.c          | 14 +++++-----
+ drivers/hwtracing/coresight/coresight-replicator.c | 20 +++++----------
+ drivers/hwtracing/coresight/coresight-stm.c        | 22 ++++++----------
+ drivers/hwtracing/coresight/coresight-tmc.c        | 30 ++++++++++------------
+ drivers/hwtracing/coresight/coresight-tpiu.c       | 18 +++++--------
+ 9 files changed, 74 insertions(+), 110 deletions(-)
 
-Debugging an integration with such format that we have literally
-decided to no make public is a pain. A lot of decoder got abandoned or
-never used because of that.
-
-It would be nice to explain the architecture you are suggesting to make
-this decoder useful. How will userspace application be able to use your
-decoder. Will the image processor usable outside the display path ?
-People might want to do transcoding, or other relatively common task
-that does not imply a display.
-
-regards,
-Nicolas
-
-p.s.
-A small note to Wu-Cheng, the definition of the DRM format in your
-Chromium branch is not correct. DRM uses format modifier, such that the
-format is the family, in your case it's most likely NV21, and the
-modifier is the compression or tiling algorithm in place (or both as
-needed).
+diff --git a/drivers/hwtracing/coresight/coresight-etb10.c b/drivers/hwtracing/coresight/coresight-etb10.c
+index 3b483e3..8a4927c 100644
+--- a/drivers/hwtracing/coresight/coresight-etb10.c
++++ b/drivers/hwtracing/coresight/coresight-etb10.c
+@@ -636,7 +636,7 @@ static int etb_probe(struct amba_device *adev, const struct amba_id *id)
+ 	struct coresight_platform_data *pdata = NULL;
+ 	struct etb_drvdata *drvdata;
+ 	struct resource *res = &adev->res;
+-	struct coresight_desc *desc;
++	struct coresight_desc desc = { 0 };
+ 	struct device_node *np = adev->dev.of_node;
+ 
+ 	if (np) {
+@@ -682,17 +682,13 @@ static int etb_probe(struct amba_device *adev, const struct amba_id *id)
+ 		return -ENOMEM;
+ 	}
+ 
+-	desc = devm_kzalloc(dev, sizeof(*desc), GFP_KERNEL);
+-	if (!desc)
+-		return -ENOMEM;
+-
+-	desc->type = CORESIGHT_DEV_TYPE_SINK;
+-	desc->subtype.sink_subtype = CORESIGHT_DEV_SUBTYPE_SINK_BUFFER;
+-	desc->ops = &etb_cs_ops;
+-	desc->pdata = pdata;
+-	desc->dev = dev;
+-	desc->groups = coresight_etb_groups;
+-	drvdata->csdev = coresight_register(desc);
++	desc.type = CORESIGHT_DEV_TYPE_SINK;
++	desc.subtype.sink_subtype = CORESIGHT_DEV_SUBTYPE_SINK_BUFFER;
++	desc.ops = &etb_cs_ops;
++	desc.pdata = pdata;
++	desc.dev = dev;
++	desc.groups = coresight_etb_groups;
++	drvdata->csdev = coresight_register(&desc);
+ 	if (IS_ERR(drvdata->csdev))
+ 		return PTR_ERR(drvdata->csdev);
+ 
+diff --git a/drivers/hwtracing/coresight/coresight-etm3x.c b/drivers/hwtracing/coresight/coresight-etm3x.c
+index d83ab82..beaaa2c 100644
+--- a/drivers/hwtracing/coresight/coresight-etm3x.c
++++ b/drivers/hwtracing/coresight/coresight-etm3x.c
+@@ -758,13 +758,9 @@ static int etm_probe(struct amba_device *adev, const struct amba_id *id)
+ 	struct coresight_platform_data *pdata = NULL;
+ 	struct etm_drvdata *drvdata;
+ 	struct resource *res = &adev->res;
+-	struct coresight_desc *desc;
++	struct coresight_desc desc = { 0 };
+ 	struct device_node *np = adev->dev.of_node;
+ 
+-	desc = devm_kzalloc(dev, sizeof(*desc), GFP_KERNEL);
+-	if (!desc)
+-		return -ENOMEM;
+-
+ 	drvdata = devm_kzalloc(dev, sizeof(*drvdata), GFP_KERNEL);
+ 	if (!drvdata)
+ 		return -ENOMEM;
+@@ -819,13 +815,13 @@ static int etm_probe(struct amba_device *adev, const struct amba_id *id)
+ 	etm_init_trace_id(drvdata);
+ 	etm_set_default(&drvdata->config);
+ 
+-	desc->type = CORESIGHT_DEV_TYPE_SOURCE;
+-	desc->subtype.source_subtype = CORESIGHT_DEV_SUBTYPE_SOURCE_PROC;
+-	desc->ops = &etm_cs_ops;
+-	desc->pdata = pdata;
+-	desc->dev = dev;
+-	desc->groups = coresight_etm_groups;
+-	drvdata->csdev = coresight_register(desc);
++	desc.type = CORESIGHT_DEV_TYPE_SOURCE;
++	desc.subtype.source_subtype = CORESIGHT_DEV_SUBTYPE_SOURCE_PROC;
++	desc.ops = &etm_cs_ops;
++	desc.pdata = pdata;
++	desc.dev = dev;
++	desc.groups = coresight_etm_groups;
++	drvdata->csdev = coresight_register(&desc);
+ 	if (IS_ERR(drvdata->csdev)) {
+ 		ret = PTR_ERR(drvdata->csdev);
+ 		goto err_arch_supported;
+diff --git a/drivers/hwtracing/coresight/coresight-etm4x.c b/drivers/hwtracing/coresight/coresight-etm4x.c
+index c8b44c6..2c21b1d 100644
+--- a/drivers/hwtracing/coresight/coresight-etm4x.c
++++ b/drivers/hwtracing/coresight/coresight-etm4x.c
+@@ -726,13 +726,9 @@ static int etm4_probe(struct amba_device *adev, const struct amba_id *id)
+ 	struct coresight_platform_data *pdata = NULL;
+ 	struct etmv4_drvdata *drvdata;
+ 	struct resource *res = &adev->res;
+-	struct coresight_desc *desc;
++	struct coresight_desc desc = { 0 };
+ 	struct device_node *np = adev->dev.of_node;
+ 
+-	desc = devm_kzalloc(dev, sizeof(*desc), GFP_KERNEL);
+-	if (!desc)
+-		return -ENOMEM;
+-
+ 	drvdata = devm_kzalloc(dev, sizeof(*drvdata), GFP_KERNEL);
+ 	if (!drvdata)
+ 		return -ENOMEM;
+@@ -778,13 +774,13 @@ static int etm4_probe(struct amba_device *adev, const struct amba_id *id)
+ 	etm4_init_trace_id(drvdata);
+ 	etm4_set_default(&drvdata->config);
+ 
+-	desc->type = CORESIGHT_DEV_TYPE_SOURCE;
+-	desc->subtype.source_subtype = CORESIGHT_DEV_SUBTYPE_SOURCE_PROC;
+-	desc->ops = &etm4_cs_ops;
+-	desc->pdata = pdata;
+-	desc->dev = dev;
+-	desc->groups = coresight_etmv4_groups;
+-	drvdata->csdev = coresight_register(desc);
++	desc.type = CORESIGHT_DEV_TYPE_SOURCE;
++	desc.subtype.source_subtype = CORESIGHT_DEV_SUBTYPE_SOURCE_PROC;
++	desc.ops = &etm4_cs_ops;
++	desc.pdata = pdata;
++	desc.dev = dev;
++	desc.groups = coresight_etmv4_groups;
++	drvdata->csdev = coresight_register(&desc);
+ 	if (IS_ERR(drvdata->csdev)) {
+ 		ret = PTR_ERR(drvdata->csdev);
+ 		goto err_arch_supported;
+diff --git a/drivers/hwtracing/coresight/coresight-funnel.c b/drivers/hwtracing/coresight/coresight-funnel.c
+index 05df789..860fe6e 100644
+--- a/drivers/hwtracing/coresight/coresight-funnel.c
++++ b/drivers/hwtracing/coresight/coresight-funnel.c
+@@ -176,7 +176,7 @@ static int funnel_probe(struct amba_device *adev, const struct amba_id *id)
+ 	struct coresight_platform_data *pdata = NULL;
+ 	struct funnel_drvdata *drvdata;
+ 	struct resource *res = &adev->res;
+-	struct coresight_desc *desc;
++	struct coresight_desc desc = { 0 };
+ 	struct device_node *np = adev->dev.of_node;
+ 
+ 	if (np) {
+@@ -207,17 +207,13 @@ static int funnel_probe(struct amba_device *adev, const struct amba_id *id)
+ 	drvdata->base = base;
+ 	pm_runtime_put(&adev->dev);
+ 
+-	desc = devm_kzalloc(dev, sizeof(*desc), GFP_KERNEL);
+-	if (!desc)
+-		return -ENOMEM;
+-
+-	desc->type = CORESIGHT_DEV_TYPE_LINK;
+-	desc->subtype.link_subtype = CORESIGHT_DEV_SUBTYPE_LINK_MERG;
+-	desc->ops = &funnel_cs_ops;
+-	desc->pdata = pdata;
+-	desc->dev = dev;
+-	desc->groups = coresight_funnel_groups;
+-	drvdata->csdev = coresight_register(desc);
++	desc.type = CORESIGHT_DEV_TYPE_LINK;
++	desc.subtype.link_subtype = CORESIGHT_DEV_SUBTYPE_LINK_MERG;
++	desc.ops = &funnel_cs_ops;
++	desc.pdata = pdata;
++	desc.dev = dev;
++	desc.groups = coresight_funnel_groups;
++	drvdata->csdev = coresight_register(&desc);
+ 	if (IS_ERR(drvdata->csdev))
+ 		return PTR_ERR(drvdata->csdev);
+ 
+diff --git a/drivers/hwtracing/coresight/coresight-replicator-qcom.c b/drivers/hwtracing/coresight/coresight-replicator-qcom.c
+index 700f710..d23e08b 100644
+--- a/drivers/hwtracing/coresight/coresight-replicator-qcom.c
++++ b/drivers/hwtracing/coresight/coresight-replicator-qcom.c
+@@ -102,7 +102,7 @@ static int replicator_probe(struct amba_device *adev, const struct amba_id *id)
+ 	struct resource *res = &adev->res;
+ 	struct coresight_platform_data *pdata = NULL;
+ 	struct replicator_state *drvdata;
+-	struct coresight_desc *desc;
++	struct coresight_desc desc = { 0 };
+ 	struct device_node *np = adev->dev.of_node;
+ 	void __iomem *base;
+ 
+@@ -138,12 +138,12 @@ static int replicator_probe(struct amba_device *adev, const struct amba_id *id)
+ 	if (!desc)
+ 		return -ENOMEM;
+ 
+-	desc->type = CORESIGHT_DEV_TYPE_LINK;
+-	desc->subtype.link_subtype = CORESIGHT_DEV_SUBTYPE_LINK_SPLIT;
+-	desc->ops = &replicator_cs_ops;
+-	desc->pdata = adev->dev.platform_data;
+-	desc->dev = &adev->dev;
+-	drvdata->csdev = coresight_register(desc);
++	desc.type = CORESIGHT_DEV_TYPE_LINK;
++	desc.subtype.link_subtype = CORESIGHT_DEV_SUBTYPE_LINK_SPLIT;
++	desc.ops = &replicator_cs_ops;
++	desc.pdata = adev->dev.platform_data;
++	desc.dev = &adev->dev;
++	drvdata->csdev = coresight_register(&desc);
+ 	if (IS_ERR(drvdata->csdev))
+ 		return PTR_ERR(drvdata->csdev);
+ 
+diff --git a/drivers/hwtracing/coresight/coresight-replicator.c b/drivers/hwtracing/coresight/coresight-replicator.c
+index c6982e3..3756e71 100644
+--- a/drivers/hwtracing/coresight/coresight-replicator.c
++++ b/drivers/hwtracing/coresight/coresight-replicator.c
+@@ -69,7 +69,7 @@ static int replicator_probe(struct platform_device *pdev)
+ 	struct device *dev = &pdev->dev;
+ 	struct coresight_platform_data *pdata = NULL;
+ 	struct replicator_drvdata *drvdata;
+-	struct coresight_desc *desc;
++	struct coresight_desc desc = { 0 };
+ 	struct device_node *np = pdev->dev.of_node;
+ 
+ 	if (np) {
+@@ -95,18 +95,12 @@ static int replicator_probe(struct platform_device *pdev)
+ 	pm_runtime_enable(&pdev->dev);
+ 	platform_set_drvdata(pdev, drvdata);
+ 
+-	desc = devm_kzalloc(dev, sizeof(*desc), GFP_KERNEL);
+-	if (!desc) {
+-		ret = -ENOMEM;
+-		goto out_disable_pm;
+-	}
+-
+-	desc->type = CORESIGHT_DEV_TYPE_LINK;
+-	desc->subtype.link_subtype = CORESIGHT_DEV_SUBTYPE_LINK_SPLIT;
+-	desc->ops = &replicator_cs_ops;
+-	desc->pdata = pdev->dev.platform_data;
+-	desc->dev = &pdev->dev;
+-	drvdata->csdev = coresight_register(desc);
++	desc.type = CORESIGHT_DEV_TYPE_LINK;
++	desc.subtype.link_subtype = CORESIGHT_DEV_SUBTYPE_LINK_SPLIT;
++	desc.ops = &replicator_cs_ops;
++	desc.pdata = pdev->dev.platform_data;
++	desc.dev = &pdev->dev;
++	drvdata->csdev = coresight_register(&desc);
+ 	if (IS_ERR(drvdata->csdev)) {
+ 		ret = PTR_ERR(drvdata->csdev);
+ 		goto out_disable_pm;
+diff --git a/drivers/hwtracing/coresight/coresight-stm.c b/drivers/hwtracing/coresight/coresight-stm.c
+index 73be58a..c221de0 100644
+--- a/drivers/hwtracing/coresight/coresight-stm.c
++++ b/drivers/hwtracing/coresight/coresight-stm.c
+@@ -778,7 +778,7 @@ static int stm_probe(struct amba_device *adev, const struct amba_id *id)
+ 	struct resource *res = &adev->res;
+ 	struct resource ch_res;
+ 	size_t res_size, bitmap_size;
+-	struct coresight_desc *desc;
++	struct coresight_desc desc = { 0 };
+ 	struct device_node *np = adev->dev.of_node;
+ 
+ 	if (np) {
+@@ -843,19 +843,13 @@ static int stm_probe(struct amba_device *adev, const struct amba_id *id)
+ 		return -EPROBE_DEFER;
+ 	}
+ 
+-	desc = devm_kzalloc(dev, sizeof(*desc), GFP_KERNEL);
+-	if (!desc) {
+-		ret = -ENOMEM;
+-		goto stm_unregister;
+-	}
+-
+-	desc->type = CORESIGHT_DEV_TYPE_SOURCE;
+-	desc->subtype.source_subtype = CORESIGHT_DEV_SUBTYPE_SOURCE_SOFTWARE;
+-	desc->ops = &stm_cs_ops;
+-	desc->pdata = pdata;
+-	desc->dev = dev;
+-	desc->groups = coresight_stm_groups;
+-	drvdata->csdev = coresight_register(desc);
++	desc.type = CORESIGHT_DEV_TYPE_SOURCE;
++	desc.subtype.source_subtype = CORESIGHT_DEV_SUBTYPE_SOURCE_SOFTWARE;
++	desc.ops = &stm_cs_ops;
++	desc.pdata = pdata;
++	desc.dev = dev;
++	desc.groups = coresight_stm_groups;
++	drvdata->csdev = coresight_register(&desc);
+ 	if (IS_ERR(drvdata->csdev)) {
+ 		ret = PTR_ERR(drvdata->csdev);
+ 		goto stm_unregister;
+diff --git a/drivers/hwtracing/coresight/coresight-tmc.c b/drivers/hwtracing/coresight/coresight-tmc.c
+index 84052c7..a8a4b66 100644
+--- a/drivers/hwtracing/coresight/coresight-tmc.c
++++ b/drivers/hwtracing/coresight/coresight-tmc.c
+@@ -302,7 +302,7 @@ static int tmc_probe(struct amba_device *adev, const struct amba_id *id)
+ 	struct coresight_platform_data *pdata = NULL;
+ 	struct tmc_drvdata *drvdata;
+ 	struct resource *res = &adev->res;
+-	struct coresight_desc *desc;
++	struct coresight_desc desc = { 0 };
+ 	struct device_node *np = adev->dev.of_node;
+ 
+ 	if (np) {
+@@ -319,10 +319,6 @@ static int tmc_probe(struct amba_device *adev, const struct amba_id *id)
+ 	if (!drvdata)
+ 		goto out;
+ 
+-	desc = devm_kzalloc(dev, sizeof(*desc), GFP_KERNEL);
+-	if (!desc)
+-		goto out;
+-
+ 	drvdata->dev = &adev->dev;
+ 	dev_set_drvdata(dev, drvdata);
+ 
+@@ -354,24 +350,24 @@ static int tmc_probe(struct amba_device *adev, const struct amba_id *id)
+ 
+ 	pm_runtime_put(&adev->dev);
+ 
+-	desc->pdata = pdata;
+-	desc->dev = dev;
+-	desc->subtype.sink_subtype = CORESIGHT_DEV_SUBTYPE_SINK_BUFFER;
+-	desc->groups = coresight_tmc_groups;
++	desc.pdata = pdata;
++	desc.dev = dev;
++	desc.subtype.sink_subtype = CORESIGHT_DEV_SUBTYPE_SINK_BUFFER;
++	desc.groups = coresight_tmc_groups;
+ 
+ 	if (drvdata->config_type == TMC_CONFIG_TYPE_ETB) {
+-		desc->type = CORESIGHT_DEV_TYPE_SINK;
+-		desc->ops = &tmc_etb_cs_ops;
++		desc.type = CORESIGHT_DEV_TYPE_SINK;
++		desc.ops = &tmc_etb_cs_ops;
+ 	} else if (drvdata->config_type == TMC_CONFIG_TYPE_ETR) {
+-		desc->type = CORESIGHT_DEV_TYPE_SINK;
+-		desc->ops = &tmc_etr_cs_ops;
++		desc.type = CORESIGHT_DEV_TYPE_SINK;
++		desc.ops = &tmc_etr_cs_ops;
+ 	} else {
+-		desc->type = CORESIGHT_DEV_TYPE_LINKSINK;
+-		desc->subtype.link_subtype = CORESIGHT_DEV_SUBTYPE_LINK_FIFO;
+-		desc->ops = &tmc_etf_cs_ops;
++		desc.type = CORESIGHT_DEV_TYPE_LINKSINK;
++		desc.subtype.link_subtype = CORESIGHT_DEV_SUBTYPE_LINK_FIFO;
++		desc.ops = &tmc_etf_cs_ops;
+ 	}
+ 
+-	drvdata->csdev = coresight_register(desc);
++	drvdata->csdev = coresight_register(&desc);
+ 	if (IS_ERR(drvdata->csdev)) {
+ 		ret = PTR_ERR(drvdata->csdev);
+ 		goto out;
+diff --git a/drivers/hwtracing/coresight/coresight-tpiu.c b/drivers/hwtracing/coresight/coresight-tpiu.c
+index 4e471e2..0673baf 100644
+--- a/drivers/hwtracing/coresight/coresight-tpiu.c
++++ b/drivers/hwtracing/coresight/coresight-tpiu.c
+@@ -119,7 +119,7 @@ static int tpiu_probe(struct amba_device *adev, const struct amba_id *id)
+ 	struct coresight_platform_data *pdata = NULL;
+ 	struct tpiu_drvdata *drvdata;
+ 	struct resource *res = &adev->res;
+-	struct coresight_desc *desc;
++	struct coresight_desc desc = { 0 };
+ 	struct device_node *np = adev->dev.of_node;
+ 
+ 	if (np) {
+@@ -154,16 +154,12 @@ static int tpiu_probe(struct amba_device *adev, const struct amba_id *id)
+ 
+ 	pm_runtime_put(&adev->dev);
+ 
+-	desc = devm_kzalloc(dev, sizeof(*desc), GFP_KERNEL);
+-	if (!desc)
+-		return -ENOMEM;
+-
+-	desc->type = CORESIGHT_DEV_TYPE_SINK;
+-	desc->subtype.sink_subtype = CORESIGHT_DEV_SUBTYPE_SINK_PORT;
+-	desc->ops = &tpiu_cs_ops;
+-	desc->pdata = pdata;
+-	desc->dev = dev;
+-	drvdata->csdev = coresight_register(desc);
++	desc.type = CORESIGHT_DEV_TYPE_SINK;
++	desc.subtype.sink_subtype = CORESIGHT_DEV_SUBTYPE_SINK_PORT;
++	desc.ops = &tpiu_cs_ops;
++	desc.pdata = pdata;
++	desc.dev = dev;
++	drvdata->csdev = coresight_register(&desc);
+ 	if (IS_ERR(drvdata->csdev))
+ 		return PTR_ERR(drvdata->csdev);
+ 
+-- 
+2.7.4
