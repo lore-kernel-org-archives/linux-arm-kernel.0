@@ -1,29 +1,48 @@
-From: chris@chris-wilson.co.uk (Chris Wilson)
-Date: Wed, 13 Jul 2016 19:05:29 +0100
-Subject: [PATCH 1/2] drm/sun4i: Remove redundant call to
- drm_connector_unregister_all()
-In-Reply-To: <CAOw6vbLmOd_pPD9sRODweNS347vhZJhBckashKuoG5ekro9BbQ@mail.gmail.com>
-References: <1468427947-28037-1-git-send-email-chris@chris-wilson.co.uk>
- <CAOw6vbLmOd_pPD9sRODweNS347vhZJhBckashKuoG5ekro9BbQ@mail.gmail.com>
-Message-ID: <20160713180529.GN6157@nuc-i3427.alporthouse.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed, 13 Jul 2016 20:08:33 +0200
+Subject: [PATCH] ARM: dts: at91: sama5d4ek: remove useless lcd_bus
+Message-ID: <1468433313-8192-1-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 13, 2016 at 10:56:58AM -0700, Sean Paul wrote:
-> On Wed, Jul 13, 2016 at 9:39 AM, Chris Wilson <chris@chris-wilson.co.uk> wrote:
-> > drm_connector_unregister_all() is automatically called by
-> > drm_dev_unregister() and so the manual call can be dropped.
-> >
-> 
-> The documentation for drm_connector_unregister_all says "Drivers
-> should call this [...] right before calling drm_dev_unregister()". If
-> this is no longer true, could you update that comment as part of this
-> series?
+lcd_bus has never been mainlined and is replaced by the atmel_hlcdc driver.
+Remove stale nodes.
 
-That is done. (The comment block is entirely removed so that we don't
-distract authors with superfluous functions that they cannot call
-themselves, i.e. Daniel wanted only the DRM interfaces documented.)
--Chris
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+ arch/arm/boot/dts/at91-sama5d4ek.dts | 20 --------------------
+ 1 file changed, 20 deletions(-)
 
+diff --git a/arch/arm/boot/dts/at91-sama5d4ek.dts b/arch/arm/boot/dts/at91-sama5d4ek.dts
+index 4e98cda97403..f8b96cef5e1a 100644
+--- a/arch/arm/boot/dts/at91-sama5d4ek.dts
++++ b/arch/arm/boot/dts/at91-sama5d4ek.dts
+@@ -69,26 +69,6 @@
+ 
+ 	ahb {
+ 		apb {
+-			lcd_bus at f0000000 {
+-				status = "okay";
+-
+-				lcd at f0000000 {
+-					status = "okay";
+-				};
+-
+-				lcdovl1 at f0000140 {
+-					status = "okay";
+-				};
+-
+-				lcdovl2 at f0000240 {
+-					status = "okay";
+-				};
+-
+-				lcdheo1 at f0000340 {
+-					status = "okay";
+-				};
+-			};
+-
+ 			adc0: adc at fc034000 {
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <
 -- 
-Chris Wilson, Intel Open Source Technology Centre
+2.8.1
