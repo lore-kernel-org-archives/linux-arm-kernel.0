@@ -1,21 +1,14 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 13 Jul 2016 10:41:03 +0200
-Subject: [PATCH v6 12/46] drm/exynos: dma-mapping: Use unsigned long for
- dma_attrs
-In-Reply-To: <1468399300-5399-11-git-send-email-k.kozlowski@samsung.com>
+Date: Wed, 13 Jul 2016 10:40:57 +0200
+Subject: [PATCH v6 06/46] arm64: dma-mapping: Use unsigned long for dma_attrs
+In-Reply-To: <1468399300-5399-5-git-send-email-k.kozlowski@samsung.com>
 References: <1468399167-28083-1-git-send-email-k.kozlowski@samsung.com>
  <1468399300-5399-1-git-send-email-k.kozlowski@samsung.com>
  <1468399300-5399-2-git-send-email-k.kozlowski@samsung.com>
  <1468399300-5399-3-git-send-email-k.kozlowski@samsung.com>
  <1468399300-5399-4-git-send-email-k.kozlowski@samsung.com>
  <1468399300-5399-5-git-send-email-k.kozlowski@samsung.com>
- <1468399300-5399-6-git-send-email-k.kozlowski@samsung.com>
- <1468399300-5399-7-git-send-email-k.kozlowski@samsung.com>
- <1468399300-5399-8-git-send-email-k.kozlowski@samsung.com>
- <1468399300-5399-9-git-send-email-k.kozlowski@samsung.com>
- <1468399300-5399-10-git-send-email-k.kozlowski@samsung.com>
- <1468399300-5399-11-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1468399300-5399-12-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1468399300-5399-6-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -23,182 +16,261 @@ Split out subsystem specific changes for easier reviews. This will be
 squashed with main commit.
 
 Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-[for drm]
-Acked-by: Daniel Vetter <daniel.vetter@ffwll.ch>
+[for arm64]
+Acked-by: Robin Murphy <robin.murphy@arm.com>
 ---
- drivers/gpu/drm/exynos/exynos_drm_fbdev.c |  2 +-
- drivers/gpu/drm/exynos/exynos_drm_g2d.c   | 12 +++++-------
- drivers/gpu/drm/exynos/exynos_drm_gem.c   | 20 ++++++++++----------
- drivers/gpu/drm/exynos/exynos_drm_gem.h   |  2 +-
- 4 files changed, 17 insertions(+), 19 deletions(-)
+ arch/arm64/mm/dma-mapping.c | 56 ++++++++++++++++++++++-----------------------
+ 1 file changed, 28 insertions(+), 28 deletions(-)
 
-diff --git a/drivers/gpu/drm/exynos/exynos_drm_fbdev.c b/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
-index 67dcd6831291..dd091175fc2d 100644
---- a/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
-+++ b/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
-@@ -52,7 +52,7 @@ static int exynos_drm_fb_mmap(struct fb_info *info,
+diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+index f6c55afab3e2..a284fd0d0b00 100644
+--- a/arch/arm64/mm/dma-mapping.c
++++ b/arch/arm64/mm/dma-mapping.c
+@@ -32,7 +32,7 @@
  
- 	ret = dma_mmap_attrs(to_dma_dev(helper->dev), vma, exynos_gem->cookie,
- 			     exynos_gem->dma_addr, exynos_gem->size,
--			     &exynos_gem->dma_attrs);
-+			     exynos_gem->dma_attrs);
- 	if (ret < 0) {
- 		DRM_ERROR("failed to mmap.\n");
- 		return ret;
-diff --git a/drivers/gpu/drm/exynos/exynos_drm_g2d.c b/drivers/gpu/drm/exynos/exynos_drm_g2d.c
-index 8564c3da0d22..4bf00f57ffe8 100644
---- a/drivers/gpu/drm/exynos/exynos_drm_g2d.c
-+++ b/drivers/gpu/drm/exynos/exynos_drm_g2d.c
-@@ -17,7 +17,6 @@
- #include <linux/slab.h>
- #include <linux/workqueue.h>
- #include <linux/dma-mapping.h>
--#include <linux/dma-attrs.h>
- #include <linux/of.h>
+ static int swiotlb __read_mostly;
  
- #include <drm/drmP.h>
-@@ -235,7 +234,7 @@ struct g2d_data {
- 	struct mutex			cmdlist_mutex;
- 	dma_addr_t			cmdlist_pool;
- 	void				*cmdlist_pool_virt;
--	struct dma_attrs		cmdlist_dma_attrs;
-+	unsigned long			cmdlist_dma_attrs;
- 
- 	/* runqueue*/
- 	struct g2d_runqueue_node	*runqueue_node;
-@@ -256,13 +255,12 @@ static int g2d_init_cmdlist(struct g2d_data *g2d)
- 	int ret;
- 	struct g2d_buf_info *buf_info;
- 
--	init_dma_attrs(&g2d->cmdlist_dma_attrs);
--	dma_set_attr(DMA_ATTR_WRITE_COMBINE, &g2d->cmdlist_dma_attrs);
-+	g2d->cmdlist_dma_attrs = DMA_ATTR_WRITE_COMBINE;
- 
- 	g2d->cmdlist_pool_virt = dma_alloc_attrs(to_dma_dev(subdrv->drm_dev),
- 						G2D_CMDLIST_POOL_SIZE,
- 						&g2d->cmdlist_pool, GFP_KERNEL,
--						&g2d->cmdlist_dma_attrs);
-+						g2d->cmdlist_dma_attrs);
- 	if (!g2d->cmdlist_pool_virt) {
- 		dev_err(dev, "failed to allocate dma memory\n");
- 		return -ENOMEM;
-@@ -295,7 +293,7 @@ static int g2d_init_cmdlist(struct g2d_data *g2d)
- err:
- 	dma_free_attrs(to_dma_dev(subdrv->drm_dev), G2D_CMDLIST_POOL_SIZE,
- 			g2d->cmdlist_pool_virt,
--			g2d->cmdlist_pool, &g2d->cmdlist_dma_attrs);
-+			g2d->cmdlist_pool, g2d->cmdlist_dma_attrs);
- 	return ret;
- }
- 
-@@ -309,7 +307,7 @@ static void g2d_fini_cmdlist(struct g2d_data *g2d)
- 		dma_free_attrs(to_dma_dev(subdrv->drm_dev),
- 				G2D_CMDLIST_POOL_SIZE,
- 				g2d->cmdlist_pool_virt,
--				g2d->cmdlist_pool, &g2d->cmdlist_dma_attrs);
-+				g2d->cmdlist_pool, g2d->cmdlist_dma_attrs);
- 	}
- }
- 
-diff --git a/drivers/gpu/drm/exynos/exynos_drm_gem.c b/drivers/gpu/drm/exynos/exynos_drm_gem.c
-index cdf9f1af4347..f2ae72ba7d5a 100644
---- a/drivers/gpu/drm/exynos/exynos_drm_gem.c
-+++ b/drivers/gpu/drm/exynos/exynos_drm_gem.c
-@@ -24,7 +24,7 @@
- static int exynos_drm_alloc_buf(struct exynos_drm_gem *exynos_gem)
+-static pgprot_t __get_dma_pgprot(struct dma_attrs *attrs, pgprot_t prot,
++static pgprot_t __get_dma_pgprot(unsigned long attrs, pgprot_t prot,
+ 				 bool coherent)
  {
- 	struct drm_device *dev = exynos_gem->base.dev;
--	enum dma_attr attr;
-+	unsigned long attr;
- 	unsigned int nr_pages;
- 	struct sg_table sgt;
- 	int ret = -ENOMEM;
-@@ -34,7 +34,7 @@ static int exynos_drm_alloc_buf(struct exynos_drm_gem *exynos_gem)
- 		return 0;
- 	}
+ 	if (!coherent || dma_get_attr(DMA_ATTR_WRITE_COMBINE, attrs))
+@@ -91,7 +91,7 @@ static int __free_from_pool(void *start, size_t size)
  
--	init_dma_attrs(&exynos_gem->dma_attrs);
-+	exynos_gem->dma_attrs = 0;
+ static void *__dma_alloc_coherent(struct device *dev, size_t size,
+ 				  dma_addr_t *dma_handle, gfp_t flags,
+-				  struct dma_attrs *attrs)
++				  unsigned long attrs)
+ {
+ 	if (dev == NULL) {
+ 		WARN_ONCE(1, "Use an actual device structure for DMA allocation\n");
+@@ -121,7 +121,7 @@ static void *__dma_alloc_coherent(struct device *dev, size_t size,
  
- 	/*
- 	 * if EXYNOS_BO_CONTIG, fully physically contiguous memory
-@@ -42,7 +42,7 @@ static int exynos_drm_alloc_buf(struct exynos_drm_gem *exynos_gem)
- 	 * as possible.
- 	 */
- 	if (!(exynos_gem->flags & EXYNOS_BO_NONCONTIG))
--		dma_set_attr(DMA_ATTR_FORCE_CONTIGUOUS, &exynos_gem->dma_attrs);
-+		exynos_gem->dma_attrs |= DMA_ATTR_FORCE_CONTIGUOUS;
+ static void __dma_free_coherent(struct device *dev, size_t size,
+ 				void *vaddr, dma_addr_t dma_handle,
+-				struct dma_attrs *attrs)
++				unsigned long attrs)
+ {
+ 	bool freed;
+ 	phys_addr_t paddr = dma_to_phys(dev, dma_handle);
+@@ -140,7 +140,7 @@ static void __dma_free_coherent(struct device *dev, size_t size,
  
- 	/*
- 	 * if EXYNOS_BO_WC or EXYNOS_BO_NONCACHABLE, writecombine mapping
-@@ -54,8 +54,8 @@ static int exynos_drm_alloc_buf(struct exynos_drm_gem *exynos_gem)
- 	else
- 		attr = DMA_ATTR_NON_CONSISTENT;
+ static void *__dma_alloc(struct device *dev, size_t size,
+ 			 dma_addr_t *dma_handle, gfp_t flags,
+-			 struct dma_attrs *attrs)
++			 unsigned long attrs)
+ {
+ 	struct page *page;
+ 	void *ptr, *coherent_ptr;
+@@ -188,7 +188,7 @@ no_mem:
  
--	dma_set_attr(attr, &exynos_gem->dma_attrs);
--	dma_set_attr(DMA_ATTR_NO_KERNEL_MAPPING, &exynos_gem->dma_attrs);
-+	exynos_gem->dma_attrs |= attr;
-+	exynos_gem->dma_attrs |= DMA_ATTR_NO_KERNEL_MAPPING;
+ static void __dma_free(struct device *dev, size_t size,
+ 		       void *vaddr, dma_addr_t dma_handle,
+-		       struct dma_attrs *attrs)
++		       unsigned long attrs)
+ {
+ 	void *swiotlb_addr = phys_to_virt(dma_to_phys(dev, dma_handle));
  
- 	nr_pages = exynos_gem->size >> PAGE_SHIFT;
+@@ -205,7 +205,7 @@ static void __dma_free(struct device *dev, size_t size,
+ static dma_addr_t __swiotlb_map_page(struct device *dev, struct page *page,
+ 				     unsigned long offset, size_t size,
+ 				     enum dma_data_direction dir,
+-				     struct dma_attrs *attrs)
++				     unsigned long attrs)
+ {
+ 	dma_addr_t dev_addr;
  
-@@ -67,7 +67,7 @@ static int exynos_drm_alloc_buf(struct exynos_drm_gem *exynos_gem)
+@@ -219,7 +219,7 @@ static dma_addr_t __swiotlb_map_page(struct device *dev, struct page *page,
  
- 	exynos_gem->cookie = dma_alloc_attrs(to_dma_dev(dev), exynos_gem->size,
- 					     &exynos_gem->dma_addr, GFP_KERNEL,
--					     &exynos_gem->dma_attrs);
-+					     exynos_gem->dma_attrs);
- 	if (!exynos_gem->cookie) {
- 		DRM_ERROR("failed to allocate buffer.\n");
- 		goto err_free;
-@@ -75,7 +75,7 @@ static int exynos_drm_alloc_buf(struct exynos_drm_gem *exynos_gem)
+ static void __swiotlb_unmap_page(struct device *dev, dma_addr_t dev_addr,
+ 				 size_t size, enum dma_data_direction dir,
+-				 struct dma_attrs *attrs)
++				 unsigned long attrs)
+ {
+ 	if (!is_device_dma_coherent(dev))
+ 		__dma_unmap_area(phys_to_virt(dma_to_phys(dev, dev_addr)), size, dir);
+@@ -228,7 +228,7 @@ static void __swiotlb_unmap_page(struct device *dev, dma_addr_t dev_addr,
  
- 	ret = dma_get_sgtable_attrs(to_dma_dev(dev), &sgt, exynos_gem->cookie,
- 				    exynos_gem->dma_addr, exynos_gem->size,
--				    &exynos_gem->dma_attrs);
-+				    exynos_gem->dma_attrs);
- 	if (ret < 0) {
- 		DRM_ERROR("failed to get sgtable.\n");
- 		goto err_dma_free;
-@@ -99,7 +99,7 @@ err_sgt_free:
- 	sg_free_table(&sgt);
- err_dma_free:
- 	dma_free_attrs(to_dma_dev(dev), exynos_gem->size, exynos_gem->cookie,
--		       exynos_gem->dma_addr, &exynos_gem->dma_attrs);
-+		       exynos_gem->dma_addr, exynos_gem->dma_attrs);
- err_free:
- 	drm_free_large(exynos_gem->pages);
+ static int __swiotlb_map_sg_attrs(struct device *dev, struct scatterlist *sgl,
+ 				  int nelems, enum dma_data_direction dir,
+-				  struct dma_attrs *attrs)
++				  unsigned long attrs)
+ {
+ 	struct scatterlist *sg;
+ 	int i, ret;
+@@ -245,7 +245,7 @@ static int __swiotlb_map_sg_attrs(struct device *dev, struct scatterlist *sgl,
+ static void __swiotlb_unmap_sg_attrs(struct device *dev,
+ 				     struct scatterlist *sgl, int nelems,
+ 				     enum dma_data_direction dir,
+-				     struct dma_attrs *attrs)
++				     unsigned long attrs)
+ {
+ 	struct scatterlist *sg;
+ 	int i;
+@@ -306,7 +306,7 @@ static void __swiotlb_sync_sg_for_device(struct device *dev,
+ static int __swiotlb_mmap(struct device *dev,
+ 			  struct vm_area_struct *vma,
+ 			  void *cpu_addr, dma_addr_t dma_addr, size_t size,
+-			  struct dma_attrs *attrs)
++			  unsigned long attrs)
+ {
+ 	int ret = -ENXIO;
+ 	unsigned long nr_vma_pages = (vma->vm_end - vma->vm_start) >>
+@@ -333,7 +333,7 @@ static int __swiotlb_mmap(struct device *dev,
  
-@@ -120,7 +120,7 @@ static void exynos_drm_free_buf(struct exynos_drm_gem *exynos_gem)
+ static int __swiotlb_get_sgtable(struct device *dev, struct sg_table *sgt,
+ 				 void *cpu_addr, dma_addr_t handle, size_t size,
+-				 struct dma_attrs *attrs)
++				 unsigned long attrs)
+ {
+ 	int ret = sg_alloc_table(sgt, 1, GFP_KERNEL);
  
- 	dma_free_attrs(to_dma_dev(dev), exynos_gem->size, exynos_gem->cookie,
- 			(dma_addr_t)exynos_gem->dma_addr,
--			&exynos_gem->dma_attrs);
-+			exynos_gem->dma_attrs);
+@@ -435,21 +435,21 @@ out:
  
- 	drm_free_large(exynos_gem->pages);
+ static void *__dummy_alloc(struct device *dev, size_t size,
+ 			   dma_addr_t *dma_handle, gfp_t flags,
+-			   struct dma_attrs *attrs)
++			   unsigned long attrs)
+ {
+ 	return NULL;
  }
-@@ -346,7 +346,7 @@ static int exynos_drm_gem_mmap_buffer(struct exynos_drm_gem *exynos_gem,
  
- 	ret = dma_mmap_attrs(to_dma_dev(drm_dev), vma, exynos_gem->cookie,
- 			     exynos_gem->dma_addr, exynos_gem->size,
--			     &exynos_gem->dma_attrs);
-+			     exynos_gem->dma_attrs);
- 	if (ret < 0) {
- 		DRM_ERROR("failed to mmap.\n");
- 		return ret;
-diff --git a/drivers/gpu/drm/exynos/exynos_drm_gem.h b/drivers/gpu/drm/exynos/exynos_drm_gem.h
-index 78100742281d..df7c543d6558 100644
---- a/drivers/gpu/drm/exynos/exynos_drm_gem.h
-+++ b/drivers/gpu/drm/exynos/exynos_drm_gem.h
-@@ -50,7 +50,7 @@ struct exynos_drm_gem {
- 	void			*cookie;
- 	void __iomem		*kvaddr;
- 	dma_addr_t		dma_addr;
--	struct dma_attrs	dma_attrs;
-+	unsigned long		dma_attrs;
- 	struct page		**pages;
- 	struct sg_table		*sgt;
- };
+ static void __dummy_free(struct device *dev, size_t size,
+ 			 void *vaddr, dma_addr_t dma_handle,
+-			 struct dma_attrs *attrs)
++			 unsigned long attrs)
+ {
+ }
+ 
+ static int __dummy_mmap(struct device *dev,
+ 			struct vm_area_struct *vma,
+ 			void *cpu_addr, dma_addr_t dma_addr, size_t size,
+-			struct dma_attrs *attrs)
++			unsigned long attrs)
+ {
+ 	return -ENXIO;
+ }
+@@ -457,20 +457,20 @@ static int __dummy_mmap(struct device *dev,
+ static dma_addr_t __dummy_map_page(struct device *dev, struct page *page,
+ 				   unsigned long offset, size_t size,
+ 				   enum dma_data_direction dir,
+-				   struct dma_attrs *attrs)
++				   unsigned long attrs)
+ {
+ 	return DMA_ERROR_CODE;
+ }
+ 
+ static void __dummy_unmap_page(struct device *dev, dma_addr_t dev_addr,
+ 			       size_t size, enum dma_data_direction dir,
+-			       struct dma_attrs *attrs)
++			       unsigned long attrs)
+ {
+ }
+ 
+ static int __dummy_map_sg(struct device *dev, struct scatterlist *sgl,
+ 			  int nelems, enum dma_data_direction dir,
+-			  struct dma_attrs *attrs)
++			  unsigned long attrs)
+ {
+ 	return 0;
+ }
+@@ -478,7 +478,7 @@ static int __dummy_map_sg(struct device *dev, struct scatterlist *sgl,
+ static void __dummy_unmap_sg(struct device *dev,
+ 			     struct scatterlist *sgl, int nelems,
+ 			     enum dma_data_direction dir,
+-			     struct dma_attrs *attrs)
++			     unsigned long attrs)
+ {
+ }
+ 
+@@ -553,7 +553,7 @@ static void flush_page(struct device *dev, const void *virt, phys_addr_t phys)
+ 
+ static void *__iommu_alloc_attrs(struct device *dev, size_t size,
+ 				 dma_addr_t *handle, gfp_t gfp,
+-				 struct dma_attrs *attrs)
++				 unsigned long attrs)
+ {
+ 	bool coherent = is_device_dma_coherent(dev);
+ 	int ioprot = dma_direction_to_prot(DMA_BIDIRECTIONAL, coherent);
+@@ -613,7 +613,7 @@ static void *__iommu_alloc_attrs(struct device *dev, size_t size,
+ }
+ 
+ static void __iommu_free_attrs(struct device *dev, size_t size, void *cpu_addr,
+-			       dma_addr_t handle, struct dma_attrs *attrs)
++			       dma_addr_t handle, unsigned long attrs)
+ {
+ 	size_t iosize = size;
+ 
+@@ -629,7 +629,7 @@ static void __iommu_free_attrs(struct device *dev, size_t size, void *cpu_addr,
+ 	 * Hence how dodgy the below logic looks...
+ 	 */
+ 	if (__in_atomic_pool(cpu_addr, size)) {
+-		iommu_dma_unmap_page(dev, handle, iosize, 0, NULL);
++		iommu_dma_unmap_page(dev, handle, iosize, 0, 0);
+ 		__free_from_pool(cpu_addr, size);
+ 	} else if (is_vmalloc_addr(cpu_addr)){
+ 		struct vm_struct *area = find_vm_area(cpu_addr);
+@@ -639,14 +639,14 @@ static void __iommu_free_attrs(struct device *dev, size_t size, void *cpu_addr,
+ 		iommu_dma_free(dev, area->pages, iosize, &handle);
+ 		dma_common_free_remap(cpu_addr, size, VM_USERMAP);
+ 	} else {
+-		iommu_dma_unmap_page(dev, handle, iosize, 0, NULL);
++		iommu_dma_unmap_page(dev, handle, iosize, 0, 0);
+ 		__free_pages(virt_to_page(cpu_addr), get_order(size));
+ 	}
+ }
+ 
+ static int __iommu_mmap_attrs(struct device *dev, struct vm_area_struct *vma,
+ 			      void *cpu_addr, dma_addr_t dma_addr, size_t size,
+-			      struct dma_attrs *attrs)
++			      unsigned long attrs)
+ {
+ 	struct vm_struct *area;
+ 	int ret;
+@@ -666,7 +666,7 @@ static int __iommu_mmap_attrs(struct device *dev, struct vm_area_struct *vma,
+ 
+ static int __iommu_get_sgtable(struct device *dev, struct sg_table *sgt,
+ 			       void *cpu_addr, dma_addr_t dma_addr,
+-			       size_t size, struct dma_attrs *attrs)
++			       size_t size, unsigned long attrs)
+ {
+ 	unsigned int count = PAGE_ALIGN(size) >> PAGE_SHIFT;
+ 	struct vm_struct *area = find_vm_area(cpu_addr);
+@@ -707,7 +707,7 @@ static void __iommu_sync_single_for_device(struct device *dev,
+ static dma_addr_t __iommu_map_page(struct device *dev, struct page *page,
+ 				   unsigned long offset, size_t size,
+ 				   enum dma_data_direction dir,
+-				   struct dma_attrs *attrs)
++				   unsigned long attrs)
+ {
+ 	bool coherent = is_device_dma_coherent(dev);
+ 	int prot = dma_direction_to_prot(dir, coherent);
+@@ -722,7 +722,7 @@ static dma_addr_t __iommu_map_page(struct device *dev, struct page *page,
+ 
+ static void __iommu_unmap_page(struct device *dev, dma_addr_t dev_addr,
+ 			       size_t size, enum dma_data_direction dir,
+-			       struct dma_attrs *attrs)
++			       unsigned long attrs)
+ {
+ 	if (!dma_get_attr(DMA_ATTR_SKIP_CPU_SYNC, attrs))
+ 		__iommu_sync_single_for_cpu(dev, dev_addr, size, dir);
+@@ -760,7 +760,7 @@ static void __iommu_sync_sg_for_device(struct device *dev,
+ 
+ static int __iommu_map_sg_attrs(struct device *dev, struct scatterlist *sgl,
+ 				int nelems, enum dma_data_direction dir,
+-				struct dma_attrs *attrs)
++				unsigned long attrs)
+ {
+ 	bool coherent = is_device_dma_coherent(dev);
+ 
+@@ -774,7 +774,7 @@ static int __iommu_map_sg_attrs(struct device *dev, struct scatterlist *sgl,
+ static void __iommu_unmap_sg_attrs(struct device *dev,
+ 				   struct scatterlist *sgl, int nelems,
+ 				   enum dma_data_direction dir,
+-				   struct dma_attrs *attrs)
++				   unsigned long attrs)
+ {
+ 	if (!dma_get_attr(DMA_ATTR_SKIP_CPU_SYNC, attrs))
+ 		__iommu_sync_sg_for_cpu(dev, sgl, nelems, dir);
 -- 
 1.9.1
