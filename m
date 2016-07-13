@@ -1,75 +1,77 @@
-From: wuchengli@chromium.org (=?UTF-8?B?V3UtQ2hlbmcgTGkgKOadjuWLmeiqoCk=?=)
-Date: Wed, 13 Jul 2016 10:22:20 +0800
-Subject: [PATCH v3 3/9] DocBook/v4l: Add compressed video formats used on
- MT8173 codec driver
-In-Reply-To: <1468350842.8843.18.camel@gmail.com>
-References: <1464611363-14936-1-git-send-email-tiffany.lin@mediatek.com>
- <1464611363-14936-2-git-send-email-tiffany.lin@mediatek.com>
- <1464611363-14936-3-git-send-email-tiffany.lin@mediatek.com>
- <1464611363-14936-4-git-send-email-tiffany.lin@mediatek.com>
- <5a793171-24a7-4e9e-8bfd-f668c789f8e0@xs4all.nl>
- <1468205771.3725.8.camel@mtksdaap41>
- <CAOMLVLiZU3D587dSyp2b2v4DV+MS9vh85bA4BoG7ddK6556rbA@mail.gmail.com>
- <1468350511.8843.16.camel@gmail.com> <1468350842.8843.18.camel@gmail.com>
-Message-ID: <CAOMLVLhQFCbn6RFcT3Gv0SnY5Y_=ANek2hOzC69UAiK9Zk8VRg@mail.gmail.com>
+From: dyoung@redhat.com (Dave Young)
+Date: Wed, 13 Jul 2016 10:36:14 +0800
+Subject: [RFC 0/3] extend kexec_file_load system call
+In-Reply-To: <20160712145010.GA8447@leverpostej>
+References: <20160712014201.11456-1-takahiro.akashi@linaro.org>
+ <1911992.H2WpLRr2Fi@wuerfel> <20160712141810.GB30181@redhat.com>
+ <293705810.hBL93OOmOz@wuerfel> <20160712145010.GA8447@leverpostej>
+Message-ID: <20160713023614.GB3222@dhcp-128-65.nay.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 13, 2016 at 3:14 AM, Nicolas Dufresne
-<nicolas.dufresne@gmail.com> wrote:
-> Le mardi 12 juillet 2016 ? 15:08 -0400, Nicolas Dufresne a ?crit :
->> Le mardi 12 juillet 2016 ? 16:16 +0800, Wu-Cheng Li (???) a ?crit :
->> > Decoder hardware produces MT21 (compressed). Image processor can
->> > convert it to a format that can be input of display driver.
->> > Tiffany.
->> > When do you plan to upstream image processor (mtk-mdp)?
->> > >
->> > > It can be as input format for encoder, MDP and display drivers in
->> > our
->> > > platform.
->> > I remember display driver can only accept uncompressed MT21. Right?
->> > Basically V4L2_PIX_FMT_MT21 is compressed and is like an opaque
->> > format. It's not usable until it's decompressed and converted by
->> > image
->> > processor.
->>
->> Previously it was described as MediaTek block mode, and now as a
->> MediaTek compressed format. It makes me think you have no idea what
->> this pixel format really is. Is that right ?
->>
->> The main reason why I keep asking, is that we often find similarities
->> between what vendor like to call their proprietary formats. Doing the
->> proper research helps not creating a mess like in Android where you
->> have a lot of formats that all point to the same format. I believe
->> there was the same concern when Samsung wanted to introduce their Z-
->> flip-Z NV12 tile format. In the end they simply provided sufficient
->> documentation so we could document it and implement software
->> converters
->> for test and validation purpose.
->
-> Here's the kind of information we want in the documentation.
->
-> https://chromium.googlesource.com/chromium/src/media/+/master/base/vide
-> o_types.h#40
-That is the documentation of decompressed MT21. Originally MT21 was meant
-to be a YUV format and we can map it in CPU to use it. The name was changed
-to mean a compressed format. The current design is only MTK image processor
-can convert it. Software cannot decompress it. I'm not sure if we
-should document
-the format inside if we cannot decompress in software. For chromium, I'll update
-the code to explain MT21 is an opaque compressed format.
->
->   // MediaTek proprietary format. MT21 is similar to NV21 except the memory
->   // layout and pixel layout (swizzles). 12bpp with Y plane followed by a 2x2
->   // interleaved VU plane. Each image contains two buffers -- Y plane and VU
->   // plane. Two planes can be non-contiguous in memory. The starting addresses
->   // of Y plane and VU plane are 4KB alignment.
->   // Suppose image dimension is (width, height). For both Y plane and VU plane:
->   // Row pitch = ((width+15)/16) * 16.
->   // Plane size = Row pitch * (((height+31)/32)*32)
->
-> Now obviously this is incomplete, as the swizzling need to be documented of course.
->
->>
->> regards,
->> Nicolas
+On 07/12/16 at 03:50pm, Mark Rutland wrote:
+> On Tue, Jul 12, 2016 at 04:24:10PM +0200, Arnd Bergmann wrote:
+> > On Tuesday, July 12, 2016 10:18:11 AM CEST Vivek Goyal wrote:
+> > > > 
+> > > > On Open Firmware, the DT is extracted from running firmware and copied
+> > > > into dynamically allocated data structures. After a kexec, the runtime
+> > > > interface to the firmware is not available, so the flattened DT format
+> > > > was created as a way to pass the same data in a binary blob to the new
+> > > > kernel in a format that can be read from the kernel by walking the
+> > > > directories in /proc/device-tree/*.
+> > > 
+> > > So this DT is available inside kernel and running kernel can still
+> > > retrieve it and pass it to second kernel?
+> > 
+> > The kernel only uses the flattened DT blob at boot time and converts
+> > it into the runtime data structures (struct device_node). The original
+> > dtb is typically overwritten later.
+> 
+> On arm64 we deliberately preserved the DTB, so we can take that and
+> build a new DTB from that kernel-side.
+> 
+> > > > - we typically ship devicetree sources for embedded machines with the
+> > > >   kernel sources. As more hardware of the system gets enabled, the
+> > > >   devicetree gains extra nodes and properties that describe the hardware
+> > > >   more completely, so we need to use the latest DT blob to use all
+> > > >   the drivers
+> > > > 
+> > > > - in some cases, kernels will fail to boot at all with an older version
+> > > >   of the DT, or fail to use the devices that were working on the
+> > > >   earlier kernel. This is usually considered a bug, but it's not rare
+> > > > 
+> > > > - In some cases, the kernel can update its DT at runtime, and the new
+> > > >   settings are expected to be available in the new kernel too, though
+> > > >   there are cases where you actually don't want the modified contents.
+> > > 
+> > > I am assuming that modified DT and unmodifed one both are accessible to
+> > > kernel. And if user space can make decisions which modfied fields to use
+> > > for new kernels and which ones not, then same can be done in kernel too?
+> > 
+> > The unmodified DT can typically be found on disk next to the kernel binary.
+> > The option you have is to either read it from /proc/devicetree or to
+> > read it from from /boot/*.dtb.
+> 
+> /proc/devicetree (aka /sys/firmware/devicetree) is a filesystem derived
+> from the raw DTB (which is exposed at /sys/firmware/fdt).
+> 
+> The blob that was handed to the kernel at boot time is exposed at
+> /sys/firmware/fdt.
+
+I believe the blob can be read and passed to kexec kernel in kernel code without
+the extra fd.
+
+But consider we can kexec to a different kernel and a different initrd so there
+will be use cases to pass a total different dtb as well. From my understanding
+it is reasonable but yes I think we should think carefully about the design.
+
+Thanks
+Dave
+
+> Thanks,
+> Mark.
+> 
+> _______________________________________________
+> kexec mailing list
+> kexec at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/kexec
