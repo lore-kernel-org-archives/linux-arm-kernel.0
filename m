@@ -1,130 +1,61 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Wed, 13 Jul 2016 14:55:58 -0700
-Subject: [PATCH v2 05/11] arm64/uaccess: Enable hardened usercopy
-In-Reply-To: <1468446964-22213-1-git-send-email-keescook@chromium.org>
-References: <1468446964-22213-1-git-send-email-keescook@chromium.org>
-Message-ID: <1468446964-22213-6-git-send-email-keescook@chromium.org>
+From: mturquette@baylibre.com (Michael Turquette)
+Date: Wed, 13 Jul 2016 14:56:43 -0700
+Subject: [PATCH v3 7/7] clk: exynos5433: remove CLK_IGNORE_UNUSED flag
+ from SPI clocks
+In-Reply-To: <1468317736-18841-8-git-send-email-andi.shyti@samsung.com>
+References: <1468317736-18841-1-git-send-email-andi.shyti@samsung.com>
+ <1468317736-18841-8-git-send-email-andi.shyti@samsung.com>
+Message-ID: <146844700397.73491.13145116929743702472@resonance>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enables CONFIG_HARDENED_USERCOPY checks on arm64. As done by KASAN in -next,
-renames the low-level functions to __arch_copy_*_user() so a static inline
-can do additional work before the copy.
+Quoting Andi Shyti (2016-07-12 03:02:16)
+> Because the Exynos5433 SPI driver supports the ioclk handling and
+> the following patch:
+> 
+>   http://marc.info/?l=linux-kernel&m=146787645626318&w=2
+> 
+> fixes a synchronus abort issue, none of the SPI clocks require
+> any critical handling: remove, then, the CLK_IGNORE_UNUSED flag
+> for the SPI related clocks.
+> 
+> Signed-off-by: Andi Shyti <andi.shyti@samsung.com>
+> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Reviewed-by: Michael Turquette <mturquette@baylibre.com>
+> Acked-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
 
-Signed-off-by: Kees Cook <keescook@chromium.org>
----
- arch/arm64/Kconfig               |  2 ++
- arch/arm64/include/asm/uaccess.h | 16 ++++++++++++++--
- arch/arm64/kernel/arm64ksyms.c   |  4 ++--
- arch/arm64/lib/copy_from_user.S  |  4 ++--
- arch/arm64/lib/copy_to_user.S    |  4 ++--
- 5 files changed, 22 insertions(+), 8 deletions(-)
+Applied towards v4.8.
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 5a0a691d4220..b771cd97f74b 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -51,10 +51,12 @@ config ARM64
- 	select HAVE_ALIGNED_STRUCT_PAGE if SLUB
- 	select HAVE_ARCH_AUDITSYSCALL
- 	select HAVE_ARCH_BITREVERSE
-+	select HAVE_ARCH_HARDENED_USERCOPY
- 	select HAVE_ARCH_HUGE_VMAP
- 	select HAVE_ARCH_JUMP_LABEL
- 	select HAVE_ARCH_KASAN if SPARSEMEM_VMEMMAP && !(ARM64_16K_PAGES && ARM64_VA_BITS_48)
- 	select HAVE_ARCH_KGDB
-+	select HAVE_ARCH_LINEAR_KERNEL_MAPPING
- 	select HAVE_ARCH_MMAP_RND_BITS
- 	select HAVE_ARCH_MMAP_RND_COMPAT_BITS if COMPAT
- 	select HAVE_ARCH_SECCOMP_FILTER
-diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
-index 9e397a542756..5d0dacdb695b 100644
---- a/arch/arm64/include/asm/uaccess.h
-+++ b/arch/arm64/include/asm/uaccess.h
-@@ -256,11 +256,23 @@ do {									\
- 		-EFAULT;						\
- })
- 
--extern unsigned long __must_check __copy_from_user(void *to, const void __user *from, unsigned long n);
--extern unsigned long __must_check __copy_to_user(void __user *to, const void *from, unsigned long n);
-+extern unsigned long __must_check __arch_copy_from_user(void *to, const void __user *from, unsigned long n);
-+extern unsigned long __must_check __arch_copy_to_user(void __user *to, const void *from, unsigned long n);
- extern unsigned long __must_check __copy_in_user(void __user *to, const void __user *from, unsigned long n);
- extern unsigned long __must_check __clear_user(void __user *addr, unsigned long n);
- 
-+static inline unsigned long __must_check __copy_from_user(void *to, const void __user *from, unsigned long n)
-+{
-+	check_object_size(to, n, false);
-+	return __arch_copy_from_user(to, from, n);
-+}
-+
-+static inline unsigned long __must_check __copy_to_user(void __user *to, const void *from, unsigned long n)
-+{
-+	check_object_size(from, n, true);
-+	return __arch_copy_to_user(to, from, n);
-+}
-+
- static inline unsigned long __must_check copy_from_user(void *to, const void __user *from, unsigned long n)
- {
- 	if (access_ok(VERIFY_READ, from, n))
-diff --git a/arch/arm64/kernel/arm64ksyms.c b/arch/arm64/kernel/arm64ksyms.c
-index 678f30b05a45..2dc44406a7ad 100644
---- a/arch/arm64/kernel/arm64ksyms.c
-+++ b/arch/arm64/kernel/arm64ksyms.c
-@@ -34,8 +34,8 @@ EXPORT_SYMBOL(copy_page);
- EXPORT_SYMBOL(clear_page);
- 
- 	/* user mem (segment) */
--EXPORT_SYMBOL(__copy_from_user);
--EXPORT_SYMBOL(__copy_to_user);
-+EXPORT_SYMBOL(__arch_copy_from_user);
-+EXPORT_SYMBOL(__arch_copy_to_user);
- EXPORT_SYMBOL(__clear_user);
- EXPORT_SYMBOL(__copy_in_user);
- 
-diff --git a/arch/arm64/lib/copy_from_user.S b/arch/arm64/lib/copy_from_user.S
-index 17e8306dca29..0b90497d4424 100644
---- a/arch/arm64/lib/copy_from_user.S
-+++ b/arch/arm64/lib/copy_from_user.S
-@@ -66,7 +66,7 @@
- 	.endm
- 
- end	.req	x5
--ENTRY(__copy_from_user)
-+ENTRY(__arch_copy_from_user)
- ALTERNATIVE("nop", __stringify(SET_PSTATE_PAN(0)), ARM64_ALT_PAN_NOT_UAO, \
- 	    CONFIG_ARM64_PAN)
- 	add	end, x0, x2
-@@ -75,7 +75,7 @@ ALTERNATIVE("nop", __stringify(SET_PSTATE_PAN(1)), ARM64_ALT_PAN_NOT_UAO, \
- 	    CONFIG_ARM64_PAN)
- 	mov	x0, #0				// Nothing to copy
- 	ret
--ENDPROC(__copy_from_user)
-+ENDPROC(__arch_copy_from_user)
- 
- 	.section .fixup,"ax"
- 	.align	2
-diff --git a/arch/arm64/lib/copy_to_user.S b/arch/arm64/lib/copy_to_user.S
-index 21faae60f988..7a7efe255034 100644
---- a/arch/arm64/lib/copy_to_user.S
-+++ b/arch/arm64/lib/copy_to_user.S
-@@ -65,7 +65,7 @@
- 	.endm
- 
- end	.req	x5
--ENTRY(__copy_to_user)
-+ENTRY(__arch_copy_to_user)
- ALTERNATIVE("nop", __stringify(SET_PSTATE_PAN(0)), ARM64_ALT_PAN_NOT_UAO, \
- 	    CONFIG_ARM64_PAN)
- 	add	end, x0, x2
-@@ -74,7 +74,7 @@ ALTERNATIVE("nop", __stringify(SET_PSTATE_PAN(1)), ARM64_ALT_PAN_NOT_UAO, \
- 	    CONFIG_ARM64_PAN)
- 	mov	x0, #0
- 	ret
--ENDPROC(__copy_to_user)
-+ENDPROC(__arch_copy_to_user)
- 
- 	.section .fixup,"ax"
- 	.align	2
--- 
-2.7.4
+Regards,
+Mike
+
+> ---
+>  drivers/clk/samsung/clk-exynos5433.c | 5 ++---
+>  1 file changed, 2 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/clk/samsung/clk-exynos5433.c b/drivers/clk/samsung/clk-exynos5433.c
+> index c3a5318..fb19525 100644
+> --- a/drivers/clk/samsung/clk-exynos5433.c
+> +++ b/drivers/clk/samsung/clk-exynos5433.c
+> @@ -1661,8 +1661,7 @@ static struct samsung_gate_clock peric_gate_clks[] __initdata = {
+>         GATE(CLK_SCLK_IOCLK_SPI2, "sclk_ioclk_spi2", "ioclk_spi2_clk_in",
+>                         ENABLE_SCLK_PERIC, 13, CLK_SET_RATE_PARENT, 0),
+>         GATE(CLK_SCLK_IOCLK_SPI1, "sclk_ioclk_spi1", "ioclk_spi1_clk_in",
+> -                       ENABLE_SCLK_PERIC, 12,
+> -                       CLK_IGNORE_UNUSED | CLK_SET_RATE_PARENT, 0),
+> +                       ENABLE_SCLK_PERIC, 12, CLK_SET_RATE_PARENT, 0),
+>         GATE(CLK_SCLK_IOCLK_SPI0, "sclk_ioclk_spi0", "ioclk_spi0_clk_in",
+>                         ENABLE_SCLK_PERIC, 11, CLK_SET_RATE_PARENT, 0),
+>         GATE(CLK_SCLK_IOCLK_I2S1_BCLK, "sclk_ioclk_i2s1_bclk",
+> @@ -1677,7 +1676,7 @@ static struct samsung_gate_clock peric_gate_clks[] __initdata = {
+>         GATE(CLK_SCLK_SPI2, "sclk_spi2", "sclk_spi2_peric", ENABLE_SCLK_PERIC,
+>                         5, CLK_SET_RATE_PARENT, 0),
+>         GATE(CLK_SCLK_SPI1, "sclk_spi1", "sclk_spi1_peric", ENABLE_SCLK_PERIC,
+> -                       4, CLK_IGNORE_UNUSED | CLK_SET_RATE_PARENT, 0),
+> +                       4, CLK_SET_RATE_PARENT, 0),
+>         GATE(CLK_SCLK_SPI0, "sclk_spi0", "sclk_spi0_peric", ENABLE_SCLK_PERIC,
+>                         3, CLK_SET_RATE_PARENT, 0),
+>         GATE(CLK_SCLK_UART2, "sclk_uart2", "sclk_uart2_peric",
+> -- 
+> 2.8.1
+> 
