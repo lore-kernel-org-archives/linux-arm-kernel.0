@@ -1,34 +1,51 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 13 Jul 2016 09:59:06 +0200
-Subject: [PATCH 2/2] [media] s5p-g2d: Replace old driver with DRM version
-In-Reply-To: <20160712200202.7496445e@recife.lan>
-References: <1464096493-13378-1-git-send-email-k.kozlowski@samsung.com>
- <1464096493-13378-2-git-send-email-k.kozlowski@samsung.com>
- <20160712200202.7496445e@recife.lan>
-Message-ID: <5785F4CA.8070908@samsung.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 13 Jul 2016 10:01:33 +0200
+Subject: [RFC 0/3] extend kexec_file_load system call
+In-Reply-To: <20160713023614.GB3222@dhcp-128-65.nay.redhat.com>
+References: <20160712014201.11456-1-takahiro.akashi@linaro.org>
+ <20160712145010.GA8447@leverpostej>
+ <20160713023614.GB3222@dhcp-128-65.nay.redhat.com>
+Message-ID: <5352106.oQ0Ff9gWJA@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/13/2016 01:02 AM, Mauro Carvalho Chehab wrote:
-> I suspect that you'll be applying this one via DRM tree, so:
+On Wednesday, July 13, 2016 10:36:14 AM CEST Dave Young wrote:
+> On 07/12/16 at 03:50pm, Mark Rutland wrote:
+> > On Tue, Jul 12, 2016 at 04:24:10PM +0200, Arnd Bergmann wrote:
+> > > On Tuesday, July 12, 2016 10:18:11 AM CEST Vivek Goyal wrote:
+> > 
+> > /proc/devicetree (aka /sys/firmware/devicetree) is a filesystem derived
+> > from the raw DTB (which is exposed at /sys/firmware/fdt).
+> > 
+> > The blob that was handed to the kernel at boot time is exposed at
+> > /sys/firmware/fdt.
 > 
-> Em Tue, 24 May 2016 15:28:13 +0200
-> Krzysztof Kozlowski <k.kozlowski@samsung.com> escreveu:
+> I believe the blob can be read and passed to kexec kernel in kernel code without
+> the extra fd.
 > 
->> Remove the old non-DRM driver because it is now entirely supported by
->> exynos_drm_g2d driver.
->>
->> Cc: Kyungmin Park <kyungmin.park@samsung.com>
->> Cc: Kamil Debski <k.debski@samsung.com>
->> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> 
-> Acked-by: Mauro Carvalho Chehab <mchehab@s-opensource.com>
-> 
-> PS.: If you prefer to apply this one via my tree, I'm ok too. Just
-> let me know when the first patch gets merged upstream.
+> But consider we can kexec to a different kernel and a different initrd so there
+> will be use cases to pass a total different dtb as well. From my understanding
+> it is reasonable but yes I think we should think carefully about the design.
 
-This patchset was insufficient and I didn't came up with follow up.
-Please ignore it for now.
+Ok, I can see four interesting use cases here:
 
-Best regards,
-Krzysztof
+- Using the dtb that the kernel has saved at boot time. Ideally this should not
+  require an additional step of signing it, since the running kernel already
+  trusts it.
+
+- A dtb blob from the file system that was produced along with the kernel image.
+  If we require a signature on the kernel, the the same requirement should be
+  made on the dtb. Whoever signs the kernel can also sign the dtb.
+  The tricky part here is the kernel command line that is part of the dtb
+  and that may need to be modified.
+
+- Modifying the dtb at for any of the reasons I listed: This should always
+  be possible when we do not use secure boot, just like booting an unsigned
+  kernel is.
+
+- kboot/petitboot with all of the user space being part of the trusted boot
+  chain: it would be good to allow these to modify the dtb as needed without
+  breaking the trust chain, just like we allow grub or u-boot to modify the dtb
+  before passing it to the kernel.
+
+	Arnd
