@@ -1,209 +1,245 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Wed, 13 Jul 2016 02:59:04 +0100
-Subject: [PATCH v9 12/17] KVM: arm64: connect LPIs to the VGIC emulation
+Date: Wed, 13 Jul 2016 02:58:59 +0100
+Subject: [PATCH v9 07/17] irqchip: refactor and add GICv3 definitions
 In-Reply-To: <20160713015909.28793-1-andre.przywara@arm.com>
 References: <20160713015909.28793-1-andre.przywara@arm.com>
-Message-ID: <20160713015909.28793-13-andre.przywara@arm.com>
+Message-ID: <20160713015909.28793-8-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-LPIs are dynamically created (mapped) at guest runtime and their
-actual number can be quite high, but is mostly assigned using a very
-sparse allocation scheme. So arrays are not an ideal data structure
-to hold the information.
-We use a spin-lock protected linked list to hold all mapped LPIs,
-represented by their struct vgic_irq. This lock is grouped between the
-ap_list_lock and the vgic_irq lock in our locking order.
-Also we store a pointer to that struct vgic_irq in our struct its_itte,
-so we can easily access it.
-Eventually we call our new vgic_get_lpi() from vgic_get_irq(), so
-the VGIC code gets transparently access to LPIs.
+arm-gic-v3.h contains bit and register definitions for the GICv3 and ITS,
+at least for the bits the we currently care about.
+The ITS emulation needs more definitions, so add them and refactor
+the memory attribute #defines to be more universally usable.
+To avoid changing all users, we still provide some of the old definitons
+defined with the help of the new macros.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
- include/kvm/arm_vgic.h        |  6 ++++
- virt/kvm/arm/vgic/vgic-init.c |  3 ++
- virt/kvm/arm/vgic/vgic-its.c  |  5 ++++
- virt/kvm/arm/vgic/vgic-v3.c   |  2 ++
- virt/kvm/arm/vgic/vgic.c      | 67 ++++++++++++++++++++++++++++++++++++++-----
- 5 files changed, 76 insertions(+), 7 deletions(-)
+ include/linux/irqchip/arm-gic-v3.h | 174 ++++++++++++++++++++++++-------------
+ 1 file changed, 114 insertions(+), 60 deletions(-)
 
-diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index 6186749..a6ca326 100644
---- a/include/kvm/arm_vgic.h
-+++ b/include/kvm/arm_vgic.h
-@@ -77,6 +77,7 @@ enum vgic_irq_config {
+diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+index bfbd707..ed61647 100644
+--- a/include/linux/irqchip/arm-gic-v3.h
++++ b/include/linux/irqchip/arm-gic-v3.h
+@@ -112,34 +112,58 @@
+ #define GICR_WAKER_ProcessorSleep	(1U << 1)
+ #define GICR_WAKER_ChildrenAsleep	(1U << 2)
  
- struct vgic_irq {
- 	spinlock_t irq_lock;		/* Protects the content of the struct */
-+	struct list_head lpi_list;	/* Used to link all LPIs together */
- 	struct list_head ap_list;
- 
- 	struct kvm_vcpu *vcpu;		/* SGIs and PPIs: The VCPU
-@@ -193,6 +194,11 @@ struct vgic_dist {
- 	 * GICv3 spec: 6.1.2 "LPI Configuration tables"
- 	 */
- 	u64			propbaser;
+-#define GICR_PROPBASER_NonShareable	(0U << 10)
+-#define GICR_PROPBASER_InnerShareable	(1U << 10)
+-#define GICR_PROPBASER_OuterShareable	(2U << 10)
+-#define GICR_PROPBASER_SHAREABILITY_MASK (3UL << 10)
+-#define GICR_PROPBASER_nCnB		(0U << 7)
+-#define GICR_PROPBASER_nC		(1U << 7)
+-#define GICR_PROPBASER_RaWt		(2U << 7)
+-#define GICR_PROPBASER_RaWb		(3U << 7)
+-#define GICR_PROPBASER_WaWt		(4U << 7)
+-#define GICR_PROPBASER_WaWb		(5U << 7)
+-#define GICR_PROPBASER_RaWaWt		(6U << 7)
+-#define GICR_PROPBASER_RaWaWb		(7U << 7)
+-#define GICR_PROPBASER_CACHEABILITY_MASK (7U << 7)
+-#define GICR_PROPBASER_IDBITS_MASK	(0x1f)
+-
+-#define GICR_PENDBASER_NonShareable	(0U << 10)
+-#define GICR_PENDBASER_InnerShareable	(1U << 10)
+-#define GICR_PENDBASER_OuterShareable	(2U << 10)
+-#define GICR_PENDBASER_SHAREABILITY_MASK (3UL << 10)
+-#define GICR_PENDBASER_nCnB		(0U << 7)
+-#define GICR_PENDBASER_nC		(1U << 7)
+-#define GICR_PENDBASER_RaWt		(2U << 7)
+-#define GICR_PENDBASER_RaWb		(3U << 7)
+-#define GICR_PENDBASER_WaWt		(4U << 7)
+-#define GICR_PENDBASER_WaWb		(5U << 7)
+-#define GICR_PENDBASER_RaWaWt		(6U << 7)
+-#define GICR_PENDBASER_RaWaWb		(7U << 7)
+-#define GICR_PENDBASER_CACHEABILITY_MASK (7U << 7)
++#define GIC_BASER_CACHE_nCnB		0ULL
++#define GIC_BASER_CACHE_SameAsInner	0ULL
++#define GIC_BASER_CACHE_nC		1ULL
++#define GIC_BASER_CACHE_RaWt		2ULL
++#define GIC_BASER_CACHE_RaWb		3ULL
++#define GIC_BASER_CACHE_WaWt		4ULL
++#define GIC_BASER_CACHE_WaWb		5ULL
++#define GIC_BASER_CACHE_RaWaWt		6ULL
++#define GIC_BASER_CACHE_RaWaWb		7ULL
++#define GIC_BASER_CACHE_MASK		7ULL
++#define GIC_BASER_NonShareable		0ULL
++#define GIC_BASER_InnerShareable	1ULL
++#define GIC_BASER_OuterShareable	2ULL
++#define GIC_BASER_SHAREABILITY_MASK	3ULL
 +
-+	/* Protects the lpi_list and the count value below. */
-+	spinlock_t		lpi_list_lock;
-+	struct list_head	lpi_list_head;
-+	int			lpi_list_count;
- };
- 
- struct vgic_v2_cpu_if {
-diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
-index ac3c1a5..535e713 100644
---- a/virt/kvm/arm/vgic/vgic-init.c
-+++ b/virt/kvm/arm/vgic/vgic-init.c
-@@ -157,6 +157,9 @@ static int kvm_vgic_dist_init(struct kvm *kvm, unsigned int nr_spis)
- 	struct kvm_vcpu *vcpu0 = kvm_get_vcpu(kvm, 0);
- 	int i;
- 
-+	INIT_LIST_HEAD(&dist->lpi_list_head);
-+	spin_lock_init(&dist->lpi_list_lock);
++#define GIC_BASER_CACHEABILITY(reg, inner_outer, type)			\
++	(GIC_BASER_CACHE_##type << reg##_##inner_outer##_CACHEABILITY_SHIFT)
 +
- 	dist->spis = kcalloc(nr_spis, sizeof(struct vgic_irq), GFP_KERNEL);
- 	if (!dist->spis)
- 		return  -ENOMEM;
-diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-index dc9a98f..4fc830c 100644
---- a/virt/kvm/arm/vgic/vgic-its.c
-+++ b/virt/kvm/arm/vgic/vgic-its.c
-@@ -56,6 +56,7 @@ struct its_collection {
- struct its_itte {
- 	struct list_head itte_list;
- 
-+	struct vgic_irq *irq;
- 	struct its_collection *collection;
- 	u32 lpi;
- 	u32 event_id;
-@@ -144,6 +145,10 @@ static unsigned long vgic_mmio_read_its_idregs(struct kvm *kvm,
- static void its_free_itte(struct kvm *kvm, struct its_itte *itte)
- {
- 	list_del(&itte->itte_list);
++#define GIC_BASER_SHAREABILITY(reg, type)				\
++	(GIC_BASER_##type << reg##_SHAREABILITY_SHIFT)
 +
-+	/* This put matches the get in vgic_add_lpi. */
-+	vgic_put_irq(kvm, itte->irq);
++#define GICR_PROPBASER_SHAREABILITY_SHIFT		(10)
++#define GICR_PROPBASER_INNER_CACHEABILITY_SHIFT		(7)
++#define GICR_PROPBASER_OUTER_CACHEABILITY_SHIFT		(56)
++#define GICR_PROPBASER_SHAREABILITY_MASK				\
++	GIC_BASER_SHAREABILITY(GICR_PROPBASER, SHAREABILITY_MASK)
++#define GICR_PROPBASER_CACHEABILITY_MASK				\
++	GIC_BASER_CACHEABILITY(GICR_PROPBASER, INNER, MASK)
++#define GICR_PROPBASER_OUTER_CACHEABILITY_MASK				\
++	GIC_BASER_CACHEABILITY(GICR_PROPBASER, OUTER, MASK)
 +
- 	kfree(itte);
- }
++#define GICR_PROPBASER_InnerShareable					\
++	GIC_BASER_SHAREABILITY(GICR_PROPBASER, InnerShareable)
++#define GICR_PROPBASER_nC GIC_BASER_CACHEABILITY(GICR_PROPBASER, INNER, nC)
++#define GICR_PROPBASER_WaWb GIC_BASER_CACHEABILITY(GICR_PROPBASER, INNER, WaWb)
++#define GICR_PROPBASER_IDBITS_MASK			(0x1f)
++
++#define GICR_PENDBASER_SHAREABILITY_SHIFT		(10)
++#define GICR_PENDBASER_INNER_CACHEABILITY_SHIFT		(7)
++#define GICR_PENDBASER_OUTER_CACHEABILITY_SHIFT		(56)
++#define GICR_PENDBASER_SHAREABILITY_MASK				\
++	GIC_BASER_SHAREABILITY(GICR_PENDBASER, SHAREABILITY_MASK)
++#define GICR_PENDBASER_CACHEABILITY_MASK				\
++	GIC_BASER_CACHEABILITY(GICR_PENDBASER, INNER, MASK)
++#define GICR_PENDBASER_OUTER_CACHEABILITY_MASK				\
++	GIC_BASER_CACHEABILITY(GICR_PENDBASER, OUTER, MASK)
++
++#define GICR_PENDBASER_InnerShareable					\
++	GIC_BASER_SHAREABILITY(GICR_PENDBASER, InnerShareable)
++#define GICR_PENDBASER_nC GIC_BASER_CACHEABILITY(GICR_PENDBASER, INNER, nC)
++#define GICR_PENDBASER_WaWb GIC_BASER_CACHEABILITY(GICR_PENDBASER, INNER, WaWb)
++#define GICR_PENDBASER_PTZ				BIT_ULL(62)
  
-diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
-index 6f8f31f..0506543 100644
---- a/virt/kvm/arm/vgic/vgic-v3.c
-+++ b/virt/kvm/arm/vgic/vgic-v3.c
-@@ -81,6 +81,8 @@ void vgic_v3_fold_lr_state(struct kvm_vcpu *vcpu)
- 		else
- 			intid = val & GICH_LR_VIRTUALID;
- 		irq = vgic_get_irq(vcpu->kvm, vcpu, intid);
-+		if (!irq)	/* An LPI could have been unmapped. */
-+			continue;
+ /*
+  * Re-Distributor registers, offsets from SGI_base
+@@ -175,53 +199,66 @@
+ #define GITS_CWRITER			0x0088
+ #define GITS_CREADR			0x0090
+ #define GITS_BASER			0x0100
++#define GITS_IDREGS_BASE		0xffd0
++#define GITS_PIDR0			0xffe0
++#define GITS_PIDR1			0xffe4
+ #define GITS_PIDR2			GICR_PIDR2
++#define GITS_PIDR4			0xffd0
++#define GITS_CIDR0			0xfff0
++#define GITS_CIDR1			0xfff4
++#define GITS_CIDR2			0xfff8
++#define GITS_CIDR3			0xfffc
  
- 		spin_lock(&irq->irq_lock);
+ #define GITS_TRANSLATER			0x10040
  
-diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
-index d7ea5df..6318ea0 100644
---- a/virt/kvm/arm/vgic/vgic.c
-+++ b/virt/kvm/arm/vgic/vgic.c
-@@ -36,7 +36,8 @@ struct vgic_global __section(.hyp.text) kvm_vgic_global_state;
-  * its->cmd_lock (mutex)
-  *   its->its_lock (mutex)
-  *     vgic_cpu->ap_list_lock
-- *       vgic_irq->irq_lock
-+ *       kvm->lpi_list_lock
-+ *         vgic_irq->irq_lock
-  *
-  * If you need to take multiple locks, always take the upper lock first,
-  * then the lower ones, e.g. first take the its_lock, then the irq_lock.
-@@ -51,6 +52,41 @@ struct vgic_global __section(.hyp.text) kvm_vgic_global_state;
-  *     spin_lock(vcpuY->arch.vgic_cpu.ap_list_lock);
+ #define GITS_CTLR_ENABLE		(1U << 0)
+ #define GITS_CTLR_QUIESCENT		(1U << 31)
+ 
++#define GITS_TYPER_PLPIS		(1UL << 0)
++#define GITS_TYPER_IDBITS_SHIFT		8
+ #define GITS_TYPER_DEVBITS_SHIFT	13
+ #define GITS_TYPER_DEVBITS(r)		((((r) >> GITS_TYPER_DEVBITS_SHIFT) & 0x1f) + 1)
+ #define GITS_TYPER_PTA			(1UL << 19)
+-
+-#define GITS_CBASER_VALID		(1UL << 63)
+-#define GITS_CBASER_nCnB		(0UL << 59)
+-#define GITS_CBASER_nC			(1UL << 59)
+-#define GITS_CBASER_RaWt		(2UL << 59)
+-#define GITS_CBASER_RaWb		(3UL << 59)
+-#define GITS_CBASER_WaWt		(4UL << 59)
+-#define GITS_CBASER_WaWb		(5UL << 59)
+-#define GITS_CBASER_RaWaWt		(6UL << 59)
+-#define GITS_CBASER_RaWaWb		(7UL << 59)
+-#define GITS_CBASER_CACHEABILITY_MASK	(7UL << 59)
+-#define GITS_CBASER_NonShareable	(0UL << 10)
+-#define GITS_CBASER_InnerShareable	(1UL << 10)
+-#define GITS_CBASER_OuterShareable	(2UL << 10)
+-#define GITS_CBASER_SHAREABILITY_MASK	(3UL << 10)
++#define GITS_TYPER_HWCOLLCNT_SHIFT	24
++
++#define GITS_CBASER_VALID			(1UL << 63)
++#define GITS_CBASER_SHAREABILITY_SHIFT		(10)
++#define GITS_CBASER_INNER_CACHEABILITY_SHIFT	(59)
++#define GITS_CBASER_OUTER_CACHEABILITY_SHIFT	(53)
++#define GITS_CBASER_SHAREABILITY_MASK					\
++	GIC_BASER_SHAREABILITY(GITS_CBASER, SHAREABILITY_MASK)
++#define GITS_CBASER_CACHEABILITY_MASK					\
++	GIC_BASER_CACHEABILITY(GITS_CBASER, INNER, MASK)
++#define GITS_CBASER_OUTER_CACHEABILITY_MASK				\
++	GIC_BASER_CACHEABILITY(GITS_CBASER, OUTER, MASK)
++
++#define GITS_CBASER_InnerShareable					\
++	GIC_BASER_SHAREABILITY(GITS_CBASER, InnerShareable)
++#define GITS_CBASER_nC GIC_BASER_CACHEABILITY(GITS_CBASER, INNER, nC)
++#define GITS_CBASER_WaWb GIC_BASER_CACHEABILITY(GITS_CBASER, INNER, WaWb)
+ 
+ #define GITS_BASER_NR_REGS		8
+ 
+-#define GITS_BASER_VALID		(1UL << 63)
+-#define GITS_BASER_nCnB			(0UL << 59)
+-#define GITS_BASER_nC			(1UL << 59)
+-#define GITS_BASER_RaWt			(2UL << 59)
+-#define GITS_BASER_RaWb			(3UL << 59)
+-#define GITS_BASER_WaWt			(4UL << 59)
+-#define GITS_BASER_WaWb			(5UL << 59)
+-#define GITS_BASER_RaWaWt		(6UL << 59)
+-#define GITS_BASER_RaWaWb		(7UL << 59)
+-#define GITS_BASER_CACHEABILITY_MASK	(7UL << 59)
+-#define GITS_BASER_TYPE_SHIFT		(56)
++#define GITS_BASER_VALID			(1UL << 63)
++#define GITS_BASER_INDIRECT			(1ULL << 62)
++#define GITS_BASER_INNER_CACHEABILITY_SHIFT	(59)
++#define GITS_BASER_OUTER_CACHEABILITY_SHIFT	(53)
++#define GITS_BASER_CACHEABILITY_MASK				\
++	GIC_BASER_CACHEABILITY(GITS_BASER, INNER, MASK)
++#define GITS_BASER_OUTER_CACHEABILITY_MASK				\
++	GIC_BASER_CACHEABILITY(GITS_BASER, OUTER, MASK)
++#define GITS_BASER_SHAREABILITY_MASK					\
++	GIC_BASER_SHAREABILITY(GITS_BASER, SHAREABILITY_MASK)
++
++#define GITS_BASER_nC GIC_BASER_CACHEABILITY(GITS_BASER, INNER, nC)
++#define GITS_BASER_WaWb GIC_BASER_CACHEABILITY(GITS_BASER, INNER, WaWb)
++#define GITS_BASER_TYPE_SHIFT			(56)
+ #define GITS_BASER_TYPE(r)		(((r) >> GITS_BASER_TYPE_SHIFT) & 7)
+-#define GITS_BASER_ENTRY_SIZE_SHIFT	(48)
++#define GITS_BASER_ENTRY_SIZE_SHIFT		(48)
+ #define GITS_BASER_ENTRY_SIZE(r)	((((r) >> GITS_BASER_ENTRY_SIZE_SHIFT) & 0xff) + 1)
+-#define GITS_BASER_NonShareable		(0UL << 10)
+-#define GITS_BASER_InnerShareable	(1UL << 10)
+-#define GITS_BASER_OuterShareable	(2UL << 10)
+ #define GITS_BASER_SHAREABILITY_SHIFT	(10)
+-#define GITS_BASER_SHAREABILITY_MASK	(3UL << GITS_BASER_SHAREABILITY_SHIFT)
++#define GITS_BASER_InnerShareable					\
++	GIC_BASER_SHAREABILITY(GITS_BASER, InnerShareable)
+ #define GITS_BASER_PAGE_SIZE_SHIFT	(8)
+ #define GITS_BASER_PAGE_SIZE_4K		(0UL << GITS_BASER_PAGE_SIZE_SHIFT)
+ #define GITS_BASER_PAGE_SIZE_16K	(1UL << GITS_BASER_PAGE_SIZE_SHIFT)
+@@ -243,7 +280,10 @@
   */
+ #define GITS_CMD_MAPD			0x08
+ #define GITS_CMD_MAPC			0x09
+-#define GITS_CMD_MAPVI			0x0a
++#define GITS_CMD_MAPTI			0x0a
++/* older GIC documentation used MAPVI for this command */
++#define GITS_CMD_MAPVI			GITS_CMD_MAPTI
++#define GITS_CMD_MAPI			0x0b
+ #define GITS_CMD_MOVI			0x01
+ #define GITS_CMD_DISCARD		0x0f
+ #define GITS_CMD_INV			0x0c
+@@ -254,6 +294,20 @@
+ #define GITS_CMD_SYNC			0x05
  
-+/*
-+ * Iterate over the VM's list of mapped LPIs to find the one with a
-+ * matching interrupt ID and return a reference to the IRQ structure.
+ /*
++ * ITS error numbers
 + */
-+static struct vgic_irq *vgic_get_lpi(struct kvm *kvm, u32 intid)
-+{
-+	struct vgic_dist *dist = &kvm->arch.vgic;
-+	struct vgic_irq *irq = NULL;
-+
-+	spin_lock(&dist->lpi_list_lock);
-+
-+	list_for_each_entry(irq, &dist->lpi_list_head, lpi_list) {
-+		if (irq->intid != intid)
-+			continue;
-+
-+		/*
-+		 * This increases the refcount, the caller is expected to
-+		 * call vgic_put_irq() later once it's finished with the IRQ.
-+		 */
-+		kref_get(&irq->refcount);
-+		goto out_unlock;
-+	}
-+	irq = NULL;
-+
-+out_unlock:
-+	spin_unlock(&dist->lpi_list_lock);
-+
-+	return irq;
-+}
++#define E_ITS_MOVI_UNMAPPED_INTERRUPT           0x010107
++#define E_ITS_MOVI_UNMAPPED_COLLECTION          0x010109
++#define E_ITS_CLEAR_UNMAPPED_INTERRUPT          0x010507
++#define E_ITS_MAPC_PROCNUM_OOR                  0x010902
++#define E_ITS_MAPTI_UNMAPPED_DEVICE             0x010a04
++#define E_ITS_MAPTI_PHYSICALID_OOR              0x010a06
++#define E_ITS_INV_UNMAPPED_INTERRUPT            0x010c07
++#define E_ITS_INVALL_UNMAPPED_COLLECTION        0x010d09
++#define E_ITS_MOVALL_PROCNUM_OOR                0x010e01
++#define E_ITS_DISCARD_UNMAPPED_INTERRUPT        0x010f07
 +
 +/*
-+ * This looks up the virtual interrupt ID to get the corresponding
-+ * struct vgic_irq. It also increases the refcount, so any caller is expected
-+ * to call vgic_put_irq() once it's finished with this IRQ.
-+ */
- struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
- 			      u32 intid)
- {
-@@ -69,23 +105,40 @@ struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
- 		return irq;
- 	}
- 
--	/* LPIs are not yet covered */
--	if (intid >= VGIC_MIN_LPI)
--		return NULL;
-+	if (intid >= VGIC_MIN_LPI)		/* LPIs */
-+		return vgic_get_lpi(kvm, intid);
- 
- 	WARN(1, "Looking up struct vgic_irq for reserved INTID");
- 	return NULL;
- }
- 
--/* The refcount should never drop to 0 at the moment. */
-+/*
-+ * We can't do anything in here, because we lack the kvm pointer to
-+ * lock and remove the item from the lpi_list. So we keep this function
-+ * empty and use the return value of kref_put() to trigger the freeing.
-+ */
- static void vgic_irq_release(struct kref *ref)
- {
--	WARN_ON(1);
- }
- 
- void vgic_put_irq(struct kvm *kvm, struct vgic_irq *irq)
- {
--	kref_put(&irq->refcount, vgic_irq_release);
-+	struct vgic_dist *dist;
-+
-+	if (!kref_put(&irq->refcount, vgic_irq_release))
-+		return;
-+
-+	if (irq->intid < VGIC_MIN_LPI)
-+		return;
-+
-+	dist = &kvm->arch.vgic;
-+
-+	spin_lock(&dist->lpi_list_lock);
-+	list_del(&irq->lpi_list);
-+	dist->lpi_list_count--;
-+	spin_unlock(&dist->lpi_list_lock);
-+
-+	kfree(irq);
- }
- 
- /**
+  * CPU interface registers
+  */
+ #define ICC_CTLR_EL1_EOImode_drop_dir	(0U << 1)
 -- 
 2.9.0
