@@ -1,71 +1,102 @@
 From: sunil.kovvuri@gmail.com (sunil.kovvuri at gmail.com)
-Date: Wed, 13 Jul 2016 11:29:26 +0530
-Subject: [PATCH v2 02/15] net: thunderx: Add VNIC's PCI devid on future chips
+Date: Wed, 13 Jul 2016 11:29:28 +0530
+Subject: [PATCH v2 04/15] net: thunderx: Set queue count based on number of
+ CPUs
 In-Reply-To: <1468389579-482-1-git-send-email-sunil.kovvuri@gmail.com>
 References: <1468389579-482-1-git-send-email-sunil.kovvuri@gmail.com>
-Message-ID: <1468389579-482-3-git-send-email-sunil.kovvuri@gmail.com>
+Message-ID: <1468389579-482-5-git-send-email-sunil.kovvuri@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sunil Goutham <sgoutham@cavium.com>
 
-This patch adds PCI device IDs of VNIC on newer chips and also
-registers VF driver with them. Device id remains same for all
-versions of chips but subsystem device id changes.
+81xx has only 4 CPUs, so it doesn't make sense to initialize
+entire Qset i.e 8 queues by default. Made changes to queue
+initialization to init queues equal to number of CPUs or
+8 queues whichever is lesser. Also this will be applicable to
+VMs with VNIC VF attached and having less VCPUs
 
 Signed-off-by: Sunil Goutham <sgoutham@cavium.com>
 ---
- drivers/net/ethernet/cavium/thunder/nic.h        | 10 +++++++++-
- drivers/net/ethernet/cavium/thunder/nicvf_main.c | 14 ++++++++++++--
- 2 files changed, 21 insertions(+), 3 deletions(-)
+ drivers/net/ethernet/cavium/thunder/nic_main.c     | 6 ++++++
+ drivers/net/ethernet/cavium/thunder/nicvf_main.c   | 7 +++----
+ drivers/net/ethernet/cavium/thunder/nicvf_queues.c | 8 ++++----
+ drivers/net/ethernet/cavium/thunder/nicvf_queues.h | 5 +----
+ 4 files changed, 14 insertions(+), 12 deletions(-)
 
-diff --git a/drivers/net/ethernet/cavium/thunder/nic.h b/drivers/net/ethernet/cavium/thunder/nic.h
-index 66b499b..6b0b240 100644
---- a/drivers/net/ethernet/cavium/thunder/nic.h
-+++ b/drivers/net/ethernet/cavium/thunder/nic.h
-@@ -21,7 +21,15 @@
- #define	PCI_DEVICE_ID_THUNDER_BGX		0xA026
+diff --git a/drivers/net/ethernet/cavium/thunder/nic_main.c b/drivers/net/ethernet/cavium/thunder/nic_main.c
+index 4974923..0d81117 100644
+--- a/drivers/net/ethernet/cavium/thunder/nic_main.c
++++ b/drivers/net/ethernet/cavium/thunder/nic_main.c
+@@ -1009,6 +1009,12 @@ static int nic_num_sqs_en(struct nicpf *nic, int vf_en)
+ 	int pos, sqs_per_vf = MAX_SQS_PER_VF_SINGLE_NODE;
+ 	u16 total_vf;
  
- /* Subsystem device IDs */
--#define PCI_SUBSYS_DEVID_88XX_NIC_PF           0xA11E
-+#define PCI_SUBSYS_DEVID_88XX_NIC_PF		0xA11E
-+#define PCI_SUBSYS_DEVID_81XX_NIC_PF		0xA21E
-+#define PCI_SUBSYS_DEVID_83XX_NIC_PF		0xA31E
++	/* Secondary Qsets are needed only if CPU count is
++	 * morethan MAX_QUEUES_PER_QSET.
++	 */
++	if (num_online_cpus() <= MAX_QUEUES_PER_QSET)
++		return 0;
 +
-+#define PCI_SUBSYS_DEVID_88XX_PASS1_NIC_VF	0xA11E
-+#define PCI_SUBSYS_DEVID_88XX_NIC_VF		0xA134
-+#define PCI_SUBSYS_DEVID_81XX_NIC_VF		0xA234
-+#define PCI_SUBSYS_DEVID_83XX_NIC_VF		0xA334
-+
- 
- /* PCI BAR nos */
- #define	PCI_CFG_REG_BAR_NUM		0
+ 	/* Check if its a multi-node environment */
+ 	if (nr_node_ids > 1)
+ 		sqs_per_vf = MAX_SQS_PER_VF;
 diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_main.c b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
-index a19e73f..0c10635 100644
+index 0c10635..af04d9f 100644
 --- a/drivers/net/ethernet/cavium/thunder/nicvf_main.c
 +++ b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
-@@ -29,10 +29,20 @@
- static const struct pci_device_id nicvf_id_table[] = {
- 	{ PCI_DEVICE_SUB(PCI_VENDOR_ID_CAVIUM,
- 			 PCI_DEVICE_ID_THUNDER_NIC_VF,
--			 PCI_VENDOR_ID_CAVIUM, 0xA134) },
-+			 PCI_VENDOR_ID_CAVIUM,
-+			 PCI_SUBSYS_DEVID_88XX_NIC_VF) },
- 	{ PCI_DEVICE_SUB(PCI_VENDOR_ID_CAVIUM,
- 			 PCI_DEVICE_ID_THUNDER_PASS1_NIC_VF,
--			 PCI_VENDOR_ID_CAVIUM, 0xA11E) },
-+			 PCI_VENDOR_ID_CAVIUM,
-+			 PCI_SUBSYS_DEVID_88XX_PASS1_NIC_VF) },
-+	{ PCI_DEVICE_SUB(PCI_VENDOR_ID_CAVIUM,
-+			 PCI_DEVICE_ID_THUNDER_NIC_VF,
-+			 PCI_VENDOR_ID_CAVIUM,
-+			 PCI_SUBSYS_DEVID_81XX_NIC_VF) },
-+	{ PCI_DEVICE_SUB(PCI_VENDOR_ID_CAVIUM,
-+			 PCI_DEVICE_ID_THUNDER_NIC_VF,
-+			 PCI_VENDOR_ID_CAVIUM,
-+			 PCI_SUBSYS_DEVID_83XX_NIC_VF) },
- 	{ 0, }  /* end of table */
- };
+@@ -1537,14 +1537,13 @@ static int nicvf_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
+ 		goto err_release_regions;
+ 	}
  
+-	qcount = MAX_CMP_QUEUES_PER_QS;
++	qcount = min_t(int, MAX_CMP_QUEUES_PER_QS, num_online_cpus());
+ 
+ 	/* Restrict multiqset support only for host bound VFs */
+ 	if (pdev->is_virtfn) {
+ 		/* Set max number of queues per VF */
+-		qcount = roundup(num_online_cpus(), MAX_CMP_QUEUES_PER_QS);
+-		qcount = min(qcount,
+-			     (MAX_SQS_PER_VF + 1) * MAX_CMP_QUEUES_PER_QS);
++		qcount = min_t(int, num_online_cpus(),
++			       (MAX_SQS_PER_VF + 1) * MAX_CMP_QUEUES_PER_QS);
+ 	}
+ 
+ 	netdev = alloc_etherdev_mqs(sizeof(struct nicvf), qcount, qcount);
+diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_queues.c b/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
+index 0ff8e60..e521a94 100644
+--- a/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
++++ b/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
+@@ -762,10 +762,10 @@ int nicvf_set_qset_resources(struct nicvf *nic)
+ 	nic->qs = qs;
+ 
+ 	/* Set count of each queue */
+-	qs->rbdr_cnt = RBDR_CNT;
+-	qs->rq_cnt = RCV_QUEUE_CNT;
+-	qs->sq_cnt = SND_QUEUE_CNT;
+-	qs->cq_cnt = CMP_QUEUE_CNT;
++	qs->rbdr_cnt = DEFAULT_RBDR_CNT;
++	qs->rq_cnt = min_t(u8, MAX_RCV_QUEUES_PER_QS, num_online_cpus());
++	qs->sq_cnt = min_t(u8, MAX_SND_QUEUES_PER_QS, num_online_cpus());
++	qs->cq_cnt = max_t(u8, qs->rq_cnt, qs->sq_cnt);
+ 
+ 	/* Set queue lengths */
+ 	qs->rbdr_len = RCV_BUF_COUNT;
+diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_queues.h b/drivers/net/ethernet/cavium/thunder/nicvf_queues.h
+index 6673e11..869f338 100644
+--- a/drivers/net/ethernet/cavium/thunder/nicvf_queues.h
++++ b/drivers/net/ethernet/cavium/thunder/nicvf_queues.h
+@@ -57,10 +57,7 @@
+ #define CMP_QUEUE_SIZE6		6ULL /* 64K entries */
+ 
+ /* Default queue count per QS, its lengths and threshold values */
+-#define RBDR_CNT		1
+-#define RCV_QUEUE_CNT		8
+-#define SND_QUEUE_CNT		8
+-#define CMP_QUEUE_CNT		8 /* Max of RCV and SND qcount */
++#define DEFAULT_RBDR_CNT	1
+ 
+ #define SND_QSIZE		SND_QUEUE_SIZE2
+ #define SND_QUEUE_LEN		(1ULL << (SND_QSIZE + 10))
 -- 
 2.7.4
