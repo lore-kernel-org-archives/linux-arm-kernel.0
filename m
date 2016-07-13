@@ -1,41 +1,37 @@
-From: andi.shyti@samsung.com (Andi Shyti)
-Date: Wed, 13 Jul 2016 21:44:16 +0900
-Subject: [PATCH v3 7/7] clk: exynos5433: remove CLK_IGNORE_UNUSED flag from
- SPI clocks
-In-Reply-To: <146836184696.73491.9452469757415968654@resonance>
-References: <1468317736-18841-1-git-send-email-andi.shyti@samsung.com>
- <1468317736-18841-8-git-send-email-andi.shyti@samsung.com>
- <CGME20160712222323epcas1p4020f224ba47b193243867ab41bc109c8@epcas1p4.samsung.com>
- <146836184696.73491.9452469757415968654@resonance>
-Message-ID: <20160713124416.GN18237@samsunx.samsung>
+From: weiyj_lk@163.com (weiyj_lk at 163.com)
+Date: Wed, 13 Jul 2016 12:44:41 +0000
+Subject: [PATCH -next] drm/mediatek/mtk_mipi_tx: remove redundant dev_err call
+ in mtk_mipi_tx_probe()
+Message-ID: <1468413881-2588-1-git-send-email-weiyj_lk@163.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 
-> > Because the Exynos5433 SPI driver supports the ioclk handling and
-> > the following patch:
-> > 
-> >   http://marc.info/?l=linux-kernel&m=146787645626318&w=2
-> > 
-> > fixes a synchronus abort issue, none of the SPI clocks require
-> > any critical handling: remove, then, the CLK_IGNORE_UNUSED flag
-> > for the SPI related clocks.
-> > 
-> > Signed-off-by: Andi Shyti <andi.shyti@samsung.com>
-> > Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> > Reviewed-by: Michael Turquette <mturquette@baylibre.com>
-> > Acked-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> 
-> Do you want these patches to go through same tree? If not, I can take
-> this patch into clk-next.
+There is a error message within devm_ioremap_resource
+already, so remove the dev_err call to avoid redundant
+error message.
 
-oh yes, as Krzysztof and Sylwester pointed out, the dependency is
-not that strict as there is no exynos5433 dts yet, so that we
-wouldn't break anything if patch 7/7 gets in before the others.
+Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+---
+ drivers/gpu/drm/mediatek/mtk_mipi_tx.c | 7 ++-----
+ 1 file changed, 2 insertions(+), 5 deletions(-)
 
-If you want to take in your branch the 7/7, please feel free to
-do so. Only the patches on the drivers/spi/spi-s3c64xx.c file
-have some dependencies on some previous patches I sent to Mark.
-
-Andi
+diff --git a/drivers/gpu/drm/mediatek/mtk_mipi_tx.c b/drivers/gpu/drm/mediatek/mtk_mipi_tx.c
+index 1c366f8..b835bba 100644
+--- a/drivers/gpu/drm/mediatek/mtk_mipi_tx.c
++++ b/drivers/gpu/drm/mediatek/mtk_mipi_tx.c
+@@ -393,11 +393,8 @@ static int mtk_mipi_tx_probe(struct platform_device *pdev)
+ 
+ 	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	mipi_tx->regs = devm_ioremap_resource(dev, mem);
+-	if (IS_ERR(mipi_tx->regs)) {
+-		ret = PTR_ERR(mipi_tx->regs);
+-		dev_err(dev, "Failed to get memory resource: %d\n", ret);
+-		return ret;
+-	}
++	if (IS_ERR(mipi_tx->regs))
++		return PTR_ERR(mipi_tx->regs);
+ 
+ 	ref_clk = devm_clk_get(dev, NULL);
+ 	if (IS_ERR(ref_clk)) {
