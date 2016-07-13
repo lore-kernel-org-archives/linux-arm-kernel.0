@@ -1,33 +1,62 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Wed, 13 Jul 2016 15:04:26 -0700
-Subject: [PATCH v2 01/11] mm: Implement stack frame object validation
-In-Reply-To: <CALCETrVDJDjdoh7yvOPd=_5twQnzQRhe8G2KLaRw-NnA1Uf__g@mail.gmail.com>
-References: <1468446964-22213-1-git-send-email-keescook@chromium.org>
- <1468446964-22213-2-git-send-email-keescook@chromium.org>
- <CALCETrVDJDjdoh7yvOPd=_5twQnzQRhe8G2KLaRw-NnA1Uf__g@mail.gmail.com>
-Message-ID: <CAGXu5jLPZiRJx8n3_7GW2bufiuUgE9=c6dQcNxDRPHMU72sD9g@mail.gmail.com>
+From: stillcompiling@gmail.com (Joshua Clayton)
+Date: Wed, 13 Jul 2016 16:20:06 -0700
+Subject: [PATCH v2 1/6] binding-doc: power: pwrseq-generic: add binding
+ doc for generic power sequence library
+In-Reply-To: <20160713084250.GB11863@shlinux2>
+References: <1468375610-18625-1-git-send-email-peter.chen@nxp.com>
+ <1468375610-18625-2-git-send-email-peter.chen@nxp.com>
+ <1468394851.3638.13.camel@pengutronix.de> <20160713084250.GB11863@shlinux2>
+Message-ID: <5786CCA6.2090709@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 13, 2016 at 3:01 PM, Andy Lutomirski <luto@amacapital.net> wrote:
-> On Wed, Jul 13, 2016 at 2:55 PM, Kees Cook <keescook@chromium.org> wrote:
->> This creates per-architecture function arch_within_stack_frames() that
->> should validate if a given object is contained by a kernel stack frame.
->> Initial implementation is on x86.
+
+
+On 07/13/2016 01:42 AM, Peter Chen wrote:
+> On Wed, Jul 13, 2016 at 09:27:31AM +0200, Philipp Zabel wrote:
+>> Am Mittwoch, den 13.07.2016, 10:06 +0800 schrieb Peter Chen:
+>>> Add binding doc for generic power sequence library.
+>>>
+>>> Signed-off-by: Peter Chen <peter.chen@nxp.com>
+>>> ---
+>>>  .../bindings/power/pwrseq/pwrseq-generic.txt       | 53 ++++++++++++++++++++++
+>>>  1 file changed, 53 insertions(+)
+>>>  create mode 100644 Documentation/devicetree/bindings/power/pwrseq/pwrseq-generic.txt
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/power/pwrseq/pwrseq-generic.txt b/Documentation/devicetree/bindings/power/pwrseq/pwrseq-generic.txt
+>>> new file mode 100644
+>>> index 0000000..186c58c
+>>> --- /dev/null
+>>> +++ b/Documentation/devicetree/bindings/power/pwrseq/pwrseq-generic.txt
+>>> @@ -0,0 +1,53 @@
+>>> +The generic power sequence library
+>>> +
+>>> +Some hard-wired USB/MMC devices need to do power sequence to let the
+>>> +device work normally,
+>> I would replace "to let the device work normally" with "before the
+>> device can be enumerated [on the bus]" here.
 >>
->> This is based on code from PaX.
->>
+> Ok.
 >
-> This, along with Josh's livepatch work, are two examples of unwinders
-> that matter for correctness instead of just debugging.  ISTM this
-> should just use Josh's code directly once it's been written.
+>>>  the typical power sequence like: enable USB
+>>> +PHY clock, toggle reset pin, etc. But current Linux USB driver
+>>> +lacks of such code to do it, it may cause some hard-wired USB devices
+>>> +works abnormal or can't be recognized by controller at all. The
+>>> +power sequence will be done before this device can be found at USB
+>>> +bus.
+>>> +
+>>> +The power sequence properties is under the device node.
+>>> +
+>>> +Required properties:
+>>> +- power-sequence: this device needs to do power sequence before enumeration
+>> As Joshua pointed out, is this even needed at all?
+>>
+> If no, how we decide whether allocates pwrseq instance through pwrseq
+> library or not?
+>
+The pwrseq driver is Linux specific. The dts is supposed to be OS agnostic.
+It seems to me that If a driver supports pwrseq and the dts elements
+are there, it should use them, e.g. if there is a clock, enable the clock.
+if there is a reset gpio then take the device into and out of reset during probe.
 
-Do you have URL for Josh's code? I'd love to see what happening there.
-
-In the meantime, usercopy can use this...
-
--Kees
-
--- 
-Kees Cook
-Chrome OS & Brillo Security
+Can you see a  problem with that approach?
