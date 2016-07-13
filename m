@@ -1,144 +1,67 @@
-From: alex.williamson@redhat.com (Alex Williamson)
-Date: Wed, 13 Jul 2016 14:11:38 -0600
-Subject: [PATCH V7 6/9] vfio: platform: call _RST method when using ACPI
-In-Reply-To: <276ae4d2-66a2-f41a-3bb4-1d4b87a96e50@codeaurora.org>
-References: <1465792001-27960-1-git-send-email-okaya@codeaurora.org>
- <1465792001-27960-7-git-send-email-okaya@codeaurora.org>
- <20160623125948.59a8c656@t450s.home>
- <276ae4d2-66a2-f41a-3bb4-1d4b87a96e50@codeaurora.org>
-Message-ID: <20160713141138.05e5fd3b@t450s.home>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Wed, 13 Jul 2016 16:12:35 -0400
+Subject: [PATCH V8 7/9] vfio, platform: make reset driver a requirement by
+ default
+In-Reply-To: <20160623125955.647008cb@t450s.home>
+References: <1466437879-32182-1-git-send-email-okaya@codeaurora.org>
+ <1466437879-32182-8-git-send-email-okaya@codeaurora.org>
+ <20160623125955.647008cb@t450s.home>
+Message-ID: <4d95e48a-b5a1-c3eb-8aed-ddd307e1b028@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 13 Jul 2016 15:39:25 -0400
-Sinan Kaya <okaya@codeaurora.org> wrote:
-
-> On 6/23/2016 2:59 PM, Alex Williamson wrote:
-> > On Mon, 13 Jun 2016 00:26:38 -0400
-> > Sinan Kaya <okaya@codeaurora.org> wrote:
-> >   
-> >> The device tree code checks for the presence of a reset driver and calls
-> >> the of_reset function pointer by looking up the reset driver as a module.
-> >>
-> >> ACPI defines _RST method to perform device level reset. After the _RST
-> >> method is executed, the OS can resume using the device. _RST method is
-> >> expected to stop DMA transfers and IRQs.
-> >>
-> >> This patch introduces two functions as vfio_platform_acpi_has_reset and
-> >> vfio_platform_acpi_call_reset. The has reset method is used to declare
-> >> reset capability via the ioctl flag VFIO_DEVICE_FLAGS_RESET. The call
-> >> reset function is used to execute the _RST ACPI method.
-> >>
-> >> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-> >> Reviewed-by: Eric Auger <eric.auger@linaro.org>
-> >> ---
-> >>  drivers/vfio/platform/vfio_platform_common.c | 51 ++++++++++++++++++++++++++++
-> >>  1 file changed, 51 insertions(+)
-> >>
-> >> diff --git a/drivers/vfio/platform/vfio_platform_common.c b/drivers/vfio/platform/vfio_platform_common.c
-> >> index e7ce2c2..0ea8c26 100644
-> >> --- a/drivers/vfio/platform/vfio_platform_common.c
-> >> +++ b/drivers/vfio/platform/vfio_platform_common.c
-> >> @@ -73,21 +73,66 @@ static int vfio_platform_acpi_probe(struct vfio_platform_device *vdev,
-> >>  	}
-> >>  	return 0;
-> >>  }
-> >> +
-> >> +static int vfio_platform_acpi_call_reset(struct vfio_platform_device *vdev,
-> >> +					 const char **extra_dbg)
-> >> +{
-> >> +	struct device *dev = vdev->device;
-> >> +	acpi_handle handle = ACPI_HANDLE(dev);
-> >> +	acpi_status acpi_ret;
-> >> +	unsigned long long val;
-> >> +
-> >> +	acpi_ret = acpi_evaluate_integer(handle, "_RST", NULL, &val);
-> >> +	if (ACPI_FAILURE(acpi_ret)) {
-> >> +		if (extra_dbg)
-> >> +			*extra_dbg = acpi_format_exception(acpi_ret);
-> >> +		return -EINVAL;
-> >> +	}
-> >> +
-> >> +	return 0;
-> >> +}
-> >> +
-> >> +static bool vfio_platform_acpi_has_reset(struct vfio_platform_device *vdev)
-> >> +{
-> >> +	struct device *dev = vdev->device;
-> >> +	acpi_handle handle = ACPI_HANDLE(dev);
-> >> +
-> >> +	return acpi_has_method(handle, "_RST");
-> >> +}
-> >>  #else
-> >>  static inline int vfio_platform_acpi_probe(struct vfio_platform_device *vdev,
-> >>  					   struct device *dev)
-> >>  {
-> >>  	return -ENOENT;
-> >>  }
-> >> +
-> >> +static inline
-> >> +int vfio_platform_acpi_call_reset(struct vfio_platform_device *vdev,
-> >> +				  const char **extra_dbg)
-> >> +{
-> >> +	return -ENOENT;
-> >> +}
-> >> +
-> >> +static inline
-> >> +bool vfio_platform_acpi_has_reset(struct vfio_platform_device *vdev)
-> >> +{
-> >> +	return false;
-> >> +}
-> >>  #endif
-> >>  
-> >>  static bool vfio_platform_has_reset(struct vfio_platform_device *vdev)
-> >>  {
-> >> +	if (vdev->acpihid)
-> >> +		return vfio_platform_acpi_has_reset(vdev);
-> >> +
-> >>  	return vdev->of_reset ? true : false;
-> >>  }
-> >>  
-> >>  static void vfio_platform_get_reset(struct vfio_platform_device *vdev)
-> >>  {
-> >> +	if (vdev->acpihid)
-> >> +		return;
-> >> +
-> >>  	vdev->of_reset = vfio_platform_lookup_reset(vdev->compat,
-> >>  						    &vdev->reset_module);
-> >>  	if (!vdev->of_reset) {
-> >> @@ -99,6 +144,9 @@ static void vfio_platform_get_reset(struct vfio_platform_device *vdev)
-> >>  
-> >>  static void vfio_platform_put_reset(struct vfio_platform_device *vdev)
-> >>  {
-> >> +	if (vdev->acpihid)
-> >> +		return;
-> >> +
-> >>  	if (vdev->of_reset)
-> >>  		module_put(vdev->reset_module);
-> >>  }
-> >> @@ -177,6 +225,9 @@ static int vfio_platform_call_reset(struct vfio_platform_device *vdev,
-> >>  	if (vdev->of_reset) {
-> >>  		dev_info(vdev->device, "reset\n");
-> >>  		return vdev->of_reset(vdev);
-> >> +	} else if (vdev->acpihid) {
-> >> +		dev_info(vdev->device, "reset\n");
-> >> +		return vfio_platform_acpi_call_reset(vdev, extra_dbg);  
-> > 
-> > 
-> > nit, all the cases until this one prioritize ACPI over DT, here we have
-> > the opposite.   
+On 6/23/2016 2:59 PM, Alex Williamson wrote:
+>> >  static struct resource *get_platform_resource(struct vfio_platform_device *vdev,
+>> > @@ -66,6 +70,7 @@ static int vfio_platform_probe(struct platform_device *pdev)
+>> >  	vdev->get_resource = get_platform_resource;
+>> >  	vdev->get_irq = get_platform_irq;
+>> >  	vdev->parent_module = THIS_MODULE;
+>> > +	vdev->reset_required = reset_required;
 > 
-> I'll reorder to be consistent.
+> Do you see value in making the global reset_required changeable, with
+> the behavior of any given device dependent on the setting of this
+> variable at the time of probe?  It seems like a bit of a support issue
+> to me.  Also, we're breaking existing users if there are any with this
+> change.  Should we introduce a CONFIG option to set the default?  I
+> think we can get away with changing the default that way, but I'm not
+> so sure otherwise.
 > 
-> > Granted we should never have of_reset set when acpihid
-> > is set.  A macro like
-> > 
-> > #define vfio_platform_is_acpi(vdev) (vdev->acpihid != NULL)
-> > 
-> > might be useful.  
-> 
-> I like your idea. If you don't mind, I like capitals in macros. 
 
-Sure.  Thanks,
+We have two groups of existing users.
 
-Alex
+1. AMBA based drivers
+2. DT based drivers
+
+and now we are trying to add the ACPI based drivers in this series.
+
+The AMBA based drivers do not have reset function implemented. Based on
+previous conversation with Eric, these devices were mostly used for
+bringing up the VFIO framework and were not intended for production. 
+If we want to maintain existing functionality, I can change reset_required to
+false by default for the AMBA based drivers.
+
+The DT based drivers all have reset functions implemented. They shouldn't be
+impacted by the reset_required flag. 
+
+The reset_required flag is again useful for testing purposes when the reset
+driver is broken or the ACPI _RST method is missing.
+
+The previously agreed approach was to force the reset required by default
+for production environment and be able to clear it for testing purposes.
+When I was implementing HIDMA, I never realized that I needed a reset driver
+until Arnd told me during the review. We want to avoid this for the long
+term for DT and ACPI based implementations.
+
+The reset_required command line parameter would be useful if somebody suspects
+that the ACPI _RST implementation is broken or the DT based reset driver is
+broken or you quickly want to test the virtualization without having a reset
+driver ready yet.
+
+Let us know which way you want to go. I can also add a Kconfig option and
+set it by default. But then I have to recompile the kernel when I want to
+test without the reset stuff.
+
+-- 
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
