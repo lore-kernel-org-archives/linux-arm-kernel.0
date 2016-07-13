@@ -1,46 +1,74 @@
-From: van.freenix@gmail.com (Peng Fan)
-Date: Wed, 13 Jul 2016 10:13:08 +0800
-Subject: [PATCH V2] iommu: arm-smmu: drop devm_free_irq when driver detach
-Message-ID: <1468375988-15596-1-git-send-email-van.freenix@gmail.com>
+From: peter.chen@nxp.com (Peter Chen)
+Date: Wed, 13 Jul 2016 10:06:44 +0800
+Subject: [PATCH v2 0/6] power: add power sequence library
+Message-ID: <1468375610-18625-1-git-send-email-peter.chen@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is no need to call devm_free_irq when driver detach.
-devres_release_all which is called after 'drv->remove' will
-release all managed resources.
+Hi all,
 
-Signed-off-by: Peng Fan <van.freenix@gmail.com>
-Reviewed-by: Robin Murphy <robin.murphy@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
----
+This is a follow-up for my last power sequence framework patch set [1].
+According to Rob Herring and Ulf Hansson's comments[2], I use a generic
+power sequence library for parsing the power sequence elements on DT,
+and implement generic power sequence on library. The host driver
+can allocate power sequence instance, and calls pwrseq APIs accordingly.
 
-V2:
- Fix compile warning. Add Robin's Reviewed-by TAG.
+In future, if there are special power sequence requirements, the special
+power sequence library can be created.
 
- drivers/iommu/arm-smmu.c | 4 ----
- 1 file changed, 4 deletions(-)
+This patch set is tested on i.mx6 sabresx evk using a dts change, I use
+two hot-plug devices to simulate this use case, the related binding
+change is updated at patch[1/6], The udoo board changes were tested
+using my last power sequence patch set.[3]
 
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index 860652e..b7ef1d8 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -2018,7 +2018,6 @@ out_put_masters:
- 
- static int arm_smmu_device_remove(struct platform_device *pdev)
- {
--	int i;
- 	struct device *dev = &pdev->dev;
- 	struct arm_smmu_device *curr, *smmu = NULL;
- 	struct rb_node *node;
-@@ -2045,9 +2044,6 @@ static int arm_smmu_device_remove(struct platform_device *pdev)
- 	if (!bitmap_empty(smmu->context_map, ARM_SMMU_MAX_CBS))
- 		dev_err(dev, "removing device with active domains!\n");
- 
--	for (i = 0; i < smmu->num_global_irqs; ++i)
--		devm_free_irq(smmu->dev, smmu->irqs[i], smmu);
--
- 	/* Turn the thing off */
- 	writel(sCR0_CLIENTPD, ARM_SMMU_GR0_NS(smmu) + ARM_SMMU_GR0_sCR0);
- 	return 0;
+Except for hard-wired MMC and USB devices, I find the USB ULPI PHY also
+need to power on itself before it can be found by ULPI bus.
+
+[1] http://www.spinics.net/lists/linux-usb/msg142755.html
+[2] http://www.spinics.net/lists/linux-usb/msg143106.html
+[3] http://www.spinics.net/lists/linux-usb/msg142815.html
+
+Changes for v2:
+- Delete "pwrseq" prefix and clock-names for properties at dt binding
+- Should use structure not but its pointer for kzalloc
+- Since chipidea core has no of_node, let core's of_node equals glue
+  layer's at core's probe
+
+
+Peter Chen (6):
+  binding-doc: power: pwrseq-generic: add binding doc for generic power
+    sequence library
+  power: add power sequence library
+  binding-doc: usb: usb-device: add optional properties for power
+    sequence
+  usb: core: add power sequence handling for USB devices
+  usb: chipidea: let chipidea core device of_node equal's glue layer
+    device of_node
+  ARM: dts: imx6qdl-udoo.dtsi: fix onboard USB HUB property
+
+ .../bindings/power/pwrseq/pwrseq-generic.txt       |  53 ++++++++
+ .../devicetree/bindings/usb/usb-device.txt         |   9 ++
+ arch/arm/boot/dts/imx6qdl-udoo.dtsi                |  27 +++--
+ drivers/power/Kconfig                              |   1 +
+ drivers/power/Makefile                             |   1 +
+ drivers/power/pwrseq/Kconfig                       |  20 +++
+ drivers/power/pwrseq/Makefile                      |   2 +
+ drivers/power/pwrseq/core.c                        |  79 ++++++++++++
+ drivers/power/pwrseq/pwrseq_generic.c              | 134 +++++++++++++++++++++
+ drivers/usb/chipidea/core.c                        |  10 ++
+ drivers/usb/core/Makefile                          |   1 +
+ drivers/usb/core/hub.c                             |  12 +-
+ drivers/usb/core/hub.h                             |  12 ++
+ drivers/usb/core/pwrseq.c                          | 102 ++++++++++++++++
+ include/linux/power/pwrseq.h                       |  55 +++++++++
+ 15 files changed, 502 insertions(+), 16 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/power/pwrseq/pwrseq-generic.txt
+ create mode 100644 drivers/power/pwrseq/Kconfig
+ create mode 100644 drivers/power/pwrseq/Makefile
+ create mode 100644 drivers/power/pwrseq/core.c
+ create mode 100644 drivers/power/pwrseq/pwrseq_generic.c
+ create mode 100644 drivers/usb/core/pwrseq.c
+ create mode 100644 include/linux/power/pwrseq.h
+
 -- 
-2.6.2
+1.9.1
