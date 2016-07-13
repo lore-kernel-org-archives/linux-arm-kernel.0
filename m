@@ -1,115 +1,76 @@
-From: atull@opensource.altera.com (atull)
-Date: Wed, 13 Jul 2016 09:58:42 -0500
-Subject: [PATCH 2/2] fpga-manager: Add Socfpga Arria10 support
-In-Reply-To: <CAAtXAHfSBzLisqBgF4Vry0vrcL3+DB4b1ctMOrTdOq5ue4D7JQ@mail.gmail.com>
-References: <20160712190709.5964-1-atull@opensource.altera.com>
- <20160712190709.5964-3-atull@opensource.altera.com>
- <CAAtXAHfSBzLisqBgF4Vry0vrcL3+DB4b1ctMOrTdOq5ue4D7JQ@mail.gmail.com>
-Message-ID: <alpine.DEB.2.02.1607130953450.10735@linuxheads99>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Wed, 13 Jul 2016 09:11:46 -0600
+Subject: [PATCH RESEND 2/2] perf tools: adding coresight etm PMU record
+ capabilities
+In-Reply-To: <578628CB.8020707@intel.com>
+References: <1466182922-14426-1-git-send-email-mathieu.poirier@linaro.org>
+ <1466182922-14426-3-git-send-email-mathieu.poirier@linaro.org>
+ <578628CB.8020707@intel.com>
+Message-ID: <CANLsYkx13a1cbGAvvt2PL8mPtOtB6FV_FUNPCDHtjenYBiHKww@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 12 Jul 2016, Moritz Fischer wrote:
+On 13 July 2016 at 05:40, Adrian Hunter <adrian.hunter@intel.com> wrote:
+> On 17/06/16 20:02, Mathieu Poirier wrote:
+>> Coresight ETMs are IP blocks used to perform HW assisted tracing
+>> on a CPU core.  This patch introduce the required auxiliary API
+>> functions allowing the perf core to interact with a tracer.
+>>
+>> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+>> ---
+>>  MAINTAINERS                         |   3 +
+>>  tools/perf/arch/arm/util/Build      |   2 +-
+>>  tools/perf/arch/arm/util/auxtrace.c |  54 ++++
+>>  tools/perf/arch/arm/util/cs-etm.c   | 559 ++++++++++++++++++++++++++++++++++++
+>>  tools/perf/arch/arm/util/cs-etm.h   |  23 ++
+>>  tools/perf/arch/arm64/util/Build    |   4 +
+>>  tools/perf/util/auxtrace.c          |   1 +
+>>  tools/perf/util/auxtrace.h          |   1 +
+>>  tools/perf/util/cs-etm.h            |  74 +++++
+>>  9 files changed, 720 insertions(+), 1 deletion(-)
+>>  create mode 100644 tools/perf/arch/arm/util/auxtrace.c
+>>  create mode 100644 tools/perf/arch/arm/util/cs-etm.c
+>>  create mode 100644 tools/perf/arch/arm/util/cs-etm.h
+>>  create mode 100644 tools/perf/util/cs-etm.h
+>>
+>> diff --git a/MAINTAINERS b/MAINTAINERS
+>> index d3451007718b..4fa03b03bfc5 100644
+>> --- a/MAINTAINERS
+>> +++ b/MAINTAINERS
+>> @@ -1086,6 +1086,9 @@ F:      Documentation/trace/coresight.txt
+>>  F:   Documentation/devicetree/bindings/arm/coresight.txt
+>>  F:   Documentation/ABI/testing/sysfs-bus-coresight-devices-*
+>>  F:   tools/perf/arch/arm/util/pmu.c
+>> +F:   tools/perf/arch/arm/util/auxtrace.c
+>> +F:   tools/perf/arch/arm/util/cs_etm.c
+>> +F:   tools/perf/arch/arm/util/cs_etm.h
+>
+> File names have changed from having '_' to '-'
 
-> Hi Alan,
-> 
-> couple of nits inline below.
-> 
+Yes, I will change that.
 
-Hi Moritz!
+> Also FWIW there is now tools/perf/util/cs-etm.h
 
-Thanks for your review!
+Ok
 
-> On Tue, Jul 12, 2016 at 12:07 PM, Alan Tull <atull@opensource.altera.com> wrote:
-> 
-> > +static int socfpga_a10_fpga_write_complete(struct fpga_manager *mgr, u32 flags)
-> > +{
-> > +       struct a10_fpga_priv *priv = mgr->priv;
-> > +       u32 reg;
-> > +       int ret;
-> > +
-> > +       /* Wait for pr_done */
-> > +       ret = socfpga_a10_fpga_wait_for_pr_done(priv);
-> > +
-> > +       /* Clear pr_request */
-> > +       regmap_update_bits(priv->regmap, A10_FPGAMGR_IMGCFG_CTL_01_OFST,
-> > +                          A10_FPGAMGR_IMGCFG_CTL_01_S2F_PR_REQUEST, 0);
-> > +
-> > +       /* Send some clocks to clear out any errors */
-> > +       socfpga_a10_fpga_generate_dclks(priv, 256);
-> > +
-> > +       /* Disable s2f dclk and data */
-> > +       regmap_update_bits(priv->regmap, A10_FPGAMGR_IMGCFG_CTL_02_OFST,
-> > +                          A10_FPGAMGR_IMGCFG_CTL_02_EN_CFG_CTRL, 0);
-> 
-> Maybe replace 0 with named constant.
+>
+> As last time, there is no decoder, which still begs the question: is there
+> anything you can actually do with the perf.data file?
 
-Generally I use named constants, but since regmap_updates_bits uses a
-mask, it is clear that we're clearing the
-A10_FPGAMGR_IMGCFG_CTL_02_EN_CFG_CTRL bit.
+We are proceeding incrementally - this is only the first set in a
+suite of upcoming submission.  The whole solution can be found here
+[1] and the decoding library, called OpenCSD, here [2].  File
+"HOWTO.md" in the latter details how to compile the components in
+order to build a working environment.
 
+>
+> Otherwise:
+>
+> Acked-by: Adrian Hunter <adrian.hunter@intel.com>
+>
 
-> > +static int socfpga_a10_fpga_probe(struct platform_device *pdev)
-> > +{
-> > +       struct device *dev = &pdev->dev;
-> > +       struct a10_fpga_priv *priv;
-> > +       void __iomem *reg_base;
-> > +       struct resource *res;
-> > +       int ret;
-> > +
-> > +       priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
-> > +       if (!priv)
-> > +               return -ENOMEM;
-> > +
-> > +       /* First mmio base is for register access */
-> > +       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> > +       reg_base = devm_ioremap_resource(dev, res);
-> > +       if (IS_ERR(reg_base))
-> > +               return PTR_ERR(reg_base);
-> > +
-> > +       /* Second mmio base is for writing FPGA image data */
-> > +       res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-> > +       priv->fpga_data_addr = devm_ioremap_resource(dev, res);
-> > +       if (IS_ERR(priv->fpga_data_addr))
-> > +               return PTR_ERR(priv->fpga_data_addr);
-> > +
-> > +       /* regmap for register access */
-> > +       priv->regmap = devm_regmap_init_mmio(dev, reg_base,
-> > +                                            &socfpga_a10_fpga_regmap_config);
-> > +       if (IS_ERR(priv->regmap))
-> > +               return -ENODEV;
-> > +
-> > +       priv->clk = devm_clk_get(dev, NULL);
-> > +       if (IS_ERR(priv->clk)) {
-> > +               dev_err(dev, "no clock specified\n");
-> > +               return PTR_ERR(priv->clk);
-> > +       }
-> > +
-> > +       ret = clk_prepare_enable(priv->clk);
-> > +       if (ret) {
-> > +               dev_err(dev, "could not enable clock\n");
-> > +               clk_put(priv->clk);
-> 
-> Seen that you used devm_clk_get() is this one necessary?
+Thanks for your time,
+Mathieu
 
-Yes, this is wrong.  I'll fix it.
-
-Thanks,
-Alan
-
-> 
-> > +static int socfpga_a10_fpga_remove(struct platform_device *pdev)
-> > +{
-> > +       struct fpga_manager *mgr = platform_get_drvdata(pdev);
-> > +       struct a10_fpga_priv *priv = mgr->priv;
-> > +
-> > +       fpga_mgr_unregister(&pdev->dev);
-> > +       clk_disable_unprepare(priv->clk);
-> > +       clk_put(priv->clk);
-> 
-> Same here, if needed at all shouldn't it be devm_clk_put() ?
-> 
-> Cheers,
-> 
-> Moritz
-> 
+[1]. https://github.com/Linaro/OpenCSD/commits/perf-opencsd-4.7-rc4
+[2]. https://github.com/Linaro/OpenCSD/tree/opencsd-0v003
