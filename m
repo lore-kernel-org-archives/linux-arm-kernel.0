@@ -1,33 +1,41 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Wed, 13 Jul 2016 09:15:29 +0100
-Subject: [PATCH v9 00/17] KVM: arm64: GICv3 ITS emulation
-In-Reply-To: <HE1PR04MB1321470CDA673EDB88B8930DFF310@HE1PR04MB1321.eurprd04.prod.outlook.com>
-References: <20160713015909.28793-1-andre.przywara@arm.com>
- <HE1PR04MB1321470CDA673EDB88B8930DFF310@HE1PR04MB1321.eurprd04.prod.outlook.com>
-Message-ID: <ed267877-0071-1cf3-d173-4eedfd183c10@arm.com>
+From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
+Date: Wed, 13 Jul 2016 11:20:00 +0300
+Subject: =?UTF-8?B?UmU6IFtQQVRDSCB2MiAyLzJdIHNwaTogYWRkIERUIGJpbmRpbmcgZm9yIGNs?=
+ =?UTF-8?B?cHM3MTF4IFNQSQ==?=
+In-Reply-To: <9132787.CoNHcRuYpT@wuerfel>
+References: <20160707094952.4111577-1-arnd@arndb.de>
+ <20160712204947.GA6182@rob-hp-laptop> <9132787.CoNHcRuYpT@wuerfel>
+Message-ID: <1468398000.319627182@f165.i.mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Diana,
+>?????, 13 ???? 2016, 11:13 +03:00 ?? Arnd Bergmann <arnd@arndb.de>:
+>
+>On Tuesday, July 12, 2016 3:49:47 PM CEST Rob Herring wrote:
+>> On Thu, Jul 07, 2016 at 11:49:46AM +0200, Arnd Bergmann wrote:
+>> > +
+>> > +An additional register is present in the system controller,
+>> > +which is assumed to be in the same device tree, with and marked
+>> > +as compatible with "cirrus,ep7209-syscon3".
+>> > +
+>> > +Example:
+>> > +
+>> > +spi at 80000500 {
+>> > +     #address-cells = <1>;
+>> > +     #size-cells = <0>;
+>> > +     compatible = "cirrus,ep7209-spi";
+>> > +     reg = <0x80000500 0x4>;
+>> > +     interrupts = <15>;
+>> > +     clocks = <&clks CLPS711X_CLK_SPI>;
+>> > +     status = "disabled";
+>> > +};
+>> > +
+>> > +syscon3: syscon at 80002200 {
+>> 
+>> This looks like it shouldn't be here.
+>
+>The label, or the entire node?
 
-On 13/07/16 08:57, Diana Madalina Craciun wrote:
-> Hi Andre,
-> 
-> On 07/13/2016 04:59 AM, Andre Przywara wrote:
->> To test this you can use the kvmtool patches available in the "its-v6"
->> branch here [2].
->> Start a guest with: "$ lkvm run --irqchip=gicv3-its --force-pci"
->> and see the ITS being used for instance by the virtio devices.
->>
->> [1]: git://linux-arm.org/linux-ap.git
->>      http://www.linux-arm.org/git?p=linux-ap.git;a=log;h=refs/heads/its-emul/v9
->> [2]: git://linux-arm.org/kvmtool.git
-> 
-> It seems that its/emul/v9 branch does not exist.
+I think that the whole syscon3 node is redundant.
 
-I could claim it was just a test to see whether someone cares ;-), but
-in fact I just forgot it.
-Just pushed it now, please try again!
-
-Thanks,
-Andre.
+---
