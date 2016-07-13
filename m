@@ -1,53 +1,170 @@
-From: andi.shyti@samsung.com (Andi Shyti)
-Date: Wed, 13 Jul 2016 17:34:13 +0900
-Subject: [PATCH -next] spi: s3c64xx: fix reference leak to master in
- s3c64xx_spi_remove()
-In-Reply-To: <481c6f26.751d.155e2c1d661.Coremail.weiyj_lk@163.com>
-References: <CGME20160712110926epcas1p13bbc88f5867d41d09d9b8c1172a7150b@epcas1p1.samsung.com>
- <1468321722-16568-1-git-send-email-weiyj_lk@163.com>
- <20160713045030.GI18237@samsunx.samsung>
- <481c6f26.751d.155e2c1d661.Coremail.weiyj_lk@163.com>
-Message-ID: <20160713083413.GK18237@samsunx.samsung>
+From: dirk.behme@de.bosch.com (Dirk Behme)
+Date: Wed, 13 Jul 2016 10:35:42 +0200
+Subject: [PATCH v4] xen/arm: Add a clock property
+In-Reply-To: <146836236759.73491.11707389619985827497@resonance>
+References: <1468309605-19522-1-git-send-email-dirk.behme@de.bosch.com>
+ <146836236759.73491.11707389619985827497@resonance>
+Message-ID: <c320f820-8749-f4a4-435e-ddd9379655b5@de.bosch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wei,
+On 13.07.2016 00:26, Michael Turquette wrote:
+> Quoting Dirk Behme (2016-07-12 00:46:45)
+>> Clocks described by this property are reserved for use by Xen, and the OS
+>> must not alter their state any way, such as disabling or gating a clock,
+>> or modifying its rate. Ensuring this may impose constraints on parent
+>> clocks or other resources used by the clock tree.
+>
+> Note that clk_prepare_enable will not prevent the rate from changing
+> (clk_set_rate) or a parent from changing (clk_set_parent). The only way
+> to do this currently would be to set the following flags on the effected
+> clocks:
+>
+> 	CLK_SET_RATE_GATE
+> 	CLK_SET_PARENT_GATE
 
-> >> Once a spi_master_get() call succeeds, we need an additional
-> >> spi_master_put() call to free the memory, otherwise we will
-> >> leak a reference to master. Fix by removing the unnecessary
-> >> spi_master_get() call.
-> >> 
-> >> Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
-> >
-> >The patch doesn't have anything wrong, but what you write in the
-> >description is not what you are doing in the patch.
-> >
-> >There is no memory allocated in spi_master_get and nothing leaks.
-> >Besides master's resources are managed, so that there would
-> >not be any need to call spi_master_put().
-> >
-> >spi_master_put() has been, indeed, removed in this commit:
-> >91800f0e90050a4db4c77e940796f501e02af8be.
-> >
-> 
-> master allocated in spi_alloc_master() need device reference count to zero
-> to be freed.
-> 
-> The call sequence spi_alloc_master/spi_register_master/spi_unregister_master
-> is complete; it reduces the device reference count to zero, which results in
-> device memory being freed.
-> 
-> In commit 91800f0e90050a4db4c77e940796f501e02af8be, 
-> devm_spi_register_master() equal to spi_register_master() and auto call
-> spi_unregister_master() when remove. But  remove spi_master_put()
-> will cause the device reference count left no zero, since spi_master_get()
-> is callled at the begin of remove function already.
-> 
-> So I think we should either remove the spi_master_get() or add spi_master_put()
-> before return from remove function.
 
-Yes, you are right, I missed this part :)
 
-Thanks,
-Andi
+Regarding setting flags, I think we already talked about that. I think 
+the conclusion was that in our case its not possible to manipulate the 
+flags in the OS as this isn't intended to be done in cases like ours. 
+Therefore no API is exported for this.
+
+I.e. if we need to set these flags, we have to do that in Xen where we 
+add the clocks to the hypervisor node in the device tree. And not in the 
+kernel patch discussed here.
+
+Best regards
+
+Dirk
+
+
+> And then enable the clocks. All calls to clk_set_parent and clk_set_rate
+> with those clocks in the path will fail, so long as they are prepared
+> and enabled. This implementation detail is specific to Linux and
+> definitely should not go into the binding.
+>
+>>
+>> This property is used to proxy clocks for devices Xen has taken ownership
+>> of, such as UARTs, for which the associated clock controller(s) remain
+>> under the control of Dom0.
+>
+> I'm still not completely sure about this type of layering and whether or
+> not it is sane. If you want Xen to manage the clock controller, AND you
+> want Linux guests or dom0 to consume those clocks and manipulate them in
+> other drivers, then this solution won't work.
+>
+> Regards,
+> Mike
+>
+>>
+>> Up to now, the workaround for this has been to use the Linux kernel
+>> command line parameter 'clk_ignore_unused'. See Xen bug
+>>
+>> http://bugs.xenproject.org/xen/bug/45
+>>
+>> too.
+>>
+>> Signed-off-by: Dirk Behme <dirk.behme@de.bosch.com>
+>> ---
+>> Changes in v4: Switch to the xen.txt description proposed by Mark:
+>>                https://www.spinics.net/lists/arm-kernel/msg516158.html
+>>
+>> Changes in v3: Use the xen.txt description proposed by Michael. Thanks!
+>>
+>> Changes in v2: Drop the Linux implementation details like clk_disable_unused
+>>                in xen.txt.
+>>
+>>  Documentation/devicetree/bindings/arm/xen.txt | 12 +++++++
+>>  arch/arm/xen/enlighten.c                      | 47 +++++++++++++++++++++++++++
+>>  2 files changed, 59 insertions(+)
+>>
+>> diff --git a/Documentation/devicetree/bindings/arm/xen.txt b/Documentation/devicetree/bindings/arm/xen.txt
+>> index c9b9321..437e50b 100644
+>> --- a/Documentation/devicetree/bindings/arm/xen.txt
+>> +++ b/Documentation/devicetree/bindings/arm/xen.txt
+>> @@ -17,6 +17,18 @@ the following properties:
+>>    A GIC node is also required.
+>>    This property is unnecessary when booting Dom0 using ACPI.
+>>
+>> +Optional properties:
+>> +
+>> +- clocks: a list of phandle + clock-specifier pairs
+>> +  Clocks described by this property are reserved for use by Xen, and the
+>> +  OS must not alter their state any way, such as disabling or gating a
+>> +  clock, or modifying its rate. Ensuring this may impose constraints on
+>> +  parent clocks or other resources used by the clock tree.
+>> +
+>> +  Note: this property is used to proxy clocks for devices Xen has taken
+>> +  ownership of, such as UARTs, for which the associated clock
+>> +  controller(s) remain under the control of Dom0.
+>> +
+>>  To support UEFI on Xen ARM virtual platforms, Xen populates the FDT "uefi" node
+>>  under /hypervisor with following parameters:
+>>
+>> diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
+>> index 47acb36..5c546d0 100644
+>> --- a/arch/arm/xen/enlighten.c
+>> +++ b/arch/arm/xen/enlighten.c
+>> @@ -24,6 +24,7 @@
+>>  #include <linux/of_fdt.h>
+>>  #include <linux/of_irq.h>
+>>  #include <linux/of_address.h>
+>> +#include <linux/clk-provider.h>
+>>  #include <linux/cpuidle.h>
+>>  #include <linux/cpufreq.h>
+>>  #include <linux/cpu.h>
+>> @@ -444,6 +445,52 @@ static int __init xen_pm_init(void)
+>>  }
+>>  late_initcall(xen_pm_init);
+>>
+>> +/*
+>> + * Check if we want to register some clocks, that they
+>> + * are not freed because unused by clk_disable_unused().
+>> + * E.g. the serial console clock.
+>> + */
+>> +static int __init xen_arm_register_clks(void)
+>> +{
+>> +       struct clk *clk;
+>> +       struct device_node *xen_node;
+>> +       unsigned int i, count;
+>> +       int ret = 0;
+>> +
+>> +       xen_node = of_find_compatible_node(NULL, NULL, "xen,xen");
+>> +       if (!xen_node) {
+>> +               pr_err("Xen support was detected before, but it has disappeared\n");
+>> +               return -EINVAL;
+>> +       }
+>> +
+>> +       count = of_clk_get_parent_count(xen_node);
+>> +       if (!count)
+>> +               goto out;
+>> +
+>> +       for (i = 0; i < count; i++) {
+>> +               clk = of_clk_get(xen_node, i);
+>> +               if (IS_ERR(clk)) {
+>> +                       pr_err("Xen failed to register clock %i. Error: %li\n",
+>> +                              i, PTR_ERR(clk));
+>> +                       ret = PTR_ERR(clk);
+>> +                       goto out;
+>> +               }
+>> +
+>> +               ret = clk_prepare_enable(clk);
+>> +               if (ret < 0) {
+>> +                       pr_err("Xen failed to enable clock %i. Error: %i\n",
+>> +                              i, ret);
+>> +                       goto out;
+>> +               }
+>> +       }
+>> +
+>> +       ret = 0;
+>> +
+>> +out:
+>> +       of_node_put(xen_node);
+>> +       return ret;
+>> +}
+>> +late_initcall(xen_arm_register_clks);
+>>
+>>  /* empty stubs */
+>>  void xen_arch_pre_suspend(void) { }
+>> --
