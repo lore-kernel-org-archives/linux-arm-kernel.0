@@ -1,49 +1,112 @@
-From: bauerman@linux.vnet.ibm.com (Thiago Jung Bauermann)
-Date: Wed, 13 Jul 2016 15:45:41 -0300
-Subject: [RFC 0/3] extend kexec_file_load system call
-In-Reply-To: <7352796.seiSnHrYPy@wuerfel>
-References: <20160712014201.11456-1-takahiro.akashi@linaro.org>
- <20160713094127.GC14522@leverpostej> <7352796.seiSnHrYPy@wuerfel>
-Message-ID: <2222184.ZN0KkkXgPC@hactar>
+From: dirk.behme@gmail.com (Dirk Behme)
+Date: Wed, 13 Jul 2016 20:47:16 +0200
+Subject: [Xen-devel] [PATCH v4] xen/arm: Add a clock property
+In-Reply-To: <alpine.DEB.2.10.1607131932530.26575@sstabellini-ThinkPad-X260>
+References: <1468309605-19522-1-git-send-email-dirk.behme@de.bosch.com>
+ <alpine.DEB.2.10.1607131932530.26575@sstabellini-ThinkPad-X260>
+Message-ID: <57868CB4.1090504@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, 13 Juli 2016, 15:13:42 schrieb Arnd Bergmann:
-> On Wednesday, July 13, 2016 10:41:28 AM CEST Mark Rutland wrote:
-> > On Wed, Jul 13, 2016 at 10:01:33AM +0200, Arnd Bergmann wrote:
-> > > - kboot/petitboot with all of the user space being part of the trusted
-> > > boot> > 
-> > >   chain: it would be good to allow these to modify the dtb as needed
-> > >   without breaking the trust chain, just like we allow grub or u-boot
-> > >   to modify the dtb before passing it to the kernel.
-> > 
-> > It depends on *what* we need to modify here. We can modify the bootargs
-> > and initrd properties as part of the kexec_file_load syscall, so what
-> > else would we want to alter?
-> 
-> I guess petitboot can also just use kexec_load() instead of
-> kexec_file_load(), as long as the initramfs containing petitboot is
-> trusted by the kernel.
+On 13.07.2016 20:35, Stefano Stabellini wrote:
+> On Tue, 12 Jul 2016, Dirk Behme wrote:
+>> Clocks described by this property are reserved for use by Xen, and the OS
+>> must not alter their state any way, such as disabling or gating a clock,
+>> or modifying its rate. Ensuring this may impose constraints on parent
+>> clocks or other resources used by the clock tree.
+>>
+>> This property is used to proxy clocks for devices Xen has taken ownership
+>> of, such as UARTs, for which the associated clock controller(s) remain
+>> under the control of Dom0.
+>>
+>> Up to now, the workaround for this has been to use the Linux kernel
+>> command line parameter 'clk_ignore_unused'. See Xen bug
+>>
+>> http://bugs.xenproject.org/xen/bug/45
+>>
+>> too.
+>>
+>> Signed-off-by: Dirk Behme <dirk.behme@de.bosch.com>
+>> ---
+>> Changes in v4: Switch to the xen.txt description proposed by Mark:
+>>                 https://www.spinics.net/lists/arm-kernel/msg516158.html
+>>
+>> Changes in v3: Use the xen.txt description proposed by Michael. Thanks!
+>>
+>> Changes in v2: Drop the Linux implementation details like clk_disable_unused
+>> 	       in xen.txt.
+>>
+>>   Documentation/devicetree/bindings/arm/xen.txt | 12 +++++++
+>>   arch/arm/xen/enlighten.c                      | 47 +++++++++++++++++++++++++++
+>>   2 files changed, 59 insertions(+)
+>>
+>> diff --git a/Documentation/devicetree/bindings/arm/xen.txt b/Documentation/devicetree/bindings/arm/xen.txt
+>> index c9b9321..437e50b 100644
+>> --- a/Documentation/devicetree/bindings/arm/xen.txt
+>> +++ b/Documentation/devicetree/bindings/arm/xen.txt
+>> @@ -17,6 +17,18 @@ the following properties:
+>>     A GIC node is also required.
+>>     This property is unnecessary when booting Dom0 using ACPI.
+>>
+>> +Optional properties:
+>> +
+>> +- clocks: a list of phandle + clock-specifier pairs
+>> +  Clocks described by this property are reserved for use by Xen, and the
+>> +  OS must not alter their state any way, such as disabling or gating a
+>> +  clock, or modifying its rate. Ensuring this may impose constraints on
+>> +  parent clocks or other resources used by the clock tree.
+>> +
+>> +  Note: this property is used to proxy clocks for devices Xen has taken
+>> +  ownership of, such as UARTs, for which the associated clock
+>> +  controller(s) remain under the control of Dom0.
+>> +
+>>   To support UEFI on Xen ARM virtual platforms, Xen populates the FDT "uefi" node
+>>   under /hypervisor with following parameters:
+>>
+>> diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
+>> index 47acb36..5c546d0 100644
+>> --- a/arch/arm/xen/enlighten.c
+>> +++ b/arch/arm/xen/enlighten.c
+>> @@ -24,6 +24,7 @@
+>>   #include <linux/of_fdt.h>
+>>   #include <linux/of_irq.h>
+>>   #include <linux/of_address.h>
+>> +#include <linux/clk-provider.h>
+>>   #include <linux/cpuidle.h>
+>>   #include <linux/cpufreq.h>
+>>   #include <linux/cpu.h>
+>> @@ -444,6 +445,52 @@ static int __init xen_pm_init(void)
+>>   }
+>>   late_initcall(xen_pm_init);
+>>
+>> +/*
+>> + * Check if we want to register some clocks, that they
+>> + * are not freed because unused by clk_disable_unused().
+>> + * E.g. the serial console clock.
+>> + */
+>> +static int __init xen_arm_register_clks(void)
+>> +{
+>> +	struct clk *clk;
+>> +	struct device_node *xen_node;
+>> +	unsigned int i, count;
+>> +	int ret = 0;
+>> +
+>> +	xen_node = of_find_compatible_node(NULL, NULL, "xen,xen");
+>> +	if (!xen_node) {
+>> +		pr_err("Xen support was detected before, but it has disappeared\n");
+>> +		return -EINVAL;
+>> +	}
+>
+> Given that this is a late initcall, the following should work:
+>
+>      if (!xen_domain())
+>          return -ENODEV;
 
-For secure boot, Petitboot needs to use kexec_file_load, because of the 
-following two features which the system call enables:
 
-1. only allow loading of signed kernels.
-2. "measure" (i.e., record the hashes of) the kernel, initrd, kernel
-   command line and other boot inputs for the Integrity Measurement
-   Architecture subsystem.
+Hmm, sorry, "should work" for what?
 
-Those can't be done with kexec_load.
+We need the xen_node from device tree, anyway.
 
-As for what we need to modify, Petitboot does the following modifications to 
-the DTB:
+Best regards
 
-1. Set /chosen/linux,stdout-path based on which console is being used to 
-interact with it, as Stewart mentioned in another email.
-2. Set display properties on /pciex at n/.../vga at 0 in machines with an 
-OpenFirmware framebuffer.
-
--- 
-[]'s
-Thiago Jung Bauermann
-IBM Linux Technology Center
+Dirk
