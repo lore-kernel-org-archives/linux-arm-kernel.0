@@ -1,60 +1,61 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 13 Jul 2016 10:47:40 +0200
-Subject: [PATCH v2] [media] mtk-vcodec: fix more type mismatches
-Message-ID: <20160713084916.2765651-1-arnd@arndb.de>
+From: hzpeterchen@gmail.com (Peter Chen)
+Date: Wed, 13 Jul 2016 16:42:50 +0800
+Subject: [PATCH v2 1/6] binding-doc: power: pwrseq-generic: add binding
+ doc for generic power sequence library
+In-Reply-To: <1468394851.3638.13.camel@pengutronix.de>
+References: <1468375610-18625-1-git-send-email-peter.chen@nxp.com>
+ <1468375610-18625-2-git-send-email-peter.chen@nxp.com>
+ <1468394851.3638.13.camel@pengutronix.de>
+Message-ID: <20160713084250.GB11863@shlinux2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The newly added mtk-vcodec driver produces a number of warnings in an ARM
-allmodconfig build, mainly since it assumes that dma_addr_t is 32-bit wide:
+On Wed, Jul 13, 2016 at 09:27:31AM +0200, Philipp Zabel wrote:
+> Am Mittwoch, den 13.07.2016, 10:06 +0800 schrieb Peter Chen:
+> > Add binding doc for generic power sequence library.
+> > 
+> > Signed-off-by: Peter Chen <peter.chen@nxp.com>
+> > ---
+> >  .../bindings/power/pwrseq/pwrseq-generic.txt       | 53 ++++++++++++++++++++++
+> >  1 file changed, 53 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/power/pwrseq/pwrseq-generic.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/power/pwrseq/pwrseq-generic.txt b/Documentation/devicetree/bindings/power/pwrseq/pwrseq-generic.txt
+> > new file mode 100644
+> > index 0000000..186c58c
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/power/pwrseq/pwrseq-generic.txt
+> > @@ -0,0 +1,53 @@
+> > +The generic power sequence library
+> > +
+> > +Some hard-wired USB/MMC devices need to do power sequence to let the
+> > +device work normally,
+> 
+> I would replace "to let the device work normally" with "before the
+> device can be enumerated [on the bus]" here.
+> 
 
-mtk-vcodec/venc/venc_vp8_if.c: In function 'vp8_enc_alloc_work_buf':
-mtk-vcodec/venc/venc_vp8_if.c:212:191: error: cast to pointer from integer of different size [-Werror=int-to-pointer-cast]
-mtk-vcodec/venc/venc_h264_if.c: In function 'h264_enc_alloc_work_buf':
-mtk-vcodec/venc/venc_h264_if.c:297:190: error: cast to pointer from integer of different size [-Werror=int-to-pointer-cast]
+Ok.
 
-This rearranges the format strings and type casts to what they should have been
-in order to avoid the warnings. e0f80d8d62f5 ("[media] mtk-vcodec: fix two compiler
-warnings") fixed some of the problems that were introduced at the same time, but
-missed two others.
+> >  the typical power sequence like: enable USB
+> > +PHY clock, toggle reset pin, etc. But current Linux USB driver
+> > +lacks of such code to do it, it may cause some hard-wired USB devices
+> > +works abnormal or can't be recognized by controller at all. The
+> > +power sequence will be done before this device can be found at USB
+> > +bus.
+> > +
+> > +The power sequence properties is under the device node.
+> > +
+> > +Required properties:
+> > +- power-sequence: this device needs to do power sequence before enumeration
+> 
+> As Joshua pointed out, is this even needed at all?
+> 
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- drivers/media/platform/mtk-vcodec/venc/venc_h264_if.c | 4 ++--
- drivers/media/platform/mtk-vcodec/venc/venc_vp8_if.c  | 4 ++--
- 2 files changed, 4 insertions(+), 4 deletions(-)
+If no, how we decide whether allocates pwrseq instance through pwrseq
+library or not?
 
-diff --git a/drivers/media/platform/mtk-vcodec/venc/venc_h264_if.c b/drivers/media/platform/mtk-vcodec/venc/venc_h264_if.c
-index f4e18bb44cb9..9a600525b3c1 100644
---- a/drivers/media/platform/mtk-vcodec/venc/venc_h264_if.c
-+++ b/drivers/media/platform/mtk-vcodec/venc/venc_h264_if.c
-@@ -295,9 +295,9 @@ static int h264_enc_alloc_work_buf(struct venc_h264_inst *inst)
- 		wb[i].iova = inst->work_bufs[i].dma_addr;
- 
- 		mtk_vcodec_debug(inst,
--				 "work_buf[%d] va=0x%p iova=0x%p size=%zu",
-+				 "work_buf[%d] va=0x%p iova=%pad size=%zu",
- 				 i, inst->work_bufs[i].va,
--				 (void *)inst->work_bufs[i].dma_addr,
-+				 &inst->work_bufs[i].dma_addr,
- 				 inst->work_bufs[i].size);
- 	}
- 
-diff --git a/drivers/media/platform/mtk-vcodec/venc/venc_vp8_if.c b/drivers/media/platform/mtk-vcodec/venc/venc_vp8_if.c
-index 5b4ef0f1740c..60bbcd2a0510 100644
---- a/drivers/media/platform/mtk-vcodec/venc/venc_vp8_if.c
-+++ b/drivers/media/platform/mtk-vcodec/venc/venc_vp8_if.c
-@@ -210,9 +210,9 @@ static int vp8_enc_alloc_work_buf(struct venc_vp8_inst *inst)
- 		wb[i].iova = inst->work_bufs[i].dma_addr;
- 
- 		mtk_vcodec_debug(inst,
--				 "work_bufs[%d] va=0x%p,iova=0x%p,size=%zu",
-+				 "work_bufs[%d] va=0x%p,iova=%pad,size=%zu",
- 				 i, inst->work_bufs[i].va,
--				 (void *)inst->work_bufs[i].dma_addr,
-+				 &inst->work_bufs[i].dma_addr,
- 				 inst->work_bufs[i].size);
- 	}
- 
 -- 
-2.9.0
+
+Best Regards,
+Peter Chen
