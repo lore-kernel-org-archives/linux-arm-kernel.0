@@ -1,106 +1,41 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 13 Jul 2016 13:28:12 +0100
-Subject: [PATCH v9 07/17] irqchip: refactor and add GICv3 definitions
-In-Reply-To: <20160713015909.28793-8-andre.przywara@arm.com>
-References: <20160713015909.28793-1-andre.przywara@arm.com>
- <20160713015909.28793-8-andre.przywara@arm.com>
-Message-ID: <578633DC.4070806@arm.com>
+From: andi.shyti@samsung.com (Andi Shyti)
+Date: Wed, 13 Jul 2016 21:44:16 +0900
+Subject: [PATCH v3 7/7] clk: exynos5433: remove CLK_IGNORE_UNUSED flag from
+ SPI clocks
+In-Reply-To: <146836184696.73491.9452469757415968654@resonance>
+References: <1468317736-18841-1-git-send-email-andi.shyti@samsung.com>
+ <1468317736-18841-8-git-send-email-andi.shyti@samsung.com>
+ <CGME20160712222323epcas1p4020f224ba47b193243867ab41bc109c8@epcas1p4.samsung.com>
+ <146836184696.73491.9452469757415968654@resonance>
+Message-ID: <20160713124416.GN18237@samsunx.samsung>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/07/16 02:58, Andre Przywara wrote:
-> arm-gic-v3.h contains bit and register definitions for the GICv3 and ITS,
-> at least for the bits the we currently care about.
-> The ITS emulation needs more definitions, so add them and refactor
-> the memory attribute #defines to be more universally usable.
-> To avoid changing all users, we still provide some of the old definitons
-> defined with the help of the new macros.
+Hi Mike,
+
+> > Because the Exynos5433 SPI driver supports the ioclk handling and
+> > the following patch:
+> > 
+> >   http://marc.info/?l=linux-kernel&m=146787645626318&w=2
+> > 
+> > fixes a synchronus abort issue, none of the SPI clocks require
+> > any critical handling: remove, then, the CLK_IGNORE_UNUSED flag
+> > for the SPI related clocks.
+> > 
+> > Signed-off-by: Andi Shyti <andi.shyti@samsung.com>
+> > Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> > Reviewed-by: Michael Turquette <mturquette@baylibre.com>
+> > Acked-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
 > 
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> ---
->  include/linux/irqchip/arm-gic-v3.h | 174 ++++++++++++++++++++++++-------------
->  1 file changed, 114 insertions(+), 60 deletions(-)
-> 
-> diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
-> index bfbd707..ed61647 100644
-> --- a/include/linux/irqchip/arm-gic-v3.h
-> +++ b/include/linux/irqchip/arm-gic-v3.h
-> @@ -112,34 +112,58 @@
->  #define GICR_WAKER_ProcessorSleep	(1U << 1)
->  #define GICR_WAKER_ChildrenAsleep	(1U << 2)
->  
-> -#define GICR_PROPBASER_NonShareable	(0U << 10)
-> -#define GICR_PROPBASER_InnerShareable	(1U << 10)
-> -#define GICR_PROPBASER_OuterShareable	(2U << 10)
-> -#define GICR_PROPBASER_SHAREABILITY_MASK (3UL << 10)
-> -#define GICR_PROPBASER_nCnB		(0U << 7)
-> -#define GICR_PROPBASER_nC		(1U << 7)
-> -#define GICR_PROPBASER_RaWt		(2U << 7)
-> -#define GICR_PROPBASER_RaWb		(3U << 7)
-> -#define GICR_PROPBASER_WaWt		(4U << 7)
-> -#define GICR_PROPBASER_WaWb		(5U << 7)
-> -#define GICR_PROPBASER_RaWaWt		(6U << 7)
-> -#define GICR_PROPBASER_RaWaWb		(7U << 7)
-> -#define GICR_PROPBASER_CACHEABILITY_MASK (7U << 7)
-> -#define GICR_PROPBASER_IDBITS_MASK	(0x1f)
-> -
-> -#define GICR_PENDBASER_NonShareable	(0U << 10)
-> -#define GICR_PENDBASER_InnerShareable	(1U << 10)
-> -#define GICR_PENDBASER_OuterShareable	(2U << 10)
-> -#define GICR_PENDBASER_SHAREABILITY_MASK (3UL << 10)
-> -#define GICR_PENDBASER_nCnB		(0U << 7)
-> -#define GICR_PENDBASER_nC		(1U << 7)
-> -#define GICR_PENDBASER_RaWt		(2U << 7)
-> -#define GICR_PENDBASER_RaWb		(3U << 7)
-> -#define GICR_PENDBASER_WaWt		(4U << 7)
-> -#define GICR_PENDBASER_WaWb		(5U << 7)
-> -#define GICR_PENDBASER_RaWaWt		(6U << 7)
-> -#define GICR_PENDBASER_RaWaWb		(7U << 7)
-> -#define GICR_PENDBASER_CACHEABILITY_MASK (7U << 7)
-> +#define GIC_BASER_CACHE_nCnB		0ULL
-> +#define GIC_BASER_CACHE_SameAsInner	0ULL
-> +#define GIC_BASER_CACHE_nC		1ULL
-> +#define GIC_BASER_CACHE_RaWt		2ULL
-> +#define GIC_BASER_CACHE_RaWb		3ULL
-> +#define GIC_BASER_CACHE_WaWt		4ULL
-> +#define GIC_BASER_CACHE_WaWb		5ULL
-> +#define GIC_BASER_CACHE_RaWaWt		6ULL
-> +#define GIC_BASER_CACHE_RaWaWb		7ULL
-> +#define GIC_BASER_CACHE_MASK		7ULL
-> +#define GIC_BASER_NonShareable		0ULL
-> +#define GIC_BASER_InnerShareable	1ULL
-> +#define GIC_BASER_OuterShareable	2ULL
-> +#define GIC_BASER_SHAREABILITY_MASK	3ULL
-> +
-> +#define GIC_BASER_CACHEABILITY(reg, inner_outer, type)			\
-> +	(GIC_BASER_CACHE_##type << reg##_##inner_outer##_CACHEABILITY_SHIFT)
-> +
-> +#define GIC_BASER_SHAREABILITY(reg, type)				\
-> +	(GIC_BASER_##type << reg##_SHAREABILITY_SHIFT)
-> +
-> +#define GICR_PROPBASER_SHAREABILITY_SHIFT		(10)
-> +#define GICR_PROPBASER_INNER_CACHEABILITY_SHIFT		(7)
-> +#define GICR_PROPBASER_OUTER_CACHEABILITY_SHIFT		(56)
-> +#define GICR_PROPBASER_SHAREABILITY_MASK				\
-> +	GIC_BASER_SHAREABILITY(GICR_PROPBASER, SHAREABILITY_MASK)
-> +#define GICR_PROPBASER_CACHEABILITY_MASK				\
-> +	GIC_BASER_CACHEABILITY(GICR_PROPBASER, INNER, MASK)
-> +#define GICR_PROPBASER_OUTER_CACHEABILITY_MASK				\
-> +	GIC_BASER_CACHEABILITY(GICR_PROPBASER, OUTER, MASK)
+> Do you want these patches to go through same tree? If not, I can take
+> this patch into clk-next.
 
-Inner Cacheability : GICR_PROPBASER_CACHEABILITY_MASK
-Outer Cacheability : GICR_PROPBASER_OUTER_CACHEABILITY_MASK
+oh yes, as Krzysztof and Sylwester pointed out, the dependency is
+not that strict as there is no exynos5433 dts yet, so that we
+wouldn't break anything if patch 7/7 gets in before the others.
 
-Why don't we have a symmetric naming (GICR_PROPBASER_INNER_CACHEABILITY_MASK)?
+If you want to take in your branch the 7/7, please feel free to
+do so. Only the patches on the drivers/spi/spi-s3c64xx.c file
+have some dependencies on some previous patches I sent to Mark.
 
-I'm all for having some backward compatibility, but given
-that you're adding a lot of those, you should make sure that
-the new stuff is not ambiguous.
-
-This applies throughout the file.
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Andi
