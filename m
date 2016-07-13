@@ -1,38 +1,54 @@
-From: dan.carpenter@oracle.com (Dan Carpenter)
-Date: Wed, 13 Jul 2016 14:31:01 +0300
-Subject: [PATCH] dmaengine: zynqmp_dma: Fix static checker warning
-In-Reply-To: <1468406536-6350-1-git-send-email-appanad@xilinx.com>
-References: <1468406536-6350-1-git-send-email-appanad@xilinx.com>
-Message-ID: <20160713113101.GU32247@mwanda>
+From: adrian.hunter@intel.com (Adrian Hunter)
+Date: Wed, 13 Jul 2016 14:40:59 +0300
+Subject: [PATCH RESEND 2/2] perf tools: adding coresight etm PMU record
+ capabilities
+In-Reply-To: <1466182922-14426-3-git-send-email-mathieu.poirier@linaro.org>
+References: <1466182922-14426-1-git-send-email-mathieu.poirier@linaro.org>
+ <1466182922-14426-3-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <578628CB.8020707@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 13, 2016 at 04:12:16PM +0530, Kedareswara rao Appana wrote:
-> diff --git a/drivers/dma/xilinx/zynqmp_dma.c b/drivers/dma/xilinx/zynqmp_dma.c
-> index f777a5b..2248704 100644
-> --- a/drivers/dma/xilinx/zynqmp_dma.c
-> +++ b/drivers/dma/xilinx/zynqmp_dma.c
-> @@ -970,8 +970,13 @@ static int zynqmp_dma_chan_probe(struct zynqmp_dma_device *zdev,
->  	chan->dst_burst_len = ZYNQMP_DMA_AWLEN_RST_VAL;
->  	chan->src_burst_len = ZYNQMP_DMA_ARLEN_RST_VAL;
->  	err = of_property_read_u32(node, "xlnx,bus-width", &chan->bus_width);
-> -	if ((err < 0) && ((chan->bus_width != ZYNQMP_DMA_BUS_WIDTH_64) ||
-> -			  (chan->bus_width != ZYNQMP_DMA_BUS_WIDTH_128))) {
-> +	if (err < 0) {
-> +		dev_err(&pdev->dev, "missing xlnx,bus-width property\n");
-> +		return err;
-> +	}
-> +
-> +	if ((chan->bus_width != ZYNQMP_DMA_BUS_WIDTH_64) ||
+On 17/06/16 20:02, Mathieu Poirier wrote:
+> Coresight ETMs are IP blocks used to perform HW assisted tracing
+> on a CPU core.  This patch introduce the required auxiliary API
+> functions allowing the perf core to interact with a tracer.
+> 
+> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+> ---
+>  MAINTAINERS                         |   3 +
+>  tools/perf/arch/arm/util/Build      |   2 +-
+>  tools/perf/arch/arm/util/auxtrace.c |  54 ++++
+>  tools/perf/arch/arm/util/cs-etm.c   | 559 ++++++++++++++++++++++++++++++++++++
+>  tools/perf/arch/arm/util/cs-etm.h   |  23 ++
+>  tools/perf/arch/arm64/util/Build    |   4 +
+>  tools/perf/util/auxtrace.c          |   1 +
+>  tools/perf/util/auxtrace.h          |   1 +
+>  tools/perf/util/cs-etm.h            |  74 +++++
+>  9 files changed, 720 insertions(+), 1 deletion(-)
+>  create mode 100644 tools/perf/arch/arm/util/auxtrace.c
+>  create mode 100644 tools/perf/arch/arm/util/cs-etm.c
+>  create mode 100644 tools/perf/arch/arm/util/cs-etm.h
+>  create mode 100644 tools/perf/util/cs-etm.h
+> 
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index d3451007718b..4fa03b03bfc5 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -1086,6 +1086,9 @@ F:	Documentation/trace/coresight.txt
+>  F:	Documentation/devicetree/bindings/arm/coresight.txt
+>  F:	Documentation/ABI/testing/sysfs-bus-coresight-devices-*
+>  F:	tools/perf/arch/arm/util/pmu.c
+> +F:	tools/perf/arch/arm/util/auxtrace.c
+> +F:	tools/perf/arch/arm/util/cs_etm.c
+> +F:	tools/perf/arch/arm/util/cs_etm.h
 
-This has to be an && because it can never be both widths.  You didn't
-test this patch.  Also too many parenthesis (you're thinking of LISP).
+File names have changed from having '_' to '-'
+Also FWIW there is now tools/perf/util/cs-etm.h
 
-> +	    (chan->bus_width != ZYNQMP_DMA_BUS_WIDTH_128)) {
->  		dev_err(zdev->dev, "invalid bus-width value");
->  		return err;
+As last time, there is no decoder, which still begs the question: is there
+anything you can actually do with the perf.data file?
 
-This has to be a negative error code.
+Otherwise:
 
-regards,
-dan carpenter
+Acked-by: Adrian Hunter <adrian.hunter@intel.com>
