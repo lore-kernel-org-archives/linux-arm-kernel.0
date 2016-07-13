@@ -1,159 +1,601 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Wed, 13 Jul 2016 02:59:09 +0100
-Subject: [PATCH v9 17/17] KVM: arm64: enable ITS emulation as a virtual MSI
- controller
+Date: Wed, 13 Jul 2016 02:59:03 +0100
+Subject: [PATCH v9 11/17] KVM: arm64: implement basic ITS register handlers
 In-Reply-To: <20160713015909.28793-1-andre.przywara@arm.com>
 References: <20160713015909.28793-1-andre.przywara@arm.com>
-Message-ID: <20160713015909.28793-18-andre.przywara@arm.com>
+Message-ID: <20160713015909.28793-12-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that all ITS emulation functionality is in place, we advertise
-MSI functionality to userland and also the ITS device to the guest - if
-userland has configured that.
+Add emulation for some basic MMIO registers used in the ITS emulation.
+This includes:
+- GITS_{CTLR,TYPER,IIDR}
+- ID registers
+- GITS_{CBASER,CREADR,CWRITER}
+  (which implement the ITS command buffer handling)
+- GITS_BASER<n>
+
+Most of the handlers are pretty straight forward, only the CWRITER
+handler is a bit more involved by taking the new its_cmd mutex and
+then iterating over the command buffer.
+The registers holding base addresses and attributes are sanitised before
+storing them.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
- Documentation/virtual/kvm/api.txt |  2 +-
- arch/arm64/kvm/Kconfig            |  1 +
- arch/arm64/kvm/reset.c            |  6 ++++++
- include/kvm/arm_vgic.h            |  5 +++++
- virt/kvm/arm/vgic/vgic-init.c     |  3 +++
- virt/kvm/arm/vgic/vgic-mmio-v3.c  | 14 ++++++++++----
- virt/kvm/arm/vgic/vgic.c          |  8 ++++++++
- 7 files changed, 34 insertions(+), 5 deletions(-)
+ include/kvm/arm_vgic.h           |  16 ++
+ virt/kvm/arm/vgic/vgic-its.c     | 394 ++++++++++++++++++++++++++++++++++++++-
+ virt/kvm/arm/vgic/vgic-mmio-v3.c |   8 +-
+ virt/kvm/arm/vgic/vgic-mmio.h    |   6 +
+ virt/kvm/arm/vgic/vgic.c         |  12 +-
+ 5 files changed, 419 insertions(+), 17 deletions(-)
 
-diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
-index 6551311..07049ea 100644
---- a/Documentation/virtual/kvm/api.txt
-+++ b/Documentation/virtual/kvm/api.txt
-@@ -2162,7 +2162,7 @@ after pausing the vcpu, but before it is resumed.
- 4.71 KVM_SIGNAL_MSI
- 
- Capability: KVM_CAP_SIGNAL_MSI
--Architectures: x86
-+Architectures: x86 arm64
- Type: vm ioctl
- Parameters: struct kvm_msi (in)
- Returns: >0 on delivery, 0 if guest blocked the MSI, and -1 on error
-diff --git a/arch/arm64/kvm/Kconfig b/arch/arm64/kvm/Kconfig
-index aa2e34e..9d2eff0 100644
---- a/arch/arm64/kvm/Kconfig
-+++ b/arch/arm64/kvm/Kconfig
-@@ -36,6 +36,7 @@ config KVM
- 	select HAVE_KVM_IRQFD
- 	select KVM_ARM_VGIC_V3
- 	select KVM_ARM_PMU if HW_PERF_EVENTS
-+	select HAVE_KVM_MSI
- 	---help---
- 	  Support hosting virtualized guest machines.
- 	  We don't support KVM with 16K page tables yet, due to the multiple
-diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
-index 3989833..d8c3140 100644
---- a/arch/arm64/kvm/reset.c
-+++ b/arch/arm64/kvm/reset.c
-@@ -86,6 +86,12 @@ int kvm_arch_dev_ioctl_check_extension(struct kvm *kvm, long ext)
- 	case KVM_CAP_VCPU_ATTRIBUTES:
- 		r = 1;
- 		break;
-+	case KVM_CAP_MSI_DEVID:
-+		if (!kvm)
-+			r = -EINVAL;
-+		else
-+			r = kvm->arch.vgic.msis_require_devid;
-+		break;
- 	default:
- 		r = 0;
- 	}
 diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index a6ca326..4e63a07 100644
+index 8609fac..6186749 100644
 --- a/include/kvm/arm_vgic.h
 +++ b/include/kvm/arm_vgic.h
-@@ -163,6 +163,9 @@ struct vgic_dist {
- 	/* vGIC model the kernel emulates for the guest (GICv2 or GICv3) */
- 	u32			vgic_model;
+@@ -22,6 +22,7 @@
+ #include <linux/spinlock.h>
+ #include <linux/types.h>
+ #include <kvm/iodev.h>
++#include <linux/list.h>
  
-+	/* Do injected MSIs require an additional device ID? */
-+	bool			msis_require_devid;
+ #define VGIC_V3_MAX_CPUS	255
+ #define VGIC_V2_MAX_CPUS	8
+@@ -136,6 +137,21 @@ struct vgic_its {
+ 	bool			enabled;
+ 	bool			initialized;
+ 	struct vgic_io_device	iodev;
 +
- 	int			nr_spis;
++	/* These registers correspond to GITS_BASER{0,1} */
++	u64			baser_device_table;
++	u64			baser_coll_table;
++
++	/* Protects the command queue */
++	struct mutex		cmd_lock;
++	u64			cbaser;
++	u32			creadr;
++	u32			cwriter;
++
++	/* Protects the device and collection lists */
++	struct mutex		its_lock;
++	struct list_head	device_list;
++	struct list_head	collection_list;
+ };
  
- 	/* TODO: Consider moving to global state */
-@@ -308,4 +311,6 @@ static inline int kvm_vgic_get_max_vcpus(void)
- 	return kvm_vgic_global_state.max_gic_vcpus;
+ struct vgic_dist {
+diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+index 393ad3a..dc9a98f 100644
+--- a/virt/kvm/arm/vgic/vgic-its.c
++++ b/virt/kvm/arm/vgic/vgic-its.c
+@@ -21,6 +21,7 @@
+ #include <linux/kvm.h>
+ #include <linux/kvm_host.h>
+ #include <linux/interrupt.h>
++#include <linux/list.h>
+ #include <linux/uaccess.h>
+ 
+ #include <linux/irqchip/arm-gic-v3.h>
+@@ -32,6 +33,326 @@
+ #include "vgic.h"
+ #include "vgic-mmio.h"
+ 
++struct its_device {
++	struct list_head dev_list;
++
++	/* the head for the list of ITTEs */
++	struct list_head itt_head;
++	u32 device_id;
++};
++
++#define COLLECTION_NOT_MAPPED ((u32)~0)
++
++struct its_collection {
++	struct list_head coll_list;
++
++	u32 collection_id;
++	u32 target_addr;
++};
++
++#define its_is_collection_mapped(coll) ((coll) && \
++				((coll)->target_addr != COLLECTION_NOT_MAPPED))
++
++struct its_itte {
++	struct list_head itte_list;
++
++	struct its_collection *collection;
++	u32 lpi;
++	u32 event_id;
++};
++
++#define CBASER_ADDRESS(x)	((x) & GENMASK_ULL(51, 12))
++
++static unsigned long vgic_mmio_read_its_ctlr(struct kvm *vcpu,
++					     struct vgic_its *its,
++					     gpa_t addr, unsigned int len)
++{
++	u32 reg = 0;
++
++	mutex_lock(&its->cmd_lock);
++	if (its->creadr == its->cwriter)
++		reg |= GITS_CTLR_QUIESCENT;
++	if (its->enabled)
++		reg |= GITS_CTLR_ENABLE;
++	mutex_unlock(&its->cmd_lock);
++
++	return reg;
++}
++
++static void vgic_mmio_write_its_ctlr(struct kvm *kvm, struct vgic_its *its,
++				     gpa_t addr, unsigned int len,
++				     unsigned long val)
++{
++	its->enabled = !!(val & GITS_CTLR_ENABLE);
++}
++
++static unsigned long vgic_mmio_read_its_typer(struct kvm *kvm,
++					      struct vgic_its *its,
++					      gpa_t addr, unsigned int len)
++{
++	u64 reg = GITS_TYPER_PLPIS;
++
++	/*
++	 * We use linear CPU numbers for redistributor addressing,
++	 * so GITS_TYPER.PTA is 0.
++	 * Also we force all PROPBASER registers to be the same, so
++	 * CommonLPIAff is 0 as well.
++	 * To avoid memory waste in the guest, we keep the number of IDBits and
++	 * DevBits low - as least for the time being.
++	 */
++	reg |= 0x0f << GITS_TYPER_DEVBITS_SHIFT;
++	reg |= 0x0f << GITS_TYPER_IDBITS_SHIFT;
++
++	return extract_bytes(reg, addr & 7, len);
++}
++
++static unsigned long vgic_mmio_read_its_iidr(struct kvm *kvm,
++					     struct vgic_its *its,
++					     gpa_t addr, unsigned int len)
++{
++	return (PRODUCT_ID_KVM << 24) | (IMPLEMENTER_ARM << 0);
++}
++
++static unsigned long vgic_mmio_read_its_idregs(struct kvm *kvm,
++					       struct vgic_its *its,
++					       gpa_t addr, unsigned int len)
++{
++	switch (addr & 0xffff) {
++	case GITS_PIDR0:
++		return 0x92;	/* part number, bits[7:0] */
++	case GITS_PIDR1:
++		return 0xb4;	/* part number, bits[11:8] */
++	case GITS_PIDR2:
++		return GIC_PIDR2_ARCH_GICv3 | 0x0b;
++	case GITS_PIDR4:
++		return 0x40;	/* This is a 64K software visible page */
++	/* The following are the ID registers for (any) GIC. */
++	case GITS_CIDR0:
++		return 0x0d;
++	case GITS_CIDR1:
++		return 0xf0;
++	case GITS_CIDR2:
++		return 0x05;
++	case GITS_CIDR3:
++		return 0xb1;
++	}
++
++	return 0;
++}
++
++/* Requires the its_lock to be held. */
++static void its_free_itte(struct kvm *kvm, struct its_itte *itte)
++{
++	list_del(&itte->itte_list);
++	kfree(itte);
++}
++
++static int vgic_its_handle_command(struct kvm *kvm, struct vgic_its *its,
++				   u64 *its_cmd)
++{
++	return -ENODEV;
++}
++
++static u64 vgic_sanitise_its_baser(u64 reg)
++{
++	reg = vgic_sanitise_field(reg, GITS_BASER_SHAREABILITY_MASK,
++				  GITS_BASER_SHAREABILITY_SHIFT,
++				  vgic_sanitise_shareability);
++	reg = vgic_sanitise_field(reg, GITS_BASER_CACHEABILITY_MASK,
++				  GITS_BASER_INNER_CACHEABILITY_SHIFT,
++				  vgic_sanitise_inner_cacheability);
++	reg = vgic_sanitise_field(reg, GITS_BASER_OUTER_CACHEABILITY_MASK,
++				  GITS_BASER_OUTER_CACHEABILITY_SHIFT,
++				  vgic_sanitise_outer_cacheability);
++
++	/* When using 64K pages, we clear bits to limit the PA to 48 bits. */
++	if ((reg & GITS_BASER_PAGE_SIZE_MASK) == GITS_BASER_PAGE_SIZE_64K)
++		reg &= ~GENMASK_ULL(15, 12);
++
++	return reg;
++}
++
++static u64 vgic_sanitise_its_cbaser(u64 reg)
++{
++	reg = vgic_sanitise_field(reg, GITS_CBASER_SHAREABILITY_MASK,
++				  GITS_CBASER_SHAREABILITY_SHIFT,
++				  vgic_sanitise_shareability);
++	reg = vgic_sanitise_field(reg, GITS_CBASER_CACHEABILITY_MASK,
++				  GITS_CBASER_INNER_CACHEABILITY_SHIFT,
++				  vgic_sanitise_inner_cacheability);
++	reg = vgic_sanitise_field(reg, GITS_CBASER_OUTER_CACHEABILITY_MASK,
++				  GITS_CBASER_OUTER_CACHEABILITY_SHIFT,
++				  vgic_sanitise_outer_cacheability);
++
++	/*
++	 * Sanitise the physical address to be 64k aligned (for 4K and 16K
++	 * pages), also limit the physical addresses to 48 bits.
++	 */
++	reg &= ~(GENMASK_ULL(51, 48) | GENMASK_ULL(15, 12));
++
++	return reg;
++}
++
++static unsigned long vgic_mmio_read_its_cbaser(struct kvm *kvm,
++					       struct vgic_its *its,
++					       gpa_t addr, unsigned int len)
++{
++	return extract_bytes(its->cbaser, addr & 7, len);
++}
++
++static void vgic_mmio_write_its_cbaser(struct kvm *kvm, struct vgic_its *its,
++				       gpa_t addr, unsigned int len,
++				       unsigned long val)
++{
++	/* When GITS_CTLR.Enable is 1, this register is RO. */
++	if (its->enabled)
++		return;
++
++	mutex_lock(&its->cmd_lock);
++	its->cbaser = update_64bit_reg(its->cbaser, addr & 7, len, val);
++	its->cbaser = vgic_sanitise_its_cbaser(its->cbaser);
++	its->creadr = 0;
++	/*
++	 * CWRITER is architecturally UNKNOWN on reset, but we need to reset
++	 * it to CREADR to make sure we start with an empty command buffer.
++	 */
++	its->cwriter = its->creadr;
++	mutex_unlock(&its->cmd_lock);
++}
++
++#define ITS_CMD_BUFFER_SIZE(baser)	((((baser) & 0xff) + 1) << 12)
++#define ITS_CMD_SIZE			32
++
++/*
++ * By writing to CWRITER the guest announces new commands to be processed.
++ * To avoid any races in the first place, we take the its_cmd lock, which
++ * protects our ring buffer variables, so that there is only one user
++ * per ITS handling commands@a given time.
++ */
++static void vgic_mmio_write_its_cwriter(struct kvm *kvm, struct vgic_its *its,
++					gpa_t addr, unsigned int len,
++					unsigned long val)
++{
++	gpa_t cbaser;
++	u64 cmd_buf[4];
++	u32 reg;
++
++	if (!its)
++		return;
++
++	cbaser = CBASER_ADDRESS(its->cbaser);
++
++	reg = update_64bit_reg(its->cwriter & 0xfffe0, addr & 7, len, val);
++	reg &= 0xfffe0;
++	if (reg > ITS_CMD_BUFFER_SIZE(its->cbaser))
++		return;
++
++	mutex_lock(&its->cmd_lock);
++
++	its->cwriter = reg;
++
++	while (its->cwriter != its->creadr) {
++		int ret = kvm_read_guest(kvm, cbaser + its->creadr,
++					 cmd_buf, ITS_CMD_SIZE);
++		/*
++		 * If kvm_read_guest() fails, this could be due to the guest
++		 * programming a bogus value in CBASER or something else going
++		 * wrong from which we cannot easily recover.
++		 * We just ignore that command then.
++		 */
++		if (!ret)
++			vgic_its_handle_command(kvm, its, cmd_buf);
++
++		its->creadr += ITS_CMD_SIZE;
++		if (its->creadr == ITS_CMD_BUFFER_SIZE(its->cbaser))
++			its->creadr = 0;
++	}
++
++	mutex_unlock(&its->cmd_lock);
++}
++
++static unsigned long vgic_mmio_read_its_cwriter(struct kvm *kvm,
++						struct vgic_its *its,
++						gpa_t addr, unsigned int len)
++{
++	return extract_bytes(its->cwriter & 0xfffe0, addr & 0x7, len);
++}
++
++static unsigned long vgic_mmio_read_its_creadr(struct kvm *kvm,
++					       struct vgic_its *its,
++					       gpa_t addr, unsigned int len)
++{
++	return extract_bytes(its->creadr & 0xfffe0, addr & 0x7, len);
++}
++
++#define BASER_INDEX(addr) (((addr) / sizeof(u64)) & 0x7)
++static unsigned long vgic_mmio_read_its_baser(struct kvm *kvm,
++					      struct vgic_its *its,
++					      gpa_t addr, unsigned int len)
++{
++	u64 reg;
++
++	switch (BASER_INDEX(addr)) {
++	case 0:
++		reg = its->baser_device_table;
++		break;
++	case 1:
++		reg = its->baser_coll_table;
++		break;
++	default:
++		reg = 0;
++		break;
++	}
++
++	return extract_bytes(reg, addr & 7, len);
++}
++
++#define GITS_BASER_RO_MASK	(GENMASK_ULL(52, 48) | GENMASK_ULL(58, 56))
++static void vgic_mmio_write_its_baser(struct kvm *kvm,
++				      struct vgic_its *its,
++				      gpa_t addr, unsigned int len,
++				      unsigned long val)
++{
++	u64 entry_size, device_type;
++	u64 reg, *regptr, clearbits = 0;
++
++	/* When GITS_CTLR.Enable is 1, we ignore write accesses. */
++	if (its->enabled)
++		return;
++
++	switch (BASER_INDEX(addr)) {
++	case 0:
++		regptr = &its->baser_device_table;
++		entry_size = 8;
++		device_type = GITS_BASER_TYPE_DEVICE;
++		break;
++	case 1:
++		regptr = &its->baser_coll_table;
++		entry_size = 8;
++		device_type = GITS_BASER_TYPE_COLLECTION;
++		clearbits = GITS_BASER_INDIRECT;
++		break;
++	default:
++		return;
++	}
++
++	reg = update_64bit_reg(*regptr, addr & 7, len, val);
++	reg &= ~GITS_BASER_RO_MASK;
++	reg &= ~clearbits;
++
++	/*
++	 * When the guest wants to use 64K pages, bits 15:12 contain bits 51:48
++	 * of the PA, which we don't support. Clear them to emulate RAZ/WI.
++	 */
++	if (reg & GITS_BASER_PAGE_SIZE_64K)
++		reg &= ~GENMASK_ULL(15, 12);
++	reg |= (entry_size - 1) << GITS_BASER_ENTRY_SIZE_SHIFT;
++	reg |= device_type << GITS_BASER_TYPE_SHIFT;
++	reg = vgic_sanitise_its_baser(reg);
++
++	*regptr = reg;
++}
++
+ #define REGISTER_ITS_DESC(off, rd, wr, length, acc)		\
+ {								\
+ 	.reg_offset = off,					\
+@@ -41,8 +362,8 @@
+ 	.its_write = wr,					\
  }
  
-+int kvm_send_userspace_msi(struct kvm *kvm, struct kvm_msi *msi);
-+
- #endif /* __KVM_ARM_VGIC_H */
-diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
-index 535e713..01a60dc 100644
---- a/virt/kvm/arm/vgic/vgic-init.c
-+++ b/virt/kvm/arm/vgic/vgic-init.c
-@@ -258,6 +258,9 @@ int vgic_init(struct kvm *kvm)
- 	if (ret)
- 		goto out;
+-static unsigned long its_mmio_read_raz(struct kvm *kvm, struct vgic_its *its,
+-				       gpa_t addr, unsigned int len)
++unsigned long its_mmio_read_raz(struct kvm *kvm, struct vgic_its *its,
++				gpa_t addr, unsigned int len)
+ {
+ 	return 0;
+ }
+@@ -55,28 +376,28 @@ static void its_mmio_write_wi(struct kvm *kvm, struct vgic_its *its,
  
-+	if (vgic_has_its(kvm))
-+		dist->msis_require_devid = true;
-+
- 	kvm_for_each_vcpu(i, vcpu, kvm)
- 		kvm_vgic_vcpu_init(vcpu);
+ static struct vgic_register_region its_registers[] = {
+ 	REGISTER_ITS_DESC(GITS_CTLR,
+-		its_mmio_read_raz, its_mmio_write_wi, 4,
++		vgic_mmio_read_its_ctlr, vgic_mmio_write_its_ctlr, 4,
+ 		VGIC_ACCESS_32bit),
+ 	REGISTER_ITS_DESC(GITS_IIDR,
+-		its_mmio_read_raz, its_mmio_write_wi, 4,
++		vgic_mmio_read_its_iidr, its_mmio_write_wi, 4,
+ 		VGIC_ACCESS_32bit),
+ 	REGISTER_ITS_DESC(GITS_TYPER,
+-		its_mmio_read_raz, its_mmio_write_wi, 8,
++		vgic_mmio_read_its_typer, its_mmio_write_wi, 8,
+ 		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
+ 	REGISTER_ITS_DESC(GITS_CBASER,
+-		its_mmio_read_raz, its_mmio_write_wi, 8,
++		vgic_mmio_read_its_cbaser, vgic_mmio_write_its_cbaser, 8,
+ 		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
+ 	REGISTER_ITS_DESC(GITS_CWRITER,
+-		its_mmio_read_raz, its_mmio_write_wi, 8,
++		vgic_mmio_read_its_cwriter, vgic_mmio_write_its_cwriter, 8,
+ 		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
+ 	REGISTER_ITS_DESC(GITS_CREADR,
+-		its_mmio_read_raz, its_mmio_write_wi, 8,
++		vgic_mmio_read_its_creadr, its_mmio_write_wi, 8,
+ 		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
+ 	REGISTER_ITS_DESC(GITS_BASER,
+-		its_mmio_read_raz, its_mmio_write_wi, 0x40,
++		vgic_mmio_read_its_baser, vgic_mmio_write_its_baser, 0x40,
+ 		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
+ 	REGISTER_ITS_DESC(GITS_IDREGS_BASE,
+-		its_mmio_read_raz, its_mmio_write_wi, 0x30,
++		vgic_mmio_read_its_idregs, its_mmio_write_wi, 0x30,
+ 		VGIC_ACCESS_32bit),
+ };
  
+@@ -100,6 +421,18 @@ static int vgic_its_register(struct kvm *kvm, struct vgic_its *its)
+ 	return ret;
+ }
+ 
++#define INITIAL_BASER_VALUE						  \
++	(GIC_BASER_CACHEABILITY(GITS_BASER, INNER, RaWb)		| \
++	 GIC_BASER_CACHEABILITY(GITS_BASER, OUTER, SameAsInner)		| \
++	 GIC_BASER_SHAREABILITY(GITS_BASER, InnerShareable)		| \
++	 ((8ULL - 1) << GITS_BASER_ENTRY_SIZE_SHIFT)			| \
++	 GITS_BASER_PAGE_SIZE_64K)
++
++#define INITIAL_PROPBASER_VALUE						  \
++	(GIC_BASER_CACHEABILITY(GICR_PROPBASER, INNER, RaWb)		| \
++	 GIC_BASER_CACHEABILITY(GICR_PROPBASER, OUTER, SameAsInner)	| \
++	 GIC_BASER_SHAREABILITY(GICR_PROPBASER, InnerShareable))
++
+ static int vgic_its_create(struct kvm_device *dev, u32 type)
+ {
+ 	struct vgic_its *its;
+@@ -111,12 +444,24 @@ static int vgic_its_create(struct kvm_device *dev, u32 type)
+ 	if (!its)
+ 		return -ENOMEM;
+ 
++	mutex_init(&its->its_lock);
++	mutex_init(&its->cmd_lock);
++
+ 	its->vgic_its_base = VGIC_ADDR_UNDEF;
+ 
++	INIT_LIST_HEAD(&its->device_list);
++	INIT_LIST_HEAD(&its->collection_list);
++
+ 	dev->kvm->arch.vgic.has_its = true;
+ 	its->initialized = false;
+ 	its->enabled = false;
+ 
++	its->baser_device_table = INITIAL_BASER_VALUE			|
++		((u64)GITS_BASER_TYPE_DEVICE << GITS_BASER_TYPE_SHIFT);
++	its->baser_coll_table = INITIAL_BASER_VALUE |
++		((u64)GITS_BASER_TYPE_COLLECTION << GITS_BASER_TYPE_SHIFT);
++	dev->kvm->arch.vgic.propbaser = INITIAL_PROPBASER_VALUE;
++
+ 	dev->private = its;
+ 
+ 	return 0;
+@@ -124,7 +469,36 @@ static int vgic_its_create(struct kvm_device *dev, u32 type)
+ 
+ static void vgic_its_destroy(struct kvm_device *kvm_dev)
+ {
++	struct kvm *kvm = kvm_dev->kvm;
+ 	struct vgic_its *its = kvm_dev->private;
++	struct its_device *dev;
++	struct its_itte *itte;
++	struct list_head *dev_cur, *dev_temp;
++	struct list_head *cur, *temp;
++
++	/*
++	 * We may end up here without the lists ever having been initialized.
++	 * Check this and bail out early to avoid dereferencing a NULL pointer.
++	 */
++	if (!its->device_list.next)
++		return;
++
++	mutex_lock(&its->its_lock);
++	list_for_each_safe(dev_cur, dev_temp, &its->device_list) {
++		dev = container_of(dev_cur, struct its_device, dev_list);
++		list_for_each_safe(cur, temp, &dev->itt_head) {
++			itte = (container_of(cur, struct its_itte, itte_list));
++			its_free_itte(kvm, itte);
++		}
++		list_del(dev_cur);
++		kfree(dev);
++	}
++
++	list_for_each_safe(cur, temp, &its->collection_list) {
++		list_del(cur);
++		kfree(container_of(cur, struct its_collection, coll_list));
++	}
++	mutex_unlock(&its->its_lock);
+ 
+ 	kfree(its);
+ }
 diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-index d98e009..9e7f6b2 100644
+index 6cb52dd..d98e009 100644
 --- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
 +++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-@@ -66,7 +66,12 @@ static unsigned long vgic_mmio_read_v3_misc(struct kvm_vcpu *vcpu,
- 	case GICD_TYPER:
- 		value = vcpu->kvm->arch.vgic.nr_spis + VGIC_NR_PRIVATE_IRQS;
- 		value = (value >> 5) - 1;
--		value |= (INTERRUPT_ID_BITS_SPIS - 1) << 19;
-+		if (vgic_has_its(vcpu->kvm)) {
-+			value |= (INTERRUPT_ID_BITS_ITS - 1) << 19;
-+			value |= GICD_TYPER_LPIS;
-+		} else {
-+			value |= (INTERRUPT_ID_BITS_SPIS - 1) << 19;
-+		}
- 		break;
- 	case GICD_IIDR:
- 		value = (PRODUCT_ID_KVM << 24) | (IMPLEMENTER_ARM << 0);
-@@ -163,9 +168,8 @@ static void vgic_mmio_write_v3r_ctlr(struct kvm_vcpu *vcpu,
+@@ -23,15 +23,15 @@
+ #include "vgic-mmio.h"
  
- 	vgic_cpu->lpis_enabled = val & GICR_CTLR_ENABLE_LPIS;
- 
--	if (!was_enabled && vgic_cpu->lpis_enabled) {
--		/* Eventually do something */
--	}
-+	if (!was_enabled && vgic_cpu->lpis_enabled)
-+		vgic_enable_lpis(vcpu);
+ /* extract @num bytes at @offset bytes offset in data */
+-static unsigned long extract_bytes(unsigned long data, unsigned int offset,
+-				   unsigned int num)
++unsigned long extract_bytes(unsigned long data, unsigned int offset,
++			    unsigned int num)
+ {
+ 	return (data >> (offset * 8)) & GENMASK_ULL(num * 8 - 1, 0);
  }
  
- static unsigned long vgic_mmio_read_v3r_typer(struct kvm_vcpu *vcpu,
-@@ -179,6 +183,8 @@ static unsigned long vgic_mmio_read_v3r_typer(struct kvm_vcpu *vcpu,
- 	value |= ((target_vcpu_id & 0xffff) << 8);
- 	if (target_vcpu_id == atomic_read(&vcpu->kvm->online_vcpus) - 1)
- 		value |= GICR_TYPER_LAST;
-+	if (vgic_has_its(vcpu->kvm))
-+		value |= GICR_TYPER_PLPIS;
+ /* allows updates of any half of a 64-bit register (or the whole thing) */
+-static u64 update_64bit_reg(u64 reg, unsigned int offset, unsigned int len,
+-			    unsigned long val)
++u64 update_64bit_reg(u64 reg, unsigned int offset, unsigned int len,
++		     unsigned long val)
+ {
+ 	int lower = (offset & 4) * 8;
+ 	int upper = lower + 8 * len - 1;
+diff --git a/virt/kvm/arm/vgic/vgic-mmio.h b/virt/kvm/arm/vgic/vgic-mmio.h
+index 366d663..0b3ecf9 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio.h
++++ b/virt/kvm/arm/vgic/vgic-mmio.h
+@@ -96,6 +96,12 @@ unsigned long vgic_data_mmio_bus_to_host(const void *val, unsigned int len);
+ void vgic_data_host_to_mmio_bus(void *buf, unsigned int len,
+ 				unsigned long data);
  
- 	return extract_bytes(value, addr & 7, len);
- }
++unsigned long extract_bytes(unsigned long data, unsigned int offset,
++			    unsigned int num);
++
++u64 update_64bit_reg(u64 reg, unsigned int offset, unsigned int len,
++		     unsigned long val);
++
+ unsigned long vgic_mmio_read_raz(struct kvm_vcpu *vcpu,
+ 				 gpa_t addr, unsigned int len);
+ 
 diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
-index 6318ea0..c7cd1a3 100644
+index 1fb2693..d7ea5df 100644
 --- a/virt/kvm/arm/vgic/vgic.c
 +++ b/virt/kvm/arm/vgic/vgic.c
-@@ -709,3 +709,11 @@ bool kvm_vgic_map_is_active(struct kvm_vcpu *vcpu, unsigned int virt_irq)
+@@ -33,10 +33,16 @@ struct vgic_global __section(.hyp.text) kvm_vgic_global_state;
  
- 	return map_is_active;
- }
-+
-+int kvm_send_userspace_msi(struct kvm *kvm, struct kvm_msi *msi)
-+{
-+	if (vgic_has_its(kvm))
-+		return vgic_its_inject_msi(kvm, msi);
-+	else
-+		return -ENODEV;
-+}
+ /*
+  * Locking order is always:
+- *   vgic_cpu->ap_list_lock
+- *     vgic_irq->irq_lock
++ * its->cmd_lock (mutex)
++ *   its->its_lock (mutex)
++ *     vgic_cpu->ap_list_lock
++ *       vgic_irq->irq_lock
+  *
+- * (that is, always take the ap_list_lock before the struct vgic_irq lock).
++ * If you need to take multiple locks, always take the upper lock first,
++ * then the lower ones, e.g. first take the its_lock, then the irq_lock.
++ * If you are already holding a lock and need to take a higher one, you
++ * have to drop the lower ranking lock first and re-aquire it after having
++ * taken the upper one.
+  *
+  * When taking more than one ap_list_lock at the same time, always take the
+  * lowest numbered VCPU's ap_list_lock first, so:
 -- 
 2.9.0
