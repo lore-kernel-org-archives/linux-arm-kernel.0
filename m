@@ -1,59 +1,41 @@
-From: agraf@suse.de (Alexander Graf)
-Date: Wed, 13 Jul 2016 18:14:11 +0200
-Subject: [PATCH] arm64: Add config to limit user space to 47bits
-In-Reply-To: <CAKv+Gu_QH=sZi--FVqHebd1P+6UMzEqWQQ1u3Y170B7cND8Kgw@mail.gmail.com>
-References: <1468424567-15925-1-git-send-email-agraf@suse.de>
- <CAKv+Gu_QH=sZi--FVqHebd1P+6UMzEqWQQ1u3Y170B7cND8Kgw@mail.gmail.com>
-Message-ID: <578668D3.6010406@suse.de>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 13 Jul 2016 13:18:46 -0300
+Subject: [PATCH 3/6] ARM: dts: imx25: substitute NO_PAD_CTL by the
+ respective reset value
+In-Reply-To: <20160713062521.GZ16643@pengutronix.de>
+References: <1468145266-7567-4-git-send-email-uwe@kleine-koenig.org>
+ <CAOMZO5A=6HLPacwp0seBn_s+AVF7zaUjUO8wOb1WoyvU1JrH7A@mail.gmail.com>
+ <20160711073721.GM16643@pengutronix.de>
+ <CAOMZO5ASsA88TQLAPdyit0xr3Lqh8e+8C_ZgoUa7w2rZxTb-ag@mail.gmail.com>
+ <20160712073859.GQ16643@pengutronix.de>
+ <CAOMZO5B+grtejgSMKrZMT9inEdh+bL0smZKE52qtcQD1NCHrqQ@mail.gmail.com>
+ <CAOMZO5D2E_G4ySUnj=yadziSunwMBSVZs-Rw=EvNybFKs2iD3w@mail.gmail.com>
+ <20160712191541.GY16643@pengutronix.de>
+ <CAOMZO5C3eQFfs=ZS5nfDw6XnEAgfcc_+W2n0y8Xd-zsTfd-+gA@mail.gmail.com>
+ <CAOMZO5B4CUr_-U3s+fo-O_BcREWQijffXFeRmUPiwDWdhY07pQ@mail.gmail.com>
+ <20160713062521.GZ16643@pengutronix.de>
+Message-ID: <CAOMZO5BEvZ6X9h-iNcbWZ4=gD8DJ+RVPBX4zAnvyu4jx6qJbVQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/13/2016 05:59 PM, Ard Biesheuvel wrote:
-> On 13 July 2016 at 17:42, Alexander Graf <agraf@suse.de> wrote:
->> Some user space applications are known to break with 48 bits virtual
-> known by whom? At least I wasn't aware of it, so could you please
-> share some examples?
+Hi Uwe,
 
-Sure! Known to me so far are:
+On Wed, Jul 13, 2016 at 3:25 AM, Uwe Kleine-K?nig
+<u.kleine-koenig@pengutronix.de> wrote:
 
-   * mozjs17
-   * mozjs24
-   * mozjs38
-   * js-1.8.5
-   * java-1.7 (older JITs, fixed in newer ones)
+> Which U-Boot did you test? Mainline or the vendor variant?
 
-I'm not sure if there are more, but the fact that I've run into this 
-problem more than once doesn't make me incredibly happy :).
+U-boot mainline.
 
+> Can you provide the output of
 >
->> address space. As interim step until the world is healed and everyone
->> embraces correct code, this patch allows to only expose 47 bits of
->> virtual address space to user space.
->>
-> Is this a code generation/toolchain issue?
+>         md 0x43fac000+0x584
+>
+> in U-Boot (which for sure has a different syntax that I don't know) and
+> from Linux
+>
+>         memtool md 0x43fac000+0x584
+>
+> (or whatever different tool you prefer to do the same).
 
-mozjs uses a single 64bit value to combine doubles, ints and pointers 
-into a single variable. It is very smart and uses the upper 17 bits for 
-metadata such as "which type of variable is this". Coincidentally those 
-bits happen to overlap the "double is an infinite number" bits, so that 
-you can also express a NaN with it. When using such a value, the upper 
-17 bits get masked out.
-
-That one was fixed upstream by force allocating the javascript heap 
-starting at a fixed location which is below 47 bits.
-
-js-1.8.5 has the same as above, but also uses pointers to .rodata as 
-javascript pointers, so it doesn't only use the heap, it also uses 
-pointers to the library itself, which gets mapped high up the address 
-space. I don't have a solution for that one yet.
-
-IcedTea for java-1.7 had a bug where it incorrectly caused an overflow 
-when trying to calculating a relative adrp offset from <address high up> 
-to <address really low>, so that the resulting pointer had the upper 
-bits set as 1s. That one is long fixed upstream, we only ran into it 
-because we used an ancient IcedTea snapshot.
-
-My main concern however is with code that I do not know is broken today.
-
-
-Alex
+Sure, I will run such tests when I get access to the board again tomorrow.
