@@ -1,93 +1,75 @@
-From: ptesarik@suse.cz (Petr Tesarik)
-Date: Wed, 13 Jul 2016 10:57:16 +0200
-Subject: [RFC 0/3] extend kexec_file_load system call
-In-Reply-To: <20160713082639.GZ1041@n2100.armlinux.org.uk>
-References: <20160712014201.11456-1-takahiro.akashi@linaro.org>
- <87furf7ztv.fsf@x220.int.ebiederm.org> <50662781.Utjsnse3nb@hactar>
- <20160712225805.0d27fe5d@hananiah.suse.cz>
- <20160712221804.GV1041@n2100.armlinux.org.uk>
- <87twfunneg.fsf@linux.vnet.ibm.com>
- <20160713073657.GX1041@n2100.armlinux.org.uk>
- <87poqinf9m.fsf@linux.vnet.ibm.com>
- <20160713082639.GZ1041@n2100.armlinux.org.uk>
-Message-ID: <20160713105716.535b6c91@hananiah.suse.cz>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 13 Jul 2016 10:02:46 +0100
+Subject: [PATCH v3 20/20] dt-bindings: pwm: sti: Update DT bindings with
+ recent changes
+In-Reply-To: <20160610145323.GO27142@ulmo.ba.sec>
+References: <20160608092135.21184-1-lee.jones@linaro.org>
+ <20160608092135.21184-21-lee.jones@linaro.org>
+ <20160608205152.GA5511@rob-hp-laptop> <20160609114107.GB1388@dell>
+ <20160610131855.GG27142@ulmo.ba.sec> <20160610140635.GC1537@dell>
+ <20160610145323.GO27142@ulmo.ba.sec>
+Message-ID: <20160713090246.GA11154@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 13 Jul 2016 09:26:39 +0100
-Russell King - ARM Linux <linux@armlinux.org.uk> wrote:
-
-> On Wed, Jul 13, 2016 at 05:55:33PM +1000, Stewart Smith wrote:
-> > Russell King - ARM Linux <linux@armlinux.org.uk> writes:
-> > > On Wed, Jul 13, 2016 at 02:59:51PM +1000, Stewart Smith wrote:
-> > >> Russell King - ARM Linux <linux@armlinux.org.uk> writes:
-> > >> > On Tue, Jul 12, 2016 at 10:58:05PM +0200, Petr Tesarik wrote:
-> > >> >> I'm not an expert on DTB, so I can't provide an example of code
-> > >> >> execution, but you have already mentioned the /chosen/linux,stdout-path
-> > >> >> property. If an attacker redirects the bootloader to an insecure
-> > >> >> console, they may get access to the system that would otherwise be
-> > >> >> impossible.
-> > >> >
-> > >> > I fail to see how kexec connects with the boot loader - the DTB image
-> > >> > that's being talked about is one which is passed from the currently
-> > >> > running kernel to the to-be-kexec'd kernel.  For ARM (and I suspect
-> > >> > also ARM64) that's a direct call chain which doesn't involve any
-> > >> > boot loader or firmware, and certainly none that would involve the
-> > >> > passed DTB image.
-> > >> 
-> > >> For OpenPOWER machines, kexec is the bootloader. Our bootloader is a
-> > >> linux kernel and initramfs with a UI (petitboot) - this means we never
-> > >> have to write a device driver twice: write a kernel one and you're done
-> > >> (for booting from the device and using it in your OS).
-> > >
-> > > I think you misunderstood my point.
-> > >
-> > > On ARM, we do not go:
-> > >
-> > > 	kernel (kexec'd from) -> boot loader -> kernel (kexec'd to)
-> > >
-> > > but we go:
-> > >
-> > > 	kernel (kexec'd from) -> kernel (kexec'd to)
-> > >
-> > > There's no intermediate step involving any bootloader.
-> > >
-> > > Hence, my point is that the dtb loaded by kexec is _only_ used by the
-> > > kernel which is being kexec'd to, not by the bootloader, nor indeed
-> > > the kernel which it is loaded into.
-> > >
-> > > Moreover, if you read the bit that I quoted (which is what I was
-> > > replying to), you'll notice that it is talking about the DTB loaded
-> > > by kexec somehow causing the _bootloader_ to be redirected to an
-> > > alternative console.  This point is wholely false on ARM.
+On Fri, 10 Jun 2016, Thierry Reding wrote:
+> On Fri, Jun 10, 2016 at 03:06:35PM +0100, Lee Jones wrote:
+> > On Fri, 10 Jun 2016, Thierry Reding wrote:
 > > 
-> > Ahh.. I missed the bootloader bit there.
+> > > > > > The second documentation adaption entails adding support for PWM
+> > > > > > capture devices.  A new clock is required as well as an IRQ line.
+> > > > > > We're also adding a new property similar to the one described
+> > > > > > above, but for capture channels.  Typically, there will be less
+> > > > > > capture channels than PWM-out, since all channels have the latter
+> > > > > > capability, but only some have capture support.
+> > > > > 
+> > > > > Humm, sounds like all of this should be implied from compatible strings.
+> > > > 
+> > > > You mean have a bunch of of_machine_is_compatibles() scattered around?
+> > > 
+> > > I don't understand why you need this at all. Quite frankly I don't even
+> > > know why st,pwm-num-devs exists. I probably missed it back at the time.
+> > > Usually, like Rob suggests, this should be inferred from the compatible
+> > > string. One commonly used way to avoid scattering explicit checks for
+> > > the compatible string is to add this information to the of_device_id
+> > > table. See a bunch of existing drivers for reference.
 > > 
-> > In which case, we're the same on OpenPOWER, there is no intermediate
-> > bootloader - in our case we have linux (with kexec) taking on what uboot
-> > or grub is typically used for on other platforms.
+> > Yes, I am aware of the strategy, and happy to oblige if this is your
+> > suggestion.  I'll move all platform data into the driver and eradicate
+> > the DT properties.
 > 
-> Indeed - maybe Eric knows better, but I can't see any situation where
-> the dtb we load via kexec should ever affect "the bootloader", unless
-> the "kernel" that's being loaded into kexec is "the bootloader".
-> 
-> Now, going back to the more fundamental issue raised in my first reply,
-> about the kernel command line.
-> 
-> On x86, I can see that it _is_ possible for userspace to specify a
-> command line, and the kernel loading the image provides the command
-> line to the to-be-kexeced kernel with very little checking.  So, if
-> your kernel is signed, what stops the "insecure userspace" loading
-> a signed kernel but giving it an insecure rootfs and/or console?
+> Great!
 
-This is a valid point. If there are kernel options that can be misused
-to defeat the purpose of UEFI SecureBoot, then we're in trouble.
-Generally, the Linux kernel should treat the command line as untrusted
-source.
+Sorry it's taken so long to get back around to this.
 
-My point is that modifying the DTB opens a completely new attack
-vector. And the goal is not extending the attack surface (because there
-are holes in it already), but reducing the attack surface (e.g. by
-limiting available kernel command line options).
+So I just had a crack at implementing this solution and ran into
+issues.  Unfortunately, the configuration isn't easy to describe using
+compatible strings.
 
-Petr T
+Unless we are prepared to have strings like:
+
+  st,sti-pwm-stih407-pwm0
+  st,sti-pwm-stih407-pwm1
+  st,sti-pwm-stih416-pwm0
+  st,sti-pwm-stih416-pwm1
+
+Or perhaps:
+
+  st,sti-pwm-4out-2cpt
+  st,sti-pwm-1out-1cpt
+
+... since some of the PWMs have an odd number of OUT and CPT
+channels/devices.  In my opinion however, this is ugly.  I don't think
+we do this for any other type of channel/device/port etc, do we?
+
+Personally I think there isn't anything wrong with having DT
+properties describing how many channels/devices there are, but I'm
+okay with whatever you both decide.  No skin of my nose really. :)
+
+What say you?
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
