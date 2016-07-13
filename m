@@ -1,5 +1,5 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 13 Jul 2016 09:47:56 +0200
+From: stewart@linux.vnet.ibm.com (Stewart Smith)
+Date: Wed, 13 Jul 2016 17:55:33 +1000
 Subject: [RFC 0/3] extend kexec_file_load system call
 In-Reply-To: <20160713073657.GX1041@n2100.armlinux.org.uk>
 References: <20160712014201.11456-1-takahiro.akashi@linaro.org>
@@ -8,12 +8,11 @@ References: <20160712014201.11456-1-takahiro.akashi@linaro.org>
  <20160712221804.GV1041@n2100.armlinux.org.uk>
  <87twfunneg.fsf@linux.vnet.ibm.com>
  <20160713073657.GX1041@n2100.armlinux.org.uk>
-Message-ID: <CAKv+Gu9kEeVuW6Hj7HYOMojE5SLEZ69uAW2t9xZySw0uWNLcBQ@mail.gmail.com>
+Message-ID: <87poqinf9m.fsf@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 July 2016 at 09:36, Russell King - ARM Linux
-<linux@armlinux.org.uk> wrote:
+Russell King - ARM Linux <linux@armlinux.org.uk> writes:
 > On Wed, Jul 13, 2016 at 02:59:51PM +1000, Stewart Smith wrote:
 >> Russell King - ARM Linux <linux@armlinux.org.uk> writes:
 >> > On Tue, Jul 12, 2016 at 10:58:05PM +0200, Petr Tesarik wrote:
@@ -29,7 +28,7 @@ On 13 July 2016 at 09:36, Russell King - ARM Linux
 >> > also ARM64) that's a direct call chain which doesn't involve any
 >> > boot loader or firmware, and certainly none that would involve the
 >> > passed DTB image.
->>
+>> 
 >> For OpenPOWER machines, kexec is the bootloader. Our bootloader is a
 >> linux kernel and initramfs with a UI (petitboot) - this means we never
 >> have to write a device driver twice: write a kernel one and you're done
@@ -39,11 +38,11 @@ On 13 July 2016 at 09:36, Russell King - ARM Linux
 >
 > On ARM, we do not go:
 >
->         kernel (kexec'd from) -> boot loader -> kernel (kexec'd to)
+> 	kernel (kexec'd from) -> boot loader -> kernel (kexec'd to)
 >
 > but we go:
 >
->         kernel (kexec'd from) -> kernel (kexec'd to)
+> 	kernel (kexec'd from) -> kernel (kexec'd to)
 >
 > There's no intermediate step involving any bootloader.
 >
@@ -55,14 +54,14 @@ On 13 July 2016 at 09:36, Russell King - ARM Linux
 > replying to), you'll notice that it is talking about the DTB loaded
 > by kexec somehow causing the _bootloader_ to be redirected to an
 > alternative console.  This point is wholely false on ARM.
->
 
-The particular example may not apply, but the argument that the DTB
--as a description of the hardware topology- needs to be signed if the
-kernel is also signed is valid. We do the same in the UEFI stub, i.e.,
-it normally takes a dtb= argument to allow the DTB to be overridden,
-but this feature is disabled when Secure Boot is in effect. By the
-same reasoning, if any kind of kexec kernel image validation is in
-effect, we should either validate the DTB image as well, or disallow
-external DTBs and only perform kexec with the kernel's current DTB
-(the blob it was booted with, not the unflattened data structure)
+Ahh.. I missed the bootloader bit there.
+
+In which case, we're the same on OpenPOWER, there is no intermediate
+bootloader - in our case we have linux (with kexec) taking on what uboot
+or grub is typically used for on other platforms.
+
+
+-- 
+Stewart Smith
+OPAL Architect, IBM.
