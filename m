@@ -1,107 +1,43 @@
-From: anna-maria@linutronix.de (Anna-Maria Gleixner)
-Date: Wed, 13 Jul 2016 17:17:02 -0000
-Subject: [patch V2 60/67] KVM/arm/arm64/vgic-new: Convert to hotplug state
- machine
-References: <20160713153219.128052238@linutronix.de>
-Message-ID: <20160713153337.900484868@linutronix.de>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Wed, 13 Jul 2016 11:23:05 -0600
+Subject: [PATCH RESEND 2/2] perf tools: adding coresight etm PMU record
+ capabilities
+In-Reply-To: <20160713151545.GB27879@kernel.org>
+References: <1466182922-14426-1-git-send-email-mathieu.poirier@linaro.org>
+ <1466182922-14426-3-git-send-email-mathieu.poirier@linaro.org>
+ <578628CB.8020707@intel.com>
+ <CANLsYkx13a1cbGAvvt2PL8mPtOtB6FV_FUNPCDHtjenYBiHKww@mail.gmail.com>
+ <20160713151545.GB27879@kernel.org>
+Message-ID: <CANLsYkyUypHJaJ5wkzFjMK_n9LgH1vkUsL2tqKuxiTMv93keFA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Anna-Maria Gleixner <anna-maria@linutronix.de>
+On 13 July 2016 at 09:15, Arnaldo Carvalho de Melo <acme@kernel.org> wrote:
+> Em Wed, Jul 13, 2016 at 09:11:46AM -0600, Mathieu Poirier escreveu:
+>> [1]. https://github.com/Linaro/OpenCSD/commits/perf-opencsd-4.7-rc4
+>> [2]. https://github.com/Linaro/OpenCSD/tree/opencsd-0v003
+>
+> https://github.com/Linaro/OpenCSD/tree/opencsd-0v003 points to:
+>
+> How the Library is used in Linux perf
+>
+> The library and additional infrastructure for programming CoreSight
+> components has been integrated with the standard linux perfomance
+> analysis tool perf.
+>
+> See HOWTO.md for details.
+>
+> ------------------------
+>
+> But the HOWTO.md link gives me a 404 :-\
+>
+> https://github.com/Linaro/OpenCSD/blob/opencsd-0v003/@ref%20howto_perf
 
-Install the callbacks via the state machine and let the core invoke
-the callbacks on the already online CPUs.
+Apologies for that.  This here will work:
 
-Signed-off-by: Anna-Maria Gleixner <anna-maria@linutronix.de>
-Cc: Andre Przywara <andre.przywara@arm.com>
-Cc: Christoffer Dall <christoffer.dall@linaro.org>
-Cc: Eric Auger <eric.auger@linaro.org>
-Cc: Linus Torvalds <torvalds@linux-foundation.org>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Paolo Bonzini <pbonzini@redhat.com>
-Cc: Peter Zijlstra <peterz@infradead.org>
-Cc: Radim Krcmar <rkrcmar@redhat.com>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: kvm at vger.kernel.org
-Cc: kvmarm at lists.cs.columbia.edu
-Cc: linux-arm-kernel at lists.infradead.org
----
- include/linux/cpuhotplug.h    |  1 +
- virt/kvm/arm/vgic/vgic-init.c | 31 +++++++++----------------------
- 2 files changed, 10 insertions(+), 22 deletions(-)
+https://github.com/Linaro/OpenCSD/blob/opencsd-0v003/HOWTO.md
 
-diff --git a/include/linux/cpuhotplug.h b/include/linux/cpuhotplug.h
-index 078bd22..822df54 100644
---- a/include/linux/cpuhotplug.h
-+++ b/include/linux/cpuhotplug.h
-@@ -52,6 +52,7 @@ enum cpuhp_state {
- 	CPUHP_AP_QCOM_TIMER_STARTING,
- 	CPUHP_AP_MIPS_GIC_TIMER_STARTING,
- 	CPUHP_AP_KVM_STARTING,
-+	CPUHP_AP_KVM_ARM_VGIC_INIT_STARTING,
- 	CPUHP_AP_KVM_ARM_VGIC_STARTING,
- 	CPUHP_AP_KVM_ARM_TIMER_STARTING,
- 	CPUHP_AP_ARM_XEN_STARTING,
-diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
-index a1442f7..2c7f0d5 100644
---- a/virt/kvm/arm/vgic/vgic-init.c
-+++ b/virt/kvm/arm/vgic/vgic-init.c
-@@ -353,32 +353,19 @@ out:
- 
- /* GENERIC PROBE */
- 
--static void vgic_init_maintenance_interrupt(void *info)
-+static int vgic_init_cpu_starting(unsigned int cpu)
- {
- 	enable_percpu_irq(kvm_vgic_global_state.maint_irq, 0);
-+	return 0;
- }
- 
--static int vgic_cpu_notify(struct notifier_block *self,
--			   unsigned long action, void *cpu)
--{
--	switch (action) {
--	case CPU_STARTING:
--	case CPU_STARTING_FROZEN:
--		vgic_init_maintenance_interrupt(NULL);
--		break;
--	case CPU_DYING:
--	case CPU_DYING_FROZEN:
--		disable_percpu_irq(kvm_vgic_global_state.maint_irq);
--		break;
--	}
- 
--	return NOTIFY_OK;
-+static int vgic_init_cpu_dying(unsigned int cpu)
-+{
-+	disable_percpu_irq(kvm_vgic_global_state.maint_irq);
-+	return 0;
- }
- 
--static struct notifier_block vgic_cpu_nb = {
--	.notifier_call = vgic_cpu_notify,
--};
--
- static irqreturn_t vgic_maintenance_handler(int irq, void *data)
- {
- 	/*
-@@ -434,14 +421,14 @@ int kvm_vgic_hyp_init(void)
- 		return ret;
- 	}
- 
--	ret = __register_cpu_notifier(&vgic_cpu_nb);
-+	ret = cpuhp_setup_state(CPUHP_AP_KVM_ARM_VGIC_INIT_STARTING,
-+				"AP_KVM_ARM_VGIC_INIT_STARTING",
-+				vgic_init_cpu_starting, vgic_init_cpu_dying);
- 	if (ret) {
- 		kvm_err("Cannot register vgic CPU notifier\n");
- 		goto out_free_irq;
- 	}
- 
--	on_each_cpu(vgic_init_maintenance_interrupt, NULL, 1);
--
- 	kvm_info("vgic interrupt IRQ%d\n", kvm_vgic_global_state.maint_irq);
- 	return 0;
- 
--- 
-2.8.1
+I will do a respin of the patchset with Adrian' comments taken into account.
+
+>
+> - Arnaldo
