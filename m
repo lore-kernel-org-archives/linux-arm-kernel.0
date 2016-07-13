@@ -1,191 +1,176 @@
 From: sunil.kovvuri@gmail.com (sunil.kovvuri at gmail.com)
-Date: Wed, 13 Jul 2016 11:29:30 +0530
-Subject: [PATCH v2 06/15] net: thunderx: Enable mailbox interrupts on 81xx/83xx
+Date: Wed, 13 Jul 2016 11:29:33 +0530
+Subject: [PATCH v2 09/15] net: thunderx: Add QSGMII interface type support
 In-Reply-To: <1468389579-482-1-git-send-email-sunil.kovvuri@gmail.com>
 References: <1468389579-482-1-git-send-email-sunil.kovvuri@gmail.com>
-Message-ID: <1468389579-482-7-git-send-email-sunil.kovvuri@gmail.com>
+Message-ID: <1468389579-482-10-git-send-email-sunil.kovvuri@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sunil Goutham <sgoutham@cavium.com>
 
-88xx has 128 VFs, 81xx has 8 VFs and 83xx will have 32VFs.
-Made changes to PF driver such that mailbox interrupt enable
-registers are configuired based on number of VFs HW supports.
-Also cleanedup mailbox irq handler registration code.
+This patch adds support for QSGMII interface type to
+the BGX driver. This type of interface is supported by
+81xx SOC.
 
 Signed-off-by: Sunil Goutham <sgoutham@cavium.com>
 ---
- drivers/net/ethernet/cavium/thunder/nic_main.c | 88 +++++++++++++++-----------
- 1 file changed, 50 insertions(+), 38 deletions(-)
+ drivers/net/ethernet/cavium/thunder/thunder_bgx.c | 55 ++++++++++++++++++-----
+ drivers/net/ethernet/cavium/thunder/thunder_bgx.h |  1 +
+ 2 files changed, 45 insertions(+), 11 deletions(-)
 
-diff --git a/drivers/net/ethernet/cavium/thunder/nic_main.c b/drivers/net/ethernet/cavium/thunder/nic_main.c
-index 3f52b36..955c522 100644
---- a/drivers/net/ethernet/cavium/thunder/nic_main.c
-+++ b/drivers/net/ethernet/cavium/thunder/nic_main.c
-@@ -66,8 +66,9 @@ struct nicpf {
- 	/* MSI-X */
- 	bool			msix_enabled;
- 	u8			num_vec;
--	struct msix_entry	msix_entries[NIC_PF_MSIX_VECTORS];
-+	struct msix_entry	*msix_entries;
- 	bool			irq_allocated[NIC_PF_MSIX_VECTORS];
-+	char			irq_name[NIC_PF_MSIX_VECTORS][20];
- };
+diff --git a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
+index 9c3c273..3274430 100644
+--- a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
++++ b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
+@@ -379,8 +379,9 @@ void bgx_lmac_internal_loopback(int node, int bgx_idx,
+ }
+ EXPORT_SYMBOL(bgx_lmac_internal_loopback);
  
- /* Supported devices */
-@@ -105,9 +106,22 @@ static u64 nic_reg_read(struct nicpf *nic, u64 offset)
- /* PF -> VF mailbox communication APIs */
- static void nic_enable_mbx_intr(struct nicpf *nic)
+-static int bgx_lmac_sgmii_init(struct bgx *bgx, int lmacid)
++static int bgx_lmac_sgmii_init(struct bgx *bgx, struct lmac *lmac)
  {
--	/* Enable mailbox interrupt for all 128 VFs */
--	nic_reg_write(nic, NIC_PF_MAILBOX_ENA_W1S, ~0ull);
--	nic_reg_write(nic, NIC_PF_MAILBOX_ENA_W1S + sizeof(u64), ~0ull);
-+	int vf_cnt = pci_sriov_get_totalvfs(nic->pdev);
-+
-+#define INTR_MASK(vfs) ((vfs < 64) ? (BIT_ULL(vfs) - 1) : (~0ull))
-+
-+	/* Clear it, to avoid spurious interrupts (if any) */
-+	nic_reg_write(nic, NIC_PF_MAILBOX_INT, INTR_MASK(vf_cnt));
-+
-+	/* Enable mailbox interrupt for all VFs */
-+	nic_reg_write(nic, NIC_PF_MAILBOX_ENA_W1S, INTR_MASK(vf_cnt));
-+	/* One mailbox intr enable reg per 64 VFs */
-+	if (vf_cnt > 64) {
-+		nic_reg_write(nic, NIC_PF_MAILBOX_INT + sizeof(u64),
-+			      INTR_MASK(vf_cnt - 64));
-+		nic_reg_write(nic, NIC_PF_MAILBOX_ENA_W1S + sizeof(u64),
-+			      INTR_MASK(vf_cnt - 64));
++	int lmacid = lmac->lmacid;
+ 	u64 cfg;
+ 
+ 	bgx_reg_modify(bgx, lmacid, BGX_GMP_GMI_TXX_THRESH, 0x30);
+@@ -409,6 +410,14 @@ static int bgx_lmac_sgmii_init(struct bgx *bgx, int lmacid)
+ 	cfg |= (PCS_MRX_CTL_RST_AN | PCS_MRX_CTL_AN_EN);
+ 	bgx_reg_write(bgx, lmacid, BGX_GMP_PCS_MRX_CTL, cfg);
+ 
++	if (lmac->lmac_type == BGX_MODE_QSGMII) {
++		/* Disable disparity check for QSGMII */
++		cfg = bgx_reg_read(bgx, lmacid, BGX_GMP_PCS_MISCX_CTL);
++		cfg &= ~PCS_MISC_CTL_DISP_EN;
++		bgx_reg_write(bgx, lmacid, BGX_GMP_PCS_MISCX_CTL, cfg);
++		return 0;
 +	}
- }
- 
- static void nic_clear_mbx_intr(struct nicpf *nic, int vf, int mbx_reg)
-@@ -894,11 +908,18 @@ unlock:
- 	nic->mbx_lock[vf] = false;
- }
- 
--static void nic_mbx_intr_handler (struct nicpf *nic, int mbx)
-+static irqreturn_t nic_mbx_intr_handler(int irq, void *nic_irq)
- {
-+	struct nicpf *nic = (struct nicpf *)nic_irq;
-+	int mbx;
- 	u64 intr;
- 	u8  vf, vf_per_mbx_reg = 64;
- 
-+	if (irq == nic->msix_entries[NIC_PF_INTR_ID_MBOX0].vector)
-+		mbx = 0;
-+	else
-+		mbx = 1;
 +
- 	intr = nic_reg_read(nic, NIC_PF_MAILBOX_INT + (mbx << 3));
- 	dev_dbg(&nic->pdev->dev, "PF interrupt Mbox%d 0x%llx\n", mbx, intr);
- 	for (vf = 0; vf < vf_per_mbx_reg; vf++) {
-@@ -910,23 +931,6 @@ static void nic_mbx_intr_handler (struct nicpf *nic, int mbx)
- 			nic_clear_mbx_intr(nic, vf, mbx);
- 		}
- 	}
--}
--
--static irqreturn_t nic_mbx0_intr_handler (int irq, void *nic_irq)
--{
--	struct nicpf *nic = (struct nicpf *)nic_irq;
--
--	nic_mbx_intr_handler(nic, 0);
--
--	return IRQ_HANDLED;
--}
--
--static irqreturn_t nic_mbx1_intr_handler (int irq, void *nic_irq)
--{
--	struct nicpf *nic = (struct nicpf *)nic_irq;
--
--	nic_mbx_intr_handler(nic, 1);
--
- 	return IRQ_HANDLED;
+ 	if (bgx_poll_reg(bgx, lmacid, BGX_GMP_PCS_MRX_STATUS,
+ 			 PCS_MRX_STATUS_AN_CPT, false)) {
+ 		dev_err(&bgx->pdev->dev, "BGX AN_CPT not completed\n");
+@@ -658,9 +667,10 @@ static int bgx_lmac_enable(struct bgx *bgx, u8 lmacid)
+ 	lmac = &bgx->lmac[lmacid];
+ 	lmac->bgx = bgx;
+ 
+-	if (lmac->lmac_type == BGX_MODE_SGMII) {
++	if ((lmac->lmac_type == BGX_MODE_SGMII) ||
++	    (lmac->lmac_type == BGX_MODE_QSGMII)) {
+ 		lmac->is_sgmii = 1;
+-		if (bgx_lmac_sgmii_init(bgx, lmacid))
++		if (bgx_lmac_sgmii_init(bgx, lmac))
+ 			return -1;
+ 	} else {
+ 		lmac->is_sgmii = 0;
+@@ -799,6 +809,11 @@ static void bgx_init_hw(struct bgx *bgx)
+ 		bgx_reg_write(bgx, 0, BGX_CMR_RX_STREERING + (i * 8), 0x00);
  }
  
-@@ -934,7 +938,13 @@ static int nic_enable_msix(struct nicpf *nic)
- {
- 	int i, ret;
- 
--	nic->num_vec = NIC_PF_MSIX_VECTORS;
-+	nic->num_vec = pci_msix_vec_count(nic->pdev);
++static u8 bgx_get_lane2sds_cfg(struct bgx *bgx, struct lmac *lmac)
++{
++	return (u8)(bgx_reg_read(bgx, lmac->lmacid, BGX_CMRX_CFG) & 0xFF);
++}
 +
-+	nic->msix_entries = kmalloc_array(nic->num_vec,
-+					  sizeof(struct msix_entry),
-+					  GFP_KERNEL);
-+	if (!nic->msix_entries)
-+		return -ENOMEM;
- 
- 	for (i = 0; i < nic->num_vec; i++)
- 		nic->msix_entries[i].entry = i;
-@@ -942,8 +952,9 @@ static int nic_enable_msix(struct nicpf *nic)
- 	ret = pci_enable_msix(nic->pdev, nic->msix_entries, nic->num_vec);
- 	if (ret) {
- 		dev_err(&nic->pdev->dev,
--			"Request for #%d msix vectors failed\n",
--			   nic->num_vec);
-+			"Request for #%d msix vectors failed, returned %d\n",
-+			   nic->num_vec, ret);
-+		kfree(nic->msix_entries);
- 		return ret;
- 	}
- 
-@@ -955,6 +966,7 @@ static void nic_disable_msix(struct nicpf *nic)
+ static void bgx_print_qlm_mode(struct bgx *bgx, u8 lmacid)
  {
- 	if (nic->msix_enabled) {
- 		pci_disable_msix(nic->pdev);
-+		kfree(nic->msix_entries);
- 		nic->msix_enabled = 0;
- 		nic->num_vec = 0;
+ 	struct device *dev = &bgx->pdev->dev;
+@@ -838,12 +853,22 @@ static void bgx_print_qlm_mode(struct bgx *bgx, u8 lmacid)
+ 		else
+ 			dev_info(dev, "%s: 40G_KR4\n", (char *)str);
+ 		break;
+-	default:
+-		dev_info(dev, "%s: INVALID\n", (char *)str);
++	case BGX_MODE_QSGMII:
++		if ((lmacid == 0) &&
++		    (bgx_get_lane2sds_cfg(bgx, lmac) != lmacid))
++			return;
++		if ((lmacid == 2) &&
++		    (bgx_get_lane2sds_cfg(bgx, lmac) == lmacid))
++			return;
++		dev_info(dev, "%s: QSGMII\n", (char *)str);
++		break;
++	case BGX_MODE_INVALID:
++		/* Nothing to do */
++		break;
  	}
-@@ -973,27 +985,26 @@ static void nic_free_all_interrupts(struct nicpf *nic)
- 
- static int nic_register_interrupts(struct nicpf *nic)
- {
--	int ret;
-+	int i, ret;
- 
- 	/* Enable MSI-X */
- 	ret = nic_enable_msix(nic);
- 	if (ret)
- 		return ret;
- 
--	/* Register mailbox interrupt handlers */
--	ret = request_irq(nic->msix_entries[NIC_PF_INTR_ID_MBOX0].vector,
--			  nic_mbx0_intr_handler, 0, "NIC Mbox0", nic);
--	if (ret)
--		goto fail;
-+	/* Register mailbox interrupt handler */
-+	for (i = NIC_PF_INTR_ID_MBOX0; i < nic->num_vec; i++) {
-+		sprintf(nic->irq_name[i],
-+			"NICPF Mbox%d", (i - NIC_PF_INTR_ID_MBOX0));
- 
--	nic->irq_allocated[NIC_PF_INTR_ID_MBOX0] = true;
-+		ret = request_irq(nic->msix_entries[i].vector,
-+				  nic_mbx_intr_handler, 0,
-+				  nic->irq_name[i], nic);
-+		if (ret)
-+			goto fail;
- 
--	ret = request_irq(nic->msix_entries[NIC_PF_INTR_ID_MBOX1].vector,
--			  nic_mbx1_intr_handler, 0, "NIC Mbox1", nic);
--	if (ret)
--		goto fail;
--
--	nic->irq_allocated[NIC_PF_INTR_ID_MBOX1] = true;
-+		nic->irq_allocated[i] = true;
-+	}
- 
- 	/* Enable mailbox interrupt */
- 	nic_enable_mbx_intr(nic);
-@@ -1002,6 +1013,7 @@ static int nic_register_interrupts(struct nicpf *nic)
- fail:
- 	dev_err(&nic->pdev->dev, "Request irq failed\n");
- 	nic_free_all_interrupts(nic);
-+	nic_disable_msix(nic);
- 	return ret;
  }
  
+-static void lmac_set_lane2sds(struct lmac *lmac)
++static void lmac_set_lane2sds(struct bgx *bgx, struct lmac *lmac)
+ {
+ 	switch (lmac->lmac_type) {
+ 	case BGX_MODE_SGMII:
+@@ -857,6 +882,14 @@ static void lmac_set_lane2sds(struct lmac *lmac)
+ 	case BGX_MODE_RXAUI:
+ 		lmac->lane_to_sds = (lmac->lmacid) ? 0xE : 0x4;
+ 		break;
++	case BGX_MODE_QSGMII:
++		/* There is no way to determine if DLM0/2 is QSGMII or
++		 * DLM1/3 is configured to QSGMII as bootloader will
++		 * configure all LMACs, so take whatever is configured
++		 * by low level firmware.
++		 */
++		lmac->lane_to_sds = bgx_get_lane2sds_cfg(bgx, lmac);
++		break;
+ 	default:
+ 		lmac->lane_to_sds = 0;
+ 		break;
+@@ -882,7 +915,7 @@ static void bgx_set_lmac_config(struct bgx *bgx, u8 idx)
+ 		lmac->use_training =
+ 			bgx_reg_read(bgx, 0, BGX_SPUX_BR_PMD_CRTL) &
+ 				SPU_PMD_CRTL_TRAIN_EN;
+-		lmac_set_lane2sds(lmac);
++		lmac_set_lane2sds(bgx, lmac);
+ 		return;
+ 	}
+ 
+@@ -901,7 +934,7 @@ static void bgx_set_lmac_config(struct bgx *bgx, u8 idx)
+ 		lmac->use_training =
+ 			bgx_reg_read(bgx, idx, BGX_SPUX_BR_PMD_CRTL) &
+ 				SPU_PMD_CRTL_TRAIN_EN;
+-		lmac_set_lane2sds(lmac);
++		lmac_set_lane2sds(bgx, lmac);
+ 
+ 		/* Set LMAC type of other lmac on same DLM i.e LMAC 1/3 */
+ 		olmac = &bgx->lmac[idx + 1];
+@@ -909,7 +942,7 @@ static void bgx_set_lmac_config(struct bgx *bgx, u8 idx)
+ 		olmac->use_training =
+ 		bgx_reg_read(bgx, idx + 1, BGX_SPUX_BR_PMD_CRTL) &
+ 			SPU_PMD_CRTL_TRAIN_EN;
+-		lmac_set_lane2sds(olmac);
++		lmac_set_lane2sds(bgx, olmac);
+ 	}
+ }
+ 
+@@ -920,7 +953,7 @@ static bool is_dlm0_in_bgx_mode(struct bgx *bgx)
+ 	if (!bgx->is_81xx)
+ 		return true;
+ 
+-	lmac = &bgx->lmac[1];
++	lmac = &bgx->lmac[0];
+ 	if (lmac->lmac_type == BGX_MODE_INVALID)
+ 		return false;
+ 
+@@ -946,7 +979,7 @@ static void bgx_get_qlm_mode(struct bgx *bgx)
+ 	if (bgx->lmac_count > MAX_LMAC_PER_BGX)
+ 		bgx->lmac_count = MAX_LMAC_PER_BGX;
+ 
+-	for (idx = 0; idx < bgx->lmac_count; idx++)
++	for (idx = 0; idx < MAX_LMAC_PER_BGX; idx++)
+ 		bgx_set_lmac_config(bgx, idx);
+ 
+ 	if (!bgx->is_81xx) {
+diff --git a/drivers/net/ethernet/cavium/thunder/thunder_bgx.h b/drivers/net/ethernet/cavium/thunder/thunder_bgx.h
+index 38e9fb4..0705863 100644
+--- a/drivers/net/ethernet/cavium/thunder/thunder_bgx.h
++++ b/drivers/net/ethernet/cavium/thunder/thunder_bgx.h
+@@ -146,6 +146,7 @@
+ #define BGX_GMP_PCS_ANX_AN_RESULTS	0x30020
+ #define BGX_GMP_PCS_SGM_AN_ADV		0x30068
+ #define BGX_GMP_PCS_MISCX_CTL		0x30078
++#define  PCS_MISC_CTL_DISP_EN			BIT_ULL(13)
+ #define  PCS_MISC_CTL_GMX_ENO			BIT_ULL(11)
+ #define  PCS_MISC_CTL_SAMP_PT_MASK	0x7Full
+ #define BGX_GMP_GMI_PRTX_CFG		0x38020
 -- 
 2.7.4
