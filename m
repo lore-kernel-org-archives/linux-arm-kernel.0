@@ -1,60 +1,30 @@
-From: andi.shyti@samsung.com (Andi Shyti)
-Date: Wed, 13 Jul 2016 13:50:30 +0900
-Subject: [PATCH -next] spi: s3c64xx: fix reference leak to master in
- s3c64xx_spi_remove()
-In-Reply-To: <1468321722-16568-1-git-send-email-weiyj_lk@163.com>
-References: <CGME20160712110926epcas1p13bbc88f5867d41d09d9b8c1172a7150b@epcas1p1.samsung.com>
- <1468321722-16568-1-git-send-email-weiyj_lk@163.com>
-Message-ID: <20160713045030.GI18237@samsunx.samsung>
+From: christophe.jaillet@wanadoo.fr (Christophe JAILLET)
+Date: Wed, 13 Jul 2016 06:58:22 +0200
+Subject: Error handling in drivers/pci/host/pcie-xilinx.c
+Message-ID: <e451321a-42de-9d5f-bf33-bbcb495ebc6f@wanadoo.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wei,
+(resent because of broken cc)
 
-> Once a spi_master_get() call succeeds, we need an additional
-> spi_master_put() call to free the memory, otherwise we will
-> leak a reference to master. Fix by removing the unnecessary
-> spi_master_get() call.
-> 
-> Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 
-The patch doesn't have anything wrong, but what you write in the
-description is not what you are doing in the patch.
+Hi,
 
-There is no memory allocated in spi_master_get and nothing leaks.
-Besides master's resources are managed, so that there would
-not be any need to call spi_master_put().
+in file 'drivers/pci/host/pcie-xilinx.c', error handling in 
+'xilinx_pcie_init_irq_domain()' seams to be broken.
 
-spi_master_put() has been, indeed, removed in this commit:
-91800f0e90050a4db4c77e940796f501e02af8be.
+The pattern used is:
 
-But even if you correct the commit log, I don't see much
-advantage for this patch on its own.
+    if (!var) {
+       ...
+       dev_err(...);
+       return PTR_ERR(var);
+    }
 
-Thanks,
-Andi
+so we always return '0', which means success.
 
-> ---
->  drivers/spi/spi-s3c64xx.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
-> index df88fa1..001c9eb 100644
-> --- a/drivers/spi/spi-s3c64xx.c
-> +++ b/drivers/spi/spi-s3c64xx.c
-> @@ -1211,7 +1211,7 @@ err0:
->  
->  static int s3c64xx_spi_remove(struct platform_device *pdev)
->  {
-> -	struct spi_master *master = spi_master_get(platform_get_drvdata(pdev));
-> +	struct spi_master *master = platform_get_drvdata(pdev);
->  	struct s3c64xx_spi_driver_data *sdd = spi_master_get_devdata(master);
->  
->  	pm_runtime_get_sync(&pdev->dev);
-> 
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+Returning PTR_ERR(-EINVAL) or PTR_ERR(-ENODEV) could be, IMHO, better.
+
+Best regards,
+
+CJ
