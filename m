@@ -1,41 +1,45 @@
-From: nicolas.dufresne@gmail.com (Nicolas Dufresne)
-Date: Wed, 13 Jul 2016 09:46:28 -0400
-Subject: [PATCH 2/2] [media] s5p-g2d: Replace old driver with DRM version
-In-Reply-To: <20160712200202.7496445e@recife.lan>
-References: <1464096493-13378-1-git-send-email-k.kozlowski@samsung.com>
- <1464096493-13378-2-git-send-email-k.kozlowski@samsung.com>
- <20160712200202.7496445e@recife.lan>
-Message-ID: <1468417588.2867.6.camel@gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 13 Jul 2016 08:49:41 -0500
+Subject: [PATCH 1/7] dt-bindings: add rk3399 support for dw-mipi-rockchip
+In-Reply-To: <1467968701-15620-2-git-send-email-zyw@rock-chips.com>
+References: <1467968701-15620-1-git-send-email-zyw@rock-chips.com>
+ <1467968701-15620-2-git-send-email-zyw@rock-chips.com>
+Message-ID: <20160713134941.GA10985@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le mardi 12 juillet 2016 ? 20:02 -0300, Mauro Carvalho Chehab a ?crit?:
-> I suspect that you'll be applying this one via DRM tree, so:
+On Fri, Jul 08, 2016 at 05:04:55PM +0800, Chris Zhong wrote:
+> The dw-mipi-dsi of rk3399 is almost the same as rk3288, the rk3399 has
+> additional phy config clock.
 > 
-> Em Tue, 24 May 2016 15:28:13 +0200
-> Krzysztof Kozlowski <k.kozlowski@samsung.com> escreveu:
+> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
+> ---
 > 
-> > Remove the old non-DRM driver because it is now entirely supported
-> by
-> > exynos_drm_g2d driver.
-> >?
-> > Cc: Kyungmin Park <kyungmin.park@samsung.com>
-> > Cc: Kamil Debski <k.debski@samsung.com>
-> > Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>  .../devicetree/bindings/display/rockchip/dw_mipi_dsi_rockchip.txt    | 5 +++++
+>  1 file changed, 5 insertions(+)
 > 
-> Acked-by: Mauro Carvalho Chehab <mchehab@s-opensource.com>
-> 
-> PS.: If you prefer to apply this one via my tree, I'm ok too. Just
-> let me know when the first patch gets merged upstream.
+> diff --git a/Documentation/devicetree/bindings/display/rockchip/dw_mipi_dsi_rockchip.txt b/Documentation/devicetree/bindings/display/rockchip/dw_mipi_dsi_rockchip.txt
+> index 1753f0c..4d59df3 100644
+> --- a/Documentation/devicetree/bindings/display/rockchip/dw_mipi_dsi_rockchip.txt
+> +++ b/Documentation/devicetree/bindings/display/rockchip/dw_mipi_dsi_rockchip.txt
+> @@ -5,6 +5,7 @@ Required properties:
+>  - #address-cells: Should be <1>.
+>  - #size-cells: Should be <0>.
+>  - compatible: "rockchip,rk3288-mipi-dsi", "snps,dw-mipi-dsi".
+> +	      "rockchip,rk3399-mipi-dsi", "snps,dw-mipi-dsi".
+>  - reg: Represent the physical address range of the controller.
+>  - interrupts: Represent the controller's interrupt to the CPU(s).
+>  - clocks, clock-names: Phandles to the controller's pll reference
+> @@ -13,6 +14,10 @@ Required properties:
+>  - ports: contain a port node with endpoint definitions as defined in [2].
+>    For vopb,set the reg = <0> and set the reg = <1> for vopl.
+>  
+> +Optional properties:
+> +- clocks, clock-names: phandle to the dw-mipi phy clock, name should be
+> +		       "phy_cfg".
+> +
 
-Just a note that this is effectively an API break.
+This is not really optional. It is required for rk3399. Document with 
+the rest of the clocks and note this one is rk3399 only.
 
-cheers,
-Nicolas
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160713/9e2fa231/attachment.sig>
+Rob
