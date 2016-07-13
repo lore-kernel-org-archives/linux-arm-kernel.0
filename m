@@ -1,183 +1,150 @@
-From: sstabellini@kernel.org (Stefano Stabellini)
-Date: Wed, 13 Jul 2016 19:43:56 +0100 (BST)
-Subject: [PATCH v4] xen/arm: Add a clock property
-In-Reply-To: <c320f820-8749-f4a4-435e-ddd9379655b5@de.bosch.com>
-References: <1468309605-19522-1-git-send-email-dirk.behme@de.bosch.com>
- <146836236759.73491.11707389619985827497@resonance>
- <c320f820-8749-f4a4-435e-ddd9379655b5@de.bosch.com>
-Message-ID: <alpine.DEB.2.10.1607131941200.26575@sstabellini-ThinkPad-X260>
+From: cmetcalf@mellanox.com (Chris Metcalf)
+Date: Wed, 13 Jul 2016 14:44:17 -0400
+Subject: [PATCH v5 0/4] improvements to the nmi_backtrace code
+In-Reply-To: <1459877208-15119-1-git-send-email-cmetcalf@mellanox.com>
+References: <1459877208-15119-1-git-send-email-cmetcalf@mellanox.com>
+Message-ID: <96e5ba5b-d8c2-42cd-11a3-ffebd85522c3@mellanox.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 13 Jul 2016, Dirk Behme wrote:
-> On 13.07.2016 00:26, Michael Turquette wrote:
-> > Quoting Dirk Behme (2016-07-12 00:46:45)
-> > > Clocks described by this property are reserved for use by Xen, and the OS
-> > > must not alter their state any way, such as disabling or gating a clock,
-> > > or modifying its rate. Ensuring this may impose constraints on parent
-> > > clocks or other resources used by the clock tree.
-> > 
-> > Note that clk_prepare_enable will not prevent the rate from changing
-> > (clk_set_rate) or a parent from changing (clk_set_parent). The only way
-> > to do this currently would be to set the following flags on the effected
-> > clocks:
-> > 
-> > 	CLK_SET_RATE_GATE
-> > 	CLK_SET_PARENT_GATE
-> 
-> 
-> 
-> Regarding setting flags, I think we already talked about that. I think the
-> conclusion was that in our case its not possible to manipulate the flags in
-> the OS as this isn't intended to be done in cases like ours. Therefore no API
-> is exported for this.
-> 
-> I.e. if we need to set these flags, we have to do that in Xen where we add the
-> clocks to the hypervisor node in the device tree. And not in the kernel patch
-> discussed here.
+Ping!
 
-These are internal Linux flags, aren't they? They cannot be set in Xen.
+I just realized that this series [1] hasn't been taken into an upstream tree yet.
+It probably makes most sense to go via Andrew's tree, given that that's
+where Petr's NMI printk cleanup patches went a couple of months ago, for 4.7.
+It seemed like this patch series had reached consensus in its current form.
 
-If the only way to make sure that clk_set_rate and clk_set_parent fail
-on one of the clocks "owned" by Xen is to set CLK_SET_RATE_GATE and
-CLK_SET_PARENT_GATE, we'll have to do that. Even if it means introducing
-a new internal Linux API.
+Andrew, if I rebase this on 4.7, do you want to take it into your tree?
+Your concern before was just that it conflicted with Petr's work [2].
 
+Thanks!
 
-> > And then enable the clocks. All calls to clk_set_parent and clk_set_rate
-> > with those clocks in the path will fail, so long as they are prepared
-> > and enabled. This implementation detail is specific to Linux and
-> > definitely should not go into the binding.
-> > 
-> > > 
-> > > This property is used to proxy clocks for devices Xen has taken ownership
-> > > of, such as UARTs, for which the associated clock controller(s) remain
-> > > under the control of Dom0.
-> > 
-> > I'm still not completely sure about this type of layering and whether or
-> > not it is sane. If you want Xen to manage the clock controller, AND you
-> > want Linux guests or dom0 to consume those clocks and manipulate them in
-> > other drivers, then this solution won't work.
-> > 
-> > Regards,
-> > Mike
-> > 
-> > > 
-> > > Up to now, the workaround for this has been to use the Linux kernel
-> > > command line parameter 'clk_ignore_unused'. See Xen bug
-> > > 
-> > > http://bugs.xenproject.org/xen/bug/45
-> > > 
-> > > too.
-> > > 
-> > > Signed-off-by: Dirk Behme <dirk.behme@de.bosch.com>
-> > > ---
-> > > Changes in v4: Switch to the xen.txt description proposed by Mark:
-> > >                https://www.spinics.net/lists/arm-kernel/msg516158.html
-> > > 
-> > > Changes in v3: Use the xen.txt description proposed by Michael. Thanks!
-> > > 
-> > > Changes in v2: Drop the Linux implementation details like
-> > > clk_disable_unused
-> > >                in xen.txt.
-> > > 
-> > >  Documentation/devicetree/bindings/arm/xen.txt | 12 +++++++
-> > >  arch/arm/xen/enlighten.c                      | 47
-> > > +++++++++++++++++++++++++++
-> > >  2 files changed, 59 insertions(+)
-> > > 
-> > > diff --git a/Documentation/devicetree/bindings/arm/xen.txt
-> > > b/Documentation/devicetree/bindings/arm/xen.txt
-> > > index c9b9321..437e50b 100644
-> > > --- a/Documentation/devicetree/bindings/arm/xen.txt
-> > > +++ b/Documentation/devicetree/bindings/arm/xen.txt
-> > > @@ -17,6 +17,18 @@ the following properties:
-> > >    A GIC node is also required.
-> > >    This property is unnecessary when booting Dom0 using ACPI.
-> > > 
-> > > +Optional properties:
-> > > +
-> > > +- clocks: a list of phandle + clock-specifier pairs
-> > > +  Clocks described by this property are reserved for use by Xen, and the
-> > > +  OS must not alter their state any way, such as disabling or gating a
-> > > +  clock, or modifying its rate. Ensuring this may impose constraints on
-> > > +  parent clocks or other resources used by the clock tree.
-> > > +
-> > > +  Note: this property is used to proxy clocks for devices Xen has taken
-> > > +  ownership of, such as UARTs, for which the associated clock
-> > > +  controller(s) remain under the control of Dom0.
-> > > +
-> > >  To support UEFI on Xen ARM virtual platforms, Xen populates the FDT
-> > > "uefi" node
-> > >  under /hypervisor with following parameters:
-> > > 
-> > > diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-> > > index 47acb36..5c546d0 100644
-> > > --- a/arch/arm/xen/enlighten.c
-> > > +++ b/arch/arm/xen/enlighten.c
-> > > @@ -24,6 +24,7 @@
-> > >  #include <linux/of_fdt.h>
-> > >  #include <linux/of_irq.h>
-> > >  #include <linux/of_address.h>
-> > > +#include <linux/clk-provider.h>
-> > >  #include <linux/cpuidle.h>
-> > >  #include <linux/cpufreq.h>
-> > >  #include <linux/cpu.h>
-> > > @@ -444,6 +445,52 @@ static int __init xen_pm_init(void)
-> > >  }
-> > >  late_initcall(xen_pm_init);
-> > > 
-> > > +/*
-> > > + * Check if we want to register some clocks, that they
-> > > + * are not freed because unused by clk_disable_unused().
-> > > + * E.g. the serial console clock.
-> > > + */
-> > > +static int __init xen_arm_register_clks(void)
-> > > +{
-> > > +       struct clk *clk;
-> > > +       struct device_node *xen_node;
-> > > +       unsigned int i, count;
-> > > +       int ret = 0;
-> > > +
-> > > +       xen_node = of_find_compatible_node(NULL, NULL, "xen,xen");
-> > > +       if (!xen_node) {
-> > > +               pr_err("Xen support was detected before, but it has
-> > > disappeared\n");
-> > > +               return -EINVAL;
-> > > +       }
-> > > +
-> > > +       count = of_clk_get_parent_count(xen_node);
-> > > +       if (!count)
-> > > +               goto out;
-> > > +
-> > > +       for (i = 0; i < count; i++) {
-> > > +               clk = of_clk_get(xen_node, i);
-> > > +               if (IS_ERR(clk)) {
-> > > +                       pr_err("Xen failed to register clock %i. Error:
-> > > %li\n",
-> > > +                              i, PTR_ERR(clk));
-> > > +                       ret = PTR_ERR(clk);
-> > > +                       goto out;
-> > > +               }
-> > > +
-> > > +               ret = clk_prepare_enable(clk);
-> > > +               if (ret < 0) {
-> > > +                       pr_err("Xen failed to enable clock %i. Error:
-> > > %i\n",
-> > > +                              i, ret);
-> > > +                       goto out;
-> > > +               }
-> > > +       }
-> > > +
-> > > +       ret = 0;
-> > > +
-> > > +out:
-> > > +       of_node_put(xen_node);
-> > > +       return ret;
-> > > +}
-> > > +late_initcall(xen_arm_register_clks);
-> > > 
-> > >  /* empty stubs */
-> > >  void xen_arch_pre_suspend(void) { }
-> > > --
-> 
+[1] http://lkml.kernel.org/g/1459877208-15119-1-git-send-email-cmetcalf at mellanox.com
+[2] http://lkml.kernel.org/g/20160229164956.8613016895bef966b6460081 at linux-foundation.org
+
+On 4/5/2016 1:26 PM, Chris Metcalf wrote:
+> This is just a one-line change to the v4 series, to catch the new arm
+> vmlinux-xip.lds.S file, which I missed when I rebased to 4.6 for v4
+> (my arm config for testing did not include CONFIG_XIP_KERNEL).
+> Thanks to Fengguang Wu and the 0-day test robot for that.
+>
+> Whose tree would this go through?  I have an ack for Peter Z for
+> patch 4/4 and no other feedback for patches 1/4 or 2/4; I can
+> certainly push 3/4 through the tile tree myself if that helps, though
+> my guess is keeping it with the rest of the series makes more sense
+> for tile since it doesn't lose any functionality that way.
+>
+>  From the version 1 cover letter:
+>
+>    This patch series modifies the trigger_xxx_backtrace() NMI-based
+>    remote backtracing code to make it more flexible, and makes a few
+>    small improvements along the way.
+>
+>    The motivation comes from the task isolation code, where there are
+>    scenarios where we want to be able to diagnose a case where some cpu
+>    is about to interrupt a task-isolated cpu.  It can be helpful to
+>    see both where the interrupting cpu is, and also an approximation
+>    of where the cpu that is being interrupted is.  The nmi_backtrace
+>    framework allows us to discover the stack of the interrupted cpu.
+>
+> I've tested that the change works as desired on tile, and build-tested
+> x86, arm64, and arm.  For x86 and arm64 I confirmed that the generic
+> cpuidle stuff as well as the architecture-specific routines are in the
+> new cpuidle section.  For arm I just build-tested it and made sure the
+> generic cpuidle routines were in the new cpuidle section, but I didn't
+> attempt to tease apart the tangle of platform-specific idle routines
+> that arm has and tag them with __cpuidle.  That might be more usefully
+> done by someone with arm platform experience in a follow-up patch.
+>
+> I have also pushed it up to kernel.org to pull if that's easier:
+>
+> git://git.kernel.org/pub/scm/linux/kernel/git/cmetcalf/linux-tile.git nmi-backtrace
+>
+> The change conflicts with Petr Mladek's NMI printk cleanup patches:
+>
+> https://lkml.kernel.org/r/1459353210-20260-1-git-send-email-pmladek at suse.com
+>
+> He has kindly offered to resolve the conflicts.
+>
+> v5: Add CPUIDLE_TEXT to the new arch/arm/kernel/vmlinux-xip.lds.S
+>
+> v4: Added some more __cpuidle functions (PeterZ, Rafael Wysocki)
+>      Rebased to kernel v4.6-rc1
+>
+> v3: Various improvements to the set of __cpuidle functions;
+>      Add back in a missing section accidentally removed in modpost.c (PeterZ)
+>      https://lkml.kernel.org/r/1458667179-19630-1-git-send-email-cmetcalf at mellanox.com
+>
+> v2: Switch to using __cpuidle tagging, switch S-O-B to Mellanox
+>      https://lkml.kernel.org/r/1458147733-29338-1-git-send-email-cmetcalf at mellanox.com
+>
+> Chris Metcalf (4):
+>    nmi_backtrace: add more trigger_*_cpu_backtrace() methods
+>    nmi_backtrace: do a local dump_stack() instead of a self-NMI
+>    arch/tile: adopt the new nmi_backtrace framework
+>    nmi_backtrace: generate one-line reports for idle cpus
+>
+>   arch/alpha/kernel/vmlinux.lds.S      |  1 +
+>   arch/arc/kernel/vmlinux.lds.S        |  1 +
+>   arch/arm/include/asm/irq.h           |  4 +-
+>   arch/arm/kernel/smp.c                | 13 +------
+>   arch/arm/kernel/vmlinux-xip.lds.S    |  1 +
+>   arch/arm/kernel/vmlinux.lds.S        |  1 +
+>   arch/arm64/kernel/vmlinux.lds.S      |  1 +
+>   arch/arm64/mm/proc.S                 |  2 +
+>   arch/avr32/kernel/vmlinux.lds.S      |  1 +
+>   arch/blackfin/kernel/vmlinux.lds.S   |  1 +
+>   arch/c6x/kernel/vmlinux.lds.S        |  1 +
+>   arch/cris/kernel/vmlinux.lds.S       |  1 +
+>   arch/frv/kernel/vmlinux.lds.S        |  1 +
+>   arch/h8300/kernel/vmlinux.lds.S      |  1 +
+>   arch/hexagon/kernel/vmlinux.lds.S    |  1 +
+>   arch/ia64/kernel/vmlinux.lds.S       |  1 +
+>   arch/m32r/kernel/vmlinux.lds.S       |  1 +
+>   arch/m68k/kernel/vmlinux-nommu.lds   |  1 +
+>   arch/m68k/kernel/vmlinux-std.lds     |  1 +
+>   arch/m68k/kernel/vmlinux-sun3.lds    |  1 +
+>   arch/metag/kernel/vmlinux.lds.S      |  1 +
+>   arch/microblaze/kernel/vmlinux.lds.S |  1 +
+>   arch/mips/kernel/vmlinux.lds.S       |  1 +
+>   arch/mn10300/kernel/vmlinux.lds.S    |  1 +
+>   arch/nios2/kernel/vmlinux.lds.S      |  1 +
+>   arch/openrisc/kernel/vmlinux.lds.S   |  1 +
+>   arch/parisc/kernel/vmlinux.lds.S     |  1 +
+>   arch/powerpc/kernel/vmlinux.lds.S    |  1 +
+>   arch/s390/kernel/vmlinux.lds.S       |  1 +
+>   arch/score/kernel/vmlinux.lds.S      |  1 +
+>   arch/sh/kernel/vmlinux.lds.S         |  1 +
+>   arch/sparc/kernel/vmlinux.lds.S      |  1 +
+>   arch/tile/include/asm/irq.h          |  4 +-
+>   arch/tile/kernel/entry.S             |  2 +-
+>   arch/tile/kernel/pmc.c               |  3 --
+>   arch/tile/kernel/process.c           | 72 ++++++++----------------------------
+>   arch/tile/kernel/traps.c             |  7 +++-
+>   arch/tile/kernel/vmlinux.lds.S       |  1 +
+>   arch/um/kernel/dyn.lds.S             |  1 +
+>   arch/um/kernel/uml.lds.S             |  1 +
+>   arch/unicore32/kernel/vmlinux.lds.S  |  1 +
+>   arch/x86/include/asm/irq.h           |  4 +-
+>   arch/x86/kernel/acpi/cstate.c        |  2 +-
+>   arch/x86/kernel/apic/hw_nmi.c        |  6 +--
+>   arch/x86/kernel/process.c            |  4 +-
+>   arch/x86/kernel/vmlinux.lds.S        |  1 +
+>   arch/xtensa/kernel/vmlinux.lds.S     |  3 ++
+>   drivers/acpi/processor_idle.c        |  5 ++-
+>   drivers/cpuidle/driver.c             |  5 ++-
+>   drivers/idle/intel_idle.c            |  4 +-
+>   include/asm-generic/vmlinux.lds.h    |  6 +++
+>   include/linux/cpu.h                  |  5 +++
+>   include/linux/nmi.h                  | 63 ++++++++++++++++++++++++-------
+>   kernel/sched/idle.c                  | 13 ++++++-
+>   lib/nmi_backtrace.c                  | 40 +++++++++++++-------
+>   scripts/mod/modpost.c                |  2 +-
+>   scripts/recordmcount.c               |  1 +
+>   scripts/recordmcount.pl              |  1 +
+>   58 files changed, 184 insertions(+), 121 deletions(-)
+>
+
+-- 
+Chris Metcalf, Mellanox Technologies
+http://www.mellanox.com
