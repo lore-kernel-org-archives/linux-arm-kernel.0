@@ -1,104 +1,93 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Wed, 13 Jul 2016 17:34:22 -0400
-Subject: [PATCH V8 7/9] vfio, platform: make reset driver a requirement by
- default
-In-Reply-To: <20160713145551.2e544361@t450s.home>
-References: <1466437879-32182-1-git-send-email-okaya@codeaurora.org>
- <1466437879-32182-8-git-send-email-okaya@codeaurora.org>
- <20160623125955.647008cb@t450s.home>
- <4d95e48a-b5a1-c3eb-8aed-ddd307e1b028@codeaurora.org>
- <20160713145551.2e544361@t450s.home>
-Message-ID: <bb0bb137-a371-ca00-43fc-3c47051243a1@codeaurora.org>
+From: rafael@kernel.org (Rafael J. Wysocki)
+Date: Wed, 13 Jul 2016 23:43:39 +0200
+Subject: [PATCH v7 4/9] acpi/arm64: Add GTDT table parse driver
+In-Reply-To: <20160713210857.GA9500@roeck-us.net>
+References: <1468432402-4872-1-git-send-email-fu.wei@linaro.org>
+ <1468432402-4872-5-git-send-email-fu.wei@linaro.org>
+ <CAJZ5v0i-1NysCiDFX4ST_uBBeYF2YNzWztgDP=u9a4S1OdpWuw@mail.gmail.com>
+ <20160713210857.GA9500@roeck-us.net>
+Message-ID: <CAJZ5v0jnNqjpcY1CGkHxbJFwX1MuRi-U=jTCKWavMdEH4bKR3g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7/13/2016 4:55 PM, Alex Williamson wrote:
-> On Wed, 13 Jul 2016 16:12:35 -0400
-> Sinan Kaya <okaya@codeaurora.org> wrote:
-> 
->> On 6/23/2016 2:59 PM, Alex Williamson wrote:
->>>>>  static struct resource *get_platform_resource(struct vfio_platform_device *vdev,
->>>>> @@ -66,6 +70,7 @@ static int vfio_platform_probe(struct platform_device *pdev)
->>>>>  	vdev->get_resource = get_platform_resource;
->>>>>  	vdev->get_irq = get_platform_irq;
->>>>>  	vdev->parent_module = THIS_MODULE;
->>>>> +	vdev->reset_required = reset_required;  
->>>
->>> Do you see value in making the global reset_required changeable, with
->>> the behavior of any given device dependent on the setting of this
->>> variable at the time of probe?  It seems like a bit of a support issue
->>> to me.  Also, we're breaking existing users if there are any with this
->>> change.  Should we introduce a CONFIG option to set the default?  I
->>> think we can get away with changing the default that way, but I'm not
->>> so sure otherwise.
->>>   
+On Wed, Jul 13, 2016 at 11:08 PM, Guenter Roeck <linux@roeck-us.net> wrote:
+> On Wed, Jul 13, 2016 at 10:30:37PM +0200, Rafael J. Wysocki wrote:
+>> On Wed, Jul 13, 2016 at 7:53 PM,  <fu.wei@linaro.org> wrote:
+>> > From: Fu Wei <fu.wei@linaro.org>
+>> >
+>> > This patch adds support for parsing arch timer in GTDT,
+>> > provides some kernel APIs to parse all the PPIs and
+>> > always-on info in GTDT and export them.
+>> >
+>> > By this driver, we can simplify arm_arch_timer drivers, and
+>> > separate the ACPI GTDT knowledge from it.
+>> >
+>> > Signed-off-by: Fu Wei <fu.wei@linaro.org>
+>> > Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+>> > ---
+>> >  drivers/acpi/Kconfig           |   5 ++
+>> >  drivers/acpi/Makefile          |   1 +
+>> >  drivers/acpi/arm64/Kconfig     |  15 ++++
+>> >  drivers/acpi/arm64/Makefile    |   1 +
+>> >  drivers/acpi/arm64/acpi_gtdt.c | 170 +++++++++++++++++++++++++++++++++++++++++
+>> >  include/linux/acpi.h           |   6 ++
+>> >  6 files changed, 198 insertions(+)
+>> >
+>> > diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
+>> > index b7e2e77..1cdc7d2 100644
+>> > --- a/drivers/acpi/Kconfig
+>> > +++ b/drivers/acpi/Kconfig
+>> > @@ -521,4 +521,9 @@ config XPOWER_PMIC_OPREGION
+>> >
+>> >  endif
+>> >
+>> > +if ARM64
+>> > +source "drivers/acpi/arm64/Kconfig"
+>> > +
+>> > +endif
+>> > +
+>> >  endif  # ACPI
+>> > diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
+>> > index 251ce85..1a94ff7 100644
+>> > --- a/drivers/acpi/Makefile
+>> > +++ b/drivers/acpi/Makefile
+>> > @@ -99,5 +99,6 @@ obj-$(CONFIG_ACPI_EXTLOG)     += acpi_extlog.o
+>> >  obj-$(CONFIG_PMIC_OPREGION)    += pmic/intel_pmic.o
+>> >  obj-$(CONFIG_CRC_PMIC_OPREGION) += pmic/intel_pmic_crc.o
+>> >  obj-$(CONFIG_XPOWER_PMIC_OPREGION) += pmic/intel_pmic_xpower.o
+>> > +obj-$(CONFIG_ARM64)    += arm64/
+>> >
+>> >  video-objs                     += acpi_video.o video_detect.o
+>> > diff --git a/drivers/acpi/arm64/Kconfig b/drivers/acpi/arm64/Kconfig
+>> > new file mode 100644
+>> > index 0000000..ff5c253
+>> > --- /dev/null
+>> > +++ b/drivers/acpi/arm64/Kconfig
+>> > @@ -0,0 +1,15 @@
+>> > +#
+>> > +# ACPI Configuration for ARM64
+>> > +#
+>> > +
+>> > +menu "The ARM64-specific ACPI Support"
+>> > +
+>> > +config ACPI_GTDT
+>> > +       bool "ACPI GTDT table Support"
 >>
->> We have two groups of existing users.
+>> This should depend on ARM64.
 >>
->> 1. AMBA based drivers
->> 2. DT based drivers
+>> Also I wonder if it needs to be user-selectable?  Wouldn't it be
+>> better to enable it by default when building for ARM64 with ACPI?
 >>
->> and now we are trying to add the ACPI based drivers in this series.
->>
->> The AMBA based drivers do not have reset function implemented. Based on
->> previous conversation with Eric, these devices were mostly used for
->> bringing up the VFIO framework and were not intended for production. 
->> If we want to maintain existing functionality, I can change reset_required to
->> false by default for the AMBA based drivers.
-> 
-> I think we need to consider them to be in production at this point, so
-> probably better to make such a change.
->  
->> The DT based drivers all have reset functions implemented. They shouldn't be
->> impacted by the reset_required flag. 
-> 
-> Ok, so we're fine there.
-> 
->> The reset_required flag is again useful for testing purposes when the reset
->> driver is broken or the ACPI _RST method is missing.
-> 
-> I don't doubt that, but it doesn't need to be mode 644 for that, which
-> allows changing the default dynamically.  We could make it 444 so that
-> it can be set at module load time and not modified.  I just don't want
-> to try to guess the state of that variable at the time the device was
-> probed.
+> It is currently selected in patch 9, in the watchdog driver's Kconfig
+> entry.
 
-OK. I'll change it to 444.
+Well, it still doesn't have to be user-selectable for that. :-)
 
-> 
->> The previously agreed approach was to force the reset required by default
->> for production environment and be able to clear it for testing purposes.
->> When I was implementing HIDMA, I never realized that I needed a reset driver
->> until Arnd told me during the review. We want to avoid this for the long
->> term for DT and ACPI based implementations.
-> 
-> I agree, but we don't need to make it dynamically changeable for that.
-> Also, nothing prevents us from printing a warning when a device is
-> probed w/o a reset function, it's just a matter of whether that causes
-> a probe failure or a complain and continue.
-> 
->> The reset_required command line parameter would be useful if somebody suspects
->> that the ACPI _RST implementation is broken or the DT based reset driver is
->> broken or you quickly want to test the virtualization without having a reset
->> driver ready yet.
->>
->> Let us know which way you want to go. I can also add a Kconfig option and
->> set it by default. But then I have to recompile the kernel when I want to
->> test without the reset stuff.
-> 
-> Seems like we don't need a Kconfig, but I don't see why the option
-> needs to be settable except at module load time and we can complain
-> either way to clue in developers and catch such things in testing.
-> Thanks,
+> Not sure if I like that; maybe the watchdog driver should depend
+> on it instead ?
 
-OK. 
+If the watchdog is not the only user of it (and I don't think it is),
+it would be better to arrange things this way.
 
-> 
-> Alex
-> 
-
-
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Thanks,
+Rafael
