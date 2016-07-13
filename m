@@ -1,36 +1,30 @@
-From: shuahkh@osg.samsung.com (Shuah Khan)
-Date: Tue, 12 Jul 2016 18:33:58 -0600
-Subject: [PATCH] media: s5p-mfc remove unnecessary error messages
-Message-ID: <1468370038-5364-1-git-send-email-shuahkh@osg.samsung.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 13 Jul 2016 03:20:49 +0200
+Subject: [PATCH 1/2] ARM: dts: r8a7792: add PLL1 divided by 2 clock
+In-Reply-To: <40786877.3MNoIeTZcz@wasted.cogentembedded.com>
+References: <1529351.Fac5N2tKoF@wasted.cogentembedded.com>
+ <40786877.3MNoIeTZcz@wasted.cogentembedded.com>
+Message-ID: <CAMuHMdVaj=gnPXR4vDzGScRbJf-54=kbAJ4TWEJm7-atmSAg2g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Removing unnecessary error messages as appropriate error code is returned.
+On Mon, Jul 11, 2016 at 11:51 PM, Sergei Shtylyov
+<sergei.shtylyov@cogentembedded.com> wrote:
+> Despite the QSPI clock has PLL1/VCOx1/4 clock as a parent, the latter
+> hasn't been added to the R8A7792 device tree  -- fix this overlook at
+> last...
+>
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Signed-off-by: Shuah Khan <shuahkh@osg.samsung.com>
----
- drivers/media/platform/s5p-mfc/s5p_mfc.c | 2 --
- 1 file changed, 2 deletions(-)
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc.c b/drivers/media/platform/s5p-mfc/s5p_mfc.c
-index b6fde20..906f80c 100644
---- a/drivers/media/platform/s5p-mfc/s5p_mfc.c
-+++ b/drivers/media/platform/s5p-mfc/s5p_mfc.c
-@@ -759,7 +759,6 @@ static int s5p_mfc_open(struct file *file)
- 	/* Allocate memory for context */
- 	ctx = kzalloc(sizeof(*ctx), GFP_KERNEL);
- 	if (!ctx) {
--		mfc_err("Not enough memory\n");
- 		ret = -ENOMEM;
- 		goto err_alloc;
- 	}
-@@ -776,7 +775,6 @@ static int s5p_mfc_open(struct file *file)
- 	while (dev->ctx[ctx->num]) {
- 		ctx->num++;
- 		if (ctx->num >= MFC_NUM_CONTEXTS) {
--			mfc_err("Too many open contexts\n");
- 			ret = -EBUSY;
- 			goto err_no_ctx;
- 		}
--- 
-2.7.4
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
