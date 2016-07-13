@@ -1,75 +1,79 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 13 Jul 2016 10:02:46 +0100
-Subject: [PATCH v3 20/20] dt-bindings: pwm: sti: Update DT bindings with
- recent changes
-In-Reply-To: <20160610145323.GO27142@ulmo.ba.sec>
-References: <20160608092135.21184-1-lee.jones@linaro.org>
- <20160608092135.21184-21-lee.jones@linaro.org>
- <20160608205152.GA5511@rob-hp-laptop> <20160609114107.GB1388@dell>
- <20160610131855.GG27142@ulmo.ba.sec> <20160610140635.GC1537@dell>
- <20160610145323.GO27142@ulmo.ba.sec>
-Message-ID: <20160713090246.GA11154@dell>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Wed, 13 Jul 2016 11:01:35 +0200
+Subject: [PATCH RFC] serial: imx: support an enable-gpio
+Message-ID: <1468400495-10471-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 10 Jun 2016, Thierry Reding wrote:
-> On Fri, Jun 10, 2016 at 03:06:35PM +0100, Lee Jones wrote:
-> > On Fri, 10 Jun 2016, Thierry Reding wrote:
-> > 
-> > > > > > The second documentation adaption entails adding support for PWM
-> > > > > > capture devices.  A new clock is required as well as an IRQ line.
-> > > > > > We're also adding a new property similar to the one described
-> > > > > > above, but for capture channels.  Typically, there will be less
-> > > > > > capture channels than PWM-out, since all channels have the latter
-> > > > > > capability, but only some have capture support.
-> > > > > 
-> > > > > Humm, sounds like all of this should be implied from compatible strings.
-> > > > 
-> > > > You mean have a bunch of of_machine_is_compatibles() scattered around?
-> > > 
-> > > I don't understand why you need this at all. Quite frankly I don't even
-> > > know why st,pwm-num-devs exists. I probably missed it back at the time.
-> > > Usually, like Rob suggests, this should be inferred from the compatible
-> > > string. One commonly used way to avoid scattering explicit checks for
-> > > the compatible string is to add this information to the of_device_id
-> > > table. See a bunch of existing drivers for reference.
-> > 
-> > Yes, I am aware of the strategy, and happy to oblige if this is your
-> > suggestion.  I'll move all platform data into the driver and eradicate
-> > the DT properties.
-> 
-> Great!
+A part of my machine looks as follows (simplified):
 
-Sorry it's taken so long to get back around to this.
+,------------------------.
+| ,---------.            |
+| |  imx25  o--RX----?---o---
+| |         o--GPIO--'   |
+| `---------'            |
+`------------------------'
 
-So I just had a crack at implementing this solution and ran into
-issues.  Unfortunately, the configuration isn't easy to describe using
-compatible strings.
+that is, there is a driver on the RX line that must be enabled before
+the UART can be used. (That is necessary because the default mux of the
+RX pad after reset is an output.)
 
-Unless we are prepared to have strings like:
+To represent this in the device tree I do:
 
-  st,sti-pwm-stih407-pwm0
-  st,sti-pwm-stih407-pwm1
-  st,sti-pwm-stih416-pwm0
-  st,sti-pwm-stih416-pwm1
+	pinctrl_uart5: uart5 {
+		fsl,pins = <
+			...
+			MX25_PAD_LBA__UART5_RXD		0x00000000
+			MX25_PAD_CS5__GPIO_3_21		0x00002001
+			...
+	};
 
-Or perhaps:
+	&uart5 {
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_uart5>;
 
-  st,sti-pwm-4out-2cpt
-  st,sti-pwm-1out-1cpt
+		enable-gpio = <&gpio3 21 GPIO_ACTIVE_LOW>;
+		...
+	};
 
-... since some of the PWMs have an odd number of OUT and CPT
-channels/devices.  In my opinion however, this is ugly.  I don't think
-we do this for any other type of channel/device/port etc, do we?
+This way it's ensured that the gpio is only enabled when the LBA pad is
+muxed as RX (together with the bootloader that sets the GPIO high).
 
-Personally I think there isn't anything wrong with having DT
-properties describing how many channels/devices there are, but I'm
-okay with whatever you both decide.  No skin of my nose really. :)
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+Hello,
 
-What say you?
+I'm not sure about the naming. Do you have a better suggestion how to handle
+this situation?
 
+Best regards
+Uwe
+
+ drivers/tty/serial/imx.c | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
+index 0df2b1c091ae..56eaa18aa5be 100644
+--- a/drivers/tty/serial/imx.c
++++ b/drivers/tty/serial/imx.c
+@@ -39,6 +39,7 @@
+ #include <linux/of_device.h>
+ #include <linux/io.h>
+ #include <linux/dma-mapping.h>
++#include <linux/gpio/consumer.h>
+ 
+ #include <asm/irq.h>
+ #include <linux/platform_data/serial-imx.h>
+@@ -1987,7 +1988,9 @@ static int serial_imx_probe_dt(struct imx_port *sport,
+ 	if (of_get_property(np, "fsl,dte-mode", NULL))
+ 		sport->dte_mode = 1;
+ 
+-	return 0;
++	ret = PTR_ERR_OR_ZERO(devm_gpiod_get_optional(&pdev->dev, "enable", GPIOD_OUT_HIGH));
++	dev_info(&pdev->dev, "Tralala: ret = %d\n", ret);
++	return ret;
+ }
+ #else
+ static inline int serial_imx_probe_dt(struct imx_port *sport,
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+2.8.1
