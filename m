@@ -1,287 +1,209 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Wed, 13 Jul 2016 02:59:00 +0100
-Subject: [PATCH v9 08/17] KVM: arm64: handle ITS related GICv3 redistributor
- registers
+Date: Wed, 13 Jul 2016 02:59:04 +0100
+Subject: [PATCH v9 12/17] KVM: arm64: connect LPIs to the VGIC emulation
 In-Reply-To: <20160713015909.28793-1-andre.przywara@arm.com>
 References: <20160713015909.28793-1-andre.przywara@arm.com>
-Message-ID: <20160713015909.28793-9-andre.przywara@arm.com>
+Message-ID: <20160713015909.28793-13-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the GICv3 redistributor there are the PENDBASER and PROPBASER
-registers which we did not emulate so far, as they only make sense
-when having an ITS. In preparation for that emulate those MMIO
-accesses by storing the 64-bit data written into it into a variable
-which we later read in the ITS emulation.
-We also sanitise the registers, making sure RES0 regions are respected
-and checking for valid memory attributes.
+LPIs are dynamically created (mapped) at guest runtime and their
+actual number can be quite high, but is mostly assigned using a very
+sparse allocation scheme. So arrays are not an ideal data structure
+to hold the information.
+We use a spin-lock protected linked list to hold all mapped LPIs,
+represented by their struct vgic_irq. This lock is grouped between the
+ap_list_lock and the vgic_irq lock in our locking order.
+Also we store a pointer to that struct vgic_irq in our struct its_itte,
+so we can easily access it.
+Eventually we call our new vgic_get_lpi() from vgic_get_irq(), so
+the VGIC code gets transparently access to LPIs.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
- include/kvm/arm_vgic.h           |  13 ++++
- virt/kvm/arm/vgic/vgic-mmio-v3.c | 153 ++++++++++++++++++++++++++++++++++++++-
- virt/kvm/arm/vgic/vgic-mmio.h    |   8 ++
- virt/kvm/arm/vgic/vgic-v3.c      |  11 ++-
- 4 files changed, 181 insertions(+), 4 deletions(-)
+ include/kvm/arm_vgic.h        |  6 ++++
+ virt/kvm/arm/vgic/vgic-init.c |  3 ++
+ virt/kvm/arm/vgic/vgic-its.c  |  5 ++++
+ virt/kvm/arm/vgic/vgic-v3.c   |  2 ++
+ virt/kvm/arm/vgic/vgic.c      | 67 ++++++++++++++++++++++++++++++++++++++-----
+ 5 files changed, 76 insertions(+), 7 deletions(-)
 
 diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index 450b4da..df2dec5 100644
+index 6186749..a6ca326 100644
 --- a/include/kvm/arm_vgic.h
 +++ b/include/kvm/arm_vgic.h
-@@ -146,6 +146,14 @@ struct vgic_dist {
- 	struct vgic_irq		*spis;
+@@ -77,6 +77,7 @@ enum vgic_irq_config {
  
- 	struct vgic_io_device	dist_iodev;
+ struct vgic_irq {
+ 	spinlock_t irq_lock;		/* Protects the content of the struct */
++	struct list_head lpi_list;	/* Used to link all LPIs together */
+ 	struct list_head ap_list;
+ 
+ 	struct kvm_vcpu *vcpu;		/* SGIs and PPIs: The VCPU
+@@ -193,6 +194,11 @@ struct vgic_dist {
+ 	 * GICv3 spec: 6.1.2 "LPI Configuration tables"
+ 	 */
+ 	u64			propbaser;
 +
-+	/*
-+	 * Contains the attributes and gpa of the LPI configuration table.
-+	 * Since we report GICR_TYPER.CommonLPIAff as 0b00, we can share
-+	 * one address across all redistributors.
-+	 * GICv3 spec: 6.1.2 "LPI Configuration tables"
-+	 */
-+	u64			propbaser;
++	/* Protects the lpi_list and the count value below. */
++	spinlock_t		lpi_list_lock;
++	struct list_head	lpi_list_head;
++	int			lpi_list_count;
  };
  
  struct vgic_v2_cpu_if {
-@@ -200,6 +208,11 @@ struct vgic_cpu {
- 	 */
- 	struct vgic_io_device	rd_iodev;
- 	struct vgic_io_device	sgi_iodev;
-+
-+	/* Contains the attributes and gpa of the LPI pending tables. */
-+	u64 pendbaser;
-+
-+	bool lpis_enabled;
- };
+diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
+index ac3c1a5..535e713 100644
+--- a/virt/kvm/arm/vgic/vgic-init.c
++++ b/virt/kvm/arm/vgic/vgic-init.c
+@@ -157,6 +157,9 @@ static int kvm_vgic_dist_init(struct kvm *kvm, unsigned int nr_spis)
+ 	struct kvm_vcpu *vcpu0 = kvm_get_vcpu(kvm, 0);
+ 	int i;
  
- int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write);
-diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-index bfcafbd..ee299a7 100644
---- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
-+++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-@@ -29,6 +29,19 @@ static unsigned long extract_bytes(unsigned long data, unsigned int offset,
- 	return (data >> (offset * 8)) & GENMASK_ULL(num * 8 - 1, 0);
- }
++	INIT_LIST_HEAD(&dist->lpi_list_head);
++	spin_lock_init(&dist->lpi_list_lock);
++
+ 	dist->spis = kcalloc(nr_spis, sizeof(struct vgic_irq), GFP_KERNEL);
+ 	if (!dist->spis)
+ 		return  -ENOMEM;
+diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+index dc9a98f..4fc830c 100644
+--- a/virt/kvm/arm/vgic/vgic-its.c
++++ b/virt/kvm/arm/vgic/vgic-its.c
+@@ -56,6 +56,7 @@ struct its_collection {
+ struct its_itte {
+ 	struct list_head itte_list;
  
-+/* allows updates of any half of a 64-bit register (or the whole thing) */
-+static u64 update_64bit_reg(u64 reg, unsigned int offset, unsigned int len,
-+			    unsigned long val)
-+{
-+	int lower = (offset & 4) * 8;
-+	int upper = lower + 8 * len - 1;
-+
-+	reg &= ~GENMASK_ULL(upper, lower);
-+	val &= GENMASK_ULL(len * 8 - 1, 0);
-+
-+	return reg | ((u64)val << lower);
-+}
-+
- static unsigned long vgic_mmio_read_v3_misc(struct kvm_vcpu *vcpu,
- 					    gpa_t addr, unsigned int len)
++	struct vgic_irq *irq;
+ 	struct its_collection *collection;
+ 	u32 lpi;
+ 	u32 event_id;
+@@ -144,6 +145,10 @@ static unsigned long vgic_mmio_read_its_idregs(struct kvm *kvm,
+ static void its_free_itte(struct kvm *kvm, struct its_itte *itte)
  {
-@@ -152,6 +165,142 @@ static unsigned long vgic_mmio_read_v3_idregs(struct kvm_vcpu *vcpu,
- 	return 0;
+ 	list_del(&itte->itte_list);
++
++	/* This put matches the get in vgic_add_lpi. */
++	vgic_put_irq(kvm, itte->irq);
++
+ 	kfree(itte);
  }
  
-+/* We want to avoid outer shareable. */
-+u64 vgic_sanitise_shareability(u64 field)
-+{
-+	switch (field) {
-+	case GIC_BASER_OuterShareable:
-+		return GIC_BASER_InnerShareable;
-+	default:
-+		return field;
-+	}
-+}
-+
-+/* Avoid any inner non-cacheable mapping. */
-+u64 vgic_sanitise_inner_cacheability(u64 field)
-+{
-+	switch (field) {
-+	case GIC_BASER_CACHE_nCnB:
-+	case GIC_BASER_CACHE_nC:
-+		return GIC_BASER_CACHE_RaWb;
-+	default:
-+		return field;
-+	}
-+}
-+
-+/* Non-cacheable or same-as-inner are OK. */
-+u64 vgic_sanitise_outer_cacheability(u64 field)
-+{
-+	switch (field) {
-+	case GIC_BASER_CACHE_SameAsInner:
-+	case GIC_BASER_CACHE_nC:
-+		return field;
-+	default:
-+		return GIC_BASER_CACHE_nC;
-+	}
-+}
-+
-+u64 vgic_sanitise_field(u64 reg, u64 field_mask, int field_shift,
-+			u64 (*sanitise_fn)(u64))
-+{
-+	u64 field = (reg & field_mask) >> field_shift;
-+
-+	field = sanitise_fn(field) << field_shift;
-+	return (reg & ~field_mask) | field;
-+}
-+
-+#define PROPBASER_RES0_MASK						\
-+	(GENMASK_ULL(63, 59) | GENMASK_ULL(55, 52) | GENMASK_ULL(6, 5))
-+#define PENDBASER_RES0_MASK						\
-+	(BIT_ULL(63) | GENMASK_ULL(61, 59) | GENMASK_ULL(55, 52) |	\
-+	 GENMASK_ULL(15, 12) | GENMASK_ULL(6, 0))
-+
-+static u64 vgic_sanitise_pendbaser(u64 reg)
-+{
-+	reg = vgic_sanitise_field(reg, GICR_PENDBASER_SHAREABILITY_MASK,
-+				  GICR_PENDBASER_SHAREABILITY_SHIFT,
-+				  vgic_sanitise_shareability);
-+	reg = vgic_sanitise_field(reg, GICR_PENDBASER_CACHEABILITY_MASK,
-+				  GICR_PENDBASER_INNER_CACHEABILITY_SHIFT,
-+				  vgic_sanitise_inner_cacheability);
-+	reg = vgic_sanitise_field(reg, GICR_PENDBASER_OUTER_CACHEABILITY_MASK,
-+				  GICR_PENDBASER_OUTER_CACHEABILITY_SHIFT,
-+				  vgic_sanitise_outer_cacheability);
-+
-+	reg &= ~PENDBASER_RES0_MASK;
-+	reg &= ~GENMASK_ULL(51, 48);
-+
-+	return reg;
-+}
-+
-+static u64 vgic_sanitise_propbaser(u64 reg)
-+{
-+	reg = vgic_sanitise_field(reg, GICR_PROPBASER_SHAREABILITY_MASK,
-+				  GICR_PROPBASER_SHAREABILITY_SHIFT,
-+				  vgic_sanitise_shareability);
-+	reg = vgic_sanitise_field(reg, GICR_PROPBASER_CACHEABILITY_MASK,
-+				  GICR_PROPBASER_INNER_CACHEABILITY_SHIFT,
-+				  vgic_sanitise_inner_cacheability);
-+	reg = vgic_sanitise_field(reg, GICR_PROPBASER_OUTER_CACHEABILITY_MASK,
-+				  GICR_PROPBASER_OUTER_CACHEABILITY_SHIFT,
-+				  vgic_sanitise_outer_cacheability);
-+
-+	reg &= ~PROPBASER_RES0_MASK;
-+	reg &= ~GENMASK_ULL(51, 48);
-+	return reg;
-+}
-+
-+static unsigned long vgic_mmio_read_propbase(struct kvm_vcpu *vcpu,
-+					     gpa_t addr, unsigned int len)
-+{
-+	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
-+
-+	return extract_bytes(dist->propbaser, addr & 7, len);
-+}
-+
-+static void vgic_mmio_write_propbase(struct kvm_vcpu *vcpu,
-+				     gpa_t addr, unsigned int len,
-+				     unsigned long val)
-+{
-+	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
-+	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
-+	u64 propbaser = dist->propbaser;
-+
-+	/* Storing a value with LPIs already enabled is undefined */
-+	if (vgic_cpu->lpis_enabled)
-+		return;
-+
-+	propbaser = update_64bit_reg(propbaser, addr & 4, len, val);
-+	propbaser = vgic_sanitise_propbaser(propbaser);
-+
-+	dist->propbaser = propbaser;
-+}
-+
-+static unsigned long vgic_mmio_read_pendbase(struct kvm_vcpu *vcpu,
-+					     gpa_t addr, unsigned int len)
-+{
-+	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
-+
-+	return extract_bytes(vgic_cpu->pendbaser, addr & 7, len);
-+}
-+
-+static void vgic_mmio_write_pendbase(struct kvm_vcpu *vcpu,
-+				     gpa_t addr, unsigned int len,
-+				     unsigned long val)
-+{
-+	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
-+	u64 pendbaser = vgic_cpu->pendbaser;
-+
-+	/* Storing a value with LPIs already enabled is undefined */
-+	if (vgic_cpu->lpis_enabled)
-+		return;
-+
-+	pendbaser = update_64bit_reg(pendbaser, addr & 4, len, val);
-+	pendbaser = vgic_sanitise_pendbaser(pendbaser);
-+
-+	vgic_cpu->pendbaser = pendbaser;
-+}
-+
- /*
-  * The GICv3 per-IRQ registers are split to control PPIs and SGIs in the
-  * redistributors, while SPIs are covered by registers in the distributor
-@@ -232,10 +381,10 @@ static const struct vgic_register_region vgic_v3_rdbase_registers[] = {
- 		vgic_mmio_read_v3r_typer, vgic_mmio_write_wi, 8,
- 		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
- 	REGISTER_DESC_WITH_LENGTH(GICR_PROPBASER,
--		vgic_mmio_read_raz, vgic_mmio_write_wi, 8,
-+		vgic_mmio_read_propbase, vgic_mmio_write_propbase, 8,
- 		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
- 	REGISTER_DESC_WITH_LENGTH(GICR_PENDBASER,
--		vgic_mmio_read_raz, vgic_mmio_write_wi, 8,
-+		vgic_mmio_read_pendbase, vgic_mmio_write_pendbase, 8,
- 		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
- 	REGISTER_DESC_WITH_LENGTH(GICR_IDREGS,
- 		vgic_mmio_read_v3_idregs, vgic_mmio_write_wi, 48,
-diff --git a/virt/kvm/arm/vgic/vgic-mmio.h b/virt/kvm/arm/vgic/vgic-mmio.h
-index 8509014..71aa39d 100644
---- a/virt/kvm/arm/vgic/vgic-mmio.h
-+++ b/virt/kvm/arm/vgic/vgic-mmio.h
-@@ -147,4 +147,12 @@ unsigned int vgic_v2_init_dist_iodev(struct vgic_io_device *dev);
- 
- unsigned int vgic_v3_init_dist_iodev(struct vgic_io_device *dev);
- 
-+#ifdef CONFIG_KVM_ARM_VGIC_V3
-+u64 vgic_sanitise_outer_cacheability(u64 reg);
-+u64 vgic_sanitise_inner_cacheability(u64 reg);
-+u64 vgic_sanitise_shareability(u64 reg);
-+u64 vgic_sanitise_field(u64 reg, u64 field_mask, int field_shift,
-+			u64 (*sanitise_fn)(u64));
-+#endif
-+
- #endif
 diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
-index f0ac064..6f8f31f 100644
+index 6f8f31f..0506543 100644
 --- a/virt/kvm/arm/vgic/vgic-v3.c
 +++ b/virt/kvm/arm/vgic/vgic-v3.c
-@@ -191,6 +191,11 @@ void vgic_v3_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
- 	vmcrp->pmr  = (vmcr & ICH_VMCR_PMR_MASK) >> ICH_VMCR_PMR_SHIFT;
+@@ -81,6 +81,8 @@ void vgic_v3_fold_lr_state(struct kvm_vcpu *vcpu)
+ 		else
+ 			intid = val & GICH_LR_VIRTUALID;
+ 		irq = vgic_get_irq(vcpu->kvm, vcpu, intid);
++		if (!irq)	/* An LPI could have been unmapped. */
++			continue;
+ 
+ 		spin_lock(&irq->irq_lock);
+ 
+diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
+index d7ea5df..6318ea0 100644
+--- a/virt/kvm/arm/vgic/vgic.c
++++ b/virt/kvm/arm/vgic/vgic.c
+@@ -36,7 +36,8 @@ struct vgic_global __section(.hyp.text) kvm_vgic_global_state;
+  * its->cmd_lock (mutex)
+  *   its->its_lock (mutex)
+  *     vgic_cpu->ap_list_lock
+- *       vgic_irq->irq_lock
++ *       kvm->lpi_list_lock
++ *         vgic_irq->irq_lock
+  *
+  * If you need to take multiple locks, always take the upper lock first,
+  * then the lower ones, e.g. first take the its_lock, then the irq_lock.
+@@ -51,6 +52,41 @@ struct vgic_global __section(.hyp.text) kvm_vgic_global_state;
+  *     spin_lock(vcpuY->arch.vgic_cpu.ap_list_lock);
+  */
+ 
++/*
++ * Iterate over the VM's list of mapped LPIs to find the one with a
++ * matching interrupt ID and return a reference to the IRQ structure.
++ */
++static struct vgic_irq *vgic_get_lpi(struct kvm *kvm, u32 intid)
++{
++	struct vgic_dist *dist = &kvm->arch.vgic;
++	struct vgic_irq *irq = NULL;
++
++	spin_lock(&dist->lpi_list_lock);
++
++	list_for_each_entry(irq, &dist->lpi_list_head, lpi_list) {
++		if (irq->intid != intid)
++			continue;
++
++		/*
++		 * This increases the refcount, the caller is expected to
++		 * call vgic_put_irq() later once it's finished with the IRQ.
++		 */
++		kref_get(&irq->refcount);
++		goto out_unlock;
++	}
++	irq = NULL;
++
++out_unlock:
++	spin_unlock(&dist->lpi_list_lock);
++
++	return irq;
++}
++
++/*
++ * This looks up the virtual interrupt ID to get the corresponding
++ * struct vgic_irq. It also increases the refcount, so any caller is expected
++ * to call vgic_put_irq() once it's finished with this IRQ.
++ */
+ struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
+ 			      u32 intid)
+ {
+@@ -69,23 +105,40 @@ struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
+ 		return irq;
+ 	}
+ 
+-	/* LPIs are not yet covered */
+-	if (intid >= VGIC_MIN_LPI)
+-		return NULL;
++	if (intid >= VGIC_MIN_LPI)		/* LPIs */
++		return vgic_get_lpi(kvm, intid);
+ 
+ 	WARN(1, "Looking up struct vgic_irq for reserved INTID");
+ 	return NULL;
  }
  
-+#define INITIAL_PENDBASER_VALUE						  \
-+	(GIC_BASER_CACHEABILITY(GICR_PENDBASER, INNER, RaWb)		| \
-+	GIC_BASER_CACHEABILITY(GICR_PENDBASER, OUTER, SameAsInner)	| \
-+	GIC_BASER_SHAREABILITY(GICR_PENDBASER, InnerShareable))
-+
- void vgic_v3_enable(struct kvm_vcpu *vcpu)
+-/* The refcount should never drop to 0 at the moment. */
++/*
++ * We can't do anything in here, because we lack the kvm pointer to
++ * lock and remove the item from the lpi_list. So we keep this function
++ * empty and use the return value of kref_put() to trigger the freeing.
++ */
+ static void vgic_irq_release(struct kref *ref)
  {
- 	struct vgic_v3_cpu_if *vgic_v3 = &vcpu->arch.vgic_cpu.vgic_v3;
-@@ -208,10 +213,12 @@ void vgic_v3_enable(struct kvm_vcpu *vcpu)
- 	 * way, so we force SRE to 1 to demonstrate this to the guest.
- 	 * This goes with the spec allowing the value to be RAO/WI.
- 	 */
--	if (vcpu->kvm->arch.vgic.vgic_model == KVM_DEV_TYPE_ARM_VGIC_V3)
-+	if (vcpu->kvm->arch.vgic.vgic_model == KVM_DEV_TYPE_ARM_VGIC_V3) {
- 		vgic_v3->vgic_sre = ICC_SRE_EL1_SRE;
--	else
-+		vcpu->arch.vgic_cpu.pendbaser = INITIAL_PENDBASER_VALUE;
-+	} else {
- 		vgic_v3->vgic_sre = 0;
-+	}
+-	WARN_ON(1);
+ }
  
- 	/* Get the show on the road... */
- 	vgic_v3->vgic_hcr = ICH_HCR_EN;
+ void vgic_put_irq(struct kvm *kvm, struct vgic_irq *irq)
+ {
+-	kref_put(&irq->refcount, vgic_irq_release);
++	struct vgic_dist *dist;
++
++	if (!kref_put(&irq->refcount, vgic_irq_release))
++		return;
++
++	if (irq->intid < VGIC_MIN_LPI)
++		return;
++
++	dist = &kvm->arch.vgic;
++
++	spin_lock(&dist->lpi_list_lock);
++	list_del(&irq->lpi_list);
++	dist->lpi_list_count--;
++	spin_unlock(&dist->lpi_list_lock);
++
++	kfree(irq);
+ }
+ 
+ /**
 -- 
 2.9.0
