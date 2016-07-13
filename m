@@ -1,40 +1,46 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 13 Jul 2016 13:41:14 -0600
-Subject: [PATCH V2 03/10] Documentation: dt-bindings: firmware: tegra: add
- bindings of the BPMP
-In-Reply-To: <20160705090431.5852-4-josephl@nvidia.com>
-References: <20160705090431.5852-1-josephl@nvidia.com>
- <20160705090431.5852-4-josephl@nvidia.com>
-Message-ID: <5786995A.1090706@wwwdotorg.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 13 Jul 2016 21:57:28 +0200
+Subject: [RFC 0/3] extend kexec_file_load system call
+In-Reply-To: <20160713175630.GA2668@leverpostej>
+References: <20160712014201.11456-1-takahiro.akashi@linaro.org>
+ <20160713173804.GA25723@porco> <20160713175630.GA2668@leverpostej>
+Message-ID: <7927804.6bj1abO0d2@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/05/2016 03:04 AM, Joseph Lo wrote:
-> The BPMP is a specific processor in Tegra chip, which is designed for
-> booting process handling and offloading the power management, clock
-> management, and reset control tasks from the CPU. The binding document
-> defines the resources that would be used by the BPMP firmware driver,
-> which can create the interprocessor communication (IPC) between the CPU
-> and BPMP.
+On Wednesday, July 13, 2016 6:58:32 PM CEST Mark Rutland wrote:
+> 
+> >   we may want to remove unnecessary devices and even add a dedicated
+> >   storage device for storing a core dump image.
+> 
+> I suspect that bringing up a minimal number of devices is better
+> controlled by a cmdline option. In general, figuring out what is
+> necessary and what is not is going to be board specific, so hacking the
+> FW tables (DTB or ACPI) is not a very portable/reliable approach.
+> 
+> Do we actually add devices in practice? More so than the above that
+> requires special knowledge of the platform (including things that were
+> not described in the boot DTB).
+> 
+> In the ACPI case modifying a DTB alone is not sufficient to change the
+> information regarding devices, as those won't be described in the DTB.
+> It's not possible to convert ACPI to DTB in general.
 
-> diff --git a/Documentation/devicetree/bindings/firmware/nvidia,tegra186-bpmp.txt b/Documentation/devicetree/bindings/firmware/nvidia,tegra186-bpmp.txt
+A more likely scenario would be replacing ACPI tables with a DTB that
+describes the platform in order to use devices that the ACPI tables
+don't contain.
 
-> +- Documentation/devicetree/bindings/mailbox/mailbox.txt
-> +- Documentation/devicetree/bindings/mailbox/nvidia,tegra186-hsp.txt
+> > - Say, booting BE kernel on ACPI LE kernel
+> >   In this case, there is no useful dtb in the kernel.
 
-> +- Documentation/devicetree/bindings/clock/clock-bindings.txt
-> +- include/dt-bindings/clock/tegra186-clock.h
-> +- Documentation/devicetree/bindings/reset/reset.txt
-> +- include/dt-bindings/reset/tegra186-reset.h
+> If the platform only has ACPI, then you cannot boot a BE kernel to begin
+> with. As above one cannot convert ACPI to DTB, so one would need
+> extensive platform knowledge for this to work.
 
-If you end up needing to repost this, it would be nice to make all those 
-file references more generic. In particular, some SW projects store 
-binding docs somewhere other than Documentation/devicetree/bindings/ 
-(e.g. U-Boot uses doc/device-tree-bindings/), and it's possible that the 
-header files aren't stored in include/ but somewhere else. To make these 
-file references valid everywhere, I'd suggest using relative paths for 
-the binding docs, and #include style paths for the headers, e.g.:
+I think what he meant was to pass a DTB to the kexec kernel in order
+to run BE, while the original kernel can only run LE due to ACPI.
 
-../clock/clock-bindings.txt
+If you boot a LE kernel using DTB, the same DTB should work
+for a kexec boot for a BE kernel.
 
-<dt-bindings/clock/tegra186-clock.h>
+	Arnd
