@@ -1,260 +1,43 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Wed, 13 Jul 2016 10:32:39 +0100
-Subject: [PATCH v22 3/8] arm64: kdump: implement machine_crash_shutdown()
-In-Reply-To: <20160712050514.22307-4-takahiro.akashi@linaro.org>
-References: <20160712050514.22307-1-takahiro.akashi@linaro.org>
- <20160712050514.22307-4-takahiro.akashi@linaro.org>
-Message-ID: <f8a6a1c7-27ed-9d2f-7d4b-7a81676c2f9c@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 13 Jul 2016 10:34:47 +0100
+Subject: [RFC 0/3] extend kexec_file_load system call
+In-Reply-To: <20160713023614.GB3222@dhcp-128-65.nay.redhat.com>
+References: <20160712014201.11456-1-takahiro.akashi@linaro.org>
+ <1911992.H2WpLRr2Fi@wuerfel> <20160712141810.GB30181@redhat.com>
+ <293705810.hBL93OOmOz@wuerfel> <20160712145010.GA8447@leverpostej>
+ <20160713023614.GB3222@dhcp-128-65.nay.redhat.com>
+Message-ID: <20160713093432.GB14522@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/07/16 06:05, AKASHI Takahiro wrote:
-> Primary kernel calls machine_crash_shutdown() to shut down non-boot cpus
-> and save registers' status in per-cpu ELF notes before starting crash
-> dump kernel. See kernel_kexec().
-> Even if not all secondary cpus have shut down, we do kdump anyway.
->
-> As we don't have to make non-boot(crashed) cpus offline (to preserve
-> correct status of cpus at crash dump) before shutting down, this patch
-> also adds a variant of smp_send_stop().
->
-> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> ---
->  arch/arm64/include/asm/hardirq.h  |  2 +-
->  arch/arm64/include/asm/kexec.h    | 41 ++++++++++++++++++++++++-
->  arch/arm64/include/asm/smp.h      |  2 ++
->  arch/arm64/kernel/machine_kexec.c | 56 ++++++++++++++++++++++++++++++++--
->  arch/arm64/kernel/smp.c           | 64 +++++++++++++++++++++++++++++++++++++++
->  5 files changed, 160 insertions(+), 5 deletions(-)
->
-> diff --git a/arch/arm64/include/asm/hardirq.h b/arch/arm64/include/asm/hardirq.h
-> index 8740297..1473fc2 100644
-> --- a/arch/arm64/include/asm/hardirq.h
-> +++ b/arch/arm64/include/asm/hardirq.h
-> @@ -20,7 +20,7 @@
->  #include <linux/threads.h>
->  #include <asm/irq.h>
->
-> -#define NR_IPI	6
-> +#define NR_IPI	7
->
->  typedef struct {
->  	unsigned int __softirq_pending;
-> diff --git a/arch/arm64/include/asm/kexec.h b/arch/arm64/include/asm/kexec.h
-> index 04744dc..a908958 100644
-> --- a/arch/arm64/include/asm/kexec.h
-> +++ b/arch/arm64/include/asm/kexec.h
-> @@ -40,7 +40,46 @@
->  static inline void crash_setup_regs(struct pt_regs *newregs,
->  				    struct pt_regs *oldregs)
->  {
-> -	/* Empty routine needed to avoid build errors. */
-> +	if (oldregs) {
-> +		memcpy(newregs, oldregs, sizeof(*newregs));
-> +	} else {
-> +		u64 tmp1, tmp2;
-> +
-> +		__asm__ __volatile__ (
-> +			"stp	 x0,   x1, [%2, #16 *  0]\n"
-> +			"stp	 x2,   x3, [%2, #16 *  1]\n"
-> +			"stp	 x4,   x5, [%2, #16 *  2]\n"
-> +			"stp	 x6,   x7, [%2, #16 *  3]\n"
-> +			"stp	 x8,   x9, [%2, #16 *  4]\n"
-> +			"stp	x10,  x11, [%2, #16 *  5]\n"
-> +			"stp	x12,  x13, [%2, #16 *  6]\n"
-> +			"stp	x14,  x15, [%2, #16 *  7]\n"
-> +			"stp	x16,  x17, [%2, #16 *  8]\n"
-> +			"stp	x18,  x19, [%2, #16 *  9]\n"
-> +			"stp	x20,  x21, [%2, #16 * 10]\n"
-> +			"stp	x22,  x23, [%2, #16 * 11]\n"
-> +			"stp	x24,  x25, [%2, #16 * 12]\n"
-> +			"stp	x26,  x27, [%2, #16 * 13]\n"
-> +			"stp	x28,  x29, [%2, #16 * 14]\n"
-> +			"mov	 %0,  sp\n"
-> +			"stp	x30,  %0,  [%2, #16 * 15]\n"
-> +
-> +			"/* faked current PSTATE */\n"
-> +			"mrs	 %0, CurrentEL\n"
-> +			"mrs	 %1, DAIF\n"
-> +			"orr	 %0, %0, %1\n"
-> +			"mrs	 %1, NZCV\n"
-> +			"orr	 %0, %0, %1\n"
-> +
-> +			/* pc */
-> +			"adr	 %1, 1f\n"
-> +		"1:\n"
-> +			"stp	 %1, %0,   [%2, #16 * 16]\n"
-> +			: "=r" (tmp1), "=r" (tmp2), "+r" (newregs)
-> +			:
-> +			: "memory"
-> +		);
-> +	}
->  }
->
->  #endif /* __ASSEMBLY__ */
-> diff --git a/arch/arm64/include/asm/smp.h b/arch/arm64/include/asm/smp.h
-> index 0226447..6b0f2c7 100644
-> --- a/arch/arm64/include/asm/smp.h
-> +++ b/arch/arm64/include/asm/smp.h
-> @@ -136,6 +136,8 @@ static inline void cpu_panic_kernel(void)
->   */
->  bool cpus_are_stuck_in_kernel(void);
->
-> +extern void smp_send_crash_stop(void);
-> +
->  #endif /* ifndef __ASSEMBLY__ */
->
->  #endif /* ifndef __ASM_SMP_H */
-> diff --git a/arch/arm64/kernel/machine_kexec.c b/arch/arm64/kernel/machine_kexec.c
-> index bc96c8a..8ac9dba8 100644
-> --- a/arch/arm64/kernel/machine_kexec.c
-> +++ b/arch/arm64/kernel/machine_kexec.c
-> @@ -9,6 +9,9 @@
->   * published by the Free Software Foundation.
->   */
->
-> +#include <linux/interrupt.h>
-> +#include <linux/irq.h>
-> +#include <linux/kernel.h>
->  #include <linux/kexec.h>
->  #include <linux/smp.h>
->
-> @@ -22,6 +25,7 @@
->  extern const unsigned char arm64_relocate_new_kernel[];
->  extern const unsigned long arm64_relocate_new_kernel_size;
->
-> +bool in_crash_kexec;
->  static unsigned long kimage_start;
->
->  /**
-> @@ -148,7 +152,8 @@ void machine_kexec(struct kimage *kimage)
->  	/*
->  	 * New cpus may have become stuck_in_kernel after we loaded the image.
->  	 */
-> -	BUG_ON(cpus_are_stuck_in_kernel() || (num_online_cpus() > 1));
-> +	BUG_ON((cpus_are_stuck_in_kernel() || (num_online_cpus() > 1)) &&
-> +			!WARN_ON(in_crash_kexec));
->
->  	reboot_code_buffer_phys = page_to_phys(kimage->control_code_page);
->  	reboot_code_buffer = phys_to_virt(reboot_code_buffer_phys);
-> @@ -200,13 +205,58 @@ void machine_kexec(struct kimage *kimage)
->  	 * relocation is complete.
->  	 */
->
-> -	cpu_soft_restart(1, reboot_code_buffer_phys, kimage->head,
-> +	cpu_soft_restart(!in_crash_kexec, reboot_code_buffer_phys, kimage->head,
->  		kimage_start, 0);
->
->  	BUG(); /* Should never get here. */
->  }
->
-> +static void machine_kexec_mask_interrupts(void)
-> +{
-> +	unsigned int i;
-> +	struct irq_desc *desc;
-> +
-> +	for_each_irq_desc(i, desc) {
-> +		struct irq_chip *chip;
-> +		int ret;
-> +
-> +		chip = irq_desc_get_chip(desc);
-> +		if (!chip)
-> +			continue;
-> +
-> +		/*
-> +		 * First try to remove the active state. If this
-> +		 * fails, try to EOI the interrupt.
-> +		 */
-> +		ret = irq_set_irqchip_state(i, IRQCHIP_STATE_ACTIVE, false);
-> +
-> +		if (ret && irqd_irq_inprogress(&desc->irq_data) &&
-> +		    chip->irq_eoi)
-> +			chip->irq_eoi(&desc->irq_data);
-> +
-> +		if (chip->irq_mask)
-> +			chip->irq_mask(&desc->irq_data);
-> +
-> +		if (chip->irq_disable && !irqd_irq_disabled(&desc->irq_data))
-> +			chip->irq_disable(&desc->irq_data);
-> +	}
-> +}
-> +
-> +/**
-> + * machine_crash_shutdown - shutdown non-crashing cpus and save registers
-> + */
->  void machine_crash_shutdown(struct pt_regs *regs)
->  {
-> -	/* Empty routine needed to avoid build errors. */
-> +	local_irq_disable();
-> +
-> +	in_crash_kexec = true;
-> +
-> +	/* shutdown non-crashing cpus */
-> +	smp_send_crash_stop();
-> +
-> +	/* for crashing cpu */
-> +	crash_save_cpu(regs, smp_processor_id());
-> +	machine_kexec_mask_interrupts();
-> +
-> +	pr_info("Starting crashdump kernel...\n");
->  }
-> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-> index 62ff3c0..66923db 100644
-> --- a/arch/arm64/kernel/smp.c
-> +++ b/arch/arm64/kernel/smp.c
-> @@ -37,6 +37,7 @@
->  #include <linux/completion.h>
->  #include <linux/of.h>
->  #include <linux/irq_work.h>
-> +#include <linux/kexec.h>
->
->  #include <asm/alternative.h>
->  #include <asm/atomic.h>
-> @@ -71,6 +72,7 @@ enum ipi_msg_type {
->  	IPI_RESCHEDULE,
->  	IPI_CALL_FUNC,
->  	IPI_CPU_STOP,
-> +	IPI_CPU_CRASH_STOP,
->  	IPI_TIMER,
->  	IPI_IRQ_WORK,
->  	IPI_WAKEUP
-> @@ -726,6 +728,7 @@ static const char *ipi_types[NR_IPI] __tracepoint_string = {
->  	S(IPI_RESCHEDULE, "Rescheduling interrupts"),
->  	S(IPI_CALL_FUNC, "Function call interrupts"),
->  	S(IPI_CPU_STOP, "CPU stop interrupts"),
-> +	S(IPI_CPU_CRASH_STOP, "CPU stop (for crash dump) interrupts"),
->  	S(IPI_TIMER, "Timer broadcast interrupts"),
->  	S(IPI_IRQ_WORK, "IRQ work interrupts"),
->  	S(IPI_WAKEUP, "CPU wake-up interrupts"),
-> @@ -800,6 +803,30 @@ static void ipi_cpu_stop(unsigned int cpu)
->  		cpu_relax();
->  }
->
-> +#ifdef CONFIG_KEXEC_CORE
-> +static atomic_t waiting_for_crash_ipi;
-> +#endif
-> +
-> +static void ipi_cpu_crash_stop(unsigned int cpu, struct pt_regs *regs)
-> +{
-> +#ifdef CONFIG_KEXEC_CORE
-> +	crash_save_cpu(regs, cpu);
-> +
-> +	atomic_dec(&waiting_for_crash_ipi);
-> +
-> +	local_irq_disable();
-> +
-> +#ifdef CONFIG_HOTPLUG_CPU
-> +	if (cpu_ops[cpu]->cpu_die)
-> +		cpu_ops[cpu]->cpu_die(cpu);
-> +#endif
-> +
+On Wed, Jul 13, 2016 at 10:36:14AM +0800, Dave Young wrote:
+> But consider we can kexec to a different kernel and a different initrd so there
+> will be use cases to pass a total different dtb as well.
 
+It depends on what you mean by "a different kernel", and what this
+implies for the DTB.
 
-> +	/* just in case */
-> +	while (1)
-> +		wfi();
+I expect future arm64 Linux kernels to function with today's DTBs, and
+the existing boot protocol. The kexec_file_load syscall already has
+enough information for the kernel to inject the initrd and bootargs
+properties into a DTB.
 
-You could use cpu_park_loop() (defined in asm/smp.h) here instead,
-which also includes wfe();
+In practice on x86 today, kexec_file_load only supports booting to a
+Linux kernel, because the in-kernel purgatory only implements the x86
+Linux boot protocol. Analagously, for arm64 I think that the first
+kernel should use its internal copy of the boot DTB, with /chosen fixed
+up appropriately, assuming the next kernel is an arm64 Linux image.
 
-Suzuki
+If booting another OS, the only parts of the DTB I would expect to
+change are the properties under chosen, as everything else *should* be
+OS-independent. However the other OS may have a completely different
+boot protocol, might not even take a DTB, and will likely need a
+compeltely different purgatory implementation. So just allowing the DTB
+to be altered isn't sufficient for that case.
+
+There might be cases where we want a different DTB, but as far as I can
+tell we have nothing analagous on x86 today. If we do need this, we
+should have an idea of what real case(s) were trying to solve.
+
+Thanks,
+Mark.
