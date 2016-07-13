@@ -1,52 +1,77 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 13 Jul 2016 15:08:09 +0200
-Subject: [PATCH] [media] mtk-vcodec: fix type mismatches
-In-Reply-To: <1468403786.32454.16.camel@mtksdaap41>
-References: <20160711213959.2481081-1-arnd@arndb.de>
- <1468403786.32454.16.camel@mtksdaap41>
-Message-ID: <4915511.9pXBipIRF8@wuerfel>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 13 Jul 2016 08:10:32 -0500
+Subject: [PATCH v5 10/11] Documentation: dtb: xgene: Add MDIO node
+In-Reply-To: <1467932579-14320-11-git-send-email-isubramanian@apm.com>
+References: <1467932579-14320-1-git-send-email-isubramanian@apm.com>
+ <1467932579-14320-11-git-send-email-isubramanian@apm.com>
+Message-ID: <20160713131010.GA15972@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, July 13, 2016 5:56:26 PM CEST tiffany lin wrote:
-> > diff --git a/drivers/media/platform/mtk-vcodec/mtk_vcodec_enc.c b/drivers/media/platform/mtk-vcodec/mtk_vcodec_enc.c
-> > index 6dcae0a0a1f2..0b25a8700877 100644
-> > --- a/drivers/media/platform/mtk-vcodec/mtk_vcodec_enc.c
-> > +++ b/drivers/media/platform/mtk-vcodec/mtk_vcodec_enc.c
-> > @@ -1028,15 +1028,15 @@ static void mtk_venc_worker(struct work_struct *work)
-> >       bs_buf.size = (size_t)dst_buf->planes[0].length;
-> >  
-> >       mtk_v4l2_debug(2,
-> > -                     "Framebuf VA=%p PA=%llx Size=0x%lx;VA=%p PA=0x%llx Size=0x%lx;VA=%p PA=0x%llx Size=%zu",
-> > +                     "Framebuf VA=%p PA=%pad Size=0x%zx;VA=%p PA=%pad Size=0x%zx;VA=%p PA=%pad Size=0x%zx",
-> >                       frm_buf.fb_addr[0].va,
-> > -                     (u64)frm_buf.fb_addr[0].dma_addr,
-> > +                     &frm_buf.fb_addr[0].dma_addr,
-> >                       frm_buf.fb_addr[0].size,
-> >                       frm_buf.fb_addr[1].va,
-> > -                     (u64)frm_buf.fb_addr[1].dma_addr,
-> > +                     &frm_buf.fb_addr[1].dma_addr,
-> >                       frm_buf.fb_addr[1].size,
-> >                       frm_buf.fb_addr[2].va,
-> > -                     (u64)frm_buf.fb_addr[2].dma_addr,
-> > +                     &frm_buf.fb_addr[2].dma_addr,
-> >                       frm_buf.fb_addr[2].size);
-> This change will make debug message dump address of dma_addr field but
-> not the value of the dma_addr we want.
-> How about change it from
-> PA=%llx -> PA=%u
-> (u64)frm_buf.fb_addr[0].dma_addr -> (u32)frm_buf.fb_addr[0].dma_addr,
+On Thu, Jul 07, 2016 at 04:02:58PM -0700, Iyappan Subramanian wrote:
+> Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
+> Tested-by: Fushen Chen <fchen@apm.com>
+> Tested-by: Toan Le <toanle@apm.com>
+> Tested-by: Matthias Brugger <mbrugger@suse.com>
+> ---
+>  .../devicetree/bindings/net/apm-xgene-mdio.txt     | 37 ++++++++++++++++++++++
+>  1 file changed, 37 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/net/apm-xgene-mdio.txt
 > 
+> diff --git a/Documentation/devicetree/bindings/net/apm-xgene-mdio.txt b/Documentation/devicetree/bindings/net/apm-xgene-mdio.txt
+> new file mode 100644
+> index 0000000..0247e70
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/net/apm-xgene-mdio.txt
+> @@ -0,0 +1,37 @@
+> +APM X-Gene SoC MDIO node
+> +
+> +MDIO node is defined to describe on-chip MDIO controller.
+> +
+> +Required properties:
+> +	- compatible: Must be "apm,xgene-mdio-rgmii"
+> +	- #address-cells: Must be <1>.
+> +	- #size-cells: Must be <0>.
+> +	- reg: Address and length of the register set
+> +	- clocks: Reference to the clock entry
+> +
+> +For the phys on the mdio bus, there must be a node with the following fields:
+> +	- compatible: PHY identifier.  Please refer ./phy.txt for the format.
+> +	- reg: The ID number for the phy.
+> +
+> +Example:
+> +
+> +	mdio: mdio at 0x17020000 {
 
-The %llx works fine with the cast to u64, the change above is mainly for the "%lx"
-on a size_t causing a warning.
+Drop the '0x'
 
-The change to %pad is done in order to use a consistent output for the
-dma_addr_t, which had a leading "0x" in two cases but not in the first
-one.
+With that,
 
-printk interprets %pad as a pointer to a dma_addr_t and prints the
-address, not the pointer to it, see Documentation/printk-formats.txt,
-which lets you avoid the type cast as well as the 0x.
+Acked-by: Rob Herring <robh@kernel.org>
 
-	Arnd
+> +		compatible = "apm,xgene-mdio-rgmii";
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		reg = <0x0 0x17020000 0x0 0xd100>;
+> +		clocks = <&menetclk 0>;
+> +	};
+> +
+> +	/* Board-specific peripheral configurations */
+> +	&mdio {
+> +		menetphy: phy at 3 {
+> +			reg = <0x3>;
+> +		};
+> +		sgenet0phy: phy at 4 {
+> +			reg = <0x4>;
+> +		};
+> +		sgenet1phy: phy at 5 {
+> +			reg = <0x5>;
+> +		};
+> +	};
+> -- 
+> 1.9.1
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
