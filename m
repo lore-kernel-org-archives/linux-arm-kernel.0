@@ -1,79 +1,49 @@
-From: vgoyal@redhat.com (Vivek Goyal)
-Date: Wed, 13 Jul 2016 14:22:47 -0400
-Subject: [RFC 0/3] extend kexec_file_load system call
-In-Reply-To: <20160713174009.GA1041@n2100.armlinux.org.uk>
-References: <87furf7ztv.fsf@x220.int.ebiederm.org> <50662781.Utjsnse3nb@hactar>
- <20160712225805.0d27fe5d@hananiah.suse.cz>
- <20160712221804.GV1041@n2100.armlinux.org.uk>
- <87twfunneg.fsf@linux.vnet.ibm.com>
- <20160713073657.GX1041@n2100.armlinux.org.uk>
- <87poqinf9m.fsf@linux.vnet.ibm.com>
- <20160713082639.GZ1041@n2100.armlinux.org.uk>
- <20160713130338.GB16900@redhat.com>
- <20160713174009.GA1041@n2100.armlinux.org.uk>
-Message-ID: <20160713182247.GA25232@redhat.com>
+From: seanpaul@chromium.org (Sean Paul)
+Date: Wed, 13 Jul 2016 11:23:29 -0700
+Subject: [PATCH 1/2] drm/sun4i: Remove redundant call to
+ drm_connector_unregister_all()
+In-Reply-To: <1468427947-28037-1-git-send-email-chris@chris-wilson.co.uk>
+References: <1468427947-28037-1-git-send-email-chris@chris-wilson.co.uk>
+Message-ID: <CAOw6vbKAKnkYknXzCsvQCRqrha==MNNX_XdouDet_bdmW8gk-g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 13, 2016 at 06:40:10PM +0100, Russell King - ARM Linux wrote:
-> On Wed, Jul 13, 2016 at 09:03:38AM -0400, Vivek Goyal wrote:
-> > On Wed, Jul 13, 2016 at 09:26:39AM +0100, Russell King - ARM Linux wrote:
-> > > Indeed - maybe Eric knows better, but I can't see any situation where
-> > > the dtb we load via kexec should ever affect "the bootloader", unless
-> > > the "kernel" that's being loaded into kexec is "the bootloader".
-> > > 
-> > > Now, going back to the more fundamental issue raised in my first reply,
-> > > about the kernel command line.
-> > > 
-> > > On x86, I can see that it _is_ possible for userspace to specify a
-> > > command line, and the kernel loading the image provides the command
-> > > line to the to-be-kexeced kernel with very little checking.  So, if
-> > > your kernel is signed, what stops the "insecure userspace" loading
-> > > a signed kernel but giving it an insecure rootfs and/or console?
-> > 
-> > It is not kexec specific. I could do this for regular boot too, right?
-> > 
-> > Command line options are not signed. I thought idea behind secureboot
-> > was to execute only trusted code and command line options don't enforce
-> > you to execute unsigned code.
-> > 
-> > So it sounds like different class of security problems which you are
-> > referring to and not necessarily covered by secureboot or signed
-> > kernel.
-> 
-> Let me give you an example.
-> 
-> You have a secure boot setup, where the firmware/ROM validates the boot
-> loader.  Good, the boot loader hasn't been tampered with.
-> 
-> You interrupt the boot loader and are able to modify the command line
-> for the booted kernel.
-> 
-> The boot loader loads the kernel and verifies the kernel's signature.
-> Good, the kernel hasn't been tampered with.  The kernel starts running.
-> 
-> You've plugged in a USB drive to the device, and specified a partition
-> containing a root filesystem that you control to the kernel.  The
-> validated kernel finds the USB drive, and mounts it, and executes
-> your own binaries on the USB drive.
+On Wed, Jul 13, 2016 at 9:39 AM, Chris Wilson <chris@chris-wilson.co.uk> wrote:
+> drm_connector_unregister_all() is automatically called by
+> drm_dev_unregister() and so the manual call can be dropped.
+>
+> Signed-off-by: Chris Wilson <chris@chris-wilson.co.uk>
+> Cc: Daniel Vetter <daniel.vetter@ffwll.ch>
+> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Cc: David Airlie <airlied@linux.ie>
+> Cc: Chen-Yu Tsai <wens@csie.org>
+> Cc: dri-devel at lists.freedesktop.org
+> Cc: linux-arm-kernel at lists.infradead.org
 
-You will require physical access to the machine to be able to
-insert your usb drive. And IIRC, argument was that if attacker has
-physical access to machine, all bets are off anyway.
 
-> 
-> You run a shell on the console.  You now have control of the system,
-> and can mount the real rootfs, inspect it, and work out what it does,
-> etc.
-> 
-> At this point, what use was all the validation that the secure boot
-> has done?  Absolutely useless.
-> 
-> If you can change the command line arguments given to the kernel, you
-> have no security, no matter how much you verify signatures.  It's
-> the illusion of security, nothing more, nothing less.
-> 
-> -- 
-> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-> FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-> according to speedtest.net.
+
+Reviewed-by: Sean Paul <seanpaul@chromium.org>
+
+> ---
+>  drivers/gpu/drm/sun4i/sun4i_drv.c | 1 -
+>  1 file changed, 1 deletion(-)
+>
+> diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.c b/drivers/gpu/drm/sun4i/sun4i_drv.c
+> index 4dc543e1db10..7092daaf6c43 100644
+> --- a/drivers/gpu/drm/sun4i/sun4i_drv.c
+> +++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
+> @@ -185,7 +185,6 @@ static void sun4i_drv_unbind(struct device *dev)
+>  {
+>         struct drm_device *drm = dev_get_drvdata(dev);
+>
+> -       drm_connector_unregister_all(drm);
+>         drm_dev_unregister(drm);
+>         drm_kms_helper_poll_fini(drm);
+>         sun4i_framebuffer_free(drm);
+> --
+> 2.8.1
+>
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
