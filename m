@@ -1,51 +1,63 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 13 Jul 2016 10:01:33 +0200
-Subject: [RFC 0/3] extend kexec_file_load system call
-In-Reply-To: <20160713023614.GB3222@dhcp-128-65.nay.redhat.com>
-References: <20160712014201.11456-1-takahiro.akashi@linaro.org>
- <20160712145010.GA8447@leverpostej>
- <20160713023614.GB3222@dhcp-128-65.nay.redhat.com>
-Message-ID: <5352106.oQ0Ff9gWJA@wuerfel>
+From: marcel@holtmann.org (Marcel Holtmann)
+Date: Wed, 13 Jul 2016 09:07:58 +0100
+Subject: [PATCH 1/2] Bluetooth: Add LED triggers for HCI frames tx and rx
+In-Reply-To: <1466657923-5776-1-git-send-email-guodong.xu@linaro.org>
+References: <1466657923-5776-1-git-send-email-guodong.xu@linaro.org>
+Message-ID: <D2545F6D-7100-4B59-A19D-7CF878902BAA@holtmann.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, July 13, 2016 10:36:14 AM CEST Dave Young wrote:
-> On 07/12/16 at 03:50pm, Mark Rutland wrote:
-> > On Tue, Jul 12, 2016 at 04:24:10PM +0200, Arnd Bergmann wrote:
-> > > On Tuesday, July 12, 2016 10:18:11 AM CEST Vivek Goyal wrote:
-> > 
-> > /proc/devicetree (aka /sys/firmware/devicetree) is a filesystem derived
-> > from the raw DTB (which is exposed at /sys/firmware/fdt).
-> > 
-> > The blob that was handed to the kernel at boot time is exposed at
-> > /sys/firmware/fdt.
+Hi Guodong,
+
+> Two LED triggers are defined: tx_led and rx_led. Upon frames
+> available in HCI core layer, for tx or for rx, the combined LED
+> can blink.
 > 
-> I believe the blob can be read and passed to kexec kernel in kernel code without
-> the extra fd.
+> Verified on HiKey, 96boards. It uses hi6220 SoC and TI WL1835 combo
+> chip.
 > 
-> But consider we can kexec to a different kernel and a different initrd so there
-> will be use cases to pass a total different dtb as well. From my understanding
-> it is reasonable but yes I think we should think carefully about the design.
+> Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
+> ---
+> include/net/bluetooth/hci_core.h |  1 +
+> net/bluetooth/hci_core.c         |  3 +++
+> net/bluetooth/leds.c             | 15 +++++++++++++++
+> net/bluetooth/leds.h             |  2 ++
+> 4 files changed, 21 insertions(+)
+> 
+> diff --git a/include/net/bluetooth/hci_core.h b/include/net/bluetooth/hci_core.h
+> index dc71473..37b8dd9 100644
+> --- a/include/net/bluetooth/hci_core.h
+> +++ b/include/net/bluetooth/hci_core.h
+> @@ -398,6 +398,7 @@ struct hci_dev {
+> 	bdaddr_t		rpa;
+> 
+> 	struct led_trigger	*power_led;
+> +	struct led_trigger	*tx_led, *rx_led;
+> 
+> 	int (*open)(struct hci_dev *hdev);
+> 	int (*close)(struct hci_dev *hdev);
+> diff --git a/net/bluetooth/hci_core.c b/net/bluetooth/hci_core.c
+> index 45a9fc6..c6e1210 100644
+> --- a/net/bluetooth/hci_core.c
+> +++ b/net/bluetooth/hci_core.c
+> @@ -3248,6 +3248,7 @@ int hci_recv_frame(struct hci_dev *hdev, struct sk_buff *skb)
+> 	skb_queue_tail(&hdev->rx_q, skb);
+> 	queue_work(hdev->workqueue, &hdev->rx_work);
+> 
+> +	hci_leds_blink_oneshot(hdev->rx_led);
+> 	return 0;
+> }
+> EXPORT_SYMBOL(hci_recv_frame);
+> @@ -3325,6 +3326,8 @@ static void hci_send_frame(struct hci_dev *hdev, struct sk_buff *skb)
+> 		BT_ERR("%s sending frame failed (%d)", hdev->name, err);
+> 		kfree_skb(skb);
+> 	}
+> +
+> +	hci_leds_blink_oneshot(hdev->tx_led);
+> }
 
-Ok, I can see four interesting use cases here:
+so I am not convinced that this is the right way of doing TX/RX activity leds. This would have them purely based on HCI traffic and this would include control frames. I think that we want activity leds for actual radio activity. Meaning that when we have an active connection and ACL packets are exchanged or when we are scanning.
 
-- Using the dtb that the kernel has saved at boot time. Ideally this should not
-  require an additional step of signing it, since the running kernel already
-  trusts it.
+Regards
 
-- A dtb blob from the file system that was produced along with the kernel image.
-  If we require a signature on the kernel, the the same requirement should be
-  made on the dtb. Whoever signs the kernel can also sign the dtb.
-  The tricky part here is the kernel command line that is part of the dtb
-  and that may need to be modified.
-
-- Modifying the dtb at for any of the reasons I listed: This should always
-  be possible when we do not use secure boot, just like booting an unsigned
-  kernel is.
-
-- kboot/petitboot with all of the user space being part of the trusted boot
-  chain: it would be good to allow these to modify the dtb as needed without
-  breaking the trust chain, just like we allow grub or u-boot to modify the dtb
-  before passing it to the kernel.
-
-	Arnd
+Marcel
