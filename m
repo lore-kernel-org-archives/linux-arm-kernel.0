@@ -1,23 +1,41 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 13 Jul 2016 15:40:53 +0200
-Subject: [PATCH V2 00/15] a few sdhci/imx clean up and fix patches
-In-Reply-To: <20160713085438.GA27041@shlinux2>
-References: <1468309584-3591-1-git-send-email-aisheng.dong@nxp.com>
- <20160712135422.GE8540@lunn.ch> <20160713085438.GA27041@shlinux2>
-Message-ID: <20160713134053.GB6667@lunn.ch>
+From: nicolas.dufresne@gmail.com (Nicolas Dufresne)
+Date: Wed, 13 Jul 2016 09:46:28 -0400
+Subject: [PATCH 2/2] [media] s5p-g2d: Replace old driver with DRM version
+In-Reply-To: <20160712200202.7496445e@recife.lan>
+References: <1464096493-13378-1-git-send-email-k.kozlowski@samsung.com>
+ <1464096493-13378-2-git-send-email-k.kozlowski@samsung.com>
+ <20160712200202.7496445e@recife.lan>
+Message-ID: <1468417588.2867.6.camel@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Thanks for the suggestion.
-> I think except patch 2 (mmc: sdhci-esdhc-imx: remove SDHCI_QUIRK_BROKEN_TIMEOUT_VAL)
-> which is only a one line change, all others are good to be cherry-picked
-> into stable.
+Le mardi 12 juillet 2016 ? 20:02 -0300, Mauro Carvalho Chehab a ?crit?:
+> I suspect that you'll be applying this one via DRM tree, so:
+> 
+> Em Tue, 24 May 2016 15:28:13 +0200
+> Krzysztof Kozlowski <k.kozlowski@samsung.com> escreveu:
+> 
+> > Remove the old non-DRM driver because it is now entirely supported
+> by
+> > exynos_drm_g2d driver.
+> >?
+> > Cc: Kyungmin Park <kyungmin.park@samsung.com>
+> > Cc: Kamil Debski <k.debski@samsung.com>
+> > Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> 
+> Acked-by: Mauro Carvalho Chehab <mchehab@s-opensource.com>
+> 
+> PS.: If you prefer to apply this one via my tree, I'm ok too. Just
+> let me know when the first patch gets merged upstream.
 
-You need to be very explicit about what you want going into
-stable. Otherwise none of them will end up in stable.
+Just a note that this is effectively an API break.
 
-Documentation/SubmittingPatches says you should include a Fixes: tag
-in each patch indicating when the bug you are fixing was added to the
-kernel. You should also be including Cc: stable at vger.kernel.org.
-
-	Andrew
+cheers,
+Nicolas
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160713/9e2fa231/attachment.sig>
