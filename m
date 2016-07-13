@@ -1,139 +1,52 @@
-From: fu.wei@linaro.org (fu.wei at linaro.org)
-Date: Thu, 14 Jul 2016 01:53:22 +0800
-Subject: [PATCH v7 9/9] acpi/arm64: Add SBSA Generic Watchdog support in GTDT
- driver
-In-Reply-To: <1468432402-4872-1-git-send-email-fu.wei@linaro.org>
-References: <1468432402-4872-1-git-send-email-fu.wei@linaro.org>
-Message-ID: <1468432402-4872-10-git-send-email-fu.wei@linaro.org>
+From: seanpaul@chromium.org (Sean Paul)
+Date: Wed, 13 Jul 2016 10:56:58 -0700
+Subject: [PATCH 1/2] drm/sun4i: Remove redundant call to
+ drm_connector_unregister_all()
+In-Reply-To: <1468427947-28037-1-git-send-email-chris@chris-wilson.co.uk>
+References: <1468427947-28037-1-git-send-email-chris@chris-wilson.co.uk>
+Message-ID: <CAOw6vbLmOd_pPD9sRODweNS347vhZJhBckashKuoG5ekro9BbQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fu Wei <fu.wei@linaro.org>
+On Wed, Jul 13, 2016 at 9:39 AM, Chris Wilson <chris@chris-wilson.co.uk> wrote:
+> drm_connector_unregister_all() is automatically called by
+> drm_dev_unregister() and so the manual call can be dropped.
+>
 
-This driver adds support for parsing SBSA Generic Watchdog timer
-in GTDT, parse all info in SBSA Generic Watchdog Structure in GTDT,
-and creating a platform device with that information.
+The documentation for drm_connector_unregister_all says "Drivers
+should call this [...] right before calling drm_dev_unregister()". If
+this is no longer true, could you update that comment as part of this
+series?
 
-This allows the operating system to obtain device data from the
-resource of platform device. The platform device named "sbsa-gwdt"
-can be used by the ARM SBSA Generic Watchdog driver.
+Sean
 
-Signed-off-by: Fu Wei <fu.wei@linaro.org>
-Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
----
- drivers/acpi/arm64/acpi_gtdt.c | 83 ++++++++++++++++++++++++++++++++++++++++++
- drivers/watchdog/Kconfig       |  1 +
- 2 files changed, 84 insertions(+)
-
-diff --git a/drivers/acpi/arm64/acpi_gtdt.c b/drivers/acpi/arm64/acpi_gtdt.c
-index ff62953..eb3edac 100644
---- a/drivers/acpi/arm64/acpi_gtdt.c
-+++ b/drivers/acpi/arm64/acpi_gtdt.c
-@@ -15,6 +15,7 @@
- #include <linux/init.h>
- #include <linux/kernel.h>
- #include <linux/module.h>
-+#include <linux/platform_device.h>
- 
- #include <clocksource/arm_arch_timer.h>
- 
-@@ -258,3 +259,85 @@ int __init gtdt_arch_timer_mem_init(struct gt_block_data *data)
- 
- 	return index;
- }
-+
-+/*
-+ * Initialize a SBSA generic Watchdog platform device info from GTDT
-+ */
-+static int __init gtdt_import_sbsa_gwdt(void *platform_timer, int index)
-+{
-+	struct platform_device *pdev;
-+	struct acpi_gtdt_watchdog *wd = platform_timer;
-+	int irq = map_generic_timer_interrupt(wd->timer_interrupt,
-+					      wd->timer_flags);
-+	int no_irq = 1;
-+
-+	/*
-+	 * According to SBSA specification the size of refresh and control
-+	 * frames of SBSA Generic Watchdog is SZ_4K(Offset 0x000 ? 0xFFF).
-+	 */
-+	struct resource res[] = {
-+		DEFINE_RES_MEM(wd->control_frame_address, SZ_4K),
-+		DEFINE_RES_MEM(wd->refresh_frame_address, SZ_4K),
-+		DEFINE_RES_IRQ(irq),
-+	};
-+
-+	pr_debug("a Watchdog GT(0x%llx/0x%llx gsi:%u flags:0x%x).\n",
-+		 wd->refresh_frame_address, wd->control_frame_address,
-+		 wd->timer_interrupt, wd->timer_flags);
-+
-+	if (!(wd->refresh_frame_address && wd->control_frame_address)) {
-+		pr_err(FW_BUG "failed getting the Watchdog GT frame addr.\n");
-+		return -EINVAL;
-+	}
-+
-+	if (!wd->timer_interrupt)
-+		pr_warn(FW_BUG "failed getting the Watchdog GT GSIV.\n");
-+	else if (irq <= 0)
-+		pr_warn("failed to map the Watchdog GT GSIV.\n");
-+	else
-+		no_irq = 0;
-+
-+	/*
-+	 * Add a platform device named "sbsa-gwdt" to match the platform driver.
-+	 * "sbsa-gwdt": SBSA(Server Base System Architecture) Generic Watchdog
-+	 * The platform driver (like drivers/watchdog/sbsa_gwdt.c)can get device
-+	 * info below by matching this name.
-+	 */
-+	pdev = platform_device_register_simple("sbsa-gwdt", index, res,
-+					       ARRAY_SIZE(res) - no_irq);
-+	if (IS_ERR(pdev)) {
-+		acpi_unregister_gsi(wd->timer_interrupt);
-+		return PTR_ERR(pdev);
-+	}
-+
-+	return 0;
-+}
-+
-+static int __init gtdt_sbsa_gwdt_init(void)
-+{
-+	struct acpi_table_header *table;
-+	void *platform_timer;
-+	int index = 0;
-+
-+	if (acpi_disabled)
-+		return 0;
-+
-+	if (ACPI_FAILURE(acpi_get_table(ACPI_SIG_GTDT, 0, &table)))
-+		return -EINVAL;
-+
-+	if (acpi_gtdt_desc_init(table) < 0)
-+		return -EINVAL;
-+
-+	for_each_platform_timer(platform_timer) {
-+		if (is_watchdog(platform_timer) &&
-+		    !gtdt_import_sbsa_gwdt(platform_timer, index))
-+			index++;
-+	}
-+
-+	if (index)
-+		pr_info("found %d SBSA generic Watchdog.\n", index);
-+
-+	return 0;
-+}
-+
-+device_initcall(gtdt_sbsa_gwdt_init);
-diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
-index b4b3e25..105f059 100644
---- a/drivers/watchdog/Kconfig
-+++ b/drivers/watchdog/Kconfig
-@@ -207,6 +207,7 @@ config ARM_SBSA_WATCHDOG
- 	depends on ARM64
- 	depends on ARM_ARCH_TIMER
- 	select WATCHDOG_CORE
-+	select ACPI_GTDT if ACPI
- 	help
- 	  ARM SBSA Generic Watchdog has two stage timeouts:
- 	  the first signal (WS0) is for alerting the system by interrupt,
--- 
-2.5.5
+> Signed-off-by: Chris Wilson <chris@chris-wilson.co.uk>
+> Cc: Daniel Vetter <daniel.vetter@ffwll.ch>
+> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Cc: David Airlie <airlied@linux.ie>
+> Cc: Chen-Yu Tsai <wens@csie.org>
+> Cc: dri-devel at lists.freedesktop.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> ---
+>  drivers/gpu/drm/sun4i/sun4i_drv.c | 1 -
+>  1 file changed, 1 deletion(-)
+>
+> diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.c b/drivers/gpu/drm/sun4i/sun4i_drv.c
+> index 4dc543e1db10..7092daaf6c43 100644
+> --- a/drivers/gpu/drm/sun4i/sun4i_drv.c
+> +++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
+> @@ -185,7 +185,6 @@ static void sun4i_drv_unbind(struct device *dev)
+>  {
+>         struct drm_device *drm = dev_get_drvdata(dev);
+>
+> -       drm_connector_unregister_all(drm);
+>         drm_dev_unregister(drm);
+>         drm_kms_helper_poll_fini(drm);
+>         sun4i_framebuffer_free(drm);
+> --
+> 2.8.1
+>
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
