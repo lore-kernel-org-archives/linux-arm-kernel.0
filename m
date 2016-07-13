@@ -1,47 +1,104 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed, 13 Jul 2016 14:24:19 -0700
-Subject: [PATCH] arm64: Add Broadcom Set Top Box Kconfig entry point
-In-Reply-To: <5784B300.2000308@arm.com>
-References: <1467229774-20738-1-git-send-email-mmayer@broadcom.com>
- <5784B300.2000308@arm.com>
-Message-ID: <5786B183.2010007@gmail.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Wed, 13 Jul 2016 17:34:22 -0400
+Subject: [PATCH V8 7/9] vfio, platform: make reset driver a requirement by
+ default
+In-Reply-To: <20160713145551.2e544361@t450s.home>
+References: <1466437879-32182-1-git-send-email-okaya@codeaurora.org>
+ <1466437879-32182-8-git-send-email-okaya@codeaurora.org>
+ <20160623125955.647008cb@t450s.home>
+ <4d95e48a-b5a1-c3eb-8aed-ddd307e1b028@codeaurora.org>
+ <20160713145551.2e544361@t450s.home>
+Message-ID: <bb0bb137-a371-ca00-43fc-3c47051243a1@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/12/2016 02:06 AM, Sudeep Holla wrote:
+On 7/13/2016 4:55 PM, Alex Williamson wrote:
+> On Wed, 13 Jul 2016 16:12:35 -0400
+> Sinan Kaya <okaya@codeaurora.org> wrote:
 > 
+>> On 6/23/2016 2:59 PM, Alex Williamson wrote:
+>>>>>  static struct resource *get_platform_resource(struct vfio_platform_device *vdev,
+>>>>> @@ -66,6 +70,7 @@ static int vfio_platform_probe(struct platform_device *pdev)
+>>>>>  	vdev->get_resource = get_platform_resource;
+>>>>>  	vdev->get_irq = get_platform_irq;
+>>>>>  	vdev->parent_module = THIS_MODULE;
+>>>>> +	vdev->reset_required = reset_required;  
+>>>
+>>> Do you see value in making the global reset_required changeable, with
+>>> the behavior of any given device dependent on the setting of this
+>>> variable at the time of probe?  It seems like a bit of a support issue
+>>> to me.  Also, we're breaking existing users if there are any with this
+>>> change.  Should we introduce a CONFIG option to set the default?  I
+>>> think we can get away with changing the default that way, but I'm not
+>>> so sure otherwise.
+>>>   
+>>
+>> We have two groups of existing users.
+>>
+>> 1. AMBA based drivers
+>> 2. DT based drivers
+>>
+>> and now we are trying to add the ACPI based drivers in this series.
+>>
+>> The AMBA based drivers do not have reset function implemented. Based on
+>> previous conversation with Eric, these devices were mostly used for
+>> bringing up the VFIO framework and were not intended for production. 
+>> If we want to maintain existing functionality, I can change reset_required to
+>> false by default for the AMBA based drivers.
 > 
-> On 29/06/16 20:49, Markus Mayer wrote:
->> From: Florian Fainelli <f.fainelli@gmail.com>
->>
->> Add an ARCH_BRCMSTB Kconfig symbol which allows us not to update the
->> dependencies for all STB-related drivers. Select BRCMSTB_L2_IRQ and
->> GENERIC_IRQ_CHIP which are required for proper functioning.
->>
->> Signed-off-by: Doug Berger <opendmb@gmail.com>
->> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
->> Signed-off-by: Markus Mayer <mmayer@broadcom.com>
->> ---
->>
->>   arch/arm64/Kconfig.platforms | 7 +++++++
->>   1 file changed, 7 insertions(+)
->>
->> diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
->> index 7ef1d05..22b5c7f 100644
->> --- a/arch/arm64/Kconfig.platforms
->> +++ b/arch/arm64/Kconfig.platforms
->> @@ -29,6 +29,13 @@ config ARCH_BERLIN
->>       help
->>         This enables support for Marvell Berlin SoC Family
->>
->> +config ARCH_BRCMSTB
->> +    bool "Broadcom Set-Top-Box SoCs"
->> +    select BRCMSTB_L2_IRQ
+> I think we need to consider them to be in production at this point, so
+> probably better to make such a change.
+>  
+>> The DT based drivers all have reset functions implemented. They shouldn't be
+>> impacted by the reset_required flag. 
 > 
-> I see that BRCMSTB_L2_IRQ selects GENERIC_IRQ_CHIP already so the below
-> one is redundant, generally irqchip code should select GENERIC_IRQ_CHIP
+> Ok, so we're fine there.
+> 
+>> The reset_required flag is again useful for testing purposes when the reset
+>> driver is broken or the ACPI _RST method is missing.
+> 
+> I don't doubt that, but it doesn't need to be mode 644 for that, which
+> allows changing the default dynamically.  We could make it 444 so that
+> it can be set at module load time and not modified.  I just don't want
+> to try to guess the state of that variable at the time the device was
+> probed.
 
-Thanks, I applied a fix in place which removes the select
-GENERIC_IRQ_CHIP since it is redundant.
+OK. I'll change it to 444.
+
+> 
+>> The previously agreed approach was to force the reset required by default
+>> for production environment and be able to clear it for testing purposes.
+>> When I was implementing HIDMA, I never realized that I needed a reset driver
+>> until Arnd told me during the review. We want to avoid this for the long
+>> term for DT and ACPI based implementations.
+> 
+> I agree, but we don't need to make it dynamically changeable for that.
+> Also, nothing prevents us from printing a warning when a device is
+> probed w/o a reset function, it's just a matter of whether that causes
+> a probe failure or a complain and continue.
+> 
+>> The reset_required command line parameter would be useful if somebody suspects
+>> that the ACPI _RST implementation is broken or the DT based reset driver is
+>> broken or you quickly want to test the virtualization without having a reset
+>> driver ready yet.
+>>
+>> Let us know which way you want to go. I can also add a Kconfig option and
+>> set it by default. But then I have to recompile the kernel when I want to
+>> test without the reset stuff.
+> 
+> Seems like we don't need a Kconfig, but I don't see why the option
+> needs to be settable except at module load time and we can complain
+> either way to clue in developers and catch such things in testing.
+> Thanks,
+
+OK. 
+
+> 
+> Alex
+> 
+
+
 -- 
-Florian
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
