@@ -1,62 +1,58 @@
-From: atull@opensource.altera.com (atull)
-Date: Wed, 13 Jul 2016 09:47:03 -0500
-Subject: [PATCH 2/2] fpga-manager: Add Socfpga Arria10 support
-In-Reply-To: <20160712222029.GW1041@n2100.armlinux.org.uk>
-References: <20160712190709.5964-1-atull@opensource.altera.com>
- <20160712190709.5964-3-atull@opensource.altera.com>
- <CAAtXAHfSBzLisqBgF4Vry0vrcL3+DB4b1ctMOrTdOq5ue4D7JQ@mail.gmail.com>
- <20160712222029.GW1041@n2100.armlinux.org.uk>
-Message-ID: <alpine.DEB.2.02.1607130944410.10735@linuxheads99>
+From: dan.carpenter@oracle.com (Dan Carpenter)
+Date: Wed, 13 Jul 2016 17:54:05 +0300
+Subject: [bug report] ARM: pxa: use generic gpio operation instead of gpio
+ register
+Message-ID: <20160713145405.GA28563@mwanda>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 12 Jul 2016, Russell King - ARM Linux wrote:
+Hello Haojian Zhuang,
 
-> On Tue, Jul 12, 2016 at 02:31:05PM -0700, Moritz Fischer wrote:
-> > On Tue, Jul 12, 2016 at 12:07 PM, Alan Tull <atull@opensource.altera.com> wrote:
-> > > +       priv->clk = devm_clk_get(dev, NULL);
-> > > +       if (IS_ERR(priv->clk)) {
-> > > +               dev_err(dev, "no clock specified\n");
-> > > +               return PTR_ERR(priv->clk);
-> > > +       }
-> > > +
-> > > +       ret = clk_prepare_enable(priv->clk);
-> > > +       if (ret) {
-> > > +               dev_err(dev, "could not enable clock\n");
-> > > +               clk_put(priv->clk);
-> > 
-> > Seen that you used devm_clk_get() is this one necessary?
-> 
-> That's actually a bug.
+The patch 9bf448c66d4b: "ARM: pxa: use generic gpio operation instead
+of gpio register" from Oct 17, 2011, leads to the following static
+checker warning:
 
-Yes, it's wrong.  And not needed anyway.
+  arch/arm/mach-pxa/spitz_pm.c:172 spitz_charger_wakeup()
+  warn: double left shift '!gpio_get_value(SPITZ_GPIO_KEY_INT) << (1 << ((SPITZ_GPIO_KEY_INT) & 31))'
 
->  Never clk_put() a devm_clk_get()'d clock.
-> devm_clk_put() is what you want if provided.  However, I think
-> this clk_put() call is useless here.
-> 
-> > > +static int socfpga_a10_fpga_remove(struct platform_device *pdev)
-> > > +{
-> > > +       struct fpga_manager *mgr = platform_get_drvdata(pdev);
-> > > +       struct a10_fpga_priv *priv = mgr->priv;
-> > > +
-> > > +       fpga_mgr_unregister(&pdev->dev);
-> > > +       clk_disable_unprepare(priv->clk);
-> > > +       clk_put(priv->clk);
-> > 
-> > Same here, if needed at all shouldn't it be devm_clk_put() ?
-> 
-> And also useless here, as the whole point of the devm_* stuff is to
-> clean up the resources that were claimed on probe failure or when
-> the device is unbound from its driver.
+  arch/arm/mach-pxa/corgi_pm.c:138 corgi_charger_wakeup()
+  warn: double left shift '!gpio_get_value(CORGI_GPIO_AC_IN) << (1 << ((CORGI_GPIO_AC_IN) & 31))'
 
-Thanks for pointing this out.  I'll take out the clk_put's.
+  arch/arm/mach-pxa/corgi_pm.c:140 corgi_charger_wakeup()
+  warn: double left shift '!gpio_get_value(CORGI_GPIO_KEY_INT) << (1 << ((CORGI_GPIO_KEY_INT) & 31))'
 
-Alan
+  arch/arm/mach-pxa/corgi_pm.c:142 corgi_charger_wakeup()
+  warn: double left shift '!gpio_get_value(CORGI_GPIO_WAKEUP) << (1 << ((CORGI_GPIO_WAKEUP) & 31))'
 
-> 
-> -- 
-> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-> FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-> according to speedtest.net.
-> 
+arch/arm/mach-pxa/spitz_pm.c
+   168  static unsigned long spitz_charger_wakeup(void)
+   169  {
+   170          unsigned long ret;
+   171          ret = ((!gpio_get_value(SPITZ_GPIO_KEY_INT)
+   172                  << GPIO_bit(SPITZ_GPIO_KEY_INT))
+                           ^^^^^^^^
+We're double shifting here.  It's clearly wrong, but I'm not sure what
+the correct thing would be.
+
+   173                  | gpio_get_value(SPITZ_GPIO_SYNC));
+   174          return ret;
+   175  }
+
+arch/arm/mach-pxa/corgi_pm.c
+   134  static unsigned long corgi_charger_wakeup(void)
+   135  {
+   136          unsigned long ret;
+   137  
+   138          ret = (!gpio_get_value(CORGI_GPIO_AC_IN) << GPIO_bit(CORGI_GPIO_AC_IN))
+                                                            ^^^^^^^^
+   139                  | (!gpio_get_value(CORGI_GPIO_KEY_INT)
+   140                  << GPIO_bit(CORGI_GPIO_KEY_INT))
+                           ^^^^^^^^
+   141                  | (!gpio_get_value(CORGI_GPIO_WAKEUP)
+   142                  << GPIO_bit(CORGI_GPIO_WAKEUP));
+                           ^^^^^^^^^
+   143          return ret;
+   144  }
+
+regards,
+dan carpenter
