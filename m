@@ -1,34 +1,113 @@
 From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
-Date: Wed, 13 Jul 2016 12:25:37 +0200
-Subject: [PATCH v3 0/2] ASoC: add driver for Atmel I2S controller
-Message-ID: <cover.1468405019.git.cyrille.pitchen@atmel.com>
+Date: Wed, 13 Jul 2016 12:25:38 +0200
+Subject: [PATCH v3 1/2] ASoC: atmel-i2s: add DT bindings for I2S controller
+In-Reply-To: <cover.1468405019.git.cyrille.pitchen@atmel.com>
+References: <cover.1468405019.git.cyrille.pitchen@atmel.com>
+Message-ID: <901eec0b7edfa488ff735e7057fbc25ea8dc59f7.1468405019.git.cyrille.pitchen@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series of patches adds support to the new Atmel I2S controller
-embedded on sama5d2 SoCs.
+This patch adds DT bindings for the new Atmel I2S controller embedded
+inside sama5d2x SoCs.
 
-ChangeLog
-
-v2 -> v3
-- fix the coding style, add some more comments and add a section dedicated
-  to sama5d2 SoCs in the DT binding documentation as suggested by Mark
-  Brown.
-
-v1 -> v2
-- initialize dev->dev before calling dev->caps->mck_init()
-
-Cyrille Pitchen (2):
-  ASoC: atmel-i2s: add DT bindings for I2S controller
-  ASoC: atmel-i2s: add driver for the new Atmel I2S controller
-
- .../devicetree/bindings/sound/atmel-i2s.txt        |  87 +++
- sound/soc/atmel/Kconfig                            |   9 +
- sound/soc/atmel/Makefile                           |   2 +
- sound/soc/atmel/atmel-i2s.c                        | 770 +++++++++++++++++++++
- 4 files changed, 868 insertions(+)
+Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+---
+ .../devicetree/bindings/sound/atmel-i2s.txt        | 87 ++++++++++++++++++++++
+ 1 file changed, 87 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/sound/atmel-i2s.txt
- create mode 100644 sound/soc/atmel/atmel-i2s.c
 
+diff --git a/Documentation/devicetree/bindings/sound/atmel-i2s.txt b/Documentation/devicetree/bindings/sound/atmel-i2s.txt
+new file mode 100644
+index 000000000000..25dcb32314bf
+--- /dev/null
++++ b/Documentation/devicetree/bindings/sound/atmel-i2s.txt
+@@ -0,0 +1,87 @@
++* Atmel I2S controller
++
++Required properties:
++- compatible:     Should be "atmel,sama5d2-i2s".
++- reg:            Should be the physical base address of the controller and the
++                  length of memory mapped region.
++- interrupts:     Should contain the interrupt for the controller.
++- dmas:           Should be a list of pairs of DMA controller phandle and flags.
++- dma-names:      Should be a list of DMA channel name among "rx", "tx" or
++                  "rx-tx".
++- clocks:         Should be a list of phandles of clocks used by the controller
++                  (1).
++- clock-names:    Should be a list matching the clocks phandles list:
++                  - "pclk" (peripheral clock) Required.
++                  - "gclk" (generated clock) Optional (1).
++                  - "aclk" (Audio PLL clock) Optional (1).
++
++Optional properties:
++- pinctrl-0:      Should specify pin control groups used for this controller.
++- princtrl-names: Should contain only one value - "default".
++
++
++(1) : Only the peripheral clock is required. The generated clock and the Audio
++      PLL clock are optional and should only be set together.
++
++Example:
++
++	i2s at f8050000 {
++		compatible = "atmel,sama5d2-i2s";
++		reg = <0xf8050000 0x300>;
++		interrupts = <54 IRQ_TYPE_LEVEL_HIGH 7>;
++		dmas = <&dma0
++			(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1) |
++			 AT91_XDMAC_DT_PERID(31))>,
++		       <&dma0
++			(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1) |
++			 AT91_XDMAC_DT_PERID(32))>;
++		dma-names = "tx", "rx";
++		clocks = <&i2s0_clk>, <&i2s0_gclk>, <&audio_pll_pmc>;
++		clock-names = "pclk", "gclk", "aclk";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_i2s0_default>;
++	};
++
++
++sama5d2 SoCs only:
++
++When the I2S controller is configured as a master, it generates the master,
++bitrate and frame clocks from a PMC input clock. This PMC input clock can be
++either the I2S peripheral clock or the I2S generated clock.
++The generated clock can reach higher frequencies and is more suited for audio
++applications hence should be preferred to the peripheral clock.
++The I2SCLKSEL register of the Special Function Register (SFR) is used to select
++the relevant PMC input clock: bit0 selects the input clock for I2S controller 0
++whereas bit1 selects the input clock for I2S controller 1.
++
++Aliases are used in the device-tree to retrieve the index of each I2S controller
++so the right bit can be updated in the I2SCLKSEL register.
++
++Finally, the SFR itself is handled by the generic syscon driver.
++Its "compatible" DT property must contain the "atmel,sama5d2-sfr" string so the
++I2S controller driver (and likely other drivers) can find the SFR node when
++needed.
++
++aliases {
++	i2s0 = &i2s0;
++	i2s1 = &i2s1;
++};
++
++...
++
++ahb {
++	apb {
++		sfr at f8030000 {
++			compatible = "atmel,sama5d2-sfr", "syscon";
++			reg = <0xf8030000 0x98>;
++		};
++
++		i2s0: i2s at f8050000 {
++			...
++		};
++
++		i2s1: i2s at fc04c000 {
++			...
++		};
++	};
++};
 -- 
 1.8.2.2
