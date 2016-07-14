@@ -1,41 +1,46 @@
-From: ralf@ramses-pyramidenbau.de (Ralf Ramsauer)
-Date: Thu, 14 Jul 2016 18:48:57 +0200
-Subject: [PATCH] ARM: tegra: fix erroneous address in dts
-Message-ID: <1468514937-23250-1-git-send-email-ralf@ramses-pyramidenbau.de>
+From: stillcompiling@gmail.com (Joshua Clayton)
+Date: Thu, 14 Jul 2016 10:01:12 -0700
+Subject: [PATCH v5 3/3] clk: imx6: Fix procedure to switch the parent of
+ LDB_DI_CLK
+In-Reply-To: <1468235521-3163-3-git-send-email-p.zabel@pengutronix.de>
+References: <1468235521-3163-1-git-send-email-p.zabel@pengutronix.de>
+ <1468235521-3163-3-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <5787C558.5060904@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-c90bb7b enabled the high speed UARTs of the Jetson TK1. The address
-specification inside the dts is wrong. Fix it and use the correct
-address.
+Hi Philipp,
+My team is testing this morning on a board that exhibits
+intermittent lvds failures that seem to match this problem.
+(black screen and a "dc stop timeout" message in the kernel log)
+With this patch set, the screen failed to come up on the second boot :(
+But...
+On 07/11/2016 04:12 AM, Philipp Zabel wrote:
+> +static void init_ldb_clks(struct device_node *np, void __iomem *ccm_base)
+> +{
+> +	unsigned int reg;
+> +	unsigned int sel[2][4];
+> +	int i;
+> +
+to feel confident the new code was running, one of our engineers added the line
+        pr_warn("ccm: In init_ldb_clks\n");
+right here.
+> +	reg = readl_relaxed(ccm_base + CCM_CS2CDR);
+> +	sel[0][0] = (reg >> CS2CDR_LDB_DI0_CLK_SEL_SHIFT) & 7;
+> +	sel[1][0] = (reg >> CS2CDR_LDB_DI1_CLK_SEL_SHIFT) & 7;
+> +
+> +	sel[0][3] = sel[0][2] = sel[0][1] = sel[0][0];
+> +	sel[1][3] = sel[1][2] = sel[1][1] = sel[1][0];
+> +
+> +	of_assigned_ldb_sels(np, &sel[0][3], &sel[1][3]);
+>
+...
 
-Fixes: c90bb7b9b9 ("ARM: tegra: Add high speed UARTs to Jetson TK1 device tree")
-Signed-off-by: Ralf Ramsauer <ralf@ramses-pyramidenbau.de>
----
- arch/arm/boot/dts/tegra124-jetson-tk1.dts | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+We have now booted that same board successfully about 30 times
+with your patches plus the extra printf .?!??
 
-diff --git a/arch/arm/boot/dts/tegra124-jetson-tk1.dts b/arch/arm/boot/dts/tegra124-jetson-tk1.dts
-index 941f362..f4d8125 100644
---- a/arch/arm/boot/dts/tegra124-jetson-tk1.dts
-+++ b/arch/arm/boot/dts/tegra124-jetson-tk1.dts
-@@ -1386,7 +1386,7 @@
- 	 *   Pin 41: BR_UART1_TXD
- 	 *   Pin 44: BR_UART1_RXD
- 	 */
--	serial at 70006000 {
-+	serial at 0,70006000 {
- 		compatible = "nvidia,tegra124-hsuart", "nvidia,tegra30-hsuart";
- 		status = "okay";
- 	};
-@@ -1398,7 +1398,7 @@
- 	 *   Pin 71: UART2_CTS_L
- 	 *   Pin 74: UART2_RTS_L
- 	 */
--	serial at 70006040 {
-+	serial at 0,70006040 {
- 		compatible = "nvidia,tegra124-hsuart", "nvidia,tegra30-hsuart";
- 		status = "okay";
- 	};
--- 
-2.7.3
+Not sure what that means in terms of delay and synchronization, so
+even though we are not finished testing I thought I should post that result.
+
+Thanks,
+Joshua Clayton
