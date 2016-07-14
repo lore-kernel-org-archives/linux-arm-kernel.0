@@ -1,49 +1,31 @@
-From: ttnguyen@apm.com (Tai Tri Nguyen)
-Date: Thu, 14 Jul 2016 11:05:48 -0700
-Subject: [PATCH v9 3/4] perf: xgene: Add APM X-Gene SoC Performance
- Monitoring Unit driver
-In-Reply-To: <CACgAJHwzWG_6iWG4OcL3v5QcUF892DwBcJxayqbH4f2kd7=kQQ@mail.gmail.com>
-References: <1468517266-1642-1-git-send-email-ttnguyen@apm.com>
- <1468517266-1642-4-git-send-email-ttnguyen@apm.com>
- <1468518428.8745.43.camel@perches.com>
- <CACgAJHwzWG_6iWG4OcL3v5QcUF892DwBcJxayqbH4f2kd7=kQQ@mail.gmail.com>
-Message-ID: <CACgAJHw7UMFKY=j8UBKUi=hNHfyzVoNMr_A5qOahhbgM+14KBQ@mail.gmail.com>
+From: jeremy.linton@arm.com (Jeremy Linton)
+Date: Thu, 14 Jul 2016 13:07:30 -0500
+Subject: [PATCH] arm64: Add config to limit user space to 47bits
+In-Reply-To: <e24481b9-fb6a-aead-a72b-43b7d561b940@suse.de>
+References: <1468424567-15925-1-git-send-email-agraf@suse.de>
+ <CAKv+Gu_QH=sZi--FVqHebd1P+6UMzEqWQQ1u3Y170B7cND8Kgw@mail.gmail.com>
+ <578668D3.6010406@suse.de> <20160714010812.GA17138@e103986-lin>
+ <837E6456-4718-45D7-8EE7-E28E11DB8BD3@suse.de>
+ <VI1PR0801MB1423AC2E8EDEE7EA33A6233196320@VI1PR0801MB1423.eurprd08.prod.outlook.com>
+ <e24481b9-fb6a-aead-a72b-43b7d561b940@suse.de>
+Message-ID: <e48483fc-8dda-3fe2-c3fe-46b93aa41973@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joe,
-
-On Thu, Jul 14, 2016 at 10:54 AM, Tai Tri Nguyen <ttnguyen@apm.com> wrote:
-> Hi Joe,
+On 07/14/2016 02:14 AM, Alexander Graf wrote:
 >
-> On Thu, Jul 14, 2016 at 10:47 AM, Joe Perches <joe@perches.com> wrote:
->> On Thu, 2016-07-14 at 10:27 -0700, Tai Nguyen wrote:
->>> This patch adds a driver for the SoC-wide (AKA uncore) PMU hardware
->>> found in APM X-Gene SoCs.
+> On 14.07.16 09:03, Zheng Xu wrote:
+>> LuaJIT also fix the 48VA issue by allocating heap memory below 47 bits.
 >>
->> trivia:
->>
->>> diff --git a/drivers/perf/xgene_pmu.c b/drivers/perf/xgene_pmu.c
->> []
->>> +struct xgene_pmu_dev_ctx {
->>> +     char *name;
->>> +     struct list_head next;
->>> +     struct xgene_pmu_dev *pmu_dev;
->>> +     struct hw_pmu_info inf;
->>> +};
->>
->> Probably better to use something like
->>         char    name[20];
->> as the kasprintf can fail and this doesn't
->> seem to be freed anywhere.
+>> For mozjs issue, if there are pointers to .rodata, it can be a problem. Does it happen on master and do we have any case to reproduce the issue so that I can take a look?
 >
-> Okay. I'll fix it shortly.
->
+> mozjs is fixed with your patch. I backported it to all of the ancient
+> versions of mozjs, so we're probably good there. Though every distro
+> will have to redo that work in their own trees, because older versions
+> of mozjs are no longer maintained upstream. If you want to be a hero,
+> you can try to port polkitd and gnome to use more recent versions of
+> mozjs ;). Or maybe they can already and we just messed up packaging.
 
-I take it back.
-I refer many other drivers using kasprintf and they do the same way I do.
-Can you please check it again?
 
-Thanks,
--- 
-Tai
+I have a polkit built against mozjs45, getting it to work on the other 
+hand is the yak of the day...
