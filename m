@@ -1,139 +1,83 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 14 Jul 2016 17:33:00 +0100
-Subject: [PATCH v9 15/17] KVM: arm64: implement ITS command queue
- command handlers
-In-Reply-To: <ef296d17-c24e-142a-761f-cf9ae0f44be5@arm.com>
-References: <20160713015909.28793-1-andre.przywara@arm.com>
- <20160713015909.28793-16-andre.przywara@arm.com> <57876B90.9050905@arm.com>
- <ef296d17-c24e-142a-761f-cf9ae0f44be5@arm.com>
-Message-ID: <20160714173300.0ae8618e@arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 14 Jul 2016 17:32:52 +0100
+Subject: Applied "spi: s3c64xx: use error code from clk_prepare_enable()" to
+ the spi tree
+In-Reply-To: <1467989201-14661-5-git-send-email-andi.shyti@samsung.com>
+Message-ID: <E1bNjZE-0001mT-Vp@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/07/16 16:35, Andre Przywara wrote:
-> Hi Marc,
-> 
-> On 14/07/16 11:38, Marc Zyngier wrote:
->> On 13/07/16 02:59, Andre Przywara wrote:
->>> The connection between a device, an event ID, the LPI number and the
->>> associated CPU is stored in in-memory tables in a GICv3, but their
->>> format is not specified by the spec. Instead software uses a command
->>> queue in a ring buffer to let an ITS implementation use its own
->>> format.
->>> Implement handlers for the various ITS commands and let them store
->>> the requested relation into our own data structures. Those data
->>> structures are protected by the its_lock mutex.
->>> Our internal ring buffer read and write pointers are protected by the
->>> its_cmd mutex, so that only one VCPU per ITS can handle commands at
->>> any given time.
->>> Error handling is very basic at the moment, as we don't have a good
->>> way of communicating errors to the guest (usually an SError).
->>> The INT command handler is missing from this patch, as we gain the
->>> capability of actually injecting MSIs into the guest only later on.
->>>
->>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
->>> ---
->>>  virt/kvm/arm/vgic/vgic-its.c | 599 ++++++++++++++++++++++++++++++++++++++++++-
->>>  1 file changed, 598 insertions(+), 1 deletion(-)
->>>
->>> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
->>> index 60108f8..28abfcd 100644
->>> --- a/virt/kvm/arm/vgic/vgic-its.c
->>> +++ b/virt/kvm/arm/vgic/vgic-its.c
-> 
-> [...]
-> 
->>>  
->>>  /*
->>> + * Promotes the ITS view of affinity of an ITTE (which redistributor this LPI
->>> + * is targeting) to the VGIC's view, which deals with target VCPUs.
->>> + * Needs to be called whenever either the collection for a LPIs has
->>> + * changed or the collection itself got retargeted.
->>> + */
->>> +static void update_affinity_itte(struct kvm *kvm, struct its_itte *itte)
->>> +{
->>> +	struct kvm_vcpu *vcpu;
->>> +
->>> +	vcpu = kvm_get_vcpu(kvm, itte->collection->target_addr);
->>
->> What happens if the collection hasn't been mapped yet? It is probably
->> worth checking before blindly assigning a NULL pointer, which would
->> corrupt the state set by another ITS.
-> 
-> OK, I can add an "if (!itte->collection) return;" for sanity. But this
-> is an internal function, intended to promote a new mapping to the struct
-> vgic_irqs, so both callers explicitly check for a mapped collection just
-> before calling this function. So This check would be a bit redundant.
-> Shall I instead add a comment documenting the requirement of the
-> collection already being mapped?
+The patch
 
-This is not the way I read it. In vgic_its_cmd_handle_mapi:
+   spi: s3c64xx: use error code from clk_prepare_enable()
 
-	if (!collection) {
-		collection = new_coll;
-		vgic_its_init_collection(its, collection, coll_id);
-	}
+has been applied to the spi tree at
 
-	itte->collection = collection;
-	itte->lpi = lpi_nr;
-	itte->irq = vgic_add_lpi(kvm, lpi_nr);
-	update_affinity_itte(kvm, itte);
+   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/spi.git 
 
-If new_coll has never been mapped, you end up with the exact situation I
-described, and I don't see how you make it work without checking for
-target_addr being a valid vcpu index.
+All being well this means that it will be integrated into the linux-next
+tree (usually sometime in the next 24 hours) and sent to Linus during
+the next merge window (or sooner if it is a bug fix), however if
+problems are discovered then the patch may be dropped or reverted.  
 
-> 
->>> +
->>> +	spin_lock(&itte->irq->irq_lock);
->>> +	itte->irq->target_vcpu = vcpu;
->>> +	spin_unlock(&itte->irq->irq_lock);
->>> +}
-> 
-> [...]
-> 
->>> +
->>> +/*
->>> + * The MAPTI and MAPI commands map LPIs to ITTEs.
->>> + * Must be called with its_lock mutex held.
->>> + */
->>> +static int vgic_its_cmd_handle_mapi(struct kvm *kvm, struct vgic_its *its,
->>> +				    u64 *its_cmd, u8 subcmd)
->>> +{
->>> +	u32 device_id = its_cmd_get_deviceid(its_cmd);
->>> +	u32 event_id = its_cmd_get_id(its_cmd);
->>> +	u32 coll_id = its_cmd_get_collection(its_cmd);
->>> +	struct its_itte *itte;
->>> +	struct its_device *device;
->>> +	struct its_collection *collection, *new_coll = NULL;
->>> +	int lpi_nr;
->>> +
->>> +	device = find_its_device(its, device_id);
->>> +	if (!device)
->>> +		return E_ITS_MAPTI_UNMAPPED_DEVICE;
->>> +
->>> +	collection = find_collection(its, coll_id);
->>
->> Don't you need to check the range of the collection ID, and whether it
->> would fit in the collection table?
-> 
-> We support the full range of 16 bits for the collection ID, and we can't
-> get more than 16 bits out of this field, so it always fits.
-> Does that sound right?
+You may get further e-mails resulting from automated or manual testing
+and review of the tree, please engage with people reporting problems and
+send followup patches addressing any issues that are reported if needed.
 
-Let's try it. Collections are "stored" in the collection table, which
-can contain at most TableSize/EntrySize entries, which is determined by
-how many pages the guest has allocated. Eventually, we'll be able to
-migrate the guest, and will need to write this into the allocated
-memory.
+If any updates are required or you are submitting further changes they
+should be sent as incremental updates against current git, existing
+patches will not be replaced.
 
-To be able to map all 2^16 collections, at 8 bytes per entry, you'd need
-512kB. Linux will only allocate 64kB for example.
-
-So to answer your question: No, this doesn't sound right at all.
+Please add any relevant lists and maintainers to the CCs when replying
+to this mail.
 
 Thanks,
+Mark
 
-	M.
+>From 25981d8281ee4cbbd6f7c5bc0f8c048ad9548037 Mon Sep 17 00:00:00 2001
+From: Andi Shyti <andi.shyti@samsung.com>
+Date: Tue, 12 Jul 2016 19:02:13 +0900
+Subject: [PATCH] spi: s3c64xx: use error code from clk_prepare_enable()
+
+If clk_prepare_enable() fails do not return -EBUSY but use the
+value provided by the function itself.
+
+Suggested-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Signed-off-by: Andi Shyti <andi.shyti@samsung.com>
+Reviewed-by: Michael Turquette <mturquette@baylibre.com>
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Signed-off-by: Mark Brown <broonie@kernel.org>
+---
+ drivers/spi/spi-s3c64xx.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
+index 0a93eb98c2b6..3d21f8a35837 100644
+--- a/drivers/spi/spi-s3c64xx.c
++++ b/drivers/spi/spi-s3c64xx.c
+@@ -1133,9 +1133,9 @@ static int s3c64xx_spi_probe(struct platform_device *pdev)
+ 		goto err_deref_master;
+ 	}
+ 
+-	if (clk_prepare_enable(sdd->clk)) {
++	ret = clk_prepare_enable(sdd->clk);
++	if (ret) {
+ 		dev_err(&pdev->dev, "Couldn't enable clock 'spi'\n");
+-		ret = -EBUSY;
+ 		goto err_deref_master;
+ 	}
+ 
+@@ -1148,9 +1148,9 @@ static int s3c64xx_spi_probe(struct platform_device *pdev)
+ 		goto err_disable_clk;
+ 	}
+ 
+-	if (clk_prepare_enable(sdd->src_clk)) {
++	ret = clk_prepare_enable(sdd->src_clk);
++	if (ret) {
+ 		dev_err(&pdev->dev, "Couldn't enable clock '%s'\n", clk_name);
+-		ret = -EBUSY;
+ 		goto err_disable_clk;
+ 	}
+ 
 -- 
-Jazz is not dead. It just smells funny...
+2.8.1
