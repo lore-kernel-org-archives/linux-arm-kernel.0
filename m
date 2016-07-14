@@ -1,26 +1,145 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 14 Jul 2016 17:54:25 +0200
-Subject: [GIT PULL v2] Second Round of Renesas ARM64 Based SoC DT Updates
- for v4.8
-In-Reply-To: <cover.1467900241.git.horms+renesas@verge.net.au>
-References: <cover.1467900241.git.horms+renesas@verge.net.au>
-Message-ID: <8207439.0JmbbpvM5T@wuerfel>
+From: sstabellini@kernel.org (Stefano Stabellini)
+Date: Thu, 14 Jul 2016 16:55:35 +0100 (BST)
+Subject: [Xen-devel] [PATCH v4] xen/arm: Add a clock property
+In-Reply-To: <86951b96-0a3e-79b1-1a2f-88dfeba9b76b@de.bosch.com>
+References: <1468309605-19522-1-git-send-email-dirk.behme@de.bosch.com>
+ <146836236759.73491.11707389619985827497@resonance>
+ <c320f820-8749-f4a4-435e-ddd9379655b5@de.bosch.com>
+ <alpine.DEB.2.10.1607131941200.26575@sstabellini-ThinkPad-X260>
+ <57868EDE.6060406@gmail.com>
+ <146844380895.73491.4867379517577413421@resonance>
+ <7df784ab-d0c0-939b-393e-214535c4b191@de.bosch.com>
+ <alpine.DEB.2.10.1607141132000.26575@sstabellini-ThinkPad-X260>
+ <86951b96-0a3e-79b1-1a2f-88dfeba9b76b@de.bosch.com>
+Message-ID: <alpine.DEB.2.10.1607141647350.22290@sstabellini-ThinkPad-X260>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, July 7, 2016 4:39:45 PM CEST Simon Horman wrote:
->       arm64: dts: r8a7796: Add SYSC PM Domains
+On Thu, 14 Jul 2016, Dirk Behme wrote:
+> On 14.07.2016 12:38, Stefano Stabellini wrote:
+> > On Thu, 14 Jul 2016, Dirk Behme wrote:
+> > > On 13.07.2016 23:03, Michael Turquette wrote:
+> > > > Quoting Dirk Behme (2016-07-13 11:56:30)
+> > > > > On 13.07.2016 20:43, Stefano Stabellini wrote:
+> > > > > > On Wed, 13 Jul 2016, Dirk Behme wrote:
+> > > > > > > On 13.07.2016 00:26, Michael Turquette wrote:
+> > > > > > > > Quoting Dirk Behme (2016-07-12 00:46:45)
+> > > > > > > > > Clocks described by this property are reserved for use by Xen,
+> > > > > > > > > and
+> > > > > > > > > the OS
+> > > > > > > > > must not alter their state any way, such as disabling or
+> > > > > > > > > gating a
+> > > > > > > > > clock,
+> > > > > > > > > or modifying its rate. Ensuring this may impose constraints on
+> > > > > > > > > parent
+> > > > > > > > > clocks or other resources used by the clock tree.
+> > > > > > > > 
+> > > > > > > > Note that clk_prepare_enable will not prevent the rate from
+> > > > > > > > changing
+> > > > > > > > (clk_set_rate) or a parent from changing (clk_set_parent). The
+> > > > > > > > only
+> > > > > > > > way
+> > > > > > > > to do this currently would be to set the following flags on the
+> > > > > > > > effected
+> > > > > > > > clocks:
+> > > > > > > > 
+> > > > > > > >     CLK_SET_RATE_GATE
+> > > > > > > >     CLK_SET_PARENT_GATE
+> > > > > > > 
+> > > > > > > 
+> > > > > > > 
+> > > > > > > Regarding setting flags, I think we already talked about that. I
+> > > > > > > think
+> > > > > > > the
+> > > > > > > conclusion was that in our case its not possible to manipulate the
+> > > > > > > flags in
+> > > > > > > the OS as this isn't intended to be done in cases like ours.
+> > > > > > > Therefore
+> > > > > > > no API
+> > > > > > > is exported for this.
+> > > > > > > 
+> > > > > > > I.e. if we need to set these flags, we have to do that in Xen
+> > > > > > > where we
+> > > > > > > add the
+> > > > > > > clocks to the hypervisor node in the device tree. And not in the
+> > > > > > > kernel patch
+> > > > > > > discussed here.
+> > > > > > 
+> > > > > > These are internal Linux flags, aren't they?
+> > > > > 
+> > > > > 
+> > > > > I've been under the impression that you can set clock "flags" via the
+> > > > > device tree. Seems I need to re-check that ;)
+> > > > 
+> > > > Right, you cannot set flags from the device tree. Also, setting these
+> > > > flags is done by the clock provider driver, not a consumer. Xen is the
+> > > > consumer.
+> > > 
+> > > 
+> > > Ok, thanks, then I think we can forget about using flags for the issue we
+> > > are
+> > > discussing here.
+> > > 
+> > > Best regards
+> > > 
+> > > Dirk
+> > > 
+> > > P.S.: Would it be an option to merge the v4 patch we are discussing here,
+> > > then? From the discussion until here, it sounds to me that it's the best
+> > > option we have at the moment. Maybe improving it in the future, then.
+> > 
+> > It might be a step in the right direction, but it doesn't really prevent
+> > clk_set_rate from changing properties of a clock owned by Xen.  This
+> > patch is incomplete.
 > 
+> 
+> Let me ask then: Do we have a practical example where it's not sufficient
+> practically?
+> 
+> To my understanding, Xen people have been happy with the "clk_ignore_unused"
+> workaround since ~2 years, now [1]. And I think the "clk_ignore_unused"
+> workaround does mainly the same like the patch discussed here. It doesn't care
+> regarding clk_set_rate from changing properties, too?
 
-While doing some sanity checks on our branch contents, I noticed
-that this commit breaks running "make dtbs" on top of our next/dt64
-branch, and I'd like to avoid that.
+Let me premise that I appreciate what you are trying to achieve with
+this patch and I don't want to feature-creep it.
 
-I found a couple more problems (tegra and meson), and I ended up
-fixing them all up (by merging the dependencies into next/dt64),
-so everything is sorted for 4.8, but it would be good to do a
-'make dtbs' run on a branch that has dt changes before you send it,
-and I'll try to do the same when pulling it to avoid the problem in
-the future.
+However we are defining a new Device Tree binding, one which will have
+to be supported for a long time by both Xen and Linux, so at the very
+least we need to have the full picture. We need to understand if the
+binding if sufficient or if we need something different to solve the
+problem completely.
 
-	Arnd
+Once we understand that, I am happy to accept a partial implementation
+in Linux, as long as it is a step in the right direction. Does it make
+sense?
+
+
+
+> While I agree that the patch theoretically incomplete, if nobody has a real
+> world example I would think that from practical point of view it's sufficient
+> in a first step.
+> 
+> If this is the case, I'd propose to fix the practical issue in a first step
+> with a patch (this one) which is sufficient to fix the issues the Xen users
+> have. And update the code for theoretical future issues in a second step.
+> 
+> Best regards
+> 
+> Dirk
+> 
+> [1] http://bugs.xenproject.org/xen/bug/45
+> 
+> 
+> > We need to understand at least what it would take
+> > to have a complete solution.
+> > 
+> > Michael, do you have any suggestions on how it would be possible to set
+> > CLK_SET_RATE_GATE and CLK_SET_PARENT_GATE for those clocks in a proper
+> > way?
+> > 
+> > Like you wrote, I would imagine it needs to be done by the clock
+> > provider driver. Maybe to do that, it would be easier to have a new
+> > device tree property on the clock node, rather than listing phandle and
+> > clock-specifier pairs under the Xen node?
+> 
