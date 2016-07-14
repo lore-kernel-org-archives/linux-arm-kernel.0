@@ -1,112 +1,166 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Thu, 14 Jul 2016 14:38:33 -0700
-Subject: [PATCH v2 01/11] mm: Implement stack frame object validation
-In-Reply-To: <20160714192351.567fmaz2h4drrxrc@treble>
-References: <1468446964-22213-1-git-send-email-keescook@chromium.org>
- <1468446964-22213-2-git-send-email-keescook@chromium.org>
- <CALCETrVDJDjdoh7yvOPd=_5twQnzQRhe8G2KLaRw-NnA1Uf__g@mail.gmail.com>
- <CAGXu5jLPZiRJx8n3_7GW2bufiuUgE9=c6dQcNxDRPHMU72sD9g@mail.gmail.com>
- <20160714054842.6zal5rqawpgew26r@treble>
- <CAGXu5jLv_pMRqdaM72D_FTQzxoGxgcEqxpvUzqwgjOmZ8D-zSw@mail.gmail.com>
- <20160714192351.567fmaz2h4drrxrc@treble>
-Message-ID: <CAGXu5jJuYDTZX7+tXCxvxdB0k4foO4z1yvejF8fjSWQMFVjksQ@mail.gmail.com>
+From: alex.williamson@redhat.com (Alex Williamson)
+Date: Thu, 14 Jul 2016 15:41:46 -0600
+Subject: [PATCH V9 4/9] vfio: platform: add support for ACPI probe
+In-Reply-To: <1468461995-32676-5-git-send-email-okaya@codeaurora.org>
+References: <1468461995-32676-1-git-send-email-okaya@codeaurora.org>
+ <1468461995-32676-5-git-send-email-okaya@codeaurora.org>
+Message-ID: <20160714154146.38e37d84@t450s.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 14, 2016 at 12:23 PM, Josh Poimboeuf <jpoimboe@redhat.com> wrote:
-> On Thu, Jul 14, 2016 at 11:10:18AM -0700, Kees Cook wrote:
->> On Wed, Jul 13, 2016 at 10:48 PM, Josh Poimboeuf <jpoimboe@redhat.com> wrote:
->> > On Wed, Jul 13, 2016 at 03:04:26PM -0700, Kees Cook wrote:
->> >> On Wed, Jul 13, 2016 at 3:01 PM, Andy Lutomirski <luto@amacapital.net> wrote:
->> >> > On Wed, Jul 13, 2016 at 2:55 PM, Kees Cook <keescook@chromium.org> wrote:
->> >> >> This creates per-architecture function arch_within_stack_frames() that
->> >> >> should validate if a given object is contained by a kernel stack frame.
->> >> >> Initial implementation is on x86.
->> >> >>
->> >> >> This is based on code from PaX.
->> >> >>
->> >> >
->> >> > This, along with Josh's livepatch work, are two examples of unwinders
->> >> > that matter for correctness instead of just debugging.  ISTM this
->> >> > should just use Josh's code directly once it's been written.
->> >>
->> >> Do you have URL for Josh's code? I'd love to see what happening there.
->> >
->> > The code is actually going to be 100% different next time around, but
->> > FWIW, here's the last attempt:
->> >
->> >   https://lkml.kernel.org/r/4d34d452bf8f85c7d6d5f93db1d3eeb4cba335c7.1461875890.git.jpoimboe at redhat.com
->> >
->> > In the meantime I've realized the need to rewrite the x86 core stack
->> > walking code to something much more manageable so we don't need all
->> > these unwinders everywhere.  I'll probably post the patches in the next
->> > week or so.  I'll add you to the CC list.
->>
->> Awesome!
->>
->> > With the new interface I think you'll be able to do something like:
->> >
->> >         struct unwind_state;
->> >
->> >         unwind_start(&state, current, NULL, NULL);
->> >         unwind_next_frame(&state);
->> >         oldframe = unwind_get_stack_pointer(&state);
->> >
->> >         unwind_next_frame(&state);
->> >         frame = unwind_get_stack_pointer(&state);
->> >
->> >         do {
->> >                 if (obj + len <= frame)
->> >                         return blah;
->> >                 oldframe = frame;
->> >                 frame = unwind_get_stack_pointer(&state);
->> >
->> >         } while (unwind_next_frame(&state);
->> >
->> > And then at the end there'll be some (still TBD) way to query whether it
->> > reached the last syscall pt_regs frame, or if it instead encountered a
->> > bogus frame pointer along the way and had to bail early.
->>
->> Sounds good to me. Will there be any frame size information available?
->> Right now, the unwinder from PaX just drops 2 pointers (saved frame,
->> saved ip) from the delta of frame address to find the size of the
->> actual stack area used by the function. If I could shave things like
->> padding and possible stack canaries off the size too, that would be
->> great.
+On Wed, 13 Jul 2016 22:06:30 -0400
+Sinan Kaya <okaya@codeaurora.org> wrote:
+
+> The code is using the compatible DT string to associate a reset driver
+> with the actual device itself. The compatible string does not exist on
+> ACPI based systems. HID is the unique identifier for a device driver
+> instead.
+> 
+> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+> Reviewed-by: Eric Auger <eric.auger@redhat.com>
+> Reviewed-by: Baptiste Reynal <b.reynal@virtualopensystems.com>
+> ---
+>  drivers/vfio/platform/vfio_platform_common.c  | 70 +++++++++++++++++++++++++--
+>  drivers/vfio/platform/vfio_platform_private.h |  1 +
+>  2 files changed, 66 insertions(+), 5 deletions(-)
+> 
+> diff --git a/drivers/vfio/platform/vfio_platform_common.c b/drivers/vfio/platform/vfio_platform_common.c
+> index 6be92c3..ff148764 100644
+> --- a/drivers/vfio/platform/vfio_platform_common.c
+> +++ b/drivers/vfio/platform/vfio_platform_common.c
+> @@ -13,6 +13,7 @@
+>   */
+>  
+>  #include <linux/device.h>
+> +#include <linux/acpi.h>
+>  #include <linux/iommu.h>
+>  #include <linux/module.h>
+>  #include <linux/mutex.h>
+> @@ -49,6 +50,33 @@ static vfio_platform_reset_fn_t vfio_platform_lookup_reset(const char *compat,
+>  	return reset_fn;
+>  }
 >
-> For x86, stacks are aligned at long word boundaries, so there's no real
-> stack padding.
 
-Well, I guess I meant the possible padding between variables and the
-aligned pointers, but that's a really minor concern in my mind (as far
-as being a potential kernel memory exposure on a bad usercopy).
+This function still feels a bit sloppy
+  
+> +static int vfio_platform_acpi_probe(struct vfio_platform_device *vdev,
+> +				    struct device *dev)
+> +{
+> +	struct acpi_device *adev = ACPI_COMPANION(dev);
 
-> Also the CC_STACKPROTECTOR stack canaries are created by a gcc feature
-> which only affects certain functions (and thus certain frames) and I
-> don't know of any reliable way to find them.
+When !CONFIG_ACPI, this returns NULL
 
-Okay, that's fine. I had a horrible idea to just have the unwinder
-look at the value stored in front of the saved ip, and if it matches
-the known canary (for current anyway), then reduce the frame size by
-another long word. ;)
+> +
+> +	if (acpi_disabled)
 
-> So with frame pointers, I think the best you can do is just assume that
-> the frame data area is always two words smaller than the total frame
-> size.
+When !CONFIG_ACPI, this is defined as 1, so we'll always exit here.
 
-Yeah, that's what's happening here currently. Cool.
+> +		return -EPERM;
+> +
+> +	if (!adev) {
 
->> Since I'm aiming the hardened usercopy series for 4.8, I figure I'll
->> just leave this unwinder in for now, and once yours lands, I can rip
->> it out again.
->
-> Sure, sounds fine to me.  If your code lands before I post mine, I can
-> convert it myself.
+This is really the only (ACPI_CONFIG && !acpi_disabled) error exit,
+because...
 
-Awesome, I'll keep you posted. Thanks!
+> +		pr_err("VFIO: ACPI companion device not found for %s\n",
+> +			vdev->name);
+> +		return -ENODEV;
+> +	}
+> +
+> +#ifdef CONFIG_ACPI
+> +	vdev->acpihid = acpi_device_hid(adev);
 
--Kees
+This can't actually return NULL.  So the test below is unreached.
+Maybe we should just conclude this function here with:
 
--- 
-Kees Cook
-Chrome OS & Brillo Security
+#endif
+
+return vdev->acpihid ? 0 : -ENOENT;
+
+which is even still a bit paranoid since it can't actually happen.
+
+> +	if (!vdev->acpihid) {
+> +		pr_err("VFIO: cannot find ACPI HID for %s\n",
+> +		       vdev->name);
+> +		return -EINVAL;
+> +	}
+> +	return 0;
+> +#else
+> +	return -ENOENT;
+> +#endif
+> +}
+> +
+>  static bool vfio_platform_has_reset(struct vfio_platform_device *vdev)
+>  {
+>  	return vdev->of_reset ? true : false;
+> @@ -547,6 +575,37 @@ static const struct vfio_device_ops vfio_platform_ops = {
+>  	.mmap		= vfio_platform_mmap,
+>  };
+>  
+> +int vfio_platform_of_probe(struct vfio_platform_device *vdev,
+> +			   struct device *dev)
+> +{
+> +	int ret;
+> +
+> +	ret = device_property_read_string(dev, "compatible",
+> +					  &vdev->compat);
+> +	if (ret)
+> +		pr_err("VFIO: cannot retrieve compat for %s\n",
+> +			vdev->name);
+> +
+> +	return ret;
+> +}
+> +
+> +/*
+> + * There can be two kernel build combinations. One build where
+> + * ACPI is not selected in Kconfig and another one with the ACPI Kconfig.
+> + *
+> + * In the first case, vfio_platform_acpi_probe will return since
+> + * acpi_disabled  * is 1. DT user will not see any kind of messages from
+
+                    ^^ Previous editing cruft?
+
+> + * ACPI.
+> + *
+> + * In the second case, both DT and ACPI is compiled in but the system is
+> + * booting with any of these combinations.
+> + *
+> + * If the firmware is DT type, then acpi_disabled is 1. The ACPI probe routine
+> + * terminates immediately without any messages.
+> + *
+> + * If the firmware is ACPI type, then acpi_disabled is 0. All other checks are
+> + * valid checks. We cannot claim that this system is DT.
+> + */
+>  int vfio_platform_probe_common(struct vfio_platform_device *vdev,
+>  			       struct device *dev)
+>  {
+> @@ -556,11 +615,12 @@ int vfio_platform_probe_common(struct vfio_platform_device *vdev,
+>  	if (!vdev)
+>  		return -EINVAL;
+>  
+> -	ret = device_property_read_string(dev, "compatible", &vdev->compat);
+> -	if (ret) {
+> -		pr_err("VFIO: cannot retrieve compat for %s\n", vdev->name);
+> -		return -EINVAL;
+> -	}
+> +	ret = vfio_platform_acpi_probe(vdev, dev);
+> +	if (ret)
+> +		ret = vfio_platform_of_probe(vdev, dev);
+> +
+> +	if (ret)
+> +		return ret;
+>  
+>  	vdev->device = dev;
+>  
+> diff --git a/drivers/vfio/platform/vfio_platform_private.h b/drivers/vfio/platform/vfio_platform_private.h
+> index 71ed7d1..ba9e4f8 100644
+> --- a/drivers/vfio/platform/vfio_platform_private.h
+> +++ b/drivers/vfio/platform/vfio_platform_private.h
+> @@ -58,6 +58,7 @@ struct vfio_platform_device {
+>  	struct mutex			igate;
+>  	struct module			*parent_module;
+>  	const char			*compat;
+> +	const char			*acpihid;
+>  	struct module			*reset_module;
+>  	struct device			*device;
+>  
