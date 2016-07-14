@@ -1,55 +1,112 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 14 Jul 2016 14:02:01 -0700 (PDT)
-Subject: [PATCH v3 3/3] ARM: dts: blanche: add Ethernet pins
-In-Reply-To: <5383928.8UnDsUpmkz@wasted.cogentembedded.com>
-References: <5383928.8UnDsUpmkz@wasted.cogentembedded.com>
-Message-ID: <2472815.TZ6Lha6VX2@wasted.cogentembedded.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Thu, 14 Jul 2016 14:38:33 -0700
+Subject: [PATCH v2 01/11] mm: Implement stack frame object validation
+In-Reply-To: <20160714192351.567fmaz2h4drrxrc@treble>
+References: <1468446964-22213-1-git-send-email-keescook@chromium.org>
+ <1468446964-22213-2-git-send-email-keescook@chromium.org>
+ <CALCETrVDJDjdoh7yvOPd=_5twQnzQRhe8G2KLaRw-NnA1Uf__g@mail.gmail.com>
+ <CAGXu5jLPZiRJx8n3_7GW2bufiuUgE9=c6dQcNxDRPHMU72sD9g@mail.gmail.com>
+ <20160714054842.6zal5rqawpgew26r@treble>
+ <CAGXu5jLv_pMRqdaM72D_FTQzxoGxgcEqxpvUzqwgjOmZ8D-zSw@mail.gmail.com>
+ <20160714192351.567fmaz2h4drrxrc@treble>
+Message-ID: <CAGXu5jJuYDTZX7+tXCxvxdB0k4foO4z1yvejF8fjSWQMFVjksQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the (previously omitted) pin data for the SMSC LAN89218 Ethernet chip
-to  the Blanche board's device tree:  the chip's IRQ output is connected to
-the SoC's IRQ0 pin and its nCS input is connected to the SoC's EX_CS0# pin.
+On Thu, Jul 14, 2016 at 12:23 PM, Josh Poimboeuf <jpoimboe@redhat.com> wrote:
+> On Thu, Jul 14, 2016 at 11:10:18AM -0700, Kees Cook wrote:
+>> On Wed, Jul 13, 2016 at 10:48 PM, Josh Poimboeuf <jpoimboe@redhat.com> wrote:
+>> > On Wed, Jul 13, 2016 at 03:04:26PM -0700, Kees Cook wrote:
+>> >> On Wed, Jul 13, 2016 at 3:01 PM, Andy Lutomirski <luto@amacapital.net> wrote:
+>> >> > On Wed, Jul 13, 2016 at 2:55 PM, Kees Cook <keescook@chromium.org> wrote:
+>> >> >> This creates per-architecture function arch_within_stack_frames() that
+>> >> >> should validate if a given object is contained by a kernel stack frame.
+>> >> >> Initial implementation is on x86.
+>> >> >>
+>> >> >> This is based on code from PaX.
+>> >> >>
+>> >> >
+>> >> > This, along with Josh's livepatch work, are two examples of unwinders
+>> >> > that matter for correctness instead of just debugging.  ISTM this
+>> >> > should just use Josh's code directly once it's been written.
+>> >>
+>> >> Do you have URL for Josh's code? I'd love to see what happening there.
+>> >
+>> > The code is actually going to be 100% different next time around, but
+>> > FWIW, here's the last attempt:
+>> >
+>> >   https://lkml.kernel.org/r/4d34d452bf8f85c7d6d5f93db1d3eeb4cba335c7.1461875890.git.jpoimboe at redhat.com
+>> >
+>> > In the meantime I've realized the need to rewrite the x86 core stack
+>> > walking code to something much more manageable so we don't need all
+>> > these unwinders everywhere.  I'll probably post the patches in the next
+>> > week or so.  I'll add you to the CC list.
+>>
+>> Awesome!
+>>
+>> > With the new interface I think you'll be able to do something like:
+>> >
+>> >         struct unwind_state;
+>> >
+>> >         unwind_start(&state, current, NULL, NULL);
+>> >         unwind_next_frame(&state);
+>> >         oldframe = unwind_get_stack_pointer(&state);
+>> >
+>> >         unwind_next_frame(&state);
+>> >         frame = unwind_get_stack_pointer(&state);
+>> >
+>> >         do {
+>> >                 if (obj + len <= frame)
+>> >                         return blah;
+>> >                 oldframe = frame;
+>> >                 frame = unwind_get_stack_pointer(&state);
+>> >
+>> >         } while (unwind_next_frame(&state);
+>> >
+>> > And then at the end there'll be some (still TBD) way to query whether it
+>> > reached the last syscall pt_regs frame, or if it instead encountered a
+>> > bogus frame pointer along the way and had to bail early.
+>>
+>> Sounds good to me. Will there be any frame size information available?
+>> Right now, the unwinder from PaX just drops 2 pointers (saved frame,
+>> saved ip) from the delta of frame address to find the size of the
+>> actual stack area used by the function. If I could shave things like
+>> padding and possible stack canaries off the size too, that would be
+>> great.
+>
+> For x86, stacks are aligned at long word boundaries, so there's no real
+> stack padding.
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Well, I guess I meant the possible padding between variables and the
+aligned pointers, but that's a really minor concern in my mind (as far
+as being a potential kernel memory exposure on a bad usercopy).
 
----
-Changes in version 3:
-- killed extra empty line;
-- reformatted the changelog.
+> Also the CC_STACKPROTECTOR stack canaries are created by a gcc feature
+> which only affects certain functions (and thus certain frames) and I
+> don't know of any reliable way to find them.
 
- arch/arm/boot/dts/r8a7792-blanche.dts |   14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+Okay, that's fine. I had a horrible idea to just have the unwinder
+look at the value stored in front of the saved ip, and if it matches
+the known canary (for current anyway), then reduce the frame size by
+another long word. ;)
 
-Index: renesas/arch/arm/boot/dts/r8a7792-blanche.dts
-===================================================================
---- renesas.orig/arch/arm/boot/dts/r8a7792-blanche.dts
-+++ renesas/arch/arm/boot/dts/r8a7792-blanche.dts
-@@ -50,6 +50,9 @@
- 		reg-io-width = <4>;
- 		vddvario-supply = <&d3_3v>;
- 		vdd33a-supply = <&d3_3v>;
-+
-+		pinctrl-0 = <&lan89218_pins>;
-+		pinctrl-names = "default";
- 	};
- };
- 
-@@ -67,6 +70,17 @@
- 		groups = "scif3_data";
- 		function = "scif3";
- 	};
-+
-+	lan89218_pins: lan89218 {
-+		intc {
-+			groups = "intc_irq0";
-+			function = "intc";
-+		};
-+		lbsc {
-+			groups = "lbsc_ex_cs0";
-+			function = "lbsc";
-+		};
-+	};
- };
- 
- &scif0 {
+> So with frame pointers, I think the best you can do is just assume that
+> the frame data area is always two words smaller than the total frame
+> size.
+
+Yeah, that's what's happening here currently. Cool.
+
+>> Since I'm aiming the hardened usercopy series for 4.8, I figure I'll
+>> just leave this unwinder in for now, and once yours lands, I can rip
+>> it out again.
+>
+> Sure, sounds fine to me.  If your code lands before I post mine, I can
+> convert it myself.
+
+Awesome, I'll keep you posted. Thanks!
+
+-Kees
+
+-- 
+Kees Cook
+Chrome OS & Brillo Security
