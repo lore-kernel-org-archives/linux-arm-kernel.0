@@ -1,70 +1,70 @@
-From: hzpeterchen@gmail.com (Peter Chen)
-Date: Thu, 14 Jul 2016 14:36:27 +0800
-Subject: [PATCH v2 1/6] binding-doc: power: pwrseq-generic: add binding
- doc for generic power sequence library
-In-Reply-To: <5786CCA6.2090709@gmail.com>
-References: <1468375610-18625-1-git-send-email-peter.chen@nxp.com>
- <1468375610-18625-2-git-send-email-peter.chen@nxp.com>
- <1468394851.3638.13.camel@pengutronix.de>
- <20160713084250.GB11863@shlinux2> <5786CCA6.2090709@gmail.com>
-Message-ID: <20160714063627.GA28730@shlinux2>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 14 Jul 2016 07:53:08 +0100
+Subject: [PATCH 2/5] remoteproc: core: Add rproc OF look-up functions
+In-Reply-To: <20160713191134.GL23833@tuxbot>
+References: <1462454983-13168-1-git-send-email-lee.jones@linaro.org>
+ <1462454983-13168-3-git-send-email-lee.jones@linaro.org>
+ <20160713191134.GL23833@tuxbot>
+Message-ID: <20160714065308.GA10504@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 13, 2016 at 04:20:06PM -0700, Joshua Clayton wrote:
-> 
-> 
-> On 07/13/2016 01:42 AM, Peter Chen wrote:
-> > On Wed, Jul 13, 2016 at 09:27:31AM +0200, Philipp Zabel wrote:
-> >> Am Mittwoch, den 13.07.2016, 10:06 +0800 schrieb Peter Chen:
-> >>> Add binding doc for generic power sequence library.
-> >>>
-> >>> Signed-off-by: Peter Chen <peter.chen@nxp.com>
-> >>> ---
-> >>>  .../bindings/power/pwrseq/pwrseq-generic.txt       | 53 ++++++++++++++++++++++
-> >>>  1 file changed, 53 insertions(+)
-> >>>  create mode 100644 Documentation/devicetree/bindings/power/pwrseq/pwrseq-generic.txt
-> >>>
-> >>> diff --git a/Documentation/devicetree/bindings/power/pwrseq/pwrseq-generic.txt b/Documentation/devicetree/bindings/power/pwrseq/pwrseq-generic.txt
-> >>> new file mode 100644
-> >>> index 0000000..186c58c
-> >>> --- /dev/null
-> >>> +++ b/Documentation/devicetree/bindings/power/pwrseq/pwrseq-generic.txt
-> >>> @@ -0,0 +1,53 @@
-> >>> +The generic power sequence library
-> >>> +
-> >>> +Some hard-wired USB/MMC devices need to do power sequence to let the
-> >>> +device work normally,
-> >> I would replace "to let the device work normally" with "before the
-> >> device can be enumerated [on the bus]" here.
-> >>
-> > Ok.
-> >
-> >>>  the typical power sequence like: enable USB
-> >>> +PHY clock, toggle reset pin, etc. But current Linux USB driver
-> >>> +lacks of such code to do it, it may cause some hard-wired USB devices
-> >>> +works abnormal or can't be recognized by controller at all. The
-> >>> +power sequence will be done before this device can be found at USB
-> >>> +bus.
-> >>> +
-> >>> +The power sequence properties is under the device node.
-> >>> +
-> >>> +Required properties:
-> >>> +- power-sequence: this device needs to do power sequence before enumeration
-> >> As Joshua pointed out, is this even needed at all?
-> >>
-> > If no, how we decide whether allocates pwrseq instance through pwrseq
-> > library or not?
-> >
-> The pwrseq driver is Linux specific. The dts is supposed to be OS agnostic.
-> It seems to me that If a driver supports pwrseq and the dts elements
-> are there, it should use them, e.g. if there is a clock, enable the clock.
-> if there is a reset gpio then take the device into and out of reset during probe.
-> 
+On Wed, 13 Jul 2016, Bjorn Andersson wrote:
 
-I agree with you, will delete this property.
+> On Thu 05 May 06:29 PDT 2016, Lee Jones wrote:
+> 
+> Lee,
+> 
+> I ran into this topic again while looking into some unrelated things.
+> 
+> > diff --git a/drivers/remoteproc/remoteproc_core.c b/drivers/remoteproc/remoteproc_core.c
+> > +struct rproc *of_rproc_byindex(struct device_node *np, int index)
+> > +{
+> > +	struct rproc *rproc;
+> > +	struct device_node *rproc_node;
+> > +	struct platform_device *pdev;
+> > +	struct klist_iter i;
+> > +
+> > +	if (index < 0)
+> > +		return ERR_PTR(-EINVAL);
+> > +
+> > +	rproc_node = of_parse_phandle(np, "rprocs", index);
+> > +	if (!rproc_node)
+> 
+> As I stated before I would like for you to use the existing rproc_list,
+> as done in rproc_get_by_phandle() today.
+> 
+> But as you resend this patch, could you please make this check fallback
+> to also checking for "ti,rproc", then simply drop the existing
+> rproc_get_by_phandle() and change the call to
+> of_rproc_byindex(dev->of_node, 0) in wkup_m3_ipc.c?
+> 
+> That way we're backwards compatible with the TI wakeup M3, without
+> having to maintain the then non-standard generic rproc phandle resolver.
+
+I started working on this yesterday.  Should be with you soon.
+
+> > +		return ERR_PTR(-ENODEV);
+> > +
+> > +	pdev = of_find_device_by_node(rproc_node);
+> > +	if (!pdev)
+> > +		return ERR_PTR(-ENODEV);
+> > +
+> > +	klist_iter_init(&rprocs, &i);
+> > +	while ((rproc = next_rproc(&i)) != NULL)
+> > +		if (rproc->dev.parent == &pdev->dev)
+> > +			break;
+> > +	klist_iter_exit(&i);
+> > +
+> > +	return rproc;
+> > +}
+> > +EXPORT_SYMBOL(of_rproc_byindex);
+> 
+> Regards,
+> Bjorn
 
 -- 
-
-Best Regards,
-Peter Chen
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
