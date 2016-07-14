@@ -1,63 +1,119 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Wed, 13 Jul 2016 22:06:31 -0400
-Subject: [PATCH V9 5/9] vfio: platform: add extra debug info argument to call
- reset
+Date: Wed, 13 Jul 2016 22:06:32 -0400
+Subject: [PATCH V9 6/9] vfio: platform: call _RST method when using ACPI
 In-Reply-To: <1468461995-32676-1-git-send-email-okaya@codeaurora.org>
 References: <1468461995-32676-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1468461995-32676-6-git-send-email-okaya@codeaurora.org>
+Message-ID: <1468461995-32676-7-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Getting ready to bring out extra debug information to the caller
-so that more verbose information can be printed when an error is
-observed.
+The device tree code checks for the presence of a reset driver and calls
+the of_reset function pointer by looking up the reset driver as a module.
+
+ACPI defines _RST method to perform device level reset. After the _RST
+method is executed, the OS can resume using the device. _RST method is
+expected to stop DMA transfers and IRQs.
+
+This patch introduces two functions as vfio_platform_acpi_has_reset and
+vfio_platform_acpi_call_reset. The has reset method is used to declare
+reset capability via the ioctl flag VFIO_DEVICE_FLAGS_RESET. The call
+reset function is used to execute the _RST ACPI method.
 
 Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-Reviewed-by: Baptiste Reynal <b.reynal@virtualopensystems.com>
 ---
- drivers/vfio/platform/vfio_platform_common.c | 9 +++++----
- 1 file changed, 5 insertions(+), 4 deletions(-)
+ drivers/vfio/platform/vfio_platform_common.c | 52 +++++++++++++++++++++++++++-
+ 1 file changed, 51 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/vfio/platform/vfio_platform_common.c b/drivers/vfio/platform/vfio_platform_common.c
-index ff148764..03483c2 100644
+index 03483c2..2d9c905 100644
 --- a/drivers/vfio/platform/vfio_platform_common.c
 +++ b/drivers/vfio/platform/vfio_platform_common.c
-@@ -167,7 +167,8 @@ static void vfio_platform_regions_cleanup(struct vfio_platform_device *vdev)
- 	kfree(vdev->regions);
+@@ -28,6 +28,8 @@
+ #define DRIVER_AUTHOR   "Antonios Motakis <a.motakis@virtualopensystems.com>"
+ #define DRIVER_DESC     "VFIO platform base module"
+ 
++#define VFIO_PLATFORM_IS_ACPI(vdev) ((vdev)->acpihid != NULL)
++
+ static LIST_HEAD(reset_list);
+ static DEFINE_MUTEX(driver_lock);
+ 
+@@ -77,13 +79,55 @@ static int vfio_platform_acpi_probe(struct vfio_platform_device *vdev,
+ #endif
  }
  
--static int vfio_platform_call_reset(struct vfio_platform_device *vdev)
-+static int vfio_platform_call_reset(struct vfio_platform_device *vdev,
-+				    const char **extra_dbg)
++static inline
++int vfio_platform_acpi_call_reset(struct vfio_platform_device *vdev,
++				  const char **extra_dbg)
++{
++#ifdef CONFIG_ACPI
++	struct acpi_buffer buffer = { ACPI_ALLOCATE_BUFFER, NULL };
++	struct device *dev = vdev->device;
++	acpi_handle handle = ACPI_HANDLE(dev);
++	acpi_status acpi_ret;
++
++	acpi_ret = acpi_evaluate_object(handle, "_RST", NULL, &buffer);
++	if (ACPI_FAILURE(acpi_ret)) {
++		if (extra_dbg)
++			*extra_dbg = acpi_format_exception(acpi_ret);
++		return -EINVAL;
++	}
++
++	return 0;
++#else
++	return -ENOENT;
++#endif
++}
++
++static inline
++bool vfio_platform_acpi_has_reset(struct vfio_platform_device *vdev)
++{
++#ifdef CONFIG_ACPI
++	struct device *dev = vdev->device;
++	acpi_handle handle = ACPI_HANDLE(dev);
++
++	return acpi_has_method(handle, "_RST");
++#else
++	return false;
++#endif
++}
++
+ static bool vfio_platform_has_reset(struct vfio_platform_device *vdev)
  {
- 	if (vdev->of_reset) {
++	if (VFIO_PLATFORM_IS_ACPI(vdev))
++		return vfio_platform_acpi_has_reset(vdev);
++
+ 	return vdev->of_reset ? true : false;
+ }
+ 
+ static void vfio_platform_get_reset(struct vfio_platform_device *vdev)
+ {
++	if (VFIO_PLATFORM_IS_ACPI(vdev))
++		return;
++
+ 	vdev->of_reset = vfio_platform_lookup_reset(vdev->compat,
+ 						    &vdev->reset_module);
+ 	if (!vdev->of_reset) {
+@@ -95,6 +139,9 @@ static void vfio_platform_get_reset(struct vfio_platform_device *vdev)
+ 
+ static void vfio_platform_put_reset(struct vfio_platform_device *vdev)
+ {
++	if (VFIO_PLATFORM_IS_ACPI(vdev))
++		return;
++
+ 	if (vdev->of_reset)
+ 		module_put(vdev->reset_module);
+ }
+@@ -170,7 +217,10 @@ static void vfio_platform_regions_cleanup(struct vfio_platform_device *vdev)
+ static int vfio_platform_call_reset(struct vfio_platform_device *vdev,
+ 				    const char **extra_dbg)
+ {
+-	if (vdev->of_reset) {
++	if (VFIO_PLATFORM_IS_ACPI(vdev)) {
++		dev_info(vdev->device, "reset\n");
++		return vfio_platform_acpi_call_reset(vdev, extra_dbg);
++	} else if (vdev->of_reset) {
  		dev_info(vdev->device, "reset\n");
-@@ -185,7 +186,7 @@ static void vfio_platform_release(void *device_data)
- 	mutex_lock(&driver_lock);
- 
- 	if (!(--vdev->refcnt)) {
--		vfio_platform_call_reset(vdev);
-+		vfio_platform_call_reset(vdev, NULL);
- 		vfio_platform_regions_cleanup(vdev);
- 		vfio_platform_irq_cleanup(vdev);
+ 		return vdev->of_reset(vdev);
  	}
-@@ -214,7 +215,7 @@ static int vfio_platform_open(void *device_data)
- 		if (ret)
- 			goto err_irq;
- 
--		vfio_platform_call_reset(vdev);
-+		vfio_platform_call_reset(vdev, NULL);
- 	}
- 
- 	vdev->refcnt++;
-@@ -346,7 +347,7 @@ static long vfio_platform_ioctl(void *device_data,
- 		return ret;
- 
- 	} else if (cmd == VFIO_DEVICE_RESET) {
--		return vfio_platform_call_reset(vdev);
-+		return vfio_platform_call_reset(vdev, NULL);
- 	}
- 
- 	return -ENOTTY;
 -- 
 1.8.2.1
