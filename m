@@ -1,38 +1,25 @@
-From: xuwei5@hisilicon.com (Wei Xu)
-Date: Thu, 14 Jul 2016 16:04:26 +0100
-Subject: [GIT PULL]arm64: dts: hisilicon: hi6220 updates for 4.8(#2)
-In-Reply-To: <4529903.blvXMCdknS@wuerfel>
-References: <577E5E70.1050304@hisilicon.com> <4529903.blvXMCdknS@wuerfel>
-Message-ID: <5787A9FA.9060704@hisilicon.com>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Thu, 14 Jul 2016 11:06:51 -0400
+Subject: [PATCH v2] media: s5p-mfc remove unnecessary error messages
+In-Reply-To: <1468507222-5314-1-git-send-email-shuahkh@osg.samsung.com>
+References: <1468507222-5314-1-git-send-email-shuahkh@osg.samsung.com>
+Message-ID: <f1de3591-7816-963c-62c7-ab9fb29e3f22@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Hello Shuah,
 
-On 14/07/2016 14:58, Arnd Bergmann wrote:
-> On Thursday, July 7, 2016 2:51:44 PM CEST Wei Xu wrote:
->> Hi Arnd, Hi Olof, Hi Kevin,
->>
->> I know the walkaround for this kind of patch is still under discussion.
->> Could you please consider to pull the following changes?
->>
->> This depends on the change in clk tree (clk-hi6220-rtc)
->> which is already in the clk-next.
->>
->> And for easier grepping through history, below is the pull request
->> for the dts specific change (no clk commits):
->>
+On 07/14/2016 10:40 AM, Shuah Khan wrote:
+> Removed unnecessary error message as appropriate error code is returned.
+> Changed error message into a debug.
 > 
-> Pulled into next/late, thanks!
+> Signed-off-by: Shuah Khan <shuahkh@osg.samsung.com>
+> ---
 
-Thanks!
+Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
 
-Best Regards,
-Wei
-
-> 
-> 	Arnd
-> 
-> 
-> .
-> 
+Best regards,
+-- 
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
