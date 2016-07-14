@@ -1,34 +1,127 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 15 Jul 2016 00:02:21 +0200
-Subject: [PATCH] ARM: tegra: fix erroneous address in dts
-In-Reply-To: <1468514937-23250-1-git-send-email-ralf@ramses-pyramidenbau.de>
-References: <1468514937-23250-1-git-send-email-ralf@ramses-pyramidenbau.de>
-Message-ID: <20160714220218.GB4205@mithrandir.ba.sec>
+From: alex.williamson@redhat.com (Alex Williamson)
+Date: Thu, 14 Jul 2016 16:04:39 -0600
+Subject: [PATCH V9 6/9] vfio: platform: call _RST method when using ACPI
+In-Reply-To: <1468461995-32676-7-git-send-email-okaya@codeaurora.org>
+References: <1468461995-32676-1-git-send-email-okaya@codeaurora.org>
+ <1468461995-32676-7-git-send-email-okaya@codeaurora.org>
+Message-ID: <20160714160439.5bafca73@t450s.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 14, 2016 at 06:48:57PM +0200, Ralf Ramsauer wrote:
-> c90bb7b enabled the high speed UARTs of the Jetson TK1. The address
-> specification inside the dts is wrong. Fix it and use the correct
-> address.
+On Wed, 13 Jul 2016 22:06:32 -0400
+Sinan Kaya <okaya@codeaurora.org> wrote:
+
+> The device tree code checks for the presence of a reset driver and calls
+> the of_reset function pointer by looking up the reset driver as a module.
 > 
-> Fixes: c90bb7b9b9 ("ARM: tegra: Add high speed UARTs to Jetson TK1 device tree")
-> Signed-off-by: Ralf Ramsauer <ralf@ramses-pyramidenbau.de>
+> ACPI defines _RST method to perform device level reset. After the _RST
+> method is executed, the OS can resume using the device. _RST method is
+> expected to stop DMA transfers and IRQs.
+> 
+> This patch introduces two functions as vfio_platform_acpi_has_reset and
+> vfio_platform_acpi_call_reset. The has reset method is used to declare
+> reset capability via the ioctl flag VFIO_DEVICE_FLAGS_RESET. The call
+> reset function is used to execute the _RST ACPI method.
+> 
+> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 > ---
->  arch/arm/boot/dts/tegra124-jetson-tk1.dts | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+>  drivers/vfio/platform/vfio_platform_common.c | 52 +++++++++++++++++++++++++++-
+>  1 file changed, 51 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/vfio/platform/vfio_platform_common.c b/drivers/vfio/platform/vfio_platform_common.c
+> index 03483c2..2d9c905 100644
+> --- a/drivers/vfio/platform/vfio_platform_common.c
+> +++ b/drivers/vfio/platform/vfio_platform_common.c
+> @@ -28,6 +28,8 @@
+>  #define DRIVER_AUTHOR   "Antonios Motakis <a.motakis@virtualopensystems.com>"
+>  #define DRIVER_DESC     "VFIO platform base module"
+>  
+> +#define VFIO_PLATFORM_IS_ACPI(vdev) ((vdev)->acpihid != NULL)
+> +
+>  static LIST_HEAD(reset_list);
+>  static DEFINE_MUTEX(driver_lock);
+>  
+> @@ -77,13 +79,55 @@ static int vfio_platform_acpi_probe(struct vfio_platform_device *vdev,
+>  #endif
+>  }
+>  
+> +static inline
+> +int vfio_platform_acpi_call_reset(struct vfio_platform_device *vdev,
+> +				  const char **extra_dbg)
+> +{
+> +#ifdef CONFIG_ACPI
+> +	struct acpi_buffer buffer = { ACPI_ALLOCATE_BUFFER, NULL };
+> +	struct device *dev = vdev->device;
+> +	acpi_handle handle = ACPI_HANDLE(dev);
+> +	acpi_status acpi_ret;
+> +
+> +	acpi_ret = acpi_evaluate_object(handle, "_RST", NULL, &buffer);
+> +	if (ACPI_FAILURE(acpi_ret)) {
+> +		if (extra_dbg)
+> +			*extra_dbg = acpi_format_exception(acpi_ret);
+> +		return -EINVAL;
+> +	}
+> +
+> +	return 0;
+> +#else
+> +	return -ENOENT;
+> +#endif
+> +}
+> +
+> +static inline
+> +bool vfio_platform_acpi_has_reset(struct vfio_platform_device *vdev)
+> +{
+> +#ifdef CONFIG_ACPI
+> +	struct device *dev = vdev->device;
+> +	acpi_handle handle = ACPI_HANDLE(dev);
+> +
+> +	return acpi_has_method(handle, "_RST");
+> +#else
+> +	return false;
+> +#endif
+> +}
 
-These addresses are correct. The 0, prefix was dropped from the unit
-address in commit b5896f67ab3c ("ARM: tegra: Remove commas from unit
-addresses on Tegra124").
+What exactly is the rationale for making these inline?  Clearly reset
+is not a performance relevant path.  Thanks,
 
-What's the problem that you're seeing? What's not working for you?
+Alex
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160715/3a6806c6/attachment.sig>
+> +
+>  static bool vfio_platform_has_reset(struct vfio_platform_device *vdev)
+>  {
+> +	if (VFIO_PLATFORM_IS_ACPI(vdev))
+> +		return vfio_platform_acpi_has_reset(vdev);
+> +
+>  	return vdev->of_reset ? true : false;
+>  }
+>  
+>  static void vfio_platform_get_reset(struct vfio_platform_device *vdev)
+>  {
+> +	if (VFIO_PLATFORM_IS_ACPI(vdev))
+> +		return;
+> +
+>  	vdev->of_reset = vfio_platform_lookup_reset(vdev->compat,
+>  						    &vdev->reset_module);
+>  	if (!vdev->of_reset) {
+> @@ -95,6 +139,9 @@ static void vfio_platform_get_reset(struct vfio_platform_device *vdev)
+>  
+>  static void vfio_platform_put_reset(struct vfio_platform_device *vdev)
+>  {
+> +	if (VFIO_PLATFORM_IS_ACPI(vdev))
+> +		return;
+> +
+>  	if (vdev->of_reset)
+>  		module_put(vdev->reset_module);
+>  }
+> @@ -170,7 +217,10 @@ static void vfio_platform_regions_cleanup(struct vfio_platform_device *vdev)
+>  static int vfio_platform_call_reset(struct vfio_platform_device *vdev,
+>  				    const char **extra_dbg)
+>  {
+> -	if (vdev->of_reset) {
+> +	if (VFIO_PLATFORM_IS_ACPI(vdev)) {
+> +		dev_info(vdev->device, "reset\n");
+> +		return vfio_platform_acpi_call_reset(vdev, extra_dbg);
+> +	} else if (vdev->of_reset) {
+>  		dev_info(vdev->device, "reset\n");
+>  		return vdev->of_reset(vdev);
+>  	}
