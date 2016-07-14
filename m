@@ -1,57 +1,62 @@
-From: radioconfusion@gmail.com (radioconfusion at gmail.com)
-Date: Thu, 14 Jul 2016 15:29:14 +0300
-Subject: [crypto] [marvell-cesa] Driver hangs on Armada 385 device
-Message-ID: <5787859b.c3c4190a.282b0.3efb@mx.google.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 14 Jul 2016 13:42:06 +0100
+Subject: [RFC 0/3] extend kexec_file_load system call
+In-Reply-To: <7927804.6bj1abO0d2@wuerfel>
+References: <20160712014201.11456-1-takahiro.akashi@linaro.org>
+ <20160713173804.GA25723@porco> <20160713175630.GA2668@leverpostej>
+ <7927804.6bj1abO0d2@wuerfel>
+Message-ID: <20160714124206.GB26061@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Thu, 7 Jul 2016 15:43:14 +0200, thomas.petazzoni at free-electrons.com wrote:
-
-> > > > My Armada 385 -device hangs when using marvell-cesa -driver.
-> > > > I'm using Linux 4.4.10 and armada-385-db-ap.dts.
-> > > > I have also tried with the driver version of Linux 4.7-rc3.
-> > > > 
-> > > > Please see https://bugzilla.kernel.org/show_bug.cgi?id=120111 for details.  
+On Wed, Jul 13, 2016 at 09:57:28PM +0200, Arnd Bergmann wrote:
+> On Wednesday, July 13, 2016 6:58:32 PM CEST Mark Rutland wrote:
 > > 
-> > > Can you try with
-> > > http://git.infradead.org/linux-mvebu.git/commitdiff/c5379ba8fccd99d5f99632c789f0393d84a57805
-> > > applied ?  
+> > >   we may want to remove unnecessary devices and even add a dedicated
+> > >   storage device for storing a core dump image.
 > > 
-> > Thanks Thomas.
-> > Your patch seems to fix a random hang during crypto operations.
->
-> OK, great.
->
+> > I suspect that bringing up a minimal number of devices is better
+> > controlled by a cmdline option. In general, figuring out what is
+> > necessary and what is not is going to be board specific, so hacking the
+> > FW tables (DTB or ACPI) is not a very portable/reliable approach.
+> > 
+> > Do we actually add devices in practice? More so than the above that
+> > requires special knowledge of the platform (including things that were
+> > not described in the boot DTB).
+> > 
+> > In the ACPI case modifying a DTB alone is not sufficient to change the
+> > information regarding devices, as those won't be described in the DTB.
+> > It's not possible to convert ACPI to DTB in general.
+> 
+> A more likely scenario would be replacing ACPI tables with a DTB that
+> describes the platform in order to use devices that the ACPI tables
+> don't contain.
 
-(Some lines snipped...)
+To do so, you need special knowledge of the platform, which users are
+unlikely to have in practice for ACPI-based platforms.
 
-> Could you test with the latest 4.7-rc kernel + the patch I provided?
+So, I think that boils down to the same problem, and the same comments
+apply.
 
-Sorry about that silence. Finally I had some time for testing this.
+> > > - Say, booting BE kernel on ACPI LE kernel
+> > >   In this case, there is no useful dtb in the kernel.
+> 
+> > If the platform only has ACPI, then you cannot boot a BE kernel to begin
+> > with. As above one cannot convert ACPI to DTB, so one would need
+> > extensive platform knowledge for this to work.
+> 
+> I think what he meant was to pass a DTB to the kexec kernel in order
+> to run BE, while the original kernel can only run LE due to ACPI.
 
-I took Linux 4.7-rc7 (92d21ac74a9e3c09b0b01c764e530657e4c85c49) and just put "fix HW I/O coherency related deadlocks" to top of it.
-Unfortunately, the result was exact same than 4.4.10.
+I understood that. My point was that to build that DTB, you need to have
+knowledge of the platform that you are unlikely to have.
 
-First, without the driver:
+The platform firmware may expect to interact with AML, which you can't
+place in DT or run in a BE context.
 
-# cryptsetup benchmark --cipher aes-cbc
-
-# Tests are approximate using memory only (no storage IO).
-#  Algorithm | Key |  Encryption |  Decryption
-      aes-cbc   256b    21.9 MiB/s    23.6 MiB/s
-
-Loading the driver:
-
-# modprobe marvell_cesa
-[  103.213901] marvell-cesa f1090000.crypto: CESA device successfully registered
-
-And after that:
-# cryptsetup benchmark --cipher aes-cbc
-
-was never done.
+If you need to run BE kernels on a platform, you would likely get a
+platform that could boot a BE kernel from the outset (i.e. one that
+provides a DTB), or run that code ina VM under an LE host.
 
 Thanks,
-
-Jussi
+Mark.
