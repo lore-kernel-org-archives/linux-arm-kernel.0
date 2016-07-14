@@ -1,118 +1,47 @@
-From: tiffany.lin@mediatek.com (tiffany lin)
-Date: Thu, 14 Jul 2016 15:34:14 +0800
-Subject: [PATCH] [media] mtk-vcodec: fix type mismatches
-In-Reply-To: <20160711213959.2481081-1-arnd@arndb.de>
-References: <20160711213959.2481081-1-arnd@arndb.de>
-Message-ID: <1468481654.27199.19.camel@mtksdaap41>
+From: Zheng.Xu@arm.com (Zheng Xu)
+Date: Thu, 14 Jul 2016 07:49:14 +0000
+Subject: [PATCH] arm64: Add config to limit user space to 47bits
+In-Reply-To: <e24481b9-fb6a-aead-a72b-43b7d561b940@suse.de>
+References: <1468424567-15925-1-git-send-email-agraf@suse.de>
+ <CAKv+Gu_QH=sZi--FVqHebd1P+6UMzEqWQQ1u3Y170B7cND8Kgw@mail.gmail.com>
+ <578668D3.6010406@suse.de> <20160714010812.GA17138@e103986-lin>
+ <837E6456-4718-45D7-8EE7-E28E11DB8BD3@suse.de>
+ <VI1PR0801MB1423AC2E8EDEE7EA33A6233196320@VI1PR0801MB1423.eurprd08.prod.outlook.com>
+ <e24481b9-fb6a-aead-a72b-43b7d561b940@suse.de>
+Message-ID: <VI1PR0801MB142315FBEDD571CC23E8D7F796320@VI1PR0801MB1423.eurprd08.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2016-07-11 at 23:37 +0200, Arnd Bergmann wrote:
-> The newly added mtk-vcodec driver produces a number of warnings in an ARM
-> allmodconfig build, mainly since it assumes that dma_addr_t is 32-bit wide:
-> 
-> mtk-vcodec/venc/venc_vp8_if.c: In function 'vp8_enc_alloc_work_buf':
-> mtk-vcodec/venc/venc_vp8_if.c:212:191: error: cast to pointer from integer of different size [-Werror=int-to-pointer-cast]
-> mtk-vcodec/venc/venc_h264_if.c: In function 'h264_enc_alloc_work_buf':
-> mtk-vcodec/venc/venc_h264_if.c:297:190: error: cast to pointer from integer of different size [-Werror=int-to-pointer-cast]
-> mtk-vcodec/mtk_vcodec_enc.c: In function 'mtk_venc_worker':
-> mtk-vcodec/mtk_vcodec_enc.c:1030:46: error: format '%lx' expects argument of type 'long unsigned int', but argument 7 has type 'size_t {aka unsigned int}' [-Werror=format=]
->   mtk_v4l2_debug(2,
-> mtk-vcodec/mtk_vcodec_enc.c:1030:46: error: format '%lx' expects argument of type 'long unsigned int', but argument 10 has type 'size_t {aka unsigned int}' [-Werror=format=]
-> mtk-vcodec/venc_vpu_if.c: In function 'vpu_enc_ipi_handler':
-> mtk-vcodec/venc_vpu_if.c:40:30: error: cast to pointer from integer of different size [-Werror=int-to-pointer-cast]
->   struct venc_vpu_inst *vpu = (struct venc_vpu_inst *)msg->venc_inst;
-> 
-> This rearranges the format strings and type casts to what they should have been
-> in order to avoid the warnings.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
->  drivers/media/platform/mtk-vcodec/mtk_vcodec_enc.c    | 8 ++++----
->  drivers/media/platform/mtk-vcodec/venc/venc_h264_if.c | 4 ++--
->  drivers/media/platform/mtk-vcodec/venc/venc_vp8_if.c  | 4 ++--
->  drivers/media/platform/mtk-vcodec/venc_vpu_if.c       | 4 ++--
->  4 files changed, 10 insertions(+), 10 deletions(-)
-> 
-> diff --git a/drivers/media/platform/mtk-vcodec/mtk_vcodec_enc.c b/drivers/media/platform/mtk-vcodec/mtk_vcodec_enc.c
-> index 6dcae0a0a1f2..0b25a8700877 100644
-> --- a/drivers/media/platform/mtk-vcodec/mtk_vcodec_enc.c
-> +++ b/drivers/media/platform/mtk-vcodec/mtk_vcodec_enc.c
-> @@ -1028,15 +1028,15 @@ static void mtk_venc_worker(struct work_struct *work)
->  	bs_buf.size = (size_t)dst_buf->planes[0].length;
->  
->  	mtk_v4l2_debug(2,
-> -			"Framebuf VA=%p PA=%llx Size=0x%lx;VA=%p PA=0x%llx Size=0x%lx;VA=%p PA=0x%llx Size=%zu",
-> +			"Framebuf VA=%p PA=%pad Size=0x%zx;VA=%p PA=%pad Size=0x%zx;VA=%p PA=%pad Size=0x%zx",
->  			frm_buf.fb_addr[0].va,
-> -			(u64)frm_buf.fb_addr[0].dma_addr,
-> +			&frm_buf.fb_addr[0].dma_addr,
->  			frm_buf.fb_addr[0].size,
->  			frm_buf.fb_addr[1].va,
-> -			(u64)frm_buf.fb_addr[1].dma_addr,
-> +			&frm_buf.fb_addr[1].dma_addr,
->  			frm_buf.fb_addr[1].size,
->  			frm_buf.fb_addr[2].va,
-> -			(u64)frm_buf.fb_addr[2].dma_addr,
-> +			&frm_buf.fb_addr[2].dma_addr,
->  			frm_buf.fb_addr[2].size);
+Sorry, I might misunderstand the issue. I thought there are still issues with master.
 
-Acked-by:Tiffany Lin <tiffany.lin@mediatek.com>
+I saw that you've mentioned there are pointers to .rodata. And I only fixed the heap. So I am just worried if there can be issues with .rodata. If pointers to .rodata are not tagged and used as js objects, it should be fine.
+
+Thanks,
+Zheng
+
+-----Original Message-----
+From: Alexander Graf [mailto:agraf at suse.de]
+Sent: 14 July 2016 15:14
+To: Zheng Xu; Steve Capper
+Cc: Ard Biesheuvel; Mark Rutland; mbrugger at suse.com; Catalin Marinas; Will Deacon; linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org; Stuart Monteith
+Subject: Re: [PATCH] arm64: Add config to limit user space to 47bits
 
 
->  
->  	ret = venc_if_encode(ctx, VENC_START_OPT_ENCODE_FRAME,
-> diff --git a/drivers/media/platform/mtk-vcodec/venc/venc_h264_if.c b/drivers/media/platform/mtk-vcodec/venc/venc_h264_if.c
-> index f4e18bb44cb9..9a600525b3c1 100644
-> --- a/drivers/media/platform/mtk-vcodec/venc/venc_h264_if.c
-> +++ b/drivers/media/platform/mtk-vcodec/venc/venc_h264_if.c
-> @@ -295,9 +295,9 @@ static int h264_enc_alloc_work_buf(struct venc_h264_inst *inst)
->  		wb[i].iova = inst->work_bufs[i].dma_addr;
->  
->  		mtk_vcodec_debug(inst,
-> -				 "work_buf[%d] va=0x%p iova=0x%p size=%zu",
-> +				 "work_buf[%d] va=0x%p iova=%pad size=%zu",
->  				 i, inst->work_bufs[i].va,
-> -				 (void *)inst->work_bufs[i].dma_addr,
-> +				 &inst->work_bufs[i].dma_addr,
->  				 inst->work_bufs[i].size);
->  	}
->  
-> diff --git a/drivers/media/platform/mtk-vcodec/venc/venc_vp8_if.c b/drivers/media/platform/mtk-vcodec/venc/venc_vp8_if.c
-> index 431ae706a427..5b35aa1900d7 100644
-> --- a/drivers/media/platform/mtk-vcodec/venc/venc_vp8_if.c
-> +++ b/drivers/media/platform/mtk-vcodec/venc/venc_vp8_if.c
-> @@ -210,9 +210,9 @@ static int vp8_enc_alloc_work_buf(struct venc_vp8_inst *inst)
->  		wb[i].iova = inst->work_bufs[i].dma_addr;
->  
->  		mtk_vcodec_debug(inst,
-> -				 "work_bufs[%d] va=0x%p,iova=0x%p,size=%zu",
-> +				 "work_bufs[%d] va=0x%p,iova=%pad,size=%zu",
->  				 i, inst->work_bufs[i].va,
-> -				 (void *)inst->work_bufs[i].dma_addr,
-> +				 &inst->work_bufs[i].dma_addr,
->  				 inst->work_bufs[i].size);
->  	}
->  
-> diff --git a/drivers/media/platform/mtk-vcodec/venc_vpu_if.c b/drivers/media/platform/mtk-vcodec/venc_vpu_if.c
-> index b92c6d2a892d..8907b02729fa 100644
-> --- a/drivers/media/platform/mtk-vcodec/venc_vpu_if.c
-> +++ b/drivers/media/platform/mtk-vcodec/venc_vpu_if.c
-> @@ -37,7 +37,7 @@ static void handle_enc_encode_msg(struct venc_vpu_inst *vpu, void *data)
->  static void vpu_enc_ipi_handler(void *data, unsigned int len, void *priv)
->  {
->  	struct venc_vpu_ipi_msg_common *msg = data;
-> -	struct venc_vpu_inst *vpu = (struct venc_vpu_inst *)msg->venc_inst;
-> +	struct venc_vpu_inst *vpu = (struct venc_vpu_inst *)(uintptr_t)msg->venc_inst;
->  
->  	mtk_vcodec_debug(vpu, "msg_id %x inst %p status %d",
->  			 msg->msg_id, vpu, msg->status);
-> @@ -112,7 +112,7 @@ int vpu_enc_init(struct venc_vpu_inst *vpu)
->  
->  	memset(&out, 0, sizeof(out));
->  	out.msg_id = AP_IPIMSG_ENC_INIT;
-> -	out.venc_inst = (unsigned long)vpu;
-> +	out.venc_inst = (uintptr_t)vpu;
->  	if (vpu_enc_send_msg(vpu, &out, sizeof(out))) {
->  		mtk_vcodec_err(vpu, "AP_IPIMSG_ENC_INIT fail");
->  		return -EINVAL;
+On 14.07.16 09:03, Zheng Xu wrote:
+> LuaJIT also fix the 48VA issue by allocating heap memory below 47 bits.
+>
+> For mozjs issue, if there are pointers to .rodata, it can be a problem. Does it happen on master and do we have any case to reproduce the issue so that I can take a look?
+
+mozjs is fixed with your patch. I backported it to all of the ancient versions of mozjs, so we're probably good there. Though every distro will have to redo that work in their own trees, because older versions of mozjs are no longer maintained upstream. If you want to be a hero, you can try to port polkitd and gnome to use more recent versions of mozjs ;). Or maybe they can already and we just messed up packaging.
+
+The issue I mentioned with "js 1.8.5" is this gem:
+
+
+https://developer.mozilla.org/en-US/docs/Mozilla/Projects/SpiderMonkey/Releases/1.8.5
+
+I don't know the exact history, but I think it predates mozjs. With a bit of sledge hammering your heap allocation patch applies there too, but we still get the rodata references.
+
+
+Alex
+
+IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
