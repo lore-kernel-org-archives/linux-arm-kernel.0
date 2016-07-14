@@ -1,15 +1,15 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Thu, 14 Jul 2016 17:33:04 +0100
-Subject: Applied "spi: s3c64xx: fix reference leak to master in
- s3c64xx_spi_remove()" to the spi tree
-In-Reply-To: <1468321722-16568-1-git-send-email-weiyj_lk@163.com>
-Message-ID: <E1bNjZQ-0001rC-Ju@debutante>
+Date: Thu, 14 Jul 2016 17:32:58 +0100
+Subject: Applied "spi: s3c64xx: document the clocks and the clock-name
+ property" to the spi tree
+In-Reply-To: <1468204581-16873-1-git-send-email-andi.shyti@samsung.com>
+Message-ID: <E1bNjZK-0001oy-Pz@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The patch
 
-   spi: s3c64xx: fix reference leak to master in s3c64xx_spi_remove()
+   spi: s3c64xx: document the clocks and the clock-name property
 
 has been applied to the spi tree at
 
@@ -34,36 +34,42 @@ to this mail.
 Thanks,
 Mark
 
->From 9f135787b1d29b0069059b580c1c77965e5e8af4 Mon Sep 17 00:00:00 2001
-From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
-Date: Tue, 12 Jul 2016 11:08:42 +0000
-Subject: [PATCH] spi: s3c64xx: fix reference leak to master in
- s3c64xx_spi_remove()
+>From 1ada32ede94fc91ff0f3236fcc70ae74dd0c2cb0 Mon Sep 17 00:00:00 2001
+From: Andi Shyti <andi.shyti@samsung.com>
+Date: Tue, 12 Jul 2016 19:02:11 +0900
+Subject: [PATCH] spi: s3c64xx: document the clocks and the clock-name property
 
-Once a spi_master_get() call succeeds, we need an additional
-spi_master_put() call to free the memory, otherwise we will
-leak a reference to master. Fix by removing the unnecessary
-spi_master_get() call.
+These two properties were not documented but used in the spi
+dts. Add the related documentation.
 
-Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
-Reviewed-by: Andi Shyti <andi.shyti@samsung.com>
+Suggested-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Signed-off-by: Andi Shyti <andi.shyti@samsung.com>
+Reviewed-by: Michael Turquette <mturquette@baylibre.com>
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- drivers/spi/spi-s3c64xx.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ Documentation/devicetree/bindings/spi/spi-samsung.txt | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
-index df88fa161d8a..001c9ebf884d 100644
---- a/drivers/spi/spi-s3c64xx.c
-+++ b/drivers/spi/spi-s3c64xx.c
-@@ -1211,7 +1211,7 @@ err0:
+diff --git a/Documentation/devicetree/bindings/spi/spi-samsung.txt b/Documentation/devicetree/bindings/spi/spi-samsung.txt
+index ab4f0a46e859..49028a4f5df1 100644
+--- a/Documentation/devicetree/bindings/spi/spi-samsung.txt
++++ b/Documentation/devicetree/bindings/spi/spi-samsung.txt
+@@ -24,6 +24,15 @@ Required SoC Specific Properties:
+ - dma-names: Names for the dma channels. There must be at least one channel
+   named "tx" for transmit and named "rx" for receive.
  
- static int s3c64xx_spi_remove(struct platform_device *pdev)
- {
--	struct spi_master *master = spi_master_get(platform_get_drvdata(pdev));
-+	struct spi_master *master = platform_get_drvdata(pdev);
- 	struct s3c64xx_spi_driver_data *sdd = spi_master_get_devdata(master);
++- clocks: specifies the clock IDs provided to the SPI controller; they are
++  required for interacting with the controller itself, for synchronizing the bus
++  and as I/O clock (the latter is required by exynos5433 and exynos7).
++
++- clock-names: string names of the clocks in the 'clocks' property; for all the
++  the devices the names must be "spi", "spi_busclkN" (where N is determined by
++  "samsung,spi-src-clk"), while Exynos5433 should specify a third clock
++  "spi_ioclk" for the I/O clock.
++
+ Required Board Specific Properties:
  
- 	pm_runtime_get_sync(&pdev->dev);
+ - #address-cells: should be 1.
 -- 
 2.8.1
