@@ -1,46 +1,47 @@
-From: stillcompiling@gmail.com (Joshua Clayton)
-Date: Thu, 14 Jul 2016 10:01:12 -0700
-Subject: [PATCH v5 3/3] clk: imx6: Fix procedure to switch the parent of
- LDB_DI_CLK
-In-Reply-To: <1468235521-3163-3-git-send-email-p.zabel@pengutronix.de>
-References: <1468235521-3163-1-git-send-email-p.zabel@pengutronix.de>
- <1468235521-3163-3-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <5787C558.5060904@gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 14 Jul 2016 14:04:14 -0300
+Subject: [PATCH 3/6] ARM: dts: imx25: substitute NO_PAD_CTL by the
+ respective reset value
+In-Reply-To: <20160713062521.GZ16643@pengutronix.de>
+References: <1468145266-7567-4-git-send-email-uwe@kleine-koenig.org>
+ <CAOMZO5A=6HLPacwp0seBn_s+AVF7zaUjUO8wOb1WoyvU1JrH7A@mail.gmail.com>
+ <20160711073721.GM16643@pengutronix.de>
+ <CAOMZO5ASsA88TQLAPdyit0xr3Lqh8e+8C_ZgoUa7w2rZxTb-ag@mail.gmail.com>
+ <20160712073859.GQ16643@pengutronix.de>
+ <CAOMZO5B+grtejgSMKrZMT9inEdh+bL0smZKE52qtcQD1NCHrqQ@mail.gmail.com>
+ <CAOMZO5D2E_G4ySUnj=yadziSunwMBSVZs-Rw=EvNybFKs2iD3w@mail.gmail.com>
+ <20160712191541.GY16643@pengutronix.de>
+ <CAOMZO5C3eQFfs=ZS5nfDw6XnEAgfcc_+W2n0y8Xd-zsTfd-+gA@mail.gmail.com>
+ <CAOMZO5B4CUr_-U3s+fo-O_BcREWQijffXFeRmUPiwDWdhY07pQ@mail.gmail.com>
+ <20160713062521.GZ16643@pengutronix.de>
+Message-ID: <CAOMZO5BtP29PD-vf1WKG0yd7OJy9A0Sthn4EQ+CuF1As2cmKoA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Philipp,
-My team is testing this morning on a board that exhibits
-intermittent lvds failures that seem to match this problem.
-(black screen and a "dc stop timeout" message in the kernel log)
-With this patch set, the screen failed to come up on the second boot :(
-But...
-On 07/11/2016 04:12 AM, Philipp Zabel wrote:
-> +static void init_ldb_clks(struct device_node *np, void __iomem *ccm_base)
-> +{
-> +	unsigned int reg;
-> +	unsigned int sel[2][4];
-> +	int i;
-> +
-to feel confident the new code was running, one of our engineers added the line
-        pr_warn("ccm: In init_ldb_clks\n");
-right here.
-> +	reg = readl_relaxed(ccm_base + CCM_CS2CDR);
-> +	sel[0][0] = (reg >> CS2CDR_LDB_DI0_CLK_SEL_SHIFT) & 7;
-> +	sel[1][0] = (reg >> CS2CDR_LDB_DI1_CLK_SEL_SHIFT) & 7;
-> +
-> +	sel[0][3] = sel[0][2] = sel[0][1] = sel[0][0];
-> +	sel[1][3] = sel[1][2] = sel[1][1] = sel[1][0];
-> +
-> +	of_assigned_ldb_sels(np, &sel[0][3], &sel[1][3]);
+Hi Uwe,
+
+On Wed, Jul 13, 2016 at 3:25 AM, Uwe Kleine-K?nig
+<u.kleine-koenig@pengutronix.de> wrote:
+
+> Which U-Boot did you test? Mainline or the vendor variant?
 >
-...
+> Can you provide the output of
+>
+>         md 0x43fac000+0x584
 
-We have now booted that same board successfully about 30 times
-with your patches plus the extra printf .?!??
+Here it goes:
+=> md.l 0x43fac584 1
+43fac584: 00000000                               ....
 
-Not sure what that means in terms of delay and synchronization, so
-even though we are not finished testing I thought I should post that result.
+>
+> in U-Boot (which for sure has a different syntax that I don't know) and
+> from Linux
+>
+>         memtool md 0x43fac000+0x584
 
-Thanks,
-Joshua Clayton
+The memtool utility version I have is broken for mx25, so I can't dump
+this register easily in Linux.
+
+Regards,
+
+Fabio Estevam
