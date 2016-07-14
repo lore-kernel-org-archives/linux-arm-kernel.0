@@ -1,47 +1,27 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 14 Jul 2016 11:52:17 +0100
+From: pbonzini@redhat.com (Paolo Bonzini)
+Date: Thu, 14 Jul 2016 13:01:30 +0200
 Subject: [PATCH v9 00/17] KVM: arm64: GICv3 ITS emulation
-In-Reply-To: <20160713015909.28793-1-andre.przywara@arm.com>
+In-Reply-To: <57876EE1.3020905@arm.com>
 References: <20160713015909.28793-1-andre.przywara@arm.com>
-Message-ID: <57876EE1.3020905@arm.com>
+ <57876EE1.3020905@arm.com>
+Message-ID: <bbc2c000-34c9-da9b-63ed-f322a18ad7fa@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/07/16 02:58, Andre Przywara wrote:
-> Hi,
+
+
+On 14/07/2016 12:52, Marc Zyngier wrote:
+> I'm done with that round. Couple of annoying bugs, and still a bunch of
+> loose ends to be tied. Timing wise, this is getting pretty tight for
+> 4.8, so unless you address the comments very quickly, it will be a miss
+> again.
 > 
-> this series allows those KVM guests that use an emulated GICv3 to use LPIs
-> as well, though in the moment this is limited to emulated PCI devices.
-> This is based on kvmarm/queue, which now only features the new VGIC
-> implementation.
-> 
-> Another round of changes after another round of review: some bugs fixed,
-> some reworks in various places. The register sanitisation has been changed
-> to be more readable and to add some missing masking.
-> The MMIO dispatching has been simplified (region type no longer in each
-> register description). Also the its_lock is now taken already in the
-> command dispatching function instead of each command handler, which
-> removes quite some "goto out_unlock;" and return value variables.
-> Also it turned out we can get rid of the special vgic_put_irq_locked()
-> variant. The changelog below holds a more detailed list.
-> 
-> You can find all of this code (and the prerequisites) in the
-> its-emul/v9 branch of my repository [1].
-> This has been briefly tested on the model and on GICv3 hardware, with
-> lockdep debugging enabled. If you have GICv3 capable hardware, please
-> test it on your setup.
-> Also of course any review comments are very welcome!
+> My plan is to cut the 4.8 branch at the end of this week, so you have
+> until then to repost something that I can stick into -next.
 
-I'm done with that round. Couple of annoying bugs, and still a bunch of
-loose ends to be tied. Timing wise, this is getting pretty tight for
-4.8, so unless you address the comments very quickly, it will be a miss
-again.
+FYI I'm on vacation on July 24-31, and will send the pull request to
+Linus around Aug 2.  If necessary you can delay things by one more week
+and send a pull request to Radim around the end of July after the merge
+window has officially started already.
 
-My plan is to cut the 4.8 branch at the end of this week, so you have
-until then to repost something that I can stick into -next.
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Paolo
