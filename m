@@ -1,74 +1,41 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 14 Jul 2016 17:33:01 +0100
-Subject: Applied "spi: s3c64xx: add exynos5433 spi compatible" to the spi tree
-In-Reply-To: <1467989201-14661-2-git-send-email-andi.shyti@samsung.com>
-Message-ID: <E1bNjZN-0001qI-NZ@debutante>
+From: ralf@ramses-pyramidenbau.de (Ralf Ramsauer)
+Date: Thu, 14 Jul 2016 18:48:57 +0200
+Subject: [PATCH] ARM: tegra: fix erroneous address in dts
+Message-ID: <1468514937-23250-1-git-send-email-ralf@ramses-pyramidenbau.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch
+c90bb7b enabled the high speed UARTs of the Jetson TK1. The address
+specification inside the dts is wrong. Fix it and use the correct
+address.
 
-   spi: s3c64xx: add exynos5433 spi compatible
-
-has been applied to the spi tree at
-
-   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/spi.git 
-
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
-
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
-
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
-
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
-
-Thanks,
-Mark
-
->From c068042bf0872c9121f4a6eab281dd63f61df5d3 Mon Sep 17 00:00:00 2001
-From: Andi Shyti <andi.shyti@samsung.com>
-Date: Tue, 12 Jul 2016 19:02:10 +0900
-Subject: [PATCH] spi: s3c64xx: add exynos5433 spi compatible
-
-The samsung,exynos5433-spi has some peculiarities that bring the
-need of creating a new compatible in the binding.
-
-One of those is the 3-clocks controller management where the spi
-is fed with three clocks: "spi", "busclkN" and "ioclk".
-
-By adding the exynos5433-spi, we deprecate the exynos7 compatible
-and discourage its use.
-
-Signed-off-by: Andi Shyti <andi.shyti@samsung.com>
-Reviewed-by: Michael Turquette <mturquette@baylibre.com>
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Reviewed-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-Signed-off-by: Mark Brown <broonie@kernel.org>
+Fixes: c90bb7b9b9 ("ARM: tegra: Add high speed UARTs to Jetson TK1 device tree")
+Signed-off-by: Ralf Ramsauer <ralf@ramses-pyramidenbau.de>
 ---
- Documentation/devicetree/bindings/spi/spi-samsung.txt | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/tegra124-jetson-tk1.dts | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/spi/spi-samsung.txt b/Documentation/devicetree/bindings/spi/spi-samsung.txt
-index 930bc7349271..ab4f0a46e859 100644
---- a/Documentation/devicetree/bindings/spi/spi-samsung.txt
-+++ b/Documentation/devicetree/bindings/spi/spi-samsung.txt
-@@ -9,7 +9,8 @@ Required SoC Specific Properties:
-     - samsung,s3c2443-spi: for s3c2443, s3c2416 and s3c2450 platforms
-     - samsung,s3c6410-spi: for s3c6410 platforms
-     - samsung,s5pv210-spi: for s5pv210 and s5pc110 platforms
--    - samsung,exynos7-spi: for exynos7 platforms
-+    - samsung,exynos5433-spi: for exynos5433 compatible controllers
-+    - samsung,exynos7-spi: for exynos7 platforms <DEPRECATED>
- 
- - reg: physical base address of the controller and length of memory mapped
-   region.
+diff --git a/arch/arm/boot/dts/tegra124-jetson-tk1.dts b/arch/arm/boot/dts/tegra124-jetson-tk1.dts
+index 941f362..f4d8125 100644
+--- a/arch/arm/boot/dts/tegra124-jetson-tk1.dts
++++ b/arch/arm/boot/dts/tegra124-jetson-tk1.dts
+@@ -1386,7 +1386,7 @@
+ 	 *   Pin 41: BR_UART1_TXD
+ 	 *   Pin 44: BR_UART1_RXD
+ 	 */
+-	serial at 70006000 {
++	serial at 0,70006000 {
+ 		compatible = "nvidia,tegra124-hsuart", "nvidia,tegra30-hsuart";
+ 		status = "okay";
+ 	};
+@@ -1398,7 +1398,7 @@
+ 	 *   Pin 71: UART2_CTS_L
+ 	 *   Pin 74: UART2_RTS_L
+ 	 */
+-	serial at 70006040 {
++	serial at 0,70006040 {
+ 		compatible = "nvidia,tegra124-hsuart", "nvidia,tegra30-hsuart";
+ 		status = "okay";
+ 	};
 -- 
-2.8.1
+2.7.3
