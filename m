@@ -1,31 +1,81 @@
-From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Thu, 14 Jul 2016 13:07:30 -0500
-Subject: [PATCH] arm64: Add config to limit user space to 47bits
-In-Reply-To: <e24481b9-fb6a-aead-a72b-43b7d561b940@suse.de>
-References: <1468424567-15925-1-git-send-email-agraf@suse.de>
- <CAKv+Gu_QH=sZi--FVqHebd1P+6UMzEqWQQ1u3Y170B7cND8Kgw@mail.gmail.com>
- <578668D3.6010406@suse.de> <20160714010812.GA17138@e103986-lin>
- <837E6456-4718-45D7-8EE7-E28E11DB8BD3@suse.de>
- <VI1PR0801MB1423AC2E8EDEE7EA33A6233196320@VI1PR0801MB1423.eurprd08.prod.outlook.com>
- <e24481b9-fb6a-aead-a72b-43b7d561b940@suse.de>
-Message-ID: <e48483fc-8dda-3fe2-c3fe-46b93aa41973@arm.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Thu, 14 Jul 2016 11:10:18 -0700
+Subject: [PATCH v2 01/11] mm: Implement stack frame object validation
+In-Reply-To: <20160714054842.6zal5rqawpgew26r@treble>
+References: <1468446964-22213-1-git-send-email-keescook@chromium.org>
+ <1468446964-22213-2-git-send-email-keescook@chromium.org>
+ <CALCETrVDJDjdoh7yvOPd=_5twQnzQRhe8G2KLaRw-NnA1Uf__g@mail.gmail.com>
+ <CAGXu5jLPZiRJx8n3_7GW2bufiuUgE9=c6dQcNxDRPHMU72sD9g@mail.gmail.com>
+ <20160714054842.6zal5rqawpgew26r@treble>
+Message-ID: <CAGXu5jLv_pMRqdaM72D_FTQzxoGxgcEqxpvUzqwgjOmZ8D-zSw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/14/2016 02:14 AM, Alexander Graf wrote:
->
-> On 14.07.16 09:03, Zheng Xu wrote:
->> LuaJIT also fix the 48VA issue by allocating heap memory below 47 bits.
+On Wed, Jul 13, 2016 at 10:48 PM, Josh Poimboeuf <jpoimboe@redhat.com> wrote:
+> On Wed, Jul 13, 2016 at 03:04:26PM -0700, Kees Cook wrote:
+>> On Wed, Jul 13, 2016 at 3:01 PM, Andy Lutomirski <luto@amacapital.net> wrote:
+>> > On Wed, Jul 13, 2016 at 2:55 PM, Kees Cook <keescook@chromium.org> wrote:
+>> >> This creates per-architecture function arch_within_stack_frames() that
+>> >> should validate if a given object is contained by a kernel stack frame.
+>> >> Initial implementation is on x86.
+>> >>
+>> >> This is based on code from PaX.
+>> >>
+>> >
+>> > This, along with Josh's livepatch work, are two examples of unwinders
+>> > that matter for correctness instead of just debugging.  ISTM this
+>> > should just use Josh's code directly once it's been written.
 >>
->> For mozjs issue, if there are pointers to .rodata, it can be a problem. Does it happen on master and do we have any case to reproduce the issue so that I can take a look?
+>> Do you have URL for Josh's code? I'd love to see what happening there.
 >
-> mozjs is fixed with your patch. I backported it to all of the ancient
-> versions of mozjs, so we're probably good there. Though every distro
-> will have to redo that work in their own trees, because older versions
-> of mozjs are no longer maintained upstream. If you want to be a hero,
-> you can try to port polkitd and gnome to use more recent versions of
-> mozjs ;). Or maybe they can already and we just messed up packaging.
+> The code is actually going to be 100% different next time around, but
+> FWIW, here's the last attempt:
+>
+>   https://lkml.kernel.org/r/4d34d452bf8f85c7d6d5f93db1d3eeb4cba335c7.1461875890.git.jpoimboe at redhat.com
+>
+> In the meantime I've realized the need to rewrite the x86 core stack
+> walking code to something much more manageable so we don't need all
+> these unwinders everywhere.  I'll probably post the patches in the next
+> week or so.  I'll add you to the CC list.
 
+Awesome!
 
-I have a polkit built against mozjs45, getting it to work on the other 
-hand is the yak of the day...
+> With the new interface I think you'll be able to do something like:
+>
+>         struct unwind_state;
+>
+>         unwind_start(&state, current, NULL, NULL);
+>         unwind_next_frame(&state);
+>         oldframe = unwind_get_stack_pointer(&state);
+>
+>         unwind_next_frame(&state);
+>         frame = unwind_get_stack_pointer(&state);
+>
+>         do {
+>                 if (obj + len <= frame)
+>                         return blah;
+>                 oldframe = frame;
+>                 frame = unwind_get_stack_pointer(&state);
+>
+>         } while (unwind_next_frame(&state);
+>
+> And then at the end there'll be some (still TBD) way to query whether it
+> reached the last syscall pt_regs frame, or if it instead encountered a
+> bogus frame pointer along the way and had to bail early.
+
+Sounds good to me. Will there be any frame size information available?
+Right now, the unwinder from PaX just drops 2 pointers (saved frame,
+saved ip) from the delta of frame address to find the size of the
+actual stack area used by the function. If I could shave things like
+padding and possible stack canaries off the size too, that would be
+great.
+
+Since I'm aiming the hardened usercopy series for 4.8, I figure I'll
+just leave this unwinder in for now, and once yours lands, I can rip
+it out again.
+
+-Kees
+
+-- 
+Kees Cook
+Chrome OS & Brillo Security
