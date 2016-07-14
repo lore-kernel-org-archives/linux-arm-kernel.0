@@ -1,55 +1,41 @@
-From: nwatters@codeaurora.org (nwatters at codeaurora.org)
-Date: Thu, 14 Jul 2016 13:33:50 -0400
-Subject: [PATCH v2] iommu/arm-smmu-v3: limit use of 2-level stream tables
-In-Reply-To: <20160714133107.GK29455@arm.com>
-References: <1468260059-10759-1-git-send-email-nwatters@codeaurora.org>
- <1468347560-29924-1-git-send-email-nwatters@codeaurora.org>
- <20160714133107.GK29455@arm.com>
-Message-ID: <103772215d30a7c862f66200bbcc16ea@codeaurora.org>
+From: dhdang@apm.com (Duc Dang)
+Date: Thu, 14 Jul 2016 10:37:25 -0700
+Subject: [PATCH v8 0/4] perf: Add APM X-Gene SoC Performance Monitoring
+ Unit driver
+In-Reply-To: <CACgAJHyBt4TCoDjm0XGyX8usD_Wt_-7_JA918Wr4oF567wY_EA@mail.gmail.com>
+References: <1468263944-10634-1-git-send-email-ttnguyen@apm.com>
+ <20160714131602.GJ29455@arm.com>
+ <CACgAJHyBt4TCoDjm0XGyX8usD_Wt_-7_JA918Wr4oF567wY_EA@mail.gmail.com>
+Message-ID: <CADaLNDnNVC48Ce1A+KU2WMULkY+skKVSm1GpaoQ6HvAEmscD=A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016-07-14 09:31, Will Deacon wrote:
-> On Tue, Jul 12, 2016 at 02:19:20PM -0400, Nate Watterson wrote:
->> In the current arm-smmu-v3 driver, all smmus that support 2-level
->> stream tables are being forced to use them. This is suboptimal for
->> smmus that support fewer stream id bits than would fill in a single
->> second level table. This patch limits the use of 2-level tables to
->> smmus that both support the feature and whose first level table can
->> possibly contain more than a single entry.
-> 
-> Just to be clear, what exactly are you seeing as being suboptimal here?
-> Is it the memory wastage from overallocating the L2 table, or something
-> more?
+On Thu, Jul 14, 2016 at 10:28 AM, Tai Tri Nguyen <ttnguyen@apm.com> wrote:
+>
+> Hi Will,
+>
+> On Thu, Jul 14, 2016 at 6:16 AM, Will Deacon <will.deacon@arm.com> wrote:
+> > On Mon, Jul 11, 2016 at 12:05:40PM -0700, Tai Nguyen wrote:
+> >> In addition to the X-Gene ARM CPU performance monitoring unit (PMU), there
+> >> are PMU for the SoC system devices such as L3 cache(s), I/O bridge(s),
+> >> memory controller bridges and memory. These PMU devices are loosely
+> >> architected to follow the same model as the PMU for ARM cores.
+> >
+> > You might want to add commit messages to patches 1,2 and 4, but then you
+> > can route this via the arm-soc tree.
+> >
+> > Will
+>
+> I will add the commit messages to these patches 1, 2 and 4 and rout
+> this via arm-soc tree.
+> CC: Duc (dhdang at apm.com)
 
-Disregarding the config cache, fetching an STE when 2-level tables are
-being used will require the hw to perform more memory accesses than it
-would have to with a linear table since the L1 descriptor must also be
-fetched. Presumably this is why the spec states, "ARM recommends that
-a more efficient linear table is used instead of programming SPLIT >
-LOG2SIZE".
+I will pull patch 1, 2 and 4 into xgene-next tree and send pull
+request to Arnd and Olof.
 
-My understanding is that the only benefit to using 2-level tables is
-that it can save space when stream ids are sparsely distributed. Are
-there any other compelling reasons to use them?
-
-> 
-> if it's just the memory allocation, I'd sooner restrict the span field
-> in the L1 desc.
-
-Although I am not especially concerned about the memory allocation, even
-if the span was reduced, we would still be wasting a page for the L1
-table unless L1 and L2 tables were allocated in a single 
-dmam_alloc_coherent
-call.
-
-> 
-> Will
-
-Nate
-
--- 
-Qualcomm Datacenter Technologies, Inc. on behalf of Qualcomm 
-Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a 
-Linux Foundation Collaborative Project.
+>
+> Thanks,
+> --
+> Tai
+Regards,
+Duc Dang.
