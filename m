@@ -1,22 +1,228 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 14 Jul 2016 15:52:39 +0200
-Subject: [GIT PULL 4/4] arm64: defconfig: Stuff for exynos for v4.8,
- last round
-In-Reply-To: <1468255278-32162-4-git-send-email-k.kozlowski@samsung.com>
-References: <1468255278-32162-1-git-send-email-k.kozlowski@samsung.com>
- <1468255278-32162-4-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <9991711.viBDQdn27v@wuerfel>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 14 Jul 2016 13:54:26 +0000
+Subject: [PATCH v2 02/10] irqchip: add irqchip driver for nuc900
+In-Reply-To: <578708D5.6050009@iommu.org>
+References: <1468135649-19980-1-git-send-email-vw@iommu.org>
+ <1468135649-19980-3-git-send-email-vw@iommu.org>
+ <20160713200906.GB31509@io.lakedaemon.net>
+ <578708D5.6050009@iommu.org>
+Message-ID: <20160714135426.GC31509@io.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, July 11, 2016 6:41:18 PM CEST Krzysztof Kozlowski wrote:
-> Samsung defconfig updates for ARM64 - enable drivers for
-> Exynos7 and Exynos5433 based boards:
-> 1. S2MPS clock driver,
-> 2. SoC: RTC, SPI, watchdog, EHCI, OHCI, DWC3, ADC and PWM,
-> 3. Enable Samsung SoC sound.
+Hi Wan Zongshun,
+
+On Thu, Jul 14, 2016 at 11:36:53AM +0800, Wan Zongshun wrote:
+> On 2016?07?14? 04:09, Jason Cooper wrote:
+> >On Sun, Jul 10, 2016 at 03:27:22PM +0800, Wan Zongshun wrote:
+> >>This patch is to add irqchip driver support for nuc900 plat,
+> >>current this driver only supports nuc970 SoC.
+> >>
+> >>Signed-off-by: Wan Zongshun <mcuos.com@gmail.com>
+> >>---
+> >>  arch/arm/mach-w90x900/include/mach/irqs.h |   5 +
+> >>  drivers/irqchip/Makefile                  |   1 +
+> >>  drivers/irqchip/irq-nuc900.c              | 150 ++++++++++++++++++++++++++++++
+> >>  3 files changed, 156 insertions(+)
+> >>  create mode 100644 drivers/irqchip/irq-nuc900.c
+> >>
+> >>diff --git a/arch/arm/mach-w90x900/include/mach/irqs.h b/arch/arm/mach-w90x900/include/mach/irqs.h
+> >>index 9d5cba3..3b035c6 100644
+> >>--- a/arch/arm/mach-w90x900/include/mach/irqs.h
+> >>+++ b/arch/arm/mach-w90x900/include/mach/irqs.h
+> >>@@ -59,7 +59,12 @@
+> >>  #define IRQ_KPI		W90X900_IRQ(29)
+> >>  #define IRQ_P2SGROUP	W90X900_IRQ(30)
+> >>  #define IRQ_ADC		W90X900_IRQ(31)
+> >>+
+> >>+#if !defined(CONFIG_SOC_NUC900)
+> >>  #define NR_IRQS		(IRQ_ADC+1)
+> >>+#else
+> >>+#define NR_IRQS		62
+> >>+#endif
+> >
+> >Arnd already covered this...
+> >
+> >>
+> >>  /*for irq group*/
+> >>
+> >>diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
+> >>index 38853a1..9ccd5af8a 100644
+> >>--- a/drivers/irqchip/Makefile
+> >>+++ b/drivers/irqchip/Makefile
+> >>@@ -69,3 +69,4 @@ obj-$(CONFIG_PIC32_EVIC)		+= irq-pic32-evic.o
+> >>  obj-$(CONFIG_MVEBU_ODMI)		+= irq-mvebu-odmi.o
+> >>  obj-$(CONFIG_LS_SCFG_MSI)		+= irq-ls-scfg-msi.o
+> >>  obj-$(CONFIG_EZNPS_GIC)			+= irq-eznps.o
+> >>+obj-$(CONFIG_SOC_NUC970)		+= irq-nuc900.o
+> >>diff --git a/drivers/irqchip/irq-nuc900.c b/drivers/irqchip/irq-nuc900.c
+> >>new file mode 100644
+> >>index 0000000..c4b2e39
+> >>--- /dev/null
+> >>+++ b/drivers/irqchip/irq-nuc900.c
+> >>@@ -0,0 +1,150 @@
+> >>+/*
+> >>+ * Copyright 2016 Wan Zongshun <mcuos.com@gmail.com>
+> >>+ *
+> >>+ * The code contained herein is licensed under the GNU General Public
+> >>+ * License. You may obtain a copy of the GNU General Public License
+> >>+ * Version 2 or later at the following locations:
+> >>+ *
+> >>+ * http://www.opensource.org/licenses/gpl-license.html
+> >>+ * http://www.gnu.org/copyleft/gpl.html
+> >>+ */
+> >>+
+> >>+#include <linux/module.h>
+> >>+#include <linux/init.h>
+> >>+#include <linux/irq.h>
+> >>+#include <linux/irqchip.h>
+> >>+#include <linux/irqdomain.h>
+> >>+#include <linux/io.h>
+> >>+#include <linux/ioport.h>
+> >>+#include <linux/of_address.h>
+> >>+#include <linux/of_irq.h>
+> >>+
+> >>+#include <asm/exception.h>
+> >>+#include <asm/hardirq.h>
+> >>+
+> >>+#define	REG_AIC_SCR1	0x00
+> >>+#define	REG_AIC_SCR2	0x04
+> >>+#define	REG_AIC_SCR3	0x08
+> >>+#define	REG_AIC_SCR4	0x0C
+> >>+#define	REG_AIC_SCR5	0x10
+> >>+#define	REG_AIC_SCR6	0x14
+> >>+#define	REG_AIC_SCR7	0x18
+> >>+#define	REG_AIC_SCR8	0x1C
+> >>+#define	REG_AIC_SCR9	0x20
+> >>+#define	REG_AIC_SCR10	0x24
+> >>+#define	REG_AIC_SCR11	0x28
+> >>+#define	REG_AIC_SCR12	0x2C
+> >>+#define	REG_AIC_SCR13	0x30
+> >>+#define	REG_AIC_SCR14	0x34
+> >>+#define	REG_AIC_SCR15	0x38
+> >>+#define	REG_AIC_IRSR	0x100
+> >>+#define	REG_AIC_IRSRH	0x104
+> >>+#define	REG_AIC_IASR	0x108
+> >>+#define	REG_AIC_IASRH	0x10C
+> >>+#define	REG_AIC_ISR	0x110
+> >>+#define	REG_AIC_ISRH	0x114
+> >>+#define	REG_AIC_IPER	0x118
+> >>+#define	REG_AIC_ISNR	0x120
+> >>+#define	REG_AIC_OISR	0x124
+> >>+#define	REG_AIC_IMR	0x128
+> >>+#define	REG_AIC_IMRH	0x12C
+> >>+#define	REG_AIC_MECR	0x130
+> >>+#define	REG_AIC_MECRH	0x134
+> >>+#define	REG_AIC_MDCR	0x138
+> >>+#define	REG_AIC_MDCRH	0x13C
+> >>+#define	REG_AIC_SSCR	0x140
+> >>+#define	REG_AIC_SSCRH	0x144
+> >>+#define	REG_AIC_SCCR	0x148
+> >>+#define	REG_AIC_SCCRH	0x14C
+> >>+#define	REG_AIC_EOSCR	0x150
+> >
+> >Please remove unused defines.
 > 
+> Okay.
+> 
+> >
+> >>+
+> >>+static void __iomem *aic_base;
+> >>+static struct irq_domain *aic_domain;
+> >>+
+> >>+static void nuc900_irq_mask(struct irq_data *d)
+> >>+{
+> >>+	if (d->irq < 32)
+> >>+		writel(1 << (d->irq), aic_base + REG_AIC_MDCR);
+> >>+	else
+> >>+		writel(1 << (d->irq - 32), aic_base + REG_AIC_MDCRH);
+> >>+}
+> >>+
+> >>+static void nuc900_irq_ack(struct irq_data *d)
+> >>+{
+> >>+	writel(0x01, aic_base + REG_AIC_EOSCR);
+> >>+}
+> >>+
+> >>+static void nuc900_irq_unmask(struct irq_data *d)
+> >>+{
+> >>+	if (d->irq < 32)
+> >>+		writel(1 << (d->irq), aic_base + REG_AIC_MECR);
+> >>+	else
+> >>+		writel(1 << (d->irq - 32), aic_base + REG_AIC_MECRH);
+> >>+}
+> >>+
+> >>+static struct irq_chip nuc900_irq_chip = {
+> >>+	.irq_ack	= nuc900_irq_ack,
+> >>+	.irq_mask	= nuc900_irq_mask,
+> >>+	.irq_unmask	= nuc900_irq_unmask,
+> >>+};
+> >>+
+> >>+void __exception_irq_entry aic_handle_irq(struct pt_regs *regs)
+> >>+{
+> >>+	u32 hwirq;
+> >>+
+> >>+	hwirq = readl(aic_base + REG_AIC_IPER);
+> >>+	hwirq = readl(aic_base + REG_AIC_ISNR);
+> >>+	if (!hwirq)
+> >>+		writel(0x01, aic_base + REG_AIC_EOSCR);
+> >
+> >Could you explain what's going on here?
+> 
+> AIC_IPER, When the AIC generates the interrupt, VECTOR represents
+> the interrupt channel number that is active, enabled, and has the
+> highest priority.
+> 
+> The value of VECTOR is copied to the register AIC_ISNR thereafter by
+> the AIC. This register was restored a value 0 after it was read by
+> the
+> interrupt handler.
 
-Merged into next/arm64, thanks!
+So, iiuc, the first readl() of AIC_IPER kicks the AIC to copy the value
+of VECTOR into AIC_ISNR?  Then we can read it?
 
-	Arnd
+If so, please add a comment above the code explaining that.
+
+> So I must read two registers for one irq number, after read IPER,
+> the ISNR(bit0:5) will be updated. ISNR value has no need do offset,
+> it is better than read IPER(bit2:7).
+
+But you aren't using the value from the first readl(...AIC_IPER)?  You
+overwrite hwirq with the value from the second readl(...AIC_ISNR)
+...
+
+The first part of your explaination makes sense, but this part isn't
+clear to me.
+
+
+> ?writel(0x01, aic_base + REG_AIC_EOSCR);??seems not necessary here,
+> since irqchip has the ack interface. I will remove it.
+
+Ok, thanks.
+
+> This AIC_EOSCR register is used by the interrupt service routine to
+> indicate that it is completely served. Thus, the
+> interrupt handler can write any value to this register to indicate
+> the end of its interrupt service.
+
+A short comment in the ack routine would be helpful.
+
+
+> >>+IRQCHIP_DECLARE(nuc900, "nuvoton,nuc900-aic", aic_of_init);
+> >
+> >afaict, there is no 'nuc900', that's a family.  If so, this compatible
+> >needs to be 'nuvoton,nuc970-aic'.
+> >
+> 
+> IRQCHIP_DECLARE(nuvoton, "nuvoton,nuc900-aic", aic_of_init);, change
+> nuc900 to nuvoton, ok?
+
+No, I was only talking about the second argument.  The compatible
+string.  For devicetree, it needs to refer to a specific model number.
+I suspect 'nuc900' is equivalent to saying 'nuc9xx'.  Meaning it refers
+to a family of devices.  The compatible string needs to refer
+specifically to the first model that the binding is compatible with.  In
+this case, I presume that would be 'nuvoton,nuc970-aic'.
+
+thx,
+
+Jason.
