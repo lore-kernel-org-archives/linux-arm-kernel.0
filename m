@@ -1,103 +1,166 @@
-From: linux@rempel-privat.de (Oleksij Rempel)
-Date: Thu, 14 Jul 2016 13:47:05 +0200
-Subject: [PATCH] arm: dts: sun7i-a20-bananapi: name the GPIO lines
-Message-ID: <1468496825-4896-1-git-send-email-linux@rempel-privat.de>
+From: minghsiu.tsai@mediatek.com (Minghsiu Tsai)
+Date: Thu, 14 Jul 2016 20:17:57 +0800
+Subject: [PATCH 0/4] Add MT8173 MDP Driver 
+Message-ID: <1468498681-19955-1-git-send-email-minghsiu.tsai@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This names the GPIO lines on the Banana Pi board in accordance with
-the A20_Banana_Pi v1.4 Specification.
+==============
+ Introduction
+==============
 
-This will make these line names reflect through to userspace
-so that they can easily be identified and used with the new
-character device ABI.
+The purpose of this series is to add the driver for Media Data Path HW embedded in the Mediatek's MT8173 SoC.
+MDP is used for scaling and color space conversion.
 
-Some care has been taken to name all lines, not just those used
-by the external connectors, also lines that are muxed into some
-other function than GPIO: these are named "[FOO]" so that users
-can see with lsgpio what all lines are used for.
+It could convert V4L2_PIX_FMT_MT21 to V4L2_PIX_FMT_NV12M or V4L2_PIX_FMT_YUV420M.
 
-Ps: most of the text was taken from Linux Wallej patch.
+NV12M/YUV420M/MT21 -> MDP -> NV12M/YUV420M
 
-Cc: devicetree at vger.kernel.org
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: Chen-Yu Tsai <wens@csie.org>
-Signed-off-by: Oleksij Rempel <linux@rempel-privat.de>
----
- arch/arm/boot/dts/sun7i-a20-bananapi.dts | 60 ++++++++++++++++++++++++++++++++
- 1 file changed, 60 insertions(+)
+This patch series rely on MTK VPU driver in patch series "Add MT8173 Video Encoder Driver and VPU Driver"[1] and "Add MT8173 Video Decoder Driver"[2].
+MDP driver rely on VPU driver to load, communicate with VPU.
 
-diff --git a/arch/arm/boot/dts/sun7i-a20-bananapi.dts b/arch/arm/boot/dts/sun7i-a20-bananapi.dts
-index 67c8a76..7529be1 100644
---- a/arch/arm/boot/dts/sun7i-a20-bananapi.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-bananapi.dts
-@@ -178,6 +178,66 @@
- };
- 
- &pio {
-+	/*
-+	 * Legend: proper name = the GPIO line is used as GPIO
-+	 *         NC = not connected (not routed from the SoC)
-+	 *         "[PER]" = pin is muxed for peripheral (not GPIO)
-+	 *         "" = no idea, schematic doesn't say, could be
-+	 *              unrouted (not connected to any external pin)
-+	 *         LSEC = Low Speed External Connector
-+	 *         HSEC = High Speed External Connector
-+	 */
-+	gpio-line-names =
-+		/* PA */
-+		"[ERXD3]", "[ERXD2]", "[ERXD1]", "[ERXD0]", "[ETXD3]",
-+			"[ETXD2]", "[ETXD1]", "[ETXD0]",
-+		"[ERXCK]", "[ERXERR]", "[ERXDV]", "[EMDC]", "[EMDIO]",
-+			"[ETXEN]", "[ETXCK]", "[ECRS]",
-+		"[ECOL]", "[ETXERR]", "", "", "", "", "", "",
-+		"", "", "", "", "", "", "", "",
-+		/* PB */
-+		"[PMU-SCK]", "[PMU-SDA]", "", "", "", "NC", "NC", "NC",
-+		"NC", "[USB0-DRV]", "NC", "NC", "NC", "NC", "", "",
-+		"", "", "", "", "SCL", "SDA", "", "",
-+		"", "", "", "", "", "", "", "",
-+		/* PC */
-+		"", "", "", "", "", "", "", "",
-+		"", "", "", "", "", "", "", "",
-+		"", "", "", "", "", "", "", "",
-+		"", "", "", "", "", "", "", "",
-+		/* PD */
-+		"", "", "", "", "", "", "", "",
-+		"", "", "", "", "", "", "", "",
-+		"", "", "", "", "", "", "", "",
-+		"", "", "", "", "", "", "", "",
-+		/* PE */
-+		"", "", "", "", "", "", "", "",
-+		"", "", "", "", "", "", "", "",
-+		"", "", "", "", "", "", "", "",
-+		"", "", "", "", "", "", "", "",
-+		/* PF */
-+		"[SD0-D1]", "[SD0-D0]", "[SD0-CLK]", "[SD0-CMD]", "[SD0-D3]",
-+			"[SD0-D2]", "", "",
-+		"", "", "", "", "", "", "", "",
-+		"", "", "", "", "", "", "", "",
-+		"", "", "", "", "", "", "", "",
-+		/* PG */
-+		"", "", "", "", "", "", "", "",
-+		"", "", "", "", "", "", "", "",
-+		"", "", "", "", "", "", "", "",
-+		"", "", "", "", "", "", "", "",
-+		/* PH */
-+		"TXD0", "RXD0", "IO-1", "PH3", "[USB0-IDDET]", "PH5", "", "",
-+		"", "", "[SD0-DET]", "", "", "", "", "",
-+		"NC", "", "", "", "IO-4", "IO-5", "NC", "[EMAC-PWR-EN]",
-+		"[LED1]", "NC", "NC", "NC", "", "", "", "",
-+		/* PI */
-+		"", "", "", "IO-GCLK", "NC", "NC", "NC", "NC",
-+		"NC", "NC", "[SPI-CE0]", "[SPI-CLK]", "[SPI-MOSI]",
-+			"[SPI-MISO]", "[SPI-CE1]", "NC",
-+		"IO-6", "IO-3", "IO-2", "IO-0", "", "", "", "",
-+		"", "", "", "", "", "", "", "";
-+
- 	usb0_id_detect_pin: usb0_id_detect_pin at 0 {
- 		allwinner,pins = "PH4";
- 		allwinner,function = "gpio_in";
--- 
-2.7.4
+Internally the driver uses videobuf2 framework and MTK IOMMU and MTK SMI both have been merged in v4.6-rc1.
+
+[1]https://patchwork.kernel.org/patch/9002171/
+[2]https://patchwork.kernel.org/patch/9141245/
+
+==================
+ Device interface
+==================
+
+In principle the driver bases on v4l2 memory-to-memory framework:
+it provides a single video node and each opened file handle gets its own private context with separate buffer queues. Each context consist of 2 buffer queues: OUTPUT (for source buffers) and CAPTURE (for destination buffers).
+OUTPUT and CAPTURE buffer could be MMAP or DMABUF memory type.
+
+v4l2-compliance test output:
+localhost ~ # v4l2-compliance -d /dev/image-proc0
+v4l2-compliance SHA   : 3d225130559e8578dce347052bee3813ddf08f28
+
+Driver Info:
+        Driver name   : mtk-mdp
+        Card type     : 14001000.rdma
+        Bus info      : platform:mt8173
+        Driver version: 3.18.0
+        Capabilities  : 0x84204000
+                Video Memory-to-Memory Multiplanar
+                Streaming
+                Extended Pix Format
+                Device Capabilities
+        Device Caps   : 0x04204000
+                Video Memory-to-Memory Multiplanar
+                Streaming
+                Extended Pix Format
+
+Compliance test for device /dev/image-proc0 (not using libv4l2):
+
+Required ioctls:
+        test VIDIOC_QUERYCAP: OK
+
+Allow for multiple opens:
+        test second video open: OK
+        test VIDIOC_QUERYCAP: OK
+        test VIDIOC_G/S_PRIORITY: OK
+
+Debug ioctls:
+        test VIDIOC_DBG_G/S_REGISTER: OK (Not Supported)
+        test VIDIOC_LOG_STATUS: OK (Not Supported)
+
+Input ioctls:
+        test VIDIOC_G/S_TUNER/ENUM_FREQ_BANDS: OK (Not Supported)
+        test VIDIOC_G/S_FREQUENCY: OK (Not Supported)
+        test VIDIOC_S_HW_FREQ_SEEK: OK (Not Supported)
+        test VIDIOC_ENUMAUDIO: OK (Not Supported)
+        test VIDIOC_G/S/ENUMINPUT: OK (Not Supported)
+        test VIDIOC_G/S_AUDIO: OK (Not Supported)
+        Inputs: 0 Audio Inputs: 0 Tuners: 0
+
+Output ioctls:
+        test VIDIOC_G/S_MODULATOR: OK (Not Supported)
+        test VIDIOC_G/S_FREQUENCY: OK (Not Supported)
+        test VIDIOC_ENUMAUDOUT: OK (Not Supported)
+        test VIDIOC_G/S/ENUMOUTPUT: OK (Not Supported)
+        test VIDIOC_G/S_AUDOUT: OK (Not Supported)
+        Outputs: 0 Audio Outputs: 0 Modulators: 0
+
+Input/Output configuration ioctls:
+        test VIDIOC_ENUM/G/S/QUERY_STD: OK (Not Supported)
+        test VIDIOC_ENUM/G/S/QUERY_DV_TIMINGS: OK (Not Supported)
+        test VIDIOC_DV_TIMINGS_CAP: OK (Not Supported)
+        test VIDIOC_G/S_EDID: OK (Not Supported)
+
+        Control ioctls:
+                test VIDIOC_QUERY_EXT_CTRL/QUERYMENU: OK
+                test VIDIOC_QUERYCTRL: OK
+                test VIDIOC_G/S_CTRL: OK
+                test VIDIOC_G/S/TRY_EXT_CTRLS: OK
+                test VIDIOC_(UN)SUBSCRIBE_EVENT/DQEVENT: OK
+                test VIDIOC_G/S_JPEGCOMP: OK (Not Supported)
+                Standard Controls: 5 Private Controls: 0
+
+        Format ioctls:
+                test VIDIOC_ENUM_FMT/FRAMESIZES/FRAMEINTERVALS: OK
+                test VIDIOC_G/S_PARM: OK (Not Supported)
+                test VIDIOC_G_FBUF: OK (Not Supported)
+                test VIDIOC_G_FMT: OK
+                test VIDIOC_TRY_FMT: OK
+                test VIDIOC_S_FMT: OK
+                test VIDIOC_G_SLICED_VBI_CAP: OK (Not Supported)
+                test Cropping: OK
+                test Composing: OK
+                test Scaling: OK (Not Supported)
+
+        Codec ioctls:
+                test VIDIOC_(TRY_)ENCODER_CMD: OK (Not Supported)
+                test VIDIOC_G_ENC_INDEX: OK (Not Supported)
+                test VIDIOC_(TRY_)DECODER_CMD: OK (Not Supported)
+
+        Buffer ioctls:
+                test VIDIOC_REQBUFS/CREATE_BUFS/QUERYBUF: OK
+                test VIDIOC_EXPBUF: OK
+
+Test input 0:
+
+
+Total: 42, Succeeded: 42, Failed: 0, Warnings: 0
+
+
+Minghsiu Tsai (4):
+  VPU: mediatek: Add mdp support
+  dt-bindings: Add a binding for Mediatek MDP
+  media: Add Mediatek MDP Driver
+  arm64: dts: mediatek: Add MDP for MT8173
+
+ .../devicetree/bindings/media/mediatek-mdp.txt     |   92 ++
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi           |   80 ++
+ drivers/media/platform/Kconfig                     |   16 +
+ drivers/media/platform/Makefile                    |    2 +
+ drivers/media/platform/mtk-mdp/Makefile            |    9 +
+ drivers/media/platform/mtk-mdp/mtk_mdp_comp.c      |  159 +++
+ drivers/media/platform/mtk-mdp/mtk_mdp_comp.h      |   72 ++
+ drivers/media/platform/mtk-mdp/mtk_mdp_core.c      |  294 +++++
+ drivers/media/platform/mtk-mdp/mtk_mdp_core.h      |  233 ++++
+ drivers/media/platform/mtk-mdp/mtk_mdp_ipi.h       |  126 ++
+ drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c       | 1304 ++++++++++++++++++++
+ drivers/media/platform/mtk-mdp/mtk_mdp_m2m.h       |   22 +
+ drivers/media/platform/mtk-mdp/mtk_mdp_regs.c      |  153 +++
+ drivers/media/platform/mtk-mdp/mtk_mdp_regs.h      |   31 +
+ drivers/media/platform/mtk-mdp/mtk_mdp_vpu.c       |  140 +++
+ drivers/media/platform/mtk-mdp/mtk_mdp_vpu.h       |   41 +
+ drivers/media/platform/mtk-vpu/mtk_vpu.h           |    5 +
+ 17 files changed, 2779 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/media/mediatek-mdp.txt
+ create mode 100644 drivers/media/platform/mtk-mdp/Makefile
+ create mode 100644 drivers/media/platform/mtk-mdp/mtk_mdp_comp.c
+ create mode 100644 drivers/media/platform/mtk-mdp/mtk_mdp_comp.h
+ create mode 100644 drivers/media/platform/mtk-mdp/mtk_mdp_core.c
+ create mode 100644 drivers/media/platform/mtk-mdp/mtk_mdp_core.h
+ create mode 100644 drivers/media/platform/mtk-mdp/mtk_mdp_ipi.h
+ create mode 100644 drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c
+ create mode 100644 drivers/media/platform/mtk-mdp/mtk_mdp_m2m.h
+ create mode 100644 drivers/media/platform/mtk-mdp/mtk_mdp_regs.c
+ create mode 100644 drivers/media/platform/mtk-mdp/mtk_mdp_regs.h
+ create mode 100644 drivers/media/platform/mtk-mdp/mtk_mdp_vpu.c
+ create mode 100644 drivers/media/platform/mtk-mdp/mtk_mdp_vpu.h
+
+--
+1.7.9.5
