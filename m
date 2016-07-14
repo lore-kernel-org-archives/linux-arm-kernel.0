@@ -1,70 +1,119 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 14 Jul 2016 07:53:08 +0100
-Subject: [PATCH 2/5] remoteproc: core: Add rproc OF look-up functions
-In-Reply-To: <20160713191134.GL23833@tuxbot>
-References: <1462454983-13168-1-git-send-email-lee.jones@linaro.org>
- <1462454983-13168-3-git-send-email-lee.jones@linaro.org>
- <20160713191134.GL23833@tuxbot>
-Message-ID: <20160714065308.GA10504@dell>
+From: Zheng.Xu@arm.com (Zheng Xu)
+Date: Thu, 14 Jul 2016 07:03:54 +0000
+Subject: [PATCH] arm64: Add config to limit user space to 47bits
+In-Reply-To: <837E6456-4718-45D7-8EE7-E28E11DB8BD3@suse.de>
+References: <1468424567-15925-1-git-send-email-agraf@suse.de>
+ <CAKv+Gu_QH=sZi--FVqHebd1P+6UMzEqWQQ1u3Y170B7cND8Kgw@mail.gmail.com>
+ <578668D3.6010406@suse.de> <20160714010812.GA17138@e103986-lin>
+ <837E6456-4718-45D7-8EE7-E28E11DB8BD3@suse.de>
+Message-ID: <VI1PR0801MB1423AC2E8EDEE7EA33A6233196320@VI1PR0801MB1423.eurprd08.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 13 Jul 2016, Bjorn Andersson wrote:
+LuaJIT also fix the 48VA issue by allocating heap memory below 47 bits.
 
-> On Thu 05 May 06:29 PDT 2016, Lee Jones wrote:
-> 
-> Lee,
-> 
-> I ran into this topic again while looking into some unrelated things.
-> 
-> > diff --git a/drivers/remoteproc/remoteproc_core.c b/drivers/remoteproc/remoteproc_core.c
-> > +struct rproc *of_rproc_byindex(struct device_node *np, int index)
-> > +{
-> > +	struct rproc *rproc;
-> > +	struct device_node *rproc_node;
-> > +	struct platform_device *pdev;
-> > +	struct klist_iter i;
-> > +
-> > +	if (index < 0)
-> > +		return ERR_PTR(-EINVAL);
-> > +
-> > +	rproc_node = of_parse_phandle(np, "rprocs", index);
-> > +	if (!rproc_node)
-> 
-> As I stated before I would like for you to use the existing rproc_list,
-> as done in rproc_get_by_phandle() today.
-> 
-> But as you resend this patch, could you please make this check fallback
-> to also checking for "ti,rproc", then simply drop the existing
-> rproc_get_by_phandle() and change the call to
-> of_rproc_byindex(dev->of_node, 0) in wkup_m3_ipc.c?
-> 
-> That way we're backwards compatible with the TI wakeup M3, without
-> having to maintain the then non-standard generic rproc phandle resolver.
+For mozjs issue, if there are pointers to .rodata, it can be a problem. Does it happen on master and do we have any case to reproduce the issue so that I can take a look?
 
-I started working on this yesterday.  Should be with you soon.
+Thanks,
+Zheng
 
-> > +		return ERR_PTR(-ENODEV);
-> > +
-> > +	pdev = of_find_device_by_node(rproc_node);
-> > +	if (!pdev)
-> > +		return ERR_PTR(-ENODEV);
-> > +
-> > +	klist_iter_init(&rprocs, &i);
-> > +	while ((rproc = next_rproc(&i)) != NULL)
-> > +		if (rproc->dev.parent == &pdev->dev)
-> > +			break;
-> > +	klist_iter_exit(&i);
-> > +
-> > +	return rproc;
-> > +}
-> > +EXPORT_SYMBOL(of_rproc_byindex);
-> 
-> Regards,
-> Bjorn
+-----Original Message-----
+From: Alexander Graf [mailto:agraf at suse.de]
+Sent: 14 July 2016 14:39
+To: Steve Capper
+Cc: Ard Biesheuvel; Mark Rutland; mbrugger at suse.com; Catalin Marinas; Will Deacon; linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org; Stuart Monteith; Zheng Xu
+Subject: Re: [PATCH] arm64: Add config to limit user space to 47bits
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+
+> On 14 Jul 2016, at 03:08, Steve Capper <steve.capper@arm.com> wrote:
+>
+> Hi Alex,
+>
+> Thanks for posting this.
+>
+> On Wed, Jul 13, 2016 at 06:14:11PM +0200, Alexander Graf wrote:
+>> On 07/13/2016 05:59 PM, Ard Biesheuvel wrote:
+>>> On 13 July 2016 at 17:42, Alexander Graf <agraf@suse.de> wrote:
+>>>> Some user space applications are known to break with 48 bits
+>>>> virtual
+>>> known by whom? At least I wasn't aware of it, so could you please
+>>> share some examples?
+>>
+>> Sure! Known to me so far are:
+>>
+>>  * mozjs17
+>>  * mozjs24
+>>  * mozjs38
+>>  * js-1.8.5
+>>  * java-1.7 (older JITs, fixed in newer ones)
+>>
+>> I'm not sure if there are more, but the fact that I've run into this
+>> problem more than once doesn't make me incredibly happy :).
+>>
+>
+> I came across this too: on bootup via polkitd (which pulled in mozJS) :-(.
+
+Yup, that?s where I stumbled over it first. Gnome uses mozjs too, as do Firefox and Thunderbird obviously.
+
+>
+>>>
+>>>> address space. As interim step until the world is healed and
+>>>> everyone embraces correct code, this patch allows to only expose 47
+>>>> bits of virtual address space to user space.
+>>>>
+>>> Is this a code generation/toolchain issue?
+>>
+>> mozjs uses a single 64bit value to combine doubles, ints and pointers
+>> into a single variable. It is very smart and uses the upper
+>> 17 bits for metadata such as "which type of variable is this".
+>> Coincidentally those bits happen to overlap the "double is an
+>> infinite number" bits, so that you can also express a NaN with it.
+>> When using such a value, the upper 17 bits get masked out.
+>>
+>> That one was fixed upstream by force allocating the javascript heap
+>> starting at a fixed location which is below 47 bits.
+>>
+>> js-1.8.5 has the same as above, but also uses pointers to .rodata as
+>> javascript pointers, so it doesn't only use the heap, it also uses
+>> pointers to the library itself, which gets mapped high up the address
+>> space. I don't have a solution for that one yet.
+>
+> Is this Spidermonkey 1.8.5? I wasn't aware of this issue.
+
+Exactly. If you?re interested in fixing it, be my guest :).
+
+>
+>>
+>> IcedTea for java-1.7 had a bug where it incorrectly caused an
+>> overflow when trying to calculating a relative adrp offset from
+>> <address high up> to <address really low>, so that the resulting
+>> pointer had the upper bits set as 1s. That one is long fixed
+>> upstream, we only ran into it because we used an ancient IcedTea
+>> snapshot.
+>
+> I would recommend updating the sources used for OpenJDK anyway as
+> there have been a few other stability and performance fixes put in
+> over the last year to my knowledge.
+
+Sure, that?s what we?ve done of course. I mostly mentioned it to answer the question where I had seen problems with 48 bits VA.
+
+>
+>>
+>> My main concern however is with code that I do not know is broken today.
+>>
+>
+> I think if we set the 47-bit VA we are just ignoring the fundamental
+> problem and even allowing the problem to get worse (as future code may
+> adopt unsafe pointer tagging); thus I agree with Mark Rutland's NAK.
+
+Yeah, I?m torn on that one. I agree that we do allow broken code to work. However, going above 47 bits means we?re different from x86_64. And that *may* be a compatibility problem. Unfortunately we won?t know until at least a few hundred ISVs started to port their crufty user space code to ARM and things fell apart from time to time ;).
+
+> Personally, I would only ever tag bits in the VA space that I control
+> (i.e. at the bottom of the pointer if I enforce alignment).
+
+Don?t blame the messenger :). For code that I write I tend to agree, but we?re talking about software that is a core dependency of other code (CouchDB uses Spidermonkey, polkit uses mozjs, etc) and that has been unmaintained for almost a decade by now, written in times when 47 bits of VA was more than the contents of the whole internet ;).
+
+
+Alex
+
+IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
