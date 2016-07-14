@@ -1,80 +1,194 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 14 Jul 2016 13:09:54 +0200
-Subject: [PATCH v2 02/10] irqchip: add irqchip driver for nuc900
-In-Reply-To: <578752CD.3010408@iommu.org>
-References: <1468135649-19980-1-git-send-email-vw@iommu.org>
- <5434334.4rKzx80y6W@wuerfel> <578752CD.3010408@iommu.org>
-Message-ID: <4372420.eqVKsk1ckW@wuerfel>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Thu, 14 Jul 2016 12:11:30 +0100
+Subject: [PATCH v9 10/17] KVM: arm64: introduce new KVM ITS device
+In-Reply-To: <57874F1E.3000202@arm.com>
+References: <20160713015909.28793-1-andre.przywara@arm.com>
+ <20160713015909.28793-11-andre.przywara@arm.com> <57874F1E.3000202@arm.com>
+Message-ID: <3ec7d294-1799-f866-db5e-891552ba3196@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, July 14, 2016 4:52:29 PM CEST Wan Zongshun wrote:
+Hi,
+
+On 14/07/16 09:36, Marc Zyngier wrote:
+> On 13/07/16 02:59, Andre Przywara wrote:
+>> Introduce a new KVM device that represents an ARM Interrupt Translation
+>> Service (ITS) controller. Since there can be multiple of this per guest,
+>> we can't piggy back on the existing GICv3 distributor device, but create
+>> a new type of KVM device.
+>> On the KVM_CREATE_DEVICE ioctl we allocate and initialize the ITS data
+>> structure and store the pointer in the kvm_device data.
+>> Upon an explicit init ioctl from userland (after having setup the MMIO
+>> address) we register the handlers with the kvm_io_bus framework.
+>> Any reference to an ITS thus has to go via this interface.
+>>
+>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+>> ---
+>>  Documentation/virtual/kvm/devices/arm-vgic.txt |  25 +++--
+>>  arch/arm/kvm/arm.c                             |   1 +
+>>  arch/arm64/include/uapi/asm/kvm.h              |   2 +
+>>  include/kvm/arm_vgic.h                         |   3 +
+>>  include/uapi/linux/kvm.h                       |   2 +
+>>  virt/kvm/arm/vgic/vgic-its.c                   | 144 ++++++++++++++++++++++++-
+>>  virt/kvm/arm/vgic/vgic-kvm-device.c            |   7 +-
+>>  virt/kvm/arm/vgic/vgic-mmio-v3.c               |   2 +-
+>>  virt/kvm/arm/vgic/vgic.h                       |   8 ++
+>>  9 files changed, 183 insertions(+), 11 deletions(-)
+>>
+>> diff --git a/Documentation/virtual/kvm/devices/arm-vgic.txt b/Documentation/virtual/kvm/devices/arm-vgic.txt
+>> index 59541d4..89182f8 100644
+>> --- a/Documentation/virtual/kvm/devices/arm-vgic.txt
+>> +++ b/Documentation/virtual/kvm/devices/arm-vgic.txt
+>> @@ -4,16 +4,22 @@ ARM Virtual Generic Interrupt Controller (VGIC)
+>>  Device types supported:
+>>    KVM_DEV_TYPE_ARM_VGIC_V2     ARM Generic Interrupt Controller v2.0
+>>    KVM_DEV_TYPE_ARM_VGIC_V3     ARM Generic Interrupt Controller v3.0
+>> +  KVM_DEV_TYPE_ARM_VGIC_ITS    ARM Interrupt Translation Service Controller
+>>  
+>> -Only one VGIC instance may be instantiated through either this API or the
+>> -legacy KVM_CREATE_IRQCHIP api.  The created VGIC will act as the VM interrupt
+>> -controller, requiring emulated user-space devices to inject interrupts to the
+>> -VGIC instead of directly to CPUs.
+>> +Only one VGIC instance of the V2/V3 types above may be instantiated through
+>> +either this API or the legacy KVM_CREATE_IRQCHIP api.  The created VGIC will
+>> +act as the VM interrupt controller, requiring emulated user-space devices to
+>> +inject interrupts to the VGIC instead of directly to CPUs.
+>>  
+>>  Creating a guest GICv3 device requires a host GICv3 as well.
+>>  GICv3 implementations with hardware compatibility support allow a guest GICv2
+>>  as well.
+>>  
+>> +Creating a virtual ITS controller requires a host GICv3 (but does not depend
+>> +on having physical ITS controllers).
+>> +There can be multiple ITS controllers per guest, each of them has to have
+>> +a separate, non-overlapping MMIO region.
+>> +
+>>  Groups:
+>>    KVM_DEV_ARM_VGIC_GRP_ADDR
+>>    Attributes:
+>> @@ -39,6 +45,13 @@ Groups:
+>>        Only valid for KVM_DEV_TYPE_ARM_VGIC_V3.
+>>        This address needs to be 64K aligned.
+>>  
+>> +    KVM_VGIC_V3_ADDR_TYPE_ITS (rw, 64-bit)
+>> +      Base address in the guest physical address space of the GICv3 ITS
+>> +      control register frame. The ITS allows MSI(-X) interrupts to be
+>> +      injected into guests. This extension is optional. If the kernel
+>> +      does not support the ITS, the call returns -ENODEV.
+>> +      Only valid for KVM_DEV_TYPE_ARM_VGIC_ITS.
+>> +      This address needs to be 64K aligned and the region covers 128K.
+>>  
+>>    KVM_DEV_ARM_VGIC_GRP_DIST_REGS
+>>    Attributes:
+>> @@ -109,8 +122,8 @@ Groups:
+>>    KVM_DEV_ARM_VGIC_GRP_CTRL
+>>    Attributes:
+>>      KVM_DEV_ARM_VGIC_CTRL_INIT
+>> -      request the initialization of the VGIC, no additional parameter in
+>> -      kvm_device_attr.addr.
+>> +      request the initialization of the VGIC or ITS, no additional parameter
+>> +      in kvm_device_attr.addr.
+>>    Errors:
+>>      -ENXIO: VGIC not properly configured as required prior to calling
+>>       this attribute
+>> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+>> index 557e390..0d5c255 100644
+>> --- a/arch/arm/kvm/arm.c
+>> +++ b/arch/arm/kvm/arm.c
+>> @@ -20,6 +20,7 @@
+>>  #include <linux/errno.h>
+>>  #include <linux/err.h>
+>>  #include <linux/kvm_host.h>
+>> +#include <linux/list.h>
+>>  #include <linux/module.h>
+>>  #include <linux/vmalloc.h>
+>>  #include <linux/fs.h>
+>> diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
+>> index f209ea1..3051f86 100644
+>> --- a/arch/arm64/include/uapi/asm/kvm.h
+>> +++ b/arch/arm64/include/uapi/asm/kvm.h
+>> @@ -87,9 +87,11 @@ struct kvm_regs {
+>>  /* Supported VGICv3 address types  */
+>>  #define KVM_VGIC_V3_ADDR_TYPE_DIST	2
+>>  #define KVM_VGIC_V3_ADDR_TYPE_REDIST	3
+>> +#define KVM_VGIC_ITS_ADDR_TYPE		4
+>>  
+>>  #define KVM_VGIC_V3_DIST_SIZE		SZ_64K
+>>  #define KVM_VGIC_V3_REDIST_SIZE		(2 * SZ_64K)
+>> +#define KVM_VGIC_V3_ITS_SIZE		(2 * SZ_64K)
+>>  
+>>  #define KVM_ARM_VCPU_POWER_OFF		0 /* CPU is started in OFF state */
+>>  #define KVM_ARM_VCPU_EL1_32BIT		1 /* CPU running a 32bit VM */
+>> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+>> index 685f339..8609fac 100644
+>> --- a/include/kvm/arm_vgic.h
+>> +++ b/include/kvm/arm_vgic.h
+>> @@ -134,6 +134,7 @@ struct vgic_its {
+>>  	gpa_t			vgic_its_base;
+>>  
+>>  	bool			enabled;
+>> +	bool			initialized;
+>>  	struct vgic_io_device	iodev;
+>>  };
+>>  
+>> @@ -167,6 +168,8 @@ struct vgic_dist {
+>>  
+>>  	struct vgic_io_device	dist_iodev;
+>>  
+>> +	bool			has_its;
+>> +
+>>  	/*
+>>  	 * Contains the attributes and gpa of the LPI configuration table.
+>>  	 * Since we report GICR_TYPER.CommonLPIAff as 0b00, we can share
+>> diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
+>> index 7de96f5..d8c4c32 100644
+>> --- a/include/uapi/linux/kvm.h
+>> +++ b/include/uapi/linux/kvm.h
+>> @@ -1077,6 +1077,8 @@ enum kvm_device_type {
+>>  #define KVM_DEV_TYPE_FLIC		KVM_DEV_TYPE_FLIC
+>>  	KVM_DEV_TYPE_ARM_VGIC_V3,
+>>  #define KVM_DEV_TYPE_ARM_VGIC_V3	KVM_DEV_TYPE_ARM_VGIC_V3
+>> +	KVM_DEV_TYPE_ARM_VGIC_ITS,
+>> +#define KVM_DEV_TYPE_ARM_VGIC_ITS	KVM_DEV_TYPE_ARM_VGIC_ITS
+>>  	KVM_DEV_TYPE_MAX,
+>>  };
+>>  
+>> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+>> index 06ad94d..393ad3a 100644
+>> --- a/virt/kvm/arm/vgic/vgic-its.c
+>> +++ b/virt/kvm/arm/vgic/vgic-its.c
+>> @@ -21,6 +21,7 @@
+>>  #include <linux/kvm.h>
+>>  #include <linux/kvm_host.h>
+>>  #include <linux/interrupt.h>
+>> +#include <linux/uaccess.h>
+>>  
+>>  #include <linux/irqchip/arm-gic-v3.h>
+>>  
+>> @@ -79,7 +80,7 @@ static struct vgic_register_region its_registers[] = {
+>>  		VGIC_ACCESS_32bit),
+>>  };
+>>  
+>> -int vgic_its_register(struct kvm *kvm, struct vgic_its *its)
+>> +static int vgic_its_register(struct kvm *kvm, struct vgic_its *its)
 > 
-> On 2016?07?12? 16:26, Arnd Bergmann wrote:
-> > On Tuesday, July 12, 2016 3:04:42 PM CEST Wan Zongshun wrote:
-> >>>
-> >>> Ideally, this should just go away once we use SPARSE_IRQ.
-> >>
-> >> This platform also can use SPARSE_IRQ? this just a simple irq map and no
-> >> more irq number in this Soc.
-> >>
-> >
-> > SPARSE_IRQ is implied by ARCH_MULTIPLATFORM, so we will have to
-> > use it once that gets enabled.
-> >
-> > Your new irqchip driver already handles IRQ domains, so it will
-> > work out of the box with SPARSE_IRQ, but you have to change the
-> > reference to "NR_IRQS" into something else.
-> >
-> > I've prototyped a patch series to enable ARCH_MULTIPLATFORM,
-> > I hope you can start working from what I have and get it to run.
-> 
-> I go through the ARCH_MULTIPLATFORM and SPARSE_IRQ related codes, but I 
-> find I also have to define the NUC900_NR_IRQS firstly like below, so 
-> that I can init the .nr_irq.
-> 
-> +#if !defined(CONFIG_SOC_NUC970)
->   #define NUC900_NR_IRQS		(IRQ_ADC+1)
-> +#else
-> +#define NUC900_NR_IRQS		62
-> +#endif
-> 
->   DT_MACHINE_START(nuc900_dt, "Nuvoton NUC900 (Device Tree Support)")
->          .dt_compat      = nuc900_dt_compat,
-> +       .nr_irqs        = NUC900_NR_IRQS,
->   MACHINE_END
+> Please move this hunk to the previous patch...
 
-You don't need to set this for the DT based machines, this number
-is just for the set of IRQ that have a hardcoded mapping. With DT,
-they get dynamically allocated as required.
+Doing this provokes a compilation warning about an unused function in
+the previous patch then.
+I tried forth and back to fix this (and a couple of other occasions),
+but it was either hideous, invoked rewriting stuff needlessly, do a
+massive reordering or squashing some patches together, all of which does
+not help review.
+So this was the least problematic solution I could come up with.
 
-For the board files, you can hardcode the original definition of 32
-IRQs, but I think you don't need that if you register a legacy IRQ
-domain in mach-w90x900/irq.c.
+I just looked at deferring the addition of vgic-its.c to the Makefile
+into the very last patch and get rid of all those lines then.
+This seems to require only very small changes.
 
-> and then in my irqchip driver, I will use the NUC900_NR_IRQS:
-> 
-> +aic_domain = irq_domain_add_linear(node, NUC900_NR_IRQS,
-> +				    &aic_irq_domain_ops, NULL);
-> 
-> 
-> Is that a right usage?
+Would that be an acceptable solution?
 
-This does not look right when NUC900_NR_IRQS can have configuration
-dependent values. I can see two ways of handling it:
+Cheers,
+Andre.
 
-a) register the maximum number of IRQs that the irqchip can handle.
-   There is no real cost for having a large number here, as SPARSE_IRQ
-   ensures we only need to allocate the descriptors that are actually
-   used.
-
-b) make the number of interrupts dependent on the compatible string
-   for the irqchip, and handle NUC970 differently from the others
-   in the driver.
-
-In the meantime, I also have a series to enable multiplatform support
-for all of mach-w90x900 based on your patches, but lacking a proper
-clk driver. I'll send that to you so you can include it in your
-series (after verifying that it works, or fixing it where necessary).
-
-	Arnd
+P.S. Will fix all of the other comments.
