@@ -1,86 +1,110 @@
-From: steve.capper@arm.com (Steve Capper)
-Date: Thu, 14 Jul 2016 02:08:16 +0100
-Subject: [PATCH] arm64: Add config to limit user space to 47bits
-In-Reply-To: <578668D3.6010406@suse.de>
-References: <1468424567-15925-1-git-send-email-agraf@suse.de>
- <CAKv+Gu_QH=sZi--FVqHebd1P+6UMzEqWQQ1u3Y170B7cND8Kgw@mail.gmail.com>
- <578668D3.6010406@suse.de>
-Message-ID: <20160714010812.GA17138@e103986-lin>
+From: caesar.upstream@gmail.com (Caesar Wang)
+Date: Thu, 14 Jul 2016 09:14:57 +0800
+Subject: [PATCH v2 0/2] arm64: dts: rockchip: Support PMU for rk3399 SoCs
+In-Reply-To: <20160706112444.GB14657@leverpostej>
+References: <1467792357-9749-1-git-send-email-wxt@rock-chips.com>
+ <20160706112444.GB14657@leverpostej>
+Message-ID: <5786E791.1010906@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alex,
+Hi,
 
-Thanks for posting this.
+On 2016?07?06? 19:24, Mark Rutland wrote:
+> On Wed, Jul 06, 2016 at 04:05:55PM +0800, Caesar Wang wrote:
+>> Hello Heiko, Marc & ARM guys
+> Hi,
+>
+> These patches themselves look fine, so FWIW:
+>
+> Acked-by: Mark Rutland <mark.rutland@arm.com>
 
-On Wed, Jul 13, 2016 at 06:14:11PM +0200, Alexander Graf wrote:
-> On 07/13/2016 05:59 PM, Ard Biesheuvel wrote:
-> >On 13 July 2016 at 17:42, Alexander Graf <agraf@suse.de> wrote:
-> >>Some user space applications are known to break with 48 bits virtual
-> >known by whom? At least I wasn't aware of it, so could you please
-> >share some examples?
-> 
-> Sure! Known to me so far are:
-> 
->   * mozjs17
->   * mozjs24
->   * mozjs38
->   * js-1.8.5
->   * java-1.7 (older JITs, fixed in newer ones)
-> 
-> I'm not sure if there are more, but the fact that I've run into this
-> problem more than once doesn't make me incredibly happy :).
-> 
+Thanks your ack.
 
-I came across this too: on bootup via polkitd (which pulled in mozJS) :-(.
+>
+> The prerequisite patch from Marc [1] also largely looks fine, but there
+> are some minor details to sort out [2], so at this point in time I'm
+> guesssing this is all v4.9 material.
+>
+> Thanks,
+> Mark.
+>
+> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-July/440647.html
+> [2] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-July/441495.html
 
-> >
-> >>address space. As interim step until the world is healed and everyone
-> >>embraces correct code, this patch allows to only expose 47 bits of
-> >>virtual address space to user space.
-> >>
-> >Is this a code generation/toolchain issue?
-> 
-> mozjs uses a single 64bit value to combine doubles, ints and
-> pointers into a single variable. It is very smart and uses the upper
-> 17 bits for metadata such as "which type of variable is this".
-> Coincidentally those bits happen to overlap the "double is an
-> infinite number" bits, so that you can also express a NaN with it.
-> When using such a value, the upper 17 bits get masked out.
-> 
-> That one was fixed upstream by force allocating the javascript heap
-> starting at a fixed location which is below 47 bits.
-> 
-> js-1.8.5 has the same as above, but also uses pointers to .rodata as
-> javascript pointers, so it doesn't only use the heap, it also uses
-> pointers to the library itself, which gets mapped high up the
-> address space. I don't have a solution for that one yet.
+Okay, I saw the Marc's patch had been merged on next kernel.:-)
 
-Is this Spidermonkey 1.8.5? I wasn't aware of this issue.
 
-> 
-> IcedTea for java-1.7 had a bug where it incorrectly caused an
-> overflow when trying to calculating a relative adrp offset from
-> <address high up> to <address really low>, so that the resulting
-> pointer had the upper bits set as 1s. That one is long fixed
-> upstream, we only ran into it because we used an ancient IcedTea
-> snapshot.
-
-I would recommend updating the sources used for OpenJDK anyway as there
-have been a few other stability and performance fixes put in over the
-last year to my knowledge.
-
-> 
-> My main concern however is with code that I do not know is broken today.
-> 
-
-I think if we set the 47-bit VA we are just ignoring the fundamental
-problem and even allowing the problem to get worse (as future code may
-adopt unsafe pointer tagging); thus I agree with Mark Rutland's NAK.
-
-Personally, I would only ever tag bits in the VA space that I control
-(i.e. at the bottom of the pointer if I enforce alignment).
-
-Cheers,
--- 
-Steve
+-Caesar
+>
+>> When Jay first submitted the rk3399.dtsi upstream
+>> <https://patchwork.kernel.org/patch/8885821/> he had the PMU node in there,
+>> but then took it out because the upstream binding wasn't done yet.
+>> It looks as if the upstream stuff has landed, since in linux/master I see:
+>> 287e9357abcc DT/arm,gic-v3: Documment PPI partition support
+>> e3825ba1af3a irqchip/gic-v3: Add support for partitioned PPIs
+>> 9e2c986cb460 irqchip: Add per-cpu interrupt partitioning library
+>> 222df54fd8b7 genirq: Allow the affinity of a percpu interrupt to be set/retrieved
+>> 651e8b54abde irqdomain: Allow domain matching on irq_fwspec
+>>
+>> This series patches add to support the rk3399 SoCs PMU.
+>> I pick up the https://patchwork.kernel.org/patch/9209369/.
+>>
+>> As do some tests with ChromeOs for my rk3399 board.
+>> Tested with linus master 4.7-rc6 kernel on rk3399 board.
+>> https://github.com/Caesar-github/rockchip/tree/rk3399/pmu-upstream
+>>
+>> localhost / # perf list
+>>
+>> List of pre-defined events (to be used in -e):
+>> cpu-cycles OR cycles [Hardware event]
+>> instructions [Hardware event]
+>> cache-references [Hardware event]
+>> cache-misses [Hardware event]
+>> branch-instructions OR branches [Hardware event]
+>> branch-misses [Hardware event]
+>> bus-cycles [Hardware event]
+>> ...
+>>
+>> perf stat --cpu 0/1/2/3..... to minitor
+>> e.g. cpu0;
+>>
+>> localhost / # perf stat --cpu 0
+>>
+>> Performance counter stats for 'CPU(s) 0':
+>>
+>> 3374.917571 task-clock (msec) # 1.001 CPUs utilized [100.00%]
+>> 20 context-switches # 0.006 K/sec [100.00%]
+>> 2 cpu-migrations # 0.001 K/sec [100.00%]
+>> 55 page-faults # 0.016 K/sec
+>> 7151843 cycles # 0.002 GHz [100.00%]
+>> <not supported> stalled-cycles-frontend
+>> <not supported> stalled-cycles-backend
+>> 4272536 instructions # 0.60 insns per cycle [100.00%]
+>> 568406 branches # 0.168 M/sec [100.00%]
+>> 65652 branch-misses # 11.55% of all branches
+>>
+>> Also, 'perf top' to monitor the PMU interrupts from cpus
+>>
+>> -Caesar
+>>
+>>
+>> Changes in v2:
+>> - AS Mark comments on https://patchwork.kernel.org/patch/9209369/
+>>    remove the interrupt-affinity property, we need depend on Marc' perf
+>>    code on https://patchwork.kernel.org/patch/9209369/.
+>>
+>> Caesar Wang (2):
+>>    arm64: dts: rockchip: change all interrupts cells for 4 on rk3399 SoCs
+>>    arm64: dts: rockchip: support the pmu node for rk3399
+>>
+>>   arch/arm64/boot/dts/rockchip/rk3399.dtsi | 118 ++++++++++++++++++-------------
+>>   1 file changed, 69 insertions(+), 49 deletions(-)
+>>
+>> -- 
+>> 1.9.1
+>>
+> _______________________________________________
+> Linux-rockchip mailing list
+> Linux-rockchip at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-rockchip
