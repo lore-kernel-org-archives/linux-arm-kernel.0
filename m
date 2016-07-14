@@ -1,24 +1,25 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 14 Jul 2016 15:10:40 +0200
-Subject: [GIT PULL v3] STi SoC changes for v4.8
-In-Reply-To: <57834D9D.4070900@st.com>
-References: <57834D9D.4070900@st.com>
-Message-ID: <5162937.DKTOH8rVm0@wuerfel>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Thu, 14 Jul 2016 06:12:49 -0700
+Subject: [PATCH] PCI: xilinx: Fix return value in case of error
+In-Reply-To: <1468491046-1427-1-git-send-email-christophe.jaillet@wanadoo.fr>
+References: <1468491046-1427-1-git-send-email-christophe.jaillet@wanadoo.fr>
+Message-ID: <20160714131249.GJ3847@xsjsorenbubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, July 11, 2016 9:41:17 AM CEST Patrice Chotard wrote:
-> Highlights:
-> -----------
-> - Add a dummy L2 cache's write_sec callback as in non secure mode execution,
->     we can't get access to L2 cache secure registers
-> - Cosmetics change, in case of dump_stack, update the hardware name with a
->     more generic for the STi SoCs family
+On Thu, 2016-07-14 at 12:10:46 +0200, Christophe JAILLET wrote:
+> In function 'xilinx_pcie_init_irq_domain', the pattern used to check and
+> return error is:
+> 
+>    if (!var) {
+>       dev_err(...);
+>       return PTR_ERR(var);
+>    }
+> 
+> So the returned value in case of error is always 0, which means 'success'.
+> Change it to return -ENODEV instead.
+> 
+> Signed-off-by: Christophe JAILLET <christophe.jaillet@wanadoo.fr>
+Acked-by: S?ren Brinkmann <soren.brinkmann@xilinx.com>
 
-Merged into next/soc. Note that you can skip the "Highlights" and "-------"
-lines in the tag, just write it the way you want it to appear in the
-git history. I actually prefer normal sentences, but lists like you have
-here are also fine. Ideally start with a one-line description of
-the branch.
-
-	Arnd
+	S?ren
