@@ -1,25 +1,20 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Thu, 14 Jul 2016 06:12:49 -0700
-Subject: [PATCH] PCI: xilinx: Fix return value in case of error
-In-Reply-To: <1468491046-1427-1-git-send-email-christophe.jaillet@wanadoo.fr>
-References: <1468491046-1427-1-git-send-email-christophe.jaillet@wanadoo.fr>
-Message-ID: <20160714131249.GJ3847@xsjsorenbubuntu>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 14 Jul 2016 15:15:38 +0200
+Subject: [GIT PULL v2] STi defconfig updates for v4.8
+In-Reply-To: <578358F8.3070303@st.com>
+References: <578358F8.3070303@st.com>
+Message-ID: <4614774.mgvvIqSIoK@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2016-07-14 at 12:10:46 +0200, Christophe JAILLET wrote:
-> In function 'xilinx_pcie_init_irq_domain', the pattern used to check and
-> return error is:
+On Monday, July 11, 2016 10:29:44 AM CEST Patrice Chotard wrote:
+> warning: refname 'sti-defconfig-for-v4.8' is ambiguous.
+> Highlights:
+> -----------
+> - Enable DRM_STI for STMicroelectronics DRM Support
+> - VIDEO_STI_BDISP for STMicroelectronics BDISP 2D
 > 
->    if (!var) {
->       dev_err(...);
->       return PTR_ERR(var);
->    }
-> 
-> So the returned value in case of error is always 0, which means 'success'.
-> Change it to return -ENODEV instead.
-> 
-> Signed-off-by: Christophe JAILLET <christophe.jaillet@wanadoo.fr>
-Acked-by: S?ren Brinkmann <soren.brinkmann@xilinx.com>
 
-	S?ren
+Pulled into next/defconfig, thanks!
+
+	Arnd
