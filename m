@@ -1,20 +1,19 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 14 Jul 2016 14:16:03 +0100
-Subject: [PATCH v8 0/4] perf: Add APM X-Gene SoC Performance Monitoring
- Unit driver
-In-Reply-To: <1468263944-10634-1-git-send-email-ttnguyen@apm.com>
-References: <1468263944-10634-1-git-send-email-ttnguyen@apm.com>
-Message-ID: <20160714131602.GJ29455@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 14 Jul 2016 15:17:02 +0200
+Subject: [GIT PULL] omap2plus_defconfig fix for v4.8 merge window
+In-Reply-To: <20160711161112.GA28563@atomide.com>
+References: <20160711161112.GA28563@atomide.com>
+Message-ID: <6564922.rj3i88MBX8@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 11, 2016 at 12:05:40PM -0700, Tai Nguyen wrote:
-> In addition to the X-Gene ARM CPU performance monitoring unit (PMU), there
-> are PMU for the SoC system devices such as L3 cache(s), I/O bridge(s),
-> memory controller bridges and memory. These PMU devices are loosely
-> architected to follow the same model as the PMU for ARM cores.
+On Monday, July 11, 2016 9:11:12 AM CEST Tony Lindgren wrote:
+> A defconfig update for omap2plus_defconfig to fix changed USB
+> Kconfig dependencies for v4.8 merge window. Otherwise things
+> like USB Ethernet on omap3 beagle, omap4 panda and omap5-uevm
+> won't work without manual configuration.
+> 
 
-You might want to add commit messages to patches 1,2 and 4, but then you
-can route this via the arm-soc tree.
+Pulled into next/defconfig, thanks!
 
-Will
+	Arnd
