@@ -1,45 +1,47 @@
-From: marex@denx.de (Marek Vasut)
-Date: Thu, 14 Jul 2016 17:47:07 +0200
-Subject: [PATCH 4/4] ARM: dts: at91: sama5d4_ma5d4evk: fix regulator names
-In-Reply-To: <1468363508-23843-4-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1468363508-23843-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1468363508-23843-4-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <35bca3f8-30b9-8ae7-495e-4c0a2d371f10@denx.de>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 14 Jul 2016 17:20:59 +0100
+Subject: [PATCH v3 2/2] ASoC: atmel-i2s: add driver for the new Atmel I2S
+ controller
+In-Reply-To: <ca944501da6c2bb6240f4a56e8d2ba5221373408.1468405019.git.cyrille.pitchen@atmel.com>
+References: <cover.1468405019.git.cyrille.pitchen@atmel.com>
+ <ca944501da6c2bb6240f4a56e8d2ba5221373408.1468405019.git.cyrille.pitchen@atmel.com>
+Message-ID: <20160714162059.GB30372@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/13/2016 12:45 AM, Alexandre Belloni wrote:
-> vcc_mmc1_reg is a fixed regulators and doesn't need a reg property. Remove
-> its unit-address.
->
-> Solves:
-> Warning (unit_address_vs_reg): Node /fixedregulator at 2 has a unit name, but no reg property
->
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+On Wed, Jul 13, 2016 at 12:25:39PM +0200, Cyrille Pitchen wrote:
 
-Reviewed-by: Marek Vasut <marex@denx.de>
+A few small things but otherwise this looks good:
 
-> ---
-> Cc: Marek Vasut <marex@denx.de>
->  arch/arm/boot/dts/at91-sama5d4_ma5d4evk.dts | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/arch/arm/boot/dts/at91-sama5d4_ma5d4evk.dts b/arch/arm/boot/dts/at91-sama5d4_ma5d4evk.dts
-> index abaaba58fbec..eac4ea2744cc 100644
-> --- a/arch/arm/boot/dts/at91-sama5d4_ma5d4evk.dts
-> +++ b/arch/arm/boot/dts/at91-sama5d4_ma5d4evk.dts
-> @@ -159,7 +159,7 @@
->  		};
->  	};
->
-> -	vcc_mmc1_reg: fixedregulator at 2 {
-> +	vcc_mmc1_reg: fixedregulator_mmc1 {
->  		compatible = "regulator-fixed";
->  		gpio = <&pioE 17 GPIO_ACTIVE_LOW>;
->  		regulator-name = "VDD MCI1";
->
+> +	switch (params_channels(params)) {
+> +	case 1:
+> +		mr |= is_playback ? ATMEL_I2SC_MR_TXMONO : ATMEL_I2SC_MR_RXMONO;
 
+Please write normal if statements, it makes things easier to read.
 
--- 
-Best regards,
-Marek Vasut
+> +		break;
+> +	case 2:
+> +		break;
+> +	default:
+> +		dev_err(dev->dev, "unsupported number of audio channels\n");
+> +		break;
+> +	}
+
+Why don't we return an error if we don't support the requested number of
+channels?
+
+> +	dev->gclk = devm_clk_get(&pdev->dev, "gclk");
+> +	if (IS_ERR(dev->aclk) && IS_ERR(dev->gclk)) {
+> +		/* Master Mode not supported */
+> +		dev->aclk = NULL;
+> +		dev->gclk = NULL;
+
+This won't handle probe deferral properly, it'll just ignore the clocks
+if we get -EPROBE_DEFER.  The driver should special case that at least.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160714/35b5e76c/attachment.sig>
