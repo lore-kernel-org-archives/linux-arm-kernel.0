@@ -1,138 +1,48 @@
-From: sstabellini@kernel.org (Stefano Stabellini)
-Date: Thu, 14 Jul 2016 11:28:31 +0100 (BST)
-Subject: [Xen-devel] [PATCH v4] xen/arm: Add a clock property
-In-Reply-To: <094be367-ff91-aec7-cbd6-cfb8dc711c54@de.bosch.com>
-References: <1468309605-19522-1-git-send-email-dirk.behme@de.bosch.com>
- <alpine.DEB.2.10.1607131932530.26575@sstabellini-ThinkPad-X260>
- <57868CB4.1090504@gmail.com>
- <alpine.DEB.2.10.1607132002000.26575@sstabellini-ThinkPad-X260>
- <094be367-ff91-aec7-cbd6-cfb8dc711c54@de.bosch.com>
-Message-ID: <alpine.DEB.2.10.1607141128010.26575@sstabellini-ThinkPad-X260>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Thu, 14 Jul 2016 12:30:34 +0200
+Subject: [PATCH RESEND] ARM: i.MX6 Phytec PFLA02: Add supplies for the SoC
+ internal regulators
+Message-ID: <1468492234-4579-1-git-send-email-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 14 Jul 2016, Dirk Behme wrote:
-> On 13.07.2016 21:07, Stefano Stabellini wrote:
-> > On Wed, 13 Jul 2016, Dirk Behme wrote:
-> > > On 13.07.2016 20:35, Stefano Stabellini wrote:
-> > > > On Tue, 12 Jul 2016, Dirk Behme wrote:
-> > > > > Clocks described by this property are reserved for use by Xen, and the
-> > > > > OS
-> > > > > must not alter their state any way, such as disabling or gating a
-> > > > > clock,
-> > > > > or modifying its rate. Ensuring this may impose constraints on parent
-> > > > > clocks or other resources used by the clock tree.
-> > > > > 
-> > > > > This property is used to proxy clocks for devices Xen has taken
-> > > > > ownership
-> > > > > of, such as UARTs, for which the associated clock controller(s) remain
-> > > > > under the control of Dom0.
-> > > > > 
-> > > > > Up to now, the workaround for this has been to use the Linux kernel
-> > > > > command line parameter 'clk_ignore_unused'. See Xen bug
-> > > > > 
-> > > > > http://bugs.xenproject.org/xen/bug/45
-> > > > > 
-> > > > > too.
-> > > > > 
-> > > > > Signed-off-by: Dirk Behme <dirk.behme@de.bosch.com>
-> > > > > ---
-> > > > > Changes in v4: Switch to the xen.txt description proposed by Mark:
-> > > > >                 https://www.spinics.net/lists/arm-kernel/msg516158.html
-> > > > > 
-> > > > > Changes in v3: Use the xen.txt description proposed by Michael.
-> > > > > Thanks!
-> > > > > 
-> > > > > Changes in v2: Drop the Linux implementation details like
-> > > > > clk_disable_unused
-> > > > > 	       in xen.txt.
-> > > > > 
-> > > > >   Documentation/devicetree/bindings/arm/xen.txt | 12 +++++++
-> > > > >   arch/arm/xen/enlighten.c                      | 47
-> > > > > +++++++++++++++++++++++++++
-> > > > >   2 files changed, 59 insertions(+)
-> > > > > 
-> > > > > diff --git a/Documentation/devicetree/bindings/arm/xen.txt
-> > > > > b/Documentation/devicetree/bindings/arm/xen.txt
-> > > > > index c9b9321..437e50b 100644
-> > > > > --- a/Documentation/devicetree/bindings/arm/xen.txt
-> > > > > +++ b/Documentation/devicetree/bindings/arm/xen.txt
-> > > > > @@ -17,6 +17,18 @@ the following properties:
-> > > > >     A GIC node is also required.
-> > > > >     This property is unnecessary when booting Dom0 using ACPI.
-> > > > > 
-> > > > > +Optional properties:
-> > > > > +
-> > > > > +- clocks: a list of phandle + clock-specifier pairs
-> > > > > +  Clocks described by this property are reserved for use by Xen, and
-> > > > > the
-> > > > > +  OS must not alter their state any way, such as disabling or gating
-> > > > > a
-> > > > > +  clock, or modifying its rate. Ensuring this may impose constraints
-> > > > > on
-> > > > > +  parent clocks or other resources used by the clock tree.
-> > > > > +
-> > > > > +  Note: this property is used to proxy clocks for devices Xen has
-> > > > > taken
-> > > > > +  ownership of, such as UARTs, for which the associated clock
-> > > > > +  controller(s) remain under the control of Dom0.
-> > > > > +
-> > > > >   To support UEFI on Xen ARM virtual platforms, Xen populates the FDT
-> > > > > "uefi" node
-> > > > >   under /hypervisor with following parameters:
-> > > > > 
-> > > > > diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-> > > > > index 47acb36..5c546d0 100644
-> > > > > --- a/arch/arm/xen/enlighten.c
-> > > > > +++ b/arch/arm/xen/enlighten.c
-> > > > > @@ -24,6 +24,7 @@
-> > > > >   #include <linux/of_fdt.h>
-> > > > >   #include <linux/of_irq.h>
-> > > > >   #include <linux/of_address.h>
-> > > > > +#include <linux/clk-provider.h>
-> > > > >   #include <linux/cpuidle.h>
-> > > > >   #include <linux/cpufreq.h>
-> > > > >   #include <linux/cpu.h>
-> > > > > @@ -444,6 +445,52 @@ static int __init xen_pm_init(void)
-> > > > >   }
-> > > > >   late_initcall(xen_pm_init);
-> > > > > 
-> > > > > +/*
-> > > > > + * Check if we want to register some clocks, that they
-> > > > > + * are not freed because unused by clk_disable_unused().
-> > > > > + * E.g. the serial console clock.
-> > > > > + */
-> > > > > +static int __init xen_arm_register_clks(void)
-> > > > > +{
-> > > > > +	struct clk *clk;
-> > > > > +	struct device_node *xen_node;
-> > > > > +	unsigned int i, count;
-> > > > > +	int ret = 0;
-> > > > > +
-> > > > > +	xen_node = of_find_compatible_node(NULL, NULL, "xen,xen");
-> > > > > +	if (!xen_node) {
-> > > > > +		pr_err("Xen support was detected before, but it has
-> > > > > disappeared\n");
-> > > > > +		return -EINVAL;
-> > > > > +	}
-> > > > 
-> > > > Given that this is a late initcall, the following should work:
-> > > > 
-> > > >      if (!xen_domain())
-> > > >          return -ENODEV;
-> > > 
-> > > 
-> > > Hmm, sorry, "should work" for what?
-> > 
-> > As a Xen check, if (!xen_domain()) is the common pattern.
-> > 
-> > > We need the xen_node from device tree, anyway.
-> > 
-> > In that case, what don't you just use the global xen_node in this file?
-> 
-> 
-> With the recent code there is no global xen_node any more:
-> 
-> https://lists.xen.org/archives/html/xen-devel/2016-06/msg02878.html
+From: Sascha Hauer <s.hauer@pengutronix.de>
 
-Ops, I was looking at upstream. I forgot about those.
+The SoC internal regulators for the CPU and the SoC come from the
+DA9063 vdd_core and vdd_soc. Add this relationship to the device tree
+so that the voltage drop on the SoC internal LDO regulators can be
+minimized.
+
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+Acked-by: Mark Brown <broonie@kernel.org>
+---
+Unmodified resend of https://patchwork.kernel.org/patch/7383061/
+---
+ arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+
+diff --git a/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi b/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi
+index d6d98d4..b879383 100644
+--- a/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi
+@@ -379,6 +379,18 @@
+ 	status = "disabled";
+ };
+ 
++&reg_arm {
++	vin-supply = <&vddcore_reg>;
++};
++
++&reg_pu {
++	vin-supply = <&vddsoc_reg>;
++};
++
++&reg_soc {
++	vin-supply = <&vddsoc_reg>;
++};
++
+ &uart3 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_uart3>;
+-- 
+2.8.1
