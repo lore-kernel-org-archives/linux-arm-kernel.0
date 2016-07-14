@@ -1,108 +1,94 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Thu, 14 Jul 2016 12:35:41 -0600
-Subject: [PATCH V2 0/3] perf tools: coresight PMU recording capabilities 
-Message-ID: <1468521344-15047-1-git-send-email-mathieu.poirier@linaro.org>
+Date: Thu, 14 Jul 2016 12:35:42 -0600
+Subject: [PATCH V2 1/3] tools: Copy the header file needed by perf tools
+In-Reply-To: <1468521344-15047-1-git-send-email-mathieu.poirier@linaro.org>
+References: <1468521344-15047-1-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1468521344-15047-2-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Good day Arnaldo,
+Directly accessing kernel files is not allowed anymore.  As such
+making file coresight-pmu.h accessible by the perf tools and complain
+if this copy strays from the one found in the main kernel tree.
 
-This is the first set of patches aimed at supporting trace acquisition and
-decoding using the ARM CoreSight drivers. The library is now out and accessible
-by anyone[1] - branch "opencsd-0v002" is stable and the one we advise to use.
-
-Part of that branch is a "HOWTO.md" that describes how to perform on-target
-trace acquisition, along with how to setup the library and perf tools for off
-system trace decoding.
-
-The patches in this set can also be found on gitHub[1], branch
-"perf-opencsd-4.7-rc1".  Available there are many more patches that will be
-submitted for review incrementally.
-
-This second revision has been rebased on the perf core branch[2], mandating the
-addition of patch 1/3.
-
-To conclude here are a couple of pastebins for you to look at if you don't want
-to go through the whole process of setting up the solution:
-
-$ perf report --stdio -D [3]
-$ perf report --stdio [4]
-
-And a snippet of the output from the "cs-etm-disasem.py" script, also included
-on branch "perf-opencsd-4.7-rc1":
-
-FILE: /lib/aarch64-linux-gnu/ld-2.21.so CPU: 3
-          7fab57fd80:   910003e0        mov     x0, sp
-          7fab57fd84:   94000d53        bl      7fab5832d0 <free@plt+0x3790>
-FILE: /lib/aarch64-linux-gnu/ld-2.21.so CPU: 3
-          7fab5832d0:   d11203ff        sub     sp, sp, #0x480
-FILE: /lib/aarch64-linux-gnu/ld-2.21.so CPU: 3
-          7fab5832d4:   a9ba7bfd        stp     x29, x30, [sp,#-96]!
-          7fab5832d8:   910003fd        mov     x29, sp
-          7fab5832dc:   a90363f7        stp     x23, x24, [sp,#48]
-          7fab5832e0:   9101e3b7        add     x23, x29, #0x78
-          7fab5832e4:   a90573fb        stp     x27, x28, [sp,#80]
-          7fab5832e8:   a90153f3        stp     x19, x20, [sp,#16]
-          7fab5832ec:   aa0003fb        mov     x27, x0
-          7fab5832f0:   910a82e1        add     x1, x23, #0x2a0
-          7fab5832f4:   a9025bf5        stp     x21, x22, [sp,#32]
-          7fab5832f8:   a9046bf9        stp     x25, x26, [sp,#64]
-          7fab5832fc:   910102e0        add     x0, x23, #0x40
-          7fab583300:   f800841f        str     xzr, [x0],#8
-          7fab583304:   eb01001f        cmp     x0, x1
-          7fab583308:   54ffffc1        b.ne    7fab583300 <free@plt+0x37c0>
-FILE: /lib/aarch64-linux-gnu/ld-2.21.so CPU: 3
-          7fab583300:   f800841f        str     xzr, [x0],#8
-          7fab583304:   eb01001f        cmp     x0, x1
-          7fab583308:   54ffffc1        b.ne    7fab583300 <free@plt+0x37c0>
-FILE: /lib/aarch64-linux-gnu/ld-2.21.so CPU: 3
-          7fab583300:   f800841f        str     xzr, [x0],#8
-          7fab583304:   eb01001f        cmp     x0, x1
-          7fab583308:   54ffffc1        b.ne    7fab583300 <free@plt+0x37c0>
-...
-...
-
-Regards,
-Mathieu
-
-[1]. https://github.com/Linaro/OpenCSD/
-[2]. git://git.kernel.org/pub/scm/linux/kernel/git/tip/tip.git perf/core
-[3]. http://pastebin.com/u9tgdwjF
-[4]. http://pastebin.com/V9N3bnEq
-
-Changes for V2:
-- Rebased on perf tree tip.
-- Fixed file list in MAINTAINERS's file.
-- Added Adrian Hunter's Acked-by.
-- Reworked ifndef/endif in config/Makefile to avoid duplication.
-- Patch 1/3, mandatory to make things compile.
-
-Mathieu Poirier (3):
-  tools: Copy the header file needed by perf tools
-  perf tools: making coresight PMU listable
-  perf tools: adding coresight etm PMU record capabilities
-
- MAINTAINERS                         |   5 +
- tools/include/linux/coresight-pmu.h |  39 +++
- tools/perf/MANIFEST                 |   1 +
- tools/perf/Makefile.perf            |   3 +
- tools/perf/arch/arm/util/Build      |   2 +
- tools/perf/arch/arm/util/auxtrace.c |  54 ++++
- tools/perf/arch/arm/util/cs-etm.c   | 559 ++++++++++++++++++++++++++++++++++++
- tools/perf/arch/arm/util/cs-etm.h   |  23 ++
- tools/perf/arch/arm/util/pmu.c      |  34 +++
- tools/perf/arch/arm64/util/Build    |   4 +
- tools/perf/config/Makefile          |  11 +-
- tools/perf/util/auxtrace.c          |   1 +
- tools/perf/util/auxtrace.h          |   1 +
- tools/perf/util/cs-etm.h            |  74 +++++
- 14 files changed, 807 insertions(+), 4 deletions(-)
+Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+---
+ tools/include/linux/coresight-pmu.h | 39 +++++++++++++++++++++++++++++++++++++
+ tools/perf/MANIFEST                 |  1 +
+ tools/perf/Makefile.perf            |  3 +++
+ 3 files changed, 43 insertions(+)
  create mode 100644 tools/include/linux/coresight-pmu.h
- create mode 100644 tools/perf/arch/arm/util/auxtrace.c
- create mode 100644 tools/perf/arch/arm/util/cs-etm.c
- create mode 100644 tools/perf/arch/arm/util/cs-etm.h
- create mode 100644 tools/perf/arch/arm/util/pmu.c
- create mode 100644 tools/perf/util/cs-etm.h
 
+diff --git a/tools/include/linux/coresight-pmu.h b/tools/include/linux/coresight-pmu.h
+new file mode 100644
+index 000000000000..7d410260661b
+--- /dev/null
++++ b/tools/include/linux/coresight-pmu.h
+@@ -0,0 +1,39 @@
++/*
++ * Copyright(C) 2015 Linaro Limited. All rights reserved.
++ * Author: Mathieu Poirier <mathieu.poirier@linaro.org>
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms of the GNU General Public License version 2 as published by
++ * the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ * You should have received a copy of the GNU General Public License along with
++ * this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#ifndef _LINUX_CORESIGHT_PMU_H
++#define _LINUX_CORESIGHT_PMU_H
++
++#define CORESIGHT_ETM_PMU_NAME "cs_etm"
++#define CORESIGHT_ETM_PMU_SEED  0x10
++
++/* ETMv3.5/PTM's ETMCR config bit */
++#define ETM_OPT_CYCACC  12
++#define ETM_OPT_TS      28
++
++static inline int coresight_get_trace_id(int cpu)
++{
++	/*
++	 * A trace ID of value 0 is invalid, so let's start at some
++	 * random value that fits in 7 bits and go from there.  Since
++	 * the common convention is to have data trace IDs be I(N) + 1,
++	 * set instruction trace IDs as a function of the CPU number.
++	 */
++	return (CORESIGHT_ETM_PMU_SEED + (cpu * 2));
++}
++
++#endif
+diff --git a/tools/perf/MANIFEST b/tools/perf/MANIFEST
+index 923eda2e7d52..475e6304db18 100644
+--- a/tools/perf/MANIFEST
++++ b/tools/perf/MANIFEST
+@@ -77,6 +77,7 @@ tools/include/linux/stringify.h
+ tools/include/linux/types.h
+ tools/include/linux/err.h
+ tools/include/linux/bitmap.h
++tools/include/linux/coresight-pmu.h
+ include/asm-generic/bitops/arch_hweight.h
+ include/asm-generic/bitops/const_hweight.h
+ include/asm-generic/bitops/fls64.h
+diff --git a/tools/perf/Makefile.perf b/tools/perf/Makefile.perf
+index a129fbc1ed37..739af9493e14 100644
+--- a/tools/perf/Makefile.perf
++++ b/tools/perf/Makefile.perf
+@@ -411,6 +411,9 @@ $(PERF_IN): prepare FORCE
+ 	@(test -f ../../arch/arm64/include/uapi/asm/kvm.h && ( \
+         (diff -B ../arch/arm64/include/uapi/asm/kvm.h ../../arch/arm64/include/uapi/asm/kvm.h >/dev/null) \
+         || echo "Warning: tools/arch/arm64/include/uapi/asm/kvm.h differs from kernel" >&2 )) || true
++	@(test -f ../../include/linux/coresight-pmu.h && ( \
++        (diff -B ../include/linux/coresight-pmu.h ../../include/linux/coresight-pmu.h >/dev/null) \
++        || echo "Warning: tools/include/linux/coresight-pmu.h differs from kernel" >&2 )) || true
+ 	$(Q)$(MAKE) $(build)=perf
+ 
+ $(OUTPUT)perf: $(PERFLIBS) $(PERF_IN) $(LIBTRACEEVENT_DYNAMIC_LIST)
 -- 
 2.7.4
