@@ -1,60 +1,48 @@
 From: seanpaul@chromium.org (Sean Paul)
-Date: Thu, 14 Jul 2016 08:35:10 -0700
-Subject: [PATCH] drm/rockchip: allocate correct crtc state structure on
- reset
-In-Reply-To: <20160714152915.31235-1-john@metanate.com>
-References: <20160714152915.31235-1-john@metanate.com>
-Message-ID: <CAOw6vbKRTpk=7f+gyAAkdS_r4bw1hyNeYqa1=qXB5_tvOuoBiw@mail.gmail.com>
+Date: Thu, 14 Jul 2016 08:36:32 -0700
+Subject: [PATCH 6/6] drm/rockchip: vop: correct rk3036 register define
+In-Reply-To: <1468467221-6819-1-git-send-email-mark.yao@rock-chips.com>
+References: <1468467090-6108-1-git-send-email-mark.yao@rock-chips.com>
+ <1468467221-6819-1-git-send-email-mark.yao@rock-chips.com>
+Message-ID: <CAOw6vb+rtH=tUyBY8VdDFRRjAAAMVdFM8by+H14L+C_L4O6g9A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 14, 2016 at 8:29 AM, John Keeping <john@metanate.com> wrote:
-> Because we are using a custom crtc_state structure, we must override the
-> reset helper to allocate the correct amount of memory.
->
-> Cc: stable at vger.kernel.org
-> Fixes: 4e257d9eee23 ("drm/rockchip: get rid of rockchip_drm_crtc_mode_config")
-> Signed-off-by: John Keeping <john@metanate.com>
+On Wed, Jul 13, 2016 at 8:33 PM, Mark Yao <mark.yao@rock-chips.com> wrote:
+> Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
+> Reported-by: Tomasz Figa <tfiga@chromium.org>
 
 Reviewed-by: Sean Paul <seanpaul@chromium.org>
 
 > ---
->  drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 13 ++++++++++++-
->  1 file changed, 12 insertions(+), 1 deletion(-)
+>  drivers/gpu/drm/rockchip/rockchip_vop_reg.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 >
-> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-> index 1c4d5b5a70a2..21e1247098be 100644
-> --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-> @@ -1048,6 +1048,17 @@ static void vop_crtc_destroy(struct drm_crtc *crtc)
->         drm_crtc_cleanup(crtc);
->  }
->
-> +static void vop_crtc_reset(struct drm_crtc *crtc)
-> +{
-> +       if (crtc->state)
-> +               __drm_atomic_helper_crtc_destroy_state(crtc, crtc->state);
-> +       kfree(crtc->state);
-> +
-> +       crtc->state = kzalloc(sizeof(struct rockchip_crtc_state), GFP_KERNEL);
-> +       if (crtc->state)
-> +               crtc->state->crtc = crtc;
-> +}
-> +
->  static struct drm_crtc_state *vop_crtc_duplicate_state(struct drm_crtc *crtc)
->  {
->         struct rockchip_crtc_state *rockchip_state;
-> @@ -1073,7 +1084,7 @@ static const struct drm_crtc_funcs vop_crtc_funcs = {
->         .set_config = drm_atomic_helper_set_config,
->         .page_flip = drm_atomic_helper_page_flip,
->         .destroy = vop_crtc_destroy,
-> -       .reset = drm_atomic_helper_crtc_reset,
-> +       .reset = vop_crtc_reset,
->         .atomic_duplicate_state = vop_crtc_duplicate_state,
->         .atomic_destroy_state = vop_crtc_destroy_state,
+> diff --git a/drivers/gpu/drm/rockchip/rockchip_vop_reg.c b/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
+> index a348a7a..919992c 100644
+> --- a/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
+> +++ b/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
+> @@ -190,7 +190,7 @@ static const struct vop_data rk3288_vop = {
+>         .win_size = ARRAY_SIZE(rk3288_vop_win_data),
 >  };
+>
+> -static const struct vop_scl_regs rk3066_win_scl = {
+> +static const struct vop_scl_regs rk3036_win_scl = {
+>         .scale_yrgb_x = VOP_REG(RK3036_WIN0_SCL_FACTOR_YRGB, 0xffff, 0x0),
+>         .scale_yrgb_y = VOP_REG(RK3036_WIN0_SCL_FACTOR_YRGB, 0xffff, 16),
+>         .scale_cbcr_x = VOP_REG(RK3036_WIN0_SCL_FACTOR_CBR, 0xffff, 0x0),
+> @@ -198,7 +198,7 @@ static const struct vop_scl_regs rk3066_win_scl = {
+>  };
+>
+>  static const struct vop_win_phy rk3036_win0_data = {
+> -       .scl = &rk3066_win_scl,
+> +       .scl = &rk3036_win_scl,
+>         .data_formats = formats_win_full,
+>         .nformats = ARRAY_SIZE(formats_win_full),
+>         .enable = VOP_REG(RK3036_SYS_CTRL, 0x1, 0),
 > --
-> 2.9.0.465.g8850cbc.dirty
+> 1.9.1
+>
 >
 > _______________________________________________
 > dri-devel mailing list
