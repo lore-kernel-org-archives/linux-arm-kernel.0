@@ -1,89 +1,116 @@
-From: julien.grall@arm.com (Julien Grall)
-Date: Thu, 14 Jul 2016 11:14:42 +0100
-Subject: [Xen-devel] [PATCH v4] xen/arm: Add a clock property
-In-Reply-To: <7df784ab-d0c0-939b-393e-214535c4b191@de.bosch.com>
-References: <1468309605-19522-1-git-send-email-dirk.behme@de.bosch.com>
- <146836236759.73491.11707389619985827497@resonance>
- <c320f820-8749-f4a4-435e-ddd9379655b5@de.bosch.com>
- <alpine.DEB.2.10.1607131941200.26575@sstabellini-ThinkPad-X260>
- <57868EDE.6060406@gmail.com>
- <146844380895.73491.4867379517577413421@resonance>
- <7df784ab-d0c0-939b-393e-214535c4b191@de.bosch.com>
-Message-ID: <57876612.3030407@arm.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Thu, 14 Jul 2016 11:16:11 +0100
+Subject: [PATCH v9 13/17] KVM: arm64: read initial LPI pending table
+In-Reply-To: <57875C92.7000004@arm.com>
+References: <20160713015909.28793-1-andre.przywara@arm.com>
+ <20160713015909.28793-14-andre.przywara@arm.com> <57875C92.7000004@arm.com>
+Message-ID: <f8d720a5-0afe-cd3b-6d33-5ec1addd5bf4@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dirk,
+Hi,
 
-On 14/07/16 07:31, Dirk Behme wrote:
-> On 13.07.2016 23:03, Michael Turquette wrote:
->> Quoting Dirk Behme (2016-07-13 11:56:30)
->>> On 13.07.2016 20:43, Stefano Stabellini wrote:
->>>> On Wed, 13 Jul 2016, Dirk Behme wrote:
->>>>> On 13.07.2016 00:26, Michael Turquette wrote:
->>>>>> Quoting Dirk Behme (2016-07-12 00:46:45)
->>>>>>> Clocks described by this property are reserved for use by Xen,
->>>>>>> and the OS
->>>>>>> must not alter their state any way, such as disabling or gating a
->>>>>>> clock,
->>>>>>> or modifying its rate. Ensuring this may impose constraints on
->>>>>>> parent
->>>>>>> clocks or other resources used by the clock tree.
->>>>>>
->>>>>> Note that clk_prepare_enable will not prevent the rate from changing
->>>>>> (clk_set_rate) or a parent from changing (clk_set_parent). The
->>>>>> only way
->>>>>> to do this currently would be to set the following flags on the
->>>>>> effected
->>>>>> clocks:
->>>>>>
->>>>>>     CLK_SET_RATE_GATE
->>>>>>     CLK_SET_PARENT_GATE
->>>>>
->>>>>
->>>>>
->>>>> Regarding setting flags, I think we already talked about that. I
->>>>> think the
->>>>> conclusion was that in our case its not possible to manipulate the
->>>>> flags in
->>>>> the OS as this isn't intended to be done in cases like ours.
->>>>> Therefore no API
->>>>> is exported for this.
->>>>>
->>>>> I.e. if we need to set these flags, we have to do that in Xen where
->>>>> we add the
->>>>> clocks to the hypervisor node in the device tree. And not in the
->>>>> kernel patch
->>>>> discussed here.
->>>>
->>>> These are internal Linux flags, aren't they?
->>>
->>>
->>> I've been under the impression that you can set clock "flags" via the
->>> device tree. Seems I need to re-check that ;)
+On 14/07/16 10:34, Marc Zyngier wrote:
+> On 13/07/16 02:59, Andre Przywara wrote:
+>> The LPI pending status for a GICv3 redistributor is held in a table
+>> in (guest) memory. To achieve reasonable performance, we cache the
+>> pending bit in our struct vgic_irq. The initial pending state must be
+>> read from guest memory upon enabling LPIs for this redistributor.
+>> As we can't access the guest memory while we hold the lpi_list spinlock,
+>> we create a snapshot of the LPI list and iterate over that.
 >>
->> Right, you cannot set flags from the device tree. Also, setting these
->> flags is done by the clock provider driver, not a consumer. Xen is the
->> consumer.
->
->
-> Ok, thanks, then I think we can forget about using flags for the issue
-> we are discussing here.
->
-> Best regards
->
-> Dirk
->
-> P.S.: Would it be an option to merge the v4 patch we are discussing
-> here, then? From the discussion until here, it sounds to me that it's
-> the best option we have at the moment. Maybe improving it in the future,
-> then.
+>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+>> ---
+>>  virt/kvm/arm/vgic/vgic-its.c | 91 ++++++++++++++++++++++++++++++++++++++++++++
+>>  virt/kvm/arm/vgic/vgic.h     |  6 +++
+>>  2 files changed, 97 insertions(+)
+>>
+>> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+>> index 4fc830c..f400ef1 100644
+>> --- a/virt/kvm/arm/vgic/vgic-its.c
+>> +++ b/virt/kvm/arm/vgic/vgic-its.c
+>> @@ -63,6 +63,90 @@ struct its_itte {
+>>  };
+>>  
+>>  #define CBASER_ADDRESS(x)	((x) & GENMASK_ULL(51, 12))
+>> +#define PENDBASER_ADDRESS(x)	((x) & GENMASK_ULL(51, 16))
+>> +
+>> +/*
+>> + * Create a snapshot of the current LPI list, so that we can enumerate all
+>> + * LPIs without holding any lock.
+>> + * Returns the array length and puts the kmalloc'ed array into intid_ptr.
+>> + */
+>> +static int vgic_copy_lpi_list(struct kvm *kvm, u32 **intid_ptr)
+>> +{
+>> +	struct vgic_dist *dist = &kvm->arch.vgic;
+>> +	struct vgic_irq *irq;
+>> +	u32 *intids;
+>> +	int irq_count = dist->lpi_list_count, i = 0;
+>> +
+>> +	/*
+>> +	 * We use the current value of the list length, which may change
+>> +	 * after the kmalloc. We don't care, because the guest shouldn't
+>> +	 * change anything while the command handling is still running,
+>> +	 * and in the worst case we would miss a new IRQ, which one wouldn't
+>> +	 * expect to be covered by this command anyway.
+>> +	 */
+>> +	intids = kmalloc_array(irq_count, sizeof(intids[0]), GFP_KERNEL);
+>> +	if (!intids)
+>> +		return -ENOMEM;
+>> +
+>> +	spin_lock(&dist->lpi_list_lock);
+>> +	list_for_each_entry(irq, &dist->lpi_list_head, lpi_list) {
+>> +		/* We don't need to "get" the IRQ, as we hold the list lock. */
+>> +		intids[i] = irq->intid;
+>> +		if (i++ == irq_count)
+>> +			break;
+> 
+> So I can perfectly rewrite this as:
+> 
+> 		if (i == irq_count)
+> 			break;
+> 		i++;
+> 
+> Do you now see the bug and how you are performing out of bound accesses?
 
-I think it is a good start, although I would like to see some rationale 
-in the code and commit message about the behavior of the Linux with 
-those clocks after this patch because it does not match the "contract".
+Ouch!
 
-Regards,
+> 
+>> +	}
+>> +	spin_unlock(&dist->lpi_list_lock);
+>> +
+>> +	*intid_ptr = intids;
+>> +	return irq_count;
+>> +}
+>> +
+>> +/*
+>> + * Scan the whole LPI pending table and sync the pending bit in there
+>> + * with our own data structures. This relies on the LPI being
+>> + * mapped before.
+>> + */
+>> +static int its_sync_lpi_pending_table(struct kvm_vcpu *vcpu)
+>> +{
+>> +	gpa_t pendbase = PENDBASER_ADDRESS(vcpu->arch.vgic_cpu.pendbaser);
+>> +	struct vgic_irq *irq;
+>> +	u8 pendmask;
+>> +	int ret = 0;
+>> +	u32 *intids;
+>> +	int nr_irqs, i;
+>> +
+>> +	nr_irqs = vgic_copy_lpi_list(vcpu->kvm, &intids);
+>> +	if (nr_irqs < 0)
+>> +		return nr_irqs;
+>> +
+>> +	for (i = 0; i < nr_irqs; i++) {
+>> +		int byte_offset, bit_nr;
+>> +		int last_byte_offset = -1;
+> 
+> Nice try. But by keeping the last_byte_offset inside the loop, you've
+> made sure that it is reset to -1 on each iteration. Wall <- head.
 
--- 
-Julien Grall
+Ouch again.
+
+Thanks for catching those! Fixed.
+
+Cheers,
+Andre.
