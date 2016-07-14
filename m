@@ -1,69 +1,37 @@
-From: guodong.xu@linaro.org (Guodong Xu)
-Date: Thu, 14 Jul 2016 15:08:20 +0800
-Subject: [PATCH 1/2] Bluetooth: Add LED triggers for HCI frames tx and rx
-In-Reply-To: <D2545F6D-7100-4B59-A19D-7CF878902BAA@holtmann.org>
-References: <1466657923-5776-1-git-send-email-guodong.xu@linaro.org>
- <D2545F6D-7100-4B59-A19D-7CF878902BAA@holtmann.org>
-Message-ID: <CAFGCpxzYLgJu6NWOHHTAQRmPEA5xz3GUpO4Ru1dKgRdMxyCU1A@mail.gmail.com>
+From: agraf@suse.de (Alexander Graf)
+Date: Thu, 14 Jul 2016 09:14:23 +0200
+Subject: [PATCH] arm64: Add config to limit user space to 47bits
+In-Reply-To: <VI1PR0801MB1423AC2E8EDEE7EA33A6233196320@VI1PR0801MB1423.eurprd08.prod.outlook.com>
+References: <1468424567-15925-1-git-send-email-agraf@suse.de>
+ <CAKv+Gu_QH=sZi--FVqHebd1P+6UMzEqWQQ1u3Y170B7cND8Kgw@mail.gmail.com>
+ <578668D3.6010406@suse.de> <20160714010812.GA17138@e103986-lin>
+ <837E6456-4718-45D7-8EE7-E28E11DB8BD3@suse.de>
+ <VI1PR0801MB1423AC2E8EDEE7EA33A6233196320@VI1PR0801MB1423.eurprd08.prod.outlook.com>
+Message-ID: <e24481b9-fb6a-aead-a72b-43b7d561b940@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 July 2016 at 16:07, Marcel Holtmann <marcel@holtmann.org> wrote:
-> Hi Guodong,
->
->> Two LED triggers are defined: tx_led and rx_led. Upon frames
->> available in HCI core layer, for tx or for rx, the combined LED
->> can blink.
->>
->> Verified on HiKey, 96boards. It uses hi6220 SoC and TI WL1835 combo
->> chip.
->>
->> Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
->> ---
->> include/net/bluetooth/hci_core.h |  1 +
->> net/bluetooth/hci_core.c         |  3 +++
->> net/bluetooth/leds.c             | 15 +++++++++++++++
->> net/bluetooth/leds.h             |  2 ++
->> 4 files changed, 21 insertions(+)
->>
->> diff --git a/include/net/bluetooth/hci_core.h b/include/net/bluetooth/hci_core.h
->> index dc71473..37b8dd9 100644
->> --- a/include/net/bluetooth/hci_core.h
->> +++ b/include/net/bluetooth/hci_core.h
->> @@ -398,6 +398,7 @@ struct hci_dev {
->>       bdaddr_t                rpa;
->>
->>       struct led_trigger      *power_led;
->> +     struct led_trigger      *tx_led, *rx_led;
->>
->>       int (*open)(struct hci_dev *hdev);
->>       int (*close)(struct hci_dev *hdev);
->> diff --git a/net/bluetooth/hci_core.c b/net/bluetooth/hci_core.c
->> index 45a9fc6..c6e1210 100644
->> --- a/net/bluetooth/hci_core.c
->> +++ b/net/bluetooth/hci_core.c
->> @@ -3248,6 +3248,7 @@ int hci_recv_frame(struct hci_dev *hdev, struct sk_buff *skb)
->>       skb_queue_tail(&hdev->rx_q, skb);
->>       queue_work(hdev->workqueue, &hdev->rx_work);
->>
->> +     hci_leds_blink_oneshot(hdev->rx_led);
->>       return 0;
->> }
->> EXPORT_SYMBOL(hci_recv_frame);
->> @@ -3325,6 +3326,8 @@ static void hci_send_frame(struct hci_dev *hdev, struct sk_buff *skb)
->>               BT_ERR("%s sending frame failed (%d)", hdev->name, err);
->>               kfree_skb(skb);
->>       }
->> +
->> +     hci_leds_blink_oneshot(hdev->tx_led);
->> }
->
-> so I am not convinced that this is the right way of doing TX/RX activity leds. This would have them purely based on HCI traffic and this would include control frames. I think that we want activity leds for actual radio activity. Meaning that when we have an active connection and ACL packets are exchanged or when we are scanning.
->
 
-Thanks. I got your point. I will revise the code and submit again.
+On 14.07.16 09:03, Zheng Xu wrote:
+> LuaJIT also fix the 48VA issue by allocating heap memory below 47 bits.
+> 
+> For mozjs issue, if there are pointers to .rodata, it can be a problem. Does it happen on master and do we have any case to reproduce the issue so that I can take a look?
 
-> Regards
->
-> Marcel
->
+mozjs is fixed with your patch. I backported it to all of the ancient
+versions of mozjs, so we're probably good there. Though every distro
+will have to redo that work in their own trees, because older versions
+of mozjs are no longer maintained upstream. If you want to be a hero,
+you can try to port polkitd and gnome to use more recent versions of
+mozjs ;). Or maybe they can already and we just messed up packaging.
+
+The issue I mentioned with "js 1.8.5" is this gem:
+
+
+https://developer.mozilla.org/en-US/docs/Mozilla/Projects/SpiderMonkey/Releases/1.8.5
+
+I don't know the exact history, but I think it predates mozjs. With a
+bit of sledge hammering your heap allocation patch applies there too,
+but we still get the rodata references.
+
+
+Alex
