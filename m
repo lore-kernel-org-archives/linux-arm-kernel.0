@@ -1,57 +1,33 @@
-From: grimaldi.ivan@gmail.com (Ivan Grimaldi)
-Date: Thu, 14 Jul 2016 15:00:21 +0200
-Subject: [PROBLEM]: pcie imx6 link problem after a random number of reboot
-Message-ID: <CAO1575Vy6mMPWgXT_7Z2vkvpXU0jnxoJTNAiRPhTUuKmLQ1bLQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 14 Jul 2016 15:07:29 +0200
+Subject: [GIT PULL] Qualcomm Driver Updates for v4.8 Part 2
+In-Reply-To: <1467921834-13636-1-git-send-email-andy.gross@linaro.org>
+References: <1467921834-13636-1-git-send-email-andy.gross@linaro.org>
+Message-ID: <5736200.8mikgbWeDe@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thursday, July 7, 2016 3:03:54 PM CEST Andy Gross wrote:
+> The following changes since commit 2cd83c75d4d2cb9832ccb4989443195c2379493e:
+> 
+>   Merge tag 'qcom-drivers-for-4.8' into HEAD (2016-07-05 16:29:02 -0500)
+> 
+> are available in the git repository at:
+> 
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git
+> tags/qcom-drivers-for-4.8-2
+> 
+> for you to fetch changes up to 6c8e99d874c96200ce985d19b407d49ed3306226:
+> 
+>   firmware: qcom: scm: Change initcall to subsys (2016-07-05 16:29:25 -0500)
+> 
+> ----------------------------------------------------------------
+> Qualcomm ARM Based Driver Updates for v4.8 Part 2
+> 
+> * Fix probe order issue in SCM
+> * Add missing qcom_scm_is_available() API
 
- I am having a problem with the iMX6 PCIe bus working, after a random
-number of reboots i have a problem with pci link (below the kenel
-log), the link is up but still in training.
+Merged into next/drivers, thanks!
 
-The hardware and software configuration is the following:
-1) Linux kernel 3.18.26
-2) Custom board based on IMX6DL SoC
-
-....
-imx6q-pcie 1ffc000.pcie: Link is up, but still in training
-imx6q-pcie 1ffc000.pcie: Link up, Gen=2
-imx6q-pcie 1ffc000.pcie: PCI host bridge to bus 0000:00
-pci_bus 0000:00: root bus resource [io  0x1000-0xffff]
-pci_bus 0000:00: root bus resource [mem 0x01000000-0x01efffff]
-pci_bus 0000:00: root bus resource [bus 00-ff]
-pci_bus 0000:00: scanning bus
-pci 0000:00:00.0: [16c3:abcd] type 01 class 0x060400
-pci 0000:00:00.0: reg 0x10: [mem 0x00000000-0x000fffff]
-pci 0000:00:00.0: reg 0x38: [mem 0x00000000-0x0000ffff pref]
-pci 0000:00:00.0: calling pci_fixup_ide_bases+0x0/0x4c
-pci 0000:00:00.0: supports D1
-pci 0000:00:00.0: PME# supported from D0 D1 D3hot D3cold
-pci 0000:00:00.0: PME# disabled
-pci_bus 0000:00: fixups for bus
-PCI: bus0: Fast back to back transfers disabled
-pci 0000:00:00.0: scanning [bus 01-01] behind bridge, pass 0
-pci 0000:00:00.0: scanning [bus 00-00] behind bridge, pass 1
-pci_bus 0000:01: scanning bus
-imx6q-pcie 1ffc000.pcie: Link is up, but still in training
-imx6q-pcie 1ffc000.pcie: Link is up, but still in training
-imx6q-pcie 1ffc000.pcie: Link is up, but still in training
-imx6q-pcie 1ffc000.pcie: Link is up, but still in training
-imx6q-pcie 1ffc000.pcie: Link is up, but still in training
-imx6q-pcie 1ffc000.pcie: transition to gen2 is stuck, reset PHY!
-imx6q-pcie 1ffc000.pcie: debug_r0=0000060d debug_r1=28000410
-pci_bus 0000:01: fixups for bus
-PCI: bus1: Fast back to back transfers enabled
-pci_bus 0000:01: bus scan returning with max=01
-pci_bus 0000:01: busn_res: [bus 01-ff] end is updated to 01
-pci_bus 0000:00: bus scan returning with max=01
-pci 0000:00:00.0: fixup irq: got 155
-pci 0000:00:00.0: assigning IRQ 155
-pci 0000:00:00.0: BAR 0: assigned [mem 0x01000000-0x010fffff]
-pci 0000:00:00.0: BAR 6: assigned [mem 0x01100000-0x0110ffff pref]
-pci 0000:00:00.0: PCI bridge to [bus 01]
-....
-
-IVan
+	Arnd
