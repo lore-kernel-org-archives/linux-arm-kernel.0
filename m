@@ -1,63 +1,141 @@
-From: jpoimboe@redhat.com (Josh Poimboeuf)
-Date: Thu, 14 Jul 2016 00:48:42 -0500
-Subject: [PATCH v2 01/11] mm: Implement stack frame object validation
-In-Reply-To: <CAGXu5jLPZiRJx8n3_7GW2bufiuUgE9=c6dQcNxDRPHMU72sD9g@mail.gmail.com>
-References: <1468446964-22213-1-git-send-email-keescook@chromium.org>
- <1468446964-22213-2-git-send-email-keescook@chromium.org>
- <CALCETrVDJDjdoh7yvOPd=_5twQnzQRhe8G2KLaRw-NnA1Uf__g@mail.gmail.com>
- <CAGXu5jLPZiRJx8n3_7GW2bufiuUgE9=c6dQcNxDRPHMU72sD9g@mail.gmail.com>
-Message-ID: <20160714054842.6zal5rqawpgew26r@treble>
+From: dirk.behme@de.bosch.com (Dirk Behme)
+Date: Thu, 14 Jul 2016 08:11:16 +0200
+Subject: [Xen-devel] [PATCH v4] xen/arm: Add a clock property
+In-Reply-To: <alpine.DEB.2.10.1607132002000.26575@sstabellini-ThinkPad-X260>
+References: <1468309605-19522-1-git-send-email-dirk.behme@de.bosch.com>
+ <alpine.DEB.2.10.1607131932530.26575@sstabellini-ThinkPad-X260>
+ <57868CB4.1090504@gmail.com>
+ <alpine.DEB.2.10.1607132002000.26575@sstabellini-ThinkPad-X260>
+Message-ID: <094be367-ff91-aec7-cbd6-cfb8dc711c54@de.bosch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 13, 2016 at 03:04:26PM -0700, Kees Cook wrote:
-> On Wed, Jul 13, 2016 at 3:01 PM, Andy Lutomirski <luto@amacapital.net> wrote:
-> > On Wed, Jul 13, 2016 at 2:55 PM, Kees Cook <keescook@chromium.org> wrote:
-> >> This creates per-architecture function arch_within_stack_frames() that
-> >> should validate if a given object is contained by a kernel stack frame.
-> >> Initial implementation is on x86.
-> >>
-> >> This is based on code from PaX.
-> >>
-> >
-> > This, along with Josh's livepatch work, are two examples of unwinders
-> > that matter for correctness instead of just debugging.  ISTM this
-> > should just use Josh's code directly once it's been written.
-> 
-> Do you have URL for Josh's code? I'd love to see what happening there.
+On 13.07.2016 21:07, Stefano Stabellini wrote:
+> On Wed, 13 Jul 2016, Dirk Behme wrote:
+>> On 13.07.2016 20:35, Stefano Stabellini wrote:
+>>> On Tue, 12 Jul 2016, Dirk Behme wrote:
+>>>> Clocks described by this property are reserved for use by Xen, and the OS
+>>>> must not alter their state any way, such as disabling or gating a clock,
+>>>> or modifying its rate. Ensuring this may impose constraints on parent
+>>>> clocks or other resources used by the clock tree.
+>>>>
+>>>> This property is used to proxy clocks for devices Xen has taken ownership
+>>>> of, such as UARTs, for which the associated clock controller(s) remain
+>>>> under the control of Dom0.
+>>>>
+>>>> Up to now, the workaround for this has been to use the Linux kernel
+>>>> command line parameter 'clk_ignore_unused'. See Xen bug
+>>>>
+>>>> http://bugs.xenproject.org/xen/bug/45
+>>>>
+>>>> too.
+>>>>
+>>>> Signed-off-by: Dirk Behme <dirk.behme@de.bosch.com>
+>>>> ---
+>>>> Changes in v4: Switch to the xen.txt description proposed by Mark:
+>>>>                 https://www.spinics.net/lists/arm-kernel/msg516158.html
+>>>>
+>>>> Changes in v3: Use the xen.txt description proposed by Michael. Thanks!
+>>>>
+>>>> Changes in v2: Drop the Linux implementation details like
+>>>> clk_disable_unused
+>>>> 	       in xen.txt.
+>>>>
+>>>>   Documentation/devicetree/bindings/arm/xen.txt | 12 +++++++
+>>>>   arch/arm/xen/enlighten.c                      | 47
+>>>> +++++++++++++++++++++++++++
+>>>>   2 files changed, 59 insertions(+)
+>>>>
+>>>> diff --git a/Documentation/devicetree/bindings/arm/xen.txt
+>>>> b/Documentation/devicetree/bindings/arm/xen.txt
+>>>> index c9b9321..437e50b 100644
+>>>> --- a/Documentation/devicetree/bindings/arm/xen.txt
+>>>> +++ b/Documentation/devicetree/bindings/arm/xen.txt
+>>>> @@ -17,6 +17,18 @@ the following properties:
+>>>>     A GIC node is also required.
+>>>>     This property is unnecessary when booting Dom0 using ACPI.
+>>>>
+>>>> +Optional properties:
+>>>> +
+>>>> +- clocks: a list of phandle + clock-specifier pairs
+>>>> +  Clocks described by this property are reserved for use by Xen, and the
+>>>> +  OS must not alter their state any way, such as disabling or gating a
+>>>> +  clock, or modifying its rate. Ensuring this may impose constraints on
+>>>> +  parent clocks or other resources used by the clock tree.
+>>>> +
+>>>> +  Note: this property is used to proxy clocks for devices Xen has taken
+>>>> +  ownership of, such as UARTs, for which the associated clock
+>>>> +  controller(s) remain under the control of Dom0.
+>>>> +
+>>>>   To support UEFI on Xen ARM virtual platforms, Xen populates the FDT
+>>>> "uefi" node
+>>>>   under /hypervisor with following parameters:
+>>>>
+>>>> diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
+>>>> index 47acb36..5c546d0 100644
+>>>> --- a/arch/arm/xen/enlighten.c
+>>>> +++ b/arch/arm/xen/enlighten.c
+>>>> @@ -24,6 +24,7 @@
+>>>>   #include <linux/of_fdt.h>
+>>>>   #include <linux/of_irq.h>
+>>>>   #include <linux/of_address.h>
+>>>> +#include <linux/clk-provider.h>
+>>>>   #include <linux/cpuidle.h>
+>>>>   #include <linux/cpufreq.h>
+>>>>   #include <linux/cpu.h>
+>>>> @@ -444,6 +445,52 @@ static int __init xen_pm_init(void)
+>>>>   }
+>>>>   late_initcall(xen_pm_init);
+>>>>
+>>>> +/*
+>>>> + * Check if we want to register some clocks, that they
+>>>> + * are not freed because unused by clk_disable_unused().
+>>>> + * E.g. the serial console clock.
+>>>> + */
+>>>> +static int __init xen_arm_register_clks(void)
+>>>> +{
+>>>> +	struct clk *clk;
+>>>> +	struct device_node *xen_node;
+>>>> +	unsigned int i, count;
+>>>> +	int ret = 0;
+>>>> +
+>>>> +	xen_node = of_find_compatible_node(NULL, NULL, "xen,xen");
+>>>> +	if (!xen_node) {
+>>>> +		pr_err("Xen support was detected before, but it has
+>>>> disappeared\n");
+>>>> +		return -EINVAL;
+>>>> +	}
+>>>
+>>> Given that this is a late initcall, the following should work:
+>>>
+>>>      if (!xen_domain())
+>>>          return -ENODEV;
+>>
+>>
+>> Hmm, sorry, "should work" for what?
+>
+> As a Xen check, if (!xen_domain()) is the common pattern.
+>
+>> We need the xen_node from device tree, anyway.
+>
+> In that case, what don't you just use the global xen_node in this file?
 
-The code is actually going to be 100% different next time around, but
-FWIW, here's the last attempt:
 
-  https://lkml.kernel.org/r/4d34d452bf8f85c7d6d5f93db1d3eeb4cba335c7.1461875890.git.jpoimboe at redhat.com
+With the recent code there is no global xen_node any more:
 
-In the meantime I've realized the need to rewrite the x86 core stack
-walking code to something much more manageable so we don't need all
-these unwinders everywhere.  I'll probably post the patches in the next
-week or so.  I'll add you to the CC list.
+https://lists.xen.org/archives/html/xen-devel/2016-06/msg02878.html
 
-With the new interface I think you'll be able to do something like:
+-- cut --
+The code in this file has changed quite a lot with the support of ACPI. 
+For instance "xen_node" is not anymore a global variable. Can you rebase 
+your rework on top of the branch for-linus-4.8?
 
-	struct unwind_state;
 
-	unwind_start(&state, current, NULL, NULL);
-	unwind_next_frame(&state);
-	oldframe = unwind_get_stack_pointer(&state);
+You can find the branch in:
 
-	unwind_next_frame(&state);
-	frame = unwind_get_stack_pointer(&state);
+git://git.kernel.org/pub/scm/linux/kernel/git/xen/tip.git
+-- cut --
 
-	do {
-		if (obj + len <= frame)
-			return blah;
-		oldframe = frame;
-		frame = unwind_get_stack_pointer(&state);
+Best regards
 
-	} while (unwind_next_frame(&state);
-
-And then@the end there'll be some (still TBD) way to query whether it
-reached the last syscall pt_regs frame, or if it instead encountered a
-bogus frame pointer along the way and had to bail early.
-
--- 
-Josh
+Dirk
