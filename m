@@ -1,60 +1,61 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 14 Jul 2016 11:10:50 +0100
-Subject: [PATCH v9 14/17] KVM: arm64: allow updates of LPI configuration
- table
-In-Reply-To: <478c84bd-46e8-5f73-45d1-82d8c6bf38c1@arm.com>
-References: <20160713015909.28793-1-andre.przywara@arm.com>
- <20160713015909.28793-15-andre.przywara@arm.com> <57875F8A.2070009@arm.com>
- <478c84bd-46e8-5f73-45d1-82d8c6bf38c1@arm.com>
-Message-ID: <5787652A.4040102@arm.com>
+From: christophe.jaillet@wanadoo.fr (Christophe JAILLET)
+Date: Thu, 14 Jul 2016 12:10:46 +0200
+Subject: [PATCH] PCI: xilinx: Fix return value in case of error
+Message-ID: <1468491046-1427-1-git-send-email-christophe.jaillet@wanadoo.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/07/16 11:00, Andre Przywara wrote:
-> Hi,
-> 
-> On 14/07/16 10:46, Marc Zyngier wrote:
->> On 13/07/16 02:59, Andre Przywara wrote:
->>> The (system-wide) LPI configuration table is held in a table in
->>> (guest) memory. To achieve reasonable performance, we cache this data
->>> in our struct vgic_irq. If the guest updates the configuration data
->>> (which consists of the enable bit and the priority value), it issues
->>> an INV or INVALL command to allow us to update our information.
->>> Provide functions that update that information for one LPI or all LPIs
->>> mapped to a specific collection.
->>>
->>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
->>> ---
->>>  virt/kvm/arm/vgic/vgic-its.c | 39 +++++++++++++++++++++++++++++++++++++++
->>>  1 file changed, 39 insertions(+)
->>>
->>> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
->>> index f400ef1..60108f8 100644
->>> --- a/virt/kvm/arm/vgic/vgic-its.c
->>> +++ b/virt/kvm/arm/vgic/vgic-its.c
->>> @@ -64,6 +64,45 @@ struct its_itte {
->>>  
->>>  #define CBASER_ADDRESS(x)	((x) & GENMASK_ULL(51, 12))
->>>  #define PENDBASER_ADDRESS(x)	((x) & GENMASK_ULL(51, 16))
->>> +#define PROPBASER_ADDRESS(x)	((x) & GENMASK_ULL(51, 12))
->>
->> Again, these masks are wrong as we limit the ITS to 48 bits PA.
-> 
-> Those masks match the architecture description of the register. We limit
-> to 48 bits of PA when the guest writes to those registers. I'd like to
-> keep this limitation in one place only.
+In function 'xilinx_pcie_init_irq_domain', the pattern used to check and
+return error is:
 
-Which makes it hard to understand for everyone. If you want something
-truly generic, assign proper names to these defines:
+   if (!var) {
+      dev_err(...);
+      return PTR_ERR(var);
+   }
 
-#define CBASER_ARCHITECTURAL_PA_BITS	52
-#define CBASER_IMPLEMENTATION_PA_BITS	48
+So the returned value in case of error is always 0, which means 'success'.
+Change it to return -ENODEV instead.
 
-and repaint all your defines to use macros along those lines. If not,
-just change everything to 48 and let's be done with it.
+Signed-off-by: Christophe JAILLET <christophe.jaillet@wanadoo.fr>
+---
+ drivers/pci/host/pcie-xilinx.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-Thanks,
-
-	M.
+diff --git a/drivers/pci/host/pcie-xilinx.c b/drivers/pci/host/pcie-xilinx.c
+index 4703aa3..a30e016 100644
+--- a/drivers/pci/host/pcie-xilinx.c
++++ b/drivers/pci/host/pcie-xilinx.c
+@@ -550,7 +550,7 @@ static int xilinx_pcie_init_irq_domain(struct xilinx_pcie_port *port)
+ 	pcie_intc_node = of_get_next_child(node, NULL);
+ 	if (!pcie_intc_node) {
+ 		dev_err(dev, "No PCIe Intc node found\n");
+-		return PTR_ERR(pcie_intc_node);
++		return -ENODEV;
+ 	}
+ 
+ 	port->irq_domain = irq_domain_add_linear(pcie_intc_node, 4,
+@@ -558,7 +558,7 @@ static int xilinx_pcie_init_irq_domain(struct xilinx_pcie_port *port)
+ 						 port);
+ 	if (!port->irq_domain) {
+ 		dev_err(dev, "Failed to get a INTx IRQ domain\n");
+-		return PTR_ERR(port->irq_domain);
++		return -ENODEV;
+ 	}
+ 
+ 	/* Setup MSI */
+@@ -569,7 +569,7 @@ static int xilinx_pcie_init_irq_domain(struct xilinx_pcie_port *port)
+ 							 &xilinx_pcie_msi_chip);
+ 		if (!port->irq_domain) {
+ 			dev_err(dev, "Failed to get a MSI IRQ domain\n");
+-			return PTR_ERR(port->irq_domain);
++			return -ENODEV;
+ 		}
+ 
+ 		xilinx_pcie_enable_msi(port);
 -- 
-Jazz is not dead. It just smells funny...
+2.7.4
+
+
+---
+L'absence de virus dans ce courrier ?lectronique a ?t? v?rifi?e par le logiciel antivirus Avast.
+https://www.avast.com/antivirus
