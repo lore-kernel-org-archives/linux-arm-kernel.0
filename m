@@ -1,119 +1,69 @@
-From: Zheng.Xu@arm.com (Zheng Xu)
-Date: Thu, 14 Jul 2016 07:03:54 +0000
-Subject: [PATCH] arm64: Add config to limit user space to 47bits
-In-Reply-To: <837E6456-4718-45D7-8EE7-E28E11DB8BD3@suse.de>
-References: <1468424567-15925-1-git-send-email-agraf@suse.de>
- <CAKv+Gu_QH=sZi--FVqHebd1P+6UMzEqWQQ1u3Y170B7cND8Kgw@mail.gmail.com>
- <578668D3.6010406@suse.de> <20160714010812.GA17138@e103986-lin>
- <837E6456-4718-45D7-8EE7-E28E11DB8BD3@suse.de>
-Message-ID: <VI1PR0801MB1423AC2E8EDEE7EA33A6233196320@VI1PR0801MB1423.eurprd08.prod.outlook.com>
+From: guodong.xu@linaro.org (Guodong Xu)
+Date: Thu, 14 Jul 2016 15:08:20 +0800
+Subject: [PATCH 1/2] Bluetooth: Add LED triggers for HCI frames tx and rx
+In-Reply-To: <D2545F6D-7100-4B59-A19D-7CF878902BAA@holtmann.org>
+References: <1466657923-5776-1-git-send-email-guodong.xu@linaro.org>
+ <D2545F6D-7100-4B59-A19D-7CF878902BAA@holtmann.org>
+Message-ID: <CAFGCpxzYLgJu6NWOHHTAQRmPEA5xz3GUpO4Ru1dKgRdMxyCU1A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-LuaJIT also fix the 48VA issue by allocating heap memory below 47 bits.
-
-For mozjs issue, if there are pointers to .rodata, it can be a problem. Does it happen on master and do we have any case to reproduce the issue so that I can take a look?
-
-Thanks,
-Zheng
-
------Original Message-----
-From: Alexander Graf [mailto:agraf at suse.de]
-Sent: 14 July 2016 14:39
-To: Steve Capper
-Cc: Ard Biesheuvel; Mark Rutland; mbrugger at suse.com; Catalin Marinas; Will Deacon; linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org; Stuart Monteith; Zheng Xu
-Subject: Re: [PATCH] arm64: Add config to limit user space to 47bits
-
-
-> On 14 Jul 2016, at 03:08, Steve Capper <steve.capper@arm.com> wrote:
+On 13 July 2016 at 16:07, Marcel Holtmann <marcel@holtmann.org> wrote:
+> Hi Guodong,
 >
-> Hi Alex,
+>> Two LED triggers are defined: tx_led and rx_led. Upon frames
+>> available in HCI core layer, for tx or for rx, the combined LED
+>> can blink.
+>>
+>> Verified on HiKey, 96boards. It uses hi6220 SoC and TI WL1835 combo
+>> chip.
+>>
+>> Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
+>> ---
+>> include/net/bluetooth/hci_core.h |  1 +
+>> net/bluetooth/hci_core.c         |  3 +++
+>> net/bluetooth/leds.c             | 15 +++++++++++++++
+>> net/bluetooth/leds.h             |  2 ++
+>> 4 files changed, 21 insertions(+)
+>>
+>> diff --git a/include/net/bluetooth/hci_core.h b/include/net/bluetooth/hci_core.h
+>> index dc71473..37b8dd9 100644
+>> --- a/include/net/bluetooth/hci_core.h
+>> +++ b/include/net/bluetooth/hci_core.h
+>> @@ -398,6 +398,7 @@ struct hci_dev {
+>>       bdaddr_t                rpa;
+>>
+>>       struct led_trigger      *power_led;
+>> +     struct led_trigger      *tx_led, *rx_led;
+>>
+>>       int (*open)(struct hci_dev *hdev);
+>>       int (*close)(struct hci_dev *hdev);
+>> diff --git a/net/bluetooth/hci_core.c b/net/bluetooth/hci_core.c
+>> index 45a9fc6..c6e1210 100644
+>> --- a/net/bluetooth/hci_core.c
+>> +++ b/net/bluetooth/hci_core.c
+>> @@ -3248,6 +3248,7 @@ int hci_recv_frame(struct hci_dev *hdev, struct sk_buff *skb)
+>>       skb_queue_tail(&hdev->rx_q, skb);
+>>       queue_work(hdev->workqueue, &hdev->rx_work);
+>>
+>> +     hci_leds_blink_oneshot(hdev->rx_led);
+>>       return 0;
+>> }
+>> EXPORT_SYMBOL(hci_recv_frame);
+>> @@ -3325,6 +3326,8 @@ static void hci_send_frame(struct hci_dev *hdev, struct sk_buff *skb)
+>>               BT_ERR("%s sending frame failed (%d)", hdev->name, err);
+>>               kfree_skb(skb);
+>>       }
+>> +
+>> +     hci_leds_blink_oneshot(hdev->tx_led);
+>> }
 >
-> Thanks for posting this.
+> so I am not convinced that this is the right way of doing TX/RX activity leds. This would have them purely based on HCI traffic and this would include control frames. I think that we want activity leds for actual radio activity. Meaning that when we have an active connection and ACL packets are exchanged or when we are scanning.
 >
-> On Wed, Jul 13, 2016 at 06:14:11PM +0200, Alexander Graf wrote:
->> On 07/13/2016 05:59 PM, Ard Biesheuvel wrote:
->>> On 13 July 2016 at 17:42, Alexander Graf <agraf@suse.de> wrote:
->>>> Some user space applications are known to break with 48 bits
->>>> virtual
->>> known by whom? At least I wasn't aware of it, so could you please
->>> share some examples?
->>
->> Sure! Known to me so far are:
->>
->>  * mozjs17
->>  * mozjs24
->>  * mozjs38
->>  * js-1.8.5
->>  * java-1.7 (older JITs, fixed in newer ones)
->>
->> I'm not sure if there are more, but the fact that I've run into this
->> problem more than once doesn't make me incredibly happy :).
->>
+
+Thanks. I got your point. I will revise the code and submit again.
+
+> Regards
 >
-> I came across this too: on bootup via polkitd (which pulled in mozJS) :-(.
-
-Yup, that?s where I stumbled over it first. Gnome uses mozjs too, as do Firefox and Thunderbird obviously.
-
+> Marcel
 >
->>>
->>>> address space. As interim step until the world is healed and
->>>> everyone embraces correct code, this patch allows to only expose 47
->>>> bits of virtual address space to user space.
->>>>
->>> Is this a code generation/toolchain issue?
->>
->> mozjs uses a single 64bit value to combine doubles, ints and pointers
->> into a single variable. It is very smart and uses the upper
->> 17 bits for metadata such as "which type of variable is this".
->> Coincidentally those bits happen to overlap the "double is an
->> infinite number" bits, so that you can also express a NaN with it.
->> When using such a value, the upper 17 bits get masked out.
->>
->> That one was fixed upstream by force allocating the javascript heap
->> starting at a fixed location which is below 47 bits.
->>
->> js-1.8.5 has the same as above, but also uses pointers to .rodata as
->> javascript pointers, so it doesn't only use the heap, it also uses
->> pointers to the library itself, which gets mapped high up the address
->> space. I don't have a solution for that one yet.
->
-> Is this Spidermonkey 1.8.5? I wasn't aware of this issue.
-
-Exactly. If you?re interested in fixing it, be my guest :).
-
->
->>
->> IcedTea for java-1.7 had a bug where it incorrectly caused an
->> overflow when trying to calculating a relative adrp offset from
->> <address high up> to <address really low>, so that the resulting
->> pointer had the upper bits set as 1s. That one is long fixed
->> upstream, we only ran into it because we used an ancient IcedTea
->> snapshot.
->
-> I would recommend updating the sources used for OpenJDK anyway as
-> there have been a few other stability and performance fixes put in
-> over the last year to my knowledge.
-
-Sure, that?s what we?ve done of course. I mostly mentioned it to answer the question where I had seen problems with 48 bits VA.
-
->
->>
->> My main concern however is with code that I do not know is broken today.
->>
->
-> I think if we set the 47-bit VA we are just ignoring the fundamental
-> problem and even allowing the problem to get worse (as future code may
-> adopt unsafe pointer tagging); thus I agree with Mark Rutland's NAK.
-
-Yeah, I?m torn on that one. I agree that we do allow broken code to work. However, going above 47 bits means we?re different from x86_64. And that *may* be a compatibility problem. Unfortunately we won?t know until at least a few hundred ISVs started to port their crufty user space code to ARM and things fell apart from time to time ;).
-
-> Personally, I would only ever tag bits in the VA space that I control
-> (i.e. at the bottom of the pointer if I enforce alignment).
-
-Don?t blame the messenger :). For code that I write I tend to agree, but we?re talking about software that is a core dependency of other code (CouchDB uses Spidermonkey, polkit uses mozjs, etc) and that has been unmaintained for almost a decade by now, written in times when 47 bits of VA was more than the contents of the whole internet ;).
-
-
-Alex
-
-IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
