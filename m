@@ -1,94 +1,184 @@
-From: guodong.xu@linaro.org (Guodong Xu)
-Date: Thu, 14 Jul 2016 17:30:56 +0800
-Subject: [PATCH 1/2] Bluetooth: Add LED triggers for HCI frames tx and rx
-In-Reply-To: <D2545F6D-7100-4B59-A19D-7CF878902BAA@holtmann.org>
-References: <1466657923-5776-1-git-send-email-guodong.xu@linaro.org>
- <D2545F6D-7100-4B59-A19D-7CF878902BAA@holtmann.org>
-Message-ID: <CAFGCpxwuOH83hdPc-c0DV5A_cKMp-0rjxg+3tMwOPTukHGd6vA@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 14 Jul 2016 10:34:10 +0100
+Subject: [PATCH v9 13/17] KVM: arm64: read initial LPI pending table
+In-Reply-To: <20160713015909.28793-14-andre.przywara@arm.com>
+References: <20160713015909.28793-1-andre.przywara@arm.com>
+ <20160713015909.28793-14-andre.przywara@arm.com>
+Message-ID: <57875C92.7000004@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 July 2016 at 16:07, Marcel Holtmann <marcel@holtmann.org> wrote:
-> Hi Guodong,
->
->> Two LED triggers are defined: tx_led and rx_led. Upon frames
->> available in HCI core layer, for tx or for rx, the combined LED
->> can blink.
->>
->> Verified on HiKey, 96boards. It uses hi6220 SoC and TI WL1835 combo
->> chip.
->>
->> Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
->> ---
->> include/net/bluetooth/hci_core.h |  1 +
->> net/bluetooth/hci_core.c         |  3 +++
->> net/bluetooth/leds.c             | 15 +++++++++++++++
->> net/bluetooth/leds.h             |  2 ++
->> 4 files changed, 21 insertions(+)
->>
->> diff --git a/include/net/bluetooth/hci_core.h b/include/net/bluetooth/hci_core.h
->> index dc71473..37b8dd9 100644
->> --- a/include/net/bluetooth/hci_core.h
->> +++ b/include/net/bluetooth/hci_core.h
->> @@ -398,6 +398,7 @@ struct hci_dev {
->>       bdaddr_t                rpa;
->>
->>       struct led_trigger      *power_led;
->> +     struct led_trigger      *tx_led, *rx_led;
->>
->>       int (*open)(struct hci_dev *hdev);
->>       int (*close)(struct hci_dev *hdev);
->> diff --git a/net/bluetooth/hci_core.c b/net/bluetooth/hci_core.c
->> index 45a9fc6..c6e1210 100644
->> --- a/net/bluetooth/hci_core.c
->> +++ b/net/bluetooth/hci_core.c
->> @@ -3248,6 +3248,7 @@ int hci_recv_frame(struct hci_dev *hdev, struct sk_buff *skb)
->>       skb_queue_tail(&hdev->rx_q, skb);
->>       queue_work(hdev->workqueue, &hdev->rx_work);
->>
->> +     hci_leds_blink_oneshot(hdev->rx_led);
->>       return 0;
->> }
->> EXPORT_SYMBOL(hci_recv_frame);
->> @@ -3325,6 +3326,8 @@ static void hci_send_frame(struct hci_dev *hdev, struct sk_buff *skb)
->>               BT_ERR("%s sending frame failed (%d)", hdev->name, err);
->>               kfree_skb(skb);
->>       }
->> +
->> +     hci_leds_blink_oneshot(hdev->tx_led);
->> }
->
-> so I am not convinced that this is the right way of doing TX/RX activity leds. This would have them purely based on HCI traffic and this would include control frames.
->
+On 13/07/16 02:59, Andre Przywara wrote:
+> The LPI pending status for a GICv3 redistributor is held in a table
+> in (guest) memory. To achieve reasonable performance, we cache the
+> pending bit in our struct vgic_irq. The initial pending state must be
+> read from guest memory upon enabling LPIs for this redistributor.
+> As we can't access the guest memory while we hold the lpi_list spinlock,
+> we create a snapshot of the LPI list and iterate over that.
+> 
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> ---
+>  virt/kvm/arm/vgic/vgic-its.c | 91 ++++++++++++++++++++++++++++++++++++++++++++
+>  virt/kvm/arm/vgic/vgic.h     |  6 +++
+>  2 files changed, 97 insertions(+)
+> 
+> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+> index 4fc830c..f400ef1 100644
+> --- a/virt/kvm/arm/vgic/vgic-its.c
+> +++ b/virt/kvm/arm/vgic/vgic-its.c
+> @@ -63,6 +63,90 @@ struct its_itte {
+>  };
+>  
+>  #define CBASER_ADDRESS(x)	((x) & GENMASK_ULL(51, 12))
+> +#define PENDBASER_ADDRESS(x)	((x) & GENMASK_ULL(51, 16))
+> +
+> +/*
+> + * Create a snapshot of the current LPI list, so that we can enumerate all
+> + * LPIs without holding any lock.
+> + * Returns the array length and puts the kmalloc'ed array into intid_ptr.
+> + */
+> +static int vgic_copy_lpi_list(struct kvm *kvm, u32 **intid_ptr)
+> +{
+> +	struct vgic_dist *dist = &kvm->arch.vgic;
+> +	struct vgic_irq *irq;
+> +	u32 *intids;
+> +	int irq_count = dist->lpi_list_count, i = 0;
+> +
+> +	/*
+> +	 * We use the current value of the list length, which may change
+> +	 * after the kmalloc. We don't care, because the guest shouldn't
+> +	 * change anything while the command handling is still running,
+> +	 * and in the worst case we would miss a new IRQ, which one wouldn't
+> +	 * expect to be covered by this command anyway.
+> +	 */
+> +	intids = kmalloc_array(irq_count, sizeof(intids[0]), GFP_KERNEL);
+> +	if (!intids)
+> +		return -ENOMEM;
+> +
+> +	spin_lock(&dist->lpi_list_lock);
+> +	list_for_each_entry(irq, &dist->lpi_list_head, lpi_list) {
+> +		/* We don't need to "get" the IRQ, as we hold the list lock. */
+> +		intids[i] = irq->intid;
+> +		if (i++ == irq_count)
+> +			break;
 
-Hi, Marcel
+So I can perfectly rewrite this as:
 
-+       if (hci_skb_pkt_type(skb) == HCI_ACLDATA_PKT ||
-+           hci_skb_pkt_type(skb) == HCI_SCODATA_PKT)
-+               hci_leds_blink_oneshot(hdev->rx_led);
-+
+		if (i == irq_count)
+			break;
+		i++;
 
-By adding pkt_type checks, we can limit LED blinks only at ACL/SCO
-DATA_PKT. Similar checks can be added for tx_led too.
+Do you now see the bug and how you are performing out of bound accesses?
 
-Does this look good to you? If you agree, I can send v2 to include this change.
+> +	}
+> +	spin_unlock(&dist->lpi_list_lock);
+> +
+> +	*intid_ptr = intids;
+> +	return irq_count;
+> +}
+> +
+> +/*
+> + * Scan the whole LPI pending table and sync the pending bit in there
+> + * with our own data structures. This relies on the LPI being
+> + * mapped before.
+> + */
+> +static int its_sync_lpi_pending_table(struct kvm_vcpu *vcpu)
+> +{
+> +	gpa_t pendbase = PENDBASER_ADDRESS(vcpu->arch.vgic_cpu.pendbaser);
+> +	struct vgic_irq *irq;
+> +	u8 pendmask;
+> +	int ret = 0;
+> +	u32 *intids;
+> +	int nr_irqs, i;
+> +
+> +	nr_irqs = vgic_copy_lpi_list(vcpu->kvm, &intids);
+> +	if (nr_irqs < 0)
+> +		return nr_irqs;
+> +
+> +	for (i = 0; i < nr_irqs; i++) {
+> +		int byte_offset, bit_nr;
+> +		int last_byte_offset = -1;
 
-> I think that we want activity leds for actual radio activity. Meaning that when we have an active connection and ACL packets are exchanged or when we are scanning.
->
+Nice try. But by keeping the last_byte_offset inside the loop, you've
+made sure that it is reset to -1 on each iteration. Wall <- head.
 
-Radio is controlled in Bluetooth module side, not Host. So I'm afraid
-actual radio activity cannot be captured in its exact form in Host
-side. The purpose of this patch is not for radio, it is for
-incoming/outgoing data. For example, it can give user a blinking
-indicator on RX frames after a Bluetooth mouse is connected. Another
-example, it can blink at bluetooth streamed audio (TX).
+> +
+> +		byte_offset = intids[i] / BITS_PER_BYTE;
+> +		bit_nr = intids[i] % BITS_PER_BYTE;
+> +
+> +		if (byte_offset != last_byte_offset) {
+> +			ret = kvm_read_guest(vcpu->kvm, pendbase + byte_offset,
+> +					     &pendmask, 1);
+> +			if (ret) {
+> +				kfree(intids);
+> +				return ret;
+> +			}
+> +			last_byte_offset = byte_offset;
+> +		}
+> +
+> +		irq = vgic_get_irq(vcpu->kvm, NULL, intids[i]);
+> +		spin_lock(&irq->irq_lock);
+> +		irq->pending = pendmask & (1U << bit_nr);
+> +		vgic_queue_irq_unlock(vcpu->kvm, irq);
+> +		vgic_put_irq(vcpu->kvm, irq);
+> +	}
+> +
+> +	kfree(intids);
+> +
+> +	return ret;
+> +}
+>  
+>  static unsigned long vgic_mmio_read_its_ctlr(struct kvm *vcpu,
+>  					     struct vgic_its *its,
+> @@ -406,6 +490,13 @@ static struct vgic_register_region its_registers[] = {
+>  		VGIC_ACCESS_32bit),
+>  };
+>  
+> +/* This is called on setting the LPI enable bit in the redistributor. */
+> +void vgic_enable_lpis(struct kvm_vcpu *vcpu)
+> +{
+> +	if (!(vcpu->arch.vgic_cpu.pendbaser & GICR_PENDBASER_PTZ))
+> +		its_sync_lpi_pending_table(vcpu);
+> +}
+> +
+>  static int vgic_its_register(struct kvm *kvm, struct vgic_its *its)
+>  {
+>  	struct vgic_io_device *iodev = &its->iodev;
+> diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
+> index 9dc7207..32d8d82 100644
+> --- a/virt/kvm/arm/vgic/vgic.h
+> +++ b/virt/kvm/arm/vgic/vgic.h
+> @@ -25,6 +25,7 @@
+>  #define IS_VGIC_ADDR_UNDEF(_x)  ((_x) == VGIC_ADDR_UNDEF)
+>  
+>  #define INTERRUPT_ID_BITS_SPIS	10
+> +#define INTERRUPT_ID_BITS_ITS	16
+>  #define VGIC_PRI_BITS		5
+>  
+>  #define vgic_irq_is_sgi(intid) ((intid) < VGIC_NR_SGIS)
+> @@ -77,6 +78,7 @@ int vgic_v3_map_resources(struct kvm *kvm);
+>  int vgic_register_redist_iodevs(struct kvm *kvm, gpa_t dist_base_address);
+>  bool vgic_has_its(struct kvm *kvm);
+>  int kvm_vgic_register_its_device(void);
+> +void vgic_enable_lpis(struct kvm_vcpu *vcpu);
+>  #else
+>  static inline void vgic_v3_process_maintenance(struct kvm_vcpu *vcpu)
+>  {
+> @@ -138,6 +140,10 @@ static inline int kvm_vgic_register_its_device(void)
+>  {
+>  	return -ENODEV;
+>  }
+> +
+> +static inline void vgic_enable_lpis(struct kvm_vcpu *vcpu)
+> +{
+> +}
+>  #endif
+>  
+>  int kvm_register_vgic_device(unsigned long type);
+> 
 
-Would that make sense?
+Thanks,
 
--Guodong
-
->
-> Regards
->
-> Marcel
->
+	M.
+-- 
+Jazz is not dead. It just smells funny...
