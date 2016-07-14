@@ -1,13 +1,20 @@
-From: dan.carpenter@oracle.com (Dan Carpenter)
-Date: Thu, 14 Jul 2016 16:40:54 +0300
-Subject: [PATCH v2] dmaengine: zynqmp_dma: Fix static checker warning
-In-Reply-To: <1468503055-20197-1-git-send-email-appanad@xilinx.com>
-References: <1468503055-20197-1-git-send-email-appanad@xilinx.com>
-Message-ID: <20160714134054.GZ32247@mwanda>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 14 Jul 2016 15:41:07 +0200
+Subject: [GIT PULL 2/4] ARM: tegra: Device tree changes for v4.8-rc1
+In-Reply-To: <20160711152512.11731-2-thierry.reding@gmail.com>
+References: <20160711152512.11731-1-thierry.reding@gmail.com>
+ <20160711152512.11731-2-thierry.reding@gmail.com>
+Message-ID: <4752920.U6jfQbfsxm@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Looks good.  Thanks!
+On Monday, July 11, 2016 5:25:10 PM CEST Thierry Reding wrote:
+> ARM: tegra: Device tree changes for v4.8-rc1
+> 
+> Some cleanups to existing device tree sources and add Toradex Apalis TK1
+> support.
+> 
 
-regards,
-dan carpenter
+Merged into next/dt, thanks!
+
+	Arnd
