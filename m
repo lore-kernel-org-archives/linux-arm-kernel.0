@@ -1,25 +1,23 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 14 Jul 2016 15:58:19 +0200
-Subject: [GIT PULL]arm64: dts: hisilicon: hi6220 updates for 4.8(#2)
-In-Reply-To: <577E5E70.1050304@hisilicon.com>
-References: <577E5E70.1050304@hisilicon.com>
-Message-ID: <4529903.blvXMCdknS@wuerfel>
+Date: Thu, 14 Jul 2016 16:01:50 +0200
+Subject: [GIT PULL] STi late updates for v4.8
+In-Reply-To: <5784F935.9050000@st.com>
+References: <5784F935.9050000@st.com>
+Message-ID: <36203387.0bf4mZW6Q8@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, July 7, 2016 2:51:44 PM CEST Wei Xu wrote:
-> Hi Arnd, Hi Olof, Hi Kevin,
+On Tuesday, July 12, 2016 4:05:41 PM CEST Patrice Chotard wrote:
+> Highlights:
+> -----------
+> - Add STi DT critical clocks declaration
+> - Remove SPI hack wich has dependecy with critical clocks
 > 
-> I know the walkaround for this kind of patch is still under discussion.
-> Could you please consider to pull the following changes?
-> 
-> This depends on the change in clk tree (clk-hi6220-rtc)
-> which is already in the clk-next.
-> 
-> And for easier grepping through history, below is the pull request
-> for the dts specific change (no clk commits):
+> These 2 STi DT patches and SPI hack MUST be applied after patches
+> contained into Stephen Boyd's branch clk-next/clk-st-critical.
+> This to ensure not to break SPI.
 > 
 
-Pulled into next/late, thanks!
+Merged into next/late now, thanks!
 
 	Arnd
