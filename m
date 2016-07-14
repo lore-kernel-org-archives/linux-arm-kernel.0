@@ -1,20 +1,32 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 14 Jul 2016 16:03:16 +0200
-Subject: [GIT PULL v2] Second Round of Renesas ARM64 Based SoC DT Updates
- for v4.8
-In-Reply-To: <cover.1467900241.git.horms+renesas@verge.net.au>
-References: <cover.1467900241.git.horms+renesas@verge.net.au>
-Message-ID: <5620110.FzyrTLq2Oq@wuerfel>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Thu, 14 Jul 2016 10:11:29 -0400 (EDT)
+Subject: [PATCH] usb: ehci-platform: use helper variables in probe function
+In-Reply-To: <1468398548-5050-1-git-send-email-zajec5@gmail.com>
+Message-ID: <Pine.LNX.4.44L0.1607141008500.32397-100000@netrider.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, July 7, 2016 4:39:45 PM CEST Simon Horman wrote:
-> Second Round of Renesas ARM64 Based SoC DT Updates for v4.8
-> 
-> * Add support for  r8a7796/salvator-x (R-Car Gen 3 M3-W)
-> * Add CAN support to r8a7795 (R-Car Gen 3 H3)
-> 
+On Wed, 13 Jul 2016, Rafa? Mi?ecki wrote:
 
-Merged into next/late to better deal with the dependency, thanks!
+> Probing function was using &dev->dev and dev->dev.of_node over 20 times
+> so I believe it made sense to use helper variables for both of them.
+> To avoid some uncommon variable name for struct device I first replaced
+> existing dev variable with pdev.
+> 
+> Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
 
-	Arnd
+Okay except for...
+
+> -		priv->num_phys = of_count_phandle_with_args(dev->dev.of_node,
+> -				"phys", "#phy-cells");
+> +		priv->num_phys = of_count_phandle_with_args(np, "phys",
+> +							    "#phy-cells");
+
+Please indent continuation lines two tab stops beyond the original 
+line, to match the style in the rest of the source file.
+
+With that change,
+
+Acked-by: Alan Stern <stern@rowland.harvard.edu>
+
+Alan Stern
