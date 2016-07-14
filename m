@@ -1,68 +1,108 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 14 Jul 2016 20:34:42 +0200
-Subject: [PATCH 3/6] ARM: dts: imx25: substitute NO_PAD_CTL by the
- respective reset value
-In-Reply-To: <CAOMZO5BtP29PD-vf1WKG0yd7OJy9A0Sthn4EQ+CuF1As2cmKoA@mail.gmail.com>
-References: <20160711073721.GM16643@pengutronix.de>
- <CAOMZO5ASsA88TQLAPdyit0xr3Lqh8e+8C_ZgoUa7w2rZxTb-ag@mail.gmail.com>
- <20160712073859.GQ16643@pengutronix.de>
- <CAOMZO5B+grtejgSMKrZMT9inEdh+bL0smZKE52qtcQD1NCHrqQ@mail.gmail.com>
- <CAOMZO5D2E_G4ySUnj=yadziSunwMBSVZs-Rw=EvNybFKs2iD3w@mail.gmail.com>
- <20160712191541.GY16643@pengutronix.de>
- <CAOMZO5C3eQFfs=ZS5nfDw6XnEAgfcc_+W2n0y8Xd-zsTfd-+gA@mail.gmail.com>
- <CAOMZO5B4CUr_-U3s+fo-O_BcREWQijffXFeRmUPiwDWdhY07pQ@mail.gmail.com>
- <20160713062521.GZ16643@pengutronix.de>
- <CAOMZO5BtP29PD-vf1WKG0yd7OJy9A0Sthn4EQ+CuF1As2cmKoA@mail.gmail.com>
-Message-ID: <20160714183442.GG6040@pengutronix.de>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Thu, 14 Jul 2016 12:35:41 -0600
+Subject: [PATCH V2 0/3] perf tools: coresight PMU recording capabilities 
+Message-ID: <1468521344-15047-1-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Fabio,
+Good day Arnaldo,
 
-On Thu, Jul 14, 2016 at 02:04:14PM -0300, Fabio Estevam wrote:
-> On Wed, Jul 13, 2016 at 3:25 AM, Uwe Kleine-K?nig
-> <u.kleine-koenig@pengutronix.de> wrote:
-> 
-> > Which U-Boot did you test? Mainline or the vendor variant?
+This is the first set of patches aimed at supporting trace acquisition and
+decoding using the ARM CoreSight drivers. The library is now out and accessible
+by anyone[1] - branch "opencsd-0v002" is stable and the one we advise to use.
 
-I assume the vendor variant, because your patch doesn't match what I saw
-in U-Boot mainline.
+Part of that branch is a "HOWTO.md" that describes how to perform on-target
+trace acquisition, along with how to setup the library and perf tools for off
+system trace decoding.
 
-> > Can you provide the output of
-> >
-> >         md 0x43fac000+0x584
-> 
-> Here it goes:
-> => md.l 0x43fac584 1
-> 43fac584: 00000000                               ....
+The patches in this set can also be found on gitHub[1], branch
+"perf-opencsd-4.7-rc1".  Available there are many more patches that will be
+submitted for review incrementally.
 
-I guess your tool (U-Boot?) would generate the output I want with:
+This second revision has been rebased on the perf core branch[2], mandating the
+addition of patch 1/3.
 
-	md.l 0x43fac000 353
+To conclude here are a couple of pastebins for you to look at if you don't want
+to go through the whole process of setting up the solution:
 
-(i.e. 353 32bit words, that are all the iomux registers)
+$ perf report --stdio -D [3]
+$ perf report --stdio [4]
 
-> > in U-Boot (which for sure has a different syntax that I don't know) and
-> > from Linux
-> >
-> >         memtool md 0x43fac000+0x584
-> 
-> The memtool utility version I have is broken for mx25, so I can't dump
-> this register easily in Linux.
+And a snippet of the output from the "cs-etm-disasem.py" script, also included
+on branch "perf-opencsd-4.7-rc1":
 
-Which version do you have? How is it broken? Did you configure AIPS to
-allow non-privileged access to the peripherals? Our internal
-documentation tells you have to set (in the boot loader) the following
-registers to 0:
+FILE: /lib/aarch64-linux-gnu/ld-2.21.so CPU: 3
+          7fab57fd80:   910003e0        mov     x0, sp
+          7fab57fd84:   94000d53        bl      7fab5832d0 <free@plt+0x3790>
+FILE: /lib/aarch64-linux-gnu/ld-2.21.so CPU: 3
+          7fab5832d0:   d11203ff        sub     sp, sp, #0x480
+FILE: /lib/aarch64-linux-gnu/ld-2.21.so CPU: 3
+          7fab5832d4:   a9ba7bfd        stp     x29, x30, [sp,#-96]!
+          7fab5832d8:   910003fd        mov     x29, sp
+          7fab5832dc:   a90363f7        stp     x23, x24, [sp,#48]
+          7fab5832e0:   9101e3b7        add     x23, x29, #0x78
+          7fab5832e4:   a90573fb        stp     x27, x28, [sp,#80]
+          7fab5832e8:   a90153f3        stp     x19, x20, [sp,#16]
+          7fab5832ec:   aa0003fb        mov     x27, x0
+          7fab5832f0:   910a82e1        add     x1, x23, #0x2a0
+          7fab5832f4:   a9025bf5        stp     x21, x22, [sp,#32]
+          7fab5832f8:   a9046bf9        stp     x25, x26, [sp,#64]
+          7fab5832fc:   910102e0        add     x0, x23, #0x40
+          7fab583300:   f800841f        str     xzr, [x0],#8
+          7fab583304:   eb01001f        cmp     x0, x1
+          7fab583308:   54ffffc1        b.ne    7fab583300 <free@plt+0x37c0>
+FILE: /lib/aarch64-linux-gnu/ld-2.21.so CPU: 3
+          7fab583300:   f800841f        str     xzr, [x0],#8
+          7fab583304:   eb01001f        cmp     x0, x1
+          7fab583308:   54ffffc1        b.ne    7fab583300 <free@plt+0x37c0>
+FILE: /lib/aarch64-linux-gnu/ld-2.21.so CPU: 3
+          7fab583300:   f800841f        str     xzr, [x0],#8
+          7fab583304:   eb01001f        cmp     x0, x1
+          7fab583308:   54ffffc1        b.ne    7fab583300 <free@plt+0x37c0>
+...
+...
 
-	0x43f00020 0x43f00024 0x43f00028 0x43f0002c
-	0x43f00040 0x43f00044 0x43f00048 0x43f0004c 0x43f00050
+Regards,
+Mathieu
 
-After that memtool works fine for me in Linux.
+[1]. https://github.com/Linaro/OpenCSD/
+[2]. git://git.kernel.org/pub/scm/linux/kernel/git/tip/tip.git perf/core
+[3]. http://pastebin.com/u9tgdwjF
+[4]. http://pastebin.com/V9N3bnEq
 
-Best regards
-Uwe
+Changes for V2:
+- Rebased on perf tree tip.
+- Fixed file list in MAINTAINERS's file.
+- Added Adrian Hunter's Acked-by.
+- Reworked ifndef/endif in config/Makefile to avoid duplication.
+- Patch 1/3, mandatory to make things compile.
+
+Mathieu Poirier (3):
+  tools: Copy the header file needed by perf tools
+  perf tools: making coresight PMU listable
+  perf tools: adding coresight etm PMU record capabilities
+
+ MAINTAINERS                         |   5 +
+ tools/include/linux/coresight-pmu.h |  39 +++
+ tools/perf/MANIFEST                 |   1 +
+ tools/perf/Makefile.perf            |   3 +
+ tools/perf/arch/arm/util/Build      |   2 +
+ tools/perf/arch/arm/util/auxtrace.c |  54 ++++
+ tools/perf/arch/arm/util/cs-etm.c   | 559 ++++++++++++++++++++++++++++++++++++
+ tools/perf/arch/arm/util/cs-etm.h   |  23 ++
+ tools/perf/arch/arm/util/pmu.c      |  34 +++
+ tools/perf/arch/arm64/util/Build    |   4 +
+ tools/perf/config/Makefile          |  11 +-
+ tools/perf/util/auxtrace.c          |   1 +
+ tools/perf/util/auxtrace.h          |   1 +
+ tools/perf/util/cs-etm.h            |  74 +++++
+ 14 files changed, 807 insertions(+), 4 deletions(-)
+ create mode 100644 tools/include/linux/coresight-pmu.h
+ create mode 100644 tools/perf/arch/arm/util/auxtrace.c
+ create mode 100644 tools/perf/arch/arm/util/cs-etm.c
+ create mode 100644 tools/perf/arch/arm/util/cs-etm.h
+ create mode 100644 tools/perf/arch/arm/util/pmu.c
+ create mode 100644 tools/perf/util/cs-etm.h
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+2.7.4
