@@ -1,42 +1,64 @@
-From: shuahkh@osg.samsung.com (Shuah Khan)
-Date: Thu, 14 Jul 2016 08:40:22 -0600
-Subject: [PATCH v2] media: s5p-mfc remove unnecessary error messages
-Message-ID: <1468507222-5314-1-git-send-email-shuahkh@osg.samsung.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Thu, 14 Jul 2016 16:45:45 +0200
+Subject: [GIT PULL 1/2] arm64: tegra: Device tree changes for v4.8-rc1
+Message-ID: <20160714144546.29427-1-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Removed unnecessary error message as appropriate error code is returned.
-Changed error message into a debug.
+Hi ARM SoC maintainers,
 
-Signed-off-by: Shuah Khan <shuahkh@osg.samsung.com>
----
+The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
 
-Changes since v1:
-- Changed EBUSY error message to a debug message.
+  Linux 4.7-rc1 (2016-05-29 09:29:24 -0700)
 
- drivers/media/platform/s5p-mfc/s5p_mfc.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+are available in the git repository at:
 
-diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc.c b/drivers/media/platform/s5p-mfc/s5p_mfc.c
-index b6fde20..eeb1db2 100644
---- a/drivers/media/platform/s5p-mfc/s5p_mfc.c
-+++ b/drivers/media/platform/s5p-mfc/s5p_mfc.c
-@@ -759,7 +759,6 @@ static int s5p_mfc_open(struct file *file)
- 	/* Allocate memory for context */
- 	ctx = kzalloc(sizeof(*ctx), GFP_KERNEL);
- 	if (!ctx) {
--		mfc_err("Not enough memory\n");
- 		ret = -ENOMEM;
- 		goto err_alloc;
- 	}
-@@ -776,7 +775,7 @@ static int s5p_mfc_open(struct file *file)
- 	while (dev->ctx[ctx->num]) {
- 		ctx->num++;
- 		if (ctx->num >= MFC_NUM_CONTEXTS) {
--			mfc_err("Too many open contexts\n");
-+			mfc_debug(2, "Too many open contexts\n");
- 			ret = -EBUSY;
- 			goto err_no_ctx;
- 		}
--- 
-2.7.4
+  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.8-arm64-dt
+
+for you to fetch changes up to 34993594181dc1b34eaf8e3b878dde5ed810e61f:
+
+  arm64: tegra: Enable HDMI on Jetson TX1 (2016-07-14 16:20:27 +0200)
+
+Thanks,
+Thierry
+
+----------------------------------------------------------------
+arm64: tegra: Device tree changes for v4.8-rc1
+
+A slew of updates for Tegra210 support: PMIC and regulator additions,
+which in turn allow a bunch of features to be enabled. Some assemblies
+of the Jetson TX1 come with a DSI panel that is now supported. For all
+other assemblies, this set of changes enables the HDMI output. Jetson
+TX1 can now also make use of the XUSB controller.
+
+PMIC and regulator support is also added for Smaug, which will allow a
+number of interesting feature additions in future releases.
+
+----------------------------------------------------------------
+Jon Hunter (5):
+      arm64: tegra: Correct Tegra210 XUSB mailbox interrupt
+      arm64: tegra: Add audio powergate node for Tegra210
+      arm64: tegra: Add ACONNECT bus node for Tegra210
+      arm64: tegra: Add DPAUX pinctrl bindings
+      arm64: tegra: Add XUSB powergates on Tegra210
+
+Rhyland Klein (1):
+      arm64: tegra: Add regulators for Tegra210 Smaug
+
+Thierry Reding (9):
+      arm64: tegra: Add PMIC support on Jetson TX1
+      arm64: tegra: p2597: Add SDMMC power supplies
+      arm64: tegra: Add DSI panel on Jetson TX1
+      arm64: tegra: Add Tegra210 XUSB pad controller
+      arm64: tegra: Add Tegra210 XUSB controller
+      arm64: tegra: Enable debug serial on Jetson TX1
+      arm64: tegra: Enable XUSB controller on Jetson TX1
+      arm64: tegra: Add sor1_src clock
+      arm64: tegra: Enable HDMI on Jetson TX1
+
+ arch/arm64/boot/dts/nvidia/tegra210-p2180.dtsi     | 249 ++++++++++++++++
+ arch/arm64/boot/dts/nvidia/tegra210-p2371-2180.dts |  45 +++
+ arch/arm64/boot/dts/nvidia/tegra210-p2597.dtsi     | 319 +++++++++++++++++++++
+ arch/arm64/boot/dts/nvidia/tegra210-smaug.dts      | 314 ++++++++++++++++++++
+ arch/arm64/boot/dts/nvidia/tegra210.dtsi           | 292 ++++++++++++++++++-
+ 5 files changed, 1218 insertions(+), 1 deletion(-)
