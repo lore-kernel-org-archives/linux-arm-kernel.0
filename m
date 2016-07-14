@@ -1,20 +1,20 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 14 Jul 2016 15:15:38 +0200
-Subject: [GIT PULL v2] STi defconfig updates for v4.8
-In-Reply-To: <578358F8.3070303@st.com>
-References: <578358F8.3070303@st.com>
-Message-ID: <4614774.mgvvIqSIoK@wuerfel>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 14 Jul 2016 14:16:03 +0100
+Subject: [PATCH v8 0/4] perf: Add APM X-Gene SoC Performance Monitoring
+ Unit driver
+In-Reply-To: <1468263944-10634-1-git-send-email-ttnguyen@apm.com>
+References: <1468263944-10634-1-git-send-email-ttnguyen@apm.com>
+Message-ID: <20160714131602.GJ29455@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, July 11, 2016 10:29:44 AM CEST Patrice Chotard wrote:
-> warning: refname 'sti-defconfig-for-v4.8' is ambiguous.
-> Highlights:
-> -----------
-> - Enable DRM_STI for STMicroelectronics DRM Support
-> - VIDEO_STI_BDISP for STMicroelectronics BDISP 2D
-> 
+On Mon, Jul 11, 2016 at 12:05:40PM -0700, Tai Nguyen wrote:
+> In addition to the X-Gene ARM CPU performance monitoring unit (PMU), there
+> are PMU for the SoC system devices such as L3 cache(s), I/O bridge(s),
+> memory controller bridges and memory. These PMU devices are loosely
+> architected to follow the same model as the PMU for ARM cores.
 
-Pulled into next/defconfig, thanks!
+You might want to add commit messages to patches 1,2 and 4, but then you
+can route this via the arm-soc tree.
 
-	Arnd
+Will
