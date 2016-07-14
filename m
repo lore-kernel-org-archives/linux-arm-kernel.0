@@ -1,18 +1,13 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 14 Jul 2016 15:38:04 +0200
-Subject: [GIT PULL 1/4] ARM: tegra: Core SoC changes for v4.8-rc1
-In-Reply-To: <20160711152512.11731-1-thierry.reding@gmail.com>
-References: <20160711152512.11731-1-thierry.reding@gmail.com>
-Message-ID: <7084807.7TOvWKuOqd@wuerfel>
+From: dan.carpenter@oracle.com (Dan Carpenter)
+Date: Thu, 14 Jul 2016 16:40:54 +0300
+Subject: [PATCH v2] dmaengine: zynqmp_dma: Fix static checker warning
+In-Reply-To: <1468503055-20197-1-git-send-email-appanad@xilinx.com>
+References: <1468503055-20197-1-git-send-email-appanad@xilinx.com>
+Message-ID: <20160714134054.GZ32247@mwanda>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, July 11, 2016 5:25:09 PM CEST Thierry Reding wrote:
-> ARM: tegra: Core SoC changes for v4.8-rc1
-> 
-> Some cleanups to eliminate sparse warnings and a section mismatch.
-> 
+Looks good.  Thanks!
 
-Pulled into next/cleanup, thanks!
-
-	Arnd
+regards,
+dan carpenter
