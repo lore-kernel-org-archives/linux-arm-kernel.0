@@ -1,166 +1,116 @@
 From: minghsiu.tsai@mediatek.com (Minghsiu Tsai)
-Date: Thu, 14 Jul 2016 20:17:57 +0800
-Subject: [PATCH 0/4] Add MT8173 MDP Driver 
-Message-ID: <1468498681-19955-1-git-send-email-minghsiu.tsai@mediatek.com>
+Date: Thu, 14 Jul 2016 20:18:01 +0800
+Subject: [PATCH 4/4] arm64: dts: mediatek: Add MDP for MT8173
+In-Reply-To: <1468498681-19955-1-git-send-email-minghsiu.tsai@mediatek.com>
+References: <1468498681-19955-1-git-send-email-minghsiu.tsai@mediatek.com>
+Message-ID: <1468498681-19955-5-git-send-email-minghsiu.tsai@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-==============
- Introduction
-==============
+Add MDP node for MT8173
 
-The purpose of this series is to add the driver for Media Data Path HW embedded in the Mediatek's MT8173 SoC.
-MDP is used for scaling and color space conversion.
+Signed-off-by: Minghsiu Tsai <minghsiu.tsai@mediatek.com>
+---
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi |   80 ++++++++++++++++++++++++++++++
+ 1 file changed, 80 insertions(+)
 
-It could convert V4L2_PIX_FMT_MT21 to V4L2_PIX_FMT_NV12M or V4L2_PIX_FMT_YUV420M.
-
-NV12M/YUV420M/MT21 -> MDP -> NV12M/YUV420M
-
-This patch series rely on MTK VPU driver in patch series "Add MT8173 Video Encoder Driver and VPU Driver"[1] and "Add MT8173 Video Decoder Driver"[2].
-MDP driver rely on VPU driver to load, communicate with VPU.
-
-Internally the driver uses videobuf2 framework and MTK IOMMU and MTK SMI both have been merged in v4.6-rc1.
-
-[1]https://patchwork.kernel.org/patch/9002171/
-[2]https://patchwork.kernel.org/patch/9141245/
-
-==================
- Device interface
-==================
-
-In principle the driver bases on v4l2 memory-to-memory framework:
-it provides a single video node and each opened file handle gets its own private context with separate buffer queues. Each context consist of 2 buffer queues: OUTPUT (for source buffers) and CAPTURE (for destination buffers).
-OUTPUT and CAPTURE buffer could be MMAP or DMABUF memory type.
-
-v4l2-compliance test output:
-localhost ~ # v4l2-compliance -d /dev/image-proc0
-v4l2-compliance SHA   : 3d225130559e8578dce347052bee3813ddf08f28
-
-Driver Info:
-        Driver name   : mtk-mdp
-        Card type     : 14001000.rdma
-        Bus info      : platform:mt8173
-        Driver version: 3.18.0
-        Capabilities  : 0x84204000
-                Video Memory-to-Memory Multiplanar
-                Streaming
-                Extended Pix Format
-                Device Capabilities
-        Device Caps   : 0x04204000
-                Video Memory-to-Memory Multiplanar
-                Streaming
-                Extended Pix Format
-
-Compliance test for device /dev/image-proc0 (not using libv4l2):
-
-Required ioctls:
-        test VIDIOC_QUERYCAP: OK
-
-Allow for multiple opens:
-        test second video open: OK
-        test VIDIOC_QUERYCAP: OK
-        test VIDIOC_G/S_PRIORITY: OK
-
-Debug ioctls:
-        test VIDIOC_DBG_G/S_REGISTER: OK (Not Supported)
-        test VIDIOC_LOG_STATUS: OK (Not Supported)
-
-Input ioctls:
-        test VIDIOC_G/S_TUNER/ENUM_FREQ_BANDS: OK (Not Supported)
-        test VIDIOC_G/S_FREQUENCY: OK (Not Supported)
-        test VIDIOC_S_HW_FREQ_SEEK: OK (Not Supported)
-        test VIDIOC_ENUMAUDIO: OK (Not Supported)
-        test VIDIOC_G/S/ENUMINPUT: OK (Not Supported)
-        test VIDIOC_G/S_AUDIO: OK (Not Supported)
-        Inputs: 0 Audio Inputs: 0 Tuners: 0
-
-Output ioctls:
-        test VIDIOC_G/S_MODULATOR: OK (Not Supported)
-        test VIDIOC_G/S_FREQUENCY: OK (Not Supported)
-        test VIDIOC_ENUMAUDOUT: OK (Not Supported)
-        test VIDIOC_G/S/ENUMOUTPUT: OK (Not Supported)
-        test VIDIOC_G/S_AUDOUT: OK (Not Supported)
-        Outputs: 0 Audio Outputs: 0 Modulators: 0
-
-Input/Output configuration ioctls:
-        test VIDIOC_ENUM/G/S/QUERY_STD: OK (Not Supported)
-        test VIDIOC_ENUM/G/S/QUERY_DV_TIMINGS: OK (Not Supported)
-        test VIDIOC_DV_TIMINGS_CAP: OK (Not Supported)
-        test VIDIOC_G/S_EDID: OK (Not Supported)
-
-        Control ioctls:
-                test VIDIOC_QUERY_EXT_CTRL/QUERYMENU: OK
-                test VIDIOC_QUERYCTRL: OK
-                test VIDIOC_G/S_CTRL: OK
-                test VIDIOC_G/S/TRY_EXT_CTRLS: OK
-                test VIDIOC_(UN)SUBSCRIBE_EVENT/DQEVENT: OK
-                test VIDIOC_G/S_JPEGCOMP: OK (Not Supported)
-                Standard Controls: 5 Private Controls: 0
-
-        Format ioctls:
-                test VIDIOC_ENUM_FMT/FRAMESIZES/FRAMEINTERVALS: OK
-                test VIDIOC_G/S_PARM: OK (Not Supported)
-                test VIDIOC_G_FBUF: OK (Not Supported)
-                test VIDIOC_G_FMT: OK
-                test VIDIOC_TRY_FMT: OK
-                test VIDIOC_S_FMT: OK
-                test VIDIOC_G_SLICED_VBI_CAP: OK (Not Supported)
-                test Cropping: OK
-                test Composing: OK
-                test Scaling: OK (Not Supported)
-
-        Codec ioctls:
-                test VIDIOC_(TRY_)ENCODER_CMD: OK (Not Supported)
-                test VIDIOC_G_ENC_INDEX: OK (Not Supported)
-                test VIDIOC_(TRY_)DECODER_CMD: OK (Not Supported)
-
-        Buffer ioctls:
-                test VIDIOC_REQBUFS/CREATE_BUFS/QUERYBUF: OK
-                test VIDIOC_EXPBUF: OK
-
-Test input 0:
-
-
-Total: 42, Succeeded: 42, Failed: 0, Warnings: 0
-
-
-Minghsiu Tsai (4):
-  VPU: mediatek: Add mdp support
-  dt-bindings: Add a binding for Mediatek MDP
-  media: Add Mediatek MDP Driver
-  arm64: dts: mediatek: Add MDP for MT8173
-
- .../devicetree/bindings/media/mediatek-mdp.txt     |   92 ++
- arch/arm64/boot/dts/mediatek/mt8173.dtsi           |   80 ++
- drivers/media/platform/Kconfig                     |   16 +
- drivers/media/platform/Makefile                    |    2 +
- drivers/media/platform/mtk-mdp/Makefile            |    9 +
- drivers/media/platform/mtk-mdp/mtk_mdp_comp.c      |  159 +++
- drivers/media/platform/mtk-mdp/mtk_mdp_comp.h      |   72 ++
- drivers/media/platform/mtk-mdp/mtk_mdp_core.c      |  294 +++++
- drivers/media/platform/mtk-mdp/mtk_mdp_core.h      |  233 ++++
- drivers/media/platform/mtk-mdp/mtk_mdp_ipi.h       |  126 ++
- drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c       | 1304 ++++++++++++++++++++
- drivers/media/platform/mtk-mdp/mtk_mdp_m2m.h       |   22 +
- drivers/media/platform/mtk-mdp/mtk_mdp_regs.c      |  153 +++
- drivers/media/platform/mtk-mdp/mtk_mdp_regs.h      |   31 +
- drivers/media/platform/mtk-mdp/mtk_mdp_vpu.c       |  140 +++
- drivers/media/platform/mtk-mdp/mtk_mdp_vpu.h       |   41 +
- drivers/media/platform/mtk-vpu/mtk_vpu.h           |    5 +
- 17 files changed, 2779 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/media/mediatek-mdp.txt
- create mode 100644 drivers/media/platform/mtk-mdp/Makefile
- create mode 100644 drivers/media/platform/mtk-mdp/mtk_mdp_comp.c
- create mode 100644 drivers/media/platform/mtk-mdp/mtk_mdp_comp.h
- create mode 100644 drivers/media/platform/mtk-mdp/mtk_mdp_core.c
- create mode 100644 drivers/media/platform/mtk-mdp/mtk_mdp_core.h
- create mode 100644 drivers/media/platform/mtk-mdp/mtk_mdp_ipi.h
- create mode 100644 drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c
- create mode 100644 drivers/media/platform/mtk-mdp/mtk_mdp_m2m.h
- create mode 100644 drivers/media/platform/mtk-mdp/mtk_mdp_regs.c
- create mode 100644 drivers/media/platform/mtk-mdp/mtk_mdp_regs.h
- create mode 100644 drivers/media/platform/mtk-mdp/mtk_mdp_vpu.c
- create mode 100644 drivers/media/platform/mtk-mdp/mtk_mdp_vpu.h
-
---
+diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+index 77b8c4e..8e1b85d 100644
+--- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
++++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+@@ -26,6 +26,16 @@
+ 	#address-cells = <2>;
+ 	#size-cells = <2>;
+ 
++	aliases {
++		mdp_rdma0 = &mdp_rdma0;
++		mdp_rdma1 = &mdp_rdma1;
++		mdp_rsz0 = &mdp_rsz0;
++		mdp_rsz1 = &mdp_rsz1;
++		mdp_rsz2 = &mdp_rsz2;
++		mdp_wdma0 = &mdp_wdma0;
++		mdp_wrot0 = &mdp_wrot0;
++		mdp_wrot1 = &mdp_wrot1;
++	};
+ 	cpus {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+@@ -678,6 +688,76 @@
+ 			#clock-cells = <1>;
+ 		};
+ 
++		mdp_rdma0: rdma at 14001000 {
++			compatible = "mediatek,mt8173-mdp-rdma",
++				     "mediatek,mt8173-mdp";
++			reg = <0 0x14001000 0 0x1000>;
++			clocks = <&mmsys CLK_MM_MDP_RDMA0>,
++				 <&mmsys CLK_MM_MUTEX_32K>;
++			power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
++			iommus = <&iommu M4U_PORT_MDP_RDMA0>;
++			mediatek,larb = <&larb0>;
++			mediatek,vpu = <&vpu>;
++		};
++
++		mdp_rdma1: rdma at 14002000 {
++			compatible = "mediatek,mt8173-mdp-rdma";
++			reg = <0 0x14002000 0 0x1000>;
++			clocks = <&mmsys CLK_MM_MDP_RDMA1>,
++				 <&mmsys CLK_MM_MUTEX_32K>;
++			power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
++			iommus = <&iommu M4U_PORT_MDP_RDMA1>;
++			mediatek,larb = <&larb4>;
++		};
++
++		mdp_rsz0: rsz at 14003000 {
++			compatible = "mediatek,mt8173-mdp-rsz";
++			reg = <0 0x14003000 0 0x1000>;
++			clocks = <&mmsys CLK_MM_MDP_RSZ0>;
++			power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
++		};
++
++		mdp_rsz1: rsz at 14004000 {
++			compatible = "mediatek,mt8173-mdp-rsz";
++			reg = <0 0x14004000 0 0x1000>;
++			clocks = <&mmsys CLK_MM_MDP_RSZ1>;
++			power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
++		};
++
++		mdp_rsz2: rsz at 14005000 {
++			compatible = "mediatek,mt8173-mdp-rsz";
++			reg = <0 0x14005000 0 0x1000>;
++			clocks = <&mmsys CLK_MM_MDP_RSZ2>;
++			power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
++		};
++
++		mdp_wdma0: wdma at 14006000 {
++			compatible = "mediatek,mt8173-mdp-wdma";
++			reg = <0 0x14006000 0 0x1000>;
++			clocks = <&mmsys CLK_MM_MDP_WDMA>;
++			power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
++			iommus = <&iommu M4U_PORT_MDP_WDMA>;
++			mediatek,larb = <&larb0>;
++		};
++
++		mdp_wrot0: wrot at 14007000 {
++			compatible = "mediatek,mt8173-mdp-wrot";
++			reg = <0 0x14007000 0 0x1000>;
++			clocks = <&mmsys CLK_MM_MDP_WROT0>;
++			power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
++			iommus = <&iommu M4U_PORT_MDP_WROT0>;
++			mediatek,larb = <&larb0>;
++		};
++
++		mdp_wrot1: wrot at 14008000 {
++			compatible = "mediatek,mt8173-mdp-wrot";
++			reg = <0 0x14008000 0 0x1000>;
++			clocks = <&mmsys CLK_MM_MDP_WROT1>;
++			power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
++			iommus = <&iommu M4U_PORT_MDP_WROT1>;
++			mediatek,larb = <&larb4>;
++		};
++
+ 		pwm0: pwm at 1401e000 {
+ 			compatible = "mediatek,mt8173-disp-pwm",
+ 				     "mediatek,mt6595-disp-pwm";
+-- 
 1.7.9.5
