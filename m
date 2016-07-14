@@ -1,47 +1,61 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Wed, 13 Jul 2016 22:06:35 -0400
-Subject: [PATCH V9 9/9] vfio: platform: check reset call return code during
- release
+Date: Wed, 13 Jul 2016 22:06:34 -0400
+Subject: [PATCH V9 8/9] vfio: platform: check reset call return code during
+ open
 In-Reply-To: <1468461995-32676-1-git-send-email-okaya@codeaurora.org>
 References: <1468461995-32676-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1468461995-32676-10-git-send-email-okaya@codeaurora.org>
+Message-ID: <1468461995-32676-9-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Release call is ignoring the return code from reset call and can
+Open call is ignoring the return code from reset call and can
 potentially continue even though reset call failed.
 
 If reset_required module parameter is set, this patch is going
-to validate the return code and will cause stack dump with
-WARN_ON and warn the user of failure.
+to validate the return code and will abort open if reset fails.
 
 Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-Reviewed-by: Eric Auger <eric.auger@redhat.com>
 Reviewed-by: Baptiste Reynal <b.reynal@virtualopensystems.com>
+Reviewed-by: Eric Auger <eric.auger@redhat.com>
 ---
- drivers/vfio/platform/vfio_platform_common.c | 10 +++++++++-
- 1 file changed, 9 insertions(+), 1 deletion(-)
+ drivers/vfio/platform/vfio_platform_common.c | 11 ++++++++++-
+ 1 file changed, 10 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/vfio/platform/vfio_platform_common.c b/drivers/vfio/platform/vfio_platform_common.c
-index 1898ff6..65e53c7 100644
+index 71248a9..1898ff6 100644
 --- a/drivers/vfio/platform/vfio_platform_common.c
 +++ b/drivers/vfio/platform/vfio_platform_common.c
-@@ -238,7 +238,15 @@ static void vfio_platform_release(void *device_data)
+@@ -259,6 +259,8 @@ static int vfio_platform_open(void *device_data)
  	mutex_lock(&driver_lock);
  
- 	if (!(--vdev->refcnt)) {
--		vfio_platform_call_reset(vdev, NULL);
+ 	if (!vdev->refcnt) {
 +		const char *extra_dbg = NULL;
-+		int ret;
 +
+ 		ret = vfio_platform_regions_init(vdev);
+ 		if (ret)
+ 			goto err_reg;
+@@ -267,7 +269,12 @@ static int vfio_platform_open(void *device_data)
+ 		if (ret)
+ 			goto err_irq;
+ 
+-		vfio_platform_call_reset(vdev, NULL);
 +		ret = vfio_platform_call_reset(vdev, &extra_dbg);
 +		if (ret && vdev->reset_required) {
-+			dev_warn(vdev->device, "reset driver is required and reset call failed in release (%d) %s\n",
++			dev_warn(vdev->device, "reset driver is required and reset call failed in open (%d) %s\n",
 +				 ret, extra_dbg ? extra_dbg : "");
-+			WARN_ON(1);
++			goto err_rst;
 +		}
- 		vfio_platform_regions_cleanup(vdev);
- 		vfio_platform_irq_cleanup(vdev);
  	}
+ 
+ 	vdev->refcnt++;
+@@ -275,6 +282,8 @@ static int vfio_platform_open(void *device_data)
+ 	mutex_unlock(&driver_lock);
+ 	return 0;
+ 
++err_rst:
++	vfio_platform_irq_cleanup(vdev);
+ err_irq:
+ 	vfio_platform_regions_cleanup(vdev);
+ err_reg:
 -- 
 1.8.2.1
