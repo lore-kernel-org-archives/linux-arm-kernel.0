@@ -1,51 +1,38 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Thu, 14 Jul 2016 16:45:46 +0200
-Subject: [GIT PULL 2/2] arm64: tegra: Enable GPU on Jetson TX1
-In-Reply-To: <20160714144546.29427-1-thierry.reding@gmail.com>
-References: <20160714144546.29427-1-thierry.reding@gmail.com>
-Message-ID: <20160714144546.29427-2-thierry.reding@gmail.com>
+From: xuwei5@hisilicon.com (Wei Xu)
+Date: Thu, 14 Jul 2016 16:04:26 +0100
+Subject: [GIT PULL]arm64: dts: hisilicon: hi6220 updates for 4.8(#2)
+In-Reply-To: <4529903.blvXMCdknS@wuerfel>
+References: <577E5E70.1050304@hisilicon.com> <4529903.blvXMCdknS@wuerfel>
+Message-ID: <5787A9FA.9060704@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM SoC maintainers,
+Hi Arnd,
 
-The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
+On 14/07/2016 14:58, Arnd Bergmann wrote:
+> On Thursday, July 7, 2016 2:51:44 PM CEST Wei Xu wrote:
+>> Hi Arnd, Hi Olof, Hi Kevin,
+>>
+>> I know the walkaround for this kind of patch is still under discussion.
+>> Could you please consider to pull the following changes?
+>>
+>> This depends on the change in clk tree (clk-hi6220-rtc)
+>> which is already in the clk-next.
+>>
+>> And for easier grepping through history, below is the pull request
+>> for the dts specific change (no clk commits):
+>>
+> 
+> Pulled into next/late, thanks!
 
-  Linux 4.7-rc1 (2016-05-29 09:29:24 -0700)
+Thanks!
 
-are available in the git repository at:
+Best Regards,
+Wei
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.8-gm20b
-
-for you to fetch changes up to 8a4383d0d71df2bc03251124bc7b6694f994a6ae:
-
-  arm64: tegra: Add VDD_GPU regulator to Jetson TX1 (2016-07-14 16:38:14 +0200)
-
-Thanks,
-Thierry
-
-----------------------------------------------------------------
-arm64: tegra: Enable GPU on Jetson TX1
-
-This pulls in PWM regulator driver changes needed in order to enable the
-GPU on Jetson TX1, adds the regulator to the device tree and hooks it up
-to the GPU.
-
-----------------------------------------------------------------
-Alexandre Courbot (2):
-      regulator: pwm: Support for enable GPIO
-      arm64: tegra: Add VDD_GPU regulator to Jetson TX1
-
-Boris Brezillon (1):
-      regulator: pwm: Drop unneeded pwm_enable() call
-
-Thierry Reding (3):
-      Merge tag 'regulator-pwm-enable' of git://git.kernel.org/.../broonie/regulator into for-4.8/gm20b
-      arm64: tegra: Add PMIC support on Jetson TX1
-      Merge branch 'for-4.8/arm64/dt' into for-4.8/gm20b
-
- .../bindings/regulator/pwm-regulator.txt           |   7 +-
- arch/arm64/boot/dts/nvidia/tegra210-p2180.dtsi     | 263 +++++++++++++++++++++
- arch/arm64/boot/dts/nvidia/tegra210-p2597.dtsi     |  55 +++++
- drivers/regulator/pwm-regulator.c                  |  31 ++-
- 4 files changed, 350 insertions(+), 6 deletions(-)
+> 
+> 	Arnd
+> 
+> 
+> .
+> 
