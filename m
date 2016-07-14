@@ -1,47 +1,46 @@
-From: appana.durga.rao@xilinx.com (Kedareswara rao Appana)
-Date: Thu, 14 Jul 2016 19:00:55 +0530
-Subject: [PATCH v2] dmaengine: zynqmp_dma: Fix static checker warning
-Message-ID: <1468503055-20197-1-git-send-email-appanad@xilinx.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 14 Jul 2016 14:33:25 +0100
+Subject: [patch] arm64: KVM: clean up a condition
+In-Reply-To: <20160714101934.GD18175@mwanda>
+References: <20160714101934.GD18175@mwanda>
+Message-ID: <578794A5.3000701@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes the below static checker warning
-drivers/dma/xilinx/zynqmp_dma.c:973 zynqmp_dma_chan_probe()
-        warn: was && intended here instead of ||?
+On 14/07/16 11:19, Dan Carpenter wrote:
+> My static checker complains that this condition looks like it should be
+> == instead of =.  This isn't a fast path, so we don't need to be fancy.
+> 
+> Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>
+> 
+> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+> index a57d650..b0b225c 100644
+> --- a/arch/arm64/kvm/sys_regs.c
+> +++ b/arch/arm64/kvm/sys_regs.c
+> @@ -1546,7 +1546,7 @@ static void unhandled_cp_access(struct kvm_vcpu *vcpu,
+>  				struct sys_reg_params *params)
+>  {
+>  	u8 hsr_ec = kvm_vcpu_trap_get_class(vcpu);
+> -	int cp;
+> +	int cp = -1;
+>  
+>  	switch(hsr_ec) {
+>  	case ESR_ELx_EC_CP15_32:
+> @@ -1558,7 +1558,7 @@ static void unhandled_cp_access(struct kvm_vcpu *vcpu,
+>  		cp = 14;
+>  		break;
+>  	default:
+> -		WARN_ON((cp = -1));
+> +		WARN_ON(1);
+>  	}
+>  
+>  	kvm_err("Unsupported guest CP%d access at: %08lx\n",
+> 
 
-Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
-Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
----
-Changes for v2:
----> Return EINVAL instead of err as suggested by Dan.
+Indeed, that looks a bit dodgy. I'll queue it for 4.8.
 
- drivers/dma/xilinx/zynqmp_dma.c |   11 ++++++++---
- 1 files changed, 8 insertions(+), 3 deletions(-)
+Thanks,
 
-diff --git a/drivers/dma/xilinx/zynqmp_dma.c b/drivers/dma/xilinx/zynqmp_dma.c
-index f777a5b..b18d51f 100644
---- a/drivers/dma/xilinx/zynqmp_dma.c
-+++ b/drivers/dma/xilinx/zynqmp_dma.c
-@@ -970,12 +970,17 @@ static int zynqmp_dma_chan_probe(struct zynqmp_dma_device *zdev,
- 	chan->dst_burst_len = ZYNQMP_DMA_AWLEN_RST_VAL;
- 	chan->src_burst_len = ZYNQMP_DMA_ARLEN_RST_VAL;
- 	err = of_property_read_u32(node, "xlnx,bus-width", &chan->bus_width);
--	if ((err < 0) && ((chan->bus_width != ZYNQMP_DMA_BUS_WIDTH_64) ||
--			  (chan->bus_width != ZYNQMP_DMA_BUS_WIDTH_128))) {
--		dev_err(zdev->dev, "invalid bus-width value");
-+	if (err < 0) {
-+		dev_err(&pdev->dev, "missing xlnx,bus-width property\n");
- 		return err;
- 	}
- 
-+	if (chan->bus_width != ZYNQMP_DMA_BUS_WIDTH_64 &&
-+	    chan->bus_width != ZYNQMP_DMA_BUS_WIDTH_128) {
-+		dev_err(zdev->dev, "invalid bus-width value");
-+		return -EINVAL;
-+	}
-+
- 	chan->is_dmacoherent =  of_property_read_bool(node, "dma-coherent");
- 	zdev->chan = chan;
- 	tasklet_init(&chan->tasklet, zynqmp_dma_do_tasklet, (ulong)chan);
+	M.
 -- 
-1.7.1
+Jazz is not dead. It just smells funny...
