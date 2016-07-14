@@ -1,81 +1,42 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Thu, 14 Jul 2016 11:10:18 -0700
-Subject: [PATCH v2 01/11] mm: Implement stack frame object validation
-In-Reply-To: <20160714054842.6zal5rqawpgew26r@treble>
-References: <1468446964-22213-1-git-send-email-keescook@chromium.org>
- <1468446964-22213-2-git-send-email-keescook@chromium.org>
- <CALCETrVDJDjdoh7yvOPd=_5twQnzQRhe8G2KLaRw-NnA1Uf__g@mail.gmail.com>
- <CAGXu5jLPZiRJx8n3_7GW2bufiuUgE9=c6dQcNxDRPHMU72sD9g@mail.gmail.com>
- <20160714054842.6zal5rqawpgew26r@treble>
-Message-ID: <CAGXu5jLv_pMRqdaM72D_FTQzxoGxgcEqxpvUzqwgjOmZ8D-zSw@mail.gmail.com>
+From: jon.mason@broadcom.com (Jon Mason)
+Date: Thu, 14 Jul 2016 14:18:08 -0400
+Subject: [PATCH] ARM: dts: NSP: Correct RAM amount for BCM958625HR board
+In-Reply-To: <5786B159.7060102@gmail.com>
+References: <1468433929-12232-1-git-send-email-jon.mason@broadcom.com>
+ <5786B159.7060102@gmail.com>
+Message-ID: <CAC3K-4ra7wmhqUi_Tc5KrML5uJGLX7-YPF1Upt=7juuTBM6QeA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 13, 2016 at 10:48 PM, Josh Poimboeuf <jpoimboe@redhat.com> wrote:
-> On Wed, Jul 13, 2016 at 03:04:26PM -0700, Kees Cook wrote:
->> On Wed, Jul 13, 2016 at 3:01 PM, Andy Lutomirski <luto@amacapital.net> wrote:
->> > On Wed, Jul 13, 2016 at 2:55 PM, Kees Cook <keescook@chromium.org> wrote:
->> >> This creates per-architecture function arch_within_stack_frames() that
->> >> should validate if a given object is contained by a kernel stack frame.
->> >> Initial implementation is on x86.
->> >>
->> >> This is based on code from PaX.
->> >>
->> >
->> > This, along with Josh's livepatch work, are two examples of unwinders
->> > that matter for correctness instead of just debugging.  ISTM this
->> > should just use Josh's code directly once it's been written.
+On Wed, Jul 13, 2016 at 5:23 PM, Florian Fainelli <f.fainelli@gmail.com> wrote:
+> On 07/13/2016 11:18 AM, Jon Mason wrote:
+>> The BCM958625HR board has 2GB of RAM available.  Increase the amount
+>> from 512MB to 2GB and add the device type to the memory entry.
 >>
->> Do you have URL for Josh's code? I'd love to see what happening there.
+>> Signed-off-by: Jon Mason <jon.mason@broadcom.com>
+>> ---
+>>  arch/arm/boot/dts/bcm958625hr.dts | 3 ++-
+>>  1 file changed, 2 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/boot/dts/bcm958625hr.dts b/arch/arm/boot/dts/bcm958625hr.dts
+>> index 4239e58..66c658a 100644
+>> --- a/arch/arm/boot/dts/bcm958625hr.dts
+>> +++ b/arch/arm/boot/dts/bcm958625hr.dts
+>> @@ -47,7 +47,8 @@
+>>       };
+>>
+>>       memory {
+>> -             reg = <0x60000000 0x20000000>;
+>> +             device_type = "memory";
+>> +             reg = <0x60000000 0x40000000>;
 >
-> The code is actually going to be 100% different next time around, but
-> FWIW, here's the last attempt:
->
->   https://lkml.kernel.org/r/4d34d452bf8f85c7d6d5f93db1d3eeb4cba335c7.1461875890.git.jpoimboe at redhat.com
->
-> In the meantime I've realized the need to rewrite the x86 core stack
-> walking code to something much more manageable so we don't need all
-> these unwinders everywhere.  I'll probably post the patches in the next
-> week or so.  I'll add you to the CC list.
+> That's just one 1GB, did you intend to provide 0x8000_0000 instead here?
 
-Awesome!
+Good catch!  I'll fix that up in v2 (and add a "Fixes:" referencing
+the original patch).
 
-> With the new interface I think you'll be able to do something like:
->
->         struct unwind_state;
->
->         unwind_start(&state, current, NULL, NULL);
->         unwind_next_frame(&state);
->         oldframe = unwind_get_stack_pointer(&state);
->
->         unwind_next_frame(&state);
->         frame = unwind_get_stack_pointer(&state);
->
->         do {
->                 if (obj + len <= frame)
->                         return blah;
->                 oldframe = frame;
->                 frame = unwind_get_stack_pointer(&state);
->
->         } while (unwind_next_frame(&state);
->
-> And then at the end there'll be some (still TBD) way to query whether it
-> reached the last syscall pt_regs frame, or if it instead encountered a
-> bogus frame pointer along the way and had to bail early.
+Thanks,
+Jon
 
-Sounds good to me. Will there be any frame size information available?
-Right now, the unwinder from PaX just drops 2 pointers (saved frame,
-saved ip) from the delta of frame address to find the size of the
-actual stack area used by the function. If I could shave things like
-padding and possible stack canaries off the size too, that would be
-great.
-
-Since I'm aiming the hardened usercopy series for 4.8, I figure I'll
-just leave this unwinder in for now, and once yours lands, I can rip
-it out again.
-
--Kees
-
--- 
-Kees Cook
-Chrome OS & Brillo Security
+> --
+> Florian
