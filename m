@@ -1,46 +1,60 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 14 Jul 2016 14:33:25 +0100
-Subject: [patch] arm64: KVM: clean up a condition
-In-Reply-To: <20160714101934.GD18175@mwanda>
-References: <20160714101934.GD18175@mwanda>
-Message-ID: <578794A5.3000701@arm.com>
+From: shuahkh@osg.samsung.com (Shuah Khan)
+Date: Thu, 14 Jul 2016 07:35:23 -0600
+Subject: [PATCH] media: s5p-mfc remove unnecessary error messages
+In-Reply-To: <c38dc1b5-e2f7-4486-a0fc-a8f690d28fe6@osg.samsung.com>
+References: <1468370038-5364-1-git-send-email-shuahkh@osg.samsung.com>
+ <c38dc1b5-e2f7-4486-a0fc-a8f690d28fe6@osg.samsung.com>
+Message-ID: <5787951B.2050401@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/07/16 11:19, Dan Carpenter wrote:
-> My static checker complains that this condition looks like it should be
-> == instead of =.  This isn't a fast path, so we don't need to be fancy.
+On 07/14/2016 06:46 AM, Javier Martinez Canillas wrote:
+> Hello Shuah,
 > 
-> Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>
+> On 07/12/2016 08:33 PM, Shuah Khan wrote:
+>> Removing unnecessary error messages as appropriate error code is returned.
+>>
+>> Signed-off-by: Shuah Khan <shuahkh@osg.samsung.com>
+>> ---
+>>  drivers/media/platform/s5p-mfc/s5p_mfc.c | 2 --
+>>  1 file changed, 2 deletions(-)
+>>
+>> diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc.c b/drivers/media/platform/s5p-mfc/s5p_mfc.c
+>> index b6fde20..906f80c 100644
+>> --- a/drivers/media/platform/s5p-mfc/s5p_mfc.c
+>> +++ b/drivers/media/platform/s5p-mfc/s5p_mfc.c
+>> @@ -759,7 +759,6 @@ static int s5p_mfc_open(struct file *file)
+>>  	/* Allocate memory for context */
+>>  	ctx = kzalloc(sizeof(*ctx), GFP_KERNEL);
+>>  	if (!ctx) {
+>> -		mfc_err("Not enough memory\n");
 > 
-> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-> index a57d650..b0b225c 100644
-> --- a/arch/arm64/kvm/sys_regs.c
-> +++ b/arch/arm64/kvm/sys_regs.c
-> @@ -1546,7 +1546,7 @@ static void unhandled_cp_access(struct kvm_vcpu *vcpu,
->  				struct sys_reg_params *params)
->  {
->  	u8 hsr_ec = kvm_vcpu_trap_get_class(vcpu);
-> -	int cp;
-> +	int cp = -1;
->  
->  	switch(hsr_ec) {
->  	case ESR_ELx_EC_CP15_32:
-> @@ -1558,7 +1558,7 @@ static void unhandled_cp_access(struct kvm_vcpu *vcpu,
->  		cp = 14;
->  		break;
->  	default:
-> -		WARN_ON((cp = -1));
-> +		WARN_ON(1);
->  	}
->  
->  	kvm_err("Unsupported guest CP%d access at: %08lx\n",
+> I agree to remove this since in case of a OOM, the core already does a
+> stack dump and prints an error message so there's no need to it here.
 > 
+>>  		ret = -ENOMEM;
+>>  		goto err_alloc;
+>>  	}
+>> @@ -776,7 +775,6 @@ static int s5p_mfc_open(struct file *file)
+>>  	while (dev->ctx[ctx->num]) {
+>>  		ctx->num++;
+>>  		if (ctx->num >= MFC_NUM_CONTEXTS) {
+>> -			mfc_err("Too many open contexts\n");
+> 
+> But I think this error message shouldn't be removed since explains why
+> the open failed, even when an error code is returned.
 
-Indeed, that looks a bit dodgy. I'll queue it for 4.8.
+This message isn't very informative and not sure if it is giving
+any more information than EBUSY. It is a good debug message perhaps,
+but not an error message. Would it be okay if I made it debug instead.
 
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+thanks,
+-- Shuah
+> 
+>>  			ret = -EBUSY;
+>>  			goto err_no_ctx;
+>>  		}
+>>
+> 
+> Best regards,
+> 
