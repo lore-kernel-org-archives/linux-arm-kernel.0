@@ -1,49 +1,50 @@
-From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
-Date: Thu, 14 Jul 2016 17:22:38 +0200
-Subject: [PATCH] usb: ehci-platform: use helper variables in probe function
-In-Reply-To: <Pine.LNX.4.44L0.1607141008500.32397-100000@netrider.rowland.org>
-References: <1468398548-5050-1-git-send-email-zajec5@gmail.com>
- <Pine.LNX.4.44L0.1607141008500.32397-100000@netrider.rowland.org>
-Message-ID: <CACna6rzdhCjHvTJSC-TCag7eCMPso-tGRRu3ajhs5jc7A6r2gQ@mail.gmail.com>
+From: john@metanate.com (John Keeping)
+Date: Thu, 14 Jul 2016 16:29:15 +0100
+Subject: [PATCH] drm/rockchip: allocate correct crtc state structure on reset
+Message-ID: <20160714152915.31235-1-john@metanate.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14 July 2016 at 16:11, Alan Stern <stern@rowland.harvard.edu> wrote:
-> On Wed, 13 Jul 2016, Rafa? Mi?ecki wrote:
->
->> Probing function was using &dev->dev and dev->dev.of_node over 20 times
->> so I believe it made sense to use helper variables for both of them.
->> To avoid some uncommon variable name for struct device I first replaced
->> existing dev variable with pdev.
->>
->> Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
->
-> Okay except for...
->
->> -             priv->num_phys = of_count_phandle_with_args(dev->dev.of_node,
->> -                             "phys", "#phy-cells");
->> +             priv->num_phys = of_count_phandle_with_args(np, "phys",
->> +                                                         "#phy-cells");
->
-> Please indent continuation lines two tab stops beyond the original
-> line, to match the style in the rest of the source file.
+Because we are using a custom crtc_state structure, we must override the
+reset helper to allocate the correct amount of memory.
 
-I'm afraid this file doesn't have any consistent coding style for line breaks.
+Cc: stable at vger.kernel.org
+Fixes: 4e257d9eee23 ("drm/rockchip: get rid of rockchip_drm_crtc_mode_config")
+Signed-off-by: John Keeping <john@metanate.com>
+---
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 13 ++++++++++++-
+ 1 file changed, 12 insertions(+), 1 deletion(-)
 
-1) dma_coerce_mask_and_coherent
-One extra tab after line break.
-
-2) devm_kcalloc
-Two extra tabs and 4 spaces. No real alignment noticed.
-
-3) devm_of_phy_get_by_index
-Two extra tabs
-
-4) devm_reset_control_get_shared_by_index
-Three extra tabs
-
-With these pointed, do you still think I should use two extra tabs? If
-so, I'll send V2 as you suggested. Just let me know.
-
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+index 1c4d5b5a70a2..21e1247098be 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+@@ -1048,6 +1048,17 @@ static void vop_crtc_destroy(struct drm_crtc *crtc)
+ 	drm_crtc_cleanup(crtc);
+ }
+ 
++static void vop_crtc_reset(struct drm_crtc *crtc)
++{
++	if (crtc->state)
++		__drm_atomic_helper_crtc_destroy_state(crtc, crtc->state);
++	kfree(crtc->state);
++
++	crtc->state = kzalloc(sizeof(struct rockchip_crtc_state), GFP_KERNEL);
++	if (crtc->state)
++		crtc->state->crtc = crtc;
++}
++
+ static struct drm_crtc_state *vop_crtc_duplicate_state(struct drm_crtc *crtc)
+ {
+ 	struct rockchip_crtc_state *rockchip_state;
+@@ -1073,7 +1084,7 @@ static const struct drm_crtc_funcs vop_crtc_funcs = {
+ 	.set_config = drm_atomic_helper_set_config,
+ 	.page_flip = drm_atomic_helper_page_flip,
+ 	.destroy = vop_crtc_destroy,
+-	.reset = drm_atomic_helper_crtc_reset,
++	.reset = vop_crtc_reset,
+ 	.atomic_duplicate_state = vop_crtc_duplicate_state,
+ 	.atomic_destroy_state = vop_crtc_destroy_state,
+ };
 -- 
-Rafa?
+2.9.0.465.g8850cbc.dirty
