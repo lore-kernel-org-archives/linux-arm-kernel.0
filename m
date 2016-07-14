@@ -1,40 +1,55 @@
-From: tthayer@opensource.altera.com (tthayer at opensource.altera.com)
-Date: Thu, 14 Jul 2016 11:06:48 -0500
-Subject: [PATCH 10/10] ARM: dts: Add Arria10 USB EDAC devicetree entry
-In-Reply-To: <1468512408-5156-1-git-send-email-tthayer@opensource.altera.com>
-References: <1468512408-5156-1-git-send-email-tthayer@opensource.altera.com>
-Message-ID: <1468512408-5156-11-git-send-email-tthayer@opensource.altera.com>
+From: marex@denx.de (Marek Vasut)
+Date: Thu, 14 Jul 2016 17:46:59 +0200
+Subject: [PATCH 3/4] ARM: dts: at91: sama5d4_ma5d4: fix regulator names
+In-Reply-To: <1468363508-23843-3-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1468363508-23843-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1468363508-23843-3-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <13a55675-36cb-5952-a3c9-5995776dcffa@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thor Thayer <tthayer@opensource.altera.com>
+On 07/13/2016 12:45 AM, Alexandre Belloni wrote:
+> vcc_3v3_reg and vcc_mmc1_reg are fixed regulators and don't need a
+> reg property. Remove their unit-address.
+>
+> Solves:
+> Warning (unit_address_vs_reg): Node /fixedregulator at 0 has a unit name, but no reg property
+> Warning (unit_address_vs_reg): Node /fixedregulator at 1 has a unit name, but no reg property
+>
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
-Add the device tree entries needed to support the Altera USB
-FIFO buffer EDAC on the Arria10 chip.
+Reviewed-by: Marek Vasut <marex@denx.de>
 
-Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
----
- arch/arm/boot/dts/socfpga_arria10.dtsi |    8 ++++++++
- 1 file changed, 8 insertions(+)
+> ---
+> Cc: Marek Vasut <marex@denx.de>
+>  arch/arm/boot/dts/at91-sama5d4_ma5d4.dtsi | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/at91-sama5d4_ma5d4.dtsi b/arch/arm/boot/dts/at91-sama5d4_ma5d4.dtsi
+> index e7b2109fc85a..d9ca7f214677 100644
+> --- a/arch/arm/boot/dts/at91-sama5d4_ma5d4.dtsi
+> +++ b/arch/arm/boot/dts/at91-sama5d4_ma5d4.dtsi
+> @@ -106,7 +106,7 @@
+>  		};
+>  	};
+>
+> -	vcc_3v3_reg: fixedregulator at 0 {
+> +	vcc_3v3_reg: fixedregulator_3v3 {
+>  		compatible = "regulator-fixed";
+>  		regulator-name = "VCC 3V3";
+>  		regulator-min-microvolt = <3300000>;
+> @@ -115,7 +115,7 @@
+>  		regulator-always-on;
+>  	};
+>
+> -	vcc_mmc0_reg: fixedregulator at 1 {
+> +	vcc_mmc0_reg: fixedregulator_mmc0 {
+>  		compatible = "regulator-fixed";
+>  		gpio = <&pioE 15 GPIO_ACTIVE_HIGH>;
+>  		regulator-name = "RST_n MCI0";
+>
 
-diff --git a/arch/arm/boot/dts/socfpga_arria10.dtsi b/arch/arm/boot/dts/socfpga_arria10.dtsi
-index a506ec0..bd548ab 100644
---- a/arch/arm/boot/dts/socfpga_arria10.dtsi
-+++ b/arch/arm/boot/dts/socfpga_arria10.dtsi
-@@ -652,6 +652,14 @@
- 				interrupts = <10 IRQ_TYPE_LEVEL_HIGH>,
- 					     <42 IRQ_TYPE_LEVEL_HIGH>;
- 			};
-+
-+			usb0-ecc at ff8c8800 {
-+				compatible = "altr,socfpga-usb-ecc";
-+				reg = <0xff8c8800 0x400>;
-+				altr,ecc-parent = <&usb0>;
-+				interrupts = <2 IRQ_TYPE_LEVEL_HIGH>,
-+					     <34 IRQ_TYPE_LEVEL_HIGH>;
-+			};
- 		};
- 
- 		rst: rstmgr at ffd05000 {
+
 -- 
-1.7.9.5
+Best regards,
+Marek Vasut
