@@ -1,19 +1,18 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Thu, 14 Jul 2016 17:32:07 +0100
-Subject: Applied "ASoC: mediatek: mt2701: fix non static symbol warning" to
- the asoc tree
-In-Reply-To: <1467985293-9041-1-git-send-email-weiyj_lk@163.com>
-Message-ID: <E1bNjYV-0001SJ-C4@debutante>
+Date: Thu, 14 Jul 2016 17:32:47 +0100
+Subject: Applied "spi: s3c64xx: restore removed comments" to the spi tree
+In-Reply-To: <1468306444-18512-1-git-send-email-andi.shyti@samsung.com>
+Message-ID: <E1bNjZ9-0001jr-4G@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The patch
 
-   ASoC: mediatek: mt2701: fix non static symbol warning
+   spi: s3c64xx: restore removed comments
 
-has been applied to the asoc tree at
+has been applied to the spi tree at
 
-   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
+   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/spi.git 
 
 All being well this means that it will be integrated into the linux-next
 tree (usually sometime in the next 24 hours) and sent to Linus during
@@ -34,35 +33,36 @@ to this mail.
 Thanks,
 Mark
 
->From 25d01dc67894de03de463727633e72e1727b4f6d Mon Sep 17 00:00:00 2001
-From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
-Date: Fri, 8 Jul 2016 13:47:01 +0000
-Subject: [PATCH] ASoC: mediatek: mt2701: fix non static symbol warning
+>From 0dbe70a1feb411d17fbcf8e73d61e6c7f33fda72 Mon Sep 17 00:00:00 2001
+From: Andi Shyti <andi.shyti@samsung.com>
+Date: Tue, 12 Jul 2016 19:02:15 +0900
+Subject: [PATCH] spi: s3c64xx: restore removed comments
 
-Fixes the following sparse warning:
+Patch a9e93e8 has erroneously removed some comments which are
+important to understand why the bus frequency is multiplied by
+two during the spi transfer.
 
-sound/soc/mediatek/mt2701/mt2701-afe-pcm.c:72:5: warning:
- symbol 'mt2701_dai_num_to_i2s' was not declared. Should it be static?
+Reword the previous comment to a more appropriate message.
 
-Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
-Acked-by: Garlic Tseng <garlic.tseng@mediatek.com>
+Suggested-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+Signed-off-by: Andi Shyti <andi.shyti@samsung.com>
+Reviewed-by: Michael Turquette <mturquette@baylibre.com>
 Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- sound/soc/mediatek/mt2701/mt2701-afe-pcm.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/spi/spi-s3c64xx.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c b/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c
-index 15522c08a967..34a6123480d3 100644
---- a/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c
-+++ b/sound/soc/mediatek/mt2701/mt2701-afe-pcm.c
-@@ -69,7 +69,7 @@ static const struct mt2701_afe_rate mt2701_afe_i2s_rates[] = {
- 	{ .rate = 352800, .regvalue = 24 },
- };
+diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
+index a1e84686c70c..3c09e94cf827 100644
+--- a/drivers/spi/spi-s3c64xx.c
++++ b/drivers/spi/spi-s3c64xx.c
+@@ -642,6 +642,7 @@ static void s3c64xx_spi_config(struct s3c64xx_spi_driver_data *sdd)
+ 	writel(val, regs + S3C64XX_SPI_MODE_CFG);
  
--int mt2701_dai_num_to_i2s(struct mtk_base_afe *afe, int num)
-+static int mt2701_dai_num_to_i2s(struct mtk_base_afe *afe, int num)
- {
- 	int val = num - MT2701_IO_I2S;
- 
+ 	if (sdd->port_conf->clk_from_cmu) {
++		/* The src_clk clock is divided internally by 2 */
+ 		clk_set_rate(sdd->src_clk, sdd->cur_speed * 2);
+ 	} else {
+ 		/* Configure Clock */
 -- 
 2.8.1
