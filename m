@@ -1,34 +1,34 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 14 Jul 2016 15:42:37 +0300
-Subject: [PATCH 2/7] dmaengine: omap-dma: Complete the cookie first on
- transfer completion
+Date: Thu, 14 Jul 2016 15:42:40 +0300
+Subject: [PATCH 5/7] dmaengine: omap-dma: Add more debug information when
+ freeing channel
 In-Reply-To: <20160714124242.7579-1-peter.ujfalusi@ti.com>
 References: <20160714124242.7579-1-peter.ujfalusi@ti.com>
-Message-ID: <20160714124242.7579-3-peter.ujfalusi@ti.com>
+Message-ID: <20160714124242.7579-6-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Before looking for the next descriptor to start, complete the just finished
-cookie.
+Print the same information the driver prints when allocating the channel
+resources regarding to the sDMA channel.
 
 Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
- drivers/dma/omap-dma.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/dma/omap-dma.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/dma/omap-dma.c b/drivers/dma/omap-dma.c
-index 7d56cd88c9a5..f7b0b0c668fb 100644
+index c026642fc66a..bbad82985083 100644
 --- a/drivers/dma/omap-dma.c
 +++ b/drivers/dma/omap-dma.c
-@@ -449,8 +449,8 @@ static void omap_dma_callback(int ch, u16 status, void *data)
- 			if (c->sgidx < d->sglen) {
- 				omap_dma_start_sg(c, d);
- 			} else {
--				omap_dma_start_desc(c);
- 				vchan_cookie_complete(&d->vd);
-+				omap_dma_start_desc(c);
- 			}
- 		} else {
- 			vchan_cyclic_callback(&d->vd);
+@@ -568,7 +568,8 @@ static void omap_dma_free_chan_resources(struct dma_chan *chan)
+ 	vchan_free_chan_resources(&c->vc);
+ 	omap_free_dma(c->dma_ch);
+ 
+-	dev_dbg(od->ddev.dev, "freeing channel for %u\n", c->dma_sig);
++	dev_dbg(od->ddev.dev, "freeing channel %u used for %u\n", c->dma_ch,
++		c->dma_sig);
+ 	c->dma_sig = 0;
+ }
+ 
 -- 
 2.9.1
