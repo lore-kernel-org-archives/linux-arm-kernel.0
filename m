@@ -1,62 +1,62 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 14 Jul 2016 13:42:06 +0100
-Subject: [RFC 0/3] extend kexec_file_load system call
-In-Reply-To: <7927804.6bj1abO0d2@wuerfel>
-References: <20160712014201.11456-1-takahiro.akashi@linaro.org>
- <20160713173804.GA25723@porco> <20160713175630.GA2668@leverpostej>
- <7927804.6bj1abO0d2@wuerfel>
-Message-ID: <20160714124206.GB26061@leverpostej>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Thu, 14 Jul 2016 15:42:35 +0300
+Subject: [PATCH 0/7] dmaengine:omap-dma: Linked List transfer for slave_sg
+Message-ID: <20160714124242.7579-1-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 13, 2016 at 09:57:28PM +0200, Arnd Bergmann wrote:
-> On Wednesday, July 13, 2016 6:58:32 PM CEST Mark Rutland wrote:
-> > 
-> > >   we may want to remove unnecessary devices and even add a dedicated
-> > >   storage device for storing a core dump image.
-> > 
-> > I suspect that bringing up a minimal number of devices is better
-> > controlled by a cmdline option. In general, figuring out what is
-> > necessary and what is not is going to be board specific, so hacking the
-> > FW tables (DTB or ACPI) is not a very portable/reliable approach.
-> > 
-> > Do we actually add devices in practice? More so than the above that
-> > requires special knowledge of the platform (including things that were
-> > not described in the boot DTB).
-> > 
-> > In the ACPI case modifying a DTB alone is not sufficient to change the
-> > information regarding devices, as those won't be described in the DTB.
-> > It's not possible to convert ACPI to DTB in general.
-> 
-> A more likely scenario would be replacing ACPI tables with a DTB that
-> describes the platform in order to use devices that the ACPI tables
-> don't contain.
+Hi,
 
-To do so, you need special knowledge of the platform, which users are
-unlikely to have in practice for ACPI-based platforms.
+The following series with the final patch will add support for sDMA Linked List
+transfer support.
+Linked List is supported by sDMA in OMAP3630+ (OMAP4/5, dra7 family).
+If the descriptor load feature is present we can create the descriptors for each
+SG beforehand and let sDMA to walk them through.
+This way the number of sDMA interrupts the kernel need to handle will drop
+dramatically.
 
-So, I think that boils down to the same problem, and the same comments
-apply.
+I have gathered some numbers to show the difference.
 
-> > > - Say, booting BE kernel on ACPI LE kernel
-> > >   In this case, there is no useful dtb in the kernel.
-> 
-> > If the platform only has ACPI, then you cannot boot a BE kernel to begin
-> > with. As above one cannot convert ACPI to DTB, so one would need
-> > extensive platform knowledge for this to work.
-> 
-> I think what he meant was to pass a DTB to the kexec kernel in order
-> to run BE, while the original kernel can only run LE due to ACPI.
+Booting up the board with filesystem on SD card for example:
+# cat /proc/interrupts | grep dma
+W/o LinkedList support:
+ 27:       4436          0     WUGEN  13 Level     omap-dma-engine
 
-I understood that. My point was that to build that DTB, you need to have
-knowledge of the platform that you are unlikely to have.
+Same board/filesystem with this patch:
+ 27:       1027          0     WUGEN  13 Level     omap-dma-engine
 
-The platform firmware may expect to interact with AML, which you can't
-place in DT or run in a BE context.
+Or copying files from SD card to eMCC:
+# du -h /usr
+2.1G    /usr/
+# find /usr/ -type f | wc -l
+232001
 
-If you need to run BE kernels on a platform, you would likely get a
-platform that could boot a BE kernel from the outset (i.e. one that
-provides a DTB), or run that code ina VM under an LE host.
+# cp -r /usr/* /mnt/emmc/tmp/
 
-Thanks,
-Mark.
+W/o LinkedList we see ~761069 DMA interrupts.
+With LinkedList support it is down to ~269314 DMA interrupts.
+
+With the decreased DMA interrupt number the CPU load is dropping
+significantly as well.
+
+The series depends on the interleaved transfer support patch I have sent couple
+of days ago:
+https://lkml.org/lkml/2016/7/12/216
+
+Regards,
+Peter
+---
+Peter Ujfalusi (7):
+  dmaengine: omap-dma: Simplify omap_dma_start_sg parameter list
+  dmaengine: omap-dma: Complete the cookie first on transfer completion
+  dmaengine: omap-dma: Simplify omap_dma_callback
+  dmaengine: omap-dma: Dynamically allocate memory for lch_map
+  dmaengine: omap-dma: Add more debug information when freeing channel
+  dmaengine: omap-dma: Use pointer to omap_sg in slave_sg setup's loop
+  dmaengine: omap-dma: Support for LinkedList transfer of slave_sg
+
+ drivers/dma/omap-dma.c | 234 +++++++++++++++++++++++++++++++++++++++++++------
+ 1 file changed, 207 insertions(+), 27 deletions(-)
+
+--
+2.9.1
