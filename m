@@ -1,37 +1,143 @@
-From: agraf@suse.de (Alexander Graf)
-Date: Thu, 14 Jul 2016 09:14:23 +0200
-Subject: [PATCH] arm64: Add config to limit user space to 47bits
-In-Reply-To: <VI1PR0801MB1423AC2E8EDEE7EA33A6233196320@VI1PR0801MB1423.eurprd08.prod.outlook.com>
-References: <1468424567-15925-1-git-send-email-agraf@suse.de>
- <CAKv+Gu_QH=sZi--FVqHebd1P+6UMzEqWQQ1u3Y170B7cND8Kgw@mail.gmail.com>
- <578668D3.6010406@suse.de> <20160714010812.GA17138@e103986-lin>
- <837E6456-4718-45D7-8EE7-E28E11DB8BD3@suse.de>
- <VI1PR0801MB1423AC2E8EDEE7EA33A6233196320@VI1PR0801MB1423.eurprd08.prod.outlook.com>
-Message-ID: <e24481b9-fb6a-aead-a72b-43b7d561b940@suse.de>
+From: tiffany.lin@mediatek.com (tiffany lin)
+Date: Thu, 14 Jul 2016 15:30:10 +0800
+Subject: [PATCH v3 3/9] DocBook/v4l: Add compressed video formats used
+ on MT8173 codec driver
+In-Reply-To: <1468418157.2867.12.camel@ndufresne.ca>
+References: <1464611363-14936-1-git-send-email-tiffany.lin@mediatek.com>
+ <1464611363-14936-2-git-send-email-tiffany.lin@mediatek.com>
+ <1464611363-14936-3-git-send-email-tiffany.lin@mediatek.com>
+ <1464611363-14936-4-git-send-email-tiffany.lin@mediatek.com>
+ <5a793171-24a7-4e9e-8bfd-f668c789f8e0@xs4all.nl>
+ <1468205771.3725.8.camel@mtksdaap41>
+ <CAOMLVLiZU3D587dSyp2b2v4DV+MS9vh85bA4BoG7ddK6556rbA@mail.gmail.com>
+ <1468350511.8843.16.camel@gmail.com> <1468350842.8843.18.camel@gmail.com>
+ <1468375209.2462.20.camel@mtksdaap41>
+ <1468418157.2867.12.camel@ndufresne.ca>
+Message-ID: <1468481410.27199.17.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Nicolas,
 
-On 14.07.16 09:03, Zheng Xu wrote:
-> LuaJIT also fix the 48VA issue by allocating heap memory below 47 bits.
+On Wed, 2016-07-13 at 09:55 -0400, Nicolas Dufresne wrote:
+> Le mercredi 13 juillet 2016 ? 10:00 +0800, tiffany lin a ?crit :
+> > Hi Nicolas,
+> > 
+> > On Tue, 2016-07-12 at 15:14 -0400, Nicolas Dufresne wrote:
+> > > Le mardi 12 juillet 2016 ? 15:08 -0400, Nicolas Dufresne a ?crit :
+> > > > Le mardi 12 juillet 2016 ? 16:16 +0800, Wu-Cheng Li (???) a ?crit
+> > :
+> > > > > Decoder hardware produces MT21 (compressed). Image processor
+> > can
+> > > > > convert it to a format that can be input of display driver.
+> > > > > Tiffany.
+> > > > > When do you plan to upstream image processor (mtk-mdp)?
+> > > > > > 
+> > > > > > It can be as input format for encoder, MDP and display
+> > drivers in
+> > > > > our
+> > > > > > platform.
+> > > > > I remember display driver can only accept uncompressed MT21.
+> > Right?
+> > > > > Basically V4L2_PIX_FMT_MT21 is compressed and is like an opaque
+> > > > > format. It's not usable until it's decompressed and converted
+> > by
+> > > > > image
+> > > > > processor.
+> > > > 
+> > > > Previously it was described as MediaTek block mode, and now as a
+> > > > MediaTek compressed format. It makes me think you have no idea
+> > what
+> > > > this pixel format really is. Is that right ?
+> > > > 
+> > > > The main reason why I keep asking, is that we often find
+> > similarities
+> > > > between what vendor like to call their proprietary formats. Doing
+> > the
+> > > > proper research helps not creating a mess like in Android where
+> > you
+> > > > have a lot of formats that all point to the same format. I
+> > believe
+> > > > there was the same concern when Samsung wanted to introduce their
+> > Z-
+> > > > flip-Z NV12 tile format. In the end they simply provided
+> > sufficient
+> > > > documentation so we could document it and implement software
+> > > > converters
+> > > > for test and validation purpose.
+> > > 
+> > > Here's the kind of information we want in the documentation.
+> > > 
+> > > https://chromium.googlesource.com/chromium/src/media/+/master/base/
+> > vide
+> > > o_types.h#40
+> > > 
+> > >   // MediaTek proprietary format. MT21 is similar to NV21 except
+> > the memory
+> > >   // layout and pixel layout (swizzles). 12bpp with Y plane
+> > followed by a 2x2
+> > >   // interleaved VU plane. Each image contains two buffers -- Y
+> > plane and VU
+> > >   // plane. Two planes can be non-contiguous in memory. The
+> > starting addresses
+> > >   // of Y plane and VU plane are 4KB alignment.
+> > >   // Suppose image dimension is (width, height). For both Y plane
+> > and VU plane:
+> > >   // Row pitch = ((width+15)/16) * 16.
+> > >   // Plane size = Row pitch * (((height+31)/32)*32)
+> > > 
+> > > Now obviously this is incomplete, as the swizzling need to be
+> > documented of course.
+> > > 
+> > Because it's finally a compressed format from our codec hw, we cannot
+> > describe its swizzling.
 > 
-> For mozjs issue, if there are pointers to .rodata, it can be a problem. Does it happen on master and do we have any case to reproduce the issue so that I can take a look?
+> Can you clarify why it cannot be described ? I don't buy any argument
+> that it's impossible to convert without hardware. Intel did document
+> their compressed formats.
+> 
+What's the Intel compressed formats? Could you provide link so we could
+reference how they provide this information.
 
-mozjs is fixed with your patch. I backported it to all of the ancient
-versions of mozjs, so we're probably good there. Though every distro
-will have to redo that work in their own trees, because older versions
-of mozjs are no longer maintained upstream. If you want to be a hero,
-you can try to port polkitd and gnome to use more recent versions of
-mozjs ;). Or maybe they can already and we just messed up packaging.
+> Debugging an integration with such format that we have literally
+> decided to no make public is a pain. A lot of decoder got abandoned or
+> never used because of that.
+> 
+> It would be nice to explain the architecture you are suggesting to make
+> this decoder useful. How will userspace application be able to use your
+> decoder. Will the image processor usable outside the display path ?
+> People might want to do transcoding, or other relatively common task
+> that does not imply a display.
+> 
 
-The issue I mentioned with "js 1.8.5" is this gem:
+In MT8173 platform, it has MDP driver, it could convert
+V4L2_PIX_FMT_MT21 to V4L2_PIX_FMT_NV12M or V4L2_PIX_FMT_YUV420M.
+
+MDP is stand alone driver, it is usable outside the display path.
+
+NV12M/YUV420M/MT21 -> MDP -> NV12M/YUV420M
+
+NV12M/NV21M/YUV420M/YVU420M -> mt8173 Encoder -> H264/VP8
+
+H264/VP8/VP9 -> mtk8173 Decoder -> MT21
+
+When encode with MT21 source, the pipeline will be:
+MT21 -> MDP driver-> NV12M/NV21M/YUV420M/YVU420M -> Encoder -> H264/VP8
+
+When playback, the pipeline will be:
+H264/VP8/VP9 -> Decoder driver -> MT21 -> MDP Driver -> DRM
 
 
-https://developer.mozilla.org/en-US/docs/Mozilla/Projects/SpiderMonkey/Releases/1.8.5
-
-I don't know the exact history, but I think it predates mozjs. With a
-bit of sledge hammering your heap allocation patch applies there too,
-but we still get the rodata references.
+best regards,
+Tiffany
 
 
-Alex
+> regards,
+> Nicolas
+> 
+> p.s.
+> A small note to Wu-Cheng, the definition of the DRM format in your
+> Chromium branch is not correct. DRM uses format modifier, such that the
+> format is the family, in your case it's most likely NV21, and the
+> modifier is the compression or tiling algorithm in place (or both as
+> needed).
