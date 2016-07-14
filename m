@@ -1,54 +1,45 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Thu, 14 Jul 2016 08:46:34 -0400
-Subject: [PATCH] media: s5p-mfc remove unnecessary error messages
-In-Reply-To: <1468370038-5364-1-git-send-email-shuahkh@osg.samsung.com>
-References: <1468370038-5364-1-git-send-email-shuahkh@osg.samsung.com>
-Message-ID: <c38dc1b5-e2f7-4486-a0fc-a8f690d28fe6@osg.samsung.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 14 Jul 2016 14:47:31 +0200
+Subject: [PATCH] ARM: s3c64xx: avoid warning about 'struct device_node'
+In-Reply-To: <4080443.gtvsF1A0TV@wuerfel>
+References: <20160627110303.3391769-1-arnd@arndb.de>
+ <1807726.lxvlsY5ymW@wuerfel> <4080443.gtvsF1A0TV@wuerfel>
+Message-ID: <12553444.SKUaCZubIO@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Shuah,
-
-On 07/12/2016 08:33 PM, Shuah Khan wrote:
-> Removing unnecessary error messages as appropriate error code is returned.
+On Monday, July 11, 2016 1:40:45 PM CEST Arnd Bergmann wrote:
+> On Monday, July 11, 2016 1:15:11 PM CEST Arnd Bergmann wrote:
+> > On Monday, June 27, 2016 1:33:51 PM CEST Krzysztof Kozlowski wrote:
+> > > On 06/27/2016 01:02 PM, Arnd Bergmann wrote:
+> > > > The change to simplify of_platform_populate() had an unintended
+> > > > side-effect of introducing a build warning on s3c64xx:
+> > > > 
+> > > > In file included from arch/arm/mach-s3c64xx/mach-s3c64xx-dt.c:18:0:
+> > > > arch/arm/mach-s3c64xx/common.h:27:30: error: 'struct device_node' declared inside parameter list will not be visible outside of this definition or declaration [-Werror]
+> > > > 
+> > > > This adds a forward-declaration for the structure name in the
+> > > > header to avoid the warning.
+> > > > 
+> > > > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> > > > Fixes: 850bea2335e4 ("arm: Remove unnecessary of_platform_populate with default match table")
+> > > > ---
+> > > > Rob, can you apply this on top of the devicetree git so we don't
+> > > > have to coordinate the merges?
+> > > 
+> > > Acked-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> > 
+> > Hi Rob,
+> > 
+> > I still get the warning in every linux-next build, do you plan to pick
+> > up the fix for the commit you merged, or should I try to work around it
+> > in arm-soc and leave this as a bisection problem?
+> > 
 > 
-> Signed-off-by: Shuah Khan <shuahkh@osg.samsung.com>
-> ---
->  drivers/media/platform/s5p-mfc/s5p_mfc.c | 2 --
->  1 file changed, 2 deletions(-)
-> 
-> diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc.c b/drivers/media/platform/s5p-mfc/s5p_mfc.c
-> index b6fde20..906f80c 100644
-> --- a/drivers/media/platform/s5p-mfc/s5p_mfc.c
-> +++ b/drivers/media/platform/s5p-mfc/s5p_mfc.c
-> @@ -759,7 +759,6 @@ static int s5p_mfc_open(struct file *file)
->  	/* Allocate memory for context */
->  	ctx = kzalloc(sizeof(*ctx), GFP_KERNEL);
->  	if (!ctx) {
-> -		mfc_err("Not enough memory\n");
+> Now with Rob back on Cc.
 
-I agree to remove this since in case of a OOM, the core already does a
-stack dump and prints an error message so there's no need to it here.
+I've applied it to arm-soc/next/cleanup now, so we can avoid the warning
+in linux-next and in 4.8, though it is still present in the devicetree
+git.
 
->  		ret = -ENOMEM;
->  		goto err_alloc;
->  	}
-> @@ -776,7 +775,6 @@ static int s5p_mfc_open(struct file *file)
->  	while (dev->ctx[ctx->num]) {
->  		ctx->num++;
->  		if (ctx->num >= MFC_NUM_CONTEXTS) {
-> -			mfc_err("Too many open contexts\n");
-
-But I think this error message shouldn't be removed since explains why
-the open failed, even when an error code is returned.
-
->  			ret = -EBUSY;
->  			goto err_no_ctx;
->  		}
-> 
-
-Best regards,
--- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+	Arnd
