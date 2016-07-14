@@ -1,32 +1,42 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Thu, 14 Jul 2016 10:11:29 -0400 (EDT)
-Subject: [PATCH] usb: ehci-platform: use helper variables in probe function
-In-Reply-To: <1468398548-5050-1-git-send-email-zajec5@gmail.com>
-Message-ID: <Pine.LNX.4.44L0.1607141008500.32397-100000@netrider.rowland.org>
+From: shuahkh@osg.samsung.com (Shuah Khan)
+Date: Thu, 14 Jul 2016 08:40:22 -0600
+Subject: [PATCH v2] media: s5p-mfc remove unnecessary error messages
+Message-ID: <1468507222-5314-1-git-send-email-shuahkh@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 13 Jul 2016, Rafa? Mi?ecki wrote:
+Removed unnecessary error message as appropriate error code is returned.
+Changed error message into a debug.
 
-> Probing function was using &dev->dev and dev->dev.of_node over 20 times
-> so I believe it made sense to use helper variables for both of them.
-> To avoid some uncommon variable name for struct device I first replaced
-> existing dev variable with pdev.
-> 
-> Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
+Signed-off-by: Shuah Khan <shuahkh@osg.samsung.com>
+---
 
-Okay except for...
+Changes since v1:
+- Changed EBUSY error message to a debug message.
 
-> -		priv->num_phys = of_count_phandle_with_args(dev->dev.of_node,
-> -				"phys", "#phy-cells");
-> +		priv->num_phys = of_count_phandle_with_args(np, "phys",
-> +							    "#phy-cells");
+ drivers/media/platform/s5p-mfc/s5p_mfc.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-Please indent continuation lines two tab stops beyond the original 
-line, to match the style in the rest of the source file.
-
-With that change,
-
-Acked-by: Alan Stern <stern@rowland.harvard.edu>
-
-Alan Stern
+diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc.c b/drivers/media/platform/s5p-mfc/s5p_mfc.c
+index b6fde20..eeb1db2 100644
+--- a/drivers/media/platform/s5p-mfc/s5p_mfc.c
++++ b/drivers/media/platform/s5p-mfc/s5p_mfc.c
+@@ -759,7 +759,6 @@ static int s5p_mfc_open(struct file *file)
+ 	/* Allocate memory for context */
+ 	ctx = kzalloc(sizeof(*ctx), GFP_KERNEL);
+ 	if (!ctx) {
+-		mfc_err("Not enough memory\n");
+ 		ret = -ENOMEM;
+ 		goto err_alloc;
+ 	}
+@@ -776,7 +775,7 @@ static int s5p_mfc_open(struct file *file)
+ 	while (dev->ctx[ctx->num]) {
+ 		ctx->num++;
+ 		if (ctx->num >= MFC_NUM_CONTEXTS) {
+-			mfc_err("Too many open contexts\n");
++			mfc_debug(2, "Too many open contexts\n");
+ 			ret = -EBUSY;
+ 			goto err_no_ctx;
+ 		}
+-- 
+2.7.4
