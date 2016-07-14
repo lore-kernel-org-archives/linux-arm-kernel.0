@@ -1,45 +1,22 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 14 Jul 2016 14:47:38 +0200
-Subject: [PATCH] ARM: dts: exynos: Properly select eMMC HighSpeed mode
-Message-ID: <1468500458-7142-1-git-send-email-k.kozlowski@samsung.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 14 Jul 2016 14:48:57 +0200
+Subject: [GIT PULL v2] arm64: dts: juno updates for v4.8
+In-Reply-To: <577E56F7.1010000@arm.com>
+References: <5768019C.40009@arm.com> <577E56F7.1010000@arm.com>
+Message-ID: <4614773.4sXm0kJFtC@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Exynos5410 supports eMMC version 4.41 so HS200 is the top mode which
-should be configured.  This is reflected in usage of
-"samsung,exynos5250-dw-mshc" compatible.  However DTS contained also
-property "mmc-hs400-1_8v" which is parsed by MMC core therefore
-resulting in mixed configuration.  MMC core set HS400 but dwmmc_exynos
-driver did not configure the data strobe for HS400 DDR mode.
+On Thursday, July 7, 2016 2:19:51 PM CEST Sudeep Holla wrote:
+> ARMv8 Vexpress/Juno DT updates for v4.8
+> 
+> 1. Adds various CoreSight debug components on Juno boards
+> 
+> 2. Adds SCPI device power domains and use them for coresight components
+> 
+> 3. Adds thermal zones for SCPI sensors on Juno
+> 
 
-Removal of HS400 properties fixes semi-random mmc errors during boot:
-  mmc_host mmc0: Bus speed (slot 0) = 400000000Hz (slot req 200000000Hz, actual 200000000HZ div = 1)
-  mmc0: mmc_select_hs400 failed, error -84
-  mmc0: error -84 whilst initialising MMC card
+Pulled into next/dt64, thanks!
 
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
----
- arch/arm/boot/dts/exynos5410-odroidxu.dts | 2 --
- 1 file changed, 2 deletions(-)
-
-diff --git a/arch/arm/boot/dts/exynos5410-odroidxu.dts b/arch/arm/boot/dts/exynos5410-odroidxu.dts
-index d9499310a301..7536164438ca 100644
---- a/arch/arm/boot/dts/exynos5410-odroidxu.dts
-+++ b/arch/arm/boot/dts/exynos5410-odroidxu.dts
-@@ -447,14 +447,12 @@
- 	samsung,dw-mshc-ciu-div = <3>;
- 	samsung,dw-mshc-sdr-timing = <0 4>;
- 	samsung,dw-mshc-ddr-timing = <0 2>;
--	samsung,dw-mshc-hs400-timing = <0 2>;
- 	samsung,read-strobe-delay = <90>;
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus1 &sd0_bus4 &sd0_bus8 &sd0_cd>;
- 	bus-width = <8>;
- 	cap-mmc-highspeed;
- 	mmc-hs200-1_8v;
--	mmc-hs400-1_8v;
- 	vmmc-supply = <&ldo20_reg>;
- 	vqmmc-supply = <&ldo11_reg>;
- };
--- 
-1.9.1
+	Arnd
