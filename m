@@ -1,55 +1,94 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 14 Jul 2016 21:21:37 +0200
-Subject: [PATCH 3/6] ARM: dts: imx25: substitute NO_PAD_CTL by the
- respective reset value
-In-Reply-To: <CAOMZO5B-vrwvOHimF4HzfDMpkG2Nwjz-D0Awp-BrJUxDF_txPA@mail.gmail.com>
-References: <20160712073859.GQ16643@pengutronix.de>
- <CAOMZO5B+grtejgSMKrZMT9inEdh+bL0smZKE52qtcQD1NCHrqQ@mail.gmail.com>
- <CAOMZO5D2E_G4ySUnj=yadziSunwMBSVZs-Rw=EvNybFKs2iD3w@mail.gmail.com>
- <20160712191541.GY16643@pengutronix.de>
- <CAOMZO5C3eQFfs=ZS5nfDw6XnEAgfcc_+W2n0y8Xd-zsTfd-+gA@mail.gmail.com>
- <CAOMZO5B4CUr_-U3s+fo-O_BcREWQijffXFeRmUPiwDWdhY07pQ@mail.gmail.com>
- <20160713062521.GZ16643@pengutronix.de>
- <CAOMZO5BtP29PD-vf1WKG0yd7OJy9A0Sthn4EQ+CuF1As2cmKoA@mail.gmail.com>
- <20160714183442.GG6040@pengutronix.de>
- <CAOMZO5B-vrwvOHimF4HzfDMpkG2Nwjz-D0Awp-BrJUxDF_txPA@mail.gmail.com>
-Message-ID: <20160714192137.GH6040@pengutronix.de>
+From: jpoimboe@redhat.com (Josh Poimboeuf)
+Date: Thu, 14 Jul 2016 14:23:51 -0500
+Subject: [PATCH v2 01/11] mm: Implement stack frame object validation
+In-Reply-To: <CAGXu5jLv_pMRqdaM72D_FTQzxoGxgcEqxpvUzqwgjOmZ8D-zSw@mail.gmail.com>
+References: <1468446964-22213-1-git-send-email-keescook@chromium.org>
+ <1468446964-22213-2-git-send-email-keescook@chromium.org>
+ <CALCETrVDJDjdoh7yvOPd=_5twQnzQRhe8G2KLaRw-NnA1Uf__g@mail.gmail.com>
+ <CAGXu5jLPZiRJx8n3_7GW2bufiuUgE9=c6dQcNxDRPHMU72sD9g@mail.gmail.com>
+ <20160714054842.6zal5rqawpgew26r@treble>
+ <CAGXu5jLv_pMRqdaM72D_FTQzxoGxgcEqxpvUzqwgjOmZ8D-zSw@mail.gmail.com>
+Message-ID: <20160714192351.567fmaz2h4drrxrc@treble>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Fabio,
-
-On Thu, Jul 14, 2016 at 04:16:59PM -0300, Fabio Estevam wrote:
-> I am running U-boot 2016.07 from mainline.
-
-hmm, ok.
-
-> > I guess your tool (U-Boot?) would generate the output I want with:
+On Thu, Jul 14, 2016 at 11:10:18AM -0700, Kees Cook wrote:
+> On Wed, Jul 13, 2016 at 10:48 PM, Josh Poimboeuf <jpoimboe@redhat.com> wrote:
+> > On Wed, Jul 13, 2016 at 03:04:26PM -0700, Kees Cook wrote:
+> >> On Wed, Jul 13, 2016 at 3:01 PM, Andy Lutomirski <luto@amacapital.net> wrote:
+> >> > On Wed, Jul 13, 2016 at 2:55 PM, Kees Cook <keescook@chromium.org> wrote:
+> >> >> This creates per-architecture function arch_within_stack_frames() that
+> >> >> should validate if a given object is contained by a kernel stack frame.
+> >> >> Initial implementation is on x86.
+> >> >>
+> >> >> This is based on code from PaX.
+> >> >>
+> >> >
+> >> > This, along with Josh's livepatch work, are two examples of unwinders
+> >> > that matter for correctness instead of just debugging.  ISTM this
+> >> > should just use Josh's code directly once it's been written.
+> >>
+> >> Do you have URL for Josh's code? I'd love to see what happening there.
 > >
-> >         md.l 0x43fac000 353
+> > The code is actually going to be 100% different next time around, but
+> > FWIW, here's the last attempt:
 > >
-> > (i.e. 353 32bit words, that are all the iomux registers)
-> 
-> Here it goes:
-> 
-> [...]
-
-Thanks, will take a look.
-
-> >> The memtool utility version I have is broken for mx25, so I can't dump
-> >> this register easily in Linux.
+> >   https://lkml.kernel.org/r/4d34d452bf8f85c7d6d5f93db1d3eeb4cba335c7.1461875890.git.jpoimboe at redhat.com
 > >
-> > Which version do you have? How is it broken? Did you configure AIPS to
+> > In the meantime I've realized the need to rewrite the x86 core stack
+> > walking code to something much more manageable so we don't need all
+> > these unwinders everywhere.  I'll probably post the patches in the next
+> > week or so.  I'll add you to the CC list.
 > 
-> The problem is that all IOMUX registers were returning the same
-> incorrect values with memtool on mx25.
+> Awesome!
+> 
+> > With the new interface I think you'll be able to do something like:
+> >
+> >         struct unwind_state;
+> >
+> >         unwind_start(&state, current, NULL, NULL);
+> >         unwind_next_frame(&state);
+> >         oldframe = unwind_get_stack_pointer(&state);
+> >
+> >         unwind_next_frame(&state);
+> >         frame = unwind_get_stack_pointer(&state);
+> >
+> >         do {
+> >                 if (obj + len <= frame)
+> >                         return blah;
+> >                 oldframe = frame;
+> >                 frame = unwind_get_stack_pointer(&state);
+> >
+> >         } while (unwind_next_frame(&state);
+> >
+> > And then at the end there'll be some (still TBD) way to query whether it
+> > reached the last syscall pt_regs frame, or if it instead encountered a
+> > bogus frame pointer along the way and had to bail early.
+> 
+> Sounds good to me. Will there be any frame size information available?
+> Right now, the unwinder from PaX just drops 2 pointers (saved frame,
+> saved ip) from the delta of frame address to find the size of the
+> actual stack area used by the function. If I could shave things like
+> padding and possible stack canaries off the size too, that would be
+> great.
 
-Yeah, that's the effect when the AIPS access control registers are not
-setup correctly.
+For x86, stacks are aligned at long word boundaries, so there's no real
+stack padding.
 
-Best regards
-Uwe
+Also the CC_STACKPROTECTOR stack canaries are created by a gcc feature
+which only affects certain functions (and thus certain frames) and I
+don't know of any reliable way to find them.
+
+So with frame pointers, I think the best you can do is just assume that
+the frame data area is always two words smaller than the total frame
+size.
+
+> Since I'm aiming the hardened usercopy series for 4.8, I figure I'll
+> just leave this unwinder in for now, and once yours lands, I can rip
+> it out again.
+
+Sure, sounds fine to me.  If your code lands before I post mine, I can
+convert it myself.
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Josh
