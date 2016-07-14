@@ -1,37 +1,86 @@
 From: mark.yao@rock-chips.com (Mark Yao)
-Date: Thu, 14 Jul 2016 11:31:26 +0800
-Subject: [PATCH 2/6] drm/rockchip: fb: add missing header
+Date: Thu, 14 Jul 2016 11:31:27 +0800
+Subject: [PATCH 3/6] drm/rockchip: fix "should it be static?" warnings
 In-Reply-To: <1468467090-6108-1-git-send-email-mark.yao@rock-chips.com>
 References: <1468467090-6108-1-git-send-email-mark.yao@rock-chips.com>
-Message-ID: <1468467090-6108-3-git-send-email-mark.yao@rock-chips.com>
+Message-ID: <1468467090-6108-4-git-send-email-mark.yao@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: John Keeping <john@metanate.com>
 
-This fixes the following sparse warnings:
-
-drivers/gpu/drm/rockchip/rockchip_drm_fb.c:32:23: warning: symbol 'rockchip_fb_get_gem_obj' was not declared. Should it be static?
-drivers/gpu/drm/rockchip/rockchip_drm_fb.c:315:24: warning: symbol 'rockchip_drm_framebuffer_init' was not declared. Should it be static?
-drivers/gpu/drm/rockchip/rockchip_drm_fb.c:329:6: warning: symbol 'rockchip_drm_mode_config_init' was not declared. Should it be static?
+Combined with the previous commit, this fixes all of the sparse warnings
+in drm/rockchip.
 
 Signed-off-by: John Keeping <john@metanate.com>
 Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
 ---
- drivers/gpu/drm/rockchip/rockchip_drm_fb.c | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/gpu/drm/rockchip/rockchip_drm_drv.c | 2 +-
+ drivers/gpu/drm/rockchip/rockchip_drm_fb.c  | 2 +-
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 4 ++--
+ drivers/gpu/drm/rockchip/rockchip_vop_reg.c | 2 +-
+ 4 files changed, 5 insertions(+), 5 deletions(-)
 
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
+index d665fb0..7216180 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
+@@ -257,7 +257,7 @@ static void rockchip_drm_unbind(struct device *dev)
+ 	dev_set_drvdata(dev, NULL);
+ }
+ 
+-void rockchip_drm_lastclose(struct drm_device *dev)
++static void rockchip_drm_lastclose(struct drm_device *dev)
+ {
+ 	struct rockchip_drm_private *priv = dev->dev_private;
+ 
 diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_fb.c b/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
-index 20f12bc..4fe2ab3 100644
+index 4fe2ab3..b33debc 100644
 --- a/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
 +++ b/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
-@@ -20,6 +20,7 @@
- #include <drm/drm_crtc_helper.h>
+@@ -246,7 +246,7 @@ rockchip_atomic_commit_tail(struct drm_atomic_state *state)
+ 	drm_atomic_helper_cleanup_planes(dev, state);
+ }
  
- #include "rockchip_drm_drv.h"
-+#include "rockchip_drm_fb.h"
- #include "rockchip_drm_gem.h"
+-struct drm_mode_config_helper_funcs rockchip_mode_config_helpers = {
++static struct drm_mode_config_helper_funcs rockchip_mode_config_helpers = {
+ 	.atomic_commit_tail = rockchip_atomic_commit_tail,
+ };
  
- #define to_rockchip_fb(x) container_of(x, struct rockchip_drm_fb, fb)
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+index 6255e5b..e01c435 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+@@ -798,7 +798,7 @@ static const struct drm_plane_helper_funcs plane_helper_funcs = {
+ 	.atomic_disable = vop_plane_atomic_disable,
+ };
+ 
+-void vop_atomic_plane_reset(struct drm_plane *plane)
++static void vop_atomic_plane_reset(struct drm_plane *plane)
+ {
+ 	struct vop_plane_state *vop_plane_state =
+ 					to_vop_plane_state(plane->state);
+@@ -815,7 +815,7 @@ void vop_atomic_plane_reset(struct drm_plane *plane)
+ 	plane->state->plane = plane;
+ }
+ 
+-struct drm_plane_state *
++static struct drm_plane_state *
+ vop_atomic_plane_duplicate_state(struct drm_plane *plane)
+ {
+ 	struct vop_plane_state *old_vop_plane_state;
+diff --git a/drivers/gpu/drm/rockchip/rockchip_vop_reg.c b/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
+index 3166b46..52661d1 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
++++ b/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
+@@ -299,7 +299,7 @@ static int vop_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
+-struct platform_driver vop_platform_driver = {
++static struct platform_driver vop_platform_driver = {
+ 	.probe = vop_probe,
+ 	.remove = vop_remove,
+ 	.driver = {
 -- 
 1.9.1
