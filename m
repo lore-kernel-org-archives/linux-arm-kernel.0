@@ -1,256 +1,239 @@
-From: vw@iommu.org (Wan Zongshun)
-Date: Thu, 14 Jul 2016 11:36:53 +0800
-Subject: [PATCH v2 02/10] irqchip: add irqchip driver for nuc900
-In-Reply-To: <20160713200906.GB31509@io.lakedaemon.net>
-References: <1468135649-19980-1-git-send-email-vw@iommu.org>
- <1468135649-19980-3-git-send-email-vw@iommu.org>
- <20160713200906.GB31509@io.lakedaemon.net>
-Message-ID: <578708D5.6050009@iommu.org>
+From: stefan@agner.ch (Stefan Agner)
+Date: Wed, 13 Jul 2016 22:28:32 -0700
+Subject: [PATCH v4 3/5] nvmem: core: Add consumer API to get nvmem cell
+ from node
+In-Reply-To: <577FE19E.4000100@linaro.org>
+References: <cover.1467872014.git.maitysanchayan@gmail.com>
+ <0e6294d931bf181376a6f4e1a86df3f6c6a5d575.1467872014.git.maitysanchayan@gmail.com>
+ <577E1E79.4090809@linaro.org>
+ <20160707123350.GA18563@Sanchayan-Arch.localdomain>
+ <577E5634.7020805@linaro.org>
+ <20160707134811.GA2692@Sanchayan-Arch.localdomain>
+ <577FC9BA.2020402@linaro.org> <951a63bf305d7df6486b652974cdb3c0@agner.ch>
+ <577FE19E.4000100@linaro.org>
+Message-ID: <6a2760c0066226c67e9323e1ad733fe4@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 2016?07?14? 04:09, Jason Cooper wrote:
-> Hi Wan Zongshun,
->
-> On Sun, Jul 10, 2016 at 03:27:22PM +0800, Wan Zongshun wrote:
->> This patch is to add irqchip driver support for nuc900 plat,
->> current this driver only supports nuc970 SoC.
+On 2016-07-08 10:23, Srinivas Kandagatla wrote:
+> On 08/07/16 17:42, Stefan Agner wrote:
+>> On 2016-07-08 08:41, Srinivas Kandagatla wrote:
+>>> On 07/07/16 14:48, maitysanchayan at gmail.com wrote:
+>>>> Hello Srinivas,
+>>>>
+>>>> On 16-07-07 1
+> 
+> ...
+> 
+>>>>>>
+>>>>>> Our requirement is to be able to pass the soc node pointer and then
+>>>>>> be able to get a nvmem cell by specifying it's name. So for our case
+>>>>>
+>>>>> Why?
+>>>>
+>>>> Sorry for not providing the background directly. The patches before this
+>>>> series used that approach. In the previous discussions it has been pointed
+>>>> out that it is not acceptable to have additional device tree bindings for
+>>>> providing data that the driver wants at the SoC node level or to have bindings
+>>>> just for the SoC bus driver alone since we aren't really describing the
+>>>> hardware.
+>>>>
+>>> SOC driver seems to search for an arbitrary node by its name, which is
+>>> not a binding and can break anytime in cases If the scope of nvmem
+>>> provider is out of soc node or if the nvmem cells are not named as
+>>> expected. That looks very fragile.
 >>
->> Signed-off-by: Wan Zongshun <mcuos.com@gmail.com>
->> ---
->>   arch/arm/mach-w90x900/include/mach/irqs.h |   5 +
->>   drivers/irqchip/Makefile                  |   1 +
->>   drivers/irqchip/irq-nuc900.c              | 150 ++++++++++++++++++++++++++++++
->>   3 files changed, 156 insertions(+)
->>   create mode 100644 drivers/irqchip/irq-nuc900.c
+>> In that case, that just "won't happen" because the soc driver is a very
+>> soc specific driver only used for this device tree. We it will always
+>> bind to that high level soc node.
 >>
->> diff --git a/arch/arm/mach-w90x900/include/mach/irqs.h b/arch/arm/mach-w90x900/include/mach/irqs.h
->> index 9d5cba3..3b035c6 100644
->> --- a/arch/arm/mach-w90x900/include/mach/irqs.h
->> +++ b/arch/arm/mach-w90x900/include/mach/irqs.h
->> @@ -59,7 +59,12 @@
->>   #define IRQ_KPI		W90X900_IRQ(29)
->>   #define IRQ_P2SGROUP	W90X900_IRQ(30)
->>   #define IRQ_ADC		W90X900_IRQ(31)
->> +
->> +#if !defined(CONFIG_SOC_NUC900)
->>   #define NR_IRQS		(IRQ_ADC+1)
->> +#else
->> +#define NR_IRQS		62
->> +#endif
->
-> Arnd already covered this...
->
+>>>
+>>> If the soc node is actual consumer of nvmem cells, I see no reason why
+>>> we should not use proper nvmem bindings?
 >>
->>   /*for irq group*/
+>> There is a reason: We don't describe the hardware with it...
 >>
->> diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
->> index 38853a1..9ccd5af8a 100644
->> --- a/drivers/irqchip/Makefile
->> +++ b/drivers/irqchip/Makefile
->> @@ -69,3 +69,4 @@ obj-$(CONFIG_PIC32_EVIC)		+= irq-pic32-evic.o
->>   obj-$(CONFIG_MVEBU_ODMI)		+= irq-mvebu-odmi.o
->>   obj-$(CONFIG_LS_SCFG_MSI)		+= irq-ls-scfg-msi.o
->>   obj-$(CONFIG_EZNPS_GIC)			+= irq-eznps.o
->> +obj-$(CONFIG_SOC_NUC970)		+= irq-nuc900.o
->> diff --git a/drivers/irqchip/irq-nuc900.c b/drivers/irqchip/irq-nuc900.c
->> new file mode 100644
->> index 0000000..c4b2e39
->> --- /dev/null
->> +++ b/drivers/irqchip/irq-nuc900.c
->> @@ -0,0 +1,150 @@
->> +/*
->> + * Copyright 2016 Wan Zongshun <mcuos.com@gmail.com>
->> + *
->> + * The code contained herein is licensed under the GNU General Public
->> + * License. You may obtain a copy of the GNU General Public License
->> + * Version 2 or later at the following locations:
->> + *
->> + * http://www.opensource.org/licenses/gpl-license.html
->> + * http://www.gnu.org/copyleft/gpl.html
->> + */
->> +
->> +#include <linux/module.h>
->> +#include <linux/init.h>
->> +#include <linux/irq.h>
->> +#include <linux/irqchip.h>
->> +#include <linux/irqdomain.h>
->> +#include <linux/io.h>
->> +#include <linux/ioport.h>
->> +#include <linux/of_address.h>
->> +#include <linux/of_irq.h>
->> +
->> +#include <asm/exception.h>
->> +#include <asm/hardirq.h>
->> +
->> +#define	REG_AIC_SCR1	0x00
->> +#define	REG_AIC_SCR2	0x04
->> +#define	REG_AIC_SCR3	0x08
->> +#define	REG_AIC_SCR4	0x0C
->> +#define	REG_AIC_SCR5	0x10
->> +#define	REG_AIC_SCR6	0x14
->> +#define	REG_AIC_SCR7	0x18
->> +#define	REG_AIC_SCR8	0x1C
->> +#define	REG_AIC_SCR9	0x20
->> +#define	REG_AIC_SCR10	0x24
->> +#define	REG_AIC_SCR11	0x28
->> +#define	REG_AIC_SCR12	0x2C
->> +#define	REG_AIC_SCR13	0x30
->> +#define	REG_AIC_SCR14	0x34
->> +#define	REG_AIC_SCR15	0x38
->> +#define	REG_AIC_IRSR	0x100
->> +#define	REG_AIC_IRSRH	0x104
->> +#define	REG_AIC_IASR	0x108
->> +#define	REG_AIC_IASRH	0x10C
->> +#define	REG_AIC_ISR	0x110
->> +#define	REG_AIC_ISRH	0x114
->> +#define	REG_AIC_IPER	0x118
->> +#define	REG_AIC_ISNR	0x120
->> +#define	REG_AIC_OISR	0x124
->> +#define	REG_AIC_IMR	0x128
->> +#define	REG_AIC_IMRH	0x12C
->> +#define	REG_AIC_MECR	0x130
->> +#define	REG_AIC_MECRH	0x134
->> +#define	REG_AIC_MDCR	0x138
->> +#define	REG_AIC_MDCRH	0x13C
->> +#define	REG_AIC_SSCR	0x140
->> +#define	REG_AIC_SSCRH	0x144
->> +#define	REG_AIC_SCCR	0x148
->> +#define	REG_AIC_SCCRH	0x14C
->> +#define	REG_AIC_EOSCR	0x150
->
-> Please remove unused defines.
+>> The cfg0/cfg1 register which Sanchayan needs to read in the soc bus
+>> driver are just two register with a unique ID of the SoC. In whatever
+> 
+> "Unique ID of the SOC" doesn't this mean that its a part of soc hw
+> description/configuration/setup?
+> 
+> Am still not clear why this setup any different to other use cases
+> like mac address/calibration data?
+> 
+> I still feel that this should be described in the DT.
+> 
+> Rob,
+>  What do you think?
 
-Okay.
+[added Rob to "To"]
 
->
->> +
->> +static void __iomem *aic_base;
->> +static struct irq_domain *aic_domain;
->> +
->> +static void nuc900_irq_mask(struct irq_data *d)
->> +{
->> +	if (d->irq < 32)
->> +		writel(1 << (d->irq), aic_base + REG_AIC_MDCR);
->> +	else
->> +		writel(1 << (d->irq - 32), aic_base + REG_AIC_MDCRH);
->> +}
->> +
->> +static void nuc900_irq_ack(struct irq_data *d)
->> +{
->> +	writel(0x01, aic_base + REG_AIC_EOSCR);
->> +}
->> +
->> +static void nuc900_irq_unmask(struct irq_data *d)
->> +{
->> +	if (d->irq < 32)
->> +		writel(1 << (d->irq), aic_base + REG_AIC_MECR);
->> +	else
->> +		writel(1 << (d->irq - 32), aic_base + REG_AIC_MECRH);
->> +}
->> +
->> +static struct irq_chip nuc900_irq_chip = {
->> +	.irq_ack	= nuc900_irq_ack,
->> +	.irq_mask	= nuc900_irq_mask,
->> +	.irq_unmask	= nuc900_irq_unmask,
->> +};
->> +
->> +void __exception_irq_entry aic_handle_irq(struct pt_regs *regs)
->> +{
->> +	u32 hwirq;
->> +
->> +	hwirq = readl(aic_base + REG_AIC_IPER);
->> +	hwirq = readl(aic_base + REG_AIC_ISNR);
->> +	if (!hwirq)
->> +		writel(0x01, aic_base + REG_AIC_EOSCR);
->
-> Could you explain what's going on here?
+Rob, can you comment?
 
-AIC_IPER, When the AIC generates the interrupt, VECTOR represents the 
-interrupt channel number that is active, enabled, and has the highest 
-priority.
+--
+Stefan
 
-The value of VECTOR is copied to the register AIC_ISNR thereafter by the 
-AIC. This register was restored a value 0 after it was read by the
-interrupt handler.
-
-So I must read two registers for one irq number, after read IPER, the 
-ISNR(bit0:5) will be updated. ISNR value has no need do offset, it is 
-better than read IPER(bit2:7).
-
-?writel(0x01, aic_base + REG_AIC_EOSCR);??seems not necessary here, 
-since irqchip has the ack interface. I will remove it.
-
-This AIC_EOSCR register is used by the interrupt service routine to 
-indicate that it is completely served. Thus, the
-interrupt handler can write any value to this register to indicate the 
-end of its interrupt service.
-
->
->> +
->> +	handle_IRQ((irq_find_mapping(aic_domain, hwirq)), regs);
->> +}
->> +
->> +static int aic_irq_domain_map(struct irq_domain *d, unsigned int virq,
->> +			      irq_hw_number_t hw)
->> +{
->> +	irq_set_chip_and_handler(virq, &nuc900_irq_chip, handle_level_irq);
->> +	irq_clear_status_flags(virq, IRQ_NOREQUEST);
->> +
->> +	return 0;
->> +}
->> +
->> +static struct irq_domain_ops aic_irq_domain_ops = {
->> +	.map = aic_irq_domain_map,
->> +	.xlate = irq_domain_xlate_onecell,
->> +};
->> +
->> +static int __init aic_of_init(struct device_node *node,
->> +			      struct device_node *parent)
->> +{
->> +	int ret;
->> +
->> +	aic_base = of_iomap(node, 0);
->> +	if (!aic_base) {
->> +		ret = -ENOMEM;
->> +		pr_err("%s: unable to map registers\n", node->full_name);
->> +		goto err_iomap;
->> +	}
->> +
->> +	writel(0xFFFFFFFC, aic_base + REG_AIC_MDCR);
->> +	writel(0xFFFFFFFF, aic_base + REG_AIC_MDCRH);
->> +
->> +	aic_domain = irq_domain_add_linear(node, NR_IRQS,
->> +					   &aic_irq_domain_ops, NULL);
->> +
->> +	if (!aic_domain) {
->> +		ret = -ENOMEM;
->> +		pr_err("%s: unable to create IRQ domain\n", node->full_name);
->> +		goto err_aic_domain;
->> +	}
->> +
->> +	set_handle_irq(aic_handle_irq);
->> +	return 0;
->> +
->> +err_aic_domain:
->> +	iounmap(aic_base);
->> +err_iomap:
->> +	return ret;
->> +}
->> +
->> +IRQCHIP_DECLARE(nuc900, "nuvoton,nuc900-aic", aic_of_init);
->
-> afaict, there is no 'nuc900', that's a family.  If so, this compatible
-> needs to be 'nuvoton,nuc970-aic'.
->
-
-IRQCHIP_DECLARE(nuvoton, "nuvoton,nuc900-aic", aic_of_init);, change 
-nuc900 to nuvoton, ok?
-
-> thx,
->
-> Jason.
->
->
+> 
+> 
+>> driver throughout the system we use that ID (e.g. in a random generator
+>> for initialization) we never describe an actual hardware relation... Its
+>> just software and how we use that unique ID. The device tree is ment to
+>> describe hardware. Hence the NVMEM consumer binding is not suited for
+>> such NVMEM cells...
+>>
+>> By describing the NVMEM cells location in device tree (producer API, the
+>> NVMEM cells are in hardware at that location, so using the device tree
+>> for that part is fine) and hard coding the NVMEM cell we need in the
+>> driver code we don't violate the device tree matra "describe the
+>> hardware"...
+> 
+> IMHO, We should indeed describe the SOC hardware and its relationship
+> w.r.t to nvmem provider in device tree. Reasoning being these both are
+> some form of IP blocks/hw which depend on each other.
+> 
+>>
+>> Looking-up the nodes direcly is what Rob suggested here:
+>> https://lkml.org/lkml/2016/5/23/573
+> 
+> I did read this, I was not convinced that we should do a direct lookup
+> for nvmem cells.
+> 
+> thanks,
+> srini
+>>
+>>>
+>>> Given the fact that the patch is potentially bypassing the nvmem
+>>> bindings, am not happy to take it!
+>>
+>> If you can provide a solution acceptable by the device tree folks and
+>> works without this patch, I am happy to do it...
+> 
+> 
+>>
+>> Btw, I am not entirely happy with the API name, but did not had a better
+>> idea... And we we should probably add a note that the device tree
+>> consumer binding is the preferred way to do it.
+>>
+>> --
+>> Stefan
+>>
+>>
+>>>
+>>> thanks,
+>>> srini
+>>>
+>>>> For the discussion,
+>>>> https://lkml.org/lkml/2016/5/23/573
+>>>> https://lkml.org/lkml/2016/5/2/71
+>>>>
+>>>> Regards,
+>>>> Sanchayan.
+>>>>
+>>>>
+>>>>>
+>>>>>> ocotp node has cfg0 and cfg1 which we want but we cannot use existing
+>>>>>> nvmem consumer API since that requires having the nvmem consumer properties
+>>>>>> in the node we are binding to viz. is a direct nvmem consumer.
+>>>>>>
+>>>>>> Regards,
+>>>>>> Sanchayan.
+>>>>>>
+>>>>>>>
+>>>>>>> thanks,
+>>>>>>> srini
+>>>>>>>>
+>>>>>>>> Parent node can also be the of_node of the main SoC device
+>>>>>>>> node.
+>>>>>>>>
+>>>>>>>> Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
+>>>>>>>> ---
+>>>>>>>>      drivers/nvmem/core.c           | 44 +++++++++++++++++++++++++++++-------------
+>>>>>>>>      include/linux/nvmem-consumer.h |  1 +
+>>>>>>>>      2 files changed, 32 insertions(+), 13 deletions(-)
+>>>>>>>>
+>>>>>>>> diff --git a/drivers/nvmem/core.c b/drivers/nvmem/core.c
+>>>>>>>> index 965911d..470abee 100644
+>>>>>>>> --- a/drivers/nvmem/core.c
+>>>>>>>> +++ b/drivers/nvmem/core.c
+>>>>>>>> @@ -743,29 +743,21 @@ static struct nvmem_cell *nvmem_cell_get_from_list(const char *cell_id)
+>>>>>>>>
+>>>>>>>>      #if IS_ENABLED(CONFIG_NVMEM) && IS_ENABLED(CONFIG_OF)
+>>>>>>>>      /**
+>>>>>>>> - * of_nvmem_cell_get() - Get a nvmem cell from given device node and cell id
+>>>>>>>> + * of_nvmem_cell_get_direct() - Get a nvmem cell from given device node
+>>>>>>>>       *
+>>>>>>>> - * @dev node: Device tree node that uses the nvmem cell
+>>>>>>>> - * @id: nvmem cell name from nvmem-cell-names property.
+>>>>>>>> + * @dev node: Device tree node that uses nvmem cell
+>>>>>>>>       *
+>>>>>>>>       * Return: Will be an ERR_PTR() on error or a valid pointer
+>>>>>>>>       * to a struct nvmem_cell.  The nvmem_cell will be freed by the
+>>>>>>>>       * nvmem_cell_put().
+>>>>>>>>       */
+>>>>>>>> -struct nvmem_cell *of_nvmem_cell_get(struct device_node *np,
+>>>>>>>> -					    const char *name)
+>>>>>>>> +struct nvmem_cell *of_nvmem_cell_get_direct(struct device_node *cell_np)
+>>>>>>>>      {
+>>>>>>>> -	struct device_node *cell_np, *nvmem_np;
+>>>>>>>> +	struct device_node *nvmem_np;
+>>>>>>>>      	struct nvmem_cell *cell;
+>>>>>>>>      	struct nvmem_device *nvmem;
+>>>>>>>>      	const __be32 *addr;
+>>>>>>>> -	int rval, len, index;
+>>>>>>>> -
+>>>>>>>> -	index = of_property_match_string(np, "nvmem-cell-names", name);
+>>>>>>>> -
+>>>>>>>> -	cell_np = of_parse_phandle(np, "nvmem-cells", index);
+>>>>>>>> -	if (!cell_np)
+>>>>>>>> -		return ERR_PTR(-EINVAL);
+>>>>>>>> +	int rval, len;
+>>>>>>>>
+>>>>>>>>      	nvmem_np = of_get_next_parent(cell_np);
+>>>>>>>>      	if (!nvmem_np)
+>>>>>>>> @@ -824,6 +816,32 @@ err_mem:
+>>>>>>>>
+>>>>>>>>      	return ERR_PTR(rval);
+>>>>>>>>      }
+>>>>>>>> +EXPORT_SYMBOL_GPL(of_nvmem_cell_get_direct);
+>>>>>>>> +
+>>>>>>>> +/**
+>>>>>>>> + * of_nvmem_cell_get() - Get a nvmem cell from given device node and cell id
+>>>>>>>> + *
+>>>>>>>> + * @dev node: Device tree node that uses the nvmem cell
+>>>>>>>> + * @id: nvmem cell name from nvmem-cell-names property.
+>>>>>>>> + *
+>>>>>>>> + * Return: Will be an ERR_PTR() on error or a valid pointer
+>>>>>>>> + * to a struct nvmem_cell.  The nvmem_cell will be freed by the
+>>>>>>>> + * nvmem_cell_put().
+>>>>>>>> + */
+>>>>>>>> +struct nvmem_cell *of_nvmem_cell_get(struct device_node *np,
+>>>>>>>> +					    const char *name)
+>>>>>>>> +{
+>>>>>>>> +	struct device_node *cell_np;
+>>>>>>>> +	int index;
+>>>>>>>> +
+>>>>>>>> +	index = of_property_match_string(np, "nvmem-cell-names", name);
+>>>>>>>> +
+>>>>>>>> +	cell_np = of_parse_phandle(np, "nvmem-cells", index);
+>>>>>>>> +	if (!cell_np)
+>>>>>>>> +		return ERR_PTR(-EINVAL);
+>>>>>>>> +
+>>>>>>>> +	return of_nvmem_cell_get_direct(cell_np);
+>>>>>>>> +}
+>>>>>>>>      EXPORT_SYMBOL_GPL(of_nvmem_cell_get);
+>>>>>>>>      #endif
+>>>>>>>>
+>>>>>>>> diff --git a/include/linux/nvmem-consumer.h b/include/linux/nvmem-consumer.h
+>>>>>>>> index 9bb77d3..bf879fc 100644
+>>>>>>>> --- a/include/linux/nvmem-consumer.h
+>>>>>>>> +++ b/include/linux/nvmem-consumer.h
+>>>>>>>> @@ -136,6 +136,7 @@ static inline int nvmem_device_write(struct nvmem_device *nvmem,
+>>>>>>>>      #endif /* CONFIG_NVMEM */
+>>>>>>>>
+>>>>>>>>      #if IS_ENABLED(CONFIG_NVMEM) && IS_ENABLED(CONFIG_OF)
+>>>>>>>> +struct nvmem_cell *of_nvmem_cell_get_direct(struct device_node *cell_np);
+>>>>>>>>      struct nvmem_cell *of_nvmem_cell_get(struct device_node *np,
+>>>>>>>>      				     const char *name);
+>>>>>>>>      struct nvmem_device *of_nvmem_device_get(struct device_node *np,
+>>>>>>>>
