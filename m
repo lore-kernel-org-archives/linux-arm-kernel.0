@@ -1,47 +1,38 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 14 Jul 2016 17:20:59 +0100
-Subject: [PATCH v3 2/2] ASoC: atmel-i2s: add driver for the new Atmel I2S
- controller
-In-Reply-To: <ca944501da6c2bb6240f4a56e8d2ba5221373408.1468405019.git.cyrille.pitchen@atmel.com>
-References: <cover.1468405019.git.cyrille.pitchen@atmel.com>
- <ca944501da6c2bb6240f4a56e8d2ba5221373408.1468405019.git.cyrille.pitchen@atmel.com>
-Message-ID: <20160714162059.GB30372@sirena.org.uk>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 14 Jul 2016 17:22:08 +0100
+Subject: [PATCH v15 00/10] arm64: Add kernel probes (kprobes) support
+In-Reply-To: <1467995754-32508-1-git-send-email-dave.long@linaro.org>
+References: <1467995754-32508-1-git-send-email-dave.long@linaro.org>
+Message-ID: <20160714162208.GA22235@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 13, 2016 at 12:25:39PM +0200, Cyrille Pitchen wrote:
+On Fri, Jul 08, 2016 at 12:35:44PM -0400, David Long wrote:
+> David A. Long (3):
+>   arm64: Add HAVE_REGS_AND_STACK_ACCESS_API feature
+>   arm64: Add more test functions to insn.c
+>   arm64: add conditional instruction simulation support
+> 
+> Pratyush Anand (2):
+>   arm64: Blacklist non-kprobe-able symbol
+>   arm64: Treat all entry code as non-kprobe-able
+> 
+> Sandeepa Prabhu (4):
+>   arm64: Kprobes with single stepping support
+>   arm64: kprobes instruction simulation support
+>   arm64: Add kernel return probes support (kretprobes)
+>   kprobes: Add arm64 case in kprobe example module
+> 
+> William Cohen (1):
+>   arm64: Add trampoline code for kretprobes
 
-A few small things but otherwise this looks good:
+I applied these patches on top of the arm64 for-next/core branch an
+tried to run the resulting kernel in a guest (on a Juno platform using
+both kvmtool and qemu) with KPROBES_SANITY_TEST enabled. Unfortunately,
+the kernel fails to boot with lots of "Unexpected kernel single-step
+exception at EL1".
 
-> +	switch (params_channels(params)) {
-> +	case 1:
-> +		mr |= is_playback ? ATMEL_I2SC_MR_TXMONO : ATMEL_I2SC_MR_RXMONO;
+Did you manage to run Kprobes in a guest before?
 
-Please write normal if statements, it makes things easier to read.
-
-> +		break;
-> +	case 2:
-> +		break;
-> +	default:
-> +		dev_err(dev->dev, "unsupported number of audio channels\n");
-> +		break;
-> +	}
-
-Why don't we return an error if we don't support the requested number of
-channels?
-
-> +	dev->gclk = devm_clk_get(&pdev->dev, "gclk");
-> +	if (IS_ERR(dev->aclk) && IS_ERR(dev->gclk)) {
-> +		/* Master Mode not supported */
-> +		dev->aclk = NULL;
-> +		dev->gclk = NULL;
-
-This won't handle probe deferral properly, it'll just ignore the clocks
-if we get -EPROBE_DEFER.  The driver should special case that at least.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160714/35b5e76c/attachment.sig>
+-- 
+Catalin
