@@ -1,50 +1,57 @@
-From: john@metanate.com (John Keeping)
-Date: Thu, 14 Jul 2016 16:29:15 +0100
-Subject: [PATCH] drm/rockchip: allocate correct crtc state structure on reset
-Message-ID: <20160714152915.31235-1-john@metanate.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 14 Jul 2016 16:31:13 +0100
+Subject: [PATCH v4 2/2] ARM: cpuidle: make arm_cpuidle_suspend() a bit
+ more efficient
+In-Reply-To: <20160708185854.22e9fae9@xhacker>
+References: <1467785755-3488-1-git-send-email-jszhang@marvell.com>
+ <1467785755-3488-3-git-send-email-jszhang@marvell.com>
+ <20160707134628.GB20553@linaro.org>
+ <20160708141729.3fa61c10@xhacker>
+ <20160708105012.GA32305@linaro.org>
+ <20160708185854.22e9fae9@xhacker>
+Message-ID: <20160714153113.GC1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Because we are using a custom crtc_state structure, we must override the
-reset helper to allocate the correct amount of memory.
+On Fri, Jul 08, 2016 at 06:58:54PM +0800, Jisheng Zhang wrote:
+> On Fri, 8 Jul 2016 12:50:12 +0200 Daniel Lezcano  wrote:
+> 
+> > On Fri, Jul 08, 2016 at 02:17:29PM +0800, Jisheng Zhang wrote:
+> > > Dear Daniel,
+> > > 
+> > > On Thu, 7 Jul 2016 15:46:28 +0200 Daniel Lezcano wrote:
+> > >   
+> > > > On Wed, Jul 06, 2016 at 02:15:55PM +0800, Jisheng Zhang wrote:  
+> > > > > Currently, we check cpuidle_ops.suspend every time when entering a
+> > > > > low-power idle state. But this check could be avoided in this hot path
+> > > > > by moving it into arm_cpuidle_read_ops() to reduce arm_cpuidle_suspend
+> > > > > overhead a bit.
+> > > > > 
+> > > > > Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+> > > > > ---    
+> > > > 
+> > > > Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>  
+> > > 
+> > > I'm not sure the upstream merging path this patch should follow, Per my
+> > > understanding, I need to put it into Russell's PATCH system.  
+> > 
+> > Or alternatively through arm-soc
+> > 
+> 
+> Got it. thanks.
+> 
+> Dear Arnd, Olof,
+> 
+> I have no pull request permission. what's your preference? Could you please
+> advise?
 
-Cc: stable at vger.kernel.org
-Fixes: 4e257d9eee23 ("drm/rockchip: get rid of rockchip_drm_crtc_mode_config")
-Signed-off-by: John Keeping <john@metanate.com>
----
- drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 13 ++++++++++++-
- 1 file changed, 12 insertions(+), 1 deletion(-)
+... and because arm-soc people haven't responded, they've now ended up
+in the patch system... So I've applied them to my tree in a separate
+branch.
 
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-index 1c4d5b5a70a2..21e1247098be 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-@@ -1048,6 +1048,17 @@ static void vop_crtc_destroy(struct drm_crtc *crtc)
- 	drm_crtc_cleanup(crtc);
- }
- 
-+static void vop_crtc_reset(struct drm_crtc *crtc)
-+{
-+	if (crtc->state)
-+		__drm_atomic_helper_crtc_destroy_state(crtc, crtc->state);
-+	kfree(crtc->state);
-+
-+	crtc->state = kzalloc(sizeof(struct rockchip_crtc_state), GFP_KERNEL);
-+	if (crtc->state)
-+		crtc->state->crtc = crtc;
-+}
-+
- static struct drm_crtc_state *vop_crtc_duplicate_state(struct drm_crtc *crtc)
- {
- 	struct rockchip_crtc_state *rockchip_state;
-@@ -1073,7 +1084,7 @@ static const struct drm_crtc_funcs vop_crtc_funcs = {
- 	.set_config = drm_atomic_helper_set_config,
- 	.page_flip = drm_atomic_helper_page_flip,
- 	.destroy = vop_crtc_destroy,
--	.reset = drm_atomic_helper_crtc_reset,
-+	.reset = vop_crtc_reset,
- 	.atomic_duplicate_state = vop_crtc_duplicate_state,
- 	.atomic_destroy_state = vop_crtc_destroy_state,
- };
+Thanks!
+
 -- 
-2.9.0.465.g8850cbc.dirty
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
