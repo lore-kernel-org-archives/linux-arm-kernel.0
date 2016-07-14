@@ -1,21 +1,25 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 14 Jul 2016 15:55:16 +0200
-Subject: [GIT PULL 4/4] arm64: tegra: Default configuration updates for
- v4.8-rc1
-In-Reply-To: <20160711152512.11731-4-thierry.reding@gmail.com>
-References: <20160711152512.11731-1-thierry.reding@gmail.com>
- <20160711152512.11731-4-thierry.reding@gmail.com>
-Message-ID: <4730483.ERIsH1GTdb@wuerfel>
+Date: Thu, 14 Jul 2016 15:58:19 +0200
+Subject: [GIT PULL]arm64: dts: hisilicon: hi6220 updates for 4.8(#2)
+In-Reply-To: <577E5E70.1050304@hisilicon.com>
+References: <577E5E70.1050304@hisilicon.com>
+Message-ID: <4529903.blvXMCdknS@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, July 11, 2016 5:25:12 PM CEST Thierry Reding wrote:
-> arm64: tegra: Default configuration updates for v4.8-rc1
+On Thursday, July 7, 2016 2:51:44 PM CEST Wei Xu wrote:
+> Hi Arnd, Hi Olof, Hi Kevin,
 > 
-> Enable a bunch of configuration options to enable PMIC, regulators, DSI,
-> HDMI, XUSB and the GPU on Jetson TX1 as well as a few new features that
-> are now functional on the Google Pixel C.
+> I know the walkaround for this kind of patch is still under discussion.
+> Could you please consider to pull the following changes?
+> 
+> This depends on the change in clk tree (clk-hi6220-rtc)
+> which is already in the clk-next.
+> 
+> And for easier grepping through history, below is the pull request
+> for the dts specific change (no clk commits):
+> 
 
-Pulled into next/arm64, thanks!
+Pulled into next/late, thanks!
 
 	Arnd
