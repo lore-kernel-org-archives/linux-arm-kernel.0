@@ -1,30 +1,46 @@
-From: agraf@suse.de (Alexander Graf)
-Date: Thu, 14 Jul 2016 10:01:50 +0200
-Subject: [PATCH] arm64: Add config to limit user space to 47bits
-In-Reply-To: <VI1PR0801MB142315FBEDD571CC23E8D7F796320@VI1PR0801MB1423.eurprd08.prod.outlook.com>
-References: <1468424567-15925-1-git-send-email-agraf@suse.de>
- <CAKv+Gu_QH=sZi--FVqHebd1P+6UMzEqWQQ1u3Y170B7cND8Kgw@mail.gmail.com>
- <578668D3.6010406@suse.de> <20160714010812.GA17138@e103986-lin>
- <837E6456-4718-45D7-8EE7-E28E11DB8BD3@suse.de>
- <VI1PR0801MB1423AC2E8EDEE7EA33A6233196320@VI1PR0801MB1423.eurprd08.prod.outlook.com>
- <e24481b9-fb6a-aead-a72b-43b7d561b940@suse.de>
- <VI1PR0801MB142315FBEDD571CC23E8D7F796320@VI1PR0801MB1423.eurprd08.prod.outlook.com>
-Message-ID: <45E0D3FF-FEC1-4A70-8B2D-A941A35788EB@suse.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 14 Jul 2016 10:29:11 +0200
+Subject: [RFC 0/3] extend kexec_file_load system call
+In-Reply-To: <1678419.ODVtyXKVYJ@hactar>
+References: <20160712014201.11456-1-takahiro.akashi@linaro.org>
+ <5108278.va6WuahHro@wuerfel> <1678419.ODVtyXKVYJ@hactar>
+Message-ID: <4321972.HZgDox36RC@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-> Am 14.07.2016 um 09:49 schrieb Zheng Xu <Zheng.Xu@arm.com>:
+On Wednesday, July 13, 2016 11:18:04 PM CEST Thiago Jung Bauermann wrote:
+> Am Mittwoch, 13 Juli 2016, 21:59:18 schrieb Arnd Bergmann:
+> > On Wednesday, July 13, 2016 3:45:41 PM CEST Thiago Jung Bauermann wrote:
+> > > Am Mittwoch, 13 Juli 2016, 15:13:42 schrieb Arnd Bergmann:
+> > > 
+> > > For secure boot, Petitboot needs to use kexec_file_load, because of the
+> > > following two features which the system call enables:
+> > > 
+> > > 1. only allow loading of signed kernels.
+> > > 2. "measure" (i.e., record the hashes of) the kernel, initrd, kernel
+> > > 
+> > >    command line and other boot inputs for the Integrity Measurement
+> > >    Architecture subsystem.
+> > > 
+> > > Those can't be done with kexec_load.
+> > 
+> > Can't petitboot do both of these in user space?
 > 
-> Sorry, I might misunderstand the issue. I thought there are still issues with master.
+> To be honest I'm not sure if it *can't* be done from userspace but if you do 
+> it from the kernel you can guarantee that any kernel image that is loaded 
+> gets verified and measured.
 > 
-> I saw that you've mentioned there are pointers to .rodata. And I only fixed the heap. So I am just worried if there can be issues with .rodata. If pointers to .rodata are not tagged and used as js objects, it should be fine.
+> Whereas if you verify and measure the kernel in userspace then if there's a 
+> vulnerability in the system which allows an attacker to upload their own 
+> binary, then they can use kexec_load directly and bypass the verification 
+> and measurement.
+> 
+> So it's a more resilient design.
 
-Please don't top post on kernel mailing lists.
+Right, but the question remains whether this helps while you allow the
+boot loader to modify the dtb. If an attacker gets in and cannot modify
+the kernel or initid but can modify the DT, a successful attack would
+be a bit harder than having a modified kernel, but you may still need
+to treat the system as compromised.
 
-The old Spidermonkey (which is used by couchdb) has some string allocation optimization in jsstr.cpp that directly pregenerates js strings in .rodata at compile time. Just try to run couchdb on a 48bit va aarch64 system and it will fall apart.
-
-Fixing mozjs master doesn't really help here, since couchdb requires the ancient spidermonkey 1.8.5. An alternative to fixing that old js implementation would obviously also be to move couchdb to mozjs master.
-
-
-Alex
+	Arnd
