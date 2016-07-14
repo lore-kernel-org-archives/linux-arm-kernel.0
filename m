@@ -1,143 +1,118 @@
 From: tiffany.lin@mediatek.com (tiffany lin)
-Date: Thu, 14 Jul 2016 15:30:10 +0800
-Subject: [PATCH v3 3/9] DocBook/v4l: Add compressed video formats used
- on MT8173 codec driver
-In-Reply-To: <1468418157.2867.12.camel@ndufresne.ca>
-References: <1464611363-14936-1-git-send-email-tiffany.lin@mediatek.com>
- <1464611363-14936-2-git-send-email-tiffany.lin@mediatek.com>
- <1464611363-14936-3-git-send-email-tiffany.lin@mediatek.com>
- <1464611363-14936-4-git-send-email-tiffany.lin@mediatek.com>
- <5a793171-24a7-4e9e-8bfd-f668c789f8e0@xs4all.nl>
- <1468205771.3725.8.camel@mtksdaap41>
- <CAOMLVLiZU3D587dSyp2b2v4DV+MS9vh85bA4BoG7ddK6556rbA@mail.gmail.com>
- <1468350511.8843.16.camel@gmail.com> <1468350842.8843.18.camel@gmail.com>
- <1468375209.2462.20.camel@mtksdaap41>
- <1468418157.2867.12.camel@ndufresne.ca>
-Message-ID: <1468481410.27199.17.camel@mtksdaap41>
+Date: Thu, 14 Jul 2016 15:34:14 +0800
+Subject: [PATCH] [media] mtk-vcodec: fix type mismatches
+In-Reply-To: <20160711213959.2481081-1-arnd@arndb.de>
+References: <20160711213959.2481081-1-arnd@arndb.de>
+Message-ID: <1468481654.27199.19.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nicolas,
-
-On Wed, 2016-07-13 at 09:55 -0400, Nicolas Dufresne wrote:
-> Le mercredi 13 juillet 2016 ? 10:00 +0800, tiffany lin a ?crit :
-> > Hi Nicolas,
-> > 
-> > On Tue, 2016-07-12 at 15:14 -0400, Nicolas Dufresne wrote:
-> > > Le mardi 12 juillet 2016 ? 15:08 -0400, Nicolas Dufresne a ?crit :
-> > > > Le mardi 12 juillet 2016 ? 16:16 +0800, Wu-Cheng Li (???) a ?crit
-> > :
-> > > > > Decoder hardware produces MT21 (compressed). Image processor
-> > can
-> > > > > convert it to a format that can be input of display driver.
-> > > > > Tiffany.
-> > > > > When do you plan to upstream image processor (mtk-mdp)?
-> > > > > > 
-> > > > > > It can be as input format for encoder, MDP and display
-> > drivers in
-> > > > > our
-> > > > > > platform.
-> > > > > I remember display driver can only accept uncompressed MT21.
-> > Right?
-> > > > > Basically V4L2_PIX_FMT_MT21 is compressed and is like an opaque
-> > > > > format. It's not usable until it's decompressed and converted
-> > by
-> > > > > image
-> > > > > processor.
-> > > > 
-> > > > Previously it was described as MediaTek block mode, and now as a
-> > > > MediaTek compressed format. It makes me think you have no idea
-> > what
-> > > > this pixel format really is. Is that right ?
-> > > > 
-> > > > The main reason why I keep asking, is that we often find
-> > similarities
-> > > > between what vendor like to call their proprietary formats. Doing
-> > the
-> > > > proper research helps not creating a mess like in Android where
-> > you
-> > > > have a lot of formats that all point to the same format. I
-> > believe
-> > > > there was the same concern when Samsung wanted to introduce their
-> > Z-
-> > > > flip-Z NV12 tile format. In the end they simply provided
-> > sufficient
-> > > > documentation so we could document it and implement software
-> > > > converters
-> > > > for test and validation purpose.
-> > > 
-> > > Here's the kind of information we want in the documentation.
-> > > 
-> > > https://chromium.googlesource.com/chromium/src/media/+/master/base/
-> > vide
-> > > o_types.h#40
-> > > 
-> > >   // MediaTek proprietary format. MT21 is similar to NV21 except
-> > the memory
-> > >   // layout and pixel layout (swizzles). 12bpp with Y plane
-> > followed by a 2x2
-> > >   // interleaved VU plane. Each image contains two buffers -- Y
-> > plane and VU
-> > >   // plane. Two planes can be non-contiguous in memory. The
-> > starting addresses
-> > >   // of Y plane and VU plane are 4KB alignment.
-> > >   // Suppose image dimension is (width, height). For both Y plane
-> > and VU plane:
-> > >   // Row pitch = ((width+15)/16) * 16.
-> > >   // Plane size = Row pitch * (((height+31)/32)*32)
-> > > 
-> > > Now obviously this is incomplete, as the swizzling need to be
-> > documented of course.
-> > > 
-> > Because it's finally a compressed format from our codec hw, we cannot
-> > describe its swizzling.
+On Mon, 2016-07-11 at 23:37 +0200, Arnd Bergmann wrote:
+> The newly added mtk-vcodec driver produces a number of warnings in an ARM
+> allmodconfig build, mainly since it assumes that dma_addr_t is 32-bit wide:
 > 
-> Can you clarify why it cannot be described ? I don't buy any argument
-> that it's impossible to convert without hardware. Intel did document
-> their compressed formats.
+> mtk-vcodec/venc/venc_vp8_if.c: In function 'vp8_enc_alloc_work_buf':
+> mtk-vcodec/venc/venc_vp8_if.c:212:191: error: cast to pointer from integer of different size [-Werror=int-to-pointer-cast]
+> mtk-vcodec/venc/venc_h264_if.c: In function 'h264_enc_alloc_work_buf':
+> mtk-vcodec/venc/venc_h264_if.c:297:190: error: cast to pointer from integer of different size [-Werror=int-to-pointer-cast]
+> mtk-vcodec/mtk_vcodec_enc.c: In function 'mtk_venc_worker':
+> mtk-vcodec/mtk_vcodec_enc.c:1030:46: error: format '%lx' expects argument of type 'long unsigned int', but argument 7 has type 'size_t {aka unsigned int}' [-Werror=format=]
+>   mtk_v4l2_debug(2,
+> mtk-vcodec/mtk_vcodec_enc.c:1030:46: error: format '%lx' expects argument of type 'long unsigned int', but argument 10 has type 'size_t {aka unsigned int}' [-Werror=format=]
+> mtk-vcodec/venc_vpu_if.c: In function 'vpu_enc_ipi_handler':
+> mtk-vcodec/venc_vpu_if.c:40:30: error: cast to pointer from integer of different size [-Werror=int-to-pointer-cast]
+>   struct venc_vpu_inst *vpu = (struct venc_vpu_inst *)msg->venc_inst;
 > 
-What's the Intel compressed formats? Could you provide link so we could
-reference how they provide this information.
-
-> Debugging an integration with such format that we have literally
-> decided to no make public is a pain. A lot of decoder got abandoned or
-> never used because of that.
+> This rearranges the format strings and type casts to what they should have been
+> in order to avoid the warnings.
 > 
-> It would be nice to explain the architecture you are suggesting to make
-> this decoder useful. How will userspace application be able to use your
-> decoder. Will the image processor usable outside the display path ?
-> People might want to do transcoding, or other relatively common task
-> that does not imply a display.
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>  drivers/media/platform/mtk-vcodec/mtk_vcodec_enc.c    | 8 ++++----
+>  drivers/media/platform/mtk-vcodec/venc/venc_h264_if.c | 4 ++--
+>  drivers/media/platform/mtk-vcodec/venc/venc_vp8_if.c  | 4 ++--
+>  drivers/media/platform/mtk-vcodec/venc_vpu_if.c       | 4 ++--
+>  4 files changed, 10 insertions(+), 10 deletions(-)
 > 
+> diff --git a/drivers/media/platform/mtk-vcodec/mtk_vcodec_enc.c b/drivers/media/platform/mtk-vcodec/mtk_vcodec_enc.c
+> index 6dcae0a0a1f2..0b25a8700877 100644
+> --- a/drivers/media/platform/mtk-vcodec/mtk_vcodec_enc.c
+> +++ b/drivers/media/platform/mtk-vcodec/mtk_vcodec_enc.c
+> @@ -1028,15 +1028,15 @@ static void mtk_venc_worker(struct work_struct *work)
+>  	bs_buf.size = (size_t)dst_buf->planes[0].length;
+>  
+>  	mtk_v4l2_debug(2,
+> -			"Framebuf VA=%p PA=%llx Size=0x%lx;VA=%p PA=0x%llx Size=0x%lx;VA=%p PA=0x%llx Size=%zu",
+> +			"Framebuf VA=%p PA=%pad Size=0x%zx;VA=%p PA=%pad Size=0x%zx;VA=%p PA=%pad Size=0x%zx",
+>  			frm_buf.fb_addr[0].va,
+> -			(u64)frm_buf.fb_addr[0].dma_addr,
+> +			&frm_buf.fb_addr[0].dma_addr,
+>  			frm_buf.fb_addr[0].size,
+>  			frm_buf.fb_addr[1].va,
+> -			(u64)frm_buf.fb_addr[1].dma_addr,
+> +			&frm_buf.fb_addr[1].dma_addr,
+>  			frm_buf.fb_addr[1].size,
+>  			frm_buf.fb_addr[2].va,
+> -			(u64)frm_buf.fb_addr[2].dma_addr,
+> +			&frm_buf.fb_addr[2].dma_addr,
+>  			frm_buf.fb_addr[2].size);
 
-In MT8173 platform, it has MDP driver, it could convert
-V4L2_PIX_FMT_MT21 to V4L2_PIX_FMT_NV12M or V4L2_PIX_FMT_YUV420M.
-
-MDP is stand alone driver, it is usable outside the display path.
-
-NV12M/YUV420M/MT21 -> MDP -> NV12M/YUV420M
-
-NV12M/NV21M/YUV420M/YVU420M -> mt8173 Encoder -> H264/VP8
-
-H264/VP8/VP9 -> mtk8173 Decoder -> MT21
-
-When encode with MT21 source, the pipeline will be:
-MT21 -> MDP driver-> NV12M/NV21M/YUV420M/YVU420M -> Encoder -> H264/VP8
-
-When playback, the pipeline will be:
-H264/VP8/VP9 -> Decoder driver -> MT21 -> MDP Driver -> DRM
+Acked-by:Tiffany Lin <tiffany.lin@mediatek.com>
 
 
-best regards,
-Tiffany
-
-
-> regards,
-> Nicolas
-> 
-> p.s.
-> A small note to Wu-Cheng, the definition of the DRM format in your
-> Chromium branch is not correct. DRM uses format modifier, such that the
-> format is the family, in your case it's most likely NV21, and the
-> modifier is the compression or tiling algorithm in place (or both as
-> needed).
+>  
+>  	ret = venc_if_encode(ctx, VENC_START_OPT_ENCODE_FRAME,
+> diff --git a/drivers/media/platform/mtk-vcodec/venc/venc_h264_if.c b/drivers/media/platform/mtk-vcodec/venc/venc_h264_if.c
+> index f4e18bb44cb9..9a600525b3c1 100644
+> --- a/drivers/media/platform/mtk-vcodec/venc/venc_h264_if.c
+> +++ b/drivers/media/platform/mtk-vcodec/venc/venc_h264_if.c
+> @@ -295,9 +295,9 @@ static int h264_enc_alloc_work_buf(struct venc_h264_inst *inst)
+>  		wb[i].iova = inst->work_bufs[i].dma_addr;
+>  
+>  		mtk_vcodec_debug(inst,
+> -				 "work_buf[%d] va=0x%p iova=0x%p size=%zu",
+> +				 "work_buf[%d] va=0x%p iova=%pad size=%zu",
+>  				 i, inst->work_bufs[i].va,
+> -				 (void *)inst->work_bufs[i].dma_addr,
+> +				 &inst->work_bufs[i].dma_addr,
+>  				 inst->work_bufs[i].size);
+>  	}
+>  
+> diff --git a/drivers/media/platform/mtk-vcodec/venc/venc_vp8_if.c b/drivers/media/platform/mtk-vcodec/venc/venc_vp8_if.c
+> index 431ae706a427..5b35aa1900d7 100644
+> --- a/drivers/media/platform/mtk-vcodec/venc/venc_vp8_if.c
+> +++ b/drivers/media/platform/mtk-vcodec/venc/venc_vp8_if.c
+> @@ -210,9 +210,9 @@ static int vp8_enc_alloc_work_buf(struct venc_vp8_inst *inst)
+>  		wb[i].iova = inst->work_bufs[i].dma_addr;
+>  
+>  		mtk_vcodec_debug(inst,
+> -				 "work_bufs[%d] va=0x%p,iova=0x%p,size=%zu",
+> +				 "work_bufs[%d] va=0x%p,iova=%pad,size=%zu",
+>  				 i, inst->work_bufs[i].va,
+> -				 (void *)inst->work_bufs[i].dma_addr,
+> +				 &inst->work_bufs[i].dma_addr,
+>  				 inst->work_bufs[i].size);
+>  	}
+>  
+> diff --git a/drivers/media/platform/mtk-vcodec/venc_vpu_if.c b/drivers/media/platform/mtk-vcodec/venc_vpu_if.c
+> index b92c6d2a892d..8907b02729fa 100644
+> --- a/drivers/media/platform/mtk-vcodec/venc_vpu_if.c
+> +++ b/drivers/media/platform/mtk-vcodec/venc_vpu_if.c
+> @@ -37,7 +37,7 @@ static void handle_enc_encode_msg(struct venc_vpu_inst *vpu, void *data)
+>  static void vpu_enc_ipi_handler(void *data, unsigned int len, void *priv)
+>  {
+>  	struct venc_vpu_ipi_msg_common *msg = data;
+> -	struct venc_vpu_inst *vpu = (struct venc_vpu_inst *)msg->venc_inst;
+> +	struct venc_vpu_inst *vpu = (struct venc_vpu_inst *)(uintptr_t)msg->venc_inst;
+>  
+>  	mtk_vcodec_debug(vpu, "msg_id %x inst %p status %d",
+>  			 msg->msg_id, vpu, msg->status);
+> @@ -112,7 +112,7 @@ int vpu_enc_init(struct venc_vpu_inst *vpu)
+>  
+>  	memset(&out, 0, sizeof(out));
+>  	out.msg_id = AP_IPIMSG_ENC_INIT;
+> -	out.venc_inst = (unsigned long)vpu;
+> +	out.venc_inst = (uintptr_t)vpu;
+>  	if (vpu_enc_send_msg(vpu, &out, sizeof(out))) {
+>  		mtk_vcodec_err(vpu, "AP_IPIMSG_ENC_INIT fail");
+>  		return -EINVAL;
