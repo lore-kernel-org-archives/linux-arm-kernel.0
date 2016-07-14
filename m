@@ -1,15 +1,14 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Thu, 14 Jul 2016 17:32:58 +0100
-Subject: Applied "spi: s3c64xx: document the clocks and the clock-name
- property" to the spi tree
-In-Reply-To: <1468204581-16873-1-git-send-email-andi.shyti@samsung.com>
-Message-ID: <E1bNjZK-0001oy-Pz@debutante>
+Date: Thu, 14 Jul 2016 17:33:01 +0100
+Subject: Applied "spi: s3c64xx: add exynos5433 spi compatible" to the spi tree
+In-Reply-To: <1467989201-14661-2-git-send-email-andi.shyti@samsung.com>
+Message-ID: <E1bNjZN-0001qI-NZ@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The patch
 
-   spi: s3c64xx: document the clocks and the clock-name property
+   spi: s3c64xx: add exynos5433 spi compatible
 
 has been applied to the spi tree at
 
@@ -34,42 +33,42 @@ to this mail.
 Thanks,
 Mark
 
->From 1ada32ede94fc91ff0f3236fcc70ae74dd0c2cb0 Mon Sep 17 00:00:00 2001
+>From c068042bf0872c9121f4a6eab281dd63f61df5d3 Mon Sep 17 00:00:00 2001
 From: Andi Shyti <andi.shyti@samsung.com>
-Date: Tue, 12 Jul 2016 19:02:11 +0900
-Subject: [PATCH] spi: s3c64xx: document the clocks and the clock-name property
+Date: Tue, 12 Jul 2016 19:02:10 +0900
+Subject: [PATCH] spi: s3c64xx: add exynos5433 spi compatible
 
-These two properties were not documented but used in the spi
-dts. Add the related documentation.
+The samsung,exynos5433-spi has some peculiarities that bring the
+need of creating a new compatible in the binding.
 
-Suggested-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+One of those is the 3-clocks controller management where the spi
+is fed with three clocks: "spi", "busclkN" and "ioclk".
+
+By adding the exynos5433-spi, we deprecate the exynos7 compatible
+and discourage its use.
+
 Signed-off-by: Andi Shyti <andi.shyti@samsung.com>
 Reviewed-by: Michael Turquette <mturquette@baylibre.com>
 Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Reviewed-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
 Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- Documentation/devicetree/bindings/spi/spi-samsung.txt | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ Documentation/devicetree/bindings/spi/spi-samsung.txt | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
 diff --git a/Documentation/devicetree/bindings/spi/spi-samsung.txt b/Documentation/devicetree/bindings/spi/spi-samsung.txt
-index ab4f0a46e859..49028a4f5df1 100644
+index 930bc7349271..ab4f0a46e859 100644
 --- a/Documentation/devicetree/bindings/spi/spi-samsung.txt
 +++ b/Documentation/devicetree/bindings/spi/spi-samsung.txt
-@@ -24,6 +24,15 @@ Required SoC Specific Properties:
- - dma-names: Names for the dma channels. There must be at least one channel
-   named "tx" for transmit and named "rx" for receive.
+@@ -9,7 +9,8 @@ Required SoC Specific Properties:
+     - samsung,s3c2443-spi: for s3c2443, s3c2416 and s3c2450 platforms
+     - samsung,s3c6410-spi: for s3c6410 platforms
+     - samsung,s5pv210-spi: for s5pv210 and s5pc110 platforms
+-    - samsung,exynos7-spi: for exynos7 platforms
++    - samsung,exynos5433-spi: for exynos5433 compatible controllers
++    - samsung,exynos7-spi: for exynos7 platforms <DEPRECATED>
  
-+- clocks: specifies the clock IDs provided to the SPI controller; they are
-+  required for interacting with the controller itself, for synchronizing the bus
-+  and as I/O clock (the latter is required by exynos5433 and exynos7).
-+
-+- clock-names: string names of the clocks in the 'clocks' property; for all the
-+  the devices the names must be "spi", "spi_busclkN" (where N is determined by
-+  "samsung,spi-src-clk"), while Exynos5433 should specify a third clock
-+  "spi_ioclk" for the I/O clock.
-+
- Required Board Specific Properties:
- 
- - #address-cells: should be 1.
+ - reg: physical base address of the controller and length of memory mapped
+   region.
 -- 
 2.8.1
