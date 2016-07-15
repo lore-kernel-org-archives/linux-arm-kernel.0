@@ -1,51 +1,54 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Fri, 15 Jul 2016 10:54:25 +0200
-Subject: outdated documentation for lp5523 LED driver?
-In-Reply-To: <20160715074052.GE29844@pali>
-References: <20160715073214.GC13429@amd>
- <20160715074052.GE29844@pali>
-Message-ID: <20160715085425.GA21257@amd>
+From: oliver@schinagl.nl (Olliver Schinagl)
+Date: Fri, 15 Jul 2016 10:57:18 +0200
+Subject: [PATCH 1/1] ARM: dts: sunxi: Add a olinuxino-lime2-emmc
+In-Reply-To: <78b34fdb-bb6e-4043-8f5b-93bc551513c7@googlegroups.com>
+References: <1461827998-12192-1-git-send-email-oliver@schinagl.nl>
+ <CAGb2v66r9m7qVW6BszeT2wqs0KyEr4x5ivTJYqu2Fes=R9-Ltw@mail.gmail.com>
+ <CANCTEQgjiuQXcaw=3Dr5kUsTPc3nsDQf2odwzs4nHvrkREAqrg@mail.gmail.com>
+ <5729F07C.3080308@schinagl.nl>
+ <948be370-4401-43cb-862e-d4376755a75d@googlegroups.com>
+ <5729F6D6.8030100@schinagl.nl>
+ <4704fa35-9a2a-4e6e-8fd4-f4778405c598@googlegroups.com>
+ <572A0052.9060202@schinagl.nl>
+ <2e745ef7-ddc0-40fc-b867-414543690276@googlegroups.com>
+ <572A10B3.2020803@schinagl.nl>
+ <4375220a-f939-4ed0-a6d7-2cf887b07509@googlegroups.com>
+ <9fe7ebb6-6d74-4b73-b6d6-93b79650cdb6@googlegroups.com>
+ <9745a80b-5444-43f7-b772-68684c96c9e5@googlegroups.com>
+ <57322C8D.5060806@schinagl.nl>
+ <8afbe753-4e74-4b30-ad7e-a12027d28264@googlegroups.com>
+ <57323CAB.7090202@schinagl.nl>
+ <f959ee5c-fa63-48f6-9819-4822c055b928@googlegroups.com>
+ <6bfa242e-c0ce-4dc5-9144-b3f16d8fb75c@googlegroups.com>
+ <5732EB34.6070203@schinagl.nl>
+ <78b34fdb-bb6e-4043-8f5b-93bc551513c7@googlegroups.com>
+Message-ID: <6214e145-b408-70f1-bc6f-db066cbe94b1@schinagl.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri 2016-07-15 09:40:52, Pali Roh?r wrote:
-> On Friday 15 July 2016 09:32:14 Pavel Machek wrote:
-> > Hi!
-> > 
-> > Documentation says that load/leds are only visible in the load mode,
-> > but that does not seem to be true (kernel 4.4.0 on N900).
-> > 
-> > # 1) Legacy interface - enginex_mode, enginex_load and enginex_leds
-> > #  Control interface for the engines:
-> > #    x is 1 .. 3
-> > #      enginex_mode : disabled, load, run
-> > #      enginex_load : microcode load (visible only in load mode)
-> > #      enginex_leds : led mux control (visible only in load mode)
-> > 
-> > pavel at n900:/sys/class/leds/lp5523:r/device$ ls -al engine*
-> > -rw-r--r-- 1 root root 4096 Jul  6 22:47 engine1_leds
-> > --w------- 1 root root 4096 Jul  6 22:47 engine1_load
-> > -rw-r--r-- 1 root root 4096 Jul  6 23:41 engine1_mode
-> > -rw-r--r-- 1 root root 4096 Jul  6 22:47 engine2_leds
-> > --w------- 1 root root 4096 Jul  6 22:47 engine2_load
-> > -rw-r--r-- 1 root root 4096 Jul  6 23:41 engine2_mode
-> > -rw-r--r-- 1 root root 4096 Jul  6 22:47 engine3_leds
-> > --w------- 1 root root 4096 Jul  6 22:47 engine3_load
-> > -rw-r--r-- 1 root root 4096 Jul  6 22:47 engine3_mode
-> > pavel at n900:/sys/class/leds/lp5523:r/device$ grep . engine*mode
-> > engine1_mode:run
-> > engine2_mode:load
-> > engine3_mode:run
-> > pavel at n900:/sys/class/leds/lp5523:r/device$
-> 
-> On 2.6.28 kernel is present only legacy interface and for this version
-> is above documentation correct. When engine is in "run" or "disabled",
-> then sysfs nodes _load and _leds are invisible.
+On 15-07-16 10:39, stefan.mavrodiev at gmail.com wrote:
+> Hi Olliver,
+>
+> Why are you using nRST signal?
+> What I mean is this pin is inactive on this eMMC chip. To use the signal
+> byte 162 of ECSD registers should be written.
+Then that sounds like a bug in the mmc layer I would say (or a missing 
+attribute in the dts), we have a nRST signal it is wired, if the chip 
+ignores it, then nothing lost, if the chip needs to be initialized with 
+byte 162 of the ECSD register to make the nRST work, then that it sounds 
+like it should be fixed there?
 
-Well, I don't think 2.6.28 is suitable kernel to compare
-against... and I don't think hiding sysfs attributes makes any sense.
+By ommitting the nRST signal just because the chip isn't properly 
+initialized sounds more like a work-around to me, but I could be wrong 
+and see things wrong.
 
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+What do the mmc guys, who have far more experience here, say?
+
+>
+> On my board, this "reset" signal causes eMMC not to work.
+That supprises me, as afaik I was using it just fine...
+
+Olliver
+>
+> Best regards,
+> Stefan Mavrodiev
