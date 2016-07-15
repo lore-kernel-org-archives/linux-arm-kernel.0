@@ -1,63 +1,40 @@
 From: anup.patel@broadcom.com (Anup Patel)
-Date: Fri, 15 Jul 2016 14:33:58 +0530
-Subject: [PATCH 3/8] uio: Add new UIO_MEM_DEVICE type for mem regions
+Date: Fri, 15 Jul 2016 14:33:59 +0530
+Subject: [PATCH 4/8] Documentation: Update documentation for
+ UIO_MEM_PHYS_CACHE and UIO_MEM_DEVICE
 In-Reply-To: <1468573443-4670-1-git-send-email-anup.patel@broadcom.com>
 References: <1468573443-4670-1-git-send-email-anup.patel@broadcom.com>
-Message-ID: <1468573443-4670-4-git-send-email-anup.patel@broadcom.com>
+Message-ID: <1468573443-4670-5-git-send-email-anup.patel@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On ARM64, the MMU supports special memory attributes for device
-memory/registers. Due to this we have pgprot_device() provided
-by asm/pgtable.h of arch/arm64.
+From: Ankit Jindal <thatsjindal@gmail.com>
 
-On architectures that do not have special MMU attribute for device
-memory/registers, the asm-generic/pgtable.h maps pgprot_device()
-to pgprot_noncached().
+This patch updates UIO documentation for new mem region
+types UIO_MEM_PHYS_CACHE and UIO_MEM_DEVICE.
 
-This patch introduces a new UIO mem region type UIO_MEM_DEVICE to
-represent device registers/memory. The UIO device drivers should
-prefer this new UIO mem region type for memory mapped device registers.
-
+Signed-off-by: Ankit Jindal <thatsjindal@gmail.com>
 Signed-off-by: Anup Patel <anup.patel@broadcom.com>
 ---
- drivers/uio/uio.c          | 4 ++++
- include/linux/uio_driver.h | 1 +
- 2 files changed, 5 insertions(+)
+ Documentation/DocBook/uio-howto.tmpl | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/uio/uio.c b/drivers/uio/uio.c
-index 0e53076..a00990c 100644
---- a/drivers/uio/uio.c
-+++ b/drivers/uio/uio.c
-@@ -663,6 +663,9 @@ static int uio_mmap_physical(struct vm_area_struct *vma, int memtype)
- 	case UIO_MEM_PHYS_CACHE:
- 		/* Do nothing. */
- 		break;
-+	case UIO_MEM_DEVICE:
-+		vma->vm_page_prot = pgprot_device(vma->vm_page_prot);
-+		break;
- 	default:
- 		return -EINVAL;
- 	}
-@@ -714,6 +717,7 @@ static int uio_mmap(struct file *filep, struct vm_area_struct *vma)
- 	switch (idev->info->mem[mi].memtype) {
- 	case UIO_MEM_PHYS:
- 	case UIO_MEM_PHYS_CACHE:
-+	case UIO_MEM_DEVICE:
- 		return uio_mmap_physical(vma, idev->info->mem[mi].memtype);
- 	case UIO_MEM_LOGICAL:
- 	case UIO_MEM_VIRTUAL:
-diff --git a/include/linux/uio_driver.h b/include/linux/uio_driver.h
-index 31359aee..7349f95 100644
---- a/include/linux/uio_driver.h
-+++ b/include/linux/uio_driver.h
-@@ -129,6 +129,7 @@ extern void uio_event_notify(struct uio_info *info);
- #define UIO_MEM_LOGICAL		2
- #define UIO_MEM_VIRTUAL		3
- #define UIO_MEM_PHYS_CACHE	4
-+#define UIO_MEM_DEVICE		5
+diff --git a/Documentation/DocBook/uio-howto.tmpl b/Documentation/DocBook/uio-howto.tmpl
+index cd0e452..de9dafe 100644
+--- a/Documentation/DocBook/uio-howto.tmpl
++++ b/Documentation/DocBook/uio-howto.tmpl
+@@ -529,8 +529,10 @@ the memory region, it will show up in the corresponding sysfs node.
+ <varname>int memtype</varname>: Required if the mapping is used. Set this to
+ <varname>UIO_MEM_PHYS</varname> if you you have physical memory on your
+ card to be mapped. Use <varname>UIO_MEM_LOGICAL</varname> for logical
+-memory (e.g. allocated with <function>kmalloc()</function>). There's also
+-<varname>UIO_MEM_VIRTUAL</varname> for virtual memory.
++memory (e.g. allocated with <function>kmalloc()</function>). There are also
++<varname>UIO_MEM_VIRTUAL</varname> for virtual memory,
++<varname>UIO_MEM_PHYS_CACHE</varname> for cacheable physical memory and,
++<varname>UIO_MEM_DEVICE</varname> for memory mapped device registers.
+ </para></listitem>
  
- /* defines for uio_port->porttype */
- #define UIO_PORT_NONE	0
+ <listitem><para>
 -- 
 1.9.1
