@@ -1,107 +1,237 @@
-From: guodong.xu@linaro.org (Guodong Xu)
-Date: Fri, 15 Jul 2016 20:08:43 +0800
-Subject: [PATCH 1/2] Bluetooth: Add LED triggers for HCI frames tx and rx
-In-Reply-To: <3C106ED5-5F2C-4EAC-8E60-D915D2AD027A@holtmann.org>
-References: <1466657923-5776-1-git-send-email-guodong.xu@linaro.org>
- <D2545F6D-7100-4B59-A19D-7CF878902BAA@holtmann.org>
- <CAFGCpxwuOH83hdPc-c0DV5A_cKMp-0rjxg+3tMwOPTukHGd6vA@mail.gmail.com>
- <3C106ED5-5F2C-4EAC-8E60-D915D2AD027A@holtmann.org>
-Message-ID: <CAFGCpxxbmgmbadE5oGctOzu33hhoiOf29DeEqZWCFYAiVBFLdA@mail.gmail.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Fri, 15 Jul 2016 14:15:27 +0200
+Subject: [PATCH v7 4/9] acpi/arm64: Add GTDT table parse driver
+In-Reply-To: <CADyBb7tkk5DhG_1_87+BQKQfF-CSC+LgP7LE=9SmztvaFLxNyQ@mail.gmail.com>
+References: <1468432402-4872-1-git-send-email-fu.wei@linaro.org>
+ <CAJZ5v0i-1NysCiDFX4ST_uBBeYF2YNzWztgDP=u9a4S1OdpWuw@mail.gmail.com>
+ <CADyBb7tkk5DhG_1_87+BQKQfF-CSC+LgP7LE=9SmztvaFLxNyQ@mail.gmail.com>
+Message-ID: <1809117.TV1VJp2Xpr@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14 July 2016 at 17:42, Marcel Holtmann <marcel@holtmann.org> wrote:
-> Hi Guodong,
->
->>>> Two LED triggers are defined: tx_led and rx_led. Upon frames
->>>> available in HCI core layer, for tx or for rx, the combined LED
->>>> can blink.
->>>>
->>>> Verified on HiKey, 96boards. It uses hi6220 SoC and TI WL1835 combo
->>>> chip.
->>>>
->>>> Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
->>>> ---
->>>> include/net/bluetooth/hci_core.h |  1 +
->>>> net/bluetooth/hci_core.c         |  3 +++
->>>> net/bluetooth/leds.c             | 15 +++++++++++++++
->>>> net/bluetooth/leds.h             |  2 ++
->>>> 4 files changed, 21 insertions(+)
->>>>
->>>> diff --git a/include/net/bluetooth/hci_core.h b/include/net/bluetooth/hci_core.h
->>>> index dc71473..37b8dd9 100644
->>>> --- a/include/net/bluetooth/hci_core.h
->>>> +++ b/include/net/bluetooth/hci_core.h
->>>> @@ -398,6 +398,7 @@ struct hci_dev {
->>>>      bdaddr_t                rpa;
->>>>
->>>>      struct led_trigger      *power_led;
->>>> +     struct led_trigger      *tx_led, *rx_led;
->>>>
->>>>      int (*open)(struct hci_dev *hdev);
->>>>      int (*close)(struct hci_dev *hdev);
->>>> diff --git a/net/bluetooth/hci_core.c b/net/bluetooth/hci_core.c
->>>> index 45a9fc6..c6e1210 100644
->>>> --- a/net/bluetooth/hci_core.c
->>>> +++ b/net/bluetooth/hci_core.c
->>>> @@ -3248,6 +3248,7 @@ int hci_recv_frame(struct hci_dev *hdev, struct sk_buff *skb)
->>>>      skb_queue_tail(&hdev->rx_q, skb);
->>>>      queue_work(hdev->workqueue, &hdev->rx_work);
->>>>
->>>> +     hci_leds_blink_oneshot(hdev->rx_led);
->>>>      return 0;
->>>> }
->>>> EXPORT_SYMBOL(hci_recv_frame);
->>>> @@ -3325,6 +3326,8 @@ static void hci_send_frame(struct hci_dev *hdev, struct sk_buff *skb)
->>>>              BT_ERR("%s sending frame failed (%d)", hdev->name, err);
->>>>              kfree_skb(skb);
->>>>      }
->>>> +
->>>> +     hci_leds_blink_oneshot(hdev->tx_led);
->>>> }
->>>
->>> so I am not convinced that this is the right way of doing TX/RX activity leds. This would have them purely based on HCI traffic and this would include control frames.
->>>
->>
->> Hi, Marcel
->>
->> +       if (hci_skb_pkt_type(skb) == HCI_ACLDATA_PKT ||
->> +           hci_skb_pkt_type(skb) == HCI_SCODATA_PKT)
->> +               hci_leds_blink_oneshot(hdev->rx_led);
->> +
->>
->> By adding pkt_type checks, we can limit LED blinks only at ACL/SCO
->> DATA_PKT. Similar checks can be added for tx_led too.
->>
->> Does this look good to you? If you agree, I can send v2 to include this change.
->
-> we are not going to keep comparing packet types over and over again. The code is already doing that. So functions like hci_sched_acl and hci_acldata_packet are already present in the code.
->
->>> I think that we want activity leds for actual radio activity. Meaning that when we have an active connection and ACL packets are exchanged or when we are scanning.
->>>
->>
->> Radio is controlled in Bluetooth module side, not Host. So I'm afraid
->> actual radio activity cannot be captured in its exact form in Host
->> side. The purpose of this patch is not for radio, it is for
->> incoming/outgoing data. For example, it can give user a blinking
->> indicator on RX frames after a Bluetooth mouse is connected. Another
->> example, it can blink at bluetooth streamed audio (TX).
->
-> So radio activity is caused by RX/TX meaning ACL/SCO packets for sure. There is also other radio activity caused by scanning, inquiry, create connection etc. And the question is if this should be there as well.
->
+On Friday, July 15, 2016 03:32:35 PM Fu Wei wrote:
+> Hi Rafael,
+> 
+> 
+> 
+> On 14 July 2016 at 04:30, Rafael J. Wysocki <rafael@kernel.org> wrote:
+> > On Wed, Jul 13, 2016 at 7:53 PM,  <fu.wei@linaro.org> wrote:
+> >> From: Fu Wei <fu.wei@linaro.org>
+> >>
+> >> This patch adds support for parsing arch timer in GTDT,
+> >> provides some kernel APIs to parse all the PPIs and
+> >> always-on info in GTDT and export them.
+> >>
+> >> By this driver, we can simplify arm_arch_timer drivers, and
+> >> separate the ACPI GTDT knowledge from it.
+> >>
+> >> Signed-off-by: Fu Wei <fu.wei@linaro.org>
+> >> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> >> ---
+> >>  drivers/acpi/Kconfig           |   5 ++
+> >>  drivers/acpi/Makefile          |   1 +
+> >>  drivers/acpi/arm64/Kconfig     |  15 ++++
+> >>  drivers/acpi/arm64/Makefile    |   1 +
+> >>  drivers/acpi/arm64/acpi_gtdt.c | 170 +++++++++++++++++++++++++++++++++++++++++
+> >>  include/linux/acpi.h           |   6 ++
+> >>  6 files changed, 198 insertions(+)
+> >>
+> >> diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
+> >> index b7e2e77..1cdc7d2 100644
+> >> --- a/drivers/acpi/Kconfig
+> >> +++ b/drivers/acpi/Kconfig
+> >> @@ -521,4 +521,9 @@ config XPOWER_PMIC_OPREGION
+> >>
+> >>  endif
+> >>
+> >> +if ARM64
+> >> +source "drivers/acpi/arm64/Kconfig"
+> >> +
+> >> +endif
+> >> +
+> >>  endif  # ACPI
+> >> diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
+> >> index 251ce85..1a94ff7 100644
+> >> --- a/drivers/acpi/Makefile
+> >> +++ b/drivers/acpi/Makefile
+> >> @@ -99,5 +99,6 @@ obj-$(CONFIG_ACPI_EXTLOG)     += acpi_extlog.o
+> >>  obj-$(CONFIG_PMIC_OPREGION)    += pmic/intel_pmic.o
+> >>  obj-$(CONFIG_CRC_PMIC_OPREGION) += pmic/intel_pmic_crc.o
+> >>  obj-$(CONFIG_XPOWER_PMIC_OPREGION) += pmic/intel_pmic_xpower.o
+> >> +obj-$(CONFIG_ARM64)    += arm64/
+> >>
+> >>  video-objs                     += acpi_video.o video_detect.o
+> >> diff --git a/drivers/acpi/arm64/Kconfig b/drivers/acpi/arm64/Kconfig
+> >> new file mode 100644
+> >> index 0000000..ff5c253
+> >> --- /dev/null
+> >> +++ b/drivers/acpi/arm64/Kconfig
+> >> @@ -0,0 +1,15 @@
+> >> +#
+> >> +# ACPI Configuration for ARM64
+> >> +#
+> >> +
+> >> +menu "The ARM64-specific ACPI Support"
+> >> +
+> >> +config ACPI_GTDT
+> >> +       bool "ACPI GTDT table Support"
+> >
+> > This should depend on ARM64.
+> >
+> > Also I wonder if it needs to be user-selectable?  Wouldn't it be
+> > better to enable it by default when building for ARM64 with ACPI?
+> >
+> >> +       help
+> >> +         GTDT (Generic Timer Description Table) provides information
+> >> +         for per-processor timers and Platform (memory-mapped) timers
+> >> +         for ARM platforms. Select this option to provide information
+> >> +         needed for the timers init.
+> >> +
+> >> +endmenu
+> >> diff --git a/drivers/acpi/arm64/Makefile b/drivers/acpi/arm64/Makefile
+> >> new file mode 100644
+> >> index 0000000..466de6b
+> >> --- /dev/null
+> >> +++ b/drivers/acpi/arm64/Makefile
+> >> @@ -0,0 +1 @@
+> >> +obj-$(CONFIG_ACPI_GTDT)                += acpi_gtdt.o
+> >> diff --git a/drivers/acpi/arm64/acpi_gtdt.c b/drivers/acpi/arm64/acpi_gtdt.c
+> >> new file mode 100644
+> >> index 0000000..9ee977d
+> >> --- /dev/null
+> >> +++ b/drivers/acpi/arm64/acpi_gtdt.c
+> >> @@ -0,0 +1,170 @@
+> >> +/*
+> >> + * ARM Specific GTDT table Support
+> >> + *
+> >> + * Copyright (C) 2016, Linaro Ltd.
+> >> + * Author: Daniel Lezcano <daniel.lezcano@linaro.org>
+> >> + *         Fu Wei <fu.wei@linaro.org>
+> >> + *         Hanjun Guo <hanjun.guo@linaro.org>
+> >> + *
+> >> + * This program is free software; you can redistribute it and/or modify
+> >> + * it under the terms of the GNU General Public License version 2 as
+> >> + * published by the Free Software Foundation.
+> >> + */
+> >> +
+> >> +#include <linux/acpi.h>
+> >> +#include <linux/init.h>
+> >> +#include <linux/kernel.h>
+> >> +#include <linux/module.h>
+> >> +
+> >> +#include <clocksource/arm_arch_timer.h>
+> >> +
+> >> +#undef pr_fmt
+> >> +#define pr_fmt(fmt) "GTDT: " fmt
+> >
+> > I would add "ACPI" to the prefix too if I were you, but that's me.
+> 
+> good idea, you are right, will do
+> 
+> >
+> >> +
+> >> +typedef struct {
+> >> +       struct acpi_table_gtdt *gtdt;
+> >> +       void *platform_timer_start;
+> >> +       void *gtdt_end;
+> >> +} acpi_gtdt_desc_t;
+> >> +
+> >> +static acpi_gtdt_desc_t acpi_gtdt_desc __initdata;
+> >> +
+> >> +static inline void *next_platform_timer(void *platform_timer)
+> >> +{
+> >> +       struct acpi_gtdt_header *gh = platform_timer;
+> >> +
+> >> +       platform_timer += gh->length;
+> >> +       if (platform_timer < acpi_gtdt_desc.gtdt_end)
+> >> +               return platform_timer;
+> >> +
+> >> +       return NULL;
+> >> +}
+> >> +
+> >> +#define for_each_platform_timer(_g)                            \
+> >> +       for (_g = acpi_gtdt_desc.platform_timer_start; _g;      \
+> >> +            _g = next_platform_timer(_g))
+> >> +
+> >> +static inline bool is_timer_block(void *platform_timer)
+> >> +{
+> >> +       struct acpi_gtdt_header *gh = platform_timer;
+> >> +
+> >> +       if (gh->type == ACPI_GTDT_TYPE_TIMER_BLOCK)
+> >> +               return true;
+> >> +
+> >> +       return false;
+> >
+> > This is just too much code.  It would suffice to do
+> >
+> >     return gh->type == ACPI_GTDT_TYPE_TIMER_BLOCK;
+> >
+> >> +}
+> >> +
+> >> +static inline bool is_watchdog(void *platform_timer)
+> >> +{
+> >> +       struct acpi_gtdt_header *gh = platform_timer;
+> >> +
+> >> +       if (gh->type == ACPI_GTDT_TYPE_WATCHDOG)
+> >> +               return true;
+> >> +
+> >> +       return false;
+> >
+> > Just like above.
+> 
+> 
+> Thanks, this is better :-) will do
+> 
+> 
+> >
+> >> +}
+> >> +
+> >> +/*
+> >> + * Get some basic info from GTDT table, and init the global variables above
+> >> + * for all timers initialization of Generic Timer.
+> >> + * This function does some validation on GTDT table.
+> >> + */
+> >> +static int __init acpi_gtdt_desc_init(struct acpi_table_header *table)
+> >> +{
+> >> +       struct acpi_table_gtdt *gtdt = container_of(table,
+> >> +                                                   struct acpi_table_gtdt,
+> >> +                                                   header);
+> >> +
+> >> +       acpi_gtdt_desc.gtdt = gtdt;
+> >> +       acpi_gtdt_desc.gtdt_end = (void *)table + table->length;
+> >> +
+> >> +       if (table->revision < 2) {
+> >> +               pr_info("Revision:%d doesn't support Platform Timers.\n",
+> >> +                       table->revision);
+> >
+> > Is it really useful to print this message (and the one below) at the
+> > "info" level?  What about changing them to pr_debug()?
+> 
+> yes, pr_debug is better, thanks :-) will do
+> 
+> 
+> >
+> >> +               return 0;
+> >> +       }
+> >> +
+> >> +       if (!gtdt->platform_timer_count) {
+> >> +               pr_info("No Platform Timer.\n");
+> >> +               return 0;
+> >> +       }
+> >> +
+> >> +       acpi_gtdt_desc.platform_timer_start = (void *)gtdt +
+> >> +                                             gtdt->platform_timer_offset;
+> >> +       if (acpi_gtdt_desc.platform_timer_start <
+> >> +           (void *)table + sizeof(struct acpi_table_gtdt)) {
+> >> +               pr_err(FW_BUG "Platform Timer pointer error.\n");
+> >
+> > Why pr_err()?
+> 
+> if (true), that means the GTDT table has bugs.
+> 
 
-I wouldn't suggest to cover scanning, inquiry, etc. Scanning, for
-example, Host sends a scan command to Bluetooth module (in an
-asynchronous way). After a given interval, Host receives inquiry
-results. Over this period, at host side, we don't know what kind of
-radio activity is happening in BT module side.
+And that's not a very useful piece of information unless you're debugging the
+platform, is it?
 
-Let's say this patch provide LED indicators to only data packets
-activity (ACL and SCO). Can we?
-
--Guodong
-
-> Regards
->
-> Marcel
->
+Thanks,
+Rafael
