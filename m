@@ -1,49 +1,101 @@
 From: sunil.kovvuri@gmail.com (sunil.kovvuri at gmail.com)
-Date: Fri, 15 Jul 2016 18:28:20 +0530
-Subject: [PATCH v3 15/15] net: thunderx: Don't set mac address for secondary
- Qset VFs
+Date: Fri, 15 Jul 2016 18:28:18 +0530
+Subject: [PATCH v3 13/15] net: thunderx: Improvement for MBX interface debug
+ messages
 In-Reply-To: <1468587500-32103-1-git-send-email-sunil.kovvuri@gmail.com>
 References: <1468587500-32103-1-git-send-email-sunil.kovvuri@gmail.com>
-Message-ID: <1468587500-32103-16-git-send-email-sunil.kovvuri@gmail.com>
+Message-ID: <1468587500-32103-14-git-send-email-sunil.kovvuri@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sunil Goutham <sgoutham@cavium.com>
+From: Radoslaw Biernacki <rad@semihalf.com>
 
-Set MAC addresses only for primary VF's and don't for
-secondary VFs.
+Adding debug messages in case of NACK for a mailbox message, also
+did small cleanups.
 
+Signed-off-by: Radoslaw Biernacki <rad@semihalf.com>
 Signed-off-by: Sunil Goutham <sgoutham@cavium.com>
 ---
- drivers/net/ethernet/cavium/thunder/nic_main.c   | 2 +-
- drivers/net/ethernet/cavium/thunder/nicvf_main.c | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ drivers/net/ethernet/cavium/thunder/nic_main.c   | 16 ++++++++++------
+ drivers/net/ethernet/cavium/thunder/nicvf_main.c |  8 ++++++--
+ 2 files changed, 16 insertions(+), 8 deletions(-)
 
 diff --git a/drivers/net/ethernet/cavium/thunder/nic_main.c b/drivers/net/ethernet/cavium/thunder/nic_main.c
-index 476eaea..74bb811 100644
+index 91c575d..f15a54a 100644
 --- a/drivers/net/ethernet/cavium/thunder/nic_main.c
 +++ b/drivers/net/ethernet/cavium/thunder/nic_main.c
-@@ -174,7 +174,7 @@ static void nic_mbx_send_ready(struct nicpf *nic, int vf)
+@@ -790,7 +790,7 @@ static void nic_handle_mbx_intr(struct nicpf *nic, int vf)
+ 		mbx_addr += sizeof(u64);
+ 	}
  
- 	mbx.nic_cfg.tns_mode = NIC_TNS_BYPASS_MODE;
+-	dev_dbg(&nic->pdev->dev, "%s: Mailbox msg %d from VF%d\n",
++	dev_dbg(&nic->pdev->dev, "%s: Mailbox msg 0x%02x from VF%d\n",
+ 		__func__, mbx.msg.msg, vf);
+ 	switch (mbx.msg.msg) {
+ 	case NIC_MBOX_MSG_READY:
+@@ -800,8 +800,7 @@ static void nic_handle_mbx_intr(struct nicpf *nic, int vf)
+ 			nic->duplex[vf] = 0;
+ 			nic->speed[vf] = 0;
+ 		}
+-		ret = 1;
+-		break;
++		goto unlock;
+ 	case NIC_MBOX_MSG_QS_CFG:
+ 		reg_addr = NIC_PF_QSET_0_127_CFG |
+ 			   (mbx.qs.num << NIC_QS_ID_SHIFT);
+@@ -850,8 +849,10 @@ static void nic_handle_mbx_intr(struct nicpf *nic, int vf)
+ 		nic_tx_channel_cfg(nic, mbx.qs.num, &mbx.sq);
+ 		break;
+ 	case NIC_MBOX_MSG_SET_MAC:
+-		if (vf >= nic->num_vf_en)
++		if (vf >= nic->num_vf_en) {
++			ret = -1; /* NACK */
+ 			break;
++		}
+ 		lmac = mbx.mac.vf_id;
+ 		bgx = NIC_GET_BGX_FROM_VF_LMAC_MAP(nic->vf_lmac_map[lmac]);
+ 		lmac = NIC_GET_LMAC_FROM_VF_LMAC_MAP(nic->vf_lmac_map[lmac]);
+@@ -906,10 +907,13 @@ static void nic_handle_mbx_intr(struct nicpf *nic, int vf)
+ 		break;
+ 	}
  
--	if (vf < MAX_LMAC) {
-+	if (vf < nic->num_vf_en) {
- 		bgx_idx = NIC_GET_BGX_FROM_VF_LMAC_MAP(nic->vf_lmac_map[vf]);
- 		lmac = NIC_GET_LMAC_FROM_VF_LMAC_MAP(nic->vf_lmac_map[vf]);
- 
+-	if (!ret)
++	if (!ret) {
+ 		nic_mbx_send_ack(nic, vf);
+-	else if (mbx.msg.msg != NIC_MBOX_MSG_READY)
++	} else if (mbx.msg.msg != NIC_MBOX_MSG_READY) {
++		dev_err(&nic->pdev->dev, "NACK for MBOX 0x%02x from VF %d\n",
++			mbx.msg.msg, vf);
+ 		nic_mbx_send_nack(nic, vf);
++	}
+ unlock:
+ 	nic->mbx_lock[vf] = false;
+ }
 diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_main.c b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
-index 300416a..4a084ab 100644
+index dbb61a8..300416a 100644
 --- a/drivers/net/ethernet/cavium/thunder/nicvf_main.c
 +++ b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
-@@ -1209,7 +1209,7 @@ int nicvf_open(struct net_device *netdev)
- 	}
+@@ -144,15 +144,19 @@ int nicvf_send_msg_to_pf(struct nicvf *nic, union nic_mbx *mbx)
  
- 	/* Check if we got MAC address from PF or else generate a radom MAC */
--	if (is_zero_ether_addr(netdev->dev_addr)) {
-+	if (!nic->sqs_mode && is_zero_ether_addr(netdev->dev_addr)) {
- 		eth_hw_addr_random(netdev);
- 		nicvf_hw_set_mac_addr(nic, netdev);
- 	}
+ 	/* Wait for previous message to be acked, timeout 2sec */
+ 	while (!nic->pf_acked) {
+-		if (nic->pf_nacked)
++		if (nic->pf_nacked) {
++			netdev_err(nic->netdev,
++				   "PF NACK to mbox msg 0x%02x from VF%d\n",
++				   (mbx->msg.msg & 0xFF), nic->vf_id);
+ 			return -EINVAL;
++		}
+ 		msleep(sleep);
+ 		if (nic->pf_acked)
+ 			break;
+ 		timeout -= sleep;
+ 		if (!timeout) {
+ 			netdev_err(nic->netdev,
+-				   "PF didn't ack to mbox msg %d from VF%d\n",
++				   "PF didn't ACK to mbox msg 0x%02x from VF%d\n",
+ 				   (mbx->msg.msg & 0xFF), nic->vf_id);
+ 			return -EBUSY;
+ 		}
 -- 
 2.7.4
