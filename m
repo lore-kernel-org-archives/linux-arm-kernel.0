@@ -1,37 +1,70 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Fri, 15 Jul 2016 12:23:11 -0700
-Subject: [kernel-hardening] Re: [PATCH v2 02/11] mm: Hardened usercopy
-In-Reply-To: <1468610363.32683.42.camel@gmail.com>
-References: <1468446964-22213-1-git-send-email-keescook@chromium.org>
- <1468446964-22213-3-git-send-email-keescook@chromium.org>
- <20160714232019.GA28254@350D>
- <CAGXu5jKzD_rCMNJQU1bB5KDfKTsb+AaidZwe=FAfGMqt_FkfqQ@mail.gmail.com>
- <1468609254.32683.34.camel@gmail.com>
- <CAGXu5jLiD1xEb=dDuf+_2JVzmkH_6O5-m=p=AVvi7qgQ+SV4UA@mail.gmail.com>
- <1468610363.32683.42.camel@gmail.com>
-Message-ID: <CAGXu5jJC0KGR1Q44MW_Rv_N1yFu8m4b8EQY59J-VhLHj_wt+Uw@mail.gmail.com>
+From: austinwc@codeaurora.org (Austin Christ)
+Date: Fri, 15 Jul 2016 14:08:40 -0600
+Subject: [PATCH v5 0/2] Add ACPI support and SMBus block read
+Message-ID: <1468613322-3219-1-git-send-email-austinwc@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 15, 2016 at 12:19 PM, Daniel Micay <danielmicay@gmail.com> wrote:
->> I'd like it to dump stack and be fatal to the process involved, but
->> yeah, I guess BUG() would work. Creating an infrastructure for
->> handling security-related Oopses can be done separately from this
->> (and
->> I'd like to see that added, since it's a nice bit of configurable
->> reactivity to possible attacks).
->
-> In grsecurity, the oops handling also uses do_group_exit instead of
-> do_exit but both that change (or at least the option to do it) and the
-> exploit handling could be done separately from this without actually
-> needing special treatment for USERCOPY. Could expose is as something
-> like panic_on_oops=2 as a balance between the existing options.
+Add ACPI support to I2C QUP driver and get properties from ACPI table.
 
-I'm also uncomfortable about BUG() being removed by unsetting
-CONFIG_BUG, but that seems unlikely. :)
+Add support to the I2C QUP driver to correctly handle SMBus block reads by
+checking I2C_M_RECV_LEN flag and reading the first byte received as the
+message length.
 
--Kees
+Documentation for the two properites used from ACPI will be submitted through
+dsd at acpica.org to https://github.com/ahs3/dsd. The documentation submitted will
+be the following:
 
--- 
-Kees Cook
-Chrome OS & Brillo Security
+property-set:   I2C Device Properties
+set-type:       definition
+vendor:         Qualcomm Technologies, Inc.
+bus:            acpi
+device-id:      QCOM8010
+revision:       0
+derived-from:   /Qualcomm/acpi/QCOM8010/0
+
+property:       clock-frequency
+type:           integer
+description:
+                Defines the target clock frequency of the I2C bus.
+values:
+                integer:            0..20000000
+                description:        integer value in hertz
+
+example:
+                Package (2) { "clock-frequency", 100000 }
+
+property:       src-clock-hz
+type:           integer
+description:
+                If present, defines the source clock frequency input
+                into the I2C QUP controller
+values:
+                integer:            100000..1000000000
+                description:        integer value in hertz
+example:
+                Package (2) { "src-clock-hz", 20000000}
+
+[V5]
+ - remove warning and use correct ACPI function
+[V4]
+ - correct error code
+ - remove warning for fall back to default clock frequency
+[V3]
+ - clean up unused variables
+ - use constant instead of variable for smbus length field
+[V2]
+ - rework the smbus block read and break into separate function
+ - clean up redundant checks and variables
+
+Naveen Kaje (2):
+  i2c: qup: add ACPI support
+  i2c: qup: support SMBus block read
+
+ drivers/i2c/busses/i2c-qup.c | 126 ++++++++++++++++++++++++++++++++++++-------
+ 1 file changed, 107 insertions(+), 19 deletions(-)
+
+--
+Qualcomm Datacenter Technologies as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
