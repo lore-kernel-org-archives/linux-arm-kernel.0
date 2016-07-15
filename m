@@ -1,170 +1,82 @@
-From: quentin.schulz@free-electrons.com (Quentin Schulz)
-Date: Fri, 15 Jul 2016 11:59:14 +0200
-Subject: [PATCH v2 4/4] hwmon: iio: add label for channels read by iio_hwmon
-In-Reply-To: <1468576754-3273-1-git-send-email-quentin.schulz@free-electrons.com>
-References: <1468576754-3273-1-git-send-email-quentin.schulz@free-electrons.com>
-Message-ID: <1468576754-3273-5-git-send-email-quentin.schulz@free-electrons.com>
+From: yt.shen@mediatek.com (YT Shen)
+Date: Fri, 15 Jul 2016 18:07:46 +0800
+Subject: [PATCH v4 0/8] MT2701 DRM support
+Message-ID: <1468577274-6178-1-git-send-email-yt.shen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, iio_hwmon only exposes values of the IIO channels it can read
-but no label by channel is exposed.
+This is MT2701 DRM support PATCH v4, based on 4.7-rc1.
+We add DSI interrupt control, transfer function for MIPI DSI panel support.
+Most codes are the same, except some register changed.
 
-This adds exposition of sysfs files containing label for IIO channels it
-can read based on extended_name field of the iio_chan_spec of the channel.
-If the extended_name field is empty, the sysfs file is not created by
-iio_hwmon.
+For example:
+ - DISP_OVL address offset changed, color format definition changed.
+ - DISP_RDMA fifo size changed.
+ - DISP_COLOR offset changed.
 
-Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
----
+We add a new component DDP_COMPONENT_BLS, and the settings are updated.
+And we have shadow register support in MT2701.
 
-patch added in v2
+Changes since v3:
+- Add DSI support for MIPI DSI panels
+- Update BLS binding to PWM nodes
+- Remove ufoe device nodes
+- Remove redundant parentheses
+- Remove global variable initialization
 
- drivers/hwmon/iio_hwmon.c | 77 +++++++++++++++++++++++++++++++++++++++++------
- 1 file changed, 68 insertions(+), 9 deletions(-)
+Changes since v2:
+- Rename mtk_ddp_mux_sel to mtk_ddp_sout_sel
+- Update mt2701_mtk_ddp_ext components
+- Changed to prefix naming
+- Reorder the patch series
+- Use of_device_get_match_data() to get driver private data
+- Use iopoll macros to implement mtk_disp_mutex_acquire()
+- Removed empty device tree nodes
 
-diff --git a/drivers/hwmon/iio_hwmon.c b/drivers/hwmon/iio_hwmon.c
-index c0da4d9..28d15b2 100644
---- a/drivers/hwmon/iio_hwmon.c
-+++ b/drivers/hwmon/iio_hwmon.c
-@@ -16,6 +16,7 @@
- #include <linux/of.h>
- #include <linux/hwmon-sysfs.h>
- #include <linux/iio/consumer.h>
-+#include <linux/iio/iio.h>
- #include <linux/iio/types.h>
- 
- /**
-@@ -57,12 +58,26 @@ static ssize_t iio_hwmon_read_val(struct device *dev,
- 	return sprintf(buf, "%d\n", result);
- }
- 
-+static ssize_t iio_hwmon_read_label(struct device *dev,
-+				    struct device_attribute *attr,
-+				    char *buf)
-+{
-+	struct sensor_device_attribute *sattr = to_sensor_dev_attr(attr);
-+	struct iio_hwmon_state *state = dev_get_drvdata(dev);
-+	const char *label = state->channels[sattr->index].channel->extend_name;
-+
-+	if (label)
-+		return sprintf(buf, "%s\n", label);
-+
-+	return 0;
-+}
-+
- static int iio_hwmon_probe(struct platform_device *pdev)
- {
- 	struct device *dev = &pdev->dev;
- 	struct iio_hwmon_state *st;
--	struct sensor_device_attribute *a;
--	int ret, i;
-+	struct sensor_device_attribute *a, *b;
-+	int ret, i, j = 0;
- 	int in_i = 1, temp_i = 1, curr_i = 1, humidity_i = 1;
- 	enum iio_chan_type type;
- 	struct iio_channel *channels;
-@@ -92,7 +107,8 @@ static int iio_hwmon_probe(struct platform_device *pdev)
- 		st->num_channels++;
- 
- 	st->attrs = devm_kzalloc(dev,
--				 sizeof(*st->attrs) * (st->num_channels + 1),
-+				 sizeof(*st->attrs) *
-+				 (2 * st->num_channels + 1),
- 				 GFP_KERNEL);
- 	if (st->attrs == NULL) {
- 		ret = -ENOMEM;
-@@ -107,6 +123,18 @@ static int iio_hwmon_probe(struct platform_device *pdev)
- 		}
- 
- 		sysfs_attr_init(&a->dev_attr.attr);
-+
-+		b = NULL;
-+		if (st->channels[i].channel->extend_name) {
-+			b = devm_kzalloc(dev, sizeof(*b), GFP_KERNEL);
-+			if (b == NULL) {
-+				ret = -ENOMEM;
-+				goto error_release_channels;
-+			}
-+
-+			sysfs_attr_init(&b->dev_attr.attr);
-+		}
-+
- 		ret = iio_get_channel_type(&st->channels[i], &type);
- 		if (ret < 0)
- 			goto error_release_channels;
-@@ -115,35 +143,66 @@ static int iio_hwmon_probe(struct platform_device *pdev)
- 		case IIO_VOLTAGE:
- 			a->dev_attr.attr.name = kasprintf(GFP_KERNEL,
- 							  "in%d_input",
--							  in_i++);
-+							  in_i);
-+			if (b)
-+				b->dev_attr.attr.name = kasprintf(GFP_KERNEL,
-+								  "in%d_label",
-+								  in_i);
-+			in_i++;
- 			break;
- 		case IIO_TEMP:
- 			a->dev_attr.attr.name = kasprintf(GFP_KERNEL,
- 							  "temp%d_input",
--							  temp_i++);
-+							  temp_i);
-+
-+			if (b)
-+				b->dev_attr.attr.name = kasprintf(GFP_KERNEL,
-+								  "temp%d_label",
-+								  temp_i);
-+			temp_i++;
- 			break;
- 		case IIO_CURRENT:
- 			a->dev_attr.attr.name = kasprintf(GFP_KERNEL,
- 							  "curr%d_input",
--							  curr_i++);
-+							  curr_i);
-+
-+			if (b)
-+				b->dev_attr.attr.name = kasprintf(GFP_KERNEL,
-+								  "curr%d_label",
-+								  curr_i);
-+			curr_i++;
- 			break;
- 		case IIO_HUMIDITYRELATIVE:
- 			a->dev_attr.attr.name = kasprintf(GFP_KERNEL,
- 							  "humidity%d_input",
--							  humidity_i++);
-+							  humidity_i);
-+
-+			if (b)
-+				b->dev_attr.attr.name = kasprintf(GFP_KERNEL,
-+								  "humidity%d_label",
-+								  humidity_i);
-+			humidity_i++;
- 			break;
- 		default:
- 			ret = -EINVAL;
- 			goto error_release_channels;
- 		}
--		if (a->dev_attr.attr.name == NULL) {
-+		if (a->dev_attr.attr.name == NULL ||
-+		    (b && b->dev_attr.attr.name == NULL)) {
- 			ret = -ENOMEM;
- 			goto error_release_channels;
- 		}
- 		a->dev_attr.show = iio_hwmon_read_val;
- 		a->dev_attr.attr.mode = S_IRUGO;
- 		a->index = i;
--		st->attrs[i] = &a->dev_attr.attr;
-+		st->attrs[j++] = &a->dev_attr.attr;
-+
-+		if (b) {
-+			b->dev_attr.show = iio_hwmon_read_label;
-+			b->dev_attr.attr.mode = S_IRUGO;
-+			b->index = i;
-+			st->attrs[j++] = &b->dev_attr.attr;
-+		}
- 	}
- 
- 	st->attr_group.attrs = st->attrs;
+Changes since v1:
+- Removed BLS bindings and codes, which belong to pwm driver
+- Moved mtk_disp_mutex_acquire() just before mtk_crtc_ddp_config()
+- Split patch into smaller parts
+- Added const keyword to constant structure
+- Removed codes for special memory align
+
+The PATCH depends on the following patch:
+https://patchwork.kernel.org/patch/8832441/ ("dt-bindings: ARM: Mediatek: Document bindings for MT2701"),
+https://patchwork.kernel.org/patch/9140487/ ("dt-bindings: pwm: Add MediaTek display PWM bindings"),
+https://patchwork.kernel.org/patch/9137919/ ("dt-bindings: mediatek: add descriptions for mediatek mt2701 iommu and smi"),
+https://patchwork.kernel.org/patch/9137923/ ("iommu/mediatek: move the common struct into header file"),
+https://patchwork.kernel.org/patch/9137921/ ("memory/mediatek: add support for mt2701"),
+https://patchwork.kernel.org/patch/9137927/ ("iommu/mediatek: add support for mtk iommu generation one HW"),
+https://patchwork.kernel.org/patch/9137931/ ("ARM: dts: mt2701: add iommu/smi dtsi node for mt2701"),
+
+Thanks,
+yt.shen
+
+YT Shen (5):
+  drm/mediatek: rename macros, add chip prefix
+  drm/mediatek: add *driver_data for different hardware settings
+  drm/mediatek: add shadow register support
+  drm/mediatek: add support for Mediatek SoC MT2701
+  arm: dts: mt2701: Add display subsystem related nodes for MT2701
+
+shaoming chen (3):
+  drm/mediatek: add dsi interrupt control
+  drm/mediatek: add dsi transfer function
+  drm/mediatek: add mipi panel support
+
+ arch/arm/boot/dts/mt2701.dtsi               |  100 +++++
+ drivers/gpu/drm/mediatek/mtk_disp_ovl.c     |   32 +-
+ drivers/gpu/drm/mediatek/mtk_disp_rdma.c    |   17 +-
+ drivers/gpu/drm/mediatek/mtk_drm_crtc.c     |   75 ++--
+ drivers/gpu/drm/mediatek/mtk_drm_ddp.c      |  134 ++++--
+ drivers/gpu/drm/mediatek/mtk_drm_ddp.h      |    2 +
+ drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c |   34 +-
+ drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h |   14 +
+ drivers/gpu/drm/mediatek/mtk_drm_drv.c      |   56 ++-
+ drivers/gpu/drm/mediatek/mtk_drm_drv.h      |    9 +
+ drivers/gpu/drm/mediatek/mtk_dsi.c          |  619 ++++++++++++++++++++++++---
+ drivers/gpu/drm/mediatek/mtk_mipi_tx.c      |   82 ++--
+ 12 files changed, 1009 insertions(+), 165 deletions(-)
+
 -- 
-2.5.0
+1.7.9.5
