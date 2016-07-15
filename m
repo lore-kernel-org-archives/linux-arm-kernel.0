@@ -1,48 +1,49 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 15 Jul 2016 11:57:01 +0100
-Subject: [PATCH v15 01/10] arm64: Add HAVE_REGS_AND_STACK_ACCESS_API
- feature
-In-Reply-To: <1467995754-32508-2-git-send-email-dave.long@linaro.org>
-References: <1467995754-32508-1-git-send-email-dave.long@linaro.org>
- <1467995754-32508-2-git-send-email-dave.long@linaro.org>
-Message-ID: <20160715105701.GB14792@e104818-lin.cambridge.arm.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Fri, 15 Jul 2016 20:32:24 +0900
+Subject: [PATCH 5/8] uio: fix dmem_region_start computation
+In-Reply-To: <1468573443-4670-6-git-send-email-anup.patel@broadcom.com>
+References: <1468573443-4670-1-git-send-email-anup.patel@broadcom.com>
+ <1468573443-4670-6-git-send-email-anup.patel@broadcom.com>
+Message-ID: <20160715113224.GA26029@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 08, 2016 at 12:35:45PM -0400, David Long wrote:
-> --- a/arch/arm64/include/asm/ptrace.h
-> +++ b/arch/arm64/include/asm/ptrace.h
-> @@ -74,6 +74,7 @@
->  #define COMPAT_PT_DATA_ADDR		0x10004
->  #define COMPAT_PT_TEXT_END_ADDR		0x10008
->  #ifndef __ASSEMBLY__
-> +#include <linux/bug.h>
->  
->  /* sizeof(struct user) for AArch32 */
->  #define COMPAT_USER_SZ	296
-> @@ -119,6 +120,8 @@ struct pt_regs {
->  	u64 syscallno;
->  };
->  
-> +#define MAX_REG_OFFSET offsetof(struct pt_regs, pstate)
-> +
->  #define arch_has_single_step()	(1)
->  
->  #ifdef CONFIG_COMPAT
-> @@ -147,6 +150,55 @@ struct pt_regs {
->  #define user_stack_pointer(regs) \
->  	(!compat_user_mode(regs) ? (regs)->sp : (regs)->compat_sp)
->  
-> +extern int regs_query_register_offset(const char *name);
-> +extern const char *regs_query_register_name(unsigned int offset);
+On Fri, Jul 15, 2016 at 02:34:00PM +0530, Anup Patel wrote:
+> From: Jan Viktorin <viktorin@rehivetech.com>
+> 
+> The variable i contains a total number of resources (including
+> IORESOURCE_IRQ). However, we want the dmem_region_start to point
+> after the last resource of type IORESOURCE_MEM. The original behaviour
+> leads (very likely) to skipping several UIO mapping regions and makes
+> them useless. Fix this by computing dmem_region_start from the uiomem
+> which points to the last used UIO mapping.
+> 
+> Fixes: 0a0c3b5a24bd ("Add new uio device for dynamic memory allocation")
+> 
+> Signed-off-by: Jan Viktorin <viktorin@rehivetech.com>
+> ---
+>  drivers/uio/uio_dmem_genirq.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 
-Is regs_query_register_offset() used anywhere? I grep'ed the kernel with
-these patches applied but couldn't find any use.
+Why isn't this patch first in the series, with a stable marking, and
+your signed off on it (you are forwarding it on to me, so you need to
+add your mark to it as well, I can't take it otherwise.)
 
-> +extern bool regs_within_kernel_stack(struct pt_regs *regs, unsigned long addr);
+> diff --git a/drivers/uio/uio_dmem_genirq.c b/drivers/uio/uio_dmem_genirq.c
+> index 915facb..e1134a4 100644
+> --- a/drivers/uio/uio_dmem_genirq.c
+> +++ b/drivers/uio/uio_dmem_genirq.c
+> @@ -229,7 +229,7 @@ static int uio_dmem_genirq_probe(struct platform_device *pdev)
+>  		++uiomem;
+>  	}
+>  
+> -	priv->dmem_region_start = i;
+> +	priv->dmem_region_start = uiomem - &uioinfo->mem[0];
 
-This one only seems to be used in arch/arm64/kernel/ptrace.c. Can we
-make it static and remove the declaration?
+Are you sure about this?  It doesn't look correct at first glance, I'm
+loath to take this without a bunch of testing.  Were you able to test
+this out to verify it doesn't break working hardware?
 
--- 
-Catalin
+thanks,
+
+greg k-h
