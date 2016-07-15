@@ -1,77 +1,167 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 15 Jul 2016 12:43:26 +0100
-Subject: [PATCH v10 05/17] KVM: kvm_io_bus: add kvm_io_bus_get_dev() call
+Date: Fri, 15 Jul 2016 12:43:34 +0100
+Subject: [PATCH v10 13/17] KVM: arm64: read initial LPI pending table
 In-Reply-To: <20160715114338.10484-1-andre.przywara@arm.com>
 References: <20160715114338.10484-1-andre.przywara@arm.com>
-Message-ID: <20160715114338.10484-6-andre.przywara@arm.com>
+Message-ID: <20160715114338.10484-14-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The kvm_io_bus framework is a nice place of holding information about
-various MMIO regions for kernel emulated devices.
-Add a call to retrieve the kvm_io_device structure which is associated
-with a certain MMIO address. This avoids to duplicate kvm_io_bus'
-knowledge of MMIO regions without having to fake MMIO calls if a user
-needs the device a certain MMIO address belongs to.
-This will be used by the ITS emulation to get the associated ITS device
-when someone triggers an MSI via an ioctl from userspace.
+The LPI pending status for a GICv3 redistributor is held in a table
+in (guest) memory. To achieve reasonable performance, we cache the
+pending bit in our struct vgic_irq. The initial pending state must be
+read from guest memory upon enabling LPIs for this redistributor.
+As we can't access the guest memory while we hold the lpi_list spinlock,
+we create a snapshot of the LPI list and iterate over that.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-Reviewed-by: Eric Auger <eric.auger@redhat.com>
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
-Acked-by: Paolo Bonzini <pbonzini@redhat.com>
 ---
- include/linux/kvm_host.h |  2 ++
- virt/kvm/kvm_main.c      | 24 ++++++++++++++++++++++++
- 2 files changed, 26 insertions(+)
+ virt/kvm/arm/vgic/vgic-its.c | 95 ++++++++++++++++++++++++++++++++++++++++++++
+ virt/kvm/arm/vgic/vgic.h     |  5 +++
+ 2 files changed, 100 insertions(+)
 
-diff --git a/include/linux/kvm_host.h b/include/linux/kvm_host.h
-index 0640ee9..614a981 100644
---- a/include/linux/kvm_host.h
-+++ b/include/linux/kvm_host.h
-@@ -164,6 +164,8 @@ int kvm_io_bus_register_dev(struct kvm *kvm, enum kvm_bus bus_idx, gpa_t addr,
- 			    int len, struct kvm_io_device *dev);
- int kvm_io_bus_unregister_dev(struct kvm *kvm, enum kvm_bus bus_idx,
- 			      struct kvm_io_device *dev);
-+struct kvm_io_device *kvm_io_bus_get_dev(struct kvm *kvm, enum kvm_bus bus_idx,
-+					 gpa_t addr);
+diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+index 14f91ff..2881b84 100644
+--- a/virt/kvm/arm/vgic/vgic-its.c
++++ b/virt/kvm/arm/vgic/vgic-its.c
+@@ -67,6 +67,94 @@ struct its_itte {
+  * supports more. Let's be restrictive here.
+  */
+ #define CBASER_ADDRESS(x)	((x) & GENMASK_ULL(47, 12))
++#define PENDBASER_ADDRESS(x)	((x) & GENMASK_ULL(47, 16))
++
++/*
++ * Create a snapshot of the current LPI list, so that we can enumerate all
++ * LPIs without holding any lock.
++ * Returns the array length and puts the kmalloc'ed array into intid_ptr.
++ */
++static int vgic_copy_lpi_list(struct kvm *kvm, u32 **intid_ptr)
++{
++	struct vgic_dist *dist = &kvm->arch.vgic;
++	struct vgic_irq *irq;
++	u32 *intids;
++	int irq_count = dist->lpi_list_count, i = 0;
++
++	/*
++	 * We use the current value of the list length, which may change
++	 * after the kmalloc. We don't care, because the guest shouldn't
++	 * change anything while the command handling is still running,
++	 * and in the worst case we would miss a new IRQ, which one wouldn't
++	 * expect to be covered by this command anyway.
++	 */
++	intids = kmalloc_array(irq_count, sizeof(intids[0]), GFP_KERNEL);
++	if (!intids)
++		return -ENOMEM;
++
++	spin_lock(&dist->lpi_list_lock);
++	list_for_each_entry(irq, &dist->lpi_list_head, lpi_list) {
++		/* We don't need to "get" the IRQ, as we hold the list lock. */
++		intids[i] = irq->intid;
++		if (++i == irq_count)
++			break;
++	}
++	spin_unlock(&dist->lpi_list_lock);
++
++	*intid_ptr = intids;
++	return irq_count;
++}
++
++/*
++ * Scan the whole LPI pending table and sync the pending bit in there
++ * with our own data structures. This relies on the LPI being
++ * mapped before.
++ */
++static int its_sync_lpi_pending_table(struct kvm_vcpu *vcpu)
++{
++	gpa_t pendbase = PENDBASER_ADDRESS(vcpu->arch.vgic_cpu.pendbaser);
++	struct vgic_irq *irq;
++	int last_byte_offset = -1;
++	int ret = 0;
++	u32 *intids;
++	int nr_irqs, i;
++
++	nr_irqs = vgic_copy_lpi_list(vcpu->kvm, &intids);
++	if (nr_irqs < 0)
++		return nr_irqs;
++
++	for (i = 0; i < nr_irqs; i++) {
++		int byte_offset, bit_nr;
++		u8 pendmask;
++
++		byte_offset = intids[i] / BITS_PER_BYTE;
++		bit_nr = intids[i] % BITS_PER_BYTE;
++
++		/*
++		 * For contiguously allocated LPIs chances are we just read
++		 * this very same byte in the last iteration. Reuse that.
++		 */
++		if (byte_offset != last_byte_offset) {
++			ret = kvm_read_guest(vcpu->kvm, pendbase + byte_offset,
++					     &pendmask, 1);
++			if (ret) {
++				kfree(intids);
++				return ret;
++			}
++			last_byte_offset = byte_offset;
++		}
++
++		irq = vgic_get_irq(vcpu->kvm, NULL, intids[i]);
++		spin_lock(&irq->irq_lock);
++		irq->pending = pendmask & (1U << bit_nr);
++		vgic_queue_irq_unlock(vcpu->kvm, irq);
++		vgic_put_irq(vcpu->kvm, irq);
++	}
++
++	kfree(intids);
++
++	return ret;
++}
  
- #ifdef CONFIG_KVM_ASYNC_PF
- struct kvm_async_pf {
-diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
-index ef54b4c..bd2eb92 100644
---- a/virt/kvm/kvm_main.c
-+++ b/virt/kvm/kvm_main.c
-@@ -3496,6 +3496,30 @@ int kvm_io_bus_unregister_dev(struct kvm *kvm, enum kvm_bus bus_idx,
- 	return r;
+ static unsigned long vgic_mmio_read_its_ctlr(struct kvm *vcpu,
+ 					     struct vgic_its *its,
+@@ -403,6 +491,13 @@ static struct vgic_register_region its_registers[] = {
+ 		VGIC_ACCESS_32bit),
+ };
+ 
++/* This is called on setting the LPI enable bit in the redistributor. */
++void vgic_enable_lpis(struct kvm_vcpu *vcpu)
++{
++	if (!(vcpu->arch.vgic_cpu.pendbaser & GICR_PENDBASER_PTZ))
++		its_sync_lpi_pending_table(vcpu);
++}
++
+ static int vgic_its_init_its(struct kvm *kvm, struct vgic_its *its)
+ {
+ 	struct vgic_io_device *iodev = &its->iodev;
+diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
+index 8192a29..ee348de 100644
+--- a/virt/kvm/arm/vgic/vgic.h
++++ b/virt/kvm/arm/vgic/vgic.h
+@@ -25,6 +25,7 @@
+ #define IS_VGIC_ADDR_UNDEF(_x)  ((_x) == VGIC_ADDR_UNDEF)
+ 
+ #define INTERRUPT_ID_BITS_SPIS	10
++#define INTERRUPT_ID_BITS_ITS	16
+ #define VGIC_PRI_BITS		5
+ 
+ #define vgic_irq_is_sgi(intid) ((intid) < VGIC_NR_SGIS)
+@@ -76,6 +77,7 @@ int vgic_v3_probe(const struct gic_kvm_info *info);
+ int vgic_v3_map_resources(struct kvm *kvm);
+ int vgic_register_redist_iodevs(struct kvm *kvm, gpa_t dist_base_address);
+ bool vgic_has_its(struct kvm *kvm);
++void vgic_enable_lpis(struct kvm_vcpu *vcpu);
+ #else
+ static inline void vgic_v3_process_maintenance(struct kvm_vcpu *vcpu)
+ {
+@@ -133,6 +135,9 @@ static inline bool vgic_has_its(struct kvm *kvm)
+ 	return false;
  }
  
-+struct kvm_io_device *kvm_io_bus_get_dev(struct kvm *kvm, enum kvm_bus bus_idx,
-+					 gpa_t addr)
++static inline void vgic_enable_lpis(struct kvm_vcpu *vcpu)
 +{
-+	struct kvm_io_bus *bus;
-+	int dev_idx, srcu_idx;
-+	struct kvm_io_device *iodev = NULL;
-+
-+	srcu_idx = srcu_read_lock(&kvm->srcu);
-+
-+	bus = srcu_dereference(kvm->buses[bus_idx], &kvm->srcu);
-+
-+	dev_idx = kvm_io_bus_get_first_dev(bus, addr, 1);
-+	if (dev_idx < 0)
-+		goto out_unlock;
-+
-+	iodev = bus->range[dev_idx].dev;
-+
-+out_unlock:
-+	srcu_read_unlock(&kvm->srcu, srcu_idx);
-+
-+	return iodev;
 +}
-+EXPORT_SYMBOL_GPL(kvm_io_bus_get_dev);
-+
- static struct notifier_block kvm_cpu_notifier = {
- 	.notifier_call = kvm_cpu_hotplug,
- };
+ #endif
+ 
+ int kvm_register_vgic_device(unsigned long type);
 -- 
 2.9.0
