@@ -1,50 +1,28 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Thu, 14 Jul 2016 21:29:25 -0700
-Subject: [PATCH v2 11/11] mm: SLUB hardened usercopy support
-In-Reply-To: <20160715020550.GB13944@balbir.ozlabs.ibm.com>
-References: <1468446964-22213-1-git-send-email-keescook@chromium.org>
- <1468446964-22213-12-git-send-email-keescook@chromium.org>
- <20160715020550.GB13944@balbir.ozlabs.ibm.com>
-Message-ID: <CAGXu5j+Ub2-jmTa-XmF90Gd+ze1os+eqk_yijouCSQoLvU1hNQ@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 15 Jul 2016 13:29:53 +0900
+Subject: [GIT PULL v2] Second Round of Renesas ARM64 Based SoC DT Updates
+ for v4.8
+In-Reply-To: <8207439.0JmbbpvM5T@wuerfel>
+References: <cover.1467900241.git.horms+renesas@verge.net.au>
+ <8207439.0JmbbpvM5T@wuerfel>
+Message-ID: <20160715042952.GF28151@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 14, 2016 at 7:05 PM, Balbir Singh <bsingharora@gmail.com> wrote:
-> On Wed, Jul 13, 2016 at 02:56:04PM -0700, Kees Cook wrote:
->> Under CONFIG_HARDENED_USERCOPY, this adds object size checking to the
->> SLUB allocator to catch any copies that may span objects. Includes a
->> redzone handling fix from Michael Ellerman.
->>
->> Based on code from PaX and grsecurity.
->>
->> Signed-off-by: Kees Cook <keescook@chromium.org>
->> ---
->>  init/Kconfig |  1 +
->>  mm/slub.c    | 36 ++++++++++++++++++++++++++++++++++++
->>  2 files changed, 37 insertions(+)
->>
->> diff --git a/init/Kconfig b/init/Kconfig
->> index 798c2020ee7c..1c4711819dfd 100644
->> --- a/init/Kconfig
->> +++ b/init/Kconfig
->> @@ -1765,6 +1765,7 @@ config SLAB
->>
->>  config SLUB
->>       bool "SLUB (Unqueued Allocator)"
->> +     select HAVE_HARDENED_USERCOPY_ALLOCATOR
->
-> Should this patch come in earlier from a build perspective? I think
-> patch 1 introduces and uses __check_heap_object.
+On Thu, Jul 14, 2016 at 05:54:25PM +0200, Arnd Bergmann wrote:
+> On Thursday, July 7, 2016 4:39:45 PM CEST Simon Horman wrote:
+> >       arm64: dts: r8a7796: Add SYSC PM Domains
+> > 
+> 
+> While doing some sanity checks on our branch contents, I noticed
+> that this commit breaks running "make dtbs" on top of our next/dt64
+> branch, and I'd like to avoid that.
+> 
+> I found a couple more problems (tegra and meson), and I ended up
+> fixing them all up (by merging the dependencies into next/dt64),
+> so everything is sorted for 4.8, but it would be good to do a
+> 'make dtbs' run on a branch that has dt changes before you send it,
+> and I'll try to do the same when pulling it to avoid the problem in
+> the future.
 
-__check_heap_object in patch 1 is protected by a check for
-CONFIG_HAVE_HARDENED_USERCOPY_ALLOCATOR.
-
-It seemed better to be to do arch enablement first, and then add the
-per-allocator heap object size check since it was a distinct piece.
-I'm happy to rearrange things, though, if there's a good reason.
-
--Kees
-
--- 
-Kees Cook
-Chrome OS & Brillo Security
+Thanks, I apologise for letting this slip through.
