@@ -1,45 +1,63 @@
 From: kwangwoo.lee@sk.com (Kwangwoo Lee)
-Date: Fri, 15 Jul 2016 11:46:19 +0900
-Subject: [PATCH v3 0/3]  support pmem on arm64
-Message-ID: <1468550782-14454-1-git-send-email-kwangwoo.lee@sk.com>
+Date: Fri, 15 Jul 2016 11:46:20 +0900
+Subject: [PATCH v3 1/3] arm64: mm: add __clean_dcache_area()
+In-Reply-To: <1468550782-14454-1-git-send-email-kwangwoo.lee@sk.com>
+References: <1468550782-14454-1-git-send-email-kwangwoo.lee@sk.com>
+Message-ID: <1468550782-14454-2-git-send-email-kwangwoo.lee@sk.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch set add supporting the pmem driver on arm64 architecture which
-can be used on NVDIMM(Non-Volatile DIMM). It has been tested on QEMU with
-NVDIMM ACPI/NFIT support on AArch64 VIRT platform.
+Ensure D-cache lines are cleaned to the PoC(Point of Coherency).
 
-Until the changes of pmem codes posted to nvdimm list is merged which assums
-supporting ADR(Asynchronous DRAM Refresh) or direct flushing based on the
-flush hint provided by ACPI/NFIT, this pmem implementation on arm64 can be
-a solution to evaluate pmem on arm64 architecture.
+This function is called by arch_wb_cache_pmem() to clean the cache lines
+and remain the data in cache for the next access.
 
-Change log:
+Signed-off-by: Kwangwoo Lee <kwangwoo.lee@sk.com>
+---
+ arch/arm64/include/asm/cacheflush.h |  1 +
+ arch/arm64/mm/cache.S               | 18 ++++++++++++++++++
+ 2 files changed, 19 insertions(+)
 
-v3)
-do not use a access helper in arch_memcpy_to_pmem().
-split cache related codes with different patch set.
-fix some comments in pmem.h.
-
-v2)
-rewrite functions under the mapping information MEMREMAP_WB.
-rewrite the comments for arm64 in pmem.h
-add __clean_dcache_area() to clean the cache lines to the PoC.
-
-v1)
-add pmem support codes.
-
-Kwangwoo Lee (3):
-  arm64: mm: add __clean_dcache_area()
-  arm64: mm: add mmio_flush_range() to support pmem
-  arm64: pmem: add pmem support codes
-
- arch/arm64/Kconfig                  |   2 +
- arch/arm64/include/asm/cacheflush.h |   3 +
- arch/arm64/include/asm/pmem.h       | 143 ++++++++++++++++++++++++++++++++++++
- arch/arm64/mm/cache.S               |  18 +++++
- 4 files changed, 166 insertions(+)
- create mode 100644 arch/arm64/include/asm/pmem.h
-
+diff --git a/arch/arm64/include/asm/cacheflush.h b/arch/arm64/include/asm/cacheflush.h
+index c64268d..903a94f 100644
+--- a/arch/arm64/include/asm/cacheflush.h
++++ b/arch/arm64/include/asm/cacheflush.h
+@@ -68,6 +68,7 @@
+ extern void flush_cache_range(struct vm_area_struct *vma, unsigned long start, unsigned long end);
+ extern void flush_icache_range(unsigned long start, unsigned long end);
+ extern void __flush_dcache_area(void *addr, size_t len);
++extern void __clean_dcache_area(void *addr, size_t len);
+ extern void __clean_dcache_area_pou(void *addr, size_t len);
+ extern long __flush_cache_user_range(unsigned long start, unsigned long end);
+ 
+diff --git a/arch/arm64/mm/cache.S b/arch/arm64/mm/cache.S
+index 6df0706..5a350e4 100644
+--- a/arch/arm64/mm/cache.S
++++ b/arch/arm64/mm/cache.S
+@@ -93,6 +93,24 @@ ENTRY(__flush_dcache_area)
+ ENDPIPROC(__flush_dcache_area)
+ 
+ /*
++ *	__clean_dcache_area(kaddr, size)
++ *
++ * 	Ensure that any D-cache lines for the interval [kaddr, kaddr+size)
++ * 	are cleaned to the PoC.
++ *
++ *	- kaddr   - kernel address
++ *	- size    - size in question
++ */
++ENTRY(__clean_dcache_area)
++alternative_if_not ARM64_WORKAROUND_CLEAN_CACHE
++	dcache_by_line_op cvac, sy, x0, x1, x2, x3
++alternative_else
++	dcache_by_line_op civac, sy, x0, x1, x2, x3
++alternative_endif
++	ret
++ENDPROC(__clean_dcache_area)
++
++/*
+  *	__clean_dcache_area_pou(kaddr, size)
+  *
+  * 	Ensure that any D-cache lines for the interval [kaddr, kaddr+size)
 -- 
 2.5.0
