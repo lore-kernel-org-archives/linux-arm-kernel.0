@@ -1,53 +1,129 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 15 Jul 2016 10:01:15 -0600
-Subject: [PATCH] ARM: tegra: fix erroneous address in dts
-In-Reply-To: <8a8ccb29-ba73-f29f-2b57-5c1d91e13bf7@ramses-pyramidenbau.de>
-References: <1468514937-23250-1-git-send-email-ralf@ramses-pyramidenbau.de>
- <20160714220218.GB4205@mithrandir.ba.sec>
- <8a8ccb29-ba73-f29f-2b57-5c1d91e13bf7@ramses-pyramidenbau.de>
-Message-ID: <578908CB.7040802@wwwdotorg.org>
+From: paul.gortmaker@windriver.com (Paul Gortmaker)
+Date: Fri, 15 Jul 2016 12:03:08 -0400
+Subject: [PATCH v2 2/2] arm64: implement live patching
+In-Reply-To: <20160627151722.B81C968D29@newverein.lst.de>
+References: <20160627151500.2247A68D20@newverein.lst.de>
+ <20160627151722.B81C968D29@newverein.lst.de>
+Message-ID: <CAP=VYLocwooC+4oODKU6ER5v+cTo3oH6ReKC3VwD-juwvfpErw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/15/2016 03:37 AM, Ralf Ramsauer wrote:
-> On 07/15/2016 12:02 AM, Thierry Reding wrote:
->> On Thu, Jul 14, 2016 at 06:48:57PM +0200, Ralf Ramsauer wrote:
->>> c90bb7b enabled the high speed UARTs of the Jetson TK1. The address
->>> specification inside the dts is wrong. Fix it and use the correct
->>> address.
->>>
->>> Fixes: c90bb7b9b9 ("ARM: tegra: Add high speed UARTs to Jetson TK1 device tree")
->>> Signed-off-by: Ralf Ramsauer <ralf@ramses-pyramidenbau.de>
->>> ---
->>>   arch/arm/boot/dts/tegra124-jetson-tk1.dts | 4 ++--
->>>   1 file changed, 2 insertions(+), 2 deletions(-)
->>
->> These addresses are correct. The 0, prefix was dropped from the unit
->> address in commit b5896f67ab3c ("ARM: tegra: Remove commas from unit
->> addresses on Tegra124").
->>
->> What's the problem that you're seeing? What's not working for you?
- >
-> I cannot find b5896f67ab3c neither in swarren's tree nor in linux
-> upstream. But there's d0bc5aaf890 in swarren's linux-tegra tree that
-> matches your described changes and was committed on 1st of July. But
-> this patch is not upstream yet, while the other patch is.
+On Mon, Jun 27, 2016 at 11:17 AM, Torsten Duwe <duwe@lst.de> wrote:
+> On top of FTRACE_WITH_REGS and the klp changes that go into v4.7
+> this is straightforward.
+>
+> Signed-off-by: Torsten Duwe <duwe@suse.de>
+> ---
+>  arch/arm64/Kconfig                 |  3 +++
+>  arch/arm64/include/asm/livepatch.h | 37 +++++++++++++++++++++++++++++++++++++
+>  arch/arm64/kernel/entry-ftrace.S   | 13 +++++++++++++
+>  3 files changed, 53 insertions(+)
+>  create mode 100644 arch/arm64/include/asm/livepatch.h
+>
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index 36a0e26..cb5adf3 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -80,6 +80,7 @@ config ARM64
+>         select HAVE_GENERIC_DMA_COHERENT
+>         select HAVE_HW_BREAKPOINT if PERF_EVENTS
+>         select HAVE_IRQ_TIME_ACCOUNTING
+> +       select HAVE_LIVEPATCH
+>         select HAVE_MEMBLOCK
+>         select HAVE_MEMBLOCK_NODE_MAP if NUMA
+>         select HAVE_PATA_PLATFORM
+> @@ -1042,4 +1043,6 @@ if CRYPTO
+>  source "arch/arm64/crypto/Kconfig"
+>  endif
+>
+> +source "kernel/livepatch/Kconfig"
+> +
+>  source "lib/Kconfig"
+> diff --git a/arch/arm64/include/asm/livepatch.h b/arch/arm64/include/asm/livepatch.h
+> new file mode 100644
+> index 0000000..6b9a3d1
+> --- /dev/null
+> +++ b/arch/arm64/include/asm/livepatch.h
+> @@ -0,0 +1,37 @@
+> +/*
+> + * livepatch.h - arm64-specific Kernel Live Patching Core
+> + *
+> + * Copyright (C) 2016 SUSE
+> + *
+> + * This program is free software; you can redistribute it and/or
+> + * modify it under the terms of the GNU General Public License
+> + * as published by the Free Software Foundation; either version 2
+> + * of the License, or (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program; if not, see <http://www.gnu.org/licenses/>.
+> + */
+> +#ifndef _ASM_ARM64_LIVEPATCH_H
+> +#define _ASM_ARM64_LIVEPATCH_H
+> +
+> +#include <linux/module.h>
+> +#include <linux/ftrace.h>
 
-The fix is in linux-next, and will be in mainline soon I expect.
+These includes don't look right.  It would seem all you need is the one
+for struct pt_regs.
 
-My github linux-tegra.git isn't relevant since it's just my own personal 
-dev branch, but for reference, the commit is there since it's based on 
-linux-next.
+Paul.
+--
 
-> Have a look at mainline tegra124-jetson-tk1.dts, there the addresses are
-> erroneous as they still use the 0, annotation. And I just realised, that
-> somehow, upstream patch c90bb7b slightly differs from my initial patch
-> [1] on the mailing list.
-
-Your patch should probably be CC: stable so that existing kernel 
-versions get fixed. That said, I'd argue that since the original patch 
-never actually had any effect since it applied to the wrong node, the 
-best fix for stable kernels is simply to revert it rather than fixing 
-it, to avoid the potential for behaviour changes and regressions. 
-Starting with kernel 4.8 (I think), that patch will begin to have actual 
-effect.
+> +
+> +#ifdef CONFIG_LIVEPATCH
+> +static inline int klp_check_compiler_support(void)
+> +{
+> +       return 0;
+> +}
+> +
+> +static inline void klp_arch_set_pc(struct pt_regs *regs, unsigned long ip)
+> +{
+> +       regs->pc = ip;
+> +}
+> +#endif /* CONFIG_LIVEPATCH */
+> +
+> +#endif /* _ASM_ARM64_LIVEPATCH_H */
+> diff --git a/arch/arm64/kernel/entry-ftrace.S b/arch/arm64/kernel/entry-ftrace.S
+> index 3ebe791..b166cbf 100644
+> --- a/arch/arm64/kernel/entry-ftrace.S
+> +++ b/arch/arm64/kernel/entry-ftrace.S
+> @@ -204,6 +204,9 @@ ENTRY(ftrace_caller)
+>         str     x9, [sp, #S_LR]
+>         /* The program counter just after the ftrace call site */
+>         str     lr, [sp, #S_PC]
+> +#if defined(CONFIG_LIVEPATCH) && defined(CONFIG_FUNCTION_GRAPH_TRACER)
+> +       mov     x19,lr          /* remember old return address */
+> +#endif
+>         /* The stack pointer as it was on ftrace_caller entry... */
+>         add     x29, sp, #S_FRAME_SIZE+16       /* ...is also our new FP */
+>         str     x29, [sp, #S_SP]
+> @@ -219,6 +222,16 @@ ftrace_call:
+>
+>         bl      ftrace_stub
+>
+> +#if defined(CONFIG_LIVEPATCH) && defined(CONFIG_FUNCTION_GRAPH_TRACER)
+> +       /* Is the trace function a live patcher an has messed with
+> +        * the return address?
+> +       */
+> +       ldr     x9, [sp, #S_PC]
+> +       cmp     x9, x19         /* compare with the value we remembered */
+> +       /* to not call graph tracer's "call" mechanism twice! */
+> +       b.eq    ftrace_regs_return
+> +#endif
+> +
+>  #ifdef CONFIG_FUNCTION_GRAPH_TRACER
+>         .global ftrace_graph_call
+>  ftrace_graph_call:                     // ftrace_graph_caller();
+> --
+> 2.6.6
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-arch" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
