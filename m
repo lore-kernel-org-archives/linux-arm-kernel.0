@@ -1,81 +1,48 @@
-From: dave.long@linaro.org (David Long)
-Date: Fri, 15 Jul 2016 13:51:02 -0400
-Subject: [PATCH v15 01/10] arm64: Add HAVE_REGS_AND_STACK_ACCESS_API
- feature
-In-Reply-To: <20160715150532.GA22563@localhost>
-References: <1467995754-32508-1-git-send-email-dave.long@linaro.org>
- <1467995754-32508-2-git-send-email-dave.long@linaro.org>
- <20160715105701.GB14792@e104818-lin.cambridge.arm.com>
- <5788F86B.60305@linaro.org> <20160715150532.GA22563@localhost>
-Message-ID: <57892286.1040609@linaro.org>
+From: davem@davemloft.net (David Miller)
+Date: Fri, 15 Jul 2016 10:51:58 -0700 (PDT)
+Subject: [PATCH] dt: bindings: Add a generic ethernet device binding
+In-Reply-To: <47a052a1-cc8b-0f75-e44a-450c4a0ac075@redhat.com>
+References: <1468405204-5845-1-git-send-email-hdegoede@redhat.com>
+ <20160714.161707.2089949241813985527.davem@davemloft.net>
+ <47a052a1-cc8b-0f75-e44a-450c4a0ac075@redhat.com>
+Message-ID: <20160715.105158.2028840258568316933.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/15/2016 11:13 AM, Catalin Marinas wrote:
-> On Fri, Jul 15, 2016 at 10:51:23AM -0400, David Long wrote:
->> On 07/15/2016 06:57 AM, Catalin Marinas wrote:
->>> On Fri, Jul 08, 2016 at 12:35:45PM -0400, David Long wrote:
->>>> --- a/arch/arm64/include/asm/ptrace.h
->>>> +++ b/arch/arm64/include/asm/ptrace.h
->>>> @@ -74,6 +74,7 @@
->>>>    #define COMPAT_PT_DATA_ADDR		0x10004
->>>>    #define COMPAT_PT_TEXT_END_ADDR		0x10008
->>>>    #ifndef __ASSEMBLY__
->>>> +#include <linux/bug.h>
->>>>
->>>>    /* sizeof(struct user) for AArch32 */
->>>>    #define COMPAT_USER_SZ	296
->>>> @@ -119,6 +120,8 @@ struct pt_regs {
->>>>    	u64 syscallno;
->>>>    };
->>>>
->>>> +#define MAX_REG_OFFSET offsetof(struct pt_regs, pstate)
->>>> +
->>>>    #define arch_has_single_step()	(1)
->>>>
->>>>    #ifdef CONFIG_COMPAT
->>>> @@ -147,6 +150,55 @@ struct pt_regs {
->>>>    #define user_stack_pointer(regs) \
->>>>    	(!compat_user_mode(regs) ? (regs)->sp : (regs)->compat_sp)
->>>>
->>>> +extern int regs_query_register_offset(const char *name);
->>>> +extern const char *regs_query_register_name(unsigned int offset);
->>>
->>> Is regs_query_register_offset() used anywhere? I grep'ed the kernel with
->>> these patches applied but couldnperf_regs.c't find any use.
+From: Hans de Goede <hdegoede@redhat.com>
+Date: Fri, 15 Jul 2016 08:40:00 +0200
+
+> Hi,
+> 
+> On 15-07-16 01:17, David Miller wrote:
+>> From: Hans de Goede <hdegoede@redhat.com>
+>> Date: Wed, 13 Jul 2016 12:20:04 +0200
 >>
->> It's referenced in kernel/trace/trace_probe.c.
->
-> I meant regs_query_register_name() (vim completion wrote the first one).
->
-
-I had assumed it was used by kgdb to provide human-readable register 
-names for debugger output, but apparently that is handled inside the 
-kgdb.c stub for each architecture. I can only assume this is currently 
-provided in all (or at least most) architectures because some code 
-outside the kernel tree needs (or used to need?) to be able to do the 
-reverse of regs_query_register_offset(). It's easy enough to remove 
-this, but that will make arm64 unlike the other architectures in its 
-CONFIG_HAVE_REGS_AND_STACK_ACCESS_API support.
-
->>>> +extern bool regs_within_kernel_stack(struct pt_regs *regs, unsigned long addr);
+>>> On some boards (android tablets) different batches use different sdio
+>>> wifi modules. This is not a problem since sdio is a discoverable bus,
+>>> so we only need to describe and activate the mmc controller in dt and
+>>> then the kernel will automatically load the right driver.
 >>>
->>> This one only seems to be used in arch/arm64/kernel/ptrace.c. Can we
->>> make it static and remove the declaration?
+>>> But sometimes it is useful to specify certain ethernet properties for
+>>> these "unknown" sdio devices, specifically we want the boot-loader
+>>> to be able to set "local-mac-address" as some of these sdio wifi
+>>> modules come without an eeprom / without a factory programmed mac
+>>> address.
+>>>
+>>> Since the exact device is unknown (differs per batch) we cannot use
+>>> a wifi-chip specific compatible. This commit adds a new
+>>> "generic,ethernet" binding for use in dt-nodes describing such an
+>>> unknown ethernet device.
+>>>
+>>> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
+>>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 >>
->> OK.
->
-> I can change it locally.
+>> Precedence exists for a "system ethernet address" as far back as the
+>> original sparc device tree implementation, so please just specify it
+>> that way rather than trying to force having to make an alias or
+>> reference to it from a specific device.
+> 
+> Some boards where this is applicable have both a wired and a wireless
+> ethernet, so one global setting will not work.
 
-It's looking like there will need to be another iteration of the patch 
-for a few small things anyway, although those changes could also be done 
-as subsequent improvements.
-
->
-> Are these going to be used in the future by uprobes?
->
-
-It would appear not.
-
-Thanks,
--dl
+Then call it "eth:local-mac-address" and "wifi:local-mac-address"
