@@ -1,41 +1,173 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Fri, 15 Jul 2016 12:15:15 -0700
-Subject: [PATCH 3/4] qcom: ipq4019: ASoC tlmm/pinctrl support
-In-Reply-To: <1468566426-19598-4-git-send-email-njaigane@codeaurora.org>
-References: <1468566426-19598-1-git-send-email-njaigane@codeaurora.org>
- <1468566426-19598-4-git-send-email-njaigane@codeaurora.org>
-Message-ID: <20160715191515.GC13516@tuxbot>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 15 Jul 2016 14:19:44 -0500
+Subject: [PATCH 1/4] soc: qcom: add an EBI2 device tree bindings
+In-Reply-To: <1467969122-6552-2-git-send-email-linus.walleij@linaro.org>
+References: <1467969122-6552-1-git-send-email-linus.walleij@linaro.org>
+ <1467969122-6552-2-git-send-email-linus.walleij@linaro.org>
+Message-ID: <20160715191944.GA5275@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri 15 Jul 00:07 PDT 2016, njaigane at codeaurora.org wrote:
-
-> From: Jaiganesh Narayanan <njaigane@codeaurora.org>
+On Fri, Jul 08, 2016 at 11:11:59AM +0200, Linus Walleij wrote:
+> This adds device tree bindings for the External Bus Interface 2, EBI2
+> to the Qualcomm SoC drivers.
 > 
-> This patch adds the tlmm/pinctrl support for IPQ4019 ASoC.
-> 
-> Signed-off-by: Jaiganesh Narayanan <njaigane@codeaurora.org>
+> Cc: devicetree at vger.kernel.org
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 > ---
->  drivers/pinctrl/qcom/pinctrl-ipq4019.c | 116 +++++++++++++++++++++++++--------
->  1 file changed, 88 insertions(+), 28 deletions(-)
+> Whoever has documentation on this block and willing to share: either share
+> the documentation or tell me what I'm doing wrong by rephrasing. Thanks.
+> ---
+>  .../devicetree/bindings/soc/qcom/qcom,ebi2.txt     | 134 +++++++++++++++++++++
+>  1 file changed, 134 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/soc/qcom/qcom,ebi2.txt
 > 
-> diff --git a/drivers/pinctrl/qcom/pinctrl-ipq4019.c b/drivers/pinctrl/qcom/pinctrl-ipq4019.c
-[..]
-> +	qca_mux_i2s_rx_mclk,
-> +	qca_mux_i2s_rx_bclk,
-> +	qca_mux_i2s_rx_fsync,
-> +	qca_mux_i2s_rxd,
-> +	qca_mux_i2s_tx_mclk,
-> +	qca_mux_i2s_tx_bclk,
-> +	qca_mux_i2s_tx_fsync,
-> +	qca_mux_i2s_txd1,
-> +	qca_mux_i2s_txd2,
-> +	qca_mux_i2s_txd3,
-> +	qca_mux_i2s_spdif_out,
-> +	qca_mux_i2s_spdif_in,
+> diff --git a/Documentation/devicetree/bindings/soc/qcom/qcom,ebi2.txt b/Documentation/devicetree/bindings/soc/qcom/qcom,ebi2.txt
+> new file mode 100644
+> index 000000000000..b848a60352ca
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/soc/qcom/qcom,ebi2.txt
+> @@ -0,0 +1,134 @@
+> +Qualcomm External Bus Interface 2 (EBI2)
+> +
+> +The EBI2 contains two peripheral blocks: XMEM and LCDC. The XMEM handles any
+> +external memory (such as NAND or other memory-mapped peripherals) whereas
+> +LCDC handles LCD displays.
+> +
+> +As it says it connects devices to an external bus interface, meaning address
+> +lines (up to 9 address lines so can only address 1KiB external memory space),
+> +data lines (16 bits), OE (output enable), ADV (address valid, used on some
+> +NOR flash memories), WE (write enable). This on top of 6 different chip selects
+> +(CS0 thru CS5) so that in theory 6 different devices can be connected.
+> +
+> +Apparently this bus is clocked at 64MHz. It has dedicated pins on the package
+> +and the bus can only come out on these pins, however if some of the pins are
+> +unused they can be left unconnected or remuxed to be used as GPIO or in some
+> +cases other orthogonal functions as well.
+> +
+> +Also CS1 and CS2 has -A and -B signals. Why they have that is unclear to me.
+> +
+> +The chip selects have the following memory range assignments. This region of
+> +memory is referred to as "Chip Peripheral SS FPB0" and is 168MB big.
+> +
+> +Chip Select                     Physical address base
+> +CS0 GPIO134                     0x1a800000-0x1b000000 (8MB)
+> +CS1 GPIO39 (A) / GPIO123 (B)    0x1b000000-0x1b800000 (8MB)
+> +CS2 GPIO40 (A) / GPIO124 (B)    0x1b800000-0x1c000000 (8MB)
+> +CS3 GPIO133                     0x1d000000-0x25000000 (128 MB)
+> +CS4 GPIO132                     0x1c800000-0x1d000000 (8MB)
+> +CS5 GPIO131                     0x1c000000-0x1c800000 (8MB)
+> +
+> +The APQ8060 Qualcomm Application Processor User Guide, 80-N7150-14 Rev. A,
+> +August 6, 2012 contains some incomplete documentation of the EBI2.
+> +
+> +FIXME: the manual mentions "write precharge cycles" and "precharge cycles".
+> +We have not been able to figure out which bit fields these correspond to
+> +in the hardware, or what valid values exist. The current hypothesis is that
+> +this is something just used on the FAST chip selects and that the SLOW
+> +chip selects are understood fully. There is also a "byte device enable"
+> +flag somewhere for 8bit memories.
+> +
+> +FIXME: The chipselects have SLOW and FAST configuration registers. It's a bit
+> +unclear what this means, if they are mutually exclusive or can be used
+> +together, or if some chip selects are hardwired to be FAST and others are SLOW
+> +by design.
+> +
+> +The XMEM registers are totally undocumented but could be partially decoded
+> +because the Cypress AN49576 Antioch Westbridge apparently has suspiciously
+> +similar register layout, see: http://www.cypress.com/file/105771/download
+> +
+> +Required properties:
+> +- compatible: should be "qcom,ebi2"
 
-I would recommend reducing this to "i2s_rx", "i2s_tx", "spdif_rx"
-and "spdif_tx", as this will make the dts cleaner.
+Chip specific compatible string please.
 
-Regards,
-Bjorn
+> +- #address-cells: shoule be <1>
+> +- #size-cells: should be <1>
+> +- ranges: boolean should be present
+> +- reg: two ranges of registers: EBI2 config and XMEM config areas
+> +- reg-names: should be "ebi2", "xmem"
+> +- clocks: two clocks, EBI_2X and EBI
+> +- clock-names: shoule be "ebi2x", "ebi2"
+> +
+> +Optional subnodes:
+> +- Nodes inside the EBI2 will be considered chipselect nodes. For each
+> +  chipselect under the EBI2 node you should have the following required
+> +  properties:
+> +
+> +Required subnode properties:
+> +- chipselect: <N> where N is the chipselect configured in this node
+
+Follow the other external buses that put the CS# in the reg property.
+
+> +- address-cells: should be <1>
+> +- size-cells: should be <1>
+> +- ranges: bool should be present
+> +
+> +Optional subnode properties for SLOW chip selects:
+> +- xmem-recovery-cycles: recovery cycles is the time the memory continues to
+> +  drive the data bus after OE is de-asserted, in order to avoid contention on
+> +  the data bus. They are inserted when reading one CS and switching to another
+> +  CS or read followed by write on the same CS. Valid values 0 thru 15. Minimum
+> +  value is actually 1, so a value of 0 will still yield 1 recovery cycle.
+> +- xmem-write-hold-cycles: write hold cycles, these are extra cycles inserted
+> +  after every write minimum 1. The data out is driven from the time WE is
+> +  asserted until CS is asserted. With a hold of 1 (value = 0), the CS stays
+> +  active for 1 extra cycle etc. Valid values 0 thru 15.
+> +- xmem-write-delta-cycles: initial latency for write cycles inserted for the
+> +  first write to a page or burst memory. Valid values 0 thru 255.
+> +- xmem-read-delta-cycles: initial latency for read cycles inserted for the
+> +  first read to a page or burst memory. Valid values 0 thru 255.
+> +- xmem-write-wait-cycles: number of wait cycles for every write access, 0=1
+> +  cycle. Valid values 0 thru 15.
+> +- xmem-read-wait-cycles: number of wait cycles for every read access, 0=1
+> +  cycle. Valid values 0 thru 15.
+
+Vendor prefix on all these.
+
+> +
+> +Optional subnode properties for FAST chip selects:
+> +- xmem-address-hold-enable: this is a boolean property stating that we shall
+> +  holde the address for an extra cycle to meet hold time requirements with ADV
+> +  assertion.
+> +- xmem-adv-to-oe-recovery-cycles: the number of cycles elapsed before an OE
+> +  assertion, with respect to the cycle where ADV (address valid) is asserted.
+> +  2 means 2 cycles between ADV and OE. Valid values 0, 1, 2 or 3.
+> +- xmem-read-hold-cycles: the length in cycles of the first segment of a read
+> +  transfer. For a single read trandfer this will be the time from CS assertion
+> +  to OE assertion. Valid values 0 thru 15.
+
+ditto
+
+> +
+> +Example:
+> +
+> +ebi2 at 1a100000 {
+> +	compatible = "qcom,ebi2";
+> +	#address-cells = <1>;
+> +	#size-cells = <1>;
+> +	ranges;
+> +	reg = <0x1a100000 0x1000>, <0x1a110000 0x1000>;
+> +	reg-names = "ebi2", "xmem";
+> +	clocks = <&gcc EBI2_2X_CLK>, <&gcc EBI2_CLK>;
+> +	clock-names = "ebi2x", "ebi2";
+> +	/* Make sure to set up the pin control for the EBI2 */
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&foo_ebi2_pins>;
+> +
+> +	cs2 at 1b800000 {
+> +		chipselect = <2>;
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		ranges;
+> +		xmem-recovery-cycles = <0>;
+> +		xmem-write-hold-cycles = <3>;
+> +		xmem-write-delta-cycles = <31>;
+> +		xmem-read-delta-cycles = <28>;
+> +		xmem-write-wait-cycles = <9>;
+> +		xmem-read-wait-cycles = <9>;
+> +
+> +		foo-ebi2 at 1b800000 {
+
+Generally, external buses are done in 2 levels. Please follow other 
+examples, or is there some reason not to?
