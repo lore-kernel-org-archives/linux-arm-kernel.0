@@ -1,73 +1,40 @@
-From: briannorris@chromium.org (Brian Norris)
-Date: Thu, 14 Jul 2016 18:30:59 -0700
-Subject: [PATCH] spi: rockchip: limit transfers to (64K - 1) bytes
-Message-ID: <1468546259-136659-1-git-send-email-briannorris@chromium.org>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Fri, 15 Jul 2016 10:33:46 +0900
+Subject: [PATCH] ARM: exynos_defconfig: Enable bus frequency scaling with
+ DEVFREQ/DEVFREQ-Event
+Message-ID: <1468546426-4482-1-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Rockchip SPI controller's length register only supports 16-bits,
-yielding a maximum length of 64KiB (the CTRLR1 register holds "length -
-1"). Trying to transfer more than that (e.g., with a large SPI flash
-read) will cause the driver to hang.
+This patch enables the bus frequency scaling driver with DEVFREQ and
+DEVFREQ-Event framework. This patches already was merged for Odroid-U3/XU3
+,Trats2 and Rinato/Monk boards.
 
-Now, it seems that while theoretically we should be able to program
-CTRLR1 with 0xffff, and get a 64KiB transfer, but that also seems to
-cause the core to choke, so stick with a maximum of 64K - 1 bytes --
-i.e., 0xffff.
-
-Signed-off-by: Brian Norris <briannorris@chromium.org>
+Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
 ---
- drivers/spi/spi-rockchip.c | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+ arch/arm/configs/exynos_defconfig | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/drivers/spi/spi-rockchip.c b/drivers/spi/spi-rockchip.c
-index d840324bcc9f..0f89c2169c24 100644
---- a/drivers/spi/spi-rockchip.c
-+++ b/drivers/spi/spi-rockchip.c
-@@ -142,6 +142,12 @@
- /* sclk_out: spi master internal logic in rk3x can support 50Mhz */
- #define MAX_SCLK_OUT		50000000
- 
-+/*
-+ * SPI_CTRLR1 is 16-bits, so we should support lengths of 0xffff + 1. However,
-+ * the controller seems to hang when given 0x10000, so stick with this for now.
-+ */
-+#define ROCKCHIP_SPI_MAX_TRANLEN		0xffff
-+
- enum rockchip_ssi_type {
- 	SSI_MOTO_SPI = 0,
- 	SSI_TI_SSP,
-@@ -573,6 +579,11 @@ static void rockchip_spi_config(struct rockchip_spi *rs)
- 	dev_dbg(rs->dev, "cr0 0x%x, div %d\n", cr0, div);
- }
- 
-+static size_t rockchip_spi_max_transfer_size(struct spi_device *spi)
-+{
-+	return ROCKCHIP_SPI_MAX_TRANLEN;
-+}
-+
- static int rockchip_spi_transfer_one(
- 		struct spi_master *master,
- 		struct spi_device *spi,
-@@ -589,6 +600,11 @@ static int rockchip_spi_transfer_one(
- 		return -EINVAL;
- 	}
- 
-+	if (xfer->len > ROCKCHIP_SPI_MAX_TRANLEN) {
-+		dev_err(rs->dev, "Transfer is too long (%d)\n", xfer->len);
-+		return -EINVAL;
-+	}
-+
- 	rs->speed = xfer->speed_hz;
- 	rs->bpw = xfer->bits_per_word;
- 	rs->n_bytes = rs->bpw >> 3;
-@@ -730,6 +746,7 @@ static int rockchip_spi_probe(struct platform_device *pdev)
- 	master->prepare_message = rockchip_spi_prepare_message;
- 	master->unprepare_message = rockchip_spi_unprepare_message;
- 	master->transfer_one = rockchip_spi_transfer_one;
-+	master->max_transfer_size = rockchip_spi_max_transfer_size;
- 	master->handle_err = rockchip_spi_handle_err;
- 
- 	rs->dma_tx.ch = dma_request_chan(rs->dev, "tx");
+diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
+index a5aa44c56bfe..37052b115a40 100644
+--- a/arch/arm/configs/exynos_defconfig
++++ b/arch/arm/configs/exynos_defconfig
+@@ -219,6 +219,16 @@ CONFIG_CROS_EC_CHARDEV=y
+ CONFIG_COMMON_CLK_MAX77686=y
+ CONFIG_COMMON_CLK_MAX77802=y
+ CONFIG_COMMON_CLK_S2MPS11=y
++CONFIG_PM_DEVFREQ=y
++CONFIG_DEVFREQ_GOV_SIMPLE_ONDEMAND=y
++CONFIG_DEVFREQ_GOV_PERFORMANCE=y
++CONFIG_DEVFREQ_GOV_POWERSAVE=y
++CONFIG_DEVFREQ_GOV_USERSPACE=y
++CONFIG_DEVFREQ_GOV_PASSIVE=y
++CONFIG_ARM_EXYNOS_BUS_DEVFREQ=y
++CONFIG_PM_DEVFREQ_EVENT=y
++CONFIG_DEVFREQ_EVENT_EXYNOS_NOCP=y
++CONFIG_DEVFREQ_EVENT_EXYNOS_PPMU=y
+ CONFIG_EXTCON=y
+ CONFIG_EXTCON_MAX14577=y
+ CONFIG_EXTCON_MAX77693=y
 -- 
-2.8.0.rc3.226.g39d4020
+1.9.1
