@@ -1,88 +1,50 @@
 From: linux@roeck-us.net (Guenter Roeck)
-Date: Fri, 15 Jul 2016 06:46:29 -0700
-Subject: [PATCH 3/3] watchdog: bcm2835_wdt: set WDOG_HW_RUNNING bit when
- appropriate
-In-Reply-To: <1468570524-18222-3-git-send-email-rasmus.villemoes@prevas.dk>
+Date: Fri, 15 Jul 2016 06:47:29 -0700
+Subject: [PATCH 2/3] watchdog: bcm2835_wdt: remove redundant ->set_timeout
+ callback
+In-Reply-To: <1468570524-18222-2-git-send-email-rasmus.villemoes@prevas.dk>
 References: <1468570524-18222-1-git-send-email-rasmus.villemoes@prevas.dk>
- <1468570524-18222-3-git-send-email-rasmus.villemoes@prevas.dk>
-Message-ID: <5788E935.6080608@roeck-us.net>
+ <1468570524-18222-2-git-send-email-rasmus.villemoes@prevas.dk>
+Message-ID: <5788E971.2020005@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 07/15/2016 01:15 AM, Rasmus Villemoes wrote:
-> A bootloader may start the watchdog device before handing control to
-> the kernel - in that case, we should tell the kernel about it so the
-> watchdog framework can keep it alive until userspace opens
-> /dev/watchdog0.
+> bcm2835_wdt_set_timeout does exactly what the watchdog framework does
+> in the absence of a ->set_timeout callback (see watchdog_set_timeout
+> in watchdog_dev.c), so remove it.
 >
-
-Separate note: The maximum timeout for this watchdog is 15 seconds.
-Given that, it might be useful to set max_hw_heartbeat_ms instead of
-max_timeout. Separate patch, though.
-
 > Signed-off-by: Rasmus Villemoes <rasmus.villemoes@prevas.dk>
+
+Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+
 > ---
->   drivers/watchdog/bcm2835_wdt.c | 22 ++++++++++++++++++++++
->   1 file changed, 22 insertions(+)
+>   drivers/watchdog/bcm2835_wdt.c | 7 -------
+>   1 file changed, 7 deletions(-)
 >
 > diff --git a/drivers/watchdog/bcm2835_wdt.c b/drivers/watchdog/bcm2835_wdt.c
-> index 4dddd82..9a08334 100644
+> index 733e402..4dddd82 100644
 > --- a/drivers/watchdog/bcm2835_wdt.c
 > +++ b/drivers/watchdog/bcm2835_wdt.c
-> @@ -55,6 +55,15 @@ struct bcm2835_wdt {
->   static unsigned int heartbeat;
->   static bool nowayout = WATCHDOG_NOWAYOUT;
+> @@ -82,12 +82,6 @@ static int bcm2835_wdt_stop(struct watchdog_device *wdog)
+>   	return 0;
+>   }
 >
-> +static bool bcm2835_wdt_is_running(struct bcm2835_wdt *wdt)
-> +{
-> +	uint32_t cur;
-> +
-> +	cur = readl(wdt->base + PM_RSTC);
-> +
-> +	return !!(cur & PM_RSTC_WRCFG_FULL_RESET);
-> +}
-> +
->   static int bcm2835_wdt_start(struct watchdog_device *wdog)
+> -static int bcm2835_wdt_set_timeout(struct watchdog_device *wdog, unsigned int t)
+> -{
+> -	wdog->timeout = t;
+> -	return 0;
+> -}
+> -
+>   static unsigned int bcm2835_wdt_get_timeleft(struct watchdog_device *wdog)
 >   {
 >   	struct bcm2835_wdt *wdt = watchdog_get_drvdata(wdog);
-> @@ -70,6 +79,7 @@ static int bcm2835_wdt_start(struct watchdog_device *wdog)
->   		  PM_RSTC_WRCFG_FULL_RESET, wdt->base + PM_RSTC);
+> @@ -100,7 +94,6 @@ static const struct watchdog_ops bcm2835_wdt_ops = {
+>   	.owner =	THIS_MODULE,
+>   	.start =	bcm2835_wdt_start,
+>   	.stop =		bcm2835_wdt_stop,
+> -	.set_timeout =	bcm2835_wdt_set_timeout,
+>   	.get_timeleft =	bcm2835_wdt_get_timeleft,
+>   };
 >
->   	spin_unlock_irqrestore(&wdt->lock, flags);
-> +	set_bit(WDOG_HW_RUNNING, &wdog->status);
->
-You don't need to set this bit here unless the watchdog can not be stopped.
-
->   	return 0;
->   }
-> @@ -79,6 +89,7 @@ static int bcm2835_wdt_stop(struct watchdog_device *wdog)
->   	struct bcm2835_wdt *wdt = watchdog_get_drvdata(wdog);
->
->   	writel_relaxed(PM_PASSWORD | PM_RSTC_RESET, wdt->base + PM_RSTC);
-> +	clear_bit(WDOG_HW_RUNNING, &wdog->status);
-
-... and since you clear the bit, it can be stopped. Both setting and resetting the bit
-is therefore not necessary.
-
->   	return 0;
->   }
->
-> @@ -181,6 +192,17 @@ static int bcm2835_wdt_probe(struct platform_device *pdev)
->   	watchdog_init_timeout(&bcm2835_wdt_wdd, heartbeat, dev);
->   	watchdog_set_nowayout(&bcm2835_wdt_wdd, nowayout);
->   	bcm2835_wdt_wdd.parent = &pdev->dev;
-> +	if (bcm2835_wdt_is_running(wdt)) {
-> +		/*
-> +		 * The currently active timeout value (set by the
-> +		 * bootloader) may be different from the module
-> +		 * heartbeat parameter or the value in device
-> +		 * tree. But we just need to set WDOG_HW_RUNNING,
-> +		 * because then the framework will "immediately" ping
-> +		 * the device, updating the timeout.
-> +		 */
-> +		set_bit(WDOG_HW_RUNNING, &bcm2835_wdt_wdd.status);
-> +	}
->   	err = watchdog_register_device(&bcm2835_wdt_wdd);
->   	if (err) {
->   		dev_err(dev, "Failed to register watchdog device");
 >
