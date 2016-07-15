@@ -1,55 +1,49 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 15 Jul 2016 09:31:02 +0200
-Subject: [RFC 0/3] extend kexec_file_load system call
-In-Reply-To: <3520758.yAgMzqF1PF@hactar>
-References: <20160712014201.11456-1-takahiro.akashi@linaro.org>
- <4321972.HZgDox36RC@wuerfel> <3520758.yAgMzqF1PF@hactar>
-Message-ID: <5547846.5l81k4b13o@wuerfel>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Fri, 15 Jul 2016 09:32:14 +0200
+Subject: outdated documentation for lp5523 LED driver?
+Message-ID: <20160715073214.GC13429@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, July 14, 2016 10:44:14 PM CEST Thiago Jung Bauermann wrote:
-> Am Donnerstag, 14 Juli 2016, 10:29:11 schrieb Arnd Bergmann:
+Hi!
 
-> > 
-> > Right, but the question remains whether this helps while you allow the
-> > boot loader to modify the dtb. If an attacker gets in and cannot modify
-> > the kernel or initid but can modify the DT, a successful attack would
-> > be a bit harder than having a modified kernel, but you may still need
-> > to treat the system as compromised.
-> 
-> Yes, and the same question also remains regarding the kernel command line.
-> 
-> We can have the kernel perform sanity checks on the device tree, just as the 
-> kernel needs to sanity check the command line.
-> 
-> There's the point that was raised about not wanting to increase the attack 
-> surface, and that's a valid point. But at least in the way Petitboot works 
-> today, it needs to modify the device tree and pass it to the kernel.
-> 
-> One thing that is unavoidable to come from userspace is 
-> /chosen/linux,stdout-path, because it's Petitboot that knows from which 
-> console the user is interacting with. The other modification to set 
-> properties in vga at 0 can be done in the kernel.
-> 
-> Given that on DTB-based systems /chosen is an important and established way 
-> to pass information to the operating system being booted, I'd like to 
-> suggest the following, then:
-> 
-> Extend the syscall as shown in this RFC from Takahiro AKASHI, but instead of 
-> accepting a complete DTB from userspace, the syscall would accept a DTB 
-> containing only a /chosen node. If the DTB contains any other node, the 
-> syscall fails with EINVAL. The kernel can then add the properties in /chosen 
-> to the device tree that it will pass to the next kernel.
-> 
-> What do you think?
+Documentation says that load/leds are only visible in the load mode,
+but that does not seem to be true (kernel 4.4.0 on N900).
 
-I think that helps, as it makes the problem space correspond to that
-of modifying the command line, but I can still come up with countless
-attacks based on modifications of the /chosen node and/or the command
-line, in fact it's probably easier than any other node.
+# 1) Legacy interface - enginex_mode, enginex_load and enginex_leds
+#  Control interface for the engines:
+#    x is 1 .. 3
+#      enginex_mode : disabled, load, run
+#      enginex_load : microcode load (visible only in load mode)
+#      enginex_leds : led mux control (visible only in load mode)
 
-What methods to we have in place for command line changes today on
-other architectures?
+pavel at n900:/sys/class/leds/lp5523:r/device$ ls -al engine*
+-rw-r--r-- 1 root root 4096 Jul  6 22:47 engine1_leds
+--w------- 1 root root 4096 Jul  6 22:47 engine1_load
+-rw-r--r-- 1 root root 4096 Jul  6 23:41 engine1_mode
+-rw-r--r-- 1 root root 4096 Jul  6 22:47 engine2_leds
+--w------- 1 root root 4096 Jul  6 22:47 engine2_load
+-rw-r--r-- 1 root root 4096 Jul  6 23:41 engine2_mode
+-rw-r--r-- 1 root root 4096 Jul  6 22:47 engine3_leds
+--w------- 1 root root 4096 Jul  6 22:47 engine3_load
+-rw-r--r-- 1 root root 4096 Jul  6 22:47 engine3_mode
+pavel at n900:/sys/class/leds/lp5523:r/device$ grep . engine*mode
+engine1_mode:run
+engine2_mode:load
+engine3_mode:run
+pavel at n900:/sys/class/leds/lp5523:r/device$
 
-	Arnd
+I got both the legacy and the firmware interface to work... but the
+firmware interface only seems to work once for me.
+
+How new and old interface are expected to interact with each other is
+not clear to me.
+
+What should be done there?
+
+Best regards,
+									Pavel
+
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
