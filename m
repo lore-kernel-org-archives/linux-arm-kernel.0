@@ -1,154 +1,56 @@
-From: quentin.schulz@free-electrons.com (Quentin Schulz)
-Date: Fri, 15 Jul 2016 16:36:54 +0200
-Subject: [PATCH v2 4/4] hwmon: iio: add label for channels read by
- iio_hwmon
-In-Reply-To: <5788ED2D.9050405@roeck-us.net>
-References: <1468576754-3273-1-git-send-email-quentin.schulz@free-electrons.com>
- <1468576754-3273-5-git-send-email-quentin.schulz@free-electrons.com>
- <5788ED2D.9050405@roeck-us.net>
-Message-ID: <5788F506.3040809@free-electrons.com>
+From: dave.long@linaro.org (David Long)
+Date: Fri, 15 Jul 2016 10:51:23 -0400
+Subject: [PATCH v15 01/10] arm64: Add HAVE_REGS_AND_STACK_ACCESS_API
+ feature
+In-Reply-To: <20160715105701.GB14792@e104818-lin.cambridge.arm.com>
+References: <1467995754-32508-1-git-send-email-dave.long@linaro.org>
+ <1467995754-32508-2-git-send-email-dave.long@linaro.org>
+ <20160715105701.GB14792@e104818-lin.cambridge.arm.com>
+Message-ID: <5788F86B.60305@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/07/2016 16:03, Guenter Roeck wrote:
-> On 07/15/2016 02:59 AM, Quentin Schulz wrote:
-[...]
->> +static ssize_t iio_hwmon_read_label(struct device *dev,
->> +                    struct device_attribute *attr,
->> +                    char *buf)
->> +{
->> +    struct sensor_device_attribute *sattr = to_sensor_dev_attr(attr);
->> +    struct iio_hwmon_state *state = dev_get_drvdata(dev);
->> +    const char *label =
->> state->channels[sattr->index].channel->extend_name;
->> +
->> +    if (label)
->> +        return sprintf(buf, "%s\n", label);
->> +
-> Can the name disappear on the fly, or be changed on the fly ?
-> Then this is unusable. We should and can only provide labels
-> if a name exists and is permanent. Otherwise all we do is
-> to confuse user space.
-
-It cannot, the extend_name field is const char* in the struct:
-http://lxr.free-electrons.com/source/include/linux/iio/iio.h#L247
-
-[...]
->> @@ -107,6 +123,18 @@ static int iio_hwmon_probe(struct platform_device
->> *pdev)
->>           }
+On 07/15/2016 06:57 AM, Catalin Marinas wrote:
+> On Fri, Jul 08, 2016 at 12:35:45PM -0400, David Long wrote:
+>> --- a/arch/arm64/include/asm/ptrace.h
+>> +++ b/arch/arm64/include/asm/ptrace.h
+>> @@ -74,6 +74,7 @@
+>>   #define COMPAT_PT_DATA_ADDR		0x10004
+>>   #define COMPAT_PT_TEXT_END_ADDR		0x10008
+>>   #ifndef __ASSEMBLY__
+>> +#include <linux/bug.h>
 >>
->>           sysfs_attr_init(&a->dev_attr.attr);
->> +
->> +        b = NULL;
->> +        if (st->channels[i].channel->extend_name) {
->> +            b = devm_kzalloc(dev, sizeof(*b), GFP_KERNEL);
->> +            if (b == NULL) {
->> +                ret = -ENOMEM;
->> +                goto error_release_channels;
->> +            }
->> +
->> +            sysfs_attr_init(&b->dev_attr.attr);
-> 
-> Why is this initialization here and not with the rest of the initialization
-> of this attribute ?
-
-I don't get your question. I've followed the exact same pattern as for
-"a" variable's initialization.
-The initialization is before the switch case because the name of the
-exposed sysfs file depends on the type of the IIO channel. If I move the
-initialization in the switch case, I'll have duplicated code.
-
->> +        }
->> +
->>           ret = iio_get_channel_type(&st->channels[i], &type);
->>           if (ret < 0)
->>               goto error_release_channels;
->> @@ -115,35 +143,66 @@ static int iio_hwmon_probe(struct
->> platform_device *pdev)
->>           case IIO_VOLTAGE:
->>               a->dev_attr.attr.name = kasprintf(GFP_KERNEL,
->>                                 "in%d_input",
->> -                              in_i++);
->> +                              in_i);
->> +            if (b)
->> +                b->dev_attr.attr.name = kasprintf(GFP_KERNEL,
->> +                                  "in%d_label",
->> +                                  in_i);
->> +            in_i++;
->>               break;
->>           case IIO_TEMP:
->>               a->dev_attr.attr.name = kasprintf(GFP_KERNEL,
->>                                 "temp%d_input",
->> -                              temp_i++);
->> +                              temp_i);
->> +
->> +            if (b)
->> +                b->dev_attr.attr.name = kasprintf(GFP_KERNEL,
->> +                                  "temp%d_label",
->> +                                  temp_i);
->> +            temp_i++;
->>               break;
->>           case IIO_CURRENT:
->>               a->dev_attr.attr.name = kasprintf(GFP_KERNEL,
->>                                 "curr%d_input",
->> -                              curr_i++);
->> +                              curr_i);
->> +
->> +            if (b)
->> +                b->dev_attr.attr.name = kasprintf(GFP_KERNEL,
->> +                                  "curr%d_label",
->> +                                  curr_i);
->> +            curr_i++;
->>               break;
->>           case IIO_HUMIDITYRELATIVE:
->>               a->dev_attr.attr.name = kasprintf(GFP_KERNEL,
->>                                 "humidity%d_input",
->> -                              humidity_i++);
->> +                              humidity_i);
->> +
->> +            if (b)
->> +                b->dev_attr.attr.name = kasprintf(GFP_KERNEL,
->> +                                  "humidity%d_label",
->> +                                  humidity_i);
->> +            humidity_i++;
->>               break;
->>           default:
->>               ret = -EINVAL;
->>               goto error_release_channels;
->>           }
->> -        if (a->dev_attr.attr.name == NULL) {
->> +        if (a->dev_attr.attr.name == NULL ||
->> +            (b && b->dev_attr.attr.name == NULL)) {
->>               ret = -ENOMEM;
->>               goto error_release_channels;
->>           }
-> 
-> Just realized that we have a memory leak here. The 'name' memory is
-> never released.
-> 
-
-I don't know if we have to do something to revert the effects of
-sysfs_attr_init but you sure are right that the a and b's attribute's
-name is never freed. This case would be handled with devm_kasprintf, I
-guess? Thanks.
-
->>           a->dev_attr.show = iio_hwmon_read_val;
->>           a->dev_attr.attr.mode = S_IRUGO;
->>           a->index = i;
->> -        st->attrs[i] = &a->dev_attr.attr;
->> +        st->attrs[j++] = &a->dev_attr.attr;
->> +
->> +        if (b) {
->> +            b->dev_attr.show = iio_hwmon_read_label;
->> +            b->dev_attr.attr.mode = S_IRUGO;
->> +            b->index = i;
->> +            st->attrs[j++] = &b->dev_attr.attr;
->> +        }
->>       }
+>>   /* sizeof(struct user) for AArch32 */
+>>   #define COMPAT_USER_SZ	296
+>> @@ -119,6 +120,8 @@ struct pt_regs {
+>>   	u64 syscallno;
+>>   };
 >>
->>       st->attr_group.attrs = st->attrs;
+>> +#define MAX_REG_OFFSET offsetof(struct pt_regs, pstate)
+>> +
+>>   #define arch_has_single_step()	(1)
 >>
-> 
+>>   #ifdef CONFIG_COMPAT
+>> @@ -147,6 +150,55 @@ struct pt_regs {
+>>   #define user_stack_pointer(regs) \
+>>   	(!compat_user_mode(regs) ? (regs)->sp : (regs)->compat_sp)
+>>
+>> +extern int regs_query_register_offset(const char *name);
+>> +extern const char *regs_query_register_name(unsigned int offset);
+>
+> Is regs_query_register_offset() used anywhere? I grep'ed the kernel with
+> these patches applied but couldn't find any use.
+>
 
-Quentin
+It's referenced in kernel/trace/trace_probe.c.
+
+>> +extern bool regs_within_kernel_stack(struct pt_regs *regs, unsigned long addr);
+>
+> This one only seems to be used in arch/arm64/kernel/ptrace.c. Can we
+> make it static and remove the declaration?
+>
+
+OK.
+
+Thanks,
+-dl
