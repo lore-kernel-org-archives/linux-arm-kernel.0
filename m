@@ -1,51 +1,34 @@
-From: j.anaszewski@samsung.com (Jacek Anaszewski)
-Date: Fri, 15 Jul 2016 11:18:22 +0200
-Subject: [PATCH] media: Doc add missing documentation for
- samsung,exynos4212-jpeg
-In-Reply-To: <57889FD5.9070302@samsung.com>
-References: <1468526499-8840-1-git-send-email-shuahkh@osg.samsung.com>
- <578890BA.8040101@samsung.com> <57889B73.4090607@samsung.com>
- <57889C23.3050106@samsung.com> <57889EAB.30502@samsung.com>
- <57889FD5.9070302@samsung.com>
-Message-ID: <5788AA5E.3070301@samsung.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Fri, 15 Jul 2016 11:25:18 +0200
+Subject: [PATCH 5/7] ARM: dts: at91: at91sam9g25ek: fix isi endpoint node
+In-Reply-To: <1468574720-24296-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1468574720-24296-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1468574720-24296-5-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/15/2016 10:33 AM, Krzysztof Kozlowski wrote:
-> On 07/15/2016 10:28 AM, Jacek Anaszewski wrote:
->> On 07/15/2016 10:17 AM, Krzysztof Kozlowski wrote:
->>> On 07/15/2016 10:14 AM, Jacek Anaszewski wrote:
->>>>> However if these compatibles are exactly equal then
->>>>> only one should be preferred. It makes everything easier. Second can be
->>>>> still documented e.g. as deprecated.
->>>>
->>>> Still, both of them are present in the driver. Shouldn't it be reflected
->>>> in the documentation?
->>>
->>> Right, it is a good practice, so how about:
->>>
->>>     - compatible    : should be one of:
->>>             "samsung,s5pv210-jpeg", "samsung,exynos3250-jpeg",
->>>             "samsung,exynos4210-jpeg", "samsung,exynos5420-jpeg",
->>>             "samsung,exynos5433-jpeg";
->>>
->>>             Deprecated: "samsung,exynos4212-jpeg"
->>>
->>> (or any other formatting)
->>> plus update to DTS changing it to 4210?
->>
->> Why newer 4212 version should be made deprecated?
->
-> I don't mind the other way. However it seems logical to me that newer
-> chip is compatible with existing one so the existing one (older) is
-> used. When adding support for new devices, for most of re-usable drivers
-> we use old compatibles. But as I said, it doesn't really matter to me.
+Add a reg property in the endpoint node as documented in
+Documentation/devicetree/bindings/media/video-interfaces.txt
 
-Frankly speaking marking a compatible deprecated looks weird to me.
-It can be interpreted in the way that the device itself is deprecated
-or it is not fully reliable. I'd just accept the patch in the original
-form.
+Solves:
+Warning (unit_address_vs_reg): Node /ahb/apb/isi at f8048000/port/endpoint at 0 has a unit name, but no reg property
 
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+ arch/arm/boot/dts/at91sam9g25ek.dts | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/boot/dts/at91sam9g25ek.dts b/arch/arm/boot/dts/at91sam9g25ek.dts
+index 30bfd2e12cae..91a71774472e 100644
+--- a/arch/arm/boot/dts/at91sam9g25ek.dts
++++ b/arch/arm/boot/dts/at91sam9g25ek.dts
+@@ -56,6 +56,7 @@
+ 				status = "okay";
+ 				port {
+ 					isi_0: endpoint at 0 {
++						reg = <0>;
+ 						remote-endpoint = <&ov2640_0>;
+ 						bus-width = <8>;
+ 						vsync-active = <1>;
 -- 
-Best regards,
-Jacek Anaszewski
+2.8.1
