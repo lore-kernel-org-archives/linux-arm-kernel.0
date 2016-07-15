@@ -1,974 +1,2041 @@
 From: njaigane@codeaurora.org (njaigane at codeaurora.org)
-Date: Fri, 15 Jul 2016 12:37:03 +0530
-Subject: [PATCH 1/4] qcom: ipq4019: Add ipq4019 ASoC device tree changes
+Date: Fri, 15 Jul 2016 12:37:04 +0530
+Subject: [PATCH 2/4] qcom: ipq4019: ASoC clock driver support
 In-Reply-To: <1468566426-19598-1-git-send-email-njaigane@codeaurora.org>
 References: <1468566426-19598-1-git-send-email-njaigane@codeaurora.org>
-Message-ID: <1468566426-19598-2-git-send-email-njaigane@codeaurora.org>
+Message-ID: <1468566426-19598-3-git-send-email-njaigane@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jaiganesh Narayanan <njaigane@codeaurora.org>
 
-This patch adds the ipq4019 ASoC device tree changes and the
-binding documentation for pcm, spdif, tdm, stereo, codec, mbox,
-adss modules
+This patch adds the support for IPQ4019 ASoC clock driver
 
 Signed-off-by: Jaiganesh Narayanan <njaigane@codeaurora.org>
 ---
- .../bindings/sound/qca,ipq4019-audio-adss.txt      |  20 ++
- .../bindings/sound/qca,ipq4019-audio.txt           |  13 ++
- .../bindings/sound/qca,ipq4019-codec.txt           |  15 ++
- .../devicetree/bindings/sound/qca,ipq4019-i2s.txt  |  33 +++
- .../devicetree/bindings/sound/qca,ipq4019-i2s1.txt |  29 +++
- .../devicetree/bindings/sound/qca,ipq4019-i2s2.txt |  29 +++
- .../devicetree/bindings/sound/qca,ipq4019-mbox.txt |  23 ++
- .../bindings/sound/qca,ipq4019-pcm-i2s.txt         |  15 ++
- .../bindings/sound/qca,ipq4019-pcm-i2s1.txt        |  15 ++
- .../bindings/sound/qca,ipq4019-pcm-i2s2.txt        |  15 ++
- .../bindings/sound/qca,ipq4019-pcm-spdif.txt       |  15 ++
- .../bindings/sound/qca,ipq4019-pcm-tdm.txt         |  15 ++
- .../bindings/sound/qca,ipq4019-spdif.txt           |  35 +++
- .../bindings/sound/qca,ipq4019-stereo.txt          |  17 ++
- .../devicetree/bindings/sound/qca,ipq4019-tdm.txt  |  33 +++
- arch/arm/boot/dts/qcom-ipq4019-ap.dk01.1.dtsi      | 195 ++++++++++++++--
- arch/arm/boot/dts/qcom-ipq4019.dtsi                | 247 ++++++++++++++++++++-
- 17 files changed, 742 insertions(+), 22 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/sound/qca,ipq4019-audio-adss.txt
- create mode 100644 Documentation/devicetree/bindings/sound/qca,ipq4019-audio.txt
- create mode 100644 Documentation/devicetree/bindings/sound/qca,ipq4019-codec.txt
- create mode 100644 Documentation/devicetree/bindings/sound/qca,ipq4019-i2s.txt
- create mode 100644 Documentation/devicetree/bindings/sound/qca,ipq4019-i2s1.txt
- create mode 100644 Documentation/devicetree/bindings/sound/qca,ipq4019-i2s2.txt
- create mode 100644 Documentation/devicetree/bindings/sound/qca,ipq4019-mbox.txt
- create mode 100644 Documentation/devicetree/bindings/sound/qca,ipq4019-pcm-i2s.txt
- create mode 100644 Documentation/devicetree/bindings/sound/qca,ipq4019-pcm-i2s1.txt
- create mode 100644 Documentation/devicetree/bindings/sound/qca,ipq4019-pcm-i2s2.txt
- create mode 100644 Documentation/devicetree/bindings/sound/qca,ipq4019-pcm-spdif.txt
- create mode 100644 Documentation/devicetree/bindings/sound/qca,ipq4019-pcm-tdm.txt
- create mode 100644 Documentation/devicetree/bindings/sound/qca,ipq4019-spdif.txt
- create mode 100644 Documentation/devicetree/bindings/sound/qca,ipq4019-stereo.txt
- create mode 100644 Documentation/devicetree/bindings/sound/qca,ipq4019-tdm.txt
+ drivers/clk/qcom/Kconfig                     |   8 +
+ drivers/clk/qcom/Makefile                    |   2 +
+ drivers/clk/qcom/adcc-ipq4019.c              | 700 +++++++++++++++++++++++++++
+ drivers/clk/qcom/clk-qcapll.c                | 197 ++++++++
+ drivers/clk/qcom/clk-qcapll.h                |  60 +++
+ drivers/clk/qcom/clk-rcg.h                   |  68 ++-
+ drivers/clk/qcom/clk-rcg2.c                  | 699 +++++++++++++++++++++++++-
+ drivers/clk/qcom/common.c                    |   9 +-
+ drivers/clk/qcom/common.h                    |   3 +-
+ include/dt-bindings/clock/qca,adcc-ipq4019.h |  45 ++
+ include/dt-bindings/clock/qcom,gcc-ipq4019.h |   4 +-
+ include/dt-bindings/sound/ipq4019-audio.h    |  37 ++
+ 12 files changed, 1825 insertions(+), 7 deletions(-)
+ create mode 100644 drivers/clk/qcom/adcc-ipq4019.c
+ create mode 100644 drivers/clk/qcom/clk-qcapll.c
+ create mode 100644 drivers/clk/qcom/clk-qcapll.h
+ create mode 100644 include/dt-bindings/clock/qca,adcc-ipq4019.h
+ create mode 100644 include/dt-bindings/sound/ipq4019-audio.h
 
-diff --git a/Documentation/devicetree/bindings/sound/qca,ipq4019-audio-adss.txt b/Documentation/devicetree/bindings/sound/qca,ipq4019-audio-adss.txt
+diff --git a/drivers/clk/qcom/Kconfig b/drivers/clk/qcom/Kconfig
+index 95e3b3e..e21417a 100644
+--- a/drivers/clk/qcom/Kconfig
++++ b/drivers/clk/qcom/Kconfig
+@@ -36,6 +36,14 @@ config IPQ_GCC_4019
+ 	  Say Y if you want to use peripheral devices such as UART, SPI,
+ 	  i2c, USB, SD/eMMC, etc.
+ 
++config IPQ_ADCC_4019
++	tristate "IPQ4019 Audio Clock Controller"
++	depends on COMMON_CLK_QCOM
++	help
++	  Say Y if you need support for audio clock controller on IPQ4019 devices.
++	  Audio clocks TXM, RXM, TXB and RXB depend on ADCC. ADCC also is used for
++	  selecting the pad's as the source for the ADSS [audio subsystem] clocks.
++
+ config IPQ_GCC_806X
+ 	tristate "IPQ806x Global Clock Controller"
+ 	depends on COMMON_CLK_QCOM
+diff --git a/drivers/clk/qcom/Makefile b/drivers/clk/qcom/Makefile
+index 2a25f4e..aec6ab4 100644
+--- a/drivers/clk/qcom/Makefile
++++ b/drivers/clk/qcom/Makefile
+@@ -4,6 +4,7 @@ clk-qcom-y += common.o
+ clk-qcom-y += clk-regmap.o
+ clk-qcom-y += clk-alpha-pll.o
+ clk-qcom-y += clk-pll.o
++clk-qcom-y += clk-qcapll.o
+ clk-qcom-y += clk-rcg.o
+ clk-qcom-y += clk-rcg2.o
+ clk-qcom-y += clk-branch.o
+@@ -15,6 +16,7 @@ clk-qcom-$(CONFIG_QCOM_GDSC) += gdsc.o
+ obj-$(CONFIG_APQ_GCC_8084) += gcc-apq8084.o
+ obj-$(CONFIG_APQ_MMCC_8084) += mmcc-apq8084.o
+ obj-$(CONFIG_IPQ_GCC_4019) += gcc-ipq4019.o
++obj-$(CONFIG_IPQ_ADCC_4019) += adcc-ipq4019.o
+ obj-$(CONFIG_IPQ_GCC_806X) += gcc-ipq806x.o
+ obj-$(CONFIG_IPQ_LCC_806X) += lcc-ipq806x.o
+ obj-$(CONFIG_MSM_GCC_8660) += gcc-msm8660.o
+diff --git a/drivers/clk/qcom/adcc-ipq4019.c b/drivers/clk/qcom/adcc-ipq4019.c
 new file mode 100644
-index 0000000..5ba2b9d
+index 0000000..0ed90e1
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/sound/qca,ipq4019-audio-adss.txt
-@@ -0,0 +1,20 @@
-+* Qualcomm Technologies IPQ4019 ASoC audio subsystem driver
++++ b/drivers/clk/qcom/adcc-ipq4019.c
+@@ -0,0 +1,700 @@
++/*
++ * Copyright (c) 2014 - 2016 The Linux Foundation. All rights reserved.
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
 +
-+This node models the Qualcomm Technologies IPQ4019 ASoC audio subsystem driver
++#include <linux/kernel.h>
++#include <linux/err.h>
++#include <linux/platform_device.h>
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/of_device.h>
++#include <linux/clk-provider.h>
++#include <linux/delay.h>
++#include <linux/regmap.h>
++#include <linux/reset-controller.h>
 +
-+Required properties:
++#include <dt-bindings/clock/qca,adcc-ipq4019.h>
 +
-+- compatible	: "qca,ipq4019-audio-adss"
-+- reg		: should have the stereo register address, length
-+- resets	: references to the reset controllers
-+- reset-names	: should be "blk_rst"
++#include "common.h"
++#include "clk-regmap.h"
++#include "clk-rcg.h"
++#include "clk-qcapll.h"
++#include "clk-branch.h"
++#include "reset.h"
 +
++#define AUDIO_PLL_CONFIG_REG				0x00000
++#define AUDIO_PLL_MODULATION_REG			0x00004
++#define AUDIO_PLL_MOD_STEP_REG				0x00008
++#define CURRENT_AUDIO_PLL_MODULATION_REG		0x0000c
++#define AUDIO_PLL_CONFIG1_REG				0x00010
++#define AUDIO_ATB_SETTING_REG				0x00014
++#define AUDIO_RXB_CFG_MUXR_REG				0x000cc
++#define AUDIO_RXB_MISC_REG				0x000d0
++#define AUDIO_RXB_CBCR_REG				0x000D4
++#define AUDIO_RXM_CMD_RCGR_REG				0x000e8
++#define AUDIO_RXM_CFG_RCGR_REG				0x000ec
++#define AUDIO_RXM_MISC_REG				0x000f0
++#define AUDIO_RXM_CBCR_REG				0x000F4
++#define AUDIO_TXB_CFG_MUXR_REG				0x0010c
++#define AUDIO_TXB_MISC_REG				0x00110
++#define AUDIO_TXB_CBCR_REG				0x00114
++#define AUDIO_SPDIF_MISC_REG				0x00118
++#define AUDIO_SPDIF_CBCR_REG				0x0011c
++#define AUDIO_SPDIFDIV2_MISC_REG			0x00120
++#define AUDIO_SPDIFDIV2_CBCR_REG			0x00124
++#define AUDIO_TXM_CMD_RCGR_REG				0x00128
++#define AUDIO_TXM_CFG_RCGR_REG				0x0012c
++#define AUDIO_TXM_MISC_REG				0x00130
++#define AUDIO_TXM_CBCR_REG				0x00134
++#define AUDIO_SAMPLE_CBCR_REG				0x00154
++#define AUDIO_PCM_CMD_RCGR_REG				0x00168
++#define AUDIO_PCM_CFG_RCGR_REG				0x0016C
++#define AUDIO_PCM_MISC_REG				0x00170
++#define AUDIO_PCM_CBCR_REG				0x00174
++#define AUDIO_XO_CBCR_REG				0x00194
++#define AUDIO_SPDIFINFAST_CMD_RCGR_REG			0x001A8
++#define AUDIO_SPDIFINFAST_CFG_RCGR_REG			0x001AC
++#define AUDIO_SPDIFINFAST_CBCR_REG			0x001B4
++#define AUDIO_AHB_CBCR_REG				0x001c8
++#define AUDIO_AHB_I2S0_CBCR_REG				0x001cc
++#define AUDIO_AHB_I2S3_CBCR_REG				0x001d0
++#define AUDIO_AHB_MBOX0_CBCR_REG			0x001D4
++#define AUDIO_AHB_MBOX3_CBCR_REG			0x001d8
 +
-+Example:
-+audio: audio at 7700000 {
-+	compatible = "qca,ipq4019-audio-adss";
-+	reg = <0x7700000 0x34>;
-+	resets = <&gcc AUDIO_BLK_ARES>;
-+	reset-names = "blk_rst";
-+	status = "disabled";
++#define F(f, s, h, m, n) { (f), (s), (2 * (h) - 1), (m), (n) }
++#define P_XO 0
++#define ADSS_PLL 1
++#define MCLK_MCLK_IN 2
++#define BCLK_BCLK_IN 2
++#define BCLK_MCLK_IN 3
++
++static struct parent_map adcc_xo_adpll_padmclk_map[] = {
++	{  P_XO, 0 },
++	{  ADSS_PLL, 1 },
++	{  MCLK_MCLK_IN, 2 },
 +};
-diff --git a/Documentation/devicetree/bindings/sound/qca,ipq4019-audio.txt b/Documentation/devicetree/bindings/sound/qca,ipq4019-audio.txt
++
++static const char * const adcc_xo_adpll_padmclk[] = {
++	"xo",
++	"adss_pll",
++	"padmclk",
++};
++
++static struct parent_map adcc_xo_adpll_padbclk_padmclk_map[] = {
++	{  P_XO, 0 },
++	{  ADSS_PLL, 1 },
++	{  MCLK_MCLK_IN, 2 },
++	{  BCLK_MCLK_IN, 3 },
++};
++
++static const char * const adcc_xo_adpll_padbclk_padmclk[] = {
++	"xo",
++	"adss_pll",
++	"padbclk",
++	"padmclk",
++};
++
++static struct parent_map adcc_xo_adpll_map[] = {
++	{  P_XO, 0 },
++	{  ADSS_PLL, 1 },
++};
++
++static const char * const adcc_xo_adpll[] = {
++	"xo",
++	"adss_pll",
++};
++
++static const struct pll_freq_tbl adss_freq_tbl[] = {
++	{163840000, 1, 5, 40, 0x3D708},
++	{180633600, 1, 5, 45, 0xA234},
++	{184320000, 1, 5, 46, 0x51E9},
++	{196608000, 1, 5, 49, 0x9bA6},
++	{197568000, 1, 5, 49, 0x19168},
++	{}
++};
++
++static struct clk_qcapll adss_pll_src = {
++	.config_reg		= AUDIO_PLL_CONFIG_REG,
++	.mod_reg		= AUDIO_PLL_MODULATION_REG,
++	.modstep_reg		= AUDIO_PLL_MOD_STEP_REG,
++	.current_mod_pll_reg	= CURRENT_AUDIO_PLL_MODULATION_REG,
++	.config1_reg		= AUDIO_PLL_CONFIG1_REG,
++	.freq_tbl = adss_freq_tbl,
++	.clkr.hw.init = &(struct clk_init_data){
++		.name = "adss_pll",
++		.parent_names = (const char *[]){ "xo" },
++		.num_parents = 1,
++		.ops = &clk_qcapll_ops,
++		.flags = CLK_IGNORE_UNUSED,
++	},
++};
++
++static const struct freq_tbl ftbl_m_clk[] = {
++	{255, MCLK_MCLK_IN, 1, 0, 0},
++	{2048000, ADSS_PLL, 96, 0, 0},
++	{2822400, ADSS_PLL, 64, 0, 0},
++	{4096000, ADSS_PLL, 48, 0, 0},
++	{5644800, ADSS_PLL, 32, 0, 0},
++	{6144000, ADSS_PLL, 32, 0, 0},
++	{8192000, ADSS_PLL, 24, 0, 0},
++	{11289600, ADSS_PLL, 16, 0, 0},
++	{12288000, ADSS_PLL, 16, 0, 0},
++	{14112000, ADSS_PLL, 14, 0, 0},
++	{15360000, ADSS_PLL, 12, 0, 0},
++	{16384000, ADSS_PLL, 12, 0, 0},
++	{20480000, ADSS_PLL, 8, 0, 0},
++	{22579200, ADSS_PLL, 8, 0, 0},
++	{24576000, ADSS_PLL, 8, 0, 0},
++	{30720000, ADSS_PLL, 6, 0, 0},
++	{ }
++};
++
++static struct clk_cdiv_rcg2 rxm_clk_src = {
++	.cdiv.offset = AUDIO_RXM_MISC_REG,
++	.cdiv.shift = 4,
++	.cdiv.mask = 0xf,
++	.cmd_rcgr = AUDIO_RXM_CMD_RCGR_REG,
++	.hid_width = 5,
++	.parent_map = adcc_xo_adpll_padmclk_map,
++	.freq_tbl = ftbl_m_clk,
++	.clkr.hw.init = &(struct clk_init_data){
++		.name = "rxm_clk_src",
++		.parent_names = adcc_xo_adpll_padmclk,
++		.num_parents = 3,
++		.ops = &clk_cdiv_rcg2_ops,
++		.flags = CLK_SET_RATE_PARENT | CLK_IGNORE_UNUSED,
++	},
++};
++
++static struct clk_branch adcc_rxm_clk_src = {
++	.halt_reg = AUDIO_RXM_CBCR_REG,
++	.clkr = {
++		.enable_reg = AUDIO_RXM_CBCR_REG,
++		.enable_mask = BIT(0),
++		.hw.init = &(struct clk_init_data){
++			.name = "adcc_rxm_clk_src",
++			.parent_names = (const char *[]){"rxm_clk_src"},
++			.num_parents = 1,
++			.ops = &clk_branch2_ops,
++			.flags = CLK_SET_RATE_PARENT,
++		},
++	},
++};
++
++static struct clk_cdiv_rcg2 txm_clk_src = {
++	.cdiv.offset = AUDIO_TXM_MISC_REG,
++	.cdiv.shift = 4,
++	.cdiv.mask = 0xf,
++	.cmd_rcgr = AUDIO_TXM_CMD_RCGR_REG,
++	.hid_width = 5,
++	.parent_map = adcc_xo_adpll_padmclk_map,
++	.freq_tbl = ftbl_m_clk,
++	.clkr.hw.init = &(struct clk_init_data){
++		.name = "txm_clk_src",
++		.parent_names = adcc_xo_adpll_padmclk,
++		.num_parents = 3,
++		.ops = &clk_cdiv_rcg2_ops,
++		.flags = CLK_SET_RATE_PARENT | CLK_IGNORE_UNUSED,
++	},
++};
++
++static struct clk_branch adcc_txm_clk_src = {
++	.halt_reg = AUDIO_TXM_CBCR_REG,
++	.clkr = {
++		.enable_reg = AUDIO_TXM_CBCR_REG,
++		.enable_mask = BIT(0),
++		.hw.init = &(struct clk_init_data){
++			.name = "adcc_txm_clk_src",
++			.parent_names = (const char *[]){
++				"txm_clk_src",
++			},
++			.num_parents = 1,
++			.ops = &clk_branch2_ops,
++			.flags = CLK_SET_RATE_PARENT,
++		},
++	},
++};
++
++static const struct freq_tbl ftbl_bclk_clk[] = {
++	{254, BCLK_BCLK_IN, 1, 0, 0},
++	{255, BCLK_MCLK_IN, 1, 0, 0},
++	{512000, ADSS_PLL, 384, 0, 0},
++	{705600, ADSS_PLL, 256, 0, 0},
++	{1024000, ADSS_PLL, 192, 0, 0},
++	{1411200, ADSS_PLL, 128, 0, 0},
++	{1536000, ADSS_PLL, 128, 0, 0},
++	{2048000, ADSS_PLL, 96, 0, 0},
++	{2822400, ADSS_PLL, 64, 0, 0},
++	{3072000, ADSS_PLL, 64, 0, 0},
++	{4096000, ADSS_PLL, 48, 0, 0},
++	{5120000, ADSS_PLL, 32, 0, 0},
++	{5644800, ADSS_PLL, 32, 0, 0},
++	{6144000, ADSS_PLL, 32, 0, 0},
++	{7056000, ADSS_PLL, 24, 0, 0},
++	{7680000, ADSS_PLL, 24, 0, 0},
++	{8192000, ADSS_PLL, 24, 0, 0},
++	{10240000, ADSS_PLL, 16, 0, 0},
++	{11289600, ADSS_PLL, 16, 0, 0},
++	{12288000, ADSS_PLL, 16, 0, 0},
++	{14112000, ADSS_PLL, 16, 0, 0},
++	{15360000, ADSS_PLL, 12, 0, 0},
++	{16384000, ADSS_PLL, 12, 0, 0},
++	{22579200, ADSS_PLL, 8, 0, 0},
++	{24576000, ADSS_PLL,  8, 0, 0},
++	{30720000, ADSS_PLL,  6, 0, 0},
++	{ }
++};
++
++static struct clk_muxr_misc txb_clk_src = {
++	.misc.offset = AUDIO_TXB_MISC_REG,
++	.misc.shift = 1,
++	.misc.mask = 0x1FF,
++	.muxr.offset = AUDIO_TXB_CFG_MUXR_REG,
++	.muxr.shift = 8,
++	.muxr.mask = 0x7,
++	.parent_map = adcc_xo_adpll_padbclk_padmclk_map,
++	.freq_tbl = ftbl_bclk_clk,
++	.clkr.hw.init = &(struct clk_init_data){
++		.name = "txb_clk_src",
++		.parent_names = adcc_xo_adpll_padbclk_padmclk,
++		.num_parents = 4,
++		.ops = &clk_muxr_misc_ops,
++		.flags = CLK_SET_RATE_PARENT | CLK_IGNORE_UNUSED,
++	},
++};
++
++static struct clk_branch adcc_txb_clk_src = {
++	.halt_reg = AUDIO_TXB_CBCR_REG,
++	.clkr = {
++		.enable_reg = AUDIO_TXB_CBCR_REG,
++		.enable_mask = BIT(0),
++		.hw.init = &(struct clk_init_data){
++			.name = "adcc_txb_clk_src",
++			.parent_names = (const char *[]){
++				"txb_clk_src",
++			},
++			.num_parents = 1,
++			.ops = &clk_branch2_ops,
++			.flags = CLK_SET_RATE_PARENT,
++		},
++	},
++};
++
++static struct clk_muxr_misc rxb_clk_src = {
++	.misc.offset = AUDIO_RXB_MISC_REG,
++	.misc.shift = 1,
++	.misc.mask = 0x1FF,
++	.muxr.offset = AUDIO_RXB_CFG_MUXR_REG,
++	.muxr.shift = 8,
++	.muxr.mask = 0x7,
++	.parent_map = adcc_xo_adpll_padbclk_padmclk_map,
++	.freq_tbl = ftbl_bclk_clk,
++	.clkr.hw.init = &(struct clk_init_data){
++		.name = "rxb_clk_src",
++		.parent_names = adcc_xo_adpll_padbclk_padmclk,
++		.num_parents = 4,
++		.ops = &clk_muxr_misc_ops,
++		.flags = CLK_SET_RATE_PARENT | CLK_IGNORE_UNUSED,
++	},
++};
++
++
++static struct clk_branch adcc_rxb_clk_src = {
++	.halt_reg = AUDIO_RXB_CBCR_REG,
++	.clkr = {
++		.enable_reg = AUDIO_RXB_CBCR_REG,
++		.enable_mask = BIT(0),
++		.hw.init = &(struct clk_init_data){
++			.name = "adcc_rxb_clk_src",
++			.parent_names = (const char *[]){
++				"rxb_clk_src",
++			},
++			.num_parents = 1,
++			.ops = &clk_branch2_ops,
++			.flags = CLK_SET_RATE_PARENT,
++		},
++	},
++};
++
++
++
++static const struct freq_tbl ftbl_adcc_pcm_clk[] = {
++	{8192000, ADSS_PLL, 24, 0, 0},
++	{16384000, ADSS_PLL, 12, 0, 0},
++	{ }
++};
++
++static struct clk_cdiv_rcg2 pcm_clk_src = {
++	.cdiv.offset = AUDIO_PCM_MISC_REG,
++	.cdiv.shift = 4,
++	.cdiv.mask = 0xf,
++	.cmd_rcgr = AUDIO_PCM_CMD_RCGR_REG,
++	.hid_width = 5,
++	.parent_map = adcc_xo_adpll_map,
++	.freq_tbl = ftbl_adcc_pcm_clk,
++	.clkr.hw.init = &(struct clk_init_data){
++		.name = "pcm_clk_src",
++		.parent_names = adcc_xo_adpll,
++		.num_parents = 2,
++		.ops = &clk_cdiv_rcg2_ops,
++		.flags = CLK_SET_RATE_PARENT | CLK_IGNORE_UNUSED,
++	},
++};
++
++
++
++static struct clk_branch adcc_pcm_clk_src = {
++	.halt_reg = AUDIO_PCM_CBCR_REG,
++	.clkr = {
++		.enable_reg = AUDIO_PCM_CBCR_REG,
++		.enable_mask = BIT(0),
++		.hw.init = &(struct clk_init_data){
++			.name = "adcc_pcm_clk_src",
++			.parent_names = (const char *[]){
++				"pcm_clk_src",
++			},
++			.num_parents = 1,
++			.ops = &clk_branch2_ops,
++			.flags = CLK_SET_RATE_PARENT | CLK_IGNORE_UNUSED,
++		},
++	},
++};
++
++
++
++static const struct freq_tbl ftbl_adcc_spdifinfast_clk[] = {
++	F(49152000, ADSS_PLL, 0x04, 0, 0),
++	{ }
++};
++
++static struct clk_rcg2 spdifinfast_src = {
++	.cmd_rcgr = AUDIO_SPDIFINFAST_CMD_RCGR_REG,
++	.hid_width = 5,
++	.parent_map = adcc_xo_adpll_map,
++	.freq_tbl = ftbl_adcc_spdifinfast_clk,
++	.clkr.hw.init = &(struct clk_init_data){
++		.name = "spdifinfast_src",
++		.parent_names = adcc_xo_adpll,
++		.num_parents = 2,
++		.ops = &clk_rcg2_ops,
++		.flags = CLK_SET_RATE_PARENT | CLK_IGNORE_UNUSED,
++	},
++};
++
++static struct clk_branch adcc_spdifinfast_src = {
++	.halt_reg = AUDIO_SPDIFINFAST_CBCR_REG,
++	.clkr = {
++		.enable_reg = AUDIO_SPDIFINFAST_CBCR_REG,
++		.enable_mask = BIT(0),
++		.hw.init = &(struct clk_init_data){
++			.name = "adcc_spdifinfast_src",
++			.parent_names = (const char *[]){
++				"spdifinfast_src",
++			},
++			.num_parents = 1,
++			.ops = &clk_branch2_ops,
++			.flags = CLK_SET_RATE_PARENT | CLK_IGNORE_UNUSED,
++		},
++	},
++};
++
++static struct clk_muxr_misc spdif_src = {
++	.misc.offset = AUDIO_SPDIF_MISC_REG,
++	.misc.shift = 1,
++	.misc.mask = 0x1FF,
++	.muxr.offset = AUDIO_TXB_CFG_MUXR_REG,
++	.muxr.shift = 8,
++	.muxr.mask = 0x7,
++	.parent_map = adcc_xo_adpll_padbclk_padmclk_map,
++	.freq_tbl = ftbl_m_clk,
++	.clkr.hw.init = &(struct clk_init_data){
++		.name = "spdif_src",
++		.parent_names = adcc_xo_adpll_padbclk_padmclk,
++		.num_parents = 4,
++		.ops = &clk_muxr_misc_ops,
++		.flags = CLK_SET_RATE_PARENT | CLK_IGNORE_UNUSED,
++	},
++};
++
++static struct clk_branch adcc_spdif_src = {
++	.halt_reg = AUDIO_SPDIF_CBCR_REG,
++	.clkr = {
++		.enable_reg = AUDIO_SPDIF_CBCR_REG,
++		.enable_mask = BIT(0),
++		.hw.init = &(struct clk_init_data){
++			.name = "adcc_spdif_src",
++			.parent_names = (const char *[]){
++				"spdif_src",
++			},
++			.num_parents = 1,
++			.ops = &clk_branch2_ops,
++			.flags = CLK_SET_RATE_PARENT | CLK_IGNORE_UNUSED,
++		},
++	},
++};
++
++static struct clk_muxr_misc spdifdiv2_src = {
++	.misc.offset = AUDIO_SPDIFDIV2_MISC_REG,
++	.misc.shift = 1,
++	.misc.mask = 0x1FF,
++	.parent_map = adcc_xo_adpll_padbclk_padmclk_map,
++	.muxr.offset = AUDIO_TXB_CFG_MUXR_REG,
++	.muxr.shift = 8,
++	.muxr.mask = 0x7,
++	.freq_tbl = ftbl_bclk_clk,
++	.clkr.hw.init = &(struct clk_init_data){
++		.name = "spdifdiv2_src",
++		.parent_names = adcc_xo_adpll_padbclk_padmclk,
++		.num_parents = 4,
++		.ops = &clk_muxr_misc_ops,
++		.flags = CLK_SET_RATE_PARENT | CLK_IGNORE_UNUSED,
++	},
++};
++
++static struct clk_branch adcc_spdifdiv2_src = {
++	.halt_reg = AUDIO_SPDIFDIV2_CBCR_REG,
++	.clkr = {
++		.enable_reg = AUDIO_SPDIFDIV2_CBCR_REG,
++		.enable_mask = BIT(0),
++		.hw.init = &(struct clk_init_data){
++			.name = "adcc_spdifdiv2_src",
++			.parent_names = (const char *[]){
++				"spdifdiv2_src",
++			},
++			.num_parents = 1,
++			.ops = &clk_branch2_ops,
++			.flags = CLK_SET_RATE_PARENT | CLK_IGNORE_UNUSED,
++		},
++	},
++};
++
++static struct clk_branch adcc_sample_src = {
++	.halt_reg = AUDIO_SAMPLE_CBCR_REG,
++	.clkr = {
++		.enable_reg = AUDIO_SAMPLE_CBCR_REG,
++		.enable_mask = BIT(0),
++		.hw.init = &(struct clk_init_data){
++			.name = "adcc_sample_src",
++			.parent_names = (const char *[]){
++				"pcnoc_clk_src",
++			},
++			.num_parents = 1,
++			.ops = &clk_branch2_ops,
++			.flags = CLK_SET_RATE_PARENT | CLK_IGNORE_UNUSED,
++		},
++	},
++};
++
++static struct clk_branch adcc_xo_src = {
++	.halt_reg = AUDIO_XO_CBCR_REG,
++	.clkr = {
++		.enable_reg = AUDIO_XO_CBCR_REG,
++		.enable_mask = BIT(0),
++		.hw.init = &(struct clk_init_data){
++			.name = "adcc_xo_src",
++			.parent_names = (const char *[]){
++				"XO",
++			},
++			.num_parents = 1,
++			.ops = &clk_branch2_ops,
++			.flags = CLK_SET_RATE_PARENT | CLK_IGNORE_UNUSED,
++		},
++	},
++};
++
++
++static struct clk_branch adcc_ahb_src = {
++	.halt_reg = AUDIO_AHB_CBCR_REG,
++	.clkr = {
++		.enable_reg = AUDIO_AHB_CBCR_REG,
++		.enable_mask = BIT(0),
++		.hw.init = &(struct clk_init_data){
++			.name = "adcc_audio_ahb_src",
++			.parent_names = (const char *[]){
++				"pcnoc_clk_src",
++			},
++			.num_parents = 1,
++			.ops = &clk_branch2_ops,
++			.flags = CLK_IGNORE_UNUSED,
++		},
++	},
++};
++
++static struct clk_branch adcc_ahb_i2s0_src = {
++	.halt_reg = AUDIO_AHB_I2S0_CBCR_REG,
++	.clkr = {
++		.enable_reg = AUDIO_AHB_I2S0_CBCR_REG,
++		.enable_mask = BIT(0),
++		.hw.init = &(struct clk_init_data){
++			.name = "adcc_audio_ahb_i2s0",
++			.parent_names = (const char *[]){
++				"pcnoc_clk_src",
++			},
++			.num_parents = 1,
++			.ops = &clk_branch2_ops,
++			.flags = CLK_IGNORE_UNUSED,
++		},
++	},
++};
++
++static struct clk_branch adcc_ahb_i2s3_src = {
++	.halt_reg = AUDIO_AHB_I2S3_CBCR_REG,
++	.clkr = {
++		.enable_reg = AUDIO_AHB_I2S3_CBCR_REG,
++		.enable_mask = BIT(0),
++		.hw.init = &(struct clk_init_data){
++			.name = "adcc_audio_ahb_i2s3",
++			.parent_names = (const char *[]){
++				"pcnoc_clk_src",
++			},
++			.num_parents = 1,
++			.ops = &clk_branch2_ops,
++			.flags = CLK_IGNORE_UNUSED,
++		},
++	},
++};
++
++static struct clk_branch adcc_ahb_mbox0_src = {
++	.halt_reg = AUDIO_AHB_MBOX0_CBCR_REG,
++	.clkr = {
++		.enable_reg = AUDIO_AHB_MBOX0_CBCR_REG,
++		.enable_mask = BIT(0),
++		.hw.init = &(struct clk_init_data){
++			.name = "adcc_audio_mbox0_src",
++			.parent_names = (const char *[]){
++				"pcnoc_clk_src",
++			},
++			.num_parents = 1,
++			.ops = &clk_branch2_ops,
++			.flags = CLK_IGNORE_UNUSED,
++		},
++	},
++};
++
++static struct clk_branch adcc_ahb_mbox3_src = {
++	.halt_reg = AUDIO_AHB_MBOX3_CBCR_REG,
++	.clkr = {
++		.enable_reg = AUDIO_AHB_MBOX3_CBCR_REG,
++		.enable_mask = BIT(0),
++		.hw.init = &(struct clk_init_data){
++			.name = "adcc_ahb_mbox3_src",
++			.parent_names = (const char *[]){
++				"pcnoc_clk_src",
++			},
++			.num_parents = 1,
++			.ops = &clk_branch2_ops,
++			.flags = CLK_IGNORE_UNUSED,
++		},
++	},
++};
++
++static struct clk_regmap *adcc_ipq4019_clocks[] = {
++	[ADSS_PLL_SRC]				= &adss_pll_src.clkr,
++	[RXM_CLK_SRC]				= &rxm_clk_src.clkr,
++	[ADCC_RXM_CLK_SRC]			= &adcc_rxm_clk_src.clkr,
++	[TXM_CLK_SRC]				= &txm_clk_src.clkr,
++	[ADCC_TXM_CLK_SRC]			= &adcc_txm_clk_src.clkr,
++	[TXB_CLK_SRC]				= &txb_clk_src.clkr,
++	[ADCC_TXB_CLK_SRC]			= &adcc_txb_clk_src.clkr,
++	[RXB_CLK_SRC]				= &rxb_clk_src.clkr,
++	[ADCC_RXB_CLK_SRC]			= &adcc_rxb_clk_src.clkr,
++	[PCM_CLK_SRC]				= &pcm_clk_src.clkr,
++	[ADCC_PCM_CLK_SRC]			= &adcc_pcm_clk_src.clkr,
++	[AUDIO_SPDIFINFAST_SRC]			= &spdifinfast_src.clkr,
++	[ADCC_AUDIO_SPDIFINFAST_SRC]		= &adcc_spdifinfast_src.clkr,
++	[ADCC_AUDIO_AHB_SRC]			= &adcc_ahb_src.clkr,
++	[ADCC_AHB_I2S0]				= &adcc_ahb_i2s0_src.clkr,
++	[ADCC_AHB_I2S3]				= &adcc_ahb_i2s3_src.clkr,
++	[ADCC_AHB_MBOX0_SRC]			= &adcc_ahb_mbox0_src.clkr,
++	[ADCC_AHB_MBOX3_SRC]			= &adcc_ahb_mbox3_src.clkr,
++	[SPDIF_SRC]				= &spdif_src.clkr,
++	[ADCC_SPDIF_SRC]			= &adcc_spdif_src.clkr,
++	[SPDIFDIV2_SRC]				= &spdifdiv2_src.clkr,
++	[ADCC_SPDIFDIV2_SRC]			= &adcc_spdifdiv2_src.clkr,
++	[ADCC_SAMPLE_SRC]			= &adcc_sample_src.clkr,
++	[ADCC_XO_SRC]				= &adcc_xo_src.clkr,
++};
++
++static const struct qcom_reset_map adcc_ipq4019_resets[] = {
++};
++
++struct cdiv_fixed {
++	char	*name;
++	char	*pname;
++	u32	flags;
++	u32	mult;
++	u32	div;
++};
++
++static const struct regmap_config adcc_ipq4019_regmap_config = {
++	.reg_bits	= 32,
++	.reg_stride	= 4,
++	.val_bits	= 32,
++	.max_register	= 0x2ff,
++	.fast_io	= true,
++};
++
++static const struct qcom_cc_desc adcc_ipq4019_desc = {
++	.config = &adcc_ipq4019_regmap_config,
++	.clks = adcc_ipq4019_clocks,
++	.num_clks = ARRAY_SIZE(adcc_ipq4019_clocks),
++	.resets = adcc_ipq4019_resets,
++	.num_resets = ARRAY_SIZE(adcc_ipq4019_resets),
++};
++
++static const struct of_device_id adcc_ipq4019_match_table[] = {
++	{ .compatible = "qcom,adcc-ipq4019" },
++	{ }
++};
++MODULE_DEVICE_TABLE(of, gcc_ipq4019_match_table);
++
++static int adcc_ipq4019_probe(struct platform_device *pdev)
++{
++	struct device *dev = &pdev->dev;
++	struct regmap *regmap;
++
++	/* High speed external clock */
++	clk_register_fixed_rate(dev, "xo", NULL, CLK_IS_ROOT, 48000000);
++
++	/* External padbclk & padmclk clock.These [254 & 255] frequencies are
++	 * taken as tokens only to support the INPUTS from PADS.
++	 * Reference: ADSS_HPG/HDD document for IPQ4019
++	 */
++	clk_register_fixed_rate(dev, "padbclk", NULL, CLK_IS_ROOT, 254);
++	clk_register_fixed_rate(dev, "padmclk", NULL, CLK_IS_ROOT, 255);
++
++	regmap = qcom_cc_map(pdev, &adcc_ipq4019_desc);
++	if (IS_ERR(regmap))
++		return PTR_ERR(regmap);
++
++	return qcom_cc_really_probe(pdev, &adcc_ipq4019_desc, regmap);
++}
++
++static int adcc_ipq4019_remove(struct platform_device *pdev)
++{
++	qcom_cc_remove(pdev);
++	return 0;
++}
++
++static struct platform_driver adcc_ipq4019_driver = {
++	.probe		= adcc_ipq4019_probe,
++	.remove		= adcc_ipq4019_remove,
++	.driver		= {
++		.name	= "adcc-ipq4019",
++		.of_match_table = adcc_ipq4019_match_table,
++	},
++};
++module_platform_driver(adcc_ipq4019_driver);
++
++MODULE_DESCRIPTION("Audio Digital Clock controller Driver for IPQ4019");
++MODULE_LICENSE("GPL v2");
++MODULE_ALIAS("platform:adcc-ipq4019");
+diff --git a/drivers/clk/qcom/clk-qcapll.c b/drivers/clk/qcom/clk-qcapll.c
 new file mode 100644
-index 0000000..fde039f
+index 0000000..fac45c8
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/sound/qca,ipq4019-audio.txt
-@@ -0,0 +1,13 @@
-+* Qualcomm Technologies IPQ4019 ASoC machine driver
++++ b/drivers/clk/qcom/clk-qcapll.c
+@@ -0,0 +1,197 @@
++/*
++ * Copyright (c) 2013, 2015-2016 The Linux Foundation. All rights reserved.
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
 +
-+This node models the Qualcomm Technologies IPQ4019 ASoC machine driver
++#include <linux/kernel.h>
++#include <linux/bitops.h>
++#include <linux/err.h>
++#include <linux/delay.h>
++#include <linux/export.h>
++#include <linux/clk-provider.h>
++#include <linux/regmap.h>
 +
-+Required properties:
++#include <asm/div64.h>
 +
-+- compatible		: "qca,ipq4019-audio"
++#include "clk-qcapll.h"
 +
-+Example:
++#define PLL_CONFIG1_SRESET_L		BIT(0)
++#define PLL_MODULATION_START		BIT(0)
++#define PLL_CONFIG_PLLPWD		BIT(5)
 +
-+sound: sound {
-+	compatible = "qca,ipq4019-audio";
++#define PLL_POSTDIV_MASK	0x380
++#define PLL_POSTDIV_SHFT	7
++#define PLL_PLLPWD_MASK         0x20
++#define PLL_PLLPWD_SHFT         5
++#define PLL_REFDIV_MASK		0x7
++#define PLL_REFDIV_SHFT		0
++#define PLL_TGT_INT_SHFT	1
++#define PLL_TGT_INT_MASK	0x3FE
++#define PLL_TGT_FRAC_MASK	0x1FFFF800
++#define PLL_TGT_FRAC_SHFT	11
++
++
++static int clk_qcapll_enable(struct clk_hw *hw)
++{
++	struct clk_qcapll *pll = to_clk_qcapll(hw);
++	int ret;
++
++	/* Enable PLL bypass mode. */
++	ret = regmap_update_bits(pll->clkr.regmap, pll->config_reg,
++				 PLL_CONFIG_PLLPWD, 0);
++	if (ret)
++		return ret;
++
++	return 0;
++}
++
++static void clk_qcapll_disable(struct clk_hw *hw)
++{
++	struct clk_qcapll *pll = to_clk_qcapll(hw);
++
++	/* Disable PLL bypass mode. */
++	regmap_update_bits(pll->clkr.regmap, pll->config_reg, PLL_CONFIG_PLLPWD,
++			   0x1);
++}
++
++static int clk_qcapll_is_enabled(struct clk_hw *hw)
++{
++	u32 config;
++	struct clk_qcapll *pll = to_clk_qcapll(hw);
++
++	regmap_read(pll->clkr.regmap, pll->config_reg, &config);
++	return config & PLL_PLLPWD_MASK;
++}
++
++static unsigned long
++clk_qcapll_recalc_rate(struct clk_hw *hw, unsigned long parent_rate)
++{
++	struct clk_qcapll *pll = to_clk_qcapll(hw);
++	u32 ref_div, post_plldiv, tgt_div_frac, tgt_div_int;
++	u32 config, mod_reg;
++
++	regmap_read(pll->clkr.regmap, pll->config_reg, &config);
++	regmap_read(pll->clkr.regmap, pll->mod_reg, &mod_reg);
++
++	ref_div = (config & PLL_REFDIV_MASK) >> PLL_REFDIV_SHFT;
++	post_plldiv = (config & PLL_POSTDIV_SHFT) >> PLL_POSTDIV_SHFT;
++	tgt_div_frac = (mod_reg & PLL_TGT_FRAC_MASK) >>  PLL_TGT_FRAC_SHFT;
++	tgt_div_int = (mod_reg & PLL_TGT_INT_MASK) >> PLL_TGT_INT_SHFT;
++
++	/*
++	 * FICO = (Fref / (refdiv+1)) * (Ninv + Nfrac[17:5]/2^13
++	 *	   + Nfrac[4:0]/(25*2^13)).
++	 *
++	 * we use this Lookups to get the precise frequencies as we need
++	 * the calculation would need use of some math functions to get
++	 * precise values which will add to the complexity. Hence, a simple
++	 * lookup table based on the Fract values
++	 */
++
++	if (tgt_div_frac == 0x3D708)
++		return 163840000;
++	else if (tgt_div_frac == 0xA234)
++		return 180633600;
++	else if (tgt_div_frac == 0x51E9)
++		return 184320000;
++	else if (tgt_div_frac == 0x9bA6)
++		return 196608000;
++	else if (tgt_div_frac == 0x19168)
++		return 197568000;
++
++	return 0;
++}
++
++static const
++struct pll_freq_tbl *find_freq(const struct pll_freq_tbl *f, unsigned long rate)
++{
++	if (!f)
++		return NULL;
++
++	for (; f->freq; f++)
++		if (rate <= f->freq)
++			return f;
++
++	return NULL;
++}
++
++static int
++clk_qcapll_determine_rate(struct clk_hw *hw, struct clk_rate_request *req)
++{
++	struct clk_qcapll *pll = to_clk_qcapll(hw);
++	const struct pll_freq_tbl *f;
++	unsigned long rate;
++
++	f = find_freq(pll->freq_tbl, req->rate);
++	if (!f)
++		rate = clk_qcapll_recalc_rate(hw, req->best_parent_rate);
++	else
++		rate = f->freq;
++
++	req->best_parent_rate = req->rate = rate;
++
++	return 0;
++}
++
++static int
++clk_qcapll_set_rate(struct clk_hw *hw, unsigned long rate, unsigned long p_rate)
++{
++	struct clk_qcapll *pll = to_clk_qcapll(hw);
++	const struct pll_freq_tbl *f;
++	u32 val, mask;
++
++	f = find_freq(pll->freq_tbl, rate);
++	if (!f)
++		return -EINVAL;
++
++	if (clk_qcapll_is_enabled(hw))
++		clk_qcapll_disable(hw);
++
++	regmap_write(pll->clkr.regmap, pll->config1_reg, 0xc);
++	udelay(2);
++	regmap_write(pll->clkr.regmap, pll->config1_reg, 0xd);
++
++	val = f->postplldiv << PLL_POSTDIV_SHFT;
++	val |= f->refdiv << PLL_REFDIV_SHFT;
++
++	mask = PLL_POSTDIV_MASK | PLL_REFDIV_MASK;
++	regmap_update_bits(pll->clkr.regmap, pll->config_reg, mask, val);
++
++	clk_qcapll_enable(hw);
++
++	val = f->tgt_div_int << PLL_TGT_INT_SHFT;
++	val |= f->tgt_div_frac << PLL_TGT_FRAC_SHFT;
++
++	mask = PLL_TGT_FRAC_MASK | PLL_TGT_INT_MASK;
++	regmap_update_bits(pll->clkr.regmap, pll->mod_reg, mask, val);
++
++	/* Start the PLL to initiate the Modulation. */
++	regmap_update_bits(pll->clkr.regmap, pll->mod_reg,
++						PLL_MODULATION_START, 0);
++
++	/*
++	 * Wait until PLL is locked. Refer DPLL document for IPQ4019.
++	 * This is recommended settling time for the PLL.
++	 */
++	udelay(50);
++
++	return 0;
++}
++
++const struct clk_ops clk_qcapll_ops = {
++	.enable = clk_qcapll_enable,
++	.disable = clk_qcapll_disable,
++	.is_enabled = clk_qcapll_is_enabled,
++	.recalc_rate = clk_qcapll_recalc_rate,
++	.determine_rate = clk_qcapll_determine_rate,
++	.set_rate = clk_qcapll_set_rate,
 +};
-diff --git a/Documentation/devicetree/bindings/sound/qca,ipq4019-codec.txt b/Documentation/devicetree/bindings/sound/qca,ipq4019-codec.txt
++EXPORT_SYMBOL_GPL(clk_qcapll_ops);
+diff --git a/drivers/clk/qcom/clk-qcapll.h b/drivers/clk/qcom/clk-qcapll.h
 new file mode 100644
-index 0000000..3df7742d
+index 0000000..c0304ac
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/sound/qca,ipq4019-codec.txt
-@@ -0,0 +1,15 @@
-+* Qualcomm Technologies IPQ4019 ASoC Codec driver
++++ b/drivers/clk/qcom/clk-qcapll.h
+@@ -0,0 +1,60 @@
++/*
++ * Copyright (c) 2013, 2015-2016 The Linux Foundation. All rights reserved.
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
 +
-+This node models the Qualcomm Technologies IPQ4019 ASoC Codec driver
++#ifndef __QCOM_CLK_QCA_PLL_H__
++#define __QCOM_CLK_QCA_PLL_H__
 +
-+Required properties:
++#include <linux/clk-provider.h>
++#include "clk-regmap.h"
 +
-+- compatible	: "qca,ipq4019-codec"
-+- reg		: should have the stereo i2c register address
-+
-+Example:
-+qca_codec: qca_codec at 12 {
-+	compatible = "qca,ipq4019-codec";
-+	reg = <0x12>;
-+	status = "disabled";
++/**
++ * struct pll_freq_tbl - PLL frequency table
++ * @postplldiv: postplldiv value
++ * @refdiv: refdiv value
++ * @tgt_div_int: tgt_div_int value
++ * @tgt_div_frac: tgt_div_frac values
++ */
++struct pll_freq_tbl {
++	unsigned long freq;
++	u8 postplldiv;
++	u8 refdiv;
++	u8 tgt_div_int;
++	u32 tgt_div_frac;
 +};
-diff --git a/Documentation/devicetree/bindings/sound/qca,ipq4019-i2s.txt b/Documentation/devicetree/bindings/sound/qca,ipq4019-i2s.txt
++
++/**
++ * struct clk_pll - phase locked loop (PLL)
++ * @config_reg: config register
++ * @mode_reg: mode register
++ * @status_reg: status register
++ * @status_bit: ANDed with @status_reg to determine if PLL is enabled
++ * @freq_tbl: PLL frequency table
++ * @hw: handle between common and hardware-specific interfaces
++ */
++struct clk_qcapll {
++	u32 config_reg;
++	u32 mod_reg;
++	u32 modstep_reg;
++	u32 current_mod_pll_reg;
++	u32 config1_reg;
++
++	const struct pll_freq_tbl *freq_tbl;
++	struct clk_regmap clkr;
++};
++
++extern const struct clk_ops clk_qcapll_ops;
++
++#define to_clk_qcapll(_hw) container_of(to_clk_regmap(_hw), \
++						struct clk_qcapll, clkr)
++
++#endif
+diff --git a/drivers/clk/qcom/clk-rcg.h b/drivers/clk/qcom/clk-rcg.h
+index b904c33..562207c 100644
+--- a/drivers/clk/qcom/clk-rcg.h
++++ b/drivers/clk/qcom/clk-rcg.h
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright (c) 2013, The Linux Foundation. All rights reserved.
++ * Copyright (c) 2013-2016 The Linux Foundation. All rights reserved.
+  *
+  * This software is licensed under the terms of the GNU General Public
+  * License version 2, as published by the Free Software Foundation, and
+@@ -20,7 +20,7 @@
+ struct freq_tbl {
+ 	unsigned long freq;
+ 	u8 src;
+-	u8 pre_div;
++	u16 pre_div;
+ 	u16 m;
+ 	u16 n;
+ };
+@@ -68,6 +68,18 @@ struct pre_div {
+ };
+ 
+ /**
++ * struct c_div - custom-divider used with Different Offsets
++ * @c_div_offset: offset of the CDIV in the ADDRESS Space
++ * @c_div_shift: lowest bit of pre divider field
++ * @c_div_width: number of bits in pre divider
++ */
++struct c_div {
++	u32	offset;
++	u8	shift;
++	u32	mask;
++};
++
++/**
+  * struct src_sel - source selector
+  * @src_sel_shift: lowest bit of source selection field
+  * @parent_map: map from software's parent index to hardware's src_sel field
+@@ -172,6 +184,55 @@ struct clk_rcg2 {
+ 
+ #define to_clk_rcg2(_hw) container_of(to_clk_regmap(_hw), struct clk_rcg2, clkr)
+ 
++/**
++ * struct clk_cdiv_rcg2 - cdiv with root clock generator
++ *
++ * @cmd_rcgr: corresponds to *_CMD_RCGR
++ * @mnd_width: number of bits in m/n/d values
++ * @hid_width: number of bits in half integer divider
++ * @parent_map: map from software's parent index to hardware's src_sel field
++ * @freq_tbl: frequency table
++ * @clkr: regmap clock handle
++ * @lock: register lock
++ *
++ */
++struct clk_cdiv_rcg2 {
++	u32		cmd_rcgr;
++	u8		mnd_width;
++	u8		hid_width;
++	struct c_div	cdiv;
++	const struct parent_map	*parent_map;
++	const struct freq_tbl	*freq_tbl;
++	struct clk_regmap	clkr;
++};
++
++#define to_clk_cdiv_rcg2(_hw) container_of(to_clk_regmap(_hw), \
++						struct clk_cdiv_rcg2, clkr)
++
++
++/**
++ * struct clk_muxr_misc - mux and misc register
++ *
++ * @cmd_rcgr: corresponds to *_CMD_RCGR
++ * @mnd_width: number of bits in m/n/d values
++ * @hid_width: number of bits in half integer divider
++ * @parent_map: map from software's parent index to hardware's src_sel field
++ * @freq_tbl: frequency table
++ * @clkr: regmap clock handle
++ * @lock: register lock
++ *
++ */
++struct clk_muxr_misc {
++	struct c_div			muxr;
++	struct c_div			misc;
++	const struct parent_map		*parent_map;
++	const struct freq_tbl	*freq_tbl;
++	struct clk_regmap		clkr;
++};
++
++#define to_clk_muxr_misc(_hw) container_of(to_clk_regmap(_hw), \
++						struct clk_muxr_misc, clkr)
++
+ extern const struct clk_ops clk_rcg2_ops;
+ extern const struct clk_ops clk_rcg2_shared_ops;
+ extern const struct clk_ops clk_edp_pixel_ops;
+@@ -179,5 +240,8 @@ extern const struct clk_ops clk_byte_ops;
+ extern const struct clk_ops clk_byte2_ops;
+ extern const struct clk_ops clk_pixel_ops;
+ extern const struct clk_ops clk_gfx3d_ops;
++extern const struct clk_ops clk_cdiv_rcg2_ops;
++extern const struct clk_ops clk_cpu_rcg2_ops;
++extern const struct clk_ops clk_muxr_misc_ops;
+ 
+ #endif
+diff --git a/drivers/clk/qcom/clk-rcg2.c b/drivers/clk/qcom/clk-rcg2.c
+index a071bba..000c423 100644
+--- a/drivers/clk/qcom/clk-rcg2.c
++++ b/drivers/clk/qcom/clk-rcg2.c
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright (c) 2013, The Linux Foundation. All rights reserved.
++ * Copyright (c) 2013-2016, The Linux Foundation. All rights reserved.
+  *
+  * This software is licensed under the terms of the GNU General Public
+  * License version 2, as published by the Free Software Foundation, and
+@@ -20,7 +20,6 @@
+ #include <linux/delay.h>
+ #include <linux/regmap.h>
+ #include <linux/math64.h>
+-
+ #include <asm/div64.h>
+ 
+ #include "clk-rcg.h"
+@@ -46,6 +45,7 @@
+ #define M_REG			0x8
+ #define N_REG			0xc
+ #define D_REG			0x10
++#define FEPLL_500_SRC		0x2
+ 
+ static int clk_rcg2_is_enabled(struct clk_hw *hw)
+ {
+@@ -209,6 +209,7 @@ static int _freq_tbl_determine_rate(struct clk_hw *hw,
+ 	} else {
+ 		rate =  clk_hw_get_rate(p);
+ 	}
++
+ 	req->best_parent_hw = p;
+ 	req->best_parent_rate = rate;
+ 	req->rate = f->freq;
+@@ -810,3 +811,697 @@ const struct clk_ops clk_gfx3d_ops = {
+ 	.determine_rate = clk_gfx3d_determine_rate,
+ };
+ EXPORT_SYMBOL_GPL(clk_gfx3d_ops);
++
++static int clk_cdiv_rcg2_is_enabled(struct clk_hw *hw)
++{
++	struct clk_cdiv_rcg2 *rcg = to_clk_cdiv_rcg2(hw);
++	u32 cmd = 0;
++	int ret;
++
++	ret = regmap_read(rcg->clkr.regmap, rcg->cmd_rcgr + CMD_REG, &cmd);
++	if (ret < 0)
++		return false;
++
++	return (cmd & CMD_ROOT_OFF) == 0;
++}
++
++static u8 clk_cdiv_rcg2_get_parent(struct clk_hw *hw)
++{
++	struct clk_cdiv_rcg2 *rcg = to_clk_cdiv_rcg2(hw);
++	int num_parents = clk_hw_get_num_parents(hw);
++	u32 cfg;
++	int i, ret;
++
++	ret = regmap_read(rcg->clkr.regmap, rcg->cmd_rcgr + CFG_REG, &cfg);
++	if (ret)
++		goto err;
++
++	cfg &= CFG_SRC_SEL_MASK;
++	cfg >>= CFG_SRC_SEL_SHIFT;
++
++	for (i = 0; i < num_parents; i++)
++		if (cfg == rcg->parent_map[i].cfg)
++			return i;
++err:
++	pr_debug("%s: Cannot find parent of %s clock, using default.\n",
++			__func__, __clk_get_name(hw->clk));
++	return 0;
++}
++
++static int cdiv_update_config(struct clk_cdiv_rcg2 *rcg)
++{
++	int count, ret;
++	struct clk_hw *hw = &rcg->clkr.hw;
++	const char *name = __clk_get_name(hw->clk);
++
++	ret = regmap_update_bits(rcg->clkr.regmap, rcg->cmd_rcgr + CMD_REG,
++				 CMD_UPDATE, CMD_UPDATE);
++	if (ret)
++		return ret;
++
++	/* Wait for update to take effect */
++	for (count = 500; count > 0; count--) {
++		u32 cmd = ~0U;
++
++		/* ignore regmap errors - until we exhaust retry count. */
++		ret = regmap_read(rcg->clkr.regmap, rcg->cmd_rcgr + CMD_REG,
++									&cmd);
++
++		if (ret >= 0 && !(cmd & CMD_UPDATE))
++			return 0;
++
++		udelay(1);
++	}
++
++	WARN(ret, "%s: rcg didn't update its configuration.", name);
++	return ret ? ret : -ETIMEDOUT;
++}
++
++static int clk_cdiv_rcg2_set_parent(struct clk_hw *hw, u8 index)
++{
++	struct clk_cdiv_rcg2 *rcg = to_clk_cdiv_rcg2(hw);
++	int ret;
++
++	ret = regmap_update_bits(rcg->clkr.regmap, rcg->cmd_rcgr + CFG_REG,
++				 CFG_SRC_SEL_MASK,
++				 rcg->parent_map[index].cfg <<
++				 CFG_SRC_SEL_SHIFT);
++	if (ret)
++		return ret;
++
++	return cdiv_update_config(rcg);
++}
++
++static unsigned long
++clk_cdiv_rcg2_recalc_rate(struct clk_hw *hw, unsigned long parent_rate)
++{
++	struct clk_cdiv_rcg2 *rcg = to_clk_cdiv_rcg2(hw);
++	u32 cfg, hid_div, m = 0, n = 0, mode = 0, mask, rate, cdiv;
++	int ret;
++
++	ret = regmap_read(rcg->clkr.regmap, rcg->cmd_rcgr + CFG_REG, &cfg);
++	if (ret)
++		return 0UL;
++
++	if (rcg->mnd_width) {
++		mask = BIT(rcg->mnd_width) - 1;
++		ret = regmap_read(rcg->clkr.regmap, rcg->cmd_rcgr + M_REG, &m);
++		if (ret)
++			return 0UL;
++
++		m &= mask;
++		ret = regmap_read(rcg->clkr.regmap, rcg->cmd_rcgr + N_REG, &n);
++		if (ret)
++			return 0UL;
++
++		n =  ~n;
++		n &= mask;
++
++		n += m;
++		mode = cfg & CFG_MODE_MASK;
++		mode >>= CFG_MODE_SHIFT;
++	}
++
++	mask = BIT(rcg->hid_width) - 1;
++	hid_div = cfg >> CFG_SRC_DIV_SHIFT;
++	hid_div &= mask;
++	rate = calc_rate(parent_rate, m, n, mode, hid_div);
++
++	ret = regmap_read(rcg->clkr.regmap, rcg->cdiv.offset, &cdiv);
++	if (ret)
++		return 0UL;
++
++	cdiv &= (rcg->cdiv.mask << rcg->cdiv.shift);
++	cdiv =  (cdiv >> rcg->cdiv.shift);
++	if (cdiv)
++		rate *= cdiv + 1;
++	return rate;
++}
++
++static int _cdiv_rcg2_freq_tbl_determine_rate(struct clk_hw *hw,
++		const struct freq_tbl *f,
++		struct clk_rate_request *req)
++{
++	unsigned long clk_flags;
++	struct clk_hw *p_hw;
++	unsigned long rate = req->rate;
++
++	f = qcom_find_freq(f, rate);
++	if (!f)
++		return 0L;
++
++	clk_flags = __clk_get_flags(hw->clk);
++	p_hw = clk_hw_get_parent_by_index(hw, f->src);
++	if (clk_flags & CLK_SET_RATE_PARENT) {
++		if (f->pre_div)
++			rate *= f->pre_div;
++		if (f->n) {
++			u64 tmp = rate;
++
++			tmp = tmp * f->n;
++			do_div(tmp, f->m);
++			rate = tmp;
++		}
++	} else {
++		rate =	clk_hw_get_rate(p_hw);
++	}
++
++	req->best_parent_rate = rate;
++	req->best_parent_hw = p_hw;
++	req->rate = f->freq;
++
++	return 0;
++}
++
++
++static int clk_cdiv_rcg2_determine_rate(struct clk_hw *hw,
++					struct clk_rate_request *req)
++{
++	struct clk_cdiv_rcg2 *rcg = to_clk_cdiv_rcg2(hw);
++
++	return _cdiv_rcg2_freq_tbl_determine_rate(hw, rcg->freq_tbl, req);
++}
++
++static int clk_cdiv_rcg2_configure(struct clk_cdiv_rcg2 *rcg,
++				const struct freq_tbl *f)
++{
++	u32 cfg = 0, mask;
++	u32 i;
++	int ret;
++
++	if (rcg->mnd_width && f->n) {
++		mask = BIT(rcg->mnd_width) - 1;
++		ret = regmap_update_bits(rcg->clkr.regmap,
++				rcg->cmd_rcgr + M_REG, mask, f->m);
++		if (ret)
++			return ret;
++
++		ret = regmap_update_bits(rcg->clkr.regmap,
++				rcg->cmd_rcgr + N_REG, mask, ~(f->n - f->m));
++		if (ret)
++			return ret;
++
++		ret = regmap_update_bits(rcg->clkr.regmap,
++				rcg->cmd_rcgr + D_REG, mask, ~f->n);
++		if (ret)
++			return ret;
++	}
++
++
++	if (rcg->cdiv.mask && f->pre_div > 16) {
++
++		/* The division is handled by two dividers. Both of which can
++		 * divide by a maximum value of 16. To achieve a division of
++		 * 256 = 16 * 16, we use a divider of 16 in the RCGR and the
++		 * other divider of 16 in the MISC Register.
++		 */
++		for (i = 2; i <= 16; i++) {
++			if (f->pre_div % i == 0)
++				cfg = i;
++		}
++
++		if (f->pre_div/cfg > 16)
++			return -EINVAL;
++		mask = (rcg->cdiv.mask)<<rcg->cdiv.shift;
++		ret = regmap_update_bits(rcg->clkr.regmap,
++					rcg->cdiv.offset, mask,
++				((cfg - 1) << rcg->cdiv.shift) & mask);
++		if (ret)
++			return ret;
++		cfg = (2 * (f->pre_div / cfg)) - 1;
++	} else {
++		ret = regmap_write(rcg->clkr.regmap, rcg->cdiv.offset, 0x0);
++		if (ret)
++			return ret;
++		cfg = ((2 * f->pre_div) - 1) << CFG_SRC_DIV_SHIFT;
++	}
++
++	mask = BIT(rcg->hid_width) - 1;
++	mask |= CFG_SRC_SEL_MASK | CFG_MODE_MASK;
++	cfg |= rcg->parent_map[f->src].cfg << CFG_SRC_SEL_SHIFT;
++	if (rcg->mnd_width && f->n)
++		cfg |= CFG_MODE_DUAL_EDGE;
++	ret = regmap_update_bits(rcg->clkr.regmap,
++			rcg->cmd_rcgr + CFG_REG, mask, cfg);
++	if (ret)
++		return ret;
++
++	return cdiv_update_config(rcg);
++}
++
++static int __clk_cdiv_rcg2_set_rate(struct clk_hw *hw, unsigned long rate)
++{
++	struct clk_cdiv_rcg2 *rcg = to_clk_cdiv_rcg2(hw);
++	const struct freq_tbl *f;
++
++	f = qcom_find_freq(rcg->freq_tbl, rate);
++	if (!f)
++		return -EINVAL;
++
++	return clk_cdiv_rcg2_configure(rcg, f);
++}
++
++static int clk_cdiv_rcg2_set_rate(struct clk_hw *hw, unsigned long rate,
++			    unsigned long parent_rate)
++{
++	return __clk_cdiv_rcg2_set_rate(hw, rate);
++}
++
++static int clk_cdiv_rcg2_set_rate_and_parent(struct clk_hw *hw,
++		unsigned long rate, unsigned long parent_rate, u8 index)
++{
++	return __clk_cdiv_rcg2_set_rate(hw, rate);
++}
++
++const struct clk_ops clk_cdiv_rcg2_ops = {
++	.is_enabled			= clk_cdiv_rcg2_is_enabled,
++	.get_parent			= clk_cdiv_rcg2_get_parent,
++	.set_parent			= clk_cdiv_rcg2_set_parent,
++	.recalc_rate			= clk_cdiv_rcg2_recalc_rate,
++	.determine_rate			= clk_cdiv_rcg2_determine_rate,
++	.set_rate			= clk_cdiv_rcg2_set_rate,
++	.set_rate_and_parent		= clk_cdiv_rcg2_set_rate_and_parent,
++};
++EXPORT_SYMBOL_GPL(clk_cdiv_rcg2_ops);
++
++static int clk_muxr_is_enabled(struct clk_hw *hw)
++{
++	return 0;
++}
++
++static u8 clk_muxr_get_parent(struct clk_hw *hw)
++{
++	struct clk_muxr_misc *rcg = to_clk_muxr_misc(hw);
++	int num_parents = clk_hw_get_num_parents(hw);
++	u32 cfg;
++	int i, ret;
++
++	ret = regmap_read(rcg->clkr.regmap, rcg->muxr.offset, &cfg);
++	if (ret)
++		goto err;
++
++	cfg >>= rcg->muxr.shift;
++	cfg &= rcg->muxr.mask;
++
++	for (i = 0; i < num_parents; i++)
++		if (cfg == rcg->parent_map[i].cfg)
++			return i;
++
++err:
++	pr_debug("%s: Cannot find parent of %s clock, using default.\n",
++			__func__, __clk_get_name(hw->clk));
++	return 0;
++}
++
++static int clk_muxr_set_parent(struct clk_hw *hw, u8 index)
++{
++	struct clk_muxr_misc *rcg = to_clk_muxr_misc(hw);
++	int ret;
++
++	ret = regmap_update_bits(rcg->clkr.regmap, rcg->muxr.offset,
++				 (rcg->muxr.mask<<rcg->muxr.shift),
++				 rcg->parent_map[index].cfg << rcg->muxr.shift);
++	if (ret)
++		return ret;
++
++	return 0;
++}
++
++static unsigned long
++clk_muxr_recalc_rate(struct clk_hw *hw, unsigned long parent_rate)
++{
++	struct clk_muxr_misc *rcg = to_clk_muxr_misc(hw);
++	u32 misc;
++	int ret;
++
++	ret = regmap_read(rcg->clkr.regmap, rcg->misc.offset, &misc);
++	if (ret)
++		return 0UL;
++
++	misc &= rcg->misc.mask;
++	misc >>= rcg->misc.shift;
++
++	return parent_rate * (misc + 1);
++}
++
++static int clk_muxr_determine_rate(struct clk_hw *hw,
++				   struct clk_rate_request *req)
++{
++	struct clk_muxr_misc *rcg = to_clk_muxr_misc(hw);
++	const struct freq_tbl *f;
++	unsigned long clk_flags;
++	unsigned long rate = req->rate;
++	struct clk_hw *p_hw;
++
++	f = qcom_find_freq(rcg->freq_tbl, rate);
++	if (!f)
++		return 0L;
++
++	clk_flags = __clk_get_flags(hw->clk);
++	p_hw = clk_hw_get_parent_by_index(hw, f->src);
++	if (clk_flags & CLK_SET_RATE_PARENT) {
++		if (f->pre_div)
++			rate *= f->pre_div;
++	} else {
++		rate =	clk_hw_get_rate(p_hw);
++	}
++
++	req->best_parent_rate = rate;
++	req->best_parent_hw = p_hw;
++	req->rate = f->freq;
++
++	return 0;
++}
++
++static int __clk_muxr_set_rate(struct clk_hw *hw, unsigned long rate)
++{
++	struct clk_muxr_misc *rcg = to_clk_muxr_misc(hw);
++	const struct freq_tbl *f;
++	int ret;
++
++	f = qcom_find_freq(rcg->freq_tbl, rate);
++	if (!f)
++		return -EINVAL;
++
++	ret = regmap_update_bits(rcg->clkr.regmap, rcg->muxr.offset,
++				rcg->muxr.mask << rcg->muxr.shift,
++				rcg->parent_map[f->src].cfg << rcg->muxr.shift);
++	if (ret)
++		return ret;
++
++	ret = regmap_update_bits(rcg->clkr.regmap, rcg->misc.offset,
++				rcg->misc.mask << rcg->misc.shift,
++				(f->pre_div - 1) << rcg->misc.shift);
++	return ret;
++}
++
++static int clk_muxr_set_rate(struct clk_hw *hw, unsigned long rate,
++			    unsigned long parent_rate)
++{
++	return __clk_muxr_set_rate(hw, rate);
++}
++
++static int clk_muxr_set_rate_and_parent(struct clk_hw *hw,
++		unsigned long rate, unsigned long parent_rate, u8 index)
++{
++	return __clk_muxr_set_rate(hw, rate);
++}
++
++const struct clk_ops clk_muxr_misc_ops = {
++	.is_enabled	=	clk_muxr_is_enabled,
++	.get_parent	=	clk_muxr_get_parent,
++	.set_parent	=	clk_muxr_set_parent,
++	.recalc_rate	=	clk_muxr_recalc_rate,
++	.determine_rate	=	clk_muxr_determine_rate,
++	.set_rate	=	clk_muxr_set_rate,
++	.set_rate_and_parent	=	clk_muxr_set_rate_and_parent,
++};
++EXPORT_SYMBOL_GPL(clk_muxr_misc_ops);
++
++static int clk_cpu_rcg2_is_enabled(struct clk_hw *hw)
++{
++	struct clk_cdiv_rcg2 *rcg = to_clk_cdiv_rcg2(hw);
++	u32 cmd;
++	int ret;
++
++	ret = regmap_read(rcg->clkr.regmap, rcg->cmd_rcgr + CMD_REG, &cmd);
++	if (ret)
++		return 0;
++
++	return (cmd & CMD_ROOT_OFF) == 0;
++
++}
++
++static u8 clk_cpu_rcg2_get_parent(struct clk_hw *hw)
++{
++	struct clk_cdiv_rcg2 *rcg = to_clk_cdiv_rcg2(hw);
++	int num_parents = clk_hw_get_num_parents(hw);
++	u32 cfg;
++	int i, ret;
++
++	ret = regmap_read(rcg->clkr.regmap, rcg->cmd_rcgr + CFG_REG, &cfg);
++	if (ret)
++		goto err;
++
++	cfg &= CFG_SRC_SEL_MASK;
++	cfg >>= CFG_SRC_SEL_SHIFT;
++
++	for (i = 0; i < num_parents; i++)
++		if (cfg == rcg->parent_map[i].cfg)
++			return i;
++
++err:
++	pr_debug("%s: Cannot find parent of %s clock, using default.\n",
++			__func__, __clk_get_name(hw->clk));
++	return 0;
++}
++
++static int cpu_rcg2_update_config(struct clk_cdiv_rcg2 *rcg)
++{
++	int count, ret;
++	u32 cmd;
++	struct clk_hw *hw = &rcg->clkr.hw;
++	const char *name = __clk_get_name(hw->clk);
++
++	ret = regmap_update_bits(rcg->clkr.regmap, rcg->cmd_rcgr + CMD_REG,
++				 CMD_UPDATE, CMD_UPDATE);
++	if (ret)
++		return ret;
++
++	/* Wait for update to take effect */
++	for (count = 500; count > 0; count--) {
++		/* ignore regmap errors until we exhaust retry count.*/
++		ret = regmap_read(rcg->clkr.regmap, rcg->cmd_rcgr + CMD_REG,
++									&cmd);
++		if (ret >= 0 && !(cmd & CMD_UPDATE))
++			return 0;
++
++		udelay(1);
++	}
++
++	WARN(1, "%s: rcg didn't update its configuration.", name);
++	return ret ? ret : -ETIMEDOUT;
++}
++
++static int clk_cpu_rcg2_set_parent(struct clk_hw *hw, u8 index)
++{
++	struct clk_cdiv_rcg2 *rcg = to_clk_cdiv_rcg2(hw);
++	int ret;
++
++	ret = regmap_update_bits(rcg->clkr.regmap, rcg->cmd_rcgr + CFG_REG,
++				 CFG_SRC_SEL_MASK,
++				 rcg->parent_map[index].cfg <<
++				 CFG_SRC_SEL_SHIFT);
++	if (ret)
++		return ret;
++
++	return cpu_rcg2_update_config(rcg);
++}
++
++
++/*
++ * These are used for looking up the actual divider ratios
++ * the divider used for DDR PLL Post divider is not linear,
++ * hence we need this look up table
++ */
++static const unsigned char ddrpll_div[] = {
++		12,
++		13,
++		14,
++		15,
++		16,
++		17,
++		18,
++		19,
++		20,
++		21,
++		22,
++		24,
++		26,
++		28
++};
++
++static unsigned long
++clk_cpu_rcg2_recalc_rate(struct clk_hw *hw, unsigned long parent_rate)
++{
++	struct clk_cdiv_rcg2 *rcg = to_clk_cdiv_rcg2(hw);
++	u32 cfg, hid_div, m = 0, n = 0, mode = 0, mask, cdiv;
++	unsigned long rate;
++	u32 src;
++	int ret;
++
++	ret = regmap_read(rcg->clkr.regmap, rcg->cmd_rcgr + CFG_REG, &cfg);
++	if (ret)
++		return 0UL;
++
++	if (rcg->mnd_width) {
++		mask = BIT(rcg->mnd_width) - 1;
++		ret = regmap_read(rcg->clkr.regmap, rcg->cmd_rcgr + M_REG, &m);
++		if (ret)
++			return 0UL;
++
++		m &= mask;
++
++		ret = regmap_read(rcg->clkr.regmap, rcg->cmd_rcgr + N_REG, &n);
++		if (ret)
++			return 0UL;
++
++		n =  ~n;
++		n &= mask;
++
++		n += m;
++		mode = cfg & CFG_MODE_MASK;
++		mode >>= CFG_MODE_SHIFT;
++	}
++
++	mask = BIT(rcg->hid_width) - 1;
++	hid_div = cfg >> CFG_SRC_DIV_SHIFT;
++	hid_div &= mask;
++	rate = calc_rate(parent_rate, m, n, mode, hid_div);
++	src = (cfg >> CFG_SRC_SEL_SHIFT) & 0xf;
++	if (src == 0x1) {
++		u64 tmp;
++
++		ret = regmap_read(rcg->clkr.regmap, rcg->cdiv.offset, &cdiv);
++		if (ret)
++			return 0UL;
++
++		cdiv &= (rcg->cdiv.mask << rcg->cdiv.shift);
++		cdiv = cdiv >> rcg->cdiv.shift;
++		tmp = rate;
++		do_div(tmp, ddrpll_div[cdiv]);
++		rate = tmp;
++		rate *= 16;
++		tmp = rate;
++		do_div(tmp, 1000000);
++		rate = tmp;
++		rate = rate * 1000000;
++	}
++	return rate;
++}
++
++static int _cpu_rcg2_freq_tbl_determine_rate(struct clk_hw *hw,
++		const struct freq_tbl *f,
++		struct clk_rate_request *req)
++{
++	unsigned long clk_flags;
++	struct clk_hw *p_hw;
++	unsigned long rate;
++
++	f = qcom_find_freq(f, req->rate);
++	if (!f)
++		return 0L;
++
++	clk_flags = __clk_get_flags(hw->clk);
++	p_hw = clk_hw_get_parent_by_index(hw, f->src);
++	rate = clk_hw_get_rate(p_hw);
++
++	req->best_parent_rate = rate;
++	req->best_parent_hw = p_hw;
++	req->rate = f->freq;
++
++	return 0;
++}
++
++static int clk_cpu_rcg2_determine_rate(struct clk_hw *hw,
++					struct clk_rate_request *req)
++{
++	struct clk_cdiv_rcg2 *rcg = to_clk_cdiv_rcg2(hw);
++
++	return _cpu_rcg2_freq_tbl_determine_rate(hw, rcg->freq_tbl, req);
++}
++
++
++static int clk_cpu_rcg2_configure(struct clk_cdiv_rcg2 *rcg,
++						const struct freq_tbl *f)
++{
++	u32 cfg, mask;
++	int ret;
++
++	if (rcg->mnd_width && f->n) {
++		mask = BIT(rcg->mnd_width) - 1;
++		ret = regmap_update_bits(rcg->clkr.regmap,
++				rcg->cmd_rcgr + M_REG, mask, f->m);
++		if (ret)
++			return ret;
++
++		ret = regmap_update_bits(rcg->clkr.regmap,
++				rcg->cmd_rcgr + N_REG, mask, ~(f->n - f->m));
++		if (ret)
++			return ret;
++
++		ret = regmap_update_bits(rcg->clkr.regmap,
++				rcg->cmd_rcgr + D_REG, mask, ~f->n);
++		if (ret)
++			return ret;
++	}
++
++	if ((rcg->parent_map[f->src].cfg == 0x01)) {
++		mask = (BIT(rcg->hid_width) - 1);
++		mask |= CFG_SRC_SEL_MASK | CFG_MODE_MASK;
++		cfg = FEPLL_500_SRC << CFG_SRC_SEL_SHIFT;
++		cfg |= (1 << CFG_SRC_DIV_SHIFT);
++		ret = regmap_update_bits(rcg->clkr.regmap,
++					rcg->cmd_rcgr + CFG_REG, mask, cfg);
++		if (ret)
++			return ret;
++		cpu_rcg2_update_config(rcg);
++		mask = (rcg->cdiv.mask)<<rcg->cdiv.shift;
++		ret = regmap_update_bits(rcg->clkr.regmap,
++					rcg->cdiv.offset, mask,
++				(f->pre_div << rcg->cdiv.shift) & mask);
++		udelay(1);
++		mask = BIT(rcg->hid_width) - 1;
++		mask |= CFG_SRC_SEL_MASK | CFG_MODE_MASK;
++		cfg = 1 << CFG_SRC_DIV_SHIFT;
++	} else {
++		mask = BIT(rcg->hid_width) - 1;
++		mask |= CFG_SRC_SEL_MASK | CFG_MODE_MASK;
++		cfg = f->pre_div << CFG_SRC_DIV_SHIFT;
++	}
++
++	cfg |= rcg->parent_map[f->src].cfg << CFG_SRC_SEL_SHIFT;
++	if (rcg->mnd_width && f->n)
++		cfg |= CFG_MODE_DUAL_EDGE;
++	ret = regmap_update_bits(rcg->clkr.regmap,
++					rcg->cmd_rcgr + CFG_REG, mask, cfg);
++	if (ret)
++		return ret;
++
++	return cpu_rcg2_update_config(rcg);
++}
++
++static int __clk_cpu_rcg2_set_rate(struct clk_hw *hw, unsigned long rate)
++{
++	struct clk_cdiv_rcg2 *rcg = to_clk_cdiv_rcg2(hw);
++	const struct freq_tbl *f;
++
++	f = qcom_find_freq(rcg->freq_tbl, rate);
++	if (!f)
++		return -EINVAL;
++
++	return clk_cpu_rcg2_configure(rcg, f);
++}
++
++static int clk_cpu_rcg2_set_rate(struct clk_hw *hw, unsigned long rate,
++			    unsigned long parent_rate)
++{
++	return __clk_cpu_rcg2_set_rate(hw, rate);
++}
++
++static int clk_cpu_rcg2_set_rate_and_parent(struct clk_hw *hw,
++		unsigned long rate, unsigned long parent_rate, u8 index)
++{
++	return __clk_cpu_rcg2_set_rate(hw, rate);
++}
++
++const struct clk_ops clk_cpu_rcg2_ops = {
++	.is_enabled	=	clk_cpu_rcg2_is_enabled,
++	.get_parent	=	clk_cpu_rcg2_get_parent,
++	.set_parent	=	clk_cpu_rcg2_set_parent,
++	.recalc_rate	=	clk_cpu_rcg2_recalc_rate,
++	.determine_rate	=	clk_cpu_rcg2_determine_rate,
++	.set_rate	=	clk_cpu_rcg2_set_rate,
++	.set_rate_and_parent	=	clk_cpu_rcg2_set_rate_and_parent,
++};
++EXPORT_SYMBOL_GPL(clk_cpu_rcg2_ops);
+diff --git a/drivers/clk/qcom/common.c b/drivers/clk/qcom/common.c
+index f7c226a..0851122 100644
+--- a/drivers/clk/qcom/common.c
++++ b/drivers/clk/qcom/common.c
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright (c) 2013-2014, The Linux Foundation. All rights reserved.
++ * Copyright (c) 2013-2016, The Linux Foundation. All rights reserved.
+  *
+  * This software is licensed under the terms of the GNU General Public
+  * License version 2, as published by the Free Software Foundation, and
+@@ -269,4 +269,11 @@ int qcom_cc_probe(struct platform_device *pdev, const struct qcom_cc_desc *desc)
+ }
+ EXPORT_SYMBOL_GPL(qcom_cc_probe);
+ 
++void qcom_cc_remove(struct platform_device *pdev)
++{
++	of_clk_del_provider(pdev->dev.of_node);
++	reset_controller_unregister(platform_get_drvdata(pdev));
++}
++EXPORT_SYMBOL_GPL(qcom_cc_remove);
++
+ MODULE_LICENSE("GPL v2");
+diff --git a/drivers/clk/qcom/common.h b/drivers/clk/qcom/common.h
+index ae9bdeb..ad66ae2 100644
+--- a/drivers/clk/qcom/common.h
++++ b/drivers/clk/qcom/common.h
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright (c) 2014, The Linux Foundation. All rights reserved.
++ * Copyright (c) 2014-2016 The Linux Foundation. All rights reserved.
+  *
+  * This software is licensed under the terms of the GNU General Public
+  * License version 2, as published by the Free Software Foundation, and
+@@ -48,5 +48,6 @@ extern int qcom_cc_really_probe(struct platform_device *pdev,
+ 				struct regmap *regmap);
+ extern int qcom_cc_probe(struct platform_device *pdev,
+ 			 const struct qcom_cc_desc *desc);
++extern void qcom_cc_remove(struct platform_device *pdev);
+ 
+ #endif
+diff --git a/include/dt-bindings/clock/qca,adcc-ipq4019.h b/include/dt-bindings/clock/qca,adcc-ipq4019.h
 new file mode 100644
-index 0000000..af9b63e
+index 0000000..9bd5f35
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/sound/qca,ipq4019-i2s.txt
-@@ -0,0 +1,33 @@
-+* Qualcomm Technologies IPQ4019 ASoC PCM driver
++++ b/include/dt-bindings/clock/qca,adcc-ipq4019.h
+@@ -0,0 +1,45 @@
++/*
++ * Copyright (c) 2015-2016, The Linux Foundation. All rights reserved.
++ *
++ * Permission to use, copy, modify, and/or distribute this software for any
++ * purpose with or without fee is hereby granted, provided that the above
++ * copyright notice and this permission notice appear in all copies.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
++ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
++ * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
++ * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
++ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
++ * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
++ * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
++ *
++ */
++#ifndef _DT_BINDINGS_CLK_IPQ_ADCC_4019_H
++#define _DT_BINDINGS_CLK_IPQ_ADCC_4019_H
 +
-+This node models the Qualcomm Technologies IPQ4019 ASoC I2S PCM driver
++#define ADSS_PLL_SRC				1
++#define RXM_CLK_SRC				2
++#define ADCC_RXM_CLK_SRC			3
++#define TXM_CLK_SRC				4
++#define ADCC_TXM_CLK_SRC			5
++#define TXB_CLK_SRC				6
++#define ADCC_TXB_CLK_SRC			7
++#define RXB_CLK_SRC				8
++#define ADCC_RXB_CLK_SRC			9
++#define PCM_CLK_SRC				10
++#define ADCC_PCM_CLK_SRC			11
++#define AUDIO_SPDIFINFAST_SRC			12
++#define ADCC_AUDIO_SPDIFINFAST_SRC		13
++#define ADCC_AUDIO_AHB_SRC			14
++#define ADCC_AHB_I2S0				15
++#define ADCC_AHB_I2S3				16
++#define ADCC_AHB_MBOX0_SRC			17
++#define ADCC_AHB_MBOX3_SRC			18
++#define SPDIF_SRC				19
++#define ADCC_SPDIF_SRC				20
++#define SPDIFDIV2_SRC				21
++#define ADCC_SPDIFDIV2_SRC			22
++#define ADCC_SAMPLE_SRC				23
++#define ADCC_XO_SRC				24
 +
-+Required properties:
-+
-+- compatible	 : "qca,ipq4019-i2s"
-+- dma-tx-channel : should have the mbox tx channel id
-+- dma-rx-channel : should have the mbox rx channel id
-+- stereo-tx-port : should have the stereo tx id
-+- stereo-rx-port : should have the stereo rx id
-+- clocks	 : should have the audio tx bit clock, tx master clock,
-+		   rx bit clock, rx master clock id
-+- clock-names	 : should be "audio_tx_bclk", "audio_tx_mclk", "audio_rx_bclk",
-+		   "audio_rx_mclk"
-+
-+Example:
-+i2s: ipq4019-pcm-i2s at 0 {
-+	compatible = "qca,ipq4019-i2s";
-+	dma-tx-channel = <MBOX0_TX_ID>;
-+	dma-rx-channel = <MBOX3_RX_ID>;
-+	stereo-tx-port = <STEREO0_ID>;
-+	stereo-rx-port = <STEREO3_ID>;
-+	clocks = <&adcc ADCC_TXB_CLK_SRC>,
-+		<&adcc ADCC_TXM_CLK_SRC>,
-+		<&adcc ADCC_RXB_CLK_SRC>,
-+		<&adcc ADCC_RXM_CLK_SRC>;
-+	clock-names = "audio_tx_bclk",
-+		"audio_tx_mclk",
-+		"audio_rx_bclk",
-+		"audio_rx_mclk";
-+	status = "disabled";
-+};
-diff --git a/Documentation/devicetree/bindings/sound/qca,ipq4019-i2s1.txt b/Documentation/devicetree/bindings/sound/qca,ipq4019-i2s1.txt
-new file mode 100644
-index 0000000..47333b3
---- /dev/null
-+++ b/Documentation/devicetree/bindings/sound/qca,ipq4019-i2s1.txt
-@@ -0,0 +1,29 @@
-+* Qualcomm Technologies IPQ4019 ASoC I2S PCM driver
-+
-+This node models the Qualcomm Technologies IPQ4019 ASoC I2S PCM driver
-+
-+Required properties:
-+
-+- compatible	 : "qca,ipq4019-i2s1"
-+- dma-tx-channel : should have the mbox tx channel id
-+- stereo-tx-port : should have the stereo tx id
-+- clocks	 : should have the audio tx bit clock, tx master clock,
-+		   rx bit clock, rx master clock id
-+- clock-names	 : should be "audio_tx_bclk", "audio_tx_mclk", "audio_rx_bclk",
-+		   "audio_rx_mclk"
-+
-+Example:
-+i2s1: ipq4019-pcm-i2s1 at 0 {
-+	compatible = "qca,ipq4019-i2s1";
-+	dma-tx-channel = <MBOX1_TX_ID>;
-+	stereo-tx-port = <STEREO1_ID>;
-+	clocks = <&adcc ADCC_TXB_CLK_SRC>,
-+		<&adcc ADCC_TXM_CLK_SRC>,
-+		<&adcc ADCC_RXB_CLK_SRC>,
-+		<&adcc ADCC_RXM_CLK_SRC>;
-+	clock-names = "audio_tx_bclk",
-+		"audio_tx_mclk",
-+		"audio_rx_bclk",
-+		"audio_rx_mclk";
-+	status = "disabled";
-+};
-diff --git a/Documentation/devicetree/bindings/sound/qca,ipq4019-i2s2.txt b/Documentation/devicetree/bindings/sound/qca,ipq4019-i2s2.txt
-new file mode 100644
-index 0000000..9af0113
---- /dev/null
-+++ b/Documentation/devicetree/bindings/sound/qca,ipq4019-i2s2.txt
-@@ -0,0 +1,29 @@
-+* Qualcomm Technologies IPQ4019 ASoC I2S PCM driver
-+
-+This node models the Qualcomm Technologies IPQ4019 ASoC I2S PCM driver
-+
-+Required properties:
-+
-+- compatible	 : "qca,ipq4019-i2s2"
-+- dma-tx-channel : should have the mbox tx channel id
-+- stereo-tx-port : should have the stereo tx id
-+- clocks	 : should have the audio tx bit clock, tx master clock,
-+		   rx bit clock, rx master clock id
-+- clock-names	 : should be "audio_tx_bclk", "audio_tx_mclk", "audio_rx_bclk",
-+		   "audio_rx_mclk"
-+
-+Example:
-+i2s1: ipq4019-pcm-i2s2 at 0 {
-+	compatible = "qca,ipq4019-i2s2";
-+	dma-tx-channel = <MBOX2_TX_ID>;
-+	stereo-tx-port = <STEREO2_ID>;
-+	clocks = <&adcc ADCC_TXB_CLK_SRC>,
-+		<&adcc ADCC_TXM_CLK_SRC>,
-+		<&adcc ADCC_RXB_CLK_SRC>,
-+		<&adcc ADCC_RXM_CLK_SRC>;
-+	clock-names = "audio_tx_bclk",
-+		"audio_tx_mclk",
-+		"audio_rx_bclk",
-+		"audio_rx_mclk";
-+	status = "disabled";
-+};
-diff --git a/Documentation/devicetree/bindings/sound/qca,ipq4019-mbox.txt b/Documentation/devicetree/bindings/sound/qca,ipq4019-mbox.txt
-new file mode 100644
-index 0000000..51d6c51
---- /dev/null
-+++ b/Documentation/devicetree/bindings/sound/qca,ipq4019-mbox.txt
-@@ -0,0 +1,23 @@
-+* Qualcomm Technologies IPQ4019 ASoC MBOX driver
-+
-+This node models the Qualcomm Technologies IPQ4019 ASoC mbox driver
-+
-+Required properties:
-+
-+- compatible	 : "qca,ipq4019-mbox"
-+- dma-index	 : should have the mbox dma index
-+- reg		 : should have the stereo register address, length
-+- interrupts	 : should have the mbox interrupt no
-+- tx-channel	 : should have the mbox tx id
-+- rx-channel	 : should have the mbox rx id
-+
-+Example:
-+mbox0: mbox at 7708000 {
-+	compatible = "qca,ipq4019-mbox";
-+	dma-index = <0>;
-+	reg = <0x7708000 0x1000>;
-+	interrupts = <0 156 0>;
-+	tx-channel = <MBOX0_TX_ID>;
-+	rx-channel = <MBOX0_RX_ID>;
-+	status = "disabled";
-+};
-diff --git a/Documentation/devicetree/bindings/sound/qca,ipq4019-pcm-i2s.txt b/Documentation/devicetree/bindings/sound/qca,ipq4019-pcm-i2s.txt
-new file mode 100644
-index 0000000..a47c7fb
---- /dev/null
-+++ b/Documentation/devicetree/bindings/sound/qca,ipq4019-pcm-i2s.txt
-@@ -0,0 +1,15 @@
-+* Qualcomm Technologies IPQ4019 ASoC platform driver
-+
-+This node models the Qualcomm Technologies IPQ4019 ASoC platform driver
-+
-+Required properties:
-+
-+- compatible	 : "qca,ipq4019-pcm-i2s"
-+- reg		 : should have the stereo register address, length
-+
-+Example:
-+i2splatform: qca-pcm-i2s at 7709000 {
-+	compatible = "qca,ipq4019-pcm-i2s";
-+	reg = <0x7709000 0x1000>;
-+	status = "disabled";
-+};
-diff --git a/Documentation/devicetree/bindings/sound/qca,ipq4019-pcm-i2s1.txt b/Documentation/devicetree/bindings/sound/qca,ipq4019-pcm-i2s1.txt
-new file mode 100644
-index 0000000..cf23ca0b
---- /dev/null
-+++ b/Documentation/devicetree/bindings/sound/qca,ipq4019-pcm-i2s1.txt
-@@ -0,0 +1,15 @@
-+* Qualcomm Technologies IPQ4019 ASoC platform driver
-+
-+This node models the Qualcomm Technologies IPQ4019 ASoC platform driver
-+
-+Required properties:
-+
-+- compatible	 : "qca,ipq4019-pcm-i2s1"
-+- reg		 : should have the stereo register address, length
-+
-+Example:
-+i2s1platform: qca-pcm-i2s1 at 770b000 {
-+	compatible = "qca,ipq4019-pcm-i2s1";
-+	reg = <0x770b000 0x1000>;
-+	status = "disabled";
-+};
-diff --git a/Documentation/devicetree/bindings/sound/qca,ipq4019-pcm-i2s2.txt b/Documentation/devicetree/bindings/sound/qca,ipq4019-pcm-i2s2.txt
-new file mode 100644
-index 0000000..ae04380
---- /dev/null
-+++ b/Documentation/devicetree/bindings/sound/qca,ipq4019-pcm-i2s2.txt
-@@ -0,0 +1,15 @@
-+* Qualcomm Technologies IPQ4019 ASoC platform driver
-+
-+This node models the Qualcomm Technologies IPQ4019 ASoC platform driver
-+
-+Required properties:
-+
-+- compatible	 : "qca,ipq4019-pcm-i2s2"
-+- reg		 : should have the stereo register address, length
-+
-+Example:
-+i2s2platform: qca-pcm-i2s1 at 770d000 {
-+	compatible = "qca,ipq4019-pcm-i2s2";
-+	reg = <0x770d000 0x1000>;
-+	status = "disabled";
-+};
-diff --git a/Documentation/devicetree/bindings/sound/qca,ipq4019-pcm-spdif.txt b/Documentation/devicetree/bindings/sound/qca,ipq4019-pcm-spdif.txt
-new file mode 100644
-index 0000000..b47c02c
---- /dev/null
-+++ b/Documentation/devicetree/bindings/sound/qca,ipq4019-pcm-spdif.txt
-@@ -0,0 +1,15 @@
-+* Qualcomm Technologies IPQ4019 ASoC SPDIF platform driver
-+
-+This node models the Qualcomm Technologies IPQ4019 ASoC SPDIF platform driver
-+
-+Required properties:
-+
-+- compatible	 : "qca,ipq4019-pcm-spdif"
-+- reg		 : should have the stereo register address, length
-+
-+Example:
-+tdmplatform: qca-pcm-spdif at 7707000 {
-+	compatible = "qca,ipq4019-pcm-spdif";
-+	reg = <0x7709000 0x1000>;
-+	status = "disabled";
-+};
-diff --git a/Documentation/devicetree/bindings/sound/qca,ipq4019-pcm-tdm.txt b/Documentation/devicetree/bindings/sound/qca,ipq4019-pcm-tdm.txt
-new file mode 100644
-index 0000000..bd3aaa3
---- /dev/null
-+++ b/Documentation/devicetree/bindings/sound/qca,ipq4019-pcm-tdm.txt
-@@ -0,0 +1,15 @@
-+* Qualcomm Technologies IPQ4019 ASoC TDM platform driver
-+
-+This node models the Qualcomm Technologies IPQ4019 ASoC TDM platform driver
-+
-+Required properties:
-+
-+- compatible	 : "qca,ipq4019-pcm-tdm"
-+- reg		 : should have the stereo register address, length
-+
-+Example:
-+tdmplatform: qca-pcm-tdm at 7709000 {
-+	compatible = "qca,ipq4019-pcm-tdm";
-+	reg = <0x7709000 0x1000>;
-+	status = "disabled";
-+};
-diff --git a/Documentation/devicetree/bindings/sound/qca,ipq4019-spdif.txt b/Documentation/devicetree/bindings/sound/qca,ipq4019-spdif.txt
-new file mode 100644
-index 0000000..5a80bbe
---- /dev/null
-+++ b/Documentation/devicetree/bindings/sound/qca,ipq4019-spdif.txt
-@@ -0,0 +1,35 @@
-+* Qualcomm Technologies IPQ4019 ASoC SPDIF driver
-+
-+This node models the Qualcomm Technologies IPQ4019 ASoC SPDIF driver
-+
-+Required properties:
-+
-+- compatible	 : "qca,ipq4019-spdif"
-+- dma-tx-channel : should have the mbox tx channel id
-+- dma-rx-channel : should have the mbox rx channel id
-+- stereo-tx-port : should have the stereo tx id
-+- stereo-rx-port : should have the stereo tx id
-+- clocks	 : should have the audio tx bit clock, tx master clock,
-+		   spdif clock, spdif divider clock, spdif in fast clock
-+- clock-names	 : should be "audio_tx_bclk", "audio_tx_mclk", "audio_spdif_src",
-+		   "audio_spdif_div2", "audio_spdifinfast_src"
-+
-+Example:
-+spdif: spdif at 0 {
-+	compatible = "qca,ipq4019-spdif";
-+	dma-tx-channel = <MBOX0_TX_ID>;
-+	dma-rx-channel = <MBOX3_RX_ID>;
-+	stereo-tx-port = <STEREO0_ID>;
-+	stereo-rx-port = <STEREO3_ID>;
-+	clocks = <&adcc ADCC_TXB_CLK_SRC>,
-+		<&adcc ADCC_TXM_CLK_SRC>,
-+		<&adcc ADCC_SPDIF_SRC>,
-+		<&adcc ADCC_SPDIFDIV2_SRC>,
-+		<&adcc ADCC_AUDIO_SPDIFINFAST_SRC>;
-+	clock-names = "audio_tx_bclk",
-+		"audio_tx_mclk",
-+		"audio_spdif_src",
-+		"audio_spdif_div2",
-+		"audio_spdifinfast_src";
-+	status = "disabled";
-+};
-diff --git a/Documentation/devicetree/bindings/sound/qca,ipq4019-stereo.txt b/Documentation/devicetree/bindings/sound/qca,ipq4019-stereo.txt
-new file mode 100644
-index 0000000..35b4815
---- /dev/null
-+++ b/Documentation/devicetree/bindings/sound/qca,ipq4019-stereo.txt
-@@ -0,0 +1,17 @@
-+* Qualcomm Technologies IPQ4019 ASoC stereo driver
-+
-+This node models the Qualcomm Technologies IPQ4019 ASoC stereo driver
-+
-+Required properties:
-+
-+- compatible	 : "qca,ipq4019-stereo"
-+- reg		 : should have the stereo register address, length
-+- stereo-index	 : should have the stereo port index
-+
-+Example:
-+stereo0: stereo at 7709000 {
-+	compatible = "qca,ipq4019-stereo";
-+	reg = <0x7709000 0x1000>;
-+	stereo-index = <STEREO0_ID>;
-+	status = "disabled";
-+};
-diff --git a/Documentation/devicetree/bindings/sound/qca,ipq4019-tdm.txt b/Documentation/devicetree/bindings/sound/qca,ipq4019-tdm.txt
-new file mode 100644
-index 0000000..c2bf38c
---- /dev/null
-+++ b/Documentation/devicetree/bindings/sound/qca,ipq4019-tdm.txt
-@@ -0,0 +1,33 @@
-+* Qualcomm Technologies IPQ4019 ASoC TDM driver
-+
-+This node models the Qualcomm Technologies IPQ4019 ASoC TDM driver
-+
-+Required properties:
-+
-+- compatible	 : "qca,ipq4019-tdm"
-+- dma-tx-channel : should have the mbox tx channel id
-+- dma-rx-channel : should have the mbox rx channel id
-+- stereo-tx-port : should have the stereo tx id
-+- stereo-rx-port : should have the stereo tx id
-+- clocks	 : should have the audio tx bit clock, tx master clock,
-+		   rx bit clock, rx master clock id
-+- clock-names	 : should be "audio_tx_bclk", "audio_tx_mclk", "audio_rx_bclk",
-+		   "audio_rx_mclk"
-+
-+Example:
-+tdm: tdm at 0 {
-+	compatible = "qca,ipq4019-tdm";
-+	dma-tx-channel = <MBOX0_TX_ID>;
-+	dma-rx-channel = <MBOX3_RX_ID>;
-+	stereo-tx-port = <STEREO0_ID>;
-+	stereo-rx-port = <STEREO3_ID>;
-+	clocks = <&adcc ADCC_TXB_CLK_SRC>,
-+		<&adcc ADCC_TXM_CLK_SRC>,
-+		<&adcc ADCC_RXB_CLK_SRC>,
-+		<&adcc ADCC_RXM_CLK_SRC>;
-+	clock-names = "audio_tx_bclk",
-+		"audio_tx_mclk",
-+		"audio_rx_bclk",
-+		"audio_rx_mclk";
-+	status = "disabled";
-+};
-diff --git a/arch/arm/boot/dts/qcom-ipq4019-ap.dk01.1.dtsi b/arch/arm/boot/dts/qcom-ipq4019-ap.dk01.1.dtsi
-index b9457dd2..e2ab95a 100644
---- a/arch/arm/boot/dts/qcom-ipq4019-ap.dk01.1.dtsi
-+++ b/arch/arm/boot/dts/qcom-ipq4019-ap.dk01.1.dtsi
-@@ -1,4 +1,4 @@
--/* Copyright (c) 2015, The Linux Foundation. All rights reserved.
-+/* Copyright (c) 2015-2016, The Linux Foundation. All rights reserved.
++#endif
+diff --git a/include/dt-bindings/clock/qcom,gcc-ipq4019.h b/include/dt-bindings/clock/qcom,gcc-ipq4019.h
+index 6240e5b..c75b98a 100644
+--- a/include/dt-bindings/clock/qcom,gcc-ipq4019.h
++++ b/include/dt-bindings/clock/qcom,gcc-ipq4019.h
+@@ -1,4 +1,5 @@
+-/* Copyright (c) 2015 The Linux Foundation. All rights reserved.
++/*
++ * Copyright (c) 2015-2016 The Linux Foundation. All rights reserved.
   *
   * Permission to use, copy, modify, and/or distribute this software for any
   * purpose with or without fee is hereby granted, provided that the above
-@@ -20,26 +20,7 @@
- 	model = "Qualcomm Technologies, Inc. IPQ4019/AP-DK01.1";
- 	compatible = "qcom,ipq4019";
+@@ -154,5 +155,6 @@
+ #define GCC_QDSS_BCR					69
+ #define GCC_MPM_BCR					70
+ #define GCC_SPDM_BCR					71
++#define AUDIO_BLK_ARES					GCC_AUDIO_BCR
  
--	clocks {
--                xo: xo {
--                        compatible = "fixed-clock";
--                        clock-frequency = <48000000>;
--                        #clock-cells = <0>;
--                };
--	};
--
- 	soc {
--
--
--		timer {
--			compatible = "arm,armv7-timer";
--			interrupts = <1 2 0xf08>,
--				     <1 3 0xf08>,
--				     <1 4 0xf08>,
--				     <1 1 0xf08>;
--			clock-frequency = <48000000>;
--		};
--
- 		pinctrl at 0x01000000 {
- 			serial_pins: serial_pinmux {
- 				mux {
-@@ -69,6 +50,81 @@
- 					bias-disable;
- 					output-high;
- 				};
-+
-+			};
-+
-+			audio_pins: audio_pinmux {
-+				mux_1 {
-+					pins = "gpio25", "gpio53", "gpio60";
-+					function = "i2s_tx_bclk";
-+					bias-pull,up;
-+				};
-+
-+				mux_2 {
-+					pins = "gpio27", "gpio54", "gpio63";
-+					function = "i2s_txd1";
-+					bias-pull,up;
-+				};
-+
-+				mux_3 {
-+					pins = "gpio28", "gpio55";
-+					function = "i2s_txd2";
-+					bias-pull,up;
-+				};
-+
-+				mux_4 {
-+					pins = "gpio29", "gpio56";
-+					function = "i2s_txd3";
-+					bias-pull,up;
-+				};
-+
-+				mux_5 {
-+					pins = "gpio24", "gpio52";
-+					function = "i2s_tx_mclk";
-+					bias-pull,up;
-+				};
-+
-+				mux_6 {
-+					pins = "gpio26", "gpio57", "gpio61";
-+					function = "i2s_tx_fsync";
-+					bias-pull,up;
-+				};
-+
-+				mux_7 {
-+					pins = "gpio2", "gpio23", "gpio63";
-+					function = "i2s_rxd";
-+					bias-pull,up;
-+				};
-+
-+				mux_8 {
-+					pins = "gpio20", "gpio58";
-+					function = "i2s_rx_mclk";
-+					bias-pull,up;
-+				};
-+
-+				mux_9 {
-+					pins = "gpio0", "gpio21", "gpio60";
-+					function = "i2s_rx_bclk";
-+					bias-pull,up;
-+				};
-+
-+				mux_10 {
-+					pins = "gpio1", "gpio22", "gpio61";
-+					function = "i2s_rx_fsync";
-+					bias-pull,up;
-+				};
-+
-+				mux_11 {
-+					pins = "gpio34", "gpio59", "gpio63";
-+					function = "i2s_spdif_in";
-+					bias-pull,up;
-+				};
-+
-+				mux_12 {
-+					pins = "gpio35", "gpio62", "gpio63";
-+					function = "i2s_spdif_out";
-+					bias-pull,up;
-+				};
- 			};
- 		};
- 
-@@ -108,5 +164,104 @@
- 		watchdog at b017000 {
- 			status = "ok";
- 		};
-+
-+		adcc: clock-controller at 7700038 {
-+			status = "ok";
-+		};
-+
-+		audio: audio at 7700000 {
-+			status = "ok";
-+		};
-+
-+		mbox0: mbox at 7708000 {
-+			status = "ok";
-+		};
-+
-+		mbox1: mbox at 770a000 {
-+			status = "ok";
-+		};
-+
-+		mbox2: mbox at 770c000 {
-+			status = "ok";
-+		};
-+
-+		mbox3: mbox at 770e000 {
-+			status = "ok";
-+		};
-+
-+		mbox4: mbox at 7706000 {
-+			status = "ok";
-+		};
-+
-+		stereo0: stereo at 7709000 {
-+			status = "ok";
-+		};
-+
-+		stereo1: stereo at 770b000 {
-+			status = "ok";
-+		};
-+
-+		stereo2: stereo at 770d000 {
-+			status = "ok";
-+		};
-+
-+		stereo3: stereo at 770f000 {
-+			status = "ok";
-+		};
-+
-+		/* Enable Audio Interfaces */
-+		i2s: ipq4019-pcm-i2s at 0 {
-+			status = "ok";
-+		};
-+
-+		i2splatform: qca-pcm-i2s at 7709000 {
-+			status = "ok";
-+		};
-+
-+		i2s1platform: qca-pcm-i2s1 at 770b000 {
-+			status = "ok";
-+		};
-+
-+		i2s1: ipq4019-pcm-i2s1 at 0 {
-+			status = "ok";
-+		};
-+
-+		i2s2platform: qca-pcm-i2s2 at 770d000 {
-+			status = "ok";
-+		};
-+
-+		i2s2: ipq4019-pcm-i2s2 at 0 {
-+			status = "ok";
-+		};
-+
-+		tdmplatform: qca-pcm-tdm at 7709000 {
-+			status = "ok";
-+		};
-+
-+		tdm: tdm at 0 {
-+			status = "ok";
-+		};
-+
-+		spdifplatform: qca-pcm-spdif at 7707000 {
-+			status = "ok";
-+		};
-+
-+		spdif: spdif at 0 {
-+			status = "ok";
-+		};
-+
-+		sound: sound at 0 {
-+			pinctrl-0 = <&audio_pins>;
-+			pinctrl-names = "default";
-+			status = "ok";
-+		};
-+
-+		i2c_0: i2c at 78b7000 { /* BLSP1 QUP2 */
-+			status = "ok";
-+
-+			qca_codec: qca_codec at 12 {
-+				status = "ok";
-+			};
-+		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/qcom-ipq4019.dtsi b/arch/arm/boot/dts/qcom-ipq4019.dtsi
-index 5c08d19..e2b4810 100644
---- a/arch/arm/boot/dts/qcom-ipq4019.dtsi
-+++ b/arch/arm/boot/dts/qcom-ipq4019.dtsi
-@@ -1,5 +1,5 @@
- /*
-- * Copyright (c) 2015, The Linux Foundation. All rights reserved.
+ #endif
+diff --git a/include/dt-bindings/sound/ipq4019-audio.h b/include/dt-bindings/sound/ipq4019-audio.h
+new file mode 100644
+index 0000000..7bf8036
+--- /dev/null
++++ b/include/dt-bindings/sound/ipq4019-audio.h
+@@ -0,0 +1,37 @@
++/*
 + * Copyright (c) 2015-2016, The Linux Foundation. All rights reserved.
-  *
-  * This program is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License version 2 and
-@@ -15,6 +15,8 @@
- 
- #include "skeleton.dtsi"
- #include <dt-bindings/clock/qcom,gcc-ipq4019.h>
-+#include <dt-bindings/clock/qca,adcc-ipq4019.h>
-+#include <dt-bindings/sound/ipq4019-audio.h>
- #include <dt-bindings/interrupt-controller/arm-gic.h>
- #include <dt-bindings/interrupt-controller/irq.h>
- 
-@@ -90,6 +92,21 @@
- 			clock-frequency = <32768>;
- 			#clock-cells = <0>;
- 		};
++ *
++ * Permission to use, copy, modify, and/or distribute this software for any
++ * purpose with or without fee is hereby granted, provided that the above
++ * copyright notice and this permission notice appear in all copies.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
++ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
++ * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
++ * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
++ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
++ * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
++ * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
++ *
++ */
 +
-+		xo: xo {
-+			compatible = "fixed-clock";
-+			clock-frequency = <48000000>;
-+			#clock-cells = <0>;
-+		};
-+	};
++#ifndef __DT_BINDINGS_QCOM_GSBI_H
++#define __DT_BINDINGS_QCOM_GSBI_H
 +
-+	timer {
-+		compatible = "arm,armv7-timer";
-+		interrupts = <1 2 0xf08>,
-+			     <1 3 0xf08>,
-+			     <1 4 0xf08>,
-+			     <1 1 0xf08>;
-+		clock-frequency = <48000000>;
- 	};
- 
- 	soc {
-@@ -156,8 +173,13 @@
- 			#address-cells = <1>;
- 			#size-cells = <0>;
- 			status = "disabled";
--		};
- 
-+			qca_codec: qca_codec at 12 {
-+				compatible = "qca,ipq4019-codec";
-+				reg = <0x12>;
-+				status = "disabled";
-+			};
-+		};
- 
- 		cryptobam: dma at 8e04000 {
- 			compatible = "qcom,bam-v1.7.0";
-@@ -263,5 +285,226 @@
- 			compatible = "qcom,pshold";
- 			reg = <0x4ab000 0x4>;
- 		};
++#define MBOX0_TX_ID		0
++#define MBOX0_RX_ID		1
++#define MBOX1_TX_ID		2
++#define MBOX1_RX_ID		3
++#define MBOX2_TX_ID		4
++#define MBOX2_RX_ID		5
++#define MBOX3_TX_ID		6
++#define MBOX3_RX_ID		7
++#define MBOX_SPDIF_TX_ID	8
++#define MBOX_SPDIF_RX_ID	9
 +
-+		adcc: clock-controller at 7700038 {
-+			compatible = "qcom,adcc-ipq4019";
-+			#clock-cells = <1>;
-+			#reset-cells = <1>;
-+			reg = <0x7700038 0x1DC>;
-+			status = "disabled";
-+		};
++#define STEREO0_ID		0
++#define STEREO1_ID		1
++#define STEREO2_ID		2
++#define STEREO3_ID		3
 +
-+		audio: audio at 7700000 {
-+			compatible = "qca,ipq4019-audio-adss";
-+			reg = <0x7700000 0x34>,
-+				<0x7707000 0x20>;
-+			resets = <&gcc AUDIO_BLK_ARES>;
-+			reset-names = "blk_rst";
-+			status = "disabled";
-+		};
-+
-+		pcm: pcm at 7704000 {
-+			compatible = "qca,ipq4019-pcm";
-+			reg = <0x7704000 0x2000>;
-+			dma-tx-channel = <MBOX3_TX_ID>;
-+			dma-rx-channel = <MBOX0_RX_ID>;
-+			stereo-tx-port = <STEREO3_ID>;
-+			stereo-rx-port = <STEREO0_ID>;
-+			clocks = <&adcc ADCC_PCM_CLK_SRC>;
-+			clock-names = "audio_pcm_clk";
-+			status = "disabled";
-+		};
-+
-+		mbox0: mbox at 7708000 {
-+			dma-index = <0>;
-+			compatible = "qca,ipq4019-mbox";
-+			reg = <0x7708000 0x1000>;
-+			interrupts = <0 156 0>;
-+			tx-channel = <MBOX0_TX_ID>;
-+			rx-channel = <MBOX0_RX_ID>;
-+			status = "disabled";
-+		};
-+
-+		mbox1: mbox at 770a000 {
-+			dma-index = <1>;
-+			compatible = "qca,ipq4019-mbox";
-+			reg = <0x770A000 0x1000>;
-+			interrupts = <0 157 0>;
-+			tx-channel = <MBOX1_TX_ID>;
-+			status = "disabled";
-+		};
-+
-+		mbox2: mbox at 770c000 {
-+			dma-index = <2>;
-+			compatible = "qca,ipq4019-mbox";
-+			reg = <0x770C000 0x1000>;
-+			interrupts = <0 158 0>;
-+			tx-channel = <MBOX2_TX_ID>;
-+			status = "disabled";
-+		};
-+
-+		mbox3: mbox at 770e000 {
-+			dma-index = <3>;
-+			compatible = "qca,ipq4019-mbox";
-+			reg = <0x770E000 0x1000>;
-+			interrupts = <0 159 0>;
-+			tx-channel = <MBOX3_TX_ID>;
-+			rx-channel = <MBOX3_RX_ID>;
-+			status = "disabled";
-+		};
-+
-+		mbox4: mbox at 7706000 {
-+			dma-index = <4>;
-+			compatible = "qca,ipq4019-mbox";
-+			reg = <0x7706000 0x1000>;
-+			interrupts = <0 163 0>;
-+			rx-channel = <MBOX_SPDIF_RX_ID>;
-+			status = "disabled";
-+		};
-+
-+		stereo0: stereo at 7709000 {
-+			stereo-index = <STEREO0_ID>;
-+			compatible = "qca,ipq4019-stereo";
-+			reg = <0x7709000 0x1000>;
-+			status = "disabled";
-+		};
-+
-+		stereo1: stereo at 770b000 {
-+			stereo-index = <STEREO1_ID>;
-+			compatible = "qca,ipq4019-stereo";
-+			reg = <0x770B000 0x1000>;
-+			status = "disabled";
-+		};
-+
-+		stereo2: stereo at 770d000 {
-+			stereo-index = <STEREO2_ID>;
-+			compatible = "qca,ipq4019-stereo";
-+			reg = <0x770D000 0x1000>;
-+			status = "disabled";
-+		};
-+
-+		stereo3: stereo at 770f000 {
-+			stereo-index = <STEREO3_ID>;
-+			compatible = "qca,ipq4019-stereo";
-+			reg = <0x770F000 0x1000>;
-+			status = "disabled";
-+		};
-+
-+		i2splatform: qca-pcm-i2s at 7709000 {
-+			compatible = "qca,ipq4019-pcm-i2s";
-+			reg = <0x7709000 0x1000>;
-+			status = "disabled";
-+		};
-+
-+		i2s: ipq4019-pcm-i2s at 0 {
-+			compatible = "qca,ipq4019-i2s";
-+			dma-tx-channel = <MBOX0_TX_ID>;
-+			stereo-tx-port = <STEREO0_ID>;
-+			dma-rx-channel = <MBOX3_RX_ID>;
-+			stereo-rx-port = <STEREO3_ID>;
-+			clocks = <&adcc ADCC_TXB_CLK_SRC>,
-+				<&adcc ADCC_TXM_CLK_SRC>,
-+				<&adcc ADCC_RXB_CLK_SRC>,
-+				<&adcc ADCC_RXM_CLK_SRC>;
-+			clock-names = "audio_tx_bclk",
-+				"audio_tx_mclk",
-+				"audio_rx_bclk",
-+				"audio_rx_mclk";
-+			status = "disabled";
-+		};
-+
-+		i2s1platform: qca-pcm-i2s1 at 770b000 {
-+			compatible = "qca,ipq4019-pcm-i2s1";
-+			reg = <0x770b000 0x1000>;
-+			status = "disabled";
-+		};
-+
-+		i2s1: ipq4019-pcm-i2s1 at 0 {
-+			compatible = "qca,ipq4019-i2s1";
-+			dma-tx-channel = <MBOX1_TX_ID>;
-+			stereo-tx-port = <STEREO1_ID>;
-+			clocks = <&adcc ADCC_TXB_CLK_SRC>,
-+				<&adcc ADCC_TXM_CLK_SRC>,
-+				<&adcc ADCC_RXB_CLK_SRC>,
-+				<&adcc ADCC_RXM_CLK_SRC>;
-+			clock-names = "audio_tx_bclk",
-+				"audio_tx_mclk",
-+				"audio_rx_bclk",
-+				"audio_rx_mclk";
-+			status = "disabled";
-+		};
-+
-+		i2s2platform: qca-pcm-i2s2 at 770d000 {
-+			compatible = "qca,ipq4019-pcm-i2s2";
-+			reg = <0x770d000 0x1000>;
-+			status = "disabled";
-+		};
-+
-+		i2s2: ipq4019-pcm-i2s2 at 0 {
-+			compatible = "qca,ipq4019-i2s2";
-+			dma-tx-channel = <MBOX2_TX_ID>;
-+			stereo-tx-port = <STEREO2_ID>;
-+			clocks = <&adcc ADCC_TXB_CLK_SRC>,
-+				<&adcc ADCC_TXM_CLK_SRC>,
-+				<&adcc ADCC_RXB_CLK_SRC>,
-+				<&adcc ADCC_RXM_CLK_SRC>;
-+			clock-names = "audio_tx_bclk",
-+				"audio_tx_mclk",
-+				"audio_rx_bclk",
-+				"audio_rx_mclk";
-+			status = "disabled";
-+		};
-+
-+		tdmplatform: qca-pcm-tdm at 7709000 {
-+			compatible = "qca,ipq4019-pcm-tdm";
-+			reg = <0x7709000 0x1000>;
-+			status = "disabled";
-+		};
-+
-+		tdm: tdm at 0 {
-+			compatible = "qca,ipq4019-tdm";
-+			dma-tx-channel = <MBOX0_TX_ID>;
-+			dma-rx-channel = <MBOX3_RX_ID>;
-+			stereo-tx-port = <STEREO0_ID>;
-+			stereo-rx-port = <STEREO3_ID>;
-+			clocks = <&adcc ADCC_TXB_CLK_SRC>,
-+				<&adcc ADCC_TXM_CLK_SRC>,
-+				<&adcc ADCC_RXB_CLK_SRC>,
-+				<&adcc ADCC_RXM_CLK_SRC>;
-+			clock-names = "audio_tx_bclk",
-+				"audio_tx_mclk",
-+				"audio_rx_bclk",
-+				"audio_rx_mclk";
-+			status = "disabled";
-+		};
-+
-+		spdifplatform: qca-pcm-spdif at 7707000 {
-+			compatible = "qca,ipq4019-pcm-spdif";
-+			reg = <0x7707000 0x1000>;
-+			status = "disabled";
-+		};
-+
-+		spdif: spdif at 0 {
-+			compatible = "qca,ipq4019-spdif";
-+			dma-tx-channel = <MBOX0_TX_ID>;
-+			dma-rx-channel = <MBOX_SPDIF_RX_ID>;
-+			stereo-tx-port = <STEREO0_ID>;
-+			clocks = <&adcc ADCC_TXB_CLK_SRC>,
-+				<&adcc ADCC_TXM_CLK_SRC>,
-+				<&adcc ADCC_SPDIF_SRC>,
-+				<&adcc ADCC_SPDIFDIV2_SRC >,
-+				<&adcc ADCC_AUDIO_SPDIFINFAST_SRC>;
-+			clock-names = "audio_tx_bclk",
-+				"audio_tx_mclk",
-+				"audio_spdif_src",
-+				"audio_spdif_div2",
-+				"audio_spdifinfast_src";
-+			status = "disabled";
-+		};
-+
-+		sound: sound at 0 {
-+			compatible = "qca,ipq4019-audio";
-+			status = "disabled";
-+		};
- 	};
- };
++#endif
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 a Linux Foundation Collaborative Project
