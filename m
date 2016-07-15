@@ -1,62 +1,74 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 15 Jul 2016 11:30:33 +0200
-Subject: [PATCH] media: Doc add missing documentation for
- samsung,exynos4212-jpeg
-In-Reply-To: <5788AA5E.3070301@samsung.com>
-References: <1468526499-8840-1-git-send-email-shuahkh@osg.samsung.com>
- <578890BA.8040101@samsung.com> <57889B73.4090607@samsung.com>
- <57889C23.3050106@samsung.com> <57889EAB.30502@samsung.com>
- <57889FD5.9070302@samsung.com> <5788AA5E.3070301@samsung.com>
-Message-ID: <5788AD39.1010108@samsung.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Fri, 15 Jul 2016 10:33:44 +0100
+Subject: [PATCH v9 10/17] KVM: arm64: introduce new KVM ITS device
+In-Reply-To: <57874F1E.3000202@arm.com>
+References: <20160713015909.28793-1-andre.przywara@arm.com>
+ <20160713015909.28793-11-andre.przywara@arm.com> <57874F1E.3000202@arm.com>
+Message-ID: <68082207-2b52-e825-cfe3-cb97cbe94186@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/15/2016 11:18 AM, Jacek Anaszewski wrote:
-> On 07/15/2016 10:33 AM, Krzysztof Kozlowski wrote:
->> On 07/15/2016 10:28 AM, Jacek Anaszewski wrote:
->>> On 07/15/2016 10:17 AM, Krzysztof Kozlowski wrote:
->>>> On 07/15/2016 10:14 AM, Jacek Anaszewski wrote:
->>>>>> However if these compatibles are exactly equal then
->>>>>> only one should be preferred. It makes everything easier. Second
->>>>>> can be
->>>>>> still documented e.g. as deprecated.
->>>>>
->>>>> Still, both of them are present in the driver. Shouldn't it be
->>>>> reflected
->>>>> in the documentation?
->>>>
->>>> Right, it is a good practice, so how about:
->>>>
->>>>     - compatible    : should be one of:
->>>>             "samsung,s5pv210-jpeg", "samsung,exynos3250-jpeg",
->>>>             "samsung,exynos4210-jpeg", "samsung,exynos5420-jpeg",
->>>>             "samsung,exynos5433-jpeg";
->>>>
->>>>             Deprecated: "samsung,exynos4212-jpeg"
->>>>
->>>> (or any other formatting)
->>>> plus update to DTS changing it to 4210?
->>>
->>> Why newer 4212 version should be made deprecated?
->>
->> I don't mind the other way. However it seems logical to me that newer
->> chip is compatible with existing one so the existing one (older) is
->> used. When adding support for new devices, for most of re-usable drivers
->> we use old compatibles. But as I said, it doesn't really matter to me.
+Hi,
+
+On 14/07/16 09:36, Marc Zyngier wrote:
+> On 13/07/16 02:59, Andre Przywara wrote:
+
+....
+
+>> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+>> index 06ad94d..393ad3a 100644
+>> --- a/virt/kvm/arm/vgic/vgic-its.c
+>> +++ b/virt/kvm/arm/vgic/vgic-its.c
+
+...
+
+>> +static int vgic_its_set_attr(struct kvm_device *dev,
+>> +			     struct kvm_device_attr *attr)
+>> +{
+>> +	struct vgic_its *its = dev->private;
+>> +	int ret;
+>> +
+>> +	switch (attr->group) {
+>> +	case KVM_DEV_ARM_VGIC_GRP_ADDR: {
+>> +		u64 __user *uaddr = (u64 __user *)(long)attr->addr;
+>> +		unsigned long type = (unsigned long)attr->attr;
+>> +		u64 addr;
+>> +
+>> +		if (type != KVM_VGIC_ITS_ADDR_TYPE)
+>> +			return -ENODEV;
+>> +
+>> +		if (its->initialized)
+>> +			return -EBUSY;
+>> +
+>> +		if (copy_from_user(&addr, uaddr, sizeof(addr)))
+>> +			return -EFAULT;
+>> +
+>> +		ret = vgic_check_ioaddr(dev->kvm, &its->vgic_its_base,
+>> +					addr, SZ_64K);
 > 
-> Frankly speaking marking a compatible deprecated looks weird to me.
-> It can be interpreted in the way that the device itself is deprecated
-> or it is not fully reliable.
+> Shouldn't that be the ITS size (128kB)?
 
-Marking a compatible or a property deprecated is commonly used, if
-needed of course. It has nothing to do with device being deprecated.
-This is documentation for bindings and deprecation affects only
-bindings. It is not weird or something strange. We already did this for
-some of Exynos compatibles (later removing them) and there are quite
-many examples in Documentation already.
+No, this is the alignment requirement. See here:
 
-Best regards,
-Krzysztof
+...
 
-> I'd just accept the patch in the original
-> form.
+>> diff --git a/virt/kvm/arm/vgic/vgic-kvm-device.c b/virt/kvm/arm/vgic/vgic-kvm-device.c
+>> index 2f24f13..1813f93 100644
+>> --- a/virt/kvm/arm/vgic/vgic-kvm-device.c
+>> +++ b/virt/kvm/arm/vgic/vgic-kvm-device.c
+>> @@ -21,8 +21,8 @@
+>>  
+>>  /* common helpers */
+>>  
+>> -static int vgic_check_ioaddr(struct kvm *kvm, phys_addr_t *ioaddr,
+>> -			     phys_addr_t addr, phys_addr_t alignment)
+>> +int vgic_check_ioaddr(struct kvm *kvm, phys_addr_t *ioaddr,
+>> +		      phys_addr_t addr, phys_addr_t alignment)
+>>  {
+>>  	if (addr & ~KVM_PHYS_MASK)
+>>  		return -E2BIG;
+
+Fixed the rest.
+
+Cheers,
+Andre.
