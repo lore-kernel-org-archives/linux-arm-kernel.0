@@ -1,35 +1,108 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 15 Jul 2016 14:19:51 +0100
-Subject: [RFC 3/3] kexec: extend kexec_file_load system call
-In-Reply-To: <20160715130955.GC23514@redhat.com>
-References: <20160712014201.11456-1-takahiro.akashi@linaro.org>
- <20160712014201.11456-4-takahiro.akashi@linaro.org>
- <20160715130955.GC23514@redhat.com>
-Message-ID: <20160715131950.GB19840@leverpostej>
+From: tjakobi@math.uni-bielefeld.de (Tobias Jakobi)
+Date: Fri, 15 Jul 2016 15:21:22 +0200
+Subject: [PATCH v2 00/10] Exynos IOMMU: proper runtime PM support (use
+ device dependencies)
+In-Reply-To: <5787B2B0.9020809@math.uni-bielefeld.de>
+References: <1466144820-6286-1-git-send-email-m.szyprowski@samsung.com>
+ <5787B2B0.9020809@math.uni-bielefeld.de>
+Message-ID: <5788E352.3040801@math.uni-bielefeld.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 15, 2016 at 09:09:55AM -0400, Vivek Goyal wrote:
-> On Tue, Jul 12, 2016 at 10:42:01AM +0900, AKASHI Takahiro wrote:
+Tobias Jakobi wrote:
+> Hello Marek,
 > 
-> [..]
-> > -SYSCALL_DEFINE5(kexec_file_load, int, kernel_fd, int, initrd_fd,
-> > +SYSCALL_DEFINE6(kexec_file_load, int, kernel_fd, int, initrd_fd,
-> >  		unsigned long, cmdline_len, const char __user *, cmdline_ptr,
-> > -		unsigned long, flags)
-> > +		unsigned long, flags, const struct kexec_fdset __user *, ufdset)
+> I've tested the patchset on 4.7-rc7 and noticed that it breaks reboot on
+> my ODROID-X2.
 > 
-> Can one add more parameters to existing syscall. Can it break existing
-> programs with new kernel? I was of the impression that one can't do that.
-> But may be I am missing something.
+> Going to check where exactly things break.
+Sadly it's the last patch where everything comes together:
+"iommu/exynos: Add proper runtime pm support"
 
-I think the idea was that we would only look at the new params if a new
-flags was set, and otherwise it would behave as the old syscall.
+I still have to check if forcing runpm status to 'on' makes a
+difference. I suspect that the aggressive clock gating might be the reason?
 
-Regardless, I think it makes far more sense to add a kexec_file_load2
-syscall if we're going to modify the prototype at all. It's a rather
-different proposition to the existing syscall, and needs to be treated
-as such.
+With best wishes,
+Tobias
 
-Thanks,
-Mark.
+> With best wishes,
+> Tobias
+> 
+> 
+> Marek Szyprowski wrote:
+>> Hello,
+>>
+>> This patch series finally implements proper runtime PM support in Exynos
+>> IOMMU driver. This has been achieved by using device links, which lets
+>> SYSMMU controller's runtime PM to follow master's device runtime PM (the
+>> device which actually performs DMA transaction). The main idea
+>> behind this solution is an observation that any DMA activity from master
+>> device can be done only when master device is active, thus when master
+>> device is suspended SYSMMU controller device can also be suspended.
+>>
+>> This patchset solves the situation that power domains are always enabled,
+>> because all SYSMMU controllers (which belongs to those domains) are
+>> permanently active (because existing driver was simplified and kept
+>> SYSMMU device active all the time after initialization).
+>>
+>> Patches 1-5 are resend of the "[RFC][PATCH 0/5] Functional dependencies
+>> between devices" patchset:
+>> http://thread.gmane.org/gmane.linux.power-management.general/67424/focus=2126379
+>> I've included them here, because it is hard to find them all on mailing
+>> list archives.
+>>
+>> Patches 6-8 are fixes to device dependencies/links code, which were
+>> required to use this solution for Exynos IOMMU driver. I'm not PM/runtime
+>> PM code expert, so please double check if my changes are really correct.
+>>
+>> This patchset requires my previous changes to Exynos IOMMU driver
+>> submitted in the "Exynos IOMMU: improve clock management" thread:
+>> http://www.spinics.net/lists/arm-kernel/msg505695.html
+>>
+>> Best regards
+>> Marek Szyprowski
+>> Samsung R&D Institute Poland
+>>
+>>
+>> Changelog:
+>> v2:
+>> - replaced PM notifiers with generic device dependencies/links developped
+>>   by Rafael J. Wysocki
+>>
+>> v1: http://www.spinics.net/lists/arm-kernel/msg509600.html
+>> - initial version
+>>
+>>
+>> Patch summary:
+>>
+>> Marek Szyprowski (5):
+>>   driver core: Avoid endless recursion if device has more than one link
+>>   driver core: Add support for links to already probed drivers
+>>   PM core: Fix restoring devices with links during system PM transition
+>>   iommu/exynos: Remove excessive, useless debug
+>>   iommu/exynos: Add proper runtime pm support
+>>
+>> Rafael J. Wysocki (5):
+>>   driver core: Add a wrapper around __device_release_driver()
+>>   driver core: Functional dependencies tracking support
+>>   PM core: Make async suspend/resume of devices use device links
+>>   PM core: Make runtime PM of devices use device links
+>>   PM core: Optimize the use of device links for runtime PM
+>>
+>>  drivers/base/base.h          |  13 ++
+>>  drivers/base/core.c          | 410 +++++++++++++++++++++++++++++++++++++++++++
+>>  drivers/base/dd.c            |  65 +++++--
+>>  drivers/base/power/main.c    |  68 ++++++-
+>>  drivers/base/power/runtime.c | 130 +++++++++++++-
+>>  drivers/iommu/exynos-iommu.c | 221 +++++++++++------------
+>>  include/linux/device.h       |  41 +++++
+>>  include/linux/pm.h           |   1 +
+>>  include/linux/pm_runtime.h   |   6 +
+>>  9 files changed, 809 insertions(+), 146 deletions(-)
+>>
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
