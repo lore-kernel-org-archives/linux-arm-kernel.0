@@ -1,141 +1,107 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Fri, 15 Jul 2016 14:11:15 +0200
-Subject: [PATCH v7 4/9] acpi/arm64: Add GTDT table parse driver
-In-Reply-To: <CADyBb7sGWizLDy3LtpGpJ9jkchyWHZ2oPfsg6fE1ZE54gn05FA@mail.gmail.com>
-References: <1468432402-4872-1-git-send-email-fu.wei@linaro.org>
- <CAJZ5v0jnNqjpcY1CGkHxbJFwX1MuRi-U=jTCKWavMdEH4bKR3g@mail.gmail.com>
- <CADyBb7sGWizLDy3LtpGpJ9jkchyWHZ2oPfsg6fE1ZE54gn05FA@mail.gmail.com>
-Message-ID: <4581163.sAHfC1UEjl@vostro.rjw.lan>
+From: guodong.xu@linaro.org (Guodong Xu)
+Date: Fri, 15 Jul 2016 20:08:43 +0800
+Subject: [PATCH 1/2] Bluetooth: Add LED triggers for HCI frames tx and rx
+In-Reply-To: <3C106ED5-5F2C-4EAC-8E60-D915D2AD027A@holtmann.org>
+References: <1466657923-5776-1-git-send-email-guodong.xu@linaro.org>
+ <D2545F6D-7100-4B59-A19D-7CF878902BAA@holtmann.org>
+ <CAFGCpxwuOH83hdPc-c0DV5A_cKMp-0rjxg+3tMwOPTukHGd6vA@mail.gmail.com>
+ <3C106ED5-5F2C-4EAC-8E60-D915D2AD027A@holtmann.org>
+Message-ID: <CAFGCpxxbmgmbadE5oGctOzu33hhoiOf29DeEqZWCFYAiVBFLdA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, July 15, 2016 03:45:05 PM Fu Wei wrote:
-> Hi Rafael,
-> 
-> 
-> On 14 July 2016 at 05:43, Rafael J. Wysocki <rafael@kernel.org> wrote:
-> > On Wed, Jul 13, 2016 at 11:08 PM, Guenter Roeck <linux@roeck-us.net> wrote:
-> >> On Wed, Jul 13, 2016 at 10:30:37PM +0200, Rafael J. Wysocki wrote:
-> >>> On Wed, Jul 13, 2016 at 7:53 PM,  <fu.wei@linaro.org> wrote:
-> >>> > From: Fu Wei <fu.wei@linaro.org>
-> >>> >
-> >>> > This patch adds support for parsing arch timer in GTDT,
-> >>> > provides some kernel APIs to parse all the PPIs and
-> >>> > always-on info in GTDT and export them.
-> >>> >
-> >>> > By this driver, we can simplify arm_arch_timer drivers, and
-> >>> > separate the ACPI GTDT knowledge from it.
-> >>> >
-> >>> > Signed-off-by: Fu Wei <fu.wei@linaro.org>
-> >>> > Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> >>> > ---
-> >>> >  drivers/acpi/Kconfig           |   5 ++
-> >>> >  drivers/acpi/Makefile          |   1 +
-> >>> >  drivers/acpi/arm64/Kconfig     |  15 ++++
-> >>> >  drivers/acpi/arm64/Makefile    |   1 +
-> >>> >  drivers/acpi/arm64/acpi_gtdt.c | 170 +++++++++++++++++++++++++++++++++++++++++
-> >>> >  include/linux/acpi.h           |   6 ++
-> >>> >  6 files changed, 198 insertions(+)
-> >>> >
-> >>> > diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
-> >>> > index b7e2e77..1cdc7d2 100644
-> >>> > --- a/drivers/acpi/Kconfig
-> >>> > +++ b/drivers/acpi/Kconfig
-> >>> > @@ -521,4 +521,9 @@ config XPOWER_PMIC_OPREGION
-> >>> >
-> >>> >  endif
-> >>> >
-> >>> > +if ARM64
-> >>> > +source "drivers/acpi/arm64/Kconfig"
-> >>> > +
-> >>> > +endif
-> >>> > +
-> >>> >  endif  # ACPI
-> >>> > diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
-> >>> > index 251ce85..1a94ff7 100644
-> >>> > --- a/drivers/acpi/Makefile
-> >>> > +++ b/drivers/acpi/Makefile
-> >>> > @@ -99,5 +99,6 @@ obj-$(CONFIG_ACPI_EXTLOG)     += acpi_extlog.o
-> >>> >  obj-$(CONFIG_PMIC_OPREGION)    += pmic/intel_pmic.o
-> >>> >  obj-$(CONFIG_CRC_PMIC_OPREGION) += pmic/intel_pmic_crc.o
-> >>> >  obj-$(CONFIG_XPOWER_PMIC_OPREGION) += pmic/intel_pmic_xpower.o
-> >>> > +obj-$(CONFIG_ARM64)    += arm64/
-> >>> >
-> >>> >  video-objs                     += acpi_video.o video_detect.o
-> >>> > diff --git a/drivers/acpi/arm64/Kconfig b/drivers/acpi/arm64/Kconfig
-> >>> > new file mode 100644
-> >>> > index 0000000..ff5c253
-> >>> > --- /dev/null
-> >>> > +++ b/drivers/acpi/arm64/Kconfig
-> >>> > @@ -0,0 +1,15 @@
-> >>> > +#
-> >>> > +# ACPI Configuration for ARM64
-> >>> > +#
-> >>> > +
-> >>> > +menu "The ARM64-specific ACPI Support"
-> >>> > +
-> >>> > +config ACPI_GTDT
-> >>> > +       bool "ACPI GTDT table Support"
-> >>>
-> >>> This should depend on ARM64.
-> >>>
-> >>> Also I wonder if it needs to be user-selectable?  Wouldn't it be
-> >>> better to enable it by default when building for ARM64 with ACPI?
-> >>>
-> >> It is currently selected in patch 9, in the watchdog driver's Kconfig
-> >> entry.
-> >
-> > Well, it still doesn't have to be user-selectable for that. :-)
-> 
-> Actually it is also automatically selected by [PATCH v7 6/9]:
+On 14 July 2016 at 17:42, Marcel Holtmann <marcel@holtmann.org> wrote:
+> Hi Guodong,
+>
+>>>> Two LED triggers are defined: tx_led and rx_led. Upon frames
+>>>> available in HCI core layer, for tx or for rx, the combined LED
+>>>> can blink.
+>>>>
+>>>> Verified on HiKey, 96boards. It uses hi6220 SoC and TI WL1835 combo
+>>>> chip.
+>>>>
+>>>> Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
+>>>> ---
+>>>> include/net/bluetooth/hci_core.h |  1 +
+>>>> net/bluetooth/hci_core.c         |  3 +++
+>>>> net/bluetooth/leds.c             | 15 +++++++++++++++
+>>>> net/bluetooth/leds.h             |  2 ++
+>>>> 4 files changed, 21 insertions(+)
+>>>>
+>>>> diff --git a/include/net/bluetooth/hci_core.h b/include/net/bluetooth/hci_core.h
+>>>> index dc71473..37b8dd9 100644
+>>>> --- a/include/net/bluetooth/hci_core.h
+>>>> +++ b/include/net/bluetooth/hci_core.h
+>>>> @@ -398,6 +398,7 @@ struct hci_dev {
+>>>>      bdaddr_t                rpa;
+>>>>
+>>>>      struct led_trigger      *power_led;
+>>>> +     struct led_trigger      *tx_led, *rx_led;
+>>>>
+>>>>      int (*open)(struct hci_dev *hdev);
+>>>>      int (*close)(struct hci_dev *hdev);
+>>>> diff --git a/net/bluetooth/hci_core.c b/net/bluetooth/hci_core.c
+>>>> index 45a9fc6..c6e1210 100644
+>>>> --- a/net/bluetooth/hci_core.c
+>>>> +++ b/net/bluetooth/hci_core.c
+>>>> @@ -3248,6 +3248,7 @@ int hci_recv_frame(struct hci_dev *hdev, struct sk_buff *skb)
+>>>>      skb_queue_tail(&hdev->rx_q, skb);
+>>>>      queue_work(hdev->workqueue, &hdev->rx_work);
+>>>>
+>>>> +     hci_leds_blink_oneshot(hdev->rx_led);
+>>>>      return 0;
+>>>> }
+>>>> EXPORT_SYMBOL(hci_recv_frame);
+>>>> @@ -3325,6 +3326,8 @@ static void hci_send_frame(struct hci_dev *hdev, struct sk_buff *skb)
+>>>>              BT_ERR("%s sending frame failed (%d)", hdev->name, err);
+>>>>              kfree_skb(skb);
+>>>>      }
+>>>> +
+>>>> +     hci_leds_blink_oneshot(hdev->tx_led);
+>>>> }
+>>>
+>>> so I am not convinced that this is the right way of doing TX/RX activity leds. This would have them purely based on HCI traffic and this would include control frames.
+>>>
+>>
+>> Hi, Marcel
+>>
+>> +       if (hci_skb_pkt_type(skb) == HCI_ACLDATA_PKT ||
+>> +           hci_skb_pkt_type(skb) == HCI_SCODATA_PKT)
+>> +               hci_leds_blink_oneshot(hdev->rx_led);
+>> +
+>>
+>> By adding pkt_type checks, we can limit LED blinks only at ACL/SCO
+>> DATA_PKT. Similar checks can be added for tx_led too.
+>>
+>> Does this look good to you? If you agree, I can send v2 to include this change.
+>
+> we are not going to keep comparing packet types over and over again. The code is already doing that. So functions like hci_sched_acl and hci_acldata_packet are already present in the code.
+>
+>>> I think that we want activity leds for actual radio activity. Meaning that when we have an active connection and ACL packets are exchanged or when we are scanning.
+>>>
+>>
+>> Radio is controlled in Bluetooth module side, not Host. So I'm afraid
+>> actual radio activity cannot be captured in its exact form in Host
+>> side. The purpose of this patch is not for radio, it is for
+>> incoming/outgoing data. For example, it can give user a blinking
+>> indicator on RX frames after a Bluetooth mouse is connected. Another
+>> example, it can blink at bluetooth streamed audio (TX).
+>
+> So radio activity is caused by RX/TX meaning ACL/SCO packets for sure. There is also other radio activity caused by scanning, inquiry, create connection etc. And the question is if this should be there as well.
+>
 
-Right.
+I wouldn't suggest to cover scanning, inquiry, etc. Scanning, for
+example, Host sends a scan command to Bluetooth module (in an
+asynchronous way). After a given interval, Host receives inquiry
+results. Over this period, at host side, we don't know what kind of
+radio activity is happening in BT module side.
 
-By user-selectable I mean "showing up in a Kconfig configurator tool".
+Let's say this patch provide LED indicators to only data packets
+activity (ACL and SCO). Can we?
 
-It just need not be visible in the configurator IMO.
+-Guodong
 
-> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-> index 47352d2..71d5b30 100644
-> --- a/drivers/clocksource/Kconfig
-> +++ b/drivers/clocksource/Kconfig
-> @@ -8,6 +8,7 @@ config CLKSRC_OF
->  config CLKSRC_ACPI
->   bool
->   select CLKSRC_PROBE
-> + select ACPI_GTDT if ARM64
-> 
->  config CLKSRC_PROBE
->   bool
-> 
-> 
-> >
-> >> Not sure if I like that; maybe the watchdog driver should depend
-> >> on it instead ?
-> >
-> > If the watchdog is not the only user of it (and I don't think it is),
-> > it would be better to arrange things this way.
-> >
-> 
-> There are two user:
-> (1) arm_arch_timer(which will select CLKSRC_ACPI if ACPI, then
-> CLKSRC_ACPI will select ACPI_GTDT if ARM64)
-> So arm_arch_timer will automatically selecte ACPI_GTDT if ARM64 && ACPI
-> 
-> (2) sbsa_gwdt (which will select ACPI_GTDT if ACPI in [PATCH v7 9/9])
-> So sbsa_gwdt will automatically selecte ACPI_GTDT if ARM64 && ACPI &&
-> ARM_ARCH_TIMER
-> 
-> So ACPI_GTDT is automatically selected by both of two users.
-> 
-> 
-> But like Timur said before:
-> 
-> maybe we just "selecte ACPI_GTDT if ACPI" for ARM64, because ARM64
-> require GTDT if we use ACPI.
-
-Right.  That's the way to do it then and make sbsa_gwdt depend on it instead
-of selecting it.
-
-Thanks,
-Rafael
+> Regards
+>
+> Marcel
+>
