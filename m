@@ -1,146 +1,56 @@
-From: austinwc@codeaurora.org (Austin Christ)
-Date: Fri, 15 Jul 2016 14:08:42 -0600
-Subject: [PATCH v5 2/2] i2c: qup: support SMBus block read
-In-Reply-To: <1468613322-3219-1-git-send-email-austinwc@codeaurora.org>
-References: <1468613322-3219-1-git-send-email-austinwc@codeaurora.org>
-Message-ID: <1468613322-3219-3-git-send-email-austinwc@codeaurora.org>
+From: andy.gross@linaro.org (Andy Gross)
+Date: Fri, 15 Jul 2016 15:23:13 -0500
+Subject: [PATCH 3/4] qcom: ipq4019: ASoC tlmm/pinctrl support
+In-Reply-To: <1468566426-19598-4-git-send-email-njaigane@codeaurora.org>
+References: <1468566426-19598-1-git-send-email-njaigane@codeaurora.org>
+ <1468566426-19598-4-git-send-email-njaigane@codeaurora.org>
+Message-ID: <20160715202313.GA3509@hector.attlocal.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Naveen Kaje <nkaje@codeaurora.org>
+On Fri, Jul 15, 2016 at 12:37:05PM +0530, njaigane at codeaurora.org wrote:
+> From: Jaiganesh Narayanan <njaigane@codeaurora.org>
+> 
+> This patch adds the tlmm/pinctrl support for IPQ4019 ASoC.
+> 
+> Signed-off-by: Jaiganesh Narayanan <njaigane@codeaurora.org>
+> ---
+>  drivers/pinctrl/qcom/pinctrl-ipq4019.c | 116 +++++++++++++++++++++++++--------
+>  1 file changed, 88 insertions(+), 28 deletions(-)
+> 
+> diff --git a/drivers/pinctrl/qcom/pinctrl-ipq4019.c b/drivers/pinctrl/qcom/pinctrl-ipq4019.c
+> index b68ae42..bc22597 100644
+> --- a/drivers/pinctrl/qcom/pinctrl-ipq4019.c
+> +++ b/drivers/pinctrl/qcom/pinctrl-ipq4019.c
+> @@ -1,5 +1,5 @@
+>  /*
+> - * Copyright (c) 2015, The Linux Foundation. All rights reserved.
+> + * Copyright (c) 2015-2016, The Linux Foundation. All rights reserved.
+>   *
+>   * This program is free software; you can redistribute it and/or modify
+>   * it under the terms of the GNU General Public License version 2 and
+> @@ -283,6 +283,18 @@ enum ipq4019_functions {
+>  	qca_mux_blsp_uart0,
+>  	qca_mux_blsp_spi1,
+>  	qca_mux_blsp_spi0,
+> +	qca_mux_i2s_rx_mclk,
+> +	qca_mux_i2s_rx_bclk,
+> +	qca_mux_i2s_rx_fsync,
+> +	qca_mux_i2s_rxd,
+> +	qca_mux_i2s_tx_mclk,
+> +	qca_mux_i2s_tx_bclk,
+> +	qca_mux_i2s_tx_fsync,
+> +	qca_mux_i2s_txd1,
+> +	qca_mux_i2s_txd2,
+> +	qca_mux_i2s_txd3,
+> +	qca_mux_i2s_spdif_out,
+> +	qca_mux_i2s_spdif_in,
 
-I2C QUP driver relies on SMBus emulation support from the framework.
-To handle SMBus block reads, the driver should check I2C_M_RECV_LEN
-flag and should read the first byte received as the message length.
+You'll also need to add all of these to the
+Documentation/devicetree/bindings/pinctrl/qcom,ipq4019-pinctrl.txt
 
-The driver configures the QUP hardware to read one byte. Once the
-message length is known from this byte, the QUP hardware is configured
-to read the rest.
+I was also going to suggest just using qca_i2s and having a single function, but
+it seems like there is at least 1 pin that supports more than one i2s mode.
 
-Signed-off-by: Naveen Kaje <nkaje@codeaurora.org>
-Signed-off-by: Austin Christ <austinwc@codeaurora.org>
-Reviewed-by: Sricharan R <sricharan@codeaurora.org>
----
- drivers/i2c/busses/i2c-qup.c | 68 ++++++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 65 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/i2c/busses/i2c-qup.c b/drivers/i2c/busses/i2c-qup.c
-index 245d0e6..fd7861c 100644
---- a/drivers/i2c/busses/i2c-qup.c
-+++ b/drivers/i2c/busses/i2c-qup.c
-@@ -517,6 +517,33 @@ static int qup_i2c_get_data_len(struct qup_i2c_dev *qup)
- 	return data_len;
- }
- 
-+static bool qup_i2c_check_msg_len(struct i2c_msg *msg)
-+{
-+	return ((msg->flags & I2C_M_RD) && (msg->flags & I2C_M_RECV_LEN));
-+}
-+
-+static int qup_i2c_set_tags_smb(u16 addr, u8 *tags, struct qup_i2c_dev *qup,
-+			struct i2c_msg *msg)
-+{
-+	int len = 0;
-+
-+	if (msg->len > 1) {
-+		tags[len++] = QUP_TAG_V2_DATARD_STOP;
-+		tags[len++] = qup_i2c_get_data_len(qup) - 1;
-+	} else {
-+		tags[len++] = QUP_TAG_V2_START;
-+		tags[len++] = addr & 0xff;
-+
-+		if (msg->flags & I2C_M_TEN)
-+			tags[len++] = addr >> 8;
-+
-+		tags[len++] = QUP_TAG_V2_DATARD;
-+		/* Read 1 byte indicating the length of the SMBus message */
-+		tags[len++] = 1;
-+	}
-+	return len;
-+}
-+
- static int qup_i2c_set_tags(u8 *tags, struct qup_i2c_dev *qup,
- 			    struct i2c_msg *msg,  int is_dma)
- {
-@@ -526,6 +553,10 @@ static int qup_i2c_set_tags(u8 *tags, struct qup_i2c_dev *qup,
- 
- 	int last = (qup->blk.pos == (qup->blk.count - 1)) && (qup->is_last);
- 
-+	/* Handle tags for SMBus block read */
-+	if (qup_i2c_check_msg_len(msg))
-+		return qup_i2c_set_tags_smb(addr, tags, qup, msg);
-+
- 	if (qup->blk.pos == 0) {
- 		tags[len++] = QUP_TAG_V2_START;
- 		tags[len++] = addr & 0xff;
-@@ -1065,9 +1096,17 @@ static int qup_i2c_read_fifo_v2(struct qup_i2c_dev *qup,
- 				struct i2c_msg *msg)
- {
- 	u32 val;
--	int idx, pos = 0, ret = 0, total;
-+	int idx, pos = 0, ret = 0, total, msg_offset = 0;
- 
-+	/*
-+	 * If the message length is already read in
-+	 * the first byte of the buffer, account for
-+	 * that by setting the offset
-+	 */
-+	if (qup_i2c_check_msg_len(msg) && (msg->len > 1))
-+		msg_offset = 1;
- 	total = qup_i2c_get_data_len(qup);
-+	total -= msg_offset;
- 
- 	/* 2 extra bytes for read tags */
- 	while (pos < (total + 2)) {
-@@ -1087,8 +1126,8 @@ static int qup_i2c_read_fifo_v2(struct qup_i2c_dev *qup,
- 
- 			if (pos >= (total + 2))
- 				goto out;
--
--			msg->buf[qup->pos++] = val & 0xff;
-+			msg->buf[qup->pos + msg_offset] = val & 0xff;
-+			qup->pos++;
- 		}
- 	}
- 
-@@ -1128,6 +1167,24 @@ static int qup_i2c_read_one_v2(struct qup_i2c_dev *qup, struct i2c_msg *msg)
- 			goto err;
- 
- 		qup->blk.pos++;
-+
-+		/* Handle SMBus block read length */
-+		if (qup_i2c_check_msg_len(msg) && (msg->len == 1)) {
-+			if (msg->buf[0] > I2C_SMBUS_BLOCK_MAX) {
-+				ret = -EPROTO;
-+				goto err;
-+			}
-+			msg->len += msg->buf[0];
-+			qup->pos = 0;
-+			qup_i2c_set_read_mode_v2(qup, msg->len);
-+			ret = qup_i2c_issue_xfer_v2(qup, msg);
-+			if (ret)
-+				goto err;
-+			ret = qup_i2c_wait_for_complete(qup, msg);
-+			if (ret)
-+				goto err;
-+			qup_i2c_set_blk_data(qup, msg);
-+		}
- 	} while (qup->blk.pos < qup->blk.count);
- 
- err:
-@@ -1210,6 +1267,11 @@ static int qup_i2c_xfer(struct i2c_adapter *adap,
- 			goto out;
- 		}
- 
-+		if (qup_i2c_check_msg_len(&msgs[idx])) {
-+			ret = -EINVAL;
-+			goto out;
-+		}
-+
- 		if (msgs[idx].flags & I2C_M_RD)
- 			ret = qup_i2c_read_one(qup, &msgs[idx]);
- 		else
--- 
-Qualcomm Datacenter Technologies as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+Regards,
+Andy
