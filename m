@@ -1,39 +1,88 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 15 Jul 2016 14:42:10 +0100
-Subject: [RFC 0/3] extend kexec_file_load system call
-In-Reply-To: <20160715132610.GD23514@redhat.com>
-References: <20160712014201.11456-1-takahiro.akashi@linaro.org>
- <4321972.HZgDox36RC@wuerfel> <3520758.yAgMzqF1PF@hactar>
- <5547846.5l81k4b13o@wuerfel> <20160715132610.GD23514@redhat.com>
-Message-ID: <20160715134209.GF1041@n2100.armlinux.org.uk>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Fri, 15 Jul 2016 06:46:29 -0700
+Subject: [PATCH 3/3] watchdog: bcm2835_wdt: set WDOG_HW_RUNNING bit when
+ appropriate
+In-Reply-To: <1468570524-18222-3-git-send-email-rasmus.villemoes@prevas.dk>
+References: <1468570524-18222-1-git-send-email-rasmus.villemoes@prevas.dk>
+ <1468570524-18222-3-git-send-email-rasmus.villemoes@prevas.dk>
+Message-ID: <5788E935.6080608@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 15, 2016 at 09:26:10AM -0400, Vivek Goyal wrote:
-> On Fri, Jul 15, 2016 at 09:31:02AM +0200, Arnd Bergmann wrote:
-> > I think that helps, as it makes the problem space correspond to that
-> > of modifying the command line, but I can still come up with countless
-> > attacks based on modifications of the /chosen node and/or the command
-> > line, in fact it's probably easier than any other node.
-> 
-> I don't know anything about DTB. So here comes a very basic question. Does
-> DTB allow passing an executable blob to kernel or pass the location of
-> some unsigned executable code at kernel level.
+On 07/15/2016 01:15 AM, Rasmus Villemoes wrote:
+> A bootloader may start the watchdog device before handing control to
+> the kernel - in that case, we should tell the kernel about it so the
+> watchdog framework can keep it alive until userspace opens
+> /dev/watchdog0.
+>
 
-DT on ARM is a description of the hardware - it can be thought of as a
-set of nodes with properties attached.  The properties can describe
-anything (we have documentation in Documentation/devicetree/bindings
-which describes what we expect the properties to contain.)
+Separate note: The maximum timeout for this watchdog is 15 seconds.
+Given that, it might be useful to set max_hw_heartbeat_ms instead of
+max_timeout. Separate patch, though.
 
-On other architectures, DT can also contain open-firmware "functions"
-but I don't think there's much support in the kernel for that - maybe
-the PPC folk can reply on that point.
+> Signed-off-by: Rasmus Villemoes <rasmus.villemoes@prevas.dk>
+> ---
+>   drivers/watchdog/bcm2835_wdt.c | 22 ++++++++++++++++++++++
+>   1 file changed, 22 insertions(+)
+>
+> diff --git a/drivers/watchdog/bcm2835_wdt.c b/drivers/watchdog/bcm2835_wdt.c
+> index 4dddd82..9a08334 100644
+> --- a/drivers/watchdog/bcm2835_wdt.c
+> +++ b/drivers/watchdog/bcm2835_wdt.c
+> @@ -55,6 +55,15 @@ struct bcm2835_wdt {
+>   static unsigned int heartbeat;
+>   static bool nowayout = WATCHDOG_NOWAYOUT;
+>
+> +static bool bcm2835_wdt_is_running(struct bcm2835_wdt *wdt)
+> +{
+> +	uint32_t cur;
+> +
+> +	cur = readl(wdt->base + PM_RSTC);
+> +
+> +	return !!(cur & PM_RSTC_WRCFG_FULL_RESET);
+> +}
+> +
+>   static int bcm2835_wdt_start(struct watchdog_device *wdog)
+>   {
+>   	struct bcm2835_wdt *wdt = watchdog_get_drvdata(wdog);
+> @@ -70,6 +79,7 @@ static int bcm2835_wdt_start(struct watchdog_device *wdog)
+>   		  PM_RSTC_WRCFG_FULL_RESET, wdt->base + PM_RSTC);
+>
+>   	spin_unlock_irqrestore(&wdt->lock, flags);
+> +	set_bit(WDOG_HW_RUNNING, &wdog->status);
+>
+You don't need to set this bit here unless the watchdog can not be stopped.
 
-It is possible that someone may, at some point, decide to create a
-property that points to some executable blob, but I can't think of a
-reason why we should ever allow such a monstrosity in mainline kernels.
+>   	return 0;
+>   }
+> @@ -79,6 +89,7 @@ static int bcm2835_wdt_stop(struct watchdog_device *wdog)
+>   	struct bcm2835_wdt *wdt = watchdog_get_drvdata(wdog);
+>
+>   	writel_relaxed(PM_PASSWORD | PM_RSTC_RESET, wdt->base + PM_RSTC);
+> +	clear_bit(WDOG_HW_RUNNING, &wdog->status);
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+... and since you clear the bit, it can be stopped. Both setting and resetting the bit
+is therefore not necessary.
+
+>   	return 0;
+>   }
+>
+> @@ -181,6 +192,17 @@ static int bcm2835_wdt_probe(struct platform_device *pdev)
+>   	watchdog_init_timeout(&bcm2835_wdt_wdd, heartbeat, dev);
+>   	watchdog_set_nowayout(&bcm2835_wdt_wdd, nowayout);
+>   	bcm2835_wdt_wdd.parent = &pdev->dev;
+> +	if (bcm2835_wdt_is_running(wdt)) {
+> +		/*
+> +		 * The currently active timeout value (set by the
+> +		 * bootloader) may be different from the module
+> +		 * heartbeat parameter or the value in device
+> +		 * tree. But we just need to set WDOG_HW_RUNNING,
+> +		 * because then the framework will "immediately" ping
+> +		 * the device, updating the timeout.
+> +		 */
+> +		set_bit(WDOG_HW_RUNNING, &bcm2835_wdt_wdd.status);
+> +	}
+>   	err = watchdog_register_device(&bcm2835_wdt_wdd);
+>   	if (err) {
+>   		dev_err(dev, "Failed to register watchdog device");
+>
