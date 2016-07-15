@@ -1,90 +1,33 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Fri, 15 Jul 2016 15:10:57 -0700
-Subject: [PATCH 2/3] mmc: mmc: do not use CMD13 to get status after speed
- mode switch
-In-Reply-To: <1463647662-27426-3-git-send-email-chaotian.jing@mediatek.com>
-References: <1463647662-27426-1-git-send-email-chaotian.jing@mediatek.com>
- <1463647662-27426-3-git-send-email-chaotian.jing@mediatek.com>
-Message-ID: <CAOCOHw67NAinC6dEX0KsDn02kuXyNwznm3-bhptSVvQH0V1dqQ@mail.gmail.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Fri, 15 Jul 2016 17:16:55 -0500
+Subject: [PATCH v3 0/3] pci: Aardvark PCIe controller driver for Marvell
+ Armada 3700
+In-Reply-To: <20160707224403.3279d807@free-electrons.com>
+References: <1467279152-5717-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20160707224403.3279d807@free-electrons.com>
+Message-ID: <20160715221655.GD1706@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 19, 2016 at 1:47 AM, Chaotian Jing
-<chaotian.jing@mediatek.com> wrote:
-> Per JEDEC spec, it is not recommended to use CMD13 to get card status
-> after speed mode switch. below are two reason about this:
-> 1. CMD13 cannot be guaranteed due to the asynchronous operation.
-> Therefore it is not recommended to use CMD13 to check busy completion
-> of the timing change indication.
-> 2. After switch to HS200, CMD13 will get response of 0x800, and even the
-> busy signal gets de-asserted, the response of CMD13 is aslo 0x800.
->
-> Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
-> ---
->  drivers/mmc/core/mmc.c | 112 ++++++++++++++++++++-----------------------------
->  1 file changed, 45 insertions(+), 67 deletions(-)
->
-> diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
-[..]
-> @@ -1274,20 +1254,18 @@ static int mmc_select_hs200(struct mmc_card *card)
->                 err = __mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
->                                    EXT_CSD_HS_TIMING, val,
->                                    card->ext_csd.generic_cmd6_time,
-> -                                  true, send_status, true);
-> +                                  true, false, true);
->                 if (err)
->                         goto err;
->                 old_timing = host->ios.timing;
->                 mmc_set_timing(host, MMC_TIMING_MMC_HS200);
-> -               if (!send_status) {
-> -                       err = mmc_switch_status(card);
-> -                       /*
-> -                        * mmc_select_timing() assumes timing has not changed if
-> -                        * it is a switch error.
-> -                        */
-> -                       if (err == -EBADMSG)
-> -                               mmc_set_timing(host, old_timing);
-> -               }
-> +               err = mmc_switch_status(card);
-> +               /*
-> +                * mmc_select_timing() assumes timing has not changed if
-> +                * it is a switch error.
-> +                */
-> +               if (err == -EBADMSG)
-> +                       mmc_set_timing(host, old_timing);
+On Thu, Jul 07, 2016 at 10:44:03PM +0200, Thomas Petazzoni wrote:
+> Hello Bjorn,
+> 
+> On Thu, 30 Jun 2016 11:32:29 +0200, Thomas Petazzoni wrote:
+> 
+> > This is the third iteration of the patch series that adds a PCIe
+> > controller driver for the Aardvark PCI controller, which is used on
+> > Marvell Armada 3700.
+> 
+> Have you had the chance to look into this third iteration, which
+> hopefully integrates the feedback you made during your review of the
+> second version?
+> 
+> I was hoping to get this in time for 4.8, so if you have any comments,
+> do not hesitate to let me know so that I can address them.
 
-Sorry for not spotting this earlier, but with the move of the call of
-mmc_switch_status() to after mmc_set_timing() we get following error
-with sdhci-msm:
+Hi Thomas, I just returned from vacation, so I haven't looked at this
+yet.  Sounds like we'll have a bonus week before v4.7 and I was
+planning to do two pull requests anyway because of my vacation, so
+there should still be time.
 
-mmc0: mmc_select_hs200 failed, error -110
-mmc0: error -110 whilst initialising MMC card
-mmc0: Reset 0x1 never completed.
-sdhci: =========== REGISTER DUMP (mmc0)===========
-sdhci: Sys addr: 0x00000000 | Version: 0x00002e02
-sdhci: Blk size: 0x00004000 | Blk cnt: 0x00000000
-sdhci: Argument: 0x00000000 | Trn mode: 0x00000000
-sdhci: Present: 0x01f80000 | Host ctl: 0x00000000
-sdhci: Power: 0x00000000 | Blk gap: 0x00000000
-sdhci: Wake-up: 0x00000000 | Clock: 0x00000003
-sdhci: Timeout: 0x00000000 | Int stat: 0x00000000
-sdhci: Int enab: 0x00000000 | Sig enab: 0x00000000
-sdhci: AC12 err: 0x00000000 | Slot int: 0x00000000
-sdhci: Caps: 0x322dc8b2 | Caps_1: 0x00008007
-sdhci: Cmd: 0x00000000 | Max curr: 0x00000000
-sdhci: Host ctl2: 0x00000000
-sdhci: ADMA Err: 0x00000000 | ADMA Ptr: 0x0000000000000000
-sdhci: ===========================================
-
-But I if I understand the commit correctly this is the intention of
-the patch (not the error, but the move).
-
-Regards,
 Bjorn
-
->         }
->  err:
->         if (err)
-> --
-> 1.8.1.1.dirty
->
