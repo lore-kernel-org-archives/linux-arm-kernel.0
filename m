@@ -1,158 +1,25 @@
-From: fu.wei@linaro.org (Fu Wei)
-Date: Sat, 16 Jul 2016 00:13:14 +0800
-Subject: [PATCH v7 4/9] acpi/arm64: Add GTDT table parse driver
-In-Reply-To: <4581163.sAHfC1UEjl@vostro.rjw.lan>
-References: <1468432402-4872-1-git-send-email-fu.wei@linaro.org>
- <CAJZ5v0jnNqjpcY1CGkHxbJFwX1MuRi-U=jTCKWavMdEH4bKR3g@mail.gmail.com>
- <CADyBb7sGWizLDy3LtpGpJ9jkchyWHZ2oPfsg6fE1ZE54gn05FA@mail.gmail.com>
- <4581163.sAHfC1UEjl@vostro.rjw.lan>
-Message-ID: <CADyBb7vziYMcAfk5TNOHoBCxi58jJypcTV_o2U75cLS-SRtEJQ@mail.gmail.com>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Fri, 15 Jul 2016 18:16:51 +0200
+Subject: iommu/rockchip: Fix bugs and enable on ARM64
+In-Reply-To: <575f6cd7-6e03-e701-78ed-ea2fe9f7573c@suse.com>
+References: <1466734413-7453-1-git-send-email-zhengsq@rock-chips.com>
+ <20160627125751.GN11432@8bytes.org>
+ <577EFB86.1060502@rock-chips.com>
+ <575f6cd7-6e03-e701-78ed-ea2fe9f7573c@suse.com>
+Message-ID: <20160715161651.GS12639@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rafael,
+On Fri, Jul 15, 2016 at 05:32:02PM +0200, Matthias Brugger wrote:
+> >The drm rockchip patches are dependent on iommu/rockchip patches, can
+> >you also apply these patches together? So that can avoid compile problem.
+> >
+> 
+> While at it. I don't see patch 8 (iommu/Kconfig) in linux-next.
+> I suppose you forgot to pick that one.
 
-On 15 July 2016 at 20:11, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
-> On Friday, July 15, 2016 03:45:05 PM Fu Wei wrote:
->> Hi Rafael,
->>
->>
->> On 14 July 2016 at 05:43, Rafael J. Wysocki <rafael@kernel.org> wrote:
->> > On Wed, Jul 13, 2016 at 11:08 PM, Guenter Roeck <linux@roeck-us.net> wrote:
->> >> On Wed, Jul 13, 2016 at 10:30:37PM +0200, Rafael J. Wysocki wrote:
->> >>> On Wed, Jul 13, 2016 at 7:53 PM,  <fu.wei@linaro.org> wrote:
->> >>> > From: Fu Wei <fu.wei@linaro.org>
->> >>> >
->> >>> > This patch adds support for parsing arch timer in GTDT,
->> >>> > provides some kernel APIs to parse all the PPIs and
->> >>> > always-on info in GTDT and export them.
->> >>> >
->> >>> > By this driver, we can simplify arm_arch_timer drivers, and
->> >>> > separate the ACPI GTDT knowledge from it.
->> >>> >
->> >>> > Signed-off-by: Fu Wei <fu.wei@linaro.org>
->> >>> > Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
->> >>> > ---
->> >>> >  drivers/acpi/Kconfig           |   5 ++
->> >>> >  drivers/acpi/Makefile          |   1 +
->> >>> >  drivers/acpi/arm64/Kconfig     |  15 ++++
->> >>> >  drivers/acpi/arm64/Makefile    |   1 +
->> >>> >  drivers/acpi/arm64/acpi_gtdt.c | 170 +++++++++++++++++++++++++++++++++++++++++
->> >>> >  include/linux/acpi.h           |   6 ++
->> >>> >  6 files changed, 198 insertions(+)
->> >>> >
->> >>> > diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
->> >>> > index b7e2e77..1cdc7d2 100644
->> >>> > --- a/drivers/acpi/Kconfig
->> >>> > +++ b/drivers/acpi/Kconfig
->> >>> > @@ -521,4 +521,9 @@ config XPOWER_PMIC_OPREGION
->> >>> >
->> >>> >  endif
->> >>> >
->> >>> > +if ARM64
->> >>> > +source "drivers/acpi/arm64/Kconfig"
->> >>> > +
->> >>> > +endif
->> >>> > +
->> >>> >  endif  # ACPI
->> >>> > diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
->> >>> > index 251ce85..1a94ff7 100644
->> >>> > --- a/drivers/acpi/Makefile
->> >>> > +++ b/drivers/acpi/Makefile
->> >>> > @@ -99,5 +99,6 @@ obj-$(CONFIG_ACPI_EXTLOG)     += acpi_extlog.o
->> >>> >  obj-$(CONFIG_PMIC_OPREGION)    += pmic/intel_pmic.o
->> >>> >  obj-$(CONFIG_CRC_PMIC_OPREGION) += pmic/intel_pmic_crc.o
->> >>> >  obj-$(CONFIG_XPOWER_PMIC_OPREGION) += pmic/intel_pmic_xpower.o
->> >>> > +obj-$(CONFIG_ARM64)    += arm64/
->> >>> >
->> >>> >  video-objs                     += acpi_video.o video_detect.o
->> >>> > diff --git a/drivers/acpi/arm64/Kconfig b/drivers/acpi/arm64/Kconfig
->> >>> > new file mode 100644
->> >>> > index 0000000..ff5c253
->> >>> > --- /dev/null
->> >>> > +++ b/drivers/acpi/arm64/Kconfig
->> >>> > @@ -0,0 +1,15 @@
->> >>> > +#
->> >>> > +# ACPI Configuration for ARM64
->> >>> > +#
->> >>> > +
->> >>> > +menu "The ARM64-specific ACPI Support"
->> >>> > +
->> >>> > +config ACPI_GTDT
->> >>> > +       bool "ACPI GTDT table Support"
->> >>>
->> >>> This should depend on ARM64.
->> >>>
->> >>> Also I wonder if it needs to be user-selectable?  Wouldn't it be
->> >>> better to enable it by default when building for ARM64 with ACPI?
->> >>>
->> >> It is currently selected in patch 9, in the watchdog driver's Kconfig
->> >> entry.
->> >
->> > Well, it still doesn't have to be user-selectable for that. :-)
->>
->> Actually it is also automatically selected by [PATCH v7 6/9]:
->
-> Right.
->
-> By user-selectable I mean "showing up in a Kconfig configurator tool".
->
-> It just need not be visible in the configurator IMO.
->
->> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
->> index 47352d2..71d5b30 100644
->> --- a/drivers/clocksource/Kconfig
->> +++ b/drivers/clocksource/Kconfig
->> @@ -8,6 +8,7 @@ config CLKSRC_OF
->>  config CLKSRC_ACPI
->>   bool
->>   select CLKSRC_PROBE
->> + select ACPI_GTDT if ARM64
->>
->>  config CLKSRC_PROBE
->>   bool
->>
->>
->> >
->> >> Not sure if I like that; maybe the watchdog driver should depend
->> >> on it instead ?
->> >
->> > If the watchdog is not the only user of it (and I don't think it is),
->> > it would be better to arrange things this way.
->> >
->>
->> There are two user:
->> (1) arm_arch_timer(which will select CLKSRC_ACPI if ACPI, then
->> CLKSRC_ACPI will select ACPI_GTDT if ARM64)
->> So arm_arch_timer will automatically selecte ACPI_GTDT if ARM64 && ACPI
->>
->> (2) sbsa_gwdt (which will select ACPI_GTDT if ACPI in [PATCH v7 9/9])
->> So sbsa_gwdt will automatically selecte ACPI_GTDT if ARM64 && ACPI &&
->> ARM_ARCH_TIMER
->>
->> So ACPI_GTDT is automatically selected by both of two users.
->>
->>
->> But like Timur said before:
->>
->> maybe we just "selecte ACPI_GTDT if ACPI" for ARM64, because ARM64
->> require GTDT if we use ACPI.
->
-> Right.  That's the way to do it then and make sbsa_gwdt depend on it instead
-> of selecting it.
-
-OK, will do in my v8 patchset
-
->
-> Thanks,
-> Rafael
->
+I picked it up first, but it causes compile errors, so I removed it for
+now.
 
 
-
--- 
-Best regards,
-
-Fu Wei
-Software Engineer
-Red Hat
+	Joerg
