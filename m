@@ -1,53 +1,29 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 15 Jul 2016 13:19:12 +0100
-Subject: [PATCH 1/2] ARM: realview: Fix PBX-A9 cache description
-Message-ID: <dbf8749c4af9aa5ffb85e961b7ae09ffeefa7f2a.1468583959.git.robin.murphy@arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 15 Jul 2016 13:50:39 +0100
+Subject: "coupled" regulator support
+In-Reply-To: <20160715200113.0f3cd823@xhacker>
+References: <20160715200113.0f3cd823@xhacker>
+Message-ID: <20160715125039.GI30372@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Clearly QEMU is very permissive in how its PL310 model may be set up,
-but the real hardware turns out to be far more particular about things
-actually being correct. Fix up the DT description so that the real
-thing actually boots:
+On Fri, Jul 15, 2016 at 08:01:13PM +0800, Jisheng Zhang wrote:
 
-- The arm,data-latency and arm,tag-latency properties need 3 cells to
-  be valid, otherwise we end up retaining the default 8-cycle latencies
-  which leads pretty quickly to lockup.
-- The arm,dirty-latency property is only relevant to L210/L220, so get
-  rid of it.
-- The cache geometry override also leads to lockup and/or general
-  misbehaviour. Irritatingly, the manual doesn't state the actual PL310
-  configuration, but based on the boardfile code and poking registers
-  from the Boot Monitor, it would seem to be 8 sets of 16KB ways.
+> regR can only be set to v1 if devA and devB all call for set voltage to v1
+> regR can set to v2 if devA or devB call for set voltage to v2
 
-With that, we can successfully boot to enjoy the fun of mismatched FPUs...
+> To support this situation, I'd like to add flag to regulator structure and
+> patch regulator_check_consumers() to check whether we are safe to set the vol
 
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
- arch/arm/boot/dts/arm-realview-pbx-a9.dts | 9 ++++-----
- 1 file changed, 4 insertions(+), 5 deletions(-)
-
-diff --git a/arch/arm/boot/dts/arm-realview-pbx-a9.dts b/arch/arm/boot/dts/arm-realview-pbx-a9.dts
-index db808f92dd79..90d00b407f85 100644
---- a/arch/arm/boot/dts/arm-realview-pbx-a9.dts
-+++ b/arch/arm/boot/dts/arm-realview-pbx-a9.dts
-@@ -70,13 +70,12 @@
- 		 * associativity as these may be erroneously set
- 		 * up by boot loader(s).
- 		 */
--		cache-size = <1048576>; // 1MB
--		cache-sets = <4096>;
-+		cache-size = <131072>; // 128KB
-+		cache-sets = <512>;
- 		cache-line-size = <32>;
- 		arm,parity-disable;
--		arm,tag-latency = <1>;
--		arm,data-latency = <1 1>;
--		arm,dirty-latency = <1>;
-+		arm,tag-latency = <1 1 1>;
-+		arm,data-latency = <1 1 1>;
- 	};
- 
- 	scu: scu at 1f000000 {
--- 
-2.8.1.dirty
+Surely this is just what normal set voltage calls do?  If devA says
+set_voltage(v1, v2) but devB still has set_voltage(v2, v2) then we will
+leave the voltage at v2, we'll only allow it to be set to v1 if both
+consumers agree that this is a valid voltage.  It feels like there's
+something else going on here that I'm missing?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160715/43fa8c09/attachment.sig>
