@@ -1,64 +1,54 @@
-From: pali.rohar@gmail.com (Pali =?utf-8?B?Um9ow6Fy?=)
-Date: Fri, 15 Jul 2016 09:40:52 +0200
-Subject: outdated documentation for lp5523 LED driver?
-In-Reply-To: <20160715073214.GC13429@amd>
-References: <20160715073214.GC13429@amd>
-Message-ID: <20160715074052.GE29844@pali>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Fri, 15 Jul 2016 15:38:40 +0800
+Subject: [PATCH v4 2/2] ARM: cpuidle: make arm_cpuidle_suspend() a bit
+ more efficient
+In-Reply-To: <20160714153113.GC1041@n2100.armlinux.org.uk>
+References: <1467785755-3488-1-git-send-email-jszhang@marvell.com>
+ <1467785755-3488-3-git-send-email-jszhang@marvell.com>
+ <20160707134628.GB20553@linaro.org>	<20160708141729.3fa61c10@xhacker>
+ <20160708105012.GA32305@linaro.org>	<20160708185854.22e9fae9@xhacker>
+ <20160714153113.GC1041@n2100.armlinux.org.uk>
+Message-ID: <20160715153840.6c91bc48@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 15 July 2016 09:32:14 Pavel Machek wrote:
-> Hi!
-> 
-> Documentation says that load/leds are only visible in the load mode,
-> but that does not seem to be true (kernel 4.4.0 on N900).
-> 
-> # 1) Legacy interface - enginex_mode, enginex_load and enginex_leds
-> #  Control interface for the engines:
-> #    x is 1 .. 3
-> #      enginex_mode : disabled, load, run
-> #      enginex_load : microcode load (visible only in load mode)
-> #      enginex_leds : led mux control (visible only in load mode)
-> 
-> pavel at n900:/sys/class/leds/lp5523:r/device$ ls -al engine*
-> -rw-r--r-- 1 root root 4096 Jul  6 22:47 engine1_leds
-> --w------- 1 root root 4096 Jul  6 22:47 engine1_load
-> -rw-r--r-- 1 root root 4096 Jul  6 23:41 engine1_mode
-> -rw-r--r-- 1 root root 4096 Jul  6 22:47 engine2_leds
-> --w------- 1 root root 4096 Jul  6 22:47 engine2_load
-> -rw-r--r-- 1 root root 4096 Jul  6 23:41 engine2_mode
-> -rw-r--r-- 1 root root 4096 Jul  6 22:47 engine3_leds
-> --w------- 1 root root 4096 Jul  6 22:47 engine3_load
-> -rw-r--r-- 1 root root 4096 Jul  6 22:47 engine3_mode
-> pavel at n900:/sys/class/leds/lp5523:r/device$ grep . engine*mode
-> engine1_mode:run
-> engine2_mode:load
-> engine3_mode:run
-> pavel at n900:/sys/class/leds/lp5523:r/device$
+On Thu, 14 Jul 2016 16:31:13 +0100 Russell King - ARM Linux wrote:
 
-On 2.6.28 kernel is present only legacy interface and for this version
-is above documentation correct. When engine is in "run" or "disabled",
-then sysfs nodes _load and _leds are invisible.
-
-So I suspect that bug is in current kernel code and documentation is
-correct... So I would propose to fix kernel code to reflect
-documentation...
-
-> I got both the legacy and the firmware interface to work... but the
-> firmware interface only seems to work once for me.
+> On Fri, Jul 08, 2016 at 06:58:54PM +0800, Jisheng Zhang wrote:
+> > On Fri, 8 Jul 2016 12:50:12 +0200 Daniel Lezcano  wrote:
+> >   
+> > > On Fri, Jul 08, 2016 at 02:17:29PM +0800, Jisheng Zhang wrote:  
+> > > > Dear Daniel,
+> > > > 
+> > > > On Thu, 7 Jul 2016 15:46:28 +0200 Daniel Lezcano wrote:
+> > > >     
+> > > > > On Wed, Jul 06, 2016 at 02:15:55PM +0800, Jisheng Zhang wrote:    
+> > > > > > Currently, we check cpuidle_ops.suspend every time when entering a
+> > > > > > low-power idle state. But this check could be avoided in this hot path
+> > > > > > by moving it into arm_cpuidle_read_ops() to reduce arm_cpuidle_suspend
+> > > > > > overhead a bit.
+> > > > > > 
+> > > > > > Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+> > > > > > ---      
+> > > > > 
+> > > > > Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>    
+> > > > 
+> > > > I'm not sure the upstream merging path this patch should follow, Per my
+> > > > understanding, I need to put it into Russell's PATCH system.    
+> > > 
+> > > Or alternatively through arm-soc
+> > >   
+> > 
+> > Got it. thanks.
+> > 
+> > Dear Arnd, Olof,
+> > 
+> > I have no pull request permission. what's your preference? Could you please
+> > advise?  
 > 
-> How new and old interface are expected to interact with each other is
-> not clear to me.
-
-In my opinion both interfaces could be used. They provide same states
-load/run but via different sysfs files.
-
-> What should be done there?
-> 
-> Best regards,
-> 									Pavel
+> ... and because arm-soc people haven't responded, they've now ended up
+> in the patch system... So I've applied them to my tree in a separate
+> branch.
 > 
 
--- 
-Pali Roh?r
-pali.rohar at gmail.com
+Thank you so much!
