@@ -1,20 +1,78 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 15 Jul 2016 23:05:42 +0200
-Subject: [GIT PULL] ARM: at91: dt for 4.8 #3
-In-Reply-To: <20160715205826.GA31997@piout.net>
-References: <20160715205826.GA31997@piout.net>
-Message-ID: <2396021.xcmCDpBAY8@wuerfel>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Fri, 15 Jul 2016 23:22:51 +0200
+Subject: [PATCH v7 4/9] acpi/arm64: Add GTDT table parse driver
+In-Reply-To: <CADyBb7sXxY_a+tJQoH01eUk5-xvg9jRZtzyhB-tDstWoBAWfLg@mail.gmail.com>
+References: <1468432402-4872-1-git-send-email-fu.wei@linaro.org>
+ <5101961.eCg7ixLQWc@vostro.rjw.lan>
+ <CADyBb7sXxY_a+tJQoH01eUk5-xvg9jRZtzyhB-tDstWoBAWfLg@mail.gmail.com>
+Message-ID: <1580087.dlcVOb6fx1@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, July 15, 2016 10:58:26 PM CEST Alexandre Belloni wrote:
-> DT Changes for 4.8 #3:
->  - Lot of fixes for dtc warnings
->  - Separate dtb compilation for ARMv4 and ARMv5
+On Saturday, July 16, 2016 12:32:14 AM Fu Wei wrote:
+> Hi Rafael,
+> 
+> On 15 July 2016 at 21:07, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+> > On Friday, July 15, 2016 02:15:27 PM Rafael J. Wysocki wrote:
+> >> On Friday, July 15, 2016 03:32:35 PM Fu Wei wrote:
+> >> > Hi Rafael,
+> >> >
+> >
+> > [cut]
+> >
+> >> > >
+> >> > >> +               return 0;
+> >> > >> +       }
+> >> > >> +
+> >> > >> +       if (!gtdt->platform_timer_count) {
+> >> > >> +               pr_info("No Platform Timer.\n");
+> >> > >> +               return 0;
+> >> > >> +       }
+> >> > >> +
+> >> > >> +       acpi_gtdt_desc.platform_timer_start = (void *)gtdt +
+> >> > >> +                                             gtdt->platform_timer_offset;
+> >> > >> +       if (acpi_gtdt_desc.platform_timer_start <
+> >> > >> +           (void *)table + sizeof(struct acpi_table_gtdt)) {
+> >> > >> +               pr_err(FW_BUG "Platform Timer pointer error.\n");
+> >> > >
+> >> > > Why pr_err()?
+> >> >
+> >> > if (true), that means the GTDT table has bugs.
+> >> >
+> >>
+> >> And that's not a very useful piece of information unless you're debugging the
+> >> platform, is it?
+> >
+> > FWIW, I'm not a big fan of printing "your firmware is buggy" type of messages
+> > (especially at the "error" log level or higher) unless they can be clearly
+> > connected to a specific type of functional failure.
+> >
+> > So if you want to pring an error-level message, something like "I cannot do X
+> > because of the firmware bug Y" would be better IMO.
+> 
+> So can I do this:
+> pr_err(FW_BUG "Can NOT init platform_timer pointer, because of the
+> GTDT table bug\n");
+> 
+> or pr_debug(FW_BUG "Can NOT init platform_timer_start, because of
+> platform_timer_offset bug in GTDT\n");
+> 
+> or just delete it?
+> 
+> which one do you prefer?  I think maybe should provide some clue for
+> users to fix the problem  :-)
 
-Great timing, I was just looking for things to merge before the end
-of the week, so I pulled it into next/dt and pushed it out.
+And how exactly would they fix it then?
 
-Thanks for addressing both issues!
+> 
+> any thought ?
 
-	Arnd
+If you print variable or function names and the like, the message should be
+a debug one, because that's information that can only be understood by
+developers (some developers are users too, but they are a minority).
+
+If you want to report an error, say what is not working (or not available
+etc) and why (if you know the reason at the time the message is printed).
+
+Thanks,
+Rafael
