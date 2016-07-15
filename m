@@ -1,55 +1,154 @@
-From: hramrach@gmail.com (Michal Suchanek)
-Date: Fri, 15 Jul 2016 16:22:31 +0200
-Subject: [linux-sunxi] Re: [PATCH v2 06/14] ARM: sun8i: clk: Add
- clk-factor rate application method
-In-Reply-To: <98fd2ab2-9b1d-1494-5867-7701780fd471@megous.com>
-References: <20160625034511.7966-1-megous@megous.com>
- <20160625034511.7966-7-megous@megous.com>
- <20160630204001.GC5485@lukather>
- <0b71ed7e-98c9-109e-85e6-ceb95131d88a@megous.com>
- <20160715085356.GR4761@lukather>
- <085e185a-ac76-dd3f-9b0e-a7dc9c0c09f3@megous.com>
- <20160715152756.db7375a7109fed18c2fbf43a@free.fr>
- <98fd2ab2-9b1d-1494-5867-7701780fd471@megous.com>
-Message-ID: <CAOMqctTds7adsfvehfv8wcxbb0NOpEQE5wRff6NwfPOUa3SbRw@mail.gmail.com>
+From: quentin.schulz@free-electrons.com (Quentin Schulz)
+Date: Fri, 15 Jul 2016 16:36:54 +0200
+Subject: [PATCH v2 4/4] hwmon: iio: add label for channels read by
+ iio_hwmon
+In-Reply-To: <5788ED2D.9050405@roeck-us.net>
+References: <1468576754-3273-1-git-send-email-quentin.schulz@free-electrons.com>
+ <1468576754-3273-5-git-send-email-quentin.schulz@free-electrons.com>
+ <5788ED2D.9050405@roeck-us.net>
+Message-ID: <5788F506.3040809@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On 15/07/2016 16:03, Guenter Roeck wrote:
+> On 07/15/2016 02:59 AM, Quentin Schulz wrote:
+[...]
+>> +static ssize_t iio_hwmon_read_label(struct device *dev,
+>> +                    struct device_attribute *attr,
+>> +                    char *buf)
+>> +{
+>> +    struct sensor_device_attribute *sattr = to_sensor_dev_attr(attr);
+>> +    struct iio_hwmon_state *state = dev_get_drvdata(dev);
+>> +    const char *label =
+>> state->channels[sattr->index].channel->extend_name;
+>> +
+>> +    if (label)
+>> +        return sprintf(buf, "%s\n", label);
+>> +
+> Can the name disappear on the fly, or be changed on the fly ?
+> Then this is unusable. We should and can only provide labels
+> if a name exists and is permanent. Otherwise all we do is
+> to confuse user space.
 
-On 15 July 2016 at 15:48, Ond?ej Jirman <megous@megous.com> wrote:
->
->
-> On 15.7.2016 15:27, Jean-Francois Moine wrote:
->> On Fri, 15 Jul 2016 12:38:54 +0200
->> Ond?ej Jirman <megous@megous.com> wrote:
+It cannot, the extend_name field is const char* in the struct:
+http://lxr.free-electrons.com/source/include/linux/iio/iio.h#L247
+
+[...]
+>> @@ -107,6 +123,18 @@ static int iio_hwmon_probe(struct platform_device
+>> *pdev)
+>>           }
 >>
->>>> If so, then yes, trying to switch to the 24MHz oscillator before
->>>> applying the factors, and then switching back when the PLL is stable
->>>> would be a nice solution.
->>>>
->>>> I just checked, and all the SoCs we've had so far have that
->>>> possibility, so if it works, for now, I'd like to stick to that.
->>>
->>> It would need to be tested. U-boot does the change only once, while the
->>> kernel would be doing it all the time and between various frequencies
->>> and PLL settings. So the issues may show up with this solution too.
+>>           sysfs_attr_init(&a->dev_attr.attr);
+>> +
+>> +        b = NULL;
+>> +        if (st->channels[i].channel->extend_name) {
+>> +            b = devm_kzalloc(dev, sizeof(*b), GFP_KERNEL);
+>> +            if (b == NULL) {
+>> +                ret = -ENOMEM;
+>> +                goto error_release_channels;
+>> +            }
+>> +
+>> +            sysfs_attr_init(&b->dev_attr.attr);
+> 
+> Why is this initialization here and not with the rest of the initialization
+> of this attribute ?
+
+I don't get your question. I've followed the exact same pattern as for
+"a" variable's initialization.
+The initialization is before the switch case because the name of the
+exposed sysfs file depends on the type of the IIO channel. If I move the
+initialization in the switch case, I'll have duplicated code.
+
+>> +        }
+>> +
+>>           ret = iio_get_channel_type(&st->channels[i], &type);
+>>           if (ret < 0)
+>>               goto error_release_channels;
+>> @@ -115,35 +143,66 @@ static int iio_hwmon_probe(struct
+>> platform_device *pdev)
+>>           case IIO_VOLTAGE:
+>>               a->dev_attr.attr.name = kasprintf(GFP_KERNEL,
+>>                                 "in%d_input",
+>> -                              in_i++);
+>> +                              in_i);
+>> +            if (b)
+>> +                b->dev_attr.attr.name = kasprintf(GFP_KERNEL,
+>> +                                  "in%d_label",
+>> +                                  in_i);
+>> +            in_i++;
+>>               break;
+>>           case IIO_TEMP:
+>>               a->dev_attr.attr.name = kasprintf(GFP_KERNEL,
+>>                                 "temp%d_input",
+>> -                              temp_i++);
+>> +                              temp_i);
+>> +
+>> +            if (b)
+>> +                b->dev_attr.attr.name = kasprintf(GFP_KERNEL,
+>> +                                  "temp%d_label",
+>> +                                  temp_i);
+>> +            temp_i++;
+>>               break;
+>>           case IIO_CURRENT:
+>>               a->dev_attr.attr.name = kasprintf(GFP_KERNEL,
+>>                                 "curr%d_input",
+>> -                              curr_i++);
+>> +                              curr_i);
+>> +
+>> +            if (b)
+>> +                b->dev_attr.attr.name = kasprintf(GFP_KERNEL,
+>> +                                  "curr%d_label",
+>> +                                  curr_i);
+>> +            curr_i++;
+>>               break;
+>>           case IIO_HUMIDITYRELATIVE:
+>>               a->dev_attr.attr.name = kasprintf(GFP_KERNEL,
+>>                                 "humidity%d_input",
+>> -                              humidity_i++);
+>> +                              humidity_i);
+>> +
+>> +            if (b)
+>> +                b->dev_attr.attr.name = kasprintf(GFP_KERNEL,
+>> +                                  "humidity%d_label",
+>> +                                  humidity_i);
+>> +            humidity_i++;
+>>               break;
+>>           default:
+>>               ret = -EINVAL;
+>>               goto error_release_channels;
+>>           }
+>> -        if (a->dev_attr.attr.name == NULL) {
+>> +        if (a->dev_attr.attr.name == NULL ||
+>> +            (b && b->dev_attr.attr.name == NULL)) {
+>>               ret = -ENOMEM;
+>>               goto error_release_channels;
+>>           }
+> 
+> Just realized that we have a memory leak here. The 'name' memory is
+> never released.
+> 
+
+I don't know if we have to do something to revert the effects of
+sysfs_attr_init but you sure are right that the a and b's attribute's
+name is never freed. This case would be handled with devm_kasprintf, I
+guess? Thanks.
+
+>>           a->dev_attr.show = iio_hwmon_read_val;
+>>           a->dev_attr.attr.mode = S_IRUGO;
+>>           a->index = i;
+>> -        st->attrs[i] = &a->dev_attr.attr;
+>> +        st->attrs[j++] = &a->dev_attr.attr;
+>> +
+>> +        if (b) {
+>> +            b->dev_attr.show = iio_hwmon_read_label;
+>> +            b->dev_attr.attr.mode = S_IRUGO;
+>> +            b->index = i;
+>> +            st->attrs[j++] = &b->dev_attr.attr;
+>> +        }
+>>       }
 >>
->> I don't think this is a good idea: the CPU clock may be changed at any
->> time with the CPUFreq governor. I don't see the system moving from
->> 1008MHz to 24MHz and then to 1200MHz when some computation is needed!
->
-> PLL lock time is around 10-20us, I'd guess based on the number of loops
-> in the PLL lock wait loop. So unless you'll be switching frequencies
-> many times per second, this should be barely noticeable.
->
-> But I'd like a different solution too.
+>>       st->attr_group.attrs = st->attrs;
+>>
+> 
 
-Do you have a patch to test this?
-
-For me changing CPU frequency on Orange Pi One always locks up the
-system. I keep running it on the u-boot setup 1.08GHz at 1.1V
-
-Thanks
-
-Michal
+Quentin
