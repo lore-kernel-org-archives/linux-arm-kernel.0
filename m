@@ -1,62 +1,63 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 15 Jul 2016 16:13:15 +0100
-Subject: [PATCH v15 01/10] arm64: Add HAVE_REGS_AND_STACK_ACCESS_API
- feature
-In-Reply-To: <5788F86B.60305@linaro.org>
-References: <1467995754-32508-1-git-send-email-dave.long@linaro.org>
- <1467995754-32508-2-git-send-email-dave.long@linaro.org>
- <20160715105701.GB14792@e104818-lin.cambridge.arm.com>
- <5788F86B.60305@linaro.org>
-Message-ID: <20160715150532.GA22563@localhost>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Fri, 15 Jul 2016 08:15:46 -0700
+Subject: [RESEND PATCH] arm: assabet_defconfig: disable IDE subsystem
+In-Reply-To: <4264651.gPKphdYuCx@wuerfel> (Arnd Bergmann's message of "Wed, 13
+ Jul 2016 16:37:31 +0200")
+References: <1467991490-24895-1-git-send-email-b.zolnierkie@samsung.com>
+ <2773873.Jjn1O47GXr@wuerfel> <4818149.nzRaU7vJQE@amdc1976>
+ <4264651.gPKphdYuCx@wuerfel>
+Message-ID: <m27fcn3pb1.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 15, 2016 at 10:51:23AM -0400, David Long wrote:
-> On 07/15/2016 06:57 AM, Catalin Marinas wrote:
-> > On Fri, Jul 08, 2016 at 12:35:45PM -0400, David Long wrote:
-> > > --- a/arch/arm64/include/asm/ptrace.h
-> > > +++ b/arch/arm64/include/asm/ptrace.h
-> > > @@ -74,6 +74,7 @@
-> > >   #define COMPAT_PT_DATA_ADDR		0x10004
-> > >   #define COMPAT_PT_TEXT_END_ADDR		0x10008
-> > >   #ifndef __ASSEMBLY__
-> > > +#include <linux/bug.h>
-> > > 
-> > >   /* sizeof(struct user) for AArch32 */
-> > >   #define COMPAT_USER_SZ	296
-> > > @@ -119,6 +120,8 @@ struct pt_regs {
-> > >   	u64 syscallno;
-> > >   };
-> > > 
-> > > +#define MAX_REG_OFFSET offsetof(struct pt_regs, pstate)
-> > > +
-> > >   #define arch_has_single_step()	(1)
-> > > 
-> > >   #ifdef CONFIG_COMPAT
-> > > @@ -147,6 +150,55 @@ struct pt_regs {
-> > >   #define user_stack_pointer(regs) \
-> > >   	(!compat_user_mode(regs) ? (regs)->sp : (regs)->compat_sp)
-> > > 
-> > > +extern int regs_query_register_offset(const char *name);
-> > > +extern const char *regs_query_register_name(unsigned int offset);
-> > 
-> > Is regs_query_register_offset() used anywhere? I grep'ed the kernel with
-> > these patches applied but couldn't find any use.
-> 
-> It's referenced in kernel/trace/trace_probe.c.
+Arnd Bergmann <arnd@arndb.de> writes:
 
-I meant regs_query_register_name() (vim completion wrote the first one).
+> On Wednesday, July 13, 2016 12:59:23 PM CEST Bartlomiej Zolnierkiewicz wrote:
+>> 
+>> On Friday, July 08, 2016 10:23:48 PM Arnd Bergmann wrote:
+>> > On Friday, July 8, 2016 5:24:41 PM CEST Bartlomiej Zolnierkiewicz wrote:
+>> > > This patch disables deprecated IDE subsystem in assabet_defconfig
+>> > > (no IDE host drivers are selected in this config so there is no
+>> > > valid reason to enable IDE subsystem itself).
+>> > > 
+>> > > Cc: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+>> > > Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+>> > 
+>> > I think the series makes a lot of sense. I have checked your assertions
+>> > in the changelogs and found no flaws in your logic, so I think we should
+>> > take them all through arm-soc unless there are other concerns.
+>> 
+>> Thank you.
+>> 
+>> Should I resend everything or just patches that were not reposted yet
+>> (the ones that were marked as RFT initially and got no feedback)?
+>
+> I'd be fine with just getting a pull request with all the patches that
+> had no negative feedback and that were not already applied (if any).
+>
+>> > Do you have a list of ARM defconfigs that keep using CONFIG_IDE and
+>> > how you determined that they need it?
+>> 
+>> The only such defconfig is davinci_all_defconfig which uses
+>> palm_bk3710 host driver (CONFIG_BLK_DEV_PALMCHIP_BK3710).
+>> 
+>> > I know that ARCH_RPC/ARCH_ACORN has a couple of special drivers that
+>> > have no libata replacement, are there any others like that, or are
+>> > they all platforms that should in theory work with libata but need
+>> > testing?
+>> 
+>> All platforms except ARCH_ACORN, ARCH_DAVINCI & ARCH_RPC should work
+>> with libata.
+>
+> Adding Sekhar and Kevin for DaVinci: At first sight, palm_bk3710 looks
+> fairly straightforward (meaning someone has to do a few day's work)
+> to convert into a libata driver.
+>
+> As this is on on-chip controller that is part of a dm644x and dm646x,
+> it should also not be hard to test (as long as someone can find
+> a hard drive to plug in).
 
-> > > +extern bool regs_within_kernel_stack(struct pt_regs *regs, unsigned long addr);
-> > 
-> > This one only seems to be used in arch/arm64/kernel/ptrace.c. Can we
-> > make it static and remove the declaration?
-> 
-> OK.
+I have a hard drive, but don't have any dm64xx hardware anymore to test
+this.  My last working dm644x board died last year.
 
-I can change it locally.
-
-Are these going to be used in the future by uprobes?
-
--- 
-Catalin
+Kevin
