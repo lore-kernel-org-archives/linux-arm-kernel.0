@@ -1,78 +1,66 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Fri, 15 Jul 2016 23:22:51 +0200
-Subject: [PATCH v7 4/9] acpi/arm64: Add GTDT table parse driver
-In-Reply-To: <CADyBb7sXxY_a+tJQoH01eUk5-xvg9jRZtzyhB-tDstWoBAWfLg@mail.gmail.com>
-References: <1468432402-4872-1-git-send-email-fu.wei@linaro.org>
- <5101961.eCg7ixLQWc@vostro.rjw.lan>
- <CADyBb7sXxY_a+tJQoH01eUk5-xvg9jRZtzyhB-tDstWoBAWfLg@mail.gmail.com>
-Message-ID: <1580087.dlcVOb6fx1@vostro.rjw.lan>
+From: keescook@chromium.org (Kees Cook)
+Date: Fri, 15 Jul 2016 14:44:18 -0700
+Subject: [PATCH v3 04/11] ARM: uaccess: Enable hardened usercopy
+In-Reply-To: <1468619065-3222-1-git-send-email-keescook@chromium.org>
+References: <1468619065-3222-1-git-send-email-keescook@chromium.org>
+Message-ID: <1468619065-3222-5-git-send-email-keescook@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday, July 16, 2016 12:32:14 AM Fu Wei wrote:
-> Hi Rafael,
-> 
-> On 15 July 2016 at 21:07, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
-> > On Friday, July 15, 2016 02:15:27 PM Rafael J. Wysocki wrote:
-> >> On Friday, July 15, 2016 03:32:35 PM Fu Wei wrote:
-> >> > Hi Rafael,
-> >> >
-> >
-> > [cut]
-> >
-> >> > >
-> >> > >> +               return 0;
-> >> > >> +       }
-> >> > >> +
-> >> > >> +       if (!gtdt->platform_timer_count) {
-> >> > >> +               pr_info("No Platform Timer.\n");
-> >> > >> +               return 0;
-> >> > >> +       }
-> >> > >> +
-> >> > >> +       acpi_gtdt_desc.platform_timer_start = (void *)gtdt +
-> >> > >> +                                             gtdt->platform_timer_offset;
-> >> > >> +       if (acpi_gtdt_desc.platform_timer_start <
-> >> > >> +           (void *)table + sizeof(struct acpi_table_gtdt)) {
-> >> > >> +               pr_err(FW_BUG "Platform Timer pointer error.\n");
-> >> > >
-> >> > > Why pr_err()?
-> >> >
-> >> > if (true), that means the GTDT table has bugs.
-> >> >
-> >>
-> >> And that's not a very useful piece of information unless you're debugging the
-> >> platform, is it?
-> >
-> > FWIW, I'm not a big fan of printing "your firmware is buggy" type of messages
-> > (especially at the "error" log level or higher) unless they can be clearly
-> > connected to a specific type of functional failure.
-> >
-> > So if you want to pring an error-level message, something like "I cannot do X
-> > because of the firmware bug Y" would be better IMO.
-> 
-> So can I do this:
-> pr_err(FW_BUG "Can NOT init platform_timer pointer, because of the
-> GTDT table bug\n");
-> 
-> or pr_debug(FW_BUG "Can NOT init platform_timer_start, because of
-> platform_timer_offset bug in GTDT\n");
-> 
-> or just delete it?
-> 
-> which one do you prefer?  I think maybe should provide some clue for
-> users to fix the problem  :-)
+Enables CONFIG_HARDENED_USERCOPY checks on arm.
 
-And how exactly would they fix it then?
+Based on code from PaX and grsecurity.
 
-> 
-> any thought ?
+Signed-off-by: Kees Cook <keescook@chromium.org>
+---
+ arch/arm/Kconfig               |  1 +
+ arch/arm/include/asm/uaccess.h | 11 +++++++++--
+ 2 files changed, 10 insertions(+), 2 deletions(-)
 
-If you print variable or function names and the like, the message should be
-a debug one, because that's information that can only be understood by
-developers (some developers are users too, but they are a minority).
-
-If you want to report an error, say what is not working (or not available
-etc) and why (if you know the reason at the time the message is printed).
-
-Thanks,
-Rafael
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 90542db1220d..f56b29b3f57e 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -35,6 +35,7 @@ config ARM
+ 	select HARDIRQS_SW_RESEND
+ 	select HAVE_ARCH_AUDITSYSCALL if (AEABI && !OABI_COMPAT)
+ 	select HAVE_ARCH_BITREVERSE if (CPU_32v7M || CPU_32v7) && !CPU_32v6
++	select HAVE_ARCH_HARDENED_USERCOPY
+ 	select HAVE_ARCH_JUMP_LABEL if !XIP_KERNEL && !CPU_ENDIAN_BE32 && MMU
+ 	select HAVE_ARCH_KGDB if !CPU_ENDIAN_BE32 && MMU
+ 	select HAVE_ARCH_MMAP_RND_BITS if MMU
+diff --git a/arch/arm/include/asm/uaccess.h b/arch/arm/include/asm/uaccess.h
+index 35c9db857ebe..7fb59199c6bb 100644
+--- a/arch/arm/include/asm/uaccess.h
++++ b/arch/arm/include/asm/uaccess.h
+@@ -496,7 +496,10 @@ arm_copy_from_user(void *to, const void __user *from, unsigned long n);
+ static inline unsigned long __must_check
+ __copy_from_user(void *to, const void __user *from, unsigned long n)
+ {
+-	unsigned int __ua_flags = uaccess_save_and_enable();
++	unsigned int __ua_flags;
++
++	check_object_size(to, n, false);
++	__ua_flags = uaccess_save_and_enable();
+ 	n = arm_copy_from_user(to, from, n);
+ 	uaccess_restore(__ua_flags);
+ 	return n;
+@@ -511,11 +514,15 @@ static inline unsigned long __must_check
+ __copy_to_user(void __user *to, const void *from, unsigned long n)
+ {
+ #ifndef CONFIG_UACCESS_WITH_MEMCPY
+-	unsigned int __ua_flags = uaccess_save_and_enable();
++	unsigned int __ua_flags;
++
++	check_object_size(from, n, true);
++	__ua_flags = uaccess_save_and_enable();
+ 	n = arm_copy_to_user(to, from, n);
+ 	uaccess_restore(__ua_flags);
+ 	return n;
+ #else
++	check_object_size(from, n, true);
+ 	return arm_copy_to_user(to, from, n);
+ #endif
+ }
+-- 
+2.7.4
