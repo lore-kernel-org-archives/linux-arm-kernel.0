@@ -1,75 +1,55 @@
-From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
-Date: Fri, 15 Jul 2016 09:59:48 +0100
-Subject: [PATCH v15 00/10] arm64: Add kernel probes (kprobes) support
-In-Reply-To: <5788986C.3030008@arm.com>
-References: <1467995754-32508-1-git-send-email-dave.long@linaro.org>
- <20160714162208.GA22235@e104818-lin.cambridge.arm.com>
- <6b43c28b-df68-112d-f8a3-6f952a50f54f@redhat.com>
- <20160715075001.GA13360@e104818-lin.cambridge.arm.com>
- <5788986C.3030008@arm.com>
-Message-ID: <877fcn46pn.fsf@linaro.org>
+From: pali.rohar@gmail.com (Pali =?utf-8?B?Um9ow6Fy?=)
+Date: Fri, 15 Jul 2016 11:01:10 +0200
+Subject: outdated documentation for lp5523 LED driver?
+In-Reply-To: <20160715085425.GA21257@amd>
+References: <20160715073214.GC13429@amd> <20160715074052.GE29844@pali>
+ <20160715085425.GA21257@amd>
+Message-ID: <20160715090110.GF29844@pali>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Friday 15 July 2016 10:54:25 Pavel Machek wrote:
+> On Fri 2016-07-15 09:40:52, Pali Roh?r wrote:
+> > On Friday 15 July 2016 09:32:14 Pavel Machek wrote:
+> > > Hi!
+> > > 
+> > > Documentation says that load/leds are only visible in the load mode,
+> > > but that does not seem to be true (kernel 4.4.0 on N900).
+> > > 
+> > > # 1) Legacy interface - enginex_mode, enginex_load and enginex_leds
+> > > #  Control interface for the engines:
+> > > #    x is 1 .. 3
+> > > #      enginex_mode : disabled, load, run
+> > > #      enginex_load : microcode load (visible only in load mode)
+> > > #      enginex_leds : led mux control (visible only in load mode)
+> > > 
+> > > pavel at n900:/sys/class/leds/lp5523:r/device$ ls -al engine*
+> > > -rw-r--r-- 1 root root 4096 Jul  6 22:47 engine1_leds
+> > > --w------- 1 root root 4096 Jul  6 22:47 engine1_load
+> > > -rw-r--r-- 1 root root 4096 Jul  6 23:41 engine1_mode
+> > > -rw-r--r-- 1 root root 4096 Jul  6 22:47 engine2_leds
+> > > --w------- 1 root root 4096 Jul  6 22:47 engine2_load
+> > > -rw-r--r-- 1 root root 4096 Jul  6 23:41 engine2_mode
+> > > -rw-r--r-- 1 root root 4096 Jul  6 22:47 engine3_leds
+> > > --w------- 1 root root 4096 Jul  6 22:47 engine3_load
+> > > -rw-r--r-- 1 root root 4096 Jul  6 22:47 engine3_mode
+> > > pavel at n900:/sys/class/leds/lp5523:r/device$ grep . engine*mode
+> > > engine1_mode:run
+> > > engine2_mode:load
+> > > engine3_mode:run
+> > > pavel at n900:/sys/class/leds/lp5523:r/device$
+> > 
+> > On 2.6.28 kernel is present only legacy interface and for this version
+> > is above documentation correct. When engine is in "run" or "disabled",
+> > then sysfs nodes _load and _leds are invisible.
+> 
+> Well, I don't think 2.6.28 is suitable kernel to compare
+> against... and I don't think hiding sysfs attributes makes any sense.
 
-Marc Zyngier <marc.zyngier@arm.com> writes:
+It is legacy interface which was used in older kernels (like 2.6.28) and
+is there to not break existing applications... So comparing with kernel
+when that interface was not legacy is correct way to check...
 
-> On 15/07/16 08:50, Catalin Marinas wrote:
->> On Thu, Jul 14, 2016 at 01:09:08PM -0400, William Cohen wrote:
->>> On 07/14/2016 12:22 PM, Catalin Marinas wrote:
->>>> On Fri, Jul 08, 2016 at 12:35:44PM -0400, David Long wrote:
->>>>> David A. Long (3):
->>>>>   arm64: Add HAVE_REGS_AND_STACK_ACCESS_API feature
->>>>>   arm64: Add more test functions to insn.c
->>>>>   arm64: add conditional instruction simulation support
->>>>>
->>>>> Pratyush Anand (2):
->>>>>   arm64: Blacklist non-kprobe-able symbol
->>>>>   arm64: Treat all entry code as non-kprobe-able
->>>>>
->>>>> Sandeepa Prabhu (4):
->>>>>   arm64: Kprobes with single stepping support
->>>>>   arm64: kprobes instruction simulation support
->>>>>   arm64: Add kernel return probes support (kretprobes)
->>>>>   kprobes: Add arm64 case in kprobe example module
->>>>>
->>>>> William Cohen (1):
->>>>>   arm64: Add trampoline code for kretprobes
->>>>
->>>> I applied these patches on top of the arm64 for-next/core branch an
->>>> tried to run the resulting kernel in a guest (on a Juno platform using
->>>> both kvmtool and qemu) with KPROBES_SANITY_TEST enabled. Unfortunately,
->>>> the kernel fails to boot with lots of "Unexpected kernel single-step
->>>> exception at EL1".
->>>>
->>>> Did you manage to run Kprobes in a guest before?
->>>
->>> I ran the systemtap testsuite several times on a physical machine
->>> running a kernel with the kprobe v15 patches without problem.
->>> Shouldn't the guest machine behave in the same manner as a host
->>> machine for single stepping and exception handling?  If the guest
->>> machine is failing, wouldn't that suggest there is a problem with the
->>> KVM handling of single stepping for guests?
->>
->> It didn't fail for me on the host either. What's strange is that on some
->> occasions even the guest managed to get to a prompt. I'll do more tests
->> today on different CPU configurations, just to rule out potential
->> hardware issues. If not hardware related, it's possible that the
->> interaction with KVM doesn't work as expected, maybe the
->> saving/restoring of the guest debug state loses information.
->
-> Could well be the latter. I'll try to have a look, but Alex Benn?e (on
-> cc) is our man when it comes to the KVM debug infrastructure.
->
-> Alex, any chance you could try this and shed some light on it?
-
-Sure I'll have a look. There are problems with running gdb inside a
-guest while trying to debug from outside associated with single-stepping
-but none of this should get in the way if your not debugging the guest.
-
-Let me get my system spun up and see if I can reproduce.
-
-Shall I just apply this series on top of the current master?
-
---
-Alex Benn?e
+-- 
+Pali Roh?r
+pali.rohar at gmail.com
