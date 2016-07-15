@@ -1,52 +1,53 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 15 Jul 2016 10:12:49 +0200
-Subject: [PATCH v2] ARM: dts: exynos: Properly select eMMC HighSpeed mode on
- Odroid XU
-Message-ID: <1468570369-14355-1-git-send-email-k.kozlowski@samsung.com>
+From: rajesh.bhagat@nxp.com (Rajesh Bhagat)
+Date: Fri, 15 Jul 2016 08:13:26 +0000
+Subject: [PATCH v2 1/5] drivers: usb: chipidea: Add qoriq platform driver
+In-Reply-To: <20160715071309.GF817@shlinux2>
+References: <1468038656-10345-1-git-send-email-rajesh.bhagat@nxp.com>
+ <1468038656-10345-2-git-send-email-rajesh.bhagat@nxp.com>
+ <20160711064358.GG31647@shlinux2>
+ <HE1PR0401MB2331ED4FB7F699A8A1BA0BE6E3300@HE1PR0401MB2331.eurprd04.prod.outlook.com>
+ <20160715071309.GF817@shlinux2>
+Message-ID: <HE1PR0401MB2331C636FB33E29796CA5868E3330@HE1PR0401MB2331.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Exynos5410 supports eMMC version 4.41 so HS200 is the top mode which
-should be configured.  This is reflected in usage of
-"samsung,exynos5250-dw-mshc" compatible.  However Odroid XU DTS
-contained also property "mmc-hs400-1_8v" which is parsed by MMC core
-therefore resulting in mixed configuration.  MMC core set HS400 but
-dwmmc_exynos driver did not configure the data strobe for HS400 DDR
-mode.
 
-Removal of HS400 properties fixes semi-random mmc errors during boot:
-  mmc_host mmc0: Bus speed (slot 0) = 400000000Hz (slot req 200000000Hz, actual 200000000HZ div = 1)
-  mmc0: mmc_select_hs400 failed, error -84
-  mmc0: error -84 whilst initialising MMC card
 
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> -----Original Message-----
+> From: Peter Chen [mailto:hzpeterchen at gmail.com]
+> Sent: Friday, July 15, 2016 12:43 PM
+> To: Rajesh Bhagat <rajesh.bhagat@nxp.com>
+> Cc: linux-usb at vger.kernel.org; linux-kernel at vger.kernel.org;
+> devicetree at vger.kernel.org; Peter Chen <peter.chen@nxp.com>;
+> gregkh at linuxfoundation.org; kishon at ti.com; robh+dt at kernel.org;
+> shawnguo at kernel.org; linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH v2 1/5] drivers: usb: chipidea: Add qoriq platform driver
+> 
+> On Tue, Jul 12, 2016 at 03:59:07AM +0000, Rajesh Bhagat wrote:
+> > > > +
+> > > > +err_clks:
+> > > > +	ci_hdrc_qoriq_disable_unprepare_clks(pdev);
+> > >
+> > > If you have only one clock, it is unnecessary to use dedicated APIs for clock
+> operation.
+> > >
+> >
+> > We do have multiple clocks, but currently one is integrated in code.
+> > Hence created the APIs for future use.
 
----
+Hello Peter, 
 
-Changes since v1:
-1. Remove also samsung,read-strobe-delay, suggested by Alim Akhtar.
----
- arch/arm/boot/dts/exynos5410-odroidxu.dts | 3 ---
- 1 file changed, 3 deletions(-)
+> 
+> If you could not integrate one more clocks, I suggest not creating dedicated API until
+> you need in future.
+> 
 
-diff --git a/arch/arm/boot/dts/exynos5410-odroidxu.dts b/arch/arm/boot/dts/exynos5410-odroidxu.dts
-index d9499310a301..f6d135245a4b 100644
---- a/arch/arm/boot/dts/exynos5410-odroidxu.dts
-+++ b/arch/arm/boot/dts/exynos5410-odroidxu.dts
-@@ -447,14 +447,11 @@
- 	samsung,dw-mshc-ciu-div = <3>;
- 	samsung,dw-mshc-sdr-timing = <0 4>;
- 	samsung,dw-mshc-ddr-timing = <0 2>;
--	samsung,dw-mshc-hs400-timing = <0 2>;
--	samsung,read-strobe-delay = <90>;
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus1 &sd0_bus4 &sd0_bus8 &sd0_cd>;
- 	bus-width = <8>;
- 	cap-mmc-highspeed;
- 	mmc-hs200-1_8v;
--	mmc-hs400-1_8v;
- 	vmmc-supply = <&ldo20_reg>;
- 	vqmmc-supply = <&ldo11_reg>;
- };
--- 
-1.9.1
+Okay, Will take care in v3. 
+
+Best Regards,
+Rajesh Bhagat 
+
+> --
+> 
+> Best Regards,
+> Peter Chen
