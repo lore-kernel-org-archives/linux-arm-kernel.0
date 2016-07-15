@@ -1,27 +1,51 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 15 Jul 2016 09:49:25 +0100
-Subject: [RFC 0/3] extend kexec_file_load system call
-In-Reply-To: <7352796.seiSnHrYPy@wuerfel>
-References: <20160712014201.11456-1-takahiro.akashi@linaro.org>
- <5352106.oQ0Ff9gWJA@wuerfel> <20160713094127.GC14522@leverpostej>
- <7352796.seiSnHrYPy@wuerfel>
-Message-ID: <20160715084925.GD1041@n2100.armlinux.org.uk>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Fri, 15 Jul 2016 10:54:25 +0200
+Subject: outdated documentation for lp5523 LED driver?
+In-Reply-To: <20160715074052.GE29844@pali>
+References: <20160715073214.GC13429@amd>
+ <20160715074052.GE29844@pali>
+Message-ID: <20160715085425.GA21257@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 13, 2016 at 03:13:42PM +0200, Arnd Bergmann wrote:
-> On Wednesday, July 13, 2016 10:41:28 AM CEST Mark Rutland wrote:
-> > The big question is whether this is a realistic case on a secure boot
-> > system.
+On Fri 2016-07-15 09:40:52, Pali Roh?r wrote:
+> On Friday 15 July 2016 09:32:14 Pavel Machek wrote:
+> > Hi!
+> > 
+> > Documentation says that load/leds are only visible in the load mode,
+> > but that does not seem to be true (kernel 4.4.0 on N900).
+> > 
+> > # 1) Legacy interface - enginex_mode, enginex_load and enginex_leds
+> > #  Control interface for the engines:
+> > #    x is 1 .. 3
+> > #      enginex_mode : disabled, load, run
+> > #      enginex_load : microcode load (visible only in load mode)
+> > #      enginex_leds : led mux control (visible only in load mode)
+> > 
+> > pavel at n900:/sys/class/leds/lp5523:r/device$ ls -al engine*
+> > -rw-r--r-- 1 root root 4096 Jul  6 22:47 engine1_leds
+> > --w------- 1 root root 4096 Jul  6 22:47 engine1_load
+> > -rw-r--r-- 1 root root 4096 Jul  6 23:41 engine1_mode
+> > -rw-r--r-- 1 root root 4096 Jul  6 22:47 engine2_leds
+> > --w------- 1 root root 4096 Jul  6 22:47 engine2_load
+> > -rw-r--r-- 1 root root 4096 Jul  6 23:41 engine2_mode
+> > -rw-r--r-- 1 root root 4096 Jul  6 22:47 engine3_leds
+> > --w------- 1 root root 4096 Jul  6 22:47 engine3_load
+> > -rw-r--r-- 1 root root 4096 Jul  6 22:47 engine3_mode
+> > pavel at n900:/sys/class/leds/lp5523:r/device$ grep . engine*mode
+> > engine1_mode:run
+> > engine2_mode:load
+> > engine3_mode:run
+> > pavel at n900:/sys/class/leds/lp5523:r/device$
 > 
-> What does x86 do here? I assume changes to the command line are also
-> limited.
+> On 2.6.28 kernel is present only legacy interface and for this version
+> is above documentation correct. When engine is in "run" or "disabled",
+> then sysfs nodes _load and _leds are invisible.
 
-They aren't.  You can specify /anything/ even with a fully-signed kernel
-and initrd, which was one of the things I pointed out in my previous
-set of responses.
+Well, I don't think 2.6.28 is suitable kernel to compare
+against... and I don't think hiding sysfs attributes makes any sense.
 
+									Pavel
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
