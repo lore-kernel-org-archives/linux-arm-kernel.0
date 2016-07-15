@@ -1,43 +1,62 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Fri, 15 Jul 2016 11:26:53 +0200
-Subject: [PATCH] drm: mediatek: add Maintainers entry for Mediatek DRM
- drivers
-In-Reply-To: <1468561924-45582-1-git-send-email-ck.hu@mediatek.com>
-References: <1468561924-45582-1-git-send-email-ck.hu@mediatek.com>
-Message-ID: <1468574813.7213.4.camel@pengutronix.de>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Fri, 15 Jul 2016 11:30:33 +0200
+Subject: [PATCH] media: Doc add missing documentation for
+ samsung,exynos4212-jpeg
+In-Reply-To: <5788AA5E.3070301@samsung.com>
+References: <1468526499-8840-1-git-send-email-shuahkh@osg.samsung.com>
+ <578890BA.8040101@samsung.com> <57889B73.4090607@samsung.com>
+ <57889C23.3050106@samsung.com> <57889EAB.30502@samsung.com>
+ <57889FD5.9070302@samsung.com> <5788AA5E.3070301@samsung.com>
+Message-ID: <5788AD39.1010108@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, den 15.07.2016, 13:52 +0800 schrieb CK Hu:
-> Add CK Hu and Philipp Zabel as maintainers for Mediatek DRM drivers.
+On 07/15/2016 11:18 AM, Jacek Anaszewski wrote:
+> On 07/15/2016 10:33 AM, Krzysztof Kozlowski wrote:
+>> On 07/15/2016 10:28 AM, Jacek Anaszewski wrote:
+>>> On 07/15/2016 10:17 AM, Krzysztof Kozlowski wrote:
+>>>> On 07/15/2016 10:14 AM, Jacek Anaszewski wrote:
+>>>>>> However if these compatibles are exactly equal then
+>>>>>> only one should be preferred. It makes everything easier. Second
+>>>>>> can be
+>>>>>> still documented e.g. as deprecated.
+>>>>>
+>>>>> Still, both of them are present in the driver. Shouldn't it be
+>>>>> reflected
+>>>>> in the documentation?
+>>>>
+>>>> Right, it is a good practice, so how about:
+>>>>
+>>>>     - compatible    : should be one of:
+>>>>             "samsung,s5pv210-jpeg", "samsung,exynos3250-jpeg",
+>>>>             "samsung,exynos4210-jpeg", "samsung,exynos5420-jpeg",
+>>>>             "samsung,exynos5433-jpeg";
+>>>>
+>>>>             Deprecated: "samsung,exynos4212-jpeg"
+>>>>
+>>>> (or any other formatting)
+>>>> plus update to DTS changing it to 4210?
+>>>
+>>> Why newer 4212 version should be made deprecated?
+>>
+>> I don't mind the other way. However it seems logical to me that newer
+>> chip is compatible with existing one so the existing one (older) is
+>> used. When adding support for new devices, for most of re-usable drivers
+>> we use old compatibles. But as I said, it doesn't really matter to me.
 > 
-> Signed-off-by: CK Hu <ck.hu@mediatek.com>
+> Frankly speaking marking a compatible deprecated looks weird to me.
+> It can be interpreted in the way that the device itself is deprecated
+> or it is not fully reliable.
 
-Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
+Marking a compatible or a property deprecated is commonly used, if
+needed of course. It has nothing to do with device being deprecated.
+This is documentation for bindings and deprecation affects only
+bindings. It is not weird or something strange. We already did this for
+some of Exynos compatibles (later removing them) and there are quite
+many examples in Documentation already.
 
-> ---
->  MAINTAINERS |    8 ++++++++
->  1 file changed, 8 insertions(+)
-> 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 7304d2e..2a04cdc 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -3973,6 +3973,14 @@ S:	Orphan / Obsolete
->  F:	drivers/gpu/drm/i810/
->  F:	include/uapi/drm/i810_drm.h
->  
-> +DRM DRIVERS FOR MEDIATEK
-> +M:	CK Hu <ck.hu@mediatek.com>
-> +M:	Philipp Zabel <p.zabel@pengutronix.de>
-> +L:	dri-devel at lists.freedesktop.org
-> +S:	Supported
-> +F:	drivers/gpu/drm/mediatek/
-> +F:	Documentation/devicetree/bindings/display/mediatek/
-> +
->  DRM DRIVER FOR MSM ADRENO GPU
->  M:	Rob Clark <robdclark@gmail.com>
->  L:	linux-arm-msm at vger.kernel.org
+Best regards,
+Krzysztof
 
-regards
-Philipp
+> I'd just accept the patch in the original
+> form.
