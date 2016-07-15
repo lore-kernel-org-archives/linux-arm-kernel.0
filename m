@@ -1,40 +1,40 @@
 From: anup.patel@broadcom.com (Anup Patel)
-Date: Fri, 15 Jul 2016 14:33:59 +0530
-Subject: [PATCH 4/8] Documentation: Update documentation for
- UIO_MEM_PHYS_CACHE and UIO_MEM_DEVICE
+Date: Fri, 15 Jul 2016 14:34:00 +0530
+Subject: [PATCH 5/8] uio: fix dmem_region_start computation
 In-Reply-To: <1468573443-4670-1-git-send-email-anup.patel@broadcom.com>
 References: <1468573443-4670-1-git-send-email-anup.patel@broadcom.com>
-Message-ID: <1468573443-4670-5-git-send-email-anup.patel@broadcom.com>
+Message-ID: <1468573443-4670-6-git-send-email-anup.patel@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ankit Jindal <thatsjindal@gmail.com>
+From: Jan Viktorin <viktorin@rehivetech.com>
 
-This patch updates UIO documentation for new mem region
-types UIO_MEM_PHYS_CACHE and UIO_MEM_DEVICE.
+The variable i contains a total number of resources (including
+IORESOURCE_IRQ). However, we want the dmem_region_start to point
+after the last resource of type IORESOURCE_MEM. The original behaviour
+leads (very likely) to skipping several UIO mapping regions and makes
+them useless. Fix this by computing dmem_region_start from the uiomem
+which points to the last used UIO mapping.
 
-Signed-off-by: Ankit Jindal <thatsjindal@gmail.com>
-Signed-off-by: Anup Patel <anup.patel@broadcom.com>
+Fixes: 0a0c3b5a24bd ("Add new uio device for dynamic memory allocation")
+
+Signed-off-by: Jan Viktorin <viktorin@rehivetech.com>
 ---
- Documentation/DocBook/uio-howto.tmpl | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
+ drivers/uio/uio_dmem_genirq.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/Documentation/DocBook/uio-howto.tmpl b/Documentation/DocBook/uio-howto.tmpl
-index cd0e452..de9dafe 100644
---- a/Documentation/DocBook/uio-howto.tmpl
-+++ b/Documentation/DocBook/uio-howto.tmpl
-@@ -529,8 +529,10 @@ the memory region, it will show up in the corresponding sysfs node.
- <varname>int memtype</varname>: Required if the mapping is used. Set this to
- <varname>UIO_MEM_PHYS</varname> if you you have physical memory on your
- card to be mapped. Use <varname>UIO_MEM_LOGICAL</varname> for logical
--memory (e.g. allocated with <function>kmalloc()</function>). There's also
--<varname>UIO_MEM_VIRTUAL</varname> for virtual memory.
-+memory (e.g. allocated with <function>kmalloc()</function>). There are also
-+<varname>UIO_MEM_VIRTUAL</varname> for virtual memory,
-+<varname>UIO_MEM_PHYS_CACHE</varname> for cacheable physical memory and,
-+<varname>UIO_MEM_DEVICE</varname> for memory mapped device registers.
- </para></listitem>
+diff --git a/drivers/uio/uio_dmem_genirq.c b/drivers/uio/uio_dmem_genirq.c
+index 915facb..e1134a4 100644
+--- a/drivers/uio/uio_dmem_genirq.c
++++ b/drivers/uio/uio_dmem_genirq.c
+@@ -229,7 +229,7 @@ static int uio_dmem_genirq_probe(struct platform_device *pdev)
+ 		++uiomem;
+ 	}
  
- <listitem><para>
+-	priv->dmem_region_start = i;
++	priv->dmem_region_start = uiomem - &uioinfo->mem[0];
+ 	priv->num_dmem_regions = pdata->num_dynamic_regions;
+ 
+ 	for (i = 0; i < pdata->num_dynamic_regions; ++i) {
 -- 
 1.9.1
