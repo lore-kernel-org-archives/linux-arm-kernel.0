@@ -1,191 +1,191 @@
 From: sunil.kovvuri@gmail.com (sunil.kovvuri at gmail.com)
-Date: Fri, 15 Jul 2016 18:28:11 +0530
-Subject: [PATCH v3 06/15] net: thunderx: Enable mailbox interrupts on 81xx/83xx
+Date: Fri, 15 Jul 2016 18:28:08 +0530
+Subject: [PATCH v3 03/15] net: thunderx: Add support for 81xx and 83xx chips
 In-Reply-To: <1468587500-32103-1-git-send-email-sunil.kovvuri@gmail.com>
 References: <1468587500-32103-1-git-send-email-sunil.kovvuri@gmail.com>
-Message-ID: <1468587500-32103-7-git-send-email-sunil.kovvuri@gmail.com>
+Message-ID: <1468587500-32103-4-git-send-email-sunil.kovvuri@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sunil Goutham <sgoutham@cavium.com>
 
-88xx has 128 VFs, 81xx has 8 VFs and 83xx will have 32VFs.
-Made changes to PF driver such that mailbox interrupt enable
-registers are configuired based on number of VFs HW supports.
-Also cleanedup mailbox irq handler registration code.
+This patch adds info on HW maximums of 81xx/83xx and also
+configures receive and transmit datapaths accordingly.
 
 Signed-off-by: Sunil Goutham <sgoutham@cavium.com>
 ---
- drivers/net/ethernet/cavium/thunder/nic_main.c | 88 +++++++++++++++-----------
- 1 file changed, 50 insertions(+), 38 deletions(-)
+ drivers/net/ethernet/cavium/thunder/nic_main.c    | 87 ++++++++++++++++++-----
+ drivers/net/ethernet/cavium/thunder/nic_reg.h     |  1 +
+ drivers/net/ethernet/cavium/thunder/thunder_bgx.h |  2 +
+ 3 files changed, 73 insertions(+), 17 deletions(-)
 
 diff --git a/drivers/net/ethernet/cavium/thunder/nic_main.c b/drivers/net/ethernet/cavium/thunder/nic_main.c
-index 3f52b36..955c522 100644
+index dc845a0..4974923 100644
 --- a/drivers/net/ethernet/cavium/thunder/nic_main.c
 +++ b/drivers/net/ethernet/cavium/thunder/nic_main.c
-@@ -66,8 +66,9 @@ struct nicpf {
- 	/* MSI-X */
- 	bool			msix_enabled;
- 	u8			num_vec;
--	struct msix_entry	msix_entries[NIC_PF_MSIX_VECTORS];
-+	struct msix_entry	*msix_entries;
- 	bool			irq_allocated[NIC_PF_MSIX_VECTORS];
-+	char			irq_name[NIC_PF_MSIX_VECTORS][20];
- };
+@@ -24,6 +24,8 @@ struct hw_info {
+ 	u8		bgx_cnt;
+ 	u8		chans_per_lmac;
+ 	u8		chans_per_bgx; /* Rx/Tx chans */
++	u8		chans_per_rgx;
++	u8		chans_per_lbk;
+ 	u16		cpi_cnt;
+ 	u16		rssi_cnt;
+ 	u16		rss_ind_tbl_size;
+@@ -332,6 +334,33 @@ static void nic_get_hw_info(struct nicpf *nic)
+ 		hw->tl1_cnt = 2;
+ 		hw->tl1_per_bgx = true;
+ 		break;
++	case PCI_SUBSYS_DEVID_81XX_NIC_PF:
++		hw->bgx_cnt = MAX_BGX_PER_CN81XX;
++		hw->chans_per_lmac = 8;
++		hw->chans_per_bgx = 32;
++		hw->chans_per_rgx = 8;
++		hw->chans_per_lbk = 24;
++		hw->cpi_cnt = 512;
++		hw->rssi_cnt = 256;
++		hw->rss_ind_tbl_size = 32; /* Max RSSI / Max interfaces */
++		hw->tl3_cnt = 64;
++		hw->tl2_cnt = 16;
++		hw->tl1_cnt = 10;
++		hw->tl1_per_bgx = false;
++		break;
++	case PCI_SUBSYS_DEVID_83XX_NIC_PF:
++		hw->bgx_cnt = MAX_BGX_PER_CN83XX;
++		hw->chans_per_lmac = 8;
++		hw->chans_per_bgx = 32;
++		hw->chans_per_lbk = 64;
++		hw->cpi_cnt = 2048;
++		hw->rssi_cnt = 1024;
++		hw->rss_ind_tbl_size = 64; /* Max RSSI / Max interfaces */
++		hw->tl3_cnt = 256;
++		hw->tl2_cnt = 64;
++		hw->tl1_cnt = 18;
++		hw->tl1_per_bgx = false;
++		break;
+ 	}
+ 	hw->tl4_cnt = MAX_QUEUES_PER_QSET * pci_sriov_get_totalvfs(nic->pdev);
+ }
+@@ -353,11 +382,15 @@ static void nic_init_hw(struct nicpf *nic)
+ 	/* Enable backpressure */
+ 	nic_reg_write(nic, NIC_PF_BP_CFG, (1ULL << 6) | 0x03);
  
- /* Supported devices */
-@@ -105,9 +106,22 @@ static u64 nic_reg_read(struct nicpf *nic, u64 offset)
- /* PF -> VF mailbox communication APIs */
- static void nic_enable_mbx_intr(struct nicpf *nic)
- {
--	/* Enable mailbox interrupt for all 128 VFs */
--	nic_reg_write(nic, NIC_PF_MAILBOX_ENA_W1S, ~0ull);
--	nic_reg_write(nic, NIC_PF_MAILBOX_ENA_W1S + sizeof(u64), ~0ull);
-+	int vf_cnt = pci_sriov_get_totalvfs(nic->pdev);
-+
-+#define INTR_MASK(vfs) ((vfs < 64) ? (BIT_ULL(vfs) - 1) : (~0ull))
-+
-+	/* Clear it, to avoid spurious interrupts (if any) */
-+	nic_reg_write(nic, NIC_PF_MAILBOX_INT, INTR_MASK(vf_cnt));
-+
-+	/* Enable mailbox interrupt for all VFs */
-+	nic_reg_write(nic, NIC_PF_MAILBOX_ENA_W1S, INTR_MASK(vf_cnt));
-+	/* One mailbox intr enable reg per 64 VFs */
-+	if (vf_cnt > 64) {
-+		nic_reg_write(nic, NIC_PF_MAILBOX_INT + sizeof(u64),
-+			      INTR_MASK(vf_cnt - 64));
-+		nic_reg_write(nic, NIC_PF_MAILBOX_ENA_W1S + sizeof(u64),
-+			      INTR_MASK(vf_cnt - 64));
+-	/* Disable TNS mode on both interfaces */
+-	nic_reg_write(nic, NIC_PF_INTF_0_1_SEND_CFG,
+-		      (NIC_TNS_BYPASS_MODE << 7) | BGX0_BLOCK);
+-	nic_reg_write(nic, NIC_PF_INTF_0_1_SEND_CFG | (1 << 8),
+-		      (NIC_TNS_BYPASS_MODE << 7) | BGX1_BLOCK);
++	/* TNS and TNS bypass modes are present only on 88xx */
++	if (nic->pdev->subsystem_device == PCI_SUBSYS_DEVID_88XX_NIC_PF) {
++		/* Disable TNS mode on both interfaces */
++		nic_reg_write(nic, NIC_PF_INTF_0_1_SEND_CFG,
++			      (NIC_TNS_BYPASS_MODE << 7) | BGX0_BLOCK);
++		nic_reg_write(nic, NIC_PF_INTF_0_1_SEND_CFG | (1 << 8),
++			      (NIC_TNS_BYPASS_MODE << 7) | BGX1_BLOCK);
 +	}
- }
- 
- static void nic_clear_mbx_intr(struct nicpf *nic, int vf, int mbx_reg)
-@@ -894,11 +908,18 @@ unlock:
- 	nic->mbx_lock[vf] = false;
- }
- 
--static void nic_mbx_intr_handler (struct nicpf *nic, int mbx)
-+static irqreturn_t nic_mbx_intr_handler(int irq, void *nic_irq)
- {
-+	struct nicpf *nic = (struct nicpf *)nic_irq;
-+	int mbx;
- 	u64 intr;
- 	u8  vf, vf_per_mbx_reg = 64;
- 
-+	if (irq == nic->msix_entries[NIC_PF_INTR_ID_MBOX0].vector)
-+		mbx = 0;
-+	else
-+		mbx = 1;
 +
- 	intr = nic_reg_read(nic, NIC_PF_MAILBOX_INT + (mbx << 3));
- 	dev_dbg(&nic->pdev->dev, "PF interrupt Mbox%d 0x%llx\n", mbx, intr);
- 	for (vf = 0; vf < vf_per_mbx_reg; vf++) {
-@@ -910,23 +931,6 @@ static void nic_mbx_intr_handler (struct nicpf *nic, int mbx)
- 			nic_clear_mbx_intr(nic, vf, mbx);
+ 	nic_reg_write(nic, NIC_PF_INTF_0_1_BP_CFG,
+ 		      (1ULL << 63) | BGX0_BLOCK);
+ 	nic_reg_write(nic, NIC_PF_INTF_0_1_BP_CFG + (1 << 8),
+@@ -525,7 +558,7 @@ static void nic_config_rss(struct nicpf *nic, struct rss_cfg_msg *cfg)
+ /* 4 level transmit side scheduler configutation
+  * for TNS bypass mode
+  *
+- * Sample configuration for SQ0
++ * Sample configuration for SQ0 on 88xx
+  * VNIC0-SQ0 -> TL4(0)   -> TL3[0]   -> TL2[0]  -> TL1[0] -> BGX0
+  * VNIC1-SQ0 -> TL4(8)   -> TL3[2]   -> TL2[0]  -> TL1[0] -> BGX0
+  * VNIC2-SQ0 -> TL4(16)  -> TL3[4]   -> TL2[1]  -> TL1[0] -> BGX0
+@@ -560,17 +593,21 @@ static void nic_tx_channel_cfg(struct nicpf *nic, u8 vnic,
+ 	/* For 88xx 0-511 TL4 transmits via BGX0 and
+ 	 * 512-1023 TL4s transmit via BGX1.
+ 	 */
+-	tl4 = bgx * (hw->tl4_cnt / hw->bgx_cnt);
+-	if (!sq->sqs_mode) {
+-		tl4 += (lmac * MAX_QUEUES_PER_QSET);
+-	} else {
+-		for (svf = 0; svf < MAX_SQS_PER_VF; svf++) {
+-			if (nic->vf_sqs[pqs_vnic][svf] == vnic)
+-				break;
++	if (hw->tl1_per_bgx) {
++		tl4 = bgx * (hw->tl4_cnt / hw->bgx_cnt);
++		if (!sq->sqs_mode) {
++			tl4 += (lmac * MAX_QUEUES_PER_QSET);
++		} else {
++			for (svf = 0; svf < MAX_SQS_PER_VF; svf++) {
++				if (nic->vf_sqs[pqs_vnic][svf] == vnic)
++					break;
++			}
++			tl4 += (MAX_LMAC_PER_BGX * MAX_QUEUES_PER_QSET);
++			tl4 += (lmac * MAX_QUEUES_PER_QSET * MAX_SQS_PER_VF);
++			tl4 += (svf * MAX_QUEUES_PER_QSET);
  		}
+-		tl4 += (MAX_LMAC_PER_BGX * MAX_QUEUES_PER_QSET);
+-		tl4 += (lmac * MAX_QUEUES_PER_QSET * MAX_SQS_PER_VF);
+-		tl4 += (svf * MAX_QUEUES_PER_QSET);
++	} else {
++		tl4 = (vnic * MAX_QUEUES_PER_QSET);
  	}
--}
--
--static irqreturn_t nic_mbx0_intr_handler (int irq, void *nic_irq)
--{
--	struct nicpf *nic = (struct nicpf *)nic_irq;
--
--	nic_mbx_intr_handler(nic, 0);
--
--	return IRQ_HANDLED;
--}
--
--static irqreturn_t nic_mbx1_intr_handler (int irq, void *nic_irq)
--{
--	struct nicpf *nic = (struct nicpf *)nic_irq;
--
--	nic_mbx_intr_handler(nic, 1);
--
- 	return IRQ_HANDLED;
- }
+ 	tl4 += sq_idx;
  
-@@ -934,7 +938,13 @@ static int nic_enable_msix(struct nicpf *nic)
- {
- 	int i, ret;
+@@ -585,9 +622,15 @@ static void nic_tx_channel_cfg(struct nicpf *nic, u8 vnic,
  
--	nic->num_vec = NIC_PF_MSIX_VECTORS;
-+	nic->num_vec = pci_msix_vec_count(nic->pdev);
+ 	/* On 88xx 0-127 channels are for BGX0 and
+ 	 * 127-255 channels for BGX1.
++	 *
++	 * On 81xx/83xx TL3_CHAN reg should be configured with channel
++	 * within LMAC i.e 0-7 and not the actual channel number like on 88xx
+ 	 */
+ 	chan = (lmac * hw->chans_per_lmac) + (bgx * hw->chans_per_bgx);
+-	nic_reg_write(nic, NIC_PF_TL3_0_255_CHAN | (tl3 << 3), chan);
++	if (hw->tl1_per_bgx)
++		nic_reg_write(nic, NIC_PF_TL3_0_255_CHAN | (tl3 << 3), chan);
++	else
++		nic_reg_write(nic, NIC_PF_TL3_0_255_CHAN | (tl3 << 3), 0);
+ 
+ 	/* Enable backpressure on the channel */
+ 	nic_reg_write(nic, NIC_PF_CHAN_0_255_TX_CFG | (chan << 3), 1);
+@@ -597,6 +640,16 @@ static void nic_tx_channel_cfg(struct nicpf *nic, u8 vnic,
+ 	nic_reg_write(nic, NIC_PF_TL2_0_63_CFG | (tl2 << 3), rr_quantum);
+ 	/* No priorities as of now */
+ 	nic_reg_write(nic, NIC_PF_TL2_0_63_PRI | (tl2 << 3), 0x00);
 +
-+	nic->msix_entries = kmalloc_array(nic->num_vec,
-+					  sizeof(struct msix_entry),
-+					  GFP_KERNEL);
-+	if (!nic->msix_entries)
-+		return -ENOMEM;
- 
- 	for (i = 0; i < nic->num_vec; i++)
- 		nic->msix_entries[i].entry = i;
-@@ -942,8 +952,9 @@ static int nic_enable_msix(struct nicpf *nic)
- 	ret = pci_enable_msix(nic->pdev, nic->msix_entries, nic->num_vec);
- 	if (ret) {
- 		dev_err(&nic->pdev->dev,
--			"Request for #%d msix vectors failed\n",
--			   nic->num_vec);
-+			"Request for #%d msix vectors failed, returned %d\n",
-+			   nic->num_vec, ret);
-+		kfree(nic->msix_entries);
- 		return ret;
- 	}
- 
-@@ -955,6 +966,7 @@ static void nic_disable_msix(struct nicpf *nic)
- {
- 	if (nic->msix_enabled) {
- 		pci_disable_msix(nic->pdev);
-+		kfree(nic->msix_entries);
- 		nic->msix_enabled = 0;
- 		nic->num_vec = 0;
- 	}
-@@ -973,27 +985,26 @@ static void nic_free_all_interrupts(struct nicpf *nic)
- 
- static int nic_register_interrupts(struct nicpf *nic)
- {
--	int ret;
-+	int i, ret;
- 
- 	/* Enable MSI-X */
- 	ret = nic_enable_msix(nic);
- 	if (ret)
- 		return ret;
- 
--	/* Register mailbox interrupt handlers */
--	ret = request_irq(nic->msix_entries[NIC_PF_INTR_ID_MBOX0].vector,
--			  nic_mbx0_intr_handler, 0, "NIC Mbox0", nic);
--	if (ret)
--		goto fail;
-+	/* Register mailbox interrupt handler */
-+	for (i = NIC_PF_INTR_ID_MBOX0; i < nic->num_vec; i++) {
-+		sprintf(nic->irq_name[i],
-+			"NICPF Mbox%d", (i - NIC_PF_INTR_ID_MBOX0));
- 
--	nic->irq_allocated[NIC_PF_INTR_ID_MBOX0] = true;
-+		ret = request_irq(nic->msix_entries[i].vector,
-+				  nic_mbx_intr_handler, 0,
-+				  nic->irq_name[i], nic);
-+		if (ret)
-+			goto fail;
- 
--	ret = request_irq(nic->msix_entries[NIC_PF_INTR_ID_MBOX1].vector,
--			  nic_mbx1_intr_handler, 0, "NIC Mbox1", nic);
--	if (ret)
--		goto fail;
--
--	nic->irq_allocated[NIC_PF_INTR_ID_MBOX1] = true;
-+		nic->irq_allocated[i] = true;
-+	}
- 
- 	/* Enable mailbox interrupt */
- 	nic_enable_mbx_intr(nic);
-@@ -1002,6 +1013,7 @@ static int nic_register_interrupts(struct nicpf *nic)
- fail:
- 	dev_err(&nic->pdev->dev, "Request irq failed\n");
- 	nic_free_all_interrupts(nic);
-+	nic_disable_msix(nic);
- 	return ret;
++	/* Unlike 88xx where TL2s 0-31 transmits to TL1 '0' and rest to TL1 '1'
++	 * on 81xx/83xx TL2 needs to be configured to transmit to one of the
++	 * possible LMACs.
++	 *
++	 * This register doesn't exist on 88xx.
++	 */
++	if (!hw->tl1_per_bgx)
++		nic_reg_write(nic, NIC_PF_TL2_LMAC | (tl2 << 3),
++			      lmac + (bgx * MAX_LMAC_PER_BGX));
  }
  
+ /* Send primary nicvf pointer to secondary QS's VF */
+diff --git a/drivers/net/ethernet/cavium/thunder/nic_reg.h b/drivers/net/ethernet/cavium/thunder/nic_reg.h
+index afb10e3..833cf3d 100644
+--- a/drivers/net/ethernet/cavium/thunder/nic_reg.h
++++ b/drivers/net/ethernet/cavium/thunder/nic_reg.h
+@@ -103,6 +103,7 @@
+ #define   NIC_PF_SW_SYNC_RX_DONE		(0x490008)
+ #define   NIC_PF_TL2_0_63_CFG			(0x500000)
+ #define   NIC_PF_TL2_0_63_PRI			(0x520000)
++#define   NIC_PF_TL2_LMAC			(0x540000)
+ #define   NIC_PF_TL2_0_63_SH_STATUS		(0x580000)
+ #define   NIC_PF_TL3A_0_63_CFG			(0x5F0000)
+ #define   NIC_PF_TL3_0_255_CFG			(0x600000)
+diff --git a/drivers/net/ethernet/cavium/thunder/thunder_bgx.h b/drivers/net/ethernet/cavium/thunder/thunder_bgx.h
+index 42010d2..9f5e49a 100644
+--- a/drivers/net/ethernet/cavium/thunder/thunder_bgx.h
++++ b/drivers/net/ethernet/cavium/thunder/thunder_bgx.h
+@@ -11,6 +11,8 @@
+ 
+ #define    MAX_BGX_THUNDER			8 /* Max 4 nodes, 2 per node */
+ #define    MAX_BGX_PER_CN88XX			2
++#define    MAX_BGX_PER_CN81XX			2
++#define    MAX_BGX_PER_CN83XX			4
+ #define    MAX_LMAC_PER_BGX			4
+ #define    MAX_BGX_CHANS_PER_LMAC		16
+ #define    MAX_DMAC_PER_LMAC			8
 -- 
 2.7.4
