@@ -1,72 +1,62 @@
-From: mcuos.com@gmail.com (Wan ZongShun)
-Date: Fri, 15 Jul 2016 17:44:50 +0800
-Subject: [PATCH v2 02/10] irqchip: add irqchip driver for nuc900
-In-Reply-To: <16178876.fFBuoBSjbd@wuerfel>
-References: <1468135649-19980-1-git-send-email-vw@iommu.org>
- <20160714135426.GC31509@io.lakedaemon.net> <5788718E.7080708@iommu.org>
- <16178876.fFBuoBSjbd@wuerfel>
-Message-ID: <CAKT61h8EkOOkDHou65Uc7NNomJ6Nowvw8o6JnWxNyc0S_=x_JA@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 15 Jul 2016 10:45:42 +0100
+Subject: [PATCH v9 3/4] perf: xgene: Add APM X-Gene SoC Performance
+ Monitoring Unit driver
+In-Reply-To: <CACgAJHw7UMFKY=j8UBKUi=hNHfyzVoNMr_A5qOahhbgM+14KBQ@mail.gmail.com>
+References: <1468517266-1642-1-git-send-email-ttnguyen@apm.com>
+ <1468517266-1642-4-git-send-email-ttnguyen@apm.com>
+ <1468518428.8745.43.camel@perches.com>
+ <CACgAJHwzWG_6iWG4OcL3v5QcUF892DwBcJxayqbH4f2kd7=kQQ@mail.gmail.com>
+ <CACgAJHw7UMFKY=j8UBKUi=hNHfyzVoNMr_A5qOahhbgM+14KBQ@mail.gmail.com>
+Message-ID: <20160715094541.GE4655@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-07-15 15:00 GMT+08:00 Arnd Bergmann <arnd@arndb.de>:
-> On Friday, July 15, 2016 1:15:58 PM CEST Wan Zongshun wrote:
->>
->> Actually, I have two choice to implement this function:
->>
->> option1:
->>
->> void __exception_irq_entry aic_handle_irq(struct pt_regs *regs)
->> {
->>         u32 hwirq;
->>
->>         (void)readl(aic_base + REG_AIC_IPER);
->>         hwirq = readl(aic_base + REG_AIC_ISNR);
->>
->>         handle_IRQ((irq_find_mapping(aic_domain, hwirq)), regs);
->> }
->
-> (side note: I think you want handle_domain_irq())
->
->> option2:
->>
->> void __exception_irq_entry aic_handle_irq(struct pt_regs *regs)
->> {
->>         u32 hwirq;
->>
->>         hwirq = readl(aic_base + REG_AIC_IPER);
->>         hwirq <<= 2;
->>
->>         handle_IRQ((irq_find_mapping(aic_domain, hwirq)), regs);
->> }
->>
->> Though the option2 do shift for hwirq, but it seems better than do io
->> operation by readl,so I prefer to option2, agree?
->
-> That will only return an irq number that is a multiple of four, which
-> seems wrong since the numbers are not that. Did you mean to write
->
->         hwirq = ilog2(hwirq);   ?
+On Thu, Jul 14, 2016 at 11:05:48AM -0700, Tai Tri Nguyen wrote:
+> Hi Joe,
+> 
+> On Thu, Jul 14, 2016 at 10:54 AM, Tai Tri Nguyen <ttnguyen@apm.com> wrote:
+> > Hi Joe,
+> >
+> > On Thu, Jul 14, 2016 at 10:47 AM, Joe Perches <joe@perches.com> wrote:
+> >> On Thu, 2016-07-14 at 10:27 -0700, Tai Nguyen wrote:
+> >>> This patch adds a driver for the SoC-wide (AKA uncore) PMU hardware
+> >>> found in APM X-Gene SoCs.
+> >>
+> >> trivia:
+> >>
+> >>> diff --git a/drivers/perf/xgene_pmu.c b/drivers/perf/xgene_pmu.c
+> >> []
+> >>> +struct xgene_pmu_dev_ctx {
+> >>> +     char *name;
+> >>> +     struct list_head next;
+> >>> +     struct xgene_pmu_dev *pmu_dev;
+> >>> +     struct hw_pmu_info inf;
+> >>> +};
+> >>
+> >> Probably better to use something like
+> >>         char    name[20];
+> >> as the kasprintf can fail and this doesn't
+> >> seem to be freed anywhere.
+> >
+> > Okay. I'll fix it shortly.
+> >
+> 
+> I take it back.
+> I refer many other drivers using kasprintf and they do the same way I do.
+> Can you please check it again?
 
-Sorry, my fault, I mean hwirq >>= 2, bit[7:2] indicates which irq is triggering.
-so I have to do right shift 2 for IPER value.
+Joe is correct that you allocate a string with kasprintf, and this never
+gets freed, even if the driver is removed. Thus, memory may be leaked.
 
->
-> That assumes that REG_AIC_IPER contains a 32-bit value with one single
-> bit set to indicate which IRQ was triggered.
->
-> If the difference is only in performance, you could try measuring which
-> of the two ends up being faster.
+If other drivers do the same, they are similarly wrong.
 
-It seems hard to measure. I think Do IO operation should be slower
-than shift 2. :)
+Even if this is a rare case, it's not good practice to leave allocations
+unbalanced. So please fix this.
 
->
->         Arnd
+If you don't want to change the struct, another option is to use
+devm_kasprintf. However, I suspect with all the accounting data
+structures that will take up more space.
 
-
-
--- 
----
-Vincent Wan(Zongshun)
-www.mcuos.com
+Thanks,
+Mark.
