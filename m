@@ -1,35 +1,22 @@
-From: yendapally.reddy@broadcom.com (Yendapally Reddy Dhananjaya Reddy)
-Date: Fri, 15 Jul 2016 04:28:26 -0400
-Subject: [PATCH 1/1] arm64: dts: Add PWM DT node for NS2
-Message-ID: <1468571306-20976-1-git-send-email-yendapally.reddy@broadcom.com>
+From: bharat.kumar.gogada@xilinx.com (Bharat Kumar Gogada)
+Date: Fri, 15 Jul 2016 08:29:49 +0000
+Subject: Memory and IO space Enabling different in x86 and ARM64
+Message-ID: <8520D5D51A55D047800579B094147198258B9376@XAP-PVEXMBX01.xlnx.xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add device tree entry for PWM support for Broadcom Northstar 2 SoC.
+Hi,
 
-Signed-off-by: Yendapally Reddy Dhananjaya Reddy <yendapally.reddy@broadcom.com>
----
- arch/arm64/boot/dts/broadcom/ns2.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
+I observe that memory and IO space are enabled by BIOS in x86.
 
-diff --git a/arch/arm64/boot/dts/broadcom/ns2.dtsi b/arch/arm64/boot/dts/broadcom/ns2.dtsi
-index ec68ec1..9c2857c 100644
---- a/arch/arm64/boot/dts/broadcom/ns2.dtsi
-+++ b/arch/arm64/boot/dts/broadcom/ns2.dtsi
-@@ -263,6 +263,14 @@
- 				      IRQ_TYPE_LEVEL_HIGH)>;
- 		};
- 
-+		pwm: pwm at 66010000 {
-+			compatible = "brcm,iproc-pwm";
-+			reg = <0x66010000 0x28>;
-+			clocks = <&osc>;
-+			#pwm-cells = <3>;
-+			status = "disabled";
-+		};
-+
- 		timer0: timer at 66030000 {
- 			compatible = "arm,sp804", "arm,primecell";
- 			reg = <0x66030000 0x1000>;
--- 
-2.1.0
+In ARM64 we need to call pci_enable_device form End Point to enable these resources.
+
+Why the resource enablement is different in x86 and ARM64 ?
+
+Please correct me if my observation is wrong.
+
+Thanks & Regards,
+Bharat
+
+
+This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
