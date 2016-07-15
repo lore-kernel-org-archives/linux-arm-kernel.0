@@ -1,70 +1,64 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 15 Jul 2016 09:36:30 +0200
-Subject: ARM: dts: exynos: Properly select eMMC HighSpeed mode
-In-Reply-To: <578857FD.7030601@samsung.com>
-References: <1468500458-7142-1-git-send-email-k.kozlowski@samsung.com>
- <578857FD.7030601@samsung.com>
-Message-ID: <5788927E.2050803@samsung.com>
+From: pali.rohar@gmail.com (Pali =?utf-8?B?Um9ow6Fy?=)
+Date: Fri, 15 Jul 2016 09:40:52 +0200
+Subject: outdated documentation for lp5523 LED driver?
+In-Reply-To: <20160715073214.GC13429@amd>
+References: <20160715073214.GC13429@amd>
+Message-ID: <20160715074052.GE29844@pali>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/15/2016 05:26 AM, Alim Akhtar wrote:
-> Hi Krzysztof,
+On Friday 15 July 2016 09:32:14 Pavel Machek wrote:
+> Hi!
 > 
-> On 07/14/2016 06:17 PM, Krzysztof Kozlowski wrote:
->> Exynos5410 supports eMMC version 4.41 so HS200 is the top mode which
->> should be configured.  This is reflected in usage of
->> "samsung,exynos5250-dw-mshc" compatible.  However DTS contained also
->> property "mmc-hs400-1_8v" which is parsed by MMC core therefore
->> resulting in mixed configuration.  MMC core set HS400 but dwmmc_exynos
->> driver did not configure the data strobe for HS400 DDR mode.
->>
->> Removal of HS400 properties fixes semi-random mmc errors during boot:
->>    mmc_host mmc0: Bus speed (slot 0) = 400000000Hz (slot req
->> 200000000Hz, actual 200000000HZ div = 1)
->>    mmc0: mmc_select_hs400 failed, error -84
->>    mmc0: error -84 whilst initialising MMC card
->>
->> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->> ---
->>   arch/arm/boot/dts/exynos5410-odroidxu.dts | 2 --
->>   1 file changed, 2 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/exynos5410-odroidxu.dts
->> b/arch/arm/boot/dts/exynos5410-odroidxu.dts
->> index d9499310a301..7536164438ca 100644
->> --- a/arch/arm/boot/dts/exynos5410-odroidxu.dts
->> +++ b/arch/arm/boot/dts/exynos5410-odroidxu.dts
->> @@ -447,14 +447,12 @@
->>       samsung,dw-mshc-ciu-div = <3>;
->>       samsung,dw-mshc-sdr-timing = <0 4>;
->>       samsung,dw-mshc-ddr-timing = <0 2>;
->> -    samsung,dw-mshc-hs400-timing = <0 2>;
-> not sure but can we use /delete-property/ option for this removable?
+> Documentation says that load/leds are only visible in the load mode,
+> but that does not seem to be true (kernel 4.4.0 on N900).
+> 
+> # 1) Legacy interface - enginex_mode, enginex_load and enginex_leds
+> #  Control interface for the engines:
+> #    x is 1 .. 3
+> #      enginex_mode : disabled, load, run
+> #      enginex_load : microcode load (visible only in load mode)
+> #      enginex_leds : led mux control (visible only in load mode)
+> 
+> pavel at n900:/sys/class/leds/lp5523:r/device$ ls -al engine*
+> -rw-r--r-- 1 root root 4096 Jul  6 22:47 engine1_leds
+> --w------- 1 root root 4096 Jul  6 22:47 engine1_load
+> -rw-r--r-- 1 root root 4096 Jul  6 23:41 engine1_mode
+> -rw-r--r-- 1 root root 4096 Jul  6 22:47 engine2_leds
+> --w------- 1 root root 4096 Jul  6 22:47 engine2_load
+> -rw-r--r-- 1 root root 4096 Jul  6 23:41 engine2_mode
+> -rw-r--r-- 1 root root 4096 Jul  6 22:47 engine3_leds
+> --w------- 1 root root 4096 Jul  6 22:47 engine3_load
+> -rw-r--r-- 1 root root 4096 Jul  6 22:47 engine3_mode
+> pavel at n900:/sys/class/leds/lp5523:r/device$ grep . engine*mode
+> engine1_mode:run
+> engine2_mode:load
+> engine3_mode:run
+> pavel at n900:/sys/class/leds/lp5523:r/device$
 
-No need for this. This property is set only here - in Odroid XU DTS.
+On 2.6.28 kernel is present only legacy interface and for this version
+is above documentation correct. When engine is in "run" or "disabled",
+then sysfs nodes _load and _leds are invisible.
 
->>       samsung,read-strobe-delay = <90>;
-> this also need to be removed.
+So I suspect that bug is in current kernel code and documentation is
+correct... So I would propose to fix kernel code to reflect
+documentation...
 
-Ah, right, thanks!
+> I got both the legacy and the firmware interface to work... but the
+> firmware interface only seems to work once for me.
+> 
+> How new and old interface are expected to interact with each other is
+> not clear to me.
 
->>       pinctrl-names = "default";
->>       pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus1 &sd0_bus4 &sd0_bus8
->> &sd0_cd>;
->>       bus-width = <8>;
->>       cap-mmc-highspeed;
->>       mmc-hs200-1_8v;
->> -    mmc-hs400-1_8v;
-> same as above if possible use /delete-property/
+In my opinion both interfaces could be used. They provide same states
+load/run but via different sysfs files.
 
-Same, no need because this does not come from other DTS/DTSI.
-
->>       vmmc-supply = <&ldo20_reg>;
->>       vqmmc-supply = <&ldo11_reg>;
->>   };
->>
+> What should be done there?
+> 
+> Best regards,
+> 									Pavel
 > 
 
-Best regards,
-Krzysztof
+-- 
+Pali Roh?r
+pali.rohar at gmail.com
