@@ -1,61 +1,81 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 15 Jul 2016 18:45:32 +0100
-Subject: [PATCH 1/2] ARM: realview: Fix PBX-A9 cache description
-In-Reply-To: <dbf8749c4af9aa5ffb85e961b7ae09ffeefa7f2a.1468583959.git.robin.murphy@arm.com>
-References: <dbf8749c4af9aa5ffb85e961b7ae09ffeefa7f2a.1468583959.git.robin.murphy@arm.com>
-Message-ID: <5789213C.4060306@arm.com>
+From: dave.long@linaro.org (David Long)
+Date: Fri, 15 Jul 2016 13:51:02 -0400
+Subject: [PATCH v15 01/10] arm64: Add HAVE_REGS_AND_STACK_ACCESS_API
+ feature
+In-Reply-To: <20160715150532.GA22563@localhost>
+References: <1467995754-32508-1-git-send-email-dave.long@linaro.org>
+ <1467995754-32508-2-git-send-email-dave.long@linaro.org>
+ <20160715105701.GB14792@e104818-lin.cambridge.arm.com>
+ <5788F86B.60305@linaro.org> <20160715150532.GA22563@localhost>
+Message-ID: <57892286.1040609@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/07/16 13:19, Robin Murphy wrote:
-> Clearly QEMU is very permissive in how its PL310 model may be set up,
-> but the real hardware turns out to be far more particular about things
-> actually being correct. Fix up the DT description so that the real
-> thing actually boots:
-> 
-> - The arm,data-latency and arm,tag-latency properties need 3 cells to
->   be valid, otherwise we end up retaining the default 8-cycle latencies
->   which leads pretty quickly to lockup.
-> - The arm,dirty-latency property is only relevant to L210/L220, so get
->   rid of it.
-> - The cache geometry override also leads to lockup and/or general
->   misbehaviour. Irritatingly, the manual doesn't state the actual PL310
->   configuration, but based on the boardfile code and poking registers
->   from the Boot Monitor, it would seem to be 8 sets of 16KB ways.
+On 07/15/2016 11:13 AM, Catalin Marinas wrote:
+> On Fri, Jul 15, 2016 at 10:51:23AM -0400, David Long wrote:
+>> On 07/15/2016 06:57 AM, Catalin Marinas wrote:
+>>> On Fri, Jul 08, 2016 at 12:35:45PM -0400, David Long wrote:
+>>>> --- a/arch/arm64/include/asm/ptrace.h
+>>>> +++ b/arch/arm64/include/asm/ptrace.h
+>>>> @@ -74,6 +74,7 @@
+>>>>    #define COMPAT_PT_DATA_ADDR		0x10004
+>>>>    #define COMPAT_PT_TEXT_END_ADDR		0x10008
+>>>>    #ifndef __ASSEMBLY__
+>>>> +#include <linux/bug.h>
+>>>>
+>>>>    /* sizeof(struct user) for AArch32 */
+>>>>    #define COMPAT_USER_SZ	296
+>>>> @@ -119,6 +120,8 @@ struct pt_regs {
+>>>>    	u64 syscallno;
+>>>>    };
+>>>>
+>>>> +#define MAX_REG_OFFSET offsetof(struct pt_regs, pstate)
+>>>> +
+>>>>    #define arch_has_single_step()	(1)
+>>>>
+>>>>    #ifdef CONFIG_COMPAT
+>>>> @@ -147,6 +150,55 @@ struct pt_regs {
+>>>>    #define user_stack_pointer(regs) \
+>>>>    	(!compat_user_mode(regs) ? (regs)->sp : (regs)->compat_sp)
+>>>>
+>>>> +extern int regs_query_register_offset(const char *name);
+>>>> +extern const char *regs_query_register_name(unsigned int offset);
+>>>
+>>> Is regs_query_register_offset() used anywhere? I grep'ed the kernel with
+>>> these patches applied but couldnperf_regs.c't find any use.
+>>
+>> It's referenced in kernel/trace/trace_probe.c.
+>
+> I meant regs_query_register_name() (vim completion wrote the first one).
+>
 
-FWIW, after an afternoon of bothering people I've tracked down the
-original spec for the test chip, and can confirm that the configuration
-is indeed 8x16KB with parity disabled.
+I had assumed it was used by kgdb to provide human-readable register 
+names for debugger output, but apparently that is handled inside the 
+kgdb.c stub for each architecture. I can only assume this is currently 
+provided in all (or at least most) architectures because some code 
+outside the kernel tree needs (or used to need?) to be able to do the 
+reverse of regs_query_register_offset(). It's easy enough to remove 
+this, but that will make arm64 unlike the other architectures in its 
+CONFIG_HAVE_REGS_AND_STACK_ACCESS_API support.
 
-Robin.
+>>>> +extern bool regs_within_kernel_stack(struct pt_regs *regs, unsigned long addr);
+>>>
+>>> This one only seems to be used in arch/arm64/kernel/ptrace.c. Can we
+>>> make it static and remove the declaration?
+>>
+>> OK.
+>
+> I can change it locally.
 
-> With that, we can successfully boot to enjoy the fun of mismatched FPUs...
-> 
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-> ---
->  arch/arm/boot/dts/arm-realview-pbx-a9.dts | 9 ++++-----
->  1 file changed, 4 insertions(+), 5 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/arm-realview-pbx-a9.dts b/arch/arm/boot/dts/arm-realview-pbx-a9.dts
-> index db808f92dd79..90d00b407f85 100644
-> --- a/arch/arm/boot/dts/arm-realview-pbx-a9.dts
-> +++ b/arch/arm/boot/dts/arm-realview-pbx-a9.dts
-> @@ -70,13 +70,12 @@
->  		 * associativity as these may be erroneously set
->  		 * up by boot loader(s).
->  		 */
-> -		cache-size = <1048576>; // 1MB
-> -		cache-sets = <4096>;
-> +		cache-size = <131072>; // 128KB
-> +		cache-sets = <512>;
->  		cache-line-size = <32>;
->  		arm,parity-disable;
-> -		arm,tag-latency = <1>;
-> -		arm,data-latency = <1 1>;
-> -		arm,dirty-latency = <1>;
-> +		arm,tag-latency = <1 1 1>;
-> +		arm,data-latency = <1 1 1>;
->  	};
->  
->  	scu: scu at 1f000000 {
-> 
+It's looking like there will need to be another iteration of the patch 
+for a few small things anyway, although those changes could also be done 
+as subsequent improvements.
+
+>
+> Are these going to be used in the future by uprobes?
+>
+
+It would appear not.
+
+Thanks,
+-dl
