@@ -1,84 +1,71 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 15 Jul 2016 19:06:57 +0200
-Subject: linux-next: manual merge of the clockevents tree with the arm-soc
- tree
-In-Reply-To: <20160711152812.3efd7047@canb.auug.org.au>
-References: <20160707141226.2b9c1e15@canb.auug.org.au>
- <20160711152812.3efd7047@canb.auug.org.au>
-Message-ID: <57891831.2080806@linaro.org>
+From: ttnguyen@apm.com (Tai Tri Nguyen)
+Date: Fri, 15 Jul 2016 10:31:09 -0700
+Subject: [PATCH v9 3/4] perf: xgene: Add APM X-Gene SoC Performance
+ Monitoring Unit driver
+In-Reply-To: <20160715094541.GE4655@leverpostej>
+References: <1468517266-1642-1-git-send-email-ttnguyen@apm.com>
+ <1468517266-1642-4-git-send-email-ttnguyen@apm.com>
+ <1468518428.8745.43.camel@perches.com>
+ <CACgAJHwzWG_6iWG4OcL3v5QcUF892DwBcJxayqbH4f2kd7=kQQ@mail.gmail.com>
+ <CACgAJHw7UMFKY=j8UBKUi=hNHfyzVoNMr_A5qOahhbgM+14KBQ@mail.gmail.com>
+ <20160715094541.GE4655@leverpostej>
+Message-ID: <CACgAJHyaoEJqyeXNsy2HbfxQo2m-Ljm61nDKOtL-Vqbv=NVhKA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/11/2016 07:28 AM, Stephen Rothwell wrote:
-> Hi all,
-> 
-> On Thu, 7 Jul 2016 14:12:26 +1000 Stephen Rothwell <sfr@canb.auug.org.au> wrote:
->>
->> Today's linux-next merge of the clockevents tree got a conflict in:
->>
->>   arch/arm/Kconfig
->>
->> between commit:
->>
->>   c86f51737f8d ("ARM: clps711x: Switch to MULTIPLATFORM")
->>
->> from the arm-soc tree and commit:
->>
->>   250e46aa3bb3 ("clocksource/drivers/clps_711x: Add the COMPILE_TEST option")
->>
->> from the clockevents tree.
->>
->> I fixed it up (I used the arm-soc version of this file and then added
->> the following merge fix patch) and can carry the fix as necessary. This
->> is now fixed as far as linux-next is concerned, but any non trivial
->> conflicts should be mentioned to your upstream maintainer when your tree
->> is submitted for merging.  You may also want to consider cooperating
->> with the maintainer of the conflicting tree to minimise any particularly
->> complex conflicts.
->>
->> From: Stephen Rothwell <sfr@canb.auug.org.au>
->> Date: Thu, 7 Jul 2016 13:59:06 +1000
->> Subject: [PATCH] clocksource/drivers/clps_711x: fixup for "ARM: clps711x: Switch to MULTIPLATFORM"
->>
->> Signed-off-by: Stephen Rothwell <sfr@canb.auug.org.au>
->> ---
->>  arch/arm/mach-clps711x/Kconfig | 2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/mach-clps711x/Kconfig b/arch/arm/mach-clps711x/Kconfig
->> index 3b56197ccfd0..dc7c6edeab39 100644
->> --- a/arch/arm/mach-clps711x/Kconfig
->> +++ b/arch/arm/mach-clps711x/Kconfig
->> @@ -3,8 +3,8 @@ menuconfig ARCH_CLPS711X
->>  	depends on ARCH_MULTI_V4T
->>  	select ARCH_REQUIRE_GPIOLIB
->>  	select AUTO_ZRELADDR
->> -	select CLKSRC_MMIO
->>  	select CLKSRC_OF
->> +	select CLPS711X_TIMER
->>  	select COMMON_CLK
->>  	select CPU_ARM720T
->>  	select GENERIC_CLOCKEVENTS
->> -- 
->> 2.8.1
-> 
-> This merge fix is now applicable to the merge between the arm-soc tree
-> and the tip tree.
-> 
-> Also, the clockevents tree needs to be cleaned up as all its commits
-> have been added to the tip tree as different commits (but the s
-> patches) :-(
+Hi Mark and Joe,
 
-I synced the branch with tip/timers/core, no more conflict should happen.
+On Fri, Jul 15, 2016 at 2:45 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Thu, Jul 14, 2016 at 11:05:48AM -0700, Tai Tri Nguyen wrote:
+>> Hi Joe,
+>>
+>> On Thu, Jul 14, 2016 at 10:54 AM, Tai Tri Nguyen <ttnguyen@apm.com> wrote:
+>> > Hi Joe,
+>> >
+>> > On Thu, Jul 14, 2016 at 10:47 AM, Joe Perches <joe@perches.com> wrote:
+>> >> On Thu, 2016-07-14 at 10:27 -0700, Tai Nguyen wrote:
+>> >>> This patch adds a driver for the SoC-wide (AKA uncore) PMU hardware
+>> >>> found in APM X-Gene SoCs.
+>> >>
+>> >> trivia:
+>> >>
+>> >>> diff --git a/drivers/perf/xgene_pmu.c b/drivers/perf/xgene_pmu.c
+>> >> []
+>> >>> +struct xgene_pmu_dev_ctx {
+>> >>> +     char *name;
+>> >>> +     struct list_head next;
+>> >>> +     struct xgene_pmu_dev *pmu_dev;
+>> >>> +     struct hw_pmu_info inf;
+>> >>> +};
+>> >>
+>> >> Probably better to use something like
+>> >>         char    name[20];
+>> >> as the kasprintf can fail and this doesn't
+>> >> seem to be freed anywhere.
+>> >
+>> > Okay. I'll fix it shortly.
+>> >
+>>
+>> I take it back.
+>> I refer many other drivers using kasprintf and they do the same way I do.
+>> Can you please check it again?
+>
+> Joe is correct that you allocate a string with kasprintf, and this never
+> gets freed, even if the driver is removed. Thus, memory may be leaked.
+>
+> If other drivers do the same, they are similarly wrong.
+>
+> Even if this is a rare case, it's not good practice to leave allocations
+> unbalanced. So please fix this.
+>
+> If you don't want to change the struct, another option is to use
+> devm_kasprintf. However, I suspect with all the accounting data
+> structures that will take up more space.
+>
 
-Thanks.
+Thanks, I will change to use devm_kasprintf because I don't want to
+change the struct.
 
-  -- Daniel
-
-
+Regards,
 -- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Tai
