@@ -1,59 +1,46 @@
-From: j.anaszewski@samsung.com (Jacek Anaszewski)
-Date: Fri, 15 Jul 2016 10:14:43 +0200
-Subject: [PATCH] media: Doc add missing documentation for
- samsung,exynos4212-jpeg
-In-Reply-To: <578890BA.8040101@samsung.com>
-References: <1468526499-8840-1-git-send-email-shuahkh@osg.samsung.com>
- <578890BA.8040101@samsung.com>
-Message-ID: <57889B73.4090607@samsung.com>
+From: rasmus.villemoes@prevas.dk (Rasmus Villemoes)
+Date: Fri, 15 Jul 2016 10:15:22 +0200
+Subject: [PATCH 2/3] watchdog: bcm2835_wdt: remove redundant ->set_timeout
+ callback
+In-Reply-To: <1468570524-18222-1-git-send-email-rasmus.villemoes@prevas.dk>
+References: <1468570524-18222-1-git-send-email-rasmus.villemoes@prevas.dk>
+Message-ID: <1468570524-18222-2-git-send-email-rasmus.villemoes@prevas.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krzysztof,
+bcm2835_wdt_set_timeout does exactly what the watchdog framework does
+in the absence of a ->set_timeout callback (see watchdog_set_timeout
+in watchdog_dev.c), so remove it.
 
-On 07/15/2016 09:28 AM, Krzysztof Kozlowski wrote:
-> On 07/14/2016 10:01 PM, Shuah Khan wrote:
->> Add add missing documentation for samsung,exynos4212-jpeg codec,
->> reorder entries to improve readability and make it easier to add
->> new entries.
->>
->> Signed-off-by: Shuah Khan <shuahkh@osg.samsung.com>
->> ---
->>   Documentation/devicetree/bindings/media/exynos-jpeg-codec.txt | 6 +++---
->>   1 file changed, 3 insertions(+), 3 deletions(-)
->>
->> diff --git a/Documentation/devicetree/bindings/media/exynos-jpeg-codec.txt b/Documentation/devicetree/bindings/media/exynos-jpeg-codec.txt
->> index 38941db..093614c 100644
->> --- a/Documentation/devicetree/bindings/media/exynos-jpeg-codec.txt
->> +++ b/Documentation/devicetree/bindings/media/exynos-jpeg-codec.txt
->> @@ -3,9 +3,9 @@ Samsung S5P/EXYNOS SoC series JPEG codec
->>   Required properties:
->>
->>   - compatible	: should be one of:
->> -		  "samsung,s5pv210-jpeg", "samsung,exynos4210-jpeg",
->> -		  "samsung,exynos3250-jpeg", "samsung,exynos5420-jpeg",
->> -		  "samsung,exynos5433-jpeg";
->> +		  "samsung,s5pv210-jpeg", "samsung,exynos3250-jpeg",
->> +		  "samsung,exynos4210-jpeg", "samsung,exynos4212-jpeg",
->> +		  "samsung,exynos5420-jpeg", "samsung,exynos5433-jpeg";
->
-> I am not convinced that this is needed because exynos4212-jpeg is equal
-> to exynos4210-jpeg... It is a little bit weird because Jacek's commit
-> 3246fdaa0ac2d9 ("[media] s5p-jpeg: Add support for Exynos3250 SoC")
-> changed the driver data for Exynos4210 from S5P to Exynos4 without
-> explaining it...
+Signed-off-by: Rasmus Villemoes <rasmus.villemoes@prevas.dk>
+---
+ drivers/watchdog/bcm2835_wdt.c | 7 -------
+ 1 file changed, 7 deletions(-)
 
-It was probably a bug fix since 4210 and 4212 have the same
-JPEG IP. I agree that it isn't best practice to smuggle bug
-fixes like that.
-
-> However if these compatibles are exactly equal then
-> only one should be preferred. It makes everything easier. Second can be
-> still documented e.g. as deprecated.
-
-Still, both of them are present in the driver. Shouldn't it be reflected
-in the documentation?
-
+diff --git a/drivers/watchdog/bcm2835_wdt.c b/drivers/watchdog/bcm2835_wdt.c
+index 733e402..4dddd82 100644
+--- a/drivers/watchdog/bcm2835_wdt.c
++++ b/drivers/watchdog/bcm2835_wdt.c
+@@ -82,12 +82,6 @@ static int bcm2835_wdt_stop(struct watchdog_device *wdog)
+ 	return 0;
+ }
+ 
+-static int bcm2835_wdt_set_timeout(struct watchdog_device *wdog, unsigned int t)
+-{
+-	wdog->timeout = t;
+-	return 0;
+-}
+-
+ static unsigned int bcm2835_wdt_get_timeleft(struct watchdog_device *wdog)
+ {
+ 	struct bcm2835_wdt *wdt = watchdog_get_drvdata(wdog);
+@@ -100,7 +94,6 @@ static const struct watchdog_ops bcm2835_wdt_ops = {
+ 	.owner =	THIS_MODULE,
+ 	.start =	bcm2835_wdt_start,
+ 	.stop =		bcm2835_wdt_stop,
+-	.set_timeout =	bcm2835_wdt_set_timeout,
+ 	.get_timeleft =	bcm2835_wdt_get_timeleft,
+ };
+ 
 -- 
-Best regards,
-Jacek Anaszewski
+2.5.0
