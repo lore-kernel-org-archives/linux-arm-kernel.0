@@ -1,66 +1,28 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Thu, 14 Jul 2016 21:05:25 -0700
-Subject: [PATCH v2 02/11] mm: Hardened usercopy
-In-Reply-To: <20160715014151.GA13944@balbir.ozlabs.ibm.com>
-References: <1468446964-22213-1-git-send-email-keescook@chromium.org>
- <1468446964-22213-3-git-send-email-keescook@chromium.org>
- <20160714232019.GA28254@350D>
- <1468544658.30053.26.camel@redhat.com>
- <20160715014151.GA13944@balbir.ozlabs.ibm.com>
-Message-ID: <CAGXu5jJy4O4tV2sB=MSkYh2DEfxUYkH4Q3ghmrHEGc6s-k285A@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 15 Jul 2016 13:13:44 +0900
+Subject: [PATCH 1/2] arm: plug a zImage corner case
+In-Reply-To: <E1bL9rj-0002Ow-6i@e0050434b2927.dyn.armlinux.org.uk>
+References: <20160707102003.GO1041@n2100.armlinux.org.uk>
+ <E1bL9rj-0002Ow-6i@e0050434b2927.dyn.armlinux.org.uk>
+Message-ID: <20160715041343.GC28151@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 14, 2016 at 6:41 PM, Balbir Singh <bsingharora@gmail.com> wrote:
-> On Thu, Jul 14, 2016 at 09:04:18PM -0400, Rik van Riel wrote:
->> On Fri, 2016-07-15 at 09:20 +1000, Balbir Singh wrote:
->>
->> > > ==
->> > > +            ((unsigned long)end & (unsigned
->> > > long)PAGE_MASK)))
->> > > +         return NULL;
->> > > +
->> > > + /* Allow if start and end are inside the same compound
->> > > page. */
->> > > + endpage = virt_to_head_page(end);
->> > > + if (likely(endpage == page))
->> > > +         return NULL;
->> > > +
->> > > + /* Allow special areas, device memory, and sometimes
->> > > kernel data. */
->> > > + if (PageReserved(page) && PageReserved(endpage))
->> > > +         return NULL;
->> >
->> > If we came here, it's likely that endpage > page, do we need to check
->> > that only the first and last pages are reserved? What about the ones
->> > in
->> > the middle?
->>
->> I think this will be so rare, we can get away with just
->> checking the beginning and the end.
->>
->
-> But do we want to leave a hole where an aware user space
-> can try a longer copy_* to avoid this check? If it is unlikely
-> should we just bite the bullet and do the check for the entire
-> range?
+On Thu, Jul 07, 2016 at 03:01:19PM +0100, Russell King wrote:
+> If a zImage is built with ARM_APPENDED_DTB enabled, the zImage will
+> look at the word following the zImage and check whether it contains
+> the DTB magic number.
+> 
+> Generally, kexec will clear the destination pages before copying the
+> zImage, but there is a corner case where the zImage is a multiple of
+> the page size, where the following page will not be touched.  Should
+> the first word in this page contain the DTB magic number, the data
+> following will be interpreted as a DTB image.
+> 
+> In order to make this bullet-proof, we must always initialise the word
+> following the zImage.  Arrange this by specifying the zImage memory
+> size one word bigger than the buffer size.
+> 
+> Signed-off-by: Russell King <rmk@armlinux.org.uk>
 
-I'd be okay with expanding the test -- it should be an extremely rare
-situation already since the common Reserved areas (kernel data) will
-have already been explicitly tested.
-
-What's the best way to do "next page"? Should it just be:
-
-for ( ; page <= endpage ; ptr += PAGE_SIZE, page = virt_to_head_page(ptr) ) {
-    if (!PageReserved(page))
-        return "<spans multiple pages>";
-}
-
-return NULL;
-
-?
-
-
--- 
-Kees Cook
-Chrome OS & Brillo Security
+Thanks, I have applied this and the next patch.
