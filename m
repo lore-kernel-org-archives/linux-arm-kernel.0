@@ -1,44 +1,90 @@
-From: shuahkh@osg.samsung.com (Shuah Khan)
-Date: Fri, 15 Jul 2016 16:10:27 -0600
-Subject: [PATCH v2] media: Doc add missing documentation for samsung,
- exynos4212-jpeg
-Message-ID: <1468620627-9750-1-git-send-email-shuahkh@osg.samsung.com>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Fri, 15 Jul 2016 15:10:57 -0700
+Subject: [PATCH 2/3] mmc: mmc: do not use CMD13 to get status after speed
+ mode switch
+In-Reply-To: <1463647662-27426-3-git-send-email-chaotian.jing@mediatek.com>
+References: <1463647662-27426-1-git-send-email-chaotian.jing@mediatek.com>
+ <1463647662-27426-3-git-send-email-chaotian.jing@mediatek.com>
+Message-ID: <CAOCOHw67NAinC6dEX0KsDn02kuXyNwznm3-bhptSVvQH0V1dqQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add add missing documentation for samsung,exynos4212-jpeg codec,
-reorder entries to improve readability and make it easier to add
-new entries.
+On Thu, May 19, 2016 at 1:47 AM, Chaotian Jing
+<chaotian.jing@mediatek.com> wrote:
+> Per JEDEC spec, it is not recommended to use CMD13 to get card status
+> after speed mode switch. below are two reason about this:
+> 1. CMD13 cannot be guaranteed due to the asynchronous operation.
+> Therefore it is not recommended to use CMD13 to check busy completion
+> of the timing change indication.
+> 2. After switch to HS200, CMD13 will get response of 0x800, and even the
+> busy signal gets de-asserted, the response of CMD13 is aslo 0x800.
+>
+> Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
+> ---
+>  drivers/mmc/core/mmc.c | 112 ++++++++++++++++++++-----------------------------
+>  1 file changed, 45 insertions(+), 67 deletions(-)
+>
+> diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
+[..]
+> @@ -1274,20 +1254,18 @@ static int mmc_select_hs200(struct mmc_card *card)
+>                 err = __mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
+>                                    EXT_CSD_HS_TIMING, val,
+>                                    card->ext_csd.generic_cmd6_time,
+> -                                  true, send_status, true);
+> +                                  true, false, true);
+>                 if (err)
+>                         goto err;
+>                 old_timing = host->ios.timing;
+>                 mmc_set_timing(host, MMC_TIMING_MMC_HS200);
+> -               if (!send_status) {
+> -                       err = mmc_switch_status(card);
+> -                       /*
+> -                        * mmc_select_timing() assumes timing has not changed if
+> -                        * it is a switch error.
+> -                        */
+> -                       if (err == -EBADMSG)
+> -                               mmc_set_timing(host, old_timing);
+> -               }
+> +               err = mmc_switch_status(card);
+> +               /*
+> +                * mmc_select_timing() assumes timing has not changed if
+> +                * it is a switch error.
+> +                */
+> +               if (err == -EBADMSG)
+> +                       mmc_set_timing(host, old_timing);
 
-samsung,exynos4212-jpeg and samsung,exynos4210-jpeg are identical,
-hence add samsung,exynos4212-jpeg as deprecated in the documentation.
+Sorry for not spotting this earlier, but with the move of the call of
+mmc_switch_status() to after mmc_set_timing() we get following error
+with sdhci-msm:
 
-Signed-off-by: Shuah Khan <shuahkh@osg.samsung.com>
----
+mmc0: mmc_select_hs200 failed, error -110
+mmc0: error -110 whilst initialising MMC card
+mmc0: Reset 0x1 never completed.
+sdhci: =========== REGISTER DUMP (mmc0)===========
+sdhci: Sys addr: 0x00000000 | Version: 0x00002e02
+sdhci: Blk size: 0x00004000 | Blk cnt: 0x00000000
+sdhci: Argument: 0x00000000 | Trn mode: 0x00000000
+sdhci: Present: 0x01f80000 | Host ctl: 0x00000000
+sdhci: Power: 0x00000000 | Blk gap: 0x00000000
+sdhci: Wake-up: 0x00000000 | Clock: 0x00000003
+sdhci: Timeout: 0x00000000 | Int stat: 0x00000000
+sdhci: Int enab: 0x00000000 | Sig enab: 0x00000000
+sdhci: AC12 err: 0x00000000 | Slot int: 0x00000000
+sdhci: Caps: 0x322dc8b2 | Caps_1: 0x00008007
+sdhci: Cmd: 0x00000000 | Max curr: 0x00000000
+sdhci: Host ctl2: 0x00000000
+sdhci: ADMA Err: 0x00000000 | ADMA Ptr: 0x0000000000000000
+sdhci: ===========================================
 
-Changes since v1:
-- Added samsung,exynos4212-jpeg as deprecated
+But I if I understand the commit correctly this is the intention of
+the patch (not the error, but the move).
 
- Documentation/devicetree/bindings/media/exynos-jpeg-codec.txt | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
+Regards,
+Bjorn
 
-diff --git a/Documentation/devicetree/bindings/media/exynos-jpeg-codec.txt b/Documentation/devicetree/bindings/media/exynos-jpeg-codec.txt
-index 38941db..c5399e7 100644
---- a/Documentation/devicetree/bindings/media/exynos-jpeg-codec.txt
-+++ b/Documentation/devicetree/bindings/media/exynos-jpeg-codec.txt
-@@ -3,9 +3,11 @@ Samsung S5P/EXYNOS SoC series JPEG codec
- Required properties:
- 
- - compatible	: should be one of:
--		  "samsung,s5pv210-jpeg", "samsung,exynos4210-jpeg",
--		  "samsung,exynos3250-jpeg", "samsung,exynos5420-jpeg",
-+		  "samsung,s5pv210-jpeg", "samsung,exynos3250-jpeg",
-+		  "samsung,exynos4210-jpeg", "samsung,exynos5420-jpeg",
- 		  "samsung,exynos5433-jpeg";
-+
-+		  (Deprecated: "samsung,exynos4212-jpeg").
- - reg		: address and length of the JPEG codec IP register set;
- - interrupts	: specifies the JPEG codec IP interrupt;
- - clock-names   : should contain:
--- 
-2.7.4
+>         }
+>  err:
+>         if (err)
+> --
+> 1.8.1.1.dirty
+>
