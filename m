@@ -1,109 +1,50 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 15 Jul 2016 19:27:04 +0100
-Subject: [PATCH v4 6/8] iommu/arm-smmu: Implement of_xlate() for SMMUv3
-In-Reply-To: <20160715135506.GA4687@red-moon>
-References: <cover.1467388950.git.robin.murphy@arm.com>
- <925b054b1e96dc83c0b1dc9607785d0346187366.1467388950.git.robin.murphy@arm.com>
- <20160715135506.GA4687@red-moon>
-Message-ID: <57892AF8.3020103@arm.com>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Fri, 15 Jul 2016 14:36:16 -0400
+Subject: [PATCH v2 1/2] arm64: implement FTRACE_WITH_REGS
+In-Reply-To: <20160709090632.GA2598@lst.de>
+References: <20160627151500.2247A68D20@newverein.lst.de>
+ <20160627151717.BD25468D26@newverein.lst.de>
+ <20160708145800.GE3556@pathway.suse.cz>
+ <20160708150709.GA8979@lst.de>
+ <20160708152421.GG3556@pathway.suse.cz>
+ <20160708154824.ikq45dgk2auigqn7@treble>
+ <20160708115710.5c657b5f@gandalf.local.home>
+ <20160708202455.GA4580@lst.de>
+ <20160708170808.1ab70ce3@gandalf.local.home>
+ <20160709090632.GA2598@lst.de>
+Message-ID: <20160715143616.5b3d063e@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/07/16 14:55, Lorenzo Pieralisi wrote:
-> On Fri, Jul 01, 2016 at 05:50:15PM +0100, Robin Murphy wrote:
+On Sat, 9 Jul 2016 11:06:32 +0200
+Torsten Duwe <duwe@lst.de> wrote:
+
+
+> Maybe the code in question can be replaced with the change below, now that
+> there is a preprocessor define in V2?
+> (untested)
 > 
-> [...]
-> 
->> +static int arm_smmu_of_xlate(struct device *dev, struct of_phandle_args *args)
->> +{
->> +	int ret;
->> +
->> +	/* We only support PCI, for now */
->> +	if (!dev_is_pci(dev))
->> +		return -ENODEV;
-> 
-> Given that a) the check above is removed in a later patch and b)
-> code below does not depend on SMMU v3, I think the aim should
-> be to make this a core function (ie I am asking this since I will
-> need it in IORT based translation and I do not want to add yet another
-> *_xlate hook to iommu_op), iommu_fwspec_xlate() ?
+> diff --git a/kernel/trace/ftrace.c b/kernel/trace/ftrace.c
+> index 3f743b1..695a646 100644
+> --- a/kernel/trace/ftrace.c
+> +++ b/kernel/trace/ftrace.c
+> @@ -2423,6 +2423,12 @@ ftrace_code_disable(struct module *mod, struct dyn_ftrace *rec)
+>  	if (unlikely(ftrace_disabled))
+>  		return 0;
+>  
+> +#ifdef CC_USING_PROLOG_PAD
+> +	/* If the compiler already generated NOPs instead of
+> +	 * calls to mcount, we're done here.
+> +	*/
+> +	return 1;
+> +#endif
 
-Indeed, this is only tied to OF by the current datatypes, and that's
-straightforward to change. Ultimately the purpose is just for
-firmware/bus code to pass in some words of configuration data, and the
-driver to respond with what corresponding runtime data it wants to
-associate with the device. As I suggested over on the fsl-mc discussion,
-the caller might not even really be 'firmware' at all.
+I really hate adding #ifdef's like this in generic code if the arch can
+handle it with some other means.
 
-> What I will do with my next RFC is move the iommu_fwspec out of
-> OF_IOMMU code in a separate compilation unit and we will take the
-> discussion from there.
+-- Steve
 
-Sounds good. If the end result starts looking clear, it might be an idea
-to squash some patches and skip this intermediate OF-specific step
-entirely (I was just hesitant to do that myself without a clear view of
-the IORT side).
 
->> +
->> +	ret = iommu_fwspec_init(dev, args->np);
->> +	if (!ret)
->> +		ret = iommu_fwspec_add_ids(dev, &args->args[0], 1);
->> +
->> +	return ret;
->> +}
->> +
->>  static struct iommu_ops arm_smmu_ops = {
->>  	.capable		= arm_smmu_capable,
->>  	.domain_alloc		= arm_smmu_domain_alloc,
->> @@ -1947,6 +1894,7 @@ static struct iommu_ops arm_smmu_ops = {
->>  	.device_group		= pci_device_group,
->>  	.domain_get_attr	= arm_smmu_domain_get_attr,
->>  	.domain_set_attr	= arm_smmu_domain_set_attr,
->> +	.of_xlate		= arm_smmu_of_xlate,
->>  	.pgsize_bitmap		= -1UL, /* Restricted during device attach */
->>  };
->>  
->> @@ -2697,6 +2645,22 @@ static void __exit arm_smmu_exit(void)
->>  subsys_initcall(arm_smmu_init);
->>  module_exit(arm_smmu_exit);
->>  
->> +static int __init arm_smmu_of_init(struct device_node *np)
->> +{
->> +	static bool registered;
->> +
->> +	if (!registered)
->> +		registered = !arm_smmu_init();
-> 
-> We also need a static variable in arm_smmu_init() to make sure
-> we do not try to execute it multiple times :( (here and
-> subsys_initcall).
-
-Strictly, yes, although since there didn't seem to be any real issue
-with just letting the initcall fail when register_driver() detects the
-collision, I'd hoped we might be able to keep this bodge together in one
-place. I guess it might end up printing some unwanted failure message
-though, so I'll take another look.
-
-Thanks,
-Robin.
-
-> Thanks,
-> Lorenzo
-> 
->> +
->> +	if (!of_platform_device_create(np, NULL, platform_bus_type.dev_root))
->> +		return -ENODEV;
->> +
->> +	of_iommu_set_ops(np, &arm_smmu_ops);
->> +
->> +	return 0;
->> +}
->> +IOMMU_OF_DECLARE(arm_smmuv3, "arm,smmu-v3", arm_smmu_of_init);
->> +
->>  MODULE_DESCRIPTION("IOMMU API for ARM architected SMMUv3 implementations");
->>  MODULE_AUTHOR("Will Deacon <will.deacon@arm.com>");
->>  MODULE_LICENSE("GPL v2");
->> -- 
->> 2.8.1.dirty
->>
-> 
+>  	ret = ftrace_make_nop(mod, rec, MCOUNT_ADDR);
+>  	if (ret) {
+>  		ftrace_bug(ret, rec);
