@@ -1,127 +1,33 @@
-From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Fri, 15 Jul 2016 12:43:41 -0400
-Subject: [v10, 3/7] soc: fsl: add GUTS driver for QorIQ platforms
-In-Reply-To: <1462417950-46796-4-git-send-email-yangbo.lu@nxp.com>
-References: <1462417950-46796-1-git-send-email-yangbo.lu@nxp.com>
- <1462417950-46796-4-git-send-email-yangbo.lu@nxp.com>
-Message-ID: <CAP=VYLqsV_M=8CM47k4kzdULCp_y0yP9t8Sq9=jFp6W593QJgw@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 15 Jul 2016 17:47:21 +0100
+Subject: [PATCH v15 06/10] arm64: Treat all entry code as non-kprobe-able
+In-Reply-To: <1467995754-32508-7-git-send-email-dave.long@linaro.org>
+References: <1467995754-32508-1-git-send-email-dave.long@linaro.org>
+ <1467995754-32508-7-git-send-email-dave.long@linaro.org>
+Message-ID: <20160715164720.GC14792@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 4, 2016 at 11:12 PM, Yangbo Lu <yangbo.lu@nxp.com> wrote:
-> The global utilities block controls power management, I/O device
-> enabling, power-onreset(POR) configuration monitoring, alternate
-> function selection for multiplexed signals,and clock control.
->
-> This patch adds GUTS driver to manage and access global utilities
-> block.
->
-> Signed-off-by: Yangbo Lu <yangbo.lu@nxp.com>
-> Acked-by: Scott Wood <oss@buserror.net>
-> ---
-> Changes for v4:
->         - Added this patch
-> Changes for v5:
->         - Modified copyright info
->         - Changed MODULE_LICENSE to GPL
->         - Changed EXPORT_SYMBOL_GPL to EXPORT_SYMBOL
->         - Made FSL_GUTS user-invisible
->         - Added a complete compatible list for GUTS
->         - Stored guts info in file-scope variable
->         - Added mfspr() getting SVR
->         - Redefined GUTS APIs
->         - Called fsl_guts_init rather than using platform driver
->         - Removed useless parentheses
->         - Removed useless 'extern' key words
-> Changes for v6:
->         - Made guts thread safe in fsl_guts_init
-> Changes for v7:
->         - Removed 'ifdef' for function declaration in guts.h
-> Changes for v8:
->         - Fixes lines longer than 80 characters checkpatch issue
->         - Added 'Acked-by: Scott Wood'
-> Changes for v9:
->         - None
-> Changes for v10:
->         - None
-> ---
->  drivers/soc/Kconfig      |   2 +-
->  drivers/soc/fsl/Kconfig  |   8 +++
->  drivers/soc/fsl/Makefile |   1 +
->  drivers/soc/fsl/guts.c   | 119 ++++++++++++++++++++++++++++++++++++++++++++
->  include/linux/fsl/guts.h | 126 +++++++++++++++++++++++++++++------------------
->  5 files changed, 207 insertions(+), 49 deletions(-)
->  create mode 100644 drivers/soc/fsl/Kconfig
->  create mode 100644 drivers/soc/fsl/guts.c
->
-> diff --git a/drivers/soc/Kconfig b/drivers/soc/Kconfig
-> index cb58ef0..7106463 100644
-> --- a/drivers/soc/Kconfig
-> +++ b/drivers/soc/Kconfig
-> @@ -2,7 +2,7 @@ menu "SOC (System On Chip) specific Drivers"
->
->  source "drivers/soc/bcm/Kconfig"
->  source "drivers/soc/brcmstb/Kconfig"
-> -source "drivers/soc/fsl/qe/Kconfig"
-> +source "drivers/soc/fsl/Kconfig"
->  source "drivers/soc/mediatek/Kconfig"
->  source "drivers/soc/qcom/Kconfig"
->  source "drivers/soc/rockchip/Kconfig"
-> diff --git a/drivers/soc/fsl/Kconfig b/drivers/soc/fsl/Kconfig
-> new file mode 100644
-> index 0000000..b313759
-> --- /dev/null
-> +++ b/drivers/soc/fsl/Kconfig
-> @@ -0,0 +1,8 @@
-> +#
-> +# Freescale SOC drivers
-> +#
+On Fri, Jul 08, 2016 at 12:35:50PM -0400, David Long wrote:
+> --- a/arch/arm64/kernel/entry.S
+> +++ b/arch/arm64/kernel/entry.S
+> @@ -243,6 +243,7 @@ tsk	.req	x28		// current thread_info
+>   * Exception vectors.
+>   */
+>  
+> +	.pushsection ".entry.text", "ax"
+>  	.align	11
+>  ENTRY(vectors)
+>  	ventry	el1_sync_invalid		// Synchronous EL1t
+> @@ -781,3 +782,5 @@ ENTRY(sys_rt_sigreturn_wrapper)
+>  	mov	x0, sp
+>  	b	sys_rt_sigreturn
+>  ENDPROC(sys_rt_sigreturn_wrapper)
 > +
-> +source "drivers/soc/fsl/qe/Kconfig"
-> +
-> +config FSL_GUTS
-> +       bool
-> diff --git a/drivers/soc/fsl/Makefile b/drivers/soc/fsl/Makefile
-> index 203307f..02afb7f 100644
-> --- a/drivers/soc/fsl/Makefile
-> +++ b/drivers/soc/fsl/Makefile
-> @@ -4,3 +4,4 @@
->
->  obj-$(CONFIG_QUICC_ENGINE)             += qe/
->  obj-$(CONFIG_CPM)                      += qe/
-> +obj-$(CONFIG_FSL_GUTS)                 += guts.o
-> diff --git a/drivers/soc/fsl/guts.c b/drivers/soc/fsl/guts.c
-> new file mode 100644
-> index 0000000..fa155e6
-> --- /dev/null
-> +++ b/drivers/soc/fsl/guts.c
-> @@ -0,0 +1,119 @@
-> +/*
-> + * Freescale QorIQ Platforms GUTS Driver
-> + *
-> + * Copyright (C) 2016 Freescale Semiconductor, Inc.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + */
-> +
-> +#include <linux/io.h>
-> +#include <linux/module.h>
+> +	.popsection
 
-Seems there was lots of discussion on this.  If it does end up being
-resent, it would be nice to get the module.h and other modular stuff
-gone since it is a bool Kconfig.
+Does the above sigreturn wrapper need to be included in the .entry.text
+section?
 
-Thanks,
-Paul.
---
-
-> +#include <linux/slab.h>
-> +#include <linux/mutex.h>
-> +#include <linux/of_address.h>
-> +#include <linux/of_platform.h>
-> +#include <linux/fsl/guts.h>
-> +
->
+-- 
+Catalin
