@@ -1,70 +1,87 @@
-From: fabio.estevam@nxp.com (Fabio Estevam)
-Date: Fri, 15 Jul 2016 10:53:02 -0300
-Subject: [PATCH] clk: imx7d: do not set the parent of IMX7D_ENET_AXI_ROOT_SRC
-Message-ID: <1468590782-8436-1-git-send-email-fabio.estevam@nxp.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 15 Jul 2016 14:55:06 +0100
+Subject: [PATCH v4 6/8] iommu/arm-smmu: Implement of_xlate() for SMMUv3
+In-Reply-To: <925b054b1e96dc83c0b1dc9607785d0346187366.1467388950.git.robin.murphy@arm.com>
+References: <cover.1467388950.git.robin.murphy@arm.com>
+ <925b054b1e96dc83c0b1dc9607785d0346187366.1467388950.git.robin.murphy@arm.com>
+Message-ID: <20160715135506.GA4687@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Booting the kernel on a imx7s-warp leads to several warnings like these:
+On Fri, Jul 01, 2016 at 05:50:15PM +0100, Robin Murphy wrote:
 
-[    0.000000] ------------[ cut here ]------------
-[    0.000000] WARNING: CPU: 0 PID: 0 at kernel/locking/lockdep.c:3536 lock_release+0x2f8/0x330
-[    0.000000] releasing a pinned lock
+[...]
 
-[    0.000000] ------------[ cut here ]------------
-[    0.000000] WARNING: CPU: 0 PID: 0 at kernel/locking/lockdep.c:2722 trace_hardirqs_on_caller+0x1ac/0x1f4
-[    0.000000] DEBUG_LOCKS_WARN_ON(unlikely(early_boot_irqs_disabled))
+> +static int arm_smmu_of_xlate(struct device *dev, struct of_phandle_args *args)
+> +{
+> +	int ret;
+> +
+> +	/* We only support PCI, for now */
+> +	if (!dev_is_pci(dev))
+> +		return -ENODEV;
 
-[    0.000000] ---[ end trace cb88537fdc8fa201 ]---
-[    0.000000] bad: scheduling from the idle thread!
-[    0.000000] CPU: 0 PID: 0 Comm: swapper/0 Tainted: G        W       4.7.0-rc7-next-20160715 #404
+Given that a) the check above is removed in a later patch and b)
+code below does not depend on SMMU v3, I think the aim should
+be to make this a core function (ie I am asking this since I will
+need it in IORT based translation and I do not want to add yet another
+*_xlate hook to iommu_op), iommu_fwspec_xlate() ?
 
-[    0.000000] ------------[ cut here ]------------
-[    0.000000] WARNING: CPU: 0 PID: 0 at kernel/time/sched_clock.c:179 sched_clock_register+0x44/0x1f8
-[    0.000000] Modules linked in:
+What I will do with my next RFC is move the iommu_fwspec out of
+OF_IOMMU code in a separate compilation unit and we will take the
+discussion from there.
 
-[    0.000591] ------------[ cut here ]------------
-[    0.000610] WARNING: CPU: 0 PID: 0 at kernel/time/sched_clock.c:179 sched_clock_register+0x44/0x1f8
+[...]
 
-[    0.002084] ------------[ cut here ]------------
-[    0.002104] WARNING: CPU: 0 PID: 0 at init/main.c:576 start_kernel+0x258/0x3b0
-[    0.002114] Interrupts were enabled early
+> +
+> +	ret = iommu_fwspec_init(dev, args->np);
+> +	if (!ret)
+> +		ret = iommu_fwspec_add_ids(dev, &args->args[0], 1);
+> +
+> +	return ret;
+> +}
+> +
+>  static struct iommu_ops arm_smmu_ops = {
+>  	.capable		= arm_smmu_capable,
+>  	.domain_alloc		= arm_smmu_domain_alloc,
+> @@ -1947,6 +1894,7 @@ static struct iommu_ops arm_smmu_ops = {
+>  	.device_group		= pci_device_group,
+>  	.domain_get_attr	= arm_smmu_domain_get_attr,
+>  	.domain_set_attr	= arm_smmu_domain_set_attr,
+> +	.of_xlate		= arm_smmu_of_xlate,
+>  	.pgsize_bitmap		= -1UL, /* Restricted during device attach */
+>  };
+>  
+> @@ -2697,6 +2645,22 @@ static void __exit arm_smmu_exit(void)
+>  subsys_initcall(arm_smmu_init);
+>  module_exit(arm_smmu_exit);
+>  
+> +static int __init arm_smmu_of_init(struct device_node *np)
+> +{
+> +	static bool registered;
+> +
+> +	if (!registered)
+> +		registered = !arm_smmu_init();
 
+We also need a static variable in arm_smmu_init() to make sure
+we do not try to execute it multiple times :( (here and
+subsys_initcall).
 
-This fix is along the same lines as 5e33ebff7edd ("clk: imx7d: do not
-set parent of ethernet time/ref clocks") and the explanation from that
-commit is:
+Thanks,
+Lorenzo
 
-"The reason for the warning is that setting the parent enables the ENET
- PLL since we are using CLK_OPS_PARENT_ENABLE. Enabling the ENET PLL can
- cause clk_pllv3_wait_lock to sleep. See also:
- commit fc8726a2c021 ("clk: core: support clocks which requires parents
- enable (part 2)")."
-
-imx7s-warp does not even use the FEC interface, so we should not really
-configure the parent of IMX7D_ENET_AXI_ROOT_SRC in the common MX7 clock
-driver code.
-
-The dts file should use the assigned-clocks/assigned-clock-parents method,
-so simply remove the configuration of IMX7D_ENET_AXI_ROOT_SRC parent.
-
-Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
----
- drivers/clk/imx/clk-imx7d.c | 2 --
- 1 file changed, 2 deletions(-)
-
-diff --git a/drivers/clk/imx/clk-imx7d.c b/drivers/clk/imx/clk-imx7d.c
-index 6ed4f8f..9257972 100644
---- a/drivers/clk/imx/clk-imx7d.c
-+++ b/drivers/clk/imx/clk-imx7d.c
-@@ -860,8 +860,6 @@ static void __init imx7d_clocks_init(struct device_node *ccm_node)
- 	/* use old gpt clk setting, gpt1 root clk must be twice as gpt counter freq */
- 	clk_set_parent(clks[IMX7D_GPT1_ROOT_SRC], clks[IMX7D_OSC_24M_CLK]);
- 
--	clk_set_parent(clks[IMX7D_ENET_AXI_ROOT_SRC], clks[IMX7D_PLL_ENET_MAIN_250M_CLK]);
--
- 	/* set uart module clock's parent clock source that must be great then 80MHz */
- 	clk_set_parent(clks[IMX7D_UART1_ROOT_SRC], clks[IMX7D_OSC_24M_CLK]);
- 
--- 
-1.9.1
+> +
+> +	if (!of_platform_device_create(np, NULL, platform_bus_type.dev_root))
+> +		return -ENODEV;
+> +
+> +	of_iommu_set_ops(np, &arm_smmu_ops);
+> +
+> +	return 0;
+> +}
+> +IOMMU_OF_DECLARE(arm_smmuv3, "arm,smmu-v3", arm_smmu_of_init);
+> +
+>  MODULE_DESCRIPTION("IOMMU API for ARM architected SMMUv3 implementations");
+>  MODULE_AUTHOR("Will Deacon <will.deacon@arm.com>");
+>  MODULE_LICENSE("GPL v2");
+> -- 
+> 2.8.1.dirty
+> 
