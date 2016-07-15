@@ -1,59 +1,107 @@
-From: megous@megous.com (=?UTF-8?Q?Ond=c5=99ej_Jirman?=)
-Date: Fri, 15 Jul 2016 15:48:45 +0200
-Subject: [PATCH v2 06/14] ARM: sun8i: clk: Add clk-factor rate application
- method
-In-Reply-To: <20160715152756.db7375a7109fed18c2fbf43a@free.fr>
-References: <20160625034511.7966-1-megous@megous.com>
- <20160625034511.7966-7-megous@megous.com> <20160630204001.GC5485@lukather>
- <0b71ed7e-98c9-109e-85e6-ceb95131d88a@megous.com>
- <20160715085356.GR4761@lukather>
- <085e185a-ac76-dd3f-9b0e-a7dc9c0c09f3@megous.com>
- <20160715152756.db7375a7109fed18c2fbf43a@free.fr>
-Message-ID: <98fd2ab2-9b1d-1494-5867-7701780fd471@megous.com>
+From: thrust73@gmail.com (Cheah Kok Cheong)
+Date: Fri, 15 Jul 2016 21:51:10 +0800
+Subject: lib/GCD.c regression on arm
+Message-ID: <20160715135109.GA2657@linux-Precision-WorkStation-T5500>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Commit fff7fb0b2d90 ("lib/GCD.c: use binary GCD algorithm instead of Euclidean")
+replaced the Euclidean algorithm totally with the Binary algorithm.
+Two variants were provided and selected via Kconfig depending on whether
+a fast __ffs (find least significant set bit) instruction is available.
+
+For arm v5 and above the fast __ffs version is used as evident in
+arch/arm/mm/Kconfig.
+
+I benchmarked the gcd performance using the code provided in the commit
+with a Cortex-A9 based Mediatek MT6577. Three runs at different settings
+were used.
+
+The performance with fast __ffs Binary algo is slower than the Euclidean
+algo. Using the non ffs version [even/odd variant] gives a comparable
+performance as the Euclidean algo.
+
+Will be interesting to see whether this is also true for other platforms
+with arm v5 and above? Hopefully others will do some testing.
+If this is the case then we should "select CPU_NO_EFFICIENT_FFS" in our
+Kconfig.
+
+Thanks.
+Best Regards,
+Cheah
+
+cross compiled with '-O2'
+
+Euclidean                 Binary with ffs           Binary no ffs
 
 
-On 15.7.2016 15:27, Jean-Francois Moine wrote:
-> On Fri, 15 Jul 2016 12:38:54 +0200
-> Ond?ej Jirman <megous@megous.com> wrote:
-> 
->>> If so, then yes, trying to switch to the 24MHz oscillator before
->>> applying the factors, and then switching back when the PLL is stable
->>> would be a nice solution.
->>>
->>> I just checked, and all the SoCs we've had so far have that
->>> possibility, so if it works, for now, I'd like to stick to that.
->>
->> It would need to be tested. U-boot does the change only once, while the
->> kernel would be doing it all the time and between various frequencies
->> and PLL settings. So the issues may show up with this solution too.
-> 
-> I don't think this is a good idea: the CPU clock may be changed at any
-> time with the CPUFreq governor. I don't see the system moving from
-> 1008MHz to 24MHz and then to 1200MHz when some computation is needed!
+gcd -r 50000 -n 10        
 
-PLL lock time is around 10-20us, I'd guess based on the number of loops
-in the PLL lock wait loop. So unless you'll be switching frequencies
-many times per second, this should be barely noticeable.
+gcd0: elapsed 25766       gcd0: elapsed 25766       gcd0: elapsed 25765
+gcd1: elapsed 19994       gcd1: elapsed 20224       gcd1: elapsed 19843
+gcd2: elapsed 20071       gcd2: elapsed 20533       gcd2: elapsed 20151
+gcd3: elapsed 20070       gcd3: elapsed 20380       gcd3: elapsed 19919
+gcd4: elapsed 20148       gcd4: elapsed 20610       gcd4: elapsed 20151
+PASS                      PASS                      PASS
+           
+gcd0: elapsed 26690       gcd0: elapsed 26612       gcd0: elapsed 24381
+gcd1: elapsed 20224       gcd1: elapsed 20379       gcd1: elapsed 19765
+gcd2: elapsed 20224       gcd2: elapsed 20304       gcd2: elapsed 19842
+gcd3: elapsed 20148       gcd3: elapsed 20302       gcd3: elapsed 19919
+gcd4: elapsed 20301       gcd4: elapsed 20302       gcd4: elapsed 19919
+PASS                      PASS                      PASS
+                                         
+gcd0: elapsed 25842       gcd0: elapsed 26459       gcd0: elapsed 25457
+gcd1: elapsed 20454       gcd1: elapsed 20532       gcd1: elapsed 20225
+gcd2: elapsed 20378       gcd2: elapsed 20762       gcd2: elapsed 20226
+gcd3: elapsed 20378       gcd3: elapsed 20378       gcd3: elapsed 20148
+gcd4: elapsed 20532       gcd4: elapsed 20918       gcd4: elapsed 20301
+PASS                      PASS                      PASS
 
-But I'd like a different solution too.
 
-> BTW, Ond?ej, in my BPi M2+, I tried to change the CPU clock with your
-> code at kernel start time from 792MHz to 1008MHz, but the hardware
-> (arisc?) set an other value, and the system speed was lower than before
-> (the PLL-CPUx register is 0x90031521 on boot, I want to set it to
-> xxxx1410 and I read 0x91031f33 - sorry, I did not have a look at the
-> CPU SD pattern). Do you know why?
+gcd -r 1000 -n 100
+                                            
+gcd0: elapsed 245873      gcd0: elapsed 252957      gcd0: elapsed 245571
+gcd1: elapsed 191290      gcd1: elapsed 198345      gcd1: elapsed 192513
+gcd2: elapsed 192672      gcd2: elapsed 199579      gcd2: elapsed 192978
+gcd3: elapsed 191366      gcd3: elapsed 198728      gcd3: elapsed 192283
+gcd4: elapsed 193134      gcd4: elapsed 200884      gcd4: elapsed 193669
+PASS                      PASS                      PASS
 
-No idea. Arisc shouldn't do anything, unless you load some firmware into
-it, and release its reset line.
+gcd0: elapsed 245180      gcd0: elapsed 251113      gcd0: elapsed 250573
+gcd1: elapsed 191755      gcd1: elapsed 196800      gcd1: elapsed 194729
+gcd2: elapsed 192286      gcd2: elapsed 198654      gcd2: elapsed 195574
+gcd3: elapsed 191601      gcd3: elapsed 197344      gcd3: elapsed 194965
+gcd4: elapsed 193135      gcd4: elapsed 200268      gcd4: elapsed 197037
+PASS                      PASS                      PASS
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160715/55a9a2db/attachment.sig>
+gcd0: elapsed 243412      gcd0: elapsed 252189      gcd0: elapsed 247876
+gcd1: elapsed 190447      gcd1: elapsed 197192      gcd1: elapsed 193355
+gcd2: elapsed 192288      gcd2: elapsed 199042      gcd2: elapsed 193437
+gcd3: elapsed 190755      gcd3: elapsed 198957      gcd3: elapsed 193660
+gcd4: elapsed 192672      gcd4: elapsed 200346      gcd4: elapsed 194586
+PASS                      PASS                      PASS
+
+
+gcd -n 1000
+
+gcd0: elapsed 2636655     gcd0: elapsed 2701340     gcd0: elapsed 2622109
+gcd1: elapsed 2055411     gcd1: elapsed 2153446     gcd1: elapsed 2053342
+gcd2: elapsed 2064420     gcd2: elapsed 2162496     gcd2: elapsed 2066503
+gcd3: elapsed 2055151     gcd3: elapsed 2163201     gcd3: elapsed 2055161
+gcd4: elapsed 2071591     gcd4: elapsed 2171636     gcd4: elapsed 2074488
+PASS                      PASS                      PASS
+
+gcd0: elapsed 2636512     gcd0: elapsed 2719436     gcd0: elapsed 2613575
+gcd1: elapsed 2060157     gcd1: elapsed 2159284     gcd1: elapsed 2046187
+gcd2: elapsed 2069242     gcd2: elapsed 2163944     gcd2: elapsed 2056430
+gcd3: elapsed 2060436     gcd3: elapsed 2166796     gcd3: elapsed 2046933
+gcd4: elapsed 2074188     gcd4: elapsed 2176243     gcd4: elapsed 2065170
+PASS                      PASS                      PASS
+
+gcd0: elapsed 2614949     gcd0: elapsed 2708342     gcd0: elapsed 2632962
+gcd1: elapsed 2044957     gcd1: elapsed 2157985     gcd1: elapsed 2055475
+gcd2: elapsed 2054496     gcd2: elapsed 2170720     gcd2: elapsed 2068926
+gcd3: elapsed 2044838     gcd3: elapsed 2167954     gcd3: elapsed 2055305
+gcd4: elapsed 2059033     gcd4: elapsed 2176002     gcd4: elapsed 2079856
+PASS                      PASS                      PASS
