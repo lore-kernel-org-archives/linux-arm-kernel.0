@@ -1,79 +1,53 @@
 From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 15 Jul 2016 13:19:13 +0100
-Subject: [PATCH 2/2] ARM: realview: Extend PBX family memory description
-In-Reply-To: <dbf8749c4af9aa5ffb85e961b7ae09ffeefa7f2a.1468583959.git.robin.murphy@arm.com>
-References: <dbf8749c4af9aa5ffb85e961b7ae09ffeefa7f2a.1468583959.git.robin.murphy@arm.com>
-Message-ID: <0acef10ce4429e372ec8c35300c6ec6d48aca7e1.1468583959.git.robin.murphy@arm.com>
+Date: Fri, 15 Jul 2016 13:19:12 +0100
+Subject: [PATCH 1/2] ARM: realview: Fix PBX-A9 cache description
+Message-ID: <dbf8749c4af9aa5ffb85e961b7ae09ffeefa7f2a.1468583959.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All three platforms sharing the later RealView Platform Baseboard memory
-map - PBX-A9, PB-A8 and PB11MPCore, provide 512MB of DDR SDRAM on the
-baseboard, of which the boot alias at 0x0 maps the first 256MB. Expand
-the size of the default memory node to refelect that, and describe the
-full memory regions in each board's DTS, but leave those commented by
-default to avoid breaking existing bootloaders.
+Clearly QEMU is very permissive in how its PL310 model may be set up,
+but the real hardware turns out to be far more particular about things
+actually being correct. Fix up the DT description so that the real
+thing actually boots:
+
+- The arm,data-latency and arm,tag-latency properties need 3 cells to
+  be valid, otherwise we end up retaining the default 8-cycle latencies
+  which leads pretty quickly to lockup.
+- The arm,dirty-latency property is only relevant to L210/L220, so get
+  rid of it.
+- The cache geometry override also leads to lockup and/or general
+  misbehaviour. Irritatingly, the manual doesn't state the actual PL310
+  configuration, but based on the boardfile code and poking registers
+  from the Boot Monitor, it would seem to be 8 sets of 16KB ways.
+
+With that, we can successfully boot to enjoy the fun of mismatched FPUs...
 
 Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 ---
- arch/arm/boot/dts/arm-realview-pba8.dts   | 8 ++++++++
- arch/arm/boot/dts/arm-realview-pbx-a9.dts | 9 +++++++++
- arch/arm/boot/dts/arm-realview-pbx.dtsi   | 4 ++--
- 3 files changed, 19 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/arm-realview-pbx-a9.dts | 9 ++++-----
+ 1 file changed, 4 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/boot/dts/arm-realview-pba8.dts b/arch/arm/boot/dts/arm-realview-pba8.dts
-index d3238c252b59..9f6c92b84f9f 100644
---- a/arch/arm/boot/dts/arm-realview-pba8.dts
-+++ b/arch/arm/boot/dts/arm-realview-pba8.dts
-@@ -40,6 +40,14 @@
- 		};
- 	};
- 
-+	/*
-+	 * Using the full 512MB of RAM will require bootloader
-+	 * changes to not load the kernel to the alias at 0x0.
-+	 */
-+	memory {
-+		/*reg = <0x70000000 0x20000000>; /* 512 MiB baseboard DDR */
-+	};
-+
- 	pmu: pmu at 0 {
- 		compatible = "arm,cortex-a8-pmu";
- 		interrupt-parent = <&intc>;
 diff --git a/arch/arm/boot/dts/arm-realview-pbx-a9.dts b/arch/arm/boot/dts/arm-realview-pbx-a9.dts
-index 90d00b407f85..9fef9188660a 100644
+index db808f92dd79..90d00b407f85 100644
 --- a/arch/arm/boot/dts/arm-realview-pbx-a9.dts
 +++ b/arch/arm/boot/dts/arm-realview-pbx-a9.dts
-@@ -60,6 +60,15 @@
- 		};
+@@ -70,13 +70,12 @@
+ 		 * associativity as these may be erroneously set
+ 		 * up by boot loader(s).
+ 		 */
+-		cache-size = <1048576>; // 1MB
+-		cache-sets = <4096>;
++		cache-size = <131072>; // 128KB
++		cache-sets = <512>;
+ 		cache-line-size = <32>;
+ 		arm,parity-disable;
+-		arm,tag-latency = <1>;
+-		arm,data-latency = <1 1>;
+-		arm,dirty-latency = <1>;
++		arm,tag-latency = <1 1 1>;
++		arm,data-latency = <1 1 1>;
  	};
  
-+	/*
-+	 * There is 1GB of RAM total, but using all of it will require
-+	 * bootloader changes to not load the kernel to the alias at 0x0.
-+	 */
-+	memory {
-+		/*reg = <0x20000000 0x20000000>, /* 512 MiB daughterboard DDR2 */
-+		/*      <0x70000000 0x20000000>; /* 512 MiB baseboard DDR */
-+	};
-+
- 	L2: l2-cache {
- 		compatible = "arm,pl310-cache";
- 		reg = <0x1f002000 0x1000>;
-diff --git a/arch/arm/boot/dts/arm-realview-pbx.dtsi b/arch/arm/boot/dts/arm-realview-pbx.dtsi
-index aeb49c4bd773..8477f667d27c 100644
---- a/arch/arm/boot/dts/arm-realview-pbx.dtsi
-+++ b/arch/arm/boot/dts/arm-realview-pbx.dtsi
-@@ -38,8 +38,8 @@
- 	};
- 
- 	memory {
--		/* 128 MiB memory @ 0x0 */
--		reg = <0x00000000 0x08000000>;
-+		/* 256 MiB alias of baseboard DDR @ 0x0 */
-+		reg = <0x00000000 0x10000000>;
- 	};
- 
- 	/* The voltage to the MMC card is hardwired at 3.3V */
+ 	scu: scu at 1f000000 {
 -- 
 2.8.1.dirty
