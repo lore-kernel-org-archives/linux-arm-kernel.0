@@ -1,70 +1,151 @@
 From: austinwc@codeaurora.org (Austin Christ)
-Date: Fri, 15 Jul 2016 14:08:40 -0600
-Subject: [PATCH v5 0/2] Add ACPI support and SMBus block read
-Message-ID: <1468613322-3219-1-git-send-email-austinwc@codeaurora.org>
+Date: Fri, 15 Jul 2016 14:08:41 -0600
+Subject: [PATCH v5 1/2] i2c: qup: add ACPI support
+In-Reply-To: <1468613322-3219-1-git-send-email-austinwc@codeaurora.org>
+References: <1468613322-3219-1-git-send-email-austinwc@codeaurora.org>
+Message-ID: <1468613322-3219-2-git-send-email-austinwc@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add ACPI support to I2C QUP driver and get properties from ACPI table.
+From: Naveen Kaje <nkaje@codeaurora.org>
 
-Add support to the I2C QUP driver to correctly handle SMBus block reads by
-checking I2C_M_RECV_LEN flag and reading the first byte received as the
-message length.
+Add support to get the device parameters from ACPI. Assume
+that the clocks are managed by firmware.
 
-Documentation for the two properites used from ACPI will be submitted through
-dsd at acpica.org to https://github.com/ahs3/dsd. The documentation submitted will
-be the following:
+Signed-off-by: Naveen Kaje <nkaje@codeaurora.org>
+Signed-off-by: Austin Christ <austinwc@codeaurora.org>
+Reviewed-by: Sricharan R <sricharan@codeaurora.org>
+---
+ drivers/i2c/busses/i2c-qup.c | 58 ++++++++++++++++++++++++++++++++------------
+ 1 file changed, 42 insertions(+), 16 deletions(-)
 
-property-set:   I2C Device Properties
-set-type:       definition
-vendor:         Qualcomm Technologies, Inc.
-bus:            acpi
-device-id:      QCOM8010
-revision:       0
-derived-from:   /Qualcomm/acpi/QCOM8010/0
-
-property:       clock-frequency
-type:           integer
-description:
-                Defines the target clock frequency of the I2C bus.
-values:
-                integer:            0..20000000
-                description:        integer value in hertz
-
-example:
-                Package (2) { "clock-frequency", 100000 }
-
-property:       src-clock-hz
-type:           integer
-description:
-                If present, defines the source clock frequency input
-                into the I2C QUP controller
-values:
-                integer:            100000..1000000000
-                description:        integer value in hertz
-example:
-                Package (2) { "src-clock-hz", 20000000}
-
-[V5]
- - remove warning and use correct ACPI function
-[V4]
- - correct error code
- - remove warning for fall back to default clock frequency
-[V3]
- - clean up unused variables
- - use constant instead of variable for smbus length field
-[V2]
- - rework the smbus block read and break into separate function
- - clean up redundant checks and variables
-
-Naveen Kaje (2):
-  i2c: qup: add ACPI support
-  i2c: qup: support SMBus block read
-
- drivers/i2c/busses/i2c-qup.c | 126 ++++++++++++++++++++++++++++++++++++-------
- 1 file changed, 107 insertions(+), 19 deletions(-)
-
---
+diff --git a/drivers/i2c/busses/i2c-qup.c b/drivers/i2c/busses/i2c-qup.c
+index dddd4da..245d0e6 100644
+--- a/drivers/i2c/busses/i2c-qup.c
++++ b/drivers/i2c/busses/i2c-qup.c
+@@ -14,6 +14,7 @@
+  *
+  */
+ 
++#include <linux/acpi.h>
+ #include <linux/atomic.h>
+ #include <linux/clk.h>
+ #include <linux/delay.h>
+@@ -132,6 +133,10 @@
+ /* Max timeout in ms for 32k bytes */
+ #define TOUT_MAX			300
+ 
++/* Default values. Use these if FW query fails */
++#define DEFAULT_CLK_FREQ 100000
++#define DEFAULT_SRC_CLK 20000000
++
+ struct qup_i2c_block {
+ 	int	count;
+ 	int	pos;
+@@ -1354,14 +1359,13 @@ static void qup_i2c_disable_clocks(struct qup_i2c_dev *qup)
+ static int qup_i2c_probe(struct platform_device *pdev)
+ {
+ 	static const int blk_sizes[] = {4, 16, 32};
+-	struct device_node *node = pdev->dev.of_node;
+ 	struct qup_i2c_dev *qup;
+ 	unsigned long one_bit_t;
+ 	struct resource *res;
+ 	u32 io_mode, hw_ver, size;
+ 	int ret, fs_div, hs_div;
+-	int src_clk_freq;
+-	u32 clk_freq = 100000;
++	u32 src_clk_freq = DEFAULT_SRC_CLK;
++	u32 clk_freq = DEFAULT_CLK_FREQ;
+ 	int blocks;
+ 
+ 	qup = devm_kzalloc(&pdev->dev, sizeof(*qup), GFP_KERNEL);
+@@ -1372,7 +1376,11 @@ static int qup_i2c_probe(struct platform_device *pdev)
+ 	init_completion(&qup->xfer);
+ 	platform_set_drvdata(pdev, qup);
+ 
+-	of_property_read_u32(node, "clock-frequency", &clk_freq);
++	ret = device_property_read_u32(qup->dev, "clock-frequency", &clk_freq);
++	if (ret) {
++		dev_notice(qup->dev, "using default clock-frequency %d",
++			DEFAULT_CLK_FREQ);
++	}
+ 
+ 	if (of_device_is_compatible(pdev->dev.of_node, "qcom,i2c-qup-v1.1.1")) {
+ 		qup->adap.algo = &qup_i2c_algo;
+@@ -1454,20 +1462,30 @@ nodma:
+ 		return qup->irq;
+ 	}
+ 
+-	qup->clk = devm_clk_get(qup->dev, "core");
+-	if (IS_ERR(qup->clk)) {
+-		dev_err(qup->dev, "Could not get core clock\n");
+-		return PTR_ERR(qup->clk);
+-	}
++	if (has_acpi_companion(qup->dev)) {
++		ret = device_property_read_u32(qup->dev,
++				"src-clock-hz", &src_clk_freq);
++		if (ret) {
++			dev_notice(qup->dev, "using default src-clock-hz %d",
++				DEFAULT_SRC_CLK);
++		}
++		ACPI_COMPANION_SET(&qup->adap.dev, ACPI_COMPANION(qup->dev));
++	} else {
++		qup->clk = devm_clk_get(qup->dev, "core");
++		if (IS_ERR(qup->clk)) {
++			dev_err(qup->dev, "Could not get core clock\n");
++			return PTR_ERR(qup->clk);
++		}
+ 
+-	qup->pclk = devm_clk_get(qup->dev, "iface");
+-	if (IS_ERR(qup->pclk)) {
+-		dev_err(qup->dev, "Could not get iface clock\n");
+-		return PTR_ERR(qup->pclk);
++		qup->pclk = devm_clk_get(qup->dev, "iface");
++		if (IS_ERR(qup->pclk)) {
++			dev_err(qup->dev, "Could not get iface clock\n");
++			return PTR_ERR(qup->pclk);
++		}
++		qup_i2c_enable_clocks(qup);
++		src_clk_freq = clk_get_rate(qup->clk);
+ 	}
+ 
+-	qup_i2c_enable_clocks(qup);
+-
+ 	/*
+ 	 * Bootloaders might leave a pending interrupt on certain QUP's,
+ 	 * so we reset the core before registering for interrupts.
+@@ -1514,7 +1532,6 @@ nodma:
+ 	size = QUP_INPUT_FIFO_SIZE(io_mode);
+ 	qup->in_fifo_sz = qup->in_blk_sz * (2 << size);
+ 
+-	src_clk_freq = clk_get_rate(qup->clk);
+ 	fs_div = ((src_clk_freq / clk_freq) / 2) - 3;
+ 	hs_div = 3;
+ 	qup->clk_ctl = (hs_div << 8) | (fs_div & 0xff);
+@@ -1639,6 +1656,14 @@ static const struct of_device_id qup_i2c_dt_match[] = {
+ };
+ MODULE_DEVICE_TABLE(of, qup_i2c_dt_match);
+ 
++#if IS_ENABLED(CONFIG_ACPI)
++static const struct acpi_device_id qup_i2c_acpi_match[] = {
++	{ "QCOM8010"},
++	{ },
++};
++MODULE_DEVICE_TABLE(acpi, qup_i2c_acpi_match);
++#endif
++
+ static struct platform_driver qup_i2c_driver = {
+ 	.probe  = qup_i2c_probe,
+ 	.remove = qup_i2c_remove,
+@@ -1646,6 +1671,7 @@ static struct platform_driver qup_i2c_driver = {
+ 		.name = "i2c_qup",
+ 		.pm = &qup_i2c_qup_pm_ops,
+ 		.of_match_table = qup_i2c_dt_match,
++		.acpi_match_table = ACPI_PTR(qup_i2c_acpi_match),
+ 	},
+ };
+ 
+-- 
 Qualcomm Datacenter Technologies as an affiliate of Qualcomm Technologies, Inc.
 Qualcomm Technologies, Inc. is a member of the
 Code Aurora Forum, a Linux Foundation Collaborative Project.
