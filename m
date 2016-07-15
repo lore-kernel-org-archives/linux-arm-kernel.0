@@ -1,30 +1,49 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 15 Jul 2016 22:42:54 +0200
-Subject: [PATCH] dt: bindings: Add a generic ethernet device binding
-In-Reply-To: <1468405204-5845-1-git-send-email-hdegoede@redhat.com>
-References: <1468405204-5845-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1788846.r3134d1VMR@wuerfel>
+Date: Fri, 15 Jul 2016 22:45:21 +0200
+Subject: [GIT PULL] Allwinner DT patches for 4.8, take 2
+In-Reply-To: <20160715105243.GA4468@lukather>
+References: <20160715105243.GA4468@lukather>
+Message-ID: <4794027.B8xcHDgPAJ@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, July 13, 2016 12:20:04 PM CEST Hans de Goede wrote:
-> +&mmc1 {
-> +       non-removable;
-> +       status = "okay";
-> +
-> +       sdio_wifi: sdio_wifi at 1 {
-> +               compatible = "generic,ethernet"
-> +               reg = <1>;
-> +       };
-> +};
+On Friday, July 15, 2016 12:52:43 PM CEST Maxime Ripard wrote:
+> Hi Arnd, Kevin, Olof,
+> 
+> Here is the final (hopefully) pull request for the Allwinner SoCs for
+> the 4.8 merge window.
+> 
+> Thanks!
+> Maxime
+> 
+> The following changes since commit d509e205d81f074a9b8d93ac80ab56405dede48b:
+> 
+>   ARM: dts: sun5i: Enable otg on the auxtex t004 (2016-07-05 08:54:33 +0200)
+> 
+> are available in the git repository at:
+> 
+>   https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-dt-for-4.8-2
+> 
+> for you to fetch changes up to 339120c5f638727a8359b054ec06ed2d66dc9b19:
+> 
+>   ARM: dts: sun8i: Add dts file for inet86dz board (2016-07-11 08:39:27 +0200)
+> 
+> ----------------------------------------------------------------
+> Allwinner DT changes for 4.8, take 2
+> 
+> Another set of changes for the 4.8 merge window, among which:
+>   - Reworking of the DT for the tablets based on Allwinner reference design
+>     and q8 designs to avoid duplication as much as possible
+>   - Renaming a DT merged in the first PR for consistency
+>   - Enable a few devices on some boards
+>   - New boards: Polaroid MID2407PXE03, inet86dz
+> 
 
-For discoverable buses, we normally use a compatible property that
-reflects the device ID on that bus, e.g. on PCI we have "pci1A2B:3C4D",
-and I think that makes more sense than having to come up with strings
-for sdio devices.
+This breaks the allmodconfig build, not pulling:
 
-In fact, Linux completely ignores the compatible strings on those
-buses (pci, usb, sdio, ...), so I think we can just do the same thing
-using no compatible string at all.
+  DTC     arch/arm/boot/dts/sun7i-a20-bananapi-m1-plus.dtb
+Error: ../arch/arm/boot/dts/sun7i-a20-bananapi-m1-plus.dts:252.1-18 Label or path usb_power_supply not found
+
+Please send a fixed pull request.
 
 	Arnd
