@@ -1,46 +1,75 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 09 Jul 2016 22:17:06 +0200
-Subject: [PATCH 4/6] irqchip: add irqchip driver for nuc900
-In-Reply-To: <57806E9F.3020407@iommu.org>
-References: <1466851042-22239-1-git-send-email-vw@iommu.org>
- <8706947.5rzUDVsB2F@wuerfel> <57806E9F.3020407@iommu.org>
-Message-ID: <7701071.Nr6sCmDkjL@wuerfel>
+Date: Fri, 15 Jul 2016 12:02:55 +0200
+Subject: [PATCH v2 02/10] irqchip: add irqchip driver for nuc900
+In-Reply-To: <CAKT61h8EkOOkDHou65Uc7NNomJ6Nowvw8o6JnWxNyc0S_=x_JA@mail.gmail.com>
+References: <1468135649-19980-1-git-send-email-vw@iommu.org>
+ <16178876.fFBuoBSjbd@wuerfel>
+ <CAKT61h8EkOOkDHou65Uc7NNomJ6Nowvw8o6JnWxNyc0S_=x_JA@mail.gmail.com>
+Message-ID: <1885052.EkH2ZADWZS@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday, July 9, 2016 11:25:19 AM CEST Wan Zongshun wrote:
-> On 2016?06?29? 23:27, Arnd Bergmann wrote:
-> > On Saturday, June 25, 2016 6:37:20 PM CEST Wan Zongshun wrote:
-> >> +#define IRQ_WDT             W90X900_IRQ(1)
-> >> +#define IRQ_WWDT    W90X900_IRQ(2)
-> >> +#define IRQ_LVD             W90X900_IRQ(3)
-> >> +#define IRQ_EXT0    W90X900_IRQ(4)
-> >> +#define IRQ_EXT1    W90X900_IRQ(5)
-> >> +#define IRQ_EXT2    W90X900_IRQ(6)
-> >> +#define IRQ_EXT3    W90X900_IRQ(7)
-> >> +#define IRQ_EXT4    W90X900_IRQ(8)
-> >> +#define IRQ_EXT5    W90X900_IRQ(9)
-> >> +#define IRQ_EXT6    W90X900_IRQ(10)
+On Friday, July 15, 2016 5:44:50 PM CEST Wan ZongShun wrote:
+> 2016-07-15 15:00 GMT+08:00 Arnd Bergmann <arnd@arndb.de>:
+> > On Friday, July 15, 2016 1:15:58 PM CEST Wan Zongshun wrote:
+> >>
+> >> Actually, I have two choice to implement this function:
+> >>
+> >> option1:
+> >>
+> >> void __exception_irq_entry aic_handle_irq(struct pt_regs *regs)
+> >> {
+> >>         u32 hwirq;
+> >>
+> >>         (void)readl(aic_base + REG_AIC_IPER);
+> >>         hwirq = readl(aic_base + REG_AIC_ISNR);
+> >>
+> >>         handle_IRQ((irq_find_mapping(aic_domain, hwirq)), regs);
+> >> }
 > >
-> > I'd suggest dropping the list, the contents are now in the dts.
+> > (side note: I think you want handle_domain_irq())
+> >
+> >> option2:
+> >>
+> >> void __exception_irq_entry aic_handle_irq(struct pt_regs *regs)
+> >> {
+> >>         u32 hwirq;
+> >>
+> >>         hwirq = readl(aic_base + REG_AIC_IPER);
+> >>         hwirq <<= 2;
+> >>
+> >>         handle_IRQ((irq_find_mapping(aic_domain, hwirq)), regs);
+> >> }
+> >>
+> >> Though the option2 do shift for hwirq, but it seems better than do io
+> >> operation by readl,so I prefer to option2, agree?
+> >
+> > That will only return an irq number that is a multiple of four, which
+> > seems wrong since the numbers are not that. Did you mean to write
+> >
+> >         hwirq = ilog2(hwirq);   ?
 > 
-> Arnd, I will drop this file later, since old w90x900 plat still need it.
+> Sorry, my fault, I mean hwirq >>= 2, bit[7:2] indicates which irq is triggering.
+> so I have to do right shift 2 for IPER value.
 
-Sure.
+Ok, got it.
 
-> but I will remove the Macros related to nuc970 and avoid nuc970 
-> interrupt using those Macro.
+> > That assumes that REG_AIC_IPER contains a 32-bit value with one single
+> > bit set to indicate which IRQ was triggered.
+> >
+> > If the difference is only in performance, you could try measuring which
+> > of the two ends up being faster.
 > 
-> But I still need hack this irqs.h like below, since here NR_IRQS defined 
-> and it is need for nuc970 irqchip driver.
-> 
-> #if !defined(CONFIG_SOC_NUC900)
-> #define NR_IRQS         (IRQ_ADC+1)
-> #else
-> #define NR_IRQS         62
-> #endif
+> It seems hard to measure. I think Do IO operation should be slower
+> than shift 2. 
 
-Have you considered using CONFIG_SPARSE_IRQ? That would avoid the need
-for setting NR_IRQS entirely, but may also require more work elsewhere.
+It depends on how fast that particular I/O path is. A lot of readl()
+operations are awfully slow, but the hardware design for the interrupt
+controller may in fact have optimized this to be reasonably fast.
+
+Another option would be to avoid the shift and just use the raw value
+of the REG_AIC_IPER register as the hwirq, with a custom map()
+callback that turns shifts the number read from the DT two bits
+so it matches the register value.
 
 	Arnd
