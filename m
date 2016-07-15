@@ -1,62 +1,45 @@
-From: mark.rutland@arm.com (Mark Rutland)
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
 Date: Fri, 15 Jul 2016 10:45:42 +0100
-Subject: [PATCH v9 3/4] perf: xgene: Add APM X-Gene SoC Performance
- Monitoring Unit driver
-In-Reply-To: <CACgAJHw7UMFKY=j8UBKUi=hNHfyzVoNMr_A5qOahhbgM+14KBQ@mail.gmail.com>
-References: <1468517266-1642-1-git-send-email-ttnguyen@apm.com>
- <1468517266-1642-4-git-send-email-ttnguyen@apm.com>
- <1468518428.8745.43.camel@perches.com>
- <CACgAJHwzWG_6iWG4OcL3v5QcUF892DwBcJxayqbH4f2kd7=kQQ@mail.gmail.com>
- <CACgAJHw7UMFKY=j8UBKUi=hNHfyzVoNMr_A5qOahhbgM+14KBQ@mail.gmail.com>
-Message-ID: <20160715094541.GE4655@leverpostej>
+Subject: [PATCH 7/8] uio: bind uio_dmem_genirq via OF
+In-Reply-To: <1468573443-4670-8-git-send-email-anup.patel@broadcom.com>
+References: <1468573443-4670-1-git-send-email-anup.patel@broadcom.com>
+ <1468573443-4670-8-git-send-email-anup.patel@broadcom.com>
+Message-ID: <20160715094542.GE1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 14, 2016 at 11:05:48AM -0700, Tai Tri Nguyen wrote:
-> Hi Joe,
-> 
-> On Thu, Jul 14, 2016 at 10:54 AM, Tai Tri Nguyen <ttnguyen@apm.com> wrote:
-> > Hi Joe,
-> >
-> > On Thu, Jul 14, 2016 at 10:47 AM, Joe Perches <joe@perches.com> wrote:
-> >> On Thu, 2016-07-14 at 10:27 -0700, Tai Nguyen wrote:
-> >>> This patch adds a driver for the SoC-wide (AKA uncore) PMU hardware
-> >>> found in APM X-Gene SoCs.
-> >>
-> >> trivia:
-> >>
-> >>> diff --git a/drivers/perf/xgene_pmu.c b/drivers/perf/xgene_pmu.c
-> >> []
-> >>> +struct xgene_pmu_dev_ctx {
-> >>> +     char *name;
-> >>> +     struct list_head next;
-> >>> +     struct xgene_pmu_dev *pmu_dev;
-> >>> +     struct hw_pmu_info inf;
-> >>> +};
-> >>
-> >> Probably better to use something like
-> >>         char    name[20];
-> >> as the kasprintf can fail and this doesn't
-> >> seem to be freed anywhere.
-> >
-> > Okay. I'll fix it shortly.
-> >
-> 
-> I take it back.
-> I refer many other drivers using kasprintf and they do the same way I do.
-> Can you please check it again?
+On Fri, Jul 15, 2016 at 02:34:02PM +0530, Anup Patel wrote:
+> +static int uio_dmem_genirq_alloc_platdata(struct platform_device *pdev)
+> +{
+> +	struct uio_dmem_genirq_pdata pdata;
+> +	u32 dma_bits, regions;
+> +	u32 sizes[MAX_UIO_MAPS];
+> +	int ret;
+> +
+> +	memset(&pdata, 0, sizeof(pdata));
+> +
+> +	ret = of_property_read_u32(pdev->dev.of_node,
+> +				   uio_of_dma_bits_prop, &dma_bits);
+> +	if (ret) {
+> +		dev_err(&pdev->dev,
+> +			"Missing property %s\n", uio_of_dma_bits_prop);
+> +		return ret;
+> +	}
+> +	if (dma_bits > 64)
+> +		dma_bits = 64;
+> +
+> +	dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(dma_bits));
 
-Joe is correct that you allocate a string with kasprintf, and this never
-gets freed, even if the driver is removed. Thus, memory may be leaked.
+You really need to check the return value from this: this function
+negotiates with the architecture, and if 64-bit DMA is not supported,
+then the call will fail and you as a driver are expected to fall back
+to 32-bit DMA only.
 
-If other drivers do the same, they are similarly wrong.
+In that case, you're expected to call the same function with a 32-bit
+mask, and if that fails, you're supposed to then decide that DMA is
+not possible.
 
-Even if this is a rare case, it's not good practice to leave allocations
-unbalanced. So please fix this.
-
-If you don't want to change the struct, another option is to use
-devm_kasprintf. However, I suspect with all the accounting data
-structures that will take up more space.
-
-Thanks,
-Mark.
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
