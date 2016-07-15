@@ -1,48 +1,109 @@
-From: davem@davemloft.net (David Miller)
-Date: Fri, 15 Jul 2016 10:51:58 -0700 (PDT)
-Subject: [PATCH] dt: bindings: Add a generic ethernet device binding
-In-Reply-To: <47a052a1-cc8b-0f75-e44a-450c4a0ac075@redhat.com>
-References: <1468405204-5845-1-git-send-email-hdegoede@redhat.com>
- <20160714.161707.2089949241813985527.davem@davemloft.net>
- <47a052a1-cc8b-0f75-e44a-450c4a0ac075@redhat.com>
-Message-ID: <20160715.105158.2028840258568316933.davem@davemloft.net>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Fri, 15 Jul 2016 19:27:04 +0100
+Subject: [PATCH v4 6/8] iommu/arm-smmu: Implement of_xlate() for SMMUv3
+In-Reply-To: <20160715135506.GA4687@red-moon>
+References: <cover.1467388950.git.robin.murphy@arm.com>
+ <925b054b1e96dc83c0b1dc9607785d0346187366.1467388950.git.robin.murphy@arm.com>
+ <20160715135506.GA4687@red-moon>
+Message-ID: <57892AF8.3020103@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Hans de Goede <hdegoede@redhat.com>
-Date: Fri, 15 Jul 2016 08:40:00 +0200
-
-> Hi,
+On 15/07/16 14:55, Lorenzo Pieralisi wrote:
+> On Fri, Jul 01, 2016 at 05:50:15PM +0100, Robin Murphy wrote:
 > 
-> On 15-07-16 01:17, David Miller wrote:
->> From: Hans de Goede <hdegoede@redhat.com>
->> Date: Wed, 13 Jul 2016 12:20:04 +0200
->>
->>> On some boards (android tablets) different batches use different sdio
->>> wifi modules. This is not a problem since sdio is a discoverable bus,
->>> so we only need to describe and activate the mmc controller in dt and
->>> then the kernel will automatically load the right driver.
->>>
->>> But sometimes it is useful to specify certain ethernet properties for
->>> these "unknown" sdio devices, specifically we want the boot-loader
->>> to be able to set "local-mac-address" as some of these sdio wifi
->>> modules come without an eeprom / without a factory programmed mac
->>> address.
->>>
->>> Since the exact device is unknown (differs per batch) we cannot use
->>> a wifi-chip specific compatible. This commit adds a new
->>> "generic,ethernet" binding for use in dt-nodes describing such an
->>> unknown ethernet device.
->>>
->>> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
->>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->>
->> Precedence exists for a "system ethernet address" as far back as the
->> original sparc device tree implementation, so please just specify it
->> that way rather than trying to force having to make an alias or
->> reference to it from a specific device.
+> [...]
 > 
-> Some boards where this is applicable have both a wired and a wireless
-> ethernet, so one global setting will not work.
+>> +static int arm_smmu_of_xlate(struct device *dev, struct of_phandle_args *args)
+>> +{
+>> +	int ret;
+>> +
+>> +	/* We only support PCI, for now */
+>> +	if (!dev_is_pci(dev))
+>> +		return -ENODEV;
+> 
+> Given that a) the check above is removed in a later patch and b)
+> code below does not depend on SMMU v3, I think the aim should
+> be to make this a core function (ie I am asking this since I will
+> need it in IORT based translation and I do not want to add yet another
+> *_xlate hook to iommu_op), iommu_fwspec_xlate() ?
 
-Then call it "eth:local-mac-address" and "wifi:local-mac-address"
+Indeed, this is only tied to OF by the current datatypes, and that's
+straightforward to change. Ultimately the purpose is just for
+firmware/bus code to pass in some words of configuration data, and the
+driver to respond with what corresponding runtime data it wants to
+associate with the device. As I suggested over on the fsl-mc discussion,
+the caller might not even really be 'firmware' at all.
+
+> What I will do with my next RFC is move the iommu_fwspec out of
+> OF_IOMMU code in a separate compilation unit and we will take the
+> discussion from there.
+
+Sounds good. If the end result starts looking clear, it might be an idea
+to squash some patches and skip this intermediate OF-specific step
+entirely (I was just hesitant to do that myself without a clear view of
+the IORT side).
+
+>> +
+>> +	ret = iommu_fwspec_init(dev, args->np);
+>> +	if (!ret)
+>> +		ret = iommu_fwspec_add_ids(dev, &args->args[0], 1);
+>> +
+>> +	return ret;
+>> +}
+>> +
+>>  static struct iommu_ops arm_smmu_ops = {
+>>  	.capable		= arm_smmu_capable,
+>>  	.domain_alloc		= arm_smmu_domain_alloc,
+>> @@ -1947,6 +1894,7 @@ static struct iommu_ops arm_smmu_ops = {
+>>  	.device_group		= pci_device_group,
+>>  	.domain_get_attr	= arm_smmu_domain_get_attr,
+>>  	.domain_set_attr	= arm_smmu_domain_set_attr,
+>> +	.of_xlate		= arm_smmu_of_xlate,
+>>  	.pgsize_bitmap		= -1UL, /* Restricted during device attach */
+>>  };
+>>  
+>> @@ -2697,6 +2645,22 @@ static void __exit arm_smmu_exit(void)
+>>  subsys_initcall(arm_smmu_init);
+>>  module_exit(arm_smmu_exit);
+>>  
+>> +static int __init arm_smmu_of_init(struct device_node *np)
+>> +{
+>> +	static bool registered;
+>> +
+>> +	if (!registered)
+>> +		registered = !arm_smmu_init();
+> 
+> We also need a static variable in arm_smmu_init() to make sure
+> we do not try to execute it multiple times :( (here and
+> subsys_initcall).
+
+Strictly, yes, although since there didn't seem to be any real issue
+with just letting the initcall fail when register_driver() detects the
+collision, I'd hoped we might be able to keep this bodge together in one
+place. I guess it might end up printing some unwanted failure message
+though, so I'll take another look.
+
+Thanks,
+Robin.
+
+> Thanks,
+> Lorenzo
+> 
+>> +
+>> +	if (!of_platform_device_create(np, NULL, platform_bus_type.dev_root))
+>> +		return -ENODEV;
+>> +
+>> +	of_iommu_set_ops(np, &arm_smmu_ops);
+>> +
+>> +	return 0;
+>> +}
+>> +IOMMU_OF_DECLARE(arm_smmuv3, "arm,smmu-v3", arm_smmu_of_init);
+>> +
+>>  MODULE_DESCRIPTION("IOMMU API for ARM architected SMMUv3 implementations");
+>>  MODULE_AUTHOR("Will Deacon <will.deacon@arm.com>");
+>>  MODULE_LICENSE("GPL v2");
+>> -- 
+>> 2.8.1.dirty
+>>
+> 
