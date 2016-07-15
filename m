@@ -1,58 +1,62 @@
-From: Joao.Pinto@synopsys.com (Joao Pinto)
-Date: Fri, 15 Jul 2016 16:10:24 +0100
-Subject: [PATCH 2/2] PCI: designware: let dw_pcie_link_up() beware of
- LTSSM training bit
-In-Reply-To: <1467802782-3024-3-git-send-email-jszhang@marvell.com>
-References: <1467802782-3024-1-git-send-email-jszhang@marvell.com>
- <1467802782-3024-3-git-send-email-jszhang@marvell.com>
-Message-ID: <2e9d2b8c-f4c3-aa6d-38be-314213db7727@synopsys.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 15 Jul 2016 16:13:15 +0100
+Subject: [PATCH v15 01/10] arm64: Add HAVE_REGS_AND_STACK_ACCESS_API
+ feature
+In-Reply-To: <5788F86B.60305@linaro.org>
+References: <1467995754-32508-1-git-send-email-dave.long@linaro.org>
+ <1467995754-32508-2-git-send-email-dave.long@linaro.org>
+ <20160715105701.GB14792@e104818-lin.cambridge.arm.com>
+ <5788F86B.60305@linaro.org>
+Message-ID: <20160715150532.GA22563@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 7/6/2016 11:59 AM, Jisheng Zhang wrote:
-> The link may be UP but still in link training. In this case, we can't
-> think the link is up and operating correctly. So we need to teach
-> dw_pcie_link_up() beware of the PCIE_PHY_DEBUG_R1_LINK_IN_TRAINING bit.
+On Fri, Jul 15, 2016 at 10:51:23AM -0400, David Long wrote:
+> On 07/15/2016 06:57 AM, Catalin Marinas wrote:
+> > On Fri, Jul 08, 2016 at 12:35:45PM -0400, David Long wrote:
+> > > --- a/arch/arm64/include/asm/ptrace.h
+> > > +++ b/arch/arm64/include/asm/ptrace.h
+> > > @@ -74,6 +74,7 @@
+> > >   #define COMPAT_PT_DATA_ADDR		0x10004
+> > >   #define COMPAT_PT_TEXT_END_ADDR		0x10008
+> > >   #ifndef __ASSEMBLY__
+> > > +#include <linux/bug.h>
+> > > 
+> > >   /* sizeof(struct user) for AArch32 */
+> > >   #define COMPAT_USER_SZ	296
+> > > @@ -119,6 +120,8 @@ struct pt_regs {
+> > >   	u64 syscallno;
+> > >   };
+> > > 
+> > > +#define MAX_REG_OFFSET offsetof(struct pt_regs, pstate)
+> > > +
+> > >   #define arch_has_single_step()	(1)
+> > > 
+> > >   #ifdef CONFIG_COMPAT
+> > > @@ -147,6 +150,55 @@ struct pt_regs {
+> > >   #define user_stack_pointer(regs) \
+> > >   	(!compat_user_mode(regs) ? (regs)->sp : (regs)->compat_sp)
+> > > 
+> > > +extern int regs_query_register_offset(const char *name);
+> > > +extern const char *regs_query_register_name(unsigned int offset);
+> > 
+> > Is regs_query_register_offset() used anywhere? I grep'ed the kernel with
+> > these patches applied but couldn't find any use.
 > 
-> This patch also rewrite PCIE_PHY_DEBUG_R1_LINK_UP definition so that
-> it's consistent with other MACROS.
-> 
-> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
-> ---
->  drivers/pci/host/pcie-designware.c | 6 ++++--
->  1 file changed, 4 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
-> index 9df879a..29e10dd 100644
-> --- a/drivers/pci/host/pcie-designware.c
-> +++ b/drivers/pci/host/pcie-designware.c
-> @@ -73,7 +73,8 @@
->  /* PCIe Port Logic registers */
->  #define PLR_OFFSET			0x700
->  #define PCIE_PHY_DEBUG_R1		(PLR_OFFSET + 0x2c)
-> -#define PCIE_PHY_DEBUG_R1_LINK_UP	0x00000010
-> +#define PCIE_PHY_DEBUG_R1_LINK_UP	(0x1 << 4)
-> +#define PCIE_PHY_DEBUG_R1_LINK_IN_TRAINING	(0x1 << 29)
+> It's referenced in kernel/trace/trace_probe.c.
 
-According to the databook bit 29 is inside a range that is dedicated to M-PCIe.
-Have you checked bit 29 state by experience?
+I meant regs_query_register_name() (vim completion wrote the first one).
 
->  
->  /* Parameters for the waiting for link up routine */
->  #define LINK_WAIT_MAX_RETRIES		10
-> @@ -417,7 +418,8 @@ int dw_pcie_link_up(struct pcie_port *pp)
->  		return pp->ops->link_up(pp);
->  
->  	val = readl(pp->dbi_base + PCIE_PHY_DEBUG_R1);
-> -	return val & PCIE_PHY_DEBUG_R1_LINK_UP;
-> +	return ((val & PCIE_PHY_DEBUG_R1_LINK_UP) &&
-> +		(!(val & PCIE_PHY_DEBUG_R1_LINK_IN_TRAINING)));
->  }
->  
->  static int dw_pcie_msi_map(struct irq_domain *domain, unsigned int irq,
+> > > +extern bool regs_within_kernel_stack(struct pt_regs *regs, unsigned long addr);
+> > 
+> > This one only seems to be used in arch/arm64/kernel/ptrace.c. Can we
+> > make it static and remove the declaration?
 > 
+> OK.
 
-Thanks,
-Joao
+I can change it locally.
+
+Are these going to be used in the future by uprobes?
+
+-- 
+Catalin
