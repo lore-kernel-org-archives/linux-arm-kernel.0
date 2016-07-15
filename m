@@ -1,50 +1,30 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Fri, 15 Jul 2016 15:07:08 +0200
-Subject: [PATCH v7 4/9] acpi/arm64: Add GTDT table parse driver
-In-Reply-To: <1809117.TV1VJp2Xpr@vostro.rjw.lan>
-References: <1468432402-4872-1-git-send-email-fu.wei@linaro.org>
- <CADyBb7tkk5DhG_1_87+BQKQfF-CSC+LgP7LE=9SmztvaFLxNyQ@mail.gmail.com>
- <1809117.TV1VJp2Xpr@vostro.rjw.lan>
-Message-ID: <5101961.eCg7ixLQWc@vostro.rjw.lan>
+From: vgoyal@redhat.com (Vivek Goyal)
+Date: Fri, 15 Jul 2016 09:03:42 -0400
+Subject: [RFC 0/3] extend kexec_file_load system call
+In-Reply-To: <20160715084925.GD1041@n2100.armlinux.org.uk>
+References: <20160712014201.11456-1-takahiro.akashi@linaro.org>
+ <5352106.oQ0Ff9gWJA@wuerfel> <20160713094127.GC14522@leverpostej>
+ <7352796.seiSnHrYPy@wuerfel>
+ <20160715084925.GD1041@n2100.armlinux.org.uk>
+Message-ID: <20160715130342.GB23514@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, July 15, 2016 02:15:27 PM Rafael J. Wysocki wrote:
-> On Friday, July 15, 2016 03:32:35 PM Fu Wei wrote:
-> > Hi Rafael,
+On Fri, Jul 15, 2016 at 09:49:25AM +0100, Russell King - ARM Linux wrote:
+> On Wed, Jul 13, 2016 at 03:13:42PM +0200, Arnd Bergmann wrote:
+> > On Wednesday, July 13, 2016 10:41:28 AM CEST Mark Rutland wrote:
+> > > The big question is whether this is a realistic case on a secure boot
+> > > system.
 > > 
-
-[cut]
-
-> > >
-> > >> +               return 0;
-> > >> +       }
-> > >> +
-> > >> +       if (!gtdt->platform_timer_count) {
-> > >> +               pr_info("No Platform Timer.\n");
-> > >> +               return 0;
-> > >> +       }
-> > >> +
-> > >> +       acpi_gtdt_desc.platform_timer_start = (void *)gtdt +
-> > >> +                                             gtdt->platform_timer_offset;
-> > >> +       if (acpi_gtdt_desc.platform_timer_start <
-> > >> +           (void *)table + sizeof(struct acpi_table_gtdt)) {
-> > >> +               pr_err(FW_BUG "Platform Timer pointer error.\n");
-> > >
-> > > Why pr_err()?
-> > 
-> > if (true), that means the GTDT table has bugs.
-> > 
+> > What does x86 do here? I assume changes to the command line are also
+> > limited.
 > 
-> And that's not a very useful piece of information unless you're debugging the
-> platform, is it?
+> They aren't.  You can specify /anything/ even with a fully-signed kernel
+> and initrd, which was one of the things I pointed out in my previous
+> set of responses.
 
-FWIW, I'm not a big fan of printing "your firmware is buggy" type of messages
-(especially at the "error" log level or higher) unless they can be clearly
-connected to a specific type of functional failure.
+Yes, kernel command line is not signed. For that matter even initird is
+not signed. Just kernel is signed and its signatures are verified. Idea
+is an unsigned code should not be able to execute in kernel space.
 
-So if you want to pring an error-level message, something like "I cannot do X
-because of the firmware bug Y" would be better IMO.
-
-Thanks,
-Rafael
+Vivek
