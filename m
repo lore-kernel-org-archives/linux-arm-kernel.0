@@ -1,241 +1,70 @@
-From: fu.wei@linaro.org (Fu Wei)
-Date: Fri, 15 Jul 2016 15:33:36 +0800
-Subject: [PATCH v7 4/9] acpi/arm64: Add GTDT table parse driver
-In-Reply-To: <CAJZ5v0hm1xkgiyPp4voUygHy_GTKqoGiA99w6EnbVQLkhF_ELA@mail.gmail.com>
-References: <1468432402-4872-1-git-send-email-fu.wei@linaro.org>
- <1468432402-4872-5-git-send-email-fu.wei@linaro.org>
- <CAJZ5v0i-1NysCiDFX4ST_uBBeYF2YNzWztgDP=u9a4S1OdpWuw@mail.gmail.com>
- <CAJZ5v0hm1xkgiyPp4voUygHy_GTKqoGiA99w6EnbVQLkhF_ELA@mail.gmail.com>
-Message-ID: <CADyBb7t8AqMuU3ABsAeD9ZaQY_khzz87p-sG+O0J7x0tnap74Q@mail.gmail.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Fri, 15 Jul 2016 09:36:30 +0200
+Subject: ARM: dts: exynos: Properly select eMMC HighSpeed mode
+In-Reply-To: <578857FD.7030601@samsung.com>
+References: <1468500458-7142-1-git-send-email-k.kozlowski@samsung.com>
+ <578857FD.7030601@samsung.com>
+Message-ID: <5788927E.2050803@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rafael,
+On 07/15/2016 05:26 AM, Alim Akhtar wrote:
+> Hi Krzysztof,
+> 
+> On 07/14/2016 06:17 PM, Krzysztof Kozlowski wrote:
+>> Exynos5410 supports eMMC version 4.41 so HS200 is the top mode which
+>> should be configured.  This is reflected in usage of
+>> "samsung,exynos5250-dw-mshc" compatible.  However DTS contained also
+>> property "mmc-hs400-1_8v" which is parsed by MMC core therefore
+>> resulting in mixed configuration.  MMC core set HS400 but dwmmc_exynos
+>> driver did not configure the data strobe for HS400 DDR mode.
+>>
+>> Removal of HS400 properties fixes semi-random mmc errors during boot:
+>>    mmc_host mmc0: Bus speed (slot 0) = 400000000Hz (slot req
+>> 200000000Hz, actual 200000000HZ div = 1)
+>>    mmc0: mmc_select_hs400 failed, error -84
+>>    mmc0: error -84 whilst initialising MMC card
+>>
+>> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>> ---
+>>   arch/arm/boot/dts/exynos5410-odroidxu.dts | 2 --
+>>   1 file changed, 2 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/exynos5410-odroidxu.dts
+>> b/arch/arm/boot/dts/exynos5410-odroidxu.dts
+>> index d9499310a301..7536164438ca 100644
+>> --- a/arch/arm/boot/dts/exynos5410-odroidxu.dts
+>> +++ b/arch/arm/boot/dts/exynos5410-odroidxu.dts
+>> @@ -447,14 +447,12 @@
+>>       samsung,dw-mshc-ciu-div = <3>;
+>>       samsung,dw-mshc-sdr-timing = <0 4>;
+>>       samsung,dw-mshc-ddr-timing = <0 2>;
+>> -    samsung,dw-mshc-hs400-timing = <0 2>;
+> not sure but can we use /delete-property/ option for this removable?
 
-On 14 July 2016 at 04:39, Rafael J. Wysocki <rafael@kernel.org> wrote:
-> On Wed, Jul 13, 2016 at 10:30 PM, Rafael J. Wysocki <rafael@kernel.org> wrote:
->> On Wed, Jul 13, 2016 at 7:53 PM,  <fu.wei@linaro.org> wrote:
->>> From: Fu Wei <fu.wei@linaro.org>
->>>
->>> This patch adds support for parsing arch timer in GTDT,
->>> provides some kernel APIs to parse all the PPIs and
->>> always-on info in GTDT and export them.
->>>
->>> By this driver, we can simplify arm_arch_timer drivers, and
->>> separate the ACPI GTDT knowledge from it.
->>>
->>> Signed-off-by: Fu Wei <fu.wei@linaro.org>
->>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
->>> ---
->>>  drivers/acpi/Kconfig           |   5 ++
->>>  drivers/acpi/Makefile          |   1 +
->>>  drivers/acpi/arm64/Kconfig     |  15 ++++
->>>  drivers/acpi/arm64/Makefile    |   1 +
->>>  drivers/acpi/arm64/acpi_gtdt.c | 170 +++++++++++++++++++++++++++++++++++++++++
->>>  include/linux/acpi.h           |   6 ++
->>>  6 files changed, 198 insertions(+)
->>>
->>> diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
->>> index b7e2e77..1cdc7d2 100644
->>> --- a/drivers/acpi/Kconfig
->>> +++ b/drivers/acpi/Kconfig
->>> @@ -521,4 +521,9 @@ config XPOWER_PMIC_OPREGION
->>>
->>>  endif
->>>
->>> +if ARM64
->>> +source "drivers/acpi/arm64/Kconfig"
->>> +
->>> +endif
->>> +
->>>  endif  # ACPI
->>> diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
->>> index 251ce85..1a94ff7 100644
->>> --- a/drivers/acpi/Makefile
->>> +++ b/drivers/acpi/Makefile
->>> @@ -99,5 +99,6 @@ obj-$(CONFIG_ACPI_EXTLOG)     += acpi_extlog.o
->>>  obj-$(CONFIG_PMIC_OPREGION)    += pmic/intel_pmic.o
->>>  obj-$(CONFIG_CRC_PMIC_OPREGION) += pmic/intel_pmic_crc.o
->>>  obj-$(CONFIG_XPOWER_PMIC_OPREGION) += pmic/intel_pmic_xpower.o
->>> +obj-$(CONFIG_ARM64)    += arm64/
->>>
->>>  video-objs                     += acpi_video.o video_detect.o
->>> diff --git a/drivers/acpi/arm64/Kconfig b/drivers/acpi/arm64/Kconfig
->>> new file mode 100644
->>> index 0000000..ff5c253
->>> --- /dev/null
->>> +++ b/drivers/acpi/arm64/Kconfig
->>> @@ -0,0 +1,15 @@
->>> +#
->>> +# ACPI Configuration for ARM64
->>> +#
->>> +
->>> +menu "The ARM64-specific ACPI Support"
->>> +
->>> +config ACPI_GTDT
->>> +       bool "ACPI GTDT table Support"
->>
->> This should depend on ARM64.
->>
->> Also I wonder if it needs to be user-selectable?  Wouldn't it be
->> better to enable it by default when building for ARM64 with ACPI?
->>
->>> +       help
->>> +         GTDT (Generic Timer Description Table) provides information
->>> +         for per-processor timers and Platform (memory-mapped) timers
->>> +         for ARM platforms. Select this option to provide information
->>> +         needed for the timers init.
->>> +
->>> +endmenu
->>> diff --git a/drivers/acpi/arm64/Makefile b/drivers/acpi/arm64/Makefile
->>> new file mode 100644
->>> index 0000000..466de6b
->>> --- /dev/null
->>> +++ b/drivers/acpi/arm64/Makefile
->>> @@ -0,0 +1 @@
->>> +obj-$(CONFIG_ACPI_GTDT)                += acpi_gtdt.o
->>> diff --git a/drivers/acpi/arm64/acpi_gtdt.c b/drivers/acpi/arm64/acpi_gtdt.c
->>> new file mode 100644
->>> index 0000000..9ee977d
->>> --- /dev/null
->>> +++ b/drivers/acpi/arm64/acpi_gtdt.c
->>> @@ -0,0 +1,170 @@
->>> +/*
->>> + * ARM Specific GTDT table Support
->>> + *
->>> + * Copyright (C) 2016, Linaro Ltd.
->>> + * Author: Daniel Lezcano <daniel.lezcano@linaro.org>
->>> + *         Fu Wei <fu.wei@linaro.org>
->>> + *         Hanjun Guo <hanjun.guo@linaro.org>
->>> + *
->>> + * This program is free software; you can redistribute it and/or modify
->>> + * it under the terms of the GNU General Public License version 2 as
->>> + * published by the Free Software Foundation.
->>> + */
->>> +
->>> +#include <linux/acpi.h>
->>> +#include <linux/init.h>
->>> +#include <linux/kernel.h>
->>> +#include <linux/module.h>
->>> +
->>> +#include <clocksource/arm_arch_timer.h>
->>> +
->>> +#undef pr_fmt
->>> +#define pr_fmt(fmt) "GTDT: " fmt
->>
->> I would add "ACPI" to the prefix too if I were you, but that's me.
->>
->>> +
->>> +typedef struct {
->>> +       struct acpi_table_gtdt *gtdt;
->>> +       void *platform_timer_start;
->>> +       void *gtdt_end;
->>> +} acpi_gtdt_desc_t;
->>> +
->>> +static acpi_gtdt_desc_t acpi_gtdt_desc __initdata;
->>> +
->>> +static inline void *next_platform_timer(void *platform_timer)
->>> +{
->>> +       struct acpi_gtdt_header *gh = platform_timer;
->>> +
->>> +       platform_timer += gh->length;
->>> +       if (platform_timer < acpi_gtdt_desc.gtdt_end)
->>> +               return platform_timer;
->>> +
->>> +       return NULL;
->>> +}
->>> +
->>> +#define for_each_platform_timer(_g)                            \
->>> +       for (_g = acpi_gtdt_desc.platform_timer_start; _g;      \
->>> +            _g = next_platform_timer(_g))
->>> +
->>> +static inline bool is_timer_block(void *platform_timer)
->>> +{
->>> +       struct acpi_gtdt_header *gh = platform_timer;
->>> +
->>> +       if (gh->type == ACPI_GTDT_TYPE_TIMER_BLOCK)
->>> +               return true;
->>> +
->>> +       return false;
->>
->> This is just too much code.  It would suffice to do
->>
->>     return gh->type == ACPI_GTDT_TYPE_TIMER_BLOCK;
->>
->>> +}
->>> +
->>> +static inline bool is_watchdog(void *platform_timer)
->>> +{
->>> +       struct acpi_gtdt_header *gh = platform_timer;
->>> +
->>> +       if (gh->type == ACPI_GTDT_TYPE_WATCHDOG)
->>> +               return true;
->>> +
->>> +       return false;
->>
->> Just like above.
->>
->>> +}
->>> +
->>> +/*
->>> + * Get some basic info from GTDT table, and init the global variables above
->>> + * for all timers initialization of Generic Timer.
->>> + * This function does some validation on GTDT table.
->>> + */
->>> +static int __init acpi_gtdt_desc_init(struct acpi_table_header *table)
->>> +{
->>> +       struct acpi_table_gtdt *gtdt = container_of(table,
->>> +                                                   struct acpi_table_gtdt,
->>> +                                                   header);
->>> +
->>> +       acpi_gtdt_desc.gtdt = gtdt;
->>> +       acpi_gtdt_desc.gtdt_end = (void *)table + table->length;
->>> +
->>> +       if (table->revision < 2) {
->>> +               pr_info("Revision:%d doesn't support Platform Timers.\n",
->>> +                       table->revision);
->>
->> Is it really useful to print this message (and the one below) at the
->> "info" level?  What about changing them to pr_debug()?
->>
->>> +               return 0;
->>> +       }
->>> +
->>> +       if (!gtdt->platform_timer_count) {
->>> +               pr_info("No Platform Timer.\n");
->>> +               return 0;
->>> +       }
->>> +
->>> +       acpi_gtdt_desc.platform_timer_start = (void *)gtdt +
->>> +                                             gtdt->platform_timer_offset;
->
-> BTW, breaking lines this way doesn't make the code particularly more readable.
->
->>> +       if (acpi_gtdt_desc.platform_timer_start <
->>> +           (void *)table + sizeof(struct acpi_table_gtdt)) {
->
-> Same here.
->
-> It might be avoided by using a local (void *) variable "start", ie.
->
->     start = (void *)gtdt + gtdt->platform_timer_offset;
->     if (start < (void *)table + sizeof(struct acpi_table_gtdt))) {
->         print message;
->         return -EINVAL;
->     }
->     acpi_gtdt_desc.platform_timer_start = start;
+No need for this. This property is set only here - in Odroid XU DTS.
 
-Pretty good idea, will do , thanks :-)
+>>       samsung,read-strobe-delay = <90>;
+> this also need to be removed.
 
->
-> Thanks,
-> Rafael
+Ah, right, thanks!
 
+>>       pinctrl-names = "default";
+>>       pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus1 &sd0_bus4 &sd0_bus8
+>> &sd0_cd>;
+>>       bus-width = <8>;
+>>       cap-mmc-highspeed;
+>>       mmc-hs200-1_8v;
+>> -    mmc-hs400-1_8v;
+> same as above if possible use /delete-property/
 
+Same, no need because this does not come from other DTS/DTSI.
 
--- 
+>>       vmmc-supply = <&ldo20_reg>;
+>>       vqmmc-supply = <&ldo11_reg>;
+>>   };
+>>
+> 
+
 Best regards,
-
-Fu Wei
-Software Engineer
-Red Hat
+Krzysztof
