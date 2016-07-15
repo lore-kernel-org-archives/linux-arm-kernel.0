@@ -1,82 +1,34 @@
-From: bsingharora@gmail.com (Balbir Singh)
-Date: Fri, 15 Jul 2016 22:55:19 +1000
-Subject: [PATCH v2 02/11] mm: Hardened usercopy
-In-Reply-To: <CAGXu5jLuQPdBH4a0BF9AgH7qQubfoz+fFW2sTi2rRxsU8u_8QQ@mail.gmail.com>
-References: <1468446964-22213-1-git-send-email-keescook@chromium.org>
- <1468446964-22213-3-git-send-email-keescook@chromium.org>
- <20160714232019.GA28254@350D>
- <1468544658.30053.26.camel@redhat.com>
- <20160715014151.GA13944@balbir.ozlabs.ibm.com>
- <CAGXu5jJy4O4tV2sB=MSkYh2DEfxUYkH4Q3ghmrHEGc6s-k285A@mail.gmail.com>
- <CAGXu5jLuQPdBH4a0BF9AgH7qQubfoz+fFW2sTi2rRxsU8u_8QQ@mail.gmail.com>
-Message-ID: <20160715125519.GA21685@350D>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 15 Jul 2016 13:56:43 +0100
+Subject: [PATCH 0/4] Qualcomm IPQ4019 Audio driver addition
+In-Reply-To: <1468566426-19598-1-git-send-email-njaigane@codeaurora.org>
+References: <1468566426-19598-1-git-send-email-njaigane@codeaurora.org>
+Message-ID: <20160715125643.GK30372@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 14, 2016 at 09:53:31PM -0700, Kees Cook wrote:
-> On Thu, Jul 14, 2016 at 9:05 PM, Kees Cook <keescook@chromium.org> wrote:
-> > On Thu, Jul 14, 2016 at 6:41 PM, Balbir Singh <bsingharora@gmail.com> wrote:
-> >> On Thu, Jul 14, 2016 at 09:04:18PM -0400, Rik van Riel wrote:
-> >>> On Fri, 2016-07-15 at 09:20 +1000, Balbir Singh wrote:
-> >>>
-> >>> > > ==
-> >>> > > +            ((unsigned long)end & (unsigned
-> >>> > > long)PAGE_MASK)))
-> >>> > > +         return NULL;
-> >>> > > +
-> >>> > > + /* Allow if start and end are inside the same compound
-> >>> > > page. */
-> >>> > > + endpage = virt_to_head_page(end);
-> >>> > > + if (likely(endpage == page))
-> >>> > > +         return NULL;
-> >>> > > +
-> >>> > > + /* Allow special areas, device memory, and sometimes
-> >>> > > kernel data. */
-> >>> > > + if (PageReserved(page) && PageReserved(endpage))
-> >>> > > +         return NULL;
-> >>> >
-> >>> > If we came here, it's likely that endpage > page, do we need to check
-> >>> > that only the first and last pages are reserved? What about the ones
-> >>> > in
-> >>> > the middle?
-> >>>
-> >>> I think this will be so rare, we can get away with just
-> >>> checking the beginning and the end.
-> >>>
-> >>
-> >> But do we want to leave a hole where an aware user space
-> >> can try a longer copy_* to avoid this check? If it is unlikely
-> >> should we just bite the bullet and do the check for the entire
-> >> range?
-> >
-> > I'd be okay with expanding the test -- it should be an extremely rare
-> > situation already since the common Reserved areas (kernel data) will
-> > have already been explicitly tested.
-> >
-> > What's the best way to do "next page"? Should it just be:
-> >
-> > for ( ; page <= endpage ; ptr += PAGE_SIZE, page = virt_to_head_page(ptr) ) {
-> >     if (!PageReserved(page))
-> >         return "<spans multiple pages>";
-> > }
-> >
-> > return NULL;
-> >
-> > ?
+On Fri, Jul 15, 2016 at 12:37:02PM +0530, njaigane at codeaurora.org wrote:
+> From: Jaiganesh Narayanan <njaigane@codeaurora.org>
 > 
-> Er, I was testing the wrong thing. How about:
+> These patches add the support for Qualcomm IPQ4019 ASoC
+> with the ALSA based audio drivers. The patches are broken
 > 
->         /*
->          * Reject if range is not Reserved (i.e. special or device memory),
->          * since then the object spans several independently allocated pages.
->          */
->         for (; ptr <= end ; ptr += PAGE_SIZE, page = virt_to_head_page(ptr)) {
->                 if (!PageReserved(page))
->                         return "<spans multiple pages>";
->         }
-> 
->         return NULL;
+> 1. Device Tree support
+> 2. Audio clock driver support
+> 3. TLMM / Pinctrl support
+> 4. ALSA based audio drivers
 
-That looks reasonable to me
-
-Balbir
+You need to completely rework how you're posting this so it can be
+reviewed, probably splitting it into separate patch serieses - please
+see SubmittingPatches for an overview of what people are expecting, and
+as I said in reply to one of the patches looking at git can also be
+helpful.  I'd suggest sending the drivers for each subsystem as a
+separate patch series, there will be some interdependency in terms of
+getting things running but not in terms of getting the patches applied.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160715/d217733d/attachment-0001.sig>
