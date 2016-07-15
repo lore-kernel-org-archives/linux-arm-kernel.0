@@ -1,86 +1,43 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Fri, 15 Jul 2016 08:54:19 +0200
-Subject: [PATCH] ARM: dts: sun6i-a31s-colorfly-e708-q1: Add full otg support
-In-Reply-To: <1468565659-17882-1-git-send-email-hdegoede@redhat.com>
-References: <1468565659-17882-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1468565659-17882-2-git-send-email-hdegoede@redhat.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 15 Jul 2016 08:55:46 +0200
+Subject: Purpose of pci_remap_iospace
+In-Reply-To: <8520D5D51A55D047800579B094147198258B92E9@XAP-PVEXMBX01.xlnx.xilinx.com>
+References: <8520D5D51A55D047800579B094147198258B85DC@XAP-PVEXMBX01.xlnx.xilinx.com>
+ <20160714145624.GB30657@red-moon>
+ <8520D5D51A55D047800579B094147198258B92E9@XAP-PVEXMBX01.xlnx.xilinx.com>
+Message-ID: <4711052.Qi2htfK0nU@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we've all the necessary bits in place we can enable
-full otg support on these tablets.
+On Friday, July 15, 2016 5:21:20 AM CEST Bharat Kumar Gogada wrote:
+> > On Thu, Jul 14, 2016 at 01:32:13PM +0000, Bharat Kumar Gogada wrote:
+> >
+> > [...]
+> >
+> > > Hi Lorenzo,
+> > >
+> > > I missed something in my device tree now I corrected it.
+> > >
+> > > ranges = <0x01000000 0x00000000 0xe0000000 0x00000000 0xe0000000 0
+> > 0x00010000   //io
+> >
+> > You have not missed anything, you changed the PCI bus address at which
+> > your host bridge responds to IO space and it must match your configuration.
+> > At what PCI bus address your host bridge maps IO space ?
+> >
+> Our host bridge does not have dedicted address space mapped for IO transactions.
+> For generation of IO transactions it requires some register read and write operations
+> in bridge logic.
+> 
+> So the above PCI address does not come in to picture also, is there alternate way to handle IO
+> Bars with our kind of hardware architecture.
 
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
- arch/arm/boot/dts/sun6i-a31s-colorfly-e708-q1.dts | 32 +++++++++++++++++------
- 1 file changed, 24 insertions(+), 8 deletions(-)
+Hisilicon has a similar thing on one of their LPC bridges, and
+Rongrong Zou has implemented something for it in the past, but I
+think it never got merged.
 
-diff --git a/arch/arm/boot/dts/sun6i-a31s-colorfly-e708-q1.dts b/arch/arm/boot/dts/sun6i-a31s-colorfly-e708-q1.dts
-index e182eec..9040bb9 100644
---- a/arch/arm/boot/dts/sun6i-a31s-colorfly-e708-q1.dts
-+++ b/arch/arm/boot/dts/sun6i-a31s-colorfly-e708-q1.dts
-@@ -106,6 +106,13 @@
- 		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
- 		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
- 	};
-+
-+	usb0_id_detect_pin: usb0_id_detect_pin at 0 {
-+		allwinner,pins = "PA15";
-+		allwinner,function = "gpio_in";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
-+	};
- };
- 
- &p2wi {
-@@ -116,6 +123,8 @@
- 		reg = <0x68>;
- 		interrupt-parent = <&nmi_intc>;
- 		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
-+		drivevbus-supply = <&reg_vcc5v0>;
-+		x-powers,drive-vbus-en;
- 	};
- };
- 
-@@ -185,24 +194,31 @@
- 	regulator-name = "vcc-pg";
- };
- 
-+&reg_drivevbus {
-+	regulator-name = "usb0-vbus";
-+	status = "okay";
-+};
-+
- &simplefb_lcd {
- 	vcc-lcd-supply = <&reg_dc1sw>;
- 	vcc-pg-supply = <&reg_dldo2>;
- };
- 
--/*
-- * FIXME for now we only support host mode and rely on u-boot to have
-- * turned on Vbus which is controlled by the axp221 pmic on the board.
-- *
-- * Once we have axp221 power-supply and vbus-usb support we should switch
-- * to fully supporting otg.
-- */
- &usb_otg {
--	dr_mode = "host";
-+	dr_mode = "otg";
-+	status = "okay";
-+};
-+
-+&usb_power_supply {
- 	status = "okay";
- };
- 
- &usbphy {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&usb0_id_detect_pin>;
-+	usb0_id_det-gpio = <&pio 0 15 GPIO_ACTIVE_HIGH>; /* PA15 */
-+	usb0_vbus_power-supply = <&usb_power_supply>;
-+	usb0_vbus-supply = <&reg_drivevbus>;
- 	usb1_vbus-supply = <&reg_dldo1>;
- 	status = "okay";
- };
--- 
-2.7.4
+https://lkml.org/lkml/2015/12/29/154 has one version of his
+proposal, not sure if that was the latest one or if something
+newer exists.
+
+	Arnd
