@@ -1,194 +1,46 @@
-From: kwangwoo.lee@sk.com (Kwangwoo Lee)
-Date: Fri, 15 Jul 2016 11:46:22 +0900
-Subject: [PATCH v3 3/3] arm64: pmem: add pmem support codes
-In-Reply-To: <1468550782-14454-1-git-send-email-kwangwoo.lee@sk.com>
-References: <1468550782-14454-1-git-send-email-kwangwoo.lee@sk.com>
-Message-ID: <1468550782-14454-4-git-send-email-kwangwoo.lee@sk.com>
+From: briannorris@chromium.org (Brian Norris)
+Date: Thu, 14 Jul 2016 20:09:00 -0700
+Subject: [PATCH] spi: rockchip: limit transfers to (64K - 1) bytes
+In-Reply-To: <b855036c-86b3-3515-86ae-24de820564ff@rock-chips.com>
+References: <1468546259-136659-1-git-send-email-briannorris@chromium.org>
+ <131afa39-4287-0fb8-61f4-146283dc7cf0@rock-chips.com>
+ <20160715023152.GA145248@google.com>
+ <b855036c-86b3-3515-86ae-24de820564ff@rock-chips.com>
+Message-ID: <20160715030859.GA3360@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support pmem on arm64 platform. The limitation of
-current implementation is that the persistency of pmem on NVDIMM
-is not guaranteed on arm64 yet.
+On Fri, Jul 15, 2016 at 10:42:55AM +0800, Shawn Lin wrote:
+> ? 2016/7/15 10:31, Brian Norris ??:
+> >So maybe there's a driver bug in the PIO path that gives us an
+> >off-by-one error. I poked around a bit and couldn't figure out anything,
+> >so I sent this. Technically, this patch is still valid (even if not
+> >optimal) for the DMA case too...
+> 
+> Huibing is using pio to test this case, and we still achieve it
+> successfully?
 
-pmem driver expects that the persistency need to be guaranteed in
-arch_wmb_pmem(), but the PoP(Point of Persistency) is going to be
-supported on ARMv8.2 with DC CVAP instruction. Until then,
-__arch_has_wmb_pmem() will return false and shows warning message.
+Are you saying Huibing has tested PIO with 64KB transfers, or is that a
+question? If the former, it'd be great if he can publish the differences
+between his kernel and upstream to produce this.
 
-[    6.250487] nd_pmem namespace0.0: unable to guarantee persistence of writes
-[    6.305000] pmem0: detected capacity change from 0 to 1073741824
-...
-[   29.215249] EXT4-fs (pmem0): DAX enabled. Warning: EXPERIMENTAL, use at your own risk
-[   29.308960] EXT4-fs (pmem0): mounted filesystem with ordered data mode. Opts: dax
+> That means there may be some minor diff for the pio
+> path between your chromium repo and my local branch.
 
-Signed-off-by: Kwangwoo Lee <kwangwoo.lee@sk.com>
----
- arch/arm64/Kconfig            |   1 +
- arch/arm64/include/asm/pmem.h | 143 ++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 144 insertions(+)
- create mode 100644 arch/arm64/include/asm/pmem.h
+This is an upstream kernel mailing list. I'd expect we can agree to test
+on an upstream kernel...
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 12546ce..e14fd31 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -16,6 +16,7 @@ config ARM64
- 	select ARCH_WANT_FRAME_POINTERS
- 	select ARCH_HAS_UBSAN_SANITIZE_ALL
- 	select ARCH_HAS_MMIO_FLUSH
-+	select ARCH_HAS_PMEM_API
- 	select ARM_AMBA
- 	select ARM_ARCH_TIMER
- 	select ARM_GIC
-diff --git a/arch/arm64/include/asm/pmem.h b/arch/arm64/include/asm/pmem.h
-new file mode 100644
-index 0000000..0bcfd87
---- /dev/null
-+++ b/arch/arm64/include/asm/pmem.h
-@@ -0,0 +1,143 @@
-+/*
-+ * Based on arch/x86/include/asm/pmem.h
-+ *
-+ * Copyright(c) 2016 SK hynix Inc. Kwangwoo Lee <kwangwoo.lee@sk.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of version 2 of the GNU General Public License as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful, but
-+ * WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-+ * General Public License for more details.
-+ */
-+#ifndef __ASM_PMEM_H__
-+#define __ASM_PMEM_H__
-+
-+#ifdef CONFIG_ARCH_HAS_PMEM_API
-+#include <linux/uaccess.h>
-+#include <asm/cacheflush.h>
-+
-+/**
-+ * arch_memcpy_to_pmem - copy data to persistent memory
-+ * @dst: destination buffer for the copy
-+ * @src: source buffer for the copy
-+ * @n: length of the copy in bytes
-+ *
-+ * Copy data to persistent memory media. if ARCH_HAS_PMEM_API is defined,
-+ * then MEMREMAP_WB is used to memremap() during probe. A subsequent
-+ * arch_wmb_pmem() need to guarantee durability.
-+ */
-+static inline void arch_memcpy_to_pmem(void __pmem *dst, const void *src,
-+		size_t n)
-+{
-+	memcpy((void __force *) dst, src, n);
-+	__flush_dcache_area(dst, n);
-+}
-+
-+static inline int arch_memcpy_from_pmem(void *dst, const void __pmem *src,
-+		size_t n)
-+{
-+	memcpy(dst, (void __force *) src, n);
-+	return 0;
-+}
-+
-+/**
-+ * arch_wmb_pmem - synchronize writes to persistent memory
-+ *
-+ * After a series of arch_memcpy_to_pmem() operations this need to be called to
-+ * ensure that written data is durable on persistent memory media.
-+ */
-+static inline void arch_wmb_pmem(void)
-+{
-+	/* pmem writes has been done in arch_memcpy_to_pmem() */
-+	wmb();
-+
-+	/*
-+	 * ARMv8.2 will support DC CVAP to ensure Point-of-Persistency and here
-+	 * is the point for the API like __clean_dcache_area_pop().
-+	 */
-+}
-+
-+/**
-+ * arch_wb_cache_pmem - write back a cache range
-+ * @vaddr:	virtual start address
-+ * @size:	number of bytes to write back
-+ *
-+ * Write back a cache range. Leave data in cache for performance of next access.
-+ * This function requires explicit ordering with an arch_wmb_pmem() call.
-+ */
-+static inline void arch_wb_cache_pmem(void __pmem *addr, size_t size)
-+{
-+	/*
-+	 * Just clean cache to PoC. The data in cache is remained to use the
-+	 * next access. arch_wmb_pmem() need to be the point to ensure the
-+	 * persistency under the current implementation.
-+	 */
-+	__clean_dcache_area(addr, size);
-+}
-+
-+/**
-+ * arch_copy_from_iter_pmem - copy data from an iterator to PMEM
-+ * @addr:	PMEM destination address
-+ * @bytes:	number of bytes to copy
-+ * @i:		iterator with source data
-+ *
-+ * Copy data from the iterator 'i' to the PMEM buffer starting at 'addr'.
-+ * This function requires explicit ordering with an arch_wmb_pmem() call.
-+ */
-+static inline size_t arch_copy_from_iter_pmem(void __pmem *addr, size_t bytes,
-+		struct iov_iter *i)
-+{
-+	void *vaddr = (void __force *)addr;
-+	size_t len;
-+
-+	/*
-+	 * ARCH_HAS_NOCACHE_UACCESS is not defined and the default mapping is
-+	 * MEMREMAP_WB. Instead of using copy_from_iter_nocache(), use cacheable
-+	 * version and call arch_wb_cache_pmem().
-+	 */
-+	len = copy_from_iter(vaddr, bytes, i);
-+
-+	arch_wb_cache_pmem(addr, bytes);
-+
-+	return len;
-+}
-+
-+/**
-+ * arch_clear_pmem - zero a PMEM memory range
-+ * @addr:	virtual start address
-+ * @size:	number of bytes to zero
-+ *
-+ * Write zeros into the memory range starting at 'addr' for 'size' bytes.
-+ * This function requires explicit ordering with an arch_wmb_pmem() call.
-+ */
-+static inline void arch_clear_pmem(void __pmem *addr, size_t size)
-+{
-+	void *vaddr = (void __force *)addr;
-+
-+	memset(vaddr, 0, size);
-+	arch_wb_cache_pmem(addr, size);
-+}
-+
-+/**
-+ * arch_invalidate_pmem - invalidate a PMEM memory range
-+ * @addr:	virtual start address
-+ * @size:	number of bytes to zero
-+ *
-+ * After finishing ARS(Address Range Scrubbing), clean and invalidate the
-+ * address range.
-+ */
-+static inline void arch_invalidate_pmem(void __pmem *addr, size_t size)
-+{
-+	__flush_dcache_area(addr, size);
-+}
-+
-+static inline bool __arch_has_wmb_pmem(void)
-+{
-+	/* return false until arch_wmb_pmem() guarantee PoP on ARMv8.2. */
-+	return false;
-+}
-+#endif /* CONFIG_ARCH_HAS_PMEM_API */
-+#endif /* __ASM_PMEM_H__ */
--- 
-2.5.0
+> >want to unnecessarily limit the DMA case, then a last resort hack could
+> >be to say:
+> >
+> 
+> Could you get spi-rockchip.c of rockchip local kernel 4.4 from Caesar
+> to see if you could transfer 64KB with the one we're using?
+
+I just compared with some (possibly old) copy of your vendor-kernel
+driver, and there are a few moderate differences. I didn't test it yet.
+I'd think the onus is on you to publish your changes though, if you
+think you've fixed things in your own private tree...but I'm willing to
+test any changes you recommend.
+
+Brian
