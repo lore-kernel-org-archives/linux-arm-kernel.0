@@ -1,56 +1,29 @@
-From: dave.long@linaro.org (David Long)
-Date: Fri, 15 Jul 2016 10:51:23 -0400
-Subject: [PATCH v15 01/10] arm64: Add HAVE_REGS_AND_STACK_ACCESS_API
- feature
-In-Reply-To: <20160715105701.GB14792@e104818-lin.cambridge.arm.com>
-References: <1467995754-32508-1-git-send-email-dave.long@linaro.org>
- <1467995754-32508-2-git-send-email-dave.long@linaro.org>
- <20160715105701.GB14792@e104818-lin.cambridge.arm.com>
-Message-ID: <5788F86B.60305@linaro.org>
+From: matt@codeblueprint.co.uk (Matt Fleming)
+Date: Fri, 15 Jul 2016 16:05:53 +0100
+Subject: [PATCH v2 1/2] efi: esrt: use memremap not ioremap to access
+ ESRT table in memory
+In-Reply-To: <1468263646-28184-2-git-send-email-ard.biesheuvel@linaro.org>
+References: <1468263646-28184-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1468263646-28184-2-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20160715150553.GD2406@codeblueprint.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/15/2016 06:57 AM, Catalin Marinas wrote:
-> On Fri, Jul 08, 2016 at 12:35:45PM -0400, David Long wrote:
->> --- a/arch/arm64/include/asm/ptrace.h
->> +++ b/arch/arm64/include/asm/ptrace.h
->> @@ -74,6 +74,7 @@
->>   #define COMPAT_PT_DATA_ADDR		0x10004
->>   #define COMPAT_PT_TEXT_END_ADDR		0x10008
->>   #ifndef __ASSEMBLY__
->> +#include <linux/bug.h>
->>
->>   /* sizeof(struct user) for AArch32 */
->>   #define COMPAT_USER_SZ	296
->> @@ -119,6 +120,8 @@ struct pt_regs {
->>   	u64 syscallno;
->>   };
->>
->> +#define MAX_REG_OFFSET offsetof(struct pt_regs, pstate)
->> +
->>   #define arch_has_single_step()	(1)
->>
->>   #ifdef CONFIG_COMPAT
->> @@ -147,6 +150,55 @@ struct pt_regs {
->>   #define user_stack_pointer(regs) \
->>   	(!compat_user_mode(regs) ? (regs)->sp : (regs)->compat_sp)
->>
->> +extern int regs_query_register_offset(const char *name);
->> +extern const char *regs_query_register_name(unsigned int offset);
->
-> Is regs_query_register_offset() used anywhere? I grep'ed the kernel with
-> these patches applied but couldn't find any use.
->
+On Mon, 11 Jul, at 09:00:45PM, Ard Biesheuvel wrote:
+> On ARM and arm64, ioremap() and memremap() are not interchangeable like
+> on x86, and the use of ioremap() on ordinary RAM is typically flagged
+> as an error if the memory region being mapped is also covered by the
+> linear mapping, since that would lead to aliases with conflicting
+> cacheability attributes.
+> 
+> Since what we are dealing with is not an I/O region with side effects,
+> using ioremap() here is arguably incorrect anyway, so let's replace
+> it with memremap() instead.
+> 
+> Acked-by: Peter Jones <pjones@redhat.com>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  drivers/firmware/efi/esrt.c | 5 +++--
+>  1 file changed, 3 insertions(+), 2 deletions(-)
 
-It's referenced in kernel/trace/trace_probe.c.
-
->> +extern bool regs_within_kernel_stack(struct pt_regs *regs, unsigned long addr);
->
-> This one only seems to be used in arch/arm64/kernel/ptrace.c. Can we
-> make it static and remove the declaration?
->
-
-OK.
-
-Thanks,
--dl
+Looks sensible, thanks Ard, applied.
