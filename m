@@ -1,63 +1,43 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Fri, 15 Jul 2016 11:26:57 +0200
-Subject: outdated documentation for lp5523 LED driver?
-In-Reply-To: <20160715090110.GF29844@pali>
-References: <20160715073214.GC13429@amd> <20160715074052.GE29844@pali>
- <20160715085425.GA21257@amd> <20160715090110.GF29844@pali>
-Message-ID: <20160715092657.GA25380@amd>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Fri, 15 Jul 2016 11:26:53 +0200
+Subject: [PATCH] drm: mediatek: add Maintainers entry for Mediatek DRM
+ drivers
+In-Reply-To: <1468561924-45582-1-git-send-email-ck.hu@mediatek.com>
+References: <1468561924-45582-1-git-send-email-ck.hu@mediatek.com>
+Message-ID: <1468574813.7213.4.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri 2016-07-15 11:01:10, Pali Roh?r wrote:
-> On Friday 15 July 2016 10:54:25 Pavel Machek wrote:
-> > On Fri 2016-07-15 09:40:52, Pali Roh?r wrote:
-> > > On Friday 15 July 2016 09:32:14 Pavel Machek wrote:
-> > > > Hi!
-> > > > 
-> > > > Documentation says that load/leds are only visible in the load mode,
-> > > > but that does not seem to be true (kernel 4.4.0 on N900).
-> > > > 
-> > > > # 1) Legacy interface - enginex_mode, enginex_load and enginex_leds
-> > > > #  Control interface for the engines:
-> > > > #    x is 1 .. 3
-> > > > #      enginex_mode : disabled, load, run
-> > > > #      enginex_load : microcode load (visible only in load mode)
-> > > > #      enginex_leds : led mux control (visible only in load mode)
-> > > > 
-> > > > pavel at n900:/sys/class/leds/lp5523:r/device$ ls -al engine*
-> > > > -rw-r--r-- 1 root root 4096 Jul  6 22:47 engine1_leds
-> > > > --w------- 1 root root 4096 Jul  6 22:47 engine1_load
-> > > > -rw-r--r-- 1 root root 4096 Jul  6 23:41 engine1_mode
-> > > > -rw-r--r-- 1 root root 4096 Jul  6 22:47 engine2_leds
-> > > > --w------- 1 root root 4096 Jul  6 22:47 engine2_load
-> > > > -rw-r--r-- 1 root root 4096 Jul  6 23:41 engine2_mode
-> > > > -rw-r--r-- 1 root root 4096 Jul  6 22:47 engine3_leds
-> > > > --w------- 1 root root 4096 Jul  6 22:47 engine3_load
-> > > > -rw-r--r-- 1 root root 4096 Jul  6 22:47 engine3_mode
-> > > > pavel at n900:/sys/class/leds/lp5523:r/device$ grep . engine*mode
-> > > > engine1_mode:run
-> > > > engine2_mode:load
-> > > > engine3_mode:run
-> > > > pavel at n900:/sys/class/leds/lp5523:r/device$
-> > > 
-> > > On 2.6.28 kernel is present only legacy interface and for this version
-> > > is above documentation correct. When engine is in "run" or "disabled",
-> > > then sysfs nodes _load and _leds are invisible.
-> > 
-> > Well, I don't think 2.6.28 is suitable kernel to compare
-> > against... and I don't think hiding sysfs attributes makes any sense.
+Am Freitag, den 15.07.2016, 13:52 +0800 schrieb CK Hu:
+> Add CK Hu and Philipp Zabel as maintainers for Mediatek DRM drivers.
 > 
-> It is legacy interface which was used in older kernels (like 2.6.28) and
-> is there to not break existing applications... So comparing with kernel
-> when that interface was not legacy is correct way to check...
+> Signed-off-by: CK Hu <ck.hu@mediatek.com>
 
-Well, not breaking legacy applications is only goal after reasonable
-interface is merged to mainline.
+Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
 
-Can you test if they actually care about the change or not? I suspect
-they don't.
+> ---
+>  MAINTAINERS |    8 ++++++++
+>  1 file changed, 8 insertions(+)
+> 
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index 7304d2e..2a04cdc 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -3973,6 +3973,14 @@ S:	Orphan / Obsolete
+>  F:	drivers/gpu/drm/i810/
+>  F:	include/uapi/drm/i810_drm.h
+>  
+> +DRM DRIVERS FOR MEDIATEK
+> +M:	CK Hu <ck.hu@mediatek.com>
+> +M:	Philipp Zabel <p.zabel@pengutronix.de>
+> +L:	dri-devel at lists.freedesktop.org
+> +S:	Supported
+> +F:	drivers/gpu/drm/mediatek/
+> +F:	Documentation/devicetree/bindings/display/mediatek/
+> +
+>  DRM DRIVER FOR MSM ADRENO GPU
+>  M:	Rob Clark <robdclark@gmail.com>
+>  L:	linux-arm-msm at vger.kernel.org
 
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+regards
+Philipp
