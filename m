@@ -1,33 +1,71 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Fri, 15 Jul 2016 17:16:55 -0500
-Subject: [PATCH v3 0/3] pci: Aardvark PCIe controller driver for Marvell
- Armada 3700
-In-Reply-To: <20160707224403.3279d807@free-electrons.com>
-References: <1467279152-5717-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20160707224403.3279d807@free-electrons.com>
-Message-ID: <20160715221655.GD1706@localhost>
+From: paul.gortmaker@windriver.com (Paul Gortmaker)
+Date: Fri, 15 Jul 2016 18:39:33 -0400
+Subject: [v10, 3/7] soc: fsl: add GUTS driver for QorIQ platforms
+In-Reply-To: <1468609977.25630.5.camel@buserror.net>
+References: <1462417950-46796-1-git-send-email-yangbo.lu@nxp.com>
+ <1462417950-46796-4-git-send-email-yangbo.lu@nxp.com>
+ <CAP=VYLqsV_M=8CM47k4kzdULCp_y0yP9t8Sq9=jFp6W593QJgw@mail.gmail.com>
+ <1468609977.25630.5.camel@buserror.net>
+Message-ID: <20160715223932.GC10758@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 07, 2016 at 10:44:03PM +0200, Thomas Petazzoni wrote:
-> Hello Bjorn,
-> 
-> On Thu, 30 Jun 2016 11:32:29 +0200, Thomas Petazzoni wrote:
-> 
-> > This is the third iteration of the patch series that adds a PCIe
-> > controller driver for the Aardvark PCI controller, which is used on
-> > Marvell Armada 3700.
-> 
-> Have you had the chance to look into this third iteration, which
-> hopefully integrates the feedback you made during your review of the
-> second version?
-> 
-> I was hoping to get this in time for 4.8, so if you have any comments,
-> do not hesitate to let me know so that I can address them.
+[Re: [v10, 3/7] soc: fsl: add GUTS driver for QorIQ platforms] On 15/07/2016 (Fri 14:12) Scott Wood wrote:
 
-Hi Thomas, I just returned from vacation, so I haven't looked at this
-yet.  Sounds like we'll have a bonus week before v4.7 and I was
-planning to do two pull requests anyway because of my vacation, so
-there should still be time.
+> On Fri, 2016-07-15 at 12:43 -0400, Paul Gortmaker wrote:
+> > > +source "drivers/soc/fsl/qe/Kconfig"
 
-Bjorn
+[...]
+
+> > > +
+> > > +config FSL_GUTS
+> > > +???????bool
+> > > diff --git a/drivers/soc/fsl/Makefile b/drivers/soc/fsl/Makefile
+> > > index 203307f..02afb7f 100644
+> > > --- a/drivers/soc/fsl/Makefile
+> > > +++ b/drivers/soc/fsl/Makefile
+> > > @@ -4,3 +4,4 @@
+> > > 
+> > > ?obj-$(CONFIG_QUICC_ENGINE)?????????????+= qe/
+> > > ?obj-$(CONFIG_CPM)??????????????????????+= qe/
+> > > +obj-$(CONFIG_FSL_GUTS)?????????????????+= guts.o
+> > > diff --git a/drivers/soc/fsl/guts.c b/drivers/soc/fsl/guts.c
+> > > new file mode 100644
+> > > index 0000000..fa155e6
+> > > --- /dev/null
+> > > +++ b/drivers/soc/fsl/guts.c
+> > > @@ -0,0 +1,119 @@
+> > > +/*
+> > > + * Freescale QorIQ Platforms GUTS Driver
+> > > + *
+> > > + * Copyright (C) 2016 Freescale Semiconductor, Inc.
+> > > + *
+> > > + * This program is free software; you can redistribute it and/or modify
+> > > + * it under the terms of the GNU General Public License as published by
+> > > + * the Free Software Foundation; either version 2 of the License, or
+> > > + * (at your option) any later version.
+> > > + */
+> > > +
+> > > +#include <linux/io.h>
+> > > +#include <linux/module.h>
+> > Seems there was lots of discussion on this.??If it does end up being
+> > resent, it would be nice to get the module.h and other modular stuff
+> > gone since it is a bool Kconfig.
+> 
+> I plan to resend just the GUTS driver portion and send it through the PPC
+> tree.
+> 
+> I don't see any modular stuff in there besides the linux/module.h include.
+
+Great.  Normally I'm seeing the MODULE_DEVICE_TABLE and MODULE_AUTHOR
+and MODULE_LICENSE etc, so it has (unfortunately) become a knee jerk
+reaction to assume the latter follows a module.h presence...  thanks for
+removing the extraneous include.
+
+Paul.
+--
+
+> 
+> -Scott
+> 
+> 
