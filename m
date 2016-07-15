@@ -1,74 +1,55 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 15 Jul 2016 10:33:44 +0100
-Subject: [PATCH v9 10/17] KVM: arm64: introduce new KVM ITS device
-In-Reply-To: <57874F1E.3000202@arm.com>
-References: <20160713015909.28793-1-andre.przywara@arm.com>
- <20160713015909.28793-11-andre.przywara@arm.com> <57874F1E.3000202@arm.com>
-Message-ID: <68082207-2b52-e825-cfe3-cb97cbe94186@arm.com>
+From: ralf@ramses-pyramidenbau.de (Ralf Ramsauer)
+Date: Fri, 15 Jul 2016 11:37:30 +0200
+Subject: [PATCH] ARM: tegra: fix erroneous address in dts
+In-Reply-To: <20160714220218.GB4205@mithrandir.ba.sec>
+References: <1468514937-23250-1-git-send-email-ralf@ramses-pyramidenbau.de>
+ <20160714220218.GB4205@mithrandir.ba.sec>
+Message-ID: <8a8ccb29-ba73-f29f-2b57-5c1d91e13bf7@ramses-pyramidenbau.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 14/07/16 09:36, Marc Zyngier wrote:
-> On 13/07/16 02:59, Andre Przywara wrote:
-
-....
-
->> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
->> index 06ad94d..393ad3a 100644
->> --- a/virt/kvm/arm/vgic/vgic-its.c
->> +++ b/virt/kvm/arm/vgic/vgic-its.c
-
-...
-
->> +static int vgic_its_set_attr(struct kvm_device *dev,
->> +			     struct kvm_device_attr *attr)
->> +{
->> +	struct vgic_its *its = dev->private;
->> +	int ret;
->> +
->> +	switch (attr->group) {
->> +	case KVM_DEV_ARM_VGIC_GRP_ADDR: {
->> +		u64 __user *uaddr = (u64 __user *)(long)attr->addr;
->> +		unsigned long type = (unsigned long)attr->attr;
->> +		u64 addr;
->> +
->> +		if (type != KVM_VGIC_ITS_ADDR_TYPE)
->> +			return -ENODEV;
->> +
->> +		if (its->initialized)
->> +			return -EBUSY;
->> +
->> +		if (copy_from_user(&addr, uaddr, sizeof(addr)))
->> +			return -EFAULT;
->> +
->> +		ret = vgic_check_ioaddr(dev->kvm, &its->vgic_its_base,
->> +					addr, SZ_64K);
+On 07/15/2016 12:02 AM, Thierry Reding wrote:
+> On Thu, Jul 14, 2016 at 06:48:57PM +0200, Ralf Ramsauer wrote:
+>> c90bb7b enabled the high speed UARTs of the Jetson TK1. The address
+>> specification inside the dts is wrong. Fix it and use the correct
+>> address.
+>>
+>> Fixes: c90bb7b9b9 ("ARM: tegra: Add high speed UARTs to Jetson TK1 device tree")
+>> Signed-off-by: Ralf Ramsauer <ralf@ramses-pyramidenbau.de>
+>> ---
+>>  arch/arm/boot/dts/tegra124-jetson-tk1.dts | 4 ++--
+>>  1 file changed, 2 insertions(+), 2 deletions(-)
 > 
-> Shouldn't that be the ITS size (128kB)?
+> These addresses are correct. The 0, prefix was dropped from the unit
+> address in commit b5896f67ab3c ("ARM: tegra: Remove commas from unit
+> addresses on Tegra124").
+> 
+> What's the problem that you're seeing? What's not working for you?
+I cannot find b5896f67ab3c neither in swarren's tree nor in linux
+upstream. But there's d0bc5aaf890 in swarren's linux-tegra tree that
+matches your described changes and was committed on 1st of July. But
+this patch is not upstream yet, while the other patch is.
 
-No, this is the alignment requirement. See here:
+Have a look at mainline tegra124-jetson-tk1.dts, there the addresses are
+erroneous as they still use the 0, annotation. And I just realised, that
+somehow, upstream patch c90bb7b slightly differs from my initial patch
+[1] on the mailing list.
 
-...
+  Ralf
 
->> diff --git a/virt/kvm/arm/vgic/vgic-kvm-device.c b/virt/kvm/arm/vgic/vgic-kvm-device.c
->> index 2f24f13..1813f93 100644
->> --- a/virt/kvm/arm/vgic/vgic-kvm-device.c
->> +++ b/virt/kvm/arm/vgic/vgic-kvm-device.c
->> @@ -21,8 +21,8 @@
->>  
->>  /* common helpers */
->>  
->> -static int vgic_check_ioaddr(struct kvm *kvm, phys_addr_t *ioaddr,
->> -			     phys_addr_t addr, phys_addr_t alignment)
->> +int vgic_check_ioaddr(struct kvm *kvm, phys_addr_t *ioaddr,
->> +		      phys_addr_t addr, phys_addr_t alignment)
->>  {
->>  	if (addr & ~KVM_PHYS_MASK)
->>  		return -E2BIG;
+[1] http://permalink.gmane.org/gmane.linux.ports.tegra/24779
+> 
+> Thierry
+> 
 
-Fixed the rest.
+-- 
+Ralf Ramsauer
+PGP: 0x8F10049B
 
-Cheers,
-Andre.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160715/dbf98a2c/attachment.sig>
