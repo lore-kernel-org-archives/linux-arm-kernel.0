@@ -1,71 +1,55 @@
-From: megous@megous.com (=?UTF-8?Q?Ond=c5=99ej_Jirman?=)
-Date: Fri, 15 Jul 2016 18:33:45 +0200
-Subject: [linux-sunxi] Re: [PATCH v2 06/14] ARM: sun8i: clk: Add
- clk-factor rate application method
-In-Reply-To: <CAOMqctTds7adsfvehfv8wcxbb0NOpEQE5wRff6NwfPOUa3SbRw@mail.gmail.com>
-References: <20160625034511.7966-1-megous@megous.com>
- <20160625034511.7966-7-megous@megous.com> <20160630204001.GC5485@lukather>
- <0b71ed7e-98c9-109e-85e6-ceb95131d88a@megous.com>
- <20160715085356.GR4761@lukather>
- <085e185a-ac76-dd3f-9b0e-a7dc9c0c09f3@megous.com>
- <20160715152756.db7375a7109fed18c2fbf43a@free.fr>
- <98fd2ab2-9b1d-1494-5867-7701780fd471@megous.com>
- <CAOMqctTds7adsfvehfv8wcxbb0NOpEQE5wRff6NwfPOUa3SbRw@mail.gmail.com>
-Message-ID: <abf2f8c1-adb6-ed75-5958-324bb4b4e1e1@megous.com>
+From: austinwc@codeaurora.org (Austin Christ)
+Date: Fri, 15 Jul 2016 10:41:31 -0600
+Subject: [PATCH] efi: capsule: allocate whole capsule into virtual memory
+Message-ID: <1468600891-15794-1-git-send-email-austinwc@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15.7.2016 16:22, Michal Suchanek wrote:
-> Hello,
-> 
-> On 15 July 2016 at 15:48, Ond?ej Jirman <megous@megous.com> wrote:
->>
->>
->> On 15.7.2016 15:27, Jean-Francois Moine wrote:
->>> On Fri, 15 Jul 2016 12:38:54 +0200
->>> Ond?ej Jirman <megous@megous.com> wrote:
->>>
->>>>> If so, then yes, trying to switch to the 24MHz oscillator before
->>>>> applying the factors, and then switching back when the PLL is stable
->>>>> would be a nice solution.
->>>>>
->>>>> I just checked, and all the SoCs we've had so far have that
->>>>> possibility, so if it works, for now, I'd like to stick to that.
->>>>
->>>> It would need to be tested. U-boot does the change only once, while the
->>>> kernel would be doing it all the time and between various frequencies
->>>> and PLL settings. So the issues may show up with this solution too.
->>>
->>> I don't think this is a good idea: the CPU clock may be changed at any
->>> time with the CPUFreq governor. I don't see the system moving from
->>> 1008MHz to 24MHz and then to 1200MHz when some computation is needed!
->>
->> PLL lock time is around 10-20us, I'd guess based on the number of loops
->> in the PLL lock wait loop. So unless you'll be switching frequencies
->> many times per second, this should be barely noticeable.
->>
->> But I'd like a different solution too.
-> 
-> Do you have a patch to test this?
-> 
-> For me changing CPU frequency on Orange Pi One always locks up the
-> system. I keep running it on the u-boot setup 1.08GHz at 1.1V
+According to UEFI 2.6 section 7.5.3, the capsule should be in contiguous
+virtual memory and firmware may consume the capsule immediately. To
+correctly implement this functionality, the kernel driver needs to vmap
+the entire capsule at the time it is made available to firmware.
 
-Not anymore. But it's quite simple to hack it into the
-drivers/clk/sunxi/clk-factors.c:clk_factors_set_rate()
+The virtual allocation of the capsule update has been changed from kmap,
+which was only allocating the first page of the update, to vmap and
+allocates the entire data payload.
 
-You can look at u-boot arch/arm/mach-sunxi/clock_sun6i.c:clock_set_pll1
-for how to change the CPU clock source.
+Signed-off-by: Austin Christ <austinwc@codeaurora.org>
+---
+ drivers/firmware/efi/capsule-loader.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
 
-> Thanks
-> 
-> Michal
-> 
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160715/4598f219/attachment.sig>
+diff --git a/drivers/firmware/efi/capsule-loader.c b/drivers/firmware/efi/capsule-loader.c
+index c99c24b..c4f3c20 100644
+--- a/drivers/firmware/efi/capsule-loader.c
++++ b/drivers/firmware/efi/capsule-loader.c
+@@ -16,6 +16,7 @@
+ #include <linux/slab.h>
+ #include <linux/mutex.h>
+ #include <linux/efi.h>
++#include <linux/vmalloc.h>
+ 
+ #define NO_FURTHER_WRITE_ACTION -1
+ 
+@@ -108,14 +109,15 @@ static ssize_t efi_capsule_submit_update(struct capsule_info *cap_info)
+ 	int ret;
+ 	void *cap_hdr_temp;
+ 
+-	cap_hdr_temp = kmap(cap_info->pages[0]);
++	cap_hdr_temp = vmap(cap_info->pages, cap_info->index,
++			VM_MAP, PAGE_KERNEL);
+ 	if (!cap_hdr_temp) {
+ 		pr_debug("%s: kmap() failed\n", __func__);
+ 		return -EFAULT;
+ 	}
+ 
+ 	ret = efi_capsule_update(cap_hdr_temp, cap_info->pages);
+-	kunmap(cap_info->pages[0]);
++	vunmap(cap_hdr_temp);
+ 	if (ret) {
+ 		pr_err("%s: efi_capsule_update() failed\n", __func__);
+ 		return ret;
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
