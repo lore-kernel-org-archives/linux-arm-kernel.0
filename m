@@ -1,36 +1,46 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Fri, 15 Jul 2016 15:38:07 +0900
-Subject: [PATCH 2/2] i2c: qup: Fixed the DMA segments length
-In-Reply-To: <1462797871-8595-3-git-send-email-absahu@codeaurora.org>
-References: <1462797871-8595-1-git-send-email-absahu@codeaurora.org>
- <1462797871-8595-3-git-send-email-absahu@codeaurora.org>
-Message-ID: <20160715063806.GC7675@tetsubishi>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Fri, 15 Jul 2016 08:40:00 +0200
+Subject: [PATCH] dt: bindings: Add a generic ethernet device binding
+In-Reply-To: <20160714.161707.2089949241813985527.davem@davemloft.net>
+References: <1468405204-5845-1-git-send-email-hdegoede@redhat.com>
+ <20160714.161707.2089949241813985527.davem@davemloft.net>
+Message-ID: <47a052a1-cc8b-0f75-e44a-450c4a0ac075@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 09, 2016 at 06:14:31PM +0530, Abhishek Sahu wrote:
-> 1. The current QCOM I2C driver code is failing for transfer length
-> greater than 255. This is happening due to improper segments length
-> as the I2C DMA segments can be maximum of 256 bytes.
-> 
-> 2. The transfer length tlen was being initialized with 0 for 256
-> bytes, which is being passed for DMA mappings resulting in improper
-> DMA mapping length.
-> 
-> This patch fixes the above said problems by initializing the block
-> count with the values calculated in qup_i2c_set_blk_data and calculating
-> the remaining length for last DMA segment. Also, the block data length
-> need to be decremented after each transfer. Additionally, this patch
-> corrects the tlen assignment for DMA mapping.
-> 
-> Signed-off-by: Abhishek Sahu <absahu@codeaurora.org>
+Hi,
 
-Applied to for-next, thanks!
+On 15-07-16 01:17, David Miller wrote:
+> From: Hans de Goede <hdegoede@redhat.com>
+> Date: Wed, 13 Jul 2016 12:20:04 +0200
+>
+>> On some boards (android tablets) different batches use different sdio
+>> wifi modules. This is not a problem since sdio is a discoverable bus,
+>> so we only need to describe and activate the mmc controller in dt and
+>> then the kernel will automatically load the right driver.
+>>
+>> But sometimes it is useful to specify certain ethernet properties for
+>> these "unknown" sdio devices, specifically we want the boot-loader
+>> to be able to set "local-mac-address" as some of these sdio wifi
+>> modules come without an eeprom / without a factory programmed mac
+>> address.
+>>
+>> Since the exact device is unknown (differs per batch) we cannot use
+>> a wifi-chip specific compatible. This commit adds a new
+>> "generic,ethernet" binding for use in dt-nodes describing such an
+>> unknown ethernet device.
+>>
+>> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
+>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>
+> Precedence exists for a "system ethernet address" as far back as the
+> original sparc device tree implementation, so please just specify it
+> that way rather than trying to force having to make an alias or
+> reference to it from a specific device.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160715/563cf6af/attachment.sig>
+Some boards where this is applicable have both a wired and a wireless
+ethernet, so one global setting will not work.
+
+Regards,
+
+Hans
