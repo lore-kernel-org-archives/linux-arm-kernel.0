@@ -1,24 +1,43 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 15 Jul 2016 10:33:06 +0200
-Subject: Memory and IO space Enabling different in x86 and ARM64
-In-Reply-To: <8520D5D51A55D047800579B094147198258B9376@XAP-PVEXMBX01.xlnx.xilinx.com>
-References: <8520D5D51A55D047800579B094147198258B9376@XAP-PVEXMBX01.xlnx.xilinx.com>
-Message-ID: <7127812.WYSppNUyGc@wuerfel>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Fri, 15 Jul 2016 10:33:25 +0200
+Subject: [PATCH] media: Doc add missing documentation for
+ samsung,exynos4212-jpeg
+In-Reply-To: <57889EAB.30502@samsung.com>
+References: <1468526499-8840-1-git-send-email-shuahkh@osg.samsung.com>
+ <578890BA.8040101@samsung.com> <57889B73.4090607@samsung.com>
+ <57889C23.3050106@samsung.com> <57889EAB.30502@samsung.com>
+Message-ID: <57889FD5.9070302@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, July 15, 2016 8:29:49 AM CEST Bharat Kumar Gogada wrote:
-> I observe that memory and IO space are enabled by BIOS in x86.
+On 07/15/2016 10:28 AM, Jacek Anaszewski wrote:
+> On 07/15/2016 10:17 AM, Krzysztof Kozlowski wrote:
+>> On 07/15/2016 10:14 AM, Jacek Anaszewski wrote:
+>>>> However if these compatibles are exactly equal then
+>>>> only one should be preferred. It makes everything easier. Second can be
+>>>> still documented e.g. as deprecated.
+>>>
+>>> Still, both of them are present in the driver. Shouldn't it be reflected
+>>> in the documentation?
+>>
+>> Right, it is a good practice, so how about:
+>>
+>>    - compatible    : should be one of:
+>>            "samsung,s5pv210-jpeg", "samsung,exynos3250-jpeg",
+>>            "samsung,exynos4210-jpeg", "samsung,exynos5420-jpeg",
+>>            "samsung,exynos5433-jpeg";
+>>
+>>            Deprecated: "samsung,exynos4212-jpeg"
+>>
+>> (or any other formatting)
+>> plus update to DTS changing it to 4210?
 > 
-> In ARM64 we need to call pci_enable_device form End Point to enable these resources.
-> 
-> Why the resource enablement is different in x86 and ARM64 ?
-> 
-> Please correct me if my observation is wrong.
+> Why newer 4212 version should be made deprecated?
 
-This is a difference between systems with a BIOS and embedded systems with
-a plain bootloader that ignores PCI. On an ARM64 server system with UEFI
-you should expect the device to be usable too, but on an embedded system,
-Linux takes the role of the BIOS.
+I don't mind the other way. However it seems logical to me that newer
+chip is compatible with existing one so the existing one (older) is
+used. When adding support for new devices, for most of re-usable drivers
+we use old compatibles. But as I said, it doesn't really matter to me.
 
-	Arnd
+BR,
+Krzysztof
