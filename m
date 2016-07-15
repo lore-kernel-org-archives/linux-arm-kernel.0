@@ -1,74 +1,77 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 15 Jul 2016 12:43:35 +0100
-Subject: [PATCH v10 14/17] KVM: arm64: allow updates of LPI configuration table
+Date: Fri, 15 Jul 2016 12:43:26 +0100
+Subject: [PATCH v10 05/17] KVM: kvm_io_bus: add kvm_io_bus_get_dev() call
 In-Reply-To: <20160715114338.10484-1-andre.przywara@arm.com>
 References: <20160715114338.10484-1-andre.przywara@arm.com>
-Message-ID: <20160715114338.10484-15-andre.przywara@arm.com>
+Message-ID: <20160715114338.10484-6-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The (system-wide) LPI configuration table is held in a table in
-(guest) memory. To achieve reasonable performance, we cache this data
-in our struct vgic_irq. If the guest updates the configuration data
-(which consists of the enable bit and the priority value), it issues
-an INV or INVALL command to allow us to update our information.
-Provide functions that update that information for one LPI or all LPIs
-mapped to a specific collection.
+The kvm_io_bus framework is a nice place of holding information about
+various MMIO regions for kernel emulated devices.
+Add a call to retrieve the kvm_io_device structure which is associated
+with a certain MMIO address. This avoids to duplicate kvm_io_bus'
+knowledge of MMIO regions without having to fake MMIO calls if a user
+needs the device a certain MMIO address belongs to.
+This will be used by the ITS emulation to get the associated ITS device
+when someone triggers an MSI via an ioctl from userspace.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+Reviewed-by: Eric Auger <eric.auger@redhat.com>
+Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+Acked-by: Paolo Bonzini <pbonzini@redhat.com>
 ---
- virt/kvm/arm/vgic/vgic-its.c | 39 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 39 insertions(+)
+ include/linux/kvm_host.h |  2 ++
+ virt/kvm/kvm_main.c      | 24 ++++++++++++++++++++++++
+ 2 files changed, 26 insertions(+)
 
-diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-index 2881b84..6f43b3b 100644
---- a/virt/kvm/arm/vgic/vgic-its.c
-+++ b/virt/kvm/arm/vgic/vgic-its.c
-@@ -68,6 +68,45 @@ struct its_itte {
-  */
- #define CBASER_ADDRESS(x)	((x) & GENMASK_ULL(47, 12))
- #define PENDBASER_ADDRESS(x)	((x) & GENMASK_ULL(47, 16))
-+#define PROPBASER_ADDRESS(x)	((x) & GENMASK_ULL(47, 12))
-+
-+#define GIC_LPI_OFFSET 8192
-+
-+#define LPI_PROP_ENABLE_BIT(p)	((p) & LPI_PROP_ENABLED)
-+#define LPI_PROP_PRIORITY(p)	((p) & 0xfc)
-+
-+/*
-+ * Reads the configuration data for a given LPI from guest memory and
-+ * updates the fields in struct vgic_irq.
-+ * If filter_vcpu is not NULL, applies only if the IRQ is targeting this
-+ * VCPU. Unconditionally applies if filter_vcpu is NULL.
-+ */
-+static int update_lpi_config(struct kvm *kvm, struct vgic_irq *irq,
-+			     struct kvm_vcpu *filter_vcpu)
-+{
-+	u64 propbase = PROPBASER_ADDRESS(kvm->arch.vgic.propbaser);
-+	u8 prop;
-+	int ret;
-+
-+	ret = kvm_read_guest(kvm, propbase + irq->intid - GIC_LPI_OFFSET,
-+			     &prop, 1);
-+
-+	if (ret)
-+		return ret;
-+
-+	spin_lock(&irq->irq_lock);
-+
-+	if (!filter_vcpu || filter_vcpu == irq->target_vcpu) {
-+		irq->priority = LPI_PROP_PRIORITY(prop);
-+		irq->enabled = LPI_PROP_ENABLE_BIT(prop);
-+
-+		vgic_queue_irq_unlock(kvm, irq);
-+	} else {
-+		spin_unlock(&irq->irq_lock);
-+	}
-+
-+	return 0;
-+}
+diff --git a/include/linux/kvm_host.h b/include/linux/kvm_host.h
+index 0640ee9..614a981 100644
+--- a/include/linux/kvm_host.h
++++ b/include/linux/kvm_host.h
+@@ -164,6 +164,8 @@ int kvm_io_bus_register_dev(struct kvm *kvm, enum kvm_bus bus_idx, gpa_t addr,
+ 			    int len, struct kvm_io_device *dev);
+ int kvm_io_bus_unregister_dev(struct kvm *kvm, enum kvm_bus bus_idx,
+ 			      struct kvm_io_device *dev);
++struct kvm_io_device *kvm_io_bus_get_dev(struct kvm *kvm, enum kvm_bus bus_idx,
++					 gpa_t addr);
  
- /*
-  * Create a snapshot of the current LPI list, so that we can enumerate all
+ #ifdef CONFIG_KVM_ASYNC_PF
+ struct kvm_async_pf {
+diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
+index ef54b4c..bd2eb92 100644
+--- a/virt/kvm/kvm_main.c
++++ b/virt/kvm/kvm_main.c
+@@ -3496,6 +3496,30 @@ int kvm_io_bus_unregister_dev(struct kvm *kvm, enum kvm_bus bus_idx,
+ 	return r;
+ }
+ 
++struct kvm_io_device *kvm_io_bus_get_dev(struct kvm *kvm, enum kvm_bus bus_idx,
++					 gpa_t addr)
++{
++	struct kvm_io_bus *bus;
++	int dev_idx, srcu_idx;
++	struct kvm_io_device *iodev = NULL;
++
++	srcu_idx = srcu_read_lock(&kvm->srcu);
++
++	bus = srcu_dereference(kvm->buses[bus_idx], &kvm->srcu);
++
++	dev_idx = kvm_io_bus_get_first_dev(bus, addr, 1);
++	if (dev_idx < 0)
++		goto out_unlock;
++
++	iodev = bus->range[dev_idx].dev;
++
++out_unlock:
++	srcu_read_unlock(&kvm->srcu, srcu_idx);
++
++	return iodev;
++}
++EXPORT_SYMBOL_GPL(kvm_io_bus_get_dev);
++
+ static struct notifier_block kvm_cpu_notifier = {
+ 	.notifier_call = kvm_cpu_hotplug,
+ };
 -- 
 2.9.0
