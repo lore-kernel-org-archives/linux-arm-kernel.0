@@ -1,60 +1,43 @@
-From: vgoyal@redhat.com (Vivek Goyal)
-Date: Fri, 15 Jul 2016 09:26:10 -0400
-Subject: [RFC 0/3] extend kexec_file_load system call
-In-Reply-To: <5547846.5l81k4b13o@wuerfel>
-References: <20160712014201.11456-1-takahiro.akashi@linaro.org>
- <4321972.HZgDox36RC@wuerfel> <3520758.yAgMzqF1PF@hactar>
- <5547846.5l81k4b13o@wuerfel>
-Message-ID: <20160715132610.GD23514@redhat.com>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Fri, 15 Jul 2016 15:27:56 +0200
+Subject: [PATCH v2 06/14] ARM: sun8i: clk: Add clk-factor rate
+ application method
+In-Reply-To: <085e185a-ac76-dd3f-9b0e-a7dc9c0c09f3@megous.com>
+References: <20160625034511.7966-1-megous@megous.com>
+ <20160625034511.7966-7-megous@megous.com>
+ <20160630204001.GC5485@lukather>
+ <0b71ed7e-98c9-109e-85e6-ceb95131d88a@megous.com>
+ <20160715085356.GR4761@lukather>
+ <085e185a-ac76-dd3f-9b0e-a7dc9c0c09f3@megous.com>
+Message-ID: <20160715152756.db7375a7109fed18c2fbf43a@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 15, 2016 at 09:31:02AM +0200, Arnd Bergmann wrote:
-> On Thursday, July 14, 2016 10:44:14 PM CEST Thiago Jung Bauermann wrote:
-> > Am Donnerstag, 14 Juli 2016, 10:29:11 schrieb Arnd Bergmann:
-> 
-> > > 
-> > > Right, but the question remains whether this helps while you allow the
-> > > boot loader to modify the dtb. If an attacker gets in and cannot modify
-> > > the kernel or initid but can modify the DT, a successful attack would
-> > > be a bit harder than having a modified kernel, but you may still need
-> > > to treat the system as compromised.
-> > 
-> > Yes, and the same question also remains regarding the kernel command line.
-> > 
-> > We can have the kernel perform sanity checks on the device tree, just as the 
-> > kernel needs to sanity check the command line.
-> > 
-> > There's the point that was raised about not wanting to increase the attack 
-> > surface, and that's a valid point. But at least in the way Petitboot works 
-> > today, it needs to modify the device tree and pass it to the kernel.
-> > 
-> > One thing that is unavoidable to come from userspace is 
-> > /chosen/linux,stdout-path, because it's Petitboot that knows from which 
-> > console the user is interacting with. The other modification to set 
-> > properties in vga at 0 can be done in the kernel.
-> > 
-> > Given that on DTB-based systems /chosen is an important and established way 
-> > to pass information to the operating system being booted, I'd like to 
-> > suggest the following, then:
-> > 
-> > Extend the syscall as shown in this RFC from Takahiro AKASHI, but instead of 
-> > accepting a complete DTB from userspace, the syscall would accept a DTB 
-> > containing only a /chosen node. If the DTB contains any other node, the 
-> > syscall fails with EINVAL. The kernel can then add the properties in /chosen 
-> > to the device tree that it will pass to the next kernel.
-> > 
-> > What do you think?
-> 
-> I think that helps, as it makes the problem space correspond to that
-> of modifying the command line, but I can still come up with countless
-> attacks based on modifications of the /chosen node and/or the command
-> line, in fact it's probably easier than any other node.
+On Fri, 15 Jul 2016 12:38:54 +0200
+Ond?ej Jirman <megous@megous.com> wrote:
 
-I don't know anything about DTB. So here comes a very basic question. Does
-DTB allow passing an executable blob to kernel or pass the location of
-some unsigned executable code at kernel level. I think from secureboot point of
-view that would be a concern. Being able to trick kernel to execute an
-unsigned code at privileged level.
+> > If so, then yes, trying to switch to the 24MHz oscillator before
+> > applying the factors, and then switching back when the PLL is stable
+> > would be a nice solution.
+> > 
+> > I just checked, and all the SoCs we've had so far have that
+> > possibility, so if it works, for now, I'd like to stick to that.
+> 
+> It would need to be tested. U-boot does the change only once, while the
+> kernel would be doing it all the time and between various frequencies
+> and PLL settings. So the issues may show up with this solution too.
 
-Vivek
+I don't think this is a good idea: the CPU clock may be changed at any
+time with the CPUFreq governor. I don't see the system moving from
+1008MHz to 24MHz and then to 1200MHz when some computation is needed!
+
+BTW, Ond?ej, in my BPi M2+, I tried to change the CPU clock with your
+code at kernel start time from 792MHz to 1008MHz, but the hardware
+(arisc?) set an other value, and the system speed was lower than before
+(the PLL-CPUx register is 0x90031521 on boot, I want to set it to
+xxxx1410 and I read 0x91031f33 - sorry, I did not have a look at the
+CPU SD pattern). Do you know why?
+
+-- 
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
