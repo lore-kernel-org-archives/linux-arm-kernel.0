@@ -1,55 +1,108 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 15 Jul 2016 09:00:22 +0200
-Subject: [PATCH v2 02/10] irqchip: add irqchip driver for nuc900
-In-Reply-To: <5788718E.7080708@iommu.org>
-References: <1468135649-19980-1-git-send-email-vw@iommu.org>
- <20160714135426.GC31509@io.lakedaemon.net> <5788718E.7080708@iommu.org>
-Message-ID: <16178876.fFBuoBSjbd@wuerfel>
+From: njaigane@codeaurora.org (njaigane at codeaurora.org)
+Date: Fri, 15 Jul 2016 12:37:02 +0530
+Subject: [PATCH 0/4] Qualcomm IPQ4019 Audio driver addition
+Message-ID: <1468566426-19598-1-git-send-email-njaigane@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, July 15, 2016 1:15:58 PM CEST Wan Zongshun wrote:
-> 
-> Actually, I have two choice to implement this function:
-> 
-> option1:
-> 
-> void __exception_irq_entry aic_handle_irq(struct pt_regs *regs)
-> {
->         u32 hwirq;
-> 
->         (void)readl(aic_base + REG_AIC_IPER);
->         hwirq = readl(aic_base + REG_AIC_ISNR);
-> 
->         handle_IRQ((irq_find_mapping(aic_domain, hwirq)), regs);
-> }
+From: Jaiganesh Narayanan <njaigane@codeaurora.org>
 
-(side note: I think you want handle_domain_irq())
+These patches add the support for Qualcomm IPQ4019 ASoC
+with the ALSA based audio drivers. The patches are broken
 
-> option2:
-> 
-> void __exception_irq_entry aic_handle_irq(struct pt_regs *regs)
-> {
->         u32 hwirq;
-> 
->         hwirq = readl(aic_base + REG_AIC_IPER);
->         hwirq <<= 2;
-> 
->         handle_IRQ((irq_find_mapping(aic_domain, hwirq)), regs);
-> }
-> 
-> Though the option2 do shift for hwirq, but it seems better than do io 
-> operation by readl,so I prefer to option2, agree?
+1. Device Tree support
+2. Audio clock driver support
+3. TLMM / Pinctrl support
+4. ALSA based audio drivers
 
-That will only return an irq number that is a multiple of four, which
-seems wrong since the numbers are not that. Did you mean to write
+Jaiganesh Narayanan (4):
+  qcom: ipq4019: Add ipq4019 ASoC device tree changes
+  qcom: ipq4019: ASoC clock driver support
+  qcom: ipq4019: ASoC tlmm/pinctrl support
+  qcom: ipq4019: Add ASoC driver modules
 
-	hwirq = ilog2(hwirq);   ?
+ .../bindings/sound/qca,ipq4019-audio-adss.txt      |  20 +
+ .../bindings/sound/qca,ipq4019-audio.txt           |  13 +
+ .../bindings/sound/qca,ipq4019-codec.txt           |  15 +
+ .../devicetree/bindings/sound/qca,ipq4019-i2s.txt  |  33 +
+ .../devicetree/bindings/sound/qca,ipq4019-i2s1.txt |  29 +
+ .../devicetree/bindings/sound/qca,ipq4019-i2s2.txt |  29 +
+ .../devicetree/bindings/sound/qca,ipq4019-mbox.txt |  23 +
+ .../bindings/sound/qca,ipq4019-pcm-i2s.txt         |  15 +
+ .../bindings/sound/qca,ipq4019-pcm-i2s1.txt        |  15 +
+ .../bindings/sound/qca,ipq4019-pcm-i2s2.txt        |  15 +
+ .../bindings/sound/qca,ipq4019-pcm-spdif.txt       |  15 +
+ .../bindings/sound/qca,ipq4019-pcm-tdm.txt         |  15 +
+ .../bindings/sound/qca,ipq4019-spdif.txt           |  35 +
+ .../bindings/sound/qca,ipq4019-stereo.txt          |  17 +
+ .../devicetree/bindings/sound/qca,ipq4019-tdm.txt  |  33 +
+ arch/arm/boot/dts/qcom-ipq4019-ap.dk01.1.dtsi      | 195 ++++-
+ arch/arm/boot/dts/qcom-ipq4019.dtsi                | 247 +++++-
+ drivers/clk/qcom/Kconfig                           |   8 +
+ drivers/clk/qcom/Makefile                          |   2 +
+ drivers/clk/qcom/adcc-ipq4019.c                    | 700 +++++++++++++++++
+ drivers/clk/qcom/clk-qcapll.c                      | 197 +++++
+ drivers/clk/qcom/clk-qcapll.h                      |  60 ++
+ drivers/clk/qcom/clk-rcg.h                         |  68 +-
+ drivers/clk/qcom/clk-rcg2.c                        | 699 ++++++++++++++++-
+ drivers/clk/qcom/common.c                          |   9 +-
+ drivers/clk/qcom/common.h                          |   3 +-
+ drivers/pinctrl/qcom/pinctrl-ipq4019.c             | 116 ++-
+ include/dt-bindings/clock/qca,adcc-ipq4019.h       |  45 ++
+ include/dt-bindings/clock/qcom,gcc-ipq4019.h       |   4 +-
+ include/dt-bindings/sound/ipq4019-audio.h          |  37 +
+ sound/soc/qcom/Kconfig                             |  47 ++
+ sound/soc/qcom/Makefile                            |   1 +
+ sound/soc/qcom/ipq4019/Makefile                    |  16 +
+ sound/soc/qcom/ipq4019/ipq4019-adss.c              | 407 ++++++++++
+ sound/soc/qcom/ipq4019/ipq4019-adss.h              | 432 +++++++++++
+ sound/soc/qcom/ipq4019/ipq4019-codec.c             | 475 ++++++++++++
+ sound/soc/qcom/ipq4019/ipq4019-codec.h             |  91 +++
+ sound/soc/qcom/ipq4019/ipq4019-cpu-dai.c           | 687 +++++++++++++++++
+ sound/soc/qcom/ipq4019/ipq4019-mbox.c              | 825 +++++++++++++++++++++
+ sound/soc/qcom/ipq4019/ipq4019-mbox.h              | 146 ++++
+ sound/soc/qcom/ipq4019/ipq4019-pcm-i2s.c           | 609 +++++++++++++++
+ sound/soc/qcom/ipq4019/ipq4019-pcm-spdif.c         | 664 +++++++++++++++++
+ sound/soc/qcom/ipq4019/ipq4019-pcm-tdm.c           | 609 +++++++++++++++
+ sound/soc/qcom/ipq4019/ipq4019-pcm.h               |  37 +
+ sound/soc/qcom/ipq4019/ipq4019-stereo.c            | 313 ++++++++
+ sound/soc/qcom/ipq4019/ipq4019.c                   | 121 +++
+ 46 files changed, 8135 insertions(+), 57 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/sound/qca,ipq4019-audio-adss.txt
+ create mode 100644 Documentation/devicetree/bindings/sound/qca,ipq4019-audio.txt
+ create mode 100644 Documentation/devicetree/bindings/sound/qca,ipq4019-codec.txt
+ create mode 100644 Documentation/devicetree/bindings/sound/qca,ipq4019-i2s.txt
+ create mode 100644 Documentation/devicetree/bindings/sound/qca,ipq4019-i2s1.txt
+ create mode 100644 Documentation/devicetree/bindings/sound/qca,ipq4019-i2s2.txt
+ create mode 100644 Documentation/devicetree/bindings/sound/qca,ipq4019-mbox.txt
+ create mode 100644 Documentation/devicetree/bindings/sound/qca,ipq4019-pcm-i2s.txt
+ create mode 100644 Documentation/devicetree/bindings/sound/qca,ipq4019-pcm-i2s1.txt
+ create mode 100644 Documentation/devicetree/bindings/sound/qca,ipq4019-pcm-i2s2.txt
+ create mode 100644 Documentation/devicetree/bindings/sound/qca,ipq4019-pcm-spdif.txt
+ create mode 100644 Documentation/devicetree/bindings/sound/qca,ipq4019-pcm-tdm.txt
+ create mode 100644 Documentation/devicetree/bindings/sound/qca,ipq4019-spdif.txt
+ create mode 100644 Documentation/devicetree/bindings/sound/qca,ipq4019-stereo.txt
+ create mode 100644 Documentation/devicetree/bindings/sound/qca,ipq4019-tdm.txt
+ create mode 100644 drivers/clk/qcom/adcc-ipq4019.c
+ create mode 100644 drivers/clk/qcom/clk-qcapll.c
+ create mode 100644 drivers/clk/qcom/clk-qcapll.h
+ create mode 100644 include/dt-bindings/clock/qca,adcc-ipq4019.h
+ create mode 100644 include/dt-bindings/sound/ipq4019-audio.h
+ create mode 100644 sound/soc/qcom/ipq4019/Makefile
+ create mode 100644 sound/soc/qcom/ipq4019/ipq4019-adss.c
+ create mode 100644 sound/soc/qcom/ipq4019/ipq4019-adss.h
+ create mode 100644 sound/soc/qcom/ipq4019/ipq4019-codec.c
+ create mode 100644 sound/soc/qcom/ipq4019/ipq4019-codec.h
+ create mode 100644 sound/soc/qcom/ipq4019/ipq4019-cpu-dai.c
+ create mode 100644 sound/soc/qcom/ipq4019/ipq4019-mbox.c
+ create mode 100644 sound/soc/qcom/ipq4019/ipq4019-mbox.h
+ create mode 100644 sound/soc/qcom/ipq4019/ipq4019-pcm-i2s.c
+ create mode 100644 sound/soc/qcom/ipq4019/ipq4019-pcm-spdif.c
+ create mode 100644 sound/soc/qcom/ipq4019/ipq4019-pcm-tdm.c
+ create mode 100644 sound/soc/qcom/ipq4019/ipq4019-pcm.h
+ create mode 100644 sound/soc/qcom/ipq4019/ipq4019-stereo.c
+ create mode 100644 sound/soc/qcom/ipq4019/ipq4019.c
 
-That assumes that REG_AIC_IPER contains a 32-bit value with one single
-bit set to indicate which IRQ was triggered.
-
-If the difference is only in performance, you could try measuring which
-of the two ends up being faster.
-
-	Arnd
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
