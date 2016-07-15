@@ -1,24 +1,141 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Fri, 15 Jul 2016 20:01:13 +0800
-Subject: "coupled" regulator support
-Message-ID: <20160715200113.0f3cd823@xhacker>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Fri, 15 Jul 2016 14:11:15 +0200
+Subject: [PATCH v7 4/9] acpi/arm64: Add GTDT table parse driver
+In-Reply-To: <CADyBb7sGWizLDy3LtpGpJ9jkchyWHZ2oPfsg6fE1ZE54gn05FA@mail.gmail.com>
+References: <1468432402-4872-1-git-send-email-fu.wei@linaro.org>
+ <CAJZ5v0jnNqjpcY1CGkHxbJFwX1MuRi-U=jTCKWavMdEH4bKR3g@mail.gmail.com>
+ <CADyBb7sGWizLDy3LtpGpJ9jkchyWHZ2oPfsg6fE1ZE54gn05FA@mail.gmail.com>
+Message-ID: <4581163.sAHfC1UEjl@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Friday, July 15, 2016 03:45:05 PM Fu Wei wrote:
+> Hi Rafael,
+> 
+> 
+> On 14 July 2016 at 05:43, Rafael J. Wysocki <rafael@kernel.org> wrote:
+> > On Wed, Jul 13, 2016 at 11:08 PM, Guenter Roeck <linux@roeck-us.net> wrote:
+> >> On Wed, Jul 13, 2016 at 10:30:37PM +0200, Rafael J. Wysocki wrote:
+> >>> On Wed, Jul 13, 2016 at 7:53 PM,  <fu.wei@linaro.org> wrote:
+> >>> > From: Fu Wei <fu.wei@linaro.org>
+> >>> >
+> >>> > This patch adds support for parsing arch timer in GTDT,
+> >>> > provides some kernel APIs to parse all the PPIs and
+> >>> > always-on info in GTDT and export them.
+> >>> >
+> >>> > By this driver, we can simplify arm_arch_timer drivers, and
+> >>> > separate the ACPI GTDT knowledge from it.
+> >>> >
+> >>> > Signed-off-by: Fu Wei <fu.wei@linaro.org>
+> >>> > Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> >>> > ---
+> >>> >  drivers/acpi/Kconfig           |   5 ++
+> >>> >  drivers/acpi/Makefile          |   1 +
+> >>> >  drivers/acpi/arm64/Kconfig     |  15 ++++
+> >>> >  drivers/acpi/arm64/Makefile    |   1 +
+> >>> >  drivers/acpi/arm64/acpi_gtdt.c | 170 +++++++++++++++++++++++++++++++++++++++++
+> >>> >  include/linux/acpi.h           |   6 ++
+> >>> >  6 files changed, 198 insertions(+)
+> >>> >
+> >>> > diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
+> >>> > index b7e2e77..1cdc7d2 100644
+> >>> > --- a/drivers/acpi/Kconfig
+> >>> > +++ b/drivers/acpi/Kconfig
+> >>> > @@ -521,4 +521,9 @@ config XPOWER_PMIC_OPREGION
+> >>> >
+> >>> >  endif
+> >>> >
+> >>> > +if ARM64
+> >>> > +source "drivers/acpi/arm64/Kconfig"
+> >>> > +
+> >>> > +endif
+> >>> > +
+> >>> >  endif  # ACPI
+> >>> > diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
+> >>> > index 251ce85..1a94ff7 100644
+> >>> > --- a/drivers/acpi/Makefile
+> >>> > +++ b/drivers/acpi/Makefile
+> >>> > @@ -99,5 +99,6 @@ obj-$(CONFIG_ACPI_EXTLOG)     += acpi_extlog.o
+> >>> >  obj-$(CONFIG_PMIC_OPREGION)    += pmic/intel_pmic.o
+> >>> >  obj-$(CONFIG_CRC_PMIC_OPREGION) += pmic/intel_pmic_crc.o
+> >>> >  obj-$(CONFIG_XPOWER_PMIC_OPREGION) += pmic/intel_pmic_xpower.o
+> >>> > +obj-$(CONFIG_ARM64)    += arm64/
+> >>> >
+> >>> >  video-objs                     += acpi_video.o video_detect.o
+> >>> > diff --git a/drivers/acpi/arm64/Kconfig b/drivers/acpi/arm64/Kconfig
+> >>> > new file mode 100644
+> >>> > index 0000000..ff5c253
+> >>> > --- /dev/null
+> >>> > +++ b/drivers/acpi/arm64/Kconfig
+> >>> > @@ -0,0 +1,15 @@
+> >>> > +#
+> >>> > +# ACPI Configuration for ARM64
+> >>> > +#
+> >>> > +
+> >>> > +menu "The ARM64-specific ACPI Support"
+> >>> > +
+> >>> > +config ACPI_GTDT
+> >>> > +       bool "ACPI GTDT table Support"
+> >>>
+> >>> This should depend on ARM64.
+> >>>
+> >>> Also I wonder if it needs to be user-selectable?  Wouldn't it be
+> >>> better to enable it by default when building for ARM64 with ACPI?
+> >>>
+> >> It is currently selected in patch 9, in the watchdog driver's Kconfig
+> >> entry.
+> >
+> > Well, it still doesn't have to be user-selectable for that. :-)
+> 
+> Actually it is also automatically selected by [PATCH v7 6/9]:
 
-I dunno how to name this kind of regulator, my situation is:
+Right.
 
-multiple devices connects to one voltage regulator_dev, e.g devA and devB connects
-to regR, regR only support two voltage v1 and v2, let's say v1 < v2
+By user-selectable I mean "showing up in a Kconfig configurator tool".
 
-regR can only be set to v1 if devA and devB all call for set voltage to v1
-regR can set to v2 if devA or devB call for set voltage to v2
+It just need not be visible in the configurator IMO.
 
-To support this situation, I'd like to add flag to regulator structure and
-patch regulator_check_consumers() to check whether we are safe to set the vol
+> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+> index 47352d2..71d5b30 100644
+> --- a/drivers/clocksource/Kconfig
+> +++ b/drivers/clocksource/Kconfig
+> @@ -8,6 +8,7 @@ config CLKSRC_OF
+>  config CLKSRC_ACPI
+>   bool
+>   select CLKSRC_PROBE
+> + select ACPI_GTDT if ARM64
+> 
+>  config CLKSRC_PROBE
+>   bool
+> 
+> 
+> >
+> >> Not sure if I like that; maybe the watchdog driver should depend
+> >> on it instead ?
+> >
+> > If the watchdog is not the only user of it (and I don't think it is),
+> > it would be better to arrange things this way.
+> >
+> 
+> There are two user:
+> (1) arm_arch_timer(which will select CLKSRC_ACPI if ACPI, then
+> CLKSRC_ACPI will select ACPI_GTDT if ARM64)
+> So arm_arch_timer will automatically selecte ACPI_GTDT if ARM64 && ACPI
+> 
+> (2) sbsa_gwdt (which will select ACPI_GTDT if ACPI in [PATCH v7 9/9])
+> So sbsa_gwdt will automatically selecte ACPI_GTDT if ARM64 && ACPI &&
+> ARM_ARCH_TIMER
+> 
+> So ACPI_GTDT is automatically selected by both of two users.
+> 
+> 
+> But like Timur said before:
+> 
+> maybe we just "selecte ACPI_GTDT if ACPI" for ARM64, because ARM64
+> require GTDT if we use ACPI.
 
-Is this patch acceptable or we already have elegant solution?
+Right.  That's the way to do it then and make sbsa_gwdt depend on it instead
+of selecting it.
 
-Thanks in advance,
-Jisheng
+Thanks,
+Rafael
