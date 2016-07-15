@@ -1,39 +1,82 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 15 Jul 2016 13:52:26 +0100
-Subject: [PATCH 4/4] qcom: ipq4019: Add ASoC driver modules
-In-Reply-To: <1468566426-19598-5-git-send-email-njaigane@codeaurora.org>
-References: <1468566426-19598-1-git-send-email-njaigane@codeaurora.org>
- <1468566426-19598-5-git-send-email-njaigane@codeaurora.org>
-Message-ID: <20160715125226.GJ30372@sirena.org.uk>
+From: bsingharora@gmail.com (Balbir Singh)
+Date: Fri, 15 Jul 2016 22:55:19 +1000
+Subject: [PATCH v2 02/11] mm: Hardened usercopy
+In-Reply-To: <CAGXu5jLuQPdBH4a0BF9AgH7qQubfoz+fFW2sTi2rRxsU8u_8QQ@mail.gmail.com>
+References: <1468446964-22213-1-git-send-email-keescook@chromium.org>
+ <1468446964-22213-3-git-send-email-keescook@chromium.org>
+ <20160714232019.GA28254@350D>
+ <1468544658.30053.26.camel@redhat.com>
+ <20160715014151.GA13944@balbir.ozlabs.ibm.com>
+ <CAGXu5jJy4O4tV2sB=MSkYh2DEfxUYkH4Q3ghmrHEGc6s-k285A@mail.gmail.com>
+ <CAGXu5jLuQPdBH4a0BF9AgH7qQubfoz+fFW2sTi2rRxsU8u_8QQ@mail.gmail.com>
+Message-ID: <20160715125519.GA21685@350D>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 15, 2016 at 12:37:06PM +0530, njaigane at codeaurora.org wrote:
+On Thu, Jul 14, 2016 at 09:53:31PM -0700, Kees Cook wrote:
+> On Thu, Jul 14, 2016 at 9:05 PM, Kees Cook <keescook@chromium.org> wrote:
+> > On Thu, Jul 14, 2016 at 6:41 PM, Balbir Singh <bsingharora@gmail.com> wrote:
+> >> On Thu, Jul 14, 2016 at 09:04:18PM -0400, Rik van Riel wrote:
+> >>> On Fri, 2016-07-15 at 09:20 +1000, Balbir Singh wrote:
+> >>>
+> >>> > > ==
+> >>> > > +            ((unsigned long)end & (unsigned
+> >>> > > long)PAGE_MASK)))
+> >>> > > +         return NULL;
+> >>> > > +
+> >>> > > + /* Allow if start and end are inside the same compound
+> >>> > > page. */
+> >>> > > + endpage = virt_to_head_page(end);
+> >>> > > + if (likely(endpage == page))
+> >>> > > +         return NULL;
+> >>> > > +
+> >>> > > + /* Allow special areas, device memory, and sometimes
+> >>> > > kernel data. */
+> >>> > > + if (PageReserved(page) && PageReserved(endpage))
+> >>> > > +         return NULL;
+> >>> >
+> >>> > If we came here, it's likely that endpage > page, do we need to check
+> >>> > that only the first and last pages are reserved? What about the ones
+> >>> > in
+> >>> > the middle?
+> >>>
+> >>> I think this will be so rare, we can get away with just
+> >>> checking the beginning and the end.
+> >>>
+> >>
+> >> But do we want to leave a hole where an aware user space
+> >> can try a longer copy_* to avoid this check? If it is unlikely
+> >> should we just bite the bullet and do the check for the entire
+> >> range?
+> >
+> > I'd be okay with expanding the test -- it should be an extremely rare
+> > situation already since the common Reserved areas (kernel data) will
+> > have already been explicitly tested.
+> >
+> > What's the best way to do "next page"? Should it just be:
+> >
+> > for ( ; page <= endpage ; ptr += PAGE_SIZE, page = virt_to_head_page(ptr) ) {
+> >     if (!PageReserved(page))
+> >         return "<spans multiple pages>";
+> > }
+> >
+> > return NULL;
+> >
+> > ?
+> 
+> Er, I was testing the wrong thing. How about:
+> 
+>         /*
+>          * Reject if range is not Reserved (i.e. special or device memory),
+>          * since then the object spans several independently allocated pages.
+>          */
+>         for (; ptr <= end ; ptr += PAGE_SIZE, page = virt_to_head_page(ptr)) {
+>                 if (!PageReserved(page))
+>                         return "<spans multiple pages>";
+>         }
+> 
+>         return NULL;
 
->  sound/soc/qcom/Kconfig                     |  47 ++
->  sound/soc/qcom/Makefile                    |   1 +
->  sound/soc/qcom/ipq4019/Makefile            |  16 +
->  sound/soc/qcom/ipq4019/ipq4019-adss.c      | 407 ++++++++++++++
->  sound/soc/qcom/ipq4019/ipq4019-adss.h      | 432 +++++++++++++++
->  sound/soc/qcom/ipq4019/ipq4019-codec.c     | 475 +++++++++++++++++
->  sound/soc/qcom/ipq4019/ipq4019-codec.h     |  91 ++++
->  sound/soc/qcom/ipq4019/ipq4019-cpu-dai.c   | 687 ++++++++++++++++++++++++
->  sound/soc/qcom/ipq4019/ipq4019-mbox.c      | 825 +++++++++++++++++++++++++++++
->  sound/soc/qcom/ipq4019/ipq4019-mbox.h      | 146 +++++
->  sound/soc/qcom/ipq4019/ipq4019-pcm-i2s.c   | 609 +++++++++++++++++++++
->  sound/soc/qcom/ipq4019/ipq4019-pcm-spdif.c | 664 +++++++++++++++++++++++
->  sound/soc/qcom/ipq4019/ipq4019-pcm-tdm.c   | 609 +++++++++++++++++++++
->  sound/soc/qcom/ipq4019/ipq4019-pcm.h       |  37 ++
->  sound/soc/qcom/ipq4019/ipq4019-stereo.c    | 313 +++++++++++
->  sound/soc/qcom/ipq4019/ipq4019.c           | 121 +++++
+That looks reasonable to me
 
-This is *far* too big to be a single patch.  Please at the very least
-split this up into one patch per driver, look at the git history of
-other drivers for examples of splitting things up.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160715/c7400e9e/attachment.sig>
+Balbir
