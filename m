@@ -1,59 +1,46 @@
 From: quentin.schulz@free-electrons.com (Quentin Schulz)
-Date: Fri, 15 Jul 2016 11:59:10 +0200
-Subject: [PATCH v2 0/4] add support for Allwinner SoCs ADC
-Message-ID: <1468576754-3273-1-git-send-email-quentin.schulz@free-electrons.com>
+Date: Fri, 15 Jul 2016 11:59:11 +0200
+Subject: [PATCH v2 1/4] hwmon: iio_hwmon: defer probe when no channel is found
+In-Reply-To: <1468576754-3273-1-git-send-email-quentin.schulz@free-electrons.com>
+References: <1468576754-3273-1-git-send-email-quentin.schulz@free-electrons.com>
+Message-ID: <1468576754-3273-2-git-send-email-quentin.schulz@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Allwinner SoCs all have an ADC that can also act as a touchscreen
-controller and a thermal sensor. The first four channels can be used either
-for the ADC or the touchscreen and the fifth channel is used for the
-thermal sensor. We currently have a driver for the two latter functions in
-drivers/input/touchscreen/sun4i-ts.c but we don't have access to the ADC
-feature at all. It is meant to replace the current driver by using MFD and
-subdrivers.
+iio_channel_get_all returns -ENODEV when it cannot find either phandles and
+properties in the Device Tree or channels whose consumer_dev_name matches
+iio_hwmon in iio_map_list. The iio_map_list is filled in by iio drivers
+which might be probed after iio_hwmon.
 
-This adds initial support for Allwinner SoCs ADC with all features. Yet,
-the touchscreen is not implemented but will be added later. To switch
-between touchscreen and ADC modes, you need to poke a few bits in registers
-and (de)activate an interrupt (pen-up).
-An MFD is provided to let the input driver activate the pen-up interrupt
-through a virtual interrupt, poke a few bits via regmap and read data from
-the ADC driver while both (and iio_hwmon) are probed by the MFD.
+It is better to defer the probe of iio_hwmon if such error is returned by
+iio_channel_get_all in order to let a chance to iio drivers to expose
+channels in iio_map_list.
 
-There are slight variations between the different SoCs ADC like the address
-of some registers and the scale and offset to apply to raw thermal sensor
-values. These variations are handled by using different platform_device_id,
-passed to the sub-drivers when they are probed by the MFD.
+Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+---
 
-This also modifies iio-hwmon to allow probe deferring when no iio channel
-is found. Currently when no iio channel is found, the probing of iio-hwmon
-fails. This is problematic when iio-hwmon probes before the iio driver
-could register iio channels to share.
-It exposes labels for channels read by iio_hwmon. Until now, there were no
-way to identify what the exposed channels are representing. Now, if a
-channel has its extend_name field set, this value will be exposed in a
-sysfs file suffixed by _label. If the field is empty, no file will be
-created.
+No modifications for this patch since we did not settled for a solution.
+What should we do?
 
-Quentin Schulz (4):
-  hwmon: iio_hwmon: defer probe when no channel is found
-  iio: adc: add support for Allwinner SoCs ADC
-  mfd: add support for Allwinner SoCs ADC
-  hwmon: iio: add label for channels read by iio_hwmon
+ drivers/hwmon/iio_hwmon.c | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
- drivers/hwmon/iio_hwmon.c           |  82 ++++++-
- drivers/iio/adc/Kconfig             |  12 ++
- drivers/iio/adc/Makefile            |   1 +
- drivers/iio/adc/sunxi-gpadc-iio.c   | 417 ++++++++++++++++++++++++++++++++++++
- drivers/mfd/Kconfig                 |  14 ++
- drivers/mfd/Makefile                |   2 +
- drivers/mfd/sunxi-gpadc-mfd.c       | 197 +++++++++++++++++
- include/linux/mfd/sunxi-gpadc-mfd.h |  23 ++
- 8 files changed, 738 insertions(+), 10 deletions(-)
- create mode 100644 drivers/iio/adc/sunxi-gpadc-iio.c
- create mode 100644 drivers/mfd/sunxi-gpadc-mfd.c
- create mode 100644 include/linux/mfd/sunxi-gpadc-mfd.h
-
+diff --git a/drivers/hwmon/iio_hwmon.c b/drivers/hwmon/iio_hwmon.c
+index b550ba5..c0da4d9 100644
+--- a/drivers/hwmon/iio_hwmon.c
++++ b/drivers/hwmon/iio_hwmon.c
+@@ -73,8 +73,11 @@ static int iio_hwmon_probe(struct platform_device *pdev)
+ 		name = dev->of_node->name;
+ 
+ 	channels = iio_channel_get_all(dev);
+-	if (IS_ERR(channels))
++	if (IS_ERR(channels)) {
++		if (PTR_ERR(channels) == -ENODEV)
++			return -EPROBE_DEFER;
+ 		return PTR_ERR(channels);
++	}
+ 
+ 	st = devm_kzalloc(dev, sizeof(*st), GFP_KERNEL);
+ 	if (st == NULL) {
 -- 
 2.5.0
