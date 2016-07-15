@@ -1,45 +1,55 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 15 Jul 2016 09:28:58 +0200
-Subject: [PATCH] media: Doc add missing documentation for
- samsung,exynos4212-jpeg
-In-Reply-To: <1468526499-8840-1-git-send-email-shuahkh@osg.samsung.com>
-References: <1468526499-8840-1-git-send-email-shuahkh@osg.samsung.com>
-Message-ID: <578890BA.8040101@samsung.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 15 Jul 2016 09:31:02 +0200
+Subject: [RFC 0/3] extend kexec_file_load system call
+In-Reply-To: <3520758.yAgMzqF1PF@hactar>
+References: <20160712014201.11456-1-takahiro.akashi@linaro.org>
+ <4321972.HZgDox36RC@wuerfel> <3520758.yAgMzqF1PF@hactar>
+Message-ID: <5547846.5l81k4b13o@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/14/2016 10:01 PM, Shuah Khan wrote:
-> Add add missing documentation for samsung,exynos4212-jpeg codec,
-> reorder entries to improve readability and make it easier to add
-> new entries.
-> 
-> Signed-off-by: Shuah Khan <shuahkh@osg.samsung.com>
-> ---
->  Documentation/devicetree/bindings/media/exynos-jpeg-codec.txt | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/media/exynos-jpeg-codec.txt b/Documentation/devicetree/bindings/media/exynos-jpeg-codec.txt
-> index 38941db..093614c 100644
-> --- a/Documentation/devicetree/bindings/media/exynos-jpeg-codec.txt
-> +++ b/Documentation/devicetree/bindings/media/exynos-jpeg-codec.txt
-> @@ -3,9 +3,9 @@ Samsung S5P/EXYNOS SoC series JPEG codec
->  Required properties:
->  
->  - compatible	: should be one of:
-> -		  "samsung,s5pv210-jpeg", "samsung,exynos4210-jpeg",
-> -		  "samsung,exynos3250-jpeg", "samsung,exynos5420-jpeg",
-> -		  "samsung,exynos5433-jpeg";
-> +		  "samsung,s5pv210-jpeg", "samsung,exynos3250-jpeg",
-> +		  "samsung,exynos4210-jpeg", "samsung,exynos4212-jpeg",
-> +		  "samsung,exynos5420-jpeg", "samsung,exynos5433-jpeg";
+On Thursday, July 14, 2016 10:44:14 PM CEST Thiago Jung Bauermann wrote:
+> Am Donnerstag, 14 Juli 2016, 10:29:11 schrieb Arnd Bergmann:
 
-I am not convinced that this is needed because exynos4212-jpeg is equal
-to exynos4210-jpeg... It is a little bit weird because Jacek's commit
-3246fdaa0ac2d9 ("[media] s5p-jpeg: Add support for Exynos3250 SoC")
-changed the driver data for Exynos4210 from S5P to Exynos4 without
-explaining it... However if these compatibles are exactly equal then
-only one should be preferred. It makes everything easier. Second can be
-still documented e.g. as deprecated.
+> > 
+> > Right, but the question remains whether this helps while you allow the
+> > boot loader to modify the dtb. If an attacker gets in and cannot modify
+> > the kernel or initid but can modify the DT, a successful attack would
+> > be a bit harder than having a modified kernel, but you may still need
+> > to treat the system as compromised.
+> 
+> Yes, and the same question also remains regarding the kernel command line.
+> 
+> We can have the kernel perform sanity checks on the device tree, just as the 
+> kernel needs to sanity check the command line.
+> 
+> There's the point that was raised about not wanting to increase the attack 
+> surface, and that's a valid point. But at least in the way Petitboot works 
+> today, it needs to modify the device tree and pass it to the kernel.
+> 
+> One thing that is unavoidable to come from userspace is 
+> /chosen/linux,stdout-path, because it's Petitboot that knows from which 
+> console the user is interacting with. The other modification to set 
+> properties in vga at 0 can be done in the kernel.
+> 
+> Given that on DTB-based systems /chosen is an important and established way 
+> to pass information to the operating system being booted, I'd like to 
+> suggest the following, then:
+> 
+> Extend the syscall as shown in this RFC from Takahiro AKASHI, but instead of 
+> accepting a complete DTB from userspace, the syscall would accept a DTB 
+> containing only a /chosen node. If the DTB contains any other node, the 
+> syscall fails with EINVAL. The kernel can then add the properties in /chosen 
+> to the device tree that it will pass to the next kernel.
+> 
+> What do you think?
 
-Best regards,
-Krzysztof
+I think that helps, as it makes the problem space correspond to that
+of modifying the command line, but I can still come up with countless
+attacks based on modifications of the /chosen node and/or the command
+line, in fact it's probably easier than any other node.
+
+What methods to we have in place for command line changes today on
+other architectures?
+
+	Arnd
