@@ -1,125 +1,45 @@
-From: shawn.lin@rock-chips.com (Shawn Lin)
-Date: Fri, 15 Jul 2016 10:42:55 +0800
-Subject: [PATCH] spi: rockchip: limit transfers to (64K - 1) bytes
-In-Reply-To: <20160715023152.GA145248@google.com>
-References: <1468546259-136659-1-git-send-email-briannorris@chromium.org>
- <131afa39-4287-0fb8-61f4-146283dc7cf0@rock-chips.com>
- <20160715023152.GA145248@google.com>
-Message-ID: <b855036c-86b3-3515-86ae-24de820564ff@rock-chips.com>
+From: kwangwoo.lee@sk.com (Kwangwoo Lee)
+Date: Fri, 15 Jul 2016 11:46:19 +0900
+Subject: [PATCH v3 0/3]  support pmem on arm64
+Message-ID: <1468550782-14454-1-git-send-email-kwangwoo.lee@sk.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2016/7/15 10:31, Brian Norris ??:
-> Hi Shawn,
->
-> On Fri, Jul 15, 2016 at 09:56:59AM +0800, Shawn Lin wrote:
->> ? 2016/7/15 9:30, Brian Norris ??:
->>> The Rockchip SPI controller's length register only supports 16-bits,
->>> yielding a maximum length of 64KiB (the CTRLR1 register holds "length -
->>> 1"). Trying to transfer more than that (e.g., with a large SPI flash
->>> read) will cause the driver to hang.
->>
->> Brian, are you using dma or pio?
->
-> I forgot to mention, I'm using PIO. (The rk3399.dts in linux-next
-> doesn't even have the 'dma{s,-names}' properties listed for spi[0-5].)
+This patch set add supporting the pmem driver on arm64 architecture which
+can be used on NVDIMM(Non-Volatile DIMM). It has been tested on QEMU with
+NVDIMM ACPI/NFIT support on AArch64 VIRT platform.
 
-okay.
+Until the changes of pmem codes posted to nvdimm list is merged which assums
+supporting ADR(Asynchronous DRAM Refresh) or direct flushing based on the
+flush hint provided by ACPI/NFIT, this pmem implementation on arm64 can be
+a solution to evaluate pmem on arm64 architecture.
 
->
->> From huibing's feedback for rk3399, you can see...
->>
->> root at rk3399:/ # echo read 0 1 0x10001 > /sys/slt/SPI.0/SPI.0
->
-> I don't know what that file is, but presumably it's some kind of bare
-> SPI test interface you have in your private tree?
+Change log:
 
-yes.
+v3)
+do not use a access helper in arch_memcpy_to_pmem().
+split cache related codes with different patch set.
+fix some comments in pmem.h.
 
->
->> [148360.004332] f0041200:       DMAMOV CCR 0x804200
->> [148360.004772] f0041206:       DMAMOV SAR 0xff1d0800
->> [148360.005161] f004120c:       DMAMOV DAR 0xc9f60000
->> [148360.005549] f0041212:       DMALP_0 255
->> [148360.005866] f0041214:       DMALP_1 255
->> [148360.006178] f0041216:       DMAWFPB 13
->> [148360.006483] f0041218:       DMALDPB 13
->> [148360.006788] f004121a:       DMASTA
->> [148360.007061] f004121b:       DMAFLUSHP 13
->> [148360.007380] f004121d:       DMALPENDA_1 bjmpto_7
->> [148360.007763] f004121f:       DMALPENDA_0 bjmpto_b
->> [148360.008144] f0041221:       DMAWFPB 13
->> [148360.008448] f0041223:       DMALDPB 13
->> [148360.008752] f0041225:       DMASTA
->> [148360.009026] f0041226:       DMAFLUSHP 13
->> [148360.009344] f0041228:       DMASEV 1
->> [148360.009633] f004122a:       DMAEND
->> [148360.147993] slt_spi_test spi32766.0: SPI transfer timed out
->> [148360.148653] spi read 65537*1 cost 144493us speed:453KB/S
->
-> And this means a 64KiB + 1 transfer using DMA timed out?
+v2)
+rewrite functions under the mapping information MEMREMAP_WB.
+rewrite the comments for arm64 in pmem.h
+add __clean_dcache_area() to clean the cache lines to the PoC.
 
-Right.
+v1)
+add pmem support codes.
 
->
->> root at rk3399:/ #
->> root at rk3399:/ # echo read 0 1 0x10000 > /sys/slt/SPI.0/SPI.0
->>
->> [148365.172429] f0041200:       DMAMOV CCR 0x804200
->> [148365.172863] f0041206:       DMAMOV SAR 0xff1d0800
->> [148365.173252] f004120c:       DMAMOV DAR 0xc9f90000
->> [148365.173641] f0041212:       DMALP_0 255
->> [148365.173958] f0041214:       DMALP_1 255
->> [148365.174270] f0041216:       DMAWFPB 13
->> [148365.174574] f0041218:       DMALDPB 13
->> [148365.174878] f004121a:       DMASTA
->> [148365.175152] f004121b:       DMAFLUSHP 13
->> [148365.175471] f004121d:       DMALPENDA_1 bjmpto_7
->> [148365.175852] f004121f:       DMALPENDA_0 bjmpto_b
->> [148365.176234] f0041221:       DMASEV 1
->> [148365.176522] f0041223:       DMAEND
->> [148365.207421] spi read 65536*1 cost 35144us speed:1864KB/S
->
-> And a 64KiB transfer using DMA completed successfully?
+Kwangwoo Lee (3):
+  arm64: mm: add __clean_dcache_area()
+  arm64: mm: add mmio_flush_range() to support pmem
+  arm64: pmem: add pmem support codes
 
-yup.
-
->
-> So maybe there's a driver bug in the PIO path that gives us an
-> off-by-one error. I poked around a bit and couldn't figure out anything,
-> so I sent this. Technically, this patch is still valid (even if not
-> optimal) for the DMA case too...
-
-Huibing is using pio to test this case, and we still achieve it
-successfully? That means there may be some minor diff for the pio
-path between your chromium repo and my local branch.
-
->
-> If you can't figure out what the difference is, and you really don't
-> want to unnecessarily limit the DMA case, then a last resort hack could
-> be to say:
->
-
-Could you get spi-rockchip.c of rockchip local kernel 4.4 from Caesar
-to see if you could transfer 64KB with the one we're using?
-
-
-> static size_t rockchip_spi_max_transfer_size(struct spi_device *device)
-> {
-> 	if (using dma) // this is obviously pseudocode
-> 		return SZ_64K;
-> 	else
-> 		return SZ_64K - 1;
-> }
->
-> or something like that.
->
-> Brian
->
->
->
-
+ arch/arm64/Kconfig                  |   2 +
+ arch/arm64/include/asm/cacheflush.h |   3 +
+ arch/arm64/include/asm/pmem.h       | 143 ++++++++++++++++++++++++++++++++++++
+ arch/arm64/mm/cache.S               |  18 +++++
+ 4 files changed, 166 insertions(+)
+ create mode 100644 arch/arm64/include/asm/pmem.h
 
 -- 
-Best Regards
-Shawn Lin
+2.5.0
