@@ -1,71 +1,104 @@
-From: ttnguyen@apm.com (Tai Tri Nguyen)
-Date: Fri, 15 Jul 2016 10:31:09 -0700
-Subject: [PATCH v9 3/4] perf: xgene: Add APM X-Gene SoC Performance
- Monitoring Unit driver
-In-Reply-To: <20160715094541.GE4655@leverpostej>
-References: <1468517266-1642-1-git-send-email-ttnguyen@apm.com>
- <1468517266-1642-4-git-send-email-ttnguyen@apm.com>
- <1468518428.8745.43.camel@perches.com>
- <CACgAJHwzWG_6iWG4OcL3v5QcUF892DwBcJxayqbH4f2kd7=kQQ@mail.gmail.com>
- <CACgAJHw7UMFKY=j8UBKUi=hNHfyzVoNMr_A5qOahhbgM+14KBQ@mail.gmail.com>
- <20160715094541.GE4655@leverpostej>
-Message-ID: <CACgAJHyaoEJqyeXNsy2HbfxQo2m-Ljm61nDKOtL-Vqbv=NVhKA@mail.gmail.com>
+From: ttnguyen@apm.com (Tai Nguyen)
+Date: Fri, 15 Jul 2016 10:38:01 -0700
+Subject: [PATCH v10 0/4] perf: Add APM X-Gene SoC Performance Monitoring Unit
+ driver
+Message-ID: <1468604285-15090-1-git-send-email-ttnguyen@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark and Joe,
+In addition to the X-Gene ARM CPU performance monitoring unit (PMU), there
+are PMU for the SoC system devices such as L3 cache(s), I/O bridge(s),
+memory controller bridges and memory. These PMU devices are loosely
+architected to follow the same model as the PMU for ARM cores.
 
-On Fri, Jul 15, 2016 at 2:45 AM, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Thu, Jul 14, 2016 at 11:05:48AM -0700, Tai Tri Nguyen wrote:
->> Hi Joe,
->>
->> On Thu, Jul 14, 2016 at 10:54 AM, Tai Tri Nguyen <ttnguyen@apm.com> wrote:
->> > Hi Joe,
->> >
->> > On Thu, Jul 14, 2016 at 10:47 AM, Joe Perches <joe@perches.com> wrote:
->> >> On Thu, 2016-07-14 at 10:27 -0700, Tai Nguyen wrote:
->> >>> This patch adds a driver for the SoC-wide (AKA uncore) PMU hardware
->> >>> found in APM X-Gene SoCs.
->> >>
->> >> trivia:
->> >>
->> >>> diff --git a/drivers/perf/xgene_pmu.c b/drivers/perf/xgene_pmu.c
->> >> []
->> >>> +struct xgene_pmu_dev_ctx {
->> >>> +     char *name;
->> >>> +     struct list_head next;
->> >>> +     struct xgene_pmu_dev *pmu_dev;
->> >>> +     struct hw_pmu_info inf;
->> >>> +};
->> >>
->> >> Probably better to use something like
->> >>         char    name[20];
->> >> as the kasprintf can fail and this doesn't
->> >> seem to be freed anywhere.
->> >
->> > Okay. I'll fix it shortly.
->> >
->>
->> I take it back.
->> I refer many other drivers using kasprintf and they do the same way I do.
->> Can you please check it again?
->
-> Joe is correct that you allocate a string with kasprintf, and this never
-> gets freed, even if the driver is removed. Thus, memory may be leaked.
->
-> If other drivers do the same, they are similarly wrong.
->
-> Even if this is a rare case, it's not good practice to leave allocations
-> unbalanced. So please fix this.
->
-> If you don't want to change the struct, another option is to use
-> devm_kasprintf. However, I suspect with all the accounting data
-> structures that will take up more space.
->
+Signed-off-by: Tai Nguyen <ttnguyen@apm.com>
+---
 
-Thanks, I will change to use devm_kasprintf because I don't want to
-change the struct.
+v10:
+ * Use devm_kasprintf instead of kasprintf which may cause memory leaked.
 
-Regards,
+v9:
+ * Add commmit messages to the patches.
+
+v8:
+ * MAINTAINERS: Fix section header in one line
+ * Change module_platform_driver to builtin_platform_driver
+   Get rid of the use of module.h and its no-ops macros
+
+v7:
+ * Remove const from the definition of xgene_pmu_cpumask_attrs
+ * Validate the event group as a whole, disallow creating groups containing
+   mixed PMUs
+ * Implement pmu::pmu_enable() and pmu::pmu_disable() to let the perf core
+   starts and stops the counters properly
+ * Using list_for_each_entry() instead of list_for_each_entry_safe() to iterate
+   over the list of pmu sub-devices
+ * Fix resource leak issue in case of registering perf devices fails
+ * Pass on returned error if acpi_walk_namespace() fails
+ * Remove unused xgene_pmu_data::data
+ * Move enable interrupt after probing pmu sub-devices
+
+v6:
+ * Add IRQF_NOBALANCING and IRQF_NO_THREAD flags to the PMU overflow interrupt
+   Exclude the interrupt from irq balancing and prevent the context from being
+   threaded
+
+v5:
+ * Remove hw_perf_event::extra_reg field use
+   Change GET_CNTR to use hw_perf_event::idx
+   Change GET_AGENTID/GET_AGEN1ID to use hw_perf_event::config_base
+ * Use compound literal structure defines for format and event attribute groups
+   to statically define them at compile time
+ * Bitwise invert the meaning of agent mask in config1 field.
+ * Fix update pmu_counter_event pointer before starting event
+ * Add reset of pmu_dev->pmu_counter_event to NULL in xgene_perf_del
+ * Use exactly half of max period to fix the overflow counter issue and account
+   for the possiblity of extreme interrupt latency
+ * Use spin lock instead of interrupt masking in overflow interrupt handler
+ * Remove unnecessary update of hw_perf_event::period_left
+
+v4:
+ * Alphabetically sorting header files
+ * Remove dynamic allocation for PMU format and event attribute groups
+   Create shared constant attribute groups per each class
+ * Remove perf_sample_data as this perf driver doesn't support sampling
+ * Consistently use the PCP_PMU_V{1,2} defines
+ * Set affinity to make sure the overflow interrupt is handled by the
+   same assigned CPU
+
+v3:
+ * Remove index property use in PMU device sub nodes
+
+v2:
+ * Use bitmask for event asignned counter mask pmu_dev->cntr_assign_mask
+ * Remove unnecessary spinlocks in perf add/del operations
+ * Remove unnecessary condition checks
+ * Enforce CPU assignment to one CPU for perf operarations
+ * Set the task_ctx_nr to perf_invalid_context for perf driver
+ * Remove irrelevant pt_rregs
+ * Change perf sysfs attributes to be fixed instead of dynamic
+ * Fix checking for an ACPI companion device instead of EFI enable
+ * Add documentation for config/config1 fields format and perf tool example
+
+---
+
+Tai Nguyen (4):
+  MAINTAINERS: Add entry for APM X-Gene SoC PMU driver
+  Documentation: Add documentation for APM X-Gene SoC PMU DTS binding
+  perf: xgene: Add APM X-Gene SoC Performance Monitoring Unit driver
+  arm64: dts: apm: Add APM X-Gene SoC PMU DTS entries
+
+ .../devicetree/bindings/perf/apm-xgene-pmu.txt     |  112 ++
+ Documentation/perf/xgene-pmu.txt                   |   48 +
+ MAINTAINERS                                        |    7 +
+ arch/arm64/boot/dts/apm/apm-storm.dtsi             |   58 +
+ drivers/perf/Kconfig                               |    7 +
+ drivers/perf/Makefile                              |    1 +
+ drivers/perf/xgene_pmu.c                           | 1398 ++++++++++++++++++++
+ 7 files changed, 1631 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/perf/apm-xgene-pmu.txt
+ create mode 100644 Documentation/perf/xgene-pmu.txt
+ create mode 100644 drivers/perf/xgene_pmu.c
+
 -- 
-Tai
+1.9.1
