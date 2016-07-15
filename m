@@ -1,71 +1,72 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 15 Jul 2016 15:45:51 +0000
-Subject: [PATCH v2 02/10] irqchip: add irqchip driver for nuc900
-In-Reply-To: <CAKT61h8EkOOkDHou65Uc7NNomJ6Nowvw8o6JnWxNyc0S_=x_JA@mail.gmail.com>
-References: <1468135649-19980-1-git-send-email-vw@iommu.org>
- <20160714135426.GC31509@io.lakedaemon.net>
- <5788718E.7080708@iommu.org> <16178876.fFBuoBSjbd@wuerfel>
- <CAKT61h8EkOOkDHou65Uc7NNomJ6Nowvw8o6JnWxNyc0S_=x_JA@mail.gmail.com>
-Message-ID: <20160715154551.GF31509@io.lakedaemon.net>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 15 Jul 2016 16:47:27 +0100
+Subject: [RFC 0/3] extend kexec_file_load system call
+In-Reply-To: <1565504.8BCDUlPeYg@hactar>
+References: <20160712014201.11456-1-takahiro.akashi@linaro.org>
+ <20160715132610.GD23514@redhat.com>
+ <20160715133346.GD19840@leverpostej> <1565504.8BCDUlPeYg@hactar>
+Message-ID: <20160715154726.GE19840@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 15, 2016 at 05:44:50PM +0800, Wan ZongShun wrote:
-> 2016-07-15 15:00 GMT+08:00 Arnd Bergmann <arnd@arndb.de>:
-> > On Friday, July 15, 2016 1:15:58 PM CEST Wan Zongshun wrote:
-> >>
-> >> Actually, I have two choice to implement this function:
-> >>
-> >> option1:
-> >>
-> >> void __exception_irq_entry aic_handle_irq(struct pt_regs *regs)
-> >> {
-> >>         u32 hwirq;
-> >>
-> >>         (void)readl(aic_base + REG_AIC_IPER);
-> >>         hwirq = readl(aic_base + REG_AIC_ISNR);
-> >>
-> >>         handle_IRQ((irq_find_mapping(aic_domain, hwirq)), regs);
-> >> }
-> >
-> > (side note: I think you want handle_domain_irq())
-> >
-> >> option2:
-> >>
-> >> void __exception_irq_entry aic_handle_irq(struct pt_regs *regs)
-> >> {
-> >>         u32 hwirq;
-> >>
-> >>         hwirq = readl(aic_base + REG_AIC_IPER);
-> >>         hwirq <<= 2;
-> >>
-> >>         handle_IRQ((irq_find_mapping(aic_domain, hwirq)), regs);
-> >> }
-> >>
-> >> Though the option2 do shift for hwirq, but it seems better than do io
-> >> operation by readl,so I prefer to option2, agree?
-> >
-> > That will only return an irq number that is a multiple of four, which
-> > seems wrong since the numbers are not that. Did you mean to write
-> >
-> >         hwirq = ilog2(hwirq);   ?
+On Fri, Jul 15, 2016 at 12:29:09PM -0300, Thiago Jung Bauermann wrote:
+> Am Freitag, 15 Juli 2016, 14:33:47 schrieb Mark Rutland:
+> > On Fri, Jul 15, 2016 at 09:26:10AM -0400, Vivek Goyal wrote:
+> > > I don't know anything about DTB. So here comes a very basic question.
+> > > Does DTB allow passing an executable blob to kernel or pass the
+> > > location of some unsigned executable code at kernel level. I think from
+> > > secureboot point of view that would be a concern. Being able to trick
+> > > kernel to execute an unsigned code at privileged level.
+> > 
+> > The DTB itself won't contain executable code.
+> > 
+> > However, arbitrary bindings could point kernel at such code. For
+> > instance, /chosen/linux,uefi-system-table could point the kernel at a
+> > faked EFI system table, with pointers to malicious code. So
+> > arbitrary modification of /chosen is not safe.
 > 
-> Sorry, my fault, I mean hwirq >>= 2, bit[7:2] indicates which irq is triggering.
-> so I have to do right shift 2 for IPER value.
-
-Ok, this makes a lot more sense now. :)
-
-> > That assumes that REG_AIC_IPER contains a 32-bit value with one single
-> > bit set to indicate which IRQ was triggered.
-> >
-> > If the difference is only in performance, you could try measuring which
-> > of the two ends up being faster.
+> PowerPC doesn't have UEFI so this option is not a concern in that 
+> architecture. I'm having a look at what a PowerPC kernel gets from /chosen 
+> and haven't found anything of concern so far, but I'm still looking.
 > 
-> It seems hard to measure. I think Do IO operation should be slower
-> than shift 2. :)
+> On the other hand, the kernel command line has the option acpi_rsdp, which 
+> is used to pass the address of the RSDP. I don't really know much about EFI 
+> so I'm not sure if it can be used to point to code that the kernel can 
+> execute, but it does point to tables that contain AML code.
 
-Agreed.
+Please let's not conflate EFI and ACPI, the two are distinct.
 
-thx,
+I believe that there aren't any ACPI tables which contain native code,
+or which contain pointers to native code, but I could be mistaken. It
+doesn't seem unlikely that malicious AML is possible, but I'm not
+familiar enough with AML to know how we sandbox that.
 
-Jason.
+>From a scan of Documentation/kernel-parameters.txt, it doesn't look like
+there are options to override the EFI system table (or related tables),
+so it doesn't look like there's a trivial mechanism to trigger arbitrary
+code execution. It looks like efi_fake_mem could be used to trick the
+kernel to poke things it shouldn't, though that likely brings the system
+down entirely.
+
+> > Bindings describe arbitrary system features (devices, firmware
+> > interfaces, etc), so in general they might provide mechanisms to execute
+> > code.
+> 
+> Even bindings in /chosen?
+
+Yes, even bindings in /chosen. As above, the linux,uefi-system-table
+property lives under /chosen, and provides pointers to native code.
+Control over this property could yield arbitrary code execution.
+
+Additionally, there are drivers that just go looking for a compatible
+string, and will probe regardless of where the node is in the hierarchy.
+e.g. clock controller drivers, memory nodes. So /chosen isn't sandboxed
+as such. 
+
+I fear that there are many things that one could place under /chosen
+that could make the kernel do the wrong thing. Given the example of
+drivers, I'm not sure it's going to be possible to audit all the
+relevant code.
+
+Thanks,
+Mark.
