@@ -1,129 +1,158 @@
-From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Fri, 15 Jul 2016 12:03:08 -0400
-Subject: [PATCH v2 2/2] arm64: implement live patching
-In-Reply-To: <20160627151722.B81C968D29@newverein.lst.de>
-References: <20160627151500.2247A68D20@newverein.lst.de>
- <20160627151722.B81C968D29@newverein.lst.de>
-Message-ID: <CAP=VYLocwooC+4oODKU6ER5v+cTo3oH6ReKC3VwD-juwvfpErw@mail.gmail.com>
+From: fu.wei@linaro.org (Fu Wei)
+Date: Sat, 16 Jul 2016 00:13:14 +0800
+Subject: [PATCH v7 4/9] acpi/arm64: Add GTDT table parse driver
+In-Reply-To: <4581163.sAHfC1UEjl@vostro.rjw.lan>
+References: <1468432402-4872-1-git-send-email-fu.wei@linaro.org>
+ <CAJZ5v0jnNqjpcY1CGkHxbJFwX1MuRi-U=jTCKWavMdEH4bKR3g@mail.gmail.com>
+ <CADyBb7sGWizLDy3LtpGpJ9jkchyWHZ2oPfsg6fE1ZE54gn05FA@mail.gmail.com>
+ <4581163.sAHfC1UEjl@vostro.rjw.lan>
+Message-ID: <CADyBb7vziYMcAfk5TNOHoBCxi58jJypcTV_o2U75cLS-SRtEJQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 27, 2016 at 11:17 AM, Torsten Duwe <duwe@lst.de> wrote:
-> On top of FTRACE_WITH_REGS and the klp changes that go into v4.7
-> this is straightforward.
->
-> Signed-off-by: Torsten Duwe <duwe@suse.de>
-> ---
->  arch/arm64/Kconfig                 |  3 +++
->  arch/arm64/include/asm/livepatch.h | 37 +++++++++++++++++++++++++++++++++++++
->  arch/arm64/kernel/entry-ftrace.S   | 13 +++++++++++++
->  3 files changed, 53 insertions(+)
->  create mode 100644 arch/arm64/include/asm/livepatch.h
->
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 36a0e26..cb5adf3 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -80,6 +80,7 @@ config ARM64
->         select HAVE_GENERIC_DMA_COHERENT
->         select HAVE_HW_BREAKPOINT if PERF_EVENTS
->         select HAVE_IRQ_TIME_ACCOUNTING
-> +       select HAVE_LIVEPATCH
->         select HAVE_MEMBLOCK
->         select HAVE_MEMBLOCK_NODE_MAP if NUMA
->         select HAVE_PATA_PLATFORM
-> @@ -1042,4 +1043,6 @@ if CRYPTO
->  source "arch/arm64/crypto/Kconfig"
->  endif
->
-> +source "kernel/livepatch/Kconfig"
-> +
->  source "lib/Kconfig"
-> diff --git a/arch/arm64/include/asm/livepatch.h b/arch/arm64/include/asm/livepatch.h
-> new file mode 100644
-> index 0000000..6b9a3d1
-> --- /dev/null
-> +++ b/arch/arm64/include/asm/livepatch.h
-> @@ -0,0 +1,37 @@
-> +/*
-> + * livepatch.h - arm64-specific Kernel Live Patching Core
-> + *
-> + * Copyright (C) 2016 SUSE
-> + *
-> + * This program is free software; you can redistribute it and/or
-> + * modify it under the terms of the GNU General Public License
-> + * as published by the Free Software Foundation; either version 2
-> + * of the License, or (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program; if not, see <http://www.gnu.org/licenses/>.
-> + */
-> +#ifndef _ASM_ARM64_LIVEPATCH_H
-> +#define _ASM_ARM64_LIVEPATCH_H
-> +
-> +#include <linux/module.h>
-> +#include <linux/ftrace.h>
+Hi Rafael,
 
-These includes don't look right.  It would seem all you need is the one
-for struct pt_regs.
+On 15 July 2016 at 20:11, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+> On Friday, July 15, 2016 03:45:05 PM Fu Wei wrote:
+>> Hi Rafael,
+>>
+>>
+>> On 14 July 2016 at 05:43, Rafael J. Wysocki <rafael@kernel.org> wrote:
+>> > On Wed, Jul 13, 2016 at 11:08 PM, Guenter Roeck <linux@roeck-us.net> wrote:
+>> >> On Wed, Jul 13, 2016 at 10:30:37PM +0200, Rafael J. Wysocki wrote:
+>> >>> On Wed, Jul 13, 2016 at 7:53 PM,  <fu.wei@linaro.org> wrote:
+>> >>> > From: Fu Wei <fu.wei@linaro.org>
+>> >>> >
+>> >>> > This patch adds support for parsing arch timer in GTDT,
+>> >>> > provides some kernel APIs to parse all the PPIs and
+>> >>> > always-on info in GTDT and export them.
+>> >>> >
+>> >>> > By this driver, we can simplify arm_arch_timer drivers, and
+>> >>> > separate the ACPI GTDT knowledge from it.
+>> >>> >
+>> >>> > Signed-off-by: Fu Wei <fu.wei@linaro.org>
+>> >>> > Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+>> >>> > ---
+>> >>> >  drivers/acpi/Kconfig           |   5 ++
+>> >>> >  drivers/acpi/Makefile          |   1 +
+>> >>> >  drivers/acpi/arm64/Kconfig     |  15 ++++
+>> >>> >  drivers/acpi/arm64/Makefile    |   1 +
+>> >>> >  drivers/acpi/arm64/acpi_gtdt.c | 170 +++++++++++++++++++++++++++++++++++++++++
+>> >>> >  include/linux/acpi.h           |   6 ++
+>> >>> >  6 files changed, 198 insertions(+)
+>> >>> >
+>> >>> > diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
+>> >>> > index b7e2e77..1cdc7d2 100644
+>> >>> > --- a/drivers/acpi/Kconfig
+>> >>> > +++ b/drivers/acpi/Kconfig
+>> >>> > @@ -521,4 +521,9 @@ config XPOWER_PMIC_OPREGION
+>> >>> >
+>> >>> >  endif
+>> >>> >
+>> >>> > +if ARM64
+>> >>> > +source "drivers/acpi/arm64/Kconfig"
+>> >>> > +
+>> >>> > +endif
+>> >>> > +
+>> >>> >  endif  # ACPI
+>> >>> > diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
+>> >>> > index 251ce85..1a94ff7 100644
+>> >>> > --- a/drivers/acpi/Makefile
+>> >>> > +++ b/drivers/acpi/Makefile
+>> >>> > @@ -99,5 +99,6 @@ obj-$(CONFIG_ACPI_EXTLOG)     += acpi_extlog.o
+>> >>> >  obj-$(CONFIG_PMIC_OPREGION)    += pmic/intel_pmic.o
+>> >>> >  obj-$(CONFIG_CRC_PMIC_OPREGION) += pmic/intel_pmic_crc.o
+>> >>> >  obj-$(CONFIG_XPOWER_PMIC_OPREGION) += pmic/intel_pmic_xpower.o
+>> >>> > +obj-$(CONFIG_ARM64)    += arm64/
+>> >>> >
+>> >>> >  video-objs                     += acpi_video.o video_detect.o
+>> >>> > diff --git a/drivers/acpi/arm64/Kconfig b/drivers/acpi/arm64/Kconfig
+>> >>> > new file mode 100644
+>> >>> > index 0000000..ff5c253
+>> >>> > --- /dev/null
+>> >>> > +++ b/drivers/acpi/arm64/Kconfig
+>> >>> > @@ -0,0 +1,15 @@
+>> >>> > +#
+>> >>> > +# ACPI Configuration for ARM64
+>> >>> > +#
+>> >>> > +
+>> >>> > +menu "The ARM64-specific ACPI Support"
+>> >>> > +
+>> >>> > +config ACPI_GTDT
+>> >>> > +       bool "ACPI GTDT table Support"
+>> >>>
+>> >>> This should depend on ARM64.
+>> >>>
+>> >>> Also I wonder if it needs to be user-selectable?  Wouldn't it be
+>> >>> better to enable it by default when building for ARM64 with ACPI?
+>> >>>
+>> >> It is currently selected in patch 9, in the watchdog driver's Kconfig
+>> >> entry.
+>> >
+>> > Well, it still doesn't have to be user-selectable for that. :-)
+>>
+>> Actually it is also automatically selected by [PATCH v7 6/9]:
+>
+> Right.
+>
+> By user-selectable I mean "showing up in a Kconfig configurator tool".
+>
+> It just need not be visible in the configurator IMO.
+>
+>> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+>> index 47352d2..71d5b30 100644
+>> --- a/drivers/clocksource/Kconfig
+>> +++ b/drivers/clocksource/Kconfig
+>> @@ -8,6 +8,7 @@ config CLKSRC_OF
+>>  config CLKSRC_ACPI
+>>   bool
+>>   select CLKSRC_PROBE
+>> + select ACPI_GTDT if ARM64
+>>
+>>  config CLKSRC_PROBE
+>>   bool
+>>
+>>
+>> >
+>> >> Not sure if I like that; maybe the watchdog driver should depend
+>> >> on it instead ?
+>> >
+>> > If the watchdog is not the only user of it (and I don't think it is),
+>> > it would be better to arrange things this way.
+>> >
+>>
+>> There are two user:
+>> (1) arm_arch_timer(which will select CLKSRC_ACPI if ACPI, then
+>> CLKSRC_ACPI will select ACPI_GTDT if ARM64)
+>> So arm_arch_timer will automatically selecte ACPI_GTDT if ARM64 && ACPI
+>>
+>> (2) sbsa_gwdt (which will select ACPI_GTDT if ACPI in [PATCH v7 9/9])
+>> So sbsa_gwdt will automatically selecte ACPI_GTDT if ARM64 && ACPI &&
+>> ARM_ARCH_TIMER
+>>
+>> So ACPI_GTDT is automatically selected by both of two users.
+>>
+>>
+>> But like Timur said before:
+>>
+>> maybe we just "selecte ACPI_GTDT if ACPI" for ARM64, because ARM64
+>> require GTDT if we use ACPI.
+>
+> Right.  That's the way to do it then and make sbsa_gwdt depend on it instead
+> of selecting it.
 
-Paul.
---
+OK, will do in my v8 patchset
 
-> +
-> +#ifdef CONFIG_LIVEPATCH
-> +static inline int klp_check_compiler_support(void)
-> +{
-> +       return 0;
-> +}
-> +
-> +static inline void klp_arch_set_pc(struct pt_regs *regs, unsigned long ip)
-> +{
-> +       regs->pc = ip;
-> +}
-> +#endif /* CONFIG_LIVEPATCH */
-> +
-> +#endif /* _ASM_ARM64_LIVEPATCH_H */
-> diff --git a/arch/arm64/kernel/entry-ftrace.S b/arch/arm64/kernel/entry-ftrace.S
-> index 3ebe791..b166cbf 100644
-> --- a/arch/arm64/kernel/entry-ftrace.S
-> +++ b/arch/arm64/kernel/entry-ftrace.S
-> @@ -204,6 +204,9 @@ ENTRY(ftrace_caller)
->         str     x9, [sp, #S_LR]
->         /* The program counter just after the ftrace call site */
->         str     lr, [sp, #S_PC]
-> +#if defined(CONFIG_LIVEPATCH) && defined(CONFIG_FUNCTION_GRAPH_TRACER)
-> +       mov     x19,lr          /* remember old return address */
-> +#endif
->         /* The stack pointer as it was on ftrace_caller entry... */
->         add     x29, sp, #S_FRAME_SIZE+16       /* ...is also our new FP */
->         str     x29, [sp, #S_SP]
-> @@ -219,6 +222,16 @@ ftrace_call:
 >
->         bl      ftrace_stub
+> Thanks,
+> Rafael
 >
-> +#if defined(CONFIG_LIVEPATCH) && defined(CONFIG_FUNCTION_GRAPH_TRACER)
-> +       /* Is the trace function a live patcher an has messed with
-> +        * the return address?
-> +       */
-> +       ldr     x9, [sp, #S_PC]
-> +       cmp     x9, x19         /* compare with the value we remembered */
-> +       /* to not call graph tracer's "call" mechanism twice! */
-> +       b.eq    ftrace_regs_return
-> +#endif
-> +
->  #ifdef CONFIG_FUNCTION_GRAPH_TRACER
->         .global ftrace_graph_call
->  ftrace_graph_call:                     // ftrace_graph_caller();
-> --
-> 2.6.6
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-arch" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+
+
+-- 
+Best regards,
+
+Fu Wei
+Software Engineer
+Red Hat
