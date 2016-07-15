@@ -1,388 +1,151 @@
 From: yt.shen@mediatek.com (YT Shen)
-Date: Fri, 15 Jul 2016 18:07:52 +0800
-Subject: [PATCH v4 6/8] drm/mediatek: add dsi transfer function
+Date: Fri, 15 Jul 2016 18:07:54 +0800
+Subject: [PATCH v4 8/8] arm: dts: mt2701: Add display subsystem related nodes
+ for MT2701
 In-Reply-To: <1468577274-6178-1-git-send-email-yt.shen@mediatek.com>
 References: <1468577274-6178-1-git-send-email-yt.shen@mediatek.com>
-Message-ID: <1468577274-6178-7-git-send-email-yt.shen@mediatek.com>
+Message-ID: <1468577274-6178-9-git-send-email-yt.shen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: shaoming chen <shaoming.chen@mediatek.com>
+This patch adds the device nodes for the DISP function blocks for MT2701
 
-add dsi read/write commands for transfer function
-
-Signed-off-by: shaoming chen <shaoming.chen@mediatek.com>
+Signed-off-by: YT Shen <yt.shen@mediatek.com>
 ---
- drivers/gpu/drm/mediatek/mtk_dsi.c |  322 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 322 insertions(+)
+ arch/arm/boot/dts/mt2701.dtsi |  100 +++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 100 insertions(+)
 
-diff --git a/drivers/gpu/drm/mediatek/mtk_dsi.c b/drivers/gpu/drm/mediatek/mtk_dsi.c
-index de5ad7f..1f99894 100644
---- a/drivers/gpu/drm/mediatek/mtk_dsi.c
-+++ b/drivers/gpu/drm/mediatek/mtk_dsi.c
-@@ -24,6 +24,7 @@
- #include <linux/of_graph.h>
- #include <linux/phy/phy.h>
- #include <linux/platform_device.h>
-+#include <video/mipi_display.h>
- #include <video/videomode.h>
+diff --git a/arch/arm/boot/dts/mt2701.dtsi b/arch/arm/boot/dts/mt2701.dtsi
+index 363de0d..7da9310 100644
+--- a/arch/arm/boot/dts/mt2701.dtsi
++++ b/arch/arm/boot/dts/mt2701.dtsi
+@@ -24,6 +24,11 @@
+ 	compatible = "mediatek,mt2701";
+ 	interrupt-parent = <&sysirq>;
  
- #include "mtk_drm_ddp_comp.h"
-@@ -80,8 +81,16 @@
- #define DSI_HBP_WC		0x54
- #define DSI_HFP_WC		0x58
++	aliases {
++		rdma0 = &rdma0;
++		rdma1 = &rdma1;
++	};
++
+ 	cpus {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+@@ -171,6 +176,16 @@
+ 		power-domains = <&scpsys MT2701_POWER_DOMAIN_DISP>;
+ 	};
  
-+#define DSI_CMDQ_SIZE		0x60
-+#define CMDQ_SIZE		0x3f
++	mipi_tx0: mipi-dphy at 10010000 {
++		compatible = "mediatek,mt2701-mipi-tx";
++		reg = <0 0x10010000 0 0x90>;
++		clocks = <&clk26m>;
++		clock-output-names = "mipi_tx0_pll";
++		#clock-cells = <0>;
++		#phy-cells = <0>;
++		status = "disabled";
++	};
 +
- #define DSI_HSTX_CKL_WC		0x64
+ 	sysirq: interrupt-controller at 10200100 {
+ 		compatible = "mediatek,mt2701-sysirq",
+ 			     "mediatek,mt6577-sysirq";
+@@ -255,6 +270,68 @@
+ 		status = "disabled";
+ 	};
  
-+#define DSI_RX_DATA0		0x74
-+#define DSI_RX_DATA1		0x78
-+#define DSI_RX_DATA2		0x7c
-+#define DSI_RX_DATA3		0x80
++	ovl at 14007000 {
++		compatible = "mediatek,mt2701-disp-ovl";
++		reg = <0 0x14007000 0 0x1000>;
++		interrupts = <GIC_SPI 153 IRQ_TYPE_LEVEL_LOW>;
++		clocks = <&mmsys CLK_MM_DISP_OVL>;
++		iommus = <&iommu MT2701_M4U_PORT_DISP_OVL_0>;
++		mediatek,larb = <&larb0>;
++	};
 +
- #define DSI_RACK		0x84
- #define RACK			BIT(0)
++	rdma0: rdma at 14008000 {
++		compatible = "mediatek,mt2701-disp-rdma";
++		reg = <0 0x14008000 0 0x1000>;
++		interrupts = <GIC_SPI 152 IRQ_TYPE_LEVEL_LOW>;
++		clocks = <&mmsys CLK_MM_DISP_RDMA>;
++		iommus = <&iommu MT2701_M4U_PORT_DISP_RDMA>;
++		mediatek,larb = <&larb0>;
++	};
++
++	wdma at 14009000 {
++		compatible = "mediatek,mt2701-disp-wdma";
++		reg = <0 0x14009000 0 0x1000>;
++		interrupts = <GIC_SPI 154 IRQ_TYPE_LEVEL_LOW>;
++		clocks = <&mmsys CLK_MM_DISP_WDMA>;
++		iommus = <&iommu MT2701_M4U_PORT_DISP_WDMA>;
++		mediatek,larb = <&larb0>;
++	};
++
++	bls at 1400a000 {
++		compatible = "mediatek,mt2701-disp-pwm";
++		reg = <0 0x1400a000 0 0x1000>;
++		interrupts = <GIC_SPI 155 IRQ_TYPE_LEVEL_LOW>;
++		clocks = <&mmsys CLK_MM_DISP_BLS>;
++	};
++
++	color at 1400b000 {
++		compatible = "mediatek,mt2701-disp-color";
++		reg = <0 0x1400b000 0 0x1000>;
++		interrupts = <GIC_SPI 156 IRQ_TYPE_LEVEL_LOW>;
++		clocks = <&mmsys CLK_MM_DISP_COLOR>;
++	};
++
++	dsi0: dsi at 1400c000 {
++		compatible = "mediatek,mt2701-dsi";
++		reg = <0 0x1400c000 0 0x1000>;
++		interrupts = <GIC_SPI 157 IRQ_TYPE_LEVEL_LOW>;
++		clocks = <&mmsys CLK_MM_DSI_ENGINE>, <&mmsys CLK_MM_DSI_DIG>,
++			 <&mipi_tx0>;
++		clock-names = "engine", "digital", "hs";
++		mediatek,syscon-dsi = <&mmsys 0x138>;
++		mediatek,ssc-range = <5>;
++		phys = <&mipi_tx0>;
++		phy-names = "dphy";
++		status = "disabled";
++	};
++
++	mutex: mutex at 1400e000 {
++		compatible = "mediatek,mt2701-disp-mutex";
++		reg = <0 0x1400e000 0 0x1000>;
++		interrupts = <GIC_SPI 161 IRQ_TYPE_LEVEL_LOW>;
++		clocks = <&mmsys CLK_MM_MUTEX_32K>;
++	};
++
+ 	larb0: larb at 14010000 {
+ 		compatible = "mediatek,mt2701-smi-larb";
+ 		reg = <0 0x14010000 0 0x1000>;
+@@ -265,6 +342,29 @@
+ 		power-domains = <&scpsys MT2701_POWER_DOMAIN_DISP>;
+ 	};
  
-@@ -117,8 +126,25 @@
- #define CLK_HS_POST			(0xff << 8)
- #define CLK_HS_EXIT			(0xff << 16)
- 
-+#define DSI_CMDQ0		0x180
-+
- #define NS_TO_CYCLE(n, c)    ((n) / (c) + (((n) % (c)) ? 1 : 0))
- 
-+#define MTK_DSI_HOST_IS_READ(type) \
-+	((type == MIPI_DSI_GENERIC_READ_REQUEST_0_PARAM) || \
-+	(type == MIPI_DSI_GENERIC_READ_REQUEST_1_PARAM) || \
-+	(type == MIPI_DSI_GENERIC_READ_REQUEST_2_PARAM) || \
-+	(type == MIPI_DSI_DCS_READ))
-+
-+#define MTK_DSI_HOST_IS_WRITE(type) \
-+	((type == MIPI_DSI_GENERIC_SHORT_WRITE_0_PARAM) || \
-+	(type == MIPI_DSI_GENERIC_SHORT_WRITE_1_PARAM) || \
-+	(type == MIPI_DSI_GENERIC_SHORT_WRITE_2_PARAM) || \
-+	(type == MIPI_DSI_DCS_SHORT_WRITE) || \
-+	(type == MIPI_DSI_DCS_SHORT_WRITE_PARAM) || \
-+	(type == MIPI_DSI_GENERIC_LONG_WRITE) || \
-+	(type == MIPI_DSI_DCS_LONG_WRITE))
-+
- struct phy;
- 
- struct mtk_dsi {
-@@ -148,6 +174,38 @@ struct mtk_dsi {
- 	int irq_num, irq_data;
- };
- 
-+struct dsi_cmd_t0 {
-+	u8 config;
-+	u8 type;
-+	u8 data0;
-+	u8 data1;
-+};
-+
-+struct dsi_cmd_t2 {
-+	u8 config;
-+	u8 type;
-+	u16 wc16;
-+	u8 *pdata;
-+};
-+
-+struct dsi_rx_data {
-+	u8 byte0;
-+	u8 byte1;
-+	u8 byte2;
-+	u8 byte3;
-+};
-+
-+struct dsi_tx_cmdq {
-+	u8 byte0;
-+	u8 byte1;
-+	u8 byte2;
-+	u8 byte3;
-+};
-+
-+struct dsi_tx_cmdq_regs {
-+	struct dsi_tx_cmdq data[128];
-+};
-+
- enum {
- 	DSI_INT_SLEEPOUT_DONE_FLAG	= BIT(6),
- 	DSI_INT_VM_CMD_DONE_FLAG	= BIT(5),
-@@ -858,9 +916,273 @@ static int mtk_dsi_host_detach(struct mipi_dsi_host *host,
- 	return 0;
- }
- 
-+static void mtk_dsi_set_cmdq(void __iomem *reg, u32 mask, u32 data)
-+{
-+	u32 temp = readl(reg);
-+
-+	writel((temp & ~mask) | (data & mask), reg);
-+}
-+
-+static void mtk_dsi_wait_for_idle(struct mtk_dsi *dsi)
-+{
-+	u32 timeout_ms = 500000; /* total 1s ~ 2s timeout */
-+
-+	while (timeout_ms--) {
-+		if (!(readl(dsi->regs + DSI_INTSTA) & DSI_BUSY))
-+			break;
-+
-+		usleep_range(2, 4);
-+	}
-+
-+	if (timeout_ms == 0) {
-+		dev_info(dsi->dev, "polling dsi wait not busy timeout!\n");
-+
-+		mtk_dsi_enable(dsi);
-+		mtk_dsi_reset_engine(dsi);
-+	}
-+}
-+
-+static ssize_t mtk_dsi_host_read_cmd(struct mtk_dsi *dsi,
-+				     const struct mipi_dsi_msg *msg)
-+{
-+	u8 max_try_count = 5;
-+	u32 recv_data_cnt, tmp_val;
-+	u32 recv_data0, recv_data1, recv_data2, recv_data3;
-+	struct dsi_rx_data read_data0, read_data1, read_data2, read_data3;
-+	struct dsi_cmd_t0 t0;
-+	s32 ret;
-+
-+	u8 *buffer = msg->rx_buf;
-+	u8 buffer_size = msg->rx_len;
-+	u8 packet_type;
-+
-+	if (readl(dsi->regs + DSI_MODE_CTRL) & 0x03) {
-+		dev_info(dsi->dev, "dsi engine is not command mode\n");
-+		return -1;
-+	}
-+
-+	if (!buffer) {
-+		dev_info(dsi->dev, "dsi receive buffer size may be NULL\n");
-+		return -1;
-+	}
-+
-+	do {
-+		if (max_try_count == 0) {
-+			dev_info(dsi->dev, "dsi engine read counter has been maxinum\n");
-+			return -1;
-+		}
-+
-+		max_try_count--;
-+		recv_data_cnt = 0;
-+
-+		mtk_dsi_wait_for_idle(dsi);
-+
-+		t0.config = 0x04;
-+		t0.data0 = *((u8 *)(msg->tx_buf));
-+
-+		if (buffer_size < 0x3)
-+			t0.type = MIPI_DSI_DCS_READ;
-+		else
-+			t0.type = MIPI_DSI_GENERIC_READ_REQUEST_1_PARAM;
-+
-+		t0.data1 = 0;
-+
-+		tmp_val = (t0.data1 << 24) | (t0.data0 << 16) | (t0.type << 8) |
-+			t0.config;
-+
-+		writel(tmp_val, dsi->regs + DSI_CMDQ0);
-+		mtk_dsi_mask(dsi, DSI_CMDQ_SIZE, CMDQ_SIZE, 1);
-+
-+		mtk_dsi_mask(dsi, DSI_RACK, RACK, RACK);
-+		mtk_dsi_mask(dsi, DSI_INTSTA, LPRX_RD_RDY_INT_FLAG,
-+			     ~LPRX_RD_RDY_INT_FLAG);
-+		mtk_dsi_mask(dsi, DSI_INTSTA, CMD_DONE_INT_FLAG,
-+			     ~CMD_DONE_INT_FLAG);
-+		mtk_dsi_mask(dsi, DSI_INTEN, DSI_INT_LPRX_RD_RDY_FLAG,
-+			     DSI_INT_LPRX_RD_RDY_FLAG);
-+		mtk_dsi_mask(dsi, DSI_INTEN, DSI_INT_CMD_DONE_FLAG,
-+			     DSI_INT_CMD_DONE_FLAG);
-+
-+		mtk_dsi_start(dsi);
-+
-+		dev_info(dsi->dev, "Start polling DSI read ready!!!\n");
-+
-+		 /* 2s timeout*/
-+		ret = mtk_dsi_wait_for_irq_timeout(dsi,
-+						   DSI_INT_LPRX_RD_RDY_FLAG,
-+						   2000);
-+		if (ret) {
-+			dev_info(dsi->dev, "Polling DSI read ready timeout!!!\n");
-+
-+			mtk_dsi_enable(dsi);
-+			mtk_dsi_reset_engine(dsi);
-+
-+			return ret;
-+		}
-+
-+		dev_info(dsi->dev, "End polling DSI read ready!!!\n");
-+
-+		mtk_dsi_mask(dsi, DSI_RACK, RACK, RACK);
-+		mtk_dsi_mask(dsi, DSI_INTSTA, LPRX_RD_RDY_INT_FLAG,
-+			     ~LPRX_RD_RDY_INT_FLAG);
-+
-+		recv_data0 = readl(dsi->regs + DSI_RX_DATA0);
-+		recv_data1 = readl(dsi->regs + DSI_RX_DATA1);
-+		recv_data2 = readl(dsi->regs + DSI_RX_DATA2);
-+		recv_data3 = readl(dsi->regs + DSI_RX_DATA3);
-+
-+		read_data0 = *((struct dsi_rx_data *)(&recv_data0));
-+		read_data1 = *((struct dsi_rx_data *)(&recv_data1));
-+		read_data2 = *((struct dsi_rx_data *)(&recv_data2));
-+		read_data3 = *((struct dsi_rx_data *)(&recv_data3));
-+
-+		ret = readl(dsi->regs + DSI_CMDQ_SIZE);
-+		dev_info(dsi->dev, "DSI_CMDQ_SIZE : 0x%x\n", ret & CMDQ_SIZE);
-+
-+		ret = readl(dsi->regs + DSI_CMDQ0);
-+		dev_info(dsi->dev, "DSI_CMDQ_DATA0 : 0x%x\n",
-+			 ret & 0xff);
-+		dev_info(dsi->dev, "DSI_CMDQ_DATA1 : 0x%x\n",
-+			 (ret >> 8) & 0xff);
-+		dev_info(dsi->dev, "DSI_CMDQ_DATA2 : 0x%x\n",
-+			 (ret >> 16) & 0xff);
-+		dev_info(dsi->dev, "DSI_CMDQ_DATA3 : 0x%x\n",
-+			 (ret >> 24) & 0xff);
-+
-+		dev_info(dsi->dev, "DSI_RX_DATA0: 0x%x\n", recv_data0);
-+		dev_info(dsi->dev, "DSI_RX_DATA1: 0x%x\n", recv_data1);
-+		dev_info(dsi->dev, "DSI_RX_DATA2: 0x%x\n", recv_data2);
-+		dev_info(dsi->dev, "DSI_RX_DATA3: 0x%x\n", recv_data3);
-+
-+		dev_info(dsi->dev, "read_data0: %x,%x,%x,%x\n",
-+			 read_data0.byte0, read_data0.byte1, read_data0.byte2,
-+			 read_data0.byte3);
-+		dev_info(dsi->dev, "read_data1: %x,%x,%x,%x\n",
-+			 read_data1.byte0, read_data1.byte1, read_data1.byte2,
-+			 read_data1.byte3);
-+		dev_info(dsi->dev, "read_data2: %x,%x,%x,%x\n",
-+			 read_data2.byte0, read_data2.byte1, read_data2.byte2,
-+			 read_data2.byte3);
-+		dev_info(dsi->dev, "read_data3: %x,%x,%x,%x\n",
-+			 read_data3.byte0, read_data3.byte1, read_data3.byte2,
-+			 read_data3.byte3);
-+
-+		packet_type = read_data0.byte0;
-+		dev_info(dsi->dev, "DSI read packet_type is 0x%x\n",
-+			 packet_type);
-+
-+		if (packet_type == 0x1a || packet_type == 0x1c) {
-+			void *read_tmp = (void *)&recv_data1;
-+
-+			recv_data_cnt = read_data0.byte1 +
-+					read_data0.byte2 * 16;
-+			if (recv_data_cnt > 10)
-+				recv_data_cnt = 10;
-+
-+			if (recv_data_cnt > buffer_size)
-+				recv_data_cnt = buffer_size;
-+
-+			memcpy(buffer, read_tmp, recv_data_cnt);
-+		} else {
-+			/* short  packet */
-+			recv_data_cnt = 2;
-+			if (recv_data_cnt > buffer_size)
-+				recv_data_cnt = buffer_size;
-+
-+			memcpy(buffer, &read_data0.byte1, 2);
-+		}
-+	} while (packet_type != 0x1c && packet_type != 0x21 &&
-+		packet_type != 0x22 && packet_type != 0x1a);
-+
-+	dev_info(dsi->dev, "dsi get %d byte data from the panel address(0x%x)\n",
-+		 recv_data_cnt, *((u8 *)(msg->tx_buf)));
-+
-+	return recv_data_cnt;
-+}
-+
-+static ssize_t mtk_dsi_host_write_cmd(struct mtk_dsi *dsi,
-+				      const struct mipi_dsi_msg *msg)
-+{
-+	u32 i;
-+	u32 goto_addr, mask_para, set_para, reg_val;
-+	void __iomem *cmdq_reg;
-+	struct dsi_cmd_t0 t0;
-+	struct dsi_cmd_t2 t2;
-+	const char *tx_buf = msg->tx_buf;
-+	struct dsi_tx_cmdq_regs *dsi_cmd_reg;
-+
-+	dsi_cmd_reg = (struct dsi_tx_cmdq_regs *)(dsi->regs + DSI_CMDQ0);
-+
-+	mtk_dsi_wait_for_idle(dsi);
-+
-+	if (msg->tx_len > 2) {
-+		t2.config = 2;
-+		t2.type = msg->type;
-+		t2.wc16 = msg->tx_len;
-+
-+		reg_val = (t2.wc16 << 16) | (t2.type << 8) | t2.config;
-+
-+		writel(reg_val, &dsi_cmd_reg->data[0]);
-+
-+		goto_addr = (u32)(&dsi_cmd_reg->data[1].byte0);
-+		mask_para = (0xff << ((goto_addr & 0x3) * 8));
-+		set_para = (tx_buf[0] << ((goto_addr & 0x3) * 8));
-+		cmdq_reg = (void __iomem *)(goto_addr & (~0x3));
-+		mtk_dsi_set_cmdq(cmdq_reg, mask_para, set_para);
-+
-+		for (i = 1; i < msg->tx_len; i++) {
-+			goto_addr = (u32)(&dsi_cmd_reg->data[1].byte1) + i - 1;
-+			mask_para = (0xff << ((goto_addr & 0x3) * 8));
-+			set_para = (tx_buf[i] << ((goto_addr & 0x3) * 8));
-+			cmdq_reg = (void __iomem *)(goto_addr & (~0x3));
-+			mtk_dsi_set_cmdq(cmdq_reg, mask_para, set_para);
-+		}
-+
-+		mtk_dsi_mask(dsi, DSI_CMDQ_SIZE, CMDQ_SIZE,
-+			     2 + (msg->tx_len - 1) / 4);
-+	} else {
-+		t0.config = 0;
-+		t0.data0 = tx_buf[0];
-+		if (msg->tx_len == 2) {
-+			t0.type = MIPI_DSI_DCS_SHORT_WRITE_PARAM;
-+			t0.data1 = tx_buf[1];
-+		} else {
-+			t0.type = MIPI_DSI_DCS_SHORT_WRITE;
-+			t0.data1 = 0;
-+		}
-+
-+		reg_val = (t0.data1 << 24) | (t0.data0 << 16) | (t0.type << 8) |
-+			   t0.config;
-+
-+		writel(reg_val, &dsi_cmd_reg->data[0]);
-+		mtk_dsi_mask(dsi, DSI_CMDQ_SIZE, CMDQ_SIZE, 1);
-+	}
-+
-+	mtk_dsi_start(dsi);
-+	mtk_dsi_wait_for_idle(dsi);
-+
-+	return 0;
-+}
-+
-+static ssize_t mtk_dsi_host_transfer(struct mipi_dsi_host *host,
-+				     const struct mipi_dsi_msg *msg)
-+{
-+	struct mtk_dsi *dsi = host_to_dsi(host);
-+	u8 type = msg->type;
-+	ssize_t ret = 0;
-+
-+	if (MTK_DSI_HOST_IS_READ(type))
-+		ret = mtk_dsi_host_read_cmd(dsi, msg);
-+	else if (MTK_DSI_HOST_IS_WRITE(type))
-+		ret = mtk_dsi_host_write_cmd(dsi, msg);
-+
-+	return ret;
-+}
-+
- static const struct mipi_dsi_host_ops mtk_dsi_ops = {
- 	.attach = mtk_dsi_host_attach,
- 	.detach = mtk_dsi_host_detach,
-+	.transfer = mtk_dsi_host_transfer,
- };
- 
- static int mtk_dsi_bind(struct device *dev, struct device *master, void *data)
++	rdma1: rdma at 14012000 {
++		compatible = "mediatek,mt2701-disp-rdma";
++		reg = <0 0x14012000 0 0x1000>;
++		interrupts = <GIC_SPI 164 IRQ_TYPE_LEVEL_LOW>;
++		clocks = <&mmsys CLK_MM_DISP_RDMA1>;
++		iommus = <&iommu MT2701_M4U_PORT_DISP_RDMA1>;
++		mediatek,larb = <&larb0>;
++	};
++
++	dpi0: dpi at 14014000 {
++		compatible = "mediatek,mt2701-dpi";
++		reg = <0 0x14014000 0 0x1000>;
++		interrupts = <GIC_SPI 194 IRQ_TYPE_LEVEL_LOW>;
++		clocks = <&mmsys CLK_MM_DPI1_DIGL>,
++			 <&mmsys CLK_MM_DPI1_ENGINE>,
++			 <&topckgen CLK_TOP_DPI1_SEL>,
++			 <&topckgen CLK_TOP_TVDPLL>,
++			 <&topckgen CLK_TOP_TVDPLL_D2>,
++			 <&topckgen CLK_TOP_TVDPLL_D4>;
++		clock-names = "pixel", "engine", "sel","div1","div2","div4";
++		status = "disabled";
++	};
++
+ 	imgsys: syscon at 15000000 {
+ 		compatible = "mediatek,mt2701-imgsys", "syscon";
+ 		reg = <0 0x15000000 0 0x1000>;
 -- 
 1.7.9.5
