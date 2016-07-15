@@ -1,201 +1,263 @@
-From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
-Date: Fri, 15 Jul 2016 07:05:56 +0200
-Subject: [PATCH V2] usb: ehci-platform: use helper variables in probe function
-In-Reply-To: <1468398548-5050-1-git-send-email-zajec5@gmail.com>
-References: <1468398548-5050-1-git-send-email-zajec5@gmail.com>
-Message-ID: <1468559156-17270-1-git-send-email-zajec5@gmail.com>
+From: vw@iommu.org (Wan Zongshun)
+Date: Fri, 15 Jul 2016 13:15:58 +0800
+Subject: [PATCH v2 02/10] irqchip: add irqchip driver for nuc900
+In-Reply-To: <20160714135426.GC31509@io.lakedaemon.net>
+References: <1468135649-19980-1-git-send-email-vw@iommu.org>
+ <1468135649-19980-3-git-send-email-vw@iommu.org>
+ <20160713200906.GB31509@io.lakedaemon.net> <578708D5.6050009@iommu.org>
+ <20160714135426.GC31509@io.lakedaemon.net>
+Message-ID: <5788718E.7080708@iommu.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Probing function was using &dev->dev and dev->dev.of_node over 20 times
-so I believe it made sense to use helper variables for both of them.
-To avoid some uncommon variable name for struct device I first replaced
-existing dev variable with pdev.
 
-Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
-Acked-by: Alan Stern <stern@rowland.harvard.edu>
----
-V2: Use 2 extra tabs after line break to match one of already used
-    coding styles.
----
- drivers/usb/host/ehci-platform.c | 65 +++++++++++++++++++---------------------
- 1 file changed, 31 insertions(+), 34 deletions(-)
 
-diff --git a/drivers/usb/host/ehci-platform.c b/drivers/usb/host/ehci-platform.c
-index 6816b8c..d67dd92 100644
---- a/drivers/usb/host/ehci-platform.c
-+++ b/drivers/usb/host/ehci-platform.c
-@@ -143,11 +143,13 @@ static struct usb_ehci_pdata ehci_platform_defaults = {
- 	.power_off =		ehci_platform_power_off,
- };
- 
--static int ehci_platform_probe(struct platform_device *dev)
-+static int ehci_platform_probe(struct platform_device *pdev)
- {
-+	struct device *dev = &pdev->dev;
-+	struct device_node *np = dev->of_node;
- 	struct usb_hcd *hcd;
- 	struct resource *res_mem;
--	struct usb_ehci_pdata *pdata = dev_get_platdata(&dev->dev);
-+	struct usb_ehci_pdata *pdata = dev_get_platdata(dev);
- 	struct ehci_platform_priv *priv;
- 	struct ehci_hcd *ehci;
- 	int err, irq, phy_num, clk = 0, rst;
-@@ -162,52 +164,49 @@ static int ehci_platform_probe(struct platform_device *dev)
- 	if (!pdata)
- 		pdata = &ehci_platform_defaults;
- 
--	err = dma_coerce_mask_and_coherent(&dev->dev,
-+	err = dma_coerce_mask_and_coherent(dev,
- 		pdata->dma_mask_64 ? DMA_BIT_MASK(64) : DMA_BIT_MASK(32));
- 	if (err) {
--		dev_err(&dev->dev, "Error: DMA mask configuration failed\n");
-+		dev_err(dev, "Error: DMA mask configuration failed\n");
- 		return err;
- 	}
- 
--	irq = platform_get_irq(dev, 0);
-+	irq = platform_get_irq(pdev, 0);
- 	if (irq < 0) {
--		dev_err(&dev->dev, "no irq provided");
-+		dev_err(dev, "no irq provided");
- 		return irq;
- 	}
- 
--	hcd = usb_create_hcd(&ehci_platform_hc_driver, &dev->dev,
--			     dev_name(&dev->dev));
-+	hcd = usb_create_hcd(&ehci_platform_hc_driver, dev, dev_name(dev));
- 	if (!hcd)
- 		return -ENOMEM;
- 
--	platform_set_drvdata(dev, hcd);
--	dev->dev.platform_data = pdata;
-+	platform_set_drvdata(pdev, hcd);
-+	dev->platform_data = pdata;
- 	priv = hcd_to_ehci_priv(hcd);
- 	ehci = hcd_to_ehci(hcd);
- 
--	if (pdata == &ehci_platform_defaults && dev->dev.of_node) {
--		if (of_property_read_bool(dev->dev.of_node, "big-endian-regs"))
-+	if (pdata == &ehci_platform_defaults && np) {
-+		if (of_property_read_bool(np, "big-endian-regs"))
- 			ehci->big_endian_mmio = 1;
- 
--		if (of_property_read_bool(dev->dev.of_node, "big-endian-desc"))
-+		if (of_property_read_bool(np, "big-endian-desc"))
- 			ehci->big_endian_desc = 1;
- 
--		if (of_property_read_bool(dev->dev.of_node, "big-endian"))
-+		if (of_property_read_bool(np, "big-endian"))
- 			ehci->big_endian_mmio = ehci->big_endian_desc = 1;
- 
--		if (of_property_read_bool(dev->dev.of_node,
--					  "needs-reset-on-resume"))
-+		if (of_property_read_bool(np, "needs-reset-on-resume"))
- 			priv->reset_on_resume = true;
- 
--		if (of_property_read_bool(dev->dev.of_node,
--					  "has-transaction-translator"))
-+		if (of_property_read_bool(np, "has-transaction-translator"))
- 			hcd->has_tt = 1;
- 
--		priv->num_phys = of_count_phandle_with_args(dev->dev.of_node,
--				"phys", "#phy-cells");
-+		priv->num_phys = of_count_phandle_with_args(np, "phys",
-+				"#phy-cells");
- 
- 		if (priv->num_phys > 0) {
--			priv->phys = devm_kcalloc(&dev->dev, priv->num_phys,
-+			priv->phys = devm_kcalloc(dev, priv->num_phys,
- 					    sizeof(struct phy *), GFP_KERNEL);
- 			if (!priv->phys)
- 				return -ENOMEM;
-@@ -216,7 +215,7 @@ static int ehci_platform_probe(struct platform_device *dev)
- 
- 		for (phy_num = 0; phy_num < priv->num_phys; phy_num++) {
- 			priv->phys[phy_num] = devm_of_phy_get_by_index(
--					&dev->dev, dev->dev.of_node, phy_num);
-+					dev, np, phy_num);
- 			if (IS_ERR(priv->phys[phy_num])) {
- 				err = PTR_ERR(priv->phys[phy_num]);
- 					goto err_put_hcd;
-@@ -224,7 +223,7 @@ static int ehci_platform_probe(struct platform_device *dev)
- 		}
- 
- 		for (clk = 0; clk < EHCI_MAX_CLKS; clk++) {
--			priv->clks[clk] = of_clk_get(dev->dev.of_node, clk);
-+			priv->clks[clk] = of_clk_get(np, clk);
- 			if (IS_ERR(priv->clks[clk])) {
- 				err = PTR_ERR(priv->clks[clk]);
- 				if (err == -EPROBE_DEFER)
-@@ -237,7 +236,7 @@ static int ehci_platform_probe(struct platform_device *dev)
- 
- 	for (rst = 0; rst < EHCI_MAX_RSTS; rst++) {
- 		priv->rsts[rst] = devm_reset_control_get_shared_by_index(
--					&dev->dev, rst);
-+					dev, rst);
- 		if (IS_ERR(priv->rsts[rst])) {
- 			err = PTR_ERR(priv->rsts[rst]);
- 			if (err == -EPROBE_DEFER)
-@@ -262,29 +261,27 @@ static int ehci_platform_probe(struct platform_device *dev)
- 
- #ifndef CONFIG_USB_EHCI_BIG_ENDIAN_MMIO
- 	if (ehci->big_endian_mmio) {
--		dev_err(&dev->dev,
--			"Error: CONFIG_USB_EHCI_BIG_ENDIAN_MMIO not set\n");
-+		dev_err(dev, "Error: CONFIG_USB_EHCI_BIG_ENDIAN_MMIO not set\n");
- 		err = -EINVAL;
- 		goto err_reset;
- 	}
- #endif
- #ifndef CONFIG_USB_EHCI_BIG_ENDIAN_DESC
- 	if (ehci->big_endian_desc) {
--		dev_err(&dev->dev,
--			"Error: CONFIG_USB_EHCI_BIG_ENDIAN_DESC not set\n");
-+		dev_err(dev, "Error: CONFIG_USB_EHCI_BIG_ENDIAN_DESC not set\n");
- 		err = -EINVAL;
- 		goto err_reset;
- 	}
- #endif
- 
- 	if (pdata->power_on) {
--		err = pdata->power_on(dev);
-+		err = pdata->power_on(pdev);
- 		if (err < 0)
- 			goto err_reset;
- 	}
- 
--	res_mem = platform_get_resource(dev, IORESOURCE_MEM, 0);
--	hcd->regs = devm_ioremap_resource(&dev->dev, res_mem);
-+	res_mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	hcd->regs = devm_ioremap_resource(dev, res_mem);
- 	if (IS_ERR(hcd->regs)) {
- 		err = PTR_ERR(hcd->regs);
- 		goto err_power;
-@@ -297,13 +294,13 @@ static int ehci_platform_probe(struct platform_device *dev)
- 		goto err_power;
- 
- 	device_wakeup_enable(hcd->self.controller);
--	platform_set_drvdata(dev, hcd);
-+	platform_set_drvdata(pdev, hcd);
- 
- 	return err;
- 
- err_power:
- 	if (pdata->power_off)
--		pdata->power_off(dev);
-+		pdata->power_off(pdev);
- err_reset:
- 	while (--rst >= 0)
- 		reset_control_assert(priv->rsts[rst]);
-@@ -312,7 +309,7 @@ err_put_clks:
- 		clk_put(priv->clks[clk]);
- err_put_hcd:
- 	if (pdata == &ehci_platform_defaults)
--		dev->dev.platform_data = NULL;
-+		dev->platform_data = NULL;
- 
- 	usb_put_hcd(hcd);
- 
--- 
-1.8.4.5
+On 2016?07?14? 21:54, Jason Cooper wrote:
+> Hi Wan Zongshun,
+>
+> On Thu, Jul 14, 2016 at 11:36:53AM +0800, Wan Zongshun wrote:
+>> On 2016?07?14? 04:09, Jason Cooper wrote:
+>>> On Sun, Jul 10, 2016 at 03:27:22PM +0800, Wan Zongshun wrote:
+>>>> This patch is to add irqchip driver support for nuc900 plat,
+>>>> current this driver only supports nuc970 SoC.
+>>>>
+>>>> Signed-off-by: Wan Zongshun <mcuos.com@gmail.com>
+>>>> ---
+>>>>   arch/arm/mach-w90x900/include/mach/irqs.h |   5 +
+>>>>   drivers/irqchip/Makefile                  |   1 +
+>>>>   drivers/irqchip/irq-nuc900.c              | 150 ++++++++++++++++++++++++++++++
+>>>>   3 files changed, 156 insertions(+)
+>>>>   create mode 100644 drivers/irqchip/irq-nuc900.c
+>>>>
+>>>> diff --git a/arch/arm/mach-w90x900/include/mach/irqs.h b/arch/arm/mach-w90x900/include/mach/irqs.h
+>>>> index 9d5cba3..3b035c6 100644
+>>>> --- a/arch/arm/mach-w90x900/include/mach/irqs.h
+>>>> +++ b/arch/arm/mach-w90x900/include/mach/irqs.h
+>>>> @@ -59,7 +59,12 @@
+>>>>   #define IRQ_KPI		W90X900_IRQ(29)
+>>>>   #define IRQ_P2SGROUP	W90X900_IRQ(30)
+>>>>   #define IRQ_ADC		W90X900_IRQ(31)
+>>>> +
+>>>> +#if !defined(CONFIG_SOC_NUC900)
+>>>>   #define NR_IRQS		(IRQ_ADC+1)
+>>>> +#else
+>>>> +#define NR_IRQS		62
+>>>> +#endif
+>>>
+>>> Arnd already covered this...
+>>>
+>>>>
+>>>>   /*for irq group*/
+>>>>
+>>>> diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
+>>>> index 38853a1..9ccd5af8a 100644
+>>>> --- a/drivers/irqchip/Makefile
+>>>> +++ b/drivers/irqchip/Makefile
+>>>> @@ -69,3 +69,4 @@ obj-$(CONFIG_PIC32_EVIC)		+= irq-pic32-evic.o
+>>>>   obj-$(CONFIG_MVEBU_ODMI)		+= irq-mvebu-odmi.o
+>>>>   obj-$(CONFIG_LS_SCFG_MSI)		+= irq-ls-scfg-msi.o
+>>>>   obj-$(CONFIG_EZNPS_GIC)			+= irq-eznps.o
+>>>> +obj-$(CONFIG_SOC_NUC970)		+= irq-nuc900.o
+>>>> diff --git a/drivers/irqchip/irq-nuc900.c b/drivers/irqchip/irq-nuc900.c
+>>>> new file mode 100644
+>>>> index 0000000..c4b2e39
+>>>> --- /dev/null
+>>>> +++ b/drivers/irqchip/irq-nuc900.c
+>>>> @@ -0,0 +1,150 @@
+>>>> +/*
+>>>> + * Copyright 2016 Wan Zongshun <mcuos.com@gmail.com>
+>>>> + *
+>>>> + * The code contained herein is licensed under the GNU General Public
+>>>> + * License. You may obtain a copy of the GNU General Public License
+>>>> + * Version 2 or later at the following locations:
+>>>> + *
+>>>> + * http://www.opensource.org/licenses/gpl-license.html
+>>>> + * http://www.gnu.org/copyleft/gpl.html
+>>>> + */
+>>>> +
+>>>> +#include <linux/module.h>
+>>>> +#include <linux/init.h>
+>>>> +#include <linux/irq.h>
+>>>> +#include <linux/irqchip.h>
+>>>> +#include <linux/irqdomain.h>
+>>>> +#include <linux/io.h>
+>>>> +#include <linux/ioport.h>
+>>>> +#include <linux/of_address.h>
+>>>> +#include <linux/of_irq.h>
+>>>> +
+>>>> +#include <asm/exception.h>
+>>>> +#include <asm/hardirq.h>
+>>>> +
+>>>> +#define	REG_AIC_SCR1	0x00
+>>>> +#define	REG_AIC_SCR2	0x04
+>>>> +#define	REG_AIC_SCR3	0x08
+>>>> +#define	REG_AIC_SCR4	0x0C
+>>>> +#define	REG_AIC_SCR5	0x10
+>>>> +#define	REG_AIC_SCR6	0x14
+>>>> +#define	REG_AIC_SCR7	0x18
+>>>> +#define	REG_AIC_SCR8	0x1C
+>>>> +#define	REG_AIC_SCR9	0x20
+>>>> +#define	REG_AIC_SCR10	0x24
+>>>> +#define	REG_AIC_SCR11	0x28
+>>>> +#define	REG_AIC_SCR12	0x2C
+>>>> +#define	REG_AIC_SCR13	0x30
+>>>> +#define	REG_AIC_SCR14	0x34
+>>>> +#define	REG_AIC_SCR15	0x38
+>>>> +#define	REG_AIC_IRSR	0x100
+>>>> +#define	REG_AIC_IRSRH	0x104
+>>>> +#define	REG_AIC_IASR	0x108
+>>>> +#define	REG_AIC_IASRH	0x10C
+>>>> +#define	REG_AIC_ISR	0x110
+>>>> +#define	REG_AIC_ISRH	0x114
+>>>> +#define	REG_AIC_IPER	0x118
+>>>> +#define	REG_AIC_ISNR	0x120
+>>>> +#define	REG_AIC_OISR	0x124
+>>>> +#define	REG_AIC_IMR	0x128
+>>>> +#define	REG_AIC_IMRH	0x12C
+>>>> +#define	REG_AIC_MECR	0x130
+>>>> +#define	REG_AIC_MECRH	0x134
+>>>> +#define	REG_AIC_MDCR	0x138
+>>>> +#define	REG_AIC_MDCRH	0x13C
+>>>> +#define	REG_AIC_SSCR	0x140
+>>>> +#define	REG_AIC_SSCRH	0x144
+>>>> +#define	REG_AIC_SCCR	0x148
+>>>> +#define	REG_AIC_SCCRH	0x14C
+>>>> +#define	REG_AIC_EOSCR	0x150
+>>>
+>>> Please remove unused defines.
+>>
+>> Okay.
+>>
+>>>
+>>>> +
+>>>> +static void __iomem *aic_base;
+>>>> +static struct irq_domain *aic_domain;
+>>>> +
+>>>> +static void nuc900_irq_mask(struct irq_data *d)
+>>>> +{
+>>>> +	if (d->irq < 32)
+>>>> +		writel(1 << (d->irq), aic_base + REG_AIC_MDCR);
+>>>> +	else
+>>>> +		writel(1 << (d->irq - 32), aic_base + REG_AIC_MDCRH);
+>>>> +}
+>>>> +
+>>>> +static void nuc900_irq_ack(struct irq_data *d)
+>>>> +{
+>>>> +	writel(0x01, aic_base + REG_AIC_EOSCR);
+>>>> +}
+>>>> +
+>>>> +static void nuc900_irq_unmask(struct irq_data *d)
+>>>> +{
+>>>> +	if (d->irq < 32)
+>>>> +		writel(1 << (d->irq), aic_base + REG_AIC_MECR);
+>>>> +	else
+>>>> +		writel(1 << (d->irq - 32), aic_base + REG_AIC_MECRH);
+>>>> +}
+>>>> +
+>>>> +static struct irq_chip nuc900_irq_chip = {
+>>>> +	.irq_ack	= nuc900_irq_ack,
+>>>> +	.irq_mask	= nuc900_irq_mask,
+>>>> +	.irq_unmask	= nuc900_irq_unmask,
+>>>> +};
+>>>> +
+>>>> +void __exception_irq_entry aic_handle_irq(struct pt_regs *regs)
+>>>> +{
+>>>> +	u32 hwirq;
+>>>> +
+>>>> +	hwirq = readl(aic_base + REG_AIC_IPER);
+>>>> +	hwirq = readl(aic_base + REG_AIC_ISNR);
+>>>> +	if (!hwirq)
+>>>> +		writel(0x01, aic_base + REG_AIC_EOSCR);
+>>>
+>>> Could you explain what's going on here?
+>>
+>> AIC_IPER, When the AIC generates the interrupt, VECTOR represents
+>> the interrupt channel number that is active, enabled, and has the
+>> highest priority.
+>>
+>> The value of VECTOR is copied to the register AIC_ISNR thereafter by
+>> the AIC. This register was restored a value 0 after it was read by
+>> the
+>> interrupt handler.
+>
+> So, iiuc, the first readl() of AIC_IPER kicks the AIC to copy the value
+> of VECTOR into AIC_ISNR?  Then we can read it?
+>
+> If so, please add a comment above the code explaining that.
+>
+>> So I must read two registers for one irq number, after read IPER,
+>> the ISNR(bit0:5) will be updated. ISNR value has no need do offset,
+>> it is better than read IPER(bit2:7).
+>
+> But you aren't using the value from the first readl(...AIC_IPER)?  You
+> overwrite hwirq with the value from the second readl(...AIC_ISNR)
+> ...
+>
+> The first part of your explaination makes sense, but this part isn't
+> clear to me.
+
+Actually, I have two choice to implement this function:
+
+option1:
+
+void __exception_irq_entry aic_handle_irq(struct pt_regs *regs)
+{
+	u32 hwirq;
+
+	(void)readl(aic_base + REG_AIC_IPER);
+	hwirq = readl(aic_base + REG_AIC_ISNR);
+
+	handle_IRQ((irq_find_mapping(aic_domain, hwirq)), regs);
+}
+
+option2:
+
+void __exception_irq_entry aic_handle_irq(struct pt_regs *regs)
+{
+	u32 hwirq;
+
+	hwirq = readl(aic_base + REG_AIC_IPER);
+	hwirq <<= 2;
+
+	handle_IRQ((irq_find_mapping(aic_domain, hwirq)), regs);
+}
+
+Though the option2 do shift for hwirq, but it seems better than do io 
+operation by readl,so I prefer to option2, agree?
+
+>
+>
+>> ?writel(0x01, aic_base + REG_AIC_EOSCR);??seems not necessary here,
+>> since irqchip has the ack interface. I will remove it.
+>
+> Ok, thanks.
+>
+>> This AIC_EOSCR register is used by the interrupt service routine to
+>> indicate that it is completely served. Thus, the
+>> interrupt handler can write any value to this register to indicate
+>> the end of its interrupt service.
+>
+> A short comment in the ack routine would be helpful.
+>
+>
+>>>> +IRQCHIP_DECLARE(nuc900, "nuvoton,nuc900-aic", aic_of_init);
+>>>
+>>> afaict, there is no 'nuc900', that's a family.  If so, this compatible
+>>> needs to be 'nuvoton,nuc970-aic'.
+>>>
+>>
+>> IRQCHIP_DECLARE(nuvoton, "nuvoton,nuc900-aic", aic_of_init);, change
+>> nuc900 to nuvoton, ok?
+>
+> No, I was only talking about the second argument.  The compatible
+> string.  For devicetree, it needs to refer to a specific model number.
+> I suspect 'nuc900' is equivalent to saying 'nuc9xx'.  Meaning it refers
+> to a family of devices.  The compatible string needs to refer
+> specifically to the first model that the binding is compatible with.  In
+> this case, I presume that would be 'nuvoton,nuc970-aic'.
+>
+> thx,
+>
+> Jason.
+>
+>
