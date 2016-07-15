@@ -1,34 +1,64 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 15 Jul 2016 13:56:43 +0100
-Subject: [PATCH 0/4] Qualcomm IPQ4019 Audio driver addition
-In-Reply-To: <1468566426-19598-1-git-send-email-njaigane@codeaurora.org>
-References: <1468566426-19598-1-git-send-email-njaigane@codeaurora.org>
-Message-ID: <20160715125643.GK30372@sirena.org.uk>
+From: sunil.kovvuri@gmail.com (sunil.kovvuri at gmail.com)
+Date: Fri, 15 Jul 2016 18:28:05 +0530
+Subject: [PATCH v3 00/15] net: thunderx: Add support for 81xx and 83xx
+Message-ID: <1468587500-32103-1-git-send-email-sunil.kovvuri@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 15, 2016 at 12:37:02PM +0530, njaigane at codeaurora.org wrote:
-> From: Jaiganesh Narayanan <njaigane@codeaurora.org>
-> 
-> These patches add the support for Qualcomm IPQ4019 ASoC
-> with the ALSA based audio drivers. The patches are broken
-> 
-> 1. Device Tree support
-> 2. Audio clock driver support
-> 3. TLMM / Pinctrl support
-> 4. ALSA based audio drivers
+From: Sunil Goutham <sgoutham@cavium.com>
 
-You need to completely rework how you're posting this so it can be
-reviewed, probably splitting it into separate patch serieses - please
-see SubmittingPatches for an overview of what people are expecting, and
-as I said in reply to one of the patches looking at git can also be
-helpful.  I'd suggest sending the drivers for each subsystem as a
-separate patch series, there will be some interdependency in terms of
-getting things running but not in terms of getting the patches applied.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160715/d217733d/attachment-0001.sig>
+This patch series adds support for VNIC on 81xx and 83xx SOCs.
+81xx/83xx is different from 88xx in terms of capabilities and different
+types of interfaces supported (eg: QSGMII, RGMII) and have DLMs instead
+of QLMs which allows single BGX to have interfaces of different LMAC types.
+
+Also included some patches which are common for all 88xx/81xx/83xx
+SOCs like using netdev's name while registering irqs, reset receive
+queue stats and some cleanup changes.
+
+Changes from v2:
+Added missing changes in QSGMII interface support patch and
+fixed CPI and TL4 indices configuration issues which got
+introduced by RGMII interface support patch.
+
+Changes from v1:
+Fixed warning reported by kbuild test robot in patch
+"Enable mailbox interrupts on 81xx/83xx"
+
+Jerin Jacob (1):
+  net: thunderx: Reset RXQ HW stats when interface is brought down
+
+Radoslaw Biernacki (1):
+  net: thunderx: Improvement for MBX interface debug messages
+
+Sunil Goutham (13):
+  net: thunderx: Moved HW capability info from macros to structure
+  net: thunderx: Add VNIC's PCI devid on future chips
+  net: thunderx: Add support for 81xx and 83xx chips
+  net: thunderx: Set queue count based on number of CPUs
+  net: thunderx: Enable CQE_RX desc's extension fields
+  net: thunderx: Enable mailbox interrupts on 81xx/83xx
+  net: thunderx: Support for different LMAC types within BGX
+  net: thunderx: Add 81xx support to BGX driver
+  net: thunderx: Add QSGMII interface type support
+  net: thunderx: Add RGMII interface type support
+  net: thunderx: Use netdev's name for naming VF's interrupts
+  net: thunderx: Use skb_add_rx_frag() for split buffer Rx pkts
+  net: thunderx: Don't set mac address for secondary Qset VFs
+
+ drivers/net/ethernet/cavium/Kconfig                |  10 +
+ drivers/net/ethernet/cavium/thunder/Makefile       |   1 +
+ drivers/net/ethernet/cavium/thunder/nic.h          |  85 +++--
+ drivers/net/ethernet/cavium/thunder/nic_main.c     | 343 +++++++++++++----
+ drivers/net/ethernet/cavium/thunder/nic_reg.h      |   2 +
+ drivers/net/ethernet/cavium/thunder/nicvf_main.c   |  51 ++-
+ drivers/net/ethernet/cavium/thunder/nicvf_queues.c |  59 +--
+ drivers/net/ethernet/cavium/thunder/nicvf_queues.h |   5 +-
+ drivers/net/ethernet/cavium/thunder/thunder_bgx.c  | 422 ++++++++++++++-------
+ drivers/net/ethernet/cavium/thunder/thunder_bgx.h  |  28 +-
+ drivers/net/ethernet/cavium/thunder/thunder_xcv.c  | 237 ++++++++++++
+ 11 files changed, 941 insertions(+), 302 deletions(-)
+ create mode 100644 drivers/net/ethernet/cavium/thunder/thunder_xcv.c
+
+-- 
+2.7.4
