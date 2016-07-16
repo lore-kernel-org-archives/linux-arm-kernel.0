@@ -1,82 +1,67 @@
-From: robh@kernel.org (Rob Herring)
-Date: Sat, 16 Jul 2016 12:56:05 -0500
-Subject: [PATCH v6] input: touchscreen: Add generic driver for Silead
- touchscreens
-In-Reply-To: <1468252304-22850-1-git-send-email-hdegoede@redhat.com>
-References: <1468252304-22850-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <20160716175605.GA4873@rob-hp-laptop>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 16 Jul 2016 21:10:38 +0200
+Subject: [PATCH v0 06/10] arm: orion5x: Add DT-based support for Netgear
+ WNR854T
+In-Reply-To: <1468679348-10522-7-git-send-email-jm@lentin.co.uk>
+References: <1468679348-10522-1-git-send-email-jm@lentin.co.uk>
+ <1468679348-10522-7-git-send-email-jm@lentin.co.uk>
+Message-ID: <4290281.AD5Bhg23o6@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 11, 2016 at 05:51:44PM +0200, Hans de Goede wrote:
-> From: Robert Dolca <robert.dolca@intel.com>
-> 
-> This driver adds support for Silead touchscreens. It has been tested
-> with GSL1680 and GSL3680 touch panels.
-> 
-> It supports ACPI and device tree enumeration. Screen resolution,
-> the maximum number of fingers supported and firmware name are
-> configurable.
-> 
-> Signed-off-by: Robert Dolca <robert.dolca@intel.com>
-> Signed-off-by: Daniel Jansen <djaniboe@gmail.com>
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> ---
-> Changes in v6:
-> -Default to 5 fingers if max-fingers is not specified
-> -Improve devicetree binding doc: improve wake-gpios description, use
->  "See touchscreen.txt" where applicable
-> ---
->  .../bindings/input/touchscreen/silead_gsl1680.txt  |  36 ++
->  drivers/input/touchscreen/Kconfig                  |  13 +
->  drivers/input/touchscreen/Makefile                 |   1 +
->  drivers/input/touchscreen/silead.c                 | 652 +++++++++++++++++++++
->  4 files changed, 702 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/input/touchscreen/silead_gsl1680.txt
->  create mode 100644 drivers/input/touchscreen/silead.c
-> 
-> diff --git a/Documentation/devicetree/bindings/input/touchscreen/silead_gsl1680.txt b/Documentation/devicetree/bindings/input/touchscreen/silead_gsl1680.txt
-> new file mode 100644
-> index 0000000..1e58d37
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/input/touchscreen/silead_gsl1680.txt
-> @@ -0,0 +1,36 @@
-> +* GSL 1680 touchscreen controller
+On Saturday, July 16, 2016 3:29:04 PM CEST Jamie Lentin wrote:
 > +
-> +Required properties:
-> +- compatible		  : "silead,gsl1680"
-> +- reg			  : I2C slave address of the chip (0x40)
-> +- interrupt-parent	  : a phandle pointing to the interrupt controller
-> +			    serving the interrupt for this chip
-> +- interrupts		  : interrupt specification for the gsl1680 interrupt
-> +- power-gpios		  : Specification for the pin connected to the gsl1680's
-> +			    shutdown input. This needs to be driven high to take the
-> +			    gsl1680 out of its low power state
-> +- touchscreen-size-x	  : See touchscreen.txt
-> +- touchscreen-size-y	  : See touchscreen.txt
-> +- touchscreen-max-fingers : maximum number of fingers the touchscreen can detect
+> +#define WNR854T_PCI_SLOT0_OFFS	7
+> +#define WNR854T_PCI_SLOT0_IRQ_PIN	4
+> +
+> +static void __init wnr854t_pci_preinit(void)
+> +{
+> +	int pin;
+> +
+> +	/*
+> +	 * Configure PCI GPIO IRQ pins
+> +	 */
+> +	pin = WNR854T_PCI_SLOT0_IRQ_PIN;
+> +	if (gpio_request(pin, "PCI Int") == 0) {
+> +		if (gpio_direction_input(pin) == 0) {
+> +			irq_set_irq_type(gpio_to_irq(pin), IRQ_TYPE_LEVEL_LOW);
+> +		} else {
+> +			pr_err("wnr854t_pci_preinit failed to set_irq_type pin %d\n",
+> +				pin);
+> +			gpio_free(pin);
+> +		}
+> +	} else {
+> +		pr_err("wnr854t_pci_preinit failed to request gpio %d\n", pin);
+> +	}
+> +}
+> +
+> +static int __init wnr854t_pci_map_irq(const struct pci_dev *dev, u8 slot,
+> +	u8 pin)
+> +{
+> +	int irq;
+> +
+> +	/*
+> +	 * Check for devices with hard-wired IRQs.
+> +	 */
+> +	irq = orion5x_pci_map_irq(dev, slot, pin);
+> +	if (irq != -1)
+> +		return irq;
+> +
+> +	/*
+> +	 * PCI IRQs are connected via GPIOs
+> +	 */
+> +	switch (slot - WNR854T_PCI_SLOT0_OFFS) {
+> +	case 0:
+> +		return gpio_to_irq(WNR854T_PCI_SLOT0_IRQ_PIN);
+> +	default:
+> +		return -1;
+> +	}
+> +}
 
-If you name it like a standard property, then it should be documented in 
-touchscreen.txt.
+The other patches all appear good to me, but I find this one suspicious.
 
-> +Optional properties:
-> +- touchscreen-inverted-x  : See touchscreen.txt
-> +- touchscreen-inverted-y  : See touchscreen.txt
-> +- touchscreen-swapped-x-y : See touchscreen.txt
-> +
-> +Example:
-> +
-> +i2c at 00000000 {
-> +	gsl1680: touchscreen at 40 {
-> +		compatible = "silead,gsl1680";
-> +		reg = <0x40>;
-> +		interrupt-parent = <&pio>;
-> +		interrupts = <6 11 IRQ_TYPE_EDGE_FALLING>;
-> +		power-gpios = <&pio 1 3 GPIO_ACTIVE_HIGH>;
-> +		touchscreen-size-x = <480>;
-> +		touchscreen-size-y = <800>;
-> +		touchscreen-max-fingers = <5>;
-> +		touchscreen-inverted-x;
-> +		touchscreen-swapped-x-y;
-> +	};
-> +};
+Why are you not using the device tree for probing PCI? Is there anything
+missing in drivers/pci/host/pci-mvebu.c, or do you just need help
+describing it in DT?
+
+	Arnd
