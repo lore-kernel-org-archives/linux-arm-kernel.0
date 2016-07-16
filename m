@@ -1,44 +1,101 @@
-From: mturquette@baylibre.com (Michael Turquette)
-Date: Fri, 15 Jul 2016 19:18:17 -0700
-Subject: [PATCH v2] clk: gxbb: expose CLKID_MMC_PCLK
-In-Reply-To: <m28tx23l0h.fsf@baylibre.com>
-References: <20160707033837.20029-1-khilman@baylibre.com>
- <146794722863.73491.474750140948566962@resonance>
- <m28tx23l0h.fsf@baylibre.com>
-Message-ID: <146863549703.73491.15445512744188633959@resonance>
+From: fu.wei@linaro.org (Fu Wei)
+Date: Sat, 16 Jul 2016 10:24:35 +0800
+Subject: [PATCH v7 4/9] acpi/arm64: Add GTDT table parse driver
+In-Reply-To: <1580087.dlcVOb6fx1@vostro.rjw.lan>
+References: <1468432402-4872-1-git-send-email-fu.wei@linaro.org>
+ <5101961.eCg7ixLQWc@vostro.rjw.lan>
+ <CADyBb7sXxY_a+tJQoH01eUk5-xvg9jRZtzyhB-tDstWoBAWfLg@mail.gmail.com>
+ <1580087.dlcVOb6fx1@vostro.rjw.lan>
+Message-ID: <CADyBb7tLyABzWFEW_8A3bK9XeWiHJjh7TqWQc=vDn5O_WUJX5w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Kevin Hilman (2016-07-15 09:48:30)
-> Michael Turquette <mturquette@baylibre.com> writes:
-> 
-> > Quoting Kevin Hilman (2016-07-06 20:38:37)
-> >> The MMC_PCLK is needed for the SD/eMMC driver, expose to DT (and comment
-> >> out in clk driver)
-> >> 
-> >> Signed-off-by: Kevin Hilman <khilman@baylibre.com>
-> >
-> > Applied to the same clk-s905 branch if you need to re-pull it as a
-> > dependency.
-> 
-> Ugh.  Just received some updated documentation, and turns out this clock
-> is not used at all. :(
-> 
-> Feel free to revert now before it becomes ABI.
+Hi Rafeal,
 
-Reverted.
+On 16 July 2016 at 05:22, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+> On Saturday, July 16, 2016 12:32:14 AM Fu Wei wrote:
+>> Hi Rafael,
+>>
+>> On 15 July 2016 at 21:07, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+>> > On Friday, July 15, 2016 02:15:27 PM Rafael J. Wysocki wrote:
+>> >> On Friday, July 15, 2016 03:32:35 PM Fu Wei wrote:
+>> >> > Hi Rafael,
+>> >> >
+>> >
+>> > [cut]
+>> >
+>> >> > >
+>> >> > >> +               return 0;
+>> >> > >> +       }
+>> >> > >> +
+>> >> > >> +       if (!gtdt->platform_timer_count) {
+>> >> > >> +               pr_info("No Platform Timer.\n");
+>> >> > >> +               return 0;
+>> >> > >> +       }
+>> >> > >> +
+>> >> > >> +       acpi_gtdt_desc.platform_timer_start = (void *)gtdt +
+>> >> > >> +                                             gtdt->platform_timer_offset;
+>> >> > >> +       if (acpi_gtdt_desc.platform_timer_start <
+>> >> > >> +           (void *)table + sizeof(struct acpi_table_gtdt)) {
+>> >> > >> +               pr_err(FW_BUG "Platform Timer pointer error.\n");
+>> >> > >
+>> >> > > Why pr_err()?
+>> >> >
+>> >> > if (true), that means the GTDT table has bugs.
+>> >> >
+>> >>
+>> >> And that's not a very useful piece of information unless you're debugging the
+>> >> platform, is it?
+>> >
+>> > FWIW, I'm not a big fan of printing "your firmware is buggy" type of messages
+>> > (especially at the "error" log level or higher) unless they can be clearly
+>> > connected to a specific type of functional failure.
+>> >
+>> > So if you want to pring an error-level message, something like "I cannot do X
+>> > because of the firmware bug Y" would be better IMO.
+>>
+>> So can I do this:
+>> pr_err(FW_BUG "Can NOT init platform_timer pointer, because of the
+>> GTDT table bug\n");
+>>
+>> or pr_debug(FW_BUG "Can NOT init platform_timer_start, because of
+>> platform_timer_offset bug in GTDT\n");
+>>
+>> or just delete it?
+>>
+>> which one do you prefer?  I think maybe should provide some clue for
+>> users to fix the problem  :-)
+>
+> And how exactly would they fix it then?
+>
+>>
+>> any thought ?
+>
+> If you print variable or function names and the like, the message should be
+> a debug one, because that's information that can only be understood by
+> developers (some developers are users too, but they are a minority).
+>
+> If you want to report an error, say what is not working (or not available
+> etc) and why (if you know the reason at the time the message is printed).
 
-> 
-> Now that I have actual docs, I'll have a new series coming that will
-> have the right clock details.
+Great thanks, I guess I got you point.
 
-No problem. I did a git revert b/c I don't want to rebase this late in
-the cycle.
+maybe just a very simple message like:
+pr_err(FW_BUG "Failed to init table: GTDT table is buggy.\n");
 
-Regards,
-Mike
+I will also check other pr_* , if I can update them
 
-> 
-> Thanks, and sorry for the noise,
-> 
-> Kevin
+
+>
+> Thanks,
+> Rafael
+>
+
+
+
+-- 
+Best regards,
+
+Fu Wei
+Software Engineer
+Red Hat
