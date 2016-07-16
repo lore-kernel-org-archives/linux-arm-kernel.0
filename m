@@ -1,73 +1,59 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sat, 16 Jul 2016 10:23:49 +0200
-Subject: [PATCH] ARM: pxa: fix GPIO double shifts
-Message-ID: <1468657429-13117-1-git-send-email-robert.jarzmik@free.fr>
+From: bhaktipriya96@gmail.com (Bhaktipriya Shridhar)
+Date: Sat, 16 Jul 2016 14:00:25 +0530
+Subject: [PATCH] [media] s5p-mfc: Remove deprecated
+ create_singlethread_workqueue
+Message-ID: <20160716083025.GA7294@Karyakshetra>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The commit 9bf448c66d4b ("ARM: pxa: use generic gpio operation instead of
-gpio register") from Oct 17, 2011, leads to the following static checker
-warning:
-  arch/arm/mach-pxa/spitz_pm.c:172 spitz_charger_wakeup()
-  warn: double left shift '!gpio_get_value(SPITZ_GPIO_KEY_INT)
-        << (1 << ((SPITZ_GPIO_KEY_INT) & 31))'
+alloc_workqueue replaces deprecated create_singlethread_workqueue().
 
-As Dan reported, the value is shifted three times :
- - once by gpio_get_value(), which returns either 0 or BIT(gpio)
- - once by the shift operation '<<'
- - a last time by GPIO_bit(gpio) which is BIT(gpio)
+The MFC device driver is a v4l2 driver which can encode/decode video
+raw/elementary streams and has support for all popular video codecs.
 
-Therefore the calculation lead to a chained or operator of :
- - (1 << gpio) << (1 << gpio) = (2^gpio)^gpio = 2 ^ (gpio * gpio)
+The driver's watchdog_workqueue has been replaced with system_wq since
+it queues a single work item, &dev->watchdog_work, which calls for no
+ordering requirement. The work item is involved in running the watchdog
+timer and is not being used on a memory reclaim path.
 
-It is be sheer luck the former statement works, only because each gpio
-used is strictly smaller than 6, and therefore 2^(gpio^2) never
-overflows a 32 bits value, and because it is used as a boolean value to
-check a gpio activation.
+Work item has been flushed in s5p_mfc_remove() to ensure
+that there are no pending tasks while disconnecting the driver.
 
-Fixes: 9bf448c66d4b ("ARM: pxa: use generic gpio operation instead of
-gpio register")
-Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
-Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+Signed-off-by: Bhaktipriya Shridhar <bhaktipriya96@gmail.com>
 ---
- arch/arm/mach-pxa/corgi_pm.c | 8 +++-----
- arch/arm/mach-pxa/spitz_pm.c | 5 ++---
- 2 files changed, 5 insertions(+), 8 deletions(-)
+ drivers/media/platform/s5p-mfc/s5p_mfc.c | 6 ++----
+ 1 file changed, 2 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-pxa/corgi_pm.c b/arch/arm/mach-pxa/corgi_pm.c
-index d9206811be9b..a7bc7e18158e 100644
---- a/arch/arm/mach-pxa/corgi_pm.c
-+++ b/arch/arm/mach-pxa/corgi_pm.c
-@@ -135,11 +135,9 @@ static unsigned long corgi_charger_wakeup(void)
- {
- 	unsigned long ret;
- 
--	ret = (!gpio_get_value(CORGI_GPIO_AC_IN) << GPIO_bit(CORGI_GPIO_AC_IN))
--		| (!gpio_get_value(CORGI_GPIO_KEY_INT)
--		<< GPIO_bit(CORGI_GPIO_KEY_INT))
--		| (!gpio_get_value(CORGI_GPIO_WAKEUP)
--		<< GPIO_bit(CORGI_GPIO_WAKEUP));
-+	ret = !gpio_get_value(CORGI_GPIO_AC_IN)
-+		| !gpio_get_value(CORGI_GPIO_KEY_INT)
-+		| !gpio_get_value(CORGI_GPIO_WAKEUP);
- 	return ret;
- }
- 
-diff --git a/arch/arm/mach-pxa/spitz_pm.c b/arch/arm/mach-pxa/spitz_pm.c
-index ea9f9034cb54..5a4c45b5a526 100644
---- a/arch/arm/mach-pxa/spitz_pm.c
-+++ b/arch/arm/mach-pxa/spitz_pm.c
-@@ -168,9 +168,8 @@ static int spitz_should_wakeup(unsigned int resume_on_alarm)
- static unsigned long spitz_charger_wakeup(void)
- {
- 	unsigned long ret;
--	ret = ((!gpio_get_value(SPITZ_GPIO_KEY_INT)
--		<< GPIO_bit(SPITZ_GPIO_KEY_INT))
--		| gpio_get_value(SPITZ_GPIO_SYNC));
-+	ret = !gpio_get_value(SPITZ_GPIO_KEY_INT)
-+		| gpio_get_value(SPITZ_GPIO_SYNC);
- 	return ret;
- }
- 
--- 
+diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc.c b/drivers/media/platform/s5p-mfc/s5p_mfc.c
+index b16466f..1bc27ec 100644
+--- a/drivers/media/platform/s5p-mfc/s5p_mfc.c
++++ b/drivers/media/platform/s5p-mfc/s5p_mfc.c
+@@ -152,7 +152,7 @@ static void s5p_mfc_watchdog(unsigned long arg)
+ 		 * error. Now it is time to kill all instances and
+ 		 * reset the MFC. */
+ 		mfc_err("Time out during waiting for HW\n");
+-		queue_work(dev->watchdog_workqueue, &dev->watchdog_work);
++		schedule_work(&dev->watchdog_work);
+ 	}
+ 	dev->watchdog_timer.expires = jiffies +
+ 					msecs_to_jiffies(MFC_WATCHDOG_INTERVAL);
+@@ -1238,7 +1238,6 @@ static int s5p_mfc_probe(struct platform_device *pdev)
+ 	platform_set_drvdata(pdev, dev);
+
+ 	dev->hw_lock = 0;
+-	dev->watchdog_workqueue = create_singlethread_workqueue(S5P_MFC_NAME);
+ 	INIT_WORK(&dev->watchdog_work, s5p_mfc_watchdog_worker);
+ 	atomic_set(&dev->watchdog_cnt, 0);
+ 	init_timer(&dev->watchdog_timer);
+@@ -1284,8 +1283,7 @@ static int s5p_mfc_remove(struct platform_device *pdev)
+ 	v4l2_info(&dev->v4l2_dev, "Removing %s\n", pdev->name);
+
+ 	del_timer_sync(&dev->watchdog_timer);
+-	flush_workqueue(dev->watchdog_workqueue);
+-	destroy_workqueue(dev->watchdog_workqueue);
++	flush_work(&dev->watchdog_work);
+
+ 	video_unregister_device(dev->vfd_enc);
+ 	video_unregister_device(dev->vfd_dec);
+--
 2.1.4
