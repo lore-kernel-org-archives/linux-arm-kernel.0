@@ -1,28 +1,35 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Fri, 15 Jul 2016 21:07:23 -0400
-Subject: [PATCH V9 7/9] vfio, platform: make reset driver a requirement by
- default
-In-Reply-To: <20160714162454.4b05813c@t450s.home>
+Date: Fri, 15 Jul 2016 21:09:33 -0400
+Subject: [PATCH V9 6/9] vfio: platform: call _RST method when using ACPI
+In-Reply-To: <20160714160439.5bafca73@t450s.home>
 References: <1468461995-32676-1-git-send-email-okaya@codeaurora.org>
- <1468461995-32676-8-git-send-email-okaya@codeaurora.org>
- <20160714162454.4b05813c@t450s.home>
-Message-ID: <46aea353-ced9-bd6b-199f-9a785d1d8758@codeaurora.org>
+ <1468461995-32676-7-git-send-email-okaya@codeaurora.org>
+ <20160714160439.5bafca73@t450s.home>
+Message-ID: <b46984d2-25b4-9d3b-394b-b0baf92bbf01@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7/14/2016 6:24 PM, Alex Williamson wrote:
->> struct vfio_platform_device {
->> > +	bool				reset_required;
->> >  	struct vfio_platform_region	*regions;
->> >  	u32				num_regions;
->> >  	struct vfio_platform_irq	*irqs;
-> Either you have 64bit bools or you're not paying any attention to
-> to the alignment of this structure.  If we only care about 64bit
-> systems we could tuck this into the gap after num_regions, otherwise
-> append it to the end of the structure, we certainly don't care about
-> keeping a reset flag within cache line boundaries.  Thanks,
+On 7/14/2016 6:04 PM, Alex Williamson wrote:
+>> +static inline
+>> > +bool vfio_platform_acpi_has_reset(struct vfio_platform_device *vdev)
+>> > +{
+>> > +#ifdef CONFIG_ACPI
+>> > +	struct device *dev = vdev->device;
+>> > +	acpi_handle handle = ACPI_HANDLE(dev);
+>> > +
+>> > +	return acpi_has_method(handle, "_RST");
+>> > +#else
+>> > +	return false;
+>> > +#endif
+>> > +}
+> What exactly is the rationale for making these inline?  Clearly reset
+> is not a performance relevant path.  Thanks,
+> 
+> Alex
+> 
 
-OK, I moved it to the end of the structure.
+It is remaining from the previous stub functions which were inline. I'll get rid
+of the inlines.
 
 -- 
 Sinan Kaya
