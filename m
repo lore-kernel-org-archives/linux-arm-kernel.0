@@ -1,31 +1,73 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Sat, 16 Jul 2016 09:39:28 +0200
-Subject: [PATCH v3 0/3] pci: Aardvark PCIe controller driver for Marvell
- Armada 3700
-In-Reply-To: <20160715221655.GD1706@localhost>
-References: <1467279152-5717-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20160707224403.3279d807@free-electrons.com>
- <20160715221655.GD1706@localhost>
-Message-ID: <20160716093928.5b61fcdf@free-electrons.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Sat, 16 Jul 2016 10:23:49 +0200
+Subject: [PATCH] ARM: pxa: fix GPIO double shifts
+Message-ID: <1468657429-13117-1-git-send-email-robert.jarzmik@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+The commit 9bf448c66d4b ("ARM: pxa: use generic gpio operation instead of
+gpio register") from Oct 17, 2011, leads to the following static checker
+warning:
+  arch/arm/mach-pxa/spitz_pm.c:172 spitz_charger_wakeup()
+  warn: double left shift '!gpio_get_value(SPITZ_GPIO_KEY_INT)
+        << (1 << ((SPITZ_GPIO_KEY_INT) & 31))'
 
-On Fri, 15 Jul 2016 17:16:55 -0500, Bjorn Helgaas wrote:
+As Dan reported, the value is shifted three times :
+ - once by gpio_get_value(), which returns either 0 or BIT(gpio)
+ - once by the shift operation '<<'
+ - a last time by GPIO_bit(gpio) which is BIT(gpio)
 
-> Hi Thomas, I just returned from vacation, so I haven't looked at this
-> yet.  Sounds like we'll have a bonus week before v4.7 and I was
-> planning to do two pull requests anyway because of my vacation, so
-> there should still be time.
+Therefore the calculation lead to a chained or operator of :
+ - (1 << gpio) << (1 << gpio) = (2^gpio)^gpio = 2 ^ (gpio * gpio)
 
-Great, thanks! If there are any things remaining to fix, I should be
-able to do so early next week.
+It is be sheer luck the former statement works, only because each gpio
+used is strictly smaller than 6, and therefore 2^(gpio^2) never
+overflows a 32 bits value, and because it is used as a boolean value to
+check a gpio activation.
 
-Thanks,
+Fixes: 9bf448c66d4b ("ARM: pxa: use generic gpio operation instead of
+gpio register")
+Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
+Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+---
+ arch/arm/mach-pxa/corgi_pm.c | 8 +++-----
+ arch/arm/mach-pxa/spitz_pm.c | 5 ++---
+ 2 files changed, 5 insertions(+), 8 deletions(-)
 
-Thomas
+diff --git a/arch/arm/mach-pxa/corgi_pm.c b/arch/arm/mach-pxa/corgi_pm.c
+index d9206811be9b..a7bc7e18158e 100644
+--- a/arch/arm/mach-pxa/corgi_pm.c
++++ b/arch/arm/mach-pxa/corgi_pm.c
+@@ -135,11 +135,9 @@ static unsigned long corgi_charger_wakeup(void)
+ {
+ 	unsigned long ret;
+ 
+-	ret = (!gpio_get_value(CORGI_GPIO_AC_IN) << GPIO_bit(CORGI_GPIO_AC_IN))
+-		| (!gpio_get_value(CORGI_GPIO_KEY_INT)
+-		<< GPIO_bit(CORGI_GPIO_KEY_INT))
+-		| (!gpio_get_value(CORGI_GPIO_WAKEUP)
+-		<< GPIO_bit(CORGI_GPIO_WAKEUP));
++	ret = !gpio_get_value(CORGI_GPIO_AC_IN)
++		| !gpio_get_value(CORGI_GPIO_KEY_INT)
++		| !gpio_get_value(CORGI_GPIO_WAKEUP);
+ 	return ret;
+ }
+ 
+diff --git a/arch/arm/mach-pxa/spitz_pm.c b/arch/arm/mach-pxa/spitz_pm.c
+index ea9f9034cb54..5a4c45b5a526 100644
+--- a/arch/arm/mach-pxa/spitz_pm.c
++++ b/arch/arm/mach-pxa/spitz_pm.c
+@@ -168,9 +168,8 @@ static int spitz_should_wakeup(unsigned int resume_on_alarm)
+ static unsigned long spitz_charger_wakeup(void)
+ {
+ 	unsigned long ret;
+-	ret = ((!gpio_get_value(SPITZ_GPIO_KEY_INT)
+-		<< GPIO_bit(SPITZ_GPIO_KEY_INT))
+-		| gpio_get_value(SPITZ_GPIO_SYNC));
++	ret = !gpio_get_value(SPITZ_GPIO_KEY_INT)
++		| gpio_get_value(SPITZ_GPIO_SYNC);
+ 	return ret;
+ }
+ 
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+2.1.4
