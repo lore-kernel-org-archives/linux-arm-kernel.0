@@ -1,60 +1,110 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 15 Jul 2016 19:35:03 -0500
-Subject: [PATCH v2 4/5] phy: DT binding documentation for qoriq usb 2.0 phy
-In-Reply-To: <1468038656-10345-5-git-send-email-rajesh.bhagat@nxp.com>
-References: <1468038656-10345-1-git-send-email-rajesh.bhagat@nxp.com>
- <1468038656-10345-5-git-send-email-rajesh.bhagat@nxp.com>
-Message-ID: <20160716003503.GA6930@rob-hp-laptop>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Fri, 15 Jul 2016 17:42:11 -0700
+Subject: [PATCH 1/6] arm64: dts: qcom: msm8916: Add smsm and smp2p nodes
+Message-ID: <1468629736-7644-1-git-send-email-bjorn.andersson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 09, 2016 at 10:00:55AM +0530, Rajesh Bhagat wrote:
-> Describes the qoriq usb 2.0 phy driver binding, currently used
-> for LS1021A and LS1012A platform.
-> 
-> Signed-off-by: Rajesh Bhagat <rajesh.bhagat@nxp.com>
-> ---
-> Changes in v2:
->  - Adds DT binding documentation for qoriq usb 2.0 phy
->  - Changed the compatible string to fsl,qoriq-usb2-phy
-> 
->  .../devicetree/bindings/phy/qoriq-usb2-phy.txt     | 22 ++++++++++++++++++++++
->  1 file changed, 22 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/phy/qoriq-usb2-phy.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/phy/qoriq-usb2-phy.txt b/Documentation/devicetree/bindings/phy/qoriq-usb2-phy.txt
-> new file mode 100644
-> index 0000000..f043855
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/phy/qoriq-usb2-phy.txt
-> @@ -0,0 +1,22 @@
-> +QorIQ SoC USB 2.0 PHY
-> +
-> +Required properties:
-> + - compatible: should be "fsl,qoriq-usb2-phy",
-> +   Wherever applicable, the version of the USB PHY should
-> +   also be mentioned (for eg. fsl,qoriq-usb2-phy-vX.Y).
-> +   where, X = Phy vendor(Legacy = 1, NXP = 2) and Y = PHY version
+This patch adds the smsm and smp2p nodes for the hexagon and wcnss
+cores.
 
-What does Legacy mean? FSL?
+Signed-off-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+---
+ arch/arm64/boot/dts/qcom/msm8916.dtsi | 82 +++++++++++++++++++++++++++++++++++
+ 1 file changed, 82 insertions(+)
 
-Use SoC specific compatible strings.
-
-> + - reg : Address and length of the usb phy control register set.
-> + - phy_type : For multi port host USB controllers, should be one of
-> +   "ulpi", or "serial". For dual role USB controllers, should be
-> +   one of "ulpi", "utmi", "utmi_wide", or "serial".
-> +
-> +The main purpose of this PHY driver is to enable the USB PHY reference clock
-> +gate on the QorIQ SOC for USB2 PHY OR implement errata workaround in
-> +future. Otherwise it is just an NOP PHY driver.
-> +
-> +usbphy0: usbphy at 8600000 {
-> +        compatible = "fsl,qoriq-usb2-phy" "fsl,qoriq-usb2-phy-vX.Y";
-
-most specific first.
-
-> +        reg = <0x0 0x8600000 0x0 0x1000>;
-> +        #phy-cells = <0>;
-> +        phy_type = "ulpi";
-> +};
+diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
+index 11bdc24cfc74..6148ea05b50a 100644
+--- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
++++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
+@@ -657,6 +657,88 @@
+ 			};
+ 		};
+ 	};
++
++	hexagon-smp2p {
++		compatible = "qcom,smp2p";
++		qcom,smem = <435>, <428>;
++
++		interrupts = <0 27 IRQ_TYPE_EDGE_RISING>;
++
++		qcom,ipc = <&apcs 8 14>;
++
++		qcom,local-pid = <0>;
++		qcom,remote-pid = <1>;
++
++		hexagon_smp2p_out: master-kernel {
++			qcom,entry-name = "master-kernel";
++
++			#qcom,smem-state-cells = <1>;
++		};
++
++		hexagon_smp2p_in: slave-kernel {
++			qcom,entry-name = "slave-kernel";
++
++			interrupt-controller;
++			#interrupt-cells = <2>;
++		};
++	};
++
++	wcnss-smp2p {
++		compatible = "qcom,smp2p";
++		qcom,smem = <451>, <431>;
++
++		interrupts = <0 143 IRQ_TYPE_EDGE_RISING>;
++
++		qcom,ipc = <&apcs 8 18>;
++
++		qcom,local-pid = <0>;
++		qcom,remote-pid = <4>;
++
++		wcnss_smp2p_out: master-kernel {
++			qcom,entry-name = "master-kernel";
++
++			#qcom,smem-state-cells = <1>;
++		};
++
++		wcnss_smp2p_in: slave-kernel {
++			qcom,entry-name = "slave-kernel";
++
++			interrupt-controller;
++			#interrupt-cells = <2>;
++		};
++	};
++
++	smsm {
++		compatible = "qcom,smsm";
++
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		qcom,ipc-1 = <&apcs 0 13>;
++		qcom,ipc-6 = <&apcs 0 19>;
++
++		apps_smsm: apps at 0 {
++			reg = <0>;
++
++			#qcom,smem-state-cells = <1>;
++		};
++
++		hexagon_smsm: hexagon at 1 {
++			reg = <1>;
++			interrupts = <0 26 IRQ_TYPE_EDGE_RISING>;
++
++			interrupt-controller;
++			#interrupt-cells = <2>;
++		};
++
++		wcnss_smsm: wcnss at 6 {
++			reg = <6>;
++			interrupts = <0 144 IRQ_TYPE_EDGE_RISING>;
++
++			interrupt-controller;
++			#interrupt-cells = <2>;
++		};
++	};
+ };
+ 
+ #include "msm8916-pins.dtsi"
+-- 
+2.5.0
