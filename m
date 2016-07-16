@@ -1,101 +1,168 @@
-From: fu.wei@linaro.org (Fu Wei)
-Date: Sat, 16 Jul 2016 10:24:35 +0800
-Subject: [PATCH v7 4/9] acpi/arm64: Add GTDT table parse driver
-In-Reply-To: <1580087.dlcVOb6fx1@vostro.rjw.lan>
-References: <1468432402-4872-1-git-send-email-fu.wei@linaro.org>
- <5101961.eCg7ixLQWc@vostro.rjw.lan>
- <CADyBb7sXxY_a+tJQoH01eUk5-xvg9jRZtzyhB-tDstWoBAWfLg@mail.gmail.com>
- <1580087.dlcVOb6fx1@vostro.rjw.lan>
-Message-ID: <CADyBb7tLyABzWFEW_8A3bK9XeWiHJjh7TqWQc=vDn5O_WUJX5w@mail.gmail.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Fri, 15 Jul 2016 19:53:32 -0700
+Subject: [PATCH v2 4/4] hwmon: iio: add label for channels read by
+ iio_hwmon
+In-Reply-To: <5788F506.3040809@free-electrons.com>
+References: <1468576754-3273-1-git-send-email-quentin.schulz@free-electrons.com>
+ <1468576754-3273-5-git-send-email-quentin.schulz@free-electrons.com>
+ <5788ED2D.9050405@roeck-us.net> <5788F506.3040809@free-electrons.com>
+Message-ID: <5789A1AC.1020706@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rafeal,
-
-On 16 July 2016 at 05:22, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
-> On Saturday, July 16, 2016 12:32:14 AM Fu Wei wrote:
->> Hi Rafael,
->>
->> On 15 July 2016 at 21:07, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
->> > On Friday, July 15, 2016 02:15:27 PM Rafael J. Wysocki wrote:
->> >> On Friday, July 15, 2016 03:32:35 PM Fu Wei wrote:
->> >> > Hi Rafael,
->> >> >
->> >
->> > [cut]
->> >
->> >> > >
->> >> > >> +               return 0;
->> >> > >> +       }
->> >> > >> +
->> >> > >> +       if (!gtdt->platform_timer_count) {
->> >> > >> +               pr_info("No Platform Timer.\n");
->> >> > >> +               return 0;
->> >> > >> +       }
->> >> > >> +
->> >> > >> +       acpi_gtdt_desc.platform_timer_start = (void *)gtdt +
->> >> > >> +                                             gtdt->platform_timer_offset;
->> >> > >> +       if (acpi_gtdt_desc.platform_timer_start <
->> >> > >> +           (void *)table + sizeof(struct acpi_table_gtdt)) {
->> >> > >> +               pr_err(FW_BUG "Platform Timer pointer error.\n");
->> >> > >
->> >> > > Why pr_err()?
->> >> >
->> >> > if (true), that means the GTDT table has bugs.
->> >> >
->> >>
->> >> And that's not a very useful piece of information unless you're debugging the
->> >> platform, is it?
->> >
->> > FWIW, I'm not a big fan of printing "your firmware is buggy" type of messages
->> > (especially at the "error" log level or higher) unless they can be clearly
->> > connected to a specific type of functional failure.
->> >
->> > So if you want to pring an error-level message, something like "I cannot do X
->> > because of the firmware bug Y" would be better IMO.
->>
->> So can I do this:
->> pr_err(FW_BUG "Can NOT init platform_timer pointer, because of the
->> GTDT table bug\n");
->>
->> or pr_debug(FW_BUG "Can NOT init platform_timer_start, because of
->> platform_timer_offset bug in GTDT\n");
->>
->> or just delete it?
->>
->> which one do you prefer?  I think maybe should provide some clue for
->> users to fix the problem  :-)
+On 07/15/2016 07:36 AM, Quentin Schulz wrote:
+> On 15/07/2016 16:03, Guenter Roeck wrote:
+>> On 07/15/2016 02:59 AM, Quentin Schulz wrote:
+> [...]
+>>> +static ssize_t iio_hwmon_read_label(struct device *dev,
+>>> +                    struct device_attribute *attr,
+>>> +                    char *buf)
+>>> +{
+>>> +    struct sensor_device_attribute *sattr = to_sensor_dev_attr(attr);
+>>> +    struct iio_hwmon_state *state = dev_get_drvdata(dev);
+>>> +    const char *label =
+>>> state->channels[sattr->index].channel->extend_name;
+>>> +
+>>> +    if (label)
+>>> +        return sprintf(buf, "%s\n", label);
+>>> +
+>> Can the name disappear on the fly, or be changed on the fly ?
+>> Then this is unusable. We should and can only provide labels
+>> if a name exists and is permanent. Otherwise all we do is
+>> to confuse user space.
 >
-> And how exactly would they fix it then?
->
->>
->> any thought ?
->
-> If you print variable or function names and the like, the message should be
-> a debug one, because that's information that can only be understood by
-> developers (some developers are users too, but they are a minority).
->
-> If you want to report an error, say what is not working (or not available
-> etc) and why (if you know the reason at the time the message is printed).
-
-Great thanks, I guess I got you point.
-
-maybe just a very simple message like:
-pr_err(FW_BUG "Failed to init table: GTDT table is buggy.\n");
-
-I will also check other pr_* , if I can update them
-
-
->
-> Thanks,
-> Rafael
+> It cannot, the extend_name field is const char* in the struct:
+> http://lxr.free-electrons.com/source/include/linux/iio/iio.h#L247
 >
 
+Then why "if(label)" ?
 
+> [...]
+>>> @@ -107,6 +123,18 @@ static int iio_hwmon_probe(struct platform_device
+>>> *pdev)
+>>>            }
+>>>
+>>>            sysfs_attr_init(&a->dev_attr.attr);
+>>> +
+>>> +        b = NULL;
+>>> +        if (st->channels[i].channel->extend_name) {
+>>> +            b = devm_kzalloc(dev, sizeof(*b), GFP_KERNEL);
+>>> +            if (b == NULL) {
+>>> +                ret = -ENOMEM;
+>>> +                goto error_release_channels;
+>>> +            }
+>>> +
+>>> +            sysfs_attr_init(&b->dev_attr.attr);
+>>
+>> Why is this initialization here and not with the rest of the initialization
+>> of this attribute ?
+>
+> I don't get your question. I've followed the exact same pattern as for
+> "a" variable's initialization.
+> The initialization is before the switch case because the name of the
+> exposed sysfs file depends on the type of the IIO channel. If I move the
+> initialization in the switch case, I'll have duplicated code.
+>
 
--- 
-Best regards,
+Yes, but that didn't require all those if statements.
 
-Fu Wei
-Software Engineer
-Red Hat
+>>> +        }
+>>> +
+>>>            ret = iio_get_channel_type(&st->channels[i], &type);
+>>>            if (ret < 0)
+>>>                goto error_release_channels;
+>>> @@ -115,35 +143,66 @@ static int iio_hwmon_probe(struct
+>>> platform_device *pdev)
+>>>            case IIO_VOLTAGE:
+>>>                a->dev_attr.attr.name = kasprintf(GFP_KERNEL,
+>>>                                  "in%d_input",
+>>> -                              in_i++);
+>>> +                              in_i);
+>>> +            if (b)
+>>> +                b->dev_attr.attr.name = kasprintf(GFP_KERNEL,
+>>> +                                  "in%d_label",
+>>> +                                  in_i);
+>>> +            in_i++;
+>>>                break;
+>>>            case IIO_TEMP:
+>>>                a->dev_attr.attr.name = kasprintf(GFP_KERNEL,
+>>>                                  "temp%d_input",
+>>> -                              temp_i++);
+>>> +                              temp_i);
+>>> +
+>>> +            if (b)
+>>> +                b->dev_attr.attr.name = kasprintf(GFP_KERNEL,
+>>> +                                  "temp%d_label",
+>>> +                                  temp_i);
+>>> +            temp_i++;
+>>>                break;
+>>>            case IIO_CURRENT:
+>>>                a->dev_attr.attr.name = kasprintf(GFP_KERNEL,
+>>>                                  "curr%d_input",
+>>> -                              curr_i++);
+>>> +                              curr_i);
+>>> +
+>>> +            if (b)
+>>> +                b->dev_attr.attr.name = kasprintf(GFP_KERNEL,
+>>> +                                  "curr%d_label",
+>>> +                                  curr_i);
+>>> +            curr_i++;
+>>>                break;
+>>>            case IIO_HUMIDITYRELATIVE:
+>>>                a->dev_attr.attr.name = kasprintf(GFP_KERNEL,
+>>>                                  "humidity%d_input",
+>>> -                              humidity_i++);
+>>> +                              humidity_i);
+>>> +
+>>> +            if (b)
+>>> +                b->dev_attr.attr.name = kasprintf(GFP_KERNEL,
+>>> +                                  "humidity%d_label",
+>>> +                                  humidity_i);
+>>> +            humidity_i++;
+>>>                break;
+>>>            default:
+>>>                ret = -EINVAL;
+>>>                goto error_release_channels;
+>>>            }
+>>> -        if (a->dev_attr.attr.name == NULL) {
+>>> +        if (a->dev_attr.attr.name == NULL ||
+>>> +            (b && b->dev_attr.attr.name == NULL)) {
+>>>                ret = -ENOMEM;
+>>>                goto error_release_channels;
+>>>            }
+>>
+>> Just realized that we have a memory leak here. The 'name' memory is
+>> never released.
+>>
+>
+> I don't know if we have to do something to revert the effects of
+> sysfs_attr_init but you sure are right that the a and b's attribute's
+> name is never freed. This case would be handled with devm_kasprintf, I
+> guess? Thanks.
+>
+>>>            a->dev_attr.show = iio_hwmon_read_val;
+>>>            a->dev_attr.attr.mode = S_IRUGO;
+>>>            a->index = i;
+>>> -        st->attrs[i] = &a->dev_attr.attr;
+>>> +        st->attrs[j++] = &a->dev_attr.attr;
+>>> +
+>>> +        if (b) {
+
+sysfs_attr_init() might be better here to keep the initialization of '*b'
+as close together as possible.
+
+Guenetr
+
+>>> +            b->dev_attr.show = iio_hwmon_read_label;
+>>> +            b->dev_attr.attr.mode = S_IRUGO;
+>>> +            b->index = i;
+>>> +            st->attrs[j++] = &b->dev_attr.attr;
+>>> +        }
+>>>        }
+>>>
+>>>        st->attr_group.attrs = st->attrs;
+>>>
+>>
+>
+> Quentin
+>
