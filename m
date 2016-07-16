@@ -1,60 +1,69 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Sat, 16 Jul 2016 12:18:40 +0200
-Subject: [PATCH] dt: bindings: Add a generic ethernet device binding
-In-Reply-To: <1788846.r3134d1VMR@wuerfel>
-References: <1468405204-5845-1-git-send-email-hdegoede@redhat.com>
- <1788846.r3134d1VMR@wuerfel>
-Message-ID: <289d5b2e-6232-2c91-f11d-774265e05125@redhat.com>
+Date: Sat, 16 Jul 2016 12:46:02 +0200
+Subject: [PATCH 2/4] mmc: sunxi: Make sample clocks optional
+In-Reply-To: <1468665964-27142-1-git-send-email-hdegoede@redhat.com>
+References: <1468665964-27142-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <1468665964-27142-3-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+It turns out that sun4i (A10) and sun5i (A13 & co) do not have sample
+clocks, so make them optional.
 
-On 15-07-16 22:42, Arnd Bergmann wrote:
-> On Wednesday, July 13, 2016 12:20:04 PM CEST Hans de Goede wrote:
->> +&mmc1 {
->> +       non-removable;
->> +       status = "okay";
->> +
->> +       sdio_wifi: sdio_wifi at 1 {
->> +               compatible = "generic,ethernet"
->> +               reg = <1>;
->> +       };
->> +};
->
-> For discoverable buses, we normally use a compatible property that
-> reflects the device ID on that bus, e.g. on PCI we have "pci1A2B:3C4D"
-> and I think that makes more sense than having to come up with strings
-> for sdio devices.
+Since these do not have sample clocks, they cannot (reliably) do
+DDR rates, so only set MMC_CAP_1_8V_DDR when we do have sample clks.
 
-2 things:
+Note this patch only changes the devm_clk_get error checking and sets
+the clocks to NULL if they don't exists. All the clk_foo calls accept
+a NULL clk and will return success when called with a NULL clk, so this
+is all that is necessary.
 
-1) The problem here is that different batches of the same board
-(cheap chinese tablet) have different sdio wifi modules, so we
-actually cannot specify a vendor / product id as in your example.
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+ drivers/mmc/host/sunxi-mmc.c | 18 +++++++++++++-----
+ 1 file changed, 13 insertions(+), 5 deletions(-)
 
-2) In some cases we do want an actual compatible because some devices
-have some oob (out-of-band) going with e.g. gpio-s which cannot be
-handled by mmc-pwrseq.
-
-> In fact, Linux completely ignores the compatible strings on those
-> buses (pci, usb, sdio, ...),
-
-You're mostly right, but at least the brcmfmac driver looks for a
-compatible in the mmc-host child node describing its sdio function
-to see if it should check for oob irq information there.
-
-> so I think we can just do the same thing
-> using no compatible string at all.
-
-I'm all for not using any compatible string at all, actually I submitted
-a patch for a sunxi dt file which did that and Maxime pointed out that
-the compatible is listed as Required in:
-Documentation/devicetree/bindings/mmc/mmc-card.txt
-
-If we can agree to make it optional, then I'll happily submit a patch
-with that change and Maxime can take my sunxi dts patch as is :)
-
-Regards,
-
-Hans
+diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
+index 71a480b..4552ee0 100644
+--- a/drivers/mmc/host/sunxi-mmc.c
++++ b/drivers/mmc/host/sunxi-mmc.c
+@@ -1016,14 +1016,20 @@ static int sunxi_mmc_resource_request(struct sunxi_mmc_host *host,
+ 
+ 	host->clk_output = devm_clk_get(&pdev->dev, "output");
+ 	if (IS_ERR(host->clk_output)) {
+-		dev_err(&pdev->dev, "Could not get output clock\n");
+-		return PTR_ERR(host->clk_output);
++		if (PTR_ERR(host->clk_output) != -ENOENT) {
++			dev_err(&pdev->dev, "Could not get output clock\n");
++			return PTR_ERR(host->clk_output);
++		}
++		host->clk_output = NULL;
+ 	}
+ 
+ 	host->clk_sample = devm_clk_get(&pdev->dev, "sample");
+ 	if (IS_ERR(host->clk_sample)) {
+-		dev_err(&pdev->dev, "Could not get sample clock\n");
+-		return PTR_ERR(host->clk_sample);
++		if (PTR_ERR(host->clk_sample) != -ENOENT) {
++			dev_err(&pdev->dev, "Could not get sample clock\n");
++			return PTR_ERR(host->clk_sample);
++		}
++		host->clk_sample = NULL;
+ 	}
+ 
+ 	host->reset = devm_reset_control_get_optional(&pdev->dev, "ahb");
+@@ -1126,9 +1132,11 @@ static int sunxi_mmc_probe(struct platform_device *pdev)
+ 	mmc->f_min		=   400000;
+ 	mmc->f_max		= 52000000;
+ 	mmc->caps	       |= MMC_CAP_MMC_HIGHSPEED | MMC_CAP_SD_HIGHSPEED |
+-				  MMC_CAP_1_8V_DDR |
+ 				  MMC_CAP_ERASE | MMC_CAP_SDIO_IRQ;
+ 
++	if (host->clk_output && host->clk_sample)
++		mmc->caps      |= MMC_CAP_1_8V_DDR;
++
+ 	ret = mmc_of_parse(mmc);
+ 	if (ret)
+ 		goto error_free_dma;
+-- 
+2.7.4
