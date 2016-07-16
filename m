@@ -1,36 +1,38 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Sat, 16 Jul 2016 12:53:46 +0200
-Subject: [GIT PULL] ARM: mvebu: dt for v4.8 (#1)
-Message-ID: <878tx1svk5.fsf@free-electrons.com>
+Date: Sat, 16 Jul 2016 12:54:12 +0200
+Subject: [GIT PULL] ARM: mvebu: cleanup for v4.8 (#2)
+Message-ID: <877fclsvjf.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-Here is the first pull request for dt for mvebu for v4.8.
+Here is the second pull request for cleanup for mvebu for v4.8.
 
 Gregory
 
-The following changes since commit c134043ed396b06addf5866d977fed7ba6a393a9:
+The following changes since commit d705c1a66e151e587271265c29844817d5108375:
 
-  ARM: dts: kirkwood: Add DTS for Linksys EA4200v2/EA4500 (2016-04-14 19:06:50 +0200)
+  ARM: Kirkwood: fix kirkwood_pm_init() declaration/type (2016-06-16 12:01:37 +0200)
 
 are available in the git repository at:
 
-  git://git.infradead.org/linux-mvebu.git tags/mvebu-dt-4.8-1
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-cleanup-4.8-2
 
-for you to fetch changes up to d261861ab52623e34a25fe6ae76714456edda033:
+for you to fetch changes up to ac29abf38176ec149671b01d228e0a9dc38e4e60:
 
-  ARM: dts: armada-388-clearfog: remove duplicate mdio entry (2016-07-11 18:05:48 +0200)
-
-----------------------------------------------------------------
-mvebu dt for 4.8 (part 1)
-
-Fix dts for the clearfog board (Armada 388 SoC based)
+  bus: mvebu-mbus: make mvebu_mbus_syscore_ops static (2016-07-11 17:59:24 +0200)
 
 ----------------------------------------------------------------
-Russell King (1):
-      ARM: dts: armada-388-clearfog: remove duplicate mdio entry
+mvebu cleanup for 4.8 (part 2)
 
- arch/arm/boot/dts/armada-388-clearfog.dts | 16 ----------------
- 1 file changed, 16 deletions(-)
+More cleanup for the mvebu mbus driver this time
+
+----------------------------------------------------------------
+Ben Dooks (2):
+      bus: mvebu-mbus: fix __iomem on register pointers
+      bus: mvebu-mbus: make mvebu_mbus_syscore_ops static
+
+ drivers/bus/mvebu-mbus.c | 10 +++++-----
+ include/linux/mbus.h     |  2 +-
+ 2 files changed, 6 insertions(+), 6 deletions(-)
