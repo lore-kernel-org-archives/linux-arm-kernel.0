@@ -1,72 +1,36 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Sat, 16 Jul 2016 12:46:04 +0200
-Subject: [PATCH 4/4] ARM: dts: sun5i: Remove sample clocks from mmc host nodes
-In-Reply-To: <1468665964-27142-1-git-send-email-hdegoede@redhat.com>
-References: <1468665964-27142-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1468665964-27142-5-git-send-email-hdegoede@redhat.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Sat, 16 Jul 2016 12:53:46 +0200
+Subject: [GIT PULL] ARM: mvebu: dt for v4.8 (#1)
+Message-ID: <878tx1svk5.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It turns out that sun5i does not have mmc sample clocks (the bits for
-this in the register always read back 0, not listed in the datasheet),
-so remove the sample clocks from the mmc host nodes.
+Hi,
 
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
- arch/arm/boot/dts/sun5i.dtsi | 24 ++++++------------------
- 1 file changed, 6 insertions(+), 18 deletions(-)
+Here is the first pull request for dt for mvebu for v4.8.
 
-diff --git a/arch/arm/boot/dts/sun5i.dtsi b/arch/arm/boot/dts/sun5i.dtsi
-index e374f4f..86044f9 100644
---- a/arch/arm/boot/dts/sun5i.dtsi
-+++ b/arch/arm/boot/dts/sun5i.dtsi
-@@ -431,13 +431,9 @@
- 			compatible = "allwinner,sun5i-a13-mmc";
- 			reg = <0x01c0f000 0x1000>;
- 			clocks = <&ahb_gates 8>,
--				 <&mmc0_clk 0>,
--				 <&mmc0_clk 1>,
--				 <&mmc0_clk 2>;
-+				 <&mmc0_clk 0>;
- 			clock-names = "ahb",
--				      "mmc",
--				      "output",
--				      "sample";
-+				      "mmc";
- 			interrupts = <32>;
- 			status = "disabled";
- 			#address-cells = <1>;
-@@ -448,13 +444,9 @@
- 			compatible = "allwinner,sun5i-a13-mmc";
- 			reg = <0x01c10000 0x1000>;
- 			clocks = <&ahb_gates 9>,
--				 <&mmc1_clk 0>,
--				 <&mmc1_clk 1>,
--				 <&mmc1_clk 2>;
-+				 <&mmc1_clk 0>;
- 			clock-names = "ahb",
--				      "mmc",
--				      "output",
--				      "sample";
-+				      "mmc";
- 			interrupts = <33>;
- 			status = "disabled";
- 			#address-cells = <1>;
-@@ -465,13 +457,9 @@
- 			compatible = "allwinner,sun5i-a13-mmc";
- 			reg = <0x01c11000 0x1000>;
- 			clocks = <&ahb_gates 10>,
--				 <&mmc2_clk 0>,
--				 <&mmc2_clk 1>,
--				 <&mmc2_clk 2>;
-+				 <&mmc2_clk 0>;
- 			clock-names = "ahb",
--				      "mmc",
--				      "output",
--				      "sample";
-+				      "mmc";
- 			interrupts = <34>;
- 			status = "disabled";
- 			#address-cells = <1>;
--- 
-2.7.4
+Gregory
+
+The following changes since commit c134043ed396b06addf5866d977fed7ba6a393a9:
+
+  ARM: dts: kirkwood: Add DTS for Linksys EA4200v2/EA4500 (2016-04-14 19:06:50 +0200)
+
+are available in the git repository at:
+
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-dt-4.8-1
+
+for you to fetch changes up to d261861ab52623e34a25fe6ae76714456edda033:
+
+  ARM: dts: armada-388-clearfog: remove duplicate mdio entry (2016-07-11 18:05:48 +0200)
+
+----------------------------------------------------------------
+mvebu dt for 4.8 (part 1)
+
+Fix dts for the clearfog board (Armada 388 SoC based)
+
+----------------------------------------------------------------
+Russell King (1):
+      ARM: dts: armada-388-clearfog: remove duplicate mdio entry
+
+ arch/arm/boot/dts/armada-388-clearfog.dts | 16 ----------------
+ 1 file changed, 16 deletions(-)
