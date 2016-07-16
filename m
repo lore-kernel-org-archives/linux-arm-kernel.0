@@ -1,16 +1,14 @@
 From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Fri, 15 Jul 2016 17:42:12 -0700
-Subject: [PATCH 2/6] arm64: dts: qcom: msm8916: Add mba memory reserve
+Date: Fri, 15 Jul 2016 17:42:14 -0700
+Subject: [PATCH 4/6] arm64: dts: qcom: msm8916: Add tcsr syscon
 In-Reply-To: <1468629736-7644-1-git-send-email-bjorn.andersson@linaro.org>
 References: <1468629736-7644-1-git-send-email-bjorn.andersson@linaro.org>
-Message-ID: <1468629736-7644-2-git-send-email-bjorn.andersson@linaro.org>
+Message-ID: <1468629736-7644-4-git-send-email-bjorn.andersson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The modem boot authenticator needs space to play in, this is supposed to
-be relocatable and as such could later be replaced with a dynamically
-allocated chunk of memory. But let's give it a reserve for now, as we
-know that works.
+The TCSR memory segment includes various functionality, among other
+things the halt-registers for the Hexagon.
 
 Signed-off-by: Bjorn Andersson <bjorn.andersson@linaro.org>
 ---
@@ -18,20 +16,20 @@ Signed-off-by: Bjorn Andersson <bjorn.andersson@linaro.org>
  1 file changed, 5 insertions(+)
 
 diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-index 6148ea05b50a..4f2882605138 100644
+index 1e67acc19a9d..64f85f82602c 100644
 --- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
 +++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-@@ -86,6 +86,11 @@
- 			reg = <0x0 0x89300000 0x0 0x600000>;
- 			no-map;
+@@ -234,6 +234,11 @@
+ 			reg = <0x1905000 0x20000>;
  		};
-+
-+		mba_mem: mba at 8ea00000 {
-+			no-map;
-+			reg = <0 0x8ea00000 0 0x100000>;
-+		};
- 	};
  
- 	cpus {
++		tcsr: syscon at 1937000 {
++			compatible = "qcom,tcsr-msm8916", "syscon";
++			reg = <0x1937000 0x30000>;
++		};
++
+ 		tcsr_mutex: hwlock {
+ 			compatible = "qcom,tcsr-mutex";
+ 			syscon = <&tcsr_mutex_regs 0 0x1000>;
 -- 
 2.5.0
