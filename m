@@ -1,25 +1,37 @@
-From: robh@kernel.org (Rob Herring)
-Date: Sat, 16 Jul 2016 08:47:18 -0500
-Subject: [PATCH v1 4/6] drm/rockchip: dw_hdmi: add RK3399 HDMI support
-In-Reply-To: <1468235146-29575-1-git-send-email-ykk@rock-chips.com>
-References: <1468235079-29152-1-git-send-email-ykk@rock-chips.com>
- <1468235146-29575-1-git-send-email-ykk@rock-chips.com>
-Message-ID: <20160716134718.GA3267@rob-hp-laptop>
+From: jm@lentin.co.uk (Jamie Lentin)
+Date: Sat, 16 Jul 2016 15:29:07 +0100
+Subject: [PATCH v0 09/10] net: phy: Re-attempt custom DT configuration after
+ configuration
+In-Reply-To: <1468679348-10522-1-git-send-email-jm@lentin.co.uk>
+References: <1468679348-10522-1-git-send-email-jm@lentin.co.uk>
+Message-ID: <1468679348-10522-10-git-send-email-jm@lentin.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 11, 2016 at 07:05:46PM +0800, Yakir Yang wrote:
-> RK3399 and RK3288 shared the same HDMI IP controller, only some light
-> difference with GRF configure.
-> 
-> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
-> ---
->  .../devicetree/bindings/display/bridge/dw_hdmi.txt |  1 +
->  .../bindings/display/rockchip/dw_hdmi-rockchip.txt |  3 +-
+marvell,reg-init is generally used to apply a custom LED configuration
+on boot. However this is then blatted in m88e1121_config_aneg when the
+interface is brought up. Re-apply any custom configuration afterwards,
+to keep custom LED configuration.
 
-Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Jamie Lentin <jm@lentin.co.uk>
+---
+ drivers/net/phy/marvell.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
->  drivers/gpu/drm/bridge/dw-hdmi.c                   |  2 +-
->  drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c        | 45 ++++++++++++++++++----
->  include/drm/bridge/dw_hdmi.h                       |  6 +++
->  5 files changed, 48 insertions(+), 9 deletions(-)
+diff --git a/drivers/net/phy/marvell.c b/drivers/net/phy/marvell.c
+index c2ca347..b55e4e0 100644
+--- a/drivers/net/phy/marvell.c
++++ b/drivers/net/phy/marvell.c
+@@ -424,6 +424,10 @@ static int m88e1121_config_aneg(struct phy_device *phydev)
+ 	phy_write(phydev, MII_MARVELL_PHY_PAGE, oldpage);
+ 
+ 	err = genphy_config_aneg(phydev);
++	if (err < 0)
++		return err;
++
++	err = marvell_of_reg_init(phydev);
+ 
+ 	return err;
+ }
+-- 
+2.8.1
