@@ -1,20 +1,20 @@
-From: davem@davemloft.net (David Miller)
-Date: Fri, 15 Jul 2016 16:43:22 -0700 (PDT)
-Subject: [PATCH 2/2] net: ethernet: xilinx: axienet: use
- phy_ethtool_{get|set}_link_ksettings
-In-Reply-To: <1468518358-28735-2-git-send-email-tremyfr@gmail.com>
-References: <1468518358-28735-1-git-send-email-tremyfr@gmail.com>
- <1468518358-28735-2-git-send-email-tremyfr@gmail.com>
-Message-ID: <20160715.164322.1968963296180277238.davem@davemloft.net>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 15 Jul 2016 19:08:41 -0500
+Subject: [PATCH 2/5] Documentation: DT: Add entry for QorIQ LS1046A-RDB
+ board
+In-Reply-To: <1467972944-12293-3-git-send-email-shh.xie@gmail.com>
+References: <1467972944-12293-1-git-send-email-shh.xie@gmail.com>
+ <1467972944-12293-3-git-send-email-shh.xie@gmail.com>
+Message-ID: <20160716000841.GA24257@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Philippe Reynes <tremyfr@gmail.com>
-Date: Thu, 14 Jul 2016 19:45:58 +0200
-
-> There are two generics functions phy_ethtool_{get|set}_link_ksettings,
-> so we can use them instead of defining the same code in the driver.
+On Fri, Jul 08, 2016 at 06:15:41PM +0800, shh.xie at gmail.com wrote:
+> From: Shaohui Xie <Shaohui.Xie@nxp.com>
 > 
-> Signed-off-by: Philippe Reynes <tremyfr@gmail.com>
+> Signed-off-by: Shaohui Xie <Shaohui.Xie@nxp.com>
+> ---
+>  Documentation/devicetree/bindings/arm/fsl.txt | 4 ++++
+>  1 file changed, 4 insertions(+)
 
-Applied.
+Acked-by: Rob Herring <robh@kernel.org>
