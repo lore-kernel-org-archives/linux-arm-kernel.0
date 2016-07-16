@@ -1,164 +1,913 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat, 16 Jul 2016 18:34:08 +0200
-Subject: [PATCH v0 06/10] arm: orion5x: Add DT-based support for Netgear
- WNR854T
-In-Reply-To: <1468679348-10522-7-git-send-email-jm@lentin.co.uk>
-References: <1468679348-10522-1-git-send-email-jm@lentin.co.uk>
- <1468679348-10522-7-git-send-email-jm@lentin.co.uk>
-Message-ID: <20160716163408.GG1777@lunn.ch>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Sat, 16 Jul 2016 09:35:35 -0700
+Subject: [PATCH v2 2/3] hwmon: xgene: Add hwmon driver
+In-Reply-To: <1468283416-12780-3-git-send-email-hotran@apm.com>
+References: <1468283416-12780-1-git-send-email-hotran@apm.com>
+ <1468283416-12780-3-git-send-email-hotran@apm.com>
+Message-ID: <578A6257.1050204@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> +	chosen {
-> +		bootargs = "console=ttyS0,115200n8 earlyprintk";
-> +		linux,stdout-path = &uart0;
-> +	};
+On 07/11/2016 05:30 PM, Hoan Tran wrote:
+> This patch adds hardware temperature and power reading support for
+> APM X-Gene SoC using the mailbox communication interface.
+>
+> Signed-off-by: Hoan Tran <hotran@apm.com>
+> ---
+>   Documentation/hwmon/xgene-hwmon |  30 ++
+>   drivers/hwmon/Kconfig           |   7 +
+>   drivers/hwmon/Makefile          |   1 +
+>   drivers/hwmon/xgene-hwmon.c     | 772 ++++++++++++++++++++++++++++++++++++++++
+>   4 files changed, 810 insertions(+)
+>   create mode 100644 Documentation/hwmon/xgene-hwmon
+>   create mode 100644 drivers/hwmon/xgene-hwmon.c
+>
+> diff --git a/Documentation/hwmon/xgene-hwmon b/Documentation/hwmon/xgene-hwmon
+> new file mode 100644
+> index 0000000..6ec50ed
+> --- /dev/null
+> +++ b/Documentation/hwmon/xgene-hwmon
+> @@ -0,0 +1,30 @@
+> +Kernel driver xgene-hwmon
+> +========================
+> +
+> +Supported chips:
+> + * APM X-Gene SoC
+> +
+> +Description
+> +-----------
+> +
+> +This driver adds hardware temperature and power reading support for
+> +APM X-Gene SoC using the mailbox communication interface.
+> +For device tree, it is the standard DT mailbox.
+> +For ACPI, it is the PCC mailbox.
+> +
+> +The following sensors are supported
+> +
+> +  * Temperature
+> +    - SoC on-die temperature in milli-degree C
+> +    - Alarm when high/over temperature occurs
+> +  * Power
+> +    - CPU power in uW
+> +    - IO power in uW
+> +
+> +sysfs-Interface
+> +---------------
+> +
+> +temp0_input - SoC on-die temperature (milli-degree C)
+> +temp0_critical_alarm - An 1 would indicates on-die temperature exceeded threshold
+> +power0_input - CPU power in (uW)
+> +power1_input - IO power in (uW)
+> diff --git a/drivers/hwmon/Kconfig b/drivers/hwmon/Kconfig
+> index ff94007..55218c6 100644
+> --- a/drivers/hwmon/Kconfig
+> +++ b/drivers/hwmon/Kconfig
+> @@ -1787,6 +1787,13 @@ config SENSORS_ULTRA45
+>   	  This driver provides support for the Ultra45 workstation environmental
+>   	  sensors.
+>
+> +config SENSORS_XGENE
+> +	tristate "APM X-Gene SoC hardware monitoring driver"
+> +	depends on XGENE_SLIMPRO_MBOX || PCC
+> +	help
+> +	  If you say yes here you get support for the temperature
+> +	  and power sensors for APM X-Gene SoC.
+> +
+>   if ACPI
+>
+>   comment "ACPI drivers"
+> diff --git a/drivers/hwmon/Makefile b/drivers/hwmon/Makefile
+> index 2ef5b7c..a2460dd 100644
+> --- a/drivers/hwmon/Makefile
+> +++ b/drivers/hwmon/Makefile
+> @@ -162,6 +162,7 @@ obj-$(CONFIG_SENSORS_W83L785TS)	+= w83l785ts.o
+>   obj-$(CONFIG_SENSORS_W83L786NG)	+= w83l786ng.o
+>   obj-$(CONFIG_SENSORS_WM831X)	+= wm831x-hwmon.o
+>   obj-$(CONFIG_SENSORS_WM8350)	+= wm8350-hwmon.o
+> +obj-$(CONFIG_SENSORS_XGENE)	+= xgene-hwmon.o
+>
+>   obj-$(CONFIG_PMBUS)		+= pmbus/
+>
+> diff --git a/drivers/hwmon/xgene-hwmon.c b/drivers/hwmon/xgene-hwmon.c
+> new file mode 100644
+> index 0000000..03917e3
+> --- /dev/null
+> +++ b/drivers/hwmon/xgene-hwmon.c
+> @@ -0,0 +1,772 @@
+> +/*
+> + * APM X-Gene SoC Hardware Monitoring Driver
+> + *
+> + * Copyright (c) 2016, Applied Micro Circuits Corporation
+> + * Author: Loc Ho <lho@apm.com>
+> + *         Hoan Tran <hotran@apm.com>
+> + *
+> + * This program is free software; you can redistribute it and/or
+> + * modify it under the terms of the GNU General Public License as
+> + * published by the Free Software Foundation; either version 2 of
+> + * the License, or (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program; if not, see <http://www.gnu.org/licenses/>.
+> + *
+> + * This driver provides the following features:
+> + *  - Retrieve CPU total power (uW)
+> + *  - Retrieve IO total power (uW)
+> + *  - Retrieve SoC temperature (milli-degree C) and alarm
+> + */
+> +#include <linux/acpi.h>
+> +#include <linux/dma-mapping.h>
+> +#include <linux/hwmon.h>
+> +#include <linux/hwmon-sysfs.h>
+> +#include <linux/kfifo.h>
+> +#include <linux/interrupt.h>
+> +#include <linux/mailbox_controller.h>
+> +#include <linux/mailbox_client.h>
+> +#include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/platform_device.h>
+> +#include <acpi/acpi_io.h>
+> +#include <acpi/pcc.h>
+> +
+Please order include files alphabetically.
 
-You can put the board rate etc in the stdout-patch. Something like:
+> +/* SLIMpro message defines */
+> +#define MSG_TYPE_DBG			0
+> +#define MSG_TYPE_ERR			7
+> +#define MSG_TYPE_PWRMGMT		9
 
-                stdout-path = "serial0:115200n8";
+Are those only used in this driver ?
 
-> +	gpio-leds {
-> +		compatible = "gpio-leds";
-> +		pinctrl-0 = <&pmx_power_led &pmx_power_led_blink &pmx_wan_led>;
-> +		pinctrl-names = "default";
+> +#define MSG_TYPE(v)			(((v) & 0xF0000000) >> 28)
+> +#define MSG_TYPE_SET(v)			(((v) << 28) & 0xF0000000)
+> +#define MSG_SUBTYPE(v)			(((v) & 0x0F000000) >> 24)
+> +#define MSG_SUBTYPE_SET(v)		(((v) << 24) & 0x0F000000)
 > +
-> +		led at 0 {
-> +			label = "power:green";
-
-Documentation/leds/leds-class.txt says:
-
-LED Device Naming
-=================
-
-Is currently of the form:
-
-"devicename:colour:function"
-
-> +	dsa at 0 {
-> +		compatible = "marvell,dsa";
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
+> +#define DBG_SUBTYPE_SENSOR_READ		4
+> +#define SENSOR_RD_MSG			0x04FFE902
+> +#define SENSOR_RD_EN_ADDR(a)		((a) & 0x000FFFFF)
+> +#define PMD_PWR_REG			0x20
+> +#define PMD_PWR_MW_REG			0x26
+> +#define SOC_PWR_REG			0x21
+> +#define SOC_PWR_MW_REG			0x27
+> +#define SOC_TEMP_REG			0x10
 > +
-> +		dsa,ethernet = <&ethport>;
-> +		dsa,mii-bus = <&mdio>;
+> +#define TEMP_NEGATIVE_BIT		8
 > +
-> +		switch at 0 {
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +			reg = <0 0>;	/* MDIO address 0, switch 0 in tree */
+> +#define PWRMGMT_SUBTYPE_TPC		1
+> +#define TPC_ALARM			2
+> +#define TPC_GET_ALARM			3
+> +#define TPC_CMD(v)			(((v) & 0x00FF0000) >> 16)
+> +#define TPC_CMD_SET(v)			(((v) << 16) & 0x00FF0000)
+> +#define TPC_EN_MSG(hndl, cmd, type) \
+> +	(MSG_TYPE_SET(MSG_TYPE_PWRMGMT) | \
+> +	MSG_SUBTYPE_SET(hndl) | TPC_CMD_SET(cmd) | type)
 > +
-> +			port at 0 {
-> +				reg = <0>;
-> +				label = "lan3";
-> +			};
+> +/* PCC defines */
+> +#define PCC_SIGNATURE_MASK		0x50424300
+> +#define PCCC_GENERATE_DB_INT		BIT(15)
+> +#define PCCS_CMD_COMPLETE		BIT(0)
+> +#define PCCS_SCI_DOORBEL		BIT(1)
+> +#define PCCS_PLATFORM_NOTIFICATION	BIT(3)
+> +/*
+> + * Arbitrary retries in case the remote processor is slow to respond
+> + * to PCC commands
+> + */
+> +#define PCC_NUM_RETRIES			500
 > +
-> +			port at 1 {
-> +				reg = <1>;
-> +				label = "lan4";
-> +			};
+> +#define ASYNC_MSG_FIFO_SIZE		16
+> +#define MBOX_OP_TIMEOUTMS		1000
 > +
-> +			port at 2 {
-> +				reg = <2>;
-> +				label = "wan";
-> +			};
+> +#define WATT_TO_mWATT(x)		((x) * 1000)
+> +#define mWATT_TO_uWATT(x)		((x) * 1000)
+> +#define CELSIUS_TO_mCELSIUS(x)		((x) * 1000)
 > +
-> +			port at 3 {
-> +				reg = <3>;
-> +				label = "cpu";
-> +			};
+> +#define to_xgene_hwmon_dev(cl)		\
+> +	container_of(cl, struct xgene_hwmon_dev, mbox_client)
 > +
-> +			port at 5 {
-> +				reg = <5>;
-> +				label = "lan1";
-> +			};
+> +struct slimpro_resp_msg {
+> +	u32 msg;
+> +	u32 param1;
+> +	u32 param2;
+> +} __packed;
 > +
-> +			port at 7 {
-> +				reg = <7>;
-> +				label = "lan2";
-> +			};
-> +		};
-> +	};
+> +struct xgene_hwmon_dev {
+> +	struct device		*dev;
+> +	struct mbox_chan	*mbox_chan;
+> +	struct mbox_client	mbox_client;
+> +	int			mbox_idx;
+> +
+> +	spinlock_t		kfifo_lock;
+> +	struct mutex		rd_mutex;
+> +	struct completion	rd_complete;
+> +	int			resp_pending;
+> +	struct slimpro_resp_msg sync_msg;
+> +
+> +	struct work_struct	workq;
+> +	struct kfifo_rec_ptr_1	async_msg_fifo;
+> +
+> +	struct device		*hwmon_dev;
+> +	bool			temp_critical_alarm;
+> +
+> +	phys_addr_t		comm_base_addr;
+> +	void			*pcc_comm_addr;
+> +	u64			usecs_lat;
 > +};
+> +
+> +/*
+> + * This function tests and clears a bitmask then returns its old value
+> + */
+> +static u16 xgene_word_tst_and_clr(u16 *addr, u16 mask)
+> +{
+> +	u16 ret, val;
+> +
+> +	val = readw_relaxed(addr);
+> +	ret = val & mask;
+> +	val &= ~mask;
+> +	writew_relaxed(val, addr);
+> +
+> +	return ret;
+> +}
+> +
+> +static int xgene_hwmon_decode_temp(u32 val)
 
-This all looks sensible, if a bit mixed up. Lets discuss the switch
-issue in a different thread.
+The "hwmon" in the function names does not really add any value.
+I would suggest to drop it.
 
-> +&devbus_bootcs {
-> +	status = "okay";
+> +{
+> +	unsigned long temp = val;
 > +
-> +	devbus,keep-config;
-> +
-> +	flash at 0 {
-> +		compatible = "cfi-flash";
-> +		reg = <0 0x800000>;
-> +		bank-width = <1>;
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
+> +	/* Convert 9 bit signed temperature to integer */
+> +	if (test_and_clear_bit(TEMP_NEGATIVE_BIT, &temp))
+> +		return (temp - 256);
+> +	else
 
-Documentation/devicetree/bindings/mtd/partition.txt says the
-partitions should be placed under a partitions node. There are some
-conditions when that does not work. So please try it, and if it does
-not, ignore my comment...
+else after return is unnecessary.
+I would suggest to use sign_extend32(val, TEMP_NEGATIVE_BIT).
 
+> +		return temp;
+> +}
 > +
-> +		partition at 0 {
-> +			label = "kernel";
-> +			reg = <0x0 0x100000>;
-> +		};
+> +static int xgene_hwmon_pcc_rd(struct xgene_hwmon_dev *ctx, u32 *msg)
+> +{
+> +	struct acpi_pcct_shared_memory *generic_comm_base = ctx->pcc_comm_addr;
+> +	void *ptr = generic_comm_base + 1;
+> +	int rc, i;
+> +	u16 val;
 > +
-> +		partition at 100000 {
-> +			label = "rootfs";
-> +			reg = <0x100000 0x660000>;
-> +		};
+> +	mutex_lock(&ctx->rd_mutex);
+> +	init_completion(&ctx->rd_complete);
+> +	ctx->resp_pending = true;
 > +
-> +		partition at 760000 {
-> +			label = "uboot_env";
-> +			reg = <0x760000 0x20000>;
-> +		};
+> +	/* Write signature for subspace */
+> +	writel_relaxed(PCC_SIGNATURE_MASK | ctx->mbox_idx,
+> +		       &generic_comm_base->signature);
 > +
-> +		partition at 780000 {
-> +			label = "uboot";
-> +			reg = <0x780000 0x80000>;
-> +			read-only;
-> +		};
-> +	};
+> +	/* Write to the shared command region */
+> +	writew_relaxed(MSG_TYPE(msg[0]) | PCCC_GENERATE_DB_INT,
+> +		       &generic_comm_base->command);
+> +
+> +	/* Flip CMD COMPLETE bit */
+> +	val = readw_relaxed(&generic_comm_base->status);
+> +	val &= ~PCCS_CMD_COMPLETE;
+> +	writew_relaxed(val, &generic_comm_base->status);
+> +
+> +	/* Copy the message to the PCC comm space */
+> +	for (i = 0; i < sizeof(struct slimpro_resp_msg) / 4; i++)
+> +		writel_relaxed(msg[i], ptr + i * 4);
+> +
+> +	/* Ring the doorbell */
+> +	rc = mbox_send_message(ctx->mbox_chan, msg);
+> +	if (rc < 0) {
+> +		dev_err(ctx->dev, "Mailbox send error %d\n", rc);
+> +		goto err;
+> +	}
+> +	if (!wait_for_completion_timeout(&ctx->rd_complete,
+> +					 usecs_to_jiffies(ctx->usecs_lat))) {
+> +		dev_err(ctx->dev, "Mailbox operation timed out\n");
+> +		rc = -ETIMEDOUT;
+> +		goto err;
+> +	}
+> +
+> +	/* Check for invalid data */
+> +	if (MSG_TYPE(ctx->sync_msg.msg) == MSG_TYPE_ERR) {
+> +		rc = -EINVAL;
+> +		goto err;
+> +	}
+> +
+> +	msg[0] = ctx->sync_msg.msg;
+> +	msg[1] = ctx->sync_msg.param1;
+> +	msg[2] = ctx->sync_msg.param2;
+> +
+> +err:
+> +	mbox_chan_txdone(ctx->mbox_chan, 0);
+> +	ctx->resp_pending = false;
+> +	mutex_unlock(&ctx->rd_mutex);
+> +	return rc;
+> +}
+> +
+> +static int xgene_hwmon_rd(struct xgene_hwmon_dev *ctx, u32 *msg)
+> +{
+> +	int rc;
+> +
+> +	mutex_lock(&ctx->rd_mutex);
+> +	init_completion(&ctx->rd_complete);
+> +	ctx->resp_pending = true;
+> +
+> +	rc = mbox_send_message(ctx->mbox_chan, msg);
+> +	if (rc < 0) {
+> +		dev_err(ctx->dev, "Mailbox send error %d\n", rc);
+> +		goto err;
+> +	}
+> +
+> +	if (!wait_for_completion_timeout(&ctx->rd_complete,
+> +					 msecs_to_jiffies(MBOX_OP_TIMEOUTMS))) {
+> +		dev_err(ctx->dev, "Mailbox operation timed out\n");
+> +		rc = -ETIMEDOUT;
+> +		goto err;
+> +	}
+> +
+> +	/* Check for invalid data */
+> +	if (MSG_TYPE(ctx->sync_msg.msg) == MSG_TYPE_ERR) {
+> +		rc = -EINVAL;
+> +		goto err;
+> +	}
+> +
+> +	msg[0] = ctx->sync_msg.msg;
+> +	msg[1] = ctx->sync_msg.param1;
+> +	msg[2] = ctx->sync_msg.param2;
+> +
+> +err:
+> +	ctx->resp_pending = false;
+> +	mutex_unlock(&ctx->rd_mutex);
+> +	return rc;
+> +}
+> +
+> +static int xgene_hwmon_reg_map_rd(struct xgene_hwmon_dev *ctx, u32 addr,
+> +				  u32 *data)
+> +{
+> +	u32 msg[3];
+> +	int rc;
+> +
+> +	msg[0] = SENSOR_RD_MSG;
+> +	msg[1] = SENSOR_RD_EN_ADDR(addr);
+> +	msg[2] = 0;
+> +
+> +	if (acpi_disabled)
+> +		rc = xgene_hwmon_rd(ctx, msg);
+> +	else
+> +		rc = xgene_hwmon_pcc_rd(ctx, msg);
+> +
+> +	if (rc < 0)
+> +		return rc;
+> +
+> +	*data = msg[1];
+> +
+> +	return rc;
+> +}
+> +
+> +static int xgene_hwmon_get_notification_msg(struct xgene_hwmon_dev *ctx,
+> +					    u32 *amsg)
+> +{
+> +	u32 msg[3];
+> +	int rc;
+> +
+> +	msg[0] = TPC_EN_MSG(PWRMGMT_SUBTYPE_TPC, TPC_GET_ALARM, 0);
+> +	msg[1] = 0;
+> +	msg[2] = 0;
+> +
+> +	rc = xgene_hwmon_pcc_rd(ctx, msg);
+> +	if (rc < 0)
+> +		return rc;
+> +
+> +	amsg[0] = msg[0];
+> +	amsg[1] = msg[1];
+> +	amsg[2] = msg[2];
+> +
+> +	return rc;
+> +}
+> +
+> +static int xgene_hwmon_get_cpu_pwr(struct xgene_hwmon_dev *ctx, u32 *val)
+> +{
+> +	u32 watt, mwatt;
+> +	int rc;
+> +
+> +	rc = xgene_hwmon_reg_map_rd(ctx, PMD_PWR_REG, &watt);
+> +	if (rc < 0)
+> +		return rc;
+> +
+> +	rc = xgene_hwmon_reg_map_rd(ctx, PMD_PWR_MW_REG, &mwatt);
+> +	if (rc < 0)
+> +		return rc;
+> +
+> +	*val = WATT_TO_mWATT(watt) + mwatt;
+> +	return 0;
+> +}
+> +
+> +static int xgene_hwmon_get_io_pwr(struct xgene_hwmon_dev *ctx, u32 *val)
+> +{
+> +	u32 watt, mwatt;
+> +	int rc;
+> +
+> +	rc = xgene_hwmon_reg_map_rd(ctx, SOC_PWR_REG, &watt);
+> +	if (rc < 0)
+> +		return rc;
+> +
+> +	rc = xgene_hwmon_reg_map_rd(ctx, SOC_PWR_MW_REG, &mwatt);
+> +	if (rc < 0)
+> +		return rc;
+> +
+> +	*val = WATT_TO_mWATT(watt) + mwatt;
+> +	return 0;
+> +}
+> +
+> +static int xgene_hwmon_get_temp(struct xgene_hwmon_dev *ctx, u32 *val)
+> +{
+> +	return xgene_hwmon_reg_map_rd(ctx, SOC_TEMP_REG, val);
+> +}
+> +
+> +/*
+> + * Sensor temperature/power functions
+> + */
+> +static ssize_t xgene_hwmon_show_temp(struct device *dev,
+> +				     struct device_attribute *attr,
+> +				     char *buf)
+> +{
+> +	struct xgene_hwmon_dev *ctx = dev_get_drvdata(dev);
+> +	int rc, temp;
+> +	u32 val;
+> +
+> +	rc = xgene_hwmon_get_temp(ctx, &val);
+> +	if (rc < 0)
+> +		return rc;
+> +
+> +	temp = xgene_hwmon_decode_temp(val);
+> +
+> +	return snprintf(buf, PAGE_SIZE, "%d\n", CELSIUS_TO_mCELSIUS(temp));
+> +}
+> +
+> +static ssize_t xgene_hwmon_show_temp_label(struct device *dev,
+> +					   struct device_attribute *attr,
+> +					   char *buf)
+> +{
+> +	return snprintf(buf, PAGE_SIZE, "SoC Temperature\n");
+> +}
+> +
+> +static ssize_t
+> +xgene_hwmon_show_temp_critical_alarm(struct device *dev,
+> +				     struct device_attribute *devattr,
+> +				     char *buf)
+> +{
+> +	struct xgene_hwmon_dev *ctx = dev_get_drvdata(dev);
+> +
+> +	return snprintf(buf, PAGE_SIZE, "%d\n", ctx->temp_critical_alarm);
+> +}
+> +
+> +
+> +static ssize_t xgene_hwmon_show_cpu_pwr_label(struct device *dev,
+> +					      struct device_attribute *attr,
+> +					      char *buf)
+> +{
+> +	return snprintf(buf, PAGE_SIZE, "CPU power\n");
+> +}
+> +
+> +static ssize_t xgene_hwmon_show_io_pwr_label(struct device *dev,
+> +					      struct device_attribute *attr,
+> +					      char *buf)
+> +{
+> +	return snprintf(buf, PAGE_SIZE, "IO power\n");
+> +}
+> +
+> +static ssize_t xgene_hwmon_show_cpu_pwr(struct device *dev,
+> +					struct device_attribute *attr,
+> +					char *buf)
+> +{
+> +	struct xgene_hwmon_dev *ctx = dev_get_drvdata(dev);
+> +	u32 val;
+> +	int rc;
+> +
+> +	rc = xgene_hwmon_get_cpu_pwr(ctx, &val);
+> +	if (rc < 0)
+> +		return rc;
+> +
+> +	return snprintf(buf, PAGE_SIZE, "%u\n", mWATT_TO_uWATT(val));
+> +}
+> +
+> +static ssize_t xgene_hwmon_show_io_pwr(struct device *dev,
+> +				       struct device_attribute *attr,
+> +				       char *buf)
+> +{
+> +	struct xgene_hwmon_dev *ctx = dev_get_drvdata(dev);
+> +	u32 val;
+> +	int rc;
+> +
+> +	rc = xgene_hwmon_get_io_pwr(ctx, &val);
+> +	if (rc < 0)
+> +		return rc;
+> +
+> +	return snprintf(buf, PAGE_SIZE, "%u\n", mWATT_TO_uWATT(val));
+> +}
+> +
+> +static SENSOR_DEVICE_ATTR(temp0_label, S_IRUGO, xgene_hwmon_show_temp_label,
+> +			  NULL, 0);
+> +static SENSOR_DEVICE_ATTR(temp0_input, S_IRUGO, xgene_hwmon_show_temp,
+> +			  NULL, 0);
+> +static SENSOR_DEVICE_ATTR(temp0_critical_alarm, S_IRUGO,
+> +			  xgene_hwmon_show_temp_critical_alarm, NULL, 0);
+> +
+> +static SENSOR_DEVICE_ATTR(power0_label, S_IRUGO,
+> +			  xgene_hwmon_show_cpu_pwr_label, NULL, 0);
+> +static SENSOR_DEVICE_ATTR(power0_input, S_IRUGO, xgene_hwmon_show_cpu_pwr,
+> +			  NULL, 0);
+> +
+> +static SENSOR_DEVICE_ATTR(power1_label, S_IRUGO,
+> +			  xgene_hwmon_show_io_pwr_label, NULL, 1);
+> +static SENSOR_DEVICE_ATTR(power1_input, S_IRUGO, xgene_hwmon_show_io_pwr,
+> +			  NULL, 1);
+> +
+
+Temperature and power attributes start with index 1. You don't use the index value in
+SENSOR_DEVICE_ATTR(), so DEVCIE_ATTR_RO() might be a better choice.
+
+> +static struct attribute *xgene_hwmon_attrs[] = {
+> +	&sensor_dev_attr_temp0_label.dev_attr.attr,
+> +	&sensor_dev_attr_temp0_input.dev_attr.attr,
+> +	&sensor_dev_attr_temp0_critical_alarm.dev_attr.attr,
+> +	&sensor_dev_attr_power0_label.dev_attr.attr,
+> +	&sensor_dev_attr_power0_input.dev_attr.attr,
+> +	&sensor_dev_attr_power1_label.dev_attr.attr,
+> +	&sensor_dev_attr_power1_input.dev_attr.attr,
+> +	NULL,
 > +};
-
-> +&pinctrl {
-> +	pinctrl-0 = <&pmx_pci_gpios &pmx_ge>;
-> +	pinctrl-names = "default";
+> +ATTRIBUTE_GROUPS(xgene_hwmon);
 > +
-> +	pmx_power_led: pmx-power-led {
-> +		marvell,pins = "mpp0";
-> +		marvell,function = "gpio";
-> +	};
+> +static int xgene_hwmon_tpc_alarm(struct xgene_hwmon_dev *ctx,
+> +				 struct slimpro_resp_msg *amsg)
+> +{
+> +	char name[40];
 > +
-> +	pmx_reset_switch: pmx-reset-switch {
-> +		marvell,pins = "mpp1";
-> +		marvell,function = "gpio";
-> +	};
+> +	ctx->temp_critical_alarm = amsg->param2 ? true : false;
 
-Ah, this is missing from your DSA node. You can then add:
+You could use !!amsg->param2, or simply rely on the compiler and C standard
+to auto-convert the integer to boolean.
 
-reset-gpios = <&gpio0 1 GPIO_ACTIVE_LOW>;
+> +	snprintf(name, sizeof(name), "temp0_critical_alarm");
+> +	sysfs_notify(&ctx->dev->kobj, NULL, name);
 
-inside the switch at 0 node.
+Why not just use "temp0_critical_alarm" (or rather "temp1_critical_alarm")
+as parameter to sysfs_notify() ?
 
-> +	pmx_ge: pmx-ge {
-> +		marvell,pins = "mpp9", "mpp12",	"mpp13", "mpp14", "mpp15",
-> +				"mpp16", "mpp17", "mpp18", "mpp19";
-> +		marvell,function = "ge";
-> +	};
+> +
+> +	return 0;
+> +}
+> +
+> +static void xgene_hwmon_process_pwrmsg(struct xgene_hwmon_dev *ctx,
+> +				       struct slimpro_resp_msg *amsg)
+> +{
+> +	if ((MSG_SUBTYPE(amsg->msg) == PWRMGMT_SUBTYPE_TPC) &&
+> +	    (TPC_CMD(amsg->msg) == TPC_ALARM))
+> +		xgene_hwmon_tpc_alarm(ctx, amsg);
+> +}
+> +
+> +/*
+> + * This function is called to process async work queue
+> + */
+> +static void xgene_hwmon_evt_work(struct work_struct *work)
+> +{
+> +	struct slimpro_resp_msg amsg;
+> +	struct xgene_hwmon_dev *ctx;
+> +	int ret;
+> +
+> +	ctx = container_of(work, struct xgene_hwmon_dev, workq);
+> +	while (kfifo_out_spinlocked(&ctx->async_msg_fifo, &amsg,
+> +				    sizeof(struct slimpro_resp_msg),
+> +				    &ctx->kfifo_lock)) {
+> +		/*
+> +		 * If PCC, send a consumer command to Platform to get info
+> +		 * If Slimpro Mailbox, get message from specific FIFO
+> +		 */
+> +		if (!acpi_disabled) {
+> +			ret = xgene_hwmon_get_notification_msg(ctx,
+> +							       (u32 *)&amsg);
+> +			if (ret < 0)
+> +				continue;
+> +		}
+> +
+> +		if (MSG_TYPE(amsg.msg) == MSG_TYPE_PWRMGMT)
+> +			xgene_hwmon_process_pwrmsg(ctx, &amsg);
+> +	}
+> +}
+> +
+> +/*
+> + * This function is called when the SLIMpro Mailbox received a message
+> + */
+> +static void xgene_hwmon_rx_cb(struct mbox_client *cl, void *msg)
+> +{
+> +	struct xgene_hwmon_dev *ctx = to_xgene_hwmon_dev(cl);
+> +	struct slimpro_resp_msg amsg;
+> +
+> +	/*
+> +	 * Response message format:
+> +	 * msg[0] is the return code of the operation
+> +	 * msg[1] is the first parameter word
+> +	 * msg[2] is the second parameter word
+> +	 *
+> +	 * As message only supports dword size, just assign it.
+> +	 */
+> +
+> +	/* Check for sync query */
+> +	if (ctx->resp_pending &&
+> +	    ((MSG_TYPE(((u32 *) msg)[0]) == MSG_TYPE_ERR) ||
+> +	     (MSG_TYPE(((u32 *) msg)[0]) == MSG_TYPE_DBG &&
+> +	      MSG_SUBTYPE(((u32 *) msg)[0]) == DBG_SUBTYPE_SENSOR_READ) ||
+> +	     (MSG_TYPE(((u32 *) msg)[0]) == MSG_TYPE_PWRMGMT &&
+> +	      MSG_SUBTYPE(((u32 *) msg)[0]) == PWRMGMT_SUBTYPE_TPC &&
+> +	      TPC_CMD(((u32 *) msg)[0]) == TPC_ALARM))) {
+> +		ctx->sync_msg.msg = ((u32 *) msg)[0];
+> +		ctx->sync_msg.param1 = ((u32 *) msg)[1];
+> +		ctx->sync_msg.param2 = ((u32 *) msg)[2];
+> +
+> +		/* Operation waiting for response */
+> +		complete(&ctx->rd_complete);
+> +
+> +		return;
+> +	}
+> +
+> +	amsg.msg   = ((u32 *) msg)[0];
+> +	amsg.param1 = ((u32 *) msg)[1];
+> +	amsg.param2 = ((u32 *) msg)[2];
+> +
+> +	/* Enqueue to the FIFO */
+> +	kfifo_in_spinlocked(&ctx->async_msg_fifo, &amsg,
+> +			    sizeof(struct slimpro_resp_msg), &ctx->kfifo_lock);
+> +	/* Schedule the bottom handler */
+> +	schedule_work(&ctx->workq);
+> +}
+> +
+> +/*
+> + * This function is called when the PCC Mailbox received a message
+> + */
+> +static void xgene_hwmon_pcc_rx_cb(struct mbox_client *cl, void *msg)
+> +{
+> +	struct xgene_hwmon_dev *ctx = to_xgene_hwmon_dev(cl);
+> +	struct acpi_pcct_shared_memory *generic_comm_base = ctx->pcc_comm_addr;
+> +	struct slimpro_resp_msg amsg;
+> +
+> +	msg = generic_comm_base + 1;
+> +	/* Check if platform sends interrupt */
+> +	if (!xgene_word_tst_and_clr(&generic_comm_base->status,
+> +				    PCCS_SCI_DOORBEL))
+> +		return;
+> +
+> +	/*
+> +	 * Response message format:
+> +	 * msg[0] is the return code of the operation
+> +	 * msg[1] is the first parameter word
+> +	 * msg[2] is the second parameter word
+> +	 *
+> +	 * As message only supports dword size, just assign it.
+> +	 */
+> +
+> +	/* Check for sync query */
+> +	if (ctx->resp_pending &&
+> +	    ((MSG_TYPE(((u32 *) msg)[0]) == MSG_TYPE_ERR) ||
+> +	     (MSG_TYPE(((u32 *) msg)[0]) == MSG_TYPE_DBG &&
+> +	      MSG_SUBTYPE(((u32 *) msg)[0]) == DBG_SUBTYPE_SENSOR_READ) ||
+> +	     (MSG_TYPE(((u32 *) msg)[0]) == MSG_TYPE_PWRMGMT &&
+> +	      MSG_SUBTYPE(((u32 *) msg)[0]) == PWRMGMT_SUBTYPE_TPC &&
+> +	      TPC_CMD(((u32 *) msg)[0]) == TPC_ALARM))) {
+> +
+> +		/* Check if platform completes command */
+> +		if (xgene_word_tst_and_clr(&generic_comm_base->status,
+> +					    PCCS_CMD_COMPLETE)) {
+> +			ctx->sync_msg.msg = ((u32 *) msg)[0];
+> +			ctx->sync_msg.param1 = ((u32 *) msg)[1];
+> +			ctx->sync_msg.param2 = ((u32 *) msg)[2];
+> +
+> +			/* Operation waiting for response */
+> +			complete(&ctx->rd_complete);
+> +
+> +			return;
+> +		}
+> +	}
+> +
+> +	/*
+> +	 * Platform notifies interrupt to OSPM.
+> +	 * OPSM schedules a consumer command to get this information
+> +	 * in a workqueue. Platform must wait until OSPM has issued
+> +	 * a consumer command that serves this notification.
+> +	 */
+> +
+> +	/* Enqueue to the FIFO */
+> +	kfifo_in_spinlocked(&ctx->async_msg_fifo, &amsg,
+> +			    sizeof(struct slimpro_resp_msg), &ctx->kfifo_lock);
+> +	/* Schedule the bottom handler */
+> +	schedule_work(&ctx->workq);
+> +}
+> +
+> +static void xgene_hwmon_tx_done(struct mbox_client *cl, void *msg, int ret)
+> +{
+> +	if (ret) {
+> +		dev_dbg(cl->dev, "TX did not complete: CMD sent:%x, ret:%d\n",
+> +			*(u16 *) msg, ret);
+> +	} else {
+> +		dev_dbg(cl->dev, "TX completed. CMD sent:%x, ret:%d\n",
+> +			*(u16 *) msg, ret);
+
+Please run your patch through checkoatch --strict. I would like to see
+at least the following messages resolved.
+
+"No space is necessary after a cast"
+"Blank lines aren't necessary after an open brace '{'"
+"Please don't use multiple blank lines"
+"Alignment should match open parenthesis"
+"line over 80 characters" (with precedence over continuation line alignment)
+
+> +	}
+> +}
+> +
+> +static int xgene_hwmon_probe(struct platform_device *pdev)
+> +{
+> +	struct xgene_hwmon_dev *ctx;
+> +	struct mbox_client *cl;
+> +	int rc;
+> +
+> +	ctx = devm_kzalloc(&pdev->dev, sizeof(*ctx), GFP_KERNEL);
+> +	if (!ctx)
+> +		return -ENOMEM;
+> +
+> +	ctx->dev = &pdev->dev;
+> +	platform_set_drvdata(pdev, ctx);
+> +	cl = &ctx->mbox_client;
+> +
+> +	/* Request mailbox channel */
+> +	cl->dev = &pdev->dev;
+> +	cl->tx_done = xgene_hwmon_tx_done;
+> +	cl->tx_block = false;
+> +	cl->tx_tout = MBOX_OP_TIMEOUTMS;
+> +	cl->knows_txdone = false;
+> +	if (acpi_disabled) {
+> +		cl->rx_callback = xgene_hwmon_rx_cb;
+> +		ctx->mbox_chan = mbox_request_channel(cl, 0);
+> +		if (IS_ERR(ctx->mbox_chan)) {
+> +			dev_err(&pdev->dev,
+> +				"SLIMpro mailbox channel request failed\n");
+> +			return -ENODEV;
+> +		}
+> +	} else {
+> +		struct acpi_pcct_hw_reduced *cppc_ss;
+> +
+> +		if (device_property_read_u32(&pdev->dev, "pcc-channel",
+> +					     &ctx->mbox_idx)) {
+> +			dev_err(&pdev->dev, "no pcc-channel property\n");
+> +			return -ENODEV;
+> +		}
+> +
+> +		cl->rx_callback = xgene_hwmon_pcc_rx_cb;
+> +		ctx->mbox_chan = pcc_mbox_request_channel(cl, ctx->mbox_idx);
+> +		if (IS_ERR(ctx->mbox_chan)) {
+> +			dev_err(&pdev->dev,
+> +				"PPC channel request failed\n");
+> +			return -ENODEV;
+> +		}
+> +
+> +		/*
+> +		 * The PCC mailbox controller driver should
+> +		 * have parsed the PCCT (global table of all
+> +		 * PCC channels) and stored pointers to the
+> +		 * subspace communication region in con_priv.
+> +		 */
+> +		cppc_ss = ctx->mbox_chan->con_priv;
+> +		if (!cppc_ss) {
+> +			dev_err(&pdev->dev, "PPC subspace not found\n");
+> +			rc = -ENODEV;
+> +			goto out_mbox_free;
+> +		}
+> +
+> +		if (!ctx->mbox_chan->mbox->txdone_irq) {
+> +			dev_err(&pdev->dev, "PCC IRQ not supported\n");
+> +			rc = -ENODEV;
+> +			goto out_mbox_free;
+> +		}
+> +
+> +		/*
+> +		 * This is the shared communication region
+> +		 * for the OS and Platform to communicate over.
+> +		 */
+> +		ctx->comm_base_addr = cppc_ss->base_address;
+> +		if (ctx->comm_base_addr) {
+> +			ctx->pcc_comm_addr =
+> +					acpi_os_ioremap(ctx->comm_base_addr,
+> +							cppc_ss->length);
+> +		} else {
+> +			dev_err(&pdev->dev, "Failed to get PCC comm region\n");
+> +			rc = -ENODEV;
+> +			goto out_mbox_free;
+> +		}
+> +
+> +		if (!ctx->pcc_comm_addr) {
+> +			dev_err(&pdev->dev,
+> +				"Failed to ioremap PCC comm region\n");
+> +			rc = -ENOMEM;
+> +			goto out_mbox_free;
+> +		}
+> +
+> +		/*
+> +		 * cppc_ss->latency is just a Nominal value. In reality
+> +		 * the remote processor could be much slower to reply.
+> +		 * So add an arbitrary amount of wait on top of Nominal.
+> +		 */
+> +		ctx->usecs_lat = PCC_NUM_RETRIES * cppc_ss->latency;
+> +	}
+> +
+> +	spin_lock_init(&ctx->kfifo_lock);
+> +	mutex_init(&ctx->rd_mutex);
+> +
+> +	rc = kfifo_alloc(&ctx->async_msg_fifo,
+> +			 sizeof(struct slimpro_resp_msg) * ASYNC_MSG_FIFO_SIZE,
+> +			 GFP_KERNEL);
+> +	if (rc)
+> +		goto out_mbox_free;
+> +
+> +	INIT_WORK(&ctx->workq, xgene_hwmon_evt_work);
+> +
+> +	ctx->hwmon_dev = devm_hwmon_device_register_with_groups(ctx->dev,
+> +								"apm_xgene",
+> +								ctx,
+> +								xgene_hwmon_groups);
+
+Using the devm_ function here would, on remove, result in the mailbox and kfifo
+being removed before the hwmon driver is removed. This might result in race
+conditions. You have two options: Use devm_add_action() to remove those in sequence,
+or use hwmon_device_register_with_groups() and remove the hwmon device explicitly
+(and first) in the remove function.
+
+Note that you don't have to store hwmon_dev in ctx if you use devm_add_action()
+and devm_hwmon_device_register_with_groups().
+
+> +	if (IS_ERR(ctx->hwmon_dev)) {
+> +		dev_err(&pdev->dev, "Failed to register HW monitor device\n");
+> +		rc = PTR_ERR(ctx->hwmon_dev);
+> +		goto out;
+> +	}
+> +
+> +	dev_info(&pdev->dev, "APM X-Gene SoC HW monitor driver registered\n");
+> +
+> +	return rc;
+> +
+> +out:
+> +	kfifo_free(&ctx->async_msg_fifo);
+> +out_mbox_free:
+> +	if (acpi_disabled)
+> +		mbox_free_channel(ctx->mbox_chan);
+> +	else
+> +		pcc_mbox_free_channel(ctx->mbox_chan);
+> +
+> +	return rc;
+> +}
+> +
+> +static int xgene_hwmon_remove(struct platform_device *pdev)
+> +{
+> +	struct xgene_hwmon_dev *ctx = platform_get_drvdata(pdev);
+> +
+> +	kfifo_free(&ctx->async_msg_fifo);
+> +	if (acpi_disabled)
+> +		mbox_free_channel(ctx->mbox_chan);
+> +	else
+> +		pcc_mbox_free_channel(ctx->mbox_chan);
+> +
+> +	return 0;
+> +}
+> +
+> +#ifdef CONFIG_ACPI
+> +static const struct acpi_device_id xgene_hwmon_acpi_match[] = {
+> +	{"APMC0D29", 0},
+> +	{},
 > +};
-
-This can go into the .dtsi file your previous patch added. 
-
+> +MODULE_DEVICE_TABLE(acpi, xgene_hwmon_acpi_match);
+> +#endif
 > +
-> +&uart0 {
-> +	/* Pin 1: Tx, Pin 7: Rx, Pin 8: Gnd */
-> +	status = "okay";
-
-Nice to see the comment.
-
-     Andrew
+> +static const struct of_device_id xgene_hwmon_of_match[] = {
+> +	{.compatible = "apm,xgene-slimpro-hwmon"},
+> +	{}
+> +};
+> +MODULE_DEVICE_TABLE(of, xgene_hwmon_of_match);
+> +
+> +static struct platform_driver xgene_hwmon_driver __refdata = {
+> +	.probe = xgene_hwmon_probe,
+> +	.remove = xgene_hwmon_remove,
+> +	.driver = {
+> +		.name = "xgene-slimpro-hwmon",
+> +		.of_match_table = xgene_hwmon_of_match,
+> +		.acpi_match_table = ACPI_PTR(xgene_hwmon_acpi_match),
+> +	},
+> +};
+> +module_platform_driver(xgene_hwmon_driver);
+> +
+> +MODULE_DESCRIPTION("APM X-Gene SoC hardware monitor");
+> +MODULE_LICENSE("GPL");
+>
