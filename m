@@ -1,22 +1,20 @@
 From: robh@kernel.org (Rob Herring)
-Date: Sat, 16 Jul 2016 17:06:42 -0500
-Subject: [PATCH 1/2] ARM: socfpga: add bindings doc for arria10 fpga
- manager
-In-Reply-To: <20160712190709.5964-2-atull@opensource.altera.com>
-References: <20160712190709.5964-1-atull@opensource.altera.com>
- <20160712190709.5964-2-atull@opensource.altera.com>
-Message-ID: <20160716220642.GA2852@rob-hp-laptop>
+Date: Sat, 16 Jul 2016 17:13:46 -0500
+Subject: [PATCH 1/4] Documentation: dt: iio: at91_adc: fix trigger node
+ names
+In-Reply-To: <1468364850-32475-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1468364850-32475-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <20160716221346.GA7057@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 12, 2016 at 02:07:08PM -0500, Alan Tull wrote:
-> Add a device tree bindings document for the SoCFPGA Arria10
-> FPGA Manager driver.
+On Wed, Jul 13, 2016 at 01:07:27AM +0200, Alexandre Belloni wrote:
+> The trigger doesn't need the reg property. When it is not defined, the node
+> name doesn't need a unit-address. Remove them from the example.
 > 
-> Signed-off-by: Alan Tull <atull@opensource.altera.com>
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 > ---
->  .../bindings/fpga/altera-socfpga-a10-fpga-mgr.txt     | 19 +++++++++++++++++++
->  1 file changed, 19 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/fpga/altera-socfpga-a10-fpga-mgr.txt
+>  Documentation/devicetree/bindings/iio/adc/at91_adc.txt | 12 ++++--------
+>  1 file changed, 4 insertions(+), 8 deletions(-)
 
 Acked-by: Rob Herring <robh@kernel.org>
