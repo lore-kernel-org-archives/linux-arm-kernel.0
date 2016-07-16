@@ -1,82 +1,36 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 16 Jul 2016 21:19:25 +0200
-Subject: [PATCH] dt: bindings: Add a generic ethernet device binding
-In-Reply-To: <289d5b2e-6232-2c91-f11d-774265e05125@redhat.com>
-References: <1468405204-5845-1-git-send-email-hdegoede@redhat.com>
- <1788846.r3134d1VMR@wuerfel>
- <289d5b2e-6232-2c91-f11d-774265e05125@redhat.com>
-Message-ID: <1829519.03iRef1QQj@wuerfel>
+From: robh@kernel.org (Rob Herring)
+Date: Sat, 16 Jul 2016 14:25:22 -0500
+Subject: [PATCH] pinctrl: qcom: Add generic ssbi and spmi GPIO/MPP bindings
+In-Reply-To: <20160711190109.16758-1-sboyd@codeaurora.org>
+References: <20160711190109.16758-1-sboyd@codeaurora.org>
+Message-ID: <20160716192522.GA8272@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday, July 16, 2016 12:18:40 PM CEST Hans de Goede wrote:
-> Hi,
+On Mon, Jul 11, 2016 at 12:01:09PM -0700, Stephen Boyd wrote:
+> The drivers don't really need to know which PMIC they're for, so
+> make a generic binding for them. This alleviates us from updating
+> the drivers every time a new PMIC comes out. It's still
+> recommended that we update the binding with new PMIC models and
+> always specify the specific model for the MPPs and gpios before
+> the generic compatible string in devicetree, but this at least
+> cuts down on adding more and more compatible strings to the
+> drivers until we actually need them.
 > 
-> On 15-07-16 22:42, Arnd Bergmann wrote:
-> > On Wednesday, July 13, 2016 12:20:04 PM CEST Hans de Goede wrote:
-> >> +&mmc1 {
-> >> +       non-removable;
-> >> +       status = "okay";
-> >> +
-> >> +       sdio_wifi: sdio_wifi at 1 {
-> >> +               compatible = "generic,ethernet"
-> >> +               reg = <1>;
-> >> +       };
-> >> +};
-> >
-> > For discoverable buses, we normally use a compatible property that
-> > reflects the device ID on that bus, e.g. on PCI we have "pci1A2B:3C4D"
-> > and I think that makes more sense than having to come up with strings
-> > for sdio devices.
+> Cc: <devicetree@vger.kernel.org>
+> Acked-by: "Ivan T. Ivanov" <iivanov.xz@gmail.com>
+> Reviewed-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> ---
 > 
-> 2 things:
+> This seems to been missed 6 months ago when sent as an RFC. The dts
+> side changes have already been made and Rob H said it "Seems okay to
+> me".
 > 
-> 1) The problem here is that different batches of the same board
-> (cheap chinese tablet) have different sdio wifi modules, so we
-> actually cannot specify a vendor / product id as in your example.
+>  Documentation/devicetree/bindings/pinctrl/qcom,pmic-gpio.txt | 5 ++++-
+>  Documentation/devicetree/bindings/pinctrl/qcom,pmic-mpp.txt  | 5 ++++-
+>  drivers/pinctrl/qcom/pinctrl-spmi-gpio.c                     | 1 +
+>  drivers/pinctrl/qcom/pinctrl-spmi-mpp.c                      | 1 +
+>  4 files changed, 10 insertions(+), 2 deletions(-)
 
-Right, this is where we have a mismatch between original OF
-that did all the device probing and provided the compatible
-strings for the OS to use, and the FDT method where the bootloader
-does no probing at all but relies on a complete hardware
-description to be there already. I have no good solution
-for that.
-
-> 2) In some cases we do want an actual compatible because some devices
-> have some oob (out-of-band) going with e.g. gpio-s which cannot be
-> handled by mmc-pwrseq.
-
-But those are the cases in which we do know the compatible
-string (whether we use one from custom binding or from the
-generic ID method doesnt' matter).
-
-> > In fact, Linux completely ignores the compatible strings on those
-> > buses (pci, usb, sdio, ...),
-> 
-> You're mostly right, but at least the brcmfmac driver looks for a
-> compatible in the mmc-host child node describing its sdio function
-> to see if it should check for oob irq information there.
-
-I'm aware of that one, and not really happy with the way it turned
-out, because the compatible string in that case identifies the
-oldest supported chip for that driver. We normally do that when
-the devices are 100% compatible, but that is not the case here
-at all, so that binding violates both the conventions for
-discoverable buses and those that we use for non-discoverable
-buses.
-
-> > so I think we can just do the same thing
-> > using no compatible string at all.
-> 
-> I'm all for not using any compatible string at all, actually I submitted
-> a patch for a sunxi dt file which did that and Maxime pointed out that
-> the compatible is listed as Required in:
-> Documentation/devicetree/bindings/mmc/mmc-card.txt
-> 
-> If we can agree to make it optional, then I'll happily submit a patch
-> with that change and Maxime can take my sunxi dts patch as is :)
-
-Right, I think that would be best, we should at least come up with a
-general policy for that case.
-
-	Arnd
+Acked-by: Rob Herring <robh@kernel.org>
