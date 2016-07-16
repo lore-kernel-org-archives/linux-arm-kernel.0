@@ -1,19 +1,25 @@
 From: robh@kernel.org (Rob Herring)
-Date: Sat, 16 Jul 2016 08:44:04 -0500
-Subject: [PATCH V2 1/3] dt-bindings: pwm: Add MediaTek display PWM bindings
-In-Reply-To: <1468225089-28576-2-git-send-email-weiqing.kong@mediatek.com>
-References: <1468225089-28576-1-git-send-email-weiqing.kong@mediatek.com>
- <1468225089-28576-2-git-send-email-weiqing.kong@mediatek.com>
-Message-ID: <20160716134404.GA2143@rob-hp-laptop>
+Date: Sat, 16 Jul 2016 08:47:18 -0500
+Subject: [PATCH v1 4/6] drm/rockchip: dw_hdmi: add RK3399 HDMI support
+In-Reply-To: <1468235146-29575-1-git-send-email-ykk@rock-chips.com>
+References: <1468235079-29152-1-git-send-email-ykk@rock-chips.com>
+ <1468235146-29575-1-git-send-email-ykk@rock-chips.com>
+Message-ID: <20160716134718.GA3267@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 11, 2016 at 04:18:07PM +0800, Weiqing Kong wrote:
-> Add MT2701 compatible string.
+On Mon, Jul 11, 2016 at 07:05:46PM +0800, Yakir Yang wrote:
+> RK3399 and RK3288 shared the same HDMI IP controller, only some light
+> difference with GRF configure.
 > 
-> Signed-off-by: Weiqing Kong <weiqing.kong@mediatek.com>
+> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
 > ---
->  Documentation/devicetree/bindings/pwm/pwm-mtk-disp.txt | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
+>  .../devicetree/bindings/display/bridge/dw_hdmi.txt |  1 +
+>  .../bindings/display/rockchip/dw_hdmi-rockchip.txt |  3 +-
 
 Acked-by: Rob Herring <robh@kernel.org>
+
+>  drivers/gpu/drm/bridge/dw-hdmi.c                   |  2 +-
+>  drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c        | 45 ++++++++++++++++++----
+>  include/drm/bridge/dw_hdmi.h                       |  6 +++
+>  5 files changed, 48 insertions(+), 9 deletions(-)
