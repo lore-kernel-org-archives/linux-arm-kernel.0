@@ -1,36 +1,38 @@
 From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Fri, 15 Jul 2016 17:42:13 -0700
-Subject: [PATCH 3/6] arm64: dts: qcom: msm8916: Make scm a reset-controller
+Date: Fri, 15 Jul 2016 17:42:15 -0700
+Subject: [PATCH 5/6] arm64: dts: qcom: msm8916: Add Hexagon SMD edge
 In-Reply-To: <1468629736-7644-1-git-send-email-bjorn.andersson@linaro.org>
 References: <1468629736-7644-1-git-send-email-bjorn.andersson@linaro.org>
-Message-ID: <1468629736-7644-3-git-send-email-bjorn.andersson@linaro.org>
+Message-ID: <1468629736-7644-5-git-send-email-bjorn.andersson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On msm8916 SCM acts as a controller for the MSS_RESET found in the GCC,
-update the DT node so that we can address this.
+Add the Hexagon SMD edge so that SMD channels provided by the Hexagon
+is recognized.
 
 Signed-off-by: Bjorn Andersson <bjorn.andersson@linaro.org>
 ---
- arch/arm64/boot/dts/qcom/msm8916.dtsi | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ arch/arm64/boot/dts/qcom/msm8916.dtsi | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
 diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-index 4f2882605138..1e67acc19a9d 100644
+index 64f85f82602c..85ec5c932975 100644
 --- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
 +++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-@@ -192,10 +192,11 @@
- 	};
- 
- 	firmware {
--		scm {
-+		scm: scm {
- 			compatible = "qcom,scm";
- 			clocks = <&gcc GCC_CRYPTO_CLK>, <&gcc GCC_CRYPTO_AXI_CLK>, <&gcc GCC_CRYPTO_AHB_CLK>;
- 			clock-names = "core", "bus", "iface";
-+			#reset-cells = <1>;
+@@ -667,6 +667,14 @@
+ 				};
+ 			};
  		};
++
++		hexagon {
++			interrupts = <0 25 IRQ_TYPE_EDGE_RISING>;
++			qcom,ipc = <&apcs 8 12>;
++
++			qcom,smd-edge = <0>;
++			qcom,remote-pid = <1>;
++		};
  	};
  
+ 	hexagon-smp2p {
 -- 
 2.5.0
