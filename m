@@ -1,80 +1,100 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Fri, 15 Jul 2016 17:42:16 -0700
-Subject: [PATCH 6/6] arm64: dts: qcom: msm8916: Add Hexagon remoteproc node
-In-Reply-To: <1468629736-7644-1-git-send-email-bjorn.andersson@linaro.org>
-References: <1468629736-7644-1-git-send-email-bjorn.andersson@linaro.org>
-Message-ID: <1468629736-7644-6-git-send-email-bjorn.andersson@linaro.org>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Fri, 15 Jul 2016 21:00:52 -0400
+Subject: [PATCH] dmaengine: qcom_hidma: release the descriptor before the
+ callback
+In-Reply-To: <1468465076-27324-1-git-send-email-okaya@codeaurora.org>
+References: <1468465076-27324-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <ccffcabf-1448-57a1-d18b-715cfd46e906@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the remoteproc node that allows us to control the life cycle
-of the Hexagon core found in the msm8916 SoC.
+Hi Vinod,
 
-Signed-off-by: Bjorn Andersson <bjorn.andersson@linaro.org>
----
- arch/arm64/boot/dts/qcom/msm8916.dtsi | 43 ++++++++++++++++++++++++++++++++++-
- 1 file changed, 42 insertions(+), 1 deletion(-)
+On 7/13/2016 10:57 PM, Sinan Kaya wrote:
+> There is a race condition between data transfer callback and descriptor
+> free code. The callback routine may decide to clear the resources even
+> though the descriptor has not yet been freed.
+> 
+> Instead of calling the callback first and then releasing the memory,
+> this code is changing the order to return the descriptor back to the
+> free pool and then call the user provided callback.
+> 
+> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+> ---
+>  drivers/dma/qcom/hidma.c | 26 +++++++++++++++-----------
+>  1 file changed, 15 insertions(+), 11 deletions(-)
+> 
+> diff --git a/drivers/dma/qcom/hidma.c b/drivers/dma/qcom/hidma.c
+> index 41b5c6d..c41696e 100644
+> --- a/drivers/dma/qcom/hidma.c
+> +++ b/drivers/dma/qcom/hidma.c
+> @@ -111,6 +111,7 @@ static void hidma_process_completed(struct hidma_chan *mchan)
+>  	struct dma_async_tx_descriptor *desc;
+>  	dma_cookie_t last_cookie;
+>  	struct hidma_desc *mdesc;
+> +	struct hidma_desc *next;
+>  	unsigned long irqflags;
+>  	struct list_head list;
+>  
+> @@ -122,28 +123,31 @@ static void hidma_process_completed(struct hidma_chan *mchan)
+>  	spin_unlock_irqrestore(&mchan->lock, irqflags);
+>  
+>  	/* Execute callbacks and run dependencies */
+> -	list_for_each_entry(mdesc, &list, node) {
+> -		enum dma_status llstat;
+> +	list_for_each_entry_safe(mdesc, next, &list, node) {
+> +		dma_async_tx_callback callback;
+> +		void *param;
+>  
+>  		desc = &mdesc->desc;
+>  
+>  		spin_lock_irqsave(&mchan->lock, irqflags);
+> -		dma_cookie_complete(desc);
+> +		if (hidma_ll_status(mdma->lldev, mdesc->tre_ch)
+> +			== DMA_COMPLETE)
+> +			dma_cookie_complete(desc);
 
-diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-index 85ec5c932975..504e524b910e 100644
---- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
-+++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-@@ -77,7 +77,7 @@
- 			no-map;
- 		};
- 
--		mpss at 86800000 {
-+		mpss_mem: mpss at 86800000 {
- 			reg = <0x0 0x86800000 0x0 0x2b00000>;
- 			no-map;
- 		};
-@@ -620,6 +620,47 @@
- 			clocks = <&gcc GCC_PRNG_AHB_CLK>;
- 			clock-names = "core";
- 		};
-+
-+		hexagon at 4080000 {
-+			compatible = "qcom,q6v5-pil";
-+			reg = <0x04080000 0x100>,
-+			      <0x04020000 0x040>;
-+
-+			reg-names = "qdsp6", "rmb";
-+
-+			interrupts-extended = <&intc 0 24 1>,
-+					      <&hexagon_smp2p_in 0 0>,
-+					      <&hexagon_smp2p_in 1 0>,
-+					      <&hexagon_smp2p_in 2 0>,
-+					      <&hexagon_smp2p_in 3 0>;
-+			interrupt-names = "wdog", "fatal", "ready",
-+					  "handover", "stop-ack";
-+
-+			clocks = <&gcc GCC_MSS_CFG_AHB_CLK>,
-+				 <&gcc GCC_MSS_Q6_BIMC_AXI_CLK>,
-+				 <&gcc GCC_BOOT_ROM_AHB_CLK>;
-+			clock-names = "iface", "bus", "mem";
-+
-+			qcom,smem-states = <&hexagon_smp2p_out 0>;
-+			qcom,smem-state-names = "stop";
-+
-+			resets = <&scm 0>;
-+			reset-names = "mss_restart";
-+
-+			mx-supply = <&pm8916_l3>;
-+			pll-supply = <&pm8916_l7>;
-+
-+			qcom,halt-regs = <&tcsr 0x18000 0x19000 0x1a000>;
-+
-+			mba {
-+				memory-region = <&mba_mem>;
-+			};
-+
-+			mpss {
-+				memory-region = <&mpss_mem>;
-+			};
-+		};
-+
- 	};
- 
- 	smd {
+It looks like I introduced a behavioral change while refactoring the code.
+The previous one would call the callback only if the transfer was successful
+but it would always call dma_cookie_complete.
+
+The new behavior is to call dma_cookie_complete only if the transfer is successful
+and it calls the callback even in the case of error cases. Then, the client has
+to query if transfer was successful.
+
+Which one is the correct behavior?
+
+
+>  		spin_unlock_irqrestore(&mchan->lock, irqflags);
+>  
+> -		llstat = hidma_ll_status(mdma->lldev, mdesc->tre_ch);
+> -		if (desc->callback && (llstat == DMA_COMPLETE))
+> -			desc->callback(desc->callback_param);
+> +		callback = desc->callback;
+> +		param = desc->callback_param;
+>  
+>  		last_cookie = desc->cookie;
+>  		dma_run_dependencies(desc);
+> -	}
+>  
+> -	/* Free descriptors */
+> -	spin_lock_irqsave(&mchan->lock, irqflags);
+> -	list_splice_tail_init(&list, &mchan->free);
+> -	spin_unlock_irqrestore(&mchan->lock, irqflags);
+> +		spin_lock_irqsave(&mchan->lock, irqflags);
+> +		list_move(&mdesc->node, &mchan->free);
+> +		spin_unlock_irqrestore(&mchan->lock, irqflags);
+>  
+> +		if (callback)
+> +			callback(param);
+> +	}
+>  }
+>  
+>  /*
+> 
+
+
 -- 
-2.5.0
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
