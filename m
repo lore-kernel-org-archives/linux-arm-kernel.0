@@ -1,168 +1,59 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Fri, 15 Jul 2016 19:53:32 -0700
-Subject: [PATCH v2 4/4] hwmon: iio: add label for channels read by
- iio_hwmon
-In-Reply-To: <5788F506.3040809@free-electrons.com>
-References: <1468576754-3273-1-git-send-email-quentin.schulz@free-electrons.com>
- <1468576754-3273-5-git-send-email-quentin.schulz@free-electrons.com>
- <5788ED2D.9050405@roeck-us.net> <5788F506.3040809@free-electrons.com>
-Message-ID: <5789A1AC.1020706@roeck-us.net>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Sat, 16 Jul 2016 11:09:31 +0800
+Subject: [GIT PULL] Allwinner DT patches for 4.8, take 2
+In-Reply-To: <4794027.B8xcHDgPAJ@wuerfel>
+References: <20160715105243.GA4468@lukather> <4794027.B8xcHDgPAJ@wuerfel>
+Message-ID: <CAGb2v65=U8hSN9WLoOaoiRyR2Z8ixJ2Chhcv2MV1DVTkCYyMWQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/15/2016 07:36 AM, Quentin Schulz wrote:
-> On 15/07/2016 16:03, Guenter Roeck wrote:
->> On 07/15/2016 02:59 AM, Quentin Schulz wrote:
-> [...]
->>> +static ssize_t iio_hwmon_read_label(struct device *dev,
->>> +                    struct device_attribute *attr,
->>> +                    char *buf)
->>> +{
->>> +    struct sensor_device_attribute *sattr = to_sensor_dev_attr(attr);
->>> +    struct iio_hwmon_state *state = dev_get_drvdata(dev);
->>> +    const char *label =
->>> state->channels[sattr->index].channel->extend_name;
->>> +
->>> +    if (label)
->>> +        return sprintf(buf, "%s\n", label);
->>> +
->> Can the name disappear on the fly, or be changed on the fly ?
->> Then this is unusable. We should and can only provide labels
->> if a name exists and is permanent. Otherwise all we do is
->> to confuse user space.
->
-> It cannot, the extend_name field is const char* in the struct:
-> http://lxr.free-electrons.com/source/include/linux/iio/iio.h#L247
->
+Hi Maxime,
 
-Then why "if(label)" ?
-
-> [...]
->>> @@ -107,6 +123,18 @@ static int iio_hwmon_probe(struct platform_device
->>> *pdev)
->>>            }
->>>
->>>            sysfs_attr_init(&a->dev_attr.attr);
->>> +
->>> +        b = NULL;
->>> +        if (st->channels[i].channel->extend_name) {
->>> +            b = devm_kzalloc(dev, sizeof(*b), GFP_KERNEL);
->>> +            if (b == NULL) {
->>> +                ret = -ENOMEM;
->>> +                goto error_release_channels;
->>> +            }
->>> +
->>> +            sysfs_attr_init(&b->dev_attr.attr);
+On Sat, Jul 16, 2016 at 4:45 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Friday, July 15, 2016 12:52:43 PM CEST Maxime Ripard wrote:
+>> Hi Arnd, Kevin, Olof,
 >>
->> Why is this initialization here and not with the rest of the initialization
->> of this attribute ?
->
-> I don't get your question. I've followed the exact same pattern as for
-> "a" variable's initialization.
-> The initialization is before the switch case because the name of the
-> exposed sysfs file depends on the type of the IIO channel. If I move the
-> initialization in the switch case, I'll have duplicated code.
->
-
-Yes, but that didn't require all those if statements.
-
->>> +        }
->>> +
->>>            ret = iio_get_channel_type(&st->channels[i], &type);
->>>            if (ret < 0)
->>>                goto error_release_channels;
->>> @@ -115,35 +143,66 @@ static int iio_hwmon_probe(struct
->>> platform_device *pdev)
->>>            case IIO_VOLTAGE:
->>>                a->dev_attr.attr.name = kasprintf(GFP_KERNEL,
->>>                                  "in%d_input",
->>> -                              in_i++);
->>> +                              in_i);
->>> +            if (b)
->>> +                b->dev_attr.attr.name = kasprintf(GFP_KERNEL,
->>> +                                  "in%d_label",
->>> +                                  in_i);
->>> +            in_i++;
->>>                break;
->>>            case IIO_TEMP:
->>>                a->dev_attr.attr.name = kasprintf(GFP_KERNEL,
->>>                                  "temp%d_input",
->>> -                              temp_i++);
->>> +                              temp_i);
->>> +
->>> +            if (b)
->>> +                b->dev_attr.attr.name = kasprintf(GFP_KERNEL,
->>> +                                  "temp%d_label",
->>> +                                  temp_i);
->>> +            temp_i++;
->>>                break;
->>>            case IIO_CURRENT:
->>>                a->dev_attr.attr.name = kasprintf(GFP_KERNEL,
->>>                                  "curr%d_input",
->>> -                              curr_i++);
->>> +                              curr_i);
->>> +
->>> +            if (b)
->>> +                b->dev_attr.attr.name = kasprintf(GFP_KERNEL,
->>> +                                  "curr%d_label",
->>> +                                  curr_i);
->>> +            curr_i++;
->>>                break;
->>>            case IIO_HUMIDITYRELATIVE:
->>>                a->dev_attr.attr.name = kasprintf(GFP_KERNEL,
->>>                                  "humidity%d_input",
->>> -                              humidity_i++);
->>> +                              humidity_i);
->>> +
->>> +            if (b)
->>> +                b->dev_attr.attr.name = kasprintf(GFP_KERNEL,
->>> +                                  "humidity%d_label",
->>> +                                  humidity_i);
->>> +            humidity_i++;
->>>                break;
->>>            default:
->>>                ret = -EINVAL;
->>>                goto error_release_channels;
->>>            }
->>> -        if (a->dev_attr.attr.name == NULL) {
->>> +        if (a->dev_attr.attr.name == NULL ||
->>> +            (b && b->dev_attr.attr.name == NULL)) {
->>>                ret = -ENOMEM;
->>>                goto error_release_channels;
->>>            }
+>> Here is the final (hopefully) pull request for the Allwinner SoCs for
+>> the 4.8 merge window.
 >>
->> Just realized that we have a memory leak here. The 'name' memory is
->> never released.
+>> Thanks!
+>> Maxime
+>>
+>> The following changes since commit d509e205d81f074a9b8d93ac80ab56405dede48b:
+>>
+>>   ARM: dts: sun5i: Enable otg on the auxtex t004 (2016-07-05 08:54:33 +0200)
+>>
+>> are available in the git repository at:
+>>
+>>   https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-dt-for-4.8-2
+>>
+>> for you to fetch changes up to 339120c5f638727a8359b054ec06ed2d66dc9b19:
+>>
+>>   ARM: dts: sun8i: Add dts file for inet86dz board (2016-07-11 08:39:27 +0200)
+>>
+>> ----------------------------------------------------------------
+>> Allwinner DT changes for 4.8, take 2
+>>
+>> Another set of changes for the 4.8 merge window, among which:
+>>   - Reworking of the DT for the tablets based on Allwinner reference design
+>>     and q8 designs to avoid duplication as much as possible
+>>   - Renaming a DT merged in the first PR for consistency
+>>   - Enable a few devices on some boards
+>>   - New boards: Polaroid MID2407PXE03, inet86dz
 >>
 >
-> I don't know if we have to do something to revert the effects of
-> sysfs_attr_init but you sure are right that the a and b's attribute's
-> name is never freed. This case would be handled with devm_kasprintf, I
-> guess? Thanks.
+> This breaks the allmodconfig build, not pulling:
 >
->>>            a->dev_attr.show = iio_hwmon_read_val;
->>>            a->dev_attr.attr.mode = S_IRUGO;
->>>            a->index = i;
->>> -        st->attrs[i] = &a->dev_attr.attr;
->>> +        st->attrs[j++] = &a->dev_attr.attr;
->>> +
->>> +        if (b) {
+>   DTC     arch/arm/boot/dts/sun7i-a20-bananapi-m1-plus.dtb
+> Error: ../arch/arm/boot/dts/sun7i-a20-bananapi-m1-plus.dts:252.1-18 Label or path usb_power_supply not found
 
-sysfs_attr_init() might be better here to keep the initialization of '*b'
-as close together as possible.
+Commit 7409d9ba72ef ("ARM: dts: sun7i: bananapi-m1-plus: Enable USB OTG"
+depends on the regulator/OPP patch that you wanted me to rework.
 
-Guenetr
+Please drop this patch for now.
 
->>> +            b->dev_attr.show = iio_hwmon_read_label;
->>> +            b->dev_attr.attr.mode = S_IRUGO;
->>> +            b->index = i;
->>> +            st->attrs[j++] = &b->dev_attr.attr;
->>> +        }
->>>        }
->>>
->>>        st->attr_group.attrs = st->attrs;
->>>
->>
+ChenYu
+
+> Please send a fixed pull request.
 >
-> Quentin
->
+>         Arnd
