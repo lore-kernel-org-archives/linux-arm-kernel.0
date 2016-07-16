@@ -1,62 +1,30 @@
 From: robh@kernel.org (Rob Herring)
-Date: Sat, 16 Jul 2016 14:31:25 -0500
-Subject: [PATCH v4 1/3] dt-bindings: auxadc: Add binding document for
- Mediatek auxadc.
-In-Reply-To: <1468291396.419.15.camel@mhfsdcap03>
-References: <1468219197-9572-1-git-send-email-zhiyong.tao@mediatek.com>
- <1468219197-9572-2-git-send-email-zhiyong.tao@mediatek.com>
- <1468291396.419.15.camel@mhfsdcap03>
-Message-ID: <20160716193125.GA14506@rob-hp-laptop>
+Date: Sat, 16 Jul 2016 15:26:32 -0500
+Subject: [PATCH v3 1/7] bindings: spi-samsung: add exynos5433 spi
+ compatible
+In-Reply-To: <1468317736-18841-2-git-send-email-andi.shyti@samsung.com>
+References: <1468317736-18841-1-git-send-email-andi.shyti@samsung.com>
+ <1468317736-18841-2-git-send-email-andi.shyti@samsung.com>
+Message-ID: <20160716202632.GA12145@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 12, 2016 at 10:43:16AM +0800, zhiyong tao wrote:
-> On Mon, 2016-07-11 at 14:39 +0800, Zhiyong Tao wrote:
-> > The commit adds the device tree binding documentation for the mediatek
-> > auxadc found on Mediatek MT2701.
-> > Thermal gets auxadc sample data by iio device.
-> > So the commit changes auxadc device tree binding documentation from
-> > /soc/mediatek/auxadc.txt to /iio/adc/mt6577_auxadc.txt.
-> > 
-> > Signed-off-by: Zhiyong Tao <zhiyong.tao@mediatek.com>
-> > ---
+On Tue, Jul 12, 2016 at 07:02:10PM +0900, Andi Shyti wrote:
+> The samsung,exynos5433-spi has some peculiarities that bring the
+> need of creating a new compatible in the binding.
 > 
-> I forgot that I should use the command 'git format-patch -M' to submit
-> this patch. The follow information is the patch after executing the
-> above command. If the patch needs to be resent, please help to notify
-> me. I will resend the patch quickly.
-> The follow information:
+> One of those is the 3-clocks controller management where the spi
+> is fed with three clocks: "spi", "busclkN" and "ioclk".
 > 
->  .../auxadc.txt => iio/adc/mt6577_auxadc.txt}       |   16
-> +++++++++++-----
->  1 file changed, 11 insertions(+), 5 deletions(-)
->  rename Documentation/devicetree/bindings/{soc/mediatek/auxadc.txt =>
-> iio/adc/mt6577_auxadc.txt} (50%)
+> By adding the exynos5433-spi, we deprecate the exynos7 compatible
+> and discourage its use.
 > 
-> diff --git a/Documentation/devicetree/bindings/soc/mediatek/auxadc.txt
-> b/Documentation/devicetree/bindings/iio/adc/mt6577_auxadc.txt
-> similarity index 50%
-> rename from Documentation/devicetree/bindings/soc/mediatek/auxadc.txt
-> rename to Documentation/devicetree/bindings/iio/adc/mt6577_auxadc.txt
-> index bdb7829..bc23792 100644
-> --- a/Documentation/devicetree/bindings/soc/mediatek/auxadc.txt
-> +++ b/Documentation/devicetree/bindings/iio/adc/mt6577_auxadc.txt
-> @@ -1,4 +1,4 @@
-> -MediaTek AUXADC
-> +* Mediatek AUXADC - Analog to Digital Converter on Mediatek mobile soc
-> (mt65xx/mt81xx/mt27xx)
->  ===============
-> 
->  The Auxiliary Analog/Digital Converter (AUXADC) is an ADC found
-> @@ -10,12 +10,18 @@
-> Documentation/devicetree/bindings/thermal/mediatek-thermal.txt
->  for the Thermal Controller which holds a phandle to the AUXADC.
-> 
->  Required properties:
-> -- compatible: Must be "mediatek,mt8173-auxadc"
-> -- reg: Address range of the AUXADC unit
-> +  - compatible: "mediatek,mt2701-auxadc" or "mediatek,mt8173-auxadc"
-
-It's preferred to list one per line, but this is fine unless you resend.
+> Signed-off-by: Andi Shyti <andi.shyti@samsung.com>
+> Reviewed-by: Michael Turquette <mturquette@baylibre.com>
+> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Reviewed-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> ---
+>  Documentation/devicetree/bindings/spi/spi-samsung.txt | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
 
 Acked-by: Rob Herring <robh@kernel.org>
