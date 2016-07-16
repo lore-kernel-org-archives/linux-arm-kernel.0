@@ -1,51 +1,34 @@
-From: robh@kernel.org (Rob Herring)
-Date: Sat, 16 Jul 2016 15:30:44 -0500
-Subject: [PATCH v3 2/7] bindings: spi-samsung: document the clocks and
- the clock-name property
-In-Reply-To: <1468317736-18841-3-git-send-email-andi.shyti@samsung.com>
-References: <1468317736-18841-1-git-send-email-andi.shyti@samsung.com>
- <1468317736-18841-3-git-send-email-andi.shyti@samsung.com>
-Message-ID: <20160716203044.GA13087@rob-hp-laptop>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Sat, 16 Jul 2016 22:53:04 +0200
+Subject: [PATCH v0 00/10] Convert Netgear WNR854T to devicetree
+In-Reply-To: <1468679348-10522-1-git-send-email-jm@lentin.co.uk>
+References: <1468679348-10522-1-git-send-email-jm@lentin.co.uk>
+Message-ID: <20160716205304.GA5075@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 12, 2016 at 07:02:11PM +0900, Andi Shyti wrote:
-> These two properties were not documented but used in the spi
-> dts. Add the related documentation.
-> 
-> Suggested-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> Signed-off-by: Andi Shyti <andi.shyti@samsung.com>
-> Reviewed-by: Michael Turquette <mturquette@baylibre.com>
-> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> ---
->  Documentation/devicetree/bindings/spi/spi-samsung.txt | 9 +++++++++
->  1 file changed, 9 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/spi/spi-samsung.txt b/Documentation/devicetree/bindings/spi/spi-samsung.txt
-> index 57d5539..f45c6eb 100644
-> --- a/Documentation/devicetree/bindings/spi/spi-samsung.txt
-> +++ b/Documentation/devicetree/bindings/spi/spi-samsung.txt
-> @@ -24,6 +24,15 @@ Required SoC Specific Properties:
->  - dma-names: Names for the dma channels. There must be at least one channel
->    named "tx" for transmit and named "rx" for receive.
->  
-> +- clocks: specifies the clock IDs provided to the SPI controller; they are
-> +  required for interacting with the controller itself, for synchronizing the bus
-> +  and as I/O clock (the latter is required by exynos5433 and exynos7).
-> +
-> +- clock-names: string names of the clocks in the 'clocks' property; for all the
-> +  the devices the names must be "spi", "spi_busclkN" (where N is determined by
-> +  "samsung,spi-src-clk"), while Exynos5433 should specify a third clock
+> There's one major flaw; unicast traffic is never received on any port.
+> Broadcast traffic is received however, and on the correct port. Thus
+> an external machine can make an ARP request and get a response, for
+> example. With a manually-entered ARP entry, the router can send pings
+> out to a remote machine which responds, and the response is lost in the
+> DSA switch. "ethtool -S" reports pings received on "in_unicast" but
+> nothing makes it through the switch. This thread[0] seems very similar.
+> I've run out of ideas here and can't find any switch datasheets to give
+> me pointers so any suggestions greatly appreciated.
 
-This sounds like you are describing the configuration of the clocks, not 
-the connections. The binding here should list clocks for all possible 
-vaules of N as those are all the input clocks to the block.
+Hi Jamie
 
-> +  "spi_ioclk" for the I/O clock.
-> +
->  Required Board Specific Properties:
->  
->  - #address-cells: should be 1.
-> -- 
-> 2.8.1
-> 
+So it is 6131? So part of the 6185 family. 
+
+I see you have NET_TAG_DSA, but not NET_TAG_EDSA in your
+configuration. Try swapping to EDSA. I even removed support for
+TAG_DSA in one of the recent patches.
+
+Please also can you get https://github.com/vivien/linux.git commit
+323321875671dfe95b6b91ce051a74d415c7158c which will give you some
+extra debug files /sys/kernel/debug/mv88e6xxx. 
+
+The reg, stats, and atu would be interesting.
+
+    Andrew
