@@ -1,23 +1,45 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Sat, 16 Jul 2016 20:43:49 -0300
-Subject: bug in error message
-In-Reply-To: <CAJz5OpfCWc2=kD8bwthizCEMau2DjMScoNkCER_FGFQkADbhrA@mail.gmail.com>
-References: <CAJz5OpfCWc2=kD8bwthizCEMau2DjMScoNkCER_FGFQkADbhrA@mail.gmail.com>
-Message-ID: <CAOMZO5CtvFGUK04jP4=Gnar8x9RShiu=9LFDfFt46JRG53PV6w@mail.gmail.com>
+Date: Sat, 16 Jul 2016 21:10:10 -0300
+Subject: [PATCH] ARM: dma-mapping: Use %zu for printing a size_t variable
+Message-ID: <1468714210-1407-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 16, 2016 at 6:51 PM, Frank Mori Hess <fmh6jj@gmail.com> wrote:
-> There is a bug in arch/arm/mm/dma-mapping.c where it prints a number
-> in an error message in hex when it should be decimal:
->
-> pr_err("DMA: failed to allocate %zx KiB pool for atomic coherent allocation\n",
->         atomic_pool_size / 1024);
->
-> patch (literally one character) here:
->
-> https://github.com/fmhess/linux/commit/dce53a26afe31c63b88bc5b5c75b41ec86579291
+From: Fabio Estevam <fabio.estevam@nxp.com>
 
-Your proposed fix is not correct. You should use %zu instead.
+According to Documentation/printk-formats.txt when printing
+a size_t variable we should use %zu or %zx format specifiers.
 
-Thanks for reporting it anyway. Will submit a patch.
+As we are printing a memory size value, we should better use %zu
+in this case.
+
+Reported-by: Frank Mori Hess <fmh6jj@gmail.com>
+Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+---
+ arch/arm/mm/dma-mapping.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+index 654f202a..5bcf71b 100644
+--- a/arch/arm/mm/dma-mapping.c
++++ b/arch/arm/mm/dma-mapping.c
+@@ -436,7 +436,7 @@ static int __init atomic_pool_init(void)
+ 		gen_pool_set_algo(atomic_pool,
+ 				gen_pool_first_fit_order_align,
+ 				(void *)PAGE_SHIFT);
+-		pr_info("DMA: preallocated %zd KiB pool for atomic coherent allocations\n",
++		pr_info("DMA: preallocated %zu KiB pool for atomic coherent allocations\n",
+ 		       atomic_pool_size / 1024);
+ 		return 0;
+ 	}
+@@ -445,7 +445,7 @@ destroy_genpool:
+ 	gen_pool_destroy(atomic_pool);
+ 	atomic_pool = NULL;
+ out:
+-	pr_err("DMA: failed to allocate %zx KiB pool for atomic coherent allocation\n",
++	pr_err("DMA: failed to allocate %zu KiB pool for atomic coherent allocation\n",
+ 	       atomic_pool_size / 1024);
+ 	return -ENOMEM;
+ }
+-- 
+1.9.1
