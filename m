@@ -1,42 +1,51 @@
-From: robh@kernel.org (Rob Herring)
-Date: Sun, 17 Jul 2016 15:40:14 -0500
-Subject: [PATCH v0 04/10] arm: orion5x: Generalise mv88f5181l pinctrl
- support for 88f5181
-In-Reply-To: <1468679348-10522-5-git-send-email-jm@lentin.co.uk>
-References: <1468679348-10522-1-git-send-email-jm@lentin.co.uk>
- <1468679348-10522-5-git-send-email-jm@lentin.co.uk>
-Message-ID: <20160717204014.GA16350@rob-hp-laptop>
+From: moritz.fischer@ettus.com (Moritz Fischer)
+Date: Sun, 17 Jul 2016 13:40:44 -0700
+Subject: [PATCH 1/2] ARM: socfpga: add bindings doc for arria10 fpga
+ manager
+In-Reply-To: <20160712190709.5964-2-atull@opensource.altera.com>
+References: <20160712190709.5964-1-atull@opensource.altera.com>
+ <20160712190709.5964-2-atull@opensource.altera.com>
+Message-ID: <CAAtXAHdFKOoYa0tWrO8=COZXAFN5rNM2-w6sR3H9cMCpT5uqxw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 16, 2016 at 03:29:02PM +0100, Jamie Lentin wrote:
-> As far as I'm aware the mv88f5181-b1 and mv88f5181l are the same at the
-> pinctrl level, so re-use the definitions for both.
-> 
-> Signed-off-by: Jamie Lentin <jm@lentin.co.uk>
+Acked-By: Moritz Fischer <moritz.fischer@ettus.com>
+
+On Tue, Jul 12, 2016 at 12:07 PM, Alan Tull <atull@opensource.altera.com> wrote:
+> Add a device tree bindings document for the SoCFPGA Arria10
+> FPGA Manager driver.
+>
+> Signed-off-by: Alan Tull <atull@opensource.altera.com>
 > ---
->  .../bindings/pinctrl/marvell,orion-pinctrl.txt     |  4 ++--
->  drivers/pinctrl/mvebu/pinctrl-orion.c              | 23 +++++++++++-----------
->  2 files changed, 14 insertions(+), 13 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/pinctrl/marvell,orion-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/marvell,orion-pinctrl.txt
-> index 27570a3..5a79bad 100644
-> --- a/Documentation/devicetree/bindings/pinctrl/marvell,orion-pinctrl.txt
-> +++ b/Documentation/devicetree/bindings/pinctrl/marvell,orion-pinctrl.txt
-> @@ -4,8 +4,8 @@ Please refer to marvell,mvebu-pinctrl.txt in this directory for common binding
->  part and usage.
->  
->  Required properties:
-> -- compatible: "marvell,88f5181l-pinctrl", "marvell,88f5182-pinctrl",
-> -              "marvell,88f5281-pinctrl"
-> +- compatible: "marvell,88f5181-pinctrl", "marvell,88f5181l-pinctrl",
-> +              "marvell,88f5182-pinctrl", "marvell,88f5281-pinctrl"
-
-Please reformat to one per line. Otherwise,
-
-Acked-by: Rob Herring <robh@kernel.org>
-
-
->  
->  - reg: two register areas, the first one describing the first two
->    contiguous MPP registers, and the second one describing the single
+>  .../bindings/fpga/altera-socfpga-a10-fpga-mgr.txt     | 19 +++++++++++++++++++
+>  1 file changed, 19 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/fpga/altera-socfpga-a10-fpga-mgr.txt
+>
+> diff --git a/Documentation/devicetree/bindings/fpga/altera-socfpga-a10-fpga-mgr.txt b/Documentation/devicetree/bindings/fpga/altera-socfpga-a10-fpga-mgr.txt
+> new file mode 100644
+> index 0000000..2fd8e7a
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/fpga/altera-socfpga-a10-fpga-mgr.txt
+> @@ -0,0 +1,19 @@
+> +Altera SOCFPGA Arria10 FPGA Manager
+> +
+> +Required properties:
+> +- compatible : should contain "altr,socfpga-a10-fpga-mgr"
+> +- reg        : base address and size for memory mapped io.
+> +               - The first index is for FPGA manager register access.
+> +               - The second index is for writing FPGA configuration data.
+> +- resets     : Phandle and reset specifier for the device's reset.
+> +- clocks     : Clocks used by the device.
+> +
+> +Example:
+> +
+> +       fpga_mgr: fpga-mgr at ffd03000 {
+> +               compatible = "altr,socfpga-a10-fpga-mgr";
+> +               reg = <0xffd03000 0x100
+> +                      0xffcfe400 0x20>;
+> +               clocks = <&l4_mp_clk>;
+> +               resets = <&rst FPGAMGR_RESET>;
+> +       };
+> --
+> 2.9.1
+>
