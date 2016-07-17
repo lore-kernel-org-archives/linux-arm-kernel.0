@@ -1,19 +1,25 @@
 From: ayaka@soulik.info (Randy Li)
-Date: Sun, 17 Jul 2016 23:38:56 +0800
-Subject: [PATCH] ARM: dts: the dts support for rk3288 firefly reload
-In-Reply-To: <5614243.tqTyZoc945@phil>
+Date: Sun, 17 Jul 2016 23:38:57 +0800
+Subject: [PATCH] ARM: dts: add rk3288-firefly-reload
+In-Reply-To: <1468769937-23387-1-git-send-email-ayaka@soulik.info>
 References: <5614243.tqTyZoc945@phil>
-Message-ID: <1468769937-23387-1-git-send-email-ayaka@soulik.info>
+ <1468769937-23387-1-git-send-email-ayaka@soulik.info>
+Message-ID: <1468769937-23387-2-git-send-email-ayaka@soulik.info>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This version is split into a reload core dtsi for the SoC module
-part and a baseboard dts for the reload baseboard. Thanks to
-the Heiko's advise.
+The Firefly RK3288 Reload is a combination Firefly rk3288 core board
+with the Reload baseboard. Add a dtsi for the Firefly rk3288 core
+which can be included into the dts for the various baseboards
+in the future and dts for Reload base board.
 
-Randy Li (1):
-  ARM: dts: add rk3288-firefly-reload
+Currently supported are serial console, wired networking, eMMC and
+SD storage, SPFIF, IR receiver, LEDs, SDIO wifi and USB. But only
+the OTG could work on the host mode now, the other USB host can't
+work now, additional patches are required.
 
+Signed-off-by: Randy Li <ayaka@soulik.info>
+---
  Documentation/devicetree/bindings/arm/rockchip.txt |   4 +
  arch/arm/boot/dts/Makefile                         |   1 +
  arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi  | 304 ++++++++++++++++++++
@@ -22,5 +28,668 @@ Randy Li (1):
  create mode 100644 arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi
  create mode 100644 arch/arm/boot/dts/rk3288-firefly-reload.dts
 
+diff --git a/Documentation/devicetree/bindings/arm/rockchip.txt b/Documentation/devicetree/bindings/arm/rockchip.txt
+index 715d960..3380212c 100644
+--- a/Documentation/devicetree/bindings/arm/rockchip.txt
++++ b/Documentation/devicetree/bindings/arm/rockchip.txt
+@@ -31,6 +31,10 @@ Rockchip platforms device tree bindings
+     or
+       - compatible = "firefly,firefly-rk3288-beta", "rockchip,rk3288";
+ 
++- Firefly Firefly-RK3288 Reload board:
++    Required root node properties:
++      - compatible = "firefly,firefly-rk3288-reload", "rockchip,rk3288";
++
+ - ChipSPARK PopMetal-RK3288 board:
+     Required root node properties:
+       - compatible = "chipspark,popmetal-rk3288", "rockchip,rk3288";
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 414b427..8173e77 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -606,6 +606,7 @@ dtb-$(CONFIG_ARCH_ROCKCHIP) += \
+ 	rk3288-evb-rk808.dtb \
+ 	rk3288-firefly-beta.dtb \
+ 	rk3288-firefly.dtb \
++	rk3288-firefly-reload.dtb \
+ 	rk3288-miqi.dtb \
+ 	rk3288-popmetal.dtb \
+ 	rk3288-r89.dtb \
+diff --git a/arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi b/arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi
+new file mode 100644
+index 0000000..039ae16
+--- /dev/null
++++ b/arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi
+@@ -0,0 +1,304 @@
++/*
++ * Device tree file for Firefly Rockchip RK3288 Core board
++ * Copyright (c) 2016 Randy Li <ayaka@soulik.info>
++ *
++ * Licensed under GPLv2 or later.
++ */
++
++#include <dt-bindings/input/input.h>
++#include "rk3288.dtsi"
++
++/ {
++	memory {
++		device_type = "memory";
++		reg = <0 0x80000000>;
++	};
++
++	dovdd_1v8: dovdd-1v8-regulator {
++		compatible = "regulator-fixed";
++		regulator-name = "dovdd_1v8";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <1800000>;
++		vin-supply = <&vcc28_dvp>;
++	};
++
++	ext_gmac: external-gmac-clock {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <125000000>;
++		clock-output-names = "ext_gmac";
++	};
++
++	io_domains: io-domains {
++		compatible = "rockchip,rk3288-io-voltage-domain";
++		rockchip,grf = <&grf>;
++
++		audio-supply = <&vcca_33>;
++		bb-supply = <&vcc_io>;
++		dvp-supply = <&dovdd_1v8>;
++		flash0-supply = <&vcc_flash>;
++		flash1-supply = <&vcc_lan>;
++		gpio30-supply = <&vcc_io>;
++		gpio1830-supply = <&vcc_io>;
++		lcdc-supply = <&vcc_io>;
++		sdcard-supply = <&vccio_sd>;
++		wifi-supply = <&vccio_wl>;
++	};
++
++	vbat_wl: vcc_sys: vsys-regulator {
++		compatible = "regulator-fixed";
++		regulator-name = "vcc_sys";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		regulator-always-on;
++		regulator-boot-on;
++	};
++
++	vcc_flash: flash-regulator {
++		compatible = "regulator-fixed";
++		regulator-name = "vcc_flash";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <1800000>;
++		vin-supply = <&vcc_io>;
++	};
++
++	vcc_5v: usb-regulator {
++		compatible = "regulator-fixed";
++		regulator-name = "vcc_5v";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		regulator-always-on;
++		regulator-boot-on;
++		vin-supply = <&vcc_sys>;
++	};
++
++};
++
++&cpu0 {
++	cpu0-supply = <&vdd_cpu>;
++};
++
++&emmc {
++	bus-width = <8>;
++	cap-mmc-highspeed;
++	mmc-ddr-1_8v;
++	mmc-hs200-1_8v;
++	disable-wp;
++	non-removable;
++	num-slots = <1>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&emmc_clk>, <&emmc_cmd>, <&emmc_pwr>, <&emmc_bus8>;
++	vmmc-supply = <&vcc_io>;
++	vqmmc-supply = <&vcc_flash>;
++	status = "okay";
++};
++
++&gmac {
++	assigned-clocks = <&cru SCLK_MAC>;
++	assigned-clock-parents = <&ext_gmac>;
++	clock_in_out = "input";
++	pinctrl-names = "default";
++	pinctrl-0 = <&rgmii_pins>, <&phy_rst>, <&phy_pmeb>, <&phy_int>;
++	phy-supply = <&vcc_lan>;
++	phy-mode = "rgmii";
++	snps,reset-active-low;
++	snps,reset-delays-us = <0 10000 1000000>;
++	snps,reset-gpio = <&gpio4 8 GPIO_ACTIVE_LOW>;
++	tx_delay = <0x30>;
++	rx_delay = <0x10>;
++	status = "ok";
++};
++
++&i2c0 {
++	clock-frequency = <400000>;
++	status = "okay";
++
++	vdd_cpu: syr827 at 40 {
++		compatible = "silergy,syr827";
++		fcs,suspend-voltage-selector = <1>;
++		reg = <0x40>;
++		regulator-name = "vdd_cpu";
++		regulator-min-microvolt = <850000>;
++		regulator-max-microvolt = <1350000>;
++		regulator-always-on;
++		regulator-boot-on;
++		regulator-enable-ramp-delay = <300>;
++		regulator-ramp-delay = <8000>;
++		vin-supply = <&vcc_sys>;
++	};
++
++	vdd_gpu: syr828 at 41 {
++		compatible = "silergy,syr828";
++		fcs,suspend-voltage-selector = <1>;
++		reg = <0x41>;
++		regulator-name = "vdd_gpu";
++		regulator-min-microvolt = <850000>;
++		regulator-max-microvolt = <1350000>;
++		regulator-always-on;
++		vin-supply = <&vcc_sys>;
++	};
++
++	act8846: act8846 at 5a {
++		compatible = "active-semi,act8846";
++		reg = <0x5a>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pmic_vsel>, <&pwr_hold>;
++		system-power-controller;
++
++		vp1-supply = <&vcc_sys>;
++		vp2-supply = <&vcc_sys>;
++		vp3-supply = <&vcc_sys>;
++		vp4-supply = <&vcc_sys>;
++		inl1-supply = <&vcc_sys>;
++		inl2-supply = <&vcc_sys>;
++		inl3-supply = <&vcc_20>;
++
++		regulators {
++			vcc_ddr: REG1 {
++				regulator-name = "vcc_ddr";
++				regulator-min-microvolt = <1200000>;
++				regulator-max-microvolt = <1200000>;
++				regulator-always-on;
++			};
++
++			vcc_io: REG2 {
++				regulator-name = "vcc_io";
++				regulator-min-microvolt = <3300000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-always-on;
++			};
++
++			vdd_log: REG3 {
++				regulator-name = "vdd_log";
++				regulator-min-microvolt = <1100000>;
++				regulator-max-microvolt = <1100000>;
++				regulator-always-on;
++			};
++
++			vcc_20: REG4 {
++				regulator-name = "vcc_20";
++				regulator-min-microvolt = <2000000>;
++				regulator-max-microvolt = <2000000>;
++				regulator-always-on;
++			};
++
++			vccio_sd: REG5 {
++				regulator-name = "vccio_sd";
++				regulator-min-microvolt = <3300000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-always-on;
++			};
++
++			vdd10_lcd: REG6 {
++				regulator-name = "vdd10_lcd";
++				regulator-min-microvolt = <1000000>;
++				regulator-max-microvolt = <1000000>;
++				regulator-always-on;
++			};
++
++			vcca_33: REG7  {
++				regulator-name = "vcca_33";
++				regulator-min-microvolt = <3300000>;
++				regulator-max-microvolt = <3300000>;
++			};
++
++			vcc_lan: REG8 {
++				regulator-name = "vcca_lan";
++				regulator-min-microvolt = <3300000>;
++				regulator-max-microvolt = <3300000>;
++			};
++
++			vccio_pmu: REG9 {
++				regulator-name = "vccio_pmu";
++				regulator-min-microvolt = <3300000>;
++				regulator-max-microvolt = <3300000>;
++			};
++
++			vdd_10: REG10 {
++				regulator-name = "vdd_10";
++				regulator-min-microvolt = <1000000>;
++				regulator-max-microvolt = <1000000>;
++				regulator-always-on;
++			};
++
++			vccio_wl: vcc_18: REG11 {
++				regulator-name = "vcc_18";
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <1800000>;
++				regulator-always-on;
++			};
++
++			vcc18_lcd: REG12 {
++				regulator-name = "vcc18_lcd";
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <1800000>;
++				regulator-always-on;
++			};
++		};
++	};
++};
++
++&pinctrl {
++	pcfg_output_high: pcfg-output-high {
++		output-high;
++	};
++
++	pcfg_output_low: pcfg-output-low {
++		output-low;
++	};
++
++	pcfg_pull_up_drv_12ma: pcfg-pull-up-drv-12ma {
++		bias-pull-up;
++		drive-strength = <12>;
++	};
++
++	act8846 {
++		pwr_hold: pwr-hold {
++			rockchip,pins = <0 1 RK_FUNC_GPIO &pcfg_output_high>;
++		};
++
++		pmic_vsel: pmic-vsel {
++			rockchip,pins = <7 14 RK_FUNC_GPIO &pcfg_output_low>;
++		};
++	};
++
++	gmac {
++		phy_int: phy-int {
++			rockchip,pins = <0 9 RK_FUNC_GPIO &pcfg_pull_up>;
++		};
++
++		phy_pmeb: phy-pmeb {
++			rockchip,pins = <0 8 RK_FUNC_GPIO &pcfg_pull_up>;
++		};
++
++		phy_rst: phy-rst {
++			rockchip,pins = <4 8 RK_FUNC_GPIO &pcfg_output_high>;
++		};
++	};
++};
++
++&tsadc {
++	rockchip,hw-tshut-mode = <0>;
++	rockchip,hw-tshut-polarity = <0>;
++	status = "okay";
++};
++
++&vopb {
++	status = "okay";
++};
++
++&vopb_mmu {
++	status = "okay";
++};
++
++&vopl {
++	status = "okay";
++};
++
++&vopl_mmu {
++	status = "okay";
++};
++
++&wdt {
++	status = "okay";
++};
+diff --git a/arch/arm/boot/dts/rk3288-firefly-reload.dts b/arch/arm/boot/dts/rk3288-firefly-reload.dts
+new file mode 100644
+index 0000000..8adda0a
+--- /dev/null
++++ b/arch/arm/boot/dts/rk3288-firefly-reload.dts
+@@ -0,0 +1,320 @@
++/*
++ * Device tree file for Firefly Rockchip RK3288 Reload base board
++ * Copyright (c) 2016 Randy Li <ayaka@soulik.info>
++ *
++ * Licensed under GPLv2 or later.
++ */
++
++/dts-v1/;
++#include "rk3288-firefly-reload-core.dtsi"
++
++/ {
++	model = "Firefly-RK3288-reload";
++	compatible = "firefly,firefly-rk3288-reload", "rockchip,rk3288";
++
++	leds {
++		compatible = "gpio-leds";
++
++		power {
++			gpios = <&gpio8 2 GPIO_ACTIVE_LOW>;
++			label = "firefly:blue:power";
++			pinctrl-names = "default";
++			pinctrl-0 = <&power_led>;
++			panic-indicator;
++		};
++
++		work {
++			gpios = <&gpio8 1 GPIO_ACTIVE_LOW>;
++			label = "firefly:blue:user";
++			linux,default-trigger = "rc-feedback";
++			pinctrl-names = "default";
++			pinctrl-0 = <&work_led>;
++		};
++	};
++	
++	vcc_sd: sdmmc-regulator {
++		compatible = "regulator-fixed";
++		gpio = <&gpio7 11 GPIO_ACTIVE_LOW>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&sdmmc_pwr>;
++		regulator-name = "vcc_sd";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		startup-delay-us = <100000>;
++		vin-supply = <&vcc_io>;
++	};
++
++	sdio_pwrseq: sdio-pwrseq {
++		compatible = "mmc-pwrseq-simple";
++		clocks = <&hym8563>;
++		clock-names = "ext_clock";
++		pinctrl-names = "default";
++		pinctrl-0 = <&wifi_enable>;
++		reset-gpios = <&gpio4 28 GPIO_ACTIVE_LOW>;
++	};
++
++	vcc_host_5v: usb-host-regulator {
++		compatible = "regulator-fixed";
++		enable-active-high;
++		gpio = <&gpio0 14 GPIO_ACTIVE_HIGH>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&host_vbus_drv>;
++		regulator-name = "vcc_host_5v";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		regulator-always-on;
++		vin-supply = <&vcc_5v>;
++	};
++
++	vcc_otg_5v: usb-otg-regulator {
++		compatible = "regulator-fixed";
++		enable-active-high;
++		gpio = <&gpio0 12 GPIO_ACTIVE_HIGH>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&otg_vbus_drv>;
++		regulator-name = "vcc_otg_5v";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		regulator-always-on;
++		vin-supply = <&vcc_5v>;
++	};
++
++	/*
++	 * A TT8142 creates both dovdd_1v8 and vcc28_dvp, controlled
++	 * by the dvp_pwr pin.
++	 */
++	vcc28_dvp: vcc28-dvp-regulator {
++		compatible = "regulator-fixed";
++		enable-active-high;
++		gpio = <&gpio0 11 GPIO_ACTIVE_HIGH>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&dvp_pwr>;
++		regulator-name = "vcc28_dvp";
++		regulator-min-microvolt = <2800000>;
++		regulator-max-microvolt = <2800000>;
++		regulator-always-on;
++		vin-supply = <&vcc_io>;
++	};
++
++	ir-receiver {
++		compatible = "gpio-ir-receiver";
++		gpios = <&gpio7 0 GPIO_ACTIVE_LOW>;
++	};
++
++	gpio-keys {
++		compatible = "gpio-keys";
++
++		power {
++			wakeup-source;
++			gpios = <&gpio0 5 GPIO_ACTIVE_LOW>;
++			label = "GPIO Power";
++			linux,code = <KEY_POWER>;
++			pinctrl-names = "default";
++			pinctrl-0 = <&pwr_key>;
++		};
++	};
++
++	sound {
++		compatible = "simple-audio-card";
++		simple-audio-card,name = "SPDIF";
++		simple-audio-card,dai-link at 1 {  /* S/PDIF - S/PDIF */
++			cpu { sound-dai = <&spdif>; };
++			codec { sound-dai = <&spdif_out>; };
++		};
++	};
++
++	spdif_out: spdif-out {
++		compatible = "linux,spdif-dit";
++		#sound-dai-cells = <0>;
++	};
++};
++
++&i2c0 {
++	hym8563: hym8563 at 51 {
++		compatible = "haoyu,hym8563";
++		reg = <0x51>;
++		#clock-cells = <0>;
++		clock-frequency = <32768>;
++		clock-output-names = "xin32k";
++		interrupt-parent = <&gpio7>;
++		interrupts = <4 IRQ_TYPE_EDGE_FALLING>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&rtc_int>;
++	};
++};
++
++&i2c2 {
++	status = "okay";
++
++	codec: es8328 at 10 {
++		compatible = "everest,es8328";
++		DVDD-supply = <&vcca_33>;
++		AVDD-supply = <&vcca_33>;
++		PVDD-supply = <&vcca_33>;
++		HPVDD-supply = <&vcca_33>;
++		clocks = <&cru HCLK_I2S0>, <&cru SCLK_I2S0>;
++		clock-names = "i2s_hclk", "i2s_clk";
++		reg = <0x10>;
++	};
++};
++
++&i2s {
++	status = "okay";
++};
++
++&sdmmc {
++	bus-width = <4>;
++	cap-mmc-highspeed;
++	cap-sd-highspeed;
++	sd-uhs-sdr12;
++	sd-uhs-sdr25;
++	sd-uhs-sdr50;
++	sd-uhs-sdr104;
++	sd-uhs-ddr50;
++	card-detect-delay = <200>;
++	disable-wp;
++	num-slots = <1>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&sdmmc_clk>, <&sdmmc_cmd>, <&sdmmc_cd>, <&sdmmc_bus4>;
++	vmmc-supply = <&vcc_sd>;
++	vqmmc-supply = <&vccio_sd>;
++	status = "okay";
++};
++
++&sdio0 {
++	bus-width = <4>;
++	cap-sd-highspeed;
++	sd-uhs-sdr12;
++	sd-uhs-sdr25;
++	sd-uhs-sdr50;
++	sd-uhs-ddr50;
++	cap-sdio-irq;
++	disable-wp;
++	mmc-pwrseq = <&sdio_pwrseq>;
++	non-removable;
++	num-slots = <1>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&sdio0_bus4>, <&sdio0_cmd>, <&sdio0_clk>, <&sdio0_int>;
++	vmmc-supply = <&vbat_wl>;
++	vqmmc-supply = <&vccio_wl>;
++	status = "okay";
++};
++
++&uart0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart0_xfer>, <&uart0_cts>, <&uart0_rts>;
++	status = "okay";
++};
++
++&uart1 {
++	status = "okay";
++};
++
++&uart2 {
++	status = "okay";
++};
++
++&uart3 {
++	status = "okay";
++};
++
++&usbphy {
++	status = "okay";
++};
++
++&usb_host1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&usbhub_rst>;
++	status = "okay";
++};
++
++&usb_otg {
++	status = "okay";
++};
++
++&spdif {
++	status = "okay";
++};
++
++&pinctrl {
++	ir {
++		ir_int: ir-int {
++			rockchip,pins = <7 0 RK_FUNC_GPIO &pcfg_pull_up>;
++		};
++	};
++
++	dvp {
++		dvp_pwr: dvp-pwr {
++			rockchip,pins = <0 11 RK_FUNC_GPIO &pcfg_pull_none>;
++		};
++	};
++
++	hym8563 {
++		rtc_int: rtc-int {
++			rockchip,pins = <7 4 RK_FUNC_GPIO &pcfg_pull_up>;
++		};
++	};
++
++	keys {
++		pwr_key: pwr-key {
++			rockchip,pins = <0 5 RK_FUNC_GPIO &pcfg_pull_up>;
++		};
++	};
++
++	leds {
++		power_led: power-led {
++			rockchip,pins = <8 2 RK_FUNC_GPIO &pcfg_pull_none>;
++		};
++
++		work_led: work-led {
++			rockchip,pins = <8 1 RK_FUNC_GPIO &pcfg_pull_none>;
++		};
++	};
++
++	sdmmc {
++		/*
++		 * Default drive strength isn't enough to achieve even
++		 * high-speed mode on firefly board so bump up to 12ma.
++		 */
++		sdmmc_bus4: sdmmc-bus4 {
++			rockchip,pins = <6 16 RK_FUNC_1 &pcfg_pull_up_drv_12ma>,
++					<6 17 RK_FUNC_1 &pcfg_pull_up_drv_12ma>,
++					<6 18 RK_FUNC_1 &pcfg_pull_up_drv_12ma>,
++					<6 19 RK_FUNC_1 &pcfg_pull_up_drv_12ma>;
++		};
++
++		sdmmc_clk: sdmmc-clk {
++			rockchip,pins = <6 20 RK_FUNC_1 &pcfg_pull_none_12ma>;
++		};
++
++		sdmmc_cmd: sdmmc-cmd {
++			rockchip,pins = <6 21 RK_FUNC_1 &pcfg_pull_up_drv_12ma>;
++		};
++
++		sdmmc_pwr: sdmmc-pwr {
++			rockchip,pins = <7 11 RK_FUNC_GPIO &pcfg_pull_none>;
++		};
++	};
++
++	sdio {
++		wifi_enable: wifi-enable {
++			rockchip,pins = <4 28 RK_FUNC_GPIO &pcfg_pull_none>;
++		};
++	};
++
++	usb_host {
++		host_vbus_drv: host-vbus-drv {
++			rockchip,pins = <0 14 RK_FUNC_GPIO &pcfg_pull_none>;
++		};
++
++		usbhub_rst: usbhub-rst {
++			rockchip,pins = <8 3 RK_FUNC_GPIO &pcfg_output_high>;
++		};
++	};
++
++	usb_otg {
++		otg_vbus_drv: otg-vbus-drv {
++			rockchip,pins = <0 12 RK_FUNC_GPIO &pcfg_pull_none>;
++		};
++	};
++};
 -- 
 2.7.4
