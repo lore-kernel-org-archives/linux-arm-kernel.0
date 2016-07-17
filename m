@@ -1,51 +1,91 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 18 Jul 2016 07:58:45 +0900
-Subject: [PATCH 2/2] ARM: dts: r8a7792: add SDHI support
-In-Reply-To: <8030361.FnpbGzHVP8@wasted.cogentembedded.com>
-References: <2441635.ESeLhIjWEX@wasted.cogentembedded.com>
- <8030361.FnpbGzHVP8@wasted.cogentembedded.com>
-Message-ID: <20160717225842.GA25133@verge.net.au>
+From: andre.przywara@arm.com (=?UTF-8?Q?Andr=c3=a9_Przywara?=)
+Date: Mon, 18 Jul 2016 00:23:38 +0100
+Subject: [PATCH v10 15/17] KVM: arm64: implement ITS command queue command
+ handlers
+In-Reply-To: <20160716110815.35f8527e@arm.com>
+References: <20160715114338.10484-1-andre.przywara@arm.com>
+ <20160715114338.10484-16-andre.przywara@arm.com>
+ <20160716110815.35f8527e@arm.com>
+Message-ID: <545f7c23-0146-ebd7-b173-be3440c29351@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 13, 2016 at 12:11:12AM +0300, Sergei Shtylyov wrote:
-> Define the generic R8A7792 part of the SDHI0 device node.
-> 
-> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> 
-> ---
->  arch/arm/boot/dts/r8a7792.dtsi |   12 ++++++++++++
->  1 file changed, 12 insertions(+)
-> 
-> Index: renesas/arch/arm/boot/dts/r8a7792.dtsi
-> ===================================================================
-> --- renesas.orig/arch/arm/boot/dts/r8a7792.dtsi
-> +++ renesas/arch/arm/boot/dts/r8a7792.dtsi
-> @@ -435,6 +435,18 @@
->  			status = "disabled";
->  		};
->  
-> +		sdhi0: sd at ee100000 {
-> +			compatible = "renesas,sdhi-r8a7792";
-> +			reg = <0 0xee100000 0 0x200>;
+Hi Marc,
 
-I do not have the documentation available to check, however, I wonder if
-as per 66f47ed0e86d ("ARM: shmobile: r8a7790: tidyup SDHI register size on
-DTSI") the register size should be 0x328.
+[...]
 
-It also looks like register the DTS for the r8a7794 needs updating along
-the same lines.
-
-> +			interrupts = <0 165 IRQ_TYPE_LEVEL_HIGH>;
-> +			dmas = <&dmac0 0xcd>, <&dmac0 0xce>,
-> +			       <&dmac1 0xcd>, <&dmac1 0xce>;
-> +			dma-names = "tx", "rx", "tx", "rx";
-> +			clocks = <&mstp3_clks R8A7792_CLK_SDHI0>;
-> +			power-domains = <&sysc R8A7792_PD_ALWAYS_ON>;
-> +			status = "disabled";
-> +		};
-> +
->  		jpu: jpeg-codec at fe980000 {
->  			compatible = "renesas,jpu-r8a7792",
->  				     "renesas,rcar-gen2-jpu";
+>> +/*
+>> + * Check whether a device ID can be stored into the guest device tables.
+>> + * For a direct table this is pretty easy, but gets a bit nasty for
+>> + * indirect tables. We check whether the resulting guest physical address
+>> + * is actually valid (covered by a memslot and guest accessbible).
+>> + * For this we have to read the respective first level entry.
+>> + */
+>> +static bool vgic_its_check_device_id(struct kvm *kvm, struct vgic_its *its,
+>> +				     int device_id)
+>> +{
+>> +	u64 r = its->baser_device_table;
+>> +	int nr_entries = GITS_BASER_NR_PAGES(r) * SZ_64K;
+>> +	int index;
+>> +	u64 indirect_ptr;
+>> +	gfn_t gfn;
+>> +
+>> +
+>> +	if (!(r & GITS_BASER_INDIRECT))
+>> +		return device_id < (nr_entries / GITS_BASER_ENTRY_SIZE(r));
+>> +
+>> +	/* calculate and check the index into the 1st level */
+>> +	index = device_id / (SZ_64K / GITS_BASER_ENTRY_SIZE(r));
+>> +	if (index >= (nr_entries / sizeof(u64)))
+>> +		return false;
+>> +
+>> +	/* Each 1st level entry is represented by a 64-bit value. */
+>> +	if (!kvm_read_guest(kvm,
+>> +			    BASER_ADDRESS(r) + index *
+>> sizeof(indirect_ptr),
+>> +			    &indirect_ptr, sizeof(indirect_ptr)))
+>> +		return false;
 > 
+> Careful. The ITS tables are written in LE format, so you need a
+> 
+> 	indirect_ptr = le64_to_cpu(indirect_ptr);
+> 
+> to cater for the LE-on-BE case.
+
+Oh right, endianness. Thanks for pointing that out!
+
+> 
+>> +
+>> +	/* check the valid bit of the first level entry */
+>> +	if (!(indirect_ptr & BIT_ULL(63)))
+>> +		return false;
+>> +
+>> +	/*
+>> +	 * Mask the guest physical address and calculate the frame number.
+>> +	 * Any address beyond our supported 48 bits of PA will be caught
+>> +	 * by the actual check in the final step.
+>> +	 */
+>> +	gfn = (indirect_ptr & GENMASK_ULL(51, 16)) >> PAGE_SHIFT;
+> 
+> Another gotcha: Here, you're only checking for the CPU page that covers
+> the beginning of the ITS page. If the CPU page size is smaller, you may
+> end-up being out of bounds. You need something like:
+> 
+> 	l2_index = device_id % (SZ_64K / GITS_BASER_ENTRY_SIZE(r));
+> 	gfn = ((indirect_ptr & GENMASK_ULL(51, 16)) +
+> 	       l2_index * GITS_BASER_ENTRY_SIZE(r)) >> PAGE_SHIFT;
+> 
+> so that you check the presence of the actual location you're virtually
+> touching.
+
+Right, that nasty case came to me as well after sending the patches.
+I had something like "gfn += ...." plus a comment in mind, but that's
+purely cosmetical.
+
+So do you want me to send out another version with those fixes (and
+possibly the usage of vgic_get_irq_kref() above)?
+
+Are there more comments?
+
+Cheers,
+Andre.
