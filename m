@@ -1,60 +1,82 @@
-From: davem@davemloft.net (David Miller)
-Date: Sat, 16 Jul 2016 18:02:45 -0700 (PDT)
-Subject: [PATCH] dt: bindings: Add a generic ethernet device binding
-In-Reply-To: <888927c4-0987-ccfb-e2de-d03f6d4ab319@redhat.com>
-References: <47a052a1-cc8b-0f75-e44a-450c4a0ac075@redhat.com>
- <20160715.105158.2028840258568316933.davem@davemloft.net>
- <888927c4-0987-ccfb-e2de-d03f6d4ab319@redhat.com>
-Message-ID: <20160716.180245.1523267216987842392.davem@davemloft.net>
+From: olof@lixom.net (Olof Johansson)
+Date: Sat, 16 Jul 2016 21:56:23 -0700
+Subject: [GIT PULL] ARM: SoC fixes
+Message-ID: <20160717045623.GA2476@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Hans de Goede <hdegoede@redhat.com>
-Date: Sat, 16 Jul 2016 12:12:37 +0200
+Hi Linus,
 
-> Hi,
-> 
-> On 15-07-16 19:51, David Miller wrote:
->> From: Hans de Goede <hdegoede@redhat.com>
->> Date: Fri, 15 Jul 2016 08:40:00 +0200
->>
->>> Hi,
->>>
->>> On 15-07-16 01:17, David Miller wrote:
->>>> From: Hans de Goede <hdegoede@redhat.com>
->>>> Date: Wed, 13 Jul 2016 12:20:04 +0200
->>>>
->>>>> On some boards (android tablets) different batches use different sdio
->>>>> wifi modules. This is not a problem since sdio is a discoverable bus,
->>>>> so we only need to describe and activate the mmc controller in dt and
->>>>> then the kernel will automatically load the right driver.
->>>>>
->>>>> But sometimes it is useful to specify certain ethernet properties for
->>>>> these "unknown" sdio devices, specifically we want the boot-loader
->>>>> to be able to set "local-mac-address" as some of these sdio wifi
->>>>> modules come without an eeprom / without a factory programmed mac
->>>>> address.
->>>>>
->>>>> Since the exact device is unknown (differs per batch) we cannot use
->>>>> a wifi-chip specific compatible. This commit adds a new
->>>>> "generic,ethernet" binding for use in dt-nodes describing such an
->>>>> unknown ethernet device.
->>>>>
->>>>> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
->>>>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->>>>
->>>> Precedence exists for a "system ethernet address" as far back as the
->>>> original sparc device tree implementation, so please just specify it
->>>> that way rather than trying to force having to make an alias or
->>>> reference to it from a specific device.
->>>
->>> Some boards where this is applicable have both a wired and a wireless
->>> ethernet, so one global setting will not work.
->>
->> Then call it "eth:local-mac-address" and "wifi:local-mac-address"
-> 
-> Until we get a board with 2 ethernet interfaces, really the alias
-> thing
-> is working fine here, that is not the problem.
+The following changes since commit 33688abb2802ff3a230bd2441f765477b94cc89e:
 
-Fair enough.
+  Linux 4.7-rc4 (2016-06-19 21:30:02 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/armsoc-fixes
+
+for you to fetch changes up to 5eb495349f5ec3b134f7341a2450392fc86d99d0:
+
+  ARM: tegra: beaver: Allow SD card voltage to be changed (2016-07-06 22:21:40 -0700)
+
+----------------------------------------------------------------
+ARM: SoC fixes
+
+A handful of fixes before final release:
+
+Marvell Armada:
+ - One to fix a typo in the devicetree specifying memory ranges for the
+   crypto engine
+ - Two to deal with marking PCI and device-memory as strongly ordered to
+   avoid hardware deadlocks, in particular when enabling above crypto driver.
+ - Compile fix for PM
+
+Allwinner:
+ - DT clock fixes to deal with u-boot-enabled framebuffer (simplefb).
+ - Make R8 (C.H.I.P. SoC) inherit system compatibility from A13 to
+   make clocks register proper.
+
+Tegra:
+ - Fix SD card voltage setting on the Tegra3 Beaver dev board
+
+Misc:
+ - Two maintainers updates for STM32 and STi platforms.
+
+----------------------------------------------------------------
+Arnd Bergmann (3):
+      ARM: mvebu: compile pm code conditionally
+      Merge tag 'sunxi-fixes-for-4.7' of https://git.kernel.org/.../mripard/linux into fixes
+      Merge tag 'mvebu-fixes-4.7-2' of git://git.infradead.org/linux-mvebu into fixes
+
+Boris Brezillon (1):
+      ARM: sunxi/dt: make the CHIP inherit from allwinner,sun5i-a13
+
+Hans de Goede (2):
+      ARM: dts: sunxi: Add pll3 to simplefb nodes clocks lists
+      ARM: dts: sun7i: Fix pll3x2 and pll7x2 not having a parent clock
+
+Lucas Stach (1):
+      ARM: tegra: beaver: Allow SD card voltage to be changed
+
+Maxime Coquelin (2):
+      MAINTAINERS: update STM32 maintainers list
+      MAINTAINERS: update STi maintainer list
+
+Olof Johansson (1):
+      Merge tag 'mvebu-fixes-4.7-1' of git://git.infradead.org/linux-mvebu into fixes
+
+Thomas Petazzoni (3):
+      ARM: mvebu: fix HW I/O coherency related deadlocks
+      ARM: mvebu: map PCI I/O regions strongly ordered
+      ARM: dts: armada-38x: fix MBUS_ID for crypto SRAM on Armada 385 Linksys
+
+ MAINTAINERS                               |  3 +--
+ arch/arm/boot/dts/armada-385-linksys.dtsi |  4 ++--
+ arch/arm/boot/dts/sun4i-a10.dtsi          | 21 ++++++++++++---------
+ arch/arm/boot/dts/sun5i-a10s.dtsi         | 11 ++++++-----
+ arch/arm/boot/dts/sun5i-r8-chip.dts       |  2 +-
+ arch/arm/boot/dts/sun7i-a20.dtsi          | 13 ++++++++-----
+ arch/arm/boot/dts/tegra30-beaver.dts      |  3 ++-
+ arch/arm/mach-mvebu/Makefile              | 10 ++++++++--
+ arch/arm/mach-mvebu/coherency.c           | 23 +++++++++--------------
+ 9 files changed, 49 insertions(+), 41 deletions(-)
