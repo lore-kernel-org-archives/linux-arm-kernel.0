@@ -1,109 +1,188 @@
-From: bsingharora@gmail.com (Balbir Singh)
-Date: Mon, 18 Jul 2016 18:26:43 +1000
-Subject: [PATCH v3 00/11] mm: Hardened usercopy
-In-Reply-To: <1468619065-3222-1-git-send-email-keescook@chromium.org>
-References: <1468619065-3222-1-git-send-email-keescook@chromium.org>
-Message-ID: <1468830403.2800.0.camel@gmail.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Mon, 18 Jul 2016 10:36:32 +0200
+Subject: [PATCH v4 3/8] drm/mediatek: add shadow register support
+In-Reply-To: <1468823575.30644.33.camel@mtksdaap41>
+References: <1468577274-6178-1-git-send-email-yt.shen@mediatek.com>
+ <1468577274-6178-4-git-send-email-yt.shen@mediatek.com>
+ <1468823575.30644.33.camel@mtksdaap41>
+Message-ID: <1468830992.2994.6.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2016-07-15 at 14:44 -0700, Kees Cook wrote:
-> Hi,
->?
-> [I'm going to carry this series in my kspp -next tree now, though I'd
-> really love to have some explicit Acked-bys or Reviewed-bys. If you've
-> looked through it or tested it, please consider it. :) (I added Valdis
-> and mpe's Tested-bys where they seemed correct, thank you!)]
->?
-> This is a start of the mainline port of PAX_USERCOPY[1]. After I started
-> writing tests (now in lkdtm in -next) for Casey's earlier port[2], I kept
-> tweaking things further and further until I ended up with a whole new
-> patch series. To that end, I took Rik and other people's feedback along
-> with other changes and clean-ups.
->?
-> Based on my understanding, PAX_USERCOPY was designed to catch a
-> few classes of flaws (mainly bad bounds checking) around the use of
-> copy_to_user()/copy_from_user(). These changes don't touch get_user() and
-> put_user(), since these operate on constant sized lengths, and tend to be
-> much less vulnerable. There are effectively three distinct protections in
-> the whole series, each of which I've given a separate CONFIG, though this
-> patch set is only the first of the three intended protections. (Generally
-> speaking, PAX_USERCOPY covers what I'm calling CONFIG_HARDENED_USERCOPY
-> (this) and CONFIG_HARDENED_USERCOPY_WHITELIST (future), and
-> PAX_USERCOPY_SLABS covers CONFIG_HARDENED_USERCOPY_SPLIT_KMALLOC
-> (future).)
->?
-> This series, which adds CONFIG_HARDENED_USERCOPY, checks that objects
-> being copied to/from userspace meet certain criteria:
-> - if address is a heap object, the size must not exceed the object's
-> ? allocated size. (This will catch all kinds of heap overflow flaws.)
-> - if address range is in the current process stack, it must be within the
-> ? current stack frame (if such checking is possible) or at least entirely
-> ? within the current process's stack. (This could catch large lengths that
-> ? would have extended beyond the current process stack, or overflows if
-> ? their length extends back into the original stack.)
-> - if the address range is part of kernel data, rodata, or bss, allow it.
-> - if address range is page-allocated, that it doesn't span multiple
-> ? allocations.
-> - if address is within the kernel text, reject it.
-> - everything else is accepted
->?
-> The patches in the series are:
-> - Support for arch-specific stack frame checking (which will likely be
-> ? replaced in the future by Josh's more comprehensive unwinder):
-> ????????1- mm: Implement stack frame object validation
-> - The core copy_to/from_user() checks, without the slab object checks:
-> ????????2- mm: Hardened usercopy
-> - Per-arch enablement of the protection:
-> ????????3- x86/uaccess: Enable hardened usercopy
-> ????????4- ARM: uaccess: Enable hardened usercopy
-> ????????5- arm64/uaccess: Enable hardened usercopy
-> ????????6- ia64/uaccess: Enable hardened usercopy
-> ????????7- powerpc/uaccess: Enable hardened usercopy
-> ????????8- sparc/uaccess: Enable hardened usercopy
-> ????????9- s390/uaccess: Enable hardened usercopy
-> - The heap allocator implementation of object size checking:
-> ???????10- mm: SLAB hardened usercopy support
-> ???????11- mm: SLUB hardened usercopy support
->?
-> Some notes:
->?
-> - This is expected to apply on top of -next which contains fixes for the
-> ? position of _etext on both arm and arm64, though it has minor conflicts
-> ? with KASAN that are trivial to fix up. Living in -next are also tests
-> ? for this protection in lkdtm, prefixed with USERCOPY_.
->?
-> - I couldn't detect a measurable performance change with these features
-> ? enabled. Kernel build times were unchanged, hackbench was unchanged,
-> ? etc. I think we could flip this to "on by default" at some point, but
-> ? for now, I'm leaving it off until I can get some more definitive
-> ? measurements. I would love if someone with greater familiarity with
-> ? perf could give this a spin and report results.
->?
-> - The SLOB support extracted from grsecurity seems entirely broken. I
-> ? have no idea what's going on there, I spent my time testing SLAB and
-> ? SLUB. Having someone else look at SLOB would be nice, but this series
-> ? doesn't depend on it.
->?
-> Additional features that would be nice, but aren't blocking this series:
->?
-> - Needs more architecture support for stack frame checking (only x86 now,
-> ? but it seems Josh will have a good solution for this soon).
->?
->?
-> Thanks!
->?
-> -Kees
->?
-> [1] https://grsecurity.net/download.php "grsecurity - test kernel patch"
-> [2] http://www.openwall.com/lists/kernel-hardening/2016/05/19/5
->?
-> v3:
-> - switch to using BUG for better Oops integration
-> - when checking page allocations, check each for Reserved
-> - use enums for the stack check return for readability
->
+Hi CK, YT,
 
-Thanks looks good so far! I'll try and test it and report back
+Am Montag, den 18.07.2016, 14:32 +0800 schrieb CK Hu:
+> Hi, YT:
+> 
+> One comment inline.
+> 
+> 
+> On Fri, 2016-07-15 at 18:07 +0800, YT Shen wrote:
+> > We need to acquire mutex before using the resources,
+> > and need to release it after finished.
+> > So we don't need to write registers in the blanking period.
+> > 
+> > Signed-off-by: YT Shen <yt.shen@mediatek.com>
+> > ---
+> >  drivers/gpu/drm/mediatek/mtk_drm_crtc.c |   75 +++++++++++++++++++------------
+> >  drivers/gpu/drm/mediatek/mtk_drm_ddp.c  |   22 +++++++++
+> >  drivers/gpu/drm/mediatek/mtk_drm_ddp.h  |    2 +
+> >  drivers/gpu/drm/mediatek/mtk_drm_drv.h  |    1 +
+> >  4 files changed, 71 insertions(+), 29 deletions(-)
+> > 
+> > diff --git a/drivers/gpu/drm/mediatek/mtk_drm_crtc.c b/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
+> > index 24aa3ba..80d9641 100644
+> > --- a/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
+> > +++ b/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
+> > @@ -315,6 +315,42 @@ static void mtk_crtc_ddp_hw_fini(struct mtk_drm_crtc *mtk_crtc)
+> >  	pm_runtime_put(drm->dev);
+> >  }
+> >  
+> > +static void mtk_crtc_ddp_config(struct drm_crtc *crtc)
+> > +{
+> > +	struct mtk_drm_crtc *mtk_crtc = to_mtk_crtc(crtc);
+> > +	struct mtk_crtc_state *state = to_mtk_crtc_state(mtk_crtc->base.state);
+> > +	struct mtk_ddp_comp *ovl = mtk_crtc->ddp_comp[0];
+> > +	unsigned int i;
+> > +
+> > +	/*
+> > +	 * TODO: instead of updating the registers here, we should prepare
+> > +	 * working registers in atomic_commit and let the hardware command
+> > +	 * queue update module registers on vblank.
+> > +	 */
+> > +	if (state->pending_config) {
+> > +		mtk_ddp_comp_config(ovl, state->pending_width,
+> > +				    state->pending_height,
+> > +				    state->pending_vrefresh);
+> > +
+> > +		state->pending_config = false;
+> > +	}
+> > +
+> > +	if (mtk_crtc->pending_planes) {
+> > +		for (i = 0; i < OVL_LAYER_NR; i++) {
+> > +			struct drm_plane *plane = &mtk_crtc->planes[i].base;
+> > +			struct mtk_plane_state *plane_state;
+> > +
+> > +			plane_state = to_mtk_plane_state(plane->state);
+> > +
+> > +			if (plane_state->pending.config) {
+> > +				mtk_ddp_comp_layer_config(ovl, i, plane_state);
+> > +				plane_state->pending.config = false;
+> > +			}
+> > +		}
+> > +		mtk_crtc->pending_planes = false;
+> > +	}
+> > +}
+> > +
+> >  static void mtk_drm_crtc_enable(struct drm_crtc *crtc)
+> >  {
+> >  	struct mtk_drm_crtc *mtk_crtc = to_mtk_crtc(crtc);
+> > @@ -391,6 +427,7 @@ static void mtk_drm_crtc_atomic_flush(struct drm_crtc *crtc,
+> >  				      struct drm_crtc_state *old_crtc_state)
+> >  {
+> >  	struct mtk_drm_crtc *mtk_crtc = to_mtk_crtc(crtc);
+> > +	struct mtk_drm_private *priv = crtc->dev->dev_private;
+> >  	unsigned int pending_planes = 0;
+> >  	int i;
+> >  
+> > @@ -409,6 +446,12 @@ static void mtk_drm_crtc_atomic_flush(struct drm_crtc *crtc,
+> >  	}
+> >  	if (pending_planes)
+> >  		mtk_crtc->pending_planes = true;
+> > +
+> > +	if (priv->data->shadow_register) {
+> > +		mtk_disp_mutex_acquire(mtk_crtc->mutex);
+> > +		mtk_crtc_ddp_config(crtc);
+> > +		mtk_disp_mutex_release(mtk_crtc->mutex);
+> > +	}
+> >  }
+> >  
+> >  static const struct drm_crtc_funcs mtk_crtc_funcs = {
+> > @@ -453,36 +496,10 @@ err_cleanup_crtc:
+> >  void mtk_crtc_ddp_irq(struct drm_crtc *crtc, struct mtk_ddp_comp *ovl)
+> >  {
+> >  	struct mtk_drm_crtc *mtk_crtc = to_mtk_crtc(crtc);
+> > -	struct mtk_crtc_state *state = to_mtk_crtc_state(mtk_crtc->base.state);
+> > -	unsigned int i;
+> > +	struct mtk_drm_private *priv = crtc->dev->dev_private;
+> >  
+> > -	/*
+> > -	 * TODO: instead of updating the registers here, we should prepare
+> > -	 * working registers in atomic_commit and let the hardware command
+> > -	 * queue update module registers on vblank.
+> > -	 */
+> > -	if (state->pending_config) {
+> > -		mtk_ddp_comp_config(ovl, state->pending_width,
+> > -				    state->pending_height,
+> > -				    state->pending_vrefresh);
+> > -
+> > -		state->pending_config = false;
+> > -	}
+> > -
+> > -	if (mtk_crtc->pending_planes) {
+> > -		for (i = 0; i < OVL_LAYER_NR; i++) {
+> > -			struct drm_plane *plane = &mtk_crtc->planes[i].base;
+> > -			struct mtk_plane_state *plane_state;
+> > -
+> > -			plane_state = to_mtk_plane_state(plane->state);
+> > -
+> > -			if (plane_state->pending.config) {
+> > -				mtk_ddp_comp_layer_config(ovl, i, plane_state);
+> > -				plane_state->pending.config = false;
+> > -			}
+> > -		}
+> > -		mtk_crtc->pending_planes = false;
+> > -	}
+> > +	if (!priv->data->shadow_register)
+> > +		mtk_crtc_ddp_config(crtc);
+> >  
+> >  	mtk_drm_finish_page_flip(mtk_crtc);
+> >  }
+> > diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+> > index 8030769..fa53806 100644
+> > --- a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+> > +++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+> > @@ -12,6 +12,7 @@
+> >   */
+> >  
+> >  #include <linux/clk.h>
+> > +#include <linux/iopoll.h>
+> >  #include <linux/module.h>
+> >  #include <linux/of_device.h>
+> >  #include <linux/platform_device.h>
+> > @@ -32,6 +33,7 @@
+> >  #define DISP_REG_CONFIG_MMSYS_CG_CON0		0x100
+> >  
+> >  #define DISP_REG_MUTEX_EN(n)	(0x20 + 0x20 * (n))
+> > +#define DISP_REG_MUTEX(n)	(0x24 + 0x20 * (n))
+> >  #define DISP_REG_MUTEX_RST(n)	(0x28 + 0x20 * (n))
+> >  #define DISP_REG_MUTEX_MOD(n)	(0x2c + 0x20 * (n))
+> >  #define DISP_REG_MUTEX_SOF(n)	(0x30 + 0x20 * (n))
+> > @@ -300,6 +302,26 @@ void mtk_disp_mutex_disable(struct mtk_disp_mutex *mutex)
+> >  	writel(0, ddp->regs + DISP_REG_MUTEX_EN(mutex->id));
+> >  }
+> >  
+> > +void mtk_disp_mutex_acquire(struct mtk_disp_mutex *mutex)
+> > +{
+> > +	struct mtk_ddp *ddp = container_of(mutex, struct mtk_ddp,
+> > +					   mutex[mutex->id]);
+> > +	u32 tmp;
+> > +
+> > +	writel(1, ddp->regs + DISP_REG_MUTEX_EN(mutex->id));
+> > +	writel(1, ddp->regs + DISP_REG_MUTEX(mutex->id));
+> > +	readl_poll_timeout_atomic(ddp->regs + DISP_REG_MUTEX(mutex->id), tmp,
+> > +				  tmp & 0x2, 1, 10000);
 
-Balbir?
+Please add a descriptive #define for the 0x2 bit of the DISP_REG_MUTEX
+registers.
+
+> Nothing to do with timeout? I think it should print error message here
+> or reset HW to recover it.
+
+I assume that if mtk_disp_mutex_acquire is called while the hardware has
+the mutex (during the shadow register update), this should wait until
+the update is complete, since it can't back out from trying to acquire
+the lock. Is that the case?
+
+regards
+Philipp
