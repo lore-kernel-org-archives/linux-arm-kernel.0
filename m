@@ -1,44 +1,41 @@
-From: robh@kernel.org (Rob Herring)
-Date: Sun, 17 Jul 2016 21:28:16 -0500
-Subject: [PATCH v2 22/22] phy: Add support for Qualcomm's USB HS phy
-In-Reply-To: <20160707222114.1673-23-stephen.boyd@linaro.org>
-References: <20160707222114.1673-1-stephen.boyd@linaro.org>
- <20160707222114.1673-23-stephen.boyd@linaro.org>
-Message-ID: <20160718022816.GA16357@rob-hp-laptop>
+From: dyoung@redhat.com (Dave Young)
+Date: Mon, 18 Jul 2016 10:30:24 +0800
+Subject: [RFC 3/3] kexec: extend kexec_file_load system call
+In-Reply-To: <20160715131950.GB19840@leverpostej>
+References: <20160712014201.11456-1-takahiro.akashi@linaro.org>
+ <20160712014201.11456-4-takahiro.akashi@linaro.org>
+ <20160715130955.GC23514@redhat.com>
+ <20160715131950.GB19840@leverpostej>
+Message-ID: <20160718023024.GB6310@dhcp-128-65.nay.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 07, 2016 at 03:21:13PM -0700, Stephen Boyd wrote:
-> The high-speed phy on qcom SoCs is controlled via the ULPI
-> viewport.
+On 07/15/16 at 02:19pm, Mark Rutland wrote:
+> On Fri, Jul 15, 2016 at 09:09:55AM -0400, Vivek Goyal wrote:
+> > On Tue, Jul 12, 2016 at 10:42:01AM +0900, AKASHI Takahiro wrote:
+> > 
+> > [..]
+> > > -SYSCALL_DEFINE5(kexec_file_load, int, kernel_fd, int, initrd_fd,
+> > > +SYSCALL_DEFINE6(kexec_file_load, int, kernel_fd, int, initrd_fd,
+> > >  		unsigned long, cmdline_len, const char __user *, cmdline_ptr,
+> > > -		unsigned long, flags)
+> > > +		unsigned long, flags, const struct kexec_fdset __user *, ufdset)
+> > 
+> > Can one add more parameters to existing syscall. Can it break existing
+> > programs with new kernel? I was of the impression that one can't do that.
+> > But may be I am missing something.
 > 
-> Cc: Kishon Vijay Abraham I <kishon@ti.com>
-> Cc: <devicetree@vger.kernel.org>
-> Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
-> ---
->  .../devicetree/bindings/phy/qcom,usb-hs-phy.txt    |  83 ++++++
->  drivers/phy/Kconfig                                |   8 +
->  drivers/phy/Makefile                               |   1 +
->  drivers/phy/phy-qcom-usb-hs.c                      | 295 +++++++++++++++++++++
->  4 files changed, 387 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/phy/qcom,usb-hs-phy.txt
->  create mode 100644 drivers/phy/phy-qcom-usb-hs.c
+> I think the idea was that we would only look at the new params if a new
+> flags was set, and otherwise it would behave as the old syscall.
 > 
-> diff --git a/Documentation/devicetree/bindings/phy/qcom,usb-hs-phy.txt b/Documentation/devicetree/bindings/phy/qcom,usb-hs-phy.txt
-> new file mode 100644
-> index 000000000000..a7bda9186d5b
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/phy/qcom,usb-hs-phy.txt
-> @@ -0,0 +1,83 @@
-> +Qualcomm's USB HS PHY
-> +
-> +PROPERTIES
-> +
-> +- compatible:
-> +    Usage: required
-> +    Value type: <string>
-> +    Definition: Should contain "qcom,usb-hs-phy"
+> Regardless, I think it makes far more sense to add a kexec_file_load2
+> syscall if we're going to modify the prototype at all. It's a rather
+> different proposition to the existing syscall, and needs to be treated
+> as such.
 
-Add a chip specific compatible.
+I do not think it is worth to add another syscall for extra fds.
+We have open(2) as an example for different numbers of arguments
+already.
 
-Rob
+Thanks
+Dave
