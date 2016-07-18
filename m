@@ -1,160 +1,76 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Mon, 18 Jul 2016 20:45:23 +0300
-Subject: [PATCH] ARM: dts: keystone: specify usb mode explicitly
-In-Reply-To: <20160628094245.9521-1-grygorii.strashko@ti.com>
-References: <20160628094245.9521-1-grygorii.strashko@ti.com>
-Message-ID: <578D15B3.1040705@ti.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Mon, 18 Jul 2016 18:47:21 +0100
+Subject: [PATCH 00/13] A bunch of vgic-its fixes
+In-Reply-To: <1468857255-9543-1-git-send-email-marc.zyngier@arm.com>
+References: <1468857255-9543-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <f2d8f9c9-9d0d-ee4a-8c24-c6e641488699@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Santosh,
-On 06/28/2016 12:42 PM, Grygorii Strashko wrote:
-> The USB OTG mode is not supported by Kestone 2 devices, as result, the
-> USB devices enumeration and detection will not work properly when
-> kernel is built with CONFIG_USB_DWC3_DUAL_ROLE=y (default for multi
-> platform build):
->   - it's required to load gadget drivers manually to make host mode
-> work and this confuses current Keystone 2 users
->   - device mode is not working, because port can't detect and switch to
-> peripheral/host mode dynamically.
->
-> Hence, specify usb mode explicitly in DT: usb0 = "host" for all KS2
-> devices and usb1 = "peripheral" for K2E.
->
-> Cc: Sekhar Nori <nsekhar@ti.com>
-> Cc: Roger Quadros <rogerq@ti.com>
-> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+Hi Marc,
 
-Do you expect any additional actions from my side relate to this patch?
+On 18/07/16 16:54, Marc Zyngier wrote:
+> As the ITS series has been posted 10 times now, and we're still
+> finding issues, I've decided to directly fix things rather than
+> commenting on them and waiting for a respin, as we are getting way too
+> close to the merge window. So I sat over the weekend and started doing
+> "stuff".
+> 
+> There is a bit of everything in there: some cosmetic things, but also
+> some more severe bugs (indirect tables were completely foobar) and
+> regressions (the cpuif stuff that Eric fixed).
 
-> ---
->   arch/arm/boot/dts/keystone-k2e-evm.dts  | 12 ++++++++++--
->   arch/arm/boot/dts/keystone-k2e.dtsi     |  4 ++--
->   arch/arm/boot/dts/keystone-k2hk-evm.dts |  6 +++++-
->   arch/arm/boot/dts/keystone-k2l-evm.dts  |  6 +++++-
->   arch/arm/boot/dts/keystone.dtsi         |  4 ++--
->   5 files changed, 24 insertions(+), 8 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/keystone-k2e-evm.dts b/arch/arm/boot/dts/keystone-k2e-evm.dts
-> index 4c32ebc..ae1ebe7 100644
-> --- a/arch/arm/boot/dts/keystone-k2e-evm.dts
-> +++ b/arch/arm/boot/dts/keystone-k2e-evm.dts
-> @@ -47,18 +47,26 @@
->   	status = "okay";
->   };
->
-> -&usb {
-> +&keystone_usb0 {
->   	status = "okay";
->   };
->
-> +&usb0 {
-> +	dr_mode = "host";
-> +};
-> +
->   &usb1_phy {
->   	status = "okay";
->   };
->
-> -&usb1 {
-> +&keystone_usb1 {
->   	status = "okay";
->   };
->
-> +&usb1 {
-> +	dr_mode = "peripheral";
-> +};
-> +
->   &i2c0 {
->   	dtt at 50 {
->   		compatible = "at,24c1024";
-> diff --git a/arch/arm/boot/dts/keystone-k2e.dtsi b/arch/arm/boot/dts/keystone-k2e.dtsi
-> index 96b349f..3540a1d 100644
-> --- a/arch/arm/boot/dts/keystone-k2e.dtsi
-> +++ b/arch/arm/boot/dts/keystone-k2e.dtsi
-> @@ -61,7 +61,7 @@
->   			status = "disabled";
->   		};
->
-> -		usb1: usb at 25000000 {
-> +		keystone_usb1: usb at 25000000 {
->   			compatible = "ti,keystone-dwc3";
->   			#address-cells = <1>;
->   			#size-cells = <1>;
-> @@ -74,7 +74,7 @@
->   			dma-ranges;
->   			status = "disabled";
->
-> -			dwc3 at 25010000 {
-> +			usb1: dwc3 at 25010000 {
->   				compatible = "synopsys,dwc3";
->   				reg = <0x25010000 0x70000>;
->   				interrupts = <GIC_SPI 414 IRQ_TYPE_EDGE_RISING>;
-> diff --git a/arch/arm/boot/dts/keystone-k2hk-evm.dts b/arch/arm/boot/dts/keystone-k2hk-evm.dts
-> index b38b344..2156ff9 100644
-> --- a/arch/arm/boot/dts/keystone-k2hk-evm.dts
-> +++ b/arch/arm/boot/dts/keystone-k2hk-evm.dts
-> @@ -83,10 +83,14 @@
->   	status = "okay";
->   };
->
-> -&usb {
-> +&keystone_usb0 {
->   	status = "okay";
->   };
->
-> +&usb0 {
-> +	dr_mode = "host";
-> +};
-> +
->   &aemif {
->   	cs0 {
->   		#address-cells = <2>;
-> diff --git a/arch/arm/boot/dts/keystone-k2l-evm.dts b/arch/arm/boot/dts/keystone-k2l-evm.dts
-> index 7f9c2e9..056b42f 100644
-> --- a/arch/arm/boot/dts/keystone-k2l-evm.dts
-> +++ b/arch/arm/boot/dts/keystone-k2l-evm.dts
-> @@ -32,10 +32,14 @@
->   	status = "okay";
->   };
->
-> -&usb {
-> +&keystone_usb0 {
->   	status = "okay";
->   };
->
-> +&usb0 {
-> +	dr_mode = "host";
-> +};
-> +
->   &i2c0 {
->   	dtt at 50 {
->   		compatible = "at,24c1024";
-> diff --git a/arch/arm/boot/dts/keystone.dtsi b/arch/arm/boot/dts/keystone.dtsi
-> index e34b226..96c9943 100644
-> --- a/arch/arm/boot/dts/keystone.dtsi
-> +++ b/arch/arm/boot/dts/keystone.dtsi
-> @@ -188,7 +188,7 @@
->   			status = "disabled";
->   		};
->
-> -		usb: usb at 2680000 {
-> +		keystone_usb0: usb at 2680000 {
->   			compatible = "ti,keystone-dwc3";
->   			#address-cells = <1>;
->   			#size-cells = <1>;
-> @@ -201,7 +201,7 @@
->   			dma-ranges;
->   			status = "disabled";
->
-> -			dwc3 at 2690000 {
-> +			usb0: dwc3 at 2690000 {
->   				compatible = "synopsys,dwc3";
->   				reg = <0x2690000 0x70000>;
->   				interrupts = <GIC_SPI 393 IRQ_TYPE_EDGE_RISING>;
->
+I wonder if it's worth to squash:
+- 01/13 into 09/17
+- 02/13 into 07/17
+- 04/13 into 15/17
+with appropriate comments in the commit message to credit the bug fixes
+and their authors?
 
+That worked for me without further ado and would leave the git tree
+bisectable - both in terms of compilability (every single commit
+compiled for me with arm64/defconfig without warnings) and functionality
+(tested new commit 17/17 with direct and indirect tables on the
+model(ITS) and qemu and kvmtool on Juno).
 
--- 
-regards,
--grygorii
+It would be a pity if other people bisecting the kernel get punished for
+my silly mistakes.
+
+> Unless someone shouts at me, I intend to put that on top of Andre's
+> series, and put the whole thing into -next. I've tested it on a LS2085
+> with kvmtool, using both flat and indirect device tables.
+
+I am fine with all those.
+
+Thanks!
+Andre.
+
+> Eric Auger (1):
+>   KVM: arm/arm64: Fix vGICv2 KVM_DEV_ARM_VGIC_GRP_CPU/DIST_REGS
+> 
+> Marc Zyngier (12):
+>   irqchip/gicv3-its: Restore all cacheability attributes
+>   KVM: arm64: vgic-its: Generalize use of vgic_get_irq_kref
+>   KVM: arm64: vgic-its: Fix handling of indirect tables
+>   KVM: arm64: vgic-its: Fix vgic_its_check_device_id BE handling
+>   KVM: arm64: vgic-its: Fix misleading nr_entries in
+>     vgic_its_check_device_id
+>   KVM: arm64: vgic-its: Validate the device table L1 entry
+>   KVM: arm64: vgic-its: Fix L2 entry validation for indirect tables
+>   KVM: arm64: vgic-its: Add collection allocator/destructor
+>   KVM: arm64: vgic-its: Add pointer to corresponding kvm_device
+>   KVM: arm64: vgic-its: Turn device_id validation into generic ID
+>     validation
+>   KVM: arm64: vgic-its: Make vgic_its_cmd_handle_mapi similar to other
+>     handlers
+>   KVM: arm64: vgic-its: Simplify MAPI error handling
+> 
+>  include/kvm/arm_vgic.h             |   1 +
+>  include/linux/irqchip/arm-gic-v3.h |  48 ++++++--
+>  virt/kvm/arm/vgic/vgic-its.c       | 224 ++++++++++++++++++++-----------------
+>  virt/kvm/arm/vgic/vgic-mmio-v2.c   |   2 +
+>  virt/kvm/arm/vgic/vgic-mmio.c      |   4 +-
+>  virt/kvm/arm/vgic/vgic.c           |  10 +-
+>  virt/kvm/arm/vgic/vgic.h           |   8 ++
+>  7 files changed, 175 insertions(+), 122 deletions(-)
+> 
