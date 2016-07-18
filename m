@@ -1,57 +1,109 @@
-From: arend.vanspriel@broadcom.com (Arend Van Spriel)
-Date: Mon, 18 Jul 2016 09:51:14 +0200
-Subject: [linux-sunxi] Re: [PATCH 1/4] brcmfmac: Add brcm, nvram_file_name
- dt property
-In-Reply-To: <20160717214502.GA11498@rob-hp-laptop>
-References: <1467209074-15634-1-git-send-email-hdegoede@redhat.com>
- <3354017.XSBSmHHtrQ@wuerfel>
- <bb1beb8d-652d-aa97-e24b-e3e27397dd2e@broadcom.com>
- <3996482.D5xdKXDiGl@wuerfel> <20160717214502.GA11498@rob-hp-laptop>
-Message-ID: <44803976-7e34-991f-5ee0-0a548f6cefc6@broadcom.com>
+From: bsingharora@gmail.com (Balbir Singh)
+Date: Mon, 18 Jul 2016 18:26:43 +1000
+Subject: [PATCH v3 00/11] mm: Hardened usercopy
+In-Reply-To: <1468619065-3222-1-git-send-email-keescook@chromium.org>
+References: <1468619065-3222-1-git-send-email-keescook@chromium.org>
+Message-ID: <1468830403.2800.0.camel@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17-7-2016 23:45, Rob Herring wrote:
-> On Thu, Jul 07, 2016 at 10:46:28AM +0200, Arnd Bergmann wrote:
->> On Wednesday, July 6, 2016 9:19:41 PM CEST Arend Van Spriel wrote:
->>> On 6-7-2016 15:42, Arnd Bergmann wrote:
->>>> On Wednesday, July 6, 2016 10:08:55 AM CEST Arend Van Spriel wrote:
->>>>> On Tue, Jul 5, 2016 at 3:43 PM, Arnd Bergmann <arnd@arndb.de> wrote:
->>>> All existing uses of the model property in arch/arm/boot/dts and most of
->>>> the ones in arch/powerpc/boot/dts are against the intended usage in
->>>> one way or another, but adding different kind of incorrect usage won't
->>>> improve that.
->>>>
->>>> The only way I can see the model property being used correctly would
->>>> be to have it match the first entry in the compatible property, but
->>>> that is completely redundant, so we tend to omit it, except for the
->>>> root node in which it is required. For the root node however, the
->>>> historic practice that has crept in on ARM is to put something completely
->>>> different in there, which is a human-readable description of the
->>>> machine rather than something we can use as a unique indentifier.
->>>>
->>>> I'd just consider the "model" property burned, and not use it for anything
->>>> that doesn't already use it, just like we handle "device_type": a few
->>>> things require it, nothing else should use it.
->>>
->>> If that is the agreed approach in devicetree arena I am fine with it. I
->>> have been unaware of this and just looked at the suggestion from Jonas
->>> seeing a solution to the problem at hand.
->>
->> I don't think it has been discussed or decided before as the question
->> has not come up, so for now this is my personal view. Maybe one of
->> the devicetree maintainers can comment on this.
-> 
-> Back from vacation and getting caught up.
-> 
-> I agree with Arnd here. In my view model is the OEM branding on the 
-> device, compatible is the h/w. If you have different firmware related 
-> files, that goes beyond OEM branding.
+On Fri, 2016-07-15 at 14:44 -0700, Kees Cook wrote:
+> Hi,
+>?
+> [I'm going to carry this series in my kspp -next tree now, though I'd
+> really love to have some explicit Acked-bys or Reviewed-bys. If you've
+> looked through it or tested it, please consider it. :) (I added Valdis
+> and mpe's Tested-bys where they seemed correct, thank you!)]
+>?
+> This is a start of the mainline port of PAX_USERCOPY[1]. After I started
+> writing tests (now in lkdtm in -next) for Casey's earlier port[2], I kept
+> tweaking things further and further until I ended up with a whole new
+> patch series. To that end, I took Rik and other people's feedback along
+> with other changes and clean-ups.
+>?
+> Based on my understanding, PAX_USERCOPY was designed to catch a
+> few classes of flaws (mainly bad bounds checking) around the use of
+> copy_to_user()/copy_from_user(). These changes don't touch get_user() and
+> put_user(), since these operate on constant sized lengths, and tend to be
+> much less vulnerable. There are effectively three distinct protections in
+> the whole series, each of which I've given a separate CONFIG, though this
+> patch set is only the first of the three intended protections. (Generally
+> speaking, PAX_USERCOPY covers what I'm calling CONFIG_HARDENED_USERCOPY
+> (this) and CONFIG_HARDENED_USERCOPY_WHITELIST (future), and
+> PAX_USERCOPY_SLABS covers CONFIG_HARDENED_USERCOPY_SPLIT_KMALLOC
+> (future).)
+>?
+> This series, which adds CONFIG_HARDENED_USERCOPY, checks that objects
+> being copied to/from userspace meet certain criteria:
+> - if address is a heap object, the size must not exceed the object's
+> ? allocated size. (This will catch all kinds of heap overflow flaws.)
+> - if address range is in the current process stack, it must be within the
+> ? current stack frame (if such checking is possible) or at least entirely
+> ? within the current process's stack. (This could catch large lengths that
+> ? would have extended beyond the current process stack, or overflows if
+> ? their length extends back into the original stack.)
+> - if the address range is part of kernel data, rodata, or bss, allow it.
+> - if address range is page-allocated, that it doesn't span multiple
+> ? allocations.
+> - if address is within the kernel text, reject it.
+> - everything else is accepted
+>?
+> The patches in the series are:
+> - Support for arch-specific stack frame checking (which will likely be
+> ? replaced in the future by Josh's more comprehensive unwinder):
+> ????????1- mm: Implement stack frame object validation
+> - The core copy_to/from_user() checks, without the slab object checks:
+> ????????2- mm: Hardened usercopy
+> - Per-arch enablement of the protection:
+> ????????3- x86/uaccess: Enable hardened usercopy
+> ????????4- ARM: uaccess: Enable hardened usercopy
+> ????????5- arm64/uaccess: Enable hardened usercopy
+> ????????6- ia64/uaccess: Enable hardened usercopy
+> ????????7- powerpc/uaccess: Enable hardened usercopy
+> ????????8- sparc/uaccess: Enable hardened usercopy
+> ????????9- s390/uaccess: Enable hardened usercopy
+> - The heap allocator implementation of object size checking:
+> ???????10- mm: SLAB hardened usercopy support
+> ???????11- mm: SLUB hardened usercopy support
+>?
+> Some notes:
+>?
+> - This is expected to apply on top of -next which contains fixes for the
+> ? position of _etext on both arm and arm64, though it has minor conflicts
+> ? with KASAN that are trivial to fix up. Living in -next are also tests
+> ? for this protection in lkdtm, prefixed with USERCOPY_.
+>?
+> - I couldn't detect a measurable performance change with these features
+> ? enabled. Kernel build times were unchanged, hackbench was unchanged,
+> ? etc. I think we could flip this to "on by default" at some point, but
+> ? for now, I'm leaving it off until I can get some more definitive
+> ? measurements. I would love if someone with greater familiarity with
+> ? perf could give this a spin and report results.
+>?
+> - The SLOB support extracted from grsecurity seems entirely broken. I
+> ? have no idea what's going on there, I spent my time testing SLAB and
+> ? SLUB. Having someone else look at SLOB would be nice, but this series
+> ? doesn't depend on it.
+>?
+> Additional features that would be nice, but aren't blocking this series:
+>?
+> - Needs more architecture support for stack frame checking (only x86 now,
+> ? but it seems Josh will have a good solution for this soon).
+>?
+>?
+> Thanks!
+>?
+> -Kees
+>?
+> [1] https://grsecurity.net/download.php "grsecurity - test kernel patch"
+> [2] http://www.openwall.com/lists/kernel-hardening/2016/05/19/5
+>?
+> v3:
+> - switch to using BUG for better Oops integration
+> - when checking page allocations, check each for Reserved
+> - use enums for the stack check return for readability
+>
 
-Thanks, Rob
+Thanks looks good so far! I'll try and test it and report back
 
-We are talking about hardware variants here. So using the model property
-is off the table.
-
-Regards,
-Arend
+Balbir?
