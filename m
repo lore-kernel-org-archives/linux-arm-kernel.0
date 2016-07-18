@@ -1,132 +1,82 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 18 Jul 2016 15:50:51 +0200
-Subject: [PATCH v2 00/10] Exynos IOMMU: proper runtime PM support (use
- device dependencies)
-In-Reply-To: <578CB6DB.90608@math.uni-bielefeld.de>
-References: <1466144820-6286-1-git-send-email-m.szyprowski@samsung.com>
- <5787B2B0.9020809@math.uni-bielefeld.de>
- <5788E352.3040801@math.uni-bielefeld.de>
- <a15e438a-7fa0-3a4d-e6e2-13425512dddd@samsung.com>
- <578CB6DB.90608@math.uni-bielefeld.de>
-Message-ID: <6939949e-4c8e-cba0-9858-b37d1ba01869@samsung.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Mon, 18 Jul 2016 09:52:57 -0400
+Subject: [PATCH V2] dmenginer: dmatest: exclude compare and fill time during
+ perf report
+Message-ID: <1468849977-28538-1-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Tobias
+Dmatest is currently including compare and fill time into the
+calculated performance numbers. This does not reflect the HW
+capability and the results vary based on the transfer sizes used.
 
+Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+---
+ drivers/dma/dmatest.c | 17 +++++++++++++++--
+ 1 file changed, 15 insertions(+), 2 deletions(-)
 
-On 2016-07-18 13:00, Tobias Jakobi wrote:
-> Marek Szyprowski wrote:
->> On 2016-07-15 15:21, Tobias Jakobi wrote:
->>> Tobias Jakobi wrote:
->>>> Hello Marek,
->>>>
->>>> I've tested the patchset on 4.7-rc7 and noticed that it breaks reboot on
->>>> my ODROID-X2.
->>>>
->>>> Going to check where exactly things break.
->>> Sadly it's the last patch where everything comes together:
->>> "iommu/exynos: Add proper runtime pm support"
->>>
->>> I still have to check if forcing runpm status to 'on' makes a
->>> difference. I suspect that the aggressive clock gating might be the
->>> reason?
->> Thanks for testing. I will check this issue. Could you send me your
->> .config?
-> This is the config I'm currently using:
-> https://github.com/tobiasjakobi/odroid-environment/blob/master/sourcecode/system/vanilla-4.7-debug.conf
->
-> Do you think checking this with no_console_suspend makes sense?
-
-no_console_suspend switch won't provide more information, but I managed 
-to reproduce your issue. I'm really confused how enabling runtime pm can 
-cause problems with usb/smsc95xx ethernet driver (that is the reason for 
-failed reboot). Maybe it is somehow related to the global relations 
-between devices and drivers and the fact that creating the runtime pm 
-links change the order of operations. I will check this again when 
-Rafael send updated patches. Here is the log I got (after waiting some 
-time):
-
-# reboot
-
-Broadcast message from root at target (ttySAC1) (Mon Jul 18 13:33:38 2016):
-
-The system is going down for reboot NOW!
-INIT: Switching to runlevel: 6
-INIT: Sending processes the TERM signal
-[info] Using makefile-style concurrent boot in runlevel 6.
-[ ok ] Stopping cgroup management proxy daemon: cgproxy[....] Stopping 
-internet superserver: inetd.
-[....] Stopping cgroup management daemon: cgmanagermax77686-rtc 
-max77686-rtc: RTC alarm IRQ: 119
-[ ok ] Shutting down ALSA...done.
-random: nonblocking pool is initialized
-[info] Saving the system clock.
-[info] Hardware Clock updated to Mon Jul 18 13:33:40 UTC 2016.
-[ ok ] Asking all remaining processes to terminate...done.
-[ ok ] All processes ended within 1 seconds...done.
-[ ok ] Stopping rpcbind daemon....
-[ ok ] Deconfiguring network interfaces...done.
-[ ok ] Unmounting temporary filesystems...done.
-[ ok ] Deactivating swap...done.
-EXT4-fs (mmcblk1p2): re-mounted. Opts: (null)
-[info] Will now restart.
-smsc95xx 1-2:1.0 eth0: Failed to read reg index 0x00000114: -110
-smsc95xx 1-2:1.0 eth0: Error reading MII_ACCESS
-smsc95xx 1-2:1.0 eth0: MII is busy in smsc95xx_mdio_read
-smsc95xx 1-2:1.0 eth0: Failed to read MII_BMSR
-INFO: task kworker/0:1:410 blocked for more than 120 seconds.
-       Not tainted 4.7.0-rc7-debug+ #155
-"echo 0 > /proc/sys/kernel/hung_task_timeout_secs" disables this message.
-kworker/0:1     D c06850a8     0   410      2 0x00000000
-Workqueue: events_freezable mmc_rescan
-Backtrace:
-[<c0684e90>] (__schedule) from [<c068560c>] (schedule+0x44/0xb0)
-  r10:00000000 r9:eebe1d88 r8:c0686234 r7:00000000 r6:00000002 r5:7fffffff
-  r4:7fffffff
-[<c06855c8>] (schedule) from [<c068a398>] (schedule_timeout+0x154/0x1b0)
-[<c068a244>] (schedule_timeout) from [<c0686250>] 
-(wait_for_common+0xe0/0x174)
-  r8:c0686234 r7:00000000 r6:00000002 r5:eebe1d8c r4:7fffffff
-[<c0686170>] (wait_for_common) from [<c0686430>] 
-(wait_for_completion+0x18/0x1c)
-  r10:00000001 r9:00000000 r8:00000000 r7:eebe1d88 r6:eebe1d78 r5:ee260000
-  r4:eebe1de4
-[<c0686418>] (wait_for_completion) from [<c04e72c8>] 
-(mmc_wait_for_req+0xc8/0x15c)
-[<c04e7200>] (mmc_wait_for_req) from [<c04e73c8>] 
-(mmc_wait_for_cmd+0x6c/0xa4)
-  r8:eef73d00 r7:00000003 r6:ee260000 r5:c0a02448 r4:eebe1de4 r3:00000000
-[<c04e735c>] (mmc_wait_for_cmd) from [<c04edbf4>] 
-(mmc_send_status+0x8c/0xb0)
-  r7:eebe1eb0 r6:ee260000 r5:ee260000 r4:00000000
-[<c04edb68>] (mmc_send_status) from [<c04eaf80>] (mmc_alive+0x18/0x1c)
-  r4:ee260000
-[<c04eaf68>] (mmc_alive) from [<c04e93d0>] 
-(_mmc_detect_card_removed+0x40/0x90)
-[<c04e9390>] (_mmc_detect_card_removed) from [<c04eba80>] 
-(mmc_detect+0x2c/0x78)
-  r5:ee2602bc r4:ee260000
-[<c04eba54>] (mmc_detect) from [<c04e96ac>] (mmc_rescan+0x1b0/0x324)
-  r5:ee2602bc r4:ee260368
-[<c04e94fc>] (mmc_rescan) from [<c013a818>] (process_one_work+0x194/0x414)
-  r8:eef73d00 r7:eebe1eb0 r6:eef70280 r5:ee260368 r4:eea24080 r3:c04e94fc
-[<c013a684>] (process_one_work) from [<c013ab0c>] (worker_thread+0x34/0x4d4)
-  r10:eef70280 r9:c0a02100 r8:00000008 r7:eef70280 r6:eea24098 r5:eef702b4
-  r4:eea24080
-[<c013aad8>] (worker_thread) from [<c0141e18>] (kthread+0xf8/0x11c)
-  r10:00000000 r9:00000000 r8:00000000 r7:c013aad8 r6:eea24080 r5:00000000
-  r4:eea29d00
-[<c0141d20>] (kthread) from [<c0107ff0>] (ret_from_fork+0x14/0x24)
-  r7:00000000 r6:00000000 r5:c0141d20 r4:eea29d00
-2 locks held by kworker/0:1/410:
-  #0:  ("events_freezable"){.+.+.+}, at: [<c013a7ac>] 
-process_one_work+0x128/0x414
-  #1:  ((&(&host->detect)->work)){+.+.+.}, at: [<c013a7ac>] 
-process_one_work+0x128/0x414
-
-
-Best regards
+diff --git a/drivers/dma/dmatest.c b/drivers/dma/dmatest.c
+index b8576fd..0b3e1f9 100644
+--- a/drivers/dma/dmatest.c
++++ b/drivers/dma/dmatest.c
+@@ -416,7 +416,9 @@ static int dmatest_func(void *data)
+ 	int			src_cnt;
+ 	int			dst_cnt;
+ 	int			i;
+-	ktime_t			ktime;
++	ktime_t			ktime, start, diff;
++	ktime_t			filltime = ktime_set(0, 0);
++	ktime_t			comparetime = ktime_set(0, 0);
+ 	s64			runtime = 0;
+ 	unsigned long long	total_len = 0;
+ 
+@@ -517,6 +519,7 @@ static int dmatest_func(void *data)
+ 			src_off = 0;
+ 			dst_off = 0;
+ 		} else {
++			start = ktime_get();
+ 			src_off = dmatest_random() % (params->buf_size - len + 1);
+ 			dst_off = dmatest_random() % (params->buf_size - len + 1);
+ 
+@@ -527,6 +530,9 @@ static int dmatest_func(void *data)
+ 					  params->buf_size);
+ 			dmatest_init_dsts(thread->dsts, dst_off, len,
+ 					  params->buf_size);
++
++			diff = ktime_sub(ktime_get(), start);
++			filltime = ktime_add(filltime, diff);
+ 		}
+ 
+ 		um = dmaengine_get_unmap_data(dev->dev, src_cnt+dst_cnt,
+@@ -657,6 +663,7 @@ static int dmatest_func(void *data)
+ 			continue;
+ 		}
+ 
++		start = ktime_get();
+ 		pr_debug("%s: verifying source buffer...\n", current->comm);
+ 		error_count = dmatest_verify(thread->srcs, 0, src_off,
+ 				0, PATTERN_SRC, true);
+@@ -677,6 +684,9 @@ static int dmatest_func(void *data)
+ 				params->buf_size, dst_off + len,
+ 				PATTERN_DST, false);
+ 
++		diff = ktime_sub(ktime_get(), start);
++		comparetime = ktime_add(comparetime, diff);
++
+ 		if (error_count) {
+ 			result("data error", total_tests, src_off, dst_off,
+ 			       len, error_count);
+@@ -686,7 +696,10 @@ static int dmatest_func(void *data)
+ 				       dst_off, len, 0);
+ 		}
+ 	}
+-	runtime = ktime_us_delta(ktime_get(), ktime);
++	ktime = ktime_sub(ktime_get(), ktime);
++	ktime = ktime_sub(ktime, comparetime);
++	ktime = ktime_sub(ktime, filltime);
++	runtime = ktime_to_us(ktime);
+ 
+ 	ret = 0;
+ err_dstbuf:
 -- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+1.8.2.1
