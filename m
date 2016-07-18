@@ -1,52 +1,78 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 18 Jul 2016 11:39:43 +0900
-Subject: [PATCH 2/2] ARM: dts: r8a7792: remove ADSP clock
-In-Reply-To: <cover.1468808109.git.horms+renesas@verge.net.au>
-References: <cover.1468808109.git.horms+renesas@verge.net.au>
-Message-ID: <e0c3f92a08f3e0a95024d0d032564fdc1ee96f54.1468808109.git.horms+renesas@verge.net.au>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Mon, 18 Jul 2016 10:38:51 +0800
+Subject: [PATCH 2/2] PCI: designware: let dw_pcie_link_up() beware of
+ LTSSM training bit
+In-Reply-To: <2e9d2b8c-f4c3-aa6d-38be-314213db7727@synopsys.com>
+References: <1467802782-3024-1-git-send-email-jszhang@marvell.com>
+ <1467802782-3024-3-git-send-email-jszhang@marvell.com>
+ <2e9d2b8c-f4c3-aa6d-38be-314213db7727@synopsys.com>
+Message-ID: <20160718103851.7cd3984a@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Dear Joao,
 
-Simon Horman told me that R8A7792 has ADSP clock based on an incorrect
-table in the most recent R-Car gen2 manual. But when I received that manual
-I discovered that this is false: R8A7792 is the only Gen 2 SoC that doesn't
-have ADSP at all.  Accordingly remove the ADSP clock from DT for the
-r8a7792.
+On Fri, 15 Jul 2016 16:10:24 +0100 Joao Pinto wrote:
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/boot/dts/r8a7792.dtsi            | 2 +-
- include/dt-bindings/clock/r8a7792-clock.h | 1 -
- 2 files changed, 1 insertion(+), 2 deletions(-)
+> Hi,
+> 
+> On 7/6/2016 11:59 AM, Jisheng Zhang wrote:
+> > The link may be UP but still in link training. In this case, we can't
+> > think the link is up and operating correctly. So we need to teach
+> > dw_pcie_link_up() beware of the PCIE_PHY_DEBUG_R1_LINK_IN_TRAINING bit.
+> > 
+> > This patch also rewrite PCIE_PHY_DEBUG_R1_LINK_UP definition so that
+> > it's consistent with other MACROS.
+> > 
+> > Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+> > ---
+> >  drivers/pci/host/pcie-designware.c | 6 ++++--
+> >  1 file changed, 4 insertions(+), 2 deletions(-)
+> > 
+> > diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
+> > index 9df879a..29e10dd 100644
+> > --- a/drivers/pci/host/pcie-designware.c
+> > +++ b/drivers/pci/host/pcie-designware.c
+> > @@ -73,7 +73,8 @@
+> >  /* PCIe Port Logic registers */
+> >  #define PLR_OFFSET			0x700
+> >  #define PCIE_PHY_DEBUG_R1		(PLR_OFFSET + 0x2c)
+> > -#define PCIE_PHY_DEBUG_R1_LINK_UP	0x00000010
+> > +#define PCIE_PHY_DEBUG_R1_LINK_UP	(0x1 << 4)
+> > +#define PCIE_PHY_DEBUG_R1_LINK_IN_TRAINING	(0x1 << 29)  
+> 
+> According to the databook bit 29 is inside a range that is dedicated to M-PCIe.
+> Have you checked bit 29 state by experience?
 
-diff --git a/arch/arm/boot/dts/r8a7792.dtsi b/arch/arm/boot/dts/r8a7792.dtsi
-index d5fd0762e2d6..3fd61d7ab906 100644
---- a/arch/arm/boot/dts/r8a7792.dtsi
-+++ b/arch/arm/boot/dts/r8a7792.dtsi
-@@ -279,7 +279,7 @@
- 			clocks = <&extal_clk>;
- 			#clock-cells = <1>;
- 			clock-output-names = "main", "pll0", "pll1", "pll3",
--					     "lb", "qspi", "z", "adsp";
-+					     "lb", "qspi", "z";
- 			#power-domain-cells = <0>;
- 		};
- 
-diff --git a/include/dt-bindings/clock/r8a7792-clock.h b/include/dt-bindings/clock/r8a7792-clock.h
-index 89a5155913f6..9a8b392ceb00 100644
---- a/include/dt-bindings/clock/r8a7792-clock.h
-+++ b/include/dt-bindings/clock/r8a7792-clock.h
-@@ -18,7 +18,6 @@
- #define R8A7792_CLK_LB			4
- #define R8A7792_CLK_QSPI		5
- #define R8A7792_CLK_Z			6
--#define R8A7792_CLK_ADSP		7
- 
- /* MSTP0 */
- #define R8A7792_CLK_MSIOF0		0
--- 
-2.7.0.rc3.207.g0ac5344
+bit 29 here is bit 61 of cxpl_debug_info(64bit) in databook, the debug info is
+composited by debug 0 and debug 1 registers.
+
+I checked databook 4.3 and 4.21, bit 29 (bit 61 in databook) isn't dedicated to
+M-PCIe. I think you may misread the bit 29 here as the bit29 in databook?
+Databook indeed mentioned that bit[31:28] is reserved for M-PCIe
+
+And after more code checking, I think this is not only marvell have this
+case(link is up but still in link training), but pci-imx6.c also has this
+case, we could check imx6_pcie_link_up() for reference.
+
+Thanks,
+Jisheng
+
+> 
+> >  
+> >  /* Parameters for the waiting for link up routine */
+> >  #define LINK_WAIT_MAX_RETRIES		10
+> > @@ -417,7 +418,8 @@ int dw_pcie_link_up(struct pcie_port *pp)
+> >  		return pp->ops->link_up(pp);
+> >  
+> >  	val = readl(pp->dbi_base + PCIE_PHY_DEBUG_R1);
+> > -	return val & PCIE_PHY_DEBUG_R1_LINK_UP;
+> > +	return ((val & PCIE_PHY_DEBUG_R1_LINK_UP) &&
+> > +		(!(val & PCIE_PHY_DEBUG_R1_LINK_IN_TRAINING)));
+> >  }
+> >  
+> >  static int dw_pcie_msi_map(struct irq_domain *domain, unsigned int irq,
+> >   
+> 
+> Thanks,
+> Joao
