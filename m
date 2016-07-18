@@ -1,37 +1,49 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 18 Jul 2016 16:54:06 +0100
-Subject: [PATCH 04/13] KVM: arm64: vgic-its: Fix handling of indirect tables
+Date: Mon, 18 Jul 2016 16:54:12 +0100
+Subject: [PATCH 10/13] KVM: arm64: vgic-its: Add pointer to corresponding
+ kvm_device
 In-Reply-To: <1468857255-9543-1-git-send-email-marc.zyngier@arm.com>
 References: <1468857255-9543-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1468857255-9543-5-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1468857255-9543-11-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current code will fail on valid indirect tables, and happily
-use the ones that are pointing out of the guest RAM. Funny what a
-small "!" can do for you...
+Going from the ITS structure to the corresponding KVM structure
+would be quite handy at times. The kvm_device pointer that is
+passed at create time is quite convenient for this, so let's
+keep a copy of it in the vgic_its structure.
+
+This will be put to a good use in subsequent patches.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- virt/kvm/arm/vgic/vgic-its.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ include/kvm/arm_vgic.h       | 1 +
+ virt/kvm/arm/vgic/vgic-its.c | 1 +
+ 2 files changed, 2 insertions(+)
 
+diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+index 4e63a07..540da51 100644
+--- a/include/kvm/arm_vgic.h
++++ b/include/kvm/arm_vgic.h
+@@ -138,6 +138,7 @@ struct vgic_its {
+ 	bool			enabled;
+ 	bool			initialized;
+ 	struct vgic_io_device	iodev;
++	struct kvm_device	*dev;
+ 
+ 	/* These registers correspond to GITS_BASER{0,1} */
+ 	u64			baser_device_table;
 diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-index f427fa2..d6697c4 100644
+index d6f68e9..dcae567 100644
 --- a/virt/kvm/arm/vgic/vgic-its.c
 +++ b/virt/kvm/arm/vgic/vgic-its.c
-@@ -702,9 +702,9 @@ static bool vgic_its_check_device_id(struct kvm *kvm, struct vgic_its *its,
- 		return false;
+@@ -1368,6 +1368,7 @@ static int vgic_its_create(struct kvm_device *dev, u32 type)
+ 	dev->kvm->arch.vgic.has_its = true;
+ 	its->initialized = false;
+ 	its->enabled = false;
++	its->dev = dev;
  
- 	/* Each 1st level entry is represented by a 64-bit value. */
--	if (!kvm_read_guest(kvm,
--			    BASER_ADDRESS(r) + index * sizeof(indirect_ptr),
--			    &indirect_ptr, sizeof(indirect_ptr)))
-+	if (kvm_read_guest(kvm,
-+			   BASER_ADDRESS(r) + index * sizeof(indirect_ptr),
-+			   &indirect_ptr, sizeof(indirect_ptr)))
- 		return false;
- 
- 	/* check the valid bit of the first level entry */
+ 	its->baser_device_table = INITIAL_BASER_VALUE			|
+ 		((u64)GITS_BASER_TYPE_DEVICE << GITS_BASER_TYPE_SHIFT);
 -- 
 2.1.4
