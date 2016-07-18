@@ -1,56 +1,25 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Mon, 18 Jul 2016 06:29:02 -0700
-Subject: [v2,1/4] hwmon: iio_hwmon: defer probe when no channel is found
-In-Reply-To: <20160718100232.GE4199@lukather>
-References: <1468576754-3273-2-git-send-email-quentin.schulz@free-electrons.com>
- <20160716170013.GA27490@roeck-us.net> <20160718100232.GE4199@lukather>
-Message-ID: <578CD99E.5000406@roeck-us.net>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 18 Jul 2016 14:35:16 +0100
+Subject: [PATCH v3 0/3] Complete ZTE PL011 device support
+In-Reply-To: <20160714132620.GB4382@tiger>
+References: <1467968441-4056-1-git-send-email-shawn.guo@linaro.org>
+ <20160714132620.GB4382@tiger>
+Message-ID: <20160718133516.GG1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/18/2016 03:02 AM, Maxime Ripard wrote:
-> Hi Guenter,
->
-> On Sat, Jul 16, 2016 at 10:00:13AM -0700, Guenter Roeck wrote:
->> On Fri, Jul 15, 2016 at 11:59:11AM +0200, Quentin Schulz wrote:
->>> iio_channel_get_all returns -ENODEV when it cannot find either phandles and
->>> properties in the Device Tree or channels whose consumer_dev_name matches
->>> iio_hwmon in iio_map_list. The iio_map_list is filled in by iio drivers
->>> which might be probed after iio_hwmon.
->>>
->>> It is better to defer the probe of iio_hwmon if such error is returned by
->>> iio_channel_get_all in order to let a chance to iio drivers to expose
->>> channels in iio_map_list.
->>>
->>> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
->>> ---
->>>
->>> No modifications for this patch since we did not settled for a solution.
->>> What should we do?
->>>
->> AFAICS the only thing we can do is to replace module_platform_driver() with
->> its explicitly coded variant, and to use use late_initcall() instead of
->> module_init().
->
-> I thought this kind of changes to the driver init time were
-> discouraged these days?
->
+On Thu, Jul 14, 2016 at 09:26:20PM +0800, Shawn Guo wrote:
+> Most of the changes of patch #3 are yours, so presumably you are fine
+> with it.  What about #1 and #2?  May I have your ACK on them, so that I
+> can ask Greg to pick up the series?  Thanks.
 
-Blindly converting -ENODEV to -EPROBEDEFER doesn't sound like a good idea
-either.
+Yes, the three patches look fine.  For the first two:
 
->> Anything else would result in endless probe deferrals if there are
->> no channels.
->
-> Well, technically, not endless. AFAIK, the kernel only retries when a
-> new driver is probed, which should hopefully settle down rather
-> quickly.
->
+Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
 
-Plus each time a new driver is loaded for whatever reason.
+Thanks.
 
-Also, are you sure that leaving a device in deferred probe state doesn't
-have undesirable side effects ? For example, would driver_probe_done()
-ever return true ?
-
-Guenter
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
