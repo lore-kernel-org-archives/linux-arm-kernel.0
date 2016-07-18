@@ -1,93 +1,80 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Mon, 18 Jul 2016 14:12:51 +0300
-Subject: [PATCH 7/7] dmaengine: omap-dma: Support for LinkedList transfer
- of slave_sg
-In-Reply-To: <20160718104159.GI5783@n2100.arm.linux.org.uk>
-References: <20160714124242.7579-1-peter.ujfalusi@ti.com>
- <20160714124242.7579-8-peter.ujfalusi@ti.com>
- <20160718104159.GI5783@n2100.arm.linux.org.uk>
-Message-ID: <bdbe3852-ec51-cb91-9dd0-ebb817cc8b57@ti.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 18 Jul 2016 13:12:35 +0200
+Subject: [PATCH 2/4] mmc: sunxi: Make sample clocks optional
+In-Reply-To: <1468665964-27142-3-git-send-email-hdegoede@redhat.com>
+References: <1468665964-27142-1-git-send-email-hdegoede@redhat.com>
+ <1468665964-27142-3-git-send-email-hdegoede@redhat.com>
+Message-ID: <CAPDyKFqf9DcTsqA5Hk4NNtbZNRqeaRiW-vZKB9ZzNF=wabcnuA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/18/16 13:42, Russell King - ARM Linux wrote:
-> On Thu, Jul 14, 2016 at 03:42:42PM +0300, Peter Ujfalusi wrote:
->>  struct omap_desc {
->> +	struct omap_chan *c;
->>  	struct virt_dma_desc vd;
-> 
-> No need for this.  to_omap_dma_chan(foo->vd.tx.chan) will give you the
-> omap_chan for the descriptor.  In any case, I question whether you
-> actually need this (see below.)
+On 16 July 2016 at 12:46, Hans de Goede <hdegoede@redhat.com> wrote:
+> It turns out that sun4i (A10) and sun5i (A13 & co) do not have sample
+> clocks, so make them optional.
+>
+> Since these do not have sample clocks, they cannot (reliably) do
+> DDR rates, so only set MMC_CAP_1_8V_DDR when we do have sample clks.
+>
+> Note this patch only changes the devm_clk_get error checking and sets
+> the clocks to NULL if they don't exists. All the clk_foo calls accept
+> a NULL clk and will return success when called with a NULL clk, so this
+> is all that is necessary.
+>
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> ---
+>  drivers/mmc/host/sunxi-mmc.c | 18 +++++++++++++-----
+>  1 file changed, 13 insertions(+), 5 deletions(-)
+>
+> diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
+> index 71a480b..4552ee0 100644
+> --- a/drivers/mmc/host/sunxi-mmc.c
+> +++ b/drivers/mmc/host/sunxi-mmc.c
+> @@ -1016,14 +1016,20 @@ static int sunxi_mmc_resource_request(struct sunxi_mmc_host *host,
+>
+>         host->clk_output = devm_clk_get(&pdev->dev, "output");
+>         if (IS_ERR(host->clk_output)) {
+> -               dev_err(&pdev->dev, "Could not get output clock\n");
+> -               return PTR_ERR(host->clk_output);
+> +               if (PTR_ERR(host->clk_output) != -ENOENT) {
 
-I don't know how I missed that. Works and looks better!
+This is new to me for how to implement support for optional clocks.
 
+Is this how the clock maintainer think it should be implemented?
 
->> +	bool using_ll;
->>  	enum dma_transfer_direction dir;
->>  	dma_addr_t dev_addr;
->>  
->> @@ -81,6 +109,9 @@ struct omap_desc {
->>  };
->>  
->>  enum {
->> +	CAPS_0_SUPPORT_LL123	= BIT(20),	/* Linked List type1/2/3 */
->> +	CAPS_0_SUPPORT_LL4	= BIT(21),	/* Linked List type4 */
->> +
->>  	CCR_FS			= BIT(5),
->>  	CCR_READ_PRIORITY	= BIT(6),
->>  	CCR_ENABLE		= BIT(7),
->> @@ -151,6 +182,19 @@ enum {
->>  	CICR_SUPER_BLOCK_IE	= BIT(14),	/* OMAP2+ only */
->>  
->>  	CLNK_CTRL_ENABLE_LNK	= BIT(15),
->> +
->> +	CDP_DST_VALID_INC	= 0 << 0,
->> +	CDP_DST_VALID_RELOAD	= 1 << 0,
->> +	CDP_DST_VALID_REUSE	= 2 << 0,
->> +	CDP_SRC_VALID_INC	= 0 << 2,
->> +	CDP_SRC_VALID_RELOAD	= 1 << 2,
->> +	CDP_SRC_VALID_REUSE	= 2 << 2,
->> +	CDP_NTYPE_TYPE1		= 1 << 4,
->> +	CDP_NTYPE_TYPE2		= 2 << 4,
->> +	CDP_NTYPE_TYPE3		= 3 << 4,
->> +	CDP_TMODE_NORMAL	= 0 << 8,
->> +	CDP_TMODE_LLIST		= 1 << 8,
->> +	CDP_FAST		= BIT(10),
->>  };
->>  
->>  static const unsigned es_bytes[] = {
->> @@ -180,7 +224,64 @@ static inline struct omap_desc *to_omap_dma_desc(struct dma_async_tx_descriptor
->>  
->>  static void omap_dma_desc_free(struct virt_dma_desc *vd)
->>  {
->> -	kfree(container_of(vd, struct omap_desc, vd));
->> +	struct omap_desc *d = container_of(vd, struct omap_desc, vd);
-> 
-> 	struct omap_desc *d = to_omap_dma_desc(&vd->tx);
-> 
-> works just as well, and looks much nicer, and follows the existing code
-> pattern.
+> +                       dev_err(&pdev->dev, "Could not get output clock\n");
+> +                       return PTR_ERR(host->clk_output);
+> +               }
+> +               host->clk_output = NULL;
+>         }
+>
+>         host->clk_sample = devm_clk_get(&pdev->dev, "sample");
+>         if (IS_ERR(host->clk_sample)) {
+> -               dev_err(&pdev->dev, "Could not get sample clock\n");
+> -               return PTR_ERR(host->clk_sample);
+> +               if (PTR_ERR(host->clk_sample) != -ENOENT) {
+> +                       dev_err(&pdev->dev, "Could not get sample clock\n");
+> +                       return PTR_ERR(host->clk_sample);
+> +               }
+> +               host->clk_sample = NULL;
+>         }
+>
+>         host->reset = devm_reset_control_get_optional(&pdev->dev, "ahb");
+> @@ -1126,9 +1132,11 @@ static int sunxi_mmc_probe(struct platform_device *pdev)
+>         mmc->f_min              =   400000;
+>         mmc->f_max              = 52000000;
+>         mmc->caps              |= MMC_CAP_MMC_HIGHSPEED | MMC_CAP_SD_HIGHSPEED |
+> -                                 MMC_CAP_1_8V_DDR |
+>                                   MMC_CAP_ERASE | MMC_CAP_SDIO_IRQ;
+>
+> +       if (host->clk_output && host->clk_sample)
+> +               mmc->caps      |= MMC_CAP_1_8V_DDR;
+> +
+>         ret = mmc_of_parse(mmc);
+>         if (ret)
+>                 goto error_free_dma;
+> --
+> 2.7.4
+>
 
-Yes, I missed this as well.
-
->> +
->> +	if (d->using_ll) {
->> +		struct omap_chan *c = d->c;
->> +		int i;
->> +
->> +		for (i = 0; i < d->sglen; i++) {
->> +			if (d->sg[i].t2_desc)
->> +				dma_pool_free(c->desc_pool, d->sg[i].t2_desc,
->> +					      d->sg[i].t2_desc_paddr);
-> 
-> Why do you need a per-channel pool of descriptors?  Won't a per-device
-> descriptor pool be much better, and simplify the code here?
-
-I was planning to try per-device pool after this series. I think I went with
-per-channel pool as for example bcm2835-dma was doing the same.
-In code wise I don't think it is going to simplify much as we still need to
-free here what we have allocated. I can test this out.
-
--- 
-P?ter
+Kind regards
+Uffe
