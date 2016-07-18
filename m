@@ -1,42 +1,52 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 18 Jul 2016 11:39:42 +0900
-Subject: [PATCH 1/2] ARM: dts: r8a7792: add PLL1 divided by 2 clock
+Date: Mon, 18 Jul 2016 11:39:43 +0900
+Subject: [PATCH 2/2] ARM: dts: r8a7792: remove ADSP clock
 In-Reply-To: <cover.1468808109.git.horms+renesas@verge.net.au>
 References: <cover.1468808109.git.horms+renesas@verge.net.au>
-Message-ID: <4b9b7b3a2c91e1ebf8be9c7efd4839b91d66e87e.1468808109.git.horms+renesas@verge.net.au>
+Message-ID: <e0c3f92a08f3e0a95024d0d032564fdc1ee96f54.1468808109.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Despite the fact that QSPI clock has PLL1/VCOx1/4 clock as a parent, the
-latter hasn't been added to the R8A7792 device tree. This patch corrects
-that oversight.
+Simon Horman told me that R8A7792 has ADSP clock based on an incorrect
+table in the most recent R-Car gen2 manual. But when I received that manual
+I discovered that this is false: R8A7792 is the only Gen 2 SoC that doesn't
+have ADSP at all.  Accordingly remove the ADSP clock from DT for the
+r8a7792.
 
 Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7792.dtsi | 7 +++++++
- 1 file changed, 7 insertions(+)
+ arch/arm/boot/dts/r8a7792.dtsi            | 2 +-
+ include/dt-bindings/clock/r8a7792-clock.h | 1 -
+ 2 files changed, 1 insertion(+), 2 deletions(-)
 
 diff --git a/arch/arm/boot/dts/r8a7792.dtsi b/arch/arm/boot/dts/r8a7792.dtsi
-index 75256ef4a04d..d5fd0762e2d6 100644
+index d5fd0762e2d6..3fd61d7ab906 100644
 --- a/arch/arm/boot/dts/r8a7792.dtsi
 +++ b/arch/arm/boot/dts/r8a7792.dtsi
-@@ -284,6 +284,13 @@
+@@ -279,7 +279,7 @@
+ 			clocks = <&extal_clk>;
+ 			#clock-cells = <1>;
+ 			clock-output-names = "main", "pll0", "pll1", "pll3",
+-					     "lb", "qspi", "z", "adsp";
++					     "lb", "qspi", "z";
+ 			#power-domain-cells = <0>;
  		};
  
- 		/* Fixed factor clocks */
-+		pll1_div2_clk: pll1_div2 {
-+			compatible = "fixed-factor-clock";
-+			clocks = <&cpg_clocks R8A7792_CLK_PLL1>;
-+			#clock-cells = <0>;
-+			clock-div = <2>;
-+			clock-mult = <1>;
-+		};
- 		zs_clk: zs {
- 			compatible = "fixed-factor-clock";
- 			clocks = <&cpg_clocks R8A7792_CLK_PLL1>;
+diff --git a/include/dt-bindings/clock/r8a7792-clock.h b/include/dt-bindings/clock/r8a7792-clock.h
+index 89a5155913f6..9a8b392ceb00 100644
+--- a/include/dt-bindings/clock/r8a7792-clock.h
++++ b/include/dt-bindings/clock/r8a7792-clock.h
+@@ -18,7 +18,6 @@
+ #define R8A7792_CLK_LB			4
+ #define R8A7792_CLK_QSPI		5
+ #define R8A7792_CLK_Z			6
+-#define R8A7792_CLK_ADSP		7
+ 
+ /* MSTP0 */
+ #define R8A7792_CLK_MSIOF0		0
 -- 
 2.7.0.rc3.207.g0ac5344
