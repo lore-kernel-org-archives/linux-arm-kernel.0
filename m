@@ -1,31 +1,72 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 18 Jul 2016 17:11:42 +0100
-Subject: [PATCH] ARM: dma-mapping: Use %zu for printing a size_t variable
-In-Reply-To: <7fe0460e-3455-cb37-c961-ca44841abdcb@gmail.com>
-References: <1468714210-1407-1-git-send-email-festevam@gmail.com>
- <7fe0460e-3455-cb37-c961-ca44841abdcb@gmail.com>
-Message-ID: <20160718161142.GI1041@n2100.armlinux.org.uk>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 18 Jul 2016 10:18:08 -0600
+Subject: [PATCH V2 03/10] Documentation: dt-bindings: firmware: tegra: add
+ bindings of the BPMP
+In-Reply-To: <578C88EC.10706@nvidia.com>
+References: <20160705090431.5852-1-josephl@nvidia.com>
+ <20160705090431.5852-4-josephl@nvidia.com>
+ <20160711142238.GA30600@rob-hp-laptop> <5783C3DE.3080708@wwwdotorg.org>
+ <578C88EC.10706@nvidia.com>
+Message-ID: <578D0140.6070004@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 18, 2016 at 06:03:05PM +0200, Matthias Brugger wrote:
-> 
-> 
-> On 07/17/2016 02:10 AM, Fabio Estevam wrote:
-> >-	pr_err("DMA: failed to allocate %zx KiB pool for atomic coherent allocation\n",
-> >+	pr_err("DMA: failed to allocate %zu KiB pool for atomic coherent allocation\n",
-> 
-> size_t should be formated as %zu or %zx so %zx is fine here.
+On 07/18/2016 01:44 AM, Joseph Lo wrote:
+> Hi Rob,
+>
+> Thanks for your reviewing.
+>
+> On 07/12/2016 12:05 AM, Stephen Warren wrote:
+>> On 07/11/2016 08:22 AM, Rob Herring wrote:
+>>> On Tue, Jul 05, 2016 at 05:04:24PM +0800, Joseph Lo wrote:
+>>>> The BPMP is a specific processor in Tegra chip, which is designed for
+>>>> booting process handling and offloading the power management, clock
+>>>> management, and reset control tasks from the CPU. The binding document
+>>>> defines the resources that would be used by the BPMP firmware driver,
+>>>> which can create the interprocessor communication (IPC) between the CPU
+>>>> and BPMP.
+>>
+>>>> diff --git
+>>>> a/Documentation/devicetree/bindings/firmware/nvidia,tegra186-bpmp.txt
+>>>> b/Documentation/devicetree/bindings/firmware/nvidia,tegra186-bpmp.txt
+>>
+>>>> +NVIDIA Tegra Boot and Power Management Processor (BPMP)
+>>>> +
+>>>> +The BPMP is a specific processor in Tegra chip, which is designed for
+>>>> +booting process handling and offloading the power management, clock
+>>>> +management, and reset control tasks from the CPU. The binding document
+>>>> +defines the resources that would be used by the BPMP firmware driver,
+>>>> +which can create the interprocessor communication (IPC) between the
+>>>> CPU
+>>>> +and BPMP.
+>>>> +
+>>>> +Required properties:
+>>>> +- name : Should be bpmp
+>>>> +- compatible
+>>>> +    Array of strings
+>>>> +    One of:
+>>>> +    - "nvidia,tegra186-bpmp"
+>>>> +- mboxes : The phandle of mailbox controller and the mailbox
+>>>> specifier.
+>>>> +- shmem : List of the phandle of the TX and RX shared memory area that
+>>>> +      the IPC between CPU and BPMP is based on.
+>>>
+>>> I think you can use memory-region here.
+>>
+>> Isn't memory-region intended for references into the /reserved-memory
+>> node. If so, that isn't appropriate in this case since this property
+>> typically points at on-chip SRAM that isn't included in the OS's view of
+>> "system RAM".
+> Agree with that.
+>
+>>
+>> Or, should /reserved-memory be used even for (e.g. non-DRAM) memory
+>> regions that aren't represented by the /memory/reg property?
+>>
+>
+> For shmem, I follow the same concept of the binding for arm,scpi
+> (.../arm/arm,scpi.txt) that is currently using in mainline. Do you think
+> that is more appropriate here?
 
-However, when it prints:
-
-DMA: failed to allocate 100 KiB pool for atomic coherent allocation
-
-how are you going to interpret it if you don't know the format string?
-
-This change is exactly the right thing to do here.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Personally I think the shmem property name used by the current patch is 
+fine. Still, if Rob feels strongly about changing it, that's fine too.
