@@ -1,152 +1,160 @@
-From: markus.mayer@broadcom.com (Markus Mayer)
-Date: Mon, 18 Jul 2016 10:41:58 -0700
-Subject: [PATCH 1/2] mtd: brcmnand: iProc big endian and ONFI support
-In-Reply-To: <1468863377-31862-2-git-send-email-ray.jui@broadcom.com>
-References: <1468863377-31862-1-git-send-email-ray.jui@broadcom.com>
- <1468863377-31862-2-git-send-email-ray.jui@broadcom.com>
-Message-ID: <CAGt4E5tyANE-fiRNp=qZHLJLp+XCd0i74E0n2vgedQC5Rb46+g@mail.gmail.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Mon, 18 Jul 2016 20:45:23 +0300
+Subject: [PATCH] ARM: dts: keystone: specify usb mode explicitly
+In-Reply-To: <20160628094245.9521-1-grygorii.strashko@ti.com>
+References: <20160628094245.9521-1-grygorii.strashko@ti.com>
+Message-ID: <578D15B3.1040705@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18 July 2016 at 10:36, Ray Jui <ray.jui@broadcom.com> wrote:
-> This patch adds big endian and ONFI support for various iProc based
-> SoCs that use the core brcmstb NAND controller
+Hi Santosh,
+On 06/28/2016 12:42 PM, Grygorii Strashko wrote:
+> The USB OTG mode is not supported by Kestone 2 devices, as result, the
+> USB devices enumeration and detection will not work properly when
+> kernel is built with CONFIG_USB_DWC3_DUAL_ROLE=y (default for multi
+> platform build):
+>   - it's required to load gadget drivers manually to make host mode
+> work and this confuses current Keystone 2 users
+>   - device mode is not working, because port can't detect and switch to
+> peripheral/host mode dynamically.
 >
-> This patch was originally implemented by Prafulla Kota
-> <prafulla.kota@broadcom.com> and fully tested on iProc based NS2 SVK
+> Hence, specify usb mode explicitly in DT: usb0 = "host" for all KS2
+> devices and usb1 = "peripheral" for K2E.
 >
-> Signed-off-by: Prafulla Kota <prafulla.kota@broadcom.com>
-> Signed-off-by: Ray Jui <ray.jui@broadcom.com>
+> Cc: Sekhar Nori <nsekhar@ti.com>
+> Cc: Roger Quadros <rogerq@ti.com>
+> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+
+Do you expect any additional actions from my side relate to this patch?
+
 > ---
->  drivers/mtd/nand/brcmnand/brcmnand.c   | 12 ++++++------
->  drivers/mtd/nand/brcmnand/brcmnand.h   | 13 ++++++++-----
->  drivers/mtd/nand/brcmnand/iproc_nand.c | 17 +++++++++++++----
->  3 files changed, 27 insertions(+), 15 deletions(-)
+>   arch/arm/boot/dts/keystone-k2e-evm.dts  | 12 ++++++++++--
+>   arch/arm/boot/dts/keystone-k2e.dtsi     |  4 ++--
+>   arch/arm/boot/dts/keystone-k2hk-evm.dts |  6 +++++-
+>   arch/arm/boot/dts/keystone-k2l-evm.dts  |  6 +++++-
+>   arch/arm/boot/dts/keystone.dtsi         |  4 ++--
+>   5 files changed, 24 insertions(+), 8 deletions(-)
 >
-> diff --git a/drivers/mtd/nand/brcmnand/brcmnand.c b/drivers/mtd/nand/brcmnand/brcmnand.c
-> index b76ad7c..12a1585 100644
-> --- a/drivers/mtd/nand/brcmnand/brcmnand.c
-> +++ b/drivers/mtd/nand/brcmnand/brcmnand.c
-> @@ -1279,7 +1279,7 @@ static void brcmnand_cmdfunc(struct mtd_info *mtd, unsigned command,
->                 u32 *flash_cache = (u32 *)ctrl->flash_cache;
->                 int i;
+> diff --git a/arch/arm/boot/dts/keystone-k2e-evm.dts b/arch/arm/boot/dts/keystone-k2e-evm.dts
+> index 4c32ebc..ae1ebe7 100644
+> --- a/arch/arm/boot/dts/keystone-k2e-evm.dts
+> +++ b/arch/arm/boot/dts/keystone-k2e-evm.dts
+> @@ -47,18 +47,26 @@
+>   	status = "okay";
+>   };
 >
-> -               brcmnand_soc_data_bus_prepare(ctrl->soc);
-> +               brcmnand_soc_data_bus_prepare(ctrl->soc, true);
+> -&usb {
+> +&keystone_usb0 {
+>   	status = "okay";
+>   };
 >
->                 /*
->                  * Must cache the FLASH_CACHE now, since changes in
-> @@ -1292,7 +1292,7 @@ static void brcmnand_cmdfunc(struct mtd_info *mtd, unsigned command,
->                          */
->                         flash_cache[i] = be32_to_cpu(brcmnand_read_fc(ctrl, i));
+> +&usb0 {
+> +	dr_mode = "host";
+> +};
+> +
+>   &usb1_phy {
+>   	status = "okay";
+>   };
 >
-> -               brcmnand_soc_data_bus_unprepare(ctrl->soc);
-> +               brcmnand_soc_data_bus_unprepare(ctrl->soc, true);
+> -&usb1 {
+> +&keystone_usb1 {
+>   	status = "okay";
+>   };
 >
->                 /* Cleanup from HW quirk: restore SECTOR_SIZE_1K */
->                 if (host->hwcfg.sector_size_1k)
-> @@ -1508,12 +1508,12 @@ static int brcmnand_read_by_pio(struct mtd_info *mtd, struct nand_chip *chip,
->                 brcmnand_waitfunc(mtd, chip);
+> +&usb1 {
+> +	dr_mode = "peripheral";
+> +};
+> +
+>   &i2c0 {
+>   	dtt at 50 {
+>   		compatible = "at,24c1024";
+> diff --git a/arch/arm/boot/dts/keystone-k2e.dtsi b/arch/arm/boot/dts/keystone-k2e.dtsi
+> index 96b349f..3540a1d 100644
+> --- a/arch/arm/boot/dts/keystone-k2e.dtsi
+> +++ b/arch/arm/boot/dts/keystone-k2e.dtsi
+> @@ -61,7 +61,7 @@
+>   			status = "disabled";
+>   		};
 >
->                 if (likely(buf)) {
-> -                       brcmnand_soc_data_bus_prepare(ctrl->soc);
-> +                       brcmnand_soc_data_bus_prepare(ctrl->soc, false);
+> -		usb1: usb at 25000000 {
+> +		keystone_usb1: usb at 25000000 {
+>   			compatible = "ti,keystone-dwc3";
+>   			#address-cells = <1>;
+>   			#size-cells = <1>;
+> @@ -74,7 +74,7 @@
+>   			dma-ranges;
+>   			status = "disabled";
 >
->                         for (j = 0; j < FC_WORDS; j++, buf++)
->                                 *buf = brcmnand_read_fc(ctrl, j);
+> -			dwc3 at 25010000 {
+> +			usb1: dwc3 at 25010000 {
+>   				compatible = "synopsys,dwc3";
+>   				reg = <0x25010000 0x70000>;
+>   				interrupts = <GIC_SPI 414 IRQ_TYPE_EDGE_RISING>;
+> diff --git a/arch/arm/boot/dts/keystone-k2hk-evm.dts b/arch/arm/boot/dts/keystone-k2hk-evm.dts
+> index b38b344..2156ff9 100644
+> --- a/arch/arm/boot/dts/keystone-k2hk-evm.dts
+> +++ b/arch/arm/boot/dts/keystone-k2hk-evm.dts
+> @@ -83,10 +83,14 @@
+>   	status = "okay";
+>   };
 >
-> -                       brcmnand_soc_data_bus_unprepare(ctrl->soc);
-> +                       brcmnand_soc_data_bus_unprepare(ctrl->soc, false);
->                 }
+> -&usb {
+> +&keystone_usb0 {
+>   	status = "okay";
+>   };
 >
->                 if (oob)
-> @@ -1678,12 +1678,12 @@ static int brcmnand_write(struct mtd_info *mtd, struct nand_chip *chip,
->                 (void)brcmnand_read_reg(ctrl, BRCMNAND_CMD_ADDRESS);
+> +&usb0 {
+> +	dr_mode = "host";
+> +};
+> +
+>   &aemif {
+>   	cs0 {
+>   		#address-cells = <2>;
+> diff --git a/arch/arm/boot/dts/keystone-k2l-evm.dts b/arch/arm/boot/dts/keystone-k2l-evm.dts
+> index 7f9c2e9..056b42f 100644
+> --- a/arch/arm/boot/dts/keystone-k2l-evm.dts
+> +++ b/arch/arm/boot/dts/keystone-k2l-evm.dts
+> @@ -32,10 +32,14 @@
+>   	status = "okay";
+>   };
 >
->                 if (buf) {
-> -                       brcmnand_soc_data_bus_prepare(ctrl->soc);
-> +                       brcmnand_soc_data_bus_prepare(ctrl->soc, false);
+> -&usb {
+> +&keystone_usb0 {
+>   	status = "okay";
+>   };
 >
->                         for (j = 0; j < FC_WORDS; j++, buf++)
->                                 brcmnand_write_fc(ctrl, j, *buf);
+> +&usb0 {
+> +	dr_mode = "host";
+> +};
+> +
+>   &i2c0 {
+>   	dtt at 50 {
+>   		compatible = "at,24c1024";
+> diff --git a/arch/arm/boot/dts/keystone.dtsi b/arch/arm/boot/dts/keystone.dtsi
+> index e34b226..96c9943 100644
+> --- a/arch/arm/boot/dts/keystone.dtsi
+> +++ b/arch/arm/boot/dts/keystone.dtsi
+> @@ -188,7 +188,7 @@
+>   			status = "disabled";
+>   		};
 >
-> -                       brcmnand_soc_data_bus_unprepare(ctrl->soc);
-> +                       brcmnand_soc_data_bus_unprepare(ctrl->soc, false);
->                 } else if (oob) {
->                         for (j = 0; j < FC_WORDS; j++)
->                                 brcmnand_write_fc(ctrl, j, 0xffffffff);
-> diff --git a/drivers/mtd/nand/brcmnand/brcmnand.h b/drivers/mtd/nand/brcmnand/brcmnand.h
-> index ef5eabb..5c44cd4 100644
-> --- a/drivers/mtd/nand/brcmnand/brcmnand.h
-> +++ b/drivers/mtd/nand/brcmnand/brcmnand.h
-> @@ -23,19 +23,22 @@ struct dev_pm_ops;
->  struct brcmnand_soc {
->         bool (*ctlrdy_ack)(struct brcmnand_soc *soc);
->         void (*ctlrdy_set_enabled)(struct brcmnand_soc *soc, bool en);
-> -       void (*prepare_data_bus)(struct brcmnand_soc *soc, bool prepare);
-> +       void (*prepare_data_bus)(struct brcmnand_soc *soc, bool prepare,
-> +                                bool is_param);
->  };
+> -		usb: usb at 2680000 {
+> +		keystone_usb0: usb at 2680000 {
+>   			compatible = "ti,keystone-dwc3";
+>   			#address-cells = <1>;
+>   			#size-cells = <1>;
+> @@ -201,7 +201,7 @@
+>   			dma-ranges;
+>   			status = "disabled";
 >
-> -static inline void brcmnand_soc_data_bus_prepare(struct brcmnand_soc *soc)
-> +static inline void brcmnand_soc_data_bus_prepare(struct brcmnand_soc *soc,
-> +                                                bool is_param)
->  {
->         if (soc && soc->prepare_data_bus)
-> -               soc->prepare_data_bus(soc, true);
-> +               soc->prepare_data_bus(soc, true, is_param);
->  }
+> -			dwc3 at 2690000 {
+> +			usb0: dwc3 at 2690000 {
+>   				compatible = "synopsys,dwc3";
+>   				reg = <0x2690000 0x70000>;
+>   				interrupts = <GIC_SPI 393 IRQ_TYPE_EDGE_RISING>;
 >
-> -static inline void brcmnand_soc_data_bus_unprepare(struct brcmnand_soc *soc)
-> +static inline void brcmnand_soc_data_bus_unprepare(struct brcmnand_soc *soc,
-> +                                                  bool is_param)
->  {
->         if (soc && soc->prepare_data_bus)
-> -               soc->prepare_data_bus(soc, false);
-> +               soc->prepare_data_bus(soc, false, is_param);
->  }
->
->  static inline u32 brcmnand_readl(void __iomem *addr)
-> diff --git a/drivers/mtd/nand/brcmnand/iproc_nand.c b/drivers/mtd/nand/brcmnand/iproc_nand.c
-> index 585596c..d98ca0b 100644
-> --- a/drivers/mtd/nand/brcmnand/iproc_nand.c
-> +++ b/drivers/mtd/nand/brcmnand/iproc_nand.c
-> @@ -74,7 +74,8 @@ static void iproc_nand_intc_set(struct brcmnand_soc *soc, bool en)
->         spin_unlock_irqrestore(&priv->idm_lock, flags);
->  }
->
-> -static void iproc_nand_apb_access(struct brcmnand_soc *soc, bool prepare)
-> +static void iproc_nand_apb_access(struct brcmnand_soc *soc, bool prepare,
-> +                                 bool is_param)
->  {
->         struct iproc_nand_soc *priv =
->                         container_of(soc, struct iproc_nand_soc, soc);
-> @@ -86,9 +87,17 @@ static void iproc_nand_apb_access(struct brcmnand_soc *soc, bool prepare)
->
->         val = brcmnand_readl(mmio);
->
-> -       if (prepare)
-> -               val |= IPROC_NAND_APB_LE_MODE;
-> -       else
-> +       /*
-> +        * In the case of BE or when dealing with NAND data, alway configure
-> +        * the APB bus to LE mode before accessing the FIFO and back to BE mode
-> +        * after the access is done
-> +        */
-> +       if (IS_ENABLED(CONFIG_CPU_BIG_ENDIAN) || !is_param) {
-> +               if (prepare)
-> +                       val |= IPROC_NAND_APB_LE_MODE;
-> +               else
-> +                       val &= ~IPROC_NAND_APB_LE_MODE;
-> +       } else /* when in LE accessing the parameter page, keep APB in BE */
 
-The coding guidelines state that if you need braces around one branch
-of an if/else combination, you must use them on the other branch,
-also, even if the other branch is just one line.
 
->                 val &= ~IPROC_NAND_APB_LE_MODE;
->
->         brcmnand_writel(val, mmio);
-> --
-> 2.1.4
->
+-- 
+regards,
+-grygorii
