@@ -1,86 +1,262 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Mon, 18 Jul 2016 14:39:33 -0400
-Subject: [PATCH 06/10] dmaengine: qcom_hidma: make error and success path
- common
+Date: Mon, 18 Jul 2016 14:39:37 -0400
+Subject: [PATCH 10/10] dmaengine: qcom_hidma: add MSI support for interrupts
 In-Reply-To: <1468867177-15007-1-git-send-email-okaya@codeaurora.org>
 References: <1468867177-15007-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1468867177-15007-7-git-send-email-okaya@codeaurora.org>
+Message-ID: <1468867177-15007-11-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove code duplication by feeding the error code from outside
-into successful data transfer handler.
+The interrupts can now be delivered as platform MSI interrupts
+on newer platforms. The code looks for a new OF and ACPI strings
+in order to enable the functionality.
 
 Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- drivers/dma/qcom/hidma_ll.c | 38 +++++++++++---------------------------
- 1 file changed, 11 insertions(+), 27 deletions(-)
+ drivers/dma/qcom/hidma.c    | 128 ++++++++++++++++++++++++++++++++++++++++++--
+ drivers/dma/qcom/hidma.h    |   2 +
+ drivers/dma/qcom/hidma_ll.c |   8 +++
+ 3 files changed, 133 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/dma/qcom/hidma_ll.c b/drivers/dma/qcom/hidma_ll.c
-index f564c92..a71f0c7 100644
---- a/drivers/dma/qcom/hidma_ll.c
-+++ b/drivers/dma/qcom/hidma_ll.c
-@@ -241,11 +241,11 @@ static int hidma_post_completed(struct hidma_lldev *lldev, int tre_iterator,
-  * Return a positive number if there are pending TREs or EVREs.
-  * Return 0 if there is nothing to consume or no pending TREs/EVREs found.
-  */
--static int hidma_handle_tre_completion(struct hidma_lldev *lldev)
-+static int hidma_handle_tre_completion(struct hidma_lldev *lldev, u8 err_info,
-+				       u8 err_code)
+diff --git a/drivers/dma/qcom/hidma.c b/drivers/dma/qcom/hidma.c
+index 41b5c6d..6a0eef2 100644
+--- a/drivers/dma/qcom/hidma.c
++++ b/drivers/dma/qcom/hidma.c
+@@ -56,6 +56,7 @@
+ #include <linux/irq.h>
+ #include <linux/atomic.h>
+ #include <linux/pm_runtime.h>
++#include <linux/msi.h>
+ 
+ #include "../dmaengine.h"
+ #include "hidma.h"
+@@ -70,6 +71,7 @@
+ #define HIDMA_ERR_INFO_SW			0xFF
+ #define HIDMA_ERR_CODE_UNEXPECTED_TERMINATE	0x0
+ #define HIDMA_NR_DEFAULT_DESC			10
++#define HIDMA_MSI_INTS				11
+ 
+ static inline struct hidma_dev *to_hidma_dev(struct dma_device *dmadev)
  {
- 	u32 evre_ring_size = lldev->evre_ring_size;
- 	u32 tre_ring_size = lldev->tre_ring_size;
--	u32 err_info, err_code, evre_write_off;
- 	u32 tre_iterator, evre_iterator;
- 	u32 num_completed = 0;
- 
-@@ -268,10 +268,13 @@ static int hidma_handle_tre_completion(struct hidma_lldev *lldev)
- 		u32 cfg;
- 
- 		cfg = current_evre[HIDMA_EVRE_CFG_IDX];
--		err_info = cfg >> HIDMA_EVRE_ERRINFO_BIT_POS;
--		err_info &= HIDMA_EVRE_ERRINFO_MASK;
--		err_code =
--		    (cfg >> HIDMA_EVRE_CODE_BIT_POS) & HIDMA_EVRE_CODE_MASK;
-+		if (!err_info) {
-+			err_info = cfg >> HIDMA_EVRE_ERRINFO_BIT_POS;
-+			err_info &= HIDMA_EVRE_ERRINFO_MASK;
-+		}
-+		if (!err_code)
-+			err_code = (cfg >> HIDMA_EVRE_CODE_BIT_POS) &
-+					HIDMA_EVRE_CODE_MASK;
- 
- 		if (hidma_post_completed(lldev, tre_iterator, err_info,
- 					 err_code))
-@@ -314,27 +317,8 @@ static int hidma_handle_tre_completion(struct hidma_lldev *lldev)
- void hidma_cleanup_pending_tre(struct hidma_lldev *lldev, u8 err_info,
- 			       u8 err_code)
- {
--	u32 tre_iterator;
--	u32 tre_ring_size = lldev->tre_ring_size;
--	int num_completed = 0;
--	u32 tre_read_off;
--
--	tre_iterator = lldev->tre_processed_off;
--	while (atomic_read(&lldev->pending_tre_count)) {
--		if (hidma_post_completed(lldev, tre_iterator, err_info,
--					 err_code))
--			break;
--		HIDMA_INCREMENT_ITERATOR(tre_iterator, HIDMA_TRE_SIZE,
--					 tre_ring_size);
--		num_completed++;
--	}
--	tre_read_off = (lldev->tre_processed_off +
--			HIDMA_TRE_SIZE * num_completed);
--
--	tre_read_off = tre_read_off % tre_ring_size;
--
--	/* record the last processed tre offset */
--	lldev->tre_processed_off = tre_read_off;
-+	while (atomic_read(&lldev->pending_tre_count))
-+		hidma_handle_tre_completion(lldev, err_info, err_code);
+@@ -530,6 +532,15 @@ static irqreturn_t hidma_chirq_handler(int chirq, void *arg)
+ 	return hidma_ll_inthandler(chirq, lldev);
  }
  
- static int hidma_ll_reset(struct hidma_lldev *lldev)
++static irqreturn_t hidma_chirq_handler_msi(int chirq, void *arg)
++{
++	struct hidma_lldev **lldevp = arg;
++	struct hidma_dev *dmadev = to_hidma_dev_from_lldev(lldevp);
++
++	return hidma_ll_inthandler_msi(chirq, *lldevp,
++				       1 << (chirq - dmadev->msi_virqbase));
++}
++
+ static ssize_t hidma_show_values(struct device *dev,
+ 				 struct device_attribute *attr, char *buf)
+ {
+@@ -567,6 +578,98 @@ static int hidma_create_sysfs_entry(struct hidma_dev *dev, char *name,
+ 	return device_create_file(dev->ddev.dev, attrs);
+ }
+ 
++#ifdef CONFIG_GENERIC_MSI_IRQ_DOMAIN
++static void hidma_write_msi_msg(struct msi_desc *desc, struct msi_msg *msg)
++{
++	struct device *dev = msi_desc_to_dev(desc);
++	struct hidma_dev *dmadev = dev_get_drvdata(dev);
++
++	if (!desc->platform.msi_index) {
++		writel(msg->address_lo, dmadev->dev_evca + 0x118);
++		writel(msg->address_hi, dmadev->dev_evca + 0x11C);
++		writel(msg->data, dmadev->dev_evca + 0x120);
++	}
++}
++
++static void hidma_free_msis(void *data)
++{
++	struct device *dev = data;
++
++	platform_msi_domain_free_irqs(dev);
++}
++#endif
++
++static int hidma_request_msi(struct hidma_dev *dmadev,
++			     struct platform_device *pdev)
++{
++#ifdef CONFIG_GENERIC_MSI_IRQ_DOMAIN
++	int rc;
++	struct msi_desc *desc;
++	struct msi_desc *failed_desc = NULL;
++
++	rc = platform_msi_domain_alloc_irqs(&pdev->dev, HIDMA_MSI_INTS,
++					    hidma_write_msi_msg);
++	if (rc)
++		return rc;
++
++	for_each_msi_entry(desc, &pdev->dev) {
++		if (!desc->platform.msi_index)
++			dmadev->msi_virqbase = desc->irq;
++
++		rc = devm_request_irq(&pdev->dev, desc->irq,
++				       hidma_chirq_handler_msi,
++				       0, "qcom-hidma-msi",
++				       &dmadev->lldev);
++		if (rc) {
++			failed_desc = desc;
++			break;
++		}
++	}
++
++	if (rc) {
++		/* free allocated MSI interrupts above */
++		for_each_msi_entry(desc, &pdev->dev) {
++			if (desc == failed_desc)
++				break;
++			devm_free_irq(&pdev->dev, desc->irq,
++				      &dmadev->lldev);
++		}
++	} else {
++		/* Add callback to free MSIs on teardown */
++		devm_add_action(&pdev->dev, hidma_free_msis,
++				&pdev->dev);
++		hidma_ll_setup_irq(dmadev->lldev, true);
++
++	}
++	if (rc)
++		dev_warn(&pdev->dev,
++			 "failed to request MSI irq, falling back to wired IRQ\n");
++	return rc;
++#else
++	return -EINVAL;
++#endif
++}
++
++static bool hidma_msi_capable(struct device *dev)
++{
++	struct acpi_device *adev = ACPI_COMPANION(dev);
++	const char *of_compat;
++	int ret;
++
++	if (!adev || acpi_disabled) {
++		ret = device_property_read_string(dev, "compatible",
++						  &of_compat);
++		if (ret)
++			return false;
++
++		ret = strcmp(of_compat, "qcom,hidma-1.1");
++	} else {
++		ret = strcmp(acpi_device_hid(adev), "QCOM8062");
++	}
++
++	return ret == 0;
++}
++
+ static int hidma_probe(struct platform_device *pdev)
+ {
+ 	struct hidma_dev *dmadev;
+@@ -576,6 +679,7 @@ static int hidma_probe(struct platform_device *pdev)
+ 	void __iomem *evca;
+ 	void __iomem *trca;
+ 	int rc;
++	bool msi;
+ 
+ 	pm_runtime_set_autosuspend_delay(&pdev->dev, HIDMA_AUTOSUSPEND_TIMEOUT);
+ 	pm_runtime_use_autosuspend(&pdev->dev);
+@@ -637,6 +741,12 @@ static int hidma_probe(struct platform_device *pdev)
+ 	dmadev->ddev.device_terminate_all = hidma_terminate_all;
+ 	dmadev->ddev.copy_align = 8;
+ 
++	/*
++	 * Determine the MSI capability of the platform. Old HW doesn't
++	 * support MSI.
++	 */
++	msi = hidma_msi_capable(&pdev->dev);
++
+ 	device_property_read_u32(&pdev->dev, "desc-count",
+ 				 &dmadev->nr_descriptors);
+ 
+@@ -665,10 +775,17 @@ static int hidma_probe(struct platform_device *pdev)
+ 		goto dmafree;
+ 	}
+ 
+-	rc = devm_request_irq(&pdev->dev, chirq, hidma_chirq_handler, 0,
+-			      "qcom-hidma", dmadev->lldev);
+-	if (rc)
+-		goto uninit;
++	platform_set_drvdata(pdev, dmadev);
++	if (msi)
++		rc = hidma_request_msi(dmadev, pdev);
++
++	if (!msi || rc) {
++		hidma_ll_setup_irq(dmadev->lldev, false);
++		rc = devm_request_irq(&pdev->dev, chirq, hidma_chirq_handler,
++				      0, "qcom-hidma", dmadev->lldev);
++		if (rc)
++			goto uninit;
++	}
+ 
+ 	INIT_LIST_HEAD(&dmadev->ddev.channels);
+ 	rc = hidma_chan_init(dmadev, 0);
+@@ -684,7 +801,6 @@ static int hidma_probe(struct platform_device *pdev)
+ 	hidma_debug_init(dmadev);
+ 	hidma_create_sysfs_entry(dmadev, "chid", S_IRUGO);
+ 	dev_info(&pdev->dev, "HI-DMA engine driver registration complete\n");
+-	platform_set_drvdata(pdev, dmadev);
+ 	pm_runtime_mark_last_busy(dmadev->ddev.dev);
+ 	pm_runtime_put_autosuspend(dmadev->ddev.dev);
+ 	return 0;
+@@ -722,12 +838,14 @@ static int hidma_remove(struct platform_device *pdev)
+ #if IS_ENABLED(CONFIG_ACPI)
+ static const struct acpi_device_id hidma_acpi_ids[] = {
+ 	{"QCOM8061"},
++	{"QCOM8062"},
+ 	{},
+ };
+ #endif
+ 
+ static const struct of_device_id hidma_match[] = {
+ 	{.compatible = "qcom,hidma-1.0",},
++	{.compatible = "qcom,hidma-1.1",},
+ 	{},
+ };
+ MODULE_DEVICE_TABLE(of, hidma_match);
+diff --git a/drivers/dma/qcom/hidma.h b/drivers/dma/qcom/hidma.h
+index 3f28f39..1c3df47 100644
+--- a/drivers/dma/qcom/hidma.h
++++ b/drivers/dma/qcom/hidma.h
+@@ -116,6 +116,7 @@ struct hidma_dev {
+ 	int				irq;
+ 	int				chidx;
+ 	u32				nr_descriptors;
++	int				msi_virqbase;
+ 
+ 	struct hidma_lldev		*lldev;
+ 	void				__iomem *dev_trca;
+@@ -154,6 +155,7 @@ struct hidma_lldev *hidma_ll_init(struct device *dev, u32 max_channels,
+ 			u8 chidx);
+ int hidma_ll_uninit(struct hidma_lldev *llhndl);
+ irqreturn_t hidma_ll_inthandler(int irq, void *arg);
++irqreturn_t hidma_ll_inthandler_msi(int irq, void *arg, int cause);
+ void hidma_cleanup_pending_tre(struct hidma_lldev *llhndl, u8 err_info,
+ 				u8 err_code);
+ int hidma_debug_init(struct hidma_dev *dmadev);
+diff --git a/drivers/dma/qcom/hidma_ll.c b/drivers/dma/qcom/hidma_ll.c
+index c3d3252..0cf01bc 100644
+--- a/drivers/dma/qcom/hidma_ll.c
++++ b/drivers/dma/qcom/hidma_ll.c
+@@ -449,6 +449,14 @@ irqreturn_t hidma_ll_inthandler(int chirq, void *arg)
+ 	return IRQ_HANDLED;
+ }
+ 
++irqreturn_t hidma_ll_inthandler_msi(int chirq, void *arg, int cause)
++{
++	struct hidma_lldev *lldev = arg;
++
++	hidma_ll_int_handler_internal(lldev, cause);
++	return IRQ_HANDLED;
++}
++
+ int hidma_ll_enable(struct hidma_lldev *lldev)
+ {
+ 	u32 val;
 -- 
 1.8.2.1
