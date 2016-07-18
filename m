@@ -1,61 +1,100 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 18 Jul 2016 09:34:11 +0200
-Subject: [PATCH -next] iommu/exynos: Fix return value check in
- exynos_iommu_of_setup()
-In-Reply-To: <577D0316.1050502@samsung.com>
-References: <1467807354-26503-1-git-send-email-weiyj_lk@163.com>
- <577D0316.1050502@samsung.com>
-Message-ID: <7d4c2517-5149-30d8-eeff-2bd7519dfdf3@samsung.com>
+From: hongxing.zhu@nxp.com (Richard Zhu)
+Date: Mon, 18 Jul 2016 07:38:36 +0000
+Subject: PROBLEM: pcie imx6 link problem after a random number of reboot
+In-Reply-To: <CAO1575VjjoA3O-8big2NG7v=xCeeLjf1K0Ck7b9AUcZ=H8HL1w@mail.gmail.com>
+References: <CAO1575Vzw5=JMVW4yh6HNz730r-RtONt_+J1A4BhygVowAWLZQ@mail.gmail.com>
+ <CAO1575Wo_Qgk-YX7kZchUTEv7o3W5-b_DJQktoF2AR+OwvAxNg@mail.gmail.com>
+ <VI1PR0401MB2624BC92B13026C53D4B13198C330@VI1PR0401MB2624.eurprd04.prod.outlook.com>
+ <CAO1575VC_cVHMxnWWDHcJhrymchJM1zMmR4X2O38JdrGP4dJfA@mail.gmail.com>
+ <VI1PR0401MB26249BF2429EF9FD6DB7F7EF8C330@VI1PR0401MB2624.eurprd04.prod.outlook.com>
+ <CAO1575VjjoA3O-8big2NG7v=xCeeLjf1K0Ck7b9AUcZ=H8HL1w@mail.gmail.com>
+Message-ID: <VI1PR0401MB2624E3404F95241302CC4C9F8C360@VI1PR0401MB2624.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Ivan:
 
 
-On 2016-07-06 15:09, Krzysztof Kozlowski wrote:
-> On 07/06/2016 02:15 PM, weiyj_lk at 163.com wrote:
->> From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
->>
->> In case of error, the function of_platform_device_create() returns
->> NULL pointer not ERR_PTR(). The IS_ERR() test in the return value
->> check should be replaced with NULL test.
->>
->> Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
->> ---
->>   drivers/iommu/exynos-iommu.c | 4 ++--
->>   1 file changed, 2 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
->> index 33dcc29..9b23059 100644
->> --- a/drivers/iommu/exynos-iommu.c
->> +++ b/drivers/iommu/exynos-iommu.c
->> @@ -1345,8 +1345,8 @@ static int __init exynos_iommu_of_setup(struct device_node *np)
->>   		exynos_iommu_init();
->>   
->>   	pdev = of_platform_device_create(np, NULL, platform_bus_type.dev_root);
->> -	if (IS_ERR(pdev))
->> -		return PTR_ERR(pdev);
->> +	if (!pdev)
->> +		return -ENOMEM;
->>   
->>   	/*
->>   	 * use the first registered sysmmu device for performing
->>
-> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->
->
-> Which in case of first sysmmu device and of_platform_device_create()
-> failure will lead to NULL pointer exception, so I think it is
-> appropriate to:
-> Fixes: 8ed55c812fa8 ("iommu/exynos: Init from dt-specific callback
-> instead of initcall")
-> Cc: <stable@vger.kernel.org>
+> -----Original Message-----
+> From: Ivan Grimaldi [mailto:grimaldi.ivan at gmail.com]
+> Sent: Friday, July 15, 2016 9:55 PM
+> To: Richard Zhu <hongxing.zhu@nxp.com>
+> Cc: r65037 at freescale.com; l.stach at pengutronix.de; linux-pci at vger.kernel.org;
+> bhelgaas at google.com; linux-arm-kernel at lists.infradead.org
+> Subject: Re: PROBLEM: pcie imx6 link problem after a random number of
+> reboot
+> 
+> Hi ,
+> 
+>  i have aligned pci-imx.c file with SHA
+> "b2d7a9cd3ff8ec561348267c2ef7d47b2b91e801" (same of kernel 4.6) and after
+> a random number of restart the kernel hangs (below the kernel log). From log,
+> as you see, the U-Boot haven't problem with PCI.
+[Zhu hongxing] The link training of kernel pcie would be impacted by the the link up state of
+ the uboot pcie. 
+> 
+> ...
+> U-Boot 2015.01-ge2977fb-dirty (Jul 15 2016 - 11:28:42)
+> 
+> CPU:   Freescale i.MX6DL rev1.1 at 792 MHz
+> Reset cause: WDOG
+>        Watchdog enabled
+> DRAM:  1 GiB
+> Flash: 96 MiB
+> MMC:   FSL_SDHC: 0
+> WARNING: Make sure the PCIe #PERST line is connected!
+>   00:01.0     - 16c3:abcd - Bridge device
+>    01:00.0    - 14e4:b242 - Network controller
+> In:    serial
+> Out:   serial
+> Err:   serial
+> Net:   FEC [PRIME]
+> Hit any key to stop autoboot:  0
+> Booting from NFS...
+> Using FEC device
+> TFTP from server 192.168.74.130; our IP address is 192.168.74.235 Filename
+> 'ags20.dtb'.
+> Load address: 0x12000000
+> Loading: ###
+>          3.2 MiB/s
+> done
+> Bytes transferred = 29921 (74e1 hex)
+> Using FEC device
+> TFTP from server 192.168.74.130; our IP address is 192.168.74.235 Filename
+> 'zImage'.
+> Load address: 0x12100000
+> Loading:
+> ################################################################
+> #
+> 
+> ################################################################
+> #
+> 
+> ################################################################
+> #
+>          ##########################################
+>          3.9 MiB/s
+> done
+> Bytes transferred = 3472120 (34faf8 hex) Kernel image @ 0x12100000
+> [ 0x000000 - 0x34faf8 ] ## Flattened Device Tree blob at 12000000
+>    Booting using the fdt blob at 0x12000000
+>    Loading Device Tree to 4f530000, end 4f53a4e0 ... OK
+> 
+> Starting kernel ...
+> 
+[Zhu hongxing] It seems that the kernel is hang.
+Most possible reason is that pcie register is accessed, but the clks is not configured properly.
+Can you enable the " CONFIG_EARLY_PRINTK", and debug into it?
 
-Thanks for spotting this issue.
+> 
+> 
+> Best regards
+> IVan
+> 
+Snip...
 
-Acked-by: Marek Szyprowski <m.szyprowski@samsung.com>
-
-Best regards
--- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+Best Regards
+hongxing zhu
+Linux BSP team
+Office: 86-21-28937189
+Email: hongxing.zhu at nxp.com
