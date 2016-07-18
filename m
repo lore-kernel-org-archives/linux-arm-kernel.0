@@ -1,42 +1,46 @@
 From: anup.patel@broadcom.com (Anup Patel)
-Date: Mon, 18 Jul 2016 14:44:13 +0530
-Subject: [PATCH v2 1/8] uio: fix dmem_region_start computation
+Date: Mon, 18 Jul 2016 14:44:14 +0530
+Subject: [PATCH v2 2/8] uio: code style cleanup
 In-Reply-To: <1468833260-5305-1-git-send-email-anup.patel@broadcom.com>
 References: <1468833260-5305-1-git-send-email-anup.patel@broadcom.com>
-Message-ID: <1468833260-5305-2-git-send-email-anup.patel@broadcom.com>
+Message-ID: <1468833260-5305-3-git-send-email-anup.patel@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jan Viktorin <viktorin@rehivetech.com>
+From: Ankit Jindal <thatsjindal@gmail.com>
 
-The variable i contains a total number of resources (including
-IORESOURCE_IRQ). However, we want the dmem_region_start to point
-after the last resource of type IORESOURCE_MEM. The original behaviour
-leads (very likely) to skipping several UIO mapping regions and makes
-them useless. Fix this by computing dmem_region_start from the uiomem
-which points to the last used UIO mapping.
+This patch fixes the indentation of switch-case block in uio driver.
 
-Fixes: 0a0c3b5a24bd ("Add new uio device for dynamic memory allocation")
-
-Signed-off-by: Jan Viktorin <viktorin@rehivetech.com>
+Signed-off-by: Ankit Jindal <thatsjindal@gmail.com>
 Signed-off-by: Anup Patel <anup.patel@broadcom.com>
-Cc: linux-stable <stable@vger.kernel.org>
 ---
- drivers/uio/uio_dmem_genirq.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/uio/uio.c | 14 +++++++-------
+ 1 file changed, 7 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/uio/uio_dmem_genirq.c b/drivers/uio/uio_dmem_genirq.c
-index 915facb..e1134a4 100644
---- a/drivers/uio/uio_dmem_genirq.c
-+++ b/drivers/uio/uio_dmem_genirq.c
-@@ -229,7 +229,7 @@ static int uio_dmem_genirq_probe(struct platform_device *pdev)
- 		++uiomem;
+diff --git a/drivers/uio/uio.c b/drivers/uio/uio.c
+index fba021f..f2729b7 100644
+--- a/drivers/uio/uio.c
++++ b/drivers/uio/uio.c
+@@ -703,13 +703,13 @@ static int uio_mmap(struct file *filep, struct vm_area_struct *vma)
  	}
  
--	priv->dmem_region_start = i;
-+	priv->dmem_region_start = uiomem - &uioinfo->mem[0];
- 	priv->num_dmem_regions = pdata->num_dynamic_regions;
+ 	switch (idev->info->mem[mi].memtype) {
+-		case UIO_MEM_PHYS:
+-			return uio_mmap_physical(vma);
+-		case UIO_MEM_LOGICAL:
+-		case UIO_MEM_VIRTUAL:
+-			return uio_mmap_logical(vma);
+-		default:
+-			return -EINVAL;
++	case UIO_MEM_PHYS:
++		return uio_mmap_physical(vma);
++	case UIO_MEM_LOGICAL:
++	case UIO_MEM_VIRTUAL:
++		return uio_mmap_logical(vma);
++	default:
++		return -EINVAL;
+ 	}
+ }
  
- 	for (i = 0; i < pdata->num_dynamic_regions; ++i) {
 -- 
 1.9.1
