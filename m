@@ -1,85 +1,41 @@
-From: slash.tmp@free.fr (Mason)
-Date: Mon, 18 Jul 2016 14:21:29 +0200
-Subject: [PATCH v3] thermal: tango: add resume support
-In-Reply-To: <57726196.5060909@free.fr>
-References: <57726196.5060909@free.fr>
-Message-ID: <578CC9C9.3050806@free.fr>
+From: james.morse@arm.com (James Morse)
+Date: Mon, 18 Jul 2016 13:27:22 +0100
+Subject: [stable:PATCH] valid_user_regs() backport
+Message-ID: <1468844845-6129-1-git-send-email-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
+Hi all,
 
-When this platform is suspended, firmware powers the entire SoC down,
-except a few hardware blocks waiting for wakeup events. And there is
-no context to save for this particular block.
+These three copies of the same patch backport dbd4d7ca563f
+("arm64: Rework valid_user_regs") to the stable kernels listed on kernel.org
+as far back as v3.16.
 
-Therefore, there is nothing useful for the driver to do on suspend;
-so we define a NULL suspend hook. On resume, the driver initializes
-the block exactly as is done in the probe callback.
+This patch fixed a userspace triggerable oops when userspace tries
+to switch to a mode not supported by the kernel:
+[  286.628508] Bad mode in Synchronous Abort handler detected, code 0x46000000 -- SVC (AArch32)
+[  286.639625] CPU: 3 PID: 2072 Comm: inter Not tainted 4.4.14 #4504
+[  286.648391] Hardware name: ARM Juno development board (r1) (DT)
+[ ... ]
+[  286.716784] Bad mode in Synchronous Abort handler detected, code 0x86000007 -- IABT (current EL)
+[  286.725483] CPU: 3 PID: 2072 Comm: inter Not tainted 4.4.14 #4504
+[  286.731513] Hardware name: ARM Juno development board (r1) (DT)
+[ ... ]
+[  286.840815] Internal error: Oops - bad mode: 0 [#1] PREEMPT SMP
+[  286.846673] Modules linked in:
+[  286.849699] CPU: 3 PID: 2072 Comm: inter Not tainted 4.4.14 #4504
+[  286.855728] Hardware name: ARM Juno development board (r1) (DT)
 
-Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
----
-Changes in v3
-Drop the DEV_PM_OPS macro, which caused some confusion.
-Note: tango_thermal_pm struct only exists when CONFIG_PM_SLEEP is defined
-@Kevin, can I add your Reviewed-by tag back?
----
- drivers/thermal/tango_thermal.c | 23 +++++++++++++++++++++--
- 1 file changed, 21 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/thermal/tango_thermal.c b/drivers/thermal/tango_thermal.c
-index 70e0d9f406e9..957f8937e126 100644
---- a/drivers/thermal/tango_thermal.c
-+++ b/drivers/thermal/tango_thermal.c
-@@ -64,6 +64,12 @@ static const struct thermal_zone_of_device_ops ops = {
- 	.get_temp	= tango_get_temp,
- };
- 
-+static void tango_thermal_init(struct tango_thermal_priv *priv)
-+{
-+	writel(0, priv->base + TEMPSI_CFG);
-+	writel(CMD_ON, priv->base + TEMPSI_CMD);
-+}
-+
- static int tango_thermal_probe(struct platform_device *pdev)
- {
- 	struct resource *res;
-@@ -79,14 +85,24 @@ static int tango_thermal_probe(struct platform_device *pdev)
- 	if (IS_ERR(priv->base))
- 		return PTR_ERR(priv->base);
- 
-+	platform_set_drvdata(pdev, priv);
- 	priv->thresh_idx = IDX_MIN;
--	writel(0, priv->base + TEMPSI_CFG);
--	writel(CMD_ON, priv->base + TEMPSI_CMD);
-+	tango_thermal_init(priv);
- 
- 	tzdev = devm_thermal_zone_of_sensor_register(&pdev->dev, 0, priv, &ops);
- 	return PTR_ERR_OR_ZERO(tzdev);
- }
- 
-+#ifdef CONFIG_PM_SLEEP
-+static int tango_thermal_resume(struct device *dev)
-+{
-+	tango_thermal_init(dev_get_drvdata(dev));
-+	return 0;
-+}
-+
-+static SIMPLE_DEV_PM_OPS(tango_thermal_pm, NULL, tango_thermal_resume);
-+#endif
-+
- static const struct of_device_id tango_sensor_ids[] = {
- 	{
- 		.compatible = "sigma,smp8758-thermal",
-@@ -99,6 +115,9 @@ static struct platform_driver tango_thermal_driver = {
- 	.driver	= {
- 		.name		= "tango-thermal",
- 		.of_match_table	= tango_sensor_ids,
-+#ifdef CONFIG_PM_SLEEP
-+		.pm		= &tango_thermal_pm,
-+#endif
- 	},
- };
- 
+Thanks,
+
+James
+
+ arch/arm64/include/asm/ptrace.h | 34 +++---------------
+ arch/arm64/kernel/ptrace.c      | 80 +++++++++++++++++++++++++++++++++++++++--
+ arch/arm64/kernel/signal.c      |  4 +--
+ arch/arm64/kernel/signal32.c    |  2 +-
+ 4 files changed, 86 insertions(+), 34 deletions(-)
+
 -- 
-2.9.0
+2.8.0.rc3
