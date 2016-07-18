@@ -1,70 +1,62 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Mon, 18 Jul 2016 20:15:08 +0530
-Subject: [RESEND PATCH] arm: assabet_defconfig: disable IDE subsystem
-In-Reply-To: <m27fcn3pb1.fsf@baylibre.com>
-References: <1467991490-24895-1-git-send-email-b.zolnierkie@samsung.com>
- <2773873.Jjn1O47GXr@wuerfel> <4818149.nzRaU7vJQE@amdc1976>
- <4264651.gPKphdYuCx@wuerfel> <m27fcn3pb1.fsf@baylibre.com>
-Message-ID: <578CEB74.2080002@ti.com>
+From: fu.wei@linaro.org (Fu Wei)
+Date: Mon, 18 Jul 2016 23:21:58 +0800
+Subject: [PATCH 0/3] watchdog, sbsa_gwdt: Update SBSA watchdog with the
+ new infrastructure of watchdog.
+In-Reply-To: <20160717195139.GC32751@spo001.leaseweb.nl>
+References: <1464674890-10512-1-git-send-email-fu.wei@linaro.org>
+ <20160717195139.GC32751@spo001.leaseweb.nl>
+Message-ID: <CADyBb7u=gU01RoVURmah7mRCLe1ZZZMgu92n5p5_fq9C9Uv_BQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 15 July 2016 08:45 PM, Kevin Hilman wrote:
-> Arnd Bergmann <arnd@arndb.de> writes:
-> 
->> On Wednesday, July 13, 2016 12:59:23 PM CEST Bartlomiej Zolnierkiewicz wrote:
->>>
->>> On Friday, July 08, 2016 10:23:48 PM Arnd Bergmann wrote:
->>>> On Friday, July 8, 2016 5:24:41 PM CEST Bartlomiej Zolnierkiewicz wrote:
->>>>> This patch disables deprecated IDE subsystem in assabet_defconfig
->>>>> (no IDE host drivers are selected in this config so there is no
->>>>> valid reason to enable IDE subsystem itself).
->>>>>
->>>>> Cc: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
->>>>> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
->>>>
->>>> I think the series makes a lot of sense. I have checked your assertions
->>>> in the changelogs and found no flaws in your logic, so I think we should
->>>> take them all through arm-soc unless there are other concerns.
->>>
->>> Thank you.
->>>
->>> Should I resend everything or just patches that were not reposted yet
->>> (the ones that were marked as RFT initially and got no feedback)?
->>
->> I'd be fine with just getting a pull request with all the patches that
->> had no negative feedback and that were not already applied (if any).
->>
->>>> Do you have a list of ARM defconfigs that keep using CONFIG_IDE and
->>>> how you determined that they need it?
->>>
->>> The only such defconfig is davinci_all_defconfig which uses
->>> palm_bk3710 host driver (CONFIG_BLK_DEV_PALMCHIP_BK3710).
->>>
->>>> I know that ARCH_RPC/ARCH_ACORN has a couple of special drivers that
->>>> have no libata replacement, are there any others like that, or are
->>>> they all platforms that should in theory work with libata but need
->>>> testing?
->>>
->>> All platforms except ARCH_ACORN, ARCH_DAVINCI & ARCH_RPC should work
->>> with libata.
->>
->> Adding Sekhar and Kevin for DaVinci: At first sight, palm_bk3710 looks
->> fairly straightforward (meaning someone has to do a few day's work)
->> to convert into a libata driver.
->>
->> As this is on on-chip controller that is part of a dm644x and dm646x,
->> it should also not be hard to test (as long as someone can find
->> a hard drive to plug in).
-> 
-> I have a hard drive, but don't have any dm64xx hardware anymore to test
-> this.  My last working dm644x board died last year.
+Hi Wim, Guenter,
 
-I have a working DM6446 EVM. I was able to connect a hard drive to it
-and do some basic tests with v4.6 kernel.
+Great thanks for your help :-)
 
-I will look into converting the driver to libata. Might take some time
-because this is unfamiliar territory for me.
+On 18 July 2016 at 03:51, Wim Van Sebroeck <wim@iguana.be> wrote:
+> Hi Fu,
+>
+>> From: Fu Wei <fu.wei@linaro.org>
+>>
+>> This patchset:
+>>     (1)Try to fix an issue about min and max timeout validity check:
+>>     when max_hw_heartbeat_ms is defined, this check should be skipped.
+>>
+>>     (2)Use max_hw_heartbeat_ms instead of max_timeout in SBSA watchdog.
+>>
+>>     (3)Set WDOG_HW_RUNNING, when SBSA watchdog is already running before
+>>     it's initialized.
+>>
+>> Changelog:
+>> v1: The first formal upstreaming version
+>>
+>> RFC: https://lkml.org/lkml/2016/5/3/145
+>>
+>> Pratyush Anand (3):
+>>   watchdog: skip min and max timeout validity check when
+>>     max_hw_heartbeat_ms is defined
+>>   sbsa_gwdt: Use max_hw_heartbeat_ms instead of max_timeout
+>>   sbsa_gwdt: Set WDOG_HW_RUNNING, when watchdog is already running.
+>>
+>>  drivers/watchdog/sbsa_gwdt.c     | 6 ++++--
+>>  drivers/watchdog/watchdog_core.c | 2 +-
+>>  2 files changed, 5 insertions(+), 3 deletions(-)
+>>
+>> --
+>> 2.5.5
+>>
+>
+> These patches have been added to linux-watchdog-next.
+>
+> Kind regards,
+> Wim.
+>
 
-Thanks,
-Sekhar
+
+
+-- 
+Best regards,
+
+Fu Wei
+Software Engineer
+Red Hat
