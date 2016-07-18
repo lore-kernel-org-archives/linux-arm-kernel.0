@@ -1,123 +1,98 @@
-From: anup.patel@broadcom.com (Anup Patel)
-Date: Mon, 18 Jul 2016 08:47:15 +0530
-Subject: [PATCH 7/8] uio: bind uio_dmem_genirq via OF
-In-Reply-To: <20160715165239.GG19840@leverpostej>
-References: <1468573443-4670-1-git-send-email-anup.patel@broadcom.com>
- <1468573443-4670-8-git-send-email-anup.patel@broadcom.com>
- <20160715132835.GC19840@leverpostej>
- <CAALAos9KVS3SveQzGWGhcdxZNPapWnmTwZe+4y2g3LNGP3muDA@mail.gmail.com>
- <20160715165239.GG19840@leverpostej>
-Message-ID: <CAALAos-VGQDwV_xGWRw6N5pkQ-tNOhjf1=gndmDYZL1-aW4vLg@mail.gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 18 Jul 2016 08:01:29 +0200
+Subject: [PATCH] ARM: tegra: fix erroneous address in dts
+In-Reply-To: <4a4d7fd4-7514-c5cb-435b-af34159fc1c4@ramses-pyramidenbau.de>
+References: <1468514937-23250-1-git-send-email-ralf@ramses-pyramidenbau.de>
+ <20160714220218.GB4205@mithrandir.ba.sec>
+ <8a8ccb29-ba73-f29f-2b57-5c1d91e13bf7@ramses-pyramidenbau.de>
+ <578908CB.7040802@wwwdotorg.org>
+ <4a4d7fd4-7514-c5cb-435b-af34159fc1c4@ramses-pyramidenbau.de>
+Message-ID: <20160718060129.GA10785@ulmo.ba.sec>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 15, 2016 at 10:22 PM, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Fri, Jul 15, 2016 at 09:57:28PM +0530, Anup Patel wrote:
->> On Fri, Jul 15, 2016 at 6:58 PM, Mark Rutland <mark.rutland@arm.com> wrote:
->> > On Fri, Jul 15, 2016 at 02:34:02PM +0530, Anup Patel wrote:
->> >> +static char uio_of_dma_bits_prop[128] = "uio,dma-bits";
->> >> +static char uio_of_dmem_count_prop[128] = "uio,number-of-dynamic-regions";
->> >> +static char uio_of_dmem_sizes_prop[128] = "uio,dynamic-regions-sizes";
->> >
->> > What are these proeprties? What is a "dynamic region" in hardware terms?
->>
->> "Dynamic region" is DMAble memory alloced using dma_alloc_xxx() APIs
->> for the device.
->>
->> For DMA-capable devices accessed from user-space, we need DMAble
->> memory available to user-space. Sometime such devices are also
->> cache-coherent (or IO-coherent) so in such case user-space will need
->> cacheable DMAble memory.
->>
->> Number of "Dynamic regions" required by UIO dmem device depends
->> on the type of HW device hence we describe number of "Dynamic regions"
->> and size of "Dynamic regions" via DT attributes.
->
-> So this is something akin to the number of DMA channels a device might
-> use.
->
-> Either that's implicit knowledge of the device (if fixed), which doesn't
-> need to be in the DT, or a real property that should be described
-> explicitly in the device binding, that has nothing to do with UIO.
->
-> In general, a device which you might want to use with UIO may not
-> require such properties, so this is imposing a requirement on DTBs
-> purely for the sake of userspace software.
->
->> > Why must they be in the DT, and why are the *property names* arbitrarily
->> > overridable as module parameters? What exactly do you expect there to be
->> > in a DT?
->>
->> They must be in DT for platform devices created using DT probing. The
->> number of "Dynamic regions" required by UIO device will depend on the
->> nature of device. We cannot have same number and sizes of "Dynamic
->> regions" for different UIO dmem devices.
->
-> If the devices are so different, they should not be handled by the same
-> driver that has no knowledge of those differences. Platform VFIO has the
-> same problem, and requires device-specific reset drivers.
->
->> The UIO dmem driver is a generic driver and not specific to any type of
->> HW. In fact, UIO dmem driver is generic enough to access variety of
->> platform devices from user-space using UIO framework.
->>
->> Based on this Rob had previously suggested to not have any (or enforce
->> any) DT bindings for UIO dmem driver.
->>
->> Refer, https://lkml.org/lkml/2016/5/18/457
->
-> I don't follow. Here Rob stated:
->
->   DT describes h/w. UIO is not a h/w block, so this does not belong in DT. A
->   UIO vs. kernel driver is purely a kernel decision which shouldn't
->   require a DT change.
->
->   The properties should be part of match data for a compatible string that
->   needs them set. Or if they can be defined in a way that is actually a
->   property of the h/w, then it would be acceptible. You'd still need to
->   define compatible strings that the properties apply to.
->
-> Above, you have come up with a default set of property names which you
-> go looking for, and you expect a class of property, even if you don't
-> expect specific names. That constitutes a binding, and a poorly-defined
-> one at that.
->
-> Per my reading, Rob's point in https://lkml.org/lkml/2016/5/23/539 was
-> that providing the *values* as module parameters was fine, not providing
-> the *property names*.
->
->> Link to original Jan's patchset is https://lkml.org/lkml/2016/5/17/141
->>
->> We had two options:
->> 1) Get details of "Dynamic regions" via module parameter but this
->> would mean using same number and sizes of "Dynamic regions" for
->> all UIO dmem devices.
->> 2) Pass names of DT attributes used by UIO dmem driver as
->> module parameters.
->>
->> > DT bindings need documentation, but there was none as part of this series.
->> >
->> > I do not think this makes sense from a DT perspective.
->>
->> As explained above, we are not fixing DT compatible string and
->> DT attributes names for UIO dmem driver instead we pass all
->> these as module parameters (preferable via kernel args or at
->> time of module insertion). Due to this we don't require DT bindings
->> document.
->
-> If you're looking for properties in the DT, you're assuming a binding of
-> some sort, regardless of whether you expect particular names.
->
-> To be clear, NAK to this as it stands.
+On Fri, Jul 15, 2016 at 06:18:03PM +0200, Ralf Ramsauer wrote:
+> On 07/15/2016 06:01 PM, Stephen Warren wrote:
+> > On 07/15/2016 03:37 AM, Ralf Ramsauer wrote:
+> >> On 07/15/2016 12:02 AM, Thierry Reding wrote:
+> >>> On Thu, Jul 14, 2016 at 06:48:57PM +0200, Ralf Ramsauer wrote:
+> >>>> c90bb7b enabled the high speed UARTs of the Jetson TK1. The address
+> >>>> specification inside the dts is wrong. Fix it and use the correct
+> >>>> address.
+> >>>>
+> >>>> Fixes: c90bb7b9b9 ("ARM: tegra: Add high speed UARTs to Jetson TK1
+> >>>> device tree")
+> >>>> Signed-off-by: Ralf Ramsauer <ralf@ramses-pyramidenbau.de>
+> >>>> ---
+> >>>>   arch/arm/boot/dts/tegra124-jetson-tk1.dts | 4 ++--
+> >>>>   1 file changed, 2 insertions(+), 2 deletions(-)
+> >>>
+> >>> These addresses are correct. The 0, prefix was dropped from the unit
+> >>> address in commit b5896f67ab3c ("ARM: tegra: Remove commas from unit
+> >>> addresses on Tegra124").
+> >>>
+> >>> What's the problem that you're seeing? What's not working for you?
+> >>
+> >> I cannot find b5896f67ab3c neither in swarren's tree nor in linux
+> >> upstream. But there's d0bc5aaf890 in swarren's linux-tegra tree that
+> >> matches your described changes and was committed on 1st of July. But
+> >> this patch is not upstream yet, while the other patch is.
+> > 
+> > The fix is in linux-next, and will be in mainline soon I expect.
+> Ah okay, but I still wonder how my original patch got changed on its
+> way... The original version on the mailinglist was not buggy.
 
-I think if we are not enforcing any DT bindings by passing compatible
-and property names as module parameters then we don't need any
-DT bindings document. We can certainly remove default property
-names and enforce UIO dmem users to always pass this as module
-parameters.
+It's most likely my fault. My recollection is that we used to have an
+earlier patch that removed all 0, prefixes from unit addresses and what
+happens is probably that I applied your patch on top, adjusted it to
+omit the 0, prefix and then we noticed that removing the 0, prefix does
+not work for the GPU (because U-Boot looks it up by node name to enable
+it), so the patch that removes the 0, prefix was dropped and I forgot
+to adjust your patch to compensate.
 
-Anyways, you have already NAKed this so I will just get all dynamic
-region info from module parameters only.
+> > My github linux-tegra.git isn't relevant since it's just my own personal
+> > dev branch, but for reference, the commit is there since it's based on
+> > linux-next.
+> > 
+> >> Have a look at mainline tegra124-jetson-tk1.dts, there the addresses are
+> >> erroneous as they still use the 0, annotation. And I just realised, that
+> >> somehow, upstream patch c90bb7b slightly differs from my initial patch
+> >> [1] on the mailing list.
+> > 
+> > Your patch should probably be CC: stable so that existing kernel
+> > versions get fixed. That said, I'd argue that since the original patch
+> > never actually had any effect since it applied to the wrong node, the
+> > best fix for stable kernels is simply to revert it rather than fixing
+> > it, to avoid the potential for behaviour changes and regressions.
+> > Starting with kernel 4.8 (I think), that patch will begin to have actual
+> > effect.
+> There is no current existing stable kernel that is affected, as it went
+> in during the last merge window in 4.6-rc1. So no need for fixing
+> stable. Maybe it's still possible to fix it as the stabilisation window
+> is still open and 4.7 is not released yet?
 
-Regards,
-Anup
+Unfortunately a patch to remove the 0, prefix from all nodes except the
+GPU was now merged into the arm-soc tree, which means that if we try to
+get this into v4.7, then we'll have to make sure to patch up the unit
+address again for v4.8.
+
+I have no objections to doing that, so feel free to add my Acked-by and
+resend this to arm at kernel.org. When you do, please keep linux-tegra in
+Cc so that we can track it, and maybe mention that you want this to go
+into v4.7 and how this came about to be, so that the arm-soc maintainers
+won't be surprised when the patch to revert this shows up in a couple of
+days for v4.8.
+
+Can you take care of sending out the second patch as well? Probably best
+to send it the same way as this, with a mention that it's targetted at
+v4.8 and a revert of this one.
+
+Thanks,
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160718/5420afc8/attachment.sig>
