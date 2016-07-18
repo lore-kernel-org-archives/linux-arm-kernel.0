@@ -1,9 +1,9 @@
 From: james.morse@arm.com (James Morse)
-Date: Mon, 18 Jul 2016 13:27:24 +0100
-Subject: [stable:PATCH] arm64: Rework valid_user_regs (v3.18)
+Date: Mon, 18 Jul 2016 13:27:25 +0100
+Subject: [stable:PATCH] arm64: Rework valid_user_regs (v3.16)
 In-Reply-To: <1468844845-6129-1-git-send-email-james.morse@arm.com>
 References: <1468844845-6129-1-git-send-email-james.morse@arm.com>
-Message-ID: <1468844845-6129-3-git-send-email-james.morse@arm.com>
+Message-ID: <1468844845-6129-4-git-send-email-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -30,37 +30,40 @@ validation).
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-[ rebased for v3.18
+[ rebased for v3.16
   This avoids a user-triggerable Oops() if a task is switched to a mode
   not supported by the kernel (e.g. switching a 64-bit task to AArch32).
 
-  v3.18 does not support SETEND, support for this was added by
+  v3.16 does not support SETEND, support for this was added by
   2d888f48e056 ("arm64: Emulate SETEND for AArch32 tasks") in v3.20
   This backport forces the kernel endianness on userspace.
+
+  Added a DBG_SPSR_SS define hidden by #ifdefs to avoid conflicts with
+  other backports.
 ]
 Signed-off-by: James Morse <james.morse@arm.com>
-Cc: <stable@vger.kernel.org> #3.18.x
+Cc: <stable@vger.kernel.org> #3.16.x
 ---
 For example, switching a task to 32bit mode, when the kernel
 was not built with support for this will cause:
-[   58.637566] Bad mode in Synchronous Abort handler detected, code 0x46000000
-[   58.646842] CPU: 0 PID: 1802 Comm: inter Tainted: G        W      3.18.36 #4519
+[   39.634111] Bad mode in Synchronous Abort handler detected, code 0x46000000
+[   39.643381] CPU: 0 PID: 1712 Comm: inter Not tainted 3.16.36 #4514
 [ ... ]
-[   58.719758] Bad mode in Synchronous Abort handler detected, code 0x86000007
-[   58.726651] CPU: 0 PID: 1802 Comm: inter Tainted: G        W      3.18.36 #4519
+[   39.709287] Bad mode in Synchronous Abort handler detected, code 0x86000007
+[   39.716180] CPU: 0 PID: 1712 Comm: inter Not tainted 3.16.36 #4514
 [ ... ]
-[   58.837320] Internal error: Oops - bad mode: 0 [#1] PREEMPT SMP
-[   58.843177] Modules linked in:
-[   58.846203] CPU: 0 PID: 1802 Comm: inter Tainted: G        W      3.18.36 #4519
+[   39.825750] Internal error: Oops - bad mode: 0 [#1] PREEMPT SMP
+[   39.831608] Modules linked in:
+[   39.834634] CPU: 0 PID: 1712 Comm: inter Not tainted 3.16.36 #4514
 
- arch/arm64/include/asm/ptrace.h | 34 +++---------------
- arch/arm64/kernel/ptrace.c      | 79 +++++++++++++++++++++++++++++++++++++++--
- arch/arm64/kernel/signal.c      |  4 +--
+ arch/arm64/include/asm/ptrace.h | 34 +++--------------
+ arch/arm64/kernel/ptrace.c      | 83 ++++++++++++++++++++++++++++++++++++++++-
+ arch/arm64/kernel/signal.c      |  4 +-
  arch/arm64/kernel/signal32.c    |  2 +-
- 4 files changed, 85 insertions(+), 34 deletions(-)
+ 4 files changed, 89 insertions(+), 34 deletions(-)
 
 diff --git a/arch/arm64/include/asm/ptrace.h b/arch/arm64/include/asm/ptrace.h
-index 41ed9e13795e..0d07fdb3fe59 100644
+index 88d6e2436808..300a382ed88f 100644
 --- a/arch/arm64/include/asm/ptrace.h
 +++ b/arch/arm64/include/asm/ptrace.h
 @@ -58,6 +58,8 @@
@@ -112,10 +115,21 @@ index 41ed9e13795e..0d07fdb3fe59 100644
  #define instruction_pointer(regs)	((unsigned long)(regs)->pc)
  
 diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
-index 8a4ae8e73213..c5b07d18bb24 100644
+index d2b9a3f7457d..e3360ad22fbc 100644
 --- a/arch/arm64/kernel/ptrace.c
 +++ b/arch/arm64/kernel/ptrace.c
-@@ -493,7 +493,7 @@ static int gpr_set(struct task_struct *target, const struct user_regset *regset,
+@@ -45,6 +45,10 @@
+ #define CREATE_TRACE_POINTS
+ #include <trace/events/syscalls.h>
+ 
++#ifndef DBG_SPSR_SS
++#define DBG_SPSR_SS             (1 << 21)
++#endif
++
+ /*
+  * TODO: does not yet catch signals sent when the child dies.
+  * in exit.c or in signal.c.
+@@ -497,7 +501,7 @@ static int gpr_set(struct task_struct *target, const struct user_regset *regset,
  	if (ret)
  		return ret;
  
@@ -124,7 +138,7 @@ index 8a4ae8e73213..c5b07d18bb24 100644
  		return -EINVAL;
  
  	task_pt_regs(target)->user_regs = newregs;
-@@ -728,7 +728,7 @@ static int compat_gpr_set(struct task_struct *target,
+@@ -728,7 +732,7 @@ static int compat_gpr_set(struct task_struct *target,
  
  	}
  
@@ -133,7 +147,7 @@ index 8a4ae8e73213..c5b07d18bb24 100644
  		*task_pt_regs(target) = newregs;
  	else
  		ret = -EINVAL;
-@@ -1136,3 +1136,78 @@ asmlinkage void syscall_trace_exit(struct pt_regs *regs)
+@@ -1131,3 +1135,78 @@ asmlinkage void syscall_trace_exit(struct pt_regs *regs)
  	if (test_thread_flag(TIF_SYSCALL_TRACE))
  		tracehook_report_syscall(regs, PTRACE_SYSCALL_EXIT);
  }
@@ -213,7 +227,7 @@ index 8a4ae8e73213..c5b07d18bb24 100644
 +		return valid_native_regs(regs);
 +}
 diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
-index 6fa792137eda..ae65430f5fb7 100644
+index 6357b9c6c90e..d1ae7c217ba9 100644
 --- a/arch/arm64/kernel/signal.c
 +++ b/arch/arm64/kernel/signal.c
 @@ -115,7 +115,7 @@ static int restore_sigframe(struct pt_regs *regs,
@@ -225,17 +239,17 @@ index 6fa792137eda..ae65430f5fb7 100644
  
  	if (err == 0) {
  		struct fpsimd_context *fpsimd_ctx =
-@@ -314,7 +314,7 @@ static void handle_signal(struct ksignal *ksig, struct pt_regs *regs)
+@@ -322,7 +322,7 @@ static void handle_signal(unsigned long sig, struct k_sigaction *ka,
  	/*
  	 * Check that the resulting registers are actually sane.
  	 */
 -	ret |= !valid_user_regs(&regs->user_regs);
 +	ret |= !valid_user_regs(&regs->user_regs, current);
  
- 	/*
- 	 * Fast forward the stepping logic so we step into the signal
+ 	if (ret != 0) {
+ 		force_sigsegv(sig, tsk);
 diff --git a/arch/arm64/kernel/signal32.c b/arch/arm64/kernel/signal32.c
-index 15dd021b0025..1714e25bf85b 100644
+index e3ac8f0c0fc7..03520c650701 100644
 --- a/arch/arm64/kernel/signal32.c
 +++ b/arch/arm64/kernel/signal32.c
 @@ -350,7 +350,7 @@ static int compat_restore_sigframe(struct pt_regs *regs,
