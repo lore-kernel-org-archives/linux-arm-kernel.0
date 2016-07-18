@@ -1,51 +1,32 @@
-From: labbott@redhat.com (Laura Abbott)
-Date: Mon, 18 Jul 2016 16:16:34 -0700
-Subject: [PATCH 0/2] arm/arm64: localise objcopy flags
-In-Reply-To: <1468337282-14527-1-git-send-email-mark.rutland@arm.com>
-References: <1468337282-14527-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <a1441405-5a3a-731c-2693-b66cd42edc99@redhat.com>
+From: tj@kernel.org (Tejun Heo)
+Date: Mon, 18 Jul 2016 19:42:50 -0400
+Subject: [PATCH] [media] s5p-mfc: Remove deprecated
+ create_singlethread_workqueue
+In-Reply-To: <20160716083025.GA7294@Karyakshetra>
+References: <20160716083025.GA7294@Karyakshetra>
+Message-ID: <20160718234250.GQ3078@mtj.duckdns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/12/2016 08:28 AM, Mark Rutland wrote:
-> Hi,
->
-> Typically, architectures (including arm and arm64) define OBJCOPYFLAGS in their
-> top-level makefile, for the purpose of generating a raw binaries suitable for
-> booting, including Image, zImage, vmlinux.bin, etc.
->
-> As this top-level arch makefile is included by the top-level kernel makefile,
-> these flags are passed to other invocations of objcopy tree-wide. This can
-> result in unexpected and inconsistent behaviour across architectures (e.g.
-> generation of a raw binary rather than an ELF [1]).
->
-> Rather than force each new user of objcopy to specially clear OBJCOPYFLAGS,
-> this patch moves the existing OBJCOPYFLAGS variable definitions such that they
-> only affects the cases we require them for today, leaving the global namespace
-> clear.
->
-> Other architectures will likely need similar treatment.
->
-> Thanks,
-> Mark.
->
-> [1] http://www.openwall.com/lists/kernel-hardening/2016/06/08/2
->
-> Mark Rutland (2):
->   arm64: localise Image objcopy flags
->   arm: localise objcopy flags
->
->  arch/arm/Makefile        | 1 -
->  arch/arm/boot/Makefile   | 2 ++
->  arch/arm64/Makefile      | 1 -
->  arch/arm64/boot/Makefile | 2 ++
->  4 files changed, 4 insertions(+), 2 deletions(-)
->
+On Sat, Jul 16, 2016 at 02:00:25PM +0530, Bhaktipriya Shridhar wrote:
+> alloc_workqueue replaces deprecated create_singlethread_workqueue().
+> 
+> The MFC device driver is a v4l2 driver which can encode/decode video
+> raw/elementary streams and has support for all popular video codecs.
+> 
+> The driver's watchdog_workqueue has been replaced with system_wq since
+> it queues a single work item, &dev->watchdog_work, which calls for no
+> ordering requirement. The work item is involved in running the watchdog
+> timer and is not being used on a memory reclaim path.
+> 
+> Work item has been flushed in s5p_mfc_remove() to ensure
+> that there are no pending tasks while disconnecting the driver.
+> 
+> Signed-off-by: Bhaktipriya Shridhar <bhaktipriya96@gmail.com>
 
-Kees' lkdtm tests compile and boot successfully with this patch for
-both arm and arm64 so you can add
+Acked-by: Tejun Heo <tj@kernel.org>
 
-Tested-by: Laura Abbott <labbott@redhat.com>
+Thanks.
 
-Thanks,
-Laura
+-- 
+tejun
