@@ -1,76 +1,66 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Mon, 18 Jul 2016 18:47:21 +0100
-Subject: [PATCH 00/13] A bunch of vgic-its fixes
-In-Reply-To: <1468857255-9543-1-git-send-email-marc.zyngier@arm.com>
-References: <1468857255-9543-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <f2d8f9c9-9d0d-ee4a-8c24-c6e641488699@arm.com>
+From: ray.jui@broadcom.com (Ray Jui)
+Date: Mon, 18 Jul 2016 10:47:01 -0700
+Subject: [PATCH 1/2] mtd: brcmnand: iProc big endian and ONFI support
+In-Reply-To: <CAGt4E5tyANE-fiRNp=qZHLJLp+XCd0i74E0n2vgedQC5Rb46+g@mail.gmail.com>
+References: <1468863377-31862-1-git-send-email-ray.jui@broadcom.com>
+ <1468863377-31862-2-git-send-email-ray.jui@broadcom.com>
+ <CAGt4E5tyANE-fiRNp=qZHLJLp+XCd0i74E0n2vgedQC5Rb46+g@mail.gmail.com>
+Message-ID: <02461aa0-687b-f640-e06a-677bf7608673@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+Hi Markus,
 
-On 18/07/16 16:54, Marc Zyngier wrote:
-> As the ITS series has been posted 10 times now, and we're still
-> finding issues, I've decided to directly fix things rather than
-> commenting on them and waiting for a respin, as we are getting way too
-> close to the merge window. So I sat over the weekend and started doing
-> "stuff".
-> 
-> There is a bit of everything in there: some cosmetic things, but also
-> some more severe bugs (indirect tables were completely foobar) and
-> regressions (the cpuif stuff that Eric fixed).
+On 7/18/2016 10:41 AM, Markus Mayer wrote:
+> On 18 July 2016 at 10:36, Ray Jui <ray.jui@broadcom.com> wrote:
+>> This patch adds big endian and ONFI support for various iProc based
+>> SoCs that use the core brcmstb NAND controller
+>>
+>> This patch was originally implemented by Prafulla Kota
+>> <prafulla.kota@broadcom.com> and fully tested on iProc based NS2 SVK
+>>
+>> Signed-off-by: Prafulla Kota <prafulla.kota@broadcom.com>
+>> Signed-off-by: Ray Jui <ray.jui@broadcom.com>
+>> ---
+>>  drivers/mtd/nand/brcmnand/brcmnand.c   | 12 ++++++------
+>>  drivers/mtd/nand/brcmnand/brcmnand.h   | 13 ++++++++-----
+>>  drivers/mtd/nand/brcmnand/iproc_nand.c | 17 +++++++++++++----
+>>  3 files changed, 27 insertions(+), 15 deletions(-)
+>>
+>> diff --git a/drivers/mtd/nand/brcmnand/brcmnand.c b/drivers/mtd/nand/brcmnand/brcmnand.c
+>> index b76ad7c..12a1585 100644
+>> --- a/drivers/mtd/nand/brcmnand/brcmnand.c
+>> +++ b/drivers/mtd/nand/brcmnand/brcmnand.c
 
-I wonder if it's worth to squash:
-- 01/13 into 09/17
-- 02/13 into 07/17
-- 04/13 into 15/17
-with appropriate comments in the commit message to credit the bug fixes
-and their authors?
+...
+...
 
-That worked for me without further ado and would leave the git tree
-bisectable - both in terms of compilability (every single commit
-compiled for me with arm64/defconfig without warnings) and functionality
-(tested new commit 17/17 with direct and indirect tables on the
-model(ITS) and qemu and kvmtool on Juno).
+>> +       /*
+>> +        * In the case of BE or when dealing with NAND data, alway configure
+>> +        * the APB bus to LE mode before accessing the FIFO and back to BE mode
+>> +        * after the access is done
+>> +        */
+>> +       if (IS_ENABLED(CONFIG_CPU_BIG_ENDIAN) || !is_param) {
+>> +               if (prepare)
+>> +                       val |= IPROC_NAND_APB_LE_MODE;
+>> +               else
+>> +                       val &= ~IPROC_NAND_APB_LE_MODE;
+>> +       } else /* when in LE accessing the parameter page, keep APB in BE */
+>
+> The coding guidelines state that if you need braces around one branch
+> of an if/else combination, you must use them on the other branch,
+> also, even if the other branch is just one line.
+>
 
-It would be a pity if other people bisecting the kernel get punished for
-my silly mistakes.
+Yes, I will add braces around in the next revision of this patch.
 
-> Unless someone shouts at me, I intend to put that on top of Andre's
-> series, and put the whole thing into -next. I've tested it on a LS2085
-> with kvmtool, using both flat and indirect device tables.
+>>                 val &= ~IPROC_NAND_APB_LE_MODE;
+>>
+>>         brcmnand_writel(val, mmio);
+>> --
+>> 2.1.4
+>>
 
-I am fine with all those.
+Thanks,
 
-Thanks!
-Andre.
-
-> Eric Auger (1):
->   KVM: arm/arm64: Fix vGICv2 KVM_DEV_ARM_VGIC_GRP_CPU/DIST_REGS
-> 
-> Marc Zyngier (12):
->   irqchip/gicv3-its: Restore all cacheability attributes
->   KVM: arm64: vgic-its: Generalize use of vgic_get_irq_kref
->   KVM: arm64: vgic-its: Fix handling of indirect tables
->   KVM: arm64: vgic-its: Fix vgic_its_check_device_id BE handling
->   KVM: arm64: vgic-its: Fix misleading nr_entries in
->     vgic_its_check_device_id
->   KVM: arm64: vgic-its: Validate the device table L1 entry
->   KVM: arm64: vgic-its: Fix L2 entry validation for indirect tables
->   KVM: arm64: vgic-its: Add collection allocator/destructor
->   KVM: arm64: vgic-its: Add pointer to corresponding kvm_device
->   KVM: arm64: vgic-its: Turn device_id validation into generic ID
->     validation
->   KVM: arm64: vgic-its: Make vgic_its_cmd_handle_mapi similar to other
->     handlers
->   KVM: arm64: vgic-its: Simplify MAPI error handling
-> 
->  include/kvm/arm_vgic.h             |   1 +
->  include/linux/irqchip/arm-gic-v3.h |  48 ++++++--
->  virt/kvm/arm/vgic/vgic-its.c       | 224 ++++++++++++++++++++-----------------
->  virt/kvm/arm/vgic/vgic-mmio-v2.c   |   2 +
->  virt/kvm/arm/vgic/vgic-mmio.c      |   4 +-
->  virt/kvm/arm/vgic/vgic.c           |  10 +-
->  virt/kvm/arm/vgic/vgic.h           |   8 ++
->  7 files changed, 175 insertions(+), 122 deletions(-)
-> 
+Ray
