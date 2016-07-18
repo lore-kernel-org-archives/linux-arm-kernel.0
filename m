@@ -1,122 +1,93 @@
-From: jun.li@nxp.com (Li Jun)
-Date: Mon, 18 Jul 2016 19:15:47 +0800
-Subject: [PATCH 4/4] usb: chipidea: imx: set over current polarity per dts
- setting
-In-Reply-To: <1468840547-17899-1-git-send-email-jun.li@nxp.com>
-References: <1468840547-17899-1-git-send-email-jun.li@nxp.com>
-Message-ID: <1468840547-17899-4-git-send-email-jun.li@nxp.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Mon, 18 Jul 2016 14:12:51 +0300
+Subject: [PATCH 7/7] dmaengine: omap-dma: Support for LinkedList transfer
+ of slave_sg
+In-Reply-To: <20160718104159.GI5783@n2100.arm.linux.org.uk>
+References: <20160714124242.7579-1-peter.ujfalusi@ti.com>
+ <20160714124242.7579-8-peter.ujfalusi@ti.com>
+ <20160718104159.GI5783@n2100.arm.linux.org.uk>
+Message-ID: <bdbe3852-ec51-cb91-9dd0-ebb817cc8b57@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With over-current-polarity property added, imx usb over current
-polarity can be configed to be low or high active, since the default
-setting value(0) is for active high, so keep this setting for those
-legacy platforms without this property specified.
+On 07/18/16 13:42, Russell King - ARM Linux wrote:
+> On Thu, Jul 14, 2016 at 03:42:42PM +0300, Peter Ujfalusi wrote:
+>>  struct omap_desc {
+>> +	struct omap_chan *c;
+>>  	struct virt_dma_desc vd;
+> 
+> No need for this.  to_omap_dma_chan(foo->vd.tx.chan) will give you the
+> omap_chan for the descriptor.  In any case, I question whether you
+> actually need this (see below.)
 
-Signed-off-by: Li Jun <jun.li@nxp.com>
----
- drivers/usb/chipidea/ci_hdrc_imx.c |  9 +++++++++
- drivers/usb/chipidea/ci_hdrc_imx.h |  1 +
- drivers/usb/chipidea/usbmisc_imx.c | 30 +++++++++++++++++++++++++-----
- 3 files changed, 35 insertions(+), 5 deletions(-)
+I don't know how I missed that. Works and looks better!
 
-diff --git a/drivers/usb/chipidea/ci_hdrc_imx.c b/drivers/usb/chipidea/ci_hdrc_imx.c
-index dedc33e..61e712b 100644
---- a/drivers/usb/chipidea/ci_hdrc_imx.c
-+++ b/drivers/usb/chipidea/ci_hdrc_imx.c
-@@ -140,6 +140,15 @@ static struct imx_usbmisc_data *usbmisc_get_init_data(struct device *dev)
- 	if (of_find_property(np, "disable-over-current", NULL))
- 		data->disable_oc = 1;
- 
-+	if (!of_property_read_u32(np, "over-current-polarity", &ret))
-+		data->oc_polarity = ret ? 1 : 0;
-+	else
-+		/*
-+		 * Keep the oc polarity setting of legacy
-+		 * platforms unchanged.
-+		 */
-+		data->oc_polarity = 1;
-+
- 	if (of_find_property(np, "external-vbus-divider", NULL))
- 		data->evdo = 1;
- 
-diff --git a/drivers/usb/chipidea/ci_hdrc_imx.h b/drivers/usb/chipidea/ci_hdrc_imx.h
-index 635717e..409aa5ca8 100644
---- a/drivers/usb/chipidea/ci_hdrc_imx.h
-+++ b/drivers/usb/chipidea/ci_hdrc_imx.h
-@@ -17,6 +17,7 @@ struct imx_usbmisc_data {
- 	int index;
- 
- 	unsigned int disable_oc:1; /* over current detect disabled */
-+	unsigned int oc_polarity:1; /* over current polarity if oc enabled */
- 	unsigned int evdo:1; /* set external vbus divider option */
- };
- 
-diff --git a/drivers/usb/chipidea/usbmisc_imx.c b/drivers/usb/chipidea/usbmisc_imx.c
-index ab8b027..193dbe4 100644
---- a/drivers/usb/chipidea/usbmisc_imx.c
-+++ b/drivers/usb/chipidea/usbmisc_imx.c
-@@ -56,6 +56,7 @@
- 
- #define MX6_BM_NON_BURST_SETTING	BIT(1)
- #define MX6_BM_OVER_CUR_DIS		BIT(7)
-+#define MX6_BM_OVER_CUR_POLARITY	BIT(8)
- #define MX6_BM_WAKEUP_ENABLE		BIT(10)
- #define MX6_BM_ID_WAKEUP		BIT(16)
- #define MX6_BM_VBUS_WAKEUP		BIT(17)
-@@ -266,11 +267,18 @@ static int usbmisc_imx6q_init(struct imx_usbmisc_data *data)
- 
- 	spin_lock_irqsave(&usbmisc->lock, flags);
- 
-+	reg = readl(usbmisc->base + data->index * 4);
- 	if (data->disable_oc) {
--		reg = readl(usbmisc->base + data->index * 4);
--		writel(reg | MX6_BM_OVER_CUR_DIS,
--			usbmisc->base + data->index * 4);
-+		reg |= MX6_BM_OVER_CUR_DIS;
-+	} else if (data->oc_polarity == 1) {
-+		/* High active */
-+		reg &= ~(MX6_BM_OVER_CUR_DIS | MX6_BM_OVER_CUR_POLARITY);
-+	} else {
-+		/* Low active */
-+		reg &= ~MX6_BM_OVER_CUR_DIS;
-+		reg |= MX6_BM_OVER_CUR_POLARITY;
- 	}
-+	writel(reg, usbmisc->base + data->index * 4);
- 
- 	/* SoC non-burst setting */
- 	reg = readl(usbmisc->base + data->index * 4);
-@@ -365,10 +373,18 @@ static int usbmisc_imx7d_init(struct imx_usbmisc_data *data)
- 		return -EINVAL;
- 
- 	spin_lock_irqsave(&usbmisc->lock, flags);
-+	reg = readl(usbmisc->base);
- 	if (data->disable_oc) {
--		reg = readl(usbmisc->base);
--		writel(reg | MX6_BM_OVER_CUR_DIS, usbmisc->base);
-+		reg |= MX6_BM_OVER_CUR_DIS;
-+	} else if (data->oc_polarity == 1) {
-+		/* High active */
-+		reg &= ~(MX6_BM_OVER_CUR_DIS | MX6_BM_OVER_CUR_POLARITY);
-+	} else {
-+		/* Low active */
-+		reg &= ~MX6_BM_OVER_CUR_DIS;
-+		reg |= MX6_BM_OVER_CUR_POLARITY;
- 	}
-+	writel(reg, usbmisc->base);
- 
- 	reg = readl(usbmisc->base + MX7D_USBNC_USB_CTRL2);
- 	reg &= ~MX7D_USB_VBUS_WAKEUP_SOURCE_MASK;
-@@ -492,6 +508,10 @@ static const struct of_device_id usbmisc_imx_dt_ids[] = {
- 		.compatible = "fsl,imx6ul-usbmisc",
- 		.data = &imx6sx_usbmisc_ops,
- 	},
-+	{
-+		.compatible = "fsl,imx7d-usbmisc",
-+		.data = &imx7d_usbmisc_ops,
-+	},
- 	{ /* sentinel */ }
- };
- MODULE_DEVICE_TABLE(of, usbmisc_imx_dt_ids);
+
+>> +	bool using_ll;
+>>  	enum dma_transfer_direction dir;
+>>  	dma_addr_t dev_addr;
+>>  
+>> @@ -81,6 +109,9 @@ struct omap_desc {
+>>  };
+>>  
+>>  enum {
+>> +	CAPS_0_SUPPORT_LL123	= BIT(20),	/* Linked List type1/2/3 */
+>> +	CAPS_0_SUPPORT_LL4	= BIT(21),	/* Linked List type4 */
+>> +
+>>  	CCR_FS			= BIT(5),
+>>  	CCR_READ_PRIORITY	= BIT(6),
+>>  	CCR_ENABLE		= BIT(7),
+>> @@ -151,6 +182,19 @@ enum {
+>>  	CICR_SUPER_BLOCK_IE	= BIT(14),	/* OMAP2+ only */
+>>  
+>>  	CLNK_CTRL_ENABLE_LNK	= BIT(15),
+>> +
+>> +	CDP_DST_VALID_INC	= 0 << 0,
+>> +	CDP_DST_VALID_RELOAD	= 1 << 0,
+>> +	CDP_DST_VALID_REUSE	= 2 << 0,
+>> +	CDP_SRC_VALID_INC	= 0 << 2,
+>> +	CDP_SRC_VALID_RELOAD	= 1 << 2,
+>> +	CDP_SRC_VALID_REUSE	= 2 << 2,
+>> +	CDP_NTYPE_TYPE1		= 1 << 4,
+>> +	CDP_NTYPE_TYPE2		= 2 << 4,
+>> +	CDP_NTYPE_TYPE3		= 3 << 4,
+>> +	CDP_TMODE_NORMAL	= 0 << 8,
+>> +	CDP_TMODE_LLIST		= 1 << 8,
+>> +	CDP_FAST		= BIT(10),
+>>  };
+>>  
+>>  static const unsigned es_bytes[] = {
+>> @@ -180,7 +224,64 @@ static inline struct omap_desc *to_omap_dma_desc(struct dma_async_tx_descriptor
+>>  
+>>  static void omap_dma_desc_free(struct virt_dma_desc *vd)
+>>  {
+>> -	kfree(container_of(vd, struct omap_desc, vd));
+>> +	struct omap_desc *d = container_of(vd, struct omap_desc, vd);
+> 
+> 	struct omap_desc *d = to_omap_dma_desc(&vd->tx);
+> 
+> works just as well, and looks much nicer, and follows the existing code
+> pattern.
+
+Yes, I missed this as well.
+
+>> +
+>> +	if (d->using_ll) {
+>> +		struct omap_chan *c = d->c;
+>> +		int i;
+>> +
+>> +		for (i = 0; i < d->sglen; i++) {
+>> +			if (d->sg[i].t2_desc)
+>> +				dma_pool_free(c->desc_pool, d->sg[i].t2_desc,
+>> +					      d->sg[i].t2_desc_paddr);
+> 
+> Why do you need a per-channel pool of descriptors?  Won't a per-device
+> descriptor pool be much better, and simplify the code here?
+
+I was planning to try per-device pool after this series. I think I went with
+per-channel pool as for example bcm2835-dma was doing the same.
+In code wise I don't think it is going to simplify much as we still need to
+free here what we have allocated. I can test this out.
+
 -- 
-1.9.1
+P?ter
