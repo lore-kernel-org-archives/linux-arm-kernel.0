@@ -1,29 +1,25 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Mon, 18 Jul 2016 17:23:21 -0400
-Subject: [PATCH V9 4/9] vfio: platform: add support for ACPI probe
-In-Reply-To: <20160718113208.5afb26c2@t450s.home>
-References: <1468461995-32676-1-git-send-email-okaya@codeaurora.org>
- <1468461995-32676-5-git-send-email-okaya@codeaurora.org>
- <20160714154146.38e37d84@t450s.home>
- <bd8dacde-da6c-2353-7488-58b2f050699c@codeaurora.org>
- <20160718113208.5afb26c2@t450s.home>
-Message-ID: <83c60af8-ad2a-d351-eace-82e653183521@codeaurora.org>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Mon, 18 Jul 2016 16:24:21 -0500
+Subject: [PATCH 03/10] of: irq: make of_msi_configure accessible from
+ modules
+In-Reply-To: <1468867177-15007-4-git-send-email-okaya@codeaurora.org>
+References: <1468867177-15007-1-git-send-email-okaya@codeaurora.org>
+ <1468867177-15007-4-git-send-email-okaya@codeaurora.org>
+Message-ID: <CAL_Jsq+zLb0RcEdykDZXZpkgjjrDWa+-Bd0LTth3kB4H5X9pOQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7/18/2016 1:32 PM, Alex Williamson wrote:
-> The implementation looks pretty fixed, it seems like a lot would break
-> if that were changed, so the callers of the function would need to be
-> updated, including this one.  The ternary below is already paranoid
-> enough to handle an API change, but if you want to add one more level
-> of paranoia, you could use WARN_ON(!vdev->acpihid) to make it user
-> visible.  It could still be done as:
-> 
-> return WARN_ON(!vdev->acpihid) ? -ENOENT : 0;
+On Mon, Jul 18, 2016 at 1:39 PM, Sinan Kaya <okaya@codeaurora.org> wrote:
+> The of_msi_configure routine is only accessible by the built-in
+> kernel drivers. Export this function so that modules can use it
+> too.
+>
+> This function is useful for configuring MSI on child device tree
+> nodes on hierarchical objects.
+>
+> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+> ---
+>  drivers/of/irq.c | 1 +
+>  1 file changed, 1 insertion(+)
 
-OK. I'm adding this and will post a new version after testing.
-
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Acked-by: Rob Herring <robh@kernel.org>
