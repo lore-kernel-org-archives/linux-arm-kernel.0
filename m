@@ -1,90 +1,85 @@
 From: jic23@kernel.org (Jonathan Cameron)
-Date: Mon, 18 Jul 2016 14:38:25 +0100
-Subject: [PATCH v2 2/2] iio: adc: sun4i_lradc: new driver
-In-Reply-To: <1468350252-11405-2-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1468350252-11405-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1468350252-11405-2-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <fe1ff787-7899-b29a-a11d-9a3048ab8b55@kernel.org>
+Date: Mon, 18 Jul 2016 18:12:13 +0100
+Subject: [PATCH v4 2/3] iio: adc: mt2701: Add Mediatek auxadc driver for
+ mt2701.
+In-Reply-To: <1468219197-9572-3-git-send-email-zhiyong.tao@mediatek.com>
+References: <1468219197-9572-1-git-send-email-zhiyong.tao@mediatek.com>
+ <1468219197-9572-3-git-send-email-zhiyong.tao@mediatek.com>
+Message-ID: <82fa5ffa-52be-e1ec-83dd-dd92b3f3ef5d@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/07/16 20:04, Alexandre Belloni wrote:
-> Add an IIO driver for the Allwinner Low Resolution ADC. This ADC is usually
-> used for physical buttons connected using a resistor ladder.
+On 11/07/16 07:39, Zhiyong Tao wrote:
+> Add Mediatek auxadc driver based on iio.
+> It will register a device in iio and support iio.
+> So thermal can read auxadc channel to sample data by iio device.
+> It is tested successfully on mt2701 platform.
+> Mt8173 and mt6577 platforms are not tested.
+> But the expectation is compatible.
 > 
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-A few small bits and pieces from me...
+> Signed-off-by: Zhiyong Tao <zhiyong.tao@mediatek.com>
+Looks good to me.  Couple of really minor points / questions inline...
+
+Just one thing to confirm... (you probably already answered this!)
+What are the units of the voltage channels?
 
 Jonathan
 > ---
-> Changes in v2:
->  - prefixed defines with SUN4I_LRADC_
->  - removed sun4i_lradc_write_raw_get_fmt
->  - set indio_dev->dev.of_node
->  - pushed devm_iio_device_register() at the end of the probe function
->  - added a remove function to call regulator_disable()
-> 
->  drivers/iio/adc/Kconfig       |  10 ++
->  drivers/iio/adc/Makefile      |   3 +-
->  drivers/iio/adc/sun4i_lradc.c | 323 ++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 335 insertions(+), 1 deletion(-)
->  create mode 100644 drivers/iio/adc/sun4i_lradc.c
+>  drivers/iio/adc/Kconfig         |   13 ++
+>  drivers/iio/adc/Makefile        |    1 +
+>  drivers/iio/adc/mt6577_auxadc.c |  294 +++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 308 insertions(+)
+>  create mode 100644 drivers/iio/adc/mt6577_auxadc.c
 > 
 > diff --git a/drivers/iio/adc/Kconfig b/drivers/iio/adc/Kconfig
-> index 25378c5882e2..87aaac6a5f44 100644
+> index 25378c5..14929fc 100644
 > --- a/drivers/iio/adc/Kconfig
 > +++ b/drivers/iio/adc/Kconfig
-> @@ -384,6 +384,16 @@ config ROCKCHIP_SARADC
->  	  To compile this driver as a module, choose M here: the
->  	  module will be called rockchip_saradc.
+> @@ -305,6 +305,19 @@ config MCP3422
+>  	  This driver can also be built as a module. If so, the module will be
+>  	  called mcp3422.
 >  
-> +config SUN4I_LRADC
-> +	tristate "Allwinner sun4i LRADC driver"
-> +	depends on ARCH_SUNXI || COMPILE_TEST
-> +	select IIO_TRIGGER
-> +	help
-> +	  Say yes here to build support for the LRADC found on Allwinner SoCs.
+> +config MEDIATEK_MT6577_AUXADC
+> +        tristate "MediaTek AUXADC driver"
+> +        depends on ARCH_MEDIATEK || COMPILE_TEST
+> +        depends on HAS_IOMEM
+> +        help
+> +          Say yes here to enable support for MediaTek mt65xx AUXADC.
 > +
-> +	  To compile this driver as a module, choose M here: the module will be
-> +	  called sun4i_lradc.
+> +          The driver supports immediate mode operation to read from one of sixteen
+> +          channels (external or internal).
 > +
->  config TI_ADC081C
->  	tristate "Texas Instruments ADC081C/ADC101C/ADC121C family"
->  	depends on I2C
+> +          This driver can also be built as a module. If so, the module will be
+> +          called mt6577_auxadc.
+> +
+>  config MEN_Z188_ADC
+>  	tristate "MEN 16z188 ADC IP Core support"
+>  	depends on MCB
 > diff --git a/drivers/iio/adc/Makefile b/drivers/iio/adc/Makefile
-> index 38638d46f972..a3b165af6bde 100644
+> index 38638d4..8306347 100644
 > --- a/drivers/iio/adc/Makefile
 > +++ b/drivers/iio/adc/Makefile
-> @@ -1,4 +1,4 @@
-> -#
-> +
-??
->  # Makefile for IIO ADC drivers
->  #
->  
-> @@ -37,6 +37,7 @@ obj-$(CONFIG_PALMAS_GPADC) += palmas_gpadc.o
->  obj-$(CONFIG_QCOM_SPMI_IADC) += qcom-spmi-iadc.o
->  obj-$(CONFIG_QCOM_SPMI_VADC) += qcom-spmi-vadc.o
->  obj-$(CONFIG_ROCKCHIP_SARADC) += rockchip_saradc.o
-> +obj-$(CONFIG_SUN4I_LRADC) += sun4i_lradc.o
->  obj-$(CONFIG_TI_ADC081C) += ti-adc081c.o
->  obj-$(CONFIG_TI_ADC0832) += ti-adc0832.o
->  obj-$(CONFIG_TI_ADC128S052) += ti-adc128s052.o
-> diff --git a/drivers/iio/adc/sun4i_lradc.c b/drivers/iio/adc/sun4i_lradc.c
+> @@ -30,6 +30,7 @@ obj-$(CONFIG_MAX1027) += max1027.o
+>  obj-$(CONFIG_MAX1363) += max1363.o
+>  obj-$(CONFIG_MCP320X) += mcp320x.o
+>  obj-$(CONFIG_MCP3422) += mcp3422.o
+> +obj-$(CONFIG_MEDIATEK_MT6577_AUXADC) += mt6577_auxadc.o
+>  obj-$(CONFIG_MEN_Z188_ADC) += men_z188_adc.o
+>  obj-$(CONFIG_MXS_LRADC) += mxs-lradc.o
+>  obj-$(CONFIG_NAU7802) += nau7802.o
+> diff --git a/drivers/iio/adc/mt6577_auxadc.c b/drivers/iio/adc/mt6577_auxadc.c
 > new file mode 100644
-> index 000000000000..cd42e1a994b9
+> index 0000000..c7cc901
 > --- /dev/null
-> +++ b/drivers/iio/adc/sun4i_lradc.c
-> @@ -0,0 +1,323 @@
+> +++ b/drivers/iio/adc/mt6577_auxadc.c
+> @@ -0,0 +1,294 @@
 > +/*
-> + * Driver for the LRADC present on the  Allwinner sun4i
-> + *
-> + * Copyright 2016 Free Electrons
+> + * Copyright (c) 2016 MediaTek Inc.
+> + * Author: Zhiyong Tao <zhiyong.tao@mediatek.com>
 > + *
 > + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
 > + *
 > + * This program is distributed in the hope that it will be useful,
 > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -92,319 +87,289 @@ Jonathan
 > + * GNU General Public License for more details.
 > + */
 > +
-> +#include <linux/bitops.h>
+> +#include <linux/clk.h>
+> +#include <linux/delay.h>
 > +#include <linux/err.h>
-> +#include <linux/io.h>
-> +#include <linux/interrupt.h>
 > +#include <linux/kernel.h>
 > +#include <linux/module.h>
 > +#include <linux/of.h>
 > +#include <linux/of_device.h>
 > +#include <linux/platform_device.h>
-> +#include <linux/sched.h>
+> +#include <linux/iopoll.h>
+> +#include <linux/io.h>
 > +#include <linux/iio/iio.h>
-> +#include <linux/iio/sysfs.h>
-> +#include <linux/regulator/consumer.h>
 > +
-> +#define SUN4I_LRADC_CTRL		0x00
-> +#define SUN4I_LRADC_INTC		0x04
-> +#define SUN4I_LRADC_INTS		0x08
-> +#define SUN4I_LRADC_DATA0		0x0c
-> +#define SUN4I_LRADC_DATA1		0x10
+> +/* Register definitions */
+> +#define MT6577_AUXADC_CON0                    0x00
+> +#define MT6577_AUXADC_CON1                    0x04
+> +#define MT6577_AUXADC_CON2                    0x10
+> +#define MT6577_AUXADC_STA                     BIT(0)
 > +
-> +/* LRADC_CTRL bits */
-> +#define SUN4I_LRADC_FIRST_CONVERT_DLY(x)	((x) << 24) /* 8 bits */
-> +#define SUN4I_LRADC_CHAN_SELECT(x)		((x) << 22) /* 2 bits */
-> +#define SUN4I_LRADC_CONTINUE_TIME_SEL(x)	((x) << 16) /* 4 bits */
-> +#define SUN4I_LRADC_KEY_MODE_SEL(x)		((x) << 12) /* 2 bits */
-> +#define SUN4I_LRADC_LEVELA_B_CNT(x)		((x) << 8)  /* 4 bits */
-> +#define SUN4I_LRADC_HOLD_EN			BIT(6)
-> +#define SUN4I_LRADC_LEVELB_VOL(x)		((x) << 4)  /* 2 bits */
-> +#define SUN4I_LRADC_SAMPLE_RATE(x)		((x) << 2)  /* 2 bits */
-> +#define SUN4I_LRADC_EN				BIT(0)
+> +#define MT6577_AUXADC_DAT0                    0x14
+> +#define MT6577_AUXADC_RDY0                    BIT(12)
 > +
-> +/* LRADC_INTC and LRADC_INTS bits */
-> +#define SUN4I_LRADC_CHAN1_KEYUP_IRQ		BIT(12)
-> +#define SUN4I_LRADC_CHAN1_ALRDY_HOLD_IRQ	BIT(11)
-> +#define SUN4I_LRADC_CHAN1_HOLD_IRQ		BIT(10)
-> +#define	SUN4I_LRADC_CHAN1_KEYDOWN_IRQ	BIT(9)
-> +#define SUN4I_LRADC_CHAN1_DATA_IRQ		BIT(8)
-> +#define SUN4I_LRADC_CHAN0_KEYUP_IRQ		BIT(4)
-> +#define SUN4I_LRADC_CHAN0_ALRDY_HOLD_IRQ	BIT(3)
-> +#define SUN4I_LRADC_CHAN0_HOLD_IRQ		BIT(2)
-> +#define	SUN4I_LRADC_CHAN0_KEYDOWN_IRQ	BIT(1)
-> +#define SUN4I_LRADC_CHAN0_DATA_IRQ		BIT(0)
+> +#define MT6577_AUXADC_MISC                    0x94
+> +#define MT6577_AUXADC_PDN_EN                  BIT(14)
 > +
-> +#define NUM_SUN4I_LRADC_CHANS		2
+> +#define MT6577_AUXADC_DAT_MASK                0xfff
+> +#define MT6577_AUXADC_SLEEP_US                1000
+> +#define MT6577_AUXADC_TIMEOUT_US              10000
+> +#define MT6577_AUXADC_POWER_READY_MS          1
+> +#define MT6577_AUXADC_SAMPLE_READY_US         25
 > +
-> +struct sun4i_lradc_state {
-> +	void __iomem *base;
-> +	struct regulator *vref_supply;
-> +	u32 vref_mv;
-> +	struct completion data_ok[NUM_SUN4I_LRADC_CHANS];
-> +	spinlock_t lock;
+> +struct mt6577_auxadc_device {
+> +	void __iomem *reg_base;
+> +	struct clk *adc_clk;
+> +	struct mutex lock;
 > +};
 > +
-> +#define SUN4I_LRADC_CHANNEL(chan) {				\
-> +	.type = IIO_VOLTAGE,					\
-> +	.indexed = 1,						\
-> +	.channel = (chan),					\
-> +	.scan_index = (chan),					\
-> +	.info_mask_separate = BIT(IIO_CHAN_INFO_RAW),		\
-> +	.info_mask_shared_by_type = BIT(IIO_CHAN_INFO_SCALE) |	\
-> +				BIT(IIO_CHAN_INFO_SAMP_FREQ)	\
+> +#define MT6577_AUXADC_CHANNEL(idx) {				    \
+> +		.type = IIO_VOLTAGE,				    \
+> +		.indexed = 1,					    \
+> +		.channel = (idx),				    \
+> +		.info_mask_separate = BIT(IIO_CHAN_INFO_PROCESSED), \
 > +}
 > +
-> +static const struct iio_chan_spec sun4i_lradc_chan_array[] = {
-> +	SUN4I_LRADC_CHANNEL(0),
-> +	SUN4I_LRADC_CHANNEL(1),
+> +static const struct iio_chan_spec mt6577_auxadc_iio_channels[] = {
+> +	MT6577_AUXADC_CHANNEL(0),
+> +	MT6577_AUXADC_CHANNEL(1),
+> +	MT6577_AUXADC_CHANNEL(2),
+> +	MT6577_AUXADC_CHANNEL(3),
+> +	MT6577_AUXADC_CHANNEL(4),
+> +	MT6577_AUXADC_CHANNEL(5),
+> +	MT6577_AUXADC_CHANNEL(6),
+> +	MT6577_AUXADC_CHANNEL(7),
+> +	MT6577_AUXADC_CHANNEL(8),
+> +	MT6577_AUXADC_CHANNEL(9),
+> +	MT6577_AUXADC_CHANNEL(10),
+> +	MT6577_AUXADC_CHANNEL(11),
+> +	MT6577_AUXADC_CHANNEL(12),
+> +	MT6577_AUXADC_CHANNEL(13),
+> +	MT6577_AUXADC_CHANNEL(14),
+> +	MT6577_AUXADC_CHANNEL(15),
 > +};
 > +
-> +static const struct {
-> +	int val;
-> +	int val2;
-> +} sun4i_lradc_sample_freq_avail[] = {
-> +	{250, 0},
-> +	{125, 0},
-> +	{62, 500000},
-> +	{32, 250000},
-> +};
-> +
-> +static IIO_CONST_ATTR_SAMP_FREQ_AVAIL("32.25 62.5 125 250");
-> +
-> +static struct attribute *sun4i_lradc_attributes[] = {
-> +	&iio_const_attr_sampling_frequency_available.dev_attr.attr,
-> +	NULL
-> +};
-> +
-> +static const struct attribute_group sun4i_lradc_attribute_group = {
-> +	.attrs = sun4i_lradc_attributes,
-> +};
-> +
-> +static irqreturn_t sun4i_lradc_irq(int irq, void *dev_id)
+> +static int mt6577_auxadc_read(struct iio_dev *indio_dev,
+> +			      struct iio_chan_spec const *chan)
 > +{
-> +	struct iio_dev *indio_dev = dev_id;
-> +	struct sun4i_lradc_state *st = iio_priv(indio_dev);
-> +	u32 ints, intc;
+> +	u32 rawdata, val;
+> +	void __iomem *reg_channel;
+> +	int ret;
+> +	struct mt6577_auxadc_device *adc_dev = iio_priv(indio_dev);
 > +
-> +	spin_lock(&st->lock);
+> +	reg_channel = adc_dev->reg_base + MT6577_AUXADC_DAT0 +
+> +		      chan->channel * 0x04;
 > +
-> +	ints = readl(st->base + SUN4I_LRADC_INTS);
-> +	intc = readl(st->base + SUN4I_LRADC_INTC);
+> +	mutex_lock(&adc_dev->lock);
 > +
-> +	if (ints & SUN4I_LRADC_CHAN0_DATA_IRQ)
-> +		complete_all(&st->data_ok[0]);
+> +	val = readl(adc_dev->reg_base + MT6577_AUXADC_CON1);
+> +	val &= ~(1 << chan->channel);
+> +	writel(val, adc_dev->reg_base + MT6577_AUXADC_CON1);
 > +
-> +	if (ints & SUN4I_LRADC_CHAN1_DATA_IRQ)
-> +		complete_all(&st->data_ok[1]);
+> +	/* read channel and make sure old ready bit == 0 */
+> +	ret = readl_poll_timeout(reg_channel, val,
+> +				 ((val & MT6577_AUXADC_RDY0) == 0),
+> +				 MT6577_AUXADC_SLEEP_US,
+> +				 MT6577_AUXADC_TIMEOUT_US);
+> +	if (ret < 0) {
+> +		dev_err(indio_dev->dev.parent,
+> +			"wait for channel[%d] ready bit clear time out\n",
+> +			chan->channel);
 > +
-> +	intc &= ~ints;
-> +	writel(intc, st->base + SUN4I_LRADC_INTC);
-> +	writel(ints, st->base + SUN4I_LRADC_INTS);
+> +		mutex_unlock(&adc_dev->lock);
 > +
-> +	spin_unlock(&st->lock);
+> +		return -ETIMEDOUT;
+> +	}
 > +
-> +	return IRQ_HANDLED;
+> +	/* set bit to trigger sample */
+> +	val = readl(adc_dev->reg_base + MT6577_AUXADC_CON1);
+> +	val |= 1 << chan->channel;
+> +	writel(val, adc_dev->reg_base + MT6577_AUXADC_CON1);
+> +
+> +	/* we must delay here for hardware sample channel data */
+> +	udelay(MT6577_AUXADC_SAMPLE_READY_US);
+> +
+> +	/* check MTK_AUXADC_CON2 if auxadc is idle */
+> +	ret = readl_poll_timeout(adc_dev->reg_base + MT6577_AUXADC_CON2, val,
+> +				 ((val & MT6577_AUXADC_STA) == 0),
+> +				 MT6577_AUXADC_SLEEP_US,
+> +				 MT6577_AUXADC_TIMEOUT_US);
+> +	if (ret < 0) {
+> +		dev_err(indio_dev->dev.parent,
+> +			"wait for auxadc idle time out\n");
+> +
+> +		mutex_unlock(&adc_dev->lock);
+> +
+> +		return -ETIMEDOUT;
+> +	}
+> +
+> +	/* read channel and make sure ready bit == 1 */
+> +	ret = readl_poll_timeout(reg_channel, val,
+> +				 ((val & MT6577_AUXADC_RDY0) != 0),
+> +				 MT6577_AUXADC_SLEEP_US,
+> +				 MT6577_AUXADC_TIMEOUT_US);
+> +	if (ret < 0) {
+> +		dev_err(indio_dev->dev.parent,
+> +			"wait for channel[%d] data ready time out\n",
+> +			chan->channel);
+> +
+> +		mutex_unlock(&adc_dev->lock);
+> +
+> +		return -ETIMEDOUT;
+> +	}
+> +
+> +	/* read data */
+> +	rawdata = readl(reg_channel) & MT6577_AUXADC_DAT_MASK;
+> +
+> +	mutex_unlock(&adc_dev->lock);
+> +
+> +	return rawdata;
 > +}
 > +
-> +static int sun4i_lradc_read_raw(struct iio_dev *indio_dev,
-> +				struct iio_chan_spec const *chan,
-> +				int *val, int *val2, long mask)
+> +static int mt6577_auxadc_read_raw(struct iio_dev *indio_dev,
+> +				  struct iio_chan_spec const *chan,
+> +				  int *val,
+> +				  int *val2,
+> +				  long info)
 > +{
-> +	struct sun4i_lradc_state *st = iio_priv(indio_dev);
-> +	int ret, tmp, idx;
-> +	unsigned long flags;
-> +
-> +	switch (mask) {
-> +	case IIO_CHAN_INFO_RAW:
-> +		reinit_completion(&st->data_ok[chan->channel]);
-> +		spin_lock_irqsave(&st->lock, flags);
-> +		tmp = readl(st->base + SUN4I_LRADC_INTC);
-> +
-> +		if (chan->channel)
-> +			tmp |= SUN4I_LRADC_CHAN1_DATA_IRQ;
-> +		else
-> +			tmp |= SUN4I_LRADC_CHAN0_DATA_IRQ;
-> +
-> +		writel(tmp, st->base + SUN4I_LRADC_INTC);
-> +		spin_unlock_irqrestore(&st->lock, flags);
-> +
-> +		ret = wait_for_completion_interruptible_timeout(
-> +			&st->data_ok[chan->channel],
-> +			msecs_to_jiffies(1000));
-> +		if (ret == 0)
-> +			return -ETIMEDOUT;
-> +
-> +		if (chan->channel)
-> +			*val = readl(st->base + SUN4I_LRADC_DATA1);
-> +		else
-> +			*val = readl(st->base + SUN4I_LRADC_DATA0);
-> +
+> +	switch (info) {
+> +	case IIO_CHAN_INFO_PROCESSED:
+> +		*val = mt6577_auxadc_read(indio_dev, chan);
+> +		if (*val < 0) {
+> +			dev_err(indio_dev->dev.parent,
+> +				"failed to sample data on channel[%d]\n",
+> +				chan->channel);
+> +			return *val;
+> +		}
 > +		return IIO_VAL_INT;
 > +
-> +	case IIO_CHAN_INFO_SCALE:
-> +		*val = st->vref_mv;
-> +		*val2 = 6;
-> +
-> +		return IIO_VAL_FRACTIONAL_LOG2;
-> +
-> +	case IIO_CHAN_INFO_SAMP_FREQ:
-> +		tmp = readl(st->base + SUN4I_LRADC_CTRL);
-> +		idx = (tmp >> 2) & 0x3;
-> +		*val = sun4i_lradc_sample_freq_avail[idx].val;
-> +		*val2 = sun4i_lradc_sample_freq_avail[idx].val2;
-> +		return IIO_VAL_INT_PLUS_MICRO;
-> +
 > +	default:
-> +		break;
+> +		return -EINVAL;
 > +	}
-> +
-> +	return -EINVAL;
 > +}
 > +
-> +static int sun4i_lradc_write_raw(struct iio_dev *indio_dev,
-> +				 struct iio_chan_spec const *chan,
-> +				 int val, int val2, long mask)
-> +{
-> +	struct sun4i_lradc_state *st = iio_priv(indio_dev);
-> +	u32 ctrl;
-> +	int i;
-> +
-> +	switch (mask) {
-> +	case IIO_CHAN_INFO_SAMP_FREQ:
-> +		for (i = 0; i < ARRAY_SIZE(sun4i_lradc_sample_freq_avail); i++)
-> +			if (sun4i_lradc_sample_freq_avail[i].val == val &&
-> +			    sun4i_lradc_sample_freq_avail[i].val2 == val2)
-> +				break;
-> +		if (i == ARRAY_SIZE(sun4i_lradc_sample_freq_avail))
-> +			return -EINVAL;
-> +
-> +		ctrl = readl(st->base + SUN4I_LRADC_CTRL);
-> +		ctrl &= ~SUN4I_LRADC_SAMPLE_RATE(0x3);
-> +		writel(ctrl | SUN4I_LRADC_SAMPLE_RATE(i),
-> +		       st->base + SUN4I_LRADC_CTRL);
-> +
-> +		return 0;
-> +
-> +	default:
-> +		break;
-> +	}
-> +
-> +	return -EINVAL;
-> +}
-> +
-> +static const struct iio_info sun4i_lradc_info = {
+> +static const struct iio_info mt6577_auxadc_info = {
 > +	.driver_module = THIS_MODULE,
-> +	.read_raw = sun4i_lradc_read_raw,
-> +	.write_raw = sun4i_lradc_write_raw,
-> +	.attrs = &sun4i_lradc_attribute_group,
+> +	.read_raw = &mt6577_auxadc_read_raw,
 > +};
 > +
-> +static int sun4i_lradc_probe(struct platform_device *pdev)
+> +static int mt6577_auxadc_probe(struct platform_device *pdev)
 > +{
+> +	struct mt6577_auxadc_device *adc_dev;
+> +	unsigned long adc_clk_rate;
+> +	struct resource *res;
 > +	struct iio_dev *indio_dev;
-> +	struct device *dev = &pdev->dev;
-> +	struct sun4i_lradc_state *st;
-> +	int err;
+> +	int ret;
+> +	u32 val;
 > +
-> +	indio_dev = devm_iio_device_alloc(dev, sizeof(*st));
+> +	indio_dev = devm_iio_device_alloc(&pdev->dev, sizeof(*adc_dev));
 > +	if (!indio_dev)
 > +		return -ENOMEM;
 > +
-> +	st = iio_priv(indio_dev);
+> +	adc_dev = iio_priv(indio_dev);
+> +	indio_dev->dev.parent = &pdev->dev;
+> +	indio_dev->name = dev_name(&pdev->dev);
+> +	indio_dev->info = &mt6577_auxadc_info;
+> +	indio_dev->modes = INDIO_DIRECT_MODE;
+> +	indio_dev->channels = mt6577_auxadc_iio_channels;
+> +	indio_dev->num_channels = ARRAY_SIZE(mt6577_auxadc_iio_channels);
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	adc_dev->reg_base = devm_ioremap_resource(&pdev->dev, res);
+> +	if (IS_ERR(adc_dev->reg_base)) {
+> +		dev_err(&pdev->dev, "failed to get auxadc base address.\n");
+> +		return PTR_ERR(adc_dev->reg_base);
+> +	}
+> +
+> +	adc_dev->adc_clk = devm_clk_get(&pdev->dev, "main");
+> +	if (IS_ERR(adc_dev->adc_clk)) {
+> +		dev_err(&pdev->dev, "failed to get auxadc clock\n");
+> +		return PTR_ERR(adc_dev->adc_clk);
+> +	}
+> +
+> +	ret = clk_prepare_enable(adc_dev->adc_clk);
+> +	if (ret) {
+> +		dev_err(&pdev->dev, "failed to enable auxadc clock\n");
+> +		return ret;
+> +	}
+> +
+> +	adc_clk_rate = clk_get_rate(adc_dev->adc_clk);
+> +	if (!adc_clk_rate) {
+> +		dev_err(&pdev->dev, "null clock rate!\n");
+> +		goto err_disable_clk;
+> +	}
+> +
+> +	mutex_init(&adc_dev->lock);
+> +
+> +	val = readl(adc_dev->reg_base + MT6577_AUXADC_MISC);
+> +	val |= MT6577_AUXADC_PDN_EN;
+> +	writel(val, adc_dev->reg_base + MT6577_AUXADC_MISC);
+> +	mdelay(MT6577_AUXADC_POWER_READY_MS);
+> +
+> +	val = readl(adc_dev->reg_base + MT6577_AUXADC_MISC);
+> +	if ((val & MT6577_AUXADC_PDN_EN) == 0) {
+That's a high level of paranoia... Any reason to believe this might fail?
+> +		dev_err(&pdev->dev, "failed to enable auxadc power!\n");
+> +		goto err_disable_clk;
+> +	}
 > +
 > +	platform_set_drvdata(pdev, indio_dev);
 > +
-> +	indio_dev->dev.parent = dev;
-> +	indio_dev->dev.of_node = dev->of_node;
-> +	indio_dev->name = dev_name(dev);
-> +	indio_dev->modes = INDIO_DIRECT_MODE;
-> +	indio_dev->info = &sun4i_lradc_info;
-> +
-> +	st->vref_supply = devm_regulator_get(dev, "vref");
-> +	if (IS_ERR(st->vref_supply))
-> +		return PTR_ERR(st->vref_supply);
-> +
-> +	st->base = devm_ioremap_resource(dev,
-> +			platform_get_resource(pdev, IORESOURCE_MEM, 0));
-> +	if (IS_ERR(st->base))
-> +		return PTR_ERR(st->base);
-> +
-> +	/* Disable then clear all interrupts */
-> +	writel(0, st->base + SUN4I_LRADC_INTC);
-> +	writel(0xffffffff, st->base + SUN4I_LRADC_INTS);
-> +
-> +	err = devm_request_irq(dev, platform_get_irq(pdev, 0),
-> +			       sun4i_lradc_irq, 0,
-> +			       "sun4i-a10-lradc", indio_dev);
-> +	if (err)
-> +		return err;
-> +
-> +	/* Setup the ADC channels available on the board */
-> +	indio_dev->num_channels = ARRAY_SIZE(sun4i_lradc_chan_array);
-> +	indio_dev->channels = sun4i_lradc_chan_array;
-> +
-> +	err = regulator_enable(st->vref_supply);
-> +	if (err)
-> +		return err;
-> +
-> +	/* lradc Vref internally is divided by 2/3 */
-> +	st->vref_mv = regulator_get_voltage(st->vref_supply) * 2 / 3000;
-> +
-> +	init_completion(&st->data_ok[0]);
-> +	init_completion(&st->data_ok[1]);
-> +	spin_lock_init(&st->lock);
-> +
-> +	/* Continuous mode on both channels */
-> +	writel(SUN4I_LRADC_CHAN_SELECT(0x3) | SUN4I_LRADC_KEY_MODE_SEL(0x2) |
-> +	       SUN4I_LRADC_SAMPLE_RATE(0x00) | SUN4I_LRADC_EN,
-> +	       st->base + SUN4I_LRADC_CTRL);
-> +
-> +	err = devm_iio_device_register(dev, indio_dev);
-> +	if (err < 0) {
-> +		dev_err(dev, "Couldn't register the device.\n");
-> +		return err;
+> +	ret = iio_device_register(indio_dev);
+> +	if (ret < 0) {
+I'd have slightly preferred that this error unwind block was also
+moved to on a goto.  Makes it easier to review as the error block then
+matches remove (with expected differences!)  Really small point however.
+
+> +		dev_err(&pdev->dev, "failed to register iio device!\n");
+> +		val = readl(adc_dev->reg_base + MT6577_AUXADC_MISC);
+> +		val &= ~MT6577_AUXADC_PDN_EN;
+> +		writel(val, adc_dev->reg_base + MT6577_AUXADC_MISC);
+> +		goto err_disable_clk;
 > +	}
 > +
 > +	return 0;
+> +
+> +err_disable_clk:
+> +	clk_disable_unprepare(adc_dev->adc_clk);
+> +	return -EINVAL;
 > +}
 > +
-> +static int sun4i_lradc_remove(struct platform_device *pdev)
+> +static int mt6577_auxadc_remove(struct platform_device *pdev)
 > +{
 > +	struct iio_dev *indio_dev = platform_get_drvdata(pdev);
-> +	struct sun4i_lradc_state *st = iio_priv(indio_dev);
+> +	struct mt6577_auxadc_device *adc_dev = iio_priv(indio_dev);
+> +	u32 val;
 > +
-Race condition here.  The interfaces this driver provides (both in
-kernel and sysfs etc) are visible until iio_device_unregister occurs.
-As you are using the devm_iio_device_register call it'll happen after
-you've turned the power off.  Probably not the best plan ;)
-
-Yeah, it's a small race, but lets get it right.  Just don't use
-the devm_ version and do an explicit unregister before calling
-the next line.
-> +	regulator_disable(st->vref_supply);
+> +	iio_device_unregister(indio_dev);
+> +
+> +	val = readl(adc_dev->reg_base + MT6577_AUXADC_MISC);
+> +	val &= ~MT6577_AUXADC_PDN_EN;
+> +	writel(val, adc_dev->reg_base + MT6577_AUXADC_MISC);
+> +
+> +	clk_disable_unprepare(adc_dev->adc_clk);
 > +
 > +	return 0;
 > +}
 > +
-> +static const struct of_device_id sun4i_lradc_of_match[] = {
-> +	{ .compatible = "allwinner,sun4i-a10-lradc", },
-> +	{ /* sentinel */ }
+> +static const struct of_device_id mt6577_auxadc_of_match[] = {
+> +	{ .compatible = "mediatek,mt2701-auxadc", },
+> +	{ .compatible = "mediatek,mt8173-auxadc", },
+> +	{ }
 > +};
-> +MODULE_DEVICE_TABLE(of, sun4i_lradc_of_match);
+> +MODULE_DEVICE_TABLE(of, mt6577_auxadc_of_match);
 > +
-> +static struct platform_driver sun4i_lradc_driver = {
-> +	.probe	= sun4i_lradc_probe,
-> +	.remove = sun4i_lradc_remove,
+> +static struct platform_driver mt6577_auxadc_driver = {
 > +	.driver = {
-> +		.name	= "sun4i-a10-lradc",
-> +		.of_match_table = of_match_ptr(sun4i_lradc_of_match),
+> +		.name   = "mt6577-auxadc",
+> +		.of_match_table = mt6577_auxadc_of_match,
 > +	},
+> +	.probe	= mt6577_auxadc_probe,
+> +	.remove	= mt6577_auxadc_remove,
 > +};
+> +module_platform_driver(mt6577_auxadc_driver);
 > +
-> +module_platform_driver(sun4i_lradc_driver);
-> +
-> +MODULE_LICENSE("GPL");
-> +MODULE_DESCRIPTION("Allwinner sun4i low resolution ADC driver");
-> +MODULE_AUTHOR("Alexandre Belloni <alexandre.belloni@free-electrons.com>");
+> +MODULE_AUTHOR("Zhiyong Tao <zhiyong.tao@mediatek.com>");
+> +MODULE_DESCRIPTION("MTK AUXADC Device Driver");
+> +MODULE_LICENSE("GPL v2");
 > 
