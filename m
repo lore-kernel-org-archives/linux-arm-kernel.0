@@ -1,34 +1,49 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Mon, 18 Jul 2016 21:46:19 +0200
-Subject: [PATCH] ARM: dts: add rk3288-firefly-reload
-In-Reply-To: <1468855952-2006-2-git-send-email-ayaka@soulik.info>
-References: <1549971.ctkvOGm2xW@diego>
- <1468855952-2006-1-git-send-email-ayaka@soulik.info>
- <1468855952-2006-2-git-send-email-ayaka@soulik.info>
-Message-ID: <2868781.4x2gJCRbLH@diego>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Mon, 18 Jul 2016 13:51:21 -0600
+Subject: [PATCH 00/10] coresight: implementing address filtering 
+Message-ID: <1468871491-10997-1-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, 18. Juli 2016, 23:32:32 schrieb Randy Li:
-> The Firefly RK3288 Reload is a combination Firefly rk3288 core board
-> with the Reload baseboard. Add a dtsi for the Firefly rk3288 core
-> which can be included into the dts for the various baseboards
-> in the future and dts for Reload base board.
-> 
-> Currently supported are serial console, wired networking, eMMC and
-> SD storage, SPFIF, IR receiver, LEDs, SDIO wifi and USB. But only
-> the OTG could work on the host mode now, the other USB host can't
-> work now, additional patches are required.
-> 
-> Signed-off-by: Randy Li <ayaka@soulik.info>
-> Acked-by: Rob Herring <robh@kernel.org>
+This patchset builds on the generic address filtering framework
+in the perf core to implement range and start/stop filters for
+ARM CoreSight.
 
-applied [0], after some minor reordering - please double check.
+Most of the code is moving things around in order to provide an
+environment where filters can be acquired from perf and then configured
+in the CoreSight drivers.
 
-Also, while the branch is named 4.8 this will only go into 4.9, as the merge-
-window supposedly opens on the weekend.
+The set is based on 4.7-rc7 and depends on these patches [1].
 
+[1]. https://lkml.org/lkml/2016/7/18/457
 
-Heiko
+Mathieu Poirier (10):
+  coresight: etm-perf: pass struct perf_event to
+    source::enable/disable()
+  coresight: remove duplicated enumeration
+  coresight: etm-perf: configuring filters from perf core
+  coresight: etm4x: split default and filter configuration
+  coresight: etm4x: cleaning up default filter configuration
+  coresight: etm4x: adding range filter configuration function
+  coresight: etm4x: configuring include/exclude function
+  coresight: etm4x: adding configurable address range filtering
+  coresight: etm4x: adding configurable start/stop filtering
+  coresight: documenting range and start/stop filtering
 
-[0] https://git.kernel.org/cgit/linux/kernel/git/mmind/linux-rockchip.git/commit/?id=e00fdd4931ea4c47f53cba59b7a3800677546bea
+ Documentation/trace/coresight.txt                  |  48 +++
+ drivers/hwtracing/coresight/coresight-etm-perf.c   | 150 +++++++--
+ drivers/hwtracing/coresight/coresight-etm-perf.h   |  32 ++
+ drivers/hwtracing/coresight/coresight-etm.h        |   8 -
+ .../hwtracing/coresight/coresight-etm3x-sysfs.c    |   1 +
+ drivers/hwtracing/coresight/coresight-etm3x.c      |  14 +-
+ .../hwtracing/coresight/coresight-etm4x-sysfs.c    |   1 +
+ drivers/hwtracing/coresight/coresight-etm4x.c      | 356 +++++++++++++++++----
+ drivers/hwtracing/coresight/coresight-etm4x.h      |   8 -
+ drivers/hwtracing/coresight/coresight-priv.h       |   8 +
+ drivers/hwtracing/coresight/coresight-stm.c        |   7 +-
+ drivers/hwtracing/coresight/coresight.c            |   2 +-
+ include/linux/coresight.h                          |   5 +-
+ 13 files changed, 530 insertions(+), 110 deletions(-)
+
+-- 
+2.7.4
