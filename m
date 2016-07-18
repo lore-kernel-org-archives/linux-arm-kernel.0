@@ -1,55 +1,32 @@
-From: luto@kernel.org (Andy Lutomirski)
-Date: Mon, 18 Jul 2016 16:47:39 -0700
-Subject: Is THREAD_INFO_IN_TASK appropriate for -mm for 4.8?
-Message-ID: <CALCETrUf_7=Tr4JrDj+3UPT5kUT1MsRtypvfqkOg_MVHAJu=PA@mail.gmail.com>
+From: tj@kernel.org (Tejun Heo)
+Date: Mon, 18 Jul 2016 19:50:00 -0400
+Subject: [PATCH] [media] s5p-mfc: Remove deprecated
+ create_singlethread_workqueue
+In-Reply-To: <20160716083025.GA7294@Karyakshetra>
+References: <20160716083025.GA7294@Karyakshetra>
+Message-ID: <20160718235000.GR3078@mtj.duckdns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all-
+On Sat, Jul 16, 2016 at 02:00:25PM +0530, Bhaktipriya Shridhar wrote:
+> alloc_workqueue replaces deprecated create_singlethread_workqueue().
+> 
+> The MFC device driver is a v4l2 driver which can encode/decode video
+> raw/elementary streams and has support for all popular video codecs.
+> 
+> The driver's watchdog_workqueue has been replaced with system_wq since
+> it queues a single work item, &dev->watchdog_work, which calls for no
+> ordering requirement. The work item is involved in running the watchdog
+> timer and is not being used on a memory reclaim path.
+> 
+> Work item has been flushed in s5p_mfc_remove() to ensure
+> that there are no pending tasks while disconnecting the driver.
+> 
+> Signed-off-by: Bhaktipriya Shridhar <bhaktipriya96@gmail.com>
 
-There are four core patches needed for the THREAD_INFO_IN_TASK thing,
-and they apply cleanly to -mm now.  The x86 patch to flip the feature
-on does not apply cleanly anywhere because it depends on changes in
--tip *and* in -mm.  I'd like to get all of this as well as the rest of
-the vmap-stacks stuff in by 4.9, but I'm wondering if it might make
-sense to get the core THREAD_INFO_IN_TASK stuff into -mm for 4.8
-instead.
+Acked-by: Tejun Heo <tj@kernel.org>
 
-Pros:
- - It reduces the amount of core code that -tip will have to carry until 4.9.
- - It may benefit other architectures.  Christian Borntraeger
-expressed an interest in enabling the feature for s390, but it'll be
-awkward for him until the core bit landed.  Similarly, arm64 seems to
-be interested.
+Thanks.
 
-Cons: It's a bit odd to merge code that can't be enabled as-is.  OTOH
-x86 could plausibly enable it for 4.8 if Ingo is okay with applying
-"x86/dumpstack: Pin the target stack in save_stack_trace_tsk()" and
-"x86: Move thread_info into task_struct" during the merge window after
-the -mm patchbomb lands.
-
-The core changes are:
-
-sched: Allow putting thread_info into task_struct
-sched: Add try_get_task_stack() and put_task_stack()
-kthread: to_live_kthread() needs try_get_task_stack()
-sched: Free the stack early if CONFIG_THREAD_INFO_IN_TASK
-
-They're also sitting here against mmots:
-
-https://git.kernel.org/cgit/linux/kernel/git/luto/linux.git/log/?h=mmots_ti_in_task
-
-It looks like this:
-
- include/linux/init_task.h   | 11 ++++++++
- include/linux/sched.h       | 66 +++++++++++++++++++++++++++++++++++++++++++--
- include/linux/thread_info.h | 15 +++++++++++
- init/Kconfig                | 10 +++++++
- init/init_task.c            |  7 +++--
- kernel/fork.c               | 35 +++++++++++++++++++++++-
- kernel/kthread.c            |  8 ++++--
- kernel/sched/core.c         |  4 +++
- kernel/sched/sched.h        |  4 +++
- 9 files changed, 153 insertions(+), 7 deletions(-)
-
-So... should I send it out against -mm or should I wait until 4.8-rc1.
+-- 
+tejun
