@@ -1,93 +1,58 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Mon, 18 Jul 2016 10:10:46 -0400
-Subject: [PATCH V2] dmenginer: dmatest: exclude compare and fill time
- during perf report
-In-Reply-To: <1468849977-28538-1-git-send-email-okaya@codeaurora.org>
-References: <1468849977-28538-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <91cef2f6-b223-182a-e4aa-64cd26337e78@codeaurora.org>
+From: zyw@rock-chips.com (Chris Zhong)
+Date: Mon, 18 Jul 2016 22:34:34 +0800
+Subject: [PATCH] ASoC: rockchip: correct the spdif clk
+Message-ID: <1468852474-15735-1-git-send-email-zyw@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sorry for the typo at the commit summary. Fat fingers...
+The spdif mclk should be 128 times of sample rate, and there is a
+internal divider, the real rate of spdif mclk is mclk / (div + 1).
+Hence, the original driver always get the good frequency for
+48000/96000/44100/192000. But for 32000, the mclk is incorrect,
+it should be 32000*128, but get 48000*128. Do not use the internal
+divider here, just set all mclk to 128 * sample rate directly.
 
+Signed-off-by: Chris Zhong <zyw@rock-chips.com>
 
-On 7/18/2016 9:52 AM, Sinan Kaya wrote:
-> Dmatest is currently including compare and fill time into the
-> calculated performance numbers. This does not reflect the HW
-> capability and the results vary based on the transfer sizes used.
-> 
-> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-> ---
->  drivers/dma/dmatest.c | 17 +++++++++++++++--
->  1 file changed, 15 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/dma/dmatest.c b/drivers/dma/dmatest.c
-> index b8576fd..0b3e1f9 100644
-> --- a/drivers/dma/dmatest.c
-> +++ b/drivers/dma/dmatest.c
-> @@ -416,7 +416,9 @@ static int dmatest_func(void *data)
->  	int			src_cnt;
->  	int			dst_cnt;
->  	int			i;
-> -	ktime_t			ktime;
-> +	ktime_t			ktime, start, diff;
-> +	ktime_t			filltime = ktime_set(0, 0);
-> +	ktime_t			comparetime = ktime_set(0, 0);
->  	s64			runtime = 0;
->  	unsigned long long	total_len = 0;
->  
-> @@ -517,6 +519,7 @@ static int dmatest_func(void *data)
->  			src_off = 0;
->  			dst_off = 0;
->  		} else {
-> +			start = ktime_get();
->  			src_off = dmatest_random() % (params->buf_size - len + 1);
->  			dst_off = dmatest_random() % (params->buf_size - len + 1);
->  
-> @@ -527,6 +530,9 @@ static int dmatest_func(void *data)
->  					  params->buf_size);
->  			dmatest_init_dsts(thread->dsts, dst_off, len,
->  					  params->buf_size);
-> +
-> +			diff = ktime_sub(ktime_get(), start);
-> +			filltime = ktime_add(filltime, diff);
->  		}
->  
->  		um = dmaengine_get_unmap_data(dev->dev, src_cnt+dst_cnt,
-> @@ -657,6 +663,7 @@ static int dmatest_func(void *data)
->  			continue;
->  		}
->  
-> +		start = ktime_get();
->  		pr_debug("%s: verifying source buffer...\n", current->comm);
->  		error_count = dmatest_verify(thread->srcs, 0, src_off,
->  				0, PATTERN_SRC, true);
-> @@ -677,6 +684,9 @@ static int dmatest_func(void *data)
->  				params->buf_size, dst_off + len,
->  				PATTERN_DST, false);
->  
-> +		diff = ktime_sub(ktime_get(), start);
-> +		comparetime = ktime_add(comparetime, diff);
-> +
->  		if (error_count) {
->  			result("data error", total_tests, src_off, dst_off,
->  			       len, error_count);
-> @@ -686,7 +696,10 @@ static int dmatest_func(void *data)
->  				       dst_off, len, 0);
->  		}
->  	}
-> -	runtime = ktime_us_delta(ktime_get(), ktime);
-> +	ktime = ktime_sub(ktime_get(), ktime);
-> +	ktime = ktime_sub(ktime, comparetime);
-> +	ktime = ktime_sub(ktime, filltime);
-> +	runtime = ktime_to_us(ktime);
->  
->  	ret = 0;
->  err_dstbuf:
-> 
+---
 
+ sound/soc/rockchip/rockchip_spdif.c | 17 +----------------
+ 1 file changed, 1 insertion(+), 16 deletions(-)
 
+diff --git a/sound/soc/rockchip/rockchip_spdif.c b/sound/soc/rockchip/rockchip_spdif.c
+index 100781e..4ca2657 100644
+--- a/sound/soc/rockchip/rockchip_spdif.c
++++ b/sound/soc/rockchip/rockchip_spdif.c
+@@ -101,21 +101,7 @@ static int rk_spdif_hw_params(struct snd_pcm_substream *substream,
+ 	int ret;
+ 
+ 	srate = params_rate(params);
+-	switch (srate) {
+-	case 32000:
+-	case 48000:
+-	case 96000:
+-		mclk = 96000 * 128; /* 12288000 hz */
+-		break;
+-	case 44100:
+-		mclk = 44100 * 256; /* 11289600 hz */
+-		break;
+-	case 192000:
+-		mclk = 192000 * 128; /* 24576000 hz */
+-		break;
+-	default:
+-		return -EINVAL;
+-	}
++	mclk = srate * 128;
+ 
+ 	switch (params_format(params)) {
+ 	case SNDRV_PCM_FORMAT_S16_LE:
+@@ -139,7 +125,6 @@ static int rk_spdif_hw_params(struct snd_pcm_substream *substream,
+ 		return ret;
+ 	}
+ 
+-	val |= SPDIF_CFGR_CLK_DIV(mclk/(srate * 256));
+ 	ret = regmap_update_bits(spdif->regmap, SPDIF_CFGR,
+ 		SPDIF_CFGR_CLK_DIV_MASK | SPDIF_CFGR_HALFWORD_ENABLE |
+ 		SDPIF_CFGR_VDW_MASK,
 -- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+2.6.3
