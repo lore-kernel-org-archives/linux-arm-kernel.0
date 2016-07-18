@@ -1,403 +1,115 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Mon, 18 Jul 2016 11:18:33 +0200
-Subject: [PATCH v10 09/17] KVM: arm64: introduce ITS emulation file with
- MMIO framework
-In-Reply-To: <20160715114338.10484-10-andre.przywara@arm.com>
-References: <20160715114338.10484-1-andre.przywara@arm.com>
- <20160715114338.10484-10-andre.przywara@arm.com>
-Message-ID: <5a1405f7-201c-6f8c-0b16-c64a192dc5f0@redhat.com>
+From: ralf@ramses-pyramidenbau.de (Ralf Ramsauer)
+Date: Mon, 18 Jul 2016 11:25:33 +0200
+Subject: [PATCH] ARM: tegra: fix erroneous address in dts
+In-Reply-To: <20160718060129.GA10785@ulmo.ba.sec>
+References: <1468514937-23250-1-git-send-email-ralf@ramses-pyramidenbau.de>
+ <20160714220218.GB4205@mithrandir.ba.sec>
+ <8a8ccb29-ba73-f29f-2b57-5c1d91e13bf7@ramses-pyramidenbau.de>
+ <578908CB.7040802@wwwdotorg.org>
+ <4a4d7fd4-7514-c5cb-435b-af34159fc1c4@ramses-pyramidenbau.de>
+ <20160718060129.GA10785@ulmo.ba.sec>
+Message-ID: <64837117-32d6-1f1d-a370-3f20d4368b7b@ramses-pyramidenbau.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andre, Marc,
 
-On 15/07/2016 13:43, Andre Przywara wrote:
-> The ARM GICv3 ITS emulation code goes into a separate file, but needs
-> to be connected to the GICv3 emulation, of which it is an option.
-> The ITS MMIO handlers require the respective ITS pointer to be passed in,
-> so we amend the existing VGIC MMIO framework to let it cope with that.
-> Also we introduce the basic ITS data structure and initialize it, but
-> don't return any success yet, as we are not yet ready for the show.
-> 
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> ---
->  include/kvm/arm_vgic.h           |  22 ++++++++-
->  virt/kvm/arm/vgic/vgic-its.c     | 103 +++++++++++++++++++++++++++++++++++++++
->  virt/kvm/arm/vgic/vgic-mmio-v3.c |  40 ++++++++++++++-
->  virt/kvm/arm/vgic/vgic-mmio.c    |  37 +++++++++++---
->  virt/kvm/arm/vgic/vgic-mmio.h    |  17 +++++--
->  virt/kvm/arm/vgic/vgic.h         |   7 +++
->  6 files changed, 213 insertions(+), 13 deletions(-)
->  create mode 100644 virt/kvm/arm/vgic/vgic-its.c
-> 
-> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-> index df2dec5..685f339 100644
-> --- a/include/kvm/arm_vgic.h
-> +++ b/include/kvm/arm_vgic.h
-> @@ -108,15 +108,35 @@ struct vgic_irq {
->  };
->  
->  struct vgic_register_region;
-> +struct vgic_its;
-> +
-> +enum iodev_type {
-> +	IODEV_CPUIF,
-> +	IODEV_DIST,
-> +	IODEV_REDIST,
-> +	IODEV_ITS
-> +};
->  
->  struct vgic_io_device {
->  	gpa_t base_addr;
-> -	struct kvm_vcpu *redist_vcpu;
-> +	union {
-> +		struct kvm_vcpu *redist_vcpu;
-> +		struct vgic_its *its;
-> +	};
->  	const struct vgic_register_region *regions;
-> +	enum iodev_type iodev_type;
->  	int nr_regions;
->  	struct kvm_io_device dev;
->  };
->  
-> +struct vgic_its {
-> +	/* The base address of the ITS control register frame */
-> +	gpa_t			vgic_its_base;
-> +
-> +	bool			enabled;
-> +	struct vgic_io_device	iodev;
-> +};
-> +
->  struct vgic_dist {
->  	bool			in_kernel;
->  	bool			ready;
-> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-> new file mode 100644
-> index 0000000..4654d6e
-> --- /dev/null
-> +++ b/virt/kvm/arm/vgic/vgic-its.c
-> @@ -0,0 +1,103 @@
-> +/*
-> + * GICv3 ITS emulation
-> + *
-> + * Copyright (C) 2015,2016 ARM Ltd.
-> + * Author: Andre Przywara <andre.przywara@arm.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> + */
-> +
-> +#include <linux/cpu.h>
-> +#include <linux/kvm.h>
-> +#include <linux/kvm_host.h>
-> +#include <linux/interrupt.h>
-> +
-> +#include <linux/irqchip/arm-gic-v3.h>
-> +
-> +#include <asm/kvm_emulate.h>
-> +#include <asm/kvm_arm.h>
-> +#include <asm/kvm_mmu.h>
-> +
-> +#include "vgic.h"
-> +#include "vgic-mmio.h"
-> +
-> +#define REGISTER_ITS_DESC(off, rd, wr, length, acc)		\
-> +{								\
-> +	.reg_offset = off,					\
-> +	.len = length,						\
-> +	.access_flags = acc,					\
-> +	.its_read = rd,						\
-> +	.its_write = wr,					\
-> +}
-> +
-> +static unsigned long its_mmio_read_raz(struct kvm *kvm, struct vgic_its *its,
-> +				       gpa_t addr, unsigned int len)
-> +{
-> +	return 0;
-> +}
-> +
-> +static void its_mmio_write_wi(struct kvm *kvm, struct vgic_its *its,
-> +			      gpa_t addr, unsigned int len, unsigned long val)
-> +{
-> +	/* Ignore */
-> +}
-> +
-> +static struct vgic_register_region its_registers[] = {
-> +	REGISTER_ITS_DESC(GITS_CTLR,
-> +		its_mmio_read_raz, its_mmio_write_wi, 4,
-> +		VGIC_ACCESS_32bit),
-> +	REGISTER_ITS_DESC(GITS_IIDR,
-> +		its_mmio_read_raz, its_mmio_write_wi, 4,
-> +		VGIC_ACCESS_32bit),
-> +	REGISTER_ITS_DESC(GITS_TYPER,
-> +		its_mmio_read_raz, its_mmio_write_wi, 8,
-> +		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
-> +	REGISTER_ITS_DESC(GITS_CBASER,
-> +		its_mmio_read_raz, its_mmio_write_wi, 8,
-> +		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
-> +	REGISTER_ITS_DESC(GITS_CWRITER,
-> +		its_mmio_read_raz, its_mmio_write_wi, 8,
-> +		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
-> +	REGISTER_ITS_DESC(GITS_CREADR,
-> +		its_mmio_read_raz, its_mmio_write_wi, 8,
-> +		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
-> +	REGISTER_ITS_DESC(GITS_BASER,
-> +		its_mmio_read_raz, its_mmio_write_wi, 0x40,
-> +		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
-> +	REGISTER_ITS_DESC(GITS_IDREGS_BASE,
-> +		its_mmio_read_raz, its_mmio_write_wi, 0x30,
-> +		VGIC_ACCESS_32bit),
-> +};
-> +
-> +static int vgic_its_init_its(struct kvm *kvm, struct vgic_its *its)
-> +{
-> +	struct vgic_io_device *iodev = &its->iodev;
-> +	int ret;
-> +
-> +	if (IS_VGIC_ADDR_UNDEF(its->vgic_its_base))
-> +		return -ENXIO;
-> +
-> +	iodev->regions = its_registers;
-> +	iodev->nr_regions = ARRAY_SIZE(its_registers);
-> +	kvm_iodevice_init(&iodev->dev, &kvm_io_gic_ops);
-> +
-> +	iodev->base_addr = its->vgic_its_base;
-> +	iodev->iodev_type = IODEV_ITS;
-> +	iodev->its = its;
-> +	mutex_lock(&kvm->slots_lock);
-> +	ret = kvm_io_bus_register_dev(kvm, KVM_MMIO_BUS, iodev->base_addr,
-> +				      KVM_VGIC_V3_ITS_SIZE, &iodev->dev);
-> +	mutex_unlock(&kvm->slots_lock);
-> +
-> +	return ret;
-> +}
-> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-> index 278bfbb..b92b7d6 100644
-> --- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
-> +++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-> @@ -42,6 +42,16 @@ static u64 update_64bit_reg(u64 reg, unsigned int offset, unsigned int len,
->  	return reg | ((u64)val << lower);
->  }
->  
-> +bool vgic_has_its(struct kvm *kvm)
-> +{
-> +	struct vgic_dist *dist = &kvm->arch.vgic;
-> +
-> +	if (dist->vgic_model != KVM_DEV_TYPE_ARM_VGIC_V3)
-> +		return false;
-> +
-> +	return false;
-> +}
-> +
->  static unsigned long vgic_mmio_read_v3_misc(struct kvm_vcpu *vcpu,
->  					    gpa_t addr, unsigned int len)
->  {
-> @@ -132,6 +142,32 @@ static void vgic_mmio_write_irouter(struct kvm_vcpu *vcpu,
->  	vgic_put_irq(vcpu->kvm, irq);
->  }
->  
-> +static unsigned long vgic_mmio_read_v3r_ctlr(struct kvm_vcpu *vcpu,
-> +					     gpa_t addr, unsigned int len)
-> +{
-> +	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
-> +
-> +	return vgic_cpu->lpis_enabled ? GICR_CTLR_ENABLE_LPIS : 0;
-> +}
-> +
-> +
-> +static void vgic_mmio_write_v3r_ctlr(struct kvm_vcpu *vcpu,
-> +				     gpa_t addr, unsigned int len,
-> +				     unsigned long val)
-> +{
-> +	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
-> +	bool was_enabled = vgic_cpu->lpis_enabled;
-> +
-> +	if (!vgic_has_its(vcpu->kvm))
-> +		return;
-> +
-> +	vgic_cpu->lpis_enabled = val & GICR_CTLR_ENABLE_LPIS;
-> +
-> +	if (!was_enabled && vgic_cpu->lpis_enabled) {
-> +		/* Eventually do something */
-> +	}
-> +}
-> +
->  static unsigned long vgic_mmio_read_v3r_typer(struct kvm_vcpu *vcpu,
->  					      gpa_t addr, unsigned int len)
->  {
-> @@ -372,7 +408,7 @@ static const struct vgic_register_region vgic_v3_dist_registers[] = {
->  
->  static const struct vgic_register_region vgic_v3_rdbase_registers[] = {
->  	REGISTER_DESC_WITH_LENGTH(GICR_CTLR,
-> -		vgic_mmio_read_raz, vgic_mmio_write_wi, 4,
-> +		vgic_mmio_read_v3r_ctlr, vgic_mmio_write_v3r_ctlr, 4,
->  		VGIC_ACCESS_32bit),
->  	REGISTER_DESC_WITH_LENGTH(GICR_IIDR,
->  		vgic_mmio_read_v3r_iidr, vgic_mmio_write_wi, 4,
-> @@ -450,6 +486,7 @@ int vgic_register_redist_iodevs(struct kvm *kvm, gpa_t redist_base_address)
->  
->  		kvm_iodevice_init(&rd_dev->dev, &kvm_io_gic_ops);
->  		rd_dev->base_addr = rd_base;
-> +		rd_dev->iodev_type = IODEV_REDIST;
->  		rd_dev->regions = vgic_v3_rdbase_registers;
->  		rd_dev->nr_regions = ARRAY_SIZE(vgic_v3_rdbase_registers);
->  		rd_dev->redist_vcpu = vcpu;
-> @@ -464,6 +501,7 @@ int vgic_register_redist_iodevs(struct kvm *kvm, gpa_t redist_base_address)
->  
->  		kvm_iodevice_init(&sgi_dev->dev, &kvm_io_gic_ops);
->  		sgi_dev->base_addr = sgi_base;
-> +		sgi_dev->iodev_type = IODEV_REDIST;
->  		sgi_dev->regions = vgic_v3_sgibase_registers;
->  		sgi_dev->nr_regions = ARRAY_SIZE(vgic_v3_sgibase_registers);
->  		sgi_dev->redist_vcpu = vcpu;
-> diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
-> index 5e79e01..26be827 100644
-> --- a/virt/kvm/arm/vgic/vgic-mmio.c
-> +++ b/virt/kvm/arm/vgic/vgic-mmio.c
-> @@ -473,8 +473,7 @@ static int dispatch_mmio_read(struct kvm_vcpu *vcpu, struct kvm_io_device *dev,
->  {
->  	struct vgic_io_device *iodev = kvm_to_vgic_iodev(dev);
->  	const struct vgic_register_region *region;
-> -	struct kvm_vcpu *r_vcpu;
-> -	unsigned long data;
-> +	unsigned long data = 0;
->  
->  	region = vgic_find_mmio_region(iodev->regions, iodev->nr_regions,
->  				       addr - iodev->base_addr);
-> @@ -483,8 +482,20 @@ static int dispatch_mmio_read(struct kvm_vcpu *vcpu, struct kvm_io_device *dev,
->  		return 0;
->  	}
->  
-> -	r_vcpu = iodev->redist_vcpu ? iodev->redist_vcpu : vcpu;
-> -	data = region->read(r_vcpu, addr, len);
-> +	switch (iodev->iodev_type) {
-> +	case IODEV_CPUIF:
-> +		return 1;
-This change causes a regression on AMD Seattle with QEMU (abort with
-message "restoring 288 IRQs, but kernel supports max 32").
-Shoudn't we have
-		data = region->read(vcpu, addr, len);
-		break;
-This path is exercised by vgic_v2_cpuif_uaccess/vgic_uaccess
-> +	case IODEV_DIST:
-> +		data = region->read(vcpu, addr, len);
-> +		break;
-> +	case IODEV_REDIST:
-> +		data = region->read(iodev->redist_vcpu, addr, len);
-> +		break;
-> +	case IODEV_ITS:
-> +		data = region->its_read(vcpu->kvm, iodev->its, addr, len);
-> +		break;
-> +	}
-> +
->  	vgic_data_host_to_mmio_bus(val, len, data);
->  	return 0;
->  }
-> @@ -494,7 +505,6 @@ static int dispatch_mmio_write(struct kvm_vcpu *vcpu, struct kvm_io_device *dev,
->  {
->  	struct vgic_io_device *iodev = kvm_to_vgic_iodev(dev);
->  	const struct vgic_register_region *region;
-> -	struct kvm_vcpu *r_vcpu;
->  	unsigned long data = vgic_data_mmio_bus_to_host(val, len);
->  
->  	region = vgic_find_mmio_region(iodev->regions, iodev->nr_regions,
-> @@ -505,8 +515,20 @@ static int dispatch_mmio_write(struct kvm_vcpu *vcpu, struct kvm_io_device *dev,
->  	if (!check_region(region, addr, len))
->  		return 0;
->  
-> -	r_vcpu = iodev->redist_vcpu ? iodev->redist_vcpu : vcpu;
-> -	region->write(r_vcpu, addr, len, data);
-> +	switch (iodev->iodev_type) {
-> +	case IODEV_CPUIF:
-> +		break;
-same here
-region->write(vcpu, addr, len, data);
 
-The above modifications fix the issue.
-
-Eric
-> +	case IODEV_DIST:
-> +		region->write(vcpu, addr, len, data);
-> +		break;
-> +	case IODEV_REDIST:
-> +		region->write(iodev->redist_vcpu, addr, len, data);
-> +		break;
-> +	case IODEV_ITS:
-> +		region->its_write(vcpu->kvm, iodev->its, addr, len, data);
-> +		break;
-> +	}
-> +
->  	return 0;
->  }
->  
-> @@ -536,6 +558,7 @@ int vgic_register_dist_iodev(struct kvm *kvm, gpa_t dist_base_address,
->  	}
->  
->  	io_device->base_addr = dist_base_address;
-> +	io_device->iodev_type = IODEV_DIST;
->  	io_device->redist_vcpu = NULL;
->  
->  	mutex_lock(&kvm->slots_lock);
-> diff --git a/virt/kvm/arm/vgic/vgic-mmio.h b/virt/kvm/arm/vgic/vgic-mmio.h
-> index 71aa39d..366d663 100644
-> --- a/virt/kvm/arm/vgic/vgic-mmio.h
-> +++ b/virt/kvm/arm/vgic/vgic-mmio.h
-> @@ -21,10 +21,19 @@ struct vgic_register_region {
->  	unsigned int len;
->  	unsigned int bits_per_irq;
->  	unsigned int access_flags;
-> -	unsigned long (*read)(struct kvm_vcpu *vcpu, gpa_t addr,
-> -			      unsigned int len);
-> -	void (*write)(struct kvm_vcpu *vcpu, gpa_t addr, unsigned int len,
-> -		      unsigned long val);
-> +	union {
-> +		unsigned long (*read)(struct kvm_vcpu *vcpu, gpa_t addr,
-> +				      unsigned int len);
-> +		unsigned long (*its_read)(struct kvm *kvm, struct vgic_its *its,
-> +					  gpa_t addr, unsigned int len);
-> +	};
-> +	union {
-> +		void (*write)(struct kvm_vcpu *vcpu, gpa_t addr,
-> +			      unsigned int len, unsigned long val);
-> +		void (*its_write)(struct kvm *kvm, struct vgic_its *its,
-> +				  gpa_t addr, unsigned int len,
-> +				  unsigned long val);
-> +	};
->  };
->  
->  extern struct kvm_io_device_ops kvm_io_gic_ops;
-> diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-> index 5b79c34..31807c1 100644
-> --- a/virt/kvm/arm/vgic/vgic.h
-> +++ b/virt/kvm/arm/vgic/vgic.h
-> @@ -72,6 +72,7 @@ void vgic_v3_enable(struct kvm_vcpu *vcpu);
->  int vgic_v3_probe(const struct gic_kvm_info *info);
->  int vgic_v3_map_resources(struct kvm *kvm);
->  int vgic_register_redist_iodevs(struct kvm *kvm, gpa_t dist_base_address);
-> +bool vgic_has_its(struct kvm *kvm);
->  #else
->  static inline void vgic_v3_process_maintenance(struct kvm_vcpu *vcpu)
->  {
-> @@ -123,6 +124,12 @@ static inline int vgic_register_redist_iodevs(struct kvm *kvm,
->  {
->  	return -ENODEV;
->  }
-> +
-> +static inline bool vgic_has_its(struct kvm *kvm)
-> +{
-> +	return false;
-> +}
-> +
->  #endif
->  
->  int kvm_register_vgic_device(unsigned long type);
+On 07/18/2016 08:01 AM, Thierry Reding wrote:
+> On Fri, Jul 15, 2016 at 06:18:03PM +0200, Ralf Ramsauer wrote:
+>> On 07/15/2016 06:01 PM, Stephen Warren wrote:
+>>> On 07/15/2016 03:37 AM, Ralf Ramsauer wrote:
+>>>> On 07/15/2016 12:02 AM, Thierry Reding wrote:
+>>>>> On Thu, Jul 14, 2016 at 06:48:57PM +0200, Ralf Ramsauer wrote:
+>>>>>> c90bb7b enabled the high speed UARTs of the Jetson TK1. The address
+>>>>>> specification inside the dts is wrong. Fix it and use the correct
+>>>>>> address.
+>>>>>>
+>>>>>> Fixes: c90bb7b9b9 ("ARM: tegra: Add high speed UARTs to Jetson TK1
+>>>>>> device tree")
+>>>>>> Signed-off-by: Ralf Ramsauer <ralf@ramses-pyramidenbau.de>
+>>>>>> ---
+>>>>>>   arch/arm/boot/dts/tegra124-jetson-tk1.dts | 4 ++--
+>>>>>>   1 file changed, 2 insertions(+), 2 deletions(-)
+>>>>>
+>>>>> These addresses are correct. The 0, prefix was dropped from the unit
+>>>>> address in commit b5896f67ab3c ("ARM: tegra: Remove commas from unit
+>>>>> addresses on Tegra124").
+>>>>>
+>>>>> What's the problem that you're seeing? What's not working for you?
+>>>>
+>>>> I cannot find b5896f67ab3c neither in swarren's tree nor in linux
+>>>> upstream. But there's d0bc5aaf890 in swarren's linux-tegra tree that
+>>>> matches your described changes and was committed on 1st of July. But
+>>>> this patch is not upstream yet, while the other patch is.
+>>>
+>>> The fix is in linux-next, and will be in mainline soon I expect.
+>> Ah okay, but I still wonder how my original patch got changed on its
+>> way... The original version on the mailinglist was not buggy.
 > 
+> It's most likely my fault. My recollection is that we used to have an
+> earlier patch that removed all 0, prefixes from unit addresses and what
+> happens is probably that I applied your patch on top, adjusted it to
+> omit the 0, prefix and then we noticed that removing the 0, prefix does
+> not work for the GPU (because U-Boot looks it up by node name to enable
+> it), so the patch that removes the 0, prefix was dropped and I forgot
+> to adjust your patch to compensate.
+Ok, i see.
+> 
+>>> My github linux-tegra.git isn't relevant since it's just my own personal
+>>> dev branch, but for reference, the commit is there since it's based on
+>>> linux-next.
+>>>
+>>>> Have a look at mainline tegra124-jetson-tk1.dts, there the addresses are
+>>>> erroneous as they still use the 0, annotation. And I just realised, that
+>>>> somehow, upstream patch c90bb7b slightly differs from my initial patch
+>>>> [1] on the mailing list.
+>>>
+>>> Your patch should probably be CC: stable so that existing kernel
+>>> versions get fixed. That said, I'd argue that since the original patch
+>>> never actually had any effect since it applied to the wrong node, the
+>>> best fix for stable kernels is simply to revert it rather than fixing
+>>> it, to avoid the potential for behaviour changes and regressions.
+>>> Starting with kernel 4.8 (I think), that patch will begin to have actual
+>>> effect.
+>> There is no current existing stable kernel that is affected, as it went
+>> in during the last merge window in 4.6-rc1. So no need for fixing
+>> stable. Maybe it's still possible to fix it as the stabilisation window
+>> is still open and 4.7 is not released yet?
+> 
+> Unfortunately a patch to remove the 0, prefix from all nodes except the
+> GPU was now merged into the arm-soc tree, which means that if we try to
+> get this into v4.7, then we'll have to make sure to patch up the unit
+> address again for v4.8.
+> 
+> I have no objections to doing that, so feel free to add my Acked-by and
+> resend this to arm at kernel.org. When you do, please keep linux-tegra in
+> Cc so that we can track it, and maybe mention that you want this to go
+> into v4.7 and how this came about to be, so that the arm-soc maintainers
+> won't be surprised when the patch to revert this shows up in a couple of
+> days for v4.8.
+Alright, I'll prepare it and add a RESEND as well as your Acked-by.
+Thank you.
+> 
+> Can you take care of sending out the second patch as well? Probably best
+> to send it the same way as this, with a mention that it's targetted at
+> v4.8 and a revert of this one.
+Yep, I'll take care of it. I'm tracking this patch since January in any
+case :-)
+
+  Ralf
+> 
+> Thanks,
+> Thierry
+> 
+
+-- 
+Ralf Ramsauer
+PGP: 0x8F10049B
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160718/38b77777/attachment.sig>
