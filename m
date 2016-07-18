@@ -1,46 +1,122 @@
 From: jun.li@nxp.com (Li Jun)
-Date: Mon, 18 Jul 2016 19:15:46 +0800
-Subject: [PATCH 3/4] ARM: dts: imx7d-sdb: Set OTG2 oc polarity to be active low
+Date: Mon, 18 Jul 2016 19:15:47 +0800
+Subject: [PATCH 4/4] usb: chipidea: imx: set over current polarity per dts
+ setting
 In-Reply-To: <1468840547-17899-1-git-send-email-jun.li@nxp.com>
 References: <1468840547-17899-1-git-send-email-jun.li@nxp.com>
-Message-ID: <1468840547-17899-3-git-send-email-jun.li@nxp.com>
+Message-ID: <1468840547-17899-4-git-send-email-jun.li@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Set OTG2 over current flag to be active low, OTG1 OC is not used
-by default.
+With over-current-polarity property added, imx usb over current
+polarity can be configed to be low or high active, since the default
+setting value(0) is for active high, so keep this setting for those
+legacy platforms without this property specified.
 
 Signed-off-by: Li Jun <jun.li@nxp.com>
 ---
- arch/arm/boot/dts/imx7d-sdb.dts | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ drivers/usb/chipidea/ci_hdrc_imx.c |  9 +++++++++
+ drivers/usb/chipidea/ci_hdrc_imx.h |  1 +
+ drivers/usb/chipidea/usbmisc_imx.c | 30 +++++++++++++++++++++++++-----
+ 3 files changed, 35 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx7d-sdb.dts b/arch/arm/boot/dts/imx7d-sdb.dts
-index b267f79..44ed399 100644
---- a/arch/arm/boot/dts/imx7d-sdb.dts
-+++ b/arch/arm/boot/dts/imx7d-sdb.dts
-@@ -287,7 +287,9 @@
+diff --git a/drivers/usb/chipidea/ci_hdrc_imx.c b/drivers/usb/chipidea/ci_hdrc_imx.c
+index dedc33e..61e712b 100644
+--- a/drivers/usb/chipidea/ci_hdrc_imx.c
++++ b/drivers/usb/chipidea/ci_hdrc_imx.c
+@@ -140,6 +140,15 @@ static struct imx_usbmisc_data *usbmisc_get_init_data(struct device *dev)
+ 	if (of_find_property(np, "disable-over-current", NULL))
+ 		data->disable_oc = 1;
  
- &usbotg2 {
- 	vbus-supply = <&reg_usb_otg2_vbus>;
-+	pinctrl-0 = <&pinctrl_usbotg2>;
- 	dr_mode = "host";
-+	over-current-polarity = <0>;
- 	status = "okay";
++	if (!of_property_read_u32(np, "over-current-polarity", &ret))
++		data->oc_polarity = ret ? 1 : 0;
++	else
++		/*
++		 * Keep the oc polarity setting of legacy
++		 * platforms unchanged.
++		 */
++		data->oc_polarity = 1;
++
+ 	if (of_find_property(np, "external-vbus-divider", NULL))
+ 		data->evdo = 1;
+ 
+diff --git a/drivers/usb/chipidea/ci_hdrc_imx.h b/drivers/usb/chipidea/ci_hdrc_imx.h
+index 635717e..409aa5ca8 100644
+--- a/drivers/usb/chipidea/ci_hdrc_imx.h
++++ b/drivers/usb/chipidea/ci_hdrc_imx.h
+@@ -17,6 +17,7 @@ struct imx_usbmisc_data {
+ 	int index;
+ 
+ 	unsigned int disable_oc:1; /* over current detect disabled */
++	unsigned int oc_polarity:1; /* over current polarity if oc enabled */
+ 	unsigned int evdo:1; /* set external vbus divider option */
  };
  
-@@ -415,6 +417,12 @@
- 			>;
- 		};
+diff --git a/drivers/usb/chipidea/usbmisc_imx.c b/drivers/usb/chipidea/usbmisc_imx.c
+index ab8b027..193dbe4 100644
+--- a/drivers/usb/chipidea/usbmisc_imx.c
++++ b/drivers/usb/chipidea/usbmisc_imx.c
+@@ -56,6 +56,7 @@
  
-+		pinctrl_usbotg2: usbotg2grp {
-+			fsl,pins = <
-+				MX7D_PAD_GPIO1_IO06__USB_OTG2_OC	0x59
-+			>;
-+		};
-+
- 		pinctrl_usdhc1: usdhc1grp {
- 			fsl,pins = <
- 				MX7D_PAD_SD1_CMD__SD1_CMD		0x59
+ #define MX6_BM_NON_BURST_SETTING	BIT(1)
+ #define MX6_BM_OVER_CUR_DIS		BIT(7)
++#define MX6_BM_OVER_CUR_POLARITY	BIT(8)
+ #define MX6_BM_WAKEUP_ENABLE		BIT(10)
+ #define MX6_BM_ID_WAKEUP		BIT(16)
+ #define MX6_BM_VBUS_WAKEUP		BIT(17)
+@@ -266,11 +267,18 @@ static int usbmisc_imx6q_init(struct imx_usbmisc_data *data)
+ 
+ 	spin_lock_irqsave(&usbmisc->lock, flags);
+ 
++	reg = readl(usbmisc->base + data->index * 4);
+ 	if (data->disable_oc) {
+-		reg = readl(usbmisc->base + data->index * 4);
+-		writel(reg | MX6_BM_OVER_CUR_DIS,
+-			usbmisc->base + data->index * 4);
++		reg |= MX6_BM_OVER_CUR_DIS;
++	} else if (data->oc_polarity == 1) {
++		/* High active */
++		reg &= ~(MX6_BM_OVER_CUR_DIS | MX6_BM_OVER_CUR_POLARITY);
++	} else {
++		/* Low active */
++		reg &= ~MX6_BM_OVER_CUR_DIS;
++		reg |= MX6_BM_OVER_CUR_POLARITY;
+ 	}
++	writel(reg, usbmisc->base + data->index * 4);
+ 
+ 	/* SoC non-burst setting */
+ 	reg = readl(usbmisc->base + data->index * 4);
+@@ -365,10 +373,18 @@ static int usbmisc_imx7d_init(struct imx_usbmisc_data *data)
+ 		return -EINVAL;
+ 
+ 	spin_lock_irqsave(&usbmisc->lock, flags);
++	reg = readl(usbmisc->base);
+ 	if (data->disable_oc) {
+-		reg = readl(usbmisc->base);
+-		writel(reg | MX6_BM_OVER_CUR_DIS, usbmisc->base);
++		reg |= MX6_BM_OVER_CUR_DIS;
++	} else if (data->oc_polarity == 1) {
++		/* High active */
++		reg &= ~(MX6_BM_OVER_CUR_DIS | MX6_BM_OVER_CUR_POLARITY);
++	} else {
++		/* Low active */
++		reg &= ~MX6_BM_OVER_CUR_DIS;
++		reg |= MX6_BM_OVER_CUR_POLARITY;
+ 	}
++	writel(reg, usbmisc->base);
+ 
+ 	reg = readl(usbmisc->base + MX7D_USBNC_USB_CTRL2);
+ 	reg &= ~MX7D_USB_VBUS_WAKEUP_SOURCE_MASK;
+@@ -492,6 +508,10 @@ static const struct of_device_id usbmisc_imx_dt_ids[] = {
+ 		.compatible = "fsl,imx6ul-usbmisc",
+ 		.data = &imx6sx_usbmisc_ops,
+ 	},
++	{
++		.compatible = "fsl,imx7d-usbmisc",
++		.data = &imx7d_usbmisc_ops,
++	},
+ 	{ /* sentinel */ }
+ };
+ MODULE_DEVICE_TABLE(of, usbmisc_imx_dt_ids);
 -- 
 1.9.1
