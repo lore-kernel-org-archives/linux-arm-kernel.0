@@ -1,117 +1,66 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Mon, 18 Jul 2016 19:09:24 -0400
-Subject: [PATCH V10 6/9] vfio: platform: call _RST method when using ACPI
-In-Reply-To: <1468883367-2854-1-git-send-email-okaya@codeaurora.org>
-References: <1468883367-2854-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1468883367-2854-7-git-send-email-okaya@codeaurora.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 18 Jul 2016 17:13:17 -0600
+Subject: [PATCH V2 01/10] Documentation: dt-bindings: mailbox: tegra: Add
+ binding for HSP mailbox
+In-Reply-To: <5783C468.2030708@wwwdotorg.org>
+References: <20160705090431.5852-1-josephl@nvidia.com>
+ <20160705090431.5852-2-josephl@nvidia.com>
+ <20160707181356.GA6864@kickseed.nvidia.com> <577EA0D6.9020308@wwwdotorg.org>
+ <20160711141407.GA25042@rob-hp-laptop> <5783C468.2030708@wwwdotorg.org>
+Message-ID: <578D628D.60802@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The device tree code checks for the presence of a reset driver and calls
-the of_reset function pointer by looking up the reset driver as a module.
+On 07/11/2016 10:08 AM, Stephen Warren wrote:
+> On 07/11/2016 08:14 AM, Rob Herring wrote:
+>> On Thu, Jul 07, 2016 at 12:35:02PM -0600, Stephen Warren wrote:
+>>> On 07/07/2016 12:13 PM, Sivaram Nair wrote:
+>>>> On Tue, Jul 05, 2016 at 05:04:22PM +0800, Joseph Lo wrote:
+>>>>> Add DT binding for the Hardware Synchronization Primitives (HSP). The
+>>>>> HSP is designed for the processors to share resources and communicate
+>>>>> together. It provides a set of hardware synchronization primitives for
+>>>>> interprocessor communication. So the interprocessor communication
+>>>>> (IPC)
+>>>>> protocols can use hardware synchronization primitive, when operating
+>>>>> between two processors not in an SMP relationship.
+>>>
+>>>>> diff --git a/include/dt-bindings/mailbox/tegra186-hsp.h
+>>>>> b/include/dt-bindings/mailbox/tegra186-hsp.h
+>>>
+>>>>> +#define HSP_MBOX_TYPE_DB 0x0
+>>>>> +#define HSP_MBOX_TYPE_SM 0x1
+>>>>> +#define HSP_MBOX_TYPE_SS 0x2
+>>>>> +#define HSP_MBOX_TYPE_AS 0x3
+>>>>> +
+>>>>> +#define HSP_DB_MASTER_CCPLEX 17
+>>>>> +#define HSP_DB_MASTER_BPMP 19
+>>>>> +
+>>>>> +#define HSP_MBOX_ID(type, ID) \
+>>>>> +        (HSP_MBOX_TYPE_##type << 16 | ID)
+>>>>
+>>>> It will be nicer if you avoid the macro glue magic '##' for 'type'. I
+>>>> would also suggest to use braces around 'type' and 'ID'.
+>>>
+>>> This technique been used without issue in quite a few other places
+>>> without
+>>> issue, and has the benefit of simplifying the text wherever the macro is
+>>> used. What issue do you foresee?
+>>
+>> I'm not a fan of using the macros to begin with and less so anything
+>> more complex than a single constant value. I'd rather see 2 cells here
+>> with the first being the id and the 2nd being the type.
+>>
+>> An issue with token pasting is grepping for DB, SM, etc. in kernel tree
+>> is probably noisy. Not such a big deal here, but a major PIA when you
+>> have more complex sets of includes.
+>
+> Is that a NAK or simply a suggestion? Having a single cell makes DT
+> parsing a bit simpler, since pretty much every SW stack provides a
+> default "one-cell" of_xlate implementation, whereas >1 cell means custom
+> code for of_xlate.
 
-ACPI defines _RST method to perform device level reset. After the _RST
-method is executed, the OS can resume using the device. _RST method is
-expected to stop DMA transfers and IRQs.
-
-This patch introduces two functions as vfio_platform_acpi_has_reset and
-vfio_platform_acpi_call_reset. The has reset method is used to declare
-reset capability via the ioctl flag VFIO_DEVICE_FLAGS_RESET. The call
-reset function is used to execute the _RST ACPI method.
-
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
----
- drivers/vfio/platform/vfio_platform_common.c | 50 +++++++++++++++++++++++++++-
- 1 file changed, 49 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/vfio/platform/vfio_platform_common.c b/drivers/vfio/platform/vfio_platform_common.c
-index f6025c9..b1e5801 100644
---- a/drivers/vfio/platform/vfio_platform_common.c
-+++ b/drivers/vfio/platform/vfio_platform_common.c
-@@ -28,6 +28,8 @@
- #define DRIVER_AUTHOR   "Antonios Motakis <a.motakis@virtualopensystems.com>"
- #define DRIVER_DESC     "VFIO platform base module"
- 
-+#define VFIO_PLATFORM_IS_ACPI(vdev) ((vdev)->acpihid != NULL)
-+
- static LIST_HEAD(reset_list);
- static DEFINE_MUTEX(driver_lock);
- 
-@@ -76,13 +78,53 @@ static int vfio_platform_acpi_probe(struct vfio_platform_device *vdev,
- 	return WARN_ON(!vdev->acpihid) ? -ENOENT : 0;
- }
- 
-+int vfio_platform_acpi_call_reset(struct vfio_platform_device *vdev,
-+				  const char **extra_dbg)
-+{
-+#ifdef CONFIG_ACPI
-+	struct acpi_buffer buffer = { ACPI_ALLOCATE_BUFFER, NULL };
-+	struct device *dev = vdev->device;
-+	acpi_handle handle = ACPI_HANDLE(dev);
-+	acpi_status acpi_ret;
-+
-+	acpi_ret = acpi_evaluate_object(handle, "_RST", NULL, &buffer);
-+	if (ACPI_FAILURE(acpi_ret)) {
-+		if (extra_dbg)
-+			*extra_dbg = acpi_format_exception(acpi_ret);
-+		return -EINVAL;
-+	}
-+
-+	return 0;
-+#else
-+	return -ENOENT;
-+#endif
-+}
-+
-+bool vfio_platform_acpi_has_reset(struct vfio_platform_device *vdev)
-+{
-+#ifdef CONFIG_ACPI
-+	struct device *dev = vdev->device;
-+	acpi_handle handle = ACPI_HANDLE(dev);
-+
-+	return acpi_has_method(handle, "_RST");
-+#else
-+	return false;
-+#endif
-+}
-+
- static bool vfio_platform_has_reset(struct vfio_platform_device *vdev)
- {
-+	if (VFIO_PLATFORM_IS_ACPI(vdev))
-+		return vfio_platform_acpi_has_reset(vdev);
-+
- 	return vdev->of_reset ? true : false;
- }
- 
- static void vfio_platform_get_reset(struct vfio_platform_device *vdev)
- {
-+	if (VFIO_PLATFORM_IS_ACPI(vdev))
-+		return;
-+
- 	vdev->of_reset = vfio_platform_lookup_reset(vdev->compat,
- 						    &vdev->reset_module);
- 	if (!vdev->of_reset) {
-@@ -94,6 +136,9 @@ static void vfio_platform_get_reset(struct vfio_platform_device *vdev)
- 
- static void vfio_platform_put_reset(struct vfio_platform_device *vdev)
- {
-+	if (VFIO_PLATFORM_IS_ACPI(vdev))
-+		return;
-+
- 	if (vdev->of_reset)
- 		module_put(vdev->reset_module);
- }
-@@ -169,7 +214,10 @@ static void vfio_platform_regions_cleanup(struct vfio_platform_device *vdev)
- static int vfio_platform_call_reset(struct vfio_platform_device *vdev,
- 				    const char **extra_dbg)
- {
--	if (vdev->of_reset) {
-+	if (VFIO_PLATFORM_IS_ACPI(vdev)) {
-+		dev_info(vdev->device, "reset\n");
-+		return vfio_platform_acpi_call_reset(vdev, extra_dbg);
-+	} else if (vdev->of_reset) {
- 		dev_info(vdev->device, "reset\n");
- 		return vdev->of_reset(vdev);
- 	}
--- 
-1.8.2.1
+I didn't see a response to this. Joseph, let's just use two cells 
+instead. I'm rather desperately waiting for this binding to be complete 
+so I can finalize the U-Boot code that uses it, and it sounds like 
+changing to two cells will get an ack faster. Can you post an updated 
+version of this series today/ASAP to get things moving? Thanks.
