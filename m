@@ -1,68 +1,56 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 18 Jul 2016 16:54:03 +0100
-Subject: [PATCH 01/13] KVM: arm/arm64: Fix vGICv2
- KVM_DEV_ARM_VGIC_GRP_CPU/DIST_REGS
-In-Reply-To: <1468857255-9543-1-git-send-email-marc.zyngier@arm.com>
-References: <1468857255-9543-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1468857255-9543-2-git-send-email-marc.zyngier@arm.com>
+Date: Mon, 18 Jul 2016 16:54:02 +0100
+Subject: [PATCH 00/13] A bunch of vgic-its fixes
+Message-ID: <1468857255-9543-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Eric Auger <eric.auger@redhat.com>
+As the ITS series has been posted 10 times now, and we're still
+finding issues, I've decided to directly fix things rather than
+commenting on them and waiting for a respin, as we are getting way too
+close to the merge window. So I sat over the weekend and started doing
+"stuff".
 
-For VGICv2 save and restore the CPU interface registers
-are accessed. Restore the modality which has been altered.
-Also explicitly set the iodev_type for both the DIST and CPU
-interface.
+There is a bit of everything in there: some cosmetic things, but also
+some more severe bugs (indirect tables were completely foobar) and
+regressions (the cpuif stuff that Eric fixed).
 
-Signed-off-by: Eric Auger <eric.auger@redhat.com>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- virt/kvm/arm/vgic/vgic-mmio-v2.c | 2 ++
- virt/kvm/arm/vgic/vgic-mmio.c    | 4 +++-
- 2 files changed, 5 insertions(+), 1 deletion(-)
+Unless someone shouts at me, I intend to put that on top of Andre's
+series, and put the whole thing into -next. I've tested it on a LS2085
+with kvmtool, using both flat and indirect device tables.
 
-diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
-index 4152348..b44b359 100644
---- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
-+++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
-@@ -437,6 +437,7 @@ int vgic_v2_cpuif_uaccess(struct kvm_vcpu *vcpu, bool is_write,
- 	struct vgic_io_device dev = {
- 		.regions = vgic_v2_cpu_registers,
- 		.nr_regions = ARRAY_SIZE(vgic_v2_cpu_registers),
-+		.iodev_type = IODEV_CPUIF,
- 	};
- 
- 	return vgic_uaccess(vcpu, &dev, is_write, offset, val);
-@@ -448,6 +449,7 @@ int vgic_v2_dist_uaccess(struct kvm_vcpu *vcpu, bool is_write,
- 	struct vgic_io_device dev = {
- 		.regions = vgic_v2_dist_registers,
- 		.nr_regions = ARRAY_SIZE(vgic_v2_dist_registers),
-+		.iodev_type = IODEV_DIST,
- 	};
- 
- 	return vgic_uaccess(vcpu, &dev, is_write, offset, val);
-diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
-index 26be827..3bad3c5 100644
---- a/virt/kvm/arm/vgic/vgic-mmio.c
-+++ b/virt/kvm/arm/vgic/vgic-mmio.c
-@@ -484,7 +484,8 @@ static int dispatch_mmio_read(struct kvm_vcpu *vcpu, struct kvm_io_device *dev,
- 
- 	switch (iodev->iodev_type) {
- 	case IODEV_CPUIF:
--		return 1;
-+		data = region->read(vcpu, addr, len);
-+		break;
- 	case IODEV_DIST:
- 		data = region->read(vcpu, addr, len);
- 		break;
-@@ -517,6 +518,7 @@ static int dispatch_mmio_write(struct kvm_vcpu *vcpu, struct kvm_io_device *dev,
- 
- 	switch (iodev->iodev_type) {
- 	case IODEV_CPUIF:
-+		region->write(vcpu, addr, len, data);
- 		break;
- 	case IODEV_DIST:
- 		region->write(vcpu, addr, len, data);
+Thanks,
+
+	M.
+
+Eric Auger (1):
+  KVM: arm/arm64: Fix vGICv2 KVM_DEV_ARM_VGIC_GRP_CPU/DIST_REGS
+
+Marc Zyngier (12):
+  irqchip/gicv3-its: Restore all cacheability attributes
+  KVM: arm64: vgic-its: Generalize use of vgic_get_irq_kref
+  KVM: arm64: vgic-its: Fix handling of indirect tables
+  KVM: arm64: vgic-its: Fix vgic_its_check_device_id BE handling
+  KVM: arm64: vgic-its: Fix misleading nr_entries in
+    vgic_its_check_device_id
+  KVM: arm64: vgic-its: Validate the device table L1 entry
+  KVM: arm64: vgic-its: Fix L2 entry validation for indirect tables
+  KVM: arm64: vgic-its: Add collection allocator/destructor
+  KVM: arm64: vgic-its: Add pointer to corresponding kvm_device
+  KVM: arm64: vgic-its: Turn device_id validation into generic ID
+    validation
+  KVM: arm64: vgic-its: Make vgic_its_cmd_handle_mapi similar to other
+    handlers
+  KVM: arm64: vgic-its: Simplify MAPI error handling
+
+ include/kvm/arm_vgic.h             |   1 +
+ include/linux/irqchip/arm-gic-v3.h |  48 ++++++--
+ virt/kvm/arm/vgic/vgic-its.c       | 224 ++++++++++++++++++++-----------------
+ virt/kvm/arm/vgic/vgic-mmio-v2.c   |   2 +
+ virt/kvm/arm/vgic/vgic-mmio.c      |   4 +-
+ virt/kvm/arm/vgic/vgic.c           |  10 +-
+ virt/kvm/arm/vgic/vgic.h           |   8 ++
+ 7 files changed, 175 insertions(+), 122 deletions(-)
+
 -- 
 2.1.4
