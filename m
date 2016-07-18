@@ -1,65 +1,40 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Mon, 18 Jul 2016 10:19:07 -0700
-Subject: [PATCH 1/3] ARM: dts: qcom: Add initial DTS for LG Nexus 5 Phone
-In-Reply-To: <20160717105208.9596-2-bshah@kde.org>
-References: <20160717105208.9596-1-bshah@kde.org>
- <20160717105208.9596-2-bshah@kde.org>
-Message-ID: <20160718171907.GF13516@tuxbot>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Mon, 18 Jul 2016 10:22:44 -0700
+Subject: [PATCH] clk: zynq: avoid retrieving clock names from DT property
+In-Reply-To: <20160717161110.GY3847@xsjsorenbubuntu>
+References: <1468682123-1434-1-git-send-email-yamada.masahiro@socionext.com>
+ <20160717161110.GY3847@xsjsorenbubuntu>
+Message-ID: <20160718172244.GF3847@xsjsorenbubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun 17 Jul 03:52 PDT 2016, Bhushan Shah wrote:
+On Sun, 2016-07-17 at 09:11:10 -0700, S?ren Brinkmann wrote:
+> On Sun, 2016-07-17 at 00:15:23 +0900, Masahiro Yamada wrote:
+> > The "clock-output-names" property is useful for generic clock
+> > providers such as fixed-clock, fixed-factor-clock, etc.
+> > 
+> > On the other hand, it should not be used for really SoC-specific
+> > clock providers like this one.  As you see in "enum zynq_clk" in
+> > this driver, it is written as if it already knows all the clock
+> > names.  Besides, this is instantiated only once, so no clock name
+> > conflict would happen even if the clock names are hard-coded in the
+> > driver.
+> > 
+> > The device tree (arch/arm/boot/dts/zynq-7000.dtsi) will be fixed
+> > later.
+> > 
+> > Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> 
+> IIRC, this was the only way to allow circular clock routing. E.g. there
+> are use-cases that route an FCLK back into the PS to use it as input for
+> the GEM. With the introduction of deferred probing this might all be
+> possible now but it would be good to verify that this kind of circular
+> clock routing still works with this change.
 
-[..]
-> diff --git a/arch/arm/boot/dts/qcom-msm8974-lge-nexus5-hammerhead.dts b/arch/arm/boot/dts/qcom-msm8974-lge-nexus5-hammerhead.dts
-> new file mode 100644
-> index 0000000..88d494f
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/qcom-msm8974-lge-nexus5-hammerhead.dts
-> @@ -0,0 +1,25 @@
-> +#include "qcom-msm8974.dtsi"
-> +#include "qcom-pm8841.dtsi"
-> +#include "qcom-pm8941.dtsi"
-> +
-> +/ {
-> +	model = "LGE MSM 8974 HAMMERHEAD";
-> +	compatible = "qcom,msm8974";
+Yep, this breaks this kind of routing. E.g. if you remove the
+clk-output-names from the DT and add an EMIO clock input like this:
+	clocks = <&clkc 15>;
+	clock-names = "gem1_emio_clk";
+the code will no longer be able to correctly obtain the clock name for that input.
 
-We should have a "lg,hammerhead" here as well, prior to "qcom,msm8974".
-Preferably some sort of "product family" definition, if we know of any
-to reduce the risk of conflicts with any other hammerheads from LGE.
-
-> +	qcom,msm-id = <126 150 0x20002 0xB>;
-
-We've decided against defining qcom,msm-id in the dts files, so please
-drop this.
-
-Instead use dtbTool from git://codeaurora.org/quic/kernel/skales which
-should inject the correct information based on the compatible.
-
-> +
-> +	aliases {
-> +		serial0 = &blsp1_uart1;
-> +	};
-> +
-> +	chosen {
-> +		stdout-path = "serial0:115200n8";
-> +	};
-> +};
-> +
-> +&soc {
-> +
-
-As you're dropping msm-id, please also drop this empty line.
-
-> +	serial at f991d000 {
-> +		status = "ok";
-> +	};
-> +
-
-Dito.
-
-> +};
-
-Regards,
-Bjorn
+	S?ren
