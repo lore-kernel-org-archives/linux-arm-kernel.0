@@ -1,42 +1,45 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 18 Jul 2016 13:59:51 +0100
-Subject: [stable:PATCH] valid_user_regs() backport
-In-Reply-To: <1468844845-6129-1-git-send-email-james.morse@arm.com>
-References: <1468844845-6129-1-git-send-email-james.morse@arm.com>
-Message-ID: <20160718125951.GD10069@leverpostej>
+From: lkp@intel.com (Fengguang Wu)
+Date: Mon, 18 Jul 2016 21:00:39 +0800
+Subject: running "make dtbs" for test builds
+In-Reply-To: <1725840.UfqkDuJ4HB@wuerfel>
+References: <8924490.SntxSU2FOC@wuerfel>
+ <20160718124122.GA30497@wfg-t540p.sh.intel.com>
+ <1725840.UfqkDuJ4HB@wuerfel>
+Message-ID: <20160718130039.GA31368@wfg-t540p.sh.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 18, 2016 at 01:27:22PM +0100, James Morse wrote:
-> Hi all,
+On Mon, Jul 18, 2016 at 02:52:32PM +0200, Arnd Bergmann wrote:
+>On Monday, July 18, 2016 8:41:22 PM CEST Fengguang Wu wrote:
+>> Hi Arnd,
+>>
+>> On Mon, Jul 18, 2016 at 02:01:17PM +0200, Arnd Bergmann wrote:
+>> >Hi Fengguang,
+>> >
+>> >I've recently run into a number of cases in which I pulled a branch that
+>> >was building fine with "make vmlinux", but that failed for "make dtbs",
+>> >and I wonder if this is something that could be checked by the kbuild
+>> >test robot so we catch it earlier.
+>>
+>> We initially run "make" without vmlinux, however during bisect more
+>> specific make targets will be used to speed it up. To do that it's
+>> necessary to know the regex patterns of "make dtbs" error messages,
+>> so that they can be correctly bisected.
+>>
+>> Can you give some "make dtbs" error messages or patterns?
+>>
+>
+>A typical error looks like
+>
+>Error: arch/arm/boot/dts/sun7i-a20-bananapi-m1-plus.dts:252.1-18 Label or path usb_power_supply not found
+>FATAL ERROR: Syntax error parsing input tree
+>scripts/Makefile.lib:312: recipe for target 'arch/arm/boot/dts/sun7i-a20-bananapi-m1-plus.dtb' failed
+>make[3]: *** [arch/arm/boot/dts/sun7i-a20-bananapi-m1-plus.dtb] Error 1
+>
+>There should be almost 100% correlation between seeing "arch/${ARCH}/boot/dts/"
+>in stderr and having a problem in the "make dtbs" stage.
 
-Hi James,
- 
-> These three copies of the same patch backport dbd4d7ca563f
-> ("arm64: Rework valid_user_regs") to the stable kernels listed on kernel.org
-> as far back as v3.16.
-> 
-> This patch fixed a userspace triggerable oops when userspace tries
-> to switch to a mode not supported by the kernel:
-> [  286.628508] Bad mode in Synchronous Abort handler detected, code 0x46000000 -- SVC (AArch32)
-> [  286.639625] CPU: 3 PID: 2072 Comm: inter Not tainted 4.4.14 #4504
-> [  286.648391] Hardware name: ARM Juno development board (r1) (DT)
-> [ ... ]
-> [  286.716784] Bad mode in Synchronous Abort handler detected, code 0x86000007 -- IABT (current EL)
-> [  286.725483] CPU: 3 PID: 2072 Comm: inter Not tainted 4.4.14 #4504
-> [  286.731513] Hardware name: ARM Juno development board (r1) (DT)
-> [ ... ]
-> [  286.840815] Internal error: Oops - bad mode: 0 [#1] PREEMPT SMP
-> [  286.846673] Modules linked in:
-> [  286.849699] CPU: 3 PID: 2072 Comm: inter Not tainted 4.4.14 #4504
-> [  286.855728] Hardware name: ARM Juno development board (r1) (DT)
+Got it, thank you for the tips!
 
-Thanks for doing this.
-
-Having looked over them, I believe that the fixups for all three
-backport patches are correct. So FWIW, for all the patches:
-
-Reviewed-by: Mark Rutland <mark.rutland@arm.com> [backport]
-
-Thanks,
-Mark.
+Regards,
+Fengguang
