@@ -1,59 +1,66 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 18 Jul 2016 11:44:24 +0200
-Subject: [PATCH v0 06/10] arm: orion5x: Add DT-based support for Netgear
- WNR854T
-In-Reply-To: <6404488.GyOP57DJrV@wuerfel>
-References: <1468679348-10522-1-git-send-email-jm@lentin.co.uk>
- <4290281.AD5Bhg23o6@wuerfel>
- <alpine.DEB.2.11.1607170959090.19980@marmot.wormnet.eu>
- <6404488.GyOP57DJrV@wuerfel>
-Message-ID: <20160718114424.14a28889@free-electrons.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 18 Jul 2016 11:45:00 +0200
+Subject: [GIT PULL] Allwinner DT patches for 4.8, take 2
+In-Reply-To: <4794027.B8xcHDgPAJ@wuerfel>
+References: <20160715105243.GA4468@lukather>
+ <4794027.B8xcHDgPAJ@wuerfel>
+Message-ID: <20160718094500.GB4199@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Fri, Jul 15, 2016 at 10:45:21PM +0200, Arnd Bergmann wrote:
+> On Friday, July 15, 2016 12:52:43 PM CEST Maxime Ripard wrote:
+> > Hi Arnd, Kevin, Olof,
+> > 
+> > Here is the final (hopefully) pull request for the Allwinner SoCs for
+> > the 4.8 merge window.
+> > 
+> > Thanks!
+> > Maxime
+> > 
+> > The following changes since commit d509e205d81f074a9b8d93ac80ab56405dede48b:
+> > 
+> >   ARM: dts: sun5i: Enable otg on the auxtex t004 (2016-07-05 08:54:33 +0200)
+> > 
+> > are available in the git repository at:
+> > 
+> >   https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-dt-for-4.8-2
+> > 
+> > for you to fetch changes up to 339120c5f638727a8359b054ec06ed2d66dc9b19:
+> > 
+> >   ARM: dts: sun8i: Add dts file for inet86dz board (2016-07-11 08:39:27 +0200)
+> > 
+> > ----------------------------------------------------------------
+> > Allwinner DT changes for 4.8, take 2
+> > 
+> > Another set of changes for the 4.8 merge window, among which:
+> >   - Reworking of the DT for the tablets based on Allwinner reference design
+> >     and q8 designs to avoid duplication as much as possible
+> >   - Renaming a DT merged in the first PR for consistency
+> >   - Enable a few devices on some boards
+> >   - New boards: Polaroid MID2407PXE03, inet86dz
+> > 
+> 
+> This breaks the allmodconfig build, not pulling:
+> 
+>   DTC     arch/arm/boot/dts/sun7i-a20-bananapi-m1-plus.dtb
+> Error: ../arch/arm/boot/dts/sun7i-a20-bananapi-m1-plus.dts:252.1-18 Label or path usb_power_supply not found
+> 
+> Please send a fixed pull request.
 
-On Sun, 17 Jul 2016 22:41:35 +0200, Arnd Bergmann wrote:
+Ouch, sorry for that, I'll send a new pull request that will
+compile...
 
-> I would assume that the PCIe port should work out of the box with the driver
+Maxime
 
-Unfortunately, no. The PCIe on Orion5x requires a workaround for
-reading/writing the PCI configuration space. Instead of doing MMIO
-accesses to PCIE_CONF_ADDR_OFF / PCIE_CONF_DATA_OFF, you must map a
-MBus window, which provides a memory-mapped view of the PCI
-configuration space.
-
-Definitely not impossible to implement, but the driver doesn't work
-as-is.
-
-> We also don't seem to need any MBUS window setup for the I/O and
-> memory spaces, which greatly simplifies the driver compared to the
-> pci-mvebu one, it would be a fairly straightforward implementation
-> based on pci-host-generic.c (which unfortunately just got way
-> more complicated and might need to go on a diet).
-
-MBus windows are needed. See:
-
-        mvebu_mbus_add_window_remap_by_id(ORION_MBUS_PCI_IO_TARGET,
-                                          ORION_MBUS_PCI_IO_ATTR,
-                                          ORION5X_PCI_IO_PHYS_BASE,
-                                          ORION5X_PCI_IO_SIZE,
-                                          ORION5X_PCI_IO_BUS_BASE);
-        mvebu_mbus_add_window_by_id(ORION_MBUS_PCI_MEM_TARGET,
-                                    ORION_MBUS_PCI_MEM_ATTR,
-                                    ORION5X_PCI_MEM_PHYS_BASE,
-                                    ORION5X_PCI_MEM_SIZE);
-
-in orion5x_setup_wins().
-
-Note that we already have some Orion5x converted to DT, and that use
-PCI: board-rd88f5182.c is an example. So we could very well take Jamie
-patches as-is, and move later to a DT-representation for PCI/PCIe.
-
-Best regards,
-
-Thomas
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
 http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160718/8bf726c4/attachment.sig>
