@@ -1,56 +1,34 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 18 Jul 2016 12:02:32 +0200
-Subject: [v2,1/4] hwmon: iio_hwmon: defer probe when no channel is found
-In-Reply-To: <20160716170013.GA27490@roeck-us.net>
-References: <1468576754-3273-2-git-send-email-quentin.schulz@free-electrons.com>
- <20160716170013.GA27490@roeck-us.net>
-Message-ID: <20160718100232.GE4199@lukather>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Mon, 18 Jul 2016 12:02:37 +0200
+Subject: [RFC 0/1] ARM: print MHz in /proc/cpuinfo
+In-Reply-To: <20160703165431.GL1041@n2100.armlinux.org.uk>
+References: <1465333713-14339-1-git-send-email-jon.mason@broadcom.com>
+ <20160607221809.GP1041@n2100.armlinux.org.uk>
+ <32b30c50-4712-568e-4044-9f533ca497b2@jonmasters.org>
+ <20160703165431.GL1041@n2100.armlinux.org.uk>
+Message-ID: <20160718100236.GA12427@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Guenter,
+On Sun 2016-07-03 17:54:31, Russell King - ARM Linux wrote:
+> On Sat, Jul 02, 2016 at 07:58:00PM -0400, Jon Masters wrote:
+> > Agreed. But we'll still be coming back to ensure this information is
+> > presented to users. I pointed out to ARM about 3-4 years ago that this
+> > was going to bite us. It is now biting us, and we will ensure that
+> > useless data is provided where it is on x86 for identical experience by
+> > users. That is unless or until x86 users do something else always. Our
+> > (separate) case will use DMI or ACPI for the same kind of data.
+> 
+> Right, so having read all your email, there's no reason why we couldn't
+> just print:
+> 
+> cpu MHz  : 99999999.999
 
-On Sat, Jul 16, 2016 at 10:00:13AM -0700, Guenter Roeck wrote:
-> On Fri, Jul 15, 2016 at 11:59:11AM +0200, Quentin Schulz wrote:
-> > iio_channel_get_all returns -ENODEV when it cannot find either phandles and
-> > properties in the Device Tree or channels whose consumer_dev_name matches
-> > iio_hwmon in iio_map_list. The iio_map_list is filled in by iio drivers
-> > which might be probed after iio_hwmon.
-> > 
-> > It is better to defer the probe of iio_hwmon if such error is returned by
-> > iio_channel_get_all in order to let a chance to iio drivers to expose
-> > channels in iio_map_list.
-> > 
-> > Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
-> > ---
-> > 
-> > No modifications for this patch since we did not settled for a solution.
-> > What should we do?
-> > 
-> AFAICS the only thing we can do is to replace module_platform_driver() with
-> its explicitly coded variant, and to use use late_initcall() instead of
-> module_init().
+You apparenly did not read the email. Because bogus number will not
+help people detecting underclocked configurations, as email was
+explaining.
 
-I thought this kind of changes to the driver init time were
-discouraged these days?
-
-> Anything else would result in endless probe deferrals if there are
-> no channels.
-
-Well, technically, not endless. AFAIK, the kernel only retries when a
-new driver is probed, which should hopefully settle down rather
-quickly.
-
-Maxime
-
+									Pavel
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160718/058276cc/attachment.sig>
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
