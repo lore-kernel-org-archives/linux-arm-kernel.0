@@ -1,62 +1,45 @@
-From: fu.wei@linaro.org (Fu Wei)
-Date: Mon, 18 Jul 2016 23:21:58 +0800
-Subject: [PATCH 0/3] watchdog, sbsa_gwdt: Update SBSA watchdog with the
- new infrastructure of watchdog.
-In-Reply-To: <20160717195139.GC32751@spo001.leaseweb.nl>
-References: <1464674890-10512-1-git-send-email-fu.wei@linaro.org>
- <20160717195139.GC32751@spo001.leaseweb.nl>
-Message-ID: <CADyBb7u=gU01RoVURmah7mRCLe1ZZZMgu92n5p5_fq9C9Uv_BQ@mail.gmail.com>
+From: stillcompiling@gmail.com (Joshua Clayton)
+Date: Mon, 18 Jul 2016 08:24:50 -0700
+Subject: [PATCH 2/4] doc: usb: ci-hdrc-usb2: add property
+ over-current-polarity
+In-Reply-To: <1468840547-17899-2-git-send-email-jun.li@nxp.com>
+References: <1468840547-17899-1-git-send-email-jun.li@nxp.com>
+ <1468840547-17899-2-git-send-email-jun.li@nxp.com>
+Message-ID: <578CF4C2.4000804@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wim, Guenter,
-
-Great thanks for your help :-)
-
-On 18 July 2016 at 03:51, Wim Van Sebroeck <wim@iguana.be> wrote:
-> Hi Fu,
+Greetings,
+On 07/18/2016 04:15 AM, Li Jun wrote:
+> Adding over-current-polarity to indicate the over current flag
+> is low active or high active.
 >
->> From: Fu Wei <fu.wei@linaro.org>
->>
->> This patchset:
->>     (1)Try to fix an issue about min and max timeout validity check:
->>     when max_hw_heartbeat_ms is defined, this check should be skipped.
->>
->>     (2)Use max_hw_heartbeat_ms instead of max_timeout in SBSA watchdog.
->>
->>     (3)Set WDOG_HW_RUNNING, when SBSA watchdog is already running before
->>     it's initialized.
->>
->> Changelog:
->> v1: The first formal upstreaming version
->>
->> RFC: https://lkml.org/lkml/2016/5/3/145
->>
->> Pratyush Anand (3):
->>   watchdog: skip min and max timeout validity check when
->>     max_hw_heartbeat_ms is defined
->>   sbsa_gwdt: Use max_hw_heartbeat_ms instead of max_timeout
->>   sbsa_gwdt: Set WDOG_HW_RUNNING, when watchdog is already running.
->>
->>  drivers/watchdog/sbsa_gwdt.c     | 6 ++++--
->>  drivers/watchdog/watchdog_core.c | 2 +-
->>  2 files changed, 5 insertions(+), 3 deletions(-)
->>
->> --
->> 2.5.5
->>
+> Signed-off-by: Li Jun <jun.li@nxp.com>
+> ---
+>  Documentation/devicetree/bindings/usb/ci-hdrc-usb2.txt | 2 ++
+>  1 file changed, 2 insertions(+)
 >
-> These patches have been added to linux-watchdog-next.
->
-> Kind regards,
-> Wim.
->
+> diff --git a/Documentation/devicetree/bindings/usb/ci-hdrc-usb2.txt b/Documentation/devicetree/bindings/usb/ci-hdrc-usb2.txt
+> index 341dc67..c5d35f4 100644
+> --- a/Documentation/devicetree/bindings/usb/ci-hdrc-usb2.txt
+> +++ b/Documentation/devicetree/bindings/usb/ci-hdrc-usb2.txt
+> @@ -81,6 +81,8 @@ i.mx specific properties
+>  - fsl,usbmisc: phandler of non-core register device, with one
+>    argument that indicate usb controller index
+>  - disable-over-current: disable over current detect
+> +- over-current-polarity: 0 if the over current signal polarity is low active,
+> +  1 if the over current signal polarity is high active.
+>  - external-vbus-divider: enables off-chip resistor divider for Vbus
+>  
+>  Example:
+The gpio device bindings already have active low/ active high.
+Could that be used here?
 
+In the imx SPI subsystem, for instance, the developers used gpio rather than
+MUXED spi chipselect lines for exactly this kind of flexibility.
 
+If there is no magic happening in silicon (which would seem to be the case if we can
+handle inverting polarity in the driver), I would suggest going the gpiod route.
 
--- 
-Best regards,
-
-Fu Wei
-Software Engineer
-Red Hat
+Thanks,
+Joshua
