@@ -1,435 +1,501 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 18 Jul 2016 10:38:26 +0200
-Subject: [PATCH v2 2/2] iio: adc: sun4i_lradc: new driver
-In-Reply-To: <1468350252-11405-2-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1468350252-11405-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1468350252-11405-2-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <20160718083826.GA22880@lukather>
+From: josephl@nvidia.com (Joseph Lo)
+Date: Mon, 18 Jul 2016 16:51:05 +0800
+Subject: [PATCH V2 02/10] mailbox: tegra-hsp: Add HSP(Hardware
+ Synchronization Primitives) driver
+In-Reply-To: <20160707211016.GA9897@kickseed.nvidia.com>
+References: <20160705090431.5852-1-josephl@nvidia.com>
+ <20160705090431.5852-3-josephl@nvidia.com>
+ <20160707211016.GA9897@kickseed.nvidia.com>
+Message-ID: <578C9879.9080509@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alex,
+On 07/08/2016 05:10 AM, Sivaram Nair wrote:
+> On Tue, Jul 05, 2016 at 05:04:23PM +0800, Joseph Lo wrote:
+>> The Tegra HSP mailbox driver implements the signaling doorbell-based
+>> interprocessor communication (IPC) for remote processors currently. The
+>> HSP HW modules support some different features for that, which are
+>> shared mailboxes, shared semaphores, arbitrated semaphores, and
+>> doorbells. And there are multiple HSP HW instances on the chip. So the
+>> driver is extendable to support more features for different IPC
+>> requirement.
+>>
+>> The driver of remote processor can use it as a mailbox client and deal
+>> with the IPC protocol to synchronize the data communications.
+>>
+>> Signed-off-by: Joseph Lo <josephl@nvidia.com>
+>> ---
+>> Changes in V2:
+>> - Update the driver to support the binding changes in V2
+>> - it's extendable to support multiple HSP sub-modules on the same HSP HW block
+>>    now.
+>> ---
+>>   drivers/mailbox/Kconfig     |   9 +
+>>   drivers/mailbox/Makefile    |   2 +
+>>   drivers/mailbox/tegra-hsp.c | 418 ++++++++++++++++++++++++++++++++++++++++++++
+>>   3 files changed, 429 insertions(+)
+>>   create mode 100644 drivers/mailbox/tegra-hsp.c
+>>
+>> diff --git a/drivers/mailbox/Kconfig b/drivers/mailbox/Kconfig
+>> index 5305923752d2..fe584cb54720 100644
+>> --- a/drivers/mailbox/Kconfig
+>> +++ b/drivers/mailbox/Kconfig
+>> @@ -114,6 +114,15 @@ config MAILBOX_TEST
+>>   	  Test client to help with testing new Controller driver
+>>   	  implementations.
+>>
+>> +config TEGRA_HSP_MBOX
+>> +	bool "Tegra HSP(Hardware Synchronization Primitives) Driver"
+>> +	depends on ARCH_TEGRA_186_SOC
+>> +	help
+>> +	  The Tegra HSP driver is used for the interprocessor communication
+>> +	  between different remote processors and host processors on Tegra186
+>> +	  and later SoCs. Say Y here if you want to have this support.
+>> +	  If unsure say N.
+>> +
+>>   config XGENE_SLIMPRO_MBOX
+>>   	tristate "APM SoC X-Gene SLIMpro Mailbox Controller"
+>>   	depends on ARCH_XGENE
+>> diff --git a/drivers/mailbox/Makefile b/drivers/mailbox/Makefile
+>> index 0be3e742bb7d..26d8f91c7fea 100644
+>> --- a/drivers/mailbox/Makefile
+>> +++ b/drivers/mailbox/Makefile
+>> @@ -25,3 +25,5 @@ obj-$(CONFIG_TI_MESSAGE_MANAGER) += ti-msgmgr.o
+>>   obj-$(CONFIG_XGENE_SLIMPRO_MBOX) += mailbox-xgene-slimpro.o
+>>
+>>   obj-$(CONFIG_HI6220_MBOX)	+= hi6220-mailbox.o
+>> +
+>> +obj-${CONFIG_TEGRA_HSP_MBOX}	+= tegra-hsp.o
+>> diff --git a/drivers/mailbox/tegra-hsp.c b/drivers/mailbox/tegra-hsp.c
+>> new file mode 100644
+>> index 000000000000..93c3ef58f29f
+>> --- /dev/null
+>> +++ b/drivers/mailbox/tegra-hsp.c
+>> @@ -0,0 +1,418 @@
+>> +/*
+>> + * Copyright (c) 2016, NVIDIA CORPORATION.  All rights reserved.
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify it
+>> + * under the terms and conditions of the GNU General Public License,
+>> + * version 2, as published by the Free Software Foundation.
+>> + *
+>> + * This program is distributed in the hope it will be useful, but WITHOUT
+>> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+>> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+>> + * more details.
+>> + */
+>> +
+>> +#include <linux/interrupt.h>
+>> +#include <linux/io.h>
+>> +#include <linux/mailbox_controller.h>
+>> +#include <linux/of.h>
+>> +#include <linux/of_device.h>
+>> +#include <linux/platform_device.h>
+>> +#include <dt-bindings/mailbox/tegra186-hsp.h>
+>> +
+>> +#define HSP_INT_DIMENSIONING	0x380
+>> +#define HSP_nSM_OFFSET		0
+>> +#define HSP_nSS_OFFSET		4
+>> +#define HSP_nAS_OFFSET		8
+>> +#define HSP_nDB_OFFSET		12
+>> +#define HSP_nSI_OFFSET		16
+>> +#define HSP_nINT_MASK		0xf
+>> +
+>> +#define HSP_DB_REG_TRIGGER	0x0
+>> +#define HSP_DB_REG_ENABLE	0x4
+>> +#define HSP_DB_REG_RAW		0x8
+>> +#define HSP_DB_REG_PENDING	0xc
+>> +
+>> +#define HSP_DB_CCPLEX		1
+>> +#define HSP_DB_BPMP		3
+>> +
+>> +#define MAX_NUM_HSP_CHAN 32
+>
+> Is this an arbitrarily chosen number?
 
-On Tue, Jul 12, 2016 at 09:04:12PM +0200, Alexandre Belloni wrote:
-> Add an IIO driver for the Allwinner Low Resolution ADC. This ADC is usually
-> used for physical buttons connected using a resistor ladder.
-> 
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> ---
-> Changes in v2:
->  - prefixed defines with SUN4I_LRADC_
->  - removed sun4i_lradc_write_raw_get_fmt
->  - set indio_dev->dev.of_node
->  - pushed devm_iio_device_register() at the end of the probe function
->  - added a remove function to call regulator_disable()
+Ah, this should be MAX_NUM_HSP_DB_CHAN now.
 
-I have the feeling that a description on how you plan to deprecate and
-remove the old input drivers is needed here.
+But the mbox driver still needs a max channel number, I will check how 
+to enhance it properly with multiple HSP modules support in the same driver.
 
-> 
->  drivers/iio/adc/Kconfig       |  10 ++
->  drivers/iio/adc/Makefile      |   3 +-
->  drivers/iio/adc/sun4i_lradc.c | 323 ++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 335 insertions(+), 1 deletion(-)
->  create mode 100644 drivers/iio/adc/sun4i_lradc.c
-> 
-> diff --git a/drivers/iio/adc/Kconfig b/drivers/iio/adc/Kconfig
-> index 25378c5882e2..87aaac6a5f44 100644
-> --- a/drivers/iio/adc/Kconfig
-> +++ b/drivers/iio/adc/Kconfig
-> @@ -384,6 +384,16 @@ config ROCKCHIP_SARADC
->  	  To compile this driver as a module, choose M here: the
->  	  module will be called rockchip_saradc.
->  
-> +config SUN4I_LRADC
-> +	tristate "Allwinner sun4i LRADC driver"
-> +	depends on ARCH_SUNXI || COMPILE_TEST
-> +	select IIO_TRIGGER
-> +	help
-> +	  Say yes here to build support for the LRADC found on Allwinner SoCs.
-> +
-> +	  To compile this driver as a module, choose M here: the module will be
-> +	  called sun4i_lradc.
-> +
->  config TI_ADC081C
->  	tristate "Texas Instruments ADC081C/ADC101C/ADC121C family"
->  	depends on I2C
-> diff --git a/drivers/iio/adc/Makefile b/drivers/iio/adc/Makefile
-> index 38638d46f972..a3b165af6bde 100644
-> --- a/drivers/iio/adc/Makefile
-> +++ b/drivers/iio/adc/Makefile
-> @@ -1,4 +1,4 @@
-> -#
-> +
+Maybe 4 channels for SM, AS, SS and DB. And the sub channels for 
+different functions under them. Then it may able to fix the double loop 
+issue in the hsp_db_irq function.
 
-Unneeded change?
+>
+>> +#define MAX_NUM_HSP_DB 7
+>> +
+>> +#define hsp_db_offset(i, d) \
+>> +	(d->base + ((1 + (d->nr_sm >> 1) + d->nr_ss + d->nr_as) << 16) + \
+>> +	(i) * 0x100)
+>> +
+>> +struct tegra_hsp_db_chan {
+>> +	int master_id;
+>> +	int db_id;
+>
+> These should be unsigned?
+Yes, will fix them.
 
->  # Makefile for IIO ADC drivers
->  #
->  
-> @@ -37,6 +37,7 @@ obj-$(CONFIG_PALMAS_GPADC) += palmas_gpadc.o
->  obj-$(CONFIG_QCOM_SPMI_IADC) += qcom-spmi-iadc.o
->  obj-$(CONFIG_QCOM_SPMI_VADC) += qcom-spmi-vadc.o
->  obj-$(CONFIG_ROCKCHIP_SARADC) += rockchip_saradc.o
-> +obj-$(CONFIG_SUN4I_LRADC) += sun4i_lradc.o
->  obj-$(CONFIG_TI_ADC081C) += ti-adc081c.o
->  obj-$(CONFIG_TI_ADC0832) += ti-adc0832.o
->  obj-$(CONFIG_TI_ADC128S052) += ti-adc128s052.o
-> diff --git a/drivers/iio/adc/sun4i_lradc.c b/drivers/iio/adc/sun4i_lradc.c
-> new file mode 100644
-> index 000000000000..cd42e1a994b9
-> --- /dev/null
-> +++ b/drivers/iio/adc/sun4i_lradc.c
-> @@ -0,0 +1,323 @@
-> +/*
-> + * Driver for the LRADC present on the  Allwinner sun4i
-> + *
-> + * Copyright 2016 Free Electrons
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#include <linux/bitops.h>
-> +#include <linux/err.h>
-> +#include <linux/io.h>
-> +#include <linux/interrupt.h>
-> +#include <linux/kernel.h>
-> +#include <linux/module.h>
-> +#include <linux/of.h>
-> +#include <linux/of_device.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/sched.h>
-> +#include <linux/iio/iio.h>
-> +#include <linux/iio/sysfs.h>
-> +#include <linux/regulator/consumer.h>
-> +
-> +#define SUN4I_LRADC_CTRL		0x00
-> +#define SUN4I_LRADC_INTC		0x04
-> +#define SUN4I_LRADC_INTS		0x08
-> +#define SUN4I_LRADC_DATA0		0x0c
-> +#define SUN4I_LRADC_DATA1		0x10
-> +
-> +/* LRADC_CTRL bits */
-> +#define SUN4I_LRADC_FIRST_CONVERT_DLY(x)	((x) << 24) /* 8 bits */
-> +#define SUN4I_LRADC_CHAN_SELECT(x)		((x) << 22) /* 2 bits */
-> +#define SUN4I_LRADC_CONTINUE_TIME_SEL(x)	((x) << 16) /* 4 bits */
-> +#define SUN4I_LRADC_KEY_MODE_SEL(x)		((x) << 12) /* 2 bits */
-> +#define SUN4I_LRADC_LEVELA_B_CNT(x)		((x) << 8)  /* 4 bits */
-> +#define SUN4I_LRADC_HOLD_EN			BIT(6)
-> +#define SUN4I_LRADC_LEVELB_VOL(x)		((x) << 4)  /* 2 bits */
-> +#define SUN4I_LRADC_SAMPLE_RATE(x)		((x) << 2)  /* 2 bits */
-> +#define SUN4I_LRADC_EN				BIT(0)
+>
+>> +};
+>> +
+>> +struct tegra_hsp_mbox_chan {
+>> +	int type;
+>
+> This too...
+>
+>> +	union {
+>> +		struct tegra_hsp_db_chan db_chan;
+>> +	};
+>> +};
+>
+> Why do we need to use a union?
 
-Usually, we place the bits define right next to their register
-definition (with a prefix that identifies which registers it belongs
-to)
+Because we only support DB right now, there is only one member in the 
+union. We can add something like sm_chan here when we need to support 
+that later.
 
-Something like SUN4I_LRADC_CTRL_EN for the last one.
+>
+>> +
+>> +struct tegra_hsp_mbox {
+>> +	struct mbox_controller *mbox;
+>> +	void __iomem *base;
+>> +	void __iomem *db_base[MAX_NUM_HSP_DB];
+>> +	int db_irq;
+>> +	int nr_sm;
+>> +	int nr_as;
+>> +	int nr_ss;
+>> +	int nr_db;
+>> +	int nr_si;
+>> +	spinlock_t lock;
+>
+> You might need to change this to a mutex - see below.
 
-> +
-> +/* LRADC_INTC and LRADC_INTS bits */
-> +#define SUN4I_LRADC_CHAN1_KEYUP_IRQ		BIT(12)
-> +#define SUN4I_LRADC_CHAN1_ALRDY_HOLD_IRQ	BIT(11)
-> +#define SUN4I_LRADC_CHAN1_HOLD_IRQ		BIT(10)
-> +#define	SUN4I_LRADC_CHAN1_KEYDOWN_IRQ	BIT(9)
+OK, will fix this.
 
-This alignment looks weird compared to the others.
+>
+>> +};
+>> +
+>> +static inline u32 hsp_readl(void __iomem *base, int reg)
+>> +{
+>> +	return readl(base + reg);
+>> +}
+>> +
+>> +static inline void hsp_writel(void __iomem *base, int reg, u32 val)
+>> +{
+>> +	writel(val, base + reg);
+>> +	readl(base + reg);
+>> +}
+>> +
+>> +static int hsp_db_can_ring(void __iomem *db_base)
+>> +{
+>> +	u32 reg;
+>> +
+>> +	reg = hsp_readl(db_base, HSP_DB_REG_ENABLE);
+>> +
+>> +	return !!(reg & BIT(HSP_DB_MASTER_CCPLEX));
+>> +}
+>> +
+>> +static irqreturn_t hsp_db_irq(int irq, void *p)
+>> +{
+>> +	struct tegra_hsp_mbox *hsp_mbox = p;
+>> +	ulong val;
+>
+> This should be u32 and...
+>
+>> +	int master_id;
+>> +
+>> +	val = (ulong)hsp_readl(hsp_mbox->db_base[HSP_DB_CCPLEX],
+>> +			       HSP_DB_REG_PENDING);
+>
+> the cast should/can be removed (hsp_readl and hsp_writel both use u32)?
+Yes.
 
-> +#define SUN4I_LRADC_CHAN1_DATA_IRQ		BIT(8)
-> +#define SUN4I_LRADC_CHAN0_KEYUP_IRQ		BIT(4)
-> +#define SUN4I_LRADC_CHAN0_ALRDY_HOLD_IRQ	BIT(3)
-> +#define SUN4I_LRADC_CHAN0_HOLD_IRQ		BIT(2)
-> +#define	SUN4I_LRADC_CHAN0_KEYDOWN_IRQ	BIT(1)
+>
+>> +	hsp_writel(hsp_mbox->db_base[HSP_DB_CCPLEX], HSP_DB_REG_PENDING, val);
+>> +
+>> +	spin_lock(&hsp_mbox->lock);
+>> +	for_each_set_bit(master_id, &val, MAX_NUM_HSP_CHAN) {
+>> +		struct mbox_chan *chan;
+>> +		struct tegra_hsp_mbox_chan *mchan;
+>> +		int i;
+>> +
+>> +		for (i = 0; i < MAX_NUM_HSP_CHAN; i++) {
+>> +			chan = &hsp_mbox->mbox->chans[i];
+>> +
+>> +			if (!chan->con_priv)
+>> +				continue;
+>> +
+>> +			mchan = chan->con_priv;
+>> +			if (mchan->type == HSP_MBOX_TYPE_DB &&
+>> +			    mchan->db_chan.master_id == master_id)
+>> +				break;
+>> +			chan = NULL;
+>> +		}
+>
+> Like Alexandre, I didn't like this use of inner loop as well. But I will
+> add my comment to the other thread.
+>
+>> +
+>> +		if (chan)
+>> +			mbox_chan_received_data(chan, NULL);
+>> +	}
+>> +	spin_unlock(&hsp_mbox->lock);
+>> +
+>> +	return IRQ_HANDLED;
+>> +}
+>> +
+>> +static int hsp_db_send_data(struct mbox_chan *chan, void *data)
+>> +{
+>> +	struct tegra_hsp_mbox_chan *mchan = chan->con_priv;
+>> +	struct tegra_hsp_db_chan *db_chan = &mchan->db_chan;
+>> +	struct tegra_hsp_mbox *hsp_mbox = dev_get_drvdata(chan->mbox->dev);
+>> +
+>> +	hsp_writel(hsp_mbox->db_base[db_chan->db_id], HSP_DB_REG_TRIGGER, 1);
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +static int hsp_db_startup(struct mbox_chan *chan)
+>> +{
+>> +	struct tegra_hsp_mbox_chan *mchan = chan->con_priv;
+>> +	struct tegra_hsp_db_chan *db_chan = &mchan->db_chan;
+>> +	struct tegra_hsp_mbox *hsp_mbox = dev_get_drvdata(chan->mbox->dev);
+>> +	u32 val;
+>> +	unsigned long flag;
+>> +
+>> +	if (db_chan->master_id >= MAX_NUM_HSP_CHAN) {
+>
+> Is this a valid check? IIUC, MAX_NUM_HSP_CHAN is independent of the
+> number of masters.
 
-Ditto.
+This should be MAX_NUM_HSP_DB_CHAN.
 
-> +#define SUN4I_LRADC_CHAN0_DATA_IRQ		BIT(0)
-> +
-> +#define NUM_SUN4I_LRADC_CHANS		2
-> +
-> +struct sun4i_lradc_state {
-> +	void __iomem *base;
-> +	struct regulator *vref_supply;
-> +	u32 vref_mv;
-> +	struct completion data_ok[NUM_SUN4I_LRADC_CHANS];
-> +	spinlock_t lock;
-> +};
-> +
-> +#define SUN4I_LRADC_CHANNEL(chan) {				\
-> +	.type = IIO_VOLTAGE,					\
-> +	.indexed = 1,						\
-> +	.channel = (chan),					\
-> +	.scan_index = (chan),					\
-> +	.info_mask_separate = BIT(IIO_CHAN_INFO_RAW),		\
-> +	.info_mask_shared_by_type = BIT(IIO_CHAN_INFO_SCALE) |	\
-> +				BIT(IIO_CHAN_INFO_SAMP_FREQ)	\
-> +}
-> +
-> +static const struct iio_chan_spec sun4i_lradc_chan_array[] = {
-> +	SUN4I_LRADC_CHANNEL(0),
-> +	SUN4I_LRADC_CHANNEL(1),
-> +};
-> +
-> +static const struct {
-> +	int val;
-> +	int val2;
-> +} sun4i_lradc_sample_freq_avail[] = {
-> +	{250, 0},
-> +	{125, 0},
-> +	{62, 500000},
-> +	{32, 250000},
-> +};
-> +
-> +static IIO_CONST_ATTR_SAMP_FREQ_AVAIL("32.25 62.5 125 250");
-> +
-> +static struct attribute *sun4i_lradc_attributes[] = {
-> +	&iio_const_attr_sampling_frequency_available.dev_attr.attr,
-> +	NULL
-> +};
-> +
-> +static const struct attribute_group sun4i_lradc_attribute_group = {
-> +	.attrs = sun4i_lradc_attributes,
-> +};
-> +
-> +static irqreturn_t sun4i_lradc_irq(int irq, void *dev_id)
-> +{
-> +	struct iio_dev *indio_dev = dev_id;
-> +	struct sun4i_lradc_state *st = iio_priv(indio_dev);
-> +	u32 ints, intc;
-> +
-> +	spin_lock(&st->lock);
-> +
-> +	ints = readl(st->base + SUN4I_LRADC_INTS);
-> +	intc = readl(st->base + SUN4I_LRADC_INTC);
-> +
-> +	if (ints & SUN4I_LRADC_CHAN0_DATA_IRQ)
-> +		complete_all(&st->data_ok[0]);
-> +
-> +	if (ints & SUN4I_LRADC_CHAN1_DATA_IRQ)
-> +		complete_all(&st->data_ok[1]);
-> +
-> +	intc &= ~ints;
-> +	writel(intc, st->base + SUN4I_LRADC_INTC);
-> +	writel(ints, st->base + SUN4I_LRADC_INTS);
+>
+>> +		dev_err(chan->mbox->dev, "invalid HSP chan: master ID: %d\n",
+>> +			db_chan->master_id);
+>> +		return -EINVAL;
+>> +	}
+>> +
+>> +	spin_lock_irqsave(&hsp_mbox->lock, flag);
+>> +	val = hsp_readl(hsp_mbox->db_base[HSP_DB_CCPLEX], HSP_DB_REG_ENABLE);
+>> +	val |= BIT(db_chan->master_id);
+>> +	hsp_writel(hsp_mbox->db_base[HSP_DB_CCPLEX], HSP_DB_REG_ENABLE, val);
+>> +	spin_unlock_irqrestore(&hsp_mbox->lock, flag);
+>> +
+>> +	if (!hsp_db_can_ring(hsp_mbox->db_base[db_chan->db_id]))
+>> +		return -ENODEV;
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +static void hsp_db_shutdown(struct mbox_chan *chan)
+>> +{
+>> +	struct tegra_hsp_mbox_chan *mchan = chan->con_priv;
+>> +	struct tegra_hsp_db_chan *db_chan = &mchan->db_chan;
+>> +	struct tegra_hsp_mbox *hsp_mbox = dev_get_drvdata(chan->mbox->dev);
+>> +	u32 val;
+>> +	unsigned long flag;
+>> +
+>> +	spin_lock_irqsave(&hsp_mbox->lock, flag);
+>> +	val = hsp_readl(hsp_mbox->db_base[HSP_DB_CCPLEX], HSP_DB_REG_ENABLE);
+>> +	val &= ~BIT(db_chan->master_id);
+>> +	hsp_writel(hsp_mbox->db_base[HSP_DB_CCPLEX], HSP_DB_REG_ENABLE, val);
+>> +	spin_unlock_irqrestore(&hsp_mbox->lock, flag);
+>> +}
+>> +
+>> +static bool hsp_db_last_tx_done(struct mbox_chan *chan)
+>> +{
+>> +	return true;
+>> +}
+>> +
+>> +static int tegra_hsp_db_init(struct tegra_hsp_mbox *hsp_mbox,
+>> +			     struct mbox_chan *mchan, int master_id)
+>> +{
+>> +	struct platform_device *pdev = to_platform_device(hsp_mbox->mbox->dev);
+>> +	struct tegra_hsp_mbox_chan *hsp_mbox_chan;
+>> +	int ret;
+>> +
+>> +	if (!hsp_mbox->db_irq) {
+>> +		int i;
+>> +
+>> +		hsp_mbox->db_irq = platform_get_irq_byname(pdev, "doorbell");
+>> +		ret = devm_request_irq(&pdev->dev, hsp_mbox->db_irq,
+>> +				       hsp_db_irq, IRQF_NO_SUSPEND,
+>> +				       dev_name(&pdev->dev), hsp_mbox);
+>> +		if (ret)
+>> +			return ret;
+>> +
+>> +		for (i = 0; i < MAX_NUM_HSP_DB; i++)
+>> +			hsp_mbox->db_base[i] = hsp_db_offset(i, hsp_mbox);
+>> +	}
+>> +
+>> +	hsp_mbox_chan = devm_kzalloc(&pdev->dev, sizeof(*hsp_mbox_chan),
+>> +				     GFP_KERNEL);
+>> +	if (!hsp_mbox_chan)
+>> +		return -ENOMEM;
+>> +
+>> +	hsp_mbox_chan->type = HSP_MBOX_TYPE_DB;
+>> +	hsp_mbox_chan->db_chan.master_id = master_id;
+>> +	switch (master_id) {
+>> +	case HSP_DB_MASTER_BPMP:
+>> +		hsp_mbox_chan->db_chan.db_id = HSP_DB_BPMP;
+>> +		break;
+>> +	default:
+>> +		hsp_mbox_chan->db_chan.db_id = MAX_NUM_HSP_DB;
+>> +		break;
+>> +	}
+>> +
+>> +	mchan->con_priv = hsp_mbox_chan;
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +static int hsp_send_data(struct mbox_chan *chan, void *data)
+>> +{
+>> +	struct tegra_hsp_mbox_chan *hsp_mbox_chan = chan->con_priv;
+>> +	int ret = 0;
+>> +
+>> +	switch (hsp_mbox_chan->type) {
+>> +	case HSP_MBOX_TYPE_DB:
+>> +		ret = hsp_db_send_data(chan, data);
+>> +		break;
+>> +	default:
+>
+> Should you return an error here?
+>
+>> +		break;
+>> +	}
+>> +
+>> +	return ret;
+>> +}
+>> +
+>> +static int hsp_startup(struct mbox_chan *chan)
+>> +{
+>> +	struct tegra_hsp_mbox_chan *hsp_mbox_chan = chan->con_priv;
+>> +	int ret = 0;
+>> +
+>> +	switch (hsp_mbox_chan->type) {
+>> +	case HSP_MBOX_TYPE_DB:
+>> +		ret = hsp_db_startup(chan);
+>> +		break;
+>> +	default:
+>
+> And here too...?
+OK, will fix both.
 
-Why do you need to modify the interrupt enabled?
+>
+>> +		break;
+>> +	}
+>> +
+>> +	return ret;
+>> +}
+>> +
+>> +static void hsp_shutdown(struct mbox_chan *chan)
+>> +{
+>> +	struct tegra_hsp_mbox_chan *hsp_mbox_chan = chan->con_priv;
+>> +
+>> +	switch (hsp_mbox_chan->type) {
+>> +	case HSP_MBOX_TYPE_DB:
+>> +		hsp_db_shutdown(chan);
+>> +		break;
+>> +	default:
+>> +		break;
+>> +	}
+>> +
+>> +	chan->con_priv = NULL;
+>> +}
+>> +
+>> +static bool hsp_last_tx_done(struct mbox_chan *chan)
+>> +{
+>> +	struct tegra_hsp_mbox_chan *hsp_mbox_chan = chan->con_priv;
+>> +	bool ret = true;
+>> +
+>> +	switch (hsp_mbox_chan->type) {
+>> +	case HSP_MBOX_TYPE_DB:
+>> +		ret = hsp_db_last_tx_done(chan);
+>
+> hsp_db_last_tx_done() return true - so we might as well make this parent
+> function to return true and remove hsp_db_last_tx_done()?
+Yes, true.
 
-> +
-> +	spin_unlock(&st->lock);
-> +
-> +	return IRQ_HANDLED;
-> +}
-> +
-> +static int sun4i_lradc_read_raw(struct iio_dev *indio_dev,
-> +				struct iio_chan_spec const *chan,
-> +				int *val, int *val2, long mask)
-> +{
-> +	struct sun4i_lradc_state *st = iio_priv(indio_dev);
-> +	int ret, tmp, idx;
-> +	unsigned long flags;
-> +
-> +	switch (mask) {
-> +	case IIO_CHAN_INFO_RAW:
-> +		reinit_completion(&st->data_ok[chan->channel]);
-> +		spin_lock_irqsave(&st->lock, flags);
-> +		tmp = readl(st->base + SUN4I_LRADC_INTC);
-> +
-> +		if (chan->channel)
-> +			tmp |= SUN4I_LRADC_CHAN1_DATA_IRQ;
-> +		else
-> +			tmp |= SUN4I_LRADC_CHAN0_DATA_IRQ;
-> +
-> +		writel(tmp, st->base + SUN4I_LRADC_INTC);
-> +		spin_unlock_irqrestore(&st->lock, flags);
-> +
-> +		ret = wait_for_completion_interruptible_timeout(
-> +			&st->data_ok[chan->channel],
-> +			msecs_to_jiffies(1000));
-> +		if (ret == 0)
-> +			return -ETIMEDOUT;
-> +
-> +		if (chan->channel)
-> +			*val = readl(st->base + SUN4I_LRADC_DATA1);
-> +		else
-> +			*val = readl(st->base + SUN4I_LRADC_DATA0);
-> +
-> +		return IIO_VAL_INT;
-> +
-> +	case IIO_CHAN_INFO_SCALE:
-> +		*val = st->vref_mv;
-> +		*val2 = 6;
-> +
-> +		return IIO_VAL_FRACTIONAL_LOG2;
-> +
-> +	case IIO_CHAN_INFO_SAMP_FREQ:
-> +		tmp = readl(st->base + SUN4I_LRADC_CTRL);
-> +		idx = (tmp >> 2) & 0x3;
-> +		*val = sun4i_lradc_sample_freq_avail[idx].val;
-> +		*val2 = sun4i_lradc_sample_freq_avail[idx].val2;
-> +		return IIO_VAL_INT_PLUS_MICRO;
-> +
-> +	default:
-> +		break;
-> +	}
-> +
-> +	return -EINVAL;
-> +}
-> +
-> +static int sun4i_lradc_write_raw(struct iio_dev *indio_dev,
-> +				 struct iio_chan_spec const *chan,
-> +				 int val, int val2, long mask)
-> +{
-> +	struct sun4i_lradc_state *st = iio_priv(indio_dev);
-> +	u32 ctrl;
-> +	int i;
-> +
-> +	switch (mask) {
-> +	case IIO_CHAN_INFO_SAMP_FREQ:
-> +		for (i = 0; i < ARRAY_SIZE(sun4i_lradc_sample_freq_avail); i++)
-> +			if (sun4i_lradc_sample_freq_avail[i].val == val &&
-> +			    sun4i_lradc_sample_freq_avail[i].val2 == val2)
-> +				break;
-> +		if (i == ARRAY_SIZE(sun4i_lradc_sample_freq_avail))
-> +			return -EINVAL;
-> +
-> +		ctrl = readl(st->base + SUN4I_LRADC_CTRL);
-> +		ctrl &= ~SUN4I_LRADC_SAMPLE_RATE(0x3);
-> +		writel(ctrl | SUN4I_LRADC_SAMPLE_RATE(i),
-> +		       st->base + SUN4I_LRADC_CTRL);
-> +
-> +		return 0;
-> +
-> +	default:
-> +		break;
-> +	}
-> +
-> +	return -EINVAL;
-> +}
-> +
-> +static const struct iio_info sun4i_lradc_info = {
-> +	.driver_module = THIS_MODULE,
-> +	.read_raw = sun4i_lradc_read_raw,
-> +	.write_raw = sun4i_lradc_write_raw,
-> +	.attrs = &sun4i_lradc_attribute_group,
-> +};
-> +
-> +static int sun4i_lradc_probe(struct platform_device *pdev)
-> +{
-> +	struct iio_dev *indio_dev;
-> +	struct device *dev = &pdev->dev;
-> +	struct sun4i_lradc_state *st;
-> +	int err;
-> +
-> +	indio_dev = devm_iio_device_alloc(dev, sizeof(*st));
-> +	if (!indio_dev)
-> +		return -ENOMEM;
-> +
-> +	st = iio_priv(indio_dev);
-> +
-> +	platform_set_drvdata(pdev, indio_dev);
-> +
-> +	indio_dev->dev.parent = dev;
-> +	indio_dev->dev.of_node = dev->of_node;
-> +	indio_dev->name = dev_name(dev);
-> +	indio_dev->modes = INDIO_DIRECT_MODE;
-> +	indio_dev->info = &sun4i_lradc_info;
-> +
-> +	st->vref_supply = devm_regulator_get(dev, "vref");
-> +	if (IS_ERR(st->vref_supply))
-> +		return PTR_ERR(st->vref_supply);
-> +
-> +	st->base = devm_ioremap_resource(dev,
-> +			platform_get_resource(pdev, IORESOURCE_MEM, 0));
-> +	if (IS_ERR(st->base))
-> +		return PTR_ERR(st->base);
-> +
-> +	/* Disable then clear all interrupts */
-> +	writel(0, st->base + SUN4I_LRADC_INTC);
-> +	writel(0xffffffff, st->base + SUN4I_LRADC_INTS);
-> +
-> +	err = devm_request_irq(dev, platform_get_irq(pdev, 0),
-> +			       sun4i_lradc_irq, 0,
-> +			       "sun4i-a10-lradc", indio_dev);
-> +	if (err)
-> +		return err;
-> +
-> +	/* Setup the ADC channels available on the board */
-> +	indio_dev->num_channels = ARRAY_SIZE(sun4i_lradc_chan_array);
-> +	indio_dev->channels = sun4i_lradc_chan_array;
-> +
-> +	err = regulator_enable(st->vref_supply);
-> +	if (err)
-> +		return err;
-> +
-> +	/* lradc Vref internally is divided by 2/3 */
-> +	st->vref_mv = regulator_get_voltage(st->vref_supply) * 2 / 3000;
-> +
-> +	init_completion(&st->data_ok[0]);
-> +	init_completion(&st->data_ok[1]);
-> +	spin_lock_init(&st->lock);
-> +
-> +	/* Continuous mode on both channels */
-> +	writel(SUN4I_LRADC_CHAN_SELECT(0x3) | SUN4I_LRADC_KEY_MODE_SEL(0x2) |
-> +	       SUN4I_LRADC_SAMPLE_RATE(0x00) | SUN4I_LRADC_EN,
-> +	       st->base + SUN4I_LRADC_CTRL);
-> +
-> +	err = devm_iio_device_register(dev, indio_dev);
-> +	if (err < 0) {
-> +		dev_err(dev, "Couldn't register the device.\n");
-> +		return err;
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static int sun4i_lradc_remove(struct platform_device *pdev)
-> +{
-> +	struct iio_dev *indio_dev = platform_get_drvdata(pdev);
-> +	struct sun4i_lradc_state *st = iio_priv(indio_dev);
-> +
-> +	regulator_disable(st->vref_supply);
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct of_device_id sun4i_lradc_of_match[] = {
-> +	{ .compatible = "allwinner,sun4i-a10-lradc", },
-> +	{ /* sentinel */ }
-> +};
-> +MODULE_DEVICE_TABLE(of, sun4i_lradc_of_match);
-> +
-> +static struct platform_driver sun4i_lradc_driver = {
-> +	.probe	= sun4i_lradc_probe,
-> +	.remove = sun4i_lradc_remove,
-> +	.driver = {
-> +		.name	= "sun4i-a10-lradc",
-> +		.of_match_table = of_match_ptr(sun4i_lradc_of_match),
-> +	},
-> +};
+>
+>> +		break;
+>> +	default:
+>> +		break;
+>> +	}
+>> +
+>> +	return ret;
+>> +}
+>> +
+>> +static const struct mbox_chan_ops tegra_hsp_ops = {
+>> +	.send_data = hsp_send_data,
+>> +	.startup = hsp_startup,
+>> +	.shutdown = hsp_shutdown,
+>> +	.last_tx_done = hsp_last_tx_done,
+>> +};
+>> +
+>> +static const struct of_device_id tegra_hsp_match[] = {
+>> +	{ .compatible = "nvidia,tegra186-hsp" },
+>> +	{ }
+>> +};
+>> +
+>> +static struct mbox_chan *
+>> +of_hsp_mbox_xlate(struct mbox_controller *mbox,
+>> +		  const struct of_phandle_args *sp)
+>> +{
+>> +	int mbox_id = sp->args[0];
+>> +	int hsp_type = (mbox_id >> 16) & 0xf;
+>
+> Wouldn't it be nicer if the shift and mask constants are made defines in
+> the DT bindings header (tegra186-hsp.h)?
+Should be OK.
 
-It would be great if you could also add some runtime_pm support. We're
-going to start working on the power management in a near future,
-having it already would save us time.
+>
+>> +	int master_id = mbox_id & 0xff;
+>> +	struct tegra_hsp_mbox *hsp_mbox = dev_get_drvdata(mbox->dev);
+>> +	struct mbox_chan *free_chan;
+>> +	int i, ret = 0;
+>> +
+>> +	spin_lock(&hsp_mbox->lock);
+>
+> If you must use spin locks, you will have to use the irqsave/restore
+> veriants in this function (called from thread context).
+>
+>> +
+>> +	for (i = 0; i < mbox->num_chans; i++) {
+>> +		free_chan = &mbox->chans[i];
+>> +		if (!free_chan->con_priv)
+>> +			break;
+>> +		free_chan = NULL;
+>> +	}
+>> +
+>> +	if (!free_chan) {
+>> +		spin_unlock(&hsp_mbox->lock);
+>> +		return ERR_PTR(-EFAULT);
+>> +	}
+>
+> IMO, it will be cleaner & simpler if you move the above code (doing the
+> lookup) into a separate function that returns free_chan - and you can
+> reuse that in hsp_db_irq()
+?
+I think it's different usage.
+>
+>> +
+>> +	switch (hsp_type) {
+>> +	case HSP_MBOX_TYPE_DB:
+>> +		ret = tegra_hsp_db_init(hsp_mbox, free_chan, master_id);
+>
+> tegra_hsp_db_init() uses devm_kzalloc and you are doing this holding a
+> spinlock.
+>
+>> +		break;
+>> +	default:
+>
+> Not returning error here will also cause resource leak (free_chan).
+>
+>> +		break;
+>> +	}
 
-Thanks!
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160718/8f956848/attachment-0001.sig>
+Thanks,
+-Joseph
