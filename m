@@ -1,67 +1,29 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 18 Jul 2016 12:13:38 +0200
-Subject: [RESEND PATCH v2] thermal: tango: add resume support
-In-Reply-To: <7689133.3ycKRvbtrh@wuerfel>
-References: <57726196.5060909@free.fr> <20160718093328.GB32259@ulmo.ba.sec>
- <7689133.3ycKRvbtrh@wuerfel>
-Message-ID: <20160718101338.GB422@ulmo.ba.sec>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Mon, 18 Jul 2016 11:20:54 +0100
+Subject: [PATCH] arm64: ptrace: remove extra define for CPSR's E bit
+Message-ID: <1468837254-44344-1-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 18, 2016 at 12:09:39PM +0200, Arnd Bergmann wrote:
-> On Monday, July 18, 2016 11:33:28 AM CEST Thierry Reding wrote:
-> 
-> > > +
-> > > +     return 0;
-> > > +}
-> > > +
-> > > +static SIMPLE_DEV_PM_OPS(tango_thermal_pm, NULL, tango_thermal_resume);
-> > > +
-> > > +#define DEV_PM_OPS   &tango_thermal_pm
-> > > +#else
-> > > +#define DEV_PM_OPS   NULL
-> > > +#endif
-> > 
-> > In my experience it's often not useful to #ifdef the struct pm_ops.
-> > These days you almost certainly want PM enabled, and the conditional
-> > doesn't save you all that much in the first place, because it's not
-> > unlikely for this to fit into some of the space that would be padded
-> > out anyway.
-> 
-> This will also generate a warning when CONFIG_PM_SLEEP is not set.
-> Better write this as
-> 
-> #define DEV_PM_OPS (IS_ENABLED(CONFIG_PM_SLEEP) ? &tango_thermal_pm : NULL)
-> 
-> so the compiler can drop the variable definition when it's not
-> needed.
+...and do not confuse source navigation tools ;)
 
-My suggestion was to define tango_thermal_pm unconditionally to avoid
-any of these tricks. For any real use-case in which the 92 bytes for the
-struct dev_pm_ops would matter you most likely want PM_SLEEP anyway, so
-I don't really see why we would even want to make it optional.
+Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+Acked-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/include/asm/ptrace.h |    1 -
+ 1 file changed, 1 deletion(-)
 
-> > As a side-note, I've noticed that this driver has the following
-> > dependencies:
-> > 
-> >         depends on ARCH_TANGO || COMPILE_TEST
-> > 
-> > which, last I checked, is probably going to fail on some architectures
-> > because you need at least another one on HAS_IOMEM (for readl() and
-> > writel()). That's a pre-existing problem, of course, so should be fixed
-> > in a separate patch.
-> 
-> No need, we just merged a patch to no longer allow COMPILE_TEST on
-> arch/um/, so we can safely rely on MMIO to be available for COMPILE_TEST.
-
-I thought at least S390 didn't have readl() and writel() either, at
-least when PCI wasn't enabled, or some such.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160718/dca40322/attachment.sig>
+diff --git a/arch/arm64/include/asm/ptrace.h b/arch/arm64/include/asm/ptrace.h
+index 7f94755..c930f1f 100644
+--- a/arch/arm64/include/asm/ptrace.h
++++ b/arch/arm64/include/asm/ptrace.h
+@@ -46,7 +46,6 @@
+ #define COMPAT_PSR_MODE_UND	0x0000001b
+ #define COMPAT_PSR_MODE_SYS	0x0000001f
+ #define COMPAT_PSR_T_BIT	0x00000020
+-#define COMPAT_PSR_E_BIT	0x00000200
+ #define COMPAT_PSR_F_BIT	0x00000040
+ #define COMPAT_PSR_I_BIT	0x00000080
+ #define COMPAT_PSR_A_BIT	0x00000100
+-- 
+1.7.9.5
