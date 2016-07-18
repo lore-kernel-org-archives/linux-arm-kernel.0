@@ -1,138 +1,36 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Mon, 18 Jul 2016 13:51:30 -0600
-Subject: [PATCH 09/10] coresight: etm4x: adding configurable start/stop
- filtering
-In-Reply-To: <1468871491-10997-1-git-send-email-mathieu.poirier@linaro.org>
-References: <1468871491-10997-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1468871491-10997-10-git-send-email-mathieu.poirier@linaro.org>
+From: mmarek@suse.com (Michal Marek)
+Date: Mon, 18 Jul 2016 22:14:39 +0200
+Subject: [PATCH v2 05/11] Kbuild: don't add obj tree in additional includes
+In-Reply-To: <20160615154553.3177021-6-arnd@arndb.de>
+References: <20160615154553.3177021-1-arnd@arndb.de>
+ <20160615154553.3177021-6-arnd@arndb.de>
+Message-ID: <20160718201439.GA9053@sepie.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With this patch we add start/stop filtering as specified on
-the perf cmd line.  When the IP matches the start address
-trace generation gets triggered.  The stop condition is
-achieved when the IP matches the stop address.
+On Wed, Jun 15, 2016 at 05:45:47PM +0200, Arnd Bergmann wrote:
+> When building with separate object directories and driver specific
+> Makefiles that add additional header include paths, Kbuild adjusts
+> the gcc flags so that we include both the directory in the source
+> tree and in the object tree.
+> 
+> However, due to another bug I fixed earlier, this did not actually
+> include the correct directory in the object tree, so we know that
+> we only really need the source tree here. Also, including the
+> object tree sometimes causes warnings about nonexisting directories
+> when the include path only exists in the source.
+> 
+> This changes the logic to only emit the -I argument for the srctree,
+> not for objects. We still need both $(srctree)/$(src) and $(obj)
+> though, so I'm adding them manually.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
----
- drivers/hwtracing/coresight/coresight-etm4x.c | 71 +++++++++++++++++++++++++++
- 1 file changed, 71 insertions(+)
+Hi Arnd,
 
-diff --git a/drivers/hwtracing/coresight/coresight-etm4x.c b/drivers/hwtracing/coresight/coresight-etm4x.c
-index b807333ce6a1..58fd37021db4 100644
---- a/drivers/hwtracing/coresight/coresight-etm4x.c
-+++ b/drivers/hwtracing/coresight/coresight-etm4x.c
-@@ -338,12 +338,25 @@ static void etm4_disable_hw(void *info)
- static int etm4_disable_perf(struct coresight_device *csdev,
- 			     struct perf_event *event)
- {
-+	u32 control;
-+	struct etm_filters *filters = event->hw.addr_filters;
- 	struct etmv4_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
- 
- 	if (WARN_ON_ONCE(drvdata->cpu != smp_processor_id()))
- 		return -EINVAL;
- 
- 	etm4_disable_hw(drvdata);
-+
-+	/*
-+	 * Check if the start/stop logic was active when the unit was stopped.
-+	 * That way we can re-enable the start/stop logic when the process is
-+	 * scheduled again.  Configuration of the start/stop logic happens in
-+	 * function etm4_set_event_filters().
-+	 */
-+	control = readl_relaxed(drvdata->base + TRCVICTLR);
-+	/* TRCVICTLR::SSSTATUS, bit[9] */
-+	filters->ssstatus = (control & BIT(9));
-+
- 	return 0;
- }
- 
-@@ -660,6 +673,27 @@ static void etm4_set_comparator_filter(struct etmv4_config *config,
- 	config->viiectlr |= BIT(comparator / 2);
- }
- 
-+static void etm4_set_start_stop_filter(struct etmv4_config *config,
-+				       u64 address, int comparator,
-+				       enum etm_addr_type type)
-+{
-+	int shift;
-+	u64 access_type = etm4_get_access_type(config);
-+
-+	/* Configure the comparator */
-+	config->addr_val[comparator] = address;
-+	config->addr_acc[comparator] = access_type;
-+	config->addr_type[comparator] = type;
-+
-+	/*
-+	 * Configure ViewInst Start-Stop control register.
-+	 * Addresses configured to start tracing go from bit 0 to n-1,
-+	 * while those configured to stop tracing from 16 to 16 + n-1.
-+	 */
-+	shift = (type == ETM_ADDR_TYPE_START ? 0 : 16);
-+	config->vissctlr |= BIT(shift + comparator);
-+}
-+
- static void etm4_set_default_filter(struct etmv4_config *config)
- {
- 	u64 start, stop;
-@@ -724,6 +758,14 @@ static int etm4_get_next_comparator(struct etmv4_drvdata *drvdata, u32 type)
- 			/* Address range comparators go in pairs */
- 			index += 2;
- 			break;
-+		case ETM_ADDR_TYPE_START:
-+		case ETM_ADDR_TYPE_STOP:
-+			if (config->addr_type[index] == ETM_ADDR_TYPE_NONE)
-+				return index;
-+
-+			/* Start/stop address can have odd indexes */
-+			index += 1;
-+			break;
- 		default:
- 			return -EINVAL;
- 		}
-@@ -737,6 +779,7 @@ static int etm4_set_event_filters(struct etmv4_drvdata *drvdata,
- 				  struct perf_event *event)
- {
- 	int i, comparator, ret = 0;
-+	u64 address;
- 	struct etmv4_config *config = &drvdata->config;
- 	struct etm_filters *filters = event->hw.addr_filters;
- 
-@@ -779,6 +822,34 @@ static int etm4_set_event_filters(struct etmv4_drvdata *drvdata,
- 			/* No start-stop filtering for ViewInst */
- 			config->vissctlr = 0x0;
- 			break;
-+		case ETM_ADDR_TYPE_START:
-+		case ETM_ADDR_TYPE_STOP:
-+			/* Get the right start or stop address */
-+			address = (type == ETM_ADDR_TYPE_START ?
-+				   filter->start_addr :
-+				   filter->stop_addr);
-+
-+			/* Configure comparator */
-+			etm4_set_start_stop_filter(config, address,
-+						   comparator, type);
-+
-+			/*
-+			 * If filters::ssstatus == 1, trace acquisition was
-+			 * started but the process was yanked away before the
-+			 * the stop address was hit.  As such the start/stop
-+			 * logic needs to be re-started so that tracing can
-+			 * resume where it left.
-+			 *
-+			 * The start/stop logic status when a process is
-+			 * scheduled out is checked in function
-+			 * etm4_disable_perf().
-+			 */
-+			if (filters->ssstatus)
-+				config->vinst_ctrl |= BIT(9);
-+
-+			/* No include/exclude filtering for ViewInst */
-+			config->viiectlr = 0x0;
-+			break;
- 		default:
- 			ret = -EINVAL;
- 			goto out;
--- 
-2.7.4
+I applied the series up to this patch to kbuild.git#kbuild. The rest
+seem to be related but not dependent patches, so I'll leave it up to the
+respective maintainers to pick them up. Is that OK with you?
+
+Thanks,
+Michal
