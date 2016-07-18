@@ -1,50 +1,70 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 18 Jul 2016 16:54:08 +0100
-Subject: [PATCH 06/13] KVM: arm64: vgic-its: Fix misleading nr_entries in
- vgic_its_check_device_id
+Date: Mon, 18 Jul 2016 16:54:14 +0100
+Subject: [PATCH 12/13] KVM: arm64: vgic-its: Make vgic_its_cmd_handle_mapi
+ similar to other handlers
 In-Reply-To: <1468857255-9543-1-git-send-email-marc.zyngier@arm.com>
 References: <1468857255-9543-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1468857255-9543-7-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1468857255-9543-13-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The nr_entries variable in vgic_its_check_device_id actually
-describe the size of the L1 table, and not the number of
-entries in this table.
-
-Rename it to l1_tbl_size, so that we can now change the code
-with a better understanding of what is what.
+vgic_its_cmd_handle_mapi has an extra "subcmd" argument, which is
+already contained in the command buffer that all command handlers
+obtain from the command queue. Let's drop it, as it is not that
+useful.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- virt/kvm/arm/vgic/vgic-its.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ virt/kvm/arm/vgic/vgic-its.c | 11 +++++------
+ 1 file changed, 5 insertions(+), 6 deletions(-)
 
 diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-index 2ac5927..268a0c7 100644
+index 996e3e1..ec7e07b 100644
 --- a/virt/kvm/arm/vgic/vgic-its.c
 +++ b/virt/kvm/arm/vgic/vgic-its.c
-@@ -687,18 +687,18 @@ static bool vgic_its_check_device_id(struct kvm *kvm, struct vgic_its *its,
- 				     int device_id)
+@@ -688,7 +688,7 @@ static void vgic_its_free_collection(struct vgic_its *its, u32 coll_id)
+  * Must be called with its_lock mutex held.
+  */
+ static int vgic_its_cmd_handle_mapi(struct kvm *kvm, struct vgic_its *its,
+-				    u64 *its_cmd, u8 subcmd)
++				    u64 *its_cmd)
  {
- 	u64 r = its->baser_device_table;
--	int nr_entries = GITS_BASER_NR_PAGES(r) * SZ_64K;
-+	int l1_tbl_size = GITS_BASER_NR_PAGES(r) * SZ_64K;
- 	int index;
- 	u64 indirect_ptr;
- 	gfn_t gfn;
+ 	u32 device_id = its_cmd_get_deviceid(its_cmd);
+ 	u32 event_id = its_cmd_get_id(its_cmd);
+@@ -711,7 +711,7 @@ static int vgic_its_cmd_handle_mapi(struct kvm *kvm, struct vgic_its *its,
+ 		new_coll = collection;
+ 	}
  
+-	if (subcmd == GITS_CMD_MAPTI)
++	if (its_cmd_get_command(its_cmd) == GITS_CMD_MAPTI)
+ 		lpi_nr = its_cmd_get_physical_id(its_cmd);
+ 	else
+ 		lpi_nr = event_id;
+@@ -999,11 +999,10 @@ static int vgic_its_cmd_handle_int(struct kvm *kvm, struct vgic_its *its,
+ static int vgic_its_handle_command(struct kvm *kvm, struct vgic_its *its,
+ 				   u64 *its_cmd)
+ {
+-	u8 cmd = its_cmd_get_command(its_cmd);
+ 	int ret = -ENODEV;
  
- 	if (!(r & GITS_BASER_INDIRECT))
--		return device_id < (nr_entries / GITS_BASER_ENTRY_SIZE(r));
-+		return device_id < (l1_tbl_size / GITS_BASER_ENTRY_SIZE(r));
- 
- 	/* calculate and check the index into the 1st level */
- 	index = device_id / (SZ_64K / GITS_BASER_ENTRY_SIZE(r));
--	if (index >= (nr_entries / sizeof(u64)))
-+	if (index >= (l1_tbl_size / sizeof(u64)))
- 		return false;
- 
- 	/* Each 1st level entry is represented by a 64-bit value. */
+ 	mutex_lock(&its->its_lock);
+-	switch (cmd) {
++	switch (its_cmd_get_command(its_cmd)) {
+ 	case GITS_CMD_MAPD:
+ 		ret = vgic_its_cmd_handle_mapd(kvm, its, its_cmd);
+ 		break;
+@@ -1011,10 +1010,10 @@ static int vgic_its_handle_command(struct kvm *kvm, struct vgic_its *its,
+ 		ret = vgic_its_cmd_handle_mapc(kvm, its, its_cmd);
+ 		break;
+ 	case GITS_CMD_MAPI:
+-		ret = vgic_its_cmd_handle_mapi(kvm, its, its_cmd, cmd);
++		ret = vgic_its_cmd_handle_mapi(kvm, its, its_cmd);
+ 		break;
+ 	case GITS_CMD_MAPTI:
+-		ret = vgic_its_cmd_handle_mapi(kvm, its, its_cmd, cmd);
++		ret = vgic_its_cmd_handle_mapi(kvm, its, its_cmd);
+ 		break;
+ 	case GITS_CMD_MOVI:
+ 		ret = vgic_its_cmd_handle_movi(kvm, its, its_cmd);
 -- 
 2.1.4
