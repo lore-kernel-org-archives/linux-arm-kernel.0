@@ -1,58 +1,70 @@
-From: zyw@rock-chips.com (Chris Zhong)
-Date: Mon, 18 Jul 2016 22:34:34 +0800
-Subject: [PATCH] ASoC: rockchip: correct the spdif clk
-Message-ID: <1468852474-15735-1-git-send-email-zyw@rock-chips.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Mon, 18 Jul 2016 20:15:08 +0530
+Subject: [RESEND PATCH] arm: assabet_defconfig: disable IDE subsystem
+In-Reply-To: <m27fcn3pb1.fsf@baylibre.com>
+References: <1467991490-24895-1-git-send-email-b.zolnierkie@samsung.com>
+ <2773873.Jjn1O47GXr@wuerfel> <4818149.nzRaU7vJQE@amdc1976>
+ <4264651.gPKphdYuCx@wuerfel> <m27fcn3pb1.fsf@baylibre.com>
+Message-ID: <578CEB74.2080002@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The spdif mclk should be 128 times of sample rate, and there is a
-internal divider, the real rate of spdif mclk is mclk / (div + 1).
-Hence, the original driver always get the good frequency for
-48000/96000/44100/192000. But for 32000, the mclk is incorrect,
-it should be 32000*128, but get 48000*128. Do not use the internal
-divider here, just set all mclk to 128 * sample rate directly.
+On Friday 15 July 2016 08:45 PM, Kevin Hilman wrote:
+> Arnd Bergmann <arnd@arndb.de> writes:
+> 
+>> On Wednesday, July 13, 2016 12:59:23 PM CEST Bartlomiej Zolnierkiewicz wrote:
+>>>
+>>> On Friday, July 08, 2016 10:23:48 PM Arnd Bergmann wrote:
+>>>> On Friday, July 8, 2016 5:24:41 PM CEST Bartlomiej Zolnierkiewicz wrote:
+>>>>> This patch disables deprecated IDE subsystem in assabet_defconfig
+>>>>> (no IDE host drivers are selected in this config so there is no
+>>>>> valid reason to enable IDE subsystem itself).
+>>>>>
+>>>>> Cc: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+>>>>> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+>>>>
+>>>> I think the series makes a lot of sense. I have checked your assertions
+>>>> in the changelogs and found no flaws in your logic, so I think we should
+>>>> take them all through arm-soc unless there are other concerns.
+>>>
+>>> Thank you.
+>>>
+>>> Should I resend everything or just patches that were not reposted yet
+>>> (the ones that were marked as RFT initially and got no feedback)?
+>>
+>> I'd be fine with just getting a pull request with all the patches that
+>> had no negative feedback and that were not already applied (if any).
+>>
+>>>> Do you have a list of ARM defconfigs that keep using CONFIG_IDE and
+>>>> how you determined that they need it?
+>>>
+>>> The only such defconfig is davinci_all_defconfig which uses
+>>> palm_bk3710 host driver (CONFIG_BLK_DEV_PALMCHIP_BK3710).
+>>>
+>>>> I know that ARCH_RPC/ARCH_ACORN has a couple of special drivers that
+>>>> have no libata replacement, are there any others like that, or are
+>>>> they all platforms that should in theory work with libata but need
+>>>> testing?
+>>>
+>>> All platforms except ARCH_ACORN, ARCH_DAVINCI & ARCH_RPC should work
+>>> with libata.
+>>
+>> Adding Sekhar and Kevin for DaVinci: At first sight, palm_bk3710 looks
+>> fairly straightforward (meaning someone has to do a few day's work)
+>> to convert into a libata driver.
+>>
+>> As this is on on-chip controller that is part of a dm644x and dm646x,
+>> it should also not be hard to test (as long as someone can find
+>> a hard drive to plug in).
+> 
+> I have a hard drive, but don't have any dm64xx hardware anymore to test
+> this.  My last working dm644x board died last year.
 
-Signed-off-by: Chris Zhong <zyw@rock-chips.com>
+I have a working DM6446 EVM. I was able to connect a hard drive to it
+and do some basic tests with v4.6 kernel.
 
----
+I will look into converting the driver to libata. Might take some time
+because this is unfamiliar territory for me.
 
- sound/soc/rockchip/rockchip_spdif.c | 17 +----------------
- 1 file changed, 1 insertion(+), 16 deletions(-)
-
-diff --git a/sound/soc/rockchip/rockchip_spdif.c b/sound/soc/rockchip/rockchip_spdif.c
-index 100781e..4ca2657 100644
---- a/sound/soc/rockchip/rockchip_spdif.c
-+++ b/sound/soc/rockchip/rockchip_spdif.c
-@@ -101,21 +101,7 @@ static int rk_spdif_hw_params(struct snd_pcm_substream *substream,
- 	int ret;
- 
- 	srate = params_rate(params);
--	switch (srate) {
--	case 32000:
--	case 48000:
--	case 96000:
--		mclk = 96000 * 128; /* 12288000 hz */
--		break;
--	case 44100:
--		mclk = 44100 * 256; /* 11289600 hz */
--		break;
--	case 192000:
--		mclk = 192000 * 128; /* 24576000 hz */
--		break;
--	default:
--		return -EINVAL;
--	}
-+	mclk = srate * 128;
- 
- 	switch (params_format(params)) {
- 	case SNDRV_PCM_FORMAT_S16_LE:
-@@ -139,7 +125,6 @@ static int rk_spdif_hw_params(struct snd_pcm_substream *substream,
- 		return ret;
- 	}
- 
--	val |= SPDIF_CFGR_CLK_DIV(mclk/(srate * 256));
- 	ret = regmap_update_bits(spdif->regmap, SPDIF_CFGR,
- 		SPDIF_CFGR_CLK_DIV_MASK | SPDIF_CFGR_HALFWORD_ENABLE |
- 		SDPIF_CFGR_VDW_MASK,
--- 
-2.6.3
+Thanks,
+Sekhar
