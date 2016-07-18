@@ -1,31 +1,72 @@
 From: michael.weiser@gmx.de (Michael Weiser)
-Date: Mon, 18 Jul 2016 18:23:55 +0200
-Subject: [PATCH 3/3] ARM: sunxi: enable big-endian
+Date: Mon, 18 Jul 2016 18:23:53 +0200
+Subject: [PATCH 1/3] mmc: sunxi-mmc: change idma descriptor to __le32
 In-Reply-To: <20160718162355.20273-1-michael.weiser@gmx.de>
 References: <20160718162355.20273-1-michael.weiser@gmx.de>
-Message-ID: <20160718162355.20273-4-michael.weiser@gmx.de>
+Message-ID: <20160718162355.20273-2-michael.weiser@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-At least the Cubieboard2 incarnation of sunxi works correctly in
-big-endian mode. Allow the selection of big-endian.
+The sunxi-mmc driver does not take into account the processor may be big
+endian when writing the DMA descriptors. This causes cards not to be
+detected when running a big-endian kernel. Change the descriptors for
+IDMA to use __le32 and ensure they are suitably swapped before writing.
+Tested successfully on the Cubieboard2.
 
 Signed-off-by: Michael Weiser <michael.weiser@gmx.de>
 ---
- arch/arm/mach-sunxi/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/mmc/host/sunxi-mmc.c | 24 ++++++++++++------------
+ 1 file changed, 12 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm/mach-sunxi/Kconfig b/arch/arm/mach-sunxi/Kconfig
-index c124d65..4dcbbfe 100644
---- a/arch/arm/mach-sunxi/Kconfig
-+++ b/arch/arm/mach-sunxi/Kconfig
-@@ -1,6 +1,7 @@
- menuconfig ARCH_SUNXI
- 	bool "Allwinner SoCs"
- 	depends on ARCH_MULTI_V7
-+	select ARCH_SUPPORTS_BIG_ENDIAN
- 	select ARCH_REQUIRE_GPIOLIB
- 	select ARCH_HAS_RESET_CONTROLLER
- 	select CLKSRC_MMIO
+diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
+index 2ee4c21..8b8f08c 100644
+--- a/drivers/mmc/host/sunxi-mmc.c
++++ b/drivers/mmc/host/sunxi-mmc.c
+@@ -223,10 +223,10 @@ struct sunxi_mmc_clk_delay {
+ };
+ 
+ struct sunxi_idma_des {
+-	u32	config;
+-	u32	buf_size;
+-	u32	buf_addr_ptr1;
+-	u32	buf_addr_ptr2;
++	__le32 config;
++	__le32 buf_size;
++	__le32 buf_addr_ptr1;
++	__le32 buf_addr_ptr2;
+ };
+ 
+ struct sunxi_mmc_host {
+@@ -325,22 +325,22 @@ static void sunxi_mmc_init_idma_des(struct sunxi_mmc_host *host,
+ 	int i, max_len = (1 << host->idma_des_size_bits);
+ 
+ 	for (i = 0; i < data->sg_len; i++) {
+-		pdes[i].config = SDXC_IDMAC_DES0_CH | SDXC_IDMAC_DES0_OWN |
+-				 SDXC_IDMAC_DES0_DIC;
++		pdes[i].config = cpu_to_le32(SDXC_IDMAC_DES0_CH | SDXC_IDMAC_DES0_OWN |
++				 SDXC_IDMAC_DES0_DIC);
+ 
+ 		if (data->sg[i].length == max_len)
+ 			pdes[i].buf_size = 0; /* 0 == max_len */
+ 		else
+-			pdes[i].buf_size = data->sg[i].length;
++			pdes[i].buf_size = cpu_to_le32(data->sg[i].length);
+ 
+ 		next_desc += sizeof(struct sunxi_idma_des);
+-		pdes[i].buf_addr_ptr1 = sg_dma_address(&data->sg[i]);
+-		pdes[i].buf_addr_ptr2 = (u32)next_desc;
++		pdes[i].buf_addr_ptr1 = cpu_to_le32(sg_dma_address(&data->sg[i]));
++		pdes[i].buf_addr_ptr2 = cpu_to_le32((u32)next_desc);
+ 	}
+ 
+-	pdes[0].config |= SDXC_IDMAC_DES0_FD;
+-	pdes[i - 1].config |= SDXC_IDMAC_DES0_LD | SDXC_IDMAC_DES0_ER;
+-	pdes[i - 1].config &= ~SDXC_IDMAC_DES0_DIC;
++	pdes[0].config |= cpu_to_le32(SDXC_IDMAC_DES0_FD);
++	pdes[i - 1].config |= cpu_to_le32(SDXC_IDMAC_DES0_LD | SDXC_IDMAC_DES0_ER);
++	pdes[i - 1].config &= cpu_to_le32(~SDXC_IDMAC_DES0_DIC);
+ 	pdes[i - 1].buf_addr_ptr2 = 0;
+ 
+ 	/*
 -- 
 2.9.0
