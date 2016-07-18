@@ -1,188 +1,435 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Mon, 18 Jul 2016 10:36:32 +0200
-Subject: [PATCH v4 3/8] drm/mediatek: add shadow register support
-In-Reply-To: <1468823575.30644.33.camel@mtksdaap41>
-References: <1468577274-6178-1-git-send-email-yt.shen@mediatek.com>
- <1468577274-6178-4-git-send-email-yt.shen@mediatek.com>
- <1468823575.30644.33.camel@mtksdaap41>
-Message-ID: <1468830992.2994.6.camel@pengutronix.de>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 18 Jul 2016 10:38:26 +0200
+Subject: [PATCH v2 2/2] iio: adc: sun4i_lradc: new driver
+In-Reply-To: <1468350252-11405-2-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1468350252-11405-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1468350252-11405-2-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <20160718083826.GA22880@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi CK, YT,
+Hi Alex,
 
-Am Montag, den 18.07.2016, 14:32 +0800 schrieb CK Hu:
-> Hi, YT:
+On Tue, Jul 12, 2016 at 09:04:12PM +0200, Alexandre Belloni wrote:
+> Add an IIO driver for the Allwinner Low Resolution ADC. This ADC is usually
+> used for physical buttons connected using a resistor ladder.
 > 
-> One comment inline.
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> ---
+> Changes in v2:
+>  - prefixed defines with SUN4I_LRADC_
+>  - removed sun4i_lradc_write_raw_get_fmt
+>  - set indio_dev->dev.of_node
+>  - pushed devm_iio_device_register() at the end of the probe function
+>  - added a remove function to call regulator_disable()
+
+I have the feeling that a description on how you plan to deprecate and
+remove the old input drivers is needed here.
+
 > 
+>  drivers/iio/adc/Kconfig       |  10 ++
+>  drivers/iio/adc/Makefile      |   3 +-
+>  drivers/iio/adc/sun4i_lradc.c | 323 ++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 335 insertions(+), 1 deletion(-)
+>  create mode 100644 drivers/iio/adc/sun4i_lradc.c
 > 
-> On Fri, 2016-07-15 at 18:07 +0800, YT Shen wrote:
-> > We need to acquire mutex before using the resources,
-> > and need to release it after finished.
-> > So we don't need to write registers in the blanking period.
-> > 
-> > Signed-off-by: YT Shen <yt.shen@mediatek.com>
-> > ---
-> >  drivers/gpu/drm/mediatek/mtk_drm_crtc.c |   75 +++++++++++++++++++------------
-> >  drivers/gpu/drm/mediatek/mtk_drm_ddp.c  |   22 +++++++++
-> >  drivers/gpu/drm/mediatek/mtk_drm_ddp.h  |    2 +
-> >  drivers/gpu/drm/mediatek/mtk_drm_drv.h  |    1 +
-> >  4 files changed, 71 insertions(+), 29 deletions(-)
-> > 
-> > diff --git a/drivers/gpu/drm/mediatek/mtk_drm_crtc.c b/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
-> > index 24aa3ba..80d9641 100644
-> > --- a/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
-> > +++ b/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
-> > @@ -315,6 +315,42 @@ static void mtk_crtc_ddp_hw_fini(struct mtk_drm_crtc *mtk_crtc)
-> >  	pm_runtime_put(drm->dev);
-> >  }
-> >  
-> > +static void mtk_crtc_ddp_config(struct drm_crtc *crtc)
-> > +{
-> > +	struct mtk_drm_crtc *mtk_crtc = to_mtk_crtc(crtc);
-> > +	struct mtk_crtc_state *state = to_mtk_crtc_state(mtk_crtc->base.state);
-> > +	struct mtk_ddp_comp *ovl = mtk_crtc->ddp_comp[0];
-> > +	unsigned int i;
-> > +
-> > +	/*
-> > +	 * TODO: instead of updating the registers here, we should prepare
-> > +	 * working registers in atomic_commit and let the hardware command
-> > +	 * queue update module registers on vblank.
-> > +	 */
-> > +	if (state->pending_config) {
-> > +		mtk_ddp_comp_config(ovl, state->pending_width,
-> > +				    state->pending_height,
-> > +				    state->pending_vrefresh);
-> > +
-> > +		state->pending_config = false;
-> > +	}
-> > +
-> > +	if (mtk_crtc->pending_planes) {
-> > +		for (i = 0; i < OVL_LAYER_NR; i++) {
-> > +			struct drm_plane *plane = &mtk_crtc->planes[i].base;
-> > +			struct mtk_plane_state *plane_state;
-> > +
-> > +			plane_state = to_mtk_plane_state(plane->state);
-> > +
-> > +			if (plane_state->pending.config) {
-> > +				mtk_ddp_comp_layer_config(ovl, i, plane_state);
-> > +				plane_state->pending.config = false;
-> > +			}
-> > +		}
-> > +		mtk_crtc->pending_planes = false;
-> > +	}
-> > +}
-> > +
-> >  static void mtk_drm_crtc_enable(struct drm_crtc *crtc)
-> >  {
-> >  	struct mtk_drm_crtc *mtk_crtc = to_mtk_crtc(crtc);
-> > @@ -391,6 +427,7 @@ static void mtk_drm_crtc_atomic_flush(struct drm_crtc *crtc,
-> >  				      struct drm_crtc_state *old_crtc_state)
-> >  {
-> >  	struct mtk_drm_crtc *mtk_crtc = to_mtk_crtc(crtc);
-> > +	struct mtk_drm_private *priv = crtc->dev->dev_private;
-> >  	unsigned int pending_planes = 0;
-> >  	int i;
-> >  
-> > @@ -409,6 +446,12 @@ static void mtk_drm_crtc_atomic_flush(struct drm_crtc *crtc,
-> >  	}
-> >  	if (pending_planes)
-> >  		mtk_crtc->pending_planes = true;
-> > +
-> > +	if (priv->data->shadow_register) {
-> > +		mtk_disp_mutex_acquire(mtk_crtc->mutex);
-> > +		mtk_crtc_ddp_config(crtc);
-> > +		mtk_disp_mutex_release(mtk_crtc->mutex);
-> > +	}
-> >  }
-> >  
-> >  static const struct drm_crtc_funcs mtk_crtc_funcs = {
-> > @@ -453,36 +496,10 @@ err_cleanup_crtc:
-> >  void mtk_crtc_ddp_irq(struct drm_crtc *crtc, struct mtk_ddp_comp *ovl)
-> >  {
-> >  	struct mtk_drm_crtc *mtk_crtc = to_mtk_crtc(crtc);
-> > -	struct mtk_crtc_state *state = to_mtk_crtc_state(mtk_crtc->base.state);
-> > -	unsigned int i;
-> > +	struct mtk_drm_private *priv = crtc->dev->dev_private;
-> >  
-> > -	/*
-> > -	 * TODO: instead of updating the registers here, we should prepare
-> > -	 * working registers in atomic_commit and let the hardware command
-> > -	 * queue update module registers on vblank.
-> > -	 */
-> > -	if (state->pending_config) {
-> > -		mtk_ddp_comp_config(ovl, state->pending_width,
-> > -				    state->pending_height,
-> > -				    state->pending_vrefresh);
-> > -
-> > -		state->pending_config = false;
-> > -	}
-> > -
-> > -	if (mtk_crtc->pending_planes) {
-> > -		for (i = 0; i < OVL_LAYER_NR; i++) {
-> > -			struct drm_plane *plane = &mtk_crtc->planes[i].base;
-> > -			struct mtk_plane_state *plane_state;
-> > -
-> > -			plane_state = to_mtk_plane_state(plane->state);
-> > -
-> > -			if (plane_state->pending.config) {
-> > -				mtk_ddp_comp_layer_config(ovl, i, plane_state);
-> > -				plane_state->pending.config = false;
-> > -			}
-> > -		}
-> > -		mtk_crtc->pending_planes = false;
-> > -	}
-> > +	if (!priv->data->shadow_register)
-> > +		mtk_crtc_ddp_config(crtc);
-> >  
-> >  	mtk_drm_finish_page_flip(mtk_crtc);
-> >  }
-> > diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-> > index 8030769..fa53806 100644
-> > --- a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-> > +++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-> > @@ -12,6 +12,7 @@
-> >   */
-> >  
-> >  #include <linux/clk.h>
-> > +#include <linux/iopoll.h>
-> >  #include <linux/module.h>
-> >  #include <linux/of_device.h>
-> >  #include <linux/platform_device.h>
-> > @@ -32,6 +33,7 @@
-> >  #define DISP_REG_CONFIG_MMSYS_CG_CON0		0x100
-> >  
-> >  #define DISP_REG_MUTEX_EN(n)	(0x20 + 0x20 * (n))
-> > +#define DISP_REG_MUTEX(n)	(0x24 + 0x20 * (n))
-> >  #define DISP_REG_MUTEX_RST(n)	(0x28 + 0x20 * (n))
-> >  #define DISP_REG_MUTEX_MOD(n)	(0x2c + 0x20 * (n))
-> >  #define DISP_REG_MUTEX_SOF(n)	(0x30 + 0x20 * (n))
-> > @@ -300,6 +302,26 @@ void mtk_disp_mutex_disable(struct mtk_disp_mutex *mutex)
-> >  	writel(0, ddp->regs + DISP_REG_MUTEX_EN(mutex->id));
-> >  }
-> >  
-> > +void mtk_disp_mutex_acquire(struct mtk_disp_mutex *mutex)
-> > +{
-> > +	struct mtk_ddp *ddp = container_of(mutex, struct mtk_ddp,
-> > +					   mutex[mutex->id]);
-> > +	u32 tmp;
-> > +
-> > +	writel(1, ddp->regs + DISP_REG_MUTEX_EN(mutex->id));
-> > +	writel(1, ddp->regs + DISP_REG_MUTEX(mutex->id));
-> > +	readl_poll_timeout_atomic(ddp->regs + DISP_REG_MUTEX(mutex->id), tmp,
-> > +				  tmp & 0x2, 1, 10000);
+> diff --git a/drivers/iio/adc/Kconfig b/drivers/iio/adc/Kconfig
+> index 25378c5882e2..87aaac6a5f44 100644
+> --- a/drivers/iio/adc/Kconfig
+> +++ b/drivers/iio/adc/Kconfig
+> @@ -384,6 +384,16 @@ config ROCKCHIP_SARADC
+>  	  To compile this driver as a module, choose M here: the
+>  	  module will be called rockchip_saradc.
+>  
+> +config SUN4I_LRADC
+> +	tristate "Allwinner sun4i LRADC driver"
+> +	depends on ARCH_SUNXI || COMPILE_TEST
+> +	select IIO_TRIGGER
+> +	help
+> +	  Say yes here to build support for the LRADC found on Allwinner SoCs.
+> +
+> +	  To compile this driver as a module, choose M here: the module will be
+> +	  called sun4i_lradc.
+> +
+>  config TI_ADC081C
+>  	tristate "Texas Instruments ADC081C/ADC101C/ADC121C family"
+>  	depends on I2C
+> diff --git a/drivers/iio/adc/Makefile b/drivers/iio/adc/Makefile
+> index 38638d46f972..a3b165af6bde 100644
+> --- a/drivers/iio/adc/Makefile
+> +++ b/drivers/iio/adc/Makefile
+> @@ -1,4 +1,4 @@
+> -#
+> +
 
-Please add a descriptive #define for the 0x2 bit of the DISP_REG_MUTEX
-registers.
+Unneeded change?
 
-> Nothing to do with timeout? I think it should print error message here
-> or reset HW to recover it.
+>  # Makefile for IIO ADC drivers
+>  #
+>  
+> @@ -37,6 +37,7 @@ obj-$(CONFIG_PALMAS_GPADC) += palmas_gpadc.o
+>  obj-$(CONFIG_QCOM_SPMI_IADC) += qcom-spmi-iadc.o
+>  obj-$(CONFIG_QCOM_SPMI_VADC) += qcom-spmi-vadc.o
+>  obj-$(CONFIG_ROCKCHIP_SARADC) += rockchip_saradc.o
+> +obj-$(CONFIG_SUN4I_LRADC) += sun4i_lradc.o
+>  obj-$(CONFIG_TI_ADC081C) += ti-adc081c.o
+>  obj-$(CONFIG_TI_ADC0832) += ti-adc0832.o
+>  obj-$(CONFIG_TI_ADC128S052) += ti-adc128s052.o
+> diff --git a/drivers/iio/adc/sun4i_lradc.c b/drivers/iio/adc/sun4i_lradc.c
+> new file mode 100644
+> index 000000000000..cd42e1a994b9
+> --- /dev/null
+> +++ b/drivers/iio/adc/sun4i_lradc.c
+> @@ -0,0 +1,323 @@
+> +/*
+> + * Driver for the LRADC present on the  Allwinner sun4i
+> + *
+> + * Copyright 2016 Free Electrons
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include <linux/bitops.h>
+> +#include <linux/err.h>
+> +#include <linux/io.h>
+> +#include <linux/interrupt.h>
+> +#include <linux/kernel.h>
+> +#include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/of_device.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/sched.h>
+> +#include <linux/iio/iio.h>
+> +#include <linux/iio/sysfs.h>
+> +#include <linux/regulator/consumer.h>
+> +
+> +#define SUN4I_LRADC_CTRL		0x00
+> +#define SUN4I_LRADC_INTC		0x04
+> +#define SUN4I_LRADC_INTS		0x08
+> +#define SUN4I_LRADC_DATA0		0x0c
+> +#define SUN4I_LRADC_DATA1		0x10
+> +
+> +/* LRADC_CTRL bits */
+> +#define SUN4I_LRADC_FIRST_CONVERT_DLY(x)	((x) << 24) /* 8 bits */
+> +#define SUN4I_LRADC_CHAN_SELECT(x)		((x) << 22) /* 2 bits */
+> +#define SUN4I_LRADC_CONTINUE_TIME_SEL(x)	((x) << 16) /* 4 bits */
+> +#define SUN4I_LRADC_KEY_MODE_SEL(x)		((x) << 12) /* 2 bits */
+> +#define SUN4I_LRADC_LEVELA_B_CNT(x)		((x) << 8)  /* 4 bits */
+> +#define SUN4I_LRADC_HOLD_EN			BIT(6)
+> +#define SUN4I_LRADC_LEVELB_VOL(x)		((x) << 4)  /* 2 bits */
+> +#define SUN4I_LRADC_SAMPLE_RATE(x)		((x) << 2)  /* 2 bits */
+> +#define SUN4I_LRADC_EN				BIT(0)
 
-I assume that if mtk_disp_mutex_acquire is called while the hardware has
-the mutex (during the shadow register update), this should wait until
-the update is complete, since it can't back out from trying to acquire
-the lock. Is that the case?
+Usually, we place the bits define right next to their register
+definition (with a prefix that identifies which registers it belongs
+to)
 
-regards
-Philipp
+Something like SUN4I_LRADC_CTRL_EN for the last one.
+
+> +
+> +/* LRADC_INTC and LRADC_INTS bits */
+> +#define SUN4I_LRADC_CHAN1_KEYUP_IRQ		BIT(12)
+> +#define SUN4I_LRADC_CHAN1_ALRDY_HOLD_IRQ	BIT(11)
+> +#define SUN4I_LRADC_CHAN1_HOLD_IRQ		BIT(10)
+> +#define	SUN4I_LRADC_CHAN1_KEYDOWN_IRQ	BIT(9)
+
+This alignment looks weird compared to the others.
+
+> +#define SUN4I_LRADC_CHAN1_DATA_IRQ		BIT(8)
+> +#define SUN4I_LRADC_CHAN0_KEYUP_IRQ		BIT(4)
+> +#define SUN4I_LRADC_CHAN0_ALRDY_HOLD_IRQ	BIT(3)
+> +#define SUN4I_LRADC_CHAN0_HOLD_IRQ		BIT(2)
+> +#define	SUN4I_LRADC_CHAN0_KEYDOWN_IRQ	BIT(1)
+
+Ditto.
+
+> +#define SUN4I_LRADC_CHAN0_DATA_IRQ		BIT(0)
+> +
+> +#define NUM_SUN4I_LRADC_CHANS		2
+> +
+> +struct sun4i_lradc_state {
+> +	void __iomem *base;
+> +	struct regulator *vref_supply;
+> +	u32 vref_mv;
+> +	struct completion data_ok[NUM_SUN4I_LRADC_CHANS];
+> +	spinlock_t lock;
+> +};
+> +
+> +#define SUN4I_LRADC_CHANNEL(chan) {				\
+> +	.type = IIO_VOLTAGE,					\
+> +	.indexed = 1,						\
+> +	.channel = (chan),					\
+> +	.scan_index = (chan),					\
+> +	.info_mask_separate = BIT(IIO_CHAN_INFO_RAW),		\
+> +	.info_mask_shared_by_type = BIT(IIO_CHAN_INFO_SCALE) |	\
+> +				BIT(IIO_CHAN_INFO_SAMP_FREQ)	\
+> +}
+> +
+> +static const struct iio_chan_spec sun4i_lradc_chan_array[] = {
+> +	SUN4I_LRADC_CHANNEL(0),
+> +	SUN4I_LRADC_CHANNEL(1),
+> +};
+> +
+> +static const struct {
+> +	int val;
+> +	int val2;
+> +} sun4i_lradc_sample_freq_avail[] = {
+> +	{250, 0},
+> +	{125, 0},
+> +	{62, 500000},
+> +	{32, 250000},
+> +};
+> +
+> +static IIO_CONST_ATTR_SAMP_FREQ_AVAIL("32.25 62.5 125 250");
+> +
+> +static struct attribute *sun4i_lradc_attributes[] = {
+> +	&iio_const_attr_sampling_frequency_available.dev_attr.attr,
+> +	NULL
+> +};
+> +
+> +static const struct attribute_group sun4i_lradc_attribute_group = {
+> +	.attrs = sun4i_lradc_attributes,
+> +};
+> +
+> +static irqreturn_t sun4i_lradc_irq(int irq, void *dev_id)
+> +{
+> +	struct iio_dev *indio_dev = dev_id;
+> +	struct sun4i_lradc_state *st = iio_priv(indio_dev);
+> +	u32 ints, intc;
+> +
+> +	spin_lock(&st->lock);
+> +
+> +	ints = readl(st->base + SUN4I_LRADC_INTS);
+> +	intc = readl(st->base + SUN4I_LRADC_INTC);
+> +
+> +	if (ints & SUN4I_LRADC_CHAN0_DATA_IRQ)
+> +		complete_all(&st->data_ok[0]);
+> +
+> +	if (ints & SUN4I_LRADC_CHAN1_DATA_IRQ)
+> +		complete_all(&st->data_ok[1]);
+> +
+> +	intc &= ~ints;
+> +	writel(intc, st->base + SUN4I_LRADC_INTC);
+> +	writel(ints, st->base + SUN4I_LRADC_INTS);
+
+Why do you need to modify the interrupt enabled?
+
+> +
+> +	spin_unlock(&st->lock);
+> +
+> +	return IRQ_HANDLED;
+> +}
+> +
+> +static int sun4i_lradc_read_raw(struct iio_dev *indio_dev,
+> +				struct iio_chan_spec const *chan,
+> +				int *val, int *val2, long mask)
+> +{
+> +	struct sun4i_lradc_state *st = iio_priv(indio_dev);
+> +	int ret, tmp, idx;
+> +	unsigned long flags;
+> +
+> +	switch (mask) {
+> +	case IIO_CHAN_INFO_RAW:
+> +		reinit_completion(&st->data_ok[chan->channel]);
+> +		spin_lock_irqsave(&st->lock, flags);
+> +		tmp = readl(st->base + SUN4I_LRADC_INTC);
+> +
+> +		if (chan->channel)
+> +			tmp |= SUN4I_LRADC_CHAN1_DATA_IRQ;
+> +		else
+> +			tmp |= SUN4I_LRADC_CHAN0_DATA_IRQ;
+> +
+> +		writel(tmp, st->base + SUN4I_LRADC_INTC);
+> +		spin_unlock_irqrestore(&st->lock, flags);
+> +
+> +		ret = wait_for_completion_interruptible_timeout(
+> +			&st->data_ok[chan->channel],
+> +			msecs_to_jiffies(1000));
+> +		if (ret == 0)
+> +			return -ETIMEDOUT;
+> +
+> +		if (chan->channel)
+> +			*val = readl(st->base + SUN4I_LRADC_DATA1);
+> +		else
+> +			*val = readl(st->base + SUN4I_LRADC_DATA0);
+> +
+> +		return IIO_VAL_INT;
+> +
+> +	case IIO_CHAN_INFO_SCALE:
+> +		*val = st->vref_mv;
+> +		*val2 = 6;
+> +
+> +		return IIO_VAL_FRACTIONAL_LOG2;
+> +
+> +	case IIO_CHAN_INFO_SAMP_FREQ:
+> +		tmp = readl(st->base + SUN4I_LRADC_CTRL);
+> +		idx = (tmp >> 2) & 0x3;
+> +		*val = sun4i_lradc_sample_freq_avail[idx].val;
+> +		*val2 = sun4i_lradc_sample_freq_avail[idx].val2;
+> +		return IIO_VAL_INT_PLUS_MICRO;
+> +
+> +	default:
+> +		break;
+> +	}
+> +
+> +	return -EINVAL;
+> +}
+> +
+> +static int sun4i_lradc_write_raw(struct iio_dev *indio_dev,
+> +				 struct iio_chan_spec const *chan,
+> +				 int val, int val2, long mask)
+> +{
+> +	struct sun4i_lradc_state *st = iio_priv(indio_dev);
+> +	u32 ctrl;
+> +	int i;
+> +
+> +	switch (mask) {
+> +	case IIO_CHAN_INFO_SAMP_FREQ:
+> +		for (i = 0; i < ARRAY_SIZE(sun4i_lradc_sample_freq_avail); i++)
+> +			if (sun4i_lradc_sample_freq_avail[i].val == val &&
+> +			    sun4i_lradc_sample_freq_avail[i].val2 == val2)
+> +				break;
+> +		if (i == ARRAY_SIZE(sun4i_lradc_sample_freq_avail))
+> +			return -EINVAL;
+> +
+> +		ctrl = readl(st->base + SUN4I_LRADC_CTRL);
+> +		ctrl &= ~SUN4I_LRADC_SAMPLE_RATE(0x3);
+> +		writel(ctrl | SUN4I_LRADC_SAMPLE_RATE(i),
+> +		       st->base + SUN4I_LRADC_CTRL);
+> +
+> +		return 0;
+> +
+> +	default:
+> +		break;
+> +	}
+> +
+> +	return -EINVAL;
+> +}
+> +
+> +static const struct iio_info sun4i_lradc_info = {
+> +	.driver_module = THIS_MODULE,
+> +	.read_raw = sun4i_lradc_read_raw,
+> +	.write_raw = sun4i_lradc_write_raw,
+> +	.attrs = &sun4i_lradc_attribute_group,
+> +};
+> +
+> +static int sun4i_lradc_probe(struct platform_device *pdev)
+> +{
+> +	struct iio_dev *indio_dev;
+> +	struct device *dev = &pdev->dev;
+> +	struct sun4i_lradc_state *st;
+> +	int err;
+> +
+> +	indio_dev = devm_iio_device_alloc(dev, sizeof(*st));
+> +	if (!indio_dev)
+> +		return -ENOMEM;
+> +
+> +	st = iio_priv(indio_dev);
+> +
+> +	platform_set_drvdata(pdev, indio_dev);
+> +
+> +	indio_dev->dev.parent = dev;
+> +	indio_dev->dev.of_node = dev->of_node;
+> +	indio_dev->name = dev_name(dev);
+> +	indio_dev->modes = INDIO_DIRECT_MODE;
+> +	indio_dev->info = &sun4i_lradc_info;
+> +
+> +	st->vref_supply = devm_regulator_get(dev, "vref");
+> +	if (IS_ERR(st->vref_supply))
+> +		return PTR_ERR(st->vref_supply);
+> +
+> +	st->base = devm_ioremap_resource(dev,
+> +			platform_get_resource(pdev, IORESOURCE_MEM, 0));
+> +	if (IS_ERR(st->base))
+> +		return PTR_ERR(st->base);
+> +
+> +	/* Disable then clear all interrupts */
+> +	writel(0, st->base + SUN4I_LRADC_INTC);
+> +	writel(0xffffffff, st->base + SUN4I_LRADC_INTS);
+> +
+> +	err = devm_request_irq(dev, platform_get_irq(pdev, 0),
+> +			       sun4i_lradc_irq, 0,
+> +			       "sun4i-a10-lradc", indio_dev);
+> +	if (err)
+> +		return err;
+> +
+> +	/* Setup the ADC channels available on the board */
+> +	indio_dev->num_channels = ARRAY_SIZE(sun4i_lradc_chan_array);
+> +	indio_dev->channels = sun4i_lradc_chan_array;
+> +
+> +	err = regulator_enable(st->vref_supply);
+> +	if (err)
+> +		return err;
+> +
+> +	/* lradc Vref internally is divided by 2/3 */
+> +	st->vref_mv = regulator_get_voltage(st->vref_supply) * 2 / 3000;
+> +
+> +	init_completion(&st->data_ok[0]);
+> +	init_completion(&st->data_ok[1]);
+> +	spin_lock_init(&st->lock);
+> +
+> +	/* Continuous mode on both channels */
+> +	writel(SUN4I_LRADC_CHAN_SELECT(0x3) | SUN4I_LRADC_KEY_MODE_SEL(0x2) |
+> +	       SUN4I_LRADC_SAMPLE_RATE(0x00) | SUN4I_LRADC_EN,
+> +	       st->base + SUN4I_LRADC_CTRL);
+> +
+> +	err = devm_iio_device_register(dev, indio_dev);
+> +	if (err < 0) {
+> +		dev_err(dev, "Couldn't register the device.\n");
+> +		return err;
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static int sun4i_lradc_remove(struct platform_device *pdev)
+> +{
+> +	struct iio_dev *indio_dev = platform_get_drvdata(pdev);
+> +	struct sun4i_lradc_state *st = iio_priv(indio_dev);
+> +
+> +	regulator_disable(st->vref_supply);
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct of_device_id sun4i_lradc_of_match[] = {
+> +	{ .compatible = "allwinner,sun4i-a10-lradc", },
+> +	{ /* sentinel */ }
+> +};
+> +MODULE_DEVICE_TABLE(of, sun4i_lradc_of_match);
+> +
+> +static struct platform_driver sun4i_lradc_driver = {
+> +	.probe	= sun4i_lradc_probe,
+> +	.remove = sun4i_lradc_remove,
+> +	.driver = {
+> +		.name	= "sun4i-a10-lradc",
+> +		.of_match_table = of_match_ptr(sun4i_lradc_of_match),
+> +	},
+> +};
+
+It would be great if you could also add some runtime_pm support. We're
+going to start working on the power management in a near future,
+having it already would save us time.
+
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160718/8f956848/attachment-0001.sig>
