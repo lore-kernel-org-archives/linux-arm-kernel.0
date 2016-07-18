@@ -1,84 +1,34 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 18 Jul 2016 16:54:15 +0100
-Subject: [PATCH 13/13] KVM: arm64: vgic-its: Simplify MAPI error handling
+Date: Mon, 18 Jul 2016 16:54:07 +0100
+Subject: [PATCH 05/13] KVM: arm64: vgic-its: Fix vgic_its_check_device_id BE
+ handling
 In-Reply-To: <1468857255-9543-1-git-send-email-marc.zyngier@arm.com>
 References: <1468857255-9543-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1468857255-9543-14-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1468857255-9543-6-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If we care to move all the checks that do not involve any memory
-allocation, we can simplify the MAPI error handling. Let's do that,
-it cannot hurt.
+The ITS tables are stored in LE format. If the host is reading
+a L1 table entry to check its validity, it must convert it to
+the CPU endianness.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- virt/kvm/arm/vgic/vgic-its.c | 30 ++++++++++++------------------
- 1 file changed, 12 insertions(+), 18 deletions(-)
+ virt/kvm/arm/vgic/vgic-its.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
 diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-index ec7e07b..07411cf 100644
+index d6697c4..2ac5927 100644
 --- a/virt/kvm/arm/vgic/vgic-its.c
 +++ b/virt/kvm/arm/vgic/vgic-its.c
-@@ -697,36 +697,34 @@ static int vgic_its_cmd_handle_mapi(struct kvm *kvm, struct vgic_its *its,
- 	struct its_device *device;
- 	struct its_collection *collection, *new_coll = NULL;
- 	int lpi_nr;
--	int ret;
+@@ -707,6 +707,8 @@ static bool vgic_its_check_device_id(struct kvm *kvm, struct vgic_its *its,
+ 			   &indirect_ptr, sizeof(indirect_ptr)))
+ 		return false;
  
- 	device = find_its_device(its, device_id);
- 	if (!device)
- 		return E_ITS_MAPTI_UNMAPPED_DEVICE;
- 
--	collection = find_collection(its, coll_id);
--	if (!collection) {
--		ret = vgic_its_alloc_collection(its, &collection, coll_id);
--		if (ret)
--			return ret;
--		new_coll = collection;
--	}
--
- 	if (its_cmd_get_command(its_cmd) == GITS_CMD_MAPTI)
- 		lpi_nr = its_cmd_get_physical_id(its_cmd);
- 	else
- 		lpi_nr = event_id;
- 	if (lpi_nr < GIC_LPI_OFFSET ||
--	    lpi_nr >= max_lpis_propbaser(kvm->arch.vgic.propbaser)) {
--		ret = E_ITS_MAPTI_PHYSICALID_OOR;
--		goto err;
-+	    lpi_nr >= max_lpis_propbaser(kvm->arch.vgic.propbaser))
-+		return E_ITS_MAPTI_PHYSICALID_OOR;
++	indirect_ptr = le64_to_cpu(indirect_ptr);
 +
-+	collection = find_collection(its, coll_id);
-+	if (!collection) {
-+		int ret = vgic_its_alloc_collection(its, &collection, coll_id);
-+		if (ret)
-+			return ret;
-+		new_coll = collection;
- 	}
- 
- 	itte = find_itte(its, device_id, event_id);
- 	if (!itte) {
- 		itte = kzalloc(sizeof(struct its_itte), GFP_KERNEL);
- 		if (!itte) {
--			ret = -ENOMEM;
--			goto err;
-+			if (new_coll)
-+				vgic_its_free_collection(its, coll_id);
-+			return -ENOMEM;
- 		}
- 
- 		itte->event_id	= event_id;
-@@ -746,10 +744,6 @@ static int vgic_its_cmd_handle_mapi(struct kvm *kvm, struct vgic_its *its,
- 	update_lpi_config(kvm, itte->irq, NULL);
- 
- 	return 0;
--err:
--	if (new_coll)
--		vgic_its_free_collection(its, coll_id);
--	return ret;
- }
- 
- /* Requires the its_lock to be held. */
+ 	/* check the valid bit of the first level entry */
+ 	if (!(indirect_ptr & BIT_ULL(63)))
+ 		return false;
 -- 
 2.1.4
