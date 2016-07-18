@@ -1,47 +1,66 @@
-From: tjakobi@math.uni-bielefeld.de (Tobias Jakobi)
-Date: Mon, 18 Jul 2016 13:00:43 +0200
-Subject: [PATCH v2 00/10] Exynos IOMMU: proper runtime PM support (use
- device dependencies)
-In-Reply-To: <a15e438a-7fa0-3a4d-e6e2-13425512dddd@samsung.com>
-References: <1466144820-6286-1-git-send-email-m.szyprowski@samsung.com>
- <5787B2B0.9020809@math.uni-bielefeld.de>
- <5788E352.3040801@math.uni-bielefeld.de>
- <a15e438a-7fa0-3a4d-e6e2-13425512dddd@samsung.com>
-Message-ID: <578CB6DB.90608@math.uni-bielefeld.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 18 Jul 2016 13:10:07 +0200
+Subject: [RESEND PATCH v2] thermal: tango: add resume support
+In-Reply-To: <20160718101338.GB422@ulmo.ba.sec>
+References: <57726196.5060909@free.fr> <7689133.3ycKRvbtrh@wuerfel>
+ <20160718101338.GB422@ulmo.ba.sec>
+Message-ID: <2701749.GrMaU3rvHr@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Marek,
-
-
-Marek Szyprowski wrote:
-> Hi Tobias,
+On Monday, July 18, 2016 12:13:38 PM CEST Thierry Reding wrote:
+> On Mon, Jul 18, 2016 at 12:09:39PM +0200, Arnd Bergmann wrote:
+> > On Monday, July 18, 2016 11:33:28 AM CEST Thierry Reding wrote:
+> > 
+> > > > +
+> > > > +     return 0;
+> > > > +}
+> > > > +
+> > > > +static SIMPLE_DEV_PM_OPS(tango_thermal_pm, NULL, tango_thermal_resume);
+> > > > +
+> > > > +#define DEV_PM_OPS   &tango_thermal_pm
+> > > > +#else
+> > > > +#define DEV_PM_OPS   NULL
+> > > > +#endif
+> > > 
+> > > In my experience it's often not useful to #ifdef the struct pm_ops.
+> > > These days you almost certainly want PM enabled, and the conditional
+> > > doesn't save you all that much in the first place, because it's not
+> > > unlikely for this to fit into some of the space that would be padded
+> > > out anyway.
+> > 
+> > This will also generate a warning when CONFIG_PM_SLEEP is not set.
+> > Better write this as
+> > 
+> > #define DEV_PM_OPS (IS_ENABLED(CONFIG_PM_SLEEP) ? &tango_thermal_pm : NULL)
+> > 
+> > so the compiler can drop the variable definition when it's not
+> > needed.
 > 
+> My suggestion was to define tango_thermal_pm unconditionally to avoid
+> any of these tricks. For any real use-case in which the 92 bytes for the
+> struct dev_pm_ops would matter you most likely want PM_SLEEP anyway, so
+> I don't really see why we would even want to make it optional.
+
+Sure, leaving it unconditional works too. 
+
+> > > As a side-note, I've noticed that this driver has the following
+> > > dependencies:
+> > > 
+> > >         depends on ARCH_TANGO || COMPILE_TEST
+> > > 
+> > > which, last I checked, is probably going to fail on some architectures
+> > > because you need at least another one on HAS_IOMEM (for readl() and
+> > > writel()). That's a pre-existing problem, of course, so should be fixed
+> > > in a separate patch.
+> > 
+> > No need, we just merged a patch to no longer allow COMPILE_TEST on
+> > arch/um/, so we can safely rely on MMIO to be available for COMPILE_TEST.
 > 
-> On 2016-07-15 15:21, Tobias Jakobi wrote:
->> Tobias Jakobi wrote:
->>> Hello Marek,
->>>
->>> I've tested the patchset on 4.7-rc7 and noticed that it breaks reboot on
->>> my ODROID-X2.
->>>
->>> Going to check where exactly things break.
->> Sadly it's the last patch where everything comes together:
->> "iommu/exynos: Add proper runtime pm support"
->>
->> I still have to check if forcing runpm status to 'on' makes a
->> difference. I suspect that the aggressive clock gating might be the
->> reason?
-> 
-> Thanks for testing. I will check this issue. Could you send me your
-> .config?
-This is the config I'm currently using:
-https://github.com/tobiasjakobi/odroid-environment/blob/master/sourcecode/system/vanilla-4.7-debug.conf
+> I thought at least S390 didn't have readl() and writel() either, at
+> least when PCI wasn't enabled, or some such.
 
-Do you think checking this with no_console_suspend makes sense?
+Yes, but they've never complained about COMPILE_TEST breakage because
+of that. Tile is in the same boat too in some configurations.
 
-- Tobias
-
-
-> 
-> Best regards
+	Arnd
