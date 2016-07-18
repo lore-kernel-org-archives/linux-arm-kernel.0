@@ -1,120 +1,111 @@
-From: vgoyal@redhat.com (Vivek Goyal)
-Date: Mon, 18 Jul 2016 09:38:24 -0400
-Subject: [RFC 0/3] extend kexec_file_load system call
-In-Reply-To: <20160718132629.GB32512@redhat.com>
-References: <20160712221804.GV1041@n2100.armlinux.org.uk>
- <87twfunneg.fsf@linux.vnet.ibm.com>
- <20160713073657.GX1041@n2100.armlinux.org.uk>
- <87poqinf9m.fsf@linux.vnet.ibm.com>
- <20160713082639.GZ1041@n2100.armlinux.org.uk>
- <20160713130338.GB16900@redhat.com>
- <20160713174009.GA1041@n2100.armlinux.org.uk>
- <20160713182247.GA25232@redhat.com>
- <1468845964.2800.3.camel@gmail.com>
- <20160718132629.GB32512@redhat.com>
-Message-ID: <20160718133824.GC32512@redhat.com>
+From: georgi.djakov@linaro.org (Georgi Djakov)
+Date: Mon, 18 Jul 2016 16:38:32 +0300
+Subject: [PATCH 2/3] mmc: mmc: do not use CMD13 to get status after speed
+ mode switch
+In-Reply-To: <CAPDyKFroGBShATJcQ=b2H=k85F+z9=hixpp3Go-j79ZvvLGAwQ@mail.gmail.com>
+References: <1463647662-27426-1-git-send-email-chaotian.jing@mediatek.com>
+ <1463647662-27426-3-git-send-email-chaotian.jing@mediatek.com>
+ <CAOCOHw67NAinC6dEX0KsDn02kuXyNwznm3-bhptSVvQH0V1dqQ@mail.gmail.com>
+ <CAPDyKFroGBShATJcQ=b2H=k85F+z9=hixpp3Go-j79ZvvLGAwQ@mail.gmail.com>
+Message-ID: <578CDBD8.2050806@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 18, 2016 at 09:26:29AM -0400, Vivek Goyal wrote:
-> On Mon, Jul 18, 2016 at 10:46:04PM +1000, Balbir Singh wrote:
-> > On Wed, 2016-07-13 at 14:22 -0400, Vivek Goyal wrote:
-> > > On Wed, Jul 13, 2016 at 06:40:10PM +0100, Russell King - ARM Linux wrote:
-> > > >?
-> > > > On Wed, Jul 13, 2016 at 09:03:38AM -0400, Vivek Goyal wrote:
-> > > > >?
-> > > > > On Wed, Jul 13, 2016 at 09:26:39AM +0100, Russell King - ARM Linux wrote:
-> > > > > >?
-> > > > > > Indeed - maybe Eric knows better, but I can't see any situation where
-> > > > > > the dtb we load via kexec should ever affect "the bootloader", unless
-> > > > > > the "kernel" that's being loaded into kexec is "the bootloader".
-> > > > > >?
-> > > > > > Now, going back to the more fundamental issue raised in my first reply,
-> > > > > > about the kernel command line.
-> > > > > >?
-> > > > > > On x86, I can see that it _is_ possible for userspace to specify a
-> > > > > > command line, and the kernel loading the image provides the command
-> > > > > > line to the to-be-kexeced kernel with very little checking.??So, if
-> > > > > > your kernel is signed, what stops the "insecure userspace" loading
-> > > > > > a signed kernel but giving it an insecure rootfs and/or console?
-> > > > > It is not kexec specific. I could do this for regular boot too, right?
-> > > > >?
-> > > > > Command line options are not signed. I thought idea behind secureboot
-> > > > > was to execute only trusted code and command line options don't enforce
-> > > > > you to execute unsigned code.
-> > > > >?
-> > 
-> > You can set module.sig_enforce=0 and open up the system a bit assuming
-> > that you can get a module to load with another attack
+On 07/18/2016 03:50 PM, Ulf Hansson wrote:
+> On 16 July 2016 at 00:10, Bjorn Andersson <bjorn.andersson@linaro.org> wrote:
+>> On Thu, May 19, 2016 at 1:47 AM, Chaotian Jing
+>> <chaotian.jing@mediatek.com> wrote:
+>>> Per JEDEC spec, it is not recommended to use CMD13 to get card status
+>>> after speed mode switch. below are two reason about this:
+>>> 1. CMD13 cannot be guaranteed due to the asynchronous operation.
+>>> Therefore it is not recommended to use CMD13 to check busy completion
+>>> of the timing change indication.
+>>> 2. After switch to HS200, CMD13 will get response of 0x800, and even the
+>>> busy signal gets de-asserted, the response of CMD13 is aslo 0x800.
+>>>
+>>> Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
+>>> ---
+>>>  drivers/mmc/core/mmc.c | 112 ++++++++++++++++++++-----------------------------
+>>>  1 file changed, 45 insertions(+), 67 deletions(-)
+>>>
+>>> diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
+>> [..]
+>>> @@ -1274,20 +1254,18 @@ static int mmc_select_hs200(struct mmc_card *card)
+>>>                 err = __mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
+>>>                                    EXT_CSD_HS_TIMING, val,
+>>>                                    card->ext_csd.generic_cmd6_time,
+>>> -                                  true, send_status, true);
+>>> +                                  true, false, true);
+>>>                 if (err)
+>>>                         goto err;
+>>>                 old_timing = host->ios.timing;
+>>>                 mmc_set_timing(host, MMC_TIMING_MMC_HS200);
+>>> -               if (!send_status) {
+>>> -                       err = mmc_switch_status(card);
+>>> -                       /*
+>>> -                        * mmc_select_timing() assumes timing has not changed if
+>>> -                        * it is a switch error.
+>>> -                        */
+>>> -                       if (err == -EBADMSG)
+>>> -                               mmc_set_timing(host, old_timing);
+>>> -               }
+>>> +               err = mmc_switch_status(card);
+>>> +               /*
+>>> +                * mmc_select_timing() assumes timing has not changed if
+>>> +                * it is a switch error.
+>>> +                */
+>>> +               if (err == -EBADMSG)
+>>> +                       mmc_set_timing(host, old_timing);
+>>
+>> Sorry for not spotting this earlier, but with the move of the call of
+>> mmc_switch_status() to after mmc_set_timing() we get following error
+>> with sdhci-msm:
 > 
-> IIUC, sig_enforce bool_enable_only so it can only be enabled. Default
-> value of it is 0 if CONFIG_MODULE_SIG_FORCE=n.
+> Thanks for reporting!
 > 
-> IOW, if your kernel forced signature verification, you should not be
-> able to do sig_enforce=0. If you kernel did not have
-> CONFIG_MODULE_SIG_FORCE=y, then sig_enforce should be 0 by default anyway
-> and you are not making it worse using command line.
+>>
+>> mmc0: mmc_select_hs200 failed, error -110
+>> mmc0: error -110 whilst initialising MMC card
+>> mmc0: Reset 0x1 never completed.
+>> sdhci: =========== REGISTER DUMP (mmc0)===========
+>> sdhci: Sys addr: 0x00000000 | Version: 0x00002e02
+>> sdhci: Blk size: 0x00004000 | Blk cnt: 0x00000000
+>> sdhci: Argument: 0x00000000 | Trn mode: 0x00000000
+>> sdhci: Present: 0x01f80000 | Host ctl: 0x00000000
+>> sdhci: Power: 0x00000000 | Blk gap: 0x00000000
+>> sdhci: Wake-up: 0x00000000 | Clock: 0x00000003
+>> sdhci: Timeout: 0x00000000 | Int stat: 0x00000000
+>> sdhci: Int enab: 0x00000000 | Sig enab: 0x00000000
+>> sdhci: AC12 err: 0x00000000 | Slot int: 0x00000000
+>> sdhci: Caps: 0x322dc8b2 | Caps_1: 0x00008007
+>> sdhci: Cmd: 0x00000000 | Max curr: 0x00000000
+>> sdhci: Host ctl2: 0x00000000
+>> sdhci: ADMA Err: 0x00000000 | ADMA Ptr: 0x0000000000000000
+>> sdhci: ===========================================
+>>
+>> But I if I understand the commit correctly this is the intention of
+>> the patch (not the error, but the move).
+> 
+> I tried dropping this change from my next branch, but there are some
+> more changes on top that prevents a "clean" drop. It's certainly
+> doable, but perhaps we can try to narrow down the problem to see if
+> this could/should be fixed in the sdhci msm driver instead!?
 
-[ CC Matthew Garrett ]
-
-I think on top of this there were patches by Matthew Garrett, which
-disallowed loading of unsigned modules if booted with secureboot on. I
-think those patches never made upstream though.
-
-Vivek
+Yes, i am working on it. Seems that if we just ignore the -ETIMEDOUT
+returned by mmc_switch_status() everything works as before. Currently
+i am expecting more information about this controller specifics, in
+order to understand if this could be fixed with a change in the driver
+only.
 
 > 
-> > 
-> > > > > So it sounds like different class of security problems which you are
-> > > > > referring to and not necessarily covered by secureboot or signed
-> > > > > kernel.
-> > > > Let me give you an example.
-> > > >?
-> > > > You have a secure boot setup, where the firmware/ROM validates the boot
-> > > > loader.??Good, the boot loader hasn't been tampered with.
-> > > >?
-> > > > You interrupt the boot loader and are able to modify the command line
-> > > > for the booted kernel.
-> > > >?
-> > > > The boot loader loads the kernel and verifies the kernel's signature.
-> > > > Good, the kernel hasn't been tampered with.??The kernel starts running.
-> > > >?
-> > > > You've plugged in a USB drive to the device, and specified a partition
-> > > > containing a root filesystem that you control to the kernel.??The
-> > > > validated kernel finds the USB drive, and mounts it, and executes
-> > > > your own binaries on the USB drive.
-> > > You will require physical access to the machine to be able to
-> > > insert your usb drive. And IIRC, argument was that if attacker has
-> > > physical access to machine, all bets are off anyway.
-> > >
-> > 
-> > You don't need physical access -- your machine controller BMC can
-> > do the magic for you. So its not always physical access, is it?
+> I also noticed that below submitted change, which *isn't* applied for
+> next, might be related.
+> https://patchwork.kernel.org/patch/9197881/
 > 
-> Well, idea was that if you have physical access to machine, then all
-> bets are off. If BMC can do something which allows running unsigned
-> code at ring level 0, its a problem I think from secureboot model of
-> security.
-> 
-> > ?
-> > > >?
-> > > >?
-> > > > You run a shell on the console.??You now have control of the system,
-> > > > and can mount the real rootfs, inspect it, and work out what it does,
-> > > > etc.
-> > > >?
-> > > > At this point, what use was all the validation that the secure boot
-> > > > has done???Absolutely useless.
-> > > >?
-> > > > If you can change the command line arguments given to the kernel, you
-> > > > have no security, no matter how much you verify signatures.??It's
-> > > > the illusion of security, nothing more, nothing less.
-> > > >?
-> > 
-> > I agree, if you can change command line arguments, all bets are of lesser value
-> 
-> If changing command line allows execution of unsigned code at ring level
-> 0, then it is a problem. Otherwise we are talking of security issues which
-> are not covered by secureboot model.
-> 
-> Vivek
+
+It is not related to this issue, but it is good to have when this is
+resolved, otherwise we will see the dumpregs output (pr_err now),
+when controller is initialized without a card in the SD slot.
+
+Thanks,
+Georgi
