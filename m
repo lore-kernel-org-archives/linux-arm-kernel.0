@@ -1,48 +1,48 @@
-From: josephl@nvidia.com (Joseph Lo)
-Date: Mon, 18 Jul 2016 14:42:43 +0800
-Subject: [PATCH V2 03/10] Documentation: dt-bindings: firmware: tegra: add
- bindings of the BPMP
-In-Reply-To: <5786995A.1090706@wwwdotorg.org>
-References: <20160705090431.5852-1-josephl@nvidia.com>
- <20160705090431.5852-4-josephl@nvidia.com> <5786995A.1090706@wwwdotorg.org>
-Message-ID: <578C7A63.1000004@nvidia.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Mon, 18 Jul 2016 14:44:22 +0800
+Subject: "coupled" regulator support
+In-Reply-To: <20160715125039.GI30372@sirena.org.uk>
+References: <20160715200113.0f3cd823@xhacker>
+ <20160715125039.GI30372@sirena.org.uk>
+Message-ID: <20160718144422.30be1e2f@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/14/2016 03:41 AM, Stephen Warren wrote:
-> On 07/05/2016 03:04 AM, Joseph Lo wrote:
->> The BPMP is a specific processor in Tegra chip, which is designed for
->> booting process handling and offloading the power management, clock
->> management, and reset control tasks from the CPU. The binding document
->> defines the resources that would be used by the BPMP firmware driver,
->> which can create the interprocessor communication (IPC) between the CPU
->> and BPMP.
->
->> diff --git
->> a/Documentation/devicetree/bindings/firmware/nvidia,tegra186-bpmp.txt
->> b/Documentation/devicetree/bindings/firmware/nvidia,tegra186-bpmp.txt
->
->> +- Documentation/devicetree/bindings/mailbox/mailbox.txt
->> +- Documentation/devicetree/bindings/mailbox/nvidia,tegra186-hsp.txt
->
->> +- Documentation/devicetree/bindings/clock/clock-bindings.txt
->> +- include/dt-bindings/clock/tegra186-clock.h
->> +- Documentation/devicetree/bindings/reset/reset.txt
->> +- include/dt-bindings/reset/tegra186-reset.h
->
-> If you end up needing to repost this, it would be nice to make all those
-> file references more generic. In particular, some SW projects store
-> binding docs somewhere other than Documentation/devicetree/bindings/
-> (e.g. U-Boot uses doc/device-tree-bindings/), and it's possible that the
-> header files aren't stored in include/ but somewhere else. To make these
-> file references valid everywhere, I'd suggest using relative paths for
-> the binding docs, and #include style paths for the headers, e.g.:
->
-> ../clock/clock-bindings.txt
->
-> <dt-bindings/clock/tegra186-clock.h>
->
-OK. Will fix this.
+Dear Mark,
+
+On Fri, 15 Jul 2016 13:50:39 +0100 Mark Brown wrote:
+
+> On Fri, Jul 15, 2016 at 08:01:13PM +0800, Jisheng Zhang wrote:
+> 
+> > regR can only be set to v1 if devA and devB all call for set voltage to v1
+> > regR can set to v2 if devA or devB call for set voltage to v2  
+> 
+> > To support this situation, I'd like to add flag to regulator structure and
+> > patch regulator_check_consumers() to check whether we are safe to set the vol  
+> 
+> Surely this is just what normal set voltage calls do?  If devA says
+> set_voltage(v1, v2) but devB still has set_voltage(v2, v2) then we will
+> leave the voltage at v2, we'll only allow it to be set to v1 if both
+> consumers agree that this is a valid voltage.  It feels like there's
+> something else going on here that I'm missing?
+
+oops, sorry for not describing the situation clearly. Here are more details.
+
+I'm implementing DVFS for devA and devB, devA and devB shares the same
+voltage regulator. devA and devB are different devices, and they are
+independent in DVFS.
+
+v1 and v2 and both valid voltages, but here we have an explicit limitation:
+we must take the "regulator shared" fact into consideration. Let's assume
+the voltage is at v2, devA is not busy now, it wants to scale down freq, then
+scale down voltage to v1, but if devB hasn't call for setting voltage to
+v1, we can't scale down voltage now, we need to wait for devB sending out
+the voltage scaling down request when it is not busy in future some time.
+Obviously, the last user will succeed to scale down the voltage.
+
+My solution is
+to extend regulator_check_consumers() to check whether all consumers agree
+to scaling down voltage or not.
 
 Thanks,
--Joseph
+Jisheng
