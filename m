@@ -1,98 +1,211 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 18 Jul 2016 08:01:29 +0200
-Subject: [PATCH] ARM: tegra: fix erroneous address in dts
-In-Reply-To: <4a4d7fd4-7514-c5cb-435b-af34159fc1c4@ramses-pyramidenbau.de>
-References: <1468514937-23250-1-git-send-email-ralf@ramses-pyramidenbau.de>
- <20160714220218.GB4205@mithrandir.ba.sec>
- <8a8ccb29-ba73-f29f-2b57-5c1d91e13bf7@ramses-pyramidenbau.de>
- <578908CB.7040802@wwwdotorg.org>
- <4a4d7fd4-7514-c5cb-435b-af34159fc1c4@ramses-pyramidenbau.de>
-Message-ID: <20160718060129.GA10785@ulmo.ba.sec>
+From: ck.hu@mediatek.com (CK Hu)
+Date: Mon, 18 Jul 2016 14:32:55 +0800
+Subject: [PATCH v4 3/8] drm/mediatek: add shadow register support
+In-Reply-To: <1468577274-6178-4-git-send-email-yt.shen@mediatek.com>
+References: <1468577274-6178-1-git-send-email-yt.shen@mediatek.com>
+ <1468577274-6178-4-git-send-email-yt.shen@mediatek.com>
+Message-ID: <1468823575.30644.33.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 15, 2016 at 06:18:03PM +0200, Ralf Ramsauer wrote:
-> On 07/15/2016 06:01 PM, Stephen Warren wrote:
-> > On 07/15/2016 03:37 AM, Ralf Ramsauer wrote:
-> >> On 07/15/2016 12:02 AM, Thierry Reding wrote:
-> >>> On Thu, Jul 14, 2016 at 06:48:57PM +0200, Ralf Ramsauer wrote:
-> >>>> c90bb7b enabled the high speed UARTs of the Jetson TK1. The address
-> >>>> specification inside the dts is wrong. Fix it and use the correct
-> >>>> address.
-> >>>>
-> >>>> Fixes: c90bb7b9b9 ("ARM: tegra: Add high speed UARTs to Jetson TK1
-> >>>> device tree")
-> >>>> Signed-off-by: Ralf Ramsauer <ralf@ramses-pyramidenbau.de>
-> >>>> ---
-> >>>>   arch/arm/boot/dts/tegra124-jetson-tk1.dts | 4 ++--
-> >>>>   1 file changed, 2 insertions(+), 2 deletions(-)
-> >>>
-> >>> These addresses are correct. The 0, prefix was dropped from the unit
-> >>> address in commit b5896f67ab3c ("ARM: tegra: Remove commas from unit
-> >>> addresses on Tegra124").
-> >>>
-> >>> What's the problem that you're seeing? What's not working for you?
-> >>
-> >> I cannot find b5896f67ab3c neither in swarren's tree nor in linux
-> >> upstream. But there's d0bc5aaf890 in swarren's linux-tegra tree that
-> >> matches your described changes and was committed on 1st of July. But
-> >> this patch is not upstream yet, while the other patch is.
-> > 
-> > The fix is in linux-next, and will be in mainline soon I expect.
-> Ah okay, but I still wonder how my original patch got changed on its
-> way... The original version on the mailinglist was not buggy.
+Hi, YT:
 
-It's most likely my fault. My recollection is that we used to have an
-earlier patch that removed all 0, prefixes from unit addresses and what
-happens is probably that I applied your patch on top, adjusted it to
-omit the 0, prefix and then we noticed that removing the 0, prefix does
-not work for the GPU (because U-Boot looks it up by node name to enable
-it), so the patch that removes the 0, prefix was dropped and I forgot
-to adjust your patch to compensate.
+One comment inline.
 
-> > My github linux-tegra.git isn't relevant since it's just my own personal
-> > dev branch, but for reference, the commit is there since it's based on
-> > linux-next.
-> > 
-> >> Have a look at mainline tegra124-jetson-tk1.dts, there the addresses are
-> >> erroneous as they still use the 0, annotation. And I just realised, that
-> >> somehow, upstream patch c90bb7b slightly differs from my initial patch
-> >> [1] on the mailing list.
-> > 
-> > Your patch should probably be CC: stable so that existing kernel
-> > versions get fixed. That said, I'd argue that since the original patch
-> > never actually had any effect since it applied to the wrong node, the
-> > best fix for stable kernels is simply to revert it rather than fixing
-> > it, to avoid the potential for behaviour changes and regressions.
-> > Starting with kernel 4.8 (I think), that patch will begin to have actual
-> > effect.
-> There is no current existing stable kernel that is affected, as it went
-> in during the last merge window in 4.6-rc1. So no need for fixing
-> stable. Maybe it's still possible to fix it as the stabilisation window
-> is still open and 4.7 is not released yet?
 
-Unfortunately a patch to remove the 0, prefix from all nodes except the
-GPU was now merged into the arm-soc tree, which means that if we try to
-get this into v4.7, then we'll have to make sure to patch up the unit
-address again for v4.8.
+On Fri, 2016-07-15 at 18:07 +0800, YT Shen wrote:
+> We need to acquire mutex before using the resources,
+> and need to release it after finished.
+> So we don't need to write registers in the blanking period.
+> 
+> Signed-off-by: YT Shen <yt.shen@mediatek.com>
+> ---
+>  drivers/gpu/drm/mediatek/mtk_drm_crtc.c |   75 +++++++++++++++++++------------
+>  drivers/gpu/drm/mediatek/mtk_drm_ddp.c  |   22 +++++++++
+>  drivers/gpu/drm/mediatek/mtk_drm_ddp.h  |    2 +
+>  drivers/gpu/drm/mediatek/mtk_drm_drv.h  |    1 +
+>  4 files changed, 71 insertions(+), 29 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_crtc.c b/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
+> index 24aa3ba..80d9641 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
+> +++ b/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
+> @@ -315,6 +315,42 @@ static void mtk_crtc_ddp_hw_fini(struct mtk_drm_crtc *mtk_crtc)
+>  	pm_runtime_put(drm->dev);
+>  }
+>  
+> +static void mtk_crtc_ddp_config(struct drm_crtc *crtc)
+> +{
+> +	struct mtk_drm_crtc *mtk_crtc = to_mtk_crtc(crtc);
+> +	struct mtk_crtc_state *state = to_mtk_crtc_state(mtk_crtc->base.state);
+> +	struct mtk_ddp_comp *ovl = mtk_crtc->ddp_comp[0];
+> +	unsigned int i;
+> +
+> +	/*
+> +	 * TODO: instead of updating the registers here, we should prepare
+> +	 * working registers in atomic_commit and let the hardware command
+> +	 * queue update module registers on vblank.
+> +	 */
+> +	if (state->pending_config) {
+> +		mtk_ddp_comp_config(ovl, state->pending_width,
+> +				    state->pending_height,
+> +				    state->pending_vrefresh);
+> +
+> +		state->pending_config = false;
+> +	}
+> +
+> +	if (mtk_crtc->pending_planes) {
+> +		for (i = 0; i < OVL_LAYER_NR; i++) {
+> +			struct drm_plane *plane = &mtk_crtc->planes[i].base;
+> +			struct mtk_plane_state *plane_state;
+> +
+> +			plane_state = to_mtk_plane_state(plane->state);
+> +
+> +			if (plane_state->pending.config) {
+> +				mtk_ddp_comp_layer_config(ovl, i, plane_state);
+> +				plane_state->pending.config = false;
+> +			}
+> +		}
+> +		mtk_crtc->pending_planes = false;
+> +	}
+> +}
+> +
+>  static void mtk_drm_crtc_enable(struct drm_crtc *crtc)
+>  {
+>  	struct mtk_drm_crtc *mtk_crtc = to_mtk_crtc(crtc);
+> @@ -391,6 +427,7 @@ static void mtk_drm_crtc_atomic_flush(struct drm_crtc *crtc,
+>  				      struct drm_crtc_state *old_crtc_state)
+>  {
+>  	struct mtk_drm_crtc *mtk_crtc = to_mtk_crtc(crtc);
+> +	struct mtk_drm_private *priv = crtc->dev->dev_private;
+>  	unsigned int pending_planes = 0;
+>  	int i;
+>  
+> @@ -409,6 +446,12 @@ static void mtk_drm_crtc_atomic_flush(struct drm_crtc *crtc,
+>  	}
+>  	if (pending_planes)
+>  		mtk_crtc->pending_planes = true;
+> +
+> +	if (priv->data->shadow_register) {
+> +		mtk_disp_mutex_acquire(mtk_crtc->mutex);
+> +		mtk_crtc_ddp_config(crtc);
+> +		mtk_disp_mutex_release(mtk_crtc->mutex);
+> +	}
+>  }
+>  
+>  static const struct drm_crtc_funcs mtk_crtc_funcs = {
+> @@ -453,36 +496,10 @@ err_cleanup_crtc:
+>  void mtk_crtc_ddp_irq(struct drm_crtc *crtc, struct mtk_ddp_comp *ovl)
+>  {
+>  	struct mtk_drm_crtc *mtk_crtc = to_mtk_crtc(crtc);
+> -	struct mtk_crtc_state *state = to_mtk_crtc_state(mtk_crtc->base.state);
+> -	unsigned int i;
+> +	struct mtk_drm_private *priv = crtc->dev->dev_private;
+>  
+> -	/*
+> -	 * TODO: instead of updating the registers here, we should prepare
+> -	 * working registers in atomic_commit and let the hardware command
+> -	 * queue update module registers on vblank.
+> -	 */
+> -	if (state->pending_config) {
+> -		mtk_ddp_comp_config(ovl, state->pending_width,
+> -				    state->pending_height,
+> -				    state->pending_vrefresh);
+> -
+> -		state->pending_config = false;
+> -	}
+> -
+> -	if (mtk_crtc->pending_planes) {
+> -		for (i = 0; i < OVL_LAYER_NR; i++) {
+> -			struct drm_plane *plane = &mtk_crtc->planes[i].base;
+> -			struct mtk_plane_state *plane_state;
+> -
+> -			plane_state = to_mtk_plane_state(plane->state);
+> -
+> -			if (plane_state->pending.config) {
+> -				mtk_ddp_comp_layer_config(ovl, i, plane_state);
+> -				plane_state->pending.config = false;
+> -			}
+> -		}
+> -		mtk_crtc->pending_planes = false;
+> -	}
+> +	if (!priv->data->shadow_register)
+> +		mtk_crtc_ddp_config(crtc);
+>  
+>  	mtk_drm_finish_page_flip(mtk_crtc);
+>  }
+> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+> index 8030769..fa53806 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+> +++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+> @@ -12,6 +12,7 @@
+>   */
+>  
+>  #include <linux/clk.h>
+> +#include <linux/iopoll.h>
+>  #include <linux/module.h>
+>  #include <linux/of_device.h>
+>  #include <linux/platform_device.h>
+> @@ -32,6 +33,7 @@
+>  #define DISP_REG_CONFIG_MMSYS_CG_CON0		0x100
+>  
+>  #define DISP_REG_MUTEX_EN(n)	(0x20 + 0x20 * (n))
+> +#define DISP_REG_MUTEX(n)	(0x24 + 0x20 * (n))
+>  #define DISP_REG_MUTEX_RST(n)	(0x28 + 0x20 * (n))
+>  #define DISP_REG_MUTEX_MOD(n)	(0x2c + 0x20 * (n))
+>  #define DISP_REG_MUTEX_SOF(n)	(0x30 + 0x20 * (n))
+> @@ -300,6 +302,26 @@ void mtk_disp_mutex_disable(struct mtk_disp_mutex *mutex)
+>  	writel(0, ddp->regs + DISP_REG_MUTEX_EN(mutex->id));
+>  }
+>  
+> +void mtk_disp_mutex_acquire(struct mtk_disp_mutex *mutex)
+> +{
+> +	struct mtk_ddp *ddp = container_of(mutex, struct mtk_ddp,
+> +					   mutex[mutex->id]);
+> +	u32 tmp;
+> +
+> +	writel(1, ddp->regs + DISP_REG_MUTEX_EN(mutex->id));
+> +	writel(1, ddp->regs + DISP_REG_MUTEX(mutex->id));
+> +	readl_poll_timeout_atomic(ddp->regs + DISP_REG_MUTEX(mutex->id), tmp,
+> +				  tmp & 0x2, 1, 10000);
 
-I have no objections to doing that, so feel free to add my Acked-by and
-resend this to arm at kernel.org. When you do, please keep linux-tegra in
-Cc so that we can track it, and maybe mention that you want this to go
-into v4.7 and how this came about to be, so that the arm-soc maintainers
-won't be surprised when the patch to revert this shows up in a couple of
-days for v4.8.
+Nothing to do with timeout? I think it should print error message here
+or reset HW to recover it.
 
-Can you take care of sending out the second patch as well? Probably best
-to send it the same way as this, with a mention that it's targetted at
-v4.8 and a revert of this one.
-
-Thanks,
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160718/5420afc8/attachment.sig>
+> +}
+> +
+> +void mtk_disp_mutex_release(struct mtk_disp_mutex *mutex)
+> +{
+> +	struct mtk_ddp *ddp = container_of(mutex, struct mtk_ddp,
+> +					   mutex[mutex->id]);
+> +
+> +	writel(0, ddp->regs + DISP_REG_MUTEX(mutex->id));
+> +}
+> +
+>  static int mtk_ddp_probe(struct platform_device *pdev)
+>  {
+>  	struct device *dev = &pdev->dev;
+> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp.h b/drivers/gpu/drm/mediatek/mtk_drm_ddp.h
+> index 92c1175..f9a7991 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_drm_ddp.h
+> +++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp.h
+> @@ -37,5 +37,7 @@ void mtk_disp_mutex_remove_comp(struct mtk_disp_mutex *mutex,
+>  				enum mtk_ddp_comp_id id);
+>  void mtk_disp_mutex_unprepare(struct mtk_disp_mutex *mutex);
+>  void mtk_disp_mutex_put(struct mtk_disp_mutex *mutex);
+> +void mtk_disp_mutex_acquire(struct mtk_disp_mutex *mutex);
+> +void mtk_disp_mutex_release(struct mtk_disp_mutex *mutex);
+>  
+>  #endif /* MTK_DRM_DDP_H */
+> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.h b/drivers/gpu/drm/mediatek/mtk_drm_drv.h
+> index fa0b106..94f8b66 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_drm_drv.h
+> +++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.h
+> @@ -33,6 +33,7 @@ struct mtk_mmsys_driver_data {
+>  	unsigned int main_len;
+>  	const enum mtk_ddp_comp_id *ext_path;
+>  	unsigned int ext_len;
+> +	bool shadow_register;
+>  };
+>  
+>  struct mtk_drm_private {
