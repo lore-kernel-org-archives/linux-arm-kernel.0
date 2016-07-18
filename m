@@ -1,110 +1,56 @@
-From: vgoyal@redhat.com (Vivek Goyal)
-Date: Mon, 18 Jul 2016 09:26:29 -0400
-Subject: [RFC 0/3] extend kexec_file_load system call
-In-Reply-To: <1468845964.2800.3.camel@gmail.com>
-References: <20160712225805.0d27fe5d@hananiah.suse.cz>
- <20160712221804.GV1041@n2100.armlinux.org.uk>
- <87twfunneg.fsf@linux.vnet.ibm.com>
- <20160713073657.GX1041@n2100.armlinux.org.uk>
- <87poqinf9m.fsf@linux.vnet.ibm.com>
- <20160713082639.GZ1041@n2100.armlinux.org.uk>
- <20160713130338.GB16900@redhat.com>
- <20160713174009.GA1041@n2100.armlinux.org.uk>
- <20160713182247.GA25232@redhat.com>
- <1468845964.2800.3.camel@gmail.com>
-Message-ID: <20160718132629.GB32512@redhat.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Mon, 18 Jul 2016 06:29:02 -0700
+Subject: [v2,1/4] hwmon: iio_hwmon: defer probe when no channel is found
+In-Reply-To: <20160718100232.GE4199@lukather>
+References: <1468576754-3273-2-git-send-email-quentin.schulz@free-electrons.com>
+ <20160716170013.GA27490@roeck-us.net> <20160718100232.GE4199@lukather>
+Message-ID: <578CD99E.5000406@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 18, 2016 at 10:46:04PM +1000, Balbir Singh wrote:
-> On Wed, 2016-07-13 at 14:22 -0400, Vivek Goyal wrote:
-> > On Wed, Jul 13, 2016 at 06:40:10PM +0100, Russell King - ARM Linux wrote:
-> > >?
-> > > On Wed, Jul 13, 2016 at 09:03:38AM -0400, Vivek Goyal wrote:
-> > > >?
-> > > > On Wed, Jul 13, 2016 at 09:26:39AM +0100, Russell King - ARM Linux wrote:
-> > > > >?
-> > > > > Indeed - maybe Eric knows better, but I can't see any situation where
-> > > > > the dtb we load via kexec should ever affect "the bootloader", unless
-> > > > > the "kernel" that's being loaded into kexec is "the bootloader".
-> > > > >?
-> > > > > Now, going back to the more fundamental issue raised in my first reply,
-> > > > > about the kernel command line.
-> > > > >?
-> > > > > On x86, I can see that it _is_ possible for userspace to specify a
-> > > > > command line, and the kernel loading the image provides the command
-> > > > > line to the to-be-kexeced kernel with very little checking.??So, if
-> > > > > your kernel is signed, what stops the "insecure userspace" loading
-> > > > > a signed kernel but giving it an insecure rootfs and/or console?
-> > > > It is not kexec specific. I could do this for regular boot too, right?
-> > > >?
-> > > > Command line options are not signed. I thought idea behind secureboot
-> > > > was to execute only trusted code and command line options don't enforce
-> > > > you to execute unsigned code.
-> > > >?
-> 
-> You can set module.sig_enforce=0 and open up the system a bit assuming
-> that you can get a module to load with another attack
+On 07/18/2016 03:02 AM, Maxime Ripard wrote:
+> Hi Guenter,
+>
+> On Sat, Jul 16, 2016 at 10:00:13AM -0700, Guenter Roeck wrote:
+>> On Fri, Jul 15, 2016 at 11:59:11AM +0200, Quentin Schulz wrote:
+>>> iio_channel_get_all returns -ENODEV when it cannot find either phandles and
+>>> properties in the Device Tree or channels whose consumer_dev_name matches
+>>> iio_hwmon in iio_map_list. The iio_map_list is filled in by iio drivers
+>>> which might be probed after iio_hwmon.
+>>>
+>>> It is better to defer the probe of iio_hwmon if such error is returned by
+>>> iio_channel_get_all in order to let a chance to iio drivers to expose
+>>> channels in iio_map_list.
+>>>
+>>> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+>>> ---
+>>>
+>>> No modifications for this patch since we did not settled for a solution.
+>>> What should we do?
+>>>
+>> AFAICS the only thing we can do is to replace module_platform_driver() with
+>> its explicitly coded variant, and to use use late_initcall() instead of
+>> module_init().
+>
+> I thought this kind of changes to the driver init time were
+> discouraged these days?
+>
 
-IIUC, sig_enforce bool_enable_only so it can only be enabled. Default
-value of it is 0 if CONFIG_MODULE_SIG_FORCE=n.
+Blindly converting -ENODEV to -EPROBEDEFER doesn't sound like a good idea
+either.
 
-IOW, if your kernel forced signature verification, you should not be
-able to do sig_enforce=0. If you kernel did not have
-CONFIG_MODULE_SIG_FORCE=y, then sig_enforce should be 0 by default anyway
-and you are not making it worse using command line.
+>> Anything else would result in endless probe deferrals if there are
+>> no channels.
+>
+> Well, technically, not endless. AFAIK, the kernel only retries when a
+> new driver is probed, which should hopefully settle down rather
+> quickly.
+>
 
-> 
-> > > > So it sounds like different class of security problems which you are
-> > > > referring to and not necessarily covered by secureboot or signed
-> > > > kernel.
-> > > Let me give you an example.
-> > >?
-> > > You have a secure boot setup, where the firmware/ROM validates the boot
-> > > loader.??Good, the boot loader hasn't been tampered with.
-> > >?
-> > > You interrupt the boot loader and are able to modify the command line
-> > > for the booted kernel.
-> > >?
-> > > The boot loader loads the kernel and verifies the kernel's signature.
-> > > Good, the kernel hasn't been tampered with.??The kernel starts running.
-> > >?
-> > > You've plugged in a USB drive to the device, and specified a partition
-> > > containing a root filesystem that you control to the kernel.??The
-> > > validated kernel finds the USB drive, and mounts it, and executes
-> > > your own binaries on the USB drive.
-> > You will require physical access to the machine to be able to
-> > insert your usb drive. And IIRC, argument was that if attacker has
-> > physical access to machine, all bets are off anyway.
-> >
-> 
-> You don't need physical access -- your machine controller BMC can
-> do the magic for you. So its not always physical access, is it?
+Plus each time a new driver is loaded for whatever reason.
 
-Well, idea was that if you have physical access to machine, then all
-bets are off. If BMC can do something which allows running unsigned
-code at ring level 0, its a problem I think from secureboot model of
-security.
+Also, are you sure that leaving a device in deferred probe state doesn't
+have undesirable side effects ? For example, would driver_probe_done()
+ever return true ?
 
-> ?
-> > >?
-> > >?
-> > > You run a shell on the console.??You now have control of the system,
-> > > and can mount the real rootfs, inspect it, and work out what it does,
-> > > etc.
-> > >?
-> > > At this point, what use was all the validation that the secure boot
-> > > has done???Absolutely useless.
-> > >?
-> > > If you can change the command line arguments given to the kernel, you
-> > > have no security, no matter how much you verify signatures.??It's
-> > > the illusion of security, nothing more, nothing less.
-> > >?
-> 
-> I agree, if you can change command line arguments, all bets are of lesser value
-
-If changing command line allows execution of unsigned code at ring level
-0, then it is a problem. Otherwise we are talking of security issues which
-are not covered by secureboot model.
-
-Vivek
+Guenter
