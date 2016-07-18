@@ -1,86 +1,68 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Mon, 18 Jul 2016 14:39:36 -0400
-Subject: [PATCH 09/10] dmaengine: qcom_hidma: add a common API to setup the
- interrupt
-In-Reply-To: <1468867177-15007-1-git-send-email-okaya@codeaurora.org>
-References: <1468867177-15007-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1468867177-15007-10-git-send-email-okaya@codeaurora.org>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Mon, 18 Jul 2016 22:12:40 +0300
+Subject: [PATCH 2/2] ARM: dts: r8a7792: add SDHI support
+In-Reply-To: <20160717225842.GA25133@verge.net.au>
+References: <2441635.ESeLhIjWEX@wasted.cogentembedded.com>
+ <8030361.FnpbGzHVP8@wasted.cogentembedded.com>
+ <20160717225842.GA25133@verge.net.au>
+Message-ID: <cece2545-52f9-7ddb-36d2-df364a272092@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introducing the hidma_ll_setup_irq function to set up the interrupt
-type externally from the OS interface.
+Hello.
 
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
----
- drivers/dma/qcom/hidma.h    |  2 ++
- drivers/dma/qcom/hidma_ll.c | 27 +++++++++++++++++++++++----
- 2 files changed, 25 insertions(+), 4 deletions(-)
+On 07/18/2016 01:58 AM, Simon Horman wrote:
 
-diff --git a/drivers/dma/qcom/hidma.h b/drivers/dma/qcom/hidma.h
-index 03c20f6..3f28f39 100644
---- a/drivers/dma/qcom/hidma.h
-+++ b/drivers/dma/qcom/hidma.h
-@@ -49,6 +49,7 @@ struct hidma_tre {
- };
- 
- struct hidma_lldev {
-+	bool msi_support;		/* flag indicating MSI support    */
- 	bool initialized;		/* initialized flag               */
- 	u8 trch_state;			/* trch_state of the device	  */
- 	u8 evch_state;			/* evch_state of the device	  */
-@@ -146,6 +147,7 @@ int hidma_ll_disable(struct hidma_lldev *lldev);
- int hidma_ll_enable(struct hidma_lldev *llhndl);
- void hidma_ll_set_transfer_params(struct hidma_lldev *llhndl, u32 tre_ch,
- 	dma_addr_t src, dma_addr_t dest, u32 len, u32 flags);
-+void hidma_ll_setup_irq(struct hidma_lldev *lldev, bool msi);
- int hidma_ll_setup(struct hidma_lldev *lldev);
- struct hidma_lldev *hidma_ll_init(struct device *dev, u32 max_channels,
- 			void __iomem *trca, void __iomem *evca,
-diff --git a/drivers/dma/qcom/hidma_ll.c b/drivers/dma/qcom/hidma_ll.c
-index eb78952..c3d3252 100644
---- a/drivers/dma/qcom/hidma_ll.c
-+++ b/drivers/dma/qcom/hidma_ll.c
-@@ -669,17 +669,36 @@ int hidma_ll_setup(struct hidma_lldev *lldev)
- 	writel(HIDMA_EVRE_SIZE * nr_tres,
- 			lldev->evca + HIDMA_EVCA_RING_LEN_REG);
- 
--	/* support IRQ only for now */
-+	/* configure interrupts */
-+	hidma_ll_setup_irq(lldev, lldev->msi_support);
-+
-+	rc = hidma_ll_enable(lldev);
-+	if (rc)
-+		return rc;
-+
-+	return rc;
-+}
-+
-+void hidma_ll_setup_irq(struct hidma_lldev *lldev, bool msi)
-+{
-+	u32 val;
-+
-+	lldev->msi_support = msi;
-+
-+	/* disable interrupts again after reset */
-+	writel(0, lldev->evca + HIDMA_EVCA_IRQ_CLR_REG);
-+	writel(0, lldev->evca + HIDMA_EVCA_IRQ_EN_REG);
-+
-+	/* support IRQ by default */
- 	val = readl(lldev->evca + HIDMA_EVCA_INTCTRL_REG);
- 	val &= ~0xF;
--	val |= 0x1;
-+	if (!lldev->msi_support)
-+		val = val | 0x1;
- 	writel(val, lldev->evca + HIDMA_EVCA_INTCTRL_REG);
- 
- 	/* clear all pending interrupts and enable them */
- 	writel(ENABLE_IRQS, lldev->evca + HIDMA_EVCA_IRQ_CLR_REG);
- 	writel(ENABLE_IRQS, lldev->evca + HIDMA_EVCA_IRQ_EN_REG);
--
--	return hidma_ll_enable(lldev);
- }
- 
- struct hidma_lldev *hidma_ll_init(struct device *dev, u32 nr_tres,
--- 
-1.8.2.1
+>> Define the generic R8A7792 part of the SDHI0 device node.
+>>
+>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+>>
+>> ---
+>>  arch/arm/boot/dts/r8a7792.dtsi |   12 ++++++++++++
+>>  1 file changed, 12 insertions(+)
+>>
+>> Index: renesas/arch/arm/boot/dts/r8a7792.dtsi
+>> ===================================================================
+>> --- renesas.orig/arch/arm/boot/dts/r8a7792.dtsi
+>> +++ renesas/arch/arm/boot/dts/r8a7792.dtsi
+>> @@ -435,6 +435,18 @@
+>>  			status = "disabled";
+>>  		};
+>>
+>> +		sdhi0: sd at ee100000 {
+>> +			compatible = "renesas,sdhi-r8a7792";
+>> +			reg = <0 0xee100000 0 0x200>;
+>
+> I do not have the documentation available to check,
+
+    Me nether. The SDHI .zip only includes the manual for E2, H2, and M2.
+
+> however, I wonder if
+> as per 66f47ed0e86d ("ARM: shmobile: r8a7790: tidyup SDHI register size on
+> DTSI") the register size should be 0x328.
+
+    I just don't know...
+
+> It also looks like register the DTS for the r8a7794 needs updating along
+> the same lines.
+
+    Indeed.
+
+>> +			interrupts = <0 165 IRQ_TYPE_LEVEL_HIGH>;
+>> +			dmas = <&dmac0 0xcd>, <&dmac0 0xce>,
+>> +			       <&dmac1 0xcd>, <&dmac1 0xce>;
+>> +			dma-names = "tx", "rx", "tx", "rx";
+>> +			clocks = <&mstp3_clks R8A7792_CLK_SDHI0>;
+>> +			power-domains = <&sysc R8A7792_PD_ALWAYS_ON>;
+>> +			status = "disabled";
+>> +		};
+>> +
+>>  		jpu: jpeg-codec at fe980000 {
+>>  			compatible = "renesas,jpu-r8a7792",
+>>  				     "renesas,rcar-gen2-jpu";
+
+    I also wonder whether whether a single per-SoC SDHI "compatible" is valid. 
+The registers and their offsets seem to differ b/w SDHI0 and the other SDHI 
+cores...
+
+MBR, Sergei
