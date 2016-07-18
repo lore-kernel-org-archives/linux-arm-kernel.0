@@ -1,83 +1,133 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 18 Jul 2016 11:42:00 +0100
-Subject: [PATCH 7/7] dmaengine: omap-dma: Support for LinkedList transfer
- of slave_sg
-In-Reply-To: <20160714124242.7579-8-peter.ujfalusi@ti.com>
-References: <20160714124242.7579-1-peter.ujfalusi@ti.com>
- <20160714124242.7579-8-peter.ujfalusi@ti.com>
-Message-ID: <20160718104159.GI5783@n2100.arm.linux.org.uk>
+From: grimaldi.ivan@gmail.com (Ivan Grimaldi)
+Date: Mon, 18 Jul 2016 12:44:36 +0200
+Subject: PROBLEM: pcie imx6 link problem after a random number of reboot
+In-Reply-To: <VI1PR0401MB2624E3404F95241302CC4C9F8C360@VI1PR0401MB2624.eurprd04.prod.outlook.com>
+References: <CAO1575Vzw5=JMVW4yh6HNz730r-RtONt_+J1A4BhygVowAWLZQ@mail.gmail.com>
+ <CAO1575Wo_Qgk-YX7kZchUTEv7o3W5-b_DJQktoF2AR+OwvAxNg@mail.gmail.com>
+ <VI1PR0401MB2624BC92B13026C53D4B13198C330@VI1PR0401MB2624.eurprd04.prod.outlook.com>
+ <CAO1575VC_cVHMxnWWDHcJhrymchJM1zMmR4X2O38JdrGP4dJfA@mail.gmail.com>
+ <VI1PR0401MB26249BF2429EF9FD6DB7F7EF8C330@VI1PR0401MB2624.eurprd04.prod.outlook.com>
+ <CAO1575VjjoA3O-8big2NG7v=xCeeLjf1K0Ck7b9AUcZ=H8HL1w@mail.gmail.com>
+ <VI1PR0401MB2624E3404F95241302CC4C9F8C360@VI1PR0401MB2624.eurprd04.prod.outlook.com>
+Message-ID: <CAO1575VCk2g0KwH=hEk4bHP1t75Pd09yCNV27r7ZfhLbUhV=eA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 14, 2016 at 03:42:42PM +0300, Peter Ujfalusi wrote:
->  struct omap_desc {
-> +	struct omap_chan *c;
->  	struct virt_dma_desc vd;
+Hi,
 
-No need for this.  to_omap_dma_chan(foo->vd.tx.chan) will give you the
-omap_chan for the descriptor.  In any case, I question whether you
-actually need this (see below.)
+  i have enabled early printk and after a random number of restart the
+kernel hangs occurs later in the log (Below kernel log).
 
-> +	bool using_ll;
->  	enum dma_transfer_direction dir;
->  	dma_addr_t dev_addr;
->  
-> @@ -81,6 +109,9 @@ struct omap_desc {
->  };
->  
->  enum {
-> +	CAPS_0_SUPPORT_LL123	= BIT(20),	/* Linked List type1/2/3 */
-> +	CAPS_0_SUPPORT_LL4	= BIT(21),	/* Linked List type4 */
-> +
->  	CCR_FS			= BIT(5),
->  	CCR_READ_PRIORITY	= BIT(6),
->  	CCR_ENABLE		= BIT(7),
-> @@ -151,6 +182,19 @@ enum {
->  	CICR_SUPER_BLOCK_IE	= BIT(14),	/* OMAP2+ only */
->  
->  	CLNK_CTRL_ENABLE_LNK	= BIT(15),
-> +
-> +	CDP_DST_VALID_INC	= 0 << 0,
-> +	CDP_DST_VALID_RELOAD	= 1 << 0,
-> +	CDP_DST_VALID_REUSE	= 2 << 0,
-> +	CDP_SRC_VALID_INC	= 0 << 2,
-> +	CDP_SRC_VALID_RELOAD	= 1 << 2,
-> +	CDP_SRC_VALID_REUSE	= 2 << 2,
-> +	CDP_NTYPE_TYPE1		= 1 << 4,
-> +	CDP_NTYPE_TYPE2		= 2 << 4,
-> +	CDP_NTYPE_TYPE3		= 3 << 4,
-> +	CDP_TMODE_NORMAL	= 0 << 8,
-> +	CDP_TMODE_LLIST		= 1 << 8,
-> +	CDP_FAST		= BIT(10),
->  };
->  
->  static const unsigned es_bytes[] = {
-> @@ -180,7 +224,64 @@ static inline struct omap_desc *to_omap_dma_desc(struct dma_async_tx_descriptor
->  
->  static void omap_dma_desc_free(struct virt_dma_desc *vd)
->  {
-> -	kfree(container_of(vd, struct omap_desc, vd));
-> +	struct omap_desc *d = container_of(vd, struct omap_desc, vd);
+...
+imx6q-pcie 1ffc000.pcie: Link up, Gen=2
+imx6q-pcie 1ffc000.pcie: PCI host bridge to bus 0000:00
+pci_bus 0000:00: root bus resource [io  0x1000-0xffff]
+pci_bus 0000:00: root bus resource [mem 0x01000000-0x01efffff]
+pci_bus 0000:00: root bus resource [bus 00-ff]
+pci_bus 0000:00: scanning bus
+pci 0000:00:00.0: [16c3:abcd] type 01 class 0x060400
+pci 0000:00:00.0: reg 0x10: [mem 0x00000000-0x000fffff]
+pci 0000:00:00.0: reg 0x38: [mem 0x00000000-0x0000ffff pref]
+pci 0000:00:00.0: calling pci_fixup_ide_bases+0x0/0x4c
+pci 0000:00:00.0: supports D1
+pci 0000:00:00.0: PME# supported from D0 D1 D3hot D3cold
+pci 0000:00:00.0: PME# disabled
+pci_bus 0000:00: fixups for bus
+PCI: bus0: Fast back to back transfers disabled
+pci 0000:00:00.0: scanning [bus 01-01] behind bridge, pass 0
+pci 0000:00:00.0: scanning [bus 00-00] behind bridge, pass 1
+pci_bus 0000:01: scanning bus
 
-	struct omap_desc *d = to_omap_dma_desc(&vd->tx);
 
-works just as well, and looks much nicer, and follows the existing code
-pattern.
 
-> +
-> +	if (d->using_ll) {
-> +		struct omap_chan *c = d->c;
-> +		int i;
-> +
-> +		for (i = 0; i < d->sglen; i++) {
-> +			if (d->sg[i].t2_desc)
-> +				dma_pool_free(c->desc_pool, d->sg[i].t2_desc,
-> +					      d->sg[i].t2_desc_paddr);
+IVan
 
-Why do you need a per-channel pool of descriptors?  Won't a per-device
-descriptor pool be much better, and simplify the code here?
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+2016-07-18 9:38 GMT+02:00 Richard Zhu <hongxing.zhu@nxp.com>:
+> Hi Ivan:
+>
+>
+>> -----Original Message-----
+>> From: Ivan Grimaldi [mailto:grimaldi.ivan at gmail.com]
+>> Sent: Friday, July 15, 2016 9:55 PM
+>> To: Richard Zhu <hongxing.zhu@nxp.com>
+>> Cc: r65037 at freescale.com; l.stach at pengutronix.de; linux-pci at vger.kernel.org;
+>> bhelgaas at google.com; linux-arm-kernel at lists.infradead.org
+>> Subject: Re: PROBLEM: pcie imx6 link problem after a random number of
+>> reboot
+>>
+>> Hi ,
+>>
+>>  i have aligned pci-imx.c file with SHA
+>> "b2d7a9cd3ff8ec561348267c2ef7d47b2b91e801" (same of kernel 4.6) and after
+>> a random number of restart the kernel hangs (below the kernel log). From log,
+>> as you see, the U-Boot haven't problem with PCI.
+> [Zhu hongxing] The link training of kernel pcie would be impacted by the the link up state of
+>  the uboot pcie.
+>>
+>> ...
+>> U-Boot 2015.01-ge2977fb-dirty (Jul 15 2016 - 11:28:42)
+>>
+>> CPU:   Freescale i.MX6DL rev1.1 at 792 MHz
+>> Reset cause: WDOG
+>>        Watchdog enabled
+>> DRAM:  1 GiB
+>> Flash: 96 MiB
+>> MMC:   FSL_SDHC: 0
+>> WARNING: Make sure the PCIe #PERST line is connected!
+>>   00:01.0     - 16c3:abcd - Bridge device
+>>    01:00.0    - 14e4:b242 - Network controller
+>> In:    serial
+>> Out:   serial
+>> Err:   serial
+>> Net:   FEC [PRIME]
+>> Hit any key to stop autoboot:  0
+>> Booting from NFS...
+>> Using FEC device
+>> TFTP from server 192.168.74.130; our IP address is 192.168.74.235 Filename
+>> 'ags20.dtb'.
+>> Load address: 0x12000000
+>> Loading: ###
+>>          3.2 MiB/s
+>> done
+>> Bytes transferred = 29921 (74e1 hex)
+>> Using FEC device
+>> TFTP from server 192.168.74.130; our IP address is 192.168.74.235 Filename
+>> 'zImage'.
+>> Load address: 0x12100000
+>> Loading:
+>> ################################################################
+>> #
+>>
+>> ################################################################
+>> #
+>>
+>> ################################################################
+>> #
+>>          ##########################################
+>>          3.9 MiB/s
+>> done
+>> Bytes transferred = 3472120 (34faf8 hex) Kernel image @ 0x12100000
+>> [ 0x000000 - 0x34faf8 ] ## Flattened Device Tree blob at 12000000
+>>    Booting using the fdt blob at 0x12000000
+>>    Loading Device Tree to 4f530000, end 4f53a4e0 ... OK
+>>
+>> Starting kernel ...
+>>
+> [Zhu hongxing] It seems that the kernel is hang.
+> Most possible reason is that pcie register is accessed, but the clks is not configured properly.
+> Can you enable the " CONFIG_EARLY_PRINTK", and debug into it?
+>
+>>
+>>
+>> Best regards
+>> IVan
+>>
+> Snip...
+>
+> Best Regards
+> hongxing zhu
+> Linux BSP team
+> Office: 86-21-28937189
+> Email: hongxing.zhu at nxp.com
+>
