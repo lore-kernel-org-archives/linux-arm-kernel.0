@@ -1,430 +1,150 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Mon, 18 Jul 2016 18:36:49 +0200
-Subject: [PATCH v10 09/17] KVM: arm64: introduce ITS emulation file with
- MMIO framework
-In-Reply-To: <b2bd8d24-92b5-d8ed-a5ce-843d8fcbf895@arm.com>
-References: <20160715114338.10484-1-andre.przywara@arm.com>
- <20160715114338.10484-10-andre.przywara@arm.com>
- <5a1405f7-201c-6f8c-0b16-c64a192dc5f0@redhat.com>
- <b2bd8d24-92b5-d8ed-a5ce-843d8fcbf895@arm.com>
-Message-ID: <2441ade3-4323-0d85-8a36-810ee6a806ba@redhat.com>
+From: tjakobi@math.uni-bielefeld.de (Tobias Jakobi)
+Date: Mon, 18 Jul 2016 18:43:02 +0200
+Subject: [PATCH v2 00/10] Exynos IOMMU: proper runtime PM support (use
+ device dependencies)
+In-Reply-To: <6939949e-4c8e-cba0-9858-b37d1ba01869@samsung.com>
+References: <1466144820-6286-1-git-send-email-m.szyprowski@samsung.com>
+ <5787B2B0.9020809@math.uni-bielefeld.de>
+ <5788E352.3040801@math.uni-bielefeld.de>
+ <a15e438a-7fa0-3a4d-e6e2-13425512dddd@samsung.com>
+ <578CB6DB.90608@math.uni-bielefeld.de>
+ <6939949e-4c8e-cba0-9858-b37d1ba01869@samsung.com>
+Message-ID: <578D0716.6060106@math.uni-bielefeld.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andre,
+Hey Marek,
 
-On 18/07/2016 18:34, Andre Przywara wrote:
-> Hi Eric,
-> 
-> On 18/07/16 10:18, Auger Eric wrote:
->> Hi Andre, Marc,
->>
->> On 15/07/2016 13:43, Andre Przywara wrote:
->>> The ARM GICv3 ITS emulation code goes into a separate file, but needs
->>> to be connected to the GICv3 emulation, of which it is an option.
->>> The ITS MMIO handlers require the respective ITS pointer to be passed in,
->>> so we amend the existing VGIC MMIO framework to let it cope with that.
->>> Also we introduce the basic ITS data structure and initialize it, but
->>> don't return any success yet, as we are not yet ready for the show.
->>>
->>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
->>> ---
->>>  include/kvm/arm_vgic.h           |  22 ++++++++-
->>>  virt/kvm/arm/vgic/vgic-its.c     | 103 +++++++++++++++++++++++++++++++++++++++
->>>  virt/kvm/arm/vgic/vgic-mmio-v3.c |  40 ++++++++++++++-
->>>  virt/kvm/arm/vgic/vgic-mmio.c    |  37 +++++++++++---
->>>  virt/kvm/arm/vgic/vgic-mmio.h    |  17 +++++--
->>>  virt/kvm/arm/vgic/vgic.h         |   7 +++
->>>  6 files changed, 213 insertions(+), 13 deletions(-)
->>>  create mode 100644 virt/kvm/arm/vgic/vgic-its.c
->>>
->>> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
->>> index df2dec5..685f339 100644
->>> --- a/include/kvm/arm_vgic.h
->>> +++ b/include/kvm/arm_vgic.h
->>> @@ -108,15 +108,35 @@ struct vgic_irq {
->>>  };
->>>  
->>>  struct vgic_register_region;
->>> +struct vgic_its;
->>> +
->>> +enum iodev_type {
->>> +	IODEV_CPUIF,
->>> +	IODEV_DIST,
->>> +	IODEV_REDIST,
->>> +	IODEV_ITS
->>> +};
->>>  
->>>  struct vgic_io_device {
->>>  	gpa_t base_addr;
->>> -	struct kvm_vcpu *redist_vcpu;
->>> +	union {
->>> +		struct kvm_vcpu *redist_vcpu;
->>> +		struct vgic_its *its;
->>> +	};
->>>  	const struct vgic_register_region *regions;
->>> +	enum iodev_type iodev_type;
->>>  	int nr_regions;
->>>  	struct kvm_io_device dev;
->>>  };
->>>  
->>> +struct vgic_its {
->>> +	/* The base address of the ITS control register frame */
->>> +	gpa_t			vgic_its_base;
->>> +
->>> +	bool			enabled;
->>> +	struct vgic_io_device	iodev;
->>> +};
->>> +
->>>  struct vgic_dist {
->>>  	bool			in_kernel;
->>>  	bool			ready;
->>> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
->>> new file mode 100644
->>> index 0000000..4654d6e
->>> --- /dev/null
->>> +++ b/virt/kvm/arm/vgic/vgic-its.c
->>> @@ -0,0 +1,103 @@
->>> +/*
->>> + * GICv3 ITS emulation
->>> + *
->>> + * Copyright (C) 2015,2016 ARM Ltd.
->>> + * Author: Andre Przywara <andre.przywara@arm.com>
->>> + *
->>> + * This program is free software; you can redistribute it and/or modify
->>> + * it under the terms of the GNU General Public License version 2 as
->>> + * published by the Free Software Foundation.
->>> + *
->>> + * This program is distributed in the hope that it will be useful,
->>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->>> + * GNU General Public License for more details.
->>> + *
->>> + * You should have received a copy of the GNU General Public License
->>> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
->>> + */
->>> +
->>> +#include <linux/cpu.h>
->>> +#include <linux/kvm.h>
->>> +#include <linux/kvm_host.h>
->>> +#include <linux/interrupt.h>
->>> +
->>> +#include <linux/irqchip/arm-gic-v3.h>
->>> +
->>> +#include <asm/kvm_emulate.h>
->>> +#include <asm/kvm_arm.h>
->>> +#include <asm/kvm_mmu.h>
->>> +
->>> +#include "vgic.h"
->>> +#include "vgic-mmio.h"
->>> +
->>> +#define REGISTER_ITS_DESC(off, rd, wr, length, acc)		\
->>> +{								\
->>> +	.reg_offset = off,					\
->>> +	.len = length,						\
->>> +	.access_flags = acc,					\
->>> +	.its_read = rd,						\
->>> +	.its_write = wr,					\
->>> +}
->>> +
->>> +static unsigned long its_mmio_read_raz(struct kvm *kvm, struct vgic_its *its,
->>> +				       gpa_t addr, unsigned int len)
->>> +{
->>> +	return 0;
->>> +}
->>> +
->>> +static void its_mmio_write_wi(struct kvm *kvm, struct vgic_its *its,
->>> +			      gpa_t addr, unsigned int len, unsigned long val)
->>> +{
->>> +	/* Ignore */
->>> +}
->>> +
->>> +static struct vgic_register_region its_registers[] = {
->>> +	REGISTER_ITS_DESC(GITS_CTLR,
->>> +		its_mmio_read_raz, its_mmio_write_wi, 4,
->>> +		VGIC_ACCESS_32bit),
->>> +	REGISTER_ITS_DESC(GITS_IIDR,
->>> +		its_mmio_read_raz, its_mmio_write_wi, 4,
->>> +		VGIC_ACCESS_32bit),
->>> +	REGISTER_ITS_DESC(GITS_TYPER,
->>> +		its_mmio_read_raz, its_mmio_write_wi, 8,
->>> +		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
->>> +	REGISTER_ITS_DESC(GITS_CBASER,
->>> +		its_mmio_read_raz, its_mmio_write_wi, 8,
->>> +		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
->>> +	REGISTER_ITS_DESC(GITS_CWRITER,
->>> +		its_mmio_read_raz, its_mmio_write_wi, 8,
->>> +		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
->>> +	REGISTER_ITS_DESC(GITS_CREADR,
->>> +		its_mmio_read_raz, its_mmio_write_wi, 8,
->>> +		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
->>> +	REGISTER_ITS_DESC(GITS_BASER,
->>> +		its_mmio_read_raz, its_mmio_write_wi, 0x40,
->>> +		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
->>> +	REGISTER_ITS_DESC(GITS_IDREGS_BASE,
->>> +		its_mmio_read_raz, its_mmio_write_wi, 0x30,
->>> +		VGIC_ACCESS_32bit),
->>> +};
->>> +
->>> +static int vgic_its_init_its(struct kvm *kvm, struct vgic_its *its)
->>> +{
->>> +	struct vgic_io_device *iodev = &its->iodev;
->>> +	int ret;
->>> +
->>> +	if (IS_VGIC_ADDR_UNDEF(its->vgic_its_base))
->>> +		return -ENXIO;
->>> +
->>> +	iodev->regions = its_registers;
->>> +	iodev->nr_regions = ARRAY_SIZE(its_registers);
->>> +	kvm_iodevice_init(&iodev->dev, &kvm_io_gic_ops);
->>> +
->>> +	iodev->base_addr = its->vgic_its_base;
->>> +	iodev->iodev_type = IODEV_ITS;
->>> +	iodev->its = its;
->>> +	mutex_lock(&kvm->slots_lock);
->>> +	ret = kvm_io_bus_register_dev(kvm, KVM_MMIO_BUS, iodev->base_addr,
->>> +				      KVM_VGIC_V3_ITS_SIZE, &iodev->dev);
->>> +	mutex_unlock(&kvm->slots_lock);
->>> +
->>> +	return ret;
->>> +}
->>> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
->>> index 278bfbb..b92b7d6 100644
->>> --- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
->>> +++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
->>> @@ -42,6 +42,16 @@ static u64 update_64bit_reg(u64 reg, unsigned int offset, unsigned int len,
->>>  	return reg | ((u64)val << lower);
->>>  }
->>>  
->>> +bool vgic_has_its(struct kvm *kvm)
->>> +{
->>> +	struct vgic_dist *dist = &kvm->arch.vgic;
->>> +
->>> +	if (dist->vgic_model != KVM_DEV_TYPE_ARM_VGIC_V3)
->>> +		return false;
->>> +
->>> +	return false;
->>> +}
->>> +
->>>  static unsigned long vgic_mmio_read_v3_misc(struct kvm_vcpu *vcpu,
->>>  					    gpa_t addr, unsigned int len)
->>>  {
->>> @@ -132,6 +142,32 @@ static void vgic_mmio_write_irouter(struct kvm_vcpu *vcpu,
->>>  	vgic_put_irq(vcpu->kvm, irq);
->>>  }
->>>  
->>> +static unsigned long vgic_mmio_read_v3r_ctlr(struct kvm_vcpu *vcpu,
->>> +					     gpa_t addr, unsigned int len)
->>> +{
->>> +	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
->>> +
->>> +	return vgic_cpu->lpis_enabled ? GICR_CTLR_ENABLE_LPIS : 0;
->>> +}
->>> +
->>> +
->>> +static void vgic_mmio_write_v3r_ctlr(struct kvm_vcpu *vcpu,
->>> +				     gpa_t addr, unsigned int len,
->>> +				     unsigned long val)
->>> +{
->>> +	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
->>> +	bool was_enabled = vgic_cpu->lpis_enabled;
->>> +
->>> +	if (!vgic_has_its(vcpu->kvm))
->>> +		return;
->>> +
->>> +	vgic_cpu->lpis_enabled = val & GICR_CTLR_ENABLE_LPIS;
->>> +
->>> +	if (!was_enabled && vgic_cpu->lpis_enabled) {
->>> +		/* Eventually do something */
->>> +	}
->>> +}
->>> +
->>>  static unsigned long vgic_mmio_read_v3r_typer(struct kvm_vcpu *vcpu,
->>>  					      gpa_t addr, unsigned int len)
->>>  {
->>> @@ -372,7 +408,7 @@ static const struct vgic_register_region vgic_v3_dist_registers[] = {
->>>  
->>>  static const struct vgic_register_region vgic_v3_rdbase_registers[] = {
->>>  	REGISTER_DESC_WITH_LENGTH(GICR_CTLR,
->>> -		vgic_mmio_read_raz, vgic_mmio_write_wi, 4,
->>> +		vgic_mmio_read_v3r_ctlr, vgic_mmio_write_v3r_ctlr, 4,
->>>  		VGIC_ACCESS_32bit),
->>>  	REGISTER_DESC_WITH_LENGTH(GICR_IIDR,
->>>  		vgic_mmio_read_v3r_iidr, vgic_mmio_write_wi, 4,
->>> @@ -450,6 +486,7 @@ int vgic_register_redist_iodevs(struct kvm *kvm, gpa_t redist_base_address)
->>>  
->>>  		kvm_iodevice_init(&rd_dev->dev, &kvm_io_gic_ops);
->>>  		rd_dev->base_addr = rd_base;
->>> +		rd_dev->iodev_type = IODEV_REDIST;
->>>  		rd_dev->regions = vgic_v3_rdbase_registers;
->>>  		rd_dev->nr_regions = ARRAY_SIZE(vgic_v3_rdbase_registers);
->>>  		rd_dev->redist_vcpu = vcpu;
->>> @@ -464,6 +501,7 @@ int vgic_register_redist_iodevs(struct kvm *kvm, gpa_t redist_base_address)
->>>  
->>>  		kvm_iodevice_init(&sgi_dev->dev, &kvm_io_gic_ops);
->>>  		sgi_dev->base_addr = sgi_base;
->>> +		sgi_dev->iodev_type = IODEV_REDIST;
->>>  		sgi_dev->regions = vgic_v3_sgibase_registers;
->>>  		sgi_dev->nr_regions = ARRAY_SIZE(vgic_v3_sgibase_registers);
->>>  		sgi_dev->redist_vcpu = vcpu;
->>> diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
->>> index 5e79e01..26be827 100644
->>> --- a/virt/kvm/arm/vgic/vgic-mmio.c
->>> +++ b/virt/kvm/arm/vgic/vgic-mmio.c
->>> @@ -473,8 +473,7 @@ static int dispatch_mmio_read(struct kvm_vcpu *vcpu, struct kvm_io_device *dev,
->>>  {
->>>  	struct vgic_io_device *iodev = kvm_to_vgic_iodev(dev);
->>>  	const struct vgic_register_region *region;
->>> -	struct kvm_vcpu *r_vcpu;
->>> -	unsigned long data;
->>> +	unsigned long data = 0;
->>>  
->>>  	region = vgic_find_mmio_region(iodev->regions, iodev->nr_regions,
->>>  				       addr - iodev->base_addr);
->>> @@ -483,8 +482,20 @@ static int dispatch_mmio_read(struct kvm_vcpu *vcpu, struct kvm_io_device *dev,
->>>  		return 0;
->>>  	}
->>>  
->>> -	r_vcpu = iodev->redist_vcpu ? iodev->redist_vcpu : vcpu;
->>> -	data = region->read(r_vcpu, addr, len);
->>> +	switch (iodev->iodev_type) {
->>> +	case IODEV_CPUIF:
->>> +		return 1;
->> This change causes a regression on AMD Seattle with QEMU (abort with
->> message "restoring 288 IRQs, but kernel supports max 32").
->> Shoudn't we have
->> 		data = region->read(vcpu, addr, len);
->> 		break;
->> This path is exercised by vgic_v2_cpuif_uaccess/vgic_uaccess
-> 
-> Of course! At the time I was writing this it totally slipped me that the
-> new VGIC _is_ using this code path now for the save/restore, so we need
-> to handle that here.
-> 
-> Apologies for the mess, and thanks a ton Eric for spotting this (and for
-> the fix)!
-no worries. It is a big series and I fully understand the pain :-)
 
-Cheers
+Marek Szyprowski wrote:
+> Dear Tobias
+> 
+> 
+> On 2016-07-18 13:00, Tobias Jakobi wrote:
+>> Marek Szyprowski wrote:
+>>> On 2016-07-15 15:21, Tobias Jakobi wrote:
+>>>> Tobias Jakobi wrote:
+>>>>> Hello Marek,
+>>>>>
+>>>>> I've tested the patchset on 4.7-rc7 and noticed that it breaks
+>>>>> reboot on
+>>>>> my ODROID-X2.
+>>>>>
+>>>>> Going to check where exactly things break.
+>>>> Sadly it's the last patch where everything comes together:
+>>>> "iommu/exynos: Add proper runtime pm support"
+>>>>
+>>>> I still have to check if forcing runpm status to 'on' makes a
+>>>> difference. I suspect that the aggressive clock gating might be the
+>>>> reason?
+>>> Thanks for testing. I will check this issue. Could you send me your
+>>> .config?
+>> This is the config I'm currently using:
+>> https://github.com/tobiasjakobi/odroid-environment/blob/master/sourcecode/system/vanilla-4.7-debug.conf
+>>
+>>
+>> Do you think checking this with no_console_suspend makes sense?
+> 
+> no_console_suspend switch won't provide more information, but I managed
+> to reproduce your issue. I'm really confused how enabling runtime pm can
+> cause problems with usb/smsc95xx ethernet driver (that is the reason for
+> failed reboot). Maybe it is somehow related to the global relations
+> between devices and drivers and the fact that creating the runtime pm
+> links change the order of operations. I will check this again when
+> Rafael send updated patches. Here is the log I got (after waiting some
+> time):
+thanks for looking into this! I'll try to reproduce this on my board. I
+have to admit that I didn't wait too long for the hung task message to
+appear.
 
-Eric
-> (for the records: kvmtool does not save/restore registers, so this code
-> never gets triggered there).
+I wonder if this has something to do with regulator code cutting some
+supplies too early. Is this on a X2 or a U2/U3? I'm not sure if we
+currently model the regulator setup correctly here (IIRC then buck8 is
+supplying the LAN/USB block on U2/U3).
+
+
+- Tobias
+
+
 > 
-> Cheers,
-> Andre.
+> # reboot
 > 
->>> +	case IODEV_DIST:
->>> +		data = region->read(vcpu, addr, len);
->>> +		break;
->>> +	case IODEV_REDIST:
->>> +		data = region->read(iodev->redist_vcpu, addr, len);
->>> +		break;
->>> +	case IODEV_ITS:
->>> +		data = region->its_read(vcpu->kvm, iodev->its, addr, len);
->>> +		break;
->>> +	}
->>> +
->>>  	vgic_data_host_to_mmio_bus(val, len, data);
->>>  	return 0;
->>>  }
->>> @@ -494,7 +505,6 @@ static int dispatch_mmio_write(struct kvm_vcpu *vcpu, struct kvm_io_device *dev,
->>>  {
->>>  	struct vgic_io_device *iodev = kvm_to_vgic_iodev(dev);
->>>  	const struct vgic_register_region *region;
->>> -	struct kvm_vcpu *r_vcpu;
->>>  	unsigned long data = vgic_data_mmio_bus_to_host(val, len);
->>>  
->>>  	region = vgic_find_mmio_region(iodev->regions, iodev->nr_regions,
->>> @@ -505,8 +515,20 @@ static int dispatch_mmio_write(struct kvm_vcpu *vcpu, struct kvm_io_device *dev,
->>>  	if (!check_region(region, addr, len))
->>>  		return 0;
->>>  
->>> -	r_vcpu = iodev->redist_vcpu ? iodev->redist_vcpu : vcpu;
->>> -	region->write(r_vcpu, addr, len, data);
->>> +	switch (iodev->iodev_type) {
->>> +	case IODEV_CPUIF:
->>> +		break;
->> same here
->> region->write(vcpu, addr, len, data);
->>
->> The above modifications fix the issue.
->>
->> Eric
->>> +	case IODEV_DIST:
->>> +		region->write(vcpu, addr, len, data);
->>> +		break;
->>> +	case IODEV_REDIST:
->>> +		region->write(iodev->redist_vcpu, addr, len, data);
->>> +		break;
->>> +	case IODEV_ITS:
->>> +		region->its_write(vcpu->kvm, iodev->its, addr, len, data);
->>> +		break;
->>> +	}
->>> +
->>>  	return 0;
->>>  }
->>>  
->>> @@ -536,6 +558,7 @@ int vgic_register_dist_iodev(struct kvm *kvm, gpa_t dist_base_address,
->>>  	}
->>>  
->>>  	io_device->base_addr = dist_base_address;
->>> +	io_device->iodev_type = IODEV_DIST;
->>>  	io_device->redist_vcpu = NULL;
->>>  
->>>  	mutex_lock(&kvm->slots_lock);
->>> diff --git a/virt/kvm/arm/vgic/vgic-mmio.h b/virt/kvm/arm/vgic/vgic-mmio.h
->>> index 71aa39d..366d663 100644
->>> --- a/virt/kvm/arm/vgic/vgic-mmio.h
->>> +++ b/virt/kvm/arm/vgic/vgic-mmio.h
->>> @@ -21,10 +21,19 @@ struct vgic_register_region {
->>>  	unsigned int len;
->>>  	unsigned int bits_per_irq;
->>>  	unsigned int access_flags;
->>> -	unsigned long (*read)(struct kvm_vcpu *vcpu, gpa_t addr,
->>> -			      unsigned int len);
->>> -	void (*write)(struct kvm_vcpu *vcpu, gpa_t addr, unsigned int len,
->>> -		      unsigned long val);
->>> +	union {
->>> +		unsigned long (*read)(struct kvm_vcpu *vcpu, gpa_t addr,
->>> +				      unsigned int len);
->>> +		unsigned long (*its_read)(struct kvm *kvm, struct vgic_its *its,
->>> +					  gpa_t addr, unsigned int len);
->>> +	};
->>> +	union {
->>> +		void (*write)(struct kvm_vcpu *vcpu, gpa_t addr,
->>> +			      unsigned int len, unsigned long val);
->>> +		void (*its_write)(struct kvm *kvm, struct vgic_its *its,
->>> +				  gpa_t addr, unsigned int len,
->>> +				  unsigned long val);
->>> +	};
->>>  };
->>>  
->>>  extern struct kvm_io_device_ops kvm_io_gic_ops;
->>> diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
->>> index 5b79c34..31807c1 100644
->>> --- a/virt/kvm/arm/vgic/vgic.h
->>> +++ b/virt/kvm/arm/vgic/vgic.h
->>> @@ -72,6 +72,7 @@ void vgic_v3_enable(struct kvm_vcpu *vcpu);
->>>  int vgic_v3_probe(const struct gic_kvm_info *info);
->>>  int vgic_v3_map_resources(struct kvm *kvm);
->>>  int vgic_register_redist_iodevs(struct kvm *kvm, gpa_t dist_base_address);
->>> +bool vgic_has_its(struct kvm *kvm);
->>>  #else
->>>  static inline void vgic_v3_process_maintenance(struct kvm_vcpu *vcpu)
->>>  {
->>> @@ -123,6 +124,12 @@ static inline int vgic_register_redist_iodevs(struct kvm *kvm,
->>>  {
->>>  	return -ENODEV;
->>>  }
->>> +
->>> +static inline bool vgic_has_its(struct kvm *kvm)
->>> +{
->>> +	return false;
->>> +}
->>> +
->>>  #endif
->>>  
->>>  int kvm_register_vgic_device(unsigned long type);
->>>
->>
+> Broadcast message from root at target (ttySAC1) (Mon Jul 18 13:33:38 2016):
+> 
+> The system is going down for reboot NOW!
+> INIT: Switching to runlevel: 6
+> INIT: Sending processes the TERM signal
+> [info] Using makefile-style concurrent boot in runlevel 6.
+> [ ok ] Stopping cgroup management proxy daemon: cgproxy[....] Stopping
+> internet superserver: inetd.
+> [....] Stopping cgroup management daemon: cgmanagermax77686-rtc
+> max77686-rtc: RTC alarm IRQ: 119
+> [ ok ] Shutting down ALSA...done.
+> random: nonblocking pool is initialized
+> [info] Saving the system clock.
+> [info] Hardware Clock updated to Mon Jul 18 13:33:40 UTC 2016.
+> [ ok ] Asking all remaining processes to terminate...done.
+> [ ok ] All processes ended within 1 seconds...done.
+> [ ok ] Stopping rpcbind daemon....
+> [ ok ] Deconfiguring network interfaces...done.
+> [ ok ] Unmounting temporary filesystems...done.
+> [ ok ] Deactivating swap...done.
+> EXT4-fs (mmcblk1p2): re-mounted. Opts: (null)
+> [info] Will now restart.
+> smsc95xx 1-2:1.0 eth0: Failed to read reg index 0x00000114: -110
+> smsc95xx 1-2:1.0 eth0: Error reading MII_ACCESS
+> smsc95xx 1-2:1.0 eth0: MII is busy in smsc95xx_mdio_read
+> smsc95xx 1-2:1.0 eth0: Failed to read MII_BMSR
+> INFO: task kworker/0:1:410 blocked for more than 120 seconds.
+>       Not tainted 4.7.0-rc7-debug+ #155
+> "echo 0 > /proc/sys/kernel/hung_task_timeout_secs" disables this message.
+> kworker/0:1     D c06850a8     0   410      2 0x00000000
+> Workqueue: events_freezable mmc_rescan
+> Backtrace:
+> [<c0684e90>] (__schedule) from [<c068560c>] (schedule+0x44/0xb0)
+>  r10:00000000 r9:eebe1d88 r8:c0686234 r7:00000000 r6:00000002 r5:7fffffff
+>  r4:7fffffff
+> [<c06855c8>] (schedule) from [<c068a398>] (schedule_timeout+0x154/0x1b0)
+> [<c068a244>] (schedule_timeout) from [<c0686250>]
+> (wait_for_common+0xe0/0x174)
+>  r8:c0686234 r7:00000000 r6:00000002 r5:eebe1d8c r4:7fffffff
+> [<c0686170>] (wait_for_common) from [<c0686430>]
+> (wait_for_completion+0x18/0x1c)
+>  r10:00000001 r9:00000000 r8:00000000 r7:eebe1d88 r6:eebe1d78 r5:ee260000
+>  r4:eebe1de4
+> [<c0686418>] (wait_for_completion) from [<c04e72c8>]
+> (mmc_wait_for_req+0xc8/0x15c)
+> [<c04e7200>] (mmc_wait_for_req) from [<c04e73c8>]
+> (mmc_wait_for_cmd+0x6c/0xa4)
+>  r8:eef73d00 r7:00000003 r6:ee260000 r5:c0a02448 r4:eebe1de4 r3:00000000
+> [<c04e735c>] (mmc_wait_for_cmd) from [<c04edbf4>]
+> (mmc_send_status+0x8c/0xb0)
+>  r7:eebe1eb0 r6:ee260000 r5:ee260000 r4:00000000
+> [<c04edb68>] (mmc_send_status) from [<c04eaf80>] (mmc_alive+0x18/0x1c)
+>  r4:ee260000
+> [<c04eaf68>] (mmc_alive) from [<c04e93d0>]
+> (_mmc_detect_card_removed+0x40/0x90)
+> [<c04e9390>] (_mmc_detect_card_removed) from [<c04eba80>]
+> (mmc_detect+0x2c/0x78)
+>  r5:ee2602bc r4:ee260000
+> [<c04eba54>] (mmc_detect) from [<c04e96ac>] (mmc_rescan+0x1b0/0x324)
+>  r5:ee2602bc r4:ee260368
+> [<c04e94fc>] (mmc_rescan) from [<c013a818>] (process_one_work+0x194/0x414)
+>  r8:eef73d00 r7:eebe1eb0 r6:eef70280 r5:ee260368 r4:eea24080 r3:c04e94fc
+> [<c013a684>] (process_one_work) from [<c013ab0c>]
+> (worker_thread+0x34/0x4d4)
+>  r10:eef70280 r9:c0a02100 r8:00000008 r7:eef70280 r6:eea24098 r5:eef702b4
+>  r4:eea24080
+> [<c013aad8>] (worker_thread) from [<c0141e18>] (kthread+0xf8/0x11c)
+>  r10:00000000 r9:00000000 r8:00000000 r7:c013aad8 r6:eea24080 r5:00000000
+>  r4:eea29d00
+> [<c0141d20>] (kthread) from [<c0107ff0>] (ret_from_fork+0x14/0x24)
+>  r7:00000000 r6:00000000 r5:c0141d20 r4:eea29d00
+> 2 locks held by kworker/0:1/410:
+>  #0:  ("events_freezable"){.+.+.+}, at: [<c013a7ac>]
+> process_one_work+0x128/0x414
+>  #1:  ((&(&host->detect)->work)){+.+.+.}, at: [<c013a7ac>]
+> process_one_work+0x128/0x414
+> 
+> 
+> Best regards
