@@ -1,181 +1,202 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 18 Jul 2016 16:54:11 +0100
-Subject: [PATCH 09/13] KVM: arm64: vgic-its: Add collection
- allocator/destructor
+Date: Mon, 18 Jul 2016 16:54:13 +0100
+Subject: [PATCH 11/13] KVM: arm64: vgic-its: Turn device_id validation into
+ generic ID validation
 In-Reply-To: <1468857255-9543-1-git-send-email-marc.zyngier@arm.com>
 References: <1468857255-9543-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1468857255-9543-10-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1468857255-9543-12-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of spreading random allocations all over the place,
-consolidate allocation/init/freeing of collections in a pair
-of constructor/destructor.
+There is no need to have separate functions to validate devices
+and collections, as the architecture doesn't really distinguish the
+two, and they are supposed to be managed the same way.
+
+Let's turn the DevID checker into a generic one.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- virt/kvm/arm/vgic/vgic-its.c | 92 ++++++++++++++++++++++++++------------------
- 1 file changed, 54 insertions(+), 38 deletions(-)
+ virt/kvm/arm/vgic/vgic-its.c | 134 ++++++++++++++++++++-----------------------
+ 1 file changed, 62 insertions(+), 72 deletions(-)
 
 diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-index 2faf1f4..d6f68e9 100644
+index dcae567..996e3e1 100644
 --- a/virt/kvm/arm/vgic/vgic-its.c
 +++ b/virt/kvm/arm/vgic/vgic-its.c
-@@ -581,14 +581,45 @@ static int vgic_its_cmd_handle_movi(struct kvm *kvm, struct vgic_its *its,
+@@ -581,12 +581,73 @@ static int vgic_its_cmd_handle_movi(struct kvm *kvm, struct vgic_its *its,
  	return 0;
  }
  
--static void vgic_its_init_collection(struct vgic_its *its,
--				     struct its_collection *collection,
-+static int vgic_its_alloc_collection(struct vgic_its *its,
-+				     struct its_collection **colp,
- 				     u32 coll_id)
- {
-+	struct its_collection *collection;
-+
-+	collection = kzalloc(sizeof(*collection), GFP_KERNEL);
-+
- 	collection->collection_id = coll_id;
- 	collection->target_addr = COLLECTION_NOT_MAPPED;
- 
- 	list_add_tail(&collection->coll_list, &its->collection_list);
-+	*colp = collection;
-+
-+	return 0;
-+}
-+
-+static void vgic_its_free_collection(struct vgic_its *its, u32 coll_id)
++/*
++ * Check whether an ID can be stored into the corresponding guest table.
++ * For a direct table this is pretty easy, but gets a bit nasty for
++ * indirect tables. We check whether the resulting guest physical address
++ * is actually valid (covered by a memslot and guest accessbible).
++ * For this we have to read the respective first level entry.
++ */
++static bool vgic_its_check_id(struct vgic_its *its, u64 baser, int id)
 +{
-+	struct its_collection *collection;
-+	struct its_device *device;
-+	struct its_itte *itte;
++	int l1_tbl_size = GITS_BASER_NR_PAGES(baser) * SZ_64K;
++	int index;
++	u64 indirect_ptr;
++	gfn_t gfn;
++
++	if (!(baser & GITS_BASER_INDIRECT)) {
++		phys_addr_t addr;
++
++		if (id >= (l1_tbl_size / GITS_BASER_ENTRY_SIZE(baser)))
++			return false;
++
++		addr = BASER_ADDRESS(baser) + id * GITS_BASER_ENTRY_SIZE(baser);
++		gfn = addr >> PAGE_SHIFT;
++
++		return kvm_is_visible_gfn(its->dev->kvm, gfn);
++	}
++
++	/* calculate and check the index into the 1st level */
++	index = id / (SZ_64K / GITS_BASER_ENTRY_SIZE(baser));
++	if (index >= (l1_tbl_size / sizeof(u64)))
++		return false;
++
++	/* Each 1st level entry is represented by a 64-bit value. */
++	if (kvm_read_guest(its->dev->kvm,
++			   BASER_ADDRESS(baser) + index * sizeof(indirect_ptr),
++			   &indirect_ptr, sizeof(indirect_ptr)))
++		return false;
++
++	indirect_ptr = le64_to_cpu(indirect_ptr);
++
++	/* check the valid bit of the first level entry */
++	if (!(indirect_ptr & BIT_ULL(63)))
++		return false;
 +
 +	/*
-+	 * Clearing the mapping for that collection ID removes the
-+	 * entry from the list. If there wasn't any before, we can
-+	 * go home early.
++	 * Mask the guest physical address and calculate the frame number.
++	 * Any address beyond our supported 48 bits of PA will be caught
++	 * by the actual check in the final step.
 +	 */
-+	collection = find_collection(its, coll_id);
-+	if (!collection)
-+		return;
++	indirect_ptr &= GENMASK_ULL(51, 16);
 +
-+	for_each_lpi_its(device, itte, its)
-+		if (itte->collection &&
-+		    itte->collection->collection_id == coll_id)
-+			itte->collection = NULL;
++	/* Find the address of the actual entry */
++	index = id % (SZ_64K / GITS_BASER_ENTRY_SIZE(baser));
++	indirect_ptr += index * GITS_BASER_ENTRY_SIZE(baser);
++	gfn = indirect_ptr >> PAGE_SHIFT;
 +
-+	list_del(&collection->coll_list);
-+	kfree(collection);
++	return kvm_is_visible_gfn(its->dev->kvm, gfn);
++}
++
+ static int vgic_its_alloc_collection(struct vgic_its *its,
+ 				     struct its_collection **colp,
+ 				     u32 coll_id)
+ {
+ 	struct its_collection *collection;
+ 
++	if (!vgic_its_check_id(its, its->baser_coll_table, coll_id))
++		return E_ITS_MAPC_COLLECTION_OOR;
++
+ 	collection = kzalloc(sizeof(*collection), GFP_KERNEL);
+ 
+ 	collection->collection_id = coll_id;
+@@ -709,67 +770,6 @@ static void vgic_its_unmap_device(struct kvm *kvm, struct its_device *device)
  }
  
  /*
-@@ -605,6 +636,7 @@ static int vgic_its_cmd_handle_mapi(struct kvm *kvm, struct vgic_its *its,
- 	struct its_device *device;
- 	struct its_collection *collection, *new_coll = NULL;
- 	int lpi_nr;
-+	int ret;
- 
- 	device = find_its_device(its, device_id);
- 	if (!device)
-@@ -612,9 +644,10 @@ static int vgic_its_cmd_handle_mapi(struct kvm *kvm, struct vgic_its *its,
- 
- 	collection = find_collection(its, coll_id);
- 	if (!collection) {
--		new_coll = kzalloc(sizeof(struct its_collection), GFP_KERNEL);
--		if (!new_coll)
--			return -ENOMEM;
-+		ret = vgic_its_alloc_collection(its, &collection, coll_id);
-+		if (ret)
-+			return ret;
-+		new_coll = collection;
- 	}
- 
- 	if (subcmd == GITS_CMD_MAPTI)
-@@ -623,27 +656,22 @@ static int vgic_its_cmd_handle_mapi(struct kvm *kvm, struct vgic_its *its,
- 		lpi_nr = event_id;
- 	if (lpi_nr < GIC_LPI_OFFSET ||
- 	    lpi_nr >= max_lpis_propbaser(kvm->arch.vgic.propbaser)) {
--		kfree(new_coll);
--		return E_ITS_MAPTI_PHYSICALID_OOR;
-+		ret = E_ITS_MAPTI_PHYSICALID_OOR;
-+		goto err;
- 	}
- 
- 	itte = find_itte(its, device_id, event_id);
- 	if (!itte) {
- 		itte = kzalloc(sizeof(struct its_itte), GFP_KERNEL);
- 		if (!itte) {
--			kfree(new_coll);
--			return -ENOMEM;
-+			ret = -ENOMEM;
-+			goto err;
- 		}
- 
- 		itte->event_id	= event_id;
- 		list_add_tail(&itte->itte_list, &device->itt_head);
- 	}
- 
--	if (!collection) {
--		collection = new_coll;
--		vgic_its_init_collection(its, collection, coll_id);
+- * Check whether a device ID can be stored into the guest device tables.
+- * For a direct table this is pretty easy, but gets a bit nasty for
+- * indirect tables. We check whether the resulting guest physical address
+- * is actually valid (covered by a memslot and guest accessbible).
+- * For this we have to read the respective first level entry.
+- */
+-static bool vgic_its_check_device_id(struct kvm *kvm, struct vgic_its *its,
+-				     int device_id)
+-{
+-	u64 r = its->baser_device_table;
+-	int l1_tbl_size = GITS_BASER_NR_PAGES(r) * SZ_64K;
+-	int index;
+-	u64 indirect_ptr;
+-	gfn_t gfn;
+-
+-
+-	if (!(r & GITS_BASER_INDIRECT)) {
+-		phys_addr_t addr;
+-
+-		if (device_id >= (l1_tbl_size / GITS_BASER_ENTRY_SIZE(r)))
+-			return false;
+-
+-		addr = BASER_ADDRESS(r) + device_id * GITS_BASER_ENTRY_SIZE(r);
+-		gfn = addr >> PAGE_SHIFT;
+-
+-		return kvm_is_visible_gfn(kvm, gfn);
 -	}
 -
- 	itte->collection = collection;
- 	itte->lpi = lpi_nr;
- 	itte->irq = vgic_add_lpi(kvm, lpi_nr);
-@@ -657,6 +685,10 @@ static int vgic_its_cmd_handle_mapi(struct kvm *kvm, struct vgic_its *its,
- 	update_lpi_config(kvm, itte->irq, NULL);
+-	/* calculate and check the index into the 1st level */
+-	index = device_id / (SZ_64K / GITS_BASER_ENTRY_SIZE(r));
+-	if (index >= (l1_tbl_size / sizeof(u64)))
+-		return false;
+-
+-	/* Each 1st level entry is represented by a 64-bit value. */
+-	if (kvm_read_guest(kvm,
+-			   BASER_ADDRESS(r) + index * sizeof(indirect_ptr),
+-			   &indirect_ptr, sizeof(indirect_ptr)))
+-		return false;
+-
+-	indirect_ptr = le64_to_cpu(indirect_ptr);
+-
+-	/* check the valid bit of the first level entry */
+-	if (!(indirect_ptr & BIT_ULL(63)))
+-		return false;
+-
+-	/*
+-	 * Mask the guest physical address and calculate the frame number.
+-	 * Any address beyond our supported 48 bits of PA will be caught
+-	 * by the actual check in the final step.
+-	 */
+-	indirect_ptr &= GENMASK_ULL(51, 16);
+-
+-	/* Find the address of the actual entry */
+-	index = device_id % (SZ_64K / GITS_BASER_ENTRY_SIZE(r));
+-	indirect_ptr += index * GITS_BASER_ENTRY_SIZE(r);
+-	gfn = indirect_ptr >> PAGE_SHIFT;
+-
+-	return kvm_is_visible_gfn(kvm, gfn);
+-}
+-
+-/*
+  * MAPD maps or unmaps a device ID to Interrupt Translation Tables (ITTs).
+  * Must be called with the its_lock mutex held.
+  */
+@@ -780,7 +780,7 @@ static int vgic_its_cmd_handle_mapd(struct kvm *kvm, struct vgic_its *its,
+ 	bool valid = its_cmd_get_validbit(its_cmd);
+ 	struct its_device *device;
  
+-	if (!vgic_its_check_device_id(kvm, its, device_id))
++	if (!vgic_its_check_id(its, its->baser_device_table, device_id))
+ 		return E_ITS_MAPD_DEVICE_OOR;
+ 
+ 	device = find_its_device(its, device_id);
+@@ -812,13 +812,6 @@ static int vgic_its_cmd_handle_mapd(struct kvm *kvm, struct vgic_its *its,
  	return 0;
-+err:
-+	if (new_coll)
-+		vgic_its_free_collection(its, coll_id);
-+	return ret;
  }
  
- /* Requires the its_lock to be held. */
-@@ -809,34 +841,18 @@ static int vgic_its_cmd_handle_mapc(struct kvm *kvm, struct vgic_its *its,
- 	if (coll_id >= vgic_its_nr_collection_ids(its))
- 		return E_ITS_MAPC_COLLECTION_OOR;
+-static int vgic_its_nr_collection_ids(struct vgic_its *its)
+-{
+-	u64 r = its->baser_coll_table;
+-
+-	return (GITS_BASER_NR_PAGES(r) * SZ_64K) / GITS_BASER_ENTRY_SIZE(r);
+-}
+-
+ /*
+  * The MAPC command maps collection IDs to redistributors.
+  * Must be called with the its_lock mutex held.
+@@ -838,9 +831,6 @@ static int vgic_its_cmd_handle_mapc(struct kvm *kvm, struct vgic_its *its,
+ 	if (target_addr >= atomic_read(&kvm->online_vcpus))
+ 		return E_ITS_MAPC_PROCNUM_OOR;
  
--	collection = find_collection(its, coll_id);
+-	if (coll_id >= vgic_its_nr_collection_ids(its))
+-		return E_ITS_MAPC_COLLECTION_OOR;
 -
  	if (!valid) {
--		struct its_device *device;
--		struct its_itte *itte;
--		/*
--		 * Clearing the mapping for that collection ID removes the
--		 * entry from the list. If there wasn't any before, we can
--		 * go home early.
--		 */
--		if (!collection)
--			return 0;
--
--		for_each_lpi_its(device, itte, its)
--			if (itte->collection &&
--			    itte->collection->collection_id == coll_id)
--				itte->collection = NULL;
--
--		list_del(&collection->coll_list);
--		kfree(collection);
-+		vgic_its_free_collection(its, coll_id);
+ 		vgic_its_free_collection(its, coll_id);
  	} else {
-+		collection = find_collection(its, coll_id);
-+
- 		if (!collection) {
--			collection = kzalloc(sizeof(struct its_collection),
--					     GFP_KERNEL);
--			if (!collection)
--				return -ENOMEM;
-+			int ret;
- 
--			vgic_its_init_collection(its, collection, coll_id);
-+			ret = vgic_its_alloc_collection(its, &collection,
-+							coll_id);
-+			if (ret)
-+				return ret;
- 			collection->target_addr = target_addr;
- 		} else {
- 			collection->target_addr = target_addr;
 -- 
 2.1.4
