@@ -1,44 +1,42 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 18 Jul 2016 11:39:35 +0900
-Subject: [GIT PULL] Renesas ARM Based SoC DT Fixes for v4.8
-Message-ID: <cover.1468808109.git.horms+renesas@verge.net.au>
+Date: Mon, 18 Jul 2016 11:39:42 +0900
+Subject: [PATCH 1/2] ARM: dts: r8a7792: add PLL1 divided by 2 clock
+In-Reply-To: <cover.1468808109.git.horms+renesas@verge.net.au>
+References: <cover.1468808109.git.horms+renesas@verge.net.au>
+Message-ID: <4b9b7b3a2c91e1ebf8be9c7efd4839b91d66e87e.1468808109.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Please consider these Renesas ARM based SoC DT fixes for v4.8.
+Despite the fact that QSPI clock has PLL1/VCOx1/4 clock as a parent, the
+latter hasn't been added to the R8A7792 device tree. This patch corrects
+that oversight.
 
-This fixes some problems with clock descriptions in DT for the r8a7792 SoC
-which is new in v4.8.
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/boot/dts/r8a7792.dtsi | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-This pull request is based on "Second Round of Renesas ARM Based SoC DT
-Updates for v4.8", tagged as renesas-dt2-for-v4.8, which you have already
-pulled.
-
-
-The following changes since commit 8fd763c75c3ab8e72e5d7f0d4c53531e6ff76197:
-
-  ARM: dts: r8a7792: add SMP support (2016-06-30 14:26:14 +0200)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt-fixes-for-v4.8
-
-for you to fetch changes up to e0c3f92a08f3e0a95024d0d032564fdc1ee96f54:
-
-  ARM: dts: r8a7792: remove ADSP clock (2016-07-15 13:22:45 +0900)
-
-----------------------------------------------------------------
-Renesas ARM Based SoC DT Fixes for v4.8
-
-* Corrections to r8a7792
-
-----------------------------------------------------------------
-Sergei Shtylyov (2):
-      ARM: dts: r8a7792: add PLL1 divided by 2 clock
-      ARM: dts: r8a7792: remove ADSP clock
-
- arch/arm/boot/dts/r8a7792.dtsi            | 9 ++++++++-
- include/dt-bindings/clock/r8a7792-clock.h | 1 -
- 2 files changed, 8 insertions(+), 2 deletions(-)
+diff --git a/arch/arm/boot/dts/r8a7792.dtsi b/arch/arm/boot/dts/r8a7792.dtsi
+index 75256ef4a04d..d5fd0762e2d6 100644
+--- a/arch/arm/boot/dts/r8a7792.dtsi
++++ b/arch/arm/boot/dts/r8a7792.dtsi
+@@ -284,6 +284,13 @@
+ 		};
+ 
+ 		/* Fixed factor clocks */
++		pll1_div2_clk: pll1_div2 {
++			compatible = "fixed-factor-clock";
++			clocks = <&cpg_clocks R8A7792_CLK_PLL1>;
++			#clock-cells = <0>;
++			clock-div = <2>;
++			clock-mult = <1>;
++		};
+ 		zs_clk: zs {
+ 			compatible = "fixed-factor-clock";
+ 			clocks = <&cpg_clocks R8A7792_CLK_PLL1>;
+-- 
+2.7.0.rc3.207.g0ac5344
