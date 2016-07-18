@@ -1,54 +1,110 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 18 Jul 2016 14:25:40 +0100
-Subject: [PATCH 1/3] mfd: Provide MACRO to declare commonly defined MFD
- cell attributes
-In-Reply-To: <5788E093.7080405@nvidia.com>
-References: <20160713112651.14539-1-lee.jones@linaro.org>
- <20160713112651.14539-2-lee.jones@linaro.org>
- <5788E093.7080405@nvidia.com>
-Message-ID: <20160718132540.GC17074@dell>
+From: vgoyal@redhat.com (Vivek Goyal)
+Date: Mon, 18 Jul 2016 09:26:29 -0400
+Subject: [RFC 0/3] extend kexec_file_load system call
+In-Reply-To: <1468845964.2800.3.camel@gmail.com>
+References: <20160712225805.0d27fe5d@hananiah.suse.cz>
+ <20160712221804.GV1041@n2100.armlinux.org.uk>
+ <87twfunneg.fsf@linux.vnet.ibm.com>
+ <20160713073657.GX1041@n2100.armlinux.org.uk>
+ <87poqinf9m.fsf@linux.vnet.ibm.com>
+ <20160713082639.GZ1041@n2100.armlinux.org.uk>
+ <20160713130338.GB16900@redhat.com>
+ <20160713174009.GA1041@n2100.armlinux.org.uk>
+ <20160713182247.GA25232@redhat.com>
+ <1468845964.2800.3.camel@gmail.com>
+Message-ID: <20160718132629.GB32512@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 15 Jul 2016, Laxman Dewangan wrote:
+On Mon, Jul 18, 2016 at 10:46:04PM +1000, Balbir Singh wrote:
+> On Wed, 2016-07-13 at 14:22 -0400, Vivek Goyal wrote:
+> > On Wed, Jul 13, 2016 at 06:40:10PM +0100, Russell King - ARM Linux wrote:
+> > >?
+> > > On Wed, Jul 13, 2016 at 09:03:38AM -0400, Vivek Goyal wrote:
+> > > >?
+> > > > On Wed, Jul 13, 2016 at 09:26:39AM +0100, Russell King - ARM Linux wrote:
+> > > > >?
+> > > > > Indeed - maybe Eric knows better, but I can't see any situation where
+> > > > > the dtb we load via kexec should ever affect "the bootloader", unless
+> > > > > the "kernel" that's being loaded into kexec is "the bootloader".
+> > > > >?
+> > > > > Now, going back to the more fundamental issue raised in my first reply,
+> > > > > about the kernel command line.
+> > > > >?
+> > > > > On x86, I can see that it _is_ possible for userspace to specify a
+> > > > > command line, and the kernel loading the image provides the command
+> > > > > line to the to-be-kexeced kernel with very little checking.??So, if
+> > > > > your kernel is signed, what stops the "insecure userspace" loading
+> > > > > a signed kernel but giving it an insecure rootfs and/or console?
+> > > > It is not kexec specific. I could do this for regular boot too, right?
+> > > >?
+> > > > Command line options are not signed. I thought idea behind secureboot
+> > > > was to execute only trusted code and command line options don't enforce
+> > > > you to execute unsigned code.
+> > > >?
+> 
+> You can set module.sig_enforce=0 and open up the system a bit assuming
+> that you can get a module to load with another attack
+
+IIUC, sig_enforce bool_enable_only so it can only be enabled. Default
+value of it is 0 if CONFIG_MODULE_SIG_FORCE=n.
+
+IOW, if your kernel forced signature verification, you should not be
+able to do sig_enforce=0. If you kernel did not have
+CONFIG_MODULE_SIG_FORCE=y, then sig_enforce should be 0 by default anyway
+and you are not making it worse using command line.
 
 > 
-> On Wednesday 13 July 2016 04:56 PM, Lee Jones wrote:
-> > Cc: Laxman Dewangan <ldewangan@nvidia.com>
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > ---
-> >   include/linux/mfd/core.h | 29 +++++++++++++++++++++++++++++
-> >   1 file changed, 29 insertions(+)
-> > 
-> > diff --git a/include/linux/mfd/core.h b/include/linux/mfd/core.h
-> > index 99c0395..c6018f4 100644
-> > --- a/include/linux/mfd/core.h
-> > +++ b/include/linux/mfd/core.h
-> > @@ -16,6 +16,35 @@
-> >   #include <linux/platform_device.h>
+> > > > So it sounds like different class of security problems which you are
+> > > > referring to and not necessarily covered by secureboot or signed
+> > > > kernel.
+> > > Let me give you an example.
+> > >?
+> > > You have a secure boot setup, where the firmware/ROM validates the boot
+> > > loader.??Good, the boot loader hasn't been tampered with.
+> > >?
+> > > You interrupt the boot loader and are able to modify the command line
+> > > for the booted kernel.
+> > >?
+> > > The boot loader loads the kernel and verifies the kernel's signature.
+> > > Good, the kernel hasn't been tampered with.??The kernel starts running.
+> > >?
+> > > You've plugged in a USB drive to the device, and specified a partition
+> > > containing a root filesystem that you control to the kernel.??The
+> > > validated kernel finds the USB drive, and mounts it, and executes
+> > > your own binaries on the USB drive.
+> > You will require physical access to the machine to be able to
+> > insert your usb drive. And IIRC, argument was that if attacker has
+> > physical access to machine, all bets are off anyway.
+> >
 > 
-> > +#define MFD_CELL_BASIC(_name, _res, _pdata, _pdsize, _id)		\
-> > +	MFD_CELL_ALL(_name, _res, _pdata, _pdsize, _id, NULL, NULL)	\
-> > +
-> > +#define MFD_CELL_RES(_name, _res)					\
-> > +	MFD_CELL_ALL(_name, _res, _pdata, 0, 0, NULL, NULL)		\
-> > +
-> Here _pdata should not be used. Instead it should be NULL.
+> You don't need physical access -- your machine controller BMC can
+> do the magic for you. So its not always physical access, is it?
 
-Yes, it should.  Thanks for the review.
+Well, idea was that if you have physical access to machine, then all
+bets are off. If BMC can do something which allows running unsigned
+code at ring level 0, its a problem I think from secureboot model of
+security.
 
-> I corrected it locally and then compiled and teste.
-
-Wonderful, thanks.
-
-> Once above fixed, you can take my ack and tested by
+> ?
+> > >?
+> > >?
+> > > You run a shell on the console.??You now have control of the system,
+> > > and can mount the real rootfs, inspect it, and work out what it does,
+> > > etc.
+> > >?
+> > > At this point, what use was all the validation that the secure boot
+> > > has done???Absolutely useless.
+> > >?
+> > > If you can change the command line arguments given to the kernel, you
+> > > have no security, no matter how much you verify signatures.??It's
+> > > the illusion of security, nothing more, nothing less.
+> > >?
 > 
-> Acked-by: Laxman Dewangan <ldewangan@nvidia.com>
-> Tested-by: Laxman Dewangan <ldewangan@nvidia.com>
-> 
+> I agree, if you can change command line arguments, all bets are of lesser value
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+If changing command line allows execution of unsigned code at ring level
+0, then it is a problem. Otherwise we are talking of security issues which
+are not covered by secureboot model.
+
+Vivek
