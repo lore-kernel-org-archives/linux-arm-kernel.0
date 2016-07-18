@@ -1,66 +1,36 @@
-From: ray.jui@broadcom.com (Ray Jui)
-Date: Mon, 18 Jul 2016 10:47:01 -0700
-Subject: [PATCH 1/2] mtd: brcmnand: iProc big endian and ONFI support
-In-Reply-To: <CAGt4E5tyANE-fiRNp=qZHLJLp+XCd0i74E0n2vgedQC5Rb46+g@mail.gmail.com>
-References: <1468863377-31862-1-git-send-email-ray.jui@broadcom.com>
- <1468863377-31862-2-git-send-email-ray.jui@broadcom.com>
- <CAGt4E5tyANE-fiRNp=qZHLJLp+XCd0i74E0n2vgedQC5Rb46+g@mail.gmail.com>
-Message-ID: <02461aa0-687b-f640-e06a-677bf7608673@broadcom.com>
+From: santosh.shilimkar@oracle.com (Santosh Shilimkar)
+Date: Mon, 18 Jul 2016 10:49:49 -0700
+Subject: [PATCH] ARM: dts: keystone: specify usb mode explicitly
+In-Reply-To: <578D15B3.1040705@ti.com>
+References: <20160628094245.9521-1-grygorii.strashko@ti.com>
+ <578D15B3.1040705@ti.com>
+Message-ID: <09af5947-1a0e-9f44-e046-67276062530d@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Markus,
-
-On 7/18/2016 10:41 AM, Markus Mayer wrote:
-> On 18 July 2016 at 10:36, Ray Jui <ray.jui@broadcom.com> wrote:
->> This patch adds big endian and ONFI support for various iProc based
->> SoCs that use the core brcmstb NAND controller
+On 7/18/2016 10:45 AM, Grygorii Strashko wrote:
+> Hi Santosh,
+> On 06/28/2016 12:42 PM, Grygorii Strashko wrote:
+>> The USB OTG mode is not supported by Kestone 2 devices, as result, the
+>> USB devices enumeration and detection will not work properly when
+>> kernel is built with CONFIG_USB_DWC3_DUAL_ROLE=y (default for multi
+>> platform build):
+>>   - it's required to load gadget drivers manually to make host mode
+>> work and this confuses current Keystone 2 users
+>>   - device mode is not working, because port can't detect and switch to
+>> peripheral/host mode dynamically.
 >>
->> This patch was originally implemented by Prafulla Kota
->> <prafulla.kota@broadcom.com> and fully tested on iProc based NS2 SVK
+>> Hence, specify usb mode explicitly in DT: usb0 = "host" for all KS2
+>> devices and usb1 = "peripheral" for K2E.
 >>
->> Signed-off-by: Prafulla Kota <prafulla.kota@broadcom.com>
->> Signed-off-by: Ray Jui <ray.jui@broadcom.com>
->> ---
->>  drivers/mtd/nand/brcmnand/brcmnand.c   | 12 ++++++------
->>  drivers/mtd/nand/brcmnand/brcmnand.h   | 13 ++++++++-----
->>  drivers/mtd/nand/brcmnand/iproc_nand.c | 17 +++++++++++++----
->>  3 files changed, 27 insertions(+), 15 deletions(-)
->>
->> diff --git a/drivers/mtd/nand/brcmnand/brcmnand.c b/drivers/mtd/nand/brcmnand/brcmnand.c
->> index b76ad7c..12a1585 100644
->> --- a/drivers/mtd/nand/brcmnand/brcmnand.c
->> +++ b/drivers/mtd/nand/brcmnand/brcmnand.c
-
-...
-...
-
->> +       /*
->> +        * In the case of BE or when dealing with NAND data, alway configure
->> +        * the APB bus to LE mode before accessing the FIFO and back to BE mode
->> +        * after the access is done
->> +        */
->> +       if (IS_ENABLED(CONFIG_CPU_BIG_ENDIAN) || !is_param) {
->> +               if (prepare)
->> +                       val |= IPROC_NAND_APB_LE_MODE;
->> +               else
->> +                       val &= ~IPROC_NAND_APB_LE_MODE;
->> +       } else /* when in LE accessing the parameter page, keep APB in BE */
+>> Cc: Sekhar Nori <nsekhar@ti.com>
+>> Cc: Roger Quadros <rogerq@ti.com>
+>> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
 >
-> The coding guidelines state that if you need braces around one branch
-> of an if/else combination, you must use them on the other branch,
-> also, even if the other branch is just one line.
+> Do you expect any additional actions from my side relate to this patch?
 >
+Nope. I will pick this up though it has to wait for next merge window
+now.
 
-Yes, I will add braces around in the next revision of this patch.
-
->>                 val &= ~IPROC_NAND_APB_LE_MODE;
->>
->>         brcmnand_writel(val, mmio);
->> --
->> 2.1.4
->>
-
-Thanks,
-
-Ray
+Regards,
+Santosh
