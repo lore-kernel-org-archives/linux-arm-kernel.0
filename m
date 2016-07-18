@@ -1,107 +1,100 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Mon, 18 Jul 2016 13:51:23 -0600
-Subject: [PATCH 02/10] coresight: remove duplicated enumeration
+Date: Mon, 18 Jul 2016 13:51:27 -0600
+Subject: [PATCH 06/10] coresight: etm4x: adding range filter configuration
+ function
 In-Reply-To: <1468871491-10997-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1468871491-10997-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1468871491-10997-3-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1468871491-10997-7-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Both ETMv3 and ETMv4 drivers are declaring an 'enum etm_addr_type',
-creating reduncancy.
-
-This patch removes the enumeration from the driver files and adds
-it to a common header.
+Introducing a new function to do address range configuration
+generic enough to work for any address range and any comparator.
 
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- drivers/hwtracing/coresight/coresight-etm.h         | 8 --------
- drivers/hwtracing/coresight/coresight-etm3x-sysfs.c | 1 +
- drivers/hwtracing/coresight/coresight-etm4x-sysfs.c | 1 +
- drivers/hwtracing/coresight/coresight-etm4x.h       | 8 --------
- drivers/hwtracing/coresight/coresight-priv.h        | 8 ++++++++
- 5 files changed, 10 insertions(+), 16 deletions(-)
+ drivers/hwtracing/coresight/coresight-etm4x.c | 56 ++++++++++++++++++---------
+ 1 file changed, 38 insertions(+), 18 deletions(-)
 
-diff --git a/drivers/hwtracing/coresight/coresight-etm.h b/drivers/hwtracing/coresight/coresight-etm.h
-index 51597cb2c08a..4a18ee499965 100644
---- a/drivers/hwtracing/coresight/coresight-etm.h
-+++ b/drivers/hwtracing/coresight/coresight-etm.h
-@@ -259,14 +259,6 @@ struct etm_drvdata {
- 	struct etm_config		config;
- };
+diff --git a/drivers/hwtracing/coresight/coresight-etm4x.c b/drivers/hwtracing/coresight/coresight-etm4x.c
+index e348c18086f5..4a4d2ef35ad6 100644
+--- a/drivers/hwtracing/coresight/coresight-etm4x.c
++++ b/drivers/hwtracing/coresight/coresight-etm4x.c
+@@ -584,16 +584,10 @@ static void etm4_set_default_config(struct etmv4_config *config)
+ 	config->vinst_ctrl |= BIT(0);
+ }
  
--enum etm_addr_type {
--	ETM_ADDR_TYPE_NONE,
--	ETM_ADDR_TYPE_SINGLE,
--	ETM_ADDR_TYPE_RANGE,
--	ETM_ADDR_TYPE_START,
--	ETM_ADDR_TYPE_STOP,
--};
--
- static inline void etm_writel(struct etm_drvdata *drvdata,
- 			      u32 val, u32 off)
+-static void etm4_set_default_filter(struct etmv4_config *config)
++static void etm4_set_comparator_filter(struct etmv4_config *config,
++				       u64 start, u64 stop, int comparator)
  {
-diff --git a/drivers/hwtracing/coresight/coresight-etm3x-sysfs.c b/drivers/hwtracing/coresight/coresight-etm3x-sysfs.c
-index 02d4b629891f..3f73cee7a094 100644
---- a/drivers/hwtracing/coresight/coresight-etm3x-sysfs.c
-+++ b/drivers/hwtracing/coresight/coresight-etm3x-sysfs.c
-@@ -18,6 +18,7 @@
- #include <linux/pm_runtime.h>
- #include <linux/sysfs.h>
- #include "coresight-etm.h"
-+#include "coresight-priv.h"
- 
- static ssize_t nr_addr_cmp_show(struct device *dev,
- 				struct device_attribute *attr, char *buf)
-diff --git a/drivers/hwtracing/coresight/coresight-etm4x-sysfs.c b/drivers/hwtracing/coresight/coresight-etm4x-sysfs.c
-index 7c84308c5564..6ae26ffeaefd 100644
---- a/drivers/hwtracing/coresight/coresight-etm4x-sysfs.c
-+++ b/drivers/hwtracing/coresight/coresight-etm4x-sysfs.c
-@@ -18,6 +18,7 @@
- #include <linux/pm_runtime.h>
- #include <linux/sysfs.h>
- #include "coresight-etm4x.h"
-+#include "coresight-priv.h"
- 
- static int etm4_set_mode_exclude(struct etmv4_drvdata *drvdata, bool exclude)
- {
-diff --git a/drivers/hwtracing/coresight/coresight-etm4x.h b/drivers/hwtracing/coresight/coresight-etm4x.h
-index 5359c5197c1d..111f4bb3a6b2 100644
---- a/drivers/hwtracing/coresight/coresight-etm4x.h
-+++ b/drivers/hwtracing/coresight/coresight-etm4x.h
-@@ -407,14 +407,6 @@ enum etm_addr_ctxtype {
- 	ETM_CTX_CTXID_VMID,
- };
- 
--enum etm_addr_type {
--	ETM_ADDR_TYPE_NONE,
--	ETM_ADDR_TYPE_SINGLE,
--	ETM_ADDR_TYPE_RANGE,
--	ETM_ADDR_TYPE_START,
--	ETM_ADDR_TYPE_STOP,
--};
+-	u64 start, stop, access_type = 0;
 -
- extern const struct attribute_group *coresight_etmv4_groups[];
- void etm4_config_trace_mode(struct etmv4_config *config);
- #endif
-diff --git a/drivers/hwtracing/coresight/coresight-priv.h b/drivers/hwtracing/coresight/coresight-priv.h
-index 3cb574b3cdd9..1f6b580ef1c4 100644
---- a/drivers/hwtracing/coresight/coresight-priv.h
-+++ b/drivers/hwtracing/coresight/coresight-priv.h
-@@ -47,6 +47,14 @@ static ssize_t name##_show(struct device *_dev,				\
- }									\
- static DEVICE_ATTR_RO(name)
+-	/*
+-	 * Configure address range comparator '0' to encompass all
+-	 * possible addresses.
+-	 */
+-	start = 0x0;
+-	stop = ~0x0;
++	u64 access_type = 0;
  
-+enum etm_addr_type {
-+	ETM_ADDR_TYPE_NONE,
-+	ETM_ADDR_TYPE_SINGLE,
-+	ETM_ADDR_TYPE_RANGE,
-+	ETM_ADDR_TYPE_START,
-+	ETM_ADDR_TYPE_STOP,
-+};
+ 	/* EXLEVEL_NS, bits[12:15], always stay away from hypervisor mode. */
+ 	access_type = ETM_EXLEVEL_NS_HYP;
+@@ -607,20 +601,46 @@ static void etm4_set_default_filter(struct etmv4_config *config)
+ 			ETM_EXLEVEL_S_HYP);
+ 
+ 	/* First half of default address comparator */
+-	config->addr_val[ETM_DEFAULT_ADDR_COMP] = start;
+-	config->addr_acc[ETM_DEFAULT_ADDR_COMP] = access_type;
+-	config->addr_type[ETM_DEFAULT_ADDR_COMP] = ETM_ADDR_TYPE_RANGE;
++	config->addr_val[comparator] = start;
++	config->addr_acc[comparator] = access_type;
++	config->addr_type[comparator] = ETM_ADDR_TYPE_RANGE;
+ 
+ 	/* Second half of default address comparator */
+-	config->addr_val[ETM_DEFAULT_ADDR_COMP + 1] = stop;
+-	config->addr_acc[ETM_DEFAULT_ADDR_COMP + 1] = access_type;
+-	config->addr_type[ETM_DEFAULT_ADDR_COMP + 1] = ETM_ADDR_TYPE_RANGE;
++	config->addr_val[comparator + 1] = stop;
++	config->addr_acc[comparator + 1] = access_type;
++	config->addr_type[comparator + 1] = ETM_ADDR_TYPE_RANGE;
 +
- enum cs_mode {
- 	CS_MODE_DISABLED,
- 	CS_MODE_SYSFS,
++	/*
++	 * Configure the ViewInst function to include this address range
++	 * comparator.
++	 *
++	 * @comparator is divided by two since it is the index in the
++	 * etmv4_config::addr_val array but register TRCVIIECTLR deals with
++	 * address range comparator _pairs_.
++	 *
++	 * Therefore:
++	 *	index 0 -> compatator pair 0
++	 *	index 2 -> comparator pair 1
++	 *	index 4 -> comparator pair 2
++	 *	...
++	 *	index 14 -> comparator pair 7
++	 */
++	config->viiectlr |= BIT(comparator / 2);
++}
++
++static void etm4_set_default_filter(struct etmv4_config *config)
++{
++	u64 start, stop;
+ 
+ 	/*
+-	 * Configure the ViewInst function to filter on address range
+-	 * comparator '0'.
++	 * Configure address range comparator '0' to encompass all
++	 * possible addresses.
+ 	 */
+-	config->viiectlr = BIT(0);
++	start = 0x0;
++	stop = ~0x0;
++
++	etm4_set_comparator_filter(config, start, stop,
++				   ETM_DEFAULT_ADDR_COMP);
+ 
+ 	/*
+ 	 * TRCVICTLR::SSSTATUS == 1, the start-stop logic is
 -- 
 2.7.4
