@@ -1,36 +1,68 @@
 From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Mon, 18 Jul 2016 11:48:16 +0100
-Subject: [PATCH 4/7] ARM: update MPIDR accessors macro
+Date: Mon, 18 Jul 2016 11:48:13 +0100
+Subject: [PATCH 1/7] arm64: KVM: Move GIC accessors to arch_gicv3.h
 In-Reply-To: <1468838899-34909-1-git-send-email-vladimir.murzin@arm.com>
 References: <1468838899-34909-1-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <1468838899-34909-5-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <1468838899-34909-2-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-vgic-v3 driver queries CPU affinity level up to Aff3, which is valid
-for arm64.  However, for arm up to Aff2 levels are supported, thus,
-report zero for any affinity level above 2.
+Since we are going to share vgic-v3 save/restore code with ARM
+keep arch specific accessors separately.
 
 Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
 ---
- arch/arm/include/asm/cputype.h |    3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ arch/arm64/include/asm/arch_gicv3.h |   13 +++++++++++++
+ arch/arm64/kvm/hyp/vgic-v3-sr.c     |   13 -------------
+ 2 files changed, 13 insertions(+), 13 deletions(-)
 
-diff --git a/arch/arm/include/asm/cputype.h b/arch/arm/include/asm/cputype.h
-index 1ee94c7..96cef49 100644
---- a/arch/arm/include/asm/cputype.h
-+++ b/arch/arm/include/asm/cputype.h
-@@ -55,9 +55,10 @@
+diff --git a/arch/arm64/include/asm/arch_gicv3.h b/arch/arm64/include/asm/arch_gicv3.h
+index 8ec88e5..ae7dbd7 100644
+--- a/arch/arm64/include/asm/arch_gicv3.h
++++ b/arch/arm64/include/asm/arch_gicv3.h
+@@ -79,6 +79,19 @@
+ #include <linux/stringify.h>
+ #include <asm/barrier.h>
  
- #define MPIDR_LEVEL_BITS 8
- #define MPIDR_LEVEL_MASK ((1 << MPIDR_LEVEL_BITS) - 1)
-+#define MPIDR_LEVEL_SHIFT(level) (MPIDR_LEVEL_BITS * level)
++#define read_gicreg(r)							\
++	({								\
++		u64 reg;						\
++		asm volatile("mrs_s %0, " __stringify(r) : "=r" (reg));	\
++		reg;							\
++	})
++
++#define write_gicreg(v,r)						\
++	do {								\
++		u64 __val = (v);					\
++		asm volatile("msr_s " __stringify(r) ", %0" : : "r" (__val));\
++	} while (0)
++
+ /*
+  * Low-level accessors
+  *
+diff --git a/arch/arm64/kvm/hyp/vgic-v3-sr.c b/arch/arm64/kvm/hyp/vgic-v3-sr.c
+index 5f8f80b..f2dbd2e 100644
+--- a/arch/arm64/kvm/hyp/vgic-v3-sr.c
++++ b/arch/arm64/kvm/hyp/vgic-v3-sr.c
+@@ -24,19 +24,6 @@
+ #define vtr_to_max_lr_idx(v)		((v) & 0xf)
+ #define vtr_to_nr_pri_bits(v)		(((u32)(v) >> 29) + 1)
  
- #define MPIDR_AFFINITY_LEVEL(mpidr, level) \
--	((mpidr >> (MPIDR_LEVEL_BITS * level)) & MPIDR_LEVEL_MASK)
-+	((level < 3) ? ((mpidr >> MPIDR_LEVEL_SHIFT(level)) & MPIDR_LEVEL_MASK) : 0)
- 
- #define ARM_CPU_IMP_ARM			0x41
- #define ARM_CPU_IMP_INTEL		0x69
+-#define read_gicreg(r)							\
+-	({								\
+-		u64 reg;						\
+-		asm volatile("mrs_s %0, " __stringify(r) : "=r" (reg));	\
+-		reg;							\
+-	})
+-
+-#define write_gicreg(v,r)						\
+-	do {								\
+-		u64 __val = (v);					\
+-		asm volatile("msr_s " __stringify(r) ", %0" : : "r" (__val));\
+-	} while (0)
+-
+ static u64 __hyp_text __gic_v3_get_lr(unsigned int lr)
+ {
+ 	switch (lr & 0xf) {
 -- 
 1.7.9.5
