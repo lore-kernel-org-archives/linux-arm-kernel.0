@@ -1,34 +1,65 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Mon, 18 Jul 2016 12:02:37 +0200
-Subject: [RFC 0/1] ARM: print MHz in /proc/cpuinfo
-In-Reply-To: <20160703165431.GL1041@n2100.armlinux.org.uk>
-References: <1465333713-14339-1-git-send-email-jon.mason@broadcom.com>
- <20160607221809.GP1041@n2100.armlinux.org.uk>
- <32b30c50-4712-568e-4044-9f533ca497b2@jonmasters.org>
- <20160703165431.GL1041@n2100.armlinux.org.uk>
-Message-ID: <20160718100236.GA12427@amd>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 18 Jul 2016 12:06:26 +0200
+Subject: [PATCH v0 06/10] arm: orion5x: Add DT-based support for Netgear
+ WNR854T
+In-Reply-To: <20160718114424.14a28889@free-electrons.com>
+References: <1468679348-10522-1-git-send-email-jm@lentin.co.uk>
+ <6404488.GyOP57DJrV@wuerfel> <20160718114424.14a28889@free-electrons.com>
+Message-ID: <1792384.6N9lHjmBFc@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun 2016-07-03 17:54:31, Russell King - ARM Linux wrote:
-> On Sat, Jul 02, 2016 at 07:58:00PM -0400, Jon Masters wrote:
-> > Agreed. But we'll still be coming back to ensure this information is
-> > presented to users. I pointed out to ARM about 3-4 years ago that this
-> > was going to bite us. It is now biting us, and we will ensure that
-> > useless data is provided where it is on x86 for identical experience by
-> > users. That is unless or until x86 users do something else always. Our
-> > (separate) case will use DMI or ACPI for the same kind of data.
+On Monday, July 18, 2016 11:44:24 AM CEST Thomas Petazzoni wrote:
 > 
-> Right, so having read all your email, there's no reason why we couldn't
-> just print:
+> On Sun, 17 Jul 2016 22:41:35 +0200, Arnd Bergmann wrote:
 > 
-> cpu MHz  : 99999999.999
+> > I would assume that the PCIe port should work out of the box with the driver
+> 
+> Unfortunately, no. The PCIe on Orion5x requires a workaround for
+> reading/writing the PCI configuration space. Instead of doing MMIO
+> accesses to PCIE_CONF_ADDR_OFF / PCIE_CONF_DATA_OFF, you must map a
+> MBus window, which provides a memory-mapped view of the PCI
+> configuration space.
+> 
+> Definitely not impossible to implement, but the driver doesn't work
+> as-is.
 
-You apparenly did not read the email. Because bogus number will not
-help people detecting underclocked configurations, as email was
-explaining.
+Ok.
 
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+> > We also don't seem to need any MBUS window setup for the I/O and
+> > memory spaces, which greatly simplifies the driver compared to the
+> > pci-mvebu one, it would be a fairly straightforward implementation
+> > based on pci-host-generic.c (which unfortunately just got way
+> > more complicated and might need to go on a diet).
+> 
+> MBus windows are needed. See:
+> 
+>         mvebu_mbus_add_window_remap_by_id(ORION_MBUS_PCI_IO_TARGET,
+>                                           ORION_MBUS_PCI_IO_ATTR,
+>                                           ORION5X_PCI_IO_PHYS_BASE,
+>                                           ORION5X_PCI_IO_SIZE,
+>                                           ORION5X_PCI_IO_BUS_BASE);
+>         mvebu_mbus_add_window_by_id(ORION_MBUS_PCI_MEM_TARGET,
+>                                     ORION_MBUS_PCI_MEM_ATTR,
+>                                     ORION5X_PCI_MEM_PHYS_BASE,
+>                                     ORION5X_PCI_MEM_SIZE);
+> 
+> in orion5x_setup_wins().
+
+Ok, I was just looking at the wrong file, as they are set up from
+common.c, not pci.c.
+
+> Note that we already have some Orion5x converted to DT, and that use
+> PCI: board-rd88f5182.c is an example. So we could very well take Jamie
+> patches as-is, and move later to a DT-representation for PCI/PCIe.
+
+Ah, I thought all the DT users were moved to mach-mvebu. I agree
+this new patch isn't introducing anything we don't already have then,
+so we can just take it, but the conversion will not be nice when
+we do that.
+
+I was also hoping that we could get to the point where pci_common_init()
+is only used for legacy machines without DT and without multiplatform,
+it seems I missed a couple of users here.
+
+	Arnd
