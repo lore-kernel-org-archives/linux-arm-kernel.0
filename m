@@ -1,56 +1,85 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 18 Jul 2016 16:54:02 +0100
-Subject: [PATCH 00/13] A bunch of vgic-its fixes
-Message-ID: <1468857255-9543-1-git-send-email-marc.zyngier@arm.com>
+Date: Mon, 18 Jul 2016 16:54:05 +0100
+Subject: [PATCH 03/13] KVM: arm64: vgic-its: Generalize use of
+ vgic_get_irq_kref
+In-Reply-To: <1468857255-9543-1-git-send-email-marc.zyngier@arm.com>
+References: <1468857255-9543-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1468857255-9543-4-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As the ITS series has been posted 10 times now, and we're still
-finding issues, I've decided to directly fix things rather than
-commenting on them and waiting for a respin, as we are getting way too
-close to the merge window. So I sat over the weekend and started doing
-"stuff".
+Instead of sprinkling raw kref_get() calls everytime we cannot
+do a normal vgic_get_irq(), use the existing vgic_get_irq_kref(),
+which does the same thing and is paired with a vgic_put_irq().
 
-There is a bit of everything in there: some cosmetic things, but also
-some more severe bugs (indirect tables were completely foobar) and
-regressions (the cpuif stuff that Eric fixed).
+vgic_get_irq_kref is moved to vgic.h in order to be easily shared.
 
-Unless someone shouts at me, I intend to put that on top of Andre's
-series, and put the whole thing into -next. I've tested it on a LS2085
-with kvmtool, using both flat and indirect device tables.
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ virt/kvm/arm/vgic/vgic-its.c |  2 +-
+ virt/kvm/arm/vgic/vgic.c     | 10 +---------
+ virt/kvm/arm/vgic/vgic.h     |  8 ++++++++
+ 3 files changed, 10 insertions(+), 10 deletions(-)
 
-Thanks,
-
-	M.
-
-Eric Auger (1):
-  KVM: arm/arm64: Fix vGICv2 KVM_DEV_ARM_VGIC_GRP_CPU/DIST_REGS
-
-Marc Zyngier (12):
-  irqchip/gicv3-its: Restore all cacheability attributes
-  KVM: arm64: vgic-its: Generalize use of vgic_get_irq_kref
-  KVM: arm64: vgic-its: Fix handling of indirect tables
-  KVM: arm64: vgic-its: Fix vgic_its_check_device_id BE handling
-  KVM: arm64: vgic-its: Fix misleading nr_entries in
-    vgic_its_check_device_id
-  KVM: arm64: vgic-its: Validate the device table L1 entry
-  KVM: arm64: vgic-its: Fix L2 entry validation for indirect tables
-  KVM: arm64: vgic-its: Add collection allocator/destructor
-  KVM: arm64: vgic-its: Add pointer to corresponding kvm_device
-  KVM: arm64: vgic-its: Turn device_id validation into generic ID
-    validation
-  KVM: arm64: vgic-its: Make vgic_its_cmd_handle_mapi similar to other
-    handlers
-  KVM: arm64: vgic-its: Simplify MAPI error handling
-
- include/kvm/arm_vgic.h             |   1 +
- include/linux/irqchip/arm-gic-v3.h |  48 ++++++--
- virt/kvm/arm/vgic/vgic-its.c       | 224 ++++++++++++++++++++-----------------
- virt/kvm/arm/vgic/vgic-mmio-v2.c   |   2 +
- virt/kvm/arm/vgic/vgic-mmio.c      |   4 +-
- virt/kvm/arm/vgic/vgic.c           |  10 +-
- virt/kvm/arm/vgic/vgic.h           |   8 ++
- 7 files changed, 175 insertions(+), 122 deletions(-)
-
+diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+index d8e8f14..f427fa2 100644
+--- a/virt/kvm/arm/vgic/vgic-its.c
++++ b/virt/kvm/arm/vgic/vgic-its.c
+@@ -80,7 +80,7 @@ static struct vgic_irq *vgic_add_lpi(struct kvm *kvm, u32 intid)
+ 		 * call vgic_put_irq() on the returned pointer once it's
+ 		 * finished with the IRQ.
+ 		 */
+-		kref_get(&irq->refcount);
++		vgic_get_irq_kref(irq);
+ 
+ 		goto out_unlock;
+ 	}
+diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
+index 424cb9ce..39f3358 100644
+--- a/virt/kvm/arm/vgic/vgic.c
++++ b/virt/kvm/arm/vgic/vgic.c
+@@ -71,7 +71,7 @@ static struct vgic_irq *vgic_get_lpi(struct kvm *kvm, u32 intid)
+ 		 * This increases the refcount, the caller is expected to
+ 		 * call vgic_put_irq() later once it's finished with the IRQ.
+ 		 */
+-		kref_get(&irq->refcount);
++		vgic_get_irq_kref(irq);
+ 		goto out_unlock;
+ 	}
+ 	irq = NULL;
+@@ -106,14 +106,6 @@ struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
+ 	return NULL;
+ }
+ 
+-static void vgic_get_irq_kref(struct vgic_irq *irq)
+-{
+-	if (irq->intid < VGIC_MIN_LPI)
+-		return;
+-
+-	kref_get(&irq->refcount);
+-}
+-
+ /*
+  * We can't do anything in here, because we lack the kvm pointer to
+  * lock and remove the item from the lpi_list. So we keep this function
+diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
+index 9d40d7b..1d8e21d 100644
+--- a/virt/kvm/arm/vgic/vgic.h
++++ b/virt/kvm/arm/vgic/vgic.h
+@@ -64,6 +64,14 @@ int vgic_v2_map_resources(struct kvm *kvm);
+ int vgic_register_dist_iodev(struct kvm *kvm, gpa_t dist_base_address,
+ 			     enum vgic_type);
+ 
++static inline void vgic_get_irq_kref(struct vgic_irq *irq)
++{
++	if (irq->intid < VGIC_MIN_LPI)
++		return;
++
++	kref_get(&irq->refcount);
++}
++
+ #ifdef CONFIG_KVM_ARM_VGIC_V3
+ void vgic_v3_process_maintenance(struct kvm_vcpu *vcpu);
+ void vgic_v3_fold_lr_state(struct kvm_vcpu *vcpu);
 -- 
 2.1.4
