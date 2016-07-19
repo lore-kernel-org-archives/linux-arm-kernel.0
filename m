@@ -1,35 +1,37 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 19 Jul 2016 08:13:22 -0300
-Subject: [PATCH v5 3/3] clk: imx6: Fix procedure to switch the parent of
- LDB_DI_CLK
-In-Reply-To: <2499789.N9zTF3cNAV@diplodocus>
-References: <1468235521-3163-1-git-send-email-p.zabel@pengutronix.de>
- <1468235521-3163-3-git-send-email-p.zabel@pengutronix.de>
- <5787C558.5060904@gmail.com> <2499789.N9zTF3cNAV@diplodocus>
-Message-ID: <CAOMZO5CPM9YfVqfpuyLmhGn9jC7p73Ocnc7LxE9=xA9ouawNQQ@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 19 Jul 2016 12:22:41 +0100
+Subject: Is THREAD_INFO_IN_TASK appropriate for -mm for 4.8?
+In-Reply-To: <CALCETrUf_7=Tr4JrDj+3UPT5kUT1MsRtypvfqkOg_MVHAJu=PA@mail.gmail.com>
+References: <CALCETrUf_7=Tr4JrDj+3UPT5kUT1MsRtypvfqkOg_MVHAJu=PA@mail.gmail.com>
+Message-ID: <20160719112223.GA20476@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joshua,
+On Mon, Jul 18, 2016 at 04:47:39PM -0700, Andy Lutomirski wrote:
+> Hi all-
+> 
+> There are four core patches needed for the THREAD_INFO_IN_TASK thing,
+> and they apply cleanly to -mm now.  The x86 patch to flip the feature
+> on does not apply cleanly anywhere because it depends on changes in
+> -tip *and* in -mm.  I'd like to get all of this as well as the rest of
+> the vmap-stacks stuff in by 4.9, but I'm wondering if it might make
+> sense to get the core THREAD_INFO_IN_TASK stuff into -mm for 4.8
+> instead.
+> 
+> Pros:
+>  - It reduces the amount of core code that -tip will have to carry until 4.9.
+>  - It may benefit other architectures.  Christian Borntraeger
+> expressed an interest in enabling the feature for s390, but it'll be
+> awkward for him until the core bit landed.  Similarly, arm64 seems to
+> be interested.
 
-On Sat, Jul 16, 2016 at 5:55 PM, Joshua Clayton
-<stillcompiling@gmail.com> wrote:
+This would probably be useful for arm64.
 
-> Took the printk out and the patch set still works as expected.
-> ...so the previous email was a false alarm. Mea culpa
-> Problem solved I think. Thanks Philipp!
->
-> for my hardware (imx6q-evi) using xorg and  lvds
->
-> Tested-by Joshua Clayton <stillcompiling@gmail.com>
+There's still a reasonable amount to figure out (e.g. [1,2]), so from my
+PoV this is a nice-to-have, but there's no pressure.
 
-Great news! It is good to know you are able to confirm this series
-fixes the LVDS issue on your board.
+Thanks,
+Mark.
 
-Still interested to know if Novena LVDS still work with this series applied.
-
-Sean,Marek,
-
-Any chances of testing this series on Novena's board?
-
-Thanks
+[1] https://lkml.org/lkml/2016/7/11/193
+[2] https://lkml.org/lkml/2016/7/11/483
