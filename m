@@ -1,39 +1,37 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Tue, 19 Jul 2016 20:32:50 +0900
-Subject: [PATCH] usb: ehci-platform: switch over to shared reset
-Message-ID: <1468927970-32240-1-git-send-email-yamada.masahiro@socionext.com>
+From: weiyj_lk@163.com (Wei Yongjun)
+Date: Tue, 19 Jul 2016 11:32:43 +0000
+Subject: [PATCH -next] drm/rockchip: analogix_dp: add missing
+ clk_disable_unprepare() on error
+Message-ID: <1468927963-2947-1-git-send-email-weiyj_lk@163.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The recent update in the reset subsystem requires all reset consumers
-to be explicit when requesting reset lines.  For detail, see the log
-of commit 3c35f6edc09b ("reset: Reorder inline reset_control_get*()
-wrappers").
+From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 
-The devm_reset_control_get_optional() is deprecated, and falls into
-the _exclusive variant during the migration, but the reset control
-in this driver is apparently shared-tolerate.  Besides, this driver
-is for generic platforms, so actually should be able to work with a
-shared reset line.
+Add the missing clk_disable_unprepare() before return in the
+error handling case.
 
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 ---
+ drivers/gpu/drm/rockchip/analogix_dp-rockchip.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
- drivers/usb/host/ehci-platform.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/usb/host/ehci-platform.c b/drivers/usb/host/ehci-platform.c
-index 1757ebb..2f5a16c 100644
---- a/drivers/usb/host/ehci-platform.c
-+++ b/drivers/usb/host/ehci-platform.c
-@@ -234,7 +234,7 @@ static int ehci_platform_probe(struct platform_device *dev)
- 		}
+diff --git a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
+index e81e19a..89aadbf 100644
+--- a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
++++ b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
+@@ -96,6 +96,7 @@ static int rockchip_dp_poweron(struct analogix_dp_plat_data *plat_data)
+ 	ret = rockchip_dp_pre_init(dp);
+ 	if (ret < 0) {
+ 		dev_err(dp->dev, "failed to dp pre init %d\n", ret);
++		clk_disable_unprepare(dp->pclk);
+ 		return ret;
  	}
  
--	priv->rst = devm_reset_control_get_optional(&dev->dev, NULL);
-+	priv->rst = devm_reset_control_get_optional_shared(&dev->dev, NULL);
- 	if (IS_ERR(priv->rst)) {
- 		err = PTR_ERR(priv->rst);
- 		if (err == -EPROBE_DEFER)
--- 
-1.9.1
+@@ -272,6 +273,7 @@ static int rockchip_dp_init(struct rockchip_dp_device *dp)
+ 	ret = rockchip_dp_pre_init(dp);
+ 	if (ret < 0) {
+ 		dev_err(dp->dev, "failed to pre init %d\n", ret);
++		clk_disable_unprepare(dp->pclk);
+ 		return ret;
+ 	}
