@@ -1,62 +1,44 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 19 Jul 2016 11:29:26 +0100
-Subject: [PATCH 0/2] arm/arm64: localise objcopy flags
-In-Reply-To: <a1441405-5a3a-731c-2693-b66cd42edc99@redhat.com>
-References: <1468337282-14527-1-git-send-email-mark.rutland@arm.com>
- <a1441405-5a3a-731c-2693-b66cd42edc99@redhat.com>
-Message-ID: <20160719102925.GB27022@leverpostej>
+Date: Tue, 19 Jul 2016 11:37:55 +0100
+Subject: [PATCH 01/10] Documentation: DT: qcom_hidma: update binding for
+ MSI
+In-Reply-To: <1468867177-15007-2-git-send-email-okaya@codeaurora.org>
+References: <1468867177-15007-1-git-send-email-okaya@codeaurora.org>
+ <1468867177-15007-2-git-send-email-okaya@codeaurora.org>
+Message-ID: <20160719103755.GC27022@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 18, 2016 at 04:16:34PM -0700, Laura Abbott wrote:
-> On 07/12/2016 08:28 AM, Mark Rutland wrote:
-> >Hi,
-> >
-> >Typically, architectures (including arm and arm64) define OBJCOPYFLAGS in their
-> >top-level makefile, for the purpose of generating a raw binaries suitable for
-> >booting, including Image, zImage, vmlinux.bin, etc.
-> >
-> >As this top-level arch makefile is included by the top-level kernel makefile,
-> >these flags are passed to other invocations of objcopy tree-wide. This can
-> >result in unexpected and inconsistent behaviour across architectures (e.g.
-> >generation of a raw binary rather than an ELF [1]).
-> >
-> >Rather than force each new user of objcopy to specially clear OBJCOPYFLAGS,
-> >this patch moves the existing OBJCOPYFLAGS variable definitions such that they
-> >only affects the cases we require them for today, leaving the global namespace
-> >clear.
-> >
-> >Other architectures will likely need similar treatment.
-> >
-> >Thanks,
-> >Mark.
-> >
-> >[1] http://www.openwall.com/lists/kernel-hardening/2016/06/08/2
-> >
-> >Mark Rutland (2):
-> >  arm64: localise Image objcopy flags
-> >  arm: localise objcopy flags
-> >
-> > arch/arm/Makefile        | 1 -
-> > arch/arm/boot/Makefile   | 2 ++
-> > arch/arm64/Makefile      | 1 -
-> > arch/arm64/boot/Makefile | 2 ++
-> > 4 files changed, 4 insertions(+), 2 deletions(-)
-> >
+On Mon, Jul 18, 2016 at 02:39:28PM -0400, Sinan Kaya wrote:
+> Adding a new binding for qcom,hidma-1.1 to distinguish HW supporting
+> MSI interrupts from the older revision.
 > 
-> Kees' lkdtm tests compile and boot successfully with this patch for
-> both arm and arm64 so you can add
+> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+> ---
+>  Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
 > 
-> Tested-by: Laura Abbott <labbott@redhat.com>
+> diff --git a/Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt b/Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt
+> index fd5618b..45ce75b 100644
+> --- a/Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt
+> +++ b/Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt
+> @@ -47,7 +47,8 @@ When the OS is not in control of the management interface (i.e. it's a guest),
+>  the channel nodes appear on their own, not under a management node.
+>  
+>  Required properties:
+> -- compatible: must contain "qcom,hidma-1.0"
+> +- compatible: must contain "qcom,hidma-1.0" for initial HW or "qcom,hidma-1.1"
+> +for MSI capable HW.
 
-Cheers!
-
-On the assumption that Russell is ok with the arm patch, I've dropped
-that in the patch system (with tags) as 8588/1 [1].
-
-Catalin, Will, I guess I should repost the arm64 patch come v4.8-rc1?
+Don't we need properties to describe the MSI details (e.g. sideband data
+like DeviceID)?
 
 Thanks,
 Mark.
 
-[1] http://www.armlinux.org.uk/developer/patches/viewpatch.php?id=8588/1
+>  - reg: Addresses for the transfer and event channel
+>  - interrupts: Should contain the event interrupt
+>  - desc-count: Number of asynchronous requests this channel can handle
+> -- 
+> 1.8.2.1
+> 
