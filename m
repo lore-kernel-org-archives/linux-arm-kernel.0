@@ -1,45 +1,42 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 19 Jul 2016 15:35:08 +0100
-Subject: [PATCH 0/2] arm/arm64: localise objcopy flags
-In-Reply-To: <20160719143141.GF21256@e104818-lin.cambridge.arm.com>
-References: <1468337282-14527-1-git-send-email-mark.rutland@arm.com>
- <a1441405-5a3a-731c-2693-b66cd42edc99@redhat.com>
- <20160719102925.GB27022@leverpostej>
- <20160719143141.GF21256@e104818-lin.cambridge.arm.com>
-Message-ID: <20160719143507.GG21256@e104818-lin.cambridge.arm.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Tue, 19 Jul 2016 08:36:00 -0600
+Subject: [PATCH -next] coresight: etm4x: remove duplicated include from
+ coresight-etm4x.c
+In-Reply-To: <1468927641-335-1-git-send-email-weiyj_lk@163.com>
+References: <1468927641-335-1-git-send-email-weiyj_lk@163.com>
+Message-ID: <CANLsYkxDt2zG78AJJtn21v7GJp9wBfvsj2B5s7Vus5wo=7cZpg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 19, 2016 at 03:31:41PM +0100, Catalin Marinas wrote:
-> On Tue, Jul 19, 2016 at 11:29:26AM +0100, Mark Rutland wrote:
-> > On Mon, Jul 18, 2016 at 04:16:34PM -0700, Laura Abbott wrote:
-> > > On 07/12/2016 08:28 AM, Mark Rutland wrote:
-> > > >Mark Rutland (2):
-> > > >  arm64: localise Image objcopy flags
-> > > >  arm: localise objcopy flags
-> > > >
-> > > > arch/arm/Makefile        | 1 -
-> > > > arch/arm/boot/Makefile   | 2 ++
-> > > > arch/arm64/Makefile      | 1 -
-> > > > arch/arm64/boot/Makefile | 2 ++
-> > > > 4 files changed, 4 insertions(+), 2 deletions(-)
-> > > >
-> > > 
-> > > Kees' lkdtm tests compile and boot successfully with this patch for
-> > > both arm and arm64 so you can add
-> > > 
-> > > Tested-by: Laura Abbott <labbott@redhat.com>
-> > 
-> > Cheers!
-> > 
-> > On the assumption that Russell is ok with the arm patch, I've dropped
-> > that in the patch system (with tags) as 8588/1 [1].
-> > 
-> > Catalin, Will, I guess I should repost the arm64 patch come v4.8-rc1?
-> 
-> I queued them for 4.8. Thanks.
+On 19 July 2016 at 05:27, Wei Yongjun <weiyj_lk@163.com> wrote:
+> From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+>
+> Remove duplicated include.
+>
+> Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+> ---
+>  drivers/hwtracing/coresight/coresight-etm4x.c | 1 -
+>  1 file changed, 1 deletion(-)
+>
+> diff --git a/drivers/hwtracing/coresight/coresight-etm4x.c b/drivers/hwtracing/coresight/coresight-etm4x.c
+> index 0d8ebfa..6e639b9 100644
+> --- a/drivers/hwtracing/coresight/coresight-etm4x.c
+> +++ b/drivers/hwtracing/coresight/coresight-etm4x.c
+> @@ -33,7 +33,6 @@
+>  #include <linux/uaccess.h>
+>  #include <linux/perf_event.h>
+>  #include <linux/pm_runtime.h>
+> -#include <linux/perf_event.h>
+>  #include <asm/sections.h>
+>  #include <asm/local.h>
 
-s/them/the arm64 patch/
+Definitely - applied.
 
--- 
-Catalin
+Thanks,
+Mathieu
+
+>
+>
+>
+>
+>
