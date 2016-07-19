@@ -1,111 +1,75 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 19 Jul 2016 15:25:30 +0200
-Subject: [PATCH v2] drivers/perf: arm-pmu: Handle per-interrupt affinity
- mask
-In-Reply-To: <1467815627-4061-1-git-send-email-marc.zyngier@arm.com>
-References: <1467815627-4061-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <CAMuHMdXU6C=jFD16Jj3NFNawiY0YEpQDZSbL+T4bLgUOG3nTUQ@mail.gmail.com>
+From: vgoyal@redhat.com (Vivek Goyal)
+Date: Tue, 19 Jul 2016 09:26:19 -0400
+Subject: [RFC 3/3] kexec: extend kexec_file_load system call
+In-Reply-To: <20160719124651.GA21007@leverpostej>
+References: <20160712014201.11456-1-takahiro.akashi@linaro.org>
+ <20160712014201.11456-4-takahiro.akashi@linaro.org>
+ <20160715130955.GC23514@redhat.com>
+ <20160715131950.GB19840@leverpostej>
+ <20160718023024.GB6310@dhcp-128-65.nay.redhat.com>
+ <20160718100704.GB10069@leverpostej>
+ <20160719005556.GE3326@dhcp-128-65.nay.redhat.com>
+ <20160719105049.GD27022@leverpostej>
+ <20160719122406.GA18124@redhat.com>
+ <20160719124651.GA21007@leverpostej>
+Message-ID: <20160719132619.GA3290@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc, Catalin, Will,
+On Tue, Jul 19, 2016 at 01:47:28PM +0100, Mark Rutland wrote:
+> On Tue, Jul 19, 2016 at 08:24:06AM -0400, Vivek Goyal wrote:
+> > On Tue, Jul 19, 2016 at 11:52:00AM +0100, Mark Rutland wrote:
+> > > Regardless, this extended syscall changes some underlying assumptions
+> > > made with the development of kexec_file_load, and I think treating this
+> > > as an extension is not a great idea. From a user's perspective there is
+> > > little difference between passing an additional flag or using a
+> > > different syscall number, so I don't think that we gain much by altering
+> > > the existing prototype relative to allocating a new syscall number.
+> > 
+> > If we are providing/opening up additional flags, I can't think what will
+> > it break. Same flag was invalid in old kernel but new kernel supports 
+> > it and will accept it. So it sounds reasonable to me to add new flags.
+> > 
+> > If existing users are not broken, then I think it might be a good idea
+> > to extend existing syscall. Otherwise userspace will have to be modified
+> > to understand a 3rd syscall also and an additional option will show up
+> > which asks users to specify which syscall to use. So extending existing
+> > syscall might keep it little simple for users.
+> 
+> I don't follow.
+> 
+> To use the new feature, you have to modify userspace anyway, as you
+> require userspace to pass information which it did not previously pass
+> (in the new arguments added to the syscall).
+> 
+> The presence of a new syscall does not imply the absence of the old
+> syscall, so you can always use that be default unless the user asks for
+> asomething only the new syscall provides. Regardless of the
+> syscall/flags difference, you still have to detect whether the new
+> functionality is present somehow.
+> 
 
-On Wed, Jul 6, 2016 at 4:33 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> On a big-little system, PMUs can be wired to CPUs using per CPU
-> interrups (PPI). In this case, it is important to make sure that
-> the enable/disable do happen on the right set of CPUs.
->
-> So instead of relying on the interrupt-affinity property, we can
-> use the actual percpu affinity that DT exposes as part of the
-> interrupt specifier. The DT binding is also updated to reflect
-> the fact that the interrupt-affinity property shouldn't be used
-> in that case.
->
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
-> * From v1:
->   - propagate the error if irq_get_percpu_devid_partition fails
+Hmm., so current idea is that we have two syscalls() which are *ideally*
+supposed to work for all arches. Difference between two is that first
+one does not support kernel signature verification while second one does.
 
-This patch, which is commit 19a469a58720ea96 in arm64/for-next/core, broke
-the PMU on r8a7740/armadillo800eva:
+By default old syscall is used and user can force using new syscall using
+option --kexec-file-load.
 
-    -hw perfevents: enabled with armv7_cortex_a9 PMU driver, 7
-counters available
-    +hw perfevents: /pmu: failed to probe PMU!
-    +hw perfevents: /pmu: failed to register PMU devices!
-    +armv7-pmu: probe of pmu failed with error -22
+If a user DTB is present, I was hoping that it will continue to work the
+same way. Both the sycalls can be used and can handle DTB. If we introduce
+a 3rd syscall, that means only first and 3rd syscall can handle DTB and
+we need to introduce one more option which tells whether to use
+kexec_load() or use the 3rd new syscall. And that's what I am trying
+to avoid.
 
-This is a single-core Cortex A9.
+Vivek
 
->  Documentation/devicetree/bindings/arm/pmu.txt |  4 +++-
->  drivers/perf/arm_pmu.c                        | 27 ++++++++++++++++++++++-----
->  2 files changed, 25 insertions(+), 6 deletions(-)
->
-> diff --git a/Documentation/devicetree/bindings/arm/pmu.txt b/Documentation/devicetree/bindings/arm/pmu.txt
-> index 74d5417..61c8b46 100644
-> --- a/Documentation/devicetree/bindings/arm/pmu.txt
-> +++ b/Documentation/devicetree/bindings/arm/pmu.txt
-> @@ -39,7 +39,9 @@ Optional properties:
->                         When using a PPI, specifies a list of phandles to CPU
->                        nodes corresponding to the set of CPUs which have
->                        a PMU of this type signalling the PPI listed in the
-> -                      interrupts property.
-> +                      interrupts property, unless this is already specified
-> +                      by the PPI interrupt specifier itself (in which case
-> +                      the interrupt-affinity property shouldn't be present).
->
->                         This property should be present when there is more than
->                        a single SPI.
-
-On a single core, there's only a single SPI, hence there's no need for an
-"interrupt-affinity" property.
-
-> diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
-> index 140436a..8e4d7f5 100644
-> --- a/drivers/perf/arm_pmu.c
-> +++ b/drivers/perf/arm_pmu.c
-> @@ -961,9 +964,23 @@ static int of_pmu_irq_cfg(struct arm_pmu *pmu)
->                 i++;
->         } while (1);
->
-> -       /* If we didn't manage to parse anything, claim to support all CPUs */
-> -       if (cpumask_weight(&pmu->supported_cpus) == 0)
-> -               cpumask_setall(&pmu->supported_cpus);
-> +       /* If we didn't manage to parse anything, try the interrupt affinity */
-> +       if (cpumask_weight(&pmu->supported_cpus) == 0) {
-> +               if (!using_spi) {
-
-However, using_spi is never set to true in the absence of that property,
-causing the wrong branch to be taken...
-
-> +                       /* If using PPIs, check the affinity of the partition */
-> +                       int ret, irq;
-> +
-> +                       irq = platform_get_irq(pdev, 0);
-> +                       ret = irq_get_percpu_devid_partition(irq, &pmu->supported_cpus);
-
-... and ret to become -22 here.
-
-> +                       if (ret) {
-> +                               kfree(irqs);
-> +                               return ret;
-> +                       }
-> +               } else {
-> +                       /* Otherwise default to all CPUs */
-> +                       cpumask_setall(&pmu->supported_cpus);
-> +               }
-> +       }
->
->         /* If we matched up the IRQ affinities, use them to route the SPIs */
->         if (using_spi && i == pdev->num_resources)
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+> > BTW, does kexec_load() needs to be modified too to handle DT?
+> 
+> No, at least for arm64. In the kexec_load case userspace provides the
+> DTB as a raw segment, and the user-provided purgatory sets up registers
+> to pass that to the new kernel.
+> 
+> Thanks,
+> Mark.
