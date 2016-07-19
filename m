@@ -1,79 +1,63 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 19 Jul 2016 08:26:20 +0200
-Subject: [PATCH v2 00/10] Exynos IOMMU: proper runtime PM support (use
- device dependencies)
-In-Reply-To: <578D0716.6060106@math.uni-bielefeld.de>
-References: <1466144820-6286-1-git-send-email-m.szyprowski@samsung.com>
- <5787B2B0.9020809@math.uni-bielefeld.de>
- <5788E352.3040801@math.uni-bielefeld.de>
- <a15e438a-7fa0-3a4d-e6e2-13425512dddd@samsung.com>
- <578CB6DB.90608@math.uni-bielefeld.de>
- <6939949e-4c8e-cba0-9858-b37d1ba01869@samsung.com>
- <578D0716.6060106@math.uni-bielefeld.de>
-Message-ID: <7c770ff5-2b22-adf6-b8d0-e94d1d7d7550@samsung.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 19 Jul 2016 08:39:55 +0200
+Subject: [PATCH] arm64: dts: rockchip: add spiX aliases for rk3399
+In-Reply-To: <1468545873-134339-1-git-send-email-briannorris@chromium.org>
+References: <1468545873-134339-1-git-send-email-briannorris@chromium.org>
+Message-ID: <20160719063955.GE5368@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tobias
+Hello,
 
+On Thu, Jul 14, 2016 at 06:24:33PM -0700, Brian Norris wrote:
+> It's nicer to see this:
+> 
+>     # ls -l /sys/bus/spi/devices/
+>     total 0
+>     lrwxrwxrwx 1 root root 0 Dec 31  1969 spi0.0 -> ../../../devices/platform/ff1c0000.spi/spi_master/spi0/spi0.0
+>     lrwxrwxrwx 1 root root 0 Dec 31  1969 spi1.0 -> ../../../devices/platform/ff1d0000.spi/spi_master/spi1/spi1.0
+>     lrwxrwxrwx 1 root root 0 Dec 31  1969 spi2.0 -> ../../../devices/platform/ff1e0000.spi/spi_master/spi2/spi2.0
+>     lrwxrwxrwx 1 root root 0 Dec 31  1969 spi5.0 -> ../../../devices/platform/ff200000.spi/spi_master/spi5/spi5.0
+> 
+> than this:
+> 
+>     # ls -l /sys/bus/spi/devices/
+>     total 0
+>     lrwxrwxrwx 1 root root 0 Dec 31  1969 spi32763.0 -> ../../../devices/platform/ff200000.spi/spi_master/spi32763/spi32763.0
+>     lrwxrwxrwx 1 root root 0 Dec 31  1969 spi32764.0 -> ../../../devices/platform/ff1e0000.spi/spi_master/spi32764/spi32764.0
+>     lrwxrwxrwx 1 root root 0 Dec 31  1969 spi32765.0 -> ../../../devices/platform/ff1d0000.spi/spi_master/spi32765/spi32765.0
+>     lrwxrwxrwx 1 root root 0 Dec 31  1969 spi32766.0 -> ../../../devices/platform/ff1c0000.spi/spi_master/spi32766/spi32766.0
+> 
+> With the latter, it's much clearer which bus devices are on.
+> 
+> Signed-off-by: Brian Norris <briannorris@chromium.org>
+> ---
+>  arch/arm64/boot/dts/rockchip/rk3399.dtsi | 6 ++++++
+>  1 file changed, 6 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+> index 4c84229789ef..b04abbfd4898 100644
+> --- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+> +++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+> @@ -70,6 +70,12 @@
+>  		serial2 = &uart2;
+>  		serial3 = &uart3;
+>  		serial4 = &uart4;
+> +		spi0 = &spi0;
+> +		spi1 = &spi1;
+> +		spi2 = &spi2;
+> +		spi3 = &spi3;
+> +		spi4 = &spi4;
+> +		spi5 = &spi5;
 
-On 2016-07-18 18:43, Tobias Jakobi wrote:
-> Marek Szyprowski wrote:
->> On 2016-07-18 13:00, Tobias Jakobi wrote:
->>> Marek Szyprowski wrote:
->>>> On 2016-07-15 15:21, Tobias Jakobi wrote:
->>>>> Tobias Jakobi wrote:
->>>>>> Hello Marek,
->>>>>>
->>>>>> I've tested the patchset on 4.7-rc7 and noticed that it breaks
->>>>>> reboot on
->>>>>> my ODROID-X2.
->>>>>>
->>>>>> Going to check where exactly things break.
->>>>> Sadly it's the last patch where everything comes together:
->>>>> "iommu/exynos: Add proper runtime pm support"
->>>>>
->>>>> I still have to check if forcing runpm status to 'on' makes a
->>>>> difference. I suspect that the aggressive clock gating might be the
->>>>> reason?
->>>> Thanks for testing. I will check this issue. Could you send me your
->>>> .config?
->>> This is the config I'm currently using:
->>> https://github.com/tobiasjakobi/odroid-environment/blob/master/sourcecode/system/vanilla-4.7-debug.conf
->>>
->>>
->>> Do you think checking this with no_console_suspend makes sense?
->> no_console_suspend switch won't provide more information, but I managed
->> to reproduce your issue. I'm really confused how enabling runtime pm can
->> cause problems with usb/smsc95xx ethernet driver (that is the reason for
->> failed reboot). Maybe it is somehow related to the global relations
->> between devices and drivers and the fact that creating the runtime pm
->> links change the order of operations. I will check this again when
->> Rafael send updated patches. Here is the log I got (after waiting some
->> time):
-> thanks for looking into this! I'll try to reproduce this on my board. I
-> have to admit that I didn't wait too long for the hung task message to
-> appear.
->
-> I wonder if this has something to do with regulator code cutting some
-> supplies too early. Is this on a X2 or a U2/U3?
-
-I've reproduced it on U3.
-
-> I'm not sure if we
-> currently model the regulator setup correctly here (IIRC then buck8 is
-> supplying the LAN/USB block on U2/U3).
-
-IMHO it is not really related to regulator operations, but the sequence
-of shutting down logical devices in the system. For some reasons when pm 
-links
-are used, something changes the order of operations in system shutdown
-procedure, what causes smsc95xx to hang. I have no idea why, but I don't 
-have
-time to investigate it further. I will wait for the next release of Rafael's
-pm links patches and then check everything again.
+Note that Rob Herring (with his dt-maintainer hat on) doesn't like these
+aliases.
+See for example:
+	http://mid.gmane.org/20160705140546.GA10601 at rob-hp-laptop
 
 Best regards
+Uwe
+
 -- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
