@@ -1,80 +1,60 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 19 Jul 2016 08:31:09 +0100
-Subject: [PATCH v2 3/4] mfd: add support for Allwinner SoCs ADC
-In-Reply-To: <de8ebab2-cde9-d209-3c9a-e1868fafb84b@kernel.org>
-References: <1468576754-3273-1-git-send-email-quentin.schulz@free-electrons.com>
- <1468576754-3273-4-git-send-email-quentin.schulz@free-electrons.com>
- <de8ebab2-cde9-d209-3c9a-e1868fafb84b@kernel.org>
-Message-ID: <20160719073109.GD17074@dell>
+From: t.remmet@phytec.de (Teresa Remmet)
+Date: Tue, 19 Jul 2016 09:29:53 +0200
+Subject: [RESEND PATCH] ARM: dts: am335x: Update elm phandle binding
+Message-ID: <1468913393-42532-1-git-send-email-t.remmet@phytec.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 18 Jul 2016, Jonathan Cameron wrote:
+The check for the "elm_id" binding had been removed.
+This causes nand boot to fail on boards still using
+the old binding. Update the bindings on those boards.
 
-> On 15/07/16 10:59, Quentin Schulz wrote:
-> > The Allwinner SoCs all have an ADC that can also act as a touchscreen
-> > controller and a thermal sensor. For now, only the ADC and the thermal
-> > sensor drivers are probed by the MFD, the touchscreen controller support
-> > will be added later.
-> > 
-> > Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
-> Hmm. Previous patch includes the header this one creates.  Ordering issue?
-> The depends kind of prevents build failures by ensuring that can't be built
-> until this one is in place, but it is certainly an ugly way to do it.
-> 
-> Few little bits innline.
-> > ---
-> > 
-> > v2:
-> >  - add license headers,
-> >  - reorder alphabetically includes,
-> >  - add SUNXI_GPADC_ prefixes for defines,
-> > 
-> >  drivers/mfd/Kconfig                 |  14 +++
-> >  drivers/mfd/Makefile                |   2 +
-> >  drivers/mfd/sunxi-gpadc-mfd.c       | 197 ++++++++++++++++++++++++++++++++++++
-> >  include/linux/mfd/sunxi-gpadc-mfd.h |  23 +++++
-> >  4 files changed, 236 insertions(+)
-> >  create mode 100644 drivers/mfd/sunxi-gpadc-mfd.c
-> >  create mode 100644 include/linux/mfd/sunxi-gpadc-mfd.h
+Signed-off-by: Teresa Remmet <t.remmet@phytec.de>
+Acked-by: Brian Norris <computersforpeace@gmail.com>
+---
+ arch/arm/boot/dts/am335x-baltos.dtsi      | 2 +-
+ arch/arm/boot/dts/am335x-igep0033.dtsi    | 2 +-
+ arch/arm/boot/dts/am335x-phycore-som.dtsi | 2 +-
+ 3 files changed, 3 insertions(+), 3 deletions(-)
 
-[...]
-
-> > +static struct mfd_cell sun6i_gpadc_mfd_cells[] = {
-> > +	{
-> > +		.name	= "sun6i-a31-gpadc-iio",
-> > +		.resources = adc_resources,
-> > +		.num_resources = ARRAY_SIZE(adc_resources),
-> > +	}, {
-> > +		.name = "iio_hwmon",
-> I still really dislike using this to force the probe of that driver but
-> kind of up to the hwmon / mfd guys on this.
-
-Can you at least say *why* you don't like it?
-
-How else would it get probed?
-
-> I don't have any better suggestions though..
-> > +	},
-> > +};
-
-[...]
-
-> > +	if (ret) {
-> > +		dev_err(&pdev->dev, "failed to add MFD devices: %d\n", ret);
-> > +		regmap_del_irq_chip(irq, sunxi_gpadc_mfd_dev->regmap_irqc);
-> > +		return ret;
-> > +	}
-> > +
-> > +	dev_info(&pdev->dev, "successfully loaded\n");
-> Seems like noise to me, but not my subsystem :)
-
-Agreed, I don't allow this either.
-
-[...]
-
+diff --git a/arch/arm/boot/dts/am335x-baltos.dtsi b/arch/arm/boot/dts/am335x-baltos.dtsi
+index c8609d8..b689172 100644
+--- a/arch/arm/boot/dts/am335x-baltos.dtsi
++++ b/arch/arm/boot/dts/am335x-baltos.dtsi
+@@ -226,7 +226,7 @@
+ 
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+-		elm_id = <&elm>;
++		ti,elm-id = <&elm>;
+ 	};
+ };
+ 
+diff --git a/arch/arm/boot/dts/am335x-igep0033.dtsi b/arch/arm/boot/dts/am335x-igep0033.dtsi
+index df63484..e7d9ca1 100644
+--- a/arch/arm/boot/dts/am335x-igep0033.dtsi
++++ b/arch/arm/boot/dts/am335x-igep0033.dtsi
+@@ -161,7 +161,7 @@
+ 
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+-		elm_id = <&elm>;
++		ti,elm-id = <&elm>;
+ 
+ 		/* MTD partition table */
+ 		partition at 0 {
+diff --git a/arch/arm/boot/dts/am335x-phycore-som.dtsi b/arch/arm/boot/dts/am335x-phycore-som.dtsi
+index 86f7731..1263c9d 100644
+--- a/arch/arm/boot/dts/am335x-phycore-som.dtsi
++++ b/arch/arm/boot/dts/am335x-phycore-som.dtsi
+@@ -197,7 +197,7 @@
+ 		gpmc,wr-access-ns = <30>;
+ 		gpmc,wr-data-mux-bus-ns = <0>;
+ 
+-		elm_id = <&elm>;
++		ti,elm-id = <&elm>;
+ 
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.9.1
