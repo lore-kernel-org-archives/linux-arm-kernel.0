@@ -1,106 +1,63 @@
-From: eric.auger@redhat.com (Eric Auger)
-Date: Tue, 19 Jul 2016 13:02:45 +0000
-Subject: [PATCH v11 08/10] irqchip/gicv3-its: register the MSI global doorbell
-In-Reply-To: <1468933367-23159-1-git-send-email-eric.auger@redhat.com>
-References: <1468933367-23159-1-git-send-email-eric.auger@redhat.com>
-Message-ID: <1468933367-23159-9-git-send-email-eric.auger@redhat.com>
+From: vigneshr@ti.com (R, Vignesh)
+Date: Tue, 19 Jul 2016 18:34:40 +0530
+Subject: [RFC PATCH 1/2] Input: rotary-encoder- Add support for absolute
+ encoder
+In-Reply-To: <576283AF.9090107@ti.com>
+References: <1463648641-6931-1-git-send-email-vigneshr@ti.com>
+ <1463648641-6931-2-git-send-email-vigneshr@ti.com>
+ <20160520163404.GC14951@dtor-ws> <5742CB03.8010805@ti.com>
+ <574565ED.3060205@ti.com> <576283AF.9090107@ti.com>
+Message-ID: <70fe4260-ffec-e069-25c6-bcc93ccbfb0a@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the registration of the MSI global doorbell in
-gicv3-its driver plus the implementation for irq_chip
-msi_doorbell_info ops.
+Dmitry,
 
-This will allow the msi layer to iommu_map this doorbell when
-requested.
+On 6/16/2016 4:17 PM, Vignesh R wrote:
+[...]
+>>> On 5/20/2016 10:04 PM, Dmitry Torokhov wrote:
+>>>> On Thu, May 19, 2016 at 02:34:00PM +0530, Vignesh R wrote:
+>>>>> There are rotary-encoders where GPIO lines reflect the actual position
+>>>>> of the rotary encoder dial. For example, if dial points to 9, then four
+>>>>> GPIO lines connected to the rotary encoder will read HLLH(1001b = 9).
+>>>>> Add support for such rotary-encoder.
+>>>>> The driver relies on rotary-encoder,absolute-encoder DT property to
+>>>>> detect such encoders.
+>>>>> Since, GPIO IRQs are not necessary to work with
+>>>>> such encoders, optional polling mode support is added using
+>>>>> input_poll_dev skeleton. This is can be used by enabling
+>>>>> CONFIG_INPUT_GPIO_ROTARY_ENCODER_POLL_MODE_SUPPORT.
+>>>>
+>>>> Does this really belong to a rotary encoder and not a new driver that
+>>>> simply translates gpio-encoded value into ABS* event?
+>>>>
+>>>
+>>> Currently rotary encoder driver only supports incremental/step counting
+>>> rotary devices. However, the device that is there on am335x-ice is an
+>>> absolute encoder but, IMO, nevertheless a kind of rotary encoder. The
+>>> only difference is that there is no need to count steps and the absolute
+>>> position value is always available as binary encoded state of connected
+>>> GPIOs.
+>>> The hardware on am335x-ice is a mechanical rotary encoder switch
+>>> connected over 4 GPIOs. It is same as binary encoder described at [1]
+>>> (except there are 4 GPIO lines), so this lead me to add support in
+>>> rotary-encoder.
+>>>
+>>> [1]https://en.wikipedia.org/wiki/Rotary_encoder#Standard_binary_encoding
+>>>
+>>
+>> Could you please comment on how would you like to support above
+>> described encoder: As a new driver or with existing driver with new
+>> compatible/mode setting via DT or as suggest by Uwe in another reply?
+>> IMHO, supporting using existing driver with new mode/compatible string
+>> looks a better option as the hardware is a kind of rotary-encoder.
+>>
 
-Signed-off-by: Eric Auger <eric.auger@redhat.com>
+Could you please suggest the right solution here? Do you think new
+driver is need to support above described absolute encoder h/w? It would
+be great to have your input now, so that I can work on the new set of
+patches and submit them for v4.9 merge window as soon as v4.8 merge
+window closes?
 
----
-
-v10 -> v11:
-- adapt to new doorbell registration API and implement msi_doorbell_info
----
- drivers/irqchip/irq-gic-v3-its.c | 28 ++++++++++++++++++++++++++++
- 1 file changed, 28 insertions(+)
-
-diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index 5eb1f9e..23102e3 100644
---- a/drivers/irqchip/irq-gic-v3-its.c
-+++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -29,6 +29,8 @@
- #include <linux/of_platform.h>
- #include <linux/percpu.h>
- #include <linux/slab.h>
-+#include <linux/iommu.h>
-+#include <linux/msi-doorbell.h>
- 
- #include <linux/irqchip.h>
- #include <linux/irqchip/arm-gic-v3.h>
-@@ -84,6 +86,7 @@ struct its_node {
- 	u32			ite_size;
- 	u32			device_ids;
- 	int			numa_node;
-+	struct irq_chip_msi_doorbell_info *doorbell_info;
- };
- 
- #define ITS_ITT_ALIGN		SZ_256
-@@ -656,6 +659,16 @@ static void its_irq_compose_msi_msg(struct irq_data *d, struct msi_msg *msg)
- 	msg->data		= its_get_event_id(d);
- }
- 
-+static struct irq_chip_msi_doorbell_info *
-+its_msi_doorbell_info(struct irq_data *d)
-+{
-+	struct its_device *its_dev = irq_data_get_irq_chip_data(d);
-+	struct its_node *its = its_dev->its;
-+
-+	return its->doorbell_info;
-+}
-+
-+
- static struct irq_chip its_irq_chip = {
- 	.name			= "ITS",
- 	.irq_mask		= its_mask_irq,
-@@ -663,6 +676,7 @@ static struct irq_chip its_irq_chip = {
- 	.irq_eoi		= irq_chip_eoi_parent,
- 	.irq_set_affinity	= its_set_affinity,
- 	.irq_compose_msi_msg	= its_irq_compose_msi_msg,
-+	.msi_doorbell_info	= its_msi_doorbell_info,
- };
- 
- /*
-@@ -1607,6 +1621,7 @@ static int __init its_probe(struct device_node *node,
- 
- 	if (of_property_read_bool(node, "msi-controller")) {
- 		struct msi_domain_info *info;
-+		phys_addr_t translater;
- 
- 		info = kzalloc(sizeof(*info), GFP_KERNEL);
- 		if (!info) {
-@@ -1614,10 +1629,23 @@ static int __init its_probe(struct device_node *node,
- 			goto out_free_tables;
- 		}
- 
-+		translater = its->phys_base + GITS_TRANSLATER;
-+		its->doorbell_info =
-+			msi_doorbell_register_global(translater, sizeof(u32),
-+						     IOMMU_WRITE | IOMMU_MMIO,
-+						     true);
-+
-+		if (IS_ERR_OR_NULL(its->doorbell_info))  {
-+			kfree(info);
-+			goto out_free_tables;
-+		}
-+
-+
- 		inner_domain = irq_domain_add_tree(node, &its_domain_ops, its);
- 		if (!inner_domain) {
- 			err = -ENOMEM;
- 			kfree(info);
-+			msi_doorbell_unregister_global(its->doorbell_info);
- 			goto out_free_tables;
- 		}
- 
--- 
-1.9.1
+Regards
+Vignesh
