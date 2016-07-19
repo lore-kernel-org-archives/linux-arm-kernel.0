@@ -1,109 +1,183 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Tue, 19 Jul 2016 16:53:52 -0600
-Subject: [PATCH 2/6] perf: Passing struct perf_event to function setup_aux()
+Date: Tue, 19 Jul 2016 16:53:56 -0600
+Subject: [PATCH 6/6] coresight: etm-perf: incorporating sink definition from
+ cmd line
 In-Reply-To: <1468968836-12695-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1468968836-12695-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1468968836-12695-3-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1468968836-12695-7-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some information, like driver specific configuration, is found
-in the hw_perf_event  structure.  As such pass a 'struct perf_event'
-to function setup_aux() rather than just the CPU number so that
-individual drivers can make the right configuration when setting
-up a session.
+Now that PMU specific configuration is available as part of the event,
+lookup the sink identified by users from the perf command line and build
+a path from source to sink.
+
+With this functionality it is no longer required to select a sink in a
+separate step (from sysFS) before a perf trace session can be started.
 
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-Cc: Alexander Shishkin <alexander.shishkin@linux.intel.com>
 ---
- arch/x86/events/intel/bts.c                      | 4 +++-
- arch/x86/events/intel/pt.c                       | 5 +++--
- drivers/hwtracing/coresight/coresight-etm-perf.c | 4 ++--
- include/linux/perf_event.h                       | 2 +-
- kernel/events/ring_buffer.c                      | 2 +-
- 5 files changed, 10 insertions(+), 7 deletions(-)
+ drivers/hwtracing/coresight/coresight-etm-perf.c | 101 ++++++++++++++++++++++-
+ 1 file changed, 100 insertions(+), 1 deletion(-)
 
-diff --git a/arch/x86/events/intel/bts.c b/arch/x86/events/intel/bts.c
-index 0a6e393a2e62..98155c2dfcce 100644
---- a/arch/x86/events/intel/bts.c
-+++ b/arch/x86/events/intel/bts.c
-@@ -68,8 +68,10 @@ static size_t buf_size(struct page *page)
- }
- 
- static void *
--bts_buffer_setup_aux(int cpu, void **pages, int nr_pages, bool overwrite)
-+bts_buffer_setup_aux(struct perf_event *event, void **pages,
-+		     int nr_pages, bool overwrite)
- {
-+	int cpu = event->cpu;
- 	struct bts_buffer *buf;
- 	struct page *page;
- 	int node = (cpu == -1) ? cpu : cpu_to_node(cpu);
-diff --git a/arch/x86/events/intel/pt.c b/arch/x86/events/intel/pt.c
-index 04bb5fb5a8d7..5178c5de0b19 100644
---- a/arch/x86/events/intel/pt.c
-+++ b/arch/x86/events/intel/pt.c
-@@ -1003,10 +1003,11 @@ static int pt_buffer_init_topa(struct pt_buffer *buf, unsigned long nr_pages,
-  * Return:	Our private PT buffer structure.
-  */
- static void *
--pt_buffer_setup_aux(int cpu, void **pages, int nr_pages, bool snapshot)
-+pt_buffer_setup_aux(struct perf_event *event, void **pages,
-+		    int nr_pages, bool snapshot)
- {
- 	struct pt_buffer *buf;
--	int node, ret;
-+	int node, ret, cpu = event->cpu;
- 
- 	if (!nr_pages)
- 		return NULL;
 diff --git a/drivers/hwtracing/coresight/coresight-etm-perf.c b/drivers/hwtracing/coresight/coresight-etm-perf.c
-index 755125f7917f..f4174f36c5a0 100644
+index f8c7a8733b23..5658a7411a66 100644
 --- a/drivers/hwtracing/coresight/coresight-etm-perf.c
 +++ b/drivers/hwtracing/coresight/coresight-etm-perf.c
-@@ -155,7 +155,7 @@ static void etm_free_aux(void *data)
- 	schedule_work(&event_data->work);
+@@ -22,6 +22,7 @@
+ #include <linux/list.h>
+ #include <linux/mm.h>
+ #include <linux/init.h>
++#include <linux/parser.h>
+ #include <linux/perf_event.h>
+ #include <linux/slab.h>
+ #include <linux/types.h>
+@@ -71,11 +72,20 @@ static const struct attribute_group *etm_pmu_attr_groups[] = {
+ 
+ static void etm_event_read(struct perf_event *event) {}
+ 
++static void etm_event_destroy(struct perf_event *event)
++{
++	kfree(event->hw.drv_configs);
++	event->hw.drv_configs = NULL;
++}
++
+ static int etm_event_init(struct perf_event *event)
+ {
+ 	if (event->attr.type != etm_pmu.type)
+ 		return -ENOENT;
+ 
++	event->destroy = etm_event_destroy;
++	event->hw.drv_configs = NULL;
++
+ 	return 0;
  }
  
--static void *etm_setup_aux(int event_cpu, void **pages,
-+static void *etm_setup_aux(struct perf_event *event, void **pages,
+@@ -159,6 +169,7 @@ static void *etm_setup_aux(struct perf_event *event, void **pages,
  			   int nr_pages, bool overwrite)
  {
  	int cpu;
-@@ -163,7 +163,7 @@ static void *etm_setup_aux(int event_cpu, void **pages,
++	char *cmdl_sink;
+ 	cpumask_t *mask;
  	struct coresight_device *sink;
  	struct etm_event_data *event_data = NULL;
+@@ -171,6 +182,12 @@ static void *etm_setup_aux(struct perf_event *event, void **pages,
  
--	event_data = alloc_event_data(event_cpu);
-+	event_data = alloc_event_data(event->cpu);
- 	if (!event_data)
- 		return NULL;
+ 	mask = &event_data->mask;
  
-diff --git a/include/linux/perf_event.h b/include/linux/perf_event.h
-index 70bfd59afa98..de23a1b82f30 100644
---- a/include/linux/perf_event.h
-+++ b/include/linux/perf_event.h
-@@ -407,7 +407,7 @@ struct pmu {
- 	/*
- 	 * Set up pmu-private data structures for an AUX area
- 	 */
--	void *(*setup_aux)		(int cpu, void **pages,
-+	void *(*setup_aux)		(struct perf_event *event, void **pages,
- 					 int nr_pages, bool overwrite);
- 					/* optional */
- 
-diff --git a/kernel/events/ring_buffer.c b/kernel/events/ring_buffer.c
-index ae9b90dc9a5a..56aba90af437 100644
---- a/kernel/events/ring_buffer.c
-+++ b/kernel/events/ring_buffer.c
-@@ -616,7 +616,7 @@ int rb_alloc_aux(struct ring_buffer *rb, struct perf_event *event,
- 			goto out;
++	/*
++	 * If a sink was specified from the perf cmdline it will be part of
++	 * the event's drv_configs.
++	 */
++	cmdl_sink = (char *)event->hw.drv_configs;
++
+ 	/* Setup the path for each CPU in a trace session */
+ 	for_each_cpu(cpu, mask) {
+ 		struct coresight_device *csdev;
+@@ -184,7 +201,7 @@ static void *etm_setup_aux(struct perf_event *event, void **pages,
+ 		 * list of devices from source to sink that can be
+ 		 * referenced later when the path is actually needed.
+ 		 */
+-		event_data->path[cpu] = coresight_build_path(csdev, NULL);
++		event_data->path[cpu] = coresight_build_path(csdev, cmdl_sink);
+ 		if (!event_data->path[cpu])
+ 			goto err;
  	}
+@@ -342,6 +359,87 @@ static void etm_event_del(struct perf_event *event, int mode)
+ 	etm_event_stop(event, PERF_EF_UPDATE);
+ }
  
--	rb->aux_priv = event->pmu->setup_aux(event->cpu, rb->aux_pages, nr_pages,
-+	rb->aux_priv = event->pmu->setup_aux(event, rb->aux_pages, nr_pages,
- 					     overwrite);
- 	if (!rb->aux_priv)
- 		goto out;
++enum {
++	ETM_TOKEN_SINK_CPU,
++	ETM_TOKEN_SINK,
++	ETM_TOKEN_ERR,
++};
++
++static const match_table_t drv_cfg_tokens = {
++	{ETM_TOKEN_SINK_CPU, "sink=cpu%d:%s"},
++	{ETM_TOKEN_SINK, "sink=%s"},
++	{ETM_TOKEN_ERR, NULL},
++};
++
++static int etm_set_drv_configs(struct perf_event *event, void __user *arg)
++{
++	char *config, *sink = NULL;
++	int cpu = -1, token, ret = 0;
++	substring_t args[MAX_OPT_ARGS];
++
++	/* Only one sink per event */
++	if (event->hw.drv_configs != NULL) {
++		ret = -EINVAL;
++		goto err;
++	}
++
++	/* Make user supplied input usable */
++	config = strndup_user(arg, PAGE_SIZE);
++	if (IS_ERR(config)) {
++		ret = PTR_ERR(config);
++		goto err;
++	}
++
++	/* See above declared @drv_cfg_tokens for the usable formats */
++	token = match_token(config, drv_cfg_tokens, args);
++	switch (token) {
++	case ETM_TOKEN_SINK:
++		/* Just a sink has been specified */
++		sink = match_strdup(&args[0]);
++		if (IS_ERR(sink)) {
++			ret = PTR_ERR(sink);
++			goto err;
++		}
++		break;
++	case ETM_TOKEN_SINK_CPU:
++		/* We have a sink and a CPU */
++
++		/* First get the cpu */
++		if (match_int(&args[0], &cpu)) {
++			ret = -EINVAL;
++			goto err;
++		}
++
++		/* Then the sink */
++		sink = match_strdup(&args[1]);
++		if (IS_ERR(sink)) {
++			ret = PTR_ERR(sink);
++			goto err;
++		}
++		break;
++	default:
++		ret = -EINVAL;
++		goto err;
++	}
++
++	/*
++	 * If the CPUs don't match the sink is destined to another path.  This
++	 * isn't as an error hence not setting @ret.
++	 */
++	if (event->cpu != cpu)
++		goto err;
++
++	/* We have a valid configuration */
++	event->hw.drv_configs = sink;
++
++out:
++	return ret;
++
++err:
++	kfree(sink);
++	goto out;
++}
++
+ int etm_perf_symlink(struct coresight_device *csdev, bool link)
+ {
+ 	char entry[sizeof("cpu9999999")];
+@@ -383,6 +481,7 @@ static int __init etm_perf_init(void)
+ 	etm_pmu.stop		= etm_event_stop;
+ 	etm_pmu.add		= etm_event_add;
+ 	etm_pmu.del		= etm_event_del;
++	etm_pmu.set_drv_configs	= etm_set_drv_configs;
+ 
+ 	ret = perf_pmu_register(&etm_pmu, CORESIGHT_ETM_PMU_NAME, -1);
+ 	if (ret == 0)
 -- 
 2.7.4
