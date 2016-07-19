@@ -1,142 +1,49 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 19 Jul 2016 16:49:05 +0100
-Subject: [PATCH 2/2] remoteproc: core: Rework obtaining a rproc from a DT
- phandle
-In-Reply-To: <20160719154905.23344-1-lee.jones@linaro.org>
-References: <20160719154905.23344-1-lee.jones@linaro.org>
-Message-ID: <20160719154905.23344-2-lee.jones@linaro.org>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 19 Jul 2016 17:20:04 +0100
+Subject: [PATCH 2/7] dmaengine: omap-dma: Complete the cookie first on
+ transfer completion
+In-Reply-To: <923b54d6-c7fc-66c2-1c20-d8d74ebed912@ti.com>
+References: <20160714124242.7579-1-peter.ujfalusi@ti.com>
+ <20160714124242.7579-3-peter.ujfalusi@ti.com>
+ <20160718103409.GH5783@n2100.arm.linux.org.uk>
+ <923b54d6-c7fc-66c2-1c20-d8d74ebed912@ti.com>
+Message-ID: <20160719162004.GK5783@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In this patch we;
- - Use a subsystem generic phandle to obtain an rproc
-   - We have to support TI's bespoke version for the time being
- - Convert wkup_m3_ipc driver to new API
- - Rename the call to be more like other, similar OF calls
- - Move feature-not-enabled inline stub to the headers
- - Strip out duplicate code by calling into of_get_rproc_by_index()
+On Tue, Jul 19, 2016 at 03:35:18PM +0300, Peter Ujfalusi wrote:
+> On 07/18/16 13:34, Russell King - ARM Linux wrote:
+> > On Thu, Jul 14, 2016 at 03:42:37PM +0300, Peter Ujfalusi wrote:
+> >> Before looking for the next descriptor to start, complete the just finished
+> >> cookie.
+> > 
+> > This change will reduce performance as we no longer have an overlap
+> > between the next request starting to be dealt with in the hardware
+> > vs the previous request being completed.
+> 
+> vchan_cookie_complete() will only mark the cookie completed, adds the vd to
+> the desc_completed list (it was deleted from desc_issued list when it was
+> started by omap_dma_start_desc) and schedule the tasklet to deal with the real
+> completion later.
+> Marking the just finished descriptor/cookie done first then looking for
+> possible descriptors in the queue to start feels like a better sequence.
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- drivers/remoteproc/remoteproc_core.c | 41 ++++++++----------------------------
- drivers/soc/ti/wkup_m3_ipc.c         | 14 +++---------
- include/linux/remoteproc.h           |  4 ++--
- 3 files changed, 14 insertions(+), 45 deletions(-)
+I deliberately arranged the code in the original order so that the next
+transfer was started on the hardware with the least amount of work by
+the CPU.  Yes, there may not be much in it, but everything you mention
+above adds to the number of CPU cycles that need to be executed before
+the next transfer can be started.
 
-diff --git a/drivers/remoteproc/remoteproc_core.c b/drivers/remoteproc/remoteproc_core.c
-index 6a0d158..aea29a75c 100644
---- a/drivers/remoteproc/remoteproc_core.c
-+++ b/drivers/remoteproc/remoteproc_core.c
-@@ -1269,47 +1269,24 @@ struct rproc *of_get_rproc_by_name(struct device_node *np, const char *name)
- EXPORT_SYMBOL(of_get_rproc_by_name);
- 
- /**
-- * rproc_get_by_phandle() - find a remote processor by phandle
-- * @phandle: phandle to the rproc
-+ * of_get_rproc_by_phandle() - lookup and obtain a reference to an rproc
-+ * @np: node to search for rproc
-  *
-- * Finds an rproc handle using the remote processor's phandle, and then
-- * return a handle to the rproc.
-+ * Finds an rproc handle using the default remote processor's phandle,
-+ * and then returns a handle to the rproc.
-  *
-  * This function increments the remote processor's refcount, so always
-  * use rproc_put() to decrement it back once rproc isn't needed anymore.
-  *
-- * Returns the rproc handle on success, and NULL on failure.
-+ * Returns a pointer to the rproc struct on success or an appropriate error
-+ * code otherwise.
-  */
--struct rproc *rproc_get_by_phandle(phandle phandle)
--{
--	struct rproc *rproc = NULL, *r;
--	struct device_node *np;
--
--	np = of_find_node_by_phandle(phandle);
--	if (!np)
--		return NULL;
--
--	mutex_lock(&rproc_list_mutex);
--	list_for_each_entry(r, &rproc_list, node) {
--		if (r->dev.parent && r->dev.parent->of_node == np) {
--			rproc = r;
--			get_device(&rproc->dev);
--			break;
--		}
--	}
--	mutex_unlock(&rproc_list_mutex);
--
--	of_node_put(np);
--
--	return rproc;
--}
--#else
--struct rproc *rproc_get_by_phandle(phandle phandle)
-+struct rproc *of_get_rproc_by_phandle(struct device_node *np)
- {
--	return NULL;
-+	return of_get_rproc_by_index(np, 0);
- }
-+EXPORT_SYMBOL(of_get_rproc_by_phandle);
- #endif
--EXPORT_SYMBOL(rproc_get_by_phandle);
- 
- /**
-  * rproc_add() - register a remote processor
-diff --git a/drivers/soc/ti/wkup_m3_ipc.c b/drivers/soc/ti/wkup_m3_ipc.c
-index 8823cc8..15481f3 100644
---- a/drivers/soc/ti/wkup_m3_ipc.c
-+++ b/drivers/soc/ti/wkup_m3_ipc.c
-@@ -385,7 +385,6 @@ static int wkup_m3_ipc_probe(struct platform_device *pdev)
- {
- 	struct device *dev = &pdev->dev;
- 	int irq, ret;
--	phandle rproc_phandle;
- 	struct rproc *m3_rproc;
- 	struct resource *res;
- 	struct task_struct *task;
-@@ -430,16 +429,9 @@ static int wkup_m3_ipc_probe(struct platform_device *pdev)
- 		return PTR_ERR(m3_ipc->mbox);
- 	}
- 
--	if (of_property_read_u32(dev->of_node, "ti,rproc", &rproc_phandle)) {
--		dev_err(&pdev->dev, "could not get rproc phandle\n");
--		ret = -ENODEV;
--		goto err_free_mbox;
--	}
--
--	m3_rproc = rproc_get_by_phandle(rproc_phandle);
--	if (!m3_rproc) {
--		dev_err(&pdev->dev, "could not get rproc handle\n");
--		ret = -EPROBE_DEFER;
-+	m3_rproc = of_get_rproc_by_phandle(dev->of_node);
-+	if (IS_ERR(m3_rproc)) {
-+		ret = PTR_ERR(m3_rproc);
- 		goto err_free_mbox;
- 	}
- 
-diff --git a/include/linux/remoteproc.h b/include/linux/remoteproc.h
-index f130938..3608d20 100644
---- a/include/linux/remoteproc.h
-+++ b/include/linux/remoteproc.h
-@@ -515,7 +515,7 @@ extern struct rproc *of_get_rproc_by_index(struct device_node *np,
- 					   int index);
- extern struct rproc *of_get_rproc_by_name(struct device_node *np,
- 					  const char *name);
--extern struct rproc *rproc_get_by_phandle(phandle phandle);
-+extern struct rproc *of_get_rproc_by_phandle(struct device_node *np);
- #else
- static inline
- struct rproc *of_get_rproc_by_index(struct device_node *np, int index)
-@@ -528,7 +528,7 @@ struct rproc *of_get_rproc_by_name(struct device_node *np, const char *name)
- 	return NULL;
- }
- static inline
--struct rproc *rproc_get_by_phandle(phandle phandle)
-+struct rproc *of_get_rproc_by_phandle(struct device_node *np)
- {
- 	return NULL;
- }
+More CPU cycles wasted means higher latency between transfers, which
+means lower performance.
+
+> After a quick grep in the kernel source: only omap-dma.c was starting the
+> next transfer before marking the current completed descriptor/cookie done.
+
+Right, because I've thought about the issue, having been the author of
+both virt-dma and omap-dma.
+
 -- 
-2.9.0
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
