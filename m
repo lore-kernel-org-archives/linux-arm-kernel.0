@@ -1,57 +1,35 @@
 From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 19 Jul 2016 18:52:58 +0100
-Subject: [PATCH v10 6/7] arm64: add support for ACPI Low Power Idle(LPI)
+Date: Tue, 19 Jul 2016 18:52:59 +0100
+Subject: [PATCH v10 7/7] ACPI : enable ACPI_PROCESSOR_IDLE on ARM64
 In-Reply-To: <1468950779-21745-1-git-send-email-sudeep.holla@arm.com>
 References: <1468950779-21745-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <1468950779-21745-7-git-send-email-sudeep.holla@arm.com>
+Message-ID: <1468950779-21745-8-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds appropriate callbacks to support ACPI Low Power Idle
-(LPI) on ARM64.
+Now that ACPI processor idle driver supports LPI(Low Power Idle), lets
+enable ACPI_PROCESSOR_IDLE for ARM64 too.
 
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
+This patch just removes the IA64 and X86 dependency on ACPI_PROCESSOR_IDLE
+
 Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
 ---
- arch/arm64/kernel/cpuidle.c | 18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
+ drivers/acpi/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm64/kernel/cpuidle.c b/arch/arm64/kernel/cpuidle.c
-index 06786fdaadeb..75a0f8acef66 100644
---- a/arch/arm64/kernel/cpuidle.c
-+++ b/arch/arm64/kernel/cpuidle.c
-@@ -9,6 +9,9 @@
-  * published by the Free Software Foundation.
-  */
- 
-+#include <linux/acpi.h>
-+#include <linux/cpuidle.h>
-+#include <linux/cpu_pm.h>
- #include <linux/of.h>
- #include <linux/of_device.h>
- 
-@@ -39,3 +42,18 @@ int arm_cpuidle_suspend(int index)
- 
- 	return cpu_ops[cpu]->cpu_suspend(index);
- }
-+
-+#ifdef CONFIG_ACPI
-+
-+#include <acpi/processor.h>
-+
-+int acpi_processor_ffh_lpi_probe(unsigned int cpu)
-+{
-+	return arm_cpuidle_init(cpu);
-+}
-+
-+int acpi_processor_ffh_lpi_enter(struct acpi_lpi_state *lpi)
-+{
-+	return CPU_PM_CPU_IDLE_ENTER(arm_cpuidle_suspend, lpi->index);
-+}
-+#endif
+diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
+index 1358fb7d7a68..d74275c0f374 100644
+--- a/drivers/acpi/Kconfig
++++ b/drivers/acpi/Kconfig
+@@ -238,7 +238,7 @@ config ACPI_CPPC_LIB
+ config ACPI_PROCESSOR
+ 	tristate "Processor"
+ 	depends on X86 || IA64 || ARM64
+-	select ACPI_PROCESSOR_IDLE if X86 || IA64
++	select ACPI_PROCESSOR_IDLE
+ 	select ACPI_CPU_FREQ_PSS if X86 || IA64
+ 	default y
+ 	help
 -- 
 2.7.4
