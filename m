@@ -1,120 +1,231 @@
-From: fu.wei@linaro.org (Fu Wei)
-Date: Wed, 20 Jul 2016 02:25:35 +0800
-Subject: [PATCH v7 4/9] acpi/arm64: Add GTDT table parse driver
-In-Reply-To: <16716612.zdLA2RMyjn@vostro.rjw.lan>
-References: <1468432402-4872-1-git-send-email-fu.wei@linaro.org>
- <1580087.dlcVOb6fx1@vostro.rjw.lan>
- <CADyBb7tLyABzWFEW_8A3bK9XeWiHJjh7TqWQc=vDn5O_WUJX5w@mail.gmail.com>
- <16716612.zdLA2RMyjn@vostro.rjw.lan>
-Message-ID: <CADyBb7uiu2d-6bkA6qg9rWCePrZPtv3aMktXUvn7UciiR-WLhA@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 19 Jul 2016 19:27:44 +0100
+Subject: [PATCH v15 00/10] arm64: Add kernel probes (kprobes) support
+In-Reply-To: <1467995754-32508-1-git-send-email-dave.long@linaro.org>
+References: <1467995754-32508-1-git-send-email-dave.long@linaro.org>
+Message-ID: <20160719182744.GI21256@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rafael,
+On Fri, Jul 08, 2016 at 12:35:44PM -0400, David Long wrote:
+> From: "David A. Long" <dave.long@linaro.org>
+> 
+> This patchset is heavily based on Sandeepa Prabhu's ARM v8 kprobes patches,
+> first seen in October 2013. This version attempts to address concerns
+> raised by reviewers and also fixes problems discovered during testing.
+> 
+> This patchset adds support for kernel probes(kprobes), jump probes(jprobes)
+> and return probes(kretprobes) support for ARM64.
 
-On 16 July 2016 at 20:35, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
-> On Saturday, July 16, 2016 10:24:35 AM Fu Wei wrote:
->> Hi Rafeal,
->>
->> On 16 July 2016 at 05:22, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
->> > On Saturday, July 16, 2016 12:32:14 AM Fu Wei wrote:
->> >> Hi Rafael,
->> >>
->> >> On 15 July 2016 at 21:07, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
->> >> > On Friday, July 15, 2016 02:15:27 PM Rafael J. Wysocki wrote:
->> >> >> On Friday, July 15, 2016 03:32:35 PM Fu Wei wrote:
->> >> >> > Hi Rafael,
->> >> >> >
->> >> >
->> >> > [cut]
->> >> >
->> >> >> > >
->> >> >> > >> +               return 0;
->> >> >> > >> +       }
->> >> >> > >> +
->> >> >> > >> +       if (!gtdt->platform_timer_count) {
->> >> >> > >> +               pr_info("No Platform Timer.\n");
->> >> >> > >> +               return 0;
->> >> >> > >> +       }
->> >> >> > >> +
->> >> >> > >> +       acpi_gtdt_desc.platform_timer_start = (void *)gtdt +
->> >> >> > >> +                                             gtdt->platform_timer_offset;
->> >> >> > >> +       if (acpi_gtdt_desc.platform_timer_start <
->> >> >> > >> +           (void *)table + sizeof(struct acpi_table_gtdt)) {
->> >> >> > >> +               pr_err(FW_BUG "Platform Timer pointer error.\n");
->> >> >> > >
->> >> >> > > Why pr_err()?
->> >> >> >
->> >> >> > if (true), that means the GTDT table has bugs.
->> >> >> >
->> >> >>
->> >> >> And that's not a very useful piece of information unless you're debugging the
->> >> >> platform, is it?
->> >> >
->> >> > FWIW, I'm not a big fan of printing "your firmware is buggy" type of messages
->> >> > (especially at the "error" log level or higher) unless they can be clearly
->> >> > connected to a specific type of functional failure.
->> >> >
->> >> > So if you want to pring an error-level message, something like "I cannot do X
->> >> > because of the firmware bug Y" would be better IMO.
->> >>
->> >> So can I do this:
->> >> pr_err(FW_BUG "Can NOT init platform_timer pointer, because of the
->> >> GTDT table bug\n");
->> >>
->> >> or pr_debug(FW_BUG "Can NOT init platform_timer_start, because of
->> >> platform_timer_offset bug in GTDT\n");
->> >>
->> >> or just delete it?
->> >>
->> >> which one do you prefer?  I think maybe should provide some clue for
->> >> users to fix the problem  :-)
->> >
->> > And how exactly would they fix it then?
->> >
->> >>
->> >> any thought ?
->> >
->> > If you print variable or function names and the like, the message should be
->> > a debug one, because that's information that can only be understood by
->> > developers (some developers are users too, but they are a minority).
->> >
->> > If you want to report an error, say what is not working (or not available
->> > etc) and why (if you know the reason at the time the message is printed).
->>
->> Great thanks, I guess I got you point.
->>
->> maybe just a very simple message like:
->> pr_err(FW_BUG "Failed to init table: GTDT table is buggy.\n");
->
-> To understand this message one needs to know what "table" means here
-> and what "GTDT" is.  Also the prefix already will be something like
-> "ACPI: GTDT:", so repeating part of it is not really useful IMO.
->
-> Can you tell me please what's not going to work when that message is printed?
->
-> Will the system boot at all then?  If so, the functionality will be limited
-> somehow I suppose.  How is it going to be limited?
+Some more errors with this patchset applied and CONFIG_NET_TCPPROBE
+enabled (it's fine with this option disabled though). I boot on a Juno
+with NFS over UDP and then try to ssh into it (hence establish the first
+TCP connection):
 
-when that message is printed, all kind of platform timer(memory-mapped
-timer and SBSA watchdog) can't work.
-actually, I think system can boot without them.
-I have updated this on my v8(just posted), let's discuss this on v8 :-)
+Unable to handle kernel NULL pointer dereference at virtual address 00000003
+pgd = ffff000008ceb000
+[00000003] *pgd=00000009fff6d003, *pud=00000009fff6c003, *pmd=0000000000000000
+Internal error: Oops: 96000004 [#1] PREEMPT SMP
+Modules linked in:
+CPU: 1 PID: 0 Comm: swapper/1 Not tainted 4.7.0-rc4+ #9
+Hardware name: ARM Juno development board (r0) (DT)
+task: ffff800976901900 ti: ffff800976910000 task.ti: ffff800976910000
+PC is at enqueue_task_fair+0x818/0x1188
+LR is at enqueue_task_fair+0x8a4/0x1188
+pc : [<ffff0000080e73d8>] lr : [<ffff0000080e7464>] pstate: 600001c5
+sp : ffff80097fec3a80
+x29: ffff80097fec3a80 x28: 0000000000000001
+x27: 00000000afb50401 x26: afb504000afb5041
+x25: 0000000000000000 x24: 0000000000000001
+x23: ffff000008bcbd90 x22: 0000000000000001
+x21: ffff800975951900 x20: ffff800975951800
+x19: ffff80097fec96e8 x18: 0000000000000000
+x17: 0000000000000000 x16: 0000000000000000
+x15: 0000000000000001 x14: 0000000000000001
+x13: 0000000005da2e6c x12: 000000000044ab8d
+x11: 0000000000000000 x10: 0000000000000001
+x9 : 0000000000000000 x8 : 0000000991653ffc
+x7 : 000000000000003e x6 : ffff80097fec9740
+x5 : 0000000000000000 x4 : ffff0000087ef950
+x3 : 0000000000000400 x2 : 000000000000005e
+x1 : ffff80097fec9680 x0 : 0000000000000003
 
->
->> I will also check other pr_* , if I can update them
->
-> OK, great!
->
-> Thanks,
-> Rafael
->
+Process swapper/1 (pid: 0, stack limit = 0xffff800976910020)
+Stack: (0xffff80097fec3a80 to 0xffff800976914000)
+Call trace:
+Exception stack(0xffff80097fec38c0 to 0xffff80097fec39e0)
+38c0: ffff80097fec96e8 ffff800975951800 ffff80097fec3a80 ffff0000080e73d8
+38e0: ffff800976ad2300 ffff800974a07e00 0000000000000003 ffff800974a00000
+3900: 0000000000000000 ffff7e0025d28000 0000000000000013 0000000080010400
+3920: ffff000008c9f000 0000000000000003 0000000100000000 000000000000000e
+3940: ffff80097fec39a0 ffff0000081ae954 0000000000000000 0000000000000000
+3960: 0000000000000003 ffff80097fec9680 000000000000005e 0000000000000400
+3980: ffff0000087ef950 0000000000000000 ffff80097fec9740 000000000000003e
+39a0: 0000000991653ffc 0000000000000000 0000000000000001 0000000000000000
+39c0: 000000000044ab8d 0000000005da2e6c 0000000000000001 0000000000000001
+[<ffff0000080e73d8>] enqueue_task_fair+0x818/0x1188
+[<ffff0000080dbdd4>] activate_task+0x5c/0xa0
+[<ffff0000080dc088>] ttwu_do_activate+0x50/0x88
+[<ffff0000080dda60>] try_to_wake_up+0x228/0x2c0
+[<ffff0000080ddbd0>] default_wake_function+0x10/0x18
+[<ffff0000080f0ffc>] autoremove_wake_function+0x14/0x40
+[<ffff0000080f0814>] __wake_up_common+0x5c/0xa0
+[<ffff0000080f0e64>] __wake_up_sync_key+0x4c/0x78
+[<ffff00000875a330>] tcp_prequeue+0x190/0x2e8
+[<ffff00000875b8a4>] tcp_v4_rcv+0xa5c/0xb08
+[<ffff000008736eac>] ip_local_deliver+0xa4/0x200
+[<ffff0000087373e4>] ip_rcv+0x3dc/0x5f0
+[<ffff000008707460>] __netif_receive_skb_core+0x5f8/0x7c8
+[<ffff000008709990>] __netif_receive_skb+0x18/0x68
+[<ffff000008709a04>] netif_receive_skb_internal+0x24/0xa8
+[<ffff000008709a94>] netif_receive_skb+0xc/0x18
+[<ffff00000858f9b0>] smsc911x_poll+0xf0/0x278
+[<ffff00000870b0b0>] net_rx_action+0x1d8/0x2b0
+[<ffff0000080be200>] __do_softirq+0x100/0x210
+[<ffff0000080be5b8>] irq_exit+0x90/0xd8
+[<ffff0000080fb2f8>] __handle_domain_irq+0x60/0xb8
+[<ffff000008081578>] gic_handle_irq+0x58/0xb0
+Exception stack(0xffff800976913df0 to 0xffff800976913f10)
+3de0:                                   0000000000000000 ffff80097fec9680
+3e00: 00008009772f9000 0000000002800000 0000000000000004 000000000115c074
+3e20: 0000000000000015 000000000000012f 000000000000016d ffff80097fec872c
+3e40: 0000000000000a12 0000000000000a12 071c71c71c71c71c 20230a2e746c7561
+3e60: 524150203a4c4c41 0000000000000000 0000000000000000 0000000000000000
+3e80: 0000000000000000 00000009972f2718 ffff8009763d7400 0000000000000000
+3ea0: 0000000000000000 ffff000008c6bb20 00000009972ada50 ffff000008c05c1c
+3ec0: ffff000008c05000 ffff000008c6bb20 ffff800976910000 ffff800976913f10
+3ee0: ffff00000864ac08 ffff800976913f10 ffff00000864ac0c 0000000060000145
+3f00: ffff000008c6bb20 ffff8009763d7400
+[<ffff000008082720>] el1_irq+0xa0/0x10c
+[<ffff00000864ac0c>] cpuidle_enter_state+0x1b4/0x238
+[<ffff00000864acc8>] cpuidle_enter+0x18/0x20
+[<ffff0000080f15c0>] call_cpuidle+0x18/0x30
+[<ffff0000080f1838>] cpu_startup_entry+0x198/0x1f8
+[<ffff00000808dc78>] secondary_start_kernel+0x158/0x198
+[<00000000800831a8>] 0x800831a8
+Code: f8606ae0 b4ffe5c0 f9447023 f9403e62 (f9400006)
+Bad mode in Synchronous Abort handler detected on CPU1, code 0x8600000f -- IABT (current EL)
+CPU: 1 PID: 0 Comm: swapper/1 Tainted: G      D         4.7.0-rc4+ #9
+Hardware name: ARM Juno development board (r0) (DT)
+task: ffff800976901900 ti: ffff800976910000 task.ti: ffff800976910000
+PC is at 0xffff80097fec3f40
+LR is at irq_work_run_list+0x68/0xb8
+pc : [<ffff80097fec3f40>] lr : [<ffff000008147978>] pstate: 000001c5
+sp : ffff80097fec35f0
+x29: ffff80097fec35f0 x28: ffff800976910000
+x27: 00000000afb50401 x26: afb504000afb5041
+x25: ffff80097fec0000 x24: ffff800976901900
+x23: ffff000008005000 x22: 0000000000000000
+x21: ffff000008ca0d53 x20: ffff000008ca0d52
+x19: ffff80097fec4da8 x18: 0000000000000006
+x17: 0000000000000000 x16: 0000000000000000
+x15: ffff000008cacc95 x14: 3431303030303630
+x13: ffff000008caf0aa x12: 0000000005f5e0ff
+x11: 000000000000016d x10: 00000000000a3d60
+x9 : ffff80097fec3480 x8 : 000000000000016e
+x7 : 6628203236653330 x6 : 000000000000000a
+x5 : ffff80097fec4da0 x4 : 00008009772f9000
+x3 : ffff80097fec3f51 x2 : 0000000000000000
+x1 : ffff80097fec3f40 x0 : ffff80097fec4da0
 
+Internal error: Oops - bad mode: 0 [#2] PREEMPT SMP
+Modules linked in:
+CPU: 1 PID: 0 Comm: swapper/1 Tainted: G      D         4.7.0-rc4+ #9
+Hardware name: ARM Juno development board (r0) (DT)
+task: ffff800976901900 ti: ffff800976910000 task.ti: ffff800976910000
+PC is at 0xffff80097fec3f40
+LR is at irq_work_run_list+0x68/0xb8
+pc : [<ffff80097fec3f40>] lr : [<ffff000008147978>] pstate: 000001c5
+sp : ffff80097fec35f0
+x29: ffff80097fec35f0 x28: ffff800976910000
+x27: 00000000afb50401 x26: afb504000afb5041
+x25: ffff80097fec0000 x24: ffff800976901900
+x23: ffff000008005000 x22: 0000000000000000
+x21: ffff000008ca0d53 x20: ffff000008ca0d52
+x19: ffff80097fec4da8 x18: 0000000000000006
+x17: 0000000000000000 x16: 0000000000000000
+x15: ffff000008cacc95 x14: 3431303030303630
+x13: ffff000008caf0aa x12: 0000000005f5e0ff
+x11: 000000000000016d x10: 00000000000a3d60
+x9 : ffff80097fec3480 x8 : 000000000000016e
+x7 : 6628203236653330 x6 : 000000000000000a
+x5 : ffff80097fec4da0 x4 : 00008009772f9000
+x3 : ffff80097fec3f51 x2 : 0000000000000000
+x1 : ffff80097fec3f40 x0 : ffff80097fec4da0
 
+Process swapper/1 (pid: 0, stack limit = 0xffff800976910020)
+Stack: (0xffff80097fec35f0 to 0xffff800976914000)
+Call trace:
+[<ffff80097fec3f40>] 0xffff80097fec3f40
+[<ffff0000081479ec>] irq_work_run+0x24/0x40
+[<ffff00000808e208>] handle_IPI+0x148/0x168
+[<ffff0000080815b0>] gic_handle_irq+0x90/0xb0
+Exception stack(0xffff80097fec3680 to 0xffff80097fec37a0)
+3680: ffff80097fec36b0 ffff80097fec3960 ffff80097fec37d0 ffff0000087d0468
+36a0: 0000000060000145 ffff80097fec3720 ffff000008ca70e8 0000000000000001
+36c0: 0000000000000080 0000000000000080 0000000000000000 ffff80097fec4da0
+36e0: 000000000000000a 6628203236653330 000000000000016e ffff80097fec3480
+3700: 00000000000a3d60 000000000000016d 0000000005f5e0ff ffff000008caf0aa
+3720: 3431303030303630 ffff000008cacc95 0000000000000000 0000000000000000
+3740: 0000000000000006 ffff000008ca7000 ffff80097fec3960 0000000000000000
+3760: ffff0000089fd908 ffff800976910000 ffff800976901900 0000000000000000
+3780: afb504000afb5041 00000000afb50401 0000000000000001 ffff80097fec37d0
+[<ffff000008082720>] el1_irq+0xa0/0x10c
+[<ffff00000809800c>] __do_kernel_fault.part.1+0x74/0x88
+[<ffff0000087d277c>] do_page_fault+0x37c/0x380
+[<ffff0000087d27c4>] do_translation_fault+0x44/0x50
+[<ffff00000808137c>] do_mem_abort+0x44/0xa0
+Exception stack(0xffff80097fec38c0 to 0xffff80097fec39e0)
+38c0: ffff80097fec96e8 ffff800975951800 ffff80097fec3a80 ffff0000080e73d8
+38e0: ffff800976ad2300 ffff800974a07e00 0000000000000003 ffff800974a00000
+3900: 0000000000000000 ffff7e0025d28000 0000000000000013 0000000080010400
+3920: ffff000008c9f000 0000000000000003 0000000100000000 000000000000000e
+3940: ffff80097fec39a0 ffff0000081ae954 0000000000000000 0000000000000000
+3960: 0000000000000003 ffff80097fec9680 000000000000005e 0000000000000400
+3980: ffff0000087ef950 0000000000000000 ffff80097fec9740 000000000000003e
+39a0: 0000000991653ffc 0000000000000000 0000000000000001 0000000000000000
+39c0: 000000000044ab8d 0000000005da2e6c 0000000000000001 0000000000000001
+[<ffff000008082568>] el1_da+0x18/0x70
+[<ffff0000080dbdd4>] activate_task+0x5c/0xa0
+[<ffff0000080dc088>] ttwu_do_activate+0x50/0x88
+[<ffff0000080dda60>] try_to_wake_up+0x228/0x2c0
+[<ffff0000080ddbd0>] default_wake_function+0x10/0x18
+[<ffff0000080f0ffc>] autoremove_wake_function+0x14/0x40
+[<ffff0000080f0814>] __wake_up_common+0x5c/0xa0
+[<ffff0000080f0e64>] __wake_up_sync_key+0x4c/0x78
+[<ffff00000875a330>] tcp_prequeue+0x190/0x2e8
+[<ffff00000875b8a4>] tcp_v4_rcv+0xa5c/0xb08
+[<ffff000008736eac>] ip_local_deliver+0xa4/0x200
+[<ffff0000087373e4>] ip_rcv+0x3dc/0x5f0
+[<ffff000008707460>] __netif_receive_skb_core+0x5f8/0x7c8
+[<ffff000008709990>] __netif_receive_skb+0x18/0x68
+[<ffff000008709a04>] netif_receive_skb_internal+0x24/0xa8
+[<ffff000008709a94>] netif_receive_skb+0xc/0x18
+[<ffff00000858f9b0>] smsc911x_poll+0xf0/0x278
+[<ffff00000870b0b0>] net_rx_action+0x1d8/0x2b0
+[<ffff0000080be200>] __do_softirq+0x100/0x210
+[<ffff0000080be5b8>] irq_exit+0x90/0xd8
+[<ffff0000080fb2f8>] __handle_domain_irq+0x60/0xb8
+[<ffff000008081578>] gic_handle_irq+0x58/0xb0
+Exception stack(0xffff800976913df0 to 0xffff800976913f10)
+3de0:                                   0000000000000000 ffff80097fec9680
+3e00: 00008009772f9000 0000000002800000 0000000000000004 000000000115c074
+3e20: 0000000000000015 000000000000012f 000000000000016d ffff80097fec872c
+3e40: 0000000000000a12 0000000000000a12 071c71c71c71c71c 20230a2e746c7561
+3e60: 524150203a4c4c41 0000000000000000 0000000000000000 0000000000000000
+3e80: 0000000000000000 00000009972f2718 ffff8009763d7400 0000000000000000
+3ea0: 0000000000000000 ffff000008c6bb20 00000009972ada50 ffff000008c05c1c
+3ec0: ffff000008c05000 ffff000008c6bb20 ffff800976910000 ffff800976913f10
+3ee0: ffff00000864ac08 ffff800976913f10 ffff00000864ac0c 0000000060000145
+3f00: ffff000008c6bb20 ffff8009763d7400
+[<ffff000008082720>] el1_irq+0xa0/0x10c
+[<ffff00000864ac0c>] cpuidle_enter_state+0x1b4/0x238
+[<ffff00000864acc8>] cpuidle_enter+0x18/0x20
+[<ffff0000080f15c0>] call_cpuidle+0x18/0x30
+[<ffff0000080f1838>] cpu_startup_entry+0x198/0x1f8
+[<ffff00000808dc78>] secondary_start_kernel+0x158/0x198
+[<00000000800831a8>] 0x800831a8
+Code: 08aa2d08 ffff0000 08ca0d50 ffff0000 (7fec3f40)
 
 -- 
-Best regards,
-
-Fu Wei
-Software Engineer
-Red Hat
+Catalin
