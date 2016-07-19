@@ -1,43 +1,32 @@
 From: mirza.krak@gmail.com (Mirza Krak)
-Date: Tue, 19 Jul 2016 15:36:36 +0200
-Subject: [RFC 5/6] ARM: tegra: Add Tegra20 NOR support
+Date: Tue, 19 Jul 2016 15:36:33 +0200
+Subject: [RFC 2/6] clk: tegra: add TEGRA30_CLK_NOR to init table
 In-Reply-To: <1468935397-11926-1-git-send-email-mirza.krak@gmail.com>
 References: <1468935397-11926-1-git-send-email-mirza.krak@gmail.com>
-Message-ID: <1468935397-11926-6-git-send-email-mirza.krak@gmail.com>
+Message-ID: <1468935397-11926-3-git-send-email-mirza.krak@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Mirza Krak <mirza.krak@gmail.com>
 
-Add a device node for the NOR controller found on Tegra20.
+Add TEGRA30_CLK_NOR to init table and set a sane default rate.
 
 Signed-off-by: Mirza Krak <mirza.krak@gmail.com>
 ---
- arch/arm/boot/dts/tegra20.dtsi | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ drivers/clk/tegra/clk-tegra30.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/tegra20.dtsi b/arch/arm/boot/dts/tegra20.dtsi
-index 2207c08..fa8b3c7 100644
---- a/arch/arm/boot/dts/tegra20.dtsi
-+++ b/arch/arm/boot/dts/tegra20.dtsi
-@@ -376,6 +376,18 @@
- 		status = "disabled";
- 	};
-
-+
-+	nor at 70009000 {
-+		compatible = "nvidia,tegra20-nor", "nvidia,tegra30-nor";
-+		reg = <70009000 0x1000>;
-+		#address-cells = <2>;
-+		#size-cells = <1>;
-+		clocks = <&tegra_car TEGRA20_CLK_NOR>;
-+		resets = < &tegra_car 42>;
-+		reset-names = "nor";
-+		status = "disabled";
-+	};
-+
- 	pwm: pwm at 7000a000 {
- 		compatible = "nvidia,tegra20-pwm";
- 		reg = <0x7000a000 0x100>;
+diff --git a/drivers/clk/tegra/clk-tegra30.c b/drivers/clk/tegra/clk-tegra30.c
+index 9396f49..5eda262 100644
+--- a/drivers/clk/tegra/clk-tegra30.c
++++ b/drivers/clk/tegra/clk-tegra30.c
+@@ -1361,6 +1361,7 @@ static struct tegra_clk_init_table init_table[] __initdata = {
+ 	{ TEGRA30_CLK_SDMMC1, TEGRA30_CLK_PLL_P, 48000000, 0 },
+ 	{ TEGRA30_CLK_SDMMC2, TEGRA30_CLK_PLL_P, 48000000, 0 },
+ 	{ TEGRA30_CLK_SDMMC3, TEGRA30_CLK_PLL_P, 48000000, 0 },
++	{ TEGRA30_CLK_NOR, TEGRA30_CLK_PLL_P, 86500000, 0 },
+ 	{ TEGRA30_CLK_PLL_M, TEGRA30_CLK_CLK_MAX, 0, 1 },
+ 	{ TEGRA30_CLK_PCLK, TEGRA30_CLK_CLK_MAX, 0, 1 },
+ 	{ TEGRA30_CLK_CSITE, TEGRA30_CLK_CLK_MAX, 0, 1 },
 --
 2.1.4
