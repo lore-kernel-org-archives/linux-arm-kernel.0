@@ -1,75 +1,70 @@
 From: eric.auger@redhat.com (Eric Auger)
-Date: Tue, 19 Jul 2016 13:11:30 +0000
-Subject: [PATCH v11 4/8] vfio/type1: handle unmap/unpin and replay for
- VFIO_IOVA_RESERVED slots
+Date: Tue, 19 Jul 2016 13:11:32 +0000
+Subject: [PATCH v11 6/8] vfio/type1: check doorbell safety
 In-Reply-To: <1468933894-23250-1-git-send-email-eric.auger@redhat.com>
 References: <1468933894-23250-1-git-send-email-eric.auger@redhat.com>
-Message-ID: <1468933894-23250-5-git-send-email-eric.auger@redhat.com>
+Message-ID: <1468933894-23250-7-git-send-email-eric.auger@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Before allowing the end-user to create VFIO_IOVA_RESERVED dma slots,
-let's implement the expected behavior for removal and replay.
+On x86 IRQ remapping is abstracted by the IOMMU. On ARM this is abstracted
+by the msi controller.
 
-As opposed to user dma slots, reserved IOVAs are not systematically bound
-to PAs and PAs are not pinned. VFIO just initializes the IOVA "aperture".
-IOVAs are allocated outside of the VFIO framework, by the MSI layer which
-is responsible to free and unmap them. The MSI mapping resources are freeed
-by the IOMMU driver on domain destruction.
+Since we currently have no way to detect whether the MSI controller is
+upstream or downstream to the IOMMU we rely on the MSI doorbell information
+registered by the interrupt controllers. In case at least one doorbell
+does not implement proper isolation, we state the assignment is unsafe
+with regard to interrupts. This is a coase assessment but should allow to
+wait for a better system description.
 
-On the creation of a new domain, the "replay" of a reserved slot simply
-needs to set the MSI aperture on the new domain.
+At this point ARM sMMU still advertises IOMMU_CAP_INTR_REMAP. This is
+removed in next patch.
 
 Signed-off-by: Eric Auger <eric.auger@redhat.com>
 
 ---
 
 v9 -> v10:
-- replay of a reserved slot sets the MSI aperture on the new domain
-- use VFIO_IOVA_RESERVED_MSI enum value instead of VFIO_IOVA_RESERVED
+- coarse safety assessment based on MSI doorbell info
 
-v7 -> v8:
-- do no destroy anything anymore, just bypass unmap/unpin and iommu_map
-  on replay
+v3 -> v4:
+- rename vfio_msi_parent_irq_remapping_capable into vfio_safe_irq_domain
+  and irq_remapping into safe_irq_domains
+
+v2 -> v3:
+- protect vfio_msi_parent_irq_remapping_capable with
+  CONFIG_GENERIC_MSI_IRQ_DOMAIN
 ---
- drivers/vfio/vfio_iommu_type1.c | 11 ++++++++++-
- 1 file changed, 10 insertions(+), 1 deletion(-)
+ drivers/vfio/vfio_iommu_type1.c | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/vfio/vfio_iommu_type1.c b/drivers/vfio/vfio_iommu_type1.c
-index 65a4038..69c775e 100644
+index 14dc9ef..7daab53 100644
 --- a/drivers/vfio/vfio_iommu_type1.c
 +++ b/drivers/vfio/vfio_iommu_type1.c
-@@ -36,6 +36,7 @@
- #include <linux/uaccess.h>
+@@ -37,6 +37,7 @@
  #include <linux/vfio.h>
  #include <linux/workqueue.h>
-+#include <linux/msi-iommu.h>
+ #include <linux/msi-iommu.h>
++#include <linux/msi-doorbell.h>
  
  #define DRIVER_VERSION  "0.2"
  #define DRIVER_AUTHOR   "Alex Williamson <alex.williamson@redhat.com>"
-@@ -387,7 +388,7 @@ static void vfio_unmap_unpin(struct vfio_iommu *iommu, struct vfio_dma *dma)
- 	struct vfio_domain *domain, *d;
- 	long unlocked = 0;
+@@ -922,8 +923,14 @@ static int vfio_iommu_type1_attach_group(void *iommu_data,
+ 	INIT_LIST_HEAD(&domain->group_list);
+ 	list_add(&group->next, &domain->group_list);
  
--	if (!dma->size)
-+	if (!dma->size || dma->type != VFIO_IOVA_USER)
- 		return;
- 	/*
- 	 * We use the IOMMU to track the physical addresses, otherwise we'd
-@@ -724,6 +725,14 @@ static int vfio_iommu_replay(struct vfio_iommu *iommu,
- 		dma = rb_entry(n, struct vfio_dma, node);
- 		iova = dma->iova;
- 
-+		if (dma->type == VFIO_IOVA_RESERVED_MSI) {
-+			ret = iommu_msi_set_aperture(domain->domain,
-+						     dma->iova,
-+						     iova + dma->size - 1);
-+			WARN_ON(ret);
-+			continue;
-+		}
-+
- 		while (iova < dma->iova + dma->size) {
- 			phys_addr_t phys = iommu_iova_to_phys(d->domain, iova);
- 			size_t size;
++	/*
++	 * to advertise safe interrupts either the IOMMU or the MSI controllers
++	 * must support IRQ remapping (aka. interrupt translation), property
++	 * exposed by their registered doorbells
++	 */
+ 	if (!allow_unsafe_interrupts &&
+-	    !iommu_capable(bus, IOMMU_CAP_INTR_REMAP)) {
++	    (!iommu_capable(bus, IOMMU_CAP_INTR_REMAP) &&
++	     !msi_doorbell_safe())) {
+ 		pr_warn("%s: No interrupt remapping support.  Use the module param \"allow_unsafe_interrupts\" to enable VFIO IOMMU support on this platform\n",
+ 		       __func__);
+ 		ret = -EPERM;
 -- 
 1.9.1
