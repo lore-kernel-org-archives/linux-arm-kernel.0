@@ -1,235 +1,66 @@
-From: dennis.chen@arm.com (Dennis Chen)
-Date: Tue, 19 Jul 2016 18:41:04 +0800
-Subject: [PATCH v22 1/8] arm64: kdump: reserve memory for crash dump kernel
-In-Reply-To: <20160719102815.GE20774@linaro.org>
-References: <20160712050514.22307-1-takahiro.akashi@linaro.org>
- <20160712050514.22307-2-takahiro.akashi@linaro.org>
- <20160719093906.GA20732@arm.com>
- <20160719102815.GE20774@linaro.org>
-Message-ID: <20160719104103.GB20990@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 19 Jul 2016 11:52:00 +0100
+Subject: [RFC 3/3] kexec: extend kexec_file_load system call
+In-Reply-To: <20160719005556.GE3326@dhcp-128-65.nay.redhat.com>
+References: <20160712014201.11456-1-takahiro.akashi@linaro.org>
+ <20160712014201.11456-4-takahiro.akashi@linaro.org>
+ <20160715130955.GC23514@redhat.com>
+ <20160715131950.GB19840@leverpostej>
+ <20160718023024.GB6310@dhcp-128-65.nay.redhat.com>
+ <20160718100704.GB10069@leverpostej>
+ <20160719005556.GE3326@dhcp-128-65.nay.redhat.com>
+Message-ID: <20160719105049.GD27022@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 19, 2016 at 07:28:16PM +0900, AKASHI Takahiro wrote:
-> On Tue, Jul 19, 2016 at 05:39:07PM +0800, Dennis Chen wrote:
-> > Hello AKASHI,
+On Tue, Jul 19, 2016 at 08:55:56AM +0800, Dave Young wrote:
+> On 07/18/16 at 11:07am, Mark Rutland wrote:
+> > On Mon, Jul 18, 2016 at 10:30:24AM +0800, Dave Young wrote:
+> > > I do not think it is worth to add another syscall for extra fds.
+> > > We have open(2) as an example for different numbers of arguments
+> > > already.
 > > 
-> > On Tue, Jul 12, 2016 at 02:05:07PM +0900, AKASHI Takahiro wrote:
-> > > On the startup of primary kernel, the memory region used by crash dump
-> > > kernel must be specified by "crashkernel=" kernel parameter.
-> > > reserve_crashkernel() will allocate and reserve the region for later use.
-> > >
-> > > User space tools, like kexec-tools, will be able to find that region as
-> > >       - "Crash kernel" in /proc/iomem, or
-> > >       - "linux,crashkernel-base" and "linux,crashkernel-size" under
-> > >         /sys/firmware/devicetree/base/chosen
-> > >
-> > > Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> > > Signed-off-by: Mark Salter <msalter@redhat.com>
-> > > Signed-off-by: Pratyush Anand <panand@redhat.com>
-> > > Reviewed-by: James Morse <james.morse@arm.com>
-> > > ---
-> > >  arch/arm64/kernel/setup.c |   7 ++-
-> > >  arch/arm64/mm/init.c      | 115 ++++++++++++++++++++++++++++++++++++++++++++++
-> > >  2 files changed, 121 insertions(+), 1 deletion(-)
-> > >
-> > > diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-> > > index c1509e6..cb5eee0 100644
-> > > --- a/arch/arm64/kernel/setup.c
-> > > +++ b/arch/arm64/kernel/setup.c
-> > > @@ -31,7 +31,6 @@
-> > >  #include <linux/screen_info.h>
-> > >  #include <linux/init.h>
-> > >  #include <linux/kexec.h>
-> > > -#include <linux/crash_dump.h>
-> > >  #include <linux/root_dev.h>
-> > >  #include <linux/cpu.h>
-> > >  #include <linux/interrupt.h>
-> > > @@ -222,6 +221,12 @@ static void __init request_standard_resources(void)
-> > >                   kernel_data.end <= res->end)
-> > >                       request_resource(res, &kernel_data);
-> > >       }
-> > > +
-> > > +#ifdef CONFIG_KEXEC_CORE
-> > > +     /* User space tools will find "Crash kernel" region in /proc/iomem. */
-> > > +     if (crashk_res.end)
-> > > +             insert_resource(&iomem_resource, &crashk_res);
-> > > +#endif
-> > >  }
-> > >
-> > >  u64 __cpu_logical_map[NR_CPUS] = { [0 ... NR_CPUS-1] = INVALID_HWID };
-> > > diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-> > > index 2ade7a6..51b1302 100644
-> > > --- a/arch/arm64/mm/init.c
-> > > +++ b/arch/arm64/mm/init.c
-> > > @@ -29,11 +29,13 @@
-> > >  #include <linux/gfp.h>
-> > >  #include <linux/memblock.h>
-> > >  #include <linux/sort.h>
-> > > +#include <linux/of.h>
-> > >  #include <linux/of_fdt.h>
-> > >  #include <linux/dma-mapping.h>
-> > >  #include <linux/dma-contiguous.h>
-> > >  #include <linux/efi.h>
-> > >  #include <linux/swiotlb.h>
-> > > +#include <linux/kexec.h>
-> > >
-> > >  #include <asm/boot.h>
-> > >  #include <asm/fixmap.h>
-> > > @@ -76,6 +78,117 @@ static int __init early_initrd(char *p)
-> > >  early_param("initrd", early_initrd);
-> > >  #endif
-> > >
-> > > +#ifdef CONFIG_KEXEC_CORE
-> > > +static unsigned long long crash_size, crash_base;
-> > > +static struct property crash_base_prop = {
-> > > +     .name = "linux,crashkernel-base",
-> > > +     .length = sizeof(u64),
-> > > +     .value = &crash_base
-> > > +};
-> > > +static struct property crash_size_prop = {
-> > > +     .name = "linux,crashkernel-size",
-> > > +     .length = sizeof(u64),
-> > > +     .value = &crash_size,
-> > > +};
-> > > +
-> > > +static int __init export_crashkernel(void)
-> > > +{
-> > > +     struct device_node *node;
-> > > +     int ret;
-> > > +
-> > > +     if (!crashk_res.end)
-> > > +             return 0;
-> > > +
-> > > +     crash_base = cpu_to_be64(crashk_res.start);
-> > > +     crash_size = cpu_to_be64(crashk_res.end - crashk_res.start + 1);
-> > > +
-> > > +     /* Add /chosen/linux,crashkernel-* properties */
-> > > +     node = of_find_node_by_path("/chosen");
-> > > +     if (!node)
-> > > +             return -ENOENT;
-> > > +
-> > > +     /*
-> > > +      * There might be existing crash kernel properties, but we can't
-> > > +      * be sure what's in them, so remove them.
-> > > +      */
-> > > +     of_remove_property(node, of_find_property(node,
-> > > +                             "linux,crashkernel-base", NULL));
-> > > +     of_remove_property(node, of_find_property(node,
-> > > +                             "linux,crashkernel-size", NULL));
-> > > +
-> > > +     ret = of_add_property(node, &crash_base_prop);
-> > > +     if (ret)
-> > > +             goto ret_err;
-> > > +
-> > > +     ret = of_add_property(node, &crash_size_prop);
-> > > +     if (ret)
-> > > +             goto ret_err;
-> > > +
-> > > +     return 0;
-> > > +
-> > > +ret_err:
-> > > +     pr_warn("Exporting crashkernel region to device tree failed\n");
-> > > +     return ret;
-> > > +}
-> > > +late_initcall(export_crashkernel);
-> > > +
-> > > +/*
-> > > + * reserve_crashkernel() - reserves memory for crash kernel
-> > > + *
-> > > + * This function reserves memory area given in "crashkernel=" kernel command
-> > > + * line parameter. The memory reserved is used by dump capture kernel when
-> > > + * primary kernel is crashing.
-> > > + */
-> > > +static void __init reserve_crashkernel(void)
-> > > +{
-> > > +     int ret;
-> > > +
-> > > +     ret = parse_crashkernel(boot_command_line, memblock_phys_mem_size(),
-> > > +                             &crash_size, &crash_base);
-> > > +     /* no crashkernel= or invalid value specified */
-> > > +     if (ret || !crash_size)
-> > > +             return;
-> > > +
-> > > +     if (crash_base == 0) {
-> > > +             /* Current arm64 boot protocol requires 2MB alignment */
-> > > +             crash_base = memblock_find_in_range(0,
-> > > +                             MEMBLOCK_ALLOC_ACCESSIBLE, crash_size, SZ_2M);
-> > > +             if (crash_base == 0) {
-> > > +                     pr_warn("Unable to allocate crashkernel (size:%llx)\n",
-> > > +                             crash_size);
-> > > +                     return;
-> > > +             }
-> > > +             memblock_reserve(crash_base, crash_size);
-> > >
-> > I am not pretty sure the context here, but
-> > can we use below code piece instead of the above lines?
-> >         if (crash_base == 0)
-> >                 memblock_alloc(crash_size, SZ_2M);
+> > Did we change the syscall interface for that?
+> > 
+> > I was under the impression that there was always one underlying syscall,
+> > and the C library did the right thing to pass the expected information
+> > to the underlying syscall.
 > 
-> Either would be fine here.
->
-Hello AKASHI, maybe you can succeed to find the base with memblock_find_in_range(), 
-but that doesn't mean you will also succeed to reserve them with memblock_reserve followed.
+> I'm not sure kexec_load and kexec_file_load were included in glibc, we use
+> syscall directly in kexec-tools.
+> 
+> kexec_load man pages says there are no wrappers for both kexec_load and
+> kexec_file_load in glibc.
+
+For the above, I was talking about how open() was handled.
+
+If there are no userspace wrappers, then the two cases aren't comparable
+in the first place...
+
+> > That's rather different to changing the underlying syscall.
+> > 
+> > Regardless of how this is wrapped in userspace, I do not think modifying
+> > the existing prototype is a good idea, and I think this kind of
+> > extension needs to be a new syscall.
+> 
+> Hmm, as I replied to Vivek, there is one case about the flags, previously
+> the new flag will be regarded as invalid, but not we extend it it will be
+> valid, this maybe the only potential bad case.
+
+It's true that adding suport for new flags will change the behaviour of
+what used to be error cases. We generally expect real users to not be
+making pointless calls for which they rely on an error being returned in
+all cases.
+
+Regardless, this extended syscall changes some underlying assumptions
+made with the development of kexec_file_load, and I think treating this
+as an extension is not a great idea. From a user's perspective there is
+little difference between passing an additional flag or using a
+different syscall number, so I don't think that we gain much by altering
+the existing prototype relative to allocating a new syscall number.
+
+Thus, I think that if this is necessary it should be treated as a new
+syscall.
 
 Thanks,
-Dennis
-> 
-> Thanks,
-> -Takahiro AKASHI
-> 
-> > Thanks,
-> > Dennis
-> > 
-> > > +
-> > > +     } else {
-> > > +             /* User specifies base address explicitly. */
-> > > +             if (!memblock_is_region_memory(crash_base, crash_size) ||
-> > > +                     memblock_is_region_reserved(crash_base, crash_size)) {
-> > > +                     pr_warn("crashkernel has wrong address or size\n");
-> > > +                     return;
-> > > +             }
-> > > +
-> > > +             if (!IS_ALIGNED(crash_base, SZ_2M)) {
-> > > +                     pr_warn("crashkernel base address is not 2MB aligned\n");
-> > > +                     return;
-> > > +             }
-> > > +
-> > > +             memblock_reserve(crash_base, crash_size);
-> > > +     }
-> > > +
-> > > +     pr_info("Reserving %lldMB of memory at %lldMB for crashkernel\n",
-> > > +             crash_size >> 20, crash_base >> 20);
-> > > +
-> > > +     crashk_res.start = crash_base;
-> > > +     crashk_res.end = crash_base + crash_size - 1;
-> > > +}
-> > > +#else
-> > > +static void __init reserve_crashkernel(void)
-> > > +{
-> > > +     ;
-> > > +}
-> > > +#endif /* CONFIG_KEXEC_CORE */
-> > > +
-> > >  /*
-> > >   * Return the maximum physical address for ZONE_DMA (DMA_BIT_MASK(32)). It
-> > >   * currently assumes that for memory starting above 4G, 32-bit devices will
-> > > @@ -289,6 +402,8 @@ void __init arm64_memblock_init(void)
-> > >       }
-> > >  #endif
-> > >
-> > > +     reserve_crashkernel();
-> > > +
-> > >       early_init_fdt_scan_reserved_mem();
-> > >
-> > >       /* 4GB maximum for 32-bit only capable devices */
-> > > --
-> > > 2.9.0
-> > >
-> > >
-> > > _______________________________________________
-> > > linux-arm-kernel mailing list
-> > > linux-arm-kernel at lists.infradead.org
-> > > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> > >
-> 
+Mark.
