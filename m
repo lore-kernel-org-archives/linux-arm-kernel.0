@@ -1,47 +1,149 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 19 Jul 2016 15:39:02 +0100
-Subject: [PATCH] drivers/perf: arm-pmu: Fix handling of SPI lacking
- "interrupt-affinity" property
-Message-ID: <1468939142-23693-1-git-send-email-marc.zyngier@arm.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Tue, 19 Jul 2016 16:38:33 +0200 (CEST)
+Subject: [PATCH v11 05/10] genirq/msi-doorbell: msi_doorbell_pages
+In-Reply-To: <1468933367-23159-6-git-send-email-eric.auger@redhat.com>
+References: <1468933367-23159-1-git-send-email-eric.auger@redhat.com>
+ <1468933367-23159-6-git-send-email-eric.auger@redhat.com>
+Message-ID: <alpine.DEB.2.11.1607191624400.3596@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Patch 19a469a58720 ("drivers/perf: arm-pmu: Handle per-interrupt
-affinity mask") added support for partitionned PPI setups, but
-inadvertently broke setups using SPIs without the "interrupt-affinity"
-property (which is the case for UP platforms).
+On Tue, 19 Jul 2016, Eric Auger wrote:
+> msi_doorbell_pages sum up the number of iommu pages of a given order
 
-This patch restore the broken functionnality by testing whether the
-interrupt is percpu or not instead of relying on the using_spi flag
-that really means "SPI *and* interrupt-affinity property".
+adding () to the function name would make it immediately clear that
+msi_doorbell_pages is a function.
 
-Reported-by: Geert Uytterhoeven <geert@linux-m68k.org>
-Tested-by: Geert Uytterhoeven <geert@linux-m68k.org>
-Fixes: 19a469a58720 ("drivers/perf: arm-pmu: Handle per-interrupt affinity mask")
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- drivers/perf/arm_pmu.c | 7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
+> +/**
+> + * msi_doorbell_pages: compute the number of iommu pages of size 1 << order
+> + * requested to map all the registered doorbells
+> + *
+> + * @order: iommu page order
+> + */
 
-diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
-index 2513365..9275e08 100644
---- a/drivers/perf/arm_pmu.c
-+++ b/drivers/perf/arm_pmu.c
-@@ -958,11 +958,12 @@ static int of_pmu_irq_cfg(struct arm_pmu *pmu)
- 
- 	/* If we didn't manage to parse anything, try the interrupt affinity */
- 	if (cpumask_weight(&pmu->supported_cpus) == 0) {
--		if (!using_spi) {
-+		int irq = platform_get_irq(pdev, 0);
-+
-+		if (irq_is_percpu(irq)) {
- 			/* If using PPIs, check the affinity of the partition */
--			int ret, irq;
-+			int ret;
- 
--			irq = platform_get_irq(pdev, 0);
- 			ret = irq_get_percpu_devid_partition(irq, &pmu->supported_cpus);
- 			if (ret) {
- 				kfree(irqs);
--- 
-2.1.4
+Why are you adding the kernel doc to the header and not to the implementation?
+
+> +int msi_doorbell_pages(unsigned int order);
+> +
+>  #else
+>  
+>  static inline struct irq_chip_msi_doorbell_info *
+> @@ -47,6 +55,12 @@ msi_doorbell_register_global(phys_addr_t base, size_t size,
+>  static inline void
+>  msi_doorbell_unregister_global(struct irq_chip_msi_doorbell_info *db) {}
+>  
+> +static inline int
+> +msi_doorbell_pages(unsigned int order)
+
+What's the point of this line break? 
+
+> +{
+> +	return 0;
+> +}
+> +
+>  #endif /* CONFIG_MSI_DOORBELL */
+>  
+>  #endif
+> diff --git a/kernel/irq/msi-doorbell.c b/kernel/irq/msi-doorbell.c
+> index 0ff541e..a5bde37 100644
+> --- a/kernel/irq/msi-doorbell.c
+> +++ b/kernel/irq/msi-doorbell.c
+> @@ -60,3 +60,55 @@ void msi_doorbell_unregister_global(struct irq_chip_msi_doorbell_info *dbinfo)
+>  	mutex_unlock(&irqchip_doorbell_mutex);
+>  }
+>  EXPORT_SYMBOL_GPL(msi_doorbell_unregister_global);
+> +
+> +static int compute_db_mapping_requirements(phys_addr_t addr, size_t size,
+> +					   unsigned int order)
+> +{
+> +	phys_addr_t offset, granule;
+> +	unsigned int nb_pages;
+> +
+> +	granule = (uint64_t)(1 << order);
+> +	offset = addr & (granule - 1);
+> +	size = ALIGN(size + offset, granule);
+> +	nb_pages = size >> order;
+> +
+> +	return nb_pages;
+> +}
+> +
+> +static int
+> +compute_dbinfo_mapping_requirements(struct irq_chip_msi_doorbell_info *dbinfo,
+> +				    unsigned int order)
+
+I'm sure you can find even longer function names which require more line
+breaks.
+
+> +{
+> +	int ret = 0;
+> +
+> +	if (!dbinfo->doorbell_is_percpu) {
+> +		ret = compute_db_mapping_requirements(dbinfo->global_doorbell,
+> +						      dbinfo->size, order);
+> +	} else {
+> +		phys_addr_t __percpu *pbase;
+> +		int cpu;
+> +
+> +		for_each_possible_cpu(cpu) {
+> +			pbase = per_cpu_ptr(dbinfo->percpu_doorbells, cpu);
+> +			ret += compute_db_mapping_requirements(*pbase,
+> +							       dbinfo->size,
+> +							       order);
+> +		}
+> +	}
+> +	return ret;
+> +}
+> +
+> +int msi_doorbell_pages(unsigned int order)
+> +{
+> +	struct irqchip_doorbell *db;
+> +	int ret = 0;
+> +
+> +	mutex_lock(&irqchip_doorbell_mutex);
+> +	list_for_each_entry(db, &irqchip_doorbell_list, next) {
+
+Pointless braces
+
+> +		ret += compute_dbinfo_mapping_requirements(&db->info, order);
+> +	}
+> +	mutex_unlock(&irqchip_doorbell_mutex);
+> +
+> +	return ret;
+> +}
+> +EXPORT_SYMBOL_GPL(msi_doorbell_pages);
+
+So here is a general rant about your naming choices.
+
+   struct irqchip_doorbell
+   struct irq_chip_msi_doorbell_info
+
+   struct irq_chip {
+   	  ....	  *(*msi_doorbell_info);
+   }
+
+   irqchip_doorbell_mutex
+
+   msi_doorbell_register_global
+   msi_doorbell_unregister_global
+
+   msi_doorbell_pages
+
+This really sucks. Your public functions start sensibly with msi_doorbell.
+
+Though what is the _global postfix for the register/unregister functions for?
+Are there _private functions in the pipeline?
+
+msi_doorbell_pages() is not telling me what it does. msi_calc_doorbell_pages()
+would describe it right away.
+
+You doorbell info structure can really do with:
+
+    struct msi_doorbell_info;
+
+And the wrapper struct around it is fine with:
+
+    struct msi_doorbell;
+
+Thanks,
+
+	tglx
