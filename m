@@ -1,31 +1,56 @@
 From: bhuvanchandra.dv@toradex.com (Bhuvanchandra DV)
-Date: Tue, 19 Jul 2016 13:13:02 +0530
-Subject: [PATCH RESEND v2 0/8] Improve Rx/Tx DMA implementation
-Message-ID: <20160719074310.16872-1-bhuvanchandra.dv@toradex.com>
+Date: Tue, 19 Jul 2016 13:13:03 +0530
+Subject: [PATCH RESEND v2 1/8] tty: serial: fsl_lpuart: consider TX FIFO too
+ in tx_empty
+In-Reply-To: <20160719074310.16872-1-bhuvanchandra.dv@toradex.com>
+References: <20160719074310.16872-1-bhuvanchandra.dv@toradex.com>
+Message-ID: <20160719074310.16872-2-bhuvanchandra.dv@toradex.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Drop the clock change patch from v2 patchset[1] since it is applied.
+From: Stefan Agner <stefan@agner.ch>
 
-Changes since v1:
-Split suspend/resume patch.
+Currently the tx_empty callback only considers the Transmit Complete Flag (TC).
+The reference manual is not quite clear if the TC flag covers the TX FIFO too.
+Debug prints on real hardware have shown that from time to time the TC flag is
+asserted (indicating Transmitter idle) while there are still data in the
+TX FIFO. Hence, in this case the serial core will call the shutdown callback
+even though there are data remaining in the TX FIFO buffers.
 
-[1] https://lkml.org/lkml/2016/6/28/124
+Avoid early shutdowns by considering the TX FIFO empty flag too. Also avoid
+theoretical race conditions between DMA and the driver by checking whether the
+TX DMA is in progress too.
 
-Bhuvanchandra DV (5):
-  tty: serial: fsl_lpuart: Fix broken 8m/s1 support
-  tty: serial: fsl_lpuart: Use cyclic DMA for Rx
-  tty: serial: fsl_lpuart: Use scatter/gather DMA for Tx
-  tty: serial: fsl_lpuart: Update suspend/resume for DMA mode
-  tty: serial: fsl_lpuart: Add support for RS-485
+Signed-off-by: Stefan Agner <stefan@agner.ch>
+Signed-off-by: Bhuvanchandra DV <bhuvanchandra.dv@toradex.com>
+---
+ drivers/tty/serial/fsl_lpuart.c | 14 ++++++++++++--
+ 1 file changed, 12 insertions(+), 2 deletions(-)
 
-Stefan Agner (3):
-  tty: serial: fsl_lpuart: consider TX FIFO too in tx_empty
-  tty: serial: fsl_lpuart: support suspend/resume
-  tty: serial: fsl_lpuart: fix clearing of receive flag
-
- drivers/tty/serial/fsl_lpuart.c | 810 +++++++++++++++++++++++-----------------
- 1 file changed, 476 insertions(+), 334 deletions(-)
-
+diff --git a/drivers/tty/serial/fsl_lpuart.c b/drivers/tty/serial/fsl_lpuart.c
+index 3d79003..fabfa7e 100644
+--- a/drivers/tty/serial/fsl_lpuart.c
++++ b/drivers/tty/serial/fsl_lpuart.c
+@@ -810,8 +810,18 @@ static irqreturn_t lpuart32_int(int irq, void *dev_id)
+ /* return TIOCSER_TEMT when transmitter is not busy */
+ static unsigned int lpuart_tx_empty(struct uart_port *port)
+ {
+-	return (readb(port->membase + UARTSR1) & UARTSR1_TC) ?
+-		TIOCSER_TEMT : 0;
++	struct lpuart_port *sport = container_of(port,
++			struct lpuart_port, port);
++	unsigned char sr1 = readb(port->membase + UARTSR1);
++	unsigned char sfifo = readb(port->membase + UARTSFIFO);
++
++	if (sport->dma_tx_in_progress)
++		return 0;
++
++	if (sr1 & UARTSR1_TC && sfifo & UARTSFIFO_TXEMPT)
++		return TIOCSER_TEMT;
++
++	return 0;
+ }
+ 
+ static unsigned int lpuart32_tx_empty(struct uart_port *port)
 -- 
 2.9.0
