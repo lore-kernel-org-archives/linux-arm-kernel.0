@@ -1,74 +1,67 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 19 Jul 2016 13:56:54 +0100
-Subject: [PATCH v2] arm64: KVM: VHE: Context switch MDSCR_EL1
-Message-ID: <1468933014-26966-1-git-send-email-marc.zyngier@arm.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Tue, 19 Jul 2016 09:01:40 -0400
+Subject: [PATCH V11 0/9] vfio, platform: add ACPI support
+Message-ID: <1468933309-19735-1-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The kprobe enablement work has uncovered that changes made by
-a guest to MDSCR_EL1 were propagated to the host when VHE was
-enabled, leading to unexpected exception being delivered.
+The current code only supports the device tree based platforms.
+The code checks for the presence of a reset driver and calls the reset
+function pointer by looking up the reset driver as a module.
 
-Moving this register to the list of registers that are always
-context-switched fixes the issue.
+ACPI defines _RST method to perform device level reset. After the _RST
+method is executed, the OS can resume using the device.
 
-Fixes: 9c6c35683286 ("arm64: KVM: VHE: Split save/restore of registers shared between guest and host")
-Cc: stable at vger.kernel.org #4.6
-Reported-by: Tirumalesh Chalamarla <Tirumalesh.Chalamarla@cavium.com>
-Tested-by: Tirumalesh Chalamarla <Tirumalesh.Chalamarla@cavium.com>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
-v2: added missing Fixes and Cc-stable tags
+The patchset is moving the device tree specific pieces out of the code
+to common functions so that ACPI support is added without impacting the
+rest of the code.
 
- arch/arm64/kvm/hyp/sysreg-sr.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+During probe, the ACPI HID of the object will be saved and will be used to
+determine if this is an ACPI capable platform or not. If acpihid is NULL
+then, device tree functions are called.
 
-diff --git a/arch/arm64/kvm/hyp/sysreg-sr.c b/arch/arm64/kvm/hyp/sysreg-sr.c
-index 0f7c40e..9341376 100644
---- a/arch/arm64/kvm/hyp/sysreg-sr.c
-+++ b/arch/arm64/kvm/hyp/sysreg-sr.c
-@@ -27,8 +27,8 @@ static void __hyp_text __sysreg_do_nothing(struct kvm_cpu_context *ctxt) { }
- /*
-  * Non-VHE: Both host and guest must save everything.
-  *
-- * VHE: Host must save tpidr*_el[01], actlr_el1, sp0, pc, pstate, and
-- * guest must save everything.
-+ * VHE: Host must save tpidr*_el[01], actlr_el1, mdscr_el1, sp0, pc,
-+ * pstate, and guest must save everything.
-  */
- 
- static void __hyp_text __sysreg_save_common_state(struct kvm_cpu_context *ctxt)
-@@ -37,6 +37,7 @@ static void __hyp_text __sysreg_save_common_state(struct kvm_cpu_context *ctxt)
- 	ctxt->sys_regs[TPIDR_EL0]	= read_sysreg(tpidr_el0);
- 	ctxt->sys_regs[TPIDRRO_EL0]	= read_sysreg(tpidrro_el0);
- 	ctxt->sys_regs[TPIDR_EL1]	= read_sysreg(tpidr_el1);
-+	ctxt->sys_regs[MDSCR_EL1]	= read_sysreg(mdscr_el1);
- 	ctxt->gp_regs.regs.sp		= read_sysreg(sp_el0);
- 	ctxt->gp_regs.regs.pc		= read_sysreg_el2(elr);
- 	ctxt->gp_regs.regs.pstate	= read_sysreg_el2(spsr);
-@@ -61,7 +62,6 @@ static void __hyp_text __sysreg_save_state(struct kvm_cpu_context *ctxt)
- 	ctxt->sys_regs[AMAIR_EL1]	= read_sysreg_el1(amair);
- 	ctxt->sys_regs[CNTKCTL_EL1]	= read_sysreg_el1(cntkctl);
- 	ctxt->sys_regs[PAR_EL1]		= read_sysreg(par_el1);
--	ctxt->sys_regs[MDSCR_EL1]	= read_sysreg(mdscr_el1);
- 
- 	ctxt->gp_regs.sp_el1		= read_sysreg(sp_el1);
- 	ctxt->gp_regs.elr_el1		= read_sysreg_el1(elr);
-@@ -90,6 +90,7 @@ static void __hyp_text __sysreg_restore_common_state(struct kvm_cpu_context *ctx
- 	write_sysreg(ctxt->sys_regs[TPIDR_EL0],	  tpidr_el0);
- 	write_sysreg(ctxt->sys_regs[TPIDRRO_EL0], tpidrro_el0);
- 	write_sysreg(ctxt->sys_regs[TPIDR_EL1],	  tpidr_el1);
-+	write_sysreg(ctxt->sys_regs[MDSCR_EL1],	  mdscr_el1);
- 	write_sysreg(ctxt->gp_regs.regs.sp,	  sp_el0);
- 	write_sysreg_el2(ctxt->gp_regs.regs.pc,	  elr);
- 	write_sysreg_el2(ctxt->gp_regs.regs.pstate, spsr);
-@@ -114,7 +115,6 @@ static void __hyp_text __sysreg_restore_state(struct kvm_cpu_context *ctxt)
- 	write_sysreg_el1(ctxt->sys_regs[AMAIR_EL1],	amair);
- 	write_sysreg_el1(ctxt->sys_regs[CNTKCTL_EL1], 	cntkctl);
- 	write_sysreg(ctxt->sys_regs[PAR_EL1],		par_el1);
--	write_sysreg(ctxt->sys_regs[MDSCR_EL1],		mdscr_el1);
- 
- 	write_sysreg(ctxt->gp_regs.sp_el1,		sp_el1);
- 	write_sysreg_el1(ctxt->gp_regs.elr_el1,		elr);
+In addition to plumbing ACPI support, reset functionality is now a
+requirement by default.
+
+The code was allowing platform devices to be used without a supporting
+VFIO reset driver. The hardware can be left in some inconsistent state
+after a guest machine abort.
+
+The reset driver will put the hardware back to safe state and disable
+interrupts before returning the control back to the host machine.
+
+Adding a new reset_required kernel module option to platform
+VFIO drivers with a default value of true.
+
+New requirements are:
+1. A reset function needs to be implemented by the corresponding driver
+via DT/ACPI.
+2. The reset function needs to be discovered via DT/ACPI.
+
+The probe of the driver will fail if any of the above conditions are
+not satisfied.
+
+Changes from V10:
+1. Get rid of redundant if check in the acpi_probe since we are now using
+WARN_ON.
+2. Change the error code order according to Alex's recommendation.
+
+Sinan Kaya (9):
+  vfio: platform: rename reset function
+  vfio: platform: move reset call to a common function
+  vfio: platform: determine reset capability
+  vfio: platform: add support for ACPI probe
+  vfio: platform: add extra debug info argument to call reset
+  vfio: platform: call _RST method when using ACPI
+  vfio, platform: make reset driver a requirement by default
+  vfio: platform: check reset call return code during open
+  vfio: platform: check reset call return code during release
+
+ drivers/vfio/platform/vfio_amba.c             |   1 +
+ drivers/vfio/platform/vfio_platform.c         |   5 +
+ drivers/vfio/platform/vfio_platform_common.c  | 192 +++++++++++++++++++++-----
+ drivers/vfio/platform/vfio_platform_private.h |   9 +-
+ 4 files changed, 173 insertions(+), 34 deletions(-)
+
 -- 
-2.1.4
+1.8.2.1
