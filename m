@@ -1,70 +1,35 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 19 Jul 2016 09:57:44 +0100
-Subject: [PATCH] arm64: KVM: VHE: Context switch MDSCR_EL1
-Message-ID: <1468918664-19130-1-git-send-email-marc.zyngier@arm.com>
+From: icenowy@aosc.xyz (Icenowy Zheng)
+Date: Tue, 19 Jul 2016 16:59:58 +0800
+Subject: [PATCH 0/4] mmc: sunxi: Make sample clocks optional
+In-Reply-To: <1468665964-27142-1-git-send-email-hdegoede@redhat.com>
+References: <1468665964-27142-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <262161468918798@web25j.yandex.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The kprobe enablement work has uncovered that changes made by
-a guest to MDSCR_EL1 were propagated to the host when VHE was
-enabled, leading to unexpected exception being delivered.
 
-Moving this register to the list of registers that are always
-context-switched fixes the issue.
 
-Reported-by: Tirumalesh Chalamarla <Tirumalesh.Chalamarla@cavium.com>
-Tested-by: Tirumalesh Chalamarla <Tirumalesh.Chalamarla@cavium.com>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm64/kvm/hyp/sysreg-sr.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+16.07.2016, 18:50, "Hans de Goede" <hdegoede@redhat.com>:
+> Hi All,
+>
+> It turns out that sun4i / sun5i do not have sample clocks at all,
+> so make them optional. Also remove the DDR capability when there
+> are no sample clocks because DDR modes do not work reliably without
+> them (observed on an UTOO P66 tablet with eMMC).
+>
+> Ulf, can you please merge the first 2 patches, patches 3-4 should
+> be merged through Maxime's sunxi/dts tree, but not before the first
+> 2 have hit linux-next.
+>
+> Regards,
+>
+> Hans
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-diff --git a/arch/arm64/kvm/hyp/sysreg-sr.c b/arch/arm64/kvm/hyp/sysreg-sr.c
-index 0f7c40e..a327e35 100644
---- a/arch/arm64/kvm/hyp/sysreg-sr.c
-+++ b/arch/arm64/kvm/hyp/sysreg-sr.c
-@@ -27,8 +27,8 @@ static void __hyp_text __sysreg_do_nothing(struct kvm_cpu_context *ctxt) { }
- /*
-  * Non-VHE: Both host and guest must save everything.
-  *
-- * VHE: Host must save tpidr*_el[01], actlr_el1, sp0, pc, pstate, and
-- * guest must save everything.
-+ * VHE: Host must save tpidr*_el[01], actlr_el1, mdscr_el1, sp0, pc,
-+ * pstate, and guest must save everything.
-  */
- 
- static void __hyp_text __sysreg_save_common_state(struct kvm_cpu_context *ctxt)
-@@ -37,6 +37,7 @@ static void __hyp_text __sysreg_save_common_state(struct kvm_cpu_context *ctxt)
- 	ctxt->sys_regs[TPIDR_EL0]	= read_sysreg(tpidr_el0);
- 	ctxt->sys_regs[TPIDRRO_EL0]	= read_sysreg(tpidrro_el0);
- 	ctxt->sys_regs[TPIDR_EL1]	= read_sysreg(tpidr_el1);
-+	ctxt->sys_regs[MDSCR_EL1]	= read_sysreg(mdscr_el1);
- 	ctxt->gp_regs.regs.sp		= read_sysreg(sp_el0);
- 	ctxt->gp_regs.regs.pc		= read_sysreg_el2(elr);
- 	ctxt->gp_regs.regs.pstate	= read_sysreg_el2(spsr);
-@@ -61,7 +62,6 @@ static void __hyp_text __sysreg_save_state(struct kvm_cpu_context *ctxt)
- 	ctxt->sys_regs[AMAIR_EL1]	= read_sysreg_el1(amair);
- 	ctxt->sys_regs[CNTKCTL_EL1]	= read_sysreg_el1(cntkctl);
- 	ctxt->sys_regs[PAR_EL1]		= read_sysreg(par_el1);
--	ctxt->sys_regs[MDSCR_EL1]	= read_sysreg(mdscr_el1);
- 
- 	ctxt->gp_regs.sp_el1		= read_sysreg(sp_el1);
- 	ctxt->gp_regs.elr_el1		= read_sysreg_el1(elr);
-@@ -90,6 +90,7 @@ static void __hyp_text __sysreg_restore_common_state(struct kvm_cpu_context *ctx
- 	write_sysreg(ctxt->sys_regs[TPIDR_EL0],	  tpidr_el0);
- 	write_sysreg(ctxt->sys_regs[TPIDRRO_EL0], tpidrro_el0);
- 	write_sysreg(ctxt->sys_regs[TPIDR_EL1],	  tpidr_el1);
-+	write_sysreg(ctxt->sys_regs[MDSCR_EL1],		mdscr_el1);
- 	write_sysreg(ctxt->gp_regs.regs.sp,	  sp_el0);
- 	write_sysreg_el2(ctxt->gp_regs.regs.pc,	  elr);
- 	write_sysreg_el2(ctxt->gp_regs.regs.pstate, spsr);
-@@ -114,7 +115,6 @@ static void __hyp_text __sysreg_restore_state(struct kvm_cpu_context *ctxt)
- 	write_sysreg_el1(ctxt->sys_regs[AMAIR_EL1],	amair);
- 	write_sysreg_el1(ctxt->sys_regs[CNTKCTL_EL1], 	cntkctl);
- 	write_sysreg(ctxt->sys_regs[PAR_EL1],		par_el1);
--	write_sysreg(ctxt->sys_regs[MDSCR_EL1],		mdscr_el1);
- 
- 	write_sysreg(ctxt->gp_regs.sp_el1,		sp_el1);
- 	write_sysreg_el1(ctxt->gp_regs.elr_el1,		elr);
--- 
-2.1.4
+Interesting...
+
+A64 have also no external sample/output clock... (The sample/output clock is integrated into MMC IP core now)
