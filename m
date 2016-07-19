@@ -1,102 +1,97 @@
-From: briannorris@chromium.org (Brian Norris)
-Date: Tue, 19 Jul 2016 12:29:14 -0700
-Subject: [PATCH] arm64: dts: rockchip: add spiX aliases for rk3399
-In-Reply-To: <20160719192754.GA140860@google.com>
-References: <1468545873-134339-1-git-send-email-briannorris@chromium.org>
- <20160719063955.GE5368@pengutronix.de> <2679180.WfB7C6de5F@diego>
- <20160719192754.GA140860@google.com>
-Message-ID: <20160719192912.GA142821@google.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Tue, 19 Jul 2016 12:31:15 -0700
+Subject: [PATCH v3 02/11] mm: Hardened usercopy
+In-Reply-To: <578DF109.5030704@de.ibm.com>
+References: <1468619065-3222-1-git-send-email-keescook@chromium.org>
+ <1468619065-3222-3-git-send-email-keescook@chromium.org>
+ <578DF109.5030704@de.ibm.com>
+Message-ID: <CAGXu5jKRDuELqGY1F-D4+MD+dMXSbiPGzf1hXb7Kp8ACBjpw9g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 19, 2016 at 12:27:54PM -0700, Brian Norris wrote:
-> + Rob
+On Tue, Jul 19, 2016 at 2:21 AM, Christian Borntraeger
+<borntraeger@de.ibm.com> wrote:
+> On 07/15/2016 11:44 PM, Kees Cook wrote:
+>> +config HAVE_ARCH_LINEAR_KERNEL_MAPPING
+>> +     bool
+>> +     help
+>> +       An architecture should select this if it has a secondary linear
+>> +       mapping of the kernel text. This is used to verify that kernel
+>> +       text exposures are not visible under CONFIG_HARDENED_USERCOPY.
+>
+> I have trouble parsing this. (What does secondary linear mapping mean?)
 
-+ Rob for real
+I likely need help clarifying this language...
 
-> Hi,
-> 
-> On Tue, Jul 19, 2016 at 08:56:47PM +0200, Heiko Stuebner wrote:
-> > Am Dienstag, 19. Juli 2016, 08:39:55 schrieb Uwe Kleine-K?nig:
-> > > On Thu, Jul 14, 2016 at 06:24:33PM -0700, Brian Norris wrote:
-> > > > It's nicer to see this:
-> > > >     # ls -l /sys/bus/spi/devices/
-> > > >     total 0
-> > > >     lrwxrwxrwx 1 root root 0 Dec 31  1969 spi0.0 ->
-> > > >     ../../../devices/platform/ff1c0000.spi/spi_master/spi0/spi0.0
-> > > >     lrwxrwxrwx 1 root root 0 Dec 31  1969 spi1.0 ->
-> > > >     ../../../devices/platform/ff1d0000.spi/spi_master/spi1/spi1.0
-> > > >     lrwxrwxrwx 1 root root 0 Dec 31  1969 spi2.0 ->
-> > > >     ../../../devices/platform/ff1e0000.spi/spi_master/spi2/spi2.0
-> > > >     lrwxrwxrwx 1 root root 0 Dec 31  1969 spi5.0 ->
-> > > >     ../../../devices/platform/ff200000.spi/spi_master/spi5/spi5.0> 
-> > > > than this:
-> > > >     # ls -l /sys/bus/spi/devices/
-> > > >     total 0
-> > > >     lrwxrwxrwx 1 root root 0 Dec 31  1969 spi32763.0 ->
-> > > >     ../../../devices/platform/ff200000.spi/spi_master/spi32763/spi32763.0
-> > > >     lrwxrwxrwx 1 root root 0 Dec 31  1969 spi32764.0 ->
-> > > >     ../../../devices/platform/ff1e0000.spi/spi_master/spi32764/spi32764.0
-> > > >     lrwxrwxrwx 1 root root 0 Dec 31  1969 spi32765.0 ->
-> > > >     ../../../devices/platform/ff1d0000.spi/spi_master/spi32765/spi32765.0
-> > > >     lrwxrwxrwx 1 root root 0 Dec 31  1969 spi32766.0 ->
-> > > >     ../../../devices/platform/ff1c0000.spi/spi_master/spi32766/spi32766.0> 
-> > > > With the latter, it's much clearer which bus devices are on.
-> > > > 
-> > > > Signed-off-by: Brian Norris <briannorris@chromium.org>
-> > > > ---
-> > > > 
-> > > >  arch/arm64/boot/dts/rockchip/rk3399.dtsi | 6 ++++++
-> > > >  1 file changed, 6 insertions(+)
-> > > > 
-> > > > diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-> > > > b/arch/arm64/boot/dts/rockchip/rk3399.dtsi index
-> > > > 4c84229789ef..b04abbfd4898 100644
-> > > > --- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-> > > > +++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-> > > > @@ -70,6 +70,12 @@
-> > > > 
-> > > >  		serial2 = &uart2;
-> > > >  		serial3 = &uart3;
-> > > >  		serial4 = &uart4;
-> > > > 
-> > > > +		spi0 = &spi0;
-> > > > +		spi1 = &spi1;
-> > > > +		spi2 = &spi2;
-> > > > +		spi3 = &spi3;
-> > > > +		spi4 = &spi4;
-> > > > +		spi5 = &spi5;
-> > > 
-> > > Note that Rob Herring (with his dt-maintainer hat on) doesn't like these
-> > > aliases.
-> > > See for example:
-> > > 	http://mid.gmane.org/20160705140546.GA10601 at rob-hp-laptop
-> 
-> But why? I believe half the arguments in the linked thread were
-> Catch-22's -- there were no "mainline" users (which is a false target
-> IMO anyway, as Christer Weinigel mentioned somewhere in the thread Rob
-> linked), and so we couldn't accept more documentation (or users) for the
-> feature. FWIW, my quick grep now shows there are currently 43 mainline
-> users.
-> 
-> This feature is very useful. Some of the thread Rob pointed to argued
-> that the indexing isn't HW documentation; in this case, it most
-> certainly is. The RK3399 TRM explicitly has these SPI buses named SPI0,
-> SPI1, SPI2, SPI3, SPI4, and SPI5, and schematics that I've seen use the
-> same terminology. It is therefore *much* nicer to have my device show up
-> as 'spi2.0' (reflecting their correct HW name) rather than spi32764.0.
-> Sometimes I can't even get as far as mounting sysfs to check what this
-> maps to, but having spi2.0 in the kernel log can clearly tell me what
-> device is causing problems.
-> 
-> If Rob can support a better alternative solution, I'd be happy to
-> switch. But I don't understand why we can't use a useful (not just to
-> me, but presumably to at least 43 other independent users, and many
-> more out of tree), existing, and long-supported feature here.
-> 
-> > thanks for the heads up on this. I've dropped this patch again.
-> 
-> :(
-> 
-> Regards,
-> Brian
+> So let me give an example below
+>
+>> +
+> [...]
+>> +/* Is this address range in the kernel text area? */
+>> +static inline const char *check_kernel_text_object(const void *ptr,
+>> +                                                unsigned long n)
+>> +{
+>> +     unsigned long textlow = (unsigned long)_stext;
+>> +     unsigned long texthigh = (unsigned long)_etext;
+>> +
+>> +     if (overlaps(ptr, n, textlow, texthigh))
+>> +             return "<kernel text>";
+>> +
+>> +#ifdef HAVE_ARCH_LINEAR_KERNEL_MAPPING
+>> +     /* Check against linear mapping as well. */
+>> +     if (overlaps(ptr, n, (unsigned long)__va(__pa(textlow)),
+>> +                  (unsigned long)__va(__pa(texthigh))))
+>> +             return "<linear kernel text>";
+>> +#endif
+>> +
+>> +     return NULL;
+>> +}
+>
+> s390 has an address space for user (primary address space from 0..4TB/8PB) and a separate
+> address space (home space from 0..4TB/8PB) for the kernel. In this home space the kernel
+> mapping is virtual containing the physical memory as well as vmalloc memory (creating aliases
+> into the physical one). The kernel text is mapped from _stext to _etext in this mapping.
+> So I assume this would qualify for HAVE_ARCH_LINEAR_KERNEL_MAPPING ?
+
+If I understand your example, yes. In the home space you have two
+addresses that reference the kernel image? The intent is that if
+__va(__pa(_stext)) != _stext, there's a linear mapping of physical
+memory in the virtual memory range. On x86_64, the kernel is visible
+in two locations in virtual memory. The kernel start in physical
+memory address 0x01000000 maps to virtual address 0xffff880001000000,
+and the "regular" virtual memory kernel address is at
+0xffffffff81000000:
+
+# grep Kernel /proc/iomem
+  01000000-01a59767 : Kernel code
+  01a59768-0213d77f : Kernel data
+  02280000-02fdefff : Kernel bss
+
+# grep startup_64 /proc/kallsyms
+ffffffff81000000 T startup_64
+
+# less /sys/kernel/debug/kernel_page_tables
+...
+---[ Low Kernel Mapping ]---
+...
+0xffff880001000000-0xffff880001a00000          10M     ro         PSE
+ GLB NX pmd
+0xffff880001a00000-0xffff880001a5c000         368K     ro   GLB NX pte
+0xffff880001a5c000-0xffff880001c00000        1680K     RW   GLB NX pte
+...
+---[ High Kernel Mapping ]---
+...
+0xffffffff81000000-0xffffffff81a00000          10M     ro         PSE
+ GLB x  pmd
+0xffffffff81a00000-0xffffffff81a5c000         368K     ro   GLB x  pte
+0xffffffff81a5c000-0xffffffff81c00000        1680K     RW   GLB NX pte
+...
+
+I wonder if I can avoid the CONFIG entirely if I just did a
+__va(__pa(_stext)) != _stext test... would that break anyone?
+
+-Kees
+
+-- 
+Kees Cook
+Chrome OS & Brillo Security
