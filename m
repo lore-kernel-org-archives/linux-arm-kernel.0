@@ -1,65 +1,79 @@
 From: mitchelh@codeaurora.org (Mitchel Humpherys)
-Date: Tue, 19 Jul 2016 13:36:52 -0700
-Subject: [PATCH v3 3/6] common: DMA-mapping: add DMA_ATTR_PRIVILEGED attribute
-In-Reply-To: <20160719203655.16629-1-mitchelh@codeaurora.org>
-References: <20160719203655.16629-1-mitchelh@codeaurora.org>
-Message-ID: <20160719203655.16629-4-mitchelh@codeaurora.org>
+Date: Tue, 19 Jul 2016 13:36:49 -0700
+Subject: [PATCH v3 0/6] Add support for privileged mappings
+Message-ID: <20160719203655.16629-1-mitchelh@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the DMA_ATTR_PRIVILEGED attribute to the DMA-mapping
-subsystem.
+The following patch to the ARM SMMU driver:
 
-Some advanced peripherals such as remote processors and GPUs perform
-accesses to DMA buffers in both privileged "supervisor" and unprivileged
-"user" modes.  This attribute is used to indicate to the DMA-mapping
-subsystem that the buffer is fully accessible at the elevated privilege
-level (and ideally inaccessible or at least read-only at the
-lesser-privileged levels).
-
-Cc: linux-doc at vger.kernel.org
-Signed-off-by: Mitchel Humpherys <mitchelh@codeaurora.org>
----
-
-Notes:
-    v2..v3
+    commit d346180e70b91b3d5a1ae7e5603e65593d4622bc
+    Author: Robin Murphy <robin.murphy@arm.com>
+    Date:   Tue Jan 26 18:06:34 2016 +0000
     
-      - Not worrying about executability.
+        iommu/arm-smmu: Treat all device transactions as unprivileged
+
+started forcing all SMMU transactions to come through as "unprivileged".
+The rationale given was that:
+
+  (1) There is no way in the IOMMU API to even request privileged mappings.
+
+  (2) It's difficult to implement a DMA mapper that correctly models the
+      ARM VMSAv8 behavior of unprivileged-writeable =>
+      privileged-execute-never.
+
+This series rectifies (1) by introducing an IOMMU API for privileged
+mappings and implements it in io-pgtable-arm.
+
+This series rectifies (2) by introducing a new dma attribute
+(DMA_ATTR_PRIVILEGED) for users of the DMA API that need privileged
+mappings which are inaccessible to lesser-privileged execution levels, and
+implements it in the arm64 IOMMU DMA mapper.  The one known user (pl330.c)
+is converted over to the new attribute.
+
+Jordan and Jeremy can provide more info on the use case if needed, but the
+high level is that it's a security feature to prevent attacks such as [1].
+
+[1] https://github.com/robclark/kilroy
+
+Changelog:
+
+  v2..v3
+
+    - Incorporated feedback from Robin:
+      * Various comments and re-wordings.
+      * Use existing bit definitions for IOMMU_PRIV implementation
+        in io-pgtable-arm.
+      * Renamed and redocumented dma_direction_to_prot.
+      * Don't worry about executability in new DMA attr.
+
+  v1..v2
+
+    - Added a new DMA attribute to make executable privileged mappings
+      work, and use that in the pl330 driver (suggested by Will).
+
+
+Jeremy Gebben (1):
+  iommu/io-pgtable-arm: add support for the IOMMU_PRIV flag
+
+Mitchel Humpherys (5):
+  iommu: add IOMMU_PRIV attribute
+  common: DMA-mapping: add DMA_ATTR_PRIVILEGED attribute
+  arm64/dma-mapping: Implement DMA_ATTR_PRIVILEGED
+  dmaengine: pl330: Make sure microcode is privileged
+  Revert "iommu/arm-smmu: Treat all device transactions as unprivileged"
 
  Documentation/DMA-attributes.txt | 10 ++++++++++
+ arch/arm64/mm/dma-mapping.c      |  6 +++---
+ drivers/dma/pl330.c              |  7 +++++--
+ drivers/iommu/arm-smmu.c         |  5 +----
+ drivers/iommu/dma-iommu.c        | 16 +++++++++++-----
+ drivers/iommu/io-pgtable-arm.c   |  5 ++++-
  include/linux/dma-attrs.h        |  1 +
- 2 files changed, 11 insertions(+)
+ include/linux/dma-iommu.h        |  3 ++-
+ include/linux/iommu.h            |  1 +
+ 9 files changed, 38 insertions(+), 16 deletions(-)
 
-diff --git a/Documentation/DMA-attributes.txt b/Documentation/DMA-attributes.txt
-index e8cf9cf873b3..d985effd0053 100644
---- a/Documentation/DMA-attributes.txt
-+++ b/Documentation/DMA-attributes.txt
-@@ -126,3 +126,13 @@ means that we won't try quite as hard to get them.
- 
- NOTE: At the moment DMA_ATTR_ALLOC_SINGLE_PAGES is only implemented on ARM,
- though ARM64 patches will likely be posted soon.
-+
-+DMA_ATTR_PRIVILEGED
-+------------------------------
-+
-+Some advanced peripherals such as remote processors and GPUs perform
-+accesses to DMA buffers in both privileged "supervisor" and unprivileged
-+"user" modes.  This attribute is used to indicate to the DMA-mapping
-+subsystem that the buffer is fully accessible at the elevated privilege
-+level (and ideally inaccessible or at least read-only at the
-+lesser-privileged levels).
-diff --git a/include/linux/dma-attrs.h b/include/linux/dma-attrs.h
-index 5246239a4953..3bc2208e1765 100644
---- a/include/linux/dma-attrs.h
-+++ b/include/linux/dma-attrs.h
-@@ -19,6 +19,7 @@ enum dma_attr {
- 	DMA_ATTR_SKIP_CPU_SYNC,
- 	DMA_ATTR_FORCE_CONTIGUOUS,
- 	DMA_ATTR_ALLOC_SINGLE_PAGES,
-+	DMA_ATTR_PRIVILEGED,
- 	DMA_ATTR_MAX,
- };
- 
 -- 
 Qualcomm Innovation Center, Inc.
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
