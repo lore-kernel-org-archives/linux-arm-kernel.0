@@ -1,79 +1,78 @@
-From: vgoyal@redhat.com (Vivek Goyal)
-Date: Tue, 19 Jul 2016 08:24:06 -0400
-Subject: [RFC 3/3] kexec: extend kexec_file_load system call
-In-Reply-To: <20160719105049.GD27022@leverpostej>
-References: <20160712014201.11456-1-takahiro.akashi@linaro.org>
- <20160712014201.11456-4-takahiro.akashi@linaro.org>
- <20160715130955.GC23514@redhat.com>
- <20160715131950.GB19840@leverpostej>
- <20160718023024.GB6310@dhcp-128-65.nay.redhat.com>
- <20160718100704.GB10069@leverpostej>
- <20160719005556.GE3326@dhcp-128-65.nay.redhat.com>
- <20160719105049.GD27022@leverpostej>
-Message-ID: <20160719122406.GA18124@redhat.com>
+From: pbonzini@redhat.com (Paolo Bonzini)
+Date: Tue, 19 Jul 2016 14:25:04 +0200
+Subject: [PATCH] arm64: KVM: VHE: Context switch MDSCR_EL1
+In-Reply-To: <1468918664-19130-1-git-send-email-marc.zyngier@arm.com>
+References: <1468918664-19130-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <d1313d99-31dd-e799-7f5b-fb03f928cefd@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 19, 2016 at 11:52:00AM +0100, Mark Rutland wrote:
-> On Tue, Jul 19, 2016 at 08:55:56AM +0800, Dave Young wrote:
-> > On 07/18/16 at 11:07am, Mark Rutland wrote:
-> > > On Mon, Jul 18, 2016 at 10:30:24AM +0800, Dave Young wrote:
-> > > > I do not think it is worth to add another syscall for extra fds.
-> > > > We have open(2) as an example for different numbers of arguments
-> > > > already.
-> > > 
-> > > Did we change the syscall interface for that?
-> > > 
-> > > I was under the impression that there was always one underlying syscall,
-> > > and the C library did the right thing to pass the expected information
-> > > to the underlying syscall.
-> > 
-> > I'm not sure kexec_load and kexec_file_load were included in glibc, we use
-> > syscall directly in kexec-tools.
-> > 
-> > kexec_load man pages says there are no wrappers for both kexec_load and
-> > kexec_file_load in glibc.
-> 
-> For the above, I was talking about how open() was handled.
-> 
-> If there are no userspace wrappers, then the two cases aren't comparable
-> in the first place...
-> 
-> > > That's rather different to changing the underlying syscall.
-> > > 
-> > > Regardless of how this is wrapped in userspace, I do not think modifying
-> > > the existing prototype is a good idea, and I think this kind of
-> > > extension needs to be a new syscall.
-> > 
-> > Hmm, as I replied to Vivek, there is one case about the flags, previously
-> > the new flag will be regarded as invalid, but not we extend it it will be
-> > valid, this maybe the only potential bad case.
-> 
-> It's true that adding suport for new flags will change the behaviour of
-> what used to be error cases. We generally expect real users to not be
-> making pointless calls for which they rely on an error being returned in
-> all cases.
-> 
-> Regardless, this extended syscall changes some underlying assumptions
-> made with the development of kexec_file_load, and I think treating this
-> as an extension is not a great idea. From a user's perspective there is
-> little difference between passing an additional flag or using a
-> different syscall number, so I don't think that we gain much by altering
-> the existing prototype relative to allocating a new syscall number.
 
-If we are providing/opening up additional flags, I can't think what will
-it break. Same flag was invalid in old kernel but new kernel supports 
-it and will accept it. So it sounds reasonable to me to add new flags.
 
-If existing users are not broken, then I think it might be a good idea
-to extend existing syscall. Otherwise userspace will have to be modified
-to understand a 3rd syscall also and an additional option will show up
-which asks users to specify which syscall to use. So extending existing
-syscall might keep it little simple for users.
+On 19/07/2016 10:57, Marc Zyngier wrote:
+> The kprobe enablement work has uncovered that changes made by
+> a guest to MDSCR_EL1 were propagated to the host when VHE was
+> enabled, leading to unexpected exception being delivered.
+> 
+> Moving this register to the list of registers that are always
+> context-switched fixes the issue.
+> 
+> Reported-by: Tirumalesh Chalamarla <Tirumalesh.Chalamarla@cavium.com>
+> Tested-by: Tirumalesh Chalamarla <Tirumalesh.Chalamarla@cavium.com>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/arm64/kvm/hyp/sysreg-sr.c | 8 ++++----
+>  1 file changed, 4 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm64/kvm/hyp/sysreg-sr.c b/arch/arm64/kvm/hyp/sysreg-sr.c
+> index 0f7c40e..a327e35 100644
+> --- a/arch/arm64/kvm/hyp/sysreg-sr.c
+> +++ b/arch/arm64/kvm/hyp/sysreg-sr.c
+> @@ -27,8 +27,8 @@ static void __hyp_text __sysreg_do_nothing(struct kvm_cpu_context *ctxt) { }
+>  /*
+>   * Non-VHE: Both host and guest must save everything.
+>   *
+> - * VHE: Host must save tpidr*_el[01], actlr_el1, sp0, pc, pstate, and
+> - * guest must save everything.
+> + * VHE: Host must save tpidr*_el[01], actlr_el1, mdscr_el1, sp0, pc,
+> + * pstate, and guest must save everything.
+>   */
+>  
+>  static void __hyp_text __sysreg_save_common_state(struct kvm_cpu_context *ctxt)
+> @@ -37,6 +37,7 @@ static void __hyp_text __sysreg_save_common_state(struct kvm_cpu_context *ctxt)
+>  	ctxt->sys_regs[TPIDR_EL0]	= read_sysreg(tpidr_el0);
+>  	ctxt->sys_regs[TPIDRRO_EL0]	= read_sysreg(tpidrro_el0);
+>  	ctxt->sys_regs[TPIDR_EL1]	= read_sysreg(tpidr_el1);
+> +	ctxt->sys_regs[MDSCR_EL1]	= read_sysreg(mdscr_el1);
+>  	ctxt->gp_regs.regs.sp		= read_sysreg(sp_el0);
+>  	ctxt->gp_regs.regs.pc		= read_sysreg_el2(elr);
+>  	ctxt->gp_regs.regs.pstate	= read_sysreg_el2(spsr);
+> @@ -61,7 +62,6 @@ static void __hyp_text __sysreg_save_state(struct kvm_cpu_context *ctxt)
+>  	ctxt->sys_regs[AMAIR_EL1]	= read_sysreg_el1(amair);
+>  	ctxt->sys_regs[CNTKCTL_EL1]	= read_sysreg_el1(cntkctl);
+>  	ctxt->sys_regs[PAR_EL1]		= read_sysreg(par_el1);
+> -	ctxt->sys_regs[MDSCR_EL1]	= read_sysreg(mdscr_el1);
+>  
+>  	ctxt->gp_regs.sp_el1		= read_sysreg(sp_el1);
+>  	ctxt->gp_regs.elr_el1		= read_sysreg_el1(elr);
+> @@ -90,6 +90,7 @@ static void __hyp_text __sysreg_restore_common_state(struct kvm_cpu_context *ctx
+>  	write_sysreg(ctxt->sys_regs[TPIDR_EL0],	  tpidr_el0);
+>  	write_sysreg(ctxt->sys_regs[TPIDRRO_EL0], tpidrro_el0);
+>  	write_sysreg(ctxt->sys_regs[TPIDR_EL1],	  tpidr_el1);
+> +	write_sysreg(ctxt->sys_regs[MDSCR_EL1],		mdscr_el1);
+>  	write_sysreg(ctxt->gp_regs.regs.sp,	  sp_el0);
+>  	write_sysreg_el2(ctxt->gp_regs.regs.pc,	  elr);
+>  	write_sysreg_el2(ctxt->gp_regs.regs.pstate, spsr);
+> @@ -114,7 +115,6 @@ static void __hyp_text __sysreg_restore_state(struct kvm_cpu_context *ctxt)
+>  	write_sysreg_el1(ctxt->sys_regs[AMAIR_EL1],	amair);
+>  	write_sysreg_el1(ctxt->sys_regs[CNTKCTL_EL1], 	cntkctl);
+>  	write_sysreg(ctxt->sys_regs[PAR_EL1],		par_el1);
+> -	write_sysreg(ctxt->sys_regs[MDSCR_EL1],		mdscr_el1);
+>  
+>  	write_sysreg(ctxt->gp_regs.sp_el1,		sp_el1);
+>  	write_sysreg_el1(ctxt->gp_regs.elr_el1,		elr);
+> 
 
-This is only if conclusion in the end is that DT needs to be passed in
-from user space.
+Can you add Fixes and Cc: stable headers?  Thanks,
 
-BTW, does kexec_load() needs to be modified too to handle DT?
-
-Vivek
+Paolo
