@@ -1,219 +1,228 @@
-From: dennis.chen@arm.com (Dennis Chen)
-Date: Tue, 19 Jul 2016 18:06:18 +0800
-Subject: [PATCH v22 2/8] arm64: limit memory regions based on DT
- property, usable-memory-range
-In-Reply-To: <20160719083554.GD20774@linaro.org>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Tue, 19 Jul 2016 19:28:16 +0900
+Subject: [PATCH v22 1/8] arm64: kdump: reserve memory for crash dump kernel
+In-Reply-To: <20160719093906.GA20732@arm.com>
 References: <20160712050514.22307-1-takahiro.akashi@linaro.org>
- <20160712050514.22307-3-takahiro.akashi@linaro.org>
- <578D1A31.5080509@arm.com> <20160719083554.GD20774@linaro.org>
-Message-ID: <20160719100616.GA20990@arm.com>
+ <20160712050514.22307-2-takahiro.akashi@linaro.org>
+ <20160719093906.GA20732@arm.com>
+Message-ID: <20160719102815.GE20774@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello AKASHI,
+On Tue, Jul 19, 2016 at 05:39:07PM +0800, Dennis Chen wrote:
+> Hello AKASHI,
+> 
+> On Tue, Jul 12, 2016 at 02:05:07PM +0900, AKASHI Takahiro wrote:
+> > On the startup of primary kernel, the memory region used by crash dump
+> > kernel must be specified by "crashkernel=" kernel parameter.
+> > reserve_crashkernel() will allocate and reserve the region for later use.
+> >
+> > User space tools, like kexec-tools, will be able to find that region as
+> >       - "Crash kernel" in /proc/iomem, or
+> >       - "linux,crashkernel-base" and "linux,crashkernel-size" under
+> >         /sys/firmware/devicetree/base/chosen
+> >
+> > Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> > Signed-off-by: Mark Salter <msalter@redhat.com>
+> > Signed-off-by: Pratyush Anand <panand@redhat.com>
+> > Reviewed-by: James Morse <james.morse@arm.com>
+> > ---
+> >  arch/arm64/kernel/setup.c |   7 ++-
+> >  arch/arm64/mm/init.c      | 115 ++++++++++++++++++++++++++++++++++++++++++++++
+> >  2 files changed, 121 insertions(+), 1 deletion(-)
+> >
+> > diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+> > index c1509e6..cb5eee0 100644
+> > --- a/arch/arm64/kernel/setup.c
+> > +++ b/arch/arm64/kernel/setup.c
+> > @@ -31,7 +31,6 @@
+> >  #include <linux/screen_info.h>
+> >  #include <linux/init.h>
+> >  #include <linux/kexec.h>
+> > -#include <linux/crash_dump.h>
+> >  #include <linux/root_dev.h>
+> >  #include <linux/cpu.h>
+> >  #include <linux/interrupt.h>
+> > @@ -222,6 +221,12 @@ static void __init request_standard_resources(void)
+> >                   kernel_data.end <= res->end)
+> >                       request_resource(res, &kernel_data);
+> >       }
+> > +
+> > +#ifdef CONFIG_KEXEC_CORE
+> > +     /* User space tools will find "Crash kernel" region in /proc/iomem. */
+> > +     if (crashk_res.end)
+> > +             insert_resource(&iomem_resource, &crashk_res);
+> > +#endif
+> >  }
+> >
+> >  u64 __cpu_logical_map[NR_CPUS] = { [0 ... NR_CPUS-1] = INVALID_HWID };
+> > diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+> > index 2ade7a6..51b1302 100644
+> > --- a/arch/arm64/mm/init.c
+> > +++ b/arch/arm64/mm/init.c
+> > @@ -29,11 +29,13 @@
+> >  #include <linux/gfp.h>
+> >  #include <linux/memblock.h>
+> >  #include <linux/sort.h>
+> > +#include <linux/of.h>
+> >  #include <linux/of_fdt.h>
+> >  #include <linux/dma-mapping.h>
+> >  #include <linux/dma-contiguous.h>
+> >  #include <linux/efi.h>
+> >  #include <linux/swiotlb.h>
+> > +#include <linux/kexec.h>
+> >
+> >  #include <asm/boot.h>
+> >  #include <asm/fixmap.h>
+> > @@ -76,6 +78,117 @@ static int __init early_initrd(char *p)
+> >  early_param("initrd", early_initrd);
+> >  #endif
+> >
+> > +#ifdef CONFIG_KEXEC_CORE
+> > +static unsigned long long crash_size, crash_base;
+> > +static struct property crash_base_prop = {
+> > +     .name = "linux,crashkernel-base",
+> > +     .length = sizeof(u64),
+> > +     .value = &crash_base
+> > +};
+> > +static struct property crash_size_prop = {
+> > +     .name = "linux,crashkernel-size",
+> > +     .length = sizeof(u64),
+> > +     .value = &crash_size,
+> > +};
+> > +
+> > +static int __init export_crashkernel(void)
+> > +{
+> > +     struct device_node *node;
+> > +     int ret;
+> > +
+> > +     if (!crashk_res.end)
+> > +             return 0;
+> > +
+> > +     crash_base = cpu_to_be64(crashk_res.start);
+> > +     crash_size = cpu_to_be64(crashk_res.end - crashk_res.start + 1);
+> > +
+> > +     /* Add /chosen/linux,crashkernel-* properties */
+> > +     node = of_find_node_by_path("/chosen");
+> > +     if (!node)
+> > +             return -ENOENT;
+> > +
+> > +     /*
+> > +      * There might be existing crash kernel properties, but we can't
+> > +      * be sure what's in them, so remove them.
+> > +      */
+> > +     of_remove_property(node, of_find_property(node,
+> > +                             "linux,crashkernel-base", NULL));
+> > +     of_remove_property(node, of_find_property(node,
+> > +                             "linux,crashkernel-size", NULL));
+> > +
+> > +     ret = of_add_property(node, &crash_base_prop);
+> > +     if (ret)
+> > +             goto ret_err;
+> > +
+> > +     ret = of_add_property(node, &crash_size_prop);
+> > +     if (ret)
+> > +             goto ret_err;
+> > +
+> > +     return 0;
+> > +
+> > +ret_err:
+> > +     pr_warn("Exporting crashkernel region to device tree failed\n");
+> > +     return ret;
+> > +}
+> > +late_initcall(export_crashkernel);
+> > +
+> > +/*
+> > + * reserve_crashkernel() - reserves memory for crash kernel
+> > + *
+> > + * This function reserves memory area given in "crashkernel=" kernel command
+> > + * line parameter. The memory reserved is used by dump capture kernel when
+> > + * primary kernel is crashing.
+> > + */
+> > +static void __init reserve_crashkernel(void)
+> > +{
+> > +     int ret;
+> > +
+> > +     ret = parse_crashkernel(boot_command_line, memblock_phys_mem_size(),
+> > +                             &crash_size, &crash_base);
+> > +     /* no crashkernel= or invalid value specified */
+> > +     if (ret || !crash_size)
+> > +             return;
+> > +
+> > +     if (crash_base == 0) {
+> > +             /* Current arm64 boot protocol requires 2MB alignment */
+> > +             crash_base = memblock_find_in_range(0,
+> > +                             MEMBLOCK_ALLOC_ACCESSIBLE, crash_size, SZ_2M);
+> > +             if (crash_base == 0) {
+> > +                     pr_warn("Unable to allocate crashkernel (size:%llx)\n",
+> > +                             crash_size);
+> > +                     return;
+> > +             }
+> > +             memblock_reserve(crash_base, crash_size);
+> >
+> I am not pretty sure the context here, but
+> can we use below code piece instead of the above lines?
+>         if (crash_base == 0)
+>                 memblock_alloc(crash_size, SZ_2M);
 
-On Tue, Jul 19, 2016 at 05:35:55PM +0900, AKASHI Takahiro wrote:
-> James,
->
-> On Mon, Jul 18, 2016 at 07:04:33PM +0100, James Morse wrote:
-> > Hi!
-> >
-> > (CC: Dennis Chen)
-> >
-> > On 12/07/16 06:05, AKASHI Takahiro wrote:
-> > > Crash dump kernel will be run with a limited range of memory as System
-> > > RAM.
-> > >
-> > > On arm64, we will use a device-tree property under /chosen,
-> > >    linux,usable-memory-range = <BASE SIZE>
-> > > in order for primary kernel either on uefi or non-uefi (device tree only)
-> > > system to hand over the information about usable memory region to crash
-> > > dump kernel. This property will supercede entries in uefi memory map table
-> > > and "memory" nodes in a device tree.
-> >
-> > > diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-> > > index 51b1302..d8b296f 100644
-> > > --- a/arch/arm64/mm/init.c
-> > > +++ b/arch/arm64/mm/init.c
-> > > @@ -300,10 +300,48 @@ static int __init early_mem(char *p)
-> > >  }
-> > >  early_param("mem", early_mem);
-> > >
-> > > +static int __init early_init_dt_scan_usablemem(unsigned long node,
-> > > +         const char *uname, int depth, void *data)
-> > > +{
-> > > + struct memblock_region *usablemem = (struct memblock_region *)data;
-> > > + const __be32 *reg;
-> > > + int len;
-> > > +
-> > > + usablemem->size = 0;
-> > > +
-> > > + if (depth != 1 || strcmp(uname, "chosen") != 0)
-> > > +         return 0;
-> > > +
-> > > + reg = of_get_flat_dt_prop(node, "linux,usable-memory-range", &len);
-> > > + if (!reg || (len < (dt_root_addr_cells + dt_root_size_cells)))
-> > > +         return 1;
-> > > +
-> > > + usablemem->base = dt_mem_next_cell(dt_root_addr_cells, &reg);
-> > > + usablemem->size = dt_mem_next_cell(dt_root_size_cells, &reg);
-> > > +
-> > > + return 1;
-> > > +}
-> > > +
-> > > +static void __init fdt_enforce_memory_region(void)
-> > > +{
-> > > + struct memblock_region reg;
-> > > +
-> > > + of_scan_flat_dt(early_init_dt_scan_usablemem, &reg);
-> > > +
-> > > + if (reg.size) {
-> > > +         memblock_remove(0, PAGE_ALIGN(reg.base));
-> > > +         memblock_remove(round_down(reg.base + reg.size, PAGE_SIZE),
-> > > +                         ULLONG_MAX);
-> >
-
-According to the panic message from James, I guess the ACPI regions are out of the range
-[reg.base, reg.base + reg.size] and removed by your above codes. On ARM64, those ACPI
-regions have been added into memblock and marked as NOMAP, so I think it should be
-easy to adapt my fix to retain the NOMAP regions here
+Either would be fine here.
 
 Thanks,
-Dennis
+-Takahiro AKASHI
 
-> > I think this is a new way to trip the problem Dennis Chen has been working on
-> > [0]. If I kdump with --reuse-cmdline on a kernel booted with 'acpi=on', I get
-> > the panic below [1]...
->
-> Yeah, it can be.
->
-> > It looks like Dennis's fix involves changes in mm/memblock.c, maybe they can be
-> > extended to support a range instead of just a limit?
-> >
-> > (It looks like x86 explicitly adds the acpi regions to the crash-kernels memory
-> > map in crash_setup_memmap_entries()).
-> >
-> >
-> >
-> > Is it possible for the kernel text to be outside this range? (a bug in
-> > kexec-tools, or another user of the DT property) If we haven't already failed in
-> > this case, it may be worth printing a warning, or refusing to
-> > restrict-memory/expose-vmcore.
->
-> In my implementation of kdump, the usable memory for crash dump
-> kernel will be allocated within memblock.memory after ACPI-related
-> regions have been mapped. "linux,usable-memory-range" indicates
-> this exact memory range.
-> On crash dump kernel, my fdt_enforce_memory_region() in arm64_memblock_init()
-> will exclude all the other regions from memblock.memory.
-> So the kernel (with acpi=on) won't recognize ACPI-regions as
-> normal memory, and map them by ioremap().
->
-> I thought that it was safe, but actually not due to unaligned accesses.
-> As you suggested, we will probably be able to do the same thing of
-> Chen's solution in fdt_enforce_memory_region().
->
->
 > Thanks,
-> -Takahiro AKASHI
->
+> Dennis
+> 
+> > +
+> > +     } else {
+> > +             /* User specifies base address explicitly. */
+> > +             if (!memblock_is_region_memory(crash_base, crash_size) ||
+> > +                     memblock_is_region_reserved(crash_base, crash_size)) {
+> > +                     pr_warn("crashkernel has wrong address or size\n");
+> > +                     return;
+> > +             }
+> > +
+> > +             if (!IS_ALIGNED(crash_base, SZ_2M)) {
+> > +                     pr_warn("crashkernel base address is not 2MB aligned\n");
+> > +                     return;
+> > +             }
+> > +
+> > +             memblock_reserve(crash_base, crash_size);
+> > +     }
+> > +
+> > +     pr_info("Reserving %lldMB of memory at %lldMB for crashkernel\n",
+> > +             crash_size >> 20, crash_base >> 20);
+> > +
+> > +     crashk_res.start = crash_base;
+> > +     crashk_res.end = crash_base + crash_size - 1;
+> > +}
+> > +#else
+> > +static void __init reserve_crashkernel(void)
+> > +{
+> > +     ;
+> > +}
+> > +#endif /* CONFIG_KEXEC_CORE */
+> > +
+> >  /*
+> >   * Return the maximum physical address for ZONE_DMA (DMA_BIT_MASK(32)). It
+> >   * currently assumes that for memory starting above 4G, 32-bit devices will
+> > @@ -289,6 +402,8 @@ void __init arm64_memblock_init(void)
+> >       }
+> >  #endif
+> >
+> > +     reserve_crashkernel();
+> > +
+> >       early_init_fdt_scan_reserved_mem();
+> >
+> >       /* 4GB maximum for 32-bit only capable devices */
+> > --
+> > 2.9.0
 > >
 > >
-> > Thanks, > > James
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 > >
-> >
-> > [0] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-July/443356.html
-> > [1]
-> > [    0.000000] efi: Getting EFI parameters from FDT:
-> > [    0.000000] efi: EFI v2.50 by ARM Juno EFI Nov 24 2015 12:36:35
-> > [    0.000000] efi:  ACPI=0xf95b0000  ACPI 2.0=0xf95b0014  PROP=0xfe8db4d8
-> > [    0.000000] Reserving 1KB of memory at 0x9fffff000 for elfcorehdr
-> > [    0.000000] cma: Reserved 16 MiB at 0x00000009fec00000
-> > [    0.000000] ACPI: Early table checksum verification disabled
-> > [    0.000000] ACPI: RSDP 0x00000000F95B0014 000024 (v02 ARMLTD)
-> > [    0.000000] ACPI: XSDT 0x00000000F95A00E8 00004C (v01 ARMLTD ARM-JUNO 2014072
-> > 7      01000013)
-> > [    0.000000] ACPI: FACP 0x00000000F9500000 00010C (v05 ARMLTD ARM-JUNO 2014072
-> > 7 ARM  00000099)
-> > [    0.000000] ACPI: DSDT 0x00000000F94C0000 000396 (v01 ARMLTD ARM-JUNO 2014072
-> > 7 INTL 20150619)
-> > [    0.000000] ACPI: GTDT 0x00000000F94F0000 000060 (v02 ARMLTD ARM-JUNO 2014072
-> > 7 ARM  00000099)
-> > [    0.000000] ACPI: APIC 0x00000000F94E0000 000224 (v03 ARMLTD ARM-JUNO 2014072
-> > 7 ARM  00000099)
-> > [    0.000000] ACPI: SSDT 0x00000000F94D0000 0001E3 (v01 ARMLTD ARM-JUNO 2014072
-> > 7 INTL 20150619)
-> > [    0.000000] ACPI: MCFG 0x00000000F94B0000 00003C (v01 ARMLTD ARM-JUNO 2014072
-> > 7 ARM  00000099)
-> > ...
-> > [    0.737577] Serial: AMBA PL011 UART driver
-> > [    0.786086] HugeTLB registered 2 MB page size, pre-allocated 0 pages
-> > [    0.794203] ACPI: Added _OSI(Module Device)
-> > [    0.798659] ACPI: Added _OSI(Processor Device)
-> > [    0.803190] ACPI: Added _OSI(3.0 _SCP Extensions)
-> > [    0.807973] ACPI: Added _OSI(Processor Aggregator Device)
-> > [    0.813653] Unable to handle kernel paging request at virtual address ffff000
-> > 00804e027
-> > [    0.821704] pgd = ffff000008cce000
-> > [    0.825155] [ffff00000804e027] *pgd=00000009ffffd003, *pud=00000009ffffc003,
-> > *pmd=00000009ffffb003, *pte=00e80000f94c0707
-> > [    0.836319] Internal error: Oops: 96000021 [#1] PREEMPT SMP
-> > [    0.841972] Modules linked in:
-> > [    0.845073] CPU: 2 PID: 1 Comm: swapper/0 Tainted: G S              4.7.0-rc4
-> > + #4569
-> > [    0.852927] Hardware name: ARM Juno development board (r1) (DT)
-> > [    0.858936] task: ffff80003d898000 ti: ffff80003d894000 task.ti: ffff80003d89
-> > 4000
-> > [    0.866537] PC is at acpi_ns_lookup+0x23c/0x378
-> > [    0.871131] LR is at acpi_ds_load1_begin_op+0x88/0x260
-> > [    0.876340] pc : [<ffff0000084061a4>] lr : [<ffff0000083fc08c>] pstate: 60000
-> > 045
-> > [    0.883846] sp : ffff80003d8979b0
-> > [    0.887206] x29: ffff80003d8979b0 x28: 0000000000000000
-> > [    0.892596] x27: 000000000000001b x26: ffff000008a80a07
-> > [    0.897986] x25: ffff80003d897a48 x24: 0000000000000001
-> > [    0.903377] x23: 0000000000000001 x22: ffff00000804e027
-> > [    0.908769] x21: 000000000000001b x20: 0000000000000001
-> > [    0.914158] x19: 0000000000000000 x18: ffff00000804efff
-> > [    0.919547] x17: 00000000000038ff x16: 0000000000000002
-> > [    0.924937] x15: ffff00000804efff x14: 0000008000000000
-> > [    0.930326] x13: ffff000008c942b2 x12: ffff00000804efff
-> > [    0.935717] x11: ffff000008bf0000 x10: 00000000ffffff76
-> > [    0.941107] x9 : 0000000000000000 x8 : ffff000008cb6000
-> > [    0.946498] x7 : 0000000000000000 x6 : ffff80003d897aa8
-> > [    0.951891] x5 : ffff80003d028400 x4 : 0000000000000001
-> > [    0.957281] x3 : 0000000000000003 x2 : ffff000008cb6090
-> > [    0.962673] x1 : 000000000000005f x0 : 0000000000000000
-> > [    0.968063]
-> > [    0.969569] Process swapper/0 (pid: 1, stack limit = 0xffff80003d894020)
-> > [    1.387661] Call trace:
-> > ...
-> > [    1.473172] [<ffff0000084061a4>] acpi_ns_lookup+0x23c/0x378
-> > [    1.478832] [<ffff0000083fc08c>] acpi_ds_load1_begin_op+0x88/0x260
-> > [    1.485105] [<ffff00000840c0e8>] acpi_ps_build_named_op+0xa8/0x170
-> > [    1.491378] [<ffff00000840c2e0>] acpi_ps_create_op+0x130/0x230
-> > [    1.497299] [<ffff00000840bc28>] acpi_ps_parse_loop+0x168/0x580
-> > [    1.503302] [<ffff00000840cb44>] acpi_ps_parse_aml+0xa0/0x278
-> > [    1.509135] [<ffff0000084081d0>] acpi_ns_one_complete_parse+0x128/0x150
-> > [    1.515852] [<ffff00000840821c>] acpi_ns_parse_table+0x24/0x44
-> > [    1.521775] [<ffff0000084079e8>] acpi_ns_load_table+0x54/0xdc
-> > [    1.527612] [<ffff000008411038>] acpi_tb_load_namespace+0xd0/0x230
-> > [    1.533887] [<ffff000008b2695c>] acpi_load_tables+0x3c/0xa8
-> > [    1.539542] [<ffff000008b25974>] acpi_init+0x88/0x2b0
-> > [    1.544670] [<ffff000008081a08>] do_one_initcall+0x38/0x128
-> > [    1.550325] [<ffff000008b00cc0>] kernel_init_freeable+0x14c/0x1f0
-> > [    1.556517] [<ffff0000087d2088>] kernel_init+0x10/0x100
-> > [    1.561823] [<ffff000008084e10>] ret_from_fork+0x10/0x40
-> > [    1.567216] Code: b9008fbb 2a000318 36380054 32190318 (b94002c0)
-> > [    1.573451] ---[ end trace dec6cecdcba673b7 ]---
-> > [    1.578158] Kernel panic - not syncing: Attempted to kill init! exitcode=0x00
-> > 00000b
-> > [    1.578158]
-> > [    1.587428] SMP: stopping secondary CPUs
-> > [    1.591411] ---[ end Kernel panic - not syncing: Attempted to kill init! exit
-> > code=0x0000000b
-> > [    0.969225] Process swapper/0 (pid: 1, stack limit = 0xffff80003d894020)
-> >
-> >
->
-IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
+> IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
+> 
