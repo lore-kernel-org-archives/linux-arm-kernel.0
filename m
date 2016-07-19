@@ -1,110 +1,41 @@
-From: kid.jin@hisilicon.com (Jinguojun)
-Date: Tue, 19 Jul 2016 20:28:20 +0800
-Subject: [PATCH 1/2] Support SD UHS for hikey-mainline-rebase
-In-Reply-To: <578DE10D.3020401@samsung.com>
-References: <CGME20160719075706epcas1p169dc5e5e0f7179f71f92a56e57e373c4@epcas1p1.samsung.com>
- <1468914713-63347-1-git-send-email-kid.jin@hisilicon.com>
- <578DE10D.3020401@samsung.com>
-Message-ID: <e7262e5d-a15c-8cb4-dc8b-c0e391f2a88b@hisilicon.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Tue, 19 Jul 2016 15:35:18 +0300
+Subject: [PATCH 2/7] dmaengine: omap-dma: Complete the cookie first on
+ transfer completion
+In-Reply-To: <20160718103409.GH5783@n2100.arm.linux.org.uk>
+References: <20160714124242.7579-1-peter.ujfalusi@ti.com>
+ <20160714124242.7579-3-peter.ujfalusi@ti.com>
+ <20160718103409.GH5783@n2100.arm.linux.org.uk>
+Message-ID: <923b54d6-c7fc-66c2-1c20-d8d74ebed912@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 07/18/16 13:34, Russell King - ARM Linux wrote:
+> On Thu, Jul 14, 2016 at 03:42:37PM +0300, Peter Ujfalusi wrote:
+>> Before looking for the next descriptor to start, complete the just finished
+>> cookie.
+> 
+> This change will reduce performance as we no longer have an overlap
+> between the next request starting to be dealt with in the hardware
+> vs the previous request being completed.
+
+vchan_cookie_complete() will only mark the cookie completed, adds the vd to
+the desc_completed list (it was deleted from desc_issued list when it was
+started by omap_dma_start_desc) and schedule the tasklet to deal with the real
+completion later.
+Marking the just finished descriptor/cookie done first then looking for
+possible descriptors in the queue to start feels like a better sequence.
+
+After a quick grep in the kernel source: only omap-dma.c was starting the next
+transfer before marking the current completed descriptor/cookie done.
+
+> Your commit log doesn't
+> say _why_ the change is being made, it merely tells us what the
+> patch is doing, which we can see already.
+> 
+> Please describe changes a little better.
+> 
 
 
-On 2016/7/19 16:13, Jaehoon Chung wrote:
-> Hi,
-> 
-> Removed the unnecessary CC'd.
-> 
-> On 07/19/2016 04:51 PM, Jin Guojun wrote:
->> From: j00226943 <j00226943@notesmail.huawei.com>
-> 
-> What is j00226943?
-> 
-> When you send the patch for dw_mmc controller, plz use the prefix "mmc: dw_mmc: ".
-> 
->>
->> Two more changes:
->>
->> Before we send cmd,we need to set CMD bit29 to
->> 1 so that CMD and DATA sent to card through the HOLD Register,
->> This is the explication in synosys host:To meet the relatively
->> high Input Hold Time requirement for SDR12, SDR25, and other MMC
->> speed modes, you should program bit[29]use_hold_Reg of the CMD
->> register to 1'b1; the output data is then registered again in the
->> cclk_in_drv domain by using the Hold Register as shown in Path B
->> of Figure 10-8. However, for the higher speed modes of SDR104, SDR50
->> and DDR50, you can meet the much smaller Input Hold Time requirement
->> of 0.8ns by bypassing the Hold Register (Path A in Figure 10-8,
->> programming CMD.use_hold_reg = 1'b0) and then adding delay elements
->> on the output path as indicated
->>
->> We have no tuning function in our drivers,so we must do the
->> Function piling when we init UHS card.
-
-1.For hikey we cant support UHS for SD card in https://github.com/96boards-hikey/linux/tree/hikey-mainline-rebase
-2.I have no SDMMC_CMD_USE_HOLD_REG in Dw_mmc-k3.c
-
-> 
-> Sorry..this patch is NACK.
-> SDMMC_CMD_USE_HOLD_REG is already used by default in dw_mmc.c
-> Which kernel version did you use?
-> 
->>
->> Signed-off-by: Jin Guojun <kid.jin@hisilicon.com>
->> ---
->>  drivers/mmc/host/dw_mmc-k3.c | 6 ++++++
->>  drivers/mmc/host/dw_mmc.c    | 2 ++
->>  2 files changed, 8 insertions(+)
->>
->> diff --git a/drivers/mmc/host/dw_mmc-k3.c b/drivers/mmc/host/dw_mmc-k3.c
->> index 63c2e2e..2cbfcc7 100644
->> --- a/drivers/mmc/host/dw_mmc-k3.c
->> +++ b/drivers/mmc/host/dw_mmc-k3.c
->> @@ -125,10 +125,16 @@ static void dw_mci_hi6220_set_ios(struct dw_mci *host, struct mmc_ios *ios)
->>  	host->bus_hz = clk_get_rate(host->biu_clk);
->>  }
->>  
->> +static void dw_mci_hi6220_prepare_command(struct dw_mci *host, u32 *cmdr)
->> +{
->> +	*cmdr |= SDMMC_CMD_USE_HOLD_REG;
->> +}
->> +
->>  static const struct dw_mci_drv_data hi6220_data = {
->>  	.switch_voltage		= dw_mci_hi6220_switch_voltage,
->>  	.set_ios		= dw_mci_hi6220_set_ios,
->>  	.parse_dt		= dw_mci_hi6220_parse_dt,
->> +	.prepare_command        = dw_mci_hi6220_prepare_command,
->>  };
-Hi,thank you for your review
-
-1.We do the prepare_command in dw_mci_prepare_command before we send CMD in dw_mmc.c
-2.I can find the same drivers in dw_mmc-exynos.c
-3.For hikey we do the initialization from Dw_mmc-k3.c,so I need to do the prepare_command in hi6220 drivers
-
-> 
-> There is no "prepare_command" hooks.
-> 
-> Best Regards,
-> Jaehoon Chung
-> 
->>  
->>  static const struct of_device_id dw_mci_k3_match[] = {
->> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
->> index 9dd1bd3..047e116 100644
->> --- a/drivers/mmc/host/dw_mmc.c
->> +++ b/drivers/mmc/host/dw_mmc.c
->> @@ -1564,6 +1564,8 @@ static int dw_mci_execute_tuning(struct mmc_host *mmc, u32 opcode)
->>  
->>  	if (drv_data && drv_data->execute_tuning)
->>  		err = drv_data->execute_tuning(slot, opcode);
->> +	else
->> +		err = 0;
->>  	return err;
->>  }
->>  
->>
-> 
-> 
-> .
-> 
+-- 
+P?ter
