@@ -1,44 +1,70 @@
-From: appana.durga.rao@xilinx.com (Appana Durga Kedareswara Rao)
-Date: Tue, 19 Jul 2016 08:53:33 +0000
-Subject: [PATCH] dmaengine: zynqmp_dma: add missing MODULE_LICENSE
-In-Reply-To: <20160719084422.3304865-1-arnd@arndb.de>
-References: <20160719084422.3304865-1-arnd@arndb.de>
-Message-ID: <C246CAC1457055469EF09E3A7AC4E11A4A5BF402@XAP-PVEXMBX01.xlnx.xilinx.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 19 Jul 2016 09:57:44 +0100
+Subject: [PATCH] arm64: KVM: VHE: Context switch MDSCR_EL1
+Message-ID: <1468918664-19130-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The kprobe enablement work has uncovered that changes made by
+a guest to MDSCR_EL1 were propagated to the host when VHE was
+enabled, leading to unexpected exception being delivered.
 
-> 
-> We get a warning about the missing MODULE_LICENSE tag for this newly added
-> driver module:
-> 
-> WARNING: modpost: missing MODULE_LICENSE() in
-> drivers/dma/xilinx/zynqmp_dma.o see include/linux/module.h for more
-> information
-> 
-> This adds a "GPL" license, matching the "version 2 or later" information in the
-> comment at the start of the file.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Moving this register to the list of registers that are always
+context-switched fixes the issue.
 
-Arnd thanks for the patch...
+Reported-by: Tirumalesh Chalamarla <Tirumalesh.Chalamarla@cavium.com>
+Tested-by: Tirumalesh Chalamarla <Tirumalesh.Chalamarla@cavium.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm64/kvm/hyp/sysreg-sr.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-Acked-by: Kedareswara rao Appana <appanad@xilinx.com>
-
-> ---
->  drivers/dma/xilinx/zynqmp_dma.c | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/drivers/dma/xilinx/zynqmp_dma.c
-> b/drivers/dma/xilinx/zynqmp_dma.c index f777a5bc0db8..693474f5f2e5 100644
-> --- a/drivers/dma/xilinx/zynqmp_dma.c
-> +++ b/drivers/dma/xilinx/zynqmp_dma.c
-> @@ -1141,5 +1141,6 @@ static struct platform_driver zynqmp_dma_driver = {
-> 
->  module_platform_driver(zynqmp_dma_driver);
-> 
-> +MODULE_LICENSE("GPL");
->  MODULE_AUTHOR("Xilinx, Inc.");
->  MODULE_DESCRIPTION("Xilinx ZynqMP DMA driver");
-> --
-> 2.9.0
+diff --git a/arch/arm64/kvm/hyp/sysreg-sr.c b/arch/arm64/kvm/hyp/sysreg-sr.c
+index 0f7c40e..a327e35 100644
+--- a/arch/arm64/kvm/hyp/sysreg-sr.c
++++ b/arch/arm64/kvm/hyp/sysreg-sr.c
+@@ -27,8 +27,8 @@ static void __hyp_text __sysreg_do_nothing(struct kvm_cpu_context *ctxt) { }
+ /*
+  * Non-VHE: Both host and guest must save everything.
+  *
+- * VHE: Host must save tpidr*_el[01], actlr_el1, sp0, pc, pstate, and
+- * guest must save everything.
++ * VHE: Host must save tpidr*_el[01], actlr_el1, mdscr_el1, sp0, pc,
++ * pstate, and guest must save everything.
+  */
+ 
+ static void __hyp_text __sysreg_save_common_state(struct kvm_cpu_context *ctxt)
+@@ -37,6 +37,7 @@ static void __hyp_text __sysreg_save_common_state(struct kvm_cpu_context *ctxt)
+ 	ctxt->sys_regs[TPIDR_EL0]	= read_sysreg(tpidr_el0);
+ 	ctxt->sys_regs[TPIDRRO_EL0]	= read_sysreg(tpidrro_el0);
+ 	ctxt->sys_regs[TPIDR_EL1]	= read_sysreg(tpidr_el1);
++	ctxt->sys_regs[MDSCR_EL1]	= read_sysreg(mdscr_el1);
+ 	ctxt->gp_regs.regs.sp		= read_sysreg(sp_el0);
+ 	ctxt->gp_regs.regs.pc		= read_sysreg_el2(elr);
+ 	ctxt->gp_regs.regs.pstate	= read_sysreg_el2(spsr);
+@@ -61,7 +62,6 @@ static void __hyp_text __sysreg_save_state(struct kvm_cpu_context *ctxt)
+ 	ctxt->sys_regs[AMAIR_EL1]	= read_sysreg_el1(amair);
+ 	ctxt->sys_regs[CNTKCTL_EL1]	= read_sysreg_el1(cntkctl);
+ 	ctxt->sys_regs[PAR_EL1]		= read_sysreg(par_el1);
+-	ctxt->sys_regs[MDSCR_EL1]	= read_sysreg(mdscr_el1);
+ 
+ 	ctxt->gp_regs.sp_el1		= read_sysreg(sp_el1);
+ 	ctxt->gp_regs.elr_el1		= read_sysreg_el1(elr);
+@@ -90,6 +90,7 @@ static void __hyp_text __sysreg_restore_common_state(struct kvm_cpu_context *ctx
+ 	write_sysreg(ctxt->sys_regs[TPIDR_EL0],	  tpidr_el0);
+ 	write_sysreg(ctxt->sys_regs[TPIDRRO_EL0], tpidrro_el0);
+ 	write_sysreg(ctxt->sys_regs[TPIDR_EL1],	  tpidr_el1);
++	write_sysreg(ctxt->sys_regs[MDSCR_EL1],		mdscr_el1);
+ 	write_sysreg(ctxt->gp_regs.regs.sp,	  sp_el0);
+ 	write_sysreg_el2(ctxt->gp_regs.regs.pc,	  elr);
+ 	write_sysreg_el2(ctxt->gp_regs.regs.pstate, spsr);
+@@ -114,7 +115,6 @@ static void __hyp_text __sysreg_restore_state(struct kvm_cpu_context *ctxt)
+ 	write_sysreg_el1(ctxt->sys_regs[AMAIR_EL1],	amair);
+ 	write_sysreg_el1(ctxt->sys_regs[CNTKCTL_EL1], 	cntkctl);
+ 	write_sysreg(ctxt->sys_regs[PAR_EL1],		par_el1);
+-	write_sysreg(ctxt->sys_regs[MDSCR_EL1],		mdscr_el1);
+ 
+ 	write_sysreg(ctxt->gp_regs.sp_el1,		sp_el1);
+ 	write_sysreg_el1(ctxt->gp_regs.elr_el1,		elr);
+-- 
+2.1.4
