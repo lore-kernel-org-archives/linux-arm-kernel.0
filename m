@@ -1,63 +1,58 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 19 Jul 2016 08:39:55 +0200
-Subject: [PATCH] arm64: dts: rockchip: add spiX aliases for rk3399
-In-Reply-To: <1468545873-134339-1-git-send-email-briannorris@chromium.org>
-References: <1468545873-134339-1-git-send-email-briannorris@chromium.org>
-Message-ID: <20160719063955.GE5368@pengutronix.de>
+From: thrust73@gmail.com (Cheah Kok Cheong)
+Date: Tue, 19 Jul 2016 14:52:47 +0800
+Subject: lib/GCD.c regression on arm
+In-Reply-To: <20160718201549.61f135c8@xhacker>
+References: <20160715135109.GA2657@linux-Precision-WorkStation-T5500>
+ <20160718201549.61f135c8@xhacker>
+Message-ID: <20160719065247.GA3741@linux-Precision-WorkStation-T5500>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Dear Jisheng,
+ Looks like you have found another kind of problem with arm64.
+That's a big hit in 64bit.
 
-On Thu, Jul 14, 2016 at 06:24:33PM -0700, Brian Norris wrote:
-> It's nicer to see this:
+On Mon, Jul 18, 2016 at 08:15:49PM +0800, Jisheng Zhang wrote:
+> Dear Cheah,
 > 
->     # ls -l /sys/bus/spi/devices/
->     total 0
->     lrwxrwxrwx 1 root root 0 Dec 31  1969 spi0.0 -> ../../../devices/platform/ff1c0000.spi/spi_master/spi0/spi0.0
->     lrwxrwxrwx 1 root root 0 Dec 31  1969 spi1.0 -> ../../../devices/platform/ff1d0000.spi/spi_master/spi1/spi1.0
->     lrwxrwxrwx 1 root root 0 Dec 31  1969 spi2.0 -> ../../../devices/platform/ff1e0000.spi/spi_master/spi2/spi2.0
->     lrwxrwxrwx 1 root root 0 Dec 31  1969 spi5.0 -> ../../../devices/platform/ff200000.spi/spi_master/spi5/spi5.0
+> Interesting, using the code in the commit, I get the following result
+> on A CA53 platform
 > 
-> than this:
+> build with aarch64 toolchain, -O2 -mcpu=cortex-a53
 > 
->     # ls -l /sys/bus/spi/devices/
->     total 0
->     lrwxrwxrwx 1 root root 0 Dec 31  1969 spi32763.0 -> ../../../devices/platform/ff200000.spi/spi_master/spi32763/spi32763.0
->     lrwxrwxrwx 1 root root 0 Dec 31  1969 spi32764.0 -> ../../../devices/platform/ff1e0000.spi/spi_master/spi32764/spi32764.0
->     lrwxrwxrwx 1 root root 0 Dec 31  1969 spi32765.0 -> ../../../devices/platform/ff1d0000.spi/spi_master/spi32765/spi32765.0
->     lrwxrwxrwx 1 root root 0 Dec 31  1969 spi32766.0 -> ../../../devices/platform/ff1c0000.spi/spi_master/spi32766/spi32766.0
+> ~ # /a53 -r 500000 -n 10
+> gcd0: elapsed 10170
+> gcd1: elapsed 11340
+> gcd2: elapsed 13590
+> gcd3: elapsed 11700
+> gcd4: elapsed 14230
+> PASS
 > 
-> With the latter, it's much clearer which bus devices are on.
+> build with armhf toolchain, -O2 -mcpu=cortex-a53
 > 
-> Signed-off-by: Brian Norris <briannorris@chromium.org>
-> ---
->  arch/arm64/boot/dts/rockchip/rk3399.dtsi | 6 ++++++
->  1 file changed, 6 insertions(+)
+> ~ # /a53_32 -r 500000 -n 10
+> gcd0: elapsed 9490
+> gcd1: elapsed 10220
+> gcd2: elapsed 10790
+> gcd3: elapsed 10270
+> gcd4: elapsed 10850
+> PASS
 > 
-> diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-> index 4c84229789ef..b04abbfd4898 100644
-> --- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-> +++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-> @@ -70,6 +70,12 @@
->  		serial2 = &uart2;
->  		serial3 = &uart3;
->  		serial4 = &uart4;
-> +		spi0 = &spi0;
-> +		spi1 = &spi1;
-> +		spi2 = &spi2;
-> +		spi3 = &spi3;
-> +		spi4 = &spi4;
-> +		spi5 = &spi5;
 
-Note that Rob Herring (with his dt-maintainer hat on) doesn't like these
-aliases.
-See for example:
-	http://mid.gmane.org/20160705140546.GA10601 at rob-hp-laptop
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> On Fri, 15 Jul 2016 21:51:10 +0800 Cheah Kok Cheong wrote:
+> 
+> > Commit fff7fb0b2d90 ("lib/GCD.c: use binary GCD algorithm instead of Euclidean")
+> > replaced the Euclidean algorithm totally with the Binary algorithm.
+> > Two variants were provided and selected via Kconfig depending on whether
+> > a fast __ffs (find least significant set bit) instruction is available.
+> > 
+> > For arm v5 and above the fast __ffs version is used as evident in
+> > arch/arm/mm/Kconfig.
+> > 
+> > I benchmarked the gcd performance using the code provided in the commit
+> > with a Cortex-A9 based Mediatek MT6577. Three runs at different settings
+> > were used.
+> > 
+> > The performance with fast __ffs Binary algo is slower than the Euclidean
+> > algo. Using the non ffs version [even/odd variant] gives a comparable
+> > performance as the Euclidean algo.
