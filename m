@@ -1,94 +1,51 @@
 From: eric.auger@redhat.com (Eric Auger)
-Date: Tue, 19 Jul 2016 13:02:39 +0000
-Subject: [PATCH v11 02/10] genirq/msi: msi_compose wrapper
-In-Reply-To: <1468933367-23159-1-git-send-email-eric.auger@redhat.com>
-References: <1468933367-23159-1-git-send-email-eric.auger@redhat.com>
-Message-ID: <1468933367-23159-3-git-send-email-eric.auger@redhat.com>
+Date: Tue, 19 Jul 2016 13:11:29 +0000
+Subject: [PATCH v11 3/8] vfio/type1: implement recursive
+ vfio_find_dma_from_node
+In-Reply-To: <1468933894-23250-1-git-send-email-eric.auger@redhat.com>
+References: <1468933894-23250-1-git-send-email-eric.auger@redhat.com>
+Message-ID: <1468933894-23250-4-git-send-email-eric.auger@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently the MSI message is composed by directly calling
-irq_chip_compose_msi_msg and erased by setting the memory to zero.
-
-On some platforms, we will need to complexify this composition to
-properly handle MSI emission through IOMMU. Also we will need to track
-when the MSI message is erased.
-
-We propose to introduce a common wrapper for actual composition and
-erasure, msi_compose.
+This patch handles the case where a node is encountered, matching
+@start and @size arguments but not matching the @type argument.
+In that case, we need to skip that node and pursue the search in the
+node's leaves. In case @start is inferior to the node's base, we
+resume the search on the left leaf. If the recursive search on the left
+leaves did not produce any match, we search the right leaves recursively.
 
 Signed-off-by: Eric Auger <eric.auger@redhat.com>
 
 ---
-v4 -> v5:
-- just introduce the msi-compose wrapper without adding new
-  functionalities
 
-v3 -> v4:
-- that code was formely in irq-gic-common.c
-  "irqchip/gicv2m/v3-its-pci-msi: IOMMU map the MSI frame when needed"
-  also the [un]mapping was done in irq_write_msi_msg; now done on compose
-
-v2 -> v3:
-- protect iova/addr manipulation with CONFIG_ARCH_DMA_ADDR_T_64BIT and
-  CONFIG_PHYS_ADDR_T_64BIT
-- only expose gic_pci_msi_domain_write_msg in case CONFIG_IOMMU_API &
-  CONFIG_PCI_MSI_IRQ_DOMAIN are set.
-- gic_set/unset_msi_addr duly become static
+v10: creation
 ---
- kernel/irq/msi.c | 19 ++++++++++++++++---
- 1 file changed, 16 insertions(+), 3 deletions(-)
+ drivers/vfio/vfio_iommu_type1.c | 12 +++++++++++-
+ 1 file changed, 11 insertions(+), 1 deletion(-)
 
-diff --git a/kernel/irq/msi.c b/kernel/irq/msi.c
-index 9b0ba4a..72bf4d6 100644
---- a/kernel/irq/msi.c
-+++ b/kernel/irq/msi.c
-@@ -55,6 +55,19 @@ static inline void irq_chip_write_msi_msg(struct irq_data *data,
- 	data->chip->irq_write_msi_msg(data, msg);
+diff --git a/drivers/vfio/vfio_iommu_type1.c b/drivers/vfio/vfio_iommu_type1.c
+index cb7267a..65a4038 100644
+--- a/drivers/vfio/vfio_iommu_type1.c
++++ b/drivers/vfio/vfio_iommu_type1.c
+@@ -125,7 +125,17 @@ static struct vfio_dma *vfio_find_dma_from_node(struct rb_node *top,
+ 	if (type == VFIO_IOVA_ANY || dma->type == type)
+ 		return dma;
+ 
+-	return NULL;
++	/* restart 2 searches skipping the current node */
++	if (start < dma->iova) {
++		dma = vfio_find_dma_from_node(node->rb_left, start,
++					      size, type);
++		if (dma)
++			return dma;
++	}
++	if (start + size > dma->iova + dma->size)
++		dma = vfio_find_dma_from_node(node->rb_right, start,
++					      size, type);
++	return dma;
  }
  
-+static int msi_compose(struct irq_data *irq_data,
-+		       struct msi_msg *msg, bool erase)
-+{
-+	int ret = 0;
-+
-+	if (erase)
-+		memset(msg, 0, sizeof(*msg));
-+	else
-+		ret = irq_chip_compose_msi_msg(irq_data, msg);
-+
-+	return ret;
-+}
-+
  /**
-  * msi_domain_set_affinity - Generic affinity setter function for MSI domains
-  * @irq_data:	The irq data associated to the interrupt
-@@ -73,7 +86,7 @@ int msi_domain_set_affinity(struct irq_data *irq_data,
- 
- 	ret = parent->chip->irq_set_affinity(parent, mask, force);
- 	if (ret >= 0 && ret != IRQ_SET_MASK_OK_DONE) {
--		BUG_ON(irq_chip_compose_msi_msg(irq_data, &msg));
-+		BUG_ON(msi_compose(irq_data, &msg, false));
- 		irq_chip_write_msi_msg(irq_data, &msg);
- 	}
- 
-@@ -85,7 +98,7 @@ static void msi_domain_activate(struct irq_domain *domain,
- {
- 	struct msi_msg msg;
- 
--	BUG_ON(irq_chip_compose_msi_msg(irq_data, &msg));
-+	BUG_ON(msi_compose(irq_data, &msg, false));
- 	irq_chip_write_msi_msg(irq_data, &msg);
- }
- 
-@@ -94,7 +107,7 @@ static void msi_domain_deactivate(struct irq_domain *domain,
- {
- 	struct msi_msg msg;
- 
--	memset(&msg, 0, sizeof(msg));
-+	msi_compose(irq_data, &msg, true);
- 	irq_chip_write_msi_msg(irq_data, &msg);
- }
- 
 -- 
 1.9.1
