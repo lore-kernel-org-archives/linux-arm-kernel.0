@@ -1,167 +1,120 @@
-From: fu.wei@linaro.org (fu.wei at linaro.org)
-Date: Wed, 20 Jul 2016 02:18:03 +0800
-Subject: [PATCH v8 8/9] clocksource/drivers/arm_arch_timer: Add GTDT support
- for memory-mapped timer
-In-Reply-To: <1468952284-28942-1-git-send-email-fu.wei@linaro.org>
-References: <1468952284-28942-1-git-send-email-fu.wei@linaro.org>
-Message-ID: <1468952284-28942-9-git-send-email-fu.wei@linaro.org>
+From: fu.wei@linaro.org (Fu Wei)
+Date: Wed, 20 Jul 2016 02:25:35 +0800
+Subject: [PATCH v7 4/9] acpi/arm64: Add GTDT table parse driver
+In-Reply-To: <16716612.zdLA2RMyjn@vostro.rjw.lan>
+References: <1468432402-4872-1-git-send-email-fu.wei@linaro.org>
+ <1580087.dlcVOb6fx1@vostro.rjw.lan>
+ <CADyBb7tLyABzWFEW_8A3bK9XeWiHJjh7TqWQc=vDn5O_WUJX5w@mail.gmail.com>
+ <16716612.zdLA2RMyjn@vostro.rjw.lan>
+Message-ID: <CADyBb7uiu2d-6bkA6qg9rWCePrZPtv3aMktXUvn7UciiR-WLhA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fu Wei <fu.wei@linaro.org>
+Hi Rafael,
 
-The patch add memory-mapped timer register support by using the information
-provided by the new GTDT driver of ACPI.
+On 16 July 2016 at 20:35, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+> On Saturday, July 16, 2016 10:24:35 AM Fu Wei wrote:
+>> Hi Rafeal,
+>>
+>> On 16 July 2016 at 05:22, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+>> > On Saturday, July 16, 2016 12:32:14 AM Fu Wei wrote:
+>> >> Hi Rafael,
+>> >>
+>> >> On 15 July 2016 at 21:07, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+>> >> > On Friday, July 15, 2016 02:15:27 PM Rafael J. Wysocki wrote:
+>> >> >> On Friday, July 15, 2016 03:32:35 PM Fu Wei wrote:
+>> >> >> > Hi Rafael,
+>> >> >> >
+>> >> >
+>> >> > [cut]
+>> >> >
+>> >> >> > >
+>> >> >> > >> +               return 0;
+>> >> >> > >> +       }
+>> >> >> > >> +
+>> >> >> > >> +       if (!gtdt->platform_timer_count) {
+>> >> >> > >> +               pr_info("No Platform Timer.\n");
+>> >> >> > >> +               return 0;
+>> >> >> > >> +       }
+>> >> >> > >> +
+>> >> >> > >> +       acpi_gtdt_desc.platform_timer_start = (void *)gtdt +
+>> >> >> > >> +                                             gtdt->platform_timer_offset;
+>> >> >> > >> +       if (acpi_gtdt_desc.platform_timer_start <
+>> >> >> > >> +           (void *)table + sizeof(struct acpi_table_gtdt)) {
+>> >> >> > >> +               pr_err(FW_BUG "Platform Timer pointer error.\n");
+>> >> >> > >
+>> >> >> > > Why pr_err()?
+>> >> >> >
+>> >> >> > if (true), that means the GTDT table has bugs.
+>> >> >> >
+>> >> >>
+>> >> >> And that's not a very useful piece of information unless you're debugging the
+>> >> >> platform, is it?
+>> >> >
+>> >> > FWIW, I'm not a big fan of printing "your firmware is buggy" type of messages
+>> >> > (especially at the "error" log level or higher) unless they can be clearly
+>> >> > connected to a specific type of functional failure.
+>> >> >
+>> >> > So if you want to pring an error-level message, something like "I cannot do X
+>> >> > because of the firmware bug Y" would be better IMO.
+>> >>
+>> >> So can I do this:
+>> >> pr_err(FW_BUG "Can NOT init platform_timer pointer, because of the
+>> >> GTDT table bug\n");
+>> >>
+>> >> or pr_debug(FW_BUG "Can NOT init platform_timer_start, because of
+>> >> platform_timer_offset bug in GTDT\n");
+>> >>
+>> >> or just delete it?
+>> >>
+>> >> which one do you prefer?  I think maybe should provide some clue for
+>> >> users to fix the problem  :-)
+>> >
+>> > And how exactly would they fix it then?
+>> >
+>> >>
+>> >> any thought ?
+>> >
+>> > If you print variable or function names and the like, the message should be
+>> > a debug one, because that's information that can only be understood by
+>> > developers (some developers are users too, but they are a minority).
+>> >
+>> > If you want to report an error, say what is not working (or not available
+>> > etc) and why (if you know the reason at the time the message is printed).
+>>
+>> Great thanks, I guess I got you point.
+>>
+>> maybe just a very simple message like:
+>> pr_err(FW_BUG "Failed to init table: GTDT table is buggy.\n");
+>
+> To understand this message one needs to know what "table" means here
+> and what "GTDT" is.  Also the prefix already will be something like
+> "ACPI: GTDT:", so repeating part of it is not really useful IMO.
+>
+> Can you tell me please what's not going to work when that message is printed?
+>
+> Will the system boot at all then?  If so, the functionality will be limited
+> somehow I suppose.  How is it going to be limited?
 
-Signed-off-by: Fu Wei <fu.wei@linaro.org>
----
- drivers/clocksource/arm_arch_timer.c | 127 ++++++++++++++++++++++++++++++++++-
- 1 file changed, 124 insertions(+), 3 deletions(-)
+when that message is printed, all kind of platform timer(memory-mapped
+timer and SBSA watchdog) can't work.
+actually, I think system can boot without them.
+I have updated this on my v8(just posted), let's discuss this on v8 :-)
 
-diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-index d285a87..6468029 100644
---- a/drivers/clocksource/arm_arch_timer.c
-+++ b/drivers/clocksource/arm_arch_timer.c
-@@ -840,7 +840,128 @@ CLOCKSOURCE_OF_DECLARE(armv7_arch_timer_mem, "arm,armv7-timer-mem",
- 		       arch_timer_mem_init);
- 
- #ifdef CONFIG_ACPI_GTDT
--/* Initialize per-processor generic timer */
-+static struct gt_timer_data __init *arch_timer_mem_get_timer(
-+						struct gt_block_data *gt_blocks)
-+{
-+	struct gt_block_data *gt_block = gt_blocks;
-+	struct gt_timer_data *best_frame = NULL;
-+	void __iomem *cntctlbase;
-+	u32 cnttidr;
-+	int i;
-+
-+	/*
-+	 * According to ARMv8 Architecture Reference Manual(ARM),
-+	 * the size of CNTCTLBase frame of memory-mapped timer
-+	 * is SZ_4K(Offset 0x000 ? 0xFFF).
-+	 */
-+	cntctlbase = ioremap(gt_block->cntctlbase_phy, SZ_4K);
-+	if (!cntctlbase) {
-+		pr_err("Failed to map mem timer control frame base address\n");
-+		return NULL;
-+	}
-+	cnttidr = readl_relaxed(cntctlbase + CNTTIDR);
-+
-+	/*
-+	 * Try to find a virtual capable frame. Otherwise fall back to a
-+	 * physical capable frame.
-+	 */
-+	for (i = 0; i < gt_block->timer_count; i++) {
-+		int n;
-+		u32 cntacr;
-+
-+		n = gt_block->timer[i].frame_nr;
-+
-+		/* Try enabling everything, and see what sticks */
-+		cntacr = CNTACR_RFRQ | CNTACR_RWPT | CNTACR_RPCT |
-+			 CNTACR_RWVT | CNTACR_RVOFF | CNTACR_RVCT;
-+		writel_relaxed(cntacr, cntctlbase + CNTACR(n));
-+		cntacr = readl_relaxed(cntctlbase + CNTACR(n));
-+
-+		if ((cnttidr & CNTTIDR_VIRT(n)) &&
-+		    !(~cntacr & (CNTACR_RWVT | CNTACR_RVCT))) {
-+			best_frame = &gt_block->timer[i];
-+			arch_timer_mem_use_virtual = true;
-+			break;
-+		}
-+
-+		if (~cntacr & (CNTACR_RWPT | CNTACR_RPCT))
-+			continue;
-+
-+		best_frame = &gt_block->timer[i];
-+	}
-+	iounmap(cntctlbase);
-+
-+	return best_frame;
-+}
-+
-+static int __init arch_timer_mem_acpi_init(size_t timer_count)
-+{
-+	struct gt_block_data *gt_blocks;
-+	struct gt_timer_data *gt_timer;
-+	void __iomem *timer_cntbase;
-+	int ret = -EINVAL;
-+	int timer_irq;
-+
-+	/*
-+	 * If we don't have any Platform Timer Structures, just return.
-+	 */
-+	if (!timer_count)
-+		return 0;
-+
-+	/*
-+	 * before really check all the Platform Timer Structures,
-+	 * we assume they are GT block, and allocate memory for them.
-+	 * We will free these memory once we finish the initialization.
-+	 */
-+	gt_blocks = kcalloc(timer_count, sizeof(*gt_blocks), GFP_KERNEL);
-+	if (!gt_blocks)
-+		return -ENOMEM;
-+
-+	if (gtdt_arch_timer_mem_init(gt_blocks) > 0) {
-+		gt_timer = arch_timer_mem_get_timer(gt_blocks);
-+		if (!gt_timer) {
-+			pr_err("Failed to get mem timer info.\n");
-+			goto error;
-+		}
-+
-+		if (arch_timer_mem_use_virtual)
-+			timer_irq = gt_timer->virt_irq;
-+		else
-+			timer_irq = gt_timer->irq;
-+		if (!timer_irq) {
-+			pr_err("Failed to get %s irq for mem timer.",
-+			       arch_timer_mem_use_virtual ? "virt" : "phys");
-+			goto error;
-+		}
-+
-+		/*
-+		 * According to ARMv8 Architecture Reference Manual(ARM),
-+		 * the size of CNTBaseN frames of memory-mapped timer
-+		 * is SZ_4K(Offset 0x000 ? 0xFFF).
-+		 */
-+		timer_cntbase = ioremap(gt_timer->cntbase_phy, SZ_4K);
-+		if (!timer_cntbase) {
-+			pr_err("Failed to map mem timer base address.\n");
-+			goto error;
-+		}
-+
-+		ret = arch_timer_mem_register(timer_cntbase, timer_irq);
-+		if (ret) {
-+			iounmap(timer_cntbase);
-+			pr_err("Failed to register mem timer.\n");
-+			goto error;
-+		}
-+
-+		arch_counter_base = timer_cntbase;
-+		arch_timers_present |= ARCH_MEM_TIMER;
-+	}
-+
-+error:
-+	kfree(gt_blocks);
-+	return ret;
-+}
-+
-+/* Initialize per-processor generic timer and memory-mapped timer(if present) */
- static int __init arch_timer_acpi_init(struct acpi_table_header *table)
- {
- 	int timer_count;
-@@ -864,8 +985,8 @@ static int __init arch_timer_acpi_init(struct acpi_table_header *table)
- 	/* Get the frequency from CNTFRQ */
- 	arch_timer_detect_rate(NULL, NULL);
- 
--	if (timer_count < 0)
--		pr_err("Failed to get platform timer info, skipping.\n");
-+	if (timer_count < 0 || arch_timer_mem_acpi_init((size_t)timer_count))
-+		pr_err("Failed to initialize memory-mapped timer, skipping.\n");
- 
- 	arch_timer_init();
- 
+>
+>> I will also check other pr_* , if I can update them
+>
+> OK, great!
+>
+> Thanks,
+> Rafael
+>
+
+
+
 -- 
-2.5.5
+Best regards,
+
+Fu Wei
+Software Engineer
+Red Hat
