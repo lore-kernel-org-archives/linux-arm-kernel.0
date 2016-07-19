@@ -1,228 +1,62 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Tue, 19 Jul 2016 19:28:16 +0900
-Subject: [PATCH v22 1/8] arm64: kdump: reserve memory for crash dump kernel
-In-Reply-To: <20160719093906.GA20732@arm.com>
-References: <20160712050514.22307-1-takahiro.akashi@linaro.org>
- <20160712050514.22307-2-takahiro.akashi@linaro.org>
- <20160719093906.GA20732@arm.com>
-Message-ID: <20160719102815.GE20774@linaro.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 19 Jul 2016 11:29:26 +0100
+Subject: [PATCH 0/2] arm/arm64: localise objcopy flags
+In-Reply-To: <a1441405-5a3a-731c-2693-b66cd42edc99@redhat.com>
+References: <1468337282-14527-1-git-send-email-mark.rutland@arm.com>
+ <a1441405-5a3a-731c-2693-b66cd42edc99@redhat.com>
+Message-ID: <20160719102925.GB27022@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 19, 2016 at 05:39:07PM +0800, Dennis Chen wrote:
-> Hello AKASHI,
+On Mon, Jul 18, 2016 at 04:16:34PM -0700, Laura Abbott wrote:
+> On 07/12/2016 08:28 AM, Mark Rutland wrote:
+> >Hi,
+> >
+> >Typically, architectures (including arm and arm64) define OBJCOPYFLAGS in their
+> >top-level makefile, for the purpose of generating a raw binaries suitable for
+> >booting, including Image, zImage, vmlinux.bin, etc.
+> >
+> >As this top-level arch makefile is included by the top-level kernel makefile,
+> >these flags are passed to other invocations of objcopy tree-wide. This can
+> >result in unexpected and inconsistent behaviour across architectures (e.g.
+> >generation of a raw binary rather than an ELF [1]).
+> >
+> >Rather than force each new user of objcopy to specially clear OBJCOPYFLAGS,
+> >this patch moves the existing OBJCOPYFLAGS variable definitions such that they
+> >only affects the cases we require them for today, leaving the global namespace
+> >clear.
+> >
+> >Other architectures will likely need similar treatment.
+> >
+> >Thanks,
+> >Mark.
+> >
+> >[1] http://www.openwall.com/lists/kernel-hardening/2016/06/08/2
+> >
+> >Mark Rutland (2):
+> >  arm64: localise Image objcopy flags
+> >  arm: localise objcopy flags
+> >
+> > arch/arm/Makefile        | 1 -
+> > arch/arm/boot/Makefile   | 2 ++
+> > arch/arm64/Makefile      | 1 -
+> > arch/arm64/boot/Makefile | 2 ++
+> > 4 files changed, 4 insertions(+), 2 deletions(-)
+> >
 > 
-> On Tue, Jul 12, 2016 at 02:05:07PM +0900, AKASHI Takahiro wrote:
-> > On the startup of primary kernel, the memory region used by crash dump
-> > kernel must be specified by "crashkernel=" kernel parameter.
-> > reserve_crashkernel() will allocate and reserve the region for later use.
-> >
-> > User space tools, like kexec-tools, will be able to find that region as
-> >       - "Crash kernel" in /proc/iomem, or
-> >       - "linux,crashkernel-base" and "linux,crashkernel-size" under
-> >         /sys/firmware/devicetree/base/chosen
-> >
-> > Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> > Signed-off-by: Mark Salter <msalter@redhat.com>
-> > Signed-off-by: Pratyush Anand <panand@redhat.com>
-> > Reviewed-by: James Morse <james.morse@arm.com>
-> > ---
-> >  arch/arm64/kernel/setup.c |   7 ++-
-> >  arch/arm64/mm/init.c      | 115 ++++++++++++++++++++++++++++++++++++++++++++++
-> >  2 files changed, 121 insertions(+), 1 deletion(-)
-> >
-> > diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-> > index c1509e6..cb5eee0 100644
-> > --- a/arch/arm64/kernel/setup.c
-> > +++ b/arch/arm64/kernel/setup.c
-> > @@ -31,7 +31,6 @@
-> >  #include <linux/screen_info.h>
-> >  #include <linux/init.h>
-> >  #include <linux/kexec.h>
-> > -#include <linux/crash_dump.h>
-> >  #include <linux/root_dev.h>
-> >  #include <linux/cpu.h>
-> >  #include <linux/interrupt.h>
-> > @@ -222,6 +221,12 @@ static void __init request_standard_resources(void)
-> >                   kernel_data.end <= res->end)
-> >                       request_resource(res, &kernel_data);
-> >       }
-> > +
-> > +#ifdef CONFIG_KEXEC_CORE
-> > +     /* User space tools will find "Crash kernel" region in /proc/iomem. */
-> > +     if (crashk_res.end)
-> > +             insert_resource(&iomem_resource, &crashk_res);
-> > +#endif
-> >  }
-> >
-> >  u64 __cpu_logical_map[NR_CPUS] = { [0 ... NR_CPUS-1] = INVALID_HWID };
-> > diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-> > index 2ade7a6..51b1302 100644
-> > --- a/arch/arm64/mm/init.c
-> > +++ b/arch/arm64/mm/init.c
-> > @@ -29,11 +29,13 @@
-> >  #include <linux/gfp.h>
-> >  #include <linux/memblock.h>
-> >  #include <linux/sort.h>
-> > +#include <linux/of.h>
-> >  #include <linux/of_fdt.h>
-> >  #include <linux/dma-mapping.h>
-> >  #include <linux/dma-contiguous.h>
-> >  #include <linux/efi.h>
-> >  #include <linux/swiotlb.h>
-> > +#include <linux/kexec.h>
-> >
-> >  #include <asm/boot.h>
-> >  #include <asm/fixmap.h>
-> > @@ -76,6 +78,117 @@ static int __init early_initrd(char *p)
-> >  early_param("initrd", early_initrd);
-> >  #endif
-> >
-> > +#ifdef CONFIG_KEXEC_CORE
-> > +static unsigned long long crash_size, crash_base;
-> > +static struct property crash_base_prop = {
-> > +     .name = "linux,crashkernel-base",
-> > +     .length = sizeof(u64),
-> > +     .value = &crash_base
-> > +};
-> > +static struct property crash_size_prop = {
-> > +     .name = "linux,crashkernel-size",
-> > +     .length = sizeof(u64),
-> > +     .value = &crash_size,
-> > +};
-> > +
-> > +static int __init export_crashkernel(void)
-> > +{
-> > +     struct device_node *node;
-> > +     int ret;
-> > +
-> > +     if (!crashk_res.end)
-> > +             return 0;
-> > +
-> > +     crash_base = cpu_to_be64(crashk_res.start);
-> > +     crash_size = cpu_to_be64(crashk_res.end - crashk_res.start + 1);
-> > +
-> > +     /* Add /chosen/linux,crashkernel-* properties */
-> > +     node = of_find_node_by_path("/chosen");
-> > +     if (!node)
-> > +             return -ENOENT;
-> > +
-> > +     /*
-> > +      * There might be existing crash kernel properties, but we can't
-> > +      * be sure what's in them, so remove them.
-> > +      */
-> > +     of_remove_property(node, of_find_property(node,
-> > +                             "linux,crashkernel-base", NULL));
-> > +     of_remove_property(node, of_find_property(node,
-> > +                             "linux,crashkernel-size", NULL));
-> > +
-> > +     ret = of_add_property(node, &crash_base_prop);
-> > +     if (ret)
-> > +             goto ret_err;
-> > +
-> > +     ret = of_add_property(node, &crash_size_prop);
-> > +     if (ret)
-> > +             goto ret_err;
-> > +
-> > +     return 0;
-> > +
-> > +ret_err:
-> > +     pr_warn("Exporting crashkernel region to device tree failed\n");
-> > +     return ret;
-> > +}
-> > +late_initcall(export_crashkernel);
-> > +
-> > +/*
-> > + * reserve_crashkernel() - reserves memory for crash kernel
-> > + *
-> > + * This function reserves memory area given in "crashkernel=" kernel command
-> > + * line parameter. The memory reserved is used by dump capture kernel when
-> > + * primary kernel is crashing.
-> > + */
-> > +static void __init reserve_crashkernel(void)
-> > +{
-> > +     int ret;
-> > +
-> > +     ret = parse_crashkernel(boot_command_line, memblock_phys_mem_size(),
-> > +                             &crash_size, &crash_base);
-> > +     /* no crashkernel= or invalid value specified */
-> > +     if (ret || !crash_size)
-> > +             return;
-> > +
-> > +     if (crash_base == 0) {
-> > +             /* Current arm64 boot protocol requires 2MB alignment */
-> > +             crash_base = memblock_find_in_range(0,
-> > +                             MEMBLOCK_ALLOC_ACCESSIBLE, crash_size, SZ_2M);
-> > +             if (crash_base == 0) {
-> > +                     pr_warn("Unable to allocate crashkernel (size:%llx)\n",
-> > +                             crash_size);
-> > +                     return;
-> > +             }
-> > +             memblock_reserve(crash_base, crash_size);
-> >
-> I am not pretty sure the context here, but
-> can we use below code piece instead of the above lines?
->         if (crash_base == 0)
->                 memblock_alloc(crash_size, SZ_2M);
+> Kees' lkdtm tests compile and boot successfully with this patch for
+> both arm and arm64 so you can add
+> 
+> Tested-by: Laura Abbott <labbott@redhat.com>
 
-Either would be fine here.
+Cheers!
+
+On the assumption that Russell is ok with the arm patch, I've dropped
+that in the patch system (with tags) as 8588/1 [1].
+
+Catalin, Will, I guess I should repost the arm64 patch come v4.8-rc1?
 
 Thanks,
--Takahiro AKASHI
+Mark.
 
-> Thanks,
-> Dennis
-> 
-> > +
-> > +     } else {
-> > +             /* User specifies base address explicitly. */
-> > +             if (!memblock_is_region_memory(crash_base, crash_size) ||
-> > +                     memblock_is_region_reserved(crash_base, crash_size)) {
-> > +                     pr_warn("crashkernel has wrong address or size\n");
-> > +                     return;
-> > +             }
-> > +
-> > +             if (!IS_ALIGNED(crash_base, SZ_2M)) {
-> > +                     pr_warn("crashkernel base address is not 2MB aligned\n");
-> > +                     return;
-> > +             }
-> > +
-> > +             memblock_reserve(crash_base, crash_size);
-> > +     }
-> > +
-> > +     pr_info("Reserving %lldMB of memory at %lldMB for crashkernel\n",
-> > +             crash_size >> 20, crash_base >> 20);
-> > +
-> > +     crashk_res.start = crash_base;
-> > +     crashk_res.end = crash_base + crash_size - 1;
-> > +}
-> > +#else
-> > +static void __init reserve_crashkernel(void)
-> > +{
-> > +     ;
-> > +}
-> > +#endif /* CONFIG_KEXEC_CORE */
-> > +
-> >  /*
-> >   * Return the maximum physical address for ZONE_DMA (DMA_BIT_MASK(32)). It
-> >   * currently assumes that for memory starting above 4G, 32-bit devices will
-> > @@ -289,6 +402,8 @@ void __init arm64_memblock_init(void)
-> >       }
-> >  #endif
-> >
-> > +     reserve_crashkernel();
-> > +
-> >       early_init_fdt_scan_reserved_mem();
-> >
-> >       /* 4GB maximum for 32-bit only capable devices */
-> > --
-> > 2.9.0
-> >
-> >
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> >
-> IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
-> 
+[1] http://www.armlinux.org.uk/developer/patches/viewpatch.php?id=8588/1
