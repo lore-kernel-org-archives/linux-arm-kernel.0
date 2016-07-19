@@ -1,34 +1,91 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 19 Jul 2016 15:07:39 +0100
-Subject: [PATCH 3/4] arm64: kprobes: WARN if attempting to step with PSTATE.D=1
-In-Reply-To: <1468937260-23988-1-git-send-email-will.deacon@arm.com>
-References: <1468937260-23988-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1468937260-23988-3-git-send-email-will.deacon@arm.com>
+Date: Tue, 19 Jul 2016 15:07:37 +0100
+Subject: [PATCH 1/4] arm64: debug: unmask PSTATE.D earlier
+Message-ID: <1468937260-23988-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stepping with PSTATE.D=1 is bad news. The step won't generate a debug
-exception and we'll likely walk off into random data structures. This
-should never happen, but when it does, it's a PITA to debug. Add a
-WARN_ON to shout if we realise this is about to take place.
+Clearing PSTATE.D is one of the requirements for generating a debug
+exception. The arm64 booting protocol requires that PSTATE.D is set,
+since many of the debug registers (for example, the hw_breakpoint
+registers) are UNKNOWN out of reset and could potentially generate
+spurious, fatal debug exceptions in early boot code if PSTATE.D was
+clear. Once the debug registers have been safely initialised, PSTATE.D
+is cleared, however this is currently broken for two reasons:
 
+(1) The boot CPU clears PSTATE.D in a postcore_initcall and secondary
+    CPUs clear PSTATE.D in secondary_start_kernel. Since the initcall
+    runs after SMP (and the scheduler) have been initialised, there is
+    no guarantee that it is actually running on the boot CPU. In this
+    case, the boot CPU is left with PSTATE.D set and is not capable of
+    generating debug exceptions.
+
+(2) In a preemptible kernel, we may explicitly schedule on the IRQ
+    return path to EL1. If an IRQ occurs with PSTATE.D set in the idle
+    thread, then we may schedule the kthread_init thread, run the
+    postcore_initcall to clear PSTATE.D and then context switch back
+    to the idle thread before returning from the IRQ. The exception
+    return path will then restore PSTATE.D from the stack, and set it
+    again.
+
+This patch fixes the problem by moving the clearing of PSTATE.D earlier
+to proc.S. This has the desirable effect of clearing it in one place for
+all CPUs, long before we have to worry about the scheduler or any
+exception handling. We ensure that the previous reset of MDSCR_EL1 has
+completed before unmasking the exception, so that any spurious
+exceptions resulting from UNKNOWN debug registers are not generated.
+
+Without this patch applied, the kprobes selftests have been seen to fail
+under KVM, where we end up attempting to step the OOL instruction buffer
+with PSTATE.D set and therefore fail to complete the step.
+
+Cc: <stable@vger.kernel.org>
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+Reported-by: Catalin Marinas <catalin.marinas@arm.com>
+Tested-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/kernel/probes/kprobes.c | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm64/kernel/debug-monitors.c | 1 -
+ arch/arm64/kernel/smp.c            | 1 -
+ arch/arm64/mm/proc.S               | 2 ++
+ 3 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/kernel/probes/kprobes.c b/arch/arm64/kernel/probes/kprobes.c
-index 9c70e8812ea9..c89811d1e294 100644
---- a/arch/arm64/kernel/probes/kprobes.c
-+++ b/arch/arm64/kernel/probes/kprobes.c
-@@ -254,6 +254,8 @@ static void __kprobes setup_singlestep(struct kprobe *p,
+diff --git a/arch/arm64/kernel/debug-monitors.c b/arch/arm64/kernel/debug-monitors.c
+index 2fbc1b99e8fb..7a907e401c98 100644
+--- a/arch/arm64/kernel/debug-monitors.c
++++ b/arch/arm64/kernel/debug-monitors.c
+@@ -156,7 +156,6 @@ static int debug_monitors_init(void)
+ 	/* Clear the OS lock. */
+ 	on_each_cpu(clear_os_lock, NULL, 1);
+ 	isb();
+-	local_dbg_enable();
  
- 		if (kcb->kprobe_status == KPROBE_REENTER)
- 			spsr_set_debug_flag(regs, 0);
-+		else
-+			WARN_ON(regs->pstate & PSR_D_BIT);
+ 	/* Register hotplug handler. */
+ 	__register_cpu_notifier(&os_lock_nb);
+diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+index 62ff3c0622e2..c0a772560ab7 100644
+--- a/arch/arm64/kernel/smp.c
++++ b/arch/arm64/kernel/smp.c
+@@ -267,7 +267,6 @@ asmlinkage void secondary_start_kernel(void)
+ 	set_cpu_online(cpu, true);
+ 	complete(&cpu_running);
  
- 		/* IRQs and single stepping do not mix well. */
- 		kprobes_save_local_irqflag(kcb, regs);
+-	local_dbg_enable();
+ 	local_irq_enable();
+ 	local_async_enable();
+ 
+diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+index c4317879b938..5bb61de23201 100644
+--- a/arch/arm64/mm/proc.S
++++ b/arch/arm64/mm/proc.S
+@@ -180,6 +180,8 @@ ENTRY(__cpu_setup)
+ 	msr	cpacr_el1, x0			// Enable FP/ASIMD
+ 	mov	x0, #1 << 12			// Reset mdscr_el1 and disable
+ 	msr	mdscr_el1, x0			// access to the DCC from EL0
++	isb					// Unmask debug exceptions now,
++	enable_dbg				// since this is per-cpu
+ 	reset_pmuserenr_el0 x0			// Disable PMU access from EL0
+ 	/*
+ 	 * Memory region attributes for LPAE:
 -- 
 2.1.4
