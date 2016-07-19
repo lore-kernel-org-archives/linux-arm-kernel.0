@@ -1,79 +1,59 @@
-From: jm@lentin.co.uk (Jamie Lentin)
-Date: Tue, 19 Jul 2016 10:40:16 +0100 (BST)
-Subject: [PATCH v0 06/10] arm: orion5x: Add DT-based support for Netgear
- WNR854T
-In-Reply-To: <1792384.6N9lHjmBFc@wuerfel>
-References: <1468679348-10522-1-git-send-email-jm@lentin.co.uk>
- <6404488.GyOP57DJrV@wuerfel> <20160718114424.14a28889@free-electrons.com>
- <1792384.6N9lHjmBFc@wuerfel>
-Message-ID: <alpine.DEB.2.11.1607191034240.19980@marmot.wormnet.eu>
+From: q8buz-help@egcss.net (q8buz-help at egcss.net)
+Date: 19 Jul 2016 09:36:05 -0000
+Subject: ezmlm warning
+Message-ID: <1468920965.7325.ezmlm-warn@egcss.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 18 Jul 2016, Arnd Bergmann wrote:
+Hi! This is the ezmlm program. I'm managing the
+q8buz at egcss.net mailing list.
 
-> On Monday, July 18, 2016 11:44:24 AM CEST Thomas Petazzoni wrote:
->>
->> On Sun, 17 Jul 2016 22:41:35 +0200, Arnd Bergmann wrote:
->>
->>> I would assume that the PCIe port should work out of the box with the driver
->>
->> Unfortunately, no. The PCIe on Orion5x requires a workaround for
->> reading/writing the PCI configuration space. Instead of doing MMIO
->> accesses to PCIE_CONF_ADDR_OFF / PCIE_CONF_DATA_OFF, you must map a
->> MBus window, which provides a memory-mapped view of the PCI
->> configuration space.
->>
->> Definitely not impossible to implement, but the driver doesn't work
->> as-is.
->
-> Ok.
+I'm working for my owner, who can be reached
+at q8buz-owner at egcss.net.
 
-Unfortunately this isn't something I can test as the PCIe port on the SoC 
-doesn't go anywhere in my case.
 
->>> We also don't seem to need any MBUS window setup for the I/O and
->>> memory spaces, which greatly simplifies the driver compared to the
->>> pci-mvebu one, it would be a fairly straightforward implementation
->>> based on pci-host-generic.c (which unfortunately just got way
->>> more complicated and might need to go on a diet).
->>
->> MBus windows are needed. See:
->>
->>         mvebu_mbus_add_window_remap_by_id(ORION_MBUS_PCI_IO_TARGET,
->>                                           ORION_MBUS_PCI_IO_ATTR,
->>                                           ORION5X_PCI_IO_PHYS_BASE,
->>                                           ORION5X_PCI_IO_SIZE,
->>                                           ORION5X_PCI_IO_BUS_BASE);
->>         mvebu_mbus_add_window_by_id(ORION_MBUS_PCI_MEM_TARGET,
->>                                     ORION_MBUS_PCI_MEM_ATTR,
->>                                     ORION5X_PCI_MEM_PHYS_BASE,
->>                                     ORION5X_PCI_MEM_SIZE);
->>
->> in orion5x_setup_wins().
->
-> Ok, I was just looking at the wrong file, as they are set up from
-> common.c, not pci.c.
->
->> Note that we already have some Orion5x converted to DT, and that use
->> PCI: board-rd88f5182.c is an example. So we could very well take Jamie
->> patches as-is, and move later to a DT-representation for PCI/PCIe.
->
-> Ah, I thought all the DT users were moved to mach-mvebu. I agree
-> this new patch isn't introducing anything we don't already have then,
-> so we can just take it, but the conversion will not be nice when
-> we do that.
+Messages to you from the q8buz mailing list seem to
+have been bouncing. I've attached a copy of the first bounce
+message I received.
 
-Yes, board-wnr854t.c is a clone of the existing board-rd88f5182.c. 
-Although I'd presume that it too would need late_initcall() or somesuch 
-mechanism to probe PCI once the GPIO controller is available.
+If this message bounces too, I will send you a probe. If the probe bounces,
+I will remove your address from the q8buz mailing list,
+without further notice.
 
-> I was also hoping that we could get to the point where pci_common_init()
-> is only used for legacy machines without DT and without multiplatform,
-> it seems I missed a couple of users here.
->
-> 	Arnd
->
 
--- 
-Jamie Lentin
+I've kept a list of which messages from the q8buz mailing list have 
+bounced from your address.
+
+Copies of these messages may be in the archive.
+
+To retrieve a set of messages 123-145 (a maximum of 100 per request),
+send an empty message to:
+   <q8buz-get.123_145@egcss.net>
+
+To receive a subject and author list for the last 100 or so messages,
+send an empty message to:
+   <q8buz-index@egcss.net>
+
+Here are the message numbers:
+
+   1
+
+--- Enclosed is a copy of the bounce message I received.
+
+Return-Path: <>
+Received: (qmail 12546 invoked for bounce); 26 Jun 2016 14:18:32 -0000
+Date: 26 Jun 2016 14:18:32 -0000
+From: MAILER-DAEMON@mail1105.opentransfer.com
+To: q8buz-return-1- at egcss.net
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="1466335049mail1105.opentransfer.com20480180"
+Subject: failure notice
+
+Hi. This is the qmail-send program at mail1105.opentransfer.com.
+I'm afraid I wasn't able to deliver your message to the following addresses.
+This is a permanent error; I've given up. Sorry it didn't work out.
+
+<linux-arm-kernel@lists.infradead.org>:
+198.137.202.9 failed after I sent the message.
+Remote host said: 550-Mailing lists do not accept HTML mail. See
+550 http://david.woodhou.se/email.html
