@@ -1,72 +1,80 @@
-From: josephl@nvidia.com (Joseph Lo)
-Date: Tue, 19 Jul 2016 15:09:06 +0800
-Subject: [PATCH V2 01/10] Documentation: dt-bindings: mailbox: tegra: Add
- binding for HSP mailbox
-In-Reply-To: <578D628D.60802@wwwdotorg.org>
-References: <20160705090431.5852-1-josephl@nvidia.com>
- <20160705090431.5852-2-josephl@nvidia.com>
- <20160707181356.GA6864@kickseed.nvidia.com> <577EA0D6.9020308@wwwdotorg.org>
- <20160711141407.GA25042@rob-hp-laptop> <5783C468.2030708@wwwdotorg.org>
- <578D628D.60802@wwwdotorg.org>
-Message-ID: <534d88b6-d08e-894b-e6e1-e610fe26149a@nvidia.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 19 Jul 2016 08:31:09 +0100
+Subject: [PATCH v2 3/4] mfd: add support for Allwinner SoCs ADC
+In-Reply-To: <de8ebab2-cde9-d209-3c9a-e1868fafb84b@kernel.org>
+References: <1468576754-3273-1-git-send-email-quentin.schulz@free-electrons.com>
+ <1468576754-3273-4-git-send-email-quentin.schulz@free-electrons.com>
+ <de8ebab2-cde9-d209-3c9a-e1868fafb84b@kernel.org>
+Message-ID: <20160719073109.GD17074@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/19/2016 07:13 AM, Stephen Warren wrote:
-> On 07/11/2016 10:08 AM, Stephen Warren wrote:
->> On 07/11/2016 08:14 AM, Rob Herring wrote:
->>> On Thu, Jul 07, 2016 at 12:35:02PM -0600, Stephen Warren wrote:
->>>> On 07/07/2016 12:13 PM, Sivaram Nair wrote:
->>>>> On Tue, Jul 05, 2016 at 05:04:22PM +0800, Joseph Lo wrote:
->>>>>> Add DT binding for the Hardware Synchronization Primitives (HSP). The
->>>>>> HSP is designed for the processors to share resources and communicate
->>>>>> together. It provides a set of hardware synchronization primitives
->>>>>> for
->>>>>> interprocessor communication. So the interprocessor communication
->>>>>> (IPC)
->>>>>> protocols can use hardware synchronization primitive, when operating
->>>>>> between two processors not in an SMP relationship.
->>>>
->>>>>> diff --git a/include/dt-bindings/mailbox/tegra186-hsp.h
->>>>>> b/include/dt-bindings/mailbox/tegra186-hsp.h
->>>>
->>>>>> +#define HSP_MBOX_TYPE_DB 0x0
->>>>>> +#define HSP_MBOX_TYPE_SM 0x1
->>>>>> +#define HSP_MBOX_TYPE_SS 0x2
->>>>>> +#define HSP_MBOX_TYPE_AS 0x3
->>>>>> +
->>>>>> +#define HSP_DB_MASTER_CCPLEX 17
->>>>>> +#define HSP_DB_MASTER_BPMP 19
->>>>>> +
->>>>>> +#define HSP_MBOX_ID(type, ID) \
->>>>>> +        (HSP_MBOX_TYPE_##type << 16 | ID)
->>>>>
->>>>> It will be nicer if you avoid the macro glue magic '##' for 'type'. I
->>>>> would also suggest to use braces around 'type' and 'ID'.
->>>>
->>>> This technique been used without issue in quite a few other places
->>>> without
->>>> issue, and has the benefit of simplifying the text wherever the
->>>> macro is
->>>> used. What issue do you foresee?
->>>
->>> I'm not a fan of using the macros to begin with and less so anything
->>> more complex than a single constant value. I'd rather see 2 cells here
->>> with the first being the id and the 2nd being the type.
->>>
->>> An issue with token pasting is grepping for DB, SM, etc. in kernel tree
->>> is probably noisy. Not such a big deal here, but a major PIA when you
->>> have more complex sets of includes.
->>
->> Is that a NAK or simply a suggestion? Having a single cell makes DT
->> parsing a bit simpler, since pretty much every SW stack provides a
->> default "one-cell" of_xlate implementation, whereas >1 cell means custom
->> code for of_xlate.
->
-> I didn't see a response to this. Joseph, let's just use two cells
-> instead. I'm rather desperately waiting for this binding to be complete
-> so I can finalize the U-Boot code that uses it, and it sounds like
-> changing to two cells will get an ack faster. Can you post an updated
-> version of this series today/ASAP to get things moving? Thanks.
->
-Okay, will use two cells instead.
+On Mon, 18 Jul 2016, Jonathan Cameron wrote:
+
+> On 15/07/16 10:59, Quentin Schulz wrote:
+> > The Allwinner SoCs all have an ADC that can also act as a touchscreen
+> > controller and a thermal sensor. For now, only the ADC and the thermal
+> > sensor drivers are probed by the MFD, the touchscreen controller support
+> > will be added later.
+> > 
+> > Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+> Hmm. Previous patch includes the header this one creates.  Ordering issue?
+> The depends kind of prevents build failures by ensuring that can't be built
+> until this one is in place, but it is certainly an ugly way to do it.
+> 
+> Few little bits innline.
+> > ---
+> > 
+> > v2:
+> >  - add license headers,
+> >  - reorder alphabetically includes,
+> >  - add SUNXI_GPADC_ prefixes for defines,
+> > 
+> >  drivers/mfd/Kconfig                 |  14 +++
+> >  drivers/mfd/Makefile                |   2 +
+> >  drivers/mfd/sunxi-gpadc-mfd.c       | 197 ++++++++++++++++++++++++++++++++++++
+> >  include/linux/mfd/sunxi-gpadc-mfd.h |  23 +++++
+> >  4 files changed, 236 insertions(+)
+> >  create mode 100644 drivers/mfd/sunxi-gpadc-mfd.c
+> >  create mode 100644 include/linux/mfd/sunxi-gpadc-mfd.h
+
+[...]
+
+> > +static struct mfd_cell sun6i_gpadc_mfd_cells[] = {
+> > +	{
+> > +		.name	= "sun6i-a31-gpadc-iio",
+> > +		.resources = adc_resources,
+> > +		.num_resources = ARRAY_SIZE(adc_resources),
+> > +	}, {
+> > +		.name = "iio_hwmon",
+> I still really dislike using this to force the probe of that driver but
+> kind of up to the hwmon / mfd guys on this.
+
+Can you at least say *why* you don't like it?
+
+How else would it get probed?
+
+> I don't have any better suggestions though..
+> > +	},
+> > +};
+
+[...]
+
+> > +	if (ret) {
+> > +		dev_err(&pdev->dev, "failed to add MFD devices: %d\n", ret);
+> > +		regmap_del_irq_chip(irq, sunxi_gpadc_mfd_dev->regmap_irqc);
+> > +		return ret;
+> > +	}
+> > +
+> > +	dev_info(&pdev->dev, "successfully loaded\n");
+> Seems like noise to me, but not my subsystem :)
+
+Agreed, I don't allow this either.
+
+[...]
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
