@@ -1,205 +1,35 @@
-From: yt.shen@mediatek.com (YT Shen)
-Date: Tue, 19 Jul 2016 19:12:38 +0800
-Subject: [PATCH v4 3/8] drm/mediatek: add shadow register support
-In-Reply-To: <1468830992.2994.6.camel@pengutronix.de>
-References: <1468577274-6178-1-git-send-email-yt.shen@mediatek.com>
- <1468577274-6178-4-git-send-email-yt.shen@mediatek.com>
- <1468823575.30644.33.camel@mtksdaap41>
- <1468830992.2994.6.camel@pengutronix.de>
-Message-ID: <1468926758.24098.37.camel@mtksdaap41>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 19 Jul 2016 08:13:22 -0300
+Subject: [PATCH v5 3/3] clk: imx6: Fix procedure to switch the parent of
+ LDB_DI_CLK
+In-Reply-To: <2499789.N9zTF3cNAV@diplodocus>
+References: <1468235521-3163-1-git-send-email-p.zabel@pengutronix.de>
+ <1468235521-3163-3-git-send-email-p.zabel@pengutronix.de>
+ <5787C558.5060904@gmail.com> <2499789.N9zTF3cNAV@diplodocus>
+Message-ID: <CAOMZO5CPM9YfVqfpuyLmhGn9jC7p73Ocnc7LxE9=xA9ouawNQQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Philipp, CK,
+Hi Joshua,
 
-Thanks for the review.
+On Sat, Jul 16, 2016 at 5:55 PM, Joshua Clayton
+<stillcompiling@gmail.com> wrote:
 
-On Mon, 2016-07-18 at 10:36 +0200, Philipp Zabel wrote:
-> Hi CK, YT,
-> 
-> Am Montag, den 18.07.2016, 14:32 +0800 schrieb CK Hu:
-> > Hi, YT:
-> > 
-> > One comment inline.
-> > 
-> > 
-> > On Fri, 2016-07-15 at 18:07 +0800, YT Shen wrote:
-> > > We need to acquire mutex before using the resources,
-> > > and need to release it after finished.
-> > > So we don't need to write registers in the blanking period.
-> > > 
-> > > Signed-off-by: YT Shen <yt.shen@mediatek.com>
-> > > ---
-> > >  drivers/gpu/drm/mediatek/mtk_drm_crtc.c |   75 +++++++++++++++++++------------
-> > >  drivers/gpu/drm/mediatek/mtk_drm_ddp.c  |   22 +++++++++
-> > >  drivers/gpu/drm/mediatek/mtk_drm_ddp.h  |    2 +
-> > >  drivers/gpu/drm/mediatek/mtk_drm_drv.h  |    1 +
-> > >  4 files changed, 71 insertions(+), 29 deletions(-)
-> > > 
-> > > diff --git a/drivers/gpu/drm/mediatek/mtk_drm_crtc.c b/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
-> > > index 24aa3ba..80d9641 100644
-> > > --- a/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
-> > > +++ b/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
-> > > @@ -315,6 +315,42 @@ static void mtk_crtc_ddp_hw_fini(struct mtk_drm_crtc *mtk_crtc)
-> > >  	pm_runtime_put(drm->dev);
-> > >  }
-> > >  
-> > > +static void mtk_crtc_ddp_config(struct drm_crtc *crtc)
-> > > +{
-> > > +	struct mtk_drm_crtc *mtk_crtc = to_mtk_crtc(crtc);
-> > > +	struct mtk_crtc_state *state = to_mtk_crtc_state(mtk_crtc->base.state);
-> > > +	struct mtk_ddp_comp *ovl = mtk_crtc->ddp_comp[0];
-> > > +	unsigned int i;
-> > > +
-> > > +	/*
-> > > +	 * TODO: instead of updating the registers here, we should prepare
-> > > +	 * working registers in atomic_commit and let the hardware command
-> > > +	 * queue update module registers on vblank.
-> > > +	 */
-> > > +	if (state->pending_config) {
-> > > +		mtk_ddp_comp_config(ovl, state->pending_width,
-> > > +				    state->pending_height,
-> > > +				    state->pending_vrefresh);
-> > > +
-> > > +		state->pending_config = false;
-> > > +	}
-> > > +
-> > > +	if (mtk_crtc->pending_planes) {
-> > > +		for (i = 0; i < OVL_LAYER_NR; i++) {
-> > > +			struct drm_plane *plane = &mtk_crtc->planes[i].base;
-> > > +			struct mtk_plane_state *plane_state;
-> > > +
-> > > +			plane_state = to_mtk_plane_state(plane->state);
-> > > +
-> > > +			if (plane_state->pending.config) {
-> > > +				mtk_ddp_comp_layer_config(ovl, i, plane_state);
-> > > +				plane_state->pending.config = false;
-> > > +			}
-> > > +		}
-> > > +		mtk_crtc->pending_planes = false;
-> > > +	}
-> > > +}
-> > > +
-> > >  static void mtk_drm_crtc_enable(struct drm_crtc *crtc)
-> > >  {
-> > >  	struct mtk_drm_crtc *mtk_crtc = to_mtk_crtc(crtc);
-> > > @@ -391,6 +427,7 @@ static void mtk_drm_crtc_atomic_flush(struct drm_crtc *crtc,
-> > >  				      struct drm_crtc_state *old_crtc_state)
-> > >  {
-> > >  	struct mtk_drm_crtc *mtk_crtc = to_mtk_crtc(crtc);
-> > > +	struct mtk_drm_private *priv = crtc->dev->dev_private;
-> > >  	unsigned int pending_planes = 0;
-> > >  	int i;
-> > >  
-> > > @@ -409,6 +446,12 @@ static void mtk_drm_crtc_atomic_flush(struct drm_crtc *crtc,
-> > >  	}
-> > >  	if (pending_planes)
-> > >  		mtk_crtc->pending_planes = true;
-> > > +
-> > > +	if (priv->data->shadow_register) {
-> > > +		mtk_disp_mutex_acquire(mtk_crtc->mutex);
-> > > +		mtk_crtc_ddp_config(crtc);
-> > > +		mtk_disp_mutex_release(mtk_crtc->mutex);
-> > > +	}
-> > >  }
-> > >  
-> > >  static const struct drm_crtc_funcs mtk_crtc_funcs = {
-> > > @@ -453,36 +496,10 @@ err_cleanup_crtc:
-> > >  void mtk_crtc_ddp_irq(struct drm_crtc *crtc, struct mtk_ddp_comp *ovl)
-> > >  {
-> > >  	struct mtk_drm_crtc *mtk_crtc = to_mtk_crtc(crtc);
-> > > -	struct mtk_crtc_state *state = to_mtk_crtc_state(mtk_crtc->base.state);
-> > > -	unsigned int i;
-> > > +	struct mtk_drm_private *priv = crtc->dev->dev_private;
-> > >  
-> > > -	/*
-> > > -	 * TODO: instead of updating the registers here, we should prepare
-> > > -	 * working registers in atomic_commit and let the hardware command
-> > > -	 * queue update module registers on vblank.
-> > > -	 */
-> > > -	if (state->pending_config) {
-> > > -		mtk_ddp_comp_config(ovl, state->pending_width,
-> > > -				    state->pending_height,
-> > > -				    state->pending_vrefresh);
-> > > -
-> > > -		state->pending_config = false;
-> > > -	}
-> > > -
-> > > -	if (mtk_crtc->pending_planes) {
-> > > -		for (i = 0; i < OVL_LAYER_NR; i++) {
-> > > -			struct drm_plane *plane = &mtk_crtc->planes[i].base;
-> > > -			struct mtk_plane_state *plane_state;
-> > > -
-> > > -			plane_state = to_mtk_plane_state(plane->state);
-> > > -
-> > > -			if (plane_state->pending.config) {
-> > > -				mtk_ddp_comp_layer_config(ovl, i, plane_state);
-> > > -				plane_state->pending.config = false;
-> > > -			}
-> > > -		}
-> > > -		mtk_crtc->pending_planes = false;
-> > > -	}
-> > > +	if (!priv->data->shadow_register)
-> > > +		mtk_crtc_ddp_config(crtc);
-> > >  
-> > >  	mtk_drm_finish_page_flip(mtk_crtc);
-> > >  }
-> > > diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-> > > index 8030769..fa53806 100644
-> > > --- a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-> > > +++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-> > > @@ -12,6 +12,7 @@
-> > >   */
-> > >  
-> > >  #include <linux/clk.h>
-> > > +#include <linux/iopoll.h>
-> > >  #include <linux/module.h>
-> > >  #include <linux/of_device.h>
-> > >  #include <linux/platform_device.h>
-> > > @@ -32,6 +33,7 @@
-> > >  #define DISP_REG_CONFIG_MMSYS_CG_CON0		0x100
-> > >  
-> > >  #define DISP_REG_MUTEX_EN(n)	(0x20 + 0x20 * (n))
-> > > +#define DISP_REG_MUTEX(n)	(0x24 + 0x20 * (n))
-> > >  #define DISP_REG_MUTEX_RST(n)	(0x28 + 0x20 * (n))
-> > >  #define DISP_REG_MUTEX_MOD(n)	(0x2c + 0x20 * (n))
-> > >  #define DISP_REG_MUTEX_SOF(n)	(0x30 + 0x20 * (n))
-> > > @@ -300,6 +302,26 @@ void mtk_disp_mutex_disable(struct mtk_disp_mutex *mutex)
-> > >  	writel(0, ddp->regs + DISP_REG_MUTEX_EN(mutex->id));
-> > >  }
-> > >  
-> > > +void mtk_disp_mutex_acquire(struct mtk_disp_mutex *mutex)
-> > > +{
-> > > +	struct mtk_ddp *ddp = container_of(mutex, struct mtk_ddp,
-> > > +					   mutex[mutex->id]);
-> > > +	u32 tmp;
-> > > +
-> > > +	writel(1, ddp->regs + DISP_REG_MUTEX_EN(mutex->id));
-> > > +	writel(1, ddp->regs + DISP_REG_MUTEX(mutex->id));
-> > > +	readl_poll_timeout_atomic(ddp->regs + DISP_REG_MUTEX(mutex->id), tmp,
-> > > +				  tmp & 0x2, 1, 10000);
-> 
-> Please add a descriptive #define for the 0x2 bit of the DISP_REG_MUTEX
-> registers.
-OK, will do.
+> Took the printk out and the patch set still works as expected.
+> ...so the previous email was a false alarm. Mea culpa
+> Problem solved I think. Thanks Philipp!
+>
+> for my hardware (imx6q-evi) using xorg and  lvds
+>
+> Tested-by Joshua Clayton <stillcompiling@gmail.com>
 
-> 
-> > Nothing to do with timeout? I think it should print error message here
-> > or reset HW to recover it.
-I will print error messages here for future debugging.
+Great news! It is good to know you are able to confirm this series
+fixes the LVDS issue on your board.
 
-> 
-> I assume that if mtk_disp_mutex_acquire is called while the hardware has
-> the mutex (during the shadow register update), this should wait until
-> the update is complete, since it can't back out from trying to acquire
-> the lock. Is that the case?
-The acquire/release is handshake interface between software and hardware
-to guarantee hardware receives a complete setting.  If software wants to
-modify registers, it needs set a request and wait acknowledge.  And
-after everything is done, software needs to notify hardware.  As far as
-I know, this timeout means hardware is wrong, eg: no output signals.
+Still interested to know if Novena LVDS still work with this series applied.
 
-> 
-> regards
-> Philipp
-> 
+Sean,Marek,
+
+Any chances of testing this series on Novena's board?
+
+Thanks
