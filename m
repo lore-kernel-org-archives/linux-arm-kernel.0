@@ -1,42 +1,63 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Tue, 19 Jul 2016 08:36:00 -0600
-Subject: [PATCH -next] coresight: etm4x: remove duplicated include from
- coresight-etm4x.c
-In-Reply-To: <1468927641-335-1-git-send-email-weiyj_lk@163.com>
-References: <1468927641-335-1-git-send-email-weiyj_lk@163.com>
-Message-ID: <CANLsYkxDt2zG78AJJtn21v7GJp9wBfvsj2B5s7Vus5wo=7cZpg@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 19 Jul 2016 15:36:50 +0100
+Subject: [PATCH 2/4] arm64: debug: remove redundant spsr manipulation
+In-Reply-To: <1468937260-23988-2-git-send-email-will.deacon@arm.com>
+References: <1468937260-23988-1-git-send-email-will.deacon@arm.com>
+ <1468937260-23988-2-git-send-email-will.deacon@arm.com>
+Message-ID: <20160719143614.GA22473@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19 July 2016 at 05:27, Wei Yongjun <weiyj_lk@163.com> wrote:
-> From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
->
-> Remove duplicated include.
->
-> Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+On Tue, Jul 19, 2016 at 03:07:38PM +0100, Will Deacon wrote:
+> There is no need to explicitly clear the SS bit immediately before
+> setting it unconditionally.
+> 
+> Reported-by: Catalin Marinas <catalin.marinas@arm.com>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+
+Mark.
+
 > ---
->  drivers/hwtracing/coresight/coresight-etm4x.c | 1 -
->  1 file changed, 1 deletion(-)
->
-> diff --git a/drivers/hwtracing/coresight/coresight-etm4x.c b/drivers/hwtracing/coresight/coresight-etm4x.c
-> index 0d8ebfa..6e639b9 100644
-> --- a/drivers/hwtracing/coresight/coresight-etm4x.c
-> +++ b/drivers/hwtracing/coresight/coresight-etm4x.c
-> @@ -33,7 +33,6 @@
->  #include <linux/uaccess.h>
->  #include <linux/perf_event.h>
->  #include <linux/pm_runtime.h>
-> -#include <linux/perf_event.h>
->  #include <asm/sections.h>
->  #include <asm/local.h>
-
-Definitely - applied.
-
-Thanks,
-Mathieu
-
->
->
->
->
->
+>  arch/arm64/kernel/debug-monitors.c | 13 ++-----------
+>  1 file changed, 2 insertions(+), 11 deletions(-)
+> 
+> diff --git a/arch/arm64/kernel/debug-monitors.c b/arch/arm64/kernel/debug-monitors.c
+> index 7a907e401c98..91fff48d0f57 100644
+> --- a/arch/arm64/kernel/debug-monitors.c
+> +++ b/arch/arm64/kernel/debug-monitors.c
+> @@ -170,22 +170,13 @@ postcore_initcall(debug_monitors_init);
+>   */
+>  static void set_regs_spsr_ss(struct pt_regs *regs)
+>  {
+> -	unsigned long spsr;
+> -
+> -	spsr = regs->pstate;
+> -	spsr &= ~DBG_SPSR_SS;
+> -	spsr |= DBG_SPSR_SS;
+> -	regs->pstate = spsr;
+> +	regs->pstate |= DBG_SPSR_SS;
+>  }
+>  NOKPROBE_SYMBOL(set_regs_spsr_ss);
+>  
+>  static void clear_regs_spsr_ss(struct pt_regs *regs)
+>  {
+> -	unsigned long spsr;
+> -
+> -	spsr = regs->pstate;
+> -	spsr &= ~DBG_SPSR_SS;
+> -	regs->pstate = spsr;
+> +	regs->pstate &= ~DBG_SPSR_SS;
+>  }
+>  NOKPROBE_SYMBOL(clear_regs_spsr_ss);
+>  
+> -- 
+> 2.1.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
