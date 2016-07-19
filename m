@@ -1,220 +1,79 @@
-From: dennis.chen@arm.com (Dennis Chen)
-Date: Tue, 19 Jul 2016 17:39:07 +0800
-Subject: [PATCH v22 1/8] arm64: kdump: reserve memory for crash dump kernel
-In-Reply-To: <20160712050514.22307-2-takahiro.akashi@linaro.org>
-References: <20160712050514.22307-1-takahiro.akashi@linaro.org>
- <20160712050514.22307-2-takahiro.akashi@linaro.org>
-Message-ID: <20160719093906.GA20732@arm.com>
+From: jm@lentin.co.uk (Jamie Lentin)
+Date: Tue, 19 Jul 2016 10:40:16 +0100 (BST)
+Subject: [PATCH v0 06/10] arm: orion5x: Add DT-based support for Netgear
+ WNR854T
+In-Reply-To: <1792384.6N9lHjmBFc@wuerfel>
+References: <1468679348-10522-1-git-send-email-jm@lentin.co.uk>
+ <6404488.GyOP57DJrV@wuerfel> <20160718114424.14a28889@free-electrons.com>
+ <1792384.6N9lHjmBFc@wuerfel>
+Message-ID: <alpine.DEB.2.11.1607191034240.19980@marmot.wormnet.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello AKASHI,
+On Mon, 18 Jul 2016, Arnd Bergmann wrote:
 
-On Tue, Jul 12, 2016 at 02:05:07PM +0900, AKASHI Takahiro wrote:
-> On the startup of primary kernel, the memory region used by crash dump
-> kernel must be specified by "crashkernel=" kernel parameter.
-> reserve_crashkernel() will allocate and reserve the region for later use.
+> On Monday, July 18, 2016 11:44:24 AM CEST Thomas Petazzoni wrote:
+>>
+>> On Sun, 17 Jul 2016 22:41:35 +0200, Arnd Bergmann wrote:
+>>
+>>> I would assume that the PCIe port should work out of the box with the driver
+>>
+>> Unfortunately, no. The PCIe on Orion5x requires a workaround for
+>> reading/writing the PCI configuration space. Instead of doing MMIO
+>> accesses to PCIE_CONF_ADDR_OFF / PCIE_CONF_DATA_OFF, you must map a
+>> MBus window, which provides a memory-mapped view of the PCI
+>> configuration space.
+>>
+>> Definitely not impossible to implement, but the driver doesn't work
+>> as-is.
 >
-> User space tools, like kexec-tools, will be able to find that region as
->       - "Crash kernel" in /proc/iomem, or
->       - "linux,crashkernel-base" and "linux,crashkernel-size" under
->         /sys/firmware/devicetree/base/chosen
->
-> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> Signed-off-by: Mark Salter <msalter@redhat.com>
-> Signed-off-by: Pratyush Anand <panand@redhat.com>
-> Reviewed-by: James Morse <james.morse@arm.com>
-> ---
->  arch/arm64/kernel/setup.c |   7 ++-
->  arch/arm64/mm/init.c      | 115 ++++++++++++++++++++++++++++++++++++++++++++++
->  2 files changed, 121 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-> index c1509e6..cb5eee0 100644
-> --- a/arch/arm64/kernel/setup.c
-> +++ b/arch/arm64/kernel/setup.c
-> @@ -31,7 +31,6 @@
->  #include <linux/screen_info.h>
->  #include <linux/init.h>
->  #include <linux/kexec.h>
-> -#include <linux/crash_dump.h>
->  #include <linux/root_dev.h>
->  #include <linux/cpu.h>
->  #include <linux/interrupt.h>
-> @@ -222,6 +221,12 @@ static void __init request_standard_resources(void)
->                   kernel_data.end <= res->end)
->                       request_resource(res, &kernel_data);
->       }
-> +
-> +#ifdef CONFIG_KEXEC_CORE
-> +     /* User space tools will find "Crash kernel" region in /proc/iomem. */
-> +     if (crashk_res.end)
-> +             insert_resource(&iomem_resource, &crashk_res);
-> +#endif
->  }
->
->  u64 __cpu_logical_map[NR_CPUS] = { [0 ... NR_CPUS-1] = INVALID_HWID };
-> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-> index 2ade7a6..51b1302 100644
-> --- a/arch/arm64/mm/init.c
-> +++ b/arch/arm64/mm/init.c
-> @@ -29,11 +29,13 @@
->  #include <linux/gfp.h>
->  #include <linux/memblock.h>
->  #include <linux/sort.h>
-> +#include <linux/of.h>
->  #include <linux/of_fdt.h>
->  #include <linux/dma-mapping.h>
->  #include <linux/dma-contiguous.h>
->  #include <linux/efi.h>
->  #include <linux/swiotlb.h>
-> +#include <linux/kexec.h>
->
->  #include <asm/boot.h>
->  #include <asm/fixmap.h>
-> @@ -76,6 +78,117 @@ static int __init early_initrd(char *p)
->  early_param("initrd", early_initrd);
->  #endif
->
-> +#ifdef CONFIG_KEXEC_CORE
-> +static unsigned long long crash_size, crash_base;
-> +static struct property crash_base_prop = {
-> +     .name = "linux,crashkernel-base",
-> +     .length = sizeof(u64),
-> +     .value = &crash_base
-> +};
-> +static struct property crash_size_prop = {
-> +     .name = "linux,crashkernel-size",
-> +     .length = sizeof(u64),
-> +     .value = &crash_size,
-> +};
-> +
-> +static int __init export_crashkernel(void)
-> +{
-> +     struct device_node *node;
-> +     int ret;
-> +
-> +     if (!crashk_res.end)
-> +             return 0;
-> +
-> +     crash_base = cpu_to_be64(crashk_res.start);
-> +     crash_size = cpu_to_be64(crashk_res.end - crashk_res.start + 1);
-> +
-> +     /* Add /chosen/linux,crashkernel-* properties */
-> +     node = of_find_node_by_path("/chosen");
-> +     if (!node)
-> +             return -ENOENT;
-> +
-> +     /*
-> +      * There might be existing crash kernel properties, but we can't
-> +      * be sure what's in them, so remove them.
-> +      */
-> +     of_remove_property(node, of_find_property(node,
-> +                             "linux,crashkernel-base", NULL));
-> +     of_remove_property(node, of_find_property(node,
-> +                             "linux,crashkernel-size", NULL));
-> +
-> +     ret = of_add_property(node, &crash_base_prop);
-> +     if (ret)
-> +             goto ret_err;
-> +
-> +     ret = of_add_property(node, &crash_size_prop);
-> +     if (ret)
-> +             goto ret_err;
-> +
-> +     return 0;
-> +
-> +ret_err:
-> +     pr_warn("Exporting crashkernel region to device tree failed\n");
-> +     return ret;
-> +}
-> +late_initcall(export_crashkernel);
-> +
-> +/*
-> + * reserve_crashkernel() - reserves memory for crash kernel
-> + *
-> + * This function reserves memory area given in "crashkernel=" kernel command
-> + * line parameter. The memory reserved is used by dump capture kernel when
-> + * primary kernel is crashing.
-> + */
-> +static void __init reserve_crashkernel(void)
-> +{
-> +     int ret;
-> +
-> +     ret = parse_crashkernel(boot_command_line, memblock_phys_mem_size(),
-> +                             &crash_size, &crash_base);
-> +     /* no crashkernel= or invalid value specified */
-> +     if (ret || !crash_size)
-> +             return;
-> +
-> +     if (crash_base == 0) {
-> +             /* Current arm64 boot protocol requires 2MB alignment */
-> +             crash_base = memblock_find_in_range(0,
-> +                             MEMBLOCK_ALLOC_ACCESSIBLE, crash_size, SZ_2M);
-> +             if (crash_base == 0) {
-> +                     pr_warn("Unable to allocate crashkernel (size:%llx)\n",
-> +                             crash_size);
-> +                     return;
-> +             }
-> +             memblock_reserve(crash_base, crash_size);
->
-I am not pretty sure the context here, but
-can we use below code piece instead of the above lines?
-        if (crash_base == 0)
-                memblock_alloc(crash_size, SZ_2M);
+> Ok.
 
-Thanks,
-Dennis
+Unfortunately this isn't something I can test as the PCIe port on the SoC 
+doesn't go anywhere in my case.
 
-> +
-> +     } else {
-> +             /* User specifies base address explicitly. */
-> +             if (!memblock_is_region_memory(crash_base, crash_size) ||
-> +                     memblock_is_region_reserved(crash_base, crash_size)) {
-> +                     pr_warn("crashkernel has wrong address or size\n");
-> +                     return;
-> +             }
-> +
-> +             if (!IS_ALIGNED(crash_base, SZ_2M)) {
-> +                     pr_warn("crashkernel base address is not 2MB aligned\n");
-> +                     return;
-> +             }
-> +
-> +             memblock_reserve(crash_base, crash_size);
-> +     }
-> +
-> +     pr_info("Reserving %lldMB of memory at %lldMB for crashkernel\n",
-> +             crash_size >> 20, crash_base >> 20);
-> +
-> +     crashk_res.start = crash_base;
-> +     crashk_res.end = crash_base + crash_size - 1;
-> +}
-> +#else
-> +static void __init reserve_crashkernel(void)
-> +{
-> +     ;
-> +}
-> +#endif /* CONFIG_KEXEC_CORE */
-> +
->  /*
->   * Return the maximum physical address for ZONE_DMA (DMA_BIT_MASK(32)). It
->   * currently assumes that for memory starting above 4G, 32-bit devices will
-> @@ -289,6 +402,8 @@ void __init arm64_memblock_init(void)
->       }
->  #endif
+>>> We also don't seem to need any MBUS window setup for the I/O and
+>>> memory spaces, which greatly simplifies the driver compared to the
+>>> pci-mvebu one, it would be a fairly straightforward implementation
+>>> based on pci-host-generic.c (which unfortunately just got way
+>>> more complicated and might need to go on a diet).
+>>
+>> MBus windows are needed. See:
+>>
+>>         mvebu_mbus_add_window_remap_by_id(ORION_MBUS_PCI_IO_TARGET,
+>>                                           ORION_MBUS_PCI_IO_ATTR,
+>>                                           ORION5X_PCI_IO_PHYS_BASE,
+>>                                           ORION5X_PCI_IO_SIZE,
+>>                                           ORION5X_PCI_IO_BUS_BASE);
+>>         mvebu_mbus_add_window_by_id(ORION_MBUS_PCI_MEM_TARGET,
+>>                                     ORION_MBUS_PCI_MEM_ATTR,
+>>                                     ORION5X_PCI_MEM_PHYS_BASE,
+>>                                     ORION5X_PCI_MEM_SIZE);
+>>
+>> in orion5x_setup_wins().
 >
-> +     reserve_crashkernel();
-> +
->       early_init_fdt_scan_reserved_mem();
+> Ok, I was just looking at the wrong file, as they are set up from
+> common.c, not pci.c.
 >
->       /* 4GB maximum for 32-bit only capable devices */
-> --
-> 2.9.0
+>> Note that we already have some Orion5x converted to DT, and that use
+>> PCI: board-rd88f5182.c is an example. So we could very well take Jamie
+>> patches as-is, and move later to a DT-representation for PCI/PCIe.
 >
+> Ah, I thought all the DT users were moved to mach-mvebu. I agree
+> this new patch isn't introducing anything we don't already have then,
+> so we can just take it, but the conversion will not be nice when
+> we do that.
+
+Yes, board-wnr854t.c is a clone of the existing board-rd88f5182.c. 
+Although I'd presume that it too would need late_initcall() or somesuch 
+mechanism to probe PCI once the GPIO controller is available.
+
+> I was also hoping that we could get to the point where pci_common_init()
+> is only used for legacy machines without DT and without multiplatform,
+> it seems I missed a couple of users here.
 >
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 	Arnd
 >
-IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
+
+-- 
+Jamie Lentin
