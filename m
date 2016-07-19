@@ -1,231 +1,232 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 19 Jul 2016 19:27:44 +0100
-Subject: [PATCH v15 00/10] arm64: Add kernel probes (kprobes) support
-In-Reply-To: <1467995754-32508-1-git-send-email-dave.long@linaro.org>
-References: <1467995754-32508-1-git-send-email-dave.long@linaro.org>
-Message-ID: <20160719182744.GI21256@e104818-lin.cambridge.arm.com>
+From: fu.wei@linaro.org (Fu Wei)
+Date: Wed, 20 Jul 2016 02:28:04 +0800
+Subject: [PATCH v7 7/9] acpi/arm64: Add memory-mapped timer support in
+ GTDT driver
+In-Reply-To: <20160714134251.GA30657@red-moon>
+References: <1468432402-4872-1-git-send-email-fu.wei@linaro.org>
+ <1468432402-4872-8-git-send-email-fu.wei@linaro.org>
+ <20160714134251.GA30657@red-moon>
+Message-ID: <CADyBb7vZTv9Gj5iUaXvgNK98kUcBDXgdyF05DMqovW19bSxe6g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 08, 2016 at 12:35:44PM -0400, David Long wrote:
-> From: "David A. Long" <dave.long@linaro.org>
-> 
-> This patchset is heavily based on Sandeepa Prabhu's ARM v8 kprobes patches,
-> first seen in October 2013. This version attempts to address concerns
-> raised by reviewers and also fixes problems discovered during testing.
-> 
-> This patchset adds support for kernel probes(kprobes), jump probes(jprobes)
-> and return probes(kretprobes) support for ARM64.
+Hi Lorenzo,
 
-Some more errors with this patchset applied and CONFIG_NET_TCPPROBE
-enabled (it's fine with this option disabled though). I boot on a Juno
-with NFS over UDP and then try to ssh into it (hence establish the first
-TCP connection):
+I have updated my patchset following all your comments.
+I have just posted v8 patchset, please check.
 
-Unable to handle kernel NULL pointer dereference at virtual address 00000003
-pgd = ffff000008ceb000
-[00000003] *pgd=00000009fff6d003, *pud=00000009fff6c003, *pmd=0000000000000000
-Internal error: Oops: 96000004 [#1] PREEMPT SMP
-Modules linked in:
-CPU: 1 PID: 0 Comm: swapper/1 Not tainted 4.7.0-rc4+ #9
-Hardware name: ARM Juno development board (r0) (DT)
-task: ffff800976901900 ti: ffff800976910000 task.ti: ffff800976910000
-PC is at enqueue_task_fair+0x818/0x1188
-LR is at enqueue_task_fair+0x8a4/0x1188
-pc : [<ffff0000080e73d8>] lr : [<ffff0000080e7464>] pstate: 600001c5
-sp : ffff80097fec3a80
-x29: ffff80097fec3a80 x28: 0000000000000001
-x27: 00000000afb50401 x26: afb504000afb5041
-x25: 0000000000000000 x24: 0000000000000001
-x23: ffff000008bcbd90 x22: 0000000000000001
-x21: ffff800975951900 x20: ffff800975951800
-x19: ffff80097fec96e8 x18: 0000000000000000
-x17: 0000000000000000 x16: 0000000000000000
-x15: 0000000000000001 x14: 0000000000000001
-x13: 0000000005da2e6c x12: 000000000044ab8d
-x11: 0000000000000000 x10: 0000000000000001
-x9 : 0000000000000000 x8 : 0000000991653ffc
-x7 : 000000000000003e x6 : ffff80097fec9740
-x5 : 0000000000000000 x4 : ffff0000087ef950
-x3 : 0000000000000400 x2 : 000000000000005e
-x1 : ffff80097fec9680 x0 : 0000000000000003
+Great thanks for your comments, they are very helpful :-)
 
-Process swapper/1 (pid: 0, stack limit = 0xffff800976910020)
-Stack: (0xffff80097fec3a80 to 0xffff800976914000)
-Call trace:
-Exception stack(0xffff80097fec38c0 to 0xffff80097fec39e0)
-38c0: ffff80097fec96e8 ffff800975951800 ffff80097fec3a80 ffff0000080e73d8
-38e0: ffff800976ad2300 ffff800974a07e00 0000000000000003 ffff800974a00000
-3900: 0000000000000000 ffff7e0025d28000 0000000000000013 0000000080010400
-3920: ffff000008c9f000 0000000000000003 0000000100000000 000000000000000e
-3940: ffff80097fec39a0 ffff0000081ae954 0000000000000000 0000000000000000
-3960: 0000000000000003 ffff80097fec9680 000000000000005e 0000000000000400
-3980: ffff0000087ef950 0000000000000000 ffff80097fec9740 000000000000003e
-39a0: 0000000991653ffc 0000000000000000 0000000000000001 0000000000000000
-39c0: 000000000044ab8d 0000000005da2e6c 0000000000000001 0000000000000001
-[<ffff0000080e73d8>] enqueue_task_fair+0x818/0x1188
-[<ffff0000080dbdd4>] activate_task+0x5c/0xa0
-[<ffff0000080dc088>] ttwu_do_activate+0x50/0x88
-[<ffff0000080dda60>] try_to_wake_up+0x228/0x2c0
-[<ffff0000080ddbd0>] default_wake_function+0x10/0x18
-[<ffff0000080f0ffc>] autoremove_wake_function+0x14/0x40
-[<ffff0000080f0814>] __wake_up_common+0x5c/0xa0
-[<ffff0000080f0e64>] __wake_up_sync_key+0x4c/0x78
-[<ffff00000875a330>] tcp_prequeue+0x190/0x2e8
-[<ffff00000875b8a4>] tcp_v4_rcv+0xa5c/0xb08
-[<ffff000008736eac>] ip_local_deliver+0xa4/0x200
-[<ffff0000087373e4>] ip_rcv+0x3dc/0x5f0
-[<ffff000008707460>] __netif_receive_skb_core+0x5f8/0x7c8
-[<ffff000008709990>] __netif_receive_skb+0x18/0x68
-[<ffff000008709a04>] netif_receive_skb_internal+0x24/0xa8
-[<ffff000008709a94>] netif_receive_skb+0xc/0x18
-[<ffff00000858f9b0>] smsc911x_poll+0xf0/0x278
-[<ffff00000870b0b0>] net_rx_action+0x1d8/0x2b0
-[<ffff0000080be200>] __do_softirq+0x100/0x210
-[<ffff0000080be5b8>] irq_exit+0x90/0xd8
-[<ffff0000080fb2f8>] __handle_domain_irq+0x60/0xb8
-[<ffff000008081578>] gic_handle_irq+0x58/0xb0
-Exception stack(0xffff800976913df0 to 0xffff800976913f10)
-3de0:                                   0000000000000000 ffff80097fec9680
-3e00: 00008009772f9000 0000000002800000 0000000000000004 000000000115c074
-3e20: 0000000000000015 000000000000012f 000000000000016d ffff80097fec872c
-3e40: 0000000000000a12 0000000000000a12 071c71c71c71c71c 20230a2e746c7561
-3e60: 524150203a4c4c41 0000000000000000 0000000000000000 0000000000000000
-3e80: 0000000000000000 00000009972f2718 ffff8009763d7400 0000000000000000
-3ea0: 0000000000000000 ffff000008c6bb20 00000009972ada50 ffff000008c05c1c
-3ec0: ffff000008c05000 ffff000008c6bb20 ffff800976910000 ffff800976913f10
-3ee0: ffff00000864ac08 ffff800976913f10 ffff00000864ac0c 0000000060000145
-3f00: ffff000008c6bb20 ffff8009763d7400
-[<ffff000008082720>] el1_irq+0xa0/0x10c
-[<ffff00000864ac0c>] cpuidle_enter_state+0x1b4/0x238
-[<ffff00000864acc8>] cpuidle_enter+0x18/0x20
-[<ffff0000080f15c0>] call_cpuidle+0x18/0x30
-[<ffff0000080f1838>] cpu_startup_entry+0x198/0x1f8
-[<ffff00000808dc78>] secondary_start_kernel+0x158/0x198
-[<00000000800831a8>] 0x800831a8
-Code: f8606ae0 b4ffe5c0 f9447023 f9403e62 (f9400006)
-Bad mode in Synchronous Abort handler detected on CPU1, code 0x8600000f -- IABT (current EL)
-CPU: 1 PID: 0 Comm: swapper/1 Tainted: G      D         4.7.0-rc4+ #9
-Hardware name: ARM Juno development board (r0) (DT)
-task: ffff800976901900 ti: ffff800976910000 task.ti: ffff800976910000
-PC is at 0xffff80097fec3f40
-LR is at irq_work_run_list+0x68/0xb8
-pc : [<ffff80097fec3f40>] lr : [<ffff000008147978>] pstate: 000001c5
-sp : ffff80097fec35f0
-x29: ffff80097fec35f0 x28: ffff800976910000
-x27: 00000000afb50401 x26: afb504000afb5041
-x25: ffff80097fec0000 x24: ffff800976901900
-x23: ffff000008005000 x22: 0000000000000000
-x21: ffff000008ca0d53 x20: ffff000008ca0d52
-x19: ffff80097fec4da8 x18: 0000000000000006
-x17: 0000000000000000 x16: 0000000000000000
-x15: ffff000008cacc95 x14: 3431303030303630
-x13: ffff000008caf0aa x12: 0000000005f5e0ff
-x11: 000000000000016d x10: 00000000000a3d60
-x9 : ffff80097fec3480 x8 : 000000000000016e
-x7 : 6628203236653330 x6 : 000000000000000a
-x5 : ffff80097fec4da0 x4 : 00008009772f9000
-x3 : ffff80097fec3f51 x2 : 0000000000000000
-x1 : ffff80097fec3f40 x0 : ffff80097fec4da0
+On 14 July 2016 at 21:42, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
+> On Thu, Jul 14, 2016 at 01:53:20AM +0800, fu.wei at linaro.org wrote:
+>> From: Fu Wei <fu.wei@linaro.org>
+>>
+>> This driver adds support for parsing memory-mapped timer in GTDT:
+>> provide a kernel APIs to parse GT Block Structure in GTDT,
+>> export all the info by filling the struct which provided
+>> by parameter(pointer of the struct).
+>>
+>> By this driver, we can add ACPI support for memory-mapped timer in
+>> arm_arch_timer drivers, and separate the ACPI GTDT knowledge from it.
+>>
+>> Signed-off-by: Fu Wei <fu.wei@linaro.org>
+>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+>> ---
+>>  drivers/acpi/arm64/acpi_gtdt.c       | 90 ++++++++++++++++++++++++++++++++++++
+>>  include/clocksource/arm_arch_timer.h | 15 ++++++
+>>  include/linux/acpi.h                 |  1 +
+>>  3 files changed, 106 insertions(+)
+>>
+>> diff --git a/drivers/acpi/arm64/acpi_gtdt.c b/drivers/acpi/arm64/acpi_gtdt.c
+>> index 9ee977d..ff62953 100644
+>> --- a/drivers/acpi/arm64/acpi_gtdt.c
+>> +++ b/drivers/acpi/arm64/acpi_gtdt.c
+>> @@ -168,3 +168,93 @@ int __init gtdt_arch_timer_init(struct acpi_table_header *table)
+>>
+>>       return -EINVAL;
+>>  }
+>> +
+>> +/*
+>> + * Helper function for getting the pointer of a timer frame in GT block.
+>> + */
+>> +static void __init *gtdt_gt_timer_frame(struct acpi_gtdt_timer_block *gt_block,
+>> +                                     int index)
+>> +{
+>> +     void *timer_frame = (void *)gt_block + gt_block->timer_offset +
+>> +                         sizeof(struct acpi_gtdt_timer_entry) * index;
+>> +
+>> +     if (timer_frame <= (void *)gt_block + gt_block->header.length -
+>> +                        sizeof(struct acpi_gtdt_timer_entry))
+>> +             return timer_frame;
+>
+> Nit: gt_block is an array, right ? I think it would be much simpler
+> if you treat is as such, so that indexing into it would be done
+> automatically by the compiler. Actually, I do not even think you
+> would need this function at all if you treat gt_block as an array,
+> the length check could be done in gtdt_parse_gt_block() straight
+> away.
+>
+>> +
+>> +     return NULL;
+>> +}
+>> +
+>> +static int __init gtdt_parse_gt_block(void *platform_timer, int index,
+>> +                                   void *data)
+>> +{
+>> +     struct acpi_gtdt_timer_block *block;
+>> +     struct acpi_gtdt_timer_entry *frame;
+>> +     struct gt_block_data *block_data;
+>> +     int i, j;
+>> +
+>> +     if (!platform_timer || !data)
+>> +             return -EINVAL;
+>> +
+>> +     block = platform_timer;
+>> +     block_data = data + sizeof(struct gt_block_data) * index;
+>
+> Nit: See above, data is a struct gt_block_data[] right ? These void
+> pointers parameters are not really great, the caller context
+> knows what they are and it can pass them as pointer to typed
+> array elements anyway unless I am missing something.
+>
+>> +     if (!block->block_address || !block->timer_count) {
+>> +             pr_err(FW_BUG "invalid GT Block data.\n");
+>> +             return -EINVAL;
+>> +     }
+>> +     block_data->cntctlbase_phy = (phys_addr_t)block->block_address;
+>> +     block_data->timer_count = block->timer_count;
+>> +
+>> +     /*
+>> +      * Get the GT timer Frame data for every GT Block Timer
+>> +      */
+>> +     for (i = 0, j = 0; i < block->timer_count; i++) {
+>
+> What's j needed for (ie can't you use just i instead ?) ?
+>
+>> +             frame = gtdt_gt_timer_frame(block, i);
+>> +             if (!frame || !frame->base_address || !frame->timer_interrupt) {
+>> +                     pr_err(FW_BUG "invalid GT Block Timer data.\n");
+>> +                     return -EINVAL;
+>> +             }
+>> +             block_data->timer[j].frame_nr = frame->frame_number;
+>> +             block_data->timer[j].cntbase_phy = frame->base_address;
+>> +             block_data->timer[j].irq = map_generic_timer_interrupt(
+>> +                                                frame->timer_interrupt,
+>> +                                                frame->timer_flags);
+>> +             if (frame->virtual_timer_interrupt)
+>> +                     block_data->timer[j].virt_irq =
+>> +                             map_generic_timer_interrupt(
+>> +                                     frame->virtual_timer_interrupt,
+>> +                                     frame->virtual_timer_flags);
+>> +             j++;
+>> +     }
+>> +
+>> +     if (j)
+>> +             return 0;
+>> +
+>> +     block_data->cntctlbase_phy = (phys_addr_t)NULL;
+>
+> This is wrong. NULL is not meant to be used as a physical address,
+> you must not do that. Is not zeroeing timer_count enough ? I have
+> to understand why you need this because casting NULL into it is
+> not safe, at all.
+>
+>> +     block_data->timer_count = 0;
+>> +
+>> +     return -EINVAL;
+>> +}
+>> +
+>> +/*
+>> + * Get the GT block info for memory-mapped timer from GTDT table.
+>> + * Please make sure we have called gtdt_arch_timer_init, because it helps to
+>> + * init the global variables.
+>
+> It is a helper function that you call once at boot, you easily
+> determine when it is called, it is not meant to be used in different
+> contexts from different subsystems; I think that this comment
+> is not clear so either you make it clearer or you remove it.
+>
+>> + */
+>> +int __init gtdt_arch_timer_mem_init(struct gt_block_data *data)
+>> +{
+>> +     void *platform_timer;
+>> +     int index = 0;
+>> +
+>> +     for_each_platform_timer(platform_timer) {
+>> +             if (is_timer_block(platform_timer) &&
+>> +                 !gtdt_parse_gt_block(platform_timer, index, data))
+>
+> Passing around these opaque void* is a tad ugly, see my comments
+> above about this.
+>
+> Apart from the NULL pointer assignment, everything else is just code
+> clean-up.
+>
+> Thanks,
+> Lorenzo
+>
+>> +                     index++;
+>> +     }
+>> +
+>> +     if (index)
+>> +             pr_info("found %d memory-mapped timer block.\n", index);
+>> +
+>> +     return index;
+>> +}
+>> diff --git a/include/clocksource/arm_arch_timer.h b/include/clocksource/arm_arch_timer.h
+>> index 16dcd10..ece6b3b 100644
+>> --- a/include/clocksource/arm_arch_timer.h
+>> +++ b/include/clocksource/arm_arch_timer.h
+>> @@ -56,6 +56,8 @@ enum spi_nr {
+>>  #define ARCH_TIMER_MEM_PHYS_ACCESS   2
+>>  #define ARCH_TIMER_MEM_VIRT_ACCESS   3
+>>
+>> +#define ARCH_TIMER_MEM_MAX_FRAME     8
+>> +
+>>  #define ARCH_TIMER_USR_PCT_ACCESS_EN (1 << 0) /* physical counter */
+>>  #define ARCH_TIMER_USR_VCT_ACCESS_EN (1 << 1) /* virtual counter */
+>>  #define ARCH_TIMER_VIRT_EVT_EN               (1 << 2)
+>> @@ -71,6 +73,19 @@ struct arch_timer_kvm_info {
+>>       int virtual_irq;
+>>  };
+>>
+>> +struct gt_timer_data {
+>> +     int frame_nr;
+>> +     phys_addr_t cntbase_phy;
+>> +     int irq;
+>> +     int virt_irq;
+>> +};
+>> +
+>> +struct gt_block_data {
+>> +     phys_addr_t cntctlbase_phy;
+>> +     int timer_count;
+>> +     struct gt_timer_data timer[ARCH_TIMER_MEM_MAX_FRAME];
+>> +};
+>> +
+>>  #ifdef CONFIG_ARM_ARCH_TIMER
+>>
+>>  extern u32 arch_timer_get_rate(void);
+>> diff --git a/include/linux/acpi.h b/include/linux/acpi.h
+>> index 8439579..b1cacbc 100644
+>> --- a/include/linux/acpi.h
+>> +++ b/include/linux/acpi.h
+>> @@ -536,6 +536,7 @@ struct platform_device *acpi_create_platform_device(struct acpi_device *);
+>>  int __init gtdt_arch_timer_init(struct acpi_table_header *table);
+>>  int __init acpi_gtdt_map_ppi(int type);
+>>  int __init acpi_gtdt_c3stop(void);
+>> +int __init gtdt_arch_timer_mem_init(struct gt_block_data *data);
+>>  #endif
+>>
+>>  #else        /* !CONFIG_ACPI */
+>> --
+>> 2.5.5
+>>
 
-Internal error: Oops - bad mode: 0 [#2] PREEMPT SMP
-Modules linked in:
-CPU: 1 PID: 0 Comm: swapper/1 Tainted: G      D         4.7.0-rc4+ #9
-Hardware name: ARM Juno development board (r0) (DT)
-task: ffff800976901900 ti: ffff800976910000 task.ti: ffff800976910000
-PC is at 0xffff80097fec3f40
-LR is at irq_work_run_list+0x68/0xb8
-pc : [<ffff80097fec3f40>] lr : [<ffff000008147978>] pstate: 000001c5
-sp : ffff80097fec35f0
-x29: ffff80097fec35f0 x28: ffff800976910000
-x27: 00000000afb50401 x26: afb504000afb5041
-x25: ffff80097fec0000 x24: ffff800976901900
-x23: ffff000008005000 x22: 0000000000000000
-x21: ffff000008ca0d53 x20: ffff000008ca0d52
-x19: ffff80097fec4da8 x18: 0000000000000006
-x17: 0000000000000000 x16: 0000000000000000
-x15: ffff000008cacc95 x14: 3431303030303630
-x13: ffff000008caf0aa x12: 0000000005f5e0ff
-x11: 000000000000016d x10: 00000000000a3d60
-x9 : ffff80097fec3480 x8 : 000000000000016e
-x7 : 6628203236653330 x6 : 000000000000000a
-x5 : ffff80097fec4da0 x4 : 00008009772f9000
-x3 : ffff80097fec3f51 x2 : 0000000000000000
-x1 : ffff80097fec3f40 x0 : ffff80097fec4da0
 
-Process swapper/1 (pid: 0, stack limit = 0xffff800976910020)
-Stack: (0xffff80097fec35f0 to 0xffff800976914000)
-Call trace:
-[<ffff80097fec3f40>] 0xffff80097fec3f40
-[<ffff0000081479ec>] irq_work_run+0x24/0x40
-[<ffff00000808e208>] handle_IPI+0x148/0x168
-[<ffff0000080815b0>] gic_handle_irq+0x90/0xb0
-Exception stack(0xffff80097fec3680 to 0xffff80097fec37a0)
-3680: ffff80097fec36b0 ffff80097fec3960 ffff80097fec37d0 ffff0000087d0468
-36a0: 0000000060000145 ffff80097fec3720 ffff000008ca70e8 0000000000000001
-36c0: 0000000000000080 0000000000000080 0000000000000000 ffff80097fec4da0
-36e0: 000000000000000a 6628203236653330 000000000000016e ffff80097fec3480
-3700: 00000000000a3d60 000000000000016d 0000000005f5e0ff ffff000008caf0aa
-3720: 3431303030303630 ffff000008cacc95 0000000000000000 0000000000000000
-3740: 0000000000000006 ffff000008ca7000 ffff80097fec3960 0000000000000000
-3760: ffff0000089fd908 ffff800976910000 ffff800976901900 0000000000000000
-3780: afb504000afb5041 00000000afb50401 0000000000000001 ffff80097fec37d0
-[<ffff000008082720>] el1_irq+0xa0/0x10c
-[<ffff00000809800c>] __do_kernel_fault.part.1+0x74/0x88
-[<ffff0000087d277c>] do_page_fault+0x37c/0x380
-[<ffff0000087d27c4>] do_translation_fault+0x44/0x50
-[<ffff00000808137c>] do_mem_abort+0x44/0xa0
-Exception stack(0xffff80097fec38c0 to 0xffff80097fec39e0)
-38c0: ffff80097fec96e8 ffff800975951800 ffff80097fec3a80 ffff0000080e73d8
-38e0: ffff800976ad2300 ffff800974a07e00 0000000000000003 ffff800974a00000
-3900: 0000000000000000 ffff7e0025d28000 0000000000000013 0000000080010400
-3920: ffff000008c9f000 0000000000000003 0000000100000000 000000000000000e
-3940: ffff80097fec39a0 ffff0000081ae954 0000000000000000 0000000000000000
-3960: 0000000000000003 ffff80097fec9680 000000000000005e 0000000000000400
-3980: ffff0000087ef950 0000000000000000 ffff80097fec9740 000000000000003e
-39a0: 0000000991653ffc 0000000000000000 0000000000000001 0000000000000000
-39c0: 000000000044ab8d 0000000005da2e6c 0000000000000001 0000000000000001
-[<ffff000008082568>] el1_da+0x18/0x70
-[<ffff0000080dbdd4>] activate_task+0x5c/0xa0
-[<ffff0000080dc088>] ttwu_do_activate+0x50/0x88
-[<ffff0000080dda60>] try_to_wake_up+0x228/0x2c0
-[<ffff0000080ddbd0>] default_wake_function+0x10/0x18
-[<ffff0000080f0ffc>] autoremove_wake_function+0x14/0x40
-[<ffff0000080f0814>] __wake_up_common+0x5c/0xa0
-[<ffff0000080f0e64>] __wake_up_sync_key+0x4c/0x78
-[<ffff00000875a330>] tcp_prequeue+0x190/0x2e8
-[<ffff00000875b8a4>] tcp_v4_rcv+0xa5c/0xb08
-[<ffff000008736eac>] ip_local_deliver+0xa4/0x200
-[<ffff0000087373e4>] ip_rcv+0x3dc/0x5f0
-[<ffff000008707460>] __netif_receive_skb_core+0x5f8/0x7c8
-[<ffff000008709990>] __netif_receive_skb+0x18/0x68
-[<ffff000008709a04>] netif_receive_skb_internal+0x24/0xa8
-[<ffff000008709a94>] netif_receive_skb+0xc/0x18
-[<ffff00000858f9b0>] smsc911x_poll+0xf0/0x278
-[<ffff00000870b0b0>] net_rx_action+0x1d8/0x2b0
-[<ffff0000080be200>] __do_softirq+0x100/0x210
-[<ffff0000080be5b8>] irq_exit+0x90/0xd8
-[<ffff0000080fb2f8>] __handle_domain_irq+0x60/0xb8
-[<ffff000008081578>] gic_handle_irq+0x58/0xb0
-Exception stack(0xffff800976913df0 to 0xffff800976913f10)
-3de0:                                   0000000000000000 ffff80097fec9680
-3e00: 00008009772f9000 0000000002800000 0000000000000004 000000000115c074
-3e20: 0000000000000015 000000000000012f 000000000000016d ffff80097fec872c
-3e40: 0000000000000a12 0000000000000a12 071c71c71c71c71c 20230a2e746c7561
-3e60: 524150203a4c4c41 0000000000000000 0000000000000000 0000000000000000
-3e80: 0000000000000000 00000009972f2718 ffff8009763d7400 0000000000000000
-3ea0: 0000000000000000 ffff000008c6bb20 00000009972ada50 ffff000008c05c1c
-3ec0: ffff000008c05000 ffff000008c6bb20 ffff800976910000 ffff800976913f10
-3ee0: ffff00000864ac08 ffff800976913f10 ffff00000864ac0c 0000000060000145
-3f00: ffff000008c6bb20 ffff8009763d7400
-[<ffff000008082720>] el1_irq+0xa0/0x10c
-[<ffff00000864ac0c>] cpuidle_enter_state+0x1b4/0x238
-[<ffff00000864acc8>] cpuidle_enter+0x18/0x20
-[<ffff0000080f15c0>] call_cpuidle+0x18/0x30
-[<ffff0000080f1838>] cpu_startup_entry+0x198/0x1f8
-[<ffff00000808dc78>] secondary_start_kernel+0x158/0x198
-[<00000000800831a8>] 0x800831a8
-Code: 08aa2d08 ffff0000 08ca0d50 ffff0000 (7fec3f40)
 
 -- 
-Catalin
+Best regards,
+
+Fu Wei
+Software Engineer
+Red Hat
