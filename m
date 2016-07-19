@@ -1,247 +1,109 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Tue, 19 Jul 2016 08:48:57 -0400
-Subject: [PATCH v22 1/8] arm64: kdump: reserve memory for crash dump kernel
-In-Reply-To: <20160719104103.GB20990@arm.com>
-References: <20160712050514.22307-1-takahiro.akashi@linaro.org>
- <20160712050514.22307-2-takahiro.akashi@linaro.org>
- <20160719093906.GA20732@arm.com> <20160719102815.GE20774@linaro.org>
- <20160719104103.GB20990@arm.com>
-Message-ID: <1468932537.27473.6.camel@redhat.com>
+From: eric.auger@redhat.com (Eric Auger)
+Date: Tue, 19 Jul 2016 12:55:04 +0000
+Subject: [PATCH v11 1/8] iommu: Add iommu_domain_msi_geometry and
+ DOMAIN_ATTR_MSI_GEOMETRY
+In-Reply-To: <1468932911-23062-1-git-send-email-eric.auger@redhat.com>
+References: <1468932911-23062-1-git-send-email-eric.auger@redhat.com>
+Message-ID: <1468932911-23062-2-git-send-email-eric.auger@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2016-07-19 at 18:41 +0800, Dennis Chen wrote:
-> On Tue, Jul 19, 2016 at 07:28:16PM +0900, AKASHI Takahiro wrote:
-> > 
-> > On Tue, Jul 19, 2016 at 05:39:07PM +0800, Dennis Chen wrote:
-> > > 
-> > > Hello AKASHI,
-> > > 
-> > > On Tue, Jul 12, 2016 at 02:05:07PM +0900, AKASHI Takahiro wrote:
-> > > > 
-> > > > On the startup of primary kernel, the memory region used by crash dump
-> > > > kernel must be specified by "crashkernel=" kernel parameter.
-> > > > reserve_crashkernel() will allocate and reserve the region for later use.
-> > > > 
-> > > > User space tools, like kexec-tools, will be able to find that region as
-> > > > ??????- "Crash kernel" in /proc/iomem, or
-> > > > ??????- "linux,crashkernel-base" and "linux,crashkernel-size" under
-> > > > ????????/sys/firmware/devicetree/base/chosen
-> > > > 
-> > > > Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> > > > Signed-off-by: Mark Salter <msalter@redhat.com>
-> > > > Signed-off-by: Pratyush Anand <panand@redhat.com>
-> > > > Reviewed-by: James Morse <james.morse@arm.com>
-> > > > ---
-> > > > ?arch/arm64/kernel/setup.c |???7 ++-
-> > > > ?arch/arm64/mm/init.c??????| 115 ++++++++++++++++++++++++++++++++++++++++++++++
-> > > > ?2 files changed, 121 insertions(+), 1 deletion(-)
-> > > > 
-> > > > diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-> > > > index c1509e6..cb5eee0 100644
-> > > > --- a/arch/arm64/kernel/setup.c
-> > > > +++ b/arch/arm64/kernel/setup.c
-> > > > @@ -31,7 +31,6 @@
-> > > > ?#include <linux/screen_info.h>
-> > > > ?#include <linux/init.h>
-> > > > ?#include <linux/kexec.h>
-> > > > -#include <linux/crash_dump.h>
-> > > > ?#include <linux/root_dev.h>
-> > > > ?#include <linux/cpu.h>
-> > > > ?#include <linux/interrupt.h>
-> > > > @@ -222,6 +221,12 @@ static void __init request_standard_resources(void)
-> > > > ??????????????????kernel_data.end <= res->end)
-> > > > ??????????????????????request_resource(res, &kernel_data);
-> > > > ??????}
-> > > > +
-> > > > +#ifdef CONFIG_KEXEC_CORE
-> > > > +?????/* User space tools will find "Crash kernel" region in /proc/iomem. */
-> > > > +?????if (crashk_res.end)
-> > > > +?????????????insert_resource(&iomem_resource, &crashk_res);
-> > > > +#endif
-> > > > ?}
-> > > > 
-> > > > ?u64 __cpu_logical_map[NR_CPUS] = { [0 ... NR_CPUS-1] = INVALID_HWID };
-> > > > diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-> > > > index 2ade7a6..51b1302 100644
-> > > > --- a/arch/arm64/mm/init.c
-> > > > +++ b/arch/arm64/mm/init.c
-> > > > @@ -29,11 +29,13 @@
-> > > > ?#include <linux/gfp.h>
-> > > > ?#include <linux/memblock.h>
-> > > > ?#include <linux/sort.h>
-> > > > +#include <linux/of.h>
-> > > > ?#include <linux/of_fdt.h>
-> > > > ?#include <linux/dma-mapping.h>
-> > > > ?#include <linux/dma-contiguous.h>
-> > > > ?#include <linux/efi.h>
-> > > > ?#include <linux/swiotlb.h>
-> > > > +#include <linux/kexec.h>
-> > > > 
-> > > > ?#include <asm/boot.h>
-> > > > ?#include <asm/fixmap.h>
-> > > > @@ -76,6 +78,117 @@ static int __init early_initrd(char *p)
-> > > > ?early_param("initrd", early_initrd);
-> > > > ?#endif
-> > > > 
-> > > > +#ifdef CONFIG_KEXEC_CORE
-> > > > +static unsigned long long crash_size, crash_base;
-> > > > +static struct property crash_base_prop = {
-> > > > +?????.name = "linux,crashkernel-base",
-> > > > +?????.length = sizeof(u64),
-> > > > +?????.value = &crash_base
-> > > > +};
-> > > > +static struct property crash_size_prop = {
-> > > > +?????.name = "linux,crashkernel-size",
-> > > > +?????.length = sizeof(u64),
-> > > > +?????.value = &crash_size,
-> > > > +};
-> > > > +
-> > > > +static int __init export_crashkernel(void)
-> > > > +{
-> > > > +?????struct device_node *node;
-> > > > +?????int ret;
-> > > > +
-> > > > +?????if (!crashk_res.end)
-> > > > +?????????????return 0;
-> > > > +
-> > > > +?????crash_base = cpu_to_be64(crashk_res.start);
-> > > > +?????crash_size = cpu_to_be64(crashk_res.end - crashk_res.start + 1);
-> > > > +
-> > > > +?????/* Add /chosen/linux,crashkernel-* properties */
-> > > > +?????node = of_find_node_by_path("/chosen");
-> > > > +?????if (!node)
-> > > > +?????????????return -ENOENT;
-> > > > +
-> > > > +?????/*
-> > > > +??????* There might be existing crash kernel properties, but we can't
-> > > > +??????* be sure what's in them, so remove them.
-> > > > +??????*/
-> > > > +?????of_remove_property(node, of_find_property(node,
-> > > > +?????????????????????????????"linux,crashkernel-base", NULL));
-> > > > +?????of_remove_property(node, of_find_property(node,
-> > > > +?????????????????????????????"linux,crashkernel-size", NULL));
-> > > > +
-> > > > +?????ret = of_add_property(node, &crash_base_prop);
-> > > > +?????if (ret)
-> > > > +?????????????goto ret_err;
-> > > > +
-> > > > +?????ret = of_add_property(node, &crash_size_prop);
-> > > > +?????if (ret)
-> > > > +?????????????goto ret_err;
-> > > > +
-> > > > +?????return 0;
-> > > > +
-> > > > +ret_err:
-> > > > +?????pr_warn("Exporting crashkernel region to device tree failed\n");
-> > > > +?????return ret;
-> > > > +}
-> > > > +late_initcall(export_crashkernel);
-> > > > +
-> > > > +/*
-> > > > + * reserve_crashkernel() - reserves memory for crash kernel
-> > > > + *
-> > > > + * This function reserves memory area given in "crashkernel=" kernel command
-> > > > + * line parameter. The memory reserved is used by dump capture kernel when
-> > > > + * primary kernel is crashing.
-> > > > + */
-> > > > +static void __init reserve_crashkernel(void)
-> > > > +{
-> > > > +?????int ret;
-> > > > +
-> > > > +?????ret = parse_crashkernel(boot_command_line, memblock_phys_mem_size(),
-> > > > +?????????????????????????????&crash_size, &crash_base);
-> > > > +?????/* no crashkernel= or invalid value specified */
-> > > > +?????if (ret || !crash_size)
-> > > > +?????????????return;
-> > > > +
-> > > > +?????if (crash_base == 0) {
-> > > > +?????????????/* Current arm64 boot protocol requires 2MB alignment */
-> > > > +?????????????crash_base = memblock_find_in_range(0,
-> > > > +?????????????????????????????MEMBLOCK_ALLOC_ACCESSIBLE, crash_size, SZ_2M);
-> > > > +?????????????if (crash_base == 0) {
-> > > > +?????????????????????pr_warn("Unable to allocate crashkernel (size:%llx)\n",
-> > > > +?????????????????????????????crash_size);
-> > > > +?????????????????????return;
-> > > > +?????????????}
-> > > > +?????????????memblock_reserve(crash_base, crash_size);
-> > > > 
-> > > I am not pretty sure the context here, but
-> > > can we use below code piece instead of the above lines?
-> > > ????????if (crash_base == 0)
-> > > ????????????????memblock_alloc(crash_size, SZ_2M);
-> > Either would be fine here.
-> > 
-> Hello AKASHI, maybe you can succeed to find the base with memblock_find_in_range(),?
-> but that doesn't mean you will also succeed to reserve them with memblock_reserve followed.
+Introduce a new DOMAIN_ATTR_MSI_GEOMETRY domain attribute. It enables
+to query the aperture of the IOVA window dedicated to MSIs and
+test whether the MSIs must be mapped with the IOMMU-MSI API.
 
-We avoid memblock_alloc() here because it panics on failure. This could happen
-if user asks for an unusually large crashkernel size. Better to print a message
-and keep booting. Checking the return value of memblock_reserve() seems like a
-good thing to do though.
+x86 IOMMUs will typically expose an MSI aperture matching the 1MB
+region [FEE0_0000h - FEF0_000h] corresponding to the the APIC
+configuration space and no support of the IOMMU-MSI API.
 
+On ARM, the support of the IOMMU-MSI API will be advertised. Aperture
+will refect the setting performed with the IOMMU-MSI API.
 
-> 
-> Thanks,
-> Dennis
-> > 
-> > 
-> > Thanks,
-> > -Takahiro AKASHI
-> > 
-> > > 
-> > > Thanks,
-> > > Dennis
-> > > 
-> > > > 
-> > > > +
-> > > > +?????} else {
-> > > > +?????????????/* User specifies base address explicitly. */
-> > > > +?????????????if (!memblock_is_region_memory(crash_base, crash_size) ||
-> > > > +?????????????????????memblock_is_region_reserved(crash_base, crash_size)) {
-> > > > +?????????????????????pr_warn("crashkernel has wrong address or size\n");
-> > > > +?????????????????????return;
-> > > > +?????????????}
-> > > > +
-> > > > +?????????????if (!IS_ALIGNED(crash_base, SZ_2M)) {
-> > > > +?????????????????????pr_warn("crashkernel base address is not 2MB aligned\n");
-> > > > +?????????????????????return;
-> > > > +?????????????}
-> > > > +
-> > > > +?????????????memblock_reserve(crash_base, crash_size);
-> > > > +?????}
-> > > > +
-> > > > +?????pr_info("Reserving %lldMB of memory at %lldMB for crashkernel\n",
-> > > > +?????????????crash_size >> 20, crash_base >> 20);
-> > > > +
-> > > > +?????crashk_res.start = crash_base;
-> > > > +?????crashk_res.end = crash_base + crash_size - 1;
-> > > > +}
-> > > > +#else
-> > > > +static void __init reserve_crashkernel(void)
-> > > > +{
-> > > > +?????;
-> > > > +}
-> > > > +#endif /* CONFIG_KEXEC_CORE */
-> > > > +
-> > > > ?/*
-> > > > ? * Return the maximum physical address for ZONE_DMA (DMA_BIT_MASK(32)). It
-> > > > ? * currently assumes that for memory starting above 4G, 32-bit devices will
-> > > > @@ -289,6 +402,8 @@ void __init arm64_memblock_init(void)
-> > > > ??????}
-> > > > ?#endif
-> > > > 
-> > > > +?????reserve_crashkernel();
-> > > > +
-> > > > ??????early_init_fdt_scan_reserved_mem();
-> > > > 
-> > > > ??????/* 4GB maximum for 32-bit only capable devices */
-> > > > --
-> > > > 2.9.0
-> > > > 
-> > > > 
-> > > > _______________________________________________
-> > > > linux-arm-kernel mailing list
-> > > > linux-arm-kernel at lists.infradead.org
-> > > > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> > > > 
+A helper function is added to allow testing if the aperture is valid.
+
+Signed-off-by: Eric Auger <eric.auger@redhat.com>
+Suggested-by: Alex Williamson <alex.williamson@redhat.com>
+
+---
+v8 -> v9:
+- rename programmable into iommu_msi_supported
+- add iommu_domain_msi_aperture_valid
+
+v8: creation
+- deprecates DOMAIN_ATTR_MSI_MAPPING flag
+---
+ drivers/iommu/iommu.c |  5 +++++
+ include/linux/iommu.h | 14 ++++++++++++++
+ 2 files changed, 19 insertions(+)
+
+diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
+index 3000051..feab3cc 100644
+--- a/drivers/iommu/iommu.c
++++ b/drivers/iommu/iommu.c
+@@ -1496,6 +1496,7 @@ int iommu_domain_get_attr(struct iommu_domain *domain,
+ 			  enum iommu_attr attr, void *data)
+ {
+ 	struct iommu_domain_geometry *geometry;
++	struct iommu_domain_msi_geometry *msi_geometry;
+ 	bool *paging;
+ 	int ret = 0;
+ 	u32 *count;
+@@ -1506,6 +1507,10 @@ int iommu_domain_get_attr(struct iommu_domain *domain,
+ 		*geometry = domain->geometry;
+ 
+ 		break;
++	case DOMAIN_ATTR_MSI_GEOMETRY:
++		msi_geometry  = data;
++		*msi_geometry = domain->msi_geometry;
++		break;
+ 	case DOMAIN_ATTR_PAGING:
+ 		paging  = data;
+ 		*paging = (domain->pgsize_bitmap != 0UL);
+diff --git a/include/linux/iommu.h b/include/linux/iommu.h
+index 664683a..1b553ee 100644
+--- a/include/linux/iommu.h
++++ b/include/linux/iommu.h
+@@ -52,6 +52,12 @@ struct iommu_domain_geometry {
+ 	bool force_aperture;       /* DMA only allowed in mappable range? */
+ };
+ 
++struct iommu_domain_msi_geometry {
++	dma_addr_t aperture_start; /* First address used for MSI IOVA    */
++	dma_addr_t aperture_end;   /* Last address used for MSI IOVA     */
++	bool iommu_msi_supported;  /* Is MSI mapping supported?		 */
++};
++
+ /* Domain feature flags */
+ #define __IOMMU_DOMAIN_PAGING	(1U << 0)  /* Support for iommu_map/unmap */
+ #define __IOMMU_DOMAIN_DMA_API	(1U << 1)  /* Domain for use in DMA-API
+@@ -83,6 +89,7 @@ struct iommu_domain {
+ 	iommu_fault_handler_t handler;
+ 	void *handler_token;
+ 	struct iommu_domain_geometry geometry;
++	struct iommu_domain_msi_geometry msi_geometry;
+ 	void *iova_cookie;
+ };
+ 
+@@ -108,6 +115,7 @@ enum iommu_cap {
+ 
+ enum iommu_attr {
+ 	DOMAIN_ATTR_GEOMETRY,
++	DOMAIN_ATTR_MSI_GEOMETRY,
+ 	DOMAIN_ATTR_PAGING,
+ 	DOMAIN_ATTR_WINDOWS,
+ 	DOMAIN_ATTR_FSL_PAMU_STASH,
+@@ -328,6 +336,12 @@ extern struct iommu_group *pci_device_group(struct device *dev);
+ /* Generic device grouping function */
+ extern struct iommu_group *generic_device_group(struct device *dev);
+ 
++static inline bool iommu_domain_msi_aperture_valid(struct iommu_domain *domain)
++{
++	return (domain->msi_geometry.aperture_end >
++		domain->msi_geometry.aperture_start);
++}
++
+ #else /* CONFIG_IOMMU_API */
+ 
+ struct iommu_ops {};
+-- 
+1.9.1
