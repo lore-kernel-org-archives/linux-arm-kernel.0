@@ -1,69 +1,143 @@
-From: mark.yao@rock-chips.com (Mark yao)
-Date: Tue, 19 Jul 2016 09:59:29 +0800
-Subject: [PATCH] drm/rockchip: Delete an unnecessary check before
- drm_gem_object_unreference_unlocked()
-In-Reply-To: <b66399ed-278b-b85d-4a21-b34164936ef6@users.sourceforge.net>
-References: <5307CAA2.8060406@users.sourceforge.net>
- <alpine.DEB.2.02.1402212321410.2043@localhost6.localdomain6>
- <530A086E.8010901@users.sourceforge.net>
- <alpine.DEB.2.02.1402231635510.1985@localhost6.localdomain6>
- <530A72AA.3000601@users.sourceforge.net>
- <alpine.DEB.2.02.1402240658210.2090@localhost6.localdomain6>
- <530B5FB6.6010207@users.sourceforge.net>
- <alpine.DEB.2.10.1402241710370.2074@hadrien>
- <530C5E18.1020800@users.sourceforge.net>
- <alpine.DEB.2.10.1402251014170.2080@hadrien>
- <530CD2C4.4050903@users.sourceforge.net>
- <alpine.DEB.2.10.1402251840450.7035@hadrien>
- <530CF8FF.8080600@users.sourceforge.net>
- <alpine.DEB.2.02.1402252117150.2047@localhost6.localdomain6>
- <530DD06F.4090703@users.sourceforge.net>
- <alpine.DEB.2.02.1402262129250.2221@localhost6.localdomain6>
- <5317A59D.4@users.sourceforge.net>
- <b66399ed-278b-b85d-4a21-b34164936ef6@users.sourceforge.net>
-Message-ID: <578D8981.2070102@rock-chips.com>
+From: hzpeterchen@gmail.com (Peter Chen)
+Date: Tue, 19 Jul 2016 09:57:29 +0800
+Subject: [PATCH 4/4] usb: chipidea: imx: set over current polarity per
+ dts setting
+In-Reply-To: <1468840547-17899-4-git-send-email-jun.li@nxp.com>
+References: <1468840547-17899-1-git-send-email-jun.li@nxp.com>
+ <1468840547-17899-4-git-send-email-jun.li@nxp.com>
+Message-ID: <20160719015729.GA26038@shlinux2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016?07?15? 21:35, SF Markus Elfring wrote:
-> From: Markus Elfring <elfring@users.sourceforge.net>
-> Date: Fri, 15 Jul 2016 15:23:22 +0200
->
-> The drm_gem_object_unreference_unlocked() function tests whether
-> its argument is NULL and then returns immediately.
-> Thus the test around the call is not needed.
->
-> This issue was detected by using the Coccinelle software.
->
-> Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
+On Mon, Jul 18, 2016 at 07:15:47PM +0800, Li Jun wrote:
+> With over-current-polarity property added, imx usb over current
+> polarity can be configed to be low or high active, since the default
+> setting value(0) is for active high, so keep this setting for those
+> legacy platforms without this property specified.
+> 
+> Signed-off-by: Li Jun <jun.li@nxp.com>
 > ---
->   drivers/gpu/drm/rockchip/rockchip_drm_fb.c | 8 ++------
->   1 file changed, 2 insertions(+), 6 deletions(-)
->
-> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_fb.c b/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
-> index 20f12bc..6f64e79 100644
-> --- a/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
-> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
-> @@ -43,14 +43,10 @@ struct drm_gem_object *rockchip_fb_get_gem_obj(struct drm_framebuffer *fb,
->   static void rockchip_drm_fb_destroy(struct drm_framebuffer *fb)
->   {
->   	struct rockchip_drm_fb *rockchip_fb = to_rockchip_fb(fb);
-> -	struct drm_gem_object *obj;
->   	int i;
->   
-> -	for (i = 0; i < ROCKCHIP_MAX_FB_BUFFER; i++) {
-> -		obj = rockchip_fb->obj[i];
-> -		if (obj)
-> -			drm_gem_object_unreference_unlocked(obj);
-> -	}
-> +	for (i = 0; i < ROCKCHIP_MAX_FB_BUFFER; i++)
-> +		drm_gem_object_unreference_unlocked(rockchip_fb->obj[i]);
->   
-Good, Thanks for the fixes, Applied to my drm-fixes.
+>  drivers/usb/chipidea/ci_hdrc_imx.c |  9 +++++++++
+>  drivers/usb/chipidea/ci_hdrc_imx.h |  1 +
+>  drivers/usb/chipidea/usbmisc_imx.c | 30 +++++++++++++++++++++++++-----
+>  3 files changed, 35 insertions(+), 5 deletions(-)
+> 
+> diff --git a/drivers/usb/chipidea/ci_hdrc_imx.c b/drivers/usb/chipidea/ci_hdrc_imx.c
+> index dedc33e..61e712b 100644
+> --- a/drivers/usb/chipidea/ci_hdrc_imx.c
+> +++ b/drivers/usb/chipidea/ci_hdrc_imx.c
+> @@ -140,6 +140,15 @@ static struct imx_usbmisc_data *usbmisc_get_init_data(struct device *dev)
+>  	if (of_find_property(np, "disable-over-current", NULL))
+>  		data->disable_oc = 1;
+>  
+> +	if (!of_property_read_u32(np, "over-current-polarity", &ret))
+> +		data->oc_polarity = ret ? 1 : 0;
+> +	else
+> +		/*
+> +		 * Keep the oc polarity setting of legacy
+> +		 * platforms unchanged.
+> +		 */
+> +		data->oc_polarity = 1;
 
->   	drm_framebuffer_cleanup(fb);
->   	kfree(rockchip_fb);
+We may can't ensure that, since there are lots of i.mx platforms, eg
+from imx27 to imx7.
+   
+If the user does not assign oc polarity at DT, we need to read it from
+register.
 
+Peter
+> +
+>  	if (of_find_property(np, "external-vbus-divider", NULL))
+>  		data->evdo = 1;
+>  
+> diff --git a/drivers/usb/chipidea/ci_hdrc_imx.h b/drivers/usb/chipidea/ci_hdrc_imx.h
+> index 635717e..409aa5ca8 100644
+> --- a/drivers/usb/chipidea/ci_hdrc_imx.h
+> +++ b/drivers/usb/chipidea/ci_hdrc_imx.h
+> @@ -17,6 +17,7 @@ struct imx_usbmisc_data {
+>  	int index;
+>  
+>  	unsigned int disable_oc:1; /* over current detect disabled */
+> +	unsigned int oc_polarity:1; /* over current polarity if oc enabled */
+>  	unsigned int evdo:1; /* set external vbus divider option */
+>  };
+>  
+> diff --git a/drivers/usb/chipidea/usbmisc_imx.c b/drivers/usb/chipidea/usbmisc_imx.c
+> index ab8b027..193dbe4 100644
+> --- a/drivers/usb/chipidea/usbmisc_imx.c
+> +++ b/drivers/usb/chipidea/usbmisc_imx.c
+> @@ -56,6 +56,7 @@
+>  
+>  #define MX6_BM_NON_BURST_SETTING	BIT(1)
+>  #define MX6_BM_OVER_CUR_DIS		BIT(7)
+> +#define MX6_BM_OVER_CUR_POLARITY	BIT(8)
+>  #define MX6_BM_WAKEUP_ENABLE		BIT(10)
+>  #define MX6_BM_ID_WAKEUP		BIT(16)
+>  #define MX6_BM_VBUS_WAKEUP		BIT(17)
+> @@ -266,11 +267,18 @@ static int usbmisc_imx6q_init(struct imx_usbmisc_data *data)
+>  
+>  	spin_lock_irqsave(&usbmisc->lock, flags);
+>  
+> +	reg = readl(usbmisc->base + data->index * 4);
+>  	if (data->disable_oc) {
+> -		reg = readl(usbmisc->base + data->index * 4);
+> -		writel(reg | MX6_BM_OVER_CUR_DIS,
+> -			usbmisc->base + data->index * 4);
+> +		reg |= MX6_BM_OVER_CUR_DIS;
+> +	} else if (data->oc_polarity == 1) {
+> +		/* High active */
+> +		reg &= ~(MX6_BM_OVER_CUR_DIS | MX6_BM_OVER_CUR_POLARITY);
+> +	} else {
+> +		/* Low active */
+> +		reg &= ~MX6_BM_OVER_CUR_DIS;
+> +		reg |= MX6_BM_OVER_CUR_POLARITY;
+>  	}
+> +	writel(reg, usbmisc->base + data->index * 4);
+>  
+>  	/* SoC non-burst setting */
+>  	reg = readl(usbmisc->base + data->index * 4);
+> @@ -365,10 +373,18 @@ static int usbmisc_imx7d_init(struct imx_usbmisc_data *data)
+>  		return -EINVAL;
+>  
+>  	spin_lock_irqsave(&usbmisc->lock, flags);
+> +	reg = readl(usbmisc->base);
+>  	if (data->disable_oc) {
+> -		reg = readl(usbmisc->base);
+> -		writel(reg | MX6_BM_OVER_CUR_DIS, usbmisc->base);
+> +		reg |= MX6_BM_OVER_CUR_DIS;
+> +	} else if (data->oc_polarity == 1) {
+> +		/* High active */
+> +		reg &= ~(MX6_BM_OVER_CUR_DIS | MX6_BM_OVER_CUR_POLARITY);
+> +	} else {
+> +		/* Low active */
+> +		reg &= ~MX6_BM_OVER_CUR_DIS;
+> +		reg |= MX6_BM_OVER_CUR_POLARITY;
+>  	}
+> +	writel(reg, usbmisc->base);
+>  
+>  	reg = readl(usbmisc->base + MX7D_USBNC_USB_CTRL2);
+>  	reg &= ~MX7D_USB_VBUS_WAKEUP_SOURCE_MASK;
+> @@ -492,6 +508,10 @@ static const struct of_device_id usbmisc_imx_dt_ids[] = {
+>  		.compatible = "fsl,imx6ul-usbmisc",
+>  		.data = &imx6sx_usbmisc_ops,
+>  	},
+> +	{
+> +		.compatible = "fsl,imx7d-usbmisc",
+> +		.data = &imx7d_usbmisc_ops,
+> +	},
+>  	{ /* sentinel */ }
+>  };
+>  MODULE_DEVICE_TABLE(of, usbmisc_imx_dt_ids);
+> -- 
+> 1.9.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
 -- 
-?ark Yao
+
+Best Regards,
+Peter Chen
