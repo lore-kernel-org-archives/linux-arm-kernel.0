@@ -1,64 +1,68 @@
-From: quentin.schulz@free-electrons.com (Quentin Schulz)
-Date: Tue, 19 Jul 2016 08:55:17 +0200
-Subject: [PATCH v2 4/4] hwmon: iio: add label for channels read by
- iio_hwmon
-In-Reply-To: <aa889446-d68c-a05f-83c1-4d54fe814000@kernel.org>
-References: <1468576754-3273-1-git-send-email-quentin.schulz@free-electrons.com>
- <1468576754-3273-5-git-send-email-quentin.schulz@free-electrons.com>
- <aa889446-d68c-a05f-83c1-4d54fe814000@kernel.org>
-Message-ID: <578DCED5.6080408@free-electrons.com>
+From: jamesjj.liao@mediatek.com (James Liao)
+Date: Tue, 19 Jul 2016 15:04:39 +0800
+Subject: [PATCH v8 0/4] Mediatek MT2701 SCPSYS power domain support 
+Message-ID: <1468911883-41882-1-git-send-email-jamesjj.liao@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/07/2016 14:24, Jonathan Cameron wrote:
-> On 15/07/16 10:59, Quentin Schulz wrote:
->> Currently, iio_hwmon only exposes values of the IIO channels it can read
->> but no label by channel is exposed.
->>
->> This adds exposition of sysfs files containing label for IIO channels it
->> can read based on extended_name field of the iio_chan_spec of the channel.
->> If the extended_name field is empty, the sysfs file is not created by
->> iio_hwmon.
-> Hmm. This is not the intent of extended name at all.  That exists to add
-> a small amount of information to an constructed IIO channel name.
-> Typically it's used to indicate physically wired stuff like:
-> 
-> in_voltage0_vdd_raw for cases where that channel of the ADC is hard wired
-> to the vdd.  In this particular case the use might actually work as the
-> vdd makes it clear it's a voltage - in general that's not the case.
-> 
-> Use of extended_name at all in IIO is only done after extensive review.
-> It adds nasty custom ABI to a device, so the gain has to be considerable
-> to use it.
-> 
-> When I read your original suggestion of adding labels, I was expecting the
-> use of datasheet_name.  That has the advantage of being well defined by
-> the datasheet (if not it should not be provided) + not being used in
-> the construction of the IIO channel related attributes.  However, that
-> may still not correspond well to the expected labelling in hwmon.
+This series is based on v4.7-rc1 and adds scpsys power domain support
+for Mediatek MT2701.
 
-Good to know for extend_name use cases. While doing further testing, I
-noticed the extend_name is also appended to the sysfs filename.. which
-is definitely not what we want.
+To share the code between MT2701 and MT8173, this patchset also refined
+original mtk-scpsys.c to separate common codes and platform codes, so
+that mtk-scpsys.c can support new SoCs more easily.
 
-I've checked for datasheet_name and it is only used to be compared to
-adc_channel_label from iio_map structure. Same for adc_channel_label
-(which has to be the same as datasheet_name of the iio_chan_spec it is
-linked to). So I could use this instead of extend_name to put a label on
-a channel.
-However, I thought of it to be more a way to identify the hardware in
-the datasheet more than giving users a hint on what it is. That's what
-"git grep adc_channel_label" told me. It's definitely better to use
-datasheet_name over extend_name for channel labeling but I don't know if
-it's really the good variable to use for labeling? In my understanding
-of datasheet_name, in my case it would be more "temp_gpadc" than "SoC
-temperature", that's what I mean.
+MT8173 and MT2701 scpsys init level are now subsys_init. Please refer to [1]
+to see discussion details.
 
-> Thinking more on this, the label is going to often be a function of how
-> the board is wired up...  Perhaps it should be a characteristic of the
-> channel_map (hence from DT or similar) rather than part of the IIO driver
-> itself?
+changes since v7:
+- Add clk_id for each scp_domain_data define.
+- Minor coding style changes.
 
-Hmm.. I would not put a property in the DT only for labeling.
+changes since v6:
+- Minor changes in the dt-binding document.
 
-[...]
+changes since v5:
+- Rebase to v4.6-rc1.
+- Add dependent clocks for MFG, ISP, ETH and HIF power domains.
+- Add "ethif" as a dependent clock in scpsys dt-binding document.
+
+changes since v4:
+- Rebase to v4.5-rc4.
+- Remove mtk-scpsys.h and Merge its code into mtk-scpsys.c.
+- Add names for every controlling registers and bits.
+- Include dt-bindings headers at the beginning of mtk-scpsys.c.
+- Sort compatible string in dt-binding documents.
+
+changes since v3:
+- Implement MT8173 and MT2701 scpsys drivers in a signle file.
+- Remove naming of registers that can't be shared among SoCs.
+
+changes since v2:
+- Rebase to mbgg/linux-mediatek v4.4-next/soc [1].
+- Remove MTK_SCPSYS_MT8173 and MTK_SCPSYS_MT2701.
+- Modify scpsys dt-binding document to support MT2701.
+
+changes since v1:
+- Make MTK_SCPSYS in Kconfig invisible from users.
+- Add comments for changing scpsys init level to subsys_init.
+
+[1] http://lists.infradead.org/pipermail/linux-mediatek/2015-December/003416.html
+
+James Liao (2):
+  soc: mediatek: Refine scpsys to support multiple platform
+  soc: mediatek: Init MT8173 scpsys driver earlier
+
+Shunli Wang (2):
+  soc: mediatek: Add MT2701 power dt-bindings
+  soc: mediatek: Add MT2701 scpsys driver
+
+ .../devicetree/bindings/soc/mediatek/scpsys.txt    |  13 +-
+ drivers/soc/mediatek/Kconfig                       |   2 +-
+ drivers/soc/mediatek/mtk-scpsys.c                  | 500 +++++++++++++++------
+ include/dt-bindings/power/mt2701-power.h           |  27 ++
+ 4 files changed, 391 insertions(+), 151 deletions(-)
+ create mode 100644 include/dt-bindings/power/mt2701-power.h
+
+--
+1.9.1
