@@ -1,60 +1,31 @@
-From: t.remmet@phytec.de (Teresa Remmet)
-Date: Tue, 19 Jul 2016 09:29:53 +0200
-Subject: [RESEND PATCH] ARM: dts: am335x: Update elm phandle binding
-Message-ID: <1468913393-42532-1-git-send-email-t.remmet@phytec.de>
+From: bhuvanchandra.dv@toradex.com (Bhuvanchandra DV)
+Date: Tue, 19 Jul 2016 13:13:02 +0530
+Subject: [PATCH RESEND v2 0/8] Improve Rx/Tx DMA implementation
+Message-ID: <20160719074310.16872-1-bhuvanchandra.dv@toradex.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The check for the "elm_id" binding had been removed.
-This causes nand boot to fail on boards still using
-the old binding. Update the bindings on those boards.
+Drop the clock change patch from v2 patchset[1] since it is applied.
 
-Signed-off-by: Teresa Remmet <t.remmet@phytec.de>
-Acked-by: Brian Norris <computersforpeace@gmail.com>
----
- arch/arm/boot/dts/am335x-baltos.dtsi      | 2 +-
- arch/arm/boot/dts/am335x-igep0033.dtsi    | 2 +-
- arch/arm/boot/dts/am335x-phycore-som.dtsi | 2 +-
- 3 files changed, 3 insertions(+), 3 deletions(-)
+Changes since v1:
+Split suspend/resume patch.
 
-diff --git a/arch/arm/boot/dts/am335x-baltos.dtsi b/arch/arm/boot/dts/am335x-baltos.dtsi
-index c8609d8..b689172 100644
---- a/arch/arm/boot/dts/am335x-baltos.dtsi
-+++ b/arch/arm/boot/dts/am335x-baltos.dtsi
-@@ -226,7 +226,7 @@
- 
- 		#address-cells = <1>;
- 		#size-cells = <1>;
--		elm_id = <&elm>;
-+		ti,elm-id = <&elm>;
- 	};
- };
- 
-diff --git a/arch/arm/boot/dts/am335x-igep0033.dtsi b/arch/arm/boot/dts/am335x-igep0033.dtsi
-index df63484..e7d9ca1 100644
---- a/arch/arm/boot/dts/am335x-igep0033.dtsi
-+++ b/arch/arm/boot/dts/am335x-igep0033.dtsi
-@@ -161,7 +161,7 @@
- 
- 		#address-cells = <1>;
- 		#size-cells = <1>;
--		elm_id = <&elm>;
-+		ti,elm-id = <&elm>;
- 
- 		/* MTD partition table */
- 		partition at 0 {
-diff --git a/arch/arm/boot/dts/am335x-phycore-som.dtsi b/arch/arm/boot/dts/am335x-phycore-som.dtsi
-index 86f7731..1263c9d 100644
---- a/arch/arm/boot/dts/am335x-phycore-som.dtsi
-+++ b/arch/arm/boot/dts/am335x-phycore-som.dtsi
-@@ -197,7 +197,7 @@
- 		gpmc,wr-access-ns = <30>;
- 		gpmc,wr-data-mux-bus-ns = <0>;
- 
--		elm_id = <&elm>;
-+		ti,elm-id = <&elm>;
- 
- 		#address-cells = <1>;
- 		#size-cells = <1>;
+[1] https://lkml.org/lkml/2016/6/28/124
+
+Bhuvanchandra DV (5):
+  tty: serial: fsl_lpuart: Fix broken 8m/s1 support
+  tty: serial: fsl_lpuart: Use cyclic DMA for Rx
+  tty: serial: fsl_lpuart: Use scatter/gather DMA for Tx
+  tty: serial: fsl_lpuart: Update suspend/resume for DMA mode
+  tty: serial: fsl_lpuart: Add support for RS-485
+
+Stefan Agner (3):
+  tty: serial: fsl_lpuart: consider TX FIFO too in tx_empty
+  tty: serial: fsl_lpuart: support suspend/resume
+  tty: serial: fsl_lpuart: fix clearing of receive flag
+
+ drivers/tty/serial/fsl_lpuart.c | 810 +++++++++++++++++++++++-----------------
+ 1 file changed, 476 insertions(+), 334 deletions(-)
+
 -- 
-1.9.1
+2.9.0
