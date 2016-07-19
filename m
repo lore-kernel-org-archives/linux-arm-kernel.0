@@ -1,30 +1,49 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 19 Jul 2016 16:01:50 +0200
-Subject: [PATCH v0 00/10] Convert Netgear WNR854T to devicetree
-In-Reply-To: <alpine.DEB.2.11.1607190933590.19980@marmot.wormnet.eu>
-References: <1468679348-10522-1-git-send-email-jm@lentin.co.uk>
- <20160716205304.GA5075@lunn.ch>
- <alpine.DEB.2.11.1607171043100.19980@marmot.wormnet.eu>
- <20160717153338.GA13611@lunn.ch>
- <alpine.DEB.2.11.1607190933590.19980@marmot.wormnet.eu>
-Message-ID: <20160719140150.GY31103@lunn.ch>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 19 Jul 2016 15:07:38 +0100
+Subject: [PATCH 2/4] arm64: debug: remove redundant spsr manipulation
+In-Reply-To: <1468937260-23988-1-git-send-email-will.deacon@arm.com>
+References: <1468937260-23988-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1468937260-23988-2-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> However, the ethertype is reflecting the port:-
-> 
-> lan1/5 : ethertype Unknown (0xc028), length 176:
-> lan2/7 : ethertype Unknown (0xc038), length 176:
-> lan3/0 : ethertype Unknown (0xc000), length 176:
-> lan4/1 : ethertype Unknown (0xc008), length 176:
-> wan/2  : ethertype Unknown (0xc010), length 176:
-> 
-> My other one of these routers, running OpenWRT / Linux 3.3.8, shows
-> the same ethertypes, which suggests that the switch is still in DSA
-> tagging mode. I'll poke around further and see what I find.
+There is no need to explicitly clear the SS bit immediately before
+setting it unconditionally.
 
-O.K. With this wrong, nothing is going to work.
+Reported-by: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/kernel/debug-monitors.c | 13 ++-----------
+ 1 file changed, 2 insertions(+), 11 deletions(-)
 
-I will check that the 6131 actually supports EDSA!
-
-  Andrew
+diff --git a/arch/arm64/kernel/debug-monitors.c b/arch/arm64/kernel/debug-monitors.c
+index 7a907e401c98..91fff48d0f57 100644
+--- a/arch/arm64/kernel/debug-monitors.c
++++ b/arch/arm64/kernel/debug-monitors.c
+@@ -170,22 +170,13 @@ postcore_initcall(debug_monitors_init);
+  */
+ static void set_regs_spsr_ss(struct pt_regs *regs)
+ {
+-	unsigned long spsr;
+-
+-	spsr = regs->pstate;
+-	spsr &= ~DBG_SPSR_SS;
+-	spsr |= DBG_SPSR_SS;
+-	regs->pstate = spsr;
++	regs->pstate |= DBG_SPSR_SS;
+ }
+ NOKPROBE_SYMBOL(set_regs_spsr_ss);
+ 
+ static void clear_regs_spsr_ss(struct pt_regs *regs)
+ {
+-	unsigned long spsr;
+-
+-	spsr = regs->pstate;
+-	spsr &= ~DBG_SPSR_SS;
+-	regs->pstate = spsr;
++	regs->pstate &= ~DBG_SPSR_SS;
+ }
+ NOKPROBE_SYMBOL(clear_regs_spsr_ss);
+ 
+-- 
+2.1.4
