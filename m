@@ -1,43 +1,108 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Tue, 19 Jul 2016 11:18:04 -0700
-Subject: SOC-specific action for irq_set_wake
-Message-ID: <20160719181804.GX3847@xsjsorenbubuntu>
+From: fu.wei@linaro.org (fu.wei at linaro.org)
+Date: Wed, 20 Jul 2016 02:17:55 +0800
+Subject: [PATCH v8 0/9]  acpi,
+ clocksource: add GTDT driver and GTDT support in arm_arch_timer
+Message-ID: <1468952284-28942-1-git-send-email-fu.wei@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Fu Wei <fu.wei@linaro.org>
 
-we are working on the PM solution for Zynq MPSOC and ran into some
-problem when setting the wake source.
+This patchset:
+    (1)Preparation for adding GTDT support in arm_arch_timer:
+        1. Move some enums and marcos to header file;
+        2. Add a new enum for spi type;
+        3. Improve printk relevant code;
+        4. use readq to get 64-bit CNTVCT.
 
-The situation is that when the A53 is in suspend, the GIC(v2) may be
-powered down. In that state a companion core is handling wake
-events/IRQs, but we expect the OS/Linux to notify the companion core
-about what device/IRQ is a wake up source. Hence, my idea was to capture
-enabling/disabling wake IRQs in our platform PM code and then
-communicate with the FW as needed during suspend operations. The problem
-is: I don't see a good way to notify the platform code about these
-events.
+    (2)Introduce ACPI GTDT parser: drivers/acpi/arm64/acpi_gtdt.c
+    Parse all kinds of timer in GTDT table of ACPI:arch timer,
+    memory-mapped timer and SBSA Generic Watchdog timer.
+    This driver can help to simplify all the relevant timer drivers,
+    and separate all the ACPI GTDT knowledge from them.
 
-My ideas were:
-1. Use the irq_chip irq_set_wake function
-  My thought was to implement the irq_set_wake function in a
-  SOC-specific way (could even be generic and call some notifier chain or
-  similar) to notify the platform PM code when a device/IRQ is
-  enabled/disabled as wake up source.
-  My problem is that the SKIP_IRQ_SET_WAKE flag is set in the generic
-  driver (drivers/irqchip/irq-gic.c) and platforms cannot implement
-  irq_set_wake without changes in the common code.
-2. Stuff things into the secure monitor
-  I guess we could read the GIC registers once we enter the secure
-  monitor and do the communication with the companion core from there by
-  identifying unmasked IRQs as wake IRQs. My concern here is that it
-  might introduce additional hardcoded mappings that are much more
-  dynamic in Linux thanks to the DT description.
+    (3)Simplify ACPI code for arm_arch_timer
 
-Does anybody have similar problems and probably already solved it?
-Any other suggestions for approaching the problem? Any preferred
-solution?
+    (4)Add GTDT support for ARM memory-mapped timer
 
-	Thanks,
-	S?ren
+This patchset has been tested on the following platforms:
+    (1)ARM Foundation v8 model
+
+Changelog:
+v8: https://lkml.org/lkml/2016/7/
+    Improve "pr_fmt(fmt)" definition: add "ACPI" in front of "GTDT",
+    and also improve printk message.
+    Simplify is_timer_block and is_watchdog.
+    Merge acpi_gtdt_desc_init and gtdt_arch_timer_init into acpi_gtdt_init();
+    Delete __init in include/linux/acpi.h for GTDT API
+    Make ARM64 select GTDT.
+    Delete "#include <linux/module.h>" from acpi_gtdt.c
+    Simplify GT block parse code.
+
+v7: https://lkml.org/lkml/2016/7/13/769
+    Move the GTDT driver to drivers/acpi/arm64
+    Add add the ARM64-specific ACPI Support maintainers in MAINTAINERS
+    Merge 3 patches of GTDT parser driver.
+    Fix the for_each_platform_timer bug.
+
+v6: https://lkml.org/lkml/2016/6/29/580
+    split the GTDT driver to 4 parts: basic, arch_timer, memory-mapped timer,
+    and SBSA Generic Watchdog timer
+    Improve driver by suggestions and example code from Daniel Lezcano
+
+v5: https://lkml.org/lkml/2016/5/24/356
+    Sorting out all patches, simplify the API of GTDT driver:
+    GTDT driver just fills the data struct for arm_arch_timer driver.
+
+v4: https://lists.linaro.org/pipermail/linaro-acpi/2016-March/006667.html
+    Delete the kvm relevant patches
+    Separate two patches for sorting out the code for arm_arch_timer.
+    Improve irq info export code to allow missing irq info in GTDT table.
+
+v3: https://lkml.org/lkml/2016/2/1/658
+    Improve GTDT driver code:
+      (1)improve pr_* by defining pr_fmt(fmt)
+      (2)simplify gtdt_sbsa_gwdt_init
+      (3)improve gtdt_arch_timer_data_init, if table is NULL, it will try
+      to get GTDT table.
+    Move enum ppi_nr to arm_arch_timer.h, and add enum spi_nr.
+    Add arm_arch_timer get ppi from DT and GTDT support for kvm.
+
+v2: https://lkml.org/lkml/2015/12/2/10
+    Rebase to latest kernel version(4.4-rc3).
+    Fix the bug about the config problem,
+    use CONFIG_ACPI_GTDT instead of CONFIG_ACPI in arm_arch_timer.c
+
+v1: The first upstreaming version: https://lkml.org/lkml/2015/10/28/553
+
+Fu Wei (9):
+  clocksource/drivers/arm_arch_timer: Move enums and defines to header
+    file
+  clocksource/drivers/arm_arch_timer: Add a new enum for spi type
+  clocksource/drivers/arm_arch_timer: Improve printk relevant code
+  clocksource/drivers/arm_arch_timer: use readq to get 64-bit CNTVCT
+  acpi/arm64: Add GTDT table parse driver
+  clocksource/drivers/arm_arch_timer: Simplify ACPI support code.
+  acpi/arm64: Add memory-mapped timer support in GTDT driver
+  clocksource/drivers/arm_arch_timer: Add GTDT support for memory-mapped
+    timer
+  acpi/arm64: Add SBSA Generic Watchdog support in GTDT driver
+
+ arch/arm64/Kconfig                   |   1 +
+ drivers/acpi/Kconfig                 |   5 +
+ drivers/acpi/Makefile                |   1 +
+ drivers/acpi/arm64/Kconfig           |   5 +
+ drivers/acpi/arm64/Makefile          |   1 +
+ drivers/acpi/arm64/acpi_gtdt.c       | 312 +++++++++++++++++++++++++++++++++++
+ drivers/clocksource/Kconfig          |   2 +-
+ drivers/clocksource/arm_arch_timer.c | 233 +++++++++++++++++---------
+ drivers/watchdog/Kconfig             |   1 +
+ include/clocksource/arm_arch_timer.h |  32 ++++
+ include/linux/acpi.h                 |   7 +
+ 11 files changed, 522 insertions(+), 78 deletions(-)
+ create mode 100644 drivers/acpi/arm64/Kconfig
+ create mode 100644 drivers/acpi/arm64/Makefile
+ create mode 100644 drivers/acpi/arm64/acpi_gtdt.c
+
+-- 
+2.5.5
