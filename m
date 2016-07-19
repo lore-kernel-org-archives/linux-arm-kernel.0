@@ -1,91 +1,226 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 19 Jul 2016 10:31:26 +0200
-Subject: [PATCH v2 05/11] Kbuild: don't add obj tree in additional includes
-In-Reply-To: <20160718201439.GA9053@sepie.suse.cz>
-References: <20160615154553.3177021-1-arnd@arndb.de>
- <20160615154553.3177021-6-arnd@arndb.de>
- <20160718201439.GA9053@sepie.suse.cz>
-Message-ID: <21521763.EfAflxWUP8@wuerfel>
+From: quentin.schulz@free-electrons.com (Quentin Schulz)
+Date: Tue, 19 Jul 2016 10:33:13 +0200
+Subject: [PATCH v2 2/4] iio: adc: add support for Allwinner SoCs ADC
+In-Reply-To: <e24c8b63-7774-66d2-3317-43fd5598ecc9@kernel.org>
+References: <1468576754-3273-1-git-send-email-quentin.schulz@free-electrons.com>
+ <1468576754-3273-3-git-send-email-quentin.schulz@free-electrons.com>
+ <e24c8b63-7774-66d2-3317-43fd5598ecc9@kernel.org>
+Message-ID: <578DE5C9.8070502@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, July 18, 2016 10:14:39 PM CEST Michal Marek wrote:
-> On Wed, Jun 15, 2016 at 05:45:47PM +0200, Arnd Bergmann wrote:
-> > When building with separate object directories and driver specific
-> > Makefiles that add additional header include paths, Kbuild adjusts
-> > the gcc flags so that we include both the directory in the source
-> > tree and in the object tree.
-> > 
-> > However, due to another bug I fixed earlier, this did not actually
-> > include the correct directory in the object tree, so we know that
-> > we only really need the source tree here. Also, including the
-> > object tree sometimes causes warnings about nonexisting directories
-> > when the include path only exists in the source.
-> > 
-> > This changes the logic to only emit the -I argument for the srctree,
-> > not for objects. We still need both $(srctree)/$(src) and $(obj)
-> > though, so I'm adding them manually.
-> > 
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+On 18/07/2016 15:18, Jonathan Cameron wrote:
+> On 15/07/16 10:59, Quentin Schulz wrote:
+>> The Allwinner SoCs all have an ADC that can also act as a touchscreen
+>> controller and a thermal sensor. This patch adds the ADC driver which is
+>> based on the MFD for the same SoCs ADC.
+>>
+>> This also registers the thermal adc channel in the iio map array so
+>> iio_hwmon could use it without modifying the Device Tree.
+>>
+>> This driver probes on three different platform_device_id to take into
+>> account slight differences between Allwinner SoCs ADCs.
+>>
+>> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
 > 
-> Hi Arnd,
+> Hi Quentin,
 > 
-> I applied the series up to this patch to kbuild.git#kbuild. The rest
-> seem to be related but not dependent patches, so I'll leave it up to the
-> respective maintainers to pick them up. Is that OK with you?
+> Various bits inline.  In particular the irq handling looks flakey / racey
+> to me.  Definitely need some explanatory comments.
+> 
+> Also another note on the craziness that using extended_name to provide
+> the hwmon labels will cause :)
+> 
+> Jonathan
+[...]
+>> +struct sunxi_gpadc_dev {
+>> +	void __iomem			*regs;
+>> +	struct completion		completion;
+>> +	int				temp_data;
+>> +	u32				adc_data;
+>> +	struct regmap			*regmap;
+>> +	unsigned int			fifo_data_irq;
+>> +	unsigned int			temp_data_irq;
+>> +	unsigned int			flags;
+> I'd prefer something more explicit than this.  Right now only one
+> bit can ever be set - indicating a particular chip family.  Why not
+> just have an enum instead?
 
-I think that's fine, a couple were already picked up, and what I have
-left now is
+ACK.
 
-a281bfa5713a [SUBMITTED 20160615] [EXPERIMENTAL] Kbuild: enable -Wmissing-include-dirs by default
-83934921e68e [SUBMITTED 20160615] rtlwifi: don't add include path for rtl8188ee
-5664e7bb88a8 [SUBMITTED 20160615] drm: amd: remove broken include path
-e6d3cf76f9f8 [SUBMITTED 20160615] ARM: hide mach-*/ include for ARM_SINGLE_ARMV7M
-b21947dbd792 [SUBMITTED 20160615] ARM: don't include removed directories
+[...]
+>> +static const struct iio_chan_spec sunxi_gpadc_channels[] = {
+>> +	SUNXI_GPADC_ADC_CHANNEL(0, "adc_chan0"),
+>> +	SUNXI_GPADC_ADC_CHANNEL(1, "adc_chan1"),
+>> +	SUNXI_GPADC_ADC_CHANNEL(2, "adc_chan2"),
+>> +	SUNXI_GPADC_ADC_CHANNEL(3, "adc_chan3"),
+>> +	{
+>> +		.type = IIO_TEMP,
+>> +		.info_mask_separate = BIT(IIO_CHAN_INFO_PROCESSED),
+>> +		.datasheet_name = "temp_adc",
+>> +		.extend_name = "SoC temperature",
+> Just curious, did you look at the resultling sysfs entries?
+> Going to be something like
+> in_temp_SoC\ Temperature_input... Not good.
 
-I can probably put the last two into arm-soc directly. After that, we'd
-be left with a very small diff for the series:
+Just encountered this after further testing, not good as you said.
 
-diff --git a/Makefile b/Makefile
-index caa33e007a8c..53074dbe8619 100644
---- a/Makefile
-+++ b/Makefile
-@@ -754,6 +754,9 @@ endif
- NOSTDINC_FLAGS += -nostdinc -isystem $(shell $(CC) -print-file-name=include)
- CHECKFLAGS     += $(NOSTDINC_FLAGS)
- 
-+# warn about incorrect -I include paths
-+KBUILD_CFLAGS += -Wmissing-include-dirs
-+
- # warn about C99 declaration after statement
- KBUILD_CFLAGS += $(call cc-option,-Wdeclaration-after-statement,)
- 
-diff --git a/drivers/gpu/drm/amd/acp/Makefile b/drivers/gpu/drm/amd/acp/Makefile
-index 8363cb57915b..8a08e81ee90d 100644
---- a/drivers/gpu/drm/amd/acp/Makefile
-+++ b/drivers/gpu/drm/amd/acp/Makefile
-@@ -3,6 +3,4 @@
- # of AMDSOC/AMDGPU drm driver.
- # It provides the HW control for ACP related functionalities.
- 
--subdir-ccflags-y += -I$(AMDACPPATH)/ -I$(AMDACPPATH)/include
--
- AMD_ACP_FILES := $(AMDACPPATH)/acp_hw.o
-diff --git a/drivers/net/wireless/realtek/rtlwifi/rtl8188ee/Makefile b/drivers/net/wireless/realtek/rtlwifi/rtl8188ee/Makefile
-index a85419a37651..676e7de27f27 100644
---- a/drivers/net/wireless/realtek/rtlwifi/rtl8188ee/Makefile
-+++ b/drivers/net/wireless/realtek/rtlwifi/rtl8188ee/Makefile
-@@ -12,4 +12,4 @@ rtl8188ee-objs :=		\
- 
- obj-$(CONFIG_RTL8188EE) += rtl8188ee.o
- 
--ccflags-y += -Idrivers/net/wireless/rtlwifi -D__CHECK_ENDIAN__
-+ccflags-y += -D__CHECK_ENDIAN__
+> If there is a strong enough reason (and there may be) to add a 'help string'
+> type label to struct iio_chan_spec then my only real worries would be that
+> we would be adding a whole pile of ABI that would be in the, near impossible
+> to change in future, category...
 
+I don't understand your "adding a whole pile of ABI" thing. Same as
+datasheet_name variable: const char* in struct iio_chan_spec and used
+whenever needed with some NULL checks. This is the easiest way to do it.
+Or maybe you're thinking of adding an item to iio_chan_info_enum and all
+its underlying modifications? This could allow us to expose a _label
+sysfs file in the iio_device per type/channel.
 
+I understand the "near impossible to change in future" concern though.
 
-I have only tested this on arm, arm64 and x86, so I don't know if that
-introduces new warnings, but we could ask Andrew if he wants to add that
-to linux-mm after the merge window.
+[...]
+>> +	enable_irq(info->temp_data_irq);
+> Is this hardware spitting out extra irqs?  If not, much better to just
+> leave it enabled all the time and control whether it can occur or not
+> by controlling the device state..
 
-	Arnd
+The temp_data_irq occurs every SUNXI_GPADC_TEMP_PERIOD(x) periods (in
+the current state of the driver: 2s). What do you mean by controlling
+the device state? Enabling or disabling the hardware part of the IP
+responsible of getting the temperature
+(SUNXI_GPADC_TP_TPR_TEMP_ENABLE(x) here)?
+Once the interrupt is activated, the IP periodically performs
+conversions. We don't really want interrupts to be activated when not
+needed.
+
+[...]
+>> +
+>> +	if (info->flags & SUNXI_GPADC_ARCH_SUN4I)
+>> +		*val = info->temp_data * 133 - 257000;
+> Why report as processed?  I'd just report them as raw with the scale
+> and offset provided.  It's not a big thing, but if we can leave it so
+> that the conversion only occurs when desired, why not?
+> 
+> For in kernel users, this all happen 'automagically' anyway ;)
+> 
+
+ACK.
+
+[...]
+>> +	mutex_unlock(&indio_dev->mlock);
+> mlock has a very specific purpose - locking the state changes of
+> between 'buffered' (push) and poll modes. Don't use it for anything else.
+> In fact it's almost always a bug to access it directly at all.  We have
+> nice wrappers now for checking and locking the access mode.
+> Just have a local lock in your iio_priv structure.
+
+ACK. There is still a lot of drivers using iio_dev mlock though.
+
+[...]
+>> +static irqreturn_t sunxi_gpadc_fifo_data_irq_handler(int irq, void *dev_id)
+>> +{
+>> +	struct sunxi_gpadc_dev *info = dev_id;
+>> +	int ret;
+>> +
+>> +	ret = regmap_read(info->regmap, SUNXI_GPADC_TP_DATA, &info->adc_data);
+>> +	if (ret == 0)
+>> +		complete(&info->completion);
+> if (!regmap_read(...))?
+> 
+
+ACK.
+
+[...]
+>> +
+>> +	info->temp_data_irq = irq;
+>> +	disable_irq(irq);
+> As below, I want a comment explaining why you are disabling the irq here.
+> This is clearly racey..
+
+Once the interrupt is activated, the IP performs continuous conversions
+(temp_data_irq only periodically). I want these interrupts to be enabled
+only when I read the sysfs file or we get useless interrupts.
+In the current state of this driver's irq handlers, I only set values in
+structures and all the needed structures are already initialized before
+requesting irqs. So it does not look like a race. I can prevent races in
+future versions by adding an atomic flag if wanted.
+
+>> +
+>> +	irq = platform_get_irq_byname(pdev, "FIFO_DATA_PENDING");
+>> +	if (irq < 0) {
+>> +		dev_err(&pdev->dev,
+>> +			"no FIFO_DATA_PENDING interrupt registered\n");
+>> +		ret = irq;
+>> +		goto err;
+>> +	}
+>> +
+>> +	irq = regmap_irq_get_virq(sunxi_gpadc_mfd_dev->regmap_irqc, irq);
+>> +	ret = devm_request_any_context_irq(&pdev->dev, irq,
+>> +					   sunxi_gpadc_fifo_data_irq_handler,
+>> +					   0, "fifo_data", info);
+>> +	if (ret < 0) {
+>> +		dev_err(&pdev->dev,
+>> +			"could not request FIFO_DATA_PENDING interrupt: %d\n",
+>> +			ret);
+>> +		goto err;
+>> +	}
+>> +
+>> +	info->fifo_data_irq = irq;
+> There's a race here - this may be the only way of doing it though.
+> 
+> However, I want a comment explaining why here... Are we looking at a hardware
+> bug?
+>> +	disable_irq(irq);
+>> +
+>> +	ret = iio_map_array_register(indio_dev, sunxi_gpadc_hwmon_maps);
+>> +	if (ret < 0) {
+>> +		dev_err(&pdev->dev, "failed to register iio map array\n");
+>> +		goto err;
+>> +	}
+>> +
+>> +	platform_set_drvdata(pdev, indio_dev);
+>> +
+>> +	ret = iio_device_register(indio_dev);
+>> +	if (ret < 0) {
+>> +		dev_err(&pdev->dev, "could not register the device\n");
+>> +		iio_map_array_unregister(indio_dev);
+> Once you have an unwinding path (which is sensible here) put everything in
+> that block - it makes it easier to review (initially I compared that block
+> with the remove and thought you'd missed this error path).
+> 
+
+ACK. As suggested by Maxime, I will put that in a different goto label.
+
+>> +		goto err;
+>> +	}
+>> +
+>> +	return 0;
+>> +
+>> +err:
+>> +	regmap_write(info->regmap, SUNXI_GPADC_TP_CTRL1, 0);
+>> +	regmap_write(info->regmap, SUNXI_GPADC_TP_TPR, 0);
+>> +
+>> +	return ret;
+>> +}
+>> +
+>> +static int sunxi_gpadc_remove(struct platform_device *pdev)
+>> +{
+>> +	struct sunxi_gpadc_dev *info;
+>> +	struct iio_dev *indio_dev = platform_get_drvdata(pdev);
+>> +
+>> +	info = iio_priv(indio_dev);
+>> +	iio_device_unregister(indio_dev);
+>> +	iio_map_array_unregister(indio_dev);
+> Slight disrepancy here between the cleanup in the error path in
+> probe vs what we have in remove (next line doesn't exist in probe cleanup)
+> Perhaps a comment here would make it clear why...
+>> +	regmap_write(info->regmap, SUNXI_GPADC_TP_INT_FIFOC, 0);
+
+SUNXI_GPADC_TP_INT_FIFO is the register in charge of activating hardware
+interrupts. I disable all interrupts. In the probe, the interrupts are
+already disabled (with disable_irq(irq)). This is actually just a
+shortcut compared to "disable_irq(info->fifo_data_irq);
+disable_irq(inf->temp_data_irq);".
+
+[...]
