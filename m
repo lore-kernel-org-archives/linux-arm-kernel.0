@@ -1,41 +1,43 @@
-From: kvalo@codeaurora.org (Kalle Valo)
-Date: Tue, 19 Jul 2016 21:07:42 +0300
-Subject: [PATCH v2 05/11] Kbuild: don't add obj tree in additional includes
-In-Reply-To: <3906958.MrNt71DzrU@wuerfel> (Arnd Bergmann's message of "Tue, 19
- Jul 2016 17:38:51 +0200")
-References: <20160615154553.3177021-1-arnd@arndb.de>
- <21521763.EfAflxWUP8@wuerfel> <87a8hdae9j.fsf@purkki.adurom.net>
- <3906958.MrNt71DzrU@wuerfel>
-Message-ID: <8760s1v6vl.fsf@kamboji.qca.qualcomm.com>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Tue, 19 Jul 2016 11:18:04 -0700
+Subject: SOC-specific action for irq_set_wake
+Message-ID: <20160719181804.GX3847@xsjsorenbubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann <arnd@arndb.de> writes:
+Hi,
 
->> > I think that's fine, a couple were already picked up, and what I have
->> > left now is
->> >
->> > a281bfa5713a [SUBMITTED 20160615] [EXPERIMENTAL] Kbuild: enable -Wmissing-include-dirs by default
->> > 83934921e68e [SUBMITTED 20160615] rtlwifi: don't add include path for rtl8188ee
->> 
->> Apparently[1] you didn't CC linux-wireless and that's why I didn't see
->> the rtlwifi patch in wireless patchwork. Care to resend?
->> 
->> [1] https://patchwork.kernel.org/patch/9178861/
->> 
->
-> Done.
+we are working on the PM solution for Zynq MPSOC and ran into some
+problem when setting the wake source.
 
-Thanks.
+The situation is that when the A53 is in suspend, the GIC(v2) may be
+powered down. In that state a companion core is handling wake
+events/IRQs, but we expect the OS/Linux to notify the companion core
+about what device/IRQ is a wake up source. Hence, my idea was to capture
+enabling/disabling wake IRQs in our platform PM code and then
+communicate with the FW as needed during suspend operations. The problem
+is: I don't see a good way to notify the platform code about these
+events.
 
-> I've also thrown in two patches for drivers/staging/rtl8*/ that I
-> submitted a while ago, but I'm not sure if they should get merged
-> through the staging tree or the wireless tree. I had previously
-> submitted those two as a combined patch along with a third one that
-> turned out to be unnecessary.
+My ideas were:
+1. Use the irq_chip irq_set_wake function
+  My thought was to implement the irq_set_wake function in a
+  SOC-specific way (could even be generic and call some notifier chain or
+  similar) to notify the platform PM code when a device/IRQ is
+  enabled/disabled as wake up source.
+  My problem is that the SKIP_IRQ_SET_WAKE flag is set in the generic
+  driver (drivers/irqchip/irq-gic.c) and platforms cannot implement
+  irq_set_wake without changes in the common code.
+2. Stuff things into the secure monitor
+  I guess we could read the GIC registers once we enter the secure
+  monitor and do the communication with the companion core from there by
+  identifying unmasked IRQs as wake IRQs. My concern here is that it
+  might introduce additional hardcoded mappings that are much more
+  dynamic in Linux thanks to the DT description.
 
-Greg applies drivers/staging patches to his staging tree, but I'll take
-the rtlwifi patch.
+Does anybody have similar problems and probably already solved it?
+Any other suggestions for approaching the problem? Any preferred
+solution?
 
--- 
-Kalle Valo
+	Thanks,
+	S?ren
