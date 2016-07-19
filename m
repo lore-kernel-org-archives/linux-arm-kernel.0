@@ -1,67 +1,34 @@
 From: eric.auger@redhat.com (Eric Auger)
-Date: Tue, 19 Jul 2016 13:02:47 +0000
-Subject: [PATCH v11 10/10] genirq/msi: use the MSI doorbell's IOVA when
- requested
+Date: Tue, 19 Jul 2016 13:02:38 +0000
+Subject: [PATCH v11 01/10] genirq/msi: export msi_get_domain_info
 In-Reply-To: <1468933367-23159-1-git-send-email-eric.auger@redhat.com>
 References: <1468933367-23159-1-git-send-email-eric.auger@redhat.com>
-Message-ID: <1468933367-23159-11-git-send-email-eric.auger@redhat.com>
+Message-ID: <1468933367-23159-2-git-send-email-eric.auger@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On MSI message composition we now use the MSI doorbell's IOVA in
-place of the doorbell's PA in case the device is upstream to an
-IOMMU that requires MSI addresses to be mapped. The doorbell's
-allocation and mapping happened on an early stage (pci_enable_msi).
+We plan to use msi_get_domain_info in VFIO module so let's export it.
 
 Signed-off-by: Eric Auger <eric.auger@redhat.com>
 
 ---
-v8 -> v9:
-- Braces on both sides of the 'else' in msi_compose
 
-v7 -> v8:
-- use iommu_msi_msg_pa_to_va
-- add WARN_ON
-
-v6 -> v7:
-- allocation/mapping is done at an earlier stage. We now just perform
-  the iova lookup. So it is safe now to be called in a code that cannot
-  sleep. iommu_msi_set_doorbell_iova is moved in the dma-reserved-iommu
-  API: I think it cleans things up with respect to various #ifdef CONFIGS.
-
-v5:
-- use macros to increase the readability
-- add comments
-- fix a typo that caused a compilation error if CONFIG_IOMMU_API
-  is not set
+v2 -> v3:
+- remove static implementation in case CONFIG_PCI_MSI_IRQ_DOMAIN is not set
 ---
- kernel/irq/msi.c | 12 ++++++++++--
- 1 file changed, 10 insertions(+), 2 deletions(-)
+ kernel/irq/msi.c | 1 +
+ 1 file changed, 1 insertion(+)
 
 diff --git a/kernel/irq/msi.c b/kernel/irq/msi.c
-index 69b5b19..e375544 100644
+index 38e89ce..9b0ba4a 100644
 --- a/kernel/irq/msi.c
 +++ b/kernel/irq/msi.c
-@@ -63,10 +63,18 @@ static int msi_compose(struct irq_data *irq_data,
+@@ -400,5 +400,6 @@ struct msi_domain_info *msi_get_domain_info(struct irq_domain *domain)
  {
- 	int ret = 0;
- 
--	if (erase)
-+	if (erase) {
- 		memset(msg, 0, sizeof(*msg));
--	else
-+	} else {
-+		struct device *dev;
-+
- 		ret = irq_chip_compose_msi_msg(irq_data, msg);
-+		if (ret)
-+			return ret;
-+
-+		dev = msi_desc_to_dev(irq_data_get_msi_desc(irq_data));
-+		WARN_ON(iommu_msi_msg_pa_to_va(dev, msg));
-+	}
- 
- 	return ret;
+ 	return (struct msi_domain_info *)domain->host_data;
  }
++EXPORT_SYMBOL_GPL(msi_get_domain_info);
+ 
+ #endif /* CONFIG_GENERIC_MSI_IRQ_DOMAIN */
 -- 
 1.9.1
