@@ -1,39 +1,50 @@
-From: labbott@redhat.com (Laura Abbott)
-Date: Tue, 19 Jul 2016 15:00:04 -0700
-Subject: [PATCH] mm: Add is_migrate_cma_page
-In-Reply-To: <CAGXu5j+nHpHcYT8FyHNe6AFQCdakoSMW=UWDatyxhRK7CB7_=g@mail.gmail.com>
-Message-ID: <1468965604-25023-1-git-send-email-labbott@redhat.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Tue, 19 Jul 2016 17:05:10 -0500
+Subject: [PATCH 9/9] [RFC] pci: include <asm/dma.h> for
+ isa_dma_bridge_buggy
+In-Reply-To: <1466175913-19067-10-git-send-email-ben.dooks@codethink.co.uk>
+References: <1466175913-19067-1-git-send-email-ben.dooks@codethink.co.uk>
+ <1466175913-19067-10-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <20160719220510.GD18635@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Code such as hardened user copy[1] needs a way to tell if a
-page is CMA or not. Add is_migrate_cma_page in a similar way
-to is_migrate_isolate_page.
+On Fri, Jun 17, 2016 at 04:05:13PM +0100, Ben Dooks wrote:
+> At least on arm, <asm/dma.h> does not get included when building
+> drivers/pci/pci.o. This causes the following build warning which
+> can be fixed by including <asm/dma.h>:
+> 
+> drivers/pci/pci.c:37:5: warning: symbol 'isa_dma_bridge_buggy' was not declared. Should it be static?
+> 
+> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
 
-[1]http://article.gmane.org/gmane.linux.kernel.mm/155238
+Applied to pci/misc for v4.8, thanks, Ben!
 
-Signed-off-by: Laura Abbott <labbott@redhat.com>
----
-Here's an explicit patch, slightly different than what I posted before. It can
-be kept separate or folded in as needed.
----
- include/linux/mmzone.h | 2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/include/linux/mmzone.h b/include/linux/mmzone.h
-index 02069c2..c8478b2 100644
---- a/include/linux/mmzone.h
-+++ b/include/linux/mmzone.h
-@@ -68,8 +68,10 @@ extern char * const migratetype_names[MIGRATE_TYPES];
- 
- #ifdef CONFIG_CMA
- #  define is_migrate_cma(migratetype) unlikely((migratetype) == MIGRATE_CMA)
-+#  define is_migrate_cma_page(_page) (get_pageblock_migratetype(_page) == MIGRATE_CMA)
- #else
- #  define is_migrate_cma(migratetype) false
-+#  define is_migrate_cma_page(_page) false
- #endif
- 
- #define for_each_migratetype_order(order, type) \
--- 
-2.7.4
+> ---
+> Cc: Bjorn Helgaas <bhelgaas@google.com>
+> Cc: linux-pci at vger.kernel.org
+> Cc: linux-kernel at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> ---
+>  drivers/pci/pci.c | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+> index 9add285..86b538d 100644
+> --- a/drivers/pci/pci.c
+> +++ b/drivers/pci/pci.c
+> @@ -26,6 +26,7 @@
+>  #include <linux/pm_runtime.h>
+>  #include <linux/pci_hotplug.h>
+>  #include <asm/setup.h>
+> +#include <asm/dma.h>
+>  #include <linux/aer.h>
+>  #include "pci.h"
+>  
+> -- 
+> 2.8.1
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
