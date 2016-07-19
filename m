@@ -1,77 +1,46 @@
 From: geoff@infradead.org (Geoff Levand)
 Date: Tue, 19 Jul 2016 23:28:13 +0000
-Subject: [PATCH v1 0/4] arm64 kexec-tools patches
-Message-ID: <cover.1468970114.git.geoff@infradead.org>
+Subject: [PATCH v1 1/4] kexec: (bugfix) calc correct end address of memory
+ ranges in device tree
+In-Reply-To: <cover.1468970114.git.geoff@infradead.org>
+References: <cover.1468970114.git.geoff@infradead.org>
+Message-ID: <c4af21ba365767f88a2516719dd0f3b70777b549.1468970114.git.geoff@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds the core support for kexec re-boot on ARM64.
+From: AKASHI Takahiro <takahiro.akashi@linaro.org>
 
-Linux kernel support for kexec reboot [1] has been merged to the ARM64
-for-next/core branch with the expectation that it will be included in the v4.8
-stable kernel release.
+The end address of "reg" attribute in device tree's memory should be
+inclusive.
 
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-June/438780.html
+From: AKASHI Takahiro <takahiro.akashi@linaro.org>
+Signed-off-by: Geoff Levand <geoff@infradead.org>
+---
+ kexec/fs2dt.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-- Geoff
-
-The following changes since commit 8d614008609f6ad5d09263767ebc771e06a173f0:
-
-  arm: use zImage size from header (2016-07-15 13:12:28 +0900)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/geoff/kexec-tools.git for-merge-arm64-v1
-
-for you to fetch changes up to 5b7aa684a9f2cf26a71b78f82d279f1d93fd644a:
-
-  arm64: Add support for binary image files (2016-07-19 16:08:38 -0700)
-
-----------------------------------------------------------------
-AKASHI Takahiro (1):
-      kexec: (bugfix) calc correct end address of memory ranges in device tree
-
-Geoff Levand (2):
-      kexec: Add common device tree routines
-      arm64: Add arm64 kexec support
-
-Pratyush Anand (1):
-      arm64: Add support for binary image files
-
- configure.ac                            |   3 +
- kexec/Makefile                          |   5 +
- kexec/arch/arm64/Makefile               |  40 ++
- kexec/arch/arm64/crashdump-arm64.c      |  21 +
- kexec/arch/arm64/crashdump-arm64.h      |  12 +
- kexec/arch/arm64/image-header.h         |  94 +++
- kexec/arch/arm64/include/arch/options.h |  43 ++
- kexec/arch/arm64/kexec-arm64.c          | 995 ++++++++++++++++++++++++++++++++
- kexec/arch/arm64/kexec-arm64.h          |  58 ++
- kexec/arch/arm64/kexec-elf-arm64.c      | 130 +++++
- kexec/arch/arm64/kexec-image-arm64.c    |  63 ++
- kexec/dt-ops.c                          | 139 +++++
- kexec/dt-ops.h                          |  13 +
- kexec/fs2dt.c                           |   5 +-
- kexec/kexec-syscall.h                   |   8 +-
- purgatory/Makefile                      |   1 +
- purgatory/arch/arm64/Makefile           |  18 +
- purgatory/arch/arm64/entry.S            |  59 ++
- purgatory/arch/arm64/purgatory-arm64.c  |  35 ++
- 19 files changed, 1738 insertions(+), 4 deletions(-)
- create mode 100644 kexec/arch/arm64/Makefile
- create mode 100644 kexec/arch/arm64/crashdump-arm64.c
- create mode 100644 kexec/arch/arm64/crashdump-arm64.h
- create mode 100644 kexec/arch/arm64/image-header.h
- create mode 100644 kexec/arch/arm64/include/arch/options.h
- create mode 100644 kexec/arch/arm64/kexec-arm64.c
- create mode 100644 kexec/arch/arm64/kexec-arm64.h
- create mode 100644 kexec/arch/arm64/kexec-elf-arm64.c
- create mode 100644 kexec/arch/arm64/kexec-image-arm64.c
- create mode 100644 kexec/dt-ops.c
- create mode 100644 kexec/dt-ops.h
- create mode 100644 purgatory/arch/arm64/Makefile
- create mode 100644 purgatory/arch/arm64/entry.S
- create mode 100644 purgatory/arch/arm64/purgatory-arm64.c
-
+diff --git a/kexec/fs2dt.c b/kexec/fs2dt.c
+index 6ed2399..f00fd98 100644
+--- a/kexec/fs2dt.c
++++ b/kexec/fs2dt.c
+@@ -236,7 +236,8 @@ static void add_dyn_reconf_usable_mem_property__(int fd)
+ 						    ranges_size*8);
+ 				}
+ 				ranges[rlen++] = cpu_to_be64(loc_base);
+-				ranges[rlen++] = cpu_to_be64(loc_end - loc_base);
++				ranges[rlen++] = cpu_to_be64(loc_end
++								- loc_base + 1);
+ 				rngs_cnt++;
+ 			}
+ 		}
+@@ -350,7 +351,7 @@ static void add_usable_mem_property(int fd, size_t len)
+ 					    ranges_size*sizeof(*ranges));
+ 			}
+ 			ranges[rlen++] = cpu_to_be64(loc_base);
+-			ranges[rlen++] = cpu_to_be64(loc_end - loc_base);
++			ranges[rlen++] = cpu_to_be64(loc_end - loc_base + 1);
+ 		}
+ 	}
+ 
 -- 
 2.5.0
