@@ -1,26 +1,57 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Tue, 19 Jul 2016 06:23:27 +0200
-Subject: [PATCH] i2c: efm32: fix a failure path in efm32_i2c_probe()
-In-Reply-To: <1468625798-6767-1-git-send-email-khoroshilov@ispras.ru>
-References: <1468625798-6767-1-git-send-email-khoroshilov@ispras.ru>
-Message-ID: <20160719042327.GD1640@katana>
+From: bshah@kde.org (Bhushan Shah)
+Date: Tue, 19 Jul 2016 10:34:09 +0530
+Subject: [Patch v2 0/5] Initial support for LG Nexus 5 phone (hammerhead)
+Message-ID: <20160719050414.31704-1-bshah@kde.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 16, 2016 at 02:36:38AM +0300, Alexey Khoroshilov wrote:
-> There is the only failure path in efm32_i2c_probe(),
-> where clk_disable_unprepare() is missed.
-> 
-> Found by Linux Driver Verification project (linuxtesting.org).
-> 
-> Signed-off-by: Alexey Khoroshilov <khoroshilov@ispras.ru>
+This patchset adds support for LG Nexus 5 phone, codenamed hammerhead.
 
-Applied to for-next, thanks!
+Initial version have following supported,
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160719/9b45af39/attachment.sig>
+    - Serial console over headphone jack
+    - pm8841 and pm8941 regulator nodes
+    - Hardware keys (volume_up and volume_down)
+
+Values for the regulator nodes are taken from following files in downstream msm
+kernel tree, branch android-msm-hammerhead-3.4-marshmallow-mr2
+
+    - arch/arm/boot/dts/msm8974-regulator.dtsi
+    - arch/arm/boot/dts/msm8974-hammerhead/msm8974-hammerhead.dtsi
+
+Values are verified against kmsg from downstream kernel as well.
+
+Cc: Andy Gross <andy.gross@linaro.org>
+Cc: Bjorn Andersson <bjorn.andersson@linaro.org>
+Cc: David Brown <david.brown@linaro.org>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Russell King <linux@armlinux.org.uk>
+Cc: devicetree at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-arm-msm at vger.kernel.org
+
+Changes since v1:
+
+    - Remove qcom,msm-id from dts file
+    - Add "lge,hammerhead" to compatible
+    - move vreg_boost node from honami.dts file to msm8974.dtsi
+    - move vph-pwr-reg node to msm8974.dtsi
+
+Bhushan Shah (5):
+  ARM: dts: qcom: Add initial DTS for LG Nexus 5 Phone
+  ARM: dts: msm8974: Move vreg_boost node from the honami to msm8974
+  ARM: dts: qcom: msm8974: Add fixed regulator node for vph-pwr-reg
+  ARM: dts: msm8974-hammerhead: Add regulator nodes for hammerhead
+  ARM: dts: msm8974-hammerhead: Introduce gpio-keys nodes
+
+ arch/arm/boot/dts/Makefile                         |   1 +
+ .../dts/qcom-msm8974-lge-nexus5-hammerhead.dts     | 271 +++++++++++++++++++++
+ .../boot/dts/qcom-msm8974-sony-xperia-honami.dts   |  18 +-
+ arch/arm/boot/dts/qcom-msm8974.dtsi                |  21 ++
+ arch/arm/boot/dts/qcom-pm8941.dtsi                 |   6 +
+ 5 files changed, 301 insertions(+), 16 deletions(-)
+ create mode 100644 arch/arm/boot/dts/qcom-msm8974-lge-nexus5-hammerhead.dts
+
+-- 
+2.9.0
