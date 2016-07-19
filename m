@@ -1,254 +1,79 @@
-From: ck.hu@mediatek.com (CK Hu)
-Date: Tue, 19 Jul 2016 13:39:27 +0800
-Subject: [PATCH v4 5/8] drm/mediatek: add dsi interrupt control
-In-Reply-To: <1468577274-6178-6-git-send-email-yt.shen@mediatek.com>
-References: <1468577274-6178-1-git-send-email-yt.shen@mediatek.com>
- <1468577274-6178-6-git-send-email-yt.shen@mediatek.com>
-Message-ID: <1468906767.30644.66.camel@mtksdaap41>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Tue, 19 Jul 2016 08:26:20 +0200
+Subject: [PATCH v2 00/10] Exynos IOMMU: proper runtime PM support (use
+ device dependencies)
+In-Reply-To: <578D0716.6060106@math.uni-bielefeld.de>
+References: <1466144820-6286-1-git-send-email-m.szyprowski@samsung.com>
+ <5787B2B0.9020809@math.uni-bielefeld.de>
+ <5788E352.3040801@math.uni-bielefeld.de>
+ <a15e438a-7fa0-3a4d-e6e2-13425512dddd@samsung.com>
+ <578CB6DB.90608@math.uni-bielefeld.de>
+ <6939949e-4c8e-cba0-9858-b37d1ba01869@samsung.com>
+ <578D0716.6060106@math.uni-bielefeld.de>
+Message-ID: <7c770ff5-2b22-adf6-b8d0-e94d1d7d7550@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, YT:
+Hi Tobias
 
-Some comments inline.
 
-On Fri, 2016-07-15 at 18:07 +0800, YT Shen wrote:
-> From: shaoming chen <shaoming.chen@mediatek.com>
-> 
-> add dsi interrupt control
-> 
-> Signed-off-by: shaoming chen <shaoming.chen@mediatek.com>
-> ---
->  drivers/gpu/drm/mediatek/mtk_dsi.c |  130 ++++++++++++++++++++++++++++++++++++
->  1 file changed, 130 insertions(+)
-> 
-> diff --git a/drivers/gpu/drm/mediatek/mtk_dsi.c b/drivers/gpu/drm/mediatek/mtk_dsi.c
-> index 2d808e5..de5ad7f 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_dsi.c
-> +++ b/drivers/gpu/drm/mediatek/mtk_dsi.c
-> @@ -18,6 +18,7 @@
->  #include <drm/drm_panel.h>
->  #include <linux/clk.h>
->  #include <linux/component.h>
-> +#include <linux/irq.h>
->  #include <linux/of.h>
->  #include <linux/of_platform.h>
->  #include <linux/of_graph.h>
-> @@ -32,6 +33,13 @@
->  
->  #define DSI_START		0x00
->  
-> +#define DSI_INTEN		0x08
-> +
-> +#define DSI_INTSTA		0x0c
-> +#define LPRX_RD_RDY_INT_FLAG	BIT(0)
-> +#define CMD_DONE_INT_FLAG	BIT(1)
-> +#define DSI_BUSY		BIT(31)
+On 2016-07-18 18:43, Tobias Jakobi wrote:
+> Marek Szyprowski wrote:
+>> On 2016-07-18 13:00, Tobias Jakobi wrote:
+>>> Marek Szyprowski wrote:
+>>>> On 2016-07-15 15:21, Tobias Jakobi wrote:
+>>>>> Tobias Jakobi wrote:
+>>>>>> Hello Marek,
+>>>>>>
+>>>>>> I've tested the patchset on 4.7-rc7 and noticed that it breaks
+>>>>>> reboot on
+>>>>>> my ODROID-X2.
+>>>>>>
+>>>>>> Going to check where exactly things break.
+>>>>> Sadly it's the last patch where everything comes together:
+>>>>> "iommu/exynos: Add proper runtime pm support"
+>>>>>
+>>>>> I still have to check if forcing runpm status to 'on' makes a
+>>>>> difference. I suspect that the aggressive clock gating might be the
+>>>>> reason?
+>>>> Thanks for testing. I will check this issue. Could you send me your
+>>>> .config?
+>>> This is the config I'm currently using:
+>>> https://github.com/tobiasjakobi/odroid-environment/blob/master/sourcecode/system/vanilla-4.7-debug.conf
+>>>
+>>>
+>>> Do you think checking this with no_console_suspend makes sense?
+>> no_console_suspend switch won't provide more information, but I managed
+>> to reproduce your issue. I'm really confused how enabling runtime pm can
+>> cause problems with usb/smsc95xx ethernet driver (that is the reason for
+>> failed reboot). Maybe it is somehow related to the global relations
+>> between devices and drivers and the fact that creating the runtime pm
+>> links change the order of operations. I will check this again when
+>> Rafael send updated patches. Here is the log I got (after waiting some
+>> time):
+> thanks for looking into this! I'll try to reproduce this on my board. I
+> have to admit that I didn't wait too long for the hung task message to
+> appear.
+>
+> I wonder if this has something to do with regulator code cutting some
+> supplies too early. Is this on a X2 or a U2/U3?
 
-Why need LPRX_RD_RDY_INT_FLAG, CMD_DONE_INT_FLAG, and DSI_BUSY? Maybe
-these three should be moved to other patch.
+I've reproduced it on U3.
 
-> +
->  #define DSI_CON_CTRL		0x10
->  #define DSI_RESET			BIT(0)
->  #define DSI_EN				BIT(1)
-> @@ -74,6 +82,9 @@
->  
->  #define DSI_HSTX_CKL_WC		0x64
->  
-> +#define DSI_RACK		0x84
-> +#define RACK			BIT(0)
-> +
->  #define DSI_PHY_LCCON		0x104
->  #define LC_HS_TX_EN			BIT(0)
->  #define LC_ULPM_EN			BIT(1)
-> @@ -134,6 +145,18 @@ struct mtk_dsi {
->  	struct videomode vm;
->  	int refcount;
->  	bool enabled;
-> +	int irq_num, irq_data;
-> +};
-> +
-> +enum {
-> +	DSI_INT_SLEEPOUT_DONE_FLAG	= BIT(6),
-> +	DSI_INT_VM_CMD_DONE_FLAG	= BIT(5),
-> +	DSI_INT_EXT_TE_RDY_FLAG		= BIT(4),
-> +	DSI_INT_VM_DONE_FLAG		= BIT(3),
-> +	DSI_INT_TE_RDY_FLAG		= BIT(2),
-> +	DSI_INT_CMD_DONE_FLAG		= BIT(1),
-> +	DSI_INT_LPRX_RD_RDY_FLAG	= BIT(0),
-> +	DSI_INT_ALL_BITS		= (0x7f)
->  };
+> I'm not sure if we
+> currently model the regulator setup correctly here (IIRC then buck8 is
+> supplying the LAN/USB block on U2/U3).
 
-I think you should use '#define' instead of 'enum'. The code would be
-like below, and these definition should be moved to after DSI_INTEN or
-DSI_INTSTA.
+IMHO it is not really related to regulator operations, but the sequence
+of shutting down logical devices in the system. For some reasons when pm 
+links
+are used, something changes the order of operations in system shutdown
+procedure, what causes smsc95xx to hang. I have no idea why, but I don't 
+have
+time to investigate it further. I will wait for the next release of Rafael's
+pm links patches and then check everything again.
 
-#define DSI_INT_LPRX_RD_RDY_FLAG	BIT(0)
-#define DSI_INT_CMD_DONE_FLAG		BIT(1)
-#define DSI_INT_TE_RDY_FLAG		BIT(2)
-#define DSI_INT_VM_DONE_FLAG		BIT(3)
-#define DSI_INT_EXT_TE_RDY_FLAG		BIT(4)
-#define DSI_INT_VM_CMD_DONE_FLAG	BIT(5)
-#define DSI_INT_SLEEPOUT_DONE_FLAG	BIT(6)
-#define DSI_INT_ALL_BITS		(DSI_INT_LPRX_RD_RDY_FLAG | \
-					DSI_INT_CMD_DONE_FLAG | \
-					DSI_INT_TE_RDY_FLAG | \
-					DSI_INT_VM_DONE_FLAG | \
-					DSI_INT_EXT_TE_RDY_FLAG | \
-					DSI_INT_VM_CMD_DONE_FLAG | \
-					DSI_INT_SLEEPOUT_DONE_FLAG)
-
->  
->  static inline struct mtk_dsi *encoder_to_dsi(struct drm_encoder *e)
-> @@ -440,6 +463,94 @@ static void mtk_dsi_start(struct mtk_dsi *dsi)
->  	writel(1, dsi->regs + DSI_START);
->  }
->  
-> +static void mtk_dsi_set_interrupt_enable(struct mtk_dsi *dsi)
-> +{
-> +	u32 inten = DSI_INT_ALL_BITS;
-> +
-> +	if (dsi->mode_flags & MIPI_DSI_MODE_VIDEO)
-> +		inten &= ~(DSI_INT_TE_RDY_FLAG | DSI_INT_EXT_TE_RDY_FLAG);
-> +
-> +	writel(inten, dsi->regs + DSI_INTEN);
-> +}
-> +
-> +static void mtk_dsi_irq_wakeup(struct mtk_dsi *dsi, u32 irq_bit)
-> +{
-> +	dsi->irq_data |= irq_bit;
-> +}
-> +
-> +static irqreturn_t mtk_dsi_irq(int irq, void *dev_id)
-> +{
-> +	struct mtk_dsi *dsi = dev_id;
-> +
-> +	u32 status, tmp;
-> +
-> +	status = readl(dsi->regs + DSI_INTSTA);
-> +
-> +	if (status & DSI_INT_LPRX_RD_RDY_FLAG) {
-> +		/* write clear RD_RDY interrupt */
-> +		/* write clear RD_RDY interrupt must be before DSI_RACK */
-> +		/* because CMD_DONE will raise after DSI_RACK, */
-> +		/* so write clear RD_RDY after that will clear CMD_DONE too */
-> +		do {
-> +			/* send read ACK */
-> +			mtk_dsi_mask(dsi, DSI_RACK, RACK, RACK);
-> +			tmp = readl(dsi->regs + DSI_INTSTA);
-> +		} while (tmp & DSI_BUSY);
-> +
-> +		mtk_dsi_mask(dsi, DSI_INTSTA, DSI_INT_LPRX_RD_RDY_FLAG, 0);
-> +		mtk_dsi_irq_wakeup(dsi, DSI_INT_LPRX_RD_RDY_FLAG);
-> +	}
-> +
-> +	if (status & DSI_INT_CMD_DONE_FLAG) {
-> +		mtk_dsi_mask(dsi, DSI_INTSTA, DSI_INT_CMD_DONE_FLAG, 0);
-> +		mtk_dsi_irq_wakeup(dsi, DSI_INT_CMD_DONE_FLAG);
-> +	}
-> +
-> +	if (status & DSI_INT_TE_RDY_FLAG) {
-> +		mtk_dsi_mask(dsi, DSI_INTSTA, DSI_INT_TE_RDY_FLAG, 0);
-> +		mtk_dsi_irq_wakeup(dsi, DSI_INT_TE_RDY_FLAG);
-> +	}
-> +
-> +	if (status & DSI_INT_VM_DONE_FLAG) {
-> +		mtk_dsi_mask(dsi, DSI_INTSTA, DSI_INT_VM_DONE_FLAG, 0);
-> +		mtk_dsi_irq_wakeup(dsi, DSI_INT_VM_DONE_FLAG);
-> +	}
-> +
-> +	if (status & DSI_INT_EXT_TE_RDY_FLAG) {
-> +		mtk_dsi_mask(dsi, DSI_INTSTA, DSI_INT_EXT_TE_RDY_FLAG, 0);
-> +		mtk_dsi_irq_wakeup(dsi, DSI_INT_EXT_TE_RDY_FLAG);
-> +	}
-> +
-> +	if (status & DSI_INT_VM_CMD_DONE_FLAG) {
-> +		mtk_dsi_mask(dsi, DSI_INTSTA, DSI_INT_VM_CMD_DONE_FLAG, 0);
-> +		mtk_dsi_irq_wakeup(dsi, DSI_INT_VM_CMD_DONE_FLAG);
-> +	}
-> +
-> +	if (status & DSI_INT_SLEEPOUT_DONE_FLAG) {
-> +		mtk_dsi_mask(dsi, DSI_INTSTA, DSI_INT_SLEEPOUT_DONE_FLAG, 0);
-> +		mtk_dsi_irq_wakeup(dsi, DSI_INT_SLEEPOUT_DONE_FLAG);
-> +	}
-
-All these 'if' statement do the same thing and I think these could be
-merge as:
-
-status = readl(dsi->regs + DSI_INTSTA) & DSI_INT_ALL_BITS);
-if (status) {
-	mtk_dsi_mask(dsi, DSI_INTSTA, status, 0);
-	mtk_dsi_irq_wakeup(dsi, status);
-}
-
-> +
-> +	return IRQ_HANDLED;
-> +}
-> +
-> +static s32 mtk_dsi_wait_for_irq_timeout(struct mtk_dsi *dsi, u32 irq_bit,
-> +					u32 timeout_ms)
-> +{
-> +	while (timeout_ms--) {
-> +		if (dsi->irq_data & irq_bit) {
-> +			dsi->irq_data &= ~irq_bit;
-> +			return 0;
-> +		}
-> +
-> +		usleep_range(1000, 1100);
-> +	}
-
-I think it's better to use wait_event() or something else. Polling with
-sleep could not react immediately.
-
-> +
-> +	dsi->irq_data = 0;
-
-Why clear all bit after wait one bit timeout?
-
-> +
-> +	return -1;
-> +}
-> +
->  static void mtk_dsi_poweroff(struct mtk_dsi *dsi)
->  {
->  	if (WARN_ON(dsi->refcount == 0))
-> @@ -488,6 +599,7 @@ static void mtk_output_dsi_enable(struct mtk_dsi *dsi)
->  
->  	dsi_ps_control_vact(dsi);
->  	dsi_config_vdo_timing(dsi);
-> +	mtk_dsi_set_interrupt_enable(dsi);
->  
->  	dsi_set_mode(dsi);
->  	dsi_clk_hs_mode(dsi, 1);
-> @@ -883,6 +995,24 @@ static int mtk_dsi_probe(struct platform_device *pdev)
->  		return ret;
->  	}
->  
-> +	dsi->irq_num = platform_get_irq(pdev, 0);
-
-You use irq_num only in this function, why keep it in dsi structure?
-
-> +	if (dsi->irq_num < 0) {
-> +		dev_err(&pdev->dev, "failed to request dsi irq resource\n");
-> +		ret = dsi->irq_num;
-> +		return -EPROBE_DEFER;
-> +	}
-> +
-> +	irq_set_status_flags(dsi->irq_num, IRQ_TYPE_LEVEL_LOW);
-> +	ret = devm_request_irq(&pdev->dev, dsi->irq_num, mtk_dsi_irq,
-> +			       IRQF_TRIGGER_LOW, dev_name(&pdev->dev), dsi);
-> +	if (ret) {
-> +		dev_err(&pdev->dev, "failed to request mediatek dsi irq\n");
-> +		return -EPROBE_DEFER;
-> +	}
-> +
-> +	dsi->irq_data = 0;
-> +	dev_info(dev, "dsi irq num is 0x%x\n", dsi->irq_num);
-> +
->  	platform_set_drvdata(pdev, dsi);
->  
->  	return component_add(&pdev->dev, &mtk_dsi_component_ops);
-
-Regards,
-CK
+Best regards
+-- 
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
