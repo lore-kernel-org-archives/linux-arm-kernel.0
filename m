@@ -1,75 +1,32 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 19 Jul 2016 14:27:54 +0100
-Subject: [PATCH v22 1/8] arm64: kdump: reserve memory for crash dump kernel
-In-Reply-To: <1468932537.27473.6.camel@redhat.com>
-References: <20160712050514.22307-1-takahiro.akashi@linaro.org>
- <20160712050514.22307-2-takahiro.akashi@linaro.org>
- <20160719093906.GA20732@arm.com>
- <20160719102815.GE20774@linaro.org>
- <20160719104103.GB20990@arm.com>
- <1468932537.27473.6.camel@redhat.com>
-Message-ID: <20160719132736.GB21007@leverpostej>
+From: mirza.krak@gmail.com (Mirza Krak)
+Date: Tue, 19 Jul 2016 15:36:32 +0200
+Subject: [RFC 1/6] clk: tegra: add TEGRA20_CLK_NOR to init table
+In-Reply-To: <1468935397-11926-1-git-send-email-mirza.krak@gmail.com>
+References: <1468935397-11926-1-git-send-email-mirza.krak@gmail.com>
+Message-ID: <1468935397-11926-2-git-send-email-mirza.krak@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 19, 2016 at 08:48:57AM -0400, Mark Salter wrote:
-> On Tue, 2016-07-19 at 18:41 +0800, Dennis Chen wrote:
-> > On Tue, Jul 19, 2016 at 07:28:16PM +0900, AKASHI Takahiro wrote:
-> > > On Tue, Jul 19, 2016 at 05:39:07PM +0800, Dennis Chen wrote:
-> > > > On Tue, Jul 12, 2016 at 02:05:07PM +0900, AKASHI Takahiro wrote:
-> > > > > +/*
-> > > > > + * reserve_crashkernel() - reserves memory for crash kernel
-> > > > > + *
-> > > > > + * This function reserves memory area given in "crashkernel=" kernel command
-> > > > > + * line parameter. The memory reserved is used by dump capture kernel when
-> > > > > + * primary kernel is crashing.
-> > > > > + */
-> > > > > +static void __init reserve_crashkernel(void)
-> > > > > +{
-> > > > > +?????int ret;
-> > > > > +
-> > > > > +?????ret = parse_crashkernel(boot_command_line, memblock_phys_mem_size(),
-> > > > > +?????????????????????????????&crash_size, &crash_base);
-> > > > > +?????/* no crashkernel= or invalid value specified */
-> > > > > +?????if (ret || !crash_size)
-> > > > > +?????????????return;
-> > > > > +
-> > > > > +?????if (crash_base == 0) {
-> > > > > +?????????????/* Current arm64 boot protocol requires 2MB alignment */
-> > > > > +?????????????crash_base = memblock_find_in_range(0,
-> > > > > +?????????????????????????????MEMBLOCK_ALLOC_ACCESSIBLE, crash_size, SZ_2M);
-> > > > > +?????????????if (crash_base == 0) {
-> > > > > +?????????????????????pr_warn("Unable to allocate crashkernel (size:%llx)\n",
-> > > > > +?????????????????????????????crash_size);
-> > > > > +?????????????????????return;
-> > > > > +?????????????}
-> > > > > +?????????????memblock_reserve(crash_base, crash_size);
-> > > > > 
-> > > > I am not pretty sure the context here, but
-> > > > can we use below code piece instead of the above lines?
-> > > > ????????if (crash_base == 0)
-> > > > ????????????????memblock_alloc(crash_size, SZ_2M);
-> > > Either would be fine here.
-> > > 
-> > Hello AKASHI, maybe you can succeed to find the base with memblock_find_in_range(),?
-> > but that doesn't mean you will also succeed to reserve them with memblock_reserve followed.
-> 
-> We avoid memblock_alloc() here because it panics on failure. This could happen
-> if user asks for an unusually large crashkernel size. Better to print a message
-> and keep booting. Checking the return value of memblock_reserve() seems like a
-> good thing to do though.
+From: Mirza Krak <mirza.krak@gmail.com>
 
-Another option would be to add a memblock_try_alloc() function to the
-memblock API, which in case of failure returns 0 rather than triggering
-a panic(). We'd still have to check the return value, but all the
-memblock manipulation would be in one place.
+Add TEGRA20_CLK_NOR to init tabel and set a "sane" default rate.
 
-It looks like adding that is fairly simple:
+Signed-off-by: Mirza Krak <mirza.krak@gmail.com>
+---
+ drivers/clk/tegra/clk-tegra20.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-phys_addr_t __init memblock_try_alloc(phys_addr_t size, phys_addr_t align)
-{
-	return __memblock_alloc_base(size, align, MEMBLOCK_ALLOC_ACCESSIBLE);
-}
-
-Thanks,
-Mark.
+diff --git a/drivers/clk/tegra/clk-tegra20.c b/drivers/clk/tegra/clk-tegra20.c
+index 837e5cb..aefc044 100644
+--- a/drivers/clk/tegra/clk-tegra20.c
++++ b/drivers/clk/tegra/clk-tegra20.c
+@@ -1047,6 +1047,7 @@ static struct tegra_clk_init_table init_table[] __initdata = {
+ 	{ TEGRA20_CLK_SDMMC3, TEGRA20_CLK_PLL_P, 48000000, 0 },
+ 	{ TEGRA20_CLK_SDMMC4, TEGRA20_CLK_PLL_P, 48000000, 0 },
+ 	{ TEGRA20_CLK_SPI, TEGRA20_CLK_PLL_P, 20000000, 0 },
++	{ TEGRA20_CLK_NOR, TEGRA20_CLK_PLL_P, 86500000, 0 },
+ 	{ TEGRA20_CLK_SBC1, TEGRA20_CLK_PLL_P, 100000000, 0 },
+ 	{ TEGRA20_CLK_SBC2, TEGRA20_CLK_PLL_P, 100000000, 0 },
+ 	{ TEGRA20_CLK_SBC3, TEGRA20_CLK_PLL_P, 100000000, 0 },
+-- 
+2.1.4
