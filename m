@@ -1,61 +1,80 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 19 Jul 2016 15:23:01 +0100
-Subject: [PATCH 1/4] arm64: debug: unmask PSTATE.D earlier
-In-Reply-To: <1468937260-23988-1-git-send-email-will.deacon@arm.com>
-References: <1468937260-23988-1-git-send-email-will.deacon@arm.com>
-Message-ID: <20160719142301.GD21256@e104818-lin.cambridge.arm.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 19 Jul 2016 16:24:07 +0200
+Subject: [PATCH v2] drivers/perf: arm-pmu: Handle per-interrupt affinity
+ mask
+In-Reply-To: <578E2F40.1000309@arm.com>
+References: <1467815627-4061-1-git-send-email-marc.zyngier@arm.com>
+ <CAMuHMdXU6C=jFD16Jj3NFNawiY0YEpQDZSbL+T4bLgUOG3nTUQ@mail.gmail.com>
+ <578E2F40.1000309@arm.com>
+Message-ID: <CAMuHMdV6tUvegGebYkdL0Z+h0a7qf=hFDW2xUJESt_68-SV2Yg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 19, 2016 at 03:07:37PM +0100, Will Deacon wrote:
-> Clearing PSTATE.D is one of the requirements for generating a debug
-> exception. The arm64 booting protocol requires that PSTATE.D is set,
-> since many of the debug registers (for example, the hw_breakpoint
-> registers) are UNKNOWN out of reset and could potentially generate
-> spurious, fatal debug exceptions in early boot code if PSTATE.D was
-> clear. Once the debug registers have been safely initialised, PSTATE.D
-> is cleared, however this is currently broken for two reasons:
-> 
-> (1) The boot CPU clears PSTATE.D in a postcore_initcall and secondary
->     CPUs clear PSTATE.D in secondary_start_kernel. Since the initcall
->     runs after SMP (and the scheduler) have been initialised, there is
->     no guarantee that it is actually running on the boot CPU. In this
->     case, the boot CPU is left with PSTATE.D set and is not capable of
->     generating debug exceptions.
-> 
-> (2) In a preemptible kernel, we may explicitly schedule on the IRQ
->     return path to EL1. If an IRQ occurs with PSTATE.D set in the idle
->     thread, then we may schedule the kthread_init thread, run the
->     postcore_initcall to clear PSTATE.D and then context switch back
->     to the idle thread before returning from the IRQ. The exception
->     return path will then restore PSTATE.D from the stack, and set it
->     again.
-> 
-> This patch fixes the problem by moving the clearing of PSTATE.D earlier
-> to proc.S. This has the desirable effect of clearing it in one place for
-> all CPUs, long before we have to worry about the scheduler or any
-> exception handling. We ensure that the previous reset of MDSCR_EL1 has
-> completed before unmasking the exception, so that any spurious
-> exceptions resulting from UNKNOWN debug registers are not generated.
-> 
-> Without this patch applied, the kprobes selftests have been seen to fail
-> under KVM, where we end up attempting to step the OOL instruction buffer
-> with PSTATE.D set and therefore fail to complete the step.
-> 
-> Cc: <stable@vger.kernel.org>
-> Acked-by: Mark Rutland <mark.rutland@arm.com>
-> Reported-by: Catalin Marinas <catalin.marinas@arm.com>
-> Tested-by: Marc Zyngier <marc.zyngier@arm.com>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
+Hi Marc,
 
-For the record (and for the whole series):
+On Tue, Jul 19, 2016 at 3:46 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> On 19/07/16 14:25, Geert Uytterhoeven wrote:
+>> On Wed, Jul 6, 2016 at 4:33 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>>> On a big-little system, PMUs can be wired to CPUs using per CPU
+>>> interrups (PPI). In this case, it is important to make sure that
+>>> the enable/disable do happen on the right set of CPUs.
+>>>
+>>> So instead of relying on the interrupt-affinity property, we can
+>>> use the actual percpu affinity that DT exposes as part of the
+>>> interrupt specifier. The DT binding is also updated to reflect
+>>> the fact that the interrupt-affinity property shouldn't be used
+>>> in that case.
+>>>
+>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>>> ---
+>>> * From v1:
+>>>   - propagate the error if irq_get_percpu_devid_partition fails
+>>
+>> This patch, which is commit 19a469a58720ea96 in arm64/for-next/core, broke
+>> the PMU on r8a7740/armadillo800eva:
+>>
+>>     -hw perfevents: enabled with armv7_cortex_a9 PMU driver, 7
+>> counters available
+>>     +hw perfevents: /pmu: failed to probe PMU!
+>>     +hw perfevents: /pmu: failed to register PMU devices!
+>>     +armv7-pmu: probe of pmu failed with error -22
 
-Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
-Tested-by: Catalin Marinas <catalin.marinas@arm.com>
+> Thanks for the thorough analysis. Could you please give the following
+> patchlet a go:
+>
+> diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
+> index 2513365..9275e08 100644
+> --- a/drivers/perf/arm_pmu.c
+> +++ b/drivers/perf/arm_pmu.c
+> @@ -958,11 +958,12 @@ static int of_pmu_irq_cfg(struct arm_pmu *pmu)
+>
+>         /* If we didn't manage to parse anything, try the interrupt affinity */
+>         if (cpumask_weight(&pmu->supported_cpus) == 0) {
+> -               if (!using_spi) {
+> +               int irq = platform_get_irq(pdev, 0);
+> +
+> +               if (irq_is_percpu(irq)) {
+>                         /* If using PPIs, check the affinity of the partition */
+> -                       int ret, irq;
+> +                       int ret;
+>
+> -                       irq = platform_get_irq(pdev, 0);
+>                         ret = irq_get_percpu_devid_partition(irq, &pmu->supported_cpus);
+>                         if (ret) {
+>                                 kfree(irqs);
+>
+>
+> and let me know if that helps?
 
-I'll queue them for 4.8.
+Thanks, that fixes it, as expected.
 
-Thanks.
+Gr{oetje,eeting}s,
 
--- 
-Catalin
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
