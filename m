@@ -1,39 +1,78 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Tue, 19 Jul 2016 17:40:02 -0400
-Subject: [PATCH 03/10] of: irq: make of_msi_configure accessible from
- modules
-In-Reply-To: <CAL_Jsq+zLb0RcEdykDZXZpkgjjrDWa+-Bd0LTth3kB4H5X9pOQ@mail.gmail.com>
-References: <1468867177-15007-1-git-send-email-okaya@codeaurora.org>
- <1468867177-15007-4-git-send-email-okaya@codeaurora.org>
- <CAL_Jsq+zLb0RcEdykDZXZpkgjjrDWa+-Bd0LTth3kB4H5X9pOQ@mail.gmail.com>
-Message-ID: <0fcc2c31-bd94-4a64-0456-9a35b692d2d8@codeaurora.org>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Tue, 19 Jul 2016 16:42:27 -0500
+Subject: [PATCH V7 3/8] PCI/MSI: Setup MSI domain on a per-device basis
+ using IORT ACPI table
+In-Reply-To: <1466420541-20101-4-git-send-email-tn@semihalf.com>
+References: <1466420541-20101-1-git-send-email-tn@semihalf.com>
+ <1466420541-20101-4-git-send-email-tn@semihalf.com>
+Message-ID: <20160719214227.GB18635@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7/18/2016 5:24 PM, Rob Herring wrote:
-> On Mon, Jul 18, 2016 at 1:39 PM, Sinan Kaya <okaya@codeaurora.org> wrote:
->> The of_msi_configure routine is only accessible by the built-in
->> kernel drivers. Export this function so that modules can use it
->> too.
->>
->> This function is useful for configuring MSI on child device tree
->> nodes on hierarchical objects.
->>
->> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
->> ---
->>  drivers/of/irq.c | 1 +
->>  1 file changed, 1 insertion(+)
+On Mon, Jun 20, 2016 at 01:02:16PM +0200, Tomasz Nowicki wrote:
+> It is possible to provide information about which MSI controller to
+> use on a per-device basis for DT. This patch supply this with ACPI support.
 > 
-> Acked-by: Rob Herring <robh@kernel.org>
-> --
-> To unsubscribe from this list: send the line "unsubscribe dmaengine" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Currently, IORT is the only one ACPI table which can provide such mapping.
+> In order to plug IORT into MSI infrastructure we are adding ACPI
+> equivalents for finding PCI device domain and its RID translation
+> (pci_msi_domain_get_msi_rid and pci_msi_domain_get_msi_rid calls).
 > 
+> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
-Thanks Rob
+Acked-by: Bjorn Helgaas <bhelgaas@google.com>
 
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+I assume this will be merged along with the rest of the series via
+some non-PCI tree.
+
+> ---
+>  drivers/pci/msi.c | 11 ++++++++---
+>  1 file changed, 8 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
+> index a080f44..1d45e81 100644
+> --- a/drivers/pci/msi.c
+> +++ b/drivers/pci/msi.c
+> @@ -18,6 +18,7 @@
+>  #include <linux/smp.h>
+>  #include <linux/errno.h>
+>  #include <linux/io.h>
+> +#include <linux/iort.h>
+>  #include <linux/slab.h>
+>  #include <linux/irqdomain.h>
+>  #include <linux/of_irq.h>
+> @@ -1364,8 +1365,8 @@ u32 pci_msi_domain_get_msi_rid(struct irq_domain *domain, struct pci_dev *pdev)
+>  	pci_for_each_dma_alias(pdev, get_msi_id_cb, &rid);
+>  
+>  	of_node = irq_domain_get_of_node(domain);
+> -	if (of_node)
+> -		rid = of_msi_map_rid(&pdev->dev, of_node, rid);
+> +	rid = of_node ? of_msi_map_rid(&pdev->dev, of_node, rid) :
+> +			iort_msi_map_rid(&pdev->dev, rid);
+>  
+>  	return rid;
+>  }
+> @@ -1381,9 +1382,13 @@ u32 pci_msi_domain_get_msi_rid(struct irq_domain *domain, struct pci_dev *pdev)
+>   */
+>  struct irq_domain *pci_msi_get_device_domain(struct pci_dev *pdev)
+>  {
+> +	struct irq_domain *dom;
+>  	u32 rid = 0;
+>  
+>  	pci_for_each_dma_alias(pdev, get_msi_id_cb, &rid);
+> -	return of_msi_map_get_device_domain(&pdev->dev, rid);
+> +	dom = of_msi_map_get_device_domain(&pdev->dev, rid);
+> +	if (!dom)
+> +		dom = iort_get_device_domain(&pdev->dev, rid);
+> +	return dom;
+>  }
+>  #endif /* CONFIG_PCI_MSI_IRQ_DOMAIN */
+> -- 
+> 1.9.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
