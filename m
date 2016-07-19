@@ -1,376 +1,238 @@
-From: quentin.schulz@free-electrons.com (Quentin Schulz)
-Date: Tue, 19 Jul 2016 11:04:23 +0200
-Subject: [PATCH v2 2/4] iio: adc: add support for Allwinner SoCs ADC
-In-Reply-To: <20160718125753.GF4199@lukather>
-References: <1468576754-3273-1-git-send-email-quentin.schulz@free-electrons.com>
- <1468576754-3273-3-git-send-email-quentin.schulz@free-electrons.com>
- <20160718125753.GF4199@lukather>
-Message-ID: <578DED17.7040309@free-electrons.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Tue, 19 Jul 2016 11:17:54 +0200
+Subject: [RFC PATCH v2 6/9] firmware: Add legacy SCPI protocol driver
+In-Reply-To: <5774FA15.6060302@arm.com>
+References: <1466503374-28841-1-git-send-email-narmstrong@baylibre.com>
+ <1466503374-28841-7-git-send-email-narmstrong@baylibre.com>
+ <5774FA15.6060302@arm.com>
+Message-ID: <578DF042.4080801@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/07/2016 14:57, Maxime Ripard wrote:
-> On Fri, Jul 15, 2016 at 11:59:12AM +0200, Quentin Schulz wrote:
->> The Allwinner SoCs all have an ADC that can also act as a touchscreen
->> controller and a thermal sensor. This patch adds the ADC driver which is
->> based on the MFD for the same SoCs ADC.
+On 06/30/2016 12:53 PM, Sudeep Holla wrote:
+> 
+> 
+> On 21/06/16 11:02, Neil Armstrong wrote:
+>> Add legacy SCPI driver based on the latest SCPI driver but modified to behave
+>> like an earlier technology preview SCPI implementation that at least the
+>> Amlogic GXBB ARMv8 based platform uses in it's SCP firmware implementation.
 >>
->> This also registers the thermal adc channel in the iio map array so
->> iio_hwmon could use it without modifying the Device Tree.
+>> The main differences between the mainline, public and recommended SCPI
+>> implementation are :
+>>   - virtual channels is not implemented
+>>   - command word is passed by the MHU instead of the virtual channel ID
+>>   - uses "sender id" in the command word for each commands groups
+>>   - payload size shift in command word is different
+>>   - command word is not in SRAM, so command queuing is not possible
+>>   - command indexes are different
+>>   - command data structures differs
+>>   - commands are redirected to low or high priority channels by their indexes,
+>>     so round-robin redirection is not possible
+> 
+> I doubt if that's the case. At-least the original arm scp f/w didn't
+> check that. Can you please trying sending any commands on any channel ?
+
+I did, and it fails.
+I'm waiting for advanced documentation for the fw, but it really seems the SCP
+fw filter the command by the channel.
+
 >>
->> This driver probes on three different platform_device_id to take into
->> account slight differences between Allwinner SoCs ADCs.
+>> A clear disclaimer is added to make it clear this implementation should not
+>> be used for new products and is only here to support already released SoCs.
 >>
->> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+>> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 >> ---
+>>   drivers/firmware/Kconfig       |  20 ++
+>>   drivers/firmware/Makefile      |   1 +
+>>   drivers/firmware/legacy_scpi.c | 644 +++++++++++++++++++++++++++++++++++++++++
+>>   3 files changed, 665 insertions(+)
+>>   create mode 100644 drivers/firmware/legacy_scpi.c
 >>
->> v2:
->>  - add SUNXI_GPADC_ prefixes for defines,
->>  - correct typo in Kconfig,
->>  - reorder alphabetically includes, makefile,
->>  - add license header,
->>  - fix architecture variations not being handled in interrupt handlers or
->>    read raw functions,
->>  - fix unability to return negative values from thermal sensor,
->>  - add gotos to reduce code repetition,
->>  - fix irq variable being unsigned int instead of int,
->>  - remove useless dev_err and dev_info,
->>  - deactivate all interrupts if probe fails,
->>  - fix iio_device_register on NULL variable,
->>  - deactivate ADC in the IP when probe fails or when removing driver,
+>> diff --git a/drivers/firmware/Kconfig b/drivers/firmware/Kconfig
+>> index 95b01f4..b9c2a33 100644
+>> --- a/drivers/firmware/Kconfig
+>> +++ b/drivers/firmware/Kconfig
+>> @@ -31,6 +31,26 @@ config ARM_SCPI_PROTOCOL
+>>         This protocol library provides interface for all the client drivers
+>>         making use of the features offered by the SCP.
 >>
->>  drivers/iio/adc/Kconfig           |  12 ++
->>  drivers/iio/adc/Makefile          |   1 +
->>  drivers/iio/adc/sunxi-gpadc-iio.c | 417 ++++++++++++++++++++++++++++++++++++++
->>  3 files changed, 430 insertions(+)
->>  create mode 100644 drivers/iio/adc/sunxi-gpadc-iio.c
->>
->> diff --git a/drivers/iio/adc/Kconfig b/drivers/iio/adc/Kconfig
->> index 25378c5..184856f 100644
->> --- a/drivers/iio/adc/Kconfig
->> +++ b/drivers/iio/adc/Kconfig
->> @@ -338,6 +338,18 @@ config NAU7802
->>  	  To compile this driver as a module, choose M here: the
->>  	  module will be called nau7802.
->>  
->> +config SUNXI_ADC
+>> +config LEGACY_SCPI_PROTOCOL
+>> +    bool "Legacy System Control and Power Interface (SCPI) Message Protocol"
 > 
-> We try to avoid the SUNXI prefix usually, otherwise this driver will
-> have a generic name (or at least is implicitly saying that it supports
-> all the sunxi SoCs), while it supports only a subset of those SoCs.
+> Do we really need to add another config ? I thought we could just manage
+> with compatibles.
 > 
-
-ACK. Will be replaced by SUN4I_GPADC.
-
->> +	tristate "ADC driver for sunxi platforms"
+>> +    default y if ARCH_MESON
+>> +    select ARM_SCPI_FW
+>> +    help
+>> +      System Control and Power Interface (SCPI) Message Protocol is
+>> +      defined for the purpose of communication between the Application
+>> +      Cores(AP) and the System Control Processor(SCP). The MHU peripheral
+>> +      provides a mechanism for inter-processor communication between SCP
+>> +      and AP.
 > 
-> And you should also mention which ADC is supported, since we usually
-> have several of them.
+> [...]
 > 
-> Something like "Support for the Allwinner SoCs GPADC"
+>> diff --git a/drivers/firmware/legacy_scpi.c b/drivers/firmware/legacy_scpi.c
+>> new file mode 100644
+>> index 0000000..4bd3ff7
+>> --- /dev/null
+>> +++ b/drivers/firmware/legacy_scpi.c
+>> @@ -0,0 +1,644 @@
 > 
-
-ACK.
-
->> +	depends on IIO
->> +	depends on MFD_SUNXI_ADC
+> [...]
 > 
-> The order of your patches is quite weird. You depend on an option that
-> is not present yet?
-> 
-
-ACK. Will modify the order of patches to reflect the real order.
-
->> +	help
->> +	  Say yes here to build support for Allwinner (A10, A13 and A31) SoCs
->> +	  ADC. This ADC provides 4 channels which can be used as an ADC or as a
->> +	  touchscreen input and one channel for thermal sensor.
 >> +
->> +          To compile this driver as a module, choose M here: the module will be
+>> +#define CMD_ID_SHIFT        0
+>> +#define CMD_ID_MASK        0x7f
+>> +#define CMD_SENDER_ID_SHIFT    8
+>> +#define CMD_SENDER_ID_MASK    0xff
 > 
-> Your indentation is weird here, and the wrapping is likely to be wrong
-> too.
-> 
+> Again this is something I introduced in the earlier driver. But from SCP
+> f/w perspective, it just sends that as is to the sender. I think we
+> retain token concept as is from the latest driver. Could you check
+> dropping them and check if f/w makes any assumption about these. It
+> should not IMO.
 
-ACK.
+I can check. I'm afraid it may check for these.
 
-[...]
->> @@ -0,0 +1,417 @@
->> +/* ADC driver for sunxi platforms
->> + *
->> + * Copyright (c) 2016 Quentin Schulz <quentin.schulz@free-electrons>
->> + *
->> + * This program is free software; you can redistribute it and/or modify it
->> + * under the terms of the GNU General Public License version 2 as published by
->> + * the Free Software Foundation.
-> 
-> Your wrapping is wrong.
-> 
-
-ACK.
-
->> + */
+>> +#define CMD_DATA_SIZE_SHIFT    20
+>> +#define CMD_DATA_SIZE_MASK    0x1ff
+>> +#define PACK_SCPI_CMD(cmd_id, sender, tx_sz)                \
+>> +    ((((cmd_id) & CMD_ID_MASK) << CMD_ID_SHIFT) |            \
+>> +    (((sender) & CMD_SENDER_ID_MASK) << CMD_SENDER_ID_SHIFT) |    \
+>> +    (((tx_sz) & CMD_DATA_SIZE_MASK) << CMD_DATA_SIZE_SHIFT))
 >> +
->> +#include <linux/completion.h>
->> +#include <linux/interrupt.h>
->> +#include <linux/io.h>
->> +#include <linux/module.h>
->> +#include <linux/of.h>
->> +#include <linux/of_device.h>
->> +#include <linux/platform_device.h>
->> +#include <linux/regmap.h>
+>> +#define CMD_SIZE(cmd)    (((cmd) >> CMD_DATA_SIZE_SHIFT) & CMD_DATA_SIZE_MASK)
+>> +#define CMD_UNIQ_MASK    (CMD_TOKEN_ID_MASK << CMD_TOKEN_ID_SHIFT | CMD_ID_MASK)
+>> +#define CMD_XTRACT_UNIQ(cmd)    ((cmd) & CMD_UNIQ_MASK)
 >> +
->> +#include <linux/iio/iio.h>
->> +#include <linux/iio/driver.h>
->> +#include <linux/iio/machine.h>
->> +#include <linux/mfd/sunxi-gpadc-mfd.h>
+>> +#define MAX_DVFS_DOMAINS    3
+>> +#define MAX_DVFS_OPPS        16
+>> +#define DVFS_LATENCY(hdr)    (le32_to_cpu(hdr) >> 16)
+>> +#define DVFS_OPP_COUNT(hdr)    ((le32_to_cpu(hdr) >> 8) & 0xff)
 >> +
->> +#define SUNXI_GPADC_TP_CTRL0			0x00
->> +#define SUNXI_GPADC_TP_CTRL1			0x04
->> +#define SUNXI_GPADC_TP_CTRL2			0x08
->> +#define SUNXI_GPADC_TP_CTRL3			0x0c
->> +#define SUNXI_GPADC_TP_TPR			0x18
->> +#define SUNXI_GPADC_TP_CDAT			0x1c
->> +#define SUNXI_GPADC_TEMP_DATA			0x20
->> +#define SUNXI_GPADC_TP_DATA			0x24
+>> +#define MAX_RX_TIMEOUT          (msecs_to_jiffies(30))
 >> +
->> +/* TP_CTRL0 bits */
->> +#define SUNXI_GPADC_ADC_FIRST_DLY(x)		((x) << 24) /* 8 bits */
->> +#define SUNXI_GPADC_ADC_FIRST_DLY_MODE		BIT(23)
->> +#define SUNXI_GPADC_ADC_CLK_SELECT		BIT(22)
->> +#define SUNXI_GPADC_ADC_CLK_DIVIDER(x)		((x) << 20) /* 2 bits */
->> +#define SUNXI_GPADC_FS_DIV(x)			((x) << 16) /* 4 bits */
->> +#define SUNXI_GPADC_T_ACQ(x)			((x) << 0)  /* 16 bits */
+>> +enum legacy_scpi_error_codes {
 > 
-> We usually prefer to have the bits defined directly after the
-> registers, and prefixed with the name of the register they belong to.
+> This along with many other defines are exactly same, not need to
+> duplicate them.
 > 
-> Something like SUNXI_GPADC_TP_CTRL_T_ACQ in this case
-> 
-
-This modification induces the name of the bits to be really long:
-SUNXI_GPADC_TP_CTRL1_SUN6I_TOUCH_PAN_CALI_EN for example. ACK anyway.
-
->> +
->> +/* TP_CTRL1 bits */
->> +#define SUNXI_GPADC_STYLUS_UP_DEBOUNCE(x)	((x) << 12) /* 8 bits */
->> +#define SUNXI_GPADC_STYLUS_UP_DEBOUNCE_EN	BIT(9)
->> +#define SUNXI_GPADC_TOUCH_PAN_CALI_EN		BIT(6)
->> +#define SUNXI_GPADC_TP_DUAL_EN			BIT(5)
->> +#define SUNXI_GPADC_TP_MODE_EN			BIT(4)
->> +#define SUNXI_GPADC_TP_ADC_SELECT		BIT(3)
->> +#define SUNXI_GPADC_ADC_CHAN_SELECT(x)		((x) << 0)  /* 3 bits */
-> 
-> Usually the comments are on the line above. However, if you really
-> want to enforce something, you should rather mask the
-> value. Otherwise, that comment is pretty useless.
-> 
-
-Do you mean something like that:
-#define SUNXI_GPADC_ADC_CHAN_SELECT(x)		(GENMASK(2,0) & x) ?
-
->> +
->> +/* TP_CTRL1 bits for sun6i SOCs */
->> +#define SUNXI_GPADC_SUN6I_TOUCH_PAN_CALI_EN	BIT(7)
->> +#define SUNXI_GPADC_SUN6I_TP_DUAL_EN		BIT(6)
->> +#define SUNXI_GPADC_SUN6I_TP_MODE_EN		BIT(5)
->> +#define SUNXI_GPADC_SUN6I_TP_ADC_SELECT		BIT(4)
-> 
-> Shouldn't that go in either a common define or the touchscreen driver?
-> 
-
-Then shouldn't I put all defines in a common header? (sunxi-gpadc-mfd.h)
-
-[...]
->> +/* TP_TPR bits */
->> +#define SUNXI_GPADC_TEMP_ENABLE(x)		((x) << 16)
->> +/* t = x * 256 * 16 / clkin */
-> 
-> That comment would be better next to the code that does that
-> computation.
-> 
-
-ACK.
-
-[...]
->> +	reinit_completion(&info->completion);
->> +	if (info->flags & SUNXI_GPADC_ARCH_SUN6I)
->> +		regmap_write(info->regmap, SUNXI_GPADC_TP_CTRL1,
->> +			     SUNXI_GPADC_SUN6I_TP_MODE_EN |
->> +			     SUNXI_GPADC_SUN6I_TP_ADC_SELECT |
->> +			     SUNXI_GPADC_SUN6I_ADC_CHAN_SELECT(channel));
->> +	else
->> +		regmap_write(info->regmap, SUNXI_GPADC_TP_CTRL1,
->> +			     SUNXI_GPADC_TP_MODE_EN |
->> +			     SUNXI_GPADC_TP_ADC_SELECT |
->> +			     SUNXI_GPADC_ADC_CHAN_SELECT(channel));
-> 
-> Using a function pointer that would compute this, or some fields in a
-> structure to store this would be better.
-> 
-
-ACK.
-
-[...]
->> +	if (info->flags & SUNXI_GPADC_ARCH_SUN4I)
->> +		*val = info->temp_data * 133 - 257000;
->> +	else if (info->flags & SUNXI_GPADC_ARCH_SUN5I)
->> +		*val = info->temp_data * 100 - 144700;
->> +	else if (info->flags & SUNXI_GPADC_ARCH_SUN6I)
->> +		*val = info->temp_data * 167 - 271000;
-> 
-> Ditto, having functions to comptue this and just store the function
-> pointer would be better.
-> 
-
-As Jonathan suggests, we should better go with separate read_raws
-(IIO_CHAN_RAW returns info->temp_data, INFO_CHAN_SCALE and
-INFO_CHAN_OFFSET return a different value depending on the
-architecture). So this would split the above code in separate functions
-as you wanted.
-
-[...]
->> +	irq = platform_get_irq_byname(pdev, "TEMP_DATA_PENDING");
->> +	if (irq < 0) {
->> +		dev_err(&pdev->dev,
->> +			"no TEMP_DATA_PENDING interrupt registered\n");
->> +		ret = irq;
->> +		goto err;
->> +	}
->> +
->> +	irq = regmap_irq_get_virq(sunxi_gpadc_mfd_dev->regmap_irqc, irq);
->> +	ret = devm_request_any_context_irq(&pdev->dev, irq,
->> +					   sunxi_gpadc_temp_data_irq_handler, 0,
->> +					   "temp_data", info);
->> +	if (ret < 0) {
->> +		dev_err(&pdev->dev,
->> +			"could not request TEMP_DATA_PENDING interrupt: %d\n",
->> +			ret);
->> +		goto err;
->> +	}
->> +
->> +	info->temp_data_irq = irq;
->> +	disable_irq(irq);
->> +
->> +	irq = platform_get_irq_byname(pdev, "FIFO_DATA_PENDING");
->> +	if (irq < 0) {
->> +		dev_err(&pdev->dev,
->> +			"no FIFO_DATA_PENDING interrupt registered\n");
->> +		ret = irq;
->> +		goto err;
->> +	}
->> +
->> +	irq = regmap_irq_get_virq(sunxi_gpadc_mfd_dev->regmap_irqc, irq);
->> +	ret = devm_request_any_context_irq(&pdev->dev, irq,
->> +					   sunxi_gpadc_fifo_data_irq_handler,
->> +					   0, "fifo_data", info);
->> +	if (ret < 0) {
->> +		dev_err(&pdev->dev,
->> +			"could not request FIFO_DATA_PENDING interrupt: %d\n",
->> +			ret);
->> +		goto err;
->> +	}
->> +
->> +	info->fifo_data_irq = irq;
->> +	disable_irq(irq);
-> 
-> request_irq starts with irq enabled, which means that you can have an
-> interrupt showing up between your call to request_irq and the
-> disable_irq. 
-> 
-> How would that work?
-> 
-
-Same as what I answered in Jonathan's mail:
-
-"Once the interrupt is activated, the IP performs continuous conversions
-(temp_data_irq only periodically). I want these interrupts to be enabled
-only when I read the sysfs file or we get useless interrupts.
-In the current state of this driver's irq handlers, I only set values in
-structures and all the needed structures are already initialized before
-requesting irqs. So it does not look like a race. I can prevent races in
-future versions by adding an atomic flag if wanted."
-
->> +
->> +	ret = iio_map_array_register(indio_dev, sunxi_gpadc_hwmon_maps);
->> +	if (ret < 0) {
->> +		dev_err(&pdev->dev, "failed to register iio map array\n");
->> +		goto err;
->> +	}
->> +
->> +	platform_set_drvdata(pdev, indio_dev);
->> +
->> +	ret = iio_device_register(indio_dev);
->> +	if (ret < 0) {
->> +		dev_err(&pdev->dev, "could not register the device\n");
->> +		iio_map_array_unregister(indio_dev);
-> 
-> That should go in a separate label.
-> 
-
-ACK.
-
->> +		goto err;
->> +	}
->> +
->> +	return 0;
->> +
->> +err:
->> +	regmap_write(info->regmap, SUNXI_GPADC_TP_CTRL1, 0);
->> +	regmap_write(info->regmap, SUNXI_GPADC_TP_TPR, 0);
-> 
-> Why is that needed?
-> 
-
-This disables ADC and Temperature on the hardware side of the IP.
-(mainly a shortcut to SUNXI_GPADC_TP_MODE_EN (or its architecture
-variant) and SUNXI_GPADC_TEMP_ENABLE set to 0.
-
->> +	return ret;
->> +}
->> +
->> +static int sunxi_gpadc_remove(struct platform_device *pdev)
->> +{
->> +	struct sunxi_gpadc_dev *info;
->> +	struct iio_dev *indio_dev = platform_get_drvdata(pdev);
->> +
->> +	info = iio_priv(indio_dev);
->> +	iio_device_unregister(indio_dev);
->> +	iio_map_array_unregister(indio_dev);
->> +	regmap_write(info->regmap, SUNXI_GPADC_TP_INT_FIFOC, 0);
->> +	regmap_write(info->regmap, SUNXI_GPADC_TP_CTRL1, 0);
->> +	regmap_write(info->regmap, SUNXI_GPADC_TP_TPR, 0);
->> +
->> +	return 0;
->> +}
->> +
->> +static const struct platform_device_id sunxi_gpadc_id[] = {
->> +	{ "sun4i-a10-gpadc-iio", SUNXI_GPADC_ARCH_SUN4I },
->> +	{ "sun5i-a13-gpadc-iio", SUNXI_GPADC_ARCH_SUN5I },
->> +	{ "sun6i-a31-gpadc-iio", SUNXI_GPADC_ARCH_SUN6I },
->> +	{ /* sentinel */ },
+>> +    SCPI_SUCCESS = 0, /* Success */
+>> +    SCPI_ERR_PARAM = 1, /* Invalid parameter(s) */
+>> +    SCPI_ERR_ALIGN = 2, /* Invalid alignment */
+>> +    SCPI_ERR_SIZE = 3, /* Invalid size */
+>> +    SCPI_ERR_HANDLER = 4, /* Invalid handler/callback */
+>> +    SCPI_ERR_ACCESS = 5, /* Invalid access/permission denied */
+>> +    SCPI_ERR_RANGE = 6, /* Value out of range */
+>> +    SCPI_ERR_TIMEOUT = 7, /* Timeout has occurred */
+>> +    SCPI_ERR_NOMEM = 8, /* Invalid memory area or pointer */
+>> +    SCPI_ERR_PWRSTATE = 9, /* Invalid power state */
+>> +    SCPI_ERR_SUPPORT = 10, /* Not supported or disabled */
+>> +    SCPI_ERR_DEVICE = 11, /* Device error */
+>> +    SCPI_ERR_BUSY = 12, /* Device busy */
+>> +    SCPI_ERR_MAX
 >> +};
 >> +
->> +static struct platform_driver sunxi_gpadc_driver = {
->> +	.driver = {
->> +		.name = "sunxi-gpadc-iio",
->> +	},
->> +	.id_table = sunxi_gpadc_id,
->> +	.probe = sunxi_gpadc_probe,
->> +	.remove = sunxi_gpadc_remove,
+>> +enum legacy_scpi_client_id {
+> 
+> Could be removed as mentioned above ?
+> 
+>> +    SCPI_CL_NONE,
+>> +    SCPI_CL_CLOCKS,
+>> +    SCPI_CL_DVFS,
+>> +    SCPI_CL_POWER,
+>> +    SCPI_CL_THERMAL,
+>> +    SCPI_CL_REMOTE,
+>> +    SCPI_CL_LED_TIMER,
+>> +    SCPI_MAX,
 >> +};
+>> +
+>> +enum legacy_scpi_std_cmd {
+>> +    SCPI_CMD_INVALID        = 0x00,
+>> +    SCPI_CMD_SCPI_READY        = 0x01,
+>> +    SCPI_CMD_SCPI_CAPABILITIES    = 0x02,
+>> +    SCPI_CMD_EVENT            = 0x03,
+>> +    SCPI_CMD_SET_CSS_PWR_STATE    = 0x04,
+>> +    SCPI_CMD_GET_CSS_PWR_STATE    = 0x05,
+>> +    SCPI_CMD_CFG_PWR_STATE_STAT    = 0x06,
+>> +    SCPI_CMD_GET_PWR_STATE_STAT    = 0x07,
+>> +    SCPI_CMD_SYS_PWR_STATE        = 0x08,
+>> +    SCPI_CMD_L2_READY        = 0x09,
+>> +    SCPI_CMD_SET_AP_TIMER        = 0x0a,
+>> +    SCPI_CMD_CANCEL_AP_TIME        = 0x0b,
+>> +    SCPI_CMD_DVFS_CAPABILITIES    = 0x0c,
+>> +    SCPI_CMD_GET_DVFS_INFO        = 0x0d,
+>> +    SCPI_CMD_SET_DVFS        = 0x0e,
+>> +    SCPI_CMD_GET_DVFS        = 0x0f,
+>> +    SCPI_CMD_GET_DVFS_STAT        = 0x10,
+>> +    SCPI_CMD_SET_RTC        = 0x11,
+>> +    SCPI_CMD_GET_RTC        = 0x12,
+>> +    SCPI_CMD_CLOCK_CAPABILITIES    = 0x13,
+>> +    SCPI_CMD_SET_CLOCK_INDEX    = 0x14,
+>> +    SCPI_CMD_SET_CLOCK_VALUE    = 0x15,
+>> +    SCPI_CMD_GET_CLOCK_VALUE    = 0x16,
+>> +    SCPI_CMD_PSU_CAPABILITIES    = 0x17,
+>> +    SCPI_CMD_SET_PSU        = 0x18,
+>> +    SCPI_CMD_GET_PSU        = 0x19,
+>> +    SCPI_CMD_SENSOR_CAPABILITIES    = 0x1a,
+>> +    SCPI_CMD_SENSOR_INFO        = 0x1b,
+>> +    SCPI_CMD_SENSOR_VALUE        = 0x1c,
+>> +    SCPI_CMD_SENSOR_CFG_PERIODIC    = 0x1d,
+>> +    SCPI_CMD_SENSOR_CFG_BOUNDS    = 0x1e,
+>> +    SCPI_CMD_SENSOR_ASYNC_VALUE    = 0x1f,
+>> +    SCPI_CMD_COUNT
+>> +};
+>> +
+>> +struct legacy_scpi_xfer {
+>> +    u32 cmd;
+>> +    u32 status;
+>> +    const void *tx_buf;
+>> +    void *rx_buf;
+>> +    unsigned int tx_len;
+>> +    unsigned int rx_len;
+>> +    struct completion done;
+>> +};
+>> +
+>> +struct legacy_scpi_chan {
+>> +    struct mbox_client cl;
+>> +    struct mbox_chan *chan;
+>> +    void __iomem *tx_payload;
+>> +    void __iomem *rx_payload;
+>> +    spinlock_t rx_lock; /* locking for the rx pending list */
+>> +    struct mutex xfers_lock;
+>> +    struct legacy_scpi_xfer t;
+>> +};
+>> +
+>> +struct legacy_scpi_drvinfo {
+>> +    int num_chans;
+>> +    struct legacy_scpi_chan *channels;
+>> +    struct scpi_dvfs_info *dvfs[MAX_DVFS_DOMAINS];
+>> +};
+>> +
 > 
-> Having some runtime_pm support for this would be great too.
+> Even these data structures could remain, and mended wherever needed or
+> an alternate can be added at worse. Complete copy paste seems
+> unnecessary to me.
+> 
+>> +    legacy_scpi_info->channels = legacy_scpi_chan;
+>> +    legacy_scpi_info->num_chans = count;
+>> +    platform_set_drvdata(pdev, legacy_scpi_info);
+>> +
+>> +    ret = devm_scpi_ops_register(dev, &legacy_scpi_ops);
+> 
+> Though the concept of registering scpi ops is really nice, I think we
+> may not require that for support this legacy scpi protocol.
+> 
+> In general, I see lot of code duplication, can you try not add another
+> file or config and introduce the legacy support into arm_scpi.c itself ?
 > 
 
-Basically disabling the ADC and interrupts (as in the remove) in
-_suspend and _idle and reenabling everything in "before _suspend"-state
-in _resume I guess?
+I can try but it will create a spaguetti monster since the core functions will be duplicated.
+I really think the official scpi driver should follow it's path and stay clean and reliable,
+and create a side-monster to support the ugly legacy based firmware for Amlogic and Rockchip.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160719/c5f00a2e/attachment-0001.sig>
+The point is to find a way to share the scpi resource drivers in common !
+
+Neil
