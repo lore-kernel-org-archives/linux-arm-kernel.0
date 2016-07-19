@@ -1,48 +1,56 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Tue, 19 Jul 2016 11:29:34 -0400
-Subject: [PATCH V10 4/9] vfio: platform: add support for ACPI probe
-In-Reply-To: <20160719092819.0334c607@t450s.home>
-References: <1468883367-2854-1-git-send-email-okaya@codeaurora.org>
- <1468883367-2854-5-git-send-email-okaya@codeaurora.org>
- <20160718180049.78db3dfb@t450s.home>
- <b4655a0ba9152e6b2951e379e1615dad@codeaurora.org>
- <20160718182448.7b11a7af@t450s.home>
- <73439c6b-c9fc-6a5d-c90c-6b8d5cd5f3f5@codeaurora.org>
- <20160719092819.0334c607@t450s.home>
-Message-ID: <055ee380-a6a2-7272-28cb-f463eb663a11@codeaurora.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 19 Jul 2016 17:38:51 +0200
+Subject: [PATCH v2 05/11] Kbuild: don't add obj tree in additional includes
+In-Reply-To: <87a8hdae9j.fsf@purkki.adurom.net>
+References: <20160615154553.3177021-1-arnd@arndb.de>
+ <21521763.EfAflxWUP8@wuerfel> <87a8hdae9j.fsf@purkki.adurom.net>
+Message-ID: <3906958.MrNt71DzrU@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7/19/2016 11:28 AM, Alex Williamson wrote:
-> On Tue, 19 Jul 2016 10:49:54 -0400
-> Sinan Kaya <okaya@codeaurora.org> wrote:
+On Tuesday, July 19, 2016 5:33:44 PM CEST Kalle Valo wrote:
+> Arnd Bergmann <arnd@arndb.de> writes:
 > 
->> On 7/18/2016 8:24 PM, Alex Williamson wrote:
->>>>> nit, might make sense to replace EPERM with ENOENT and use EINVAL here.  
->>>>>>>     
->>>>>
->>>>> Sure, will take carr of it.
->>>>>
->>>>> Anything else I need to take care of?  
->>> Not that I see, maybe just send a new version of this patch if the
->>> changes don't trickle through too much.  Thanks,  
->>
->> I posted V11 with the discussed change. 
->>
->> [PATCH V11 0/9] vfio, platform: add ACPI support
->>
->> Do you see this making to 4.8 kernel?
+> > On Monday, July 18, 2016 10:14:39 PM CEST Michal Marek wrote:
+> >> On Wed, Jun 15, 2016 at 05:45:47PM +0200, Arnd Bergmann wrote:
+> >> > When building with separate object directories and driver specific
+> >> > Makefiles that add additional header include paths, Kbuild adjusts
+> >> > the gcc flags so that we include both the directory in the source
+> >> > tree and in the object tree.
+> >> > 
+> >> > However, due to another bug I fixed earlier, this did not actually
+> >> > include the correct directory in the object tree, so we know that
+> >> > we only really need the source tree here. Also, including the
+> >> > object tree sometimes causes warnings about nonexisting directories
+> >> > when the include path only exists in the source.
+> >> > 
+> >> > This changes the logic to only emit the -I argument for the srctree,
+> >> > not for objects. We still need both $(srctree)/$(src) and $(obj)
+> >> > though, so I'm adding them manually.
+> >> > 
+> >> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> >> 
+> >> Hi Arnd,
+> >> 
+> >> I applied the series up to this patch to kbuild.git#kbuild. The rest
+> >> seem to be related but not dependent patches, so I'll leave it up to the
+> >> respective maintainers to pick them up. Is that OK with you?
+> >
+> > I think that's fine, a couple were already picked up, and what I have
+> > left now is
+> >
+> > a281bfa5713a [SUBMITTED 20160615] [EXPERIMENTAL] Kbuild: enable -Wmissing-include-dirs by default
+> > 83934921e68e [SUBMITTED 20160615] rtlwifi: don't add include path for rtl8188ee
 > 
+> Apparently[1] you didn't CC linux-wireless and that's why I didn't see
+> the rtlwifi patch in wireless patchwork. Care to resend?
 > 
-> I hope so, I'll try to get it into my next branch within the next day
-> or so.  Thanks,
-> 
-> Alex
+> [1] https://patchwork.kernel.org/patch/9178861/
 > 
 
-Thank you.
+Done. I've also thrown in two patches for drivers/staging/rtl8*/ that I submitted
+a while ago, but I'm not sure if they should get merged through the staging
+tree or the wireless tree. I had previously submitted those two as a combined
+patch along with a third one that turned out to be unnecessary.
 
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+	Arnd
