@@ -1,40 +1,34 @@
-From: quentin.schulz@free-electrons.com (Quentin Schulz)
-Date: Tue, 19 Jul 2016 10:35:46 +0200
-Subject: [PATCH v2 3/4] mfd: add support for Allwinner SoCs ADC
-In-Reply-To: <de8ebab2-cde9-d209-3c9a-e1868fafb84b@kernel.org>
-References: <1468576754-3273-1-git-send-email-quentin.schulz@free-electrons.com>
- <1468576754-3273-4-git-send-email-quentin.schulz@free-electrons.com>
- <de8ebab2-cde9-d209-3c9a-e1868fafb84b@kernel.org>
-Message-ID: <578DE662.90007@free-electrons.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 19 Jul 2016 10:43:49 +0200
+Subject: [PATCH] dmaengine: zynqmp_dma: add missing MODULE_LICENSE
+Message-ID: <20160719084422.3304865-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/07/2016 15:25, Jonathan Cameron wrote:
-> On 15/07/16 10:59, Quentin Schulz wrote:
->> The Allwinner SoCs all have an ADC that can also act as a touchscreen
->> controller and a thermal sensor. For now, only the ADC and the thermal
->> sensor drivers are probed by the MFD, the touchscreen controller support
->> will be added later.
->>
->> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
-> Hmm. Previous patch includes the header this one creates.  Ordering issue?
-> The depends kind of prevents build failures by ensuring that can't be built
-> until this one is in place, but it is certainly an ugly way to do it.
-> 
-> Few little bits innline.
-[...]
->> +static int sunxi_gpadc_mfd_probe(struct platform_device *pdev)
->> +{
->> +	struct sunxi_gpadc_mfd_dev *sunxi_gpadc_mfd_dev = NULL;
->> +	struct resource *mem = NULL;
-> Neither of the above assignments is necessary as both will be explicitly
-> assigned before they are otherwise used.
+We get a warning about the missing MODULE_LICENSE tag for this newly
+added driver module:
 
-ACK.
+WARNING: modpost: missing MODULE_LICENSE() in drivers/dma/xilinx/zynqmp_dma.o
+see include/linux/module.h for more information
 
-[...]
->> +	dev_info(&pdev->dev, "successfully loaded\n");
-> Seems like noise to me, but not my subsystem :)
+This adds a "GPL" license, matching the "version 2 or later" information in
+the comment at the start of the file.
 
-ACK.
-[...]
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ drivers/dma/xilinx/zynqmp_dma.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/dma/xilinx/zynqmp_dma.c b/drivers/dma/xilinx/zynqmp_dma.c
+index f777a5bc0db8..693474f5f2e5 100644
+--- a/drivers/dma/xilinx/zynqmp_dma.c
++++ b/drivers/dma/xilinx/zynqmp_dma.c
+@@ -1141,5 +1141,6 @@ static struct platform_driver zynqmp_dma_driver = {
+ 
+ module_platform_driver(zynqmp_dma_driver);
+ 
++MODULE_LICENSE("GPL");
+ MODULE_AUTHOR("Xilinx, Inc.");
+ MODULE_DESCRIPTION("Xilinx ZynqMP DMA driver");
+-- 
+2.9.0
