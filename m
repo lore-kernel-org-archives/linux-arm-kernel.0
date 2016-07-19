@@ -1,37 +1,35 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 19 Jul 2016 12:22:41 +0100
-Subject: Is THREAD_INFO_IN_TASK appropriate for -mm for 4.8?
-In-Reply-To: <CALCETrUf_7=Tr4JrDj+3UPT5kUT1MsRtypvfqkOg_MVHAJu=PA@mail.gmail.com>
-References: <CALCETrUf_7=Tr4JrDj+3UPT5kUT1MsRtypvfqkOg_MVHAJu=PA@mail.gmail.com>
-Message-ID: <20160719112223.GA20476@leverpostej>
+From: weiyj_lk@163.com (Wei Yongjun)
+Date: Tue, 19 Jul 2016 11:23:24 +0000
+Subject: [PATCH -next] net: axienet: Fix return value check in axienet_probe()
+Message-ID: <1468927404-32270-1-git-send-email-weiyj_lk@163.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 18, 2016 at 04:47:39PM -0700, Andy Lutomirski wrote:
-> Hi all-
-> 
-> There are four core patches needed for the THREAD_INFO_IN_TASK thing,
-> and they apply cleanly to -mm now.  The x86 patch to flip the feature
-> on does not apply cleanly anywhere because it depends on changes in
-> -tip *and* in -mm.  I'd like to get all of this as well as the rest of
-> the vmap-stacks stuff in by 4.9, but I'm wondering if it might make
-> sense to get the core THREAD_INFO_IN_TASK stuff into -mm for 4.8
-> instead.
-> 
-> Pros:
->  - It reduces the amount of core code that -tip will have to carry until 4.9.
->  - It may benefit other architectures.  Christian Borntraeger
-> expressed an interest in enabling the feature for s390, but it'll be
-> awkward for him until the core bit landed.  Similarly, arm64 seems to
-> be interested.
+From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 
-This would probably be useful for arm64.
+In case of error, the function of_parse_phandle() returns NULL
+pointer not ERR_PTR(). The IS_ERR() test in the return value
+check should be replaced with NULL test.
 
-There's still a reasonable amount to figure out (e.g. [1,2]), so from my
-PoV this is a nice-to-have, but there's no pressure.
+Fixes: 46aa27df8853 ('net: axienet: Use devm_* calls')
+Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+---
+ drivers/net/ethernet/xilinx/xilinx_axienet_main.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Thanks,
-Mark.
-
-[1] https://lkml.org/lkml/2016/7/11/193
-[2] https://lkml.org/lkml/2016/7/11/483
+diff --git a/drivers/net/ethernet/xilinx/xilinx_axienet_main.c b/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
+index 9c82993..36ee7ab 100644
+--- a/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
++++ b/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
+@@ -1541,9 +1541,9 @@ static int axienet_probe(struct platform_device *pdev)
+ 
+ 	/* Find the DMA node, map the DMA registers, and decode the DMA IRQs */
+ 	np = of_parse_phandle(pdev->dev.of_node, "axistream-connected", 0);
+-	if (IS_ERR(np)) {
++	if (!np) {
+ 		dev_err(&pdev->dev, "could not find DMA node\n");
+-		ret = PTR_ERR(np);
++		ret = -ENODEV;
+ 		goto free_netdev;
+ 	}
+ 	ret = of_address_to_resource(np, 0, &dmares);
