@@ -1,63 +1,63 @@
-From: vigneshr@ti.com (R, Vignesh)
-Date: Tue, 19 Jul 2016 18:34:40 +0530
-Subject: [RFC PATCH 1/2] Input: rotary-encoder- Add support for absolute
- encoder
-In-Reply-To: <576283AF.9090107@ti.com>
-References: <1463648641-6931-1-git-send-email-vigneshr@ti.com>
- <1463648641-6931-2-git-send-email-vigneshr@ti.com>
- <20160520163404.GC14951@dtor-ws> <5742CB03.8010805@ti.com>
- <574565ED.3060205@ti.com> <576283AF.9090107@ti.com>
-Message-ID: <70fe4260-ffec-e069-25c6-bcc93ccbfb0a@ti.com>
+From: eric.auger@redhat.com (Eric Auger)
+Date: Tue, 19 Jul 2016 13:11:27 +0000
+Subject: [PATCH v11 1/8] vfio: introduce a vfio_dma type field
+In-Reply-To: <1468933894-23250-1-git-send-email-eric.auger@redhat.com>
+References: <1468933894-23250-1-git-send-email-eric.auger@redhat.com>
+Message-ID: <1468933894-23250-2-git-send-email-eric.auger@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dmitry,
+We introduce a vfio_dma type since we will need to discriminate
+different types of dma slots:
+- VFIO_IOVA_USER: IOVA region used to map user vaddr
+- VFIO_IOVA_RESERVED_MSI: IOVA region reserved to map MSI doorbells
 
-On 6/16/2016 4:17 PM, Vignesh R wrote:
-[...]
->>> On 5/20/2016 10:04 PM, Dmitry Torokhov wrote:
->>>> On Thu, May 19, 2016 at 02:34:00PM +0530, Vignesh R wrote:
->>>>> There are rotary-encoders where GPIO lines reflect the actual position
->>>>> of the rotary encoder dial. For example, if dial points to 9, then four
->>>>> GPIO lines connected to the rotary encoder will read HLLH(1001b = 9).
->>>>> Add support for such rotary-encoder.
->>>>> The driver relies on rotary-encoder,absolute-encoder DT property to
->>>>> detect such encoders.
->>>>> Since, GPIO IRQs are not necessary to work with
->>>>> such encoders, optional polling mode support is added using
->>>>> input_poll_dev skeleton. This is can be used by enabling
->>>>> CONFIG_INPUT_GPIO_ROTARY_ENCODER_POLL_MODE_SUPPORT.
->>>>
->>>> Does this really belong to a rotary encoder and not a new driver that
->>>> simply translates gpio-encoded value into ABS* event?
->>>>
->>>
->>> Currently rotary encoder driver only supports incremental/step counting
->>> rotary devices. However, the device that is there on am335x-ice is an
->>> absolute encoder but, IMO, nevertheless a kind of rotary encoder. The
->>> only difference is that there is no need to count steps and the absolute
->>> position value is always available as binary encoded state of connected
->>> GPIOs.
->>> The hardware on am335x-ice is a mechanical rotary encoder switch
->>> connected over 4 GPIOs. It is same as binary encoder described at [1]
->>> (except there are 4 GPIO lines), so this lead me to add support in
->>> rotary-encoder.
->>>
->>> [1]https://en.wikipedia.org/wiki/Rotary_encoder#Standard_binary_encoding
->>>
->>
->> Could you please comment on how would you like to support above
->> described encoder: As a new driver or with existing driver with new
->> compatible/mode setting via DT or as suggest by Uwe in another reply?
->> IMHO, supporting using existing driver with new mode/compatible string
->> looks a better option as the hardware is a kind of rotary-encoder.
->>
+Signed-off-by: Eric Auger <eric.auger@redhat.com>
 
-Could you please suggest the right solution here? Do you think new
-driver is need to support above described absolute encoder h/w? It would
-be great to have your input now, so that I can work on the new set of
-patches and submit them for v4.9 merge window as soon as v4.8 merge
-window closes?
+---
+v9 -> v10:
+- renamed VFIO_IOVA_RESERVED into VFIO_IOVA_RESERVED_MSI
+- explicitly set type to VFIO_IOVA_USER on dma_map
 
-Regards
-Vignesh
+v6 -> v7:
+- add VFIO_IOVA_ANY
+- do not introduce yet any VFIO_IOVA_RESERVED handling
+---
+ drivers/vfio/vfio_iommu_type1.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/drivers/vfio/vfio_iommu_type1.c b/drivers/vfio/vfio_iommu_type1.c
+index 2ba1942..a9f8b93 100644
+--- a/drivers/vfio/vfio_iommu_type1.c
++++ b/drivers/vfio/vfio_iommu_type1.c
+@@ -53,6 +53,12 @@ module_param_named(disable_hugepages,
+ MODULE_PARM_DESC(disable_hugepages,
+ 		 "Disable VFIO IOMMU support for IOMMU hugepages.");
+ 
++enum vfio_iova_type {
++	VFIO_IOVA_USER = 0,	/* standard IOVA used to map user vaddr */
++	VFIO_IOVA_RESERVED_MSI,	/* reserved to map MSI doorbells */
++	VFIO_IOVA_ANY,		/* matches any IOVA type */
++};
++
+ struct vfio_iommu {
+ 	struct list_head	domain_list;
+ 	struct mutex		lock;
+@@ -75,6 +81,7 @@ struct vfio_dma {
+ 	unsigned long		vaddr;		/* Process virtual addr */
+ 	size_t			size;		/* Map size (bytes) */
+ 	int			prot;		/* IOMMU_READ/WRITE */
++	enum vfio_iova_type	type;		/* type of IOVA */
+ };
+ 
+ struct vfio_group {
+@@ -607,6 +614,7 @@ static int vfio_dma_do_map(struct vfio_iommu *iommu,
+ 	dma->iova = iova;
+ 	dma->vaddr = vaddr;
+ 	dma->prot = prot;
++	dma->type = VFIO_IOVA_USER;
+ 
+ 	/* Insert zero-sized and grow as we map chunks of it */
+ 	vfio_link_dma(iommu, dma);
+-- 
+1.9.1
