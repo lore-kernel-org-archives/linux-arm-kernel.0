@@ -1,48 +1,18 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Wed, 20 Jul 2016 10:45:01 +1000
-Subject: linux-next: manual merge of the fsl tree with the arm-soc tree
-Message-ID: <20160720104501.02bd5a2a@canb.auug.org.au>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 19 Jul 2016 20:04:34 -0500
+Subject: [PATCH 1/4] doc: usb: usbmisc-imx: add imx7d compatible string
+In-Reply-To: <1468840547-17899-1-git-send-email-jun.li@nxp.com>
+References: <1468840547-17899-1-git-send-email-jun.li@nxp.com>
+Message-ID: <20160720010434.GA475@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Scott,
+On Mon, Jul 18, 2016 at 07:15:44PM +0800, Li Jun wrote:
+> Add compatible string for imx7d-usbmisc.
+> 
+> Signed-off-by: Li Jun <jun.li@nxp.com>
+> ---
+>  Documentation/devicetree/bindings/usb/usbmisc-imx.txt | 1 +
+>  1 file changed, 1 insertion(+)
 
-Today's linux-next merge of the fsl tree got a conflict in:
-
-  drivers/soc/Kconfig
-
-between commit:
-
-  34642650e5bc ("soc: Move brcmstb to bcm/brcmstb")
-
-from the arm-soc tree and commit:
-
-  82117b4a8897 ("soc: fsl: add GUTS driver for QorIQ platforms")
-
-from the fsl tree.
-
-I fixed it up (see below) and can carry the fix as necessary. This
-is now fixed as far as linux-next is concerned, but any non trivial
-conflicts should be mentioned to your upstream maintainer when your tree
-is submitted for merging.  You may also want to consider cooperating
-with the maintainer of the conflicting tree to minimise any particularly
-complex conflicts.
-
--- 
-Cheers,
-Stephen Rothwell
-
-diff --cc drivers/soc/Kconfig
-index fe42a2fdf351,7106463f118e..000000000000
---- a/drivers/soc/Kconfig
-+++ b/drivers/soc/Kconfig
-@@@ -1,7 -1,8 +1,7 @@@
-  menu "SOC (System On Chip) specific Drivers"
-  
-  source "drivers/soc/bcm/Kconfig"
-- source "drivers/soc/fsl/qe/Kconfig"
- -source "drivers/soc/brcmstb/Kconfig"
-+ source "drivers/soc/fsl/Kconfig"
-  source "drivers/soc/mediatek/Kconfig"
-  source "drivers/soc/qcom/Kconfig"
-  source "drivers/soc/rockchip/Kconfig"
+Acked-by: Rob Herring <robh@kernel.org>
