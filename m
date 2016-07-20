@@ -1,57 +1,70 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 20 Jul 2016 14:36:12 +0100
-Subject: SOC-specific action for irq_set_wake
-In-Reply-To: <20160720131606.GJ3847@xsjsorenbubuntu>
-References: <20160719181804.GX3847@xsjsorenbubuntu>
- <20160719224713.GA13533@hector.attlocal.net>
- <20160719233440.GG3847@xsjsorenbubuntu> <578F338C.40309@arm.com>
- <20160720131606.GJ3847@xsjsorenbubuntu>
-Message-ID: <578F7E4C.9040407@arm.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Wed, 20 Jul 2016 16:40:14 +0300
+Subject: [PATCH 2/2] ARM: dts: r8a7792: add SDHI support
+In-Reply-To: <CAMuHMdUUZ=gopWOir9PMiDgJ8o+CMp+qG=FLhGg_gHrMYzwgFg@mail.gmail.com>
+References: <2441635.ESeLhIjWEX@wasted.cogentembedded.com>
+ <8030361.FnpbGzHVP8@wasted.cogentembedded.com>
+ <20160717225842.GA25133@verge.net.au>
+ <cece2545-52f9-7ddb-36d2-df364a272092@cogentembedded.com>
+ <CAMuHMdUUZ=gopWOir9PMiDgJ8o+CMp+qG=FLhGg_gHrMYzwgFg@mail.gmail.com>
+Message-ID: <e6246060-fa54-37c1-949d-b93da109dbb9@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi S?ren,
+On 07/20/2016 11:07 AM, Geert Uytterhoeven wrote:
 
-On 20/07/16 14:16, S?ren Brinkmann wrote:
-> Hi Marc,
-
->>>>> Does anybody have similar problems and probably already solved it?
->>>>> Any other suggestions for approaching the problem? Any preferred
->>>>> solution?
+>>>> --- renesas.orig/arch/arm/boot/dts/r8a7792.dtsi
+>>>> +++ renesas/arch/arm/boot/dts/r8a7792.dtsi
+>>>> @@ -435,6 +435,18 @@
+>>>>                         status = "disabled";
+>>>>                 };
 >>>>
->>>> I think we have the same problem.  Can you provide more detail on the hardware
->>>> implementation of your wake irq controller?  I presume you have some set of
->>>> registers, an irq maybe, and some other stuff?  And how does it fit into the
->>>> overall architecture from a hardware perspective?
+>>>> +               sdhi0: sd at ee100000 {
+>>>> +                       compatible = "renesas,sdhi-r8a7792";
+>>>> +                       reg = <0 0xee100000 0 0x200>;
 >>>
->>> We have essentially a whole second interrupt controller. All IRQs are
->>> connected to the A53 GIC and this second interrupt controller that is
->>> controlled by the companion core. The companion core is supposed to be
->>> informed about what source the A53 needs to wake up on and will program
->>> this second IRQ controller, etc.
+>>>
+>>> I do not have the documentation available to check,
 >>
->> So your "special case" is exactly like everyone else's. Implement it as
->> a hierarchical chip on top of the GIC, just like Tegra, OMAP, iMX6,
->> Exynos and a few others. Unless you implement PSCI.
-> 
-> I didn't really think that our case is unique. I was just looking for
-> some pointers into the right direction as the extension mechanism that I
-> remembered disappeared and I haven't been following the development
-> closely enough to just know what alternatives are available.
-> So, you say the approach of letting the secure monitor infer the wake
-> IRQ by reading the GIC config is preferred over handling it as
-> hierarchical chip within Linux?
+>>    Me nether. The SDHI .zip only includes the manual for E2, H2, and M2.
+>>
+>>> however, I wonder if
+>>> as per 66f47ed0e86d ("ARM: shmobile: r8a7790: tidyup SDHI register size on
+>>> DTSI") the register size should be 0x328.
+>>
+>>    I just don't know...
+>
+>>>> +                       interrupts = <0 165 IRQ_TYPE_LEVEL_HIGH>;
+>>>> +                       dmas = <&dmac0 0xcd>, <&dmac0 0xce>,
+>>>> +                              <&dmac1 0xcd>, <&dmac1 0xce>;
+>>>> +                       dma-names = "tx", "rx", "tx", "rx";
+>>>> +                       clocks = <&mstp3_clks R8A7792_CLK_SDHI0>;
+>>>> +                       power-domains = <&sysc R8A7792_PD_ALWAYS_ON>;
+>>>> +                       status = "disabled";
+>>>> +               };
+>>>> +
+>>>>                 jpu: jpeg-codec at fe980000 {
+>>>>                         compatible = "renesas,jpu-r8a7792",
+>>>>                                      "renesas,rcar-gen2-jpu";
+>>
+>>    I also wonder whether whether a single per-SoC SDHI "compatible" is
+>> valid. The registers and their offsets seem to differ b/w SDHI0 and the
+>> other SDHI cores...
+>
+> There's version register.
+>
+> BTW, given SDHI on V2H doesn't support SDR50/SDR104, unlike the instances
+> on other R-Car Gen2 SoCs, can you please tell us the version value, as read
+> from CTL_VERSION in sh_mobile_sdhi_sdbuf_width()?
 
-The in-kernel approach is a consequence of the firmware-less 32bit
-configuration. Hopefully, we won't see anything like that anymore.
-Fingers crossed.
+    It's 0xCB0D, the same as on other SoCs.
 
-So the firmware approach is clearly the preferred one on arm64, as it
-simplifies absolutely everything (and your power management has to know
-about all of this anyway).
+> Thanks!
 
-Thanks,
+    Not at all. :-)
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+> Gr{oetje,eeting}s,
+>
+>                         Geert
+
+MBR, Sergei
