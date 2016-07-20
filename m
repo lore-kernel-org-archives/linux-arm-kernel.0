@@ -1,86 +1,47 @@
-From: dennis.chen@arm.com (Dennis Chen)
-Date: Wed, 20 Jul 2016 11:48:40 +0800
-Subject: [PATCH v22 1/8] arm64: kdump: reserve memory for crash dump kernel
-In-Reply-To: <20160719132736.GB21007@leverpostej>
-References: <20160712050514.22307-1-takahiro.akashi@linaro.org>
- <20160712050514.22307-2-takahiro.akashi@linaro.org>
- <20160719093906.GA20732@arm.com>
- <20160719102815.GE20774@linaro.org>
- <20160719104103.GB20990@arm.com>
- <1468932537.27473.6.camel@redhat.com>
- <20160719132736.GB21007@leverpostej>
-Message-ID: <20160720034838.GB30575@arm.com>
+From: motobud@gmail.com (Brent Taylor)
+Date: Tue, 19 Jul 2016 22:58:40 -0500
+Subject: at_xdmac: txd used outside spinlock after being released?
+Message-ID: <CAP+RiCAXKmFAzWoow_g=LR=tML7kxAi_dG0w4Z6X9KrvSypD9w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 19, 2016 at 02:27:54PM +0100, Mark Rutland wrote:
-> On Tue, Jul 19, 2016 at 08:48:57AM -0400, Mark Salter wrote:
-> > On Tue, 2016-07-19 at 18:41 +0800, Dennis Chen wrote:
-> > > On Tue, Jul 19, 2016 at 07:28:16PM +0900, AKASHI Takahiro wrote:
-> > > > On Tue, Jul 19, 2016 at 05:39:07PM +0800, Dennis Chen wrote:
-> > > > > On Tue, Jul 12, 2016 at 02:05:07PM +0900, AKASHI Takahiro wrote:
-> > > > > > +/*
-> > > > > > + * reserve_crashkernel() - reserves memory for crash kernel
-> > > > > > + *
-> > > > > > + * This function reserves memory area given in "crashkernel=" kernel command
-> > > > > > + * line parameter. The memory reserved is used by dump capture kernel when
-> > > > > > + * primary kernel is crashing.
-> > > > > > + */
-> > > > > > +static void __init reserve_crashkernel(void)
-> > > > > > +{
-> > > > > > +?????int ret;
-> > > > > > +
-> > > > > > +?????ret = parse_crashkernel(boot_command_line, memblock_phys_mem_size(),
-> > > > > > +?????????????????????????????&crash_size, &crash_base);
-> > > > > > +?????/* no crashkernel= or invalid value specified */
-> > > > > > +?????if (ret || !crash_size)
-> > > > > > +?????????????return;
-> > > > > > +
-> > > > > > +?????if (crash_base == 0) {
-> > > > > > +?????????????/* Current arm64 boot protocol requires 2MB alignment */
-> > > > > > +?????????????crash_base = memblock_find_in_range(0,
-> > > > > > +?????????????????????????????MEMBLOCK_ALLOC_ACCESSIBLE, crash_size, SZ_2M);
-> > > > > > +?????????????if (crash_base == 0) {
-> > > > > > +?????????????????????pr_warn("Unable to allocate crashkernel (size:%llx)\n",
-> > > > > > +?????????????????????????????crash_size);
-> > > > > > +?????????????????????return;
-> > > > > > +?????????????}
-> > > > > > +?????????????memblock_reserve(crash_base, crash_size);
-> > > > > > 
-> > > > > I am not pretty sure the context here, but
-> > > > > can we use below code piece instead of the above lines?
-> > > > > ????????if (crash_base == 0)
-> > > > > ????????????????memblock_alloc(crash_size, SZ_2M);
-> > > > Either would be fine here.
-> > > > 
-> > > Hello AKASHI, maybe you can succeed to find the base with memblock_find_in_range(),?
-> > > but that doesn't mean you will also succeed to reserve them with memblock_reserve followed.
-> > 
-> > We avoid memblock_alloc() here because it panics on failure. This could happen
-> > if user asks for an unusually large crashkernel size. Better to print a message
-> > and keep booting. Checking the return value of memblock_reserve() seems like a
-> > good thing to do though.
-> 
-> Another option would be to add a memblock_try_alloc() function to the
-> memblock API, which in case of failure returns 0 rather than triggering
-> a panic(). We'd still have to check the return value, but all the
-> memblock manipulation would be in one place.
-> 
-> It looks like adding that is fairly simple:
-> 
-> phys_addr_t __init memblock_try_alloc(phys_addr_t size, phys_addr_t align)
-> {
-> 	return __memblock_alloc_base(size, align, MEMBLOCK_ALLOC_ACCESSIBLE);
-> }
->
-Hi Mark, memblock_alloc() should remove the panic just as we did in kmalloc IMO, as a memory allocation
-API, it should handover the failure case to the user and the latter should make the final decision.
-Just take a look at the usage case of the memblock_alloc() in the kernel tree, codes have been messed
-up by -- some codes check the return value of memblock_alloc, while others not.
+Hi Ludovic,
+   I'm learning about the dmaengine subsystem and I was using the
+at_xdmac as a reference.    I'm not real familiar with tasklets
+because I have used threaded interrupt handlers instead of them.
+   I noticed that the variable "txd" in the following block of code
+(from the function at_xdmac_tasklet) is used after releasing the
+atchan->lock and after the "desc" the txd is associated with is
+returned back to the free descriptor list.
 
-Thanks,
-Dennis 
-> 
-> Thanks,
-> Mark.
-> 
+      spin_lock_bh(&atchan->lock);
+      desc = list_first_entry(&atchan->xfers_list,
+               struct at_xdmac_desc,
+               xfer_node);
+     ...
+     txd = &desc->tx_dma_desc;
+
+      at_xdmac_remove_xfer(atchan, desc);
+      spin_unlock_bh(&atchan->lock);
+
+      if (!at_xdmac_chan_is_cyclic(atchan)) {
+         dma_cookie_complete(txd);
+         if (txd->callback && (txd->flags & DMA_PREP_INTERRUPT))
+            txd->callback(txd->callback_param);
+      }
+
+      dma_run_dependencies(txd);
+
+Is there any danger of another process (maybe running on another
+processor) changing desc->txd after it has been put back on the
+free_list?
+My first thought was to move the spin_unlock_bh(&atchan->lock) untill
+after dma_run_dependencies(txd), but a deadlock will be introduced
+because dma_run_dependencies could invoke at_xdmac_issue_pending which
+could eventually call spin_lock_irqsave(&atchan->lock).  A deadlock
+could also be created if the "callback" function invoked another
+"device_prep_*" function.
+
+If I'm miss-understanding something, I apologize for the noise.
+
+-- Brent Taylor
