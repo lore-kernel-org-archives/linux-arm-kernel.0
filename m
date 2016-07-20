@@ -1,111 +1,80 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 20 Jul 2016 12:23:25 +0100
-Subject: [RFC PATCH v3 03/13] drivers: acpi: iort: add support for IOMMU
- fwnode registration
+Date: Wed, 20 Jul 2016 12:23:26 +0100
+Subject: [RFC PATCH v3 04/13] drivers: platform: add fwnode base platform
+ devices retrieval
 In-Reply-To: <1469013815-24380-1-git-send-email-lorenzo.pieralisi@arm.com>
 References: <1469013815-24380-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <1469013815-24380-4-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <1469013815-24380-5-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ACPI IORT table provide entries for IOMMU (aka SMMU in ARM world)
-components that allow creating the kernel data structures required to
-probe and initialize the IOMMU devices.
+The platform device kernel API does not provide functions to
+retrieve a platform device through the corresponding struct
+device fwnode pointer.
 
-This patch provides support in the IORT kernel code to register IOMMU
-components and their respective fwnode.
+Implement the fwnode platform_device look-up in drivers core
+code by using the bus_find_device() API and a corresponding
+matching function. The OF equivalent (eg of_find_device_by_node())
+will reuse the newly introduced function when OF code will
+take care of setting up the device->fwnode value that is
+currently left dangling for platform devices instantiated out
+of device tree nodes.
 
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Cc: Hanjun Guo <hanjun.guo@linaro.org>
-Cc: Tomasz Nowicki <tn@semihalf.com>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
 ---
- drivers/acpi/iort.c | 65 +++++++++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 65 insertions(+)
+ drivers/base/platform.c         | 23 +++++++++++++++++++++++
+ include/linux/platform_device.h |  3 +++
+ 2 files changed, 26 insertions(+)
 
-diff --git a/drivers/acpi/iort.c b/drivers/acpi/iort.c
-index 1f440d2..86f6985 100644
---- a/drivers/acpi/iort.c
-+++ b/drivers/acpi/iort.c
-@@ -20,7 +20,9 @@
+diff --git a/drivers/base/platform.c b/drivers/base/platform.c
+index 6482d47..3ef150d 100644
+--- a/drivers/base/platform.c
++++ b/drivers/base/platform.c
+@@ -760,6 +760,29 @@ err_out:
+ }
+ EXPORT_SYMBOL_GPL(__platform_create_bundle);
  
- #include <linux/iort.h>
- #include <linux/kernel.h>
-+#include <linux/list.h>
- #include <linux/pci.h>
-+#include <linux/slab.h>
- 
- struct iort_its_msi_chip {
- 	struct list_head	list;
-@@ -28,6 +30,69 @@ struct iort_its_msi_chip {
- 	u32			translation_id;
- };
- 
-+struct iort_fwnode {
-+	struct list_head list;
-+	struct acpi_iort_node *iort_node;
-+	struct fwnode_handle *fwnode;
-+};
-+static LIST_HEAD(iort_fwnode_list);
-+static DEFINE_SPINLOCK(iort_fwnode_lock);
++static int fwnode_dev_match(struct device *dev, void *data)
++{
++	return dev->fwnode == data;
++}
 +
 +/**
-+ * iort_set_fwnode() - Create iort_fwnode and use it to register
-+ *		       iommu data in the iort_fwnode_list
++ * platform_find_device_by_fwnode() - Find the platform_device associated
++ *				      with a fwnode
++ * @fwnode: Pointer to firmware node
 + *
-+ * @node: IORT table node associated with the IOMMU
-+ * @fwnode: fwnode associated with the IORT node
-+ *
-+ * Returns: 0 on success
-+ *          -ENOMEM on failure
++ * Returns platform_device pointer, or NULL if not found
 + */
-+static inline int iort_set_fwnode(struct acpi_iort_node *iort_node,
-+				  struct fwnode_handle *fwnode)
++struct platform_device *
++platform_find_device_by_fwnode(struct fwnode_handle *fwnode)
 +{
-+	struct iort_fwnode *np;
++	struct device *dev;
 +
-+	np = kzalloc(sizeof(struct iort_fwnode), GFP_KERNEL);
-+
-+	if (WARN_ON(!np))
-+		return -ENOMEM;
-+
-+	INIT_LIST_HEAD(&np->list);
-+	np->iort_node = iort_node;
-+	np->fwnode = fwnode;
-+
-+	spin_lock(&iort_fwnode_lock);
-+	list_add_tail(&np->list, &iort_fwnode_list);
-+	spin_unlock(&iort_fwnode_lock);
-+
-+	return 0;
++	dev = bus_find_device(&platform_bus_type, NULL, fwnode,
++			      fwnode_dev_match);
++	return dev ? to_platform_device(dev) : NULL;
 +}
++EXPORT_SYMBOL(platform_find_device_by_fwnode);
 +
-+/**
-+ * iort_get_fwnode() - Retrieve fwnode associated with an IORT node
-+ *
-+ * @node: IORT table node to be looked-up
-+ *
-+ * Returns: fwnode_handle pointer on success NULL on failure
-+*/
-+static inline struct fwnode_handle *
-+iort_get_fwnode(struct acpi_iort_node *node)
-+{
-+	struct iort_fwnode *curr, *iommu_fwnode = NULL;
-+
-+	spin_lock(&iort_fwnode_lock);
-+	list_for_each_entry(curr, &iort_fwnode_list, list) {
-+		if (curr->iort_node == node) {
-+			iommu_fwnode = curr;
-+			break;
-+		}
-+	}
-+	spin_unlock(&iort_fwnode_lock);
-+
-+	return iommu_fwnode ? iommu_fwnode->fwnode : NULL;
-+}
-+
- typedef acpi_status (*iort_find_node_callback)
- 	(struct acpi_iort_node *node, void *context);
+ /**
+  * __platform_register_drivers - register an array of platform drivers
+  * @drivers: an array of drivers to register
+diff --git a/include/linux/platform_device.h b/include/linux/platform_device.h
+index 98c2a7c..01a3eb2 100644
+--- a/include/linux/platform_device.h
++++ b/include/linux/platform_device.h
+@@ -276,6 +276,9 @@ extern struct platform_device *__platform_create_bundle(
+ 	struct resource *res, unsigned int n_res,
+ 	const void *data, size_t size, struct module *module);
  
++extern struct platform_device *
++platform_find_device_by_fwnode(struct fwnode_handle *fwnode);
++
+ int __platform_register_drivers(struct platform_driver * const *drivers,
+ 				unsigned int count, struct module *owner);
+ void platform_unregister_drivers(struct platform_driver * const *drivers,
 -- 
 2.6.4
