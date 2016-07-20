@@ -1,51 +1,49 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Wed, 20 Jul 2016 10:33:39 -0500
-Subject: [net-next PATCH 1/3] net: phy: dp83867: Add documentation for
- optional impedance control
-In-Reply-To: <20160720145614.13132-2-mugunthanvnm@ti.com>
-References: <20160720145614.13132-1-mugunthanvnm@ti.com>
- <20160720145614.13132-2-mugunthanvnm@ti.com>
-Message-ID: <578F99D3.9090601@ti.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Wed, 20 Jul 2016 16:34:07 +0100
+Subject: [PATCH 01/10] coresight: etm-perf: pass struct perf_event to
+ source::enable/disable()
+In-Reply-To: <1468871491-10997-2-git-send-email-mathieu.poirier@linaro.org>
+References: <1468871491-10997-1-git-send-email-mathieu.poirier@linaro.org>
+ <1468871491-10997-2-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <a06945bb-9af4-f2a5-0f5d-62b165ba07f1@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/20/2016 09:56 AM, Mugunthan V N wrote:
-> Add documention of ti,impedance-control which can be used to
-> correct MAC impedance mismatch using phy extended registers.
+On 18/07/16 20:51, Mathieu Poirier wrote:
+> With this commit [1] address range filter information is now found
+> in the struct hw_perf_event::addr_filters.  As such pass the event
+> itself to the coresight_source::enable/disable() functions so that
+> both event attribute and filter can be accessible for configuration.
 >
-> Signed-off-by: Mugunthan V N <mugunthanvnm@ti.com>
-> ---
->   Documentation/devicetree/bindings/net/ti,dp83867.txt | 7 +++++++
->   1 file changed, 7 insertions(+)
->
-> diff --git a/Documentation/devicetree/bindings/net/ti,dp83867.txt b/Documentation/devicetree/bindings/net/ti,dp83867.txt
-> index 5d21141..531ea3c5 100644
-> --- a/Documentation/devicetree/bindings/net/ti,dp83867.txt
-> +++ b/Documentation/devicetree/bindings/net/ti,dp83867.txt
-> @@ -9,6 +9,13 @@ Required properties:
->   	- ti,fifo-depth - Transmitt FIFO depth- see dt-bindings/net/ti-dp83867.h
->   		for applicable values
->
-> +Optional property:
-> +	- ti,impedance-control - MAC Interface Impedance control to vary the
-> +				 output impedance with an approximate range
-> +				 from 35-70 ohms in 32 steps. Value range can
-> +				 be 0x0 to 0x1f. Lowest impedance value is
-> +				 0x1f and highest impedance being 0x0.
-> +
+> [1] 'commit 375637bc5249 ("perf/core: Introduce address range filtering")'
 
-Should'nt you be using the impedance values of 35 to 70 as the valid 
-values here? that would be the hardware description, and the values to 
-program corresponding to those are 0x00 to 0x1f. Right?
+> diff --git a/include/linux/coresight.h b/include/linux/coresight.h
+> index 385d62e64abb..2a5982c37dfb 100644
+> --- a/include/linux/coresight.h
+> +++ b/include/linux/coresight.h
+> @@ -232,8 +232,9 @@ struct coresight_ops_source {
+>  	int (*cpu_id)(struct coresight_device *csdev);
+>  	int (*trace_id)(struct coresight_device *csdev);
+>  	int (*enable)(struct coresight_device *csdev,
+> -		      struct perf_event_attr *attr,  u32 mode);
+> -	void (*disable)(struct coresight_device *csdev);
+> +		      struct perf_event *event,  u32 mode);
+> +	void (*disable)(struct coresight_device *csdev,
+> +			struct perf_event *event);
 
-Rob: is'nt that the right way to do it?
+nit:
 
->   Default child nodes are standard Ethernet PHY device
->   nodes as described in Documentation/devicetree/bindings/net/phy.txt
->
->
+Should we make this a a bit more generic API rather than hard coding
+the perf stuff in there ? i.e,
 
+how about :
 
--- 
-Regards,
-Nishanth Menon
+int (*enable)(struct coresight_device *csdev, void *data, u32 mode)
+
+void (*disable)(struct coresight_device *csdev, void *data, u32 mode)
+
+where data is specific to the mode of operation. That way the API is
+cleaner and each mode could pass their own data (even though sysfs
+doesn't use any at the moment).
+
+Suzuki
