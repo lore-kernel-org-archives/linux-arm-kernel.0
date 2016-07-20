@@ -1,77 +1,22 @@
-From: lukas@wunner.de (Lukas Wunner)
-Date: Wed, 20 Jul 2016 08:24:50 +0200
-Subject: [PATCH v2 02/10] driver core: Functional dependencies tracking
- support
-In-Reply-To: <1975118.iO8UCAENoH@vostro.rjw.lan>
-References: <1466144820-6286-1-git-send-email-m.szyprowski@samsung.com>
- <CAJZ5v0h71xxvzex2D6s9W8Qvq3+BqOQnTJRKy32gMu=tuQLxDA@mail.gmail.com>
- <20160617140738.GA1809@wunner.de>
- <1975118.iO8UCAENoH@vostro.rjw.lan>
-Message-ID: <20160720062450.GA8066@wunner.de>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Wed, 20 Jul 2016 08:38:22 +0200 (CEST)
+Subject: SOC-specific action for irq_set_wake
+In-Reply-To: <20160719224713.GA13533@hector.attlocal.net>
+References: <20160719181804.GX3847@xsjsorenbubuntu>
+ <20160719224713.GA13533@hector.attlocal.net>
+Message-ID: <alpine.DEB.2.11.1607200836590.3564@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 20, 2016 at 02:33:18AM +0200, Rafael J. Wysocki wrote:
-> On Friday, June 17, 2016 04:07:38 PM Lukas Wunner wrote:
-> > On Fri, Jun 17, 2016 at 02:54:56PM +0200, Rafael J. Wysocki wrote:
-> > > On Fri, Jun 17, 2016 at 12:36 PM, Lukas Wunner <lukas@wunner.de> wrote:
-> > > > On Fri, Jun 17, 2016 at 08:26:52AM +0200, Marek Szyprowski wrote:
-> > > > > From: "Rafael J. Wysocki" <rafael.j.wysocki@intel.com>
-> > > > We also have such a functional dependency for Thunderbolt on Macs:
-> > > > On resume from system sleep, the PCIe hotplug ports may not resume
-> > > > before the thunderbolt driver has reestablished the PCI tunnels.
-> > > > Currently this is enforced by quirk_apple_wait_for_thunderbolt()
-> > > > in drivers/pci/quirks.c. It would be good if we could represent
-> > > > this dependency using something like Rafael's approach instead of
-> > > > open coding it, however one detail in Rafael's patches is problematic:
-> > > >
-> > > > > New links are added by calling device_link_add() which may happen
-> > > > > either before the consumer device is probed or when probing it, in
-> > > > > which case the caller needs to ensure that the driver of the
-> > > > > supplier device is present and functional and the DEVICE_LINK_PROBE_TIME
-> > > > > flag should be passed to device_link_add() to reflect that.
-> > > >
-> > > > The thunderbolt driver cannot call device_link_add() before the
-> > > > PCIe hotplug ports are bound to a driver unless we amend portdrv
-> > > > to return -EPROBE_DEFER for Thunderbolt hotplug ports on Macs
-> > > > if the thunderbolt driver isn't loaded.
-> > > >
-> > > > It would therefore be beneficial if device_link_add() can be
-> > > > called even *after* the consumer is bound.
-> > > 
-> > > I don't quite follow.
-> > > 
-> > > Who's the provider and who's the consumer here?
-> > 
-> > thunderbolt.ko is the supplier.
-> 
-> But it binds to the children of the ports that are supposed to be its
-> consumers?
-> 
-> Why is that even expected to work?
+On Tue, 19 Jul 2016, Andy Gross wrote:
 
-No, the consumers are aunts (or uncles) of the supplier, if you will. :-)
+> So not too long ago there were irq extensions that you could add in to an
+> irq controller that would allow for intercepting the set wake calls.  This
+> went away and was replaced by the hierarchical irq design.
 
-The consumers are the hotplug ports (named "Downstream Bridge 1 / 2" in
-the drawing below). The supplier is the NHI:
-
-      (Root Port) ---- Upstream Bridge --+-- Downstream Bridge 0 ---- NHI
-                                         +-- Downstream Bridge 1 --
-                                         +-- Downstream Bridge 2 --
-                                         ...
-
-We're calling pci_power_up() and pci_restore_state() from
-pci_pm_resume_noirq(). And that will fail for devices below
-the hotplug ports if the PCI tunnels haven't been re-established
-yet by the NHI.
-
-Currently we achieve that via quirk_apple_wait_for_thunderbolt() in
-drivers/pci/quirks.c. It would be more elegant if we could make this
-relationship explicit with "device links" and let the core handle it.
-
-Or am I mistaken and this particular use case is not what "device links"
-are intended for?
+For a very good reason. The 'extensions' were a horrible hack and an
+unmaintainable mess. This problem is not that hard to solve w/o these hacks.
 
 Thanks,
 
-Lukas
+	tglx
