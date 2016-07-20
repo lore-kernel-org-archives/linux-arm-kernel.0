@@ -1,85 +1,139 @@
-From: olivier.schonken@gmail.com (Olivier Schonken)
-Date: Wed, 20 Jul 2016 10:17:09 +0200
-Subject: [PATCH v2 2/2] ARM: dts: at91: sama5d2: add ETM and ETB nodes
-In-Reply-To: <CANLsYkw830w5f3R55QMaNbT8hn+PE9CA9bm5MwiT0RhYVXqq=w@mail.gmail.com>
-References: <1467705950-29482-1-git-send-email-olivier.schonken@gmail.com>
- <1467705950-29482-2-git-send-email-olivier.schonken@gmail.com>
- <CANLsYkw830w5f3R55QMaNbT8hn+PE9CA9bm5MwiT0RhYVXqq=w@mail.gmail.com>
-Message-ID: <CALdGskJV-OO7hPVom4MDaUuc2nyUL=Chx5p+MLhzfxPf5sffjg@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 20 Jul 2016 09:17:16 +0100
+Subject: SOC-specific action for irq_set_wake
+In-Reply-To: <20160719233440.GG3847@xsjsorenbubuntu>
+References: <20160719181804.GX3847@xsjsorenbubuntu>
+ <20160719224713.GA13533@hector.attlocal.net>
+ <20160719233440.GG3847@xsjsorenbubuntu>
+Message-ID: <578F338C.40309@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All
-
-Just wondering if there are still some issues regarding the sama5d2
-ETM and ETB nodes patch that I have to change/update.
-If I should resend at a better time for it to not get lost in the
-noise just let me know.
-
-I see that I accidentily left Boris out in the initial resend of the
-patch.  My apologies.  Will forward the initial send to him as well.
-
-Regards
-
-Olivier Schonken
-
-On 5 July 2016 at 18:16, Mathieu Poirier <mathieu.poirier@linaro.org> wrote:
-> On 5 July 2016 at 02:05, Olivier Schonken <olivier.schonken@gmail.com> wrote:
->> Add node to support SAMA5D2 Embedded Trace Macrocell and Embedded
->> Trace Buffer.
+On 20/07/16 00:34, S?ren Brinkmann wrote:
+> Hi Andy,
+> 
+> On Tue, 2016-07-19 at 17:47:13 -0500, Andy Gross wrote:
+>> On Tue, Jul 19, 2016 at 11:18:04AM -0700, S?ren Brinkmann wrote:
+>>> Hi,
+>>>
+>>> we are working on the PM solution for Zynq MPSOC and ran into some
+>>> problem when setting the wake source.
+>>>
+>>> The situation is that when the A53 is in suspend, the GIC(v2) may be
+>>> powered down. In that state a companion core is handling wake
+>>> events/IRQs, but we expect the OS/Linux to notify the companion core
+>>> about what device/IRQ is a wake up source. Hence, my idea was to capture
+>>> enabling/disabling wake IRQs in our platform PM code and then
+>>> communicate with the FW as needed during suspend operations. The problem
+>>> is: I don't see a good way to notify the platform code about these
+>>> events.
 >>
->> This patch depends on coresight-etm3x: Add ARM ETM-A5 peripheral ID
->> for proper coresight functionality.
->> It also depends on clocksource: timer-atmel-pit: enable mck to not
->> stall SAMA5D2 on bootup.
+>> On Qualcomm platforms there is something similar.  When the system is power
+>> collapsed, the GIC loses context and can no longer handle/generate IRQs.  There
+>> is a separate block called the MPM that provides some registers that the user
+>> can program.  These registers allow for up to 64 wake IRQs, each of which can
+>> map to either a GPIO pin or an GIC IRQ.  The MPM also has a timer that can
+>> generate a wake IRQ so that the system can wake up and maintain the time.
+> 
+> We have a full companion core running firmware. As in your case,
+> we can use any IRQ source and some additional IOs as wake event. So,
+> it's fundamentally very similar. Main difference is probably the
+> interface. In our case, we have some platform-specific FW interfaces
+> that we need to call. Basically, Linux doing an SMC call and then the
+> secure monitor handling the rest. And for that we may also have to do
+> some additional mapping of the IRQ number to something the FW interface
+> understands.
+> 
 >>
->> Signed-off-by: Olivier Schonken <olivier.schonken@gmail.com>
->> ---
->>  arch/arm/boot/dts/sama5d2.dtsi | 29 +++++++++++++++++++++++++++++
->>  1 file changed, 29 insertions(+)
+>>>
+>>> My ideas were:
+>>> 1. Use the irq_chip irq_set_wake function
+>>>   My thought was to implement the irq_set_wake function in a
+>>>   SOC-specific way (could even be generic and call some notifier chain or
+>>>   similar) to notify the platform PM code when a device/IRQ is
+>>>   enabled/disabled as wake up source.
+>>>   My problem is that the SKIP_IRQ_SET_WAKE flag is set in the generic
+>>>   driver (drivers/irqchip/irq-gic.c) and platforms cannot implement
+>>>   irq_set_wake without changes in the common code.
 >>
->> diff --git a/arch/arm/boot/dts/sama5d2.dtsi b/arch/arm/boot/dts/sama5d2.dtsi
->> index 5d63206..bde24ab 100644
->> --- a/arch/arm/boot/dts/sama5d2.dtsi
->> +++ b/arch/arm/boot/dts/sama5d2.dtsi
->> @@ -77,6 +77,35 @@
->>                 interrupts = <2 IRQ_TYPE_LEVEL_HIGH 0>;
->>         };
+>> So not too long ago there were irq extensions that you could add in to an irq
+>> controller that would allow for intercepting the set wake calls.  This went away
+>> and was replaced by the hierarchical irq design.
+> 
+> Yeah, I though I remembered that and wanted to use it now and was slightly
+> disappointed when I couldn't find the code anymore.
+
+It was slaughtered for a good reason: It was unmaintainable, had
+horrible performance issues, wasn't described in any of DT or ACPI, and
+didn't fit any of the core code idioms. It has been replaced by
+something we that is supported in the code code and that is working for
+all current users of the GIC that have similar requirements to yours.
+
+>> The way I am currently implementing the MPM for Qualcomm, I am defining the MPM
+>> as a IRQ controller and creating relationships between the MPM and the GPIO
+>> controller (source of irqs) and the GIC.  As irqs are set wake and cleared the
+>> calls go up through the hierarchy and they call each irqchips functions (if you
+>> have it setup to do that).
+> 
+> I suspected that some sort of dummy interrupt controller might be one
+> way to do it. I was hoping to find a simpler way, but maybe this is the
+> way to go. One concern could be that this might require adding something
+> into the DT that doesn't really exist.
+
+It is not "dummy". It drives an actual piece of HW (the wake up
+interrupts) and a piece of ****ware (the secure monitor side). And since
+when the DT has become something that we cannot change? Last time I
+checked, people were still adding 20 new bindings per merge window.
+
+> 
 >>
->> +       etb {
->> +               compatible = "arm,coresight-etb10", "arm,primecell";
->> +               reg = <0x740000 0x1000>;
->> +
->> +               clocks = <&mck>;
->> +               clock-names = "apb_pclk";
->> +
->> +               port {
->> +                       etb_in: endpoint {
->> +                               slave-mode;
->> +                               remote-endpoint = <&etm_out>;
->> +                       };
->> +               };
->> +       };
->> +
->> +       etm {
->> +               compatible = "arm,coresight-etm3x", "arm,primecell";
->> +               reg = <0x73C000 0x1000>;
->> +
->> +               clocks = <&mck>;
->> +               clock-names = "apb_pclk";
->> +
->> +               port {
->> +                       etm_out: endpoint {
->> +                               remote-endpoint = <&etb_in>;
->> +                       };
->> +               };
->> +       };
->> +
->>         memory {
->>                 reg = <0x20000000 0x20000000>;
->>         };
->> --
->> 1.9.1
 >>
->
-> Acked-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+>>> 2. Stuff things into the secure monitor
+>>>   I guess we could read the GIC registers once we enter the secure
+>>>   monitor and do the communication with the companion core from there by
+>>>   identifying unmasked IRQs as wake IRQs. My concern here is that it
+>>>   might introduce additional hardcoded mappings that are much more
+>>>   dynamic in Linux thanks to the DT description.
+>>
+>> This could work, but you'd have to have control of the secure monitor code.  In
+>> Qualcomm's case, that wouldn't work or couldn't because they won't change that
+>> code.  And you'd have to have calls into the monitor to turn on/off the lines.
+> 
+> We fully control our secure monitor. That should not be an issue for us.
+> What do you mean we'd need to call into the monitor? Linux masks all wake
+> IRQs when going into suspend. Everything unmasked should be a wake IRQ,
+> or am I missing something? I thought we could simply read the
+> enable/disable status of all IRQs in the secure monitor suspend path and
+> do the needed communication with the companion core.
+
+That's also a possibility. If you do that, you really have to wonder why
+you're not implementing this as part of PSCI, because it seems a bit
+silly to have two interfaces for the same thing.
+
+> 
+>>
+>>>
+>>> Does anybody have similar problems and probably already solved it?
+>>> Any other suggestions for approaching the problem? Any preferred
+>>> solution?
+>>
+>> I think we have the same problem.  Can you provide more detail on the hardware
+>> implementation of your wake irq controller?  I presume you have some set of
+>> registers, an irq maybe, and some other stuff?  And how does it fit into the
+>> overall architecture from a hardware perspective?
+> 
+> We have essentially a whole second interrupt controller. All IRQs are
+> connected to the A53 GIC and this second interrupt controller that is
+> controlled by the companion core. The companion core is supposed to be
+> informed about what source the A53 needs to wake up on and will program
+> this second IRQ controller, etc.
+
+So your "special case" is exactly like everyone else's. Implement it as
+a hierarchical chip on top of the GIC, just like Tegra, OMAP, iMX6,
+Exynos and a few others. Unless you implement PSCI.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
