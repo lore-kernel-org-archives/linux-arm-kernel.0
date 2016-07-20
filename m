@@ -1,87 +1,60 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 20 Jul 2016 11:58:52 +0200
-Subject: [PATCH v2 2/7] drm/sun4i: Move panel retrieval in RGB connector
-In-Reply-To: <20160720095857.12297-1-maxime.ripard@free-electrons.com>
-References: <20160720095857.12297-1-maxime.ripard@free-electrons.com>
-Message-ID: <20160720095857.12297-3-maxime.ripard@free-electrons.com>
+Date: Wed, 20 Jul 2016 11:58:50 +0200
+Subject: [PATCH v2 0/7] drm: Add Support for Passive RGB to VGA bridges
+Message-ID: <20160720095857.12297-1-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to properly support bridges and use drm_encoder's bridge pointer,
-move the panel (and bridge eventually) retrieval code in the RGB output
-init function.
+Hi,
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- drivers/gpu/drm/sun4i/sun4i_rgb.c  | 10 ++++++----
- drivers/gpu/drm/sun4i/sun4i_tcon.c |  8 +-------
- drivers/gpu/drm/sun4i/sun4i_tcon.h |  2 ++
- 3 files changed, 9 insertions(+), 11 deletions(-)
+This serie is about adding support for the RGB to VGA bridge found in
+the A13-Olinuxino and the CHIP VGA adapter.
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_rgb.c b/drivers/gpu/drm/sun4i/sun4i_rgb.c
-index f5bbac6efb4c..d32f08f9ce5f 100644
---- a/drivers/gpu/drm/sun4i/sun4i_rgb.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_rgb.c
-@@ -206,15 +206,17 @@ int sun4i_rgb_init(struct drm_device *drm)
- 	struct sun4i_rgb *rgb;
- 	int ret;
- 
--	/* If we don't have a panel, there's no point in going on */
--	if (IS_ERR(tcon->panel))
--		return -ENODEV;
--
- 	rgb = devm_kzalloc(drm->dev, sizeof(*rgb), GFP_KERNEL);
- 	if (!rgb)
- 		return -ENOMEM;
- 	rgb->drv = drv;
- 
-+	tcon->panel = sun4i_tcon_find_panel(tcon->dev->of_node);
-+	if (IS_ERR(tcon->panel)) {
-+		dev_info(drm->dev, "No panel found... RGB output disabled\n");
-+		return 0;
-+	}
-+
- 	drm_encoder_helper_add(&rgb->encoder,
- 			       &sun4i_rgb_enc_helper_funcs);
- 	ret = drm_encoder_init(drm,
-diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-index af136dfc206e..d2f7489d29a5 100644
---- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-@@ -398,7 +398,7 @@ static int sun4i_tcon_init_regmap(struct device *dev,
- 	return 0;
- }
- 
--static struct drm_panel *sun4i_tcon_find_panel(struct device_node *node)
-+struct drm_panel *sun4i_tcon_find_panel(struct device_node *node)
- {
- 	struct device_node *port, *remote, *child;
- 	struct device_node *end_node = NULL;
-@@ -485,12 +485,6 @@ static int sun4i_tcon_bind(struct device *dev, struct device *master,
- 		goto err_free_clocks;
- 	}
- 
--	tcon->panel = sun4i_tcon_find_panel(dev->of_node);
--	if (IS_ERR(tcon->panel)) {
--		dev_info(dev, "No panel found... RGB output disabled\n");
--		return 0;
--	}
--
- 	ret = sun4i_rgb_init(drm);
- 	if (ret < 0)
- 		goto err_free_clocks;
-diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.h b/drivers/gpu/drm/sun4i/sun4i_tcon.h
-index 230550b720f1..4f81d86ee5a4 100644
---- a/drivers/gpu/drm/sun4i/sun4i_tcon.h
-+++ b/drivers/gpu/drm/sun4i/sun4i_tcon.h
-@@ -166,6 +166,8 @@ struct sun4i_tcon {
- 	struct drm_panel		*panel;
- };
- 
-+struct drm_panel *sun4i_tcon_find_panel(struct device_node *node);
-+
- /* Global Control */
- void sun4i_tcon_disable(struct sun4i_tcon *tcon);
- void sun4i_tcon_enable(struct sun4i_tcon *tcon);
+Both these boards rely on an entirely passive bridge made out of
+resitor ladders that do not require any initialisation. The only thing
+needed is to get the timings from the screen if available (and if not,
+fall back on XGA standards), set up the display pipeline to output on
+the RGB bus with the proper timings, and you're done.
+
+This serie also fixes a bunch of bugs uncovered when trying to
+increase the resolution, and hence the pixel clock, of our
+pipeline. It also fixes a few bugs in the DRM driver itself that went
+unnoticed before.
+
+Let me know what you think,
+Maxime
+
+Changes from v1:
+  - Switch to using a vga-connector
+  - Use drm_encoder bridge pointer instead of doing our own
+  - Report the connector status as unknown instead of connected by
+    default, and as connected only if we can retrieve the EDID.
+  - Switch to of_i2c_get_adapter by node, and put the reference when done
+  - Rebased on linux-next
+
+Maxime Ripard (7):
+  drm/sun4i: Store TCON's device structure pointer
+  drm/sun4i: Move panel retrieval in RGB connector
+  drm/sun4i: Add bridge support
+  drm/bridge: Add RGB to VGA bridge support
+  ARM: sun5i: a13-olinuxino: Enable VGA bridge
+  ARM: multi_v7: enable VGA bridge
+  ARM: sunxi: Enable VGA bridge
+
+ .../bindings/display/bridge/dumb-vga.txt           |  54 +++++
+ arch/arm/boot/dts/sun5i-a13-olinuxino.dts          |  60 ++++++
+ arch/arm/configs/multi_v7_defconfig                |   1 +
+ arch/arm/configs/sunxi_defconfig                   |   1 +
+ drivers/gpu/drm/bridge/Kconfig                     |   6 +
+ drivers/gpu/drm/bridge/Makefile                    |   1 +
+ drivers/gpu/drm/bridge/dumb-vga.c                  | 232 +++++++++++++++++++++
+ drivers/gpu/drm/sun4i/sun4i_drv.c                  |   4 +-
+ drivers/gpu/drm/sun4i/sun4i_rgb.c                  |  64 ++++--
+ drivers/gpu/drm/sun4i/sun4i_tcon.c                 |  52 ++++-
+ drivers/gpu/drm/sun4i/sun4i_tcon.h                 |   4 +
+ 11 files changed, 451 insertions(+), 28 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/display/bridge/dumb-vga.txt
+ create mode 100644 drivers/gpu/drm/bridge/dumb-vga.c
+
 -- 
 2.9.0
