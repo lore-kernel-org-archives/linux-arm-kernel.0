@@ -1,132 +1,102 @@
 From: keescook@chromium.org (Kees Cook)
-Date: Wed, 20 Jul 2016 13:26:57 -0700
-Subject: [PATCH v4 02/12] mm: Implement stack frame object validation
+Date: Wed, 20 Jul 2016 13:27:04 -0700
+Subject: [PATCH v4 09/12] sparc/uaccess: Enable hardened usercopy
 In-Reply-To: <1469046427-12696-1-git-send-email-keescook@chromium.org>
 References: <1469046427-12696-1-git-send-email-keescook@chromium.org>
-Message-ID: <1469046427-12696-3-git-send-email-keescook@chromium.org>
+Message-ID: <1469046427-12696-10-git-send-email-keescook@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This creates per-architecture function arch_within_stack_frames() that
-should validate if a given object is contained by a kernel stack frame.
-Initial implementation is on x86.
+Enables CONFIG_HARDENED_USERCOPY checks on sparc.
 
-This is based on code from PaX.
+Based on code from PaX and grsecurity.
 
 Signed-off-by: Kees Cook <keescook@chromium.org>
 ---
- arch/Kconfig                       |  9 ++++++++
- arch/x86/Kconfig                   |  1 +
- arch/x86/include/asm/thread_info.h | 44 ++++++++++++++++++++++++++++++++++++++
- include/linux/thread_info.h        |  9 ++++++++
- 4 files changed, 63 insertions(+)
+ arch/sparc/Kconfig                  |  1 +
+ arch/sparc/include/asm/uaccess_32.h | 14 ++++++++++----
+ arch/sparc/include/asm/uaccess_64.h | 11 +++++++++--
+ 3 files changed, 20 insertions(+), 6 deletions(-)
 
-diff --git a/arch/Kconfig b/arch/Kconfig
-index d794384a0404..5e2776562035 100644
---- a/arch/Kconfig
-+++ b/arch/Kconfig
-@@ -424,6 +424,15 @@ config CC_STACKPROTECTOR_STRONG
+diff --git a/arch/sparc/Kconfig b/arch/sparc/Kconfig
+index 546293d9e6c5..59b09600dd32 100644
+--- a/arch/sparc/Kconfig
++++ b/arch/sparc/Kconfig
+@@ -43,6 +43,7 @@ config SPARC
+ 	select OLD_SIGSUSPEND
+ 	select ARCH_HAS_SG_CHAIN
+ 	select CPU_NO_EFFICIENT_FFS
++	select HAVE_ARCH_HARDENED_USERCOPY
  
- endchoice
+ config SPARC32
+ 	def_bool !64BIT
+diff --git a/arch/sparc/include/asm/uaccess_32.h b/arch/sparc/include/asm/uaccess_32.h
+index 57aca2792d29..341a5a133f48 100644
+--- a/arch/sparc/include/asm/uaccess_32.h
++++ b/arch/sparc/include/asm/uaccess_32.h
+@@ -248,22 +248,28 @@ unsigned long __copy_user(void __user *to, const void __user *from, unsigned lon
  
-+config HAVE_ARCH_WITHIN_STACK_FRAMES
-+	bool
-+	help
-+	  An architecture should select this if it can walk the kernel stack
-+	  frames to determine if an object is part of either the arguments
-+	  or local variables (i.e. that it excludes saved return addresses,
-+	  and similar) by implementing an inline arch_within_stack_frames(),
-+	  which is used by CONFIG_HARDENED_USERCOPY.
-+
- config HAVE_CONTEXT_TRACKING
- 	bool
- 	help
-diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
-index 0a7b885964ba..4407f596b72c 100644
---- a/arch/x86/Kconfig
-+++ b/arch/x86/Kconfig
-@@ -91,6 +91,7 @@ config X86
- 	select HAVE_ARCH_SOFT_DIRTY		if X86_64
- 	select HAVE_ARCH_TRACEHOOK
- 	select HAVE_ARCH_TRANSPARENT_HUGEPAGE
-+	select HAVE_ARCH_WITHIN_STACK_FRAMES
- 	select HAVE_EBPF_JIT			if X86_64
- 	select HAVE_CC_STACKPROTECTOR
- 	select HAVE_CMPXCHG_DOUBLE
-diff --git a/arch/x86/include/asm/thread_info.h b/arch/x86/include/asm/thread_info.h
-index 30c133ac05cd..ab386f1336f2 100644
---- a/arch/x86/include/asm/thread_info.h
-+++ b/arch/x86/include/asm/thread_info.h
-@@ -180,6 +180,50 @@ static inline unsigned long current_stack_pointer(void)
- 	return sp;
+ static inline unsigned long copy_to_user(void __user *to, const void *from, unsigned long n)
+ {
+-	if (n && __access_ok((unsigned long) to, n))
++	if (n && __access_ok((unsigned long) to, n)) {
++		if (!__builtin_constant_p(n))
++			check_object_size(from, n, true);
+ 		return __copy_user(to, (__force void __user *) from, n);
+-	else
++	} else
+ 		return n;
  }
  
-+/*
-+ * Walks up the stack frames to make sure that the specified object is
-+ * entirely contained by a single stack frame.
-+ *
-+ * Returns:
-+ *		 1 if within a frame
-+ *		-1 if placed across a frame boundary (or outside stack)
-+ *		 0 unable to determine (no frame pointers, etc)
-+ */
-+static inline int arch_within_stack_frames(const void * const stack,
-+					   const void * const stackend,
-+					   const void *obj, unsigned long len)
-+{
-+#if defined(CONFIG_FRAME_POINTER)
-+	const void *frame = NULL;
-+	const void *oldframe;
-+
-+	oldframe = __builtin_frame_address(1);
-+	if (oldframe)
-+		frame = __builtin_frame_address(2);
-+	/*
-+	 * low ----------------------------------------------> high
-+	 * [saved bp][saved ip][args][local vars][saved bp][saved ip]
-+	 *                     ^----------------^
-+	 *               allow copies only within here
-+	 */
-+	while (stack <= frame && frame < stackend) {
-+		/*
-+		 * If obj + len extends past the last frame, this
-+		 * check won't pass and the next frame will be 0,
-+		 * causing us to bail out and correctly report
-+		 * the copy as invalid.
-+		 */
-+		if (obj + len <= frame)
-+			return obj >= oldframe + 2 * sizeof(void *) ? 1 : -1;
-+		oldframe = frame;
-+		frame = *(const void * const *)frame;
-+	}
-+	return -1;
-+#else
-+	return 0;
-+#endif
-+}
-+
- #else /* !__ASSEMBLY__ */
+ static inline unsigned long __copy_to_user(void __user *to, const void *from, unsigned long n)
+ {
++	if (!__builtin_constant_p(n))
++		check_object_size(from, n, true);
+ 	return __copy_user(to, (__force void __user *) from, n);
+ }
  
- #ifdef CONFIG_X86_64
-diff --git a/include/linux/thread_info.h b/include/linux/thread_info.h
-index b4c2a485b28a..3d5c80b4391d 100644
---- a/include/linux/thread_info.h
-+++ b/include/linux/thread_info.h
-@@ -146,6 +146,15 @@ static inline bool test_and_clear_restore_sigmask(void)
- #error "no set_restore_sigmask() provided and default one won't work"
- #endif
+ static inline unsigned long copy_from_user(void *to, const void __user *from, unsigned long n)
+ {
+-	if (n && __access_ok((unsigned long) from, n))
++	if (n && __access_ok((unsigned long) from, n)) {
++		if (!__builtin_constant_p(n))
++			check_object_size(to, n, false);
+ 		return __copy_user((__force void __user *) to, from, n);
+-	else
++	} else
+ 		return n;
+ }
  
-+#ifndef CONFIG_HAVE_ARCH_WITHIN_STACK_FRAMES
-+static inline int arch_within_stack_frames(const void * const stack,
-+					   const void * const stackend,
-+					   const void *obj, unsigned long len)
-+{
-+	return 0;
-+}
-+#endif
+diff --git a/arch/sparc/include/asm/uaccess_64.h b/arch/sparc/include/asm/uaccess_64.h
+index e9a51d64974d..8bda94fab8e8 100644
+--- a/arch/sparc/include/asm/uaccess_64.h
++++ b/arch/sparc/include/asm/uaccess_64.h
+@@ -210,8 +210,12 @@ unsigned long copy_from_user_fixup(void *to, const void __user *from,
+ static inline unsigned long __must_check
+ copy_from_user(void *to, const void __user *from, unsigned long size)
+ {
+-	unsigned long ret = ___copy_from_user(to, from, size);
++	unsigned long ret;
+ 
++	if (!__builtin_constant_p(size))
++		check_object_size(to, size, false);
 +
- #endif	/* __KERNEL__ */
++	ret = ___copy_from_user(to, from, size);
+ 	if (unlikely(ret))
+ 		ret = copy_from_user_fixup(to, from, size);
  
- #endif /* _LINUX_THREAD_INFO_H */
+@@ -227,8 +231,11 @@ unsigned long copy_to_user_fixup(void __user *to, const void *from,
+ static inline unsigned long __must_check
+ copy_to_user(void __user *to, const void *from, unsigned long size)
+ {
+-	unsigned long ret = ___copy_to_user(to, from, size);
++	unsigned long ret;
+ 
++	if (!__builtin_constant_p(size))
++		check_object_size(from, size, true);
++	ret = ___copy_to_user(to, from, size);
+ 	if (unlikely(ret))
+ 		ret = copy_to_user_fixup(to, from, size);
+ 	return ret;
 -- 
 2.7.4
