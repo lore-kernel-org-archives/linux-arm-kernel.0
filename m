@@ -1,49 +1,51 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Wed, 20 Jul 2016 16:34:07 +0100
-Subject: [PATCH 01/10] coresight: etm-perf: pass struct perf_event to
- source::enable/disable()
-In-Reply-To: <1468871491-10997-2-git-send-email-mathieu.poirier@linaro.org>
-References: <1468871491-10997-1-git-send-email-mathieu.poirier@linaro.org>
- <1468871491-10997-2-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <a06945bb-9af4-f2a5-0f5d-62b165ba07f1@arm.com>
+From: labbott@redhat.com (Laura Abbott)
+Date: Wed, 20 Jul 2016 08:36:38 -0700
+Subject: [PATCH v3 02/11] mm: Hardened usercopy
+In-Reply-To: <1469010283.2800.5.camel@gmail.com>
+References: <1468619065-3222-1-git-send-email-keescook@chromium.org>
+ <1468619065-3222-3-git-send-email-keescook@chromium.org>
+ <fc3c7f68-bd2e-cb06-c47c-d97c520fc08b@redhat.com>
+ <CAGXu5j+nHpHcYT8FyHNe6AFQCdakoSMW=UWDatyxhRK7CB7_=g@mail.gmail.com>
+ <1469010283.2800.5.camel@gmail.com>
+Message-ID: <2aabe10d-2ccb-2ba6-18bb-b7f52d70d36c@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/07/16 20:51, Mathieu Poirier wrote:
-> With this commit [1] address range filter information is now found
-> in the struct hw_perf_event::addr_filters.  As such pass the event
-> itself to the coresight_source::enable/disable() functions so that
-> both event attribute and filter can be accessible for configuration.
+On 07/20/2016 03:24 AM, Balbir Singh wrote:
+> On Tue, 2016-07-19 at 11:48 -0700, Kees Cook wrote:
+>> On Mon, Jul 18, 2016 at 6:06 PM, Laura Abbott <labbott@redhat.com> wrote:
+>>>
+>>> On 07/15/2016 02:44 PM, Kees Cook wrote:
+>>>
+>>> This doesn't work when copying CMA allocated memory since CMA purposely
+>>> allocates larger than a page block size without setting head pages.
+>>> Given CMA may be used with drivers doing zero copy buffers, I think it
+>>> should be permitted.
+>>>
+>>> Something like the following lets it pass (I can clean up and submit
+>>> the is_migrate_cma_page APIs as a separate patch for review)
+>> Yeah, this would be great. I'd rather use an accessor to check this
+>> than a direct check for MIGRATE_CMA.
+>>
+>>>          */
+>>>         for (; ptr <= end ; ptr += PAGE_SIZE, page = virt_to_head_page(ptr))
+>>> {
+>>> -               if (!PageReserved(page))
+>>> +               if (!PageReserved(page) && !is_migrate_cma_page(page))
+>>>                         return "<spans multiple pages>";
+>>>         }
+>> Yeah, I'll modify this a bit so that which type it starts as is
+>> maintained for all pages (rather than allowing to flip back and forth
+>> -- even though that is likely impossible).
+>>
+> Sorry, I completely missed the MIGRATE_CMA bits. Could you clarify if you
+> caught this in testing/review?
 >
-> [1] 'commit 375637bc5249 ("perf/core: Introduce address range filtering")'
+> Balbir Singh.
+>
 
-> diff --git a/include/linux/coresight.h b/include/linux/coresight.h
-> index 385d62e64abb..2a5982c37dfb 100644
-> --- a/include/linux/coresight.h
-> +++ b/include/linux/coresight.h
-> @@ -232,8 +232,9 @@ struct coresight_ops_source {
->  	int (*cpu_id)(struct coresight_device *csdev);
->  	int (*trace_id)(struct coresight_device *csdev);
->  	int (*enable)(struct coresight_device *csdev,
-> -		      struct perf_event_attr *attr,  u32 mode);
-> -	void (*disable)(struct coresight_device *csdev);
-> +		      struct perf_event *event,  u32 mode);
-> +	void (*disable)(struct coresight_device *csdev,
-> +			struct perf_event *event);
+I caught it while looking at the code and then wrote a test case to confirm
+I was correct because I wasn't sure how to easily find an in tree user.
 
-nit:
-
-Should we make this a a bit more generic API rather than hard coding
-the perf stuff in there ? i.e,
-
-how about :
-
-int (*enable)(struct coresight_device *csdev, void *data, u32 mode)
-
-void (*disable)(struct coresight_device *csdev, void *data, u32 mode)
-
-where data is specific to the mode of operation. That way the API is
-cleaner and each mode could pass their own data (even though sysfs
-doesn't use any at the moment).
-
-Suzuki
+Thanks,
+Laura
