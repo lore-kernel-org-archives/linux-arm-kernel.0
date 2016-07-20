@@ -1,125 +1,114 @@
 From: shankerd@codeaurora.org (Shanker Donthineni)
-Date: Wed, 20 Jul 2016 08:53:57 -0500
-Subject: [PATCH V3 1/4] arm/io: Use separate memory allocation for mmio
- handlers
+Date: Wed, 20 Jul 2016 08:53:58 -0500
+Subject: [PATCH V3 2/4] xen: Add generic implementation of binary search
 In-Reply-To: <1469022840-2142-1-git-send-email-shankerd@codeaurora.org>
 References: <1469022840-2142-1-git-send-email-shankerd@codeaurora.org>
-Message-ID: <1469022840-2142-2-git-send-email-shankerd@codeaurora.org>
+Message-ID: <1469022840-2142-3-git-send-email-shankerd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The number of mmio handlers are limited to a compile time macro
-MAX_IO_HANDLER which is 16. This number is not at all sufficient
-to support per CPU distributor regions. Either it needs to be
-increased to a bigger number, at least CONFIG_NR_CPUS+16, or
-allocate a separate memory for mmio handlers dynamically during
-domain build.
-
-This patch uses the dynamic allocation strategy to reduce memory
-footprint for 'struct domain' instead of static allocation.
+This patch adds the generic implementation of binary search algorithm
+which is copied from Linux kernel v4.7-rc7. No functional changes.
 
 Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
-Acked-by: Julien Grall <julien.grall@arm.com>
+Reviewed-by: Andrew Cooper <andrew.cooper3@citrix.com>
+Reviewed-by: Julien Grall <julien.grall@arm.com>
 ---
- xen/arch/arm/domain.c      |  6 ++++--
- xen/arch/arm/io.c          | 13 +++++++++++--
- xen/include/asm-arm/mmio.h |  7 +++++--
- 3 files changed, 20 insertions(+), 6 deletions(-)
+Changes since v2:
+ Fixed the compilation issue due to a missing ';'.
+ Fixed typo.
 
-diff --git a/xen/arch/arm/domain.c b/xen/arch/arm/domain.c
-index 61fc08e..0170cee 100644
---- a/xen/arch/arm/domain.c
-+++ b/xen/arch/arm/domain.c
-@@ -546,7 +546,7 @@ void vcpu_destroy(struct vcpu *v)
- int arch_domain_create(struct domain *d, unsigned int domcr_flags,
-                        struct xen_arch_domainconfig *config)
- {
--    int rc;
-+    int rc, count;
- 
-     d->arch.relmem = RELMEM_not_started;
- 
-@@ -569,7 +569,8 @@ int arch_domain_create(struct domain *d, unsigned int domcr_flags,
-     share_xen_page_with_guest(
-         virt_to_page(d->shared_info), d, XENSHARE_writable);
- 
--    if ( (rc = domain_io_init(d)) != 0 )
-+    count = MAX_IO_HANDLER;
-+    if ( (rc = domain_io_init(d, count)) != 0 )
-         goto fail;
- 
-     if ( (rc = p2m_alloc_table(d)) != 0 )
-@@ -663,6 +664,7 @@ void arch_domain_destroy(struct domain *d)
-     free_xenheap_pages(d->arch.efi_acpi_table,
-                        get_order_from_bytes(d->arch.efi_acpi_len));
- #endif
-+    domain_io_free(d);
- }
- 
- void arch_domain_shutdown(struct domain *d)
-diff --git a/xen/arch/arm/io.c b/xen/arch/arm/io.c
-index 5a96836..40330f0 100644
---- a/xen/arch/arm/io.c
-+++ b/xen/arch/arm/io.c
-@@ -118,7 +118,7 @@ void register_mmio_handler(struct domain *d,
-     struct vmmio *vmmio = &d->arch.vmmio;
-     struct mmio_handler *handler;
- 
--    BUG_ON(vmmio->num_entries >= MAX_IO_HANDLER);
-+    BUG_ON(vmmio->num_entries >= vmmio->max_num_entries);
- 
-     write_lock(&vmmio->lock);
- 
-@@ -134,14 +134,23 @@ void register_mmio_handler(struct domain *d,
-     write_unlock(&vmmio->lock);
- }
- 
--int domain_io_init(struct domain *d)
-+int domain_io_init(struct domain *d, int max_count)
- {
-     rwlock_init(&d->arch.vmmio.lock);
-     d->arch.vmmio.num_entries = 0;
-+    d->arch.vmmio.max_num_entries = max_count;
-+    d->arch.vmmio.handlers = xzalloc_array(struct mmio_handler, max_count);
-+    if ( !d->arch.vmmio.handlers )
-+        return -ENOMEM;
- 
-     return 0;
- }
- 
-+void domain_io_free(struct domain *d)
+Changes since v1:
+ Removed the header file xen/include/xen/bsearch.h.
+ Defined function bsearch() prototype in the header file xen/lib.h.
+
+ xen/common/Makefile   |  1 +
+ xen/common/bsearch.c  | 51 +++++++++++++++++++++++++++++++++++++++++++++++++++
+ xen/include/xen/lib.h |  3 +++
+ 3 files changed, 55 insertions(+)
+ create mode 100644 xen/common/bsearch.c
+
+diff --git a/xen/common/Makefile b/xen/common/Makefile
+index dbf00c6..f8123c2 100644
+--- a/xen/common/Makefile
++++ b/xen/common/Makefile
+@@ -43,6 +43,7 @@ obj-y += schedule.o
+ obj-y += shutdown.o
+ obj-y += softirq.o
+ obj-y += sort.o
++obj-y += bsearch.o
+ obj-y += smp.o
+ obj-y += spinlock.o
+ obj-y += stop_machine.o
+diff --git a/xen/common/bsearch.c b/xen/common/bsearch.c
+new file mode 100644
+index 0000000..7090930
+--- /dev/null
++++ b/xen/common/bsearch.c
+@@ -0,0 +1,51 @@
++/*
++ * A generic implementation of binary search for the Linux kernel
++ *
++ * Copyright (C) 2008-2009 Ksplice, Inc.
++ * Author: Tim Abbott <tabbott@ksplice.com>
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License as
++ * published by the Free Software Foundation; version 2.
++ */
++
++#include <xen/lib.h>
++
++/*
++ * bsearch - binary search an array of elements
++ * @key: pointer to item being searched for
++ * @base: pointer to first element to search
++ * @num: number of elements
++ * @size: size of each element
++ * @cmp: pointer to comparison function
++ *
++ * This function does a binary search on the given array.  The
++ * contents of the array should already be in ascending sorted order
++ * under the provided comparison function.
++ *
++ * Note that the key need not have the same type as the elements in
++ * the array, e.g. key could be a string and the comparison function
++ * could compare the string with the struct's name field.  However, if
++ * the key and elements in the array are of the same type, you can use
++ * the same comparison function for both sort() and bsearch().
++ */
++void *bsearch(const void *key, const void *base, size_t num, size_t size,
++	      int (*cmp)(const void *key, const void *elt))
 +{
-+    xfree(d->arch.vmmio.handlers);
++	size_t start = 0, end = num;
++	int result;
++
++	while (start < end) {
++		size_t mid = start + (end - start) / 2;
++
++		result = cmp(key, base + mid * size);
++		if (result < 0)
++			end = mid;
++		else if (result > 0)
++			start = mid + 1;
++		else
++			return (void *)base + mid * size;
++	}
++
++	return NULL;
 +}
+diff --git a/xen/include/xen/lib.h b/xen/include/xen/lib.h
+index b1b0fb2..b90d582 100644
+--- a/xen/include/xen/lib.h
++++ b/xen/include/xen/lib.h
+@@ -153,4 +153,7 @@ void dump_execstate(struct cpu_user_regs *);
+ 
+ void init_constructors(void);
+ 
++void *bsearch(const void *key, const void *base, size_t num, size_t size,
++              int (*cmp)(const void *key, const void *elt));
 +
- /*
-  * Local variables:
-  * mode: C
-diff --git a/xen/include/asm-arm/mmio.h b/xen/include/asm-arm/mmio.h
-index 32f10f2..c620eed 100644
---- a/xen/include/asm-arm/mmio.h
-+++ b/xen/include/asm-arm/mmio.h
-@@ -52,15 +52,18 @@ struct mmio_handler {
- 
- struct vmmio {
-     int num_entries;
-+    int max_num_entries;
-     rwlock_t lock;
--    struct mmio_handler handlers[MAX_IO_HANDLER];
-+    struct mmio_handler *handlers;
- };
- 
- extern int handle_mmio(mmio_info_t *info);
- void register_mmio_handler(struct domain *d,
-                            const struct mmio_handler_ops *ops,
-                            paddr_t addr, paddr_t size, void *priv);
--int domain_io_init(struct domain *d);
-+int domain_io_init(struct domain *d, int max_count);
-+void domain_io_free(struct domain *d);
-+
- 
- #endif  /* __ASM_ARM_MMIO_H__ */
- 
+ #endif /* __LIB_H__ */
 -- 
 Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm Technologies, Inc.
 Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
