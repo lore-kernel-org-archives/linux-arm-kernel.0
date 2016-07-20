@@ -1,38 +1,77 @@
 From: mugunthanvnm@ti.com (Mugunthan V N)
-Date: Wed, 20 Jul 2016 20:26:12 +0530
-Subject: [net-next PATCH 1/3] net: phy: dp83867: Add documentation for
- optional impedance control
+Date: Wed, 20 Jul 2016 20:26:13 +0530
+Subject: [net-next PATCH 2/3] net: phy: dp83867: add support for MAC impedance
+ configuration
 In-Reply-To: <20160720145614.13132-1-mugunthanvnm@ti.com>
 References: <20160720145614.13132-1-mugunthanvnm@ti.com>
-Message-ID: <20160720145614.13132-2-mugunthanvnm@ti.com>
+Message-ID: <20160720145614.13132-3-mugunthanvnm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add documention of ti,impedance-control which can be used to
-correct MAC impedance mismatch using phy extended registers.
+Add support for programmable MAC impedance configuration
 
 Signed-off-by: Mugunthan V N <mugunthanvnm@ti.com>
 ---
- Documentation/devicetree/bindings/net/ti,dp83867.txt | 7 +++++++
- 1 file changed, 7 insertions(+)
+ drivers/net/phy/dp83867.c | 22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/net/ti,dp83867.txt b/Documentation/devicetree/bindings/net/ti,dp83867.txt
-index 5d21141..531ea3c5 100644
---- a/Documentation/devicetree/bindings/net/ti,dp83867.txt
-+++ b/Documentation/devicetree/bindings/net/ti,dp83867.txt
-@@ -9,6 +9,13 @@ Required properties:
- 	- ti,fifo-depth - Transmitt FIFO depth- see dt-bindings/net/ti-dp83867.h
- 		for applicable values
+diff --git a/drivers/net/phy/dp83867.c b/drivers/net/phy/dp83867.c
+index 91177a4..ace3558 100644
+--- a/drivers/net/phy/dp83867.c
++++ b/drivers/net/phy/dp83867.c
+@@ -33,6 +33,7 @@
+ /* Extended Registers */
+ #define DP83867_RGMIICTL	0x0032
+ #define DP83867_RGMIIDCTL	0x0086
++#define DP83867_IO_MUX_CFG	0x0170
  
-+Optional property:
-+	- ti,impedance-control - MAC Interface Impedance control to vary the
-+				 output impedance with an approximate range
-+				 from 35-70 ohms in 32 steps. Value range can
-+				 be 0x0 to 0x1f. Lowest impedance value is
-+				 0x1f and highest impedance being 0x0.
+ #define DP83867_SW_RESET	BIT(15)
+ #define DP83867_SW_RESTART	BIT(14)
+@@ -62,10 +63,14 @@
+ /* RGMIIDCTL bits */
+ #define DP83867_RGMII_TX_CLK_DELAY_SHIFT	4
+ 
++/* IO_MUX_CFG bits */
++#define DP83867_IO_MUX_CFG_IO_IMPEDANCE_CTRL	0x1F
 +
- Default child nodes are standard Ethernet PHY device
- nodes as described in Documentation/devicetree/bindings/net/phy.txt
+ struct dp83867_private {
+ 	int rx_id_delay;
+ 	int tx_id_delay;
+ 	int fifo_depth;
++	int io_impedance;
+ };
  
+ static int dp83867_ack_interrupt(struct phy_device *phydev)
+@@ -111,6 +116,12 @@ static int dp83867_of_init(struct phy_device *phydev)
+ 	if (!of_node)
+ 		return -ENODEV;
+ 
++	dp83867->io_impedance = -EINVAL;
++
++	/* Optional configuration */
++	of_property_read_u32(of_node, "ti,impedance-control",
++			     &dp83867->io_impedance);
++
+ 	ret = of_property_read_u32(of_node, "ti,rx-internal-delay",
+ 				   &dp83867->rx_id_delay);
+ 	if (ret)
+@@ -184,6 +195,17 @@ static int dp83867_config_init(struct phy_device *phydev)
+ 
+ 		phy_write_mmd_indirect(phydev, DP83867_RGMIIDCTL,
+ 				       DP83867_DEVADDR, delay);
++
++		if (dp83867->io_impedance >= 0) {
++			val = phy_read_mmd_indirect(phydev,
++						    DP83867_IO_MUX_CFG,
++						    DP83867_DEVADDR);
++			val &= ~DP83867_IO_MUX_CFG_IO_IMPEDANCE_CTRL;
++			val |= dp83867->io_impedance &
++			       DP83867_IO_MUX_CFG_IO_IMPEDANCE_CTRL;
++			phy_write_mmd_indirect(phydev, DP83867_IO_MUX_CFG,
++					       DP83867_DEVADDR, val);
++		}
+ 	}
+ 
+ 	return 0;
 -- 
 2.9.2.368.g08bb350
