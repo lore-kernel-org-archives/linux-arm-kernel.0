@@ -1,40 +1,146 @@
 From: keescook@chromium.org (Kees Cook)
-Date: Wed, 20 Jul 2016 13:26:56 -0700
-Subject: [PATCH v4 01/12] mm: Add is_migrate_cma_page
+Date: Wed, 20 Jul 2016 13:27:01 -0700
+Subject: [PATCH v4 06/12] arm64/uaccess: Enable hardened usercopy
 In-Reply-To: <1469046427-12696-1-git-send-email-keescook@chromium.org>
 References: <1469046427-12696-1-git-send-email-keescook@chromium.org>
-Message-ID: <1469046427-12696-2-git-send-email-keescook@chromium.org>
+Message-ID: <1469046427-12696-7-git-send-email-keescook@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Laura Abbott <labbott@redhat.com>
+Enables CONFIG_HARDENED_USERCOPY checks on arm64. As done by KASAN in -next,
+renames the low-level functions to __arch_copy_*_user() so a static inline
+can do additional work before the copy.
 
-Code such as hardened user copy[1] needs a way to tell if a
-page is CMA or not. Add is_migrate_cma_page in a similar way
-to is_migrate_isolate_page.
-
-[1]http://article.gmane.org/gmane.linux.kernel.mm/155238
-
-Signed-off-by: Laura Abbott <labbott@redhat.com>
 Signed-off-by: Kees Cook <keescook@chromium.org>
 ---
- include/linux/mmzone.h | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm64/Kconfig               |  1 +
+ arch/arm64/include/asm/uaccess.h | 29 ++++++++++++++++++++++-------
+ arch/arm64/kernel/arm64ksyms.c   |  4 ++--
+ arch/arm64/lib/copy_from_user.S  |  4 ++--
+ arch/arm64/lib/copy_to_user.S    |  4 ++--
+ 5 files changed, 29 insertions(+), 13 deletions(-)
 
-diff --git a/include/linux/mmzone.h b/include/linux/mmzone.h
-index 02069c23486d..c8478b29f070 100644
---- a/include/linux/mmzone.h
-+++ b/include/linux/mmzone.h
-@@ -68,8 +68,10 @@ extern char * const migratetype_names[MIGRATE_TYPES];
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 5a0a691d4220..9cdb2322c811 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -51,6 +51,7 @@ config ARM64
+ 	select HAVE_ALIGNED_STRUCT_PAGE if SLUB
+ 	select HAVE_ARCH_AUDITSYSCALL
+ 	select HAVE_ARCH_BITREVERSE
++	select HAVE_ARCH_HARDENED_USERCOPY
+ 	select HAVE_ARCH_HUGE_VMAP
+ 	select HAVE_ARCH_JUMP_LABEL
+ 	select HAVE_ARCH_KASAN if SPARSEMEM_VMEMMAP && !(ARM64_16K_PAGES && ARM64_VA_BITS_48)
+diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
+index 9e397a542756..92848b00e3cd 100644
+--- a/arch/arm64/include/asm/uaccess.h
++++ b/arch/arm64/include/asm/uaccess.h
+@@ -256,24 +256,39 @@ do {									\
+ 		-EFAULT;						\
+ })
  
- #ifdef CONFIG_CMA
- #  define is_migrate_cma(migratetype) unlikely((migratetype) == MIGRATE_CMA)
-+#  define is_migrate_cma_page(_page) (get_pageblock_migratetype(_page) == MIGRATE_CMA)
- #else
- #  define is_migrate_cma(migratetype) false
-+#  define is_migrate_cma_page(_page) false
- #endif
+-extern unsigned long __must_check __copy_from_user(void *to, const void __user *from, unsigned long n);
+-extern unsigned long __must_check __copy_to_user(void __user *to, const void *from, unsigned long n);
++extern unsigned long __must_check __arch_copy_from_user(void *to, const void __user *from, unsigned long n);
++extern unsigned long __must_check __arch_copy_to_user(void __user *to, const void *from, unsigned long n);
+ extern unsigned long __must_check __copy_in_user(void __user *to, const void __user *from, unsigned long n);
+ extern unsigned long __must_check __clear_user(void __user *addr, unsigned long n);
  
- #define for_each_migratetype_order(order, type) \
++static inline unsigned long __must_check __copy_from_user(void *to, const void __user *from, unsigned long n)
++{
++	check_object_size(to, n, false);
++	return __arch_copy_from_user(to, from, n);
++}
++
++static inline unsigned long __must_check __copy_to_user(void __user *to, const void *from, unsigned long n)
++{
++	check_object_size(from, n, true);
++	return __arch_copy_to_user(to, from, n);
++}
++
+ static inline unsigned long __must_check copy_from_user(void *to, const void __user *from, unsigned long n)
+ {
+-	if (access_ok(VERIFY_READ, from, n))
+-		n = __copy_from_user(to, from, n);
+-	else /* security hole - plug it */
++	if (access_ok(VERIFY_READ, from, n)) {
++		check_object_size(to, n, false);
++		n = __arch_copy_from_user(to, from, n);
++	} else /* security hole - plug it */
+ 		memset(to, 0, n);
+ 	return n;
+ }
+ 
+ static inline unsigned long __must_check copy_to_user(void __user *to, const void *from, unsigned long n)
+ {
+-	if (access_ok(VERIFY_WRITE, to, n))
+-		n = __copy_to_user(to, from, n);
++	if (access_ok(VERIFY_WRITE, to, n)) {
++		check_object_size(from, n, true);
++		n = __arch_copy_to_user(to, from, n);
++	}
+ 	return n;
+ }
+ 
+diff --git a/arch/arm64/kernel/arm64ksyms.c b/arch/arm64/kernel/arm64ksyms.c
+index 678f30b05a45..2dc44406a7ad 100644
+--- a/arch/arm64/kernel/arm64ksyms.c
++++ b/arch/arm64/kernel/arm64ksyms.c
+@@ -34,8 +34,8 @@ EXPORT_SYMBOL(copy_page);
+ EXPORT_SYMBOL(clear_page);
+ 
+ 	/* user mem (segment) */
+-EXPORT_SYMBOL(__copy_from_user);
+-EXPORT_SYMBOL(__copy_to_user);
++EXPORT_SYMBOL(__arch_copy_from_user);
++EXPORT_SYMBOL(__arch_copy_to_user);
+ EXPORT_SYMBOL(__clear_user);
+ EXPORT_SYMBOL(__copy_in_user);
+ 
+diff --git a/arch/arm64/lib/copy_from_user.S b/arch/arm64/lib/copy_from_user.S
+index 17e8306dca29..0b90497d4424 100644
+--- a/arch/arm64/lib/copy_from_user.S
++++ b/arch/arm64/lib/copy_from_user.S
+@@ -66,7 +66,7 @@
+ 	.endm
+ 
+ end	.req	x5
+-ENTRY(__copy_from_user)
++ENTRY(__arch_copy_from_user)
+ ALTERNATIVE("nop", __stringify(SET_PSTATE_PAN(0)), ARM64_ALT_PAN_NOT_UAO, \
+ 	    CONFIG_ARM64_PAN)
+ 	add	end, x0, x2
+@@ -75,7 +75,7 @@ ALTERNATIVE("nop", __stringify(SET_PSTATE_PAN(1)), ARM64_ALT_PAN_NOT_UAO, \
+ 	    CONFIG_ARM64_PAN)
+ 	mov	x0, #0				// Nothing to copy
+ 	ret
+-ENDPROC(__copy_from_user)
++ENDPROC(__arch_copy_from_user)
+ 
+ 	.section .fixup,"ax"
+ 	.align	2
+diff --git a/arch/arm64/lib/copy_to_user.S b/arch/arm64/lib/copy_to_user.S
+index 21faae60f988..7a7efe255034 100644
+--- a/arch/arm64/lib/copy_to_user.S
++++ b/arch/arm64/lib/copy_to_user.S
+@@ -65,7 +65,7 @@
+ 	.endm
+ 
+ end	.req	x5
+-ENTRY(__copy_to_user)
++ENTRY(__arch_copy_to_user)
+ ALTERNATIVE("nop", __stringify(SET_PSTATE_PAN(0)), ARM64_ALT_PAN_NOT_UAO, \
+ 	    CONFIG_ARM64_PAN)
+ 	add	end, x0, x2
+@@ -74,7 +74,7 @@ ALTERNATIVE("nop", __stringify(SET_PSTATE_PAN(1)), ARM64_ALT_PAN_NOT_UAO, \
+ 	    CONFIG_ARM64_PAN)
+ 	mov	x0, #0
+ 	ret
+-ENDPROC(__copy_to_user)
++ENDPROC(__arch_copy_to_user)
+ 
+ 	.section .fixup,"ax"
+ 	.align	2
 -- 
 2.7.4
