@@ -1,46 +1,42 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 20 Jul 2016 11:15:53 +0100
-Subject: [PATCH v8 0/4] perf: Add APM X-Gene SoC Performance Monitoring
- Unit driver
-In-Reply-To: <CADaLNDnqs+jRTfQTXV5VaKbWbQ4dZMGGQAgWXVqWhX8AZZrWgw@mail.gmail.com>
-References: <1468263944-10634-1-git-send-email-ttnguyen@apm.com>
- <20160714131602.GJ29455@arm.com>
- <CACgAJHyBt4TCoDjm0XGyX8usD_Wt_-7_JA918Wr4oF567wY_EA@mail.gmail.com>
- <CADaLNDnNVC48Ce1A+KU2WMULkY+skKVSm1GpaoQ6HvAEmscD=A@mail.gmail.com>
- <CADaLNDnqs+jRTfQTXV5VaKbWbQ4dZMGGQAgWXVqWhX8AZZrWgw@mail.gmail.com>
-Message-ID: <20160720101553.GA20508@arm.com>
+From: bsingharora@gmail.com (Balbir Singh)
+Date: Wed, 20 Jul 2016 20:24:43 +1000
+Subject: [PATCH v3 02/11] mm: Hardened usercopy
+In-Reply-To: <CAGXu5j+nHpHcYT8FyHNe6AFQCdakoSMW=UWDatyxhRK7CB7_=g@mail.gmail.com>
+References: <1468619065-3222-1-git-send-email-keescook@chromium.org>
+ <1468619065-3222-3-git-send-email-keescook@chromium.org>
+ <fc3c7f68-bd2e-cb06-c47c-d97c520fc08b@redhat.com>
+ <CAGXu5j+nHpHcYT8FyHNe6AFQCdakoSMW=UWDatyxhRK7CB7_=g@mail.gmail.com>
+Message-ID: <1469010283.2800.5.camel@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 19, 2016 at 01:22:09PM -0700, Duc Dang wrote:
-> On Thu, Jul 14, 2016 at 10:37 AM, Duc Dang <dhdang@apm.com> wrote:
-> > On Thu, Jul 14, 2016 at 10:28 AM, Tai Tri Nguyen <ttnguyen@apm.com> wrote:
-> >> On Thu, Jul 14, 2016 at 6:16 AM, Will Deacon <will.deacon@arm.com> wrote:
-> >> > On Mon, Jul 11, 2016 at 12:05:40PM -0700, Tai Nguyen wrote:
-> >> >> In addition to the X-Gene ARM CPU performance monitoring unit (PMU), there
-> >> >> are PMU for the SoC system devices such as L3 cache(s), I/O bridge(s),
-> >> >> memory controller bridges and memory. These PMU devices are loosely
-> >> >> architected to follow the same model as the PMU for ARM cores.
-> >> >
-> >> > You might want to add commit messages to patches 1,2 and 4, but then you
-> >> > can route this via the arm-soc tree.
-> >> >
-> >> > Will
-> >>
-> >> I will add the commit messages to these patches 1, 2 and 4 and rout
-> >> this via arm-soc tree.
-> >> CC: Duc (dhdang at apm.com)
-> >
-> > I will pull patch 1, 2 and 4 into xgene-next tree and send pull
-> > request to Arnd and Olof.
-> 
-> Hi Will,
-> 
-> Do you plan to merge this series (Tai posted v10) into 4.8 or you want
-> to wait until 4.9? Please let know so that I can plan my pull request
-> to Arnd/Olof accordingly to include patch 1, 2, and 4.
+On Tue, 2016-07-19 at 11:48 -0700, Kees Cook wrote:
+> On Mon, Jul 18, 2016 at 6:06 PM, Laura Abbott <labbott@redhat.com> wrote:
+> >?
+> > On 07/15/2016 02:44 PM, Kees Cook wrote:
+> >?
+> > This doesn't work when copying CMA allocated memory since CMA purposely
+> > allocates larger than a page block size without setting head pages.
+> > Given CMA may be used with drivers doing zero copy buffers, I think it
+> > should be permitted.
+> >?
+> > Something like the following lets it pass (I can clean up and submit
+> > the is_migrate_cma_page APIs as a separate patch for review)
+> Yeah, this would be great. I'd rather use an accessor to check this
+> than a direct check for MIGRATE_CMA.
+>
+> > ?????????*/
+> > ????????for (; ptr <= end ; ptr += PAGE_SIZE, page = virt_to_head_page(ptr))
+> > {
+> > -???????????????if (!PageReserved(page))
+> > +???????????????if (!PageReserved(page) && !is_migrate_cma_page(page))
+> > ????????????????????????return "<spans multiple pages>";
+> > ????????}
+> Yeah, I'll modify this a bit so that which type it starts as is
+> maintained for all pages (rather than allowing to flip back and forth
+> -- even though that is likely impossible).
+>?
+Sorry, I completely missed the MIGRATE_CMA bits. Could you clarify if you
+caught this in testing/review?
 
-I was hoping that the whole series would go via arm-soc. Mark reviewed
-the PMU driver code, so that should be sufficient.
-
-Will
+Balbir Singh.
