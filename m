@@ -1,72 +1,56 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 20 Jul 2016 10:07:39 +0200
-Subject: [PATCH 2/2] ARM: dts: r8a7792: add SDHI support
-In-Reply-To: <cece2545-52f9-7ddb-36d2-df364a272092@cogentembedded.com>
-References: <2441635.ESeLhIjWEX@wasted.cogentembedded.com>
- <8030361.FnpbGzHVP8@wasted.cogentembedded.com>
- <20160717225842.GA25133@verge.net.au>
- <cece2545-52f9-7ddb-36d2-df364a272092@cogentembedded.com>
-Message-ID: <CAMuHMdUUZ=gopWOir9PMiDgJ8o+CMp+qG=FLhGg_gHrMYzwgFg@mail.gmail.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Wed, 20 Jul 2016 10:08:15 +0200
+Subject: [PATCH] RFC: ARM: fix the uaccess crash on PB11MPCore
+In-Reply-To: <5959782.fqYxkarPT3@wuerfel>
+References: <1468256893-12811-1-git-send-email-linus.walleij@linaro.org>
+ <CAA3gFWsZJ3BV+FncGHnHvXSDnxbg_2FnugtgVnanPmmaqKOJAQ@mail.gmail.com>
+ <5959782.fqYxkarPT3@wuerfel>
+Message-ID: <578F316F.2000706@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergei,
-
-On Mon, Jul 18, 2016 at 9:12 PM, Sergei Shtylyov
-<sergei.shtylyov@cogentembedded.com> wrote:
->>> --- renesas.orig/arch/arm/boot/dts/r8a7792.dtsi
->>> +++ renesas/arch/arm/boot/dts/r8a7792.dtsi
->>> @@ -435,6 +435,18 @@
->>>                         status = "disabled";
->>>                 };
+On 07/12/2016 01:53 PM, Arnd Bergmann wrote:
+> On Tuesday, July 12, 2016 1:27:11 PM CEST Neil Armstrong wrote:
+>> 2016-07-11 19:08 GMT+02:00 Linus Walleij <linus.walleij@linaro.org>:
+>>> The following patch was sketched by Russell in response to my
+>>> crashes on the PB11MPCore after the patch for software-based
+>>> priviledged no access support for ARMv8.1. See this thread:
+>>> http://marc.info/?l=linux-arm-kernel&m=144051749807214&w=2
 >>>
->>> +               sdhi0: sd at ee100000 {
->>> +                       compatible = "renesas,sdhi-r8a7792";
->>> +                       reg = <0 0xee100000 0 0x200>;
+>>> I am unsure what is going on, I suspect everyone involved in
+>>> the discussion is. I just want to repost this to get the
+>>> discussion restarted, as I still have to apply this patch
+>>> with every kernel iteration to get my PB11MPCore Realview
+>>> running.
+>>>
+>>> I also know that Oxnas has actual, mass-deployed NAS (PogoPlug
+>>> Pro variants) using PB11MPCore, and that they may or may not
+>>> be seeing the same issue so I want their feedback on this: do
+>>> you or do you not see this with mainline, or have you not even
+>>> tested?
 >>
+>> Hi Linus,
 >>
->> I do not have the documentation available to check,
->
->    Me nether. The SDHI .zip only includes the manual for E2, H2, and M2.
->
->> however, I wonder if
->> as per 66f47ed0e86d ("ARM: shmobile: r8a7790: tidyup SDHI register size on
->> DTSI") the register size should be 0x328.
->
->    I just don't know...
+>> Actually the last off-tree support of the OX820 is on 4.4, and I do
+>> not personally own a OX820 based device,
+>> but I'm in he process of finding one to achieve upstream support along
+>> the Ox810.
+>>
+> 
+> The Aldi NAS boxes (NAS-212) are widely available on ebay in Germany,
+> there is even a shop that sells both the Pogoplug and the Medion
+> machine with Debian preinstalled: http://www.ebay.de/sch/it-shop-rm/m.html
+> 
+> If you need help getting one, you can send it to me and I forward
+> it to your French address.
+> 
+> 	Arnd
+> 
 
->>> +                       interrupts = <0 165 IRQ_TYPE_LEVEL_HIGH>;
->>> +                       dmas = <&dmac0 0xcd>, <&dmac0 0xce>,
->>> +                              <&dmac1 0xcd>, <&dmac1 0xce>;
->>> +                       dma-names = "tx", "rx", "tx", "rx";
->>> +                       clocks = <&mstp3_clks R8A7792_CLK_SDHI0>;
->>> +                       power-domains = <&sysc R8A7792_PD_ALWAYS_ON>;
->>> +                       status = "disabled";
->>> +               };
->>> +
->>>                 jpu: jpeg-codec at fe980000 {
->>>                         compatible = "renesas,jpu-r8a7792",
->>>                                      "renesas,rcar-gen2-jpu";
->
->    I also wonder whether whether a single per-SoC SDHI "compatible" is
-> valid. The registers and their offsets seem to differ b/w SDHI0 and the
-> other SDHI cores...
+Arnd,
 
-There's version register.
+Thanks, I got a Pogoplug V3 and have access to the serial line, I will
+forward port the 4.4 openwrt kernel to 4.7 ASAP and try to reproduce the bug
+encountered by Linus.
 
-BTW, given SDHI on V2H doesn't support SDR50/SDR104, unlike the instances
-on other R-Car Gen2 SoCs, can you please tell us the version value, as read
-from CTL_VERSION in sh_mobile_sdhi_sdbuf_width()?
-
-Thanks!
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Neil
