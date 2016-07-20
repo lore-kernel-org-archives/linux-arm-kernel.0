@@ -1,43 +1,82 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 20 Jul 2016 11:43:03 +0200
-Subject: [PATCH v4] xen/arm: Add a clock property
-In-Reply-To: <1468309605-19522-1-git-send-email-dirk.behme@de.bosch.com>
-References: <1468309605-19522-1-git-send-email-dirk.behme@de.bosch.com>
-Message-ID: <CAMuHMdU9yP2SMYa5ssrQSu1vwSN2gM4mD-EVYSGr2Pqf=jmCgw@mail.gmail.com>
+From: peter.chen@nxp.com (Peter Chen)
+Date: Wed, 20 Jul 2016 17:40:23 +0800
+Subject: [PATCH v3 0/6] power: add power sequence library
+Message-ID: <1469007629-31757-1-git-send-email-peter.chen@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dirk,
+Hi all,
 
-On Tue, Jul 12, 2016 at 9:46 AM, Dirk Behme <dirk.behme@de.bosch.com> wrote:
-> Clocks described by this property are reserved for use by Xen, and the OS
-> must not alter their state any way, such as disabling or gating a clock,
-> or modifying its rate. Ensuring this may impose constraints on parent
-> clocks or other resources used by the clock tree.
->
-> This property is used to proxy clocks for devices Xen has taken ownership
-> of, such as UARTs, for which the associated clock controller(s) remain
-> under the control of Dom0.
+This is a follow-up for my last power sequence framework patch set [1].
+According to Rob Herring and Ulf Hansson's comments[2], I use a generic
+power sequence library for parsing the power sequence elements on DT,
+and implement generic power sequence on library. The host driver
+can allocate power sequence instance, and calls pwrseq APIs accordingly.
 
-I'm not familiar with using XEN at all, but I'm a bit puzzled...
+In future, if there are special power sequence requirements, the special
+power sequence library can be created.
 
-Can't you just add a clocks property to the (virtual) serial device node in DT?
-Then the (virtual) serial device driver can get and enable the clock?
+This patch set is tested on i.mx6 sabresx evk using a dts change, I use
+two hot-plug devices to simulate this use case, the related binding
+change is updated at patch [1/6], The udoo board changes were tested
+using my last power sequence patch set.[3]
 
-Alternatively, you can add a (virtual) clock controller, and power-domains
-and clock properties to all affected devices (I assume there can be others,
-besides virtual UARTs?), and let it be handled by Runtime PM, without the
-(virtual) device drivers having to care about clocks at all.
+Except for hard-wired MMC and USB devices, I find the USB ULPI PHY also
+need to power on itself before it can be found by ULPI bus.
 
-Thanks!
+[1] http://www.spinics.net/lists/linux-usb/msg142755.html
+[2] http://www.spinics.net/lists/linux-usb/msg143106.html
+[3] http://www.spinics.net/lists/linux-usb/msg142815.html
 
-Gr{oetje,eeting}s,
+Changes for v3:
+- Delete "power-sequence" property at binding-doc, and change related code
+  at both library and user code.
+- Change binding-doc example node name with Rob's comments
+- of_get_named_gpio_flags only gets the gpio, but without setting gpio flags,
+  add additional code request gpio with proper gpio flags
+- Add Philipp Zabel's Ack and MAINTAINER's entry
 
-                        Geert
+Changes for v2:
+- Delete "pwrseq" prefix and clock-names for properties at dt binding
+- Should use structure not but its pointer for kzalloc
+- Since chipidea core has no of_node, let core's of_node equals glue
+  layer's at core's probe
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+Peter Chen (6):
+  binding-doc: power: pwrseq-generic: add binding doc for generic power
+    sequence library
+  power: add power sequence library
+  binding-doc: usb: usb-device: add optional properties for power
+    sequence
+  usb: core: add power sequence handling for USB devices
+  usb: chipidea: let chipidea core device of_node equal's glue layer
+    device of_node
+  ARM: dts: imx6qdl-udoo.dtsi: fix onboard USB HUB property
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+ .../bindings/power/pwrseq/pwrseq-generic.txt       |  48 +++++++
+ .../devicetree/bindings/usb/usb-device.txt         |  10 +-
+ MAINTAINERS                                        |   9 ++
+ arch/arm/boot/dts/imx6qdl-udoo.dtsi                |  26 ++--
+ drivers/power/Kconfig                              |   1 +
+ drivers/power/Makefile                             |   1 +
+ drivers/power/pwrseq/Kconfig                       |  20 +++
+ drivers/power/pwrseq/Makefile                      |   2 +
+ drivers/power/pwrseq/core.c                        |  71 ++++++++++
+ drivers/power/pwrseq/pwrseq_generic.c              | 151 +++++++++++++++++++++
+ drivers/usb/chipidea/core.c                        |  10 ++
+ drivers/usb/core/Makefile                          |   1 +
+ drivers/usb/core/hub.c                             |  12 +-
+ drivers/usb/core/hub.h                             |  12 ++
+ drivers/usb/core/pwrseq.c                          | 100 ++++++++++++++
+ include/linux/power/pwrseq.h                       |  50 +++++++
+ 16 files changed, 507 insertions(+), 17 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/power/pwrseq/pwrseq-generic.txt
+ create mode 100644 drivers/power/pwrseq/Kconfig
+ create mode 100644 drivers/power/pwrseq/Makefile
+ create mode 100644 drivers/power/pwrseq/core.c
+ create mode 100644 drivers/power/pwrseq/pwrseq_generic.c
+ create mode 100644 drivers/usb/core/pwrseq.c
+ create mode 100644 include/linux/power/pwrseq.h
+
+-- 
+1.9.1
