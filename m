@@ -1,359 +1,109 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Wed, 20 Jul 2016 14:38:17 -0600
-Subject: [PATCH V2 3/6] perf tools: add infrastructure for PMU specific
- configuration
+Date: Wed, 20 Jul 2016 14:38:16 -0600
+Subject: [PATCH V2 2/6] perf: Passing struct perf_event to function setup_aux()
 In-Reply-To: <1469047100-18131-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1469047100-18131-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1469047100-18131-4-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1469047100-18131-3-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset adds PMU driver specific configuration to the parser
-infrastructure by preceding any term with the '@' letter.  As such
-doing something like:
-
-perf record -e some_event/@cfg1, at cfg2=config/ ...
-
-will see 'cfg1' and 'cfg2=config' being added to the list of evsel config
-terms.  Token 'cfg1' and 'cfg2=config' are not processed in user space
-and are meant to be interpreted by the PMU driver.
-
-First the lexer/parser are supplemented with the required definitions to
-recognise the driver specific configuration.  From there they are simply
-added to the list of event terms.  The bulk of the work is done in
-function "parse_events_add_pmu()" where driver config event terms are
-added to a new list of driver config terms, which in turn spliced with
-the event's new driver configuration list.
+Some information, like driver specific configuration, is found
+in the hw_perf_event  structure.  As such pass a 'struct perf_event'
+to function setup_aux() rather than just the CPU number so that
+individual drivers can make the right configuration when setting
+up a session.
 
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+Cc: Alexander Shishkin <alexander.shishkin@linux.intel.com>
 ---
- tools/perf/util/evsel.c        |  1 +
- tools/perf/util/evsel.h        |  4 +++
- tools/perf/util/parse-events.c | 76 +++++++++++++++++++++++++++++++-----------
- tools/perf/util/parse-events.h |  1 +
- tools/perf/util/parse-events.l | 12 +++++++
- tools/perf/util/parse-events.y | 11 ++++++
- 6 files changed, 85 insertions(+), 20 deletions(-)
+ arch/x86/events/intel/bts.c                      | 4 +++-
+ arch/x86/events/intel/pt.c                       | 5 +++--
+ drivers/hwtracing/coresight/coresight-etm-perf.c | 4 ++--
+ include/linux/perf_event.h                       | 2 +-
+ kernel/events/ring_buffer.c                      | 2 +-
+ 5 files changed, 10 insertions(+), 7 deletions(-)
 
-diff --git a/tools/perf/util/evsel.c b/tools/perf/util/evsel.c
-index 8c54df61fe64..b16f1621ce3e 100644
---- a/tools/perf/util/evsel.c
-+++ b/tools/perf/util/evsel.c
-@@ -231,6 +231,7 @@ void perf_evsel__init(struct perf_evsel *evsel,
- 	evsel->bpf_fd	   = -1;
- 	INIT_LIST_HEAD(&evsel->node);
- 	INIT_LIST_HEAD(&evsel->config_terms);
-+	INIT_LIST_HEAD(&evsel->drv_config_terms);
- 	perf_evsel__object.init(evsel);
- 	evsel->sample_size = __perf_evsel__sample_size(attr->sample_type);
- 	perf_evsel__calc_id_pos(evsel);
-diff --git a/tools/perf/util/evsel.h b/tools/perf/util/evsel.h
-index 8a4a6c9f1480..e25fd5e4c740 100644
---- a/tools/perf/util/evsel.h
-+++ b/tools/perf/util/evsel.h
-@@ -46,6 +46,7 @@ enum {
- 	PERF_EVSEL__CONFIG_TERM_INHERIT,
- 	PERF_EVSEL__CONFIG_TERM_MAX_STACK,
- 	PERF_EVSEL__CONFIG_TERM_OVERWRITE,
-+	PERF_EVSEL__CONFIG_TERM_DRV_CFG,
- 	PERF_EVSEL__CONFIG_TERM_MAX,
- };
+diff --git a/arch/x86/events/intel/bts.c b/arch/x86/events/intel/bts.c
+index 0a6e393a2e62..98155c2dfcce 100644
+--- a/arch/x86/events/intel/bts.c
++++ b/arch/x86/events/intel/bts.c
+@@ -68,8 +68,10 @@ static size_t buf_size(struct page *page)
+ }
  
-@@ -57,6 +58,7 @@ struct perf_evsel_config_term {
- 		u64	freq;
- 		bool	time;
- 		char	*callgraph;
-+		char	*drv_cfg;
- 		u64	stack_user;
- 		int	max_stack;
- 		bool	inherit;
-@@ -79,6 +81,7 @@ struct perf_evsel_config_term {
-  *          PERF_SAMPLE_IDENTIFIER) in a non-sample event i.e. if sample_id_all
-  *          is used there is an id sample appended to non-sample events
-  * @priv:   And what is in its containing unnamed union are tool specific
-+ * @drv_config_terms: List of configurables sent directly to the PMU driver
+ static void *
+-bts_buffer_setup_aux(int cpu, void **pages, int nr_pages, bool overwrite)
++bts_buffer_setup_aux(struct perf_event *event, void **pages,
++		     int nr_pages, bool overwrite)
+ {
++	int cpu = event->cpu;
+ 	struct bts_buffer *buf;
+ 	struct page *page;
+ 	int node = (cpu == -1) ? cpu : cpu_to_node(cpu);
+diff --git a/arch/x86/events/intel/pt.c b/arch/x86/events/intel/pt.c
+index 04bb5fb5a8d7..5178c5de0b19 100644
+--- a/arch/x86/events/intel/pt.c
++++ b/arch/x86/events/intel/pt.c
+@@ -1003,10 +1003,11 @@ static int pt_buffer_init_topa(struct pt_buffer *buf, unsigned long nr_pages,
+  * Return:	Our private PT buffer structure.
   */
- struct perf_evsel {
- 	struct list_head	node;
-@@ -125,6 +128,7 @@ struct perf_evsel {
- 	char			*group_name;
- 	bool			cmdline_group_boundary;
- 	struct list_head	config_terms;
-+	struct list_head	drv_config_terms;
- 	int			bpf_fd;
- };
- 
-diff --git a/tools/perf/util/parse-events.c b/tools/perf/util/parse-events.c
-index 6c913c3914fb..697a21c11fc5 100644
---- a/tools/perf/util/parse-events.c
-+++ b/tools/perf/util/parse-events.c
-@@ -303,7 +303,8 @@ static struct perf_evsel *
- __add_event(struct list_head *list, int *idx,
- 	    struct perf_event_attr *attr,
- 	    char *name, struct cpu_map *cpus,
--	    struct list_head *config_terms)
-+	    struct list_head *config_terms,
-+	    struct list_head *drv_config_terms)
+ static void *
+-pt_buffer_setup_aux(int cpu, void **pages, int nr_pages, bool snapshot)
++pt_buffer_setup_aux(struct perf_event *event, void **pages,
++		    int nr_pages, bool snapshot)
  {
- 	struct perf_evsel *evsel;
+ 	struct pt_buffer *buf;
+-	int node, ret;
++	int node, ret, cpu = event->cpu;
  
-@@ -322,6 +323,10 @@ __add_event(struct list_head *list, int *idx,
- 	if (config_terms)
- 		list_splice(config_terms, &evsel->config_terms);
- 
-+	if (drv_config_terms)
-+		list_splice(drv_config_terms, &evsel->drv_config_terms);
-+
-+
- 	list_add_tail(&evsel->node, list);
- 	return evsel;
+ 	if (!nr_pages)
+ 		return NULL;
+diff --git a/drivers/hwtracing/coresight/coresight-etm-perf.c b/drivers/hwtracing/coresight/coresight-etm-perf.c
+index 755125f7917f..f4174f36c5a0 100644
+--- a/drivers/hwtracing/coresight/coresight-etm-perf.c
++++ b/drivers/hwtracing/coresight/coresight-etm-perf.c
+@@ -155,7 +155,7 @@ static void etm_free_aux(void *data)
+ 	schedule_work(&event_data->work);
  }
-@@ -330,7 +335,8 @@ static int add_event(struct list_head *list, int *idx,
- 		     struct perf_event_attr *attr, char *name,
- 		     struct list_head *config_terms)
+ 
+-static void *etm_setup_aux(int event_cpu, void **pages,
++static void *etm_setup_aux(struct perf_event *event, void **pages,
+ 			   int nr_pages, bool overwrite)
  {
--	return __add_event(list, idx, attr, name, NULL, config_terms) ? 0 : -ENOMEM;
-+	return __add_event(list, idx, attr, name,
-+			   NULL, config_terms, NULL) ? 0 : -ENOMEM;
- }
+ 	int cpu;
+@@ -163,7 +163,7 @@ static void *etm_setup_aux(int event_cpu, void **pages,
+ 	struct coresight_device *sink;
+ 	struct etm_event_data *event_data = NULL;
  
- static int parse_aliases(char *str, const char *names[][PERF_EVSEL__MAX_ALIASES], int size)
-@@ -904,6 +910,7 @@ static const char *config_term_names[__PARSE_EVENTS__TERM_TYPE_NR] = {
- 	[PARSE_EVENTS__TERM_TYPE_MAX_STACK]		= "max-stack",
- 	[PARSE_EVENTS__TERM_TYPE_OVERWRITE]		= "overwrite",
- 	[PARSE_EVENTS__TERM_TYPE_NOOVERWRITE]		= "no-overwrite",
-+	[PARSE_EVENTS__TERM_TYPE_DRV_CFG]		= "driver-config",
- };
+-	event_data = alloc_event_data(event_cpu);
++	event_data = alloc_event_data(event->cpu);
+ 	if (!event_data)
+ 		return NULL;
  
- static bool config_term_shrinked;
-@@ -1034,7 +1041,8 @@ static int config_term_pmu(struct perf_event_attr *attr,
- 			   struct parse_events_term *term,
- 			   struct parse_events_error *err)
- {
--	if (term->type_term == PARSE_EVENTS__TERM_TYPE_USER)
-+	if (term->type_term == PARSE_EVENTS__TERM_TYPE_USER ||
-+	    term->type_term == PARSE_EVENTS__TERM_TYPE_DRV_CFG)
- 		/*
- 		 * Always succeed for sysfs terms, as we dont know
- 		 * at this point what type they need to have.
-@@ -1083,10 +1091,7 @@ static int config_attr(struct perf_event_attr *attr,
- 	return 0;
- }
+diff --git a/include/linux/perf_event.h b/include/linux/perf_event.h
+index 59d61a12cf9d..5275b6594989 100644
+--- a/include/linux/perf_event.h
++++ b/include/linux/perf_event.h
+@@ -407,7 +407,7 @@ struct pmu {
+ 	/*
+ 	 * Set up pmu-private data structures for an AUX area
+ 	 */
+-	void *(*setup_aux)		(int cpu, void **pages,
++	void *(*setup_aux)		(struct perf_event *event, void **pages,
+ 					 int nr_pages, bool overwrite);
+ 					/* optional */
  
--static int get_config_terms(struct list_head *head_config,
--			    struct list_head *head_terms __maybe_unused)
--{
--#define ADD_CONFIG_TERM(__type, __name, __val)			\
-+#define ADD_CONFIG_TERM(__type, __name, __val, __head_terms)	\
- do {								\
- 	struct perf_evsel_config_term *__t;			\
- 								\
-@@ -1097,42 +1102,53 @@ do {								\
- 	INIT_LIST_HEAD(&__t->list);				\
- 	__t->type       = PERF_EVSEL__CONFIG_TERM_ ## __type;	\
- 	__t->val.__name = __val;				\
--	list_add_tail(&__t->list, head_terms);			\
-+	list_add_tail(&__t->list, __head_terms);		\
- } while (0)
- 
-+static int get_config_terms(struct list_head *head_config,
-+			    struct list_head *head_terms)
-+{
- 	struct parse_events_term *term;
- 
- 	list_for_each_entry(term, head_config, list) {
- 		switch (term->type_term) {
- 		case PARSE_EVENTS__TERM_TYPE_SAMPLE_PERIOD:
--			ADD_CONFIG_TERM(PERIOD, period, term->val.num);
-+			ADD_CONFIG_TERM(PERIOD, period,
-+					term->val.num, head_terms);
- 			break;
- 		case PARSE_EVENTS__TERM_TYPE_SAMPLE_FREQ:
--			ADD_CONFIG_TERM(FREQ, freq, term->val.num);
-+			ADD_CONFIG_TERM(FREQ, freq, term->val.num, head_terms);
- 			break;
- 		case PARSE_EVENTS__TERM_TYPE_TIME:
--			ADD_CONFIG_TERM(TIME, time, term->val.num);
-+			ADD_CONFIG_TERM(TIME, time, term->val.num, head_terms);
- 			break;
- 		case PARSE_EVENTS__TERM_TYPE_CALLGRAPH:
--			ADD_CONFIG_TERM(CALLGRAPH, callgraph, term->val.str);
-+			ADD_CONFIG_TERM(CALLGRAPH, callgraph,
-+					term->val.str, head_terms);
- 			break;
- 		case PARSE_EVENTS__TERM_TYPE_STACKSIZE:
--			ADD_CONFIG_TERM(STACK_USER, stack_user, term->val.num);
-+			ADD_CONFIG_TERM(STACK_USER, stack_user,
-+					term->val.num, head_terms);
- 			break;
- 		case PARSE_EVENTS__TERM_TYPE_INHERIT:
--			ADD_CONFIG_TERM(INHERIT, inherit, term->val.num ? 1 : 0);
-+			ADD_CONFIG_TERM(INHERIT, inherit,
-+					term->val.num ? 1 : 0, head_terms);
- 			break;
- 		case PARSE_EVENTS__TERM_TYPE_NOINHERIT:
--			ADD_CONFIG_TERM(INHERIT, inherit, term->val.num ? 0 : 1);
-+			ADD_CONFIG_TERM(INHERIT, inherit,
-+					term->val.num ? 0 : 1, head_terms);
- 			break;
- 		case PARSE_EVENTS__TERM_TYPE_MAX_STACK:
--			ADD_CONFIG_TERM(MAX_STACK, max_stack, term->val.num);
-+			ADD_CONFIG_TERM(MAX_STACK, max_stack,
-+					term->val.num, head_terms);
- 			break;
- 		case PARSE_EVENTS__TERM_TYPE_OVERWRITE:
--			ADD_CONFIG_TERM(OVERWRITE, overwrite, term->val.num ? 1 : 0);
-+			ADD_CONFIG_TERM(OVERWRITE, overwrite,
-+					term->val.num ? 1 : 0, head_terms);
- 			break;
- 		case PARSE_EVENTS__TERM_TYPE_NOOVERWRITE:
--			ADD_CONFIG_TERM(OVERWRITE, overwrite, term->val.num ? 0 : 1);
-+			ADD_CONFIG_TERM(OVERWRITE, overwrite,
-+					term->val.num ? 0 : 1, head_terms);
- 			break;
- 		default:
- 			break;
-@@ -1142,6 +1158,21 @@ do {								\
- 	return 0;
- }
- 
-+static int get_drv_config_terms(struct list_head *head_config,
-+				struct list_head *head_terms)
-+{
-+	struct parse_events_term *term;
-+
-+	list_for_each_entry(term, head_config, list) {
-+		if (term->type_term != PARSE_EVENTS__TERM_TYPE_DRV_CFG)
-+			continue;
-+
-+		ADD_CONFIG_TERM(DRV_CFG, drv_cfg, term->val.str, head_terms);
-+	}
-+
-+	return 0;
-+}
-+
- int parse_events_add_tracepoint(struct list_head *list, int *idx,
- 				const char *sys, const char *event,
- 				struct parse_events_error *err,
-@@ -1197,6 +1228,7 @@ int parse_events_add_pmu(struct parse_events_evlist *data,
- 	struct perf_pmu *pmu;
- 	struct perf_evsel *evsel;
- 	LIST_HEAD(config_terms);
-+	LIST_HEAD(drv_config_terms);
- 
- 	pmu = perf_pmu__find(name);
- 	if (!pmu)
-@@ -1211,7 +1243,8 @@ int parse_events_add_pmu(struct parse_events_evlist *data,
- 
- 	if (!head_config) {
- 		attr.type = pmu->type;
--		evsel = __add_event(list, &data->idx, &attr, NULL, pmu->cpus, NULL);
-+		evsel = __add_event(list, &data->idx, &attr,
-+				    NULL, pmu->cpus, NULL, NULL);
- 		return evsel ? 0 : -ENOMEM;
+diff --git a/kernel/events/ring_buffer.c b/kernel/events/ring_buffer.c
+index ae9b90dc9a5a..56aba90af437 100644
+--- a/kernel/events/ring_buffer.c
++++ b/kernel/events/ring_buffer.c
+@@ -616,7 +616,7 @@ int rb_alloc_aux(struct ring_buffer *rb, struct perf_event *event,
+ 			goto out;
  	}
  
-@@ -1228,12 +1261,15 @@ int parse_events_add_pmu(struct parse_events_evlist *data,
- 	if (get_config_terms(head_config, &config_terms))
- 		return -ENOMEM;
- 
-+	if (get_drv_config_terms(head_config, &drv_config_terms))
-+		return -ENOMEM;
-+
- 	if (perf_pmu__config(pmu, &attr, head_config, data->error))
- 		return -EINVAL;
- 
- 	evsel = __add_event(list, &data->idx, &attr,
- 			    get_config_name(head_config), pmu->cpus,
--			    &config_terms);
-+			    &config_terms, &drv_config_terms);
- 	if (evsel) {
- 		evsel->unit = info.unit;
- 		evsel->scale = info.scale;
-diff --git a/tools/perf/util/parse-events.h b/tools/perf/util/parse-events.h
-index d1edbf8cc66a..8d09a976fca8 100644
---- a/tools/perf/util/parse-events.h
-+++ b/tools/perf/util/parse-events.h
-@@ -71,6 +71,7 @@ enum {
- 	PARSE_EVENTS__TERM_TYPE_MAX_STACK,
- 	PARSE_EVENTS__TERM_TYPE_NOOVERWRITE,
- 	PARSE_EVENTS__TERM_TYPE_OVERWRITE,
-+	PARSE_EVENTS__TERM_TYPE_DRV_CFG,
- 	__PARSE_EVENTS__TERM_TYPE_NR,
- };
- 
-diff --git a/tools/perf/util/parse-events.l b/tools/perf/util/parse-events.l
-index 7a2519435da0..1f7e11a6c5b3 100644
---- a/tools/perf/util/parse-events.l
-+++ b/tools/perf/util/parse-events.l
-@@ -53,6 +53,16 @@ static int str(yyscan_t scanner, int token)
- 	return token;
- }
- 
-+static int drv_str(yyscan_t scanner, int token)
-+{
-+	YYSTYPE *yylval = parse_events_get_lval(scanner);
-+	char *text = parse_events_get_text(scanner);
-+
-+	/* Strip off the '@' */
-+	yylval->str = strdup(text + 1);
-+	return token;
-+}
-+
- #define REWIND(__alloc)				\
- do {								\
- 	YYSTYPE *__yylval = parse_events_get_lval(yyscanner);	\
-@@ -124,6 +134,7 @@ num_hex		0x[a-fA-F0-9]+
- num_raw_hex	[a-fA-F0-9]+
- name		[a-zA-Z_*?][a-zA-Z0-9_*?.]*
- name_minus	[a-zA-Z_*?][a-zA-Z0-9\-_*?.:]*
-+drv_cfg_term	[a-zA-Z0-9_\.]+(=[a-zA-Z0-9_*?\.:]+)?
- /* If you add a modifier you need to update check_modifier() */
- modifier_event	[ukhpPGHSDI]+
- modifier_bp	[rwx]{1,3}
-@@ -209,6 +220,7 @@ no-overwrite		{ return term(yyscanner, PARSE_EVENTS__TERM_TYPE_NOOVERWRITE); }
- {name_minus}		{ return str(yyscanner, PE_NAME); }
- \[all\]			{ return PE_ARRAY_ALL; }
- "["			{ BEGIN(array); return '['; }
-+@{drv_cfg_term}		{ return drv_str(yyscanner, PE_DRV_CFG_TERM); }
- }
- 
- <mem>{
-diff --git a/tools/perf/util/parse-events.y b/tools/perf/util/parse-events.y
-index 5be4a5f216d6..879115f93edc 100644
---- a/tools/perf/util/parse-events.y
-+++ b/tools/perf/util/parse-events.y
-@@ -49,6 +49,7 @@ static void inc_group_count(struct list_head *list,
- %token PE_ERROR
- %token PE_PMU_EVENT_PRE PE_PMU_EVENT_SUF PE_KERNEL_PMU_EVENT
- %token PE_ARRAY_ALL PE_ARRAY_RANGE
-+%token PE_DRV_CFG_TERM
- %type <num> PE_VALUE
- %type <num> PE_VALUE_SYM_HW
- %type <num> PE_VALUE_SYM_SW
-@@ -63,6 +64,7 @@ static void inc_group_count(struct list_head *list,
- %type <str> PE_MODIFIER_BP
- %type <str> PE_EVENT_NAME
- %type <str> PE_PMU_EVENT_PRE PE_PMU_EVENT_SUF PE_KERNEL_PMU_EVENT
-+%type <str> PE_DRV_CFG_TERM
- %type <num> value_sym
- %type <head> event_config
- %type <head> opt_event_config
-@@ -599,6 +601,15 @@ PE_NAME array '=' PE_VALUE
- 	term->array = $2;
- 	$$ = term;
- }
-+|
-+PE_DRV_CFG_TERM
-+{
-+	struct parse_events_term *term;
-+
-+	ABORT_ON(parse_events_term__str(&term, PARSE_EVENTS__TERM_TYPE_DRV_CFG,
-+					$1, $1, &@1, NULL));
-+	$$ = term;
-+}
- 
- array:
- '[' array_terms ']'
+-	rb->aux_priv = event->pmu->setup_aux(event->cpu, rb->aux_pages, nr_pages,
++	rb->aux_priv = event->pmu->setup_aux(event, rb->aux_pages, nr_pages,
+ 					     overwrite);
+ 	if (!rb->aux_priv)
+ 		goto out;
 -- 
 2.7.4
