@@ -1,52 +1,62 @@
-From: vgoyal@redhat.com (Vivek Goyal)
-Date: Wed, 20 Jul 2016 08:27:37 -0400
-Subject: [RFC 0/3] extend kexec_file_load system call
-In-Reply-To: <8a8b2909-7f95-03e4-bf8e-dd29b5fc1fba@gmail.com>
-References: <87twfunneg.fsf@linux.vnet.ibm.com>
- <20160713073657.GX1041@n2100.armlinux.org.uk>
- <87poqinf9m.fsf@linux.vnet.ibm.com>
- <20160713082639.GZ1041@n2100.armlinux.org.uk>
- <20160713130338.GB16900@redhat.com>
- <20160713174009.GA1041@n2100.armlinux.org.uk>
- <20160713182247.GA25232@redhat.com>
- <1468845964.2800.3.camel@gmail.com>
- <20160718132629.GB32512@redhat.com>
- <8a8b2909-7f95-03e4-bf8e-dd29b5fc1fba@gmail.com>
-Message-ID: <20160720122737.GA11361@redhat.com>
+From: quentin.schulz@free-electrons.com (Quentin Schulz)
+Date: Wed, 20 Jul 2016 14:37:40 +0200
+Subject: [PATCH v2 2/4] iio: adc: add support for Allwinner SoCs ADC
+In-Reply-To: <e24c8b63-7774-66d2-3317-43fd5598ecc9@kernel.org>
+References: <1468576754-3273-1-git-send-email-quentin.schulz@free-electrons.com>
+ <1468576754-3273-3-git-send-email-quentin.schulz@free-electrons.com>
+ <e24c8b63-7774-66d2-3317-43fd5598ecc9@kernel.org>
+Message-ID: <f6e32bf0-f043-0d34-5190-18b89920bbfd@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 20, 2016 at 01:45:42PM +1000, Balbir Singh wrote:
-> >>>>>  
-> >>>>> Command line options are not signed. I thought idea behind secureboot
-> >>>>> was to execute only trusted code and command line options don't enforce
-> >>>>> you to execute unsigned code.
-> >>>>>  
-> >>
-> >> You can set module.sig_enforce=0 and open up the system a bit assuming
-> >> that you can get a module to load with another attack
-> > 
-> > IIUC, sig_enforce bool_enable_only so it can only be enabled. Default
-> > value of it is 0 if CONFIG_MODULE_SIG_FORCE=n.
-> > 
-> > IOW, if your kernel forced signature verification, you should not be
-> > able to do sig_enforce=0. If you kernel did not have
-> > CONFIG_MODULE_SIG_FORCE=y, then sig_enforce should be 0 by default anyway
-> > and you are not making it worse using command line.
-> > 
+On 18/07/2016 15:18, Jonathan Cameron wrote:
+[...]
+>> +
+>> +	if (!wait_for_completion_timeout(&info->completion,
+>> +					 msecs_to_jiffies(100))) {
+>> +		ret = -ETIMEDOUT;
+>> +		goto out;
+>> +	}
+>> +
+>> +	if (info->flags & SUNXI_GPADC_ARCH_SUN4I)
+>> +		*val = info->temp_data * 133 - 257000;
+> Why report as processed?  I'd just report them as raw with the scale
+> and offset provided.  It's not a big thing, but if we can leave it so
+> that the conversion only occurs when desired, why not?
 > 
-> OK.. I checked and you are right, but that is an example and there are
-> other things like security=, thermal.*, nosmep, nosmap that need auditing
-> for safety and might hurt the system security if used. I still think
-> think that assuming you can pass any command line without breaking security
-> is a broken argument.
+> For in kernel users, this all happen 'automagically' anyway ;)
+> 
 
-I agree that if some command line option allows running unsigned code
-at ring 0, then we probably should disable that on secureboot enabled
-boot.
+Mmmmh, in the code above we apply the scale on the raw value and then
+the offset. While in iio_convert_raw_to_processed
+(http://lxr.free-electrons.com/source/drivers/iio/inkern.c#L507), the
+offset is applied before the scale.
 
-In fact, there were bunch of patches which made things tighter on
-secureboot enabled machines from matthew garrett. AFAIK, these patches
-never went upstream.
+The way would be to factorize the computation by scale:
+Now: *val = raw * scale + offset
+Then: *val = (raw + offset/scale) * scale
 
-Vivek
+But the offset is an integer and offset/scale is therefore rounded.
+Currently, we have the following values:
+sun4i: -257000/133 = -1932.3308270676691
+sun5i: -144700/100 = -1447
+sun6i: -271000/167 = -1622.754491017964
+
+Do we accept such rounding?
+
+If not, we either stay with the processed value in read_raw or patch
+inkern to add an offset to apply after having applied the scale to the
+raw value (val2 from iio_channel_read is yet unused with
+IIO_CHAN_INFO_OFFSET for example, we could use that to specify an
+offset2 to apply after the switch(scale_type)-case).
+
+[...]
+Quentin
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160720/b66e41b3/attachment.sig>
