@@ -1,39 +1,67 @@
-From: amitoj1606@gmail.com (Amitoj Kaur Chawla)
-Date: Wed, 20 Jul 2016 14:10:01 +0530
-Subject: [PATCH] ARM: sa1111: Use clk_disable_unprepare
-Message-ID: <20160720084000.GA27003@amitoj-Inspiron-3542>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Wed, 20 Jul 2016 11:50:26 +0300
+Subject: [PATCH v2 0/6] dmaengine:omap-dma: Linked List transfer for slave_sg
+Message-ID: <20160720085032.2955-1-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace clk_disable and clk_unprepare with clk_disable_unprepare.
+Hi,
 
-The Coccinelle semantic patch used to make this change is as follows:
-@@
-expression e;
-@@
+Changes since v1:
+- dropped the patch changing the sequence of vchan_cookie_complete and
+  omap_dma_start_sg in omap_dma_callback
+- Use appropriate macros to find omap_chan and omap_desc in patch 6
+- Use per-device pool instead of per-channel pools.
 
-- clk_disable(e);
-- clk_unprepare(e);
-+ clk_disable_unprepare(e);
+The following series with the final patch will add support for sDMA Linked List
+transfer support.
+Linked List is supported by sDMA in OMAP3630+ (OMAP4/5, dra7 family).
+If the descriptor load feature is present we can create the descriptors for each
+SG beforehand and let sDMA to walk them through.
+This way the number of sDMA interrupts the kernel need to handle will drop
+dramatically.
 
-Signed-off-by: Amitoj Kaur Chawla <amitoj1606@gmail.com>
+I have gathered some numbers to show the difference.
+
+Booting up the board with filesystem on SD card for example:
+# cat /proc/interrupts | grep dma
+W/o LinkedList support:
+ 27:       4436          0     WUGEN  13 Level     omap-dma-engine
+
+Same board/filesystem with this patch:
+ 27:       1027          0     WUGEN  13 Level     omap-dma-engine
+
+Or copying files from SD card to eMCC:
+# du -h /usr
+2.1G    /usr/
+# find /usr/ -type f | wc -l
+232001
+
+# cp -r /usr/* /mnt/emmc/tmp/
+
+W/o LinkedList we see ~761069 DMA interrupts.
+With LinkedList support it is down to ~269314 DMA interrupts.
+
+With the decreased DMA interrupt number the CPU load is dropping
+significantly as well.
+
+The series depends on the interleaved transfer support patch I have sent couple
+of days ago:
+https://lkml.org/lkml/2016/7/12/216
+
+Regards,
+Peter
 ---
- arch/arm/common/sa1111.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+Peter Ujfalusi (6):
+  dmaengine: omap-dma: Simplify omap_dma_start_sg parameter list
+  dmaengine: omap-dma: Simplify omap_dma_callback
+  dmaengine: omap-dma: Dynamically allocate memory for lch_map
+  dmaengine: omap-dma: Add more debug information when freeing channel
+  dmaengine: omap-dma: Use pointer to omap_sg in slave_sg setup's loop
+  dmaengine: omap-dma: Support for LinkedList transfer of slave_sg
 
-diff --git a/arch/arm/common/sa1111.c b/arch/arm/common/sa1111.c
-index 3d22494..368d571 100644
---- a/arch/arm/common/sa1111.c
-+++ b/arch/arm/common/sa1111.c
-@@ -831,8 +831,7 @@ static void __sa1111_remove(struct sa1111 *sachip)
- 	sa1111_writel(0, irqbase + SA1111_WAKEEN0);
- 	sa1111_writel(0, irqbase + SA1111_WAKEEN1);
- 
--	clk_disable(sachip->clk);
--	clk_unprepare(sachip->clk);
-+	clk_disable_unprepare(sachip->clk);
- 
- 	if (sachip->irq != NO_IRQ) {
- 		irq_set_chained_handler_and_data(sachip->irq, NULL, NULL);
--- 
-1.9.1
+ drivers/dma/omap-dma.c | 234 +++++++++++++++++++++++++++++++++++++++++++------
+ 1 file changed, 207 insertions(+), 27 deletions(-)
+
+--
+2.9.2
