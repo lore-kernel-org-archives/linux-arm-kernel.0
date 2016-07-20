@@ -1,40 +1,61 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 20 Jul 2016 16:11:39 +0200
-Subject: [PATCH v2 4/4] ARM: sun5i: chip: Add status LED
-In-Reply-To: <20160720141139.25098-1-maxime.ripard@free-electrons.com>
-References: <20160720141139.25098-1-maxime.ripard@free-electrons.com>
-Message-ID: <20160720141139.25098-5-maxime.ripard@free-electrons.com>
+From: cmo@melexis.com (Crt Mori)
+Date: Wed, 20 Jul 2016 16:15:39 +0200
+Subject: [PATCH v2 2/4] iio: adc: add support for Allwinner SoCs ADC
+In-Reply-To: <f6e32bf0-f043-0d34-5190-18b89920bbfd@free-electrons.com>
+References: <1468576754-3273-1-git-send-email-quentin.schulz@free-electrons.com>
+ <1468576754-3273-3-git-send-email-quentin.schulz@free-electrons.com>
+ <e24c8b63-7774-66d2-3317-43fd5598ecc9@kernel.org>
+ <f6e32bf0-f043-0d34-5190-18b89920bbfd@free-electrons.com>
+Message-ID: <CAKv63us_NoRq=B+koC823yCz_-7Dz8HerGLDbh3tkUW-zU4ecQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The CHIP has a status LED connected to one of the AXP GPIOs. Add the
-gpio-leds node to be able to use the proper LED framework to control it.
-
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- arch/arm/boot/dts/sun5i-r8-chip.dts | 10 ++++++++++
- 1 file changed, 10 insertions(+)
-
-diff --git a/arch/arm/boot/dts/sun5i-r8-chip.dts b/arch/arm/boot/dts/sun5i-r8-chip.dts
-index f694482bdeb6..b68a12374b35 100644
---- a/arch/arm/boot/dts/sun5i-r8-chip.dts
-+++ b/arch/arm/boot/dts/sun5i-r8-chip.dts
-@@ -64,6 +64,16 @@
- 	chosen {
- 		stdout-path = "serial0:115200n8";
- 	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+
-+		status {
-+			label = "chip:white:status";
-+			gpios = <&axp_gpio 2 GPIO_ACTIVE_HIGH>;
-+			default-state = "on";
-+		};
-+	};
- };
- 
- &be0 {
--- 
-2.9.0
+On 20 July 2016 at 14:37, Quentin Schulz
+<quentin.schulz@free-electrons.com> wrote:
+> On 18/07/2016 15:18, Jonathan Cameron wrote:
+> [...]
+>>> +
+>>> +    if (!wait_for_completion_timeout(&info->completion,
+>>> +                                     msecs_to_jiffies(100))) {
+>>> +            ret = -ETIMEDOUT;
+>>> +            goto out;
+>>> +    }
+>>> +
+>>> +    if (info->flags & SUNXI_GPADC_ARCH_SUN4I)
+>>> +            *val = info->temp_data * 133 - 257000;
+>> Why report as processed?  I'd just report them as raw with the scale
+>> and offset provided.  It's not a big thing, but if we can leave it so
+>> that the conversion only occurs when desired, why not?
+>>
+>> For in kernel users, this all happen 'automagically' anyway ;)
+>>
+>
+> Mmmmh, in the code above we apply the scale on the raw value and then
+> the offset. While in iio_convert_raw_to_processed
+> (http://lxr.free-electrons.com/source/drivers/iio/inkern.c#L507), the
+> offset is applied before the scale.
+>
+> The way would be to factorize the computation by scale:
+> Now: *val = raw * scale + offset
+> Then: *val = (raw + offset/scale) * scale
+>
+> But the offset is an integer and offset/scale is therefore rounded.
+> Currently, we have the following values:
+> sun4i: -257000/133 = -1932.3308270676691
+> sun5i: -144700/100 = -1447
+> sun6i: -271000/167 = -1622.754491017964
+>
+> Do we accept such rounding?
+How much does this rounding bring as mistake on end result and is this
+acceptable for you? You can always multiply it by 1000 or more to get
+the precision you want out.
+>
+> If not, we either stay with the processed value in read_raw or patch
+> inkern to add an offset to apply after having applied the scale to the
+> raw value (val2 from iio_channel_read is yet unused with
+> IIO_CHAN_INFO_OFFSET for example, we could use that to specify an
+> offset2 to apply after the switch(scale_type)-case).
+>
+> [...]
+> Quentin
+>
