@@ -1,32 +1,29 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Wed, 20 Jul 2016 18:22:39 +1000
-Subject: [PATCH 2/4] drivers/clocksource/moxart: Refactor enable/disable
-In-Reply-To: <20160720081400.GA2705@linaro.org>
-References: <1462797169-14512-1-git-send-email-joel@jms.id.au>
- <1462797169-14512-3-git-send-email-joel@jms.id.au>
- <CACPK8XfJ2e1kr-WftidvqsoYew7LqPiNo0sw7opgh8UH=3q_3A@mail.gmail.com>
- <20160510130414.GE14952@linaro.org>
- <CACPK8XdK35p9rxr8et58omvQExjdri20yCq91LGocnPRYpGLQQ@mail.gmail.com>
- <20160720081400.GA2705@linaro.org>
-Message-ID: <1469002959.8568.102.camel@kernel.crashing.org>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 20 Jul 2016 10:29:35 +0100
+Subject: [PATCH 1/1] rpmsg: virtio_rpmsg_bus: Fix randomly placed semi-colon
+Message-ID: <20160720092935.5902-1-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2016-07-20 at 10:14 +0200, Daniel Lezcano wrote:
-> 
-> actually I forgot to include your patchset which is no longer applying?
-> correctly and the conflicts are not trivials (easy but not trivial). It is a?
-> bit late to ask for a last minute pull. Sorry for that.
-> 
-> Please respin and resend your patchset, I will include it in my tree?
-> immediately so that won't happen again. The patch 1/4 is no longer needed.
-> 
-> If there is a really urgent need of this series, please let us know and?
-> Thomas can take a decision accordingly.
+It should never have been there in the first place.
 
-I think all the other bits to have basic support for the Aspeed SoC are
-in except this one, so it would be nice for this to make the merge
-window...
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ drivers/rpmsg/virtio_rpmsg_bus.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Cheers,
-Ben.
+diff --git a/drivers/rpmsg/virtio_rpmsg_bus.c b/drivers/rpmsg/virtio_rpmsg_bus.c
+index fe03b2a..9823178 100644
+--- a/drivers/rpmsg/virtio_rpmsg_bus.c
++++ b/drivers/rpmsg/virtio_rpmsg_bus.c
+@@ -865,7 +865,7 @@ static void rpmsg_recv_done(struct virtqueue *rvq)
+ 		msgs_received++;
+ 
+ 		msg = virtqueue_get_buf(rvq, &len);
+-	};
++	}
+ 
+ 	dev_dbg(dev, "Received %u messages\n", msgs_received);
+ 
+-- 
+2.9.0
