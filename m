@@ -1,34 +1,64 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Wed, 20 Jul 2016 11:50:30 +0300
-Subject: [PATCH v2 4/6] dmaengine: omap-dma: Add more debug information when
- freeing channel
+Date: Wed, 20 Jul 2016 11:50:29 +0300
+Subject: [PATCH v2 3/6] dmaengine: omap-dma: Dynamically allocate memory for
+ lch_map
 In-Reply-To: <20160720085032.2955-1-peter.ujfalusi@ti.com>
 References: <20160720085032.2955-1-peter.ujfalusi@ti.com>
-Message-ID: <20160720085032.2955-5-peter.ujfalusi@ti.com>
+Message-ID: <20160720085032.2955-4-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Print the same information the driver prints when allocating the channel
-resources regarding to the sDMA channel.
+On OMAP1 platforms we do not have 32 channels available. Allocate the
+lch_map based on the available channels. This way we are not going to have
+more visible channels then it is available on the platform.
 
 Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
- drivers/dma/omap-dma.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ drivers/dma/omap-dma.c | 20 ++++++++++++++------
+ 1 file changed, 14 insertions(+), 6 deletions(-)
 
 diff --git a/drivers/dma/omap-dma.c b/drivers/dma/omap-dma.c
-index 6a97350ea76d..072fff7164dd 100644
+index d469f9b820e0..6a97350ea76d 100644
 --- a/drivers/dma/omap-dma.c
 +++ b/drivers/dma/omap-dma.c
-@@ -568,7 +568,8 @@ static void omap_dma_free_chan_resources(struct dma_chan *chan)
- 	vchan_free_chan_resources(&c->vc);
- 	omap_free_dma(c->dma_ch);
+@@ -35,7 +35,7 @@ struct omap_dmadev {
+ 	unsigned dma_requests;
+ 	spinlock_t irq_lock;
+ 	uint32_t irq_enable_mask;
+-	struct omap_chan *lch_map[OMAP_SDMA_CHANNELS];
++	struct omap_chan **lch_map;
+ };
  
--	dev_dbg(od->ddev.dev, "freeing channel for %u\n", c->dma_sig);
-+	dev_dbg(od->ddev.dev, "freeing channel %u used for %u\n", c->dma_ch,
-+		c->dma_sig);
- 	c->dma_sig = 0;
- }
+ struct omap_chan {
+@@ -1223,16 +1223,24 @@ static int omap_dma_probe(struct platform_device *pdev)
+ 	spin_lock_init(&od->lock);
+ 	spin_lock_init(&od->irq_lock);
  
+-	od->dma_requests = OMAP_SDMA_REQUESTS;
+-	if (pdev->dev.of_node && of_property_read_u32(pdev->dev.of_node,
+-						      "dma-requests",
+-						      &od->dma_requests)) {
++	if (!pdev->dev.of_node) {
++		od->dma_requests = od->plat->dma_attr->lch_count;
++		if (unlikely(!od->dma_requests))
++			od->dma_requests = OMAP_SDMA_REQUESTS;
++	} else if (of_property_read_u32(pdev->dev.of_node, "dma-requests",
++					&od->dma_requests)) {
+ 		dev_info(&pdev->dev,
+ 			 "Missing dma-requests property, using %u.\n",
+ 			 OMAP_SDMA_REQUESTS);
++		od->dma_requests = OMAP_SDMA_REQUESTS;
+ 	}
+ 
+-	for (i = 0; i < OMAP_SDMA_CHANNELS; i++) {
++	od->lch_map = devm_kcalloc(&pdev->dev, od->dma_requests,
++				   sizeof(*od->lch_map), GFP_KERNEL);
++	if (!od->lch_map)
++		return -ENOMEM;
++
++	for (i = 0; i < od->dma_requests; i++) {
+ 		rc = omap_dma_chan_init(od);
+ 		if (rc) {
+ 			omap_dma_free(od);
 -- 
 2.9.2
