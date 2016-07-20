@@ -1,44 +1,29 @@
-From: vgoyal@redhat.com (Vivek Goyal)
-Date: Wed, 20 Jul 2016 08:46:49 -0400
-Subject: [RFC 0/3] extend kexec_file_load system call
-In-Reply-To: <20160720083530.GK1041@n2100.armlinux.org.uk>
-References: <20160713073657.GX1041@n2100.armlinux.org.uk>
- <87poqinf9m.fsf@linux.vnet.ibm.com>
- <20160713082639.GZ1041@n2100.armlinux.org.uk>
- <20160713130338.GB16900@redhat.com>
- <20160713174009.GA1041@n2100.armlinux.org.uk>
- <20160713182247.GA25232@redhat.com>
- <1468845964.2800.3.camel@gmail.com>
- <20160718132629.GB32512@redhat.com>
- <8a8b2909-7f95-03e4-bf8e-dd29b5fc1fba@gmail.com>
- <20160720083530.GK1041@n2100.armlinux.org.uk>
-Message-ID: <20160720124649.GB11361@redhat.com>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 20 Jul 2016 07:46:56 -0500
+Subject: [PATCH 1/3] dt-bindings: add power domains to Tegra BPMP firmware
+In-Reply-To: <20160719191442.15439-1-swarren@wwwdotorg.org>
+References: <20160719191442.15439-1-swarren@wwwdotorg.org>
+Message-ID: <20160720124656.GA18773@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 20, 2016 at 09:35:30AM +0100, Russell King - ARM Linux wrote:
-> On Wed, Jul 20, 2016 at 01:45:42PM +1000, Balbir Singh wrote:
-> > > IOW, if your kernel forced signature verification, you should not be
-> > > able to do sig_enforce=0. If you kernel did not have
-> > > CONFIG_MODULE_SIG_FORCE=y, then sig_enforce should be 0 by default anyway
-> > > and you are not making it worse using command line.
-> > 
-> > OK.. I checked and you are right, but that is an example and there are
-> > other things like security=, thermal.*, nosmep, nosmap that need auditing
-> > for safety and might hurt the system security if used. I still think
-> > think that assuming you can pass any command line without breaking security
-> > is a broken argument.
+On Tue, Jul 19, 2016 at 01:14:40PM -0600, Stephen Warren wrote:
+> From: Stephen Warren <swarren@nvidia.com>
 > 
-> Quite, and you don't need to run code in a privileged environment to do
-> any of that.
+> The Tegra186 BPMP is also a provider of power domains. Enhance the device
+> tree binding to describe this.
 > 
-> It's also not trivial to protect against: new kernels gain new arguments
-> which older kernels may not know about.  No matter how much protection
-> is built into older kernels, newer kernels can become vulnerable through
-> the addition of further arguments.
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> ---
+> These patches all build on top of Joseph Lo's baseline BPMP binding patches[1]
+> and enhance them to represent a few more features of the firmware.
+> 
+> [1] https://lkml.org/lkml/2016/7/19/280
+> "[PATCH V3 01/10] Documentation: dt-bindings: mailbox: tegra: Add binding for HSP mailbox"
+> 
+>  .../bindings/firmware/nvidia,tegra186-bpmp.txt     | 10 ++++--
+>  include/dt-bindings/power/tegra186-powergate.h     | 39 ++++++++++++++++++++++
+>  2 files changed, 46 insertions(+), 3 deletions(-)
+>  create mode 100644 include/dt-bindings/power/tegra186-powergate.h
 
-If a new kernel command line option becomes an issue, new kernel can
-block that in secureboot environment. That way it helps kexec
-boot as well as regular boot.
-
-Vivek
+Acked-by: Rob Herring <robh@kernel.org>
