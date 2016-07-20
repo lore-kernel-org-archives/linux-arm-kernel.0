@@ -1,57 +1,160 @@
-From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Wed, 20 Jul 2016 00:13:31 -0400
-Subject: [PATCH 2/3] ARM: pxa: add module.h for corgi symbol_get/symbol_put
- usage
-In-Reply-To: <20160720041332.30789-1-paul.gortmaker@windriver.com>
-References: <20160720041332.30789-1-paul.gortmaker@windriver.com>
-Message-ID: <20160720041332.30789-3-paul.gortmaker@windriver.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Wed, 20 Jul 2016 13:22:05 +0900
+Subject: [PATCH v22 2/8] arm64: limit memory regions based on DT
+ property, usable-memory-range
+In-Reply-To: <20160720033909.GA30575@arm.com>
+References: <20160712050514.22307-1-takahiro.akashi@linaro.org>
+ <20160712050514.22307-3-takahiro.akashi@linaro.org>
+ <578D1A31.5080509@arm.com> <20160719083554.GD20774@linaro.org>
+ <20160719100616.GA20990@arm.com>
+ <20160719110120.GF20774@linaro.org>
+ <20160720033909.GA30575@arm.com>
+Message-ID: <20160720042204.GI20774@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-During unrelated work, attempting to remove an include of the
-linux/module.h in favour of "struct module;" in order to reduce
-header entanglement, we found doing so caused a build failure in
-this file.
+On Wed, Jul 20, 2016 at 11:39:11AM +0800, Dennis Chen wrote:
+> On Tue, Jul 19, 2016 at 08:01:21PM +0900, AKASHI Takahiro wrote:
+> > On Tue, Jul 19, 2016 at 06:06:18PM +0800, Dennis Chen wrote:
+> > > Hello AKASHI,
+> > > 
+> > > On Tue, Jul 19, 2016 at 05:35:55PM +0900, AKASHI Takahiro wrote:
+> > > > James,
+> > > >
+> > > > On Mon, Jul 18, 2016 at 07:04:33PM +0100, James Morse wrote:
+> > > > > Hi!
+> > > > >
+> > > > > (CC: Dennis Chen)
+> > > > >
+> > > > > On 12/07/16 06:05, AKASHI Takahiro wrote:
+> > > > > > Crash dump kernel will be run with a limited range of memory as System
+> > > > > > RAM.
+> > > > > >
+> > > > > > On arm64, we will use a device-tree property under /chosen,
+> > > > > >    linux,usable-memory-range = <BASE SIZE>
+> > > > > > in order for primary kernel either on uefi or non-uefi (device tree only)
+> > > > > > system to hand over the information about usable memory region to crash
+> > > > > > dump kernel. This property will supercede entries in uefi memory map table
+> > > > > > and "memory" nodes in a device tree.
+> > > > >
+> > > > > > diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+> > > > > > index 51b1302..d8b296f 100644
+> > > > > > --- a/arch/arm64/mm/init.c
+> > > > > > +++ b/arch/arm64/mm/init.c
+> > > > > > @@ -300,10 +300,48 @@ static int __init early_mem(char *p)
+> > > > > >  }
+> > > > > >  early_param("mem", early_mem);
+> > > > > >
+> > > > > > +static int __init early_init_dt_scan_usablemem(unsigned long node,
+> > > > > > +         const char *uname, int depth, void *data)
+> > > > > > +{
+> > > > > > + struct memblock_region *usablemem = (struct memblock_region *)data;
+> > > > > > + const __be32 *reg;
+> > > > > > + int len;
+> > > > > > +
+> > > > > > + usablemem->size = 0;
+> > > > > > +
+> > > > > > + if (depth != 1 || strcmp(uname, "chosen") != 0)
+> > > > > > +         return 0;
+> > > > > > +
+> > > > > > + reg = of_get_flat_dt_prop(node, "linux,usable-memory-range", &len);
+> > > > > > + if (!reg || (len < (dt_root_addr_cells + dt_root_size_cells)))
+> > > > > > +         return 1;
+> > > > > > +
+> > > > > > + usablemem->base = dt_mem_next_cell(dt_root_addr_cells, &reg);
+> > > > > > + usablemem->size = dt_mem_next_cell(dt_root_size_cells, &reg);
+> > > > > > +
+> > > > > > + return 1;
+> > > > > > +}
+> > > > > > +
+> > > > > > +static void __init fdt_enforce_memory_region(void)
+> > > > > > +{
+> > > > > > + struct memblock_region reg;
+> > > > > > +
+> > > > > > + of_scan_flat_dt(early_init_dt_scan_usablemem, &reg);
+> > > > > > +
+> > > > > > + if (reg.size) {
+> > > > > > +         memblock_remove(0, PAGE_ALIGN(reg.base));
+> > > > > > +         memblock_remove(round_down(reg.base + reg.size, PAGE_SIZE),
+> > > > > > +                         ULLONG_MAX);
+> > > > >
+> > > 
+> > > According to the panic message from James, I guess the ACPI regions are out of the range
+> > > [reg.base, reg.base + reg.size] and removed by your above codes. On ARM64, those ACPI
+> > > regions have been added into memblock and marked as NOMAP, so I think it should be
+> > > easy to adapt my fix to retain the NOMAP regions here
+> > 
+> > See below.
+> > 
+> > > Thanks,
+> > > Dennis
+> > > 
+> > > > > I think this is a new way to trip the problem Dennis Chen has been working on
+> > > > > [0]. If I kdump with --reuse-cmdline on a kernel booted with 'acpi=on', I get
+> > > > > the panic below [1]...
+> > > >
+> > > > Yeah, it can be.
+> > > >
+> > > > > It looks like Dennis's fix involves changes in mm/memblock.c, maybe they can be
+> > > > > extended to support a range instead of just a limit?
+> > > > >
+> > > > > (It looks like x86 explicitly adds the acpi regions to the crash-kernels memory
+> > > > > map in crash_setup_memmap_entries()).
+> > > > >
+> > > > >
+> > > > >
+> > > > > Is it possible for the kernel text to be outside this range? (a bug in
+> > > > > kexec-tools, or another user of the DT property) If we haven't already failed in
+> > > > > this case, it may be worth printing a warning, or refusing to
+> > > > > restrict-memory/expose-vmcore.
+> > > >
+> > > > In my implementation of kdump, the usable memory for crash dump
+> > > > kernel will be allocated within memblock.memory after ACPI-related
+> > > > regions have been mapped. "linux,usable-memory-range" indicates
+> > > > this exact memory range.
+> > > > On crash dump kernel, my fdt_enforce_memory_region() in arm64_memblock_init()
+> > > > will exclude all the other regions from memblock.memory.
+> > > > So the kernel (with acpi=on) won't recognize ACPI-regions as
+> > > > normal memory, and map them by ioremap().
+> > > >
+> > > > I thought that it was safe, but actually not due to unaligned accesses.
+> > > > As you suggested, we will probably be able to do the same thing of
+> > > > Chen's solution in fdt_enforce_memory_region().
+> > 
+> > memblock_isolate_range() and memblock_remove_range() are not exported.
+> > So we'd better implement an unified interface like:
+> >     memblock_cap_memory_range(phys_addr_t base, size_t size);
+> > 
+> > If base == NULL, it would behave in the exact same way as your
+> > memblock_mem_limit_remove_map().
+> >
+> Hello AKASHI, it's not reasonable to change the prototype of an existing memblock API
 
-mach-pxa/corgi.c: In function 'corgi_bl_kick_battery':
-mach-pxa/corgi.c:548:2: error: implicit declaration of function 'symbol_get' [-Werror=implicit-function-declaration]
-mach-pxa/corgi.c:548:12: warning: assignment makes pointer from integer without a cast [enabled by default]
-mach-pxa/corgi.c:551:3: error: implicit declaration of function 'symbol_put' [-Werror=implicit-function-declaration]
+I didn't say memblock_enforce_memory_limit(), but
+*your* memblock_memblock_remove_limit().
 
-It turns out this file uses symbol_get/symbol_put which live in the
-module.h header, but it wasn't including module.h -- which was
-being masked by the module.h in include/linux/gpio/driver.h - the
-one we want to remove/replace.
+> which will be used by other components as we did with memblock_enforce_memory_limit. 
+> Moreover the @size in you case is to specify a memory range of the memblock, which is
+> different from the @limit as an indicator of the total size of memblocks being limited. 
+> But I can be help to post an new memblock API patch to cater for your case.
 
-With ARM and GPIO being different subsystems, we'll need to get
-this in ARM 1st, and then wait a release before changing the GPIO
-header, otherwise we'll risk triggering build failures.
+Thanks, but I have already prototyped the function.
+If you don't agree to my opinion, I will have to submit
+a patch for a quite similar but different function.
+I think that nobody will accept this.
 
-Cc: Daniel Mack <daniel@zonque.org>
-Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
-Cc: Robert Jarzmik <robert.jarzmik@free.fr>
-Cc: Russell King <linux@armlinux.org.uk>
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Cc: Alexandre Courbot <gnurou@gmail.com>
-Cc: linux-omap at vger.kernel.org
-Cc: linux-gpio at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
----
- arch/arm/mach-pxa/corgi.c | 1 +
- 1 file changed, 1 insertion(+)
+-Takahiro AKASHI
 
-diff --git a/arch/arm/mach-pxa/corgi.c b/arch/arm/mach-pxa/corgi.c
-index aa952979461f..183cd3446f25 100644
---- a/arch/arm/mach-pxa/corgi.c
-+++ b/arch/arm/mach-pxa/corgi.c
-@@ -13,6 +13,7 @@
-  */
- 
- #include <linux/kernel.h>
-+#include <linux/module.h>	/* symbol_get ; symbol_put */
- #include <linux/init.h>
- #include <linux/platform_device.h>
- #include <linux/major.h>
--- 
-2.8.4
+> Thanks,
+> Dennis
+>   
+> >
+> > Thanks,
+> > -Takahiro AKASHI
+> > 
+> > > >
+> > > >
+> > > > Thanks,
+> > > > -Takahiro AKASHI
+> > > >
+> 
