@@ -1,39 +1,66 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 21 Jul 2016 08:44:08 +0900
-Subject: [PATCH v2] ARM: dts: r8a7794: Correct SDHI register size
-Message-ID: <1469058248-27880-1-git-send-email-horms+renesas@verge.net.au>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Wed, 20 Jul 2016 16:47:32 -0700
+Subject: [PATCH 3/3] watchdog: bcm2835_wdt: set WDOG_HW_RUNNING bit when
+ appropriate
+In-Reply-To: <578FEF33.9020801@prevas.dk>
+References: <1468570524-18222-1-git-send-email-rasmus.villemoes@prevas.dk>
+ <1468570524-18222-3-git-send-email-rasmus.villemoes@prevas.dk>
+ <5788E935.6080608@roeck-us.net> <578FEF33.9020801@prevas.dk>
+Message-ID: <20160720234732.GB23213@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-r8a7794 SDHI ch0 has SD_DMACR which is located in 0x324.
-This patch updates register size
+On Wed, Jul 20, 2016 at 11:37:55PM +0200, Rasmus Villemoes wrote:
+> On 2016-07-15 15:46, Guenter Roeck wrote:
+> >On 07/15/2016 01:15 AM, Rasmus Villemoes wrote:
+> >>
+> >>+static bool bcm2835_wdt_is_running(struct bcm2835_wdt *wdt)
+> >>+{
+> >>+    uint32_t cur;
+> >>+
+> >>+    cur = readl(wdt->base + PM_RSTC);
+> >>+
+> >>+    return !!(cur & PM_RSTC_WRCFG_FULL_RESET);
+> >>+}
+> >>+
+> >>  static int bcm2835_wdt_start(struct watchdog_device *wdog)
+> >>  {
+> >>      struct bcm2835_wdt *wdt = watchdog_get_drvdata(wdog);
+> >>@@ -70,6 +79,7 @@ static int bcm2835_wdt_start(struct watchdog_device
+> >>*wdog)
+> >>            PM_RSTC_WRCFG_FULL_RESET, wdt->base + PM_RSTC);
+> >>
+> >>      spin_unlock_irqrestore(&wdt->lock, flags);
+> >>+    set_bit(WDOG_HW_RUNNING, &wdog->status);
+> >>
+> >You don't need to set this bit here unless the watchdog can not be stopped.
+> >
+> >>      return 0;
+> >>  }
+> >>@@ -79,6 +89,7 @@ static int bcm2835_wdt_stop(struct watchdog_device
+> >>*wdog)
+> >>      struct bcm2835_wdt *wdt = watchdog_get_drvdata(wdog);
+> >>
+> >>      writel_relaxed(PM_PASSWORD | PM_RSTC_RESET, wdt->base + PM_RSTC);
+> >>+    clear_bit(WDOG_HW_RUNNING, &wdog->status);
+> >
+> >... and since you clear the bit, it can be stopped. Both setting and
+> >resetting the bit
+> >is therefore not necessary.
+> 
+> Well, if the bit isn't cleared here, but it was set during probe(), the
+> framework will (re)start this watchdog (and keep it fed) since there's no
+> separate ping method. I suppose that's reasonable semantics if the watchdog
+> was running at boot (and I like how that ends up interacting with my
+> open_deadline proposal), but probably a little too subtle. This would also
+> change if the ->start method was broken up into separate ping and start
+> methods, which it seems that it could be.
+> 
+> If we do clear the bit here, I think it's neater to set it in start as well,
+> even if that doesn't really have any effect.
+> 
 
-Based on work for the r8a7790 by Kuninori Morimoto.
+The problem is different. The core should clear the bit on close if there is a
+stop function, and if calling the stop function does not return an error.
 
-Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
-Found by inspection
-Compile tested only
-
-v2
-* Correct register size: some how I messed it up the first time around
----
- arch/arm/boot/dts/r8a7794.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
-index 685f986cf962..55737bca4e63 100644
---- a/arch/arm/boot/dts/r8a7794.dtsi
-+++ b/arch/arm/boot/dts/r8a7794.dtsi
-@@ -697,7 +697,7 @@
- 
- 	sdhi0: sd at ee100000 {
- 		compatible = "renesas,sdhi-r8a7794";
--		reg = <0 0xee100000 0 0x200>;
-+		reg = <0 0xee100000 0 0x328>;
- 		interrupts = <GIC_SPI 165 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp3_clks R8A7794_CLK_SDHI0>;
- 		dmas = <&dmac0 0xcd>, <&dmac0 0xce>,
--- 
-2.7.0.rc3.207.g0ac5344
+Guenter
