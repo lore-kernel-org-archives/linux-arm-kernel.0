@@ -1,49 +1,77 @@
-From: bauerman@linux.vnet.ibm.com (Thiago Jung Bauermann)
-Date: Wed, 20 Jul 2016 12:50:11 -0300
-Subject: [RFC 0/3] extend kexec_file_load system call
-In-Reply-To: <34243612.Gid3QHG1hd@wuerfel>
-References: <87twfunneg.fsf@linux.vnet.ibm.com>
- <20160720083530.GK1041@n2100.armlinux.org.uk> <34243612.Gid3QHG1hd@wuerfel>
-Message-ID: <2545578.SWp0m9VQX8@hactar>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 20 Jul 2016 09:57:43 -0600
+Subject: [PATCH 2/3] dt-bindings: allow child nodes inside the Tegra BPMP
+In-Reply-To: <20160720131622.GA20276@rob-hp-laptop>
+References: <20160719191442.15439-1-swarren@wwwdotorg.org>
+ <20160719191442.15439-2-swarren@wwwdotorg.org>
+ <20160720131622.GA20276@rob-hp-laptop>
+Message-ID: <578F9F77.9010203@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, 20 Juli 2016, 13:12:20 schrieb Arnd Bergmann:
-> On Wednesday, July 20, 2016 8:47:45 PM CEST Michael Ellerman wrote:
-> > At least for stdout-path, I can't really see how that would
-> > significantly help an attacker, but I'm all ears if anyone has ideas.
-> 
-> That's actually an easy one that came up before: If an attacker controls
-> a tty device (e.g. network console) that can be used to enter a debugger
-> (kdb, kgdb, xmon, ...), enabling that to be the console device
-> gives you a direct attack vector. The same thing will happen if you
-> have a piece of software that intentially gives extra rights to the
-> owner of the console device by treating it as "physical presence".
+On 07/20/2016 07:16 AM, Rob Herring wrote:
+> On Tue, Jul 19, 2016 at 01:14:41PM -0600, Stephen Warren wrote:
+>> From: Stephen Warren <swarren@nvidia.com>
+>>
+>> The BPMP implements some services which must be represented by separate
+>> nodes. For example, it can provide access to certain I2C controllers, and
+>> the I2C bindings represent each I2C controller as a device tree node.
+>> Update the binding to describe how the BPMP supports this.
+>>
+>> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+>> ---
+>>   .../bindings/firmware/nvidia,tegra186-bpmp.txt     | 23 ++++++++++++++++++++++
+>>   1 file changed, 23 insertions(+)
+>>
+>> diff --git a/Documentation/devicetree/bindings/firmware/nvidia,tegra186-bpmp.txt b/Documentation/devicetree/bindings/firmware/nvidia,tegra186-bpmp.txt
+>> index 9a3864f56955..142d363406f6 100644
+>> --- a/Documentation/devicetree/bindings/firmware/nvidia,tegra186-bpmp.txt
+>> +++ b/Documentation/devicetree/bindings/firmware/nvidia,tegra186-bpmp.txt
+>> @@ -38,6 +38,24 @@ implemented by this node:
+>>   - .../reset/reset.txt
+>>   - <dt-bindings/reset/tegra186-reset.h>
+>>
+>> +The BPMP implements some services which must be represented by separate nodes.
+>> +For example, it can provide access to certain I2C controllers, and the I2C
+>> +bindings represent each I2C controller as a device tree node. Such nodes should
+>> +be nested directly inside the main BPMP node.
+>> +
+>> +Software can determine whether a child node of the BPMP node represents a device
+>> +by checking for a compatible property. Any node with a compatible property
+>> +represents a device that can be instantiated. Nodes without a compatible
+>> +property may be used to provide configuration information regarding the BPMP
+>> +itself, although no such configuration nodes are currently defined by this
+>> +binding.
+>> +
+>> +The BPMP firmware defines no single global name-/numbering-space for such
+>> +services. Put another way, the numbering scheme for I2C buses is distinct from
+>> +the numbering scheme for any other service the BPMP may provide (e.g. a future
+>> +hypothetical SPI bus service). As such, child device nodes will have no reg
+>> +property, and the BPMP node will have no #address-cells or #size-cells property.
+>> +
+>>   The shared memory bindings for BPMP
+>>   -----------------------------------
+>>
+>> @@ -78,4 +96,9 @@ bpmp {
+>>   	#clock-cells = <1>;
+>>   	#power-domain-cells = <1>;
+>>   	#reset-cells = <1>;
+>> +
+>> +	bpmp-i2c {
+>
+> Just 'i2c' here. With that:
+>
+> Acked-by: Rob Herring <robh@kernel.org>
 
-I think people are talking past each other a bit in these arguments about 
-what is relevant to security or not.
+What if we have multiple BPMP I2C buses? The node names need to be 
+unique, and there's no concept of register number so we can't use a unit 
+address to do that.
 
-For the kexec maintainers, kexec_file_load has one very specific and narrow 
-purpose: enable Secure Boot as defined by UEFI.
+I guess we could go for plain "i2c" for now and defer the more general 
+naming discussion until some later point if/when we actually instantiate 
+multiple buses, but I would like to confirm we can solve the problem 
+if/when that time comes.
 
-And from what I understand of their arguments so far, there is one and only 
-one security concern: when in Secure Boot mode, a system must not allow 
-execution of unsigned code with kernel privileges. So even if one can 
-specify a different root filesystem and do a lot of nasty things to the 
-system with a rogue userspace in that root filesystem, as long as the kernel 
-won't load unsigned modules that's not a problem as far as they're 
-concerned.
-
-Also, AFAIK attacks requiring "physical presence" are out of scope for the 
-UEFI Secure Boot security model. Thus an attack that involves control of a 
-console of plugging an USB device is also not a concern.
-
-One thing I don't know is whether an attack involving a networked IPMI 
-console or a USB device that can be "plugged" virtually by a managing system 
-(BMC) is considered a physical attack or a remote attack in the context of 
-UEFI Secure Boot.
-
--- 
-[]'s
-Thiago Jung Bauermann
-IBM Linux Technology Center
+(As an aside, "pwr-i2c" might be a better name for the current bus, when 
+the time comes, since any/all I2C nodes inside the BPMP would be BPMP 
+I2C buses).
