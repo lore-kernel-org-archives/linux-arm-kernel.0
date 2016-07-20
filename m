@@ -1,105 +1,86 @@
-From: bsingharora@gmail.com (Balbir Singh)
-Date: Wed, 20 Jul 2016 13:45:42 +1000
-Subject: [RFC 0/3] extend kexec_file_load system call
-In-Reply-To: <20160718132629.GB32512@redhat.com>
-References: <20160712225805.0d27fe5d@hananiah.suse.cz>
- <20160712221804.GV1041@n2100.armlinux.org.uk>
- <87twfunneg.fsf@linux.vnet.ibm.com>
- <20160713073657.GX1041@n2100.armlinux.org.uk>
- <87poqinf9m.fsf@linux.vnet.ibm.com>
- <20160713082639.GZ1041@n2100.armlinux.org.uk>
- <20160713130338.GB16900@redhat.com>
- <20160713174009.GA1041@n2100.armlinux.org.uk>
- <20160713182247.GA25232@redhat.com> <1468845964.2800.3.camel@gmail.com>
- <20160718132629.GB32512@redhat.com>
-Message-ID: <8a8b2909-7f95-03e4-bf8e-dd29b5fc1fba@gmail.com>
+From: dennis.chen@arm.com (Dennis Chen)
+Date: Wed, 20 Jul 2016 11:48:40 +0800
+Subject: [PATCH v22 1/8] arm64: kdump: reserve memory for crash dump kernel
+In-Reply-To: <20160719132736.GB21007@leverpostej>
+References: <20160712050514.22307-1-takahiro.akashi@linaro.org>
+ <20160712050514.22307-2-takahiro.akashi@linaro.org>
+ <20160719093906.GA20732@arm.com>
+ <20160719102815.GE20774@linaro.org>
+ <20160719104103.GB20990@arm.com>
+ <1468932537.27473.6.camel@redhat.com>
+ <20160719132736.GB21007@leverpostej>
+Message-ID: <20160720034838.GB30575@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>>>>  
->>>>> Command line options are not signed. I thought idea behind secureboot
->>>>> was to execute only trusted code and command line options don't enforce
->>>>> you to execute unsigned code.
->>>>>  
->>
->> You can set module.sig_enforce=0 and open up the system a bit assuming
->> that you can get a module to load with another attack
+On Tue, Jul 19, 2016 at 02:27:54PM +0100, Mark Rutland wrote:
+> On Tue, Jul 19, 2016 at 08:48:57AM -0400, Mark Salter wrote:
+> > On Tue, 2016-07-19 at 18:41 +0800, Dennis Chen wrote:
+> > > On Tue, Jul 19, 2016 at 07:28:16PM +0900, AKASHI Takahiro wrote:
+> > > > On Tue, Jul 19, 2016 at 05:39:07PM +0800, Dennis Chen wrote:
+> > > > > On Tue, Jul 12, 2016 at 02:05:07PM +0900, AKASHI Takahiro wrote:
+> > > > > > +/*
+> > > > > > + * reserve_crashkernel() - reserves memory for crash kernel
+> > > > > > + *
+> > > > > > + * This function reserves memory area given in "crashkernel=" kernel command
+> > > > > > + * line parameter. The memory reserved is used by dump capture kernel when
+> > > > > > + * primary kernel is crashing.
+> > > > > > + */
+> > > > > > +static void __init reserve_crashkernel(void)
+> > > > > > +{
+> > > > > > +?????int ret;
+> > > > > > +
+> > > > > > +?????ret = parse_crashkernel(boot_command_line, memblock_phys_mem_size(),
+> > > > > > +?????????????????????????????&crash_size, &crash_base);
+> > > > > > +?????/* no crashkernel= or invalid value specified */
+> > > > > > +?????if (ret || !crash_size)
+> > > > > > +?????????????return;
+> > > > > > +
+> > > > > > +?????if (crash_base == 0) {
+> > > > > > +?????????????/* Current arm64 boot protocol requires 2MB alignment */
+> > > > > > +?????????????crash_base = memblock_find_in_range(0,
+> > > > > > +?????????????????????????????MEMBLOCK_ALLOC_ACCESSIBLE, crash_size, SZ_2M);
+> > > > > > +?????????????if (crash_base == 0) {
+> > > > > > +?????????????????????pr_warn("Unable to allocate crashkernel (size:%llx)\n",
+> > > > > > +?????????????????????????????crash_size);
+> > > > > > +?????????????????????return;
+> > > > > > +?????????????}
+> > > > > > +?????????????memblock_reserve(crash_base, crash_size);
+> > > > > > 
+> > > > > I am not pretty sure the context here, but
+> > > > > can we use below code piece instead of the above lines?
+> > > > > ????????if (crash_base == 0)
+> > > > > ????????????????memblock_alloc(crash_size, SZ_2M);
+> > > > Either would be fine here.
+> > > > 
+> > > Hello AKASHI, maybe you can succeed to find the base with memblock_find_in_range(),?
+> > > but that doesn't mean you will also succeed to reserve them with memblock_reserve followed.
+> > 
+> > We avoid memblock_alloc() here because it panics on failure. This could happen
+> > if user asks for an unusually large crashkernel size. Better to print a message
+> > and keep booting. Checking the return value of memblock_reserve() seems like a
+> > good thing to do though.
 > 
-> IIUC, sig_enforce bool_enable_only so it can only be enabled. Default
-> value of it is 0 if CONFIG_MODULE_SIG_FORCE=n.
+> Another option would be to add a memblock_try_alloc() function to the
+> memblock API, which in case of failure returns 0 rather than triggering
+> a panic(). We'd still have to check the return value, but all the
+> memblock manipulation would be in one place.
 > 
-> IOW, if your kernel forced signature verification, you should not be
-> able to do sig_enforce=0. If you kernel did not have
-> CONFIG_MODULE_SIG_FORCE=y, then sig_enforce should be 0 by default anyway
-> and you are not making it worse using command line.
+> It looks like adding that is fairly simple:
 > 
+> phys_addr_t __init memblock_try_alloc(phys_addr_t size, phys_addr_t align)
+> {
+> 	return __memblock_alloc_base(size, align, MEMBLOCK_ALLOC_ACCESSIBLE);
+> }
+>
+Hi Mark, memblock_alloc() should remove the panic just as we did in kmalloc IMO, as a memory allocation
+API, it should handover the failure case to the user and the latter should make the final decision.
+Just take a look at the usage case of the memblock_alloc() in the kernel tree, codes have been messed
+up by -- some codes check the return value of memblock_alloc, while others not.
 
-OK.. I checked and you are right, but that is an example and there are
-other things like security=, thermal.*, nosmep, nosmap that need auditing
-for safety and might hurt the system security if used. I still think
-think that assuming you can pass any command line without breaking security
-is a broken argument.
-
->>
->>>>> So it sounds like different class of security problems which you are
->>>>> referring to and not necessarily covered by secureboot or signed
->>>>> kernel.
->>>> Let me give you an example.
->>>>  
->>>> You have a secure boot setup, where the firmware/ROM validates the boot
->>>> loader.  Good, the boot loader hasn't been tampered with.
->>>>  
->>>> You interrupt the boot loader and are able to modify the command line
->>>> for the booted kernel.
->>>>  
->>>> The boot loader loads the kernel and verifies the kernel's signature.
->>>> Good, the kernel hasn't been tampered with.  The kernel starts running.
->>>>  
->>>> You've plugged in a USB drive to the device, and specified a partition
->>>> containing a root filesystem that you control to the kernel.  The
->>>> validated kernel finds the USB drive, and mounts it, and executes
->>>> your own binaries on the USB drive.
->>> You will require physical access to the machine to be able to
->>> insert your usb drive. And IIRC, argument was that if attacker has
->>> physical access to machine, all bets are off anyway.
->>>
->>
->> You don't need physical access -- your machine controller BMC can
->> do the magic for you. So its not always physical access, is it?
+Thanks,
+Dennis 
 > 
-> Well, idea was that if you have physical access to machine, then all
-> bets are off. If BMC can do something which allows running unsigned
-> code at ring level 0, its a problem I think from secureboot model of
-> security.
+> Thanks,
+> Mark.
 > 
->>  
->>>>  
->>>>  
->>>> You run a shell on the console.  You now have control of the system,
->>>> and can mount the real rootfs, inspect it, and work out what it does,
->>>> etc.
->>>>  
->>>> At this point, what use was all the validation that the secure boot
->>>> has done?  Absolutely useless.
->>>>  
->>>> If you can change the command line arguments given to the kernel, you
->>>> have no security, no matter how much you verify signatures.  It's
->>>> the illusion of security, nothing more, nothing less.
->>>>  
->>
->> I agree, if you can change command line arguments, all bets are of lesser value
-> 
-> If changing command line allows execution of unsigned code at ring level
-> 0, then it is a problem. Otherwise we are talking of security issues which
-> are not covered by secure
-
-
-I agree that from what I can see/grep there is nothing that allows unsigned
-code to run at boot in ring0, but there are implications like the ones
-I've mentioned above.
-
-Attacks are typically built as a chain and every bit might matter. One could
-turn off features that might lead to the system being attacked at run-time
-
-
-Balbir Singh.
