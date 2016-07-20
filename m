@@ -1,67 +1,44 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 20 Jul 2016 14:46:43 +0200
-Subject: [PATCH v4] xen/arm: Add a clock property
-In-Reply-To: <04d9dbfb-196d-a775-7fbb-526aba8085f4@arm.com>
-References: <1468309605-19522-1-git-send-email-dirk.behme@de.bosch.com>
- <CAMuHMdU9yP2SMYa5ssrQSu1vwSN2gM4mD-EVYSGr2Pqf=jmCgw@mail.gmail.com>
- <cc28ef7e-dce3-fe5f-ab80-b662244bcbd0@arm.com>
- <CAMuHMdWeJjcuBHjnjppc5Ys5Ew8VssXzg=dLpLPCOQaBnUo_7Q@mail.gmail.com>
- <04d9dbfb-196d-a775-7fbb-526aba8085f4@arm.com>
-Message-ID: <CAMuHMdWdqdT4jnae8h9tDDzzh8ZAbJJwiMW-scPBNVwmjYSiWQ@mail.gmail.com>
+From: vgoyal@redhat.com (Vivek Goyal)
+Date: Wed, 20 Jul 2016 08:46:49 -0400
+Subject: [RFC 0/3] extend kexec_file_load system call
+In-Reply-To: <20160720083530.GK1041@n2100.armlinux.org.uk>
+References: <20160713073657.GX1041@n2100.armlinux.org.uk>
+ <87poqinf9m.fsf@linux.vnet.ibm.com>
+ <20160713082639.GZ1041@n2100.armlinux.org.uk>
+ <20160713130338.GB16900@redhat.com>
+ <20160713174009.GA1041@n2100.armlinux.org.uk>
+ <20160713182247.GA25232@redhat.com>
+ <1468845964.2800.3.camel@gmail.com>
+ <20160718132629.GB32512@redhat.com>
+ <8a8b2909-7f95-03e4-bf8e-dd29b5fc1fba@gmail.com>
+ <20160720083530.GK1041@n2100.armlinux.org.uk>
+Message-ID: <20160720124649.GB11361@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Julien,
+On Wed, Jul 20, 2016 at 09:35:30AM +0100, Russell King - ARM Linux wrote:
+> On Wed, Jul 20, 2016 at 01:45:42PM +1000, Balbir Singh wrote:
+> > > IOW, if your kernel forced signature verification, you should not be
+> > > able to do sig_enforce=0. If you kernel did not have
+> > > CONFIG_MODULE_SIG_FORCE=y, then sig_enforce should be 0 by default anyway
+> > > and you are not making it worse using command line.
+> > 
+> > OK.. I checked and you are right, but that is an example and there are
+> > other things like security=, thermal.*, nosmep, nosmap that need auditing
+> > for safety and might hurt the system security if used. I still think
+> > think that assuming you can pass any command line without breaking security
+> > is a broken argument.
+> 
+> Quite, and you don't need to run code in a privileged environment to do
+> any of that.
+> 
+> It's also not trivial to protect against: new kernels gain new arguments
+> which older kernels may not know about.  No matter how much protection
+> is built into older kernels, newer kernels can become vulnerable through
+> the addition of further arguments.
 
-On Wed, Jul 20, 2016 at 2:10 PM, Julien Grall <julien.grall@arm.com> wrote:
-> On 20/07/16 12:49, Geert Uytterhoeven wrote:
->> On Wed, Jul 20, 2016 at 1:01 PM, Julien Grall <julien.grall@arm.com>
->> wrote:
->>> On 20/07/16 10:43, Geert Uytterhoeven wrote:
->>>> On Tue, Jul 12, 2016 at 9:46 AM, Dirk Behme <dirk.behme@de.bosch.com>
->>>> wrote:
->>>>> Clocks described by this property are reserved for use by Xen, and the
->>>>> OS
->>>>> must not alter their state any way, such as disabling or gating a
->>>>> clock,
->>>>> or modifying its rate. Ensuring this may impose constraints on parent
->>>>> clocks or other resources used by the clock tree.
->>>>>
->>>>> This property is used to proxy clocks for devices Xen has taken
->>>>> ownership
->>>>> of, such as UARTs, for which the associated clock controller(s) remain
->>>>> under the control of Dom0.
->>>>
->>>> I'm not familiar with using XEN at all, but I'm a bit puzzled...
->>>>
->>>> Can't you just add a clocks property to the (virtual) serial device node
->>>> in DT?
->>>> Then the (virtual) serial device driver can get and enable the clock?
->>>
->>> There is no DT node for the Xen console (hvc). The UART used by Xen will
->>> be
->>> completely removed from the Device tree.
->>
->> Why is it removed?
->
-> Because the device is used exclusively by Xen and DOM0 should not touch it
-> at all (IRQs and MMIOs are not mapped).
+If a new kernel command line option becomes an issue, new kernel can
+block that in secureboot environment. That way it helps kexec
+boot as well as regular boot.
 
-IMHO then it's Xen's responsability to make sure not to disable the clock(s).
-
-Who removes the device node from the DT? If Xen, can't it just remember
-which clocks were present in removed device nodes?
-
-What to do on SoCs where the serial device is part of a power area (e.g.
-Renesas SH/R-Mobile)? Who will make sure it is not powered down?
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Vivek
