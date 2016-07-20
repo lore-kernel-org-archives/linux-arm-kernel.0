@@ -1,47 +1,40 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 20 Jul 2016 16:11:35 +0200
-Subject: [PATCH v2 0/4] Add AXP209 GPIO driver
-Message-ID: <20160720141139.25098-1-maxime.ripard@free-electrons.com>
+Date: Wed, 20 Jul 2016 16:11:39 +0200
+Subject: [PATCH v2 4/4] ARM: sun5i: chip: Add status LED
+In-Reply-To: <20160720141139.25098-1-maxime.ripard@free-electrons.com>
+References: <20160720141139.25098-1-maxime.ripard@free-electrons.com>
+Message-ID: <20160720141139.25098-5-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The CHIP has a status LED connected to one of the AXP GPIOs. Add the
+gpio-leds node to be able to use the proper LED framework to control it.
 
-The axp209 PMIC used in combination to some Allwinner SoCs has a bunch
-of GPIOs accessible. Some boards use these to control their backlight
-or a few LEDs.
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ arch/arm/boot/dts/sun5i-r8-chip.dts | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-There's supposed to be 4 of them, but the fourth one has a different
-configuration register scheme, and I couldn't find any board that was
-using this GPIO. It will be probably be supported eventually, but
-until then, we support only the first 3 GPIOs.
-
-Let me know what you think,
-Maxime
-
-Changes from v1:
-  - Use gpiochip_add_data and gpiochip_get_data
-  - Drop unneeded headers
-  - Make sure gpio_get returns 0 or 1
-  - Made sure it compiles
-  - Rebased on linux-next
-
-Maxime Ripard (4):
-  gpio: Add AXP209 GPIO driver
-  mfd: axp20x: Add AXP209 GPIO driver to the mfd
-  ARM: dt: axp209: Add AXP209 GPIO driver
-  ARM: sun5i: chip: Add status LED
-
- .../devicetree/bindings/gpio/gpio-axp209.txt       |  30 ++++
- arch/arm/boot/dts/axp209.dtsi                      |   6 +
- arch/arm/boot/dts/sun5i-r8-chip.dts                |  10 ++
- drivers/gpio/Kconfig                               |   6 +
- drivers/gpio/Makefile                              |   1 +
- drivers/gpio/gpio-axp209.c                         | 162 +++++++++++++++++++++
- drivers/mfd/axp20x.c                               |   3 +
- 7 files changed, 218 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/gpio/gpio-axp209.txt
- create mode 100644 drivers/gpio/gpio-axp209.c
-
+diff --git a/arch/arm/boot/dts/sun5i-r8-chip.dts b/arch/arm/boot/dts/sun5i-r8-chip.dts
+index f694482bdeb6..b68a12374b35 100644
+--- a/arch/arm/boot/dts/sun5i-r8-chip.dts
++++ b/arch/arm/boot/dts/sun5i-r8-chip.dts
+@@ -64,6 +64,16 @@
+ 	chosen {
+ 		stdout-path = "serial0:115200n8";
+ 	};
++
++	leds {
++		compatible = "gpio-leds";
++
++		status {
++			label = "chip:white:status";
++			gpios = <&axp_gpio 2 GPIO_ACTIVE_HIGH>;
++			default-state = "on";
++		};
++	};
+ };
+ 
+ &be0 {
 -- 
 2.9.0
