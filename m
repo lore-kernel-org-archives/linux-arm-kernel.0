@@ -1,84 +1,82 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Wed, 20 Jul 2016 16:01:05 +0100
-Subject: [PATCH v2 3/4] mfd: add support for Allwinner SoCs ADC
-In-Reply-To: <20160719073109.GD17074@dell>
-References: <1468576754-3273-1-git-send-email-quentin.schulz@free-electrons.com>
- <1468576754-3273-4-git-send-email-quentin.schulz@free-electrons.com>
- <de8ebab2-cde9-d209-3c9a-e1868fafb84b@kernel.org>
- <20160719073109.GD17074@dell>
-Message-ID: <d64cf632-41a4-3e23-6239-7f854cbb0293@kernel.org>
+From: lukas@wunner.de (Lukas Wunner)
+Date: Wed, 20 Jul 2016 17:23:40 +0200
+Subject: [PATCH v2 02/10] driver core: Functional dependencies tracking
+ support
+In-Reply-To: <3969169.CcnEsvYuly@vostro.rjw.lan>
+References: <1466144820-6286-1-git-send-email-m.szyprowski@samsung.com>
+ <1975118.iO8UCAENoH@vostro.rjw.lan>
+ <20160720062450.GA8066@wunner.de>
+ <3969169.CcnEsvYuly@vostro.rjw.lan>
+Message-ID: <20160720152340.GA8337@wunner.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/07/16 08:31, Lee Jones wrote:
-> On Mon, 18 Jul 2016, Jonathan Cameron wrote:
+On Wed, Jul 20, 2016 at 02:52:42PM +0200, Rafael J. Wysocki wrote:
+> On Wednesday, July 20, 2016 08:24:50 AM Lukas Wunner wrote:
+> > On Wed, Jul 20, 2016 at 02:33:18AM +0200, Rafael J. Wysocki wrote:
+> > > On Friday, June 17, 2016 04:07:38 PM Lukas Wunner wrote:
+> > > > On Fri, Jun 17, 2016 at 02:54:56PM +0200, Rafael J. Wysocki wrote:
+> > > > > On Fri, Jun 17, 2016 at 12:36 PM, Lukas Wunner <lukas@wunner.de> wrote:
+> > > > > > On Fri, Jun 17, 2016 at 08:26:52AM +0200, Marek Szyprowski wrote:
+> > > > > > > From: "Rafael J. Wysocki" <rafael.j.wysocki@intel.com>
+> > > > > > We also have such a functional dependency for Thunderbolt on Macs:
+> > > > > > On resume from system sleep, the PCIe hotplug ports may not resume
+> > > > > > before the thunderbolt driver has reestablished the PCI tunnels.
+> > > > > > Currently this is enforced by quirk_apple_wait_for_thunderbolt()
+> > > > > > in drivers/pci/quirks.c. It would be good if we could represent
+> > > > > > this dependency using something like Rafael's approach instead of
+> > > > > > open coding it, however one detail in Rafael's patches is problematic:
+> > > > > >
+> > > > > > > New links are added by calling device_link_add() which may happen
+> > > > > > > either before the consumer device is probed or when probing it, in
+> > > > > > > which case the caller needs to ensure that the driver of the
+> > > > > > > supplier device is present and functional and the DEVICE_LINK_PROBE_TIME
+> > > > > > > flag should be passed to device_link_add() to reflect that.
+> > > > > >
+> > > > > > The thunderbolt driver cannot call device_link_add() before the
+> > > > > > PCIe hotplug ports are bound to a driver unless we amend portdrv
+> > > > > > to return -EPROBE_DEFER for Thunderbolt hotplug ports on Macs
+> > > > > > if the thunderbolt driver isn't loaded.
+> > > > > >
+> > > > > > It would therefore be beneficial if device_link_add() can be
+> > > > > > called even *after* the consumer is bound.
+> > > > > 
+> > > > > I don't quite follow.
+> > > > > 
+> > > > > Who's the provider and who's the consumer here?
+> > > > 
+> > > > thunderbolt.ko is the supplier.
+> > > 
+> > > But it binds to the children of the ports that are supposed to be its
+> > > consumers?
+> > > 
+> > > Why is that even expected to work?
+> > 
+> > No, the consumers are aunts (or uncles) of the supplier, if you will. :-)
+> > 
+> > The consumers are the hotplug ports (named "Downstream Bridge 1 / 2" in
+> > the drawing below). The supplier is the NHI:
+> > 
+> >       (Root Port) ---- Upstream Bridge --+-- Downstream Bridge 0 ---- NHI
+> >                                          +-- Downstream Bridge 1 --
+> >                                          +-- Downstream Bridge 2 --
+> >                                          ...
+> > 
+> > We're calling pci_power_up() and pci_restore_state() from
+> > pci_pm_resume_noirq(). And that will fail for devices below
+> > the hotplug ports if the PCI tunnels haven't been re-established
+> > yet by the NHI.
 > 
->> On 15/07/16 10:59, Quentin Schulz wrote:
->>> The Allwinner SoCs all have an ADC that can also act as a touchscreen
->>> controller and a thermal sensor. For now, only the ADC and the thermal
->>> sensor drivers are probed by the MFD, the touchscreen controller support
->>> will be added later.
->>>
->>> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
->> Hmm. Previous patch includes the header this one creates.  Ordering issue?
->> The depends kind of prevents build failures by ensuring that can't be built
->> until this one is in place, but it is certainly an ugly way to do it.
->>
->> Few little bits innline.
->>> ---
->>>
->>> v2:
->>>  - add license headers,
->>>  - reorder alphabetically includes,
->>>  - add SUNXI_GPADC_ prefixes for defines,
->>>
->>>  drivers/mfd/Kconfig                 |  14 +++
->>>  drivers/mfd/Makefile                |   2 +
->>>  drivers/mfd/sunxi-gpadc-mfd.c       | 197 ++++++++++++++++++++++++++++++++++++
->>>  include/linux/mfd/sunxi-gpadc-mfd.h |  23 +++++
->>>  4 files changed, 236 insertions(+)
->>>  create mode 100644 drivers/mfd/sunxi-gpadc-mfd.c
->>>  create mode 100644 include/linux/mfd/sunxi-gpadc-mfd.h
+> So the NHI is a PCIe device, right?
 > 
-> [...]
-> 
->>> +static struct mfd_cell sun6i_gpadc_mfd_cells[] = {
->>> +	{
->>> +		.name	= "sun6i-a31-gpadc-iio",
->>> +		.resources = adc_resources,
->>> +		.num_resources = ARRAY_SIZE(adc_resources),
->>> +	}, {
->>> +		.name = "iio_hwmon",
->> I still really dislike using this to force the probe of that driver but
->> kind of up to the hwmon / mfd guys on this.
-> 
-> Can you at least say *why* you don't like it?
-It just feels odd to have an mfd child that isn't really dependent
-on the mfd hardware itself.
+> Does the Thunderbolt driver bind to that device?
 
-Still if you are happy, mfd is your domain and my objections were
-as you probably noticed not that strong - or well described!)
+The NHI is a PCI device but not a bridge. It has class 0x88000.
+Yes, thunderbolt.ko binds to the NHI.
 
-So I'm fine with this.
-> 
-> How else would it get probed?
-> 
->> I don't have any better suggestions though..
->>> +	},
->>> +};
-> 
-> [...]
-> 
->>> +	if (ret) {
->>> +		dev_err(&pdev->dev, "failed to add MFD devices: %d\n", ret);
->>> +		regmap_del_irq_chip(irq, sunxi_gpadc_mfd_dev->regmap_irqc);
->>> +		return ret;
->>> +	}
->>> +
->>> +	dev_info(&pdev->dev, "successfully loaded\n");
->> Seems like noise to me, but not my subsystem :)
-> 
-> Agreed, I don't allow this either.
-> 
-> [...]
-> 
+And portdrv binds to the upstream bridge and downstream bridges.
+Those have class 0x60400.
+
+Best regards,
+
+Lukas
