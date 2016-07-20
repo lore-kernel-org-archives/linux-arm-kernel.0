@@ -1,122 +1,67 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 20 Jul 2016 10:36:08 +0100
-Subject: [PATCH v15 04/10] arm64: Kprobes with single stepping support
-In-Reply-To: <1467995754-32508-5-git-send-email-dave.long@linaro.org>
-References: <1467995754-32508-1-git-send-email-dave.long@linaro.org>
- <1467995754-32508-5-git-send-email-dave.long@linaro.org>
-Message-ID: <578F4608.4030901@arm.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Wed, 20 Jul 2016 11:41:58 +0200
+Subject: [PATCH 3/4] drm/mediatek: fix the wrong pixel clock when
+ resolution is 4K
+In-Reply-To: <1468987385-37353-4-git-send-email-bibby.hsieh@mediatek.com>
+References: <1468987385-37353-1-git-send-email-bibby.hsieh@mediatek.com>
+ <1468987385-37353-4-git-send-email-bibby.hsieh@mediatek.com>
+Message-ID: <1469007718.5809.32.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/07/16 17:35, David Long wrote:
-> From: Sandeepa Prabhu <sandeepa.s.prabhu@gmail.com>
+Am Mittwoch, den 20.07.2016, 12:03 +0800 schrieb Bibby Hsieh:
+> From: Junzhi Zhao <junzhi.zhao@mediatek.com>
 > 
-> Add support for basic kernel probes(kprobes) and jump probes
-> (jprobes) for ARM64.
+> Pixel clock should be 297MHz when resolution is 4K.
 > 
-> Kprobes utilizes software breakpoint and single step debug
-> exceptions supported on ARM v8.
-> 
-> A software breakpoint is placed at the probe address to trap the
-> kernel execution into the kprobe handler.
-> 
-> ARM v8 supports enabling single stepping before the break exception
-> return (ERET), with next PC in exception return address (ELR_EL1). The
-> kprobe handler prepares an executable memory slot for out-of-line
-> execution with a copy of the original instruction being probed, and
-> enables single stepping. The PC is set to the out-of-line slot address
-> before the ERET. With this scheme, the instruction is executed with the
-> exact same register context except for the PC (and DAIF) registers.
-> 
-> Debug mask (PSTATE.D) is enabled only when single stepping a recursive
-> kprobe, e.g.: during kprobes reenter so that probed instruction can be
-> single stepped within the kprobe handler -exception- context.
-> The recursion depth of kprobe is always 2, i.e. upon probe re-entry,
-> any further re-entry is prevented by not calling handlers and the case
-> counted as a missed kprobe).
-> 
-> Single stepping from the x-o-l slot has a drawback for PC-relative accesses
-> like branching and symbolic literals access as the offset from the new PC
-> (slot address) may not be ensured to fit in the immediate value of
-> the opcode. Such instructions need simulation, so reject
-> probing them.
-> 
-> Instructions generating exceptions or cpu mode change are rejected
-> for probing.
-> 
-> Exclusive load/store instructions are rejected too.  Additionally, the
-> code is checked to see if it is inside an exclusive load/store sequence
-> (code from Pratyush).
-> 
-> System instructions are mostly enabled for stepping, except MSR/MRS
-> accesses to "DAIF" flags in PSTATE, which are not safe for
-> probing.
-> 
-> This also changes arch/arm64/include/asm/ptrace.h to use
-> include/asm-generic/ptrace.h.
-> 
-> Thanks to Steve Capper and Pratyush Anand for several suggested
-> Changes.
-> 
-> Signed-off-by: Sandeepa Prabhu <sandeepa.s.prabhu@gmail.com>
-> Signed-off-by: David A. Long <dave.long@linaro.org>
-> Signed-off-by: Pratyush Anand <panand@redhat.com>
-> Acked-by: Masami Hiramatsu <mhiramat@kernel.org>
+> Signed-off-by: Junzhi Zhao <junzhi.zhao@mediatek.com>
+> Signed-off-by: Bibby Hsieh <bibby.hsieh@mediatek.com>
 > ---
+>  drivers/gpu/drm/mediatek/mtk_dpi.c |  184 +++++++++++++++++++++++++-----------
+>  1 file changed, 131 insertions(+), 53 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/mediatek/mtk_dpi.c b/drivers/gpu/drm/mediatek/mtk_dpi.c
+> index d05ca79..c0f04d2 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_dpi.c
+> +++ b/drivers/gpu/drm/mediatek/mtk_dpi.c
+> @@ -60,14 +60,35 @@ enum mtk_dpi_out_color_format {
+>  	MTK_DPI_COLOR_FORMAT_YCBCR_422_FULL
+>  };
+>  
+> +enum mtk_dpi_clk_id {
+> +	MTK_DPI_CLK_DPI_ENGINE,
+> +	MTK_DPI_CLK_DPI_PIXEL,
+> +	MTK_DPI_CLK_TVD_PLL,
+> +	MTK_DPI_CLK_TVDPLL_MUX,
+> +	MTK_DPI_CLK_TVDPLL_D2,
+> +	MTK_DPI_CLK_TVDPLL_D4,
+> +	MTK_DPI_CLK_TVDPLL_D8,
+> +	MTK_DPI_CLK_TVDPLL_D16,
+> +	MTK_DPI_CLK_COUNT,
+> +};
 
-[...]
+I think this is going in the wrong direction. If the pixel clock output
+isn't correct after a clk_set_rate(dpi->pixel_clk, rate), the clock
+drivers should be fixed, not worked around in the dpi driver.
 
-> +void __kprobes jprobe_return(void)
-> +{
-> +	struct kprobe_ctlblk *kcb = get_kprobe_ctlblk();
-> +
-> +	/*
-> +	 * Jprobe handler return by entering break exception,
-> +	 * encoded same as kprobe, but with following conditions
-> +	 * -a magic number in x0 to identify from rest of other kprobes.
-> +	 * -restore stack addr to original saved pt_regs
-> +	 */
-> +	asm volatile ("ldr x0, [%0]\n\t"
-> +		      "mov sp, x0\n\t"
-> +		      ".globl jprobe_return_break\n\t"
-> +		      "jprobe_return_break:\n\t"
-> +		      "brk %1\n\t"
-> +		      :
-> +		      : "r"(&kcb->jprobe_saved_regs.sp),
-> +		      "I"(BRK64_ESR_KPROBES)
-> +		      : "memory");
+The TVDPLL_* mux and dividers are not direct inputs to the DPI module:
 
-A couple of remarks here:
-- the comment seems wrong, as you load the stack pointer in X0, nothing
-else, and seem to identify the jprobe by looking at the PC, not X0.
-- using explicit registers is really ugly. How about something like this
-instead:
+   tvdpll ("pll")
+     |               ..|\
+     v               ..| | mm_sel ----> mm_dpi_engine ("engine")
+   tvdpll_594m(1/3)  ..|/
+     |
+     |`-> tvdpll_d2 -->|\
+     |`-> tvdpll_d4 -->| | dpi0_sel --> mm_dpi_pixel ("pixel")
+     |`-> tvdpll_d8 -->| |
+     `--> tvdpll_d16 ->|/
 
-diff --git a/arch/arm64/kernel/probes/kprobes.c b/arch/arm64/kernel/probes/kprobes.c
-index c89811d..823cf92 100644
---- a/arch/arm64/kernel/probes/kprobes.c
-+++ b/arch/arm64/kernel/probes/kprobes.c
-@@ -513,13 +513,12 @@ void __kprobes jprobe_return(void)
- 	 * -a magic number in x0 to identify from rest of other kprobes.
- 	 * -restore stack addr to original saved pt_regs
- 	 */
--	asm volatile ("ldr x0, [%0]\n\t"
--		      "mov sp, x0\n\t"
-+	asm volatile ("mov sp, %0\n\t"
- 		      ".globl jprobe_return_break\n\t"
- 		      "jprobe_return_break:\n\t"
- 		      "brk %1\n\t"
- 		      :
--		      : "r"(&kcb->jprobe_saved_regs.sp),
-+		      : "r" (kcb->jprobe_saved_regs.sp),
- 		      "I"(BRK64_ESR_KPROBES)
- 		      : "memory");
- }
+Currently the code first sets the "pll" to the desired multiple of the
+pixel clock manually (*3*4, *3*8) and than calls clk_set_rate on the
+"pixel" clock which gets propagated by the clock framework up to
+dpi0_sel. Since dpi0_sel doesn't have the CLK_SET_RATE_PARENT flag set,
+it should just choose the tvdpll_d* input divider. I'd like not to give
+the dpi driver direct access to all the intermediate clocks.
 
-though hijacking SP in the middle of a C function still feels pretty fragile.
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+regards
+Philipp
