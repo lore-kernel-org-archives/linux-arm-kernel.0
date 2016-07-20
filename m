@@ -1,64 +1,66 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Wed, 20 Jul 2016 11:50:29 +0300
-Subject: [PATCH v2 3/6] dmaengine: omap-dma: Dynamically allocate memory for
- lch_map
-In-Reply-To: <20160720085032.2955-1-peter.ujfalusi@ti.com>
-References: <20160720085032.2955-1-peter.ujfalusi@ti.com>
-Message-ID: <20160720085032.2955-4-peter.ujfalusi@ti.com>
+From: hongxing.zhu@nxp.com (Richard Zhu)
+Date: Wed, 20 Jul 2016 08:51:20 +0000
+Subject: PROBLEM: pcie imx6 link problem after a random number of reboot
+In-Reply-To: <CAO1575VCk2g0KwH=hEk4bHP1t75Pd09yCNV27r7ZfhLbUhV=eA@mail.gmail.com>
+References: <CAO1575Vzw5=JMVW4yh6HNz730r-RtONt_+J1A4BhygVowAWLZQ@mail.gmail.com>
+ <CAO1575Wo_Qgk-YX7kZchUTEv7o3W5-b_DJQktoF2AR+OwvAxNg@mail.gmail.com>
+ <VI1PR0401MB2624BC92B13026C53D4B13198C330@VI1PR0401MB2624.eurprd04.prod.outlook.com>
+ <CAO1575VC_cVHMxnWWDHcJhrymchJM1zMmR4X2O38JdrGP4dJfA@mail.gmail.com>
+ <VI1PR0401MB26249BF2429EF9FD6DB7F7EF8C330@VI1PR0401MB2624.eurprd04.prod.outlook.com>
+ <CAO1575VjjoA3O-8big2NG7v=xCeeLjf1K0Ck7b9AUcZ=H8HL1w@mail.gmail.com>
+ <VI1PR0401MB2624E3404F95241302CC4C9F8C360@VI1PR0401MB2624.eurprd04.prod.outlook.com>
+ <CAO1575VCk2g0KwH=hEk4bHP1t75Pd09yCNV27r7ZfhLbUhV=eA@mail.gmail.com>
+Message-ID: <VI1PR0401MB26249037CC087F05C0BC467B8C080@VI1PR0401MB2624.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On OMAP1 platforms we do not have 32 channels available. Allocate the
-lch_map based on the available channels. This way we are not going to have
-more visible channels then it is available on the platform.
+Hi Ivan:
+Sorry to reply late.
 
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
----
- drivers/dma/omap-dma.c | 20 ++++++++++++++------
- 1 file changed, 14 insertions(+), 6 deletions(-)
+> -----Original Message-----
+> From: Ivan Grimaldi [mailto:grimaldi.ivan at gmail.com]
+> Sent: Monday, July 18, 2016 6:45 PM
+> To: Richard Zhu <hongxing.zhu@nxp.com>
+> Cc: r65037 at freescale.com; l.stach at pengutronix.de; linux-pci at vger.kernel.org;
+> bhelgaas at google.com; linux-arm-kernel at lists.infradead.org
+> Subject: Re: PROBLEM: pcie imx6 link problem after a random number of
+> reboot
+> 
+> Hi,
+> 
+>   i have enabled early printk and after a random number of restart the kernel
+> hangs occurs later in the log (Below kernel log).
+> 
+> ...
+> imx6q-pcie 1ffc000.pcie: Link up, Gen=2
+> imx6q-pcie 1ffc000.pcie: PCI host bridge to bus 0000:00 pci_bus 0000:00: root
+> bus resource [io  0x1000-0xffff] pci_bus 0000:00: root bus resource [mem
+> 0x01000000-0x01efffff] pci_bus 0000:00: root bus resource [bus 00-ff] pci_bus
+> 0000:00: scanning bus pci 0000:00:00.0: [16c3:abcd] type 01 class 0x060400 pci
+> 0000:00:00.0: reg 0x10: [mem 0x00000000-0x000fffff] pci 0000:00:00.0: reg
+> 0x38: [mem 0x00000000-0x0000ffff pref] pci 0000:00:00.0: calling
+> pci_fixup_ide_bases+0x0/0x4c pci 0000:00:00.0: supports D1 pci 0000:00:00.0:
+> PME# supported from D0 D1 D3hot D3cold pci 0000:00:00.0: PME# disabled
+> pci_bus 0000:00: fixups for bus
+> PCI: bus0: Fast back to back transfers disabled pci 0000:00:00.0: scanning [bus
+> 01-01] behind bridge, pass 0 pci 0000:00:00.0: scanning [bus 00-00] behind
+> bridge, pass 1 pci_bus 0000:01: scanning bus
+> 
+>
+[Zhu hongxing] The pcie link is up refer to the log.
+Is it hang here?
 
-diff --git a/drivers/dma/omap-dma.c b/drivers/dma/omap-dma.c
-index d469f9b820e0..6a97350ea76d 100644
---- a/drivers/dma/omap-dma.c
-+++ b/drivers/dma/omap-dma.c
-@@ -35,7 +35,7 @@ struct omap_dmadev {
- 	unsigned dma_requests;
- 	spinlock_t irq_lock;
- 	uint32_t irq_enable_mask;
--	struct omap_chan *lch_map[OMAP_SDMA_CHANNELS];
-+	struct omap_chan **lch_map;
- };
- 
- struct omap_chan {
-@@ -1223,16 +1223,24 @@ static int omap_dma_probe(struct platform_device *pdev)
- 	spin_lock_init(&od->lock);
- 	spin_lock_init(&od->irq_lock);
- 
--	od->dma_requests = OMAP_SDMA_REQUESTS;
--	if (pdev->dev.of_node && of_property_read_u32(pdev->dev.of_node,
--						      "dma-requests",
--						      &od->dma_requests)) {
-+	if (!pdev->dev.of_node) {
-+		od->dma_requests = od->plat->dma_attr->lch_count;
-+		if (unlikely(!od->dma_requests))
-+			od->dma_requests = OMAP_SDMA_REQUESTS;
-+	} else if (of_property_read_u32(pdev->dev.of_node, "dma-requests",
-+					&od->dma_requests)) {
- 		dev_info(&pdev->dev,
- 			 "Missing dma-requests property, using %u.\n",
- 			 OMAP_SDMA_REQUESTS);
-+		od->dma_requests = OMAP_SDMA_REQUESTS;
- 	}
- 
--	for (i = 0; i < OMAP_SDMA_CHANNELS; i++) {
-+	od->lch_map = devm_kcalloc(&pdev->dev, od->dma_requests,
-+				   sizeof(*od->lch_map), GFP_KERNEL);
-+	if (!od->lch_map)
-+		return -ENOMEM;
-+
-+	for (i = 0; i < od->dma_requests; i++) {
- 		rc = omap_dma_chan_init(od);
- 		if (rc) {
- 			omap_dma_free(od);
--- 
-2.9.2
+If yes, I suspect that the link is not stable, and the link is down here.
+Can you use one pcie protocol analyzer to figure out what happen on the bus?
+
+> 
+> IVan
+> 
+> 
+<snip...>
+
+Best Regards
+hongxing zhu
+Linux BSP team
+Office: 86-21-28937189
+Email: hongxing.zhu at nxp.com
