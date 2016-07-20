@@ -1,30 +1,35 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Thu, 21 Jul 2016 08:14:17 +0900
-Subject: [PATCH] Fix shmobile build with CONFIG_SMP=n
-In-Reply-To: <CAMuHMdWfqbv4MXuThRPL2hsdN4Hq53Ng=1cp8DBB7o7XGzM9Zw@mail.gmail.com>
-References: <20160719115703.GJ1041@n2100.armlinux.org.uk>
- <CAMuHMdWfqbv4MXuThRPL2hsdN4Hq53Ng=1cp8DBB7o7XGzM9Zw@mail.gmail.com>
-Message-ID: <20160720231416.GC9599@verge.net.au>
+Date: Thu, 21 Jul 2016 08:15:24 +0900
+Subject: [PATCH] ARM: shmobile: don't call platform_can_secondary_boot on
+ UP
+In-Reply-To: <CAMuHMdWJOVs_pzDHWVHN8=mguUPETbq2m8LAG_N6mUFk+UA_og@mail.gmail.com>
+References: <20160630122529.4031024-1-arnd@arndb.de>
+ <CAMuHMdWJOVs_pzDHWVHN8=mguUPETbq2m8LAG_N6mUFk+UA_og@mail.gmail.com>
+Message-ID: <20160720231523.GD9599@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 19, 2016 at 02:02:53PM +0200, Geert Uytterhoeven wrote:
-> Hi Russell,
+On Thu, Jun 30, 2016 at 03:09:46PM +0200, Geert Uytterhoeven wrote:
+> Hi Arnd,
 > 
-> On Tue, Jul 19, 2016 at 1:57 PM, Russell King - ARM Linux
-> <linux@armlinux.org.uk> wrote:
-> > Shmobile currently fails to build when CONFIG_SMP is disabled:
+> On Thu, Jun 30, 2016 at 2:25 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > For rcar-gen2, we build the SMP files even for UP configurations,
+> > and that just broke:
 > >
 > > arch/arm/mach-shmobile/built-in.o: In function `shmobile_smp_init_fallback_ops':
-> > pm-rcar-gen2.c:(.init.text+0x744): undefined reference to `platform_can_secondary_boot'
-> > make[1]: *** [vmlinux] Error 1
+> > pm-rcar-gen2.c:(.init.text+0x40c): undefined reference to `platform_can_secondary_boot'
 > >
-> > Fix this by providing a stub for this function.
+> > This adds an compile-time check before the call to platform_can_secondary_boot,
+> > turning the function into an empty stub for UP configurations.
 > >
-> > Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> > Fixes: c21af444eace ("ARM: shmobile: smp: Add function to prioritize DT SMP")
 > 
-> Arnd send a smaller one https://patchwork.kernel.org/patch/9207413/,
-> which seems have fallen through the cracks.
+> Crap, I think I took the shortcut of only compile-testing
+> arch/arm/mach-shmobile,
+> not link-testing the whole kernel, with CONFIG_SMP=n...
+> 
+> Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Sorry for missing that. I have queued up Arnd's patch as a fix for v4.8
-with Acked-by Geert and a Reported-by Russel tags.
+Sorry for missing this until now.
+I have queued it up as a fix for v4.7.
