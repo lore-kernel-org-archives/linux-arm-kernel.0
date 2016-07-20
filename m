@@ -1,83 +1,88 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Thu, 21 Jul 2016 00:51:31 +0200
-Subject: [PATCH v2 02/10] driver core: Functional dependencies tracking
- support
-In-Reply-To: <20160720152340.GA8337@wunner.de>
-References: <1466144820-6286-1-git-send-email-m.szyprowski@samsung.com>
- <3969169.CcnEsvYuly@vostro.rjw.lan> <20160720152340.GA8337@wunner.de>
-Message-ID: <1735644.0mfUjJQtul@vostro.rjw.lan>
+From: andrew@aj.id.au (Andrew Jeffery)
+Date: Thu, 21 Jul 2016 08:43:36 +0930
+Subject: [PATCH 01/12] pinctrl: dt-bindings: Add documentation for
+ Aspeed pin controllers
+In-Reply-To: <20160720190519.GA9190@rob-hp-laptop>
+References: <1468994313-13538-1-git-send-email-andrew@aj.id.au>
+ <1468994313-13538-2-git-send-email-andrew@aj.id.au>
+ <20160720190519.GA9190@rob-hp-laptop>
+Message-ID: <1469056416.954.107.camel@aj.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, July 20, 2016 05:23:40 PM Lukas Wunner wrote:
-> On Wed, Jul 20, 2016 at 02:52:42PM +0200, Rafael J. Wysocki wrote:
-> > On Wednesday, July 20, 2016 08:24:50 AM Lukas Wunner wrote:
-> > > On Wed, Jul 20, 2016 at 02:33:18AM +0200, Rafael J. Wysocki wrote:
-> > > > On Friday, June 17, 2016 04:07:38 PM Lukas Wunner wrote:
-> > > > > On Fri, Jun 17, 2016 at 02:54:56PM +0200, Rafael J. Wysocki wrote:
-> > > > > > On Fri, Jun 17, 2016 at 12:36 PM, Lukas Wunner <lukas@wunner.de> wrote:
-> > > > > > > On Fri, Jun 17, 2016 at 08:26:52AM +0200, Marek Szyprowski wrote:
-> > > > > > > > From: "Rafael J. Wysocki" <rafael.j.wysocki@intel.com>
-> > > > > > > We also have such a functional dependency for Thunderbolt on Macs:
-> > > > > > > On resume from system sleep, the PCIe hotplug ports may not resume
-> > > > > > > before the thunderbolt driver has reestablished the PCI tunnels.
-> > > > > > > Currently this is enforced by quirk_apple_wait_for_thunderbolt()
-> > > > > > > in drivers/pci/quirks.c. It would be good if we could represent
-> > > > > > > this dependency using something like Rafael's approach instead of
-> > > > > > > open coding it, however one detail in Rafael's patches is problematic:
-> > > > > > >
-> > > > > > > > New links are added by calling device_link_add() which may happen
-> > > > > > > > either before the consumer device is probed or when probing it, in
-> > > > > > > > which case the caller needs to ensure that the driver of the
-> > > > > > > > supplier device is present and functional and the DEVICE_LINK_PROBE_TIME
-> > > > > > > > flag should be passed to device_link_add() to reflect that.
-> > > > > > >
-> > > > > > > The thunderbolt driver cannot call device_link_add() before the
-> > > > > > > PCIe hotplug ports are bound to a driver unless we amend portdrv
-> > > > > > > to return -EPROBE_DEFER for Thunderbolt hotplug ports on Macs
-> > > > > > > if the thunderbolt driver isn't loaded.
-> > > > > > >
-> > > > > > > It would therefore be beneficial if device_link_add() can be
-> > > > > > > called even *after* the consumer is bound.
-> > > > > > 
-> > > > > > I don't quite follow.
-> > > > > > 
-> > > > > > Who's the provider and who's the consumer here?
-> > > > > 
-> > > > > thunderbolt.ko is the supplier.
-> > > > 
-> > > > But it binds to the children of the ports that are supposed to be its
-> > > > consumers?
-> > > > 
-> > > > Why is that even expected to work?
-> > > 
-> > > No, the consumers are aunts (or uncles) of the supplier, if you will. :-)
-> > > 
-> > > The consumers are the hotplug ports (named "Downstream Bridge 1 / 2" in
-> > > the drawing below). The supplier is the NHI:
-> > > 
-> > >       (Root Port) ---- Upstream Bridge --+-- Downstream Bridge 0 ---- NHI
-> > >                                          +-- Downstream Bridge 1 --
-> > >                                          +-- Downstream Bridge 2 --
-> > >                                          ...
-> > > 
-> > > We're calling pci_power_up() and pci_restore_state() from
-> > > pci_pm_resume_noirq(). And that will fail for devices below
-> > > the hotplug ports if the PCI tunnels haven't been re-established
-> > > yet by the NHI.
+On Wed, 2016-07-20 at 14:05 -0500, Rob Herring wrote:
+> On Wed, Jul 20, 2016 at 03:28:22PM +0930, Andrew Jeffery wrote:
 > > 
-> > So the NHI is a PCIe device, right?
+> > Outline expectations on the pin controller's relationship with the
+> > System Control Unit (SCU) IP through syscon, and document the compatible
+> > strings for 4th and 5th generation Aspeed SoC pin controllers.
 > > 
-> > Does the Thunderbolt driver bind to that device?
-> 
-> The NHI is a PCI device but not a bridge. It has class 0x88000.
-> Yes, thunderbolt.ko binds to the NHI.
-> 
-> And portdrv binds to the upstream bridge and downstream bridges.
-> Those have class 0x60400.
+> > Signed-off-by: Andrew Jeffery <andrew@aj.id.au>
+> > ---
+> > ?.../devicetree/bindings/pinctrl/pinctrl-aspeed.txt | 45 ++++++++++++++++++++++
+> > ?MAINTAINERS????????????????????????????????????????|??1 +
+> > ?2 files changed, 46 insertions(+)
+> > ?create mode 100644 Documentation/devicetree/bindings/pinctrl/pinctrl-aspeed.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/pinctrl/pinctrl-aspeed.txt b/Documentation/devicetree/bindings/pinctrl/pinctrl-aspeed.txt
+> > new file mode 100644
+> > index 000000000000..5aac6a0a2e89
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/pinctrl/pinctrl-aspeed.txt
+> > @@ -0,0 +1,45 @@
+> > +Aspeed Pin Controllers
+> > +----------------------
+> > +
+> > +The Aspeed SoCs vary in functionality inside a generation but have a common mux
+> > +device register layout.
+> > +
+> > +Required properties:
+> > +- compatible: should be one of the following:
+> > +	"aspeed,g4-pinctrl";
+> > +	"aspeed,g5-pinctrl"
+> > +
+> > +The pin controller node should be a child of a syscon node with the required
+> > +property:
+> > +- compatible: "syscon", "simple-mfd"
+> > +
+> > +Refer to the the bindings described in
+> > +Documentation/devicetree/bindings/mfd/syscon.txt
+> > +
+> > +Subnode format:
+> > +
+> > +Please refer to pinctrl-bindings.txt in this directory for details of the
+> > +common pinctrl bindings used by client devices.
+> > +
+> > +The required properties of child nodes are (as defined in pinctrl-bindings):
+> > +- function
+> > +- groups
+> > +
+> > +Each function has only one associated pin group. Each group is named by its
+> > +function.
+> > +
+> > +Examples:
+> > +
+> > +syscon: scu at 1e6e2000 {
+> > +	compatible = "syscon", "simple-mfd";
+> > +	reg = <0x1e6e2000 0x1a8>;
+> > +
+> > +	pinctrl: pinctrl at 1e6e2000 {
+> > +		compatible = "aspeed,g4-pinctrl";
+> > +
+> > +		pinctrl_i2c3_default: i2c3_default {
+> > +			function = "I2C3";
+> > +			groups = "I2C3";
+> All these strings need to be documented.
 
-OK, so why would there be a problem with creating links from the NHI (producer)
-to the ports (consumers) before binding portdrv to them?
+Right! Will do.
 
-Thanks,
-Rafael
+Cheers,
+
+Andrew
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160721/707e6ef1/attachment.sig>
