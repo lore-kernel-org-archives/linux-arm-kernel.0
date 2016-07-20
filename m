@@ -1,47 +1,96 @@
-From: josephl@nvidia.com (Joseph Lo)
-Date: Wed, 20 Jul 2016 09:37:17 +0800
-Subject: [PATCH V3 3/10] Documentation: dt-bindings: firmware: tegra: add
- bindings of the BPMP
-In-Reply-To: <20160720012231.GA8522@rob-hp-laptop>
-References: <20160719091723.30919-1-josephl@nvidia.com>
- <20160719091723.30919-2-josephl@nvidia.com>
- <20160720012231.GA8522@rob-hp-laptop>
-Message-ID: <6aafa2af-d9e9-cf7a-6c4f-b7a1f59914bf@nvidia.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Wed, 20 Jul 2016 11:17:23 +0900
+Subject: [PATCH v22 1/8] arm64: kdump: reserve memory for crash dump kernel
+In-Reply-To: <20160719132736.GB21007@leverpostej>
+References: <20160712050514.22307-1-takahiro.akashi@linaro.org>
+ <20160712050514.22307-2-takahiro.akashi@linaro.org>
+ <20160719093906.GA20732@arm.com>
+ <20160719102815.GE20774@linaro.org>
+ <20160719104103.GB20990@arm.com>
+ <1468932537.27473.6.camel@redhat.com>
+ <20160719132736.GB21007@leverpostej>
+Message-ID: <20160720021721.GH20774@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/20/2016 09:22 AM, Rob Herring wrote:
-> On Tue, Jul 19, 2016 at 05:17:23PM +0800, Joseph Lo wrote:
->> The BPMP is a specific processor in Tegra chip, which is designed for
->> booting process handling and offloading the power management, clock
->> management, and reset control tasks from the CPU. The binding document
->> defines the resources that would be used by the BPMP firmware driver,
->> which can create the interprocessor communication (IPC) between the CPU
->> and BPMP.
->>
->> Signed-off-by: Joseph Lo <josephl@nvidia.com>
->> ---
->> Changes in V3:
->> - s/mmio-ram/mmio-sram/
->> - revise the file path of the reference binding documents and header files
->>   for more generic viem in different SW projects
->> Changes in V2:
->> - update the message that the BPMP is clock and reset control provider
->> - add tegra186-clock.h and tegra186-reset.h header files
->> - revise the description of the required properties
->> ---
->>  .../bindings/firmware/nvidia,tegra186-bpmp.txt     |  77 ++
->>  include/dt-bindings/clock/tegra186-clock.h         | 940 +++++++++++++++++++++
->>  include/dt-bindings/reset/tegra186-reset.h         | 217 +++++
->>  3 files changed, 1234 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/firmware/nvidia,tegra186-bpmp.txt
->>  create mode 100644 include/dt-bindings/clock/tegra186-clock.h
->>  create mode 100644 include/dt-bindings/reset/tegra186-reset.h
->
-> Acked-by: Rob Herring <robh@kernel.org>
->
-Rob, Stephen,
+On Tue, Jul 19, 2016 at 02:27:54PM +0100, Mark Rutland wrote:
+> On Tue, Jul 19, 2016 at 08:48:57AM -0400, Mark Salter wrote:
+> > On Tue, 2016-07-19 at 18:41 +0800, Dennis Chen wrote:
+> > > On Tue, Jul 19, 2016 at 07:28:16PM +0900, AKASHI Takahiro wrote:
+> > > > On Tue, Jul 19, 2016 at 05:39:07PM +0800, Dennis Chen wrote:
+> > > > > On Tue, Jul 12, 2016 at 02:05:07PM +0900, AKASHI Takahiro wrote:
+> > > > > > +/*
+> > > > > > + * reserve_crashkernel() - reserves memory for crash kernel
+> > > > > > + *
+> > > > > > + * This function reserves memory area given in "crashkernel=" kernel command
+> > > > > > + * line parameter. The memory reserved is used by dump capture kernel when
+> > > > > > + * primary kernel is crashing.
+> > > > > > + */
+> > > > > > +static void __init reserve_crashkernel(void)
+> > > > > > +{
+> > > > > > +??????????int ret;
+> > > > > > +
+> > > > > > +??????????ret = parse_crashkernel(boot_command_line, memblock_phys_mem_size(),
+> > > > > > +??????????????????????????????????????????????????????????&crash_size, &crash_base);
+> > > > > > +??????????/* no crashkernel= or invalid value specified */
+> > > > > > +??????????if (ret || !crash_size)
+> > > > > > +??????????????????????????return;
+> > > > > > +
+> > > > > > +??????????if (crash_base == 0) {
+> > > > > > +??????????????????????????/* Current arm64 boot protocol requires 2MB alignment */
+> > > > > > +??????????????????????????crash_base = memblock_find_in_range(0,
+> > > > > > +??????????????????????????????????????????????????????????MEMBLOCK_ALLOC_ACCESSIBLE, crash_size, SZ_2M);
+> > > > > > +??????????????????????????if (crash_base == 0) {
+> > > > > > +??????????????????????????????????????????pr_warn("Unable to allocate crashkernel (size:%llx)\n",
+> > > > > > +??????????????????????????????????????????????????????????crash_size);
+> > > > > > +??????????????????????????????????????????return;
+> > > > > > +??????????????????????????}
+> > > > > > +??????????????????????????memblock_reserve(crash_base, crash_size);
+> > > > > > 
+> > > > > I am not pretty sure the context here, but
+> > > > > can we use below code piece instead of the above lines?
+> > > > > ????????????????if (crash_base == 0)
+> > > > > ????????????????????????????????memblock_alloc(crash_size, SZ_2M);
+> > > > Either would be fine here.
+> > > > 
+> > > Hello AKASHI, maybe you can succeed to find the base with memblock_find_in_range(),??
+> > > but that doesn't mean you will also succeed to reserve them with memblock_reserve followed.
+> > 
+> > We avoid memblock_alloc() here because it panics on failure. This could happen
+> > if user asks for an unusually large crashkernel size. Better to print a message
+> > and keep booting. Checking the return value of memblock_reserve() seems like a
+> > good thing to do though.
+> 
+> Another option would be to add a memblock_try_alloc() function to the
+> memblock API, which in case of failure returns 0 rather than triggering
+> a panic(). We'd still have to check the return value, but all the
+> memblock manipulation would be in one place.
+> 
+> It looks like adding that is fairly simple:
+> 
+> phys_addr_t __init memblock_try_alloc(phys_addr_t size, phys_addr_t align)
+> {
+> 	return __memblock_alloc_base(size, align, MEMBLOCK_ALLOC_ACCESSIBLE);
+> }
 
-Thanks for your review.
+Apart form this issue, I found that the kernel can panic, if the memory
+for crash dump kernel is allocated above 32-bits, due to a failure
+of alloc_bootmem_low() in request_standard_resources().
+(In addition, dma_contiguous_reserve() will also fail.)
 
--Joseph
+So I'd like to change the code to:
+        if (crash_base == 0) {
+                crash_base = memblock_find_in_range(0,
+                                IS_ENABLED(CONFIG_ZONE_DMA) ?
+                                        ARCH_LOW_ADDRESS_LIMIT :
+                                        MEMBLOCK_ALLOC_ACCESSIBLE,
+                                crash_size, SZ_2M);
+        ...
+
+Does this make sense?
+
+Thanks,
+-Takahiro AKASHI
+
+> Thanks,
+> Mark.
