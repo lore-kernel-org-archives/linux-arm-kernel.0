@@ -1,42 +1,39 @@
-From: bsingharora@gmail.com (Balbir Singh)
-Date: Wed, 20 Jul 2016 20:24:43 +1000
-Subject: [PATCH v3 02/11] mm: Hardened usercopy
-In-Reply-To: <CAGXu5j+nHpHcYT8FyHNe6AFQCdakoSMW=UWDatyxhRK7CB7_=g@mail.gmail.com>
-References: <1468619065-3222-1-git-send-email-keescook@chromium.org>
- <1468619065-3222-3-git-send-email-keescook@chromium.org>
- <fc3c7f68-bd2e-cb06-c47c-d97c520fc08b@redhat.com>
- <CAGXu5j+nHpHcYT8FyHNe6AFQCdakoSMW=UWDatyxhRK7CB7_=g@mail.gmail.com>
-Message-ID: <1469010283.2800.5.camel@gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Wed, 20 Jul 2016 13:25:50 +0300
+Subject: [PATCH] ARM: shmobile: r8a7794: tidyup SDHI register size on DTSI
+In-Reply-To: <1469002759-2860-1-git-send-email-horms+renesas@verge.net.au>
+References: <1469002759-2860-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <98aa1325-227b-d384-2515-9e65705edfe4@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2016-07-19 at 11:48 -0700, Kees Cook wrote:
-> On Mon, Jul 18, 2016 at 6:06 PM, Laura Abbott <labbott@redhat.com> wrote:
-> >?
-> > On 07/15/2016 02:44 PM, Kees Cook wrote:
-> >?
-> > This doesn't work when copying CMA allocated memory since CMA purposely
-> > allocates larger than a page block size without setting head pages.
-> > Given CMA may be used with drivers doing zero copy buffers, I think it
-> > should be permitted.
-> >?
-> > Something like the following lets it pass (I can clean up and submit
-> > the is_migrate_cma_page APIs as a separate patch for review)
-> Yeah, this would be great. I'd rather use an accessor to check this
-> than a direct check for MIGRATE_CMA.
->
-> > ?????????*/
-> > ????????for (; ptr <= end ; ptr += PAGE_SIZE, page = virt_to_head_page(ptr))
-> > {
-> > -???????????????if (!PageReserved(page))
-> > +???????????????if (!PageReserved(page) && !is_migrate_cma_page(page))
-> > ????????????????????????return "<spans multiple pages>";
-> > ????????}
-> Yeah, I'll modify this a bit so that which type it starts as is
-> maintained for all pages (rather than allowing to flip back and forth
-> -- even though that is likely impossible).
->?
-Sorry, I completely missed the MIGRATE_CMA bits. Could you clarify if you
-caught this in testing/review?
+On 7/20/2016 11:19 AM, Simon Horman wrote:
 
-Balbir Singh.
+> r8a7794 SDHI ch0 has SD_DMACR which is located in 0x324.
+> This patch updates register size
+>
+> Based on work for the r8a7790 by Kuninori Morimoto.
+>
+> Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> ---
+> Found by inspection
+> Compile tested only
+> ---
+>  arch/arm/boot/dts/r8a7794.dtsi | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
+> index 685f986cf962..9b36f58dff41 100644
+> --- a/arch/arm/boot/dts/r8a7794.dtsi
+> +++ b/arch/arm/boot/dts/r8a7794.dtsi
+> @@ -697,7 +697,7 @@
+>
+>  	sdhi0: sd at ee100000 {
+>  		compatible = "renesas,sdhi-r8a7794";
+> -		reg = <0 0xee100000 0 0x200>;
+> +		reg = <0 0xee100000 0 0x384>;
+
+    Not 0x328?
+
+MBR, Sergei
