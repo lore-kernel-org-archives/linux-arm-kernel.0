@@ -1,60 +1,67 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 20 Jul 2016 07:44:08 -0500
-Subject: [RFC 3/6] dt/bindings: Add bindings for Tegra20/30 NOR bus driver
-In-Reply-To: <1468935397-11926-4-git-send-email-mirza.krak@gmail.com>
-References: <1468935397-11926-1-git-send-email-mirza.krak@gmail.com>
- <1468935397-11926-4-git-send-email-mirza.krak@gmail.com>
-Message-ID: <20160720124408.GA19113@rob-hp-laptop>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 20 Jul 2016 14:46:43 +0200
+Subject: [PATCH v4] xen/arm: Add a clock property
+In-Reply-To: <04d9dbfb-196d-a775-7fbb-526aba8085f4@arm.com>
+References: <1468309605-19522-1-git-send-email-dirk.behme@de.bosch.com>
+ <CAMuHMdU9yP2SMYa5ssrQSu1vwSN2gM4mD-EVYSGr2Pqf=jmCgw@mail.gmail.com>
+ <cc28ef7e-dce3-fe5f-ab80-b662244bcbd0@arm.com>
+ <CAMuHMdWeJjcuBHjnjppc5Ys5Ew8VssXzg=dLpLPCOQaBnUo_7Q@mail.gmail.com>
+ <04d9dbfb-196d-a775-7fbb-526aba8085f4@arm.com>
+Message-ID: <CAMuHMdWdqdT4jnae8h9tDDzzh8ZAbJJwiMW-scPBNVwmjYSiWQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 19, 2016 at 03:36:34PM +0200, Mirza Krak wrote:
-> From: Mirza Krak <mirza.krak@gmail.com>
-> 
-> Document the devicetree bindings for NOR bus driver found on Tegra20 and
-> Tegra30 SOCs
-> 
-> Signed-off-by: Mirza Krak <mirza.krak@gmail.com>
-> ---
->  .../devicetree/bindings/bus/nvidia,tegra20-nor.txt | 73 ++++++++++++++++++++++
->  1 file changed, 73 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/bus/nvidia,tegra20-nor.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/bus/nvidia,tegra20-nor.txt b/Documentation/devicetree/bindings/bus/nvidia,tegra20-nor.txt
-> new file mode 100644
-> index 0000000..9ee4a66
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/bus/nvidia,tegra20-nor.txt
-> @@ -0,0 +1,73 @@
-> +Device tree bindings for NVIDIA Tegra20/30 NOR Bus
-> +
-> +The NOR controller supports a number of memory types, including synchronous NOR,
-> +asynchronous NOR, and other flash memories with similar interfaces, such as
-> +MuxOneNAND. One could also connect high speed devices like FPGAs, DSPs,
-> +CAN chips, Wi-Fi chips etc.
-> +
-> +The actual devices are instantiated from the child nodes of a NOR node.
-> +
-> +Required properties:
-> +
-> + - compatible: should be "nvidia,tegra20-nor", "nvidia,tegra30-nor"
-> + - reg: Should contain NOR controller registers location and length.
-> + - clocks: Must contain one entry, for the module clock.
-> +   See ../clocks/clock-bindings.txt for details.
-> + - resets : Must contain an entry for each entry in reset-names.
-> +   See ../reset/reset.txt for details.
-> + - reset-names : Must include the following entries:
-> +  - nor
-> + - #address-cells: Must be set to 2 to allow memory address translation
-> + - #size-cells:	Must be set to 1 to allow CS address passing
-> + - ranges: Must be set up to reflect the memory layout with four integer
-> + 		values for each chip-select line in use.
-> + - nvidia,config: This property represents the SNOR_CONFIG_0 register.
-> +
-> +Note that the NOR controller does not have any internal chip-select address
-> +decoding and if you want to access multiple devices external chip-select
-> +decoding must be provided.
+Hi Julien,
 
-Then what are the 2 chip selects in ranges?
+On Wed, Jul 20, 2016 at 2:10 PM, Julien Grall <julien.grall@arm.com> wrote:
+> On 20/07/16 12:49, Geert Uytterhoeven wrote:
+>> On Wed, Jul 20, 2016 at 1:01 PM, Julien Grall <julien.grall@arm.com>
+>> wrote:
+>>> On 20/07/16 10:43, Geert Uytterhoeven wrote:
+>>>> On Tue, Jul 12, 2016 at 9:46 AM, Dirk Behme <dirk.behme@de.bosch.com>
+>>>> wrote:
+>>>>> Clocks described by this property are reserved for use by Xen, and the
+>>>>> OS
+>>>>> must not alter their state any way, such as disabling or gating a
+>>>>> clock,
+>>>>> or modifying its rate. Ensuring this may impose constraints on parent
+>>>>> clocks or other resources used by the clock tree.
+>>>>>
+>>>>> This property is used to proxy clocks for devices Xen has taken
+>>>>> ownership
+>>>>> of, such as UARTs, for which the associated clock controller(s) remain
+>>>>> under the control of Dom0.
+>>>>
+>>>> I'm not familiar with using XEN at all, but I'm a bit puzzled...
+>>>>
+>>>> Can't you just add a clocks property to the (virtual) serial device node
+>>>> in DT?
+>>>> Then the (virtual) serial device driver can get and enable the clock?
+>>>
+>>> There is no DT node for the Xen console (hvc). The UART used by Xen will
+>>> be
+>>> completely removed from the Device tree.
+>>
+>> Why is it removed?
+>
+> Because the device is used exclusively by Xen and DOM0 should not touch it
+> at all (IRQs and MMIOs are not mapped).
 
-Rob
+IMHO then it's Xen's responsability to make sure not to disable the clock(s).
+
+Who removes the device node from the DT? If Xen, can't it just remember
+which clocks were present in removed device nodes?
+
+What to do on SoCs where the serial device is part of a power area (e.g.
+Renesas SH/R-Mobile)? Who will make sure it is not powered down?
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
