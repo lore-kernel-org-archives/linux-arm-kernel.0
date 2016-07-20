@@ -1,45 +1,34 @@
-From: dinguyen@opensource.altera.com (Dinh Nguyen)
-Date: Wed, 20 Jul 2016 11:05:51 -0500
-Subject: [PATCH 10/10] ARM: dts: Add Arria10 USB EDAC devicetree entry
-In-Reply-To: <1468512408-5156-11-git-send-email-tthayer@opensource.altera.com>
-References: <1468512408-5156-1-git-send-email-tthayer@opensource.altera.com>
- <1468512408-5156-11-git-send-email-tthayer@opensource.altera.com>
-Message-ID: <578FA15F.7000105@opensource.altera.com>
+From: riel@redhat.com (Rik van Riel)
+Date: Wed, 20 Jul 2016 12:22:07 -0400
+Subject: [PATCH v3 00/11] mm: Hardened usercopy
+In-Reply-To: <063D6719AE5E284EB5DD2968C1650D6D5F4FEA62@AcuExch.aculab.com>
+References: <1468619065-3222-1-git-send-email-keescook@chromium.org>
+ <063D6719AE5E284EB5DD2968C1650D6D5F4FD6A3@AcuExch.aculab.com>
+ <CAGXu5j+QH8Fdk7p6bZV_yMv1puHRxZRu5z45+tKrmLyGBTymFw@mail.gmail.com>
+ <063D6719AE5E284EB5DD2968C1650D6D5F4FEA62@AcuExch.aculab.com>
+Message-ID: <1469031727.30053.71.camel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/14/2016 11:06 AM, tthayer at opensource.altera.com wrote:
-> From: Thor Thayer <tthayer@opensource.altera.com>
+On Wed, 2016-07-20 at 16:02 +0000, David Laight wrote:
+> From: Kees Cook
+> > Sent: 20 July 2016 16:32
+> ...
+> > Yup: that's exactly what it's doing: walking up the stack. :)
 > 
-> Add the device tree entries needed to support the Altera USB
-> FIFO buffer EDAC on the Arria10 chip.
-> 
-> Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
-> ---
->  arch/arm/boot/dts/socfpga_arria10.dtsi |    8 ++++++++
->  1 file changed, 8 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/socfpga_arria10.dtsi b/arch/arm/boot/dts/socfpga_arria10.dtsi
-> index a506ec0..bd548ab 100644
-> --- a/arch/arm/boot/dts/socfpga_arria10.dtsi
-> +++ b/arch/arm/boot/dts/socfpga_arria10.dtsi
-> @@ -652,6 +652,14 @@
->  				interrupts = <10 IRQ_TYPE_LEVEL_HIGH>,
->  					     <42 IRQ_TYPE_LEVEL_HIGH>;
->  			};
-> +
-> +			usb0-ecc at ff8c8800 {
-> +				compatible = "altr,socfpga-usb-ecc";
-> +				reg = <0xff8c8800 0x400>;
-> +				altr,ecc-parent = <&usb0>;
-> +				interrupts = <2 IRQ_TYPE_LEVEL_HIGH>,
-> +					     <34 IRQ_TYPE_LEVEL_HIGH>;
-> +			};
->  		};
->  
->  		rst: rstmgr at ffd05000 {
-> 
+> Remind me to make sure all our customers run kernels with it
+> disabled.
 
-Acked-by: Dinh Nguyen <dinguyen@opensource.altera.com>
+You want a single copy_from_user to write to data in
+multiple stack frames?
 
-Dinh
+-- 
+
+All Rights Reversed.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160720/8149e731/attachment.sig>
