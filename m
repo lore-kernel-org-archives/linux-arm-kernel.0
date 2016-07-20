@@ -1,134 +1,71 @@
-From: dave.long@linaro.org (David Long)
-Date: Wed, 20 Jul 2016 14:28:39 -0400
-Subject: [PATCH v15 08/10] arm64: Add trampoline code for kretprobes
-In-Reply-To: <20160719134655.GA21256@e104818-lin.cambridge.arm.com>
-References: <1467995754-32508-1-git-send-email-dave.long@linaro.org>
- <1467995754-32508-9-git-send-email-dave.long@linaro.org>
- <20160719134655.GA21256@e104818-lin.cambridge.arm.com>
-Message-ID: <578FC2D7.9090708@linaro.org>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 20 Jul 2016 13:56:07 -0500
+Subject: [PATCH v6 1/8] Documentation: arm: define DT cpu
+ capacity-dmips-mhz bindings
+In-Reply-To: <1468932048-31635-2-git-send-email-juri.lelli@arm.com>
+References: <1468932048-31635-1-git-send-email-juri.lelli@arm.com>
+ <1468932048-31635-2-git-send-email-juri.lelli@arm.com>
+Message-ID: <20160720185607.GA30072@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/19/2016 09:46 AM, Catalin Marinas wrote:
-> On Fri, Jul 08, 2016 at 12:35:52PM -0400, David Long wrote:
->> --- /dev/null
->> +++ b/arch/arm64/kernel/probes/kprobes_trampoline.S
->> @@ -0,0 +1,85 @@
->> +/*
->> + * trampoline entry and return code for kretprobes.
->> + */
->> +
->> +#include <linux/linkage.h>
->> +#include <asm/asm-offsets.h>
->> +#include <asm/assembler.h>
->> +
->> +	.text
->> +
->> +.macro save_all_base_regs
->> +	stp x0, x1, [sp, #S_X0]
->> +	stp x2, x3, [sp, #S_X2]
->> +	stp x4, x5, [sp, #S_X4]
->> +	stp x6, x7, [sp, #S_X6]
->> +	stp x8, x9, [sp, #S_X8]
->> +	stp x10, x11, [sp, #S_X10]
->> +	stp x12, x13, [sp, #S_X12]
->> +	stp x14, x15, [sp, #S_X14]
->> +	stp x16, x17, [sp, #S_X16]
->> +	stp x18, x19, [sp, #S_X18]
->> +	stp x20, x21, [sp, #S_X20]
->> +	stp x22, x23, [sp, #S_X22]
->> +	stp x24, x25, [sp, #S_X24]
->> +	stp x26, x27, [sp, #S_X26]
->> +	stp x28, x29, [sp, #S_X28]
->> +	add x0, sp, #S_FRAME_SIZE
->> +	stp lr, x0, [sp, #S_LR]
->> +/*
->> + * Construct a useful saved PSTATE
->> + */
->> +	mrs x0, nzcv
->> +	and x0, x0, #(PSR_N_BIT | PSR_Z_BIT | PSR_C_BIT | PSR_V_BIT)
->> +	mrs x1, daif
->> +	and x1, x1, #(PSR_D_BIT | PSR_A_BIT | PSR_I_BIT | PSR_F_BIT)
->
-> I don't think you need the masking here, the mrs should return the
-> corresponding 4 bits.
->
+On Tue, Jul 19, 2016 at 01:40:41PM +0100, Juri Lelli wrote:
+> ARM systems may be configured to have cpus with different power/performance
+> characteristics within the same chip. In this case, additional information
+> has to be made available to the kernel (the scheduler in particular) for it
+> to be aware of such differences and take decisions accordingly.
+> 
+> Therefore, this patch aims at standardizing cpu capacities device tree
+> bindings for ARM platforms. Bindings define cpu capacity-dmips-mhz
+> parameter, to allow operating systems to retrieve such information from
+> the device tree and initialize related kernel structures, paving the way
+> for common code in the kernel to deal with heterogeneity.
+> 
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Pawel Moll <pawel.moll@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+> Cc: Kumar Gala <galak@codeaurora.org>
+> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Cc: Olof Johansson <olof@lixom.net>
+> Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> Cc: Paul Walmsley <paul@pwsan.com>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Chen-Yu Tsai <wens@csie.org>
+> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Cc: devicetree at vger.kernel.org
+> Signed-off-by: Juri Lelli <juri.lelli@arm.com>
+> ---
+> 
+> Changes from v1:
+>  - removed section regarding capacity-scale
+>  - added information regarding normalization
+> 
+> Changes from v4:
+>  - binding changed to capacity-dmips-mhz
+>  - sections and changelod updated accordingly
+> 
+> Changes from v5:
+>  - addressed Mark and Vincent comments
+> ---
+>  .../devicetree/bindings/arm/cpu-capacity.txt       | 236 +++++++++++++++++++++
+>  Documentation/devicetree/bindings/arm/cpus.txt     |  10 +
+>  2 files changed, 246 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/cpu-capacity.txt
 
-OK. I see you've done that.
+I guess I'm okay with the scaled values, so:
 
->> +	orr x0, x0, x1
->> +	mrs x1, CurrentEL
->> +	and x1, x1, #(3 << 2)
->> +	orr x0, x1, x0
->> +	mrs x1, SPSel
->> +	and x1, x1, #1
->
-> Same here.
+Acked-by: Rob Herring <robh@kernel.org>
 
-OK. ^
+[...]
 
->
->> +	orr x0, x1, x0
->> +	str x0, [sp, #S_PSTATE]
->> +.endm
->
-> How is this pstate used, other than the restoring of the condition flag
-> in the restore_all_base_regs macro? Does a kretprobes handler need
-> access to them?
->
+> +Example 2 (ARM 32-bit, 4-cpu system, two clusters,
+> +	   cpus 0,1 at 1GHz, cpus 2,3 at 500MHz):
+> +capacities-dmips-mhz are scaled w.r.t. 2 (cpu at 0 and cpu at 1), this means that first
+> +cpu at 0 and cpu at 1 are twice fast than cpu at 2 and cpu at 3 (at the same frequency)
 
-A kretprobes handler should probably be able to examine a reasonable 
-pstate value, particularly in terms of DAIF. As I recall not having a 
-valid DAIF was an issue at one time.
+This example is a bit confusing with both the capacity and frequency 
+being half. I also find it a bit unrealistic to have a 2x performance 
+difference on the same micro arch. But it is all just an example...
 
-> Anyway, it's worth doing an stp xzr, x0, [sp, S_PC] so that we
-> initialise the pc in pt_regs.
->
-
-OK.  Looks like you've done this.
-
->> +
->> +.macro restore_all_base_regs
->> +	ldr x0, [sp, #S_PSTATE]
->> +	and x0, x0, #(PSR_N_BIT | PSR_Z_BIT | PSR_C_BIT | PSR_V_BIT)
->> +	msr nzcv, x0
->> +	ldp x0, x1, [sp, #S_X0]
->> +	ldp x2, x3, [sp, #S_X2]
->> +	ldp x4, x5, [sp, #S_X4]
->> +	ldp x6, x7, [sp, #S_X6]
->> +	ldp x8, x9, [sp, #S_X8]
->> +	ldp x10, x11, [sp, #S_X10]
->> +	ldp x12, x13, [sp, #S_X12]
->> +	ldp x14, x15, [sp, #S_X14]
->> +	ldp x16, x17, [sp, #S_X16]
->> +	ldp x18, x19, [sp, #S_X18]
->> +	ldp x20, x21, [sp, #S_X20]
->> +	ldp x22, x23, [sp, #S_X22]
->> +	ldp x24, x25, [sp, #S_X24]
->> +	ldp x26, x27, [sp, #S_X26]
->> +	ldp x28, x29, [sp, #S_X28]
->> +.endm
->> +
->> +ENTRY(kretprobe_trampoline)
->> +
->> +	sub sp, sp, #S_FRAME_SIZE
->> +
->> +	save_all_base_regs
->> +
->> +	mov x0, sp
->> +	bl trampoline_probe_handler
->> +	/* Replace trampoline address in lr with actual
->> +	   orig_ret_addr return address. */
->> +	mov lr, x0
->> +
->> +	restore_all_base_regs
->> +
->> +	add sp, sp, #S_FRAME_SIZE
->> +
->> +	ret
->> +
->> +ENDPROC(kretprobe_trampoline)
->
-
-Thanks,
--dl
+Rob
