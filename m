@@ -1,61 +1,76 @@
-From: cmo@melexis.com (Crt Mori)
-Date: Wed, 20 Jul 2016 16:15:39 +0200
-Subject: [PATCH v2 2/4] iio: adc: add support for Allwinner SoCs ADC
-In-Reply-To: <f6e32bf0-f043-0d34-5190-18b89920bbfd@free-electrons.com>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Wed, 20 Jul 2016 15:49:33 +0100
+Subject: [PATCH v2 4/4] hwmon: iio: add label for channels read by
+ iio_hwmon
+In-Reply-To: <578DCED5.6080408@free-electrons.com>
 References: <1468576754-3273-1-git-send-email-quentin.schulz@free-electrons.com>
- <1468576754-3273-3-git-send-email-quentin.schulz@free-electrons.com>
- <e24c8b63-7774-66d2-3317-43fd5598ecc9@kernel.org>
- <f6e32bf0-f043-0d34-5190-18b89920bbfd@free-electrons.com>
-Message-ID: <CAKv63us_NoRq=B+koC823yCz_-7Dz8HerGLDbh3tkUW-zU4ecQ@mail.gmail.com>
+ <1468576754-3273-5-git-send-email-quentin.schulz@free-electrons.com>
+ <aa889446-d68c-a05f-83c1-4d54fe814000@kernel.org>
+ <578DCED5.6080408@free-electrons.com>
+Message-ID: <1e7e369d-21c1-b05d-63c6-bf6551e268ae@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20 July 2016 at 14:37, Quentin Schulz
-<quentin.schulz@free-electrons.com> wrote:
-> On 18/07/2016 15:18, Jonathan Cameron wrote:
-> [...]
->>> +
->>> +    if (!wait_for_completion_timeout(&info->completion,
->>> +                                     msecs_to_jiffies(100))) {
->>> +            ret = -ETIMEDOUT;
->>> +            goto out;
->>> +    }
->>> +
->>> +    if (info->flags & SUNXI_GPADC_ARCH_SUN4I)
->>> +            *val = info->temp_data * 133 - 257000;
->> Why report as processed?  I'd just report them as raw with the scale
->> and offset provided.  It's not a big thing, but if we can leave it so
->> that the conversion only occurs when desired, why not?
+On 19/07/16 07:55, Quentin Schulz wrote:
+> On 18/07/2016 14:24, Jonathan Cameron wrote:
+>> On 15/07/16 10:59, Quentin Schulz wrote:
+>>> Currently, iio_hwmon only exposes values of the IIO channels it can read
+>>> but no label by channel is exposed.
+>>>
+>>> This adds exposition of sysfs files containing label for IIO channels it
+>>> can read based on extended_name field of the iio_chan_spec of the channel.
+>>> If the extended_name field is empty, the sysfs file is not created by
+>>> iio_hwmon.
+>> Hmm. This is not the intent of extended name at all.  That exists to add
+>> a small amount of information to an constructed IIO channel name.
+>> Typically it's used to indicate physically wired stuff like:
 >>
->> For in kernel users, this all happen 'automagically' anyway ;)
+>> in_voltage0_vdd_raw for cases where that channel of the ADC is hard wired
+>> to the vdd.  In this particular case the use might actually work as the
+>> vdd makes it clear it's a voltage - in general that's not the case.
 >>
->
-> Mmmmh, in the code above we apply the scale on the raw value and then
-> the offset. While in iio_convert_raw_to_processed
-> (http://lxr.free-electrons.com/source/drivers/iio/inkern.c#L507), the
-> offset is applied before the scale.
->
-> The way would be to factorize the computation by scale:
-> Now: *val = raw * scale + offset
-> Then: *val = (raw + offset/scale) * scale
->
-> But the offset is an integer and offset/scale is therefore rounded.
-> Currently, we have the following values:
-> sun4i: -257000/133 = -1932.3308270676691
-> sun5i: -144700/100 = -1447
-> sun6i: -271000/167 = -1622.754491017964
->
-> Do we accept such rounding?
-How much does this rounding bring as mistake on end result and is this
-acceptable for you? You can always multiply it by 1000 or more to get
-the precision you want out.
->
-> If not, we either stay with the processed value in read_raw or patch
-> inkern to add an offset to apply after having applied the scale to the
-> raw value (val2 from iio_channel_read is yet unused with
-> IIO_CHAN_INFO_OFFSET for example, we could use that to specify an
-> offset2 to apply after the switch(scale_type)-case).
->
+>> Use of extended_name at all in IIO is only done after extensive review.
+>> It adds nasty custom ABI to a device, so the gain has to be considerable
+>> to use it.
+>>
+>> When I read your original suggestion of adding labels, I was expecting the
+>> use of datasheet_name.  That has the advantage of being well defined by
+>> the datasheet (if not it should not be provided) + not being used in
+>> the construction of the IIO channel related attributes.  However, that
+>> may still not correspond well to the expected labelling in hwmon.
+> 
+> Good to know for extend_name use cases. While doing further testing, I
+> noticed the extend_name is also appended to the sysfs filename.. which
+> is definitely not what we want.
+> 
+> I've checked for datasheet_name and it is only used to be compared to
+> adc_channel_label from iio_map structure. Same for adc_channel_label
+> (which has to be the same as datasheet_name of the iio_chan_spec it is
+> linked to). So I could use this instead of extend_name to put a label on
+> a channel.
+> However, I thought of it to be more a way to identify the hardware in
+> the datasheet more than giving users a hint on what it is. That's what
+> "git grep adc_channel_label" told me. It's definitely better to use
+> datasheet_name over extend_name for channel labeling but I don't know if
+> it's really the good variable to use for labeling? In my understanding
+> of datasheet_name, in my case it would be more "temp_gpadc" than "SoC
+> temperature", that's what I mean.
+If we are going to do this I think we need a new field in iio_chan_spec
+for it.  The problem as ever is going to be that we'll end up with
+'fuzzy' ABI which we can't change - even if we end up with spelling
+mistakes sneaking through review - or entirely incorrect labels.
+> 
+>> Thinking more on this, the label is going to often be a function of how
+>> the board is wired up...  Perhaps it should be a characteristic of the
+>> channel_map (hence from DT or similar) rather than part of the IIO driver
+>> itself?
+> 
+> Hmm.. I would not put a property in the DT only for labeling.
+It's an odd one because in many cases the map (which is effectively
+representing a wire) is the only relevant place to have such a label.
+
+Can see what you mean about not putting things in DT which are basically
+'help'!
+> 
 > [...]
-> Quentin
->
+> 
