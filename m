@@ -1,54 +1,62 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 20 Jul 2016 12:25:48 +0200
-Subject: next build: 7 warnings 0 failures (next/next-20160720)
-In-Reply-To: <578f4bea.0568620a.1e97.8d17@mx.google.com>
-References: <578f4bea.0568620a.1e97.8d17@mx.google.com>
-Message-ID: <5106658.dbvAtpQNOs@wuerfel>
+From: mpe@ellerman.id.au (Michael Ellerman)
+Date: Wed, 20 Jul 2016 20:47:45 +1000
+Subject: [RFC 0/3] extend kexec_file_load system call
+In-Reply-To: <20160720083530.GK1041@n2100.armlinux.org.uk>
+References: <87twfunneg.fsf@linux.vnet.ibm.com>
+ <20160713073657.GX1041@n2100.armlinux.org.uk>
+ <87poqinf9m.fsf@linux.vnet.ibm.com>
+ <20160713082639.GZ1041@n2100.armlinux.org.uk>
+ <20160713130338.GB16900@redhat.com>
+ <20160713174009.GA1041@n2100.armlinux.org.uk>
+ <20160713182247.GA25232@redhat.com> <1468845964.2800.3.camel@gmail.com>
+ <20160718132629.GB32512@redhat.com>
+ <8a8b2909-7f95-03e4-bf8e-dd29b5fc1fba@gmail.com>
+ <20160720083530.GK1041@n2100.armlinux.org.uk>
+Message-ID: <87zipc8u26.fsf@@concordia.ellerman.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, July 20, 2016 3:01:14 AM CEST Olof's autobuilder wrote:
->        Passed:                 122
->        Failed:                 0
->        Warnings:               7
->        Section mismatches:     0
+Russell King - ARM Linux <linux@armlinux.org.uk> writes:
 
-Looking pretty good, almost no warnings left. The first one in this
-list is the only one that already exists in v4.7 (and a long time
-before that), all other preexisting warnings are fixed in -next.
+> On Wed, Jul 20, 2016 at 01:45:42PM +1000, Balbir Singh wrote:
+>> > IOW, if your kernel forced signature verification, you should not be
+>> > able to do sig_enforce=0. If you kernel did not have
+>> > CONFIG_MODULE_SIG_FORCE=y, then sig_enforce should be 0 by default anyway
+>> > and you are not making it worse using command line.
+>> 
+>> OK.. I checked and you are right, but that is an example and there are
+>> other things like security=, thermal.*, nosmep, nosmap that need auditing
+>> for safety and might hurt the system security if used. I still think
+>> think that assuming you can pass any command line without breaking security
+>> is a broken argument.
+>
+> Quite, and you don't need to run code in a privileged environment to do
+> any of that.
+>
+> It's also not trivial to protect against: new kernels gain new arguments
+> which older kernels may not know about.  No matter how much protection
+> is built into older kernels, newer kernels can become vulnerable through
+> the addition of further arguments.
 
-The kernelci autobuilder finds a couple of other warnings on top
-of these, because they build more unusual configurations and use
-some slightly older compilers that produce false positives.
+Indeed. A whitelist of allowed command line arguments is the only option.
 
-> Warnings:
->       1 drivers/infiniband/core/cma.c:1242:12: warning: 'src_addr_storage.sin_addr.s_addr' may be used uninitialized in this function [-Wmaybe-uninitialized]
+But given the existing syscall has shipped without a whitelist of command line
+arguments, you can't add a whitelist now without potentially breaking someone's
+setup.
 
-I sent a patch on July 4 to the infiniband list but got no reply.
-It only shows up on powerpc, presumably with an older compiler, so I
-don't consider this as urgent, the only reason to fix it up would be
-to get to zero warnings for the common architectures.
+Getting back to the device tree, we could similarly have a whitelist of
+nodes/properties that we allow to be passed in.
 
-Doug, any chance you can still pick up "infiniband: shut up a
-maybe-uninitialized warning" for 4.8?
+At least for stdout-path, I can't really see how that would significantly help
+an attacker, but I'm all ears if anyone has ideas.
 
->       1 drivers/tty/serial/8250/8250_fintek.c:34:0: warning: "IRQ_MODE" redefined
+> Also, how sure are we that there are no stack overflow issues with kernel
+> command line parsing?  Can we be sure that there's none?  This is
+> something which happens early in the kernel boot, before the full memory
+> protections have been set up.
 
-I sent a patch on June 26 to Greg, but he hasn't applied any serial
-driver patches since June 25, so I assume it's in his queue and will
-make it into v4.8 without further action on my side.
+Yeah that's also a good point. More so for the device tree, because the parsing
+is more complicated. I think there has been some work done on fuzzing libfdt,
+but we should probably do more.
 
->       2 drivers/media/dvb-frontends/cxd2841er.c:3408:40: warning: 'carrier_offset' may be used uninitialized in this function [-Wmaybe-uninitialized]
-
-It's in patchwork, so I assume Mauro will get to it in time:
-https://patchwork.linuxtv.org/patch/35398/
-
-The warning was introduced by a patch outside of drivers/media
-in linux-mm ("dynamic_debug: add jump label support").
-
->       3 drivers/net/wireless/ti/wlcore/spi.c:457:6: warning: unused variable 'ret' [-Wunused-variable]
-
-This came up today, and the author of the patch that broke it already
-sent a fix "wlcore: spi: fix build warning caused by redundant variable".
-
-	Arnd
+cheers
