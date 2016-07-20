@@ -1,99 +1,198 @@
-From: quentin.schulz@free-electrons.com (Quentin Schulz)
-Date: Wed, 20 Jul 2016 10:57:38 +0200
-Subject: [PATCH 3/5] iio: adc: sunxi-gpadc-iio: enable iio_buffers
-In-Reply-To: <alpine.DEB.2.02.1607201034450.18224@pmeerw.net>
-References: <1469003351-15263-1-git-send-email-quentin.schulz@free-electrons.com>
- <1469003351-15263-4-git-send-email-quentin.schulz@free-electrons.com>
- <alpine.DEB.2.02.1607201034450.18224@pmeerw.net>
-Message-ID: <4c9b92e6-d481-8efe-81d6-31595618171d@free-electrons.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Wed, 20 Jul 2016 11:04:11 +0200 (CEST)
+Subject: [PATCH v11 09/10] genirq/msi: map/unmap the MSI doorbells on
+ msi_domain_alloc/free_irqs
+In-Reply-To: <1468933367-23159-10-git-send-email-eric.auger@redhat.com>
+References: <1468933367-23159-1-git-send-email-eric.auger@redhat.com>
+ <1468933367-23159-10-git-send-email-eric.auger@redhat.com>
+Message-ID: <alpine.DEB.2.11.1607201016060.3564@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/07/2016 10:38, Peter Meerwald-Stadler wrote:
-> 
->> This enables the use of buffers on ADC channels of sunxi-gpadc-iio driver.
->> It also prepares the code which will be used by the touchscreen driver
->> named sunxi-gpadc-ts.
->>
->> The GPADC on Allwinner SoCs (A10, A13 and A31) has a 12 bits register for
->> conversion's data. The GPADC uses the same ADC channels for the ADC and the
->> touchscreen therefore exposes these channels to the sunxi-gpadc-ts iio
->> consumer which will be in charge of reading data from these channels for
->> the input framework.
->>
->> The temperature can only be read when in touchscreen mode. This means if
->> the buffers are being used for the ADC, the temperature sensor cannot be
->> read.
->>
->> When a FIFO_DATA_PENDING irq occurs, its handler will read the entire FIFO
->> and fill a buffer before sending it to the consumers which registered in
->> IIO for the ADC channels.
->>
->> When a consumer starts buffering ADC channels,
->> sunxi_gpadc_buffer_postenable is called and will enable FIFO_DATA_PENDING
->> irq and select the mode in which the GPADC should run (ADC or touchscreen)
->> depending on a property of the DT ("allwinner,ts-attached").
->> When the consumer stops buffering, it disables the same irq.
-> 
-> comments below
+On Tue, 19 Jul 2016, Eric Auger wrote:
+>  /**
+> + * msi_handle_doorbell_mappings: in case the irq data corresponds to an
+> + * MSI that requires iommu mapping, traverse the irq domain hierarchy
+> + * to retrieve the doorbells to handle and iommu_map/unmap them according
+> + * to @map boolean.
+> + *
+> + * @data: irq data handle
+> + * @map: mapping if true, unmapping if false
+> + */
+
+
+Please run that through the kernel doc generator. It does not work that way.
+
+The format is:
+
+/**
+ * function_name - Short function description    
+ * @arg1:	Description of arg1
+ * @argument2:	Description of argument2
+ *
+ * Long explanation including documentation of the return values.
+ */
+
+> +static int msi_handle_doorbell_mappings(struct irq_data *data, bool map)
+> +{
+> +	const struct irq_chip_msi_doorbell_info *dbinfo;
+> +	struct iommu_domain *domain;
+> +	struct irq_chip *chip;
+> +	struct device *dev;
+> +	dma_addr_t iova;
+> +	int ret = 0, cpu;
+> +
+> +	while (data) {
+> +		dev = msi_desc_to_dev(irq_data_get_msi_desc(data));
+> +		domain = iommu_msi_domain(dev);
+> +		if (domain) {
+> +			chip = irq_data_get_irq_chip(data);
+> +			if (chip->msi_doorbell_info)
+> +				break;
+> +		}
+> +		data = data->parent_data;
+> +	}
+
+Please split that out into a seperate function
+
+struct irq_data *msi_get_doorbell_info(data)
+{
+	.....
+		if (chip->msi_doorbell_info)
+			return chip->msi_get_doorbell_info(data);
+	}
+	return NULL;
+}
+
+       info = msi_get_doorbell_info(data);
+       .....
+
+> +	if (!data)
+> +		return 0;
+> +
+> +	dbinfo = chip->msi_doorbell_info(data);
+> +	if (!dbinfo)
+> +		return -EINVAL;
+> +
+> +	if (!dbinfo->doorbell_is_percpu) {
+> +		if (!map) {
+> +			iommu_msi_put_doorbell_iova(domain,
+> +						    dbinfo->global_doorbell);
+> +			return 0;
+> +		}
+> +		return iommu_msi_get_doorbell_iova(domain,
+> +						   dbinfo->global_doorbell,
+> +						   dbinfo->size, dbinfo->prot,
+> +						   &iova);
+> +	}
+
+You can spare an indentation level with a helper function
+
+    	if (!dbinfo->doorbell_is_percpu)
+		return msi_map_global_doorbell(domain, dbinfo);
+
+> +
+> +	/* percpu doorbells */
+> +	for_each_possible_cpu(cpu) {
+> +		phys_addr_t __percpu *db_addr =
+> +			per_cpu_ptr(dbinfo->percpu_doorbells, cpu);
+> +
+> +		if (!map) {
+> +			iommu_msi_put_doorbell_iova(domain, *db_addr);
+> +		} else {
+> +
+> +			ret = iommu_msi_get_doorbell_iova(domain, *db_addr,
+> +							  dbinfo->size,
+> +							  dbinfo->prot, &iova);
+> +			if (ret)
+> +				return ret;
+> +		}
+> +	}
+
+Same here:
+
+	for_each_possible_cpu(cpu) {
+		ret = msi_map_percpu_doorbell(domain, cpu);
+		if (ret)
+			return ret;
+	}
+     	return 0;
+     
+Hmm?
+
+> +
+> +	return 0;
+> +}
+> +
+> +/**
+>   * msi_domain_alloc_irqs - Allocate interrupts from a MSI interrupt domain
+>   * @domain:	The domain to allocate from
+>   * @dev:	Pointer to device struct of the device for which the interrupts
+> @@ -352,17 +423,29 @@ int msi_domain_alloc_irqs(struct irq_domain *domain, struct device *dev,
 >  
-[...]
->> @@ -101,19 +104,43 @@ struct sunxi_gpadc_dev {
->>  	unsigned int			fifo_data_irq;
->>  	unsigned int			temp_data_irq;
->>  	unsigned int			flags;
->> +	struct iio_dev			*indio_dev;
->> +	struct sunxi_gpadc_buffer	buffer;
->> +	bool				ts_attached;
->> +	bool				buffered;
-> 
-> why add buffered, duplicate state and not query iio_buffer_enabled()?
-> 
->>  };
->>  
->> -#define SUNXI_GPADC_ADC_CHANNEL(_channel, _name) {		\
->> +#define SUNXI_GPADC_ADC_CHANNEL(_channel, _name, _index) {	\
->>  	.type = IIO_VOLTAGE,					\
->>  	.indexed = 1,						\
->>  	.channel = _channel,					\
->>  	.info_mask_separate = BIT(IIO_CHAN_INFO_RAW),		\
->>  	.info_mask_shared_by_type = BIT(IIO_CHAN_INFO_SCALE),	\
->>  	.datasheet_name = _name,				\
->> +	.scan_index = _index,					\
->> +	.scan_type = {						\
->> +		.sign = 'u',					\
->> +		.realbits = 12,					\
->> +		.storagebits = 16,				\
->> +		.shift = 0,					\
-> 
-> shift not strictly needed
-> 
+>  		virq = __irq_domain_alloc_irqs(domain, virq, desc->nvec_used,
+>  					       dev_to_node(dev), &arg, false);
+> -		if (virq < 0) {
+> -			ret = -ENOSPC;
+> -			if (ops->handle_error)
+> -				ret = ops->handle_error(domain, desc, ret);
+> -			if (ops->msi_finish)
+> -				ops->msi_finish(&arg, ret);
+> -			return ret;
+> -		}
+> +		if (virq < 0)
+> +			goto error;
+>  
+>  		for (i = 0; i < desc->nvec_used; i++)
+>  			irq_set_msi_desc_off(virq, i, desc);
+> +
+> +		for (i = 0; i < desc->nvec_used; i++) {
+> +			struct irq_data *d = irq_get_irq_data(virq + i);
+> +
+> +			ret = msi_handle_doorbell_mappings(d, true);
+> +			if (ret)
+> +				break;
+> +		}
+> +		if (ret) {
+> +			for (; i >= 0; i--) {
+> +				struct irq_data *d = irq_get_irq_data(virq + i);
+> +
+> +				msi_handle_doorbell_mappings(d, false);
+> +			}
+> +			irq_domain_free_irqs(virq, desc->nvec_used);
+> +			desc->irq = 0;
+> +			goto error;
 
-ACK.
+How is that supposed to work? You clear desc->irq and then you call
+ops->handle_error.
 
-[...]
->>  static int sunxi_gpadc_read_raw(struct iio_dev *indio_dev,
->> @@ -219,15 +253,22 @@ static int sunxi_gpadc_read_raw(struct iio_dev *indio_dev,
->>  				int *val, int *val2, long mask)
->>  {
->>  	int ret;
->> +	struct sunxi_gpadc_dev *info = iio_priv(indio_dev);
->>  
->>  	switch (mask) {
->>  	case IIO_CHAN_INFO_PROCESSED:
->> +		if (info->buffered && !info->ts_attached)
->> +			return -EBUSY;
-> 
-> there would be iio_device_claim_direct_mode()
-> 
+Why are you adding this extra stuff here? Look at the call sites of
+msi_domain_alloc_irqs(). All of them use msi_domain_free_irqs() in case of
+error. There is no reason why you can't do the same....
 
-OK, iio_device_claim_direct_mode() and iio_device_release_direct_mode()
-are new functions which are not yet in the Linux Cross Reference
-(http://lxr.free-electrons.com/), I didn't know they existed. I'll use
-that, iio_buffer_enabled() when needed and get rid of the buffered
-boolean variable.
+>  /**
+> @@ -396,6 +486,9 @@ void msi_domain_free_irqs(struct irq_domain *domain, struct device *dev)
+>  		 * entry. If that's the case, don't do anything.
+>  		 */
+>  		if (desc->irq) {
+> +			msi_handle_doorbell_mappings(
+> +				irq_get_irq_data(desc->irq),
+> +				false);
+>  			irq_domain_free_irqs(desc->irq, desc->nvec_used);
+>  			desc->irq = 0;
 
-[...]
-Thanks.
+Can you please restructure the code so it reads
 
-Quentin
+		if (desc->irq)
+			continue;
+
+		msi_handle_doorbell_mappings(irq_get_irq_data(desc->irq),
+					     false);	
+		irq_domain_free_irqs(desc->irq, desc->nvec_used);
+		desc->irq = 0;
+
+Just blindly whacking stuff into the 80 char limit is not helping readability.
+
+Thanks,
+
+	tglx
