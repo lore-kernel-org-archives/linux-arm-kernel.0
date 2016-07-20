@@ -1,49 +1,68 @@
-From: honghui.zhang@mediatek.com (honghui.zhang at mediatek.com)
-Date: Wed, 20 Jul 2016 20:49:21 +0800
-Subject: [RFC PATCH] iommu: create direct_mapping after device attached
-Message-ID: <1469018961-16367-1-git-send-email-honghui.zhang@mediatek.com>
+From: dirk.behme@de.bosch.com (Dirk Behme)
+Date: Wed, 20 Jul 2016 14:53:44 +0200
+Subject: [PATCH v4] xen/arm: Add a clock property
+In-Reply-To: <CAMuHMdWdqdT4jnae8h9tDDzzh8ZAbJJwiMW-scPBNVwmjYSiWQ@mail.gmail.com>
+References: <1468309605-19522-1-git-send-email-dirk.behme@de.bosch.com>
+ <CAMuHMdU9yP2SMYa5ssrQSu1vwSN2gM4mD-EVYSGr2Pqf=jmCgw@mail.gmail.com>
+ <cc28ef7e-dce3-fe5f-ab80-b662244bcbd0@arm.com>
+ <CAMuHMdWeJjcuBHjnjppc5Ys5Ew8VssXzg=dLpLPCOQaBnUo_7Q@mail.gmail.com>
+ <04d9dbfb-196d-a775-7fbb-526aba8085f4@arm.com>
+ <CAMuHMdWdqdT4jnae8h9tDDzzh8ZAbJJwiMW-scPBNVwmjYSiWQ@mail.gmail.com>
+Message-ID: <847d3d22-985d-cbe9-3cd9-7c85080fae37@de.bosch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Honghui Zhang <honghui.zhang@mediatek.com>
+On 20.07.2016 14:46, Geert Uytterhoeven wrote:
+> Hi Julien,
+>
+> On Wed, Jul 20, 2016 at 2:10 PM, Julien Grall <julien.grall@arm.com> wrote:
+>> On 20/07/16 12:49, Geert Uytterhoeven wrote:
+>>> On Wed, Jul 20, 2016 at 1:01 PM, Julien Grall <julien.grall@arm.com>
+>>> wrote:
+>>>> On 20/07/16 10:43, Geert Uytterhoeven wrote:
+>>>>> On Tue, Jul 12, 2016 at 9:46 AM, Dirk Behme <dirk.behme@de.bosch.com>
+>>>>> wrote:
+>>>>>> Clocks described by this property are reserved for use by Xen, and the
+>>>>>> OS
+>>>>>> must not alter their state any way, such as disabling or gating a
+>>>>>> clock,
+>>>>>> or modifying its rate. Ensuring this may impose constraints on parent
+>>>>>> clocks or other resources used by the clock tree.
+>>>>>>
+>>>>>> This property is used to proxy clocks for devices Xen has taken
+>>>>>> ownership
+>>>>>> of, such as UARTs, for which the associated clock controller(s) remain
+>>>>>> under the control of Dom0.
+>>>>>
+>>>>> I'm not familiar with using XEN at all, but I'm a bit puzzled...
+>>>>>
+>>>>> Can't you just add a clocks property to the (virtual) serial device node
+>>>>> in DT?
+>>>>> Then the (virtual) serial device driver can get and enable the clock?
+>>>>
+>>>> There is no DT node for the Xen console (hvc). The UART used by Xen will
+>>>> be
+>>>> completely removed from the Device tree.
+>>>
+>>> Why is it removed?
+>>
+>> Because the device is used exclusively by Xen and DOM0 should not touch it
+>> at all (IRQs and MMIOs are not mapped).
+>
+> IMHO then it's Xen's responsability to make sure not to disable the clock(s).
+>
+> Who removes the device node from the DT? If Xen, can't it just remember
+> which clocks were present in removed device nodes?
 
-For mtk iommu, the domain_finalize was called in device attatch, the mtk
-iommu iopgt ops was allocated and initialized in domain_finalize, the
-iommu_group_create_direct_mappings would call the map interface to
-implement the map. If it's earlier than device attach, there would be NULL
-dereference. Move the iommu_group_create_direct_mappings call after device
-attached.
 
-Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
----
- drivers/iommu/iommu.c | 9 +++++++--
- 1 file changed, 7 insertions(+), 2 deletions(-)
+Yes, we are trying this with "moving" the clocks of the removed nodes to 
+the Xen hypervisor node:
 
-diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
-index 3000051..24c671c 100644
---- a/drivers/iommu/iommu.c
-+++ b/drivers/iommu/iommu.c
-@@ -427,14 +427,19 @@ rename:
- 
- 	dev->iommu_group = group;
- 
--	iommu_group_create_direct_mappings(group, dev);
--
- 	mutex_lock(&group->mutex);
- 	list_add_tail(&device->list, &group->devices);
- 	if (group->domain)
- 		__iommu_attach_device(group->domain, dev);
- 	mutex_unlock(&group->mutex);
- 
-+	/*
-+	 * For some iommu driver like mtk iommu, the map callback was assigned
-+	 * after device attached. The direct_mappings would call iommu map and
-+	 * dereference NULL if it's called earlier than attach_device.
-+	 */
-+	iommu_group_create_direct_mappings(group, dev);
-+
- 	/* Notify any listeners about change to group. */
- 	blocking_notifier_call_chain(&group->notifier,
- 				     IOMMU_GROUP_NOTIFY_ADD_DEVICE, dev);
--- 
-1.8.1.1.dirty
+https://lists.xen.org/archives/html/xen-devel/2016-06/msg02605.html
+
+The question discussed here is how to deal with these clocks properly in 
+Linux, then.
+
+Best regards
+
+Dirk
