@@ -1,43 +1,51 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Wed, 20 Jul 2016 08:31:37 -0700
-Subject: [PATCH v3 00/11] mm: Hardened usercopy
-In-Reply-To: <063D6719AE5E284EB5DD2968C1650D6D5F4FD6A3@AcuExch.aculab.com>
-References: <1468619065-3222-1-git-send-email-keescook@chromium.org>
- <063D6719AE5E284EB5DD2968C1650D6D5F4FD6A3@AcuExch.aculab.com>
-Message-ID: <CAGXu5j+QH8Fdk7p6bZV_yMv1puHRxZRu5z45+tKrmLyGBTymFw@mail.gmail.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Wed, 20 Jul 2016 10:33:39 -0500
+Subject: [net-next PATCH 1/3] net: phy: dp83867: Add documentation for
+ optional impedance control
+In-Reply-To: <20160720145614.13132-2-mugunthanvnm@ti.com>
+References: <20160720145614.13132-1-mugunthanvnm@ti.com>
+ <20160720145614.13132-2-mugunthanvnm@ti.com>
+Message-ID: <578F99D3.9090601@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 20, 2016 at 2:52 AM, David Laight <David.Laight@aculab.com> wrote:
-> From: Kees Cook
->> Sent: 15 July 2016 22:44
->> This is a start of the mainline port of PAX_USERCOPY[1].
-> ...
->> - if address range is in the current process stack, it must be within the
->>   current stack frame (if such checking is possible) or at least entirely
->>   within the current process's stack.
-> ...
+On 07/20/2016 09:56 AM, Mugunthan V N wrote:
+> Add documention of ti,impedance-control which can be used to
+> correct MAC impedance mismatch using phy extended registers.
 >
-> That description doesn't seem quite right to me.
-> I presume the check is:
->   Within the current process's stack and not crossing the ends of the
->   current stack frame.
+> Signed-off-by: Mugunthan V N <mugunthanvnm@ti.com>
+> ---
+>   Documentation/devicetree/bindings/net/ti,dp83867.txt | 7 +++++++
+>   1 file changed, 7 insertions(+)
+>
+> diff --git a/Documentation/devicetree/bindings/net/ti,dp83867.txt b/Documentation/devicetree/bindings/net/ti,dp83867.txt
+> index 5d21141..531ea3c5 100644
+> --- a/Documentation/devicetree/bindings/net/ti,dp83867.txt
+> +++ b/Documentation/devicetree/bindings/net/ti,dp83867.txt
+> @@ -9,6 +9,13 @@ Required properties:
+>   	- ti,fifo-depth - Transmitt FIFO depth- see dt-bindings/net/ti-dp83867.h
+>   		for applicable values
+>
+> +Optional property:
+> +	- ti,impedance-control - MAC Interface Impedance control to vary the
+> +				 output impedance with an approximate range
+> +				 from 35-70 ohms in 32 steps. Value range can
+> +				 be 0x0 to 0x1f. Lowest impedance value is
+> +				 0x1f and highest impedance being 0x0.
+> +
 
-Actually, it's a bad description all around. :) The check is that the
-range is within a valid stack frame (current or any prior caller's
-frame). i.e. it does not cross a frame or touch the saved frame
-pointer nor instruction pointer.
+Should'nt you be using the impedance values of 35 to 70 as the valid 
+values here? that would be the hardware description, and the values to 
+program corresponding to those are 0x00 to 0x1f. Right?
 
-> The 'current' stack frame is likely to be that of copy_to/from_user().
-> Even if you use the stack of the caller, any problematic buffers
-> are likely to have been passed in from a calling function.
-> So unless you are going to walk the stack (good luck on that)
-> I'm not sure checking the stack frames is worth it.
+Rob: is'nt that the right way to do it?
 
-Yup: that's exactly what it's doing: walking up the stack. :)
+>   Default child nodes are standard Ethernet PHY device
+>   nodes as described in Documentation/devicetree/bindings/net/phy.txt
+>
+>
 
--Kees
 
 -- 
-Kees Cook
-Chrome OS & Brillo Security
+Regards,
+Nishanth Menon
