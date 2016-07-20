@@ -1,169 +1,47 @@
-From: quentin.schulz@free-electrons.com (Quentin Schulz)
-Date: Wed, 20 Jul 2016 10:29:11 +0200
-Subject: [PATCH 5/5] mfd: sunxi-gpadc-mfd: probe sunxi-gpadc-ts driver
-In-Reply-To: <1469003351-15263-1-git-send-email-quentin.schulz@free-electrons.com>
-References: <1469003351-15263-1-git-send-email-quentin.schulz@free-electrons.com>
-Message-ID: <1469003351-15263-6-git-send-email-quentin.schulz@free-electrons.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Wed, 20 Jul 2016 09:35:30 +0100
+Subject: [RFC 0/3] extend kexec_file_load system call
+In-Reply-To: <8a8b2909-7f95-03e4-bf8e-dd29b5fc1fba@gmail.com>
+References: <87twfunneg.fsf@linux.vnet.ibm.com>
+ <20160713073657.GX1041@n2100.armlinux.org.uk>
+ <87poqinf9m.fsf@linux.vnet.ibm.com>
+ <20160713082639.GZ1041@n2100.armlinux.org.uk>
+ <20160713130338.GB16900@redhat.com>
+ <20160713174009.GA1041@n2100.armlinux.org.uk>
+ <20160713182247.GA25232@redhat.com>
+ <1468845964.2800.3.camel@gmail.com>
+ <20160718132629.GB32512@redhat.com>
+ <8a8b2909-7f95-03e4-bf8e-dd29b5fc1fba@gmail.com>
+Message-ID: <20160720083530.GK1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This probes the touchscreen driver for Allwinner SoCs (A10, A13 and A31)
-when the property "allwinner,ts-attached" is set in the GPADC (rtp) node of
-the DT.
+On Wed, Jul 20, 2016 at 01:45:42PM +1000, Balbir Singh wrote:
+> > IOW, if your kernel forced signature verification, you should not be
+> > able to do sig_enforce=0. If you kernel did not have
+> > CONFIG_MODULE_SIG_FORCE=y, then sig_enforce should be 0 by default anyway
+> > and you are not making it worse using command line.
+> 
+> OK.. I checked and you are right, but that is an example and there are
+> other things like security=, thermal.*, nosmep, nosmap that need auditing
+> for safety and might hurt the system security if used. I still think
+> think that assuming you can pass any command line without breaking security
+> is a broken argument.
 
-Some comestic modifications done to shorten and increase readability of the
-code.
+Quite, and you don't need to run code in a privileged environment to do
+any of that.
 
-Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
----
- drivers/mfd/sunxi-gpadc-mfd.c | 115 ++++++++++++++++++++++++++++--------------
- 1 file changed, 77 insertions(+), 38 deletions(-)
+It's also not trivial to protect against: new kernels gain new arguments
+which older kernels may not know about.  No matter how much protection
+is built into older kernels, newer kernels can become vulnerable through
+the addition of further arguments.
 
-diff --git a/drivers/mfd/sunxi-gpadc-mfd.c b/drivers/mfd/sunxi-gpadc-mfd.c
-index 05a000b..9b9ed0b 100644
---- a/drivers/mfd/sunxi-gpadc-mfd.c
-+++ b/drivers/mfd/sunxi-gpadc-mfd.c
-@@ -21,6 +21,11 @@
- #define SUNXI_IRQ_TEMP_DATA	1
- #define SUNXI_IRQ_TP_UP		2
- 
-+#define SUNXI_GPADC_MFD_CELL(_name, _resources, _num_resources) {	\
-+	.name = _name,							\
-+	.resources = _resources,					\
-+	.num_resources = _num_resources					\
-+}
- 
- static struct resource adc_resources[] = {
- 	{
-@@ -64,33 +69,45 @@ static const struct regmap_irq_chip sunxi_gpadc_mfd_regmap_irq_chip = {
- };
- 
- static struct mfd_cell sun4i_gpadc_mfd_cells[] = {
--	{
--		.name	= "sun4i-a10-gpadc-iio",
--		.resources = adc_resources,
--		.num_resources = ARRAY_SIZE(adc_resources),
--	}, {
--		.name = "iio_hwmon",
--	}
-+	SUNXI_GPADC_MFD_CELL("sun4i-a10-gpadc-iio", adc_resources,
-+			     ARRAY_SIZE(adc_resources)),
-+	SUNXI_GPADC_MFD_CELL("iio_hwmon", NULL, 0),
- };
- 
- static struct mfd_cell sun5i_gpadc_mfd_cells[] = {
--	{
--		.name	= "sun5i-a13-gpadc-iio",
--		.resources = adc_resources,
--		.num_resources = ARRAY_SIZE(adc_resources),
--	}, {
--		.name = "iio_hwmon",
--	},
-+	SUNXI_GPADC_MFD_CELL("sun5i-a13-gpadc-iio", adc_resources,
-+			     ARRAY_SIZE(adc_resources)),
-+	SUNXI_GPADC_MFD_CELL("iio_hwmon", NULL, 0),
- };
- 
- static struct mfd_cell sun6i_gpadc_mfd_cells[] = {
--	{
--		.name	= "sun6i-a31-gpadc-iio",
--		.resources = adc_resources,
--		.num_resources = ARRAY_SIZE(adc_resources),
--	}, {
--		.name = "iio_hwmon",
--	},
-+	SUNXI_GPADC_MFD_CELL("sun6i-a31-gpadc-iio", adc_resources,
-+			     ARRAY_SIZE(adc_resources)),
-+	SUNXI_GPADC_MFD_CELL("iio_hwmon", NULL, 0),
-+};
-+
-+static struct mfd_cell sun4i_gpadc_mfd_cells_ts[] = {
-+	SUNXI_GPADC_MFD_CELL("sun6i-a31-gpadc-iio", adc_resources,
-+			     ARRAY_SIZE(adc_resources)),
-+	SUNXI_GPADC_MFD_CELL("iio_hwmon", NULL, 0),
-+	SUNXI_GPADC_MFD_CELL("sunxi-gpadc-ts", ts_resources,
-+			     ARRAY_SIZE(ts_resources)),
-+};
-+
-+static struct mfd_cell sun5i_gpadc_mfd_cells_ts[] = {
-+	SUNXI_GPADC_MFD_CELL("sun5i-a13-gpadc-iio", adc_resources,
-+			     ARRAY_SIZE(adc_resources)),
-+	SUNXI_GPADC_MFD_CELL("iio_hwmon", NULL, 0),
-+	SUNXI_GPADC_MFD_CELL("sunxi-gpadc-ts", ts_resources,
-+			     ARRAY_SIZE(ts_resources)),
-+};
-+
-+static struct mfd_cell sun6i_gpadc_mfd_cells_ts[] = {
-+	SUNXI_GPADC_MFD_CELL("sun6i-a31-gpadc-iio", adc_resources,
-+			     ARRAY_SIZE(adc_resources)),
-+	SUNXI_GPADC_MFD_CELL("iio_hwmon", NULL, 0),
-+	SUNXI_GPADC_MFD_CELL("sunxi-gpadc-ts", ts_resources,
-+			     ARRAY_SIZE(ts_resources)),
- };
- 
- static const struct regmap_config sunxi_gpadc_mfd_regmap_config = {
-@@ -142,23 +159,45 @@ static int sunxi_gpadc_mfd_probe(struct platform_device *pdev)
- 	}
- 
- 	if (of_device_is_compatible(pdev->dev.of_node,
--				    "allwinner,sun4i-a10-ts"))
--		ret = mfd_add_devices(sunxi_gpadc_mfd_dev->dev, 0,
--				      sun4i_gpadc_mfd_cells,
--				      ARRAY_SIZE(sun4i_gpadc_mfd_cells), NULL,
--				      0, NULL);
--	else if (of_device_is_compatible(pdev->dev.of_node,
--					 "allwinner,sun5i-a13-ts"))
--		ret = mfd_add_devices(sunxi_gpadc_mfd_dev->dev, 0,
--				      sun5i_gpadc_mfd_cells,
--				      ARRAY_SIZE(sun5i_gpadc_mfd_cells), NULL,
--				      0, NULL);
--	else if (of_device_is_compatible(pdev->dev.of_node,
--					 "allwinner,sun6i-a31-ts"))
--		ret = mfd_add_devices(sunxi_gpadc_mfd_dev->dev, 0,
--				      sun6i_gpadc_mfd_cells,
--				      ARRAY_SIZE(sun6i_gpadc_mfd_cells), NULL,
--				      0, NULL);
-+				    "allwinner,sun4i-a10-ts")) {
-+		if (of_property_read_bool(pdev->dev.of_node,
-+					  "allwinner,ts-attached"))
-+			ret = mfd_add_devices(sunxi_gpadc_mfd_dev->dev, 0,
-+					      sun4i_gpadc_mfd_cells_ts,
-+					      ARRAY_SIZE(sun4i_gpadc_mfd_cells_ts),
-+					      NULL, 0, NULL);
-+		else
-+			ret = mfd_add_devices(sunxi_gpadc_mfd_dev->dev, 0,
-+					      sun4i_gpadc_mfd_cells,
-+					      ARRAY_SIZE(sun4i_gpadc_mfd_cells),
-+					      NULL, 0, NULL);
-+	} else if (of_device_is_compatible(pdev->dev.of_node,
-+					 "allwinner,sun5i-a13-ts")) {
-+		if (of_property_read_bool(pdev->dev.of_node,
-+					  "allwinner,ts-attached"))
-+			ret = mfd_add_devices(sunxi_gpadc_mfd_dev->dev, 0,
-+					      sun5i_gpadc_mfd_cells_ts,
-+					      ARRAY_SIZE(sun5i_gpadc_mfd_cells_ts),
-+					      NULL, 0, NULL);
-+		else
-+			ret = mfd_add_devices(sunxi_gpadc_mfd_dev->dev, 0,
-+					      sun5i_gpadc_mfd_cells,
-+					      ARRAY_SIZE(sun5i_gpadc_mfd_cells),
-+					      NULL, 0, NULL);
-+	} else if (of_device_is_compatible(pdev->dev.of_node,
-+					 "allwinner,sun6i-a31-ts")) {
-+		if (of_property_read_bool(pdev->dev.of_node,
-+					  "allwinner,ts-attached"))
-+			ret = mfd_add_devices(sunxi_gpadc_mfd_dev->dev, 0,
-+					      sun6i_gpadc_mfd_cells_ts,
-+					      ARRAY_SIZE(sun6i_gpadc_mfd_cells_ts),
-+					      NULL, 0, NULL);
-+		else
-+			ret = mfd_add_devices(sunxi_gpadc_mfd_dev->dev, 0,
-+					      sun6i_gpadc_mfd_cells,
-+					      ARRAY_SIZE(sun6i_gpadc_mfd_cells),
-+					      NULL, 0, NULL);
-+	}
- 
- 	if (ret) {
- 		dev_err(&pdev->dev, "failed to add MFD devices: %d\n", ret);
+Also, how sure are we that there are no stack overflow issues with kernel
+command line parsing?  Can we be sure that there's none?  This is
+something which happens early in the kernel boot, before the full memory
+protections have been set up.
+
 -- 
-2.5.0
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
