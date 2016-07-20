@@ -1,47 +1,33 @@
-From: motobud@gmail.com (Brent Taylor)
-Date: Tue, 19 Jul 2016 22:58:40 -0500
-Subject: at_xdmac: txd used outside spinlock after being released?
-Message-ID: <CAP+RiCAXKmFAzWoow_g=LR=tML7kxAi_dG0w4Z6X9KrvSypD9w@mail.gmail.com>
+From: bibby.hsieh@mediatek.com (Bibby Hsieh)
+Date: Wed, 20 Jul 2016 12:03:01 +0800
+Subject: [PATCH 0/4] MT8173 HDMI 4K support
+Message-ID: <1468987385-37353-1-git-send-email-bibby.hsieh@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ludovic,
-   I'm learning about the dmaengine subsystem and I was using the
-at_xdmac as a reference.    I'm not real familiar with tasklets
-because I have used threaded interrupt handlers instead of them.
-   I noticed that the variable "txd" in the following block of code
-(from the function at_xdmac_tasklet) is used after releasing the
-atchan->lock and after the "desc" the txd is associated with is
-returned back to the free descriptor list.
+This is MT8173 HDMI 4K support PATCH, based on 4.7-rc1.
 
-      spin_lock_bh(&atchan->lock);
-      desc = list_first_entry(&atchan->xfers_list,
-               struct at_xdmac_desc,
-               xfer_node);
-     ...
-     txd = &desc->tx_dma_desc;
+In order to support HDMI 4K on MT8173,
+we have to make some modifications.
+1) Make sure that mtk_hdmi_send_infoframe is sent successfully.
+2) Enhance the HDMI driving current to improve performance.
+3) Make sure that pixel clock is 297MHz when resolution is 4K.  
+4) Adjust VENCPLL clock.
 
-      at_xdmac_remove_xfer(atchan, desc);
-      spin_unlock_bh(&atchan->lock);
+Bibby Hsieh (1):
+  drm/mediatek: adjust VENCPLL clock for 4K HDMI output
 
-      if (!at_xdmac_chan_is_cyclic(atchan)) {
-         dma_cookie_complete(txd);
-         if (txd->callback && (txd->flags & DMA_PREP_INTERRUPT))
-            txd->callback(txd->callback_param);
-      }
+Junzhi Zhao (3):
+  drm/mediatek: do mtk_hdmi_send_infoframe after HDMI clock enable
+  drm/mediatek: enhance the HDMI driving current
+  drm/mediatek: fix the wrong pixel clock when resolution is 4K
 
-      dma_run_dependencies(txd);
+ drivers/gpu/drm/mediatek/mtk_dpi.c             |  184 +++++++++++++++++-------
+ drivers/gpu/drm/mediatek/mtk_drm_drv.c         |    9 ++
+ drivers/gpu/drm/mediatek/mtk_drm_drv.h         |    1 +
+ drivers/gpu/drm/mediatek/mtk_hdmi.c            |   19 ++-
+ drivers/gpu/drm/mediatek/mtk_mt8173_hdmi_phy.c |   89 ++++++++----
+ 5 files changed, 216 insertions(+), 86 deletions(-)
 
-Is there any danger of another process (maybe running on another
-processor) changing desc->txd after it has been put back on the
-free_list?
-My first thought was to move the spin_unlock_bh(&atchan->lock) untill
-after dma_run_dependencies(txd), but a deadlock will be introduced
-because dma_run_dependencies could invoke at_xdmac_issue_pending which
-could eventually call spin_lock_irqsave(&atchan->lock).  A deadlock
-could also be created if the "callback" function invoked another
-"device_prep_*" function.
-
-If I'm miss-understanding something, I apologize for the noise.
-
--- Brent Taylor
+-- 
+1.7.9.5
