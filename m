@@ -1,19 +1,18 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Wed, 20 Jul 2016 17:44:04 +0100
-Subject: Applied "spi: rockchip: limit transfers to (64K - 1) bytes" to the
- spi tree
-In-Reply-To: <1468546259-136659-1-git-send-email-briannorris@chromium.org>
-Message-ID: <E1bPubM-0002u3-AQ@debutante>
+Date: Wed, 20 Jul 2016 17:43:40 +0100
+Subject: Applied "ASoC: rockchip: correct the spdif clk" to the asoc tree
+In-Reply-To: <1468852474-15735-1-git-send-email-zyw@rock-chips.com>
+Message-ID: <E1bPuay-0002iL-Ap@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The patch
 
-   spi: rockchip: limit transfers to (64K - 1) bytes
+   ASoC: rockchip: correct the spdif clk
 
-has been applied to the spi tree at
+has been applied to the asoc tree at
 
-   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/spi.git 
+   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
 
 All being well this means that it will be integrated into the linux-next
 tree (usually sometime in the next 24 hours) and sent to Linus during
@@ -34,75 +33,58 @@ to this mail.
 Thanks,
 Mark
 
->From 5185a81c02d4118b11e6cb7b5fbf6f15ff7aff90 Mon Sep 17 00:00:00 2001
-From: Brian Norris <briannorris@chromium.org>
-Date: Thu, 14 Jul 2016 18:30:59 -0700
-Subject: [PATCH] spi: rockchip: limit transfers to (64K - 1) bytes
+>From 46dd2e28a90e48fbf1b7e253933fa3b7242e9b1b Mon Sep 17 00:00:00 2001
+From: Chris Zhong <zyw@rock-chips.com>
+Date: Mon, 18 Jul 2016 22:34:34 +0800
+Subject: [PATCH] ASoC: rockchip: correct the spdif clk
 
-The Rockchip SPI controller's length register only supports 16-bits,
-yielding a maximum length of 64KiB (the CTRLR1 register holds "length -
-1"). Trying to transfer more than that (e.g., with a large SPI flash
-read) will cause the driver to hang.
+The spdif mclk should be 128 times of sample rate, and there is a
+internal divider, the real rate of spdif mclk is mclk / (div + 1).
+Hence, the original driver always get the good frequency for
+48000/96000/44100/192000. But for 32000, the mclk is incorrect,
+it should be 32000*128, but get 48000*128. Do not use the internal
+divider here, just set all mclk to 128 * sample rate directly.
 
-Now, it seems that while theoretically we should be able to program
-CTRLR1 with 0xffff, and get a 64KiB transfer, but that also seems to
-cause the core to choke, so stick with a maximum of 64K - 1 bytes --
-i.e., 0xffff.
-
-Signed-off-by: Brian Norris <briannorris@chromium.org>
+Signed-off-by: Chris Zhong <zyw@rock-chips.com>
 Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- drivers/spi/spi-rockchip.c | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+ sound/soc/rockchip/rockchip_spdif.c | 17 +----------------
+ 1 file changed, 1 insertion(+), 16 deletions(-)
 
-diff --git a/drivers/spi/spi-rockchip.c b/drivers/spi/spi-rockchip.c
-index cd89682065b9..cf69f4dfb8c7 100644
---- a/drivers/spi/spi-rockchip.c
-+++ b/drivers/spi/spi-rockchip.c
-@@ -142,6 +142,12 @@
- /* sclk_out: spi master internal logic in rk3x can support 50Mhz */
- #define MAX_SCLK_OUT		50000000
+diff --git a/sound/soc/rockchip/rockchip_spdif.c b/sound/soc/rockchip/rockchip_spdif.c
+index 100781e37848..4ca265737eda 100644
+--- a/sound/soc/rockchip/rockchip_spdif.c
++++ b/sound/soc/rockchip/rockchip_spdif.c
+@@ -101,21 +101,7 @@ static int rk_spdif_hw_params(struct snd_pcm_substream *substream,
+ 	int ret;
  
-+/*
-+ * SPI_CTRLR1 is 16-bits, so we should support lengths of 0xffff + 1. However,
-+ * the controller seems to hang when given 0x10000, so stick with this for now.
-+ */
-+#define ROCKCHIP_SPI_MAX_TRANLEN		0xffff
-+
- enum rockchip_ssi_type {
- 	SSI_MOTO_SPI = 0,
- 	SSI_TI_SSP,
-@@ -573,6 +579,11 @@ static void rockchip_spi_config(struct rockchip_spi *rs)
- 	dev_dbg(rs->dev, "cr0 0x%x, div %d\n", cr0, div);
- }
+ 	srate = params_rate(params);
+-	switch (srate) {
+-	case 32000:
+-	case 48000:
+-	case 96000:
+-		mclk = 96000 * 128; /* 12288000 hz */
+-		break;
+-	case 44100:
+-		mclk = 44100 * 256; /* 11289600 hz */
+-		break;
+-	case 192000:
+-		mclk = 192000 * 128; /* 24576000 hz */
+-		break;
+-	default:
+-		return -EINVAL;
+-	}
++	mclk = srate * 128;
  
-+static size_t rockchip_spi_max_transfer_size(struct spi_device *spi)
-+{
-+	return ROCKCHIP_SPI_MAX_TRANLEN;
-+}
-+
- static int rockchip_spi_transfer_one(
- 		struct spi_master *master,
- 		struct spi_device *spi,
-@@ -589,6 +600,11 @@ static int rockchip_spi_transfer_one(
- 		return -EINVAL;
+ 	switch (params_format(params)) {
+ 	case SNDRV_PCM_FORMAT_S16_LE:
+@@ -139,7 +125,6 @@ static int rk_spdif_hw_params(struct snd_pcm_substream *substream,
+ 		return ret;
  	}
  
-+	if (xfer->len > ROCKCHIP_SPI_MAX_TRANLEN) {
-+		dev_err(rs->dev, "Transfer is too long (%d)\n", xfer->len);
-+		return -EINVAL;
-+	}
-+
- 	rs->speed = xfer->speed_hz;
- 	rs->bpw = xfer->bits_per_word;
- 	rs->n_bytes = rs->bpw >> 3;
-@@ -728,6 +744,7 @@ static int rockchip_spi_probe(struct platform_device *pdev)
- 	master->prepare_message = rockchip_spi_prepare_message;
- 	master->unprepare_message = rockchip_spi_unprepare_message;
- 	master->transfer_one = rockchip_spi_transfer_one;
-+	master->max_transfer_size = rockchip_spi_max_transfer_size;
- 	master->handle_err = rockchip_spi_handle_err;
- 
- 	rs->dma_tx.ch = dma_request_chan(rs->dev, "tx");
+-	val |= SPDIF_CFGR_CLK_DIV(mclk/(srate * 256));
+ 	ret = regmap_update_bits(spdif->regmap, SPDIF_CFGR,
+ 		SPDIF_CFGR_CLK_DIV_MASK | SPDIF_CFGR_HALFWORD_ENABLE |
+ 		SDPIF_CFGR_VDW_MASK,
 -- 
 2.8.1
