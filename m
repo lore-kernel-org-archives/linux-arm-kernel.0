@@ -1,29 +1,81 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 20 Jul 2016 07:46:56 -0500
-Subject: [PATCH 1/3] dt-bindings: add power domains to Tegra BPMP firmware
-In-Reply-To: <20160719191442.15439-1-swarren@wwwdotorg.org>
-References: <20160719191442.15439-1-swarren@wwwdotorg.org>
-Message-ID: <20160720124656.GA18773@rob-hp-laptop>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Wed, 20 Jul 2016 14:52:42 +0200
+Subject: [PATCH v2 02/10] driver core: Functional dependencies tracking
+ support
+In-Reply-To: <20160720062450.GA8066@wunner.de>
+References: <1466144820-6286-1-git-send-email-m.szyprowski@samsung.com>
+ <1975118.iO8UCAENoH@vostro.rjw.lan> <20160720062450.GA8066@wunner.de>
+Message-ID: <3969169.CcnEsvYuly@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 19, 2016 at 01:14:40PM -0600, Stephen Warren wrote:
-> From: Stephen Warren <swarren@nvidia.com>
+On Wednesday, July 20, 2016 08:24:50 AM Lukas Wunner wrote:
+> On Wed, Jul 20, 2016 at 02:33:18AM +0200, Rafael J. Wysocki wrote:
+> > On Friday, June 17, 2016 04:07:38 PM Lukas Wunner wrote:
+> > > On Fri, Jun 17, 2016 at 02:54:56PM +0200, Rafael J. Wysocki wrote:
+> > > > On Fri, Jun 17, 2016 at 12:36 PM, Lukas Wunner <lukas@wunner.de> wrote:
+> > > > > On Fri, Jun 17, 2016 at 08:26:52AM +0200, Marek Szyprowski wrote:
+> > > > > > From: "Rafael J. Wysocki" <rafael.j.wysocki@intel.com>
+> > > > > We also have such a functional dependency for Thunderbolt on Macs:
+> > > > > On resume from system sleep, the PCIe hotplug ports may not resume
+> > > > > before the thunderbolt driver has reestablished the PCI tunnels.
+> > > > > Currently this is enforced by quirk_apple_wait_for_thunderbolt()
+> > > > > in drivers/pci/quirks.c. It would be good if we could represent
+> > > > > this dependency using something like Rafael's approach instead of
+> > > > > open coding it, however one detail in Rafael's patches is problematic:
+> > > > >
+> > > > > > New links are added by calling device_link_add() which may happen
+> > > > > > either before the consumer device is probed or when probing it, in
+> > > > > > which case the caller needs to ensure that the driver of the
+> > > > > > supplier device is present and functional and the DEVICE_LINK_PROBE_TIME
+> > > > > > flag should be passed to device_link_add() to reflect that.
+> > > > >
+> > > > > The thunderbolt driver cannot call device_link_add() before the
+> > > > > PCIe hotplug ports are bound to a driver unless we amend portdrv
+> > > > > to return -EPROBE_DEFER for Thunderbolt hotplug ports on Macs
+> > > > > if the thunderbolt driver isn't loaded.
+> > > > >
+> > > > > It would therefore be beneficial if device_link_add() can be
+> > > > > called even *after* the consumer is bound.
+> > > > 
+> > > > I don't quite follow.
+> > > > 
+> > > > Who's the provider and who's the consumer here?
+> > > 
+> > > thunderbolt.ko is the supplier.
+> > 
+> > But it binds to the children of the ports that are supposed to be its
+> > consumers?
+> > 
+> > Why is that even expected to work?
 > 
-> The Tegra186 BPMP is also a provider of power domains. Enhance the device
-> tree binding to describe this.
+> No, the consumers are aunts (or uncles) of the supplier, if you will. :-)
 > 
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> ---
-> These patches all build on top of Joseph Lo's baseline BPMP binding patches[1]
-> and enhance them to represent a few more features of the firmware.
+> The consumers are the hotplug ports (named "Downstream Bridge 1 / 2" in
+> the drawing below). The supplier is the NHI:
 > 
-> [1] https://lkml.org/lkml/2016/7/19/280
-> "[PATCH V3 01/10] Documentation: dt-bindings: mailbox: tegra: Add binding for HSP mailbox"
+>       (Root Port) ---- Upstream Bridge --+-- Downstream Bridge 0 ---- NHI
+>                                          +-- Downstream Bridge 1 --
+>                                          +-- Downstream Bridge 2 --
+>                                          ...
 > 
->  .../bindings/firmware/nvidia,tegra186-bpmp.txt     | 10 ++++--
->  include/dt-bindings/power/tegra186-powergate.h     | 39 ++++++++++++++++++++++
->  2 files changed, 46 insertions(+), 3 deletions(-)
->  create mode 100644 include/dt-bindings/power/tegra186-powergate.h
+> We're calling pci_power_up() and pci_restore_state() from
+> pci_pm_resume_noirq(). And that will fail for devices below
+> the hotplug ports if the PCI tunnels haven't been re-established
+> yet by the NHI.
 
-Acked-by: Rob Herring <robh@kernel.org>
+So the NHI is a PCIe device, right?
+
+Does the Thunderbolt driver bind to that device?
+
+> Currently we achieve that via quirk_apple_wait_for_thunderbolt() in
+> drivers/pci/quirks.c. It would be more elegant if we could make this
+> relationship explicit with "device links" and let the core handle it.
+> 
+> Or am I mistaken and this particular use case is not what "device links"
+> are intended for?
+
+I'm not sure yet.
+
+Thanks,
+Rafael
