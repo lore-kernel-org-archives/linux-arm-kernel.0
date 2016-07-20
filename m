@@ -1,96 +1,80 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Wed, 20 Jul 2016 11:17:23 +0900
-Subject: [PATCH v22 1/8] arm64: kdump: reserve memory for crash dump kernel
-In-Reply-To: <20160719132736.GB21007@leverpostej>
-References: <20160712050514.22307-1-takahiro.akashi@linaro.org>
- <20160712050514.22307-2-takahiro.akashi@linaro.org>
- <20160719093906.GA20732@arm.com>
- <20160719102815.GE20774@linaro.org>
- <20160719104103.GB20990@arm.com>
- <1468932537.27473.6.camel@redhat.com>
- <20160719132736.GB21007@leverpostej>
-Message-ID: <20160720021721.GH20774@linaro.org>
+From: thunder.leizhen@huawei.com (Leizhen (ThunderTown))
+Date: Wed, 20 Jul 2016 10:46:27 +0800
+Subject: [PATCH 1/1] arm64/hugetlb: clear PG_dcache_clean if the page is
+ dirty when munmap
+In-Reply-To: <20160712153535.GH22183@e104818-lin.cambridge.arm.com>
+References: <1467893344-8352-1-git-send-email-thunder.leizhen@huawei.com>
+ <20160707153741.GC27180@e104818-lin.cambridge.arm.com>
+ <577F1FD9.1040205@huawei.com>
+ <20160708135447.GB22099@e104818-lin.cambridge.arm.com>
+ <577FC5AA.5010709@huawei.com>
+ <20160708161347.GC22099@e104818-lin.cambridge.arm.com>
+ <57839474.6030203@huawei.com>
+ <20160712153535.GH22183@e104818-lin.cambridge.arm.com>
+Message-ID: <578EE603.9020206@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 19, 2016 at 02:27:54PM +0100, Mark Rutland wrote:
-> On Tue, Jul 19, 2016 at 08:48:57AM -0400, Mark Salter wrote:
-> > On Tue, 2016-07-19 at 18:41 +0800, Dennis Chen wrote:
-> > > On Tue, Jul 19, 2016 at 07:28:16PM +0900, AKASHI Takahiro wrote:
-> > > > On Tue, Jul 19, 2016 at 05:39:07PM +0800, Dennis Chen wrote:
-> > > > > On Tue, Jul 12, 2016 at 02:05:07PM +0900, AKASHI Takahiro wrote:
-> > > > > > +/*
-> > > > > > + * reserve_crashkernel() - reserves memory for crash kernel
-> > > > > > + *
-> > > > > > + * This function reserves memory area given in "crashkernel=" kernel command
-> > > > > > + * line parameter. The memory reserved is used by dump capture kernel when
-> > > > > > + * primary kernel is crashing.
-> > > > > > + */
-> > > > > > +static void __init reserve_crashkernel(void)
-> > > > > > +{
-> > > > > > +??????????int ret;
-> > > > > > +
-> > > > > > +??????????ret = parse_crashkernel(boot_command_line, memblock_phys_mem_size(),
-> > > > > > +??????????????????????????????????????????????????????????&crash_size, &crash_base);
-> > > > > > +??????????/* no crashkernel= or invalid value specified */
-> > > > > > +??????????if (ret || !crash_size)
-> > > > > > +??????????????????????????return;
-> > > > > > +
-> > > > > > +??????????if (crash_base == 0) {
-> > > > > > +??????????????????????????/* Current arm64 boot protocol requires 2MB alignment */
-> > > > > > +??????????????????????????crash_base = memblock_find_in_range(0,
-> > > > > > +??????????????????????????????????????????????????????????MEMBLOCK_ALLOC_ACCESSIBLE, crash_size, SZ_2M);
-> > > > > > +??????????????????????????if (crash_base == 0) {
-> > > > > > +??????????????????????????????????????????pr_warn("Unable to allocate crashkernel (size:%llx)\n",
-> > > > > > +??????????????????????????????????????????????????????????crash_size);
-> > > > > > +??????????????????????????????????????????return;
-> > > > > > +??????????????????????????}
-> > > > > > +??????????????????????????memblock_reserve(crash_base, crash_size);
-> > > > > > 
-> > > > > I am not pretty sure the context here, but
-> > > > > can we use below code piece instead of the above lines?
-> > > > > ????????????????if (crash_base == 0)
-> > > > > ????????????????????????????????memblock_alloc(crash_size, SZ_2M);
-> > > > Either would be fine here.
-> > > > 
-> > > Hello AKASHI, maybe you can succeed to find the base with memblock_find_in_range(),??
-> > > but that doesn't mean you will also succeed to reserve them with memblock_reserve followed.
-> > 
-> > We avoid memblock_alloc() here because it panics on failure. This could happen
-> > if user asks for an unusually large crashkernel size. Better to print a message
-> > and keep booting. Checking the return value of memblock_reserve() seems like a
-> > good thing to do though.
+
+
+On 2016/7/12 23:35, Catalin Marinas wrote:
+> On Mon, Jul 11, 2016 at 08:43:32PM +0800, Leizhen (ThunderTown) wrote:
+>> On 2016/7/9 0:13, Catalin Marinas wrote:
+>>> On Fri, Jul 08, 2016 at 11:24:26PM +0800, Leizhen (ThunderTown) wrote:
+>>>> On 2016/7/8 21:54, Catalin Marinas wrote:
+>>>>> ------------8<----------------
+>>>>> diff --git a/arch/arm64/mm/flush.c b/arch/arm64/mm/flush.c
+>>>>> index dbd12ea8ce68..c753fa804165 100644
+>>>>> --- a/arch/arm64/mm/flush.c
+>>>>> +++ b/arch/arm64/mm/flush.c
+>>>>> @@ -75,7 +75,8 @@ void __sync_icache_dcache(pte_t pte, unsigned long addr)
+>>>>>  	if (!page_mapping(page))
+>>>>>  		return;
+>>>>>  
+>>>>> -	if (!test_and_set_bit(PG_dcache_clean, &page->flags))
+>>>>> +	if (!test_and_set_bit(PG_dcache_clean, &page->flags) ||
+>>>>> +	    PageDirty(page))
+>>>>>  		sync_icache_aliases(page_address(page),
+>>>>>  				    PAGE_SIZE << compound_order(page));
+>>>>>  	else if (icache_is_aivivt())
+>>>>> ----------------8<---------------------
+Hi, Catalin:
+  Do you plan to send this patch? My colleagues told me that if our patches are quite
+different, it should be Signed-off-by you.
+
+  I searched all Linux source code, __sync_icache_dcache is only called by set_pte_at,
+and some check conditions(especially pte_exec) will limit its impact.
+
+	if (pte_user(pte) && pte_exec(pte) && !pte_special(pte))
+		__sync_icache_dcache(pte, addr);
+
+>>>>>
+>>>>> BTW, can you make your tests (source) available somewhere?
+>>>>
+>>>> Both cases worked well with this patch.
+>>>
+>>> Now I'm even more confused ;). IIUC, after an msync() in user space we
+>>> should flush the pages to disk via write_cache_pages(). This function
+>>> calls clear_page_dirty_for_io() after which PageDirty() is no longer
+>>> true. I can't tell how a subsequent mmap() can see the written pages as
+>>> dirty.
+>>
+>> As my tracing, both cases invoked empty function.
+>>
+>> int vfs_fsync_range(struct file *file, loff_t start, loff_t end, int datasync)
+>> 	......
+>> 	return file->f_op->fsync(file, start, end, datasync);
+>> }
+>>
+>> const struct file_operations hugetlbfs_file_operations = {
+>> 	.fsync			= noop_fsync,
+>>
+>> static const struct file_operations shmem_file_operations = {
+>> 	.mmap		= shmem_mmap,
+>> #ifdef CONFIG_TMPFS
+>> 	.fsync		= noop_fsync,
 > 
-> Another option would be to add a memblock_try_alloc() function to the
-> memblock API, which in case of failure returns 0 rather than triggering
-> a panic(). We'd still have to check the return value, but all the
-> memblock manipulation would be in one place.
+> I was referring to standard filesystem (e.g. ext4) writes where, IIUC,
+> the PageDirty() status is cleared after I/O but it's not necessarily
+> removed from the page cache.
 > 
-> It looks like adding that is fairly simple:
-> 
-> phys_addr_t __init memblock_try_alloc(phys_addr_t size, phys_addr_t align)
-> {
-> 	return __memblock_alloc_base(size, align, MEMBLOCK_ALLOC_ACCESSIBLE);
-> }
-
-Apart form this issue, I found that the kernel can panic, if the memory
-for crash dump kernel is allocated above 32-bits, due to a failure
-of alloc_bootmem_low() in request_standard_resources().
-(In addition, dma_contiguous_reserve() will also fail.)
-
-So I'd like to change the code to:
-        if (crash_base == 0) {
-                crash_base = memblock_find_in_range(0,
-                                IS_ENABLED(CONFIG_ZONE_DMA) ?
-                                        ARCH_LOW_ADDRESS_LIMIT :
-                                        MEMBLOCK_ALLOC_ACCESSIBLE,
-                                crash_size, SZ_2M);
-        ...
-
-Does this make sense?
-
-Thanks,
--Takahiro AKASHI
-
-> Thanks,
-> Mark.
