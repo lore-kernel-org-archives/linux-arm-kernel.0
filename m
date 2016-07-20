@@ -1,455 +1,553 @@
-From: ck.hu@mediatek.com (CK Hu)
-Date: Wed, 20 Jul 2016 13:59:06 +0800
-Subject: [PATCH v4 6/8] drm/mediatek: add dsi transfer function
-In-Reply-To: <1468577274-6178-7-git-send-email-yt.shen@mediatek.com>
-References: <1468577274-6178-1-git-send-email-yt.shen@mediatek.com>
- <1468577274-6178-7-git-send-email-yt.shen@mediatek.com>
-Message-ID: <1468994346.11841.31.camel@mtksdaap41>
+From: andrew@aj.id.au (Andrew Jeffery)
+Date: Wed, 20 Jul 2016 15:28:27 +0930
+Subject: [PATCH 06/12] gpio: Add Aspeed driver
+In-Reply-To: <1468994313-13538-1-git-send-email-andrew@aj.id.au>
+References: <1468994313-13538-1-git-send-email-andrew@aj.id.au>
+Message-ID: <1468994313-13538-7-git-send-email-andrew@aj.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, YT:
+From: Joel Stanley <joel@jms.id.au>
 
-Some comments inline.
+The Aspeed SoCs contain GPIOs grouped by letter, where each letter group
+contains 8 pins. The GPIO letter groups are then banked in sets of four
+in the register layout.
 
-On Fri, 2016-07-15 at 18:07 +0800, YT Shen wrote:
-> From: shaoming chen <shaoming.chen@mediatek.com>
-> 
-> add dsi read/write commands for transfer function
-> 
-> Signed-off-by: shaoming chen <shaoming.chen@mediatek.com>
-> ---
->  drivers/gpu/drm/mediatek/mtk_dsi.c |  322 ++++++++++++++++++++++++++++++++++++
->  1 file changed, 322 insertions(+)
-> 
-> diff --git a/drivers/gpu/drm/mediatek/mtk_dsi.c b/drivers/gpu/drm/mediatek/mtk_dsi.c
-> index de5ad7f..1f99894 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_dsi.c
-> +++ b/drivers/gpu/drm/mediatek/mtk_dsi.c
-> @@ -24,6 +24,7 @@
->  #include <linux/of_graph.h>
->  #include <linux/phy/phy.h>
->  #include <linux/platform_device.h>
-> +#include <video/mipi_display.h>
->  #include <video/videomode.h>
->  
->  #include "mtk_drm_ddp_comp.h"
-> @@ -80,8 +81,16 @@
->  #define DSI_HBP_WC		0x54
->  #define DSI_HFP_WC		0x58
->  
-> +#define DSI_CMDQ_SIZE		0x60
-> +#define CMDQ_SIZE		0x3f
-> +
->  #define DSI_HSTX_CKL_WC		0x64
->  
-> +#define DSI_RX_DATA0		0x74
-> +#define DSI_RX_DATA1		0x78
-> +#define DSI_RX_DATA2		0x7c
-> +#define DSI_RX_DATA3		0x80
-> +
->  #define DSI_RACK		0x84
->  #define RACK			BIT(0)
->  
-> @@ -117,8 +126,25 @@
->  #define CLK_HS_POST			(0xff << 8)
->  #define CLK_HS_EXIT			(0xff << 16)
->  
-> +#define DSI_CMDQ0		0x180
-> +
->  #define NS_TO_CYCLE(n, c)    ((n) / (c) + (((n) % (c)) ? 1 : 0))
->  
-> +#define MTK_DSI_HOST_IS_READ(type) \
-> +	((type == MIPI_DSI_GENERIC_READ_REQUEST_0_PARAM) || \
-> +	(type == MIPI_DSI_GENERIC_READ_REQUEST_1_PARAM) || \
-> +	(type == MIPI_DSI_GENERIC_READ_REQUEST_2_PARAM) || \
-> +	(type == MIPI_DSI_DCS_READ))
-> +
-> +#define MTK_DSI_HOST_IS_WRITE(type) \
-> +	((type == MIPI_DSI_GENERIC_SHORT_WRITE_0_PARAM) || \
-> +	(type == MIPI_DSI_GENERIC_SHORT_WRITE_1_PARAM) || \
-> +	(type == MIPI_DSI_GENERIC_SHORT_WRITE_2_PARAM) || \
-> +	(type == MIPI_DSI_DCS_SHORT_WRITE) || \
-> +	(type == MIPI_DSI_DCS_SHORT_WRITE_PARAM) || \
-> +	(type == MIPI_DSI_GENERIC_LONG_WRITE) || \
-> +	(type == MIPI_DSI_DCS_LONG_WRITE))
-> +
->  struct phy;
->  
->  struct mtk_dsi {
-> @@ -148,6 +174,38 @@ struct mtk_dsi {
->  	int irq_num, irq_data;
->  };
->  
-> +struct dsi_cmd_t0 {
-> +	u8 config;
-> +	u8 type;
-> +	u8 data0;
-> +	u8 data1;
-> +};
-> +
-> +struct dsi_cmd_t2 {
-> +	u8 config;
-> +	u8 type;
-> +	u16 wc16;
-> +	u8 *pdata;
-> +};
-> +
-> +struct dsi_rx_data {
-> +	u8 byte0;
-> +	u8 byte1;
-> +	u8 byte2;
-> +	u8 byte3;
-> +};
-> +
-> +struct dsi_tx_cmdq {
-> +	u8 byte0;
-> +	u8 byte1;
-> +	u8 byte2;
-> +	u8 byte3;
-> +};
-> +
-> +struct dsi_tx_cmdq_regs {
-> +	struct dsi_tx_cmdq data[128];
-> +};
-> +
->  enum {
->  	DSI_INT_SLEEPOUT_DONE_FLAG	= BIT(6),
->  	DSI_INT_VM_CMD_DONE_FLAG	= BIT(5),
-> @@ -858,9 +916,273 @@ static int mtk_dsi_host_detach(struct mipi_dsi_host *host,
->  	return 0;
->  }
->  
-> +static void mtk_dsi_set_cmdq(void __iomem *reg, u32 mask, u32 data)
-> +{
-> +	u32 temp = readl(reg);
-> +
-> +	writel((temp & ~mask) | (data & mask), reg);
-> +}
-> +
-> +static void mtk_dsi_wait_for_idle(struct mtk_dsi *dsi)
-> +{
-> +	u32 timeout_ms = 500000; /* total 1s ~ 2s timeout */
-> +
-> +	while (timeout_ms--) {
-> +		if (!(readl(dsi->regs + DSI_INTSTA) & DSI_BUSY))
-> +			break;
-> +
-> +		usleep_range(2, 4);
-> +	}
-> +
-> +	if (timeout_ms == 0) {
-> +		dev_info(dsi->dev, "polling dsi wait not busy timeout!\n");
-> +
-> +		mtk_dsi_enable(dsi);
-> +		mtk_dsi_reset_engine(dsi);
-> +	}
-> +}
-> +
-> +static ssize_t mtk_dsi_host_read_cmd(struct mtk_dsi *dsi,
-> +				     const struct mipi_dsi_msg *msg)
-> +{
-> +	u8 max_try_count = 5;
-> +	u32 recv_data_cnt, tmp_val;
-> +	u32 recv_data0, recv_data1, recv_data2, recv_data3;
-> +	struct dsi_rx_data read_data0, read_data1, read_data2, read_data3;
-> +	struct dsi_cmd_t0 t0;
-> +	s32 ret;
-> +
-> +	u8 *buffer = msg->rx_buf;
-> +	u8 buffer_size = msg->rx_len;
-> +	u8 packet_type;
-> +
-> +	if (readl(dsi->regs + DSI_MODE_CTRL) & 0x03) {
-> +		dev_info(dsi->dev, "dsi engine is not command mode\n");
-> +		return -1;
-> +	}
-> +
-> +	if (!buffer) {
-> +		dev_info(dsi->dev, "dsi receive buffer size may be NULL\n");
-> +		return -1;
-> +	}
-> +
-> +	do {
-> +		if (max_try_count == 0) {
-> +			dev_info(dsi->dev, "dsi engine read counter has been maxinum\n");
-> +			return -1;
-> +		}
-> +
-> +		max_try_count--;
-> +		recv_data_cnt = 0;
-> +
-> +		mtk_dsi_wait_for_idle(dsi);
-> +
-> +		t0.config = 0x04;
-> +		t0.data0 = *((u8 *)(msg->tx_buf));
-> +
-> +		if (buffer_size < 0x3)
+The implementation exposes multiple banks through the one driver, and
+requests and releases pins via the pinctrl subsystem. The hardware
+supports generation of interrupts with per-pin triggers, and exposes this
+capability through an irqchip and devicetree.
 
-It's better to use '3' instead of '0x3'.
+A number of supported features are not yet implemented: Configuration of
+interrupt direction (ARM or LPC), debouncing, and provides WDT reset
+tolerance for output ports.
 
-> +			t0.type = MIPI_DSI_DCS_READ;
-> +		else
-> +			t0.type = MIPI_DSI_GENERIC_READ_REQUEST_1_PARAM;
-> +
-> +		t0.data1 = 0;
-> +
-> +		tmp_val = (t0.data1 << 24) | (t0.data0 << 16) | (t0.type << 8) |
-> +			t0.config;
+Signed-off-by: Joel Stanley <joel@jms.id.au>
+Signed-off-by: Alistair Popple <alistair@popple.id.au>
+Signed-off-by: Jeremy Kerr <jk@ozlabs.org>
+Signed-off-by: Andrew Jeffery <andrew@aj.id.au>
+---
+ arch/arm/mach-aspeed/Kconfig |   4 +
+ drivers/gpio/Kconfig         |   8 +-
+ drivers/gpio/Makefile        |   1 +
+ drivers/gpio/gpio-aspeed.c   | 456 +++++++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 468 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/gpio/gpio-aspeed.c
 
-Why need 'struct dsi_cmd_t0 t0'? I think code is more simple when get
-rid of this structure. The code looks like:
-
-tmp_val = (data1 << 24) | (data0 << 16) | (type << 8) | config;
-
-> +
-> +		writel(tmp_val, dsi->regs + DSI_CMDQ0);
-> +		mtk_dsi_mask(dsi, DSI_CMDQ_SIZE, CMDQ_SIZE, 1);
-> +
-> +		mtk_dsi_mask(dsi, DSI_RACK, RACK, RACK);
-> +		mtk_dsi_mask(dsi, DSI_INTSTA, LPRX_RD_RDY_INT_FLAG,
-> +			     ~LPRX_RD_RDY_INT_FLAG);
-> +		mtk_dsi_mask(dsi, DSI_INTSTA, CMD_DONE_INT_FLAG,
-> +			     ~CMD_DONE_INT_FLAG);
-
-I think interrupt status should be cleared in irq handler. So you need
-not to clear it here.
-
-> +		mtk_dsi_mask(dsi, DSI_INTEN, DSI_INT_LPRX_RD_RDY_FLAG,
-> +			     DSI_INT_LPRX_RD_RDY_FLAG);
-> +		mtk_dsi_mask(dsi, DSI_INTEN, DSI_INT_CMD_DONE_FLAG,
-> +			     DSI_INT_CMD_DONE_FLAG);
-
-Why enable cmd_done interrupt? You just need interrupt of LPRX_RD_RDY.
-
-> +
-> +		mtk_dsi_start(dsi);
-> +
-> +		dev_info(dsi->dev, "Start polling DSI read ready!!!\n");
-> +
-> +		 /* 2s timeout*/
-> +		ret = mtk_dsi_wait_for_irq_timeout(dsi,
-> +						   DSI_INT_LPRX_RD_RDY_FLAG,
-> +						   2000);
-> +		if (ret) {
-> +			dev_info(dsi->dev, "Polling DSI read ready timeout!!!\n");
-> +
-> +			mtk_dsi_enable(dsi);
-> +			mtk_dsi_reset_engine(dsi);
-> +
-> +			return ret;
-> +		}
-> +
-> +		dev_info(dsi->dev, "End polling DSI read ready!!!\n");
-> +
-> +		mtk_dsi_mask(dsi, DSI_RACK, RACK, RACK);
-> +		mtk_dsi_mask(dsi, DSI_INTSTA, LPRX_RD_RDY_INT_FLAG,
-> +			     ~LPRX_RD_RDY_INT_FLAG);
-> +
-> +		recv_data0 = readl(dsi->regs + DSI_RX_DATA0);
-> +		recv_data1 = readl(dsi->regs + DSI_RX_DATA1);
-> +		recv_data2 = readl(dsi->regs + DSI_RX_DATA2);
-> +		recv_data3 = readl(dsi->regs + DSI_RX_DATA3);
-> +
-> +		read_data0 = *((struct dsi_rx_data *)(&recv_data0));
-> +		read_data1 = *((struct dsi_rx_data *)(&recv_data1));
-> +		read_data2 = *((struct dsi_rx_data *)(&recv_data2));
-> +		read_data3 = *((struct dsi_rx_data *)(&recv_data3));
-
-You only use read_data0. read_data1, read_data2, and read_data3 are just
-for debug. Remove the debug only modification if they are not necessary.
-Or move them to another patch to make this patch clear.
-
-> +
-> +		ret = readl(dsi->regs + DSI_CMDQ_SIZE);
-> +		dev_info(dsi->dev, "DSI_CMDQ_SIZE : 0x%x\n", ret & CMDQ_SIZE);
-> +
-> +		ret = readl(dsi->regs + DSI_CMDQ0);
-> +		dev_info(dsi->dev, "DSI_CMDQ_DATA0 : 0x%x\n",
-> +			 ret & 0xff);
-> +		dev_info(dsi->dev, "DSI_CMDQ_DATA1 : 0x%x\n",
-> +			 (ret >> 8) & 0xff);
-> +		dev_info(dsi->dev, "DSI_CMDQ_DATA2 : 0x%x\n",
-> +			 (ret >> 16) & 0xff);
-> +		dev_info(dsi->dev, "DSI_CMDQ_DATA3 : 0x%x\n",
-> +			 (ret >> 24) & 0xff);
-> +
-> +		dev_info(dsi->dev, "DSI_RX_DATA0: 0x%x\n", recv_data0);
-> +		dev_info(dsi->dev, "DSI_RX_DATA1: 0x%x\n", recv_data1);
-> +		dev_info(dsi->dev, "DSI_RX_DATA2: 0x%x\n", recv_data2);
-> +		dev_info(dsi->dev, "DSI_RX_DATA3: 0x%x\n", recv_data3);
-> +
-> +		dev_info(dsi->dev, "read_data0: %x,%x,%x,%x\n",
-> +			 read_data0.byte0, read_data0.byte1, read_data0.byte2,
-> +			 read_data0.byte3);
-> +		dev_info(dsi->dev, "read_data1: %x,%x,%x,%x\n",
-> +			 read_data1.byte0, read_data1.byte1, read_data1.byte2,
-> +			 read_data1.byte3);
-> +		dev_info(dsi->dev, "read_data2: %x,%x,%x,%x\n",
-> +			 read_data2.byte0, read_data2.byte1, read_data2.byte2,
-> +			 read_data2.byte3);
-> +		dev_info(dsi->dev, "read_data3: %x,%x,%x,%x\n",
-> +			 read_data3.byte0, read_data3.byte1, read_data3.byte2,
-> +			 read_data3.byte3);
-> +
-> +		packet_type = read_data0.byte0;
-> +		dev_info(dsi->dev, "DSI read packet_type is 0x%x\n",
-> +			 packet_type);
-> +
-> +		if (packet_type == 0x1a || packet_type == 0x1c) {
-> +			void *read_tmp = (void *)&recv_data1;
-> +
-> +			recv_data_cnt = read_data0.byte1 +
-> +					read_data0.byte2 * 16;
-> +			if (recv_data_cnt > 10)
-> +				recv_data_cnt = 10;
-
-Why do you drop data over size of 10? Isn't it an error?
-
-> +
-> +			if (recv_data_cnt > buffer_size)
-> +				recv_data_cnt = buffer_size;
-
-Isn't it an error while you drop data over the buffer size?
-
-> +
-> +			memcpy(buffer, read_tmp, recv_data_cnt);
-> +		} else {
-> +			/* short  packet */
-> +			recv_data_cnt = 2;
-> +			if (recv_data_cnt > buffer_size)
-> +				recv_data_cnt = buffer_size;
-
-Isn't it an error while you drop data over the buffer size?
-
-> +
-> +			memcpy(buffer, &read_data0.byte1, 2);
-
-If buffer_size is 1, why do you still copy 2 bytes?
-
-> +		}
-> +	} while (packet_type != 0x1c && packet_type != 0x21 &&
-> +		packet_type != 0x22 && packet_type != 0x1a);
-
-Could you give these magic number a descriptive name?
-
-> +
-> +	dev_info(dsi->dev, "dsi get %d byte data from the panel address(0x%x)\n",
-> +		 recv_data_cnt, *((u8 *)(msg->tx_buf)));
-> +
-> +	return recv_data_cnt;
-> +}
-> +
-> +static ssize_t mtk_dsi_host_write_cmd(struct mtk_dsi *dsi,
-> +				      const struct mipi_dsi_msg *msg)
-> +{
-> +	u32 i;
-> +	u32 goto_addr, mask_para, set_para, reg_val;
-> +	void __iomem *cmdq_reg;
-> +	struct dsi_cmd_t0 t0;
-> +	struct dsi_cmd_t2 t2;
-> +	const char *tx_buf = msg->tx_buf;
-> +	struct dsi_tx_cmdq_regs *dsi_cmd_reg;
-> +
-> +	dsi_cmd_reg = (struct dsi_tx_cmdq_regs *)(dsi->regs + DSI_CMDQ0);
-> +
-> +	mtk_dsi_wait_for_idle(dsi);
-> +
-> +	if (msg->tx_len > 2) {
-> +		t2.config = 2;
-> +		t2.type = msg->type;
-> +		t2.wc16 = msg->tx_len;
-> +
-> +		reg_val = (t2.wc16 << 16) | (t2.type << 8) | t2.config;
-
-Why need 'struct dsi_cmd_t2 t2'? I think code is more simple when get
-rid of this structure. The code looks like:
-
-reg_val = (wc16 << 16) | (type << 8) | config;
-
-> +
-> +		writel(reg_val, &dsi_cmd_reg->data[0]);
-> +
-> +		goto_addr = (u32)(&dsi_cmd_reg->data[1].byte0);
-> +		mask_para = (0xff << ((goto_addr & 0x3) * 8));
-> +		set_para = (tx_buf[0] << ((goto_addr & 0x3) * 8));
-> +		cmdq_reg = (void __iomem *)(goto_addr & (~0x3));
-> +		mtk_dsi_set_cmdq(cmdq_reg, mask_para, set_para);
-
-I think you can merge this setting into 'for loop' and the loop look
-like this:
-
-for (i = 0; i < msg->tx_len; i++) {
-	goto_addr = (u32)(&dsi_cmd_reg->data[1].byte0) + i;
-	mask_para = (0xff << ((goto_addr & 0x3) * 8));
-	set_para = (tx_buf[i] << ((goto_addr & 0x3) * 8));
-	cmdq_reg = (void __iomem *)(goto_addr & (~0x3));
-	mtk_dsi_set_cmdq(cmdq_reg, mask_para, set_para);
-}
-
-> +
-> +		for (i = 1; i < msg->tx_len; i++) {
-> +			goto_addr = (u32)(&dsi_cmd_reg->data[1].byte1) + i - 1;
-> +			mask_para = (0xff << ((goto_addr & 0x3) * 8));
-> +			set_para = (tx_buf[i] << ((goto_addr & 0x3) * 8));
-> +			cmdq_reg = (void __iomem *)(goto_addr & (~0x3));
-> +			mtk_dsi_set_cmdq(cmdq_reg, mask_para, set_para);
-> +		}
-> +
-> +		mtk_dsi_mask(dsi, DSI_CMDQ_SIZE, CMDQ_SIZE,
-> +			     2 + (msg->tx_len - 1) / 4);
-
-I think it is better to change formula of DSI_CMDQ_SIZE to '1 +
-(msg->tx_len + 3) / 4'. The '1' means the first cmd which describe the
-size of tx_buf, and the rest means the other cmds for body of tx_buf.
-
-> +	} else {
-> +		t0.config = 0;
-> +		t0.data0 = tx_buf[0];
-> +		if (msg->tx_len == 2) {
-> +			t0.type = MIPI_DSI_DCS_SHORT_WRITE_PARAM;
-> +			t0.data1 = tx_buf[1];
-> +		} else {
-> +			t0.type = MIPI_DSI_DCS_SHORT_WRITE;
-> +			t0.data1 = 0;
-> +		}
-> +
-> +		reg_val = (t0.data1 << 24) | (t0.data0 << 16) | (t0.type << 8) |
-> +			   t0.config;
-> +
-> +		writel(reg_val, &dsi_cmd_reg->data[0]);
-> +		mtk_dsi_mask(dsi, DSI_CMDQ_SIZE, CMDQ_SIZE, 1);
-> +	}
-> +
-> +	mtk_dsi_start(dsi);
-> +	mtk_dsi_wait_for_idle(dsi);
-> +
-> +	return 0;
-> +}
-> +
-> +static ssize_t mtk_dsi_host_transfer(struct mipi_dsi_host *host,
-> +				     const struct mipi_dsi_msg *msg)
-> +{
-> +	struct mtk_dsi *dsi = host_to_dsi(host);
-> +	u8 type = msg->type;
-> +	ssize_t ret = 0;
-> +
-> +	if (MTK_DSI_HOST_IS_READ(type))
-> +		ret = mtk_dsi_host_read_cmd(dsi, msg);
-> +	else if (MTK_DSI_HOST_IS_WRITE(type))
-> +		ret = mtk_dsi_host_write_cmd(dsi, msg);
-> +
-> +	return ret;
-> +}
-> +
->  static const struct mipi_dsi_host_ops mtk_dsi_ops = {
->  	.attach = mtk_dsi_host_attach,
->  	.detach = mtk_dsi_host_detach,
-> +	.transfer = mtk_dsi_host_transfer,
->  };
->  
->  static int mtk_dsi_bind(struct device *dev, struct device *master, void *data)
-
-
-Regards,
-CK
+diff --git a/arch/arm/mach-aspeed/Kconfig b/arch/arm/mach-aspeed/Kconfig
+index 25a0ae01429e..a52de9d3adfb 100644
+--- a/arch/arm/mach-aspeed/Kconfig
++++ b/arch/arm/mach-aspeed/Kconfig
+@@ -6,6 +6,10 @@ menuconfig ARCH_ASPEED
+ 	select ASPEED_WATCHDOG
+ 	select MOXART_TIMER
+ 	select PINCTRL
++	select GPIOLIB
++	select GPIO_ASPEED
++	select GPIO_SYSFS
++
+ 	help
+ 	  Say Y here if you want to run your kernel on an ASpeed BMC SoC.
+ 
+diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
+index 536112fd2466..2c21b5db09cd 100644
+--- a/drivers/gpio/Kconfig
++++ b/drivers/gpio/Kconfig
+@@ -137,6 +137,13 @@ config GPIO_ATH79
+ 	  Select this option to enable GPIO driver for
+ 	  Atheros AR71XX/AR724X/AR913X SoC devices.
+ 
++config GPIO_ASPEED
++	bool "Aspeed GPIO support"
++	depends on (ARCH_ASPEED || COMPILE_TEST) && OF
++	select GENERIC_IRQ_CHIP
++	help
++	  Say Y here to support Aspeed AST2400 and AST2500 GPIO controllers.
++
+ config GPIO_BCM_KONA
+ 	bool "Broadcom Kona GPIO"
+ 	depends on OF_GPIO && (ARCH_BCM_MOBILE || COMPILE_TEST)
+@@ -1072,7 +1079,6 @@ config GPIO_SODAVILLE
+ 	select GENERIC_IRQ_CHIP
+ 	help
+ 	  Say Y here to support Intel Sodaville GPIO.
+-
+ endmenu
+ 
+ menu "SPI GPIO expanders"
+diff --git a/drivers/gpio/Makefile b/drivers/gpio/Makefile
+index 991598ea3fba..a2b18beb8af5 100644
+--- a/drivers/gpio/Makefile
++++ b/drivers/gpio/Makefile
+@@ -28,6 +28,7 @@ obj-$(CONFIG_GPIO_AMD8111)	+= gpio-amd8111.o
+ obj-$(CONFIG_GPIO_AMDPT)	+= gpio-amdpt.o
+ obj-$(CONFIG_GPIO_ARIZONA)	+= gpio-arizona.o
+ obj-$(CONFIG_GPIO_ATH79)	+= gpio-ath79.o
++obj-$(CONFIG_GPIO_ASPEED)	+= gpio-aspeed.o
+ obj-$(CONFIG_GPIO_BCM_KONA)	+= gpio-bcm-kona.o
+ obj-$(CONFIG_GPIO_BRCMSTB)	+= gpio-brcmstb.o
+ obj-$(CONFIG_GPIO_BT8XX)	+= gpio-bt8xx.o
+diff --git a/drivers/gpio/gpio-aspeed.c b/drivers/gpio/gpio-aspeed.c
+new file mode 100644
+index 000000000000..7885adc1332a
+--- /dev/null
++++ b/drivers/gpio/gpio-aspeed.c
+@@ -0,0 +1,456 @@
++/*
++ * Copyright 2015 IBM Corp.
++ *
++ * Joel Stanley <joel@jms.id.au>
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version
++ * 2 of the License, or (at your option) any later version.
++ */
++
++#include <linux/module.h>
++#include <linux/kernel.h>
++#include <linux/init.h>
++#include <linux/io.h>
++#include <linux/spinlock.h>
++#include <linux/platform_device.h>
++#include <linux/gpio/driver.h>
++#include <linux/pinctrl/consumer.h>
++
++struct aspeed_gpio {
++	struct gpio_chip chip;
++	spinlock_t lock;
++	void __iomem *base;
++	int irq;
++	struct irq_chip irq_chip;
++	struct irq_domain *irq_domain;
++};
++
++struct aspeed_gpio_bank {
++	uint16_t	val_regs;
++	uint16_t	irq_regs;
++	const char	names[4];
++};
++
++static const struct aspeed_gpio_bank aspeed_gpio_banks[] = {
++	{
++		.val_regs = 0x0000,
++		.irq_regs = 0x0008,
++		.names = { 'A', 'B', 'C', 'D' },
++	},
++	{
++		.val_regs = 0x0020,
++		.irq_regs = 0x0028,
++		.names = { 'E', 'F', 'G', 'H' },
++	},
++	{
++		.val_regs = 0x0070,
++		.irq_regs = 0x0098,
++		.names = { 'I', 'J', 'K', 'L' },
++	},
++	{
++		.val_regs = 0x0078,
++		.irq_regs = 0x00e8,
++		.names = { 'M', 'N', 'O', 'P' },
++	},
++	{
++		.val_regs = 0x0080,
++		.irq_regs = 0x0118,
++		.names = { 'Q', 'R', 'S', 'T' },
++	},
++	{
++		.val_regs = 0x0088,
++		.irq_regs = 0x0148,
++		.names = { 'U', 'V', 'W', 'X' },
++	},
++	/*
++	 * A bank exists for { 'Y', 'Z', "AA", "AB" }, but is not implemented.
++	 * Only half of GPIOs Y support interrupt configuration, and none of Z,
++	 * AA or AB do as they are output only.
++	 */
++};
++
++#define GPIO_BANK(x)	((x) >> 5)
++#define GPIO_OFFSET(x)	((x) & 0x1f)
++#define GPIO_BIT(x)	BIT(GPIO_OFFSET(x))
++
++#define GPIO_DATA	0x00
++#define GPIO_DIR	0x04
++
++#define GPIO_IRQ_ENABLE	0x00
++#define GPIO_IRQ_TYPE0	0x04
++#define GPIO_IRQ_TYPE1	0x08
++#define GPIO_IRQ_TYPE2	0x0c
++#define GPIO_IRQ_STATUS	0x10
++
++static inline struct aspeed_gpio *to_aspeed_gpio(struct gpio_chip *chip)
++{
++	return container_of(chip, struct aspeed_gpio, chip);
++}
++
++static const struct aspeed_gpio_bank *to_bank(unsigned int offset)
++{
++	unsigned int bank = GPIO_BANK(offset);
++
++	WARN_ON(bank > ARRAY_SIZE(aspeed_gpio_banks));
++	return &aspeed_gpio_banks[bank];
++}
++
++static void *bank_val_reg(struct aspeed_gpio *gpio,
++		const struct aspeed_gpio_bank *bank,
++		unsigned int reg)
++{
++	return gpio->base + bank->val_regs + reg;
++}
++
++static void *bank_irq_reg(struct aspeed_gpio *gpio,
++		const struct aspeed_gpio_bank *bank,
++		unsigned int reg)
++{
++	return gpio->base + bank->irq_regs + reg;
++}
++
++static int aspeed_gpio_get(struct gpio_chip *gc, unsigned int offset)
++{
++	struct aspeed_gpio *gpio = to_aspeed_gpio(gc);
++	const struct aspeed_gpio_bank *bank = to_bank(offset);
++
++	return !!(ioread32(bank_val_reg(gpio, bank, GPIO_DATA))
++			& GPIO_BIT(offset));
++}
++
++static void aspeed_gpio_set(struct gpio_chip *gc, unsigned int offset,
++			    int val)
++{
++	struct aspeed_gpio *gpio = to_aspeed_gpio(gc);
++	const struct aspeed_gpio_bank *bank = to_bank(offset);
++	unsigned long flags;
++	u32 reg;
++
++	spin_lock_irqsave(&gpio->lock, flags);
++
++	reg = ioread32(bank_val_reg(gpio, bank, GPIO_DATA));
++	if (val)
++		reg |= GPIO_BIT(offset);
++	else
++		reg &= ~GPIO_BIT(offset);
++
++	iowrite32(reg, bank_val_reg(gpio, bank, GPIO_DATA));
++
++	spin_unlock_irqrestore(&gpio->lock, flags);
++}
++
++static int aspeed_gpio_dir_in(struct gpio_chip *gc, unsigned int offset)
++{
++	struct aspeed_gpio *gpio = to_aspeed_gpio(gc);
++	const struct aspeed_gpio_bank *bank = to_bank(offset);
++	unsigned long flags;
++	u32 reg;
++
++	spin_lock_irqsave(&gpio->lock, flags);
++
++	reg = ioread32(bank_val_reg(gpio, bank, GPIO_DIR));
++	iowrite32(reg & ~GPIO_BIT(offset), bank_val_reg(gpio, bank, GPIO_DIR));
++
++	spin_unlock_irqrestore(&gpio->lock, flags);
++
++	return 0;
++}
++
++static int aspeed_gpio_dir_out(struct gpio_chip *gc,
++			       unsigned int offset, int val)
++{
++	struct aspeed_gpio *gpio = to_aspeed_gpio(gc);
++	const struct aspeed_gpio_bank *bank = to_bank(offset);
++	unsigned long flags;
++	u32 reg;
++
++	spin_lock_irqsave(&gpio->lock, flags);
++
++	reg = ioread32(bank_val_reg(gpio, bank, GPIO_DIR));
++	iowrite32(reg | GPIO_BIT(offset), bank_val_reg(gpio, bank, GPIO_DIR));
++
++	spin_unlock_irqrestore(&gpio->lock, flags);
++
++	return 0;
++}
++
++static inline int irqd_to_aspeed_gpio_data(struct irq_data *d,
++		struct aspeed_gpio **gpio,
++		const struct aspeed_gpio_bank **bank,
++		u32 *bit)
++{
++	int offset;
++
++	offset = irqd_to_hwirq(d);
++
++	*gpio = irq_data_get_irq_chip_data(d);
++	*bank = to_bank(offset);
++	*bit = GPIO_BIT(offset);
++
++	return 0;
++}
++
++static void aspeed_gpio_irq_ack(struct irq_data *d)
++{
++	const struct aspeed_gpio_bank *bank;
++	struct aspeed_gpio *gpio;
++	unsigned long flags;
++	void *status_addr;
++	u32 bit;
++	int rc;
++
++	rc = irqd_to_aspeed_gpio_data(d, &gpio, &bank, &bit);
++	if (rc)
++		return;
++
++	status_addr = bank_irq_reg(gpio, bank, GPIO_IRQ_STATUS);
++
++	spin_lock_irqsave(&gpio->lock, flags);
++	iowrite32(bit, status_addr);
++	spin_unlock_irqrestore(&gpio->lock, flags);
++}
++
++static void __aspeed_gpio_irq_set_mask(struct irq_data *d, bool set)
++{
++	const struct aspeed_gpio_bank *bank;
++	struct aspeed_gpio *gpio;
++	unsigned long flags;
++	u32 reg, bit;
++	void *addr;
++	int rc;
++
++	rc = irqd_to_aspeed_gpio_data(d, &gpio, &bank, &bit);
++	if (rc)
++		return;
++
++	addr = bank_irq_reg(gpio, bank, GPIO_IRQ_ENABLE);
++
++	spin_lock_irqsave(&gpio->lock, flags);
++
++	reg = ioread32(addr);
++	if (set)
++		reg |= bit;
++	else
++		reg &= bit;
++	iowrite32(reg, addr);
++
++	spin_unlock_irqrestore(&gpio->lock, flags);
++}
++
++static void aspeed_gpio_irq_mask(struct irq_data *d)
++{
++	__aspeed_gpio_irq_set_mask(d, false);
++}
++
++static void aspeed_gpio_irq_unmask(struct irq_data *d)
++{
++	__aspeed_gpio_irq_set_mask(d, true);
++}
++
++static int aspeed_gpio_set_type(struct irq_data *d, unsigned int type)
++{
++	u32 type0, type1, type2, bit, reg;
++	const struct aspeed_gpio_bank *bank;
++	irq_flow_handler_t handler;
++	struct aspeed_gpio *gpio;
++	unsigned long flags;
++	void *addr;
++	int rc;
++
++	rc = irqd_to_aspeed_gpio_data(d, &gpio, &bank, &bit);
++	if (rc)
++		return -EINVAL;
++
++	type0 = type1 = type2 = 0;
++
++	switch (type & IRQ_TYPE_SENSE_MASK) {
++	case IRQ_TYPE_EDGE_BOTH:
++		type2 |= bit;
++	case IRQ_TYPE_EDGE_RISING:
++		type0 |= bit;
++	case IRQ_TYPE_EDGE_FALLING:
++		handler = handle_edge_irq;
++		break;
++	case IRQ_TYPE_LEVEL_HIGH:
++		type0 |= bit;
++	case IRQ_TYPE_LEVEL_LOW:
++		type1 |= bit;
++		handler = handle_level_irq;
++		break;
++	default:
++		return -EINVAL;
++	}
++
++	spin_lock_irqsave(&gpio->lock, flags);
++
++	addr = bank_irq_reg(gpio, bank, GPIO_IRQ_TYPE0);
++	reg = ioread32(addr);
++	reg = (reg & ~bit) | type0;
++	iowrite32(reg, addr);
++
++	addr = bank_irq_reg(gpio, bank, GPIO_IRQ_TYPE1);
++	reg = ioread32(addr);
++	reg = (reg & ~bit) | type1;
++	iowrite32(reg, addr);
++
++	addr = bank_irq_reg(gpio, bank, GPIO_IRQ_TYPE2);
++	reg = ioread32(addr);
++	reg = (reg & ~bit) | type2;
++	iowrite32(reg, addr);
++
++	spin_unlock_irqrestore(&gpio->lock, flags);
++
++	irq_set_handler_locked(d, handler);
++
++	return 0;
++}
++
++static void aspeed_gpio_irq_handler(struct irq_desc *desc)
++{
++	struct aspeed_gpio *gpio = irq_desc_get_handler_data(desc);
++	struct irq_chip *chip = irq_desc_get_chip(desc);
++	unsigned int i, p, girq;
++	unsigned long reg;
++
++	chained_irq_enter(chip, desc);
++
++	for (i = 0; i < ARRAY_SIZE(aspeed_gpio_banks); i++) {
++		const struct aspeed_gpio_bank *bank = &aspeed_gpio_banks[i];
++
++		reg = ioread32(bank_irq_reg(gpio, bank, GPIO_IRQ_STATUS));
++
++		for_each_set_bit(p, &reg, 32) {
++			girq = irq_find_mapping(gpio->irq_domain, i * 32 + p);
++			generic_handle_irq(girq);
++		}
++
++	}
++
++	chained_irq_exit(chip, desc);
++}
++
++static struct irq_chip aspeed_gpio_irqchip = {
++	.name		= "aspeed-gpio",
++	.irq_ack	= aspeed_gpio_irq_ack,
++	.irq_mask	= aspeed_gpio_irq_mask,
++	.irq_unmask	= aspeed_gpio_irq_unmask,
++	.irq_set_type	= aspeed_gpio_set_type,
++};
++
++static int aspeed_gpio_to_irq(struct gpio_chip *chip, unsigned int offset)
++{
++	struct aspeed_gpio *gpio = to_aspeed_gpio(chip);
++
++	return irq_find_mapping(gpio->irq_domain, offset);
++}
++
++static void aspeed_gpio_setup_irqs(struct aspeed_gpio *gpio,
++		struct platform_device *pdev)
++{
++	int i, irq;
++
++	/* request our upstream IRQ */
++	gpio->irq = platform_get_irq(pdev, 0);
++	if (gpio->irq < 0)
++		return;
++
++	/* establish our irq domain to provide IRQs for each extended bank */
++	gpio->irq_domain = irq_domain_add_linear(pdev->dev.of_node,
++			gpio->chip.ngpio, &irq_domain_simple_ops, NULL);
++	if (!gpio->irq_domain)
++		return;
++
++	for (i = 0; i < gpio->chip.ngpio; i++) {
++		irq = irq_create_mapping(gpio->irq_domain, i);
++		irq_set_chip_data(irq, gpio);
++		irq_set_chip_and_handler(irq, &aspeed_gpio_irqchip,
++				handle_simple_irq);
++		irq_set_probe(irq);
++	}
++
++	irq_set_chained_handler_and_data(gpio->irq,
++			aspeed_gpio_irq_handler, gpio);
++}
++
++static int aspeed_gpio_request(struct gpio_chip *chip, unsigned int offset)
++{
++	return pinctrl_request_gpio(chip->base + offset);
++}
++
++static void aspeed_gpio_free(struct gpio_chip *chip, unsigned int offset)
++{
++	pinctrl_free_gpio(chip->base + offset);
++}
++
++static int __init aspeed_gpio_probe(struct platform_device *pdev)
++{
++	struct aspeed_gpio *gpio;
++	struct resource *res;
++	int rc;
++
++	gpio = devm_kzalloc(&pdev->dev, sizeof(*gpio), GFP_KERNEL);
++	if (!gpio)
++		return -ENOMEM;
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	if (!res)
++		return -ENXIO;
++
++	gpio->base = devm_ioremap_resource(&pdev->dev, res);
++	if (!gpio->base)
++		return -ENOMEM;
++
++	spin_lock_init(&gpio->lock);
++
++	gpio->chip.ngpio = ARRAY_SIZE(aspeed_gpio_banks) * 32;
++
++	gpio->chip.parent = &pdev->dev;
++	gpio->chip.direction_input = aspeed_gpio_dir_in;
++	gpio->chip.direction_output = aspeed_gpio_dir_out;
++	gpio->chip.request = aspeed_gpio_request;
++	gpio->chip.free = aspeed_gpio_free;
++	gpio->chip.get = aspeed_gpio_get;
++	gpio->chip.set = aspeed_gpio_set;
++	gpio->chip.to_irq = aspeed_gpio_to_irq;
++	gpio->chip.label = dev_name(&pdev->dev);
++	gpio->chip.base = -1;
++
++	platform_set_drvdata(pdev, gpio);
++
++	rc = gpiochip_add(&gpio->chip);
++	if (rc < 0)
++		return rc;
++
++	aspeed_gpio_setup_irqs(gpio, pdev);
++
++	return 0;
++}
++
++static int aspeed_gpio_remove(struct platform_device *pdev)
++{
++	struct aspeed_gpio *gpio = platform_get_drvdata(pdev);
++
++	gpiochip_remove(&gpio->chip);
++	return 0;
++}
++
++static const struct of_device_id aspeed_gpio_of_table[] = {
++	{ .compatible = "aspeed,ast2400-gpio" },
++	{ .compatible = "aspeed,ast2500-gpio" },
++	{}
++};
++MODULE_DEVICE_TABLE(of, aspeed_gpio_of_table);
++
++static struct platform_driver aspeed_gpio_driver = {
++	.remove = aspeed_gpio_remove,
++	.driver = {
++		.name = KBUILD_MODNAME,
++		.of_match_table = aspeed_gpio_of_table,
++	},
++};
++
++module_platform_driver_probe(aspeed_gpio_driver, aspeed_gpio_probe);
++
++MODULE_DESCRIPTION("Aspeed GPIO Driver");
+-- 
+2.7.4
