@@ -1,425 +1,213 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Wed, 20 Jul 2016 13:26:58 -0700
-Subject: [PATCH v4 03/12] mm: Hardened usercopy
-In-Reply-To: <1469046427-12696-1-git-send-email-keescook@chromium.org>
-References: <1469046427-12696-1-git-send-email-keescook@chromium.org>
-Message-ID: <1469046427-12696-4-git-send-email-keescook@chromium.org>
+From: geoff@infradead.org (Geoff Levand)
+Date: Wed, 20 Jul 2016 13:33:48 -0700
+Subject: [PATCH v1 3/4] arm64: Add arm64 kexec support
+In-Reply-To: <20160720175305.GB4797@localhost.localdomain>
+References: <cover.1468970114.git.geoff@infradead.org>
+ <9ed513fd44a19b2f49b4da99477cedfff7341bf0.1468970114.git.geoff@infradead.org>
+ <20160720175305.GB4797@localhost.localdomain>
+Message-ID: <1469046828.2977.122.camel@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is the start of porting PAX_USERCOPY into the mainline kernel. This
-is the first set of features, controlled by CONFIG_HARDENED_USERCOPY. The
-work is based on code by PaX Team and Brad Spengler, and an earlier port
-from Casey Schaufler. Additional non-slab page tests are from Rik van Riel.
+Hi Pratyush,
 
-This patch contains the logic for validating several conditions when
-performing copy_to_user() and copy_from_user() on the kernel object
-being copied to/from:
-- address range doesn't wrap around
-- address range isn't NULL or zero-allocated (with a non-zero copy size)
-- if on the slab allocator:
-  - object size must be less than or equal to copy size (when check is
-    implemented in the allocator, which appear in subsequent patches)
-- otherwise, object must not span page allocations (excepting Reserved
-  and CMA ranges)
-- if on the stack
-  - object must not extend before/after the current process stack
-  - object must be contained by a valid stack frame (when there is
-    arch/build support for identifying stack frames)
-- object must not overlap with kernel text
+On Wed, 2016-07-20 at 23:23 +0530, Pratyush Anand wrote:
+> On 19/07/2016:11:28:13 PM, Geoff Levand wrote:
 
-Signed-off-by: Kees Cook <keescook@chromium.org>
-Tested-by: Valdis Kletnieks <valdis.kletnieks@vt.edu>
-Tested-by: Michael Ellerman <mpe@ellerman.id.au>
----
- include/linux/slab.h        |  12 ++
- include/linux/thread_info.h |  15 +++
- mm/Makefile                 |   4 +
- mm/usercopy.c               | 268 ++++++++++++++++++++++++++++++++++++++++++++
- security/Kconfig            |  28 +++++
- 5 files changed, 327 insertions(+)
- create mode 100644 mm/usercopy.c
+> > +++ b/kexec/arch/arm64/include/arch/options.h
+> > @@ -0,0 +1,43 @@
+> > +#if !defined(KEXEC_ARCH_ARM64_OPTIONS_H)
+> > +#define KEXEC_ARCH_ARM64_OPTIONS_H
+> > +
+> > +#define OPT_APPEND> > 	> > 	> > ((OPT_MAX)+0)
+> > +#define OPT_DTB> > 	> > 	> > 	> > ((OPT_MAX)+1)
+> > +#define OPT_INITRD> > 	> > 	> > ((OPT_MAX)+2)
+> > +#define OPT_PORT> > 	> > 	> > ((OPT_MAX)+3)
+> > +#define OPT_REUSE_CMDLINE> > 	> > ((OPT_MAX)+4)
+> > +#define OPT_ARCH_MAX> > 	> > 	> > ((OPT_MAX)+5)
+> > +
+> > +#define KEXEC_ARCH_OPTIONS \
+> > +> > 	> > KEXEC_OPTIONS \
+> > +> > 	> > { "append",        1, NULL, OPT_APPEND }, \
+> > +> > 	> > { "command-line",  1, NULL, OPT_APPEND }, \
+> > +> > 	> > { "dtb",           1, NULL, OPT_DTB }, \
+> > +> > 	> > { "initrd",        1, NULL, OPT_INITRD }, \
+> > +> > 	> > { "port",          1, NULL, OPT_PORT }, \
+> 
+> I still think that we should have a way to check TX buffer overflow..Anyway, I
+> will send top up patch for that when these patch set are merged.
 
-diff --git a/include/linux/slab.h b/include/linux/slab.h
-index aeb3e6d00a66..96a16a3fb7cb 100644
---- a/include/linux/slab.h
-+++ b/include/linux/slab.h
-@@ -155,6 +155,18 @@ void kfree(const void *);
- void kzfree(const void *);
- size_t ksize(const void *);
- 
-+#ifdef CONFIG_HAVE_HARDENED_USERCOPY_ALLOCATOR
-+const char *__check_heap_object(const void *ptr, unsigned long n,
-+				struct page *page);
-+#else
-+static inline const char *__check_heap_object(const void *ptr,
-+					      unsigned long n,
-+					      struct page *page)
-+{
-+	return NULL;
-+}
-+#endif
-+
- /*
-  * Some archs want to perform DMA into kmalloc caches and need a guaranteed
-  * alignment larger than the alignment of a 64-bit integer.
-diff --git a/include/linux/thread_info.h b/include/linux/thread_info.h
-index 3d5c80b4391d..f24b99eac969 100644
---- a/include/linux/thread_info.h
-+++ b/include/linux/thread_info.h
-@@ -155,6 +155,21 @@ static inline int arch_within_stack_frames(const void * const stack,
- }
- #endif
- 
-+#ifdef CONFIG_HARDENED_USERCOPY
-+extern void __check_object_size(const void *ptr, unsigned long n,
-+					bool to_user);
-+
-+static inline void check_object_size(const void *ptr, unsigned long n,
-+				     bool to_user)
-+{
-+	__check_object_size(ptr, n, to_user);
-+}
-+#else
-+static inline void check_object_size(const void *ptr, unsigned long n,
-+				     bool to_user)
-+{ }
-+#endif /* CONFIG_HARDENED_USERCOPY */
-+
- #endif	/* __KERNEL__ */
- 
- #endif /* _LINUX_THREAD_INFO_H */
-diff --git a/mm/Makefile b/mm/Makefile
-index 78c6f7dedb83..32d37247c7e5 100644
---- a/mm/Makefile
-+++ b/mm/Makefile
-@@ -21,6 +21,9 @@ KCOV_INSTRUMENT_memcontrol.o := n
- KCOV_INSTRUMENT_mmzone.o := n
- KCOV_INSTRUMENT_vmstat.o := n
- 
-+# Since __builtin_frame_address does work as used, disable the warning.
-+CFLAGS_usercopy.o += $(call cc-disable-warning, frame-address)
-+
- mmu-y			:= nommu.o
- mmu-$(CONFIG_MMU)	:= gup.o highmem.o memory.o mincore.o \
- 			   mlock.o mmap.o mprotect.o mremap.o msync.o rmap.o \
-@@ -99,3 +102,4 @@ obj-$(CONFIG_USERFAULTFD) += userfaultfd.o
- obj-$(CONFIG_IDLE_PAGE_TRACKING) += page_idle.o
- obj-$(CONFIG_FRAME_VECTOR) += frame_vector.o
- obj-$(CONFIG_DEBUG_PAGE_REF) += debug_page_ref.o
-+obj-$(CONFIG_HARDENED_USERCOPY) += usercopy.o
-diff --git a/mm/usercopy.c b/mm/usercopy.c
-new file mode 100644
-index 000000000000..8ebae91a6b55
---- /dev/null
-+++ b/mm/usercopy.c
-@@ -0,0 +1,268 @@
-+/*
-+ * This implements the various checks for CONFIG_HARDENED_USERCOPY*,
-+ * which are designed to protect kernel memory from needless exposure
-+ * and overwrite under many unintended conditions. This code is based
-+ * on PAX_USERCOPY, which is:
-+ *
-+ * Copyright (C) 2001-2016 PaX Team, Bradley Spengler, Open Source
-+ * Security Inc.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ */
-+#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
-+
-+#include <linux/mm.h>
-+#include <linux/slab.h>
-+#include <asm/sections.h>
-+
-+enum {
-+	BAD_STACK = -1,
-+	NOT_STACK = 0,
-+	GOOD_FRAME,
-+	GOOD_STACK,
-+};
-+
-+/*
-+ * Checks if a given pointer and length is contained by the current
-+ * stack frame (if possible).
-+ *
-+ * Returns:
-+ *	NOT_STACK: not at all on the stack
-+ *	GOOD_FRAME: fully within a valid stack frame
-+ *	GOOD_STACK: fully on the stack (when can't do frame-checking)
-+ *	BAD_STACK: error condition (invalid stack position or bad stack frame)
-+ */
-+static noinline int check_stack_object(const void *obj, unsigned long len)
-+{
-+	const void * const stack = task_stack_page(current);
-+	const void * const stackend = stack + THREAD_SIZE;
-+	int ret;
-+
-+	/* Object is not on the stack at all. */
-+	if (obj + len <= stack || stackend <= obj)
-+		return NOT_STACK;
-+
-+	/*
-+	 * Reject: object partially overlaps the stack (passing the
-+	 * the check above means@least one end is within the stack,
-+	 * so if this check fails, the other end is outside the stack).
-+	 */
-+	if (obj < stack || stackend < obj + len)
-+		return BAD_STACK;
-+
-+	/* Check if object is safely within a valid frame. */
-+	ret = arch_within_stack_frames(stack, stackend, obj, len);
-+	if (ret)
-+		return ret;
-+
-+	return GOOD_STACK;
-+}
-+
-+static void report_usercopy(const void *ptr, unsigned long len,
-+			    bool to_user, const char *type)
-+{
-+	pr_emerg("kernel memory %s attempt detected %s %p (%s) (%lu bytes)\n",
-+		to_user ? "exposure" : "overwrite",
-+		to_user ? "from" : "to", ptr, type ? : "unknown", len);
-+	/*
-+	 * For greater effect, it would be nice to do do_group_exit(),
-+	 * but BUG() actually hooks all the lock-breaking and per-arch
-+	 * Oops code, so that is used here instead.
-+	 */
-+	BUG();
-+}
-+
-+/* Returns true if any portion of [ptr,ptr+n) over laps with [low,high). */
-+static bool overlaps(const void *ptr, unsigned long n, unsigned long low,
-+		     unsigned long high)
-+{
-+	unsigned long check_low = (uintptr_t)ptr;
-+	unsigned long check_high = check_low + n;
-+
-+	/* Does not overlap if entirely above or entirely below. */
-+	if (check_low >= high || check_high < low)
-+		return false;
-+
-+	return true;
-+}
-+
-+/* Is this address range in the kernel text area? */
-+static inline const char *check_kernel_text_object(const void *ptr,
-+						   unsigned long n)
-+{
-+	unsigned long textlow = (unsigned long)_stext;
-+	unsigned long texthigh = (unsigned long)_etext;
-+	unsigned long textlow_linear, texthigh_linear;
-+
-+	if (overlaps(ptr, n, textlow, texthigh))
-+		return "<kernel text>";
-+
-+	/*
-+	 * Some architectures have virtual memory mappings with a secondary
-+	 * mapping of the kernel text, i.e. there is more than one virtual
-+	 * kernel address that points to the kernel image. It is usually
-+	 * when there is a separate linear physical memory mapping, in that
-+	 * __pa() is not just the reverse of __va(). This can be detected
-+	 * and checked:
-+	 */
-+	textlow_linear = (unsigned long)__va(__pa(textlow));
-+	/* No different mapping: we're done. */
-+	if (textlow_linear == textlow)
-+		return NULL;
-+
-+	/* Check the secondary mapping... */
-+	texthigh_linear = (unsigned long)__va(__pa(texthigh));
-+	if (overlaps(ptr, n, textlow_linear, texthigh_linear))
-+		return "<linear kernel text>";
-+
-+	return NULL;
-+}
-+
-+static inline const char *check_bogus_address(const void *ptr, unsigned long n)
-+{
-+	/* Reject if object wraps past end of memory. */
-+	if (ptr + n < ptr)
-+		return "<wrapped address>";
-+
-+	/* Reject if NULL or ZERO-allocation. */
-+	if (ZERO_OR_NULL_PTR(ptr))
-+		return "<null>";
-+
-+	return NULL;
-+}
-+
-+static inline const char *check_heap_object(const void *ptr, unsigned long n,
-+					    bool to_user)
-+{
-+	struct page *page, *endpage;
-+	const void *end = ptr + n - 1;
-+	bool is_reserved, is_cma;
-+
-+	/*
-+	 * Some architectures (arm64) return true for virt_addr_valid() on
-+	 * vmalloced addresses. Work around this by checking for vmalloc
-+	 * first.
-+	 */
-+	if (is_vmalloc_addr(ptr))
-+		return NULL;
-+
-+	if (!virt_addr_valid(ptr))
-+		return NULL;
-+
-+	page = virt_to_head_page(ptr);
-+
-+	/* Check slab allocator for flags and size. */
-+	if (PageSlab(page))
-+		return __check_heap_object(ptr, n, page);
-+
-+	/*
-+	 * Sometimes the kernel data regions are not marked Reserved (see
-+	 * check below). And sometimes [_sdata,_edata) does not cover
-+	 * rodata and/or bss, so check each range explicitly.
-+	 */
-+
-+	/* Allow reads of kernel rodata region (if not marked as Reserved). */
-+	if (ptr >= (const void *)__start_rodata &&
-+	    end <= (const void *)__end_rodata) {
-+		if (!to_user)
-+			return "<rodata>";
-+		return NULL;
-+	}
-+
-+	/* Allow kernel data region (if not marked as Reserved). */
-+	if (ptr >= (const void *)_sdata && end <= (const void *)_edata)
-+		return NULL;
-+
-+	/* Allow kernel bss region (if not marked as Reserved). */
-+	if (ptr >= (const void *)__bss_start &&
-+	    end <= (const void *)__bss_stop)
-+		return NULL;
-+
-+	/* Is the object wholly within one base page? */
-+	if (likely(((unsigned long)ptr & (unsigned long)PAGE_MASK) ==
-+		   ((unsigned long)end & (unsigned long)PAGE_MASK)))
-+		return NULL;
-+
-+	/* Allow if start and end are inside the same compound page. */
-+	endpage = virt_to_head_page(end);
-+	if (likely(endpage == page))
-+		return NULL;
-+
-+	/*
-+	 * Reject if range is entirely either Reserved (i.e. special or
-+	 * device memory), or CMA. Otherwise, reject since the object spans
-+	 * several independently allocated pages.
-+	 */
-+	is_reserved = PageReserved(page);
-+	is_cma = is_migrate_cma_page(page);
-+	if (!is_reserved && !is_cma)
-+		goto reject;
-+
-+	for (ptr += PAGE_SIZE; ptr <= end; ptr += PAGE_SIZE) {
-+		page = virt_to_head_page(ptr);
-+		if (is_reserved && !PageReserved(page))
-+			goto reject;
-+		if (is_cma && !is_migrate_cma_page(page))
-+			goto reject;
-+	}
-+
-+	return NULL;
-+
-+reject:
-+	return "<spans multiple pages>";
-+}
-+
-+/*
-+ * Validates that the given object is:
-+ * - not bogus address
-+ * - known-safe heap or stack object
-+ * - not in kernel text
-+ */
-+void __check_object_size(const void *ptr, unsigned long n, bool to_user)
-+{
-+	const char *err;
-+
-+	/* Skip all tests if size is zero. */
-+	if (!n)
-+		return;
-+
-+	/* Check for invalid addresses. */
-+	err = check_bogus_address(ptr, n);
-+	if (err)
-+		goto report;
-+
-+	/* Check for bad heap object. */
-+	err = check_heap_object(ptr, n, to_user);
-+	if (err)
-+		goto report;
-+
-+	/* Check for bad stack object. */
-+	switch (check_stack_object(ptr, n)) {
-+	case NOT_STACK:
-+		/* Object is not touching the current process stack. */
-+		break;
-+	case GOOD_FRAME:
-+	case GOOD_STACK:
-+		/*
-+		 * Object is either in the correct frame (when it
-+		 * is possible to check) or just generally on the
-+		 * process stack (when frame checking not available).
-+		 */
-+		return;
-+	default:
-+		err = "<process stack>";
-+		goto report;
-+	}
-+
-+	/* Check for object in kernel to avoid text exposure. */
-+	err = check_kernel_text_object(ptr, n);
-+	if (!err)
-+		return;
-+
-+report:
-+	report_usercopy(ptr, n, to_user, err);
-+}
-+EXPORT_SYMBOL(__check_object_size);
-diff --git a/security/Kconfig b/security/Kconfig
-index 176758cdfa57..df28f2b6f3e1 100644
---- a/security/Kconfig
-+++ b/security/Kconfig
-@@ -118,6 +118,34 @@ config LSM_MMAP_MIN_ADDR
- 	  this low address space will need the permission specific to the
- 	  systems running LSM.
- 
-+config HAVE_HARDENED_USERCOPY_ALLOCATOR
-+	bool
-+	help
-+	  The heap allocator implements __check_heap_object() for
-+	  validating memory ranges against heap object sizes in
-+	  support of CONFIG_HARDENED_USERCOPY.
-+
-+config HAVE_ARCH_HARDENED_USERCOPY
-+	bool
-+	help
-+	  The architecture supports CONFIG_HARDENED_USERCOPY by
-+	  calling check_object_size() just before performing the
-+	  userspace copies in the low level implementation of
-+	  copy_to_user() and copy_from_user().
-+
-+config HARDENED_USERCOPY
-+	bool "Harden memory copies between kernel and userspace"
-+	depends on HAVE_ARCH_HARDENED_USERCOPY
-+	select BUG
-+	help
-+	  This option checks for obviously wrong memory regions when
-+	  copying memory to/from the kernel (via copy_to_user() and
-+	  copy_from_user() functions) by rejecting memory ranges that
-+	  are larger than the specified heap object, span multiple
-+	  separately allocates pages, are not on the process stack,
-+	  or are part of the kernel text. This kills entire classes
-+	  of heap overflow exploits and similar kernel memory exposures.
-+
- source security/selinux/Kconfig
- source security/smack/Kconfig
- source security/tomoyo/Kconfig
--- 
-2.7.4
+I was very tempted to just not support the purgatory printing,
+as other arches do, because of all the trouble with different
+UARTs.  Is it really so important to see the 'I'm in purgatory'
+message?
+
+> > +> > 	> > { "ramdisk",       1, NULL, OPT_INITRD }, \
+> > +> > 	> > { "reuse-cmdline", 0, NULL, OPT_REUSE_CMDLINE }, \
+> > +
+> > +#define KEXEC_ARCH_OPT_STR KEXEC_OPT_STR /* Only accept long arch options. */
+> > +#define KEXEC_ALL_OPTIONS KEXEC_ARCH_OPTIONS
+> > +#define KEXEC_ALL_OPT_STR KEXEC_ARCH_OPT_STR
+> > +
+> > +static const char arm64_opts_usage[] __attribute__ ((unused)) =
+> > +"     --append=STRING       Set the kernel command line to STRING.\n"
+> 
+> "Update the kernel command line with STRING.\n" may be a better description.
+
+That is the text the other arches use, so I'll keep it for consistency.
+
+> 
+> > +"     --command-line=STRING Set the kernel command line to STRING.\n"
+> > +"     --dtb=FILE            Use FILE as the device tree blob.\n"
+> > +"     --initrd=FILE         Use FILE as the kernel initial ramdisk.\n"
+> > +"     --port=ADDRESS        Purgatory output to port ADDRESS.\n"
+> > +"     --ramdisk=FILE        Use FILE as the kernel initial ramdisk.\n"
+> > +"     --reuse-cmdline       Use kernel command line from running system.\n";
+> > +
+> > +
+> > +static int check_cpu_properties(const struct cpu_properties *cp_1,
+> > +> > 	> > const struct cpu_properties *cp_2)
+> > +{
+> > +> > 	> > assert(cp_1->hwid == cp_2->hwid);
+> > +
+> > +> > 	> > if (cp_1->method != cp_2->method) {
+> > +> > 	> > 	> > fprintf(stderr,
+> > +> > 	> > 	> > 	> > "%s:%d: hwid-%" PRIx64 ": Error: Different cpu enable methods: %s -> %s\n",
+> > +> > 	> > 	> > 	> > __func__, __LINE__, cp_1->hwid,
+> > +> > 	> > 	> > 	> > cpu_enable_method_str(cp_1->method),
+> > +> > 	> > 	> > 	> > cpu_enable_method_str(cp_2->method));
+> > +> > 	> > 	> > return -EINVAL;
+> > +> > 	> > }
+> > +
+> > +> > 	> > if (cp_2->method != cpu_enable_method_psci) {
+> > +> > 	> > 	> > fprintf(stderr,
+> > +> > 	> > 	> > 	> > "%s:%d: hwid-%" PRIx64 ": Error: Unsupported cpu enable method: %s\n",
+> > +> > 	> > 	> > 	> > __func__, __LINE__, cp_1->hwid,
+> > +> > 	> > 	> > 	> > cpu_enable_method_str(cp_1->method));
+> > +> > 	> > 	> > return -EINVAL;
+> > +> > 	> > }
+> 
+> What if cp_1->method = cp_2->method = cpu_enable_method_spin_table?
+> 
+> I think, second if loop should be within 1st loop's scope.
+
+There is no way to get a cpu back into a spin, so spin_table is not supported.
+
+> +> 	> for (cpu_1 = 0; cpu_1 < info_1.cpu_count; cpu_1++) {
+> > +> > 	> > 	> > struct cpu_properties *cp_1 = &info_1.cp[cpu_1];
+> > +> > 	> > 	> > unsigned int cpu_2;
+> > +
+> > +> > 	> > 	> > for (cpu_2 = 0; cpu_2 < info_2.cpu_count; cpu_2++) {
+> > +> > 	> > 	> > 	> > struct cpu_properties *cp_2 = &info_2.cp[cpu_2];
+> > +
+> > +> > 	> > 	> > 	> > if (cp_1->hwid != cp_2->hwid)
+> > +> > 	> > 	> > 	> > 	> > continue;
+> > +
+> > +> > 	> > 	> > 	> > to_process--;
+> > +
+> > +> > 	> > 	> > 	> > result = check_cpu_properties(cp_1, cp_2);
+> > +
+> > +> > 	> > 	> > 	> > if (result)
+> > +> > 	> > 	> > 	> > 	> > goto on_exit;
+> 
+> I think, you can break the loop when cp_1->hwid and cp_2->hwid matches.
+
+OK.
+
+> +int arm64_load_other_segments(struct kexec_info *info,
+> > +> > 	> > uint64_t kernel_entry)
+> > +{
+> > +> > 	> > int result;
+> > +> > 	> > uint64_t dtb_base;
+> > +> > 	> > uint64_t image_base;
+> > +> > 	> > unsigned long hole_min;
+> > +> > 	> > unsigned long hole_max;
+> > +> > 	> > uint64_t purgatory_sink;
+> > +> > 	> > char *initrd_buf = NULL;
+> > +> > 	> > struct dtb dtb_1 = {.name = "dtb_1"};
+> > +> > 	> > struct dtb dtb_2 = {.name = "dtb_2"};
+> > +> > 	> > char command_line[COMMAND_LINE_SIZE] = "";
+> > +
+> > +> > 	> > if (arm64_opts.command_line) {
+> > +> > 	> > 	> > strncpy(command_line, arm64_opts.command_line,
+> > +> > 	> > 	> > 	> > sizeof(command_line));
+> > +> > 	> > 	> > command_line[sizeof(command_line) - 1] = 0;
+> > +> > 	> > }
+> > +
+> > +> > 	> > purgatory_sink = read_sink(command_line);
+> > +
+> > +> > 	> > dbgprintf("%s:%d: purgatory sink: 0x%" PRIx64 "\n", __func__, __LINE__,
+> > +> > 	> > 	> > purgatory_sink);
+> > +
+> > +> > 	> > if (arm64_opts.dtb) {
+> > +> > 	> > 	> > dtb_2.buf = slurp_file(arm64_opts.dtb, &dtb_2.size);
+> > +> > 	> > 	> > assert(dtb_2.buf);
+> > +> > 	> > }
+> > +
+> > +> > 	> > result = read_1st_dtb(&dtb_1, command_line);
+> > +
+> > +> > 	> > if (result && !arm64_opts.dtb) {
+> > +> > 	> > 	> > fprintf(stderr, "kexec: Error: No device tree available.\n");
+> > +> > 	> > 	> > return result;
+> > +> > 	> > }
+> > +
+> > +> > 	> > if (result && arm64_opts.dtb)
+> > +> > 	> > 	> > dtb_1 = dtb_2;
+> > +> > 	> > else if (!result && !arm64_opts.dtb)
+> > +> > 	> > 	> > dtb_2 = dtb_1;
+> > +
+> > +> > 	> > result = setup_2nd_dtb(command_line, &dtb_2);
+> > +
+> > +> > 	> > if (result)
+> > +> > 	> > 	> > return result;
+> > +> > 	
+> > +> > 	> > result =  check_cpu_nodes(&dtb_1, &dtb_2);
+> 
+> Probably, we can skip check_cpu_nodes() when dtb_2 = dtb_1.               
+
+OK.
+
+> > +unsigned long virt_to_phys(unsigned long v)
+> > +{
+> > +> > 	> > unsigned long p;
+> > +
+> > +> > 	> > p = v - get_page_offset() + get_phys_offset();
+> 
+> 
+> Do we need to take care of kaslr while converting from virtual to physical?
+
+>From what I understand of kaslr, the kernel relocates parts of
+itself after startup.
+
+This virt_to_phys conversion here is to just convert the (virtual
+address) values in the vmlinux elf file to physical addresses we
+can use to load the elf segments.  I don't think kaslr should
+affect how the elf file is loaded.
+
+> > +
+> > +int get_memory_ranges(struct memory_range **range, int *ranges,
+> > +> > 	> > unsigned long kexec_flags)
+> > +{
+> > +> > 	> > static struct memory_range array[KEXEC_SEGMENT_MAX];
+> > +> > 	> > unsigned int count;
+> > +> > 	> > int result;
+> > +
+> > +> > 	> > result = get_memory_ranges_dt(array, &count);
+> > +
+> > +> > 	> > if (result)
+> > +> > 	> > 	> > result = get_memory_ranges_iomem(array, &count);
+> 
+> IMO, reading from iomem should be preferred over reading from dt, because
+> /proc/iomem would have updated information whether it is DT or ACPI. 
+> 
+> Actually, there are some platform's DT file (such as mustang) which expects that
+> firmware will update memory node information. Now, if firmware is not doing that
+> (ofcourse its a firmware issue) then, kexec will fail with above code. However,
+> it will work fine even with those systems if memory ranges are read from
+> /proc/iomem.
+
+That's a good point.  I will switch the order.
+
+Thanks for the review.
+
+-Geoff
