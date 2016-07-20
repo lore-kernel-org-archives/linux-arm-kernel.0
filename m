@@ -1,146 +1,105 @@
-From: dennis.chen@arm.com (Dennis Chen)
-Date: Wed, 20 Jul 2016 11:39:11 +0800
-Subject: [PATCH v22 2/8] arm64: limit memory regions based on DT
- property, usable-memory-range
-In-Reply-To: <20160719110120.GF20774@linaro.org>
-References: <20160712050514.22307-1-takahiro.akashi@linaro.org>
- <20160712050514.22307-3-takahiro.akashi@linaro.org>
- <578D1A31.5080509@arm.com> <20160719083554.GD20774@linaro.org>
- <20160719100616.GA20990@arm.com>
- <20160719110120.GF20774@linaro.org>
-Message-ID: <20160720033909.GA30575@arm.com>
+From: bsingharora@gmail.com (Balbir Singh)
+Date: Wed, 20 Jul 2016 13:45:42 +1000
+Subject: [RFC 0/3] extend kexec_file_load system call
+In-Reply-To: <20160718132629.GB32512@redhat.com>
+References: <20160712225805.0d27fe5d@hananiah.suse.cz>
+ <20160712221804.GV1041@n2100.armlinux.org.uk>
+ <87twfunneg.fsf@linux.vnet.ibm.com>
+ <20160713073657.GX1041@n2100.armlinux.org.uk>
+ <87poqinf9m.fsf@linux.vnet.ibm.com>
+ <20160713082639.GZ1041@n2100.armlinux.org.uk>
+ <20160713130338.GB16900@redhat.com>
+ <20160713174009.GA1041@n2100.armlinux.org.uk>
+ <20160713182247.GA25232@redhat.com> <1468845964.2800.3.camel@gmail.com>
+ <20160718132629.GB32512@redhat.com>
+Message-ID: <8a8b2909-7f95-03e4-bf8e-dd29b5fc1fba@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 19, 2016 at 08:01:21PM +0900, AKASHI Takahiro wrote:
-> On Tue, Jul 19, 2016 at 06:06:18PM +0800, Dennis Chen wrote:
-> > Hello AKASHI,
-> > 
-> > On Tue, Jul 19, 2016 at 05:35:55PM +0900, AKASHI Takahiro wrote:
-> > > James,
-> > >
-> > > On Mon, Jul 18, 2016 at 07:04:33PM +0100, James Morse wrote:
-> > > > Hi!
-> > > >
-> > > > (CC: Dennis Chen)
-> > > >
-> > > > On 12/07/16 06:05, AKASHI Takahiro wrote:
-> > > > > Crash dump kernel will be run with a limited range of memory as System
-> > > > > RAM.
-> > > > >
-> > > > > On arm64, we will use a device-tree property under /chosen,
-> > > > >    linux,usable-memory-range = <BASE SIZE>
-> > > > > in order for primary kernel either on uefi or non-uefi (device tree only)
-> > > > > system to hand over the information about usable memory region to crash
-> > > > > dump kernel. This property will supercede entries in uefi memory map table
-> > > > > and "memory" nodes in a device tree.
-> > > >
-> > > > > diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-> > > > > index 51b1302..d8b296f 100644
-> > > > > --- a/arch/arm64/mm/init.c
-> > > > > +++ b/arch/arm64/mm/init.c
-> > > > > @@ -300,10 +300,48 @@ static int __init early_mem(char *p)
-> > > > >  }
-> > > > >  early_param("mem", early_mem);
-> > > > >
-> > > > > +static int __init early_init_dt_scan_usablemem(unsigned long node,
-> > > > > +         const char *uname, int depth, void *data)
-> > > > > +{
-> > > > > + struct memblock_region *usablemem = (struct memblock_region *)data;
-> > > > > + const __be32 *reg;
-> > > > > + int len;
-> > > > > +
-> > > > > + usablemem->size = 0;
-> > > > > +
-> > > > > + if (depth != 1 || strcmp(uname, "chosen") != 0)
-> > > > > +         return 0;
-> > > > > +
-> > > > > + reg = of_get_flat_dt_prop(node, "linux,usable-memory-range", &len);
-> > > > > + if (!reg || (len < (dt_root_addr_cells + dt_root_size_cells)))
-> > > > > +         return 1;
-> > > > > +
-> > > > > + usablemem->base = dt_mem_next_cell(dt_root_addr_cells, &reg);
-> > > > > + usablemem->size = dt_mem_next_cell(dt_root_size_cells, &reg);
-> > > > > +
-> > > > > + return 1;
-> > > > > +}
-> > > > > +
-> > > > > +static void __init fdt_enforce_memory_region(void)
-> > > > > +{
-> > > > > + struct memblock_region reg;
-> > > > > +
-> > > > > + of_scan_flat_dt(early_init_dt_scan_usablemem, &reg);
-> > > > > +
-> > > > > + if (reg.size) {
-> > > > > +         memblock_remove(0, PAGE_ALIGN(reg.base));
-> > > > > +         memblock_remove(round_down(reg.base + reg.size, PAGE_SIZE),
-> > > > > +                         ULLONG_MAX);
-> > > >
-> > 
-> > According to the panic message from James, I guess the ACPI regions are out of the range
-> > [reg.base, reg.base + reg.size] and removed by your above codes. On ARM64, those ACPI
-> > regions have been added into memblock and marked as NOMAP, so I think it should be
-> > easy to adapt my fix to retain the NOMAP regions here
+>>>>>  
+>>>>> Command line options are not signed. I thought idea behind secureboot
+>>>>> was to execute only trusted code and command line options don't enforce
+>>>>> you to execute unsigned code.
+>>>>>  
+>>
+>> You can set module.sig_enforce=0 and open up the system a bit assuming
+>> that you can get a module to load with another attack
 > 
-> See below.
+> IIUC, sig_enforce bool_enable_only so it can only be enabled. Default
+> value of it is 0 if CONFIG_MODULE_SIG_FORCE=n.
 > 
-> > Thanks,
-> > Dennis
-> > 
-> > > > I think this is a new way to trip the problem Dennis Chen has been working on
-> > > > [0]. If I kdump with --reuse-cmdline on a kernel booted with 'acpi=on', I get
-> > > > the panic below [1]...
-> > >
-> > > Yeah, it can be.
-> > >
-> > > > It looks like Dennis's fix involves changes in mm/memblock.c, maybe they can be
-> > > > extended to support a range instead of just a limit?
-> > > >
-> > > > (It looks like x86 explicitly adds the acpi regions to the crash-kernels memory
-> > > > map in crash_setup_memmap_entries()).
-> > > >
-> > > >
-> > > >
-> > > > Is it possible for the kernel text to be outside this range? (a bug in
-> > > > kexec-tools, or another user of the DT property) If we haven't already failed in
-> > > > this case, it may be worth printing a warning, or refusing to
-> > > > restrict-memory/expose-vmcore.
-> > >
-> > > In my implementation of kdump, the usable memory for crash dump
-> > > kernel will be allocated within memblock.memory after ACPI-related
-> > > regions have been mapped. "linux,usable-memory-range" indicates
-> > > this exact memory range.
-> > > On crash dump kernel, my fdt_enforce_memory_region() in arm64_memblock_init()
-> > > will exclude all the other regions from memblock.memory.
-> > > So the kernel (with acpi=on) won't recognize ACPI-regions as
-> > > normal memory, and map them by ioremap().
-> > >
-> > > I thought that it was safe, but actually not due to unaligned accesses.
-> > > As you suggested, we will probably be able to do the same thing of
-> > > Chen's solution in fdt_enforce_memory_region().
+> IOW, if your kernel forced signature verification, you should not be
+> able to do sig_enforce=0. If you kernel did not have
+> CONFIG_MODULE_SIG_FORCE=y, then sig_enforce should be 0 by default anyway
+> and you are not making it worse using command line.
 > 
-> memblock_isolate_range() and memblock_remove_range() are not exported.
-> So we'd better implement an unified interface like:
->     memblock_cap_memory_range(phys_addr_t base, size_t size);
-> 
-> If base == NULL, it would behave in the exact same way as your
-> memblock_mem_limit_remove_map().
->
-Hello AKASHI, it's not reasonable to change the prototype of an existing memblock API
-which will be used by other components as we did with memblock_enforce_memory_limit. 
-Moreover the @size in you case is to specify a memory range of the memblock, which is
-different from the @limit as an indicator of the total size of memblocks being limited. 
-But I can be help to post an new memblock API patch to cater for your case.
 
-Thanks,
-Dennis
-  
->
-> Thanks,
-> -Takahiro AKASHI
+OK.. I checked and you are right, but that is an example and there are
+other things like security=, thermal.*, nosmep, nosmap that need auditing
+for safety and might hurt the system security if used. I still think
+think that assuming you can pass any command line without breaking security
+is a broken argument.
+
+>>
+>>>>> So it sounds like different class of security problems which you are
+>>>>> referring to and not necessarily covered by secureboot or signed
+>>>>> kernel.
+>>>> Let me give you an example.
+>>>>  
+>>>> You have a secure boot setup, where the firmware/ROM validates the boot
+>>>> loader.  Good, the boot loader hasn't been tampered with.
+>>>>  
+>>>> You interrupt the boot loader and are able to modify the command line
+>>>> for the booted kernel.
+>>>>  
+>>>> The boot loader loads the kernel and verifies the kernel's signature.
+>>>> Good, the kernel hasn't been tampered with.  The kernel starts running.
+>>>>  
+>>>> You've plugged in a USB drive to the device, and specified a partition
+>>>> containing a root filesystem that you control to the kernel.  The
+>>>> validated kernel finds the USB drive, and mounts it, and executes
+>>>> your own binaries on the USB drive.
+>>> You will require physical access to the machine to be able to
+>>> insert your usb drive. And IIRC, argument was that if attacker has
+>>> physical access to machine, all bets are off anyway.
+>>>
+>>
+>> You don't need physical access -- your machine controller BMC can
+>> do the magic for you. So its not always physical access, is it?
 > 
-> > >
-> > >
-> > > Thanks,
-> > > -Takahiro AKASHI
-> > >
+> Well, idea was that if you have physical access to machine, then all
+> bets are off. If BMC can do something which allows running unsigned
+> code at ring level 0, its a problem I think from secureboot model of
+> security.
+> 
+>>  
+>>>>  
+>>>>  
+>>>> You run a shell on the console.  You now have control of the system,
+>>>> and can mount the real rootfs, inspect it, and work out what it does,
+>>>> etc.
+>>>>  
+>>>> At this point, what use was all the validation that the secure boot
+>>>> has done?  Absolutely useless.
+>>>>  
+>>>> If you can change the command line arguments given to the kernel, you
+>>>> have no security, no matter how much you verify signatures.  It's
+>>>> the illusion of security, nothing more, nothing less.
+>>>>  
+>>
+>> I agree, if you can change command line arguments, all bets are of lesser value
+> 
+> If changing command line allows execution of unsigned code at ring level
+> 0, then it is a problem. Otherwise we are talking of security issues which
+> are not covered by secure
+
+
+I agree that from what I can see/grep there is nothing that allows unsigned
+code to run at boot in ring0, but there are implications like the ones
+I've mentioned above.
+
+Attacks are typically built as a chain and every bit might matter. One could
+turn off features that might lead to the system being attacked at run-time
+
+
+Balbir Singh.
