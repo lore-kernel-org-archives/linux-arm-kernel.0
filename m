@@ -1,36 +1,35 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 20 Jul 2016 17:19:19 +0900
-Subject: [PATCH] ARM: shmobile: r8a7794: tidyup SDHI register size on DTSI
-Message-ID: <1469002759-2860-1-git-send-email-horms+renesas@verge.net.au>
+From: quentin.schulz@free-electrons.com (Quentin Schulz)
+Date: Wed, 20 Jul 2016 10:29:08 +0200
+Subject: [PATCH 2/5] mfd: sunxi-gpadc-mfd: add buffer structure
+In-Reply-To: <1469003351-15263-1-git-send-email-quentin.schulz@free-electrons.com>
+References: <1469003351-15263-1-git-send-email-quentin.schulz@free-electrons.com>
+Message-ID: <1469003351-15263-3-git-send-email-quentin.schulz@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-r8a7794 SDHI ch0 has SD_DMACR which is located in 0x324.
-This patch updates register size
+This adds a buffer structure for files including the sunxi-gpadc-mfd
+header. This structure has a buffer of 32 u32 values to store data from the
+FIFO of the GPADC of Allwinner SoCs. A buff_size is provided in case the
+buffer is not full.
 
-Based on work for the r8a7790 by Kuninori Morimoto.
-
-Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
 ---
-Found by inspection
-Compile tested only
----
- arch/arm/boot/dts/r8a7794.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ include/linux/mfd/sunxi-gpadc-mfd.h | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
-index 685f986cf962..9b36f58dff41 100644
---- a/arch/arm/boot/dts/r8a7794.dtsi
-+++ b/arch/arm/boot/dts/r8a7794.dtsi
-@@ -697,7 +697,7 @@
+diff --git a/include/linux/mfd/sunxi-gpadc-mfd.h b/include/linux/mfd/sunxi-gpadc-mfd.h
+index 7155845..f658299 100644
+--- a/include/linux/mfd/sunxi-gpadc-mfd.h
++++ b/include/linux/mfd/sunxi-gpadc-mfd.h
+@@ -20,4 +20,9 @@ struct sunxi_gpadc_mfd_dev {
+ 	void __iomem			*regs;
+ };
  
- 	sdhi0: sd at ee100000 {
- 		compatible = "renesas,sdhi-r8a7794";
--		reg = <0 0xee100000 0 0x200>;
-+		reg = <0 0xee100000 0 0x384>;
- 		interrupts = <GIC_SPI 165 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp3_clks R8A7794_CLK_SDHI0>;
- 		dmas = <&dmac0 0xcd>, <&dmac0 0xce>,
++struct sunxi_gpadc_buffer {
++	u32				buffer[32];
++	unsigned int			buff_size;
++};
++
+ #endif
 -- 
-2.7.0.rc3.207.g0ac5344
+2.5.0
