@@ -1,33 +1,60 @@
 From: bibby.hsieh@mediatek.com (Bibby Hsieh)
-Date: Wed, 20 Jul 2016 12:03:01 +0800
-Subject: [PATCH 0/4] MT8173 HDMI 4K support
-Message-ID: <1468987385-37353-1-git-send-email-bibby.hsieh@mediatek.com>
+Date: Wed, 20 Jul 2016 12:03:05 +0800
+Subject: [PATCH 4/4] drm/mediatek: adjust VENCPLL clock for 4K HDMI output
+In-Reply-To: <1468987385-37353-1-git-send-email-bibby.hsieh@mediatek.com>
+References: <1468987385-37353-1-git-send-email-bibby.hsieh@mediatek.com>
+Message-ID: <1468987385-37353-5-git-send-email-bibby.hsieh@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is MT8173 HDMI 4K support PATCH, based on 4.7-rc1.
+if MT8173 display module can support 4K HDMI output,
+we have to adjust VENCPLL clock from default 660MHz
+to 800MHz.
 
-In order to support HDMI 4K on MT8173,
-we have to make some modifications.
-1) Make sure that mtk_hdmi_send_infoframe is sent successfully.
-2) Enhance the HDMI driving current to improve performance.
-3) Make sure that pixel clock is 297MHz when resolution is 4K.  
-4) Adjust VENCPLL clock.
+Signed-off-by: Bibby Hsieh <bibby.hsieh@mediatek.com>
+---
+ drivers/gpu/drm/mediatek/mtk_drm_drv.c |    9 +++++++++
+ drivers/gpu/drm/mediatek/mtk_drm_drv.h |    1 +
+ 2 files changed, 10 insertions(+)
 
-Bibby Hsieh (1):
-  drm/mediatek: adjust VENCPLL clock for 4K HDMI output
-
-Junzhi Zhao (3):
-  drm/mediatek: do mtk_hdmi_send_infoframe after HDMI clock enable
-  drm/mediatek: enhance the HDMI driving current
-  drm/mediatek: fix the wrong pixel clock when resolution is 4K
-
- drivers/gpu/drm/mediatek/mtk_dpi.c             |  184 +++++++++++++++++-------
- drivers/gpu/drm/mediatek/mtk_drm_drv.c         |    9 ++
- drivers/gpu/drm/mediatek/mtk_drm_drv.h         |    1 +
- drivers/gpu/drm/mediatek/mtk_hdmi.c            |   19 ++-
- drivers/gpu/drm/mediatek/mtk_mt8173_hdmi_phy.c |   89 ++++++++----
- 5 files changed, 216 insertions(+), 86 deletions(-)
-
+diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.c b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
+index b1223d5..f159189 100644
+--- a/drivers/gpu/drm/mediatek/mtk_drm_drv.c
++++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
+@@ -23,6 +23,7 @@
+ #include <linux/of_address.h>
+ #include <linux/of_platform.h>
+ #include <linux/pm_runtime.h>
++#include <linux/clk.h>
+ 
+ #include "mtk_drm_crtc.h"
+ #include "mtk_drm_ddp.h"
+@@ -363,6 +364,14 @@ static int mtk_drm_probe(struct platform_device *pdev)
+ 		return ret;
+ 	}
+ 
++	private->vencpll_clk = devm_clk_get(dev, "vencpll");
++	if (IS_ERR(private->vencpll_clk)) {
++		ret = PTR_ERR(private->vencpll_clk);
++		dev_err(dev, "Failed to get vencpll clock: %d\n", ret);
++		return ret;
++	}
++	clk_set_rate(private->vencpll_clk, 800000000);
++
+ 	/* Iterate over sibling DISP function blocks */
+ 	for_each_child_of_node(dev->of_node->parent, node) {
+ 		const struct of_device_id *of_id;
+diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.h b/drivers/gpu/drm/mediatek/mtk_drm_drv.h
+index aa93894..273ad02 100644
+--- a/drivers/gpu/drm/mediatek/mtk_drm_drv.h
++++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.h
+@@ -40,6 +40,7 @@ struct mtk_drm_private {
+ 	void __iomem *config_regs;
+ 	struct device_node *comp_node[DDP_COMPONENT_ID_MAX];
+ 	struct mtk_ddp_comp *ddp_comp[DDP_COMPONENT_ID_MAX];
++	struct clk *vencpll_clk;
+ 
+ 	struct {
+ 		struct drm_atomic_state *state;
 -- 
 1.7.9.5
