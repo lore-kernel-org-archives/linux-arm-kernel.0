@@ -1,40 +1,47 @@
 From: clabbe.montjoie@gmail.com (LABBE Corentin)
-Date: Wed, 20 Jul 2016 10:03:20 +0200
-Subject: [PATCH v2 5/5] ARM: dts: sun8i: Enable sun8i-emac on the Orange PI PC
+Date: Wed, 20 Jul 2016 10:03:19 +0200
+Subject: [PATCH v2 4/5] ARM: dts: sun8i-h3: add sun8i-emac ethernet driver
 In-Reply-To: <1469001800-11615-1-git-send-email-clabbe.montjoie@gmail.com>
 References: <1469001800-11615-1-git-send-email-clabbe.montjoie@gmail.com>
-Message-ID: <1469001800-11615-6-git-send-email-clabbe.montjoie@gmail.com>
+Message-ID: <1469001800-11615-5-git-send-email-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The sun8i-emac hardware is present on the Orange PI PC.
-It uses the internal PHY.
+The sun8i-emac is an ethernet MAC hardware that support 10/100/1000
+speed.
 
-This patch create the needed emac and phy nodes.
+This patch enable the sun8i-emac on the Allwinner H3 SoC Device-tree.
+The SoC H3 have an internal PHY, so optionals syscon and ephy are set.
 
 Signed-off-by: LABBE Corentin <clabbe.montjoie@gmail.com>
 ---
- arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+ arch/arm/boot/dts/sun8i-h3.dtsi | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
-index daf50b9a6..b8340f7 100644
---- a/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
-+++ b/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
-@@ -165,3 +165,14 @@
- 	/* USB VBUS is always on */
- 	status = "okay";
- };
+diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
+index 4a4926b..f5a95ff 100644
+--- a/arch/arm/boot/dts/sun8i-h3.dtsi
++++ b/arch/arm/boot/dts/sun8i-h3.dtsi
+@@ -626,6 +626,20 @@
+ 			status = "disabled";
+ 		};
+ 
++		emac: ethernet at 1c30000 {
++			compatible = "allwinner,sun8i-h3-emac";
++			reg = <0x01c30000 0x104>, <0x01c00030 0x4>;
++			reg-names = "emac", "syscon";
++			interrupts = <GIC_SPI 82 IRQ_TYPE_LEVEL_HIGH>;
++			resets = <&ahb_rst 17>, <&ahb_rst 66>;
++			reset-names = "ahb", "ephy";
++			clocks = <&bus_gates 17>, <&bus_gates 128>;
++			clock-names = "ahb", "ephy";
++			#address-cells = <1>;
++			#size-cells = <0>;
++			status = "disabled";
++		};
 +
-+&emac {
-+	phy = <&phy1>;
-+	phy-mode = "mii";
-+	allwinner,use-internal-phy;
-+	allwinner,leds-active-low;
-+	status = "okay";
-+	phy1: ethernet-phy at 1 {
-+		reg = <1>;
-+	};
-+};
+ 		gic: interrupt-controller at 01c81000 {
+ 			compatible = "arm,cortex-a7-gic", "arm,cortex-a15-gic";
+ 			reg = <0x01c81000 0x1000>,
 -- 
 2.7.3
