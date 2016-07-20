@@ -1,82 +1,43 @@
-From: lukas@wunner.de (Lukas Wunner)
-Date: Wed, 20 Jul 2016 17:23:40 +0200
-Subject: [PATCH v2 02/10] driver core: Functional dependencies tracking
- support
-In-Reply-To: <3969169.CcnEsvYuly@vostro.rjw.lan>
-References: <1466144820-6286-1-git-send-email-m.szyprowski@samsung.com>
- <1975118.iO8UCAENoH@vostro.rjw.lan>
- <20160720062450.GA8066@wunner.de>
- <3969169.CcnEsvYuly@vostro.rjw.lan>
-Message-ID: <20160720152340.GA8337@wunner.de>
+From: keescook@chromium.org (Kees Cook)
+Date: Wed, 20 Jul 2016 08:31:37 -0700
+Subject: [PATCH v3 00/11] mm: Hardened usercopy
+In-Reply-To: <063D6719AE5E284EB5DD2968C1650D6D5F4FD6A3@AcuExch.aculab.com>
+References: <1468619065-3222-1-git-send-email-keescook@chromium.org>
+ <063D6719AE5E284EB5DD2968C1650D6D5F4FD6A3@AcuExch.aculab.com>
+Message-ID: <CAGXu5j+QH8Fdk7p6bZV_yMv1puHRxZRu5z45+tKrmLyGBTymFw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 20, 2016 at 02:52:42PM +0200, Rafael J. Wysocki wrote:
-> On Wednesday, July 20, 2016 08:24:50 AM Lukas Wunner wrote:
-> > On Wed, Jul 20, 2016 at 02:33:18AM +0200, Rafael J. Wysocki wrote:
-> > > On Friday, June 17, 2016 04:07:38 PM Lukas Wunner wrote:
-> > > > On Fri, Jun 17, 2016 at 02:54:56PM +0200, Rafael J. Wysocki wrote:
-> > > > > On Fri, Jun 17, 2016 at 12:36 PM, Lukas Wunner <lukas@wunner.de> wrote:
-> > > > > > On Fri, Jun 17, 2016 at 08:26:52AM +0200, Marek Szyprowski wrote:
-> > > > > > > From: "Rafael J. Wysocki" <rafael.j.wysocki@intel.com>
-> > > > > > We also have such a functional dependency for Thunderbolt on Macs:
-> > > > > > On resume from system sleep, the PCIe hotplug ports may not resume
-> > > > > > before the thunderbolt driver has reestablished the PCI tunnels.
-> > > > > > Currently this is enforced by quirk_apple_wait_for_thunderbolt()
-> > > > > > in drivers/pci/quirks.c. It would be good if we could represent
-> > > > > > this dependency using something like Rafael's approach instead of
-> > > > > > open coding it, however one detail in Rafael's patches is problematic:
-> > > > > >
-> > > > > > > New links are added by calling device_link_add() which may happen
-> > > > > > > either before the consumer device is probed or when probing it, in
-> > > > > > > which case the caller needs to ensure that the driver of the
-> > > > > > > supplier device is present and functional and the DEVICE_LINK_PROBE_TIME
-> > > > > > > flag should be passed to device_link_add() to reflect that.
-> > > > > >
-> > > > > > The thunderbolt driver cannot call device_link_add() before the
-> > > > > > PCIe hotplug ports are bound to a driver unless we amend portdrv
-> > > > > > to return -EPROBE_DEFER for Thunderbolt hotplug ports on Macs
-> > > > > > if the thunderbolt driver isn't loaded.
-> > > > > >
-> > > > > > It would therefore be beneficial if device_link_add() can be
-> > > > > > called even *after* the consumer is bound.
-> > > > > 
-> > > > > I don't quite follow.
-> > > > > 
-> > > > > Who's the provider and who's the consumer here?
-> > > > 
-> > > > thunderbolt.ko is the supplier.
-> > > 
-> > > But it binds to the children of the ports that are supposed to be its
-> > > consumers?
-> > > 
-> > > Why is that even expected to work?
-> > 
-> > No, the consumers are aunts (or uncles) of the supplier, if you will. :-)
-> > 
-> > The consumers are the hotplug ports (named "Downstream Bridge 1 / 2" in
-> > the drawing below). The supplier is the NHI:
-> > 
-> >       (Root Port) ---- Upstream Bridge --+-- Downstream Bridge 0 ---- NHI
-> >                                          +-- Downstream Bridge 1 --
-> >                                          +-- Downstream Bridge 2 --
-> >                                          ...
-> > 
-> > We're calling pci_power_up() and pci_restore_state() from
-> > pci_pm_resume_noirq(). And that will fail for devices below
-> > the hotplug ports if the PCI tunnels haven't been re-established
-> > yet by the NHI.
-> 
-> So the NHI is a PCIe device, right?
-> 
-> Does the Thunderbolt driver bind to that device?
+On Wed, Jul 20, 2016 at 2:52 AM, David Laight <David.Laight@aculab.com> wrote:
+> From: Kees Cook
+>> Sent: 15 July 2016 22:44
+>> This is a start of the mainline port of PAX_USERCOPY[1].
+> ...
+>> - if address range is in the current process stack, it must be within the
+>>   current stack frame (if such checking is possible) or at least entirely
+>>   within the current process's stack.
+> ...
+>
+> That description doesn't seem quite right to me.
+> I presume the check is:
+>   Within the current process's stack and not crossing the ends of the
+>   current stack frame.
 
-The NHI is a PCI device but not a bridge. It has class 0x88000.
-Yes, thunderbolt.ko binds to the NHI.
+Actually, it's a bad description all around. :) The check is that the
+range is within a valid stack frame (current or any prior caller's
+frame). i.e. it does not cross a frame or touch the saved frame
+pointer nor instruction pointer.
 
-And portdrv binds to the upstream bridge and downstream bridges.
-Those have class 0x60400.
+> The 'current' stack frame is likely to be that of copy_to/from_user().
+> Even if you use the stack of the caller, any problematic buffers
+> are likely to have been passed in from a calling function.
+> So unless you are going to walk the stack (good luck on that)
+> I'm not sure checking the stack frames is worth it.
 
-Best regards,
+Yup: that's exactly what it's doing: walking up the stack. :)
 
-Lukas
+-Kees
+
+-- 
+Kees Cook
+Chrome OS & Brillo Security
