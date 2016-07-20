@@ -1,51 +1,35 @@
-From: tn@semihalf.com (Tomasz Nowicki)
-Date: Wed, 20 Jul 2016 07:05:00 +0200
-Subject: [RFC PATCH 0/3] ECAM quirks handling for ARM64 platforms
-In-Reply-To: <20160719211753.GA17840@localhost>
-References: <1464856864-18049-1-git-send-email-tn@semihalf.com>
- <20160719211753.GA17840@localhost>
-Message-ID: <578F067C.7080509@semihalf.com>
+From: joel@jms.id.au (Joel Stanley)
+Date: Wed, 20 Jul 2016 14:47:15 +0930
+Subject: [PATCH 2/4] drivers/clocksource/moxart: Refactor enable/disable
+In-Reply-To: <20160510130414.GE14952@linaro.org>
+References: <1462797169-14512-1-git-send-email-joel@jms.id.au>
+ <1462797169-14512-3-git-send-email-joel@jms.id.au>
+ <CACPK8XfJ2e1kr-WftidvqsoYew7LqPiNo0sw7opgh8UH=3q_3A@mail.gmail.com>
+ <20160510130414.GE14952@linaro.org>
+Message-ID: <CACPK8XdK35p9rxr8et58omvQExjdri20yCq91LGocnPRYpGLQQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19.07.2016 23:17, Bjorn Helgaas wrote:
-> On Thu, Jun 02, 2016 at 10:41:00AM +0200, Tomasz Nowicki wrote:
->> This series bases on pending ACPI PCI support for ARM64:
->> https://lkml.org/lkml/2016/5/30/468
+Hello Daniel,
+
+On Tue, May 10, 2016 at 10:34 PM, Daniel Lezcano
+<daniel.lezcano@linaro.org> wrote:
+> On Tue, May 10, 2016 at 08:36:50PM +0930, Joel Stanley wrote:
+>> Hi Daniel,
 >>
->> Quirk handling relies on an idea of matching MCFG OEM ID and OEM revision
->> (the ones from standard header of MCFG table). Linker section is used
->> so that quirks can be registered using special macro (see patches) and
->> kept self contained.
->>
->> As an example, last patch presents above mechanism usage for ThunderX PEM driver.
->>
->> Tomasz Nowicki (3):
->>    pci, acpi: Match PCI config space accessors against platfrom specific
->>      ECAM quirks.
->>    arm64, pci: Start using quirks handling for ACPI based PCI host
->>      controller.
->>    pci, pci-thunder-pem: Add ACPI support for ThunderX PEM.
->>
->>   arch/arm64/kernel/pci.c            |   7 +-
->>   drivers/acpi/pci_mcfg.c            |  32 +++++++++
->>   drivers/pci/host/pci-thunder-pem.c | 132 +++++++++++++++++++++++++++++++++----
->>   include/asm-generic/vmlinux.lds.h  |   7 ++
->>   include/linux/pci-acpi.h           |  19 ++++++
->>   5 files changed, 181 insertions(+), 16 deletions(-)
+>> Here's a commit message for this patch. If you'd prefer me to resend
+>> the entire series with this included then I can do that.
 >
-> Is this series superceded by Dongdong's series of 6/13 ("[RFC,V2,1/2]
-> ACPI/PCI: Match PCI config space accessors against platfrom specific ECAM
-> quirks")?
+> No, it is ok (except if there are comments on the patches before I merge
+> them).
+
+I couldn't find this in your tree. Any chance I could get it merged now?
+
+Cheers,
+
+Joel
+
 >
-
-Yes this series had two another versions (v2,v3) posted by someone else. 
-However, I posted another v4 which is the latest one:
-[RFC PATCH v4 0/5] ECAM quirks handling for ARM64 platforms
-https://lkml.org/lkml/2016/6/28/165
-
-In v4 there is one minor thing to be fixed. Do you want me to resend it 
-as v5 including mentioned fix ?
-
-Thanks,
-Tomasz
+>> This patch abstracts the enable and disable register writes into their
+>> own functions in preparation for future changes to use SoC specific
+>> values for the writes.
