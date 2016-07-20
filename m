@@ -1,35 +1,78 @@
-From: mingo@kernel.org (Ingo Molnar)
-Date: Wed, 20 Jul 2016 09:44:51 +0200
-Subject: Is THREAD_INFO_IN_TASK appropriate for -mm for 4.8?
-In-Reply-To: <CALCETrUf_7=Tr4JrDj+3UPT5kUT1MsRtypvfqkOg_MVHAJu=PA@mail.gmail.com>
-References: <CALCETrUf_7=Tr4JrDj+3UPT5kUT1MsRtypvfqkOg_MVHAJu=PA@mail.gmail.com>
-Message-ID: <20160720074451.GB28606@gmail.com>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Wed, 20 Jul 2016 09:50:14 +0200
+Subject: [PATCH v11 04/10] genirq/msi-doorbell: allow MSI doorbell
+ (un)registration
+In-Reply-To: <alpine.DEB.2.11.1607191617071.3596@nanos>
+References: <1468933367-23159-1-git-send-email-eric.auger@redhat.com>
+ <1468933367-23159-5-git-send-email-eric.auger@redhat.com>
+ <alpine.DEB.2.11.1607191617071.3596@nanos>
+Message-ID: <cfd24f24-a7ff-2657-f88b-43537f6316dd@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Thomas,
+On 19/07/2016 16:22, Thomas Gleixner wrote:
+> On Tue, 19 Jul 2016, Eric Auger wrote:
+>> +
+>> +#include <linux/slab.h>
+>> +#include <linux/irq.h>
+>> +#include <linux/msi-doorbell.h>
+>> +
+>> +struct irqchip_doorbell {
+>> +	struct irq_chip_msi_doorbell_info info;
+>> +	struct list_head next;
+> 
+> Again, please align the struct members.
+> 
+>> +};
+>> +
+>> +static LIST_HEAD(irqchip_doorbell_list);
+>> +static DEFINE_MUTEX(irqchip_doorbell_mutex);
+>> +
+>> +struct irq_chip_msi_doorbell_info *
+>> +msi_doorbell_register_global(phys_addr_t base, size_t size,
+>> +			     int prot, bool irq_remapping)
+>> +{
+>> +	struct irqchip_doorbell *db;
+>> +
+>> +	db = kmalloc(sizeof(*db), GFP_KERNEL);
+>> +	if (!db)
+>> +		return ERR_PTR(-ENOMEM);
+>> +
+>> +	db->info.doorbell_is_percpu = false;
+> 
+> Please use kzalloc and get rid of zero initialization. If you add stuff to the
+> struct then initialization will be automatically 0.
+OK
+> 
+>> +void msi_doorbell_unregister_global(struct irq_chip_msi_doorbell_info *dbinfo)
+>> +{
+>> +	struct irqchip_doorbell *db, *tmp;
+>> +
+>> +	mutex_lock(&irqchip_doorbell_mutex);
+>> +	list_for_each_entry_safe(db, tmp, &irqchip_doorbell_list, next) {
+> 
+> Why do you need that iterator? 
+> 
+>     db = container_of(dbinfo, struct ....., info);
+> 
+> Hmm?
 
-* Andy Lutomirski <luto@kernel.org> wrote:
+definitively
+> 
+>> +		if (dbinfo == &db->info) {
+>> +			list_del(&db->next);
+>> +			kfree(db);
+> 
+> Please move the kfree() outside of the lock region. It does not matter much
+> here, but we really should stop doing random crap in locked regions.
+OK
 
-> Cons: It's a bit odd to merge code that can't be enabled as-is.  OTOH
-> x86 could plausibly enable it for 4.8 if Ingo is okay with applying
-> "x86/dumpstack: Pin the target stack in save_stack_trace_tsk()" and
-> "x86: Move thread_info into task_struct" during the merge window after
-> the -mm patchbomb lands.
+Thanks
 
-There's quite a few risky stuff piled up already so I'd prefer if we delayed these 
-core bits and the enablement to v4.9.
-
-We can carry these core bits in -tip as well, can create a tip:sched/thread_info 
-tree for it and such. I'd prefer that because this way we have natural proximity 
-between patch application, testing and eventual fixes.
-
-Then we can expose -next to all these changes as a single, bisectable group of 
-commits and, should anything overly catastrophic happen, remove it and regroup our 
-forces.
-
-This would really be the best approach I think, since I'd like to default-enable 
-all this on x86 from the very beginning.
-
-Thanks,
-
-	Ingo
+Eric
+> 
+> Thanks,
+> 
+> 	tglx
+> 
