@@ -1,66 +1,36 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Wed, 20 Jul 2016 16:47:32 -0700
-Subject: [PATCH 3/3] watchdog: bcm2835_wdt: set WDOG_HW_RUNNING bit when
- appropriate
-In-Reply-To: <578FEF33.9020801@prevas.dk>
-References: <1468570524-18222-1-git-send-email-rasmus.villemoes@prevas.dk>
- <1468570524-18222-3-git-send-email-rasmus.villemoes@prevas.dk>
- <5788E935.6080608@roeck-us.net> <578FEF33.9020801@prevas.dk>
-Message-ID: <20160720234732.GB23213@roeck-us.net>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 21 Jul 2016 08:51:54 +0900
+Subject: [PATCH v3 1/3] arm64: dts: r8a7796: Add Renesas R8A7796 SoC
+ support
+In-Reply-To: <d0b2edc9-c191-d61c-add0-85f189083931@de.bosch.com>
+References: <1464054880-25843-1-git-send-email-horms+renesas@verge.net.au>
+ <1464054880-25843-2-git-send-email-horms+renesas@verge.net.au>
+ <b30c9c84-23b6-b088-4983-b2498317492b@de.bosch.com>
+ <20160525004825.GC7292@verge.net.au>
+ <c0fd13d5-c5c4-579b-6fad-c637bda92398@de.bosch.com>
+ <20160526022833.GE18393@verge.net.au>
+ <59e6225a-6dfa-8bde-dd2e-3428d6fedfe2@de.bosch.com>
+ <20160527004256.GD14269@verge.net.au>
+ <b03c68c9-6949-519d-2c44-c140eac727a4@de.bosch.com>
+ <d0b2edc9-c191-d61c-add0-85f189083931@de.bosch.com>
+Message-ID: <20160720235154.GA21407@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 20, 2016 at 11:37:55PM +0200, Rasmus Villemoes wrote:
-> On 2016-07-15 15:46, Guenter Roeck wrote:
-> >On 07/15/2016 01:15 AM, Rasmus Villemoes wrote:
-> >>
-> >>+static bool bcm2835_wdt_is_running(struct bcm2835_wdt *wdt)
-> >>+{
-> >>+    uint32_t cur;
-> >>+
-> >>+    cur = readl(wdt->base + PM_RSTC);
-> >>+
-> >>+    return !!(cur & PM_RSTC_WRCFG_FULL_RESET);
-> >>+}
-> >>+
-> >>  static int bcm2835_wdt_start(struct watchdog_device *wdog)
-> >>  {
-> >>      struct bcm2835_wdt *wdt = watchdog_get_drvdata(wdog);
-> >>@@ -70,6 +79,7 @@ static int bcm2835_wdt_start(struct watchdog_device
-> >>*wdog)
-> >>            PM_RSTC_WRCFG_FULL_RESET, wdt->base + PM_RSTC);
-> >>
-> >>      spin_unlock_irqrestore(&wdt->lock, flags);
-> >>+    set_bit(WDOG_HW_RUNNING, &wdog->status);
-> >>
-> >You don't need to set this bit here unless the watchdog can not be stopped.
-> >
-> >>      return 0;
-> >>  }
-> >>@@ -79,6 +89,7 @@ static int bcm2835_wdt_stop(struct watchdog_device
-> >>*wdog)
-> >>      struct bcm2835_wdt *wdt = watchdog_get_drvdata(wdog);
-> >>
-> >>      writel_relaxed(PM_PASSWORD | PM_RSTC_RESET, wdt->base + PM_RSTC);
-> >>+    clear_bit(WDOG_HW_RUNNING, &wdog->status);
-> >
-> >... and since you clear the bit, it can be stopped. Both setting and
-> >resetting the bit
-> >is therefore not necessary.
-> 
-> Well, if the bit isn't cleared here, but it was set during probe(), the
-> framework will (re)start this watchdog (and keep it fed) since there's no
-> separate ping method. I suppose that's reasonable semantics if the watchdog
-> was running at boot (and I like how that ends up interacting with my
-> open_deadline proposal), but probably a little too subtle. This would also
-> change if the ->start method was broken up into separate ping and start
-> methods, which it seems that it could be.
-> 
-> If we do clear the bit here, I think it's neater to set it in start as well,
-> even if that doesn't really have any effect.
-> 
+On Wed, Jun 29, 2016 at 10:15:27AM +0200, Dirk Behme wrote:
+> Hi Simon,
 
-The problem is different. The core should clear the bit on close if there is a
-stop function, and if calling the stop function does not return an error.
+...
 
-Guenter
+> Hmm, could you kindly help me to remember what's the recent status of your
+> discussion above regarding a hierarchical structure of the RCar3 device
+> trees?
+
+Hi Dirk,
+
+>From my point of view the most promising avenue at this time is work that
+Geert has been doing to explore making things more flexible by updating the
+DT automatically at run time. He can expand on this but the idea is to add
+per-soc compat strings and otherwise update the DT into a per-SoC version.
+This ought to allow significant portions of the DT to be common between
+SoCs in the same R-Car generation for at lest Gen 2 and Gen 3.
