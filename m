@@ -1,56 +1,19 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Wed, 20 Jul 2016 09:03:13 -0700
-Subject: SOC-specific action for irq_set_wake
-In-Reply-To: <578F7E4C.9040407@arm.com>
-References: <20160719181804.GX3847@xsjsorenbubuntu>
- <20160719224713.GA13533@hector.attlocal.net>
- <20160719233440.GG3847@xsjsorenbubuntu> <578F338C.40309@arm.com>
- <20160720131606.GJ3847@xsjsorenbubuntu> <578F7E4C.9040407@arm.com>
-Message-ID: <20160720160313.GU3847@xsjsorenbubuntu>
+From: David.Laight@ACULAB.COM (David Laight)
+Date: Wed, 20 Jul 2016 16:02:39 +0000
+Subject: [PATCH v3 00/11] mm: Hardened usercopy
+In-Reply-To: <CAGXu5j+QH8Fdk7p6bZV_yMv1puHRxZRu5z45+tKrmLyGBTymFw@mail.gmail.com>
+References: <1468619065-3222-1-git-send-email-keescook@chromium.org>
+ <063D6719AE5E284EB5DD2968C1650D6D5F4FD6A3@AcuExch.aculab.com>
+ <CAGXu5j+QH8Fdk7p6bZV_yMv1puHRxZRu5z45+tKrmLyGBTymFw@mail.gmail.com>
+Message-ID: <063D6719AE5E284EB5DD2968C1650D6D5F4FEA62@AcuExch.aculab.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2016-07-20 at 14:36:12 +0100, Marc Zyngier wrote:
-> Hi S?ren,
-> 
-> On 20/07/16 14:16, S?ren Brinkmann wrote:
-> > Hi Marc,
-> 
-> >>>>> Does anybody have similar problems and probably already solved it?
-> >>>>> Any other suggestions for approaching the problem? Any preferred
-> >>>>> solution?
-> >>>>
-> >>>> I think we have the same problem.  Can you provide more detail on the hardware
-> >>>> implementation of your wake irq controller?  I presume you have some set of
-> >>>> registers, an irq maybe, and some other stuff?  And how does it fit into the
-> >>>> overall architecture from a hardware perspective?
-> >>>
-> >>> We have essentially a whole second interrupt controller. All IRQs are
-> >>> connected to the A53 GIC and this second interrupt controller that is
-> >>> controlled by the companion core. The companion core is supposed to be
-> >>> informed about what source the A53 needs to wake up on and will program
-> >>> this second IRQ controller, etc.
-> >>
-> >> So your "special case" is exactly like everyone else's. Implement it as
-> >> a hierarchical chip on top of the GIC, just like Tegra, OMAP, iMX6,
-> >> Exynos and a few others. Unless you implement PSCI.
-> > 
-> > I didn't really think that our case is unique. I was just looking for
-> > some pointers into the right direction as the extension mechanism that I
-> > remembered disappeared and I haven't been following the development
-> > closely enough to just know what alternatives are available.
-> > So, you say the approach of letting the secure monitor infer the wake
-> > IRQ by reading the GIC config is preferred over handling it as
-> > hierarchical chip within Linux?
-> 
-> The in-kernel approach is a consequence of the firmware-less 32bit
-> configuration. Hopefully, we won't see anything like that anymore.
-> Fingers crossed.
-> 
-> So the firmware approach is clearly the preferred one on arm64, as it
-> simplifies absolutely everything (and your power management has to know
-> about all of this anyway).
+From: Kees Cook
+> Sent: 20 July 2016 16:32
+...
+> Yup: that's exactly what it's doing: walking up the stack. :)
 
-Thanks for your input. We'll do it this way then. Thanks, everybody.
+Remind me to make sure all our customers run kernels with it disabled.
 
-	S?ren
+	David
