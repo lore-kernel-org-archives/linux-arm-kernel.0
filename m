@@ -1,39 +1,60 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 20 Jul 2016 12:50:14 +0200
-Subject: [PATCH v3] thermal: tango: add resume support
-In-Reply-To: <578CC9C9.3050806@free.fr>
-References: <57726196.5060909@free.fr>
- <578CC9C9.3050806@free.fr>
-Message-ID: <20160720105014.GA17170@ulmo.ba.sec>
+From: julien.grall@arm.com (Julien Grall)
+Date: Wed, 20 Jul 2016 12:01:47 +0100
+Subject: [PATCH v4] xen/arm: Add a clock property
+In-Reply-To: <CAMuHMdU9yP2SMYa5ssrQSu1vwSN2gM4mD-EVYSGr2Pqf=jmCgw@mail.gmail.com>
+References: <1468309605-19522-1-git-send-email-dirk.behme@de.bosch.com>
+ <CAMuHMdU9yP2SMYa5ssrQSu1vwSN2gM4mD-EVYSGr2Pqf=jmCgw@mail.gmail.com>
+Message-ID: <cc28ef7e-dce3-fe5f-ab80-b662244bcbd0@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 18, 2016 at 02:21:29PM +0200, Mason wrote:
-> From: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
-> 
-> When this platform is suspended, firmware powers the entire SoC down,
-> except a few hardware blocks waiting for wakeup events. And there is
-> no context to save for this particular block.
-> 
-> Therefore, there is nothing useful for the driver to do on suspend;
-> so we define a NULL suspend hook. On resume, the driver initializes
-> the block exactly as is done in the probe callback.
-> 
-> Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
-> ---
-> Changes in v3
-> Drop the DEV_PM_OPS macro, which caused some confusion.
-> Note: tango_thermal_pm struct only exists when CONFIG_PM_SLEEP is defined
-> @Kevin, can I add your Reviewed-by tag back?
-> ---
->  drivers/thermal/tango_thermal.c | 23 +++++++++++++++++++++--
->  1 file changed, 21 insertions(+), 2 deletions(-)
 
-Reviewed-by: Thierry Reding <treding@nvidia.com>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160720/37477eea/attachment.sig>
+
+On 20/07/16 10:43, Geert Uytterhoeven wrote:
+> Hi Dirk,
+
+Hi Geert,
+
+> On Tue, Jul 12, 2016 at 9:46 AM, Dirk Behme <dirk.behme@de.bosch.com> wrote:
+>> Clocks described by this property are reserved for use by Xen, and the OS
+>> must not alter their state any way, such as disabling or gating a clock,
+>> or modifying its rate. Ensuring this may impose constraints on parent
+>> clocks or other resources used by the clock tree.
+>>
+>> This property is used to proxy clocks for devices Xen has taken ownership
+>> of, such as UARTs, for which the associated clock controller(s) remain
+>> under the control of Dom0.
+>
+> I'm not familiar with using XEN at all, but I'm a bit puzzled...
+>
+> Can't you just add a clocks property to the (virtual) serial device node in DT?
+> Then the (virtual) serial device driver can get and enable the clock?
+
+There is no DT node for the Xen console (hvc). The UART used by Xen will 
+be completely removed from the Device tree.
+
+>
+> Alternatively, you can add a (virtual) clock controller, and power-domains
+> and clock properties to all affected devices (I assume there can be others,
+> besides virtual UARTs?), and let it be handled by Runtime PM, without the
+> (virtual) device drivers having to care about clocks at all.
+
+I am not sure to understand here. The problem is not because we provide 
+virtual device to DOM0 but because the physical devices will be 
+completely hidden (i.e remove from the DT) from DOM0.
+
+Those devices will be removed from the Device Tree and may not have a 
+corresponding virtual device. So we cannot replicate the clocks property 
+in the device.
+
+In a previous mail [1], Stefano suggested to add a new property for the 
+clock to mention that the clock should not changed (i.e rate, 
+disable...). How would that fit?
+
+Regards,
+
+[1] 
+https://lists.xenproject.org/archives/html/xen-devel/2016-07/msg01614.html
+
+-- 
+Julien Grall
