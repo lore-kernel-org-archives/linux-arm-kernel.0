@@ -1,80 +1,93 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 20 Jul 2016 12:23:24 +0100
-Subject: [RFC PATCH v3 02/13] drivers: acpi: iort: introduce linker section
- for IORT entries probing
+Date: Wed, 20 Jul 2016 12:23:23 +0100
+Subject: [RFC PATCH v3 01/13] drivers: iommu: add FWNODE_IOMMU fwnode type
 In-Reply-To: <1469013815-24380-1-git-send-email-lorenzo.pieralisi@arm.com>
 References: <1469013815-24380-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <1469013815-24380-3-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <1469013815-24380-2-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since commit e647b532275b ("ACPI: Add early device probing
-infrastructure") the kernel has gained the infrastructure that allows
-adding linker script section entries to execute ACPI driver callbacks
-(ie probe routines) for all subsystems that register a table entry
-in the respective kernel section (eg clocksource, irqchip).
+On systems booting with a device tree, every struct device is
+associated with a struct device_node, that represents its DT
+representation. The device node can be used in generic kernel
+contexts (eg IRQ translation, IOMMU streamid mapping), to
+retrieve the properties associated with the device and carry
+out kernel operation accordingly. Owing to the 1:1 relationship
+between the device and its device_node, the device_node can also
+be used as a look-up token for the device (eg looking up a device
+through its device_node), to retrieve the device in kernel paths
+where the device_node is available.
 
-Since ARM IOMMU devices data is described through IORT tables when
-booting with ACPI, the ARM IOMMU drivers must be made able to hook ACPI
-callback routines that are called to probe IORT entries and initialize
-the respective IOMMU devices.
+On systems booting with ACPI, the same abstraction provided by
+the device_node is required to provide look-up functionality.
 
-To avoid adding driver specific hooks into IORT table initialization
-code (breaking therefore code modularity - ie ACPI IORT code must be made
-aware of ARM SMMU drivers ACPI init callbacks), this patch adds code
-that allows ARM SMMU drivers to take advantage of the ACPI early probing
-infrastructure, so that they can add linker script section entries
-containing drivers callback to be executed on IORT tables detection.
+Therefore, mirroring the approach implemented in the IRQ domain
+kernel layer, this patch adds an additional fwnode type FWNODE_IOMMU.
 
-Since IORT nodes are differentiated by a type, the callback routines
-can easily parse the IORT table entries, check the IORT nodes and
-carry out some actions whenever the IORT node type associated with
-the driver specific callback is matched.
+This patch also implements a glue kernel layer that allows to
+allocate/free FWNODE_IOMMU fwnode_handle structures and associate
+them with IOMMU devices.
 
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Cc: Tomasz Nowicki <tn@semihalf.com>
+Cc: Joerg Roedel <joro@8bytes.org>
 Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/acpi/iort.c               | 2 ++
- include/asm-generic/vmlinux.lds.h | 1 +
- include/linux/iort.h              | 3 +++
- 3 files changed, 6 insertions(+)
+ include/linux/fwnode.h |  1 +
+ include/linux/iommu.h  | 25 +++++++++++++++++++++++++
+ 2 files changed, 26 insertions(+)
 
-diff --git a/drivers/acpi/iort.c b/drivers/acpi/iort.c
-index 6611607..1f440d2 100644
---- a/drivers/acpi/iort.c
-+++ b/drivers/acpi/iort.c
-@@ -383,4 +383,6 @@ void __init iort_table_detect(void)
- 		const char *msg = acpi_format_exception(status);
- 		pr_err("Failed to get table, %s\n", msg);
- 	}
-+
-+	acpi_probe_device_table(iort);
- }
-diff --git a/include/asm-generic/vmlinux.lds.h b/include/asm-generic/vmlinux.lds.h
-index 6a67ab9..b896ab2 100644
---- a/include/asm-generic/vmlinux.lds.h
-+++ b/include/asm-generic/vmlinux.lds.h
-@@ -538,6 +538,7 @@
- 	IRQCHIP_OF_MATCH_TABLE()					\
- 	ACPI_PROBE_TABLE(irqchip)					\
- 	ACPI_PROBE_TABLE(clksrc)					\
-+	ACPI_PROBE_TABLE(iort)						\
- 	EARLYCON_TABLE()
+diff --git a/include/linux/fwnode.h b/include/linux/fwnode.h
+index 8516717..6e10050 100644
+--- a/include/linux/fwnode.h
++++ b/include/linux/fwnode.h
+@@ -19,6 +19,7 @@ enum fwnode_type {
+ 	FWNODE_ACPI_DATA,
+ 	FWNODE_PDATA,
+ 	FWNODE_IRQCHIP,
++	FWNODE_IOMMU,
+ };
  
- #define INIT_TEXT							\
-diff --git a/include/linux/iort.h b/include/linux/iort.h
-index d7daba1..9bb30c5 100644
---- a/include/linux/iort.h
-+++ b/include/linux/iort.h
-@@ -38,4 +38,7 @@ static inline struct irq_domain *
- iort_get_device_domain(struct device *dev, u32 req_id) { return NULL; }
- #endif
+ struct fwnode_handle {
+diff --git a/include/linux/iommu.h b/include/linux/iommu.h
+index 664683a..298328a 100644
+--- a/include/linux/iommu.h
++++ b/include/linux/iommu.h
+@@ -38,6 +38,7 @@ struct bus_type;
+ struct device;
+ struct iommu_domain;
+ struct notifier_block;
++struct fwnode_handle;
  
-+#define IORT_ACPI_DECLARE(name, table_id, fn)		\
-+	ACPI_DECLARE_PROBE_ENTRY(iort, name, table_id, 0, NULL, 0, fn)
+ /* iommu fault flags */
+ #define IOMMU_FAULT_READ	0x0
+@@ -540,4 +541,28 @@ static inline void iommu_device_unlink(struct device *dev, struct device *link)
+ 
+ #endif /* CONFIG_IOMMU_API */
+ 
++/* IOMMU fwnode handling */
++static inline bool is_fwnode_iommu(struct fwnode_handle *fwnode)
++{
++	return fwnode && fwnode->type == FWNODE_IOMMU;
++}
 +
- #endif /* __IORT_H__ */
++static inline struct fwnode_handle *iommu_alloc_fwnode(void)
++{
++	struct fwnode_handle *fwnode;
++
++	fwnode = kzalloc(sizeof(struct fwnode_handle), GFP_KERNEL);
++	fwnode->type = FWNODE_IOMMU;
++
++	return fwnode;
++}
++
++static inline void iommu_free_fwnode(struct fwnode_handle *fwnode)
++{
++	if (WARN_ON(!is_fwnode_iommu(fwnode)))
++		return;
++
++	kfree(fwnode);
++}
++
+ #endif /* __LINUX_IOMMU_H */
 -- 
 2.6.4
