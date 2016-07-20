@@ -1,68 +1,43 @@
-From: dirk.behme@de.bosch.com (Dirk Behme)
-Date: Wed, 20 Jul 2016 14:53:44 +0200
-Subject: [PATCH v4] xen/arm: Add a clock property
-In-Reply-To: <CAMuHMdWdqdT4jnae8h9tDDzzh8ZAbJJwiMW-scPBNVwmjYSiWQ@mail.gmail.com>
-References: <1468309605-19522-1-git-send-email-dirk.behme@de.bosch.com>
- <CAMuHMdU9yP2SMYa5ssrQSu1vwSN2gM4mD-EVYSGr2Pqf=jmCgw@mail.gmail.com>
- <cc28ef7e-dce3-fe5f-ab80-b662244bcbd0@arm.com>
- <CAMuHMdWeJjcuBHjnjppc5Ys5Ew8VssXzg=dLpLPCOQaBnUo_7Q@mail.gmail.com>
- <04d9dbfb-196d-a775-7fbb-526aba8085f4@arm.com>
- <CAMuHMdWdqdT4jnae8h9tDDzzh8ZAbJJwiMW-scPBNVwmjYSiWQ@mail.gmail.com>
-Message-ID: <847d3d22-985d-cbe9-3cd9-7c85080fae37@de.bosch.com>
+From: vijay.kilari@gmail.com (vijay.kilari at gmail.com)
+Date: Wed, 20 Jul 2016 18:32:24 +0530
+Subject: [RFC PATCH v1 0/4] arm/arm64: vgic-new: Implement API for vGICv3 live
+ migration
+Message-ID: <1469019748-31005-1-git-send-email-vijay.kilari@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20.07.2016 14:46, Geert Uytterhoeven wrote:
-> Hi Julien,
->
-> On Wed, Jul 20, 2016 at 2:10 PM, Julien Grall <julien.grall@arm.com> wrote:
->> On 20/07/16 12:49, Geert Uytterhoeven wrote:
->>> On Wed, Jul 20, 2016 at 1:01 PM, Julien Grall <julien.grall@arm.com>
->>> wrote:
->>>> On 20/07/16 10:43, Geert Uytterhoeven wrote:
->>>>> On Tue, Jul 12, 2016 at 9:46 AM, Dirk Behme <dirk.behme@de.bosch.com>
->>>>> wrote:
->>>>>> Clocks described by this property are reserved for use by Xen, and the
->>>>>> OS
->>>>>> must not alter their state any way, such as disabling or gating a
->>>>>> clock,
->>>>>> or modifying its rate. Ensuring this may impose constraints on parent
->>>>>> clocks or other resources used by the clock tree.
->>>>>>
->>>>>> This property is used to proxy clocks for devices Xen has taken
->>>>>> ownership
->>>>>> of, such as UARTs, for which the associated clock controller(s) remain
->>>>>> under the control of Dom0.
->>>>>
->>>>> I'm not familiar with using XEN at all, but I'm a bit puzzled...
->>>>>
->>>>> Can't you just add a clocks property to the (virtual) serial device node
->>>>> in DT?
->>>>> Then the (virtual) serial device driver can get and enable the clock?
->>>>
->>>> There is no DT node for the Xen console (hvc). The UART used by Xen will
->>>> be
->>>> completely removed from the Device tree.
->>>
->>> Why is it removed?
->>
->> Because the device is used exclusively by Xen and DOM0 should not touch it
->> at all (IRQs and MMIOs are not mapped).
->
-> IMHO then it's Xen's responsability to make sure not to disable the clock(s).
->
-> Who removes the device node from the DT? If Xen, can't it just remember
-> which clocks were present in removed device nodes?
+From: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
 
+This patchset adds API for saving and restoring
+of VGICv3 registers to support live migration with new vgic feature.
+This API definition is as per draft version of VGICv3 specification
+https://lists.cs.columbia.edu/pipermail/kvmarm/2016-May/020355.html
 
-Yes, we are trying this with "moving" the clocks of the removed nodes to 
-the Xen hypervisor node:
+To test live migration with QEMU, the QEMU patches will
+be posted soon.
 
-https://lists.xen.org/archives/html/xen-devel/2016-06/msg02605.html
+The patch 3 & 4 are picked from the Pavel's previous implementation.
+http://www.spinics.net/lists/kvm/msg122040.html
 
-The question discussed here is how to deal with these clocks properly in 
-Linux, then.
+Vijaya Kumar K (4):
+  arm/arm64: vgic-new: Introduce 64-bit reg access support
+  arm/arm64: vgic-new: Add distributor and redistributor access
+  arm/arm64: vgic-new: Introduce find_reg_by_id()
+  arm/arm64: vgic-new: Implement VGICv3 CPU interface access
 
-Best regards
+ arch/arm64/include/uapi/asm/kvm.h   |   12 ++
+ arch/arm64/kvm/Makefile             |    1 +
+ arch/arm64/kvm/sys_regs.c           |   22 ++--
+ arch/arm64/kvm/sys_regs.h           |    4 +
+ include/linux/irqchip/arm-gic-v3.h  |    4 +
+ virt/kvm/arm/vgic/vgic-kvm-device.c |  120 +++++++++++++++++--
+ virt/kvm/arm/vgic/vgic-mmio-v2.c    |    4 +-
+ virt/kvm/arm/vgic/vgic-mmio-v3.c    |  111 +++++++++++++++++
+ virt/kvm/arm/vgic/vgic-mmio.c       |    2 +-
+ virt/kvm/arm/vgic/vgic-sys-reg-v3.c |  225 +++++++++++++++++++++++++++++++++++
+ virt/kvm/arm/vgic/vgic.h            |   14 +++
+ 11 files changed, 497 insertions(+), 22 deletions(-)
+ create mode 100644 virt/kvm/arm/vgic/vgic-sys-reg-v3.c
 
-Dirk
+-- 
+1.7.9.5
