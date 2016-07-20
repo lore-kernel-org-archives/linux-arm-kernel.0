@@ -1,114 +1,52 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Tue, 19 Jul 2016 16:34:40 -0700
-Subject: SOC-specific action for irq_set_wake
-In-Reply-To: <20160719224713.GA13533@hector.attlocal.net>
-References: <20160719181804.GX3847@xsjsorenbubuntu>
- <20160719224713.GA13533@hector.attlocal.net>
-Message-ID: <20160719233440.GG3847@xsjsorenbubuntu>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Wed, 20 Jul 2016 02:33:18 +0200
+Subject: [PATCH v2 02/10] driver core: Functional dependencies tracking
+ support
+In-Reply-To: <20160617140738.GA1809@wunner.de>
+References: <1466144820-6286-1-git-send-email-m.szyprowski@samsung.com>
+ <CAJZ5v0h71xxvzex2D6s9W8Qvq3+BqOQnTJRKy32gMu=tuQLxDA@mail.gmail.com>
+ <20160617140738.GA1809@wunner.de>
+Message-ID: <1975118.iO8UCAENoH@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andy,
-
-On Tue, 2016-07-19 at 17:47:13 -0500, Andy Gross wrote:
-> On Tue, Jul 19, 2016 at 11:18:04AM -0700, S?ren Brinkmann wrote:
-> > Hi,
+On Friday, June 17, 2016 04:07:38 PM Lukas Wunner wrote:
+> On Fri, Jun 17, 2016 at 02:54:56PM +0200, Rafael J. Wysocki wrote:
+> > On Fri, Jun 17, 2016 at 12:36 PM, Lukas Wunner <lukas@wunner.de> wrote:
+> > > On Fri, Jun 17, 2016 at 08:26:52AM +0200, Marek Szyprowski wrote:
+> > > > From: "Rafael J. Wysocki" <rafael.j.wysocki@intel.com>
+> > > We also have such a functional dependency for Thunderbolt on Macs:
+> > > On resume from system sleep, the PCIe hotplug ports may not resume
+> > > before the thunderbolt driver has reestablished the PCI tunnels.
+> > > Currently this is enforced by quirk_apple_wait_for_thunderbolt()
+> > > in drivers/pci/quirks.c. It would be good if we could represent
+> > > this dependency using something like Rafael's approach instead of
+> > > open coding it, however one detail in Rafael's patches is problematic:
+> > >
+> > > > New links are added by calling device_link_add() which may happen
+> > > > either before the consumer device is probed or when probing it, in
+> > > > which case the caller needs to ensure that the driver of the
+> > > > supplier device is present and functional and the DEVICE_LINK_PROBE_TIME
+> > > > flag should be passed to device_link_add() to reflect that.
+> > >
+> > > The thunderbolt driver cannot call device_link_add() before the
+> > > PCIe hotplug ports are bound to a driver unless we amend portdrv
+> > > to return -EPROBE_DEFER for Thunderbolt hotplug ports on Macs
+> > > if the thunderbolt driver isn't loaded.
+> > >
+> > > It would therefore be beneficial if device_link_add() can be
+> > > called even *after* the consumer is bound.
 > > 
-> > we are working on the PM solution for Zynq MPSOC and ran into some
-> > problem when setting the wake source.
+> > I don't quite follow.
 > > 
-> > The situation is that when the A53 is in suspend, the GIC(v2) may be
-> > powered down. In that state a companion core is handling wake
-> > events/IRQs, but we expect the OS/Linux to notify the companion core
-> > about what device/IRQ is a wake up source. Hence, my idea was to capture
-> > enabling/disabling wake IRQs in our platform PM code and then
-> > communicate with the FW as needed during suspend operations. The problem
-> > is: I don't see a good way to notify the platform code about these
-> > events.
+> > Who's the provider and who's the consumer here?
 > 
-> On Qualcomm platforms there is something similar.  When the system is power
-> collapsed, the GIC loses context and can no longer handle/generate IRQs.  There
-> is a separate block called the MPM that provides some registers that the user
-> can program.  These registers allow for up to 64 wake IRQs, each of which can
-> map to either a GPIO pin or an GIC IRQ.  The MPM also has a timer that can
-> generate a wake IRQ so that the system can wake up and maintain the time.
+> thunderbolt.ko is the supplier.
 
-We have a full companion core running firmware. As in your case,
-we can use any IRQ source and some additional IOs as wake event. So,
-it's fundamentally very similar. Main difference is probably the
-interface. In our case, we have some platform-specific FW interfaces
-that we need to call. Basically, Linux doing an SMC call and then the
-secure monitor handling the rest. And for that we may also have to do
-some additional mapping of the IRQ number to something the FW interface
-understands.
+But it binds to the children of the ports that are supposed to be its
+consumers?
 
-> 
-> > 
-> > My ideas were:
-> > 1. Use the irq_chip irq_set_wake function
-> >   My thought was to implement the irq_set_wake function in a
-> >   SOC-specific way (could even be generic and call some notifier chain or
-> >   similar) to notify the platform PM code when a device/IRQ is
-> >   enabled/disabled as wake up source.
-> >   My problem is that the SKIP_IRQ_SET_WAKE flag is set in the generic
-> >   driver (drivers/irqchip/irq-gic.c) and platforms cannot implement
-> >   irq_set_wake without changes in the common code.
-> 
-> So not too long ago there were irq extensions that you could add in to an irq
-> controller that would allow for intercepting the set wake calls.  This went away
-> and was replaced by the hierarchical irq design.
+Why is that even expected to work?
 
-Yeah, I though I remembered that and wanted to use it now and was slightly
-disappointed when I couldn't find the code anymore.
-
-> 
-> The way I am currently implementing the MPM for Qualcomm, I am defining the MPM
-> as a IRQ controller and creating relationships between the MPM and the GPIO
-> controller (source of irqs) and the GIC.  As irqs are set wake and cleared the
-> calls go up through the hierarchy and they call each irqchips functions (if you
-> have it setup to do that).
-
-I suspected that some sort of dummy interrupt controller might be one
-way to do it. I was hoping to find a simpler way, but maybe this is the
-way to go. One concern could be that this might require adding something
-into the DT that doesn't really exist.
-
-> 
-> 
-> > 2. Stuff things into the secure monitor
-> >   I guess we could read the GIC registers once we enter the secure
-> >   monitor and do the communication with the companion core from there by
-> >   identifying unmasked IRQs as wake IRQs. My concern here is that it
-> >   might introduce additional hardcoded mappings that are much more
-> >   dynamic in Linux thanks to the DT description.
-> 
-> This could work, but you'd have to have control of the secure monitor code.  In
-> Qualcomm's case, that wouldn't work or couldn't because they won't change that
-> code.  And you'd have to have calls into the monitor to turn on/off the lines.
-
-We fully control our secure monitor. That should not be an issue for us.
-What do you mean we'd need to call into the monitor? Linux masks all wake
-IRQs when going into suspend. Everything unmasked should be a wake IRQ,
-or am I missing something? I thought we could simply read the
-enable/disable status of all IRQs in the secure monitor suspend path and
-do the needed communication with the companion core.
-
-> 
-> > 
-> > Does anybody have similar problems and probably already solved it?
-> > Any other suggestions for approaching the problem? Any preferred
-> > solution?
-> 
-> I think we have the same problem.  Can you provide more detail on the hardware
-> implementation of your wake irq controller?  I presume you have some set of
-> registers, an irq maybe, and some other stuff?  And how does it fit into the
-> overall architecture from a hardware perspective?
-
-We have essentially a whole second interrupt controller. All IRQs are
-connected to the A53 GIC and this second interrupt controller that is
-controlled by the companion core. The companion core is supposed to be
-informed about what source the A53 needs to wake up on and will program
-this second IRQ controller, etc.
-
-	Thanks,
-	S?ren
+Thanks,
+Rafael
