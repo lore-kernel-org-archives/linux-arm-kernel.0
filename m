@@ -1,60 +1,73 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Wed, 20 Jul 2016 18:04:26 +0100
-Subject: [PATCH v7 06/15] PCI: Only allocate IRQ routing entry when available
+Date: Wed, 20 Jul 2016 18:04:30 +0100
+Subject: [PATCH v7 10/15] add kvm__check_vm_capability
 In-Reply-To: <20160720170435.28090-1-andre.przywara@arm.com>
 References: <20160720170435.28090-1-andre.przywara@arm.com>
-Message-ID: <20160720170435.28090-7-andre.przywara@arm.com>
+Message-ID: <20160720170435.28090-11-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If we need to inject an MSI into the guest, we rely at the moment on a
-working GSI MSI routing functionality. However we can get away without
-IRQ routing, if the host supports MSI injection via the KVM_SIGNAL_MSI
-ioctl.
-So we try the GSI routing first, but if that fails due to a missing
-IRQ routing functionality, we fall back to KVM_SIGNAL_MSI (if that is
-supported).
+KVM capabilities can be per-VM, in this case the ioctl should be
+issued on the VM file descriptor, not on the system fd.
+Since this feature is guarded by a (system) capability itself, wrap
+the call into a function of its own.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
- virtio/pci.c | 16 ++++++++++++++--
- 1 file changed, 14 insertions(+), 2 deletions(-)
+ include/kvm/kvm.h |  1 +
+ kvm.c             | 28 ++++++++++++++++++++++++++++
+ 2 files changed, 29 insertions(+)
 
-diff --git a/virtio/pci.c b/virtio/pci.c
-index b3b4aac..604b9ec 100644
---- a/virtio/pci.c
-+++ b/virtio/pci.c
-@@ -193,8 +193,14 @@ static bool virtio_pci__specific_io_out(struct kvm *kvm, struct virtio_device *v
+diff --git a/include/kvm/kvm.h b/include/kvm/kvm.h
+index 4a76ec2..a76a25d 100644
+--- a/include/kvm/kvm.h
++++ b/include/kvm/kvm.h
+@@ -129,6 +129,7 @@ static inline bool host_ptr_in_ram(struct kvm *kvm, void *p)
+ }
  
- 			gsi = irq__add_msix_route(kvm,
- 						  &vpci->msix_table[vec].msg);
--			if (gsi >= 0)
-+			if (gsi >= 0) {
- 				vpci->config_gsi = gsi;
-+				break;
-+			}
-+			if (gsi == -ENXIO &&
-+			    vpci->features & VIRTIO_PCI_F_SIGNAL_MSI)
-+					break;
-+			die("failed to configure MSIs");
- 			break;
- 		case VIRTIO_MSI_QUEUE_VECTOR:
- 			vec = ioport__read16(data);
-@@ -205,8 +211,14 @@ static bool virtio_pci__specific_io_out(struct kvm *kvm, struct virtio_device *v
+ bool kvm__supports_extension(struct kvm *kvm, unsigned int extension);
++bool kvm__supports_vm_extension(struct kvm *kvm, unsigned int extension);
  
- 			gsi = irq__add_msix_route(kvm,
- 						  &vpci->msix_table[vec].msg);
--			if (gsi < 0)
-+			if (gsi < 0) {
-+				if (gsi == -ENXIO &&
-+				    vpci->features & VIRTIO_PCI_F_SIGNAL_MSI)
-+					break;
+ static inline void kvm__set_thread_name(const char *name)
+ {
+diff --git a/kvm.c b/kvm.c
+index 7fa76f7..665ed14 100644
+--- a/kvm.c
++++ b/kvm.c
+@@ -93,6 +93,34 @@ const char *kvm__get_dir(void)
+ 	return kvm_dir;
+ }
+ 
++bool kvm__supports_vm_extension(struct kvm *kvm, unsigned int extension)
++{
++	static int supports_vm_ext_check = 0;
++	int ret;
 +
-+				die("failed to configure MSIs");
- 				break;
-+			}
- 			vpci->gsis[vpci->queue_selector] = gsi;
- 			if (vdev->ops->notify_vq_gsi)
- 				vdev->ops->notify_vq_gsi(kvm, vpci->dev,
++	switch (supports_vm_ext_check) {
++	case 0:
++		ret = ioctl(kvm->sys_fd, KVM_CHECK_EXTENSION,
++			    KVM_CAP_CHECK_EXTENSION_VM);
++		if (ret <= 0) {
++			supports_vm_ext_check = -1;
++			return false;
++		}
++		supports_vm_ext_check = 1;
++		/* fall through */
++	case 1:
++		break;
++	case -1:
++		return false;
++	}
++
++	ret = ioctl(kvm->vm_fd, KVM_CHECK_EXTENSION, extension);
++	if (ret < 0)
++		return false;
++
++	return ret;
++}
++
+ bool kvm__supports_extension(struct kvm *kvm, unsigned int extension)
+ {
+ 	int ret;
 -- 
 2.9.0
