@@ -1,68 +1,95 @@
-From: briannorris@chromium.org (Brian Norris)
-Date: Wed, 20 Jul 2016 10:01:52 -0700
-Subject: Applied "spi: rockchip: limit transfers to (64K - 1) bytes" to
- the spi tree
-In-Reply-To: <E1bPubM-0002u3-AQ@debutante>
-References: <1468546259-136659-1-git-send-email-briannorris@chromium.org>
- <E1bPubM-0002u3-AQ@debutante>
-Message-ID: <20160720170151.GA14956@google.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Wed, 20 Jul 2016 18:04:20 +0100
+Subject: [PATCH v7 00/15] kvmtool: arm: ITS emulation and GSI routing support
+Message-ID: <20160720170435.28090-1-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+Hi,
 
-On Wed, Jul 20, 2016 at 05:44:04PM +0100, Mark Brown wrote:
-> The patch
-> 
->    spi: rockchip: limit transfers to (64K - 1) bytes
-> 
-> has been applied to the spi tree at
-> 
->    git://git.kernel.org/pub/scm/linux/kernel/git/broonie/spi.git 
-> 
-> All being well this means that it will be integrated into the linux-next
-> tree (usually sometime in the next 24 hours) and sent to Linus during
-> the next merge window (or sooner if it is a bug fix), however if
-> problems are discovered then the patch may be dropped or reverted.  
-> 
-> You may get further e-mails resulting from automated or manual testing
-> and review of the tree, please engage with people reporting problems and
-> send followup patches addressing any issues that are reported if needed.
-> 
-> If any updates are required or you are submitting further changes they
-> should be sent as incremental updates against current git, existing
-> patches will not be replaced.
-> 
-> Please add any relevant lists and maintainers to the CCs when replying
-> to this mail.
-> 
-> Thanks,
-> Mark
-> 
-> From 5185a81c02d4118b11e6cb7b5fbf6f15ff7aff90 Mon Sep 17 00:00:00 2001
-> From: Brian Norris <briannorris@chromium.org>
-> Date: Thu, 14 Jul 2016 18:30:59 -0700
-> Subject: [PATCH] spi: rockchip: limit transfers to (64K - 1) bytes
-> 
-> The Rockchip SPI controller's length register only supports 16-bits,
-> yielding a maximum length of 64KiB (the CTRLR1 register holds "length -
-> 1"). Trying to transfer more than that (e.g., with a large SPI flash
-> read) will cause the driver to hang.
-> 
-> Now, it seems that while theoretically we should be able to program
-> CTRLR1 with 0xffff, and get a 64KiB transfer, but that also seems to
-> cause the core to choke, so stick with a maximum of 64K - 1 bytes --
-> i.e., 0xffff.
-> 
-> Signed-off-by: Brian Norris <briannorris@chromium.org>
-> Signed-off-by: Mark Brown <broonie@kernel.org>
+this series teaches kvmtool how to support KVM's ITS emulation. Also
+(as this is somewhat related and has been co-developed) it enables GSI
+routing for ARM/ARM64, which allows IRQFDs to be used, for instance
+to use vhost_net. At the moment this is dependent on the guest
+using the ITS emulation, but GICv2M support may be added at later time.
 
-Thanks for applying! I'm OK with that, but just to be clear this might
-qualify as a (very slight) hack, since I believe we should be able to
-support a full 64KiB on both PIO and DMA. But it is better than the
-current state of things on this driver, IMO. I suppose it's up to
-Rockchip (or me) to figure out why some PIO transfers fail at exactly
-64K if we want to support that. They have reproduced the failures I've
-seen.
+The first 5 patches are generic fixes and refactoring to pave the
+road for the rest of the patches. Most importantly patch 3/15 pulls
+the GSI routing code from x86 into generic code.
+The following 6 patches add ITS emulation support. They reserve and
+register the required ITS register frame and populate a DT node with
+the necessary data. Also the patches add the device ID to the
+KVM_SIGNAL_MSI ioctl.
+Patches 12/15 and 13/15 enable IRQ GSI routing for ARM/ARM64.
+This is needed to use IRQFDs, which is a prerequisite for vhost
+functionality, for instance. The code sets up the (dummy) SPI
+routing table and adds the device ID to the routing entry.
+Patch 14/15 enables the guest ITS support by extending the existing
+--irqchip= parameter to allow "--irqchip=gicv3-its".
+The final patch adds a workaround the avoid breaking ARM(32)
+compilation, which lacks some symbol defines now used in the (shared)
+ARM GIC handling code.
 
-Brian
+The ITS part relates to the latest kernel ITS emulation series, the
+IRQ routing code to Eric's respective series [1].
+This code can also be found in my kvmtool git repository [2].
+
+Cheers,
+Andre.
+
+[1] https://lists.cs.columbia.edu/pipermail/kvmarm/2016-July/020950.html
+[2] git://linux-arm.org/kvmtool.git (branch: its/v7)
+    http://www.linux-arm.org/git?p=kvmtool.git;a=log;h=refs/heads/its/v7
+
+Andre Przywara (15):
+  FDT: introduce global phandle allocation
+  arm: use new phandle allocation functions
+  irq: move IRQ routing into irq.c
+  MSI-X: update GSI routing after changed MSI-X configuration
+  virtio: fix endianness check for vhost support
+  PCI: Only allocate IRQ routing entry when available
+  TEMPORARY: update public headers for GICv3 ITS emulation
+  arm: allow creation of an MSI register frame region
+  arm: FDT: create MSI controller DT node
+  add kvm__check_vm_capability
+  PCI: inject PCI device ID on MSI injection
+  arm: setup SPI IRQ routing tables
+  extend GSI IRQ routing to take a device ID
+  arm64: enable GICv3-ITS emulation
+  arm: gic: allow 32-bit compilation
+
+ Makefile                                 |   5 +-
+ arm/aarch32/arm-cpu.c                    |   4 +-
+ arm/aarch64/arm-cpu.c                    |   5 +-
+ arm/aarch64/include/asm/kvm.h            |   2 +
+ arm/fdt.c                                |   8 +-
+ arm/gic.c                                | 132 +++++++++++++++++++++++++++++-
+ arm/include/arm-common/gic.h             |   3 +-
+ arm/include/arm-common/kvm-config-arch.h |   2 +-
+ arm/include/arm-common/kvm-cpu-arch.h    |   3 +-
+ arm/include/arm-common/pci.h             |   2 +-
+ arm/irq.c                                |   9 ---
+ arm/pci.c                                |  13 ++-
+ hw/pci-shmem.c                           |   5 +-
+ include/kvm/fdt.h                        |  10 +--
+ include/kvm/irq.h                        |   8 +-
+ include/kvm/kvm.h                        |   1 +
+ include/kvm/virtio.h                     |   9 ++-
+ include/linux/kvm.h                      |  13 ++-
+ irq.c                                    | 134 +++++++++++++++++++++++++++++++
+ kvm-fdt.c                                |  26 ++++++
+ kvm.c                                    |  28 +++++++
+ mips/irq.c                               |  10 ---
+ powerpc/irq.c                            |  31 -------
+ virtio/net.c                             |   2 +-
+ virtio/pci.c                             |  87 +++++++++++++++++---
+ x86/include/asm/kvm.h                    |   6 +-
+ x86/irq.c                                |  45 ++---------
+ 27 files changed, 466 insertions(+), 137 deletions(-)
+ delete mode 100644 arm/irq.c
+ create mode 100644 kvm-fdt.c
+ delete mode 100644 mips/irq.c
+ delete mode 100644 powerpc/irq.c
+
+-- 
+2.9.0
