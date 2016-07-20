@@ -1,44 +1,77 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Wed, 20 Jul 2016 08:28:35 +0200 (CEST)
-Subject: SOC-specific action for irq_set_wake
-In-Reply-To: <20160719181804.GX3847@xsjsorenbubuntu>
-References: <20160719181804.GX3847@xsjsorenbubuntu>
-Message-ID: <alpine.DEB.2.11.1607200759230.3564@nanos>
+From: lukas@wunner.de (Lukas Wunner)
+Date: Wed, 20 Jul 2016 08:24:50 +0200
+Subject: [PATCH v2 02/10] driver core: Functional dependencies tracking
+ support
+In-Reply-To: <1975118.iO8UCAENoH@vostro.rjw.lan>
+References: <1466144820-6286-1-git-send-email-m.szyprowski@samsung.com>
+ <CAJZ5v0h71xxvzex2D6s9W8Qvq3+BqOQnTJRKy32gMu=tuQLxDA@mail.gmail.com>
+ <20160617140738.GA1809@wunner.de>
+ <1975118.iO8UCAENoH@vostro.rjw.lan>
+Message-ID: <20160720062450.GA8066@wunner.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 19 Jul 2016, S?ren Brinkmann wrote:
-> we are working on the PM solution for Zynq MPSOC and ran into some
-> problem when setting the wake source.
+On Wed, Jul 20, 2016 at 02:33:18AM +0200, Rafael J. Wysocki wrote:
+> On Friday, June 17, 2016 04:07:38 PM Lukas Wunner wrote:
+> > On Fri, Jun 17, 2016 at 02:54:56PM +0200, Rafael J. Wysocki wrote:
+> > > On Fri, Jun 17, 2016 at 12:36 PM, Lukas Wunner <lukas@wunner.de> wrote:
+> > > > On Fri, Jun 17, 2016 at 08:26:52AM +0200, Marek Szyprowski wrote:
+> > > > > From: "Rafael J. Wysocki" <rafael.j.wysocki@intel.com>
+> > > > We also have such a functional dependency for Thunderbolt on Macs:
+> > > > On resume from system sleep, the PCIe hotplug ports may not resume
+> > > > before the thunderbolt driver has reestablished the PCI tunnels.
+> > > > Currently this is enforced by quirk_apple_wait_for_thunderbolt()
+> > > > in drivers/pci/quirks.c. It would be good if we could represent
+> > > > this dependency using something like Rafael's approach instead of
+> > > > open coding it, however one detail in Rafael's patches is problematic:
+> > > >
+> > > > > New links are added by calling device_link_add() which may happen
+> > > > > either before the consumer device is probed or when probing it, in
+> > > > > which case the caller needs to ensure that the driver of the
+> > > > > supplier device is present and functional and the DEVICE_LINK_PROBE_TIME
+> > > > > flag should be passed to device_link_add() to reflect that.
+> > > >
+> > > > The thunderbolt driver cannot call device_link_add() before the
+> > > > PCIe hotplug ports are bound to a driver unless we amend portdrv
+> > > > to return -EPROBE_DEFER for Thunderbolt hotplug ports on Macs
+> > > > if the thunderbolt driver isn't loaded.
+> > > >
+> > > > It would therefore be beneficial if device_link_add() can be
+> > > > called even *after* the consumer is bound.
+> > > 
+> > > I don't quite follow.
+> > > 
+> > > Who's the provider and who's the consumer here?
+> > 
+> > thunderbolt.ko is the supplier.
 > 
-> The situation is that when the A53 is in suspend, the GIC(v2) may be
-> powered down. In that state a companion core is handling wake
-> events/IRQs, but we expect the OS/Linux to notify the companion core
-> about what device/IRQ is a wake up source. Hence, my idea was to capture
-> enabling/disabling wake IRQs in our platform PM code and then
-> communicate with the FW as needed during suspend operations. The problem
-> is: I don't see a good way to notify the platform code about these
-> events.
+> But it binds to the children of the ports that are supposed to be its
+> consumers?
 > 
-> My ideas were:
-> 1. Use the irq_chip irq_set_wake function
->   My thought was to implement the irq_set_wake function in a
->   SOC-specific way (could even be generic and call some notifier chain or
+> Why is that even expected to work?
 
-Don't even think about notifier chains.
+No, the consumers are aunts (or uncles) of the supplier, if you will. :-)
 
->   similar) to notify the platform PM code when a device/IRQ is
->   enabled/disabled as wake up source.
->   My problem is that the SKIP_IRQ_SET_WAKE flag is set in the generic
->   driver (drivers/irqchip/irq-gic.c) and platforms cannot implement
->   irq_set_wake without changes in the common code.
+The consumers are the hotplug ports (named "Downstream Bridge 1 / 2" in
+the drawing below). The supplier is the NHI:
 
-So and because it requires changes in the common code you think aboiut
-notifiers and other absurdities. Come on, common code is not a sacred cow. It
-can be modified and if you need for your particular platform that
-SKIP_IRQ_SET_WAKE is cleared, then there are a gazillion of sane ways to do
-that.
+      (Root Port) ---- Upstream Bridge --+-- Downstream Bridge 0 ---- NHI
+                                         +-- Downstream Bridge 1 --
+                                         +-- Downstream Bridge 2 --
+                                         ...
+
+We're calling pci_power_up() and pci_restore_state() from
+pci_pm_resume_noirq(). And that will fail for devices below
+the hotplug ports if the PCI tunnels haven't been re-established
+yet by the NHI.
+
+Currently we achieve that via quirk_apple_wait_for_thunderbolt() in
+drivers/pci/quirks.c. It would be more elegant if we could make this
+relationship explicit with "device links" and let the core handle it.
+
+Or am I mistaken and this particular use case is not what "device links"
+are intended for?
 
 Thanks,
 
-	tglx
+Lukas
