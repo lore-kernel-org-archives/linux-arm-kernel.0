@@ -1,49 +1,38 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Wed, 20 Jul 2016 18:04:34 +0100
-Subject: [PATCH v7 14/15] arm64: enable GICv3-ITS emulation
-In-Reply-To: <20160720170435.28090-1-andre.przywara@arm.com>
-References: <20160720170435.28090-1-andre.przywara@arm.com>
-Message-ID: <20160720170435.28090-15-andre.przywara@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 20 Jul 2016 18:04:33 +0100
+Subject: [PATCH v15 04/10] arm64: Kprobes with single stepping support
+In-Reply-To: <578FAB02.90707@arm.com>
+References: <1467995754-32508-1-git-send-email-dave.long@linaro.org>
+ <1467995754-32508-5-git-send-email-dave.long@linaro.org>
+ <578FA238.3050206@arm.com>
+ <20160720162827.GF25890@e104818-lin.cambridge.arm.com>
+ <578FAB02.90707@arm.com>
+Message-ID: <20160720170432.GH25890@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With everything in place for the ITS emulation add a new option to the
---irqchip parameter to allow the user to specify --irqchip=gicv3-its
-to enable the ITS emulation.
-This will trigger creating the FDT node and an ITS register frame to
-tell the kernel we want ITS emulation in the guest.
+On Wed, Jul 20, 2016 at 05:46:58PM +0100, Marc Zyngier wrote:
+> From 0d120f95b3348e1946d8a789c7147f316c27ea6b Mon Sep 17 00:00:00 2001
+> From: Marc Zyngier <marc.zyngier@arm.com>
+> Date: Wed, 20 Jul 2016 17:36:42 +0100
+> Subject: [PATCH] arm64: kprobes: Fix overflow when saving stack
+> 
+> The MIN_STACK_SIZE macro tries evaluate how much stack space needs
+> to be saved in the jprobes_stack array, sized at 128 bytes.
+> 
+> When using the IRQ stack, said macro can happily return up to
+> IRQ_STACK_SIZE, which is 16kB. Mayhem follows.
+> 
+> This patch fixes things by getting rid of the crazy macro and
+> limiting the copy to be at most the size of the jprobes_stack
+> array, no matter which stack we're on.
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 
-Signed-off-by: Andre Przywara <andre.przywara@arm.com>
----
- arm/gic.c                                | 2 ++
- arm/include/arm-common/kvm-config-arch.h | 2 +-
- 2 files changed, 3 insertions(+), 1 deletion(-)
+Applied to the kprobes branch. Thanks.
 
-diff --git a/arm/gic.c b/arm/gic.c
-index a0b392e..7fd0768 100644
---- a/arm/gic.c
-+++ b/arm/gic.c
-@@ -35,6 +35,8 @@ int irqchip_parser(const struct option *opt, const char *arg, int unset)
- 		*type = IRQCHIP_GICV2;
- 	} else if (!strcmp(arg, "gicv3")) {
- 		*type = IRQCHIP_GICV3;
-+	} else if (!strcmp(arg, "gicv3-its")) {
-+		*type = IRQCHIP_GICV3_ITS;
- 	} else {
- 		pr_err("irqchip: unknown type \"%s\"\n", arg);
- 		return -1;
-diff --git a/arm/include/arm-common/kvm-config-arch.h b/arm/include/arm-common/kvm-config-arch.h
-index ed626b5..b48e720 100644
---- a/arm/include/arm-common/kvm-config-arch.h
-+++ b/arm/include/arm-common/kvm-config-arch.h
-@@ -27,7 +27,7 @@ int irqchip_parser(const struct option *opt, const char *arg, int unset);
- 		    "Force virtio devices to use PCI as their default "		\
- 		    "transport"),						\
-         OPT_CALLBACK('\0', "irqchip", &(cfg)->irqchip,				\
--		     "[gicv2|gicv3]",					\
-+		     "[gicv2|gicv3|gicv3-its]",					\
- 		     "Type of interrupt controller to emulate in the guest",	\
- 		     irqchip_parser, NULL),
- 
+(I can't yet tell whether kprobes will make into 4.8; I need to run some
+more tests before deciding)
+
 -- 
-2.9.0
+Catalin
