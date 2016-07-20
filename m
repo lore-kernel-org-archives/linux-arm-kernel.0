@@ -1,48 +1,35 @@
 From: yong.wu@mediatek.com (Yong Wu)
-Date: Wed, 20 Jul 2016 11:02:00 +0800
-Subject: [PATCH 2/3] drm/mediatek: Add probe-defer for MTK IOMMU and SMI
+Date: Wed, 20 Jul 2016 11:02:01 +0800
+Subject: [PATCH 3/3] vcodec: mediatek: Add probe-defer for MTK IOMMU and SMI
 In-Reply-To: <1468983721-3627-1-git-send-email-yong.wu@mediatek.com>
 References: <1468983721-3627-1-git-send-email-yong.wu@mediatek.com>
-Message-ID: <1468983721-3627-2-git-send-email-yong.wu@mediatek.com>
+Message-ID: <1468983721-3627-3-git-send-email-yong.wu@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If DRM begin to probe before SMI probe done. It will hang:
-
-[    7.832359] Call trace:
-[    7.834778] [<ffffffc000764424>] mtk_smi_larb_get+0x24/0xa8
-[    7.840300] [<ffffffc0005a1390>] mtk_drm_crtc_enable+0x6c/0x450
-
-Use the new interface(mtk_smi_larb_is_ready) to wait for IOMMU and
-SMI probe done.
+Mediatek V4l2 depend on the IOMMU and SMI. we should add probe-defer
+to wait for the IOMMU and SMI is ready.
 
 Signed-off-by: Yong Wu <yong.wu@mediatek.com>
 ---
- drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c | 5 +++++
+ drivers/media/platform/mtk-vcodec/mtk_vcodec_enc_pm.c | 5 +++++
  1 file changed, 5 insertions(+)
 
-diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
-index 3970fcf..3ef3124 100644
---- a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
-+++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
-@@ -21,6 +21,7 @@
- #include <linux/of_platform.h>
- #include <linux/platform_device.h>
- #include <drm/drmP.h>
-+#include <soc/mediatek/smi.h>
- #include "mtk_drm_drv.h"
- #include "mtk_drm_plane.h"
- #include "mtk_drm_ddp_comp.h"
-@@ -201,6 +202,10 @@ int mtk_ddp_comp_init(struct device *dev, struct device_node *node,
- 	}
- 	of_node_put(larb_node);
+diff --git a/drivers/media/platform/mtk-vcodec/mtk_vcodec_enc_pm.c b/drivers/media/platform/mtk-vcodec/mtk_vcodec_enc_pm.c
+index 4c977b2..9e6203e 100644
+--- a/drivers/media/platform/mtk-vcodec/mtk_vcodec_enc_pm.c
++++ b/drivers/media/platform/mtk-vcodec/mtk_vcodec_enc_pm.c
+@@ -66,6 +66,11 @@ int mtk_vcodec_init_enc_pm(struct mtk_vcodec_dev *mtkdev)
+ 	pdev = mtkdev->plat_dev;
+ 	pm->dev = &pdev->dev;
  
 +	/* Wait until MTK IOMMU and SMI probe done.*/
-+	if (!mtk_smi_larb_is_ready(&larb_pdev->dev))
++	if (!mtk_smi_larb_is_ready(pm->larbvenc) ||
++	    !mtk_smi_larb_is_ready(pm->larbvenclt))
 +		return -EPROBE_DEFER;
 +
- 	comp->larb_dev = &larb_pdev->dev;
- 
- 	return 0;
+ 	pm->vencpll_d2 = devm_clk_get(&pdev->dev, "venc_sel_src");
+ 	if (IS_ERR(pm->vencpll_d2)) {
+ 		mtk_v4l2_err("devm_clk_get vencpll_d2 fail");
 -- 
 1.8.1.1.dirty
