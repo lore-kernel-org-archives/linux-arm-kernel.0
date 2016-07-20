@@ -1,63 +1,62 @@
-From: bibby.hsieh@mediatek.com (Bibby Hsieh)
-Date: Wed, 20 Jul 2016 12:06:11 +0800
-Subject: [PATCH] arm64: dts: mt8173: add tvdpll and vencpll clocks for 4K
- support
-Message-ID: <1468987571-39104-1-git-send-email-bibby.hsieh@mediatek.com>
+From: paul.gortmaker@windriver.com (Paul Gortmaker)
+Date: Wed, 20 Jul 2016 00:13:30 -0400
+Subject: [PATCH 1/3] ARM: mach-omap2: remove bogus "or_module" from
+ rx51-peripherals
+In-Reply-To: <20160720041332.30789-1-paul.gortmaker@windriver.com>
+References: <20160720041332.30789-1-paul.gortmaker@windriver.com>
+Message-ID: <20160720041332.30789-2-paul.gortmaker@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Junzhi Zhao <junzhi.zhao@mediatek.com>
+During unrelated work, attempting to remove an include of the
+linux/module.h in favour of "struct module;" in order to reduce
+header entanglement, we found doing so caused a build failure in
+this file.
 
-When the resolution is set to 4k*2k, the hdmi
-pixel clock will be 250MHz, however, the correct
-pixel clock should be 297MHz. Fix this error by
-adding the correct tvdpll clocks.
-If MT8173 can support 4K, the vencpll clock should
-be 800MHz. Add the vencpll clocks to support 4K.
+It turns out this file uses __init_or_module which lives in the
+module.h header, but it wasn't including module.h -- which was
+being masked by the module.h in include/linux/gpio/driver.h - the
+one we want to remove/replace.
 
-Signed-off-by: Junzhi Zhao <junzhi.zhao@mediatek.com>
-Signed-off-by: Bibby Hsieh <bibby.hsieh@mediatek.com>
+However, if we dig into Makefile / Kconfig we find:
+
+mach-omap2/board-rx51-peripherals.o ---->
+   mach-omap2/Makefile:obj-$(CONFIG_MACH_NOKIA_RX51) += board-rx51-peripherals.o
+
+arch/arm/mach-omap2/Kconfig:config MACH_NOKIA_RX51
+arch/arm/mach-omap2/Kconfig:    bool "Nokia N900 (RX-51) phone"
+
+...and hence the __init_or_module is pointless, as it will always
+evaluate to plain __init.
+
+With ARM and GPIO being different subsystems, we'll need to get
+this in ARM 1st, and then wait a release before changing the GPIO
+header, otherwise we'll risk triggering build failures.
+
+Cc: Tony Lindgren <tony@atomide.com>
+Cc: Russell King <linux@armlinux.org.uk>
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: Alexandre Courbot <gnurou@gmail.com>
+Cc: linux-omap at vger.kernel.org
+Cc: linux-gpio at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
 ---
- arch/arm64/boot/dts/mediatek/mt8173.dtsi |   18 ++++++++++++++++--
- 1 file changed, 16 insertions(+), 2 deletions(-)
+ arch/arm/mach-omap2/board-rx51-peripherals.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-index 78529e4..e79bacf 100644
---- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-+++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-@@ -690,6 +690,8 @@
- 			compatible = "mediatek,mt8173-mmsys", "syscon";
- 			reg = <0 0x14000000 0 0x1000>;
- 			power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
-+			clocks = <&topckgen CLK_TOP_VENCPLL>;
-+			clock-names = "vencpll";
- 			#clock-cells = <1>;
- 		};
+diff --git a/arch/arm/mach-omap2/board-rx51-peripherals.c b/arch/arm/mach-omap2/board-rx51-peripherals.c
+index a5ab712c1a59..4ddda1d33ec1 100644
+--- a/arch/arm/mach-omap2/board-rx51-peripherals.c
++++ b/arch/arm/mach-omap2/board-rx51-peripherals.c
+@@ -978,7 +978,7 @@ static struct twl4030_platform_data rx51_twldata __initdata = {
+ 	.vio			= &rx51_vio,
+ };
  
-@@ -857,10 +859,22 @@
- 			reg = <0 0x1401d000 0 0x1000>;
- 			interrupts = <GIC_SPI 194 IRQ_TYPE_LEVEL_LOW>;
- 			power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
--			clocks = <&mmsys CLK_MM_DPI_PIXEL>,
-+			clocks = <&topckgen CLK_TOP_TVDPLL_D2>,
-+				 <&topckgen CLK_TOP_TVDPLL_D4>,
-+				 <&topckgen CLK_TOP_TVDPLL_D8>,
-+				 <&topckgen CLK_TOP_TVDPLL_D16>,
-+				 <&topckgen CLK_TOP_DPI0_SEL>,
-+				 <&mmsys CLK_MM_DPI_PIXEL>,
- 				 <&mmsys CLK_MM_DPI_ENGINE>,
- 				 <&apmixedsys CLK_APMIXED_TVDPLL>;
--			clock-names = "pixel", "engine", "pll";
-+			clock-names = "tvdpll_d2",
-+				      "tvdpll_d4",
-+				      "tvdpll_d8",
-+				      "tvdpll_d16",
-+				      "tvdpll_mux",
-+				      "pixel",
-+				      "engine",
-+				      "pll";
- 			status = "disabled";
- 		};
+-static struct tpa6130a2_platform_data rx51_tpa6130a2_data __initdata_or_module = {
++static struct tpa6130a2_platform_data rx51_tpa6130a2_data __initdata = {
+ 	.power_gpio		= 98,
+ };
  
 -- 
-1.7.9.5
+2.8.4
