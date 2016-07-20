@@ -1,56 +1,108 @@
-From: elfring@users.sourceforge.net (SF Markus Elfring)
-Date: Wed, 20 Jul 2016 18:40:49 +0200
-Subject: [PATCH] GPU-DRM-sun4i: Delete an unnecessary check before
- drm_fbdev_cma_hotplug_event()
-In-Reply-To: <5317A59D.4@users.sourceforge.net>
-References: <5307CAA2.8060406@users.sourceforge.net>
- <alpine.DEB.2.02.1402212321410.2043@localhost6.localdomain6>
- <530A086E.8010901@users.sourceforge.net>
- <alpine.DEB.2.02.1402231635510.1985@localhost6.localdomain6>
- <530A72AA.3000601@users.sourceforge.net>
- <alpine.DEB.2.02.1402240658210.2090@localhost6.localdomain6>
- <530B5FB6.6010207@users.sourceforge.net>
- <alpine.DEB.2.10.1402241710370.2074@hadrien>
- <530C5E18.1020800@users.sourceforge.net>
- <alpine.DEB.2.10.1402251014170.2080@hadrien>
- <530CD2C4.4050903@users.sourceforge.net>
- <alpine.DEB.2.10.1402251840450.7035@hadrien>
- <530CF8FF.8080600@users.sourceforge.net>
- <alpine.DEB.2.02.1402252117150.2047@localhost6.localdomain6>
- <530DD06F.4090703@users.sourceforge.net>
- <alpine.DEB.2.02.1402262129250.2221@localhost6.localdomain6>
- <5317A59D.4@users.sourceforge.net>
-Message-ID: <cd959d92-f7d9-598c-421f-d3f40bedee10@users.sourceforge.net>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 20 Jul 2016 17:44:04 +0100
+Subject: Applied "spi: rockchip: limit transfers to (64K - 1) bytes" to the
+ spi tree
+In-Reply-To: <1468546259-136659-1-git-send-email-briannorris@chromium.org>
+Message-ID: <E1bPubM-0002u3-AQ@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Markus Elfring <elfring@users.sourceforge.net>
-Date: Wed, 20 Jul 2016 18:32:34 +0200
+The patch
 
-The drm_fbdev_cma_hotplug_event() function tests whether its argument
-is NULL and then returns immediately.
-Thus the test around the call is not needed.
+   spi: rockchip: limit transfers to (64K - 1) bytes
 
-This issue was detected by using the Coccinelle software.
+has been applied to the spi tree at
 
-Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
+   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/spi.git 
+
+All being well this means that it will be integrated into the linux-next
+tree (usually sometime in the next 24 hours) and sent to Linus during
+the next merge window (or sooner if it is a bug fix), however if
+problems are discovered then the patch may be dropped or reverted.  
+
+You may get further e-mails resulting from automated or manual testing
+and review of the tree, please engage with people reporting problems and
+send followup patches addressing any issues that are reported if needed.
+
+If any updates are required or you are submitting further changes they
+should be sent as incremental updates against current git, existing
+patches will not be replaced.
+
+Please add any relevant lists and maintainers to the CCs when replying
+to this mail.
+
+Thanks,
+Mark
+
+>From 5185a81c02d4118b11e6cb7b5fbf6f15ff7aff90 Mon Sep 17 00:00:00 2001
+From: Brian Norris <briannorris@chromium.org>
+Date: Thu, 14 Jul 2016 18:30:59 -0700
+Subject: [PATCH] spi: rockchip: limit transfers to (64K - 1) bytes
+
+The Rockchip SPI controller's length register only supports 16-bits,
+yielding a maximum length of 64KiB (the CTRLR1 register holds "length -
+1"). Trying to transfer more than that (e.g., with a large SPI flash
+read) will cause the driver to hang.
+
+Now, it seems that while theoretically we should be able to program
+CTRLR1 with 0xffff, and get a 64KiB transfer, but that also seems to
+cause the core to choke, so stick with a maximum of 64K - 1 bytes --
+i.e., 0xffff.
+
+Signed-off-by: Brian Norris <briannorris@chromium.org>
+Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- drivers/gpu/drm/sun4i/sun4i_framebuffer.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+ drivers/spi/spi-rockchip.c | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_framebuffer.c b/drivers/gpu/drm/sun4i/sun4i_framebuffer.c
-index a0b30c2..70688fe 100644
---- a/drivers/gpu/drm/sun4i/sun4i_framebuffer.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_framebuffer.c
-@@ -20,8 +20,7 @@ static void sun4i_de_output_poll_changed(struct drm_device *drm)
- {
- 	struct sun4i_drv *drv = drm->dev_private;
+diff --git a/drivers/spi/spi-rockchip.c b/drivers/spi/spi-rockchip.c
+index cd89682065b9..cf69f4dfb8c7 100644
+--- a/drivers/spi/spi-rockchip.c
++++ b/drivers/spi/spi-rockchip.c
+@@ -142,6 +142,12 @@
+ /* sclk_out: spi master internal logic in rk3x can support 50Mhz */
+ #define MAX_SCLK_OUT		50000000
  
--	if (drv->fbdev)
--		drm_fbdev_cma_hotplug_event(drv->fbdev);
-+	drm_fbdev_cma_hotplug_event(drv->fbdev);
++/*
++ * SPI_CTRLR1 is 16-bits, so we should support lengths of 0xffff + 1. However,
++ * the controller seems to hang when given 0x10000, so stick with this for now.
++ */
++#define ROCKCHIP_SPI_MAX_TRANLEN		0xffff
++
+ enum rockchip_ssi_type {
+ 	SSI_MOTO_SPI = 0,
+ 	SSI_TI_SSP,
+@@ -573,6 +579,11 @@ static void rockchip_spi_config(struct rockchip_spi *rs)
+ 	dev_dbg(rs->dev, "cr0 0x%x, div %d\n", cr0, div);
  }
  
- static const struct drm_mode_config_funcs sun4i_de_mode_config_funcs = {
++static size_t rockchip_spi_max_transfer_size(struct spi_device *spi)
++{
++	return ROCKCHIP_SPI_MAX_TRANLEN;
++}
++
+ static int rockchip_spi_transfer_one(
+ 		struct spi_master *master,
+ 		struct spi_device *spi,
+@@ -589,6 +600,11 @@ static int rockchip_spi_transfer_one(
+ 		return -EINVAL;
+ 	}
+ 
++	if (xfer->len > ROCKCHIP_SPI_MAX_TRANLEN) {
++		dev_err(rs->dev, "Transfer is too long (%d)\n", xfer->len);
++		return -EINVAL;
++	}
++
+ 	rs->speed = xfer->speed_hz;
+ 	rs->bpw = xfer->bits_per_word;
+ 	rs->n_bytes = rs->bpw >> 3;
+@@ -728,6 +744,7 @@ static int rockchip_spi_probe(struct platform_device *pdev)
+ 	master->prepare_message = rockchip_spi_prepare_message;
+ 	master->unprepare_message = rockchip_spi_unprepare_message;
+ 	master->transfer_one = rockchip_spi_transfer_one;
++	master->max_transfer_size = rockchip_spi_max_transfer_size;
+ 	master->handle_err = rockchip_spi_handle_err;
+ 
+ 	rs->dma_tx.ch = dma_request_chan(rs->dev, "tx");
 -- 
-2.9.2
+2.8.1
