@@ -1,35 +1,128 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 19 Jul 2016 20:09:02 -0500
-Subject: [PATCH 2/4] doc: usb: ci-hdrc-usb2: add property
- over-current-polarity
-In-Reply-To: <1468840547-17899-2-git-send-email-jun.li@nxp.com>
-References: <1468840547-17899-1-git-send-email-jun.li@nxp.com>
- <1468840547-17899-2-git-send-email-jun.li@nxp.com>
-Message-ID: <20160720010902.GA972@rob-hp-laptop>
+From: shawn.lin@rock-chips.com (Shawn Lin)
+Date: Wed, 20 Jul 2016 09:09:45 +0800
+Subject: [PATCH 1/2] Support SD UHS for hikey-mainline-rebase
+In-Reply-To: <e7262e5d-a15c-8cb4-dc8b-c0e391f2a88b@hisilicon.com>
+References: <CGME20160719075706epcas1p169dc5e5e0f7179f71f92a56e57e373c4@epcas1p1.samsung.com>
+ <1468914713-63347-1-git-send-email-kid.jin@hisilicon.com>
+ <578DE10D.3020401@samsung.com>
+ <e7262e5d-a15c-8cb4-dc8b-c0e391f2a88b@hisilicon.com>
+Message-ID: <1c131523-36c0-bcb8-f3e1-96bf27b5488c@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 18, 2016 at 07:15:45PM +0800, Li Jun wrote:
-> Adding over-current-polarity to indicate the over current flag
-> is low active or high active.
-> 
-> Signed-off-by: Li Jun <jun.li@nxp.com>
-> ---
->  Documentation/devicetree/bindings/usb/ci-hdrc-usb2.txt | 2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/usb/ci-hdrc-usb2.txt b/Documentation/devicetree/bindings/usb/ci-hdrc-usb2.txt
-> index 341dc67..c5d35f4 100644
-> --- a/Documentation/devicetree/bindings/usb/ci-hdrc-usb2.txt
-> +++ b/Documentation/devicetree/bindings/usb/ci-hdrc-usb2.txt
-> @@ -81,6 +81,8 @@ i.mx specific properties
->  - fsl,usbmisc: phandler of non-core register device, with one
->    argument that indicate usb controller index
->  - disable-over-current: disable over current detect
-> +- over-current-polarity: 0 if the over current signal polarity is low active,
-> +  1 if the over current signal polarity is high active.
+? 2016/7/19 20:28, Jinguojun ??:
+>
+>
+> On 2016/7/19 16:13, Jaehoon Chung wrote:
+>> Hi,
+>>
+>> Removed the unnecessary CC'd.
+>>
+>> On 07/19/2016 04:51 PM, Jin Guojun wrote:
+>>> From: j00226943 <j00226943@notesmail.huawei.com>
+>>
+>> What is j00226943?
+>>
+>> When you send the patch for dw_mmc controller, plz use the prefix "mmc: dw_mmc: ".
+>>
+>>>
+>>> Two more changes:
+>>>
+>>> Before we send cmd,we need to set CMD bit29 to
+>>> 1 so that CMD and DATA sent to card through the HOLD Register,
+>>> This is the explication in synosys host:To meet the relatively
+>>> high Input Hold Time requirement for SDR12, SDR25, and other MMC
+>>> speed modes, you should program bit[29]use_hold_Reg of the CMD
+>>> register to 1'b1; the output data is then registered again in the
+>>> cclk_in_drv domain by using the Hold Register as shown in Path B
+>>> of Figure 10-8. However, for the higher speed modes of SDR104, SDR50
+>>> and DDR50, you can meet the much smaller Input Hold Time requirement
+>>> of 0.8ns by bypassing the Hold Register (Path A in Figure 10-8,
+>>> programming CMD.use_hold_reg = 1'b0) and then adding delay elements
+>>> on the output path as indicated
+>>>
+>>> We have no tuning function in our drivers,so we must do the
+>>> Function piling when we init UHS card.
+>
+> 1.For hikey we cant support UHS for SD card in https://github.com/96boards-hikey/linux/tree/hikey-mainline-rebase
+> 2.I have no SDMMC_CMD_USE_HOLD_REG in Dw_mmc-k3.c
+>
+>>
+>> Sorry..this patch is NACK.
+>> SDMMC_CMD_USE_HOLD_REG is already used by default in dw_mmc.c
+>> Which kernel version did you use?
+>>
+>>>
+>>> Signed-off-by: Jin Guojun <kid.jin@hisilicon.com>
+>>> ---
+>>>  drivers/mmc/host/dw_mmc-k3.c | 6 ++++++
+>>>  drivers/mmc/host/dw_mmc.c    | 2 ++
+>>>  2 files changed, 8 insertions(+)
+>>>
+>>> diff --git a/drivers/mmc/host/dw_mmc-k3.c b/drivers/mmc/host/dw_mmc-k3.c
+>>> index 63c2e2e..2cbfcc7 100644
+>>> --- a/drivers/mmc/host/dw_mmc-k3.c
+>>> +++ b/drivers/mmc/host/dw_mmc-k3.c
+>>> @@ -125,10 +125,16 @@ static void dw_mci_hi6220_set_ios(struct dw_mci *host, struct mmc_ios *ios)
+>>>  	host->bus_hz = clk_get_rate(host->biu_clk);
+>>>  }
+>>>
+>>> +static void dw_mci_hi6220_prepare_command(struct dw_mci *host, u32 *cmdr)
+>>> +{
+>>> +	*cmdr |= SDMMC_CMD_USE_HOLD_REG;
+>>> +}
+>>> +
+>>>  static const struct dw_mci_drv_data hi6220_data = {
+>>>  	.switch_voltage		= dw_mci_hi6220_switch_voltage,
+>>>  	.set_ios		= dw_mci_hi6220_set_ios,
+>>>  	.parse_dt		= dw_mci_hi6220_parse_dt,
+>>> +	.prepare_command        = dw_mci_hi6220_prepare_command,
+>>>  };
+> Hi,thank you for your review
+>
+> 1.We do the prepare_command in dw_mci_prepare_command before we send CMD in dw_mmc.c
 
-Make the common case be no property and make this bool. So if typically 
-active high, the property is "over-current-active-low".
+please clone Ulf's tree[0] and rebase your any patches on its next
+branch, thanks.
 
-Rob
+
+[0] git://git.linaro.org/people/ulf.hansson/mmc
+
+> 2.I can find the same drivers in dw_mmc-exynos.c
+> 3.For hikey we do the initialization from Dw_mmc-k3.c,so I need to do the prepare_command in hi6220 drivers
+>
+>>
+>> There is no "prepare_command" hooks.
+>>
+>> Best Regards,
+>> Jaehoon Chung
+>>
+>>>
+>>>  static const struct of_device_id dw_mci_k3_match[] = {
+>>> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
+>>> index 9dd1bd3..047e116 100644
+>>> --- a/drivers/mmc/host/dw_mmc.c
+>>> +++ b/drivers/mmc/host/dw_mmc.c
+>>> @@ -1564,6 +1564,8 @@ static int dw_mci_execute_tuning(struct mmc_host *mmc, u32 opcode)
+>>>
+>>>  	if (drv_data && drv_data->execute_tuning)
+>>>  		err = drv_data->execute_tuning(slot, opcode);
+>>> +	else
+>>> +		err = 0;
+>>>  	return err;
+>>>  }
+>>>
+>>>
+>>
+>>
+>> .
+>>
+>
+>
+>
+>
+
+
+-- 
+Best Regards
+Shawn Lin
