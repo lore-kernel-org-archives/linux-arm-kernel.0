@@ -1,90 +1,118 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 20 Jul 2016 17:43:40 +0100
-Subject: Applied "ASoC: rockchip: correct the spdif clk" to the asoc tree
-In-Reply-To: <1468852474-15735-1-git-send-email-zyw@rock-chips.com>
-Message-ID: <E1bPuay-0002iL-Ap@debutante>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 20 Jul 2016 17:46:58 +0100
+Subject: [PATCH v15 04/10] arm64: Kprobes with single stepping support
+In-Reply-To: <20160720162827.GF25890@e104818-lin.cambridge.arm.com>
+References: <1467995754-32508-1-git-send-email-dave.long@linaro.org>
+ <1467995754-32508-5-git-send-email-dave.long@linaro.org>
+ <578FA238.3050206@arm.com>
+ <20160720162827.GF25890@e104818-lin.cambridge.arm.com>
+Message-ID: <578FAB02.90707@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch
+On 20/07/16 17:28, Catalin Marinas wrote:
+> On Wed, Jul 20, 2016 at 05:09:28PM +0100, Marc Zyngier wrote:
+>> +static inline unsigned long min_stack_size(unsigned long addr)
+>> +{
+>> +	unsigned long size;
+>> +	struct kprobe_ctlblk *ctl;
+>> +
+>> +	if (on_irq_stack(addr, raw_smp_processor_id()))
+>> +		size = IRQ_STACK_PTR(raw_smp_processor_id()) - addr;
+>> +	else
+>> +		size = (unsigned long)current_thread_info() + THREAD_START_SP - addr;
+>> +
+>> +	return min(size, sizeof(ctl->jprobes_stack));
+>> +}
+> 
+> We could drop the local ctl pointer:
+> 
+> 	return min(size, sizeof(((struct kprobe_ctlblk *)0)->jprobes_stack));
+> 
+> If you add a log, I'll push the patch on top of the kprobes branch.
 
-   ASoC: rockchip: correct the spdif clk
+Here you go:
 
-has been applied to the asoc tree at
+----8<----
+>From 0d120f95b3348e1946d8a789c7147f316c27ea6b Mon Sep 17 00:00:00 2001
+From: Marc Zyngier <marc.zyngier@arm.com>
+Date: Wed, 20 Jul 2016 17:36:42 +0100
+Subject: [PATCH] arm64: kprobes: Fix overflow when saving stack
 
-   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
+The MIN_STACK_SIZE macro tries evaluate how much stack space needs
+to be saved in the jprobes_stack array, sized at 128 bytes.
 
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
+When using the IRQ stack, said macro can happily return up to
+IRQ_STACK_SIZE, which is 16kB. Mayhem follows.
 
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
+This patch fixes things by getting rid of the crazy macro and
+limiting the copy to be at most the size of the jprobes_stack
+array, no matter which stack we're on.
 
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm64/kernel/probes/kprobes.c | 22 ++++++++++++++--------
+ 1 file changed, 14 insertions(+), 8 deletions(-)
 
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
+diff --git a/arch/arm64/kernel/probes/kprobes.c b/arch/arm64/kernel/probes/kprobes.c
+index 823cf92..87a24f6 100644
+--- a/arch/arm64/kernel/probes/kprobes.c
++++ b/arch/arm64/kernel/probes/kprobes.c
+@@ -34,12 +34,6 @@
+ 
+ #include "decode-insn.h"
+ 
+-#define MIN_STACK_SIZE(addr)	(on_irq_stack(addr, raw_smp_processor_id()) ? \
+-	min((unsigned long)IRQ_STACK_SIZE,	\
+-	IRQ_STACK_PTR(raw_smp_processor_id()) - (addr)) : \
+-	min((unsigned long)MAX_STACK_SIZE,	\
+-	(unsigned long)current_thread_info() + THREAD_START_SP - (addr)))
+-
+ void jprobe_return_break(void);
+ 
+ DEFINE_PER_CPU(struct kprobe *, current_kprobe) = NULL;
+@@ -48,6 +42,18 @@ DEFINE_PER_CPU(struct kprobe_ctlblk, kprobe_ctlblk);
+ static void __kprobes
+ post_kprobe_handler(struct kprobe_ctlblk *, struct pt_regs *);
+ 
++static inline unsigned long min_stack_size(unsigned long addr)
++{
++	unsigned long size;
++
++	if (on_irq_stack(addr, raw_smp_processor_id()))
++		size = IRQ_STACK_PTR(raw_smp_processor_id()) - addr;
++	else
++		size = (unsigned long)current_thread_info() + THREAD_START_SP - addr;
++
++	return min(size, FIELD_SIZEOF(struct kprobe_ctlblk, jprobes_stack));
++}
++
+ static void __kprobes arch_prepare_ss_slot(struct kprobe *p)
+ {
+ 	/* prepare insn slot */
+@@ -495,7 +501,7 @@ int __kprobes setjmp_pre_handler(struct kprobe *p, struct pt_regs *regs)
+ 	 * the argument area.
+ 	 */
+ 	memcpy(kcb->jprobes_stack, (void *)stack_ptr,
+-	       MIN_STACK_SIZE(stack_ptr));
++	       min_stack_size(stack_ptr));
+ 
+ 	instruction_pointer_set(regs, (unsigned long) jp->entry);
+ 	preempt_disable();
+@@ -547,7 +553,7 @@ int __kprobes longjmp_break_handler(struct kprobe *p, struct pt_regs *regs)
+ 	unpause_graph_tracing();
+ 	*regs = kcb->jprobe_saved_regs;
+ 	memcpy((void *)stack_addr, kcb->jprobes_stack,
+-	       MIN_STACK_SIZE(stack_addr));
++	       min_stack_size(stack_addr));
+ 	preempt_enable_no_resched();
+ 	return 1;
+ }
+-- 
+2.1.4
 
 Thanks,
-Mark
 
->From 46dd2e28a90e48fbf1b7e253933fa3b7242e9b1b Mon Sep 17 00:00:00 2001
-From: Chris Zhong <zyw@rock-chips.com>
-Date: Mon, 18 Jul 2016 22:34:34 +0800
-Subject: [PATCH] ASoC: rockchip: correct the spdif clk
-
-The spdif mclk should be 128 times of sample rate, and there is a
-internal divider, the real rate of spdif mclk is mclk / (div + 1).
-Hence, the original driver always get the good frequency for
-48000/96000/44100/192000. But for 32000, the mclk is incorrect,
-it should be 32000*128, but get 48000*128. Do not use the internal
-divider here, just set all mclk to 128 * sample rate directly.
-
-Signed-off-by: Chris Zhong <zyw@rock-chips.com>
-Signed-off-by: Mark Brown <broonie@kernel.org>
----
- sound/soc/rockchip/rockchip_spdif.c | 17 +----------------
- 1 file changed, 1 insertion(+), 16 deletions(-)
-
-diff --git a/sound/soc/rockchip/rockchip_spdif.c b/sound/soc/rockchip/rockchip_spdif.c
-index 100781e37848..4ca265737eda 100644
---- a/sound/soc/rockchip/rockchip_spdif.c
-+++ b/sound/soc/rockchip/rockchip_spdif.c
-@@ -101,21 +101,7 @@ static int rk_spdif_hw_params(struct snd_pcm_substream *substream,
- 	int ret;
- 
- 	srate = params_rate(params);
--	switch (srate) {
--	case 32000:
--	case 48000:
--	case 96000:
--		mclk = 96000 * 128; /* 12288000 hz */
--		break;
--	case 44100:
--		mclk = 44100 * 256; /* 11289600 hz */
--		break;
--	case 192000:
--		mclk = 192000 * 128; /* 24576000 hz */
--		break;
--	default:
--		return -EINVAL;
--	}
-+	mclk = srate * 128;
- 
- 	switch (params_format(params)) {
- 	case SNDRV_PCM_FORMAT_S16_LE:
-@@ -139,7 +125,6 @@ static int rk_spdif_hw_params(struct snd_pcm_substream *substream,
- 		return ret;
- 	}
- 
--	val |= SPDIF_CFGR_CLK_DIV(mclk/(srate * 256));
- 	ret = regmap_update_bits(spdif->regmap, SPDIF_CFGR,
- 		SPDIF_CFGR_CLK_DIV_MASK | SPDIF_CFGR_HALFWORD_ENABLE |
- 		SDPIF_CFGR_VDW_MASK,
+	M.
 -- 
-2.8.1
+Jazz is not dead. It just smells funny...
