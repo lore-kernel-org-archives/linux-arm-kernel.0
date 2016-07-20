@@ -1,130 +1,107 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Wed, 20 Jul 2016 18:04:29 +0100
-Subject: [PATCH v7 09/15] arm: FDT: create MSI controller DT node
+Date: Wed, 20 Jul 2016 18:04:27 +0100
+Subject: [PATCH v7 07/15] TEMPORARY: update public headers for GICv3 ITS
+ emulation
 In-Reply-To: <20160720170435.28090-1-andre.przywara@arm.com>
 References: <20160720170435.28090-1-andre.przywara@arm.com>
-Message-ID: <20160720170435.28090-10-andre.przywara@arm.com>
+Message-ID: <20160720170435.28090-8-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ARM GICv3 ITS requires a separate device tree node to describe
-the ITS. Add this as a child to the GIC interrupt controller node
-to let a guest discover and use the ITS if the user requests it.
-Since we now need to specify #address-cells for the GIC node, we
-have to add two zeroes to the interrupt map to match that.
+This patch is preliminary and updates the headers from a kernel with
+ITS emulation and ARM GSI routing support. It should be replaced by a
+proper header update once the kernel patches have been merged and all
+merge conflict have been sorted out.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
- arm/gic.c         | 23 ++++++++++++++++++++++-
- arm/pci.c         | 12 ++++++++++--
- include/kvm/fdt.h |  2 +-
- 3 files changed, 33 insertions(+), 4 deletions(-)
+ arm/aarch64/include/asm/kvm.h |  2 ++
+ include/linux/kvm.h           | 13 +++++++++++--
+ x86/include/asm/kvm.h         |  6 +++---
+ 3 files changed, 16 insertions(+), 5 deletions(-)
 
-diff --git a/arm/gic.c b/arm/gic.c
-index 3544211..12139fe 100644
---- a/arm/gic.c
-+++ b/arm/gic.c
-@@ -259,7 +259,8 @@ late_init(gic__init_gic)
+diff --git a/arm/aarch64/include/asm/kvm.h b/arm/aarch64/include/asm/kvm.h
+index f209ea1..3051f86 100644
+--- a/arm/aarch64/include/asm/kvm.h
++++ b/arm/aarch64/include/asm/kvm.h
+@@ -87,9 +87,11 @@ struct kvm_regs {
+ /* Supported VGICv3 address types  */
+ #define KVM_VGIC_V3_ADDR_TYPE_DIST	2
+ #define KVM_VGIC_V3_ADDR_TYPE_REDIST	3
++#define KVM_VGIC_ITS_ADDR_TYPE		4
  
- void gic__generate_fdt_nodes(void *fdt, enum irqchip_type type)
- {
--	const char *compatible;
-+	const char *compatible, *msi_compatible = NULL;
-+	u64 msi_prop[2];
- 	u64 reg_prop[] = {
- 		cpu_to_fdt64(ARM_GIC_DIST_BASE), cpu_to_fdt64(ARM_GIC_DIST_SIZE),
- 		0, 0,				/* to be filled */
-@@ -271,6 +272,9 @@ void gic__generate_fdt_nodes(void *fdt, enum irqchip_type type)
- 		reg_prop[2] = cpu_to_fdt64(ARM_GIC_CPUI_BASE);
- 		reg_prop[3] = cpu_to_fdt64(ARM_GIC_CPUI_SIZE);
- 		break;
-+	case IRQCHIP_GICV3_ITS:
-+		msi_compatible = "arm,gic-v3-its";
-+		/* fall-through */
- 	case IRQCHIP_GICV3:
- 		compatible = "arm,gic-v3";
- 		reg_prop[2] = cpu_to_fdt64(gic_redists_base);
-@@ -286,6 +290,23 @@ void gic__generate_fdt_nodes(void *fdt, enum irqchip_type type)
- 	_FDT(fdt_property(fdt, "interrupt-controller", NULL, 0));
- 	_FDT(fdt_property(fdt, "reg", reg_prop, sizeof(reg_prop)));
- 	_FDT(fdt_property_cell(fdt, "phandle", fdt__get_phandle(PHANDLE_GIC)));
-+	_FDT(fdt_property_cell(fdt, "#address-cells", 2));
-+	_FDT(fdt_property_cell(fdt, "#size-cells", 2));
-+
-+	if (msi_compatible) {
-+		_FDT(fdt_property(fdt, "ranges", NULL, 0));
-+
-+		_FDT(fdt_begin_node(fdt, "msic"));
-+		_FDT(fdt_property_string(fdt, "compatible", msi_compatible));
-+		_FDT(fdt_property(fdt, "msi-controller", NULL, 0));
-+		_FDT(fdt_property_cell(fdt, "phandle",
-+				       fdt__get_phandle(PHANDLE_MSI)));
-+		msi_prop[0] = cpu_to_fdt64(gic_msi_base);
-+		msi_prop[1] = cpu_to_fdt64(gic_msi_size);
-+		_FDT(fdt_property(fdt, "reg", msi_prop, sizeof(msi_prop)));
-+		_FDT(fdt_end_node(fdt));
-+	}
-+
- 	_FDT(fdt_end_node(fdt));
- }
+ #define KVM_VGIC_V3_DIST_SIZE		SZ_64K
+ #define KVM_VGIC_V3_REDIST_SIZE		(2 * SZ_64K)
++#define KVM_VGIC_V3_ITS_SIZE		(2 * SZ_64K)
  
-diff --git a/arm/pci.c b/arm/pci.c
-index 9630657..104349a 100644
---- a/arm/pci.c
-+++ b/arm/pci.c
-@@ -18,6 +18,8 @@ struct of_gic_irq {
- struct of_interrupt_map_entry {
- 	struct of_pci_irq_mask		pci_irq_mask;
- 	u32				gic_phandle;
-+	u32				gic_addr_hi;
-+	u32				gic_addr_lo;
- 	struct of_gic_irq		gic_irq;
- } __attribute__((packed));
+ #define KVM_ARM_VCPU_POWER_OFF		0 /* CPU is started in OFF state */
+ #define KVM_ARM_VCPU_EL1_32BIT		1 /* CPU running a 32bit VM */
+diff --git a/include/linux/kvm.h b/include/linux/kvm.h
+index a7f1f80..91226f4 100644
+--- a/include/linux/kvm.h
++++ b/include/linux/kvm.h
+@@ -865,6 +865,8 @@ struct kvm_ppc_smmu_info {
+ #define KVM_CAP_SPAPR_TCE_64 125
+ #define KVM_CAP_ARM_PMU_V3 126
+ #define KVM_CAP_VCPU_ATTRIBUTES 127
++#define KVM_CAP_MAX_VCPU_ID 128
++#define KVM_CAP_MSI_DEVID 131
  
-@@ -26,7 +28,7 @@ void pci__generate_fdt_nodes(void *fdt)
- 	struct device_header *dev_hdr;
- 	struct of_interrupt_map_entry irq_map[OF_PCI_IRQ_MAP_MAX];
- 	unsigned nentries = 0;
--	u32 gic_phandle = fdt__get_phandle(PHANDLE_GIC);
-+	u32 phandle;
- 	/* Bus range */
- 	u32 bus_range[] = { cpu_to_fdt32(0), cpu_to_fdt32(1), };
- 	/* Configuration Space */
-@@ -65,7 +67,11 @@ void pci__generate_fdt_nodes(void *fdt)
- 	_FDT(fdt_property(fdt, "bus-range", bus_range, sizeof(bus_range)));
- 	_FDT(fdt_property(fdt, "reg", &cfg_reg_prop, sizeof(cfg_reg_prop)));
- 	_FDT(fdt_property(fdt, "ranges", ranges, sizeof(ranges)));
-+	phandle = fdt__get_phandle(PHANDLE_MSI);
-+	if (FDT_IS_VALID_PHANDLE(phandle))
-+		_FDT(fdt_property_cell(fdt, "msi-parent", phandle));
+ #ifdef KVM_CAP_IRQ_ROUTING
  
-+	phandle = fdt__get_phandle(PHANDLE_GIC);
- 	/* Generate the interrupt map ... */
- 	dev_hdr = device__first_dev(DEVICE_BUS_PCI);
- 	while (dev_hdr && nentries < ARRAY_SIZE(irq_map)) {
-@@ -84,7 +90,9 @@ void pci__generate_fdt_nodes(void *fdt)
- 				},
- 				.pci_pin	= cpu_to_fdt32(pin),
- 			},
--			.gic_phandle	= cpu_to_fdt32(gic_phandle),
-+			.gic_phandle	= cpu_to_fdt32(phandle),
-+			.gic_addr_hi	= 0,
-+			.gic_addr_lo	= 0,
- 			.gic_irq = {
- 				.type	= cpu_to_fdt32(GIC_FDT_IRQ_TYPE_SPI),
- 				.num	= cpu_to_fdt32(irq - GIC_SPI_IRQ_BASE),
-diff --git a/include/kvm/fdt.h b/include/kvm/fdt.h
-index cd2bb72..8006e8f 100644
---- a/include/kvm/fdt.h
-+++ b/include/kvm/fdt.h
-@@ -11,7 +11,7 @@
- #define FDT_INVALID_PHANDLE 0
- #define FDT_IS_VALID_PHANDLE(phandle) ((phandle) != FDT_INVALID_PHANDLE)
+@@ -877,7 +879,10 @@ struct kvm_irq_routing_msi {
+ 	__u32 address_lo;
+ 	__u32 address_hi;
+ 	__u32 data;
+-	__u32 pad;
++	union {
++		__u32 pad;
++		__u32 devid;
++	};
+ };
  
--enum phandles {PHANDLE_GIC, PHANDLES_MAX};
-+enum phandles {PHANDLE_GIC, PHANDLE_MSI, PHANDLES_MAX};
+ struct kvm_irq_routing_s390_adapter {
+@@ -1023,12 +1028,14 @@ struct kvm_one_reg {
+ 	__u64 addr;
+ };
  
- /* Those definitions are generic FDT values for specifying IRQ
-  * types and are used in the Linux kernel internally as well as in
++#define KVM_MSI_VALID_DEVID	(1U << 0)
+ struct kvm_msi {
+ 	__u32 address_lo;
+ 	__u32 address_hi;
+ 	__u32 data;
+ 	__u32 flags;
+-	__u8  pad[16];
++	__u32 devid;
++	__u8  pad[12];
+ };
+ 
+ struct kvm_arm_device_addr {
+@@ -1073,6 +1080,8 @@ enum kvm_device_type {
+ #define KVM_DEV_TYPE_FLIC		KVM_DEV_TYPE_FLIC
+ 	KVM_DEV_TYPE_ARM_VGIC_V3,
+ #define KVM_DEV_TYPE_ARM_VGIC_V3	KVM_DEV_TYPE_ARM_VGIC_V3
++	KVM_DEV_TYPE_ARM_VGIC_ITS,
++#define KVM_DEV_TYPE_ARM_VGIC_ITS	KVM_DEV_TYPE_ARM_VGIC_ITS
+ 	KVM_DEV_TYPE_MAX,
+ };
+ 
+diff --git a/x86/include/asm/kvm.h b/x86/include/asm/kvm.h
+index cd54147..739c0c5 100644
+--- a/x86/include/asm/kvm.h
++++ b/x86/include/asm/kvm.h
+@@ -216,9 +216,9 @@ struct kvm_cpuid_entry2 {
+ 	__u32 padding[3];
+ };
+ 
+-#define KVM_CPUID_FLAG_SIGNIFCANT_INDEX		BIT(0)
+-#define KVM_CPUID_FLAG_STATEFUL_FUNC		BIT(1)
+-#define KVM_CPUID_FLAG_STATE_READ_NEXT		BIT(2)
++#define KVM_CPUID_FLAG_SIGNIFCANT_INDEX		(1 << 0)
++#define KVM_CPUID_FLAG_STATEFUL_FUNC		(1 << 1)
++#define KVM_CPUID_FLAG_STATE_READ_NEXT		(1 << 2)
+ 
+ /* for KVM_SET_CPUID2 */
+ struct kvm_cpuid2 {
 -- 
 2.9.0
