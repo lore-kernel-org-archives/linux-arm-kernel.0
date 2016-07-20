@@ -1,19 +1,33 @@
-From: adrian.hunter@intel.com (Adrian Hunter)
-Date: Wed, 20 Jul 2016 12:46:17 +0300
-Subject: [PATCH V2 3/3] perf tools: adding coresight etm PMU record
- capabilities
-In-Reply-To: <1468521344-15047-4-git-send-email-mathieu.poirier@linaro.org>
-References: <1468521344-15047-1-git-send-email-mathieu.poirier@linaro.org>
- <1468521344-15047-4-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <578F4869.5070201@intel.com>
+From: David.Laight@ACULAB.COM (David Laight)
+Date: Wed, 20 Jul 2016 09:52:25 +0000
+Subject: [PATCH v3 00/11] mm: Hardened usercopy
+In-Reply-To: <1468619065-3222-1-git-send-email-keescook@chromium.org>
+References: <1468619065-3222-1-git-send-email-keescook@chromium.org>
+Message-ID: <063D6719AE5E284EB5DD2968C1650D6D5F4FD6A3@AcuExch.aculab.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/07/16 21:35, Mathieu Poirier wrote:
-> Coresight ETMs are IP blocks used to perform HW assisted tracing
-> on a CPU core.  This patch introduce the required auxiliary API
-> functions allowing the perf core to interact with a tracer.
-> 
-> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+From: Kees Cook
+> Sent: 15 July 2016 22:44
+> This is a start of the mainline port of PAX_USERCOPY[1]. 
+...
+> - if address range is in the current process stack, it must be within the
+>   current stack frame (if such checking is possible) or at least entirely
+>   within the current process's stack.
+...
 
-Acked-by: Adrian Hunter <adrian.hunter@intel.com>
+That description doesn't seem quite right to me.
+I presume the check is:
+  Within the current process's stack and not crossing the ends of the
+  current stack frame.
+
+The 'current' stack frame is likely to be that of copy_to/from_user().
+Even if you use the stack of the caller, any problematic buffers
+are likely to have been passed in from a calling function.
+So unless you are going to walk the stack (good luck on that)
+I'm not sure checking the stack frames is worth it.
+
+I'd also guess that a lot of copies are from the middle of structures
+so cannot fail the tests you are adding.
+
+	David
