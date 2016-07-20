@@ -1,35 +1,54 @@
 From: quentin.schulz@free-electrons.com (Quentin Schulz)
-Date: Wed, 20 Jul 2016 10:29:08 +0200
-Subject: [PATCH 2/5] mfd: sunxi-gpadc-mfd: add buffer structure
+Date: Wed, 20 Jul 2016 10:29:07 +0200
+Subject: [PATCH 1/5] mfd: sunxi-gpadc-mfd: add TP_UP_PENDING irq
 In-Reply-To: <1469003351-15263-1-git-send-email-quentin.schulz@free-electrons.com>
 References: <1469003351-15263-1-git-send-email-quentin.schulz@free-electrons.com>
-Message-ID: <1469003351-15263-3-git-send-email-quentin.schulz@free-electrons.com>
+Message-ID: <1469003351-15263-2-git-send-email-quentin.schulz@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds a buffer structure for files including the sunxi-gpadc-mfd
-header. This structure has a buffer of 32 u32 values to store data from the
-FIFO of the GPADC of Allwinner SoCs. A buff_size is provided in case the
-buffer is not full.
+This adds support for TP_UP_PENDING irq in Allwinner SoCs' GPADC's MFD.
+
+This interrupt occurs when a touchscreen is attached and the thing (stylus,
+finger) currently touching the touchscreen releases the touch.
 
 Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
 ---
- include/linux/mfd/sunxi-gpadc-mfd.h | 5 +++++
- 1 file changed, 5 insertions(+)
+ drivers/mfd/sunxi-gpadc-mfd.c | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-diff --git a/include/linux/mfd/sunxi-gpadc-mfd.h b/include/linux/mfd/sunxi-gpadc-mfd.h
-index 7155845..f658299 100644
---- a/include/linux/mfd/sunxi-gpadc-mfd.h
-+++ b/include/linux/mfd/sunxi-gpadc-mfd.h
-@@ -20,4 +20,9 @@ struct sunxi_gpadc_mfd_dev {
- 	void __iomem			*regs;
+diff --git a/drivers/mfd/sunxi-gpadc-mfd.c b/drivers/mfd/sunxi-gpadc-mfd.c
+index f0005a6..05a000b 100644
+--- a/drivers/mfd/sunxi-gpadc-mfd.c
++++ b/drivers/mfd/sunxi-gpadc-mfd.c
+@@ -19,6 +19,8 @@
+ 
+ #define SUNXI_IRQ_FIFO_DATA	0
+ #define SUNXI_IRQ_TEMP_DATA	1
++#define SUNXI_IRQ_TP_UP		2
++
+ 
+ static struct resource adc_resources[] = {
+ 	{
+@@ -34,9 +36,19 @@ static struct resource adc_resources[] = {
+ 	},
  };
  
-+struct sunxi_gpadc_buffer {
-+	u32				buffer[32];
-+	unsigned int			buff_size;
++static struct resource ts_resources[] = {
++	{
++		.name	= "TP_UP_PENDING",
++		.start	= SUNXI_IRQ_TP_UP,
++		.end	= SUNXI_IRQ_TP_UP,
++		.flags	= IORESOURCE_IRQ,
++	},
 +};
 +
- #endif
+ static const struct regmap_irq sunxi_gpadc_mfd_regmap_irq[] = {
+ 	REGMAP_IRQ_REG(SUNXI_IRQ_FIFO_DATA, 0, BIT(16)),
+ 	REGMAP_IRQ_REG(SUNXI_IRQ_TEMP_DATA, 0, BIT(18)),
++	REGMAP_IRQ_REG(SUNXI_IRQ_TP_UP, 0, BIT(1)),
+ };
+ 
+ static const struct regmap_irq_chip sunxi_gpadc_mfd_regmap_irq_chip = {
 -- 
 2.5.0
