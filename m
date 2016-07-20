@@ -1,100 +1,55 @@
-From: julien.grall@arm.com (Julien Grall)
-Date: Wed, 20 Jul 2016 14:21:45 +0100
-Subject: [PATCH v4] xen/arm: Add a clock property
-In-Reply-To: <CAMuHMdWdqdT4jnae8h9tDDzzh8ZAbJJwiMW-scPBNVwmjYSiWQ@mail.gmail.com>
-References: <1468309605-19522-1-git-send-email-dirk.behme@de.bosch.com>
- <CAMuHMdU9yP2SMYa5ssrQSu1vwSN2gM4mD-EVYSGr2Pqf=jmCgw@mail.gmail.com>
- <cc28ef7e-dce3-fe5f-ab80-b662244bcbd0@arm.com>
- <CAMuHMdWeJjcuBHjnjppc5Ys5Ew8VssXzg=dLpLPCOQaBnUo_7Q@mail.gmail.com>
- <04d9dbfb-196d-a775-7fbb-526aba8085f4@arm.com>
- <CAMuHMdWdqdT4jnae8h9tDDzzh8ZAbJJwiMW-scPBNVwmjYSiWQ@mail.gmail.com>
-Message-ID: <457c61fd-4a64-b050-cd87-845b7e22ec39@arm.com>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Wed, 20 Jul 2016 06:23:33 -0700
+Subject: SOC-specific action for irq_set_wake
+In-Reply-To: <alpine.DEB.2.11.1607200759230.3564@nanos>
+References: <20160719181804.GX3847@xsjsorenbubuntu>
+ <alpine.DEB.2.11.1607200759230.3564@nanos>
+Message-ID: <20160720132333.GK3847@xsjsorenbubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Thomas,
 
+On Wed, 2016-07-20 at 08:28:35 +0200, Thomas Gleixner wrote:
+> On Tue, 19 Jul 2016, S?ren Brinkmann wrote:
+> > we are working on the PM solution for Zynq MPSOC and ran into some
+> > problem when setting the wake source.
+> > 
+> > The situation is that when the A53 is in suspend, the GIC(v2) may be
+> > powered down. In that state a companion core is handling wake
+> > events/IRQs, but we expect the OS/Linux to notify the companion core
+> > about what device/IRQ is a wake up source. Hence, my idea was to capture
+> > enabling/disabling wake IRQs in our platform PM code and then
+> > communicate with the FW as needed during suspend operations. The problem
+> > is: I don't see a good way to notify the platform code about these
+> > events.
+> > 
+> > My ideas were:
+> > 1. Use the irq_chip irq_set_wake function
+> >   My thought was to implement the irq_set_wake function in a
+> >   SOC-specific way (could even be generic and call some notifier chain or
+> 
+> Don't even think about notifier chains.
+> 
+> >   similar) to notify the platform PM code when a device/IRQ is
+> >   enabled/disabled as wake up source.
+> >   My problem is that the SKIP_IRQ_SET_WAKE flag is set in the generic
+> >   driver (drivers/irqchip/irq-gic.c) and platforms cannot implement
+> >   irq_set_wake without changes in the common code.
+> 
+> So and because it requires changes in the common code you think aboiut
+> notifiers and other absurdities. Come on, common code is not a sacred cow. It
+> can be modified and if you need for your particular platform that
+> SKIP_IRQ_SET_WAKE is cleared, then there are a gazillion of sane ways to do
+> that.
 
-On 20/07/2016 13:46, Geert Uytterhoeven wrote:
-> Hi Julien,
+I'm not afraid of changing it, but I was hoping to get an idea of what
+an acceptable solution would look like, as I don't want to run of into
+any of the directions that are not sane and have it shoot down in the
+end (like my notifier approach apparently would). I remembered the mentioned
+extensions mechanism which disappeared. Hence, I thought it might be a
+better idea to check beforehand why and what happened and what
+alternative approach may be an acceptable solution for that problem.
 
-Hello Geert,
-
-> On Wed, Jul 20, 2016 at 2:10 PM, Julien Grall <julien.grall@arm.com> wrote:
->> On 20/07/16 12:49, Geert Uytterhoeven wrote:
->>> On Wed, Jul 20, 2016 at 1:01 PM, Julien Grall <julien.grall@arm.com>
->>> wrote:
->>>> On 20/07/16 10:43, Geert Uytterhoeven wrote:
->>>>> On Tue, Jul 12, 2016 at 9:46 AM, Dirk Behme <dirk.behme@de.bosch.com>
->>>>> wrote:
->>>>>> Clocks described by this property are reserved for use by Xen, and the
->>>>>> OS
->>>>>> must not alter their state any way, such as disabling or gating a
->>>>>> clock,
->>>>>> or modifying its rate. Ensuring this may impose constraints on parent
->>>>>> clocks or other resources used by the clock tree.
->>>>>>
->>>>>> This property is used to proxy clocks for devices Xen has taken
->>>>>> ownership
->>>>>> of, such as UARTs, for which the associated clock controller(s) remain
->>>>>> under the control of Dom0.
->>>>>
->>>>> I'm not familiar with using XEN at all, but I'm a bit puzzled...
->>>>>
->>>>> Can't you just add a clocks property to the (virtual) serial device node
->>>>> in DT?
->>>>> Then the (virtual) serial device driver can get and enable the clock?
->>>>
->>>> There is no DT node for the Xen console (hvc). The UART used by Xen will
->>>> be
->>>> completely removed from the Device tree.
->>>
->>> Why is it removed?
->>
->> Because the device is used exclusively by Xen and DOM0 should not touch it
->> at all (IRQs and MMIOs are not mapped).
->
-> IMHO then it's Xen's responsability to make sure not to disable the clock(s).
-
-Xen does not disable the clock(s). The problem is Linux thinks the clock 
-is not used and therefore will disable the clock.
-
-Actually Xen does not have any knowledge how to handle clocks (i.e 
-setting rate, enabling/disabling). I would recommend you to read the 
-binding description in the patch and not the implementation which is 
-IHMO misleading.
-
->
-> Who removes the device node from the DT? If Xen, can't it just remember
-> which clocks were present in removed device nodes?
-
-Xen is removing the node from the DT. Not removing the node will not 
-change the problem. Linux is disabling the clock because there is no 
-driver which used those clocks.
-
-As the clock subsystem will disable any unused clocks (from Linux point 
-of view), the UART will get disabled and the console will be lost.
-
-What we want to achieve with this patch is to let Linux knows that this 
-clock is in use by someone else (hypervisor or guest) and:
-     * If the clock is not shared: don't disable it
-     * If the clock is shared: don't change the rate
-
->
-> What to do on SoCs where the serial device is part of a power area (e.g.
-> Renesas SH/R-Mobile)? Who will make sure it is not powered down?
-
-I don't have any knowledge on the Renesas SH/R-Mobile. However, we 
-expect some cooperation between DOM0 and Xen to handle the power.
-
-For instance managing the clocks in Xen would require to implement clock 
-driver for each SOC because it does not seem to have a generic way to do it.
-
-Given that Linux already knows a lot about the clock, we want to hand 
-over the clock control to the hardware domain (i.e dom0). This means 
-that we have to find a way to cooperate with it to keep enable clocks 
-that we care about.
-
-Regards,
-
--- 
-Julien Grall
+	Thanks,
+	S?ren
