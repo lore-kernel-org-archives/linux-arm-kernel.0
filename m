@@ -1,55 +1,52 @@
-From: minghsiu.tsai@mediatek.com (Minghsiu Tsai)
-Date: Wed, 20 Jul 2016 20:14:42 +0800
-Subject: [PATCH 2/4] dt-bindings: Add a binding for Mediatek MDP
-In-Reply-To: <20160716230113.GA31551@rob-hp-laptop>
-References: <1468498681-19955-1-git-send-email-minghsiu.tsai@mediatek.com>
- <1468498681-19955-3-git-send-email-minghsiu.tsai@mediatek.com>
- <20160716230113.GA31551@rob-hp-laptop>
-Message-ID: <1469016882.12306.3.camel@mtksdaap41>
+From: vgoyal@redhat.com (Vivek Goyal)
+Date: Wed, 20 Jul 2016 08:27:37 -0400
+Subject: [RFC 0/3] extend kexec_file_load system call
+In-Reply-To: <8a8b2909-7f95-03e4-bf8e-dd29b5fc1fba@gmail.com>
+References: <87twfunneg.fsf@linux.vnet.ibm.com>
+ <20160713073657.GX1041@n2100.armlinux.org.uk>
+ <87poqinf9m.fsf@linux.vnet.ibm.com>
+ <20160713082639.GZ1041@n2100.armlinux.org.uk>
+ <20160713130338.GB16900@redhat.com>
+ <20160713174009.GA1041@n2100.armlinux.org.uk>
+ <20160713182247.GA25232@redhat.com>
+ <1468845964.2800.3.camel@gmail.com>
+ <20160718132629.GB32512@redhat.com>
+ <8a8b2909-7f95-03e4-bf8e-dd29b5fc1fba@gmail.com>
+Message-ID: <20160720122737.GA11361@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2016-07-16 at 18:01 -0500, Rob Herring wrote:
-> On Thu, Jul 14, 2016 at 08:17:59PM +0800, Minghsiu Tsai wrote:
-> > Add a DT binding documentation of MDP for the MT8173 SoC
-> > from Mediatek
+On Wed, Jul 20, 2016 at 01:45:42PM +1000, Balbir Singh wrote:
+> >>>>>  
+> >>>>> Command line options are not signed. I thought idea behind secureboot
+> >>>>> was to execute only trusted code and command line options don't enforce
+> >>>>> you to execute unsigned code.
+> >>>>>  
+> >>
+> >> You can set module.sig_enforce=0 and open up the system a bit assuming
+> >> that you can get a module to load with another attack
 > > 
-> > Signed-off-by: Minghsiu Tsai <minghsiu.tsai@mediatek.com>
-> > ---
-> >  .../devicetree/bindings/media/mediatek-mdp.txt     |   92 ++++++++++++++++++++
-> >  1 file changed, 92 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/media/mediatek-mdp.txt
+> > IIUC, sig_enforce bool_enable_only so it can only be enabled. Default
+> > value of it is 0 if CONFIG_MODULE_SIG_FORCE=n.
 > > 
-> > diff --git a/Documentation/devicetree/bindings/media/mediatek-mdp.txt b/Documentation/devicetree/bindings/media/mediatek-mdp.txt
-> > new file mode 100644
-> > index 0000000..ef570c3
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/media/mediatek-mdp.txt
-> > @@ -0,0 +1,92 @@
-> > +* Mediatek Media Data Path
-> > +
-> > +Media Data Path is used for scaling and color space conversion.
-> > +
-> > +Required properties:
-> > +  - compatible : should contain them as below:
-> > +        "mediatek,mt8173-mdp"
-> > +        "mediatek,mt8173-mdp-rdma"
-> > +        "mediatek,mt8173-mdp-rsz"
-> > +        "mediatek,mt8173-mdp-wdma"
-> > +        "mediatek,mt8173-mdp-wrot"
-> > +  - clocks : device clocks
-> > +  - power-domains : a phandle to the power domain.
-> > +  - mediatek,larb : should contain the larbes of current platform
-> > +  - iommus : Mediatek IOMMU H/W has designed the fixed associations with
-> > +        the multimedia H/W. and there is only one multimedia iommu domain.
-> > +        "iommus = <&iommu portid>" the "portid" is from
-> > +        dt-bindings\iommu\mt8173-iommu-port.h, it means that this portid will
-> > +        enable iommu. The portid default is disable iommu if "<&iommu portid>"
-> > +        don't be added.
-> > +  - mediatek,vpu : the node of video processor unit
+> > IOW, if your kernel forced signature verification, you should not be
+> > able to do sig_enforce=0. If you kernel did not have
+> > CONFIG_MODULE_SIG_FORCE=y, then sig_enforce should be 0 by default anyway
+> > and you are not making it worse using command line.
+> > 
 > 
-> These properties don't apply to all the nodes. I think you need a 
-> section for each IP block.
+> OK.. I checked and you are right, but that is an example and there are
+> other things like security=, thermal.*, nosmep, nosmap that need auditing
+> for safety and might hurt the system security if used. I still think
+> think that assuming you can pass any command line without breaking security
+> is a broken argument.
 
+I agree that if some command line option allows running unsigned code
+at ring 0, then we probably should disable that on secureboot enabled
+boot.
 
-I will add description for those IP block, thanks.
+In fact, there were bunch of patches which made things tighter on
+secureboot enabled machines from matthew garrett. AFAIK, these patches
+never went upstream.
+
+Vivek
