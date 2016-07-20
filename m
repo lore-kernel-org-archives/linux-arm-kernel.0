@@ -1,60 +1,134 @@
-From: dhdang@apm.com (Duc Dang)
-Date: Wed, 20 Jul 2016 11:04:42 -0700
-Subject: [PATCH v8 0/4] perf: Add APM X-Gene SoC Performance Monitoring
- Unit driver
-In-Reply-To: <20160720101553.GA20508@arm.com>
-References: <1468263944-10634-1-git-send-email-ttnguyen@apm.com>
- <20160714131602.GJ29455@arm.com>
- <CACgAJHyBt4TCoDjm0XGyX8usD_Wt_-7_JA918Wr4oF567wY_EA@mail.gmail.com>
- <CADaLNDnNVC48Ce1A+KU2WMULkY+skKVSm1GpaoQ6HvAEmscD=A@mail.gmail.com>
- <CADaLNDnqs+jRTfQTXV5VaKbWbQ4dZMGGQAgWXVqWhX8AZZrWgw@mail.gmail.com>
- <20160720101553.GA20508@arm.com>
-Message-ID: <CADaLND=5Wu6+2G2E1K28BejGenRi89yODACdwhZJVr-Ee+um6w@mail.gmail.com>
+From: dave.long@linaro.org (David Long)
+Date: Wed, 20 Jul 2016 14:28:39 -0400
+Subject: [PATCH v15 08/10] arm64: Add trampoline code for kretprobes
+In-Reply-To: <20160719134655.GA21256@e104818-lin.cambridge.arm.com>
+References: <1467995754-32508-1-git-send-email-dave.long@linaro.org>
+ <1467995754-32508-9-git-send-email-dave.long@linaro.org>
+ <20160719134655.GA21256@e104818-lin.cambridge.arm.com>
+Message-ID: <578FC2D7.9090708@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 20, 2016 at 3:15 AM, Will Deacon <will.deacon@arm.com> wrote:
-> On Tue, Jul 19, 2016 at 01:22:09PM -0700, Duc Dang wrote:
->> On Thu, Jul 14, 2016 at 10:37 AM, Duc Dang <dhdang@apm.com> wrote:
->> > On Thu, Jul 14, 2016 at 10:28 AM, Tai Tri Nguyen <ttnguyen@apm.com> wrote:
->> >> On Thu, Jul 14, 2016 at 6:16 AM, Will Deacon <will.deacon@arm.com> wrote:
->> >> > On Mon, Jul 11, 2016 at 12:05:40PM -0700, Tai Nguyen wrote:
->> >> >> In addition to the X-Gene ARM CPU performance monitoring unit (PMU), there
->> >> >> are PMU for the SoC system devices such as L3 cache(s), I/O bridge(s),
->> >> >> memory controller bridges and memory. These PMU devices are loosely
->> >> >> architected to follow the same model as the PMU for ARM cores.
->> >> >
->> >> > You might want to add commit messages to patches 1,2 and 4, but then you
->> >> > can route this via the arm-soc tree.
->> >> >
->> >> > Will
->> >>
->> >> I will add the commit messages to these patches 1, 2 and 4 and rout
->> >> this via arm-soc tree.
->> >> CC: Duc (dhdang at apm.com)
->> >
->> > I will pull patch 1, 2 and 4 into xgene-next tree and send pull
->> > request to Arnd and Olof.
->>
->> Hi Will,
->>
->> Do you plan to merge this series (Tai posted v10) into 4.8 or you want
->> to wait until 4.9? Please let know so that I can plan my pull request
->> to Arnd/Olof accordingly to include patch 1, 2, and 4.
+On 07/19/2016 09:46 AM, Catalin Marinas wrote:
+> On Fri, Jul 08, 2016 at 12:35:52PM -0400, David Long wrote:
+>> --- /dev/null
+>> +++ b/arch/arm64/kernel/probes/kprobes_trampoline.S
+>> @@ -0,0 +1,85 @@
+>> +/*
+>> + * trampoline entry and return code for kretprobes.
+>> + */
+>> +
+>> +#include <linux/linkage.h>
+>> +#include <asm/asm-offsets.h>
+>> +#include <asm/assembler.h>
+>> +
+>> +	.text
+>> +
+>> +.macro save_all_base_regs
+>> +	stp x0, x1, [sp, #S_X0]
+>> +	stp x2, x3, [sp, #S_X2]
+>> +	stp x4, x5, [sp, #S_X4]
+>> +	stp x6, x7, [sp, #S_X6]
+>> +	stp x8, x9, [sp, #S_X8]
+>> +	stp x10, x11, [sp, #S_X10]
+>> +	stp x12, x13, [sp, #S_X12]
+>> +	stp x14, x15, [sp, #S_X14]
+>> +	stp x16, x17, [sp, #S_X16]
+>> +	stp x18, x19, [sp, #S_X18]
+>> +	stp x20, x21, [sp, #S_X20]
+>> +	stp x22, x23, [sp, #S_X22]
+>> +	stp x24, x25, [sp, #S_X24]
+>> +	stp x26, x27, [sp, #S_X26]
+>> +	stp x28, x29, [sp, #S_X28]
+>> +	add x0, sp, #S_FRAME_SIZE
+>> +	stp lr, x0, [sp, #S_LR]
+>> +/*
+>> + * Construct a useful saved PSTATE
+>> + */
+>> +	mrs x0, nzcv
+>> +	and x0, x0, #(PSR_N_BIT | PSR_Z_BIT | PSR_C_BIT | PSR_V_BIT)
+>> +	mrs x1, daif
+>> +	and x1, x1, #(PSR_D_BIT | PSR_A_BIT | PSR_I_BIT | PSR_F_BIT)
 >
-> I was hoping that the whole series would go via arm-soc. Mark reviewed
-> the PMU driver code, so that should be sufficient.
-
-Thanks, Will.
-
-Hi Arnd, Olof,
-
-Can you please help merge v10 of this series into your arm-soc tree? I
-can merge this series into xgene-next and send a pull request to you
-too, but the pull request will only contain this series as I don't
-have more dts changes at this time.
-
-Regards,
-Duc Dang.
+> I don't think you need the masking here, the mrs should return the
+> corresponding 4 bits.
 >
-> Will
+
+OK. I see you've done that.
+
+>> +	orr x0, x0, x1
+>> +	mrs x1, CurrentEL
+>> +	and x1, x1, #(3 << 2)
+>> +	orr x0, x1, x0
+>> +	mrs x1, SPSel
+>> +	and x1, x1, #1
+>
+> Same here.
+
+OK. ^
+
+>
+>> +	orr x0, x1, x0
+>> +	str x0, [sp, #S_PSTATE]
+>> +.endm
+>
+> How is this pstate used, other than the restoring of the condition flag
+> in the restore_all_base_regs macro? Does a kretprobes handler need
+> access to them?
+>
+
+A kretprobes handler should probably be able to examine a reasonable 
+pstate value, particularly in terms of DAIF. As I recall not having a 
+valid DAIF was an issue at one time.
+
+> Anyway, it's worth doing an stp xzr, x0, [sp, S_PC] so that we
+> initialise the pc in pt_regs.
+>
+
+OK.  Looks like you've done this.
+
+>> +
+>> +.macro restore_all_base_regs
+>> +	ldr x0, [sp, #S_PSTATE]
+>> +	and x0, x0, #(PSR_N_BIT | PSR_Z_BIT | PSR_C_BIT | PSR_V_BIT)
+>> +	msr nzcv, x0
+>> +	ldp x0, x1, [sp, #S_X0]
+>> +	ldp x2, x3, [sp, #S_X2]
+>> +	ldp x4, x5, [sp, #S_X4]
+>> +	ldp x6, x7, [sp, #S_X6]
+>> +	ldp x8, x9, [sp, #S_X8]
+>> +	ldp x10, x11, [sp, #S_X10]
+>> +	ldp x12, x13, [sp, #S_X12]
+>> +	ldp x14, x15, [sp, #S_X14]
+>> +	ldp x16, x17, [sp, #S_X16]
+>> +	ldp x18, x19, [sp, #S_X18]
+>> +	ldp x20, x21, [sp, #S_X20]
+>> +	ldp x22, x23, [sp, #S_X22]
+>> +	ldp x24, x25, [sp, #S_X24]
+>> +	ldp x26, x27, [sp, #S_X26]
+>> +	ldp x28, x29, [sp, #S_X28]
+>> +.endm
+>> +
+>> +ENTRY(kretprobe_trampoline)
+>> +
+>> +	sub sp, sp, #S_FRAME_SIZE
+>> +
+>> +	save_all_base_regs
+>> +
+>> +	mov x0, sp
+>> +	bl trampoline_probe_handler
+>> +	/* Replace trampoline address in lr with actual
+>> +	   orig_ret_addr return address. */
+>> +	mov lr, x0
+>> +
+>> +	restore_all_base_regs
+>> +
+>> +	add sp, sp, #S_FRAME_SIZE
+>> +
+>> +	ret
+>> +
+>> +ENDPROC(kretprobe_trampoline)
+>
+
+Thanks,
+-dl
