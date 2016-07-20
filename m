@@ -1,76 +1,116 @@
 From: keescook@chromium.org (Kees Cook)
-Date: Wed, 20 Jul 2016 13:27:06 -0700
-Subject: [PATCH v4 11/12] mm: SLAB hardened usercopy support
-In-Reply-To: <1469046427-12696-1-git-send-email-keescook@chromium.org>
-References: <1469046427-12696-1-git-send-email-keescook@chromium.org>
-Message-ID: <1469046427-12696-12-git-send-email-keescook@chromium.org>
+Date: Wed, 20 Jul 2016 13:26:55 -0700
+Subject: [PATCH v4 00/12] mm: Hardened usercopy
+Message-ID: <1469046427-12696-1-git-send-email-keescook@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Under CONFIG_HARDENED_USERCOPY, this adds object size checking to the
-SLAB allocator to catch any copies that may span objects.
+Hi,
 
-Based on code from PaX and grsecurity.
+[This is now in my kspp -next tree, though I'd really love to add some
+additional explicit Tested-bys, Reviewed-bys, or Acked-bys. If you've
+looked through any part of this or have done any testing, please consider
+sending an email with your "*-by:" line. :)]
 
-Signed-off-by: Kees Cook <keescook@chromium.org>
-Tested-by: Valdis Kletnieks <valdis.kletnieks@vt.edu>
----
- init/Kconfig |  1 +
- mm/slab.c    | 30 ++++++++++++++++++++++++++++++
- 2 files changed, 31 insertions(+)
+This is a start of the mainline port of PAX_USERCOPY[1]. After writing
+tests (now in lkdtm in -next) for Casey's earlier port[2], I kept tweaking
+things further and further until I ended up with a whole new patch series.
+To that end, I took Rik, Laura, and other people's feedback along with
+additional changes and clean-ups.
 
-diff --git a/init/Kconfig b/init/Kconfig
-index f755a602d4a1..798c2020ee7c 100644
---- a/init/Kconfig
-+++ b/init/Kconfig
-@@ -1757,6 +1757,7 @@ choice
- 
- config SLAB
- 	bool "SLAB"
-+	select HAVE_HARDENED_USERCOPY_ALLOCATOR
- 	help
- 	  The regular slab allocator that is established and known to work
- 	  well in all environments. It organizes cache hot objects in
-diff --git a/mm/slab.c b/mm/slab.c
-index cc8bbc1e6bc9..5e2d5f349aca 100644
---- a/mm/slab.c
-+++ b/mm/slab.c
-@@ -4477,6 +4477,36 @@ static int __init slab_proc_init(void)
- module_init(slab_proc_init);
- #endif
- 
-+#ifdef CONFIG_HARDENED_USERCOPY
-+/*
-+ * Rejects objects that are incorrectly sized.
-+ *
-+ * Returns NULL if check passes, otherwise const char * to name of cache
-+ * to indicate an error.
-+ */
-+const char *__check_heap_object(const void *ptr, unsigned long n,
-+				struct page *page)
-+{
-+	struct kmem_cache *cachep;
-+	unsigned int objnr;
-+	unsigned long offset;
-+
-+	/* Find and validate object. */
-+	cachep = page->slab_cache;
-+	objnr = obj_to_index(cachep, page, (void *)ptr);
-+	BUG_ON(objnr >= cachep->num);
-+
-+	/* Find offset within object. */
-+	offset = ptr - index_to_obj(cachep, page, objnr) - obj_offset(cachep);
-+
-+	/* Allow address range falling entirely within object size. */
-+	if (offset <= cachep->object_size && n <= cachep->object_size - offset)
-+		return NULL;
-+
-+	return cachep->name;
-+}
-+#endif /* CONFIG_HARDENED_USERCOPY */
-+
- /**
-  * ksize - get the actual amount of memory allocated for a given object
-  * @objp: Pointer to the object
--- 
-2.7.4
+Based on my understanding, PAX_USERCOPY was designed to catch a
+few classes of flaws (mainly bad bounds checking) around the use of
+copy_to_user()/copy_from_user(). These changes don't touch get_user() and
+put_user(), since these operate on constant sized lengths, and tend to be
+much less vulnerable. There are effectively three distinct protections in
+the whole series, each of which I've given a separate CONFIG, though this
+patch set is only the first of the three intended protections. (Generally
+speaking, PAX_USERCOPY covers what I'm calling CONFIG_HARDENED_USERCOPY
+(this) and CONFIG_HARDENED_USERCOPY_WHITELIST (future), and
+PAX_USERCOPY_SLABS covers CONFIG_HARDENED_USERCOPY_SPLIT_KMALLOC
+(future).)
+
+This series, which adds CONFIG_HARDENED_USERCOPY, checks that objects
+being copied to/from userspace meet certain criteria:
+- if address is a heap object, the size must not exceed the object's
+  allocated size. (This will catch all kinds of heap overflow flaws.)
+- if address range is in the current process stack, it must be within the
+  a valid stack frame (if such checking is possible) or at least entirely
+  within the current process's stack. (This could catch large lengths that
+  would have extended beyond the current process stack, or overflows if
+  their length extends back into the original stack.)
+- if the address range is part of kernel data, rodata, or bss, allow it.
+- if address range is page-allocated, that it doesn't span multiple
+  allocations (excepting Reserved and CMA pages).
+- if address is within the kernel text, reject it.
+- everything else is accepted
+
+The patches in the series are:
+- Support for examination of CMA page types:
+	1- mm: Add is_migrate_cma_page
+- Support for arch-specific stack frame checking (which will likely be
+  replaced in the future by Josh's more comprehensive unwinder):
+        2- mm: Implement stack frame object validation
+- The core copy_to/from_user() checks, without the slab object checks:
+        3- mm: Hardened usercopy
+- Per-arch enablement of the protection:
+        4- x86/uaccess: Enable hardened usercopy
+        5- ARM: uaccess: Enable hardened usercopy
+        6- arm64/uaccess: Enable hardened usercopy
+        7- ia64/uaccess: Enable hardened usercopy
+        8- powerpc/uaccess: Enable hardened usercopy
+        9- sparc/uaccess: Enable hardened usercopy
+       10- s390/uaccess: Enable hardened usercopy
+- The heap allocator implementation of object size checking:
+       11- mm: SLAB hardened usercopy support
+       12- mm: SLUB hardened usercopy support
+
+Some notes:
+
+- This is expected to apply on top of -next which contains fixes for the
+  position of _etext on both arm and arm64, though it has some conflicts
+  with KASAN that should be trivial to fix up. Also in -next are the
+  tests for this protection (in lkdtm), prefixed with USERCOPY_.
+
+- I couldn't detect a measurable performance change with these features
+  enabled. Kernel build times were unchanged, hackbench was unchanged,
+  etc. I think we could flip this to "on by default" at some point, but
+  for now, I'm leaving it off until I can get some more definitive
+  measurements. I would love if someone with greater familiarity with
+  perf could give this a spin and report results.
+
+- The SLOB support extracted from grsecurity seems entirely broken. I
+  have no idea what's going on there, I spent my time testing SLAB and
+  SLUB. Having someone else look at SLOB would be nice, but this series
+  doesn't depend on it.
+
+Additional features that would be nice, but aren't blocking this series:
+
+- Needs more architecture support for stack frame checking (only x86 now,
+  but it seems Josh will have a good solution for this soon).
+
+
+Thanks!
+
+-Kees
+
+[1] https://grsecurity.net/download.php "grsecurity - test kernel patch"
+[2] http://www.openwall.com/lists/kernel-hardening/2016/05/19/5
+
+v4:
+- handle CMA pages, labbott
+- update stack checker comments, labbott
+- check for vmalloc addresses, labbott
+- deal with KASAN in -next changing arm64 copy*user calls
+- check for linear mappings at runtime instead of via CONFIG
+
+v3:
+- switch to using BUG for better Oops integration
+- when checking page allocations, check each for Reserved
+- use enums for the stack check return for readability
+
+v2:
+- added s390 support
+- handle slub red zone
+- disallow writes to rodata area
+- stack frame walker now CONFIG-controlled arch-specific helper
