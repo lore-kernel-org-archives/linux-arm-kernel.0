@@ -1,149 +1,71 @@
-From: ck.hu@mediatek.com (CK Hu)
-Date: Wed, 20 Jul 2016 15:15:02 +0800
-Subject: [PATCH 2/4] drm/mediatek: enhance the HDMI driving current
-In-Reply-To: <1468987385-37353-3-git-send-email-bibby.hsieh@mediatek.com>
-References: <1468987385-37353-1-git-send-email-bibby.hsieh@mediatek.com>
- <1468987385-37353-3-git-send-email-bibby.hsieh@mediatek.com>
-Message-ID: <1468998902.11841.54.camel@mtksdaap41>
+From: jolsa@redhat.com (Jiri Olsa)
+Date: Wed, 20 Jul 2016 09:26:20 +0200
+Subject: [PATCH 3/6] perf tools: add infrastructure for PMU specific
+ configuration
+In-Reply-To: <1468968836-12695-4-git-send-email-mathieu.poirier@linaro.org>
+References: <1468968836-12695-1-git-send-email-mathieu.poirier@linaro.org>
+ <1468968836-12695-4-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <20160720072620.GA26497@krava>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Bibby:
-
-One comment inline.
-
-On Wed, 2016-07-20 at 12:03 +0800, Bibby Hsieh wrote:
-> From: Junzhi Zhao <junzhi.zhao@mediatek.com>
+On Tue, Jul 19, 2016 at 04:53:53PM -0600, Mathieu Poirier wrote:
+> This patchset adds PMU driver specific configuration to the parser
+> infrastructure by preceding any term with the '@' letter.  As such
+> doing something like:
 > 
-> In order to improve 4K resolution performance,
-> we have to enhance the HDMI driving currend
-> when clock rate is greater than 165MHz.
+> perf record -e some_event/@cfg1, at cfg2=config/ ...
 > 
-> Signed-off-by: Junzhi Zhao <junzhi.zhao@mediatek.com>
-> Signed-off-by: Bibby Hsieh <bibby.hsieh@mediatek.com>
+> will see 'cfg1' and 'cfg2=config' being added to the list of evsel config
+> terms.  Token 'cfg1' and 'cfg2=config' are not processed in user space
+> and are meant to be interpreted by the PMU driver.
+> 
+> First the lexer/parser are supplemented with the required definitions to
+> recognise the driver specific configuration.  From there they are simply
+> added to the list of event terms.  The bulk of the work is done in
+> function "parse_events_add_pmu()" where driver config event terms are
+> added to a new list of driver config terms, which in turn spliced with
+> the event's new driver configuration list.
+> 
+> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 > ---
->  drivers/gpu/drm/mediatek/mtk_mt8173_hdmi_phy.c |   89 +++++++++++++++++-------
->  1 file changed, 63 insertions(+), 26 deletions(-)
+>  tools/perf/util/evsel.c        |  1 +
+>  tools/perf/util/evsel.h        |  4 +++
+>  tools/perf/util/parse-events.c | 67 +++++++++++++++++++++++++++++++-----------
+>  tools/perf/util/parse-events.h |  1 +
+>  tools/perf/util/parse-events.l | 12 ++++++++
+>  tools/perf/util/parse-events.y | 11 +++++++
+>  6 files changed, 79 insertions(+), 17 deletions(-)
 > 
-> diff --git a/drivers/gpu/drm/mediatek/mtk_mt8173_hdmi_phy.c b/drivers/gpu/drm/mediatek/mtk_mt8173_hdmi_phy.c
-> index 8a24754..a871c14 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_mt8173_hdmi_phy.c
-> +++ b/drivers/gpu/drm/mediatek/mtk_mt8173_hdmi_phy.c
-> @@ -298,32 +298,69 @@ static int mtk_hdmi_pll_set_rate(struct clk_hw *hw, unsigned long rate,
->  			  (0x1 << PLL_BR_SHIFT),
->  			  RG_HDMITX_PLL_BP | RG_HDMITX_PLL_BC |
->  			  RG_HDMITX_PLL_BR);
-> -	mtk_hdmi_phy_clear_bits(hdmi_phy, HDMI_CON3, RG_HDMITX_PRD_IMP_EN);
-> -	mtk_hdmi_phy_mask(hdmi_phy, HDMI_CON4,
-> -			  (0x3 << PRD_IBIAS_CLK_SHIFT) |
-> -			  (0x3 << PRD_IBIAS_D2_SHIFT) |
-> -			  (0x3 << PRD_IBIAS_D1_SHIFT) |
-> -			  (0x3 << PRD_IBIAS_D0_SHIFT),
-> -			  RG_HDMITX_PRD_IBIAS_CLK |
-> -			  RG_HDMITX_PRD_IBIAS_D2 |
-> -			  RG_HDMITX_PRD_IBIAS_D1 |
-> -			  RG_HDMITX_PRD_IBIAS_D0);
-> -	mtk_hdmi_phy_mask(hdmi_phy, HDMI_CON3,
-> -			  (0x0 << DRV_IMP_EN_SHIFT), RG_HDMITX_DRV_IMP_EN);
-> -	mtk_hdmi_phy_mask(hdmi_phy, HDMI_CON6,
-> -			  (hdmi_phy->drv_imp_clk << DRV_IMP_CLK_SHIFT) |
-> -			  (hdmi_phy->drv_imp_d2 << DRV_IMP_D2_SHIFT) |
-> -			  (hdmi_phy->drv_imp_d1 << DRV_IMP_D1_SHIFT) |
-> -			  (hdmi_phy->drv_imp_d0 << DRV_IMP_D0_SHIFT),
-> -			  RG_HDMITX_DRV_IMP_CLK | RG_HDMITX_DRV_IMP_D2 |
-> -			  RG_HDMITX_DRV_IMP_D1 | RG_HDMITX_DRV_IMP_D0);
-> -	mtk_hdmi_phy_mask(hdmi_phy, HDMI_CON5,
-> -			  (hdmi_phy->ibias << DRV_IBIAS_CLK_SHIFT) |
-> -			  (hdmi_phy->ibias << DRV_IBIAS_D2_SHIFT) |
-> -			  (hdmi_phy->ibias << DRV_IBIAS_D1_SHIFT) |
-> -			  (hdmi_phy->ibias << DRV_IBIAS_D0_SHIFT),
-> -			  RG_HDMITX_DRV_IBIAS_CLK | RG_HDMITX_DRV_IBIAS_D2 |
-> -			  RG_HDMITX_DRV_IBIAS_D1 | RG_HDMITX_DRV_IBIAS_D0);
-> +	if (rate < 165000000) {
-> +		mtk_hdmi_phy_clear_bits(hdmi_phy, HDMI_CON3,
-> +					RG_HDMITX_PRD_IMP_EN);
-> +		mtk_hdmi_phy_mask(hdmi_phy, HDMI_CON4,
-> +				  (0x3 << PRD_IBIAS_CLK_SHIFT) |
-> +				  (0x3 << PRD_IBIAS_D2_SHIFT) |
-> +				  (0x3 << PRD_IBIAS_D1_SHIFT) |
-> +				  (0x3 << PRD_IBIAS_D0_SHIFT),
-> +				  RG_HDMITX_PRD_IBIAS_CLK |
-> +				  RG_HDMITX_PRD_IBIAS_D2 |
-> +				  RG_HDMITX_PRD_IBIAS_D1 |
-> +				  RG_HDMITX_PRD_IBIAS_D0);
-> +		mtk_hdmi_phy_mask(hdmi_phy, HDMI_CON3,
-> +				  (0x0 << DRV_IMP_EN_SHIFT),
-> +				  RG_HDMITX_DRV_IMP_EN);
-> +		mtk_hdmi_phy_mask(hdmi_phy, HDMI_CON6,
-> +				  (hdmi_phy->drv_imp_clk << DRV_IMP_CLK_SHIFT) |
-> +				  (hdmi_phy->drv_imp_d2 << DRV_IMP_D2_SHIFT) |
-> +				  (hdmi_phy->drv_imp_d1 << DRV_IMP_D1_SHIFT) |
-> +				  (hdmi_phy->drv_imp_d0 << DRV_IMP_D0_SHIFT),
-> +				  RG_HDMITX_DRV_IMP_CLK | RG_HDMITX_DRV_IMP_D2 |
-> +				  RG_HDMITX_DRV_IMP_D1 | RG_HDMITX_DRV_IMP_D0);
-> +		mtk_hdmi_phy_mask(hdmi_phy, HDMI_CON5,
-> +				  (hdmi_phy->ibias << DRV_IBIAS_CLK_SHIFT) |
-> +				  (hdmi_phy->ibias << DRV_IBIAS_D2_SHIFT) |
-> +				  (hdmi_phy->ibias << DRV_IBIAS_D1_SHIFT) |
-> +				  (hdmi_phy->ibias << DRV_IBIAS_D0_SHIFT),
-> +				  RG_HDMITX_DRV_IBIAS_CLK |
-> +				  RG_HDMITX_DRV_IBIAS_D2 |
-> +				  RG_HDMITX_DRV_IBIAS_D1 |
-> +				  RG_HDMITX_DRV_IBIAS_D0);
-> +	} else {
-> +		mtk_hdmi_phy_set_bits(hdmi_phy, HDMI_CON3,
-> +				      RG_HDMITX_PRD_IMP_EN);
-> +		mtk_hdmi_phy_mask(hdmi_phy, HDMI_CON4,
-> +				  (0x6 << PRD_IBIAS_CLK_SHIFT) |
-> +				  (0x6 << PRD_IBIAS_D2_SHIFT) |
-> +				  (0x6 << PRD_IBIAS_D1_SHIFT) |
-> +				  (0x6 << PRD_IBIAS_D0_SHIFT),
-> +				  RG_HDMITX_PRD_IBIAS_CLK |
-> +				  RG_HDMITX_PRD_IBIAS_D2 |
-> +				  RG_HDMITX_PRD_IBIAS_D1 |
-> +				  RG_HDMITX_PRD_IBIAS_D0);
-> +		mtk_hdmi_phy_mask(hdmi_phy, HDMI_CON3,
-> +				  (0xf << DRV_IMP_EN_SHIFT),
-> +				  RG_HDMITX_DRV_IMP_EN);
-> +		mtk_hdmi_phy_mask(hdmi_phy, HDMI_CON6,
-> +				  (hdmi_phy->drv_imp_clk << DRV_IMP_CLK_SHIFT) |
-> +				  (hdmi_phy->drv_imp_d2 << DRV_IMP_D2_SHIFT) |
-> +				  (hdmi_phy->drv_imp_d1 << DRV_IMP_D1_SHIFT) |
-> +				  (hdmi_phy->drv_imp_d0 << DRV_IMP_D0_SHIFT),
-> +				  RG_HDMITX_DRV_IMP_CLK | RG_HDMITX_DRV_IMP_D2 |
-> +				  RG_HDMITX_DRV_IMP_D1 | RG_HDMITX_DRV_IMP_D0);
-> +		mtk_hdmi_phy_mask(hdmi_phy, HDMI_CON5,
-> +				  (hdmi_phy->ibias_up << DRV_IBIAS_CLK_SHIFT) |
-> +				  (hdmi_phy->ibias_up << DRV_IBIAS_D2_SHIFT) |
-> +				  (hdmi_phy->ibias_up << DRV_IBIAS_D1_SHIFT) |
-> +				  (hdmi_phy->ibias_up << DRV_IBIAS_D0_SHIFT),
-> +				  RG_HDMITX_DRV_IBIAS_CLK |
-> +				  RG_HDMITX_DRV_IBIAS_D2 |
-> +				  RG_HDMITX_DRV_IBIAS_D1 |
-> +				  RG_HDMITX_DRV_IBIAS_D0);
-> +	}
+> diff --git a/tools/perf/util/evsel.c b/tools/perf/util/evsel.c
+> index 5d7037ef7d3b..7f97bae594ff 100644
+> --- a/tools/perf/util/evsel.c
+> +++ b/tools/perf/util/evsel.c
+> @@ -213,6 +213,7 @@ void perf_evsel__init(struct perf_evsel *evsel,
+>  	evsel->bpf_fd	   = -1;
+>  	INIT_LIST_HEAD(&evsel->node);
+>  	INIT_LIST_HEAD(&evsel->config_terms);
+> +	INIT_LIST_HEAD(&evsel->drv_config_terms);
+>  	perf_evsel__object.init(evsel);
+>  	evsel->sample_size = __perf_evsel__sample_size(attr->sample_type);
+>  	perf_evsel__calc_id_pos(evsel);
+> diff --git a/tools/perf/util/evsel.h b/tools/perf/util/evsel.h
+> index c1f10159804c..0441be00a366 100644
+> --- a/tools/perf/util/evsel.h
+> +++ b/tools/perf/util/evsel.h
+> @@ -44,6 +44,7 @@ enum {
+>  	PERF_EVSEL__CONFIG_TERM_CALLGRAPH,
+>  	PERF_EVSEL__CONFIG_TERM_STACK_USER,
+>  	PERF_EVSEL__CONFIG_TERM_INHERIT,
+> +	PERF_EVSEL__CONFIG_TERM_DRV_CFG,
+>  	PERF_EVSEL__CONFIG_TERM_MAX,
 
-'if' part and 'else' part looks almost the same. Use variable for
-difference and merge these two part. For example:
+Arnaldo just merged changes that adds new terms, so this patch
+won't apply.. could you please rebase to [1] and resend?
 
-if (rate < 165000000)
-	prd_ibias = 0x3;
-else
-	prd_ibias = 0x6;
+We don't change it too often, you just hit the window ;-)
 
-mtk_hdmi_phy_mask(hdmi_phy, HDMI_CON4,
-		  (prd_ibias << PRD_IBIAS_CLK_SHIFT) |
-		  (prd_ibias << PRD_IBIAS_D2_SHIFT) |
-		  (prd_ibias << PRD_IBIAS_D1_SHIFT) |
-		  (prd_ibias << PRD_IBIAS_D0_SHIFT),
-		  RG_HDMITX_PRD_IBIAS_CLK |
-		  RG_HDMITX_PRD_IBIAS_D2 |
-		  RG_HDMITX_PRD_IBIAS_D1 |
-		  RG_HDMITX_PRD_IBIAS_D0);
+thanks,
+jirka
 
->  	return 0;
->  }
->  
-
-Regards,
-CK
+[1] git://git.kernel.org/pub/scm/linux/kernel/git/acme/linux.git perf/core
