@@ -1,86 +1,82 @@
 From: andrew@aj.id.au (Andrew Jeffery)
-Date: Wed, 20 Jul 2016 15:28:22 +0930
-Subject: [PATCH 01/12] pinctrl: dt-bindings: Add documentation for Aspeed pin
- controllers
-In-Reply-To: <1468994313-13538-1-git-send-email-andrew@aj.id.au>
-References: <1468994313-13538-1-git-send-email-andrew@aj.id.au>
-Message-ID: <1468994313-13538-2-git-send-email-andrew@aj.id.au>
+Date: Wed, 20 Jul 2016 15:28:21 +0930
+Subject: [PATCH 00/12] aspeed: Add pinctrl and gpio drivers
+Message-ID: <1468994313-13538-1-git-send-email-andrew@aj.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Outline expectations on the pin controller's relationship with the
-System Control Unit (SCU) IP through syscon, and document the compatible
-strings for 4th and 5th generation Aspeed SoC pin controllers.
+Hi all,
 
-Signed-off-by: Andrew Jeffery <andrew@aj.id.au>
----
- .../devicetree/bindings/pinctrl/pinctrl-aspeed.txt | 45 ++++++++++++++++++++++
- MAINTAINERS                                        |  1 +
- 2 files changed, 46 insertions(+)
+This series is an evolution of the AST2400 pinctrl RFC posted a few months
+back:
+
+  http://www.spinics.net/lists/linux-gpio/msg14414.html
+
+The approach is similar to the RFC but a number of details have changed, often
+to support the weirder mux configuration cases. Unlike the RFC this series
+separates the common code for 4th and 5th generation SoC support and integrates
+the code into the kernel at large. The GPIO driver is included so it can
+integrate with pinctrl from the outset; the code already existed but had not
+yet been sent upstream.
+
+The series has been tested on both the AST2400 (g4) and AST2500 (g5) SoCs on
+OpenPOWER Palmetto and Aspeed AST2500 EVB machines respectively, and similarly
+in qemu where models were available.
+
+As mentioned in the RFC cover letter this is my first significant contribution
+to the kernel so I fully expect I've made some oversights; apologies in advance
+if I've missed anything required or obvious!
+
+Cheers,
+
+Andrew
+
+Andrew Jeffery (11):
+  pinctrl: dt-bindings: Add documentation for Aspeed pin controllers
+  pinctrl: Add core pinctrl support for Aspeed SoCs
+  pinctrl: Add pinctrl-aspeed-g4 driver
+  pinctrl: Add pinctrl-aspeed-g5 driver
+  gpio: dt-bindings: Add documentation for Aspeed GPIO controllers
+  syscon: dt-bindings: Add documentation for Aspeed system control units
+  aspeed-g4: Add syscon and pin controller nodes
+  palmetto: Request relevant mux functions in devicetree
+  aspeed-g4: Add gpio controller to devicetree
+  aspeed-g5: Add syscon and pin controller nodes
+  aspeed-g5: Add gpio controller to devicetree
+
+Joel Stanley (1):
+  gpio: Add Aspeed driver
+
+ .../devicetree/bindings/gpio/gpio-aspeed.txt       |   42 +
+ .../devicetree/bindings/mfd/aspeed-scu.txt         |   16 +
+ .../devicetree/bindings/pinctrl/pinctrl-aspeed.txt |   45 +
+ MAINTAINERS                                        |    2 +
+ arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts      |   28 +
+ arch/arm/boot/dts/aspeed-g4.dtsi                   |  293 ++++++
+ arch/arm/boot/dts/aspeed-g5.dtsi                   |  143 +++
+ arch/arm/mach-aspeed/Kconfig                       |    7 +
+ drivers/gpio/Kconfig                               |    8 +-
+ drivers/gpio/Makefile                              |    1 +
+ drivers/gpio/gpio-aspeed.c                         |  456 ++++++++
+ drivers/pinctrl/Kconfig                            |    1 +
+ drivers/pinctrl/Makefile                           |    1 +
+ drivers/pinctrl/aspeed/Kconfig                     |   24 +
+ drivers/pinctrl/aspeed/Makefile                    |    5 +
+ drivers/pinctrl/aspeed/pinctrl-aspeed-g4.c         | 1091 ++++++++++++++++++++
+ drivers/pinctrl/aspeed/pinctrl-aspeed-g5.c         |  561 ++++++++++
+ drivers/pinctrl/aspeed/pinctrl-aspeed.c            |  373 +++++++
+ drivers/pinctrl/aspeed/pinctrl-aspeed.h            |  562 ++++++++++
+ 19 files changed, 3658 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/gpio/gpio-aspeed.txt
+ create mode 100644 Documentation/devicetree/bindings/mfd/aspeed-scu.txt
  create mode 100644 Documentation/devicetree/bindings/pinctrl/pinctrl-aspeed.txt
+ create mode 100644 drivers/gpio/gpio-aspeed.c
+ create mode 100644 drivers/pinctrl/aspeed/Kconfig
+ create mode 100644 drivers/pinctrl/aspeed/Makefile
+ create mode 100644 drivers/pinctrl/aspeed/pinctrl-aspeed-g4.c
+ create mode 100644 drivers/pinctrl/aspeed/pinctrl-aspeed-g5.c
+ create mode 100644 drivers/pinctrl/aspeed/pinctrl-aspeed.c
+ create mode 100644 drivers/pinctrl/aspeed/pinctrl-aspeed.h
 
-diff --git a/Documentation/devicetree/bindings/pinctrl/pinctrl-aspeed.txt b/Documentation/devicetree/bindings/pinctrl/pinctrl-aspeed.txt
-new file mode 100644
-index 000000000000..5aac6a0a2e89
---- /dev/null
-+++ b/Documentation/devicetree/bindings/pinctrl/pinctrl-aspeed.txt
-@@ -0,0 +1,45 @@
-+Aspeed Pin Controllers
-+----------------------
-+
-+The Aspeed SoCs vary in functionality inside a generation but have a common mux
-+device register layout.
-+
-+Required properties:
-+- compatible: should be one of the following:
-+	"aspeed,g4-pinctrl";
-+	"aspeed,g5-pinctrl"
-+
-+The pin controller node should be a child of a syscon node with the required
-+property:
-+- compatible: "syscon", "simple-mfd"
-+
-+Refer to the the bindings described in
-+Documentation/devicetree/bindings/mfd/syscon.txt
-+
-+Subnode format:
-+
-+Please refer to pinctrl-bindings.txt in this directory for details of the
-+common pinctrl bindings used by client devices.
-+
-+The required properties of child nodes are (as defined in pinctrl-bindings):
-+- function
-+- groups
-+
-+Each function has only one associated pin group. Each group is named by its
-+function.
-+
-+Examples:
-+
-+syscon: scu at 1e6e2000 {
-+	compatible = "syscon", "simple-mfd";
-+	reg = <0x1e6e2000 0x1a8>;
-+
-+	pinctrl: pinctrl at 1e6e2000 {
-+		compatible = "aspeed,g4-pinctrl";
-+
-+		pinctrl_i2c3_default: i2c3_default {
-+			function = "I2C3";
-+			groups = "I2C3";
-+		};
-+	};
-+};
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 1209323b7e43..b5f2d3576d3a 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1003,6 +1003,7 @@ S:	Maintained
- F:	arch/arm/mach-aspeed/
- F:	arch/arm/boot/dts/aspeed-*
- F:	drivers/*/*aspeed*
-+F:	Documentation/devicetree/bindings/*/*aspeed*
- 
- ARM/ATMEL AT91RM9200, AT91SAM9 AND SAMA5 SOC SUPPORT
- M:	Nicolas Ferre <nicolas.ferre@atmel.com>
 -- 
 2.7.4
