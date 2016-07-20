@@ -1,56 +1,123 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Wed, 20 Jul 2016 10:08:15 +0200
-Subject: [PATCH] RFC: ARM: fix the uaccess crash on PB11MPCore
-In-Reply-To: <5959782.fqYxkarPT3@wuerfel>
-References: <1468256893-12811-1-git-send-email-linus.walleij@linaro.org>
- <CAA3gFWsZJ3BV+FncGHnHvXSDnxbg_2FnugtgVnanPmmaqKOJAQ@mail.gmail.com>
- <5959782.fqYxkarPT3@wuerfel>
-Message-ID: <578F316F.2000706@baylibre.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Wed, 20 Jul 2016 10:11:11 +0200
+Subject: [PATCH] arm64: dts: rockchip: add spiX aliases for rk3399
+In-Reply-To: <1841177.NDa9D09EGz@diego>
+References: <1468545873-134339-1-git-send-email-briannorris@chromium.org>
+ <20160719192912.GA142821@google.com> <1841177.NDa9D09EGz@diego>
+Message-ID: <3484113.eKHnDqRbfE@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/12/2016 01:53 PM, Arnd Bergmann wrote:
-> On Tuesday, July 12, 2016 1:27:11 PM CEST Neil Armstrong wrote:
->> 2016-07-11 19:08 GMT+02:00 Linus Walleij <linus.walleij@linaro.org>:
->>> The following patch was sketched by Russell in response to my
->>> crashes on the PB11MPCore after the patch for software-based
->>> priviledged no access support for ARMv8.1. See this thread:
->>> http://marc.info/?l=linux-arm-kernel&m=144051749807214&w=2
->>>
->>> I am unsure what is going on, I suspect everyone involved in
->>> the discussion is. I just want to repost this to get the
->>> discussion restarted, as I still have to apply this patch
->>> with every kernel iteration to get my PB11MPCore Realview
->>> running.
->>>
->>> I also know that Oxnas has actual, mass-deployed NAS (PogoPlug
->>> Pro variants) using PB11MPCore, and that they may or may not
->>> be seeing the same issue so I want their feedback on this: do
->>> you or do you not see this with mainline, or have you not even
->>> tested?
->>
->> Hi Linus,
->>
->> Actually the last off-tree support of the OX820 is on 4.4, and I do
->> not personally own a OX820 based device,
->> but I'm in he process of finding one to achieve upstream support along
->> the Ox810.
->>
+Am Mittwoch, 20. Juli 2016, 00:18:40 schrieb Heiko St?bner:
+> Am Dienstag, 19. Juli 2016, 12:29:14 schrieb Brian Norris:
+> > On Tue, Jul 19, 2016 at 12:27:54PM -0700, Brian Norris wrote:
+> > > + Rob
+> > 
+> > + Rob for real
+> > 
+> > > Hi,
+> > > 
+> > > On Tue, Jul 19, 2016 at 08:56:47PM +0200, Heiko Stuebner wrote:
+> > > > Am Dienstag, 19. Juli 2016, 08:39:55 schrieb Uwe Kleine-K?nig:
+> > > > > On Thu, Jul 14, 2016 at 06:24:33PM -0700, Brian Norris wrote:
+> > > > > > It's nicer to see this:
+> > > > > >     # ls -l /sys/bus/spi/devices/
+> > > > > >     total 0
+> > > > > >     lrwxrwxrwx 1 root root 0 Dec 31  1969 spi0.0 ->
+> > > > > >     ../../../devices/platform/ff1c0000.spi/spi_master/spi0/spi0.0
+> > > > > >     lrwxrwxrwx 1 root root 0 Dec 31  1969 spi1.0 ->
+> > > > > >     ../../../devices/platform/ff1d0000.spi/spi_master/spi1/spi1.0
+> > > > > >     lrwxrwxrwx 1 root root 0 Dec 31  1969 spi2.0 ->
+> > > > > >     ../../../devices/platform/ff1e0000.spi/spi_master/spi2/spi2.0
+> > > > > >     lrwxrwxrwx 1 root root 0 Dec 31  1969 spi5.0 ->
+> > > > > >     ../../../devices/platform/ff200000.spi/spi_master/spi5/spi5.0>
+> > > > > > 
+> > > > > > than this:
+> > > > > >     # ls -l /sys/bus/spi/devices/
+> > > > > >     total 0
+> > > > > >     lrwxrwxrwx 1 root root 0 Dec 31  1969 spi32763.0 ->
+> > > > > >     ../../../devices/platform/ff200000.spi/spi_master/spi32763/spi
+> > > > > >     32
+> > > > > >     763.0
+> > > > > >     lrwxrwxrwx 1 root root 0 Dec 31  1969 spi32764.0 ->
+> > > > > >     ../../../devices/platform/ff1e0000.spi/spi_master/spi32764/spi
+> > > > > >     32
+> > > > > >     764.0
+> > > > > >     lrwxrwxrwx 1 root root 0 Dec 31  1969 spi32765.0 ->
+> > > > > >     ../../../devices/platform/ff1d0000.spi/spi_master/spi32765/spi
+> > > > > >     32
+> > > > > >     765.0
+> > > > > >     lrwxrwxrwx 1 root root 0 Dec 31  1969 spi32766.0 ->
+> > > > > >     ../../../devices/platform/ff1c0000.spi/spi_master/spi32766/spi
+> > > > > >     32
+> > > > > >     766.0>
+> > > > > > 
+> > > > > > With the latter, it's much clearer which bus devices are on.
+> > > > > > 
+> > > > > > Signed-off-by: Brian Norris <briannorris@chromium.org>
+> > > > > > ---
+> > > > > > 
+> > > > > >  arch/arm64/boot/dts/rockchip/rk3399.dtsi | 6 ++++++
+> > > > > >  1 file changed, 6 insertions(+)
+> > > > > > 
+> > > > > > diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+> > > > > > b/arch/arm64/boot/dts/rockchip/rk3399.dtsi index
+> > > > > > 4c84229789ef..b04abbfd4898 100644
+> > > > > > --- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+> > > > > > +++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+> > > > > > @@ -70,6 +70,12 @@
+> > > > > > 
+> > > > > >  		serial2 = &uart2;
+> > > > > >  		serial3 = &uart3;
+> > > > > >  		serial4 = &uart4;
+> > > > > > 
+> > > > > > +		spi0 = &spi0;
+> > > > > > +		spi1 = &spi1;
+> > > > > > +		spi2 = &spi2;
+> > > > > > +		spi3 = &spi3;
+> > > > > > +		spi4 = &spi4;
+> > > > > > +		spi5 = &spi5;
+> > > > > 
+> > > > > Note that Rob Herring (with his dt-maintainer hat on) doesn't like
+> > > > > these
+> > > > > aliases.
+> > > > > 
+> > > > > See for example:
+> > > > > 	http://mid.gmane.org/20160705140546.GA10601 at rob-hp-laptop
+> > > 
+> > > But why? I believe half the arguments in the linked thread were
+> > > Catch-22's -- there were no "mainline" users (which is a false target
+> > > IMO anyway, as Christer Weinigel mentioned somewhere in the thread Rob
+> > > linked), and so we couldn't accept more documentation (or users) for the
+> > > feature. FWIW, my quick grep now shows there are currently 43 mainline
+> > > users.
+> > > 
+> > > This feature is very useful. Some of the thread Rob pointed to argued
+> > > that the indexing isn't HW documentation; in this case, it most
+> > > certainly is. The RK3399 TRM explicitly has these SPI buses named SPI0,
+> > > SPI1, SPI2, SPI3, SPI4, and SPI5, and schematics that I've seen use the
+> > > same terminology. It is therefore *much* nicer to have my device show up
+> > > as 'spi2.0' (reflecting their correct HW name) rather than spi32764.0.
+> > > Sometimes I can't even get as far as mounting sysfs to check what this
+> > > maps to, but having spi2.0 in the kernel log can clearly tell me what
+> > > device is causing problems.
+> > > 
+> > > If Rob can support a better alternative solution, I'd be happy to
+> > > switch. But I don't understand why we can't use a useful (not just to
+> > > me, but presumably to at least 43 other independent users, and many
+> > > more out of tree), existing, and long-supported feature here.
 > 
-> The Aldi NAS boxes (NAS-212) are widely available on ebay in Germany,
-> there is even a shop that sells both the Pogoplug and the Medion
-> machine with Debian preinstalled: http://www.ebay.de/sch/it-shop-rm/m.html
+> Personally, I don't have any real opinion on this but the argument sounds
+> plausible to me (aka they are named with numbers in every manual,
+> schematics) so it might be helpful to have that around - similar to i2c
+> that is in the dtsi already.
 > 
-> If you need help getting one, you can send it to me and I forward
-> it to your French address.
+> I think I remember Doug having a similar discussion around mmc-aliases some
+> time ago - that met opposition as well [0] - although I guess the numbering
+> was a bit more arbitary there.
 > 
-> 	Arnd
-> 
+> I guess we'll just see what Rob says.
 
-Arnd,
-
-Thanks, I got a Pogoplug V3 and have access to the serial line, I will
-forward port the 4.4 openwrt kernel to 4.7 ASAP and try to reproduce the bug
-encountered by Linus.
-
-Neil
+Uwe pointed me to a very similar discussion and response from Rob about spi 
+aliases at:
+https://lkml.org/lkml/2016/5/25/566
