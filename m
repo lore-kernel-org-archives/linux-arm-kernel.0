@@ -1,224 +1,358 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 20 Jul 2016 11:58:53 +0200
-Subject: [PATCH v2 3/7] drm/sun4i: Add bridge support
+Date: Wed, 20 Jul 2016 11:58:54 +0200
+Subject: [PATCH v2 4/7] drm/bridge: Add RGB to VGA bridge support
 In-Reply-To: <20160720095857.12297-1-maxime.ripard@free-electrons.com>
 References: <20160720095857.12297-1-maxime.ripard@free-electrons.com>
-Message-ID: <20160720095857.12297-4-maxime.ripard@free-electrons.com>
+Message-ID: <20160720095857.12297-5-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Our RGB bus can be either connected to a bridge or a panel. While the panel
-support was already there, the bridge was not.
+Some boards have an entirely passive RGB to VGA bridge, based on either
+DACs or resistor ladders.
 
-Fix that.
+Those might or might not have an i2c bus routed to the VGA connector in
+order to access the screen EDIDs.
+
+Add a bridge that doesn't do anything but expose the modes available on the
+screen, either based on the EDIDs if available, or based on the XGA
+standards.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/gpu/drm/sun4i/sun4i_drv.c  |  4 +--
- drivers/gpu/drm/sun4i/sun4i_rgb.c  | 58 +++++++++++++++++++++++++++++---------
- drivers/gpu/drm/sun4i/sun4i_tcon.c | 43 ++++++++++++++++++++++++++--
- drivers/gpu/drm/sun4i/sun4i_tcon.h |  1 +
- 4 files changed, 87 insertions(+), 19 deletions(-)
+ .../bindings/display/bridge/dumb-vga.txt           |  54 +++++
+ drivers/gpu/drm/bridge/Kconfig                     |   6 +
+ drivers/gpu/drm/bridge/Makefile                    |   1 +
+ drivers/gpu/drm/bridge/dumb-vga.c                  | 232 +++++++++++++++++++++
+ 4 files changed, 293 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/display/bridge/dumb-vga.txt
+ create mode 100644 drivers/gpu/drm/bridge/dumb-vga.c
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.c b/drivers/gpu/drm/sun4i/sun4i_drv.c
-index 4dc543e1db10..db5ab4d50bd6 100644
---- a/drivers/gpu/drm/sun4i/sun4i_drv.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
-@@ -258,8 +258,8 @@ static int sun4i_drv_add_endpoints(struct device *dev,
- 		}
- 
- 		/*
--		 * If the node is our TCON, the first port is used for our
--		 * panel, and will not be part of the
-+		 * If the node is our TCON, the first port is used for
-+		 * panel or bridges, and will not be part of the
- 		 * component framework.
- 		 */
- 		if (sun4i_drv_node_is_tcon(node)) {
-diff --git a/drivers/gpu/drm/sun4i/sun4i_rgb.c b/drivers/gpu/drm/sun4i/sun4i_rgb.c
-index d32f08f9ce5f..d4e52522ec53 100644
---- a/drivers/gpu/drm/sun4i/sun4i_rgb.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_rgb.c
-@@ -151,7 +151,12 @@ static void sun4i_rgb_encoder_enable(struct drm_encoder *encoder)
- 
- 	DRM_DEBUG_DRIVER("Enabling RGB output\n");
- 
--	drm_panel_enable(tcon->panel);
-+	if (!IS_ERR(tcon->panel))
-+		drm_panel_enable(tcon->panel);
+diff --git a/Documentation/devicetree/bindings/display/bridge/dumb-vga.txt b/Documentation/devicetree/bindings/display/bridge/dumb-vga.txt
+new file mode 100644
+index 000000000000..0056ffa2b31d
+--- /dev/null
++++ b/Documentation/devicetree/bindings/display/bridge/dumb-vga.txt
+@@ -0,0 +1,54 @@
++Passive RGB to VGA bridge
++-------------------------
 +
-+	if (!IS_ERR(encoder->bridge))
-+		drm_bridge_enable(encoder->bridge);
++This binding is aimed for entirely passive RGB to VGA bridges that do not
++require any configuration.
 +
- 	sun4i_tcon_channel_enable(tcon, 0);
- }
- 
-@@ -164,7 +169,12 @@ static void sun4i_rgb_encoder_disable(struct drm_encoder *encoder)
- 	DRM_DEBUG_DRIVER("Disabling RGB output\n");
- 
- 	sun4i_tcon_channel_disable(tcon, 0);
--	drm_panel_disable(tcon->panel);
++Required properties:
 +
-+	if (!IS_ERR(encoder->bridge))
-+		drm_bridge_disable(encoder->bridge);
++- compatible: Must be "dumb-vga-bridge"
 +
-+	if (!IS_ERR(tcon->panel))
-+		drm_panel_disable(tcon->panel);
- }
- 
- static void sun4i_rgb_encoder_mode_set(struct drm_encoder *encoder,
-@@ -203,6 +213,7 @@ int sun4i_rgb_init(struct drm_device *drm)
- {
- 	struct sun4i_drv *drv = drm->dev_private;
- 	struct sun4i_tcon *tcon = drv->tcon;
-+	struct drm_encoder *encoder;
- 	struct sun4i_rgb *rgb;
- 	int ret;
- 
-@@ -210,10 +221,12 @@ int sun4i_rgb_init(struct drm_device *drm)
- 	if (!rgb)
- 		return -ENOMEM;
- 	rgb->drv = drv;
-+	encoder = &rgb->encoder;
- 
- 	tcon->panel = sun4i_tcon_find_panel(tcon->dev->of_node);
--	if (IS_ERR(tcon->panel)) {
--		dev_info(drm->dev, "No panel found... RGB output disabled\n");
-+	encoder->bridge = sun4i_tcon_find_bridge(tcon->dev->of_node);
-+	if (IS_ERR(tcon->panel) && IS_ERR(encoder->bridge)) {
-+		dev_info(drm->dev, "No panel or bridge found... RGB output disabled\n");
- 		return 0;
- 	}
- 
-@@ -232,19 +245,36 @@ int sun4i_rgb_init(struct drm_device *drm)
- 	/* The RGB encoder can only work with the TCON channel 0 */
- 	rgb->encoder.possible_crtcs = BIT(0);
- 
--	drm_connector_helper_add(&rgb->connector,
--				 &sun4i_rgb_con_helper_funcs);
--	ret = drm_connector_init(drm, &rgb->connector,
--				 &sun4i_rgb_con_funcs,
--				 DRM_MODE_CONNECTOR_Unknown);
--	if (ret) {
--		dev_err(drm->dev, "Couldn't initialise the rgb connector\n");
--		goto err_cleanup_connector;
-+	if (!IS_ERR(tcon->panel)) {
-+		drm_connector_helper_add(&rgb->connector,
-+					 &sun4i_rgb_con_helper_funcs);
-+		ret = drm_connector_init(drm, &rgb->connector,
-+					 &sun4i_rgb_con_funcs,
-+					 DRM_MODE_CONNECTOR_Unknown);
-+		if (ret) {
-+			dev_err(drm->dev, "Couldn't initialise the rgb connector\n");
-+			goto err_cleanup_connector;
-+		}
++Required nodes:
 +
-+		drm_mode_connector_attach_encoder(&rgb->connector,
-+						  &rgb->encoder);
++This device has two video ports. Their connections are modeled using the OF
++graph bindings specified in Documentation/devicetree/bindings/graph.txt.
 +
-+		ret = drm_panel_attach(tcon->panel, &rgb->connector);
-+		if (ret) {
-+			dev_err(drm->dev, "Couldn't attach our panel\n");
-+			goto err_cleanup_connector;
-+		}
- 	}
++- Video port 0 for RGB input
++- Video port 1 for VGA output
++
++
++Example
++-------
++
++bridge {
++	compatible = "dumb-vga-bridge";
++	#address-cells = <1>;
++	#size-cells = <0>;
++
++	ports {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		port at 0 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <0>;
++
++			vga_bridge_in: endpoint at 0 {
++				reg = <0>;
++				remote-endpoint = <&tcon0_out_vga>;
++			};
++		};
++
++		port at 1 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <1>;
++
++			vga_bridge_out: endpoint at 0 {
++				reg = <0>;
++				remote-endpoint = <&vga_con_in>;
++			};
++		};
++	};
++};
+diff --git a/drivers/gpu/drm/bridge/Kconfig b/drivers/gpu/drm/bridge/Kconfig
+index a141921445f4..4a6560714397 100644
+--- a/drivers/gpu/drm/bridge/Kconfig
++++ b/drivers/gpu/drm/bridge/Kconfig
+@@ -17,6 +17,12 @@ config DRM_ANALOGIX_ANX78XX
+ 	  the HDMI output of an application processor to MyDP
+ 	  or DisplayPort.
  
--	drm_mode_connector_attach_encoder(&rgb->connector, &rgb->encoder);
-+	if (!IS_ERR(encoder->bridge)) {
-+		encoder->bridge->encoder = &rgb->encoder;
++config DRM_DUMB_VGA
++	tristate "Dumb RGB to VGA Bridge support"
++	select DRM_KMS_HELPER
++	help
++	  Support for passive RGB to VGA bridges
++
+ config DRM_DW_HDMI
+ 	tristate
+ 	select DRM_KMS_HELPER
+diff --git a/drivers/gpu/drm/bridge/Makefile b/drivers/gpu/drm/bridge/Makefile
+index bfec9f8cb9d2..413d783828bb 100644
+--- a/drivers/gpu/drm/bridge/Makefile
++++ b/drivers/gpu/drm/bridge/Makefile
+@@ -1,6 +1,7 @@
+ ccflags-y := -Iinclude/drm
  
--	drm_panel_attach(tcon->panel, &rgb->connector);
-+		ret = drm_bridge_attach(drm, encoder->bridge);
-+		if (ret) {
-+			dev_err(drm->dev, "Couldn't attach our bridge\n");
-+			goto err_cleanup_connector;
-+		}
-+	}
- 
- 	return 0;
- 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-index d2f7489d29a5..2145ecf2cf5d 100644
---- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-@@ -432,6 +432,40 @@ struct drm_panel *sun4i_tcon_find_panel(struct device_node *node)
- 	return of_drm_find_panel(remote) ?: ERR_PTR(-EPROBE_DEFER);
- }
- 
-+struct drm_bridge *sun4i_tcon_find_bridge(struct device_node *node)
+ obj-$(CONFIG_DRM_ANALOGIX_ANX78XX) += analogix-anx78xx.o
++obj-$(CONFIG_DRM_DUMB_VGA) += dumb-vga.o
+ obj-$(CONFIG_DRM_DW_HDMI) += dw-hdmi.o
+ obj-$(CONFIG_DRM_DW_HDMI_AHB_AUDIO) += dw-hdmi-ahb-audio.o
+ obj-$(CONFIG_DRM_NXP_PTN3460) += nxp-ptn3460.o
+diff --git a/drivers/gpu/drm/bridge/dumb-vga.c b/drivers/gpu/drm/bridge/dumb-vga.c
+new file mode 100644
+index 000000000000..c197be591fb6
+--- /dev/null
++++ b/drivers/gpu/drm/bridge/dumb-vga.c
+@@ -0,0 +1,232 @@
++
++#include <linux/module.h>
++#include <linux/of_graph.h>
++
++#include <drm/drmP.h>
++#include <drm/drm_atomic_helper.h>
++#include <drm/drm_crtc.h>
++#include <drm/drm_crtc_helper.h>
++
++struct dumb_vga {
++	struct drm_bridge	bridge;
++	struct drm_connector	connector;
++
++	struct i2c_adapter	*ddc;
++};
++
++static inline struct dumb_vga *
++drm_bridge_to_dumb_vga(struct drm_bridge *bridge)
 +{
-+	struct device_node *port, *remote, *child;
-+	struct device_node *end_node = NULL;
++	return container_of(bridge, struct dumb_vga, bridge);
++}
 +
-+	/* Inputs are listed first, then outputs */
-+	port = of_graph_get_port_by_id(node, 1);
++static inline struct dumb_vga *
++drm_connector_to_dumb_vga(struct drm_connector *connector)
++{
++	return container_of(connector, struct dumb_vga, connector);
++}
++
++static int dumb_vga_get_modes(struct drm_connector *connector)
++{
++	struct dumb_vga *vga = drm_connector_to_dumb_vga(connector);
++	struct edid *edid;
++	int ret;
++
++	if (IS_ERR(vga->ddc))
++		goto fallback;
++
++	edid = drm_get_edid(connector, vga->ddc);
++	if (!edid) {
++		DRM_INFO("EDID readout failed, falling back to standard modes\n");
++		goto fallback;
++	}
++
++	drm_mode_connector_update_edid_property(connector, edid);
++	return drm_add_edid_modes(connector, edid);
++
++fallback:
++	/*
++	 * In case we cannot retrieve the EDIDs (broken or missing i2c
++	 * bus), fallback on the XGA standards
++	 */
++	ret = drm_add_modes_noedid(connector, 1920, 1200);
++
++	/* And prefer a mode pretty much anyone can handle */
++	drm_set_preferred_mode(connector, 1024, 768);
++
++	return ret;
++}
++
++static struct drm_encoder *
++dumb_vga_best_encoder(struct drm_connector *connector)
++{
++	struct dumb_vga *vga = drm_connector_to_dumb_vga(connector);
++
++	return vga->bridge.encoder;
++}
++
++static struct drm_connector_helper_funcs dumb_vga_con_helper_funcs = {
++	.get_modes	= dumb_vga_get_modes,
++	.best_encoder	= dumb_vga_best_encoder,
++};
++
++static enum drm_connector_status
++dumb_vga_connector_detect(struct drm_connector *connector, bool force)
++{
++	struct dumb_vga *vga = drm_connector_to_dumb_vga(connector);
 +
 +	/*
-+	 * Our first output is the RGB interface where the panel will
-+	 * be connected.
++	 * Even if we have an I2C bus, we can't assume that the cable
++	 * is disconnected if drm_probe_ddc. Some cables don't wire
++	 * the DDC pins, or the I2C bus might be disfunctional.
 +	 */
-+	for_each_child_of_node(port, child) {
-+		u32 reg;
++	if (!IS_ERR(vga->ddc) && drm_probe_ddc(vga->ddc))
++		return connector_status_connected;
 +
-+		of_property_read_u32(child, "reg", &reg);
-+		if (reg == 0)
-+			end_node = child;
++	return connector_status_unknown;
++}
++
++static void
++dumb_vga_connector_destroy(struct drm_connector *connector)
++{
++	drm_connector_cleanup(connector);
++}
++
++static struct drm_connector_funcs dumb_vga_con_funcs = {
++	.dpms			= drm_atomic_helper_connector_dpms,
++	.detect			= dumb_vga_connector_detect,
++	.fill_modes		= drm_helper_probe_single_connector_modes,
++	.destroy		= dumb_vga_connector_destroy,
++	.reset			= drm_atomic_helper_connector_reset,
++	.atomic_duplicate_state	= drm_atomic_helper_connector_duplicate_state,
++	.atomic_destroy_state	= drm_atomic_helper_connector_destroy_state,
++};
++
++static int dumb_vga_attach(struct drm_bridge *bridge)
++{
++	struct dumb_vga *vga = drm_bridge_to_dumb_vga(bridge);
++	int ret;
++
++	if (!bridge->encoder) {
++		DRM_ERROR("Missing encoder\n");
++		return -ENODEV;
 +	}
 +
++	drm_connector_helper_add(&vga->connector,
++				 &dumb_vga_con_helper_funcs);
++	ret = drm_connector_init(bridge->dev, &vga->connector,
++				 &dumb_vga_con_funcs, DRM_MODE_CONNECTOR_VGA);
++	if (ret) {
++		DRM_ERROR("Failed to initialize connector\n");
++		return ret;
++	}
++
++	drm_mode_connector_attach_encoder(&vga->connector,
++					  bridge->encoder);
++
++	return 0;
++}
++
++static void dumb_vga_nop(struct drm_bridge *bridge) {};
++
++static struct drm_bridge_funcs dumb_vga_bridge_funcs = {
++	.attach		= dumb_vga_attach,
++	.enable		= dumb_vga_nop,
++	.disable	= dumb_vga_nop,
++	.pre_enable	= dumb_vga_nop,
++	.post_disable	= dumb_vga_nop,
++};
++
++static struct i2c_adapter *dumb_vga_retrieve_ddc(struct device *dev)
++{
++	struct device_node *end_node, *phandle, *remote;
++	struct i2c_adapter *ddc;
++
++	end_node = of_graph_get_endpoint_by_regs(dev->of_node, 1, -1);
 +	if (!end_node) {
-+		DRM_DEBUG_DRIVER("Missing bridge endpoint\n");
++		dev_err(dev, "Missing connector endpoint\n");
 +		return ERR_PTR(-ENODEV);
 +	}
 +
 +	remote = of_graph_get_remote_port_parent(end_node);
++	of_node_put(end_node);
 +	if (!remote) {
-+		DRM_DEBUG_DRIVER("Enable to parse remote node\n");
++		dev_err(dev, "Enable to parse remote node\n");
 +		return ERR_PTR(-EINVAL);
 +	}
 +
-+	return of_drm_find_bridge(remote) ?: ERR_PTR(-EPROBE_DEFER);
++	phandle = of_parse_phandle(remote, "ddc-i2c-bus", 0);
++	of_node_put(remote);
++	if (!phandle)
++		return ERR_PTR(-ENODEV);
++
++	ddc = of_get_i2c_adapter_by_node(phandle);
++	of_node_put(phandle);
++	if (!ddc)
++		return ERR_PTR(-EPROBE_DEFER);
++
++	return ddc;
 +}
 +
- static int sun4i_tcon_bind(struct device *dev, struct device *master,
- 			   void *data)
- {
-@@ -514,19 +548,22 @@ static struct component_ops sun4i_tcon_ops = {
- static int sun4i_tcon_probe(struct platform_device *pdev)
- {
- 	struct device_node *node = pdev->dev.of_node;
-+	struct drm_bridge *bridge;
- 	struct drm_panel *panel;
- 
- 	/*
--	 * The panel is not ready.
-+	 * Neither the bridge or the panel is ready.
- 	 * Defer the probe.
- 	 */
- 	panel = sun4i_tcon_find_panel(node);
-+	bridge = sun4i_tcon_find_bridge(node);
- 
- 	/*
- 	 * If we don't have a panel endpoint, just go on
- 	 */
--	if (PTR_ERR(panel) == -EPROBE_DEFER) {
--		DRM_DEBUG_DRIVER("Still waiting for our panel. Deferring...\n");
-+	if ((PTR_ERR(panel) == -EPROBE_DEFER) &&
-+	    (PTR_ERR(bridge) == -EPROBE_DEFER)) {
-+		DRM_DEBUG_DRIVER("Still waiting for our panel/bridge. Deferring...\n");
- 		return -EPROBE_DEFER;
- 	}
- 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.h b/drivers/gpu/drm/sun4i/sun4i_tcon.h
-index 4f81d86ee5a4..100bfa093277 100644
---- a/drivers/gpu/drm/sun4i/sun4i_tcon.h
-+++ b/drivers/gpu/drm/sun4i/sun4i_tcon.h
-@@ -166,6 +166,7 @@ struct sun4i_tcon {
- 	struct drm_panel		*panel;
- };
- 
-+struct drm_bridge *sun4i_tcon_find_bridge(struct device_node *node);
- struct drm_panel *sun4i_tcon_find_panel(struct device_node *node);
- 
- /* Global Control */
++static int dumb_vga_probe(struct platform_device *pdev)
++{
++	struct dumb_vga *vga;
++	int ret;
++
++	vga = devm_kzalloc(&pdev->dev, sizeof(*vga), GFP_KERNEL);
++	if (!vga)
++		return -ENOMEM;
++	platform_set_drvdata(pdev, vga);
++
++	vga->ddc = dumb_vga_retrieve_ddc(&pdev->dev);
++	if (IS_ERR(vga->ddc)) {
++		if (PTR_ERR(vga->ddc) == -ENODEV) {
++			dev_info(&pdev->dev,
++				 "No i2c bus specified... Disabling EDID readout\n");
++		} else {
++			dev_err(&pdev->dev, "Couldn't retrieve i2c bus\n");
++			return PTR_ERR(vga->ddc);
++		}
++	}
++
++	vga->bridge.funcs = &dumb_vga_bridge_funcs;
++	vga->bridge.of_node = pdev->dev.of_node;
++
++	ret = drm_bridge_add(&vga->bridge);
++	if (ret && !IS_ERR(vga->ddc))
++		i2c_put_adapter(vga->ddc);
++
++	return ret;
++}
++
++static int dumb_vga_remove(struct platform_device *pdev)
++{
++	struct dumb_vga *vga = platform_get_drvdata(pdev);
++
++	drm_bridge_remove(&vga->bridge);
++
++	if (!IS_ERR(vga->ddc))
++		i2c_put_adapter(vga->ddc);
++
++	return 0;
++}
++
++static const struct of_device_id dumb_vga_match[] = {
++	{ .compatible = "dumb-vga-bridge" },
++	{},
++};
++MODULE_DEVICE_TABLE(of, dumb_vga_match);
++
++struct platform_driver dumb_vga_driver = {
++	.probe	= dumb_vga_probe,
++	.remove	= dumb_vga_remove,
++	.driver		= {
++		.name		= "dumb-vga-bridge",
++		.of_match_table	= dumb_vga_match,
++	},
++};
++module_platform_driver(dumb_vga_driver);
++
++MODULE_AUTHOR("Maxime Ripard <maxime.ripard@free-electrons.com>");
++MODULE_DESCRIPTION("Dumb RGB to VGA bridge driver");
++MODULE_LICENSE("GPL");
 -- 
 2.9.0
