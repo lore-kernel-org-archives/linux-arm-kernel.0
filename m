@@ -1,235 +1,415 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 20 Jul 2016 12:23:33 +0100
-Subject: [RFC PATCH v3 11/13] drivers: iommu: arm-smmu-v3: add IORT platform
- device creation
+Date: Wed, 20 Jul 2016 12:23:27 +0100
+Subject: [RFC PATCH v3 05/13] drivers: iommu: make iommu_fwspec OF agnostic
 In-Reply-To: <1469013815-24380-1-git-send-email-lorenzo.pieralisi@arm.com>
 References: <1469013815-24380-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <1469013815-24380-12-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <1469013815-24380-6-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In ACPI bases systems, in order to be able to create platform
-devices and initialize them for ARM SMMU v3 components, the IORT
-kernel implementation requires a set of static functions to be
-used by the IORT kernel layer to configure platform devices for
-ARM SMMU v3 components.
+The iommu_fwspec structure, used to hold per device iommu configuration
+data is not OF specific and therefore can be moved to a generic
+and OF independent compilation unit.
 
-Add static configuration functions to the IORT kernel layer for
-the ARM SMMU v3 components, so that the ARM SMMU v3 driver can
-initialize its respective platform device by relying on the IORT
-kernel infrastructure and by adding a corresponding ACPI device
-early probe section entry.
+In particular, the iommu_fwspec handling hinges on the device_node
+pointer to identify the IOMMU device associated with the iommu_fwspec
+structure, that is easily converted to a more generic fwnode_handle
+pointer that can cater for OF and non-OF (ie ACPI) systems.
+
+Create the files and related Kconfig entry to decouple iommu_fwspec
+structure from the OF iommu kernel layer.
+
+Given that the current iommu_fwspec implementation relies on
+the arch specific struct device.archdata.iommu field in its
+implementation, by making the code standalone and independent
+of the OF layer this patch makes sure that the iommu_fwspec
+kernel code can be selected only on arches implementing the
+struct device.archdata.iommu field by adding an explicit
+arch dependency in its config entry.
+
+Current drivers using the iommu_fwspec for streamid translation
+are converted to the new iommu_fwspec API by simply converting
+the device_node to its fwnode_handle pointer.
 
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
+Cc: Hanjun Guo <hanjun.guo@linaro.org>
 Cc: Robin Murphy <robin.murphy@arm.com>
 Cc: Joerg Roedel <joro@8bytes.org>
 ---
- drivers/acpi/iort.c         | 98 ++++++++++++++++++++++++++++++++++++++++++++-
- drivers/iommu/arm-smmu-v3.c | 58 +++++++++++++++++++++++++++
- 2 files changed, 155 insertions(+), 1 deletion(-)
+ drivers/iommu/Kconfig        |   4 ++
+ drivers/iommu/Makefile       |   1 +
+ drivers/iommu/arm-smmu-v3.c  |  13 +++--
+ drivers/iommu/iommu-fwspec.c | 114 +++++++++++++++++++++++++++++++++++++++++++
+ drivers/iommu/of_iommu.c     |  52 --------------------
+ include/linux/iommu-fwspec.h |  60 +++++++++++++++++++++++
+ include/linux/of_iommu.h     |  24 +++------
+ 7 files changed, 196 insertions(+), 72 deletions(-)
+ create mode 100644 drivers/iommu/iommu-fwspec.c
+ create mode 100644 include/linux/iommu-fwspec.h
 
-diff --git a/drivers/acpi/iort.c b/drivers/acpi/iort.c
-index 23c80c7..c91e45d 100644
---- a/drivers/acpi/iort.c
-+++ b/drivers/acpi/iort.c
-@@ -455,6 +455,90 @@ iort_get_device_domain(struct device *dev, u32 req_id)
- 	return irq_find_matching_fwnode(handle, DOMAIN_BUS_PCI_MSI);
- }
+diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
+index d1c66af..2b26bfb 100644
+--- a/drivers/iommu/Kconfig
++++ b/drivers/iommu/Kconfig
+@@ -67,6 +67,10 @@ config OF_IOMMU
+        def_bool y
+        depends on OF && IOMMU_API
  
-+static void acpi_smmu_v3_register_irq(int hwirq, const char *name,
-+				      struct resource *res)
-+{
-+	int irq = acpi_register_gsi(NULL, hwirq, ACPI_EDGE_SENSITIVE,
-+				    ACPI_ACTIVE_HIGH);
++config IOMMU_FWSPEC
++       def_bool y
++       depends on ARM64 && IOMMU_API
 +
-+	if (irq < 0) {
-+		pr_err("could not register gsi hwirq %d name [%s]\n", hwirq,
-+								      name);
-+		return;
-+	}
-+
-+	res->start = irq;
-+	res->end = irq;
-+	res->flags = IORESOURCE_IRQ;
-+	res->name = name;
-+}
-+
-+static int arm_smmu_v3_count_resources(struct acpi_iort_node *node)
-+{
-+	struct acpi_iort_smmu_v3 *smmu;
-+	/* Always present mem resource */
-+	int num_res = 1;
-+
-+	/* Retrieve SMMUv3 specific data */
-+	smmu = (struct acpi_iort_smmu_v3 *)node->node_data;
-+
-+	if (smmu->event_gsiv)
-+		num_res++;
-+
-+	if (smmu->pri_gsiv)
-+		num_res++;
-+
-+	if (smmu->gerr_gsiv)
-+		num_res++;
-+
-+	if (smmu->sync_gsiv)
-+		num_res++;
-+
-+	return num_res;
-+}
-+
-+static void arm_smmu_v3_init_resources(struct resource *res,
-+				       struct acpi_iort_node *node)
-+{
-+	struct acpi_iort_smmu_v3 *smmu;
-+	int num_res = 0;
-+
-+	/* Retrieve SMMUv3 specific data */
-+	smmu = (struct acpi_iort_smmu_v3 *)node->node_data;
-+
-+	res[num_res].start = smmu->base_address;
-+	res[num_res].end = smmu->base_address + SZ_128K - 1;
-+	res[num_res].flags = IORESOURCE_MEM;
-+
-+	num_res++;
-+
-+	if (smmu->event_gsiv)
-+		acpi_smmu_v3_register_irq(smmu->event_gsiv, "eventq",
-+					  &res[num_res++]);
-+
-+	if (smmu->pri_gsiv)
-+		acpi_smmu_v3_register_irq(smmu->pri_gsiv, "priq",
-+				       &res[num_res++]);
-+
-+	if (smmu->gerr_gsiv)
-+		acpi_smmu_v3_register_irq(smmu->gerr_gsiv, "gerror",
-+					  &res[num_res++]);
-+
-+	if (smmu->sync_gsiv)
-+		acpi_smmu_v3_register_irq(smmu->sync_gsiv, "cmdq-sync",
-+					  &res[num_res++]);
-+}
-+
-+static bool arm_smmu_v3_is_coherent(struct acpi_iort_node *node)
-+{
-+	struct acpi_iort_smmu_v3 *smmu;
-+
-+	/* Retrieve SMMUv3 specific data */
-+	smmu = (struct acpi_iort_smmu_v3 *)node->node_data;
-+
-+	return smmu->flags & ACPI_IORT_SMMU_V3_COHACC_OVERRIDE;
-+}
-+
- struct iort_iommu_config {
- 	const char *name;
- 	int (*iommu_init)(struct acpi_iort_node *node);
-@@ -464,10 +548,22 @@ struct iort_iommu_config {
- 				     struct acpi_iort_node *node);
- };
- 
-+const struct iort_iommu_config iort_arm_smmu_v3_cfg = {
-+	.name = "arm-smmu-v3",
-+	.iommu_is_coherent = arm_smmu_v3_is_coherent,
-+	.iommu_count_resources = arm_smmu_v3_count_resources,
-+	.iommu_init_resources = arm_smmu_v3_init_resources
-+};
-+
- static inline const struct iort_iommu_config *
- iort_get_iommu_config(struct acpi_iort_node *node)
- {
--	return NULL;
-+	switch (node->type) {
-+	case ACPI_IORT_NODE_SMMU_V3:
-+		return &iort_arm_smmu_v3_cfg;
-+	default:
-+		return NULL;
-+	}
- }
- 
- /**
+ # IOMMU-agnostic DMA-mapping layer
+ config IOMMU_DMA
+ 	bool
+diff --git a/drivers/iommu/Makefile b/drivers/iommu/Makefile
+index c6edb31..dd85337 100644
+--- a/drivers/iommu/Makefile
++++ b/drivers/iommu/Makefile
+@@ -7,6 +7,7 @@ obj-$(CONFIG_IOMMU_IO_PGTABLE_ARMV7S) += io-pgtable-arm-v7s.o
+ obj-$(CONFIG_IOMMU_IO_PGTABLE_LPAE) += io-pgtable-arm.o
+ obj-$(CONFIG_IOMMU_IOVA) += iova.o
+ obj-$(CONFIG_OF_IOMMU)	+= of_iommu.o
++obj-$(CONFIG_IOMMU_FWSPEC) += iommu-fwspec.o
+ obj-$(CONFIG_MSM_IOMMU) += msm_iommu.o msm_iommu_dev.o
+ obj-$(CONFIG_AMD_IOMMU) += amd_iommu.o amd_iommu_init.o
+ obj-$(CONFIG_AMD_IOMMU_V2) += amd_iommu_v2.o
 diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index 1a4e9ce..294ed5e 100644
+index 98e6441..052a26c 100644
 --- a/drivers/iommu/arm-smmu-v3.c
 +++ b/drivers/iommu/arm-smmu-v3.c
-@@ -1749,6 +1749,8 @@ arm_smmu_get_by_fwnode(struct fwnode_handle *handle)
+@@ -25,6 +25,7 @@
+ #include <linux/err.h>
+ #include <linux/interrupt.h>
+ #include <linux/iommu.h>
++#include <linux/iommu-fwspec.h>
+ #include <linux/iopoll.h>
+ #include <linux/module.h>
+ #include <linux/msi.h>
+@@ -1739,9 +1740,13 @@ arm_smmu_iova_to_phys(struct iommu_domain *domain, dma_addr_t iova)
+ 	return ret;
+ }
  
- 	if (is_of_node(handle))
- 		smmu_pdev = of_find_device_by_node(to_of_node(handle));
-+	else if (is_fwnode_iommu(handle))
-+		smmu_pdev = platform_find_device_by_fwnode(handle);
+-static struct arm_smmu_device *arm_smmu_get_by_node(struct device_node *np)
++static struct arm_smmu_device *
++arm_smmu_get_by_fwnode(struct fwnode_handle *handle)
+ {
+-	struct platform_device *smmu_pdev = of_find_device_by_node(np);
++	struct platform_device *smmu_pdev = NULL;
++
++	if (is_of_node(handle))
++		smmu_pdev = of_find_device_by_node(to_of_node(handle));
  
  	if (!smmu_pdev)
  		return NULL;
-@@ -1771,6 +1773,7 @@ static struct iommu_ops arm_smmu_ops;
- static int arm_smmu_add_device(struct device *dev)
- {
- 	int i, ret;
-+
- 	struct arm_smmu_device *smmu;
- 	struct arm_smmu_master_data *master;
- 	struct iommu_fwspec *fwspec = dev_iommu_fwspec(dev);
-@@ -2741,6 +2744,61 @@ static int __init arm_smmu_of_init(struct device_node *np)
- }
- IOMMU_OF_DECLARE(arm_smmuv3, "arm,smmu-v3", arm_smmu_of_init);
+@@ -1780,7 +1785,7 @@ static int arm_smmu_add_device(struct device *dev)
+ 		master = fwspec->iommu_priv;
+ 		smmu = master->smmu;
+ 	} else {
+-		smmu = arm_smmu_get_by_node(fwspec->iommu_np);
++		smmu = arm_smmu_get_by_fwnode(fwspec->iommu_fwnode);
+ 		if (!smmu)
+ 			return -ENODEV;
+ 		master = kzalloc(sizeof(*master), GFP_KERNEL);
+@@ -1892,7 +1897,7 @@ out_unlock:
  
-+#ifdef CONFIG_ACPI
-+static int acpi_smmu_v3_init(struct acpi_table_header *table)
-+{
-+	struct acpi_iort_node *iort_node, *iort_end;
-+	struct acpi_table_iort *iort;
+ static int arm_smmu_of_xlate(struct device *dev, struct of_phandle_args *args)
+ {
+-	int ret = iommu_fwspec_init(dev, args->np);
++	int ret = iommu_fwspec_init(dev, &args->np->fwnode);
+ 
+ 	if (!ret)
+ 		ret = iommu_fwspec_add_ids(dev, &args->args[0], 1);
+diff --git a/drivers/iommu/iommu-fwspec.c b/drivers/iommu/iommu-fwspec.c
+new file mode 100644
+index 0000000..0600c17
+--- /dev/null
++++ b/drivers/iommu/iommu-fwspec.c
+@@ -0,0 +1,114 @@
++/*
++ * Firmware handling helpers for IOMMU
++ *
++ * Copyright (c) 2016 ARM Ltd.  All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ */
++
++#include <linux/iommu.h>
++#include <linux/iommu-fwspec.h>
++#include <linux/of_iommu.h>
++#include <linux/slab.h>
++
++struct fwspec_iommu_node {
++	struct list_head list;
 +	struct fwnode_handle *fwnode;
-+	int i, ret;
++	const struct iommu_ops *ops;
++};
++static LIST_HEAD(fwnode_iommu_list);
++static DEFINE_SPINLOCK(fwspec_iommu_lock);
 +
-+	/*
-+	 * table and iort will both point to the start of IORT table, but
-+	 * have different struct types
-+	 */
-+	iort = (struct acpi_table_iort *)table;
++void fwspec_iommu_set_ops(struct fwnode_handle *fwnode,
++			  const struct iommu_ops *ops)
++{
++	struct fwspec_iommu_node *iommu =
++				kzalloc(sizeof(*iommu), GFP_KERNEL);
 +
-+	/* Get the first IORT node */
-+	iort_node = ACPI_ADD_PTR(struct acpi_iort_node, table,
-+				 iort->node_offset);
-+	iort_end = ACPI_ADD_PTR(struct acpi_iort_node, table,
-+				table->length);
++	if (WARN_ON(!iommu))
++		return;
 +
-+	for (i = 0; i < iort->node_count; i++) {
-+
-+		if (iort_node >= iort_end) {
-+			pr_err("iort node pointer overflows, bad table\n");
-+			return -EINVAL;
-+		}
-+
-+		if (iort_node->type == ACPI_IORT_NODE_SMMU_V3) {
-+			fwnode = iommu_alloc_fwnode();
-+
-+			if (!fwnode)
-+				return -ENOMEM;
-+
-+			ret = iort_add_smmu_platform_device(fwnode,
-+							    iort_node);
-+			if (ret)
-+				goto free;
-+
-+			fwspec_iommu_set_ops(fwnode, &arm_smmu_ops);
-+		}
-+
-+		iort_node = ACPI_ADD_PTR(struct acpi_iort_node, iort_node,
-+					 iort_node->length);
-+	}
-+
-+	return 0;
-+free:
-+	iommu_free_fwnode(fwnode);
-+	return ret;
-+
++	INIT_LIST_HEAD(&iommu->list);
++	iommu->fwnode = fwnode;
++	iommu->ops = ops;
++	spin_lock(&fwspec_iommu_lock);
++	list_add_tail(&iommu->list, &fwnode_iommu_list);
++	spin_unlock(&fwspec_iommu_lock);
 +}
-+IORT_ACPI_DECLARE(arm_smmu_v3, ACPI_SIG_IORT, acpi_smmu_v3_init);
 +
-+#endif
++const struct iommu_ops *fwspec_iommu_get_ops(struct fwnode_handle *fwnode)
++{
++	struct fwspec_iommu_node *node;
++	const struct iommu_ops *ops = NULL;
 +
- MODULE_DESCRIPTION("IOMMU API for ARM architected SMMUv3 implementations");
- MODULE_AUTHOR("Will Deacon <will.deacon@arm.com>");
- MODULE_LICENSE("GPL v2");
++	spin_lock(&fwspec_iommu_lock);
++	list_for_each_entry(node, &fwnode_iommu_list, list)
++		if (node->fwnode == fwnode) {
++			ops = node->ops;
++			break;
++		}
++	spin_unlock(&fwspec_iommu_lock);
++	return ops;
++}
++
++int iommu_fwspec_init(struct device *dev,
++		      struct fwnode_handle *iommu_fwnode)
++{
++	struct iommu_fwspec *fwspec = dev->archdata.iommu;
++	const struct iommu_ops *ops;
++
++	if (fwspec)
++		return 0;
++
++	fwspec = kzalloc(sizeof(*fwspec), GFP_KERNEL);
++	if (!fwspec)
++		return -ENOMEM;
++
++	if (is_of_node(iommu_fwnode))
++		ops = of_iommu_get_ops(to_of_node(iommu_fwnode));
++	else
++		ops = fwspec_iommu_get_ops(iommu_fwnode);
++
++	fwspec->iommu_fwnode = iommu_fwnode;
++	fwspec->iommu_ops = ops;
++
++	dev->archdata.iommu = fwspec;
++	return 0;
++}
++
++void iommu_fwspec_free(struct device *dev)
++{
++	kfree(dev->archdata.iommu);
++}
++
++int iommu_fwspec_add_ids(struct device *dev, u32 *ids, int num_ids)
++{
++	struct iommu_fwspec *fwspec = dev->archdata.iommu;
++	size_t size;
++
++	if (!fwspec)
++		return -EINVAL;
++
++	size = offsetof(struct iommu_fwspec, ids[fwspec->num_ids + 1]);
++	fwspec = krealloc(dev->archdata.iommu, size, GFP_KERNEL);
++	if (!fwspec)
++		return -ENOMEM;
++
++	while (num_ids--)
++		fwspec->ids[fwspec->num_ids++] = *ids++;
++
++	dev->archdata.iommu = fwspec;
++	return 0;
++}
++
++inline struct iommu_fwspec *dev_iommu_fwspec(struct device *dev)
++{
++	return dev->archdata.iommu;
++}
+diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
+index 4618e89..1fe1f62 100644
+--- a/drivers/iommu/of_iommu.c
++++ b/drivers/iommu/of_iommu.c
+@@ -216,55 +216,3 @@ void __init of_iommu_init(void)
+ 				of_node_full_name(np));
+ 	}
+ }
+-
+-int iommu_fwspec_init(struct device *dev, struct device_node *iommu_np)
+-{
+-	struct iommu_fwspec *fwspec = dev->archdata.iommu;
+-
+-	if (fwspec)
+-		return 0;
+-
+-	fwspec = kzalloc(sizeof(*fwspec), GFP_KERNEL);
+-	if (!fwspec)
+-		return -ENOMEM;
+-
+-	fwspec->iommu_np = of_node_get(iommu_np);
+-	fwspec->iommu_ops = of_iommu_get_ops(iommu_np);
+-	dev->archdata.iommu = fwspec;
+-	return 0;
+-}
+-
+-void iommu_fwspec_free(struct device *dev)
+-{
+-	struct iommu_fwspec *fwspec = dev->archdata.iommu;
+-
+-	if (fwspec) {
+-		of_node_put(fwspec->iommu_np);
+-		kfree(fwspec);
+-	}
+-}
+-
+-int iommu_fwspec_add_ids(struct device *dev, u32 *ids, int num_ids)
+-{
+-	struct iommu_fwspec *fwspec = dev->archdata.iommu;
+-	size_t size;
+-
+-	if (!fwspec)
+-		return -EINVAL;
+-
+-	size = offsetof(struct iommu_fwspec, ids[fwspec->num_ids + 1]);
+-	fwspec = krealloc(dev->archdata.iommu, size, GFP_KERNEL);
+-	if (!fwspec)
+-		return -ENOMEM;
+-
+-	while (num_ids--)
+-		fwspec->ids[fwspec->num_ids++] = *ids++;
+-
+-	dev->archdata.iommu = fwspec;
+-	return 0;
+-}
+-
+-inline struct iommu_fwspec *dev_iommu_fwspec(struct device *dev)
+-{
+-	return dev->archdata.iommu;
+-}
+diff --git a/include/linux/iommu-fwspec.h b/include/linux/iommu-fwspec.h
+new file mode 100644
+index 0000000..3a572c6
+--- /dev/null
++++ b/include/linux/iommu-fwspec.h
+@@ -0,0 +1,60 @@
++#ifndef __IOMMU_FWSPEC_H
++#define __IOMMU_FWSPEC_H
++
++#include <linux/device.h>
++#include <linux/iommu.h>
++
++struct iommu_fwspec {
++	const struct iommu_ops	*iommu_ops;
++	struct fwnode_handle	*iommu_fwnode;
++	void			*iommu_priv;
++	unsigned int		num_ids;
++	u32			ids[];
++};
++
++#ifdef CONFIG_IOMMU_FWSPEC
++int iommu_fwspec_init(struct device *dev,
++		      struct fwnode_handle *iommu_fwnode);
++void iommu_fwspec_free(struct device *dev);
++int iommu_fwspec_add_ids(struct device *dev, u32 *ids, int num_ids);
++struct iommu_fwspec *dev_iommu_fwspec(struct device *dev);
++
++void fwspec_iommu_set_ops(struct fwnode_handle *fwnode,
++			  const struct iommu_ops *ops);
++const struct iommu_ops *fwspec_iommu_get_ops(struct fwnode_handle *fwnode);
++#else /* CONFIG_IOMMU_FWSPEC */
++static inline int iommu_fwspec_init(struct device *dev,
++				    struct fwnode_handle *iommu_fwnode)
++{
++	return -ENODEV;
++}
++
++static inline void iommu_fwspec_free(struct device *dev)
++{
++}
++
++static inline int iommu_fwspec_add_ids(struct device *dev, u32 *ids,
++				       int num_ids)
++{
++	return -ENODEV;
++}
++
++static inline struct iommu_fwspec *dev_iommu_fwspec(struct device *dev)
++{
++	return NULL;
++}
++
++static inline void fwspec_iommu_set_ops(struct fwnode_handle *fwnode,
++					const struct iommu_ops *ops)
++{
++}
++
++static inline const struct iommu_ops *
++fwspec_iommu_get_ops(struct fwnode_handle *fwnode)
++{
++	return NULL;
++}
++
++#endif /* CONFIG_IOMMU_FWSPEC */
++
++#endif /* __IOMMU_FWSPEC_H */
+diff --git a/include/linux/of_iommu.h b/include/linux/of_iommu.h
+index 308791f..2362232 100644
+--- a/include/linux/of_iommu.h
++++ b/include/linux/of_iommu.h
+@@ -15,13 +15,8 @@ extern void of_iommu_init(void);
+ extern const struct iommu_ops *of_iommu_configure(struct device *dev,
+ 					struct device_node *master_np);
+ 
+-struct iommu_fwspec {
+-	const struct iommu_ops	*iommu_ops;
+-	struct device_node	*iommu_np;
+-	void			*iommu_priv;
+-	unsigned int		num_ids;
+-	u32			ids[];
+-};
++void of_iommu_set_ops(struct device_node *np, const struct iommu_ops *ops);
++const struct iommu_ops *of_iommu_get_ops(struct device_node *np);
+ 
+ #else
+ 
+@@ -39,17 +34,14 @@ static inline const struct iommu_ops *of_iommu_configure(struct device *dev,
+ 	return NULL;
+ }
+ 
+-struct iommu_fwspec;
+-
+-#endif	/* CONFIG_OF_IOMMU */
++static inline void of_iommu_set_ops(struct device_node *np,
++				    const struct iommu_ops *ops)
++{ }
+ 
+-int iommu_fwspec_init(struct device *dev, struct device_node *iommu_np);
+-void iommu_fwspec_free(struct device *dev);
+-int iommu_fwspec_add_ids(struct device *dev, u32 *ids, int num_ids);
+-struct iommu_fwspec *dev_iommu_fwspec(struct device *dev);
++static inline const struct iommu_ops *
++of_iommu_get_ops(struct device_node *np) { return NULL; }
+ 
+-void of_iommu_set_ops(struct device_node *np, const struct iommu_ops *ops);
+-const struct iommu_ops *of_iommu_get_ops(struct device_node *np);
++#endif	/* CONFIG_OF_IOMMU */
+ 
+ extern struct of_device_id __iommu_of_table;
+ 
 -- 
 2.6.4
