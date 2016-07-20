@@ -1,153 +1,145 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 20 Jul 2016 12:23:31 +0100
-Subject: [RFC PATCH v3 09/13] drivers: iommu: arm-smmu-v3: split probe
- functions into DT/generic portions
+Date: Wed, 20 Jul 2016 12:23:28 +0100
+Subject: [RFC PATCH v3 06/13] drivers: acpi: implement acpi_dma_configure
 In-Reply-To: <1469013815-24380-1-git-send-email-lorenzo.pieralisi@arm.com>
 References: <1469013815-24380-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <1469013815-24380-10-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <1469013815-24380-7-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Current ARM SMMUv3 probe functions intermingle HW and DT probing in the
-initialization functions to detect and programme the ARM SMMU v3 driver
-features. In order to allow probing the ARM SMMUv3 with other firmwares
-than DT, this patch splits the ARM SMMUv3 init functions into DT and HW
-specific portions so that other FW interfaces (ie ACPI) can reuse the HW
-probing functions and skip the DT portion accordingly.
+On DT based systems, the of_dma_configure() API implements DMA
+configuration for a given device. On ACPI systems an API equivalent to
+of_dma_configure() is missing which implies that it is currently not
+possible to set-up DMA operations for devices through the ACPI generic
+kernel layer.
 
-This patch implements no functional change, only code reshuffling.
+This patch fills the gap by introducing acpi_dma_configure/deconfigure()
+calls that for now are just wrappers around arch_setup_dma_ops() and
+arch_teardown_dma_ops() and also updates ACPI and PCI core code to use
+the newly introduced acpi_dma_configure/acpi_dma_deconfigure functions.
+
+The DMA range size passed to arch_setup_dma_ops() is sized according
+to the device coherent_dma_mask (starting at address 0x0), mirroring the
+DT probing path behaviour when a dma-ranges property is not provided
+for the device being probed; this changes the current arch_setup_dma_ops()
+call parameters in the ACPI probing case, but since arch_setup_dma_ops()
+is a NOP on all architectures but ARM/ARM64 this patch does not change
+the current kernel behaviour on them.
 
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Acked-by: Will Deacon <will.deacon@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Hanjun Guo <hanjun.guo@linaro.org>
+Acked-by: Bjorn Helgaas <bhelgaas@google.com> [pci]
+Cc: Bjorn Helgaas <bhelgaas@google.com>
 Cc: Robin Murphy <robin.murphy@arm.com>
+Cc: Tomasz Nowicki <tn@semihalf.com>
 Cc: Joerg Roedel <joro@8bytes.org>
+Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
 ---
- drivers/iommu/arm-smmu-v3.c | 63 +++++++++++++++++++++++++++++++++++++--------
- 1 file changed, 52 insertions(+), 11 deletions(-)
+ drivers/acpi/glue.c     |  4 ++--
+ drivers/acpi/scan.c     | 24 ++++++++++++++++++++++++
+ drivers/pci/probe.c     |  3 +--
+ include/acpi/acpi_bus.h |  2 ++
+ include/linux/acpi.h    |  5 +++++
+ 5 files changed, 34 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index 052a26c..15e74da 100644
---- a/drivers/iommu/arm-smmu-v3.c
-+++ b/drivers/iommu/arm-smmu-v3.c
-@@ -20,6 +20,7 @@
-  * This driver is powered by bad coffee and bombay mix.
-  */
+diff --git a/drivers/acpi/glue.c b/drivers/acpi/glue.c
+index 5ea5dc2..f8d6564 100644
+--- a/drivers/acpi/glue.c
++++ b/drivers/acpi/glue.c
+@@ -227,8 +227,7 @@ int acpi_bind_one(struct device *dev, struct acpi_device *acpi_dev)
  
-+#include <linux/acpi.h>
- #include <linux/delay.h>
- #include <linux/dma-iommu.h>
- #include <linux/err.h>
-@@ -27,6 +28,7 @@
- #include <linux/iommu.h>
- #include <linux/iommu-fwspec.h>
- #include <linux/iopoll.h>
-+#include <linux/iort.h>
- #include <linux/module.h>
- #include <linux/msi.h>
- #include <linux/of.h>
-@@ -2377,10 +2379,10 @@ static int arm_smmu_device_reset(struct arm_smmu_device *smmu)
+ 	attr = acpi_get_dma_attr(acpi_dev);
+ 	if (attr != DEV_DMA_NOT_SUPPORTED)
+-		arch_setup_dma_ops(dev, 0, 0, NULL,
+-				   attr == DEV_DMA_COHERENT);
++		acpi_dma_configure(dev, attr);
+ 
+ 	acpi_physnode_link_name(physical_node_name, node_id);
+ 	retval = sysfs_create_link(&acpi_dev->dev.kobj, &dev->kobj,
+@@ -251,6 +250,7 @@ int acpi_bind_one(struct device *dev, struct acpi_device *acpi_dev)
  	return 0;
+ 
+  err:
++	acpi_dma_deconfigure(dev);
+ 	ACPI_COMPANION_SET(dev, NULL);
+ 	put_device(dev);
+ 	put_device(&acpi_dev->dev);
+diff --git a/drivers/acpi/scan.c b/drivers/acpi/scan.c
+index 5f28cf7..b4b9064 100644
+--- a/drivers/acpi/scan.c
++++ b/drivers/acpi/scan.c
+@@ -1358,6 +1358,30 @@ enum dev_dma_attr acpi_get_dma_attr(struct acpi_device *adev)
+ 		return DEV_DMA_NON_COHERENT;
  }
  
--static int arm_smmu_device_probe(struct arm_smmu_device *smmu)
-+static int arm_smmu_device_hw_probe(struct arm_smmu_device *smmu)
++/**
++ * acpi_dma_configure - Set-up DMA configuration for the device.
++ * @dev: The pointer to the device
++ * @attr: device dma attributes
++ */
++void acpi_dma_configure(struct device *dev, enum dev_dma_attr attr)
++{
++	/*
++	 * Assume dma valid range starts at 0 and covers the whole
++	 * coherent_dma_mask.
++	 */
++	arch_setup_dma_ops(dev, 0, dev->coherent_dma_mask + 1, NULL,
++			   attr == DEV_DMA_COHERENT);
++}
++
++/**
++ * acpi_dma_deconfigure - Tear-down DMA configuration for the device.
++ * @dev: The pointer to the device
++ */
++void acpi_dma_deconfigure(struct device *dev)
++{
++	arch_teardown_dma_ops(dev);
++}
++
+ static void acpi_init_coherency(struct acpi_device *adev)
  {
- 	u32 reg;
--	bool coherent;
-+	bool coherent = smmu->features & ARM_SMMU_FEAT_COHERENCY;
+ 	unsigned long long cca = 0;
+diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+index 380d46d..7ef3933 100644
+--- a/drivers/pci/probe.c
++++ b/drivers/pci/probe.c
+@@ -1725,8 +1725,7 @@ static void pci_dma_configure(struct pci_dev *dev)
+ 		if (attr == DEV_DMA_NOT_SUPPORTED)
+ 			dev_warn(&dev->dev, "DMA not supported.\n");
+ 		else
+-			arch_setup_dma_ops(&dev->dev, 0, 0, NULL,
+-					   attr == DEV_DMA_COHERENT);
++			acpi_dma_configure(&dev->dev, attr);
+ 	}
  
- 	/* IDR0 */
- 	reg = readl_relaxed(smmu->base + ARM_SMMU_IDR0);
-@@ -2432,13 +2434,9 @@ static int arm_smmu_device_probe(struct arm_smmu_device *smmu)
- 		smmu->features |= ARM_SMMU_FEAT_HYP;
+ 	pci_put_host_bridge_device(bridge);
+diff --git a/include/acpi/acpi_bus.h b/include/acpi/acpi_bus.h
+index 788c6c35..8b5039a 100644
+--- a/include/acpi/acpi_bus.h
++++ b/include/acpi/acpi_bus.h
+@@ -566,6 +566,8 @@ struct acpi_pci_root {
  
- 	/*
--	 * The dma-coherent property is used in preference to the ID
-+	 * The coherency feature as set by FW is used in preference to the ID
- 	 * register, but warn on mismatch.
- 	 */
--	coherent = of_dma_is_coherent(smmu->dev->of_node);
--	if (coherent)
--		smmu->features |= ARM_SMMU_FEAT_COHERENCY;
--
- 	if (!!(reg & IDR0_COHACC) != coherent)
- 		dev_warn(smmu->dev, "IDR0.COHACC overridden by dma-coherent property (%s)\n",
- 			 coherent ? "true" : "false");
-@@ -2559,7 +2557,44 @@ static int arm_smmu_device_probe(struct arm_smmu_device *smmu)
- 	return 0;
+ bool acpi_dma_supported(struct acpi_device *adev);
+ enum dev_dma_attr acpi_get_dma_attr(struct acpi_device *adev);
++void acpi_dma_configure(struct device *dev, enum dev_dma_attr attr);
++void acpi_dma_deconfigure(struct device *dev);
+ 
+ struct acpi_device *acpi_find_child_device(struct acpi_device *parent,
+ 					   u64 address, bool check_children);
+diff --git a/include/linux/acpi.h b/include/linux/acpi.h
+index 288fac5..135a452 100644
+--- a/include/linux/acpi.h
++++ b/include/linux/acpi.h
+@@ -676,6 +676,11 @@ static inline enum dev_dma_attr acpi_get_dma_attr(struct acpi_device *adev)
+ 	return DEV_DMA_NOT_SUPPORTED;
  }
  
--static int arm_smmu_device_dt_probe(struct platform_device *pdev)
-+#ifdef CONFIG_ACPI
-+static int arm_smmu_device_acpi_probe(struct platform_device *pdev,
-+				      struct arm_smmu_device *smmu)
-+{
-+	struct acpi_iort_smmu_v3 *iort_smmu;
-+	struct device *dev = smmu->dev;
-+	struct acpi_iort_node *node;
++static inline void acpi_dma_configure(struct device *dev,
++				      enum dev_dma_attr attr) { }
 +
-+	node = *(struct acpi_iort_node **)dev_get_platdata(dev);
++static inline void acpi_dma_deconfigure(struct device *dev) { }
 +
-+	/* Retrieve SMMUv3 specific data */
-+	iort_smmu = (struct acpi_iort_smmu_v3 *)node->node_data;
-+
-+	if (iort_smmu->flags & ACPI_IORT_SMMU_V3_COHACC_OVERRIDE)
-+		smmu->features |= ARM_SMMU_FEAT_COHERENCY;
-+
-+	return 0;
-+}
-+#else
-+static int arm_smmu_device_acpi_probe(struct platform_device *pdev,
-+				      struct arm_smmu_device *smmu)
-+{
-+	return -ENODEV;
-+}
-+#endif
-+
-+static int arm_smmu_device_dt_probe(struct platform_device *pdev,
-+				    struct arm_smmu_device *smmu)
-+{
-+	parse_driver_options(smmu);
-+
-+	if (of_dma_is_coherent(smmu->dev->of_node))
-+		smmu->features |= ARM_SMMU_FEAT_COHERENCY;
-+
-+	return 0;
-+}
-+
-+static int arm_smmu_device_probe(struct platform_device *pdev)
- {
- 	int irq, ret;
- 	struct resource *res;
-@@ -2601,10 +2636,16 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
- 	if (irq > 0)
- 		smmu->gerr_irq = irq;
+ #define ACPI_PTR(_ptr)	(NULL)
  
--	parse_driver_options(smmu);
-+	if (acpi_disabled)
-+		ret = arm_smmu_device_dt_probe(pdev, smmu);
-+	else
-+		ret = arm_smmu_device_acpi_probe(pdev, smmu);
-+
-+	if (ret)
-+		return ret;
- 
- 	/* Probe the h/w */
--	ret = arm_smmu_device_probe(smmu);
-+	ret = arm_smmu_device_hw_probe(smmu);
- 	if (ret)
- 		return ret;
- 
-@@ -2639,7 +2680,7 @@ static struct platform_driver arm_smmu_driver = {
- 		.name		= "arm-smmu-v3",
- 		.of_match_table	= of_match_ptr(arm_smmu_of_match),
- 	},
--	.probe	= arm_smmu_device_dt_probe,
-+	.probe	= arm_smmu_device_probe,
- 	.remove	= arm_smmu_device_remove,
- };
- 
+ #endif	/* !CONFIG_ACPI */
 -- 
 2.6.4
