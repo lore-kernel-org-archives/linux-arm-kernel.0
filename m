@@ -1,107 +1,100 @@
-From: adrian.hunter@intel.com (Adrian Hunter)
-Date: Thu, 21 Jul 2016 10:46:57 +0300
-Subject: [PATCH V2 08/15] mmc: sdhci: add standard hw auto retuning support
-In-Reply-To: <1468309584-3591-9-git-send-email-aisheng.dong@nxp.com>
-References: <1468309584-3591-1-git-send-email-aisheng.dong@nxp.com>
- <1468309584-3591-9-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <57907DF1.60104@intel.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 21 Jul 2016 09:55:19 +0200
+Subject: [PATCH v2 3/5] ARM: sun8i: dt: Add DT bindings documentation for
+ Allwinner sun8i-emac
+In-Reply-To: <1469001800-11615-4-git-send-email-clabbe.montjoie@gmail.com>
+References: <1469001800-11615-1-git-send-email-clabbe.montjoie@gmail.com>
+ <1469001800-11615-4-git-send-email-clabbe.montjoie@gmail.com>
+Message-ID: <20160721075519.GC5993@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/07/16 10:46, Dong Aisheng wrote:
-> If HW supports SDHCI_TUNING_MODE_3 which is auto retuning, we won't
-> retune during runtime suspend and resume, instead we use Re-tuning
-> Request signaled via SDHCI_INT_RETUNE interrupt to do retuning and
-> hw auto retuning during data transfer to guarantee the signal sample
-> window correction.
+Hi,
+
+On Wed, Jul 20, 2016 at 10:03:18AM +0200, LABBE Corentin wrote:
+> This patch adds documentation for Device-Tree bindings for the
+> Allwinner sun8i-emac driver.
 > 
-> This can avoid a mass of repeatedly retuning during small file system
-> data access and improve the performance.
-> 
-> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
-
-
-Acked-by: Adrian Hunter <adrian.hunter@intel.com>
-
-
+> Signed-off-by: LABBE Corentin <clabbe.montjoie@gmail.com>
 > ---
->  drivers/mmc/host/sdhci.c | 15 ++++++++++++---
->  drivers/mmc/host/sdhci.h |  3 +++
->  2 files changed, 15 insertions(+), 3 deletions(-)
+>  .../bindings/net/allwinner,sun8i-emac.txt          | 65 ++++++++++++++++++++++
+>  1 file changed, 65 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/net/allwinner,sun8i-emac.txt
 > 
-> diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
-> index 7894652b9929..31c14b0ff8e2 100644
-> --- a/drivers/mmc/host/sdhci.c
-> +++ b/drivers/mmc/host/sdhci.c
-> @@ -229,6 +229,10 @@ static void sdhci_init(struct sdhci_host *host, int soft)
->  		    SDHCI_INT_TIMEOUT | SDHCI_INT_DATA_END |
->  		    SDHCI_INT_RESPONSE;
->  
-> +	if (host->tuning_mode == SDHCI_TUNING_MODE_2 ||
-> +	    host->tuning_mode == SDHCI_TUNING_MODE_3)
-> +		host->ier |= SDHCI_INT_RETUNE;
+> diff --git a/Documentation/devicetree/bindings/net/allwinner,sun8i-emac.txt b/Documentation/devicetree/bindings/net/allwinner,sun8i-emac.txt
+> new file mode 100644
+> index 0000000..4bf4e53
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/net/allwinner,sun8i-emac.txt
+> @@ -0,0 +1,65 @@
+> +* Allwinner sun8i EMAC ethernet controller
 > +
->  	sdhci_writel(host, host->ier, SDHCI_INT_ENABLE);
->  	sdhci_writel(host, host->ier, SDHCI_SIGNAL_ENABLE);
->  
-> @@ -2673,6 +2677,9 @@ static irqreturn_t sdhci_irq(int irq, void *dev_id)
->  			pr_err("%s: Card is consuming too much power!\n",
->  				mmc_hostname(host->mmc));
->  
-> +		if (intmask & SDHCI_INT_RETUNE)
-> +			mmc_retune_needed(host->mmc);
+> +Required properties:
+> +- compatible: "allwinner,sun8i-a83t-emac", "allwinner,sun8i-h3-emac",
+> +		or "allwinner,sun50i-a64-emac"
+> +- reg: address and length of the register sets for the device.
+> +- reg-names: should be "emac" and "syscon", matching the register sets
+
+Blindly mapping a register of some other device on the SoC doesn't
+look very reasonable.
+
+> +- interrupts: interrupt for the device
+> +- clocks: A phandle to the reference clock for this device
+> +- clock-names: should be "ahb"
+> +- resets: A phandle to the reset control for this device
+> +- reset-names: should be "ahb"
+> +- phy-mode: See ethernet.txt
+> +- phy or phy-handle: See ethernet.txt
+> +- #address-cells: shall be 1
+> +- #size-cells: shall be 0
 > +
->  		if (intmask & SDHCI_INT_CARD_INT) {
->  			sdhci_enable_sdio_irq_nolock(host, false);
->  			host->thread_isr |= SDHCI_INT_CARD_INT;
-> @@ -2682,7 +2689,7 @@ static irqreturn_t sdhci_irq(int irq, void *dev_id)
->  		intmask &= ~(SDHCI_INT_CARD_INSERT | SDHCI_INT_CARD_REMOVE |
->  			     SDHCI_INT_CMD_MASK | SDHCI_INT_DATA_MASK |
->  			     SDHCI_INT_ERROR | SDHCI_INT_BUS_POWER |
-> -			     SDHCI_INT_CARD_INT);
-> +			     SDHCI_INT_RETUNE | SDHCI_INT_CARD_INT);
->  
->  		if (intmask) {
->  			unexpected |= intmask;
-> @@ -2787,7 +2794,8 @@ int sdhci_suspend_host(struct sdhci_host *host)
->  	sdhci_disable_card_detection(host);
->  
->  	mmc_retune_timer_stop(host->mmc);
-> -	mmc_retune_needed(host->mmc);
-> +	if (host->tuning_mode != SDHCI_TUNING_MODE_3)
-> +		mmc_retune_needed(host->mmc);
->  
->  	if (!device_may_wakeup(mmc_dev(host->mmc))) {
->  		host->ier = 0;
-> @@ -2848,7 +2856,8 @@ int sdhci_runtime_suspend_host(struct sdhci_host *host)
->  	unsigned long flags;
->  
->  	mmc_retune_timer_stop(host->mmc);
-> -	mmc_retune_needed(host->mmc);
-> +	if (host->tuning_mode != SDHCI_TUNING_MODE_3)
-> +		mmc_retune_needed(host->mmc);
->  
->  	spin_lock_irqsave(&host->lock, flags);
->  	host->ier &= SDHCI_INT_CARD_INT;
-> diff --git a/drivers/mmc/host/sdhci.h b/drivers/mmc/host/sdhci.h
-> index e241e11a90d0..0411c9f36461 100644
-> --- a/drivers/mmc/host/sdhci.h
-> +++ b/drivers/mmc/host/sdhci.h
-> @@ -128,6 +128,7 @@
->  #define  SDHCI_INT_CARD_INSERT	0x00000040
->  #define  SDHCI_INT_CARD_REMOVE	0x00000080
->  #define  SDHCI_INT_CARD_INT	0x00000100
-> +#define  SDHCI_INT_RETUNE	0x00001000
->  #define  SDHCI_INT_ERROR	0x00008000
->  #define  SDHCI_INT_TIMEOUT	0x00010000
->  #define  SDHCI_INT_CRC		0x00020000
-> @@ -518,6 +519,8 @@ struct sdhci_host {
->  	unsigned int		tuning_count;	/* Timer count for re-tuning */
->  	unsigned int		tuning_mode;	/* Re-tuning mode supported by host */
->  #define SDHCI_TUNING_MODE_1	0
-> +#define SDHCI_TUNING_MODE_2	1
-> +#define SDHCI_TUNING_MODE_3	2
->  
->  	unsigned long private[0] ____cacheline_aligned;
->  };
-> 
+> +"allwinner,sun8i-h3-emac" also requires:
+> +- clocks: an extra phandle to the reference clock for the EPHY
+> +- clock-names: an extra "ephy" entry matching the clocks property
+> +- resets: an extra phandle to the reset control for the EPHY
+> +- resets-names: an extra "ephy" entry matching the resets property
+
+Shouldn't that be attached to the phy itself?
+
+> +See ethernet.txt in the same directory for generic bindings for ethernet
+> +controllers.
+> +
+> +The device node referenced by "phy" or "phy-handle" should be a child node
+> +of this node. See phy.txt for the generic PHY bindings.
+> +
+> +Optional properties:
+> +- phy-supply: phandle to a regulator if the PHY needs one
+> +- phy-io-supply: phandle to a regulator if the PHY needs a another one for I/O.
+> +		 This is sometimes found with RGMII PHYs, which use a second
+> +		 regulator for the lower I/O voltage.
+> +- allwinner,tx-delay: The setting of the TX clock delay chain
+> +- allwinner,rx-delay: The setting of the RX clock delay chain
+
+In which unit? What is the default value?
+
+> +
+> +The TX/RX clock delay chain settings are board specific.
+> +
+> +Optional properties for "allwinner,sun8i-h3-emac":
+> +- allwinner,use-internal-phy: Use the H3 SoC's internal E(thernet) PHY
+
+Can't that be derived from the presence of the phy property?
+
+> +- allwinner,leds-active-low: EPHY LEDs are active low
+
+That also seems PHY related. Overall, I feel like we really need a phy
+node for the internal phy.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160721/88a7e1f6/attachment.sig>
