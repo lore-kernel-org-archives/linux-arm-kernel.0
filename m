@@ -1,64 +1,55 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Thu, 21 Jul 2016 11:34:25 -0700
-Subject: [PATCH v3 02/11] mm: Hardened usercopy
-In-Reply-To: <5790711f.2350420a.b4287.2cc0SMTPIN_ADDED_BROKEN@mx.google.com>
-References: <1468619065-3222-1-git-send-email-keescook@chromium.org>
- <1468619065-3222-3-git-send-email-keescook@chromium.org>
- <5790711f.2350420a.b4287.2cc0SMTPIN_ADDED_BROKEN@mx.google.com>
-Message-ID: <CAGXu5jLCu1Vv0uugKZrsjSEsoABgXJSOJ8GkKmrHbvj9jkC2YA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 21 Jul 2016 20:36:14 +0200
+Subject: [PATCH] ARM: mps2: fix typo
+In-Reply-To: <c192d67a-891a-31a3-d919-d1101e1b7db4@arm.com>
+References: <f607bbd274fe705955116ba590d31ac788f402bf.1468744529.git.baruch@tkos.co.il>
+ <4283147.1vrh2ZlxD5@wuerfel> <c192d67a-891a-31a3-d919-d1101e1b7db4@arm.com>
+Message-ID: <4431558.vilS2ZKHUM@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 20, 2016 at 11:52 PM, Michael Ellerman <mpe@ellerman.id.au> wrote:
-> Kees Cook <keescook@chromium.org> writes:
->
->> diff --git a/mm/usercopy.c b/mm/usercopy.c
->> new file mode 100644
->> index 000000000000..e4bf4e7ccdf6
->> --- /dev/null
->> +++ b/mm/usercopy.c
->> @@ -0,0 +1,234 @@
-> ...
->> +
->> +/*
->> + * Checks if a given pointer and length is contained by the current
->> + * stack frame (if possible).
->> + *
->> + *   0: not at all on the stack
->> + *   1: fully within a valid stack frame
->> + *   2: fully on the stack (when can't do frame-checking)
->> + *   -1: error condition (invalid stack position or bad stack frame)
->> + */
->> +static noinline int check_stack_object(const void *obj, unsigned long len)
->> +{
->> +     const void * const stack = task_stack_page(current);
->> +     const void * const stackend = stack + THREAD_SIZE;
->
-> That allows access to the entire stack, including the struct thread_info,
-> is that what we want - it seems dangerous? Or did I miss a check
-> somewhere else?
+On Thursday, July 21, 2016 4:04:18 PM CEST Sudeep Holla wrote:
+> 
+> On 21/07/16 13:39, Arnd Bergmann wrote:
+> > On Monday, July 18, 2016 11:13:30 AM CEST Vladimir Murzin wrote:
+> >> On 17/07/16 09:35, Baruch Siach wrote:
+> >>> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+> >>> ---
+> >>>  arch/arm/Kconfig | 2 +-
+> >>>  1 file changed, 1 insertion(+), 1 deletion(-)
+> >>>
+> >>> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> >>> index 90542db1220d..8ebe5d86b707 100644
+> >>> --- a/arch/arm/Kconfig
+> >>> +++ b/arch/arm/Kconfig
+> >>> @@ -901,7 +901,7 @@ config MACH_STM32F429
+> >>>       default y
+> >>>
+> >>>  config ARCH_MPS2
+> >>> -     bool "ARM MPS2 paltform"
+> >>> +     bool "ARM MPS2 platform"
+> >>>       depends on ARM_SINGLE_ARMV7M
+> >>>       select ARM_AMBA
+> >>>       select CLKSRC_MPS2
+> >>>
+> >>
+> >> Reviewed-by: Vladimir Murzin <vladimir.murzin@arm.com>
+> >>
+> >>
+> >
+> > Merged into next/cleanup, thanks!
+> >
+> 
+> Thanks Arnd, I was thinking on how to organize into branches along with
+> other of/DT refcounting fixes I had for vexpress/scpi code. You made it
+> easy.
 
-That seems like a nice improvement to make, yeah.
+Oops, I actually miscategorized the patch and shouldn't have applied it
+without your Ack. I'm glad it worked out for you this time. If you get
+into this situation again for one separate patch, feel free to just
+ask us at arm at kernel.org to apply it directly.
 
-> We have end_of_stack() which computes the end of the stack taking
-> thread_info into account (end being the opposite of your end above).
+In doubt, just send more branches (one per topic) than might be needed
+and let us deal with how to split them up into our branches.
 
-Amusingly, the object_is_on_stack() check in sched.h doesn't take
-thread_info into account either. :P Regardless, I think using
-end_of_stack() may not be best. To tighten the check, I think we could
-add this after checking that the object is on the stack:
-
-#ifdef CONFIG_STACK_GROWSUP
-        stackend -= sizeof(struct thread_info);
-#else
-        stack += sizeof(struct thread_info);
-#endif
-
-e.g. then if the pointer was in the thread_info, the second test would
-fail, triggering the protection.
-
--Kees
-
--- 
-Kees Cook
-Chrome OS & Brillo Security
+	Arnd
