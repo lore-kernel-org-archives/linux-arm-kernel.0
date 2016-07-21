@@ -1,39 +1,38 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Fri, 22 Jul 2016 06:08:54 +0800
-Subject: [PATCH v5 3/3] arm: dts: mt2701: Add auxadc node.
-In-Reply-To: <1469085449-22679-4-git-send-email-zhiyong.tao@mediatek.com>
-Message-ID: <201607220639.0tIT3cRj%fengguang.wu@intel.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 21 Jul 2016 17:16:05 -0500
+Subject: [PATCH 14/18] ARM: mvebu: add support for the Armada 395 SoC
+ family
+In-Reply-To: <1469105055-25181-16-git-send-email-jaz@semihalf.com>
+References: <1469105055-25181-1-git-send-email-jaz@semihalf.com>
+ <1469105055-25181-16-git-send-email-jaz@semihalf.com>
+Message-ID: <20160721221605.GA21883@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Jul 21, 2016 at 02:44:11PM +0200, Grzegorz Jaszczyk wrote:
+> Beside interfaces described in the armada-39x.dtsi, the Armada 395 SoC
+> family supports: 2 x SATA3 (2 ports in one unit) and the USB3.0
+> 
+> Signed-off-by: Grzegorz Jaszczyk <jaz@semihalf.com>
+> ---
+>  .../devicetree/bindings/arm/marvell/armada-39x.txt |  2 +-
+>  arch/arm/boot/dts/armada-395.dtsi                  | 76 ++++++++++++++++++++++
+>  2 files changed, 77 insertions(+), 1 deletion(-)
+>  create mode 100644 arch/arm/boot/dts/armada-395.dtsi
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/marvell/armada-39x.txt b/Documentation/devicetree/bindings/arm/marvell/armada-39x.txt
+> index 53d4ff9..f066801 100644
+> --- a/Documentation/devicetree/bindings/arm/marvell/armada-39x.txt
+> +++ b/Documentation/devicetree/bindings/arm/marvell/armada-39x.txt
+> @@ -17,4 +17,4 @@ compatible: must contain "marvell,armada398"
+>  
+>  Example:
+>  
+> -compatible = "marvell,a398-db", "marvell,armada398", "marvell,armada390";
+> +compatible = "marvell,a398-db", "marvell,armada398", "marvell,armada395", "marvell,armada390";
 
-[auto build test ERROR on robh/for-next]
-[also build test ERROR on v4.7-rc7 next-20160721]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+If 395 came after 398, then it should come first in the order. This 
+implies that marvell,armada398 is a better match than marvell,armada395. 
+Or perhaps you shouldn't have both?
 
-url:    https://github.com/0day-ci/linux/commits/Zhiyong-Tao/AUXADC-Mediatek-auxadc-driver/20160722-041141
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git for-next
-config: arm-at91_dt_defconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 5.4.0-6) 5.4.0 20160609
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
-
-All errors (new ones prefixed by >>):
-
->> Error: arch/arm/boot/dts/mt2701.dtsi:145.22-23 syntax error
-   FATAL ERROR: Unable to parse input tree
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 21319 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160722/d4a5fbee/attachment-0001.obj>
+Rob
