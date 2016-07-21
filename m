@@ -1,179 +1,88 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 21 Jul 2016 11:31:21 +0100
-Subject: [PATCH v1 3/4] arm64: Add arm64 kexec support
-In-Reply-To: <1469042361.2977.90.camel@infradead.org>
-References: <cover.1468970114.git.geoff@infradead.org>
- <9ed513fd44a19b2f49b4da99477cedfff7341bf0.1468970114.git.geoff@infradead.org>
- <20160720153859.GG24691@leverpostej>
- <1469042361.2977.90.camel@infradead.org>
-Message-ID: <20160721103120.GB20559@leverpostej>
+From: dongas86@gmail.com (Dong Aisheng)
+Date: Thu, 21 Jul 2016 18:23:31 +0800
+Subject: [PATCH V2 00/15] a few sdhci/imx clean up and fix patches
+In-Reply-To: <579096B5.2030509@intel.com>
+References: <1468309584-3591-1-git-send-email-aisheng.dong@nxp.com>
+ <579096B5.2030509@intel.com>
+Message-ID: <20160721102330.GA20072@shlinux2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 20, 2016 at 12:19:21PM -0700, Geoff Levand wrote:
-> > > +static uint64_t read_sink(const char *command_line)
-> > > +{
-> > > +> > 	> > uint64_t v;
-> > > +> > 	> > const char *p;
-> > > +
-> > > +> > 	> > if (arm64_opts.port)
-> > > +> > 	> > 	> > return arm64_opts.port;
-> > > +
-> > > +#if defined(ARM64_DEBUG_PORT)
-> > > +> > 	> > return (uint64_t)(ARM64_DEBUG_PORT);
-> > > +#endif
-> > > +> > 	> > if (!command_line)
-> > > +> > 	> > 	> > return 0;
-> > > +
-> > > +> > 	> > if (!(p = strstr(command_line, "earlyprintk=")) &&
-> > > +> > 	> > 	> > !(p = strstr(command_line, "earlycon=")))
-> > > +> > 	> > 	> > return 0;
-> > > +
-> > > +> > 	> > while (*p != ',')
-> > > +> > 	> > 	> > p++;
-> > > +
-> > > +> > 	> > p++;
-> > > +
-> > > +> > 	> > while (isspace(*p))
-> > > +> > 	> > 	> > p++;
+On Thu, Jul 21, 2016 at 12:32:37PM +0300, Adrian Hunter wrote:
+> On 12/07/16 10:46, Dong Aisheng wrote:
+> > Patch 1~10 are mainly sdhci cleanup patches while patch 7,9,10
+> > are fixes which seems needed for stable tree as well.
+> 
+> I have ack'ed all the sdhci-related patches. i.e. all but patch 7 the dt
+> bindings change.
+> 
+> I am not sure what needs to be done for stable.  I would suggest these
+> patches are queued for 4.8, then Dong can send the relevant patches to the
+> linux-stable mailing list separately after -rc1.
+> 
+
+Good suggestion!
+I also think that would be a better way due to many updates recently which
+may cause trouble on the simply back porting.
+
+Regards
+Dong Aisheng
+
 > > 
-> > Why do we skip spaces? As far as I am aware, there should not be any
-> > spaces in the option.
-> 
-> Sure, I can remove it.
-> 
-> > > +
-> > > +> > 	> > if (*p == 0)
-> > > +> > 	> > 	> > return 0;
-> > > +
-> > > +> > 	> > errno = 0;
-> > > +
-> > > +> > 	> > v = strtoull(p, NULL, 0);
-> > > +
-> > > +> > 	> > if (errno)
-> > > +> > 	> > 	> > return 0;
-> > > +
-> > > +> > 	> > return v;
-> > > +}
+> > The main work is:
+> > 1) using more robust mmc_regulator_set_vqmmc 
+> > 2) add auto retune support
+> > 3) improve sdhci-esdhc-imx stability
+> > 4) add state save and restore for low power mode
 > > 
-> > It looks like the purgatory code expects angel SWI as the earlycon,
-> 
-> Maybe you saw the debug_brk macro in entry.S?  I should remove
-> that and just loop.
-
-Ah, sorry. For some reason I got that confused with the sink code. My
-bad.
-
-Now I see that's assuming an 8-bit MMIO register.
-
-> > whereas many other earlycons exist (with pl011 being extremely popular).
-> > Regardless, if we assume a particular UART type, we should explicitly
-> > verify that here. Otherwise the purgatory code will likely bring down
-> > the system, and it will be very painful to debug.
+> > Change Log:
+> > v1->v2:
+> >  * address all Adrian's comments
+> >  * below patches are dropped
+> >   mmc: sdhci: move sdhci_get_cd() forward to avoid declaration
+> >   mmc: core: fix a comment typo
+> >   mmc: sdhci: re-factor sdhci_start_signal_voltage()
+> >   mmc: core: mmc_regulator_set_vqmmc not return error if vqmmc/vmmc not
+> >     exist
+> >   mmc: sdhci: check SDHCI_QUIRK2_NO_1_8_V when do voltage switch
+> >   mmc: sdhci: rename quirk SDHCI_QUIRK_MULTIBLOCK_READ_ACMD12
+> > 	Above clean up is not needed so far according to Adrian.
 > > 
-> > Please explicitly check for the supported earlycon name.
-> 
-> Purgatory just writes bytes to the address given.  Are there
-> UARTs that don't have TX as the first port?
-
-I'm not sure, but it's certainly possible. The generic earlycon binding
-doesn't guarantee that the first address is a TX register. Even if they
-don't exist today, they could in a month's time, so I don't think we
-should assume anything.
-
-Additionally, the width of that TX register can differ (e.g.
-uart8250,mmio vs uart8250,mmio32), and some UARTs aren't very forgiving
-if accessed with the wrong width.
-
-> To be safe, we could do a check when we get the address from
-> an earlycon parameter. 
-
-Yup. I think you need a whitelist of UARTs that can be handled, along
-with parsing for their options (e.g. mmio vs mmio32), giving up if
-unknown options are spotted.
-
-> Here's what I found in the dts'.  The
-> first three are OK, but I don't know about the others.  
-
-I believe you can find the full set with:
-
-$ git grep EARLYCON_DECLARE
-
-[...]
-
-> > > +> > 	> > if (result)
-> > > +> > 	> > 	> > fprintf(stderr, "kexec: Warning: No device tree available.\n");
+> >   mmc: sdhci: fix incorrect get data interrupt during no data transfer
+> > 	This one is not needed anymore cause Adrian had another fix
+> > 	already in tree.
+> > 	(commit 0e0a35d2d4058 mmc: sdhci: Track whether a reset is pending)
 > > 
-> > There are other reasons we'd return an error (e.g. mismatched enable
-> > methods), so this is somewhat misleading.
+> >   mmc: core: disable auto retune during card detection process
+> > 	This one will sent out in another patch series to fix in CORE.
 > > 
-> > I believe that in all cases we log the specific reason first anyway, so
-> > perhaps it's best to jsut remove this warning.
-> 
-> Yes, this could be removed.
-> 
-> > Won't this also be very noisy in the case of ACPI with a stub DTB? In
-> > that case ther are no cpu nodes, and may be no memory nodes.
-> 
-> Should we just remove check_cpu_nodes and everything associated with
-> it?  It is a lot of code, and all it does now is issue warnings.
-> It is still around from the early days of spin_table support.  
-
-That sounds fine to me.
-
-> As for memory nodes, we currently look at the dt, then fall back
-> to iomem. We could switch the order, iomem then dt, but then
-> those just issue dbgprintf's.
-
-Sure.
-
-> > > +int arm64_process_image_header(const struct arm64_image_header *h)
-> > > +{
-> > > +#if !defined(KERNEL_IMAGE_SIZE)
-> > > +# define KERNEL_IMAGE_SIZE (768 * 1024)
-> > > +#endif
-> > > +
-> > > +> > 	> > if (!arm64_header_check_magic(h))
-> > > +> > 	> > 	> > return -EINVAL;
-> > > +
-> > > +> > 	> > if (h->image_size) {
-> > > +> > 	> > 	> > arm64_mem.text_offset = le64_to_cpu(h->text_offset);
-> > > +> > 	> > 	> > arm64_mem.image_size = le64_to_cpu(h->image_size);
-> > > +> > 	> > } else {
-> > > +> > 	> > 	> > /* For 3.16 and older kernels. */
-> > > +> > 	> > 	> > arm64_mem.text_offset = 0x80000;
-> > > +> > 	> > 	> > arm64_mem.image_size = KERNEL_IMAGE_SIZE;
-> > > +> > 	> > }
-> > > +
-> > > +> > 	> > return 0;
-> > > +}
+> > v1:
+> > http://www.spinics.net/lists/linux-mmc/msg36316.html
 > > 
-> > A v3.16 defconfig Image with the Linaro 14.09 GCC 4.9 toolchain is
-> > 6.3MB, so the chosen value for KERNEL_IMAGE_SIZE is far too small. I'm
-> > not sure what to suggest as a better value, however, as I know that some
-> > configurations are far bigger than that.
+> > Dong Aisheng (15):
+> >   mmc: sdhci: using common mmc_regulator_set_vqmmc()
+> >   mmc: sdhci-esdhc-imx: remove SDHCI_QUIRK_BROKEN_TIMEOUT_VAL
+> >   mmc: sdhci-esdhc-imx: add esdhc specific suspend resume callback
+> >   mmc: sdhci-esdhc-imx: restore watermark level setting after resume
+> >   mmc: sdhci-esdhci-imx: disable DLL delay line settings explicitly
+> >   mmc: sdhci-esdhc-imx: support setting tuning start point
+> >   doc: dt: fsl-imx-esdhc: add set tuning start point binding
+> >   mmc: sdhci: add standard hw auto retuning support
+> >   mmc: sdhci-esdhc-imx: enable hw auto retuning for STD_TUNING
+> >   mmc: sdhci-esdhc-imx: enable hw auto retuning for MAN_TUNING
+> >   mmc: sdhci-esdhc-imx: fix strobe DLL lock wrong clock issue
+> >   mmc: sdhci-esdhc-imx: factor out hw related initialization into
+> >     function
+> >   mmc: sdhci-esdhc-imx: move tuning static configuration into hwinit
+> >     function
+> >   mmc: sdhci-esdhci-imx: re-initialize hw state after resume
+> >   mmc: sdhci-esdhc-imx: clear tuning bits during driver probe
+> > 
+> >  .../devicetree/bindings/mmc/fsl-imx-esdhc.txt      |   2 +
+> >  drivers/mmc/host/sdhci-esdhc-imx.c                 | 149 ++++++++++++++-------
+> >  drivers/mmc/host/sdhci.c                           |  24 ++--
+> >  drivers/mmc/host/sdhci.h                           |   3 +
+> >  include/linux/platform_data/mmc-esdhc-imx.h        |   1 +
+> >  5 files changed, 122 insertions(+), 57 deletions(-)
+> > 
 > 
-> OK, I'll make it bigger, say 7.  When I set this up I expected
-> the distro maintainer to choose KERNEL_IMAGE_SIZE to match their
-> needs.
-
-To give some headroom, bumping to 16 or so is probably a safer bet.
-
-Perhaps it's worth logging a warning that we're guessing the effective
-image size in this case? That could avoid a lot of head-scratching if
-things do end up overlapping.
-
-> > Do we expect to kexec to a v3.16 or earlier kernel, given we need a much
-> > newer first kernel to have kexec in the first place? We could mandate
-> > having a header with a non-zero image_size (i.e. the target kernel has
-> > to be v3.16 or newer).
-> 
-> Kexec could be installed as a bootloader, and users may want the
-> ability to boot older installations, so I think it worthwile to
-> have.
-
-Sure. I was under the impression that most distros had chosen v3.16 or
-later, but I have no problem with trying to support earlier kernels.
-
-Thanks,
-Mark.
