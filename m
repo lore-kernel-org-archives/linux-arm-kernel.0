@@ -1,58 +1,43 @@
-From: Joao.Pinto@synopsys.com (Joao Pinto)
-Date: Thu, 21 Jul 2016 11:11:23 +0100
-Subject: [PATCH 2/2] PCI: designware: let dw_pcie_link_up() beware of
- LTSSM training bit
-In-Reply-To: <20160718103851.7cd3984a@xhacker>
-References: <1467802782-3024-1-git-send-email-jszhang@marvell.com>
- <1467802782-3024-3-git-send-email-jszhang@marvell.com>
- <2e9d2b8c-f4c3-aa6d-38be-314213db7727@synopsys.com>
- <20160718103851.7cd3984a@xhacker>
-Message-ID: <c79de6c7-5d86-4090-085b-63163d2467e7@synopsys.com>
+From: suzuki.poulose@arm.com (Suzuki K Poulose)
+Date: Thu, 21 Jul 2016 11:12:55 +0100
+Subject: [PATCH] arm64: Fix incorrect per-cpu usage for boot CPU
+Message-ID: <1469095975-976-1-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+In smp_prepare_boot_cpu(), we invoke cpuinfo_store_boot_cpu to  store
+the cpuinfo in a per-cpu ptr, before initialising the per-cpu offset for
+the boot CPU. This patch reorders the sequence to make sure we initialise
+the per-cpu offset before accessing the per-cpu area.
 
-Hi Jisheng,
+Commit 4b998ff1885eec ("arm64: Delay cpuinfo_store_boot_cpu") fixed the
+issue where we modified the per-cpu area even before the kernel initialises
+the per-cpu areas, but failed to wait until the boot cpu updated it's
+offset.
 
-On 7/18/2016 3:38 AM, Jisheng Zhang wrote:
-> Dear Joao,
-> 
-> On Fri, 15 Jul 2016 16:10:24 +0100 Joao Pinto wrote:
-> 
->> Hi,
->>
->> On 7/6/2016 11:59 AM, Jisheng Zhang wrote:
->>> The link may be UP but still in link training. In this case, we can't
->>> think the link is up and operating correctly. So we need to teach
->>> dw_pcie_link_up() beware of the PCIE_PHY_DEBUG_R1_LINK_IN_TRAINING bit.
->>>
->>> This patch also rewrite PCIE_PHY_DEBUG_R1_LINK_UP definition so that
->>> it's consistent with other MACROS.
->>>
->>> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
->>> ---
->>>  drivers/pci/host/pcie-designware.c | 6 ++++--
->>>  1 file changed, 4 insertions(+), 2 deletions(-)
->>>
->>> diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
->>> index 9df879a..29e10dd 100644
->>> --- a/drivers/pci/host/pcie-designware.c
->>> +++ b/drivers/pci/host/pcie-designware.c
->>> @@ -73,7 +73,8 @@
->>>  /* PCIe Port Logic registers */
->>>  #define PLR_OFFSET			0x700
->>>  #define PCIE_PHY_DEBUG_R1		(PLR_OFFSET + 0x2c)
->>> -#define PCIE_PHY_DEBUG_R1_LINK_UP	0x00000010
->>> +#define PCIE_PHY_DEBUG_R1_LINK_UP	(0x1 << 4)
->>> +#define PCIE_PHY_DEBUG_R1_LINK_IN_TRAINING	(0x1 << 29)  
->>
->> According to the databook bit 29 is inside a range that is dedicated to M-PCIe.
->> Have you checked bit 29 state by experience?
-> 
-> bit 29 here is bit 61 of cxpl_debug_info(64bit) in databook, the debug info is
-> composited by debug 0 and debug 1 registers.
+Fixes: commit 4b998ff1885eec ("arm64: Delay cpuinfo_store_boot_cpu")
+Cc: <stable@vger.kernel.org>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+---
+ arch/arm64/kernel/smp.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-You are absolutely correct... I misread the databook in this subject.
-In the latest Core versions this is also valid.
-
-Acked-By: Joao Pinto <jpinto@synopsys.com>
+diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+index 62ff3c0..d242e81 100644
+--- a/arch/arm64/kernel/smp.c
++++ b/arch/arm64/kernel/smp.c
+@@ -437,9 +437,9 @@ void __init smp_cpus_done(unsigned int max_cpus)
+ 
+ void __init smp_prepare_boot_cpu(void)
+ {
++	set_my_cpu_offset(per_cpu_offset(smp_processor_id()));
+ 	cpuinfo_store_boot_cpu();
+ 	save_boot_cpu_run_el();
+-	set_my_cpu_offset(per_cpu_offset(smp_processor_id()));
+ }
+ 
+ static u64 __init of_get_cpu_mpidr(struct device_node *dn)
+-- 
+2.7.4
