@@ -1,51 +1,49 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Thu, 21 Jul 2016 11:26:55 +0200
-Subject: [PATCH 2/3] mmc: sunxi: Set the 'New Timing' register for 8
- bits DDR transfers
-In-Reply-To: <20160721085615.GG5993@lukather>
-References: <cover.1469082481.git.moinejf@free.fr>
- <bc7b767cad6db159a44c4b98d5b1f3eb53c26bd3.1469082481.git.moinejf@free.fr>
- <20160721085615.GG5993@lukather>
-Message-ID: <20160721112655.941b1dad04f7a5b94d4172c1@free.fr>
+From: hzpeterchen@gmail.com (Peter Chen)
+Date: Thu, 21 Jul 2016 17:20:12 +0800
+Subject: [PATCH v3 5/6] usb: chipidea: let chipidea core device of_node
+ equal's glue layer device of_node
+In-Reply-To: <20160721091438.GL1041@n2100.armlinux.org.uk>
+References: <1469007629-31757-1-git-send-email-peter.chen@nxp.com>
+ <1469007629-31757-6-git-send-email-peter.chen@nxp.com>
+ <20160721091438.GL1041@n2100.armlinux.org.uk>
+Message-ID: <20160721092012.GA22749@shlinux2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 21 Jul 2016 10:56:15 +0200
-Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
-
-> On Wed, Jul 20, 2016 at 08:16:28PM +0200, Jean-Francois Moine wrote:
-> > The 'new timing mode' with 8 bits DDR works correctly when the NewTiming
-> > register is set.
+On Thu, Jul 21, 2016 at 10:14:38AM +0100, Russell King - ARM Linux wrote:
+> On Wed, Jul 20, 2016 at 05:40:28PM +0800, Peter Chen wrote:
+> > diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
+> > index 69426e6..0d05812 100644
+> > --- a/drivers/usb/chipidea/core.c
+> > +++ b/drivers/usb/chipidea/core.c
+> > @@ -914,6 +914,16 @@ static int ci_hdrc_probe(struct platform_device *pdev)
+> >  	if (!ci)
+> >  		return -ENOMEM;
+> >  
+> > +	/*
+> > +	 * At device tree, we have no device node for chipidea core,
+> > +	 * the glue layer's node is the parent node for host and udc
+> > +	 * device. But in related driver, the parent device is chipidea
+> > +	 * core. So, in order to let the common driver get parent's node,
+> > +	 * we let the core's device node equals glue layer's node.
+> > +	 */
+> > +	if (dev->parent && dev->parent->of_node)
+> > +		dev->of_node = dev->parent->of_node;
 > 
-> What does that mode brings to the table?
-
->From my tests, the eMMC of the Banana Pi M3 (A83T) cannot work when the
-new mode is not used.
-
-> > 
-> > Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
-> > ---
-> > Note about the 'new timing mode'.
-> > 
-> > This patch assumes that, when the new mode is used, the clock driver
-> > sets the mode select in the MMC clock and multiplies the clock rate
-> > by 2:
-> > - MMC side:
-> >   - with a timing 8 bits DDR at 50MHz, the MMC driver calls
-> >     clk_set_rate() with a rate 50*2 = 100MHz,
-> > - clock side:
-> >   - the clock driver sets the hardware MMC clock to 100*2 = 200MHz,
-> >   - setting the 'mode select' of the hardware MMC clock divides the
-> >     rate by 2,
-> > - MMC side:
-> >   - setting the MMC clock divider register to 1 divides the rate by 2.
-> > So, the final rate is 50MHz.
+> This is a dangerous thing to do.  You're changing the dev->of_node of
+> _this_ device, which means that _this_ driver will no longer match
+> the device if you remove and reinsert the driver module, or unbind
+> and try to re-bind the device to this driver.
 > 
-> What happens if you actually want to set it to 100MHz?
 
-There is no SDXC_CLK_100M in the mainline driver, and 100MHz is asked
-only for 8 bits DDR at 50MHz.
+Thanks for commenting it.
+
+I have tested load/unload, it does not show any problems.
+
+The chipidea core device is created by code at runtime, not by device node.
+And we have NO device node for this chipidea core device at dts.
 
 -- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+
+Best Regards,
+Peter Chen
