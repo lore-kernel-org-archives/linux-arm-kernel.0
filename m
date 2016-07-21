@@ -1,36 +1,110 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 21 Jul 2016 08:51:54 +0900
-Subject: [PATCH v3 1/3] arm64: dts: r8a7796: Add Renesas R8A7796 SoC
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Thu, 21 Jul 2016 02:25:15 +0200
+Subject: [PATCH v2 02/10] driver core: Functional dependencies tracking
  support
-In-Reply-To: <d0b2edc9-c191-d61c-add0-85f189083931@de.bosch.com>
-References: <1464054880-25843-1-git-send-email-horms+renesas@verge.net.au>
- <1464054880-25843-2-git-send-email-horms+renesas@verge.net.au>
- <b30c9c84-23b6-b088-4983-b2498317492b@de.bosch.com>
- <20160525004825.GC7292@verge.net.au>
- <c0fd13d5-c5c4-579b-6fad-c637bda92398@de.bosch.com>
- <20160526022833.GE18393@verge.net.au>
- <59e6225a-6dfa-8bde-dd2e-3428d6fedfe2@de.bosch.com>
- <20160527004256.GD14269@verge.net.au>
- <b03c68c9-6949-519d-2c44-c140eac727a4@de.bosch.com>
- <d0b2edc9-c191-d61c-add0-85f189083931@de.bosch.com>
-Message-ID: <20160720235154.GA21407@verge.net.au>
+In-Reply-To: <20160720232553.GA8460@wunner.de>
+References: <1466144820-6286-1-git-send-email-m.szyprowski@samsung.com>
+ <1735644.0mfUjJQtul@vostro.rjw.lan> <20160720232553.GA8460@wunner.de>
+Message-ID: <4258432.JNKr9zJtMp@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 29, 2016 at 10:15:27AM +0200, Dirk Behme wrote:
-> Hi Simon,
+On Thursday, July 21, 2016 01:25:53 AM Lukas Wunner wrote:
+> On Thu, Jul 21, 2016 at 12:51:31AM +0200, Rafael J. Wysocki wrote:
+> > On Wednesday, July 20, 2016 05:23:40 PM Lukas Wunner wrote:
+> > > On Wed, Jul 20, 2016 at 02:52:42PM +0200, Rafael J. Wysocki wrote:
+> > > > On Wednesday, July 20, 2016 08:24:50 AM Lukas Wunner wrote:
+> > > > > On Wed, Jul 20, 2016 at 02:33:18AM +0200, Rafael J. Wysocki wrote:
+> > > > > > On Friday, June 17, 2016 04:07:38 PM Lukas Wunner wrote:
+> > > > > > > On Fri, Jun 17, 2016 at 02:54:56PM +0200, Rafael J. Wysocki wrote:
+> > > > > > > > On Fri, Jun 17, 2016 at 12:36 PM, Lukas Wunner <lukas@wunner.de> wrote:
+> > > > > > > > > On Fri, Jun 17, 2016 at 08:26:52AM +0200, Marek Szyprowski wrote:
+> > > > > > > > > > From: "Rafael J. Wysocki" <rafael.j.wysocki@intel.com>
+> > > > > > > > > We also have such a functional dependency for Thunderbolt on Macs:
+> > > > > > > > > On resume from system sleep, the PCIe hotplug ports may not resume
+> > > > > > > > > before the thunderbolt driver has reestablished the PCI tunnels.
+> > > > > > > > > Currently this is enforced by quirk_apple_wait_for_thunderbolt()
+> > > > > > > > > in drivers/pci/quirks.c. It would be good if we could represent
+> > > > > > > > > this dependency using something like Rafael's approach instead of
+> > > > > > > > > open coding it, however one detail in Rafael's patches is problematic:
+> > > > > > > > >
+> > > > > > > > > > New links are added by calling device_link_add() which may happen
+> > > > > > > > > > either before the consumer device is probed or when probing it, in
+> > > > > > > > > > which case the caller needs to ensure that the driver of the
+> > > > > > > > > > supplier device is present and functional and the DEVICE_LINK_PROBE_TIME
+> > > > > > > > > > flag should be passed to device_link_add() to reflect that.
+> > > > > > > > >
+> > > > > > > > > The thunderbolt driver cannot call device_link_add() before the
+> > > > > > > > > PCIe hotplug ports are bound to a driver unless we amend portdrv
+> > > > > > > > > to return -EPROBE_DEFER for Thunderbolt hotplug ports on Macs
+> > > > > > > > > if the thunderbolt driver isn't loaded.
+> > > > > > > > >
+> > > > > > > > > It would therefore be beneficial if device_link_add() can be
+> > > > > > > > > called even *after* the consumer is bound.
+> > > > > > > > 
+> > > > > > > > I don't quite follow.
+> > > > > > > > 
+> > > > > > > > Who's the provider and who's the consumer here?
+> > > > > > > 
+> > > > > > > thunderbolt.ko is the supplier.
+> > > > > > 
+> > > > > > But it binds to the children of the ports that are supposed to be its
+> > > > > > consumers?
+> > > > > > 
+> > > > > > Why is that even expected to work?
+> > > > > 
+> > > > > No, the consumers are aunts (or uncles) of the supplier, if you will. :-)
+> > > > > 
+> > > > > The consumers are the hotplug ports (named "Downstream Bridge 1 / 2" in
+> > > > > the drawing below). The supplier is the NHI:
+> > > > > 
+> > > > >       (Root Port) ---- Upstream Bridge --+-- Downstream Bridge 0 ---- NHI
+> > > > >                                          +-- Downstream Bridge 1 --
+> > > > >                                          +-- Downstream Bridge 2 --
+> > > > >                                          ...
+> > > > > 
+> > > > > We're calling pci_power_up() and pci_restore_state() from
+> > > > > pci_pm_resume_noirq(). And that will fail for devices below
+> > > > > the hotplug ports if the PCI tunnels haven't been re-established
+> > > > > yet by the NHI.
+> > > > 
+> > > > So the NHI is a PCIe device, right?
+> > > > 
+> > > > Does the Thunderbolt driver bind to that device?
+> > > 
+> > > The NHI is a PCI device but not a bridge. It has class 0x88000.
+> > > Yes, thunderbolt.ko binds to the NHI.
+> > > 
+> > > And portdrv binds to the upstream bridge and downstream bridges.
+> > > Those have class 0x60400.
+> > 
+> > OK, so why would there be a problem with creating links from the NHI
+> > (producer) to the ports (consumers) before binding portdrv to them?
+> 
+> Because the ordering in which drivers bind isn't guaranteed. At least
+> on my machine (Debian), portdrv always binds before thunderbolt.
 
-...
+But what drivers have to do with that really?  Do you need drivers to
+know that the dependency is there?
 
-> Hmm, could you kindly help me to remember what's the recent status of your
-> discussion above regarding a hierarchical structure of the RCar3 device
-> trees?
+Just add likns *before* even probing for drivers (yes, you can do that)
+and the core will handle that for you.
 
-Hi Dirk,
+> I guess I could amend portdrv to return -EPROBE_DEFER on Macs if
+> no driver is bound to the NHI. Doesn't feel pretty to me though.
+> 
+> Ultimately this seems to be the same issue as with calling
+> dev_pm_domain_set() for a bound device. Perhaps device_link_add()
+> can likewise be allowed if a runtime PM ref is held for the devices
+> and the call happens under lock_system_sleep()?
 
->From my point of view the most promising avenue at this time is work that
-Geert has been doing to explore making things more flexible by updating the
-DT automatically at run time. He can expand on this but the idea is to add
-per-soc compat strings and otherwise update the DT into a per-SoC version.
-This ought to allow significant portions of the DT to be common between
-SoCs in the same R-Car generation for at lest Gen 2 and Gen 3.
+No, the whole synchronization scheme in the links code would have had to be
+changed for that to really work.
+
+And it really is about what is needed (at least in principle) to run your
+device.  If you think you need device X with a driver to handle device Y
+correctly, then either you need it all the time, from probe to remove, or
+you just don't really need it at all.
+
+Thanks,
+Rafael
