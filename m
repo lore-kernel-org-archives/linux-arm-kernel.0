@@ -1,58 +1,39 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Thu, 21 Jul 2016 15:09:53 -0700
-Subject: [PATCH v3 3/3] arm64: dts: apm: Add X-Gene SoC hwmon to device
- tree
-In-Reply-To: <1469134557-26869-4-git-send-email-hotran@apm.com>
-References: <1469134557-26869-1-git-send-email-hotran@apm.com>
- <1469134557-26869-4-git-send-email-hotran@apm.com>
-Message-ID: <20160721220953.GC19236@roeck-us.net>
+From: lkp@intel.com (kbuild test robot)
+Date: Fri, 22 Jul 2016 06:08:54 +0800
+Subject: [PATCH v5 3/3] arm: dts: mt2701: Add auxadc node.
+In-Reply-To: <1469085449-22679-4-git-send-email-zhiyong.tao@mediatek.com>
+Message-ID: <201607220639.0tIT3cRj%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 21, 2016 at 01:55:57PM -0700, Hoan Tran wrote:
-> This patch adds DT node to enable hwmon driver for APM X-Gene SoC.
-> 
-> Signed-off-by: Hoan Tran <hotran@apm.com>
+Hi,
 
-Acked-by: Guenter Roeck <linux@roeck-us.net>
+[auto build test ERROR on robh/for-next]
+[also build test ERROR on v4.7-rc7 next-20160721]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-> ---
->  arch/arm64/boot/dts/apm/apm-shadowcat.dtsi | 5 +++++
->  arch/arm64/boot/dts/apm/apm-storm.dtsi     | 5 +++++
->  2 files changed, 10 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/apm/apm-shadowcat.dtsi b/arch/arm64/boot/dts/apm/apm-shadowcat.dtsi
-> index c569f76..a5935f5 100644
-> --- a/arch/arm64/boot/dts/apm/apm-shadowcat.dtsi
-> +++ b/arch/arm64/boot/dts/apm/apm-shadowcat.dtsi
-> @@ -472,6 +472,11 @@
->  			mboxes = <&mailbox 0>;
->  		};
->  
-> +		hwmonslimpro {
-> +			compatible = "apm,xgene-slimpro-hwmon";
-> +			mboxes = <&mailbox 7>;
-> +		};
-> +
->  		serial0: serial at 10600000 {
->  			device_type = "serial";
->  			compatible = "ns16550";
-> diff --git a/arch/arm64/boot/dts/apm/apm-storm.dtsi b/arch/arm64/boot/dts/apm/apm-storm.dtsi
-> index 5147d76..f8ea5b5 100644
-> --- a/arch/arm64/boot/dts/apm/apm-storm.dtsi
-> +++ b/arch/arm64/boot/dts/apm/apm-storm.dtsi
-> @@ -716,6 +716,11 @@
->  			mboxes = <&mailbox 0>;
->  		};
->  
-> +		hwmonslimpro {
-> +			compatible = "apm,xgene-slimpro-hwmon";
-> +			mboxes = <&mailbox 7>;
-> +		};
-> +
->  		serial0: serial at 1c020000 {
->  			status = "disabled";
->  			device_type = "serial";
-> -- 
-> 1.9.1
-> 
+url:    https://github.com/0day-ci/linux/commits/Zhiyong-Tao/AUXADC-Mediatek-auxadc-driver/20160722-041141
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git for-next
+config: arm-at91_dt_defconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 5.4.0-6) 5.4.0 20160609
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
+
+All errors (new ones prefixed by >>):
+
+>> Error: arch/arm/boot/dts/mt2701.dtsi:145.22-23 syntax error
+   FATAL ERROR: Unable to parse input tree
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 21319 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160722/d4a5fbee/attachment-0001.obj>
