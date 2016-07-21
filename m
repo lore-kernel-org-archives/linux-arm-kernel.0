@@ -1,95 +1,248 @@
 From: isubramanian@apm.com (Iyappan Subramanian)
-Date: Wed, 20 Jul 2016 23:59:18 -0700
-Subject: [PATCH v6 00/12] drivers: net: xgene: Fix module crash and 1G hot-plug
-Message-ID: <1469084370-16781-1-git-send-email-isubramanian@apm.com>
+Date: Wed, 20 Jul 2016 23:59:22 -0700
+Subject: [PATCH v6 04/12] drivers: net: xgene: Fix module unload crash -
+ clkrst sequence
+In-Reply-To: <1469084370-16781-1-git-send-email-isubramanian@apm.com>
+References: <1469084370-16781-1-git-send-email-isubramanian@apm.com>
+Message-ID: <1469084370-16781-5-git-send-email-isubramanian@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset addresses the following issues,
+This patch fixes clock reset sequence.
 
-1. Fixes the kernel crash when the driver loaded as an kernel module
-	- by fixing hardware cleanups and rearrange kernel API calls
-
-2. Hot-plug issue on the SGMII 1G interface
-	- by adding a driver for MDIO management
+- Added clock reset sequence for ACPI
+- Added delay in clock reset sequence to make sure pulse is generated
+- Added clk_unprepare_disable() in port shutdown to make sure
+  clock increment/decrement counts are matching
+- Removed MII_MGMT_CONFIG programming, since it is not required
+- Fixed programming XGENET_CONFIG_REG to enable SGMII mode
 
 Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
 Tested-by: Fushen Chen <fchen@apm.com>
 Tested-by: Toan Le <toanle@apm.com>
 ---
-v6: Address review comments from v5
-	- changed to use devm_ioremap_resource
-	- changed to return PTR_ERR(clk) on failure
-	- cleaned up and removed indirections
-	- exported mdio read/write and phy_register functions
-	- changed mii_bus is to indicate interface instance
-	- changed to call the exported mdio read/write and phy_register functions
+ drivers/net/ethernet/apm/xgene/xgene_enet_hw.c    | 34 +++++++++++------
+ drivers/net/ethernet/apm/xgene/xgene_enet_sgmac.c | 45 ++++++++++++++++++++---
+ drivers/net/ethernet/apm/xgene/xgene_enet_sgmac.h |  1 +
+ drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.c | 24 +++++++++++-
+ 4 files changed, 86 insertions(+), 18 deletions(-)
 
-v5: Address review comments from v4
-	- Fixed clock reset sequence by adding delay
-	- Fixed clock count by adding clk_unprepare_disable() in port shutdown
-
-v4: Address review comments from v3
-	- Reorganized into smaller patches
-	- Added wrapper functions for sgmii_control_reset and sgmii_tbi_control_reset
-	- Removed clk_get warning info
-	- mdio: Changed the order of 'if' statements and removed the 'else' statement
-	- mdio: Removed the mdio_read(write) indirection wrapper functions
-	- ethtool: Fixed SGMII 1G get_settings and set_settings
-	- Documentation: dtb: Added MDIO node information
-	- MAINTAINERS: Added MDIO driver and documentation path
-
-v3: Address review comments from v2
-	- Add comment about hardware clock reset sequence on xgene_mdio_reset
-
-v2: Address review comments from v1
-	- Fixed patch 1 compilation error
-	- Fixed mdio at 1f610000 xge0clk reference
-	- Squashed dtb patches
-	- Added PORT_OFFSET macro
-
-v1:
-	- Initial version
----
-
-Iyappan Subramanian (12):
-  drivers: net: xgene: Separate set_speed from mac_init
-  drivers: net: xgene: Fix module unload crash - hw resource cleanup
-  drivers: net: xgene: Fix module unload crash - change sw sequence
-  drivers: net: xgene: Fix module unload crash - clkrst sequence
-  drivers: net: phy: xgene: Add MDIO driver
-  drivers: net: xgene: Add backward compatibility
-  drivers: net: xgene: Enable MDIO driver
-  drivers: net: xgene: Use exported functions
-  drivers: net: xgene: ethtool: Use phy_ethtool_gset and sset
-  dtb: xgene: Add MDIO node
-  Documentation: dtb: xgene: Add MDIO node
-  MAINTAINERS: xgene: Add driver and documentation path
-
- .../devicetree/bindings/net/apm-xgene-mdio.txt     |  37 ++
- MAINTAINERS                                        |   2 +
- arch/arm64/boot/dts/apm/apm-merlin.dts             |   6 +
- arch/arm64/boot/dts/apm/apm-mustang.dts            |  12 +
- arch/arm64/boot/dts/apm/apm-shadowcat.dtsi         |  11 +-
- arch/arm64/boot/dts/apm/apm-storm.dtsi             |  26 +-
- drivers/net/ethernet/apm/xgene/Kconfig             |   1 +
- .../net/ethernet/apm/xgene/xgene_enet_ethtool.c    |  22 +-
- drivers/net/ethernet/apm/xgene/xgene_enet_hw.c     | 255 ++++++-----
- drivers/net/ethernet/apm/xgene/xgene_enet_hw.h     |  11 +-
- drivers/net/ethernet/apm/xgene/xgene_enet_main.c   | 215 ++++++----
- drivers/net/ethernet/apm/xgene/xgene_enet_main.h   |  33 +-
- drivers/net/ethernet/apm/xgene/xgene_enet_sgmac.c  | 239 +++++++++--
- drivers/net/ethernet/apm/xgene/xgene_enet_sgmac.h  |   8 +
- drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.c  |  66 ++-
- drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.h  |   3 +
- drivers/net/phy/Kconfig                            |   5 +
- drivers/net/phy/Makefile                           |   1 +
- drivers/net/phy/mdio-xgene.c                       | 477 +++++++++++++++++++++
- drivers/net/phy/mdio-xgene.h                       | 143 ++++++
- 20 files changed, 1290 insertions(+), 283 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/net/apm-xgene-mdio.txt
- create mode 100644 drivers/net/phy/mdio-xgene.c
- create mode 100644 drivers/net/phy/mdio-xgene.h
-
+diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c b/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c
+index 4f98749..91a67a0 100644
+--- a/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c
++++ b/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c
+@@ -675,24 +675,33 @@ bool xgene_ring_mgr_init(struct xgene_enet_pdata *p)
+ 
+ static int xgene_enet_reset(struct xgene_enet_pdata *pdata)
+ {
+-	u32 val;
++	struct device *dev = &pdata->pdev->dev;
+ 
+ 	if (!xgene_ring_mgr_init(pdata))
+ 		return -ENODEV;
+ 
+-	if (!IS_ERR(pdata->clk)) {
++	if (dev->of_node) {
+ 		clk_prepare_enable(pdata->clk);
++		udelay(5);
+ 		clk_disable_unprepare(pdata->clk);
++		udelay(5);
+ 		clk_prepare_enable(pdata->clk);
+-		xgene_enet_ecc_init(pdata);
++		udelay(5);
++	} else {
++#ifdef CONFIG_ACPI
++		if (acpi_has_method(ACPI_HANDLE(&pdata->pdev->dev), "_RST")) {
++			acpi_evaluate_object(ACPI_HANDLE(&pdata->pdev->dev),
++					     "_RST", NULL, NULL);
++		} else if (acpi_has_method(ACPI_HANDLE(&pdata->pdev->dev),
++					 "_INI")) {
++			acpi_evaluate_object(ACPI_HANDLE(&pdata->pdev->dev),
++					     "_INI", NULL, NULL);
++		}
++#endif
+ 	}
+-	xgene_enet_config_ring_if_assoc(pdata);
+ 
+-	/* Enable auto-incr for scanning */
+-	xgene_enet_rd_mcx_mac(pdata, MII_MGMT_CONFIG_ADDR, &val);
+-	val |= SCAN_AUTO_INCR;
+-	MGMT_CLOCK_SEL_SET(&val, 1);
+-	xgene_enet_wr_mcx_mac(pdata, MII_MGMT_CONFIG_ADDR, val);
++	xgene_enet_ecc_init(pdata);
++	xgene_enet_config_ring_if_assoc(pdata);
+ 
+ 	return 0;
+ }
+@@ -717,6 +726,7 @@ static void xgene_enet_clear(struct xgene_enet_pdata *pdata,
+ 
+ static void xgene_gport_shutdown(struct xgene_enet_pdata *pdata)
+ {
++	struct device *dev = &pdata->pdev->dev;
+ 	struct xgene_enet_desc_ring *ring;
+ 	u32 pb, val;
+ 	int i;
+@@ -739,8 +749,10 @@ static void xgene_gport_shutdown(struct xgene_enet_pdata *pdata)
+ 	}
+ 	xgene_enet_wr_ring_if(pdata, ENET_CFGSSQMIWQRESET_ADDR, pb);
+ 
+-	if (!IS_ERR(pdata->clk))
+-		clk_disable_unprepare(pdata->clk);
++	if (dev->of_node) {
++		if (!IS_ERR(pdata->clk))
++			clk_disable_unprepare(pdata->clk);
++	}
+ }
+ 
+ static int xgene_enet_mdio_read(struct mii_bus *bus, int mii_id, int regnum)
+diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_sgmac.c b/drivers/net/ethernet/apm/xgene/xgene_enet_sgmac.c
+index f1477d2..03a70c5 100644
+--- a/drivers/net/ethernet/apm/xgene/xgene_enet_sgmac.c
++++ b/drivers/net/ethernet/apm/xgene/xgene_enet_sgmac.c
+@@ -28,6 +28,12 @@ static void xgene_enet_wr_csr(struct xgene_enet_pdata *p, u32 offset, u32 val)
+ 	iowrite32(val, p->eth_csr_addr + offset);
+ }
+ 
++static void xgene_enet_wr_clkrst_csr(struct xgene_enet_pdata *p, u32 offset,
++				     u32 val)
++{
++	iowrite32(val, p->base_addr + offset);
++}
++
+ static void xgene_enet_wr_ring_if(struct xgene_enet_pdata *p,
+ 				  u32 offset, u32 val)
+ {
+@@ -434,17 +440,38 @@ static void xgene_sgmac_tx_disable(struct xgene_enet_pdata *p)
+ 
+ static int xgene_enet_reset(struct xgene_enet_pdata *p)
+ {
++	struct device *dev = &p->pdev->dev;
++
+ 	if (!xgene_ring_mgr_init(p))
+ 		return -ENODEV;
+ 
+-	if (!IS_ERR(p->clk)) {
+-		clk_prepare_enable(p->clk);
+-		clk_disable_unprepare(p->clk);
+-		clk_prepare_enable(p->clk);
++	if (p->enet_id == XGENE_ENET2)
++		xgene_enet_wr_clkrst_csr(p, XGENET_CONFIG_REG_ADDR, SGMII_EN);
++
++	if (dev->of_node) {
++		if (!IS_ERR(p->clk)) {
++			clk_prepare_enable(p->clk);
++			udelay(5);
++			clk_disable_unprepare(p->clk);
++			udelay(5);
++			clk_prepare_enable(p->clk);
++			udelay(5);
++		}
++	} else {
++#ifdef CONFIG_ACPI
++		if (acpi_has_method(ACPI_HANDLE(&p->pdev->dev), "_RST"))
++			acpi_evaluate_object(ACPI_HANDLE(&p->pdev->dev),
++					     "_RST", NULL, NULL);
++		else if (acpi_has_method(ACPI_HANDLE(&p->pdev->dev), "_INI"))
++			acpi_evaluate_object(ACPI_HANDLE(&p->pdev->dev),
++					     "_INI", NULL, NULL);
++#endif
+ 	}
+ 
+-	xgene_enet_ecc_init(p);
+-	xgene_enet_config_ring_if_assoc(p);
++	if (!p->port_id) {
++		xgene_enet_ecc_init(p);
++		xgene_enet_config_ring_if_assoc(p);
++	}
+ 
+ 	return 0;
+ }
+@@ -492,6 +519,7 @@ static void xgene_enet_clear(struct xgene_enet_pdata *pdata,
+ 
+ static void xgene_enet_shutdown(struct xgene_enet_pdata *p)
+ {
++	struct device *dev = &p->pdev->dev;
+ 	struct xgene_enet_desc_ring *ring;
+ 	u32 pb, val;
+ 	int i;
+@@ -513,6 +541,11 @@ static void xgene_enet_shutdown(struct xgene_enet_pdata *p)
+ 		pb |= BIT(val);
+ 	}
+ 	xgene_enet_wr_ring_if(p, ENET_CFGSSQMIWQRESET_ADDR, pb);
++
++	if (dev->of_node) {
++		if (!IS_ERR(p->clk))
++			clk_disable_unprepare(p->clk);
++	}
+ }
+ 
+ static void xgene_enet_link_state(struct work_struct *work)
+diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_sgmac.h b/drivers/net/ethernet/apm/xgene/xgene_enet_sgmac.h
+index 32f140a..3d0ba37 100644
+--- a/drivers/net/ethernet/apm/xgene/xgene_enet_sgmac.h
++++ b/drivers/net/ethernet/apm/xgene/xgene_enet_sgmac.h
+@@ -35,6 +35,7 @@
+ #define LINK_UP				BIT(15)
+ #define MPA_IDLE_WITH_QMI_EMPTY		BIT(12)
+ #define SG_RX_DV_GATE_REG_0_ADDR	0x05fc
++#define SGMII_EN			0x1
+ 
+ enum xgene_phy_speed {
+ 	PHY_SPEED_10,
+diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.c b/drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.c
+index d0b4419..9c6ad0d 100644
+--- a/drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.c
++++ b/drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.c
+@@ -258,13 +258,29 @@ static void xgene_xgmac_tx_disable(struct xgene_enet_pdata *pdata)
+ 
+ static int xgene_enet_reset(struct xgene_enet_pdata *pdata)
+ {
++	struct device *dev = &pdata->pdev->dev;
++
+ 	if (!xgene_ring_mgr_init(pdata))
+ 		return -ENODEV;
+ 
+-	if (!IS_ERR(pdata->clk)) {
++	if (dev->of_node) {
+ 		clk_prepare_enable(pdata->clk);
++		udelay(5);
+ 		clk_disable_unprepare(pdata->clk);
++		udelay(5);
+ 		clk_prepare_enable(pdata->clk);
++		udelay(5);
++	} else {
++#ifdef CONFIG_ACPI
++		if (acpi_has_method(ACPI_HANDLE(&pdata->pdev->dev), "_RST")) {
++			acpi_evaluate_object(ACPI_HANDLE(&pdata->pdev->dev),
++					     "_RST", NULL, NULL);
++		} else if (acpi_has_method(ACPI_HANDLE(&pdata->pdev->dev),
++					   "_INI")) {
++			acpi_evaluate_object(ACPI_HANDLE(&pdata->pdev->dev),
++					     "_INI", NULL, NULL);
++		}
++#endif
+ 	}
+ 
+ 	xgene_enet_ecc_init(pdata);
+@@ -292,6 +308,7 @@ static void xgene_enet_xgcle_bypass(struct xgene_enet_pdata *pdata,
+ 
+ static void xgene_enet_shutdown(struct xgene_enet_pdata *pdata)
+ {
++	struct device *dev = &pdata->pdev->dev;
+ 	struct xgene_enet_desc_ring *ring;
+ 	u32 pb, val;
+ 	int i;
+@@ -313,6 +330,11 @@ static void xgene_enet_shutdown(struct xgene_enet_pdata *pdata)
+ 		pb |= BIT(val);
+ 	}
+ 	xgene_enet_wr_ring_if(pdata, ENET_CFGSSQMIWQRESET_ADDR, pb);
++
++	if (dev->of_node) {
++		if (!IS_ERR(pdata->clk))
++			clk_disable_unprepare(pdata->clk);
++	}
+ }
+ 
+ static void xgene_enet_clear(struct xgene_enet_pdata *pdata,
 -- 
 1.9.1
