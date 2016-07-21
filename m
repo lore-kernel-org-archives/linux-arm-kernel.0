@@ -1,59 +1,132 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Wed, 20 Jul 2016 20:28:47 +0200
-Subject: [PATCH 3/3] mmc: sunxi: Add support to the Allwinner A83T
-In-Reply-To: <cover.1469082481.git.moinejf@free.fr>
-References: <cover.1469082481.git.moinejf@free.fr>
-Message-ID: <0ddc5f7d9a42515f901c95b8c0c1f5a5e4d575e9.1469082481.git.moinejf@free.fr>
+From: adrian.hunter@intel.com (Adrian Hunter)
+Date: Thu, 21 Jul 2016 11:11:27 +0300
+Subject: [PATCH V2 12/15] mmc: sdhci-esdhc-imx: factor out hw related
+ initialization into function
+In-Reply-To: <1468309584-3591-13-git-send-email-aisheng.dong@nxp.com>
+References: <1468309584-3591-1-git-send-email-aisheng.dong@nxp.com>
+ <1468309584-3591-13-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <579083AF.1040403@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The rate of the PLL-PERIPH clock is usually set to 1.2GHz in the A83T.
-This patch sets the phase delays of the output and sample clocks
-accordingly.
+On 12/07/16 10:46, Dong Aisheng wrote:
+> Move all hw related static initializations into a separate function
+> which helps concentrate the hw related initialization code.
+> And that function could also be called by other places later as a
+> basic hw state restore.
+> e.g. suspend/resume where the hw state is possible to lost due to
+> low power mode.
+> 
+> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
 
-Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
----
-Note: The impacted phase delays are only for 50MHz.
-The phase delays are not used in 50MHz 8 bits DDR (new timing mode).
----
- drivers/mmc/host/sunxi-mmc.c | 11 +++++++++++
- 1 file changed, 11 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
-index 7f9c31a..e161a64 100644
---- a/drivers/mmc/host/sunxi-mmc.c
-+++ b/drivers/mmc/host/sunxi-mmc.c
-@@ -961,6 +961,7 @@ static int sunxi_mmc_card_busy(struct mmc_host *mmc)
- static const struct of_device_id sunxi_mmc_of_match[] = {
- 	{ .compatible = "allwinner,sun4i-a10-mmc", },
- 	{ .compatible = "allwinner,sun5i-a13-mmc", },
-+	{ .compatible = "allwinner,sun8i-a83t-mmc", },
- 	{ .compatible = "allwinner,sun9i-a80-mmc", },
- 	{ /* sentinel */ }
- };
-@@ -986,6 +987,14 @@ static const struct sunxi_mmc_clk_delay sunxi_mmc_clk_delays[] = {
- 	[SDXC_CLK_50M_DDR_8BIT]	= { .output =  90, .sample = 180 },
- };
- 
-+static const struct sunxi_mmc_clk_delay sun8i_a83t_mmc_clk_delays[] = {
-+	[SDXC_CLK_400K]		= { .output = 180, .sample = 180 },
-+	[SDXC_CLK_25M]		= { .output = 180, .sample =  75 },
-+	[SDXC_CLK_50M]		= { .output =  90, .sample = 105 },
-+	[SDXC_CLK_50M_DDR]	= { .output =  60, .sample = 120 },
-+	[SDXC_CLK_50M_DDR_8BIT]	= { .output =  180, .sample = 180 },
-+};
-+
- static const struct sunxi_mmc_clk_delay sun9i_mmc_clk_delays[] = {
- 	[SDXC_CLK_400K]		= { .output = 180, .sample = 180 },
- 	[SDXC_CLK_25M]		= { .output = 180, .sample =  75 },
-@@ -1007,6 +1016,8 @@ static int sunxi_mmc_resource_request(struct sunxi_mmc_host *host,
- 
- 	if (of_device_is_compatible(np, "allwinner,sun9i-a80-mmc"))
- 		host->clk_delays = sun9i_mmc_clk_delays;
-+	else if (of_device_is_compatible(np, "allwinner,sun8i-a83t-mmc"))
-+		host->clk_delays = sun8i_a83t_mmc_clk_delays;
- 	else
- 		host->clk_delays = sunxi_mmc_clk_delays;
- 
--- 
-2.9.2
+Acked-by: Adrian Hunter <adrian.hunter@intel.com>
+
+
+> ---
+>  drivers/mmc/host/sdhci-esdhc-imx.c | 72 +++++++++++++++++++++-----------------
+>  1 file changed, 40 insertions(+), 32 deletions(-)
+> 
+> diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
+> index bbb0bd4eac28..5a0e5dee977f 100644
+> --- a/drivers/mmc/host/sdhci-esdhc-imx.c
+> +++ b/drivers/mmc/host/sdhci-esdhc-imx.c
+> @@ -979,6 +979,44 @@ static const struct sdhci_pltfm_data sdhci_esdhc_imx_pdata = {
+>  	.ops = &sdhci_esdhc_ops,
+>  };
+>  
+> +static void sdhci_esdhc_imx_hwinit(struct sdhci_host *host)
+> +{
+> +	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+> +	struct pltfm_imx_data *imx_data = sdhci_pltfm_priv(pltfm_host);
+> +
+> +	if (esdhc_is_usdhc(imx_data)) {
+> +		/*
+> +		 * The imx6q ROM code will change the default watermark
+> +		 * level setting to something insane.  Change it back here.
+> +		 */
+> +		writel(ESDHC_WTMK_DEFAULT_VAL, host->ioaddr + ESDHC_WTMK_LVL);
+> +
+> +		/*
+> +		 * ROM code will change the bit burst_length_enable setting
+> +		 * to zero if this usdhc is choosed to boot system. Change
+> +		 * it back here, otherwise it will impact the performance a
+> +		 * lot. This bit is used to enable/disable the burst length
+> +		 * for the external AHB2AXI bridge, it's usefully especially
+> +		 * for INCR transfer because without burst length indicator,
+> +		 * the AHB2AXI bridge does not know the burst length in
+> +		 * advance. And without burst length indicator, AHB INCR
+> +		 * transfer can only be converted to singles on the AXI side.
+> +		 */
+> +		writel(readl(host->ioaddr + SDHCI_HOST_CONTROL)
+> +			| ESDHC_BURST_LEN_EN_INCR,
+> +			host->ioaddr + SDHCI_HOST_CONTROL);
+> +		/*
+> +		* errata ESDHC_FLAG_ERR004536 fix for MX6Q TO1.2 and MX6DL
+> +		* TO1.1, it's harmless for MX6SL
+> +		*/
+> +		writel(readl(host->ioaddr + 0x6c) | BIT(7),
+> +			host->ioaddr + 0x6c);
+> +
+> +		/* disable DLL_CTRL delay line settings */
+> +		writel(0x0, host->ioaddr + ESDHC_DLL_CTRL);
+> +	}
+> +}
+> +
+>  #ifdef CONFIG_OF
+>  static int
+>  sdhci_esdhc_imx_probe_dt(struct platform_device *pdev,
+> @@ -1176,43 +1214,11 @@ static int sdhci_esdhc_imx_probe(struct platform_device *pdev)
+>  		host->quirks |= SDHCI_QUIRK_NO_MULTIBLOCK
+>  			| SDHCI_QUIRK_BROKEN_ADMA;
+>  
+> -	/*
+> -	 * The imx6q ROM code will change the default watermark level setting
+> -	 * to something insane.  Change it back here.
+> -	 */
+>  	if (esdhc_is_usdhc(imx_data)) {
+> -		writel(ESDHC_WTMK_DEFAULT_VAL, host->ioaddr + ESDHC_WTMK_LVL);
+> -
+>  		host->quirks2 |= SDHCI_QUIRK2_PRESET_VALUE_BROKEN;
+>  		host->mmc->caps |= MMC_CAP_1_8V_DDR;
+> -
+> -		/*
+> -		 * ROM code will change the bit burst_length_enable setting
+> -		 * to zero if this usdhc is choosed to boot system. Change
+> -		 * it back here, otherwise it will impact the performance a
+> -		 * lot. This bit is used to enable/disable the burst length
+> -		 * for the external AHB2AXI bridge, it's usefully especially
+> -		 * for INCR transfer because without burst length indicator,
+> -		 * the AHB2AXI bridge does not know the burst length in
+> -		 * advance. And without burst length indicator, AHB INCR
+> -		 * transfer can only be converted to singles on the AXI side.
+> -		 */
+> -		writel(readl(host->ioaddr + SDHCI_HOST_CONTROL)
+> -			| ESDHC_BURST_LEN_EN_INCR,
+> -			host->ioaddr + SDHCI_HOST_CONTROL);
+> -
+>  		if (!(imx_data->socdata->flags & ESDHC_FLAG_HS200))
+>  			host->quirks2 |= SDHCI_QUIRK2_BROKEN_HS200;
+> -
+> -		/*
+> -		* errata ESDHC_FLAG_ERR004536 fix for MX6Q TO1.2 and MX6DL
+> -		* TO1.1, it's harmless for MX6SL
+> -		*/
+> -		writel(readl(host->ioaddr + 0x6c) | BIT(7),
+> -			host->ioaddr + 0x6c);
+> -
+> -		/* disable DLL_CTRL delay line settings */
+> -		writel(0x0, host->ioaddr + ESDHC_DLL_CTRL);
+>  	}
+>  
+>  	if (imx_data->socdata->flags & ESDHC_FLAG_MAN_TUNING)
+> @@ -1237,6 +1243,8 @@ static int sdhci_esdhc_imx_probe(struct platform_device *pdev)
+>  	if (err)
+>  		goto disable_clk;
+>  
+> +	sdhci_esdhc_imx_hwinit(host);
+> +
+>  	err = sdhci_add_host(host);
+>  	if (err)
+>  		goto disable_clk;
+> 
