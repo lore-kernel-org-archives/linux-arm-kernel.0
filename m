@@ -1,55 +1,107 @@
-From: jolsa@redhat.com (Jiri Olsa)
-Date: Thu, 21 Jul 2016 09:47:38 +0200
-Subject: [PATCH V2 4/6] perf tools: pushing driver configuration down to
- the kernel
-In-Reply-To: <1469047100-18131-5-git-send-email-mathieu.poirier@linaro.org>
-References: <1469047100-18131-1-git-send-email-mathieu.poirier@linaro.org>
- <1469047100-18131-5-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <20160721074738.GD7192@krava>
+From: adrian.hunter@intel.com (Adrian Hunter)
+Date: Thu, 21 Jul 2016 10:46:57 +0300
+Subject: [PATCH V2 08/15] mmc: sdhci: add standard hw auto retuning support
+In-Reply-To: <1468309584-3591-9-git-send-email-aisheng.dong@nxp.com>
+References: <1468309584-3591-1-git-send-email-aisheng.dong@nxp.com>
+ <1468309584-3591-9-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <57907DF1.60104@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 20, 2016 at 02:38:18PM -0600, Mathieu Poirier wrote:
-> Now that PMU specific driver configuration are queued in
-> evsel::drv_config_terms, all we need to do is re-use the current
-> ioctl() mechanism to push down the information to the kernel
-> driver.
+On 12/07/16 10:46, Dong Aisheng wrote:
+> If HW supports SDHCI_TUNING_MODE_3 which is auto retuning, we won't
+> retune during runtime suspend and resume, instead we use Re-tuning
+> Request signaled via SDHCI_INT_RETUNE interrupt to do retuning and
+> hw auto retuning during data transfer to guarantee the signal sample
+> window correction.
 > 
-> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+> This can avoid a mass of repeatedly retuning during small file system
+> data access and improve the performance.
+> 
+> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+
+
+Acked-by: Adrian Hunter <adrian.hunter@intel.com>
+
+
 > ---
->  tools/perf/builtin-record.c |  9 +++++++++
->  tools/perf/util/evlist.c    | 24 ++++++++++++++++++++++++
->  tools/perf/util/evlist.h    |  3 +++
->  tools/perf/util/evsel.c     | 32 ++++++++++++++++++++++++++++++++
->  tools/perf/util/evsel.h     |  3 +++
->  5 files changed, 71 insertions(+)
+>  drivers/mmc/host/sdhci.c | 15 ++++++++++++---
+>  drivers/mmc/host/sdhci.h |  3 +++
+>  2 files changed, 15 insertions(+), 3 deletions(-)
 > 
-> diff --git a/tools/perf/builtin-record.c b/tools/perf/builtin-record.c
-> index 8f2c16d9275f..dffea1033b8e 100644
-> --- a/tools/perf/builtin-record.c
-> +++ b/tools/perf/builtin-record.c
-> @@ -383,6 +383,7 @@ static int record__open(struct record *rec)
->  	struct perf_evlist *evlist = rec->evlist;
->  	struct perf_session *session = rec->session;
->  	struct record_opts *opts = &rec->opts;
-> +	struct perf_evsel_config_term *err_term;
->  	int rc = 0;
+> diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
+> index 7894652b9929..31c14b0ff8e2 100644
+> --- a/drivers/mmc/host/sdhci.c
+> +++ b/drivers/mmc/host/sdhci.c
+> @@ -229,6 +229,10 @@ static void sdhci_init(struct sdhci_host *host, int soft)
+>  		    SDHCI_INT_TIMEOUT | SDHCI_INT_DATA_END |
+>  		    SDHCI_INT_RESPONSE;
 >  
->  	perf_evlist__config(evlist, opts, &callchain_param);
-> @@ -412,6 +413,14 @@ try_again:
->  		goto out;
->  	}
->  
-> +	if (perf_evlist__apply_drv_configs(evlist, &pos, &err_term)) {
-> +		error("failed to set config \"%s\" on event %s with %d (%s)\n",
-> +			err_term->val.drv_cfg, perf_evsel__name(pos), errno,
-> +			strerror_r(errno, msg, sizeof(msg)));
-> +		rc = -1;
-> +		goto out;
-> +	}
+> +	if (host->tuning_mode == SDHCI_TUNING_MODE_2 ||
+> +	    host->tuning_mode == SDHCI_TUNING_MODE_3)
+> +		host->ier |= SDHCI_INT_RETUNE;
 > +
-
-how about 'perf top' and 'perf stat', should they support this too?
-
-thanks,
-jirka
+>  	sdhci_writel(host, host->ier, SDHCI_INT_ENABLE);
+>  	sdhci_writel(host, host->ier, SDHCI_SIGNAL_ENABLE);
+>  
+> @@ -2673,6 +2677,9 @@ static irqreturn_t sdhci_irq(int irq, void *dev_id)
+>  			pr_err("%s: Card is consuming too much power!\n",
+>  				mmc_hostname(host->mmc));
+>  
+> +		if (intmask & SDHCI_INT_RETUNE)
+> +			mmc_retune_needed(host->mmc);
+> +
+>  		if (intmask & SDHCI_INT_CARD_INT) {
+>  			sdhci_enable_sdio_irq_nolock(host, false);
+>  			host->thread_isr |= SDHCI_INT_CARD_INT;
+> @@ -2682,7 +2689,7 @@ static irqreturn_t sdhci_irq(int irq, void *dev_id)
+>  		intmask &= ~(SDHCI_INT_CARD_INSERT | SDHCI_INT_CARD_REMOVE |
+>  			     SDHCI_INT_CMD_MASK | SDHCI_INT_DATA_MASK |
+>  			     SDHCI_INT_ERROR | SDHCI_INT_BUS_POWER |
+> -			     SDHCI_INT_CARD_INT);
+> +			     SDHCI_INT_RETUNE | SDHCI_INT_CARD_INT);
+>  
+>  		if (intmask) {
+>  			unexpected |= intmask;
+> @@ -2787,7 +2794,8 @@ int sdhci_suspend_host(struct sdhci_host *host)
+>  	sdhci_disable_card_detection(host);
+>  
+>  	mmc_retune_timer_stop(host->mmc);
+> -	mmc_retune_needed(host->mmc);
+> +	if (host->tuning_mode != SDHCI_TUNING_MODE_3)
+> +		mmc_retune_needed(host->mmc);
+>  
+>  	if (!device_may_wakeup(mmc_dev(host->mmc))) {
+>  		host->ier = 0;
+> @@ -2848,7 +2856,8 @@ int sdhci_runtime_suspend_host(struct sdhci_host *host)
+>  	unsigned long flags;
+>  
+>  	mmc_retune_timer_stop(host->mmc);
+> -	mmc_retune_needed(host->mmc);
+> +	if (host->tuning_mode != SDHCI_TUNING_MODE_3)
+> +		mmc_retune_needed(host->mmc);
+>  
+>  	spin_lock_irqsave(&host->lock, flags);
+>  	host->ier &= SDHCI_INT_CARD_INT;
+> diff --git a/drivers/mmc/host/sdhci.h b/drivers/mmc/host/sdhci.h
+> index e241e11a90d0..0411c9f36461 100644
+> --- a/drivers/mmc/host/sdhci.h
+> +++ b/drivers/mmc/host/sdhci.h
+> @@ -128,6 +128,7 @@
+>  #define  SDHCI_INT_CARD_INSERT	0x00000040
+>  #define  SDHCI_INT_CARD_REMOVE	0x00000080
+>  #define  SDHCI_INT_CARD_INT	0x00000100
+> +#define  SDHCI_INT_RETUNE	0x00001000
+>  #define  SDHCI_INT_ERROR	0x00008000
+>  #define  SDHCI_INT_TIMEOUT	0x00010000
+>  #define  SDHCI_INT_CRC		0x00020000
+> @@ -518,6 +519,8 @@ struct sdhci_host {
+>  	unsigned int		tuning_count;	/* Timer count for re-tuning */
+>  	unsigned int		tuning_mode;	/* Re-tuning mode supported by host */
+>  #define SDHCI_TUNING_MODE_1	0
+> +#define SDHCI_TUNING_MODE_2	1
+> +#define SDHCI_TUNING_MODE_3	2
+>  
+>  	unsigned long private[0] ____cacheline_aligned;
+>  };
+> 
