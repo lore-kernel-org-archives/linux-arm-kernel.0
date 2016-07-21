@@ -1,20 +1,19 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 21 Jul 2016 14:36:15 +0200
-Subject: [GIT PULL] Allwinner DT patches for 4.8, take 2, bis
-In-Reply-To: <20160718094611.GA31634@lukather>
-References: <20160718094611.GA31634@lukather>
-Message-ID: <3989441.uoNd2N0R95@wuerfel>
+Date: Thu, 21 Jul 2016 14:38:16 +0200
+Subject: [GIT PULL] ARM: mvebu: dt for v4.8 (#1)
+In-Reply-To: <878tx1svk5.fsf@free-electrons.com>
+References: <878tx1svk5.fsf@free-electrons.com>
+Message-ID: <4582699.JfJv3ntdgZ@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, July 18, 2016 11:46:11 AM CEST Maxime Ripard wrote:
-> Hi Arnd, Kevin, Olof,
+On Saturday, July 16, 2016 12:53:46 PM CEST Gregory CLEMENT wrote:
+> mvebu dt for 4.8 (part 1)
 > 
-> Here is the final (hopefully) pull request for the Allwinner SoCs for
-> the 4.8 merge window. The commit that was breaking the build has been
-> removed, and will be resent later on.
+> Fix dts for the clearfog board (Armada 388 SoC based)
+> 
+> 
 
-
-Pulled into next/dt now, this version looks fine. Thanks,
+Pulled into next/dt, thanks!
 
 	Arnd
