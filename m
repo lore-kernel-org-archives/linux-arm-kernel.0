@@ -1,135 +1,54 @@
-From: mirza.krak@gmail.com (Mirza Krak)
-Date: Thu, 21 Jul 2016 22:42:51 +0200
-Subject: [RFC 6/6] bus: Add support for Tegra NOR controller
-In-Reply-To: <f6df33eb-53ae-699b-9e1f-69eb7fed7da0@nvidia.com>
-References: <1468935397-11926-1-git-send-email-mirza.krak@gmail.com>
- <1468935397-11926-7-git-send-email-mirza.krak@gmail.com>
- <f6df33eb-53ae-699b-9e1f-69eb7fed7da0@nvidia.com>
-Message-ID: <CALw8SCVy4ud5_+gS3C8WeyTCV0m_4R2xjdEY4vCKEq_3-aFanw@mail.gmail.com>
+From: hotran@apm.com (Hoan Tran)
+Date: Thu, 21 Jul 2016 13:55:54 -0700
+Subject: [PATCH v3 0/3] hwmon: xgene: Add support for X-Gene hwmon driver
+Message-ID: <1469134557-26869-1-git-send-email-hotran@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-07-21 12:15 GMT+02:00 Jon Hunter <jonathanh@nvidia.com>:
->
-> On 19/07/16 14:36, Mirza Krak wrote:
->> From: Mirza Krak <mirza.krak@gmail.com>
->> +config TEGRA_NOR
->> +     tristate "Nvidia Tegra NOR flash bus driver a.k.a GMI/SNOR"
->> +             depends on ARCH_TEGRA_2x_SOC || ARCH_TEGRA_3x_SOC
->> +             depends on OF
->> +             help
->> +                     Driver for NOR flash bus found on Tegra30/20 SOC`s.
->
-> It is actually present on all Tegra's and so I would drop the 30/20.
+This patch set adds hardware temperature and power reading support for
+APM X-Gene SoC using the mailbox communication interface.
+For device tree, it is the standard DT mailbox.
+For ACPI, it is the PCC mailbox.
 
-ACK.
+For ACPI, this patch is built on top and depends on patch[1]:
+[1] http://www.spinics.net/lists/linux-acpi/msg66041.html
+ - [PATCH v3] mailbox: pcc: Support HW-Reduced Communication Subspace type 2
 
->> +++ b/drivers/bus/tegra-nor.c
->> @@ -0,0 +1,118 @@
->> +/*
->> + * Driver for Nvidia NOR Flash bus a.k.a SNOR/GMI.
->> + *
->> + * Copyright (C) 2016 Host Mobility AB. All rights reserved.
->> + *
->> + * This file is licensed under the terms of the GNU General Public
->> + * License version 2. This program is licensed "as is" without any
->> + * warranty of any kind, whether express or implied.
->> + */
->> +
->> +#include <linux/clk.h>
->> +#include <linux/io.h>
->> +#include <linux/mfd/syscon.h>
->
-> Is this needed?
+v3
+ - Order include files alphabetically
+ - Use sign_extend32() to decode temperature
+ - Use DEVICE_ATTR_RO() for temperature and power attributes
+ - Temperature and power attributes start with index 1
+ - Use !!amsg->param2
+ - Fix checkpatch WARNING with --strict flag
+ - Use hwmon_device_register_with_groups()
+ - Check invalid sensor data
 
-It is not. ACK.
+v2
+ - Increase power reading accurateness by using 2 registers
+(a register for Watt, another for milli-Watt)
+ - Remove power reading for SoC
+ - Fix review comments from Guenter
 
->
->> +#include <linux/module.h>
->> +#include <linux/of_device.h>
->> +#include <linux/regmap.h>
->
-> Or this?
+v1
+ - Initial
 
-It is not. ACK.
+Hoan Tran (3):
+  Documentation: dtb: xgene: Add hwmon dts binding documentation
+  hwmon: xgene: Add hwmon driver
+  arm64: dts: apm: Add X-Gene SoC hwmon to device tree
 
->
->> +
->> +#define TEGRA_NOR_TIMING_REG_COUNT   2
->> +
->> +#define TEGRA_NOR_CONFIG                     0x00
->> +#define TEGRA_NOR_STATUS                     0x04
->> +#define TEGRA_NOR_ADDR_PTR                   0x08
->> +#define TEGRA_NOR_AHB_ADDR_PTR               0x0c
->> +#define TEGRA_NOR_TIMING0                    0x10
->> +#define TEGRA_NOR_TIMING1                    0x14
->> +#define TEGRA_NOR_MIO_CONFIG         0x18
->> +#define TEGRA_NOR_MIO_TIMING         0x1c
->> +#define TEGRA_NOR_DMA_CONFIG         0x20
->> +#define TEGRA_NOR_CS_MUX_CONFIG              0x24
->
-> Not all of these are used. It is good to define them and I wonder if we
-> should add support for MIO while are at it :-)
+ .../devicetree/bindings/hwmon/apm-xgene-hwmon.txt  |  14 +
+ Documentation/hwmon/xgene-hwmon                    |  30 +
+ arch/arm64/boot/dts/apm/apm-shadowcat.dtsi         |   5 +
+ arch/arm64/boot/dts/apm/apm-storm.dtsi             |   5 +
+ drivers/hwmon/Kconfig                              |   7 +
+ drivers/hwmon/Makefile                             |   1 +
+ drivers/hwmon/xgene-hwmon.c                        | 755 +++++++++++++++++++++
+ 7 files changed, 817 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/hwmon/apm-xgene-hwmon.txt
+ create mode 100644 Documentation/hwmon/xgene-hwmon
+ create mode 100644 drivers/hwmon/xgene-hwmon.c
 
-We can come back to this once I have all SNOR stuff in order.
-
->
->> +
->> +#define TEGRA_NOR_CONFIG_GO                          BIT(31)
->> +
->> +static const struct of_device_id nor_id_table[] = {
->> +     /* Tegra30 */
->
-> I don't think this comment is needed.
-
-ACK.
-
->
->> +     { .compatible = "nvidia,tegra30-nor", .data = NULL, },
->
-> You don't need to set data to NULL.
-
-ACK.
-
->
->> +     /* Tegra20 */
->> +     { .compatible = "nvidia,tegra20-nor", .data = NULL, },
->
-> Same here.
-
-ACK
-
->> +static int __init nor_probe(struct platform_device *pdev)
->> +{
->
-> I would drop the __init.
-
-ACK.
-
->> +static struct platform_driver nor_driver = {
->> +     .driver = {
->> +             .name           = "tegra-nor",
->> +             .of_match_table = nor_id_table,
->> +     },
->> +};
->
-> The driver should have a remove function given that we can build as a
-> module.
-
-At the moment I do not know what we would do in a remove function and
-hence me not adding one.
-
->
->> +module_platform_driver_probe(nor_driver, nor_probe);
->
-> I would use "tegra_nor" namespace for all the structs, functions, etc.
-> However, we may prefer to go with GMI and in which case tegra_gmi_probe,
-> etc.
-
-ACK. Who gets the last call on what we should call the driver? It
-seems that we both think GMI is a better name, do we need a third? :).
-
-Thank you Jonathan for your feedback.
-
-Best Regards,
-Mirza
+-- 
+1.9.1
