@@ -1,39 +1,128 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Thu, 21 Jul 2016 11:18:51 +0200
-Subject: [PATCH 3/3] mmc: sunxi: Add support to the Allwinner A83T
-In-Reply-To: <20160721085838.GH5993@lukather>
-References: <cover.1469082481.git.moinejf@free.fr>
- <0ddc5f7d9a42515f901c95b8c0c1f5a5e4d575e9.1469082481.git.moinejf@free.fr>
- <20160721085838.GH5993@lukather>
-Message-ID: <20160721111851.133a3f16d6e9de1ee45b3654@free.fr>
+From: gabriel.fernandez@st.com (gabriel.fernandez at st.com)
+Date: Thu, 21 Jul 2016 11:19:25 +0200
+Subject: [PATCH v2 1/4] dt-bindings: mfd: Add STM32F4 RCC numeric constants
+ into DT include file
+In-Reply-To: <1469092768-17489-1-git-send-email-gabriel.fernandez@st.com>
+References: <1469092768-17489-1-git-send-email-gabriel.fernandez@st.com>
+Message-ID: <1469092768-17489-2-git-send-email-gabriel.fernandez@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 21 Jul 2016 10:58:38 +0200
-Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+From: Maxime Coquelin <mcoquelin.stm32@gmail.com>
 
-> On Wed, Jul 20, 2016 at 08:28:47PM +0200, Jean-Francois Moine wrote:
-> > The rate of the PLL-PERIPH clock is usually set to 1.2GHz in the A83T.
-> 
-> Uh? The datasheet says to set it to 600MHz.
+Ths patch lists STM32F4's RCC numeric constants.
+It will be used by clock and reset drivers, and DT bindings.
 
-Right. But the driver of the SDK for the Banana Pi M3 (A83T) sets it
-to 1.2GHz.
+Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
+---
+ include/dt-bindings/mfd/stm32f4-rcc.h | 98 +++++++++++++++++++++++++++++++++++
+ 1 file changed, 98 insertions(+)
+ create mode 100644 include/dt-bindings/mfd/stm32f4-rcc.h
 
-> > This patch sets the phase delays of the output and sample clocks
-> > accordingly.
-> > 
-> > Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
-> > ---
-> > Note: The impacted phase delays are only for 50MHz.
-> > The phase delays are not used in 50MHz 8 bits DDR (new timing mode).
-> 
-> Actually, they seem to be, in the new timing mode register.
-
-In the SDK driver, nothing is set in the new timing mode register.
-Anyway, the eMMC works fine in both the Banana Pis M2+ and M3
-with no delay.
-
+diff --git a/include/dt-bindings/mfd/stm32f4-rcc.h b/include/dt-bindings/mfd/stm32f4-rcc.h
+new file mode 100644
+index 0000000..e98942dc
+--- /dev/null
++++ b/include/dt-bindings/mfd/stm32f4-rcc.h
+@@ -0,0 +1,98 @@
++/*
++ * This header provides constants for the STM32F4 RCC IP
++ */
++
++#ifndef _DT_BINDINGS_MFD_STM32F4_RCC_H
++#define _DT_BINDINGS_MFD_STM32F4_RCC_H
++
++/* AHB1 */
++#define STM32F4_RCC_AHB1_GPIOA	0
++#define STM32F4_RCC_AHB1_GPIOB	1
++#define STM32F4_RCC_AHB1_GPIOC	2
++#define STM32F4_RCC_AHB1_GPIOD	3
++#define STM32F4_RCC_AHB1_GPIOE	4
++#define STM32F4_RCC_AHB1_GPIOF	5
++#define STM32F4_RCC_AHB1_GPIOG	6
++#define STM32F4_RCC_AHB1_GPIOH	7
++#define STM32F4_RCC_AHB1_GPIOI	8
++#define STM32F4_RCC_AHB1_GPIOJ	9
++#define STM32F4_RCC_AHB1_GPIOK	10
++#define STM32F4_RCC_AHB1_CRC	12
++#define STM32F4_RCC_AHB1_DMA1	21
++#define STM32F4_RCC_AHB1_DMA2	22
++#define STM32F4_RCC_AHB1_DMA2D	23
++#define STM32F4_RCC_AHB1_ETHMAC	25
++#define STM32F4_RCC_AHB1_OTGHS	29
++
++#define STM32F4_AHB1_RESET(bit) (STM32F4_RCC_AHB1_##bit + (0x10 * 8))
++#define STM32F4_AHB1_CLOCK(bit) (STM32F4_RCC_AHB1_##bit + (0x30 * 8))
++
++
++/* AHB2 */
++#define STM32F4_RCC_AHB2_DCMI	0
++#define STM32F4_RCC_AHB2_CRYP	4
++#define STM32F4_RCC_AHB2_HASH	5
++#define STM32F4_RCC_AHB2_RNG	6
++#define STM32F4_RCC_AHB2_OTGFS	7
++
++#define STM32F4_AHB2_RESET(bit)	(STM32F4_RCC_AHB2_##bit + (0x14 * 8))
++#define STM32F4_AHB2_CLOCK(bit)	(STM32F4_RCC_AHB2_##bit + (0x34 * 8))
++
++/* AHB3 */
++#define STM32F4_RCC_AHB3_FMC	0
++
++#define STM32F4_AHB3_RESET(bit)	(STM32F4_RCC_AHB3_##bit + (0x18 * 8))
++#define STM32F4_AHB3_CLOCK(bit)	(STM32F4_RCC_AHB3_##bit + (0x38 * 8))
++
++/* APB1 */
++#define STM32F4_RCC_APB1_TIM2	0
++#define STM32F4_RCC_APB1_TIM3	1
++#define STM32F4_RCC_APB1_TIM4	2
++#define STM32F4_RCC_APB1_TIM5	3
++#define STM32F4_RCC_APB1_TIM6	4
++#define STM32F4_RCC_APB1_TIM7	5
++#define STM32F4_RCC_APB1_TIM12	6
++#define STM32F4_RCC_APB1_TIM13	7
++#define STM32F4_RCC_APB1_TIM14	8
++#define STM32F4_RCC_APB1_WWDG	11
++#define STM32F4_RCC_APB1_SPI2	14
++#define STM32F4_RCC_APB1_SPI3	15
++#define STM32F4_RCC_APB1_UART2	17
++#define STM32F4_RCC_APB1_UART3	18
++#define STM32F4_RCC_APB1_UART4	19
++#define STM32F4_RCC_APB1_UART5	20
++#define STM32F4_RCC_APB1_I2C1	21
++#define STM32F4_RCC_APB1_I2C2	22
++#define STM32F4_RCC_APB1_I2C3	23
++#define STM32F4_RCC_APB1_CAN1	25
++#define STM32F4_RCC_APB1_CAN2	26
++#define STM32F4_RCC_APB1_PWR	28
++#define STM32F4_RCC_APB1_DAC	29
++#define STM32F4_RCC_APB1_UART7	30
++#define STM32F4_RCC_APB1_UART8	31
++
++#define STM32F4_APB1_RESET(bit)	(STM32F4_RCC_APB1_##bit + (0x20 * 8))
++#define STM32F4_APB1_CLOCK(bit)	(STM32F4_RCC_APB1_##bit + (0x40 * 8))
++
++/* APB2 */
++#define STM32F4_RCC_APB2_TIM1	0
++#define STM32F4_RCC_APB2_TIM8	1
++#define STM32F4_RCC_APB2_USART1	4
++#define STM32F4_RCC_APB2_USART6	5
++#define STM32F4_RCC_APB2_ADC	8
++#define STM32F4_RCC_APB2_SDIO	11
++#define STM32F4_RCC_APB2_SPI1	12
++#define STM32F4_RCC_APB2_SPI4	13
++#define STM32F4_RCC_APB2_SYSCFG	14
++#define STM32F4_RCC_APB2_TIM9	16
++#define STM32F4_RCC_APB2_TIM10	17
++#define STM32F4_RCC_APB2_TIM11	18
++#define STM32F4_RCC_APB2_SPI5	20
++#define STM32F4_RCC_APB2_SPI6	21
++#define STM32F4_RCC_APB2_SAI1	22
++#define STM32F4_RCC_APB2_LTDC	26
++
++#define STM32F4_APB2_RESET(bit)	(STM32F4_RCC_APB2_##bit + (0x24 * 8))
++#define STM32F4_APB2_CLOCK(bit)	(STM32F4_RCC_APB2_##bit + (0x44 * 8))
++
++#endif /* _DT_BINDINGS_MFD_STM32F4_RCC_H */
 -- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+1.9.1
