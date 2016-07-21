@@ -1,51 +1,28 @@
-From: michael.weiser@gmx.de (Michael Weiser)
-Date: Thu, 21 Jul 2016 13:27:01 +0200
-Subject: [PATCH v6] ARM: sun4i: spi: Allow transfers larger than FIFO size
-In-Reply-To: <1439062912-4405-1-git-send-email-oliver@schinagl.nl>
-References: <1439062912-4405-1-git-send-email-oliver@schinagl.nl>
-Message-ID: <20160721112701.GB6610@weiser.dinsnail.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 21 Jul 2016 14:04:33 +0200
+Subject: [PATCH 2/2] ARM: DRA7: select PCI_DOMAINS config
+In-Reply-To: <1469102276-14777-3-git-send-email-kishon@ti.com>
+References: <1469102276-14777-1-git-send-email-kishon@ti.com>
+ <1469102276-14777-3-git-send-email-kishon@ti.com>
+Message-ID: <8047226.VhgpLo8JQu@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On Thursday, July 21, 2016 5:27:56 PM CEST Kishon Vijay Abraham I wrote:
+> diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+> index 1a648e9..8e6e2c0 100644
+> --- a/arch/arm/mach-omap2/Kconfig
+> +++ b/arch/arm/mach-omap2/Kconfig
+> @@ -86,6 +86,7 @@ config SOC_DRA7XX
+>         select OMAP_INTERCONNECT_BARRIER
+>         select PM_OPP if PM
+>         select ZONE_DMA if ARM_LPAE
+> +       select PCI_DOMAINS if PCI
+>  
+>  config ARCH_OMAP2PLUS
+>         bool
+> 
 
-On Sat, Aug 08, 2015 at 09:41:51PM +0200, Olliver Schinagl wrote:
+Should we just set this unconditionally for ARCH_MULTIPLATFORM maybe?
 
-> Alexandru sent this patch over a year and a half ago, and I believe several
-> tree's have been carrying it since. We've been using this patch on an
-> Olimex OLinuxIno Lime1 and Lime2 using the mmc-spi driver to access SD cards
-> without problems. So bumping this and adding my
-
-I also have a need for this addition since it makes an ENC28J60 SPI
-ethernet controller work on the Cubieboard2. I've successfully tested it
-with 4.6.3 where it still applies cleanly.
-
-(There's is a very minor conflict when applying against current Linus
-master (EINVAL was changed to EMSGSIZE). I can supply a rebased version
-if so desired.)
-
-What is keeping the patch from being merged (i.e. into mainline)?
-
-Thanks!
-Michael
-
-> Tested-by: Olliver Schinagl <oliver@schinagl.nl>
-
-Tested-by: Michael Weiser <michael.weiser@gmx.de>
-
-> Changes from v5as warned by checkpatch. No functional changes.
->  * Added some newlines to make checkpatch happy. No functional changes.
-
-> Changes from v4:
->  * use min3() instead of two if statements in sun4i_spi_fill_fifo()
->  * fix trivial whitespace issue in if statement in sun4i_spi_handler()
->  * use consistent style in assigning 'reg' in the added functions.
-
-> Alexandru Gagniuc (1):
->   ARM: sun4i: spi: Allow transfers larger than FIFO size
-
->  drivers/spi/spi-sun4i.c | 76 +++++++++++++++++++++++++++++++++++++++++++------
->  1 file changed, 67 insertions(+), 9 deletions(-)
--- 
-Thanks,
-Michael
+	Arnd
