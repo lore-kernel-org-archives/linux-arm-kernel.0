@@ -1,61 +1,67 @@
-From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Thu, 21 Jul 2016 14:04:37 -0400
-Subject: [PATCH] ARM: dont specify STACKPROTECTOR in defconfigs
-In-Reply-To: <CACPK8XfRFPxr6NbaMBztNCrOnGUkFaAiE+op+Mxyqk7de4_2ng@mail.gmail.com>
-References: <20160721151134.5803-1-paul.gortmaker@windriver.com>
- <CACPK8XfRFPxr6NbaMBztNCrOnGUkFaAiE+op+Mxyqk7de4_2ng@mail.gmail.com>
-Message-ID: <20160721180437.GE21225@windriver.com>
+From: seanpaul@chromium.org (Sean Paul)
+Date: Thu, 21 Jul 2016 14:07:53 -0400
+Subject: [PATCH] GPU-DRM-Exynos: Delete an unnecessary check before the
+ function call "vunmap"
+In-Reply-To: <a5a79711-10a3-e304-a897-892ebdf2ff9f@users.sourceforge.net>
+References: <5307CAA2.8060406@users.sourceforge.net>
+ <alpine.DEB.2.02.1402212321410.2043@localhost6.localdomain6>
+ <530A086E.8010901@users.sourceforge.net>
+ <alpine.DEB.2.02.1402231635510.1985@localhost6.localdomain6>
+ <530A72AA.3000601@users.sourceforge.net>
+ <alpine.DEB.2.02.1402240658210.2090@localhost6.localdomain6>
+ <530B5FB6.6010207@users.sourceforge.net>
+ <alpine.DEB.2.10.1402241710370.2074@hadrien>
+ <530C5E18.1020800@users.sourceforge.net>
+ <alpine.DEB.2.10.1402251014170.2080@hadrien>
+ <530CD2C4.4050903@users.sourceforge.net>
+ <alpine.DEB.2.10.1402251840450.7035@hadrien>
+ <530CF8FF.8080600@users.sourceforge.net>
+ <alpine.DEB.2.02.1402252117150.2047@localhost6.localdomain6>
+ <530DD06F.4090703@users.sourceforge.net>
+ <alpine.DEB.2.02.1402262129250.2221@localhost6.localdomain6>
+ <5317A59D.4@users.sourceforge.net> <54D28870.3060400@users.sourceforge.net>
+ <54D329D0.7050006@samsung.com>
+ <a5a79711-10a3-e304-a897-892ebdf2ff9f@users.sourceforge.net>
+Message-ID: <CAOw6vb+PqxeU4ioJ0SxF2W_zEJBJHg8PdJYEyF1M0wxXNzU5_A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Re: [PATCH] ARM: dont specify STACKPROTECTOR in defconfigs] On 22/07/2016 (Fri 01:40) Joel Stanley wrote:
+On Thu, Jul 21, 2016 at 1:42 PM, SF Markus Elfring
+<elfring@users.sourceforge.net> wrote:
+> From: Markus Elfring <elfring@users.sourceforge.net>
+> Date: Thu, 21 Jul 2016 19:23:25 +0200
+>
+> The vunmap() function performs also input parameter validation.
+> Thus the test around the call is not needed.
+>
+> This issue was detected by using the Coccinelle software.
+>
+> Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
 
-> Hi Paul,
-> 
-> On Fri, Jul 22, 2016 at 12:41 AM, Paul Gortmaker
-> <paul.gortmaker@windriver.com> wrote:
-> > Note the output from the following:
-> >
-> >    $ git grep STACKPROTECTOR arch/arm/configs/
-> >    arch/arm/configs/aspeed_g4_defconfig:CONFIG_CC_STACKPROTECTOR_STRONG=y
-> >    arch/arm/configs/aspeed_g5_defconfig:CONFIG_CC_STACKPROTECTOR_STRONG=y
-> >    arch/arm/configs/bcm2835_defconfig:CONFIG_CC_STACKPROTECTOR_REGULAR=y
-> >    $
-> >
-> > Only three defconfigs specify a value.  And two of the three ask for
-> > the strong variant, which isn't supported by older toolchains.
-> >
-> > Due to the nature of ARM having more platform specific code than say
-> > x86, the allyesconfig and allmodconfig aren't as effective for build
-> > coverage.  So, in addition, I like to use a trivial script to walk all
-> > the defconfigs and build each one.
-> >
-> > However I will get false positives on unsupported stackprotector values
-> > with an older toolchain like gcc-4.6.3.  As in this instance I am just
-> > using the compiler as a glorified syntax checker on a machine where I
-> > build a bunch of other arch for the same reason, there is no real
-> > motivation to get a newer toolchain for improved optimization etc.
-> 
-> I'm happy to remove it from the Aspeed configurations as I'm not sure
-> why it was enabled in the first place.
-> 
-> However, I do not agree with the reasoning here. If you're building to
-> check syntax a modern GCC will certainly pick up on more than one from
-> four years ago.
+Applied to drm-misc
 
-Just to clarify, syntax in this case is just for fat fingered typos and
-ensuring functions resolve with the appropriate header includes.  If I
-was coding new stuff specifically for ARM, then that would be different.
-
-> 
-> > Since there are only three of them, and there is nothing about these
-> > settings that are board/platform specific, I propose we just eliminate
-> > the three existing instances and take the default.
-> 
-> This makes sense to me.
-> 
-> Acked-by: Joel Stanley <joel@jms.id.au>
-
-Thanks,
-Paul.
---
+> ---
+>  drivers/gpu/drm/exynos/exynos_drm_fbdev.c | 3 +--
+>  1 file changed, 1 insertion(+), 2 deletions(-)
+>
+> diff --git a/drivers/gpu/drm/exynos/exynos_drm_fbdev.c b/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
+> index dd09117..4cfb39d 100644
+> --- a/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
+> +++ b/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
+> @@ -269,8 +269,7 @@ static void exynos_drm_fbdev_destroy(struct drm_device *dev,
+>         struct exynos_drm_gem *exynos_gem = exynos_fbd->exynos_gem;
+>         struct drm_framebuffer *fb;
+>
+> -       if (exynos_gem->kvaddr)
+> -               vunmap(exynos_gem->kvaddr);
+> +       vunmap(exynos_gem->kvaddr);
+>
+>         /* release drm framebuffer and real buffer */
+>         if (fb_helper->fb && fb_helper->fb->funcs) {
+> --
+> 2.9.2
+>
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
