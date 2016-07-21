@@ -1,42 +1,29 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 21 Jul 2016 10:56:15 +0200
-Subject: [PATCH 2/3] mmc: sunxi: Set the 'New Timing' register for 8 bits
- DDR transfers
-In-Reply-To: <bc7b767cad6db159a44c4b98d5b1f3eb53c26bd3.1469082481.git.moinejf@free.fr>
+Date: Thu, 21 Jul 2016 10:58:38 +0200
+Subject: [PATCH 3/3] mmc: sunxi: Add support to the Allwinner A83T
+In-Reply-To: <0ddc5f7d9a42515f901c95b8c0c1f5a5e4d575e9.1469082481.git.moinejf@free.fr>
 References: <cover.1469082481.git.moinejf@free.fr>
- <bc7b767cad6db159a44c4b98d5b1f3eb53c26bd3.1469082481.git.moinejf@free.fr>
-Message-ID: <20160721085615.GG5993@lukather>
+ <0ddc5f7d9a42515f901c95b8c0c1f5a5e4d575e9.1469082481.git.moinejf@free.fr>
+Message-ID: <20160721085838.GH5993@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Maxime
 
-On Wed, Jul 20, 2016 at 08:16:28PM +0200, Jean-Francois Moine wrote:
-> The 'new timing mode' with 8 bits DDR works correctly when the NewTiming
-> register is set.
+On Wed, Jul 20, 2016 at 08:28:47PM +0200, Jean-Francois Moine wrote:
+> The rate of the PLL-PERIPH clock is usually set to 1.2GHz in the A83T.
 
-What does that mode brings to the table?
+Uh? The datasheet says to set it to 600MHz.
 
+> This patch sets the phase delays of the output and sample clocks
+> accordingly.
 > 
 > Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
 > ---
-> Note about the 'new timing mode'.
-> 
-> This patch assumes that, when the new mode is used, the clock driver
-> sets the mode select in the MMC clock and multiplies the clock rate
-> by 2:
-> - MMC side:
->   - with a timing 8 bits DDR at 50MHz, the MMC driver calls
->     clk_set_rate() with a rate 50*2 = 100MHz,
-> - clock side:
->   - the clock driver sets the hardware MMC clock to 100*2 = 200MHz,
->   - setting the 'mode select' of the hardware MMC clock divides the
->     rate by 2,
-> - MMC side:
->   - setting the MMC clock divider register to 1 divides the rate by 2.
-> So, the final rate is 50MHz.
+> Note: The impacted phase delays are only for 50MHz.
+> The phase delays are not used in 50MHz 8 bits DDR (new timing mode).
 
-What happens if you actually want to set it to 100MHz?
+Actually, they seem to be, in the new timing mode register.
 
 Maxime
 
@@ -50,4 +37,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160721/39cd3e0c/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160721/50da17d5/attachment.sig>
