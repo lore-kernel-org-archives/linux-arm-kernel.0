@@ -1,76 +1,42 @@
-From: grimaldi.ivan@gmail.com (Ivan Grimaldi)
-Date: Thu, 21 Jul 2016 08:45:18 +0200
-Subject: PROBLEM: pcie imx6 link problem after a random number of reboot
-In-Reply-To: <VI1PR0401MB26249037CC087F05C0BC467B8C080@VI1PR0401MB2624.eurprd04.prod.outlook.com>
-References: <CAO1575Vzw5=JMVW4yh6HNz730r-RtONt_+J1A4BhygVowAWLZQ@mail.gmail.com>
- <CAO1575Wo_Qgk-YX7kZchUTEv7o3W5-b_DJQktoF2AR+OwvAxNg@mail.gmail.com>
- <VI1PR0401MB2624BC92B13026C53D4B13198C330@VI1PR0401MB2624.eurprd04.prod.outlook.com>
- <CAO1575VC_cVHMxnWWDHcJhrymchJM1zMmR4X2O38JdrGP4dJfA@mail.gmail.com>
- <VI1PR0401MB26249BF2429EF9FD6DB7F7EF8C330@VI1PR0401MB2624.eurprd04.prod.outlook.com>
- <CAO1575VjjoA3O-8big2NG7v=xCeeLjf1K0Ck7b9AUcZ=H8HL1w@mail.gmail.com>
- <VI1PR0401MB2624E3404F95241302CC4C9F8C360@VI1PR0401MB2624.eurprd04.prod.outlook.com>
- <CAO1575VCk2g0KwH=hEk4bHP1t75Pd09yCNV27r7ZfhLbUhV=eA@mail.gmail.com>
- <VI1PR0401MB26249037CC087F05C0BC467B8C080@VI1PR0401MB2624.eurprd04.prod.outlook.com>
-Message-ID: <CAO1575VPMTEUe+fuaYeaV=U_JW6EP=XPQzKjokNhno8GVFm+9Q@mail.gmail.com>
+From: mpe@ellerman.id.au (Michael Ellerman)
+Date: Thu, 21 Jul 2016 16:52:09 +1000
+Subject: [PATCH v3 02/11] mm: Hardened usercopy
+In-Reply-To: <1468619065-3222-3-git-send-email-keescook@chromium.org>
+References: <1468619065-3222-1-git-send-email-keescook@chromium.org>
+ <1468619065-3222-3-git-send-email-keescook@chromium.org>
+Message-ID: <87poq78ova.fsf@@concordia.ellerman.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Kees Cook <keescook@chromium.org> writes:
 
- yes the hang is after "bridge, pass 1 pci_bus 0000:01: scanning bus";
-I haven't a pcie analyzer.
+> diff --git a/mm/usercopy.c b/mm/usercopy.c
+> new file mode 100644
+> index 000000000000..e4bf4e7ccdf6
+> --- /dev/null
+> +++ b/mm/usercopy.c
+> @@ -0,0 +1,234 @@
+...
+> +
+> +/*
+> + * Checks if a given pointer and length is contained by the current
+> + * stack frame (if possible).
+> + *
+> + *	0: not at all on the stack
+> + *	1: fully within a valid stack frame
+> + *	2: fully on the stack (when can't do frame-checking)
+> + *	-1: error condition (invalid stack position or bad stack frame)
+> + */
+> +static noinline int check_stack_object(const void *obj, unsigned long len)
+> +{
+> +	const void * const stack = task_stack_page(current);
+> +	const void * const stackend = stack + THREAD_SIZE;
 
-IVan
+That allows access to the entire stack, including the struct thread_info,
+is that what we want - it seems dangerous? Or did I miss a check
+somewhere else?
 
-2016-07-20 10:51 GMT+02:00 Richard Zhu <hongxing.zhu@nxp.com>:
-> Hi Ivan:
-> Sorry to reply late.
->
->> -----Original Message-----
->> From: Ivan Grimaldi [mailto:grimaldi.ivan at gmail.com]
->> Sent: Monday, July 18, 2016 6:45 PM
->> To: Richard Zhu <hongxing.zhu@nxp.com>
->> Cc: r65037 at freescale.com; l.stach at pengutronix.de; linux-pci at vger.kernel.org;
->> bhelgaas at google.com; linux-arm-kernel at lists.infradead.org
->> Subject: Re: PROBLEM: pcie imx6 link problem after a random number of
->> reboot
->>
->> Hi,
->>
->>   i have enabled early printk and after a random number of restart the kernel
->> hangs occurs later in the log (Below kernel log).
->>
->> ...
->> imx6q-pcie 1ffc000.pcie: Link up, Gen=2
->> imx6q-pcie 1ffc000.pcie: PCI host bridge to bus 0000:00 pci_bus 0000:00: root
->> bus resource [io  0x1000-0xffff] pci_bus 0000:00: root bus resource [mem
->> 0x01000000-0x01efffff] pci_bus 0000:00: root bus resource [bus 00-ff] pci_bus
->> 0000:00: scanning bus pci 0000:00:00.0: [16c3:abcd] type 01 class 0x060400 pci
->> 0000:00:00.0: reg 0x10: [mem 0x00000000-0x000fffff] pci 0000:00:00.0: reg
->> 0x38: [mem 0x00000000-0x0000ffff pref] pci 0000:00:00.0: calling
->> pci_fixup_ide_bases+0x0/0x4c pci 0000:00:00.0: supports D1 pci 0000:00:00.0:
->> PME# supported from D0 D1 D3hot D3cold pci 0000:00:00.0: PME# disabled
->> pci_bus 0000:00: fixups for bus
->> PCI: bus0: Fast back to back transfers disabled pci 0000:00:00.0: scanning [bus
->> 01-01] behind bridge, pass 0 pci 0000:00:00.0: scanning [bus 00-00] behind
->> bridge, pass 1 pci_bus 0000:01: scanning bus
->>
->>
-> [Zhu hongxing] The pcie link is up refer to the log.
-> Is it hang here?
->
-> If yes, I suspect that the link is not stable, and the link is down here.
-> Can you use one pcie protocol analyzer to figure out what happen on the bus?
->
->>
->> IVan
->>
->>
-> <snip...>
->
-> Best Regards
-> hongxing zhu
-> Linux BSP team
-> Office: 86-21-28937189
-> Email: hongxing.zhu at nxp.com
->
+We have end_of_stack() which computes the end of the stack taking
+thread_info into account (end being the opposite of your end above).
+
+cheers
