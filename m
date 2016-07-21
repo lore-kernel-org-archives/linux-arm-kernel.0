@@ -1,52 +1,60 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 21 Jul 2016 11:33:07 +0100
-Subject: [PATCH] arm64: Fix incorrect per-cpu usage for boot CPU
-In-Reply-To: <1469095975-976-1-git-send-email-suzuki.poulose@arm.com>
-References: <1469095975-976-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <20160721103307.GC20559@leverpostej>
+Date: Thu, 21 Jul 2016 11:36:44 +0100
+Subject: [PATCH] [4.7] arm64: Honor nosmp kernel command line option
+In-Reply-To: <1469096127-1136-1-git-send-email-suzuki.poulose@arm.com>
+References: <1469096127-1136-1-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <20160721103643.GD20559@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 21, 2016 at 11:12:55AM +0100, Suzuki K Poulose wrote:
-> In smp_prepare_boot_cpu(), we invoke cpuinfo_store_boot_cpu to  store
-> the cpuinfo in a per-cpu ptr, before initialising the per-cpu offset for
-> the boot CPU. This patch reorders the sequence to make sure we initialise
-> the per-cpu offset before accessing the per-cpu area.
+On Thu, Jul 21, 2016 at 11:15:27AM +0100, Suzuki K Poulose wrote:
+> Passing "nosmp" should boot the kernel with a single processor, without
+> provision to enable secondary CPUs even if they are present. "nosmp" is
+> implemented by setting maxcpus=0. At the moment we still mark the secondary
+> CPUs present even with nosmp, which allows the userspace to bring them
+> up. This patch corrects the smp_prepare_cpus() to honor the maxcpus == 0.
 > 
-> Commit 4b998ff1885eec ("arm64: Delay cpuinfo_store_boot_cpu") fixed the
-> issue where we modified the per-cpu area even before the kernel initialises
-> the per-cpu areas, but failed to wait until the boot cpu updated it's
-> offset.
+> Commit 44dbcc93ab67145 ("arm64: Fix behavior of maxcpus=N") fixed the
+> behavior for maxcpus >= 1, but broke maxcpus = 0.
 > 
-> Fixes: commit 4b998ff1885eec ("arm64: Delay cpuinfo_store_boot_cpu")
-> Cc: <stable@vger.kernel.org>
+> Fixes: commit 44dbcc93ab67145 ("arm64: Fix behavior of maxcpus=N")
 > Cc: Will Deacon <will.deacon@arm.com>
 > Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: James Morse <james.morse@arm.com>
 > Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> ---
+>  arch/arm64/kernel/smp.c | 7 +++++++
+>  1 file changed, 7 insertions(+)
+> 
+> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+> index d242e81..ec08b7a 100644
+> --- a/arch/arm64/kernel/smp.c
+> +++ b/arch/arm64/kernel/smp.c
+> @@ -694,6 +694,13 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
+>  	smp_store_cpu_info(smp_processor_id());
+>  
+>  	/*
+> +	 * If UP is mandated by "nosmp"(implies maxcpus=0), don't bother about
+
+Nit: missing space between the quote abnd opening bracket. It would also
+be nicer to have s/implies/which implies/
+
+Otherwise:
 
 Acked-by: Mark Rutland <mark.rutland@arm.com>
 
 Mark.
 
-> ---
->  arch/arm64/kernel/smp.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-> index 62ff3c0..d242e81 100644
-> --- a/arch/arm64/kernel/smp.c
-> +++ b/arch/arm64/kernel/smp.c
-> @@ -437,9 +437,9 @@ void __init smp_cpus_done(unsigned int max_cpus)
->  
->  void __init smp_prepare_boot_cpu(void)
->  {
-> +	set_my_cpu_offset(per_cpu_offset(smp_processor_id()));
->  	cpuinfo_store_boot_cpu();
->  	save_boot_cpu_run_el();
-> -	set_my_cpu_offset(per_cpu_offset(smp_processor_id()));
->  }
->  
->  static u64 __init of_get_cpu_mpidr(struct device_node *dn)
+> +	 * secondary CPUs.
+> +	 */
+> +	if (max_cpus == 0)
+> +		return;
+> +
+> +	/*
+>  	 * Initialise the present map (which describes the set of CPUs
+>  	 * actually populated at the present time) and release the
+>  	 * secondaries from the bootloader.
 > -- 
 > 2.7.4
 > 
