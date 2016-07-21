@@ -1,77 +1,61 @@
-From: adrian.hunter@intel.com (Adrian Hunter)
-Date: Thu, 21 Jul 2016 12:32:37 +0300
-Subject: [PATCH V2 00/15] a few sdhci/imx clean up and fix patches
-In-Reply-To: <1468309584-3591-1-git-send-email-aisheng.dong@nxp.com>
-References: <1468309584-3591-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <579096B5.2030509@intel.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 21 Jul 2016 10:41:28 +0100
+Subject: [PATCH v3 5/6] usb: chipidea: let chipidea core device of_node
+ equal's glue layer device of_node
+In-Reply-To: <20160721092012.GA22749@shlinux2>
+References: <1469007629-31757-1-git-send-email-peter.chen@nxp.com>
+ <1469007629-31757-6-git-send-email-peter.chen@nxp.com>
+ <20160721091438.GL1041@n2100.armlinux.org.uk>
+ <20160721092012.GA22749@shlinux2>
+Message-ID: <20160721094128.GN1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/07/16 10:46, Dong Aisheng wrote:
-> Patch 1~10 are mainly sdhci cleanup patches while patch 7,9,10
-> are fixes which seems needed for stable tree as well.
+On Thu, Jul 21, 2016 at 05:20:12PM +0800, Peter Chen wrote:
+> On Thu, Jul 21, 2016 at 10:14:38AM +0100, Russell King - ARM Linux wrote:
+> > On Wed, Jul 20, 2016 at 05:40:28PM +0800, Peter Chen wrote:
+> > > diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
+> > > index 69426e6..0d05812 100644
+> > > --- a/drivers/usb/chipidea/core.c
+> > > +++ b/drivers/usb/chipidea/core.c
+> > > @@ -914,6 +914,16 @@ static int ci_hdrc_probe(struct platform_device *pdev)
+> > >  	if (!ci)
+> > >  		return -ENOMEM;
+> > >  
+> > > +	/*
+> > > +	 * At device tree, we have no device node for chipidea core,
+> > > +	 * the glue layer's node is the parent node for host and udc
+> > > +	 * device. But in related driver, the parent device is chipidea
+> > > +	 * core. So, in order to let the common driver get parent's node,
+> > > +	 * we let the core's device node equals glue layer's node.
+> > > +	 */
+> > > +	if (dev->parent && dev->parent->of_node)
+> > > +		dev->of_node = dev->parent->of_node;
+> > 
+> > This is a dangerous thing to do.  You're changing the dev->of_node of
+> > _this_ device, which means that _this_ driver will no longer match
+> > the device if you remove and reinsert the driver module, or unbind
+> > and try to re-bind the device to this driver.
+> > 
+> 
+> Thanks for commenting it.
+> 
+> I have tested load/unload, it does not show any problems.
+> 
+> The chipidea core device is created by code at runtime, not by device node.
+> And we have NO device node for this chipidea core device at dts.
 
-I have ack'ed all the sdhci-related patches. i.e. all but patch 7 the dt
-bindings change.
+Okay, so we still probably have the bind/unbind problem, where "dev"
+can be matched by the driver which claimed "dev->parent".  Remember,
+in an OF environment, driver matching is done by the compatible
+property, which is accessed via dev->of_node.
 
-I am not sure what needs to be done for stable.  I would suggest these
-patches are queued for 4.8, then Dong can send the relevant patches to the
-linux-stable mailing list separately after -rc1.
+Therefore, I would suggest that you NULL dev->of_node in the error
+cleanup paths and in the remove function, so you don't have an
+unbound device with a duplicated (but inappropriate) dev->of_node
+pointer.
 
-> 
-> The main work is:
-> 1) using more robust mmc_regulator_set_vqmmc 
-> 2) add auto retune support
-> 3) improve sdhci-esdhc-imx stability
-> 4) add state save and restore for low power mode
-> 
-> Change Log:
-> v1->v2:
->  * address all Adrian's comments
->  * below patches are dropped
->   mmc: sdhci: move sdhci_get_cd() forward to avoid declaration
->   mmc: core: fix a comment typo
->   mmc: sdhci: re-factor sdhci_start_signal_voltage()
->   mmc: core: mmc_regulator_set_vqmmc not return error if vqmmc/vmmc not
->     exist
->   mmc: sdhci: check SDHCI_QUIRK2_NO_1_8_V when do voltage switch
->   mmc: sdhci: rename quirk SDHCI_QUIRK_MULTIBLOCK_READ_ACMD12
-> 	Above clean up is not needed so far according to Adrian.
-> 
->   mmc: sdhci: fix incorrect get data interrupt during no data transfer
-> 	This one is not needed anymore cause Adrian had another fix
-> 	already in tree.
-> 	(commit 0e0a35d2d4058 mmc: sdhci: Track whether a reset is pending)
-> 
->   mmc: core: disable auto retune during card detection process
-> 	This one will sent out in another patch series to fix in CORE.
-> 
-> v1:
-> http://www.spinics.net/lists/linux-mmc/msg36316.html
-> 
-> Dong Aisheng (15):
->   mmc: sdhci: using common mmc_regulator_set_vqmmc()
->   mmc: sdhci-esdhc-imx: remove SDHCI_QUIRK_BROKEN_TIMEOUT_VAL
->   mmc: sdhci-esdhc-imx: add esdhc specific suspend resume callback
->   mmc: sdhci-esdhc-imx: restore watermark level setting after resume
->   mmc: sdhci-esdhci-imx: disable DLL delay line settings explicitly
->   mmc: sdhci-esdhc-imx: support setting tuning start point
->   doc: dt: fsl-imx-esdhc: add set tuning start point binding
->   mmc: sdhci: add standard hw auto retuning support
->   mmc: sdhci-esdhc-imx: enable hw auto retuning for STD_TUNING
->   mmc: sdhci-esdhc-imx: enable hw auto retuning for MAN_TUNING
->   mmc: sdhci-esdhc-imx: fix strobe DLL lock wrong clock issue
->   mmc: sdhci-esdhc-imx: factor out hw related initialization into
->     function
->   mmc: sdhci-esdhc-imx: move tuning static configuration into hwinit
->     function
->   mmc: sdhci-esdhci-imx: re-initialize hw state after resume
->   mmc: sdhci-esdhc-imx: clear tuning bits during driver probe
-> 
->  .../devicetree/bindings/mmc/fsl-imx-esdhc.txt      |   2 +
->  drivers/mmc/host/sdhci-esdhc-imx.c                 | 149 ++++++++++++++-------
->  drivers/mmc/host/sdhci.c                           |  24 ++--
->  drivers/mmc/host/sdhci.h                           |   3 +
->  include/linux/platform_data/mmc-esdhc-imx.h        |   1 +
->  5 files changed, 122 insertions(+), 57 deletions(-)
-> 
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
