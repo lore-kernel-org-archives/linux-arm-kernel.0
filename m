@@ -1,77 +1,77 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 21 Jul 2016 12:35:43 +0300
-Subject: [PATCH 2/7] dmaengine: omap-dma: Complete the cookie first on
- transfer completion
-In-Reply-To: <f18ced07-39e4-c336-b788-254c2c130f82@ti.com>
-References: <20160714124242.7579-1-peter.ujfalusi@ti.com>
- <20160714124242.7579-3-peter.ujfalusi@ti.com>
- <20160718103409.GH5783@n2100.arm.linux.org.uk>
- <923b54d6-c7fc-66c2-1c20-d8d74ebed912@ti.com> <877fcg25c4.fsf@belgarion.home>
- <f18ced07-39e4-c336-b788-254c2c130f82@ti.com>
-Message-ID: <ecc0ef95-bf14-488d-aa72-ae2c70a1b63c@ti.com>
+From: adrian.hunter@intel.com (Adrian Hunter)
+Date: Thu, 21 Jul 2016 12:32:37 +0300
+Subject: [PATCH V2 00/15] a few sdhci/imx clean up and fix patches
+In-Reply-To: <1468309584-3591-1-git-send-email-aisheng.dong@nxp.com>
+References: <1468309584-3591-1-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <579096B5.2030509@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/21/16 12:33, Peter Ujfalusi wrote:
-> On 07/20/16 09:26, Robert Jarzmik wrote:
->> Peter Ujfalusi <peter.ujfalusi@ti.com> writes:
->>
->>> On 07/18/16 13:34, Russell King - ARM Linux wrote:
->>>> On Thu, Jul 14, 2016 at 03:42:37PM +0300, Peter Ujfalusi wrote:
->>>>> Before looking for the next descriptor to start, complete the just finished
->>>>> cookie.
->>>>
->>>> This change will reduce performance as we no longer have an overlap
->>>> between the next request starting to be dealt with in the hardware
->>>> vs the previous request being completed.
->>>
->>> vchan_cookie_complete() will only mark the cookie completed, adds the vd to
->>> the desc_completed list (it was deleted from desc_issued list when it was
->>> started by omap_dma_start_desc) and schedule the tasklet to deal with the real
->>> completion later.
->>> Marking the just finished descriptor/cookie done first then looking for
->>> possible descriptors in the queue to start feels like a better sequence.
->>>
->>> After a quick grep in the kernel source: only omap-dma.c was starting the next
->>> transfer before marking the current completed descriptor/cookie done.
->>
->> Euh actually I think it's done in other drivers as well :
->>  - Documentation/dmaengine/pxa_dma.txt (chapter "Transfers hot-chaining)
->>  - drivers/dma/pxa_dma.c
->>    => look for pxad_try_hotchain() and it's impact on pxad_chan_handler() which
->>    will mark the completion while the next transfer is already pumped by the
->>    hardware.
-> 
-> The 'hot-chaining' is a bit different then what omap-dma is doing.
+On 12/07/16 10:46, Dong Aisheng wrote:
+> Patch 1~10 are mainly sdhci cleanup patches while patch 7,9,10
+> are fixes which seems needed for stable tree as well.
 
-s/then/than
+I have ack'ed all the sdhci-related patches. i.e. all but patch 7 the dt
+bindings change.
 
-> If I got it
-> right. When the DMA is running and a new request comes the driver will append
-> the new transfer to the list used by the HW. This way there will be no stop
-> and restart needed, the DMA is running w/o interruption.
-> 
->> Speaking of which, from a purely design point of view, as long as you think
->> beforehand what is your sequence, ie. what is the sequence of your link
->> chaining, completion handling, etc ..., both marking before or after next tx
->> start should be fine IMHO.
-> 
-> Yes, it might be a bit better from performance point of view if we first start
-> the pending descriptor (if there is one) then do the vchan_cookie_complete().
-> On the other hand if we care more about latency and accuracy we should
-> complete the transfer first then look for pending descriptors. But since
-> virt_dma is using a tasklet for the real completion, the latency is always
-> going to be when the tasklet is given the chance to execute.
-> 
->> So in your quest for the "better sequence" the pxa driver's one might give you
->> some perspective :)
-> 
-> I did thought about similar 'hot-chaining' for TI's eDMA and sDMA. Especially
-> eDMA would benefit from it, but so far I see too many race conditions to
-> overcome to be brave enough to write something to test it. and I don't have
-> time for it atm ;)
-> 
+I am not sure what needs to be done for stable.  I would suggest these
+patches are queued for 4.8, then Dong can send the relevant patches to the
+linux-stable mailing list separately after -rc1.
 
-
--- 
-P?ter
+> 
+> The main work is:
+> 1) using more robust mmc_regulator_set_vqmmc 
+> 2) add auto retune support
+> 3) improve sdhci-esdhc-imx stability
+> 4) add state save and restore for low power mode
+> 
+> Change Log:
+> v1->v2:
+>  * address all Adrian's comments
+>  * below patches are dropped
+>   mmc: sdhci: move sdhci_get_cd() forward to avoid declaration
+>   mmc: core: fix a comment typo
+>   mmc: sdhci: re-factor sdhci_start_signal_voltage()
+>   mmc: core: mmc_regulator_set_vqmmc not return error if vqmmc/vmmc not
+>     exist
+>   mmc: sdhci: check SDHCI_QUIRK2_NO_1_8_V when do voltage switch
+>   mmc: sdhci: rename quirk SDHCI_QUIRK_MULTIBLOCK_READ_ACMD12
+> 	Above clean up is not needed so far according to Adrian.
+> 
+>   mmc: sdhci: fix incorrect get data interrupt during no data transfer
+> 	This one is not needed anymore cause Adrian had another fix
+> 	already in tree.
+> 	(commit 0e0a35d2d4058 mmc: sdhci: Track whether a reset is pending)
+> 
+>   mmc: core: disable auto retune during card detection process
+> 	This one will sent out in another patch series to fix in CORE.
+> 
+> v1:
+> http://www.spinics.net/lists/linux-mmc/msg36316.html
+> 
+> Dong Aisheng (15):
+>   mmc: sdhci: using common mmc_regulator_set_vqmmc()
+>   mmc: sdhci-esdhc-imx: remove SDHCI_QUIRK_BROKEN_TIMEOUT_VAL
+>   mmc: sdhci-esdhc-imx: add esdhc specific suspend resume callback
+>   mmc: sdhci-esdhc-imx: restore watermark level setting after resume
+>   mmc: sdhci-esdhci-imx: disable DLL delay line settings explicitly
+>   mmc: sdhci-esdhc-imx: support setting tuning start point
+>   doc: dt: fsl-imx-esdhc: add set tuning start point binding
+>   mmc: sdhci: add standard hw auto retuning support
+>   mmc: sdhci-esdhc-imx: enable hw auto retuning for STD_TUNING
+>   mmc: sdhci-esdhc-imx: enable hw auto retuning for MAN_TUNING
+>   mmc: sdhci-esdhc-imx: fix strobe DLL lock wrong clock issue
+>   mmc: sdhci-esdhc-imx: factor out hw related initialization into
+>     function
+>   mmc: sdhci-esdhc-imx: move tuning static configuration into hwinit
+>     function
+>   mmc: sdhci-esdhci-imx: re-initialize hw state after resume
+>   mmc: sdhci-esdhc-imx: clear tuning bits during driver probe
+> 
+>  .../devicetree/bindings/mmc/fsl-imx-esdhc.txt      |   2 +
+>  drivers/mmc/host/sdhci-esdhc-imx.c                 | 149 ++++++++++++++-------
+>  drivers/mmc/host/sdhci.c                           |  24 ++--
+>  drivers/mmc/host/sdhci.h                           |   3 +
+>  include/linux/platform_data/mmc-esdhc-imx.h        |   1 +
+>  5 files changed, 122 insertions(+), 57 deletions(-)
+> 
