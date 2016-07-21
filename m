@@ -1,56 +1,82 @@
-From: elfring@users.sourceforge.net (SF Markus Elfring)
-Date: Thu, 21 Jul 2016 19:42:33 +0200
-Subject: [PATCH] GPU-DRM-Exynos: Delete an unnecessary check before the
- function call "vunmap"
-In-Reply-To: <54D329D0.7050006@samsung.com>
-References: <5307CAA2.8060406@users.sourceforge.net>
- <alpine.DEB.2.02.1402212321410.2043@localhost6.localdomain6>
- <530A086E.8010901@users.sourceforge.net>
- <alpine.DEB.2.02.1402231635510.1985@localhost6.localdomain6>
- <530A72AA.3000601@users.sourceforge.net>
- <alpine.DEB.2.02.1402240658210.2090@localhost6.localdomain6>
- <530B5FB6.6010207@users.sourceforge.net>
- <alpine.DEB.2.10.1402241710370.2074@hadrien>
- <530C5E18.1020800@users.sourceforge.net>
- <alpine.DEB.2.10.1402251014170.2080@hadrien>
- <530CD2C4.4050903@users.sourceforge.net>
- <alpine.DEB.2.10.1402251840450.7035@hadrien>
- <530CF8FF.8080600@users.sourceforge.net>
- <alpine.DEB.2.02.1402252117150.2047@localhost6.localdomain6>
- <530DD06F.4090703@users.sourceforge.net>
- <alpine.DEB.2.02.1402262129250.2221@localhost6.localdomain6>
- <5317A59D.4@users.sourceforge.net> <54D28870.3060400@users.sourceforge.net>
- <54D329D0.7050006@samsung.com>
-Message-ID: <a5a79711-10a3-e304-a897-892ebdf2ff9f@users.sourceforge.net>
+From: isubramanian@apm.com (Iyappan Subramanian)
+Date: Thu, 21 Jul 2016 10:57:59 -0700
+Subject: [PATCH v5 10/11] Documentation: dtb: xgene: Add MDIO node
+In-Reply-To: <20160713131010.GA15972@rob-hp-laptop>
+References: <1467932579-14320-1-git-send-email-isubramanian@apm.com>
+ <1467932579-14320-11-git-send-email-isubramanian@apm.com>
+ <20160713131010.GA15972@rob-hp-laptop>
+Message-ID: <CAKh23F=jT=rjU_e9Xu82Jna5ntPR5zdt3VGEyXR4_w+6aQ6Cyg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Markus Elfring <elfring@users.sourceforge.net>
-Date: Thu, 21 Jul 2016 19:23:25 +0200
+On Wed, Jul 13, 2016 at 6:10 AM, Rob Herring <robh@kernel.org> wrote:
+> On Thu, Jul 07, 2016 at 04:02:58PM -0700, Iyappan Subramanian wrote:
+>> Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
+>> Tested-by: Fushen Chen <fchen@apm.com>
+>> Tested-by: Toan Le <toanle@apm.com>
+>> Tested-by: Matthias Brugger <mbrugger@suse.com>
+>> ---
+>>  .../devicetree/bindings/net/apm-xgene-mdio.txt     | 37 ++++++++++++++++++++++
+>>  1 file changed, 37 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/net/apm-xgene-mdio.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/net/apm-xgene-mdio.txt b/Documentation/devicetree/bindings/net/apm-xgene-mdio.txt
+>> new file mode 100644
+>> index 0000000..0247e70
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/net/apm-xgene-mdio.txt
+>> @@ -0,0 +1,37 @@
+>> +APM X-Gene SoC MDIO node
+>> +
+>> +MDIO node is defined to describe on-chip MDIO controller.
+>> +
+>> +Required properties:
+>> +     - compatible: Must be "apm,xgene-mdio-rgmii"
+>> +     - #address-cells: Must be <1>.
+>> +     - #size-cells: Must be <0>.
+>> +     - reg: Address and length of the register set
+>> +     - clocks: Reference to the clock entry
+>> +
+>> +For the phys on the mdio bus, there must be a node with the following fields:
+>> +     - compatible: PHY identifier.  Please refer ./phy.txt for the format.
+>> +     - reg: The ID number for the phy.
+>> +
+>> +Example:
+>> +
+>> +     mdio: mdio at 0x17020000 {
+>
+> Drop the '0x'
 
-The vunmap() function performs also input parameter validation.
-Thus the test around the call is not needed.
+Thanks for the review.  Corrected and posted v6.
 
-This issue was detected by using the Coccinelle software.
-
-Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
----
- drivers/gpu/drm/exynos/exynos_drm_fbdev.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
-
-diff --git a/drivers/gpu/drm/exynos/exynos_drm_fbdev.c b/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
-index dd09117..4cfb39d 100644
---- a/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
-+++ b/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
-@@ -269,8 +269,7 @@ static void exynos_drm_fbdev_destroy(struct drm_device *dev,
- 	struct exynos_drm_gem *exynos_gem = exynos_fbd->exynos_gem;
- 	struct drm_framebuffer *fb;
- 
--	if (exynos_gem->kvaddr)
--		vunmap(exynos_gem->kvaddr);
-+	vunmap(exynos_gem->kvaddr);
- 
- 	/* release drm framebuffer and real buffer */
- 	if (fb_helper->fb && fb_helper->fb->funcs) {
--- 
-2.9.2
+>
+> With that,
+>
+> Acked-by: Rob Herring <robh@kernel.org>
+>
+>> +             compatible = "apm,xgene-mdio-rgmii";
+>> +             #address-cells = <1>;
+>> +             #size-cells = <0>;
+>> +             reg = <0x0 0x17020000 0x0 0xd100>;
+>> +             clocks = <&menetclk 0>;
+>> +     };
+>> +
+>> +     /* Board-specific peripheral configurations */
+>> +     &mdio {
+>> +             menetphy: phy at 3 {
+>> +                     reg = <0x3>;
+>> +             };
+>> +             sgenet0phy: phy at 4 {
+>> +                     reg = <0x4>;
+>> +             };
+>> +             sgenet1phy: phy at 5 {
+>> +                     reg = <0x5>;
+>> +             };
+>> +     };
+>> --
+>> 1.9.1
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
