@@ -1,46 +1,58 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Thu, 21 Jul 2016 18:45:21 +0800
-Subject: "coupled" regulator support
-In-Reply-To: <20160718180508.GV30372@sirena.org.uk>
-References: <20160715200113.0f3cd823@xhacker>
- <20160715125039.GI30372@sirena.org.uk>	<20160718144422.30be1e2f@xhacker>
- <20160718180508.GV30372@sirena.org.uk>
-Message-ID: <20160721184521.03a1b690@xhacker>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 21 Jul 2016 11:50:42 +0100
+Subject: [PATCH v1 3/4] arm64: Add arm64 kexec support
+In-Reply-To: <20160721103120.GB20559@leverpostej>
+References: <cover.1468970114.git.geoff@infradead.org>
+ <9ed513fd44a19b2f49b4da99477cedfff7341bf0.1468970114.git.geoff@infradead.org>
+ <20160720153859.GG24691@leverpostej> <1469042361.2977.90.camel@infradead.org>
+ <20160721103120.GB20559@leverpostej>
+Message-ID: <5790A902.6070601@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Mark,
-
-On Mon, 18 Jul 2016 19:05:08 +0100 Mark Brown wrote:
-
-> On Mon, Jul 18, 2016 at 02:44:22PM +0800, Jisheng Zhang wrote:
+On 21/07/16 11:31, Mark Rutland wrote:
+[...]
+>>>> +
+>>>> +> > 	> > if (*p == 0)
+>>>> +> > 	> > 	> > return 0;
+>>>> +
+>>>> +> > 	> > errno = 0;
+>>>> +
+>>>> +> > 	> > v = strtoull(p, NULL, 0);
+>>>> +
+>>>> +> > 	> > if (errno)
+>>>> +> > 	> > 	> > return 0;
+>>>> +
+>>>> +> > 	> > return v;
+>>>> +}
+>>>
+>>> It looks like the purgatory code expects angel SWI as the earlycon,
+>>
+>> Maybe you saw the debug_brk macro in entry.S?  I should remove
+>> that and just loop.
 > 
-> > v1 and v2 and both valid voltages, but here we have an explicit limitation:
-> > we must take the "regulator shared" fact into consideration. Let's assume
-> > the voltage is at v2, devA is not busy now, it wants to scale down freq, then
-> > scale down voltage to v1, but if devB hasn't call for setting voltage to
-> > v1, we can't scale down voltage now, we need to wait for devB sending out
-> > the voltage scaling down request when it is not busy in future some time.
-> > Obviously, the last user will succeed to scale down the voltage.  
+> Ah, sorry. For some reason I got that confused with the sink code. My
+> bad.
 > 
-> > My solution is
-> > to extend regulator_check_consumers() to check whether all consumers agree
-> > to scaling down voltage or not.  
+> Now I see that's assuming an 8-bit MMIO register.
 > 
-> I'm not sure I 100% follow your explanation above - it still sounds like
-> a normal shared regulator situation.  In general I'm really unsure how
+>>> whereas many other earlycons exist (with pl011 being extremely popular).
+>>> Regardless, if we assume a particular UART type, we should explicitly
+>>> verify that here. Otherwise the purgatory code will likely bring down
+>>> the system, and it will be very painful to debug.
+>>>
+>>> Please explicitly check for the supported earlycon name.
+>>
+>> Purgatory just writes bytes to the address given.  Are there
+>> UARTs that don't have TX as the first port?
+> 
+> I'm not sure, but it's certainly possible. The generic earlycon binding
+> doesn't guarantee that the first address is a TX register. Even if they
+> don't exist today, they could in a month's time, so I don't think we
+> should assume anything.
 
-You are right!
-After carefully checking the code, I found the existing regulator core could
-meet my what I want.
+The Exynos UART (drivers/tty/serial/samsung.c) is one which comes to
+mind as definitely existing, and on arm64 systems to boot. The TX
+register is at offset 0x20 there.
 
-Thanks so much,
-Jisheng
-
-> this sort of scheme is expected to work.  It seems like in a lot of
-> cases there will be some other constraints in play (like needing to do
-> frequency updates as part of the sequence) which can't be handled purely
-> in the regulator API and/or that the DVFS driver ought to be able to use
-> notifiers to discover when actual changes have happened and handle
-> things in their own code.  But like I say I don't 100% follow what's new
-> in your example so I may be missing something.
+Robin.
