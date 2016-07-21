@@ -1,50 +1,65 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 21 Jul 2016 00:00:36 -0700
-Subject: kexec failures with DEBUG_RODATA
-In-Reply-To: <20160707102003.GO1041@n2100.armlinux.org.uk>
-References: <20160614175920.GD1041@n2100.armlinux.org.uk>
- <CAGXu5j+5j32HO0rQtF2hcqMUBaa8cyxgLT4JvaZ6LL2WPj_zjw@mail.gmail.com>
- <20160615211359.GJ1041@n2100.armlinux.org.uk>
- <CAGXu5jKRBA9b6gos+FG7iV2ppxtAERstNPschxA0z=aDL_y1YA@mail.gmail.com>
- <20160615224228.GK1041@n2100.armlinux.org.uk>
- <20160707102003.GO1041@n2100.armlinux.org.uk>
-Message-ID: <20160721070035.GV28140@atomide.com>
+From: adrian.hunter@intel.com (Adrian Hunter)
+Date: Thu, 21 Jul 2016 10:06:43 +0300
+Subject: [PATCH V2 01/15] mmc: sdhci: using common
+ mmc_regulator_set_vqmmc()
+In-Reply-To: <1468309584-3591-2-git-send-email-aisheng.dong@nxp.com>
+References: <1468309584-3591-1-git-send-email-aisheng.dong@nxp.com>
+ <1468309584-3591-2-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <57907483.3030207@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@armlinux.org.uk> [160707 03:25]:
-> On Wed, Jun 15, 2016 at 11:42:28PM +0100, Russell King - ARM Linux wrote:
-> > The boot environment must be setup such that there is room for the
-> > uncompressed image (aligned currently to 256 bytes) followed by the
-> > size of the compressed image, with any appended DTBs included.
-> > Anything which is located below that is likely to get trampled by
-> > the decompressor.
+On 12/07/16 10:46, Dong Aisheng wrote:
+> Switch to use the more robust common mmc_regulator_set_vqmmc()
+> function in MMC core which set the target voltage as close as
+> possible to target voltage.
 > 
-> There's a question that's been lingering, which hasn't been brought up
-> by anyone yet: should we even support zImage files with an appended
-> DTB for kexec?
+> We did not re-factor the whole sdhci_start_signal_voltage_switch()
+> cause we want to keep the original signal switch order between host
+> and card to avoid potential break.
 > 
-> When kexec is operating in DTB mode, it will provide the DTB to the
-> kernel from the host environment, possibly with some modifications (eg,
-> to change the command line arguments.)  Since an appended DTB would
-> override the kexec-provided DTB, this would wipe out those changes,
-> some of which are necessary for things like crashdump to work.
+> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+
+
+Acked-by: Adrian Hunter <adrian.hunter@intel.com>
+
+
+> ---
+>  drivers/mmc/host/sdhci.c | 9 +++------
+>  1 file changed, 3 insertions(+), 6 deletions(-)
 > 
-> So, I'm thinking that kexec should not support a zImage with appended
-> DTB - in fact, I think it should truncate the zImage to be loaded, and
-> ensure that the word following the zImage does not contain a DTB magic
-> number, in case the zImage has been built with CONFIG_ARM_APPENDED_DTB
-> enabled.
+> diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
+> index 2ee8bfa77116..7894652b9929 100644
+> --- a/drivers/mmc/host/sdhci.c
+> +++ b/drivers/mmc/host/sdhci.c
+> @@ -1835,8 +1835,7 @@ static int sdhci_start_signal_voltage_switch(struct mmc_host *mmc,
+>  		sdhci_writew(host, ctrl, SDHCI_HOST_CONTROL2);
+>  
+>  		if (!IS_ERR(mmc->supply.vqmmc)) {
+> -			ret = regulator_set_voltage(mmc->supply.vqmmc, 2700000,
+> -						    3600000);
+> +			ret = mmc_regulator_set_vqmmc(mmc, ios);
+>  			if (ret) {
+>  				pr_warn("%s: Switching to 3.3V signalling voltage failed\n",
+>  					mmc_hostname(mmc));
+> @@ -1859,8 +1858,7 @@ static int sdhci_start_signal_voltage_switch(struct mmc_host *mmc,
+>  		if (!(host->flags & SDHCI_SIGNALING_180))
+>  			return -EINVAL;
+>  		if (!IS_ERR(mmc->supply.vqmmc)) {
+> -			ret = regulator_set_voltage(mmc->supply.vqmmc,
+> -					1700000, 1950000);
+> +			ret = mmc_regulator_set_vqmmc(mmc, ios);
+>  			if (ret) {
+>  				pr_warn("%s: Switching to 1.8V signalling voltage failed\n",
+>  					mmc_hostname(mmc));
+> @@ -1892,8 +1890,7 @@ static int sdhci_start_signal_voltage_switch(struct mmc_host *mmc,
+>  		if (!(host->flags & SDHCI_SIGNALING_120))
+>  			return -EINVAL;
+>  		if (!IS_ERR(mmc->supply.vqmmc)) {
+> -			ret = regulator_set_voltage(mmc->supply.vqmmc, 1100000,
+> -						    1300000);
+> +			ret = mmc_regulator_set_vqmmc(mmc, ios);
+>  			if (ret) {
+>  				pr_warn("%s: Switching to 1.2V signalling voltage failed\n",
+>  					mmc_hostname(mmc));
 > 
-> Thoughts?
-
-Sorry for a late reply, I've been offline.
-
-Sounds like a good idea to me as this as we can properly error out
-with appendd dtb before anything nasty happens making new kernel
-fail. And if somebody really needs it, we can add an option for
---force-appended-dtb.
-
-Regards,
-
-Tony
