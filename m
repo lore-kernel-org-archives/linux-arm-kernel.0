@@ -1,34 +1,24 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 21 Jul 2016 19:20:37 +0100
-Subject: [PATCH v6] ARM: sun4i: spi: Allow transfers larger than FIFO size
-In-Reply-To: <20160721172712.GA10640@weiser.dinsnail.net>
-References: <1439062912-4405-1-git-send-email-oliver@schinagl.nl>
- <20160721112701.GB6610@weiser.dinsnail.net>
- <20160721163153.GO6509@sirena.org.uk>
- <20160721172712.GA10640@weiser.dinsnail.net>
-Message-ID: <20160721182037.GQ6509@sirena.org.uk>
+From: michael.weiser@gmx.de (Michael Weiser)
+Date: Thu, 21 Jul 2016 20:23:26 +0200
+Subject: [PATCH 0/3 v2] Fixes for running a big-endian kernel on Cubieboard2
+Message-ID: <20160721182329.13478-1-michael.weiser@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 21, 2016 at 07:27:12PM +0200, Michael Weiser wrote:
-> On Thu, Jul 21, 2016 at 05:31:53PM +0100, Mark Brown wrote:
+Hello,
 
-> > > What is keeping the patch from being merged (i.e. into mainline)?
-> > Someone needs to address whatever review comments there were on the last
-> > version and submit it.
+the following patches fix up endianness problems with DMA descriptors in the
+sunxi-mmc and stmmac drivers preventing a big-endian kernel from working
+correctly on the Cubieboard2. The final patch enables the big-endian kernel
+configuration option for sunxi devices in order to be able to compile a
+big-endian kernel for the Cubieboard2. All of these have been tested
+successfull on a Cubieboard2 Dual-Card.
 
-> That's my point: There don't seem to be any.
+Changes since v1:
+- fixed checkpatch niggles
+- added respective Cc:s
 
-> v6 was resend with fixes to checkpatch niggles on v5:
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-August/363073.html
+Regards,
+Michael
 
-I can't tell if that was even submitted, it's got a subject line of
-"ARM: sun4i" so there's every chance that even if it was sent to me it
-got deleted unread.  Whatever was going on it needs to be submited.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160721/23a291e2/attachment.sig>
+Signed-off-by: Michael Weiser <michael.weiser@gmx.de>
