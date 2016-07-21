@@ -1,88 +1,69 @@
-From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Thu, 21 Jul 2016 11:11:34 -0400
-Subject: [PATCH] ARM: dont specify STACKPROTECTOR in defconfigs
-Message-ID: <20160721151134.5803-1-paul.gortmaker@windriver.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Thu, 21 Jul 2016 16:12:05 +0100
+Subject: [RFC 6/6] bus: Add support for Tegra NOR controller
+In-Reply-To: <1468935397-11926-7-git-send-email-mirza.krak@gmail.com>
+References: <1468935397-11926-1-git-send-email-mirza.krak@gmail.com>
+ <1468935397-11926-7-git-send-email-mirza.krak@gmail.com>
+Message-ID: <222d4179-a72f-56d1-246b-ab66af3057d9@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Note the output from the following:
 
-   $ git grep STACKPROTECTOR arch/arm/configs/
-   arch/arm/configs/aspeed_g4_defconfig:CONFIG_CC_STACKPROTECTOR_STRONG=y
-   arch/arm/configs/aspeed_g5_defconfig:CONFIG_CC_STACKPROTECTOR_STRONG=y
-   arch/arm/configs/bcm2835_defconfig:CONFIG_CC_STACKPROTECTOR_REGULAR=y
-   $
+On 19/07/16 14:36, Mirza Krak wrote:
+> From: Mirza Krak <mirza.krak@gmail.com>
+> 
+> The NOR bus can be used to connect high-speed devices such as NOR flash,
+> FPGAs, DSPs, CAN chips, Wi-Fi chips etc.
+> 
+> Signed-off-by: Mirza Krak <mirza.krak@gmail.com>
+> ---
+>  drivers/bus/Kconfig     |   7 +++
+>  drivers/bus/Makefile    |   1 +
+>  drivers/bus/tegra-nor.c | 118 ++++++++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 126 insertions(+)
+>  create mode 100644 drivers/bus/tegra-nor.c
 
-Only three defconfigs specify a value.  And two of the three ask for
-the strong variant, which isn't supported by older toolchains.
+...
 
-Due to the nature of ARM having more platform specific code than say
-x86, the allyesconfig and allmodconfig aren't as effective for build
-coverage.  So, in addition, I like to use a trivial script to walk all
-the defconfigs and build each one.
+> +static int __init nor_probe(struct platform_device *pdev)
+> +{
+> +	struct resource *res;
+> +	struct clk *clk;
+> +	void __iomem *base;
+> +	int ret;
+> +
+> +	/* get the resource */
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	base = devm_ioremap_resource(&pdev->dev, res);
+> +	if (IS_ERR(base))
+> +		return PTR_ERR(base);
+> +
+> +	/* get the clock */
+> +	clk = devm_clk_get(&pdev->dev, NULL);
+> +	if (IS_ERR(clk))
+> +		return PTR_ERR(clk);
+> +
+> +	ret = clk_prepare_enable(clk);
+> +	if (ret)
+> +		return ret;
+> +
+> +	/* parse the device node */
+> +	ret = nor_parse_dt(pdev, base);
+> +	if (ret) {
+> +		dev_err(&pdev->dev, "%s fail to create devices.\n",
+> +			pdev->dev.of_node->full_name);
+> +		clk_disable_unprepare(clk);
+> +		return ret;
+> +	}
+> +
+> +	dev_info(&pdev->dev, "Driver registered.\n");
+> +	return 0;
+> +}
 
-However I will get false positives on unsupported stackprotector values
-with an older toolchain like gcc-4.6.3.  As in this instance I am just
-using the compiler as a glorified syntax checker on a machine where I
-build a bunch of other arch for the same reason, there is no real
-motivation to get a newer toolchain for improved optimization etc.
+The reset is defined in the binding, but never used. Should we make sure
+the reset is de-asserted in the probe?
 
-Since there are only three of them, and there is nothing about these
-settings that are board/platform specific, I propose we just eliminate
-the three existing instances and take the default.
+Jon
 
-Cc: Russell King <linux@armlinux.org.uk>
-Cc: Florian Fainelli <f.fainelli@gmail.com>
-Cc: Ray Jui <rjui@broadcom.com>
-Cc: Scott Branden <sbranden@broadcom.com>
-Cc: Stephen Warren <swarren@wwwdotorg.org>
-Cc: Lee Jones <lee@kernel.org>
-Cc: Eric Anholt <eric@anholt.net>
-Cc: Joel Stanley <joel@jms.id.au>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: bcm-kernel-feedback-list at broadcom.com
-Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
----
- arch/arm/configs/aspeed_g4_defconfig | 1 -
- arch/arm/configs/aspeed_g5_defconfig | 1 -
- arch/arm/configs/bcm2835_defconfig   | 1 -
- 3 files changed, 3 deletions(-)
-
-diff --git a/arch/arm/configs/aspeed_g4_defconfig b/arch/arm/configs/aspeed_g4_defconfig
-index b6e54ee9bdbd..78dae22c56de 100644
---- a/arch/arm/configs/aspeed_g4_defconfig
-+++ b/arch/arm/configs/aspeed_g4_defconfig
-@@ -18,7 +18,6 @@ CONFIG_BPF_SYSCALL=y
- CONFIG_EMBEDDED=y
- # CONFIG_COMPAT_BRK is not set
- CONFIG_SLAB=y
--CONFIG_CC_STACKPROTECTOR_STRONG=y
- CONFIG_MODULES=y
- CONFIG_MODULE_UNLOAD=y
- # CONFIG_BLOCK is not set
-diff --git a/arch/arm/configs/aspeed_g5_defconfig b/arch/arm/configs/aspeed_g5_defconfig
-index 892605167357..2253a09cc3c2 100644
---- a/arch/arm/configs/aspeed_g5_defconfig
-+++ b/arch/arm/configs/aspeed_g5_defconfig
-@@ -18,7 +18,6 @@ CONFIG_BPF_SYSCALL=y
- CONFIG_EMBEDDED=y
- # CONFIG_COMPAT_BRK is not set
- CONFIG_SLAB=y
--CONFIG_CC_STACKPROTECTOR_STRONG=y
- CONFIG_MODULES=y
- CONFIG_MODULE_UNLOAD=y
- # CONFIG_BLOCK is not set
-diff --git a/arch/arm/configs/bcm2835_defconfig b/arch/arm/configs/bcm2835_defconfig
-index cc55e4252fda..8c06b380c561 100644
---- a/arch/arm/configs/bcm2835_defconfig
-+++ b/arch/arm/configs/bcm2835_defconfig
-@@ -24,7 +24,6 @@ CONFIG_EMBEDDED=y
- CONFIG_PROFILING=y
- CONFIG_OPROFILE=y
- CONFIG_JUMP_LABEL=y
--CONFIG_CC_STACKPROTECTOR_REGULAR=y
- CONFIG_ARCH_MULTI_V6=y
- CONFIG_ARCH_BCM=y
- CONFIG_ARCH_BCM2835=y
 -- 
-2.8.4
+nvpublic
