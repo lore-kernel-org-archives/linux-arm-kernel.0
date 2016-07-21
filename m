@@ -1,34 +1,57 @@
 From: jaz@semihalf.com (Grzegorz Jaszczyk)
-Date: Thu, 21 Jul 2016 14:44:06 +0200
-Subject: [PATCH 09/18] ARM: mvebu: a39x: enable the thermal sensor in
- Armada-39x SoCs
+Date: Thu, 21 Jul 2016 14:44:05 +0200
+Subject: [PATCH 08/18] ARM: mvebu: a39x: Enable PMU,
+ CA9 MPcore SoC Controller and Coherency fabric
 In-Reply-To: <1469105055-25181-1-git-send-email-jaz@semihalf.com>
 References: <1469105055-25181-1-git-send-email-jaz@semihalf.com>
-Message-ID: <1469105055-25181-11-git-send-email-jaz@semihalf.com>
+Message-ID: <1469105055-25181-10-git-send-email-jaz@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This commit enables:
+- CA9's Performance Monitor Unit
+- CA9 MPcore SoC Controller
+- Coherency fabric
+on Armada 39x, basing on the Armada 38x (which has the same CA9 CPU).
+
 Signed-off-by: Grzegorz Jaszczyk <jaz@semihalf.com>
+Reviewed-by: Lior Amsalem <alior@marvell.com>
 ---
- arch/arm/boot/dts/armada-39x.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm/boot/dts/armada-39x.dtsi | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
 
 diff --git a/arch/arm/boot/dts/armada-39x.dtsi b/arch/arm/boot/dts/armada-39x.dtsi
-index 8a22c02..03dc0ec 100644
+index cb66f20..8a22c02 100644
 --- a/arch/arm/boot/dts/armada-39x.dtsi
 +++ b/arch/arm/boot/dts/armada-39x.dtsi
-@@ -413,6 +413,12 @@
- 				clocks = <&mainpll>;
- 				clock-output-names = "nand";
- 			};
-+
-+			thermal at e8078 {
-+				compatible = "marvell,armada380-thermal";
-+				reg = <0xe4078 0x4>, <0xe4074 0x4>;
-+				status = "okay";
-+			};
+@@ -78,6 +78,11 @@
  		};
+ 	};
  
- 		pcie-controller {
++	pmu {
++		compatible = "arm,cortex-a9-pmu";
++		interrupts-extended = <&mpic 3>;
++	};
++
+ 	soc {
+ 		compatible = "marvell,armada390-mbus", "marvell,armadaxp-mbus",
+ 			     "simple-bus";
+@@ -322,6 +327,16 @@
+ 				reg = <0x20800 0x10>;
+ 			};
+ 
++			mpcore-soc-ctrl at 20d20 {
++				compatible = "marvell,armada-380-mpcore-soc-ctrl";
++				reg = <0x20d20 0x6c>;
++			};
++
++			coherency-fabric at 21010 {
++				compatible = "marvell,armada-380-coherency-fabric";
++				reg = <0x21010 0x1c>;
++			};
++
+ 			pmsu at 22000 {
+ 				compatible = "marvell,armada-390-pmsu",
+ 					     "marvell,armada-380-pmsu";
 -- 
 1.8.3.1
