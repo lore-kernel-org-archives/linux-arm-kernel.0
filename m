@@ -1,31 +1,34 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Thu, 21 Jul 2016 19:15:45 +0100
+Date: Thu, 21 Jul 2016 19:20:37 +0100
 Subject: [PATCH v6] ARM: sun4i: spi: Allow transfers larger than FIFO size
-In-Reply-To: <34E27D10-C620-4288-A1A8-489B75D4757B@schinagl.nl>
+In-Reply-To: <20160721172712.GA10640@weiser.dinsnail.net>
 References: <1439062912-4405-1-git-send-email-oliver@schinagl.nl>
  <20160721112701.GB6610@weiser.dinsnail.net>
  <20160721163153.GO6509@sirena.org.uk>
  <20160721172712.GA10640@weiser.dinsnail.net>
- <34E27D10-C620-4288-A1A8-489B75D4757B@schinagl.nl>
-Message-ID: <20160721181545.GP6509@sirena.org.uk>
+Message-ID: <20160721182037.GQ6509@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 21, 2016 at 08:03:16PM +0200, Olliver Schinagl wrote:
-> As i recall, some claimed it was needed as we have dma now, but i think this patch still scratches the same itch ...
+On Thu, Jul 21, 2016 at 07:27:12PM +0200, Michael Weiser wrote:
+> On Thu, Jul 21, 2016 at 05:31:53PM +0100, Mark Brown wrote:
 
-Please don't top post, reply in line with needed context.  This allows
-readers to readily follow the flow of conversation and understand what
-you are talking about and also helps ensure that everything in the
-discussion is being addressed.
+> > > What is keeping the patch from being merged (i.e. into mainline)?
+> > Someone needs to address whatever review comments there were on the last
+> > version and submit it.
 
-Please fix your mail client to word wrap within paragraphs at something
-substantially less than 80 columns.  Doing this makes your messages much
-easier to read and reply to.
+> That's my point: There don't seem to be any.
+
+> v6 was resend with fixes to checkpatch niggles on v5:
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-August/363073.html
+
+I can't tell if that was even submitted, it's got a subject line of
+"ARM: sun4i" so there's every chance that even if it was sent to me it
+got deleted unread.  Whatever was going on it needs to be submited.
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 473 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160721/f0f1a2d4/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160721/23a291e2/attachment.sig>
