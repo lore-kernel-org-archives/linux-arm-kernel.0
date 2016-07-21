@@ -1,44 +1,58 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 21 Jul 2016 14:54:42 +0200
-Subject: [PATCH v2 03/10] Clocksource: add nuc970 clocksource driver
-In-Reply-To: <20160721125224.GA10047@linaro.org>
-References: <1468135649-19980-1-git-send-email-vw@iommu.org>
- <26830152.1oBSpuVOM0@wuerfel> <20160721125224.GA10047@linaro.org>
-Message-ID: <6378088.D2hhHiJIV0@wuerfel>
+From: matt@codeblueprint.co.uk (Matt Fleming)
+Date: Thu, 21 Jul 2016 14:12:30 +0100
+Subject: [PATCH] efi: capsule: allocate whole capsule into virtual memory
+In-Reply-To: <1468600891-15794-1-git-send-email-austinwc@codeaurora.org>
+References: <1468600891-15794-1-git-send-email-austinwc@codeaurora.org>
+Message-ID: <20160721131230.GH26504@codeblueprint.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, July 21, 2016 2:52:24 PM CEST Daniel Lezcano wrote:
-> On Tue, Jul 12, 2016 at 10:28:35AM +0200, Arnd Bergmann wrote:
+On Fri, 15 Jul, at 10:41:31AM, Christ, Austin wrote:
+> According to UEFI 2.6 section 7.5.3, the capsule should be in contiguous
+> virtual memory and firmware may consume the capsule immediately. To
+> correctly implement this functionality, the kernel driver needs to vmap
+> the entire capsule at the time it is made available to firmware.
 > 
-> [ ... ]
+> The virtual allocation of the capsule update has been changed from kmap,
+> which was only allocating the first page of the update, to vmap and
+> allocates the entire data payload.
 > 
-> > > > Also the init function has changed its return type in linux-next:
-> > > >
-> > > >> +static void __init nuc970_timer_of_init(struct device_node *node)
-> > > >
-> > > > This now needs to return an error code or we get:
-> > > >
-> > > > ../include/linux/of.h:1004:20: error: comparison of distinct pointer types lacks a cast [-Werror]
-> > > >          .data = (fn == (fn_type)NULL) ? fn : fn  }
-> > > >
-> > > > Daniel Lezcano seems to have implemented a migration strategy, but I
-> > > > can't see what you are supposed to do here, since the
-> > > > CLOCKSOURCE_OF_DECLARE_RET macro is no longer part of linux-next.
-> > > 
-> > > Wait for Daniel's comments? or what should I do now?
-> > 
-> > Yes, let's see what he says. I guess from the timing, this will probably
-> > have to wait for linux-4.9 anyway, and then we have no problem because the
-> > API change will make it into 4.8.
+> Signed-off-by: Austin Christ <austinwc@codeaurora.org>
+> ---
+>  drivers/firmware/efi/capsule-loader.c | 6 ++++--
+>  1 file changed, 4 insertions(+), 2 deletions(-)
 > 
-> CLOCKSOURCE_OF_DECLARE_RET was renamed back to CLOCKSOURCE_OF_DECLARE but it 
-> expects now an init function returning an 'int'.
-> 
-> These changes are now in tip/timers/core, so in linux-next.
+> diff --git a/drivers/firmware/efi/capsule-loader.c b/drivers/firmware/efi/capsule-loader.c
+> index c99c24b..c4f3c20 100644
+> --- a/drivers/firmware/efi/capsule-loader.c
+> +++ b/drivers/firmware/efi/capsule-loader.c
+> @@ -16,6 +16,7 @@
+>  #include <linux/slab.h>
+>  #include <linux/mutex.h>
+>  #include <linux/efi.h>
+> +#include <linux/vmalloc.h>
+>  
+>  #define NO_FURTHER_WRITE_ACTION -1
+>  
+> @@ -108,14 +109,15 @@ static ssize_t efi_capsule_submit_update(struct capsule_info *cap_info)
+>  	int ret;
+>  	void *cap_hdr_temp;
+>  
+> -	cap_hdr_temp = kmap(cap_info->pages[0]);
+> +	cap_hdr_temp = vmap(cap_info->pages, cap_info->index,
+> +			VM_MAP, PAGE_KERNEL);
+>  	if (!cap_hdr_temp) {
+>  		pr_debug("%s: kmap() failed\n", __func__);
+>  		return -EFAULT;
+>  	}
+>  
+>  	ret = efi_capsule_update(cap_hdr_temp, cap_info->pages);
+> -	kunmap(cap_info->pages[0]);
+> +	vunmap(cap_hdr_temp);
+>  	if (ret) {
+>  		pr_err("%s: efi_capsule_update() failed\n", __func__);
+>  		return ret;
 
-Ok, so the driver could be merged on top of that, but it's really
-late for 4.8 now, so we'd just wait until after the merge window
-anyway.
-
-	Arnd
+Looks OK to me but could you also update the comments above
+efi_capsule_update() that mention the virtual mapping only being
+required for the first page?
