@@ -1,155 +1,56 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 21 Jul 2016 18:23:52 +0100
-Subject: [PATCH v15 04/10] arm64: Kprobes with single stepping support
-In-Reply-To: <5790F960.5050007@linaro.org>
-References: <1467995754-32508-1-git-send-email-dave.long@linaro.org>
- <1467995754-32508-5-git-send-email-dave.long@linaro.org>
- <578FA238.3050206@arm.com> <5790F960.5050007@linaro.org>
-Message-ID: <57910528.7070902@arm.com>
+From: elfring@users.sourceforge.net (SF Markus Elfring)
+Date: Thu, 21 Jul 2016 19:42:33 +0200
+Subject: [PATCH] GPU-DRM-Exynos: Delete an unnecessary check before the
+ function call "vunmap"
+In-Reply-To: <54D329D0.7050006@samsung.com>
+References: <5307CAA2.8060406@users.sourceforge.net>
+ <alpine.DEB.2.02.1402212321410.2043@localhost6.localdomain6>
+ <530A086E.8010901@users.sourceforge.net>
+ <alpine.DEB.2.02.1402231635510.1985@localhost6.localdomain6>
+ <530A72AA.3000601@users.sourceforge.net>
+ <alpine.DEB.2.02.1402240658210.2090@localhost6.localdomain6>
+ <530B5FB6.6010207@users.sourceforge.net>
+ <alpine.DEB.2.10.1402241710370.2074@hadrien>
+ <530C5E18.1020800@users.sourceforge.net>
+ <alpine.DEB.2.10.1402251014170.2080@hadrien>
+ <530CD2C4.4050903@users.sourceforge.net>
+ <alpine.DEB.2.10.1402251840450.7035@hadrien>
+ <530CF8FF.8080600@users.sourceforge.net>
+ <alpine.DEB.2.02.1402252117150.2047@localhost6.localdomain6>
+ <530DD06F.4090703@users.sourceforge.net>
+ <alpine.DEB.2.02.1402262129250.2221@localhost6.localdomain6>
+ <5317A59D.4@users.sourceforge.net> <54D28870.3060400@users.sourceforge.net>
+ <54D329D0.7050006@samsung.com>
+Message-ID: <a5a79711-10a3-e304-a897-892ebdf2ff9f@users.sourceforge.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/07/16 17:33, David Long wrote:
-> On 07/20/2016 12:09 PM, Marc Zyngier wrote:
->> On 08/07/16 17:35, David Long wrote:
->>> From: Sandeepa Prabhu <sandeepa.s.prabhu@gmail.com>
->>>
->>> Add support for basic kernel probes(kprobes) and jump probes
->>> (jprobes) for ARM64.
->>>
->>> Kprobes utilizes software breakpoint and single step debug
->>> exceptions supported on ARM v8.
->>>
->>> A software breakpoint is placed at the probe address to trap the
->>> kernel execution into the kprobe handler.
->>>
->>> ARM v8 supports enabling single stepping before the break exception
->>> return (ERET), with next PC in exception return address (ELR_EL1). The
->>> kprobe handler prepares an executable memory slot for out-of-line
->>> execution with a copy of the original instruction being probed, and
->>> enables single stepping. The PC is set to the out-of-line slot address
->>> before the ERET. With this scheme, the instruction is executed with the
->>> exact same register context except for the PC (and DAIF) registers.
->>>
->>> Debug mask (PSTATE.D) is enabled only when single stepping a recursive
->>> kprobe, e.g.: during kprobes reenter so that probed instruction can be
->>> single stepped within the kprobe handler -exception- context.
->>> The recursion depth of kprobe is always 2, i.e. upon probe re-entry,
->>> any further re-entry is prevented by not calling handlers and the case
->>> counted as a missed kprobe).
->>>
->>> Single stepping from the x-o-l slot has a drawback for PC-relative accesses
->>> like branching and symbolic literals access as the offset from the new PC
->>> (slot address) may not be ensured to fit in the immediate value of
->>> the opcode. Such instructions need simulation, so reject
->>> probing them.
->>>
->>> Instructions generating exceptions or cpu mode change are rejected
->>> for probing.
->>>
->>> Exclusive load/store instructions are rejected too.  Additionally, the
->>> code is checked to see if it is inside an exclusive load/store sequence
->>> (code from Pratyush).
->>>
->>> System instructions are mostly enabled for stepping, except MSR/MRS
->>> accesses to "DAIF" flags in PSTATE, which are not safe for
->>> probing.
->>>
->>> This also changes arch/arm64/include/asm/ptrace.h to use
->>> include/asm-generic/ptrace.h.
->>>
->>> Thanks to Steve Capper and Pratyush Anand for several suggested
->>> Changes.
->>>
->>> Signed-off-by: Sandeepa Prabhu <sandeepa.s.prabhu@gmail.com>
->>> Signed-off-by: David A. Long <dave.long@linaro.org>
->>> Signed-off-by: Pratyush Anand <panand@redhat.com>
->>> Acked-by: Masami Hiramatsu <mhiramat@kernel.org>
->>> ---
->>>   arch/arm64/Kconfig                      |   1 +
->>>   arch/arm64/include/asm/debug-monitors.h |   5 +
->>>   arch/arm64/include/asm/insn.h           |   2 +
->>>   arch/arm64/include/asm/kprobes.h        |  60 ++++
->>>   arch/arm64/include/asm/probes.h         |  34 +++
->>>   arch/arm64/include/asm/ptrace.h         |  14 +-
->>>   arch/arm64/kernel/Makefile              |   2 +-
->>>   arch/arm64/kernel/debug-monitors.c      |  16 +-
->>>   arch/arm64/kernel/probes/Makefile       |   1 +
->>>   arch/arm64/kernel/probes/decode-insn.c  | 143 +++++++++
->>>   arch/arm64/kernel/probes/decode-insn.h  |  34 +++
->>>   arch/arm64/kernel/probes/kprobes.c      | 525 ++++++++++++++++++++++++++++++++
->>>   arch/arm64/kernel/vmlinux.lds.S         |   1 +
->>>   arch/arm64/mm/fault.c                   |  26 ++
->>>   14 files changed, 859 insertions(+), 5 deletions(-)
->>>   create mode 100644 arch/arm64/include/asm/kprobes.h
->>>   create mode 100644 arch/arm64/include/asm/probes.h
->>>   create mode 100644 arch/arm64/kernel/probes/Makefile
->>>   create mode 100644 arch/arm64/kernel/probes/decode-insn.c
->>>   create mode 100644 arch/arm64/kernel/probes/decode-insn.h
->>>   create mode 100644 arch/arm64/kernel/probes/kprobes.c
->>>
->>
->> [...]
->>
->>> diff --git a/arch/arm64/include/asm/kprobes.h b/arch/arm64/include/asm/kprobes.h
->>> new file mode 100644
->>> index 0000000..79c9511
->>> --- /dev/null
->>> +++ b/arch/arm64/include/asm/kprobes.h
->>> @@ -0,0 +1,60 @@
->>> +/*
->>> + * arch/arm64/include/asm/kprobes.h
->>> + *
->>> + * Copyright (C) 2013 Linaro Limited
->>> + *
->>> + * This program is free software; you can redistribute it and/or modify
->>> + * it under the terms of the GNU General Public License version 2 as
->>> + * published by the Free Software Foundation.
->>> + *
->>> + * This program is distributed in the hope that it will be useful,
->>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
->>> + * General Public License for more details.
->>> + */
->>> +
->>> +#ifndef _ARM_KPROBES_H
->>> +#define _ARM_KPROBES_H
->>> +
->>> +#include <linux/types.h>
->>> +#include <linux/ptrace.h>
->>> +#include <linux/percpu.h>
->>> +
->>> +#define __ARCH_WANT_KPROBES_INSN_SLOT
->>> +#define MAX_INSN_SIZE			1
->>> +#define MAX_STACK_SIZE			128
->>
->> Where is that value coming from? Because even on my 6502, I have a 256
->> byte stack.
->>
-> 
-> Although I don't claim to know the original author's thoughts I would 
-> guess it is based on the seven other existing implementations for 
-> kprobes on various architectures, all of which appear to use either 64 
-> or 128 for MAX_STACK_SIZE.  The code is not trying to duplicate the 
-> whole stack.
+From: Markus Elfring <elfring@users.sourceforge.net>
+Date: Thu, 21 Jul 2016 19:23:25 +0200
 
-I get that (this was supposed to be a humorous comment, but I guess
-after spending too much time tracking this thing, my own sense of humour
-was becoming limited).
+The vunmap() function performs also input parameter validation.
+Thus the test around the call is not needed.
 
-My main worry is that whatever value you pick, it is always going to be
-wrong. This is used to preserve arguments that are passed on the stack,
-as opposed to passed by registers). We have no idea of what is getting
-passed there so saving nothing, 128 bytes or 2kB is about the same. It
-is always wrong.
+This issue was detected by using the Coccinelle software.
 
-A much better solution would be to check the frame pointer, and copy the
-delta between FP and SP, assuming it fits inside the allocated buffer.
-If it doesn't, or if FP is invalid, we just skip the hook, because we
-can't reliably execute it.
+Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
+---
+ drivers/gpu/drm/exynos/exynos_drm_fbdev.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-Thanks,
-
-	M.
+diff --git a/drivers/gpu/drm/exynos/exynos_drm_fbdev.c b/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
+index dd09117..4cfb39d 100644
+--- a/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
++++ b/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
+@@ -269,8 +269,7 @@ static void exynos_drm_fbdev_destroy(struct drm_device *dev,
+ 	struct exynos_drm_gem *exynos_gem = exynos_fbd->exynos_gem;
+ 	struct drm_framebuffer *fb;
+ 
+-	if (exynos_gem->kvaddr)
+-		vunmap(exynos_gem->kvaddr);
++	vunmap(exynos_gem->kvaddr);
+ 
+ 	/* release drm framebuffer and real buffer */
+ 	if (fb_helper->fb && fb_helper->fb->funcs) {
 -- 
-Jazz is not dead. It just smells funny...
+2.9.2
