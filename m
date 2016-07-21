@@ -1,111 +1,17 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 21 Jul 2016 16:14:29 -0500
-Subject: [net-next PATCH 1/3] net: phy: dp83867: Add documentation for
- optional impedance control
-In-Reply-To: <57906A2C.7010201@ti.com>
-References: <20160720145614.13132-1-mugunthanvnm@ti.com>
- <20160720145614.13132-2-mugunthanvnm@ti.com>
- <578F99D3.9090601@ti.com> <57906A2C.7010201@ti.com>
-Message-ID: <20160721211429.GA17696@rob-hp-laptop>
+From: mirza.krak@gmail.com (Mirza Krak)
+Date: Thu, 21 Jul 2016 23:41:56 +0200
+Subject: [RFC 6/6] bus: Add support for Tegra NOR controller
+In-Reply-To: <222d4179-a72f-56d1-246b-ab66af3057d9@nvidia.com>
+References: <1468935397-11926-1-git-send-email-mirza.krak@gmail.com>
+ <1468935397-11926-7-git-send-email-mirza.krak@gmail.com>
+ <222d4179-a72f-56d1-246b-ab66af3057d9@nvidia.com>
+Message-ID: <CALw8SCV9ZV+OpuVz3r2dXGb55mC26es-Oe7HfZRCJgyxONRqTQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 21, 2016 at 11:52:36AM +0530, Sekhar Nori wrote:
-> Nishanth,
-> 
-> On Wednesday 20 July 2016 09:03 PM, Nishanth Menon wrote:
-> > On 07/20/2016 09:56 AM, Mugunthan V N wrote:
-> >> Add documention of ti,impedance-control which can be used to
-> >> correct MAC impedance mismatch using phy extended registers.
-> >>
-> >> Signed-off-by: Mugunthan V N <mugunthanvnm@ti.com>
-> >> ---
-> >>   Documentation/devicetree/bindings/net/ti,dp83867.txt | 7 +++++++
-> >>   1 file changed, 7 insertions(+)
-> >>
-> >> diff --git a/Documentation/devicetree/bindings/net/ti,dp83867.txt
-> >> b/Documentation/devicetree/bindings/net/ti,dp83867.txt
-> >> index 5d21141..531ea3c5 100644
-> >> --- a/Documentation/devicetree/bindings/net/ti,dp83867.txt
-> >> +++ b/Documentation/devicetree/bindings/net/ti,dp83867.txt
-> >> @@ -9,6 +9,13 @@ Required properties:
-> >>       - ti,fifo-depth - Transmitt FIFO depth- see
-> >> dt-bindings/net/ti-dp83867.h
-> >>           for applicable values
-> >>
-> >> +Optional property:
-> >> +    - ti,impedance-control - MAC Interface Impedance control to vary the
-> >> +                 output impedance with an approximate range
-> >> +                 from 35-70 ohms in 32 steps. Value range can
-> >> +                 be 0x0 to 0x1f. Lowest impedance value is
-> >> +                 0x1f and highest impedance being 0x0.
-> >> +
-> > 
-> > Should'nt you be using the impedance values of 35 to 70 as the valid
-> > values here? that would be the hardware description, and the values to
-> > program corresponding to those are 0x00 to 0x1f. Right?
-> > 
-> > Rob: is'nt that the right way to do it?
+2016-07-21 17:12 GMT+02:00 Jon Hunter <jonathanh@nvidia.com>:
+>
+> The reset is defined in the binding, but never used. Should we make sure
+> the reset is de-asserted in the probe?
 
-Normally, yes that is preferred. I don't have an issue with it here if 
-that is what makes sense.
-
-> Agree that that is usually the right way to do it. I believe this case
-> is bit peculiar though. Here is the extract from the datasheet[1] about
-> how the register in question works.
-> 
-> "
-> Output impedance approximate range from 35-70 ohms in 32 steps.
-> Lowest being 11110 and highest being 00000. Range and Step size
-> will vary with process.
-> 
-> Default is set to 50 ohms by trim. But the default register value can
-> vary by process. Non default values of MAC I/O impedance can be
-> used based on trace impedance. Mismatch between device and
-> trace impedance can cause voltage overshoot and undershoot.
-> "
-> 
-> So clearly, there is no easy correspondence that the hardware guarantees
-> between output impedance ohmage and the register value programmed. Only
-> couple of things are guaranteed.
-> 
-> 1) Programming a value of 0 gives approximately 35 ohms
-> 2) Programming a value of 0x1F gives approximately 70 ohms
-> 3) Default value of the register gives 50 ohms (the default value could
-> vary by device).
-> 4) Programming a value in between will give some ohmage in the
-> approximate range 35-70 (curve is unknown).
-> 
-> Given this, I am not sure how one can convert a given user supplied ohms
-> values to a reasonable register value. Clearly, the register is supposed
-> to be programmed by experimentation, not calculation.
-
-So your are going to change from a known value tuned for the individual 
-Si (50ohm) to the same value for all chips (at least for a given board). 
-Or does this get set by firmware at boot? If not, seems like you would 
-want to specify a delta from the default register value in this case.
-
-> That said, we could take another approach. At least for the current
-> issue we are trying to address, we only need to configure the register
-> to max value. And given the nature of the register, I am pretty sure
-> that is what most people will end up doing.
-
-How does the max value get determined? Possibly it should just be set in 
-the kernel.
- 
-> So, may be we have two properties:
-> 
-> ti,max-output-impedance
-> ti,min-output-imepdance
-
-Just define max if that's all you currently need.
-
-> which configure the impedance to maximum and minimum values
-> respectively. If, in future, someone needs to configure a value in
-> between, he can introduce a more granular property which when then
-> override whatever else is specified.
-> 
-> Regards,
-> Sekhar
-> 
-> [1] http://www.ti.com/lit/ds/symlink/dp83867ir.pdf
+Yes, will do that.
