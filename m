@@ -1,57 +1,90 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 21 Jul 2016 21:55:01 +0200
-Subject: [PATCH v2 3/4] drivers: reset: Add STM32 reset driver
-In-Reply-To: <CAP=VYLq+Yp=dyMLY5zp8evNJ+jLkUgJ_s19gD1uC6KP8MmXPDQ@mail.gmail.com>
-References: <1469092768-17489-1-git-send-email-gabriel.fernandez@st.com>
- <1469092768-17489-4-git-send-email-gabriel.fernandez@st.com>
- <CAP=VYLq+Yp=dyMLY5zp8evNJ+jLkUgJ_s19gD1uC6KP8MmXPDQ@mail.gmail.com>
-Message-ID: <34955897.5sjo821nJx@wuerfel>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 21 Jul 2016 22:08:02 +0200
+Subject: [PATCH v2 3/4] mfd: add support for Allwinner SoCs ADC
+In-Reply-To: <20160721121253.GE14925@dell>
+References: <1468576754-3273-1-git-send-email-quentin.schulz@free-electrons.com>
+ <1468576754-3273-4-git-send-email-quentin.schulz@free-electrons.com>
+ <de8ebab2-cde9-d209-3c9a-e1868fafb84b@kernel.org>
+ <20160719073109.GD17074@dell>
+ <d64cf632-41a4-3e23-6239-7f854cbb0293@kernel.org>
+ <20160721121253.GE14925@dell>
+Message-ID: <20160721200802.GL5993@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, July 21, 2016 3:48:09 PM CEST Paul Gortmaker wrote:
-> > diff --git a/drivers/reset/Makefile b/drivers/reset/Makefile
-> > index 5d65a93..64ebb0c 100644
-> > --- a/drivers/reset/Makefile
-> > +++ b/drivers/reset/Makefile
-> > @@ -4,6 +4,7 @@ obj-$(CONFIG_ARCH_SOCFPGA) += reset-socfpga.o
-> >  obj-$(CONFIG_ARCH_BERLIN) += reset-berlin.o
-> >  obj-$(CONFIG_MACH_PISTACHIO) += reset-pistachio.o
-> >  obj-$(CONFIG_ARCH_MESON) += reset-meson.o
-> > +obj-$(CONFIG_ARCH_STM32) += reset-stm32.o
+1;4205;0c
+On Thu, Jul 21, 2016 at 01:12:53PM +0100, Lee Jones wrote:
+> On Wed, 20 Jul 2016, Jonathan Cameron wrote:
 > 
-> In my tree, this Kconfig ARCH_STM32 is a bool, so...
+> > On 19/07/16 08:31, Lee Jones wrote:
+> > > On Mon, 18 Jul 2016, Jonathan Cameron wrote:
+> > > 
+> > >> On 15/07/16 10:59, Quentin Schulz wrote:
+> > >>> The Allwinner SoCs all have an ADC that can also act as a touchscreen
+> > >>> controller and a thermal sensor. For now, only the ADC and the thermal
+> > >>> sensor drivers are probed by the MFD, the touchscreen controller support
+> > >>> will be added later.
+> > >>>
+> > >>> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+> > >> Hmm. Previous patch includes the header this one creates.  Ordering issue?
+> > >> The depends kind of prevents build failures by ensuring that can't be built
+> > >> until this one is in place, but it is certainly an ugly way to do it.
+> > >>
+> > >> Few little bits innline.
+> > >>> ---
+> > >>>
+> > >>> v2:
+> > >>>  - add license headers,
+> > >>>  - reorder alphabetically includes,
+> > >>>  - add SUNXI_GPADC_ prefixes for defines,
+> > >>>
+> > >>>  drivers/mfd/Kconfig                 |  14 +++
+> > >>>  drivers/mfd/Makefile                |   2 +
+> > >>>  drivers/mfd/sunxi-gpadc-mfd.c       | 197 ++++++++++++++++++++++++++++++++++++
+> > >>>  include/linux/mfd/sunxi-gpadc-mfd.h |  23 +++++
+> > >>>  4 files changed, 236 insertions(+)
+> > >>>  create mode 100644 drivers/mfd/sunxi-gpadc-mfd.c
+> > >>>  create mode 100644 include/linux/mfd/sunxi-gpadc-mfd.h
+> > > 
+> > > [...]
+> > > 
+> > >>> +static struct mfd_cell sun6i_gpadc_mfd_cells[] = {
+> > >>> +	{
+> > >>> +		.name	= "sun6i-a31-gpadc-iio",
+> > >>> +		.resources = adc_resources,
+> > >>> +		.num_resources = ARRAY_SIZE(adc_resources),
+> > >>> +	}, {
+> > >>> +		.name = "iio_hwmon",
+> > >> I still really dislike using this to force the probe of that driver but
+> > >> kind of up to the hwmon / mfd guys on this.
+> > > 
+> > > Can you at least say *why* you don't like it?
+> > It just feels odd to have an mfd child that isn't really dependent
+> > on the mfd hardware itself.
+> > 
+> > Still if you are happy, mfd is your domain and my objections were
+> > as you probably noticed not that strong - or well described!)
+> > 
+> > So I'm fine with this.
 > 
-> >  obj-$(CONFIG_ARCH_SUNXI) += reset-sunxi.o
-> >  obj-$(CONFIG_ARCH_STI) += sti/
-> >  obj-$(CONFIG_ARCH_HISI) += hisilicon/
-> > diff --git a/drivers/reset/reset-stm32.c b/drivers/reset/reset-stm32.c
-> > new file mode 100644
-> > index 0000000..993af2a
-> > --- /dev/null
-> > +++ b/drivers/reset/reset-stm32.c
-> > @@ -0,0 +1,113 @@
-> > +/*
-> > + * Copyright (C) Maxime Coquelin 2015
-> > + * Author:  Maxime Coquelin <mcoquelin.stm32@gmail.com>_
-> > + * License terms:  GNU General Public License (GPL), version 2
-> > + *
-> > + * Heavily based on sunxi driver from Maxime Ripard.
-> > + */
-> > +
-> > +#include <linux/err.h>
-> > +#include <linux/io.h>
-> > +#include <linux/module.h>
-> 
-> ...we probably don't need module.h here or any of the other
-> MODULE_<blah> tags/macros either.  Use the builtin for the
-> register and all should be good.
+> I see.  So it's not actually part of the same IP/chip?
 
-I wonder if we should have separate symbols for each reset driver
-instead. Those could be allowed to be tristate, and could also
-be enabled for compile testing on other architectures.
+The chip has a temperature sensor, and we want to expose that
+temperature through IIO.
 
-I actually made a patch for that a while ago, to simplify the
-dependencies around reset drivers.
+But we don't really have the choice on how we probe iio-hwmon
+here. The binding was already there, and we have to keep it.
 
-	Arnd
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160721/22b492d8/attachment.sig>
