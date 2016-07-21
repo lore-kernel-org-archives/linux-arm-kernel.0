@@ -1,131 +1,118 @@
-From: mirza.krak@gmail.com (Mirza Krak)
-Date: Thu, 21 Jul 2016 22:10:49 +0200
-Subject: [RFC 3/6] dt/bindings: Add bindings for Tegra20/30 NOR bus driver
-In-Reply-To: <434561ec-510e-a3bf-c7b6-c961db299bd6@nvidia.com>
-References: <1468935397-11926-1-git-send-email-mirza.krak@gmail.com>
- <1468935397-11926-4-git-send-email-mirza.krak@gmail.com>
- <434561ec-510e-a3bf-c7b6-c961db299bd6@nvidia.com>
-Message-ID: <CALw8SCU0cz6mbO=oudCZ4-=2PHVORNt3gwmg2bzNjyhJFnWS3g@mail.gmail.com>
+From: paul.gortmaker@windriver.com (Paul Gortmaker)
+Date: Thu, 21 Jul 2016 16:12:44 -0400
+Subject: [PATCH 06/12] gpio: Add Aspeed driver
+In-Reply-To: <1468994313-13538-7-git-send-email-andrew@aj.id.au>
+References: <1468994313-13538-1-git-send-email-andrew@aj.id.au>
+ <1468994313-13538-7-git-send-email-andrew@aj.id.au>
+Message-ID: <CAP=VYLrJfRmKOoDWTpBrD5+iPdX6J9r609FzZ0CkzDd7vGBWyw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-07-21 11:56 GMT+02:00 Jon Hunter <jonathanh@nvidia.com>:
->> +
->> +The NOR controller supports a number of memory types, including synchronous NOR,
->> +asynchronous NOR, and other flash memories with similar interfaces, such as
->> +MuxOneNAND. One could also connect high speed devices like FPGAs, DSPs,
->> +CAN chips, Wi-Fi chips etc.
+On Wed, Jul 20, 2016 at 1:58 AM, Andrew Jeffery <andrew@aj.id.au> wrote:
+> From: Joel Stanley <joel@jms.id.au>
 >
-> Nit-pick ... the Tegra documentation refers to this controller as the
-> GMI (general memory interface) or SNOR (sync-NOR) controller because it
-> is not just limited to NOR as you mentioned. I see references to GMI in
-> the Tegra pinctrl driver and so may be we should use this name.
-
-ACK.
-
-
->> +Required properties:
->> +
->> + - compatible: should be "nvidia,tegra20-nor", "nvidia,tegra30-nor"
+> The Aspeed SoCs contain GPIOs grouped by letter, where each letter group
+> contains 8 pins. The GPIO letter groups are then banked in sets of four
+> in the register layout.
 >
-> I see at least one difference at the register level between Tegra20 and
-> Tegra30 and so I think this should be something like ...
+> The implementation exposes multiple banks through the one driver, and
+> requests and releases pins via the pinctrl subsystem. The hardware
+> supports generation of interrupts with per-pin triggers, and exposes this
+> capability through an irqchip and devicetree.
 >
->  - compatible : Should contain one of the following:
->         For Tegra20 must contain "nvidia,tegra20-gmi".
->         For Tegra30 must contain "nvidia,tegra30-gmi".
-
-ACK. Just curious, which register was it? I only checked that they
-have the same count of registers.
-
->> + - nvidia,config: This property represents the SNOR_CONFIG_0 register.
+> A number of supported features are not yet implemented: Configuration of
+> interrupt direction (ARM or LPC), debouncing, and provides WDT reset
+> tolerance for output ports.
 >
-> There is also a SNOR_MIO_CONFIG for the MIO address space and so I think
-> that this should be nvidia,snor-config to be explicit. It might be nice
-> to also add a "nvidia,mio-config" while you are at it as well, however,
-> that could always be done later. If you do, then the
-> "nvidia,snor-config" becomes optional depending on whether you are using
-> the SNOR or MIO address space.
-
-ACK the nvidia,snor-config part, will though wait for further comments
-regarding what to do with the config registers, break-out or keep it
-is a one property / register.
-
-Regarding mio-config, not sure about if I would like to include that
-part in this stage. If you feel strongly about this we can do it. If
-it only comes to down to replicate the same configurations that we do
-for SNOR to MIO then I do not see much of a problem, but would like
-SNOR to be accepted and would not like the MIO part to halt this. But
-then again this up to you guys.
-
+> Signed-off-by: Joel Stanley <joel@jms.id.au>
+> Signed-off-by: Alistair Popple <alistair@popple.id.au>
+> Signed-off-by: Jeremy Kerr <jk@ozlabs.org>
+> Signed-off-by: Andrew Jeffery <andrew@aj.id.au>
+> ---
+>  arch/arm/mach-aspeed/Kconfig |   4 +
+>  drivers/gpio/Kconfig         |   8 +-
+>  drivers/gpio/Makefile        |   1 +
+>  drivers/gpio/gpio-aspeed.c   | 456 +++++++++++++++++++++++++++++++++++++++++++
+>  4 files changed, 468 insertions(+), 1 deletion(-)
+>  create mode 100644 drivers/gpio/gpio-aspeed.c
 >
->> +
->> +Note that the NOR controller does not have any internal chip-select address
->> +decoding and if you want to access multiple devices external chip-select
->> +decoding must be provided.
+> diff --git a/arch/arm/mach-aspeed/Kconfig b/arch/arm/mach-aspeed/Kconfig
+> index 25a0ae01429e..a52de9d3adfb 100644
+> --- a/arch/arm/mach-aspeed/Kconfig
+> +++ b/arch/arm/mach-aspeed/Kconfig
+> @@ -6,6 +6,10 @@ menuconfig ARCH_ASPEED
+>         select ASPEED_WATCHDOG
+>         select MOXART_TIMER
+>         select PINCTRL
+> +       select GPIOLIB
+> +       select GPIO_ASPEED
+> +       select GPIO_SYSFS
+> +
+>         help
+>           Say Y here if you want to run your kernel on an ASpeed BMC SoC.
 >
-> Although it is true, you do have the MIO address space and so you could
-> support two devices via the SNOR address space and MIO address space
-> (assuming that the MIO can be used for the 2nd device).
-
-This is true. If we include MIO support above could be added to the bindings.
-
+> diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
+> index 536112fd2466..2c21b5db09cd 100644
+> --- a/drivers/gpio/Kconfig
+> +++ b/drivers/gpio/Kconfig
+> @@ -137,6 +137,13 @@ config GPIO_ATH79
+>           Select this option to enable GPIO driver for
+>           Atheros AR71XX/AR724X/AR913X SoC devices.
 >
-> Furthermore, if you do have external logic to support multiple devices
-> this would assume that the devices use the same timing and so are
-> probably the same type. It also assumes both can fit in the 256MB
-> address range. May be worth mentioning.
+> +config GPIO_ASPEED
+> +       bool "Aspeed GPIO support"
 
-ACK.
+Since this is a bool Kconfig...
 
->
-> The GMI does have 8 chip selects and I believe the purpose of these is
-> to allow you to address more than the 256MB range. However, I believe to
-> do this it require software intervention to change the current CS that
-> is in use.
+> +       depends on (ARCH_ASPEED || COMPILE_TEST) && OF
+> +       select GENERIC_IRQ_CHIP
+> +       help
+> +         Say Y here to support Aspeed AST2400 and AST2500 GPIO controllers.
+> +
 
-Yes that is true. One has to modify the SNOR_CONFIG register to choose
-a different CS pin.
+[...]
 
->
-> I wonder if it is worth mentioning that the chip-select specified in the
-> "nvidia,config" prop should match that in the "ranges" prop unless you
-> have some external decoding logic to provide an external chip-select.
-> Which raises a question, what does the chip-select in the ranges
-> actually represent? I am not sure if there is a common practice here for
-> device tree when boards have external logic to provide additional
-> chip-selects. I am sure this is quite common.
+ > diff --git a/drivers/gpio/gpio-aspeed.c b/drivers/gpio/gpio-aspeed.c
+> new file mode 100644
+> index 000000000000..7885adc1332a
+> --- /dev/null
+> +++ b/drivers/gpio/gpio-aspeed.c
+> @@ -0,0 +1,456 @@
+> +/*
+> + * Copyright 2015 IBM Corp
+> + *
+> + * Joel Stanley <joel@jms.id.au>
+> + *
+> + * This program is free software; you can redistribute it and/or
+> + * modify it under the terms of the GNU General Public License
+> + * as published by the Free Software Foundation; either version
+> + * 2 of the License, or (at your option) any later version.
+> + */
+> +
+> +#include <linux/module.h>
 
-I do not understand why CS pin setting in nvidia,config need to match
-the "ranges" prop? Other then maybe cosmetics.
+...can you please get rid of module.h and all the MODULE_<xyz>
+stuff and use the built in registration?   Alternatively change it to
+a tristate if there is a valid use case for it to be modular.
 
-If we do not have any external decoding logic to create more
-chip-selects we only have ONE chip-select, and that one should always
-be indexed as 0? Regardless of which CS pin is used. Because
-ultimately what we configure in SNOR_CONFIG is which PIN(function) to
-use as chip-select. The address space remains the same.
+Thanks.
+Paul.
+--
 
->> +Example with two SJA1000 CAN controllers connected to the NOR bus:
->> +
->> +     nor at 70009000 {
->> +             status = "okay";
->> +             compatible = "nvidia,tegra20-nor", "nvidia,tegra30-nor";
->> +             reg = <0x70009000 0x1000>;
->> +             #address-cells = <2>;
->> +             #size-cells = <1>;
->> +             clocks = <&tegra_car TEGRA30_CLK_NOR>;
->> +             resets = < &tegra_car 42>;
->> +             reset-names = "nor";
->> +             ranges = <
->> +                     0 0 0x48000000 0x00000100
->> +                     1 0 0x48040000 0x00000100
->> +             >;
->
-> The "nvidia,config" appears to be missing here.
-
-Indeed it is. ACK.
-
-Thank you Jonanthan for your feedback.
-
-Best Regards,
-Mirza
+> +#include <linux/kernel.h>
+> +#include <linux/init.h>
+> +#include <linux/io.h>
+> +#include <linux/spinlock.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/gpio/driver.h>
+> +#include <linux/pinctrl/consumer.h>
+> +
+> +struct aspeed_gpio {
+> +       struct gpio_chip chip;
+> +       spinlock_t lock;
+> +       void __iomem *base;
+> +       int irq;
+> +       struct irq_chip irq_chip;
+> +       struct irq_domain *irq_domain;
+> +};
+> +
