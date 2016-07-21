@@ -1,60 +1,50 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 21 Jul 2016 11:36:44 +0100
-Subject: [PATCH] [4.7] arm64: Honor nosmp kernel command line option
-In-Reply-To: <1469096127-1136-1-git-send-email-suzuki.poulose@arm.com>
-References: <1469096127-1136-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <20160721103643.GD20559@leverpostej>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Thu, 21 Jul 2016 11:49:23 +0100
+Subject: [PATCH V2 5/6] coresight: adding sink parameter to function
+ coresight_build_path()
+In-Reply-To: <1469047100-18131-6-git-send-email-mathieu.poirier@linaro.org>
+References: <1469047100-18131-1-git-send-email-mathieu.poirier@linaro.org>
+ <1469047100-18131-6-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <07484e7c-7d19-465f-04d9-1dbb4899b643@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 21, 2016 at 11:15:27AM +0100, Suzuki K Poulose wrote:
-> Passing "nosmp" should boot the kernel with a single processor, without
-> provision to enable secondary CPUs even if they are present. "nosmp" is
-> implemented by setting maxcpus=0. At the moment we still mark the secondary
-> CPUs present even with nosmp, which allows the userspace to bring them
-> up. This patch corrects the smp_prepare_cpus() to honor the maxcpus == 0.
-> 
-> Commit 44dbcc93ab67145 ("arm64: Fix behavior of maxcpus=N") fixed the
-> behavior for maxcpus >= 1, but broke maxcpus = 0.
-> 
-> Fixes: commit 44dbcc93ab67145 ("arm64: Fix behavior of maxcpus=N")
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: James Morse <james.morse@arm.com>
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> ---
->  arch/arm64/kernel/smp.c | 7 +++++++
->  1 file changed, 7 insertions(+)
-> 
-> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-> index d242e81..ec08b7a 100644
-> --- a/arch/arm64/kernel/smp.c
-> +++ b/arch/arm64/kernel/smp.c
-> @@ -694,6 +694,13 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
->  	smp_store_cpu_info(smp_processor_id());
->  
->  	/*
-> +	 * If UP is mandated by "nosmp"(implies maxcpus=0), don't bother about
+On 20/07/16 21:38, Mathieu Poirier wrote:
+> Up to now function coresight_build_path() was counting on a sink to
+> have been selected (from sysFS) prior to being called.  This patch
+> adds a string argument so that a sink matching the argument can be
+> selected.
+>
 
-Nit: missing space between the quote abnd opening bracket. It would also
-be nicer to have s/implies/which implies/
-
-Otherwise:
-
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-
-Mark.
-
-> +	 * secondary CPUs.
-> +	 */
-> +	if (max_cpus == 0)
-> +		return;
-> +
+>  static int _coresight_build_path(struct coresight_device *csdev,
+> -				 struct list_head *path)
+> +				 struct list_head *path, const char *sink)
+>  {
+>  	int i;
+>  	bool found = false;
+>  	struct coresight_node *node;
+>
+> -	/* An activated sink has been found.  Enqueue the element */
+> -	if ((csdev->type == CORESIGHT_DEV_TYPE_SINK ||
+> -	     csdev->type == CORESIGHT_DEV_TYPE_LINKSINK) && csdev->activated)
+> -		goto out;
 > +	/*
->  	 * Initialise the present map (which describes the set of CPUs
->  	 * actually populated at the present time) and release the
->  	 * secondaries from the bootloader.
-> -- 
-> 2.7.4
-> 
+> +	 * First see if we are dealing with a sink.  If we have one check if
+> +	 * it was selected via sysFS or the perf cmd line.
+> +	 */
+> +	if (csdev->type == CORESIGHT_DEV_TYPE_SINK ||
+> +	    csdev->type == CORESIGHT_DEV_TYPE_LINKSINK) {
+> +		/* Activated via perf cmd line */
+> +		if (sink && !strcmp(dev_name(&csdev->dev), sink))
+> +			goto out;
+> +		/* Activated via sysFS */
+> +		if (csdev->activated)
+
+When a sink is specified, should we skip an activated sink and continue to
+find the specified one ? or at least fail with an error as we may not be using
+the sink specified by the user ?
+i.e may be :
+		if (!sink && csdev->activated)
+			goto out;
+
+Suzuki
