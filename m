@@ -1,19 +1,39 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 21 Jul 2016 14:38:16 +0200
-Subject: [GIT PULL] ARM: mvebu: dt for v4.8 (#1)
-In-Reply-To: <878tx1svk5.fsf@free-electrons.com>
-References: <878tx1svk5.fsf@free-electrons.com>
-Message-ID: <4582699.JfJv3ntdgZ@wuerfel>
+Date: Thu, 21 Jul 2016 14:39:51 +0200
+Subject: [PATCH] ARM: mps2: fix typo
+In-Reply-To: <578CABCA.4020803@arm.com>
+References: <f607bbd274fe705955116ba590d31ac788f402bf.1468744529.git.baruch@tkos.co.il>
+ <578CABCA.4020803@arm.com>
+Message-ID: <4283147.1vrh2ZlxD5@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday, July 16, 2016 12:53:46 PM CEST Gregory CLEMENT wrote:
-> mvebu dt for 4.8 (part 1)
+On Monday, July 18, 2016 11:13:30 AM CEST Vladimir Murzin wrote:
+> On 17/07/16 09:35, Baruch Siach wrote:
+> > Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+> > ---
+> >  arch/arm/Kconfig | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > 
+> > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> > index 90542db1220d..8ebe5d86b707 100644
+> > --- a/arch/arm/Kconfig
+> > +++ b/arch/arm/Kconfig
+> > @@ -901,7 +901,7 @@ config MACH_STM32F429
+> >       default y
+> >  
+> >  config ARCH_MPS2
+> > -     bool "ARM MPS2 paltform"
+> > +     bool "ARM MPS2 platform"
+> >       depends on ARM_SINGLE_ARMV7M
+> >       select ARM_AMBA
+> >       select CLKSRC_MPS2
+> > 
 > 
-> Fix dts for the clearfog board (Armada 388 SoC based)
+> Reviewed-by: Vladimir Murzin <vladimir.murzin@arm.com>
 > 
 > 
 
-Pulled into next/dt, thanks!
+Merged into next/cleanup, thanks!
 
 	Arnd
