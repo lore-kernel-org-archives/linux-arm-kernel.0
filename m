@@ -1,67 +1,31 @@
-From: seanpaul@chromium.org (Sean Paul)
-Date: Thu, 21 Jul 2016 14:07:53 -0400
-Subject: [PATCH] GPU-DRM-Exynos: Delete an unnecessary check before the
- function call "vunmap"
-In-Reply-To: <a5a79711-10a3-e304-a897-892ebdf2ff9f@users.sourceforge.net>
-References: <5307CAA2.8060406@users.sourceforge.net>
- <alpine.DEB.2.02.1402212321410.2043@localhost6.localdomain6>
- <530A086E.8010901@users.sourceforge.net>
- <alpine.DEB.2.02.1402231635510.1985@localhost6.localdomain6>
- <530A72AA.3000601@users.sourceforge.net>
- <alpine.DEB.2.02.1402240658210.2090@localhost6.localdomain6>
- <530B5FB6.6010207@users.sourceforge.net>
- <alpine.DEB.2.10.1402241710370.2074@hadrien>
- <530C5E18.1020800@users.sourceforge.net>
- <alpine.DEB.2.10.1402251014170.2080@hadrien>
- <530CD2C4.4050903@users.sourceforge.net>
- <alpine.DEB.2.10.1402251840450.7035@hadrien>
- <530CF8FF.8080600@users.sourceforge.net>
- <alpine.DEB.2.02.1402252117150.2047@localhost6.localdomain6>
- <530DD06F.4090703@users.sourceforge.net>
- <alpine.DEB.2.02.1402262129250.2221@localhost6.localdomain6>
- <5317A59D.4@users.sourceforge.net> <54D28870.3060400@users.sourceforge.net>
- <54D329D0.7050006@samsung.com>
- <a5a79711-10a3-e304-a897-892ebdf2ff9f@users.sourceforge.net>
-Message-ID: <CAOw6vb+PqxeU4ioJ0SxF2W_zEJBJHg8PdJYEyF1M0wxXNzU5_A@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 21 Jul 2016 19:15:45 +0100
+Subject: [PATCH v6] ARM: sun4i: spi: Allow transfers larger than FIFO size
+In-Reply-To: <34E27D10-C620-4288-A1A8-489B75D4757B@schinagl.nl>
+References: <1439062912-4405-1-git-send-email-oliver@schinagl.nl>
+ <20160721112701.GB6610@weiser.dinsnail.net>
+ <20160721163153.GO6509@sirena.org.uk>
+ <20160721172712.GA10640@weiser.dinsnail.net>
+ <34E27D10-C620-4288-A1A8-489B75D4757B@schinagl.nl>
+Message-ID: <20160721181545.GP6509@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 21, 2016 at 1:42 PM, SF Markus Elfring
-<elfring@users.sourceforge.net> wrote:
-> From: Markus Elfring <elfring@users.sourceforge.net>
-> Date: Thu, 21 Jul 2016 19:23:25 +0200
->
-> The vunmap() function performs also input parameter validation.
-> Thus the test around the call is not needed.
->
-> This issue was detected by using the Coccinelle software.
->
-> Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
+On Thu, Jul 21, 2016 at 08:03:16PM +0200, Olliver Schinagl wrote:
+> As i recall, some claimed it was needed as we have dma now, but i think this patch still scratches the same itch ...
 
-Applied to drm-misc
+Please don't top post, reply in line with needed context.  This allows
+readers to readily follow the flow of conversation and understand what
+you are talking about and also helps ensure that everything in the
+discussion is being addressed.
 
-> ---
->  drivers/gpu/drm/exynos/exynos_drm_fbdev.c | 3 +--
->  1 file changed, 1 insertion(+), 2 deletions(-)
->
-> diff --git a/drivers/gpu/drm/exynos/exynos_drm_fbdev.c b/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
-> index dd09117..4cfb39d 100644
-> --- a/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
-> +++ b/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
-> @@ -269,8 +269,7 @@ static void exynos_drm_fbdev_destroy(struct drm_device *dev,
->         struct exynos_drm_gem *exynos_gem = exynos_fbd->exynos_gem;
->         struct drm_framebuffer *fb;
->
-> -       if (exynos_gem->kvaddr)
-> -               vunmap(exynos_gem->kvaddr);
-> +       vunmap(exynos_gem->kvaddr);
->
->         /* release drm framebuffer and real buffer */
->         if (fb_helper->fb && fb_helper->fb->funcs) {
-> --
-> 2.9.2
->
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+Please fix your mail client to word wrap within paragraphs at something
+substantially less than 80 columns.  Doing this makes your messages much
+easier to read and reply to.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160721/f0f1a2d4/attachment.sig>
