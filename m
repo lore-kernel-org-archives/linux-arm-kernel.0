@@ -1,49 +1,64 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Thu, 21 Jul 2016 16:04:18 +0100
-Subject: [PATCH] ARM: mps2: fix typo
-In-Reply-To: <4283147.1vrh2ZlxD5@wuerfel>
-References: <f607bbd274fe705955116ba590d31ac788f402bf.1468744529.git.baruch@tkos.co.il>
- <578CABCA.4020803@arm.com> <4283147.1vrh2ZlxD5@wuerfel>
-Message-ID: <c192d67a-891a-31a3-d919-d1101e1b7db4@arm.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Thu, 21 Jul 2016 09:05:27 -0600
+Subject: [PATCH V2 5/6] coresight: adding sink parameter to function
+ coresight_build_path()
+In-Reply-To: <07484e7c-7d19-465f-04d9-1dbb4899b643@arm.com>
+References: <1469047100-18131-1-git-send-email-mathieu.poirier@linaro.org>
+ <1469047100-18131-6-git-send-email-mathieu.poirier@linaro.org>
+ <07484e7c-7d19-465f-04d9-1dbb4899b643@arm.com>
+Message-ID: <CANLsYkydbXRsHzuwQQczc7Od7g7CN4HgsJRX5rCtB0+7-m0hEg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 21/07/16 13:39, Arnd Bergmann wrote:
-> On Monday, July 18, 2016 11:13:30 AM CEST Vladimir Murzin wrote:
->> On 17/07/16 09:35, Baruch Siach wrote:
->>> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
->>> ---
->>>  arch/arm/Kconfig | 2 +-
->>>  1 file changed, 1 insertion(+), 1 deletion(-)
->>>
->>> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
->>> index 90542db1220d..8ebe5d86b707 100644
->>> --- a/arch/arm/Kconfig
->>> +++ b/arch/arm/Kconfig
->>> @@ -901,7 +901,7 @@ config MACH_STM32F429
->>>       default y
->>>
->>>  config ARCH_MPS2
->>> -     bool "ARM MPS2 paltform"
->>> +     bool "ARM MPS2 platform"
->>>       depends on ARM_SINGLE_ARMV7M
->>>       select ARM_AMBA
->>>       select CLKSRC_MPS2
->>>
+On 21 July 2016 at 04:49, Suzuki K Poulose <Suzuki.Poulose@arm.com> wrote:
+> On 20/07/16 21:38, Mathieu Poirier wrote:
 >>
->> Reviewed-by: Vladimir Murzin <vladimir.murzin@arm.com>
->>
+>> Up to now function coresight_build_path() was counting on a sink to
+>> have been selected (from sysFS) prior to being called.  This patch
+>> adds a string argument so that a sink matching the argument can be
+>> selected.
 >>
 >
-> Merged into next/cleanup, thanks!
+>>  static int _coresight_build_path(struct coresight_device *csdev,
+>> -                                struct list_head *path)
+>> +                                struct list_head *path, const char *sink)
+>>  {
+>>         int i;
+>>         bool found = false;
+>>         struct coresight_node *node;
+>>
+>> -       /* An activated sink has been found.  Enqueue the element */
+>> -       if ((csdev->type == CORESIGHT_DEV_TYPE_SINK ||
+>> -            csdev->type == CORESIGHT_DEV_TYPE_LINKSINK) &&
+>> csdev->activated)
+>> -               goto out;
+>> +       /*
+>> +        * First see if we are dealing with a sink.  If we have one check
+>> if
+>> +        * it was selected via sysFS or the perf cmd line.
+>> +        */
+>> +       if (csdev->type == CORESIGHT_DEV_TYPE_SINK ||
+>> +           csdev->type == CORESIGHT_DEV_TYPE_LINKSINK) {
+>> +               /* Activated via perf cmd line */
+>> +               if (sink && !strcmp(dev_name(&csdev->dev), sink))
+>> +                       goto out;
+>> +               /* Activated via sysFS */
+>> +               if (csdev->activated)
 >
+>
+> When a sink is specified, should we skip an activated sink and continue to
+> find the specified one ? or at least fail with an error as we may not be
+> using
+> the sink specified by the user ?
+> i.e may be :
+>                 if (!sink && csdev->activated)
+>                         goto out;
 
-Thanks Arnd, I was thinking on how to organize into branches along with
-other of/DT refcounting fixes I had for vexpress/scpi code. You made it
-easy.
 
--- 
-Regards,
-Sudeep
+I understand your point.  My goal though is to discourage people from
+meddling in sysFS when using CS from the perf interface.  As such if
+any code is to be added here, it would be to report an error when both
+a sink has been specified from perf and activated from sysFS.
+
+>
+> Suzuki
