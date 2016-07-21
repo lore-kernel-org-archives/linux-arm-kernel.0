@@ -1,114 +1,50 @@
-From: songjun.wu@microchip.com (Songjun Wu)
-Date: Thu, 21 Jul 2016 16:14:58 +0800
-Subject: [PATCH v6 2/2] [media] atmel-isc: DT binding for Image Sensor
- Controller driver
-In-Reply-To: <1469088900-23935-1-git-send-email-songjun.wu@microchip.com>
-References: <1469088900-23935-1-git-send-email-songjun.wu@microchip.com>
-Message-ID: <1469088900-23935-3-git-send-email-songjun.wu@microchip.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Thu, 21 Jul 2016 17:34:03 +0900
+Subject: [PATCH] ARM: exynos_defconfig: Enable bus frequency scaling with
+ DEVFREQ/DEVFREQ-Event
+In-Reply-To: <1468546426-4482-1-git-send-email-cw00.choi@samsung.com>
+References: <CGME20160715013357epcas1p1f7e365ac861b48a56c029e67b9461d60@epcas1p1.samsung.com>
+ <1468546426-4482-1-git-send-email-cw00.choi@samsung.com>
+Message-ID: <579088FB.2000101@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DT binding documentation for ISC driver.
+Hi Krzysztof,
 
-Signed-off-by: Songjun Wu <songjun.wu@microchip.com>
----
+Could you please pick this patch?
 
-Changes in v6:
-- Add "iscck" and "gck" to clock-names.
+Regards,
+Chanwoo Choi
 
-Changes in v5:
-- Add clock-output-names.
-
-Changes in v4:
-- Remove the isc clock nodes.
-
-Changes in v3:
-- Remove the 'atmel,sensor-preferred'.
-- Modify the isc clock node according to the Rob's remarks.
-
-Changes in v2:
-- Remove the unit address of the endpoint.
-- Add the unit address to the clock node.
-- Avoid using underscores in node names.
-- Drop the "0x" in the unit address of the i2c node.
-- Modify the description of 'atmel,sensor-preferred'.
-- Add the description for the ISC internal clock.
-
- .../devicetree/bindings/media/atmel-isc.txt        | 65 ++++++++++++++++++++++
- 1 file changed, 65 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/media/atmel-isc.txt
-
-diff --git a/Documentation/devicetree/bindings/media/atmel-isc.txt b/Documentation/devicetree/bindings/media/atmel-isc.txt
-new file mode 100644
-index 0000000..50ab60b
---- /dev/null
-+++ b/Documentation/devicetree/bindings/media/atmel-isc.txt
-@@ -0,0 +1,65 @@
-+Atmel Image Sensor Controller (ISC)
-+----------------------------------------------
-+
-+Required properties for ISC:
-+- compatible
-+	Must be "atmel,sama5d2-isc".
-+- reg
-+	Physical base address and length of the registers set for the device.
-+- interrupts
-+	Should contain IRQ line for the ISC.
-+- clocks
-+	List of clock specifiers, corresponding to entries in
-+	the clock-names property;
-+	Please refer to clock-bindings.txt.
-+- clock-names
-+	Required elements: "hclock", "iscck", "gck".
-+- #clock-cells
-+	Should be 0.
-+- clock-output-names
-+	Should be "isc-mck".
-+- pinctrl-names, pinctrl-0
-+	Please refer to pinctrl-bindings.txt.
-+
-+ISC supports a single port node with parallel bus. It should contain one
-+'port' child node with child 'endpoint' node. Please refer to the bindings
-+defined in Documentation/devicetree/bindings/media/video-interfaces.txt.
-+
-+Example:
-+isc: isc at f0008000 {
-+	compatible = "atmel,sama5d2-isc";
-+	reg = <0xf0008000 0x4000>;
-+	interrupts = <46 IRQ_TYPE_LEVEL_HIGH 5>;
-+	clocks = <&isc_clk>, <&iscck>, <&isc_gclk>;
-+	clock-names = "hclock", "iscck", "gck";
-+	#clock-cells = <0>;
-+	clock-output-names = "isc-mck";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_isc_base &pinctrl_isc_data_8bit &pinctrl_isc_data_9_10 &pinctrl_isc_data_11_12>;
-+
-+	port {
-+		isc_0: endpoint {
-+			remote-endpoint = <&ov7740_0>;
-+			hsync-active = <1>;
-+			vsync-active = <0>;
-+			pclk-sample = <1>;
-+		};
-+	};
-+};
-+
-+i2c1: i2c at fc028000 {
-+	ov7740: camera at 21 {
-+		compatible = "ovti,ov7740";
-+		reg = <0x21>;
-+		clocks = <&isc>;
-+		clock-names = "xvclk";
-+		assigned-clocks = <&isc>;
-+		assigned-clock-rates = <24000000>;
-+
-+		port {
-+			ov7740_0: endpoint {
-+				remote-endpoint = <&isc_0>;
-+			};
-+		};
-+	};
-+};
-\ No newline at end of file
--- 
-2.7.4
+On 2016? 07? 15? 10:33, Chanwoo Choi wrote:
+> This patch enables the bus frequency scaling driver with DEVFREQ and
+> DEVFREQ-Event framework. This patches already was merged for Odroid-U3/XU3
+> ,Trats2 and Rinato/Monk boards.
+> 
+> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+> ---
+>  arch/arm/configs/exynos_defconfig | 10 ++++++++++
+>  1 file changed, 10 insertions(+)
+> 
+> diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
+> index a5aa44c56bfe..37052b115a40 100644
+> --- a/arch/arm/configs/exynos_defconfig
+> +++ b/arch/arm/configs/exynos_defconfig
+> @@ -219,6 +219,16 @@ CONFIG_CROS_EC_CHARDEV=y
+>  CONFIG_COMMON_CLK_MAX77686=y
+>  CONFIG_COMMON_CLK_MAX77802=y
+>  CONFIG_COMMON_CLK_S2MPS11=y
+> +CONFIG_PM_DEVFREQ=y
+> +CONFIG_DEVFREQ_GOV_SIMPLE_ONDEMAND=y
+> +CONFIG_DEVFREQ_GOV_PERFORMANCE=y
+> +CONFIG_DEVFREQ_GOV_POWERSAVE=y
+> +CONFIG_DEVFREQ_GOV_USERSPACE=y
+> +CONFIG_DEVFREQ_GOV_PASSIVE=y
+> +CONFIG_ARM_EXYNOS_BUS_DEVFREQ=y
+> +CONFIG_PM_DEVFREQ_EVENT=y
+> +CONFIG_DEVFREQ_EVENT_EXYNOS_NOCP=y
+> +CONFIG_DEVFREQ_EVENT_EXYNOS_PPMU=y
+>  CONFIG_EXTCON=y
+>  CONFIG_EXTCON_MAX14577=y
+>  CONFIG_EXTCON_MAX77693=y
+> 
