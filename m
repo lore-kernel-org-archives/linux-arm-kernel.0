@@ -1,47 +1,31 @@
-From: hotran@apm.com (Hoan Tran)
-Date: Thu, 21 Jul 2016 15:21:11 -0700
-Subject: [PATCH v3 2/3] hwmon: xgene: Add hwmon driver
-In-Reply-To: <20160721220935.GB19236@roeck-us.net>
-References: <1469134557-26869-1-git-send-email-hotran@apm.com>
- <1469134557-26869-3-git-send-email-hotran@apm.com>
- <20160721220935.GB19236@roeck-us.net>
-Message-ID: <CAFHUOYzi48QkAp+Uw9yRSvcCrNPR5LKczDfb9r5t0fqZ0qVcFw@mail.gmail.com>
+From: isubramanian@apm.com (Iyappan Subramanian)
+Date: Thu, 21 Jul 2016 15:31:42 -0700
+Subject: [PATCH v6 11/12] Documentation: dtb: xgene: Add MDIO node
+In-Reply-To: <20160721220132.GA16264@rob-hp-laptop>
+References: <1469084370-16781-1-git-send-email-isubramanian@apm.com>
+ <1469084370-16781-12-git-send-email-isubramanian@apm.com>
+ <20160721220132.GA16264@rob-hp-laptop>
+Message-ID: <CAKh23FnmJvhwvr-qU=d3GfGxxRu5=Rsb2kNQi8=wXCi8Afzgtg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Guenter,
+Hi Rob,
 
-On Thu, Jul 21, 2016 at 3:09 PM, Guenter Roeck <linux@roeck-us.net> wrote:
-> On Thu, Jul 21, 2016 at 01:55:56PM -0700, Hoan Tran wrote:
->> This patch adds hardware temperature and power reading support for
->> APM X-Gene SoC using the mailbox communication interface.
->>
->> Signed-off-by: Hoan Tran <hotran@apm.com>
+On Thu, Jul 21, 2016 at 3:01 PM, Rob Herring <robh@kernel.org> wrote:
+> On Wed, Jul 20, 2016 at 11:59:29PM -0700, Iyappan Subramanian wrote:
+>> Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
+>> Tested-by: Fushen Chen <fchen@apm.com>
+>> Tested-by: Toan Le <toanle@apm.com>
 >> ---
+>>  .../devicetree/bindings/net/apm-xgene-mdio.txt     | 37 ++++++++++++++++++++++
+>>  1 file changed, 37 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/net/apm-xgene-mdio.txt
 >
-> [ ... ]
->
->> +
->> +     dev_info(&pdev->dev, "APM X-Gene SoC HW monitor driver registered\n");
->> +
->> +     return rc;
->> +
->
-> Nitpick: rc == 0 here, so return 0; is a better choice.
-> Otherwise looks good.
+> Please add acks when posting new versions (but don't post new versions
+> just to add acks).
 
-Yes, I'll fix it then send v4 shortly.
+I am sorry, I thought that the maintainer would add the Acked/Tested
+when the patches get applied.
 
 >
-> Reviewed-by: Guenter Roeck <linux@roeck-us.net>
->
-> Note that I can not apply the patch at this time due to its dependency.
-
-Thanks ! I'll let you know when Rafael applies that dependent patch
-into linux-next.
-
-Thanks
-Hoan
-
->
-> Guenter
+> Rob
