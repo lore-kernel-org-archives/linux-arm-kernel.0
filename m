@@ -1,167 +1,64 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Thu, 21 Jul 2016 11:12:32 -0600
-Subject: [PATCH 03/10] coresight: etm-perf: configuring filters from perf
- core
-In-Reply-To: <CANLsYkzUrRVZbCrhsV=X-2EhbtBpX5fX16g2pOdsRc3XF8+8Rg@mail.gmail.com>
-References: <1468871491-10997-1-git-send-email-mathieu.poirier@linaro.org>
- <1468871491-10997-4-git-send-email-mathieu.poirier@linaro.org>
- <d711d4da-a356-3a71-c594-785efb1ae752@arm.com>
- <CANLsYkzUrRVZbCrhsV=X-2EhbtBpX5fX16g2pOdsRc3XF8+8Rg@mail.gmail.com>
-Message-ID: <CANLsYkxYhx3afo_ayHDP_r3kAmmMGy_KpuWxbyrsUGuoo4m3xA@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 21 Jul 2016 18:16:36 +0100
+Subject: [PATCH v15 04/10] arm64: Kprobes with single stepping support
+In-Reply-To: <5790F960.5050007@linaro.org>
+References: <1467995754-32508-1-git-send-email-dave.long@linaro.org>
+ <1467995754-32508-5-git-send-email-dave.long@linaro.org>
+ <578FA238.3050206@arm.com> <5790F960.5050007@linaro.org>
+Message-ID: <20160721171636.GG16666@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21 July 2016 at 09:15, Mathieu Poirier <mathieu.poirier@linaro.org> wrote:
-> On 20 July 2016 at 10:07, Suzuki K Poulose <Suzuki.Poulose@arm.com> wrote:
->> On 18/07/16 20:51, Mathieu Poirier wrote:
->>>
->>> This patch implements the required API needed to access
->>> and retrieve range and start/stop filters from the perf core.
->>>
->>> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
->>> ---
->>>  drivers/hwtracing/coresight/coresight-etm-perf.c | 146
->>> ++++++++++++++++++++---
->>>  drivers/hwtracing/coresight/coresight-etm-perf.h |  32 +++++
->>>  2 files changed, 162 insertions(+), 16 deletions(-)
->>>
->>> diff --git a/drivers/hwtracing/coresight/coresight-etm-perf.c
->>> b/drivers/hwtracing/coresight/coresight-etm-perf.c
->>> index 78a1bc0013a2..fde7f42149c5 100644
->>> --- a/drivers/hwtracing/coresight/coresight-etm-perf.c
->>> +++ b/drivers/hwtracing/coresight/coresight-etm-perf.c
->>> @@ -29,6 +29,7 @@
->>>  #include <linux/workqueue.h>
->>>
->>>  #include "coresight-priv.h"
->>> +#include "coresight-etm-perf.h"
->>>
->>>  static struct pmu etm_pmu;
->>>  static bool etm_perf_up;
->>> @@ -83,12 +84,44 @@ static const struct attribute_group
->>> *etm_pmu_attr_groups[] = {
->>>
->>>  static void etm_event_read(struct perf_event *event) {}
->>>
->>> +static int etm_addr_filters_alloc(struct perf_event *event)
->>> +{
->>
->>
->> ...
->>
->>> +       return 0;
->>> +}
->>> +
->>
->>
->>
->>> +
->>>  static int etm_event_init(struct perf_event *event)
->>>  {
->>> +       int ret;
->>> +
->>>         if (event->attr.type != etm_pmu.type)
->>>                 return -ENOENT;
->>>
->>> -       return 0;
->>> +       ret = etm_addr_filters_alloc(event);
->>
->>
->>
->>>  }
->>>
->>>  static void free_event_data(struct work_struct *work)
->>> @@ -456,6 +489,85 @@ static void etm_free_drv_configs(struct perf_event
->>> *event)
->>>         }
->>>  }
->>>
->>> +static int etm_addr_filters_validate(struct list_head *filters)
->>> +{
->>
->>
->>> +
->>> +       return 0;
->>> +}
->>> +
->>> +static void etm_addr_filters_sync(struct perf_event *event)
->>> +{
->>> +       struct perf_addr_filters_head *head =
->>> perf_event_addr_filters(event);
->>> +       unsigned long start, stop, *offs = event->addr_filters_offs;
->>> +       struct etm_filters *filters = event->hw.addr_filters;
->>> +       struct perf_addr_filter *filter;
->>> +       int i = 0;
->>
->>
->> Is it possible to delay the etm_addr_filters_alloc() until this point ?
->> I understand that this function cannot report back failures if we fail
->> to allocate memory. Or may be do a lazy allocation from
->> addr_filters_validate(),
->> when we get the first filter added.
->
-> Humm... You want to avoid allocating memory that may never be used if
-> filters aren't specified.  Ok, let's do the allocation in
-> addr_filters_validate().
->
+On Thu, Jul 21, 2016 at 12:33:36PM -0400, David Long wrote:
+> On 07/20/2016 12:09 PM, Marc Zyngier wrote:
+> >On 08/07/16 17:35, David Long wrote:
+> >>diff --git a/arch/arm64/include/asm/kprobes.h b/arch/arm64/include/asm/kprobes.h
+> >>new file mode 100644
+> >>index 0000000..79c9511
+> >>--- /dev/null
+> >>+++ b/arch/arm64/include/asm/kprobes.h
+> >>@@ -0,0 +1,60 @@
+> >>+/*
+> >>+ * arch/arm64/include/asm/kprobes.h
+> >>+ *
+> >>+ * Copyright (C) 2013 Linaro Limited
+> >>+ *
+> >>+ * This program is free software; you can redistribute it and/or modify
+> >>+ * it under the terms of the GNU General Public License version 2 as
+> >>+ * published by the Free Software Foundation.
+> >>+ *
+> >>+ * This program is distributed in the hope that it will be useful,
+> >>+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> >>+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+> >>+ * General Public License for more details.
+> >>+ */
+> >>+
+> >>+#ifndef _ARM_KPROBES_H
+> >>+#define _ARM_KPROBES_H
+> >>+
+> >>+#include <linux/types.h>
+> >>+#include <linux/ptrace.h>
+> >>+#include <linux/percpu.h>
+> >>+
+> >>+#define __ARCH_WANT_KPROBES_INSN_SLOT
+> >>+#define MAX_INSN_SIZE			1
+> >>+#define MAX_STACK_SIZE			128
+> >
+> >Where is that value coming from? Because even on my 6502, I have a 256
+> >byte stack.
+> 
+> Although I don't claim to know the original author's thoughts I would guess
+> it is based on the seven other existing implementations for kprobes on
+> various architectures, all of which appear to use either 64 or 128 for
+> MAX_STACK_SIZE.  The code is not trying to duplicate the whole stack.
 
-On second thought we don't have access to the perf event in
-addr_filters_validate() so the previous strategy won't work.  And as
-you said etm_addr_filters_sync() doesn't return an error code so that
-won't work either.  As such I will keep the current code as is.
+This seems to be some random choice in the hope that arguments passed on
+the stack cannot exceed MAX_STACK_SIZE.
 
-Mathieu
+I'll put a patch together which checks the previous stack frame and
+limit the copying. If the fp information or if the size to be copied
+exceeds MAX_STACK_SIZE, just skip the probe hook (return 0 in
+setjmp_pre_handler).
 
->>
->> Of course this could be done as a follow up patch to improve things once
->> we get the initial framework in.
->>
->>
->>
->>> +
->>> +       list_for_each_entry(filter, &head->list, entry) {
->>> +               start = filter->offset + offs[i];
->>> +               stop = start + filter->size;
->>> +
->>> +               if (filter->range == 1) {
->>> +                       filters->filter[i].start_addr = start;
->>> +                       filters->filter[i].stop_addr = stop;
->>> +                       filters->filter[i].type = ETM_ADDR_TYPE_RANGE;
->>> +               } else {
->>> +                       if (filter->filter == 1) {
->>> +                               filters->filter[i].start_addr = start;
->>> +                               filters->filter[i].type =
->>> ETM_ADDR_TYPE_START;
->>> +                       } else {
->>> +                               filters->filter[i].stop_addr = stop;
->>> +                               filters->filter[i].type =
->>> ETM_ADDR_TYPE_STOP;
->>> +                       }
->>> +               }
->>> +               i++;
->>> +       }
->>> +
->>> +       filters->nr_filters = i;
->>> +/**
->>> + * struct etm_filters - set of filters for a session
->>> + * @etm_filter:        All the filters for this session.
->>> + * @nr_filters:        Number of filters
->>> + * @ssstatus:  Status of the start/stop logic.
->>> + */
->>> +struct etm_filters {
->>> +       struct etm_filter       filter[ETM_ADDR_CMP_MAX];
->>
->>
->> nit: having the variable renamed to etm_filter will make the code a bit more
->> readable
->> where we populate/validate the filters.
->
-> Very well.
->
-> Thanks,
-> Mathieu
->
->>
->> Otherwise looks good
->>
->> Suzuki
+-- 
+Catalin
