@@ -1,125 +1,188 @@
-From: yunhui.cui@nxp.com (Yunhui Cui)
-Date: Thu, 21 Jul 2016 05:58:48 +0000
-Subject: [PATCH v2 1/9] mtd:fsl-quadspi:use the property fields of SPI-NOR
-In-Reply-To: <DB5PR0401MB191200E18A336E0BE5318D1694240@DB5PR0401MB1912.eurprd04.prod.outlook.com>
-References: <1461307192-866-1-git-send-email-B56489@freescale.com>
- <DB5PR0401MB191200E18A336E0BE5318D1694240@DB5PR0401MB1912.eurprd04.prod.outlook.com>
-Message-ID: <VI1PR0401MB26403FE955617EFEB3DD809294090@VI1PR0401MB2640.eurprd04.prod.outlook.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 21 Jul 2016 08:08:12 +0200
+Subject: [PATCH 5/5] mfd: sunxi-gpadc-mfd: probe sunxi-gpadc-ts driver
+In-Reply-To: <1469003351-15263-6-git-send-email-quentin.schulz@free-electrons.com>
+References: <1469003351-15263-1-git-send-email-quentin.schulz@free-electrons.com>
+ <1469003351-15263-6-git-send-email-quentin.schulz@free-electrons.com>
+Message-ID: <20160721060812.GA5993@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David,
+Hi Quentin,
 
-Could you please help to review this patch set.
-This patch set is very importmant for fsl-quadspi driver. 
-
-Thanks.
-
-
-Thursday, June 30, 2016 9:54 AM Yunhui Cui wrote:
-> Hi Brian and Han,
-> Could you please give me some comments about this patch set v2 ?
+On Wed, Jul 20, 2016 at 10:29:11AM +0200, Quentin Schulz wrote:
+> This probes the touchscreen driver for Allwinner SoCs (A10, A13 and A31)
+> when the property "allwinner,ts-attached" is set in the GPADC (rtp) node of
+> the DT.
 > 
-> Thanks
+> Some comestic modifications done to shorten and increase readability of the
+> code.
 > 
-> > -----Original Message-----
-> > From: Yunhui Cui [mailto:B56489 at freescale.com]
-> > Sent: Friday, April 22, 2016 2:40 PM
-> > To: dwmw2 at infradead.org; computersforpeace at gmail.com;
-> > han.xu at freescale.com
-> > Cc: linux-kernel at vger.kernel.org; linux-mtd at lists.infradead.org;
-> > linux- arm-kernel at lists.infradead.org; Yao Yuan; Yunhui Cui
-> > Subject: [PATCH v2 1/9] mtd:fsl-quadspi:use the property fields of
-> > SPI- NOR
-> >
-> > We can get the read/write/erase opcode from the spi nor framework
-> > directly. This patch uses the information stored in the SPI-NOR to
-> > remove the hardcode in the fsl_qspi_init_lut().
-> >
-> > Signed-off-by: Yunhui Cui <B56489@freescale.com>
-> > Signed-off-by: Yunhui Cui <yunhui.cui@nxp.com>
-> > ---
-> >  drivers/mtd/spi-nor/fsl-quadspi.c | 40
-> > ++++++++++++---------------------
-> > ------
-> >  1 file changed, 12 insertions(+), 28 deletions(-)
-> >
-> > diff --git a/drivers/mtd/spi-nor/fsl-quadspi.c
-> > b/drivers/mtd/spi-nor/fsl- quadspi.c index 9ab2b51..517ffe2 100644
-> > --- a/drivers/mtd/spi-nor/fsl-quadspi.c
-> > +++ b/drivers/mtd/spi-nor/fsl-quadspi.c
-> > @@ -373,9 +373,13 @@ static void fsl_qspi_init_lut(struct fsl_qspi *q)
-> >  	void __iomem *base = q->iobase;
-> >  	int rxfifo = q->devtype_data->rxfifo;
-> >  	u32 lut_base;
-> > -	u8 cmd, addrlen, dummy;
-> >  	int i;
-> >
-> > +	struct spi_nor *nor = &q->nor[0];
-> > +	u8 addrlen = (nor->addr_width == 3) ? ADDR24BIT : ADDR32BIT;
-> > +	u8 read_op = nor->read_opcode;
-> > +	u8 read_dm = nor->read_dummy;
-> > +
-> >  	fsl_qspi_unlock_lut(q);
-> >
-> >  	/* Clear all the LUT table */
-> > @@ -385,20 +389,10 @@ static void fsl_qspi_init_lut(struct fsl_qspi *q)
-> >  	/* Quad Read */
-> >  	lut_base = SEQID_QUAD_READ * 4;
-> >
-> > -	if (q->nor_size <= SZ_16M) {
-> > -		cmd = SPINOR_OP_READ_1_1_4;
-> > -		addrlen = ADDR24BIT;
-> > -		dummy = 8;
-> > -	} else {
-> > -		/* use the 4-byte address */
-> > -		cmd = SPINOR_OP_READ_1_1_4;
-> > -		addrlen = ADDR32BIT;
-> > -		dummy = 8;
-> > -	}
-> > -
-> > -	qspi_writel(q, LUT0(CMD, PAD1, cmd) | LUT1(ADDR, PAD1, addrlen),
-> > +	qspi_writel(q, LUT0(CMD, PAD1, read_op) | LUT1(ADDR, PAD1, addrlen),
-> >  			base + QUADSPI_LUT(lut_base));
-> > -	qspi_writel(q, LUT0(DUMMY, PAD1, dummy) | LUT1(FSL_READ, PAD4,
-> > rxfifo),
-> > +	qspi_writel(q, LUT0(DUMMY, PAD1, read_dm) |
-> > +		    LUT1(FSL_READ, PAD4, rxfifo),
-> >  			base + QUADSPI_LUT(lut_base + 1));
-> >
-> >  	/* Write enable */
-> > @@ -409,16 +403,8 @@ static void fsl_qspi_init_lut(struct fsl_qspi *q)
-> >  	/* Page Program */
-> >  	lut_base = SEQID_PP * 4;
-> >
-> > -	if (q->nor_size <= SZ_16M) {
-> > -		cmd = SPINOR_OP_PP;
-> > -		addrlen = ADDR24BIT;
-> > -	} else {
-> > -		/* use the 4-byte address */
-> > -		cmd = SPINOR_OP_PP;
-> > -		addrlen = ADDR32BIT;
-> > -	}
-> > -
-> > -	qspi_writel(q, LUT0(CMD, PAD1, cmd) | LUT1(ADDR, PAD1, addrlen),
-> > +	qspi_writel(q, LUT0(CMD, PAD1, nor->program_opcode) |
-> > +		    LUT1(ADDR, PAD1, addrlen),
-> >  			base + QUADSPI_LUT(lut_base));
-> >  	qspi_writel(q, LUT0(FSL_WRITE, PAD1, 0),
-> >  			base + QUADSPI_LUT(lut_base + 1)); @@ -432,10 +418,8 @@
-> static
-> > void fsl_qspi_init_lut(struct fsl_qspi *q)
-> >  	/* Erase a sector */
-> >  	lut_base = SEQID_SE * 4;
-> >
-> > -	cmd = q->nor[0].erase_opcode;
-> > -	addrlen = q->nor_size <= SZ_16M ? ADDR24BIT : ADDR32BIT;
-> > -
-> > -	qspi_writel(q, LUT0(CMD, PAD1, cmd) | LUT1(ADDR, PAD1, addrlen),
-> > +	qspi_writel(q, LUT0(CMD, PAD1, nor->erase_opcode) |
-> > +		    LUT1(ADDR, PAD1, addrlen),
-> >  			base + QUADSPI_LUT(lut_base));
-> >
-> >  	/* Erase the whole chip */
-> > --
-> > 2.1.0.27.g96db324
+> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+> ---
+>  drivers/mfd/sunxi-gpadc-mfd.c | 115 ++++++++++++++++++++++++++++--------------
+>  1 file changed, 77 insertions(+), 38 deletions(-)
+> 
+> diff --git a/drivers/mfd/sunxi-gpadc-mfd.c b/drivers/mfd/sunxi-gpadc-mfd.c
+> index 05a000b..9b9ed0b 100644
+> --- a/drivers/mfd/sunxi-gpadc-mfd.c
+> +++ b/drivers/mfd/sunxi-gpadc-mfd.c
+> @@ -21,6 +21,11 @@
+>  #define SUNXI_IRQ_TEMP_DATA	1
+>  #define SUNXI_IRQ_TP_UP		2
+>  
+> +#define SUNXI_GPADC_MFD_CELL(_name, _resources, _num_resources) {	\
+> +	.name = _name,							\
+> +	.resources = _resources,					\
+> +	.num_resources = _num_resources					\
+> +}
+>  
+>  static struct resource adc_resources[] = {
+>  	{
+> @@ -64,33 +69,45 @@ static const struct regmap_irq_chip sunxi_gpadc_mfd_regmap_irq_chip = {
+>  };
+>  
+>  static struct mfd_cell sun4i_gpadc_mfd_cells[] = {
+> -	{
+> -		.name	= "sun4i-a10-gpadc-iio",
+> -		.resources = adc_resources,
+> -		.num_resources = ARRAY_SIZE(adc_resources),
+> -	}, {
+> -		.name = "iio_hwmon",
+> -	}
+> +	SUNXI_GPADC_MFD_CELL("sun4i-a10-gpadc-iio", adc_resources,
+> +			     ARRAY_SIZE(adc_resources)),
+> +	SUNXI_GPADC_MFD_CELL("iio_hwmon", NULL, 0),
+>  };
+>  
+>  static struct mfd_cell sun5i_gpadc_mfd_cells[] = {
+> -	{
+> -		.name	= "sun5i-a13-gpadc-iio",
+> -		.resources = adc_resources,
+> -		.num_resources = ARRAY_SIZE(adc_resources),
+> -	}, {
+> -		.name = "iio_hwmon",
+> -	},
+> +	SUNXI_GPADC_MFD_CELL("sun5i-a13-gpadc-iio", adc_resources,
+> +			     ARRAY_SIZE(adc_resources)),
+> +	SUNXI_GPADC_MFD_CELL("iio_hwmon", NULL, 0),
+>  };
+>  
+>  static struct mfd_cell sun6i_gpadc_mfd_cells[] = {
+> -	{
+> -		.name	= "sun6i-a31-gpadc-iio",
+> -		.resources = adc_resources,
+> -		.num_resources = ARRAY_SIZE(adc_resources),
+> -	}, {
+> -		.name = "iio_hwmon",
+> -	},
+> +	SUNXI_GPADC_MFD_CELL("sun6i-a31-gpadc-iio", adc_resources,
+> +			     ARRAY_SIZE(adc_resources)),
+> +	SUNXI_GPADC_MFD_CELL("iio_hwmon", NULL, 0),
+> +};
+
+This should be part of a separate patch.
+
+> +
+> +static struct mfd_cell sun4i_gpadc_mfd_cells_ts[] = {
+> +	SUNXI_GPADC_MFD_CELL("sun6i-a31-gpadc-iio", adc_resources,
+> +			     ARRAY_SIZE(adc_resources)),
+> +	SUNXI_GPADC_MFD_CELL("iio_hwmon", NULL, 0),
+> +	SUNXI_GPADC_MFD_CELL("sunxi-gpadc-ts", ts_resources,
+> +			     ARRAY_SIZE(ts_resources)),
+> +};
+> +
+> +static struct mfd_cell sun5i_gpadc_mfd_cells_ts[] = {
+> +	SUNXI_GPADC_MFD_CELL("sun5i-a13-gpadc-iio", adc_resources,
+> +			     ARRAY_SIZE(adc_resources)),
+> +	SUNXI_GPADC_MFD_CELL("iio_hwmon", NULL, 0),
+> +	SUNXI_GPADC_MFD_CELL("sunxi-gpadc-ts", ts_resources,
+> +			     ARRAY_SIZE(ts_resources)),
+> +};
+> +
+> +static struct mfd_cell sun6i_gpadc_mfd_cells_ts[] = {
+> +	SUNXI_GPADC_MFD_CELL("sun6i-a31-gpadc-iio", adc_resources,
+> +			     ARRAY_SIZE(adc_resources)),
+> +	SUNXI_GPADC_MFD_CELL("iio_hwmon", NULL, 0),
+> +	SUNXI_GPADC_MFD_CELL("sunxi-gpadc-ts", ts_resources,
+> +			     ARRAY_SIZE(ts_resources)),
+>  };
+>  
+>  static const struct regmap_config sunxi_gpadc_mfd_regmap_config = {
+> @@ -142,23 +159,45 @@ static int sunxi_gpadc_mfd_probe(struct platform_device *pdev)
+>  	}
+>  
+>  	if (of_device_is_compatible(pdev->dev.of_node,
+> -				    "allwinner,sun4i-a10-ts"))
+> -		ret = mfd_add_devices(sunxi_gpadc_mfd_dev->dev, 0,
+> -				      sun4i_gpadc_mfd_cells,
+> -				      ARRAY_SIZE(sun4i_gpadc_mfd_cells), NULL,
+> -				      0, NULL);
+> -	else if (of_device_is_compatible(pdev->dev.of_node,
+> -					 "allwinner,sun5i-a13-ts"))
+> -		ret = mfd_add_devices(sunxi_gpadc_mfd_dev->dev, 0,
+> -				      sun5i_gpadc_mfd_cells,
+> -				      ARRAY_SIZE(sun5i_gpadc_mfd_cells), NULL,
+> -				      0, NULL);
+> -	else if (of_device_is_compatible(pdev->dev.of_node,
+> -					 "allwinner,sun6i-a31-ts"))
+> -		ret = mfd_add_devices(sunxi_gpadc_mfd_dev->dev, 0,
+> -				      sun6i_gpadc_mfd_cells,
+> -				      ARRAY_SIZE(sun6i_gpadc_mfd_cells), NULL,
+> -				      0, NULL);
+> +				    "allwinner,sun4i-a10-ts")) {
+> +		if (of_property_read_bool(pdev->dev.of_node,
+> +					  "allwinner,ts-attached"))
+> +			ret = mfd_add_devices(sunxi_gpadc_mfd_dev->dev, 0,
+> +					      sun4i_gpadc_mfd_cells_ts,
+> +					      ARRAY_SIZE(sun4i_gpadc_mfd_cells_ts),
+> +					      NULL, 0, NULL);
+> +		else
+> +			ret = mfd_add_devices(sunxi_gpadc_mfd_dev->dev, 0,
+> +					      sun4i_gpadc_mfd_cells,
+> +					      ARRAY_SIZE(sun4i_gpadc_mfd_cells),
+> +					      NULL, 0, NULL);
+> +	} else if (of_device_is_compatible(pdev->dev.of_node,
+> +					 "allwinner,sun5i-a13-ts")) {
+> +		if (of_property_read_bool(pdev->dev.of_node,
+> +					  "allwinner,ts-attached"))
+> +			ret = mfd_add_devices(sunxi_gpadc_mfd_dev->dev, 0,
+> +					      sun5i_gpadc_mfd_cells_ts,
+> +					      ARRAY_SIZE(sun5i_gpadc_mfd_cells_ts),
+> +					      NULL, 0, NULL);
+> +		else
+> +			ret = mfd_add_devices(sunxi_gpadc_mfd_dev->dev, 0,
+> +					      sun5i_gpadc_mfd_cells,
+> +					      ARRAY_SIZE(sun5i_gpadc_mfd_cells),
+> +					      NULL, 0, NULL);
+> +	} else if (of_device_is_compatible(pdev->dev.of_node,
+> +					 "allwinner,sun6i-a31-ts")) {
+> +		if (of_property_read_bool(pdev->dev.of_node,
+> +					  "allwinner,ts-attached"))
+> +			ret = mfd_add_devices(sunxi_gpadc_mfd_dev->dev, 0,
+> +					      sun6i_gpadc_mfd_cells_ts,
+> +					      ARRAY_SIZE(sun6i_gpadc_mfd_cells_ts),
+> +					      NULL, 0, NULL);
+> +		else
+> +			ret = mfd_add_devices(sunxi_gpadc_mfd_dev->dev, 0,
+> +					      sun6i_gpadc_mfd_cells,
+> +					      ARRAY_SIZE(sun6i_gpadc_mfd_cells),
+> +					      NULL, 0, NULL);
+> +	}
+
+Please don't use any of_device_is_compatible.
+
+Thanks,
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160721/2b13f92a/attachment-0001.sig>
