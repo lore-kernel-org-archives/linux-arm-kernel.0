@@ -1,83 +1,28 @@
-From: juri.lelli@arm.com (Juri Lelli)
-Date: Thu, 21 Jul 2016 12:43:38 +0100
-Subject: [PATCH v6 1/8] Documentation: arm: define DT cpu
- capacity-dmips-mhz bindings
-In-Reply-To: <20160720185607.GA30072@rob-hp-laptop>
-References: <1468932048-31635-1-git-send-email-juri.lelli@arm.com>
- <1468932048-31635-2-git-send-email-juri.lelli@arm.com>
- <20160720185607.GA30072@rob-hp-laptop>
-Message-ID: <20160721114338.GG30584@e106622-lin>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Thu, 21 Jul 2016 17:27:54 +0530
+Subject: [PATCH 0/2] dra7: add support for two PCIe ports
+Message-ID: <1469102276-14777-1-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+This series adds patches to support 2 PCIe ports simultaneously
+on dra7 based boards.
+None of the supported boards exposes 2 PCIe ports. However these are
+mandatory changes that would be required in order to support
+2 PCIe ports.
 
-On 20/07/16 13:56, Rob Herring wrote:
-> On Tue, Jul 19, 2016 at 01:40:41PM +0100, Juri Lelli wrote:
-> > ARM systems may be configured to have cpus with different power/performance
-> > characteristics within the same chip. In this case, additional information
-> > has to be made available to the kernel (the scheduler in particular) for it
-> > to be aware of such differences and take decisions accordingly.
-> > 
-> > Therefore, this patch aims at standardizing cpu capacities device tree
-> > bindings for ARM platforms. Bindings define cpu capacity-dmips-mhz
-> > parameter, to allow operating systems to retrieve such information from
-> > the device tree and initialize related kernel structures, paving the way
-> > for common code in the kernel to deal with heterogeneity.
-> > 
-> > Cc: Rob Herring <robh+dt@kernel.org>
-> > Cc: Pawel Moll <pawel.moll@arm.com>
-> > Cc: Mark Rutland <mark.rutland@arm.com>
-> > Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-> > Cc: Kumar Gala <galak@codeaurora.org>
-> > Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > Cc: Olof Johansson <olof@lixom.net>
-> > Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> > Cc: Paul Walmsley <paul@pwsan.com>
-> > Cc: Linus Walleij <linus.walleij@linaro.org>
-> > Cc: Chen-Yu Tsai <wens@csie.org>
-> > Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> > Cc: devicetree at vger.kernel.org
-> > Signed-off-by: Juri Lelli <juri.lelli@arm.com>
-> > ---
-> > 
-> > Changes from v1:
-> >  - removed section regarding capacity-scale
-> >  - added information regarding normalization
-> > 
-> > Changes from v4:
-> >  - binding changed to capacity-dmips-mhz
-> >  - sections and changelod updated accordingly
-> > 
-> > Changes from v5:
-> >  - addressed Mark and Vincent comments
-> > ---
-> >  .../devicetree/bindings/arm/cpu-capacity.txt       | 236 +++++++++++++++++++++
-> >  Documentation/devicetree/bindings/arm/cpus.txt     |  10 +
-> >  2 files changed, 246 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/arm/cpu-capacity.txt
-> 
-> I guess I'm okay with the scaled values, so:
-> 
-> Acked-by: Rob Herring <robh@kernel.org>
-> 
+This series has been tested to see if there are regressions with 1
+PCIe port. Though testing of 2 PCIe ports is not done
+while sending this patch series, it has been verified in
+few of the customer boards.
 
-Thanks!
+Kishon Vijay Abraham I (2):
+  ARM: dts: DRA7: Add "linux,pci-domain" property for pci dt nodes
+  ARM: DRA7: select PCI_DOMAINS config
 
-> [...]
-> 
-> > +Example 2 (ARM 32-bit, 4-cpu system, two clusters,
-> > +	   cpus 0,1 at 1GHz, cpus 2,3 at 500MHz):
-> > +capacities-dmips-mhz are scaled w.r.t. 2 (cpu at 0 and cpu at 1), this means that first
-> > +cpu at 0 and cpu at 1 are twice fast than cpu at 2 and cpu at 3 (at the same frequency)
-> 
-> This example is a bit confusing with both the capacity and frequency 
-> being half. I also find it a bit unrealistic to have a 2x performance 
-> difference on the same micro arch. But it is all just an example...
-> 
+ arch/arm/boot/dts/dra7.dtsi |    2 ++
+ arch/arm/mach-omap2/Kconfig |    1 +
+ 2 files changed, 3 insertions(+)
 
-Right, it's a fake example just to highlight how the values are used.
-
-Best,
-
-- Juri
+-- 
+1.7.9.5
