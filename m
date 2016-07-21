@@ -1,41 +1,46 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 21 Jul 2016 17:27:55 +0530
-Subject: [PATCH 1/2] ARM: dts: DRA7: Add "linux,
- pci-domain" property for pci dt nodes
-In-Reply-To: <1469102276-14777-1-git-send-email-kishon@ti.com>
-References: <1469102276-14777-1-git-send-email-kishon@ti.com>
-Message-ID: <1469102276-14777-2-git-send-email-kishon@ti.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 21 Jul 2016 13:01:12 +0100
+Subject: [PATCH] kvm: arm: Enforce some NS-SVC initialisation
+Message-ID: <5322cdb9cb397741d15b60c6693ad39dbf74b6d5.1469101945.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since DRA7 has multiple PCIe Rootcomplex, add "linux,pci-domain"
-property to assign a PCI domain number to each of the host
-bridges.
+Since the non-secure copies of banked registers lack architecturally
+defined reset values, there is no actual guarantee when entering in Hyp
+from secure-only firmware that the non-secure PL1 state will look the
+way that kernel entry (in particular the decompressor stub) expects.
+So far, we've been getting away with it thanks to implementation details
+of ARMv7 cores and/or bootloader behaviour, but for the sake of forwards
+compatibility let's try to ensure that we have a minimally sane state
+before dropping down into it.
 
-Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 ---
- arch/arm/boot/dts/dra7.dtsi |    2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/kernel/hyp-stub.S | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-index 3a8f397..b275f80 100644
---- a/arch/arm/boot/dts/dra7.dtsi
-+++ b/arch/arm/boot/dts/dra7.dtsi
-@@ -253,6 +253,7 @@
- 					  0x82000000 0 0x20013000 0x13000 0 0xffed000>;
- 				#interrupt-cells = <1>;
- 				num-lanes = <1>;
-+				linux,pci-domain = <0>;
- 				ti,hwmods = "pcie1";
- 				phys = <&pcie1_phy>;
- 				phy-names = "pcie-phy0";
-@@ -288,6 +289,7 @@
- 					  0x82000000 0 0x30013000 0x13000 0 0xffed000>;
- 				#interrupt-cells = <1>;
- 				num-lanes = <1>;
-+				linux,pci-domain = <1>;
- 				ti,hwmods = "pcie2";
- 				phys = <&pcie2_phy>;
- 				phy-names = "pcie-phy0";
+diff --git a/arch/arm/kernel/hyp-stub.S b/arch/arm/kernel/hyp-stub.S
+index 0b1e4a93d67e..7de3fe15ab21 100644
+--- a/arch/arm/kernel/hyp-stub.S
++++ b/arch/arm/kernel/hyp-stub.S
+@@ -142,6 +142,18 @@ ARM_BE8(orr	r7, r7, #(1 << 25))     @ HSCTLR.EE
+ 	and	r7, #0x1f		@ Preserve HPMN
+ 	mcr	p15, 4, r7, c1, c1, 1	@ HDCR
+ 
++	@ Make sure NS-SVC is initialised appropriately
++	mrc	p15, 0, r7, c1, c0, 0	@ SCTLR
++	orr	r7, #(1 << 5)		@ CP15 barriers enabled
++	bic	r7, #(3 << 19)		@ WXN and UWXN disabled
++	mcr	p15, 0, r7, c1, c0, 0	@ SCTLR
++
++	mrc	p15, 0, r7, c0, c0, 0	@ MIDR
++	mcr	p15, 4, r7, c0, c0, 0	@ VPIDR
++
++	mrc	p15, 0, r7, c0, c0, 5	@ MPIDR
++	mcr	p15, 4, r7, c0, c0, 5	@ VMPIDR
++
+ #if !defined(ZIMAGE) && defined(CONFIG_ARM_ARCH_TIMER)
+ 	@ make CNTP_* and CNTPCT accessible from PL1
+ 	mrc	p15, 0, r7, c0, c1, 1	@ ID_PFR1
 -- 
-1.7.9.5
+2.8.1.dirty
