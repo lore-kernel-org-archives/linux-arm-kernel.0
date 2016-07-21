@@ -1,46 +1,51 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 21 Jul 2016 13:01:12 +0100
-Subject: [PATCH] kvm: arm: Enforce some NS-SVC initialisation
-Message-ID: <5322cdb9cb397741d15b60c6693ad39dbf74b6d5.1469101945.git.robin.murphy@arm.com>
+From: michael.weiser@gmx.de (Michael Weiser)
+Date: Thu, 21 Jul 2016 13:27:01 +0200
+Subject: [PATCH v6] ARM: sun4i: spi: Allow transfers larger than FIFO size
+In-Reply-To: <1439062912-4405-1-git-send-email-oliver@schinagl.nl>
+References: <1439062912-4405-1-git-send-email-oliver@schinagl.nl>
+Message-ID: <20160721112701.GB6610@weiser.dinsnail.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since the non-secure copies of banked registers lack architecturally
-defined reset values, there is no actual guarantee when entering in Hyp
-from secure-only firmware that the non-secure PL1 state will look the
-way that kernel entry (in particular the decompressor stub) expects.
-So far, we've been getting away with it thanks to implementation details
-of ARMv7 cores and/or bootloader behaviour, but for the sake of forwards
-compatibility let's try to ensure that we have a minimally sane state
-before dropping down into it.
+Hi all,
 
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
- arch/arm/kernel/hyp-stub.S | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+On Sat, Aug 08, 2015 at 09:41:51PM +0200, Olliver Schinagl wrote:
 
-diff --git a/arch/arm/kernel/hyp-stub.S b/arch/arm/kernel/hyp-stub.S
-index 0b1e4a93d67e..7de3fe15ab21 100644
---- a/arch/arm/kernel/hyp-stub.S
-+++ b/arch/arm/kernel/hyp-stub.S
-@@ -142,6 +142,18 @@ ARM_BE8(orr	r7, r7, #(1 << 25))     @ HSCTLR.EE
- 	and	r7, #0x1f		@ Preserve HPMN
- 	mcr	p15, 4, r7, c1, c1, 1	@ HDCR
- 
-+	@ Make sure NS-SVC is initialised appropriately
-+	mrc	p15, 0, r7, c1, c0, 0	@ SCTLR
-+	orr	r7, #(1 << 5)		@ CP15 barriers enabled
-+	bic	r7, #(3 << 19)		@ WXN and UWXN disabled
-+	mcr	p15, 0, r7, c1, c0, 0	@ SCTLR
-+
-+	mrc	p15, 0, r7, c0, c0, 0	@ MIDR
-+	mcr	p15, 4, r7, c0, c0, 0	@ VPIDR
-+
-+	mrc	p15, 0, r7, c0, c0, 5	@ MPIDR
-+	mcr	p15, 4, r7, c0, c0, 5	@ VMPIDR
-+
- #if !defined(ZIMAGE) && defined(CONFIG_ARM_ARCH_TIMER)
- 	@ make CNTP_* and CNTPCT accessible from PL1
- 	mrc	p15, 0, r7, c0, c1, 1	@ ID_PFR1
+> Alexandru sent this patch over a year and a half ago, and I believe several
+> tree's have been carrying it since. We've been using this patch on an
+> Olimex OLinuxIno Lime1 and Lime2 using the mmc-spi driver to access SD cards
+> without problems. So bumping this and adding my
+
+I also have a need for this addition since it makes an ENC28J60 SPI
+ethernet controller work on the Cubieboard2. I've successfully tested it
+with 4.6.3 where it still applies cleanly.
+
+(There's is a very minor conflict when applying against current Linus
+master (EINVAL was changed to EMSGSIZE). I can supply a rebased version
+if so desired.)
+
+What is keeping the patch from being merged (i.e. into mainline)?
+
+Thanks!
+Michael
+
+> Tested-by: Olliver Schinagl <oliver@schinagl.nl>
+
+Tested-by: Michael Weiser <michael.weiser@gmx.de>
+
+> Changes from v5as warned by checkpatch. No functional changes.
+>  * Added some newlines to make checkpatch happy. No functional changes.
+
+> Changes from v4:
+>  * use min3() instead of two if statements in sun4i_spi_fill_fifo()
+>  * fix trivial whitespace issue in if statement in sun4i_spi_handler()
+>  * use consistent style in assigning 'reg' in the added functions.
+
+> Alexandru Gagniuc (1):
+>   ARM: sun4i: spi: Allow transfers larger than FIFO size
+
+>  drivers/spi/spi-sun4i.c | 76 +++++++++++++++++++++++++++++++++++++++++++------
+>  1 file changed, 67 insertions(+), 9 deletions(-)
 -- 
-2.8.1.dirty
+Thanks,
+Michael
