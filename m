@@ -1,55 +1,42 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 21 Jul 2016 20:36:14 +0200
-Subject: [PATCH] ARM: mps2: fix typo
-In-Reply-To: <c192d67a-891a-31a3-d919-d1101e1b7db4@arm.com>
-References: <f607bbd274fe705955116ba590d31ac788f402bf.1468744529.git.baruch@tkos.co.il>
- <4283147.1vrh2ZlxD5@wuerfel> <c192d67a-891a-31a3-d919-d1101e1b7db4@arm.com>
-Message-ID: <4431558.vilS2ZKHUM@wuerfel>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 21 Jul 2016 18:45:34 +0000
+Subject: [PATCH v2 02/10] irqchip: add irqchip driver for nuc900
+In-Reply-To: <1885052.EkH2ZADWZS@wuerfel>
+References: <1468135649-19980-1-git-send-email-vw@iommu.org>
+ <16178876.fFBuoBSjbd@wuerfel>
+ <CAKT61h8EkOOkDHou65Uc7NNomJ6Nowvw8o6JnWxNyc0S_=x_JA@mail.gmail.com>
+ <1885052.EkH2ZADWZS@wuerfel>
+Message-ID: <20160721184534.GI5814@io.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, July 21, 2016 4:04:18 PM CEST Sudeep Holla wrote:
+Wan ZongShun,
+
+On Fri, Jul 15, 2016 at 12:02:55PM +0200, Arnd Bergmann wrote:
+> On Friday, July 15, 2016 5:44:50 PM CEST Wan ZongShun wrote:
+> > 2016-07-15 15:00 GMT+08:00 Arnd Bergmann <arnd@arndb.de>:
+> > > On Friday, July 15, 2016 1:15:58 PM CEST Wan Zongshun wrote:
+...
+> > > That assumes that REG_AIC_IPER contains a 32-bit value with one single
+> > > bit set to indicate which IRQ was triggered.
+> > >
+> > > If the difference is only in performance, you could try measuring which
+> > > of the two ends up being faster.
+> > 
+> > It seems hard to measure. I think Do IO operation should be slower
+> > than shift 2. 
 > 
-> On 21/07/16 13:39, Arnd Bergmann wrote:
-> > On Monday, July 18, 2016 11:13:30 AM CEST Vladimir Murzin wrote:
-> >> On 17/07/16 09:35, Baruch Siach wrote:
-> >>> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
-> >>> ---
-> >>>  arch/arm/Kconfig | 2 +-
-> >>>  1 file changed, 1 insertion(+), 1 deletion(-)
-> >>>
-> >>> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> >>> index 90542db1220d..8ebe5d86b707 100644
-> >>> --- a/arch/arm/Kconfig
-> >>> +++ b/arch/arm/Kconfig
-> >>> @@ -901,7 +901,7 @@ config MACH_STM32F429
-> >>>       default y
-> >>>
-> >>>  config ARCH_MPS2
-> >>> -     bool "ARM MPS2 paltform"
-> >>> +     bool "ARM MPS2 platform"
-> >>>       depends on ARM_SINGLE_ARMV7M
-> >>>       select ARM_AMBA
-> >>>       select CLKSRC_MPS2
-> >>>
-> >>
-> >> Reviewed-by: Vladimir Murzin <vladimir.murzin@arm.com>
-> >>
-> >>
-> >
-> > Merged into next/cleanup, thanks!
-> >
+> It depends on how fast that particular I/O path is. A lot of readl()
+> operations are awfully slow, but the hardware design for the interrupt
+> controller may in fact have optimized this to be reasonably fast.
 > 
-> Thanks Arnd, I was thinking on how to organize into branches along with
-> other of/DT refcounting fixes I had for vexpress/scpi code. You made it
-> easy.
+> Another option would be to avoid the shift and just use the raw value
+> of the REG_AIC_IPER register as the hwirq, with a custom map()
+> callback that turns shifts the number read from the DT two bits
+> so it matches the register value.
 
-Oops, I actually miscategorized the patch and shouldn't have applied it
-without your Ack. I'm glad it worked out for you this time. If you get
-into this situation again for one separate patch, feel free to just
-ask us at arm at kernel.org to apply it directly.
+Good idea.  Are the two lsb bits constant or do they need to be masked?
 
-In doubt, just send more branches (one per topic) than might be needed
-and let us deal with how to split them up into our branches.
+thx,
 
-	Arnd
+Jason.
