@@ -1,118 +1,135 @@
-From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Thu, 21 Jul 2016 16:12:44 -0400
-Subject: [PATCH 06/12] gpio: Add Aspeed driver
-In-Reply-To: <1468994313-13538-7-git-send-email-andrew@aj.id.au>
-References: <1468994313-13538-1-git-send-email-andrew@aj.id.au>
- <1468994313-13538-7-git-send-email-andrew@aj.id.au>
-Message-ID: <CAP=VYLrJfRmKOoDWTpBrD5+iPdX6J9r609FzZ0CkzDd7vGBWyw@mail.gmail.com>
+From: mirza.krak@gmail.com (Mirza Krak)
+Date: Thu, 21 Jul 2016 22:42:51 +0200
+Subject: [RFC 6/6] bus: Add support for Tegra NOR controller
+In-Reply-To: <f6df33eb-53ae-699b-9e1f-69eb7fed7da0@nvidia.com>
+References: <1468935397-11926-1-git-send-email-mirza.krak@gmail.com>
+ <1468935397-11926-7-git-send-email-mirza.krak@gmail.com>
+ <f6df33eb-53ae-699b-9e1f-69eb7fed7da0@nvidia.com>
+Message-ID: <CALw8SCVy4ud5_+gS3C8WeyTCV0m_4R2xjdEY4vCKEq_3-aFanw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 20, 2016 at 1:58 AM, Andrew Jeffery <andrew@aj.id.au> wrote:
-> From: Joel Stanley <joel@jms.id.au>
+2016-07-21 12:15 GMT+02:00 Jon Hunter <jonathanh@nvidia.com>:
 >
-> The Aspeed SoCs contain GPIOs grouped by letter, where each letter group
-> contains 8 pins. The GPIO letter groups are then banked in sets of four
-> in the register layout.
+> On 19/07/16 14:36, Mirza Krak wrote:
+>> From: Mirza Krak <mirza.krak@gmail.com>
+>> +config TEGRA_NOR
+>> +     tristate "Nvidia Tegra NOR flash bus driver a.k.a GMI/SNOR"
+>> +             depends on ARCH_TEGRA_2x_SOC || ARCH_TEGRA_3x_SOC
+>> +             depends on OF
+>> +             help
+>> +                     Driver for NOR flash bus found on Tegra30/20 SOC`s.
 >
-> The implementation exposes multiple banks through the one driver, and
-> requests and releases pins via the pinctrl subsystem. The hardware
-> supports generation of interrupts with per-pin triggers, and exposes this
-> capability through an irqchip and devicetree.
+> It is actually present on all Tegra's and so I would drop the 30/20.
+
+ACK.
+
+>> +++ b/drivers/bus/tegra-nor.c
+>> @@ -0,0 +1,118 @@
+>> +/*
+>> + * Driver for Nvidia NOR Flash bus a.k.a SNOR/GMI.
+>> + *
+>> + * Copyright (C) 2016 Host Mobility AB. All rights reserved.
+>> + *
+>> + * This file is licensed under the terms of the GNU General Public
+>> + * License version 2. This program is licensed "as is" without any
+>> + * warranty of any kind, whether express or implied.
+>> + */
+>> +
+>> +#include <linux/clk.h>
+>> +#include <linux/io.h>
+>> +#include <linux/mfd/syscon.h>
 >
-> A number of supported features are not yet implemented: Configuration of
-> interrupt direction (ARM or LPC), debouncing, and provides WDT reset
-> tolerance for output ports.
+> Is this needed?
+
+It is not. ACK.
+
 >
-> Signed-off-by: Joel Stanley <joel@jms.id.au>
-> Signed-off-by: Alistair Popple <alistair@popple.id.au>
-> Signed-off-by: Jeremy Kerr <jk@ozlabs.org>
-> Signed-off-by: Andrew Jeffery <andrew@aj.id.au>
-> ---
->  arch/arm/mach-aspeed/Kconfig |   4 +
->  drivers/gpio/Kconfig         |   8 +-
->  drivers/gpio/Makefile        |   1 +
->  drivers/gpio/gpio-aspeed.c   | 456 +++++++++++++++++++++++++++++++++++++++++++
->  4 files changed, 468 insertions(+), 1 deletion(-)
->  create mode 100644 drivers/gpio/gpio-aspeed.c
+>> +#include <linux/module.h>
+>> +#include <linux/of_device.h>
+>> +#include <linux/regmap.h>
 >
-> diff --git a/arch/arm/mach-aspeed/Kconfig b/arch/arm/mach-aspeed/Kconfig
-> index 25a0ae01429e..a52de9d3adfb 100644
-> --- a/arch/arm/mach-aspeed/Kconfig
-> +++ b/arch/arm/mach-aspeed/Kconfig
-> @@ -6,6 +6,10 @@ menuconfig ARCH_ASPEED
->         select ASPEED_WATCHDOG
->         select MOXART_TIMER
->         select PINCTRL
-> +       select GPIOLIB
-> +       select GPIO_ASPEED
-> +       select GPIO_SYSFS
-> +
->         help
->           Say Y here if you want to run your kernel on an ASpeed BMC SoC.
+> Or this?
+
+It is not. ACK.
+
 >
-> diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
-> index 536112fd2466..2c21b5db09cd 100644
-> --- a/drivers/gpio/Kconfig
-> +++ b/drivers/gpio/Kconfig
-> @@ -137,6 +137,13 @@ config GPIO_ATH79
->           Select this option to enable GPIO driver for
->           Atheros AR71XX/AR724X/AR913X SoC devices.
+>> +
+>> +#define TEGRA_NOR_TIMING_REG_COUNT   2
+>> +
+>> +#define TEGRA_NOR_CONFIG                     0x00
+>> +#define TEGRA_NOR_STATUS                     0x04
+>> +#define TEGRA_NOR_ADDR_PTR                   0x08
+>> +#define TEGRA_NOR_AHB_ADDR_PTR               0x0c
+>> +#define TEGRA_NOR_TIMING0                    0x10
+>> +#define TEGRA_NOR_TIMING1                    0x14
+>> +#define TEGRA_NOR_MIO_CONFIG         0x18
+>> +#define TEGRA_NOR_MIO_TIMING         0x1c
+>> +#define TEGRA_NOR_DMA_CONFIG         0x20
+>> +#define TEGRA_NOR_CS_MUX_CONFIG              0x24
 >
-> +config GPIO_ASPEED
-> +       bool "Aspeed GPIO support"
+> Not all of these are used. It is good to define them and I wonder if we
+> should add support for MIO while are at it :-)
 
-Since this is a bool Kconfig...
+We can come back to this once I have all SNOR stuff in order.
 
-> +       depends on (ARCH_ASPEED || COMPILE_TEST) && OF
-> +       select GENERIC_IRQ_CHIP
-> +       help
-> +         Say Y here to support Aspeed AST2400 and AST2500 GPIO controllers.
-> +
+>
+>> +
+>> +#define TEGRA_NOR_CONFIG_GO                          BIT(31)
+>> +
+>> +static const struct of_device_id nor_id_table[] = {
+>> +     /* Tegra30 */
+>
+> I don't think this comment is needed.
 
-[...]
+ACK.
 
- > diff --git a/drivers/gpio/gpio-aspeed.c b/drivers/gpio/gpio-aspeed.c
-> new file mode 100644
-> index 000000000000..7885adc1332a
-> --- /dev/null
-> +++ b/drivers/gpio/gpio-aspeed.c
-> @@ -0,0 +1,456 @@
-> +/*
-> + * Copyright 2015 IBM Corp
-> + *
-> + * Joel Stanley <joel@jms.id.au>
-> + *
-> + * This program is free software; you can redistribute it and/or
-> + * modify it under the terms of the GNU General Public License
-> + * as published by the Free Software Foundation; either version
-> + * 2 of the License, or (at your option) any later version.
-> + */
-> +
-> +#include <linux/module.h>
+>
+>> +     { .compatible = "nvidia,tegra30-nor", .data = NULL, },
+>
+> You don't need to set data to NULL.
 
-...can you please get rid of module.h and all the MODULE_<xyz>
-stuff and use the built in registration?   Alternatively change it to
-a tristate if there is a valid use case for it to be modular.
+ACK.
 
-Thanks.
-Paul.
---
+>
+>> +     /* Tegra20 */
+>> +     { .compatible = "nvidia,tegra20-nor", .data = NULL, },
+>
+> Same here.
 
-> +#include <linux/kernel.h>
-> +#include <linux/init.h>
-> +#include <linux/io.h>
-> +#include <linux/spinlock.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/gpio/driver.h>
-> +#include <linux/pinctrl/consumer.h>
-> +
-> +struct aspeed_gpio {
-> +       struct gpio_chip chip;
-> +       spinlock_t lock;
-> +       void __iomem *base;
-> +       int irq;
-> +       struct irq_chip irq_chip;
-> +       struct irq_domain *irq_domain;
-> +};
-> +
+ACK
+
+>> +static int __init nor_probe(struct platform_device *pdev)
+>> +{
+>
+> I would drop the __init.
+
+ACK.
+
+>> +static struct platform_driver nor_driver = {
+>> +     .driver = {
+>> +             .name           = "tegra-nor",
+>> +             .of_match_table = nor_id_table,
+>> +     },
+>> +};
+>
+> The driver should have a remove function given that we can build as a
+> module.
+
+At the moment I do not know what we would do in a remove function and
+hence me not adding one.
+
+>
+>> +module_platform_driver_probe(nor_driver, nor_probe);
+>
+> I would use "tegra_nor" namespace for all the structs, functions, etc.
+> However, we may prefer to go with GMI and in which case tegra_gmi_probe,
+> etc.
+
+ACK. Who gets the last call on what we should call the driver? It
+seems that we both think GMI is a better name, do we need a third? :).
+
+Thank you Jonathan for your feedback.
+
+Best Regards,
+Mirza
