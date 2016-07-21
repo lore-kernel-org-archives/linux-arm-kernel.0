@@ -1,33 +1,53 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 21 Jul 2016 10:52:53 +0200
-Subject: [PATCH] ARM: exynos_defconfig: Enable bus frequency scaling with
- DEVFREQ/DEVFREQ-Event
-In-Reply-To: <579088FB.2000101@samsung.com>
-References: <CGME20160715013357epcas1p1f7e365ac861b48a56c029e67b9461d60@epcas1p1.samsung.com>
- <1468546426-4482-1-git-send-email-cw00.choi@samsung.com>
- <579088FB.2000101@samsung.com>
-Message-ID: <0b7a7675-f3ef-b78d-d56a-09c2f0029d53@samsung.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 21 Jul 2016 10:56:15 +0200
+Subject: [PATCH 2/3] mmc: sunxi: Set the 'New Timing' register for 8 bits
+ DDR transfers
+In-Reply-To: <bc7b767cad6db159a44c4b98d5b1f3eb53c26bd3.1469082481.git.moinejf@free.fr>
+References: <cover.1469082481.git.moinejf@free.fr>
+ <bc7b767cad6db159a44c4b98d5b1f3eb53c26bd3.1469082481.git.moinejf@free.fr>
+Message-ID: <20160721085615.GG5993@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/21/2016 10:34 AM, Chanwoo Choi wrote:
-> Hi Krzysztof,
-> 
-> Could you please pick this patch?
-> 
-> Regards,
-> Chanwoo Choi
-
 Hi,
 
-The patchset looks good, only the commit message needs some minor
-improvements (I can do that while applying). However it came too late
-for this cycle - after my last pull request for v4.8 ten days ago. I
-won't be able to push anything more so it has to wait for v4.9. I'll
-pick it up after merge window.
+On Wed, Jul 20, 2016 at 08:16:28PM +0200, Jean-Francois Moine wrote:
+> The 'new timing mode' with 8 bits DDR works correctly when the NewTiming
+> register is set.
 
-For the record:
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+What does that mode brings to the table?
 
-Best regards,
-Krzysztof
+> 
+> Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
+> ---
+> Note about the 'new timing mode'.
+> 
+> This patch assumes that, when the new mode is used, the clock driver
+> sets the mode select in the MMC clock and multiplies the clock rate
+> by 2:
+> - MMC side:
+>   - with a timing 8 bits DDR at 50MHz, the MMC driver calls
+>     clk_set_rate() with a rate 50*2 = 100MHz,
+> - clock side:
+>   - the clock driver sets the hardware MMC clock to 100*2 = 200MHz,
+>   - setting the 'mode select' of the hardware MMC clock divides the
+>     rate by 2,
+> - MMC side:
+>   - setting the MMC clock divider register to 1 divides the rate by 2.
+> So, the final rate is 50MHz.
+
+What happens if you actually want to set it to 100MHz?
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160721/39cd3e0c/attachment.sig>
