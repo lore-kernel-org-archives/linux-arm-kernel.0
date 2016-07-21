@@ -1,174 +1,393 @@
-From: megous@megous.com (=?UTF-8?Q?Ond=c5=99ej_Jirman?=)
-Date: Thu, 21 Jul 2016 11:52:15 +0200
-Subject: [PATCH v2 06/14] ARM: sun8i: clk: Add clk-factor rate application
- method
-In-Reply-To: <20160721094852.GI5993@lukather>
-References: <20160625034511.7966-1-megous@megous.com>
- <20160625034511.7966-7-megous@megous.com> <20160630204001.GC5485@lukather>
- <0b71ed7e-98c9-109e-85e6-ceb95131d88a@megous.com>
- <20160715085356.GR4761@lukather>
- <085e185a-ac76-dd3f-9b0e-a7dc9c0c09f3@megous.com>
- <20160721094852.GI5993@lukather>
-Message-ID: <c46d1af5-9410-402a-7144-48b396ef6da7@megous.com>
+From: architt@codeaurora.org (Archit Taneja)
+Date: Thu, 21 Jul 2016 15:23:18 +0530
+Subject: [PATCH v2 4/7] drm/bridge: Add RGB to VGA bridge support
+In-Reply-To: <20160720095857.12297-5-maxime.ripard@free-electrons.com>
+References: <20160720095857.12297-1-maxime.ripard@free-electrons.com>
+ <20160720095857.12297-5-maxime.ripard@free-electrons.com>
+Message-ID: <57909B8E.7030105@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
+On 07/20/2016 03:28 PM, Maxime Ripard wrote:
+> Some boards have an entirely passive RGB to VGA bridge, based on either
+> DACs or resistor ladders.
+>
+> Those might or might not have an i2c bus routed to the VGA connector in
+> order to access the screen EDIDs.
+>
+> Add a bridge that doesn't do anything but expose the modes available on the
+> screen, either based on the EDIDs if available, or based on the XGA
+> standards.
 
-On 21.7.2016 11:48, Maxime Ripard wrote:
-> On Fri, Jul 15, 2016 at 12:38:54PM +0200, Ond?ej Jirman wrote:
->> On 15.7.2016 10:53, Maxime Ripard wrote:
->>> On Fri, Jul 01, 2016 at 02:50:57AM +0200, Ond?ej Jirman wrote:
->>>>>>  /**
->>>>>> + * sun8i_h3_apply_pll1_factors() - applies n, k, m, p factors to the
->>>>>> + * register using an algorithm that tries to reserve the PLL lock
->>>>>> + */
->>>>>> +
->>>>>> +static void sun8i_h3_apply_pll1_factors(struct clk_factors *factors, struct factors_request *req)
->>>>>> +{
->>>>>> +	const struct clk_factors_config *config = factors->config;
->>>>>> +	u32 reg;
->>>>>> +
->>>>>> +	/* Fetch the register value */
->>>>>> +	reg = readl(factors->reg);
->>>>>> +
->>>>>> +	if (FACTOR_GET(config->pshift, config->pwidth, reg) < req->p) {
->>>>>> +		reg = FACTOR_SET(config->pshift, config->pwidth, reg, req->p);
->>>>>> +
->>>>>> +		writel(reg, factors->reg);
->>>>>> +		__delay(2000);
->>>>>> +	}
->>>>>
->>>>> So there was some doubts about the fact that P was being used, or at
->>>>> least that it was useful.
->>>>
->>>> p is necessary to reduce frequencies below 288 MHz according to the
->>>> datasheet.
->>>
->>> Yes, but you could reach those frequencies without P, too, and it's
->>> not part of any OPP provided by Allwinner.
->>
->> The arisc firmware for H3 contains table of factors for frequences from
->> 0 to 2GHz and, P is used below 240MHz. M is never used, BTW. (other
->> datasheets specify M as for testing use only, whatever that means - not
->> H3, but it seems it's the same PLL block)
-> 
-> Interesting. Which SoCs in particular?
-> 
->>>>>> +	if (FACTOR_GET(config->mshift, config->mwidth, reg) < req->m) {
->>>>>> +		reg = FACTOR_SET(config->mshift, config->mwidth, reg, req->m);
->>>>>> +
->>>>>> +		writel(reg, factors->reg);
->>>>>> +		__delay(2000);
->>>>>> +	}
->>>>>> +
->>>>>> +	reg = FACTOR_SET(config->nshift, config->nwidth, reg, req->n);
->>>>>> +	reg = FACTOR_SET(config->kshift, config->kwidth, reg, req->k);
->>>>>> +
->>>>>> +	writel(reg, factors->reg);
->>>>>> +	__delay(20);
->>>>>> +
->>>>>> +	while (!(readl(factors->reg) & (1 << config->lock)));
->>>>>
->>>>> So, they are applying the dividers first, and then applying the
->>>>> multipliers, and then wait for the PLL to stabilize.
->>>>
->>>> Not exactly, first we are increasing dividers if the new dividers are
->>>> higher that that what's already set. This ensures that because
->>>> application of dividers is immediate by the design of the PLL, the
->>>> application of multipliers isn't. So the VCO would still run at the same
->>>> frequency for a while gradually rising to a new value for example,
->>>> while the dividers would be reduced immediately. Leading to crash.
->>>>
->>>> PLL
->>>> --------------------------
->>>> PRE DIV(f0) -> VCO(f1) -> POST DIV(f2)
->>>>    P             K,N           M
->>>>
->>>> Example: (we set all factors at once, reducing dividers and multipliers
->>>> at the same time at 0ms - this should lead to no change in the output
->>>> frequency, but...)
->>>>
->>>> -1ms: f0 = 24MHz, f1 = 2GHz,   f2 = 1GHz
->>>>  0ms: f0 = 24MHz, f1 = 2GHz,   f2 = 2GHz       - boom
->>>>  1ms: f0 = 24MHz, f1 = 1.5GHz, f2 = 1.5GHz
->>>>  2ms: f0 = 24MHz, f1 = 1GHz,   f2 = 1GHz
->>>>
->>>> The current code crashes exactly at boom, you don't get any more
->>>> instructions to execute.
->>>>
->>>> See.
->>>>
->>>> So this patch first increases dividers (only if necessary), changes
->>>> multipliers and waits for change to happen (takes around 2000 cycles),
->>>> and then decreases dividers (only if necessary).
->>>>
->>>> So we get:
->>>>
->>>> -1ms: f0 = 24MHz, f1 = 2GHz,   f2 = 1GHz
->>>>  0ms: f0 = 24MHz, f1 = 2GHz,   f2 = 1GHz   - no boom, multiplier
->>>>                                              reduced
->>>>  1ms: f0 = 24MHz, f1 = 1.5GHz, f2 = 0.75GHz
->>>> 1.9ms: f0 = 24MHz, f1 = 1GHz,   f2 = 0.5GHz - we got PLL sync
->>>>  2ms: f0 = 24MHz, f1 = 1GHz,   f2 = 1GHz   - and here we reduce divider
->>>> at last
->>>
->>> Awesome explanation, thanks!
->>>
->>> So I guess it really all boils down to the fact that the CPU is
->>> clocked way outside of it's operating frequency while the PLL
->>> stabilizes, right?
->>
->> It may be, depending on the factors before and after change. I haven't
->> tested what factors the mainline kernel calculates for each frequency.
->> The arisc never uses M, and only uses P at frequencies that would not
->> allow for this behavior.
->>
->> I created a test program for arisc that runs a loop on the main CPU
->> using msgbox to send pings to the arisc CPU, and the vary the PLL1
->> randomly from the arisc, and haven't been able to lockup the main CPU
->> yet with either method.
->>
->> There's also AXI clock, that depends on PLL1. Arisc firmware uses the
->> same method to change it while changing CPUX clock. If the clock would
->> rise above certain frequency, AXI divider is increased before the PLL1
->> change. If it would fall below certain frequency it is decreased after
->> the PLL1 change.
-> 
-> If we ever need to change that, we can always rely on a clock notifier
-> to adjust the divider before the change happen (and support all the
-> scenarios, like the clock change has been aborted).
-> 
->>> If so, then yes, trying to switch to the 24MHz oscillator before
->>> applying the factors, and then switching back when the PLL is stable
->>> would be a nice solution.
->>>
->>> I just checked, and all the SoCs we've had so far have that
->>> possibility, so if it works, for now, I'd like to stick to that.
->>
->> It would need to be tested. U-boot does the change only once, while the
->> kernel would be doing it all the time and between various frequencies
->> and PLL settings. So the issues may show up with this solution too.
-> 
-> That would have the benefit of being quite easy to document, not be a
-> huge amount of code and it would work on all the CPUs PLLs we have so
-> far, so still, a pretty big win. If it doesn't, of course, we don't
-> really have the choice.
+Our eventual aim is to separate out the connectors from the bridge
+drivers wherever possible. In the future, a KMS driver using the
+bridge would be responsible for establishing the links between
+the bridge and encoder, and the encoder and connector.
 
-It's probably more code though. It has to access different register from
-the one that is already defined in dts, which would add a lot of code
-and require dts changes. The original patch I sent is simpler than that.
+If in the future we remove the connector pieces from this driver
+to create a separate generic VGA connector driver, we'll end up
+with a bridge driver whose main functionality is to convert RGB
+signals to VGA. The EDID parts would move to the VGA connector
+driver. In your platform's case, there is no software needed
+to translate RGB to VGA, but maybe in the future, we might need
+to add an optional regulator in the driver to support another
+platform. Therefore, the bridge driver would still be handy to
+have.
 
-regards,
-  Ondrej
+Keeping this in consideration, I think this driver (and the DT
+binding) should be called "dumb-rgb-to-vga-bridge", or
+"rgb-to-vga-bridge" since that's what the bridge HW primarily
+does.
 
-> Maxime
-> 
+Thanks,
+Archit
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160721/7bc0138f/attachment.sig>
+>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>   .../bindings/display/bridge/dumb-vga.txt           |  54 +++++
+>   drivers/gpu/drm/bridge/Kconfig                     |   6 +
+>   drivers/gpu/drm/bridge/Makefile                    |   1 +
+>   drivers/gpu/drm/bridge/dumb-vga.c                  | 232 +++++++++++++++++++++
+>   4 files changed, 293 insertions(+)
+>   create mode 100644 Documentation/devicetree/bindings/display/bridge/dumb-vga.txt
+>   create mode 100644 drivers/gpu/drm/bridge/dumb-vga.c
+>
+> diff --git a/Documentation/devicetree/bindings/display/bridge/dumb-vga.txt b/Documentation/devicetree/bindings/display/bridge/dumb-vga.txt
+> new file mode 100644
+> index 000000000000..0056ffa2b31d
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/display/bridge/dumb-vga.txt
+> @@ -0,0 +1,54 @@
+> +Passive RGB to VGA bridge
+> +-------------------------
+> +
+> +This binding is aimed for entirely passive RGB to VGA bridges that do not
+> +require any configuration.
+> +
+> +Required properties:
+> +
+> +- compatible: Must be "dumb-vga-bridge"
+> +
+> +Required nodes:
+> +
+> +This device has two video ports. Their connections are modeled using the OF
+> +graph bindings specified in Documentation/devicetree/bindings/graph.txt.
+> +
+> +- Video port 0 for RGB input
+> +- Video port 1 for VGA output
+> +
+> +
+> +Example
+> +-------
+> +
+> +bridge {
+> +	compatible = "dumb-vga-bridge";
+> +	#address-cells = <1>;
+> +	#size-cells = <0>;
+> +
+> +	ports {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		port at 0 {
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +			reg = <0>;
+> +
+> +			vga_bridge_in: endpoint at 0 {
+> +				reg = <0>;
+> +				remote-endpoint = <&tcon0_out_vga>;
+> +			};
+> +		};
+> +
+> +		port at 1 {
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +			reg = <1>;
+> +
+> +			vga_bridge_out: endpoint at 0 {
+> +				reg = <0>;
+> +				remote-endpoint = <&vga_con_in>;
+> +			};
+> +		};
+> +	};
+> +};
+> diff --git a/drivers/gpu/drm/bridge/Kconfig b/drivers/gpu/drm/bridge/Kconfig
+> index a141921445f4..4a6560714397 100644
+> --- a/drivers/gpu/drm/bridge/Kconfig
+> +++ b/drivers/gpu/drm/bridge/Kconfig
+> @@ -17,6 +17,12 @@ config DRM_ANALOGIX_ANX78XX
+>   	  the HDMI output of an application processor to MyDP
+>   	  or DisplayPort.
+>
+> +config DRM_DUMB_VGA
+> +	tristate "Dumb RGB to VGA Bridge support"
+> +	select DRM_KMS_HELPER
+> +	help
+> +	  Support for passive RGB to VGA bridges
+> +
+>   config DRM_DW_HDMI
+>   	tristate
+>   	select DRM_KMS_HELPER
+> diff --git a/drivers/gpu/drm/bridge/Makefile b/drivers/gpu/drm/bridge/Makefile
+> index bfec9f8cb9d2..413d783828bb 100644
+> --- a/drivers/gpu/drm/bridge/Makefile
+> +++ b/drivers/gpu/drm/bridge/Makefile
+> @@ -1,6 +1,7 @@
+>   ccflags-y := -Iinclude/drm
+>
+>   obj-$(CONFIG_DRM_ANALOGIX_ANX78XX) += analogix-anx78xx.o
+> +obj-$(CONFIG_DRM_DUMB_VGA) += dumb-vga.o
+>   obj-$(CONFIG_DRM_DW_HDMI) += dw-hdmi.o
+>   obj-$(CONFIG_DRM_DW_HDMI_AHB_AUDIO) += dw-hdmi-ahb-audio.o
+>   obj-$(CONFIG_DRM_NXP_PTN3460) += nxp-ptn3460.o
+> diff --git a/drivers/gpu/drm/bridge/dumb-vga.c b/drivers/gpu/drm/bridge/dumb-vga.c
+> new file mode 100644
+> index 000000000000..c197be591fb6
+> --- /dev/null
+> +++ b/drivers/gpu/drm/bridge/dumb-vga.c
+> @@ -0,0 +1,232 @@
+> +
+> +#include <linux/module.h>
+> +#include <linux/of_graph.h>
+> +
+> +#include <drm/drmP.h>
+> +#include <drm/drm_atomic_helper.h>
+> +#include <drm/drm_crtc.h>
+> +#include <drm/drm_crtc_helper.h>
+> +
+> +struct dumb_vga {
+> +	struct drm_bridge	bridge;
+> +	struct drm_connector	connector;
+> +
+> +	struct i2c_adapter	*ddc;
+> +};
+> +
+> +static inline struct dumb_vga *
+> +drm_bridge_to_dumb_vga(struct drm_bridge *bridge)
+> +{
+> +	return container_of(bridge, struct dumb_vga, bridge);
+> +}
+> +
+> +static inline struct dumb_vga *
+> +drm_connector_to_dumb_vga(struct drm_connector *connector)
+> +{
+> +	return container_of(connector, struct dumb_vga, connector);
+> +}
+> +
+> +static int dumb_vga_get_modes(struct drm_connector *connector)
+> +{
+> +	struct dumb_vga *vga = drm_connector_to_dumb_vga(connector);
+> +	struct edid *edid;
+> +	int ret;
+> +
+> +	if (IS_ERR(vga->ddc))
+> +		goto fallback;
+> +
+> +	edid = drm_get_edid(connector, vga->ddc);
+> +	if (!edid) {
+> +		DRM_INFO("EDID readout failed, falling back to standard modes\n");
+> +		goto fallback;
+> +	}
+> +
+> +	drm_mode_connector_update_edid_property(connector, edid);
+> +	return drm_add_edid_modes(connector, edid);
+> +
+> +fallback:
+> +	/*
+> +	 * In case we cannot retrieve the EDIDs (broken or missing i2c
+> +	 * bus), fallback on the XGA standards
+> +	 */
+> +	ret = drm_add_modes_noedid(connector, 1920, 1200);
+> +
+> +	/* And prefer a mode pretty much anyone can handle */
+> +	drm_set_preferred_mode(connector, 1024, 768);
+> +
+> +	return ret;
+> +}
+> +
+> +static struct drm_encoder *
+> +dumb_vga_best_encoder(struct drm_connector *connector)
+> +{
+> +	struct dumb_vga *vga = drm_connector_to_dumb_vga(connector);
+> +
+> +	return vga->bridge.encoder;
+> +}
+> +
+> +static struct drm_connector_helper_funcs dumb_vga_con_helper_funcs = {
+> +	.get_modes	= dumb_vga_get_modes,
+> +	.best_encoder	= dumb_vga_best_encoder,
+> +};
+> +
+> +static enum drm_connector_status
+> +dumb_vga_connector_detect(struct drm_connector *connector, bool force)
+> +{
+> +	struct dumb_vga *vga = drm_connector_to_dumb_vga(connector);
+> +
+> +	/*
+> +	 * Even if we have an I2C bus, we can't assume that the cable
+> +	 * is disconnected if drm_probe_ddc. Some cables don't wire
+> +	 * the DDC pins, or the I2C bus might be disfunctional.
+> +	 */
+> +	if (!IS_ERR(vga->ddc) && drm_probe_ddc(vga->ddc))
+> +		return connector_status_connected;
+> +
+> +	return connector_status_unknown;
+> +}
+> +
+> +static void
+> +dumb_vga_connector_destroy(struct drm_connector *connector)
+> +{
+> +	drm_connector_cleanup(connector);
+> +}
+> +
+> +static struct drm_connector_funcs dumb_vga_con_funcs = {
+> +	.dpms			= drm_atomic_helper_connector_dpms,
+> +	.detect			= dumb_vga_connector_detect,
+> +	.fill_modes		= drm_helper_probe_single_connector_modes,
+> +	.destroy		= dumb_vga_connector_destroy,
+> +	.reset			= drm_atomic_helper_connector_reset,
+> +	.atomic_duplicate_state	= drm_atomic_helper_connector_duplicate_state,
+> +	.atomic_destroy_state	= drm_atomic_helper_connector_destroy_state,
+> +};
+> +
+> +static int dumb_vga_attach(struct drm_bridge *bridge)
+> +{
+> +	struct dumb_vga *vga = drm_bridge_to_dumb_vga(bridge);
+> +	int ret;
+> +
+> +	if (!bridge->encoder) {
+> +		DRM_ERROR("Missing encoder\n");
+> +		return -ENODEV;
+> +	}
+> +
+> +	drm_connector_helper_add(&vga->connector,
+> +				 &dumb_vga_con_helper_funcs);
+> +	ret = drm_connector_init(bridge->dev, &vga->connector,
+> +				 &dumb_vga_con_funcs, DRM_MODE_CONNECTOR_VGA);
+> +	if (ret) {
+> +		DRM_ERROR("Failed to initialize connector\n");
+> +		return ret;
+> +	}
+> +
+> +	drm_mode_connector_attach_encoder(&vga->connector,
+> +					  bridge->encoder);
+> +
+> +	return 0;
+> +}
+> +
+> +static void dumb_vga_nop(struct drm_bridge *bridge) {};
+> +
+> +static struct drm_bridge_funcs dumb_vga_bridge_funcs = {
+> +	.attach		= dumb_vga_attach,
+> +	.enable		= dumb_vga_nop,
+> +	.disable	= dumb_vga_nop,
+> +	.pre_enable	= dumb_vga_nop,
+> +	.post_disable	= dumb_vga_nop,
+
+We don't need to install nops here, the drm bridge core skips
+calling the op if it can't find it.
+
+> +};
+> +
+> +static struct i2c_adapter *dumb_vga_retrieve_ddc(struct device *dev)
+> +{
+> +	struct device_node *end_node, *phandle, *remote;
+> +	struct i2c_adapter *ddc;
+> +
+> +	end_node = of_graph_get_endpoint_by_regs(dev->of_node, 1, -1);
+> +	if (!end_node) {
+> +		dev_err(dev, "Missing connector endpoint\n");
+> +		return ERR_PTR(-ENODEV);
+> +	}
+> +
+> +	remote = of_graph_get_remote_port_parent(end_node);
+> +	of_node_put(end_node);
+> +	if (!remote) {
+> +		dev_err(dev, "Enable to parse remote node\n");
+> +		return ERR_PTR(-EINVAL);
+> +	}
+> +
+> +	phandle = of_parse_phandle(remote, "ddc-i2c-bus", 0);
+> +	of_node_put(remote);
+> +	if (!phandle)
+> +		return ERR_PTR(-ENODEV);
+> +
+> +	ddc = of_get_i2c_adapter_by_node(phandle);
+> +	of_node_put(phandle);
+> +	if (!ddc)
+> +		return ERR_PTR(-EPROBE_DEFER);
+> +
+> +	return ddc;
+> +}
+> +
+> +static int dumb_vga_probe(struct platform_device *pdev)
+> +{
+> +	struct dumb_vga *vga;
+> +	int ret;
+> +
+> +	vga = devm_kzalloc(&pdev->dev, sizeof(*vga), GFP_KERNEL);
+> +	if (!vga)
+> +		return -ENOMEM;
+> +	platform_set_drvdata(pdev, vga);
+> +
+> +	vga->ddc = dumb_vga_retrieve_ddc(&pdev->dev);
+> +	if (IS_ERR(vga->ddc)) {
+> +		if (PTR_ERR(vga->ddc) == -ENODEV) {
+> +			dev_info(&pdev->dev,
+> +				 "No i2c bus specified... Disabling EDID readout\n");
+> +		} else {
+> +			dev_err(&pdev->dev, "Couldn't retrieve i2c bus\n");
+> +			return PTR_ERR(vga->ddc);
+> +		}
+> +	}
+> +
+> +	vga->bridge.funcs = &dumb_vga_bridge_funcs;
+> +	vga->bridge.of_node = pdev->dev.of_node;
+> +
+> +	ret = drm_bridge_add(&vga->bridge);
+> +	if (ret && !IS_ERR(vga->ddc))
+> +		i2c_put_adapter(vga->ddc);
+> +
+> +	return ret;
+> +}
+> +
+> +static int dumb_vga_remove(struct platform_device *pdev)
+> +{
+> +	struct dumb_vga *vga = platform_get_drvdata(pdev);
+> +
+> +	drm_bridge_remove(&vga->bridge);
+> +
+> +	if (!IS_ERR(vga->ddc))
+> +		i2c_put_adapter(vga->ddc);
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct of_device_id dumb_vga_match[] = {
+> +	{ .compatible = "dumb-vga-bridge" },
+> +	{},
+> +};
+> +MODULE_DEVICE_TABLE(of, dumb_vga_match);
+> +
+> +struct platform_driver dumb_vga_driver = {
+> +	.probe	= dumb_vga_probe,
+> +	.remove	= dumb_vga_remove,
+> +	.driver		= {
+> +		.name		= "dumb-vga-bridge",
+> +		.of_match_table	= dumb_vga_match,
+> +	},
+> +};
+> +module_platform_driver(dumb_vga_driver);
+> +
+> +MODULE_AUTHOR("Maxime Ripard <maxime.ripard@free-electrons.com>");
+> +MODULE_DESCRIPTION("Dumb RGB to VGA bridge driver");
+> +MODULE_LICENSE("GPL");
+>
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
