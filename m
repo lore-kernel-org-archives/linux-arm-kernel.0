@@ -1,42 +1,42 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 21 Jul 2016 18:45:34 +0000
-Subject: [PATCH v2 02/10] irqchip: add irqchip driver for nuc900
-In-Reply-To: <1885052.EkH2ZADWZS@wuerfel>
-References: <1468135649-19980-1-git-send-email-vw@iommu.org>
- <16178876.fFBuoBSjbd@wuerfel>
- <CAKT61h8EkOOkDHou65Uc7NNomJ6Nowvw8o6JnWxNyc0S_=x_JA@mail.gmail.com>
- <1885052.EkH2ZADWZS@wuerfel>
-Message-ID: <20160721184534.GI5814@io.lakedaemon.net>
+From: xhnjupt@gmail.com (Han Xu)
+Date: Thu, 21 Jul 2016 14:34:42 -0500
+Subject: [PATCH v2 1/9] mtd:fsl-quadspi:use the property fields of SPI-NOR
+In-Reply-To: <20160721170955.GA91127@google.com>
+References: <1461307192-866-1-git-send-email-B56489@freescale.com>
+ <DB5PR0401MB191200E18A336E0BE5318D1694240@DB5PR0401MB1912.eurprd04.prod.outlook.com>
+ <VI1PR0401MB26403FE955617EFEB3DD809294090@VI1PR0401MB2640.eurprd04.prod.outlook.com>
+ <20160721170955.GA91127@google.com>
+Message-ID: <CA+EcR23zC=9542Ds5-7KJ69F1MuQmJEcoVzmNgb-9wHbSyfWdw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Wan ZongShun,
+On Thu, Jul 21, 2016 at 12:09 PM, Brian Norris
+<computersforpeace@gmail.com> wrote:
+> On Thu, Jul 21, 2016 at 05:58:48AM +0000, Yunhui Cui wrote:
+>> Could you please help to review this patch set.
+>> This patch set is very importmant for fsl-quadspi driver.
+>
+> I didn't want this to be my only comment, but since you're pinging
+> again...
+>
+> Your patchset doesn't build on the latest. You need to refresh.
+>
+> Also, has Han Xu reviewed this?
 
-On Fri, Jul 15, 2016 at 12:02:55PM +0200, Arnd Bergmann wrote:
-> On Friday, July 15, 2016 5:44:50 PM CEST Wan ZongShun wrote:
-> > 2016-07-15 15:00 GMT+08:00 Arnd Bergmann <arnd@arndb.de>:
-> > > On Friday, July 15, 2016 1:15:58 PM CEST Wan Zongshun wrote:
-...
-> > > That assumes that REG_AIC_IPER contains a 32-bit value with one single
-> > > bit set to indicate which IRQ was triggered.
-> > >
-> > > If the difference is only in performance, you could try measuring which
-> > > of the two ends up being faster.
-> > 
-> > It seems hard to measure. I think Do IO operation should be slower
-> > than shift 2. 
-> 
-> It depends on how fast that particular I/O path is. A lot of readl()
-> operations are awfully slow, but the hardware design for the interrupt
-> controller may in fact have optimized this to be reasonably fast.
-> 
-> Another option would be to avoid the shift and just use the raw value
-> of the REG_AIC_IPER register as the hwirq, with a custom map()
-> callback that turns shifts the number read from the DT two bits
-> so it matches the register value.
+I sent comments for v1 in [PATCH 6/9] mtd: spi-nor: Support R/W for
+S25FS-S family flash,
+but nothing changed in v2. Brian, could you please check my comment
+which related to spi-nor
+driver.
 
-Good idea.  Are the two lsb bits constant or do they need to be masked?
+>
+> ______________________________________________________
+> Linux MTD discussion mailing list
+> http://lists.infradead.org/mailman/listinfo/linux-mtd/
 
-thx,
 
-Jason.
+
+-- 
+Sincerely,
+
+Han XU
