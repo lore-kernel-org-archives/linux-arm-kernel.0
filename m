@@ -1,206 +1,113 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 21 Jul 2016 13:40:53 +0100
-Subject: [PATCH v8 7/9] acpi/arm64: Add memory-mapped timer support in
- GTDT driver
-In-Reply-To: <1468952284-28942-8-git-send-email-fu.wei@linaro.org>
-References: <1468952284-28942-1-git-send-email-fu.wei@linaro.org>
- <1468952284-28942-8-git-send-email-fu.wei@linaro.org>
-Message-ID: <20160721124053.GB7982@red-moon>
+From: jaz@semihalf.com (Grzegorz Jaszczyk)
+Date: Thu, 21 Jul 2016 14:44:11 +0200
+Subject: [PATCH 14/18] ARM: mvebu: add support for the Armada 395 SoC family
+In-Reply-To: <1469105055-25181-1-git-send-email-jaz@semihalf.com>
+References: <1469105055-25181-1-git-send-email-jaz@semihalf.com>
+Message-ID: <1469105055-25181-16-git-send-email-jaz@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 20, 2016 at 02:18:02AM +0800, fu.wei at linaro.org wrote:
-> From: Fu Wei <fu.wei@linaro.org>
-> 
-> This driver adds support for parsing memory-mapped timer in GTDT:
-> provide a kernel APIs to parse GT Block Structure in GTDT,
-> export all the info by filling the struct which provided
-> by parameter(pointer of the struct).
-> 
-> By this driver, we can add ACPI support for memory-mapped timer in
-> arm_arch_timer drivers, and separate the ACPI GTDT knowledge from it.
+Beside interfaces described in the armada-39x.dtsi, the Armada 395 SoC
+family supports: 2 x SATA3 (2 ports in one unit) and the USB3.0
 
-"On platforms booting with ACPI, architected memory timers configuration
-data is provided by firmware through the ACPI GTDT static table.
+Signed-off-by: Grzegorz Jaszczyk <jaz@semihalf.com>
+---
+ .../devicetree/bindings/arm/marvell/armada-39x.txt |  2 +-
+ arch/arm/boot/dts/armada-395.dtsi                  | 76 ++++++++++++++++++++++
+ 2 files changed, 77 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/armada-395.dtsi
 
-The clocksource architected timer kernel driver requires a firmware
-interface to collect timer configuration and configure its driver;
-this infrastructure is present for device tree systems but it is
-missing on systems booting with ACPI.
-
-Implement the kernel infrastructure required to parse the static
-ACPI GTDT table so that the architected timer clocksource driver can
-make use of it on systems booting with ACPI, therefore enabling
-the corresponding timers configuration."
-
-> Signed-off-by: Fu Wei <fu.wei@linaro.org>
-> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> ---
->  drivers/acpi/arm64/acpi_gtdt.c       | 72 ++++++++++++++++++++++++++++++++++++
->  include/clocksource/arm_arch_timer.h | 15 ++++++++
->  include/linux/acpi.h                 |  1 +
->  3 files changed, 88 insertions(+)
-> 
-> diff --git a/drivers/acpi/arm64/acpi_gtdt.c b/drivers/acpi/arm64/acpi_gtdt.c
-> index e1cfc9e..b48e443 100644
-> --- a/drivers/acpi/arm64/acpi_gtdt.c
-> +++ b/drivers/acpi/arm64/acpi_gtdt.c
-> @@ -150,3 +150,75 @@ int __init acpi_gtdt_init(struct acpi_table_header *table)
->  
->  	return gtdt->platform_timer_count;
->  }
-> +
-> +static int __init gtdt_parse_gt_block(void *platform_timer,
-> +				      struct gt_block_data *data)
-> +{
-
-Nit: you can directly pass a struct acpi_gtdt_timer_block* pointer.
-
-> +	struct acpi_gtdt_timer_block *block = platform_timer;
-> +	struct acpi_gtdt_timer_entry *frame;
-> +	int i;
-> +
-> +	if (!block || !data)
-> +		return -EINVAL;
-> +
-> +	if (!block->block_address || !block->timer_count)
-> +		goto error;
-
-Here we jump to print an error and bail out. The only reason
-why we need a goto is to print a common error message and that's
-exactly what we do _not_ need, if there is a FW error we want
-to understand which one is that, otherwise the information you
-are printing is useless for debugging (provided we can make use
-of this info, which is questionable anyway).
-
-> +	data->cntctlbase_phy = (phys_addr_t)block->block_address;
-> +	data->timer_count = block->timer_count;
-> +
-> +	frame = (void *)block + block->timer_offset;
-> +	if (frame + block->timer_count != (void *)block + block->header.length)
-> +		goto error;
-
-See above.
-
-> +	/*
-> +	 * Get the GT timer Frame data for every GT Block Timer
-> +	 */
-> +	for (i = 0; i < block->timer_count; i++) {
-> +		frame += i;
-
-This is wrong, if you have multiple frames, pointers would add up and
-that's not correct.
-
-> +		if (!frame->base_address || !frame->timer_interrupt)
-> +			goto error;
-
-See above.
-
-> +		data->timer[i].frame_nr = frame->frame_number;
-> +		data->timer[i].cntbase_phy = frame->base_address;
-> +		data->timer[i].irq =
-> +			map_generic_timer_interrupt(frame->timer_interrupt,
-> +						    frame->timer_flags);
-
-AFAIK map_generic_timer_interrupt() may fail, you should cater for that.
-
-> +		if (frame->virtual_timer_interrupt)
-> +			data->timer[i].virt_irq =
-> +				map_generic_timer_interrupt(
-> +					frame->virtual_timer_interrupt,
-> +					frame->virtual_timer_flags);
-
-Ditto.
-
-> +	}
-> +	return 0;
-> +
-> +error:
-> +	pr_err(FW_BUG "invalid GT Block data.\n");
-> +	return -EINVAL;
-
-See above.
-
-> +}
-> +
-> +/*
-> + * Get the GT block info for memory-mapped timer from GTDT table.
-> + * Please make sure we have called acpi_gtdt_init, because it helps to
-> + * init the global variables.
-
-I already commented on this. I think the second part of this comment
-is useless (it is a function with one caller, make sure you respect
-the calling sequence and be done with this).
-
-Thanks,
-Lorenzo
-
-> + */
-> +int __init gtdt_arch_timer_mem_init(struct gt_block_data *data)
-> +{
-> +	void *platform_timer;
-> +	int index = 0;
-> +	int ret;
-> +
-> +	for_each_platform_timer(platform_timer) {
-> +		if (!is_timer_block(platform_timer))
-> +			continue;
-> +		ret = gtdt_parse_gt_block(platform_timer, data + index);
-> +		if (ret)
-> +			return ret;
-> +		index++;
-> +	}
-> +
-> +	if (index)
-> +		pr_info("found %d memory-mapped timer block(s).\n", index);
-> +
-> +	return index;
-> +}
-> diff --git a/include/clocksource/arm_arch_timer.h b/include/clocksource/arm_arch_timer.h
-> index 16dcd10..ece6b3b 100644
-> --- a/include/clocksource/arm_arch_timer.h
-> +++ b/include/clocksource/arm_arch_timer.h
-> @@ -56,6 +56,8 @@ enum spi_nr {
->  #define ARCH_TIMER_MEM_PHYS_ACCESS	2
->  #define ARCH_TIMER_MEM_VIRT_ACCESS	3
->  
-> +#define ARCH_TIMER_MEM_MAX_FRAME	8
-> +
->  #define ARCH_TIMER_USR_PCT_ACCESS_EN	(1 << 0) /* physical counter */
->  #define ARCH_TIMER_USR_VCT_ACCESS_EN	(1 << 1) /* virtual counter */
->  #define ARCH_TIMER_VIRT_EVT_EN		(1 << 2)
-> @@ -71,6 +73,19 @@ struct arch_timer_kvm_info {
->  	int virtual_irq;
->  };
->  
-> +struct gt_timer_data {
-> +	int frame_nr;
-> +	phys_addr_t cntbase_phy;
-> +	int irq;
-> +	int virt_irq;
-> +};
-> +
-> +struct gt_block_data {
-> +	phys_addr_t cntctlbase_phy;
-> +	int timer_count;
-> +	struct gt_timer_data timer[ARCH_TIMER_MEM_MAX_FRAME];
-> +};
-> +
->  #ifdef CONFIG_ARM_ARCH_TIMER
->  
->  extern u32 arch_timer_get_rate(void);
-> diff --git a/include/linux/acpi.h b/include/linux/acpi.h
-> index fb8b689..24b1750 100644
-> --- a/include/linux/acpi.h
-> +++ b/include/linux/acpi.h
-> @@ -536,6 +536,7 @@ struct platform_device *acpi_create_platform_device(struct acpi_device *);
->  int acpi_gtdt_init(struct acpi_table_header *table);
->  int acpi_gtdt_map_ppi(int type);
->  bool acpi_gtdt_c3stop(void);
-> +int gtdt_arch_timer_mem_init(struct gt_block_data *data);
->  #endif
->  
->  #else	/* !CONFIG_ACPI */
-> -- 
-> 2.5.5
-> 
+diff --git a/Documentation/devicetree/bindings/arm/marvell/armada-39x.txt b/Documentation/devicetree/bindings/arm/marvell/armada-39x.txt
+index 53d4ff9..f066801 100644
+--- a/Documentation/devicetree/bindings/arm/marvell/armada-39x.txt
++++ b/Documentation/devicetree/bindings/arm/marvell/armada-39x.txt
+@@ -17,4 +17,4 @@ compatible: must contain "marvell,armada398"
+ 
+ Example:
+ 
+-compatible = "marvell,a398-db", "marvell,armada398", "marvell,armada390";
++compatible = "marvell,a398-db", "marvell,armada398", "marvell,armada395", "marvell,armada390";
+diff --git a/arch/arm/boot/dts/armada-395.dtsi b/arch/arm/boot/dts/armada-395.dtsi
+new file mode 100644
+index 0000000..ab5dc49
+--- /dev/null
++++ b/arch/arm/boot/dts/armada-395.dtsi
+@@ -0,0 +1,76 @@
++/*
++ * Device Tree Include file for Marvell Armada 395 SoC.
++ *
++ * Copyright (C) 2016 Marvell
++ *
++ * Grzegorz Jaszczyk <jaz@semihalf.com>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++#include "armada-39x.dtsi"
++
++/ {
++	compatible = "marvell,armada395", "marvell,armada390";
++
++	soc {
++		internal-regs {
++			pinctrl at 18000 {
++				compatible = "marvell,mv88f6925-pinctrl";
++				reg = <0x18000 0x20>;
++			};
++
++			sata at a8000 {
++				compatible = "marvell,armada-380-ahci";
++				reg = <0xa8000 0x2000>;
++				interrupts = <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&gateclk 15>;
++				status = "disabled";
++			};
++
++			usb3 at f0000 {
++				compatible = "marvell,armada-380-xhci";
++				reg = <0xf0000 0x4000>,<0xf4000 0x4000>;
++				interrupts = <GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&gateclk 9>;
++				status = "disabled";
++			};
++		};
++	};
++};
+-- 
+1.8.3.1
