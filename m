@@ -1,57 +1,41 @@
 From: jaz@semihalf.com (Grzegorz Jaszczyk)
-Date: Thu, 21 Jul 2016 14:44:04 +0200
-Subject: [PATCH 08/18] ARM: mvebu: a39x: enable PMU,
- CA9 MPcore SoC Controller and Coherency fabric
+Date: Thu, 21 Jul 2016 14:44:03 +0200
+Subject: [PATCH 07/18] ARM: mvebu: a39x: update the SDHCI node on Armada 39x
 In-Reply-To: <1469105055-25181-1-git-send-email-jaz@semihalf.com>
 References: <1469105055-25181-1-git-send-email-jaz@semihalf.com>
-Message-ID: <1469105055-25181-9-git-send-email-jaz@semihalf.com>
+Message-ID: <1469105055-25181-8-git-send-email-jaz@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit enables:
-- CA9's Performance Monitor Unit
-- CA9 MPcore SoC Controller
-- Coherency fabric
-on Armada 39x, basing on the Armada 38x (which has the same CA9 CPU).
+Commit 1140011ee9d9 ("mmc: sdhci-pxav3: Modify clock settings
+for the SDR50 and DDR50 modes") has extended the Device Tree
+binding used to describe PXAv3 SDHCI controllers in order to be
+able to use the SDR50 and DDR50 modes.
+
+This commit updates the Device Tree description of the Armada
+39x SDHCI controller in other to take advantage of this
+functionality.
 
 Signed-off-by: Grzegorz Jaszczyk <jaz@semihalf.com>
-Reviewed-by: Lior Amsalem <alior@marvell.com>
 ---
- arch/arm/boot/dts/armada-39x.dtsi | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+ arch/arm/boot/dts/armada-39x.dtsi | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
 diff --git a/arch/arm/boot/dts/armada-39x.dtsi b/arch/arm/boot/dts/armada-39x.dtsi
-index cb66f20..8a22c02 100644
+index dc6efd3..cb66f20 100644
 --- a/arch/arm/boot/dts/armada-39x.dtsi
 +++ b/arch/arm/boot/dts/armada-39x.dtsi
-@@ -78,6 +78,11 @@
- 		};
- 	};
+@@ -380,7 +380,10 @@
  
-+	pmu {
-+		compatible = "arm,cortex-a9-pmu";
-+		interrupts-extended = <&mpic 3>;
-+	};
-+
- 	soc {
- 		compatible = "marvell,armada390-mbus", "marvell,armadaxp-mbus",
- 			     "simple-bus";
-@@ -322,6 +327,16 @@
- 				reg = <0x20800 0x10>;
- 			};
- 
-+			mpcore-soc-ctrl at 20d20 {
-+				compatible = "marvell,armada-380-mpcore-soc-ctrl";
-+				reg = <0x20d20 0x6c>;
-+			};
-+
-+			coherency-fabric at 21010 {
-+				compatible = "marvell,armada-380-coherency-fabric";
-+				reg = <0x21010 0x1c>;
-+			};
-+
- 			pmsu at 22000 {
- 				compatible = "marvell,armada-390-pmsu",
- 					     "marvell,armada-380-pmsu";
+ 			sdhci at d8000 {
+ 				compatible = "marvell,armada-380-sdhci";
+-				reg = <0xd8000 0x1000>, <0xdc000 0x100>;
++				reg-names = "sdhci", "mbus", "conf-sdio3";
++				reg = <0xd8000 0x1000>,
++					<0xdc000 0x100>,
++					<0x18454 0x4>;
+ 				interrupts = <GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>;
+ 				clocks = <&gateclk 17>;
+ 				mrvl,clk-delay-cycles = <0x1F>;
 -- 
 1.8.3.1
