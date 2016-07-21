@@ -1,49 +1,69 @@
-From: hzpeterchen@gmail.com (Peter Chen)
-Date: Thu, 21 Jul 2016 17:20:12 +0800
-Subject: [PATCH v3 5/6] usb: chipidea: let chipidea core device of_node
- equal's glue layer device of_node
-In-Reply-To: <20160721091438.GL1041@n2100.armlinux.org.uk>
-References: <1469007629-31757-1-git-send-email-peter.chen@nxp.com>
- <1469007629-31757-6-git-send-email-peter.chen@nxp.com>
- <20160721091438.GL1041@n2100.armlinux.org.uk>
-Message-ID: <20160721092012.GA22749@shlinux2>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Thu, 21 Jul 2016 12:33:12 +0300
+Subject: [PATCH 2/7] dmaengine: omap-dma: Complete the cookie first on
+ transfer completion
+In-Reply-To: <877fcg25c4.fsf@belgarion.home>
+References: <20160714124242.7579-1-peter.ujfalusi@ti.com>
+ <20160714124242.7579-3-peter.ujfalusi@ti.com>
+ <20160718103409.GH5783@n2100.arm.linux.org.uk>
+ <923b54d6-c7fc-66c2-1c20-d8d74ebed912@ti.com> <877fcg25c4.fsf@belgarion.home>
+Message-ID: <f18ced07-39e4-c336-b788-254c2c130f82@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 21, 2016 at 10:14:38AM +0100, Russell King - ARM Linux wrote:
-> On Wed, Jul 20, 2016 at 05:40:28PM +0800, Peter Chen wrote:
-> > diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
-> > index 69426e6..0d05812 100644
-> > --- a/drivers/usb/chipidea/core.c
-> > +++ b/drivers/usb/chipidea/core.c
-> > @@ -914,6 +914,16 @@ static int ci_hdrc_probe(struct platform_device *pdev)
-> >  	if (!ci)
-> >  		return -ENOMEM;
-> >  
-> > +	/*
-> > +	 * At device tree, we have no device node for chipidea core,
-> > +	 * the glue layer's node is the parent node for host and udc
-> > +	 * device. But in related driver, the parent device is chipidea
-> > +	 * core. So, in order to let the common driver get parent's node,
-> > +	 * we let the core's device node equals glue layer's node.
-> > +	 */
-> > +	if (dev->parent && dev->parent->of_node)
-> > +		dev->of_node = dev->parent->of_node;
+On 07/20/16 09:26, Robert Jarzmik wrote:
+> Peter Ujfalusi <peter.ujfalusi@ti.com> writes:
 > 
-> This is a dangerous thing to do.  You're changing the dev->of_node of
-> _this_ device, which means that _this_ driver will no longer match
-> the device if you remove and reinsert the driver module, or unbind
-> and try to re-bind the device to this driver.
+>> On 07/18/16 13:34, Russell King - ARM Linux wrote:
+>>> On Thu, Jul 14, 2016 at 03:42:37PM +0300, Peter Ujfalusi wrote:
+>>>> Before looking for the next descriptor to start, complete the just finished
+>>>> cookie.
+>>>
+>>> This change will reduce performance as we no longer have an overlap
+>>> between the next request starting to be dealt with in the hardware
+>>> vs the previous request being completed.
+>>
+>> vchan_cookie_complete() will only mark the cookie completed, adds the vd to
+>> the desc_completed list (it was deleted from desc_issued list when it was
+>> started by omap_dma_start_desc) and schedule the tasklet to deal with the real
+>> completion later.
+>> Marking the just finished descriptor/cookie done first then looking for
+>> possible descriptors in the queue to start feels like a better sequence.
+>>
+>> After a quick grep in the kernel source: only omap-dma.c was starting the next
+>> transfer before marking the current completed descriptor/cookie done.
 > 
+> Euh actually I think it's done in other drivers as well :
+>  - Documentation/dmaengine/pxa_dma.txt (chapter "Transfers hot-chaining)
+>  - drivers/dma/pxa_dma.c
+>    => look for pxad_try_hotchain() and it's impact on pxad_chan_handler() which
+>    will mark the completion while the next transfer is already pumped by the
+>    hardware.
 
-Thanks for commenting it.
+The 'hot-chaining' is a bit different then what omap-dma is doing. If I got it
+right. When the DMA is running and a new request comes the driver will append
+the new transfer to the list used by the HW. This way there will be no stop
+and restart needed, the DMA is running w/o interruption.
 
-I have tested load/unload, it does not show any problems.
+> Speaking of which, from a purely design point of view, as long as you think
+> beforehand what is your sequence, ie. what is the sequence of your link
+> chaining, completion handling, etc ..., both marking before or after next tx
+> start should be fine IMHO.
 
-The chipidea core device is created by code at runtime, not by device node.
-And we have NO device node for this chipidea core device at dts.
+Yes, it might be a bit better from performance point of view if we first start
+the pending descriptor (if there is one) then do the vchan_cookie_complete().
+On the other hand if we care more about latency and accuracy we should
+complete the transfer first then look for pending descriptors. But since
+virt_dma is using a tasklet for the real completion, the latency is always
+going to be when the tasklet is given the chance to execute.
+
+> So in your quest for the "better sequence" the pxa driver's one might give you
+> some perspective :)
+
+I did thought about similar 'hot-chaining' for TI's eDMA and sDMA. Especially
+eDMA would benefit from it, but so far I see too many race conditions to
+overcome to be brave enough to write something to test it. and I don't have
+time for it atm ;)
 
 -- 
-
-Best Regards,
-Peter Chen
+P?ter
