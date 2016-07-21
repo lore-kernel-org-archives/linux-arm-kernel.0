@@ -1,85 +1,179 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Thu, 21 Jul 2016 11:26:09 +0100
-Subject: [RFC 3/6] dt/bindings: Add bindings for Tegra20/30 NOR bus driver
-In-Reply-To: <CALw8SCXFexogJn3BwrZm63yEL0rtTpYsYYb0O9D_ibhginVLqw@mail.gmail.com>
-References: <1468935397-11926-1-git-send-email-mirza.krak@gmail.com>
- <1468935397-11926-4-git-send-email-mirza.krak@gmail.com>
- <20160720124408.GA19113@rob-hp-laptop>
- <CALw8SCXFexogJn3BwrZm63yEL0rtTpYsYYb0O9D_ibhginVLqw@mail.gmail.com>
-Message-ID: <1f280c99-156f-59d3-308f-b4c8ff0f8f7c@nvidia.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 21 Jul 2016 11:31:21 +0100
+Subject: [PATCH v1 3/4] arm64: Add arm64 kexec support
+In-Reply-To: <1469042361.2977.90.camel@infradead.org>
+References: <cover.1468970114.git.geoff@infradead.org>
+ <9ed513fd44a19b2f49b4da99477cedfff7341bf0.1468970114.git.geoff@infradead.org>
+ <20160720153859.GG24691@leverpostej>
+ <1469042361.2977.90.camel@infradead.org>
+Message-ID: <20160721103120.GB20559@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 20/07/16 20:28, Mirza Krak wrote:
-> 2016-07-20 14:44 GMT+02:00 Rob Herring <robh@kernel.org>:
->> On Tue, Jul 19, 2016 at 03:36:34PM +0200, Mirza Krak wrote:
->>> From: Mirza Krak <mirza.krak@gmail.com>
->>>
->>> Document the devicetree bindings for NOR bus driver found on Tegra20 and
->>> Tegra30 SOCs
->>>
->>> Signed-off-by: Mirza Krak <mirza.krak@gmail.com>
->>> ---
->>>  .../devicetree/bindings/bus/nvidia,tegra20-nor.txt | 73 ++++++++++++++++++++++
->>>  1 file changed, 73 insertions(+)
->>>  create mode 100644 Documentation/devicetree/bindings/bus/nvidia,tegra20-nor.txt
->>>
->>> diff --git a/Documentation/devicetree/bindings/bus/nvidia,tegra20-nor.txt b/Documentation/devicetree/bindings/bus/nvidia,tegra20-nor.txt
->>> new file mode 100644
->>> index 0000000..9ee4a66
->>> --- /dev/null
->>> +++ b/Documentation/devicetree/bindings/bus/nvidia,tegra20-nor.txt
->>> @@ -0,0 +1,73 @@
->>> +Device tree bindings for NVIDIA Tegra20/30 NOR Bus
->>> +
->>> +The NOR controller supports a number of memory types, including synchronous NOR,
->>> +asynchronous NOR, and other flash memories with similar interfaces, such as
->>> +MuxOneNAND. One could also connect high speed devices like FPGAs, DSPs,
->>> +CAN chips, Wi-Fi chips etc.
->>> +
->>> +The actual devices are instantiated from the child nodes of a NOR node.
->>> +
->>> +Required properties:
->>> +
->>> + - compatible: should be "nvidia,tegra20-nor", "nvidia,tegra30-nor"
->>> + - reg: Should contain NOR controller registers location and length.
->>> + - clocks: Must contain one entry, for the module clock.
->>> +   See ../clocks/clock-bindings.txt for details.
->>> + - resets : Must contain an entry for each entry in reset-names.
->>> +   See ../reset/reset.txt for details.
->>> + - reset-names : Must include the following entries:
->>> +  - nor
->>> + - #address-cells: Must be set to 2 to allow memory address translation
->>> + - #size-cells:      Must be set to 1 to allow CS address passing
->>> + - ranges: Must be set up to reflect the memory layout with four integer
->>> +             values for each chip-select line in use.
->>> + - nvidia,config: This property represents the SNOR_CONFIG_0 register.
->>> +
->>> +Note that the NOR controller does not have any internal chip-select address
->>> +decoding and if you want to access multiple devices external chip-select
->>> +decoding must be provided.
->>
->> Then what are the 2 chip selects in ranges?
->>
->> Rob
+On Wed, Jul 20, 2016 at 12:19:21PM -0700, Geoff Levand wrote:
+> > > +static uint64_t read_sink(const char *command_line)
+> > > +{
+> > > +> > 	> > uint64_t v;
+> > > +> > 	> > const char *p;
+> > > +
+> > > +> > 	> > if (arm64_opts.port)
+> > > +> > 	> > 	> > return arm64_opts.port;
+> > > +
+> > > +#if defined(ARM64_DEBUG_PORT)
+> > > +> > 	> > return (uint64_t)(ARM64_DEBUG_PORT);
+> > > +#endif
+> > > +> > 	> > if (!command_line)
+> > > +> > 	> > 	> > return 0;
+> > > +
+> > > +> > 	> > if (!(p = strstr(command_line, "earlyprintk=")) &&
+> > > +> > 	> > 	> > !(p = strstr(command_line, "earlycon=")))
+> > > +> > 	> > 	> > return 0;
+> > > +
+> > > +> > 	> > while (*p != ',')
+> > > +> > 	> > 	> > p++;
+> > > +
+> > > +> > 	> > p++;
+> > > +
+> > > +> > 	> > while (isspace(*p))
+> > > +> > 	> > 	> > p++;
+> > 
+> > Why do we skip spaces? As far as I am aware, there should not be any
+> > spaces in the option.
 > 
-> Those two chip selects are actually a representation of a external
-> decoding logic based on what we use on our board. Even though it the
-> NOR controller only supports one single chip select I wanted to give
-> an example on how one could create more chip-selects with an external
-> logic and what it would look like in the device tree representation.
+> Sure, I can remove it.
+> 
+> > > +
+> > > +> > 	> > if (*p == 0)
+> > > +> > 	> > 	> > return 0;
+> > > +
+> > > +> > 	> > errno = 0;
+> > > +
+> > > +> > 	> > v = strtoull(p, NULL, 0);
+> > > +
+> > > +> > 	> > if (errno)
+> > > +> > 	> > 	> > return 0;
+> > > +
+> > > +> > 	> > return v;
+> > > +}
+> > 
+> > It looks like the purgatory code expects angel SWI as the earlycon,
+> 
+> Maybe you saw the debug_brk macro in entry.S?  I should remove
+> that and just loop.
 
-Technically, the GMI/SNOR controller supports 8 chip-selects, however,
-unlike some devices, it appears that software has to select the active
-chip-select. Although this sounds odd, I believe that the idea is that
-in order to support devices greater than 256MB (external address space
-for available NOR/async devices) you can use the chip-selects to page
-through memory greater than this 256MB range. At least that it my
-(limited) understanding!
+Ah, sorry. For some reason I got that confused with the sink code. My
+bad.
 
-Cheers
-Jon
+Now I see that's assuming an 8-bit MMIO register.
 
--- 
-nvpublic
+> > whereas many other earlycons exist (with pl011 being extremely popular).
+> > Regardless, if we assume a particular UART type, we should explicitly
+> > verify that here. Otherwise the purgatory code will likely bring down
+> > the system, and it will be very painful to debug.
+> > 
+> > Please explicitly check for the supported earlycon name.
+> 
+> Purgatory just writes bytes to the address given.  Are there
+> UARTs that don't have TX as the first port?
+
+I'm not sure, but it's certainly possible. The generic earlycon binding
+doesn't guarantee that the first address is a TX register. Even if they
+don't exist today, they could in a month's time, so I don't think we
+should assume anything.
+
+Additionally, the width of that TX register can differ (e.g.
+uart8250,mmio vs uart8250,mmio32), and some UARTs aren't very forgiving
+if accessed with the wrong width.
+
+> To be safe, we could do a check when we get the address from
+> an earlycon parameter. 
+
+Yup. I think you need a whitelist of UARTs that can be handled, along
+with parsing for their options (e.g. mmio vs mmio32), giving up if
+unknown options are spotted.
+
+> Here's what I found in the dts'.  The
+> first three are OK, but I don't know about the others.  
+
+I believe you can find the full set with:
+
+$ git grep EARLYCON_DECLARE
+
+[...]
+
+> > > +> > 	> > if (result)
+> > > +> > 	> > 	> > fprintf(stderr, "kexec: Warning: No device tree available.\n");
+> > 
+> > There are other reasons we'd return an error (e.g. mismatched enable
+> > methods), so this is somewhat misleading.
+> > 
+> > I believe that in all cases we log the specific reason first anyway, so
+> > perhaps it's best to jsut remove this warning.
+> 
+> Yes, this could be removed.
+> 
+> > Won't this also be very noisy in the case of ACPI with a stub DTB? In
+> > that case ther are no cpu nodes, and may be no memory nodes.
+> 
+> Should we just remove check_cpu_nodes and everything associated with
+> it?  It is a lot of code, and all it does now is issue warnings.
+> It is still around from the early days of spin_table support.  
+
+That sounds fine to me.
+
+> As for memory nodes, we currently look at the dt, then fall back
+> to iomem. We could switch the order, iomem then dt, but then
+> those just issue dbgprintf's.
+
+Sure.
+
+> > > +int arm64_process_image_header(const struct arm64_image_header *h)
+> > > +{
+> > > +#if !defined(KERNEL_IMAGE_SIZE)
+> > > +# define KERNEL_IMAGE_SIZE (768 * 1024)
+> > > +#endif
+> > > +
+> > > +> > 	> > if (!arm64_header_check_magic(h))
+> > > +> > 	> > 	> > return -EINVAL;
+> > > +
+> > > +> > 	> > if (h->image_size) {
+> > > +> > 	> > 	> > arm64_mem.text_offset = le64_to_cpu(h->text_offset);
+> > > +> > 	> > 	> > arm64_mem.image_size = le64_to_cpu(h->image_size);
+> > > +> > 	> > } else {
+> > > +> > 	> > 	> > /* For 3.16 and older kernels. */
+> > > +> > 	> > 	> > arm64_mem.text_offset = 0x80000;
+> > > +> > 	> > 	> > arm64_mem.image_size = KERNEL_IMAGE_SIZE;
+> > > +> > 	> > }
+> > > +
+> > > +> > 	> > return 0;
+> > > +}
+> > 
+> > A v3.16 defconfig Image with the Linaro 14.09 GCC 4.9 toolchain is
+> > 6.3MB, so the chosen value for KERNEL_IMAGE_SIZE is far too small. I'm
+> > not sure what to suggest as a better value, however, as I know that some
+> > configurations are far bigger than that.
+> 
+> OK, I'll make it bigger, say 7.  When I set this up I expected
+> the distro maintainer to choose KERNEL_IMAGE_SIZE to match their
+> needs.
+
+To give some headroom, bumping to 16 or so is probably a safer bet.
+
+Perhaps it's worth logging a warning that we're guessing the effective
+image size in this case? That could avoid a lot of head-scratching if
+things do end up overlapping.
+
+> > Do we expect to kexec to a v3.16 or earlier kernel, given we need a much
+> > newer first kernel to have kexec in the first place? We could mandate
+> > having a header with a non-zero image_size (i.e. the target kernel has
+> > to be v3.16 or newer).
+> 
+> Kexec could be installed as a bootloader, and users may want the
+> ability to boot older installations, so I think it worthwile to
+> have.
+
+Sure. I was under the impression that most distros had chosen v3.16 or
+later, but I have no problem with trying to support earlier kernels.
+
+Thanks,
+Mark.
