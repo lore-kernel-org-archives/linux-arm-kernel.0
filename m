@@ -1,393 +1,136 @@
-From: architt@codeaurora.org (Archit Taneja)
-Date: Thu, 21 Jul 2016 15:23:18 +0530
-Subject: [PATCH v2 4/7] drm/bridge: Add RGB to VGA bridge support
-In-Reply-To: <20160720095857.12297-5-maxime.ripard@free-electrons.com>
-References: <20160720095857.12297-1-maxime.ripard@free-electrons.com>
- <20160720095857.12297-5-maxime.ripard@free-electrons.com>
-Message-ID: <57909B8E.7030105@codeaurora.org>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Thu, 21 Jul 2016 10:56:44 +0100
+Subject: [RFC 3/6] dt/bindings: Add bindings for Tegra20/30 NOR bus driver
+In-Reply-To: <1468935397-11926-4-git-send-email-mirza.krak@gmail.com>
+References: <1468935397-11926-1-git-send-email-mirza.krak@gmail.com>
+ <1468935397-11926-4-git-send-email-mirza.krak@gmail.com>
+Message-ID: <434561ec-510e-a3bf-c7b6-c961db299bd6@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-On 07/20/2016 03:28 PM, Maxime Ripard wrote:
-> Some boards have an entirely passive RGB to VGA bridge, based on either
-> DACs or resistor ladders.
->
-> Those might or might not have an i2c bus routed to the VGA connector in
-> order to access the screen EDIDs.
->
-> Add a bridge that doesn't do anything but expose the modes available on the
-> screen, either based on the EDIDs if available, or based on the XGA
-> standards.
-
-Our eventual aim is to separate out the connectors from the bridge
-drivers wherever possible. In the future, a KMS driver using the
-bridge would be responsible for establishing the links between
-the bridge and encoder, and the encoder and connector.
-
-If in the future we remove the connector pieces from this driver
-to create a separate generic VGA connector driver, we'll end up
-with a bridge driver whose main functionality is to convert RGB
-signals to VGA. The EDID parts would move to the VGA connector
-driver. In your platform's case, there is no software needed
-to translate RGB to VGA, but maybe in the future, we might need
-to add an optional regulator in the driver to support another
-platform. Therefore, the bridge driver would still be handy to
-have.
-
-Keeping this in consideration, I think this driver (and the DT
-binding) should be called "dumb-rgb-to-vga-bridge", or
-"rgb-to-vga-bridge" since that's what the bridge HW primarily
-does.
-
-Thanks,
-Archit
-
->
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+On 19/07/16 14:36, Mirza Krak wrote:
+> From: Mirza Krak <mirza.krak@gmail.com>
+> 
+> Document the devicetree bindings for NOR bus driver found on Tegra20 and
+> Tegra30 SOCs
+> 
+> Signed-off-by: Mirza Krak <mirza.krak@gmail.com>
 > ---
->   .../bindings/display/bridge/dumb-vga.txt           |  54 +++++
->   drivers/gpu/drm/bridge/Kconfig                     |   6 +
->   drivers/gpu/drm/bridge/Makefile                    |   1 +
->   drivers/gpu/drm/bridge/dumb-vga.c                  | 232 +++++++++++++++++++++
->   4 files changed, 293 insertions(+)
->   create mode 100644 Documentation/devicetree/bindings/display/bridge/dumb-vga.txt
->   create mode 100644 drivers/gpu/drm/bridge/dumb-vga.c
->
-> diff --git a/Documentation/devicetree/bindings/display/bridge/dumb-vga.txt b/Documentation/devicetree/bindings/display/bridge/dumb-vga.txt
+>  .../devicetree/bindings/bus/nvidia,tegra20-nor.txt | 73 ++++++++++++++++++++++
+>  1 file changed, 73 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/bus/nvidia,tegra20-nor.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/bus/nvidia,tegra20-nor.txt b/Documentation/devicetree/bindings/bus/nvidia,tegra20-nor.txt
 > new file mode 100644
-> index 000000000000..0056ffa2b31d
+> index 0000000..9ee4a66
 > --- /dev/null
-> +++ b/Documentation/devicetree/bindings/display/bridge/dumb-vga.txt
-> @@ -0,0 +1,54 @@
-> +Passive RGB to VGA bridge
-> +-------------------------
+> +++ b/Documentation/devicetree/bindings/bus/nvidia,tegra20-nor.txt
+> @@ -0,0 +1,73 @@
+> +Device tree bindings for NVIDIA Tegra20/30 NOR Bus
 > +
-> +This binding is aimed for entirely passive RGB to VGA bridges that do not
-> +require any configuration.
+> +The NOR controller supports a number of memory types, including synchronous NOR,
+> +asynchronous NOR, and other flash memories with similar interfaces, such as
+> +MuxOneNAND. One could also connect high speed devices like FPGAs, DSPs,
+> +CAN chips, Wi-Fi chips etc.
+
+Nit-pick ... the Tegra documentation refers to this controller as the
+GMI (general memory interface) or SNOR (sync-NOR) controller because it
+is not just limited to NOR as you mentioned. I see references to GMI in
+the Tegra pinctrl driver and so may be we should use this name.
+
+> +
+> +The actual devices are instantiated from the child nodes of a NOR node.
 > +
 > +Required properties:
 > +
-> +- compatible: Must be "dumb-vga-bridge"
-> +
-> +Required nodes:
-> +
-> +This device has two video ports. Their connections are modeled using the OF
-> +graph bindings specified in Documentation/devicetree/bindings/graph.txt.
-> +
-> +- Video port 0 for RGB input
-> +- Video port 1 for VGA output
-> +
-> +
-> +Example
-> +-------
-> +
-> +bridge {
-> +	compatible = "dumb-vga-bridge";
-> +	#address-cells = <1>;
-> +	#size-cells = <0>;
-> +
-> +	ports {
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +
-> +		port at 0 {
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +			reg = <0>;
-> +
-> +			vga_bridge_in: endpoint at 0 {
-> +				reg = <0>;
-> +				remote-endpoint = <&tcon0_out_vga>;
-> +			};
-> +		};
-> +
-> +		port at 1 {
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +			reg = <1>;
-> +
-> +			vga_bridge_out: endpoint at 0 {
-> +				reg = <0>;
-> +				remote-endpoint = <&vga_con_in>;
-> +			};
-> +		};
-> +	};
-> +};
-> diff --git a/drivers/gpu/drm/bridge/Kconfig b/drivers/gpu/drm/bridge/Kconfig
-> index a141921445f4..4a6560714397 100644
-> --- a/drivers/gpu/drm/bridge/Kconfig
-> +++ b/drivers/gpu/drm/bridge/Kconfig
-> @@ -17,6 +17,12 @@ config DRM_ANALOGIX_ANX78XX
->   	  the HDMI output of an application processor to MyDP
->   	  or DisplayPort.
->
-> +config DRM_DUMB_VGA
-> +	tristate "Dumb RGB to VGA Bridge support"
-> +	select DRM_KMS_HELPER
-> +	help
-> +	  Support for passive RGB to VGA bridges
-> +
->   config DRM_DW_HDMI
->   	tristate
->   	select DRM_KMS_HELPER
-> diff --git a/drivers/gpu/drm/bridge/Makefile b/drivers/gpu/drm/bridge/Makefile
-> index bfec9f8cb9d2..413d783828bb 100644
-> --- a/drivers/gpu/drm/bridge/Makefile
-> +++ b/drivers/gpu/drm/bridge/Makefile
-> @@ -1,6 +1,7 @@
->   ccflags-y := -Iinclude/drm
->
->   obj-$(CONFIG_DRM_ANALOGIX_ANX78XX) += analogix-anx78xx.o
-> +obj-$(CONFIG_DRM_DUMB_VGA) += dumb-vga.o
->   obj-$(CONFIG_DRM_DW_HDMI) += dw-hdmi.o
->   obj-$(CONFIG_DRM_DW_HDMI_AHB_AUDIO) += dw-hdmi-ahb-audio.o
->   obj-$(CONFIG_DRM_NXP_PTN3460) += nxp-ptn3460.o
-> diff --git a/drivers/gpu/drm/bridge/dumb-vga.c b/drivers/gpu/drm/bridge/dumb-vga.c
-> new file mode 100644
-> index 000000000000..c197be591fb6
-> --- /dev/null
-> +++ b/drivers/gpu/drm/bridge/dumb-vga.c
-> @@ -0,0 +1,232 @@
-> +
-> +#include <linux/module.h>
-> +#include <linux/of_graph.h>
-> +
-> +#include <drm/drmP.h>
-> +#include <drm/drm_atomic_helper.h>
-> +#include <drm/drm_crtc.h>
-> +#include <drm/drm_crtc_helper.h>
-> +
-> +struct dumb_vga {
-> +	struct drm_bridge	bridge;
-> +	struct drm_connector	connector;
-> +
-> +	struct i2c_adapter	*ddc;
-> +};
-> +
-> +static inline struct dumb_vga *
-> +drm_bridge_to_dumb_vga(struct drm_bridge *bridge)
-> +{
-> +	return container_of(bridge, struct dumb_vga, bridge);
-> +}
-> +
-> +static inline struct dumb_vga *
-> +drm_connector_to_dumb_vga(struct drm_connector *connector)
-> +{
-> +	return container_of(connector, struct dumb_vga, connector);
-> +}
-> +
-> +static int dumb_vga_get_modes(struct drm_connector *connector)
-> +{
-> +	struct dumb_vga *vga = drm_connector_to_dumb_vga(connector);
-> +	struct edid *edid;
-> +	int ret;
-> +
-> +	if (IS_ERR(vga->ddc))
-> +		goto fallback;
-> +
-> +	edid = drm_get_edid(connector, vga->ddc);
-> +	if (!edid) {
-> +		DRM_INFO("EDID readout failed, falling back to standard modes\n");
-> +		goto fallback;
-> +	}
-> +
-> +	drm_mode_connector_update_edid_property(connector, edid);
-> +	return drm_add_edid_modes(connector, edid);
-> +
-> +fallback:
-> +	/*
-> +	 * In case we cannot retrieve the EDIDs (broken or missing i2c
-> +	 * bus), fallback on the XGA standards
-> +	 */
-> +	ret = drm_add_modes_noedid(connector, 1920, 1200);
-> +
-> +	/* And prefer a mode pretty much anyone can handle */
-> +	drm_set_preferred_mode(connector, 1024, 768);
-> +
-> +	return ret;
-> +}
-> +
-> +static struct drm_encoder *
-> +dumb_vga_best_encoder(struct drm_connector *connector)
-> +{
-> +	struct dumb_vga *vga = drm_connector_to_dumb_vga(connector);
-> +
-> +	return vga->bridge.encoder;
-> +}
-> +
-> +static struct drm_connector_helper_funcs dumb_vga_con_helper_funcs = {
-> +	.get_modes	= dumb_vga_get_modes,
-> +	.best_encoder	= dumb_vga_best_encoder,
-> +};
-> +
-> +static enum drm_connector_status
-> +dumb_vga_connector_detect(struct drm_connector *connector, bool force)
-> +{
-> +	struct dumb_vga *vga = drm_connector_to_dumb_vga(connector);
-> +
-> +	/*
-> +	 * Even if we have an I2C bus, we can't assume that the cable
-> +	 * is disconnected if drm_probe_ddc. Some cables don't wire
-> +	 * the DDC pins, or the I2C bus might be disfunctional.
-> +	 */
-> +	if (!IS_ERR(vga->ddc) && drm_probe_ddc(vga->ddc))
-> +		return connector_status_connected;
-> +
-> +	return connector_status_unknown;
-> +}
-> +
-> +static void
-> +dumb_vga_connector_destroy(struct drm_connector *connector)
-> +{
-> +	drm_connector_cleanup(connector);
-> +}
-> +
-> +static struct drm_connector_funcs dumb_vga_con_funcs = {
-> +	.dpms			= drm_atomic_helper_connector_dpms,
-> +	.detect			= dumb_vga_connector_detect,
-> +	.fill_modes		= drm_helper_probe_single_connector_modes,
-> +	.destroy		= dumb_vga_connector_destroy,
-> +	.reset			= drm_atomic_helper_connector_reset,
-> +	.atomic_duplicate_state	= drm_atomic_helper_connector_duplicate_state,
-> +	.atomic_destroy_state	= drm_atomic_helper_connector_destroy_state,
-> +};
-> +
-> +static int dumb_vga_attach(struct drm_bridge *bridge)
-> +{
-> +	struct dumb_vga *vga = drm_bridge_to_dumb_vga(bridge);
-> +	int ret;
-> +
-> +	if (!bridge->encoder) {
-> +		DRM_ERROR("Missing encoder\n");
-> +		return -ENODEV;
-> +	}
-> +
-> +	drm_connector_helper_add(&vga->connector,
-> +				 &dumb_vga_con_helper_funcs);
-> +	ret = drm_connector_init(bridge->dev, &vga->connector,
-> +				 &dumb_vga_con_funcs, DRM_MODE_CONNECTOR_VGA);
-> +	if (ret) {
-> +		DRM_ERROR("Failed to initialize connector\n");
-> +		return ret;
-> +	}
-> +
-> +	drm_mode_connector_attach_encoder(&vga->connector,
-> +					  bridge->encoder);
-> +
-> +	return 0;
-> +}
-> +
-> +static void dumb_vga_nop(struct drm_bridge *bridge) {};
-> +
-> +static struct drm_bridge_funcs dumb_vga_bridge_funcs = {
-> +	.attach		= dumb_vga_attach,
-> +	.enable		= dumb_vga_nop,
-> +	.disable	= dumb_vga_nop,
-> +	.pre_enable	= dumb_vga_nop,
-> +	.post_disable	= dumb_vga_nop,
+> + - compatible: should be "nvidia,tegra20-nor", "nvidia,tegra30-nor"
 
-We don't need to install nops here, the drm bridge core skips
-calling the op if it can't find it.
+I see at least one difference at the register level between Tegra20 and
+Tegra30 and so I think this should be something like ...
 
-> +};
+ - compatible : Should contain one of the following:
+	For Tegra20 must contain "nvidia,tegra20-gmi".
+ 	For Tegra30 must contain "nvidia,tegra30-gmi".
+
+> + - reg: Should contain NOR controller registers location and length.
+> + - clocks: Must contain one entry, for the module clock.
+> +   See ../clocks/clock-bindings.txt for details.
+> + - resets : Must contain an entry for each entry in reset-names.
+> +   See ../reset/reset.txt for details.
+> + - reset-names : Must include the following entries:
+> +  - nor
+> + - #address-cells: Must be set to 2 to allow memory address translation
+> + - #size-cells:	Must be set to 1 to allow CS address passing
+> + - ranges: Must be set up to reflect the memory layout with four integer
+> + 		values for each chip-select line in use.
+> + - nvidia,config: This property represents the SNOR_CONFIG_0 register.
+
+There is also a SNOR_MIO_CONFIG for the MIO address space and so I think
+that this should be nvidia,snor-config to be explicit. It might be nice
+to also add a "nvidia,mio-config" while you are at it as well, however,
+that could always be done later. If you do, then the
+"nvidia,snor-config" becomes optional depending on whether you are using
+the SNOR or MIO address space.
+
+Thierry, Stephen, do prefer all the fields on the config registers are
+broken out? There are quite a few but I am not sure what we typically
+recommend here?
+
 > +
-> +static struct i2c_adapter *dumb_vga_retrieve_ddc(struct device *dev)
-> +{
-> +	struct device_node *end_node, *phandle, *remote;
-> +	struct i2c_adapter *ddc;
+> +Note that the NOR controller does not have any internal chip-select address
+> +decoding and if you want to access multiple devices external chip-select
+> +decoding must be provided.
+
+Although it is true, you do have the MIO address space and so you could
+support two devices via the SNOR address space and MIO address space
+(assuming that the MIO can be used for the 2nd device).
+
+Furthermore, if you do have external logic to support multiple devices
+this would assume that the devices use the same timing and so are
+probably the same type. It also assumes both can fit in the 256MB
+address range. May be worth mentioning.
+
+The GMI does have 8 chip selects and I believe the purpose of these is
+to allow you to address more than the 256MB range. However, I believe to
+do this it require software intervention to change the current CS that
+is in use.
+
+I wonder if it is worth mentioning that the chip-select specified in the
+"nvidia,config" prop should match that in the "ranges" prop unless you
+have some external decoding logic to provide an external chip-select.
+Which raises a question, what does the chip-select in the ranges
+actually represent? I am not sure if there is a common practice here for
+device tree when boards have external logic to provide additional
+chip-selects. I am sure this is quite common.
+
+> +Optional properties:
 > +
-> +	end_node = of_graph_get_endpoint_by_regs(dev->of_node, 1, -1);
-> +	if (!end_node) {
-> +		dev_err(dev, "Missing connector endpoint\n");
-> +		return ERR_PTR(-ENODEV);
-> +	}
+> + - nvidia,cs-timing: The timing array represents the SNOR_TIMING0_0 and
+> +   SNOR_TIMING1_0 registers for the NOR controller. If unset reset-values will
+> +   be used. See reference documentation for detailed description of the timing
+> +   registers.
 > +
-> +	remote = of_graph_get_remote_port_parent(end_node);
-> +	of_node_put(end_node);
-> +	if (!remote) {
-> +		dev_err(dev, "Enable to parse remote node\n");
-> +		return ERR_PTR(-EINVAL);
-> +	}
+> +Example with two SJA1000 CAN controllers connected to the NOR bus:
 > +
-> +	phandle = of_parse_phandle(remote, "ddc-i2c-bus", 0);
-> +	of_node_put(remote);
-> +	if (!phandle)
-> +		return ERR_PTR(-ENODEV);
-> +
-> +	ddc = of_get_i2c_adapter_by_node(phandle);
-> +	of_node_put(phandle);
-> +	if (!ddc)
-> +		return ERR_PTR(-EPROBE_DEFER);
-> +
-> +	return ddc;
-> +}
-> +
-> +static int dumb_vga_probe(struct platform_device *pdev)
-> +{
-> +	struct dumb_vga *vga;
-> +	int ret;
-> +
-> +	vga = devm_kzalloc(&pdev->dev, sizeof(*vga), GFP_KERNEL);
-> +	if (!vga)
-> +		return -ENOMEM;
-> +	platform_set_drvdata(pdev, vga);
-> +
-> +	vga->ddc = dumb_vga_retrieve_ddc(&pdev->dev);
-> +	if (IS_ERR(vga->ddc)) {
-> +		if (PTR_ERR(vga->ddc) == -ENODEV) {
-> +			dev_info(&pdev->dev,
-> +				 "No i2c bus specified... Disabling EDID readout\n");
-> +		} else {
-> +			dev_err(&pdev->dev, "Couldn't retrieve i2c bus\n");
-> +			return PTR_ERR(vga->ddc);
-> +		}
-> +	}
-> +
-> +	vga->bridge.funcs = &dumb_vga_bridge_funcs;
-> +	vga->bridge.of_node = pdev->dev.of_node;
-> +
-> +	ret = drm_bridge_add(&vga->bridge);
-> +	if (ret && !IS_ERR(vga->ddc))
-> +		i2c_put_adapter(vga->ddc);
-> +
-> +	return ret;
-> +}
-> +
-> +static int dumb_vga_remove(struct platform_device *pdev)
-> +{
-> +	struct dumb_vga *vga = platform_get_drvdata(pdev);
-> +
-> +	drm_bridge_remove(&vga->bridge);
-> +
-> +	if (!IS_ERR(vga->ddc))
-> +		i2c_put_adapter(vga->ddc);
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct of_device_id dumb_vga_match[] = {
-> +	{ .compatible = "dumb-vga-bridge" },
-> +	{},
-> +};
-> +MODULE_DEVICE_TABLE(of, dumb_vga_match);
-> +
-> +struct platform_driver dumb_vga_driver = {
-> +	.probe	= dumb_vga_probe,
-> +	.remove	= dumb_vga_remove,
-> +	.driver		= {
-> +		.name		= "dumb-vga-bridge",
-> +		.of_match_table	= dumb_vga_match,
-> +	},
-> +};
-> +module_platform_driver(dumb_vga_driver);
-> +
-> +MODULE_AUTHOR("Maxime Ripard <maxime.ripard@free-electrons.com>");
-> +MODULE_DESCRIPTION("Dumb RGB to VGA bridge driver");
-> +MODULE_LICENSE("GPL");
->
+> +	nor at 70009000 {
+> +		status = "okay";
+> +		compatible = "nvidia,tegra20-nor", "nvidia,tegra30-nor";
+> +		reg = <0x70009000 0x1000>;
+> +		#address-cells = <2>;
+> +		#size-cells = <1>;
+> +		clocks = <&tegra_car TEGRA30_CLK_NOR>;
+> +		resets = < &tegra_car 42>;
+> +		reset-names = "nor";
+> +		ranges = <
+> +			0 0 0x48000000 0x00000100
+> +			1 0 0x48040000 0x00000100
+> +		>;
+
+The "nvidia,config" appears to be missing here.
+
+Cheers
+Jon
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+nvpublic
