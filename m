@@ -1,98 +1,45 @@
-From: joel@jms.id.au (Joel Stanley)
-Date: Thu, 21 Jul 2016 23:13:53 +0930
-Subject: [PATCH v2 3/3] drivers/clocksource/moxart: Add Aspeed support
-In-Reply-To: <1469108633-7940-1-git-send-email-joel@jms.id.au>
-References: <1469108633-7940-1-git-send-email-joel@jms.id.au>
-Message-ID: <1469108633-7940-4-git-send-email-joel@jms.id.au>
+From: rkrcmar@redhat.com (Radim =?utf-8?B?S3LEjW3DocWZ?=)
+Date: Thu, 21 Jul 2016 15:49:38 +0200
+Subject: [PATCH v2] arm64: KVM: VHE: Context switch MDSCR_EL1
+In-Reply-To: <20160721142451.2ee990ce@arm.com>
+References: <1468933014-26966-1-git-send-email-marc.zyngier@arm.com>
+ <20160721131720.GA32739@potion> <20160721142451.2ee990ce@arm.com>
+Message-ID: <20160721134937.GA4603@potion>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Aspeed SoC has timer IP with a very similar register layout to the
-moxart timer. This patch adds support for the fourth and fifth gen
-aspeed SoCs, and has been tested on the ast2400 and ast2500.
+2016-07-21 14:24+0100, Marc Zyngier:
+> On Thu, 21 Jul 2016 15:17:20 +0200
+> Radim Kr?m?? <rkrcmar@redhat.com> wrote:
+> 
+> Hi Radim,
+> 
+>> 2016-07-19 13:56+0100, Marc Zyngier:
+>> > The kprobe enablement work has uncovered that changes made by
+>> > a guest to MDSCR_EL1 were propagated to the host when VHE was
+>> > enabled, leading to unexpected exception being delivered.
+>> > 
+>> > Moving this register to the list of registers that are always
+>> > context-switched fixes the issue.
+>> > 
+>> > Fixes: 9c6c35683286 ("arm64: KVM: VHE: Split save/restore of registers shared between guest and host")
+>> > Cc: stable at vger.kernel.org #4.6
+>> > Reported-by: Tirumalesh Chalamarla <Tirumalesh.Chalamarla@cavium.com>
+>> > Tested-by: Tirumalesh Chalamarla <Tirumalesh.Chalamarla@cavium.com>
+>> > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> > ---  
+>> 
+>> I would take this patch to 4.7 directly through the main tree.
+>> Are your plans different?
+> 
+> If you're happy to take it now, that works for me.
 
-Signed-off-by: Joel Stanley <joel@jms.id.au>
-Acked-by: Rob Herring <robh@kernel.org>
----
- .../bindings/timer/moxa,moxart-timer.txt           |  4 ++-
- drivers/clocksource/moxart_timer.c                 | 32 ++++++++++++++++++++++
- 2 files changed, 35 insertions(+), 1 deletion(-)
+The fix is clear, tested, and would go to 4.7.stable.  Better to have it
+in 4.7, IMO.
 
-diff --git a/Documentation/devicetree/bindings/timer/moxa,moxart-timer.txt b/Documentation/devicetree/bindings/timer/moxa,moxart-timer.txt
-index da2d510cae47..e207c11630af 100644
---- a/Documentation/devicetree/bindings/timer/moxa,moxart-timer.txt
-+++ b/Documentation/devicetree/bindings/timer/moxa,moxart-timer.txt
-@@ -2,7 +2,9 @@ MOXA ART timer
- 
- Required properties:
- 
--- compatible : Must be "moxa,moxart-timer"
-+- compatible : Must be one of:
-+ 	- "moxa,moxart-timer"
-+ 	- "aspeed,ast2400-timer"
- - reg : Should contain registers location and length
- - interrupts : Should contain the timer interrupt number
- - clocks : Should contain phandle for the clock that drives the counter
-diff --git a/drivers/clocksource/moxart_timer.c b/drivers/clocksource/moxart_timer.c
-index cb0b34786a8e..ad2bead9ce45 100644
---- a/drivers/clocksource/moxart_timer.c
-+++ b/drivers/clocksource/moxart_timer.c
-@@ -56,6 +56,23 @@
- #define MOXART_TIMER1_ENABLE	(MOXART_CR_2_ENABLE | MOXART_CR_1_ENABLE)
- #define MOXART_TIMER1_DISABLE	(MOXART_CR_2_ENABLE)
- 
-+/*
-+ * The ASpeed variant of the IP block has a different layout
-+ * for the control register
-+ */
-+#define ASPEED_CR_1_ENABLE	BIT(0)
-+#define ASPEED_CR_1_CLOCK	BIT(1)
-+#define ASPEED_CR_1_INT		BIT(2)
-+#define ASPEED_CR_2_ENABLE	BIT(4)
-+#define ASPEED_CR_2_CLOCK	BIT(5)
-+#define ASPEED_CR_2_INT		BIT(6)
-+#define ASPEED_CR_3_ENABLE	BIT(8)
-+#define ASPEED_CR_3_CLOCK	BIT(9)
-+#define ASPEED_CR_3_INT		BIT(10)
-+
-+#define ASPEED_TIMER1_ENABLE   (ASPEED_CR_2_ENABLE | ASPEED_CR_1_ENABLE)
-+#define ASPEED_TIMER1_DISABLE  (ASPEED_CR_2_ENABLE)
-+
- struct moxart_timer {
- 	void __iomem *base;
- 	unsigned int t1_disable_val;
-@@ -165,6 +182,9 @@ static int __init moxart_timer_init(struct device_node *node)
- 	if (of_device_is_compatible(node, "moxa,moxart-timer")) {
- 		timer->t1_enable_val = MOXART_TIMER1_ENABLE;
- 		timer->t1_disable_val = MOXART_TIMER1_DISABLE;
-+	} else if (of_device_is_compatible(node, "aspeed,ast2400-timer")) {
-+		timer->t1_enable_val = ASPEED_TIMER1_ENABLE;
-+		timer->t1_disable_val = ASPEED_TIMER1_DISABLE;
- 	} else
- 		panic("%s: unknown platform\n", node->full_name);
- 
-@@ -200,6 +220,17 @@ static int __init moxart_timer_init(struct device_node *node)
- 		return ret;
- 	}
- 
-+	/* Clear match registers */
-+	writel(0, timer->base + TIMER1_BASE + REG_MATCH1);
-+	writel(0, timer->base + TIMER1_BASE + REG_MATCH2);
-+	writel(0, timer->base + TIMER2_BASE + REG_MATCH1);
-+	writel(0, timer->base + TIMER2_BASE + REG_MATCH2);
-+
-+	/*
-+	 * Start timer 2 rolling as our main wall clock source, keep timer 1
-+	 * disabled
-+	 */
-+	writel(0, timer->base + TIMER_CR);
- 	writel(~0, timer->base + TIMER2_BASE + REG_LOAD);
- 	writel(timer->t1_disable_val, timer->base + TIMER_CR);
- 
-@@ -214,3 +245,4 @@ static int __init moxart_timer_init(struct device_node *node)
- 	return 0;
- }
- CLOCKSOURCE_OF_DECLARE(moxart, "moxa,moxart-timer", moxart_timer_init);
-+CLOCKSOURCE_OF_DECLARE(aspeed, "aspeed,ast2400-timer", moxart_timer_init);
--- 
-2.8.1
+>                                                    I can either send a
+> PR right away, or you can apply it directly, whichever works best for
+> you.
+
+It is just one patch so I'll apply it and send a pull request to Linus
+on Saturday;  less cummulative work that way. :)
