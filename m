@@ -1,38 +1,47 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 21 Jul 2016 17:16:05 -0500
-Subject: [PATCH 14/18] ARM: mvebu: add support for the Armada 395 SoC
- family
-In-Reply-To: <1469105055-25181-16-git-send-email-jaz@semihalf.com>
-References: <1469105055-25181-1-git-send-email-jaz@semihalf.com>
- <1469105055-25181-16-git-send-email-jaz@semihalf.com>
-Message-ID: <20160721221605.GA21883@rob-hp-laptop>
+From: hotran@apm.com (Hoan Tran)
+Date: Thu, 21 Jul 2016 15:21:11 -0700
+Subject: [PATCH v3 2/3] hwmon: xgene: Add hwmon driver
+In-Reply-To: <20160721220935.GB19236@roeck-us.net>
+References: <1469134557-26869-1-git-send-email-hotran@apm.com>
+ <1469134557-26869-3-git-send-email-hotran@apm.com>
+ <20160721220935.GB19236@roeck-us.net>
+Message-ID: <CAFHUOYzi48QkAp+Uw9yRSvcCrNPR5LKczDfb9r5t0fqZ0qVcFw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 21, 2016 at 02:44:11PM +0200, Grzegorz Jaszczyk wrote:
-> Beside interfaces described in the armada-39x.dtsi, the Armada 395 SoC
-> family supports: 2 x SATA3 (2 ports in one unit) and the USB3.0
-> 
-> Signed-off-by: Grzegorz Jaszczyk <jaz@semihalf.com>
-> ---
->  .../devicetree/bindings/arm/marvell/armada-39x.txt |  2 +-
->  arch/arm/boot/dts/armada-395.dtsi                  | 76 ++++++++++++++++++++++
->  2 files changed, 77 insertions(+), 1 deletion(-)
->  create mode 100644 arch/arm/boot/dts/armada-395.dtsi
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/marvell/armada-39x.txt b/Documentation/devicetree/bindings/arm/marvell/armada-39x.txt
-> index 53d4ff9..f066801 100644
-> --- a/Documentation/devicetree/bindings/arm/marvell/armada-39x.txt
-> +++ b/Documentation/devicetree/bindings/arm/marvell/armada-39x.txt
-> @@ -17,4 +17,4 @@ compatible: must contain "marvell,armada398"
->  
->  Example:
->  
-> -compatible = "marvell,a398-db", "marvell,armada398", "marvell,armada390";
-> +compatible = "marvell,a398-db", "marvell,armada398", "marvell,armada395", "marvell,armada390";
+Hi Guenter,
 
-If 395 came after 398, then it should come first in the order. This 
-implies that marvell,armada398 is a better match than marvell,armada395. 
-Or perhaps you shouldn't have both?
+On Thu, Jul 21, 2016 at 3:09 PM, Guenter Roeck <linux@roeck-us.net> wrote:
+> On Thu, Jul 21, 2016 at 01:55:56PM -0700, Hoan Tran wrote:
+>> This patch adds hardware temperature and power reading support for
+>> APM X-Gene SoC using the mailbox communication interface.
+>>
+>> Signed-off-by: Hoan Tran <hotran@apm.com>
+>> ---
+>
+> [ ... ]
+>
+>> +
+>> +     dev_info(&pdev->dev, "APM X-Gene SoC HW monitor driver registered\n");
+>> +
+>> +     return rc;
+>> +
+>
+> Nitpick: rc == 0 here, so return 0; is a better choice.
+> Otherwise looks good.
 
-Rob
+Yes, I'll fix it then send v4 shortly.
+
+>
+> Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+>
+> Note that I can not apply the patch at this time due to its dependency.
+
+Thanks ! I'll let you know when Rafael applies that dependent patch
+into linux-next.
+
+Thanks
+Hoan
+
+>
+> Guenter
