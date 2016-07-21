@@ -1,50 +1,48 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Thu, 21 Jul 2016 17:34:03 +0900
-Subject: [PATCH] ARM: exynos_defconfig: Enable bus frequency scaling with
- DEVFREQ/DEVFREQ-Event
-In-Reply-To: <1468546426-4482-1-git-send-email-cw00.choi@samsung.com>
-References: <CGME20160715013357epcas1p1f7e365ac861b48a56c029e67b9461d60@epcas1p1.samsung.com>
- <1468546426-4482-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <579088FB.2000101@samsung.com>
+From: adrian.hunter@intel.com (Adrian Hunter)
+Date: Thu, 21 Jul 2016 11:33:02 +0300
+Subject: [PATCH V2 15/15] mmc: sdhci-esdhc-imx: clear tuning bits during
+ driver probe
+In-Reply-To: <1468309584-3591-16-git-send-email-aisheng.dong@nxp.com>
+References: <1468309584-3591-1-git-send-email-aisheng.dong@nxp.com>
+ <1468309584-3591-16-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <579088BE.9090207@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krzysztof,
-
-Could you please pick this patch?
-
-Regards,
-Chanwoo Choi
-
-On 2016? 07? 15? 10:33, Chanwoo Choi wrote:
-> This patch enables the bus frequency scaling driver with DEVFREQ and
-> DEVFREQ-Event framework. This patches already was merged for Odroid-U3/XU3
-> ,Trats2 and Rinato/Monk boards.
+On 12/07/16 10:46, Dong Aisheng wrote:
+> The tuning bits like FBCLK_SEL, SMP_CLK_SEL and DLY_CELL which affects
+> timing may have already been set by ROM if booting from SD3.0 mode like
+> SDR104. Let's clear it first during driver probe before doing the new
+> card enumeration to avoid working on the wrong timing.
 > 
-> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+> Note that tuning bits are dynamical settings which may need to be kept
+> during MMC_PM_KEEP_POWER suspend, so we did not put them into hwinit
+> function.
+> 
+> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+
+
+Acked-by: Adrian Hunter <adrian.hunter@intel.com>
+
+
 > ---
->  arch/arm/configs/exynos_defconfig | 10 ++++++++++
->  1 file changed, 10 insertions(+)
+>  drivers/mmc/host/sdhci-esdhc-imx.c | 5 +++++
+>  1 file changed, 5 insertions(+)
 > 
-> diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
-> index a5aa44c56bfe..37052b115a40 100644
-> --- a/arch/arm/configs/exynos_defconfig
-> +++ b/arch/arm/configs/exynos_defconfig
-> @@ -219,6 +219,16 @@ CONFIG_CROS_EC_CHARDEV=y
->  CONFIG_COMMON_CLK_MAX77686=y
->  CONFIG_COMMON_CLK_MAX77802=y
->  CONFIG_COMMON_CLK_S2MPS11=y
-> +CONFIG_PM_DEVFREQ=y
-> +CONFIG_DEVFREQ_GOV_SIMPLE_ONDEMAND=y
-> +CONFIG_DEVFREQ_GOV_PERFORMANCE=y
-> +CONFIG_DEVFREQ_GOV_POWERSAVE=y
-> +CONFIG_DEVFREQ_GOV_USERSPACE=y
-> +CONFIG_DEVFREQ_GOV_PASSIVE=y
-> +CONFIG_ARM_EXYNOS_BUS_DEVFREQ=y
-> +CONFIG_PM_DEVFREQ_EVENT=y
-> +CONFIG_DEVFREQ_EVENT_EXYNOS_NOCP=y
-> +CONFIG_DEVFREQ_EVENT_EXYNOS_PPMU=y
->  CONFIG_EXTCON=y
->  CONFIG_EXTCON_MAX14577=y
->  CONFIG_EXTCON_MAX77693=y
+> diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
+> index e5b5d1c3eb01..2bb326bbc34a 100644
+> --- a/drivers/mmc/host/sdhci-esdhc-imx.c
+> +++ b/drivers/mmc/host/sdhci-esdhc-imx.c
+> @@ -1224,6 +1224,11 @@ static int sdhci_esdhc_imx_probe(struct platform_device *pdev)
+>  		host->mmc->caps |= MMC_CAP_1_8V_DDR;
+>  		if (!(imx_data->socdata->flags & ESDHC_FLAG_HS200))
+>  			host->quirks2 |= SDHCI_QUIRK2_BROKEN_HS200;
+> +
+> +		/* clear tuning bits in case ROM has set it already */
+> +		writel(0x0, host->ioaddr + ESDHC_MIX_CTRL);
+> +		writel(0x0, host->ioaddr + SDHCI_ACMD12_ERR);
+> +		writel(0x0, host->ioaddr + ESDHC_TUNE_CTRL_STATUS);
+>  	}
+>  
+>  	if (imx_data->socdata->flags & ESDHC_FLAG_MAN_TUNING)
 > 
