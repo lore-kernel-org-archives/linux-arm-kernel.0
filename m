@@ -1,31 +1,57 @@
-From: isubramanian@apm.com (Iyappan Subramanian)
-Date: Thu, 21 Jul 2016 15:31:42 -0700
-Subject: [PATCH v6 11/12] Documentation: dtb: xgene: Add MDIO node
-In-Reply-To: <20160721220132.GA16264@rob-hp-laptop>
-References: <1469084370-16781-1-git-send-email-isubramanian@apm.com>
- <1469084370-16781-12-git-send-email-isubramanian@apm.com>
- <20160721220132.GA16264@rob-hp-laptop>
-Message-ID: <CAKh23FnmJvhwvr-qU=d3GfGxxRu5=Rsb2kNQi8=wXCi8Afzgtg@mail.gmail.com>
+From: hotran@apm.com (Hoan Tran)
+Date: Thu, 21 Jul 2016 15:37:30 -0700
+Subject: [PATCH v4 0/3] hwmon: xgene: Add support for X-Gene hwmon driver
+Message-ID: <1469140653-2287-1-git-send-email-hotran@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+This patch set adds hardware temperature and power reading support for
+APM X-Gene SoC using the mailbox communication interface.
+For device tree, it is the standard DT mailbox.
+For ACPI, it is the PCC mailbox.
 
-On Thu, Jul 21, 2016 at 3:01 PM, Rob Herring <robh@kernel.org> wrote:
-> On Wed, Jul 20, 2016 at 11:59:29PM -0700, Iyappan Subramanian wrote:
->> Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
->> Tested-by: Fushen Chen <fchen@apm.com>
->> Tested-by: Toan Le <toanle@apm.com>
->> ---
->>  .../devicetree/bindings/net/apm-xgene-mdio.txt     | 37 ++++++++++++++++++++++
->>  1 file changed, 37 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/net/apm-xgene-mdio.txt
->
-> Please add acks when posting new versions (but don't post new versions
-> just to add acks).
+For ACPI, this patch is built on top and depends on patch[1]:
+[1] http://www.spinics.net/lists/linux-acpi/msg66041.html
+ - [PATCH v3] mailbox: pcc: Support HW-Reduced Communication Subspace type 2
 
-I am sorry, I thought that the maintainer would add the Acked/Tested
-when the patches get applied.
+v4
+ - Return 0 if driver registers successfully
+ 
+v3
+ - Order include files alphabetically
+ - Use sign_extend32() to decode temperature
+ - Use DEVICE_ATTR_RO() for temperature and power attributes
+ - Temperature and power attributes start with index 1
+ - Use !!amsg->param2
+ - Fix checkpatch WARNING with --strict flag
+ - Use hwmon_device_register_with_groups()
+ - Check invalid sensor data
 
->
-> Rob
+v2
+ - Increase power reading accurateness by using 2 registers
+(a register for Watt, another for milli-Watt)
+ - Remove power reading for SoC
+ - Fix review comments from Guenter
+
+v1
+ - Initial
+
+Hoan Tran (3):
+  Documentation: dtb: xgene: Add hwmon dts binding documentation
+  hwmon: xgene: Add hwmon driver
+  arm64: dts: apm: Add X-Gene SoC hwmon to device tree
+
+ .../devicetree/bindings/hwmon/apm-xgene-hwmon.txt  |  14 +
+ Documentation/hwmon/xgene-hwmon                    |  30 +
+ arch/arm64/boot/dts/apm/apm-shadowcat.dtsi         |   5 +
+ arch/arm64/boot/dts/apm/apm-storm.dtsi             |   5 +
+ drivers/hwmon/Kconfig                              |   7 +
+ drivers/hwmon/Makefile                             |   1 +
+ drivers/hwmon/xgene-hwmon.c                        | 755 +++++++++++++++++++++
+ 7 files changed, 817 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/hwmon/apm-xgene-hwmon.txt
+ create mode 100644 Documentation/hwmon/xgene-hwmon
+ create mode 100644 drivers/hwmon/xgene-hwmon.c
+
+-- 
+1.9.1
