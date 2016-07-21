@@ -1,103 +1,55 @@
 From: jolsa@redhat.com (Jiri Olsa)
-Date: Thu, 21 Jul 2016 09:47:31 +0200
-Subject: [PATCH V2 3/6] perf tools: add infrastructure for PMU specific
- configuration
-In-Reply-To: <1469047100-18131-4-git-send-email-mathieu.poirier@linaro.org>
+Date: Thu, 21 Jul 2016 09:47:38 +0200
+Subject: [PATCH V2 4/6] perf tools: pushing driver configuration down to
+ the kernel
+In-Reply-To: <1469047100-18131-5-git-send-email-mathieu.poirier@linaro.org>
 References: <1469047100-18131-1-git-send-email-mathieu.poirier@linaro.org>
- <1469047100-18131-4-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <20160721074731.GC7192@krava>
+ <1469047100-18131-5-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <20160721074738.GD7192@krava>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 20, 2016 at 02:38:17PM -0600, Mathieu Poirier wrote:
-
-SNIP
-
-> +static int get_config_terms(struct list_head *head_config,
-> +			    struct list_head *head_terms)
-> +{
->  	struct parse_events_term *term;
+On Wed, Jul 20, 2016 at 02:38:18PM -0600, Mathieu Poirier wrote:
+> Now that PMU specific driver configuration are queued in
+> evsel::drv_config_terms, all we need to do is re-use the current
+> ioctl() mechanism to push down the information to the kernel
+> driver.
+> 
+> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+> ---
+>  tools/perf/builtin-record.c |  9 +++++++++
+>  tools/perf/util/evlist.c    | 24 ++++++++++++++++++++++++
+>  tools/perf/util/evlist.h    |  3 +++
+>  tools/perf/util/evsel.c     | 32 ++++++++++++++++++++++++++++++++
+>  tools/perf/util/evsel.h     |  3 +++
+>  5 files changed, 71 insertions(+)
+> 
+> diff --git a/tools/perf/builtin-record.c b/tools/perf/builtin-record.c
+> index 8f2c16d9275f..dffea1033b8e 100644
+> --- a/tools/perf/builtin-record.c
+> +++ b/tools/perf/builtin-record.c
+> @@ -383,6 +383,7 @@ static int record__open(struct record *rec)
+>  	struct perf_evlist *evlist = rec->evlist;
+>  	struct perf_session *session = rec->session;
+>  	struct record_opts *opts = &rec->opts;
+> +	struct perf_evsel_config_term *err_term;
+>  	int rc = 0;
 >  
->  	list_for_each_entry(term, head_config, list) {
->  		switch (term->type_term) {
->  		case PARSE_EVENTS__TERM_TYPE_SAMPLE_PERIOD:
-> -			ADD_CONFIG_TERM(PERIOD, period, term->val.num);
-> +			ADD_CONFIG_TERM(PERIOD, period,
-> +					term->val.num, head_terms);
->  			break;
->  		case PARSE_EVENTS__TERM_TYPE_SAMPLE_FREQ:
-> -			ADD_CONFIG_TERM(FREQ, freq, term->val.num);
-> +			ADD_CONFIG_TERM(FREQ, freq, term->val.num, head_terms);
->  			break;
->  		case PARSE_EVENTS__TERM_TYPE_TIME:
-> -			ADD_CONFIG_TERM(TIME, time, term->val.num);
-> +			ADD_CONFIG_TERM(TIME, time, term->val.num, head_terms);
->  			break;
->  		case PARSE_EVENTS__TERM_TYPE_CALLGRAPH:
-> -			ADD_CONFIG_TERM(CALLGRAPH, callgraph, term->val.str);
-> +			ADD_CONFIG_TERM(CALLGRAPH, callgraph,
-> +					term->val.str, head_terms);
->  			break;
->  		case PARSE_EVENTS__TERM_TYPE_STACKSIZE:
-> -			ADD_CONFIG_TERM(STACK_USER, stack_user, term->val.num);
-> +			ADD_CONFIG_TERM(STACK_USER, stack_user,
-> +					term->val.num, head_terms);
->  			break;
->  		case PARSE_EVENTS__TERM_TYPE_INHERIT:
-> -			ADD_CONFIG_TERM(INHERIT, inherit, term->val.num ? 1 : 0);
-> +			ADD_CONFIG_TERM(INHERIT, inherit,
-> +					term->val.num ? 1 : 0, head_terms);
->  			break;
->  		case PARSE_EVENTS__TERM_TYPE_NOINHERIT:
-> -			ADD_CONFIG_TERM(INHERIT, inherit, term->val.num ? 0 : 1);
-> +			ADD_CONFIG_TERM(INHERIT, inherit,
-> +					term->val.num ? 0 : 1, head_terms);
->  			break;
->  		case PARSE_EVENTS__TERM_TYPE_MAX_STACK:
-> -			ADD_CONFIG_TERM(MAX_STACK, max_stack, term->val.num);
-> +			ADD_CONFIG_TERM(MAX_STACK, max_stack,
-> +					term->val.num, head_terms);
->  			break;
->  		case PARSE_EVENTS__TERM_TYPE_OVERWRITE:
-> -			ADD_CONFIG_TERM(OVERWRITE, overwrite, term->val.num ? 1 : 0);
-> +			ADD_CONFIG_TERM(OVERWRITE, overwrite,
-> +					term->val.num ? 1 : 0, head_terms);
->  			break;
->  		case PARSE_EVENTS__TERM_TYPE_NOOVERWRITE:
-> -			ADD_CONFIG_TERM(OVERWRITE, overwrite, term->val.num ? 0 : 1);
-> +			ADD_CONFIG_TERM(OVERWRITE, overwrite,
-> +					term->val.num ? 0 : 1, head_terms);
->  			break;
+>  	perf_evlist__config(evlist, opts, &callchain_param);
+> @@ -412,6 +413,14 @@ try_again:
+>  		goto out;
+>  	}
+>  
+> +	if (perf_evlist__apply_drv_configs(evlist, &pos, &err_term)) {
+> +		error("failed to set config \"%s\" on event %s with %d (%s)\n",
+> +			err_term->val.drv_cfg, perf_evsel__name(pos), errno,
+> +			strerror_r(errno, msg, sizeof(msg)));
+> +		rc = -1;
+> +		goto out;
+> +	}
+> +
 
-I think it'd be better to have all terms altogether,
-and handle the 'case PARSE_EVENTS__TERM_TYPE_DRV_CFG:'
-in here, rather than in separate function
-
-also ADD_CONFIG_TERM macro could stay local to the
-function with no need of adding new head arguments
+how about 'perf top' and 'perf stat', should they support this too?
 
 thanks,
 jirka
-
->  		default:
->  			break;
-> @@ -1142,6 +1158,21 @@ do {								\
->  	return 0;
->  }
->  
-> +static int get_drv_config_terms(struct list_head *head_config,
-> +				struct list_head *head_terms)
-> +{
-> +	struct parse_events_term *term;
-> +
-> +	list_for_each_entry(term, head_config, list) {
-> +		if (term->type_term != PARSE_EVENTS__TERM_TYPE_DRV_CFG)
-> +			continue;
-> +
-> +		ADD_CONFIG_TERM(DRV_CFG, drv_cfg, term->val.str, head_terms);
-> +	}
-> +
-> +	return 0;
-> +}
-
-SNIP
