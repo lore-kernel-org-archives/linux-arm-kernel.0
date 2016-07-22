@@ -1,47 +1,35 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 22 Jul 2016 17:51:07 +0100
-Subject: [PATCH v3 0/6] Add support for privileged mappings
-In-Reply-To: <20160719203655.16629-1-mitchelh@codeaurora.org>
-References: <20160719203655.16629-1-mitchelh@codeaurora.org>
-Message-ID: <20160722165107.GH16837@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 22 Jul 2016 18:28:19 +0100
+Subject: [PATCH 02/55] arm64: Add PTE_HYP_XN page table flag
+In-Reply-To: <1469208552-4155-1-git-send-email-marc.zyngier@arm.com>
+References: <1469208552-4155-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1469208552-4155-3-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 19, 2016 at 01:36:49PM -0700, Mitchel Humpherys wrote:
-> The following patch to the ARM SMMU driver:
-> 
->     commit d346180e70b91b3d5a1ae7e5603e65593d4622bc
->     Author: Robin Murphy <robin.murphy@arm.com>
->     Date:   Tue Jan 26 18:06:34 2016 +0000
->     
->         iommu/arm-smmu: Treat all device transactions as unprivileged
-> 
-> started forcing all SMMU transactions to come through as "unprivileged".
-> The rationale given was that:
-> 
->   (1) There is no way in the IOMMU API to even request privileged mappings.
-> 
->   (2) It's difficult to implement a DMA mapper that correctly models the
->       ARM VMSAv8 behavior of unprivileged-writeable =>
->       privileged-execute-never.
-> 
-> This series rectifies (1) by introducing an IOMMU API for privileged
-> mappings and implements it in io-pgtable-arm.
-> 
-> This series rectifies (2) by introducing a new dma attribute
-> (DMA_ATTR_PRIVILEGED) for users of the DMA API that need privileged
-> mappings which are inaccessible to lesser-privileged execution levels, and
-> implements it in the arm64 IOMMU DMA mapper.  The one known user (pl330.c)
-> is converted over to the new attribute.
-> 
-> Jordan and Jeremy can provide more info on the use case if needed, but the
-> high level is that it's a security feature to prevent attacks such as [1].
+EL2 page tables can be configured to deny code from being
+executed, which is done by setting bit 54 in the page descriptor.
 
-This all looks good to me:
+It is the same bit as PTE_UXN, but the "USER" reference felt odd
+in the hypervisor code.
 
-Acked-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+---
+ arch/arm64/include/asm/pgtable-hwdef.h | 1 +
+ 1 file changed, 1 insertion(+)
 
-It looks pretty fiddly to merge, however. How are you planning to get
-this upstream?
-
-Will
+diff --git a/arch/arm64/include/asm/pgtable-hwdef.h b/arch/arm64/include/asm/pgtable-hwdef.h
+index 2813748..c3ae239 100644
+--- a/arch/arm64/include/asm/pgtable-hwdef.h
++++ b/arch/arm64/include/asm/pgtable-hwdef.h
+@@ -164,6 +164,7 @@
+ #define PTE_CONT		(_AT(pteval_t, 1) << 52)	/* Contiguous range */
+ #define PTE_PXN			(_AT(pteval_t, 1) << 53)	/* Privileged XN */
+ #define PTE_UXN			(_AT(pteval_t, 1) << 54)	/* User XN */
++#define PTE_HYP_XN		(_AT(pteval_t, 1) << 54)	/* HYP XN */
+ 
+ /*
+  * AttrIndx[2:0] encoding (mapping attributes defined in the MAIR* registers).
+-- 
+2.8.1
