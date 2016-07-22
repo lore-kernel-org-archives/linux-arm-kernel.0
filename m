@@ -1,47 +1,43 @@
-From: panand@redhat.com (Pratyush Anand)
-Date: Fri, 22 Jul 2016 09:38:42 +0530
-Subject: [PATCH v1 3/4] arm64: Add arm64 kexec support
-In-Reply-To: <1469137776.2977.128.camel@infradead.org>
-References: <cover.1468970114.git.geoff@infradead.org>
- <9ed513fd44a19b2f49b4da99477cedfff7341bf0.1468970114.git.geoff@infradead.org>
- <20160720153859.GG24691@leverpostej>
- <1469042361.2977.90.camel@infradead.org>
- <20160721103120.GB20559@leverpostej> <5790A902.6070601@arm.com>
- <1469137776.2977.128.camel@infradead.org>
-Message-ID: <20160722040842.GA14911@localhost.localdomain>
+From: zhiyong.tao@mediatek.com (zhiyong tao)
+Date: Fri, 22 Jul 2016 12:19:21 +0800
+Subject: [PATCH v5 3/3] arm: dts: mt2701: Add auxadc node.
+In-Reply-To: <201607220639.0tIT3cRj%fengguang.wu@intel.com>
+References: <201607220639.0tIT3cRj%fengguang.wu@intel.com>
+Message-ID: <1469161161.419.48.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/07/2016:02:49:36 PM, Geoff Levand wrote:
-> On Thu, 2016-07-21 at 11:50 +0100, Robin Murphy wrote:
-> > The Exynos UART (drivers/tty/serial/samsung.c) is one which comes to
-> > mind as definitely existing, and on arm64 systems to boot. The TX
-> > register is at offset 0x20 there.
-> 
-> Here's what I came up with.
-> 
-> 
-> +	struct data {const char *name; int tx_offset;};
-> +	static const struct data ok_list[] = {
-> +	/*	{"armada-3700-uart", ?},	*/
-> +		{"exynos4210-uart", 0x20},
-> +	/*	{"ls1021a-lpuart", ?},		*/
-> +	/*	{"meson-uart", ?},		*/
-> +	/*	{"mt6577-uart", ?},		*/
-> +		{"ns16550", 0},
-> +		{"ns16550a", 0},
-> +		{"pl011", 0},
-> +		{NULL, 0}
-> +	};
+On Fri, 2016-07-22 at 06:08 +0800, kbuild test robot wrote:
 
-sinc functionality is just to debug the scenario when something goes wrong in
-purgatory. IMHO, it should be disabled by default. So, why not to keep it as
-simple as possible. Its a low level debugging mainly for developer, so user
-should know the absolute address. Therefore, I think no need to parse earlycon
-or earlyprintk from command line.  Whatever user passes in --port can be treated
-as address of TX register. If TX offset is 0x20, then user can pass --port as
-base+0x20. Additionally, we can pass TX register width as well. So what about
-something like "--port=0x1c020000,1" where 0x1c020000 is TX register address and
-1 says about it's width in bytes.
+sorry, I forget to add this information:
+---
+This patch dependents on "Add clock support for Mediatek MT2701"[1].
+Please accept this patch together with [1].
+[1]http://lists.infradead.org/pipermail/linux-mediatek/2016-June/005969.html
+---
+I will add this information in next version commit message.
 
-~Pratyush
+> Hi,
+> 
+> [auto build test ERROR on robh/for-next]
+> [also build test ERROR on v4.7-rc7 next-20160721]
+> [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+> 
+> url:    https://github.com/0day-ci/linux/commits/Zhiyong-Tao/AUXADC-Mediatek-auxadc-driver/20160722-041141
+> base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git for-next
+> config: arm-at91_dt_defconfig (attached as .config)
+> compiler: arm-linux-gnueabi-gcc (Debian 5.4.0-6) 5.4.0 20160609
+> reproduce:
+>         wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+>         chmod +x ~/bin/make.cross
+>         # save the attached .config to linux build tree
+>         make.cross ARCH=arm 
+> 
+> All errors (new ones prefixed by >>):
+> 
+> >> Error: arch/arm/boot/dts/mt2701.dtsi:145.22-23 syntax error
+>    FATAL ERROR: Unable to parse input tree
+> 
+> ---
+> 0-DAY kernel test infrastructure                Open Source Technology Center
+> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
