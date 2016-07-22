@@ -1,210 +1,68 @@
-From: oss@buserror.net (Scott Wood)
-Date: Fri, 22 Jul 2016 09:29:35 -0500
-Subject: [PATCH] [linux-devel]arm64: Add DTS support for FSL's LS1012A SoC
-In-Reply-To: <1469165712-4356-1-git-send-email-Bhaskar.Upadhaya@nxp.com>
-References: <1469165712-4356-1-git-send-email-Bhaskar.Upadhaya@nxp.com>
-Message-ID: <1469197775.25630.72.camel@buserror.net>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Fri, 22 Jul 2016 15:30:44 +0100
+Subject: [PATCH 2/5] arm64: efi: always map runtime services code and data
+ regions down to pages
+In-Reply-To: <1467204690-10790-3-git-send-email-ard.biesheuvel@linaro.org>
+References: <1467204690-10790-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1467204690-10790-3-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <64a731b2-1ddb-78f5-fd02-204f19f0a432@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2016-07-22 at 11:05 +0530, Bhaskar Upadhaya wrote:
-> diff --git a/arch/arm64/boot/dts/freescale/Makefile
-> b/arch/arm64/boot/dts/freescale/Makefile
-> index 1b7783d..4aa3bee 100644
-> --- a/arch/arm64/boot/dts/freescale/Makefile
-> +++ b/arch/arm64/boot/dts/freescale/Makefile
-> @@ -3,6 +3,9 @@ dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1043a-rdb.dtb
-> ?dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2080a-qds.dtb
-> ?dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2080a-rdb.dtb
-> ?dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2080a-simu.dtb
-> +dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1012a-qds.dtb
-> +dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1012a-rdb.dtb
-> +dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1012a-frdm.dtb
-?
-Please keep such lists sorted.
+Hi Ard,
 
-> +&i2c0 {
-> +	status = "okay";
-> +
-> +	codec: sgtl5000 at a {
-> +		#sound-dai-cells = <0>;
-> +		compatible = "fsl,sgtl5000";
-> +		reg = <0xa>;
-> +		VDDA-supply = <&reg_1p8v>;
-> +		VDDIO-supply = <&reg_1p8v>;
-> +		clocks = <&sys_mclk 1>;
+On 29/06/16 13:51, Ard Biesheuvel wrote:
+> To avoid triggering diagnostics in the MMU code that are finicky about
+> splitting block mappings into more granular mappings, ensure that regions
+> that are likely to appear in the Memory Attributes table as well as the
+> UEFI memory map are always mapped down to pages. This way, we can use
+> apply_to_page_range() instead of create_pgd_mapping() for the second pass,
+> which cannot split or merge block entries, and operates strictly on PTEs.
+>
+> Note that this aligns the arm64 Memory Attributes table handling code with
+> the ARM code, which already uses apply_to_page_range() to set the strict
+> permissions.
+>
 
-sys_mclk is a fixed-clock, with #clock-cells = <0>. ?What is the "1" for?
+This patch is merged in arm64/for-next/core now and when I try that
+branch with defconfig + CONFIG_PROVE_LOCKING, I get the following splat
+on boot and it fails to boot further on Juno.
 
-> +	ethernet at 1 {
-> +		compatible = "fsl,pfe-gemac-port";
+I could bisect that to this patch(Commit bd264d046aad ("arm64: efi:
+always map runtime services code and data regions down to pages") in
+that branch)
 
-Binding?
+Regards,
+Sudeep
 
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		reg = <	0x1 >;	/* GEM_ID */
-> +		fsl,gemac-bus-id = < 0x1 >;	/* BUS_ID */
-> +		fsl,gemac-phy-id = < 0x1 >;	/* PHY_ID */
-> +		fsl,mdio-mux-val = <0x0>;
+-->8
 
-No spaces inside <>
-
-> +		local-mac-address = [ 00 AA BB CC DD EE ];
-
-No.
-
-> +	regulators {
-> +		compatible = "simple-bus";
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-
-simple-bus does not make sense with #size-cells = <0>. ?It's for memory-mapped 
-devices.
-
-> +};
-> +&ftm0 {
-
-Leave a blank line between nodes.
-
-> +/ {
-> +	compatible = "fsl,ls1012a";
-> +	interrupt-parent = <&gic>;
-> +	#address-cells = <2>;
-> +	#size-cells = <2>;
-> +
-> +	cpus {
-> +		#address-cells = <2>;
-> +		#size-cells = <0>;
-> +
-> +		/*
-> +		?* We expect the enable-method for cpu's to be "psci", but
-> this
-> +		?* is dependent on the SoC FW, which will fill this in.
-> +		?*
-> +		?* Currently supported enable-method is psci v0.2
-> +		?*/
-
-Why do you expect any enable-method on a chip with only one CPU?
-
-
-> +	sysclk: sysclk {
-> +		compatible = "fixed-clock";
-> +		#clock-cells = <0>;
-> +		clock-frequency = <100000000>;
-> +		clock-output-names = "sysclk";
-> +	};
-> +
-> +	timer {
-> +		compatible = "arm,armv8-timer";
-> +		interrupts = <1 13 0x1>, /* Physical Secure PPI */
-> +			?????<1 14 0x1>, /* Physical Non-Secure PPI */
-> +			?????<1 11 0x1>, /* Virtual PPI */
-> +			?????<1 10 0x1>; /* Hypervisor PPI */
-> +		arm,reread-timer;
-> +	};
-
-arm,reread-timer does not belong here.
-
-Please don't blindly copy and paste things, either from one chip to another or
-from old deprecated internal stuff.
-
-
-> +
-> +		clockgen: clocking at 1ee1000 {
-> +			compatible = "fsl,ls1012a-clockgen","fsl,ls1043a-
-> clockgen";
-> +			reg = <0x0 0x1ee1000 0x0 0x1000>;
-> +			#clock-cells = <2>;
-> +			clocks = <&sysclk>;
-> +		};
-
-clockgen nodes should not claim compatibility with another SoC. ?The clocking
-options on ls1012a are not the same as on ls1043a.
-
-
-> +
-> +		scfg: scfg at 1570000 {
-> +			compatible = "fsl,ls1012a-scfg", "fsl,ls1043a-
-> scfg", "syscon";
-> +			reg = <0x0 0x1570000 0x0 0x10000>;
-> +			big-endian;
-> +		};
-
-The SCFG on ls1021a is not compatible with ls1043a.
-
-> +		reset: reset at 1EE00B0 {
-> +			compatible = "fsl,ls-reset";
-> +			reg = <0x0 0x1EE00B0 0x0 0x4>;
-> +			big-endian;
-> +		};
-
-This was an old internal hack that doesn't belong here.
-
-> +
-> +		rcpm: rcpm at 1ee2000 {
-> +			compatible = "fsl,ls1012a-rcpm", "fsl,ls1043a-
-> rcpm", "fsl,qoriq-rcpm-2.1";
-> +			reg = <0x0 0x1ee2000 0x0 0x10000>;
-
-The RCPM on ls1043a has several registers that ls1012a does not have. ?They
-are not compatible.
-
-"rcpm-2.1" is probably not appropriate either.
-
-> +		};
-> +
-> +????????????????ftm0: ftm0 at 29d0000 {
-> +????????????????????????compatible = "fsl,ftm-alarm";
-> +????????????????????????reg = <0x0 0x29d0000 0x0 0x10000>;
-> +????????????????????????interrupts = <0 86 0x4>;
-> +????????????????????????big-endian;
-> +			rcpm-wakeup = <&rcpm 0x00020000 0x0>;
-> +????????????????????????status = "disabled";
-> +????????????????};
-> +
-> +		esdhc0: esdhc at 1560000 {
-
-Whitespace
-
-> +		tmu: tmu at 1f00000 {
-> +			compatible = "fsl,qoriq-tmu", "fsl,ls1012a-tmu";
-
-More specific compatibles come first.
-
-> +	reserved-memory {
-> +		#address-cells = <2>;
-> +		#size-cells = <2>;
-> +		ranges;
-> +
-> +		pfe_reserved: packetbuffer at 83400000 {
-> +			reg = <0 0x83400000 0 0xc00000>;
-> +		};
-> +	};
-
-Could you explain this reservation?
-
-> +
-> +	pfe: pfe at 04000000 {
-> +		compatible = "fsl,pfe";
-> +		ranges = <0x0 0x00 0x04000000 0xc00000
-> +			??0x1 0x00 0x83400000 0xc00000>;
-> +		reg =???<0x0 0x90500000 0x0 0x10000>,	/* APB 64K */
-> +			<0x0 0x04000000 0x0 0xc00000>,	/* AXI 16M */
-> +			<0x0 0x83400000 0x0 0xc00000>,????/* PFE DDR 12M */
-> +			<0x0 0x10000000 0x0 0x2000>;	/* OCRAM 8K??*/
-> +		fsl,pfe-num-interfaces = < 0x2 >;
-> +		interrupts = <0 172 0x4>;
-> +		#interrupt-names = "hifirq";
-> +		memory-region = <&pfe_reserved>;
-> +		fsl,pfe-scfg = <&scfg 0>;
-
-Binding?
-
-> +	};
-> +
-> +};
-
-Don't put a blank line between these.
-
--Scott
+efi: memattr: Processing EFI Memory Attributes table:
+efi: memattr:  0x0000f9400000-0x0000f942ffff [Runtime Data       |RUN| | 
+  |XP|  |  |  |   |  |  |  |  ]
+Unable to handle kernel NULL pointer dereference at virtual address 00000018
+pgd = ffff000009aa4000
+[00000018] *pgd=00000009ffffe003, *pud=00000009ffffd003, 
+*pmd=0000000000000000
+Internal error: Oops: 96000004 [#1] PREEMPT SMP
+Modules linked in:
+CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.7.0-rc7-next-20160722 #134
+Hardware name: ARM Juno development board (r2) (DT)
+task: ffff800976ca0000 task.stack: ffff800976c3c000
+PC is at __lock_acquire+0x13c/0x19e0
+LR is at lock_acquire+0x4c/0x68
+pc : [<ffff000008104544>] lr : [<ffff000008106114>] pstate: 200000c5
+....
+  __lock_acquire+0x13c/0x19e0
+  lock_acquire+0x4c/0x68
+  _raw_spin_lock+0x40/0x58
+  apply_to_page_range+0x18c/0x388
+  efi_set_mapping_permissions+0x34/0x44
+  efi_memattr_apply_permissions+0x200/0x2a8
+  arm_enable_runtime_services+0x1b4/0x1fc
+  do_one_initcall+0x38/0x128
+  kernel_init_freeable+0x84/0x1f0
+  kernel_init+0x10/0x100
+  ret_from_fork+0x10/0x40
+Code: 5280003c 79004401 140000b5 b000b880 (f9400282)
+---[ end trace 892120beb6681b4e ]---
