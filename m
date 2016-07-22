@@ -1,53 +1,31 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 22 Jul 2016 21:30:58 +0200
-Subject: [GIT PULL] Renesas ARM Based SoC DT Fixes for v4.8
-In-Reply-To: <20160722015924.GH21943@verge.net.au>
-References: <cover.1468808109.git.horms+renesas@verge.net.au>
- <7322553.kXvQYPfzzh@wuerfel> <20160722015924.GH21943@verge.net.au>
-Message-ID: <4175400.eEqji2rNII@wuerfel>
+From: rkrcmar@redhat.com (Radim =?utf-8?B?S3LEjW3DocWZ?=)
+Date: Fri, 22 Jul 2016 21:50:17 +0200
+Subject: [PULL] KVM/ARM updates for Linux 4.8, take #1
+In-Reply-To: <1469208552-4155-1-git-send-email-marc.zyngier@arm.com>
+References: <1469208552-4155-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20160722195016.GD9019@potion>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, July 22, 2016 10:59:24 AM CEST Simon Horman wrote:
-> On Thu, Jul 21, 2016 at 02:41:52PM +0200, Arnd Bergmann wrote:
-> > On Monday, July 18, 2016 11:39:35 AM CEST Simon Horman wrote:
-> > > Renesas ARM Based SoC DT Fixes for v4.8
-> > > 
-> > > * Corrections to r8a7792
-> > > 
-> > 
-> > Merged into next/dt, thanks!
+2016-07-22 18:28+0100, Marc Zyngier:
+> Paolo, Radim,
 > 
-> Thanks!
+> Please find below the first batch of 4.8 updates for KVM/ARM. Biggest
+> feature is the long awaited GICv3 ITS emulation, allowing MSIs to be
+> delivered into guests running on GICv3 HW. The other big feature is
+> the removal of the old vgic implementation. Less visible is the revamp
+> of the way we deal with the HYP initialization (by keeping an idmap
+> around), and making HYP page tables honor the kernel's own protection.
 > 
-> I have queued up another fix for v4.8 since sending the above to you.
-> This time it is an SoC (C-code) rather than a DT fix. I am wondering
-> if you could offer guidance on:
+> This may generate a few conflicts, all of which have been seen in
+> -next. 3 which are KVM specific (and pretty easy to resolve), and
+> another one in include/irqchip/arm-gic-v3.h. They should be resolved
+> as in -next.
 > 
-> * If you would prefer me to split fixes out into separate (DT, SoC, ...)
->   branches? If so is that until around rc1 when everything has been
->   merged into the forthcoming release and thereafter you would prefer
->   a single fixes branch?
+> Please pull!
 
-I prefer a separate fixes branch. It's fine for all other branches
-to be based on top of this branch so you have a working baseline
-for testing.
+Pulled into kvm/next, KVM_CAP_MSI_DEVID is 131.
 
-> * What pace you would like me to send fixes. I guess it depends on
->   where we are in the cycle. Currently I put the changes in next and
->   send what I have about once a week (or not if there are none :).
-> 
-> Typically there are very few fixes. But as I already have 3 for v4.8,
-> including those in this pull request, I get the feeling a few more could
-> emerge before v4.8 is released.
+>  54 files changed, 2698 insertions(+), 6065 deletions(-)
 
-I'd say don't wait longer than a week before forwarding bugfixes.
-If you find something urgent, just send that right away along with
-whatever less urgent patches you have accumulated.
-
-It's possible we won't merge it right away as we might all be busy
-for a couple of days, but in the worst case that means you send
-another fixes pull request that is a superset before we have merged
-the first one.
-
-	Arnd
+<3
