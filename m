@@ -1,140 +1,74 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Fri, 22 Jul 2016 12:24:48 -0600
-Subject: [PATCH V2 3/6] perf tools: add infrastructure for PMU specific
- configuration
-In-Reply-To: <20160721145434.GA15915@krava>
-References: <1469047100-18131-1-git-send-email-mathieu.poirier@linaro.org>
- <1469047100-18131-4-git-send-email-mathieu.poirier@linaro.org>
- <20160721074722.GB7192@krava>
- <CANLsYkxj+kccmvTtOLAYwyN9fOp0pMxdPcWy5cJHQDQLoj-NmQ@mail.gmail.com>
- <20160721145434.GA15915@krava>
-Message-ID: <CANLsYkwx+iOE6uwOVPtsHFMmNaH0=NjeDP8z0GZhHja2oibt8g@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 22 Jul 2016 20:42:08 +0200
+Subject: [PATCH] ARM: mm: use fully constructed struct pages for EFI pgd
+ allocations
+Message-ID: <1469212928-21517-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21 July 2016 at 08:54, Jiri Olsa <jolsa@redhat.com> wrote:
-> On Thu, Jul 21, 2016 at 08:44:53AM -0600, Mathieu Poirier wrote:
->
-> SNIP
->
->> >> diff --git a/tools/perf/util/parse-events.l b/tools/perf/util/parse-events.l
->> >> index 7a2519435da0..1f7e11a6c5b3 100644
->> >> --- a/tools/perf/util/parse-events.l
->> >> +++ b/tools/perf/util/parse-events.l
->> >> @@ -53,6 +53,16 @@ static int str(yyscan_t scanner, int token)
->> >>       return token;
->> >>  }
->> >>
->> >> +static int drv_str(yyscan_t scanner, int token)
->> >> +{
->> >> +     YYSTYPE *yylval = parse_events_get_lval(scanner);
->> >> +     char *text = parse_events_get_text(scanner);
->> >> +
->> >> +     /* Strip off the '@' */
->> >> +     yylval->str = strdup(text + 1);
->> >> +     return token;
->> >> +}
->> >
->> > why don't let bison parse this with rule like:
->> >
->> > | '@' PE_DRV_CFG_TERM
->> > {
->> > ...
->> > }
->> >
->> >
->> > you could omit the drv_str function then
->>
->> I simply thought it was simple and clean to do it that way - and it
->> follows the trend already in place.  Are you sure you want me to move
->> this to bison?  Either way we have to add code...
->>
->> Many thanks for the review,
->> Mathieu
->
-> hum, i might be missing something, but what I meant
-> was something like below
->
-> thanks,
-> jirka
->
->
-> ---
-> diff --git a/tools/perf/util/parse-events.l b/tools/perf/util/parse-events.l
-> index 1f7e11a6c5b3..9b00f9b9caa2 100644
-> --- a/tools/perf/util/parse-events.l
-> +++ b/tools/perf/util/parse-events.l
-> @@ -53,16 +53,6 @@ static int str(yyscan_t scanner, int token)
->         return token;
->  }
->
-> -static int drv_str(yyscan_t scanner, int token)
-> -{
-> -       YYSTYPE *yylval = parse_events_get_lval(scanner);
-> -       char *text = parse_events_get_text(scanner);
-> -
-> -       /* Strip off the '@' */
-> -       yylval->str = strdup(text + 1);
-> -       return token;
-> -}
-> -
->  #define REWIND(__alloc)                                \
->  do {                                                           \
->         YYSTYPE *__yylval = parse_events_get_lval(yyscanner);   \
-> @@ -220,7 +210,7 @@ no-overwrite                { return term(yyscanner, PARSE_EVENTS__TERM_TYPE_NOOVERWRITE); }
->  {name_minus}           { return str(yyscanner, PE_NAME); }
->  \[all\]                        { return PE_ARRAY_ALL; }
->  "["                    { BEGIN(array); return '['; }
-> -@{drv_cfg_term}                { return drv_str(yyscanner, PE_DRV_CFG_TERM); }
-> +{drv_cfg_term}         { return PE_DRV_CFG_TERM; }
->  }
->
->  <mem>{
-> diff --git a/tools/perf/util/parse-events.y b/tools/perf/util/parse-events.y
-> --- a/tools/perf/util/parse-events.y
-> +++ b/tools/perf/util/parse-events.y
-> @@ -602,12 +602,12 @@ PE_NAME array '=' PE_VALUE
->         $$ = term;
->  }
->  |
-> -PE_DRV_CFG_TERM
-> +'@' PE_DRV_CFG_TERM
->  {
->         struct parse_events_term *term;
->
->         ABORT_ON(parse_events_term__str(&term, PARSE_EVENTS__TERM_TYPE_DRV_CFG,
-> -                                       $1, $1, &@1, NULL));
-> +                                       $2, $2, &@2, NULL));
->         $$ = term;
->  }
->
+The late_alloc() PTE allocation function used by create_mapping_late()
+does not call pgtable_page_ctor() on PTE pages it allocates, leaving
+the per-page spinlock uninitialized.
 
-I've been experimenting with the above solution and it is not yielding
-the results one might think at first glance.
+Since generic page table manipulation code may assume that translation
+table pages that are not owned by init_mm are covered by fully
+constructed struct pages, the following crash may occur with the new
+UEFI memory attributes table code.
 
-If we use the example: -e event/@cfg1/ ...
+  efi: memattr: Processing EFI Memory Attributes table:
+  efi: memattr:  0x0000ffa16000-0x0000ffa82fff [Runtime Code       |RUN|  |  |XP|  |  |  |   |  |  |  |  ]
+  Unable to handle kernel NULL pointer dereference at virtual address 00000010
+  pgd = c0204000
+  [00000010] *pgd=00000000
+  Internal error: Oops: 5 [#1] SMP ARM
+  Modules linked in:
+  CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.7.0-rc4-00063-g3882aa7b340b #361
+  Hardware name: Generic DT based system
+  task: ed858000 ti: ed842000 task.ti: ed842000
+  PC is at __lock_acquire+0xa0/0x19a8
+  ...
+  [<c038c830>] (__lock_acquire) from [<c038e4f8>] (lock_acquire+0x6c/0x88)
+  [<c038e4f8>] (lock_acquire) from [<c0c06134>] (_raw_spin_lock+0x2c/0x3c)
+  [<c0c06134>] (_raw_spin_lock) from [<c0410384>] (apply_to_page_range+0xe8/0x238)
+  [<c0410384>] (apply_to_page_range) from [<c1205f34>] (efi_set_mapping_permissions+0x54/0x5c)
+  [<c1205f34>] (efi_set_mapping_permissions) from [<c1247474>] (efi_memattr_apply_permissions+0x2b8/0x378)
+  [<c1247474>] (efi_memattr_apply_permissions) from [<c1248258>] (arm_enable_runtime_services+0x1f0/0x22c)
+  [<c1248258>] (arm_enable_runtime_services) from [<c0301f0c>] (do_one_initcall+0x44/0x174)
+  [<c0301f0c>] (do_one_initcall) from [<c1200d10>] (kernel_init_freeable+0x90/0x1e8)
+  [<c1200d10>] (kernel_init_freeable) from [<c0bff690>] (kernel_init+0x8/0x114)
+  [<c0bff690>] (kernel_init) from [<c0307ed0>] (ret_from_fork+0x14/0x24)
 
-First if we leave things exactly the way they are suggested in the
-code snippet flex doesn't know what do to with the '@' character and
-returns an error.  To deal with that a new clause
+The crash is due to the fact that the UEFI page tables are not owned by
+init_mm, but are not covered by fully constructed struct pages.
 
-"@"        { return '@'; }
+Given that the UEFI subsystem is currently the only user of
+create_mapping_late(), add an unconditional call to pgtable_page_ctor() to
+late_alloc().
 
-can be inserted in the config state.  But that doesn't link '@' with
-'cfg1', and 'cfg1' gets interpreted as a PE_NAME.  Introducing a new
-state upon hitting '@' would get us around that but we are moving away
-from our initial goal of keeping things simple.
+Fixes: 9fc68b717c24 ("ARM/efi: Apply strict permissions for UEFI Runtime Services regions")
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
 
-Another solution is to have something like this:
+The commit in question was introduced in v4.7, so ideally this should go in
+as a late fix. However, EFI on ARM is not widely used [yet], and the memory
+attributes table even less so, so I am perfectly happy for this to go in
+later.
 
-drv_cfg_term    @[a-zA-Z0-9_\.]+(=[a-zA-Z0-9_*?\.:]+)?
+ arch/arm/mm/mmu.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-But then we need to strip off the '@' character in the parse-events.y
-file, which isn't pretty given that it can be done so easily with the
-solution I had before.
-
-So I'm a little puzzled on how to proceed here, but I'm well aware
-that my flex/bison knowledge might also be too shallow...
-
-Thanks,
-Mathieu
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index 62f4d01941f7..d0ac45451805 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -728,7 +728,7 @@ static void *__init late_alloc(unsigned long sz)
+ {
+ 	void *ptr = (void *)__get_free_pages(PGALLOC_GFP, get_order(sz));
+ 
+-	BUG_ON(!ptr);
++	BUG_ON(!ptr || !pgtable_page_ctor(virt_to_page(ptr)));
+ 	return ptr;
+ }
+ 
+-- 
+2.7.4
