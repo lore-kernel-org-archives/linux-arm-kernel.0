@@ -1,68 +1,118 @@
-From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Thu, 21 Jul 2016 19:16:02 -0400
-Subject: [PATCH v2 3/4] drivers: reset: Add STM32 reset driver
-In-Reply-To: <34955897.5sjo821nJx@wuerfel>
-References: <1469092768-17489-1-git-send-email-gabriel.fernandez@st.com>
- <1469092768-17489-4-git-send-email-gabriel.fernandez@st.com>
- <CAP=VYLq+Yp=dyMLY5zp8evNJ+jLkUgJ_s19gD1uC6KP8MmXPDQ@mail.gmail.com>
- <34955897.5sjo821nJx@wuerfel>
-Message-ID: <20160721231602.GK21225@windriver.com>
+From: mturquette@baylibre.com (Michael Turquette)
+Date: Thu, 21 Jul 2016 17:07:53 -0700
+Subject: [Xen-devel] [PATCH v4] xen/arm: Add a clock property
+In-Reply-To: <alpine.DEB.2.10.1607141132000.26575@sstabellini-ThinkPad-X260>
+References: <1468309605-19522-1-git-send-email-dirk.behme@de.bosch.com>
+ <146836236759.73491.11707389619985827497@resonance>
+ <c320f820-8749-f4a4-435e-ddd9379655b5@de.bosch.com>
+ <alpine.DEB.2.10.1607131941200.26575@sstabellini-ThinkPad-X260>
+ <57868EDE.6060406@gmail.com>
+ <146844380895.73491.4867379517577413421@resonance>
+ <7df784ab-d0c0-939b-393e-214535c4b191@de.bosch.com>
+ <alpine.DEB.2.10.1607141132000.26575@sstabellini-ThinkPad-X260>
+Message-ID: <146914607316.8780.7961396342647226841@resonance>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Re: [PATCH v2 3/4] drivers: reset: Add STM32 reset driver] On 21/07/2016 (Thu 21:55) Arnd Bergmann wrote:
-
-> On Thursday, July 21, 2016 3:48:09 PM CEST Paul Gortmaker wrote:
-> > > diff --git a/drivers/reset/Makefile b/drivers/reset/Makefile
-> > > index 5d65a93..64ebb0c 100644
-> > > --- a/drivers/reset/Makefile
-> > > +++ b/drivers/reset/Makefile
-> > > @@ -4,6 +4,7 @@ obj-$(CONFIG_ARCH_SOCFPGA) += reset-socfpga.o
-> > >  obj-$(CONFIG_ARCH_BERLIN) += reset-berlin.o
-> > >  obj-$(CONFIG_MACH_PISTACHIO) += reset-pistachio.o
-> > >  obj-$(CONFIG_ARCH_MESON) += reset-meson.o
-> > > +obj-$(CONFIG_ARCH_STM32) += reset-stm32.o
+Quoting Stefano Stabellini (2016-07-14 03:38:04)
+> On Thu, 14 Jul 2016, Dirk Behme wrote:
+> > On 13.07.2016 23:03, Michael Turquette wrote:
+> > > Quoting Dirk Behme (2016-07-13 11:56:30)
+> > > > On 13.07.2016 20:43, Stefano Stabellini wrote:
+> > > > > On Wed, 13 Jul 2016, Dirk Behme wrote:
+> > > > > > On 13.07.2016 00:26, Michael Turquette wrote:
+> > > > > > > Quoting Dirk Behme (2016-07-12 00:46:45)
+> > > > > > > > Clocks described by this property are reserved for use by Xen, and
+> > > > > > > > the OS
+> > > > > > > > must not alter their state any way, such as disabling or gating a
+> > > > > > > > clock,
+> > > > > > > > or modifying its rate. Ensuring this may impose constraints on
+> > > > > > > > parent
+> > > > > > > > clocks or other resources used by the clock tree.
+> > > > > > > 
+> > > > > > > Note that clk_prepare_enable will not prevent the rate from changing
+> > > > > > > (clk_set_rate) or a parent from changing (clk_set_parent). The only
+> > > > > > > way
+> > > > > > > to do this currently would be to set the following flags on the
+> > > > > > > effected
+> > > > > > > clocks:
+> > > > > > > 
+> > > > > > >     CLK_SET_RATE_GATE
+> > > > > > >     CLK_SET_PARENT_GATE
+> > > > > > 
+> > > > > > 
+> > > > > > 
+> > > > > > Regarding setting flags, I think we already talked about that. I think
+> > > > > > the
+> > > > > > conclusion was that in our case its not possible to manipulate the
+> > > > > > flags in
+> > > > > > the OS as this isn't intended to be done in cases like ours. Therefore
+> > > > > > no API
+> > > > > > is exported for this.
+> > > > > > 
+> > > > > > I.e. if we need to set these flags, we have to do that in Xen where we
+> > > > > > add the
+> > > > > > clocks to the hypervisor node in the device tree. And not in the
+> > > > > > kernel patch
+> > > > > > discussed here.
+> > > > > 
+> > > > > These are internal Linux flags, aren't they?
+> > > > 
+> > > > 
+> > > > I've been under the impression that you can set clock "flags" via the
+> > > > device tree. Seems I need to re-check that ;)
+> > > 
+> > > Right, you cannot set flags from the device tree. Also, setting these
+> > > flags is done by the clock provider driver, not a consumer. Xen is the
+> > > consumer.
 > > 
-> > In my tree, this Kconfig ARCH_STM32 is a bool, so...
 > > 
-> > >  obj-$(CONFIG_ARCH_SUNXI) += reset-sunxi.o
-> > >  obj-$(CONFIG_ARCH_STI) += sti/
-> > >  obj-$(CONFIG_ARCH_HISI) += hisilicon/
-> > > diff --git a/drivers/reset/reset-stm32.c b/drivers/reset/reset-stm32.c
-> > > new file mode 100644
-> > > index 0000000..993af2a
-> > > --- /dev/null
-> > > +++ b/drivers/reset/reset-stm32.c
-> > > @@ -0,0 +1,113 @@
-> > > +/*
-> > > + * Copyright (C) Maxime Coquelin 2015
-> > > + * Author:  Maxime Coquelin <mcoquelin.stm32@gmail.com>_
-> > > + * License terms:  GNU General Public License (GPL), version 2
-> > > + *
-> > > + * Heavily based on sunxi driver from Maxime Ripard.
-> > > + */
-> > > +
-> > > +#include <linux/err.h>
-> > > +#include <linux/io.h>
-> > > +#include <linux/module.h>
+> > Ok, thanks, then I think we can forget about using flags for the issue we are
+> > discussing here.
 > > 
-> > ...we probably don't need module.h here or any of the other
-> > MODULE_<blah> tags/macros either.  Use the builtin for the
-> > register and all should be good.
+> > Best regards
+> > 
+> > Dirk
+> > 
+> > P.S.: Would it be an option to merge the v4 patch we are discussing here,
+> > then? From the discussion until here, it sounds to me that it's the best
+> > option we have at the moment. Maybe improving it in the future, then.
 > 
-> I wonder if we should have separate symbols for each reset driver
-> instead. Those could be allowed to be tristate, and could also
-> be enabled for compile testing on other architectures.
+> It might be a step in the right direction, but it doesn't really prevent
+> clk_set_rate from changing properties of a clock owned by Xen.  This
+> patch is incomplete. We need to understand at least what it would take
+> to have a complete solution.
+> 
+> Michael, do you have any suggestions on how it would be possible to set
+> CLK_SET_RATE_GATE and CLK_SET_PARENT_GATE for those clocks in a proper
+> way?
 
-I'm not quite clear on what you mean by the above.  Maybe if you have a
-pointer to an example -- say like the work you mention below -- then
-I'll understand what you have in mind.
-
-P.
---
+No, there is no way for a consumer to do that. The provider must do it.
 
 > 
-> I actually made a patch for that a while ago, to simplify the
-> dependencies around reset drivers.
+> Like you wrote, I would imagine it needs to be done by the clock
+> provider driver. Maybe to do that, it would be easier to have a new
+> device tree property on the clock node, rather than listing phandle and
+> clock-specifier pairs under the Xen node?
+
+Upon further reflection, I think that your clock consumer can probably
+use clk_set_rate_range() to "lock" in a rate. This is good because it is
+exactly what a clock consumer should do:
+
+1) get the clk
+2) enable the clk
+3) set the required rate for the clock
+4) set rate range constraints, or conversely,
+5) lock in an exact rate; set the min/max rate to the same value
+
+The problem with this solution is that it requires the consumer to have
+knowledge of the rates that it wants for that clock, which I guess is
+something that Linux kernels in a Xen setup do not want/need?
+
+Is it correct that you would prefer some sort of never_touch_this_clk()
+api?
+
+Regards,
+Mike
+
 > 
-> 	Arnd
