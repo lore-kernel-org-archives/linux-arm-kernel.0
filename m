@@ -1,74 +1,30 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 22 Jul 2016 20:42:08 +0200
-Subject: [PATCH] ARM: mm: use fully constructed struct pages for EFI pgd
- allocations
-Message-ID: <1469212928-21517-1-git-send-email-ard.biesheuvel@linaro.org>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Fri, 22 Jul 2016 21:00:06 +0200
+Subject: [PATCH 3/3] mmc: sunxi: Add support to the Allwinner A83T
+In-Reply-To: <20160721111851.133a3f16d6e9de1ee45b3654@free.fr>
+References: <cover.1469082481.git.moinejf@free.fr>
+ <0ddc5f7d9a42515f901c95b8c0c1f5a5e4d575e9.1469082481.git.moinejf@free.fr>
+ <20160721085838.GH5993@lukather>
+ <20160721111851.133a3f16d6e9de1ee45b3654@free.fr>
+Message-ID: <20160722210006.2d08c8261f84c59f7e2ddd34@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The late_alloc() PTE allocation function used by create_mapping_late()
-does not call pgtable_page_ctor() on PTE pages it allocates, leaving
-the per-page spinlock uninitialized.
+On Thu, 21 Jul 2016 11:18:51 +0200
+Jean-Francois Moine <moinejf@free.fr> wrote:
 
-Since generic page table manipulation code may assume that translation
-table pages that are not owned by init_mm are covered by fully
-constructed struct pages, the following crash may occur with the new
-UEFI memory attributes table code.
+> > On Wed, Jul 20, 2016 at 08:28:47PM +0200, Jean-Francois Moine wrote:
+> > > The rate of the PLL-PERIPH clock is usually set to 1.2GHz in the A83T.
+> > 
+> > Uh? The datasheet says to set it to 600MHz.
+> 
+> Right. But the driver of the SDK for the Banana Pi M3 (A83T) sets it
+> to 1.2GHz.
 
-  efi: memattr: Processing EFI Memory Attributes table:
-  efi: memattr:  0x0000ffa16000-0x0000ffa82fff [Runtime Code       |RUN|  |  |XP|  |  |  |   |  |  |  |  ]
-  Unable to handle kernel NULL pointer dereference at virtual address 00000010
-  pgd = c0204000
-  [00000010] *pgd=00000000
-  Internal error: Oops: 5 [#1] SMP ARM
-  Modules linked in:
-  CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.7.0-rc4-00063-g3882aa7b340b #361
-  Hardware name: Generic DT based system
-  task: ed858000 ti: ed842000 task.ti: ed842000
-  PC is at __lock_acquire+0xa0/0x19a8
-  ...
-  [<c038c830>] (__lock_acquire) from [<c038e4f8>] (lock_acquire+0x6c/0x88)
-  [<c038e4f8>] (lock_acquire) from [<c0c06134>] (_raw_spin_lock+0x2c/0x3c)
-  [<c0c06134>] (_raw_spin_lock) from [<c0410384>] (apply_to_page_range+0xe8/0x238)
-  [<c0410384>] (apply_to_page_range) from [<c1205f34>] (efi_set_mapping_permissions+0x54/0x5c)
-  [<c1205f34>] (efi_set_mapping_permissions) from [<c1247474>] (efi_memattr_apply_permissions+0x2b8/0x378)
-  [<c1247474>] (efi_memattr_apply_permissions) from [<c1248258>] (arm_enable_runtime_services+0x1f0/0x22c)
-  [<c1248258>] (arm_enable_runtime_services) from [<c0301f0c>] (do_one_initcall+0x44/0x174)
-  [<c0301f0c>] (do_one_initcall) from [<c1200d10>] (kernel_init_freeable+0x90/0x1e8)
-  [<c1200d10>] (kernel_init_freeable) from [<c0bff690>] (kernel_init+0x8/0x114)
-  [<c0bff690>] (kernel_init) from [<c0307ed0>] (ret_from_fork+0x14/0x24)
+I tested again, and, with the pll-periph at 600MHz, both the SDcard and
+the eMMC are working fine.
+So, you may forget about this patch, sorry for the noise.
 
-The crash is due to the fact that the UEFI page tables are not owned by
-init_mm, but are not covered by fully constructed struct pages.
-
-Given that the UEFI subsystem is currently the only user of
-create_mapping_late(), add an unconditional call to pgtable_page_ctor() to
-late_alloc().
-
-Fixes: 9fc68b717c24 ("ARM/efi: Apply strict permissions for UEFI Runtime Services regions")
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
-
-The commit in question was introduced in v4.7, so ideally this should go in
-as a late fix. However, EFI on ARM is not widely used [yet], and the memory
-attributes table even less so, so I am perfectly happy for this to go in
-later.
-
- arch/arm/mm/mmu.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index 62f4d01941f7..d0ac45451805 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -728,7 +728,7 @@ static void *__init late_alloc(unsigned long sz)
- {
- 	void *ptr = (void *)__get_free_pages(PGALLOC_GFP, get_order(sz));
- 
--	BUG_ON(!ptr);
-+	BUG_ON(!ptr || !pgtable_page_ctor(virt_to_page(ptr)));
- 	return ptr;
- }
- 
 -- 
-2.7.4
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
