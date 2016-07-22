@@ -1,28 +1,31 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 21 Jul 2016 23:41:02 -0700
-Subject: [PATCH 1/3] ARM: mach-omap2: remove bogus "or_module" from
- rx51-peripherals
-In-Reply-To: <20160720041332.30789-2-paul.gortmaker@windriver.com>
-References: <20160720041332.30789-1-paul.gortmaker@windriver.com>
- <20160720041332.30789-2-paul.gortmaker@windriver.com>
-Message-ID: <20160722064101.GW28140@atomide.com>
+Date: Thu, 21 Jul 2016 23:46:32 -0700
+Subject: [PATCH 3/4] ARM: OMAP4+: Have _omap4_wait_target_* check for
+ valid clkctrl_offs
+In-Reply-To: <20160712175034.743-4-d-gerlach@ti.com>
+References: <20160712175034.743-1-d-gerlach@ti.com>
+ <20160712175034.743-4-d-gerlach@ti.com>
+Message-ID: <20160722064631.GX28140@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+* Dave Gerlach <d-gerlach@ti.com> [160712 10:53]:
+> Previously the low-level CM call internal to the
+> _omap4_wait_target_ready/disable calls was responsible for checking for
+> a valid clkctrl_offs. Now we must also consider the value of the
+> prcm.omap4.flags because if HWMOD_OMAP4_ZERO_CLKCTRL_OFFSET is set in
+> the flags then clkctrl_offs of 0 is valid.
+> 
+> Let's move this check into the _omap4_wait_target_ready/disable where we
+> have access to both the clkctrl_offs and the flags values and simply
+> return 0 without calling the low level CM call at all, which would have
+> returned 0 anyway if the clktrl_offs was zero.
 
-* Paul Gortmaker <paul.gortmaker@windriver.com> [160719 21:17]:
-> During unrelated work, attempting to remove an include of the
-> linux/module.h in favour of "struct module;" in order to reduce
-> header entanglement, we found doing so caused a build failure in
-> this file.
+This series looks OK to me to fix the RTC regression. Paul and Tero,
+do you see any issues with this or care to ack?
 
-We're planning to drop this file after v4.8-rc1 after I've
-verified that legacy booting still works at v4.8-rc1.
-
-Are you OK if I pick this patch into my omap-for-v4.8/legacy
-branch? Or if you have a minimal immutable branch against v4.7-rc1
-with just this patch I can merge it in no problem.
+I'm planning to s/Let's move this check/Let's add this check/ while
+committing to avoid confusion.
 
 Regards,
 
