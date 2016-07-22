@@ -1,73 +1,40 @@
-From: panand@redhat.com (Pratyush Anand)
-Date: Fri, 22 Jul 2016 19:26:30 +0530
-Subject: [PATCH v1 3/4] arm64: Add arm64 kexec support
-In-Reply-To: <5791EF62.5070006@arm.com>
-References: <cover.1468970114.git.geoff@infradead.org>
- <9ed513fd44a19b2f49b4da99477cedfff7341bf0.1468970114.git.geoff@infradead.org>
- <20160720153859.GG24691@leverpostej>
- <1469042361.2977.90.camel@infradead.org>
- <20160721103120.GB20559@leverpostej> <5790A902.6070601@arm.com>
- <1469137776.2977.128.camel@infradead.org>
- <20160722040842.GA14911@localhost.localdomain>
- <5791EF62.5070006@arm.com>
-Message-ID: <20160722135630.GC14911@localhost.localdomain>
+From: michael.weiser@gmx.de (Michael Weiser)
+Date: Fri, 22 Jul 2016 15:56:58 +0200
+Subject: [PATCH 3/3] ARM: sunxi: enable big-endian
+In-Reply-To: <20160722090101.GB7687@lukather>
+References: <20160721182329.13478-1-michael.weiser@gmx.de>
+ <20160721182329.13478-4-michael.weiser@gmx.de>
+ <20160722090101.GB7687@lukather>
+Message-ID: <20160722135658.GA18977@weiser.dinsnail.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
+Hi Maxime,
 
-On 22/07/2016:11:03:14 AM, Robin Murphy wrote:
-> On 22/07/16 05:08, Pratyush Anand wrote:
-> > On 21/07/2016:02:49:36 PM, Geoff Levand wrote:
-> >> On Thu, 2016-07-21 at 11:50 +0100, Robin Murphy wrote:
-> >>> The Exynos UART (drivers/tty/serial/samsung.c) is one which comes to
-> >>> mind as definitely existing, and on arm64 systems to boot. The TX
-> >>> register is at offset 0x20 there.
-> >>
-> >> Here's what I came up with.
-> >>
-> >>
-> >> +	struct data {const char *name; int tx_offset;};
-> >> +	static const struct data ok_list[] = {
-> >> +	/*	{"armada-3700-uart", ?},	*/
-> >> +		{"exynos4210-uart", 0x20},
-> >> +	/*	{"ls1021a-lpuart", ?},		*/
-> >> +	/*	{"meson-uart", ?},		*/
-> >> +	/*	{"mt6577-uart", ?},		*/
-> >> +		{"ns16550", 0},
-> >> +		{"ns16550a", 0},
-> >> +		{"pl011", 0},
-> >> +		{NULL, 0}
-> >> +	};
-> > 
-> > sinc functionality is just to debug the scenario when something goes wrong in
-> > purgatory. IMHO, it should be disabled by default. So, why not to keep it as
-> > simple as possible. Its a low level debugging mainly for developer, so user
-> > should know the absolute address. Therefore, I think no need to parse earlycon
-> > or earlyprintk from command line.  Whatever user passes in --port can be treated
-> > as address of TX register. If TX offset is 0x20, then user can pass --port as
-> > base+0x20. Additionally, we can pass TX register width as well. So what about
-> > something like "--port=0x1c020000,1" where 0x1c020000 is TX register address and
-> > 1 says about it's width in bytes.
-> 
-> I don't think even that is worthwhile, since without any polling it
-> still relies on the UART having FIFOs, someone having already enabled
-> the FIFOs, the FIFOs being deep enough and/or the output being short
-> enough. In short, it's fragile enough that I'm not convinced it's even
-> useful as a debug option. I suggest we simply copy the purgatory console
-> implementation from, say, ARM or Alpha.
+On Fri, Jul 22, 2016 at 11:01:01AM +0200, Maxime Ripard wrote:
 
-May be I am missing, but deep TX FIFO should not be an issue. Whatever, we write
-in TX register, that will go to the port eventually. However, I do agree that
-short FIFO could be an issue and overflow is quite possible in that case. I had
-been trying to convince Geoff to take [1], which will help to resolve it.
+> > At least the Cubieboard2 incarnation of sunxi works correctly in
+> > big-endian mode. Allow the selection of big-endian.
+> With what devices has it been tested? The one doing DMA will probably
+> be the one who fail, have you tested the DMA engine? EMAC? GMAC?
 
-[1] https://github.com/pratyushanand/kexec-tools/commit/0d49d420810f070bcff9c96e377477d96f909d11
+I've tested with a Cubieboard2 Two-Card (on-board EMMC replaced with a
+second slot). I ran into and fixed DMA problems with stmmac (that's
+GMAC) and sunxi-mmc. Patches are submitted as part of this patchset.
+Endianness fixes to stmmac went much farther than just GMAC but remain
+untested since the Cubieboard2 only uses GMAC.
 
-~Pratyush
-> 
-> Robin.
-> 
-> > 
-> > ~Pratyush
-> > 
+I have also successfully used SATA, SPI, UART, security system (with
+cryptodev), the hwmon part of the touchscreen controller, pinctrl with a
+custom interrupt pin via fdt for ethernet via SPI (ENC28J60), watchdog
+as reset controller, onboard RTC and external battery-backed DS1307 RTC
+via I2C. I have not deliberately/synthetically tested the DMA engine. It's
+enabled in the my kernel config and seems happy but was not selected by
+any other driver so seems to be unused currently.
+
+I was reluctant to enable big endian support this generically but found
+no better way. Since board specifics are in device tree now, I can't
+really do a && CONFIG_MACH_CUBIEBOARD2 or somesuch. Or can I?
+-- 
+Thanks,
+Michael
