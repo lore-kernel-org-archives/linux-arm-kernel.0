@@ -1,76 +1,21 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Fri, 22 Jul 2016 13:57:05 -0600
-Subject: [PATCH V2 4/6] perf tools: pushing driver configuration down to
- the kernel
-In-Reply-To: <20160721074738.GD7192@krava>
-References: <1469047100-18131-1-git-send-email-mathieu.poirier@linaro.org>
- <1469047100-18131-5-git-send-email-mathieu.poirier@linaro.org>
- <20160721074738.GD7192@krava>
-Message-ID: <CANLsYkznP87ZeTfWgbeQKBRou5n5XT2nMEUcc5Dypyzixw04_Q@mail.gmail.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Fri, 22 Jul 2016 13:01:39 -0700
+Subject: [PATCH V2] ARM: BCM5301X: Specify PHY of USB 2.0 in DT
+In-Reply-To: <1464811627-12218-1-git-send-email-zajec5@gmail.com>
+References: <1464808585-14996-1-git-send-email-zajec5@gmail.com>
+ <1464811627-12218-1-git-send-email-zajec5@gmail.com>
+Message-ID: <5483f72a-1840-cde3-5d10-0b23e3f77fc9@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21 July 2016 at 01:47, Jiri Olsa <jolsa@redhat.com> wrote:
-> On Wed, Jul 20, 2016 at 02:38:18PM -0600, Mathieu Poirier wrote:
->> Now that PMU specific driver configuration are queued in
->> evsel::drv_config_terms, all we need to do is re-use the current
->> ioctl() mechanism to push down the information to the kernel
->> driver.
->>
->> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
->> ---
->>  tools/perf/builtin-record.c |  9 +++++++++
->>  tools/perf/util/evlist.c    | 24 ++++++++++++++++++++++++
->>  tools/perf/util/evlist.h    |  3 +++
->>  tools/perf/util/evsel.c     | 32 ++++++++++++++++++++++++++++++++
->>  tools/perf/util/evsel.h     |  3 +++
->>  5 files changed, 71 insertions(+)
->>
->> diff --git a/tools/perf/builtin-record.c b/tools/perf/builtin-record.c
->> index 8f2c16d9275f..dffea1033b8e 100644
->> --- a/tools/perf/builtin-record.c
->> +++ b/tools/perf/builtin-record.c
->> @@ -383,6 +383,7 @@ static int record__open(struct record *rec)
->>       struct perf_evlist *evlist = rec->evlist;
->>       struct perf_session *session = rec->session;
->>       struct record_opts *opts = &rec->opts;
->> +     struct perf_evsel_config_term *err_term;
->>       int rc = 0;
->>
->>       perf_evlist__config(evlist, opts, &callchain_param);
->> @@ -412,6 +413,14 @@ try_again:
->>               goto out;
->>       }
->>
->> +     if (perf_evlist__apply_drv_configs(evlist, &pos, &err_term)) {
->> +             error("failed to set config \"%s\" on event %s with %d (%s)\n",
->> +                     err_term->val.drv_cfg, perf_evsel__name(pos), errno,
->> +                     strerror_r(errno, msg, sizeof(msg)));
->> +             rc = -1;
->> +             goto out;
->> +     }
->> +
->
-> how about 'perf top' and 'perf stat', should they support this too?
+On 06/01/2016 01:07 PM, Rafa? Mi?ecki wrote:
+> Driver for Northstar USB 2.0 PHY was added in 4.7-rc1 by:
+> commit d3feb4067335 ("phy: bcm-ns-usb2: new driver for USB 2.0 PHY on
+> Northstar").
+> It should be used to let EHCI platform driver init PHY.
+> 
+> Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
 
-After looking into this (hence the delayed reply) I'm not completely sure.
-
-'perf stat' calls perf_evlist__apply_filters() and therefore the
-semantic is likely to be close enough for PMU driver specific
-configuration to make sense, should a particular use case lends itself
-to it.  But that is certainly not the case for CoreSight PMUs.  Since
-there is no current client for it, do you wish to see 'perf stat'
-support this feature?
-
->From a quick glance at the code, filters in the context of 'perf top'
-seem to be related to symbols rather than the tuning of events.  As
-such I just can't see how driver specific configuration would fit in
-that scheme.
-
-Regards,
-Mathieu
-
-
->
-> thanks,
-> jirka
+Applied, thanks
+-- 
+Florian
