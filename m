@@ -1,40 +1,159 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Fri, 22 Jul 2016 14:44:02 +0200 (CEST)
-Subject: [PATCH v11 06/10] genirq/msi-doorbell: msi_doorbell_safe
-In-Reply-To: <3f188661-1d68-199b-3fcc-4da432bae633@redhat.com>
-References: <1468933367-23159-1-git-send-email-eric.auger@redhat.com>
- <1468933367-23159-7-git-send-email-eric.auger@redhat.com>
- <alpine.DEB.2.11.1607201010350.3564@nanos>
- <3f188661-1d68-199b-3fcc-4da432bae633@redhat.com>
-Message-ID: <alpine.DEB.2.11.1607221443090.3906@nanos>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Fri, 22 Jul 2016 20:42:50 +0800
+Subject: [PATCH] PM / OPP: optimize dev_pm_opp_set_rate() a bit
+Message-ID: <1469191370-1285-1-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 21 Jul 2016, Auger Eric wrote:
-> On 20/07/2016 10:12, Thomas Gleixner wrote:
-> > On Tue, 19 Jul 2016, Eric Auger wrote:
-> >> +bool msi_doorbell_safe(void)
-> >> +{
-> >> +	struct irqchip_doorbell *db;
-> >> +	bool irq_remapping = true;
-> >> +
-> >> +	mutex_lock(&irqchip_doorbell_mutex);
-> >> +	list_for_each_entry(db, &irqchip_doorbell_list, next) {
-> >> +		irq_remapping &= db->info.irq_remapping;
-> > 
-> > db->info.irq_remapping is set in msi_doorbell_register(). So you can keep book
-> > about that there. No need to iterate here.
-> Yes makes sense to store the info at registration time. Currently this
-> function is not in any fast path but that's cleaner from a general
-> perspective. I will need to do such iteration at un-registration though.
+In dev_pm_opp_set_rate(), _find_opp_table() is called three times: once
+by _get_opp_clk(), twice by dev_pm_opp_find_freq_ceil(). If there are
+several opp_tables in the system, three times of opp table finding is a
+big waste. This patch reduced the call of _find_opp_table() to only
+once.
 
-Two simple counter should be sufficient.
+Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+---
+ drivers/base/power/opp/core.c | 85 ++++++++++++++++++-------------------------
+ 1 file changed, 36 insertions(+), 49 deletions(-)
 
-  nr_registered_bells;
-  nr_remapped_bells;
-
-....
-
-Thanks,
-
-	tglx
+diff --git a/drivers/base/power/opp/core.c b/drivers/base/power/opp/core.c
+index 7c04c87..96043ee 100644
+--- a/drivers/base/power/opp/core.c
++++ b/drivers/base/power/opp/core.c
+@@ -402,6 +402,22 @@ struct dev_pm_opp *dev_pm_opp_find_freq_exact(struct device *dev,
+ }
+ EXPORT_SYMBOL_GPL(dev_pm_opp_find_freq_exact);
+ 
++static struct dev_pm_opp *_find_freq_ceil(struct opp_table *opp_table,
++					  unsigned long *freq)
++{
++	struct dev_pm_opp *temp_opp, *opp = ERR_PTR(-ERANGE);
++
++	list_for_each_entry_rcu(temp_opp, &opp_table->opp_list, node) {
++		if (temp_opp->available && temp_opp->rate >= *freq) {
++			opp = temp_opp;
++			*freq = opp->rate;
++			break;
++		}
++	}
++
++	return opp;
++}
++
+ /**
+  * dev_pm_opp_find_freq_ceil() - Search for an rounded ceil freq
+  * @dev:	device for which we do this operation
+@@ -427,7 +443,6 @@ struct dev_pm_opp *dev_pm_opp_find_freq_ceil(struct device *dev,
+ 					     unsigned long *freq)
+ {
+ 	struct opp_table *opp_table;
+-	struct dev_pm_opp *temp_opp, *opp = ERR_PTR(-ERANGE);
+ 
+ 	opp_rcu_lockdep_assert();
+ 
+@@ -440,15 +455,7 @@ struct dev_pm_opp *dev_pm_opp_find_freq_ceil(struct device *dev,
+ 	if (IS_ERR(opp_table))
+ 		return ERR_CAST(opp_table);
+ 
+-	list_for_each_entry_rcu(temp_opp, &opp_table->opp_list, node) {
+-		if (temp_opp->available && temp_opp->rate >= *freq) {
+-			opp = temp_opp;
+-			*freq = opp->rate;
+-			break;
+-		}
+-	}
+-
+-	return opp;
++	return _find_freq_ceil(opp_table, freq);
+ }
+ EXPORT_SYMBOL_GPL(dev_pm_opp_find_freq_ceil);
+ 
+@@ -506,34 +513,6 @@ struct dev_pm_opp *dev_pm_opp_find_freq_floor(struct device *dev,
+ }
+ EXPORT_SYMBOL_GPL(dev_pm_opp_find_freq_floor);
+ 
+-/*
+- * The caller needs to ensure that opp_table (and hence the clk) isn't freed,
+- * while clk returned here is used.
+- */
+-static struct clk *_get_opp_clk(struct device *dev)
+-{
+-	struct opp_table *opp_table;
+-	struct clk *clk;
+-
+-	rcu_read_lock();
+-
+-	opp_table = _find_opp_table(dev);
+-	if (IS_ERR(opp_table)) {
+-		dev_err(dev, "%s: device opp doesn't exist\n", __func__);
+-		clk = ERR_CAST(opp_table);
+-		goto unlock;
+-	}
+-
+-	clk = opp_table->clk;
+-	if (IS_ERR(clk))
+-		dev_err(dev, "%s: No clock available for the device\n",
+-			__func__);
+-
+-unlock:
+-	rcu_read_unlock();
+-	return clk;
+-}
+-
+ static int _set_opp_voltage(struct device *dev, struct regulator *reg,
+ 			    unsigned long u_volt, unsigned long u_volt_min,
+ 			    unsigned long u_volt_max)
+@@ -586,9 +565,24 @@ int dev_pm_opp_set_rate(struct device *dev, unsigned long target_freq)
+ 		return -EINVAL;
+ 	}
+ 
+-	clk = _get_opp_clk(dev);
+-	if (IS_ERR(clk))
++	rcu_read_lock();
++
++	opp_table = _find_opp_table(dev);
++	if (IS_ERR(opp_table)) {
++		dev_err(dev, "%s: device opp doesn't exist\n", __func__);
++		rcu_read_unlock();
++		return PTR_ERR(opp_table);
++	}
++
++	clk = opp_table->clk;
++	if (IS_ERR(clk)) {
++		dev_err(dev, "%s: No clock available for the device\n",
++			__func__);
++		rcu_read_unlock();
+ 		return PTR_ERR(clk);
++	}
++
++	rcu_read_unlock();
+ 
+ 	freq = clk_round_rate(clk, target_freq);
+ 	if ((long)freq <= 0)
+@@ -605,14 +599,7 @@ int dev_pm_opp_set_rate(struct device *dev, unsigned long target_freq)
+ 
+ 	rcu_read_lock();
+ 
+-	opp_table = _find_opp_table(dev);
+-	if (IS_ERR(opp_table)) {
+-		dev_err(dev, "%s: device opp doesn't exist\n", __func__);
+-		rcu_read_unlock();
+-		return PTR_ERR(opp_table);
+-	}
+-
+-	old_opp = dev_pm_opp_find_freq_ceil(dev, &old_freq);
++	old_opp = _find_freq_ceil(opp_table, &old_freq);
+ 	if (!IS_ERR(old_opp)) {
+ 		ou_volt = old_opp->u_volt;
+ 		ou_volt_min = old_opp->u_volt_min;
+@@ -622,7 +609,7 @@ int dev_pm_opp_set_rate(struct device *dev, unsigned long target_freq)
+ 			__func__, old_freq, PTR_ERR(old_opp));
+ 	}
+ 
+-	opp = dev_pm_opp_find_freq_ceil(dev, &freq);
++	opp = _find_freq_ceil(opp_table, &freq);
+ 	if (IS_ERR(opp)) {
+ 		ret = PTR_ERR(opp);
+ 		dev_err(dev, "%s: failed to find OPP for freq %lu (%d)\n",
+-- 
+2.8.1
