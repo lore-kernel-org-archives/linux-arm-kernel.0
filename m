@@ -1,68 +1,70 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 22 Jul 2016 18:29:00 +0100
-Subject: [PATCH 43/55] KVM: arm/arm64: Fix vGICv2
- KVM_DEV_ARM_VGIC_GRP_CPU/DIST_REGS
+Date: Fri, 22 Jul 2016 18:29:11 +0100
+Subject: [PATCH 54/55] KVM: arm64: vgic-its: Make vgic_its_cmd_handle_mapi
+ similar to other handlers
 In-Reply-To: <1469208552-4155-1-git-send-email-marc.zyngier@arm.com>
 References: <1469208552-4155-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1469208552-4155-44-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1469208552-4155-55-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Eric Auger <eric.auger@redhat.com>
+vgic_its_cmd_handle_mapi has an extra "subcmd" argument, which is
+already contained in the command buffer that all command handlers
+obtain from the command queue. Let's drop it, as it is not that
+useful.
 
-For VGICv2 save and restore the CPU interface registers
-are accessed. Restore the modality which has been altered.
-Also explicitly set the iodev_type for both the DIST and CPU
-interface.
-
-Signed-off-by: Eric Auger <eric.auger@redhat.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- virt/kvm/arm/vgic/vgic-mmio-v2.c | 2 ++
- virt/kvm/arm/vgic/vgic-mmio.c    | 4 +++-
- 2 files changed, 5 insertions(+), 1 deletion(-)
+ virt/kvm/arm/vgic/vgic-its.c | 11 +++++------
+ 1 file changed, 5 insertions(+), 6 deletions(-)
 
-diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
-index 4152348..b44b359 100644
---- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
-+++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
-@@ -437,6 +437,7 @@ int vgic_v2_cpuif_uaccess(struct kvm_vcpu *vcpu, bool is_write,
- 	struct vgic_io_device dev = {
- 		.regions = vgic_v2_cpu_registers,
- 		.nr_regions = ARRAY_SIZE(vgic_v2_cpu_registers),
-+		.iodev_type = IODEV_CPUIF,
- 	};
+diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+index 996e3e1..ec7e07b 100644
+--- a/virt/kvm/arm/vgic/vgic-its.c
++++ b/virt/kvm/arm/vgic/vgic-its.c
+@@ -688,7 +688,7 @@ static void vgic_its_free_collection(struct vgic_its *its, u32 coll_id)
+  * Must be called with its_lock mutex held.
+  */
+ static int vgic_its_cmd_handle_mapi(struct kvm *kvm, struct vgic_its *its,
+-				    u64 *its_cmd, u8 subcmd)
++				    u64 *its_cmd)
+ {
+ 	u32 device_id = its_cmd_get_deviceid(its_cmd);
+ 	u32 event_id = its_cmd_get_id(its_cmd);
+@@ -711,7 +711,7 @@ static int vgic_its_cmd_handle_mapi(struct kvm *kvm, struct vgic_its *its,
+ 		new_coll = collection;
+ 	}
  
- 	return vgic_uaccess(vcpu, &dev, is_write, offset, val);
-@@ -448,6 +449,7 @@ int vgic_v2_dist_uaccess(struct kvm_vcpu *vcpu, bool is_write,
- 	struct vgic_io_device dev = {
- 		.regions = vgic_v2_dist_registers,
- 		.nr_regions = ARRAY_SIZE(vgic_v2_dist_registers),
-+		.iodev_type = IODEV_DIST,
- 	};
+-	if (subcmd == GITS_CMD_MAPTI)
++	if (its_cmd_get_command(its_cmd) == GITS_CMD_MAPTI)
+ 		lpi_nr = its_cmd_get_physical_id(its_cmd);
+ 	else
+ 		lpi_nr = event_id;
+@@ -999,11 +999,10 @@ static int vgic_its_cmd_handle_int(struct kvm *kvm, struct vgic_its *its,
+ static int vgic_its_handle_command(struct kvm *kvm, struct vgic_its *its,
+ 				   u64 *its_cmd)
+ {
+-	u8 cmd = its_cmd_get_command(its_cmd);
+ 	int ret = -ENODEV;
  
- 	return vgic_uaccess(vcpu, &dev, is_write, offset, val);
-diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
-index 26be827..3bad3c5 100644
---- a/virt/kvm/arm/vgic/vgic-mmio.c
-+++ b/virt/kvm/arm/vgic/vgic-mmio.c
-@@ -484,7 +484,8 @@ static int dispatch_mmio_read(struct kvm_vcpu *vcpu, struct kvm_io_device *dev,
- 
- 	switch (iodev->iodev_type) {
- 	case IODEV_CPUIF:
--		return 1;
-+		data = region->read(vcpu, addr, len);
-+		break;
- 	case IODEV_DIST:
- 		data = region->read(vcpu, addr, len);
+ 	mutex_lock(&its->its_lock);
+-	switch (cmd) {
++	switch (its_cmd_get_command(its_cmd)) {
+ 	case GITS_CMD_MAPD:
+ 		ret = vgic_its_cmd_handle_mapd(kvm, its, its_cmd);
  		break;
-@@ -517,6 +518,7 @@ static int dispatch_mmio_write(struct kvm_vcpu *vcpu, struct kvm_io_device *dev,
- 
- 	switch (iodev->iodev_type) {
- 	case IODEV_CPUIF:
-+		region->write(vcpu, addr, len, data);
+@@ -1011,10 +1010,10 @@ static int vgic_its_handle_command(struct kvm *kvm, struct vgic_its *its,
+ 		ret = vgic_its_cmd_handle_mapc(kvm, its, its_cmd);
  		break;
- 	case IODEV_DIST:
- 		region->write(vcpu, addr, len, data);
+ 	case GITS_CMD_MAPI:
+-		ret = vgic_its_cmd_handle_mapi(kvm, its, its_cmd, cmd);
++		ret = vgic_its_cmd_handle_mapi(kvm, its, its_cmd);
+ 		break;
+ 	case GITS_CMD_MAPTI:
+-		ret = vgic_its_cmd_handle_mapi(kvm, its, its_cmd, cmd);
++		ret = vgic_its_cmd_handle_mapi(kvm, its, its_cmd);
+ 		break;
+ 	case GITS_CMD_MOVI:
+ 		ret = vgic_its_cmd_handle_movi(kvm, its, its_cmd);
 -- 
 2.8.1
