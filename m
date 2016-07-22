@@ -1,37 +1,50 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 22 Jul 2016 18:29:03 +0100
-Subject: [PATCH 46/55] KVM: arm64: vgic-its: Fix handling of indirect tables
+Date: Fri, 22 Jul 2016 18:28:22 +0100
+Subject: [PATCH 05/55] arm/arm64: KVM: Make default HYP mappings non-excutable
 In-Reply-To: <1469208552-4155-1-git-send-email-marc.zyngier@arm.com>
 References: <1469208552-4155-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1469208552-4155-47-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1469208552-4155-6-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current code will fail on valid indirect tables, and happily
-use the ones that are pointing out of the guest RAM. Funny what a
-small "!" can do for you...
+Structures that can be generally written to don't have any requirement
+to be executable (quite the opposite). This includes the kvm and vcpu
+structures, as well as the stacks.
+
+Let's change the default to incorporate the XN flag.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- virt/kvm/arm/vgic/vgic-its.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/include/asm/pgtable.h        | 2 +-
+ arch/arm64/include/asm/pgtable-prot.h | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-index f427fa2..d6697c4 100644
---- a/virt/kvm/arm/vgic/vgic-its.c
-+++ b/virt/kvm/arm/vgic/vgic-its.c
-@@ -702,9 +702,9 @@ static bool vgic_its_check_device_id(struct kvm *kvm, struct vgic_its *its,
- 		return false;
+diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
+index 7487bf9..e0d76ba 100644
+--- a/arch/arm/include/asm/pgtable.h
++++ b/arch/arm/include/asm/pgtable.h
+@@ -97,7 +97,7 @@ extern pgprot_t		pgprot_s2_device;
+ #define PAGE_READONLY_EXEC	_MOD_PROT(pgprot_user, L_PTE_USER | L_PTE_RDONLY)
+ #define PAGE_KERNEL		_MOD_PROT(pgprot_kernel, L_PTE_XN)
+ #define PAGE_KERNEL_EXEC	pgprot_kernel
+-#define PAGE_HYP		_MOD_PROT(pgprot_kernel, L_PTE_HYP)
++#define PAGE_HYP		_MOD_PROT(pgprot_kernel, L_PTE_HYP | L_PTE_XN)
+ #define PAGE_HYP_EXEC		_MOD_PROT(pgprot_kernel, L_PTE_HYP | L_PTE_RDONLY)
+ #define PAGE_HYP_RO		_MOD_PROT(pgprot_kernel, L_PTE_HYP | L_PTE_RDONLY | L_PTE_XN)
+ #define PAGE_HYP_DEVICE		_MOD_PROT(pgprot_hyp_device, L_PTE_HYP)
+diff --git a/arch/arm64/include/asm/pgtable-prot.h b/arch/arm64/include/asm/pgtable-prot.h
+index 3802048..39f5252 100644
+--- a/arch/arm64/include/asm/pgtable-prot.h
++++ b/arch/arm64/include/asm/pgtable-prot.h
+@@ -55,7 +55,7 @@
+ #define PAGE_KERNEL_EXEC	__pgprot(_PAGE_DEFAULT | PTE_UXN | PTE_DIRTY | PTE_WRITE)
+ #define PAGE_KERNEL_EXEC_CONT	__pgprot(_PAGE_DEFAULT | PTE_UXN | PTE_DIRTY | PTE_WRITE | PTE_CONT)
  
- 	/* Each 1st level entry is represented by a 64-bit value. */
--	if (!kvm_read_guest(kvm,
--			    BASER_ADDRESS(r) + index * sizeof(indirect_ptr),
--			    &indirect_ptr, sizeof(indirect_ptr)))
-+	if (kvm_read_guest(kvm,
-+			   BASER_ADDRESS(r) + index * sizeof(indirect_ptr),
-+			   &indirect_ptr, sizeof(indirect_ptr)))
- 		return false;
- 
- 	/* check the valid bit of the first level entry */
+-#define PAGE_HYP		__pgprot(_PAGE_DEFAULT | PTE_HYP)
++#define PAGE_HYP		__pgprot(_PAGE_DEFAULT | PTE_HYP | PTE_HYP_XN)
+ #define PAGE_HYP_EXEC		__pgprot(_PAGE_DEFAULT | PTE_HYP | PTE_RDONLY)
+ #define PAGE_HYP_RO		__pgprot(_PAGE_DEFAULT | PTE_HYP | PTE_RDONLY | PTE_HYP_XN)
+ #define PAGE_HYP_DEVICE		__pgprot(PROT_DEVICE_nGnRE | PTE_HYP)
 -- 
 2.8.1
