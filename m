@@ -1,28 +1,53 @@
-From: jaz@semihalf.com (Grzegorz Jaszczyk)
-Date: Fri, 22 Jul 2016 09:51:20 +0200
-Subject: [PATCH 00/18] ARM: mvebu: misc Armada 38x/39x DT and v7 defconfig
- improvements
-In-Reply-To: <20160721134345.GL11309@lunn.ch>
-References: <1469105055-25181-1-git-send-email-jaz@semihalf.com>
- <20160721134345.GL11309@lunn.ch>
-Message-ID: <CAH76GKPNU4tHv2E+XPoL-jc+SsSNJd0AXEGHWisOg5xYaFMFzQ@mail.gmail.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Fri, 22 Jul 2016 13:56:47 +0530
+Subject: [PATCH 2/2] ARM: DRA7: select PCI_DOMAINS config
+In-Reply-To: <20160722071644.GZ28140@atomide.com>
+References: <1469102276-14777-1-git-send-email-kishon@ti.com>
+ <1469102276-14777-3-git-send-email-kishon@ti.com>
+ <8047226.VhgpLo8JQu@wuerfel> <20160722071644.GZ28140@atomide.com>
+Message-ID: <5791D8C7.5020303@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
+Hi,
 
-2016-07-21 15:43 GMT+02:00 Andrew Lunn <andrew@lunn.ch>:
-> On Thu, Jul 21, 2016 at 02:43:56PM +0200, Grzegorz Jaszczyk wrote:
->
-> Hi Grzegorz
->
-> Some of these patches are missing a commit log entry. Please add at
-> least one line.
->
+On Friday 22 July 2016 12:46 PM, Tony Lindgren wrote:
+> * Arnd Bergmann <arnd@arndb.de> [160721 05:08]:
+>> On Thursday, July 21, 2016 5:27:56 PM CEST Kishon Vijay Abraham I wrote:
+>>> diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+>>> index 1a648e9..8e6e2c0 100644
+>>> --- a/arch/arm/mach-omap2/Kconfig
+>>> +++ b/arch/arm/mach-omap2/Kconfig
+>>> @@ -86,6 +86,7 @@ config SOC_DRA7XX
+>>>         select OMAP_INTERCONNECT_BARRIER
+>>>         select PM_OPP if PM
+>>>         select ZONE_DMA if ARM_LPAE
+>>> +       select PCI_DOMAINS if PCI
+>>>  
+>>>  config ARCH_OMAP2PLUS
+>>>         bool
+>>>
+>>
+>> Should we just set this unconditionally for ARCH_MULTIPLATFORM maybe?
+> 
+> Makes sense to me if many SoCs need this.
 
-Ok, I will add it in next version of this patch-set, which I am
-planning to resubmit next week. Maybe I will get more feedback till
-then.
+since it doesn't harm even if a platform has a single PCIe port, it should be
+okay to set PCI_DOMAINS. I'll resend the following as a separate patch if it's
+okay.
 
-Thank you,
-Grzegorz
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 90542db..0cccb50 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -338,6 +338,7 @@ config ARCH_MULTIPLATFORM
+        select MULTI_IRQ_HANDLER
+        select SPARSE_IRQ
+        select USE_OF
++       select PCI_DOMAINS if PCI
+
+ config ARM_SINGLE_ARMV7M
+        bool "ARMv7-M based platforms (Cortex-M0/M3/M4)"
+
+Thanks
+Kishon
