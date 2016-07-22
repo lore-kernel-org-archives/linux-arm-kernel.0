@@ -1,123 +1,152 @@
 From: gabriel.fernandez@st.com (gabriel.fernandez at st.com)
-Date: Fri, 22 Jul 2016 11:37:48 +0200
-Subject: [PATCH v3 2/4] dt-bindings: Document the STM32 reset bindings
+Date: Fri, 22 Jul 2016 11:37:49 +0200
+Subject: [PATCH v3 3/4] drivers: reset: Add STM32 reset driver
 In-Reply-To: <1469180270-5446-1-git-send-email-gabriel.fernandez@st.com>
 References: <1469180270-5446-1-git-send-email-gabriel.fernandez@st.com>
-Message-ID: <1469180270-5446-3-git-send-email-gabriel.fernandez@st.com>
+Message-ID: <1469180270-5446-4-git-send-email-gabriel.fernandez@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Maxime Coquelin <mcoquelin.stm32@gmail.com>
 
-This adds documentation of device tree bindings for the
-STM32 reset controller.
+The STM32 MCUs family IPs can be reset by accessing some registers
+from the RCC block.
+
+The list of available reset lines is documented in the DT bindings.
 
 Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
 Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
-Acked-by: Rob Herring <robh@kernel.org>
 ---
- .../devicetree/bindings/clock/st,stm32-rcc.txt     | 42 ++++++++++++++++++----
- .../devicetree/bindings/reset/st,stm32-rcc.txt     |  6 ++++
- 2 files changed, 41 insertions(+), 7 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/reset/st,stm32-rcc.txt
+ drivers/reset/Makefile      |   1 +
+ drivers/reset/reset-stm32.c | 108 ++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 109 insertions(+)
+ create mode 100644 drivers/reset/reset-stm32.c
 
-diff --git a/Documentation/devicetree/bindings/clock/st,stm32-rcc.txt b/Documentation/devicetree/bindings/clock/st,stm32-rcc.txt
-index fee3205..c209de6 100644
---- a/Documentation/devicetree/bindings/clock/st,stm32-rcc.txt
-+++ b/Documentation/devicetree/bindings/clock/st,stm32-rcc.txt
-@@ -1,16 +1,16 @@
- STMicroelectronics STM32 Reset and Clock Controller
- ===================================================
- 
--The RCC IP is both a reset and a clock controller. This documentation only
--describes the clock part.
-+The RCC IP is both a reset and a clock controller.
- 
--Please also refer to clock-bindings.txt in this directory for common clock
--controller binding usage.
-+Please refer to clock-bindings.txt for common clock controller binding usage.
-+Please also refer to reset.txt for common reset controller binding usage.
- 
- Required properties:
- - compatible: Should be "st,stm32f42xx-rcc"
- - reg: should be register base and length as documented in the
-   datasheet
-+- #reset-cells: 1, see below
- - #clock-cells: 2, device nodes should specify the clock in their "clocks"
-   property, containing a phandle to the clock device node, an index selecting
-   between gated clocks and other clocks and an index specifying the clock to
-@@ -19,6 +19,7 @@ Required properties:
- Example:
- 
- 	rcc: rcc at 40023800 {
-+		#reset-cells = <1>;
- 		#clock-cells = <2>
- 		compatible = "st,stm32f42xx-rcc", "st,stm32-rcc";
- 		reg = <0x40023800 0x400>;
-@@ -35,16 +36,23 @@ from the first RCC clock enable register (RCC_AHB1ENR, address offset 0x30).
- It is calculated as: index = register_offset / 4 * 32 + bit_offset.
- Where bit_offset is the bit offset within the register (LSB is 0, MSB is 31).
- 
-+To simplify the usage and to share bit definition with the reset and clock
-+drivers of the RCC IP, macros are available to generate the index in
-+human-readble format.
-+
-+For STM32F4 series, the macro are available here:
-+ - include/dt-bindings/mfd/stm32f4-rcc.h
-+
- Example:
- 
- 	/* Gated clock, AHB1 bit 0 (GPIOA) */
- 	... {
--		clocks = <&rcc 0 0>
-+		clocks = <&rcc 0 STM32F4_AHB1_CLOCK(GPIOA)>
- 	};
- 
- 	/* Gated clock, AHB2 bit 4 (CRYP) */
- 	... {
--		clocks = <&rcc 0 36>
-+		clocks = <&rcc 0 STM32F4_AHB2_CLOCK(CRYP)>
- 	};
- 
- Specifying other clocks
-@@ -61,5 +69,25 @@ Example:
- 
- 	/* Misc clock, FCLK */
- 	... {
--		clocks = <&rcc 1 1>
-+		clocks = <&rcc 1 STM32F4_APB1_CLOCK(TIM2)>
-+	};
-+
-+
-+Specifying softreset control of devices
-+=======================================
-+
-+Device nodes should specify the reset channel required in their "resets"
-+property, containing a phandle to the reset device node and an index specifying
-+which channel to use.
-+The index is the bit number within the RCC registers bank, starting from RCC
-+base address.
-+It is calculated as: index = register_offset / 4 * 32 + bit_offset.
-+Where bit_offset is the bit offset within the register.
-+For example, for CRC reset:
-+  crc = AHB1RSTR_offset / 4 * 32 + CRCRST_bit_offset = 0x10 / 4 * 32 + 12 = 140
-+
-+example:
-+
-+	timer2 {
-+		resets	= <&rcc STM32F4_APB1_RESET(TIM2)>;
- 	};
-diff --git a/Documentation/devicetree/bindings/reset/st,stm32-rcc.txt b/Documentation/devicetree/bindings/reset/st,stm32-rcc.txt
+diff --git a/drivers/reset/Makefile b/drivers/reset/Makefile
+index 5d65a93..64ebb0c 100644
+--- a/drivers/reset/Makefile
++++ b/drivers/reset/Makefile
+@@ -4,6 +4,7 @@ obj-$(CONFIG_ARCH_SOCFPGA) += reset-socfpga.o
+ obj-$(CONFIG_ARCH_BERLIN) += reset-berlin.o
+ obj-$(CONFIG_MACH_PISTACHIO) += reset-pistachio.o
+ obj-$(CONFIG_ARCH_MESON) += reset-meson.o
++obj-$(CONFIG_ARCH_STM32) += reset-stm32.o
+ obj-$(CONFIG_ARCH_SUNXI) += reset-sunxi.o
+ obj-$(CONFIG_ARCH_STI) += sti/
+ obj-$(CONFIG_ARCH_HISI) += hisilicon/
+diff --git a/drivers/reset/reset-stm32.c b/drivers/reset/reset-stm32.c
 new file mode 100644
-index 0000000..01db343
+index 0000000..3a7c8527
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/reset/st,stm32-rcc.txt
-@@ -0,0 +1,6 @@
-+STMicroelectronics STM32 Peripheral Reset Controller
-+====================================================
++++ b/drivers/reset/reset-stm32.c
+@@ -0,0 +1,108 @@
++/*
++ * Copyright (C) Maxime Coquelin 2015
++ * Author:  Maxime Coquelin <mcoquelin.stm32@gmail.com>
++ * License terms:  GNU General Public License (GPL), version 2
++ *
++ * Heavily based on sunxi driver from Maxime Ripard.
++ */
 +
-+The RCC IP is both a reset and a clock controller.
++#include <linux/err.h>
++#include <linux/io.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/platform_device.h>
++#include <linux/reset-controller.h>
++#include <linux/slab.h>
++#include <linux/spinlock.h>
++#include <linux/types.h>
 +
-+Please see Documentation/devicetree/bindings/clock/st,stm32-rcc.txt
++struct stm32_reset_data {
++	spinlock_t			lock;
++	void __iomem			*membase;
++	struct reset_controller_dev	rcdev;
++};
++
++static int stm32_reset_assert(struct reset_controller_dev *rcdev,
++			      unsigned long id)
++{
++	struct stm32_reset_data *data = container_of(rcdev,
++						     struct stm32_reset_data,
++						     rcdev);
++	int bank = id / BITS_PER_LONG;
++	int offset = id % BITS_PER_LONG;
++	unsigned long flags;
++	u32 reg;
++
++	spin_lock_irqsave(&data->lock, flags);
++
++	reg = readl(data->membase + (bank * 4));
++	writel(reg | BIT(offset), data->membase + (bank * 4));
++
++	spin_unlock_irqrestore(&data->lock, flags);
++
++	return 0;
++}
++
++static int stm32_reset_deassert(struct reset_controller_dev *rcdev,
++				unsigned long id)
++{
++	struct stm32_reset_data *data = container_of(rcdev,
++						     struct stm32_reset_data,
++						     rcdev);
++	int bank = id / BITS_PER_LONG;
++	int offset = id % BITS_PER_LONG;
++	unsigned long flags;
++	u32 reg;
++
++	spin_lock_irqsave(&data->lock, flags);
++
++	reg = readl(data->membase + (bank * 4));
++	writel(reg & ~BIT(offset), data->membase + (bank * 4));
++
++	spin_unlock_irqrestore(&data->lock, flags);
++
++	return 0;
++}
++
++static const struct reset_control_ops stm32_reset_ops = {
++	.assert		= stm32_reset_assert,
++	.deassert	= stm32_reset_deassert,
++};
++
++static const struct of_device_id stm32_reset_dt_ids[] = {
++	 { .compatible = "st,stm32-rcc", },
++	 { /* sentinel */ },
++};
++
++static int stm32_reset_probe(struct platform_device *pdev)
++{
++	struct stm32_reset_data *data;
++	struct resource *res;
++
++	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
++	if (!data)
++		return -ENOMEM;
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	data->membase = devm_ioremap_resource(&pdev->dev, res);
++	if (IS_ERR(data->membase))
++		return PTR_ERR(data->membase);
++
++	spin_lock_init(&data->lock);
++
++	data->rcdev.owner = THIS_MODULE;
++	data->rcdev.nr_resets = resource_size(res) * 8;
++	data->rcdev.ops = &stm32_reset_ops;
++	data->rcdev.of_node = pdev->dev.of_node;
++
++	return devm_reset_controller_register(&pdev->dev, &data->rcdev);
++}
++
++static struct platform_driver stm32_reset_driver = {
++	.probe	= stm32_reset_probe,
++	.driver = {
++		.name		= "stm32-rcc-reset",
++		.of_match_table	= stm32_reset_dt_ids,
++	},
++};
++builtin_platform_driver(stm32_reset_driver);
 -- 
 1.9.1
