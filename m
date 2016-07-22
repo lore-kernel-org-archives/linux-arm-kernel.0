@@ -1,59 +1,122 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 22 Jul 2016 11:03:14 +0100
-Subject: [PATCH v1 3/4] arm64: Add arm64 kexec support
-In-Reply-To: <20160722040842.GA14911@localhost.localdomain>
-References: <cover.1468970114.git.geoff@infradead.org>
- <9ed513fd44a19b2f49b4da99477cedfff7341bf0.1468970114.git.geoff@infradead.org>
- <20160720153859.GG24691@leverpostej> <1469042361.2977.90.camel@infradead.org>
- <20160721103120.GB20559@leverpostej> <5790A902.6070601@arm.com>
- <1469137776.2977.128.camel@infradead.org>
- <20160722040842.GA14911@localhost.localdomain>
-Message-ID: <5791EF62.5070006@arm.com>
+From: mugunthanvnm@ti.com (Mugunthan V N)
+Date: Fri, 22 Jul 2016 15:35:46 +0530
+Subject: [net-next PATCH 1/3] net: phy: dp83867: Add documentation for
+ optional impedance control
+In-Reply-To: <20160721211429.GA17696@rob-hp-laptop>
+References: <20160720145614.13132-1-mugunthanvnm@ti.com>
+ <20160720145614.13132-2-mugunthanvnm@ti.com> <578F99D3.9090601@ti.com>
+ <57906A2C.7010201@ti.com> <20160721211429.GA17696@rob-hp-laptop>
+Message-ID: <959bac39-ccd6-8338-a9f4-7f56f63b0478@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/07/16 05:08, Pratyush Anand wrote:
-> On 21/07/2016:02:49:36 PM, Geoff Levand wrote:
->> On Thu, 2016-07-21 at 11:50 +0100, Robin Murphy wrote:
->>> The Exynos UART (drivers/tty/serial/samsung.c) is one which comes to
->>> mind as definitely existing, and on arm64 systems to boot. The TX
->>> register is at offset 0x20 there.
->>
->> Here's what I came up with.
->>
->>
->> +	struct data {const char *name; int tx_offset;};
->> +	static const struct data ok_list[] = {
->> +	/*	{"armada-3700-uart", ?},	*/
->> +		{"exynos4210-uart", 0x20},
->> +	/*	{"ls1021a-lpuart", ?},		*/
->> +	/*	{"meson-uart", ?},		*/
->> +	/*	{"mt6577-uart", ?},		*/
->> +		{"ns16550", 0},
->> +		{"ns16550a", 0},
->> +		{"pl011", 0},
->> +		{NULL, 0}
->> +	};
-> 
-> sinc functionality is just to debug the scenario when something goes wrong in
-> purgatory. IMHO, it should be disabled by default. So, why not to keep it as
-> simple as possible. Its a low level debugging mainly for developer, so user
-> should know the absolute address. Therefore, I think no need to parse earlycon
-> or earlyprintk from command line.  Whatever user passes in --port can be treated
-> as address of TX register. If TX offset is 0x20, then user can pass --port as
-> base+0x20. Additionally, we can pass TX register width as well. So what about
-> something like "--port=0x1c020000,1" where 0x1c020000 is TX register address and
-> 1 says about it's width in bytes.
+Rob,
 
-I don't think even that is worthwhile, since without any polling it
-still relies on the UART having FIFOs, someone having already enabled
-the FIFOs, the FIFOs being deep enough and/or the output being short
-enough. In short, it's fragile enough that I'm not convinced it's even
-useful as a debug option. I suggest we simply copy the purgatory console
-implementation from, say, ARM or Alpha.
+On Friday 22 July 2016 02:44 AM, Rob Herring wrote:
+> On Thu, Jul 21, 2016 at 11:52:36AM +0530, Sekhar Nori wrote:
+>> Nishanth,
+>>
+>> On Wednesday 20 July 2016 09:03 PM, Nishanth Menon wrote:
+>>> On 07/20/2016 09:56 AM, Mugunthan V N wrote:
+>>>> Add documention of ti,impedance-control which can be used to
+>>>> correct MAC impedance mismatch using phy extended registers.
+>>>>
+>>>> Signed-off-by: Mugunthan V N <mugunthanvnm@ti.com>
+>>>> ---
+>>>>   Documentation/devicetree/bindings/net/ti,dp83867.txt | 7 +++++++
+>>>>   1 file changed, 7 insertions(+)
+>>>>
+>>>> diff --git a/Documentation/devicetree/bindings/net/ti,dp83867.txt
+>>>> b/Documentation/devicetree/bindings/net/ti,dp83867.txt
+>>>> index 5d21141..531ea3c5 100644
+>>>> --- a/Documentation/devicetree/bindings/net/ti,dp83867.txt
+>>>> +++ b/Documentation/devicetree/bindings/net/ti,dp83867.txt
+>>>> @@ -9,6 +9,13 @@ Required properties:
+>>>>       - ti,fifo-depth - Transmitt FIFO depth- see
+>>>> dt-bindings/net/ti-dp83867.h
+>>>>           for applicable values
+>>>>
+>>>> +Optional property:
+>>>> +    - ti,impedance-control - MAC Interface Impedance control to vary the
+>>>> +                 output impedance with an approximate range
+>>>> +                 from 35-70 ohms in 32 steps. Value range can
+>>>> +                 be 0x0 to 0x1f. Lowest impedance value is
+>>>> +                 0x1f and highest impedance being 0x0.
+>>>> +
+>>>
+>>> Should'nt you be using the impedance values of 35 to 70 as the valid
+>>> values here? that would be the hardware description, and the values to
+>>> program corresponding to those are 0x00 to 0x1f. Right?
+>>>
+>>> Rob: is'nt that the right way to do it?
+> 
+> Normally, yes that is preferred. I don't have an issue with it here if 
+> that is what makes sense.
+> 
+>> Agree that that is usually the right way to do it. I believe this case
+>> is bit peculiar though. Here is the extract from the datasheet[1] about
+>> how the register in question works.
+>>
+>> "
+>> Output impedance approximate range from 35-70 ohms in 32 steps.
+>> Lowest being 11110 and highest being 00000. Range and Step size
+>> will vary with process.
+>>
+>> Default is set to 50 ohms by trim. But the default register value can
+>> vary by process. Non default values of MAC I/O impedance can be
+>> used based on trace impedance. Mismatch between device and
+>> trace impedance can cause voltage overshoot and undershoot.
+>> "
+>>
+>> So clearly, there is no easy correspondence that the hardware guarantees
+>> between output impedance ohmage and the register value programmed. Only
+>> couple of things are guaranteed.
+>>
+>> 1) Programming a value of 0 gives approximately 35 ohms
+>> 2) Programming a value of 0x1F gives approximately 70 ohms
+>> 3) Default value of the register gives 50 ohms (the default value could
+>> vary by device).
+>> 4) Programming a value in between will give some ohmage in the
+>> approximate range 35-70 (curve is unknown).
 
-Robin.
+Sekhar got it wrong, programming 0x1F provides the minimum impedance of
+35 ohms and 0x0 provides the maximum impedance of 70 ohms.
+
+>>
+>> Given this, I am not sure how one can convert a given user supplied ohms
+>> values to a reasonable register value. Clearly, the register is supposed
+>> to be programmed by experimentation, not calculation.
+> 
+> So your are going to change from a known value tuned for the individual 
+> Si (50ohm) to the same value for all chips (at least for a given board). 
+> Or does this get set by firmware at boot? If not, seems like you would 
+> want to specify a delta from the default register value in this case.
+
+The delta will not be constant for each steps of the register content.
+So this approach cannot be taken.
 
 > 
-> ~Pratyush
+>> That said, we could take another approach. At least for the current
+>> issue we are trying to address, we only need to configure the register
+>> to max value. And given the nature of the register, I am pretty sure
+>> that is what most people will end up doing.
 > 
+> How does the max value get determined? Possibly it should just be set in 
+> the kernel.
+
+Yes, the min/max value will be determined in the kernel and the DT will
+have either of the properties below.
+
+>  
+>> So, may be we have two properties:
+>>
+>> ti,max-output-impedance
+>> ti,min-output-imepdance
+> 
+> Just define max if that's all you currently need.
+
+Currently we care about only the min-output-impedance (register content
+0x1f). Will respin the patch using ti,min-output-impedance.
+
+Regards
+Mugunthan V N
