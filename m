@@ -1,65 +1,66 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 22 Jul 2016 18:28:39 +0100
-Subject: [PATCH 22/55] arm/arm64: KVM: Prune unused #defines
-In-Reply-To: <1469208552-4155-1-git-send-email-marc.zyngier@arm.com>
-References: <1469208552-4155-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1469208552-4155-23-git-send-email-marc.zyngier@arm.com>
+From: jpoimboe@redhat.com (Josh Poimboeuf)
+Date: Fri, 22 Jul 2016 12:45:51 -0500
+Subject: [PATCH v3 02/11] mm: Hardened usercopy
+In-Reply-To: <CAGXu5jLCu1Vv0uugKZrsjSEsoABgXJSOJ8GkKmrHbvj9jkC2YA@mail.gmail.com>
+References: <1468619065-3222-1-git-send-email-keescook@chromium.org>
+ <1468619065-3222-3-git-send-email-keescook@chromium.org>
+ <5790711f.2350420a.b4287.2cc0SMTPIN_ADDED_BROKEN@mx.google.com>
+ <CAGXu5jLCu1Vv0uugKZrsjSEsoABgXJSOJ8GkKmrHbvj9jkC2YA@mail.gmail.com>
+Message-ID: <20160722174551.jddle6mf7zlq6xmb@treble>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We can now remove a number of dead #defines, thanks to the trampoline
-code being gone.
+On Thu, Jul 21, 2016 at 11:34:25AM -0700, Kees Cook wrote:
+> On Wed, Jul 20, 2016 at 11:52 PM, Michael Ellerman <mpe@ellerman.id.au> wrote:
+> > Kees Cook <keescook@chromium.org> writes:
+> >
+> >> diff --git a/mm/usercopy.c b/mm/usercopy.c
+> >> new file mode 100644
+> >> index 000000000000..e4bf4e7ccdf6
+> >> --- /dev/null
+> >> +++ b/mm/usercopy.c
+> >> @@ -0,0 +1,234 @@
+> > ...
+> >> +
+> >> +/*
+> >> + * Checks if a given pointer and length is contained by the current
+> >> + * stack frame (if possible).
+> >> + *
+> >> + *   0: not at all on the stack
+> >> + *   1: fully within a valid stack frame
+> >> + *   2: fully on the stack (when can't do frame-checking)
+> >> + *   -1: error condition (invalid stack position or bad stack frame)
+> >> + */
+> >> +static noinline int check_stack_object(const void *obj, unsigned long len)
+> >> +{
+> >> +     const void * const stack = task_stack_page(current);
+> >> +     const void * const stackend = stack + THREAD_SIZE;
+> >
+> > That allows access to the entire stack, including the struct thread_info,
+> > is that what we want - it seems dangerous? Or did I miss a check
+> > somewhere else?
+> 
+> That seems like a nice improvement to make, yeah.
+> 
+> > We have end_of_stack() which computes the end of the stack taking
+> > thread_info into account (end being the opposite of your end above).
+> 
+> Amusingly, the object_is_on_stack() check in sched.h doesn't take
+> thread_info into account either. :P Regardless, I think using
+> end_of_stack() may not be best. To tighten the check, I think we could
+> add this after checking that the object is on the stack:
+> 
+> #ifdef CONFIG_STACK_GROWSUP
+>         stackend -= sizeof(struct thread_info);
+> #else
+>         stack += sizeof(struct thread_info);
+> #endif
+> 
+> e.g. then if the pointer was in the thread_info, the second test would
+> fail, triggering the protection.
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
----
- arch/arm/include/asm/kvm_mmu.h   |  9 ---------
- arch/arm64/include/asm/kvm_mmu.h | 10 ----------
- 2 files changed, 19 deletions(-)
+FWIW, this won't work right on x86 after Andy's
+CONFIG_THREAD_INFO_IN_TASK patches get merged.
 
-diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-index d5fd9fb..73c2818 100644
---- a/arch/arm/include/asm/kvm_mmu.h
-+++ b/arch/arm/include/asm/kvm_mmu.h
-@@ -26,18 +26,9 @@
-  * We directly use the kernel VA for the HYP, as we can directly share
-  * the mapping (HTTBR "covers" TTBR1).
-  */
--#define HYP_PAGE_OFFSET_MASK	UL(~0)
--#define HYP_PAGE_OFFSET		PAGE_OFFSET
- #define KERN_TO_HYP(kva)	(kva)
- 
- /*
-- * Our virtual mapping for the boot-time MMU-enable code. Must be
-- * shared across all the page-tables. Conveniently, we use the vectors
-- * page, where no kernel data will ever be shared with HYP.
-- */
--#define TRAMPOLINE_VA		UL(CONFIG_VECTORS_BASE)
--
--/*
-  * KVM_MMU_CACHE_MIN_PAGES is the number of stage2 page table translation levels.
-  */
- #define KVM_MMU_CACHE_MIN_PAGES	2
-diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index b89122e..9226f8b 100644
---- a/arch/arm64/include/asm/kvm_mmu.h
-+++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -72,16 +72,6 @@
- #define HYP_PAGE_OFFSET_HIGH_MASK	((UL(1) << VA_BITS) - 1)
- #define HYP_PAGE_OFFSET_LOW_MASK	((UL(1) << (VA_BITS - 1)) - 1)
- 
--/* Temporary compat define */
--#define HYP_PAGE_OFFSET_MASK		HYP_PAGE_OFFSET_HIGH_MASK
--
--/*
-- * Our virtual mapping for the idmap-ed MMU-enable code. Must be
-- * shared across all the page-tables. Conveniently, we use the last
-- * possible page, where no kernel mapping will ever exist.
-- */
--#define TRAMPOLINE_VA		(HYP_PAGE_OFFSET_MASK & PAGE_MASK)
--
- #ifdef __ASSEMBLY__
- 
- #include <asm/alternative.h>
 -- 
-2.8.1
+Josh
