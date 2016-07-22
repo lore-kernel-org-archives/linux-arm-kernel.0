@@ -1,484 +1,126 @@
 From: tanxiaojun@huawei.com (Tan Xiaojun)
-Date: Fri, 22 Jul 2016 16:48:52 +0800
-Subject: [RFC PATCH v1 2/2] drivers: soc: Add support for Hisilicon Djtag
- driver
+Date: Fri, 22 Jul 2016 16:48:51 +0800
+Subject: [RFC PATCH v1 1/2] Documentation: arm64: Add Hisilicon HiP05/06/07
+ Sysctrl and Djtag dts bindings
 In-Reply-To: <1469177332-72156-1-git-send-email-tanxiaojun@huawei.com>
 References: <1469177332-72156-1-git-send-email-tanxiaojun@huawei.com>
-Message-ID: <1469177332-72156-3-git-send-email-tanxiaojun@huawei.com>
+Message-ID: <1469177332-72156-2-git-send-email-tanxiaojun@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Hisilicon Djtag is an independent module which connects with some modules
-in the SoC by Debug Bus. This module can be configured to access the registers
-of connecting modules (like L3 cache) during real time debugging.
-
-This patch add the driver of Hisilicon Djtag.
+First, add Hisilicon HiP05/06/07 CPU and ALGSUB system controller dts
+bindings. Then, add Hisilicon Djtag dts binding.
 
 Signed-off-by: Tan Xiaojun <tanxiaojun@huawei.com>
 ---
- drivers/soc/Kconfig                 |    1 +
- drivers/soc/Makefile                |    1 +
- drivers/soc/hisilicon/Kconfig       |   12 ++
- drivers/soc/hisilicon/Makefile      |    1 +
- drivers/soc/hisilicon/djtag.c       |  373 +++++++++++++++++++++++++++++++++++
- include/linux/soc/hisilicon/djtag.h |   18 ++
- 6 files changed, 406 insertions(+)
- create mode 100644 drivers/soc/hisilicon/Kconfig
- create mode 100644 drivers/soc/hisilicon/Makefile
- create mode 100644 drivers/soc/hisilicon/djtag.c
- create mode 100644 include/linux/soc/hisilicon/djtag.h
+ .../bindings/arm/hisilicon/hisilicon.txt           |   98 ++++++++++++++++++++
+ 1 file changed, 98 insertions(+)
 
-diff --git a/drivers/soc/Kconfig b/drivers/soc/Kconfig
-index cb58ef0..f5982ec 100644
---- a/drivers/soc/Kconfig
-+++ b/drivers/soc/Kconfig
-@@ -3,6 +3,7 @@ menu "SOC (System On Chip) specific Drivers"
- source "drivers/soc/bcm/Kconfig"
- source "drivers/soc/brcmstb/Kconfig"
- source "drivers/soc/fsl/qe/Kconfig"
-+source "drivers/soc/hisilicon/Kconfig"
- source "drivers/soc/mediatek/Kconfig"
- source "drivers/soc/qcom/Kconfig"
- source "drivers/soc/rockchip/Kconfig"
-diff --git a/drivers/soc/Makefile b/drivers/soc/Makefile
-index 380230f..373449d 100644
---- a/drivers/soc/Makefile
-+++ b/drivers/soc/Makefile
-@@ -7,6 +7,7 @@ obj-$(CONFIG_SOC_BRCMSTB)	+= brcmstb/
- obj-$(CONFIG_ARCH_DOVE)		+= dove/
- obj-$(CONFIG_MACH_DOVE)		+= dove/
- obj-y				+= fsl/
-+obj-$(CONFIG_ARCH_HISI)		+= hisilicon/
- obj-$(CONFIG_ARCH_MEDIATEK)	+= mediatek/
- obj-$(CONFIG_ARCH_QCOM)		+= qcom/
- obj-$(CONFIG_ARCH_RENESAS)	+= renesas/
-diff --git a/drivers/soc/hisilicon/Kconfig b/drivers/soc/hisilicon/Kconfig
-new file mode 100644
-index 0000000..3644aab
---- /dev/null
-+++ b/drivers/soc/hisilicon/Kconfig
-@@ -0,0 +1,12 @@
-+#
-+# Hisilicon SoC drivers
-+#
-+config HISI_DJTAG
-+	bool "Hisilicon Djtag Support"
-+	depends on ARCH_HISI || COMPILE_TEST
-+	help
-+	  Say y here to enable the Hisilicon Djtag support. It is an
-+	  independent module which connects with some modules in the
-+	  SoC by Debug Bus. This module can be configured to access
-+	  the registers of connecting modules during real time
-+	  debugging.
-diff --git a/drivers/soc/hisilicon/Makefile b/drivers/soc/hisilicon/Makefile
-new file mode 100644
-index 0000000..35a7b4b
---- /dev/null
-+++ b/drivers/soc/hisilicon/Makefile
-@@ -0,0 +1 @@
-+obj-$(CONFIG_HISI_DJTAG)	+= djtag.o
-diff --git a/drivers/soc/hisilicon/djtag.c b/drivers/soc/hisilicon/djtag.c
-new file mode 100644
-index 0000000..41e11ed
---- /dev/null
-+++ b/drivers/soc/hisilicon/djtag.c
-@@ -0,0 +1,373 @@
-+/*
-+ * Driver for Hisilicon Djtag r/w via System Controller.
-+ *
-+ * Copyright (C) 2016 Hisilicon Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
+diff --git a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
+index 83fe816..82a22ed 100644
+--- a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
++++ b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
+@@ -249,3 +249,101 @@ Required Properties:
+   [1]: bootwrapper size
+   [2]: relocation physical address
+   [3]: relocation size
++
++-----------------------------------------------------------------------
++Hisilicon HiP05 CPU system controller
++Required properties:
++- compatible : "hisilicon,hip05-sysctrl", "syscon", "simple-mfd";
++- reg : Register address and size
++- djtag :
++  - compatible : "hisilicon,hip05-cpu-djtag-v1"
++  - syscon : which sysctrl node
++
++Hisilicon HiP06 CPU system controller
++Required properties:
++- compatible : "hisilicon,hip06-sysctrl", "syscon", "simple-mfd";
++- reg : Register address and size
++- djtag :
++  - compatible : "hisilicon,hip06-cpu-djtag-v1"
++  - syscon : which sysctrl node
++
++Hisilicon HiP07 CPU system controller
++Required properties:
++- compatible : "hisilicon,hip07-sysctrl", "syscon", "simple-mfd";
++- reg : Register address and size
++- djtag :
++  - compatible : "hisilicon,hip07-cpu-djtag-v2"
++  - syscon : which sysctrl node
++
++The Hisilicon HiP05/06/07 CPU system controller is in CPU die of SoC. It is 
++used to control system operation mode, control system operating status and
++manage some important modules (such as clock, reset, soft reset, secure
++debugger, etc.). We can also configure some functions of the peripheral
++devices and query their status by it.
++
++The Hisilicon Djtag in CPU die is an independent module which connects with
++some modules in the SoC by Debug Bus. This module can be configured to access
++the registers of connecting modules (like L3 cache) during real time debugging
++by sysctrl.
++
++Example:
++	/* for Hisilicon HiP05 sysctrl */
++	hip05-sysctrl: hip05-sysctrl at 80010000 {
++		compatible = "hisilicon,hip05-sysctrl", "syscon", "simple-mfd";
++		reg = <0x80010000 0x10000>;
++		
++		djtag0: djtag at 0 {
++		       compatible = "hisilicon,hip05-cpu-djtag-v1";
++		       syscon = <&hip05-sysctrl>;
++		};
++	};
++
++	/* for Hisilicon HiP05 l3 cache maybe set like below */
++	llc0: llc at 0 {
++		compatible = "hisilicon,hip05-llc";
++		djtag = <&djtag0>;
++	};
++
++-----------------------------------------------------------------------
++Hisilicon HiP05 ALGSUB system controller
++Required properties:
++- compatible : "hisilicon,hip05-alg-sysctrl", "syscon", "simple-mfd";
++- reg : Register address and size
++- djtag :
++  - compatible : "hisilicon,hip05-io-djtag-v1"
++  - syscon : which sysctrl node
++
++Hisilicon HiP06 ALGSUB system controller
++Required properties:
++- compatible : "hisilicon,hip06-alg-sysctrl", "syscon", "simple-mfd";
++- reg : Register address and size
++- djtag :
++  - compatible : "hisilicon,hip06-io-djtag-v2"
++  - syscon : which sysctrl node
++
++Hisilicon HiP07 ALGSUB system controller
++Required properties:
++- compatible : "hisilicon,hip07-alg-sysctrl", "syscon", "simple-mfd";
++- reg : Register address and size
++- djtag :
++  - compatible : "hisilicon,hip07-io-djtag-v2"
++  - syscon : which sysctrl node
++
++The Hisilicon HiP05/06/07 ALGSUB system controller is in IO die of SoC. It
++has a similar function as the Hisilicon HiP05/06/07 CPU system controller
++in CPU die and it manage default modules, like RSA, etc.
++
++The Hisilicon Djtag in IO die has a similar function as the one in CPU die.
++
++Example:
++	/* for Hisilicon HiP05 alg subctrl */
++	hip05-alg-sysctrl: hip05-alg-sysctrl at d0000000 {
++		compatible = "hisilicon,hip05-alg-sysctrl", "syscon", "simple-mfd";
++		reg = <0xd0000000 0x10000>;
++		
++		djtag0: djtag at 0 {
++		       compatible = "hisilicon,hip05-io-djtag-v1";
++		       syscon = <&hip05-alg-sysctrl>;
++		};
++	};
 +
-+#include <linux/bitops.h>
-+#include <linux/init.h>
-+#include <linux/list.h>
-+#include <linux/mfd/syscon.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/of_device.h>
-+#include <linux/platform_device.h>
-+#include <linux/regmap.h>
-+#include <linux/slab.h>
-+#include <linux/spinlock.h>
-+
-+#include <asm-generic/delay.h>
-+#include <linux/soc/hisilicon/djtag.h>
-+
-+#define SC_DJTAG_TIMEOUT		100000	/* 100ms */
-+
-+/* for djtag v1 */
-+#define SC_DJTAG_MSTR_EN		0x6800
-+#define DJTAG_NOR_CFG			BIT(1)	/* accelerate R,W */
-+#define DJTAG_MSTR_EN			BIT(0)
-+#define SC_DJTAG_MSTR_START_EN		0x6804
-+#define DJTAG_MSTR_START_EN		0x1
-+#define SC_DJTAG_DEBUG_MODULE_SEL	0x680c
-+#define SC_DJTAG_MSTR_WR		0x6810
-+#define DJTAG_MSTR_W			0x1
-+#define DJTAG_MSTR_R			0x0
-+#define SC_DJTAG_CHAIN_UNIT_CFG_EN	0x6814
-+#define CHAIN_UNIT_CFG_EN		0xFFFF
-+#define SC_DJTAG_MSTR_ADDR		0x6818
-+#define SC_DJTAG_MSTR_DATA		0x681c
-+#define SC_DJTAG_RD_DATA_BASE		0xe800
-+
-+/* for djtag v2 */
-+#define SC_DJTAG_SEC_ACC_EN_EX		0xd800
-+#define DJTAG_SEC_ACC_EN_EX		0x1
-+#define SC_DJTAG_MSTR_CFG_EX		0xd818
-+#define DJTAG_MSTR_RW_SHIFT_EX		29
-+#define DJTAG_MSTR_RD_EX		(0x0 << DJTAG_MSTR_RW_SHIFT_EX)
-+#define DJTAG_MSTR_WR_EX		(0x1 << DJTAG_MSTR_RW_SHIFT_EX)
-+#define DEBUG_MODULE_SEL_SHIFT_EX	16
-+#define CHAIN_UNIT_CFG_EN_EX		0xFFFF
-+#define SC_DJTAG_MSTR_ADDR_EX		0xd810
-+#define SC_DJTAG_MSTR_DATA_EX		0xd814
-+#define SC_DJTAG_MSTR_START_EN_EX	0xd81c
-+#define DJTAG_MSTR_START_EN_EX		0x1
-+#define SC_DJTAG_RD_DATA_BASE_EX	0xe800
-+#define SC_DJTAG_OP_ST_EX		0xe828
-+#define DJTAG_OP_DONE_EX		BIT(8)
-+
-+static LIST_HEAD(djtag_list);
-+
-+struct djtag_data {
-+	spinlock_t lock;
-+	struct list_head list;
-+	struct regmap *scl_map;
-+	struct device_node *node;
-+	int (*djtag_readwrite)(struct regmap *map, u32 offset,
-+			u32 mod_sel, u32 mod_mask, bool is_w,
-+			u32 wval, int chain_id, u32 *rval);
-+};
-+
-+/*
-+ * djtag_readwrite_v1/v2: djtag read/write interface
-+ * @regmap:	djtag base address
-+ * @offset:	register's offset
-+ * @mod_sel:	module selection
-+ * @mod_mask:	mask to select specific modules for write
-+ * @is_w:	write -> true, read -> false
-+ * @wval:	value to register for write
-+ * @chain_id:	which sub module for read
-+ * @rval:	value in register for read
-+ *
-+ * Return non-zero if error, else return 0.
-+ */
-+static int djtag_readwrite_v1(struct regmap *map, u32 offset, u32 mod_sel,
-+		u32 mod_mask, bool is_w, u32 wval, int chain_id, u32 *rval)
-+{
-+	u32 rd;
-+	int timeout = SC_DJTAG_TIMEOUT;
-+
-+	if (!(mod_mask & CHAIN_UNIT_CFG_EN)) {
-+		pr_warn("djtag: do nothing.\n");
-+		return 0;
-+	}
-+
-+	/* djtag mster enable & accelerate R,W */
-+	regmap_write(map, SC_DJTAG_MSTR_EN, DJTAG_NOR_CFG | DJTAG_MSTR_EN);
-+
-+	/* select module */
-+	regmap_write(map, SC_DJTAG_DEBUG_MODULE_SEL, mod_sel);
-+
-+	regmap_write(map, SC_DJTAG_CHAIN_UNIT_CFG_EN,
-+			mod_mask & CHAIN_UNIT_CFG_EN);
-+
-+	if (is_w) {
-+		regmap_write(map, SC_DJTAG_MSTR_WR, DJTAG_MSTR_W);
-+		regmap_write(map, SC_DJTAG_MSTR_DATA, wval);
-+	} else
-+		regmap_write(map, SC_DJTAG_MSTR_WR, DJTAG_MSTR_R);
-+
-+	/* address offset */
-+	regmap_write(map, SC_DJTAG_MSTR_ADDR, offset);
-+
-+	/* start to write to djtag register */
-+	regmap_write(map, SC_DJTAG_MSTR_START_EN, DJTAG_MSTR_START_EN);
-+
-+	/* ensure the djtag operation is done */
-+	do {
-+		regmap_read(map, SC_DJTAG_MSTR_START_EN, &rd);
-+
-+		if (!(rd & DJTAG_MSTR_EN))
-+			break;
-+
-+		udelay(1);
-+	} while (timeout--);
-+
-+	if (timeout < 0) {
-+		pr_err("djtag: %s timeout!\n", is_w ? "write" : "read");
-+		return -EBUSY;
-+	}
-+
-+	if (!is_w)
-+		regmap_read(map, SC_DJTAG_RD_DATA_BASE + chain_id * 0x4, rval);
-+
-+	return 0;
-+}
-+
-+static int djtag_readwrite_v2(struct regmap *map, u32 offset, u32 mod_sel,
-+		u32 mod_mask, bool is_w, u32 wval, int chain_id, u32 *rval)
-+{
-+	u32 rd;
-+	int timeout = SC_DJTAG_TIMEOUT;
-+
-+	if (!(mod_mask & CHAIN_UNIT_CFG_EN_EX)) {
-+		pr_warn("djtag: do nothing.\n");
-+		return 0;
-+	}
-+
-+	/* djtag mster enable */
-+	regmap_write(map, SC_DJTAG_SEC_ACC_EN_EX, DJTAG_SEC_ACC_EN_EX);
-+
-+	if (is_w) {
-+		regmap_write(map, SC_DJTAG_MSTR_CFG_EX, DJTAG_MSTR_WR_EX
-+				| (mod_sel << DEBUG_MODULE_SEL_SHIFT_EX)
-+				| (mod_mask & CHAIN_UNIT_CFG_EN_EX));
-+		regmap_write(map, SC_DJTAG_MSTR_DATA_EX, wval);
-+	} else
-+		regmap_write(map, SC_DJTAG_MSTR_CFG_EX, DJTAG_MSTR_RD_EX
-+				| (mod_sel << DEBUG_MODULE_SEL_SHIFT_EX)
-+				| (mod_mask & CHAIN_UNIT_CFG_EN_EX));
-+
-+	/* address offset */
-+	regmap_write(map, SC_DJTAG_MSTR_ADDR_EX, offset);
-+
-+	/* start to write to djtag register */
-+	regmap_write(map, SC_DJTAG_MSTR_START_EN_EX, DJTAG_MSTR_START_EN_EX);
-+
-+	/* ensure the djtag operation is done */
-+	do {
-+		regmap_read(map, SC_DJTAG_MSTR_START_EN_EX, &rd);
-+
-+		if (!(rd & DJTAG_MSTR_START_EN_EX))
-+			break;
-+
-+		udelay(1);
-+	} while (timeout--);
-+
-+	if (timeout < 0)
-+		goto timeout;
-+
-+	timeout = SC_DJTAG_TIMEOUT;
-+	do {
-+		regmap_read(map, SC_DJTAG_OP_ST_EX, &rd);
-+
-+		if (rd & DJTAG_OP_DONE_EX)
-+			break;
-+
-+		udelay(1);
-+	} while (timeout--);
-+
-+	if (timeout < 0)
-+		goto timeout;
-+
-+	if (!is_w)
-+		regmap_read(map, SC_DJTAG_RD_DATA_BASE_EX + chain_id * 0x4,
-+				rval);
-+
-+	return 0;
-+
-+timeout:
-+	pr_err("djtag: %s timeout!\n", is_w ? "write" : "read");
-+	return -EBUSY;
-+}
-+
-+
-+/**
-+ * djtag_writel - write registers via djtag
-+ * @node:	djtag node
-+ * @offset:	register's offset
-+ * @mod_sel:	module selection
-+ * @mod_mask:	mask to select specific modules
-+ * @val:	value to write to register
-+ *
-+ * If error return errno, otherwise return 0.
-+ */
-+int hisi_djtag_writel(struct device_node *node, u32 offset, u32 mod_sel,
-+			u32 mod_mask, u32 val)
-+{
-+	struct regmap *map;
-+	unsigned long flags;
-+	struct djtag_data *tmp, *p;
-+	int ret = 0;
-+
-+	map = NULL;
-+	list_for_each_entry_safe(tmp, p, &djtag_list, list) {
-+		if (tmp->node == node) {
-+			map = tmp->scl_map;
-+
-+			spin_lock_irqsave(&tmp->lock, flags);
-+			ret = tmp->djtag_readwrite(map, offset, mod_sel, mod_mask,
-+					true, val, 0, NULL);
-+			if (ret)
-+				pr_err("djtag_writel: %s: error!\n",
-+						node->full_name);
-+			spin_unlock_irqrestore(&tmp->lock, flags);
-+			break;
-+		}
-+	}
-+
-+	if (!map)
-+		return -ENODEV;
-+
-+	return ret;
-+}
-+EXPORT_SYMBOL_GPL(hisi_djtag_writel);
-+
-+/**
-+ * djtag_readl - read registers via djtag
-+ * @node:	djtag node
-+ * @offset:	register's offset
-+ * @mod_sel:	module type selection
-+ * @chain_id:	chain_id number, mostly is 0
-+ * @val:	register's value
-+ *
-+ * If error return errno, otherwise return 0.
-+ */
-+int hisi_djtag_readl(struct device_node *node, u32 offset, u32 mod_sel,
-+		int chain_id, u32 *val)
-+{
-+	struct regmap *map;
-+	unsigned long flags;
-+	struct djtag_data *tmp, *p;
-+	int ret = 0;
-+
-+	map = NULL;
-+	list_for_each_entry_safe(tmp, p, &djtag_list, list) {
-+		if (tmp->node == node) {
-+			map = tmp->scl_map;
-+
-+			spin_lock_irqsave(&tmp->lock, flags);
-+			ret = tmp->djtag_readwrite(map, offset, mod_sel,
-+					0, false, 0, chain_id, val);
-+			if (ret)
-+				pr_err("djtag_readl: %s: error!\n",
-+						node->full_name);
-+			spin_unlock_irqrestore(&tmp->lock, flags);
-+			break;
-+		}
-+	}
-+
-+	if (!map)
-+		return -ENODEV;
-+
-+	return ret;
-+}
-+EXPORT_SYMBOL_GPL(hisi_djtag_readl);
-+
-+static const struct of_device_id djtag_of_match[] = {
-+	/* for hip05(D02) cpu die */
-+	{ .compatible = "hisilicon,hip05-cpu-djtag-v1",
-+		.data = (void *)djtag_readwrite_v1 },
-+	/* for hip05(D02) io die */
-+	{ .compatible = "hisilicon,hip05-io-djtag-v1",
-+		.data = (void *)djtag_readwrite_v1 },
-+	/* for hip06(D03) cpu die */
-+	{ .compatible = "hisilicon,hip06-cpu-djtag-v1",
-+		.data = (void *)djtag_readwrite_v1 },
-+	/* for hip06(D03) io die */
-+	{ .compatible = "hisilicon,hip06-io-djtag-v2",
-+		.data = (void *)djtag_readwrite_v2 },
-+	/* for hip07(D04) cpu die */
-+	{ .compatible = "hisilicon,hip07-cpu-djtag-v2",
-+		.data = (void *)djtag_readwrite_v2 },
-+	/* for hip07(D04) io die */
-+	{ .compatible = "hisilicon,hip07-io-djtag-v2",
-+		.data = (void *)djtag_readwrite_v2 },
-+	{},
-+};
-+
-+MODULE_DEVICE_TABLE(of, djtag_of_match);
-+
-+static int djtag_dev_probe(struct platform_device *pdev)
-+{
-+	struct device *dev = &pdev->dev;
-+	struct djtag_data *dg_data;
-+	const struct of_device_id *of_id;
-+
-+	of_id = of_match_device(djtag_of_match, dev);
-+	if (!of_id)
-+		return -EINVAL;
-+
-+	dg_data = kzalloc(sizeof(struct djtag_data), GFP_KERNEL);
-+	if (!dg_data)
-+		return -ENOMEM;
-+
-+	dg_data->node = dev->of_node;
-+	dg_data->djtag_readwrite = of_id->data;
-+	spin_lock_init(&dg_data->lock);
-+
-+	INIT_LIST_HEAD(&dg_data->list);
-+	dg_data->scl_map = syscon_regmap_lookup_by_phandle(dg_data->node,
-+			"syscon");
-+	if (IS_ERR(dg_data->scl_map)) {
-+		dev_warn(dev, "wrong syscon register address.\n");
-+		kfree(dg_data);
-+		return -EINVAL;
-+	}
-+
-+	list_add_tail(&dg_data->list, &djtag_list);
-+	dev_info(dev, "%s init successfully.\n", dg_data->node->name);
-+	return 0;
-+}
-+
-+static int djtag_dev_remove(struct platform_device *pdev)
-+{
-+	struct device *dev = &pdev->dev;
-+	struct djtag_data *tmp, *p;
-+
-+	list_for_each_entry_safe(tmp, p, &djtag_list, list) {
-+		list_del(&tmp->list);
-+		dev_info(dev, "%s remove successfully.\n", tmp->node->name);
-+		kfree(tmp);
-+	}
-+
-+	return 0;
-+}
-+
-+static struct platform_driver djtag_dev_driver = {
-+	.driver = {
-+		.name = "hisi-djtag",
-+		.of_match_table = djtag_of_match,
-+	},
-+	.probe = djtag_dev_probe,
-+	.remove = djtag_dev_remove,
-+};
-+
-+module_platform_driver(djtag_dev_driver);
-+
-+MODULE_DESCRIPTION("Hisilicon djtag driver");
-+MODULE_LICENSE("GPL");
-+MODULE_VERSION("1.0");
-diff --git a/include/linux/soc/hisilicon/djtag.h b/include/linux/soc/hisilicon/djtag.h
-new file mode 100644
-index 0000000..2d3fc61
---- /dev/null
-+++ b/include/linux/soc/hisilicon/djtag.h
-@@ -0,0 +1,18 @@
-+/*
-+ * Driver for Hisilicon djtag r/w via System Controller.
-+ *
-+ * Copyright (C) 2016-2017 Hisilicon Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#ifndef __HISI_DJTAG_H
-+#define __HISI_DJTAG_H
-+
-+int hisi_djtag_readl(struct device_node *node, u32 offset, u32 mod_sel,
-+						int chain_id, u32 *val);
-+int hisi_djtag_writel(struct device_node *node, u32 offset, u32 mod_sel,
-+						u32 mod_mask, u32 val);
-+#endif /* __HISI_DJTAG_H */
 -- 
 1.7.9.5
