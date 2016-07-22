@@ -1,152 +1,146 @@
-From: gabriel.fernandez@st.com (gabriel.fernandez at st.com)
-Date: Fri, 22 Jul 2016 11:37:49 +0200
-Subject: [PATCH v3 3/4] drivers: reset: Add STM32 reset driver
-In-Reply-To: <1469180270-5446-1-git-send-email-gabriel.fernandez@st.com>
-References: <1469180270-5446-1-git-send-email-gabriel.fernandez@st.com>
-Message-ID: <1469180270-5446-4-git-send-email-gabriel.fernandez@st.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Fri, 22 Jul 2016 10:38:56 +0100
+Subject: [RFC 6/6] bus: Add support for Tegra NOR controller
+In-Reply-To: <CALw8SCVy4ud5_+gS3C8WeyTCV0m_4R2xjdEY4vCKEq_3-aFanw@mail.gmail.com>
+References: <1468935397-11926-1-git-send-email-mirza.krak@gmail.com>
+ <1468935397-11926-7-git-send-email-mirza.krak@gmail.com>
+ <f6df33eb-53ae-699b-9e1f-69eb7fed7da0@nvidia.com>
+ <CALw8SCVy4ud5_+gS3C8WeyTCV0m_4R2xjdEY4vCKEq_3-aFanw@mail.gmail.com>
+Message-ID: <dbbb5c9f-8c67-9d9f-171b-64cd18353411@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Maxime Coquelin <mcoquelin.stm32@gmail.com>
 
-The STM32 MCUs family IPs can be reset by accessing some registers
-from the RCC block.
+On 21/07/16 21:42, Mirza Krak wrote:
+> 2016-07-21 12:15 GMT+02:00 Jon Hunter <jonathanh@nvidia.com>:
+>>
+>> On 19/07/16 14:36, Mirza Krak wrote:
+>>> From: Mirza Krak <mirza.krak@gmail.com>
+>>> +config TEGRA_NOR
+>>> +     tristate "Nvidia Tegra NOR flash bus driver a.k.a GMI/SNOR"
+>>> +             depends on ARCH_TEGRA_2x_SOC || ARCH_TEGRA_3x_SOC
+>>> +             depends on OF
+>>> +             help
+>>> +                     Driver for NOR flash bus found on Tegra30/20 SOC`s.
+>>
+>> It is actually present on all Tegra's and so I would drop the 30/20.
+> 
+> ACK.
+> 
+>>> +++ b/drivers/bus/tegra-nor.c
+>>> @@ -0,0 +1,118 @@
+>>> +/*
+>>> + * Driver for Nvidia NOR Flash bus a.k.a SNOR/GMI.
+>>> + *
+>>> + * Copyright (C) 2016 Host Mobility AB. All rights reserved.
+>>> + *
+>>> + * This file is licensed under the terms of the GNU General Public
+>>> + * License version 2. This program is licensed "as is" without any
+>>> + * warranty of any kind, whether express or implied.
+>>> + */
+>>> +
+>>> +#include <linux/clk.h>
+>>> +#include <linux/io.h>
+>>> +#include <linux/mfd/syscon.h>
+>>
+>> Is this needed?
+> 
+> It is not. ACK.
+> 
+>>
+>>> +#include <linux/module.h>
+>>> +#include <linux/of_device.h>
+>>> +#include <linux/regmap.h>
+>>
+>> Or this?
+> 
+> It is not. ACK.
+> 
+>>
+>>> +
+>>> +#define TEGRA_NOR_TIMING_REG_COUNT   2
+>>> +
+>>> +#define TEGRA_NOR_CONFIG                     0x00
+>>> +#define TEGRA_NOR_STATUS                     0x04
+>>> +#define TEGRA_NOR_ADDR_PTR                   0x08
+>>> +#define TEGRA_NOR_AHB_ADDR_PTR               0x0c
+>>> +#define TEGRA_NOR_TIMING0                    0x10
+>>> +#define TEGRA_NOR_TIMING1                    0x14
+>>> +#define TEGRA_NOR_MIO_CONFIG         0x18
+>>> +#define TEGRA_NOR_MIO_TIMING         0x1c
+>>> +#define TEGRA_NOR_DMA_CONFIG         0x20
+>>> +#define TEGRA_NOR_CS_MUX_CONFIG              0x24
+>>
+>> Not all of these are used. It is good to define them and I wonder if we
+>> should add support for MIO while are at it :-)
+> 
+> We can come back to this once I have all SNOR stuff in order.
+> 
+>>
+>>> +
+>>> +#define TEGRA_NOR_CONFIG_GO                          BIT(31)
+>>> +
+>>> +static const struct of_device_id nor_id_table[] = {
+>>> +     /* Tegra30 */
+>>
+>> I don't think this comment is needed.
+> 
+> ACK.
+> 
+>>
+>>> +     { .compatible = "nvidia,tegra30-nor", .data = NULL, },
+>>
+>> You don't need to set data to NULL.
+> 
+> ACK.
+> 
+>>
+>>> +     /* Tegra20 */
+>>> +     { .compatible = "nvidia,tegra20-nor", .data = NULL, },
+>>
+>> Same here.
+> 
+> ACK
+> 
+>>> +static int __init nor_probe(struct platform_device *pdev)
+>>> +{
+>>
+>> I would drop the __init.
+> 
+> ACK.
+> 
+>>> +static struct platform_driver nor_driver = {
+>>> +     .driver = {
+>>> +             .name           = "tegra-nor",
+>>> +             .of_match_table = nor_id_table,
+>>> +     },
+>>> +};
+>>
+>> The driver should have a remove function given that we can build as a
+>> module.
+> 
+> At the moment I do not know what we would do in a remove function and
+> hence me not adding one.
 
-The list of available reset lines is documented in the DT bindings.
+Should just be the inverse of the probe (although there is no inverse
+for the parsing DT bit). If you don't wish to add a remove, that is
+fine, but make the driver a 'bool' and not 'tristate' in the Kconfig so
+it cannot be configured as a module.
 
-Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
-Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
----
- drivers/reset/Makefile      |   1 +
- drivers/reset/reset-stm32.c | 108 ++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 109 insertions(+)
- create mode 100644 drivers/reset/reset-stm32.c
+>>
+>>> +module_platform_driver_probe(nor_driver, nor_probe);
+>>
+>> I would use "tegra_nor" namespace for all the structs, functions, etc.
+>> However, we may prefer to go with GMI and in which case tegra_gmi_probe,
+>> etc.
+> 
+> ACK. Who gets the last call on what we should call the driver? It
+> seems that we both think GMI is a better name, do we need a third? :).
 
-diff --git a/drivers/reset/Makefile b/drivers/reset/Makefile
-index 5d65a93..64ebb0c 100644
---- a/drivers/reset/Makefile
-+++ b/drivers/reset/Makefile
-@@ -4,6 +4,7 @@ obj-$(CONFIG_ARCH_SOCFPGA) += reset-socfpga.o
- obj-$(CONFIG_ARCH_BERLIN) += reset-berlin.o
- obj-$(CONFIG_MACH_PISTACHIO) += reset-pistachio.o
- obj-$(CONFIG_ARCH_MESON) += reset-meson.o
-+obj-$(CONFIG_ARCH_STM32) += reset-stm32.o
- obj-$(CONFIG_ARCH_SUNXI) += reset-sunxi.o
- obj-$(CONFIG_ARCH_STI) += sti/
- obj-$(CONFIG_ARCH_HISI) += hisilicon/
-diff --git a/drivers/reset/reset-stm32.c b/drivers/reset/reset-stm32.c
-new file mode 100644
-index 0000000..3a7c8527
---- /dev/null
-+++ b/drivers/reset/reset-stm32.c
-@@ -0,0 +1,108 @@
-+/*
-+ * Copyright (C) Maxime Coquelin 2015
-+ * Author:  Maxime Coquelin <mcoquelin.stm32@gmail.com>
-+ * License terms:  GNU General Public License (GPL), version 2
-+ *
-+ * Heavily based on sunxi driver from Maxime Ripard.
-+ */
-+
-+#include <linux/err.h>
-+#include <linux/io.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/platform_device.h>
-+#include <linux/reset-controller.h>
-+#include <linux/slab.h>
-+#include <linux/spinlock.h>
-+#include <linux/types.h>
-+
-+struct stm32_reset_data {
-+	spinlock_t			lock;
-+	void __iomem			*membase;
-+	struct reset_controller_dev	rcdev;
-+};
-+
-+static int stm32_reset_assert(struct reset_controller_dev *rcdev,
-+			      unsigned long id)
-+{
-+	struct stm32_reset_data *data = container_of(rcdev,
-+						     struct stm32_reset_data,
-+						     rcdev);
-+	int bank = id / BITS_PER_LONG;
-+	int offset = id % BITS_PER_LONG;
-+	unsigned long flags;
-+	u32 reg;
-+
-+	spin_lock_irqsave(&data->lock, flags);
-+
-+	reg = readl(data->membase + (bank * 4));
-+	writel(reg | BIT(offset), data->membase + (bank * 4));
-+
-+	spin_unlock_irqrestore(&data->lock, flags);
-+
-+	return 0;
-+}
-+
-+static int stm32_reset_deassert(struct reset_controller_dev *rcdev,
-+				unsigned long id)
-+{
-+	struct stm32_reset_data *data = container_of(rcdev,
-+						     struct stm32_reset_data,
-+						     rcdev);
-+	int bank = id / BITS_PER_LONG;
-+	int offset = id % BITS_PER_LONG;
-+	unsigned long flags;
-+	u32 reg;
-+
-+	spin_lock_irqsave(&data->lock, flags);
-+
-+	reg = readl(data->membase + (bank * 4));
-+	writel(reg & ~BIT(offset), data->membase + (bank * 4));
-+
-+	spin_unlock_irqrestore(&data->lock, flags);
-+
-+	return 0;
-+}
-+
-+static const struct reset_control_ops stm32_reset_ops = {
-+	.assert		= stm32_reset_assert,
-+	.deassert	= stm32_reset_deassert,
-+};
-+
-+static const struct of_device_id stm32_reset_dt_ids[] = {
-+	 { .compatible = "st,stm32-rcc", },
-+	 { /* sentinel */ },
-+};
-+
-+static int stm32_reset_probe(struct platform_device *pdev)
-+{
-+	struct stm32_reset_data *data;
-+	struct resource *res;
-+
-+	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
-+	if (!data)
-+		return -ENOMEM;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	data->membase = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(data->membase))
-+		return PTR_ERR(data->membase);
-+
-+	spin_lock_init(&data->lock);
-+
-+	data->rcdev.owner = THIS_MODULE;
-+	data->rcdev.nr_resets = resource_size(res) * 8;
-+	data->rcdev.ops = &stm32_reset_ops;
-+	data->rcdev.of_node = pdev->dev.of_node;
-+
-+	return devm_reset_controller_register(&pdev->dev, &data->rcdev);
-+}
-+
-+static struct platform_driver stm32_reset_driver = {
-+	.probe	= stm32_reset_probe,
-+	.driver = {
-+		.name		= "stm32-rcc-reset",
-+		.of_match_table	= stm32_reset_dt_ids,
-+	},
-+};
-+builtin_platform_driver(stm32_reset_driver);
+The patches would have to go via Thierry and so ultimately, Thierry.
+However, I can't imagine he would object to GMI ;-)
+
+Jon
+
 -- 
-1.9.1
+nvpublic
