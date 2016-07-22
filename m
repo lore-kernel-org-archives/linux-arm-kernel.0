@@ -1,785 +1,207 @@
 From: hl@rock-chips.com (Lin Huang)
-Date: Fri, 22 Jul 2016 17:07:19 +0800
-Subject: [PATCH v3 6/7] PM / devfreq: rockchip: add devfreq driver for rk3399
- dmc
+Date: Fri, 22 Jul 2016 17:07:20 +0800
+Subject: [PATCH v3 7/7] drm/rockchip: Add dmc notifier in vop driver
 In-Reply-To: <1469178440-4668-1-git-send-email-hl@rock-chips.com>
 References: <1469178440-4668-1-git-send-email-hl@rock-chips.com>
-Message-ID: <1469178440-4668-7-git-send-email-hl@rock-chips.com>
+Message-ID: <1469178440-4668-8-git-send-email-hl@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-base on dfi result, we do ddr frequency scaling, register
-dmc driver to devfreq framework, and use simple-ondemand
-policy.
+when in ddr frequency scaling process, vop can not do
+enable or disable operate, since dcf will base on vop vblank
+time to do frequency scaling and need to get vop irq if there
+have vop enabled. So need register to dmc notifier, and we can
+get the dmc status.
 
 Signed-off-by: Lin Huang <hl@rock-chips.com>
 ---
 Changes in v3:
-- operate dram setting through sip call
-- imporve set rate flow
+- when do vop eanble/disable, dmc will wait until it finish
 
 Changes in v2:
 - None
- 
+
 Changes in v1:
-- move dfi controller to event
-- fix set voltage sequence when set rate fail
-- change Kconfig type from tristate to bool
-- move unuse EXPORT_SYMBOL_GPL()
+- use wait_event instead usleep
 
- drivers/devfreq/Kconfig                 |   1 +
- drivers/devfreq/Makefile                |   1 +
- drivers/devfreq/rockchip/Kconfig        |  15 +
- drivers/devfreq/rockchip/Makefile       |   2 +
- drivers/devfreq/rockchip/rk3399_dmc.c   | 482 ++++++++++++++++++++++++++++++++
- drivers/devfreq/rockchip/rockchip_dmc.c | 143 ++++++++++
- include/soc/rockchip/rockchip_dmc.h     |  45 +++
- 7 files changed, 689 insertions(+)
- create mode 100644 drivers/devfreq/rockchip/Kconfig
- create mode 100644 drivers/devfreq/rockchip/Makefile
- create mode 100644 drivers/devfreq/rockchip/rk3399_dmc.c
- create mode 100644 drivers/devfreq/rockchip/rockchip_dmc.c
- create mode 100644 include/soc/rockchip/rockchip_dmc.h
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 75 ++++++++++++++++++++++++++---
+ 1 file changed, 69 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/devfreq/Kconfig b/drivers/devfreq/Kconfig
-index a5be56e..cb67246 100644
---- a/drivers/devfreq/Kconfig
-+++ b/drivers/devfreq/Kconfig
-@@ -101,5 +101,6 @@ config ARM_TEGRA_DEVFREQ
-          operating frequencies and voltages with OPP support.
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+index 6255e5b..4220629 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+@@ -31,6 +31,8 @@
+ #include <linux/reset.h>
+ #include <linux/delay.h>
  
- source "drivers/devfreq/event/Kconfig"
-+source "drivers/devfreq/rockchip/Kconfig"
- 
- endif # PM_DEVFREQ
-diff --git a/drivers/devfreq/Makefile b/drivers/devfreq/Makefile
-index 09f11d9..48e2ae6 100644
---- a/drivers/devfreq/Makefile
-+++ b/drivers/devfreq/Makefile
-@@ -9,6 +9,7 @@ obj-$(CONFIG_DEVFREQ_GOV_PASSIVE)	+= governor_passive.o
- # DEVFREQ Drivers
- obj-$(CONFIG_ARM_EXYNOS_BUS_DEVFREQ)	+= exynos-bus.o
- obj-$(CONFIG_ARM_TEGRA_DEVFREQ)		+= tegra-devfreq.o
-+obj-$(CONFIG_ARCH_ROCKCHIP)		+= rockchip/
- 
- # DEVFREQ Event Drivers
- obj-$(CONFIG_PM_DEVFREQ_EVENT)		+= event/
-diff --git a/drivers/devfreq/rockchip/Kconfig b/drivers/devfreq/rockchip/Kconfig
-new file mode 100644
-index 0000000..7fb1cff
---- /dev/null
-+++ b/drivers/devfreq/rockchip/Kconfig
-@@ -0,0 +1,15 @@
-+config ARM_ROCKCHIP_DMC_DEVFREQ
-+	bool "ARM ROCKCHIP DMC DEVFREQ Driver"
-+	depends on ARCH_ROCKCHIP
-+	help
-+	  This adds the DEVFREQ driver framework for the rockchip dmc.
-+
-+config ARM_RK3399_DMC_DEVFREQ
-+	bool "ARM RK3399 DMC DEVFREQ Driver"
-+	depends on ARM_ROCKCHIP_DMC_DEVFREQ
-+	select PM_OPP
-+	select DEVFREQ_GOV_SIMPLE_ONDEMAND
-+	help
-+          This adds the DEVFREQ driver for the RK3399 dmc. It sets the frequency
-+          for the memory controller and reads the usage counts from hardware.
-+
-diff --git a/drivers/devfreq/rockchip/Makefile b/drivers/devfreq/rockchip/Makefile
-new file mode 100644
-index 0000000..caca525
---- /dev/null
-+++ b/drivers/devfreq/rockchip/Makefile
-@@ -0,0 +1,2 @@
-+obj-$(CONFIG_ARM_ROCKCHIP_DMC_DEVFREQ)	+= rockchip_dmc.o
-+obj-$(CONFIG_ARM_RK3399_DMC_DEVFREQ)	+= rk3399_dmc.o
-diff --git a/drivers/devfreq/rockchip/rk3399_dmc.c b/drivers/devfreq/rockchip/rk3399_dmc.c
-new file mode 100644
-index 0000000..f1d6120
---- /dev/null
-+++ b/drivers/devfreq/rockchip/rk3399_dmc.c
-@@ -0,0 +1,482 @@
-+/*
-+ * Copyright (c) 2016, Fuzhou Rockchip Electronics Co., Ltd
-+ * Author: Lin Huang <hl@rock-chips.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+ */
-+
-+#include <linux/clk.h>
-+#include <linux/completion.h>
-+#include <linux/delay.h>
-+#include <linux/devfreq.h>
-+#include <linux/devfreq-event.h>
-+#include <linux/interrupt.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/platform_device.h>
-+#include <linux/pm_opp.h>
-+#include <linux/regulator/consumer.h>
-+#include <linux/rwsem.h>
-+#include <linux/suspend.h>
-+#include <linux/syscore_ops.h>
-+
 +#include <soc/rockchip/rockchip_dmc.h>
-+#include "../../firmware/rockchip_sip.h"
 +
-+struct dram_timing {
-+	unsigned int ddr3_speed_bin;
-+	unsigned int pd_idle;
-+	unsigned int sr_idle;
-+	unsigned int sr_mc_gate_idle;
-+	unsigned int srpd_lite_idle;
-+	unsigned int standby_idle;
-+	unsigned int dram_dll_dis_freq;
-+	unsigned int phy_dll_dis_freq;
-+	unsigned int ddr3_odt_dis_freq;
-+	unsigned int ddr3_drv;
-+	unsigned int ddr3_odt;
-+	unsigned int phy_ddr3_ca_drv;
-+	unsigned int phy_ddr3_dq_drv;
-+	unsigned int phy_ddr3_odt;
-+	unsigned int lpddr3_odt_dis_freq;
-+	unsigned int lpddr3_drv;
-+	unsigned int lpddr3_odt;
-+	unsigned int phy_lpddr3_ca_drv;
-+	unsigned int phy_lpddr3_dq_drv;
-+	unsigned int phy_lpddr3_odt;
-+	unsigned int lpddr4_odt_dis_freq;
-+	unsigned int lpddr4_drv;
-+	unsigned int lpddr4_dq_odt;
-+	unsigned int lpddr4_ca_odt;
-+	unsigned int phy_lpddr4_ca_drv;
-+	unsigned int phy_lpddr4_ck_cs_drv;
-+	unsigned int phy_lpddr4_dq_drv;
-+	unsigned int phy_lpddr4_odt;
-+};
-+
-+struct rk3399_dmcfreq {
-+	struct device *dev;
-+	struct devfreq *devfreq;
-+	struct devfreq_simple_ondemand_data ondemand_data;
-+	struct clk *dmc_clk;
-+	struct devfreq_event_dev *edev;
-+	struct mutex lock;
+ #include "rockchip_drm_drv.h"
+ #include "rockchip_drm_gem.h"
+ #include "rockchip_drm_fb.h"
+@@ -120,6 +122,11 @@ struct vop {
+ 
+ 	const struct vop_data *data;
+ 
 +	struct notifier_block dmc_nb;
-+	struct dram_timing *timing;
-+	wait_queue_head_t	wait_dcf_queue;
-+	int irq;
-+	int wait_dcf_flag;
-+	struct regulator *vdd_center;
-+	unsigned long rate, target_rate;
-+	unsigned long volt, target_volt;
-+};
-+
-+static int rk3399_dmcfreq_target(struct device *dev, unsigned long *freq,
-+				 u32 flags)
++	int dmc_in_process;
++	int vop_switch_status;
++	wait_queue_head_t	wait_dmc_queue;
++	wait_queue_head_t	wait_vop_switch_queue;
+ 	uint32_t *regsbak;
+ 	void __iomem *regs;
+ 
+@@ -430,21 +437,56 @@ static void vop_dsp_hold_valid_irq_disable(struct vop *vop)
+ 	spin_unlock_irqrestore(&vop->irq_lock, flags);
+ }
+ 
++static int dmc_notify(struct notifier_block *nb, unsigned long event,
++		      void *data)
 +{
-+	struct platform_device *pdev = container_of(dev, struct platform_device,
-+						    dev);
-+	struct rk3399_dmcfreq *dmcfreq = platform_get_drvdata(pdev);
-+	struct dev_pm_opp *opp;
-+	unsigned long old_clk_rate = dmcfreq->rate;
-+	unsigned long target_volt, target_rate;
-+	int err;
++	struct vop *vop = container_of(nb, struct vop, dmc_nb);
 +
-+	rcu_read_lock();
-+	opp = devfreq_recommended_opp(dev, freq, flags);
-+	if (IS_ERR(opp)) {
-+		rcu_read_unlock();
-+		return PTR_ERR(opp);
-+	}
-+	target_rate = dev_pm_opp_get_freq(opp);
-+	target_volt = dev_pm_opp_get_voltage(opp);
-+	opp = devfreq_recommended_opp(dev, &dmcfreq->rate, flags);
-+	if (IS_ERR(opp)) {
-+		rcu_read_unlock();
-+		return PTR_ERR(opp);
-+	}
-+	dmcfreq->volt = dev_pm_opp_get_voltage(opp);
-+	rcu_read_unlock();
++	if (event == DMCFREQ_ADJUST) {
 +
-+	if (dmcfreq->rate == target_rate)
-+		return 0;
-+
-+	mutex_lock(&dmcfreq->lock);
-+	/*
-+	 * if frequency scaling from low to high, adjust voltage first;
-+	 * if frequency scaling from high to low, adjuset frequency first;
-+	 */
-+	if (old_clk_rate < target_rate) {
-+		err = regulator_set_voltage(dmcfreq->vdd_center, target_volt,
-+					    target_volt);
-+		if (err) {
-+			dev_err(dev, "Unable to set vol %lu\n", target_volt);
-+			goto out;
-+		}
++		/*
++		 * check if vop in enable or disable process,
++		 * if yes, wait until it finish, use 200ms as
++		 * timeout.
++		 */
++		wait_event_timeout(vop->wait_vop_switch_queue,
++			   !vop->vop_switch_status, HZ / 5);
++		vop->dmc_in_process = 1;
++	} else if (event == DMCFREQ_FINISH) {
++		vop->dmc_in_process = 0;
++		wake_up(&vop->wait_dmc_queue);
 +	}
 +
-+	dmc_event(DMCFREQ_ADJUST);
-+	dmcfreq->wait_dcf_flag = 1;
++	return NOTIFY_OK;
++}
 +
-+	err = clk_set_rate(dmcfreq->dmc_clk, target_rate);
-+	if (err) {
-+		dev_err(dev,
-+			"Unable to set freq %lu. Current freq %lu. Error %d\n",
-+			target_rate, old_clk_rate, err);
-+		regulator_set_voltage(dmcfreq->vdd_center, dmcfreq->volt,
-+				      dmcfreq->volt);
-+		dmc_event(DMCFREQ_FINISH);
-+		goto out;
-+	}
+ static void vop_enable(struct drm_crtc *crtc)
+ {
+ 	struct vop *vop = to_vop(crtc);
+ 	int ret;
+ 
++	if (vop->is_enabled)
++		return;
 +
 +	/*
-+	 * wait until bcf irq happen, it means freq scaling finish in bl31,
-+	 * use 100ms as timeout time
++	 * if in dmc scaling frequency process, wait until it finish
++	 * use 100ms as timeout time.
 +	 */
-+	wait_event_timeout(dmcfreq->wait_dcf_queue,
-+			   !dmcfreq->wait_dcf_flag, HZ / 10);
++	wait_event_timeout(vop->wait_dmc_queue,
++			   !vop->dmc_in_process, HZ / 5);
 +
-+	dmc_event(DMCFREQ_FINISH);
++	vop->vop_switch_status = 1;
 +
-+	/*
-+	 * check the dpll rate
-+	 * there only two result we will get,
-+	 * 1. ddr frequency scaling fail, we still get the old rate
-+	 * 2, ddr frequency scaling sucessful, we get the rate we set
-+	 */
-+	dmcfreq->rate = clk_get_rate(dmcfreq->dmc_clk);
-+
-+	/* if get the incorrect rate, set voltage to old value */
-+	if (dmcfreq->rate != target_rate) {
-+		dev_err(dev, "get wrong ddr frequency, Request freq %lu,\
-+			Current freq %lu\n", target_rate, dmcfreq->rate);
-+		regulator_set_voltage(dmcfreq->vdd_center, dmcfreq->volt,
-+				      dmcfreq->volt);
-+	} else if (old_clk_rate > target_rate)
-+		err = regulator_set_voltage(dmcfreq->vdd_center, target_volt,
-+					    target_volt);
-+	if (err)
-+		dev_err(dev, "Unable to set vol %lu\n", target_volt);
-+
-+out:
-+	mutex_unlock(&dmcfreq->lock);
-+	return err;
-+}
-+
-+static int rk3399_dmcfreq_get_dev_status(struct device *dev,
-+					 struct devfreq_dev_status *stat)
-+{
-+	struct platform_device *pdev = container_of(dev, struct platform_device,
-+						    dev);
-+	struct rk3399_dmcfreq *dmcfreq = platform_get_drvdata(pdev);
-+	struct devfreq_event_data edata;
-+
-+	devfreq_event_get_event(dmcfreq->edev, &edata);
-+
-+	stat->current_frequency = dmcfreq->rate;
-+	stat->busy_time = edata.load_count;
-+	stat->total_time = edata.total_count;
-+
-+	return 0;
-+}
-+
-+static int rk3399_dmcfreq_get_cur_freq(struct device *dev, unsigned long *freq)
-+{
-+	struct platform_device *pdev = container_of(dev, struct platform_device,
-+						    dev);
-+	struct rk3399_dmcfreq *dmcfreq = platform_get_drvdata(pdev);
-+
-+	*freq = dmcfreq->rate;
-+
-+	return 0;
-+}
-+
-+static void rk3399_dmcfreq_exit(struct device *dev)
-+{
-+	struct platform_device *pdev = container_of(dev, struct platform_device,
-+						    dev);
-+	struct rk3399_dmcfreq *dmcfreq = platform_get_drvdata(pdev);
-+
-+	devfreq_unregister_opp_notifier(dev, dmcfreq->devfreq);
-+}
-+
-+static struct devfreq_dev_profile rk3399_devfreq_dmc_profile = {
-+	.polling_ms	= 200,
-+	.target		= rk3399_dmcfreq_target,
-+	.get_dev_status	= rk3399_dmcfreq_get_dev_status,
-+	.get_cur_freq	= rk3399_dmcfreq_get_cur_freq,
-+	.exit		= rk3399_dmcfreq_exit,
-+};
-+
-+static __maybe_unused int rk3399_dmcfreq_suspend(struct device *dev)
-+{
-+	rockchip_dmc_disable();
-+	return 0;
-+}
-+
-+static __maybe_unused int rk3399_dmcfreq_resume(struct device *dev)
-+{
-+	rockchip_dmc_enable();
-+	return 0;
-+}
-+
-+static SIMPLE_DEV_PM_OPS(rk3399_dmcfreq_pm, rk3399_dmcfreq_suspend,
-+			 rk3399_dmcfreq_resume);
-+
-+static int rk3399_dmc_enable_notify(struct notifier_block *nb,
-+				    unsigned long event, void *data)
-+{
-+	struct rk3399_dmcfreq *dmcfreq =
-+			      container_of(nb, struct rk3399_dmcfreq, dmc_nb);
-+	unsigned long freq = ULONG_MAX;
-+
-+	if (event == DMC_ENABLE) {
-+		devfreq_event_enable_edev(dmcfreq->edev);
-+		devfreq_resume_device(dmcfreq->devfreq);
-+		return NOTIFY_OK;
-+	} else if (event == DMC_DISABLE) {
-+		devfreq_event_disable_edev(dmcfreq->edev);
-+		devfreq_suspend_device(dmcfreq->devfreq);
-+
-+		/* when disable dmc, set sdram to max frequency */
-+		rk3399_dmcfreq_target(dmcfreq->dev, &freq, 0);
-+		return NOTIFY_OK;
-+	}
-+
-+	return NOTIFY_DONE;
-+}
-+
-+static irqreturn_t rk3399_dmc_irq(int irq, void *dev_id)
-+{
-+	struct rk3399_dmcfreq *dmcfreq = dev_id;
-+
-+	dmcfreq->wait_dcf_flag = 0;
-+	wake_up(&dmcfreq->wait_dcf_queue);
-+
-+	/* clr dcf irq */
-+	sip_smc_clr_ddr_irq();
-+
-+	return IRQ_HANDLED;
-+}
-+
-+static int of_do_get_timing(struct device_node *np,
-+		struct dram_timing *timing)
-+{
-+	int ret;
-+
-+	ret = of_property_read_u32(np, "ddr3_speed_bin",
-+				   &timing->ddr3_speed_bin);
-+	ret |= of_property_read_u32(np, "pd_idle", &timing->pd_idle);
-+	ret |= of_property_read_u32(np, "sr_idle", &timing->sr_idle);
-+	ret |= of_property_read_u32(np, "sr_mc_gate_idle",
-+				    &timing->sr_mc_gate_idle);
-+	ret |= of_property_read_u32(np, "srpd_lite_idle",
-+				    &timing->srpd_lite_idle);
-+	ret |= of_property_read_u32(np, "standby_idle", &timing->standby_idle);
-+	ret |= of_property_read_u32(np, "dram_dll_dis_freq",
-+				    &timing->dram_dll_dis_freq);
-+	ret |= of_property_read_u32(np, "phy_dll_dis_freq",
-+				    &timing->phy_dll_dis_freq);
-+	ret |= of_property_read_u32(np, "ddr3_odt_dis_freq",
-+				    &timing->ddr3_odt_dis_freq);
-+	ret |= of_property_read_u32(np, "ddr3_drv", &timing->ddr3_drv);
-+	ret |= of_property_read_u32(np, "ddr3_odt", &timing->ddr3_odt);
-+	ret |= of_property_read_u32(np, "phy_ddr3_ca_drv",
-+				    &timing->phy_ddr3_ca_drv);
-+	ret |= of_property_read_u32(np, "phy_ddr3_dq_drv",
-+				    &timing->phy_ddr3_dq_drv);
-+	ret |= of_property_read_u32(np, "phy_ddr3_odt", &timing->phy_ddr3_odt);
-+	ret |= of_property_read_u32(np, "lpddr3_odt_dis_freq",
-+				    &timing->lpddr3_odt_dis_freq);
-+	ret |= of_property_read_u32(np, "lpddr3_drv", &timing->lpddr3_drv);
-+	ret |= of_property_read_u32(np, "lpddr3_odt", &timing->lpddr3_odt);
-+	ret |= of_property_read_u32(np, "phy_lpddr3_ca_drv",
-+				    &timing->phy_lpddr3_ca_drv);
-+	ret |= of_property_read_u32(np, "phy_lpddr3_dq_drv",
-+				    &timing->phy_lpddr3_dq_drv);
-+	ret |= of_property_read_u32(np, "phy_lpddr3_odt",
-+				    &timing->phy_lpddr3_odt);
-+	ret |= of_property_read_u32(np, "lpddr4_odt_dis_freq",
-+				    &timing->lpddr4_odt_dis_freq);
-+	ret |= of_property_read_u32(np, "lpddr4_drv",
-+				    &timing->lpddr4_drv);
-+	ret |= of_property_read_u32(np, "lpddr4_dq_odt",
-+				    &timing->lpddr4_dq_odt);
-+	ret |= of_property_read_u32(np, "lpddr4_ca_odt",
-+				    &timing->lpddr4_ca_odt);
-+	ret |= of_property_read_u32(np, "phy_lpddr4_ca_drv",
-+				    &timing->phy_lpddr4_ca_drv);
-+	ret |= of_property_read_u32(np, "phy_lpddr4_ck_cs_drv",
-+				    &timing->phy_lpddr4_ck_cs_drv);
-+	ret |= of_property_read_u32(np, "phy_lpddr4_dq_drv",
-+				    &timing->phy_lpddr4_dq_drv);
-+	ret |= of_property_read_u32(np, "phy_lpddr4_odt",
-+				    &timing->phy_lpddr4_odt);
-+
-+	return ret;
-+}
-+
-+static struct dram_timing *of_get_ddr_timings(struct device *dev,
-+					      struct device_node *np)
-+{
-+	struct dram_timing	*timing = NULL;
-+	struct device_node	*np_tim;
-+
-+	np_tim = of_parse_phandle(np, "ddr_timing", 0);
-+	if (np_tim) {
-+		timing = devm_kzalloc(dev, sizeof(*timing), GFP_KERNEL);
-+		if (!timing)
-+			goto err;
-+		if (of_do_get_timing(np_tim, timing)) {
-+			devm_kfree(dev, timing);
-+			goto err;
-+		}
-+		return timing;
-+	}
-+
+ 	ret = pm_runtime_get_sync(vop->dev);
+ 	if (ret < 0) {
+ 		dev_err(vop->dev, "failed to get pm runtime: %d\n", ret);
+-		return;
++		goto err;
+ 	}
+ 
+ 	ret = clk_enable(vop->hclk);
+ 	if (ret < 0) {
+ 		dev_err(vop->dev, "failed to enable hclk - %d\n", ret);
+-		return;
++		goto err;
+ 	}
+ 
+ 	ret = clk_enable(vop->dclk);
+@@ -458,7 +500,6 @@ static void vop_enable(struct drm_crtc *crtc)
+ 		dev_err(vop->dev, "failed to enable aclk - %d\n", ret);
+ 		goto err_disable_dclk;
+ 	}
+-
+ 	/*
+ 	 * Slave iommu shares power, irq and clock with vop.  It was associated
+ 	 * automatically with this master device via common driver code.
+@@ -486,7 +527,9 @@ static void vop_enable(struct drm_crtc *crtc)
+ 	enable_irq(vop->irq);
+ 
+ 	drm_crtc_vblank_on(crtc);
+-
++	vop->vop_switch_status = 0;
++	wake_up(&vop->wait_vop_switch_queue);
++	rockchip_dmc_get(&vop->dmc_nb);
+ 	return;
+ 
+ err_disable_aclk:
+@@ -495,6 +538,10 @@ err_disable_dclk:
+ 	clk_disable(vop->dclk);
+ err_disable_hclk:
+ 	clk_disable(vop->hclk);
 +err:
-+	if (timing) {
-+		devm_kfree(dev, timing);
-+		timing = NULL;
-+	}
++	vop->vop_switch_status = 0;
++	wake_up(&vop->wait_vop_switch_queue);
++	return;
+ }
+ 
+ static void vop_crtc_disable(struct drm_crtc *crtc)
+@@ -505,6 +552,15 @@ static void vop_crtc_disable(struct drm_crtc *crtc)
+ 	WARN_ON(vop->event);
+ 
+ 	/*
++	 * if in dmc scaling frequency process, wait until it finish
++	 * use 100ms as timeout time.
++	 */
++	wait_event_timeout(vop->wait_dmc_queue,
++			   !vop->dmc_in_process, HZ / 5);
 +
-+	return timing;
-+}
-+
-+static int rk3399_dmcfreq_probe(struct platform_device *pdev)
-+{
-+	struct device *dev = &pdev->dev;
-+	struct rk3399_dmcfreq *data;
-+	int ret, irq, index;
-+	uint64_t param = 0;
-+	uint32_t *timing;
-+	struct device_node *np = pdev->dev.of_node;
-+
-+	irq = platform_get_irq(pdev, 0);
-+	if (irq < 0) {
-+		dev_err(&pdev->dev, "no dmc irq resource\n");
-+		return -EINVAL;
-+	}
-+
-+	data = devm_kzalloc(dev, sizeof(struct rk3399_dmcfreq), GFP_KERNEL);
-+	if (!data)
-+		return -ENOMEM;
-+
-+	mutex_init(&data->lock);
-+
-+	data->vdd_center = devm_regulator_get(dev, "center");
-+	if (IS_ERR(data->vdd_center)) {
-+		dev_err(dev, "Cannot get the regulator \"center\"\n");
-+		return PTR_ERR(data->vdd_center);
-+	}
-+
-+	data->dmc_clk = devm_clk_get(dev, "dmc_clk");
-+	if (IS_ERR(data->dmc_clk)) {
-+		dev_err(dev, "Cannot get the clk dmc_clk\n");
-+		return PTR_ERR(data->dmc_clk);
-+	};
-+
-+	data->edev = devfreq_event_get_edev_by_phandle(dev, 0);
-+	if (IS_ERR(data->edev))
-+		return -EPROBE_DEFER;
-+
-+	ret = devfreq_event_enable_edev(data->edev);
-+	if (ret < 0) {
-+		dev_err(dev, "failed to enable devfreq-event devices\n");
-+		return ret;
-+	}
++	vop->vop_switch_status = 1;
 +
 +	/*
-+	 * We add a devfreq driver to our parent since it has a device tree node
-+	 * with operating points.
-+	 */
-+	if (dev_pm_opp_of_add_table(dev)) {
-+		dev_err(dev, "Invalid operating-points in device tree.\n");
-+		return -EINVAL;
-+	}
+ 	 * We need to make sure that all windows are disabled before we
+ 	 * disable that crtc. Otherwise we might try to scan from a destroyed
+ 	 * buffer later.
+@@ -517,7 +573,6 @@ static void vop_crtc_disable(struct drm_crtc *crtc)
+ 		VOP_WIN_SET(vop, win, enable, 0);
+ 		spin_unlock(&vop->reg_lock);
+ 	}
+-
+ 	drm_crtc_vblank_off(crtc);
+ 
+ 	/*
+@@ -548,7 +603,6 @@ static void vop_crtc_disable(struct drm_crtc *crtc)
+ 	 * vop standby complete, so iommu detach is safe.
+ 	 */
+ 	rockchip_drm_dma_detach_device(vop->drm_dev, vop->dev);
+-
+ 	clk_disable(vop->dclk);
+ 	clk_disable(vop->aclk);
+ 	clk_disable(vop->hclk);
+@@ -561,6 +615,9 @@ static void vop_crtc_disable(struct drm_crtc *crtc)
+ 
+ 		crtc->state->event = NULL;
+ 	}
++	vop->vop_switch_status = 0;
++	wake_up(&vop->wait_vop_switch_queue);
++	rockchip_dmc_put(&vop->dmc_nb);
+ }
+ 
+ static void vop_plane_destroy(struct drm_plane *plane)
+@@ -1247,6 +1304,7 @@ static int vop_create_crtc(struct vop *vop)
+ 		goto err_cleanup_crtc;
+ 	}
+ 
++	vop->dmc_nb.notifier_call = dmc_notify;
+ 	init_completion(&vop->dsp_hold_completion);
+ 	init_completion(&vop->wait_update_complete);
+ 	crtc->port = port;
+@@ -1468,6 +1526,11 @@ static int vop_bind(struct device *dev, struct device *master, void *data)
+ 	/* IRQ is initially disabled; it gets enabled in power_on */
+ 	disable_irq(vop->irq);
+ 
++	init_waitqueue_head(&vop->wait_vop_switch_queue);
++	vop->vop_switch_status = 0;
++	init_waitqueue_head(&vop->wait_dmc_queue);
++	vop->dmc_in_process = 0;
 +
-+	of_property_read_u32(np, "upthreshold",
-+			     &data->ondemand_data.upthreshold);
-+
-+	of_property_read_u32(np, "downdifferential",
-+			     &data->ondemand_data.downdifferential);
-+
-+	data->rate = clk_get_rate(data->dmc_clk);
-+	rk3399_devfreq_dmc_profile.initial_freq = data->rate;
-+	data->devfreq = devfreq_add_device(dev,
-+					   &rk3399_devfreq_dmc_profile,
-+					   "simple_ondemand",
-+					   &data->ondemand_data);
-+	if (IS_ERR(data->devfreq))
-+		return PTR_ERR(data->devfreq);
-+
-+	devfreq_register_opp_notifier(dev, data->devfreq);
-+
-+	data->dmc_nb.notifier_call = rk3399_dmc_enable_notify;
-+	dmc_register_notifier(&data->dmc_nb);
-+	data->irq = irq;
-+	ret = devm_request_irq(dev, irq, rk3399_dmc_irq, 0,
-+			       dev_name(dev), data);
-+	if (ret) {
-+		dev_err(dev, "failed to request dmc irq: %d\n", ret);
-+		return ret;
-+	}
-+
-+	/* get dram timing and pass it to bl31 */
-+	data->timing = of_get_ddr_timings(dev, np);
-+	if (data->timing) {
-+		timing = (uint32_t *)data->timing;
-+		for (index = 0; index < (sizeof(struct dram_timing) / 4);
-+		     index++) {
-+			param = index;
-+			param = param << 32 | *timing++;
-+			sip_smc_set_ddr_param(param);
-+			param = 0;
-+		}
-+	}
-+	sip_smc_ddr_init();
-+
-+	init_waitqueue_head(&data->wait_dcf_queue);
-+	data->wait_dcf_flag = 0;
-+
-+	data->dev = dev;
-+	platform_set_drvdata(pdev, data);
-+
-+	return 0;
-+}
-+
-+static int rk3399_dmcfreq_remove(struct platform_device *pdev)
-+{
-+	struct rk3399_dmcfreq *dmcfreq = platform_get_drvdata(pdev);
-+
-+	devfreq_remove_device(dmcfreq->devfreq);
-+	regulator_put(dmcfreq->vdd_center);
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id rk3399dmc_devfreq_of_match[] = {
-+	{ .compatible = "rockchip,rk3399-dmc" },
-+	{ },
-+};
-+
-+static struct platform_driver rk3399_dmcfreq_driver = {
-+	.probe	= rk3399_dmcfreq_probe,
-+	.remove	= rk3399_dmcfreq_remove,
-+	.driver = {
-+		.name	= "rk3399-dmc-freq",
-+		.pm	= &rk3399_dmcfreq_pm,
-+		.of_match_table = rk3399dmc_devfreq_of_match,
-+	},
-+};
-+module_platform_driver(rk3399_dmcfreq_driver);
-+
-+MODULE_LICENSE("GPL v2");
-+MODULE_DESCRIPTION("RK3399 dmcfreq driver with devfreq framework");
-diff --git a/drivers/devfreq/rockchip/rockchip_dmc.c b/drivers/devfreq/rockchip/rockchip_dmc.c
-new file mode 100644
-index 0000000..78baee5
---- /dev/null
-+++ b/drivers/devfreq/rockchip/rockchip_dmc.c
-@@ -0,0 +1,143 @@
-+/*
-+ * Copyright (c) 2016, Fuzhou Rockchip Electronics Co., Ltd
-+ * Author: Lin Huang <hl@rock-chips.com>
-+ * Base on: https://chromium-review.googlesource.com/#/c/231477/
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+ */
-+
-+#include <linux/mutex.h>
-+#include <soc/rockchip/rockchip_dmc.h>
-+
-+static int num_wait;
-+static int num_disable;
-+static BLOCKING_NOTIFIER_HEAD(dmc_notifier_list);
-+static DEFINE_MUTEX(dmc_en_lock);
-+static DEFINE_MUTEX(dmc_sync_lock);
-+
-+/**
-+ * rockchip_dmc_enabled - Returns true if dmc freq is enabled, false otherwise.
-+ */
-+bool rockchip_dmc_enabled(void)
-+{
-+	return num_disable <= 0 && num_wait <= 1;
-+}
-+
-+/**
-+ * rockchip_dmc_enable - Enable dmc frequency scaling. Will only enable
-+ * frequency scaling if there are 1 or fewer notifiers. Call to undo
-+ * rockchip_dmc_disable.
-+ */
-+void rockchip_dmc_enable(void)
-+{
-+	mutex_lock(&dmc_en_lock);
-+	num_disable--;
-+	WARN_ON(num_disable < 0);
-+	if (rockchip_dmc_enabled())
-+		dmc_event(DMC_ENABLE);
-+	mutex_unlock(&dmc_en_lock);
-+}
-+
-+/**
-+ * rockchip_dmc_disable - Disable dmc frequency scaling. Call when something
-+ * cannot coincide with dmc frequency scaling.
-+ */
-+void rockchip_dmc_disable(void)
-+{
-+	mutex_lock(&dmc_en_lock);
-+	if (rockchip_dmc_enabled())
-+		dmc_event(DMC_DISABLE);
-+	num_disable++;
-+	mutex_unlock(&dmc_en_lock);
-+}
-+
-+void dmc_event(int event)
-+{
-+	mutex_lock(&dmc_sync_lock);
-+	blocking_notifier_call_chain(&dmc_notifier_list, event, NULL);
-+	mutex_unlock(&dmc_sync_lock);
-+}
-+
-+/**
-+ * dmc_register_notifier - register a driver to dmc chain
-+ * @nb: notifier function to register
-+ */
-+int dmc_register_notifier(struct notifier_block *nb)
-+{
-+	int ret;
-+
-+	if (!nb)
-+		return -EINVAL;
-+
-+	ret = blocking_notifier_chain_register(&dmc_notifier_list, nb);
-+
-+	return ret;
-+}
-+
-+/**
-+ * dmc_unregister_notifier - unregister a driver from dmc chain
-+ * @nb: remove notifier function
-+ */
-+int dmc_unregister_notifier(struct notifier_block *nb)
-+{
-+	int ret;
-+
-+	if (!nb)
-+		return -EINVAL;
-+
-+	ret = blocking_notifier_chain_unregister(&dmc_notifier_list, nb);
-+
-+	return ret;
-+}
-+
-+/**
-+ * rockchip_dmc_get - Register the notifier block for the dmc chain.
-+ * @nb The dmc notifier block to register
-+ */
-+int rockchip_dmc_get(struct notifier_block *nb)
-+{
-+	if (!nb)
-+		return -EINVAL;
-+
-+	mutex_lock(&dmc_en_lock);
-+
-+	/*
-+	 * if have two notifier(enable two vop etc),
-+	 * need to disable dmc
-+	 */
-+	if (num_wait == 1 && num_disable <= 0)
-+		dmc_event(DMC_DISABLE);
-+	num_wait++;
-+	dmc_register_notifier(nb);
-+	mutex_unlock(&dmc_en_lock);
-+
-+	return 0;
-+}
-+
-+/**
-+ * rockchip_dmc_put - Remove the notifier block from the dmc chain.
-+ * @nb The dmc notifier block to unregister
-+ */
-+int rockchip_dmc_put(struct notifier_block *nb)
-+{
-+	if (!nb)
-+		return -EINVAL;
-+
-+	mutex_lock(&dmc_en_lock);
-+	num_wait--;
-+
-+	/* if notifier from 2 back to 1, enable dmc again */
-+	if (num_wait == 1 && num_disable <= 0)
-+		dmc_event(DMC_ENABLE);
-+	dmc_unregister_notifier(nb);
-+	mutex_unlock(&dmc_en_lock);
-+
-+	return 0;
-+}
-diff --git a/include/soc/rockchip/rockchip_dmc.h b/include/soc/rockchip/rockchip_dmc.h
-new file mode 100644
-index 0000000..3f69cbf
---- /dev/null
-+++ b/include/soc/rockchip/rockchip_dmc.h
-@@ -0,0 +1,45 @@
-+/*
-+ * Copyright (c) 2016, Fuzhou Rockchip Electronics Co., Ltd
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+ */
-+
-+#ifndef __SOC_ROCKCHIP_DMC_H
-+#define __SOC_ROCKCHIP_DMC_H
-+
-+#include <linux/notifier.h>
-+
-+#define DMC_ENABLE	0
-+#define DMC_DISABLE	1
-+#define DMCFREQ_ADJUST	2
-+#define DMCFREQ_FINISH	3
-+
-+#if IS_ENABLED(CONFIG_ARM_ROCKCHIP_DMC_DEVFREQ)
-+int rockchip_dmc_get(struct notifier_block *nb);
-+int rockchip_dmc_put(struct notifier_block *nb);
-+#else
-+static inline int rockchip_dmc_get(struct notifier_block *nb)
-+{
-+	return 0;
-+}
-+
-+static inline int rockchip_dmc_put(struct notifier_block *nb)
-+{
-+	return 0;
-+}
-+#endif
-+
-+void dmc_event(int event);
-+int dmc_register_notifier(struct notifier_block *nb);
-+int dmc_unregister_notifier(struct notifier_block *nb);
-+void rockchip_dmc_enable(void);
-+void rockchip_dmc_disable(void);
-+bool rockchip_dmc_enabled(void);
-+#endif
+ 	ret = vop_create_crtc(vop);
+ 	if (ret)
+ 		return ret;
 -- 
 2.6.6
