@@ -1,58 +1,65 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 22 Jul 2016 19:32:25 +0200
-Subject: [PATCH 2/2] arm64: mm: run pgtable_page_ctor() on non-swapper
- translation table pages
-In-Reply-To: <1469208745-6693-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1469208745-6693-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1469208745-6693-3-git-send-email-ard.biesheuvel@linaro.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 22 Jul 2016 18:28:39 +0100
+Subject: [PATCH 22/55] arm/arm64: KVM: Prune unused #defines
+In-Reply-To: <1469208552-4155-1-git-send-email-marc.zyngier@arm.com>
+References: <1469208552-4155-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1469208552-4155-23-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The kernel page table creation routines are accessible to other subsystems
-(e.g., EFI) via the create_pgd_mapping() entry point, which allows mappings
-to be created that are not covered by init_mm.
+We can now remove a number of dead #defines, thanks to the trampoline
+code being gone.
 
-Since generic code such as apply_to_page_range() may expect translation
-table pages that are not associated with init_mm to be covered by fully
-constructed struct pages, add a call to pgtable_page_ctor() in the alloc
-function used by create_pgd_mapping. Since it is no longer used by
-create_mapping_late(), also update the name of this function to better
-reflect its purpose.
-
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm64/mm/mmu.c | 9 ++++++---
- 1 file changed, 6 insertions(+), 3 deletions(-)
+ arch/arm/include/asm/kvm_mmu.h   |  9 ---------
+ arch/arm64/include/asm/kvm_mmu.h | 10 ----------
+ 2 files changed, 19 deletions(-)
 
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index 33f36cede02d..51a558195bb9 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -268,10 +268,11 @@ static void __create_pgd_mapping(pgd_t *pgdir, phys_addr_t phys,
- 	} while (pgd++, addr = next, addr != end);
- }
+diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+index d5fd9fb..73c2818 100644
+--- a/arch/arm/include/asm/kvm_mmu.h
++++ b/arch/arm/include/asm/kvm_mmu.h
+@@ -26,18 +26,9 @@
+  * We directly use the kernel VA for the HYP, as we can directly share
+  * the mapping (HTTBR "covers" TTBR1).
+  */
+-#define HYP_PAGE_OFFSET_MASK	UL(~0)
+-#define HYP_PAGE_OFFSET		PAGE_OFFSET
+ #define KERN_TO_HYP(kva)	(kva)
  
--static phys_addr_t late_pgtable_alloc(void)
-+static phys_addr_t pgd_pgtable_alloc(void)
- {
- 	void *ptr = (void *)__get_free_page(PGALLOC_GFP);
--	BUG_ON(!ptr);
-+	if (!ptr || !pgtable_page_ctor(virt_to_page(ptr)))
-+		BUG();
+ /*
+- * Our virtual mapping for the boot-time MMU-enable code. Must be
+- * shared across all the page-tables. Conveniently, we use the vectors
+- * page, where no kernel data will ever be shared with HYP.
+- */
+-#define TRAMPOLINE_VA		UL(CONFIG_VECTORS_BASE)
+-
+-/*
+  * KVM_MMU_CACHE_MIN_PAGES is the number of stage2 page table translation levels.
+  */
+ #define KVM_MMU_CACHE_MIN_PAGES	2
+diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+index b89122e..9226f8b 100644
+--- a/arch/arm64/include/asm/kvm_mmu.h
++++ b/arch/arm64/include/asm/kvm_mmu.h
+@@ -72,16 +72,6 @@
+ #define HYP_PAGE_OFFSET_HIGH_MASK	((UL(1) << VA_BITS) - 1)
+ #define HYP_PAGE_OFFSET_LOW_MASK	((UL(1) << (VA_BITS - 1)) - 1)
  
- 	/* Ensure the zeroed page is visible to the page table walker */
- 	dsb(ishst);
-@@ -298,8 +299,10 @@ void __init create_pgd_mapping(struct mm_struct *mm, phys_addr_t phys,
- 			       unsigned long virt, phys_addr_t size,
- 			       pgprot_t prot, bool allow_block_mappings)
- {
-+	BUG_ON(mm == &init_mm);
-+
- 	__create_pgd_mapping(mm->pgd, phys, virt, size, prot,
--			     late_pgtable_alloc, allow_block_mappings);
-+			     pgd_pgtable_alloc, allow_block_mappings);
- }
+-/* Temporary compat define */
+-#define HYP_PAGE_OFFSET_MASK		HYP_PAGE_OFFSET_HIGH_MASK
+-
+-/*
+- * Our virtual mapping for the idmap-ed MMU-enable code. Must be
+- * shared across all the page-tables. Conveniently, we use the last
+- * possible page, where no kernel mapping will ever exist.
+- */
+-#define TRAMPOLINE_VA		(HYP_PAGE_OFFSET_MASK & PAGE_MASK)
+-
+ #ifdef __ASSEMBLY__
  
- static void create_mapping_late(phys_addr_t phys, unsigned long virt,
+ #include <asm/alternative.h>
 -- 
-2.7.4
+2.8.1
