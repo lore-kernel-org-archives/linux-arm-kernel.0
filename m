@@ -1,95 +1,135 @@
-From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Fri, 22 Jul 2016 16:28:53 -0400
-Subject: [PATCH v3 5/7] PM / devfreq: event: support rockchip dfi
- controller
-In-Reply-To: <1469178440-4668-6-git-send-email-hl@rock-chips.com>
-References: <1469178440-4668-1-git-send-email-hl@rock-chips.com>
- <1469178440-4668-6-git-send-email-hl@rock-chips.com>
-Message-ID: <CAP=VYLo6ZH+Vc+3N0Ed6XyLdy-rc9tKnjiACDnovcqv2CnE0Sg@mail.gmail.com>
+From: paul.gortmaker@gmail.com (Paul Gortmaker)
+Date: Fri, 22 Jul 2016 16:37:36 -0400
+Subject: [RFC PATCH v1 2/2] drivers: soc: Add support for Hisilicon Djtag
+ driver
+In-Reply-To: <1469177332-72156-3-git-send-email-tanxiaojun@huawei.com>
+References: <1469177332-72156-1-git-send-email-tanxiaojun@huawei.com>
+ <1469177332-72156-3-git-send-email-tanxiaojun@huawei.com>
+Message-ID: <CAP=VYLpfsMqPZL4J0K2+NMkxG+RHKchDBA+ZGhza9ZfWAa4VnQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 22, 2016 at 5:07 AM, Lin Huang <hl@rock-chips.com> wrote:
-> on rk3399 platform, there is dfi conroller can monitor
-> ddr load, base on this result, we can do ddr freqency
-> scaling.
+On Fri, Jul 22, 2016 at 4:48 AM, Tan Xiaojun <tanxiaojun@huawei.com> wrote:
+> The Hisilicon Djtag is an independent module which connects with some modules
+> in the SoC by Debug Bus. This module can be configured to access the registers
+> of connecting modules (like L3 cache) during real time debugging.
 >
-> Signed-off-by: Lin Huang <hl@rock-chips.com>
-> Acked-by: Chanwoo Choi <cw00.choi@samsung.com>
+> This patch add the driver of Hisilicon Djtag.
+>
+> Signed-off-by: Tan Xiaojun <tanxiaojun@huawei.com>
 > ---
-> Changes in v3:
-> - None
+>  drivers/soc/Kconfig                 |    1 +
+>  drivers/soc/Makefile                |    1 +
+>  drivers/soc/hisilicon/Kconfig       |   12 ++
+>  drivers/soc/hisilicon/Makefile      |    1 +
+>  drivers/soc/hisilicon/djtag.c       |  373 +++++++++++++++++++++++++++++++++++
+>  include/linux/soc/hisilicon/djtag.h |   18 ++
+>  6 files changed, 406 insertions(+)
+>  create mode 100644 drivers/soc/hisilicon/Kconfig
+>  create mode 100644 drivers/soc/hisilicon/Makefile
+>  create mode 100644 drivers/soc/hisilicon/djtag.c
+>  create mode 100644 include/linux/soc/hisilicon/djtag.h
 >
-> Changes in v2:
-> - use clk_disable_unprepare and clk_enable_prepare
-> - remove clk_enable_prepare in probe
-> - remove rockchip_dfi_remove function
->
-> Changes in v1:
-> - None
->
->  drivers/devfreq/event/Kconfig        |   7 +
->  drivers/devfreq/event/Makefile       |   1 +
->  drivers/devfreq/event/rockchip-dfi.c | 253 +++++++++++++++++++++++++++++++++++
->  3 files changed, 261 insertions(+)
->  create mode 100644 drivers/devfreq/event/rockchip-dfi.c
->
-> diff --git a/drivers/devfreq/event/Kconfig b/drivers/devfreq/event/Kconfig
-> index eb6f74a..0d32d68 100644
-> --- a/drivers/devfreq/event/Kconfig
-> +++ b/drivers/devfreq/event/Kconfig
-> @@ -30,4 +30,11 @@ config DEVFREQ_EVENT_EXYNOS_PPMU
->           (Platform Performance Monitoring Unit) counters to estimate the
->           utilization of each module.
->
-> +config DEVFREQ_EVENT_ROCKCHIP_DFI
-> +       bool "ROCKCHIP DFI DEVFREQ event Driver"
-> +       depends on ARCH_ROCKCHIP
-> +       help
-> +         This add the devfreq-event driver for Rockchip SoC. It provides DFI
-> +         (DDR Monitor Module) driver to count ddr load.
-> +
->  endif # PM_DEVFREQ_EVENT
-> diff --git a/drivers/devfreq/event/Makefile b/drivers/devfreq/event/Makefile
-> index 3d6afd3..dda7090 100644
-> --- a/drivers/devfreq/event/Makefile
-> +++ b/drivers/devfreq/event/Makefile
-> @@ -2,3 +2,4 @@
->
->  obj-$(CONFIG_DEVFREQ_EVENT_EXYNOS_NOCP) += exynos-nocp.o
->  obj-$(CONFIG_DEVFREQ_EVENT_EXYNOS_PPMU) += exynos-ppmu.o
-> +obj-$(CONFIG_DEVFREQ_EVENT_ROCKCHIP_DFI) += rockchip-dfi.o
-> diff --git a/drivers/devfreq/event/rockchip-dfi.c b/drivers/devfreq/event/rockchip-dfi.c
+> diff --git a/drivers/soc/Kconfig b/drivers/soc/Kconfig
+> index cb58ef0..f5982ec 100644
+> --- a/drivers/soc/Kconfig
+> +++ b/drivers/soc/Kconfig
+> @@ -3,6 +3,7 @@ menu "SOC (System On Chip) specific Drivers"
+>  source "drivers/soc/bcm/Kconfig"
+>  source "drivers/soc/brcmstb/Kconfig"
+>  source "drivers/soc/fsl/qe/Kconfig"
+> +source "drivers/soc/hisilicon/Kconfig"
+>  source "drivers/soc/mediatek/Kconfig"
+>  source "drivers/soc/qcom/Kconfig"
+>  source "drivers/soc/rockchip/Kconfig"
+> diff --git a/drivers/soc/Makefile b/drivers/soc/Makefile
+> index 380230f..373449d 100644
+> --- a/drivers/soc/Makefile
+> +++ b/drivers/soc/Makefile
+> @@ -7,6 +7,7 @@ obj-$(CONFIG_SOC_BRCMSTB)       += brcmstb/
+>  obj-$(CONFIG_ARCH_DOVE)                += dove/
+>  obj-$(CONFIG_MACH_DOVE)                += dove/
+>  obj-y                          += fsl/
+> +obj-$(CONFIG_ARCH_HISI)                += hisilicon/
+>  obj-$(CONFIG_ARCH_MEDIATEK)    += mediatek/
+>  obj-$(CONFIG_ARCH_QCOM)                += qcom/
+>  obj-$(CONFIG_ARCH_RENESAS)     += renesas/
+> diff --git a/drivers/soc/hisilicon/Kconfig b/drivers/soc/hisilicon/Kconfig
 > new file mode 100644
-> index 0000000..96a0307
+> index 0000000..3644aab
 > --- /dev/null
-> +++ b/drivers/devfreq/event/rockchip-dfi.c
-> @@ -0,0 +1,253 @@
+> +++ b/drivers/soc/hisilicon/Kconfig
+> @@ -0,0 +1,12 @@
+> +#
+> +# Hisilicon SoC drivers
+> +#
+> +config HISI_DJTAG
+> +       bool "Hisilicon Djtag Support"
+> +       depends on ARCH_HISI || COMPILE_TEST
+> +       help
+> +         Say y here to enable the Hisilicon Djtag support. It is an
+> +         independent module which connects with some modules in the
+> +         SoC by Debug Bus. This module can be configured to access
+> +         the registers of connecting modules during real time
+> +         debugging.
+
+Choice of word "module" here is probably confusing since it normally
+means a ".ko" when used in Kconfig help.   Maybe instead, use:
+
+...independent component...
+
+...connects with some other components....
+
+This driver can be configured to ....
+
+--hopefully  the above will clarify against such confusion.   Also....
+
+> diff --git a/drivers/soc/hisilicon/Makefile b/drivers/soc/hisilicon/Makefile
+> new file mode 100644
+> index 0000000..35a7b4b
+> --- /dev/null
+> +++ b/drivers/soc/hisilicon/Makefile
+> @@ -0,0 +1 @@
+> +obj-$(CONFIG_HISI_DJTAG)       += djtag.o
+> diff --git a/drivers/soc/hisilicon/djtag.c b/drivers/soc/hisilicon/djtag.c
+> new file mode 100644
+> index 0000000..41e11ed
+> --- /dev/null
+> +++ b/drivers/soc/hisilicon/djtag.c
+> @@ -0,0 +1,373 @@
 > +/*
-> + * Copyright (c) 2016, Fuzhou Rockchip Electronics Co., Ltd
-> + * Author: Lin Huang <hl@rock-chips.com>
+> + * Driver for Hisilicon Djtag r/w via System Controller.
 > + *
-> + * This program is free software; you can redistribute it and/or modify it
-> + * under the terms and conditions of the GNU General Public License,
-> + * version 2, as published by the Free Software Foundation.
+> + * Copyright (C) 2016 Hisilicon Ltd.
 > + *
-> + * This program is distributed in the hope it will be useful, but WITHOUT
-> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-> + * more details.
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
 > + */
 > +
-> +#include <linux/clk.h>
-> +#include <linux/devfreq-event.h>
-> +#include <linux/kernel.h>
-> +#include <linux/err.h>
+> +#include <linux/bitops.h>
 > +#include <linux/init.h>
-> +#include <linux/io.h>
+> +#include <linux/list.h>
 > +#include <linux/mfd/syscon.h>
 > +#include <linux/module.h>
 
-Same comment applies here.   Also might want to check any instances
-of "IS_ENABLED" being used on bool items, as that is overkill too.
+...since you add the driver as a bool Kconfig item, you should
+avoid using module.h and any MODULE_<xyz> tags.  Use the
+builtin registration functions instead.
+
+Alternatively, if there is a genuine use case for this to really be
+a dynamically loadable .ko module, then convert it to tristate.
 
 Thanks,
 Paul.
+--
+> +#include <linux/of.h>
+> +#include <linux/of_address.h>
+> +#include <linux/of_device.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/regmap.h>
+> +#include <linux/slab.h>
+> +#include <linux/spinlock.h>
+> +
+> +#include <asm-generic/delay.h>
+> +#include <linux/soc/hisilicon/djtag.h>
