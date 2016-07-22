@@ -1,123 +1,69 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 22 Jul 2016 23:47:16 +0800
-Subject: [PATCH] arm: dts: sun7i-a20-bananapi: name the GPIO lines
-In-Reply-To: <CACRpkdZLG1Ffdiw3xkP4G0XBr=WDXg2Vbh2Xmgno1PTNhfZHfg@mail.gmail.com>
-References: <1468496825-4896-1-git-send-email-linux@rempel-privat.de>
- <CACRpkdZLG1Ffdiw3xkP4G0XBr=WDXg2Vbh2Xmgno1PTNhfZHfg@mail.gmail.com>
-Message-ID: <CAGb2v66tf1LcBs69ECW0Xa2OeN0C0NWVyvpC8=4DsVLjAnrO3Q@mail.gmail.com>
+From: dave.long@linaro.org (David Long)
+Date: Fri, 22 Jul 2016 11:51:32 -0400
+Subject: [PATCH v15 04/10] arm64: Kprobes with single stepping support
+In-Reply-To: <20160722101617.GA17821@e104818-lin.cambridge.arm.com>
+References: <1467995754-32508-1-git-send-email-dave.long@linaro.org>
+ <1467995754-32508-5-git-send-email-dave.long@linaro.org>
+ <578FA238.3050206@arm.com> <5790F960.5050007@linaro.org>
+ <57910528.7070902@arm.com> <57911590.50305@linaro.org>
+ <20160722101617.GA17821@e104818-lin.cambridge.arm.com>
+Message-ID: <57924104.1080202@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 22, 2016 at 10:55 PM, Linus Walleij
-<linus.walleij@linaro.org> wrote:
-> On Thu, Jul 14, 2016 at 1:47 PM, Oleksij Rempel <linux@rempel-privat.de> wrote:
->
->> This names the GPIO lines on the Banana Pi board in accordance with
->> the A20_Banana_Pi v1.4 Specification.
+On 07/22/2016 06:16 AM, Catalin Marinas wrote:
+> On Thu, Jul 21, 2016 at 02:33:52PM -0400, David Long wrote:
+>> On 07/21/2016 01:23 PM, Marc Zyngier wrote:
+>>> On 21/07/16 17:33, David Long wrote:
+>>>> On 07/20/2016 12:09 PM, Marc Zyngier wrote:
+>>>>> On 08/07/16 17:35, David Long wrote:
+>>>>>> +#define MAX_INSN_SIZE			1
+>>>>>> +#define MAX_STACK_SIZE			128
+>>>>>
+>>>>> Where is that value coming from? Because even on my 6502, I have a 256
+>>>>> byte stack.
+>>>>>
+>>>>
+>>>> Although I don't claim to know the original author's thoughts I would
+>>>> guess it is based on the seven other existing implementations for
+>>>> kprobes on various architectures, all of which appear to use either 64
+>>>> or 128 for MAX_STACK_SIZE.  The code is not trying to duplicate the
+>>>> whole stack.
+> [...]
+>>> My main worry is that whatever value you pick, it is always going to be
+>>> wrong. This is used to preserve arguments that are passed on the stack,
+>>> as opposed to passed by registers). We have no idea of what is getting
+>>> passed there so saving nothing, 128 bytes or 2kB is about the same. It
+>>> is always wrong.
+>>>
+>>> A much better solution would be to check the frame pointer, and copy the
+>>> delta between FP and SP, assuming it fits inside the allocated buffer.
+>>> If it doesn't, or if FP is invalid, we just skip the hook, because we
+>>> can't reliably execute it.
 >>
->> This will make these line names reflect through to userspace
->> so that they can easily be identified and used with the new
->> character device ABI.
->>
->> Some care has been taken to name all lines, not just those used
->> by the external connectors, also lines that are muxed into some
->> other function than GPIO: these are named "[FOO]" so that users
->> can see with lsgpio what all lines are used for.
->>
->> Ps: most of the text was taken from Linux Wallej patch.
+>> Well, this is the way it works literally everywhere else. It is a documented
+>> limitation (Documentation/kprobes.txt). Said documentation may need to be
+>> changed along with the suggested fix.
 >
-> LinuS
+> The document states: "Up to MAX_STACK_SIZE bytes are copied". That means
+> the arch code could always copy less but never more than MAX_STACK_SIZE.
+> What we are proposing is that we should try to guess how much to copy
+> based on the FP value (caller's frame) and, if larger than
+> MAX_STACK_SIZE, skip the probe hook entirely. I don't think this goes
+> against the kprobes.txt document but at least it (a) may improve the
+> performance slightly by avoiding unnecessary copy and (b) it avoids
+> undefined behaviour if we ever encounter a jprobe with arguments passed
+> on the stack beyond MAX_STACK_SIZE.
 >
->>
->> Cc: devicetree at vger.kernel.org
->> Cc: Linus Walleij <linus.walleij@linaro.org>
->> Cc: linux-arm-kernel at lists.infradead.org
->> Cc: Chen-Yu Tsai <wens@csie.org>
->> Signed-off-by: Oleksij Rempel <linux@rempel-privat.de>
->
-> Nice usecase!
->
->> +       /*
->> +        * Legend: proper name = the GPIO line is used as GPIO
->> +        *         NC = not connected (not routed from the SoC)
->> +        *         "[PER]" = pin is muxed for peripheral (not GPIO)
->> +        *         "" = no idea, schematic doesn't say, could be
->> +        *              unrouted (not connected to any external pin)
->> +        *         LSEC = Low Speed External Connector
->> +        *         HSEC = High Speed External Connector
 
-I don't see LSEC/HSEC used anywhere?
+OK, it sounds like an improvement. I do worry a little about unexpected 
+side effects.  I'm just asking if we can accept the existing code as now 
+complete enough (in that I believe it matches the other implementations) 
+and make this enhancement something for the next release cycle, allowing 
+the existing code to be exercised by a wider audience and providing 
+ample time to test the new modification? I'd hate to get stuck in a mode 
+where this patch gets repeatedly delayed for changes that go above and 
+beyond the original design.
 
->> +        */
->
-> So maybe we should make this naming convention a suggested
-> standard. People seem to like it.
-
-One question about this whole thing: how extensively should we add
-the names? Only for exposed pins? Or every pin that's routed/used?
-
->> +       gpio-line-names =
->> +               /* PA */
->> +               "[ERXD3]", "[ERXD2]", "[ERXD1]", "[ERXD0]", "[ETXD3]",
->> +                       "[ETXD2]", "[ETXD1]", "[ETXD0]",
->> +               "[ERXCK]", "[ERXERR]", "[ERXDV]", "[EMDC]", "[EMDIO]",
->> +                       "[ETXEN]", "[ETXCK]", "[ECRS]",
->> +               "[ECOL]", "[ETXERR]", "", "", "", "", "", "",
->> +               "", "", "", "", "", "", "", "",
->> +               /* PB */
->> +               "[PMU-SCK]", "[PMU-SDA]", "", "", "", "NC", "NC", "NC",
->> +               "NC", "[USB0-DRV]", "NC", "NC", "NC", "NC", "", "",
->> +               "", "", "", "", "SCL", "SDA", "", "",
->
-> Are these bit-banged SCL and SDA for doing I2C with
-> GPIO? Otherwise you probably want to name them "[SCL]" and "[SDA]"
-
-There's an actual I2C controller backing them.
-
->
->> +               "TXD0", "RXD0", "IO-1", "PH3", "[USB0-IDDET]", "PH5", "", "",
->
-> Same here. You probably want "[TXD0]" etc unless you're bit-banging
-> the serial port. "IO-1" sounds like a real GPIO though and should
-> probably be named like that without [] and "PH3" what is that really?
-> A device-muxed pin or some kind of GPIO?
-
-PH3 is actually the pin name. The vendor uses "IO-7" and "IO-8" as function
-names for PH3 and PH5, but actually names them "NC":
-
-    http://www.bananapi.org/p/product.html
-
->
->> +               "", "", "[SD0-DET]", "", "", "", "", "",
->> +               "NC", "", "", "", "IO-4", "IO-5", "NC", "[EMAC-PWR-EN]",
->
-> So these seem correct too.
->
->> +               "[LED1]", "NC", "NC", "NC", "", "", "", "",
->
-> "LED1" seems like the right name, if this is a GPIO used to drive
-> a LED.
-
-This is GPIO based.
-
->
->> +               "", "", "", "IO-GCLK", "NC", "NC", "NC", "NC",
->
-> WHat is IO-GCLK? A real GPIO line used for toggling a clock?
-> Or a hardware clock signal? In the first case it it correctly named,
-> in the other case it should be "[IO-GCLK]".
-
-According to the schematics this is a PWM output.
-
-Regards
-ChenYu
-
->
->> +               "NC", "NC", "[SPI-CE0]", "[SPI-CLK]", "[SPI-MOSI]",
->> +                       "[SPI-MISO]", "[SPI-CE1]", "NC",
->> +               "IO-6", "IO-3", "IO-2", "IO-0", "", "", "", "",
->
-> Looks right.
->
-> Yours,
-> Linus Walleij
+Thanks,
+-dl
