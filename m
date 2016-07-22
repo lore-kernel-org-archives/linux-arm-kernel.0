@@ -1,39 +1,95 @@
-From: labbott@redhat.com (Laura Abbott)
-Date: Fri, 22 Jul 2016 14:53:01 -0700
-Subject: [PATCH 0/2] arm64: mm: use fully constructed struct pages from
- EFI page tables
-In-Reply-To: <1469208745-6693-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1469208745-6693-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <522054e9-1cd2-c7df-99ab-aeeb5ff05ade@redhat.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Fri, 22 Jul 2016 15:00:51 -0700
+Subject: [PATCH v3] thermal: tango: add resume support
+In-Reply-To: <578CC9C9.3050806@free.fr> (Mason's message of "Mon, 18 Jul 2016
+ 14:21:29 +0200")
+References: <57726196.5060909@free.fr> <578CC9C9.3050806@free.fr>
+Message-ID: <m2wpkd1gfg.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/22/2016 10:32 AM, Ard Biesheuvel wrote:
-> As reported by Sudeep, the EFI memory attributes table handling may crash
-> on an uninitialized spinlock in the struct page associated with a UEFI runtime
-> translation table page.
->
-> This is caused by a failure to take into account the fact that generic code
-> treats such pages differently depending on whether they are associated with
-> init_mm or not. The EFI page tables are completely separate from both the
-> kernel and the userland mappings, and are completely static during the
-> lifetime of the OS, but still, the most robust solution is to simply
-> construct these pages fully, so that generic code that compares against
-> &init_mm can work safely and correctly.
->
-> Patch #1 is a preparatory patch to drop a reference to late_pgtable_alloc
-> from code that no longer needs it.
->
-> Patch #2 renamed late_pgtable_alloc to pgd_table_alloc, and updates it to
-> construct the struct page associated with the allocated page.
->
-> Ard Biesheuvel (2):
->   arm64: mm: make create_mapping_late() non-allocating
->   arm64: mm: run pgtable_page_ctor() on non-swapper translation table
->     pages
->
->  arch/arm64/mm/mmu.c | 11 +++++++----
->  1 file changed, 7 insertions(+), 4 deletions(-)
->
+Mason <slash.tmp@free.fr> writes:
 
-Reviewed-by: Laura Abbott <labbott@redhat.com>
+> From: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
+>
+> When this platform is suspended, firmware powers the entire SoC down,
+> except a few hardware blocks waiting for wakeup events. And there is
+> no context to save for this particular block.
+>
+> Therefore, there is nothing useful for the driver to do on suspend;
+> so we define a NULL suspend hook. On resume, the driver initializes
+> the block exactly as is done in the probe callback.
+>
+> Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
+> ---
+> Changes in v3
+> Drop the DEV_PM_OPS macro, which caused some confusion.
+> Note: tango_thermal_pm struct only exists when CONFIG_PM_SLEEP is defined
+> @Kevin, can I add your Reviewed-by tag back?
+> ---
+>  drivers/thermal/tango_thermal.c | 23 +++++++++++++++++++++--
+>  1 file changed, 21 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/thermal/tango_thermal.c b/drivers/thermal/tango_thermal.c
+> index 70e0d9f406e9..957f8937e126 100644
+> --- a/drivers/thermal/tango_thermal.c
+> +++ b/drivers/thermal/tango_thermal.c
+> @@ -64,6 +64,12 @@ static const struct thermal_zone_of_device_ops ops = {
+>  	.get_temp	= tango_get_temp,
+>  };
+>  
+> +static void tango_thermal_init(struct tango_thermal_priv *priv)
+> +{
+> +	writel(0, priv->base + TEMPSI_CFG);
+> +	writel(CMD_ON, priv->base + TEMPSI_CMD);
+> +}
+> +
+>  static int tango_thermal_probe(struct platform_device *pdev)
+>  {
+>  	struct resource *res;
+> @@ -79,14 +85,24 @@ static int tango_thermal_probe(struct platform_device *pdev)
+>  	if (IS_ERR(priv->base))
+>  		return PTR_ERR(priv->base);
+>  
+> +	platform_set_drvdata(pdev, priv);
+>  	priv->thresh_idx = IDX_MIN;
+> -	writel(0, priv->base + TEMPSI_CFG);
+> -	writel(CMD_ON, priv->base + TEMPSI_CMD);
+> +	tango_thermal_init(priv);
+>  
+>  	tzdev = devm_thermal_zone_of_sensor_register(&pdev->dev, 0, priv, &ops);
+>  	return PTR_ERR_OR_ZERO(tzdev);
+>  }
+>  
+> +#ifdef CONFIG_PM_SLEEP
+> +static int tango_thermal_resume(struct device *dev)
+> +{
+> +	tango_thermal_init(dev_get_drvdata(dev));
+> +	return 0;
+> +}
+> +
+> +static SIMPLE_DEV_PM_OPS(tango_thermal_pm, NULL, tango_thermal_resume);
+> +#endif
+
+#else
+#define tango_thermal_resume NULL
+#endif
+
+And then move the SIMPLE_DEV_PM_OPS here...
+
+> +
+>  static const struct of_device_id tango_sensor_ids[] = {
+>  	{
+>  		.compatible = "sigma,smp8758-thermal",
+> @@ -99,6 +115,9 @@ static struct platform_driver tango_thermal_driver = {
+>  	.driver	= {
+>  		.name		= "tango-thermal",
+>  		.of_match_table	= tango_sensor_ids,
+> +#ifdef CONFIG_PM_SLEEP
+> +		.pm		= &tango_thermal_pm,
+> +#endif
+
+... which allows you to get rid of the ugly ifdef here.
+(c.f. CodingStyle, Chapter 20,)
+
+Kevin
