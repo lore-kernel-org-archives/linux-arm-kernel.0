@@ -1,194 +1,55 @@
-From: Songjun.Wu@microchip.com (Wu, Songjun)
-Date: Fri, 22 Jul 2016 13:21:09 +0800
-Subject: [PATCH v6 0/2] [media] atmel-isc: add driver for Atmel ISC
-In-Reply-To: <e0592f57-f679-fcde-7446-e3259ad9825b@xs4all.nl>
-References: <1469088900-23935-1-git-send-email-songjun.wu@microchip.com>
- <e0592f57-f679-fcde-7446-e3259ad9825b@xs4all.nl>
-Message-ID: <4e2bb244-42ad-3d20-0325-0a35991fae58@microchip.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Fri, 22 Jul 2016 14:33:17 +0900
+Subject: [PATCH v1 3/4] arm64: Add arm64 kexec support
+In-Reply-To: <20160722040842.GA14911@localhost.localdomain>
+References: <cover.1468970114.git.geoff@infradead.org>
+ <9ed513fd44a19b2f49b4da99477cedfff7341bf0.1468970114.git.geoff@infradead.org>
+ <20160720153859.GG24691@leverpostej>
+ <1469042361.2977.90.camel@infradead.org>
+ <20160721103120.GB20559@leverpostej> <5790A902.6070601@arm.com>
+ <1469137776.2977.128.camel@infradead.org>
+ <20160722040842.GA14911@localhost.localdomain>
+Message-ID: <20160722053316.GO20774@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Jul 22, 2016 at 09:38:42AM +0530, Pratyush Anand wrote:
+> On 21/07/2016:02:49:36 PM, Geoff Levand wrote:
+> > On Thu, 2016-07-21 at 11:50 +0100, Robin Murphy wrote:
+> > > The Exynos UART (drivers/tty/serial/samsung.c) is one which comes to
+> > > mind as definitely existing, and on arm64 systems to boot. The TX
+> > > register is at offset 0x20 there.
+> > 
+> > Here's what I came up with.
+> > 
+> > 
+> > +	struct data {const char *name; int tx_offset;};
+> > +	static const struct data ok_list[] = {
+> > +	/*	{"armada-3700-uart", ?},	*/
+> > +		{"exynos4210-uart", 0x20},
+> > +	/*	{"ls1021a-lpuart", ?},		*/
+> > +	/*	{"meson-uart", ?},		*/
+> > +	/*	{"mt6577-uart", ?},		*/
+> > +		{"ns16550", 0},
+> > +		{"ns16550a", 0},
+> > +		{"pl011", 0},
+> > +		{NULL, 0}
+> > +	};
+> 
+> sinc functionality is just to debug the scenario when something goes wrong in
+> purgatory. IMHO, it should be disabled by default.
 
++1
 
-On 7/21/2016 16:41, Hans Verkuil wrote:
->
->
-> On 07/21/2016 10:14 AM, Songjun Wu wrote:
->> The Image Sensor Controller driver includes two parts.
->> 1) Driver code to implement the ISC function.
->> 2) Device tree binding documentation, it describes how
->>    to add the ISC in device tree.
->>
->> Test result with v4l-utils 1.10.1
->
-> Please compile from the v4l-utils repository. The version you used here is out-of-date.
-> I continually add new tests, so always compile the latest version from the repo.
->
-OK, I will compile the latest version from the v4l-utils repository.
-Thank you.
+-Takahiro AKASHI
 
-> Regards,
->
-> 	Hans
->
->> Driver Info:
->>         Driver name   : atmel_isc
->>         Card type     : Atmel Image Sensor Controller
->>         Bus info      : platform:atmel_isc f0008000.isc
->>         Driver version: 4.7.0
->>         Capabilities  : 0x84200001
->>                 Video Capture
->>                 Streaming
->>                 Extended Pix Format
->>                 Device Capabilities
->>         Device Caps   : 0x04200001
->>                 Video Capture
->>                 Streaming
->>                 Extended Pix Format
->>
->> Compliance test for device /dev/video0 (not using libv4l2):
->>
->> Required ioctls:
->>         test VIDIOC_QUERYCAP: OK
->>
->> Allow for multiple opens:
->>         test second video open: OK
->>         test VIDIOC_QUERYCAP: OK
->>         test VIDIOC_G/S_PRIORITY: OK
->>
->> Debug ioctls:
->>         test VIDIOC_DBG_G/S_REGISTER: OK (Not Supported)
->>         test VIDIOC_LOG_STATUS: OK (Not Supported)
->>
->> Input ioctls:
->>         test VIDIOC_G/S_TUNER/ENUM_FREQ_BANDS: OK (Not Supported)
->>         test VIDIOC_G/S_FREQUENCY: OK (Not Supported)
->>         test VIDIOC_S_HW_FREQ_SEEK: OK (Not Supported)
->>         test VIDIOC_ENUMAUDIO: OK (Not Supported)
->>         test VIDIOC_G/S/ENUMINPUT: OK
->>         test VIDIOC_G/S_AUDIO: OK (Not Supported)
->>         Inputs: 1 Audio Inputs: 0 Tuners: 0
->>
->> Output ioctls:
->>         test VIDIOC_G/S_MODULATOR: OK (Not Supported)
->>         test VIDIOC_G/S_FREQUENCY: OK (Not Supported)
->>         test VIDIOC_ENUMAUDOUT: OK (Not Supported)
->>         test VIDIOC_G/S/ENUMOUTPUT: OK (Not Supported)
->>         test VIDIOC_G/S_AUDOUT: OK (Not Supported)
->>         Outputs: 0 Audio Outputs: 0 Modulators: 0
->>
->> Input/Output configuration ioctls:
->>         test VIDIOC_ENUM/G/S/QUERY_STD: OK (Not Supported)
->>         test VIDIOC_ENUM/G/S/QUERY_DV_TIMINGS: OK (Not Supported)
->>         test VIDIOC_DV_TIMINGS_CAP: OK (Not Supported)
->>         test VIDIOC_G/S_EDID: OK (Not Supported)
->>
->> Test input 0:
->>
->>         Control ioctls:
->>                 test VIDIOC_QUERY_EXT_CTRL/QUERYMENU: OK (Not Supported)
->>                 test VIDIOC_QUERYCTRL: OK (Not Supported)
->>                 test VIDIOC_G/S_CTRL: OK (Not Supported)
->>                 test VIDIOC_G/S/TRY_EXT_CTRLS: OK (Not Supported)
->>                 test VIDIOC_(UN)SUBSCRIBE_EVENT/DQEVENT: OK (Not Supported)
->>                 test VIDIOC_G/S_JPEGCOMP: OK (Not Supported)
->>                 Standard Controls: 0 Private Controls: 0
->>
->>         Format ioctls:
->>                 test VIDIOC_ENUM_FMT/FRAMESIZES/FRAMEINTERVALS: OK
->>                 test VIDIOC_G/S_PARM: OK
->>                 test VIDIOC_G_FBUF: OK (Not Supported)
->>                 test VIDIOC_G_FMT: OK
->>                 test VIDIOC_TRY_FMT: OK
->>                 test VIDIOC_S_FMT: OK
->>                 test VIDIOC_G_SLICED_VBI_CAP: OK (Not Supported)
->>                 test Cropping: OK (Not Supported)
->>                 test Composing: OK (Not Supported)
->>                 test Scaling: OK (Not Supported)
->>
->>         Codec ioctls:
->>                 test VIDIOC_(TRY_)ENCODER_CMD: OK (Not Supported)
->>                 test VIDIOC_G_ENC_INDEX: OK (Not Supported)
->>                 test VIDIOC_(TRY_)DECODER_CMD: OK (Not Supported)
->>
->>         Buffer ioctls:
->>                 test VIDIOC_REQBUFS/CREATE_BUFS/QUERYBUF: OK
->>                 test VIDIOC_EXPBUF: OK
->>
->> Test input 0:
->>
->> Stream using all formats:
->>         test MMAP for Format BA81, Frame Size 640x480:
->>                 Stride 640, Field None: OK
->>         test MMAP for Format YUYV, Frame Size 640x480:
->>                 Stride 1280, Field None: OK
->>
->> Total: 44, Succeeded: 44, Failed: 0, Warnings: 0
->>
->> Changes in v6:
->> - Add "iscck" and "gck" to clock-names.
->>
->> Changes in v5:
->> - Modify the macro definition and the related code.
->> - Add clock-output-names.
->>
->> Changes in v4:
->> - Modify the isc clock code since the dt is changed.
->> - Remove the isc clock nodes.
->>
->> Changes in v3:
->> - Add pm runtime feature.
->> - Modify the isc clock code since the dt is changed.
->> - Remove the 'atmel,sensor-preferred'.
->> - Modify the isc clock node according to the Rob's remarks.
->>
->> Changes in v2:
->> - Add "depends on COMMON_CLK" and "VIDEO_V4L2_SUBDEV_API"
->>   in Kconfig file.
->> - Correct typos and coding style according to Laurent's remarks
->> - Delete the loop while in 'isc_clk_enable' function.
->> - Replace 'hsync_active', 'vsync_active' and 'pclk_sample'
->>   with 'pfe_cfg0' in struct isc_subdev_entity.
->> - Add the code to support VIDIOC_CREATE_BUFS in
->>   'isc_queue_setup' function.
->> - Invoke isc_config to configure register in
->>   'isc_start_streaming' function.
->> - Add the struct completion 'comp' to synchronize with
->>   the frame end interrupt in 'isc_stop_streaming' function.
->> - Check the return value of the clk_prepare_enable
->>   in 'isc_open' function.
->> - Set the default format in 'isc_open' function.
->> - Add an exit condition in the loop while in 'isc_config'.
->> - Delete the hardware setup operation in 'isc_set_format'.
->> - Refuse format modification during streaming
->>   in 'isc_s_fmt_vid_cap' function.
->> - Invoke v4l2_subdev_alloc_pad_config to allocate and
->>   initialize the pad config in 'isc_async_complete' function.
->> - Remove the '.owner  = THIS_MODULE,' in atmel_isc_driver.
->> - Replace the module_platform_driver_probe() with
->>   module_platform_driver().
->> - Remove the unit address of the endpoint.
->> - Add the unit address to the clock node.
->> - Avoid using underscores in node names.
->> - Drop the "0x" in the unit address of the i2c node.
->> - Modify the description of 'atmel,sensor-preferred'.
->> - Add the description for the ISC internal clock.
->>
->> Songjun Wu (2):
->>   [media] atmel-isc: add the Image Sensor Controller code
->>   [media] atmel-isc: DT binding for Image Sensor Controller driver
->>
->>  .../devicetree/bindings/media/atmel-isc.txt        |   65 +
->>  drivers/media/platform/Kconfig                     |    1 +
->>  drivers/media/platform/Makefile                    |    2 +
->>  drivers/media/platform/atmel/Kconfig               |    9 +
->>  drivers/media/platform/atmel/Makefile              |    1 +
->>  drivers/media/platform/atmel/atmel-isc-regs.h      |  165 +++
->>  drivers/media/platform/atmel/atmel-isc.c           | 1554 ++++++++++++++++++++
->>  7 files changed, 1797 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/media/atmel-isc.txt
->>  create mode 100644 drivers/media/platform/atmel/Kconfig
->>  create mode 100644 drivers/media/platform/atmel/Makefile
->>  create mode 100644 drivers/media/platform/atmel/atmel-isc-regs.h
->>  create mode 100644 drivers/media/platform/atmel/atmel-isc.c
->>
+> So, why not to keep it as
+> simple as possible. Its a low level debugging mainly for developer, so user
+> should know the absolute address. Therefore, I think no need to parse earlycon
+> or earlyprintk from command line.  Whatever user passes in --port can be treated
+> as address of TX register. If TX offset is 0x20, then user can pass --port as
+> base+0x20. Additionally, we can pass TX register width as well. So what about
+> something like "--port=0x1c020000,1" where 0x1c020000 is TX register address and
+> 1 says about it's width in bytes.
+> 
+> ~Pratyush
