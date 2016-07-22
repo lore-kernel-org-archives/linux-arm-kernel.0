@@ -1,50 +1,64 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 22 Jul 2016 18:28:25 +0100
-Subject: [PATCH 08/55] arm64: KVM: Always reference __hyp_panic_string via its
- kernel VA
+Date: Fri, 22 Jul 2016 18:28:20 +0100
+Subject: [PATCH 03/55] arm/arm64: KVM: Enforce HYP read-only mapping of the
+ kernel's rodata section
 In-Reply-To: <1469208552-4155-1-git-send-email-marc.zyngier@arm.com>
 References: <1469208552-4155-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1469208552-4155-9-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1469208552-4155-4-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-__hyp_panic_string is passed via the HYP panic code to the panic
-function, and is being "upgraded" to a kernel address, as it is
-referenced by the HYP code (in a PC-relative way).
+In order to be able to use C code in HYP, we're now mapping the kernel's
+rodata in HYP. It works absolutely fine, except that we're mapping it RWX,
+which is not what it should be.
 
-This is a bit silly, and we'd be better off obtaining the kernel
-address and not mess with it at all. This patch implements this
-with a tiny bit of asm glue, by forcing the string pointer to be
-read from the literal pool.
+Add a new HYP_PAGE_RO protection, and pass it as the protection flags
+when mapping the rodata section.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm64/kvm/hyp/switch.c | 11 +++++++++--
- 1 file changed, 9 insertions(+), 2 deletions(-)
+ arch/arm/include/asm/pgtable.h        | 1 +
+ arch/arm/kvm/arm.c                    | 2 +-
+ arch/arm64/include/asm/pgtable-prot.h | 1 +
+ 3 files changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-index 437cfad..81f21a2 100644
---- a/arch/arm64/kvm/hyp/switch.c
-+++ b/arch/arm64/kvm/hyp/switch.c
-@@ -299,9 +299,16 @@ static const char __hyp_panic_string[] = "HYP panic:\nPS:%08llx PC:%016llx ESR:%
+diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
+index 348caab..f332087 100644
+--- a/arch/arm/include/asm/pgtable.h
++++ b/arch/arm/include/asm/pgtable.h
+@@ -98,6 +98,7 @@ extern pgprot_t		pgprot_s2_device;
+ #define PAGE_KERNEL		_MOD_PROT(pgprot_kernel, L_PTE_XN)
+ #define PAGE_KERNEL_EXEC	pgprot_kernel
+ #define PAGE_HYP		_MOD_PROT(pgprot_kernel, L_PTE_HYP)
++#define PAGE_HYP_RO		_MOD_PROT(pgprot_kernel, L_PTE_HYP | L_PTE_RDONLY | L_PTE_XN)
+ #define PAGE_HYP_DEVICE		_MOD_PROT(pgprot_hyp_device, L_PTE_HYP)
+ #define PAGE_S2			_MOD_PROT(pgprot_s2, L_PTE_S2_RDONLY)
+ #define PAGE_S2_DEVICE		_MOD_PROT(pgprot_s2_device, L_PTE_S2_RDONLY)
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index 45dd6df..b308976 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -1300,7 +1300,7 @@ static int init_hyp_mode(void)
+ 	}
  
- static void __hyp_text __hyp_call_panic_nvhe(u64 spsr, u64 elr, u64 par)
- {
--	unsigned long str_va = (unsigned long)__hyp_panic_string;
-+	unsigned long str_va;
+ 	err = create_hyp_mappings(kvm_ksym_ref(__start_rodata),
+-				  kvm_ksym_ref(__end_rodata), PAGE_HYP);
++				  kvm_ksym_ref(__end_rodata), PAGE_HYP_RO);
+ 	if (err) {
+ 		kvm_err("Cannot map rodata section\n");
+ 		goto out_err;
+diff --git a/arch/arm64/include/asm/pgtable-prot.h b/arch/arm64/include/asm/pgtable-prot.h
+index 29fcb33..88db58c 100644
+--- a/arch/arm64/include/asm/pgtable-prot.h
++++ b/arch/arm64/include/asm/pgtable-prot.h
+@@ -56,6 +56,7 @@
+ #define PAGE_KERNEL_EXEC_CONT	__pgprot(_PAGE_DEFAULT | PTE_UXN | PTE_DIRTY | PTE_WRITE | PTE_CONT)
  
--	__hyp_do_panic(hyp_kern_va(str_va),
-+	/*
-+	 * Force the panic string to be loaded from the literal pool,
-+	 * making sure it is a kernel address and not a PC-relative
-+	 * reference.
-+	 */
-+	asm volatile("ldr %0, =__hyp_panic_string" : "=r" (str_va));
-+
-+	__hyp_do_panic(str_va,
- 		       spsr,  elr,
- 		       read_sysreg(esr_el2),   read_sysreg_el2(far),
- 		       read_sysreg(hpfar_el2), par,
+ #define PAGE_HYP		__pgprot(_PAGE_DEFAULT | PTE_HYP)
++#define PAGE_HYP_RO		__pgprot(_PAGE_DEFAULT | PTE_HYP | PTE_RDONLY | PTE_HYP_XN)
+ #define PAGE_HYP_DEVICE		__pgprot(PROT_DEVICE_nGnRE | PTE_HYP)
+ 
+ #define PAGE_S2			__pgprot(PROT_DEFAULT | PTE_S2_MEMATTR(MT_S2_NORMAL) | PTE_S2_RDONLY)
 -- 
 2.8.1
