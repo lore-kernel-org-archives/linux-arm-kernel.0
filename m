@@ -1,96 +1,61 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 22 Jul 2016 16:55:45 +0200
-Subject: [PATCH] arm: dts: sun7i-a20-bananapi: name the GPIO lines
-In-Reply-To: <1468496825-4896-1-git-send-email-linux@rempel-privat.de>
-References: <1468496825-4896-1-git-send-email-linux@rempel-privat.de>
-Message-ID: <CACRpkdZLG1Ffdiw3xkP4G0XBr=WDXg2Vbh2Xmgno1PTNhfZHfg@mail.gmail.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Fri, 22 Jul 2016 15:56:09 +0100
+Subject: [PATCH] ARM: no need to select SMP_ON_UP explicitly
+Message-ID: <1469199369-25746-1-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 14, 2016 at 1:47 PM, Oleksij Rempel <linux@rempel-privat.de> wrote:
+SMP_ON_UP is already defaulted to "y" and has all dependencies expressed
+- no need to select it per platform level
 
-> This names the GPIO lines on the Banana Pi board in accordance with
-> the A20_Banana_Pi v1.4 Specification.
->
-> This will make these line names reflect through to userspace
-> so that they can easily be identified and used with the new
-> character device ABI.
->
-> Some care has been taken to name all lines, not just those used
-> by the external connectors, also lines that are muxed into some
-> other function than GPIO: these are named "[FOO]" so that users
-> can see with lsgpio what all lines are used for.
->
-> Ps: most of the text was taken from Linux Wallej patch.
+Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+---
 
-LinuS
+This time sent to LAKML
 
->
-> Cc: devicetree at vger.kernel.org
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: Chen-Yu Tsai <wens@csie.org>
-> Signed-off-by: Oleksij Rempel <linux@rempel-privat.de>
+ arch/arm/mach-imx/Kconfig      |    3 ---
+ arch/arm/mach-realview/Kconfig |    1 -
+ 2 files changed, 4 deletions(-)
 
-Nice usecase!
-
-> +       /*
-> +        * Legend: proper name = the GPIO line is used as GPIO
-> +        *         NC = not connected (not routed from the SoC)
-> +        *         "[PER]" = pin is muxed for peripheral (not GPIO)
-> +        *         "" = no idea, schematic doesn't say, could be
-> +        *              unrouted (not connected to any external pin)
-> +        *         LSEC = Low Speed External Connector
-> +        *         HSEC = High Speed External Connector
-> +        */
-
-So maybe we should make this naming convention a suggested
-standard. People seem to like it.
-
-> +       gpio-line-names =
-> +               /* PA */
-> +               "[ERXD3]", "[ERXD2]", "[ERXD1]", "[ERXD0]", "[ETXD3]",
-> +                       "[ETXD2]", "[ETXD1]", "[ETXD0]",
-> +               "[ERXCK]", "[ERXERR]", "[ERXDV]", "[EMDC]", "[EMDIO]",
-> +                       "[ETXEN]", "[ETXCK]", "[ECRS]",
-> +               "[ECOL]", "[ETXERR]", "", "", "", "", "", "",
-> +               "", "", "", "", "", "", "", "",
-> +               /* PB */
-> +               "[PMU-SCK]", "[PMU-SDA]", "", "", "", "NC", "NC", "NC",
-> +               "NC", "[USB0-DRV]", "NC", "NC", "NC", "NC", "", "",
-> +               "", "", "", "", "SCL", "SDA", "", "",
-
-Are these bit-banged SCL and SDA for doing I2C with
-GPIO? Otherwise you probably want to name them "[SCL]" and "[SDA]"
-
-> +               "TXD0", "RXD0", "IO-1", "PH3", "[USB0-IDDET]", "PH5", "", "",
-
-Same here. You probably want "[TXD0]" etc unless you're bit-banging
-the serial port. "IO-1" sounds like a real GPIO though and should
-probably be named like that without [] and "PH3" what is that really?
-A device-muxed pin or some kind of GPIO?
-
-> +               "", "", "[SD0-DET]", "", "", "", "", "",
-> +               "NC", "", "", "", "IO-4", "IO-5", "NC", "[EMAC-PWR-EN]",
-
-So these seem correct too.
-
-> +               "[LED1]", "NC", "NC", "NC", "", "", "", "",
-
-"LED1" seems like the right name, if this is a GPIO used to drive
-a LED.
-
-> +               "", "", "", "IO-GCLK", "NC", "NC", "NC", "NC",
-
-WHat is IO-GCLK? A real GPIO line used for toggling a clock?
-Or a hardware clock signal? In the first case it it correctly named,
-in the other case it should be "[IO-GCLK]".
-
-> +               "NC", "NC", "[SPI-CE0]", "[SPI-CLK]", "[SPI-MOSI]",
-> +                       "[SPI-MISO]", "[SPI-CE1]", "NC",
-> +               "IO-6", "IO-3", "IO-2", "IO-0", "", "", "", "",
-
-Looks right.
-
-Yours,
-Linus Walleij
+diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+index dd905b9..cfb1120 100644
+--- a/arch/arm/mach-imx/Kconfig
++++ b/arch/arm/mach-imx/Kconfig
+@@ -92,7 +92,6 @@ config SOC_IMX31
+ 	select CPU_V6
+ 	select IMX_HAVE_PLATFORM_MXC_RNGA
+ 	select MXC_AVIC
+-	select SMP_ON_UP if SMP
+ 
+ config SOC_IMX35
+ 	bool
+@@ -100,7 +99,6 @@ config SOC_IMX35
+ 	select HAVE_EPIT
+ 	select MXC_AVIC
+ 	select PINCTRL_IMX35
+-	select SMP_ON_UP if SMP
+ 
+ if ARCH_MULTI_V4T
+ 
+@@ -589,7 +587,6 @@ config SOC_VF610
+ 	select ARM_GIC if ARCH_MULTI_V7
+ 	select PINCTRL_VF610
+ 	select PL310_ERRATA_769419 if CACHE_L2X0
+-	select SMP_ON_UP if SMP
+ 
+ 	help
+ 	  This enables support for Freescale Vybrid VF610 processor.
+diff --git a/arch/arm/mach-realview/Kconfig b/arch/arm/mach-realview/Kconfig
+index 70ab4a2..739800e 100644
+--- a/arch/arm/mach-realview/Kconfig
++++ b/arch/arm/mach-realview/Kconfig
+@@ -24,7 +24,6 @@ config REALVIEW_DT
+ 	select POWER_RESET
+ 	select POWER_RESET_VERSATILE
+ 	select POWER_SUPPLY
+-	select SMP_ON_UP if SMP
+ 	select SOC_REALVIEW
+ 	select USE_OF
+ 	help
+-- 
+1.7.9.5
