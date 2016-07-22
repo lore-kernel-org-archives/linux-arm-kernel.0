@@ -1,60 +1,52 @@
 From: mirza.krak@gmail.com (Mirza Krak)
-Date: Fri, 22 Jul 2016 21:07:02 +0200
-Subject: [RFC 3/6] dt/bindings: Add bindings for Tegra20/30 NOR bus driver
-In-Reply-To: <8e9cdefd-68d1-b788-92fb-b74aae1713c8@nvidia.com>
+Date: Fri, 22 Jul 2016 21:18:37 +0200
+Subject: [RFC 6/6] bus: Add support for Tegra NOR controller
+In-Reply-To: <dbbb5c9f-8c67-9d9f-171b-64cd18353411@nvidia.com>
 References: <1468935397-11926-1-git-send-email-mirza.krak@gmail.com>
- <1468935397-11926-4-git-send-email-mirza.krak@gmail.com>
- <434561ec-510e-a3bf-c7b6-c961db299bd6@nvidia.com>
- <CALw8SCU0cz6mbO=oudCZ4-=2PHVORNt3gwmg2bzNjyhJFnWS3g@mail.gmail.com>
- <8e9cdefd-68d1-b788-92fb-b74aae1713c8@nvidia.com>
-Message-ID: <CALw8SCXb29NM=BRnUBsnFFObe25fSFi2mzvhrb5CvvJVCcWRfA@mail.gmail.com>
+ <1468935397-11926-7-git-send-email-mirza.krak@gmail.com>
+ <f6df33eb-53ae-699b-9e1f-69eb7fed7da0@nvidia.com>
+ <CALw8SCVy4ud5_+gS3C8WeyTCV0m_4R2xjdEY4vCKEq_3-aFanw@mail.gmail.com>
+ <dbbb5c9f-8c67-9d9f-171b-64cd18353411@nvidia.com>
+Message-ID: <CALw8SCXCdVMKgemEyQ-MZbxdthkPCDVzi+3boqtXk1_XNjcz4g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-07-22 11:32 GMT+02:00 Jon Hunter <jonathanh@nvidia.com>:
->
-> On 21/07/16 21:10, Mirza Krak wrote:
->> 2016-07-21 11:56 GMT+02:00 Jon Hunter <jonathanh@nvidia.com>:
->>>
->>> I wonder if it is worth mentioning that the chip-select specified in the
->>> "nvidia,config" prop should match that in the "ranges" prop unless you
->>> have some external decoding logic to provide an external chip-select.
->>> Which raises a question, what does the chip-select in the ranges
->>> actually represent? I am not sure if there is a common practice here for
->>> device tree when boards have external logic to provide additional
->>> chip-selects. I am sure this is quite common.
+2016-07-22 11:38 GMT+02:00 Jon Hunter <jonathanh@nvidia.com>:
+>>> The driver should have a remove function given that we can build as a
+>>> module.
 >>
->> I do not understand why CS pin setting in nvidia,config need to match
->> the "ranges" prop? Other then maybe cosmetics.
+>> At the moment I do not know what we would do in a remove function and
+>> hence me not adding one.
 >
-> Yes it would be cosmetic. That said, I even wonder if CS needs to be
-> exposed at all given that they all map to the same CPU address space.
-> Couldn't your binding for the CAN devices be as follows?
+> Should just be the inverse of the probe (although there is no inverse
+> for the parsing DT bit). If you don't wish to add a remove, that is
+> fine, but make the driver a 'bool' and not 'tristate' in the Kconfig so
+> it cannot be configured as a module.
+
+I understand the concept of a remove function, but I use devm_ calls
+for all resources. These should be handled by the device core on a
+driver detach?
+
+One thing came to mind now that could be done in a remove method and
+that is clearing the CONFIG_GO bit, or I could just do that first on
+probe instead to make sure the controller is stopped.
+
+Ok, one more thing came to mind, and that is depopulating the child
+devices. Got it remove function it is then.
+
+>>>> +module_platform_driver_probe(nor_driver, nor_probe);
+>>>
+>>> I would use "tegra_nor" namespace for all the structs, functions, etc.
+>>> However, we may prefer to go with GMI and in which case tegra_gmi_probe,
+>>> etc.
+>>
+>> ACK. Who gets the last call on what we should call the driver? It
+>> seems that we both think GMI is a better name, do we need a third? :).
 >
-> nor at 70009000 {
->         ...
->
->         can at 48000000 {
->                 ...
->         };
->
->         can at 48040000 {
->                 ...
->         };
-> };
+> The patches would have to go via Thierry and so ultimately, Thierry.
+> However, I can't imagine he would object to GMI ;-)
 
-This has also crossed my mind, maybe just get rid of the "ranges" prop
-and do like you have above. But then again I do not know what is
-preferred so I went with "ranges" prop initially.
+Eagerly awaiting Thierry`s comments :).
 
-
->
-> Problem is if you did have devices on different chip-selects then how
-> would these be handled? They could not point to the same physical
-> address. I am not sure if there is a way to do that in DT?
-
-Having trouble following your though here. We do not have "different"
-chip-selects?
-
-Best Regards
+Best Regards,
 Mirza
