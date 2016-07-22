@@ -1,73 +1,36 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 22 Jul 2016 18:28:24 +0100
-Subject: [PATCH 07/55] arm64: KVM: Merged page tables documentation
+Date: Fri, 22 Jul 2016 18:28:28 +0100
+Subject: [PATCH 11/55] arm64: Add ARM64_HYP_OFFSET_LOW capability
 In-Reply-To: <1469208552-4155-1-git-send-email-marc.zyngier@arm.com>
 References: <1469208552-4155-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1469208552-4155-8-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1469208552-4155-12-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since dealing with VA ranges tends to hurt my brain badly, let's
-start with a bit of documentation that will hopefully help
-understanding what comes next...
+As we need to indicate to the rest of the kernel which region of
+the HYP VA space is safe to use, add a capability that will
+indicate that KVM should use the [VA_BITS-2:0] range.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm64/include/asm/kvm_mmu.h | 40 +++++++++++++++++++++++++++++++++++++---
- 1 file changed, 37 insertions(+), 3 deletions(-)
+ arch/arm64/include/asm/cpufeature.h | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index fdfbddb..6149dfc 100644
---- a/arch/arm64/include/asm/kvm_mmu.h
-+++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -29,10 +29,44 @@
-  *
-  * Instead, give the HYP mode its own VA region at a fixed offset from
-  * the kernel by just masking the top bits (which are all ones for a
-- * kernel address).
-+ * kernel address). We need to find out how many bits to mask.
-  *
-- * ARMv8.1 (using VHE) does have a TTBR1_EL2, and doesn't use these
-- * macros (the entire kernel runs at EL2).
-+ * We want to build a set of page tables that cover both parts of the
-+ * idmap (the trampoline page used to initialize EL2), and our normal
-+ * runtime VA space, at the same time.
-+ *
-+ * Given that the kernel uses VA_BITS for its entire address space,
-+ * and that half of that space (VA_BITS - 1) is used for the linear
-+ * mapping, we can also limit the EL2 space to (VA_BITS - 1).
-+ *
-+ * The main question is "Within the VA_BITS space, does EL2 use the
-+ * top or the bottom half of that space to shadow the kernel's linear
-+ * mapping?". As we need to idmap the trampoline page, this is
-+ * determined by the range in which this page lives.
-+ *
-+ * If the page is in the bottom half, we have to use the top half. If
-+ * the page is in the top half, we have to use the bottom half:
-+ *
-+ * T = __virt_to_phys(__hyp_idmap_text_start)
-+ * if (T & BIT(VA_BITS - 1))
-+ *	HYP_VA_MIN = 0  //idmap in upper half
-+ * else
-+ *	HYP_VA_MIN = 1 << (VA_BITS - 1)
-+ * HYP_VA_MAX = HYP_VA_MIN + (1 << (VA_BITS - 1)) - 1
-+ *
-+ * This of course assumes that the trampoline page exists within the
-+ * VA_BITS range. If it doesn't, then it means we're in the odd case
-+ * where the kernel idmap (as well as HYP) uses more levels than the
-+ * kernel runtime page tables (as seen when the kernel is configured
-+ * for 4k pages, 39bits VA, and yet memory lives just above that
-+ * limit, forcing the idmap to use 4 levels of page tables while the
-+ * kernel itself only uses 3). In this particular case, it doesn't
-+ * matter which side of VA_BITS we use, as we're guaranteed not to
-+ * conflict with anything.
-+ *
-+ * When using VHE, there are no separate hyp mappings and all KVM
-+ * functionality is already mapped as part of the main kernel
-+ * mappings, and none of this applies in that case.
-  */
- #define HYP_PAGE_OFFSET_SHIFT	VA_BITS
- #define HYP_PAGE_OFFSET_MASK	((UL(1) << HYP_PAGE_OFFSET_SHIFT) - 1)
+diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+index 224efe7..d40edbb 100644
+--- a/arch/arm64/include/asm/cpufeature.h
++++ b/arch/arm64/include/asm/cpufeature.h
+@@ -36,8 +36,9 @@
+ #define ARM64_HAS_VIRT_HOST_EXTN		11
+ #define ARM64_WORKAROUND_CAVIUM_27456		12
+ #define ARM64_HAS_32BIT_EL0			13
++#define ARM64_HYP_OFFSET_LOW			14
+ 
+-#define ARM64_NCAPS				14
++#define ARM64_NCAPS				15
+ 
+ #ifndef __ASSEMBLY__
+ 
 -- 
 2.8.1
