@@ -1,86 +1,73 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 22 Jul 2016 14:55:56 +0100
-Subject: [PATCH v2 3/4] mfd: add support for Allwinner SoCs ADC
-In-Reply-To: <20160721200802.GL5993@lukather>
-References: <1468576754-3273-1-git-send-email-quentin.schulz@free-electrons.com>
- <1468576754-3273-4-git-send-email-quentin.schulz@free-electrons.com>
- <de8ebab2-cde9-d209-3c9a-e1868fafb84b@kernel.org>
- <20160719073109.GD17074@dell>
- <d64cf632-41a4-3e23-6239-7f854cbb0293@kernel.org>
- <20160721121253.GE14925@dell> <20160721200802.GL5993@lukather>
-Message-ID: <20160722135556.GG14925@dell>
+From: panand@redhat.com (Pratyush Anand)
+Date: Fri, 22 Jul 2016 19:26:30 +0530
+Subject: [PATCH v1 3/4] arm64: Add arm64 kexec support
+In-Reply-To: <5791EF62.5070006@arm.com>
+References: <cover.1468970114.git.geoff@infradead.org>
+ <9ed513fd44a19b2f49b4da99477cedfff7341bf0.1468970114.git.geoff@infradead.org>
+ <20160720153859.GG24691@leverpostej>
+ <1469042361.2977.90.camel@infradead.org>
+ <20160721103120.GB20559@leverpostej> <5790A902.6070601@arm.com>
+ <1469137776.2977.128.camel@infradead.org>
+ <20160722040842.GA14911@localhost.localdomain>
+ <5791EF62.5070006@arm.com>
+Message-ID: <20160722135630.GC14911@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 21 Jul 2016, Maxime Ripard wrote:
+Hi Robin,
 
-> 1;4205;0c
-> On Thu, Jul 21, 2016 at 01:12:53PM +0100, Lee Jones wrote:
-> > On Wed, 20 Jul 2016, Jonathan Cameron wrote:
+On 22/07/2016:11:03:14 AM, Robin Murphy wrote:
+> On 22/07/16 05:08, Pratyush Anand wrote:
+> > On 21/07/2016:02:49:36 PM, Geoff Levand wrote:
+> >> On Thu, 2016-07-21 at 11:50 +0100, Robin Murphy wrote:
+> >>> The Exynos UART (drivers/tty/serial/samsung.c) is one which comes to
+> >>> mind as definitely existing, and on arm64 systems to boot. The TX
+> >>> register is at offset 0x20 there.
+> >>
+> >> Here's what I came up with.
+> >>
+> >>
+> >> +	struct data {const char *name; int tx_offset;};
+> >> +	static const struct data ok_list[] = {
+> >> +	/*	{"armada-3700-uart", ?},	*/
+> >> +		{"exynos4210-uart", 0x20},
+> >> +	/*	{"ls1021a-lpuart", ?},		*/
+> >> +	/*	{"meson-uart", ?},		*/
+> >> +	/*	{"mt6577-uart", ?},		*/
+> >> +		{"ns16550", 0},
+> >> +		{"ns16550a", 0},
+> >> +		{"pl011", 0},
+> >> +		{NULL, 0}
+> >> +	};
 > > 
-> > > On 19/07/16 08:31, Lee Jones wrote:
-> > > > On Mon, 18 Jul 2016, Jonathan Cameron wrote:
-> > > > 
-> > > >> On 15/07/16 10:59, Quentin Schulz wrote:
-> > > >>> The Allwinner SoCs all have an ADC that can also act as a touchscreen
-> > > >>> controller and a thermal sensor. For now, only the ADC and the thermal
-> > > >>> sensor drivers are probed by the MFD, the touchscreen controller support
-> > > >>> will be added later.
-> > > >>>
-> > > >>> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
-> > > >> Hmm. Previous patch includes the header this one creates.  Ordering issue?
-> > > >> The depends kind of prevents build failures by ensuring that can't be built
-> > > >> until this one is in place, but it is certainly an ugly way to do it.
-> > > >>
-> > > >> Few little bits innline.
-> > > >>> ---
-> > > >>>
-> > > >>> v2:
-> > > >>>  - add license headers,
-> > > >>>  - reorder alphabetically includes,
-> > > >>>  - add SUNXI_GPADC_ prefixes for defines,
-> > > >>>
-> > > >>>  drivers/mfd/Kconfig                 |  14 +++
-> > > >>>  drivers/mfd/Makefile                |   2 +
-> > > >>>  drivers/mfd/sunxi-gpadc-mfd.c       | 197 ++++++++++++++++++++++++++++++++++++
-> > > >>>  include/linux/mfd/sunxi-gpadc-mfd.h |  23 +++++
-> > > >>>  4 files changed, 236 insertions(+)
-> > > >>>  create mode 100644 drivers/mfd/sunxi-gpadc-mfd.c
-> > > >>>  create mode 100644 include/linux/mfd/sunxi-gpadc-mfd.h
-> > > > 
-> > > > [...]
-> > > > 
-> > > >>> +static struct mfd_cell sun6i_gpadc_mfd_cells[] = {
-> > > >>> +	{
-> > > >>> +		.name	= "sun6i-a31-gpadc-iio",
-> > > >>> +		.resources = adc_resources,
-> > > >>> +		.num_resources = ARRAY_SIZE(adc_resources),
-> > > >>> +	}, {
-> > > >>> +		.name = "iio_hwmon",
-> > > >> I still really dislike using this to force the probe of that driver but
-> > > >> kind of up to the hwmon / mfd guys on this.
-> > > > 
-> > > > Can you at least say *why* you don't like it?
-> > > It just feels odd to have an mfd child that isn't really dependent
-> > > on the mfd hardware itself.
-> > > 
-> > > Still if you are happy, mfd is your domain and my objections were
-> > > as you probably noticed not that strong - or well described!)
-> > > 
-> > > So I'm fine with this.
+> > sinc functionality is just to debug the scenario when something goes wrong in
+> > purgatory. IMHO, it should be disabled by default. So, why not to keep it as
+> > simple as possible. Its a low level debugging mainly for developer, so user
+> > should know the absolute address. Therefore, I think no need to parse earlycon
+> > or earlyprintk from command line.  Whatever user passes in --port can be treated
+> > as address of TX register. If TX offset is 0x20, then user can pass --port as
+> > base+0x20. Additionally, we can pass TX register width as well. So what about
+> > something like "--port=0x1c020000,1" where 0x1c020000 is TX register address and
+> > 1 says about it's width in bytes.
+> 
+> I don't think even that is worthwhile, since without any polling it
+> still relies on the UART having FIFOs, someone having already enabled
+> the FIFOs, the FIFOs being deep enough and/or the output being short
+> enough. In short, it's fragile enough that I'm not convinced it's even
+> useful as a debug option. I suggest we simply copy the purgatory console
+> implementation from, say, ARM or Alpha.
+
+May be I am missing, but deep TX FIFO should not be an issue. Whatever, we write
+in TX register, that will go to the port eventually. However, I do agree that
+short FIFO could be an issue and overflow is quite possible in that case. I had
+been trying to convince Geoff to take [1], which will help to resolve it.
+
+[1] https://github.com/pratyushanand/kexec-tools/commit/0d49d420810f070bcff9c96e377477d96f909d11
+
+~Pratyush
+> 
+> Robin.
+> 
 > > 
-> > I see.  So it's not actually part of the same IP/chip?
-> 
-> The chip has a temperature sensor, and we want to expose that
-> temperature through IIO.
-> 
-> But we don't really have the choice on how we probe iio-hwmon
-> here. The binding was already there, and we have to keep it.
-
-What binding?
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+> > ~Pratyush
+> > 
