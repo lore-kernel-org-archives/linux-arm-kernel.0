@@ -1,25 +1,184 @@
-From: bharat.kumar.gogada@xilinx.com (Bharat Kumar Gogada)
-Date: Fri, 22 Jul 2016 09:24:22 +0000
-Subject: Why does BIOS assign memory to 16 byte BAR
-Message-ID: <8520D5D51A55D047800579B094147198258BB59B@XAP-PVEXMBX01.xlnx.xilinx.com>
+From: gabriel.fernandez@st.com (Gabriel Fernandez)
+Date: Fri, 22 Jul 2016 11:24:07 +0200
+Subject: [PATCH v2 3/4] drivers: reset: Add STM32 reset driver
+In-Reply-To: <CAP=VYLq+Yp=dyMLY5zp8evNJ+jLkUgJ_s19gD1uC6KP8MmXPDQ@mail.gmail.com>
+References: <1469092768-17489-1-git-send-email-gabriel.fernandez@st.com>
+ <1469092768-17489-4-git-send-email-gabriel.fernandez@st.com>
+ <CAP=VYLq+Yp=dyMLY5zp8evNJ+jLkUgJ_s19gD1uC6KP8MmXPDQ@mail.gmail.com>
+Message-ID: <7bb17181-e436-826d-7f2c-bd0ceaeca50b@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-I'm observing that on x86 BIOS successfully assigns memory if an End point requests
-BAR of size 16byte.
-
-But as per Spec:
-The minimum memory address range requested by a BAR is 128 bytes.
-
-Why BIOS is successfully allocating region to 16 byte BAR requests?
-
-Please let me know if my observation is wrong.
-
-Regards,
-Bharat
+Hi Paul
 
 
+On 07/21/2016 09:48 PM, Paul Gortmaker wrote:
+> On Thu, Jul 21, 2016 at 5:19 AM,  <gabriel.fernandez@st.com> wrote:
+>> From: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+>>
+>> The STM32 MCUs family IPs can be reset by accessing some registers
+>> from the RCC block.
+>>
+>> The list of available reset lines is documented in the DT bindings.
+>>
+>> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+>> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
+>> ---
+>>   drivers/reset/Makefile      |   1 +
+>>   drivers/reset/reset-stm32.c | 113 ++++++++++++++++++++++++++++++++++++++++++++
+>>   2 files changed, 114 insertions(+)
+>>   create mode 100644 drivers/reset/reset-stm32.c
+>>
+>> diff --git a/drivers/reset/Makefile b/drivers/reset/Makefile
+>> index 5d65a93..64ebb0c 100644
+>> --- a/drivers/reset/Makefile
+>> +++ b/drivers/reset/Makefile
+>> @@ -4,6 +4,7 @@ obj-$(CONFIG_ARCH_SOCFPGA) += reset-socfpga.o
+>>   obj-$(CONFIG_ARCH_BERLIN) += reset-berlin.o
+>>   obj-$(CONFIG_MACH_PISTACHIO) += reset-pistachio.o
+>>   obj-$(CONFIG_ARCH_MESON) += reset-meson.o
+>> +obj-$(CONFIG_ARCH_STM32) += reset-stm32.o
+> In my tree, this Kconfig ARCH_STM32 is a bool, so...
+>
+>>   obj-$(CONFIG_ARCH_SUNXI) += reset-sunxi.o
+>>   obj-$(CONFIG_ARCH_STI) += sti/
+>>   obj-$(CONFIG_ARCH_HISI) += hisilicon/
+>> diff --git a/drivers/reset/reset-stm32.c b/drivers/reset/reset-stm32.c
+>> new file mode 100644
+>> index 0000000..993af2a
+>> --- /dev/null
+>> +++ b/drivers/reset/reset-stm32.c
+>> @@ -0,0 +1,113 @@
+>> +/*
+>> + * Copyright (C) Maxime Coquelin 2015
+>> + * Author:  Maxime Coquelin <mcoquelin.stm32@gmail.com>_
+>> + * License terms:  GNU General Public License (GPL), version 2
+>> + *
+>> + * Heavily based on sunxi driver from Maxime Ripard.
+>> + */
+>> +
+>> +#include <linux/err.h>
+>> +#include <linux/io.h>
+>> +#include <linux/module.h>
+> ...we probably don't need module.h here or any of the other
+> MODULE_<blah> tags/macros either.  Use the builtin for the
+> register and all should be good.
+>
+> Thanks,
+> Paul.
+> --
+Ok i will sent a v3
 
-This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
+Thanks for reviewing !
+
+
+BR
+Gabriel
+
+
+>
+>> +#include <linux/of.h>
+>> +#include <linux/of_address.h>
+>> +#include <linux/platform_device.h>
+>> +#include <linux/reset-controller.h>
+>> +#include <linux/slab.h>
+>> +#include <linux/spinlock.h>
+>> +#include <linux/types.h>
+>> +
+>> +struct stm32_reset_data {
+>> +       spinlock_t                      lock;
+>> +       void __iomem                    *membase;
+>> +       struct reset_controller_dev     rcdev;
+>> +};
+>> +
+>> +static int stm32_reset_assert(struct reset_controller_dev *rcdev,
+>> +                             unsigned long id)
+>> +{
+>> +       struct stm32_reset_data *data = container_of(rcdev,
+>> +                                                    struct stm32_reset_data,
+>> +                                                    rcdev);
+>> +       int bank = id / BITS_PER_LONG;
+>> +       int offset = id % BITS_PER_LONG;
+>> +       unsigned long flags;
+>> +       u32 reg;
+>> +
+>> +       spin_lock_irqsave(&data->lock, flags);
+>> +
+>> +       reg = readl(data->membase + (bank * 4));
+>> +       writel(reg | BIT(offset), data->membase + (bank * 4));
+>> +
+>> +       spin_unlock_irqrestore(&data->lock, flags);
+>> +
+>> +       return 0;
+>> +}
+>> +
+>> +static int stm32_reset_deassert(struct reset_controller_dev *rcdev,
+>> +                               unsigned long id)
+>> +{
+>> +       struct stm32_reset_data *data = container_of(rcdev,
+>> +                                                    struct stm32_reset_data,
+>> +                                                    rcdev);
+>> +       int bank = id / BITS_PER_LONG;
+>> +       int offset = id % BITS_PER_LONG;
+>> +       unsigned long flags;
+>> +       u32 reg;
+>> +
+>> +       spin_lock_irqsave(&data->lock, flags);
+>> +
+>> +       reg = readl(data->membase + (bank * 4));
+>> +       writel(reg & ~BIT(offset), data->membase + (bank * 4));
+>> +
+>> +       spin_unlock_irqrestore(&data->lock, flags);
+>> +
+>> +       return 0;
+>> +}
+>> +
+>> +static const struct reset_control_ops stm32_reset_ops = {
+>> +       .assert         = stm32_reset_assert,
+>> +       .deassert       = stm32_reset_deassert,
+>> +};
+>> +
+>> +static const struct of_device_id stm32_reset_dt_ids[] = {
+>> +        { .compatible = "st,stm32-rcc", },
+>> +        { /* sentinel */ },
+>> +};
+>> +
+>> +static int stm32_reset_probe(struct platform_device *pdev)
+>> +{
+>> +       struct stm32_reset_data *data;
+>> +       struct resource *res;
+>> +
+>> +       data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
+>> +       if (!data)
+>> +               return -ENOMEM;
+>> +
+>> +       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>> +       data->membase = devm_ioremap_resource(&pdev->dev, res);
+>> +       if (IS_ERR(data->membase))
+>> +               return PTR_ERR(data->membase);
+>> +
+>> +       spin_lock_init(&data->lock);
+>> +
+>> +       data->rcdev.owner = THIS_MODULE;
+>> +       data->rcdev.nr_resets = resource_size(res) * 8;
+>> +       data->rcdev.ops = &stm32_reset_ops;
+>> +       data->rcdev.of_node = pdev->dev.of_node;
+>> +
+>> +       return devm_reset_controller_register(&pdev->dev, &data->rcdev);
+>> +}
+>> +
+>> +static struct platform_driver stm32_reset_driver = {
+>> +       .probe  = stm32_reset_probe,
+>> +       .driver = {
+>> +               .name           = "stm32-rcc-reset",
+>> +               .of_match_table = stm32_reset_dt_ids,
+>> +       },
+>> +};
+>> +module_platform_driver(stm32_reset_driver);
+>> +
+>> +MODULE_AUTHOR("Maxime Coquelin <maxime.coquelin@gmail.com>");
+>> +MODULE_DESCRIPTION("STM32 MCUs Reset Controller Driver");
+>> +MODULE_LICENSE("GPL");
+>> --
+>> 1.9.1
+>>
