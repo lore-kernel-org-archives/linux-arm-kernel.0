@@ -1,50 +1,116 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 22 Jul 2016 18:28:22 +0100
-Subject: [PATCH 05/55] arm/arm64: KVM: Make default HYP mappings non-excutable
+Date: Fri, 22 Jul 2016 18:28:30 +0100
+Subject: [PATCH 13/55] arm64: KVM: Refactor kern_hyp_va to deal with multiple
+ offsets
 In-Reply-To: <1469208552-4155-1-git-send-email-marc.zyngier@arm.com>
 References: <1469208552-4155-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1469208552-4155-6-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1469208552-4155-14-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Structures that can be generally written to don't have any requirement
-to be executable (quite the opposite). This includes the kvm and vcpu
-structures, as well as the stacks.
+As we move towards a selectable HYP VA range, it is obvious that
+we don't want to test a variable to find out if we need to use
+the bottom VA range, the top VA range, or use the address as is
+(for VHE).
 
-Let's change the default to incorporate the XN flag.
+Instead, we can expand our current helper to generate the right
+mask or nop with code patching. We default to using the top VA
+space, with alternatives to switch to the bottom one or to nop
+out the instructions.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm/include/asm/pgtable.h        | 2 +-
- arch/arm64/include/asm/pgtable-prot.h | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ arch/arm64/include/asm/kvm_hyp.h | 11 -----------
+ arch/arm64/include/asm/kvm_mmu.h | 42 +++++++++++++++++++++++++++++++++++++---
+ 2 files changed, 39 insertions(+), 14 deletions(-)
 
-diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
-index 7487bf9..e0d76ba 100644
---- a/arch/arm/include/asm/pgtable.h
-+++ b/arch/arm/include/asm/pgtable.h
-@@ -97,7 +97,7 @@ extern pgprot_t		pgprot_s2_device;
- #define PAGE_READONLY_EXEC	_MOD_PROT(pgprot_user, L_PTE_USER | L_PTE_RDONLY)
- #define PAGE_KERNEL		_MOD_PROT(pgprot_kernel, L_PTE_XN)
- #define PAGE_KERNEL_EXEC	pgprot_kernel
--#define PAGE_HYP		_MOD_PROT(pgprot_kernel, L_PTE_HYP)
-+#define PAGE_HYP		_MOD_PROT(pgprot_kernel, L_PTE_HYP | L_PTE_XN)
- #define PAGE_HYP_EXEC		_MOD_PROT(pgprot_kernel, L_PTE_HYP | L_PTE_RDONLY)
- #define PAGE_HYP_RO		_MOD_PROT(pgprot_kernel, L_PTE_HYP | L_PTE_RDONLY | L_PTE_XN)
- #define PAGE_HYP_DEVICE		_MOD_PROT(pgprot_hyp_device, L_PTE_HYP)
-diff --git a/arch/arm64/include/asm/pgtable-prot.h b/arch/arm64/include/asm/pgtable-prot.h
-index 3802048..39f5252 100644
---- a/arch/arm64/include/asm/pgtable-prot.h
-+++ b/arch/arm64/include/asm/pgtable-prot.h
-@@ -55,7 +55,7 @@
- #define PAGE_KERNEL_EXEC	__pgprot(_PAGE_DEFAULT | PTE_UXN | PTE_DIRTY | PTE_WRITE)
- #define PAGE_KERNEL_EXEC_CONT	__pgprot(_PAGE_DEFAULT | PTE_UXN | PTE_DIRTY | PTE_WRITE | PTE_CONT)
+diff --git a/arch/arm64/include/asm/kvm_hyp.h b/arch/arm64/include/asm/kvm_hyp.h
+index 1d81f9a..cff5105 100644
+--- a/arch/arm64/include/asm/kvm_hyp.h
++++ b/arch/arm64/include/asm/kvm_hyp.h
+@@ -25,17 +25,6 @@
  
--#define PAGE_HYP		__pgprot(_PAGE_DEFAULT | PTE_HYP)
-+#define PAGE_HYP		__pgprot(_PAGE_DEFAULT | PTE_HYP | PTE_HYP_XN)
- #define PAGE_HYP_EXEC		__pgprot(_PAGE_DEFAULT | PTE_HYP | PTE_RDONLY)
- #define PAGE_HYP_RO		__pgprot(_PAGE_DEFAULT | PTE_HYP | PTE_RDONLY | PTE_HYP_XN)
- #define PAGE_HYP_DEVICE		__pgprot(PROT_DEVICE_nGnRE | PTE_HYP)
+ #define __hyp_text __section(.hyp.text) notrace
+ 
+-static inline unsigned long __kern_hyp_va(unsigned long v)
+-{
+-	asm volatile(ALTERNATIVE("and %0, %0, %1",
+-				 "nop",
+-				 ARM64_HAS_VIRT_HOST_EXTN)
+-		     : "+r" (v) : "i" (HYP_PAGE_OFFSET_MASK));
+-	return v;
+-}
+-
+-#define kern_hyp_va(v) (typeof(v))(__kern_hyp_va((unsigned long)(v)))
+-
+ #define read_sysreg_elx(r,nvh,vh)					\
+ 	({								\
+ 		u64 reg;						\
+diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+index 5e54323..2970537 100644
+--- a/arch/arm64/include/asm/kvm_mmu.h
++++ b/arch/arm64/include/asm/kvm_mmu.h
+@@ -90,13 +90,33 @@
+ /*
+  * Convert a kernel VA into a HYP VA.
+  * reg: VA to be converted.
++ *
++ * This generates the following sequences:
++ * - High mask:
++ *		and x0, x0, #HYP_PAGE_OFFSET_HIGH_MASK
++ *		nop
++ * - Low mask:
++ *		and x0, x0, #HYP_PAGE_OFFSET_HIGH_MASK
++ *		and x0, x0, #HYP_PAGE_OFFSET_LOW_MASK
++ * - VHE:
++ *		nop
++ *		nop
++ *
++ * The "low mask" version works because the mask is a strict subset of
++ * the "high mask", hence performing the first mask for nothing.
++ * Should be completely invisible on any viable CPU.
+  */
+ .macro kern_hyp_va	reg
+-alternative_if_not ARM64_HAS_VIRT_HOST_EXTN	
+-	and	\reg, \reg, #HYP_PAGE_OFFSET_MASK
++alternative_if_not ARM64_HAS_VIRT_HOST_EXTN
++	and     \reg, \reg, #HYP_PAGE_OFFSET_HIGH_MASK
+ alternative_else
+ 	nop
+ alternative_endif
++alternative_if_not ARM64_HYP_OFFSET_LOW
++	nop
++alternative_else
++	and     \reg, \reg, #HYP_PAGE_OFFSET_LOW_MASK
++alternative_endif
+ .endm
+ 
+ #else
+@@ -107,7 +127,23 @@ alternative_endif
+ #include <asm/mmu_context.h>
+ #include <asm/pgtable.h>
+ 
+-#define KERN_TO_HYP(kva)	((unsigned long)kva & HYP_PAGE_OFFSET_MASK)
++static inline unsigned long __kern_hyp_va(unsigned long v)
++{
++	asm volatile(ALTERNATIVE("and %0, %0, %1",
++				 "nop",
++				 ARM64_HAS_VIRT_HOST_EXTN)
++		     : "+r" (v)
++		     : "i" (HYP_PAGE_OFFSET_HIGH_MASK));
++	asm volatile(ALTERNATIVE("nop",
++				 "and %0, %0, %1",
++				 ARM64_HYP_OFFSET_LOW)
++		     : "+r" (v)
++		     : "i" (HYP_PAGE_OFFSET_LOW_MASK));
++	return v;
++}
++
++#define kern_hyp_va(v) 	(typeof(v))(__kern_hyp_va((unsigned long)(v)))
++#define KERN_TO_HYP(v)	kern_hyp_va(v)
+ 
+ /*
+  * We currently only support a 40bit IPA.
 -- 
 2.8.1
