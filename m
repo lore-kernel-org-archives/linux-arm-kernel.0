@@ -1,57 +1,50 @@
-From: elfring@users.sourceforge.net (SF Markus Elfring)
-Date: Fri, 22 Jul 2016 12:56:23 +0200
-Subject: [PATCH] GPU-DRM: Delete an unnecessary check before
- drm_property_unreference_blob()
-In-Reply-To: <5317A59D.4@users.sourceforge.net>
-References: <5307CAA2.8060406@users.sourceforge.net>
- <alpine.DEB.2.02.1402212321410.2043@localhost6.localdomain6>
- <530A086E.8010901@users.sourceforge.net>
- <alpine.DEB.2.02.1402231635510.1985@localhost6.localdomain6>
- <530A72AA.3000601@users.sourceforge.net>
- <alpine.DEB.2.02.1402240658210.2090@localhost6.localdomain6>
- <530B5FB6.6010207@users.sourceforge.net>
- <alpine.DEB.2.10.1402241710370.2074@hadrien>
- <530C5E18.1020800@users.sourceforge.net>
- <alpine.DEB.2.10.1402251014170.2080@hadrien>
- <530CD2C4.4050903@users.sourceforge.net>
- <alpine.DEB.2.10.1402251840450.7035@hadrien>
- <530CF8FF.8080600@users.sourceforge.net>
- <alpine.DEB.2.02.1402252117150.2047@localhost6.localdomain6>
- <530DD06F.4090703@users.sourceforge.net>
- <alpine.DEB.2.02.1402262129250.2221@localhost6.localdomain6>
- <5317A59D.4@users.sourceforge.net>
-Message-ID: <515bcb7e-3e00-3438-cc47-227cfcd41990@users.sourceforge.net>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 22 Jul 2016 11:56:49 +0100
+Subject: [RFC PATCH v1 0/2] Add Hisilicon Djtag driver
+In-Reply-To: <1469177332-72156-1-git-send-email-tanxiaojun@huawei.com>
+References: <1469177332-72156-1-git-send-email-tanxiaojun@huawei.com>
+Message-ID: <20160722105648.GD17584@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Markus Elfring <elfring@users.sourceforge.net>
-Date: Fri, 22 Jul 2016 12:48:12 +0200
+Hi,
 
-The drm_property_unreference_blob() function tests whether its argument
-is NULL and then returns immediately.
-Thus the test around the call is not needed.
+I understand that some SoC/socket level PMU is accessed via these
+registers. It doesn't make sense to review either in isolation. Please
+put together a unified series, with both the djtag accessors and the
+PMU code.
 
-This issue was detected by using the Coccinelle software.
+On it's own, it's *very* difficult to understand how this fits into the
+SoC, and how it is to be used.
 
-Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
----
- drivers/gpu/drm/mediatek/mtk_drm_crtc.c | 4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
+Thanks,
+Mark.
 
-diff --git a/drivers/gpu/drm/mediatek/mtk_drm_crtc.c b/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
-index 24aa3ba..07541d0 100644
---- a/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
-+++ b/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
-@@ -112,9 +112,7 @@ static void mtk_drm_crtc_reset(struct drm_crtc *crtc)
- 	struct mtk_crtc_state *state;
- 
- 	if (crtc->state) {
--		if (crtc->state->mode_blob)
--			drm_property_unreference_blob(crtc->state->mode_blob);
--
-+		drm_property_unreference_blob(crtc->state->mode_blob);
- 		state = to_mtk_crtc_state(crtc->state);
- 		memset(state, 0, sizeof(*state));
- 	} else {
--- 
-2.9.2
+On Fri, Jul 22, 2016 at 04:48:50PM +0800, Tan Xiaojun wrote:
+> 
+> Tan Xiaojun (2):
+>   Documentation: arm64: Add Hisilicon HiP05/06/07 Sysctrl and Djtag dts
+>     bindings
+>   drivers: soc: Add support for Hisilicon Djtag driver
+> 
+>  .../bindings/arm/hisilicon/hisilicon.txt           |   98 +++++
+>  drivers/soc/Kconfig                                |    1 +
+>  drivers/soc/Makefile                               |    1 +
+>  drivers/soc/hisilicon/Kconfig                      |   12 +
+>  drivers/soc/hisilicon/Makefile                     |    1 +
+>  drivers/soc/hisilicon/djtag.c                      |  373 ++++++++++++++++++++
+>  include/linux/soc/hisilicon/djtag.h                |   18 +
+>  7 files changed, 504 insertions(+)
+>  create mode 100644 drivers/soc/hisilicon/Kconfig
+>  create mode 100644 drivers/soc/hisilicon/Makefile
+>  create mode 100644 drivers/soc/hisilicon/djtag.c
+>  create mode 100644 include/linux/soc/hisilicon/djtag.h
+> 
+> -- 
+> 1.7.9.5
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
