@@ -1,32 +1,47 @@
-From: rric@kernel.org (Robert Richter)
-Date: Fri, 22 Jul 2016 14:11:00 +0200
-Subject: [RFC PATCH v4 3/5] PCI: Check platform specific ECAM quirks
-In-Reply-To: <CAKv+Gu9jfHGF3Z=_yA2rR9v3MGWptom4x1Mm=eGxmB0xoBpqoA@mail.gmail.com>
-References: <1467100442-28078-1-git-send-email-tn@semihalf.com>
- <1467100442-28078-4-git-send-email-tn@semihalf.com>
- <577275EA.7010002@codeaurora.org>
- <CADaLNDkhPZuG7UJ4SK_j5v_nXbd782Q17LAcXduG0uEObaFF=g@mail.gmail.com>
- <5773A773.8040700@semihalf.com> <5773CE49.1050802@codeaurora.org>
- <CAKv+Gu9=0=qw70o1aYNg=tDyv4TguiG2WwXNK8RbWM1-ZcabUg@mail.gmail.com>
- <20160722113809.GM25086@rric.localdomain>
- <CAKv+Gu9jfHGF3Z=_yA2rR9v3MGWptom4x1Mm=eGxmB0xoBpqoA@mail.gmail.com>
-Message-ID: <20160722121100.GN25086@rric.localdomain>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Fri, 22 Jul 2016 14:36:00 +0200
+Subject: [PATCH v3 0/4] Add STM32 Reset Driver
+In-Reply-To: <1469180270-5446-1-git-send-email-gabriel.fernandez@st.com>
+References: <1469180270-5446-1-git-send-email-gabriel.fernandez@st.com>
+Message-ID: <1469190960.27223.15.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22.07.16 14:00:42, Ard Biesheuvel wrote:
-> On 22 July 2016 at 13:38, Robert Richter <rric@kernel.org> wrote:
-
-> > And, we should support some sort of MCFG_OEM_REVISION_ANY to move the
-> > rev handling optional to pci_cfg_fixup::init().
-> >
+Am Freitag, den 22.07.2016, 11:37 +0200 schrieb
+gabriel.fernandez at st.com:
+> From: Gabriel Fernandez <gabriel.fernandez@st.com>
 > 
-> xxx_ANY implies 'wildcard', which we don't want in this code. The set
-> of quirky hardware we intend to support is known, and wildcard
-> matching makes it easier to circumvent our policy that from here on,
-> i.e., that all ACPI/arm64 supported hardware shall adhere to the spec.
+> v3:
+>  - Use the builtin for the register
+> 
+> v2:
+>  - switch to the non-relaxed variants
+>  - describe dt-binfings in one place
+> 
+> The STM32 MCUs family IPs can be reset by accessing some registers
+> from the RCC block.
+> 
+> Gabriel Fernandez (1):
+>   ARM: dts: stm32f429: add missing #reset-cells of rcc
+> 
+> Maxime Coquelin (3):
+>   dt-bindings: mfd: Add STM32F4 RCC numeric constants into DT include
+>     file
+>   dt-bindings: Document the STM32 reset bindings
+>   drivers: reset: Add STM32 reset driver
+> 
+>  .../devicetree/bindings/clock/st,stm32-rcc.txt     |  42 ++++++--
+>  .../devicetree/bindings/reset/st,stm32-rcc.txt     |   6 ++
+>  arch/arm/boot/dts/stm32f429.dtsi                   |   1 +
+>  drivers/reset/Makefile                             |   1 +
+>  drivers/reset/reset-stm32.c                        | 108 +++++++++++++++++++++
+>  include/dt-bindings/mfd/stm32f4-rcc.h              |  98 +++++++++++++++++++
+>  6 files changed, 249 insertions(+), 7 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/reset/st,stm32-rcc.txt
+>  create mode 100644 drivers/reset/reset-stm32.c
+>  create mode 100644 include/dt-bindings/mfd/stm32f4-rcc.h
 
-Fine with me, there shouln't be to many revs around to have a quirk
-per rev.
+Thank you, I've applied all four patches.
 
--Robert
+regards
+Philipp
