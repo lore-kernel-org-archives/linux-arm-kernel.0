@@ -1,61 +1,36 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Fri, 22 Jul 2016 15:56:09 +0100
-Subject: [PATCH] ARM: no need to select SMP_ON_UP explicitly
-Message-ID: <1469199369-25746-1-git-send-email-vladimir.murzin@arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 22 Jul 2016 17:02:26 +0200
+Subject: [PATCH 1/2] ARM: realview: Fix PBX-A9 cache description
+In-Reply-To: <dbf8749c4af9aa5ffb85e961b7ae09ffeefa7f2a.1468583959.git.robin.murphy@arm.com>
+References: <dbf8749c4af9aa5ffb85e961b7ae09ffeefa7f2a.1468583959.git.robin.murphy@arm.com>
+Message-ID: <CACRpkdYTp2V_qR80ykn_3SxaBVg9mj71OZmU=T8knMZqo_i2rw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-SMP_ON_UP is already defaulted to "y" and has all dependencies expressed
-- no need to select it per platform level
+On Fri, Jul 15, 2016 at 2:19 PM, Robin Murphy <robin.murphy@arm.com> wrote:
 
-Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
----
+> Clearly QEMU is very permissive in how its PL310 model may be set up,
+> but the real hardware turns out to be far more particular about things
+> actually being correct. Fix up the DT description so that the real
+> thing actually boots:
+>
+> - The arm,data-latency and arm,tag-latency properties need 3 cells to
+>   be valid, otherwise we end up retaining the default 8-cycle latencies
+>   which leads pretty quickly to lockup.
+> - The arm,dirty-latency property is only relevant to L210/L220, so get
+>   rid of it.
+> - The cache geometry override also leads to lockup and/or general
+>   misbehaviour. Irritatingly, the manual doesn't state the actual PL310
+>   configuration, but based on the boardfile code and poking registers
+>   from the Boot Monitor, it would seem to be 8 sets of 16KB ways.
+>
+> With that, we can successfully boot to enjoy the fun of mismatched FPUs...
+>
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 
-This time sent to LAKML
+Sorry for screwing things up! :(
 
- arch/arm/mach-imx/Kconfig      |    3 ---
- arch/arm/mach-realview/Kconfig |    1 -
- 2 files changed, 4 deletions(-)
+Patch applied with Rutland's Test tag, I will carry this to ARM SoC as a fix.
 
-diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index dd905b9..cfb1120 100644
---- a/arch/arm/mach-imx/Kconfig
-+++ b/arch/arm/mach-imx/Kconfig
-@@ -92,7 +92,6 @@ config SOC_IMX31
- 	select CPU_V6
- 	select IMX_HAVE_PLATFORM_MXC_RNGA
- 	select MXC_AVIC
--	select SMP_ON_UP if SMP
- 
- config SOC_IMX35
- 	bool
-@@ -100,7 +99,6 @@ config SOC_IMX35
- 	select HAVE_EPIT
- 	select MXC_AVIC
- 	select PINCTRL_IMX35
--	select SMP_ON_UP if SMP
- 
- if ARCH_MULTI_V4T
- 
-@@ -589,7 +587,6 @@ config SOC_VF610
- 	select ARM_GIC if ARCH_MULTI_V7
- 	select PINCTRL_VF610
- 	select PL310_ERRATA_769419 if CACHE_L2X0
--	select SMP_ON_UP if SMP
- 
- 	help
- 	  This enables support for Freescale Vybrid VF610 processor.
-diff --git a/arch/arm/mach-realview/Kconfig b/arch/arm/mach-realview/Kconfig
-index 70ab4a2..739800e 100644
---- a/arch/arm/mach-realview/Kconfig
-+++ b/arch/arm/mach-realview/Kconfig
-@@ -24,7 +24,6 @@ config REALVIEW_DT
- 	select POWER_RESET
- 	select POWER_RESET_VERSATILE
- 	select POWER_SUPPLY
--	select SMP_ON_UP if SMP
- 	select SOC_REALVIEW
- 	select USE_OF
- 	help
--- 
-1.7.9.5
+Yours,
+Linus Walleij
