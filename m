@@ -1,132 +1,128 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Fri, 22 Jul 2016 10:32:19 +0100
-Subject: [RFC 3/6] dt/bindings: Add bindings for Tegra20/30 NOR bus driver
-In-Reply-To: <CALw8SCU0cz6mbO=oudCZ4-=2PHVORNt3gwmg2bzNjyhJFnWS3g@mail.gmail.com>
-References: <1468935397-11926-1-git-send-email-mirza.krak@gmail.com>
- <1468935397-11926-4-git-send-email-mirza.krak@gmail.com>
- <434561ec-510e-a3bf-c7b6-c961db299bd6@nvidia.com>
- <CALw8SCU0cz6mbO=oudCZ4-=2PHVORNt3gwmg2bzNjyhJFnWS3g@mail.gmail.com>
-Message-ID: <8e9cdefd-68d1-b788-92fb-b74aae1713c8@nvidia.com>
+From: gabriel.fernandez@st.com (gabriel.fernandez at st.com)
+Date: Fri, 22 Jul 2016 11:37:47 +0200
+Subject: [PATCH v3 1/4] dt-bindings: mfd: Add STM32F4 RCC numeric constants
+ into DT include file
+In-Reply-To: <1469180270-5446-1-git-send-email-gabriel.fernandez@st.com>
+References: <1469180270-5446-1-git-send-email-gabriel.fernandez@st.com>
+Message-ID: <1469180270-5446-2-git-send-email-gabriel.fernandez@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Maxime Coquelin <mcoquelin.stm32@gmail.com>
 
-On 21/07/16 21:10, Mirza Krak wrote:
-> 2016-07-21 11:56 GMT+02:00 Jon Hunter <jonathanh@nvidia.com>:
->>> +
->>> +The NOR controller supports a number of memory types, including synchronous NOR,
->>> +asynchronous NOR, and other flash memories with similar interfaces, such as
->>> +MuxOneNAND. One could also connect high speed devices like FPGAs, DSPs,
->>> +CAN chips, Wi-Fi chips etc.
->>
->> Nit-pick ... the Tegra documentation refers to this controller as the
->> GMI (general memory interface) or SNOR (sync-NOR) controller because it
->> is not just limited to NOR as you mentioned. I see references to GMI in
->> the Tegra pinctrl driver and so may be we should use this name.
-> 
-> ACK.
-> 
-> 
->>> +Required properties:
->>> +
->>> + - compatible: should be "nvidia,tegra20-nor", "nvidia,tegra30-nor"
->>
->> I see at least one difference at the register level between Tegra20 and
->> Tegra30 and so I think this should be something like ...
->>
->>  - compatible : Should contain one of the following:
->>         For Tegra20 must contain "nvidia,tegra20-gmi".
->>         For Tegra30 must contain "nvidia,tegra30-gmi".
-> 
-> ACK. Just curious, which register was it? I only checked that they
-> have the same count of registers.
+Ths patch lists STM32F4's RCC numeric constants.
+It will be used by clock and reset drivers, and DT bindings.
 
-Register counts are the same, but the SNOR_CONFIG_0 is not identical. I
-believe only Tegra30 defines bit 14.
+Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
+---
+ include/dt-bindings/mfd/stm32f4-rcc.h | 98 +++++++++++++++++++++++++++++++++++
+ 1 file changed, 98 insertions(+)
+ create mode 100644 include/dt-bindings/mfd/stm32f4-rcc.h
 
->>> + - nvidia,config: This property represents the SNOR_CONFIG_0 register.
->>
->> There is also a SNOR_MIO_CONFIG for the MIO address space and so I think
->> that this should be nvidia,snor-config to be explicit. It might be nice
->> to also add a "nvidia,mio-config" while you are at it as well, however,
->> that could always be done later. If you do, then the
->> "nvidia,snor-config" becomes optional depending on whether you are using
->> the SNOR or MIO address space.
-> 
-> ACK the nvidia,snor-config part, will though wait for further comments
-> regarding what to do with the config registers, break-out or keep it
-> is a one property / register.
-> 
-> Regarding mio-config, not sure about if I would like to include that
-> part in this stage. If you feel strongly about this we can do it. If
-> it only comes to down to replicate the same configurations that we do
-> for SNOR to MIO then I do not see much of a problem, but would like
-> SNOR to be accepted and would not like the MIO part to halt this. But
-> then again this up to you guys.
-> 
->>
->>> +
->>> +Note that the NOR controller does not have any internal chip-select address
->>> +decoding and if you want to access multiple devices external chip-select
->>> +decoding must be provided.
->>
->> Although it is true, you do have the MIO address space and so you could
->> support two devices via the SNOR address space and MIO address space
->> (assuming that the MIO can be used for the 2nd device).
-> 
-> This is true. If we include MIO support above could be added to the bindings.
-> 
->>
->> Furthermore, if you do have external logic to support multiple devices
->> this would assume that the devices use the same timing and so are
->> probably the same type. It also assumes both can fit in the 256MB
->> address range. May be worth mentioning.
-> 
-> ACK.
-> 
->>
->> The GMI does have 8 chip selects and I believe the purpose of these is
->> to allow you to address more than the 256MB range. However, I believe to
->> do this it require software intervention to change the current CS that
->> is in use.
-> 
-> Yes that is true. One has to modify the SNOR_CONFIG register to choose
-> a different CS pin.
-> 
->>
->> I wonder if it is worth mentioning that the chip-select specified in the
->> "nvidia,config" prop should match that in the "ranges" prop unless you
->> have some external decoding logic to provide an external chip-select.
->> Which raises a question, what does the chip-select in the ranges
->> actually represent? I am not sure if there is a common practice here for
->> device tree when boards have external logic to provide additional
->> chip-selects. I am sure this is quite common.
-> 
-> I do not understand why CS pin setting in nvidia,config need to match
-> the "ranges" prop? Other then maybe cosmetics.
-
-Yes it would be cosmetic. That said, I even wonder if CS needs to be
-exposed at all given that they all map to the same CPU address space.
-Couldn't your binding for the CAN devices be as follows?
-
-nor at 70009000 {
-	...
-
-	can at 48000000 {
-		...
-	};
-
-	can at 48040000 {
-		...
-	};
-};
-
-Problem is if you did have devices on different chip-selects then how
-would these be handled? They could not point to the same physical
-address. I am not sure if there is a way to do that in DT?
-
-Cheers
-Jon
-
+diff --git a/include/dt-bindings/mfd/stm32f4-rcc.h b/include/dt-bindings/mfd/stm32f4-rcc.h
+new file mode 100644
+index 0000000..e98942dc
+--- /dev/null
++++ b/include/dt-bindings/mfd/stm32f4-rcc.h
+@@ -0,0 +1,98 @@
++/*
++ * This header provides constants for the STM32F4 RCC IP
++ */
++
++#ifndef _DT_BINDINGS_MFD_STM32F4_RCC_H
++#define _DT_BINDINGS_MFD_STM32F4_RCC_H
++
++/* AHB1 */
++#define STM32F4_RCC_AHB1_GPIOA	0
++#define STM32F4_RCC_AHB1_GPIOB	1
++#define STM32F4_RCC_AHB1_GPIOC	2
++#define STM32F4_RCC_AHB1_GPIOD	3
++#define STM32F4_RCC_AHB1_GPIOE	4
++#define STM32F4_RCC_AHB1_GPIOF	5
++#define STM32F4_RCC_AHB1_GPIOG	6
++#define STM32F4_RCC_AHB1_GPIOH	7
++#define STM32F4_RCC_AHB1_GPIOI	8
++#define STM32F4_RCC_AHB1_GPIOJ	9
++#define STM32F4_RCC_AHB1_GPIOK	10
++#define STM32F4_RCC_AHB1_CRC	12
++#define STM32F4_RCC_AHB1_DMA1	21
++#define STM32F4_RCC_AHB1_DMA2	22
++#define STM32F4_RCC_AHB1_DMA2D	23
++#define STM32F4_RCC_AHB1_ETHMAC	25
++#define STM32F4_RCC_AHB1_OTGHS	29
++
++#define STM32F4_AHB1_RESET(bit) (STM32F4_RCC_AHB1_##bit + (0x10 * 8))
++#define STM32F4_AHB1_CLOCK(bit) (STM32F4_RCC_AHB1_##bit + (0x30 * 8))
++
++
++/* AHB2 */
++#define STM32F4_RCC_AHB2_DCMI	0
++#define STM32F4_RCC_AHB2_CRYP	4
++#define STM32F4_RCC_AHB2_HASH	5
++#define STM32F4_RCC_AHB2_RNG	6
++#define STM32F4_RCC_AHB2_OTGFS	7
++
++#define STM32F4_AHB2_RESET(bit)	(STM32F4_RCC_AHB2_##bit + (0x14 * 8))
++#define STM32F4_AHB2_CLOCK(bit)	(STM32F4_RCC_AHB2_##bit + (0x34 * 8))
++
++/* AHB3 */
++#define STM32F4_RCC_AHB3_FMC	0
++
++#define STM32F4_AHB3_RESET(bit)	(STM32F4_RCC_AHB3_##bit + (0x18 * 8))
++#define STM32F4_AHB3_CLOCK(bit)	(STM32F4_RCC_AHB3_##bit + (0x38 * 8))
++
++/* APB1 */
++#define STM32F4_RCC_APB1_TIM2	0
++#define STM32F4_RCC_APB1_TIM3	1
++#define STM32F4_RCC_APB1_TIM4	2
++#define STM32F4_RCC_APB1_TIM5	3
++#define STM32F4_RCC_APB1_TIM6	4
++#define STM32F4_RCC_APB1_TIM7	5
++#define STM32F4_RCC_APB1_TIM12	6
++#define STM32F4_RCC_APB1_TIM13	7
++#define STM32F4_RCC_APB1_TIM14	8
++#define STM32F4_RCC_APB1_WWDG	11
++#define STM32F4_RCC_APB1_SPI2	14
++#define STM32F4_RCC_APB1_SPI3	15
++#define STM32F4_RCC_APB1_UART2	17
++#define STM32F4_RCC_APB1_UART3	18
++#define STM32F4_RCC_APB1_UART4	19
++#define STM32F4_RCC_APB1_UART5	20
++#define STM32F4_RCC_APB1_I2C1	21
++#define STM32F4_RCC_APB1_I2C2	22
++#define STM32F4_RCC_APB1_I2C3	23
++#define STM32F4_RCC_APB1_CAN1	25
++#define STM32F4_RCC_APB1_CAN2	26
++#define STM32F4_RCC_APB1_PWR	28
++#define STM32F4_RCC_APB1_DAC	29
++#define STM32F4_RCC_APB1_UART7	30
++#define STM32F4_RCC_APB1_UART8	31
++
++#define STM32F4_APB1_RESET(bit)	(STM32F4_RCC_APB1_##bit + (0x20 * 8))
++#define STM32F4_APB1_CLOCK(bit)	(STM32F4_RCC_APB1_##bit + (0x40 * 8))
++
++/* APB2 */
++#define STM32F4_RCC_APB2_TIM1	0
++#define STM32F4_RCC_APB2_TIM8	1
++#define STM32F4_RCC_APB2_USART1	4
++#define STM32F4_RCC_APB2_USART6	5
++#define STM32F4_RCC_APB2_ADC	8
++#define STM32F4_RCC_APB2_SDIO	11
++#define STM32F4_RCC_APB2_SPI1	12
++#define STM32F4_RCC_APB2_SPI4	13
++#define STM32F4_RCC_APB2_SYSCFG	14
++#define STM32F4_RCC_APB2_TIM9	16
++#define STM32F4_RCC_APB2_TIM10	17
++#define STM32F4_RCC_APB2_TIM11	18
++#define STM32F4_RCC_APB2_SPI5	20
++#define STM32F4_RCC_APB2_SPI6	21
++#define STM32F4_RCC_APB2_SAI1	22
++#define STM32F4_RCC_APB2_LTDC	26
++
++#define STM32F4_APB2_RESET(bit)	(STM32F4_RCC_APB2_##bit + (0x24 * 8))
++#define STM32F4_APB2_CLOCK(bit)	(STM32F4_RCC_APB2_##bit + (0x44 * 8))
++
++#endif /* _DT_BINDINGS_MFD_STM32F4_RCC_H */
 -- 
-nvpublic
+1.9.1
