@@ -1,51 +1,71 @@
-From: joel@jms.id.au (Joel Stanley)
-Date: Fri, 22 Jul 2016 15:59:58 +0930
-Subject: [PATCH 02/12] pinctrl: Add core pinctrl support for Aspeed SoCs
-In-Reply-To: <1468994313-13538-3-git-send-email-andrew@aj.id.au>
-References: <1468994313-13538-1-git-send-email-andrew@aj.id.au>
- <1468994313-13538-3-git-send-email-andrew@aj.id.au>
-Message-ID: <CACPK8XeuPEuc9NgZjyRko86ksrBjtAOai4D=nbzvS7KUHJy=sQ@mail.gmail.com>
+From: hl@rock-chips.com (Lin Huang)
+Date: Fri, 22 Jul 2016 14:37:45 +0800
+Subject: [PATCH] clk: rockchip: add clock flag parameter when register pll
+Message-ID: <1469169465-5892-1-git-send-email-hl@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 20, 2016 at 3:28 PM, Andrew Jeffery <andrew@aj.id.au> wrote:
-> The Aspeed SoCs provide typically more than 200 pins for GPIO and other
-> functions. The signal enabled on a pin is determined on a priority
-> basis, where a given pin can provide a number of different signal types.
->
-> In addition to the priority levels, the Aspeed pin controllers describe
-> the signal active on a pin by compound logical expressions involving
-> multiple operators, registers and bits. Some difficulty arises as a
-> pin's function bit masks for each priority level are frequently not the
-> same (i.e. we cannot just flip a bit to change from a high to low
-> priority signal), or even in the same register(s). Some configuration
-> bits affect multiple pins, while in other cases the signals for a bus
-> must each be enabled individually.
->
-> Together, these features give rise to some complexity in the
-> implementation. A more complete description of the complexities is
-> provided in the associated header file in an attempt to justify the
-> approach.
->
-> Note that the patch doesn't implement pinctrl/pinmux/pinconf for any
-> particular SoC, just adds the framework for defining mux configurations
-> for any available functions.
->
-> Signed-off-by: Andrew Jeffery <andrew@aj.id.au>
+From: Heiko St??bner <heiko@sntech.de>
 
-Reviewed-by: Joel Stanley <joel@jms.id.au>
+add clock flag parameter so we can pass specific clock flag
+(like CLK_GET_RATE_NOCACHE etc..)to pll driver.
 
-> ---
->  MAINTAINERS                             |   1 +
->  arch/arm/mach-aspeed/Kconfig            |   1 +
->  drivers/pinctrl/Kconfig                 |   1 +
->  drivers/pinctrl/Makefile                |   1 +
->  drivers/pinctrl/aspeed/Kconfig          |   8 +
->  drivers/pinctrl/aspeed/Makefile         |   3 +
->  drivers/pinctrl/aspeed/pinctrl-aspeed.c | 373 +++++++++++++++++++++
->  drivers/pinctrl/aspeed/pinctrl-aspeed.h | 562 ++++++++++++++++++++++++++++++++
->  8 files changed, 950 insertions(+)
->  create mode 100644 drivers/pinctrl/aspeed/Kconfig
->  create mode 100644 drivers/pinctrl/aspeed/Makefile
->  create mode 100644 drivers/pinctrl/aspeed/pinctrl-aspeed.c
->  create mode 100644 drivers/pinctrl/aspeed/pinctrl-aspeed.h
+Change-Id: I1e076b3efa6b5da082b6e68e2e2a4c9dfd93e3d4
+Signed-off-by: Heiko St??bner <heiko@sntech.de>
+Signed-off-by: Lin Huang <hl@rock-chips.com>
+---
+ drivers/clk/rockchip/clk-pll.c | 4 ++--
+ drivers/clk/rockchip/clk.c     | 2 +-
+ drivers/clk/rockchip/clk.h     | 2 +-
+ 3 files changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/clk/rockchip/clk-pll.c b/drivers/clk/rockchip/clk-pll.c
+index db81e45..9c1373e 100644
+--- a/drivers/clk/rockchip/clk-pll.c
++++ b/drivers/clk/rockchip/clk-pll.c
+@@ -837,7 +837,7 @@ struct clk *rockchip_clk_register_pll(struct rockchip_clk_provider *ctx,
+ 		u8 num_parents, int con_offset, int grf_lock_offset,
+ 		int lock_shift, int mode_offset, int mode_shift,
+ 		struct rockchip_pll_rate_table *rate_table,
+-		u8 clk_pll_flags)
++		unsigned long flags, u8 clk_pll_flags)
+ {
+ 	const char *pll_parents[3];
+ 	struct clk_init_data init;
+@@ -892,7 +892,7 @@ struct clk *rockchip_clk_register_pll(struct rockchip_clk_provider *ctx,
+ 	init.name = pll_name;
+ 
+ 	/* keep all plls untouched for now */
+-	init.flags = CLK_IGNORE_UNUSED;
++	init.flags = flags | CLK_IGNORE_UNUSED;
+ 
+ 	init.parent_names = &parent_names[0];
+ 	init.num_parents = 1;
+diff --git a/drivers/clk/rockchip/clk.c b/drivers/clk/rockchip/clk.c
+index 7ffd134..1f1c74f 100644
+--- a/drivers/clk/rockchip/clk.c
++++ b/drivers/clk/rockchip/clk.c
+@@ -385,7 +385,7 @@ void __init rockchip_clk_register_plls(struct rockchip_clk_provider *ctx,
+ 				list->con_offset, grf_lock_offset,
+ 				list->lock_shift, list->mode_offset,
+ 				list->mode_shift, list->rate_table,
+-				list->pll_flags);
++				list->flags, list->pll_flags);
+ 		if (IS_ERR(clk)) {
+ 			pr_err("%s: failed to register clock %s\n", __func__,
+ 				list->name);
+diff --git a/drivers/clk/rockchip/clk.h b/drivers/clk/rockchip/clk.h
+index 2194ffa..3747de5 100644
+--- a/drivers/clk/rockchip/clk.h
++++ b/drivers/clk/rockchip/clk.h
+@@ -238,7 +238,7 @@ struct clk *rockchip_clk_register_pll(struct rockchip_clk_provider *ctx,
+ 		u8 num_parents, int con_offset, int grf_lock_offset,
+ 		int lock_shift, int mode_offset, int mode_shift,
+ 		struct rockchip_pll_rate_table *rate_table,
+-		u8 clk_pll_flags);
++		unsigned long flags, u8 clk_pll_flags);
+ 
+ struct rockchip_cpuclk_clksel {
+ 	int reg;
+-- 
+2.6.6
