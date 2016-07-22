@@ -1,36 +1,62 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Fri, 22 Jul 2016 10:51:33 -0500
-Subject: Why does BIOS assign memory to 16 byte BAR
-In-Reply-To: <20160722151546.GA20646@localhost>
-References: <8520D5D51A55D047800579B094147198258BB59B@XAP-PVEXMBX01.xlnx.xilinx.com>
- <20160722151546.GA20646@localhost>
-Message-ID: <20160722155133.GB20646@localhost>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Fri, 22 Jul 2016 18:03:35 +0200
+Subject: [PATCH] arm64: Kconfig: select ALPINE_MSI only if PCI is selected
+In-Reply-To: <180e7e82-13cc-7fda-fbb1-2f2b43e75271@arm.com>
+References: <1469198527-12525-1-git-send-email-sudeep.holla@arm.com>
+ <20160722152730.GC6397@kwain>
+ <180e7e82-13cc-7fda-fbb1-2f2b43e75271@arm.com>
+Message-ID: <20160722160335.GD6397@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 22, 2016 at 10:15:46AM -0500, Bjorn Helgaas wrote:
-> Hi Bharat,
+On Fri, Jul 22, 2016 at 04:36:41PM +0100, Sudeep Holla wrote:
+> On 22/07/16 16:27, Antoine Tenart wrote:
+> >
+> >On Fri, Jul 22, 2016 at 03:42:07PM +0100, Sudeep Holla wrote:
+> >>Even when PCI is disabled, ARCH_ALPINE selects ALPINE_MSI triggerring
+> >>the following config warning:
+> >>
+> >>warning: (ARCH_ALPINE) selects ALPINE_MSI which has unmet direct dependencies (PCI)
+> >>
+> >>This patch makes selection of ALPINE_MSI conditional on PCI.
+> >
+> >[...]
+> >
+> >>--- a/arch/arm64/Kconfig.platforms
+> >>+++ b/arch/arm64/Kconfig.platforms
+> >>@@ -8,7 +8,7 @@ config ARCH_SUNXI
+> >>
+> >> config ARCH_ALPINE
+> >> 	bool "Annapurna Labs Alpine platform"
+> >>-	select ALPINE_MSI
+> >>+	select ALPINE_MSI if PCI
+> >> 	help
+> >> 	  This enables support for the Annapurna Labs Alpine
+> >> 	  Soc family.
+> >
+> >ALPINE_MSI also depends on PCI_MSI (which itself depends on PCI).
 > 
-> On Fri, Jul 22, 2016 at 09:24:22AM +0000, Bharat Kumar Gogada wrote:
-> > Hi,
-> > 
-> > I'm observing that on x86 BIOS successfully assigns memory if an End point requests
-> > BAR of size 16byte.
-> > 
-> > But as per Spec:
-> > The minimum memory address range requested by a BAR is 128 bytes.
-> 
-> Can you provide the spec reference for this?  I don't see it in PCI
-> r3.0.
->
-> PCI r3.0, sec 6.2.5.1, shows bits 4-31 of a memory BAR as writable,
-> which would correspond to a minimum size of 16 bytes.
+> ALPINE_MSI now selects PCI_MSI
 
-The reference above is to the conventional PCI spec.  I happened to
-trip over a note in PCIe r3.0, sec 1.3.2.2, that for a PCI Express
-endpoint, "the minimum memory address range requested by a BAR is 128
-bytes."
+You're right, I didn't look at -next. As you mentioned ALPINE_MSI now
+selects PCI_MSI.
 
-I don't think linux currently enforces this minimum.
+So,
 
-Bjorn
+Acked-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+
+Thanks!
+
+Antoine
+
+-- 
+Antoine T?nart, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160722/0d39e839/attachment-0001.sig>
