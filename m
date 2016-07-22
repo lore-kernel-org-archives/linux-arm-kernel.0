@@ -1,102 +1,64 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 22 Jul 2016 09:22:25 +0800
-Subject: [PATCH v4 4/7] rtc: ac100: Add clk output support
-In-Reply-To: <146914709427.8780.16475894348537760808@resonance>
-References: <1467302331-9663-1-git-send-email-wens@csie.org>
- <1467302331-9663-5-git-send-email-wens@csie.org>
- <146800297598.73491.13472152266331488346@resonance>
- <CAGb2v67ft=EktCcfGFdBN1K4SoOyK+Stz2WuvqScMmRjoBWxfA@mail.gmail.com>
- <146914709427.8780.16475894348537760808@resonance>
-Message-ID: <CAGb2v65x_3b84mRJMkt2e7-rbbyYQ3Zz05hS3GuH=P9v8ecwpA@mail.gmail.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Thu, 21 Jul 2016 18:30:52 -0700
+Subject: [PATCH v4 0/3] hwmon: xgene: Add support for X-Gene hwmon driver
+In-Reply-To: <1469140653-2287-1-git-send-email-hotran@apm.com>
+References: <1469140653-2287-1-git-send-email-hotran@apm.com>
+Message-ID: <5791774C.4010804@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 22, 2016 at 8:24 AM, Michael Turquette
-<mturquette@baylibre.com> wrote:
-> Quoting Chen-Yu Tsai (2016-07-13 20:34:34)
->> On Sat, Jul 9, 2016 at 2:36 AM, Michael Turquette
->> <mturquette@baylibre.com> wrote:
->> > Quoting Chen-Yu Tsai (2016-06-30 08:58:48)
->> >> +static long ac100_clkout_round_rate(struct clk_hw *hw, unsigned long rate,
->> >> +                                   unsigned long prate)
->> >> +{
->> >> +       unsigned long best_rate = 0, tmp_rate, tmp_prate;
->> >> +       int i;
->> >> +
->> >> +       if (prate == AC100_RTC_32K_RATE)
->> >> +               return divider_round_rate(hw, rate, &prate, NULL,
->> >> +                                         AC100_CLKOUT_DIV_WIDTH,
->> >> +                                         CLK_DIVIDER_POWER_OF_TWO);
->> >> +
->> >> +       for (i = 0; ac100_clkout_prediv[i].div; i++) {
->> >> +               tmp_prate = DIV_ROUND_UP(prate, ac100_clkout_prediv[i].val);
->> >> +               tmp_rate = divider_round_rate(hw, rate, &tmp_prate, NULL,
->> >> +                                             AC100_CLKOUT_DIV_WIDTH,
->> >> +                                             CLK_DIVIDER_POWER_OF_TWO);
->> >> +
->> >> +               if (tmp_rate > rate)
->> >> +                       continue;
->> >> +               if (rate - tmp_rate < best_rate - tmp_rate)
->> >> +                       best_rate = tmp_rate;
->> >> +       }
->> >> +
->> >> +       return best_rate;
->> >> +}
->> >> +
->> >> +static int ac100_clkout_determine_rate(struct clk_hw *hw,
->> >> +                                      struct clk_rate_request *req)
->> >> +{
->> >> +       struct clk_hw *best_parent;
->> >> +       unsigned long best = 0;
->> >> +       int i, num_parents = clk_hw_get_num_parents(hw);
->> >> +
->> >> +       for (i = 0; i < num_parents; i++) {
->> >> +               struct clk_hw *parent = clk_hw_get_parent_by_index(hw, i);
->> >> +               unsigned long tmp, prate = clk_hw_get_rate(parent);
->> >> +
->> >> +               tmp = ac100_clkout_round_rate(hw, req->rate, prate);
->> >> +
->> >> +               if (tmp > req->rate)
->> >> +                       continue;
->> >> +               if (req->rate - tmp < req->rate - best) {
->> >> +                       best = tmp;
->> >> +                       best_parent = parent;
->> >> +               }
->> >> +       }
->> >> +
->> >> +       if (!best)
->> >> +               return -EINVAL;
->> >> +
->> >> +       req->best_parent_hw = best_parent;
->> >> +       req->best_parent_rate = best;
->> >> +       req->rate = best;
->> >> +
->> >> +       return 0;
->> >> +}
->> >
->> > You only need one of the two functions above. Keep the .determine_rate
->> > callback and drop .round_rate.
->>
->> Only .round_rate is set in the clk_ops. ac100_clkout_round_rate just
->> serves to split out some of the calculations done per parent.
+On 07/21/2016 03:37 PM, Hoan Tran wrote:
+> This patch set adds hardware temperature and power reading support for
+> APM X-Gene SoC using the mailbox communication interface.
+> For device tree, it is the standard DT mailbox.
+> For ACPI, it is the PCC mailbox.
 >
-> If you only use .round_rate, shouldn't you drop .determine_rate then?
-
-Oops! I meant we only set .determine_rate. ac100_clkout_round_rate is
-called in the per parent loop in .determine_rate.
-
-ChenYu
-
+> For ACPI, this patch is built on top and depends on patch[1]:
+> [1] http://www.spinics.net/lists/linux-acpi/msg66041.html
+>   - [PATCH v3] mailbox: pcc: Support HW-Reduced Communication Subspace type 2
 >
-> Regards,
-> Mike
+
+One thought: You might consider taking ACPI support out of the driver for now,
+and add it back in after the dependent patch was accepted.
+
+Guenter
+
+> v4
+>   - Return 0 if driver registers successfully
 >
->>
->> > Otherwise the rest of the clk support looks great to me. Feel free to
->> > add:
->> >
->> > Reviewed-by: Michael Turquette <mturquette@baylibre.com>
->>
->> Thanks!
->>
->> ChenYu
+> v3
+>   - Order include files alphabetically
+>   - Use sign_extend32() to decode temperature
+>   - Use DEVICE_ATTR_RO() for temperature and power attributes
+>   - Temperature and power attributes start with index 1
+>   - Use !!amsg->param2
+>   - Fix checkpatch WARNING with --strict flag
+>   - Use hwmon_device_register_with_groups()
+>   - Check invalid sensor data
+>
+> v2
+>   - Increase power reading accurateness by using 2 registers
+> (a register for Watt, another for milli-Watt)
+>   - Remove power reading for SoC
+>   - Fix review comments from Guenter
+>
+> v1
+>   - Initial
+>
+> Hoan Tran (3):
+>    Documentation: dtb: xgene: Add hwmon dts binding documentation
+>    hwmon: xgene: Add hwmon driver
+>    arm64: dts: apm: Add X-Gene SoC hwmon to device tree
+>
+>   .../devicetree/bindings/hwmon/apm-xgene-hwmon.txt  |  14 +
+>   Documentation/hwmon/xgene-hwmon                    |  30 +
+>   arch/arm64/boot/dts/apm/apm-shadowcat.dtsi         |   5 +
+>   arch/arm64/boot/dts/apm/apm-storm.dtsi             |   5 +
+>   drivers/hwmon/Kconfig                              |   7 +
+>   drivers/hwmon/Makefile                             |   1 +
+>   drivers/hwmon/xgene-hwmon.c                        | 755 +++++++++++++++++++++
+>   7 files changed, 817 insertions(+)
+>   create mode 100644 Documentation/devicetree/bindings/hwmon/apm-xgene-hwmon.txt
+>   create mode 100644 Documentation/hwmon/xgene-hwmon
+>   create mode 100644 drivers/hwmon/xgene-hwmon.c
+>
