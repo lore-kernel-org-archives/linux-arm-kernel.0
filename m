@@ -1,26 +1,40 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 22 Jul 2016 17:06:34 +0200
-Subject: [PATCH 2/2] ARM: realview: Extend PBX family memory description
-In-Reply-To: <0acef10ce4429e372ec8c35300c6ec6d48aca7e1.1468583959.git.robin.murphy@arm.com>
-References: <dbf8749c4af9aa5ffb85e961b7ae09ffeefa7f2a.1468583959.git.robin.murphy@arm.com>
- <0acef10ce4429e372ec8c35300c6ec6d48aca7e1.1468583959.git.robin.murphy@arm.com>
-Message-ID: <CACRpkda8EuC2qfoOydahwWAnBYUX97WPixP85mCQ+04UZq98vg@mail.gmail.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Fri, 22 Jul 2016 10:15:46 -0500
+Subject: Why does BIOS assign memory to 16 byte BAR
+In-Reply-To: <8520D5D51A55D047800579B094147198258BB59B@XAP-PVEXMBX01.xlnx.xilinx.com>
+References: <8520D5D51A55D047800579B094147198258BB59B@XAP-PVEXMBX01.xlnx.xilinx.com>
+Message-ID: <20160722151546.GA20646@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 15, 2016 at 2:19 PM, Robin Murphy <robin.murphy@arm.com> wrote:
+Hi Bharat,
 
-> All three platforms sharing the later RealView Platform Baseboard memory
-> map - PBX-A9, PB-A8 and PB11MPCore, provide 512MB of DDR SDRAM on the
-> baseboard, of which the boot alias at 0x0 maps the first 256MB. Expand
-> the size of the default memory node to refelect that, and describe the
-> full memory regions in each board's DTS, but leave those commented by
-> default to avoid breaking existing bootloaders.
->
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+On Fri, Jul 22, 2016 at 09:24:22AM +0000, Bharat Kumar Gogada wrote:
+> Hi,
+> 
+> I'm observing that on x86 BIOS successfully assigns memory if an End point requests
+> BAR of size 16byte.
+> 
+> But as per Spec:
+> The minimum memory address range requested by a BAR is 128 bytes.
 
-I've applied this patch for the next kernel cycle. Tweaked the commit
-text a bit (removed spelling mistake and prefixed with dts:).
+Can you provide the spec reference for this?  I don't see it in PCI
+r3.0.
 
-Yours,
-Linus Walleij
+PCI r3.0, sec 6.2.5.1, shows bits 4-31 of a memory BAR as writable,
+which would correspond to a minimum size of 16 bytes.
+
+> Why BIOS is successfully allocating region to 16 byte BAR requests?
+
+If you want to know why the BIOS does this, you'd have to ask the BIOS
+writer.
+
+If you were to ask about *Linux*, I'd say we should not gratuitously
+enforce things in the spec merely for the sake of being compliant with
+the letter of the spec.  We should enforce things that are logically
+required or that are required for compatibility, security, etc.  But
+if the spec contained an arbitrary restriction  for no good reason,
+and real-world hardware violated that restriction, I'd say Linux
+should accommodate the hardware.
+
+Bjorn
