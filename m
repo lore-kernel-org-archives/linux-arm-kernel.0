@@ -1,38 +1,57 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Fri, 22 Jul 2016 12:08:33 +0200
-Subject: [PATCH v3 3/7] clk: rockchip: rk3399: add SCLK_DDRCLK ID for ddrc
-In-Reply-To: <1469178440-4668-4-git-send-email-hl@rock-chips.com>
-References: <1469178440-4668-1-git-send-email-hl@rock-chips.com>
- <1469178440-4668-4-git-send-email-hl@rock-chips.com>
-Message-ID: <1486821.Jd4tDmJ7c4@diego>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 22 Jul 2016 11:16:17 +0100
+Subject: [PATCH v15 04/10] arm64: Kprobes with single stepping support
+In-Reply-To: <57911590.50305@linaro.org>
+References: <1467995754-32508-1-git-send-email-dave.long@linaro.org>
+ <1467995754-32508-5-git-send-email-dave.long@linaro.org>
+ <578FA238.3050206@arm.com> <5790F960.5050007@linaro.org>
+ <57910528.7070902@arm.com> <57911590.50305@linaro.org>
+Message-ID: <20160722101617.GA17821@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, 22. Juli 2016, 17:07:16 schrieb Lin Huang:
-> Signed-off-by: Lin Huang <hl@rock-chips.com>
-> ---
-> Changes in v3:
-> -None
+On Thu, Jul 21, 2016 at 02:33:52PM -0400, David Long wrote:
+> On 07/21/2016 01:23 PM, Marc Zyngier wrote:
+> >On 21/07/16 17:33, David Long wrote:
+> >>On 07/20/2016 12:09 PM, Marc Zyngier wrote:
+> >>>On 08/07/16 17:35, David Long wrote:
+> >>>>+#define MAX_INSN_SIZE			1
+> >>>>+#define MAX_STACK_SIZE			128
+> >>>
+> >>>Where is that value coming from? Because even on my 6502, I have a 256
+> >>>byte stack.
+> >>>
+> >>
+> >>Although I don't claim to know the original author's thoughts I would
+> >>guess it is based on the seven other existing implementations for
+> >>kprobes on various architectures, all of which appear to use either 64
+> >>or 128 for MAX_STACK_SIZE.  The code is not trying to duplicate the
+> >>whole stack.
+[...]
+> >My main worry is that whatever value you pick, it is always going to be
+> >wrong. This is used to preserve arguments that are passed on the stack,
+> >as opposed to passed by registers). We have no idea of what is getting
+> >passed there so saving nothing, 128 bytes or 2kB is about the same. It
+> >is always wrong.
+> >
+> >A much better solution would be to check the frame pointer, and copy the
+> >delta between FP and SP, assuming it fits inside the allocated buffer.
+> >If it doesn't, or if FP is invalid, we just skip the hook, because we
+> >can't reliably execute it.
 > 
-> Changes in v2:
-> - None
-> Changes in v1:
-> - None
-> 
->  include/dt-bindings/clock/rk3399-cru.h | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/include/dt-bindings/clock/rk3399-cru.h
-> b/include/dt-bindings/clock/rk3399-cru.h index 50a44cf..8a0f0442 100644
-> --- a/include/dt-bindings/clock/rk3399-cru.h
-> +++ b/include/dt-bindings/clock/rk3399-cru.h
-> @@ -131,6 +131,7 @@
->  #define SCLK_DPHY_RX0_CFG		165
->  #define SCLK_RMII_SRC			166
->  #define SCLK_PCIEPHY_REF100M		167
-> +#define SCLK_DDRCLK			168
+> Well, this is the way it works literally everywhere else. It is a documented
+> limitation (Documentation/kprobes.txt). Said documentation may need to be
+> changed along with the suggested fix.
 
-nit: SCLK_DDR (i.e. without the CLK at the end)?
+The document states: "Up to MAX_STACK_SIZE bytes are copied". That means
+the arch code could always copy less but never more than MAX_STACK_SIZE.
+What we are proposing is that we should try to guess how much to copy
+based on the FP value (caller's frame) and, if larger than
+MAX_STACK_SIZE, skip the probe hook entirely. I don't think this goes
+against the kprobes.txt document but at least it (a) may improve the
+performance slightly by avoiding unnecessary copy and (b) it avoids
+undefined behaviour if we ever encounter a jprobe with arguments passed
+on the stack beyond MAX_STACK_SIZE.
 
->  #define DCLK_VOP0			180
->  #define DCLK_VOP1			181
+-- 
+Catalin
