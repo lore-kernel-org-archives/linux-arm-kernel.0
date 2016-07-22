@@ -1,63 +1,59 @@
-From: mitchelh@codeaurora.org (Mitchel Humpherys)
-Date: Fri, 22 Jul 2016 13:39:45 -0700
-Subject: [PATCH v3 0/6] Add support for privileged mappings
-In-Reply-To: <20160722165107.GH16837@arm.com> (Will Deacon's message of "Fri,
- 22 Jul 2016 17:51:07 +0100")
-References: <20160719203655.16629-1-mitchelh@codeaurora.org>
- <20160722165107.GH16837@arm.com>
-Message-ID: <vnkweg6l9zla.fsf@codeaurora.org>
+From: bauerman@linux.vnet.ibm.com (Thiago Jung Bauermann)
+Date: Fri, 22 Jul 2016 17:41:40 -0300
+Subject: [RFC 0/3] extend kexec_file_load system call
+In-Reply-To: <878twutmaj.fsf@concordia.ellerman.id.au>
+References: <20160712014201.11456-1-takahiro.akashi@linaro.org>
+ <4197460.etrDupniY8@hactar> <878twutmaj.fsf@concordia.ellerman.id.au>
+Message-ID: <1732711.nTAkJm8nA3@hactar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 22 2016 at 05:51:07 PM, Will Deacon <will.deacon@arm.com> wrote:
-> On Tue, Jul 19, 2016 at 01:36:49PM -0700, Mitchel Humpherys wrote:
->> The following patch to the ARM SMMU driver:
->> 
->>     commit d346180e70b91b3d5a1ae7e5603e65593d4622bc
->>     Author: Robin Murphy <robin.murphy@arm.com>
->>     Date:   Tue Jan 26 18:06:34 2016 +0000
->>     
->>         iommu/arm-smmu: Treat all device transactions as unprivileged
->> 
->> started forcing all SMMU transactions to come through as "unprivileged".
->> The rationale given was that:
->> 
->>   (1) There is no way in the IOMMU API to even request privileged mappings.
->> 
->>   (2) It's difficult to implement a DMA mapper that correctly models the
->>       ARM VMSAv8 behavior of unprivileged-writeable =>
->>       privileged-execute-never.
->> 
->> This series rectifies (1) by introducing an IOMMU API for privileged
->> mappings and implements it in io-pgtable-arm.
->> 
->> This series rectifies (2) by introducing a new dma attribute
->> (DMA_ATTR_PRIVILEGED) for users of the DMA API that need privileged
->> mappings which are inaccessible to lesser-privileged execution levels, and
->> implements it in the arm64 IOMMU DMA mapper.  The one known user (pl330.c)
->> is converted over to the new attribute.
->> 
->> Jordan and Jeremy can provide more info on the use case if needed, but the
->> high level is that it's a security feature to prevent attacks such as [1].
->
-> This all looks good to me:
->
-> Acked-by: Will Deacon <will.deacon@arm.com>
->
-> It looks pretty fiddly to merge, however. How are you planning to get
-> this upstream?
+Am Freitag, 22 Juli 2016, 12:54:28 schrieb Michael Ellerman:
+> Thiago Jung Bauermann <bauerman@linux.vnet.ibm.com> writes:
+> > So even if not ideal, the solution above is desirable for powerpc. We
+> > would like to preserve the ability of allowing userspace to pass
+> > parameters to the OS via the DTB, even if secure boot is enabled.
+> > 
+> > I would like to turn the above into a proposal:
+> > 
+> > Extend the syscall as shown in this RFC from Takahiro AKASHI, but
+> > instead of accepting a complete DTB from userspace, the syscall accepts
+> > a DTB containing only a /chosen node. If the DTB contains any other
+> > node, the syscall fails with EINVAL. If the DTB contains any subnode in
+> > /chosen, or if there's a compatible or device_type property in /chosen,
+> > the syscall fails with EINVAL as well.
+> > 
+> > The kernel can then add the properties in /chosen to the device tree
+> > that it will pass to the next kernel.
+> > 
+> > What do you think?
+> 
+> I think we will inevitably have someone who wants to pass something
+> other than a child of /chosen.
+> 
+> At that point we would be faced with adding yet another syscall, or at
+> best a new flag.
+> 
+> I think we'd be better allowing userspace to pass a DTB, and having an
+> explicit whitelist (in the kernel) of which nodes & properties are
+> allowed in that DTB.
 
-Fiddly in what way?  Do you mean in relation to "dma-mapping: Use
-unsigned long for dma_attrs" [1]?  I admit I wasn't aware of that
-activity until Robin mentioned it.  It looks like it's merged on
-next/master, shall I rebase/rework on that and resend?
+Sounds good to me.
 
-[1] https://lkml.org/lkml/2016/7/13/198
+> For starters it would only contain /chosen/stdout-path (for example).
+> But we would be able to add new nodes & properties in future.
 
+If we allow things outside of chosen, we can keep the offb.c hook in 
+Petitboot and whitelist the framebuffer properties it adds to the vga node.
 
--Mitch
+> The downside is userspace would have no way of detecting the content of
+> the white list, other than trial and error. But in practice I'm not sure
+> that would be a big problem.
+
+For our use case in OpenPower I don't think it would be a problem, since the 
+userspace and the kernel are developed together.
 
 -- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+[]'s
+Thiago Jung Bauermann
+IBM Linux Technology Center
