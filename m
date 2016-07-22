@@ -1,41 +1,32 @@
 From: gabriel.fernandez@st.com (gabriel.fernandez at st.com)
-Date: Fri, 22 Jul 2016 11:37:46 +0200
-Subject: [PATCH v3 0/4] Add STM32 Reset Driver
-Message-ID: <1469180270-5446-1-git-send-email-gabriel.fernandez@st.com>
+Date: Fri, 22 Jul 2016 11:37:50 +0200
+Subject: [PATCH v3 4/4] ARM: dts: stm32f429: add missing #reset-cells of rcc
+In-Reply-To: <1469180270-5446-1-git-send-email-gabriel.fernandez@st.com>
+References: <1469180270-5446-1-git-send-email-gabriel.fernandez@st.com>
+Message-ID: <1469180270-5446-5-git-send-email-gabriel.fernandez@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Gabriel Fernandez <gabriel.fernandez@st.com>
 
-v3:
- - Use the builtin for the register
+This patch adds #reset-cells property to rcc node.
 
-v2:
- - switch to the non-relaxed variants
- - describe dt-binfings in one place
+Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
+---
+ arch/arm/boot/dts/stm32f429.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
 
-The STM32 MCUs family IPs can be reset by accessing some registers
-from the RCC block.
-
-Gabriel Fernandez (1):
-  ARM: dts: stm32f429: add missing #reset-cells of rcc
-
-Maxime Coquelin (3):
-  dt-bindings: mfd: Add STM32F4 RCC numeric constants into DT include
-    file
-  dt-bindings: Document the STM32 reset bindings
-  drivers: reset: Add STM32 reset driver
-
- .../devicetree/bindings/clock/st,stm32-rcc.txt     |  42 ++++++--
- .../devicetree/bindings/reset/st,stm32-rcc.txt     |   6 ++
- arch/arm/boot/dts/stm32f429.dtsi                   |   1 +
- drivers/reset/Makefile                             |   1 +
- drivers/reset/reset-stm32.c                        | 108 +++++++++++++++++++++
- include/dt-bindings/mfd/stm32f4-rcc.h              |  98 +++++++++++++++++++
- 6 files changed, 249 insertions(+), 7 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/reset/st,stm32-rcc.txt
- create mode 100644 drivers/reset/reset-stm32.c
- create mode 100644 include/dt-bindings/mfd/stm32f4-rcc.h
-
+diff --git a/arch/arm/boot/dts/stm32f429.dtsi b/arch/arm/boot/dts/stm32f429.dtsi
+index 35df462..fe89236 100644
+--- a/arch/arm/boot/dts/stm32f429.dtsi
++++ b/arch/arm/boot/dts/stm32f429.dtsi
+@@ -326,6 +326,7 @@
+ 		};
+ 
+ 		rcc: rcc at 40023810 {
++			#reset-cells = <1>;
+ 			#clock-cells = <2>;
+ 			compatible = "st,stm32f42xx-rcc", "st,stm32-rcc";
+ 			reg = <0x40023800 0x400>;
 -- 
 1.9.1
