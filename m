@@ -1,30 +1,60 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Fri, 22 Jul 2016 21:00:06 +0200
-Subject: [PATCH 3/3] mmc: sunxi: Add support to the Allwinner A83T
-In-Reply-To: <20160721111851.133a3f16d6e9de1ee45b3654@free.fr>
-References: <cover.1469082481.git.moinejf@free.fr>
- <0ddc5f7d9a42515f901c95b8c0c1f5a5e4d575e9.1469082481.git.moinejf@free.fr>
- <20160721085838.GH5993@lukather>
- <20160721111851.133a3f16d6e9de1ee45b3654@free.fr>
-Message-ID: <20160722210006.2d08c8261f84c59f7e2ddd34@free.fr>
+From: mirza.krak@gmail.com (Mirza Krak)
+Date: Fri, 22 Jul 2016 21:07:02 +0200
+Subject: [RFC 3/6] dt/bindings: Add bindings for Tegra20/30 NOR bus driver
+In-Reply-To: <8e9cdefd-68d1-b788-92fb-b74aae1713c8@nvidia.com>
+References: <1468935397-11926-1-git-send-email-mirza.krak@gmail.com>
+ <1468935397-11926-4-git-send-email-mirza.krak@gmail.com>
+ <434561ec-510e-a3bf-c7b6-c961db299bd6@nvidia.com>
+ <CALw8SCU0cz6mbO=oudCZ4-=2PHVORNt3gwmg2bzNjyhJFnWS3g@mail.gmail.com>
+ <8e9cdefd-68d1-b788-92fb-b74aae1713c8@nvidia.com>
+Message-ID: <CALw8SCXb29NM=BRnUBsnFFObe25fSFi2mzvhrb5CvvJVCcWRfA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 21 Jul 2016 11:18:51 +0200
-Jean-Francois Moine <moinejf@free.fr> wrote:
+2016-07-22 11:32 GMT+02:00 Jon Hunter <jonathanh@nvidia.com>:
+>
+> On 21/07/16 21:10, Mirza Krak wrote:
+>> 2016-07-21 11:56 GMT+02:00 Jon Hunter <jonathanh@nvidia.com>:
+>>>
+>>> I wonder if it is worth mentioning that the chip-select specified in the
+>>> "nvidia,config" prop should match that in the "ranges" prop unless you
+>>> have some external decoding logic to provide an external chip-select.
+>>> Which raises a question, what does the chip-select in the ranges
+>>> actually represent? I am not sure if there is a common practice here for
+>>> device tree when boards have external logic to provide additional
+>>> chip-selects. I am sure this is quite common.
+>>
+>> I do not understand why CS pin setting in nvidia,config need to match
+>> the "ranges" prop? Other then maybe cosmetics.
+>
+> Yes it would be cosmetic. That said, I even wonder if CS needs to be
+> exposed at all given that they all map to the same CPU address space.
+> Couldn't your binding for the CAN devices be as follows?
+>
+> nor at 70009000 {
+>         ...
+>
+>         can at 48000000 {
+>                 ...
+>         };
+>
+>         can at 48040000 {
+>                 ...
+>         };
+> };
 
-> > On Wed, Jul 20, 2016 at 08:28:47PM +0200, Jean-Francois Moine wrote:
-> > > The rate of the PLL-PERIPH clock is usually set to 1.2GHz in the A83T.
-> > 
-> > Uh? The datasheet says to set it to 600MHz.
-> 
-> Right. But the driver of the SDK for the Banana Pi M3 (A83T) sets it
-> to 1.2GHz.
+This has also crossed my mind, maybe just get rid of the "ranges" prop
+and do like you have above. But then again I do not know what is
+preferred so I went with "ranges" prop initially.
 
-I tested again, and, with the pll-periph at 600MHz, both the SDcard and
-the eMMC are working fine.
-So, you may forget about this patch, sorry for the noise.
 
--- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+>
+> Problem is if you did have devices on different chip-selects then how
+> would these be handled? They could not point to the same physical
+> address. I am not sure if there is a way to do that in DT?
+
+Having trouble following your though here. We do not have "different"
+chip-selects?
+
+Best Regards
+Mirza
