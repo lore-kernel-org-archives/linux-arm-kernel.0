@@ -1,31 +1,76 @@
-From: rkrcmar@redhat.com (Radim =?utf-8?B?S3LEjW3DocWZ?=)
-Date: Fri, 22 Jul 2016 21:50:17 +0200
-Subject: [PULL] KVM/ARM updates for Linux 4.8, take #1
-In-Reply-To: <1469208552-4155-1-git-send-email-marc.zyngier@arm.com>
-References: <1469208552-4155-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20160722195016.GD9019@potion>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Fri, 22 Jul 2016 13:57:05 -0600
+Subject: [PATCH V2 4/6] perf tools: pushing driver configuration down to
+ the kernel
+In-Reply-To: <20160721074738.GD7192@krava>
+References: <1469047100-18131-1-git-send-email-mathieu.poirier@linaro.org>
+ <1469047100-18131-5-git-send-email-mathieu.poirier@linaro.org>
+ <20160721074738.GD7192@krava>
+Message-ID: <CANLsYkznP87ZeTfWgbeQKBRou5n5XT2nMEUcc5Dypyzixw04_Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-07-22 18:28+0100, Marc Zyngier:
-> Paolo, Radim,
-> 
-> Please find below the first batch of 4.8 updates for KVM/ARM. Biggest
-> feature is the long awaited GICv3 ITS emulation, allowing MSIs to be
-> delivered into guests running on GICv3 HW. The other big feature is
-> the removal of the old vgic implementation. Less visible is the revamp
-> of the way we deal with the HYP initialization (by keeping an idmap
-> around), and making HYP page tables honor the kernel's own protection.
-> 
-> This may generate a few conflicts, all of which have been seen in
-> -next. 3 which are KVM specific (and pretty easy to resolve), and
-> another one in include/irqchip/arm-gic-v3.h. They should be resolved
-> as in -next.
-> 
-> Please pull!
+On 21 July 2016 at 01:47, Jiri Olsa <jolsa@redhat.com> wrote:
+> On Wed, Jul 20, 2016 at 02:38:18PM -0600, Mathieu Poirier wrote:
+>> Now that PMU specific driver configuration are queued in
+>> evsel::drv_config_terms, all we need to do is re-use the current
+>> ioctl() mechanism to push down the information to the kernel
+>> driver.
+>>
+>> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+>> ---
+>>  tools/perf/builtin-record.c |  9 +++++++++
+>>  tools/perf/util/evlist.c    | 24 ++++++++++++++++++++++++
+>>  tools/perf/util/evlist.h    |  3 +++
+>>  tools/perf/util/evsel.c     | 32 ++++++++++++++++++++++++++++++++
+>>  tools/perf/util/evsel.h     |  3 +++
+>>  5 files changed, 71 insertions(+)
+>>
+>> diff --git a/tools/perf/builtin-record.c b/tools/perf/builtin-record.c
+>> index 8f2c16d9275f..dffea1033b8e 100644
+>> --- a/tools/perf/builtin-record.c
+>> +++ b/tools/perf/builtin-record.c
+>> @@ -383,6 +383,7 @@ static int record__open(struct record *rec)
+>>       struct perf_evlist *evlist = rec->evlist;
+>>       struct perf_session *session = rec->session;
+>>       struct record_opts *opts = &rec->opts;
+>> +     struct perf_evsel_config_term *err_term;
+>>       int rc = 0;
+>>
+>>       perf_evlist__config(evlist, opts, &callchain_param);
+>> @@ -412,6 +413,14 @@ try_again:
+>>               goto out;
+>>       }
+>>
+>> +     if (perf_evlist__apply_drv_configs(evlist, &pos, &err_term)) {
+>> +             error("failed to set config \"%s\" on event %s with %d (%s)\n",
+>> +                     err_term->val.drv_cfg, perf_evsel__name(pos), errno,
+>> +                     strerror_r(errno, msg, sizeof(msg)));
+>> +             rc = -1;
+>> +             goto out;
+>> +     }
+>> +
+>
+> how about 'perf top' and 'perf stat', should they support this too?
 
-Pulled into kvm/next, KVM_CAP_MSI_DEVID is 131.
+After looking into this (hence the delayed reply) I'm not completely sure.
 
->  54 files changed, 2698 insertions(+), 6065 deletions(-)
+'perf stat' calls perf_evlist__apply_filters() and therefore the
+semantic is likely to be close enough for PMU driver specific
+configuration to make sense, should a particular use case lends itself
+to it.  But that is certainly not the case for CoreSight PMUs.  Since
+there is no current client for it, do you wish to see 'perf stat'
+support this feature?
 
-<3
+>From a quick glance at the code, filters in the context of 'perf top'
+seem to be related to symbols rather than the tuning of events.  As
+such I just can't see how driver specific configuration would fit in
+that scheme.
+
+Regards,
+Mathieu
+
+
+>
+> thanks,
+> jirka
