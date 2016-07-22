@@ -1,34 +1,36 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 22 Jul 2016 00:16:44 -0700
-Subject: [PATCH 2/2] ARM: DRA7: select PCI_DOMAINS config
-In-Reply-To: <8047226.VhgpLo8JQu@wuerfel>
-References: <1469102276-14777-1-git-send-email-kishon@ti.com>
- <1469102276-14777-3-git-send-email-kishon@ti.com>
- <8047226.VhgpLo8JQu@wuerfel>
-Message-ID: <20160722071644.GZ28140@atomide.com>
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Fri, 22 Jul 2016 09:21:07 +0200
+Subject: [PATCH v6 1/2] [media] atmel-isc: add the Image Sensor Controller
+ code
+In-Reply-To: <bc8fc3da-9fe0-71ee-e55a-4d8c50b10cd3@microchip.com>
+References: <1469088900-23935-1-git-send-email-songjun.wu@microchip.com>
+ <1469088900-23935-2-git-send-email-songjun.wu@microchip.com>
+ <3ad06658-1e5f-2cd0-f092-4d8f50b4aaa6@xs4all.nl>
+ <bc8fc3da-9fe0-71ee-e55a-4d8c50b10cd3@microchip.com>
+Message-ID: <ebd3617c-ad3c-d0e0-e024-b72924b5f864@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Arnd Bergmann <arnd@arndb.de> [160721 05:08]:
-> On Thursday, July 21, 2016 5:27:56 PM CEST Kishon Vijay Abraham I wrote:
-> > diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-> > index 1a648e9..8e6e2c0 100644
-> > --- a/arch/arm/mach-omap2/Kconfig
-> > +++ b/arch/arm/mach-omap2/Kconfig
-> > @@ -86,6 +86,7 @@ config SOC_DRA7XX
-> >         select OMAP_INTERCONNECT_BARRIER
-> >         select PM_OPP if PM
-> >         select ZONE_DMA if ARM_LPAE
-> > +       select PCI_DOMAINS if PCI
-> >  
-> >  config ARCH_OMAP2PLUS
-> >         bool
-> > 
-> 
-> Should we just set this unconditionally for ARCH_MULTIPLATFORM maybe?
 
-Makes sense to me if many SoCs need this.
+
+On 07/22/2016 07:18 AM, Wu, Songjun wrote:
+
+<snip>
+
+>>> +/*
+>>> + * index(0~11):  raw formats.
+>>> + * index(12~12): the formats which can be converted from raw format by ISC.
+>>> + * index():      the formats which can only be provided by subdev.
+>>> + */
+>>> +static struct isc_format isc_formats[] = {
+>>
+>> static const
+>>
+> Some members in structure isc_format need be modified, so it can not be 
+> const.
+
+OK. Please add a comment about that.
 
 Regards,
 
-Tony
+	Hans
