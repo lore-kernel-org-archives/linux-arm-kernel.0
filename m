@@ -1,33 +1,28 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 22 Jul 2016 15:29:26 +0200
-Subject: [PATCH 2/2] ARM: DRA7: select PCI_DOMAINS config
-In-Reply-To: <5791D8C7.5020303@ti.com>
-References: <1469102276-14777-1-git-send-email-kishon@ti.com>
- <20160722071644.GZ28140@atomide.com> <5791D8C7.5020303@ti.com>
-Message-ID: <5655227.Z3Bo3vTPGH@wuerfel>
+Date: Fri, 22 Jul 2016 15:27:04 +0200
+Subject: [RFC PATCH v1 0/2] Add Hisilicon Djtag driver
+In-Reply-To: <20160722105648.GD17584@leverpostej>
+References: <1469177332-72156-1-git-send-email-tanxiaojun@huawei.com>
+ <20160722105648.GD17584@leverpostej>
+Message-ID: <11848764.OZ77lJYCM4@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, July 22, 2016 1:56:47 PM CEST Kishon Vijay Abraham I wrote:
+On Friday, July 22, 2016 11:56:49 AM CEST Mark Rutland wrote:
+> Hi,
 > 
-> since it doesn't harm even if a platform has a single PCIe port, it should be
-> okay to set PCI_DOMAINS. I'll resend the following as a separate patch if it's
-> okay.
+> I understand that some SoC/socket level PMU is accessed via these
+> registers. It doesn't make sense to review either in isolation. Please
+> put together a unified series, with both the djtag accessors and the
+> PMU code.
 > 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 90542db..0cccb50 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -338,6 +338,7 @@ config ARCH_MULTIPLATFORM
->         select MULTI_IRQ_HANDLER
->         select SPARSE_IRQ
->         select USE_OF
-> +       select PCI_DOMAINS if PCI
-> 
+> On it's own, it's *very* difficult to understand how this fits into the
+> SoC, and how it is to be used.
 
-Sounds good, but please remove all other 'select PCI_DOMAINS if PCI'
-statements in arch/arm then in the same patch.
+Is there anything else that the driver is used for?
 
-I have checked that all of them are for ARCH_MULTIPLATFORM based machines.
+Having it in drivers/soc/ feels wrong to me, and if there is only
+one user, I'd recommend having it as part of the same driver module
+as the code accessing it.
 
 	Arnd
