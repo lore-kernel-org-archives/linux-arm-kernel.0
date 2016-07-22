@@ -1,68 +1,78 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Fri, 22 Jul 2016 15:30:44 +0100
-Subject: [PATCH 2/5] arm64: efi: always map runtime services code and data
- regions down to pages
-In-Reply-To: <1467204690-10790-3-git-send-email-ard.biesheuvel@linaro.org>
-References: <1467204690-10790-1-git-send-email-ard.biesheuvel@linaro.org>
- <1467204690-10790-3-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <64a731b2-1ddb-78f5-fd02-204f19f0a432@arm.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Fri, 22 Jul 2016 22:30:53 +0800
+Subject: [PATCH] PM / OPP: optimize dev_pm_opp_set_rate() a bit
+In-Reply-To: <1469191370-1285-1-git-send-email-jszhang@marvell.com>
+Message-ID: <201607222230.DZObarhu%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard,
+Hi,
 
-On 29/06/16 13:51, Ard Biesheuvel wrote:
-> To avoid triggering diagnostics in the MMU code that are finicky about
-> splitting block mappings into more granular mappings, ensure that regions
-> that are likely to appear in the Memory Attributes table as well as the
-> UEFI memory map are always mapped down to pages. This way, we can use
-> apply_to_page_range() instead of create_pgd_mapping() for the second pass,
-> which cannot split or merge block entries, and operates strictly on PTEs.
->
-> Note that this aligns the arm64 Memory Attributes table handling code with
-> the ARM code, which already uses apply_to_page_range() to set the strict
-> permissions.
->
+[auto build test WARNING on pm/linux-next]
+[also build test WARNING on v4.7-rc7 next-20160722]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-This patch is merged in arm64/for-next/core now and when I try that
-branch with defconfig + CONFIG_PROVE_LOCKING, I get the following splat
-on boot and it fails to boot further on Juno.
+url:    https://github.com/0day-ci/linux/commits/Jisheng-Zhang/PM-OPP-optimize-dev_pm_opp_set_rate-a-bit/20160722-205339
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/rafael/linux-pm.git linux-next
+config: x86_64-allmodconfig (attached as .config)
+compiler: gcc-6 (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=x86_64 
 
-I could bisect that to this patch(Commit bd264d046aad ("arm64: efi:
-always map runtime services code and data regions down to pages") in
-that branch)
+Note: it may well be a FALSE warning. FWIW you are at least aware of it now.
+http://gcc.gnu.org/wiki/Better_Uninitialized_Warnings
 
-Regards,
-Sudeep
+All warnings (new ones prefixed by >>):
 
--->8
+   drivers/base/power/opp/core.c: In function 'dev_pm_opp_set_rate':
+>> drivers/base/power/opp/core.c:666:3: warning: 'ou_volt_max' may be used uninitialized in this function [-Wmaybe-uninitialized]
+      _set_opp_voltage(dev, reg, ou_volt, ou_volt_min, ou_volt_max);
+      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+>> drivers/base/power/opp/core.c:666:3: warning: 'ou_volt_min' may be used uninitialized in this function [-Wmaybe-uninitialized]
+>> drivers/base/power/opp/core.c:666:3: warning: 'ou_volt' may be used uninitialized in this function [-Wmaybe-uninitialized]
 
-efi: memattr: Processing EFI Memory Attributes table:
-efi: memattr:  0x0000f9400000-0x0000f942ffff [Runtime Data       |RUN| | 
-  |XP|  |  |  |   |  |  |  |  ]
-Unable to handle kernel NULL pointer dereference at virtual address 00000018
-pgd = ffff000009aa4000
-[00000018] *pgd=00000009ffffe003, *pud=00000009ffffd003, 
-*pmd=0000000000000000
-Internal error: Oops: 96000004 [#1] PREEMPT SMP
-Modules linked in:
-CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.7.0-rc7-next-20160722 #134
-Hardware name: ARM Juno development board (r2) (DT)
-task: ffff800976ca0000 task.stack: ffff800976c3c000
-PC is at __lock_acquire+0x13c/0x19e0
-LR is at lock_acquire+0x4c/0x68
-pc : [<ffff000008104544>] lr : [<ffff000008106114>] pstate: 200000c5
-....
-  __lock_acquire+0x13c/0x19e0
-  lock_acquire+0x4c/0x68
-  _raw_spin_lock+0x40/0x58
-  apply_to_page_range+0x18c/0x388
-  efi_set_mapping_permissions+0x34/0x44
-  efi_memattr_apply_permissions+0x200/0x2a8
-  arm_enable_runtime_services+0x1b4/0x1fc
-  do_one_initcall+0x38/0x128
-  kernel_init_freeable+0x84/0x1f0
-  kernel_init+0x10/0x100
-  ret_from_fork+0x10/0x40
-Code: 5280003c 79004401 140000b5 b000b880 (f9400282)
----[ end trace 892120beb6681b4e ]---
+vim +/ou_volt_max +666 drivers/base/power/opp/core.c
+
+6a0712f6 drivers/base/power/opp/core.c Viresh Kumar 2016-02-09  650  	if (freq < old_freq) {
+6a0712f6 drivers/base/power/opp/core.c Viresh Kumar 2016-02-09  651  		ret = _set_opp_voltage(dev, reg, u_volt, u_volt_min,
+6a0712f6 drivers/base/power/opp/core.c Viresh Kumar 2016-02-09  652  				       u_volt_max);
+6a0712f6 drivers/base/power/opp/core.c Viresh Kumar 2016-02-09  653  		if (ret)
+6a0712f6 drivers/base/power/opp/core.c Viresh Kumar 2016-02-09  654  			goto restore_freq;
+6a0712f6 drivers/base/power/opp/core.c Viresh Kumar 2016-02-09  655  	}
+6a0712f6 drivers/base/power/opp/core.c Viresh Kumar 2016-02-09  656  
+6a0712f6 drivers/base/power/opp/core.c Viresh Kumar 2016-02-09  657  	return 0;
+6a0712f6 drivers/base/power/opp/core.c Viresh Kumar 2016-02-09  658  
+6a0712f6 drivers/base/power/opp/core.c Viresh Kumar 2016-02-09  659  restore_freq:
+6a0712f6 drivers/base/power/opp/core.c Viresh Kumar 2016-02-09  660  	if (clk_set_rate(clk, old_freq))
+6a0712f6 drivers/base/power/opp/core.c Viresh Kumar 2016-02-09  661  		dev_err(dev, "%s: failed to restore old-freq (%lu Hz)\n",
+6a0712f6 drivers/base/power/opp/core.c Viresh Kumar 2016-02-09  662  			__func__, old_freq);
+6a0712f6 drivers/base/power/opp/core.c Viresh Kumar 2016-02-09  663  restore_voltage:
+6a0712f6 drivers/base/power/opp/core.c Viresh Kumar 2016-02-09  664  	/* This shouldn't harm even if the voltages weren't updated earlier */
+6a0712f6 drivers/base/power/opp/core.c Viresh Kumar 2016-02-09  665  	if (!IS_ERR(old_opp))
+6a0712f6 drivers/base/power/opp/core.c Viresh Kumar 2016-02-09 @666  		_set_opp_voltage(dev, reg, ou_volt, ou_volt_min, ou_volt_max);
+6a0712f6 drivers/base/power/opp/core.c Viresh Kumar 2016-02-09  667  
+6a0712f6 drivers/base/power/opp/core.c Viresh Kumar 2016-02-09  668  	return ret;
+6a0712f6 drivers/base/power/opp/core.c Viresh Kumar 2016-02-09  669  }
+6a0712f6 drivers/base/power/opp/core.c Viresh Kumar 2016-02-09  670  EXPORT_SYMBOL_GPL(dev_pm_opp_set_rate);
+6a0712f6 drivers/base/power/opp/core.c Viresh Kumar 2016-02-09  671  
+2c2709dc drivers/base/power/opp/core.c Viresh Kumar 2016-02-16  672  /* OPP-dev Helpers */
+2c2709dc drivers/base/power/opp/core.c Viresh Kumar 2016-02-16  673  static void _kfree_opp_dev_rcu(struct rcu_head *head)
+06441658 drivers/base/power/opp.c      Viresh Kumar 2015-07-29  674  {
+
+:::::: The code at line 666 was first introduced by commit
+:::::: 6a0712f6f199e737aa5913d28ec4bd3a25de9660 PM / OPP: Add dev_pm_opp_set_rate()
+
+:::::: TO: Viresh Kumar <viresh.kumar@linaro.org>
+:::::: CC: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 54839 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160722/0211a3ca/attachment-0001.obj>
