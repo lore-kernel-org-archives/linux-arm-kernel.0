@@ -1,41 +1,28 @@
-From: jaz@semihalf.com (Grzegorz Jaszczyk)
-Date: Fri, 22 Jul 2016 11:10:46 +0200
-Subject: [PATCH 14/18] ARM: mvebu: add support for the Armada 395 SoC
- family
-In-Reply-To: <20160721221605.GA21883@rob-hp-laptop>
-References: <1469105055-25181-1-git-send-email-jaz@semihalf.com>
- <1469105055-25181-16-git-send-email-jaz@semihalf.com>
- <20160721221605.GA21883@rob-hp-laptop>
-Message-ID: <CAH76GKOidxFZ7R1pQZ2W9BRBCxEnLXNHQGrXbAUmouozBUj51Q@mail.gmail.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Fri, 22 Jul 2016 14:53:33 +0530
+Subject: [PATCH 2/2] ARM: DRA7: select PCI_DOMAINS config
+In-Reply-To: <5791D8C7.5020303@ti.com>
+References: <1469102276-14777-1-git-send-email-kishon@ti.com>
+ <1469102276-14777-3-git-send-email-kishon@ti.com>
+ <8047226.VhgpLo8JQu@wuerfel> <20160722071644.GZ28140@atomide.com>
+ <5791D8C7.5020303@ti.com>
+Message-ID: <5791E615.3070904@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+On Friday 22 July 2016 01:56 PM, Kishon Vijay Abraham I wrote:
 
-2016-07-22 0:16 GMT+02:00 Rob Herring <robh@kernel.org>:
-> On Thu, Jul 21, 2016 at 02:44:11PM +0200, Grzegorz Jaszczyk wrote:
->> -compatible = "marvell,a398-db", "marvell,armada398", "marvell,armada390";
->> +compatible = "marvell,a398-db", "marvell,armada398", "marvell,armada395", "marvell,armada390";
->
-> If 395 came after 398, then it should come first in the order. This
-> implies that marvell,armada398 is a better match than marvell,armada395.
-> Or perhaps you shouldn't have both?
->
-> Rob
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 90542db..0cccb50 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -338,6 +338,7 @@ config ARCH_MULTIPLATFORM
+>         select MULTI_IRQ_HANDLER
+>         select SPARSE_IRQ
+>         select USE_OF
+> +       select PCI_DOMAINS if PCI
 
-I am not sure if I get your point. The Armada-398 extends the
-Armada-395 about 2 additional SATA ports (as you can see in commit
-"[PATCH 15/18] ARM: mvebu: a398: update the dtsi about missing
-interfaces"). In this example the a398-db board contains the Armada398
-SoC, so it is a better match and goes first.
+Keep the select list in sorted order.
 
-Quite the same is for existing armada-388-db.dts, in which compatible
-looks like this:
-compatible = "marvell,a385-db", "marvell,armada388",
-"marvell,armada385", "marvell,armada380";
-
-In above, Armada-388 also extends the Armada-385 and the order of the
-compatible is similar to one from my example.
-
-Thank you,
-Grzegorz
+Regards,
+Sekhar
