@@ -1,54 +1,120 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 22 Jul 2016 18:28:40 +0100
-Subject: [PATCH 23/55] arm/arm64: KVM: Check that IDMAP doesn't intersect with
- VA range
+Date: Fri, 22 Jul 2016 18:28:43 +0100
+Subject: [PATCH 26/55] KVM: arm/arm64: vgic: Move redistributor kvm_io_devices
 In-Reply-To: <1469208552-4155-1-git-send-email-marc.zyngier@arm.com>
 References: <1469208552-4155-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1469208552-4155-24-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1469208552-4155-27-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is more of a safety measure than anything else: If we end-up
-with an idmap page that intersect with the range picked for the
-the HYP VA space, abort the KVM setup, as it is unsafe to go
-further.
+From: Andre Przywara <andre.przywara@arm.com>
 
-I cannot imagine it happening on 64bit (we have a mechanism to
-work around it), but could potentially occur on a 32bit system with
-the kernel loaded high enough in memory so that in conflicts with
-the kernel VA.
+Logically a GICv3 redistributor is assigned to a (v)CPU, so we should
+aim to keep redistributor related variables out of our struct vgic_dist.
 
+Let's start by replacing the redistributor related kvm_io_device array
+with two members in our existing struct vgic_cpu, which are naturally
+per-VCPU and thus don't require any allocation / freeing.
+So apart from the better fit with the redistributor design this saves
+some code as well.
+
+Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+Reviewed-by: Eric Auger <eric.auger@redhat.com>
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+Tested-by: Eric Auger <eric.auger@redhat.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm/kvm/mmu.c | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+ include/kvm/arm_vgic.h           |  8 +++++++-
+ virt/kvm/arm/vgic/vgic-init.c    |  1 -
+ virt/kvm/arm/vgic/vgic-mmio-v3.c | 22 ++++++++--------------
+ 3 files changed, 15 insertions(+), 16 deletions(-)
 
-diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index 0b36dd52..8a0aa37 100644
---- a/arch/arm/kvm/mmu.c
-+++ b/arch/arm/kvm/mmu.c
-@@ -1709,6 +1709,21 @@ int kvm_mmu_init(void)
- 	 */
- 	BUG_ON((hyp_idmap_start ^ (hyp_idmap_end - 1)) & PAGE_MASK);
+diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+index 1264037..5142e2a 100644
+--- a/include/kvm/arm_vgic.h
++++ b/include/kvm/arm_vgic.h
+@@ -145,7 +145,6 @@ struct vgic_dist {
+ 	struct vgic_irq		*spis;
  
-+	kvm_info("IDMAP page: %lx\n", hyp_idmap_start);
-+	kvm_info("HYP VA range: %lx:%lx\n",
-+		 KERN_TO_HYP(PAGE_OFFSET), KERN_TO_HYP(~0UL));
+ 	struct vgic_io_device	dist_iodev;
+-	struct vgic_io_device	*redist_iodevs;
+ };
+ 
+ struct vgic_v2_cpu_if {
+@@ -193,6 +192,13 @@ struct vgic_cpu {
+ 	struct list_head ap_list_head;
+ 
+ 	u64 live_lrs;
 +
-+	if (hyp_idmap_start >= KERN_TO_HYP(PAGE_OFFSET) &&
-+	    hyp_idmap_start <  KERN_TO_HYP(~0UL)) {
-+		/*
-+		 * The idmap page is intersecting with the VA space,
-+		 * it is not safe to continue further.
-+		 */
-+		kvm_err("IDMAP intersecting with HYP VA, unable to continue\n");
-+		err = -EINVAL;
-+		goto out;
-+	}
++	/*
++	 * Members below are used with GICv3 emulation only and represent
++	 * parts of the redistributor.
++	 */
++	struct vgic_io_device	rd_iodev;
++	struct vgic_io_device	sgi_iodev;
+ };
+ 
+ int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write);
+diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
+index a1442f7..90cae48 100644
+--- a/virt/kvm/arm/vgic/vgic-init.c
++++ b/virt/kvm/arm/vgic/vgic-init.c
+@@ -271,7 +271,6 @@ static void kvm_vgic_dist_destroy(struct kvm *kvm)
+ 	dist->initialized = false;
+ 
+ 	kfree(dist->spis);
+-	kfree(dist->redist_iodevs);
+ 	dist->nr_spis = 0;
+ 
+ 	mutex_unlock(&kvm->lock);
+diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+index a0c515a..fc7b6c9 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
++++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+@@ -285,21 +285,14 @@ unsigned int vgic_v3_init_dist_iodev(struct vgic_io_device *dev)
+ 
+ int vgic_register_redist_iodevs(struct kvm *kvm, gpa_t redist_base_address)
+ {
+-	int nr_vcpus = atomic_read(&kvm->online_vcpus);
+ 	struct kvm_vcpu *vcpu;
+-	struct vgic_io_device *devices;
+ 	int c, ret = 0;
+ 
+-	devices = kmalloc(sizeof(struct vgic_io_device) * nr_vcpus * 2,
+-			  GFP_KERNEL);
+-	if (!devices)
+-		return -ENOMEM;
+-
+ 	kvm_for_each_vcpu(c, vcpu, kvm) {
+ 		gpa_t rd_base = redist_base_address + c * SZ_64K * 2;
+ 		gpa_t sgi_base = rd_base + SZ_64K;
+-		struct vgic_io_device *rd_dev = &devices[c * 2];
+-		struct vgic_io_device *sgi_dev = &devices[c * 2 + 1];
++		struct vgic_io_device *rd_dev = &vcpu->arch.vgic_cpu.rd_iodev;
++		struct vgic_io_device *sgi_dev = &vcpu->arch.vgic_cpu.sgi_iodev;
+ 
+ 		kvm_iodevice_init(&rd_dev->dev, &kvm_io_gic_ops);
+ 		rd_dev->base_addr = rd_base;
+@@ -335,14 +328,15 @@ int vgic_register_redist_iodevs(struct kvm *kvm, gpa_t redist_base_address)
+ 	if (ret) {
+ 		/* The current c failed, so we start with the previous one. */
+ 		for (c--; c >= 0; c--) {
++			struct vgic_cpu *vgic_cpu;
 +
- 	hyp_pgd = (pgd_t *)__get_free_pages(GFP_KERNEL | __GFP_ZERO, hyp_pgd_order);
- 	if (!hyp_pgd) {
- 		kvm_err("Hyp mode PGD not allocated\n");
++			vcpu = kvm_get_vcpu(kvm, c);
++			vgic_cpu = &vcpu->arch.vgic_cpu;
+ 			kvm_io_bus_unregister_dev(kvm, KVM_MMIO_BUS,
+-						  &devices[c * 2].dev);
++						  &vgic_cpu->rd_iodev.dev);
+ 			kvm_io_bus_unregister_dev(kvm, KVM_MMIO_BUS,
+-						  &devices[c * 2 + 1].dev);
++						  &vgic_cpu->sgi_iodev.dev);
+ 		}
+-		kfree(devices);
+-	} else {
+-		kvm->arch.vgic.redist_iodevs = devices;
+ 	}
+ 
+ 	return ret;
 -- 
 2.8.1
