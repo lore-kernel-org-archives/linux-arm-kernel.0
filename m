@@ -1,135 +1,63 @@
-From: paul.gortmaker@gmail.com (Paul Gortmaker)
-Date: Fri, 22 Jul 2016 16:37:36 -0400
-Subject: [RFC PATCH v1 2/2] drivers: soc: Add support for Hisilicon Djtag
- driver
-In-Reply-To: <1469177332-72156-3-git-send-email-tanxiaojun@huawei.com>
-References: <1469177332-72156-1-git-send-email-tanxiaojun@huawei.com>
- <1469177332-72156-3-git-send-email-tanxiaojun@huawei.com>
-Message-ID: <CAP=VYLpfsMqPZL4J0K2+NMkxG+RHKchDBA+ZGhza9ZfWAa4VnQ@mail.gmail.com>
+From: mitchelh@codeaurora.org (Mitchel Humpherys)
+Date: Fri, 22 Jul 2016 13:39:45 -0700
+Subject: [PATCH v3 0/6] Add support for privileged mappings
+In-Reply-To: <20160722165107.GH16837@arm.com> (Will Deacon's message of "Fri,
+ 22 Jul 2016 17:51:07 +0100")
+References: <20160719203655.16629-1-mitchelh@codeaurora.org>
+ <20160722165107.GH16837@arm.com>
+Message-ID: <vnkweg6l9zla.fsf@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 22, 2016 at 4:48 AM, Tan Xiaojun <tanxiaojun@huawei.com> wrote:
-> The Hisilicon Djtag is an independent module which connects with some modules
-> in the SoC by Debug Bus. This module can be configured to access the registers
-> of connecting modules (like L3 cache) during real time debugging.
+On Fri, Jul 22 2016 at 05:51:07 PM, Will Deacon <will.deacon@arm.com> wrote:
+> On Tue, Jul 19, 2016 at 01:36:49PM -0700, Mitchel Humpherys wrote:
+>> The following patch to the ARM SMMU driver:
+>> 
+>>     commit d346180e70b91b3d5a1ae7e5603e65593d4622bc
+>>     Author: Robin Murphy <robin.murphy@arm.com>
+>>     Date:   Tue Jan 26 18:06:34 2016 +0000
+>>     
+>>         iommu/arm-smmu: Treat all device transactions as unprivileged
+>> 
+>> started forcing all SMMU transactions to come through as "unprivileged".
+>> The rationale given was that:
+>> 
+>>   (1) There is no way in the IOMMU API to even request privileged mappings.
+>> 
+>>   (2) It's difficult to implement a DMA mapper that correctly models the
+>>       ARM VMSAv8 behavior of unprivileged-writeable =>
+>>       privileged-execute-never.
+>> 
+>> This series rectifies (1) by introducing an IOMMU API for privileged
+>> mappings and implements it in io-pgtable-arm.
+>> 
+>> This series rectifies (2) by introducing a new dma attribute
+>> (DMA_ATTR_PRIVILEGED) for users of the DMA API that need privileged
+>> mappings which are inaccessible to lesser-privileged execution levels, and
+>> implements it in the arm64 IOMMU DMA mapper.  The one known user (pl330.c)
+>> is converted over to the new attribute.
+>> 
+>> Jordan and Jeremy can provide more info on the use case if needed, but the
+>> high level is that it's a security feature to prevent attacks such as [1].
 >
-> This patch add the driver of Hisilicon Djtag.
+> This all looks good to me:
 >
-> Signed-off-by: Tan Xiaojun <tanxiaojun@huawei.com>
-> ---
->  drivers/soc/Kconfig                 |    1 +
->  drivers/soc/Makefile                |    1 +
->  drivers/soc/hisilicon/Kconfig       |   12 ++
->  drivers/soc/hisilicon/Makefile      |    1 +
->  drivers/soc/hisilicon/djtag.c       |  373 +++++++++++++++++++++++++++++++++++
->  include/linux/soc/hisilicon/djtag.h |   18 ++
->  6 files changed, 406 insertions(+)
->  create mode 100644 drivers/soc/hisilicon/Kconfig
->  create mode 100644 drivers/soc/hisilicon/Makefile
->  create mode 100644 drivers/soc/hisilicon/djtag.c
->  create mode 100644 include/linux/soc/hisilicon/djtag.h
+> Acked-by: Will Deacon <will.deacon@arm.com>
 >
-> diff --git a/drivers/soc/Kconfig b/drivers/soc/Kconfig
-> index cb58ef0..f5982ec 100644
-> --- a/drivers/soc/Kconfig
-> +++ b/drivers/soc/Kconfig
-> @@ -3,6 +3,7 @@ menu "SOC (System On Chip) specific Drivers"
->  source "drivers/soc/bcm/Kconfig"
->  source "drivers/soc/brcmstb/Kconfig"
->  source "drivers/soc/fsl/qe/Kconfig"
-> +source "drivers/soc/hisilicon/Kconfig"
->  source "drivers/soc/mediatek/Kconfig"
->  source "drivers/soc/qcom/Kconfig"
->  source "drivers/soc/rockchip/Kconfig"
-> diff --git a/drivers/soc/Makefile b/drivers/soc/Makefile
-> index 380230f..373449d 100644
-> --- a/drivers/soc/Makefile
-> +++ b/drivers/soc/Makefile
-> @@ -7,6 +7,7 @@ obj-$(CONFIG_SOC_BRCMSTB)       += brcmstb/
->  obj-$(CONFIG_ARCH_DOVE)                += dove/
->  obj-$(CONFIG_MACH_DOVE)                += dove/
->  obj-y                          += fsl/
-> +obj-$(CONFIG_ARCH_HISI)                += hisilicon/
->  obj-$(CONFIG_ARCH_MEDIATEK)    += mediatek/
->  obj-$(CONFIG_ARCH_QCOM)                += qcom/
->  obj-$(CONFIG_ARCH_RENESAS)     += renesas/
-> diff --git a/drivers/soc/hisilicon/Kconfig b/drivers/soc/hisilicon/Kconfig
-> new file mode 100644
-> index 0000000..3644aab
-> --- /dev/null
-> +++ b/drivers/soc/hisilicon/Kconfig
-> @@ -0,0 +1,12 @@
-> +#
-> +# Hisilicon SoC drivers
-> +#
-> +config HISI_DJTAG
-> +       bool "Hisilicon Djtag Support"
-> +       depends on ARCH_HISI || COMPILE_TEST
-> +       help
-> +         Say y here to enable the Hisilicon Djtag support. It is an
-> +         independent module which connects with some modules in the
-> +         SoC by Debug Bus. This module can be configured to access
-> +         the registers of connecting modules during real time
-> +         debugging.
+> It looks pretty fiddly to merge, however. How are you planning to get
+> this upstream?
 
-Choice of word "module" here is probably confusing since it normally
-means a ".ko" when used in Kconfig help.   Maybe instead, use:
+Fiddly in what way?  Do you mean in relation to "dma-mapping: Use
+unsigned long for dma_attrs" [1]?  I admit I wasn't aware of that
+activity until Robin mentioned it.  It looks like it's merged on
+next/master, shall I rebase/rework on that and resend?
 
-...independent component...
+[1] https://lkml.org/lkml/2016/7/13/198
 
-...connects with some other components....
 
-This driver can be configured to ....
+-Mitch
 
---hopefully  the above will clarify against such confusion.   Also....
-
-> diff --git a/drivers/soc/hisilicon/Makefile b/drivers/soc/hisilicon/Makefile
-> new file mode 100644
-> index 0000000..35a7b4b
-> --- /dev/null
-> +++ b/drivers/soc/hisilicon/Makefile
-> @@ -0,0 +1 @@
-> +obj-$(CONFIG_HISI_DJTAG)       += djtag.o
-> diff --git a/drivers/soc/hisilicon/djtag.c b/drivers/soc/hisilicon/djtag.c
-> new file mode 100644
-> index 0000000..41e11ed
-> --- /dev/null
-> +++ b/drivers/soc/hisilicon/djtag.c
-> @@ -0,0 +1,373 @@
-> +/*
-> + * Driver for Hisilicon Djtag r/w via System Controller.
-> + *
-> + * Copyright (C) 2016 Hisilicon Ltd.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#include <linux/bitops.h>
-> +#include <linux/init.h>
-> +#include <linux/list.h>
-> +#include <linux/mfd/syscon.h>
-> +#include <linux/module.h>
-
-...since you add the driver as a bool Kconfig item, you should
-avoid using module.h and any MODULE_<xyz> tags.  Use the
-builtin registration functions instead.
-
-Alternatively, if there is a genuine use case for this to really be
-a dynamically loadable .ko module, then convert it to tristate.
-
-Thanks,
-Paul.
---
-> +#include <linux/of.h>
-> +#include <linux/of_address.h>
-> +#include <linux/of_device.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/regmap.h>
-> +#include <linux/slab.h>
-> +#include <linux/spinlock.h>
-> +
-> +#include <asm-generic/delay.h>
-> +#include <linux/soc/hisilicon/djtag.h>
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
