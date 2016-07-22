@@ -1,72 +1,47 @@
-From: michael@ellerman.id.au (Michael Ellerman)
-Date: Fri, 22 Jul 2016 12:54:28 +1000
-Subject: [RFC 0/3] extend kexec_file_load system call
-In-Reply-To: <4197460.etrDupniY8@hactar>
-References: <20160712014201.11456-1-takahiro.akashi@linaro.org>
- <3489461.zQnV5C1bXR@wuerfel> <1808359.GMbkTHC4O6@hactar>
- <4197460.etrDupniY8@hactar>
-Message-ID: <878twutmaj.fsf@concordia.ellerman.id.au>
+From: panand@redhat.com (Pratyush Anand)
+Date: Fri, 22 Jul 2016 09:38:42 +0530
+Subject: [PATCH v1 3/4] arm64: Add arm64 kexec support
+In-Reply-To: <1469137776.2977.128.camel@infradead.org>
+References: <cover.1468970114.git.geoff@infradead.org>
+ <9ed513fd44a19b2f49b4da99477cedfff7341bf0.1468970114.git.geoff@infradead.org>
+ <20160720153859.GG24691@leverpostej>
+ <1469042361.2977.90.camel@infradead.org>
+ <20160721103120.GB20559@leverpostej> <5790A902.6070601@arm.com>
+ <1469137776.2977.128.camel@infradead.org>
+Message-ID: <20160722040842.GA14911@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thiago Jung Bauermann <bauerman@linux.vnet.ibm.com> writes:
+On 21/07/2016:02:49:36 PM, Geoff Levand wrote:
+> On Thu, 2016-07-21 at 11:50 +0100, Robin Murphy wrote:
+> > The Exynos UART (drivers/tty/serial/samsung.c) is one which comes to
+> > mind as definitely existing, and on arm64 systems to boot. The TX
+> > register is at offset 0x20 there.
+> 
+> Here's what I came up with.
+> 
+> 
+> +	struct data {const char *name; int tx_offset;};
+> +	static const struct data ok_list[] = {
+> +	/*	{"armada-3700-uart", ?},	*/
+> +		{"exynos4210-uart", 0x20},
+> +	/*	{"ls1021a-lpuart", ?},		*/
+> +	/*	{"meson-uart", ?},		*/
+> +	/*	{"mt6577-uart", ?},		*/
+> +		{"ns16550", 0},
+> +		{"ns16550a", 0},
+> +		{"pl011", 0},
+> +		{NULL, 0}
+> +	};
 
-> Am Freitag, 15 Juli 2016, 18:03:35 schrieb Thiago Jung Bauermann:
->> Am Freitag, 15 Juli 2016, 22:26:09 schrieb Arnd Bergmann:
->> > However, the powerpc specific RTAS runtime services provide a similar
->> > interface to the UEFI runtime support and allow to call into
->> > binary code from the kernel, which gets mapped from a physical
->> > address in the "linux,rtas-base" property in the rtas device node.
->> > 
->> > Modifying the /rtas node will definitely give you a backdoor into
->> > priviledged code, but modifying only /chosen should not let you get
->> > in through that specific method.
->> 
->> Except that arch/powerpc/kernel/rtas.c looks for any node in the tree
->> called "rtas", so it will try to use /chosen/rtas, or /chosen/foo/rtas.
->> 
->> We can forbid subnodes in /chosen in the dtb passed to kexec_file_load,
->> though that means userspace can't use the simple-framebuffer binding via
->> this mechanism.
->> 
->> We also have to blacklist the device_type and compatible properties in
->> /chosen to avoid the problem Mark mentioned.
->> 
->> Still doable, but not ideal. :-/
->
-> So even if not ideal, the solution above is desirable for powerpc. We would 
-> like to preserve the ability of allowing userspace to pass parameters to the 
-> OS via the DTB, even if secure boot is enabled.
->
-> I would like to turn the above into a proposal:
->
-> Extend the syscall as shown in this RFC from Takahiro AKASHI, but instead of 
-> accepting a complete DTB from userspace, the syscall accepts a DTB 
-> containing only a /chosen node. If the DTB contains any other node, the 
-> syscall fails with EINVAL. If the DTB contains any subnode in /chosen, or if 
-> there's a compatible or device_type property in /chosen, the syscall fails 
-> with EINVAL as well.
->
-> The kernel can then add the properties in /chosen to the device tree that it 
-> will pass to the next kernel.
->
-> What do you think?
+sinc functionality is just to debug the scenario when something goes wrong in
+purgatory. IMHO, it should be disabled by default. So, why not to keep it as
+simple as possible. Its a low level debugging mainly for developer, so user
+should know the absolute address. Therefore, I think no need to parse earlycon
+or earlyprintk from command line.  Whatever user passes in --port can be treated
+as address of TX register. If TX offset is 0x20, then user can pass --port as
+base+0x20. Additionally, we can pass TX register width as well. So what about
+something like "--port=0x1c020000,1" where 0x1c020000 is TX register address and
+1 says about it's width in bytes.
 
-I think we will inevitably have someone who wants to pass something
-other than a child of /chosen.
-
-At that point we would be faced with adding yet another syscall, or at
-best a new flag.
-
-I think we'd be better allowing userspace to pass a DTB, and having an
-explicit whitelist (in the kernel) of which nodes & properties are
-allowed in that DTB.
-
-For starters it would only contain /chosen/stdout-path (for example).
-But we would be able to add new nodes & properties in future.
-
-The downside is userspace would have no way of detecting the content of
-the white list, other than trial and error. But in practice I'm not sure
-that would be a big problem.
-
-cheers
+~Pratyush
