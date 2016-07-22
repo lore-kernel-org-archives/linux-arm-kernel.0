@@ -1,65 +1,40 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 22 Jul 2016 18:28:31 +0100
-Subject: [PATCH 14/55] arm/arm64: KVM: Export __hyp_text_start/end symbols
+Date: Fri, 22 Jul 2016 18:28:29 +0100
+Subject: [PATCH 12/55] arm64: KVM: Define HYP offset masks
 In-Reply-To: <1469208552-4155-1-git-send-email-marc.zyngier@arm.com>
 References: <1469208552-4155-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1469208552-4155-15-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1469208552-4155-13-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Declare the __hyp_text_start/end symbols in asm/virt.h so that
-they can be reused without having to declare them locally.
+Define the two possible HYP VA regions in terms of VA_BITS,
+and keep HYP_PAGE_OFFSET_MASK as a temporary compatibility
+definition.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm/include/asm/virt.h   | 4 ++++
- arch/arm/kvm/mmu.c            | 2 --
- arch/arm64/include/asm/virt.h | 4 ++++
- 3 files changed, 8 insertions(+), 2 deletions(-)
+ arch/arm64/include/asm/kvm_mmu.h | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/include/asm/virt.h b/arch/arm/include/asm/virt.h
-index d4ceaf5..a2e75b8 100644
---- a/arch/arm/include/asm/virt.h
-+++ b/arch/arm/include/asm/virt.h
-@@ -80,6 +80,10 @@ static inline bool is_kernel_in_hyp_mode(void)
- 	return false;
- }
- 
-+/* The section containing the hypervisor idmap text */
-+extern char __hyp_idmap_text_start[];
-+extern char __hyp_idmap_text_end[];
+diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+index 2f1e1ae..5e54323 100644
+--- a/arch/arm64/include/asm/kvm_mmu.h
++++ b/arch/arm64/include/asm/kvm_mmu.h
+@@ -68,8 +68,12 @@
+  * functionality is already mapped as part of the main kernel
+  * mappings, and none of this applies in that case.
+  */
+-#define HYP_PAGE_OFFSET_SHIFT	VA_BITS
+-#define HYP_PAGE_OFFSET_MASK	((UL(1) << HYP_PAGE_OFFSET_SHIFT) - 1)
 +
- /* The section containing the hypervisor text */
- extern char __hyp_text_start[];
- extern char __hyp_text_end[];
-diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index 679608f..f004e70 100644
---- a/arch/arm/kvm/mmu.c
-+++ b/arch/arm/kvm/mmu.c
-@@ -32,8 +32,6 @@
- 
- #include "trace.h"
- 
--extern char  __hyp_idmap_text_start[], __hyp_idmap_text_end[];
--
- static pgd_t *boot_hyp_pgd;
- static pgd_t *hyp_pgd;
- static pgd_t *merged_hyp_pgd;
-diff --git a/arch/arm64/include/asm/virt.h b/arch/arm64/include/asm/virt.h
-index dcbcf8d..88aa8ec 100644
---- a/arch/arm64/include/asm/virt.h
-+++ b/arch/arm64/include/asm/virt.h
-@@ -82,6 +82,10 @@ extern void verify_cpu_run_el(void);
- static inline void verify_cpu_run_el(void) {}
- #endif
- 
-+/* The section containing the hypervisor idmap text */
-+extern char __hyp_idmap_text_start[];
-+extern char __hyp_idmap_text_end[];
++#define HYP_PAGE_OFFSET_HIGH_MASK	((UL(1) << VA_BITS) - 1)
++#define HYP_PAGE_OFFSET_LOW_MASK	((UL(1) << (VA_BITS - 1)) - 1)
 +
- /* The section containing the hypervisor text */
- extern char __hyp_text_start[];
- extern char __hyp_text_end[];
++/* Temporary compat define */
++#define HYP_PAGE_OFFSET_MASK		HYP_PAGE_OFFSET_HIGH_MASK
+ 
+ /*
+  * Our virtual mapping for the idmap-ed MMU-enable code. Must be
 -- 
 2.8.1
