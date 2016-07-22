@@ -1,53 +1,53 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Fri, 22 Jul 2016 13:56:47 +0530
-Subject: [PATCH 2/2] ARM: DRA7: select PCI_DOMAINS config
-In-Reply-To: <20160722071644.GZ28140@atomide.com>
-References: <1469102276-14777-1-git-send-email-kishon@ti.com>
- <1469102276-14777-3-git-send-email-kishon@ti.com>
- <8047226.VhgpLo8JQu@wuerfel> <20160722071644.GZ28140@atomide.com>
-Message-ID: <5791D8C7.5020303@ti.com>
+From: minghsiu.tsai@mediatek.com (Minghsiu Tsai)
+Date: Fri, 22 Jul 2016 16:33:00 +0800
+Subject: [PATCH v2 1/4] VPU: mediatek: Add mdp support
+In-Reply-To: <1469176383-35210-1-git-send-email-minghsiu.tsai@mediatek.com>
+References: <1469176383-35210-1-git-send-email-minghsiu.tsai@mediatek.com>
+Message-ID: <1469176383-35210-2-git-send-email-minghsiu.tsai@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+VPU driver add mdp support
 
-On Friday 22 July 2016 12:46 PM, Tony Lindgren wrote:
-> * Arnd Bergmann <arnd@arndb.de> [160721 05:08]:
->> On Thursday, July 21, 2016 5:27:56 PM CEST Kishon Vijay Abraham I wrote:
->>> diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
->>> index 1a648e9..8e6e2c0 100644
->>> --- a/arch/arm/mach-omap2/Kconfig
->>> +++ b/arch/arm/mach-omap2/Kconfig
->>> @@ -86,6 +86,7 @@ config SOC_DRA7XX
->>>         select OMAP_INTERCONNECT_BARRIER
->>>         select PM_OPP if PM
->>>         select ZONE_DMA if ARM_LPAE
->>> +       select PCI_DOMAINS if PCI
->>>  
->>>  config ARCH_OMAP2PLUS
->>>         bool
->>>
->>
->> Should we just set this unconditionally for ARCH_MULTIPLATFORM maybe?
-> 
-> Makes sense to me if many SoCs need this.
+Signed-off-by: Minghsiu Tsai <minghsiu.tsai@mediatek.com>
+---
+ drivers/media/platform/mtk-vpu/mtk_vpu.h |    5 +++++
+ 1 file changed, 5 insertions(+)
 
-since it doesn't harm even if a platform has a single PCIe port, it should be
-okay to set PCI_DOMAINS. I'll resend the following as a separate patch if it's
-okay.
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 90542db..0cccb50 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -338,6 +338,7 @@ config ARCH_MULTIPLATFORM
-        select MULTI_IRQ_HANDLER
-        select SPARSE_IRQ
-        select USE_OF
-+       select PCI_DOMAINS if PCI
-
- config ARM_SINGLE_ARMV7M
-        bool "ARMv7-M based platforms (Cortex-M0/M3/M4)"
-
-Thanks
-Kishon
+diff --git a/drivers/media/platform/mtk-vpu/mtk_vpu.h b/drivers/media/platform/mtk-vpu/mtk_vpu.h
+index f457479..291ae46 100644
+--- a/drivers/media/platform/mtk-vpu/mtk_vpu.h
++++ b/drivers/media/platform/mtk-vpu/mtk_vpu.h
+@@ -53,6 +53,8 @@ typedef void (*ipi_handler_t) (void *data,
+ 			 handle H264 video encoder job, and vice versa.
+  * @IPI_VENC_VP8:	 The interrupt fro vpu is to notify kernel to
+ 			 handle VP8 video encoder job,, and vice versa.
++ * @IPI_MDP:		 The interrupt from vpu is to notify kernel to
++			 handle MDP (Media Data Path) job, and vice versa.
+  * @IPI_MAX:		 The maximum IPI number
+  */
+ 
+@@ -63,6 +65,7 @@ enum ipi_id {
+ 	IPI_VDEC_VP9,
+ 	IPI_VENC_H264,
+ 	IPI_VENC_VP8,
++	IPI_MDP,
+ 	IPI_MAX,
+ };
+ 
+@@ -71,11 +74,13 @@ enum ipi_id {
+  *
+  * @VPU_RST_ENC: encoder reset id
+  * @VPU_RST_DEC: decoder reset id
++ * @VPU_RST_MDP: MDP (Media Data Path) reset id
+  * @VPU_RST_MAX: maximum reset id
+  */
+ enum rst_id {
+ 	VPU_RST_ENC,
+ 	VPU_RST_DEC,
++	VPU_RST_MDP,
+ 	VPU_RST_MAX,
+ };
+ 
+-- 
+1.7.9.5
