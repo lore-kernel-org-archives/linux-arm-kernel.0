@@ -1,270 +1,81 @@
-From: fu.wei@linaro.org (Fu Wei)
-Date: Sat, 23 Jul 2016 01:57:02 +0800
-Subject: [PATCH v8 5/9] acpi/arm64: Add GTDT table parse driver
-In-Reply-To: <2091912.arUKSr7MLh@vostro.rjw.lan>
-References: <1468952284-28942-1-git-send-email-fu.wei@linaro.org>
- <1468952284-28942-6-git-send-email-fu.wei@linaro.org>
- <2091912.arUKSr7MLh@vostro.rjw.lan>
-Message-ID: <CADyBb7vDHb7o8d3B-gOp_hVK4dksZHg3fOuLMaOfvUX+=wX3vA@mail.gmail.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Fri, 22 Jul 2016 18:59:24 +0100
+Subject: [PATCH v1 3/4] arm64: Add arm64 kexec support
+In-Reply-To: <20160722135630.GC14911@localhost.localdomain>
+References: <cover.1468970114.git.geoff@infradead.org>
+ <9ed513fd44a19b2f49b4da99477cedfff7341bf0.1468970114.git.geoff@infradead.org>
+ <20160720153859.GG24691@leverpostej> <1469042361.2977.90.camel@infradead.org>
+ <20160721103120.GB20559@leverpostej> <5790A902.6070601@arm.com>
+ <1469137776.2977.128.camel@infradead.org>
+ <20160722040842.GA14911@localhost.localdomain> <5791EF62.5070006@arm.com>
+ <20160722135630.GC14911@localhost.localdomain>
+Message-ID: <57925EFC.20205@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rafael,
-
-On 21 July 2016 at 21:28, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
-> On Wednesday, July 20, 2016 02:18:00 AM fu.wei at linaro.org wrote:
->> From: Fu Wei <fu.wei@linaro.org>
+On 22/07/16 14:56, Pratyush Anand wrote:
+> Hi Robin,
+> 
+> On 22/07/2016:11:03:14 AM, Robin Murphy wrote:
+>> On 22/07/16 05:08, Pratyush Anand wrote:
+>>> On 21/07/2016:02:49:36 PM, Geoff Levand wrote:
+>>>> On Thu, 2016-07-21 at 11:50 +0100, Robin Murphy wrote:
+>>>>> The Exynos UART (drivers/tty/serial/samsung.c) is one which comes to
+>>>>> mind as definitely existing, and on arm64 systems to boot. The TX
+>>>>> register is at offset 0x20 there.
+>>>>
+>>>> Here's what I came up with.
+>>>>
+>>>>
+>>>> +	struct data {const char *name; int tx_offset;};
+>>>> +	static const struct data ok_list[] = {
+>>>> +	/*	{"armada-3700-uart", ?},	*/
+>>>> +		{"exynos4210-uart", 0x20},
+>>>> +	/*	{"ls1021a-lpuart", ?},		*/
+>>>> +	/*	{"meson-uart", ?},		*/
+>>>> +	/*	{"mt6577-uart", ?},		*/
+>>>> +		{"ns16550", 0},
+>>>> +		{"ns16550a", 0},
+>>>> +		{"pl011", 0},
+>>>> +		{NULL, 0}
+>>>> +	};
+>>>
+>>> sinc functionality is just to debug the scenario when something goes wrong in
+>>> purgatory. IMHO, it should be disabled by default. So, why not to keep it as
+>>> simple as possible. Its a low level debugging mainly for developer, so user
+>>> should know the absolute address. Therefore, I think no need to parse earlycon
+>>> or earlyprintk from command line.  Whatever user passes in --port can be treated
+>>> as address of TX register. If TX offset is 0x20, then user can pass --port as
+>>> base+0x20. Additionally, we can pass TX register width as well. So what about
+>>> something like "--port=0x1c020000,1" where 0x1c020000 is TX register address and
+>>> 1 says about it's width in bytes.
 >>
->> This patch adds support for parsing arch timer in GTDT,
->> provides some kernel APIs to parse all the PPIs and
->> always-on info in GTDT and export them.
->>
->> By this driver, we can simplify arm_arch_timer drivers, and
->> separate the ACPI GTDT knowledge from it.
->>
->> Signed-off-by: Fu Wei <fu.wei@linaro.org>
->> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
->> ---
->>  arch/arm64/Kconfig             |   1 +
->>  drivers/acpi/Kconfig           |   5 ++
->>  drivers/acpi/Makefile          |   1 +
->>  drivers/acpi/arm64/Kconfig     |   5 ++
->>  drivers/acpi/arm64/Makefile    |   1 +
->>  drivers/acpi/arm64/acpi_gtdt.c | 152 +++++++++++++++++++++++++++++++++++++++++
->>  drivers/clocksource/Kconfig    |   1 -
->>  include/linux/acpi.h           |   6 ++
->>  8 files changed, 171 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
->> index 5a0a691..0b9fba7 100644
->> --- a/arch/arm64/Kconfig
->> +++ b/arch/arm64/Kconfig
->> @@ -2,6 +2,7 @@ config ARM64
->>       def_bool y
->>       select ACPI_CCA_REQUIRED if ACPI
->>       select ACPI_GENERIC_GSI if ACPI
->> +     select ACPI_GTDT if ACPI
->>       select ACPI_REDUCED_HARDWARE_ONLY if ACPI
->>       select ARCH_HAS_DEVMEM_IS_ALLOWED
->>       select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
->> diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
->> index b7e2e77..1cdc7d2 100644
->> --- a/drivers/acpi/Kconfig
->> +++ b/drivers/acpi/Kconfig
->> @@ -521,4 +521,9 @@ config XPOWER_PMIC_OPREGION
->>
->>  endif
->>
->> +if ARM64
->> +source "drivers/acpi/arm64/Kconfig"
->> +
->> +endif
->> +
->>  endif        # ACPI
->> diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
->> index 251ce85..1a94ff7 100644
->> --- a/drivers/acpi/Makefile
->> +++ b/drivers/acpi/Makefile
->> @@ -99,5 +99,6 @@ obj-$(CONFIG_ACPI_EXTLOG)   += acpi_extlog.o
->>  obj-$(CONFIG_PMIC_OPREGION)  += pmic/intel_pmic.o
->>  obj-$(CONFIG_CRC_PMIC_OPREGION) += pmic/intel_pmic_crc.o
->>  obj-$(CONFIG_XPOWER_PMIC_OPREGION) += pmic/intel_pmic_xpower.o
->> +obj-$(CONFIG_ARM64)  += arm64/
->>
->>  video-objs                   += acpi_video.o video_detect.o
->> diff --git a/drivers/acpi/arm64/Kconfig b/drivers/acpi/arm64/Kconfig
->> new file mode 100644
->> index 0000000..80201be
->> --- /dev/null
->> +++ b/drivers/acpi/arm64/Kconfig
->> @@ -0,0 +1,5 @@
->> +#
->> +# ACPI Configuration for ARM64
->> +#
->> +config ACPI_GTDT
->> +     bool
->> diff --git a/drivers/acpi/arm64/Makefile b/drivers/acpi/arm64/Makefile
->> new file mode 100644
->> index 0000000..466de6b
->> --- /dev/null
->> +++ b/drivers/acpi/arm64/Makefile
->> @@ -0,0 +1 @@
->> +obj-$(CONFIG_ACPI_GTDT)              += acpi_gtdt.o
->> diff --git a/drivers/acpi/arm64/acpi_gtdt.c b/drivers/acpi/arm64/acpi_gtdt.c
->> new file mode 100644
->> index 0000000..e1cfc9e
->> --- /dev/null
->> +++ b/drivers/acpi/arm64/acpi_gtdt.c
->> @@ -0,0 +1,152 @@
->> +/*
->> + * ARM Specific GTDT table Support
->> + *
->> + * Copyright (C) 2016, Linaro Ltd.
->> + * Author: Daniel Lezcano <daniel.lezcano@linaro.org>
->> + *         Fu Wei <fu.wei@linaro.org>
->> + *         Hanjun Guo <hanjun.guo@linaro.org>
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + */
->> +
->> +#include <linux/acpi.h>
->> +#include <linux/init.h>
->> +#include <linux/kernel.h>
->> +
->> +#include <clocksource/arm_arch_timer.h>
->> +
->> +#undef pr_fmt
->> +#define pr_fmt(fmt) "ACPI GTDT: " fmt
->> +
->> +typedef struct {
->> +     struct acpi_table_gtdt *gtdt;
->> +     void *platform_timer_start;
->> +     void *gtdt_end;
->> +} acpi_gtdt_desc_t;
->> +
->> +static acpi_gtdt_desc_t acpi_gtdt_desc __initdata;
->> +
->> +static inline void *next_platform_timer(void *platform_timer)
->> +{
->> +     struct acpi_gtdt_header *gh = platform_timer;
->> +
->> +     platform_timer += gh->length;
->> +     if (platform_timer < acpi_gtdt_desc.gtdt_end)
->> +             return platform_timer;
->> +
->> +     return NULL;
->> +}
->> +
->> +#define for_each_platform_timer(_g)                          \
->> +     for (_g = acpi_gtdt_desc.platform_timer_start; _g;      \
->> +          _g = next_platform_timer(_g))
->> +
->> +static inline bool is_timer_block(void *platform_timer)
->> +{
->> +     struct acpi_gtdt_header *gh = platform_timer;
->> +
->> +     return gh->type == ACPI_GTDT_TYPE_TIMER_BLOCK;
->> +}
->> +
->> +static inline bool is_watchdog(void *platform_timer)
->> +{
->> +     struct acpi_gtdt_header *gh = platform_timer;
->> +
->> +     return gh->type == ACPI_GTDT_TYPE_WATCHDOG;
->> +}
->> +
->> +static int __init map_generic_timer_interrupt(u32 interrupt, u32 flags)
->> +{
->> +     int trigger, polarity;
->> +
->> +     if (!interrupt)
->> +             return 0;
->> +
->> +     trigger = (flags & ACPI_GTDT_INTERRUPT_MODE) ? ACPI_EDGE_SENSITIVE
->> +                     : ACPI_LEVEL_SENSITIVE;
->> +
->> +     polarity = (flags & ACPI_GTDT_INTERRUPT_POLARITY) ? ACPI_ACTIVE_LOW
->> +                     : ACPI_ACTIVE_HIGH;
->> +
->> +     return acpi_register_gsi(NULL, interrupt, trigger, polarity);
->> +}
->> +
->> +/*
->> + * Map the PPIs of per-cpu arch_timer.
->> + * @type: the type of PPI
->> + * Returns 0 if error.
->> + */
->> +int __init acpi_gtdt_map_ppi(int type)
->> +{
->> +     struct acpi_table_gtdt *gtdt = acpi_gtdt_desc.gtdt;
->> +
->> +     switch (type) {
->> +     case PHYS_SECURE_PPI:
->> +             return map_generic_timer_interrupt(gtdt->secure_el1_interrupt,
->> +                                                gtdt->secure_el1_flags);
->> +     case PHYS_NONSECURE_PPI:
->> +             return map_generic_timer_interrupt(gtdt->non_secure_el1_interrupt,
->> +                                                gtdt->non_secure_el1_flags);
->> +     case VIRT_PPI:
->> +             return map_generic_timer_interrupt(gtdt->virtual_timer_interrupt,
->> +                                                gtdt->virtual_timer_flags);
->> +
->> +     case HYP_PPI:
->> +             return map_generic_timer_interrupt(gtdt->non_secure_el2_interrupt,
->> +                                                gtdt->non_secure_el2_flags);
->> +     default:
->> +             pr_err("Map PPI failed: invalid type.\n");
->> +     }
->> +
->> +     return 0;
->> +}
->> +
->> +/*
->> + * acpi_gtdt_c3stop - got c3stop info from GTDT
->> + *
->> + * Returns 1 if the timer is powered in deep idle state, 0 otherwise.
->> + */
->> +bool __init acpi_gtdt_c3stop(void)
->> +{
->> +     struct acpi_table_gtdt *gtdt = acpi_gtdt_desc.gtdt;
->> +
->> +     return !(gtdt->non_secure_el1_flags & ACPI_GTDT_ALWAYS_ON);
->> +}
->> +
->> +/*
->> + * Get some basic info from GTDT table, and init the global variables above
->> + * for all timers initialization of Generic Timer.
->> + * This function does some validation on GTDT table.
->> + */
->> +int __init acpi_gtdt_init(struct acpi_table_header *table)
->> +{
->> +     void *start;
->> +     struct acpi_table_gtdt *gtdt;
->> +
->> +     gtdt = container_of(table, struct acpi_table_gtdt, header);
->> +
->> +     acpi_gtdt_desc.gtdt = gtdt;
->> +     acpi_gtdt_desc.gtdt_end = (void *)table + table->length;
->> +
->> +     if (table->revision < 2) {
->> +             pr_debug("Revision:%d doesn't support Platform Timers.\n",
->> +                      table->revision);
->> +             return 0;
->> +     }
->> +
->> +     if (!gtdt->platform_timer_count) {
->> +             pr_debug("No Platform Timer.\n");
->> +             return 0;
->> +     }
->> +
->> +     start = (void *)gtdt + gtdt->platform_timer_offset;
->> +     if (start < (void *)table + sizeof(struct acpi_table_gtdt)) {
->> +             pr_err(FW_BUG "Failed to init table: ACPI/GTDT is buggy.\n");
->
-> I would prefer something like
->
->                 pr_err(FW_BUG "Failed to retrieve timer information from firmware (invalid data)\n");
->
-> which is clear enough IMO and doesn't require whoever reads this message
-> to know anything about ACPI/GTDT etc.
+>> I don't think even that is worthwhile, since without any polling it
+>> still relies on the UART having FIFOs, someone having already enabled
+>> the FIFOs, the FIFOs being deep enough and/or the output being short
+>> enough. In short, it's fragile enough that I'm not convinced it's even
+>> useful as a debug option. I suggest we simply copy the purgatory console
+>> implementation from, say, ARM or Alpha.
+> 
+> May be I am missing, but deep TX FIFO should not be an issue. Whatever, we write
+> in TX register, that will go to the port eventually. However, I do agree that
 
-OK, NP, I will do, and Thanks for your suggestion :-)
-I will also check other pr_* , see If I can update them
+"Deep" is an issue when in the sense of "not %s enough" ;)
 
-thanks
+(of which "disabled" is also really just a special case of depth=1)
 
->
-> Thanks,
-> Rafael
->
+> short FIFO could be an issue and overflow is quite possible in that case. I had
+> been trying to convince Geoff to take [1], which will help to resolve it.
 
+That would make things more useful, yes. As above it would also want
+extending to specify the MMIO access size, so for completeness I guess
+we'd end up with something like:
 
+--console-tx=<addr>[,{8|16|16be|32|32be}]
+--console-status=<addr>,<mask>[,{8|16|16be|32|32be}]
 
--- 
-Best regards,
+which, other than probably needing some inline asm to guarantee the
+appropriate accesses, seems like it could be shared across other
+architectures too. Or more bother than it's worth; I can't really decide.
 
-Fu Wei
-Software Engineer
-Red Hat
+Robin.
