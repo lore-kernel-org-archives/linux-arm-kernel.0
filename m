@@ -1,167 +1,82 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 22 Jul 2016 18:28:35 +0100
-Subject: [PATCH 18/55] arm/arm64: KVM: Drop boot_pgd
+Date: Fri, 22 Jul 2016 18:28:47 +0100
+Subject: [PATCH 30/55] KVM: kvm_io_bus: Add kvm_io_bus_get_dev() call
 In-Reply-To: <1469208552-4155-1-git-send-email-marc.zyngier@arm.com>
 References: <1469208552-4155-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1469208552-4155-19-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1469208552-4155-31-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since we now only have one set of page tables, the concept of
-boot_pgd is useless and can be removed. We still keep it as
-an element of the "extended idmap" thing.
+From: Andre Przywara <andre.przywara@arm.com>
 
+The kvm_io_bus framework is a nice place of holding information about
+various MMIO regions for kernel emulated devices.
+Add a call to retrieve the kvm_io_device structure which is associated
+with a certain MMIO address. This avoids to duplicate kvm_io_bus'
+knowledge of MMIO regions without having to fake MMIO calls if a user
+needs the device a certain MMIO address belongs to.
+This will be used by the ITS emulation to get the associated ITS device
+when someone triggers an MSI via an ioctl from userspace.
+
+Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+Reviewed-by: Eric Auger <eric.auger@redhat.com>
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+Acked-by: Paolo Bonzini <pbonzini@redhat.com>
+Tested-by: Eric Auger <eric.auger@redhat.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm/include/asm/kvm_host.h   |  8 +++-----
- arch/arm/include/asm/kvm_mmu.h    |  1 -
- arch/arm/kvm/arm.c                | 15 +++------------
- arch/arm/kvm/mmu.c                |  8 --------
- arch/arm64/include/asm/kvm_host.h |  6 ++----
- arch/arm64/include/asm/kvm_mmu.h  |  1 -
- 6 files changed, 8 insertions(+), 31 deletions(-)
+ include/linux/kvm_host.h |  2 ++
+ virt/kvm/kvm_main.c      | 24 ++++++++++++++++++++++++
+ 2 files changed, 26 insertions(+)
 
-diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-index 96387d4..020f4eb 100644
---- a/arch/arm/include/asm/kvm_host.h
-+++ b/arch/arm/include/asm/kvm_host.h
-@@ -241,8 +241,7 @@ int kvm_arm_coproc_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *);
- int handle_exit(struct kvm_vcpu *vcpu, struct kvm_run *run,
- 		int exception_index);
+diff --git a/include/linux/kvm_host.h b/include/linux/kvm_host.h
+index 0640ee9..614a981 100644
+--- a/include/linux/kvm_host.h
++++ b/include/linux/kvm_host.h
+@@ -164,6 +164,8 @@ int kvm_io_bus_register_dev(struct kvm *kvm, enum kvm_bus bus_idx, gpa_t addr,
+ 			    int len, struct kvm_io_device *dev);
+ int kvm_io_bus_unregister_dev(struct kvm *kvm, enum kvm_bus bus_idx,
+ 			      struct kvm_io_device *dev);
++struct kvm_io_device *kvm_io_bus_get_dev(struct kvm *kvm, enum kvm_bus bus_idx,
++					 gpa_t addr);
  
--static inline void __cpu_init_hyp_mode(phys_addr_t boot_pgd_ptr,
--				       phys_addr_t pgd_ptr,
-+static inline void __cpu_init_hyp_mode(phys_addr_t pgd_ptr,
- 				       unsigned long hyp_stack_ptr,
- 				       unsigned long vector_ptr)
- {
-@@ -272,12 +271,11 @@ static inline void __cpu_init_stage2(void)
- 	kvm_call_hyp(__init_stage2_translation);
+ #ifdef CONFIG_KVM_ASYNC_PF
+ struct kvm_async_pf {
+diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
+index ef54b4c..bd2eb92 100644
+--- a/virt/kvm/kvm_main.c
++++ b/virt/kvm/kvm_main.c
+@@ -3496,6 +3496,30 @@ int kvm_io_bus_unregister_dev(struct kvm *kvm, enum kvm_bus bus_idx,
+ 	return r;
  }
  
--static inline void __cpu_reset_hyp_mode(phys_addr_t boot_pgd_ptr,
--					phys_addr_t phys_idmap_start)
-+static inline void __cpu_reset_hyp_mode(phys_addr_t phys_idmap_start)
- {
- 	/*
- 	 * TODO
--	 * kvm_call_reset(boot_pgd_ptr, phys_idmap_start);
-+	 * kvm_call_reset(phys_idmap_start);
- 	 */
- }
- 
-diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-index 6cb4d4d..5d161d1 100644
---- a/arch/arm/include/asm/kvm_mmu.h
-+++ b/arch/arm/include/asm/kvm_mmu.h
-@@ -65,7 +65,6 @@ int kvm_handle_guest_abort(struct kvm_vcpu *vcpu, struct kvm_run *run);
- void kvm_mmu_free_memory_caches(struct kvm_vcpu *vcpu);
- 
- phys_addr_t kvm_mmu_get_httbr(void);
--phys_addr_t kvm_mmu_get_boot_httbr(void);
- phys_addr_t kvm_get_idmap_vector(void);
- phys_addr_t kvm_get_idmap_start(void);
- int kvm_mmu_init(void);
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index c74483f..0887cc1 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -1038,7 +1038,6 @@ long kvm_arch_vm_ioctl(struct file *filp,
- 
- static void cpu_init_hyp_mode(void *dummy)
- {
--	phys_addr_t boot_pgd_ptr;
- 	phys_addr_t pgd_ptr;
- 	unsigned long hyp_stack_ptr;
- 	unsigned long stack_page;
-@@ -1047,13 +1046,12 @@ static void cpu_init_hyp_mode(void *dummy)
- 	/* Switch from the HYP stub to our own HYP init vector */
- 	__hyp_set_vectors(kvm_get_idmap_vector());
- 
--	boot_pgd_ptr = kvm_mmu_get_boot_httbr();
- 	pgd_ptr = kvm_mmu_get_httbr();
- 	stack_page = __this_cpu_read(kvm_arm_hyp_stack_page);
- 	hyp_stack_ptr = stack_page + PAGE_SIZE;
- 	vector_ptr = (unsigned long)kvm_ksym_ref(__kvm_hyp_vector);
- 
--	__cpu_init_hyp_mode(boot_pgd_ptr, pgd_ptr, hyp_stack_ptr, vector_ptr);
-+	__cpu_init_hyp_mode(pgd_ptr, hyp_stack_ptr, vector_ptr);
- 	__cpu_init_stage2();
- 
- 	kvm_arm_init_debug();
-@@ -1075,15 +1073,8 @@ static void cpu_hyp_reinit(void)
- 
- static void cpu_hyp_reset(void)
- {
--	phys_addr_t boot_pgd_ptr;
--	phys_addr_t phys_idmap_start;
--
--	if (!is_kernel_in_hyp_mode()) {
--		boot_pgd_ptr = kvm_mmu_get_boot_httbr();
--		phys_idmap_start = kvm_get_idmap_start();
--
--		__cpu_reset_hyp_mode(boot_pgd_ptr, phys_idmap_start);
--	}
-+	if (!is_kernel_in_hyp_mode())
-+		__cpu_reset_hyp_mode(kvm_get_idmap_start());
- }
- 
- static void _kvm_arch_hardware_enable(void *discard)
-diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index 80d3737..dd4ccc7 100644
---- a/arch/arm/kvm/mmu.c
-+++ b/arch/arm/kvm/mmu.c
-@@ -1685,14 +1685,6 @@ phys_addr_t kvm_mmu_get_httbr(void)
- 		return virt_to_phys(hyp_pgd);
- }
- 
--phys_addr_t kvm_mmu_get_boot_httbr(void)
--{
--	if (__kvm_cpu_uses_extended_idmap())
--		return virt_to_phys(merged_hyp_pgd);
--	else
--		return virt_to_phys(hyp_pgd);
--}
--
- phys_addr_t kvm_get_idmap_vector(void)
- {
- 	return hyp_idmap_vector;
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index 88462c3..6731d4e 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -347,8 +347,7 @@ int kvm_perf_teardown(void);
- 
- struct kvm_vcpu *kvm_mpidr_to_vcpu(struct kvm *kvm, unsigned long mpidr);
- 
--static inline void __cpu_init_hyp_mode(phys_addr_t boot_pgd_ptr,
--				       phys_addr_t pgd_ptr,
-+static inline void __cpu_init_hyp_mode(phys_addr_t pgd_ptr,
- 				       unsigned long hyp_stack_ptr,
- 				       unsigned long vector_ptr)
- {
-@@ -360,8 +359,7 @@ static inline void __cpu_init_hyp_mode(phys_addr_t boot_pgd_ptr,
- }
- 
- void __kvm_hyp_teardown(void);
--static inline void __cpu_reset_hyp_mode(phys_addr_t boot_pgd_ptr,
--					phys_addr_t phys_idmap_start)
-+static inline void __cpu_reset_hyp_mode(phys_addr_t phys_idmap_start)
- {
- 	kvm_call_hyp(__kvm_hyp_teardown, phys_idmap_start);
- }
-diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index 2970537..390acab 100644
---- a/arch/arm64/include/asm/kvm_mmu.h
-+++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -170,7 +170,6 @@ int kvm_handle_guest_abort(struct kvm_vcpu *vcpu, struct kvm_run *run);
- void kvm_mmu_free_memory_caches(struct kvm_vcpu *vcpu);
- 
- phys_addr_t kvm_mmu_get_httbr(void);
--phys_addr_t kvm_mmu_get_boot_httbr(void);
- phys_addr_t kvm_get_idmap_vector(void);
- phys_addr_t kvm_get_idmap_start(void);
- int kvm_mmu_init(void);
++struct kvm_io_device *kvm_io_bus_get_dev(struct kvm *kvm, enum kvm_bus bus_idx,
++					 gpa_t addr)
++{
++	struct kvm_io_bus *bus;
++	int dev_idx, srcu_idx;
++	struct kvm_io_device *iodev = NULL;
++
++	srcu_idx = srcu_read_lock(&kvm->srcu);
++
++	bus = srcu_dereference(kvm->buses[bus_idx], &kvm->srcu);
++
++	dev_idx = kvm_io_bus_get_first_dev(bus, addr, 1);
++	if (dev_idx < 0)
++		goto out_unlock;
++
++	iodev = bus->range[dev_idx].dev;
++
++out_unlock:
++	srcu_read_unlock(&kvm->srcu, srcu_idx);
++
++	return iodev;
++}
++EXPORT_SYMBOL_GPL(kvm_io_bus_get_dev);
++
+ static struct notifier_block kvm_cpu_notifier = {
+ 	.notifier_call = kvm_cpu_hotplug,
+ };
 -- 
 2.8.1
