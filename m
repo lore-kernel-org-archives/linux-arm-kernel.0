@@ -1,57 +1,39 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 22 Jul 2016 11:41:30 +0300
-Subject: [PATCH 0/4] ARM: OMAP2+: Fix AM335x RTC External Abort
-In-Reply-To: <20160712175034.743-1-d-gerlach@ti.com>
-References: <20160712175034.743-1-d-gerlach@ti.com>
-Message-ID: <5791DC3A.6070808@ti.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 22 Jul 2016 10:59:29 +0200
+Subject: [PATCH 1/3] mmc: sunxi-mmc: change idma descriptor to __le32
+In-Reply-To: <20160721182329.13478-2-michael.weiser@gmx.de>
+References: <20160721182329.13478-1-michael.weiser@gmx.de>
+ <20160721182329.13478-2-michael.weiser@gmx.de>
+Message-ID: <20160722085929.GA7687@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/07/16 20:50, Dave Gerlach wrote:
-> Hi,
-> With next-20160711 there is an external abort during boot on am335x
-> platforms from the RTC which is caused by commit 183e2077d007 ("ARM:
-> AM33xx: fix module_wait_ready without clkctrl register"), log is here [1].
-> The RTC hwmod is unique in that it has a clkctrl_offs of 0 which is
-> invalid normally, all other hwmods have non-zero offsets. Because of this,
-> we need to flag the hwmod so 0 actually gets used for the offset
-> instead of the just returning 0 and doing nothing.
->
-> This series adds a HWMOD_OMAP4_ZERO_CLKCTRL_OFFSET flag and moves the check
-> for validity of the clkctrl_offs value to the omap_hwmod code so that we are
-> able to check both the flag and clkctrl_offs values. This code is shared by
-> all OMAP4+ platforms but shoudl have no affect for anything but RTC on
-> am335x but still boot tested on the following platforms:
+On Thu, Jul 21, 2016 at 08:23:27PM +0200, Michael Weiser wrote:
+> The sunxi-mmc driver does not take into account the processor may be big
+> endian when writing the DMA descriptors. This causes cards not to be
+> detected when running a big-endian kernel. Change the descriptors for
+> IDMA to use __le32 and ensure they are suitably swapped before writing.
+> Tested successfully on the Cubieboard2.
+> 
+> Signed-off-by: Michael Weiser <michael.weiser@gmx.de>
+> Cc: Ulf Hansson <ulf.hansson@linaro.org>
+> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Cc: Chen-Yu Tsai <wens@csie.org>
+> Cc: linux-mmc at vger.kernel.org
 
-Series looks good to me, so:
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-Acked-by: Tero Kristo <t-kristo@ti.com>
+Thanks,
+Maxime
 
--Tero
-
->
-> AM335x GP EVM:		Pass http://pastebin.ubuntu.com/19186160/
-> Beaglebone Black:	Pass http://pastebin.ubuntu.com/19186862/
-> AM437x GP EVM:		Pass http://pastebin.ubuntu.com/19186555/
-> OMAP4 Panda ES:		Pass http://pastebin.ubuntu.com/19186711/
-> OMAP5 uEVM:		Pass http://pastebin.ubuntu.com/19186925/
->
-> Regards,
-> Dave
->
-> [1] https://storage.kernelci.org/next/next-20160711/arm-omap2plus_defconfig/lab-baylibre-seattle/boot-am335x-boneblack.html
->
-> Dave Gerlach (4):
->    ARM: OMAP4+: hwmod: Add hwmod flag for HWMOD_OMAP4_ZERO_CLKCTRL_OFFSET
->    ARM: OMAP2+: AM33XX: Add HWMOD_OMAP4_ZERO_CLKCTRL_OFFSET flag to rtc
->      hwmod
->    ARM: OMAP4+: Have _omap4_wait_target_* check for valid clkctrl_offs
->    ARM: OMAP4+: CM: Remove redundant checks for clkctrl_offs of zero
->
->   arch/arm/mach-omap2/cm33xx.c                            | 6 ------
->   arch/arm/mach-omap2/cminst44xx.c                        | 6 ------
->   arch/arm/mach-omap2/omap_hwmod.c                        | 8 ++++++++
->   arch/arm/mach-omap2/omap_hwmod.h                        | 4 ++++
->   arch/arm/mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c | 2 ++
->   5 files changed, 14 insertions(+), 12 deletions(-)
->
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160722/f4b399ca/attachment.sig>
