@@ -1,39 +1,54 @@
-From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Sat, 23 Jul 2016 10:14:22 -0400
-Subject: [PATCH 1/3] ARM: mach-omap2: remove bogus "or_module" from
- rx51-peripherals
-In-Reply-To: <20160723055524.GA28140@atomide.com>
-References: <20160720041332.30789-1-paul.gortmaker@windriver.com>
- <20160720041332.30789-2-paul.gortmaker@windriver.com>
- <20160722064101.GW28140@atomide.com>
- <20160722140242.GC11410@windriver.com>
- <20160723055524.GA28140@atomide.com>
-Message-ID: <20160723141421.GC12632@windriver.com>
+From: elfring@users.sourceforge.net (SF Markus Elfring)
+Date: Sat, 23 Jul 2016 20:08:38 +0200
+Subject: [PATCH] coresight: tmc: Delete an unnecessary check before the
+ function call "kfree"
+In-Reply-To: <5317A59D.4@users.sourceforge.net>
+References: <5307CAA2.8060406@users.sourceforge.net>
+ <alpine.DEB.2.02.1402212321410.2043@localhost6.localdomain6>
+ <530A086E.8010901@users.sourceforge.net>
+ <alpine.DEB.2.02.1402231635510.1985@localhost6.localdomain6>
+ <530A72AA.3000601@users.sourceforge.net>
+ <alpine.DEB.2.02.1402240658210.2090@localhost6.localdomain6>
+ <530B5FB6.6010207@users.sourceforge.net>
+ <alpine.DEB.2.10.1402241710370.2074@hadrien>
+ <530C5E18.1020800@users.sourceforge.net>
+ <alpine.DEB.2.10.1402251014170.2080@hadrien>
+ <530CD2C4.4050903@users.sourceforge.net>
+ <alpine.DEB.2.10.1402251840450.7035@hadrien>
+ <530CF8FF.8080600@users.sourceforge.net>
+ <alpine.DEB.2.02.1402252117150.2047@localhost6.localdomain6>
+ <530DD06F.4090703@users.sourceforge.net>
+ <alpine.DEB.2.02.1402262129250.2221@localhost6.localdomain6>
+ <5317A59D.4@users.sourceforge.net>
+Message-ID: <5c1330e9-351f-0401-5018-5e6a7aa56a32@users.sourceforge.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Re: [PATCH 1/3] ARM: mach-omap2: remove bogus "or_module" from rx51-peripherals] On 22/07/2016 (Fri 22:55) Tony Lindgren wrote:
+From: Markus Elfring <elfring@users.sourceforge.net>
+Date: Sat, 23 Jul 2016 20:04:09 +0200
 
-> * Paul Gortmaker <paul.gortmaker@windriver.com> [160722 07:02]:
+The kfree() function tests whether its argument is NULL and then
+returns immediately. Thus the test around the call is not needed.
 
-[...]
+This issue was detected by using the Coccinelle software.
 
-> > Having the patch present, or having the file deleted both take care of
-> > my concern -- which was was introducing build regressions when adding
-> > the gpio header cleanup into for-4.9 content.  
-> 
-> OK. As I've already pushed out the board-*.c removal branch, I
-> suggest we just drop the $subject patch to avoid a merge conflict.
+Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
+---
+ drivers/hwtracing/coresight/coresight-tmc-etf.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Sounds like a plan.  I'll just keep it in my local queue so my tests
-don't fail and drop it on the floor once I see your removal loop around
-to me via linux-next or master.
-
-Thanks,
-Paul.
---
-
-> 
-> Regards,
-> 
-> Tony
+diff --git a/drivers/hwtracing/coresight/coresight-tmc-etf.c b/drivers/hwtracing/coresight/coresight-tmc-etf.c
+index e68289b..5fa49c4 100644
+--- a/drivers/hwtracing/coresight/coresight-tmc-etf.c
++++ b/drivers/hwtracing/coresight/coresight-tmc-etf.c
+@@ -168,7 +168,7 @@ out:
+ 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
+ 
+ 	/* Free memory outside the spinlock if need be */
+-	if (!used && buf)
++	if (!used)
+ 		kfree(buf);
+ 
+ 	if (!ret)
+-- 
+2.9.2
