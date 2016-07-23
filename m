@@ -1,38 +1,50 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Fri, 22 Jul 2016 18:20:10 -0700
-Subject: ADS1118: hwmon or iio ? [was: Re: [RCF 1/3] hwmon: Add ads1118 driver]
-In-Reply-To: <5792301A.6030206@gmail.com>
-References: <cover.1468626668.git.stillcompiling@gmail.com>
- <0294fbcb211e8f14f4e68fed4d9375cf23c6a70e.1468626668.git.stillcompiling@gmail.com>
- <578990A1.6020300@roeck-us.net> <5792301A.6030206@gmail.com>
-Message-ID: <5792C64A.3090600@roeck-us.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 22 Jul 2016 22:55:24 -0700
+Subject: [PATCH 1/3] ARM: mach-omap2: remove bogus "or_module" from
+ rx51-peripherals
+In-Reply-To: <20160722140242.GC11410@windriver.com>
+References: <20160720041332.30789-1-paul.gortmaker@windriver.com>
+ <20160720041332.30789-2-paul.gortmaker@windriver.com>
+ <20160722064101.GW28140@atomide.com>
+ <20160722140242.GC11410@windriver.com>
+Message-ID: <20160723055524.GA28140@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/22/2016 07:39 AM, Joshua Clayton wrote:
-> Greetings Guenter,
->
-> Thank you for reviewing my submission.
->
-> On 07/15/2016 06:40 PM, Guenter Roeck wrote:
->> On 07/15/2016 05:18 PM, Joshua Clayton wrote:
->>> Add new driver for Texas Instruments ADS1118 and and ADS1018.
->>> This driver works with ADS1018, because of code borrowed
->>> from asd1015, which is similar, but I can only test ADS1118
->>>
->>
->> Browsing through the datasheet, I think this should probably be implemented
->> as iio driver (and iio already has a driver for ads1015).
->>
->> Jonathan, what do you think ?
->>
->> Thanks,
->> Guenter
->>
-> No response from Jonathan as yet, but I am willing to rework the driver when I
-> have some time. It might be weeks before I can start, though.
->
+* Paul Gortmaker <paul.gortmaker@windriver.com> [160722 07:02]:
+> [Re: [PATCH 1/3] ARM: mach-omap2: remove bogus "or_module" from rx51-peripherals] On 21/07/2016 (Thu 23:41) Tony Lindgren wrote:
+> 
+> > Hi,
+> > 
+> > * Paul Gortmaker <paul.gortmaker@windriver.com> [160719 21:17]:
+> > > During unrelated work, attempting to remove an include of the
+> > > linux/module.h in favour of "struct module;" in order to reduce
+> > > header entanglement, we found doing so caused a build failure in
+> > > this file.
+> > 
+> > We're planning to drop this file after v4.8-rc1 after I've
+> > verified that legacy booting still works at v4.8-rc1.
+> > 
+> > Are you OK if I pick this patch into my omap-for-v4.8/legacy
+> > branch? Or if you have a minimal immutable branch against v4.7-rc1
+> > with just this patch I can merge it in no problem.
+> 
+> Is the legacy branch a contingency plan for the case where legacy
+> booting doesn't work?  If so, that should be OK.
 
-Changing the subject - maybe it helps to get Jonathan's attention.
+Well it's just a branch of omap legacy booting related patches
+for v4.8. But looking at it now, looks like I already pushed out the
+removal of the last two remaining board files before I took few weeks
+off. But I did not add it to Linux next to keep things working
+until -rc1.
 
-Guenter
+> Having the patch present, or having the file deleted both take care of
+> my concern -- which was was introducing build regressions when adding
+> the gpio header cleanup into for-4.9 content.  
+
+OK. As I've already pushed out the board-*.c removal branch, I
+suggest we just drop the $subject patch to avoid a merge conflict.
+
+Regards,
+
+Tony
