@@ -1,98 +1,79 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Sat, 23 Jul 2016 08:42:27 +0200
-Subject: [PATCH v2 3/4] mfd: add support for Allwinner SoCs ADC
-In-Reply-To: <20160722135556.GG14925@dell>
-References: <1468576754-3273-1-git-send-email-quentin.schulz@free-electrons.com>
- <1468576754-3273-4-git-send-email-quentin.schulz@free-electrons.com>
- <de8ebab2-cde9-d209-3c9a-e1868fafb84b@kernel.org>
- <20160719073109.GD17074@dell>
- <d64cf632-41a4-3e23-6239-7f854cbb0293@kernel.org>
- <20160721121253.GE14925@dell> <20160721200802.GL5993@lukather>
- <20160722135556.GG14925@dell>
-Message-ID: <d14ee65b-a508-b30e-83d8-f3b87e0a340f@kernel.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Sat, 23 Jul 2016 13:02:59 +0200
+Subject: [PATCH] ARM: mm: use fully constructed struct pages for EFI pgd
+ allocations
+In-Reply-To: <1469212928-21517-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1469212928-21517-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <CAKv+Gu_O3BTKP30TodkhxAgtQtPX5QcwakWzu5y9dxh-k-T8eA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/07/16 15:55, Lee Jones wrote:
-> On Thu, 21 Jul 2016, Maxime Ripard wrote:
-> 
->> 1;4205;0c
->> On Thu, Jul 21, 2016 at 01:12:53PM +0100, Lee Jones wrote:
->>> On Wed, 20 Jul 2016, Jonathan Cameron wrote:
->>>
->>>> On 19/07/16 08:31, Lee Jones wrote:
->>>>> On Mon, 18 Jul 2016, Jonathan Cameron wrote:
->>>>>
->>>>>> On 15/07/16 10:59, Quentin Schulz wrote:
->>>>>>> The Allwinner SoCs all have an ADC that can also act as a touchscreen
->>>>>>> controller and a thermal sensor. For now, only the ADC and the thermal
->>>>>>> sensor drivers are probed by the MFD, the touchscreen controller support
->>>>>>> will be added later.
->>>>>>>
->>>>>>> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
->>>>>> Hmm. Previous patch includes the header this one creates.  Ordering issue?
->>>>>> The depends kind of prevents build failures by ensuring that can't be built
->>>>>> until this one is in place, but it is certainly an ugly way to do it.
->>>>>>
->>>>>> Few little bits innline.
->>>>>>> ---
->>>>>>>
->>>>>>> v2:
->>>>>>>  - add license headers,
->>>>>>>  - reorder alphabetically includes,
->>>>>>>  - add SUNXI_GPADC_ prefixes for defines,
->>>>>>>
->>>>>>>  drivers/mfd/Kconfig                 |  14 +++
->>>>>>>  drivers/mfd/Makefile                |   2 +
->>>>>>>  drivers/mfd/sunxi-gpadc-mfd.c       | 197 ++++++++++++++++++++++++++++++++++++
->>>>>>>  include/linux/mfd/sunxi-gpadc-mfd.h |  23 +++++
->>>>>>>  4 files changed, 236 insertions(+)
->>>>>>>  create mode 100644 drivers/mfd/sunxi-gpadc-mfd.c
->>>>>>>  create mode 100644 include/linux/mfd/sunxi-gpadc-mfd.h
->>>>>
->>>>> [...]
->>>>>
->>>>>>> +static struct mfd_cell sun6i_gpadc_mfd_cells[] = {
->>>>>>> +	{
->>>>>>> +		.name	= "sun6i-a31-gpadc-iio",
->>>>>>> +		.resources = adc_resources,
->>>>>>> +		.num_resources = ARRAY_SIZE(adc_resources),
->>>>>>> +	}, {
->>>>>>> +		.name = "iio_hwmon",
->>>>>> I still really dislike using this to force the probe of that driver but
->>>>>> kind of up to the hwmon / mfd guys on this.
->>>>>
->>>>> Can you at least say *why* you don't like it?
->>>> It just feels odd to have an mfd child that isn't really dependent
->>>> on the mfd hardware itself.
->>>>
->>>> Still if you are happy, mfd is your domain and my objections were
->>>> as you probably noticed not that strong - or well described!)
->>>>
->>>> So I'm fine with this.
->>>
->>> I see.  So it's not actually part of the same IP/chip?
->>
->> The chip has a temperature sensor, and we want to expose that
->> temperature through IIO.
->>
->> But we don't really have the choice on how we probe iio-hwmon
->> here. The binding was already there, and we have to keep it.
-> 
-> What binding?
-> 
-The somewhat 'interesting' one for iio-hwmon I would guess is what
-Maxime is referring to.  Here they are using what was effectively
-the old 'board file' methods inside the driver itself.  Which is
-fine and done in quite a few places - though we have some issues
-with deferred probing that we can improve upon.
+On 22 July 2016 at 20:42, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> The late_alloc() PTE allocation function used by create_mapping_late()
+> does not call pgtable_page_ctor() on PTE pages it allocates, leaving
+> the per-page spinlock uninitialized.
+>
+> Since generic page table manipulation code may assume that translation
+> table pages that are not owned by init_mm are covered by fully
+> constructed struct pages, the following crash may occur with the new
+> UEFI memory attributes table code.
+>
+>   efi: memattr: Processing EFI Memory Attributes table:
+>   efi: memattr:  0x0000ffa16000-0x0000ffa82fff [Runtime Code       |RUN|  |  |XP|  |  |  |   |  |  |  |  ]
+>   Unable to handle kernel NULL pointer dereference at virtual address 00000010
+>   pgd = c0204000
+>   [00000010] *pgd=00000000
+>   Internal error: Oops: 5 [#1] SMP ARM
+>   Modules linked in:
+>   CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.7.0-rc4-00063-g3882aa7b340b #361
+>   Hardware name: Generic DT based system
+>   task: ed858000 ti: ed842000 task.ti: ed842000
+>   PC is at __lock_acquire+0xa0/0x19a8
+>   ...
+>   [<c038c830>] (__lock_acquire) from [<c038e4f8>] (lock_acquire+0x6c/0x88)
+>   [<c038e4f8>] (lock_acquire) from [<c0c06134>] (_raw_spin_lock+0x2c/0x3c)
+>   [<c0c06134>] (_raw_spin_lock) from [<c0410384>] (apply_to_page_range+0xe8/0x238)
+>   [<c0410384>] (apply_to_page_range) from [<c1205f34>] (efi_set_mapping_permissions+0x54/0x5c)
+>   [<c1205f34>] (efi_set_mapping_permissions) from [<c1247474>] (efi_memattr_apply_permissions+0x2b8/0x378)
+>   [<c1247474>] (efi_memattr_apply_permissions) from [<c1248258>] (arm_enable_runtime_services+0x1f0/0x22c)
+>   [<c1248258>] (arm_enable_runtime_services) from [<c0301f0c>] (do_one_initcall+0x44/0x174)
+>   [<c0301f0c>] (do_one_initcall) from [<c1200d10>] (kernel_init_freeable+0x90/0x1e8)
+>   [<c1200d10>] (kernel_init_freeable) from [<c0bff690>] (kernel_init+0x8/0x114)
+>   [<c0bff690>] (kernel_init) from [<c0307ed0>] (ret_from_fork+0x14/0x24)
+>
+> The crash is due to the fact that the UEFI page tables are not owned by
+> init_mm, but are not covered by fully constructed struct pages.
+>
+> Given that the UEFI subsystem is currently the only user of
+> create_mapping_late(), add an unconditional call to pgtable_page_ctor() to
+> late_alloc().
+>
+> Fixes: 9fc68b717c24 ("ARM/efi: Apply strict permissions for UEFI Runtime Services regions")
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>
+> The commit in question was introduced in v4.7, so ideally this should go in
+> as a late fix. However, EFI on ARM is not widely used [yet], and the memory
+> attributes table even less so, so I am perfectly happy for this to go in
+> later.
+>
+>  arch/arm/mm/mmu.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+> index 62f4d01941f7..d0ac45451805 100644
+> --- a/arch/arm/mm/mmu.c
+> +++ b/arch/arm/mm/mmu.c
+> @@ -728,7 +728,7 @@ static void *__init late_alloc(unsigned long sz)
+>  {
+>         void *ptr = (void *)__get_free_pages(PGALLOC_GFP, get_order(sz));
+>
+> -       BUG_ON(!ptr);
+> +       BUG_ON(!ptr || !pgtable_page_ctor(virt_to_page(ptr)));
 
-Anyhow, it's real hardware and as this doesn't have anything to
-do with device tree there is no need to get around the objections
-of lack of generality that bothers the dt maintainers :)
+Actually, putting code with side effects inside BUG_ON() is not a good
+idea, and I deliberately avoided doing so in the arm64 counterpart of
+this patch.
 
-Lets go with it as it is. Sorry for confusing everyone!
-
-p.s. I'm pitching a tech session for the KS at the moment
-on ksummit-discuss to hit the fiddlier question of bindings
-/ cross subsystem interactions if anyone is interested.
+If there are no other comments on this patch, I will fix that up
+before dropping this in the patch system
