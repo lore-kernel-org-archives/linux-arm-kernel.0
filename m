@@ -1,95 +1,127 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Fri, 22 Jul 2016 15:00:51 -0700
-Subject: [PATCH v3] thermal: tango: add resume support
-In-Reply-To: <578CC9C9.3050806@free.fr> (Mason's message of "Mon, 18 Jul 2016
- 14:21:29 +0200")
-References: <57726196.5060909@free.fr> <578CC9C9.3050806@free.fr>
-Message-ID: <m2wpkd1gfg.fsf@baylibre.com>
+From: labbott@redhat.com (Laura Abbott)
+Date: Fri, 22 Jul 2016 17:36:33 -0700
+Subject: [PATCH v4 00/12] mm: Hardened usercopy
+In-Reply-To: <1469046427-12696-1-git-send-email-keescook@chromium.org>
+References: <1469046427-12696-1-git-send-email-keescook@chromium.org>
+Message-ID: <93009d46-0171-7398-4add-98e09ade608b@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mason <slash.tmp@free.fr> writes:
-
-> From: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
+On 07/20/2016 01:26 PM, Kees Cook wrote:
+> Hi,
 >
-> When this platform is suspended, firmware powers the entire SoC down,
-> except a few hardware blocks waiting for wakeup events. And there is
-> no context to save for this particular block.
+> [This is now in my kspp -next tree, though I'd really love to add some
+> additional explicit Tested-bys, Reviewed-bys, or Acked-bys. If you've
+> looked through any part of this or have done any testing, please consider
+> sending an email with your "*-by:" line. :)]
 >
-> Therefore, there is nothing useful for the driver to do on suspend;
-> so we define a NULL suspend hook. On resume, the driver initializes
-> the block exactly as is done in the probe callback.
+> This is a start of the mainline port of PAX_USERCOPY[1]. After writing
+> tests (now in lkdtm in -next) for Casey's earlier port[2], I kept tweaking
+> things further and further until I ended up with a whole new patch series.
+> To that end, I took Rik, Laura, and other people's feedback along with
+> additional changes and clean-ups.
 >
-> Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
-> ---
-> Changes in v3
-> Drop the DEV_PM_OPS macro, which caused some confusion.
-> Note: tango_thermal_pm struct only exists when CONFIG_PM_SLEEP is defined
-> @Kevin, can I add your Reviewed-by tag back?
-> ---
->  drivers/thermal/tango_thermal.c | 23 +++++++++++++++++++++--
->  1 file changed, 21 insertions(+), 2 deletions(-)
+> Based on my understanding, PAX_USERCOPY was designed to catch a
+> few classes of flaws (mainly bad bounds checking) around the use of
+> copy_to_user()/copy_from_user(). These changes don't touch get_user() and
+> put_user(), since these operate on constant sized lengths, and tend to be
+> much less vulnerable. There are effectively three distinct protections in
+> the whole series, each of which I've given a separate CONFIG, though this
+> patch set is only the first of the three intended protections. (Generally
+> speaking, PAX_USERCOPY covers what I'm calling CONFIG_HARDENED_USERCOPY
+> (this) and CONFIG_HARDENED_USERCOPY_WHITELIST (future), and
+> PAX_USERCOPY_SLABS covers CONFIG_HARDENED_USERCOPY_SPLIT_KMALLOC
+> (future).)
 >
-> diff --git a/drivers/thermal/tango_thermal.c b/drivers/thermal/tango_thermal.c
-> index 70e0d9f406e9..957f8937e126 100644
-> --- a/drivers/thermal/tango_thermal.c
-> +++ b/drivers/thermal/tango_thermal.c
-> @@ -64,6 +64,12 @@ static const struct thermal_zone_of_device_ops ops = {
->  	.get_temp	= tango_get_temp,
->  };
->  
-> +static void tango_thermal_init(struct tango_thermal_priv *priv)
-> +{
-> +	writel(0, priv->base + TEMPSI_CFG);
-> +	writel(CMD_ON, priv->base + TEMPSI_CMD);
-> +}
-> +
->  static int tango_thermal_probe(struct platform_device *pdev)
->  {
->  	struct resource *res;
-> @@ -79,14 +85,24 @@ static int tango_thermal_probe(struct platform_device *pdev)
->  	if (IS_ERR(priv->base))
->  		return PTR_ERR(priv->base);
->  
-> +	platform_set_drvdata(pdev, priv);
->  	priv->thresh_idx = IDX_MIN;
-> -	writel(0, priv->base + TEMPSI_CFG);
-> -	writel(CMD_ON, priv->base + TEMPSI_CMD);
-> +	tango_thermal_init(priv);
->  
->  	tzdev = devm_thermal_zone_of_sensor_register(&pdev->dev, 0, priv, &ops);
->  	return PTR_ERR_OR_ZERO(tzdev);
->  }
->  
-> +#ifdef CONFIG_PM_SLEEP
-> +static int tango_thermal_resume(struct device *dev)
-> +{
-> +	tango_thermal_init(dev_get_drvdata(dev));
-> +	return 0;
-> +}
-> +
-> +static SIMPLE_DEV_PM_OPS(tango_thermal_pm, NULL, tango_thermal_resume);
-> +#endif
+> This series, which adds CONFIG_HARDENED_USERCOPY, checks that objects
+> being copied to/from userspace meet certain criteria:
+> - if address is a heap object, the size must not exceed the object's
+>   allocated size. (This will catch all kinds of heap overflow flaws.)
+> - if address range is in the current process stack, it must be within the
+>   a valid stack frame (if such checking is possible) or at least entirely
+>   within the current process's stack. (This could catch large lengths that
+>   would have extended beyond the current process stack, or overflows if
+>   their length extends back into the original stack.)
+> - if the address range is part of kernel data, rodata, or bss, allow it.
+> - if address range is page-allocated, that it doesn't span multiple
+>   allocations (excepting Reserved and CMA pages).
+> - if address is within the kernel text, reject it.
+> - everything else is accepted
+>
+> The patches in the series are:
+> - Support for examination of CMA page types:
+> 	1- mm: Add is_migrate_cma_page
+> - Support for arch-specific stack frame checking (which will likely be
+>   replaced in the future by Josh's more comprehensive unwinder):
+>         2- mm: Implement stack frame object validation
+> - The core copy_to/from_user() checks, without the slab object checks:
+>         3- mm: Hardened usercopy
+> - Per-arch enablement of the protection:
+>         4- x86/uaccess: Enable hardened usercopy
+>         5- ARM: uaccess: Enable hardened usercopy
+>         6- arm64/uaccess: Enable hardened usercopy
+>         7- ia64/uaccess: Enable hardened usercopy
+>         8- powerpc/uaccess: Enable hardened usercopy
+>         9- sparc/uaccess: Enable hardened usercopy
+>        10- s390/uaccess: Enable hardened usercopy
+> - The heap allocator implementation of object size checking:
+>        11- mm: SLAB hardened usercopy support
+>        12- mm: SLUB hardened usercopy support
+>
+> Some notes:
+>
+> - This is expected to apply on top of -next which contains fixes for the
+>   position of _etext on both arm and arm64, though it has some conflicts
+>   with KASAN that should be trivial to fix up. Also in -next are the
+>   tests for this protection (in lkdtm), prefixed with USERCOPY_.
+>
+> - I couldn't detect a measurable performance change with these features
+>   enabled. Kernel build times were unchanged, hackbench was unchanged,
+>   etc. I think we could flip this to "on by default" at some point, but
+>   for now, I'm leaving it off until I can get some more definitive
+>   measurements. I would love if someone with greater familiarity with
+>   perf could give this a spin and report results.
+>
+> - The SLOB support extracted from grsecurity seems entirely broken. I
+>   have no idea what's going on there, I spent my time testing SLAB and
+>   SLUB. Having someone else look at SLOB would be nice, but this series
+>   doesn't depend on it.
+>
+> Additional features that would be nice, but aren't blocking this series:
+>
+> - Needs more architecture support for stack frame checking (only x86 now,
+>   but it seems Josh will have a good solution for this soon).
+>
+>
+> Thanks!
+>
+> -Kees
+>
+> [1] https://grsecurity.net/download.php "grsecurity - test kernel patch"
+> [2] http://www.openwall.com/lists/kernel-hardening/2016/05/19/5
+>
+> v4:
+> - handle CMA pages, labbott
+> - update stack checker comments, labbott
+> - check for vmalloc addresses, labbott
+> - deal with KASAN in -next changing arm64 copy*user calls
+> - check for linear mappings at runtime instead of via CONFIG
+>
+> v3:
+> - switch to using BUG for better Oops integration
+> - when checking page allocations, check each for Reserved
+> - use enums for the stack check return for readability
+>
+> v2:
+> - added s390 support
+> - handle slub red zone
+> - disallow writes to rodata area
+> - stack frame walker now CONFIG-controlled arch-specific helper
+>
 
-#else
-#define tango_thermal_resume NULL
-#endif
+Do you have/plan to have LKDTM or the like tests for this? I started reviewing
+the slub code and was about to write some test cases for myself. I did that
+for CMA as well which is a decent indicator these should all go somewhere.
 
-And then move the SIMPLE_DEV_PM_OPS here...
-
-> +
->  static const struct of_device_id tango_sensor_ids[] = {
->  	{
->  		.compatible = "sigma,smp8758-thermal",
-> @@ -99,6 +115,9 @@ static struct platform_driver tango_thermal_driver = {
->  	.driver	= {
->  		.name		= "tango-thermal",
->  		.of_match_table	= tango_sensor_ids,
-> +#ifdef CONFIG_PM_SLEEP
-> +		.pm		= &tango_thermal_pm,
-> +#endif
-
-... which allows you to get rid of the ugly ifdef here.
-(c.f. CodingStyle, Chapter 20,)
-
-Kevin
+Thanks,
+Laura
