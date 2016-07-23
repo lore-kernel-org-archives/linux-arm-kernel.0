@@ -1,93 +1,77 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sat, 23 Jul 2016 10:09:20 +0200
-Subject: [PATCH 0/3] ARM: fix three implicit module use cases fed via gpio
-In-Reply-To: <20160720041332.30789-1-paul.gortmaker@windriver.com> (Paul
- Gortmaker's message of "Wed, 20 Jul 2016 00:13:29 -0400")
-References: <20160720041332.30789-1-paul.gortmaker@windriver.com>
-Message-ID: <8737n022tr.fsf@belgarion.home>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Sat, 23 Jul 2016 11:37:40 +0200
+Subject: [PATCH V2 00/15] a few sdhci/imx clean up and fix patches
+In-Reply-To: <1468309584-3591-1-git-send-email-aisheng.dong@nxp.com>
+References: <1468309584-3591-1-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <CAPDyKFo-M81h+XkjdwjrKrrAR8SPMiPHzbO+DHFYWjVwCsOYzw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Paul Gortmaker <paul.gortmaker@windriver.com> writes:
-
-> While working on some for-4.9 cleanups of linux/gpio/driver.h it was
-> found that changes there caused build failures when walking all the
-> ARM defconfigs, in ARM specific mach-* files.
+On 12 July 2016 at 09:46, Dong Aisheng <aisheng.dong@nxp.com> wrote:
+> Patch 1~10 are mainly sdhci cleanup patches while patch 7,9,10
+> are fixes which seems needed for stable tree as well.
 >
-> The proposed GPIO header change is just this:
+> The main work is:
+> 1) using more robust mmc_regulator_set_vqmmc
+> 2) add auto retune support
+> 3) improve sdhci-esdhc-imx stability
+> 4) add state save and restore for low power mode
 >
->  ---------------------------------------      
->      --- a/include/linux/gpio/driver.h
->      +++ b/include/linux/gpio/driver.h
->      @@ -3,7 +3,6 @@
->       
->       #include <linux/device.h>
->       #include <linux/types.h>
->      -#include <linux/module.h>
->       #include <linux/irq.h>
->       #include <linux/irqchip/chained_irq.h>
->       #include <linux/irqdomain.h>
->      @@ -16,6 +15,7 @@ struct of_phandle_args;
->       struct device_node;
->       struct seq_file;
->       struct gpio_device;
->      +struct module;
->       
->       #ifdef CONFIG_GPIOLIB
->  ---------------------------------------      
+> Change Log:
+> v1->v2:
+>  * address all Andrian's comments
+>  * below patches are dropped
+>   mmc: sdhci: move sdhci_get_cd() forward to avoid declaration
+>   mmc: core: fix a comment typo
+>   mmc: sdhci: re-factor sdhci_start_signal_voltage()
+>   mmc: core: mmc_regulator_set_vqmmc not return error if vqmmc/vmmc not
+>     exist
+>   mmc: sdhci: check SDHCI_QUIRK2_NO_1_8_V when do voltage switch
+>   mmc: sdhci: rename quirk SDHCI_QUIRK_MULTIBLOCK_READ_ACMD12
+>         Above clean up is not needed so far according to Andrian.
 >
-> ...which is what we've already got in ~50 other include/linux/* files to
-> try and keep cross contamination entanglement at a minimum.
+>   mmc: sdhci: fix incorrect get data interrupt during no data transfer
+>         This one is not needed anymore cause Andrian had another fix
+>         already in tree.
+>         (commit 0e0a35d2d4058 mmc: sdhci: Track whether a reset is pending)
 >
-> So we uncovered three users in ARM specific files relying on the above
-> presence in this header, vs. dealing with it within the driver itself.
+>   mmc: core: disable auto retune during card detection process
+>         This one will sent out in another patch series to fix in CORE.
 >
-> But with ARM and GPIO being different subsystems, we'll need to get
-> this in ARM 1st, and then wait a release before changing the GPIO
-> header, otherwise we'll risk triggering these three build failures.
+> v1:
+> http://www.spinics.net/lists/linux-mmc/msg36316.html
 >
-> So, if folks consider these three trivial changes OK for late in the
-> for-4.8 cycle, then great.  Otherwise I'll resubmit the ARM parts for
-> for-4.9 and the GPIO bits for the one after that.
+> Dong Aisheng (15):
+>   mmc: sdhci: using common mmc_regulator_set_vqmmc()
+>   mmc: sdhci-esdhc-imx: remove SDHCI_QUIRK_BROKEN_TIMEOUT_VAL
+>   mmc: sdhci-esdhc-imx: add esdhc specific suspend resume callback
+>   mmc: sdhci-esdhc-imx: restore watermark level setting after resume
+>   mmc: sdhci-esdhci-imx: disable DLL delay line settings explicitly
+>   mmc: sdhci-esdhc-imx: support setting tuning start point
+>   doc: dt: fsl-imx-esdhc: add set tuning start point binding
+>   mmc: sdhci: add standard hw auto retuning support
+>   mmc: sdhci-esdhc-imx: enable hw auto retuning for STD_TUNING
+>   mmc: sdhci-esdhc-imx: enable hw auto retuning for MAN_TUNING
+>   mmc: sdhci-esdhc-imx: fix strobe DLL lock wrong clock issue
+>   mmc: sdhci-esdhc-imx: factor out hw related initialization into
+>     function
+>   mmc: sdhci-esdhc-imx: move tuning static configuration into hwinit
+>     function
+>   mmc: sdhci-esdhci-imx: re-initialize hw state after resume
+>   mmc: sdhci-esdhc-imx: clear tuning bits during driver probe
 >
-> [Yes, there were gpio implicit users too, but they are easily sync'd
-> with the gpio header change being at the end of that series.]
+>  .../devicetree/bindings/mmc/fsl-imx-esdhc.txt      |   2 +
+>  drivers/mmc/host/sdhci-esdhc-imx.c                 | 149 ++++++++++++++-------
+>  drivers/mmc/host/sdhci.c                           |  24 ++--
+>  drivers/mmc/host/sdhci.h                           |   3 +
+>  include/linux/platform_data/mmc-esdhc-imx.h        |   1 +
+>  5 files changed, 122 insertions(+), 57 deletions(-)
 >
-> Paul.
 > --
+> 1.9.1
 >
-> Cc: Alexandre Courbot <gnurou@gmail.com>
-> Cc: Daniel Mack <daniel@zonque.org>
-> Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-gpio at vger.kernel.org
-> Cc: linux-omap at vger.kernel.org
-> Cc: Robert Jarzmik <robert.jarzmik@free.fr>
-> Cc: Russell King <linux@armlinux.org.uk>
-> Cc: Tony Lindgren <tony@atomide.com>
->
-> Paul Gortmaker (3):
->   ARM: mach-omap2: remove bogus "or_module" from rx51-peripherals
->   ARM: pxa: add module.h for corgi symbol_get/symbol_put usage
->   ARM: pxa: add module.h for spitz symbol_get/symbol_put usage
->
->  arch/arm/mach-omap2/board-rx51-peripherals.c | 2 +-
->  arch/arm/mach-pxa/corgi.c                    | 1 +
->  arch/arm/mach-pxa/spitz.c                    | 1 +
->  3 files changed, 3 insertions(+), 1 deletion(-)
 
-Hi Paul,
+Thanks, applied for next!
 
-I'll take the mach-pxa changes to pxa/for-next tree with Linus's ack.
-Tony, I think you will carry the remaining omap2 one, right ?
-
-As for the cycle, I'd prefer have it for-4.9 as we're at rc7 and it's a bit late
-for me. If you want your GPIO bits to get in 4.9 I think I can commit to request
-pull very early (-rc1 time) or give my ack so that Linus can carry these changes
-through the gpio tree with the other changes.
-
-Cheers.
-
--- 
-Robert
+Kind regards
+Uffe
