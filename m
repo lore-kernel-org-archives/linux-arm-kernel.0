@@ -1,55 +1,51 @@
 From: jic23@kernel.org (Jonathan Cameron)
-Date: Sat, 23 Jul 2016 08:37:47 +0200
-Subject: [PATCH v2 2/4] iio: adc: add support for Allwinner SoCs ADC
-In-Reply-To: <26aa8f33-8525-6d82-ca17-b782c55c2c82@free-electrons.com>
-References: <1468576754-3273-1-git-send-email-quentin.schulz@free-electrons.com>
- <1468576754-3273-3-git-send-email-quentin.schulz@free-electrons.com>
- <e24c8b63-7774-66d2-3317-43fd5598ecc9@kernel.org>
- <578DE5C9.8070502@free-electrons.com>
- <e763fba8-391f-f353-9ffe-354c08305dc5@kernel.org>
- <26aa8f33-8525-6d82-ca17-b782c55c2c82@free-electrons.com>
-Message-ID: <a3928a7a-b600-27b8-a038-dc5e0c8a7a99@kernel.org>
+Date: Sat, 23 Jul 2016 08:02:01 +0200
+Subject: [RCF 1/3] hwmon: Add ads1118 driver
+In-Reply-To: <5792301A.6030206@gmail.com>
+References: <cover.1468626668.git.stillcompiling@gmail.com>
+ <0294fbcb211e8f14f4e68fed4d9375cf23c6a70e.1468626668.git.stillcompiling@gmail.com>
+ <578990A1.6020300@roeck-us.net> <5792301A.6030206@gmail.com>
+Message-ID: <e3e67d8f-9a48-e1ed-c26f-554cb190a0ae@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/07/16 14:15, Quentin Schulz wrote:
-> On 20/07/2016 16:57, Jonathan Cameron wrote:
->> On 19/07/16 09:33, Quentin Schulz wrote:
->>> On 18/07/2016 15:18, Jonathan Cameron wrote:
->>>> On 15/07/16 10:59, Quentin Schulz wrote:
-> [...]
->>>>> +	enable_irq(info->temp_data_irq);
->>>> Is this hardware spitting out extra irqs?  If not, much better to just
->>>> leave it enabled all the time and control whether it can occur or not
->>>> by controlling the device state..
+On 22/07/16 16:39, Joshua Clayton wrote:
+> Greetings Guenter,
+> 
+> Thank you for reviewing my submission.
+> 
+> On 07/15/2016 06:40 PM, Guenter Roeck wrote:
+>> On 07/15/2016 05:18 PM, Joshua Clayton wrote:
+>>> Add new driver for Texas Instruments ADS1118 and and ADS1018.
+>>> This driver works with ADS1018, because of code borrowed
+>>> from asd1015, which is similar, but I can only test ADS1118
 >>>
->>> The temp_data_irq occurs every SUNXI_GPADC_TEMP_PERIOD(x) periods (in
->>> the current state of the driver: 2s). What do you mean by controlling
->>> the device state? Enabling or disabling the hardware part of the IP
->>> responsible of getting the temperature
->>> (SUNXI_GPADC_TP_TPR_TEMP_ENABLE(x) here)?
->> Yes, or something along those lines if it wakes up fast enough.
+>>
+>> Browsing through the datasheet, I think this should probably be implemented
+>> as iio driver (and iio already has a driver for ads1015).
+>>
+>> Jonathan, what do you think ?
+>>
+>> Thanks,
+>> Guenter
+>>
+> No response from Jonathan as yet, but I am willing to rework the driver when I
+> have some time. It might be weeks before I can start, though.
+Sorry, made week and I thought I'd have time to get reviews done in evenings
+so didn't look at anything last weekend.   Catching up on train home this morning.
 > 
-> The ADC wakes up fast enough but resets its internal time clock (I don't
-> know if it's the right term to use). Note that the temperature interrupt
-> occurs by period of X seconds in this IP.
+> I am not very familiar with the iio subsystem, (actually had never heard of it before
+> receiving your response). Learning it might be beneficial, as it looks like a good fit
+> for an in house driver, which I'd like to eventually upstream.
+Cool
 > 
-> This means that each time we disable the ADC on the hardware side, no
-> temperature interrupt will occur within the first X seconds. I don't
-> think this is what we want.
-I'm guessing X is non trivial ;)
-
-So fair enough.  Could you add this justification as a comment in the
-driver somewhere so that people coming back to this in a few years time
-will know what the justification for this 'unusual' handling is.
-
-Thanks,
-
-Jonathan
+> If an hwmon driver is adequate, I have new patches that address kbuild and endianness
+> issues in the first version.
+I'd flip it over to IIO.  If you keep to just the simple bits it'll end up pretty
+simple to do.
 > 
-> [...]
 > 
-> Quentin
+> ~Joshua Clayton
 > --
 > To unsubscribe from this list: send the line "unsubscribe linux-iio" in
 > the body of a message to majordomo at vger.kernel.org
