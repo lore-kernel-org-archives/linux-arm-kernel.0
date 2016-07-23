@@ -1,49 +1,34 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 22 Jul 2016 22:55:24 -0700
-Subject: [PATCH 1/3] ARM: mach-omap2: remove bogus "or_module" from
- rx51-peripherals
-In-Reply-To: <20160722140242.GC11410@windriver.com>
-References: <20160720041332.30789-1-paul.gortmaker@windriver.com>
- <20160720041332.30789-2-paul.gortmaker@windriver.com>
- <20160722064101.GW28140@atomide.com>
- <20160722140242.GC11410@windriver.com>
-Message-ID: <20160723055524.GA28140@atomide.com>
+Date: Fri, 22 Jul 2016 23:26:35 -0700
+Subject: [PATCH 0/4] ARM: OMAP2+: Fix AM335x RTC External Abort
+In-Reply-To: <5791DC3A.6070808@ti.com>
+References: <20160712175034.743-1-d-gerlach@ti.com> <5791DC3A.6070808@ti.com>
+Message-ID: <20160723062635.GB28140@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul Gortmaker <paul.gortmaker@windriver.com> [160722 07:02]:
-> [Re: [PATCH 1/3] ARM: mach-omap2: remove bogus "or_module" from rx51-peripherals] On 21/07/2016 (Thu 23:41) Tony Lindgren wrote:
-> 
+* Tero Kristo <t-kristo@ti.com> [160722 01:41]:
+> On 12/07/16 20:50, Dave Gerlach wrote:
 > > Hi,
+> > With next-20160711 there is an external abort during boot on am335x
+> > platforms from the RTC which is caused by commit 183e2077d007 ("ARM:
+> > AM33xx: fix module_wait_ready without clkctrl register"), log is here [1].
+> > The RTC hwmod is unique in that it has a clkctrl_offs of 0 which is
+> > invalid normally, all other hwmods have non-zero offsets. Because of this,
+> > we need to flag the hwmod so 0 actually gets used for the offset
+> > instead of the just returning 0 and doing nothing.
 > > 
-> > * Paul Gortmaker <paul.gortmaker@windriver.com> [160719 21:17]:
-> > > During unrelated work, attempting to remove an include of the
-> > > linux/module.h in favour of "struct module;" in order to reduce
-> > > header entanglement, we found doing so caused a build failure in
-> > > this file.
-> > 
-> > We're planning to drop this file after v4.8-rc1 after I've
-> > verified that legacy booting still works at v4.8-rc1.
-> > 
-> > Are you OK if I pick this patch into my omap-for-v4.8/legacy
-> > branch? Or if you have a minimal immutable branch against v4.7-rc1
-> > with just this patch I can merge it in no problem.
+> > This series adds a HWMOD_OMAP4_ZERO_CLKCTRL_OFFSET flag and moves the check
+> > for validity of the clkctrl_offs value to the omap_hwmod code so that we are
+> > able to check both the flag and clkctrl_offs values. This code is shared by
+> > all OMAP4+ platforms but shoudl have no affect for anything but RTC on
+> > am335x but still boot tested on the following platforms:
 > 
-> Is the legacy branch a contingency plan for the case where legacy
-> booting doesn't work?  If so, that should be OK.
+> Series looks good to me, so:
+> 
+> Acked-by: Tero Kristo <t-kristo@ti.com>
 
-Well it's just a branch of omap legacy booting related patches
-for v4.8. But looking at it now, looks like I already pushed out the
-removal of the last two remaining board files before I took few weeks
-off. But I did not add it to Linux next to keep things working
-until -rc1.
-
-> Having the patch present, or having the file deleted both take care of
-> my concern -- which was was introducing build regressions when adding
-> the gpio header cleanup into for-4.9 content.  
-
-OK. As I've already pushed out the board-*.c removal branch, I
-suggest we just drop the $subject patch to avoid a merge conflict.
+Applying these into omap-for-v4,8/soc.
 
 Regards,
 
