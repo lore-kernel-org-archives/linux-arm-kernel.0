@@ -1,101 +1,39 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sat, 23 Jul 2016 22:17:42 +0300
-Subject: [PATCH 2/2] ARM: dts: r8a7792: add VIN support
-In-Reply-To: <17288006.ERHB6654v5@wasted.cogentembedded.com>
-References: <17288006.ERHB6654v5@wasted.cogentembedded.com>
-Message-ID: <2505176.7Q9RZuLBta@wasted.cogentembedded.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Sun, 24 Jul 2016 07:00:53 +0800
+Subject: [PATCH v5 3/3] arm: dts: mt2701: Add auxadc node.
+In-Reply-To: <1469085449-22679-4-git-send-email-zhiyong.tao@mediatek.com>
+Message-ID: <201607240649.gukdrhZS%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define the generic R8A7792 parts of the VIN[0-5] device nodes.
+Hi,
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+[auto build test ERROR on robh/for-next]
+[also build test ERROR on v4.7-rc7 next-20160722]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+
+url:    https://github.com/0day-ci/linux/commits/Zhiyong-Tao/AUXADC-Mediatek-auxadc-driver/20160724-043228
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git for-next
+config: arm-allnoconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 5.4.0-6) 5.4.0 20160609
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
+
+All errors (new ones prefixed by >>):
+
+   Error: arch/arm/boot/dts/mt2701.dtsi:145.22-23 syntax error
+>> FATAL ERROR: Unable to parse input tree
 
 ---
- arch/arm/boot/dts/r8a7792.dtsi |   66 +++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 66 insertions(+)
-
-Index: renesas/arch/arm/boot/dts/r8a7792.dtsi
-===================================================================
---- renesas.orig/arch/arm/boot/dts/r8a7792.dtsi
-+++ renesas/arch/arm/boot/dts/r8a7792.dtsi
-@@ -25,6 +25,12 @@
- 		i2c3 = &i2c3;
- 		i2c4 = &i2c4;
- 		i2c5 = &i2c5;
-+		vin0 = &vin0;
-+		vin1 = &vin1;
-+		vin2 = &vin2;
-+		vin3 = &vin3;
-+		vin4 = &vin4;
-+		vin5 = &vin5;
- };
- 
- 	cpus {
-@@ -573,6 +579,66 @@
- 			power-domains = <&sysc R8A7792_PD_ALWAYS_ON>;
- 			status = "disabled";
- 		};
-+
-+		vin0: video at e6ef0000 {
-+			compatible = "renesas,vin-r8a7792",
-+				     "renesas,rcar-gen2-vin";
-+			reg = <0 0xe6ef0000 0 0x1000>;
-+			interrupts = <GIC_SPI 188 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&mstp8_clks R8A7792_CLK_VIN0>;
-+			power-domains = <&sysc R8A7792_PD_ALWAYS_ON>;
-+			status = "disabled";
-+		};
-+
-+		vin1: video at e6ef1000 {
-+			compatible = "renesas,vin-r8a7792",
-+				     "renesas,rcar-gen2-vin";
-+			reg = <0 0xe6ef1000 0 0x1000>;
-+			interrupts = <GIC_SPI 189 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&mstp8_clks R8A7792_CLK_VIN1>;
-+			power-domains = <&sysc R8A7792_PD_ALWAYS_ON>;
-+			status = "disabled";
-+		};
-+
-+		vin2: video at e6ef2000 {
-+			compatible = "renesas,vin-r8a7792",
-+				     "renesas,rcar-gen2-vin";
-+			reg = <0 0xe6ef2000 0 0x1000>;
-+			interrupts = <GIC_SPI 190 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&mstp8_clks R8A7792_CLK_VIN2>;
-+			power-domains = <&sysc R8A7792_PD_ALWAYS_ON>;
-+			status = "disabled";
-+		};
-+
-+		vin3: video at e6ef3000 {
-+			compatible = "renesas,vin-r8a7792",
-+				     "renesas,rcar-gen2-vin";
-+			reg = <0 0xe6ef3000 0 0x1000>;
-+			interrupts = <GIC_SPI 191 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&mstp8_clks R8A7792_CLK_VIN3>;
-+			power-domains = <&sysc R8A7792_PD_ALWAYS_ON>;
-+			status = "disabled";
-+		};
-+
-+		vin4: video at e6ef4000 {
-+			compatible = "renesas,vin-r8a7792",
-+				     "renesas,rcar-gen2-vin";
-+			reg = <0 0xe6ef4000 0 0x1000>;
-+			interrupts = <GIC_SPI 144 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&mstp8_clks R8A7792_CLK_VIN4>;
-+			power-domains = <&sysc R8A7792_PD_ALWAYS_ON>;
-+			status = "disabled";
-+		};
-+
-+		vin5: video at e6ef5000 {
-+			compatible = "renesas,vin-r8a7792",
-+				     "renesas,rcar-gen2-vin";
-+			reg = <0 0xe6ef5000 0 0x1000>;
-+			interrupts = <GIC_SPI 145 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&mstp8_clks R8A7792_CLK_VIN5>;
-+			power-domains = <&sysc R8A7792_PD_ALWAYS_ON>;
-+			status = "disabled";
-+		};
- 
- 		/* Special CPG clocks */
- 		cpg_clocks: cpg_clocks at e6150000 {
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 5589 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160724/761900ac/attachment.obj>
