@@ -1,155 +1,51 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Sat, 23 Jul 2016 20:22:28 +0900
-Subject: Why do we need reset_control_get_optional() ?
-Message-ID: <CAK7LNAQnitMMp5wMXXvVeS-UFF=Fo9m=M1hL=5f4=RF8JYCnGg@mail.gmail.com>
+From: paul.gortmaker@windriver.com (Paul Gortmaker)
+Date: Sat, 23 Jul 2016 10:10:52 -0400
+Subject: [PATCH 0/3] ARM: fix three implicit module use cases fed via gpio
+In-Reply-To: <8737n022tr.fsf@belgarion.home>
+References: <20160720041332.30789-1-paul.gortmaker@windriver.com>
+ <8737n022tr.fsf@belgarion.home>
+Message-ID: <20160723141051.GB12632@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi.
+[Re: [PATCH 0/3] ARM: fix three implicit module use cases fed via gpio] On 23/07/2016 (Sat 10:09) Robert Jarzmik wrote:
 
+> Paul Gortmaker <paul.gortmaker@windriver.com> writes:
+> 
 
-Now the reset subsystem provides
-a bunch of reset_control_get variants.
+[...]
 
-I am still wondering why we need to have _optional ones.
+> >
+> > But with ARM and GPIO being different subsystems, we'll need to get
+> > this in ARM 1st, and then wait a release before changing the GPIO
+> > header, otherwise we'll risk triggering these three build failures.
+> >
+> > So, if folks consider these three trivial changes OK for late in the
+> > for-4.8 cycle, then great.  Otherwise I'll resubmit the ARM parts for
+> > for-4.9 and the GPIO bits for the one after that.
 
-As far as I see, the difference is WARN_ON(1)
-when CONFIG_RESET_CONTROLLER is not defined.
+[...]
 
+> Hi Paul,
+> 
+> I'll take the mach-pxa changes to pxa/for-next tree with Linus's ack.
+> Tony, I think you will carry the remaining omap2 one, right ?
+> 
+> As for the cycle, I'd prefer have it for-4.9 as we're at rc7 and it's a bit late
+> for me. If you want your GPIO bits to get in 4.9 I think I can commit to request
+> pull very early (-rc1 time) or give my ack so that Linus can carry these changes
+> through the gpio tree with the other changes.
 
+Yep, agreed it is now (Sat) a bit late, so as per what I said above, do
+whatever you are comfortable with and I'll react accordingly to make
+sure the gpio fix lands on a baseline with all the other three patches
+present and doesn't introduce build regressions.
 
-[1] When the reset is mandatory,
-the code of the reset consumer is probably like follows:
+Thanks,
+Paul.
 
-  rst = devm_reset_control_get(dev, NULL);
-  if (IS_ERR(rst)) {
-          dev_err(dev, "failed to get reset\n");
-          return PTR_ERR(rst);
-  }
-
-  ret = reset_control_deassert(rst);
-  if (ret) {
-          dev_err(dev, "failed to deassert reset\n");
-          return ret;
-  }
-
-   ...
-
-
-
-[2] When the reset is optional,
-  the code should be something like follows:
-
-   rst = devm_reset_control_get(dev, NULL);
-   if (ERR_PTR(rst) == -EPROBE_DEFER)
-           return -EPROBE_DEFER;
-
-   /* deassert reset if it is available */
-   if (!IS_ERR(rst)) {
-           ret = reset_control_deassert(rst);
-           if (ret) {
-                  dev_err(dev, "failed to deassert reset\n");
-                  return ret;
-           }
-    }
-
-
-
-
-What I mean is, we can write a driver in either way
-without using the _optional one.
-
-No need to call WARN_ON(1).
-
-
-What does _optional buy us?
-
-
-
-One more thing.
-WARN_ON(1) is only useful on run-time,
-but run-time test is more expensive than compile-time test.
-
-If a driver really needs reset control,
-it should not be complied without CONFIG_RESET_CONTROLLER.
-So, the driver should have "depends on RESET_CONTROLLER" in Kconfig.
-
-
-
-I dug the git-log to figure out historical reason.
-
-The _optional functions were introduced by the following commit:
-
------------------>8-----------------
-commit b424080a9e086e683ad5fdc624a7cf3c024e0c0f
-Author: Philipp Zabel <p.zabel@pengutronix.de>
-Date:   Fri Mar 7 15:18:47 2014 +0100
-
-    reset: Add optional resets and stubs
-
-    This patch adds device_reset_optional and (devm_)reset_control_get_optional
-    variants that drivers can use to indicate they can function without control
-    over the reset line. For those functions, stubs are added so the drivers can
-    be compiled with CONFIG_RESET_CONTROLLER disabled.
-    Also, device_reset is annotated with __must_check. Drivers
-ignoring the return
-    value should use device_reset_optional instead.
-
-    Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-------------------8<-----------------------------
-
-At that point of time, the reset_control_get  (without _optional)
-did not have a stub, so drivers calling reset_control_get()
-could not be built without CONFIG_RESET_CONTROLLER enabled.
-So, it made sense to add _optional variants.
-
-
-
-
-A while later, any drivers became able to be built
-without CONFIG_RESET_CONTROLLER, by the following commit.
-
------------------>8------------------------------------
-commit 5bcd0b7f3c56c616abffd89e11c841834dd1528c
-Author: Axel Lin <axel.lin@ingics.com>
-Date:   Tue Sep 1 07:56:38 2015 +0800
-
-    reset: Add (devm_)reset_control_get stub functions
-
-    So the drivers can be compiled with CONFIG_RESET_CONTROLLER disabled.
-
-    Signed-off-by: Axel Lin <axel.lin@ingics.com>
-    Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
--------------------8<------------------------------------
-
-
-Since then, it became pointless to have _optional variants.
-
-
-
-
-I want to deprecate _optional variants in the following steps:
-
-[1] Add "depends on RESET_CONTROLLER" to drivers
-    for which reset_control is mandatory.
-
-    We can find those driver easily by grepping
-    the reference to non-optional reset_control_get().
-
-
-[2] Change all of _optional calls to non-optional ones.
-
-
-[3] Remove _optional static inline functions from include/linux/reset.h
-
-
-
-It will take some releases to complete this task,
-but I am happy to volunteer to it if we agree on this idea.
-
-
-
-
--- 
-Best Regards
-Masahiro Yamada
+> 
+> Cheers.
+> 
+> -- 
+> Robert
