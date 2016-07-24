@@ -1,41 +1,86 @@
 From: johan@kernel.org (Johan Hovold)
-Date: Sun, 24 Jul 2016 14:10:59 +0200
-Subject: [PATCH 2/3] ARM: dts: overo: fix gpmc nand cs0 range
+Date: Sun, 24 Jul 2016 14:11:00 +0200
+Subject: [PATCH 3/3] ARM: dts: overo: fix gpmc nand on boards with ethernet
 In-Reply-To: <1469362260-20066-1-git-send-email-johan@kernel.org>
 References: <1469362260-20066-1-git-send-email-johan@kernel.org>
-Message-ID: <1469362260-20066-3-git-send-email-johan@kernel.org>
+Message-ID: <1469362260-20066-4-git-send-email-johan@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The gpmc ranges property for NAND at CS0 has been broken since it was
-first added.
-
-This currently prevents the nand gpmc child node from being probed:
+The gpmc ranges property for NAND at CS0 was being overridden by later
+includes that defined gpmc ethernet nodes, effectively breaking NAND on
+these systems:
 
 	omap-gpmc 6e000000.gpmc: /ocp/gpmc at 6e000000/nand at 0,0 has
 	malformed 'reg' property
 
-and consequently the NAND device from being registered.
+Instead of redefining the NAND range in every such dtsi, define all
+currently used ranges in omap3-overo-base.dtsi.
 
 Fixes: 98ce6007efb4 ("ARM: dts: overo: Support PoP NAND")
-Cc: stable <stable@vger.kernel.org>	# 4.3
+Cc: stable <stable@vger.kernel.org> # 4.3
 Signed-off-by: Johan Hovold <johan@kernel.org>
 ---
- arch/arm/boot/dts/omap3-overo-base.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/omap3-overo-base.dtsi              | 4 +++-
+ arch/arm/boot/dts/omap3-overo-chestnut43-common.dtsi | 2 --
+ arch/arm/boot/dts/omap3-overo-tobi-common.dtsi       | 2 --
+ arch/arm/boot/dts/omap3-overo-tobiduo-common.dtsi    | 3 ---
+ 4 files changed, 3 insertions(+), 8 deletions(-)
 
 diff --git a/arch/arm/boot/dts/omap3-overo-base.dtsi b/arch/arm/boot/dts/omap3-overo-base.dtsi
-index de256fa8da48..b15c435439fb 100644
+index b15c435439fb..3e946cac55f3 100644
 --- a/arch/arm/boot/dts/omap3-overo-base.dtsi
 +++ b/arch/arm/boot/dts/omap3-overo-base.dtsi
-@@ -223,7 +223,7 @@
+@@ -223,7 +223,9 @@
  };
  
  &gpmc {
--	ranges = <0 0 0x00000000 0x20000000>;
-+	ranges = <0 0 0x30000000 0x1000000>;	/* CS0 */
+-	ranges = <0 0 0x30000000 0x1000000>;	/* CS0 */
++	ranges = <0 0 0x30000000 0x1000000>,	/* CS0 */
++		 <4 0 0x2b000000 0x1000000>,	/* CS4 */
++		 <5 0 0x2c000000 0x1000000>;	/* CS5 */
  
  	nand at 0,0 {
  		compatible = "ti,omap2-nand";
+diff --git a/arch/arm/boot/dts/omap3-overo-chestnut43-common.dtsi b/arch/arm/boot/dts/omap3-overo-chestnut43-common.dtsi
+index 7df27926ead2..4f4c6efbd518 100644
+--- a/arch/arm/boot/dts/omap3-overo-chestnut43-common.dtsi
++++ b/arch/arm/boot/dts/omap3-overo-chestnut43-common.dtsi
+@@ -55,8 +55,6 @@
+ #include "omap-gpmc-smsc9221.dtsi"
+ 
+ &gpmc {
+-	ranges = <5 0 0x2c000000 0x1000000>;	/* CS5 */
+-
+ 	ethernet at gpmc {
+ 		reg = <5 0 0xff>;
+ 		interrupt-parent = <&gpio6>;
+diff --git a/arch/arm/boot/dts/omap3-overo-tobi-common.dtsi b/arch/arm/boot/dts/omap3-overo-tobi-common.dtsi
+index 9e24b6a1d07b..1b304e2f1bd2 100644
+--- a/arch/arm/boot/dts/omap3-overo-tobi-common.dtsi
++++ b/arch/arm/boot/dts/omap3-overo-tobi-common.dtsi
+@@ -27,8 +27,6 @@
+ #include "omap-gpmc-smsc9221.dtsi"
+ 
+ &gpmc {
+-	ranges = <5 0 0x2c000000 0x1000000>;	/* CS5 */
+-
+ 	ethernet at gpmc {
+ 		reg = <5 0 0xff>;
+ 		interrupt-parent = <&gpio6>;
+diff --git a/arch/arm/boot/dts/omap3-overo-tobiduo-common.dtsi b/arch/arm/boot/dts/omap3-overo-tobiduo-common.dtsi
+index 334109e14613..82e98ee3023a 100644
+--- a/arch/arm/boot/dts/omap3-overo-tobiduo-common.dtsi
++++ b/arch/arm/boot/dts/omap3-overo-tobiduo-common.dtsi
+@@ -15,9 +15,6 @@
+ #include "omap-gpmc-smsc9221.dtsi"
+ 
+ &gpmc {
+-	ranges = <4 0 0x2b000000 0x1000000>,	/* CS4 */
+-		 <5 0 0x2c000000 0x1000000>;	/* CS5 */
+-
+ 	smsc1: ethernet at gpmc {
+ 		reg = <5 0 0xff>;
+ 		interrupt-parent = <&gpio6>;
 -- 
 2.7.3
