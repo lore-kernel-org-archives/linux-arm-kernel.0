@@ -1,75 +1,111 @@
 From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Sun, 24 Jul 2016 11:30:19 -0400
-Subject: [PATCH v5 05/15] binfmt_flat: use generic transfer_args_to_stack()
+Date: Sun, 24 Jul 2016 11:30:21 -0400
+Subject: [PATCH v5 07/15] binfmt_flat: use proper user space accessors with
+ relocs processing code
 In-Reply-To: <1469374229-21585-1-git-send-email-nicolas.pitre@linaro.org>
 References: <1469374229-21585-1-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <1469374229-21585-6-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <1469374229-21585-8-git-send-email-nicolas.pitre@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This gets rid of the rather ugly, open coded and suboptimal copy code.
+Relocs are fixed up in place in user space memory.  The appropriate
+accessors are required for this code to work with an active MMU.
+
+The architecture specific handlers flat_get_addr_from_rp() and
+flat_put_addr_at_rp() for ARM and M68K are adjusted with separate
+patches. SuperH and Xtensa are left out as they doesn't implement
+__get_user_unaligned() and __put_user_unaligned() yet. The other
+architectures that use BFLT don't have any MMU.
 
 Signed-off-by: Nicolas Pitre <nico@linaro.org>
 Reviewed-by: Greg Ungerer <gerg@linux-m68k.org>
 ---
- fs/binfmt_flat.c | 22 ++++++++++------------
- 1 file changed, 10 insertions(+), 12 deletions(-)
+ fs/binfmt_flat.c | 31 +++++++++++++++++++------------
+ 1 file changed, 19 insertions(+), 12 deletions(-)
 
 diff --git a/fs/binfmt_flat.c b/fs/binfmt_flat.c
-index 03301bad1f..a002e1a3b9 100644
+index 5dc7968a42..9deafb282d 100644
 --- a/fs/binfmt_flat.c
 +++ b/fs/binfmt_flat.c
-@@ -846,10 +846,8 @@ static int load_flat_binary(struct linux_binprm *bprm)
- {
- 	struct lib_info libinfo;
- 	struct pt_regs *regs = current_pt_regs();
--	unsigned long p = bprm->p;
--	unsigned long stack_len;
-+	unsigned long sp, stack_len;
- 	unsigned long start_addr;
--	unsigned long *sp;
- 	int res;
- 	int i, j;
+@@ -419,7 +419,7 @@ static int load_flat_file(struct linux_binprm *bprm,
+ 	unsigned long textpos, datapos, realdatastart;
+ 	unsigned long text_len, data_len, bss_len, stack_len, full_data, flags;
+ 	unsigned long len, memp, memp_size, extra, rlim;
+-	unsigned long *reloc, *rp;
++	unsigned long __user *reloc, *rp;
+ 	struct inode *inode;
+ 	int i, rev, relocs;
+ 	loff_t fpos;
+@@ -591,7 +591,7 @@ static int load_flat_file(struct linux_binprm *bprm,
+ 			goto err;
+ 		}
  
-@@ -884,15 +882,15 @@ static int load_flat_binary(struct linux_binprm *bprm)
+-		reloc = (unsigned long *)
++		reloc = (unsigned long __user *)
+ 			(datapos + (ntohl(hdr->reloc_start) - text_len));
+ 		memp = realdatastart;
+ 		memp_size = len;
+@@ -616,7 +616,7 @@ static int load_flat_file(struct linux_binprm *bprm,
+ 				MAX_SHARED_LIBS * sizeof(unsigned long),
+ 				FLAT_DATA_ALIGN);
  
- 	set_binfmt(&flat_format);
- 
--	p = ((current->mm->context.end_brk + stack_len + 3) & ~3) - 4;
--	pr_debug("p=%lx\n", p);
-+	sp = ((current->mm->context.end_brk + stack_len + 3) & ~3) - 4;
-+	pr_debug("sp=%lx\n", sp);
- 
--	/* copy the arg pages onto the stack, this could be more efficient :-) */
--	for (i = TOP_OF_ARGS - 1; i >= bprm->p; i--)
--		*(char *) --p =
--			((char *) page_address(bprm->page[i/PAGE_SIZE]))[i % PAGE_SIZE];
-+	/* copy the arg pages onto the stack */
-+	res = transfer_args_to_stack(bprm, &sp);
-+	if (res)
-+		return res;
- 
--	sp = (unsigned long *) create_flat_tables(p, bprm);
-+	sp = create_flat_tables(sp, bprm);
- 
- 	/* Fake some return addresses to ensure the call chain will
- 	 * initialise library in order for us.  We are required to call
-@@ -904,14 +902,14 @@ static int load_flat_binary(struct linux_binprm *bprm)
- 	for (i = MAX_SHARED_LIBS-1; i > 0; i--) {
- 		if (libinfo.lib_list[i].loaded) {
- 			/* Push previos first to call address */
--			--sp;	put_user(start_addr, sp);
-+			--sp;	put_user(start_addr, (unsigned long *)sp);
- 			start_addr = libinfo.lib_list[i].entry;
+-		reloc = (unsigned long *)
++		reloc = (unsigned long __user *)
+ 			(datapos + (ntohl(hdr->reloc_start) - text_len));
+ 		memp = textpos;
+ 		memp_size = len;
+@@ -708,15 +708,20 @@ static int load_flat_file(struct linux_binprm *bprm,
+ 	 * image.
+ 	 */
+ 	if (flags & FLAT_FLAG_GOTPIC) {
+-		for (rp = (unsigned long *)datapos; *rp != 0xffffffff; rp++) {
+-			unsigned long addr;
+-			if (*rp) {
+-				addr = calc_reloc(*rp, libinfo, id, 0);
++		for (rp = (unsigned long __user *)datapos; ; rp++) {
++			unsigned long addr, rp_val;
++			if (get_user(rp_val, rp))
++				return -EFAULT;
++			if (rp_val == 0xffffffff)
++				break;
++			if (rp_val) {
++				addr = calc_reloc(rp_val, libinfo, id, 0);
+ 				if (addr == RELOC_FAILED) {
+ 					ret = -ENOEXEC;
+ 					goto err;
+ 				}
+-				*rp = addr;
++				if (put_user(addr, rp))
++					return -EFAULT;
+ 			}
  		}
  	}
- #endif
+@@ -733,7 +738,7 @@ static int load_flat_file(struct linux_binprm *bprm,
+ 	 * __start to address 4 so that is okay).
+ 	 */
+ 	if (rev > OLD_FLAT_VERSION) {
+-		unsigned long persistent = 0;
++		unsigned long __maybe_unused persistent = 0;
+ 		for (i = 0; i < relocs; i++) {
+ 			unsigned long addr, relval;
  
- 	/* Stash our initial stack pointer into the mm structure */
--	current->mm->start_stack = (unsigned long)sp;
-+	current->mm->start_stack = sp;
- 
- #ifdef FLAT_PLAT_INIT
- 	FLAT_PLAT_INIT(regs);
+@@ -742,12 +747,14 @@ static int load_flat_file(struct linux_binprm *bprm,
+ 			 * relocated (of course, the address has to be
+ 			 * relocated first).
+ 			 */
+-			relval = ntohl(reloc[i]);
++			if (get_user(relval, reloc + i))
++				return -EFAULT;
++			relval = ntohl(relval);
+ 			if (flat_set_persistent(relval, &persistent))
+ 				continue;
+ 			addr = flat_get_relocate_addr(relval);
+-			rp = (unsigned long *) calc_reloc(addr, libinfo, id, 1);
+-			if (rp == (unsigned long *)RELOC_FAILED) {
++			rp = (unsigned long __user *)calc_reloc(addr, libinfo, id, 1);
++			if (rp == (unsigned long __user *)RELOC_FAILED) {
+ 				ret = -ENOEXEC;
+ 				goto err;
+ 			}
 -- 
 2.7.4
