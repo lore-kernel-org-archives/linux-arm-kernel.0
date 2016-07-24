@@ -1,72 +1,45 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Sun, 24 Jul 2016 10:38:11 -0400
-Subject: [PATCH 10/10] dmaengine: qcom_hidma: add MSI support for
- interrupts
-In-Reply-To: <20160724064256.GA9681@localhost>
+Date: Sun, 24 Jul 2016 10:40:19 -0400
+Subject: [PATCH 04/10] dmaending: qcom_hidma: configure DMA and MSI for OF
+In-Reply-To: <20160724063312.GZ9681@localhost>
 References: <1468867177-15007-1-git-send-email-okaya@codeaurora.org>
- <1468867177-15007-11-git-send-email-okaya@codeaurora.org>
- <20160724064256.GA9681@localhost>
-Message-ID: <e6560c8b-e18e-9e32-5b51-c1c12d8551ce@codeaurora.org>
+ <1468867177-15007-5-git-send-email-okaya@codeaurora.org>
+ <20160724063312.GZ9681@localhost>
+Message-ID: <3e69f5d5-ce06-8912-cf15-42546fd243af@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vinod,
-
-On 7/24/2016 2:42 AM, Vinod Koul wrote:
-> On Tue, Jul 19, 2016 at 12:09:37AM +0530, Sinan Kaya wrote:
-> 
->> @@ -567,6 +578,98 @@ static int hidma_create_sysfs_entry(struct hidma_dev *dev, char *name,
->>         return device_create_file(dev->ddev.dev, attrs);
->>  }
+On 7/24/2016 2:33 AM, Vinod Koul wrote:
+> On Tue, Jul 19, 2016 at 12:09:31AM +0530, Sinan Kaya wrote:
+>> Configure the DMA bindings for the device tree based firmware.
 >>
->> +#ifdef CONFIG_GENERIC_MSI_IRQ_DOMAIN
+>> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+>> ---
+>>  drivers/dma/qcom/hidma_mgmt.c | 4 +++-
+>>  1 file changed, 3 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/dma/qcom/hidma_mgmt.c b/drivers/dma/qcom/hidma_mgmt.c
+>> index c0e3653..fb30730 100644
+>> --- a/drivers/dma/qcom/hidma_mgmt.c
+>> +++ b/drivers/dma/qcom/hidma_mgmt.c
+>> @@ -375,8 +375,10 @@ static int __init hidma_mgmt_of_populate_channels(struct device_node *np)
+>>                         ret = -ENODEV;
+>>                         goto out;
+>>                 }
+>> +               of_node_get(child);
+>> +               new_pdev->dev.of_node = child;
+>>                 of_dma_configure(&new_pdev->dev, child);
+>> -
+>> +               of_msi_configure(&new_pdev->dev, child);
 > 
-> This can be true on machine with your older HW, so I would be bit more
-> careful here..
-
-Correct, I tested the patch with new and old HW. The old HW won't attempt calling this function
-since msi flag will be false.
-
-> 
->> +       if (rc)
->> +               dev_warn(&pdev->dev,
->> +                        "failed to request MSI irq, falling back to wired IRQ\n");
->> +       return rc;
->> +#else
->> +       return -EINVAL;
-> 
-> -EINVAL doesnt sound apt here..
-
-What should I use? -ENOENT ?
-
-> 
->> +       struct acpi_device *adev = ACPI_COMPANION(dev);
->> +       const char *of_compat;
->> +       int ret;
->> +
->> +       if (!adev || acpi_disabled) {
->> +               ret = device_property_read_string(dev, "compatible",
->> +                                                 &of_compat);
->> +               if (ret)
->> +                       return false;
->> +
->> +               ret = strcmp(of_compat, "qcom,hidma-1.1");
->> +       } else {
->> +               ret = strcmp(acpi_device_hid(adev), "QCOM8062");
-> 
-> Okay if you ahve a device ID then why do we need new binding? This device as
-> you said implies the support for MSI interrupts.
-
-
-Yes, I do have a new device ID for platforms with MSI capability. 
-
-Which new binding are you referring to?
-
-> 
-> Thanks
+> How would this work on non MSI platforms?
 > 
 
-Sinan
+The way it works is MSI on OF platforms relies on an optional msi-parent and msi-cells attribute
+present in the device tree firmware. 
+
+If these attributes do not exist, the function bails out. The function would create the MSI bindings
+only if the correct attributes are present. 
 
 -- 
 Sinan Kaya
