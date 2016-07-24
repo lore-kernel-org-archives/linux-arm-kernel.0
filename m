@@ -1,47 +1,76 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Sun, 24 Jul 2016 10:40:19 -0400
-Subject: [PATCH 04/10] dmaending: qcom_hidma: configure DMA and MSI for OF
-In-Reply-To: <20160724063312.GZ9681@localhost>
-References: <1468867177-15007-1-git-send-email-okaya@codeaurora.org>
- <1468867177-15007-5-git-send-email-okaya@codeaurora.org>
- <20160724063312.GZ9681@localhost>
-Message-ID: <3e69f5d5-ce06-8912-cf15-42546fd243af@codeaurora.org>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Sun, 24 Jul 2016 11:30:14 -0400
+Subject: [PATCH v5 00/15] allow BFLT executables on systems with a MMU
+Message-ID: <1469374229-21585-1-git-send-email-nicolas.pitre@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7/24/2016 2:33 AM, Vinod Koul wrote:
-> On Tue, Jul 19, 2016 at 12:09:31AM +0530, Sinan Kaya wrote:
->> Configure the DMA bindings for the device tree based firmware.
->>
->> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
->> ---
->>  drivers/dma/qcom/hidma_mgmt.c | 4 +++-
->>  1 file changed, 3 insertions(+), 1 deletion(-)
->>
->> diff --git a/drivers/dma/qcom/hidma_mgmt.c b/drivers/dma/qcom/hidma_mgmt.c
->> index c0e3653..fb30730 100644
->> --- a/drivers/dma/qcom/hidma_mgmt.c
->> +++ b/drivers/dma/qcom/hidma_mgmt.c
->> @@ -375,8 +375,10 @@ static int __init hidma_mgmt_of_populate_channels(struct device_node *np)
->>                         ret = -ENODEV;
->>                         goto out;
->>                 }
->> +               of_node_get(child);
->> +               new_pdev->dev.of_node = child;
->>                 of_dma_configure(&new_pdev->dev, child);
->> -
->> +               of_msi_configure(&new_pdev->dev, child);
-> 
-> How would this work on non MSI platforms?
-> 
+This series provides the necessary changes to allow "flat" executable
+binaries meant for no-MMU systems to actually run on systems with a MMU.
+Also thrown in are various cleanups to binfmt_flat.c.
 
-The way it works is MSI on OF platforms relies on an optional msi-parent and msi-cells attribute
-present in the device tree firmware. 
+This can also be found in the following git repo:
 
-If these attributes do not exist, the function bails out. The function would create the MSI bindings
-only if the correct attributes are present. 
+	git://git.linaro.org/people/nicolas.pitre/linux binfmt_flat_with_mmu
 
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+*Why?*
+
+Because developing and testing natively on a large system with lots of
+RAM makes it so much more convenient to use all the existing profiling
+tools and debugging facilities that a kernel with lots of RAM can give.
+And incidentally, those systems with lots of RAM all have a MMU.
+
+*Why not use elf_fdpic?*
+
+The flat executable format is simple with very small footprint
+overhead, either in the executables themselves or kernel support.
+This makes the flat format more suitable than elf_fdpic for very small
+single user-app embedded systems.
+
+And while elf_fdpic binaries can run on MMU systems, flat binaries still
+couldn't, which just felt wrong.
+
+So here it is. The no-MMU support should remain unaffected, confirmed by
+Greg Ungerer. Tested with MMU on ARM and M68K.
+
+Changes since v4:
+
+- Isolated architecture specific changes in their own patches for easier
+  review through their own path to mainline.
+
+- Added needed m68k register fixup from Greg Ungerer.
+
+Changes since v3:
+
+- Small cosmetic changes to pr_*().
+
+- Addressed most important checkpatch complaints on the whole source file
+  and patches in this seris.
+
+Changes since  v2:
+
+- Added protection against a corrupted header that could have caused nasty
+  overflows etc. Suggested by Alan Cox.
+
+- printk() modernization. Suggested by Greg Ungerer / Geert Uytterhoeven.
+
+- Added Greg Ungerer's reviewed-by tag.
+
+Changes since v1:
+
+- Removed SuperH and Xtensa from the Kconfig rule as they fail to build
+  due to lack of get/put_unaligned_user().
+
+- Clarified some commit logs a bit.
+
+diffstat:
+
+ arch/arm/include/asm/flat.h       |   5 +-
+ arch/m68k/include/asm/flat.h      |  11 +-
+ arch/m68k/include/asm/processor.h |   2 -
+ fs/Kconfig.binfmt                 |   3 +-
+ fs/binfmt_elf_fdpic.c             |  38 +--
+ fs/binfmt_flat.c                  | 525 ++++++++++++++++++--------------
+ fs/exec.c                         |  33 ++
+ include/linux/binfmts.h           |   2 +
+ 8 files changed, 345 insertions(+), 274 deletions(-)
