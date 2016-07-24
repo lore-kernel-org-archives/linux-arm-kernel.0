@@ -1,144 +1,34 @@
-From: tjakobi@math.uni-bielefeld.de (Tobias Jakobi)
-Date: Sun, 24 Jul 2016 20:02:59 +0200
-Subject: [PATCH v2 00/10] Exynos IOMMU: proper runtime PM support (use
- device dependencies)
-In-Reply-To: <7c770ff5-2b22-adf6-b8d0-e94d1d7d7550@samsung.com>
-References: <1466144820-6286-1-git-send-email-m.szyprowski@samsung.com>
- <5787B2B0.9020809@math.uni-bielefeld.de>
- <5788E352.3040801@math.uni-bielefeld.de>
- <a15e438a-7fa0-3a4d-e6e2-13425512dddd@samsung.com>
- <578CB6DB.90608@math.uni-bielefeld.de>
- <6939949e-4c8e-cba0-9858-b37d1ba01869@samsung.com>
- <578D0716.6060106@math.uni-bielefeld.de>
- <7c770ff5-2b22-adf6-b8d0-e94d1d7d7550@samsung.com>
-Message-ID: <579502D3.7090004@math.uni-bielefeld.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sun, 24 Jul 2016 21:48:55 +0200
+Subject: [PATCH v5 12/15] binfmt_flat: allow compressed flat binary format
+ to work on MMU systems
+In-Reply-To: <1469374229-21585-13-git-send-email-nicolas.pitre@linaro.org>
+References: <1469374229-21585-1-git-send-email-nicolas.pitre@linaro.org>
+ <1469374229-21585-13-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <4262519.L4vdOGcrh0@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
-
-
-Marek Szyprowski wrote:
-> Hi Tobias
+On Sunday, July 24, 2016 11:30:26 AM CEST Nicolas Pitre wrote:
+> +#else
+> +                       /*
+> +                        * This is used on MMU systems mainly for testing.
+> +                        * Let's use a kernel buffer to simplify things.
+> +                        */
+> +                       long unz_text_len = text_len - sizeof(struct flat_hdr);
+> +                       long unz_len = unz_text_len + full_data;
+> +                       char *unz_data = vmalloc(unz_len);
+> +                       if (!unz_data) {
+> +                               result = -ENOMEM;
 > 
-> 
-> On 2016-07-18 18:43, Tobias Jakobi wrote:
->> Marek Szyprowski wrote:
->>> On 2016-07-18 13:00, Tobias Jakobi wrote:
->>>> Marek Szyprowski wrote:
->>>>> On 2016-07-15 15:21, Tobias Jakobi wrote:
->>>>>> Tobias Jakobi wrote:
->>>>>>> Hello Marek,
->>>>>>>
->>>>>>> I've tested the patchset on 4.7-rc7 and noticed that it breaks
->>>>>>> reboot on
->>>>>>> my ODROID-X2.
->>>>>>>
->>>>>>> Going to check where exactly things break.
->>>>>> Sadly it's the last patch where everything comes together:
->>>>>> "iommu/exynos: Add proper runtime pm support"
->>>>>>
->>>>>> I still have to check if forcing runpm status to 'on' makes a
->>>>>> difference. I suspect that the aggressive clock gating might be the
->>>>>> reason?
->>>>> Thanks for testing. I will check this issue. Could you send me your
->>>>> .config?
->>>> This is the config I'm currently using:
->>>> https://github.com/tobiasjakobi/odroid-environment/blob/master/sourcecode/system/vanilla-4.7-debug.conf
->>>>
->>>>
->>>>
->>>> Do you think checking this with no_console_suspend makes sense?
->>> no_console_suspend switch won't provide more information, but I managed
->>> to reproduce your issue. I'm really confused how enabling runtime pm can
->>> cause problems with usb/smsc95xx ethernet driver (that is the reason for
->>> failed reboot). Maybe it is somehow related to the global relations
->>> between devices and drivers and the fact that creating the runtime pm
->>> links change the order of operations. I will check this again when
->>> Rafael send updated patches. Here is the log I got (after waiting some
->>> time):
->> thanks for looking into this! I'll try to reproduce this on my board. I
->> have to admit that I didn't wait too long for the hung task message to
->> appear.
->>
->> I wonder if this has something to do with regulator code cutting some
->> supplies too early. Is this on a X2 or a U2/U3?
-> 
-> I've reproduced it on U3.
-Here's what I get on my X2.
 
->  * Remounting remaining filesystems read-only ...
->  *   Remounting / read only ...
-> [   59.695857] EXT4-fs (mmcblk0p2): re-mounted. Opts: (null)
->  [ ok ]
->  [ ok ]
-> [   59.858672] sd 0:0:0:0: [sda] Synchronizing SCSI cache
-> [   66.537116] smsc95xx 1-2.1.1:1.0 eth0: Failed to read reg index 0x00000114: -110
-> [   66.538887] smsc95xx 1-2.1.1:1.0 eth0: Error reading MII_ACCESS
-> [   66.544803] smsc95xx 1-2.1.1:1.0 eth0: MII is busy in smsc95xx_mdio_read
-> [   66.551487] smsc95xx 1-2.1.1:1.0 eth0: Failed to read MII_BMSR
-> [   93.597127] usb 1-2-port2: cannot reset (err = -110)
-> [   94.596714] usb 1-2-port2: cannot reset (err = -110)
-> [   95.596737] usb 1-2-port2: cannot reset (err = -110)
-> [   96.596722] usb 1-2-port2: cannot reset (err = -110)
-> [   97.596735] usb 1-2-port2: cannot reset (err = -110)
-> [   97.596800] usb 1-2-port2: Cannot enable. Maybe the USB cable is bad?
-> [   98.602116] usb 1-2-port2: cannot disable (err = -110)
-> [   99.601744] usb 1-2-port2: cannot reset (err = -110)
-> [  100.601730] usb 1-2-port2: cannot reset (err = -110)
-> [  101.601743] usb 1-2-port2: cannot reset (err = -110)
-> [  102.601729] usb 1-2-port2: cannot reset (err = -110)
-> [  103.601746] usb 1-2-port2: cannot reset (err = -110)
-> [  103.601811] usb 1-2-port2: Cannot enable. Maybe the USB cable is bad?
-> [  104.606737] usb 1-2-port2: cannot disable (err = -110)
-> [  105.606756] usb 1-2-port2: cannot reset (err = -110)
-> [  106.606742] usb 1-2-port2: cannot reset (err = -110)
-> [  107.606758] usb 1-2-port2: cannot reset (err = -110)
-> [  108.606747] usb 1-2-port2: cannot reset (err = -110)
-> [  109.606763] usb 1-2-port2: cannot reset (err = -110)
-> [  109.606835] usb 1-2-port2: Cannot enable. Maybe the USB cable is bad?
-> [  110.611748] usb 1-2-port2: cannot disable (err = -110)
-> [  111.611766] usb 1-2-port2: cannot reset (err = -110)
-> [  112.611758] usb 1-2-port2: cannot reset (err = -110)
-> [  113.611769] usb 1-2-port2: cannot reset (err = -110)
-> [  114.611758] usb 1-2-port2: cannot reset (err = -110)
-> [  115.611776] usb 1-2-port2: cannot reset (err = -110)
-> [  115.611846] usb 1-2-port2: Cannot enable. Maybe the USB cable is bad?
-> [  116.616764] usb 1-2-port2: cannot disable (err = -110)
-> [  117.617148] usb 1-2-port2: cannot disable (err = -110)
-> [  122.616775] hub 1-2:1.0: hub_ext_port_status failed (err = -110)
+Is there a risk of a malicious user exhausting vmalloc space with a
+binary that has forged headers? If there is, maybe put an upper bound on
+the size of allocation.
 
-Output stops there, I don't see any more output with respect to hung
-tasks (even though hung task detection is on and I've waited for like 10
-minutes).
+More broadly speaking, are there any other attacks that may get enabled
+through forged binaries? We've had a couple of vulnerabilities in
+binfmt_elf over the years, and I wonder how dangerous it might be
+if distros turn on binfmt_flat support by default.
 
-Anyway, I looks like that smsc95xx_unbind() is never called, and hence
-the check_carrier() delayed work queue isn't cancelled.
-
-However I'm not convinced that this is the real problem. I have manually
-triggered the unbind before shutdown, and while the error message from
-the smsc95xx driver have disappeared, the other messages are still produced.
-
-My guess is that we are seeing these messages because reboot is not
-working, and not the other way round.
-
-
-- Tobias
-
-
-> 
->> I'm not sure if we
->> currently model the regulator setup correctly here (IIRC then buck8 is
->> supplying the LAN/USB block on U2/U3).
-> 
-> IMHO it is not really related to regulator operations, but the sequence
-> of shutting down logical devices in the system. For some reasons when pm
-> links
-> are used, something changes the order of operations in system shutdown
-> procedure, what causes smsc95xx to hang. I have no idea why, but I don't
-> have
-> time to investigate it further. I will wait for the next release of
-> Rafael's
-> pm links patches and then check everything again.
-> 
-> Best regards
+	Arnd
