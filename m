@@ -1,52 +1,75 @@
 From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Sun, 24 Jul 2016 11:30:28 -0400
-Subject: [PATCH v5 14/15] m68k: enable binfmt_flat on systems with an MMU
+Date: Sun, 24 Jul 2016 11:30:19 -0400
+Subject: [PATCH v5 05/15] binfmt_flat: use generic transfer_args_to_stack()
 In-Reply-To: <1469374229-21585-1-git-send-email-nicolas.pitre@linaro.org>
 References: <1469374229-21585-1-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <1469374229-21585-15-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <1469374229-21585-6-git-send-email-nicolas.pitre@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the generic changes are in place, this can be enabled on m68k
-with the use of proper user space accessors in the flat_get_addr_from_rp()
-and flat_put_addr_at_rp() handlers as rp actually holds a user space
-address.
+This gets rid of the rather ugly, open coded and suboptimal copy code.
 
 Signed-off-by: Nicolas Pitre <nico@linaro.org>
+Reviewed-by: Greg Ungerer <gerg@linux-m68k.org>
 ---
- arch/m68k/include/asm/flat.h | 5 +++--
- fs/Kconfig.binfmt            | 3 ++-
- 2 files changed, 5 insertions(+), 3 deletions(-)
+ fs/binfmt_flat.c | 22 ++++++++++------------
+ 1 file changed, 10 insertions(+), 12 deletions(-)
 
-diff --git a/arch/m68k/include/asm/flat.h b/arch/m68k/include/asm/flat.h
-index f46c2f044f..a97c479b11 100644
---- a/arch/m68k/include/asm/flat.h
-+++ b/arch/m68k/include/asm/flat.h
-@@ -8,8 +8,9 @@
- #define	flat_argvp_envp_on_stack()		1
- #define	flat_old_ram_flag(flags)		(flags)
- #define	flat_reloc_valid(reloc, size)		((reloc) <= (size))
--#define	flat_get_addr_from_rp(rp, relval, flags, p)	get_unaligned(rp)
--#define	flat_put_addr_at_rp(rp, val, relval)	put_unaligned(val,rp)
-+#define	flat_get_addr_from_rp(rp, relval, flags, p) \
-+	({ unsigned long __val; __get_user_unaligned(__val, rp); __val; })
-+#define	flat_put_addr_at_rp(rp, val, relval)	__put_user_unaligned(val, rp)
- #define	flat_get_relocate_addr(rel)		(rel)
+diff --git a/fs/binfmt_flat.c b/fs/binfmt_flat.c
+index 03301bad1f..a002e1a3b9 100644
+--- a/fs/binfmt_flat.c
++++ b/fs/binfmt_flat.c
+@@ -846,10 +846,8 @@ static int load_flat_binary(struct linux_binprm *bprm)
+ {
+ 	struct lib_info libinfo;
+ 	struct pt_regs *regs = current_pt_regs();
+-	unsigned long p = bprm->p;
+-	unsigned long stack_len;
++	unsigned long sp, stack_len;
+ 	unsigned long start_addr;
+-	unsigned long *sp;
+ 	int res;
+ 	int i, j;
  
- static inline int flat_set_persistent(unsigned long relval,
-diff --git a/fs/Kconfig.binfmt b/fs/Kconfig.binfmt
-index 72c03354c1..c7efddf6e0 100644
---- a/fs/Kconfig.binfmt
-+++ b/fs/Kconfig.binfmt
-@@ -89,7 +89,8 @@ config BINFMT_SCRIPT
+@@ -884,15 +882,15 @@ static int load_flat_binary(struct linux_binprm *bprm)
  
- config BINFMT_FLAT
- 	bool "Kernel support for flat binaries"
--	depends on !MMU && (!FRV || BROKEN)
-+	depends on !MMU || M68K
-+	depends on !FRV || BROKEN
- 	help
- 	  Support uClinux FLAT format binaries.
+ 	set_binfmt(&flat_format);
  
+-	p = ((current->mm->context.end_brk + stack_len + 3) & ~3) - 4;
+-	pr_debug("p=%lx\n", p);
++	sp = ((current->mm->context.end_brk + stack_len + 3) & ~3) - 4;
++	pr_debug("sp=%lx\n", sp);
+ 
+-	/* copy the arg pages onto the stack, this could be more efficient :-) */
+-	for (i = TOP_OF_ARGS - 1; i >= bprm->p; i--)
+-		*(char *) --p =
+-			((char *) page_address(bprm->page[i/PAGE_SIZE]))[i % PAGE_SIZE];
++	/* copy the arg pages onto the stack */
++	res = transfer_args_to_stack(bprm, &sp);
++	if (res)
++		return res;
+ 
+-	sp = (unsigned long *) create_flat_tables(p, bprm);
++	sp = create_flat_tables(sp, bprm);
+ 
+ 	/* Fake some return addresses to ensure the call chain will
+ 	 * initialise library in order for us.  We are required to call
+@@ -904,14 +902,14 @@ static int load_flat_binary(struct linux_binprm *bprm)
+ 	for (i = MAX_SHARED_LIBS-1; i > 0; i--) {
+ 		if (libinfo.lib_list[i].loaded) {
+ 			/* Push previos first to call address */
+-			--sp;	put_user(start_addr, sp);
++			--sp;	put_user(start_addr, (unsigned long *)sp);
+ 			start_addr = libinfo.lib_list[i].entry;
+ 		}
+ 	}
+ #endif
+ 
+ 	/* Stash our initial stack pointer into the mm structure */
+-	current->mm->start_stack = (unsigned long)sp;
++	current->mm->start_stack = sp;
+ 
+ #ifdef FLAT_PLAT_INIT
+ 	FLAT_PLAT_INIT(regs);
 -- 
 2.7.4
