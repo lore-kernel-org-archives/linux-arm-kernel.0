@@ -1,51 +1,44 @@
 From: vinod.koul@intel.com (Vinod Koul)
-Date: Sun, 24 Jul 2016 12:12:56 +0530
-Subject: [PATCH 10/10] dmaengine: qcom_hidma: add MSI support for
- interrupts
-In-Reply-To: <1468867177-15007-11-git-send-email-okaya@codeaurora.org>
-References: <1468867177-15007-1-git-send-email-okaya@codeaurora.org>
- <1468867177-15007-11-git-send-email-okaya@codeaurora.org>
-Message-ID: <20160724064256.GA9681@localhost>
+Date: Sun, 24 Jul 2016 13:09:22 +0530
+Subject: [PATCH 2/7] dmaengine: omap-dma: Complete the cookie first on
+ transfer completion
+In-Reply-To: <20160719162004.GK5783@n2100.arm.linux.org.uk>
+References: <20160714124242.7579-1-peter.ujfalusi@ti.com>
+ <20160714124242.7579-3-peter.ujfalusi@ti.com>
+ <20160718103409.GH5783@n2100.arm.linux.org.uk>
+ <923b54d6-c7fc-66c2-1c20-d8d74ebed912@ti.com>
+ <20160719162004.GK5783@n2100.arm.linux.org.uk>
+Message-ID: <20160724073922.GE9681@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 19, 2016 at 12:09:37AM +0530, Sinan Kaya wrote:
-
-> @@ -567,6 +578,98 @@ static int hidma_create_sysfs_entry(struct hidma_dev *dev, char *name,
->         return device_create_file(dev->ddev.dev, attrs);
->  }
+On Tue, Jul 19, 2016 at 05:20:04PM +0100, Russell King - ARM Linux wrote:
+> On Tue, Jul 19, 2016 at 03:35:18PM +0300, Peter Ujfalusi wrote:
+> > On 07/18/16 13:34, Russell King - ARM Linux wrote:
+> > > On Thu, Jul 14, 2016 at 03:42:37PM +0300, Peter Ujfalusi wrote:
+> > >> Before looking for the next descriptor to start, complete the just finished
+> > >> cookie.
+> > > 
+> > > This change will reduce performance as we no longer have an overlap
+> > > between the next request starting to be dealt with in the hardware
+> > > vs the previous request being completed.
+> > 
+> > vchan_cookie_complete() will only mark the cookie completed, adds the vd to
+> > the desc_completed list (it was deleted from desc_issued list when it was
+> > started by omap_dma_start_desc) and schedule the tasklet to deal with the real
+> > completion later.
+> > Marking the just finished descriptor/cookie done first then looking for
+> > possible descriptors in the queue to start feels like a better sequence.
 > 
-> +#ifdef CONFIG_GENERIC_MSI_IRQ_DOMAIN
+> I deliberately arranged the code in the original order so that the next
+> transfer was started on the hardware with the least amount of work by
+> the CPU.  Yes, there may not be much in it, but everything you mention
+> above adds to the number of CPU cycles that need to be executed before
+> the next transfer can be started.
 
-This can be true on machine with your older HW, so I would be bit more
-careful here..
+Yes that is really the right thing to do. Ideally people would want to
+minimize the delay and submit the next one as soon as possible, but people
+have been lazy on this and few other aspects :)
 
-> +       if (rc)
-> +               dev_warn(&pdev->dev,
-> +                        "failed to request MSI irq, falling back to wired IRQ\n");
-> +       return rc;
-> +#else
-> +       return -EINVAL;
-
--EINVAL doesnt sound apt here..
-
-> +       struct acpi_device *adev = ACPI_COMPANION(dev);
-> +       const char *of_compat;
-> +       int ret;
-> +
-> +       if (!adev || acpi_disabled) {
-> +               ret = device_property_read_string(dev, "compatible",
-> +                                                 &of_compat);
-> +               if (ret)
-> +                       return false;
-> +
-> +               ret = strcmp(of_compat, "qcom,hidma-1.1");
-> +       } else {
-> +               ret = strcmp(acpi_device_hid(adev), "QCOM8062");
-
-Okay if you ahve a device ID then why do we need new binding? This device as
-you said implies the support for MSI interrupts.
-
-Thanks
 -- 
 ~Vinod
