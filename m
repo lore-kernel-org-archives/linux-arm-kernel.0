@@ -1,50 +1,56 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Sun, 24 Jul 2016 16:25:16 -0400 (EDT)
-Subject: [PATCH v5 12/15] binfmt_flat: allow compressed flat binary format
- to work on MMU systems
-In-Reply-To: <4262519.L4vdOGcrh0@wuerfel>
-References: <1469374229-21585-1-git-send-email-nicolas.pitre@linaro.org>
- <1469374229-21585-13-git-send-email-nicolas.pitre@linaro.org>
- <4262519.L4vdOGcrh0@wuerfel>
-Message-ID: <alpine.LFD.2.20.1607241612480.1594@knanqh.ubzr>
+From: lkp@intel.com (kbuild test robot)
+Date: Mon, 25 Jul 2016 04:26:42 +0800
+Subject: [PATCH v8 4/9] clocksource/drivers/arm_arch_timer: use readq to
+ get 64-bit CNTVCT
+In-Reply-To: <1468952284-28942-5-git-send-email-fu.wei@linaro.org>
+Message-ID: <201607250415.f4732fEH%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 24 Jul 2016, Arnd Bergmann wrote:
+Hi,
 
-> On Sunday, July 24, 2016 11:30:26 AM CEST Nicolas Pitre wrote:
-> > +#else
-> > +                       /*
-> > +                        * This is used on MMU systems mainly for testing.
-> > +                        * Let's use a kernel buffer to simplify things.
-> > +                        */
-> > +                       long unz_text_len = text_len - sizeof(struct flat_hdr);
-> > +                       long unz_len = unz_text_len + full_data;
-> > +                       char *unz_data = vmalloc(unz_len);
-> > +                       if (!unz_data) {
-> > +                               result = -ENOMEM;
-> > 
-> 
-> Is there a risk of a malicious user exhausting vmalloc space with a
-> binary that has forged headers? If there is, maybe put an upper bound on
-> the size of allocation.
+[auto build test ERROR on stable/master]
+[cannot apply to tip/timers/core pm/linux-next next-20160724]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-Patch #3 enforces a cap on all parameters to avoid overflows and 
-unreasonable section sizes.
+url:    https://github.com/0day-ci/linux/commits/fu-wei-linaro-org/acpi-clocksource-add-GTDT-driver-and-GTDT-support-in-arm_arch_timer/20160725-022614
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux-stable.git master
+config: arm-sunxi_defconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 5.4.0-6) 5.4.0 20160609
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
-Then vmalloc space is used here only for decompressing the binary into, 
-after which the whole thing is copied to user space and the vmalloc area 
-is freed right away.
+All errors (new ones prefixed by >>):
 
-> More broadly speaking, are there any other attacks that may get enabled
-> through forged binaries? We've had a couple of vulnerabilities in
-> binfmt_elf over the years, and I wonder how dangerous it might be
-> if distros turn on binfmt_flat support by default.
+   drivers/clocksource/arm_arch_timer.c: In function 'arch_counter_get_cntvct_mem':
+>> drivers/clocksource/arm_arch_timer.c:421:9: error: implicit declaration of function 'readq' [-Werror=implicit-function-declaration]
+     return readq(arch_counter_base + CNTVCT_LO);
+            ^
+   cc1: some warnings being treated as errors
 
-That was Alan's concern too which prompted patch #3. But with a clamp on 
-all parameters, everything else is done via user accessors.  So an 
-executable still can crap onto itself or generate a segfault but I doubt 
-we really care at that point.
+vim +/readq +421 drivers/clocksource/arm_arch_timer.c
 
+   415	{
+   416		return arch_timer_rate;
+   417	}
+   418	
+   419	static u64 arch_counter_get_cntvct_mem(void)
+   420	{
+ > 421		return readq(arch_counter_base + CNTVCT_LO);
+   422	}
+   423	
+   424	/*
 
-Nicolas
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 19385 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160725/6fab7e8c/attachment-0001.obj>
