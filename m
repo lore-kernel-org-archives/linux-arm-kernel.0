@@ -1,48 +1,40 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Sun, 24 Jul 2016 11:09:02 +0200
-Subject: [PATCH v3 2/7] clk: rockchip: add new clock-type for the ddrclk
-In-Reply-To: <1469178440-4668-3-git-send-email-hl@rock-chips.com>
-References: <1469178440-4668-1-git-send-email-hl@rock-chips.com>
- <1469178440-4668-3-git-send-email-hl@rock-chips.com>
-Message-ID: <1619904.zXvqDRdkgD@diego>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Sun, 24 Jul 2016 11:32:09 +0100
+Subject: [PATCH 2/5] mfd: sunxi-gpadc-mfd: add buffer structure
+In-Reply-To: <1469003351-15263-3-git-send-email-quentin.schulz@free-electrons.com>
+References: <1469003351-15263-1-git-send-email-quentin.schulz@free-electrons.com>
+ <1469003351-15263-3-git-send-email-quentin.schulz@free-electrons.com>
+Message-ID: <8e64fb86-d59c-c641-ded4-6c9f372e2a56@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, 22. Juli 2016, 17:07:15 schrieb Lin Huang:
-> @@ -488,6 +496,25 @@ struct rockchip_clk_branch {
->  		.child		= ch,				\
->  	}
+On 20/07/16 09:29, Quentin Schulz wrote:
+> This adds a buffer structure for files including the sunxi-gpadc-mfd
+> header. This structure has a buffer of 32 u32 values to store data from the
+> FIFO of the GPADC of Allwinner SoCs. A buff_size is provided in case the
+> buffer is not full.
 > 
-> +#define COMPOSITE_DDRC(_id, cname, pnames, f, mo, ms, mw, mf,	\
-> +			 ds, dw, df)				\
-> +	{							\
-> +		.id		= _id,				\
-> +		.branch_type	= branch_ddrc,			\
-> +		.name		= cname,			\
-> +		.parent_names	= pnames,			\
-> +		.num_parents	= ARRAY_SIZE(pnames),		\
-> +		.flags		= f,				\
-> +		.muxdiv_offset	= mo,				\
-> +		.mux_shift	= ms,				\
-> +		.mux_width	= mw,				\
-> +		.mux_flags	= mf,				\
-> +		.div_shift	= ds,				\
-> +		.div_width	= dw,				\
-> +		.div_flags	= df,				\
-> +		.gate_offset	= -1,				\
-> +	}
+> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+I'd roll this into the first patch that uses it.
+Easier to see what is for when reviewing then!
+
+Jonathan
+> ---
+>  include/linux/mfd/sunxi-gpadc-mfd.h | 5 +++++
+>  1 file changed, 5 insertions(+)
+> 
+> diff --git a/include/linux/mfd/sunxi-gpadc-mfd.h b/include/linux/mfd/sunxi-gpadc-mfd.h
+> index 7155845..f658299 100644
+> --- a/include/linux/mfd/sunxi-gpadc-mfd.h
+> +++ b/include/linux/mfd/sunxi-gpadc-mfd.h
+> @@ -20,4 +20,9 @@ struct sunxi_gpadc_mfd_dev {
+>  	void __iomem			*regs;
+>  };
+>  
+> +struct sunxi_gpadc_buffer {
+> +	u32				buffer[32];
+> +	unsigned int			buff_size;
+> +};
 > +
-
-the mux and div-flags are not used in your clock type. Instead I think we could 
-go a similar way as the inverter-type, having one flag type, which could for 
-example encode the interface type ROCKCHIP_DDRCLK_SIP, etc.
-
-Because right now there exist 3 types on how to set the ddr clk, SIP, an SCPI-
-variant and through code in SRAM (rk3288), while the core clock type on the 
-side of the CRU is pretty much the same.
-
-And while it is definitly not necessary to do that now, I think the ddrclk-type 
-can hold the other interfaces as well in the future.
-
-
-Heiko
+>  #endif
+> 
