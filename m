@@ -1,281 +1,83 @@
-From: stefan.mavrodiev@gmail.com (Stefan Mavrodiev)
-Date: Mon, 25 Jul 2016 15:37:23 +0300
-Subject: [PATCH v4] ARM: dts: sun8i: Add dts file for Olimex A33-OLinuXino
-Message-ID: <1469450243-19138-1-git-send-email-stefan.mavrodiev@gmail.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Mon, 25 Jul 2016 14:09:18 +0100
+Subject: [RFC 3/6] dt/bindings: Add bindings for Tegra20/30 NOR bus driver
+In-Reply-To: <20160725121045.GG21170@ulmo.ba.sec>
+References: <1468935397-11926-1-git-send-email-mirza.krak@gmail.com>
+ <1468935397-11926-4-git-send-email-mirza.krak@gmail.com>
+ <434561ec-510e-a3bf-c7b6-c961db299bd6@nvidia.com>
+ <CALw8SCU0cz6mbO=oudCZ4-=2PHVORNt3gwmg2bzNjyhJFnWS3g@mail.gmail.com>
+ <20160725121045.GG21170@ulmo.ba.sec>
+Message-ID: <43ce209d-1b11-ab9b-0e80-8f7fad45eb41@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A33-OLinuXino is A33 development board designed by Olimex LTD.
 
-It has AXP233 PMU, 1GB DRAM, a micro SD card, one USB-OTG connector,
-headphone and mic jacks, connector for LiPo battery and optional
-4GB NAND Flash.
+On 25/07/16 13:10, Thierry Reding wrote:
+> * PGP Signed by an unknown key
+> 
+> On Thu, Jul 21, 2016 at 10:10:49PM +0200, Mirza Krak wrote:
+>> 2016-07-21 11:56 GMT+02:00 Jon Hunter <jonathanh@nvidia.com>:
+>>>> +
+>>>> +The NOR controller supports a number of memory types, including synchronous NOR,
+>>>> +asynchronous NOR, and other flash memories with similar interfaces, such as
+>>>> +MuxOneNAND. One could also connect high speed devices like FPGAs, DSPs,
+>>>> +CAN chips, Wi-Fi chips etc.
+>>>
+>>> Nit-pick ... the Tegra documentation refers to this controller as the
+>>> GMI (general memory interface) or SNOR (sync-NOR) controller because it
+>>> is not just limited to NOR as you mentioned. I see references to GMI in
+>>> the Tegra pinctrl driver and so may be we should use this name.
+>>
+>> ACK.
+>>
+>>
+>>>> +Required properties:
+>>>> +
+>>>> + - compatible: should be "nvidia,tegra20-nor", "nvidia,tegra30-nor"
+>>>
+>>> I see at least one difference at the register level between Tegra20 and
+>>> Tegra30 and so I think this should be something like ...
+>>>
+>>>  - compatible : Should contain one of the following:
+>>>         For Tegra20 must contain "nvidia,tegra20-gmi".
+>>>         For Tegra30 must contain "nvidia,tegra30-gmi".
+>>
+>> ACK. Just curious, which register was it? I only checked that they
+>> have the same count of registers.
+>>
+>>>> + - nvidia,config: This property represents the SNOR_CONFIG_0 register.
+>>>
+>>> There is also a SNOR_MIO_CONFIG for the MIO address space and so I think
+>>> that this should be nvidia,snor-config to be explicit. It might be nice
+>>> to also add a "nvidia,mio-config" while you are at it as well, however,
+>>> that could always be done later. If you do, then the
+>>> "nvidia,snor-config" becomes optional depending on whether you are using
+>>> the SNOR or MIO address space.
+>>
+>> ACK the nvidia,snor-config part, will though wait for further comments
+>> regarding what to do with the config registers, break-out or keep it
+>> is a one property / register.
+>>
+>> Regarding mio-config, not sure about if I would like to include that
+>> part in this stage. If you feel strongly about this we can do it. If
+>> it only comes to down to replicate the same configurations that we do
+>> for SNOR to MIO then I do not see much of a problem, but would like
+>> SNOR to be accepted and would not like the MIO part to halt this. But
+>> then again this up to you guys.
+> 
+> What's the difference between SNOR and MIO? Sorry if I'm being dense but
+> a quick look around the internet didn't yield anything related. I'd be
+> happy to read up if somebody can provide a link.
 
-It has two 40-pin headers. One for LCD panel, and one for
-additional modules. Also there is CSI/DSI connector.
+I am not sure where this term MIO comes from (may be an NVIDIA term),
+but from looking at the MIO_CONFIG register, it looks like a basic
+16/32-bit interface with configurable read/write strobe timing. Does not
+support bursting or address/data multiplexing that the SNOR interface
+does. So may be it is used for interfacing to external devices such as
+FIFOs, UARTs, I2C expanders, etc.
 
-Signed-off-by: Stefan Mavrodiev <stefan.mavrodiev@gmail.com>
----
-Changes for v2:
-        - Removed unused power nodes
-        - Removed default-trigger for green led
-        - Removed "always-on" option for LCD power
+Cheers
+Jon
 
-Changes for v3:
-        - Nodes are sorted alphabetically
-
-Changes for v4:
-	- Green led renamed
-	- Added OTG support
-
- arch/arm/boot/dts/Makefile                |   1 +
- arch/arm/boot/dts/sun8i-a33-olinuxino.dts | 226 ++++++++++++++++++++++++++++++
- 2 files changed, 227 insertions(+)
- create mode 100644 arch/arm/boot/dts/sun8i-a33-olinuxino.dts
-
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 016611d..e02a97e 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -759,6 +759,7 @@ dtb-$(CONFIG_MACH_SUN8I) += \
- 	sun8i-a33-et-q8-v1.6.dtb \
- 	sun8i-a33-ga10h-v1.1.dtb \
- 	sun8i-a33-ippo-q8h-v1.2.dtb \
-+	sun8i-a33-olinuxino.dtb \
- 	sun8i-a33-q8-tablet.dtb \
- 	sun8i-a33-sinlinx-sina33.dtb \
- 	sun8i-a83t-allwinner-h8homlet-v2.dtb \
-diff --git a/arch/arm/boot/dts/sun8i-a33-olinuxino.dts b/arch/arm/boot/dts/sun8i-a33-olinuxino.dts
-new file mode 100644
-index 0000000..3882aa1
---- /dev/null
-+++ b/arch/arm/boot/dts/sun8i-a33-olinuxino.dts
-@@ -0,0 +1,226 @@
-+/*
-+ * Copyright 2016 - Stefan Mavrodiev <stefan.mavrodiev@gmail.com>
-+ *                  Olimex LTD. <support@olimex.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+#include "sun8i-a33.dtsi"
-+#include "sunxi-common-regulators.dtsi"
-+
-+#include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/input/input.h>
-+
-+/ {
-+	model = "Olimex A33-OLinuXino";
-+	compatible = "olimex,a33-olinuxino","allwinner,sun8i-a33";
-+
-+	aliases {
-+		serial0 = &uart0;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&led_pin_olinuxino>;
-+
-+		green {
-+			label = "a33-olinuxino:green:usr";
-+			gpios = <&pio 1 7 GPIO_ACTIVE_HIGH>;
-+		};
-+	};
-+};
-+
-+&ehci0 {
-+	status = "okay";
-+};
-+
-+&mmc0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_olinuxino>;
-+	vmmc-supply = <&reg_dcdc1>;
-+	bus-width = <4>;
-+	cd-gpios = <&pio 1 4 GPIO_ACTIVE_HIGH>; /* PB4 */
-+	cd-inverted;
-+	status = "okay";
-+};
-+
-+&ohci0 {
-+	status = "okay";
-+};
-+
-+&pio {
-+	led_pin_olinuxino: led_pins at 0 {
-+		allwinner,pins = "PB7";
-+        allwinner,function = "gpio_out";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+    };
-+
-+	mmc0_cd_pin_olinuxino: mmc0_cd_pin at 0 {
-+		allwinner,pins = "PB4";
-+		allwinner,function = "gpio_in";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+	};
-+
-+	usb0_id_detect_pin: usb0_id_detect_pin at 0 {
-+		allwinner,pins = "PB3";
-+		allwinner,function = "gpio_in";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+	};
-+};
-+
-+&r_rsb {
-+	status = "okay";
-+
-+	axp22x: pmic at 3a3 {
-+		compatible = "x-powers,axp223";
-+		reg = <0x3a3>;
-+		interrupt-parent = <&nmi_intc>;
-+		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
-+		eldoin-supply = <&reg_dcdc1>;
-+		x-powers,drive-vbus-en;
-+	};
-+};
-+
-+#include "axp22x.dtsi"
-+
-+&reg_aldo1 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <3300000>;
-+	regulator-max-microvolt = <3300000>;
-+	regulator-name = "vcc-io";
-+};
-+
-+&reg_aldo2 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <2350000>;
-+	regulator-max-microvolt = <2650000>;
-+	regulator-name = "vdd-dll";
-+};
-+
-+&reg_aldo3 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <3300000>;
-+	regulator-max-microvolt = <3300000>;
-+	regulator-name = "vcc-avcc";
-+};
-+
-+&reg_dc1sw {
-+	regulator-name = "vcc-lcd";
-+};
-+
-+&reg_dc5ldo {
-+	regulator-always-on;
-+	regulator-min-microvolt = <900000>;
-+	regulator-max-microvolt = <1400000>;
-+	regulator-name = "vdd-cpus";
-+};
-+
-+&reg_dcdc1 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <3300000>;
-+	regulator-max-microvolt = <3300000>;
-+	regulator-name = "vcc-dsi";
-+};
-+
-+&reg_dcdc2 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <900000>;
-+	regulator-max-microvolt = <1400000>;
-+	regulator-name = "vdd-sys";
-+};
-+
-+&reg_dcdc3 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <900000>;
-+	regulator-max-microvolt = <1400000>;
-+	regulator-name = "vdd-cpu";
-+};
-+
-+&reg_dcdc5 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <1500000>;
-+	regulator-max-microvolt = <1500000>;
-+	regulator-name = "vcc-dram";
-+};
-+
-+&reg_drivevbus {
-+	regulator-name = "usb0-vbus";
-+	status = "okay";
-+};
-+
-+&reg_rtc_ldo {
-+	regulator-name = "vcc-rtc";
-+};
-+
-+&simplefb_lcd {
-+	vcc-lcd-supply = <&reg_dc1sw>;
-+};
-+
-+&uart0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart0_pins_b>;
-+	status = "okay";
-+};
-+
-+&usb_otg {
-+	dr_mode = "otg";
-+	status = "okay";
-+};
-+
-+&usb_power_supply {
-+	status = "okay";
-+};
-+
-+&usbphy {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&usb0_id_detect_pin>;
-+	usb0_id_det-gpios = <&pio 1 3 GPIO_ACTIVE_HIGH>; /* PB3 */
-+	usb0_vbus_power-supply = <&usb_power_supply>;
-+	usb0_vbus-supply = <&reg_drivevbus>;
-+	status = "okay";
-+};
 -- 
-2.8.1
+nvpublic
