@@ -1,34 +1,56 @@
-From: torvalds@linux-foundation.org (Linus Torvalds)
-Date: Sun, 24 Jul 2016 21:18:19 -0700
-Subject: [RFC/PATCH 00/14] split exception table content out of module.h
- into extable.h
-In-Reply-To: <20160725034247.109173-1-paul.gortmaker@windriver.com>
-References: <20160725034247.109173-1-paul.gortmaker@windriver.com>
-Message-ID: <CA+55aFyDw_jK609LcjpWvVMTzCWuH6nLUXiZDeYC2tpSaZqhXA@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Sun, 24 Jul 2016 21:30:46 -0700
+Subject: [GIT PULL] Renesas ARM Based SoC DT Fixes for v4.8
+In-Reply-To: <20160725021552.GJ12825@verge.net.au>
+References: <cover.1468808109.git.horms+renesas@verge.net.au>
+ <7322553.kXvQYPfzzh@wuerfel> <20160722015924.GH21943@verge.net.au>
+ <4175400.eEqji2rNII@wuerfel> <20160725021552.GJ12825@verge.net.au>
+Message-ID: <CAOesGMjQN=kM1iwmXYQpQ4-VdnqJbf3FPZhJFB0LjUuh31qfpw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 24, 2016 at 8:42 PM, Paul Gortmaker
-<paul.gortmaker@windriver.com> wrote:
->
-> While doing an audit looking for unnecessary instances of module.h
-> inclusion across arch/x86/ I found a significant number of includes
-> of module.h were for things like search_exception_table and friends.
->
-> For historical reasons (i.e. pre-git) the exception table stuff was
-> buried in the middle of the module.h file.  So we have core kernel
-> files that are completely non-modular (both arch specific and arch
-> independent) that are just including module.h for this.
->
-> The converse is also true, in that conventional drivers, be they for
-> filesystems or actual hardware peripherals or similar, do not
-> normally care about the exception tables.
->
-> Here we fork the exception table content [...]
+[resending as non-HTML]
 
-This looks to be the right thing to do as far as I can tell. I'm not
-sure how big of a problem the extable stuff is (we definitely have
-much bigger unnecessary include files that cause a lot more problems),
-but it seems like a reasonable cleanup.
+On Sun, Jul 24, 2016 at 7:15 PM, Simon Horman <horms@verge.net.au> wrote:
+> On Fri, Jul 22, 2016 at 09:30:58PM +0200, Arnd Bergmann wrote:
+>> On Friday, July 22, 2016 10:59:24 AM CEST Simon Horman wrote:
+>> > On Thu, Jul 21, 2016 at 02:41:52PM +0200, Arnd Bergmann wrote:
+>> > > On Monday, July 18, 2016 11:39:35 AM CEST Simon Horman wrote:
+>> > > > Renesas ARM Based SoC DT Fixes for v4.8
+>> > > >
+>> > > > * Corrections to r8a7792
+>> > > >
+>> > >
+>> > > Merged into next/dt, thanks!
+>> >
+>> > Thanks!
+>> >
+>> > I have queued up another fix for v4.8 since sending the above to you.
+>> > This time it is an SoC (C-code) rather than a DT fix. I am wondering
+>> > if you could offer guidance on:
+>> >
+>> > * If you would prefer me to split fixes out into separate (DT, SoC, ...)
+>> >   branches? If so is that until around rc1 when everything has been
+>> >   merged into the forthcoming release and thereafter you would prefer
+>> >   a single fixes branch?
+>>
+>> I prefer a separate fixes branch. It's fine for all other branches
+>> to be based on top of this branch so you have a working baseline
+>> for testing.
+>
+> Is some sort of minimal base for the fixes branch desired?
+> If should the base be a merge of all the tags you have pulled for v4.8?
+>
+> Currently I have DT fixes and SoC fixes which depend on
+> respective tags that have been accepted for v4.8.
 
-              Linus
+
+It's hard to make those one branch without doing your own merge. You
+can't take a merge out of our for-next branch as a base, since those
+aren't stable.
+
+Wait for our merges to go into Linus' tree, then use his last merge
+commit as the base (before -rc1 is out).
+
+
+-Olof
