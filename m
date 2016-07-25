@@ -1,76 +1,105 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Mon, 25 Jul 2016 18:31:55 +0200
-Subject: [PATCH v11 10/10] genirq/msi: use the MSI doorbell's IOVA when
- requested
-In-Reply-To: <alpine.DEB.2.11.1607201105310.3564@nanos>
-References: <1468933367-23159-1-git-send-email-eric.auger@redhat.com>
- <1468933367-23159-11-git-send-email-eric.auger@redhat.com>
- <alpine.DEB.2.11.1607201105310.3564@nanos>
-Message-ID: <08a930f2-8cc9-7d99-78c0-77d08ee40db3@redhat.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 25 Jul 2016 18:33:58 +0200
+Subject: [PATCH v3 0/6]  Add clock support for Armada 37xx SoCs
+In-Reply-To: <1468935742-11218-1-git-send-email-gregory.clement@free-electrons.com>
+ (Gregory CLEMENT's message of "Tue, 19 Jul 2016 15:42:16 +0200")
+References: <1468935742-11218-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <878twppthl.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+Hi Mike and Stephen,
 
-On 20/07/2016 11:09, Thomas Gleixner wrote:
-> On Tue, 19 Jul 2016, Eric Auger wrote:
-> 
-> First of all - valid for all patches:
-> 
-> Subject: sys/subsys: Sentence starts with an uppercase letter
-OK understood.
-> 
-> Now for this particular one:
-> 
-> genirq/msi: use the MSI doorbell's IOVA when requested
-> 
->> On MSI message composition we now use the MSI doorbell's IOVA in
->> place of the doorbell's PA in case the device is upstream to an
->> IOMMU that requires MSI addresses to be mapped. The doorbell's
->> allocation and mapping happened on an early stage (pci_enable_msi).
-> 
-> This changelog is completely useless. At least I cannot figure out what that
-> patch actually does. And the implementation is not self explaining either.
+ On mar., juil. 19 2016, Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
 
->  
->> @@ -63,10 +63,18 @@ static int msi_compose(struct irq_data *irq_data,
->>  {
->>  	int ret = 0;
->>  
->> -	if (erase)
->> +	if (erase) {
->>  		memset(msg, 0, sizeof(*msg));
->> -	else
->> +	} else {
->> +		struct device *dev;
->> +
->>  		ret = irq_chip_compose_msi_msg(irq_data, msg);
->> +		if (ret)
->> +			return ret;
->> +
->> +		dev = msi_desc_to_dev(irq_data_get_msi_desc(irq_data));
->> +		WARN_ON(iommu_msi_msg_pa_to_va(dev, msg));
-> 
-> What the heck is this call doing? And why is there only a WARN_ON and not a
-> proper error return code handling?
+> Hi,
+>
+> this is the third version of the series adding clock support for the
+> Armada 37xx SoCs.
+>
+> The main change is the use of static data for the peripheral clocks
+> when possible, it lead to a use of many macro to define all the needed
+> variables.
+>
+> The design of the drivers is as close as possible as the hardware is,
+> with some clocks made of several layers: muxing, divider and gating.
+>
+> The device tree binding was written in a way that even if we discover
+> some change inside the clocks, the binding should not be
+> affected. Especially, there are some holes in the clocks, but we
+> should be able to add them seamless.
+>
+> The full series is available on the branch Armada-3700-Clocks-v3 at
+> git at github.com:MISL-EBU-System-SW/mainline-public.git
 
-iommu_msi_msg_pa_to_va is part of the new iommu-msi API introduced in PART I of
-this series. This helper function detects the physical address found in the
-MSI message has a corresponding allocated IOVA. This happens if the MSI doorbell
-is accessed through an IOMMU and this IOMMU do not bypass the MSI addresses
-(ARM case). Allocation of this IOVA was performed in the previous patch.
+I think that with this series I took into account all the comments, do
+you think there is a chance that it will be merged in v4.8?
 
-So, if this is the case, the physical address is swapped with the IOVA
-address. That way the PCIe device will send the MSI with this IOVA and
-the address will be translated by the IOMMU into the target MSI doorbell PA.
+Thanks,
 
-Hope this clarifies
+Gregory
 
-Thanks
-
-Eric 
-> 
+>
 > Thanks,
-> 
-> 	tglx
-> 
+>
+> Changelog:
+>
+> v2 -> v3
+>
+> - used marvell,armada-3700-gpio instead of marvell,mvebu-gpio-3700 in
+>   the binding as pointed by Thomas,
+> - removed the unnecessary include of clk.h in the 3 drivers, suggested
+>   by Mike Turquette
+> - removed the modular reference in the 3 drivers, suggested by Paul
+>   Gortmaker
+> - used static data for the peripheral driver when possible, suggested
+>   by Mike Turquette
+>
+> v1 -> v2
+>
+> - Move to clk_hw based registration for the 3 clock driver as
+>   requested by Stephen Boyd
+> - Fixed typo noticed by Stephen Boyd
+> - Added const and static when they were missing: suggested by Stephen
+>   Boyd
+> - Allocated the driver variable during probe instead of using a global
+>   one as requested by Stephen Boyd
+> - Managed the failure of the of_clk_add_hw_provider call
+> - Added the Acked-by from Rob Herring on the dt binding patchs
+>
+>
+>
+> Gregory CLEMENT (6):
+>   dt-bindings: clock: add DT binding for the Xtal clock on Armada 3700
+>   clk: mvebu: Add the xtal clock for Armada 3700 SoC
+>   dt-bindings: clock: add DT binding for the TBG clocks on Armada 3700
+>   clk: mvebu Add the time base generator clocks for Armada 3700
+>   dt-bindings: clock: add DT binding for the peripheral clocks on Armada
+>     3700
+>   clk: mvebu: Add the peripheral clock driver for Armada 3700
+>
+>  .../bindings/clock/armada3700-periph-clock.txt     |  70 ++++
+>  .../bindings/clock/armada3700-tbg-clock.txt        |  27 ++
+>  .../bindings/clock/armada3700-xtal-clock.txt       |  28 ++
+>  drivers/clk/mvebu/Kconfig                          |   3 +
+>  drivers/clk/mvebu/Makefile                         |   3 +
+>  drivers/clk/mvebu/armada-37xx-periph.c             | 449 +++++++++++++++++++++
+>  drivers/clk/mvebu/armada-37xx-tbg.c                | 158 ++++++++
+>  drivers/clk/mvebu/armada-37xx-xtal.c               |  91 +++++
+>  8 files changed, 829 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/clock/armada3700-periph-clock.txt
+>  create mode 100644 Documentation/devicetree/bindings/clock/armada3700-tbg-clock.txt
+>  create mode 100644 Documentation/devicetree/bindings/clock/armada3700-xtal-clock.txt
+>  create mode 100644 drivers/clk/mvebu/armada-37xx-periph.c
+>  create mode 100644 drivers/clk/mvebu/armada-37xx-tbg.c
+>  create mode 100644 drivers/clk/mvebu/armada-37xx-xtal.c
+>
+> -- 
+> 2.5.0
+>
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
