@@ -1,64 +1,71 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Mon, 25 Jul 2016 18:03:34 +0100
-Subject: [PATCH 2/2] arm64: mm: run pgtable_page_ctor() on non-swapper
- translation table pages
-In-Reply-To: <20160725164654.GD2423@e104818-lin.cambridge.arm.com>
-References: <1469208745-6693-1-git-send-email-ard.biesheuvel@linaro.org>
- <1469208745-6693-3-git-send-email-ard.biesheuvel@linaro.org>
- <26dd79ee-8c0b-6302-85bf-3c6d69cab933@arm.com>
- <962833c8-0f5d-57bc-786e-9a832ed457d5@arm.com>
- <20160725164654.GD2423@e104818-lin.cambridge.arm.com>
-Message-ID: <34e52799-1717-97f4-07eb-f640f8ac762e@arm.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Mon, 25 Jul 2016 10:08:39 -0700
+Subject: [PATCH 4/5] input: touchscreen: support Allwinner SoCs'
+ touchscreen
+In-Reply-To: <20160725094542.GI7419@lukather>
+References: <1469003351-15263-1-git-send-email-quentin.schulz@free-electrons.com>
+ <1469003351-15263-5-git-send-email-quentin.schulz@free-electrons.com>
+ <20160721062950.GB5993@lukather> <20160721064140.GA17658@dtor-ws>
+ <20160725094542.GI7419@lukather>
+Message-ID: <20160725170839.GA27415@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/07/16 17:46, Catalin Marinas wrote:
-> On Mon, Jul 25, 2016 at 03:43:21PM +0100, Suzuki K. Poulose wrote:
->> On 25/07/16 15:31, Suzuki K Poulose wrote:
->>> On 22/07/16 18:32, Ard Biesheuvel wrote:
->>>> The kernel page table creation routines are accessible to other subsystems
->>>> (e.g., EFI) via the create_pgd_mapping() entry point, which allows mappings
->>>> to be created that are not covered by init_mm.
->>>>
->>>> Since generic code such as apply_to_page_range() may expect translation
->>>> table pages that are not associated with init_mm to be covered by fully
->>>> constructed struct pages, add a call to pgtable_page_ctor() in the alloc
->>>> function used by create_pgd_mapping. Since it is no longer used by
->>>> create_mapping_late(), also update the name of this function to better
->>>> reflect its purpose.
->>>>
->>>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->>>> ---
->>>> arch/arm64/mm/mmu.c | 9 ++++++---
->>>> 1 file changed, 6 insertions(+), 3 deletions(-)
->>>>
->>>> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
->>>> index 33f36cede02d..51a558195bb9 100644
->>>> --- a/arch/arm64/mm/mmu.c
->>>> +++ b/arch/arm64/mm/mmu.c
->>>> @@ -268,10 +268,11 @@ static void __create_pgd_mapping(pgd_t *pgdir, phys_addr_t phys,
->>>>     } while (pgd++, addr = next, addr != end);
->>>> }
->>>>
->>>> -static phys_addr_t late_pgtable_alloc(void)
->>>> +static phys_addr_t pgd_pgtable_alloc(void)
->>>> {
->>>>     void *ptr = (void *)__get_free_page(PGALLOC_GFP);
->>>> -    BUG_ON(!ptr);
->>>> +    if (!ptr || !pgtable_page_ctor(virt_to_page(ptr)))
->>>
->>> Should we free the page and return NULL when we encounter an error
->>> in pgtable_page_ctor(), like the rest of the callers ?
->>>
->>>
->>>> +        BUG();
->>
->> Just to clarify, of course with the BUG() retained.
->
-> But then, if we return, we no longer trigger BUG(). The callers of this
-> function assume that it always succeeds or does not return.
+On Mon, Jul 25, 2016 at 11:45:42AM +0200, maxime.ripard at free-electrons.com wrote:
+> Hi Dmitry,
+> 
+> On Wed, Jul 20, 2016 at 11:41:40PM -0700, Dmitry Torokhov wrote:
+> > On Thu, Jul 21, 2016 at 08:29:50AM +0200, Maxime Ripard wrote:
+> > > On Wed, Jul 20, 2016 at 10:29:10AM +0200, Quentin Schulz wrote:
+> > > > +	irq = regmap_irq_get_virq(sunxi_gpadc_mfd_dev->regmap_irqc, irq);
+> > > > +	ret = devm_request_any_context_irq(&pdev->dev, irq,
+> > > > +					   sunxi_gpadc_tp_up_irq_handler, 0,
+> > > > +					   "tp_up", info);
+> > > > +	if (ret < 0) {
+> > > > +		dev_err(&pdev->dev,
+> > > > +			"could not request TP_UP_PENDING interrupt: %d\n", ret);
+> > > > +		goto err;
+> > > > +	}
+> > > 
+> > > You enable the interrupts...
+> > > 
+> > > > +	info->tp_up_irq = irq;
+> > > > +	disable_irq(irq);
+> > > > +
+> > > > +	ret = input_register_device(input);
+> > > > +	if (ret) {
+> > > > +		dev_err(&pdev->dev, "failed to register input device\n");
+> > > > +		goto err;
+> > > > +	}
+> > > 
+> > > ... but your driver isn't registered yet. How does input_report and
+> > > input_sync behave in such a case?
+> > 
+> > This is explicitly allowed:
+> > 
+> > "
+> > ...
+> >  * NOTE: input_event() may be safely used right after input device was
+> >  * allocated with input_allocate_device(), even before it is registered
+> >  * with input_register_device(), but the event will not reach any of the
+> >  * input handlers. Such early invocation of input_event() may be used
+> >  * to 'seed' initial state of a switch or initial position of absolute
+> >  * axis, etc.
+> >  */
+> > "
+> 
+> Good to know. Still, it feels like it should be handled explicitly,
+> instead of relying on the fact that we only call input_event in our
+> handler and that it works that way.
 
-Bah, my bad. I somehow confused myself it with WARN behavior and thought
-that we could still continue after BUG(). Please ignore the noise.
+Why? It is the documented property of input API and it is done so
+precisely so that you can register interrupt before registering input
+device. That is done because once registered input device is supposed to
+be fully-functional.  It does not matter for this driver but there are
+drivers out there that require interrupt handling as part of their
+"open" method.
 
-Suzuki
+Thanks.
+
+-- 
+Dmitry
