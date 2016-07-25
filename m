@@ -1,41 +1,70 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 25 Jul 2016 15:50:50 +0200
-Subject: [PATCH 14/18] ARM: mvebu: add support for the Armada 395 SoC
- family
-In-Reply-To: <CAL_JsqJeObuS8OWeErRA5MX-SrMtu_254A-LtP9-A=xdPO7p1Q@mail.gmail.com>
-References: <1469105055-25181-1-git-send-email-jaz@semihalf.com>
- <1469105055-25181-16-git-send-email-jaz@semihalf.com>
- <20160721221605.GA21883@rob-hp-laptop>
- <CAH76GKOidxFZ7R1pQZ2W9BRBCxEnLXNHQGrXbAUmouozBUj51Q@mail.gmail.com>
- <CAL_JsqJeObuS8OWeErRA5MX-SrMtu_254A-LtP9-A=xdPO7p1Q@mail.gmail.com>
-Message-ID: <20160725155050.3aee974e@free-electrons.com>
+From: mirza.krak@gmail.com (Mirza Krak)
+Date: Mon, 25 Jul 2016 15:50:55 +0200
+Subject: [RFC 3/6] dt/bindings: Add bindings for Tegra20/30 NOR bus driver
+In-Reply-To: <20160725133922.GK21170@ulmo.ba.sec>
+References: <1468935397-11926-1-git-send-email-mirza.krak@gmail.com>
+ <1468935397-11926-4-git-send-email-mirza.krak@gmail.com>
+ <434561ec-510e-a3bf-c7b6-c961db299bd6@nvidia.com>
+ <20160725115923.GF21170@ulmo.ba.sec>
+ <CALw8SCU6vWeDyoy+t53k2+tmnrZd+ieBV88Vc6FSL9x3FzSm5g@mail.gmail.com>
+ <20160725133922.GK21170@ulmo.ba.sec>
+Message-ID: <CALw8SCVkAXN0GBFXKthB=bHCAiOioVE-MTg3AGsZHK3kdcEMJw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+2016-07-25 15:39 GMT+02:00 Thierry Reding <thierry.reding@gmail.com>:
+> On Mon, Jul 25, 2016 at 03:30:34PM +0200, Mirza Krak wrote:
+>> 2016-07-25 13:59 GMT+02:00 Thierry Reding <thierry.reding@gmail.com>:
+>> > On Thu, Jul 21, 2016 at 10:56:44AM +0100, Jon Hunter wrote:
+>> >>
+>> >
+>> >> > +Note that the NOR controller does not have any internal chip-select address
+>> >> > +decoding and if you want to access multiple devices external chip-select
+>> >> > +decoding must be provided.
+>> >>
+>> >> Although it is true, you do have the MIO address space and so you could
+>> >> support two devices via the SNOR address space and MIO address space
+>> >> (assuming that the MIO can be used for the 2nd device).
+>> >
+>> > Now I'm even more confused. If the GMI controller itself can't select a
+>> > chip, what is the SNOR_SEL field in the SNOR_CONFIG_0 register for? Does
+>> > that not select a specific chip?
+>> >
+>> >> Furthermore, if you do have external logic to support multiple devices
+>> >> this would assume that the devices use the same timing and so are
+>> >> probably the same type. It also assumes both can fit in the 256MB
+>> >> address range. May be worth mentioning.
+>> >
+>> > Similarly if you switch between different devices, wouldn't you have to
+>> > reprogram the timing registers if they are different?
+>> >
+>> > The way I remember this kind of interface to work (it's been a long time
+>> > since I used one) is that in order to operate on a chip you need to
+>> > acquire the bus first. Typically that would be an API exposed by the bus
+>> > driver or some framework that the bus driver registers with. That API
+>> > arbitrates between multiple devices on the bus and makes sure that the
+>> > proper chip select is asserted and timing is programmed when you're
+>> > granted access. A driver that has acquired the bus can then perform what
+>> > operations they need and release the bus when done.
+>> >
+>> > SPI uses a mechanism like this, for example.
+>> >
+>> > Thierry
+>>
+>> From my experience (maybe not as long as yours :)) but these kind of
+>> things would be handled by the controller. At least with previous SOCs
+>> that I have used, PXA270, PXA300 and i.MX SOCs.
+>>
+>> That it has an address range per chip-select PIN and timing registers
+>> per chip-select. And thus eliminating a need for a infrastructure or
+>> framework.
+>
+> Okay, so the controllers have a translation table that needs to be
+> programmed and which maps address ranges to chip-selects. That's a nifty
+> feature, but I think it's also fairly specialized. In such a setup there
+> doesn't need to be a concept of chip-selects in software because it's
+> all transparently handled by the controller. Effectively the only time a
+> chip-select is needed is during the initial programming of the
+> controller when the translation table is set up.
 
-On Mon, 25 Jul 2016 08:47:23 -0500, Rob Herring wrote:
-
-> > I am not sure if I get your point. The Armada-398 extends the
-> > Armada-395 about 2 additional SATA ports (as you can see in commit
-> > "[PATCH 15/18] ARM: mvebu: a398: update the dtsi about missing
-> > interfaces"). In this example the a398-db board contains the Armada398
-> > SoC, so it is a better match and goes first.  
-> 
-> But your patch title is adding 395 support, but you are adding the
-> string to a 398 based board. It would make sense to have 395 here if
-> the OS already had support for 395 and you want to support the 398
-> without updating the OS. That doesn't seem to apply here.
-
-I think the argument of Grzegorz is that the 398 is functionally a
-strict superset of the 395, so that anything that applies to the 395
-will also apply to 398.
-
-Now, whether it is a good idea to consider them "compatible" in the DT
-sense, I'm not sure.
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Yes, and in some cases you can not "program" the map as it is fixed in hardware.
