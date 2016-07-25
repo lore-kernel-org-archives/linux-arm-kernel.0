@@ -1,35 +1,34 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 25 Jul 2016 15:22:42 +0100
-Subject: [PATCH 1/2] arm64: mm: make create_mapping_late() non-allocating
-In-Reply-To: <3728BEC2-B1C8-40A5-9E0C-E27D56149BD4@linaro.org>
-References: <1469208745-6693-1-git-send-email-ard.biesheuvel@linaro.org>
- <1469208745-6693-2-git-send-email-ard.biesheuvel@linaro.org>
- <20160725134550.GA14465@leverpostej>
- <3728BEC2-B1C8-40A5-9E0C-E27D56149BD4@linaro.org>
-Message-ID: <20160725142241.GC14465@leverpostej>
+From: heiko.carstens@de.ibm.com (Heiko Carstens)
+Date: Mon, 25 Jul 2016 16:26:40 +0200
+Subject: Is THREAD_INFO_IN_TASK appropriate for -mm for 4.8?
+In-Reply-To: <578DE406.9060902@de.ibm.com>
+References: <CALCETrUf_7=Tr4JrDj+3UPT5kUT1MsRtypvfqkOg_MVHAJu=PA@mail.gmail.com>
+ <578DE406.9060902@de.ibm.com>
+Message-ID: <20160725142640.GA4337@osiris>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 25, 2016 at 04:10:50PM +0200, Ard Biesheuvel wrote:
-> > On 25 jul. 2016, at 15:46, Mark Rutland <mark.rutland@arm.com> wrote:
-> > How about we drop the __init marker from create_mapping_noalloc(), and
-> > update the callers in mark_rodata_ro() to use that, so that we can drop
-> > create_mapping_late() entirely.
+On Tue, Jul 19, 2016 at 10:25:42AM +0200, Christian Borntraeger wrote:
+> On 07/19/2016 01:47 AM, Andy Lutomirski wrote:
+> > Hi all-
 > > 
-> > Other than the __init marker and name, create_mapping_late() and
-> > create_mapping_noalloc() would be identical after this change, and the
-> > naming of create_mapping_noalloc() does better describe what we're
-> > trying to achieve in mark_rodata_ro().
+> > There are four core patches needed for the THREAD_INFO_IN_TASK thing,
+> > and they apply cleanly to -mm now.  The x86 patch to flip the feature
+> > on does not apply cleanly anywhere because it depends on changes in
+> > -tip *and* in -mm.  I'd like to get all of this as well as the rest of
+> > the vmap-stacks stuff in by 4.9, but I'm wondering if it might make
+> > sense to get the core THREAD_INFO_IN_TASK stuff into -mm for 4.8
+> > instead.
+> > 
+> > Pros:
+> >  - It reduces the amount of core code that -tip will have to carry until 4.9.
+> >  - It may benefit other architectures.  Christian Borntraeger
+> > expressed an interest in enabling the feature for s390, but it'll be
+> > awkward for him until the core bit landed.  Similarly, arm64 seems to
+> > be interested.
 > 
-> Not entirely. The _late() variant should map down to pages if the
-> first mapping was mapped down to pages as well. The _noalloc() variant
-> may end attempting to merge regions
+> I have not yet talked to Martin/Heiko about this, so not sure yet if and when
+> s390 is going to use this - so no pressure from our side yet.
 
-Ah, I was comparing against mainline rather than the arm64 for-next/core
-branch with the recent rework. Sorry for the noise.
-
-Given that, FWIW:
-
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-
-Mark.
+I wrote a patch four weeks ago which converts s390 based on Linus' orginal
+patches. So yes, we will convert s390 as soon as this hits upstream.
