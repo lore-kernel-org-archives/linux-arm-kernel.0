@@ -1,161 +1,173 @@
-From: fixed-term.Oleksij.Rempel@de.bosch.com (fixed-term.Oleksij.Rempel)
-Date: Mon, 25 Jul 2016 07:27:16 +0200
-Subject: [PATCH] arm: dts: sun7i-a20-bananapi: name the GPIO lines
-In-Reply-To: <CAGb2v66tf1LcBs69ECW0Xa2OeN0C0NWVyvpC8=4DsVLjAnrO3Q@mail.gmail.com>
-References: <1468496825-4896-1-git-send-email-linux@rempel-privat.de>
- <CACRpkdZLG1Ffdiw3xkP4G0XBr=WDXg2Vbh2Xmgno1PTNhfZHfg@mail.gmail.com>
- <CAGb2v66tf1LcBs69ECW0Xa2OeN0C0NWVyvpC8=4DsVLjAnrO3Q@mail.gmail.com>
-Message-ID: <5795A334.3000701@de.bosch.com>
+From: dennis.chen@arm.com (Dennis Chen)
+Date: Mon, 25 Jul 2016 13:53:32 +0800
+Subject: [RFC PATCH v3 00/13] ACPI IORT ARM SMMU v3 support
+In-Reply-To: <1469013815-24380-1-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1469013815-24380-1-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <20160725055330.GA21004@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 22.07.2016 17:47, Chen-Yu Tsai wrote:
-> On Fri, Jul 22, 2016 at 10:55 PM, Linus Walleij
-> <linus.walleij@linaro.org> wrote:
->> On Thu, Jul 14, 2016 at 1:47 PM, Oleksij Rempel <linux@rempel-privat.de> wrote:
->>
->>> This names the GPIO lines on the Banana Pi board in accordance with
->>> the A20_Banana_Pi v1.4 Specification.
->>>
->>> This will make these line names reflect through to userspace
->>> so that they can easily be identified and used with the new
->>> character device ABI.
->>>
->>> Some care has been taken to name all lines, not just those used
->>> by the external connectors, also lines that are muxed into some
->>> other function than GPIO: these are named "[FOO]" so that users
->>> can see with lsgpio what all lines are used for.
->>>
->>> Ps: most of the text was taken from Linux Wallej patch.
->>
->> LinuS
-
-oops... :)
-
->>>
->>> Cc: devicetree at vger.kernel.org
->>> Cc: Linus Walleij <linus.walleij@linaro.org>
->>> Cc: linux-arm-kernel at lists.infradead.org
->>> Cc: Chen-Yu Tsai <wens@csie.org>
->>> Signed-off-by: Oleksij Rempel <linux@rempel-privat.de>
->>
->> Nice usecase!
->>
->>> +       /*
->>> +        * Legend: proper name = the GPIO line is used as GPIO
->>> +        *         NC = not connected (not routed from the SoC)
->>> +        *         "[PER]" = pin is muxed for peripheral (not GPIO)
->>> +        *         "" = no idea, schematic doesn't say, could be
->>> +        *              unrouted (not connected to any external pin)
->>> +        *         LSEC = Low Speed External Connector
->>> +        *         HSEC = High Speed External Connector
+Hi
+On Wed, Jul 20, 2016 at 12:23:22PM +0100, Lorenzo Pieralisi wrote:
+> This RFC patch series is v3 of a previous posting:
 > 
-> I don't see LSEC/HSEC used anywhere?
-
-ok, will remove it. Probably it will be better to have it in common
-place some where by the Docs?
-
-
->>> +        */
->>
->> So maybe we should make this naming convention a suggested
->> standard. People seem to like it.
-
-Why should i invent some thing new, some Docs with suggested names will
-be good.
-
-> One question about this whole thing: how extensively should we add
-> the names? Only for exposed pins? Or every pin that's routed/used?
-
-Depends on HW. Even on production system i had cases where i need to
-jump in and use some random pin for debugging. So, hawing it in
-devicetree can help to reduce time later.
-
-But i would prefer to have some kind of merged names: Names provided by
-SoC descriptor (real pin names or locations) and names provided by board
-design.
-
->>> +       gpio-line-names =
->>> +               /* PA */
->>> +               "[ERXD3]", "[ERXD2]", "[ERXD1]", "[ERXD0]", "[ETXD3]",
->>> +                       "[ETXD2]", "[ETXD1]", "[ETXD0]",
->>> +               "[ERXCK]", "[ERXERR]", "[ERXDV]", "[EMDC]", "[EMDIO]",
->>> +                       "[ETXEN]", "[ETXCK]", "[ECRS]",
->>> +               "[ECOL]", "[ETXERR]", "", "", "", "", "", "",
->>> +               "", "", "", "", "", "", "", "",
->>> +               /* PB */
->>> +               "[PMU-SCK]", "[PMU-SDA]", "", "", "", "NC", "NC", "NC",
->>> +               "NC", "[USB0-DRV]", "NC", "NC", "NC", "NC", "", "",
->>> +               "", "", "", "", "SCL", "SDA", "", "",
->>
->> Are these bit-banged SCL and SDA for doing I2C with
->> GPIO? Otherwise you probably want to name them "[SCL]" and "[SDA]"
+> https://lkml.org/lkml/2016/6/7/523
 > 
-> There's an actual I2C controller backing them.
-
-Ok, i will fix it.
-
->>
->>> +               "TXD0", "RXD0", "IO-1", "PH3", "[USB0-IDDET]", "PH5", "", "",
->>
->> Same here. You probably want "[TXD0]" etc unless you're bit-banging
->> the serial port. "IO-1" sounds like a real GPIO though and should
->> probably be named like that without [] and "PH3" what is that really?
->> A device-muxed pin or some kind of GPIO?
+> v2 -> v3
+> 	- Rebased on top of dependencies series [1][2][3](v4.7-rc3)
+> 	- Added back reliance on ACPI early probing infrastructure
+> 	- Patch[1-3] merged through other dependent series
+> 	- Added back IOMMU fwnode generalization
+> 	- Move SMMU v3 static functions configuration to IORT code
+> 	- Implemented generic IOMMU fwspec API
+> 	- Added code to implement fwnode platform device look-up
 > 
-> PH3 is actually the pin name. The vendor uses "IO-7" and "IO-8" as function
-> names for PH3 and PH5, but actually names them "NC":
-
-Not in:
-https://linux-sunxi.org/images/9/9d/A20_Bananapi_Schematic.pdf
-
-which was used for this patch.
-
->     http://www.bananapi.org/p/product.html
+> v1 -> v2:
+> 	- Rebased on top of dependencies series [1][2][3](v4.7-rc1)
+> 	- Removed IOMMU fwnode generalization
+> 	- Implemented ARM SMMU v3 ACPI probing instead of ARM SMMU v2
+> 	  owing to patch series dependencies [1]
+> 	- Moved platform device creation logic to IORT code to
+> 	  generalize its usage for ARM SMMU v1-v2-v3 components
+> 	- Removed reliance on ACPI early device probing
+> 	- Created IORT specific iommu_xlate() translation hook leaving
+> 	  OF code unchanged according to v1 reviews
 > 
->>
->>> +               "", "", "[SD0-DET]", "", "", "", "", "",
->>> +               "NC", "", "", "", "IO-4", "IO-5", "NC", "[EMAC-PWR-EN]",
->>
->> So these seem correct too.
->>
->>> +               "[LED1]", "NC", "NC", "NC", "", "", "", "",
->>
->> "LED1" seems like the right name, if this is a GPIO used to drive
->> a LED.
+> The ACPI IORT table provides information that allows instantiating
+> ARM SMMU devices and carrying out id mappings between components on
+> ARM based systems (devices, IOMMUs, interrupt controllers).
 > 
-> This is GPIO based.
-
-This was not clear to me, marking GPIO pin as peripheral, at moment of
-writing and testing it was a allocated by led driver. Bit for example
-IO-GCLK was free to use for GPIO :).. so do [] actually make sense?
-
->>
->>> +               "", "", "", "IO-GCLK", "NC", "NC", "NC", "NC",
->>
->> WHat is IO-GCLK? A real GPIO line used for toggling a clock?
->> Or a hardware clock signal? In the first case it it correctly named,
->> in the other case it should be "[IO-GCLK]".
+> http://infocenter.arm.com/help/topic/com.arm.doc.den0049b/DEN0049B_IO_Remapping_Table.pdf
 > 
-> According to the schematics this is a PWM output.
-
-there are two names:
-SoC name: PWM1
-Connector name: IO-GCLK
-
-Which should be used. IMO it was user friendly to use connector name.
-
-> Regards
-> ChenYu
+> Building on basic IORT support, available through [2]:
 > 
->>
->>> +               "NC", "NC", "[SPI-CE0]", "[SPI-CLK]", "[SPI-MOSI]",
->>> +                       "[SPI-MISO]", "[SPI-CE1]", "NC",
->>> +               "IO-6", "IO-3", "IO-2", "IO-0", "", "", "", "",
->>
->> Looks right.
->>
->> Yours,
->> Linus Walleij
+> this patchset enables ARM SMMU v3 support on ACPI systems.
+> 
+> Most of the code is aimed at building the required generic ACPI
+> infrastructure to create and enable IOMMU components and to bring
+> the IOMMU infrastructure for ACPI on par with DT, which is going to
+> make future ARM SMMU components easier to integrate.
+> 
+> PATCH (1) adds a FWNODE_IOMMU type to the struct fwnode_handle type.
+>           It is required to attach a fwnode identifier to platform
+>           devices allocated/detected through IORT tables entries;
+>           IOMMU devices have to have an identifier to look them up
+>           eg IOMMU core layer carrying out id translation. This can be
+>           done through a fwnode_handle (ie IOMMU platform devices created
+>           out of IORT tables are not ACPI devices hence they can't be
+>           allocated as such, otherwise they would have a fwnode_handle of
+>           type FWNODE_ACPI). This patch requires discussion and it is key
+>           to the RFC.
+> 
+> PATCH (2) makes use of the ACPI early probing API to add a linker script
+>           section for probing devices via IORT ACPI kernel code.
+> 
+> PATCH (3) provides IORT support for registering IOMMU IORT node through
+>           their fwnode handle.
+> 
+> PATCH (4) implements core code fwnode based platform devices look-up.
+> 
+> PATCH (5) extends iommu_fwspec so that it can be used on ACPI based
+>           system by creating a generic IOMMU fwspec kernel layer.
+> 
+> PATCH (6) implements the of_dma_configure() API in ACPI world -
+>           acpi_dma_configure() - and patches PCI and ACPI core code to
+>           start making use of it.
+> 
+> PATCH (7) provides an IORT function to detect existence of specific type
+>           of IORT components.
+> 
+> PATCH (8) creates the kernel infrastructure required to create ARM SMMU
+>           platform devices for IORT nodes.
+> 
+> PATCH (9) refactors the ARM SMMU v3 driver so that the init functions are
+>           split in a way that groups together code that probes through DT
+>           and code that carries out HW registers FW agnostic probing, in
+>           preparation for adding the ACPI probing path.
+> 
+> PATCH (10) rework ARM SMMU v3 platform driver registration to make it work
+>            on ACPI systems.
+> 
+> PATCH (11) Building on patch (8), it adds ARM SMMU v3 IORT IOMMU
+>            operations to create and probe ARM SMMU v3 components.
+> 
+> PATCH (12) Extend the IORT iort_node_map_rid() to work on a type mask
+>            instead of a single type so that the translation API can
+>            be used on a range of components.
+> 
+> PATCH (13) provides IORT infrastructure to carry out IOMMU configuration
+>            for devices and hook it up to the previously introduced ACPI
+>            DMA configure API.
+> 
+> This patchset is built on top and depends on these three patch series:
+> 
+> [1] R.Murphy "Generic DT bindings for PCI and ARM SMMU v3" v4
+>     https://marc.info/?l=devicetree&m=146739193215518&w=2
+> 
+> [2] T.Nowicki "Introduce ACPI world to ITS irqchip" v7
+>     https://marc.info/?l=linux-arm-kernel&m=146642080022289&w=2
+> 
+> [3] T.Nowicki "Support for ARM64 ACPI based PCI host controller" v8
+>     http://marc.info/?l=linux-acpi&m=146462129816292&w=2
+> 
+> and is provided for early review/testing purposes here:
+> 
+> git://git.kernel.org/pub/scm/linux/kernel/git/lpieralisi/linux.git acpi/iort-smmu-v3i
+>
+I thought I can got all the 13 patches applied with the above git tree, but I can't find
+any ACPI related stuff after I cloned the git repos to my local machine, am I missing
+something here?
+
+Thanks,
+Dennis
+> 
+> Tested on FVP models for ARM SMMU v3 probing path.
+> 
+> Lorenzo Pieralisi (13):
+>   drivers: iommu: add FWNODE_IOMMU fwnode type
+>   drivers: acpi: iort: introduce linker section for IORT entries probing
+>   drivers: acpi: iort: add support for IOMMU fwnode registration
+>   drivers: platform: add fwnode base platform devices retrieval
+>   drivers: iommu: make iommu_fwspec OF agnostic
+>   drivers: acpi: implement acpi_dma_configure
+>   drivers: acpi: iort: add node match function
+>   drivers: acpi: iort: add support for ARM SMMU platform devices
+>     creation
+>   drivers: iommu: arm-smmu-v3: split probe functions into DT/generic
+>     portions
+>   drivers: iommu: arm-smmu-v3: enable ACPI driver initialization
+>   drivers: iommu: arm-smmu-v3: add IORT platform device creation
+>   drivers: acpi: iort: replace rid map type with type mask
+>   drivers: acpi: iort: introduce iort_iommu_configure
+> 
+>  drivers/acpi/glue.c               |   4 +-
+>  drivers/acpi/iort.c               | 360 +++++++++++++++++++++++++++++++++++++-
+>  drivers/acpi/scan.c               |  29 +++
+>  drivers/base/platform.c           |  23 +++
+>  drivers/iommu/Kconfig             |   4 +
+>  drivers/iommu/Makefile            |   1 +
+>  drivers/iommu/arm-smmu-v3.c       | 147 ++++++++++++++--
+>  drivers/iommu/iommu-fwspec.c      | 114 ++++++++++++
+>  drivers/iommu/of_iommu.c          |  52 ------
+>  drivers/pci/probe.c               |   3 +-
+>  include/acpi/acpi_bus.h           |   2 +
+>  include/asm-generic/vmlinux.lds.h |   1 +
+>  include/linux/acpi.h              |   5 +
+>  include/linux/fwnode.h            |   1 +
+>  include/linux/iommu-fwspec.h      |  60 +++++++
+>  include/linux/iommu.h             |  25 +++
+>  include/linux/iort.h              |  19 ++
+>  include/linux/of_iommu.h          |  24 +--
+>  include/linux/platform_device.h   |   3 +
+>  19 files changed, 782 insertions(+), 95 deletions(-)
+>  create mode 100644 drivers/iommu/iommu-fwspec.c
+>  create mode 100644 include/linux/iommu-fwspec.h
+> 
+> -- 
+> 2.6.4
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
