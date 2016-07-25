@@ -1,100 +1,107 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 25 Jul 2016 11:55:32 +0200
-Subject: [PATCH v2 3/4] mfd: add support for Allwinner SoCs ADC
-In-Reply-To: <20160722135556.GG14925@dell>
-References: <1468576754-3273-1-git-send-email-quentin.schulz@free-electrons.com>
- <1468576754-3273-4-git-send-email-quentin.schulz@free-electrons.com>
- <de8ebab2-cde9-d209-3c9a-e1868fafb84b@kernel.org>
- <20160719073109.GD17074@dell>
- <d64cf632-41a4-3e23-6239-7f854cbb0293@kernel.org>
- <20160721121253.GE14925@dell> <20160721200802.GL5993@lukather>
- <20160722135556.GG14925@dell>
-Message-ID: <20160725095532.GK7419@lukather>
+From: jic23@jic23.retrosnub.co.uk (Jonathan Cameron)
+Date: Mon, 25 Jul 2016 11:08:27 +0100
+Subject: [PATCH 5/5] mfd: sunxi-gpadc-mfd: probe sunxi-gpadc-ts driver
+In-Reply-To: <20160725095113.GJ7419@lukather>
+References: <1469003351-15263-1-git-send-email-quentin.schulz@free-electrons.com>
+ <1469003351-15263-6-git-send-email-quentin.schulz@free-electrons.com>
+ <20160721060812.GA5993@lukather>
+ <11247e4f-d04d-d5bc-6ebf-a637820c011d@kernel.org>
+ <20160725095113.GJ7419@lukather>
+Message-ID: <B06C774E-19BF-43B3-9CA6-8AB67A1D8678@jic23.retrosnub.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 22, 2016 at 02:55:56PM +0100, Lee Jones wrote:
-> On Thu, 21 Jul 2016, Maxime Ripard wrote:
-> 
-> > 1;4205;0c
-> > On Thu, Jul 21, 2016 at 01:12:53PM +0100, Lee Jones wrote:
-> > > On Wed, 20 Jul 2016, Jonathan Cameron wrote:
-> > > 
-> > > > On 19/07/16 08:31, Lee Jones wrote:
-> > > > > On Mon, 18 Jul 2016, Jonathan Cameron wrote:
-> > > > > 
-> > > > >> On 15/07/16 10:59, Quentin Schulz wrote:
-> > > > >>> The Allwinner SoCs all have an ADC that can also act as a touchscreen
-> > > > >>> controller and a thermal sensor. For now, only the ADC and the thermal
-> > > > >>> sensor drivers are probed by the MFD, the touchscreen controller support
-> > > > >>> will be added later.
-> > > > >>>
-> > > > >>> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
-> > > > >> Hmm. Previous patch includes the header this one creates.  Ordering issue?
-> > > > >> The depends kind of prevents build failures by ensuring that can't be built
-> > > > >> until this one is in place, but it is certainly an ugly way to do it.
-> > > > >>
-> > > > >> Few little bits innline.
-> > > > >>> ---
-> > > > >>>
-> > > > >>> v2:
-> > > > >>>  - add license headers,
-> > > > >>>  - reorder alphabetically includes,
-> > > > >>>  - add SUNXI_GPADC_ prefixes for defines,
-> > > > >>>
-> > > > >>>  drivers/mfd/Kconfig                 |  14 +++
-> > > > >>>  drivers/mfd/Makefile                |   2 +
-> > > > >>>  drivers/mfd/sunxi-gpadc-mfd.c       | 197 ++++++++++++++++++++++++++++++++++++
-> > > > >>>  include/linux/mfd/sunxi-gpadc-mfd.h |  23 +++++
-> > > > >>>  4 files changed, 236 insertions(+)
-> > > > >>>  create mode 100644 drivers/mfd/sunxi-gpadc-mfd.c
-> > > > >>>  create mode 100644 include/linux/mfd/sunxi-gpadc-mfd.h
-> > > > > 
-> > > > > [...]
-> > > > > 
-> > > > >>> +static struct mfd_cell sun6i_gpadc_mfd_cells[] = {
-> > > > >>> +	{
-> > > > >>> +		.name	= "sun6i-a31-gpadc-iio",
-> > > > >>> +		.resources = adc_resources,
-> > > > >>> +		.num_resources = ARRAY_SIZE(adc_resources),
-> > > > >>> +	}, {
-> > > > >>> +		.name = "iio_hwmon",
-> > > > >> I still really dislike using this to force the probe of that driver but
-> > > > >> kind of up to the hwmon / mfd guys on this.
-> > > > > 
-> > > > > Can you at least say *why* you don't like it?
-> > > > It just feels odd to have an mfd child that isn't really dependent
-> > > > on the mfd hardware itself.
-> > > > 
-> > > > Still if you are happy, mfd is your domain and my objections were
-> > > > as you probably noticed not that strong - or well described!)
-> > > > 
-> > > > So I'm fine with this.
-> > > 
-> > > I see.  So it's not actually part of the same IP/chip?
-> > 
-> > The chip has a temperature sensor, and we want to expose that
-> > temperature through IIO.
-> > 
-> > But we don't really have the choice on how we probe iio-hwmon
-> > here. The binding was already there, and we have to keep it.
-> 
-> What binding?
 
-The binding introduced for the original driver this serie aims to
-replace:
-https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/Documentation/devicetree/bindings/input/touchscreen/sun4i.txt
 
-Maxime
+On 25 July 2016 10:51:13 BST, Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+>Hi Jonathan,
+>
+>On Sun, Jul 24, 2016 at 12:26:56PM +0100, Jonathan Cameron wrote:
+>> >> @@ -142,23 +159,45 @@ static int sunxi_gpadc_mfd_probe(struct
+>platform_device *pdev)
+>> >>  	}
+>> >>  
+>> >>  	if (of_device_is_compatible(pdev->dev.of_node,
+>> >> -				    "allwinner,sun4i-a10-ts"))
+>> >> -		ret = mfd_add_devices(sunxi_gpadc_mfd_dev->dev, 0,
+>> >> -				      sun4i_gpadc_mfd_cells,
+>> >> -				      ARRAY_SIZE(sun4i_gpadc_mfd_cells), NULL,
+>> >> -				      0, NULL);
+>> >> -	else if (of_device_is_compatible(pdev->dev.of_node,
+>> >> -					 "allwinner,sun5i-a13-ts"))
+>> >> -		ret = mfd_add_devices(sunxi_gpadc_mfd_dev->dev, 0,
+>> >> -				      sun5i_gpadc_mfd_cells,
+>> >> -				      ARRAY_SIZE(sun5i_gpadc_mfd_cells), NULL,
+>> >> -				      0, NULL);
+>> >> -	else if (of_device_is_compatible(pdev->dev.of_node,
+>> >> -					 "allwinner,sun6i-a31-ts"))
+>> >> -		ret = mfd_add_devices(sunxi_gpadc_mfd_dev->dev, 0,
+>> >> -				      sun6i_gpadc_mfd_cells,
+>> >> -				      ARRAY_SIZE(sun6i_gpadc_mfd_cells), NULL,
+>> >> -				      0, NULL);
+>> >> +				    "allwinner,sun4i-a10-ts")) {
+>> >> +		if (of_property_read_bool(pdev->dev.of_node,
+>> >> +					  "allwinner,ts-attached"))
+>> >> +			ret = mfd_add_devices(sunxi_gpadc_mfd_dev->dev, 0,
+>> >> +					      sun4i_gpadc_mfd_cells_ts,
+>> >> +					      ARRAY_SIZE(sun4i_gpadc_mfd_cells_ts),
+>> >> +					      NULL, 0, NULL);
+>> >> +		else
+>> >> +			ret = mfd_add_devices(sunxi_gpadc_mfd_dev->dev, 0,
+>> >> +					      sun4i_gpadc_mfd_cells,
+>> >> +					      ARRAY_SIZE(sun4i_gpadc_mfd_cells),
+>> >> +					      NULL, 0, NULL);
+>> >> +	} else if (of_device_is_compatible(pdev->dev.of_node,
+>> >> +					 "allwinner,sun5i-a13-ts")) {
+>> >> +		if (of_property_read_bool(pdev->dev.of_node,
+>> >> +					  "allwinner,ts-attached"))
+>> >> +			ret = mfd_add_devices(sunxi_gpadc_mfd_dev->dev, 0,
+>> >> +					      sun5i_gpadc_mfd_cells_ts,
+>> >> +					      ARRAY_SIZE(sun5i_gpadc_mfd_cells_ts),
+>> >> +					      NULL, 0, NULL);
+>> >> +		else
+>> >> +			ret = mfd_add_devices(sunxi_gpadc_mfd_dev->dev, 0,
+>> >> +					      sun5i_gpadc_mfd_cells,
+>> >> +					      ARRAY_SIZE(sun5i_gpadc_mfd_cells),
+>> >> +					      NULL, 0, NULL);
+>> >> +	} else if (of_device_is_compatible(pdev->dev.of_node,
+>> >> +					 "allwinner,sun6i-a31-ts")) {
+>> >> +		if (of_property_read_bool(pdev->dev.of_node,
+>> >> +					  "allwinner,ts-attached"))
+>> >> +			ret = mfd_add_devices(sunxi_gpadc_mfd_dev->dev, 0,
+>> >> +					      sun6i_gpadc_mfd_cells_ts,
+>> >> +					      ARRAY_SIZE(sun6i_gpadc_mfd_cells_ts),
+>> >> +					      NULL, 0, NULL);
+>> >> +		else
+>> >> +			ret = mfd_add_devices(sunxi_gpadc_mfd_dev->dev, 0,
+>> >> +					      sun6i_gpadc_mfd_cells,
+>> >> +					      ARRAY_SIZE(sun6i_gpadc_mfd_cells),
+>> >> +					      NULL, 0, NULL);
+>> >> +	}
+>> > 
+>> > Please don't use any of_device_is_compatible.
+>> Hi Maxime,
+>> 
+>> Why?  (Just curious...)
+>
+>This is completely redundant. The compatible has already been looked
+>up once to match the driver, and you can associate a void * pointer to
+>any compatible you register in the of_device_id array.
+>
+>So you can just retrieve the compatible that probed you in the first
+>place, and use it's private data pointer to store whatever you want,
+>without the numerous (and expensive) calls to of_device_is_compatible.
+>
+>It's also easier to maintain in the long term, since you can simply
+>add a new field to the structure you would register there, instead of
+>keeping adding more conditions.
+Fair enough, now I get what you mean.
+
+Thanks,
+
+Jonathan
+>
+>Maxime
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160725/e0612716/attachment.sig>
+Sent from my Android device with K-9 Mail. Please excuse my brevity.
