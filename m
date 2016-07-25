@@ -1,43 +1,26 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 25 Jul 2016 11:40:15 +0100
-Subject: [STLinux Kernel] [PATCH 1/1] drm/sti: use new Reset API
-In-Reply-To: <20160725103232.GA4278@griffinp-ThinkPad-X1-Carbon-2nd>
-References: <20160725100933.9261-1-lee.jones@linaro.org>
- <20160725103232.GA4278@griffinp-ThinkPad-X1-Carbon-2nd>
-Message-ID: <20160725104015.GK14925@dell>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Mon, 25 Jul 2016 13:40:48 +0300
+Subject: [PATCH 0/2] Add R8A7792 I2C support
+In-Reply-To: <20160725020947.GI12825@verge.net.au>
+References: <17288006.ERHB6654v5@wasted.cogentembedded.com>
+ <20160725020947.GI12825@verge.net.au>
+Message-ID: <162faf65-4286-add4-6eb2-ac07a6d04deb@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 25 Jul 2016, Peter Griffin wrote:
-> On Mon, 25 Jul 2016, Lee Jones wrote:
-> 
-> > Since 0b52297f228 ("reset: Add support for shared reset controls") the
-> > new Reset API now demands consumers choose either an *_exclusive or a
-> > *_shared line when requesting reset lines.
-> > 
-> > This issue was found when running a kernel containing the aforementioned
-> > patch  which includes an informitive WARN().  It implies that one or
-> > more used reset lines are in fact shared.  This is why we're using the
-> > *_shared variant.
-> > 
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > ---
-> >  drivers/gpu/drm/sti/sti_compositor.c | 4 ++--
-> >  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> Your missing a changelog on the v2 version.
+On 7/25/2016 5:09 AM, Simon Horman wrote:
 
-This isn't really a v2, hence the lack if [PATCH vX] increment.
+>>    Here's the set of 2 patches against Simon Horman's 'renesas.git' repo,
+>> 'renesas-devel-20160722-v4.7-rc7' tag plus the SDHI/I2C patches just posted.
+>> We're adding the R8A7792 VIN clocks and device nodes. The patches have been
+>> tested on the Blanche board with the switches set to the HDMI input mode...
+>>
+>> [1/2] ARM: dts: r8a7792: add VIN clocks
+>> [2/2] ARM: dts: r8a7792: add VIN support
+>
+> Thanks, I have queued these up for v4.9.
 
-This is v1 with a more verbose changelog.
+    Oops, sorry for using a stale subject. :-(
+    Thank you!
 
-> Apart from that:
->  Acked-by: Peter Griffin <peter.griffin@linaro.org>
-
-Ta.
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+MBR, Sergei
