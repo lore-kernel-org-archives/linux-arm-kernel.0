@@ -1,129 +1,48 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 25 Jul 2016 16:09:55 +0100
-Subject: [RFC PATCH v3 05/13] drivers: iommu: make iommu_fwspec OF agnostic
-In-Reply-To: <1469013815-24380-6-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1469013815-24380-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1469013815-24380-6-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <1499f802-5f98-b0c0-d3aa-dabcac81e84e@arm.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 25 Jul 2016 10:12:43 -0500
+Subject: [PATCH 14/18] ARM: mvebu: add support for the Armada 395 SoC
+ family
+In-Reply-To: <20160725155050.3aee974e@free-electrons.com>
+References: <1469105055-25181-1-git-send-email-jaz@semihalf.com>
+ <1469105055-25181-16-git-send-email-jaz@semihalf.com>
+ <20160721221605.GA21883@rob-hp-laptop>
+ <CAH76GKOidxFZ7R1pQZ2W9BRBCxEnLXNHQGrXbAUmouozBUj51Q@mail.gmail.com>
+ <CAL_JsqJeObuS8OWeErRA5MX-SrMtu_254A-LtP9-A=xdPO7p1Q@mail.gmail.com>
+ <20160725155050.3aee974e@free-electrons.com>
+Message-ID: <CAL_JsqL=bkzhjOTcOCeGNvKsAfYg0D=CypZs4sCsQ01pnbitoQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lorenzo,
+On Mon, Jul 25, 2016 at 8:50 AM, Thomas Petazzoni
+<thomas.petazzoni@free-electrons.com> wrote:
+> Hello,
+>
+> On Mon, 25 Jul 2016 08:47:23 -0500, Rob Herring wrote:
+>
+>> > I am not sure if I get your point. The Armada-398 extends the
+>> > Armada-395 about 2 additional SATA ports (as you can see in commit
+>> > "[PATCH 15/18] ARM: mvebu: a398: update the dtsi about missing
+>> > interfaces"). In this example the a398-db board contains the Armada398
+>> > SoC, so it is a better match and goes first.
+>>
+>> But your patch title is adding 395 support, but you are adding the
+>> string to a 398 based board. It would make sense to have 395 here if
+>> the OS already had support for 395 and you want to support the 398
+>> without updating the OS. That doesn't seem to apply here.
+>
+> I think the argument of Grzegorz is that the 398 is functionally a
+> strict superset of the 395, so that anything that applies to the 395
+> will also apply to 398.
 
-On 20/07/16 12:23, Lorenzo Pieralisi wrote:
-> The iommu_fwspec structure, used to hold per device iommu configuration
-> data is not OF specific and therefore can be moved to a generic
-> and OF independent compilation unit.
-> 
-> In particular, the iommu_fwspec handling hinges on the device_node
-> pointer to identify the IOMMU device associated with the iommu_fwspec
-> structure, that is easily converted to a more generic fwnode_handle
-> pointer that can cater for OF and non-OF (ie ACPI) systems.
-> 
-> Create the files and related Kconfig entry to decouple iommu_fwspec
-> structure from the OF iommu kernel layer.
-> 
-> Given that the current iommu_fwspec implementation relies on
-> the arch specific struct device.archdata.iommu field in its
-> implementation, by making the code standalone and independent
-> of the OF layer this patch makes sure that the iommu_fwspec
-> kernel code can be selected only on arches implementing the
-> struct device.archdata.iommu field by adding an explicit
-> arch dependency in its config entry.
-> 
-> Current drivers using the iommu_fwspec for streamid translation
-> are converted to the new iommu_fwspec API by simply converting
-> the device_node to its fwnode_handle pointer.
-> 
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Hanjun Guo <hanjun.guo@linaro.org>
-> Cc: Robin Murphy <robin.murphy@arm.com>
-> Cc: Joerg Roedel <joro@8bytes.org>
-> ---
->  drivers/iommu/Kconfig        |   4 ++
->  drivers/iommu/Makefile       |   1 +
->  drivers/iommu/arm-smmu-v3.c  |  13 +++--
->  drivers/iommu/iommu-fwspec.c | 114 +++++++++++++++++++++++++++++++++++++++++++
->  drivers/iommu/of_iommu.c     |  52 --------------------
->  include/linux/iommu-fwspec.h |  60 +++++++++++++++++++++++
->  include/linux/of_iommu.h     |  24 +++------
->  7 files changed, 196 insertions(+), 72 deletions(-)
->  create mode 100644 drivers/iommu/iommu-fwspec.c
->  create mode 100644 include/linux/iommu-fwspec.h
-> 
-> diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
-> index d1c66af..2b26bfb 100644
-> --- a/drivers/iommu/Kconfig
-> +++ b/drivers/iommu/Kconfig
-> @@ -67,6 +67,10 @@ config OF_IOMMU
->         def_bool y
->         depends on OF && IOMMU_API
->  
-> +config IOMMU_FWSPEC
-> +       def_bool y
-> +       depends on ARM64 && IOMMU_API
+Yes, I get that, but that is only meaningful if you want to run an OS
+that is only aware of 395 on a 398 SoC/board (though I'd guess the 390
+compat is enough for that). Otherwise, that property is not really
+meaningful as the additional nodes are enough to handle what is the
+superset.
 
-I think that could be at least (ARM || ARM64).
+I would agree both are fine if both chips are in fact the same die,
+just fused or packaged differently. I've seen a lot of chips that are
+supposed to be sub/supersets of each other, but have different errata
+lists because they are different die.
 
-> +
->  # IOMMU-agnostic DMA-mapping layer
->  config IOMMU_DMA
->  	bool
-
-[...]
-
-> diff --git a/include/linux/of_iommu.h b/include/linux/of_iommu.h
-> index 308791f..2362232 100644
-> --- a/include/linux/of_iommu.h
-> +++ b/include/linux/of_iommu.h
-> @@ -15,13 +15,8 @@ extern void of_iommu_init(void);
->  extern const struct iommu_ops *of_iommu_configure(struct device *dev,
->  					struct device_node *master_np);
->  
-> -struct iommu_fwspec {
-> -	const struct iommu_ops	*iommu_ops;
-> -	struct device_node	*iommu_np;
-> -	void			*iommu_priv;
-> -	unsigned int		num_ids;
-> -	u32			ids[];
-> -};
-> +void of_iommu_set_ops(struct device_node *np, const struct iommu_ops *ops);
-> +const struct iommu_ops *of_iommu_get_ops(struct device_node *np);
-
-Is there some reason we need to retain the existing definitions of
-these? I was assuming we'd be able to move the entire implementation
-over to the fwspec code and leave behind nothing more than trivial
-wrappers, e.g.:
-
-#define of_iommu_get_ops(np) iommu_fwspec_get_ops(&(np)->fwnode_handle)
-
-Robin.
-
->  #else
->  
-> @@ -39,17 +34,14 @@ static inline const struct iommu_ops *of_iommu_configure(struct device *dev,
->  	return NULL;
->  }
->  
-> -struct iommu_fwspec;
-> -
-> -#endif	/* CONFIG_OF_IOMMU */
-> +static inline void of_iommu_set_ops(struct device_node *np,
-> +				    const struct iommu_ops *ops)
-> +{ }
->  
-> -int iommu_fwspec_init(struct device *dev, struct device_node *iommu_np);
-> -void iommu_fwspec_free(struct device *dev);
-> -int iommu_fwspec_add_ids(struct device *dev, u32 *ids, int num_ids);
-> -struct iommu_fwspec *dev_iommu_fwspec(struct device *dev);
-> +static inline const struct iommu_ops *
-> +of_iommu_get_ops(struct device_node *np) { return NULL; }
->  
-> -void of_iommu_set_ops(struct device_node *np, const struct iommu_ops *ops);
-> -const struct iommu_ops *of_iommu_get_ops(struct device_node *np);
-> +#endif	/* CONFIG_OF_IOMMU */
->  
->  extern struct of_device_id __iommu_of_table;
->  
-> 
+Rob
