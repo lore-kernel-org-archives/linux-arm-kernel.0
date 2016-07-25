@@ -1,34 +1,69 @@
-From: heiko.carstens@de.ibm.com (Heiko Carstens)
-Date: Mon, 25 Jul 2016 16:26:40 +0200
-Subject: Is THREAD_INFO_IN_TASK appropriate for -mm for 4.8?
-In-Reply-To: <578DE406.9060902@de.ibm.com>
-References: <CALCETrUf_7=Tr4JrDj+3UPT5kUT1MsRtypvfqkOg_MVHAJu=PA@mail.gmail.com>
- <578DE406.9060902@de.ibm.com>
-Message-ID: <20160725142640.GA4337@osiris>
+From: ruslan.bilovol@gmail.com (Ruslan Bilovol)
+Date: Mon, 25 Jul 2016 17:28:22 +0300
+Subject: [PATCH v1.2 3/4] arm64: Add arm64 kexec support
+In-Reply-To: <1469048065.2977.124.camel@infradead.org>
+References: <cover.1468970114.git.geoff@infradead.org>
+ <9ed513fd44a19b2f49b4da99477cedfff7341bf0.1468970114.git.geoff@infradead.org>
+ <1469048065.2977.124.camel@infradead.org>
+Message-ID: <CAB=otbSObtEE7n4LjWWZZ0G=oA1Xd5QUmHnX44+uyUiWP4qXpw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 19, 2016 at 10:25:42AM +0200, Christian Borntraeger wrote:
-> On 07/19/2016 01:47 AM, Andy Lutomirski wrote:
-> > Hi all-
-> > 
-> > There are four core patches needed for the THREAD_INFO_IN_TASK thing,
-> > and they apply cleanly to -mm now.  The x86 patch to flip the feature
-> > on does not apply cleanly anywhere because it depends on changes in
-> > -tip *and* in -mm.  I'd like to get all of this as well as the rest of
-> > the vmap-stacks stuff in by 4.9, but I'm wondering if it might make
-> > sense to get the core THREAD_INFO_IN_TASK stuff into -mm for 4.8
-> > instead.
-> > 
-> > Pros:
-> >  - It reduces the amount of core code that -tip will have to carry until 4.9.
-> >  - It may benefit other architectures.  Christian Borntraeger
-> > expressed an interest in enabling the feature for s390, but it'll be
-> > awkward for him until the core bit landed.  Similarly, arm64 seems to
-> > be interested.
-> 
-> I have not yet talked to Martin/Heiko about this, so not sure yet if and when
-> s390 is going to use this - so no pressure from our side yet.
+Hi Geoff,
 
-I wrote a patch four weeks ago which converts s390 based on Linus' orginal
-patches. So yes, we will convert s390 as soon as this hits upstream.
+On Wed, Jul 20, 2016 at 11:54 PM, Geoff Levand <geoff@infradead.org> wrote:
+> Add kexec reboot support for ARM64 platforms.
+>
+> Signed-off-by: Geoff Levand <geoff@infradead.org>
+> ---
+
+[snip]
+
+> diff --git a/kexec/arch/arm64/crashdump-arm64.c b/kexec/arch/arm64/crashdump-arm64.c
+> new file mode 100644
+> index 0000000..d2272c8
+> --- /dev/null
+> +++ b/kexec/arch/arm64/crashdump-arm64.c
+> @@ -0,0 +1,21 @@
+> +/*
+> + * ARM64 crashdump.
+> + */
+> +
+> +#define _GNU_SOURCE
+> +
+> +#include <errno.h>
+> +#include <linux/elf.h>
+> +
+> +#include "kexec.h"
+> +#include "crashdump.h"
+> +#include "crashdump-arm64.h"
+> +#include "kexec-arm64.h"
+> +#include "kexec-elf.h"
+> +
+> +struct memory_ranges usablemem_rgns = {};
+> +
+> +int is_crashkernel_mem_reserved(void)
+> +{
+> +       return 0;
+> +}
+
+Shouldn't is_crashkernel_mem_reserved() parse iomem and return
+true if crashkernel region is reserved?
+
+Due to this issue when I'm trying to validate these patches, I always
+get next error:
+| Memory for crashkernel is not reserved
+| Please reserve memory by passing"crashkernel=X at Y" parameter to kernel
+| Then try to loading kdump kernel
+
+My system already has reserved region for crashkernel:
+~# cat /proc/iomem | grep Crash
+  7f000000-7fffffff : Crash kernel
+
+And I use kexec next way:
+kexec --type Image -p /Image --ramdisk=/ramdisk.cpio.gz
+--dtb=dtb-arm64.dtb --append="root=/dev/ram0 1 maxcpus=1
+reset_devices"
+
+Best regards,
+Ruslan Bilovol
