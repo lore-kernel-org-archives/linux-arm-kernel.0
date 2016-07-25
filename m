@@ -1,48 +1,67 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 25 Jul 2016 10:02:59 +0100
-Subject: [PATCH v8 4/9] clocksource/drivers/arm_arch_timer: use readq to
- get 64-bit CNTVCT
-In-Reply-To: <1468952284-28942-5-git-send-email-fu.wei@linaro.org>
-References: <1468952284-28942-1-git-send-email-fu.wei@linaro.org>
- <1468952284-28942-5-git-send-email-fu.wei@linaro.org>
-Message-ID: <20160725090258.GA15864@arm.com>
+From: David.Laight@ACULAB.COM (David Laight)
+Date: Mon, 25 Jul 2016 09:27:31 +0000
+Subject: [PATCH v3 02/11] mm: Hardened usercopy
+In-Reply-To: <20160722174551.jddle6mf7zlq6xmb@treble>
+References: <1468619065-3222-1-git-send-email-keescook@chromium.org>
+ <1468619065-3222-3-git-send-email-keescook@chromium.org>
+ <5790711f.2350420a.b4287.2cc0SMTPIN_ADDED_BROKEN@mx.google.com>
+ <CAGXu5jLCu1Vv0uugKZrsjSEsoABgXJSOJ8GkKmrHbvj9jkC2YA@mail.gmail.com>
+ <20160722174551.jddle6mf7zlq6xmb@treble>
+Message-ID: <063D6719AE5E284EB5DD2968C1650D6D5F502102@AcuExch.aculab.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 20, 2016 at 02:17:59AM +0800, fu.wei at linaro.org wrote:
-> From: Fu Wei <fu.wei@linaro.org>
+From: Josh Poimboeuf
+> Sent: 22 July 2016 18:46
+..
+> > >> +/*
+> > >> + * Checks if a given pointer and length is contained by the current
+> > >> + * stack frame (if possible).
+> > >> + *
+> > >> + *   0: not at all on the stack
+> > >> + *   1: fully within a valid stack frame
+> > >> + *   2: fully on the stack (when can't do frame-checking)
+> > >> + *   -1: error condition (invalid stack position or bad stack frame)
+> > >> + */
+> > >> +static noinline int check_stack_object(const void *obj, unsigned long len)
+> > >> +{
+> > >> +     const void * const stack = task_stack_page(current);
+> > >> +     const void * const stackend = stack + THREAD_SIZE;
+> > >
+> > > That allows access to the entire stack, including the struct thread_info,
+> > > is that what we want - it seems dangerous? Or did I miss a check
+> > > somewhere else?
+> >
+> > That seems like a nice improvement to make, yeah.
+> >
+> > > We have end_of_stack() which computes the end of the stack taking
+> > > thread_info into account (end being the opposite of your end above).
+> >
+> > Amusingly, the object_is_on_stack() check in sched.h doesn't take
+> > thread_info into account either. :P Regardless, I think using
+> > end_of_stack() may not be best. To tighten the check, I think we could
+> > add this after checking that the object is on the stack:
+> >
+> > #ifdef CONFIG_STACK_GROWSUP
+> >         stackend -= sizeof(struct thread_info);
+> > #else
+> >         stack += sizeof(struct thread_info);
+> > #endif
+> >
+> > e.g. then if the pointer was in the thread_info, the second test would
+> > fail, triggering the protection.
 > 
-> This patch simplify arch_counter_get_cntvct_mem function by
-> using readq to get 64-bit CNTVCT value instead of readl_relaxed.
-> 
-> Signed-off-by: Fu Wei <fu.wei@linaro.org>
-> ---
->  drivers/clocksource/arm_arch_timer.c | 10 +---------
->  1 file changed, 1 insertion(+), 9 deletions(-)
-> 
-> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-> index e6fd42d..483d2f9 100644
-> --- a/drivers/clocksource/arm_arch_timer.c
-> +++ b/drivers/clocksource/arm_arch_timer.c
-> @@ -418,15 +418,7 @@ u32 arch_timer_get_rate(void)
->  
->  static u64 arch_counter_get_cntvct_mem(void)
->  {
-> -	u32 vct_lo, vct_hi, tmp_hi;
-> -
-> -	do {
-> -		vct_hi = readl_relaxed(arch_counter_base + CNTVCT_HI);
-> -		vct_lo = readl_relaxed(arch_counter_base + CNTVCT_LO);
-> -		tmp_hi = readl_relaxed(arch_counter_base + CNTVCT_HI);
-> -	} while (vct_hi != tmp_hi);
-> -
-> -	return ((u64) vct_hi << 32) | vct_lo;
-> +	return readq(arch_counter_base + CNTVCT_LO);
+> FWIW, this won't work right on x86 after Andy's
+> CONFIG_THREAD_INFO_IN_TASK patches get merged.
 
-What's the benefit of doing this? If you use readq here, how can we
-guarantee that (a) the endpoint won't generate a SLVERR or similar and
-(b) that we get an atomic read?
+What ends up in the 'thread_info' area?
+If it contains the fp save area then programs like gdb may end up requesting
+copy_in/out directly from that area.
 
-"If it ain't broke, don't fix it"
+Interestingly the avx registers don't need saving on a normal system call
+entry (they are all caller-saved) so the kernel stack can safely overwrite
+that area.
+Syscall entry probably ought to execute the 'zero all avx registers' instruction.
+They do need saving on interrupt entry - but the stack used will be less.
 
-Will
+	David
