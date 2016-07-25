@@ -1,97 +1,70 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 25 Jul 2016 16:51:00 +0100
-Subject: [RFC PATCH v3 05/13] drivers: iommu: make iommu_fwspec OF agnostic
-In-Reply-To: <20160725154103.GA28507@red-moon>
-References: <1469013815-24380-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1469013815-24380-6-git-send-email-lorenzo.pieralisi@arm.com>
- <1499f802-5f98-b0c0-d3aa-dabcac81e84e@arm.com>
- <20160725154103.GA28507@red-moon>
-Message-ID: <856415fc-b9bf-ca44-cc70-85d454574e53@arm.com>
+From: fu.wei@linaro.org (Fu Wei)
+Date: Mon, 25 Jul 2016 23:55:49 +0800
+Subject: [PATCH v9 4/9] clocksource/drivers/arm_arch_timer: use readq to
+ get 64-bit CNTVCT
+In-Reply-To: <20160725153118.GD19209@arm.com>
+References: <1469460427-8643-1-git-send-email-fu.wei@linaro.org>
+ <1469460427-8643-5-git-send-email-fu.wei@linaro.org>
+ <20160725153118.GD19209@arm.com>
+Message-ID: <CADyBb7ubKceQiB7+u7sSA=1+9_VMUrGjiabf_FkN2-n4rq7Kgg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/07/16 16:41, Lorenzo Pieralisi wrote:
-[...]
->>> diff --git a/include/linux/of_iommu.h b/include/linux/of_iommu.h
->>> index 308791f..2362232 100644
->>> --- a/include/linux/of_iommu.h
->>> +++ b/include/linux/of_iommu.h
->>> @@ -15,13 +15,8 @@ extern void of_iommu_init(void);
->>>  extern const struct iommu_ops *of_iommu_configure(struct device *dev,
->>>  					struct device_node *master_np);
->>>  
->>> -struct iommu_fwspec {
->>> -	const struct iommu_ops	*iommu_ops;
->>> -	struct device_node	*iommu_np;
->>> -	void			*iommu_priv;
->>> -	unsigned int		num_ids;
->>> -	u32			ids[];
->>> -};
->>> +void of_iommu_set_ops(struct device_node *np, const struct iommu_ops *ops);
->>> +const struct iommu_ops *of_iommu_get_ops(struct device_node *np);
->>
->> Is there some reason we need to retain the existing definitions of
->> these? I was assuming we'd be able to move the entire implementation
->> over to the fwspec code and leave behind nothing more than trivial
->> wrappers, e.g.:
->>
->> #define of_iommu_get_ops(np) iommu_fwspec_get_ops(&(np)->fwnode_handle)
-> 
-> Yep, that's exactly what I did but then I was bitten by config
-> dependencies. If we implement of_iommu_get/set_ops() as wrappers,
-> we have to compile iommu_fwspec_get/set_ops() on arches that may
-> not have struct dev_archdata.iommu, unless we introduce yet another
-> config symbol to avoid compiling that code (see eg iommu_fwspec_init(),
-> we can't compile it on eg x86 even though we do need of_iommu_get_ops()
-> on it - so iommu_fwspec_get_ops(), that lives in the same compilation
-> unit as eg iommu_fwspec_init()).
-> 
-> So short answer is: there is no reason apart from dev_archdata.iommu
-> being arch specific, if we were able to move iommu_fwspec to generic
-> code (ie struct device, somehow) I would certainly get rid of this
-> stupid code duplication (or as I said I can add a config entry for
-> that, more ideas are welcome).
+Hi Will,
 
-OK, given Rob's comment as well, I guess breaking that dependency is to
-everyone's benefit. Since it's quite closely related, how about if we
-follow the arch_setup_dma_ops() pattern with an
-arch_{get,set}_iommu_fwspec(dev) type thing?
+On 25 July 2016 at 23:31, Will Deacon <will.deacon@arm.com> wrote:
+> On Mon, Jul 25, 2016 at 11:27:02PM +0800, fu.wei at linaro.org wrote:
+>> From: Fu Wei <fu.wei@linaro.org>
+>>
+>> This patch simplify arch_counter_get_cntvct_mem function by
+>> using readq to get 64-bit CNTVCT value instead of readl_relaxed.
+>>
+>> Signed-off-by: Fu Wei <fu.wei@linaro.org>
+>> ---
+>>  drivers/clocksource/arm_arch_timer.c | 10 +---------
+>>  1 file changed, 1 insertion(+), 9 deletions(-)
+>>
+>> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+>> index e6fd42d..483d2f9 100644
+>> --- a/drivers/clocksource/arm_arch_timer.c
+>> +++ b/drivers/clocksource/arm_arch_timer.c
+>> @@ -418,15 +418,7 @@ u32 arch_timer_get_rate(void)
+>>
+>>  static u64 arch_counter_get_cntvct_mem(void)
+>>  {
+>> -     u32 vct_lo, vct_hi, tmp_hi;
+>> -
+>> -     do {
+>> -             vct_hi = readl_relaxed(arch_counter_base + CNTVCT_HI);
+>> -             vct_lo = readl_relaxed(arch_counter_base + CNTVCT_LO);
+>> -             tmp_hi = readl_relaxed(arch_counter_base + CNTVCT_HI);
+>> -     } while (vct_hi != tmp_hi);
+>> -
+>> -     return ((u64) vct_hi << 32) | vct_lo;
+>> +     return readq(arch_counter_base + CNTVCT_LO);
+>
+> Please drop this patch. It doesn't work.
 
-Robin.
+I am OK to drop this, but could you let me know why it doesn't work?
 
-> 
-> Thanks,
-> Lorenzo
-> 
->>
->> Robin.
->>
->>>  #else
->>>  
->>> @@ -39,17 +34,14 @@ static inline const struct iommu_ops *of_iommu_configure(struct device *dev,
->>>  	return NULL;
->>>  }
->>>  
->>> -struct iommu_fwspec;
->>> -
->>> -#endif	/* CONFIG_OF_IOMMU */
->>> +static inline void of_iommu_set_ops(struct device_node *np,
->>> +				    const struct iommu_ops *ops)
->>> +{ }
->>>  
->>> -int iommu_fwspec_init(struct device *dev, struct device_node *iommu_np);
->>> -void iommu_fwspec_free(struct device *dev);
->>> -int iommu_fwspec_add_ids(struct device *dev, u32 *ids, int num_ids);
->>> -struct iommu_fwspec *dev_iommu_fwspec(struct device *dev);
->>> +static inline const struct iommu_ops *
->>> +of_iommu_get_ops(struct device_node *np) { return NULL; }
->>>  
->>> -void of_iommu_set_ops(struct device_node *np, const struct iommu_ops *ops);
->>> -const struct iommu_ops *of_iommu_get_ops(struct device_node *np);
->>> +#endif	/* CONFIG_OF_IOMMU */
->>>  
->>>  extern struct of_device_id __iommu_of_table;
->>>  
->>>
->>
-> 
+I did get some problem on Foundation model about readq, but it works on Seattle.
+I guess that is a problem of model, but not a code problem.
+So I just got confused, why readq  doesn't work,  :-)
+
+
+>
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2016-July/445369.html
+
+I just replied to it, sorry.
+
+>
+> Will
+
+
+
+-- 
+Best regards,
+
+Fu Wei
+Software Engineer
+Red Hat
