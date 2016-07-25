@@ -1,53 +1,35 @@
-From: nava.manne@xilinx.com (Nava kishore Manne)
-Date: Mon, 25 Jul 2016 10:27:01 +0000
-Subject: [PATCH v4] Axi-usb: Add support for 64-bit addressing.
-References: <1464626798-1334-1-git-send-email-navam@xilinx.com>
- <20160602225815.GA5508@rob-hp-laptop>
- <C89496FEAE474D468F30D558A9468D9F26CF8BC0@XAP-PVEXMBX01.xlnx.xilinx.com>
- <20160711220623.GB8465@kroah.com>
-Message-ID: <C89496FEAE474D468F30D558A9468D9F26CFB7EA@XAP-PVEXMBX01.xlnx.xilinx.com>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Mon, 25 Jul 2016 11:32:32 +0100
+Subject: [STLinux Kernel] [PATCH 1/1] drm/sti: use new Reset API
+In-Reply-To: <20160725100933.9261-1-lee.jones@linaro.org>
+References: <20160725100933.9261-1-lee.jones@linaro.org>
+Message-ID: <20160725103232.GA4278@griffinp-ThinkPad-X1-Carbon-2nd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ping!!
+Hi Lee,
 
-> -----Original Message-----
-> From: Nava kishore Manne
-> Sent: Wednesday, July 13, 2016 1:00 PM
-> To: 'gregkh at linuxfoundation.org' <gregkh@linuxfoundation.org>
-> Cc: Rob Herring <robh@kernel.org>; pawel.moll at arm.com;
-> mark.rutland at arm.com; ijc+devicetree at hellion.org.uk;
-> galak at codeaurora.org; Michal Simek <michals@xilinx.com>; Soren
-> Brinkmann <sorenb@xilinx.com>; balbi at ti.com; Hyun Kwon
-> <hyunk@xilinx.com>; Radhey Shyam Pandey <radheys@xilinx.com>;
-> devicetree at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
-> kernel at vger.kernel.org
-> Subject: RE: [PATCH v4] Axi-usb: Add support for 64-bit addressing.
+On Mon, 25 Jul 2016, Lee Jones wrote:
+
+> Since 0b52297f228 ("reset: Add support for shared reset controls") the
+> new Reset API now demands consumers choose either an *_exclusive or a
+> *_shared line when requesting reset lines.
 > 
-> Hi Greg,
+> This issue was found when running a kernel containing the aforementioned
+> patch  which includes an informitive WARN().  It implies that one or
+> more used reset lines are in fact shared.  This is why we're using the
+> *_shared variant.
 > 
-> > > Ping!!
-> >
-> > <snip>
-> >
-> > >
-> > > This email and any attachments are intended for the sole use of the
-> > > named
-> > recipient(s) and contain(s) confidential information that may be
-> > proprietary, privileged or copyrighted under applicable law. If you
-> > are not the intended recipient, do not read, copy, or forward this
-> > email message or any attachments. Delete this email message and any
-> attachments immediately.
-> >
-> > You do realize that with an email footer like this, you prevent any of
-> > us from responding to you, sorry.  I shouldn't even be writing this...
-> 
-> Sorry something fishy happened with my email-client I have fixed it now next
-> time onwards will take care before giving replies...
-> 
-> Regards,
-> Navakishore.
-> >
-> 
-> 
-> > greg k-h
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  drivers/gpu/drm/sti/sti_compositor.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+
+Your missing a changelog on the v2 version.
+
+Apart from that:
+ Acked-by: Peter Griffin <peter.griffin@linaro.org>
+
+regards,
+
+Peter.
