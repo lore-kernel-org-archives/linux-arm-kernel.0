@@ -1,105 +1,40 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 25 Jul 2016 18:13:50 +0100
-Subject: [PATCH v15 04/10] arm64: Kprobes with single stepping support
-In-Reply-To: <57924104.1080202@linaro.org>
-References: <1467995754-32508-1-git-send-email-dave.long@linaro.org>
- <1467995754-32508-5-git-send-email-dave.long@linaro.org>
- <578FA238.3050206@arm.com> <5790F960.5050007@linaro.org>
- <57910528.7070902@arm.com> <57911590.50305@linaro.org>
- <20160722101617.GA17821@e104818-lin.cambridge.arm.com>
- <57924104.1080202@linaro.org>
-Message-ID: <20160725171350.GE2423@e104818-lin.cambridge.arm.com>
+Date: Mon, 25 Jul 2016 18:14:42 +0100
+Subject: [PATCH 0/2] arm64: mm: use fully constructed struct pages from
+ EFI page tables
+In-Reply-To: <1469208745-6693-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1469208745-6693-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20160725171442.GF2423@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 22, 2016 at 11:51:32AM -0400, David Long wrote:
-> On 07/22/2016 06:16 AM, Catalin Marinas wrote:
-> >On Thu, Jul 21, 2016 at 02:33:52PM -0400, David Long wrote:
-> >>On 07/21/2016 01:23 PM, Marc Zyngier wrote:
-> >>>On 21/07/16 17:33, David Long wrote:
-> >>>>On 07/20/2016 12:09 PM, Marc Zyngier wrote:
-> >>>>>On 08/07/16 17:35, David Long wrote:
-> >>>>>>+#define MAX_INSN_SIZE			1
-> >>>>>>+#define MAX_STACK_SIZE			128
-> >>>>>
-> >>>>>Where is that value coming from? Because even on my 6502, I have a 256
-> >>>>>byte stack.
-> >>>>>
-> >>>>
-> >>>>Although I don't claim to know the original author's thoughts I would
-> >>>>guess it is based on the seven other existing implementations for
-> >>>>kprobes on various architectures, all of which appear to use either 64
-> >>>>or 128 for MAX_STACK_SIZE.  The code is not trying to duplicate the
-> >>>>whole stack.
-> >[...]
-> >>>My main worry is that whatever value you pick, it is always going to be
-> >>>wrong. This is used to preserve arguments that are passed on the stack,
-> >>>as opposed to passed by registers). We have no idea of what is getting
-> >>>passed there so saving nothing, 128 bytes or 2kB is about the same. It
-> >>>is always wrong.
-> >>>
-> >>>A much better solution would be to check the frame pointer, and copy the
-> >>>delta between FP and SP, assuming it fits inside the allocated buffer.
-> >>>If it doesn't, or if FP is invalid, we just skip the hook, because we
-> >>>can't reliably execute it.
-> >>
-> >>Well, this is the way it works literally everywhere else. It is a documented
-> >>limitation (Documentation/kprobes.txt). Said documentation may need to be
-> >>changed along with the suggested fix.
-> >
-> >The document states: "Up to MAX_STACK_SIZE bytes are copied". That means
-> >the arch code could always copy less but never more than MAX_STACK_SIZE.
-> >What we are proposing is that we should try to guess how much to copy
-> >based on the FP value (caller's frame) and, if larger than
-> >MAX_STACK_SIZE, skip the probe hook entirely. I don't think this goes
-> >against the kprobes.txt document but at least it (a) may improve the
-> >performance slightly by avoiding unnecessary copy and (b) it avoids
-> >undefined behaviour if we ever encounter a jprobe with arguments passed
-> >on the stack beyond MAX_STACK_SIZE.
+On Fri, Jul 22, 2016 at 07:32:23PM +0200, Ard Biesheuvel wrote:
+> As reported by Sudeep, the EFI memory attributes table handling may crash
+> on an uninitialized spinlock in the struct page associated with a UEFI runtime
+> translation table page.
 > 
-> OK, it sounds like an improvement. I do worry a little about unexpected side
-> effects.
+> This is caused by a failure to take into account the fact that generic code
+> treats such pages differently depending on whether they are associated with
+> init_mm or not. The EFI page tables are completely separate from both the
+> kernel and the userland mappings, and are completely static during the
+> lifetime of the OS, but still, the most robust solution is to simply
+> construct these pages fully, so that generic code that compares against
+> &init_mm can work safely and correctly.
+> 
+> Patch #1 is a preparatory patch to drop a reference to late_pgtable_alloc
+> from code that no longer needs it.
+> 
+> Patch #2 renamed late_pgtable_alloc to pgd_table_alloc, and updates it to
+> construct the struct page associated with the allocated page.
+> 
+> Ard Biesheuvel (2):
+>   arm64: mm: make create_mapping_late() non-allocating
+>   arm64: mm: run pgtable_page_ctor() on non-swapper translation table
+>     pages
 
-You get more unexpected side effects by not saving/restoring the whole
-stack. We looked into this on Friday and came to the conclusion that
-there is no safe way for kprobes to know which arguments passed on the
-stack should be preserved, at least not with the current API.
+Patches applied. I'll send them with the 4.8 pull request this week.
 
-Basically the AArch64 PCS states that for arguments passed on the stack
-(e.g. they can't fit in registers), the caller allocates memory for them
-(on its own stack) and passes the pointer to the callee. Unfortunately,
-the frame pointer seems to be decremented correspondingly to cover the
-arguments, so we don't really have a way to tell how much to copy.
-Copying just the caller's stack frame isn't safe either since a
-callee/caller receiving such argument on the stack may passed it down to
-a callee without copying (I couldn't find anything in the PCS stating
-that this isn't allowed).
-
-> I'm just asking if we can accept the existing code as now complete
-> enough (in that I believe it matches the other implementations) and make
-> this enhancement something for the next release cycle, allowing the existing
-> code to be exercised by a wider audience and providing ample time to test
-> the new modification? I'd hate to get stuck in a mode where this patch gets
-> repeatedly delayed for changes that go above and beyond the original design.
-
-The problem is that the original design was done on x86 for its PCS and
-it doesn't always fit other architectures. So we could either ignore the
-problem, hoping that no probed function requires argument passing on
-stack or we copy all the valid data on the kernel stack:
-
-diff --git a/arch/arm64/include/asm/kprobes.h b/arch/arm64/include/asm/kprobes.h
-index 61b49150dfa3..157fd0d0aa08 100644
---- a/arch/arm64/include/asm/kprobes.h
-+++ b/arch/arm64/include/asm/kprobes.h
-@@ -22,7 +22,7 @@
- 
- #define __ARCH_WANT_KPROBES_INSN_SLOT
- #define MAX_INSN_SIZE			1
--#define MAX_STACK_SIZE			128
-+#define MAX_STACK_SIZE			THREAD_SIZE
- 
- #define flush_insn_slot(p)		do { } while (0)
- #define kretprobe_blacklist_size	0
+Thanks.
 
 -- 
 Catalin
