@@ -1,132 +1,129 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Mon, 25 Jul 2016 16:01:49 +0100
-Subject: [RFC 3/6] dt/bindings: Add bindings for Tegra20/30 NOR bus driver
-In-Reply-To: <CALw8SCWouYF+CY7n67mFxyL2CFbY4k1oB7oySTU9WkSMqosFUA@mail.gmail.com>
-References: <1468935397-11926-1-git-send-email-mirza.krak@gmail.com>
- <1468935397-11926-4-git-send-email-mirza.krak@gmail.com>
- <20160725113034.GD21170@ulmo.ba.sec>
- <CALw8SCWEFVu__8Gyr5q995h+=oMQEz1VUNB=Ne7MRb0O-tZXqg@mail.gmail.com>
- <20160725141544.GN21170@ulmo.ba.sec>
- <CALw8SCWouYF+CY7n67mFxyL2CFbY4k1oB7oySTU9WkSMqosFUA@mail.gmail.com>
-Message-ID: <44b2703e-a417-eb3e-b154-6919dc6618d7@nvidia.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Mon, 25 Jul 2016 16:09:55 +0100
+Subject: [RFC PATCH v3 05/13] drivers: iommu: make iommu_fwspec OF agnostic
+In-Reply-To: <1469013815-24380-6-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1469013815-24380-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1469013815-24380-6-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <1499f802-5f98-b0c0-d3aa-dabcac81e84e@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Lorenzo,
 
-On 25/07/16 15:38, Mirza Krak wrote:
-> 2016-07-25 16:15 GMT+02:00 Thierry Reding <thierry.reding@gmail.com>:
->> On Mon, Jul 25, 2016 at 03:16:28PM +0200, Mirza Krak wrote:
->>> 2016-07-25 13:30 GMT+02:00 Thierry Reding <thierry.reding@gmail.com>:
->> [...]
->>>> The above suggests that one of the CAN controllers gets mapped to an
->>>> address 0x48000000 and the other gets mapped to 0x48040000. But why do
->>>> we even need a chip-select at all in that case? If both chips don't use
->>>> any overlapping memory region, what good does the chip-select do?
->>>
->>> If we take a look on similar controllers found on others SOCs they
->>> usually define an address range / chip-select.
->>>
->>> Example (weim):
->>> ranges = <
->>> 0 0 0x10000000 0x02000000
->>> 1 0 0x12000000 0x01000000
->>> 2 0 0x13000000 0x01000000
->>> 3 0 0x14000000 0x01000000
->>> 4 0 0x15000000 0x01000000
->>> 5 0 0x16000000 0x01000000
->>>> ;
->>>
->>> Which means that you all ready have an address mapped to PIN function.
->>>
->>> But Tegra GMI controller is a first for me, where you do not have this
->>> kind of setup in hardware. Usually you also have a timing register /
->>> chip-select so that you can connect different chip types.
->>>
->>> The lack of hardware support do decode an address to a chip-select PIN
->>> function, we have implemented this our self externally.
->>>
->>> We actually have 6 different chips connected to the GMI bus and the
->>> "ranges" would be:
->>>   ranges = <
->>>    0 0 0x48000000 0x00000100
->>>    1 0 0x48040000 0x00000100
->>>    2 0 0x48080000 0x00000100
->>>    3 0 0x480A0000 0x00000100
->>>    4 0 0x480C0000 0x00000100
->>>    5 0 0x480E0000 0x00000100
->>>   >;
->>>
->>> And this not nothing complicated, small number of AND gates and that is it.
->>>
->>> The chip-select signal is necessary for the access characteristics, so
->>> we need to translate an address to an chip-select so that the chip
->>> knows the host CPU wants to talk to it.
->>>
->>> Do not know if I made anything more clear here :).
->>
->> Yes, that clarifies many things. The presence of an external, address-
->> based chip-select is essential information in order to describe this
->> setup properly.
->>
->> Given that the external chip select is entirely invisible to software, I
->> think a more accurate description of your setup would be:
->>
->>         gmi at 70090000 {
->>                 ...
->>
->>                 /* for the chip select */
->>                 #address-cells = <1>;
->>                 #size-cells = <0>;
->>
->>                 /*
->>                  * Technically this could be used to translate the range from
->>                  * 0x48000000 to 0x4fffffff into a different range, but that
->>                  * no longer works because of the #address-cells. Does this
->>                  * matter?
->>                  */
->>                 ranges;
->>
->>                 bus at 0 {
->>                         compatible = "simple-bus";
->>                         reg = <0>;
->>
->>                         #address-cells = <1>;
->>                         #size-cells = <1>;
->>
->>                         can at 48000000 {
->>                                 reg = <0x48000000 0x100>;
->>                                 ...
->>                         };
->>
->>                         can at 48040000 {
->>                                 reg = <0x48040000 0x100>;
->>                                 ...
->>                         };
->>                 };
->>         };
->>
->> That omits any reference to the external chip select, which I think
->> makes sense because it's something that software is completely unaware
->> of.
->>
->> Perhaps one important question: does your setup use the GMI's CS lines
->> in any way? Or does it simply get ignored?
+On 20/07/16 12:23, Lorenzo Pieralisi wrote:
+> The iommu_fwspec structure, used to hold per device iommu configuration
+> data is not OF specific and therefore can be moved to a generic
+> and OF independent compilation unit.
 > 
-> Yes, we use the GMI`s CS line. It is important that is present because
-> it is ANDED with address lines and NOT ALE line. Especially since we
-> run the GMI controller in AD_MUX mode, which means that we use same
-> pins for address and data and the access happens in two phases, one
-> address latch phase where CS is not asserted but ALE is, second
-> read/write phase where CS must be asserted. In this case we need the
-> GMI`s CS line to determine which phase we are in.
+> In particular, the iommu_fwspec handling hinges on the device_node
+> pointer to identify the IOMMU device associated with the iommu_fwspec
+> structure, that is easily converted to a more generic fwnode_handle
+> pointer that can cater for OF and non-OF (ie ACPI) systems.
+> 
+> Create the files and related Kconfig entry to decouple iommu_fwspec
+> structure from the OF iommu kernel layer.
+> 
+> Given that the current iommu_fwspec implementation relies on
+> the arch specific struct device.archdata.iommu field in its
+> implementation, by making the code standalone and independent
+> of the OF layer this patch makes sure that the iommu_fwspec
+> kernel code can be selected only on arches implementing the
+> struct device.archdata.iommu field by adding an explicit
+> arch dependency in its config entry.
+> 
+> Current drivers using the iommu_fwspec for streamid translation
+> are converted to the new iommu_fwspec API by simply converting
+> the device_node to its fwnode_handle pointer.
+> 
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Hanjun Guo <hanjun.guo@linaro.org>
+> Cc: Robin Murphy <robin.murphy@arm.com>
+> Cc: Joerg Roedel <joro@8bytes.org>
+> ---
+>  drivers/iommu/Kconfig        |   4 ++
+>  drivers/iommu/Makefile       |   1 +
+>  drivers/iommu/arm-smmu-v3.c  |  13 +++--
+>  drivers/iommu/iommu-fwspec.c | 114 +++++++++++++++++++++++++++++++++++++++++++
+>  drivers/iommu/of_iommu.c     |  52 --------------------
+>  include/linux/iommu-fwspec.h |  60 +++++++++++++++++++++++
+>  include/linux/of_iommu.h     |  24 +++------
+>  7 files changed, 196 insertions(+), 72 deletions(-)
+>  create mode 100644 drivers/iommu/iommu-fwspec.c
+>  create mode 100644 include/linux/iommu-fwspec.h
+> 
+> diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
+> index d1c66af..2b26bfb 100644
+> --- a/drivers/iommu/Kconfig
+> +++ b/drivers/iommu/Kconfig
+> @@ -67,6 +67,10 @@ config OF_IOMMU
+>         def_bool y
+>         depends on OF && IOMMU_API
+>  
+> +config IOMMU_FWSPEC
+> +       def_bool y
+> +       depends on ARM64 && IOMMU_API
 
-Even though the CS is used, we could still implement the driver such
-that if only 1 CS is defined in the binding, we then statically program
-the configuration at probe. For now, if there is more than one, we can
-return an error from probe as it is not supported or default to the
-first CS defined and warn?
+I think that could be at least (ARM || ARM64).
 
-Jon
+> +
+>  # IOMMU-agnostic DMA-mapping layer
+>  config IOMMU_DMA
+>  	bool
 
--- 
-nvpublic
+[...]
+
+> diff --git a/include/linux/of_iommu.h b/include/linux/of_iommu.h
+> index 308791f..2362232 100644
+> --- a/include/linux/of_iommu.h
+> +++ b/include/linux/of_iommu.h
+> @@ -15,13 +15,8 @@ extern void of_iommu_init(void);
+>  extern const struct iommu_ops *of_iommu_configure(struct device *dev,
+>  					struct device_node *master_np);
+>  
+> -struct iommu_fwspec {
+> -	const struct iommu_ops	*iommu_ops;
+> -	struct device_node	*iommu_np;
+> -	void			*iommu_priv;
+> -	unsigned int		num_ids;
+> -	u32			ids[];
+> -};
+> +void of_iommu_set_ops(struct device_node *np, const struct iommu_ops *ops);
+> +const struct iommu_ops *of_iommu_get_ops(struct device_node *np);
+
+Is there some reason we need to retain the existing definitions of
+these? I was assuming we'd be able to move the entire implementation
+over to the fwspec code and leave behind nothing more than trivial
+wrappers, e.g.:
+
+#define of_iommu_get_ops(np) iommu_fwspec_get_ops(&(np)->fwnode_handle)
+
+Robin.
+
+>  #else
+>  
+> @@ -39,17 +34,14 @@ static inline const struct iommu_ops *of_iommu_configure(struct device *dev,
+>  	return NULL;
+>  }
+>  
+> -struct iommu_fwspec;
+> -
+> -#endif	/* CONFIG_OF_IOMMU */
+> +static inline void of_iommu_set_ops(struct device_node *np,
+> +				    const struct iommu_ops *ops)
+> +{ }
+>  
+> -int iommu_fwspec_init(struct device *dev, struct device_node *iommu_np);
+> -void iommu_fwspec_free(struct device *dev);
+> -int iommu_fwspec_add_ids(struct device *dev, u32 *ids, int num_ids);
+> -struct iommu_fwspec *dev_iommu_fwspec(struct device *dev);
+> +static inline const struct iommu_ops *
+> +of_iommu_get_ops(struct device_node *np) { return NULL; }
+>  
+> -void of_iommu_set_ops(struct device_node *np, const struct iommu_ops *ops);
+> -const struct iommu_ops *of_iommu_get_ops(struct device_node *np);
+> +#endif	/* CONFIG_OF_IOMMU */
+>  
+>  extern struct of_device_id __iommu_of_table;
+>  
+> 
