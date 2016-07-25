@@ -1,139 +1,40 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Mon, 25 Jul 2016 10:50:05 -0700
-Subject: [PATCH v4 00/12] mm: Hardened usercopy
-In-Reply-To: <93009d46-0171-7398-4add-98e09ade608b@redhat.com>
-References: <1469046427-12696-1-git-send-email-keescook@chromium.org>
- <93009d46-0171-7398-4add-98e09ade608b@redhat.com>
-Message-ID: <CAGXu5jJYYaedBZPoEWz5KROP=tn8hAmOepoC+gMpXkRn8SCyTw@mail.gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 25 Jul 2016 20:22:09 +0200
+Subject: [PATCH 14/18] ARM: mvebu: add support for the Armada 395 SoC
+ family
+In-Reply-To: <CAL_JsqL=bkzhjOTcOCeGNvKsAfYg0D=CypZs4sCsQ01pnbitoQ@mail.gmail.com>
+References: <1469105055-25181-1-git-send-email-jaz@semihalf.com>
+ <1469105055-25181-16-git-send-email-jaz@semihalf.com>
+ <20160721221605.GA21883@rob-hp-laptop>
+ <CAH76GKOidxFZ7R1pQZ2W9BRBCxEnLXNHQGrXbAUmouozBUj51Q@mail.gmail.com>
+ <CAL_JsqJeObuS8OWeErRA5MX-SrMtu_254A-LtP9-A=xdPO7p1Q@mail.gmail.com>
+ <20160725155050.3aee974e@free-electrons.com>
+ <CAL_JsqL=bkzhjOTcOCeGNvKsAfYg0D=CypZs4sCsQ01pnbitoQ@mail.gmail.com>
+Message-ID: <20160725202209.5fae4d98@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 22, 2016 at 5:36 PM, Laura Abbott <labbott@redhat.com> wrote:
-> On 07/20/2016 01:26 PM, Kees Cook wrote:
->>
->> Hi,
->>
->> [This is now in my kspp -next tree, though I'd really love to add some
->> additional explicit Tested-bys, Reviewed-bys, or Acked-bys. If you've
->> looked through any part of this or have done any testing, please consider
->> sending an email with your "*-by:" line. :)]
->>
->> This is a start of the mainline port of PAX_USERCOPY[1]. After writing
->> tests (now in lkdtm in -next) for Casey's earlier port[2], I kept tweaking
->> things further and further until I ended up with a whole new patch series.
->> To that end, I took Rik, Laura, and other people's feedback along with
->> additional changes and clean-ups.
->>
->> Based on my understanding, PAX_USERCOPY was designed to catch a
->> few classes of flaws (mainly bad bounds checking) around the use of
->> copy_to_user()/copy_from_user(). These changes don't touch get_user() and
->> put_user(), since these operate on constant sized lengths, and tend to be
->> much less vulnerable. There are effectively three distinct protections in
->> the whole series, each of which I've given a separate CONFIG, though this
->> patch set is only the first of the three intended protections. (Generally
->> speaking, PAX_USERCOPY covers what I'm calling CONFIG_HARDENED_USERCOPY
->> (this) and CONFIG_HARDENED_USERCOPY_WHITELIST (future), and
->> PAX_USERCOPY_SLABS covers CONFIG_HARDENED_USERCOPY_SPLIT_KMALLOC
->> (future).)
->>
->> This series, which adds CONFIG_HARDENED_USERCOPY, checks that objects
->> being copied to/from userspace meet certain criteria:
->> - if address is a heap object, the size must not exceed the object's
->>   allocated size. (This will catch all kinds of heap overflow flaws.)
->> - if address range is in the current process stack, it must be within the
->>   a valid stack frame (if such checking is possible) or at least entirely
->>   within the current process's stack. (This could catch large lengths that
->>   would have extended beyond the current process stack, or overflows if
->>   their length extends back into the original stack.)
->> - if the address range is part of kernel data, rodata, or bss, allow it.
->> - if address range is page-allocated, that it doesn't span multiple
->>   allocations (excepting Reserved and CMA pages).
->> - if address is within the kernel text, reject it.
->> - everything else is accepted
->>
->> The patches in the series are:
->> - Support for examination of CMA page types:
->>         1- mm: Add is_migrate_cma_page
->> - Support for arch-specific stack frame checking (which will likely be
->>   replaced in the future by Josh's more comprehensive unwinder):
->>         2- mm: Implement stack frame object validation
->> - The core copy_to/from_user() checks, without the slab object checks:
->>         3- mm: Hardened usercopy
->> - Per-arch enablement of the protection:
->>         4- x86/uaccess: Enable hardened usercopy
->>         5- ARM: uaccess: Enable hardened usercopy
->>         6- arm64/uaccess: Enable hardened usercopy
->>         7- ia64/uaccess: Enable hardened usercopy
->>         8- powerpc/uaccess: Enable hardened usercopy
->>         9- sparc/uaccess: Enable hardened usercopy
->>        10- s390/uaccess: Enable hardened usercopy
->> - The heap allocator implementation of object size checking:
->>        11- mm: SLAB hardened usercopy support
->>        12- mm: SLUB hardened usercopy support
->>
->> Some notes:
->>
->> - This is expected to apply on top of -next which contains fixes for the
->>   position of _etext on both arm and arm64, though it has some conflicts
->>   with KASAN that should be trivial to fix up. Also in -next are the
->>   tests for this protection (in lkdtm), prefixed with USERCOPY_.
->>
->> - I couldn't detect a measurable performance change with these features
->>   enabled. Kernel build times were unchanged, hackbench was unchanged,
->>   etc. I think we could flip this to "on by default" at some point, but
->>   for now, I'm leaving it off until I can get some more definitive
->>   measurements. I would love if someone with greater familiarity with
->>   perf could give this a spin and report results.
->>
->> - The SLOB support extracted from grsecurity seems entirely broken. I
->>   have no idea what's going on there, I spent my time testing SLAB and
->>   SLUB. Having someone else look at SLOB would be nice, but this series
->>   doesn't depend on it.
->>
->> Additional features that would be nice, but aren't blocking this series:
->>
->> - Needs more architecture support for stack frame checking (only x86 now,
->>   but it seems Josh will have a good solution for this soon).
->>
->>
->> Thanks!
->>
->> -Kees
->>
->> [1] https://grsecurity.net/download.php "grsecurity - test kernel patch"
->> [2] http://www.openwall.com/lists/kernel-hardening/2016/05/19/5
->>
->> v4:
->> - handle CMA pages, labbott
->> - update stack checker comments, labbott
->> - check for vmalloc addresses, labbott
->> - deal with KASAN in -next changing arm64 copy*user calls
->> - check for linear mappings at runtime instead of via CONFIG
->>
->> v3:
->> - switch to using BUG for better Oops integration
->> - when checking page allocations, check each for Reserved
->> - use enums for the stack check return for readability
->>
->> v2:
->> - added s390 support
->> - handle slub red zone
->> - disallow writes to rodata area
->> - stack frame walker now CONFIG-controlled arch-specific helper
->>
->
-> Do you have/plan to have LKDTM or the like tests for this? I started
-> reviewing
-> the slub code and was about to write some test cases for myself. I did that
-> for CMA as well which is a decent indicator these should all go somewhere.
+Hello,
 
-Yeah, there is an entire section of tests in lkdtm for the usercopy
-protection. I didn't add anything for CMA or multipage allocations
-yet, though. Feel free to add those if you have a moment! :) It's on
-my todo list.
+On Mon, 25 Jul 2016 10:12:43 -0500, Rob Herring wrote:
 
--Kees
+> Yes, I get that, but that is only meaningful if you want to run an OS
+> that is only aware of 395 on a 398 SoC/board (though I'd guess the 390
+> compat is enough for that). Otherwise, that property is not really
+> meaningful as the additional nodes are enough to handle what is the
+> superset.
+> 
+> I would agree both are fine if both chips are in fact the same die,
+> just fused or packaged differently. I've seen a lot of chips that are
+> supposed to be sub/supersets of each other, but have different errata
+> lists because they are different die.
 
+Unfortunately HW vendors are rarely willing to publicly indicate whether
+the different chips in their families are actually the same die fused
+differently, or really different dies.
+
+Thomas
 -- 
-Kees Cook
-Chrome OS & Brillo Security
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
