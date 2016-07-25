@@ -1,75 +1,76 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 25 Jul 2016 17:31:45 +0100
-Subject: [PATCH v9 4/9] clocksource/drivers/arm_arch_timer: use readq to
- get 64-bit CNTVCT
-In-Reply-To: <CADyBb7ubKceQiB7+u7sSA=1+9_VMUrGjiabf_FkN2-n4rq7Kgg@mail.gmail.com>
-References: <1469460427-8643-1-git-send-email-fu.wei@linaro.org>
- <1469460427-8643-5-git-send-email-fu.wei@linaro.org>
- <20160725153118.GD19209@arm.com>
- <CADyBb7ubKceQiB7+u7sSA=1+9_VMUrGjiabf_FkN2-n4rq7Kgg@mail.gmail.com>
-Message-ID: <20160725163144.GE19209@arm.com>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Mon, 25 Jul 2016 18:31:55 +0200
+Subject: [PATCH v11 10/10] genirq/msi: use the MSI doorbell's IOVA when
+ requested
+In-Reply-To: <alpine.DEB.2.11.1607201105310.3564@nanos>
+References: <1468933367-23159-1-git-send-email-eric.auger@redhat.com>
+ <1468933367-23159-11-git-send-email-eric.auger@redhat.com>
+ <alpine.DEB.2.11.1607201105310.3564@nanos>
+Message-ID: <08a930f2-8cc9-7d99-78c0-77d08ee40db3@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 25, 2016 at 11:55:49PM +0800, Fu Wei wrote:
-> On 25 July 2016 at 23:31, Will Deacon <will.deacon@arm.com> wrote:
-> > On Mon, Jul 25, 2016 at 11:27:02PM +0800, fu.wei at linaro.org wrote:
-> >> From: Fu Wei <fu.wei@linaro.org>
-> >>
-> >> This patch simplify arch_counter_get_cntvct_mem function by
-> >> using readq to get 64-bit CNTVCT value instead of readl_relaxed.
-> >>
-> >> Signed-off-by: Fu Wei <fu.wei@linaro.org>
-> >> ---
-> >>  drivers/clocksource/arm_arch_timer.c | 10 +---------
-> >>  1 file changed, 1 insertion(+), 9 deletions(-)
-> >>
-> >> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-> >> index e6fd42d..483d2f9 100644
-> >> --- a/drivers/clocksource/arm_arch_timer.c
-> >> +++ b/drivers/clocksource/arm_arch_timer.c
-> >> @@ -418,15 +418,7 @@ u32 arch_timer_get_rate(void)
-> >>
-> >>  static u64 arch_counter_get_cntvct_mem(void)
-> >>  {
-> >> -     u32 vct_lo, vct_hi, tmp_hi;
-> >> -
-> >> -     do {
-> >> -             vct_hi = readl_relaxed(arch_counter_base + CNTVCT_HI);
-> >> -             vct_lo = readl_relaxed(arch_counter_base + CNTVCT_LO);
-> >> -             tmp_hi = readl_relaxed(arch_counter_base + CNTVCT_HI);
-> >> -     } while (vct_hi != tmp_hi);
-> >> -
-> >> -     return ((u64) vct_hi << 32) | vct_lo;
-> >> +     return readq(arch_counter_base + CNTVCT_LO);
-> >
-> > Please drop this patch. It doesn't work.
+Hi Thomas,
+
+On 20/07/2016 11:09, Thomas Gleixner wrote:
+> On Tue, 19 Jul 2016, Eric Auger wrote:
 > 
-> I am OK to drop this, but could you let me know why it doesn't work?
+> First of all - valid for all patches:
 > 
-> I did get some problem on Foundation model about readq, but it works on Seattle.
-> I guess that is a problem of model, but not a code problem.
-> So I just got confused, why readq  doesn't work,  :-)
+> Subject: sys/subsys: Sentence starts with an uppercase letter
+OK understood.
+> 
+> Now for this particular one:
+> 
+> genirq/msi: use the MSI doorbell's IOVA when requested
+> 
+>> On MSI message composition we now use the MSI doorbell's IOVA in
+>> place of the doorbell's PA in case the device is upstream to an
+>> IOMMU that requires MSI addresses to be mapped. The doorbell's
+>> allocation and mapping happened on an early stage (pci_enable_msi).
+> 
+> This changelog is completely useless. At least I cannot figure out what that
+> patch actually does. And the implementation is not self explaining either.
 
-The kernel really needs to support both of those platforms :/
+>  
+>> @@ -63,10 +63,18 @@ static int msi_compose(struct irq_data *irq_data,
+>>  {
+>>  	int ret = 0;
+>>  
+>> -	if (erase)
+>> +	if (erase) {
+>>  		memset(msg, 0, sizeof(*msg));
+>> -	else
+>> +	} else {
+>> +		struct device *dev;
+>> +
+>>  		ret = irq_chip_compose_msi_msg(irq_data, msg);
+>> +		if (ret)
+>> +			return ret;
+>> +
+>> +		dev = msi_desc_to_dev(irq_data_get_msi_desc(irq_data));
+>> +		WARN_ON(iommu_msi_msg_pa_to_va(dev, msg));
+> 
+> What the heck is this call doing? And why is there only a WARN_ON and not a
+> proper error return code handling?
 
-For the memory-mapped counter registers, the architecture says:
+iommu_msi_msg_pa_to_va is part of the new iommu-msi API introduced in PART I of
+this series. This helper function detects the physical address found in the
+MSI message has a corresponding allocated IOVA. This happens if the MSI doorbell
+is accessed through an IOMMU and this IOMMU do not bypass the MSI addresses
+(ARM case). Allocation of this IOVA was performed in the previous patch.
 
-  `If the implementation supports 64-bit atomic accesses, then the
-   CNTV_CVAL register must be accessible as an atomic 64-bit value.'
+So, if this is the case, the physical address is swapped with the IOVA
+address. That way the PCIe device will send the MSI with this IOVA and
+the address will be translated by the IOMMU into the target MSI doorbell PA.
 
-which is borderline tautological. If we take the generous reading that
-this means AArch64 CPUs can use readq (and I'm not completely
-comfortable with that assertion, particularly as you say that it breaks
-the model), then you still need to use readq_relaxed here to avoid a
-DSB. Furthermore, what are you going to do for AArch32? readq doesn't
-exist over there, and if you use the generic implementation then it's
-not atomic. In which case, we end up with the current code, as well as a
-readq_relaxed guarded by a questionable #ifdef that is known to break a
-supported platform for an unknown performance improvement. Hardly a big
-win.
+Hope this clarifies
 
-Did you see any performance advantage from this? Given that you've added
-a DSB, this looks to be extremely premature.
+Thanks
 
-Will
+Eric 
+> 
+> Thanks,
+> 
+> 	tglx
+> 
