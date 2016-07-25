@@ -1,54 +1,139 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Mon, 25 Jul 2016 12:42:27 -0500
-Subject: [PATCH] PCI: xilinx: Modify error handling
-In-Reply-To: <20160629151820.GA14282@amitoj-Inspiron-3542>
-References: <20160629151820.GA14282@amitoj-Inspiron-3542>
-Message-ID: <20160725174227.GE12484@localhost>
+From: keescook@chromium.org (Kees Cook)
+Date: Mon, 25 Jul 2016 10:50:05 -0700
+Subject: [PATCH v4 00/12] mm: Hardened usercopy
+In-Reply-To: <93009d46-0171-7398-4add-98e09ade608b@redhat.com>
+References: <1469046427-12696-1-git-send-email-keescook@chromium.org>
+ <93009d46-0171-7398-4add-98e09ade608b@redhat.com>
+Message-ID: <CAGXu5jJYYaedBZPoEWz5KROP=tn8hAmOepoC+gMpXkRn8SCyTw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 29, 2016 at 08:48:20PM +0530, Amitoj Kaur Chawla wrote:
-> Failure of of_get_next_child returns NULL, not an ERR_PTR. Use
-> appropriate error code -ENODEV to be returned on failure instead.
-> 
-> The Coccinelle semantic patch used to find this issue is as follows:
-> @@
-> expression E,E1;
-> @@
-> 
-> if (
-> *   E == NULL
->    ) { <+... when != E = E1
->         PTR_ERR(E)
->        ...+> }
-> 
-> Signed-off-by: Amitoj Kaur Chawla <amitoj1606@gmail.com>
-> ---
->  drivers/pci/host/pcie-xilinx.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/pci/host/pcie-xilinx.c b/drivers/pci/host/pcie-xilinx.c
-> index 65f0fe0..d76ea8d 100644
-> --- a/drivers/pci/host/pcie-xilinx.c
-> +++ b/drivers/pci/host/pcie-xilinx.c
-> @@ -550,7 +550,7 @@ static int xilinx_pcie_init_irq_domain(struct xilinx_pcie_port *port)
->  	pcie_intc_node = of_get_next_child(node, NULL);
->  	if (!pcie_intc_node) {
->  		dev_err(dev, "No PCIe Intc node found\n");
-> -		return PTR_ERR(pcie_intc_node);
-> +		return -ENODEV;
+On Fri, Jul 22, 2016 at 5:36 PM, Laura Abbott <labbott@redhat.com> wrote:
+> On 07/20/2016 01:26 PM, Kees Cook wrote:
+>>
+>> Hi,
+>>
+>> [This is now in my kspp -next tree, though I'd really love to add some
+>> additional explicit Tested-bys, Reviewed-bys, or Acked-bys. If you've
+>> looked through any part of this or have done any testing, please consider
+>> sending an email with your "*-by:" line. :)]
+>>
+>> This is a start of the mainline port of PAX_USERCOPY[1]. After writing
+>> tests (now in lkdtm in -next) for Casey's earlier port[2], I kept tweaking
+>> things further and further until I ended up with a whole new patch series.
+>> To that end, I took Rik, Laura, and other people's feedback along with
+>> additional changes and clean-ups.
+>>
+>> Based on my understanding, PAX_USERCOPY was designed to catch a
+>> few classes of flaws (mainly bad bounds checking) around the use of
+>> copy_to_user()/copy_from_user(). These changes don't touch get_user() and
+>> put_user(), since these operate on constant sized lengths, and tend to be
+>> much less vulnerable. There are effectively three distinct protections in
+>> the whole series, each of which I've given a separate CONFIG, though this
+>> patch set is only the first of the three intended protections. (Generally
+>> speaking, PAX_USERCOPY covers what I'm calling CONFIG_HARDENED_USERCOPY
+>> (this) and CONFIG_HARDENED_USERCOPY_WHITELIST (future), and
+>> PAX_USERCOPY_SLABS covers CONFIG_HARDENED_USERCOPY_SPLIT_KMALLOC
+>> (future).)
+>>
+>> This series, which adds CONFIG_HARDENED_USERCOPY, checks that objects
+>> being copied to/from userspace meet certain criteria:
+>> - if address is a heap object, the size must not exceed the object's
+>>   allocated size. (This will catch all kinds of heap overflow flaws.)
+>> - if address range is in the current process stack, it must be within the
+>>   a valid stack frame (if such checking is possible) or at least entirely
+>>   within the current process's stack. (This could catch large lengths that
+>>   would have extended beyond the current process stack, or overflows if
+>>   their length extends back into the original stack.)
+>> - if the address range is part of kernel data, rodata, or bss, allow it.
+>> - if address range is page-allocated, that it doesn't span multiple
+>>   allocations (excepting Reserved and CMA pages).
+>> - if address is within the kernel text, reject it.
+>> - everything else is accepted
+>>
+>> The patches in the series are:
+>> - Support for examination of CMA page types:
+>>         1- mm: Add is_migrate_cma_page
+>> - Support for arch-specific stack frame checking (which will likely be
+>>   replaced in the future by Josh's more comprehensive unwinder):
+>>         2- mm: Implement stack frame object validation
+>> - The core copy_to/from_user() checks, without the slab object checks:
+>>         3- mm: Hardened usercopy
+>> - Per-arch enablement of the protection:
+>>         4- x86/uaccess: Enable hardened usercopy
+>>         5- ARM: uaccess: Enable hardened usercopy
+>>         6- arm64/uaccess: Enable hardened usercopy
+>>         7- ia64/uaccess: Enable hardened usercopy
+>>         8- powerpc/uaccess: Enable hardened usercopy
+>>         9- sparc/uaccess: Enable hardened usercopy
+>>        10- s390/uaccess: Enable hardened usercopy
+>> - The heap allocator implementation of object size checking:
+>>        11- mm: SLAB hardened usercopy support
+>>        12- mm: SLUB hardened usercopy support
+>>
+>> Some notes:
+>>
+>> - This is expected to apply on top of -next which contains fixes for the
+>>   position of _etext on both arm and arm64, though it has some conflicts
+>>   with KASAN that should be trivial to fix up. Also in -next are the
+>>   tests for this protection (in lkdtm), prefixed with USERCOPY_.
+>>
+>> - I couldn't detect a measurable performance change with these features
+>>   enabled. Kernel build times were unchanged, hackbench was unchanged,
+>>   etc. I think we could flip this to "on by default" at some point, but
+>>   for now, I'm leaving it off until I can get some more definitive
+>>   measurements. I would love if someone with greater familiarity with
+>>   perf could give this a spin and report results.
+>>
+>> - The SLOB support extracted from grsecurity seems entirely broken. I
+>>   have no idea what's going on there, I spent my time testing SLAB and
+>>   SLUB. Having someone else look at SLOB would be nice, but this series
+>>   doesn't depend on it.
+>>
+>> Additional features that would be nice, but aren't blocking this series:
+>>
+>> - Needs more architecture support for stack frame checking (only x86 now,
+>>   but it seems Josh will have a good solution for this soon).
+>>
+>>
+>> Thanks!
+>>
+>> -Kees
+>>
+>> [1] https://grsecurity.net/download.php "grsecurity - test kernel patch"
+>> [2] http://www.openwall.com/lists/kernel-hardening/2016/05/19/5
+>>
+>> v4:
+>> - handle CMA pages, labbott
+>> - update stack checker comments, labbott
+>> - check for vmalloc addresses, labbott
+>> - deal with KASAN in -next changing arm64 copy*user calls
+>> - check for linear mappings at runtime instead of via CONFIG
+>>
+>> v3:
+>> - switch to using BUG for better Oops integration
+>> - when checking page allocations, check each for Reserved
+>> - use enums for the stack check return for readability
+>>
+>> v2:
+>> - added s390 support
+>> - handle slub red zone
+>> - disallow writes to rodata area
+>> - stack frame walker now CONFIG-controlled arch-specific helper
+>>
+>
+> Do you have/plan to have LKDTM or the like tests for this? I started
+> reviewing
+> the slub code and was about to write some test cases for myself. I did that
+> for CMA as well which is a decent indicator these should all go somewhere.
 
-This fix is included in the patch posted by Christophe JAILLET
-<christophe.jaillet@wanadoo.fr>, along with two other similar fixes.
-I applied Christophe's patch to pci/host-xilinx for v4.8.
+Yeah, there is an entire section of tests in lkdtm for the usercopy
+protection. I didn't add anything for CMA or multipage allocations
+yet, though. Feel free to add those if you have a moment! :) It's on
+my todo list.
 
->  	}
->  
->  	port->irq_domain = irq_domain_add_linear(pcie_intc_node, 4,
-> -- 
-> 1.9.1
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+-Kees
+
+-- 
+Kees Cook
+Chrome OS & Brillo Security
