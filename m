@@ -1,91 +1,117 @@
-From: mitchelh@codeaurora.org (Mitchel Humpherys)
-Date: Mon, 25 Jul 2016 12:16:43 -0700
-Subject: [PATCH v4 0/6] Add support for privileged mappings
-Message-ID: <20160725191649.13414-1-mitchelh@codeaurora.org>
+From: labbott@redhat.com (Laura Abbott)
+Date: Mon, 25 Jul 2016 12:16:24 -0700
+Subject: [PATCH v4 12/12] mm: SLUB hardened usercopy support
+In-Reply-To: <1469046427-12696-13-git-send-email-keescook@chromium.org>
+References: <1469046427-12696-1-git-send-email-keescook@chromium.org>
+ <1469046427-12696-13-git-send-email-keescook@chromium.org>
+Message-ID: <0f980e84-b587-3d9e-3c26-ad57f947c08b@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following patch to the ARM SMMU driver:
+On 07/20/2016 01:27 PM, Kees Cook wrote:
+> Under CONFIG_HARDENED_USERCOPY, this adds object size checking to the
+> SLUB allocator to catch any copies that may span objects. Includes a
+> redzone handling fix discovered by Michael Ellerman.
+>
+> Based on code from PaX and grsecurity.
+>
+> Signed-off-by: Kees Cook <keescook@chromium.org>
+> Tested-by: Michael Ellerman <mpe@ellerman.id.au>
+> ---
+>  init/Kconfig |  1 +
+>  mm/slub.c    | 36 ++++++++++++++++++++++++++++++++++++
+>  2 files changed, 37 insertions(+)
+>
+> diff --git a/init/Kconfig b/init/Kconfig
+> index 798c2020ee7c..1c4711819dfd 100644
+> --- a/init/Kconfig
+> +++ b/init/Kconfig
+> @@ -1765,6 +1765,7 @@ config SLAB
+>
+>  config SLUB
+>  	bool "SLUB (Unqueued Allocator)"
+> +	select HAVE_HARDENED_USERCOPY_ALLOCATOR
+>  	help
+>  	   SLUB is a slab allocator that minimizes cache line usage
+>  	   instead of managing queues of cached objects (SLAB approach).
+> diff --git a/mm/slub.c b/mm/slub.c
+> index 825ff4505336..7dee3d9a5843 100644
+> --- a/mm/slub.c
+> +++ b/mm/slub.c
+> @@ -3614,6 +3614,42 @@ void *__kmalloc_node(size_t size, gfp_t flags, int node)
+>  EXPORT_SYMBOL(__kmalloc_node);
+>  #endif
+>
+> +#ifdef CONFIG_HARDENED_USERCOPY
+> +/*
+> + * Rejects objects that are incorrectly sized.
+> + *
+> + * Returns NULL if check passes, otherwise const char * to name of cache
+> + * to indicate an error.
+> + */
+> +const char *__check_heap_object(const void *ptr, unsigned long n,
+> +				struct page *page)
+> +{
+> +	struct kmem_cache *s;
+> +	unsigned long offset;
+> +	size_t object_size;
+> +
+> +	/* Find object and usable object size. */
+> +	s = page->slab_cache;
+> +	object_size = slab_ksize(s);
+> +
+> +	/* Find offset within object. */
+> +	offset = (ptr - page_address(page)) % s->size;
+> +
+> +	/* Adjust for redzone and reject if within the redzone. */
+> +	if (kmem_cache_debug(s) && s->flags & SLAB_RED_ZONE) {
+> +		if (offset < s->red_left_pad)
+> +			return s->name;
+> +		offset -= s->red_left_pad;
+> +	}
+> +
+> +	/* Allow address range falling entirely within object size. */
+> +	if (offset <= object_size && n <= object_size - offset)
+> +		return NULL;
+> +
+> +	return s->name;
+> +}
+> +#endif /* CONFIG_HARDENED_USERCOPY */
+> +
 
-    commit d346180e70b91b3d5a1ae7e5603e65593d4622bc
-    Author: Robin Murphy <robin.murphy@arm.com>
-    Date:   Tue Jan 26 18:06:34 2016 +0000
-    
-        iommu/arm-smmu: Treat all device transactions as unprivileged
+I compared this against what check_valid_pointer does for SLUB_DEBUG
+checking. I was hoping we could utilize that function to avoid
+duplication but a) __check_heap_object needs to allow accesses anywhere
+in the object, not just the beginning b) accessing page->objects
+is racy without the addition of locking in SLUB_DEBUG.
 
-started forcing all SMMU transactions to come through as "unprivileged".
-The rationale given was that:
+Still, the ptr < page_address(page) check from __check_heap_object would
+be good to add to avoid generating garbage large offsets and trying to
+infer C math.
 
-  (1) There is no way in the IOMMU API to even request privileged mappings.
+diff --git a/mm/slub.c b/mm/slub.c
+index 7dee3d9..5370e4f 100644
+--- a/mm/slub.c
++++ b/mm/slub.c
+@@ -3632,6 +3632,9 @@ const char *__check_heap_object(const void *ptr, unsigned long n,
+         s = page->slab_cache;
+         object_size = slab_ksize(s);
+  
++       if (ptr < page_address(page))
++               return s->name;
++
+         /* Find offset within object. */
+         offset = (ptr - page_address(page)) % s->size;
+  
 
-  (2) It's difficult to implement a DMA mapper that correctly models the
-      ARM VMSAv8 behavior of unprivileged-writeable =>
-      privileged-execute-never.
+With that, you can add
 
-This series rectifies (1) by introducing an IOMMU API for privileged
-mappings and implements it in io-pgtable-arm.
+Reviwed-by: Laura Abbott <labbott@redhat.com>
 
-This series rectifies (2) by introducing a new dma attribute
-(DMA_ATTR_PRIVILEGED) for users of the DMA API that need privileged
-mappings which are inaccessible to lesser-privileged execution levels, and
-implements it in the arm64 IOMMU DMA mapper.  The one known user (pl330.c)
-is converted over to the new attribute.
+>  static size_t __ksize(const void *object)
+>  {
+>  	struct page *page;
+>
 
-Jordan and Jeremy can provide more info on the use case if needed, but the
-high level is that it's a security feature to prevent attacks such as [1].
-
-Joerg, the v3 series was previously acked by Will [2].  He also recommended
-that we take all of this through your tree since it's touching multiple
-subsystems [3].  Can you please take a look?  Thanks!
-
-[1] https://github.com/robclark/kilroy
-[2] http://article.gmane.org/gmane.linux.kernel.iommu/14617
-[3] http://article.gmane.org/gmane.linux.kernel/2272531
-
-Changelog:
-
-  v3..v4
-
-    - Rebased and reworked on linux next due to the dma attrs rework going
-      on over there.  Patches changed: 3/6, 4/6, and 5/6.
-
-  v2..v3
-
-    - Incorporated feedback from Robin:
-      * Various comments and re-wordings.
-      * Use existing bit definitions for IOMMU_PRIV implementation
-        in io-pgtable-arm.
-      * Renamed and redocumented dma_direction_to_prot.
-      * Don't worry about executability in new DMA attr.
-
-  v1..v2
-
-    - Added a new DMA attribute to make executable privileged mappings
-      work, and use that in the pl330 driver (suggested by Will).
-
-
-Jeremy Gebben (1):
-  iommu/io-pgtable-arm: add support for the IOMMU_PRIV flag
-
-Mitchel Humpherys (5):
-  iommu: add IOMMU_PRIV attribute
-  common: DMA-mapping: add DMA_ATTR_PRIVILEGED attribute
-  arm64/dma-mapping: Implement DMA_ATTR_PRIVILEGED
-  dmaengine: pl330: Make sure microcode is privileged
-  Revert "iommu/arm-smmu: Treat all device transactions as unprivileged"
-
- Documentation/DMA-attributes.txt | 10 ++++++++++
- arch/arm64/mm/dma-mapping.c      |  6 +++---
- drivers/dma/pl330.c              |  6 ++++--
- drivers/iommu/arm-smmu.c         |  5 +----
- drivers/iommu/dma-iommu.c        | 16 +++++++++++-----
- drivers/iommu/io-pgtable-arm.c   |  5 ++++-
- include/linux/dma-iommu.h        |  3 ++-
- include/linux/dma-mapping.h      |  6 ++++++
- include/linux/iommu.h            |  1 +
- 9 files changed, 42 insertions(+), 16 deletions(-)
-
--- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Thanks,
+Laura
