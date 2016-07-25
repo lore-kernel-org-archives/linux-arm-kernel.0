@@ -1,173 +1,180 @@
-From: dennis.chen@arm.com (Dennis Chen)
-Date: Mon, 25 Jul 2016 13:53:32 +0800
-Subject: [RFC PATCH v3 00/13] ACPI IORT ARM SMMU v3 support
-In-Reply-To: <1469013815-24380-1-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1469013815-24380-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <20160725055330.GA21004@arm.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Mon, 25 Jul 2016 11:27:21 +0530
+Subject: [PATCH 2/3] phy: rockchip-emmc: Be tolerant to card clock of 0 in
+ power on
+In-Reply-To: <CAPDyKFqPHB2O=-hDxVda-h04WS9xYpJ3MyzH8bk5Fc4ogTfB5A@mail.gmail.com>
+References: <1467049167-14628-1-git-send-email-dianders@chromium.org>
+ <1467049167-14628-3-git-send-email-dianders@chromium.org>
+ <5773D1FD.8020601@ti.com>
+ <CAD=FV=U_-8HJRjWa8ktT=7tmM5RB4OVnDce-Bv2teDibYfbCeA@mail.gmail.com>
+ <CAPDyKFqPHB2O=-hDxVda-h04WS9xYpJ3MyzH8bk5Fc4ogTfB5A@mail.gmail.com>
+Message-ID: <5795AA41.7070604@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
-On Wed, Jul 20, 2016 at 12:23:22PM +0100, Lorenzo Pieralisi wrote:
-> This RFC patch series is v3 of a previous posting:
-> 
-> https://lkml.org/lkml/2016/6/7/523
-> 
-> v2 -> v3
-> 	- Rebased on top of dependencies series [1][2][3](v4.7-rc3)
-> 	- Added back reliance on ACPI early probing infrastructure
-> 	- Patch[1-3] merged through other dependent series
-> 	- Added back IOMMU fwnode generalization
-> 	- Move SMMU v3 static functions configuration to IORT code
-> 	- Implemented generic IOMMU fwspec API
-> 	- Added code to implement fwnode platform device look-up
-> 
-> v1 -> v2:
-> 	- Rebased on top of dependencies series [1][2][3](v4.7-rc1)
-> 	- Removed IOMMU fwnode generalization
-> 	- Implemented ARM SMMU v3 ACPI probing instead of ARM SMMU v2
-> 	  owing to patch series dependencies [1]
-> 	- Moved platform device creation logic to IORT code to
-> 	  generalize its usage for ARM SMMU v1-v2-v3 components
-> 	- Removed reliance on ACPI early device probing
-> 	- Created IORT specific iommu_xlate() translation hook leaving
-> 	  OF code unchanged according to v1 reviews
-> 
-> The ACPI IORT table provides information that allows instantiating
-> ARM SMMU devices and carrying out id mappings between components on
-> ARM based systems (devices, IOMMUs, interrupt controllers).
-> 
-> http://infocenter.arm.com/help/topic/com.arm.doc.den0049b/DEN0049B_IO_Remapping_Table.pdf
-> 
-> Building on basic IORT support, available through [2]:
-> 
-> this patchset enables ARM SMMU v3 support on ACPI systems.
-> 
-> Most of the code is aimed at building the required generic ACPI
-> infrastructure to create and enable IOMMU components and to bring
-> the IOMMU infrastructure for ACPI on par with DT, which is going to
-> make future ARM SMMU components easier to integrate.
-> 
-> PATCH (1) adds a FWNODE_IOMMU type to the struct fwnode_handle type.
->           It is required to attach a fwnode identifier to platform
->           devices allocated/detected through IORT tables entries;
->           IOMMU devices have to have an identifier to look them up
->           eg IOMMU core layer carrying out id translation. This can be
->           done through a fwnode_handle (ie IOMMU platform devices created
->           out of IORT tables are not ACPI devices hence they can't be
->           allocated as such, otherwise they would have a fwnode_handle of
->           type FWNODE_ACPI). This patch requires discussion and it is key
->           to the RFC.
-> 
-> PATCH (2) makes use of the ACPI early probing API to add a linker script
->           section for probing devices via IORT ACPI kernel code.
-> 
-> PATCH (3) provides IORT support for registering IOMMU IORT node through
->           their fwnode handle.
-> 
-> PATCH (4) implements core code fwnode based platform devices look-up.
-> 
-> PATCH (5) extends iommu_fwspec so that it can be used on ACPI based
->           system by creating a generic IOMMU fwspec kernel layer.
-> 
-> PATCH (6) implements the of_dma_configure() API in ACPI world -
->           acpi_dma_configure() - and patches PCI and ACPI core code to
->           start making use of it.
-> 
-> PATCH (7) provides an IORT function to detect existence of specific type
->           of IORT components.
-> 
-> PATCH (8) creates the kernel infrastructure required to create ARM SMMU
->           platform devices for IORT nodes.
-> 
-> PATCH (9) refactors the ARM SMMU v3 driver so that the init functions are
->           split in a way that groups together code that probes through DT
->           and code that carries out HW registers FW agnostic probing, in
->           preparation for adding the ACPI probing path.
-> 
-> PATCH (10) rework ARM SMMU v3 platform driver registration to make it work
->            on ACPI systems.
-> 
-> PATCH (11) Building on patch (8), it adds ARM SMMU v3 IORT IOMMU
->            operations to create and probe ARM SMMU v3 components.
-> 
-> PATCH (12) Extend the IORT iort_node_map_rid() to work on a type mask
->            instead of a single type so that the translation API can
->            be used on a range of components.
-> 
-> PATCH (13) provides IORT infrastructure to carry out IOMMU configuration
->            for devices and hook it up to the previously introduced ACPI
->            DMA configure API.
-> 
-> This patchset is built on top and depends on these three patch series:
-> 
-> [1] R.Murphy "Generic DT bindings for PCI and ARM SMMU v3" v4
->     https://marc.info/?l=devicetree&m=146739193215518&w=2
-> 
-> [2] T.Nowicki "Introduce ACPI world to ITS irqchip" v7
->     https://marc.info/?l=linux-arm-kernel&m=146642080022289&w=2
-> 
-> [3] T.Nowicki "Support for ARM64 ACPI based PCI host controller" v8
->     http://marc.info/?l=linux-acpi&m=146462129816292&w=2
-> 
-> and is provided for early review/testing purposes here:
-> 
-> git://git.kernel.org/pub/scm/linux/kernel/git/lpieralisi/linux.git acpi/iort-smmu-v3i
->
-I thought I can got all the 13 patches applied with the above git tree, but I can't find
-any ACPI related stuff after I cloned the git repos to my local machine, am I missing
-something here?
+Ulf,
 
-Thanks,
-Dennis
+On Saturday 23 July 2016 03:09 PM, Ulf Hansson wrote:
+> On 29 June 2016 at 17:18, Doug Anderson <dianders@chromium.org> wrote:
+>> Kishon,
+>>
+>> On Wed, Jun 29, 2016 at 6:49 AM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+>>> Hi,
+>>>
+>>> On Monday 27 June 2016 11:09 PM, Douglas Anderson wrote:
+>>>> It's possible that there are some reasons to turn the PHY on while the
+>>>> clock is 0.  In this case we just won't wait for the DLL to lock.
+>>>>
+>>>> This is a bit of a stopgap until we figure out exactly when we're
+>>>> supposed to wait for the DLL to lock and when we're supposed to power
+>>>> cycle the PHY.
+>>>>
+>>>> Note: this patch should help with suspend/resume where the system will
+>>>> try to turn the PHY back on when the clock is 0.
+>>>>
+>>>> Signed-off-by: Douglas Anderson <dianders@chromium.org>
+>>>> ---
+>>>>  drivers/phy/phy-rockchip-emmc.c | 59 ++++++++++++++++++++++++++---------------
+>>>>  1 file changed, 37 insertions(+), 22 deletions(-)
+>>>>
+>>>> diff --git a/drivers/phy/phy-rockchip-emmc.c b/drivers/phy/phy-rockchip-emmc.c
+>>>> index 9dce958233a0..a2aa6aca7dec 100644
+>>>> --- a/drivers/phy/phy-rockchip-emmc.c
+>>>> +++ b/drivers/phy/phy-rockchip-emmc.c
+>>>> @@ -88,15 +88,36 @@ static int rockchip_emmc_phy_power(struct phy *phy, bool on_off)
+>>>>       unsigned int caldone;
+>>>>       unsigned int dllrdy;
+>>>>       unsigned int freqsel = PHYCTRL_FREQSEL_200M;
+>>>> +     unsigned long rate;
+>>>>       unsigned long timeout;
+>>>>
+>>>> -     if (rk_phy->emmcclk != NULL) {
+>>>> -             unsigned long rate = clk_get_rate(rk_phy->emmcclk);
+>>>> +     /*
+>>>> +      * Keep phyctrl_pdb and phyctrl_endll low to allow
+>>>> +      * initialization of CALIO state M/C DFFs
+>>>> +      */
+>>>> +     regmap_write(rk_phy->reg_base,
+>>>> +                  rk_phy->reg_offset + GRF_EMMCPHY_CON6,
+>>>> +                  HIWORD_UPDATE(PHYCTRL_PDB_PWR_OFF,
+>>>> +                                PHYCTRL_PDB_MASK,
+>>>> +                                PHYCTRL_PDB_SHIFT));
+>>>> +     regmap_write(rk_phy->reg_base,
+>>>> +                  rk_phy->reg_offset + GRF_EMMCPHY_CON6,
+>>>> +                  HIWORD_UPDATE(PHYCTRL_ENDLL_DISABLE,
+>>>> +                                PHYCTRL_ENDLL_MASK,
+>>>> +                                PHYCTRL_ENDLL_SHIFT));
+>>>> +
+>>>> +     /* Already finish power_off above */
+>>>> +     if (on_off == PHYCTRL_PDB_PWR_OFF)
+>>>> +             return 0;
+>>>> +
+>>>> +     rate = clk_get_rate(rk_phy->emmcclk);
+>>>> +
+>>>> +     if (rate != 0) {
+>>>>               unsigned long ideal_rate;
+>>>>               unsigned long diff;
+>>>>
+>>>>               switch (rate) {
+>>>> -             case 0 ... 74999999:
+>>>> +             case 1 ... 74999999:
+>>>>                       ideal_rate = 50000000;
+>>>>                       freqsel = PHYCTRL_FREQSEL_50M;
+>>>>                       break;
+>>>> @@ -127,25 +148,6 @@ static int rockchip_emmc_phy_power(struct phy *phy, bool on_off)
+>>>>       }
+>>>>
+>>>>       /*
+>>>> -      * Keep phyctrl_pdb and phyctrl_endll low to allow
+>>>> -      * initialization of CALIO state M/C DFFs
+>>>> -      */
+>>>> -     regmap_write(rk_phy->reg_base,
+>>>> -                  rk_phy->reg_offset + GRF_EMMCPHY_CON6,
+>>>> -                  HIWORD_UPDATE(PHYCTRL_PDB_PWR_OFF,
+>>>> -                                PHYCTRL_PDB_MASK,
+>>>> -                                PHYCTRL_PDB_SHIFT));
+>>>> -     regmap_write(rk_phy->reg_base,
+>>>> -                  rk_phy->reg_offset + GRF_EMMCPHY_CON6,
+>>>> -                  HIWORD_UPDATE(PHYCTRL_ENDLL_DISABLE,
+>>>> -                                PHYCTRL_ENDLL_MASK,
+>>>> -                                PHYCTRL_ENDLL_SHIFT));
+>>>> -
+>>>> -     /* Already finish power_off above */
+>>>> -     if (on_off == PHYCTRL_PDB_PWR_OFF)
+>>>> -             return 0;
+>>>> -
+>>>> -     /*
+>>>>        * According to the user manual, calpad calibration
+>>>>        * cycle takes more than 2us without the minimal recommended
+>>>>        * value, so we may need a little margin here
+>>>> @@ -183,6 +185,19 @@ static int rockchip_emmc_phy_power(struct phy *phy, bool on_off)
+>>>>                    HIWORD_UPDATE(PHYCTRL_ENDLL_ENABLE,
+>>>>                                  PHYCTRL_ENDLL_MASK,
+>>>>                                  PHYCTRL_ENDLL_SHIFT));
+>>>> +
+>>>> +     /*
+>>>> +      * We turned on the DLL even though the rate was 0 because we the
+>>>> +      * clock might be turned on later.  ...but we can't wait for the DLL
+>>>> +      * to lock when the rate is 0 because it will never lock with no
+>>>> +      * input clock.
+>>>> +      *
+>>>> +      * Technically we should be checking the lock later when the clock
+>>>> +      * is turned on, but for now we won't.
+>>>> +      */
+>>>> +     if (rate == 0)
+>>>> +             return 0;
+>>>
+>>> Why not return initially from rockchip_emmc_phy_power if the clock rate is '0'.
+>>> Are there other functions to lock the DLL apart from phy_power?
+>>
+>> Yeah, it's a big ugly right now.  This ugliness is really needed
+>> because of <https://patchwork.kernel.org/patch/9201035/> because:
+>>
+>> 1. We power on the PHY at probe time and the card clock is in an
+>> unknown state at that time.  It will be reported as 0 right now, but
+>> it may or may not actually be 0.
+>>
+>> 2. We don't have an easy way to call back into the PHY when we
+>> actually set the clock to a low rate (like 400kHz) for ID mode.
+>> Before this series I tried to power the PHY off and on for every clock
+>> change, but apparently that was causing problems.
+>>
+>>
+>> As talked about in <https://patchwork.kernel.org/patch/9201035/>, I
+>> think the right answer is to figure out how to get the common clock
+>> framework notifications to happen for the card clock and then remove
+>> the wholesale PHY power off / power on for every clock change.  The
+>> PHY itself can register for the clock change notifications and figure
+>> out how much or how little to do on every clock change.
+>>
+>> Unfortunately, as also discussed in the other patch, it's not trivial
+>> to do this because I think it requires surgery on the main SDHCI
+>> driver to change the way it deals with the card clock.  I'm not sure I
+>> have time for this delicate surgery right now and I'm hoping that
+>> perhaps Shawn will be able to help figure something out (maybe?) or I
+>> can try coming back to it later.
+>>
+>>
+>> In any case, I think a wholesale revert of my previous 150 MHz series
+>> probably puts us in a worse state than we started with, so I was just
+>> proposing reverting the one patch.  Once we do that, this PHY patch
+>> helps keep us in a sane state (keeps suspend/resume working).
+>>
+>>
+>> -Doug
 > 
-> Tested on FVP models for ARM SMMU v3 probing path.
+> Doug, Kishon,
 > 
-> Lorenzo Pieralisi (13):
->   drivers: iommu: add FWNODE_IOMMU fwnode type
->   drivers: acpi: iort: introduce linker section for IORT entries probing
->   drivers: acpi: iort: add support for IOMMU fwnode registration
->   drivers: platform: add fwnode base platform devices retrieval
->   drivers: iommu: make iommu_fwspec OF agnostic
->   drivers: acpi: implement acpi_dma_configure
->   drivers: acpi: iort: add node match function
->   drivers: acpi: iort: add support for ARM SMMU platform devices
->     creation
->   drivers: iommu: arm-smmu-v3: split probe functions into DT/generic
->     portions
->   drivers: iommu: arm-smmu-v3: enable ACPI driver initialization
->   drivers: iommu: arm-smmu-v3: add IORT platform device creation
->   drivers: acpi: iort: replace rid map type with type mask
->   drivers: acpi: iort: introduce iort_iommu_configure
-> 
->  drivers/acpi/glue.c               |   4 +-
->  drivers/acpi/iort.c               | 360 +++++++++++++++++++++++++++++++++++++-
->  drivers/acpi/scan.c               |  29 +++
->  drivers/base/platform.c           |  23 +++
->  drivers/iommu/Kconfig             |   4 +
->  drivers/iommu/Makefile            |   1 +
->  drivers/iommu/arm-smmu-v3.c       | 147 ++++++++++++++--
->  drivers/iommu/iommu-fwspec.c      | 114 ++++++++++++
->  drivers/iommu/of_iommu.c          |  52 ------
->  drivers/pci/probe.c               |   3 +-
->  include/acpi/acpi_bus.h           |   2 +
->  include/asm-generic/vmlinux.lds.h |   1 +
->  include/linux/acpi.h              |   5 +
->  include/linux/fwnode.h            |   1 +
->  include/linux/iommu-fwspec.h      |  60 +++++++
->  include/linux/iommu.h             |  25 +++
->  include/linux/iort.h              |  19 ++
->  include/linux/of_iommu.h          |  24 +--
->  include/linux/platform_device.h   |   3 +
->  19 files changed, 782 insertions(+), 95 deletions(-)
->  create mode 100644 drivers/iommu/iommu-fwspec.c
->  create mode 100644 include/linux/iommu-fwspec.h
-> 
-> -- 
-> 2.6.4
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+> Did you agree on how to move forward with this change?
+
+I think still few things are not very clear especially on what should be
+handled in PHY when the clock rate changes or if any new PHY APIs are required
+to handle any clock changes etc..
+But since this actually gets MMC working in rockchip, I'd be okay to merge this
+now. Though I'd expect this to be refined in the future release cycles.
+
+FWIW:
+Reviewed-by: Kishon Vijay Abraham I <kishon@ti.com>
+
+Thanks
+Kishon
