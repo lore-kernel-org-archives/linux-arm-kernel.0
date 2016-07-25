@@ -1,69 +1,38 @@
 From: mitchelh@codeaurora.org (Mitchel Humpherys)
-Date: Mon, 25 Jul 2016 12:01:05 -0700
-Subject: [PATCH v3 0/6] Add support for privileged mappings
-In-Reply-To: <20160725095012.GC15864@arm.com> (Will Deacon's message of "Mon,
- 25 Jul 2016 10:50:13 +0100")
-References: <20160719203655.16629-1-mitchelh@codeaurora.org>
- <20160722165107.GH16837@arm.com> <vnkweg6l9zla.fsf@codeaurora.org>
- <20160725095012.GC15864@arm.com>
-Message-ID: <vnkwoa5l8rv2.fsf@codeaurora.org>
+Date: Mon, 25 Jul 2016 12:16:44 -0700
+Subject: [PATCH v4 1/6] iommu: add IOMMU_PRIV attribute
+In-Reply-To: <20160725191649.13414-1-mitchelh@codeaurora.org>
+References: <20160725191649.13414-1-mitchelh@codeaurora.org>
+Message-ID: <20160725191649.13414-2-mitchelh@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 25 2016 at 10:50:13 AM, Will Deacon <will.deacon@arm.com> wrote:
-> On Fri, Jul 22, 2016 at 01:39:45PM -0700, Mitchel Humpherys wrote:
->> On Fri, Jul 22 2016 at 05:51:07 PM, Will Deacon <will.deacon@arm.com> wrote:
->> > On Tue, Jul 19, 2016 at 01:36:49PM -0700, Mitchel Humpherys wrote:
->> >> The following patch to the ARM SMMU driver:
->> >> 
->> >>     commit d346180e70b91b3d5a1ae7e5603e65593d4622bc
->> >>     Author: Robin Murphy <robin.murphy@arm.com>
->> >>     Date:   Tue Jan 26 18:06:34 2016 +0000
->> >>     
->> >>         iommu/arm-smmu: Treat all device transactions as unprivileged
->> >> 
->> >> started forcing all SMMU transactions to come through as "unprivileged".
->> >> The rationale given was that:
->> >> 
->> >>   (1) There is no way in the IOMMU API to even request privileged mappings.
->> >> 
->> >>   (2) It's difficult to implement a DMA mapper that correctly models the
->> >>       ARM VMSAv8 behavior of unprivileged-writeable =>
->> >>       privileged-execute-never.
->> >> 
->> >> This series rectifies (1) by introducing an IOMMU API for privileged
->> >> mappings and implements it in io-pgtable-arm.
->> >> 
->> >> This series rectifies (2) by introducing a new dma attribute
->> >> (DMA_ATTR_PRIVILEGED) for users of the DMA API that need privileged
->> >> mappings which are inaccessible to lesser-privileged execution levels, and
->> >> implements it in the arm64 IOMMU DMA mapper.  The one known user (pl330.c)
->> >> is converted over to the new attribute.
->> >> 
->> >> Jordan and Jeremy can provide more info on the use case if needed, but the
->> >> high level is that it's a security feature to prevent attacks such as [1].
->> >
->> > This all looks good to me:
->> >
->> > Acked-by: Will Deacon <will.deacon@arm.com>
->> >
->> > It looks pretty fiddly to merge, however. How are you planning to get
->> > this upstream?
->> 
->> Fiddly in what way?  Do you mean in relation to "dma-mapping: Use
->> unsigned long for dma_attrs" [1]?  I admit I wasn't aware of that
->> activity until Robin mentioned it.  It looks like it's merged on
->> next/master, shall I rebase/rework on that and resend?
->
-> Fiddly in that it touches multiple subsystems. I guess routing it via
-> the iommu tree (Joerg) might be the best bet.
+Add the IOMMU_PRIV attribute, which is used to indicate privileged
+mappings.
 
-Sounds good.  I'm going to rebase on linux-next as well anyways to get
-the new dma attrs format and resend.
+Signed-off-by: Mitchel Humpherys <mitchelh@codeaurora.org>
+---
 
+Notes:
+    v2..v3
+    
+      - Added comment
 
--Mitch
+ include/linux/iommu.h | 1 +
+ 1 file changed, 1 insertion(+)
 
+diff --git a/include/linux/iommu.h b/include/linux/iommu.h
+index a35fb8b42e1a..35804abbd6cf 100644
+--- a/include/linux/iommu.h
++++ b/include/linux/iommu.h
+@@ -31,6 +31,7 @@
+ #define IOMMU_CACHE	(1 << 2) /* DMA cache coherency */
+ #define IOMMU_NOEXEC	(1 << 3)
+ #define IOMMU_MMIO	(1 << 4) /* e.g. things like MSI doorbells */
++#define IOMMU_PRIV	(1 << 5) /* privileged */
+ 
+ struct iommu_ops;
+ struct iommu_group;
 -- 
 Qualcomm Innovation Center, Inc.
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
