@@ -1,77 +1,68 @@
-From: hramrach@gmail.com (Michal Suchanek)
-Date: Mon, 25 Jul 2016 10:03:14 +0200
-Subject: [PATCH v3 00/13] sunxi spi fixes
-In-Reply-To: <20160725073204.GD7419@lukather>
-References: <cover.1465490774.git.hramrach@gmail.com>
- <20160613195716.GD9354@lukather>
- <CAOMqctS6ZQ3_a97sE2e7H34ZCny2aDE38V1tQA=-SBZwF2sbDQ@mail.gmail.com>
- <20160725073204.GD7419@lukather>
-Message-ID: <CAOMqctQybJoOfUHGtpmpB_koQ=iY+GpQ_BOL2o0QBbwC_HXC0g@mail.gmail.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Mon, 25 Jul 2016 09:14:27 +0100
+Subject: [RFC 3/6] dt/bindings: Add bindings for Tegra20/30 NOR bus driver
+In-Reply-To: <CALw8SCXb29NM=BRnUBsnFFObe25fSFi2mzvhrb5CvvJVCcWRfA@mail.gmail.com>
+References: <1468935397-11926-1-git-send-email-mirza.krak@gmail.com>
+ <1468935397-11926-4-git-send-email-mirza.krak@gmail.com>
+ <434561ec-510e-a3bf-c7b6-c961db299bd6@nvidia.com>
+ <CALw8SCU0cz6mbO=oudCZ4-=2PHVORNt3gwmg2bzNjyhJFnWS3g@mail.gmail.com>
+ <8e9cdefd-68d1-b788-92fb-b74aae1713c8@nvidia.com>
+ <CALw8SCXb29NM=BRnUBsnFFObe25fSFi2mzvhrb5CvvJVCcWRfA@mail.gmail.com>
+Message-ID: <88fb7138-f2b4-b51c-307b-5ef69b953498@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
 
-On 25 July 2016 at 09:32, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> On Fri, Jun 17, 2016 at 12:34:44PM +0200, Michal Suchanek wrote:
->> Hello,
+On 22/07/16 20:07, Mirza Krak wrote:
+> 2016-07-22 11:32 GMT+02:00 Jon Hunter <jonathanh@nvidia.com>:
 >>
->> On 13 June 2016 at 21:57, Maxime Ripard
->> <maxime.ripard@free-electrons.com> wrote:
->> > On Mon, Jun 13, 2016 at 05:46:48PM -0000, Michal Suchanek wrote:
->> >> Hello,
->> >>
->> >> This is update of the sunxi spi patches that should give full-featured SPI
->> >> driver.
->> >>
->> >> First three patches fix issues with the current driver and can be of use for
->> >> stable kernels so adding cc for those.
->> >>
->> >> I merged the sun4i and sun6i driver because there several issues that need to
->> >> be fixed in both separately and they are even out of sync wrt some fixes.
->> >> I guess some of the merge patches can be squashed.
->> >>
->> >> I tested this with A10s Olinuxino Micro. I have no sun6i device so I cannot
->> >> tell if that side was broken by this patchset - especially the last patch that
->> >> adds DMA was afaik never tested on sun6i.
->> >
->> >
->> > For the record, I'm still very much opposed to such a merge.
+>> On 21/07/16 21:10, Mirza Krak wrote:
+>>> 2016-07-21 11:56 GMT+02:00 Jon Hunter <jonathanh@nvidia.com>:
+>>>>
+>>>> I wonder if it is worth mentioning that the chip-select specified in the
+>>>> "nvidia,config" prop should match that in the "ranges" prop unless you
+>>>> have some external decoding logic to provide an external chip-select.
+>>>> Which raises a question, what does the chip-select in the ranges
+>>>> actually represent? I am not sure if there is a common practice here for
+>>>> device tree when boards have external logic to provide additional
+>>>> chip-selects. I am sure this is quite common.
+>>>
+>>> I do not understand why CS pin setting in nvidia,config need to match
+>>> the "ranges" prop? Other then maybe cosmetics.
 >>
->> What is the reason against the merge? I did not find the original
->> discussion.
->
-> I really prefer some code that is concise and clear but a little
-> duplicated over some code that shares every possible lines of code but
-> is a giant mess impossible to understand.
+>> Yes it would be cosmetic. That said, I even wonder if CS needs to be
+>> exposed at all given that they all map to the same CPU address space.
+>> Couldn't your binding for the CAN devices be as follows?
+>>
+>> nor at 70009000 {
+>>         ...
+>>
+>>         can at 48000000 {
+>>                 ...
+>>         };
+>>
+>>         can at 48040000 {
+>>                 ...
+>>         };
+>> };
+> 
+> This has also crossed my mind, maybe just get rid of the "ranges" prop
+> and do like you have above. But then again I do not know what is
+> preferred so I went with "ranges" prop initially.
+> 
+> 
+>>
+>> Problem is if you did have devices on different chip-selects then how
+>> would these be handled? They could not point to the same physical
+>> address. I am not sure if there is a way to do that in DT?
+> 
+> Having trouble following your though here. We do not have "different"
+> chip-selects?
 
-Yes, it's been tried. In the case of this driver there is more duplication
-than differences. Also bitrot due to different variants receiving different
-updates and fixes crept in already.
+I meant that the device has multiple chip-selects and so I was not sure
+the best way to handle this for the GMI.
 
-Adding the remap layer certainly does not make the driver easier to
-understand but it's not becoming giant mess either.
+Jon
 
->
-> I just came across the reg_field stuff in regmap that would allow to
-> partially address that problem though, there's still the bit indices
-> issue to overcome though.
->
->> I tried to rename everything in the drivers from sun4i and sun6i to
->> sunxi to look at a clean diff and found about 5 differences 2 of which
->> look like a bug.
->
-> It's hard to tell without testing.
-
-I tested the merged (and separate) driver on a H3 board and found a
-type bug in the remap layer.
-
-I also found I can transfer at most 68 bytes without DMA although
-the manuals claim 128 byte FIFO. DMA transfers weren't very reliable
-which may or may not be a wiring issue. I have seen similar issues
-intermittently with SPI on A10s.
-
-Thanks
-
-Michal
+-- 
+nvpublic
