@@ -1,126 +1,161 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 25 Jul 2016 09:36:41 +0100
-Subject: [RFC PATCH v3 00/13] ACPI IORT ARM SMMU v3 support
-In-Reply-To: <20160725055330.GA21004@arm.com>
-References: <1469013815-24380-1-git-send-email-lorenzo.pieralisi@arm.com>
- <20160725055330.GA21004@arm.com>
-Message-ID: <20160725083641.GA20044@red-moon>
+From: bibby.hsieh@mediatek.com (Bibby Hsieh)
+Date: Mon, 25 Jul 2016 16:37:50 +0800
+Subject: [PATCH 3/4] drm/mediatek: fix the wrong pixel clock when
+ resolution is 4K
+In-Reply-To: <1469429375.11841.69.camel@mtksdaap41>
+References: <1468987385-37353-1-git-send-email-bibby.hsieh@mediatek.com>
+ <1468987385-37353-4-git-send-email-bibby.hsieh@mediatek.com>
+ <1469001443.11841.59.camel@mtksdaap41>
+ <1469427845.26205.17.camel@mtksdaap41>
+ <1469429375.11841.69.camel@mtksdaap41>
+Message-ID: <1469435870.26205.20.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 25, 2016 at 01:53:32PM +0800, Dennis Chen wrote:
-> Hi
-> On Wed, Jul 20, 2016 at 12:23:22PM +0100, Lorenzo Pieralisi wrote:
-> > This RFC patch series is v3 of a previous posting:
-> > 
-> > https://lkml.org/lkml/2016/6/7/523
-> > 
-> > v2 -> v3
-> > 	- Rebased on top of dependencies series [1][2][3](v4.7-rc3)
-> > 	- Added back reliance on ACPI early probing infrastructure
-> > 	- Patch[1-3] merged through other dependent series
-> > 	- Added back IOMMU fwnode generalization
-> > 	- Move SMMU v3 static functions configuration to IORT code
-> > 	- Implemented generic IOMMU fwspec API
-> > 	- Added code to implement fwnode platform device look-up
-> > 
-> > v1 -> v2:
-> > 	- Rebased on top of dependencies series [1][2][3](v4.7-rc1)
-> > 	- Removed IOMMU fwnode generalization
-> > 	- Implemented ARM SMMU v3 ACPI probing instead of ARM SMMU v2
-> > 	  owing to patch series dependencies [1]
-> > 	- Moved platform device creation logic to IORT code to
-> > 	  generalize its usage for ARM SMMU v1-v2-v3 components
-> > 	- Removed reliance on ACPI early device probing
-> > 	- Created IORT specific iommu_xlate() translation hook leaving
-> > 	  OF code unchanged according to v1 reviews
-> > 
-> > The ACPI IORT table provides information that allows instantiating
-> > ARM SMMU devices and carrying out id mappings between components on
-> > ARM based systems (devices, IOMMUs, interrupt controllers).
-> > 
-> > http://infocenter.arm.com/help/topic/com.arm.doc.den0049b/DEN0049B_IO_Remapping_Table.pdf
-> > 
-> > Building on basic IORT support, available through [2]:
-> > 
-> > this patchset enables ARM SMMU v3 support on ACPI systems.
-> > 
-> > Most of the code is aimed at building the required generic ACPI
-> > infrastructure to create and enable IOMMU components and to bring
-> > the IOMMU infrastructure for ACPI on par with DT, which is going to
-> > make future ARM SMMU components easier to integrate.
-> > 
-> > PATCH (1) adds a FWNODE_IOMMU type to the struct fwnode_handle type.
-> >           It is required to attach a fwnode identifier to platform
-> >           devices allocated/detected through IORT tables entries;
-> >           IOMMU devices have to have an identifier to look them up
-> >           eg IOMMU core layer carrying out id translation. This can be
-> >           done through a fwnode_handle (ie IOMMU platform devices created
-> >           out of IORT tables are not ACPI devices hence they can't be
-> >           allocated as such, otherwise they would have a fwnode_handle of
-> >           type FWNODE_ACPI). This patch requires discussion and it is key
-> >           to the RFC.
-> > 
-> > PATCH (2) makes use of the ACPI early probing API to add a linker script
-> >           section for probing devices via IORT ACPI kernel code.
-> > 
-> > PATCH (3) provides IORT support for registering IOMMU IORT node through
-> >           their fwnode handle.
-> > 
-> > PATCH (4) implements core code fwnode based platform devices look-up.
-> > 
-> > PATCH (5) extends iommu_fwspec so that it can be used on ACPI based
-> >           system by creating a generic IOMMU fwspec kernel layer.
-> > 
-> > PATCH (6) implements the of_dma_configure() API in ACPI world -
-> >           acpi_dma_configure() - and patches PCI and ACPI core code to
-> >           start making use of it.
-> > 
-> > PATCH (7) provides an IORT function to detect existence of specific type
-> >           of IORT components.
-> > 
-> > PATCH (8) creates the kernel infrastructure required to create ARM SMMU
-> >           platform devices for IORT nodes.
-> > 
-> > PATCH (9) refactors the ARM SMMU v3 driver so that the init functions are
-> >           split in a way that groups together code that probes through DT
-> >           and code that carries out HW registers FW agnostic probing, in
-> >           preparation for adding the ACPI probing path.
-> > 
-> > PATCH (10) rework ARM SMMU v3 platform driver registration to make it work
-> >            on ACPI systems.
-> > 
-> > PATCH (11) Building on patch (8), it adds ARM SMMU v3 IORT IOMMU
-> >            operations to create and probe ARM SMMU v3 components.
-> > 
-> > PATCH (12) Extend the IORT iort_node_map_rid() to work on a type mask
-> >            instead of a single type so that the translation API can
-> >            be used on a range of components.
-> > 
-> > PATCH (13) provides IORT infrastructure to carry out IOMMU configuration
-> >            for devices and hook it up to the previously introduced ACPI
-> >            DMA configure API.
-> > 
-> > This patchset is built on top and depends on these three patch series:
-> > 
-> > [1] R.Murphy "Generic DT bindings for PCI and ARM SMMU v3" v4
-> >     https://marc.info/?l=devicetree&m=146739193215518&w=2
-> > 
-> > [2] T.Nowicki "Introduce ACPI world to ITS irqchip" v7
-> >     https://marc.info/?l=linux-arm-kernel&m=146642080022289&w=2
-> > 
-> > [3] T.Nowicki "Support for ARM64 ACPI based PCI host controller" v8
-> >     http://marc.info/?l=linux-acpi&m=146462129816292&w=2
-> > 
-> > and is provided for early review/testing purposes here:
-> > 
-> > git://git.kernel.org/pub/scm/linux/kernel/git/lpieralisi/linux.git acpi/iort-smmu-v3i
-> >
-> I thought I can got all the 13 patches applied with the above git
-> tree, but I can't find any ACPI related stuff after I cloned the git
-> repos to my local machine, am I missing something here?
+Hi, CK,
 
-Have you pulled the acpi/iort-smmu-v3 branch ?
+Thanks for your comments.
 
-Thanks,
-Lorenzo
+On Mon, 2016-07-25 at 14:49 +0800, CK Hu wrote:
+> Hi, Bibby:
+> 
+> On Mon, 2016-07-25 at 14:24 +0800, Bibby Hsieh wrote:
+> > Hi, CK,
+> > 
+> > Thanks for your comments.
+> > 
+> > On Wed, 2016-07-20 at 15:57 +0800, CK Hu wrote:
+> > > Hi, Bibby:
+> > > 
+> > > Some comments inline.
+> > > 
+> > > On Wed, 2016-07-20 at 12:03 +0800, Bibby Hsieh wrote:
+> > > > From: Junzhi Zhao <junzhi.zhao@mediatek.com>
+> > > > 
+> > > > Pixel clock should be 297MHz when resolution is 4K.
+> > > > 
+> > > > Signed-off-by: Junzhi Zhao <junzhi.zhao@mediatek.com>
+> > > > Signed-off-by: Bibby Hsieh <bibby.hsieh@mediatek.com>
+> > > > ---
+> > > >  drivers/gpu/drm/mediatek/mtk_dpi.c |  184 +++++++++++++++++++++++++-----------
+> > > >  1 file changed, 131 insertions(+), 53 deletions(-)
+> > > > 
+> 
+> [snip...]
+> 
+> > > >  
+> > > > +static int mt8173_parse_clk_from_dt(struct mtk_dpi *dpi, struct device_node *np)
+> > > > +{
+> > > > +	int i;
+> > > > +
+> > > > +	for (i = 0; i < ARRAY_SIZE(mtk_dpi_clk_names); i++) {
+> > > > +		dpi->clk[i] = of_clk_get_by_name(np,
+> > > > +						  mtk_dpi_clk_names[i]);
+> > > > +		if (IS_ERR(dpi->clk[i]))
+> > > > +			return PTR_ERR(dpi->clk[i]);
+> > > > +	}
+> > > > +	return 0;
+> > > > +}
+> > > 
+> > > I think parsing device tree is a pure SW behavior. Would this vary for
+> > > different MTK soc?
+> > > 
+> > Yes
+> 
+> I can not imaging that, so could you give me an example source code of
+> other MTK soc for parse_clk_from_dt()?
+> 
+I will do some changes according to your comments. 
+
+> > > > +
+> > > > +
+> > > > +static const struct mtk_dpi_conf mt8173_conf = {
+> > > > +	.parse_clk_from_dt = mt8173_parse_clk_from_dt,
+> > > > +	.clk_config = mt8173_clk_config,
+> > > > +};
+> > > > +
+> > > > +static const struct of_device_id mtk_dpi_of_ids[] = {
+> > > > +	{ .compatible = "mediatek,mt8173-dpi",
+> > > > +		.data = &mt8173_conf,
+> > > > +	},
+> > > > +	{}
+> > > > +};
+> > > > +
+> > > >  static int mtk_dpi_probe(struct platform_device *pdev)
+> > > >  {
+> > > >  	struct device *dev = &pdev->dev;
+> > > >  	struct mtk_dpi *dpi;
+> > > >  	struct resource *mem;
+> > > > +	struct device_node *np = dev->of_node;
+> > > >  	struct device_node *ep, *bridge_node = NULL;
+> > > >  	int comp_id;
+> > > > +	const struct of_device_id *match;
+> > > > +	struct mtk_dpi_conf *conf;
+> > > >  	int ret;
+> > > >  
+> > > > +	match = of_match_node(mtk_dpi_of_ids, dev->of_node);
+> > > > +	if (!match)
+> > > > +		return -ENODEV;
+> > > > +
+> > > >  	dpi = devm_kzalloc(dev, sizeof(*dpi), GFP_KERNEL);
+> > > >  	if (!dpi)
+> > > >  		return -ENOMEM;
+> > > >  
+> > > >  	dpi->dev = dev;
+> > > > +	dpi->data = (void *)match->data;
+> > > > +	conf = (struct mtk_dpi_conf *)match->data;
+> > > >  
+> > > >  	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> > > >  	dpi->regs = devm_ioremap_resource(dev, mem);
+> > > > @@ -679,24 +777,9 @@ static int mtk_dpi_probe(struct platform_device *pdev)
+> > > >  		return ret;
+> > > >  	}
+> > > >  
+> > > > -	dpi->engine_clk = devm_clk_get(dev, "engine");
+> > > > -	if (IS_ERR(dpi->engine_clk)) {
+> > > > -		ret = PTR_ERR(dpi->engine_clk);
+> > > > -		dev_err(dev, "Failed to get engine clock: %d\n", ret);
+> > > > -		return ret;
+> > > > -	}
+> > > > -
+> > > > -	dpi->pixel_clk = devm_clk_get(dev, "pixel");
+> > > > -	if (IS_ERR(dpi->pixel_clk)) {
+> > > > -		ret = PTR_ERR(dpi->pixel_clk);
+> > > > -		dev_err(dev, "Failed to get pixel clock: %d\n", ret);
+> > > > -		return ret;
+> > > > -	}
+> > > > -
+> > > > -	dpi->tvd_clk = devm_clk_get(dev, "pll");
+> > > > -	if (IS_ERR(dpi->tvd_clk)) {
+> > > > -		ret = PTR_ERR(dpi->tvd_clk);
+> > > > -		dev_err(dev, "Failed to get tvdpll clock: %d\n", ret);
+> > > > +	ret = conf->parse_clk_from_dt(dpi, np);
+> > > > +	if (ret) {
+> > > > +		dev_err(dev, "parse tvd div clk failed!");
+> > > >  		return ret;
+> > > >  	}
+> > > >  
+> > > > @@ -754,11 +837,6 @@ static int mtk_dpi_remove(struct platform_device *pdev)
+> > > >  	return 0;
+> > > >  }
+> > > >  
+> > > > -static const struct of_device_id mtk_dpi_of_ids[] = {
+> > > > -	{ .compatible = "mediatek,mt8173-dpi", },
+> > > > -	{}
+> > > > -};
+> > > > -
+> > > >  struct platform_driver mtk_dpi_driver = {
+> > > >  	.probe = mtk_dpi_probe,
+> > > >  	.remove = mtk_dpi_remove,
+> > > 
+> > > Regards,
+> > > CK
+> > > 
+> > 
+> 
+> 
+> Regards,
+> CK
+> > 
+> 
+> 
