@@ -1,220 +1,75 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Mon, 25 Jul 2016 18:21:45 +0200
-Subject: [PATCH v11 09/10] genirq/msi: map/unmap the MSI doorbells on
- msi_domain_alloc/free_irqs
-In-Reply-To: <alpine.DEB.2.11.1607201016060.3564@nanos>
-References: <1468933367-23159-1-git-send-email-eric.auger@redhat.com>
- <1468933367-23159-10-git-send-email-eric.auger@redhat.com>
- <alpine.DEB.2.11.1607201016060.3564@nanos>
-Message-ID: <75f5e846-6ca4-4178-e7aa-fed90e45e546@redhat.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 25 Jul 2016 17:31:45 +0100
+Subject: [PATCH v9 4/9] clocksource/drivers/arm_arch_timer: use readq to
+ get 64-bit CNTVCT
+In-Reply-To: <CADyBb7ubKceQiB7+u7sSA=1+9_VMUrGjiabf_FkN2-n4rq7Kgg@mail.gmail.com>
+References: <1469460427-8643-1-git-send-email-fu.wei@linaro.org>
+ <1469460427-8643-5-git-send-email-fu.wei@linaro.org>
+ <20160725153118.GD19209@arm.com>
+ <CADyBb7ubKceQiB7+u7sSA=1+9_VMUrGjiabf_FkN2-n4rq7Kgg@mail.gmail.com>
+Message-ID: <20160725163144.GE19209@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+On Mon, Jul 25, 2016 at 11:55:49PM +0800, Fu Wei wrote:
+> On 25 July 2016 at 23:31, Will Deacon <will.deacon@arm.com> wrote:
+> > On Mon, Jul 25, 2016 at 11:27:02PM +0800, fu.wei at linaro.org wrote:
+> >> From: Fu Wei <fu.wei@linaro.org>
+> >>
+> >> This patch simplify arch_counter_get_cntvct_mem function by
+> >> using readq to get 64-bit CNTVCT value instead of readl_relaxed.
+> >>
+> >> Signed-off-by: Fu Wei <fu.wei@linaro.org>
+> >> ---
+> >>  drivers/clocksource/arm_arch_timer.c | 10 +---------
+> >>  1 file changed, 1 insertion(+), 9 deletions(-)
+> >>
+> >> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+> >> index e6fd42d..483d2f9 100644
+> >> --- a/drivers/clocksource/arm_arch_timer.c
+> >> +++ b/drivers/clocksource/arm_arch_timer.c
+> >> @@ -418,15 +418,7 @@ u32 arch_timer_get_rate(void)
+> >>
+> >>  static u64 arch_counter_get_cntvct_mem(void)
+> >>  {
+> >> -     u32 vct_lo, vct_hi, tmp_hi;
+> >> -
+> >> -     do {
+> >> -             vct_hi = readl_relaxed(arch_counter_base + CNTVCT_HI);
+> >> -             vct_lo = readl_relaxed(arch_counter_base + CNTVCT_LO);
+> >> -             tmp_hi = readl_relaxed(arch_counter_base + CNTVCT_HI);
+> >> -     } while (vct_hi != tmp_hi);
+> >> -
+> >> -     return ((u64) vct_hi << 32) | vct_lo;
+> >> +     return readq(arch_counter_base + CNTVCT_LO);
+> >
+> > Please drop this patch. It doesn't work.
+> 
+> I am OK to drop this, but could you let me know why it doesn't work?
+> 
+> I did get some problem on Foundation model about readq, but it works on Seattle.
+> I guess that is a problem of model, but not a code problem.
+> So I just got confused, why readq  doesn't work,  :-)
 
-On 20/07/2016 11:04, Thomas Gleixner wrote:
-> On Tue, 19 Jul 2016, Eric Auger wrote:
->>  /**
->> + * msi_handle_doorbell_mappings: in case the irq data corresponds to an
->> + * MSI that requires iommu mapping, traverse the irq domain hierarchy
->> + * to retrieve the doorbells to handle and iommu_map/unmap them according
->> + * to @map boolean.
->> + *
->> + * @data: irq data handle
->> + * @map: mapping if true, unmapping if false
->> + */
-> 
-> 
-> Please run that through the kernel doc generator. It does not work that way.
-> 
-> The format is:
-> 
-> /**
->  * function_name - Short function description    
->  * @arg1:	Description of arg1
->  * @argument2:	Description of argument2
->  *
->  * Long explanation including documentation of the return values.
->  */
-> 
->> +static int msi_handle_doorbell_mappings(struct irq_data *data, bool map)
->> +{
->> +	const struct irq_chip_msi_doorbell_info *dbinfo;
->> +	struct iommu_domain *domain;
->> +	struct irq_chip *chip;
->> +	struct device *dev;
->> +	dma_addr_t iova;
->> +	int ret = 0, cpu;
->> +
->> +	while (data) {
->> +		dev = msi_desc_to_dev(irq_data_get_msi_desc(data));
->> +		domain = iommu_msi_domain(dev);
->> +		if (domain) {
->> +			chip = irq_data_get_irq_chip(data);
->> +			if (chip->msi_doorbell_info)
->> +				break;
->> +		}
->> +		data = data->parent_data;
->> +	}
-> 
-> Please split that out into a seperate function
-> 
-> struct irq_data *msi_get_doorbell_info(data)
-> {
-> 	.....
-> 		if (chip->msi_doorbell_info)
-> 			return chip->msi_get_doorbell_info(data);
-> 	}
-> 	return NULL;
-> }
-> 
->        info = msi_get_doorbell_info(data);
->        .....
-> 
->> +	if (!data)
->> +		return 0;
->> +
->> +	dbinfo = chip->msi_doorbell_info(data);
->> +	if (!dbinfo)
->> +		return -EINVAL;
->> +
->> +	if (!dbinfo->doorbell_is_percpu) {
->> +		if (!map) {
->> +			iommu_msi_put_doorbell_iova(domain,
->> +						    dbinfo->global_doorbell);
->> +			return 0;
->> +		}
->> +		return iommu_msi_get_doorbell_iova(domain,
->> +						   dbinfo->global_doorbell,
->> +						   dbinfo->size, dbinfo->prot,
->> +						   &iova);
->> +	}
-> 
-> You can spare an indentation level with a helper function
-> 
->     	if (!dbinfo->doorbell_is_percpu)
-> 		return msi_map_global_doorbell(domain, dbinfo);
-> 
->> +
->> +	/* percpu doorbells */
->> +	for_each_possible_cpu(cpu) {
->> +		phys_addr_t __percpu *db_addr =
->> +			per_cpu_ptr(dbinfo->percpu_doorbells, cpu);
->> +
->> +		if (!map) {
->> +			iommu_msi_put_doorbell_iova(domain, *db_addr);
->> +		} else {
->> +
->> +			ret = iommu_msi_get_doorbell_iova(domain, *db_addr,
->> +							  dbinfo->size,
->> +							  dbinfo->prot, &iova);
->> +			if (ret)
->> +				return ret;
->> +		}
->> +	}
-> 
-> Same here:
-> 
-> 	for_each_possible_cpu(cpu) {
-> 		ret = msi_map_percpu_doorbell(domain, cpu);
-> 		if (ret)
-> 			return ret;
-> 	}
->      	return 0;
->      
-> Hmm?
-> 
->> +
->> +	return 0;
->> +}
->> +
->> +/**
->>   * msi_domain_alloc_irqs - Allocate interrupts from a MSI interrupt domain
->>   * @domain:	The domain to allocate from
->>   * @dev:	Pointer to device struct of the device for which the interrupts
->> @@ -352,17 +423,29 @@ int msi_domain_alloc_irqs(struct irq_domain *domain, struct device *dev,
->>  
->>  		virq = __irq_domain_alloc_irqs(domain, virq, desc->nvec_used,
->>  					       dev_to_node(dev), &arg, false);
->> -		if (virq < 0) {
->> -			ret = -ENOSPC;
->> -			if (ops->handle_error)
->> -				ret = ops->handle_error(domain, desc, ret);
->> -			if (ops->msi_finish)
->> -				ops->msi_finish(&arg, ret);
->> -			return ret;
->> -		}
->> +		if (virq < 0)
->> +			goto error;
->>  
->>  		for (i = 0; i < desc->nvec_used; i++)
->>  			irq_set_msi_desc_off(virq, i, desc);
->> +
->> +		for (i = 0; i < desc->nvec_used; i++) {
->> +			struct irq_data *d = irq_get_irq_data(virq + i);
->> +
->> +			ret = msi_handle_doorbell_mappings(d, true);
->> +			if (ret)
->> +				break;
->> +		}
->> +		if (ret) {
->> +			for (; i >= 0; i--) {
->> +				struct irq_data *d = irq_get_irq_data(virq + i);
->> +
->> +				msi_handle_doorbell_mappings(d, false);
->> +			}
->> +			irq_domain_free_irqs(virq, desc->nvec_used);
->> +			desc->irq = 0;
->> +			goto error;
-> 
-> How is that supposed to work? You clear desc->irq and then you call
-> ops->handle_error.
-if I don't clear the desc->irq I enter an infinite loop in pci_enable_msix_range.
-This happens because msix_capability_init and pcie_enable_msix returns 1.
+The kernel really needs to support both of those platforms :/
 
-In msix_capability_init, at out_avail: we enumerate the msi_desc which have a non
-zero irq, hence the returned value equal to 1.
+For the memory-mapped counter registers, the architecture says:
 
-Currently the only handle_error ops I found, pci_msi_domain_handle_error does not
-use irq field so works although questionable.
+  `If the implementation supports 64-bit atomic accesses, then the
+   CNTV_CVAL register must be accessible as an atomic 64-bit value.'
 
-As for the irq_domain_free_irqs I think I can remove it since handled later.
+which is borderline tautological. If we take the generous reading that
+this means AArch64 CPUs can use readq (and I'm not completely
+comfortable with that assertion, particularly as you say that it breaks
+the model), then you still need to use readq_relaxed here to avoid a
+DSB. Furthermore, what are you going to do for AArch32? readq doesn't
+exist over there, and if you use the generic implementation then it's
+not atomic. In which case, we end up with the current code, as well as a
+readq_relaxed guarded by a questionable #ifdef that is known to break a
+supported platform for an unknown performance improvement. Hardly a big
+win.
 
-How do you advise to handle the above situation?
+Did you see any performance advantage from this? Given that you've added
+a DSB, this looks to be extremely premature.
 
-Thanks
-
-Eric
-
-> 
-> Why are you adding this extra stuff here? Look at the call sites of
-> msi_domain_alloc_irqs(). All of them use msi_domain_free_irqs() in case of
-> error. There is no reason why you can't do the same....
-> 
->>  /**
->> @@ -396,6 +486,9 @@ void msi_domain_free_irqs(struct irq_domain *domain, struct device *dev)
->>  		 * entry. If that's the case, don't do anything.
->>  		 */
->>  		if (desc->irq) {
->> +			msi_handle_doorbell_mappings(
->> +				irq_get_irq_data(desc->irq),
->> +				false);
->>  			irq_domain_free_irqs(desc->irq, desc->nvec_used);
->>  			desc->irq = 0;
-> 
-> Can you please restructure the code so it reads
-> 
-> 		if (desc->irq)
-> 			continue;
-> 
-> 		msi_handle_doorbell_mappings(irq_get_irq_data(desc->irq),
-> 					     false);	
-> 		irq_domain_free_irqs(desc->irq, desc->nvec_used);
-> 		desc->irq = 0;
-> 
-> Just blindly whacking stuff into the 80 char limit is not helping readability.
-> 
-> Thanks,
-> 
-> 	tglx
-> 
+Will
