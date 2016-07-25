@@ -1,69 +1,52 @@
-From: ruslan.bilovol@gmail.com (Ruslan Bilovol)
-Date: Mon, 25 Jul 2016 17:28:22 +0300
-Subject: [PATCH v1.2 3/4] arm64: Add arm64 kexec support
-In-Reply-To: <1469048065.2977.124.camel@infradead.org>
-References: <cover.1468970114.git.geoff@infradead.org>
- <9ed513fd44a19b2f49b4da99477cedfff7341bf0.1468970114.git.geoff@infradead.org>
- <1469048065.2977.124.camel@infradead.org>
-Message-ID: <CAB=otbSObtEE7n4LjWWZZ0G=oA1Xd5QUmHnX44+uyUiWP4qXpw@mail.gmail.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Mon, 25 Jul 2016 15:31:08 +0100
+Subject: [PATCH 2/2] arm64: mm: run pgtable_page_ctor() on non-swapper
+ translation table pages
+In-Reply-To: <1469208745-6693-3-git-send-email-ard.biesheuvel@linaro.org>
+References: <1469208745-6693-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1469208745-6693-3-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <26dd79ee-8c0b-6302-85bf-3c6d69cab933@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geoff,
-
-On Wed, Jul 20, 2016 at 11:54 PM, Geoff Levand <geoff@infradead.org> wrote:
-> Add kexec reboot support for ARM64 platforms.
+On 22/07/16 18:32, Ard Biesheuvel wrote:
+> The kernel page table creation routines are accessible to other subsystems
+> (e.g., EFI) via the create_pgd_mapping() entry point, which allows mappings
+> to be created that are not covered by init_mm.
 >
-> Signed-off-by: Geoff Levand <geoff@infradead.org>
+> Since generic code such as apply_to_page_range() may expect translation
+> table pages that are not associated with init_mm to be covered by fully
+> constructed struct pages, add a call to pgtable_page_ctor() in the alloc
+> function used by create_pgd_mapping. Since it is no longer used by
+> create_mapping_late(), also update the name of this function to better
+> reflect its purpose.
+>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 > ---
+>  arch/arm64/mm/mmu.c | 9 ++++++---
+>  1 file changed, 6 insertions(+), 3 deletions(-)
+>
+> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+> index 33f36cede02d..51a558195bb9 100644
+> --- a/arch/arm64/mm/mmu.c
+> +++ b/arch/arm64/mm/mmu.c
+> @@ -268,10 +268,11 @@ static void __create_pgd_mapping(pgd_t *pgdir, phys_addr_t phys,
+>  	} while (pgd++, addr = next, addr != end);
+>  }
+>
+> -static phys_addr_t late_pgtable_alloc(void)
+> +static phys_addr_t pgd_pgtable_alloc(void)
+>  {
+>  	void *ptr = (void *)__get_free_page(PGALLOC_GFP);
+> -	BUG_ON(!ptr);
+> +	if (!ptr || !pgtable_page_ctor(virt_to_page(ptr)))
 
-[snip]
+Should we free the page and return NULL when we encounter an error
+in pgtable_page_ctor(), like the rest of the callers ?
 
-> diff --git a/kexec/arch/arm64/crashdump-arm64.c b/kexec/arch/arm64/crashdump-arm64.c
-> new file mode 100644
-> index 0000000..d2272c8
-> --- /dev/null
-> +++ b/kexec/arch/arm64/crashdump-arm64.c
-> @@ -0,0 +1,21 @@
-> +/*
-> + * ARM64 crashdump.
-> + */
-> +
-> +#define _GNU_SOURCE
-> +
-> +#include <errno.h>
-> +#include <linux/elf.h>
-> +
-> +#include "kexec.h"
-> +#include "crashdump.h"
-> +#include "crashdump-arm64.h"
-> +#include "kexec-arm64.h"
-> +#include "kexec-elf.h"
-> +
-> +struct memory_ranges usablemem_rgns = {};
-> +
-> +int is_crashkernel_mem_reserved(void)
-> +{
-> +       return 0;
-> +}
 
-Shouldn't is_crashkernel_mem_reserved() parse iomem and return
-true if crashkernel region is reserved?
+> +		BUG();
 
-Due to this issue when I'm trying to validate these patches, I always
-get next error:
-| Memory for crashkernel is not reserved
-| Please reserve memory by passing"crashkernel=X at Y" parameter to kernel
-| Then try to loading kdump kernel
+Otherwise, looks good to me.
 
-My system already has reserved region for crashkernel:
-~# cat /proc/iomem | grep Crash
-  7f000000-7fffffff : Crash kernel
-
-And I use kexec next way:
-kexec --type Image -p /Image --ramdisk=/ramdisk.cpio.gz
---dtb=dtb-arm64.dtb --append="root=/dev/ram0 1 maxcpus=1
-reset_devices"
-
-Best regards,
-Ruslan Bilovol
+Suzuki
