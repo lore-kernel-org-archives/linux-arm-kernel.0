@@ -1,143 +1,46 @@
-From: fu.wei@linaro.org (fu.wei at linaro.org)
-Date: Mon, 25 Jul 2016 23:27:07 +0800
-Subject: [PATCH v9 9/9] acpi/arm64: Add SBSA Generic Watchdog support in GTDT
- driver
-In-Reply-To: <1469460427-8643-1-git-send-email-fu.wei@linaro.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 25 Jul 2016 16:31:19 +0100
+Subject: [PATCH v9 4/9] clocksource/drivers/arm_arch_timer: use readq to
+ get 64-bit CNTVCT
+In-Reply-To: <1469460427-8643-5-git-send-email-fu.wei@linaro.org>
 References: <1469460427-8643-1-git-send-email-fu.wei@linaro.org>
-Message-ID: <1469460427-8643-10-git-send-email-fu.wei@linaro.org>
+ <1469460427-8643-5-git-send-email-fu.wei@linaro.org>
+Message-ID: <20160725153118.GD19209@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fu Wei <fu.wei@linaro.org>
+On Mon, Jul 25, 2016 at 11:27:02PM +0800, fu.wei at linaro.org wrote:
+> From: Fu Wei <fu.wei@linaro.org>
+> 
+> This patch simplify arch_counter_get_cntvct_mem function by
+> using readq to get 64-bit CNTVCT value instead of readl_relaxed.
+> 
+> Signed-off-by: Fu Wei <fu.wei@linaro.org>
+> ---
+>  drivers/clocksource/arm_arch_timer.c | 10 +---------
+>  1 file changed, 1 insertion(+), 9 deletions(-)
+> 
+> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+> index e6fd42d..483d2f9 100644
+> --- a/drivers/clocksource/arm_arch_timer.c
+> +++ b/drivers/clocksource/arm_arch_timer.c
+> @@ -418,15 +418,7 @@ u32 arch_timer_get_rate(void)
+>  
+>  static u64 arch_counter_get_cntvct_mem(void)
+>  {
+> -	u32 vct_lo, vct_hi, tmp_hi;
+> -
+> -	do {
+> -		vct_hi = readl_relaxed(arch_counter_base + CNTVCT_HI);
+> -		vct_lo = readl_relaxed(arch_counter_base + CNTVCT_LO);
+> -		tmp_hi = readl_relaxed(arch_counter_base + CNTVCT_HI);
+> -	} while (vct_hi != tmp_hi);
+> -
+> -	return ((u64) vct_hi << 32) | vct_lo;
+> +	return readq(arch_counter_base + CNTVCT_LO);
 
-This driver adds support for parsing SBSA Generic Watchdog timer
-in GTDT, parse all info in SBSA Generic Watchdog Structure in GTDT,
-and creating a platform device with that information.
+Please drop this patch. It doesn't work.
 
-This allows the operating system to obtain device data from the
-resource of platform device. The platform device named "sbsa-gwdt"
-can be used by the ARM SBSA Generic Watchdog driver.
+http://lists.infradead.org/pipermail/linux-arm-kernel/2016-July/445369.html
 
-Signed-off-by: Fu Wei <fu.wei@linaro.org>
-Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
----
- drivers/acpi/arm64/acpi_gtdt.c | 87 ++++++++++++++++++++++++++++++++++++++++++
- drivers/watchdog/Kconfig       |  1 +
- 2 files changed, 88 insertions(+)
-
-diff --git a/drivers/acpi/arm64/acpi_gtdt.c b/drivers/acpi/arm64/acpi_gtdt.c
-index 0159175..05e838f 100644
---- a/drivers/acpi/arm64/acpi_gtdt.c
-+++ b/drivers/acpi/arm64/acpi_gtdt.c
-@@ -14,6 +14,7 @@
- #include <linux/acpi.h>
- #include <linux/init.h>
- #include <linux/kernel.h>
-+#include <linux/platform_device.h>
- 
- #include <clocksource/arm_arch_timer.h>
- 
-@@ -220,3 +221,89 @@ int __init gtdt_arch_timer_mem_init(struct gt_block_data *data)
- 
- 	return index;
- }
-+
-+/*
-+ * Initialize a SBSA generic Watchdog platform device info from GTDT
-+ */
-+static int __init gtdt_import_sbsa_gwdt(struct acpi_gtdt_watchdog *wd,
-+					int index)
-+{
-+	struct platform_device *pdev;
-+	int irq = map_gt_gsi(wd->timer_interrupt, wd->timer_flags);
-+	int no_irq = 1;
-+
-+	/*
-+	 * According to SBSA specification the size of refresh and control
-+	 * frames of SBSA Generic Watchdog is SZ_4K(Offset 0x000 ? 0xFFF).
-+	 */
-+	struct resource res[] = {
-+		DEFINE_RES_MEM(wd->control_frame_address, SZ_4K),
-+		DEFINE_RES_MEM(wd->refresh_frame_address, SZ_4K),
-+		DEFINE_RES_IRQ(irq),
-+	};
-+
-+	pr_debug("found a Watchdog (0x%llx/0x%llx gsi:%u flags:0x%x).\n",
-+		 wd->refresh_frame_address, wd->control_frame_address,
-+		 wd->timer_interrupt, wd->timer_flags);
-+
-+	if (!(wd->refresh_frame_address && wd->control_frame_address)) {
-+		pr_err(FW_BUG "failed to get the Watchdog base address.\n");
-+		return -EINVAL;
-+	}
-+
-+	if (!wd->timer_interrupt)
-+		pr_warn(FW_BUG "failed to get the Watchdog interrupt.\n");
-+	else if (irq <= 0)
-+		pr_warn("failed to map the Watchdog interrupt.\n");
-+	else
-+		no_irq = 0;
-+
-+	/*
-+	 * Add a platform device named "sbsa-gwdt" to match the platform driver.
-+	 * "sbsa-gwdt": SBSA(Server Base System Architecture) Generic Watchdog
-+	 * The platform driver (like drivers/watchdog/sbsa_gwdt.c)can get device
-+	 * info below by matching this name.
-+	 */
-+	pdev = platform_device_register_simple("sbsa-gwdt", index, res,
-+					       ARRAY_SIZE(res) - no_irq);
-+	if (IS_ERR(pdev)) {
-+		acpi_unregister_gsi(wd->timer_interrupt);
-+		return PTR_ERR(pdev);
-+	}
-+
-+	return 0;
-+}
-+
-+static int __init gtdt_sbsa_gwdt_init(void)
-+{
-+	struct acpi_table_header *table;
-+	void *platform_timer;
-+	int index = 0;
-+	int ret;
-+
-+	if (acpi_disabled)
-+		return 0;
-+
-+	if (ACPI_FAILURE(acpi_get_table(ACPI_SIG_GTDT, 0, &table)))
-+		return -EINVAL;
-+
-+	ret = acpi_gtdt_init(table);
-+	if (ret <= 0)
-+		return ret;
-+
-+	for_each_platform_timer(platform_timer) {
-+		if (!is_watchdog(platform_timer))
-+			continue;
-+		ret = gtdt_import_sbsa_gwdt(platform_timer, index);
-+		if (ret)
-+			break;
-+		index++;
-+	}
-+
-+	if (index)
-+		pr_info("found %d SBSA generic Watchdog(s).\n", index);
-+
-+	return ret;
-+}
-+
-+device_initcall(gtdt_sbsa_gwdt_init);
-diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
-index b4b3e25..4019792 100644
---- a/drivers/watchdog/Kconfig
-+++ b/drivers/watchdog/Kconfig
-@@ -206,6 +206,7 @@ config ARM_SBSA_WATCHDOG
- 	tristate "ARM SBSA Generic Watchdog"
- 	depends on ARM64
- 	depends on ARM_ARCH_TIMER
-+	depends on ACPI_GTDT || !ACPI
- 	select WATCHDOG_CORE
- 	help
- 	  ARM SBSA Generic Watchdog has two stage timeouts:
--- 
-2.5.5
+Will
