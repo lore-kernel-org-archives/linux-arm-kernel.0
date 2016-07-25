@@ -1,92 +1,54 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Mon, 25 Jul 2016 18:36:04 +0100
-Subject: [PATCH v3 1/7] firmware: rockchip: sip: Add rockchip SIP runtime
- service
-In-Reply-To: <1497407.KruMAzy5tb@diego>
-References: <1469178440-4668-1-git-send-email-hl@rock-chips.com>
- <1469178440-4668-2-git-send-email-hl@rock-chips.com>
- <1497407.KruMAzy5tb@diego>
-Message-ID: <6d3827c1-976c-ba96-600d-a405da2f645c@arm.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Mon, 25 Jul 2016 12:42:27 -0500
+Subject: [PATCH] PCI: xilinx: Modify error handling
+In-Reply-To: <20160629151820.GA14282@amitoj-Inspiron-3542>
+References: <20160629151820.GA14282@amitoj-Inspiron-3542>
+Message-ID: <20160725174227.GE12484@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Jun 29, 2016 at 08:48:20PM +0530, Amitoj Kaur Chawla wrote:
+> Failure of of_get_next_child returns NULL, not an ERR_PTR. Use
+> appropriate error code -ENODEV to be returned on failure instead.
+> 
+> The Coccinelle semantic patch used to find this issue is as follows:
+> @@
+> expression E,E1;
+> @@
+> 
+> if (
+> *   E == NULL
+>    ) { <+... when != E = E1
+>         PTR_ERR(E)
+>        ...+> }
+> 
+> Signed-off-by: Amitoj Kaur Chawla <amitoj1606@gmail.com>
+> ---
+>  drivers/pci/host/pcie-xilinx.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/pci/host/pcie-xilinx.c b/drivers/pci/host/pcie-xilinx.c
+> index 65f0fe0..d76ea8d 100644
+> --- a/drivers/pci/host/pcie-xilinx.c
+> +++ b/drivers/pci/host/pcie-xilinx.c
+> @@ -550,7 +550,7 @@ static int xilinx_pcie_init_irq_domain(struct xilinx_pcie_port *port)
+>  	pcie_intc_node = of_get_next_child(node, NULL);
+>  	if (!pcie_intc_node) {
+>  		dev_err(dev, "No PCIe Intc node found\n");
+> -		return PTR_ERR(pcie_intc_node);
+> +		return -ENODEV;
 
+This fix is included in the patch posted by Christophe JAILLET
+<christophe.jaillet@wanadoo.fr>, along with two other similar fixes.
+I applied Christophe's patch to pci/host-xilinx for v4.8.
 
-On 22/07/16 21:50, Heiko St?bner wrote:
-> Hi again,
->
-> one bigger thing I noticed only now.
->
-> Am Freitag, 22. Juli 2016, 17:07:14 schrieben Sie:
->> diff --git a/drivers/firmware/rockchip_sip.c
->> b/drivers/firmware/rockchip_sip.c new file mode 100644
->> index 0000000..7756af9
->> --- /dev/null
->> +++ b/drivers/firmware/rockchip_sip.c
->> @@ -0,0 +1,64 @@
->> +/*
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + *
->> + * This program is distributed in the hope that it will be useful,
->> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + * GNU General Public License for more details.
->> + *
->> + * Copyright (C) 2016 ARM Limited
->> + */
->> +#include <linux/errno.h>
->> +#include <linux/linkage.h>
->> +#include <linux/of.h>
->> +#include <linux/pm.h>
->> +#include <linux/printk.h>
->> +#include "rockchip_sip.h"
->> +
->> +typedef unsigned long (psci_fn)(unsigned long, unsigned long,
->> +				unsigned long, unsigned long);
->> +asmlinkage psci_fn __invoke_psci_fn_smc;
->> +
->> +#define CONFIG_DRAM_INIT	0x00
->> +#define CONFIG_DRAM_SET_RATE	0x01
->> +#define CONFIG_DRAM_ROUND_RATE	0x02
->> +#define CONFIG_DRAM_SET_AT_SR	0x03
->> +#define CONFIG_DRAM_GET_BW	0x04
->> +#define CONFIG_DRAM_GET_RATE	0x05
->> +#define CONFIG_DRAM_CLR_IRQ	0x06
->> +#define CONFIG_DRAM_SET_PARAM   0x07
->> +
->> +uint64_t sip_smc_ddr_init(void)
->> +{
->> +	return __invoke_psci_fn_smc(SIP_DDR_FREQ, 0,
->> +				    0, CONFIG_DRAM_INIT);
->
-> I don't think that is legal to use. For one this function itself is declared
-> static in the psci code - most likely for a specific reason.
->
-> And also if anything invoke_psci_fn would hold the correct pointer depending
-> on the calling method.
->
-> But as said above, accessing psci static stuff is most likely wrong. Maybe the
-> two psci people I've included can tell us how this is to be accessed.
->
-
-Thanks Heiko for looping us in this thread.
-
-The feature being added in this series is completely out of scope of
-PSCI specification and hence PSCI can't be used. Firstly we need to
-audit if these are need in Linux and why they can't be handled within
-the existing PSCI APIs. But yes, this series is misuse of PSCI.
-
-I also see to know that ARM Trusted Firmware community has not accepted
-this PSCI approach, so this patches are useless without that.
-
-If they are still needed they need to make use of SMC Calling Convention
-(arm_smccc_smc). Either make these smc function identifiers standard on
-their platforms and use them directly in the driver. If they tend to
-change too much across their platforms, use the DT approach with
-appropriate bindings.
-
--- 
-Regards,
-Sudeep
+>  	}
+>  
+>  	port->irq_domain = irq_domain_add_linear(pcie_intc_node, 4,
+> -- 
+> 1.9.1
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
