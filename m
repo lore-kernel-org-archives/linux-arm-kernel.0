@@ -1,36 +1,28 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Mon, 25 Jul 2016 15:44:18 -0600
-Subject: coresight: next v4.7-rc5
-In-Reply-To: <20160725203630.GA1132@kroah.com>
-References: <CANLsYkzsfq=f_rSBduM3Zy3rkxdVS5KfLnE18s8CFfEFfV2_eQ@mail.gmail.com>
- <20160725203630.GA1132@kroah.com>
-Message-ID: <CANLsYkymEhkdxiMqB6CpYRW3Y+xe_Zr4GvRO5t2spER3ZH0ayg@mail.gmail.com>
+From: geoff@infradead.org (Geoff Levand)
+Date: Mon, 25 Jul 2016 14:56:01 -0700
+Subject: [PATCH v1 3/4] arm64: Add arm64 kexec support
+In-Reply-To: <5791EF62.5070006@arm.com>
+References: <cover.1468970114.git.geoff@infradead.org>
+ <9ed513fd44a19b2f49b4da99477cedfff7341bf0.1468970114.git.geoff@infradead.org>
+ <20160720153859.GG24691@leverpostej>
+ <1469042361.2977.90.camel@infradead.org>
+ <20160721103120.GB20559@leverpostej> <5790A902.6070601@arm.com>
+ <1469137776.2977.128.camel@infradead.org>
+ <20160722040842.GA14911@localhost.localdomain> <5791EF62.5070006@arm.com>
+Message-ID: <1469483761.2889.10.camel@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 July 2016 at 14:36, Greg KH <gregkh@linuxfoundation.org> wrote:
-> On Mon, Jul 25, 2016 at 10:17:36AM -0600, Mathieu Poirier wrote:
->> Good day Greg,
->>
->> A while back I sent a set of CoreSight related patches for you to
->> consider for the 4.8 cycle.  Since then I haven't received the usual
->> set of emails telling me the patches have been added to your next
->> tree.  With the merge window now being open I was wondering if the
->> patches have reached you and if you had the opportunity to look at
->> them.
->
-> Yes, I got them, right on the day after I left for vacation, and I've
-> been traveling since :(
->
-> It missed 4.8, so unless these are bugfixes/regressions that need to get
-> into 4.8, I'll queue them up for 4.9.  If they are things that should
-> get in, can you resend this as 2 series, one for 4.8 and one for 4.9?
->
-> thanks, and sorry about that.
+On Fri, 2016-07-22 at 11:03 +0100, Robin Murphy wrote:
 
-Since there will be more patches for the 4.9 cycle,  I suggest you
-forget about this set and I'll send another one that includes
-everything.
+> I suggest we simply copy the purgatory
+> console
+> implementation from, say, ARM or Alpha.
 
->
-> greg k-h
+I decided on what mips had.  It was a little more applicable.
+
+I put the code I removed into a separate patch, 'arm64: Add
+purgatory printing' that we can use to build the perfect bike
+shed later.
+
+-Geoff
