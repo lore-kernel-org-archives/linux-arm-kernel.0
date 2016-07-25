@@ -1,117 +1,122 @@
-From: labbott@redhat.com (Laura Abbott)
-Date: Mon, 25 Jul 2016 12:16:24 -0700
-Subject: [PATCH v4 12/12] mm: SLUB hardened usercopy support
-In-Reply-To: <1469046427-12696-13-git-send-email-keescook@chromium.org>
-References: <1469046427-12696-1-git-send-email-keescook@chromium.org>
- <1469046427-12696-13-git-send-email-keescook@chromium.org>
-Message-ID: <0f980e84-b587-3d9e-3c26-ad57f947c08b@redhat.com>
+From: mitchelh@codeaurora.org (Mitchel Humpherys)
+Date: Mon, 25 Jul 2016 12:16:47 -0700
+Subject: [PATCH v4 4/6] arm64/dma-mapping: Implement DMA_ATTR_PRIVILEGED
+In-Reply-To: <20160725191649.13414-1-mitchelh@codeaurora.org>
+References: <20160725191649.13414-1-mitchelh@codeaurora.org>
+Message-ID: <20160725191649.13414-5-mitchelh@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/20/2016 01:27 PM, Kees Cook wrote:
-> Under CONFIG_HARDENED_USERCOPY, this adds object size checking to the
-> SLUB allocator to catch any copies that may span objects. Includes a
-> redzone handling fix discovered by Michael Ellerman.
->
-> Based on code from PaX and grsecurity.
->
-> Signed-off-by: Kees Cook <keescook@chromium.org>
-> Tested-by: Michael Ellerman <mpe@ellerman.id.au>
-> ---
->  init/Kconfig |  1 +
->  mm/slub.c    | 36 ++++++++++++++++++++++++++++++++++++
->  2 files changed, 37 insertions(+)
->
-> diff --git a/init/Kconfig b/init/Kconfig
-> index 798c2020ee7c..1c4711819dfd 100644
-> --- a/init/Kconfig
-> +++ b/init/Kconfig
-> @@ -1765,6 +1765,7 @@ config SLAB
->
->  config SLUB
->  	bool "SLUB (Unqueued Allocator)"
-> +	select HAVE_HARDENED_USERCOPY_ALLOCATOR
->  	help
->  	   SLUB is a slab allocator that minimizes cache line usage
->  	   instead of managing queues of cached objects (SLAB approach).
-> diff --git a/mm/slub.c b/mm/slub.c
-> index 825ff4505336..7dee3d9a5843 100644
-> --- a/mm/slub.c
-> +++ b/mm/slub.c
-> @@ -3614,6 +3614,42 @@ void *__kmalloc_node(size_t size, gfp_t flags, int node)
->  EXPORT_SYMBOL(__kmalloc_node);
->  #endif
->
-> +#ifdef CONFIG_HARDENED_USERCOPY
-> +/*
-> + * Rejects objects that are incorrectly sized.
-> + *
-> + * Returns NULL if check passes, otherwise const char * to name of cache
-> + * to indicate an error.
-> + */
-> +const char *__check_heap_object(const void *ptr, unsigned long n,
-> +				struct page *page)
-> +{
-> +	struct kmem_cache *s;
-> +	unsigned long offset;
-> +	size_t object_size;
-> +
-> +	/* Find object and usable object size. */
-> +	s = page->slab_cache;
-> +	object_size = slab_ksize(s);
-> +
-> +	/* Find offset within object. */
-> +	offset = (ptr - page_address(page)) % s->size;
-> +
-> +	/* Adjust for redzone and reject if within the redzone. */
-> +	if (kmem_cache_debug(s) && s->flags & SLAB_RED_ZONE) {
-> +		if (offset < s->red_left_pad)
-> +			return s->name;
-> +		offset -= s->red_left_pad;
-> +	}
-> +
-> +	/* Allow address range falling entirely within object size. */
-> +	if (offset <= object_size && n <= object_size - offset)
-> +		return NULL;
-> +
-> +	return s->name;
-> +}
-> +#endif /* CONFIG_HARDENED_USERCOPY */
-> +
+The newly added DMA_ATTR_PRIVILEGED is useful for creating mappings that
+are only accessible to privileged DMA engines.  Implement it in
+dma-iommu.c so that the ARM64 DMA IOMMU mapper can make use of it.
 
-I compared this against what check_valid_pointer does for SLUB_DEBUG
-checking. I was hoping we could utilize that function to avoid
-duplication but a) __check_heap_object needs to allow accesses anywhere
-in the object, not just the beginning b) accessing page->objects
-is racy without the addition of locking in SLUB_DEBUG.
+Signed-off-by: Mitchel Humpherys <mitchelh@codeaurora.org>
+---
 
-Still, the ptr < page_address(page) check from __check_heap_object would
-be good to add to avoid generating garbage large offsets and trying to
-infer C math.
+Notes:
+    v3..v4
+    
+      - Reworked against the new dma attrs format
+    
+    v2..v3
+    
+      - Renamed and redocumented dma_direction_to_prot.
+      - Dropped the stuff making all privileged mappings read-only.
 
-diff --git a/mm/slub.c b/mm/slub.c
-index 7dee3d9..5370e4f 100644
---- a/mm/slub.c
-+++ b/mm/slub.c
-@@ -3632,6 +3632,9 @@ const char *__check_heap_object(const void *ptr, unsigned long n,
-         s = page->slab_cache;
-         object_size = slab_ksize(s);
-  
-+       if (ptr < page_address(page))
-+               return s->name;
-+
-         /* Find offset within object. */
-         offset = (ptr - page_address(page)) % s->size;
-  
+ arch/arm64/mm/dma-mapping.c |  6 +++---
+ drivers/iommu/dma-iommu.c   | 16 +++++++++++-----
+ include/linux/dma-iommu.h   |  3 ++-
+ 3 files changed, 16 insertions(+), 9 deletions(-)
 
-With that, you can add
-
-Reviwed-by: Laura Abbott <labbott@redhat.com>
-
->  static size_t __ksize(const void *object)
->  {
->  	struct page *page;
->
-
-Thanks,
-Laura
+diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+index c4284c432ae8..1c6f85c56115 100644
+--- a/arch/arm64/mm/dma-mapping.c
++++ b/arch/arm64/mm/dma-mapping.c
+@@ -556,7 +556,7 @@ static void *__iommu_alloc_attrs(struct device *dev, size_t size,
+ 				 unsigned long attrs)
+ {
+ 	bool coherent = is_device_dma_coherent(dev);
+-	int ioprot = dma_direction_to_prot(DMA_BIDIRECTIONAL, coherent);
++	int ioprot = dma_info_to_prot(DMA_BIDIRECTIONAL, coherent, attrs);
+ 	size_t iosize = size;
+ 	void *addr;
+ 
+@@ -710,7 +710,7 @@ static dma_addr_t __iommu_map_page(struct device *dev, struct page *page,
+ 				   unsigned long attrs)
+ {
+ 	bool coherent = is_device_dma_coherent(dev);
+-	int prot = dma_direction_to_prot(dir, coherent);
++	int prot = dma_info_to_prot(dir, coherent, attrs);
+ 	dma_addr_t dev_addr = iommu_dma_map_page(dev, page, offset, size, prot);
+ 
+ 	if (!iommu_dma_mapping_error(dev, dev_addr) &&
+@@ -768,7 +768,7 @@ static int __iommu_map_sg_attrs(struct device *dev, struct scatterlist *sgl,
+ 		__iommu_sync_sg_for_device(dev, sgl, nelems, dir);
+ 
+ 	return iommu_dma_map_sg(dev, sgl, nelems,
+-			dma_direction_to_prot(dir, coherent));
++				dma_info_to_prot(dir, coherent, attrs));
+ }
+ 
+ static void __iommu_unmap_sg_attrs(struct device *dev,
+diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
+index 08a1e2f3690f..5e1e495b35f8 100644
+--- a/drivers/iommu/dma-iommu.c
++++ b/drivers/iommu/dma-iommu.c
+@@ -129,26 +129,32 @@ int iommu_dma_init_domain(struct iommu_domain *domain, dma_addr_t base, u64 size
+ EXPORT_SYMBOL(iommu_dma_init_domain);
+ 
+ /**
+- * dma_direction_to_prot - Translate DMA API directions to IOMMU API page flags
++ * dma_info_to_prot - Translate DMA API directions and attributes to IOMMU API
++ *                    page flags.
+  * @dir: Direction of DMA transfer
+  * @coherent: Is the DMA master cache-coherent?
++ * @attrs: DMA attributes for the mapping
+  *
+  * Return: corresponding IOMMU API page protection flags
+  */
+-int dma_direction_to_prot(enum dma_data_direction dir, bool coherent)
++int dma_info_to_prot(enum dma_data_direction dir, bool coherent,
++		     unsigned long attrs)
+ {
+ 	int prot = coherent ? IOMMU_CACHE : 0;
+ 
+ 	switch (dir) {
+ 	case DMA_BIDIRECTIONAL:
+-		return prot | IOMMU_READ | IOMMU_WRITE;
++		prot |= IOMMU_READ | IOMMU_WRITE;
+ 	case DMA_TO_DEVICE:
+-		return prot | IOMMU_READ;
++		prot |= IOMMU_READ;
+ 	case DMA_FROM_DEVICE:
+-		return prot | IOMMU_WRITE;
++		prot |= IOMMU_WRITE;
+ 	default:
+ 		return 0;
+ 	}
++	if (attrs & DMA_ATTR_PRIVILEGED)
++		prot |= IOMMU_PRIV;
++	return prot;
+ }
+ 
+ static struct iova *__alloc_iova(struct iova_domain *iovad, size_t size,
+diff --git a/include/linux/dma-iommu.h b/include/linux/dma-iommu.h
+index 81c5c8d167ad..b367613d49ba 100644
+--- a/include/linux/dma-iommu.h
++++ b/include/linux/dma-iommu.h
+@@ -32,7 +32,8 @@ void iommu_put_dma_cookie(struct iommu_domain *domain);
+ int iommu_dma_init_domain(struct iommu_domain *domain, dma_addr_t base, u64 size);
+ 
+ /* General helpers for DMA-API <-> IOMMU-API interaction */
+-int dma_direction_to_prot(enum dma_data_direction dir, bool coherent);
++int dma_info_to_prot(enum dma_data_direction dir, bool coherent,
++		     unsigned long attrs);
+ 
+ /*
+  * These implement the bulk of the relevant DMA mapping callbacks, but require
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
