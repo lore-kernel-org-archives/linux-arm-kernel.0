@@ -1,152 +1,75 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 25 Jul 2016 16:41:03 +0100
-Subject: [RFC PATCH v3 05/13] drivers: iommu: make iommu_fwspec OF agnostic
-In-Reply-To: <1499f802-5f98-b0c0-d3aa-dabcac81e84e@arm.com>
-References: <1469013815-24380-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1469013815-24380-6-git-send-email-lorenzo.pieralisi@arm.com>
- <1499f802-5f98-b0c0-d3aa-dabcac81e84e@arm.com>
-Message-ID: <20160725154103.GA28507@red-moon>
+From: fu.wei@linaro.org (Fu Wei)
+Date: Mon, 25 Jul 2016 23:50:19 +0800
+Subject: [PATCH v8 4/9] clocksource/drivers/arm_arch_timer: use readq to
+ get 64-bit CNTVCT
+In-Reply-To: <20160725090258.GA15864@arm.com>
+References: <1468952284-28942-1-git-send-email-fu.wei@linaro.org>
+ <1468952284-28942-5-git-send-email-fu.wei@linaro.org>
+ <20160725090258.GA15864@arm.com>
+Message-ID: <CADyBb7tR4+78k52JrVZGo9FMuO8a8RBTTYK7PBx1RzP3Lx9snQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 25, 2016 at 04:09:55PM +0100, Robin Murphy wrote:
-> Hi Lorenzo,
-> 
-> On 20/07/16 12:23, Lorenzo Pieralisi wrote:
-> > The iommu_fwspec structure, used to hold per device iommu configuration
-> > data is not OF specific and therefore can be moved to a generic
-> > and OF independent compilation unit.
-> > 
-> > In particular, the iommu_fwspec handling hinges on the device_node
-> > pointer to identify the IOMMU device associated with the iommu_fwspec
-> > structure, that is easily converted to a more generic fwnode_handle
-> > pointer that can cater for OF and non-OF (ie ACPI) systems.
-> > 
-> > Create the files and related Kconfig entry to decouple iommu_fwspec
-> > structure from the OF iommu kernel layer.
-> > 
-> > Given that the current iommu_fwspec implementation relies on
-> > the arch specific struct device.archdata.iommu field in its
-> > implementation, by making the code standalone and independent
-> > of the OF layer this patch makes sure that the iommu_fwspec
-> > kernel code can be selected only on arches implementing the
-> > struct device.archdata.iommu field by adding an explicit
-> > arch dependency in its config entry.
-> > 
-> > Current drivers using the iommu_fwspec for streamid translation
-> > are converted to the new iommu_fwspec API by simply converting
-> > the device_node to its fwnode_handle pointer.
-> > 
-> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > Cc: Will Deacon <will.deacon@arm.com>
-> > Cc: Hanjun Guo <hanjun.guo@linaro.org>
-> > Cc: Robin Murphy <robin.murphy@arm.com>
-> > Cc: Joerg Roedel <joro@8bytes.org>
-> > ---
-> >  drivers/iommu/Kconfig        |   4 ++
-> >  drivers/iommu/Makefile       |   1 +
-> >  drivers/iommu/arm-smmu-v3.c  |  13 +++--
-> >  drivers/iommu/iommu-fwspec.c | 114 +++++++++++++++++++++++++++++++++++++++++++
-> >  drivers/iommu/of_iommu.c     |  52 --------------------
-> >  include/linux/iommu-fwspec.h |  60 +++++++++++++++++++++++
-> >  include/linux/of_iommu.h     |  24 +++------
-> >  7 files changed, 196 insertions(+), 72 deletions(-)
-> >  create mode 100644 drivers/iommu/iommu-fwspec.c
-> >  create mode 100644 include/linux/iommu-fwspec.h
-> > 
-> > diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
-> > index d1c66af..2b26bfb 100644
-> > --- a/drivers/iommu/Kconfig
-> > +++ b/drivers/iommu/Kconfig
-> > @@ -67,6 +67,10 @@ config OF_IOMMU
-> >         def_bool y
-> >         depends on OF && IOMMU_API
-> >  
-> > +config IOMMU_FWSPEC
-> > +       def_bool y
-> > +       depends on ARM64 && IOMMU_API
-> 
-> I think that could be at least (ARM || ARM64).
+Hi Will,
 
-Yes agreed.
+On 25 July 2016 at 17:02, Will Deacon <will.deacon@arm.com> wrote:
+> On Wed, Jul 20, 2016 at 02:17:59AM +0800, fu.wei at linaro.org wrote:
+>> From: Fu Wei <fu.wei@linaro.org>
+>>
+>> This patch simplify arch_counter_get_cntvct_mem function by
+>> using readq to get 64-bit CNTVCT value instead of readl_relaxed.
+>>
+>> Signed-off-by: Fu Wei <fu.wei@linaro.org>
+>> ---
+>>  drivers/clocksource/arm_arch_timer.c | 10 +---------
+>>  1 file changed, 1 insertion(+), 9 deletions(-)
+>>
+>> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+>> index e6fd42d..483d2f9 100644
+>> --- a/drivers/clocksource/arm_arch_timer.c
+>> +++ b/drivers/clocksource/arm_arch_timer.c
+>> @@ -418,15 +418,7 @@ u32 arch_timer_get_rate(void)
+>>
+>>  static u64 arch_counter_get_cntvct_mem(void)
+>>  {
+>> -     u32 vct_lo, vct_hi, tmp_hi;
+>> -
+>> -     do {
+>> -             vct_hi = readl_relaxed(arch_counter_base + CNTVCT_HI);
+>> -             vct_lo = readl_relaxed(arch_counter_base + CNTVCT_LO);
+>> -             tmp_hi = readl_relaxed(arch_counter_base + CNTVCT_HI);
+>> -     } while (vct_hi != tmp_hi);
+>> -
+>> -     return ((u64) vct_hi << 32) | vct_lo;
+>> +     return readq(arch_counter_base + CNTVCT_LO);
+>
 
-> >  # IOMMU-agnostic DMA-mapping layer
-> >  config IOMMU_DMA
-> >  	bool
-> 
-> [...]
-> 
-> > diff --git a/include/linux/of_iommu.h b/include/linux/of_iommu.h
-> > index 308791f..2362232 100644
-> > --- a/include/linux/of_iommu.h
-> > +++ b/include/linux/of_iommu.h
-> > @@ -15,13 +15,8 @@ extern void of_iommu_init(void);
-> >  extern const struct iommu_ops *of_iommu_configure(struct device *dev,
-> >  					struct device_node *master_np);
-> >  
-> > -struct iommu_fwspec {
-> > -	const struct iommu_ops	*iommu_ops;
-> > -	struct device_node	*iommu_np;
-> > -	void			*iommu_priv;
-> > -	unsigned int		num_ids;
-> > -	u32			ids[];
-> > -};
-> > +void of_iommu_set_ops(struct device_node *np, const struct iommu_ops *ops);
-> > +const struct iommu_ops *of_iommu_get_ops(struct device_node *np);
-> 
-> Is there some reason we need to retain the existing definitions of
-> these? I was assuming we'd be able to move the entire implementation
-> over to the fwspec code and leave behind nothing more than trivial
-> wrappers, e.g.:
-> 
-> #define of_iommu_get_ops(np) iommu_fwspec_get_ops(&(np)->fwnode_handle)
+Sorry, right after posting v9, I got your comment,
 
-Yep, that's exactly what I did but then I was bitten by config
-dependencies. If we implement of_iommu_get/set_ops() as wrappers,
-we have to compile iommu_fwspec_get/set_ops() on arches that may
-not have struct dev_archdata.iommu, unless we introduce yet another
-config symbol to avoid compiling that code (see eg iommu_fwspec_init(),
-we can't compile it on eg x86 even though we do need of_iommu_get_ops()
-on it - so iommu_fwspec_get_ops(), that lives in the same compilation
-unit as eg iommu_fwspec_init()).
+> What's the benefit of doing this? If you use readq here, how can we
 
-So short answer is: there is no reason apart from dev_archdata.iommu
-being arch specific, if we were able to move iommu_fwspec to generic
-code (ie struct device, somehow) I would certainly get rid of this
-stupid code duplication (or as I said I can add a config entry for
-that, more ideas are welcome).
+benefit:
+1. simplify the code
+2. from arch/arm64/include/asm/io.h, I guess readq is more efficient
 
-Thanks,
-Lorenzo
+> guarantee that (a) the endpoint won't generate a SLVERR or similar and
+> (b) that we get ?
 
-> 
-> Robin.
-> 
-> >  #else
-> >  
-> > @@ -39,17 +34,14 @@ static inline const struct iommu_ops *of_iommu_configure(struct device *dev,
-> >  	return NULL;
-> >  }
-> >  
-> > -struct iommu_fwspec;
-> > -
-> > -#endif	/* CONFIG_OF_IOMMU */
-> > +static inline void of_iommu_set_ops(struct device_node *np,
-> > +				    const struct iommu_ops *ops)
-> > +{ }
-> >  
-> > -int iommu_fwspec_init(struct device *dev, struct device_node *iommu_np);
-> > -void iommu_fwspec_free(struct device *dev);
-> > -int iommu_fwspec_add_ids(struct device *dev, u32 *ids, int num_ids);
-> > -struct iommu_fwspec *dev_iommu_fwspec(struct device *dev);
-> > +static inline const struct iommu_ops *
-> > +of_iommu_get_ops(struct device_node *np) { return NULL; }
-> >  
-> > -void of_iommu_set_ops(struct device_node *np, const struct iommu_ops *ops);
-> > -const struct iommu_ops *of_iommu_get_ops(struct device_node *np);
-> > +#endif	/* CONFIG_OF_IOMMU */
-> >  
-> >  extern struct of_device_id __iommu_of_table;
-> >  
-> > 
-> 
+I think so, according to arch/arm64/include/asm/io.h.
+readq Implement by "LDR" and "LDAR", So I think It is an atomic read.
+
+Please correct me, If I misunderstand something, thanks
+
+>
+> "If it ain't broke, don't fix it"
+>
+> Will
+
+
+
+-- 
+Best regards,
+
+Fu Wei
+Software Engineer
+Red Hat
