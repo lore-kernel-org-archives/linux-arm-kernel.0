@@ -1,162 +1,146 @@
-From: iwamatsu@nigauri.org (Nobuhiro Iwamatsu)
-Date: Tue, 26 Jul 2016 06:30:08 +0900
-Subject: [PATCH] ARM: dts: socfpga: Add Macnica sodia board
-Message-ID: <1469482208-5071-1-git-send-email-iwamatsu@nigauri.org>
+From: riel@redhat.com (Rik van Riel)
+Date: Mon, 25 Jul 2016 17:42:03 -0400
+Subject: [PATCH v4 12/12] mm: SLUB hardened usercopy support
+In-Reply-To: <0f980e84-b587-3d9e-3c26-ad57f947c08b@redhat.com>
+References: <1469046427-12696-1-git-send-email-keescook@chromium.org>
+ <1469046427-12696-13-git-send-email-keescook@chromium.org>
+ <0f980e84-b587-3d9e-3c26-ad57f947c08b@redhat.com>
+Message-ID: <1469482923.30053.122.camel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for board based on the Altera Cyclone V SoC.
-This board has the following functions:
-    - 1 GiB of DRAM
-    - 1 Gigabit ethernet
-    - 1 SD card slot
-    - 1 USB gadget port
-    - QSPI NOR Flash
-    - I2C EEPROMs and I2C RTC
-    - DVI output
-    - Audio port
+On Mon, 2016-07-25 at 12:16 -0700, Laura Abbott wrote:
+> On 07/20/2016 01:27 PM, Kees Cook wrote:
+> > Under CONFIG_HARDENED_USERCOPY, this adds object size checking to
+> > the
+> > SLUB allocator to catch any copies that may span objects. Includes
+> > a
+> > redzone handling fix discovered by Michael Ellerman.
+> > 
+> > Based on code from PaX and grsecurity.
+> > 
+> > Signed-off-by: Kees Cook <keescook@chromium.org>
+> > Tested-by: Michael Ellerman <mpe@ellerman.id.au>
+> > ---
+> > ?init/Kconfig |??1 +
+> > ?mm/slub.c????| 36 ++++++++++++++++++++++++++++++++++++
+> > ?2 files changed, 37 insertions(+)
+> > 
+> > diff --git a/init/Kconfig b/init/Kconfig
+> > index 798c2020ee7c..1c4711819dfd 100644
+> > --- a/init/Kconfig
+> > +++ b/init/Kconfig
+> > @@ -1765,6 +1765,7 @@ config SLAB
+> > 
+> > ?config SLUB
+> > ?	bool "SLUB (Unqueued Allocator)"
+> > +	select HAVE_HARDENED_USERCOPY_ALLOCATOR
+> > ?	help
+> > ?	???SLUB is a slab allocator that minimizes cache line
+> > usage
+> > ?	???instead of managing queues of cached objects (SLAB
+> > approach).
+> > diff --git a/mm/slub.c b/mm/slub.c
+> > index 825ff4505336..7dee3d9a5843 100644
+> > --- a/mm/slub.c
+> > +++ b/mm/slub.c
+> > @@ -3614,6 +3614,42 @@ void *__kmalloc_node(size_t size, gfp_t
+> > flags, int node)
+> > ?EXPORT_SYMBOL(__kmalloc_node);
+> > ?#endif
+> > 
+> > +#ifdef CONFIG_HARDENED_USERCOPY
+> > +/*
+> > + * Rejects objects that are incorrectly sized.
+> > + *
+> > + * Returns NULL if check passes, otherwise const char * to name of
+> > cache
+> > + * to indicate an error.
+> > + */
+> > +const char *__check_heap_object(const void *ptr, unsigned long n,
+> > +				struct page *page)
+> > +{
+> > +	struct kmem_cache *s;
+> > +	unsigned long offset;
+> > +	size_t object_size;
+> > +
+> > +	/* Find object and usable object size. */
+> > +	s = page->slab_cache;
+> > +	object_size = slab_ksize(s);
+> > +
+> > +	/* Find offset within object. */
+> > +	offset = (ptr - page_address(page)) % s->size;
+> > +
+> > +	/* Adjust for redzone and reject if within the redzone. */
+> > +	if (kmem_cache_debug(s) && s->flags & SLAB_RED_ZONE) {
+> > +		if (offset < s->red_left_pad)
+> > +			return s->name;
+> > +		offset -= s->red_left_pad;
+> > +	}
+> > +
+> > +	/* Allow address range falling entirely within object
+> > size. */
+> > +	if (offset <= object_size && n <= object_size - offset)
+> > +		return NULL;
+> > +
+> > +	return s->name;
+> > +}
+> > +#endif /* CONFIG_HARDENED_USERCOPY */
+> > +
+> 
+> I compared this against what check_valid_pointer does for SLUB_DEBUG
+> checking. I was hoping we could utilize that function to avoid
+> duplication but a) __check_heap_object needs to allow accesses
+> anywhere
+> in the object, not just the beginning b) accessing page->objects
+> is racy without the addition of locking in SLUB_DEBUG.
+> 
+> Still, the ptr < page_address(page) check from __check_heap_object
+> would
+> be good to add to avoid generating garbage large offsets and trying
+> to
+> infer C math.
+> 
+> diff --git a/mm/slub.c b/mm/slub.c
+> index 7dee3d9..5370e4f 100644
+> --- a/mm/slub.c
+> +++ b/mm/slub.c
+> @@ -3632,6 +3632,9 @@ const char *__check_heap_object(const void
+> *ptr, unsigned long n,
+> ?????????s = page->slab_cache;
+> ?????????object_size = slab_ksize(s);
+> ??
+> +???????if (ptr < page_address(page))
+> +???????????????return s->name;
+> +
+> ?????????/* Find offset within object. */
+> ?????????offset = (ptr - page_address(page)) % s->size;
+>?
 
-This commit supports without QSPI, DVI and Audio.
+I don't get it, isn't that already guaranteed because we
+look for the page that ptr is in, before __check_heap_object
+is called?
 
-Signed-off-by: Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
----
- arch/arm/boot/dts/Makefile                   |   1 +
- arch/arm/boot/dts/socfpga_cyclone5_sodia.dts | 115 +++++++++++++++++++++++++++
- 2 files changed, 116 insertions(+)
- create mode 100644 arch/arm/boot/dts/socfpga_cyclone5_sodia.dts
+Specifically, in patch 3/12:
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 06b6c2d..b85f872 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -650,6 +650,7 @@ dtb-$(CONFIG_ARCH_SOCFPGA) += \
- 	socfpga_cyclone5_de0_sockit.dtb \
- 	socfpga_cyclone5_sockit.dtb \
- 	socfpga_cyclone5_socrates.dtb \
-+	socfpga_cyclone5_sodia.dtb \
- 	socfpga_cyclone5_vining_fpga.dtb \
- 	socfpga_vt.dtb
- dtb-$(CONFIG_ARCH_SPEAR13XX) += \
-diff --git a/arch/arm/boot/dts/socfpga_cyclone5_sodia.dts b/arch/arm/boot/dts/socfpga_cyclone5_sodia.dts
-new file mode 100644
-index 0000000..15354e5
---- /dev/null
-+++ b/arch/arm/boot/dts/socfpga_cyclone5_sodia.dts
-@@ -0,0 +1,115 @@
-+/*
-+ *  Copyright (C) 2016 Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
++???????page = virt_to_head_page(ptr);
 +
-+#include "socfpga_cyclone5.dtsi"
-+#include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/input/input.h>
-+
-+/ {
-+	model = "Altera SOCFPGA Cyclone V SoC Macnica Sodia board";
-+	compatible = "altr,socfpga-cyclone5", "altr,socfpga";
-+
-+	chosen {
-+		bootargs = "earlyprintk";
-+		stdout-path = "serial0:115200n8";
-+	};
-+
-+	memory {
-+		name = "memory";
-+		device_type = "memory";
-+		reg = <0x0 0x40000000>;
-+	};
-+
-+	aliases {
-+		ethernet0 = &gmac1;
-+	};
-+
-+	regulator_3_3v: 3-3-v-regulator {
-+		compatible = "regulator-fixed";
-+		regulator-name = "3.3V";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+	};
-+
-+	leds: gpio-leds {
-+		compatible = "gpio-leds";
-+
-+		hps_led0 {
-+			label = "hps:green:led0";
-+			gpios = <&portb 12 GPIO_ACTIVE_LOW>;
-+		};
-+
-+		hps_led1 {
-+			label = "hps:green:led1";
-+			gpios = <&portb 13 GPIO_ACTIVE_LOW>;
-+		};
-+
-+		hps_led2 {
-+			label = "hps:green:led2";
-+			gpios = <&portb 14 GPIO_ACTIVE_LOW>;
-+		};
-+
-+		hps_led3 {
-+			label = "hps:green:led3";
-+			gpios = <&portb 15 GPIO_ACTIVE_LOW>;
-+		};
-+	};
-+};
-+
-+&gmac1 {
-+	status = "okay";
-+	phy-mode = "rgmii";
-+
-+	rxd0-skew-ps = <0>;
-+	rxd1-skew-ps = <0>;
-+	rxd2-skew-ps = <0>;
-+	rxd3-skew-ps = <0>;
-+	rxdv-skew-ps = <0>;
-+	rxc-skew-ps = <3000>;
-+	txen-skew-ps = <0>;
-+	txc-skew-ps = <3000>;
-+};
-+
-+&gpio1 {
-+	status = "okay";
-+};
-+
-+&i2c0 {
-+	status = "okay";
-+
-+	eeprom at 51 {
-+		compatible = "atmel,24c32";
-+		reg = <0x51>;
-+		pagesize = <32>;
-+	};
-+
-+	rtc at 68 {
-+		compatible = "dallas,ds1339";
-+		reg = <0x68>;
-+	};
-+};
-+
-+&mmc0 {
-+	cd-gpios = <&portb 18 0>;
-+	vmmc-supply = <&regulator_3_3v>;
-+	vqmmc-supply = <&regulator_3_3v>;
-+	status = "okay";
-+};
-+
-+&usb1 {
-+	status = "okay";
-+};
++???????/* Check slab allocator for flags and size. */
++???????if (PageSlab(page))
++???????????????return __check_heap_object(ptr, n, page);
+
+How can that generate a ptr that is not inside the page?
+
+What am I overlooking? ?And, should it be in the changelog or
+a comment? :)
+
 -- 
-2.8.1
+
+All Rights Reversed.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160725/cdce2ed3/attachment-0001.sig>
