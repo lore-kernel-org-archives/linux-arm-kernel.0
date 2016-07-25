@@ -1,70 +1,86 @@
-From: fu.wei@linaro.org (Fu Wei)
-Date: Mon, 25 Jul 2016 23:55:49 +0800
-Subject: [PATCH v9 4/9] clocksource/drivers/arm_arch_timer: use readq to
- get 64-bit CNTVCT
-In-Reply-To: <20160725153118.GD19209@arm.com>
-References: <1469460427-8643-1-git-send-email-fu.wei@linaro.org>
- <1469460427-8643-5-git-send-email-fu.wei@linaro.org>
- <20160725153118.GD19209@arm.com>
-Message-ID: <CADyBb7ubKceQiB7+u7sSA=1+9_VMUrGjiabf_FkN2-n4rq7Kgg@mail.gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 25 Jul 2016 16:56:21 +0100
+Subject: [RFC PATCH v3 05/13] drivers: iommu: make iommu_fwspec OF agnostic
+In-Reply-To: <CAL_JsqKc4aJ1xiJAS6HRKeVO8mrZWpBF0uugvmCgNuUamJF=Eg@mail.gmail.com>
+References: <1469013815-24380-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1469013815-24380-6-git-send-email-lorenzo.pieralisi@arm.com>
+ <1499f802-5f98-b0c0-d3aa-dabcac81e84e@arm.com>
+ <CAL_JsqKc4aJ1xiJAS6HRKeVO8mrZWpBF0uugvmCgNuUamJF=Eg@mail.gmail.com>
+Message-ID: <20160725155620.GB28507@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+On Mon, Jul 25, 2016 at 10:21:10AM -0500, Rob Herring wrote:
+> On Mon, Jul 25, 2016 at 10:09 AM, Robin Murphy <robin.murphy@arm.com> wrote:
+> > Hi Lorenzo,
+> >
+> > On 20/07/16 12:23, Lorenzo Pieralisi wrote:
+> >> The iommu_fwspec structure, used to hold per device iommu configuration
+> >> data is not OF specific and therefore can be moved to a generic
+> >> and OF independent compilation unit.
+> >>
+> >> In particular, the iommu_fwspec handling hinges on the device_node
+> >> pointer to identify the IOMMU device associated with the iommu_fwspec
+> >> structure, that is easily converted to a more generic fwnode_handle
+> >> pointer that can cater for OF and non-OF (ie ACPI) systems.
+> >>
+> >> Create the files and related Kconfig entry to decouple iommu_fwspec
+> >> structure from the OF iommu kernel layer.
+> >>
+> >> Given that the current iommu_fwspec implementation relies on
+> >> the arch specific struct device.archdata.iommu field in its
+> >> implementation, by making the code standalone and independent
+> >> of the OF layer this patch makes sure that the iommu_fwspec
+> >> kernel code can be selected only on arches implementing the
+> >> struct device.archdata.iommu field by adding an explicit
+> >> arch dependency in its config entry.
+> >>
+> >> Current drivers using the iommu_fwspec for streamid translation
+> >> are converted to the new iommu_fwspec API by simply converting
+> >> the device_node to its fwnode_handle pointer.
+> >>
+> >> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> >> Cc: Will Deacon <will.deacon@arm.com>
+> >> Cc: Hanjun Guo <hanjun.guo@linaro.org>
+> >> Cc: Robin Murphy <robin.murphy@arm.com>
+> >> Cc: Joerg Roedel <joro@8bytes.org>
+> >> ---
+> >>  drivers/iommu/Kconfig        |   4 ++
+> >>  drivers/iommu/Makefile       |   1 +
+> >>  drivers/iommu/arm-smmu-v3.c  |  13 +++--
+> >>  drivers/iommu/iommu-fwspec.c | 114 +++++++++++++++++++++++++++++++++++++++++++
+> >>  drivers/iommu/of_iommu.c     |  52 --------------------
+> >>  include/linux/iommu-fwspec.h |  60 +++++++++++++++++++++++
+> >>  include/linux/of_iommu.h     |  24 +++------
+> >>  7 files changed, 196 insertions(+), 72 deletions(-)
+> >>  create mode 100644 drivers/iommu/iommu-fwspec.c
+> >>  create mode 100644 include/linux/iommu-fwspec.h
+> >>
+> >> diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
+> >> index d1c66af..2b26bfb 100644
+> >> --- a/drivers/iommu/Kconfig
+> >> +++ b/drivers/iommu/Kconfig
+> >> @@ -67,6 +67,10 @@ config OF_IOMMU
+> >>         def_bool y
+> >>         depends on OF && IOMMU_API
+> >>
+> >> +config IOMMU_FWSPEC
+> >> +       def_bool y
+> >> +       depends on ARM64 && IOMMU_API
+> >
+> > I think that could be at least (ARM || ARM64).
+> 
+> Why any arch dependency?
+> 
+> Seems like OF_IOMMU (and ACPI?) should select this.
 
-On 25 July 2016 at 23:31, Will Deacon <will.deacon@arm.com> wrote:
-> On Mon, Jul 25, 2016 at 11:27:02PM +0800, fu.wei at linaro.org wrote:
->> From: Fu Wei <fu.wei@linaro.org>
->>
->> This patch simplify arch_counter_get_cntvct_mem function by
->> using readq to get 64-bit CNTVCT value instead of readl_relaxed.
->>
->> Signed-off-by: Fu Wei <fu.wei@linaro.org>
->> ---
->>  drivers/clocksource/arm_arch_timer.c | 10 +---------
->>  1 file changed, 1 insertion(+), 9 deletions(-)
->>
->> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
->> index e6fd42d..483d2f9 100644
->> --- a/drivers/clocksource/arm_arch_timer.c
->> +++ b/drivers/clocksource/arm_arch_timer.c
->> @@ -418,15 +418,7 @@ u32 arch_timer_get_rate(void)
->>
->>  static u64 arch_counter_get_cntvct_mem(void)
->>  {
->> -     u32 vct_lo, vct_hi, tmp_hi;
->> -
->> -     do {
->> -             vct_hi = readl_relaxed(arch_counter_base + CNTVCT_HI);
->> -             vct_lo = readl_relaxed(arch_counter_base + CNTVCT_LO);
->> -             tmp_hi = readl_relaxed(arch_counter_base + CNTVCT_HI);
->> -     } while (vct_hi != tmp_hi);
->> -
->> -     return ((u64) vct_hi << 32) | vct_lo;
->> +     return readq(arch_counter_base + CNTVCT_LO);
->
-> Please drop this patch. It doesn't work.
+Absolutely, that's the end goal. Current issue is that the iommu_fwspec
+mechanism relies on dev_archdata.iommu pointer internally to work and
+since that's arch specific I can't select it on arches that do not have
+that field, it would break the compilation.
 
-I am OK to drop this, but could you let me know why it doesn't work?
+I will follow up with Robin to make sure we will be able to
+implement what you request above.
 
-I did get some problem on Foundation model about readq, but it works on Seattle.
-I guess that is a problem of model, but not a code problem.
-So I just got confused, why readq  doesn't work,  :-)
-
-
->
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2016-July/445369.html
-
-I just replied to it, sorry.
-
->
-> Will
-
-
-
--- 
-Best regards,
-
-Fu Wei
-Software Engineer
-Red Hat
+Thanks !
+Lorenzo
