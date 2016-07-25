@@ -1,52 +1,40 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 25 Jul 2016 10:18:52 +0200
-Subject: [PATCH v5 12/15] binfmt_flat: allow compressed flat binary format
- to work on MMU systems
-In-Reply-To: <alpine.LFD.2.20.1607241612480.1594@knanqh.ubzr>
-References: <1469374229-21585-1-git-send-email-nicolas.pitre@linaro.org>
- <4262519.L4vdOGcrh0@wuerfel> <alpine.LFD.2.20.1607241612480.1594@knanqh.ubzr>
-Message-ID: <9805659.OeD7S5yAQd@wuerfel>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Mon, 25 Jul 2016 09:19:12 +0100
+Subject: [RFC 6/6] bus: Add support for Tegra NOR controller
+In-Reply-To: <CALw8SCXCdVMKgemEyQ-MZbxdthkPCDVzi+3boqtXk1_XNjcz4g@mail.gmail.com>
+References: <1468935397-11926-1-git-send-email-mirza.krak@gmail.com>
+ <1468935397-11926-7-git-send-email-mirza.krak@gmail.com>
+ <f6df33eb-53ae-699b-9e1f-69eb7fed7da0@nvidia.com>
+ <CALw8SCVy4ud5_+gS3C8WeyTCV0m_4R2xjdEY4vCKEq_3-aFanw@mail.gmail.com>
+ <dbbb5c9f-8c67-9d9f-171b-64cd18353411@nvidia.com>
+ <CALw8SCXCdVMKgemEyQ-MZbxdthkPCDVzi+3boqtXk1_XNjcz4g@mail.gmail.com>
+Message-ID: <7f558131-60c7-22e2-2b2e-93d4b405a2db@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday, July 24, 2016 4:25:16 PM CEST Nicolas Pitre wrote:
-> On Sun, 24 Jul 2016, Arnd Bergmann wrote:
-> 
-> > On Sunday, July 24, 2016 11:30:26 AM CEST Nicolas Pitre wrote:
-> > > +#else
-> > > +                       /*
-> > > +                        * This is used on MMU systems mainly for testing.
-> > > +                        * Let's use a kernel buffer to simplify things.
-> > > +                        */
-> > > +                       long unz_text_len = text_len - sizeof(struct flat_hdr);
-> > > +                       long unz_len = unz_text_len + full_data;
-> > > +                       char *unz_data = vmalloc(unz_len);
-> > > +                       if (!unz_data) {
-> > > +                               result = -ENOMEM;
-> > > 
-> > 
-> > Is there a risk of a malicious user exhausting vmalloc space with a
-> > binary that has forged headers? If there is, maybe put an upper bound on
-> > the size of allocation.
-> 
-> Patch #3 enforces a cap on all parameters to avoid overflows and 
-> unreasonable section sizes.
-> 
-> Then vmalloc space is used here only for decompressing the binary into, 
-> after which the whole thing is copied to user space and the vmalloc area 
-> is freed right away.
-> 
-> > More broadly speaking, are there any other attacks that may get enabled
-> > through forged binaries? We've had a couple of vulnerabilities in
-> > binfmt_elf over the years, and I wonder how dangerous it might be
-> > if distros turn on binfmt_flat support by default.
-> 
-> That was Alan's concern too which prompted patch #3. But with a clamp on 
-> all parameters, everything else is done via user accessors.  So an 
-> executable still can crap onto itself or generate a segfault but I doubt 
-> we really care at that point.
-> 
 
-Ok, sounds good.
 
-	Arnd
+On 22/07/16 20:18, Mirza Krak wrote:
+> 2016-07-22 11:38 GMT+02:00 Jon Hunter <jonathanh@nvidia.com>:
+>>>> The driver should have a remove function given that we can build as a
+>>>> module.
+>>>
+>>> At the moment I do not know what we would do in a remove function and
+>>> hence me not adding one.
+>>
+>> Should just be the inverse of the probe (although there is no inverse
+>> for the parsing DT bit). If you don't wish to add a remove, that is
+>> fine, but make the driver a 'bool' and not 'tristate' in the Kconfig so
+>> it cannot be configured as a module.
+> 
+> I understand the concept of a remove function, but I use devm_ calls
+> for all resources. These should be handled by the device core on a
+> driver detach?
+
+There is one clock that needs to be disabled in the remove.
+
+Cheers
+Jon
+
+-- 
+nvpublic
