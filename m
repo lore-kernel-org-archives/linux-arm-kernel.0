@@ -1,109 +1,126 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 25 Jul 2016 10:26:48 +0200
-Subject: [PATCH 06/14] ARM: dts: sun8i: Add cpu0 label to sun8i-h3.dtsi
-In-Reply-To: <49ce09ae-052a-bb2b-ce66-f0aa0d0024e3@megous.com>
-References: <20160623192104.18720-1-megous@megous.com>
- <20160623192104.18720-7-megous@megous.com>
- <CAGb2v66eskVAxdz8VtjBJBCO7VV9WL4bdFDVrPWrSmxk4RASCw@mail.gmail.com>
- <adaf7f61-af80-cc02-8c47-af721b86f81e@megous.com>
- <CAGb2v665O75vQEfo5WdWtWJSbKEbLi6MBAHbgZC7pyrOCOu+6g@mail.gmail.com>
- <20160625070208.GA4000@lukather>
- <49ce09ae-052a-bb2b-ce66-f0aa0d0024e3@megous.com>
-Message-ID: <20160725082648.GG7419@lukather>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 25 Jul 2016 09:36:41 +0100
+Subject: [RFC PATCH v3 00/13] ACPI IORT ARM SMMU v3 support
+In-Reply-To: <20160725055330.GA21004@arm.com>
+References: <1469013815-24380-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <20160725055330.GA21004@arm.com>
+Message-ID: <20160725083641.GA20044@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 17, 2016 at 04:39:27PM +0200, Ond?ej Jirman wrote:
-> 
-> 
-> On 25.6.2016 09:02, Maxime Ripard wrote:
-> > On Sat, Jun 25, 2016 at 09:02:48AM +0800, Chen-Yu Tsai wrote:
-> >> On Sat, Jun 25, 2016 at 6:51 AM, Ond?ej Jirman <megous@megous.com> wrote:
-> >>> Hello,
-> >>>
-> >>> comments below.
-> >>>
-> >>> On 24.6.2016 05:48, Chen-Yu Tsai wrote:
-> >>>> On Fri, Jun 24, 2016 at 3:20 AM,  <megous@megous.com> wrote:
-> >>>>> From: Ondrej Jirman <megous@megous.com>
-> >>>>>
-> >>>>> Add label to the first cpu so that it can be referenced
-> >>>>> from derived dts files.
-> >>>>>
-> >>>>> Signed-off-by: Ondrej Jirman <megous@megous.com>
-> >>>>> ---
-> >>>>>  arch/arm/boot/dts/sun8i-h3.dtsi | 2 +-
-> >>>>>  1 file changed, 1 insertion(+), 1 deletion(-)
-> >>>>>
-> >>>>> diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
-> >>>>> index 9938972..82faefc 100644
-> >>>>> --- a/arch/arm/boot/dts/sun8i-h3.dtsi
-> >>>>> +++ b/arch/arm/boot/dts/sun8i-h3.dtsi
-> >>>>> @@ -52,7 +52,7 @@
-> >>>>>                 #address-cells = <1>;
-> >>>>>                 #size-cells = <0>;
-> >>>>>
-> >>>>> -               cpu at 0 {
-> >>>>> +               cpu0: cpu at 0 {
-> >>>>>                         compatible = "arm,cortex-a7";
-> >>>>>                         device_type = "cpu";
-> >>>>>                         reg = <0>;
-> >>>>
-> >>>> Can you also set the cpu clock here? It is part of the SoC
-> >>>> and does not belong in the board DTS files.
-> >>>
-> >>> Do you mean operating-points, or something else? Different SBCs will
-> >>> probably require different combinations of operating points just for
-> >>> safety's sake, because they have different regulators and [some have
-> >>> botched] thermal designs, so it might make sense to customize it for
-> >>> differnt boards, and I don't feel adventurous enough setting it for all
-> >>> H3 boards out there.
-> >>
-> >> I meant clocks = <...> and clock-latency = <...>.
-> >>
-> >> These 2 are part of the SoC.
-> >>
-> >> The OPP can stay in the board files. It's a pity there's no standard
-> >> OPP table for H3 though. :(
+On Mon, Jul 25, 2016 at 01:53:32PM +0800, Dennis Chen wrote:
+> Hi
+> On Wed, Jul 20, 2016 at 12:23:22PM +0100, Lorenzo Pieralisi wrote:
+> > This RFC patch series is v3 of a previous posting:
 > > 
-> > This has never been the case, and we always had some deviation in the
-> > FEX files for all the SoCs.
+> > https://lkml.org/lkml/2016/6/7/523
 > > 
-> > If we could come up with standard OPPs that work for every one,
-> > there's no reason it can't happen here.
+> > v2 -> v3
+> > 	- Rebased on top of dependencies series [1][2][3](v4.7-rc3)
+> > 	- Added back reliance on ACPI early probing infrastructure
+> > 	- Patch[1-3] merged through other dependent series
+> > 	- Added back IOMMU fwnode generalization
+> > 	- Move SMMU v3 static functions configuration to IORT code
+> > 	- Implemented generic IOMMU fwspec API
+> > 	- Added code to implement fwnode platform device look-up
 > > 
-> > I don't really see why the thermal design should change anything. If a
-> > boards heats faster, it will throttle down to a lower OPP faster, but
-> > those OPPs are not going to change.
-> 
-> So I tried, and found out that it will not be so easy. Different boards
-> have different regulators, and linux doesn't deal well with voltages
-> that are not supported by the regulator.
-> 
-> So even if the board can run at certain frequency if you round the
-> voltage to the next higher voltage supported by the regulator, opp
-> implementation doesn't do the rounding and just drops the operating
-> points that have no support in the voltage regulator.
-> 
-> We have boards that have 1.1/1.3V switching, only 1.3V, fine tuned
-> voltage regulation and every such board will need it's own set of
-> operating points.
-> 
-> I'd leave the OPP definitions in the board files for now.
+> > v1 -> v2:
+> > 	- Rebased on top of dependencies series [1][2][3](v4.7-rc1)
+> > 	- Removed IOMMU fwnode generalization
+> > 	- Implemented ARM SMMU v3 ACPI probing instead of ARM SMMU v2
+> > 	  owing to patch series dependencies [1]
+> > 	- Moved platform device creation logic to IORT code to
+> > 	  generalize its usage for ARM SMMU v1-v2-v3 components
+> > 	- Removed reliance on ACPI early device probing
+> > 	- Created IORT specific iommu_xlate() translation hook leaving
+> > 	  OF code unchanged according to v1 reviews
+> > 
+> > The ACPI IORT table provides information that allows instantiating
+> > ARM SMMU devices and carrying out id mappings between components on
+> > ARM based systems (devices, IOMMUs, interrupt controllers).
+> > 
+> > http://infocenter.arm.com/help/topic/com.arm.doc.den0049b/DEN0049B_IO_Remapping_Table.pdf
+> > 
+> > Building on basic IORT support, available through [2]:
+> > 
+> > this patchset enables ARM SMMU v3 support on ACPI systems.
+> > 
+> > Most of the code is aimed at building the required generic ACPI
+> > infrastructure to create and enable IOMMU components and to bring
+> > the IOMMU infrastructure for ACPI on par with DT, which is going to
+> > make future ARM SMMU components easier to integrate.
+> > 
+> > PATCH (1) adds a FWNODE_IOMMU type to the struct fwnode_handle type.
+> >           It is required to attach a fwnode identifier to platform
+> >           devices allocated/detected through IORT tables entries;
+> >           IOMMU devices have to have an identifier to look them up
+> >           eg IOMMU core layer carrying out id translation. This can be
+> >           done through a fwnode_handle (ie IOMMU platform devices created
+> >           out of IORT tables are not ACPI devices hence they can't be
+> >           allocated as such, otherwise they would have a fwnode_handle of
+> >           type FWNODE_ACPI). This patch requires discussion and it is key
+> >           to the RFC.
+> > 
+> > PATCH (2) makes use of the ACPI early probing API to add a linker script
+> >           section for probing devices via IORT ACPI kernel code.
+> > 
+> > PATCH (3) provides IORT support for registering IOMMU IORT node through
+> >           their fwnode handle.
+> > 
+> > PATCH (4) implements core code fwnode based platform devices look-up.
+> > 
+> > PATCH (5) extends iommu_fwspec so that it can be used on ACPI based
+> >           system by creating a generic IOMMU fwspec kernel layer.
+> > 
+> > PATCH (6) implements the of_dma_configure() API in ACPI world -
+> >           acpi_dma_configure() - and patches PCI and ACPI core code to
+> >           start making use of it.
+> > 
+> > PATCH (7) provides an IORT function to detect existence of specific type
+> >           of IORT components.
+> > 
+> > PATCH (8) creates the kernel infrastructure required to create ARM SMMU
+> >           platform devices for IORT nodes.
+> > 
+> > PATCH (9) refactors the ARM SMMU v3 driver so that the init functions are
+> >           split in a way that groups together code that probes through DT
+> >           and code that carries out HW registers FW agnostic probing, in
+> >           preparation for adding the ACPI probing path.
+> > 
+> > PATCH (10) rework ARM SMMU v3 platform driver registration to make it work
+> >            on ACPI systems.
+> > 
+> > PATCH (11) Building on patch (8), it adds ARM SMMU v3 IORT IOMMU
+> >            operations to create and probe ARM SMMU v3 components.
+> > 
+> > PATCH (12) Extend the IORT iort_node_map_rid() to work on a type mask
+> >            instead of a single type so that the translation API can
+> >            be used on a range of components.
+> > 
+> > PATCH (13) provides IORT infrastructure to carry out IOMMU configuration
+> >            for devices and hook it up to the previously introduced ACPI
+> >            DMA configure API.
+> > 
+> > This patchset is built on top and depends on these three patch series:
+> > 
+> > [1] R.Murphy "Generic DT bindings for PCI and ARM SMMU v3" v4
+> >     https://marc.info/?l=devicetree&m=146739193215518&w=2
+> > 
+> > [2] T.Nowicki "Introduce ACPI world to ITS irqchip" v7
+> >     https://marc.info/?l=linux-arm-kernel&m=146642080022289&w=2
+> > 
+> > [3] T.Nowicki "Support for ARM64 ACPI based PCI host controller" v8
+> >     http://marc.info/?l=linux-acpi&m=146462129816292&w=2
+> > 
+> > and is provided for early review/testing purposes here:
+> > 
+> > git://git.kernel.org/pub/scm/linux/kernel/git/lpieralisi/linux.git acpi/iort-smmu-v3i
+> >
+> I thought I can got all the 13 patches applied with the above git
+> tree, but I can't find any ACPI related stuff after I cloned the git
+> repos to my local machine, am I missing something here?
 
-Works for me.
+Have you pulled the acpi/iort-smmu-v3 branch ?
 
-Maxime
-
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160725/402ec2ce/attachment.sig>
+Thanks,
+Lorenzo
