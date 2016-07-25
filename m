@@ -1,51 +1,55 @@
 From: mitchelh@codeaurora.org (Mitchel Humpherys)
-Date: Mon, 25 Jul 2016 12:16:49 -0700
-Subject: [PATCH v4 6/6] Revert "iommu/arm-smmu: Treat all device transactions
- as unprivileged"
+Date: Mon, 25 Jul 2016 12:16:48 -0700
+Subject: [PATCH v4 5/6] dmaengine: pl330: Make sure microcode is privileged
 In-Reply-To: <20160725191649.13414-1-mitchelh@codeaurora.org>
 References: <20160725191649.13414-1-mitchelh@codeaurora.org>
-Message-ID: <20160725191649.13414-7-mitchelh@codeaurora.org>
+Message-ID: <20160725191649.13414-6-mitchelh@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This reverts commit d346180e70b9 ("iommu/arm-smmu: Treat all device
-transactions as unprivileged") since some platforms actually make use of
-privileged transactions.
+The PL330 performs privileged instruction fetches.  This can result in
+SMMU permission faults on SMMUs that implement the ARMv8 VMSA, which
+specifies that mappings that are writeable at one execution level shall
+not be executable at any higher-privileged level.  Fix this by using the
+DMA_ATTR_PRIVILEGED attribute, which will ensure that the microcode
+IOMMU mapping is only accessible to the privileged level.
 
+Cc: Dan Williams <dan.j.williams@intel.com>
+Cc: Jassi Brar <jassi.brar@samsung.com>
 Signed-off-by: Mitchel Humpherys <mitchelh@codeaurora.org>
 ---
 
 Notes:
-    v2..v3
+    v3..v4
     
-      - Moved to the end of the series.
+      - Reworked against the new dma attrs format.
 
- drivers/iommu/arm-smmu.c | 5 +----
- 1 file changed, 1 insertion(+), 4 deletions(-)
+ drivers/dma/pl330.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index 4f49fe29f202..46059b06f48d 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -178,9 +178,6 @@
- #define S2CR_TYPE_BYPASS		(1 << S2CR_TYPE_SHIFT)
- #define S2CR_TYPE_FAULT			(2 << S2CR_TYPE_SHIFT)
+diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
+index 4fc3ffbd5ca0..8cd624fc3760 100644
+--- a/drivers/dma/pl330.c
++++ b/drivers/dma/pl330.c
+@@ -1854,14 +1854,16 @@ static int dmac_alloc_resources(struct pl330_dmac *pl330)
+ {
+ 	int chans = pl330->pcfg.num_chan;
+ 	int ret;
++	unsigned long dma_attrs = DMA_ATTR_PRIVILEGED;
  
--#define S2CR_PRIVCFG_SHIFT		24
--#define S2CR_PRIVCFG_UNPRIV		(2 << S2CR_PRIVCFG_SHIFT)
--
- /* Context bank attribute registers */
- #define ARM_SMMU_GR1_CBAR(n)		(0x0 + ((n) << 2))
- #define CBAR_VMID_SHIFT			0
-@@ -1175,7 +1172,7 @@ static int arm_smmu_domain_add_master(struct arm_smmu_domain *smmu_domain,
- 		u32 idx, s2cr;
- 
- 		idx = cfg->smrs ? cfg->smrs[i].idx : cfg->streamids[i];
--		s2cr = S2CR_TYPE_TRANS | S2CR_PRIVCFG_UNPRIV |
-+		s2cr = S2CR_TYPE_TRANS |
- 		       (smmu_domain->cfg.cbndx << S2CR_CBNDX_SHIFT);
- 		writel_relaxed(s2cr, gr0_base + ARM_SMMU_GR0_S2CR(idx));
- 	}
+ 	/*
+ 	 * Alloc MicroCode buffer for 'chans' Channel threads.
+ 	 * A channel's buffer offset is (Channel_Id * MCODE_BUFF_PERCHAN)
+ 	 */
+-	pl330->mcode_cpu = dma_alloc_coherent(pl330->ddma.dev,
++	pl330->mcode_cpu = dma_alloc_attrs(pl330->ddma.dev,
+ 				chans * pl330->mcbufsz,
+-				&pl330->mcode_bus, GFP_KERNEL);
++				&pl330->mcode_bus, GFP_KERNEL,
++				dma_attrs);
+ 	if (!pl330->mcode_cpu) {
+ 		dev_err(pl330->ddma.dev, "%s:%d Can't allocate memory!\n",
+ 			__func__, __LINE__);
 -- 
 Qualcomm Innovation Center, Inc.
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
