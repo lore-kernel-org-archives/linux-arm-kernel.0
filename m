@@ -1,98 +1,157 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Mon, 25 Jul 2016 14:11:16 +0800
-Subject: [PATCH v3] PM / OPP: optimize dev_pm_opp_set_rate() performance a bit
-Message-ID: <1469427076-2078-1-git-send-email-jszhang@marvell.com>
+From: bibby.hsieh@mediatek.com (Bibby Hsieh)
+Date: Mon, 25 Jul 2016 14:15:35 +0800
+Subject: [PATCH 2/4] drm/mediatek: enhance the HDMI driving current
+In-Reply-To: <1468998902.11841.54.camel@mtksdaap41>
+References: <1468987385-37353-1-git-send-email-bibby.hsieh@mediatek.com>
+ <1468987385-37353-3-git-send-email-bibby.hsieh@mediatek.com>
+ <1468998902.11841.54.camel@mtksdaap41>
+Message-ID: <1469427335.26205.12.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In dev_pm_opp_set_rate(), _find_opp_table() is called 4 times: once by
-_get_opp_clk(), once by dev_pm_opp_set_rate() itself, and twice by
-dev_pm_opp_find_freq_ceil(). If there are several opp_tables in the
-system, three times of opp table finding is a big waste. This patch
-reduced the call of _find_opp_table() to twice.
+Hi, CK,
 
-Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
----
-Since v2:
- - fix gcc warnings
+I'm appreciate your comment.
 
-Since v1:
- - avoid opp_table pointer usage after the rcu_read_unlock() as pointed
-   out by Viresh, thus we can only reduced the call of _find_opp_table
-   to twice.
-
- drivers/base/power/opp/core.c | 31 +++++++++++++++++++------------
- 1 file changed, 19 insertions(+), 12 deletions(-)
-
-diff --git a/drivers/base/power/opp/core.c b/drivers/base/power/opp/core.c
-index 7c04c87..df0c709 100644
---- a/drivers/base/power/opp/core.c
-+++ b/drivers/base/power/opp/core.c
-@@ -402,6 +402,22 @@ struct dev_pm_opp *dev_pm_opp_find_freq_exact(struct device *dev,
- }
- EXPORT_SYMBOL_GPL(dev_pm_opp_find_freq_exact);
- 
-+static noinline struct dev_pm_opp *_find_freq_ceil(struct opp_table *opp_table,
-+						   unsigned long *freq)
-+{
-+	struct dev_pm_opp *temp_opp, *opp = ERR_PTR(-ERANGE);
-+
-+	list_for_each_entry_rcu(temp_opp, &opp_table->opp_list, node) {
-+		if (temp_opp->available && temp_opp->rate >= *freq) {
-+			opp = temp_opp;
-+			*freq = opp->rate;
-+			break;
-+		}
-+	}
-+
-+	return opp;
-+}
-+
- /**
-  * dev_pm_opp_find_freq_ceil() - Search for an rounded ceil freq
-  * @dev:	device for which we do this operation
-@@ -427,7 +443,6 @@ struct dev_pm_opp *dev_pm_opp_find_freq_ceil(struct device *dev,
- 					     unsigned long *freq)
- {
- 	struct opp_table *opp_table;
--	struct dev_pm_opp *temp_opp, *opp = ERR_PTR(-ERANGE);
- 
- 	opp_rcu_lockdep_assert();
- 
-@@ -440,15 +455,7 @@ struct dev_pm_opp *dev_pm_opp_find_freq_ceil(struct device *dev,
- 	if (IS_ERR(opp_table))
- 		return ERR_CAST(opp_table);
- 
--	list_for_each_entry_rcu(temp_opp, &opp_table->opp_list, node) {
--		if (temp_opp->available && temp_opp->rate >= *freq) {
--			opp = temp_opp;
--			*freq = opp->rate;
--			break;
--		}
--	}
--
--	return opp;
-+	return _find_freq_ceil(opp_table, freq);
- }
- EXPORT_SYMBOL_GPL(dev_pm_opp_find_freq_ceil);
- 
-@@ -612,7 +619,7 @@ int dev_pm_opp_set_rate(struct device *dev, unsigned long target_freq)
- 		return PTR_ERR(opp_table);
- 	}
- 
--	old_opp = dev_pm_opp_find_freq_ceil(dev, &old_freq);
-+	old_opp = _find_freq_ceil(opp_table, &old_freq);
- 	if (!IS_ERR(old_opp)) {
- 		ou_volt = old_opp->u_volt;
- 		ou_volt_min = old_opp->u_volt_min;
-@@ -622,7 +629,7 @@ int dev_pm_opp_set_rate(struct device *dev, unsigned long target_freq)
- 			__func__, old_freq, PTR_ERR(old_opp));
- 	}
- 
--	opp = dev_pm_opp_find_freq_ceil(dev, &freq);
-+	opp = _find_freq_ceil(opp_table, &freq);
- 	if (IS_ERR(opp)) {
- 		ret = PTR_ERR(opp);
- 		dev_err(dev, "%s: failed to find OPP for freq %lu (%d)\n",
--- 
-2.8.1
+On Wed, 2016-07-20 at 15:15 +0800, CK Hu wrote:
+> Hi, Bibby:
+> 
+> One comment inline.
+> 
+> On Wed, 2016-07-20 at 12:03 +0800, Bibby Hsieh wrote:
+> > From: Junzhi Zhao <junzhi.zhao@mediatek.com>
+> > 
+> > In order to improve 4K resolution performance,
+> > we have to enhance the HDMI driving currend
+> > when clock rate is greater than 165MHz.
+> > 
+> > Signed-off-by: Junzhi Zhao <junzhi.zhao@mediatek.com>
+> > Signed-off-by: Bibby Hsieh <bibby.hsieh@mediatek.com>
+> > ---
+> >  drivers/gpu/drm/mediatek/mtk_mt8173_hdmi_phy.c |   89 +++++++++++++++++-------
+> >  1 file changed, 63 insertions(+), 26 deletions(-)
+> > 
+> > diff --git a/drivers/gpu/drm/mediatek/mtk_mt8173_hdmi_phy.c b/drivers/gpu/drm/mediatek/mtk_mt8173_hdmi_phy.c
+> > index 8a24754..a871c14 100644
+> > --- a/drivers/gpu/drm/mediatek/mtk_mt8173_hdmi_phy.c
+> > +++ b/drivers/gpu/drm/mediatek/mtk_mt8173_hdmi_phy.c
+> > @@ -298,32 +298,69 @@ static int mtk_hdmi_pll_set_rate(struct clk_hw *hw, unsigned long rate,
+> >  			  (0x1 << PLL_BR_SHIFT),
+> >  			  RG_HDMITX_PLL_BP | RG_HDMITX_PLL_BC |
+> >  			  RG_HDMITX_PLL_BR);
+> > -	mtk_hdmi_phy_clear_bits(hdmi_phy, HDMI_CON3, RG_HDMITX_PRD_IMP_EN);
+> > -	mtk_hdmi_phy_mask(hdmi_phy, HDMI_CON4,
+> > -			  (0x3 << PRD_IBIAS_CLK_SHIFT) |
+> > -			  (0x3 << PRD_IBIAS_D2_SHIFT) |
+> > -			  (0x3 << PRD_IBIAS_D1_SHIFT) |
+> > -			  (0x3 << PRD_IBIAS_D0_SHIFT),
+> > -			  RG_HDMITX_PRD_IBIAS_CLK |
+> > -			  RG_HDMITX_PRD_IBIAS_D2 |
+> > -			  RG_HDMITX_PRD_IBIAS_D1 |
+> > -			  RG_HDMITX_PRD_IBIAS_D0);
+> > -	mtk_hdmi_phy_mask(hdmi_phy, HDMI_CON3,
+> > -			  (0x0 << DRV_IMP_EN_SHIFT), RG_HDMITX_DRV_IMP_EN);
+> > -	mtk_hdmi_phy_mask(hdmi_phy, HDMI_CON6,
+> > -			  (hdmi_phy->drv_imp_clk << DRV_IMP_CLK_SHIFT) |
+> > -			  (hdmi_phy->drv_imp_d2 << DRV_IMP_D2_SHIFT) |
+> > -			  (hdmi_phy->drv_imp_d1 << DRV_IMP_D1_SHIFT) |
+> > -			  (hdmi_phy->drv_imp_d0 << DRV_IMP_D0_SHIFT),
+> > -			  RG_HDMITX_DRV_IMP_CLK | RG_HDMITX_DRV_IMP_D2 |
+> > -			  RG_HDMITX_DRV_IMP_D1 | RG_HDMITX_DRV_IMP_D0);
+> > -	mtk_hdmi_phy_mask(hdmi_phy, HDMI_CON5,
+> > -			  (hdmi_phy->ibias << DRV_IBIAS_CLK_SHIFT) |
+> > -			  (hdmi_phy->ibias << DRV_IBIAS_D2_SHIFT) |
+> > -			  (hdmi_phy->ibias << DRV_IBIAS_D1_SHIFT) |
+> > -			  (hdmi_phy->ibias << DRV_IBIAS_D0_SHIFT),
+> > -			  RG_HDMITX_DRV_IBIAS_CLK | RG_HDMITX_DRV_IBIAS_D2 |
+> > -			  RG_HDMITX_DRV_IBIAS_D1 | RG_HDMITX_DRV_IBIAS_D0);
+> > +	if (rate < 165000000) {
+> > +		mtk_hdmi_phy_clear_bits(hdmi_phy, HDMI_CON3,
+> > +					RG_HDMITX_PRD_IMP_EN);
+> > +		mtk_hdmi_phy_mask(hdmi_phy, HDMI_CON4,
+> > +				  (0x3 << PRD_IBIAS_CLK_SHIFT) |
+> > +				  (0x3 << PRD_IBIAS_D2_SHIFT) |
+> > +				  (0x3 << PRD_IBIAS_D1_SHIFT) |
+> > +				  (0x3 << PRD_IBIAS_D0_SHIFT),
+> > +				  RG_HDMITX_PRD_IBIAS_CLK |
+> > +				  RG_HDMITX_PRD_IBIAS_D2 |
+> > +				  RG_HDMITX_PRD_IBIAS_D1 |
+> > +				  RG_HDMITX_PRD_IBIAS_D0);
+> > +		mtk_hdmi_phy_mask(hdmi_phy, HDMI_CON3,
+> > +				  (0x0 << DRV_IMP_EN_SHIFT),
+> > +				  RG_HDMITX_DRV_IMP_EN);
+> > +		mtk_hdmi_phy_mask(hdmi_phy, HDMI_CON6,
+> > +				  (hdmi_phy->drv_imp_clk << DRV_IMP_CLK_SHIFT) |
+> > +				  (hdmi_phy->drv_imp_d2 << DRV_IMP_D2_SHIFT) |
+> > +				  (hdmi_phy->drv_imp_d1 << DRV_IMP_D1_SHIFT) |
+> > +				  (hdmi_phy->drv_imp_d0 << DRV_IMP_D0_SHIFT),
+> > +				  RG_HDMITX_DRV_IMP_CLK | RG_HDMITX_DRV_IMP_D2 |
+> > +				  RG_HDMITX_DRV_IMP_D1 | RG_HDMITX_DRV_IMP_D0);
+> > +		mtk_hdmi_phy_mask(hdmi_phy, HDMI_CON5,
+> > +				  (hdmi_phy->ibias << DRV_IBIAS_CLK_SHIFT) |
+> > +				  (hdmi_phy->ibias << DRV_IBIAS_D2_SHIFT) |
+> > +				  (hdmi_phy->ibias << DRV_IBIAS_D1_SHIFT) |
+> > +				  (hdmi_phy->ibias << DRV_IBIAS_D0_SHIFT),
+> > +				  RG_HDMITX_DRV_IBIAS_CLK |
+> > +				  RG_HDMITX_DRV_IBIAS_D2 |
+> > +				  RG_HDMITX_DRV_IBIAS_D1 |
+> > +				  RG_HDMITX_DRV_IBIAS_D0);
+> > +	} else {
+> > +		mtk_hdmi_phy_set_bits(hdmi_phy, HDMI_CON3,
+> > +				      RG_HDMITX_PRD_IMP_EN);
+> > +		mtk_hdmi_phy_mask(hdmi_phy, HDMI_CON4,
+> > +				  (0x6 << PRD_IBIAS_CLK_SHIFT) |
+> > +				  (0x6 << PRD_IBIAS_D2_SHIFT) |
+> > +				  (0x6 << PRD_IBIAS_D1_SHIFT) |
+> > +				  (0x6 << PRD_IBIAS_D0_SHIFT),
+> > +				  RG_HDMITX_PRD_IBIAS_CLK |
+> > +				  RG_HDMITX_PRD_IBIAS_D2 |
+> > +				  RG_HDMITX_PRD_IBIAS_D1 |
+> > +				  RG_HDMITX_PRD_IBIAS_D0);
+> > +		mtk_hdmi_phy_mask(hdmi_phy, HDMI_CON3,
+> > +				  (0xf << DRV_IMP_EN_SHIFT),
+> > +				  RG_HDMITX_DRV_IMP_EN);
+> > +		mtk_hdmi_phy_mask(hdmi_phy, HDMI_CON6,
+> > +				  (hdmi_phy->drv_imp_clk << DRV_IMP_CLK_SHIFT) |
+> > +				  (hdmi_phy->drv_imp_d2 << DRV_IMP_D2_SHIFT) |
+> > +				  (hdmi_phy->drv_imp_d1 << DRV_IMP_D1_SHIFT) |
+> > +				  (hdmi_phy->drv_imp_d0 << DRV_IMP_D0_SHIFT),
+> > +				  RG_HDMITX_DRV_IMP_CLK | RG_HDMITX_DRV_IMP_D2 |
+> > +				  RG_HDMITX_DRV_IMP_D1 | RG_HDMITX_DRV_IMP_D0);
+> > +		mtk_hdmi_phy_mask(hdmi_phy, HDMI_CON5,
+> > +				  (hdmi_phy->ibias_up << DRV_IBIAS_CLK_SHIFT) |
+> > +				  (hdmi_phy->ibias_up << DRV_IBIAS_D2_SHIFT) |
+> > +				  (hdmi_phy->ibias_up << DRV_IBIAS_D1_SHIFT) |
+> > +				  (hdmi_phy->ibias_up << DRV_IBIAS_D0_SHIFT),
+> > +				  RG_HDMITX_DRV_IBIAS_CLK |
+> > +				  RG_HDMITX_DRV_IBIAS_D2 |
+> > +				  RG_HDMITX_DRV_IBIAS_D1 |
+> > +				  RG_HDMITX_DRV_IBIAS_D0);
+> > +	}
+> 
+> 'if' part and 'else' part looks almost the same. Use variable for
+> difference and merge these two part. For example:
+> 
+> if (rate < 165000000)
+> 	prd_ibias = 0x3;
+> else
+> 	prd_ibias = 0x6;
+> 
+> mtk_hdmi_phy_mask(hdmi_phy, HDMI_CON4,
+> 		  (prd_ibias << PRD_IBIAS_CLK_SHIFT) |
+> 		  (prd_ibias << PRD_IBIAS_D2_SHIFT) |
+> 		  (prd_ibias << PRD_IBIAS_D1_SHIFT) |
+> 		  (prd_ibias << PRD_IBIAS_D0_SHIFT),
+> 		  RG_HDMITX_PRD_IBIAS_CLK |
+> 		  RG_HDMITX_PRD_IBIAS_D2 |
+> 		  RG_HDMITX_PRD_IBIAS_D1 |
+> 		  RG_HDMITX_PRD_IBIAS_D0);
+> 
+> >  	return 0;
+> >  }
+> >  
+Ok, I will use variable instead of that.
+> 
+> Regards,
+> CK
+> 
