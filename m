@@ -1,87 +1,161 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Mon, 25 Jul 2016 13:19:47 +0800
-Subject: [PATCH] PM / OPP: optimize dev_pm_opp_set_rate() a bit
-In-Reply-To: <201607222230.DZObarhu%fengguang.wu@intel.com>
-References: <1469191370-1285-1-git-send-email-jszhang@marvell.com>
- <201607222230.DZObarhu%fengguang.wu@intel.com>
-Message-ID: <20160725131947.644e6166@xhacker>
+From: fixed-term.Oleksij.Rempel@de.bosch.com (fixed-term.Oleksij.Rempel)
+Date: Mon, 25 Jul 2016 07:27:16 +0200
+Subject: [PATCH] arm: dts: sun7i-a20-bananapi: name the GPIO lines
+In-Reply-To: <CAGb2v66tf1LcBs69ECW0Xa2OeN0C0NWVyvpC8=4DsVLjAnrO3Q@mail.gmail.com>
+References: <1468496825-4896-1-git-send-email-linux@rempel-privat.de>
+ <CACRpkdZLG1Ffdiw3xkP4G0XBr=WDXg2Vbh2Xmgno1PTNhfZHfg@mail.gmail.com>
+ <CAGb2v66tf1LcBs69ECW0Xa2OeN0C0NWVyvpC8=4DsVLjAnrO3Q@mail.gmail.com>
+Message-ID: <5795A334.3000701@de.bosch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear all,
 
-On Fri, 22 Jul 2016 22:30:53 +0800 kbuild test robot wrote:
 
-> Hi,
-> 
-> [auto build test WARNING on pm/linux-next]
-> [also build test WARNING on v4.7-rc7 next-20160722]
-> [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
-> 
-> url:    https://github.com/0day-ci/linux/commits/Jisheng-Zhang/PM-OPP-optimize-dev_pm_opp_set_rate-a-bit/20160722-205339
-> base:   https://git.kernel.org/pub/scm/linux/kernel/git/rafael/linux-pm.git linux-next
-> config: x86_64-allmodconfig (attached as .config)
-> compiler: gcc-6 (Debian 6.1.1-9) 6.1.1 20160705
-> reproduce:
->         # save the attached .config to linux build tree
->         make ARCH=x86_64 
-> 
-> Note: it may well be a FALSE warning. FWIW you are at least aware of it now.
-> http://gcc.gnu.org/wiki/Better_Uninitialized_Warnings
-> 
-> All warnings (new ones prefixed by >>):
-> 
->    drivers/base/power/opp/core.c: In function 'dev_pm_opp_set_rate':
-> >> drivers/base/power/opp/core.c:666:3: warning: 'ou_volt_max' may be used uninitialized in this function [-Wmaybe-uninitialized]  
->       _set_opp_voltage(dev, reg, ou_volt, ou_volt_min, ou_volt_max);
->       ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-> >> drivers/base/power/opp/core.c:666:3: warning: 'ou_volt_min' may be used uninitialized in this function [-Wmaybe-uninitialized]
-> >> drivers/base/power/opp/core.c:666:3: warning: 'ou_volt' may be used uninitialized in this function [-Wmaybe-uninitialized]  
+On 22.07.2016 17:47, Chen-Yu Tsai wrote:
+> On Fri, Jul 22, 2016 at 10:55 PM, Linus Walleij
+> <linus.walleij@linaro.org> wrote:
+>> On Thu, Jul 14, 2016 at 1:47 PM, Oleksij Rempel <linux@rempel-privat.de> wrote:
+>>
+>>> This names the GPIO lines on the Banana Pi board in accordance with
+>>> the A20_Banana_Pi v1.4 Specification.
+>>>
+>>> This will make these line names reflect through to userspace
+>>> so that they can easily be identified and used with the new
+>>> character device ABI.
+>>>
+>>> Some care has been taken to name all lines, not just those used
+>>> by the external connectors, also lines that are muxed into some
+>>> other function than GPIO: these are named "[FOO]" so that users
+>>> can see with lsgpio what all lines are used for.
+>>>
+>>> Ps: most of the text was taken from Linux Wallej patch.
+>>
+>> LinuS
 
-These warnings seem weired. We only use them when !IS_ERR(old_opp), and we
-should already set them if !IS_ERR(old_opp). Another weired thing is if
-we add something, printk e.g in _find_freq_ceil(), then these warnings disappear
+oops... :)
 
-Could you please kindly give some suggestions about how to fix these warnings?
+>>>
+>>> Cc: devicetree at vger.kernel.org
+>>> Cc: Linus Walleij <linus.walleij@linaro.org>
+>>> Cc: linux-arm-kernel at lists.infradead.org
+>>> Cc: Chen-Yu Tsai <wens@csie.org>
+>>> Signed-off-by: Oleksij Rempel <linux@rempel-privat.de>
+>>
+>> Nice usecase!
+>>
+>>> +       /*
+>>> +        * Legend: proper name = the GPIO line is used as GPIO
+>>> +        *         NC = not connected (not routed from the SoC)
+>>> +        *         "[PER]" = pin is muxed for peripheral (not GPIO)
+>>> +        *         "" = no idea, schematic doesn't say, could be
+>>> +        *              unrouted (not connected to any external pin)
+>>> +        *         LSEC = Low Speed External Connector
+>>> +        *         HSEC = High Speed External Connector
+> 
+> I don't see LSEC/HSEC used anywhere?
 
-Thanks,
-Jisheng
+ok, will remove it. Probably it will be better to have it in common
+place some where by the Docs?
 
+
+>>> +        */
+>>
+>> So maybe we should make this naming convention a suggested
+>> standard. People seem to like it.
+
+Why should i invent some thing new, some Docs with suggested names will
+be good.
+
+> One question about this whole thing: how extensively should we add
+> the names? Only for exposed pins? Or every pin that's routed/used?
+
+Depends on HW. Even on production system i had cases where i need to
+jump in and use some random pin for debugging. So, hawing it in
+devicetree can help to reduce time later.
+
+But i would prefer to have some kind of merged names: Names provided by
+SoC descriptor (real pin names or locations) and names provided by board
+design.
+
+>>> +       gpio-line-names =
+>>> +               /* PA */
+>>> +               "[ERXD3]", "[ERXD2]", "[ERXD1]", "[ERXD0]", "[ETXD3]",
+>>> +                       "[ETXD2]", "[ETXD1]", "[ETXD0]",
+>>> +               "[ERXCK]", "[ERXERR]", "[ERXDV]", "[EMDC]", "[EMDIO]",
+>>> +                       "[ETXEN]", "[ETXCK]", "[ECRS]",
+>>> +               "[ECOL]", "[ETXERR]", "", "", "", "", "", "",
+>>> +               "", "", "", "", "", "", "", "",
+>>> +               /* PB */
+>>> +               "[PMU-SCK]", "[PMU-SDA]", "", "", "", "NC", "NC", "NC",
+>>> +               "NC", "[USB0-DRV]", "NC", "NC", "NC", "NC", "", "",
+>>> +               "", "", "", "", "SCL", "SDA", "", "",
+>>
+>> Are these bit-banged SCL and SDA for doing I2C with
+>> GPIO? Otherwise you probably want to name them "[SCL]" and "[SDA]"
 > 
-> vim +/ou_volt_max +666 drivers/base/power/opp/core.c
+> There's an actual I2C controller backing them.
+
+Ok, i will fix it.
+
+>>
+>>> +               "TXD0", "RXD0", "IO-1", "PH3", "[USB0-IDDET]", "PH5", "", "",
+>>
+>> Same here. You probably want "[TXD0]" etc unless you're bit-banging
+>> the serial port. "IO-1" sounds like a real GPIO though and should
+>> probably be named like that without [] and "PH3" what is that really?
+>> A device-muxed pin or some kind of GPIO?
 > 
-> 6a0712f6 drivers/base/power/opp/core.c Viresh Kumar 2016-02-09  650  	if (freq < old_freq) {
-> 6a0712f6 drivers/base/power/opp/core.c Viresh Kumar 2016-02-09  651  		ret = _set_opp_voltage(dev, reg, u_volt, u_volt_min,
-> 6a0712f6 drivers/base/power/opp/core.c Viresh Kumar 2016-02-09  652  				       u_volt_max);
-> 6a0712f6 drivers/base/power/opp/core.c Viresh Kumar 2016-02-09  653  		if (ret)
-> 6a0712f6 drivers/base/power/opp/core.c Viresh Kumar 2016-02-09  654  			goto restore_freq;
-> 6a0712f6 drivers/base/power/opp/core.c Viresh Kumar 2016-02-09  655  	}
-> 6a0712f6 drivers/base/power/opp/core.c Viresh Kumar 2016-02-09  656  
-> 6a0712f6 drivers/base/power/opp/core.c Viresh Kumar 2016-02-09  657  	return 0;
-> 6a0712f6 drivers/base/power/opp/core.c Viresh Kumar 2016-02-09  658  
-> 6a0712f6 drivers/base/power/opp/core.c Viresh Kumar 2016-02-09  659  restore_freq:
-> 6a0712f6 drivers/base/power/opp/core.c Viresh Kumar 2016-02-09  660  	if (clk_set_rate(clk, old_freq))
-> 6a0712f6 drivers/base/power/opp/core.c Viresh Kumar 2016-02-09  661  		dev_err(dev, "%s: failed to restore old-freq (%lu Hz)\n",
-> 6a0712f6 drivers/base/power/opp/core.c Viresh Kumar 2016-02-09  662  			__func__, old_freq);
-> 6a0712f6 drivers/base/power/opp/core.c Viresh Kumar 2016-02-09  663  restore_voltage:
-> 6a0712f6 drivers/base/power/opp/core.c Viresh Kumar 2016-02-09  664  	/* This shouldn't harm even if the voltages weren't updated earlier */
-> 6a0712f6 drivers/base/power/opp/core.c Viresh Kumar 2016-02-09  665  	if (!IS_ERR(old_opp))
-> 6a0712f6 drivers/base/power/opp/core.c Viresh Kumar 2016-02-09 @666  		_set_opp_voltage(dev, reg, ou_volt, ou_volt_min, ou_volt_max);
-> 6a0712f6 drivers/base/power/opp/core.c Viresh Kumar 2016-02-09  667  
-> 6a0712f6 drivers/base/power/opp/core.c Viresh Kumar 2016-02-09  668  	return ret;
-> 6a0712f6 drivers/base/power/opp/core.c Viresh Kumar 2016-02-09  669  }
-> 6a0712f6 drivers/base/power/opp/core.c Viresh Kumar 2016-02-09  670  EXPORT_SYMBOL_GPL(dev_pm_opp_set_rate);
-> 6a0712f6 drivers/base/power/opp/core.c Viresh Kumar 2016-02-09  671  
-> 2c2709dc drivers/base/power/opp/core.c Viresh Kumar 2016-02-16  672  /* OPP-dev Helpers */
-> 2c2709dc drivers/base/power/opp/core.c Viresh Kumar 2016-02-16  673  static void _kfree_opp_dev_rcu(struct rcu_head *head)
-> 06441658 drivers/base/power/opp.c      Viresh Kumar 2015-07-29  674  {
+> PH3 is actually the pin name. The vendor uses "IO-7" and "IO-8" as function
+> names for PH3 and PH5, but actually names them "NC":
+
+Not in:
+https://linux-sunxi.org/images/9/9d/A20_Bananapi_Schematic.pdf
+
+which was used for this patch.
+
+>     http://www.bananapi.org/p/product.html
 > 
-> :::::: The code at line 666 was first introduced by commit
-> :::::: 6a0712f6f199e737aa5913d28ec4bd3a25de9660 PM / OPP: Add dev_pm_opp_set_rate()
+>>
+>>> +               "", "", "[SD0-DET]", "", "", "", "", "",
+>>> +               "NC", "", "", "", "IO-4", "IO-5", "NC", "[EMAC-PWR-EN]",
+>>
+>> So these seem correct too.
+>>
+>>> +               "[LED1]", "NC", "NC", "NC", "", "", "", "",
+>>
+>> "LED1" seems like the right name, if this is a GPIO used to drive
+>> a LED.
 > 
-> :::::: TO: Viresh Kumar <viresh.kumar@linaro.org>
-> :::::: CC: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+> This is GPIO based.
+
+This was not clear to me, marking GPIO pin as peripheral, at moment of
+writing and testing it was a allocated by led driver. Bit for example
+IO-GCLK was free to use for GPIO :).. so do [] actually make sense?
+
+>>
+>>> +               "", "", "", "IO-GCLK", "NC", "NC", "NC", "NC",
+>>
+>> WHat is IO-GCLK? A real GPIO line used for toggling a clock?
+>> Or a hardware clock signal? In the first case it it correctly named,
+>> in the other case it should be "[IO-GCLK]".
 > 
-> ---
-> 0-DAY kernel test infrastructure                Open Source Technology Center
-> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+> According to the schematics this is a PWM output.
+
+there are two names:
+SoC name: PWM1
+Connector name: IO-GCLK
+
+Which should be used. IMO it was user friendly to use connector name.
+
+> Regards
+> ChenYu
+> 
+>>
+>>> +               "NC", "NC", "[SPI-CE0]", "[SPI-CLK]", "[SPI-MOSI]",
+>>> +                       "[SPI-MISO]", "[SPI-CE1]", "NC",
+>>> +               "IO-6", "IO-3", "IO-2", "IO-0", "", "", "", "",
+>>
+>> Looks right.
+>>
+>> Yours,
+>> Linus Walleij
