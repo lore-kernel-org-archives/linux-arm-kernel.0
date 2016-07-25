@@ -1,71 +1,48 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Mon, 25 Jul 2016 10:00:24 +0100
-Subject: Tegra baseline test results for v4.7
-Message-ID: <34b07bcc-d1c4-85cc-bef9-4d8ce4a48480@nvidia.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 25 Jul 2016 10:02:59 +0100
+Subject: [PATCH v8 4/9] clocksource/drivers/arm_arch_timer: use readq to
+ get 64-bit CNTVCT
+In-Reply-To: <1468952284-28942-5-git-send-email-fu.wei@linaro.org>
+References: <1468952284-28942-1-git-send-email-fu.wei@linaro.org>
+ <1468952284-28942-5-git-send-email-fu.wei@linaro.org>
+Message-ID: <20160725090258.GA15864@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here are some basic Tegra test results for Linux v4.7.
-Logs and other details at:
+On Wed, Jul 20, 2016 at 02:17:59AM +0800, fu.wei at linaro.org wrote:
+> From: Fu Wei <fu.wei@linaro.org>
+> 
+> This patch simplify arch_counter_get_cntvct_mem function by
+> using readq to get 64-bit CNTVCT value instead of readl_relaxed.
+> 
+> Signed-off-by: Fu Wei <fu.wei@linaro.org>
+> ---
+>  drivers/clocksource/arm_arch_timer.c | 10 +---------
+>  1 file changed, 1 insertion(+), 9 deletions(-)
+> 
+> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+> index e6fd42d..483d2f9 100644
+> --- a/drivers/clocksource/arm_arch_timer.c
+> +++ b/drivers/clocksource/arm_arch_timer.c
+> @@ -418,15 +418,7 @@ u32 arch_timer_get_rate(void)
+>  
+>  static u64 arch_counter_get_cntvct_mem(void)
+>  {
+> -	u32 vct_lo, vct_hi, tmp_hi;
+> -
+> -	do {
+> -		vct_hi = readl_relaxed(arch_counter_base + CNTVCT_HI);
+> -		vct_lo = readl_relaxed(arch_counter_base + CNTVCT_LO);
+> -		tmp_hi = readl_relaxed(arch_counter_base + CNTVCT_HI);
+> -	} while (vct_hi != tmp_hi);
+> -
+> -	return ((u64) vct_hi << 32) | vct_lo;
+> +	return readq(arch_counter_base + CNTVCT_LO);
 
-    https://nvtb.github.io//linux/test_v4.7/20160724130103/
+What's the benefit of doing this? If you use readq here, how can we
+guarantee that (a) the endpoint won't generate a SLVERR or similar and
+(b) that we get an atomic read?
 
+"If it ain't broke, don't fix it"
 
-Test summary
-------------
-
-Build: zImage:
-    Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
-
-Build: Image:
-    Pass: ( 1/ 1): defconfig
-
-Boot to userspace: defconfig:
-    Pass: ( 4/ 4): qemu-vexpress64, tegra132-norrin,
-		   tegra210-p2371-0000, tegra210-smaug
-
-Boot to userspace: multi_v7_defconfig:
-    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
-
-Boot to userspace: tegra_defconfig:
-    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
-
-PM: System suspend: multi_v7_defconfig:
-    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
-
-PM: System suspend: tegra_defconfig:
-    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
-
-
-vmlinux object size
-(delta in bytes from test_v4.7-rc7 (92d21ac74a9e3c09b0b01c764e530657e4c85c49)):
-   text     data      bss    total  kernel
-   -225        0     +128      -97  defconfig
-   +759        0        0     +759  multi_v7_defconfig
-   +603     +128        0     +731  tegra_defconfig
-
-
-Boot-time memory difference
-(delta in bytes from test_v4.7-rc7 (92d21ac74a9e3c09b0b01c764e530657e4c85c49))
-    avail    rsrvd     high    freed                board              kconfig                  dtb
-        .        .        .        .      qemu-vexpress64            defconfig           __internal
-        .        .        .        . tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
-        .        .        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
-        .        .        .        .  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
-        .        .        .        .  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
-        .        .        .        .    tegra124-nyan-big   multi_v7_defconfig    tegra124-nyan-big
-        .        .        .        .    tegra124-nyan-big      tegra_defconfig    tegra124-nyan-big
-        .        .        .        .      tegra132-norrin            defconfig      tegra132-norrin
-        .        .        .        .    tegra20-trimslice   multi_v7_defconfig    tegra20-trimslice
-        .        .        .        .    tegra20-trimslice      tegra_defconfig    tegra20-trimslice
-        .        .        .        .  tegra210-p2371-0000            defconfig  tegra210-p2371-0000
-        .        .        .        .       tegra210-smaug            defconfig       tegra210-smaug
-        .        .        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
-        .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
-
---
-nvpublic
+Will
