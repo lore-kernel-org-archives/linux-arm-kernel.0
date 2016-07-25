@@ -1,191 +1,53 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 25 Jul 2016 11:21:58 +0100
-Subject: [PATCH 5/5] mfd: sunxi-gpadc-mfd: probe sunxi-gpadc-ts driver
-In-Reply-To: <11247e4f-d04d-d5bc-6ebf-a637820c011d@kernel.org>
-References: <1469003351-15263-1-git-send-email-quentin.schulz@free-electrons.com>
- <1469003351-15263-6-git-send-email-quentin.schulz@free-electrons.com>
- <20160721060812.GA5993@lukather>
- <11247e4f-d04d-d5bc-6ebf-a637820c011d@kernel.org>
-Message-ID: <20160725102158.GJ14925@dell>
+From: nava.manne@xilinx.com (Nava kishore Manne)
+Date: Mon, 25 Jul 2016 10:27:01 +0000
+Subject: [PATCH v4] Axi-usb: Add support for 64-bit addressing.
+References: <1464626798-1334-1-git-send-email-navam@xilinx.com>
+ <20160602225815.GA5508@rob-hp-laptop>
+ <C89496FEAE474D468F30D558A9468D9F26CF8BC0@XAP-PVEXMBX01.xlnx.xilinx.com>
+ <20160711220623.GB8465@kroah.com>
+Message-ID: <C89496FEAE474D468F30D558A9468D9F26CFB7EA@XAP-PVEXMBX01.xlnx.xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 24 Jul 2016, Jonathan Cameron wrote:
+Ping!!
 
-> On 21/07/16 07:08, Maxime Ripard wrote:
-> > Hi Quentin,
-> > 
-> > On Wed, Jul 20, 2016 at 10:29:11AM +0200, Quentin Schulz wrote:
-> >> This probes the touchscreen driver for Allwinner SoCs (A10, A13 and A31)
-> >> when the property "allwinner,ts-attached" is set in the GPADC (rtp) node of
-> >> the DT.
-> >>
-> >> Some comestic modifications done to shorten and increase readability of the
-> >> code.
-> >>
-> >> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
-> >> ---
-> >>  drivers/mfd/sunxi-gpadc-mfd.c | 115 ++++++++++++++++++++++++++++--------------
-> >>  1 file changed, 77 insertions(+), 38 deletions(-)
-> >>
-> >> diff --git a/drivers/mfd/sunxi-gpadc-mfd.c b/drivers/mfd/sunxi-gpadc-mfd.c
-> >> index 05a000b..9b9ed0b 100644
-> >> --- a/drivers/mfd/sunxi-gpadc-mfd.c
-> >> +++ b/drivers/mfd/sunxi-gpadc-mfd.c
-> >> @@ -21,6 +21,11 @@
-> >>  #define SUNXI_IRQ_TEMP_DATA	1
-> >>  #define SUNXI_IRQ_TP_UP		2
-> >>  
-> >> +#define SUNXI_GPADC_MFD_CELL(_name, _resources, _num_resources) {	\
-> >> +	.name = _name,							\
-> >> +	.resources = _resources,					\
-> >> +	.num_resources = _num_resources					\
-> >> +}
-> >>  
-> >>  static struct resource adc_resources[] = {
-> >>  	{
-> >> @@ -64,33 +69,45 @@ static const struct regmap_irq_chip sunxi_gpadc_mfd_regmap_irq_chip = {
-> >>  };
-> >>  
-> >>  static struct mfd_cell sun4i_gpadc_mfd_cells[] = {
-> >> -	{
-> >> -		.name	= "sun4i-a10-gpadc-iio",
-> >> -		.resources = adc_resources,
-> >> -		.num_resources = ARRAY_SIZE(adc_resources),
-> >> -	}, {
-> >> -		.name = "iio_hwmon",
-> >> -	}
-> >> +	SUNXI_GPADC_MFD_CELL("sun4i-a10-gpadc-iio", adc_resources,
-> >> +			     ARRAY_SIZE(adc_resources)),
-> >> +	SUNXI_GPADC_MFD_CELL("iio_hwmon", NULL, 0),
-> >>  };
-> >>  
-> >>  static struct mfd_cell sun5i_gpadc_mfd_cells[] = {
-> >> -	{
-> >> -		.name	= "sun5i-a13-gpadc-iio",
-> >> -		.resources = adc_resources,
-> >> -		.num_resources = ARRAY_SIZE(adc_resources),
-> >> -	}, {
-> >> -		.name = "iio_hwmon",
-> >> -	},
-> >> +	SUNXI_GPADC_MFD_CELL("sun5i-a13-gpadc-iio", adc_resources,
-> >> +			     ARRAY_SIZE(adc_resources)),
-> >> +	SUNXI_GPADC_MFD_CELL("iio_hwmon", NULL, 0),
-> >>  };
-> >>  
-> >>  static struct mfd_cell sun6i_gpadc_mfd_cells[] = {
-> >> -	{
-> >> -		.name	= "sun6i-a31-gpadc-iio",
-> >> -		.resources = adc_resources,
-> >> -		.num_resources = ARRAY_SIZE(adc_resources),
-> >> -	}, {
-> >> -		.name = "iio_hwmon",
-> >> -	},
-> >> +	SUNXI_GPADC_MFD_CELL("sun6i-a31-gpadc-iio", adc_resources,
-> >> +			     ARRAY_SIZE(adc_resources)),
-> >> +	SUNXI_GPADC_MFD_CELL("iio_hwmon", NULL, 0),
-> >> +};
-> > 
-> > This should be part of a separate patch.
-> > 
-> >> +
-> >> +static struct mfd_cell sun4i_gpadc_mfd_cells_ts[] = {
-> >> +	SUNXI_GPADC_MFD_CELL("sun6i-a31-gpadc-iio", adc_resources,
-> >> +			     ARRAY_SIZE(adc_resources)),
-> >> +	SUNXI_GPADC_MFD_CELL("iio_hwmon", NULL, 0),
-> >> +	SUNXI_GPADC_MFD_CELL("sunxi-gpadc-ts", ts_resources,
-> >> +			     ARRAY_SIZE(ts_resources)),
-> >> +};
-> >> +
-> >> +static struct mfd_cell sun5i_gpadc_mfd_cells_ts[] = {
-> >> +	SUNXI_GPADC_MFD_CELL("sun5i-a13-gpadc-iio", adc_resources,
-> >> +			     ARRAY_SIZE(adc_resources)),
-> >> +	SUNXI_GPADC_MFD_CELL("iio_hwmon", NULL, 0),
-> >> +	SUNXI_GPADC_MFD_CELL("sunxi-gpadc-ts", ts_resources,
-> >> +			     ARRAY_SIZE(ts_resources)),
-> >> +};
-> >> +
-> >> +static struct mfd_cell sun6i_gpadc_mfd_cells_ts[] = {
-> >> +	SUNXI_GPADC_MFD_CELL("sun6i-a31-gpadc-iio", adc_resources,
-> >> +			     ARRAY_SIZE(adc_resources)),
-> >> +	SUNXI_GPADC_MFD_CELL("iio_hwmon", NULL, 0),
-> >> +	SUNXI_GPADC_MFD_CELL("sunxi-gpadc-ts", ts_resources,
-> >> +			     ARRAY_SIZE(ts_resources)),
-> >>  };
-> >>  
-> >>  static const struct regmap_config sunxi_gpadc_mfd_regmap_config = {
-> >> @@ -142,23 +159,45 @@ static int sunxi_gpadc_mfd_probe(struct platform_device *pdev)
-> >>  	}
-> >>  
-> >>  	if (of_device_is_compatible(pdev->dev.of_node,
-> >> -				    "allwinner,sun4i-a10-ts"))
-> >> -		ret = mfd_add_devices(sunxi_gpadc_mfd_dev->dev, 0,
-> >> -				      sun4i_gpadc_mfd_cells,
-> >> -				      ARRAY_SIZE(sun4i_gpadc_mfd_cells), NULL,
-> >> -				      0, NULL);
-> >> -	else if (of_device_is_compatible(pdev->dev.of_node,
-> >> -					 "allwinner,sun5i-a13-ts"))
-> >> -		ret = mfd_add_devices(sunxi_gpadc_mfd_dev->dev, 0,
-> >> -				      sun5i_gpadc_mfd_cells,
-> >> -				      ARRAY_SIZE(sun5i_gpadc_mfd_cells), NULL,
-> >> -				      0, NULL);
-> >> -	else if (of_device_is_compatible(pdev->dev.of_node,
-> >> -					 "allwinner,sun6i-a31-ts"))
-> >> -		ret = mfd_add_devices(sunxi_gpadc_mfd_dev->dev, 0,
-> >> -				      sun6i_gpadc_mfd_cells,
-> >> -				      ARRAY_SIZE(sun6i_gpadc_mfd_cells), NULL,
-> >> -				      0, NULL);
-> >> +				    "allwinner,sun4i-a10-ts")) {
-> >> +		if (of_property_read_bool(pdev->dev.of_node,
-> >> +					  "allwinner,ts-attached"))
-> >> +			ret = mfd_add_devices(sunxi_gpadc_mfd_dev->dev, 0,
-> >> +					      sun4i_gpadc_mfd_cells_ts,
-> >> +					      ARRAY_SIZE(sun4i_gpadc_mfd_cells_ts),
-> >> +					      NULL, 0, NULL);
-> >> +		else
-> >> +			ret = mfd_add_devices(sunxi_gpadc_mfd_dev->dev, 0,
-> >> +					      sun4i_gpadc_mfd_cells,
-> >> +					      ARRAY_SIZE(sun4i_gpadc_mfd_cells),
-> >> +					      NULL, 0, NULL);
-> >> +	} else if (of_device_is_compatible(pdev->dev.of_node,
-> >> +					 "allwinner,sun5i-a13-ts")) {
-> >> +		if (of_property_read_bool(pdev->dev.of_node,
-> >> +					  "allwinner,ts-attached"))
-> >> +			ret = mfd_add_devices(sunxi_gpadc_mfd_dev->dev, 0,
-> >> +					      sun5i_gpadc_mfd_cells_ts,
-> >> +					      ARRAY_SIZE(sun5i_gpadc_mfd_cells_ts),
-> >> +					      NULL, 0, NULL);
-> >> +		else
-> >> +			ret = mfd_add_devices(sunxi_gpadc_mfd_dev->dev, 0,
-> >> +					      sun5i_gpadc_mfd_cells,
-> >> +					      ARRAY_SIZE(sun5i_gpadc_mfd_cells),
-> >> +					      NULL, 0, NULL);
-> >> +	} else if (of_device_is_compatible(pdev->dev.of_node,
-> >> +					 "allwinner,sun6i-a31-ts")) {
-> >> +		if (of_property_read_bool(pdev->dev.of_node,
-> >> +					  "allwinner,ts-attached"))
-> >> +			ret = mfd_add_devices(sunxi_gpadc_mfd_dev->dev, 0,
-> >> +					      sun6i_gpadc_mfd_cells_ts,
-> >> +					      ARRAY_SIZE(sun6i_gpadc_mfd_cells_ts),
-> >> +					      NULL, 0, NULL);
-> >> +		else
-> >> +			ret = mfd_add_devices(sunxi_gpadc_mfd_dev->dev, 0,
-> >> +					      sun6i_gpadc_mfd_cells,
-> >> +					      ARRAY_SIZE(sun6i_gpadc_mfd_cells),
-> >> +					      NULL, 0, NULL);
-> >> +	}
-> > 
-> > Please don't use any of_device_is_compatible.
-> Hi Maxime,
+> -----Original Message-----
+> From: Nava kishore Manne
+> Sent: Wednesday, July 13, 2016 1:00 PM
+> To: 'gregkh at linuxfoundation.org' <gregkh@linuxfoundation.org>
+> Cc: Rob Herring <robh@kernel.org>; pawel.moll at arm.com;
+> mark.rutland at arm.com; ijc+devicetree at hellion.org.uk;
+> galak at codeaurora.org; Michal Simek <michals@xilinx.com>; Soren
+> Brinkmann <sorenb@xilinx.com>; balbi at ti.com; Hyun Kwon
+> <hyunk@xilinx.com>; Radhey Shyam Pandey <radheys@xilinx.com>;
+> devicetree at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
+> kernel at vger.kernel.org
+> Subject: RE: [PATCH v4] Axi-usb: Add support for 64-bit addressing.
 > 
-> Why?  (Just curious...)
-
-'cos they make for ugly code.
-
-Use of_match_device() instead.
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+> Hi Greg,
+> 
+> > > Ping!!
+> >
+> > <snip>
+> >
+> > >
+> > > This email and any attachments are intended for the sole use of the
+> > > named
+> > recipient(s) and contain(s) confidential information that may be
+> > proprietary, privileged or copyrighted under applicable law. If you
+> > are not the intended recipient, do not read, copy, or forward this
+> > email message or any attachments. Delete this email message and any
+> attachments immediately.
+> >
+> > You do realize that with an email footer like this, you prevent any of
+> > us from responding to you, sorry.  I shouldn't even be writing this...
+> 
+> Sorry something fishy happened with my email-client I have fixed it now next
+> time onwards will take care before giving replies...
+> 
+> Regards,
+> Navakishore.
+> >
+> 
+> 
+> > greg k-h
