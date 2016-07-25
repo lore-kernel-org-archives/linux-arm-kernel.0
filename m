@@ -1,86 +1,55 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 25 Jul 2016 16:56:21 +0100
-Subject: [RFC PATCH v3 05/13] drivers: iommu: make iommu_fwspec OF agnostic
-In-Reply-To: <CAL_JsqKc4aJ1xiJAS6HRKeVO8mrZWpBF0uugvmCgNuUamJF=Eg@mail.gmail.com>
-References: <1469013815-24380-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1469013815-24380-6-git-send-email-lorenzo.pieralisi@arm.com>
- <1499f802-5f98-b0c0-d3aa-dabcac81e84e@arm.com>
- <CAL_JsqKc4aJ1xiJAS6HRKeVO8mrZWpBF0uugvmCgNuUamJF=Eg@mail.gmail.com>
-Message-ID: <20160725155620.GB28507@red-moon>
+From: james.hogan@imgtec.com (James Hogan)
+Date: Mon, 25 Jul 2016 16:59:51 +0100
+Subject: [PATCH 2/5] ARM: Define AT_VECTOR_SIZE_ARCH for ARCH_DLINFO
+In-Reply-To: <1469462394-8970-1-git-send-email-james.hogan@imgtec.com>
+References: <1469462394-8970-1-git-send-email-james.hogan@imgtec.com>
+Message-ID: <1469462394-8970-3-git-send-email-james.hogan@imgtec.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 25, 2016 at 10:21:10AM -0500, Rob Herring wrote:
-> On Mon, Jul 25, 2016 at 10:09 AM, Robin Murphy <robin.murphy@arm.com> wrote:
-> > Hi Lorenzo,
-> >
-> > On 20/07/16 12:23, Lorenzo Pieralisi wrote:
-> >> The iommu_fwspec structure, used to hold per device iommu configuration
-> >> data is not OF specific and therefore can be moved to a generic
-> >> and OF independent compilation unit.
-> >>
-> >> In particular, the iommu_fwspec handling hinges on the device_node
-> >> pointer to identify the IOMMU device associated with the iommu_fwspec
-> >> structure, that is easily converted to a more generic fwnode_handle
-> >> pointer that can cater for OF and non-OF (ie ACPI) systems.
-> >>
-> >> Create the files and related Kconfig entry to decouple iommu_fwspec
-> >> structure from the OF iommu kernel layer.
-> >>
-> >> Given that the current iommu_fwspec implementation relies on
-> >> the arch specific struct device.archdata.iommu field in its
-> >> implementation, by making the code standalone and independent
-> >> of the OF layer this patch makes sure that the iommu_fwspec
-> >> kernel code can be selected only on arches implementing the
-> >> struct device.archdata.iommu field by adding an explicit
-> >> arch dependency in its config entry.
-> >>
-> >> Current drivers using the iommu_fwspec for streamid translation
-> >> are converted to the new iommu_fwspec API by simply converting
-> >> the device_node to its fwnode_handle pointer.
-> >>
-> >> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> >> Cc: Will Deacon <will.deacon@arm.com>
-> >> Cc: Hanjun Guo <hanjun.guo@linaro.org>
-> >> Cc: Robin Murphy <robin.murphy@arm.com>
-> >> Cc: Joerg Roedel <joro@8bytes.org>
-> >> ---
-> >>  drivers/iommu/Kconfig        |   4 ++
-> >>  drivers/iommu/Makefile       |   1 +
-> >>  drivers/iommu/arm-smmu-v3.c  |  13 +++--
-> >>  drivers/iommu/iommu-fwspec.c | 114 +++++++++++++++++++++++++++++++++++++++++++
-> >>  drivers/iommu/of_iommu.c     |  52 --------------------
-> >>  include/linux/iommu-fwspec.h |  60 +++++++++++++++++++++++
-> >>  include/linux/of_iommu.h     |  24 +++------
-> >>  7 files changed, 196 insertions(+), 72 deletions(-)
-> >>  create mode 100644 drivers/iommu/iommu-fwspec.c
-> >>  create mode 100644 include/linux/iommu-fwspec.h
-> >>
-> >> diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
-> >> index d1c66af..2b26bfb 100644
-> >> --- a/drivers/iommu/Kconfig
-> >> +++ b/drivers/iommu/Kconfig
-> >> @@ -67,6 +67,10 @@ config OF_IOMMU
-> >>         def_bool y
-> >>         depends on OF && IOMMU_API
-> >>
-> >> +config IOMMU_FWSPEC
-> >> +       def_bool y
-> >> +       depends on ARM64 && IOMMU_API
-> >
-> > I think that could be at least (ARM || ARM64).
-> 
-> Why any arch dependency?
-> 
-> Seems like OF_IOMMU (and ACPI?) should select this.
+AT_VECTOR_SIZE_ARCH should be defined with the maximum number of
+NEW_AUX_ENT entries that ARCH_DLINFO can contain, but it wasn't defined
+for ARM at all even though ARCH_DLINFO can contain one NEW_AUX_ENT when
+VDSO is enabled.
 
-Absolutely, that's the end goal. Current issue is that the iommu_fwspec
-mechanism relies on dev_archdata.iommu pointer internally to work and
-since that's arch specific I can't select it on arches that do not have
-that field, it would break the compilation.
+This shouldn't be a problem as AT_VECTOR_SIZE_BASE includes space for
+AT_BASE_PLATFORM which ARM doesn't use, but lets define it now and add
+the comment above ARCH_DLINFO as found in several other architectures to
+remind future modifiers of ARCH_DLINFO to keep AT_VECTOR_SIZE_ARCH up to
+date.
 
-I will follow up with Robin to make sure we will be able to
-implement what you request above.
+Fixes: 1713ce7c4375 ("ARM: 8329/1: miscellaneous vdso infrastructure, preparation")
+Signed-off-by: James Hogan <james.hogan@imgtec.com>
+Cc: Russell King <linux@armlinux.org.uk>
+Cc: Nathan Lynch <nathan_lynch@mentor.com>
+Cc: linux-arm-kernel at lists.infradead.org
+---
+ arch/arm/include/asm/elf.h         | 1 +
+ arch/arm/include/uapi/asm/auxvec.h | 2 ++
+ 2 files changed, 3 insertions(+)
 
-Thanks !
-Lorenzo
+diff --git a/arch/arm/include/asm/elf.h b/arch/arm/include/asm/elf.h
+index d2315ffd8f12..dc58133e33f1 100644
+--- a/arch/arm/include/asm/elf.h
++++ b/arch/arm/include/asm/elf.h
+@@ -129,6 +129,7 @@ extern void elf_set_personality(const struct elf32_hdr *);
+ 
+ #ifdef CONFIG_MMU
+ #ifdef CONFIG_VDSO
++/* update AT_VECTOR_SIZE_ARCH if the number of NEW_AUX_ENT entries changes */
+ #define ARCH_DLINFO						\
+ do {								\
+ 	NEW_AUX_ENT(AT_SYSINFO_EHDR,				\
+diff --git a/arch/arm/include/uapi/asm/auxvec.h b/arch/arm/include/uapi/asm/auxvec.h
+index cb02a767a500..5ab9090356df 100644
+--- a/arch/arm/include/uapi/asm/auxvec.h
++++ b/arch/arm/include/uapi/asm/auxvec.h
+@@ -4,4 +4,6 @@
+ /* VDSO location */
+ #define AT_SYSINFO_EHDR	33
+ 
++#define AT_VECTOR_SIZE_ARCH 1 /* entries in ARCH_DLINFO */
++
+ #endif
+-- 
+2.4.10
