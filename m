@@ -1,61 +1,21 @@
-From: tanxiaojun@huawei.com (Tan Xiaojun)
-Date: Mon, 25 Jul 2016 10:00:21 +0800
-Subject: [RFC PATCH v1 0/2] Add Hisilicon Djtag driver
-In-Reply-To: <20160722105648.GD17584@leverpostej>
-References: <1469177332-72156-1-git-send-email-tanxiaojun@huawei.com>
- <20160722105648.GD17584@leverpostej>
-Message-ID: <579572B5.5080108@huawei.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 25 Jul 2016 11:09:48 +0900
+Subject: [PATCH 0/2] Add R8A7792 I2C support
+In-Reply-To: <17288006.ERHB6654v5@wasted.cogentembedded.com>
+References: <17288006.ERHB6654v5@wasted.cogentembedded.com>
+Message-ID: <20160725020947.GI12825@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016/7/22 18:56, Mark Rutland wrote:
-> Hi,
+On Sat, Jul 23, 2016 at 10:15:56PM +0300, Sergei Shtylyov wrote:
+> Hello.
 > 
-> I understand that some SoC/socket level PMU is accessed via these
-> registers. It doesn't make sense to review either in isolation. Please
-> put together a unified series, with both the djtag accessors and the
-> PMU code.
+>    Here's the set of 2 patches against Simon Horman's 'renesas.git' repo,
+> 'renesas-devel-20160722-v4.7-rc7' tag plus the SDHI/I2C patches just posted.
+> We're adding the R8A7792 VIN clocks and device nodes. The patches have been
+> tested on the Blanche board with the switches set to the HDMI input mode...
 > 
-> On it's own, it's *very* difficult to understand how this fits into the
-> SoC, and how it is to be used.
-> 
-> Thanks,
-> Mark.
-> 
+> [1/2] ARM: dts: r8a7792: add VIN clocks
+> [2/2] ARM: dts: r8a7792: add VIN support
 
-OK. Thank you for your suggestion. I need to think about it again.
-
-Thanks,
-Xiaojun.
-
-> On Fri, Jul 22, 2016 at 04:48:50PM +0800, Tan Xiaojun wrote:
->>
->> Tan Xiaojun (2):
->>   Documentation: arm64: Add Hisilicon HiP05/06/07 Sysctrl and Djtag dts
->>     bindings
->>   drivers: soc: Add support for Hisilicon Djtag driver
->>
->>  .../bindings/arm/hisilicon/hisilicon.txt           |   98 +++++
->>  drivers/soc/Kconfig                                |    1 +
->>  drivers/soc/Makefile                               |    1 +
->>  drivers/soc/hisilicon/Kconfig                      |   12 +
->>  drivers/soc/hisilicon/Makefile                     |    1 +
->>  drivers/soc/hisilicon/djtag.c                      |  373 ++++++++++++++++++++
->>  include/linux/soc/hisilicon/djtag.h                |   18 +
->>  7 files changed, 504 insertions(+)
->>  create mode 100644 drivers/soc/hisilicon/Kconfig
->>  create mode 100644 drivers/soc/hisilicon/Makefile
->>  create mode 100644 drivers/soc/hisilicon/djtag.c
->>  create mode 100644 include/linux/soc/hisilicon/djtag.h
->>
->> -- 
->> 1.7.9.5
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe devicetree" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->>
-> 
-> .
-> 
+Thanks, I have queued these up for v4.9.
