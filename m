@@ -1,58 +1,106 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 25 Jul 2016 10:50:13 +0100
-Subject: [PATCH v3 0/6] Add support for privileged mappings
-In-Reply-To: <vnkweg6l9zla.fsf@codeaurora.org>
-References: <20160719203655.16629-1-mitchelh@codeaurora.org>
- <20160722165107.GH16837@arm.com> <vnkweg6l9zla.fsf@codeaurora.org>
-Message-ID: <20160725095012.GC15864@arm.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 25 Jul 2016 11:51:13 +0200
+Subject: [PATCH 5/5] mfd: sunxi-gpadc-mfd: probe sunxi-gpadc-ts driver
+In-Reply-To: <11247e4f-d04d-d5bc-6ebf-a637820c011d@kernel.org>
+References: <1469003351-15263-1-git-send-email-quentin.schulz@free-electrons.com>
+ <1469003351-15263-6-git-send-email-quentin.schulz@free-electrons.com>
+ <20160721060812.GA5993@lukather>
+ <11247e4f-d04d-d5bc-6ebf-a637820c011d@kernel.org>
+Message-ID: <20160725095113.GJ7419@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 22, 2016 at 01:39:45PM -0700, Mitchel Humpherys wrote:
-> On Fri, Jul 22 2016 at 05:51:07 PM, Will Deacon <will.deacon@arm.com> wrote:
-> > On Tue, Jul 19, 2016 at 01:36:49PM -0700, Mitchel Humpherys wrote:
-> >> The following patch to the ARM SMMU driver:
-> >> 
-> >>     commit d346180e70b91b3d5a1ae7e5603e65593d4622bc
-> >>     Author: Robin Murphy <robin.murphy@arm.com>
-> >>     Date:   Tue Jan 26 18:06:34 2016 +0000
-> >>     
-> >>         iommu/arm-smmu: Treat all device transactions as unprivileged
-> >> 
-> >> started forcing all SMMU transactions to come through as "unprivileged".
-> >> The rationale given was that:
-> >> 
-> >>   (1) There is no way in the IOMMU API to even request privileged mappings.
-> >> 
-> >>   (2) It's difficult to implement a DMA mapper that correctly models the
-> >>       ARM VMSAv8 behavior of unprivileged-writeable =>
-> >>       privileged-execute-never.
-> >> 
-> >> This series rectifies (1) by introducing an IOMMU API for privileged
-> >> mappings and implements it in io-pgtable-arm.
-> >> 
-> >> This series rectifies (2) by introducing a new dma attribute
-> >> (DMA_ATTR_PRIVILEGED) for users of the DMA API that need privileged
-> >> mappings which are inaccessible to lesser-privileged execution levels, and
-> >> implements it in the arm64 IOMMU DMA mapper.  The one known user (pl330.c)
-> >> is converted over to the new attribute.
-> >> 
-> >> Jordan and Jeremy can provide more info on the use case if needed, but the
-> >> high level is that it's a security feature to prevent attacks such as [1].
-> >
-> > This all looks good to me:
-> >
-> > Acked-by: Will Deacon <will.deacon@arm.com>
-> >
-> > It looks pretty fiddly to merge, however. How are you planning to get
-> > this upstream?
+Hi Jonathan,
+
+On Sun, Jul 24, 2016 at 12:26:56PM +0100, Jonathan Cameron wrote:
+> >> @@ -142,23 +159,45 @@ static int sunxi_gpadc_mfd_probe(struct platform_device *pdev)
+> >>  	}
+> >>  
+> >>  	if (of_device_is_compatible(pdev->dev.of_node,
+> >> -				    "allwinner,sun4i-a10-ts"))
+> >> -		ret = mfd_add_devices(sunxi_gpadc_mfd_dev->dev, 0,
+> >> -				      sun4i_gpadc_mfd_cells,
+> >> -				      ARRAY_SIZE(sun4i_gpadc_mfd_cells), NULL,
+> >> -				      0, NULL);
+> >> -	else if (of_device_is_compatible(pdev->dev.of_node,
+> >> -					 "allwinner,sun5i-a13-ts"))
+> >> -		ret = mfd_add_devices(sunxi_gpadc_mfd_dev->dev, 0,
+> >> -				      sun5i_gpadc_mfd_cells,
+> >> -				      ARRAY_SIZE(sun5i_gpadc_mfd_cells), NULL,
+> >> -				      0, NULL);
+> >> -	else if (of_device_is_compatible(pdev->dev.of_node,
+> >> -					 "allwinner,sun6i-a31-ts"))
+> >> -		ret = mfd_add_devices(sunxi_gpadc_mfd_dev->dev, 0,
+> >> -				      sun6i_gpadc_mfd_cells,
+> >> -				      ARRAY_SIZE(sun6i_gpadc_mfd_cells), NULL,
+> >> -				      0, NULL);
+> >> +				    "allwinner,sun4i-a10-ts")) {
+> >> +		if (of_property_read_bool(pdev->dev.of_node,
+> >> +					  "allwinner,ts-attached"))
+> >> +			ret = mfd_add_devices(sunxi_gpadc_mfd_dev->dev, 0,
+> >> +					      sun4i_gpadc_mfd_cells_ts,
+> >> +					      ARRAY_SIZE(sun4i_gpadc_mfd_cells_ts),
+> >> +					      NULL, 0, NULL);
+> >> +		else
+> >> +			ret = mfd_add_devices(sunxi_gpadc_mfd_dev->dev, 0,
+> >> +					      sun4i_gpadc_mfd_cells,
+> >> +					      ARRAY_SIZE(sun4i_gpadc_mfd_cells),
+> >> +					      NULL, 0, NULL);
+> >> +	} else if (of_device_is_compatible(pdev->dev.of_node,
+> >> +					 "allwinner,sun5i-a13-ts")) {
+> >> +		if (of_property_read_bool(pdev->dev.of_node,
+> >> +					  "allwinner,ts-attached"))
+> >> +			ret = mfd_add_devices(sunxi_gpadc_mfd_dev->dev, 0,
+> >> +					      sun5i_gpadc_mfd_cells_ts,
+> >> +					      ARRAY_SIZE(sun5i_gpadc_mfd_cells_ts),
+> >> +					      NULL, 0, NULL);
+> >> +		else
+> >> +			ret = mfd_add_devices(sunxi_gpadc_mfd_dev->dev, 0,
+> >> +					      sun5i_gpadc_mfd_cells,
+> >> +					      ARRAY_SIZE(sun5i_gpadc_mfd_cells),
+> >> +					      NULL, 0, NULL);
+> >> +	} else if (of_device_is_compatible(pdev->dev.of_node,
+> >> +					 "allwinner,sun6i-a31-ts")) {
+> >> +		if (of_property_read_bool(pdev->dev.of_node,
+> >> +					  "allwinner,ts-attached"))
+> >> +			ret = mfd_add_devices(sunxi_gpadc_mfd_dev->dev, 0,
+> >> +					      sun6i_gpadc_mfd_cells_ts,
+> >> +					      ARRAY_SIZE(sun6i_gpadc_mfd_cells_ts),
+> >> +					      NULL, 0, NULL);
+> >> +		else
+> >> +			ret = mfd_add_devices(sunxi_gpadc_mfd_dev->dev, 0,
+> >> +					      sun6i_gpadc_mfd_cells,
+> >> +					      ARRAY_SIZE(sun6i_gpadc_mfd_cells),
+> >> +					      NULL, 0, NULL);
+> >> +	}
+> > 
+> > Please don't use any of_device_is_compatible.
+> Hi Maxime,
 > 
-> Fiddly in what way?  Do you mean in relation to "dma-mapping: Use
-> unsigned long for dma_attrs" [1]?  I admit I wasn't aware of that
-> activity until Robin mentioned it.  It looks like it's merged on
-> next/master, shall I rebase/rework on that and resend?
+> Why?  (Just curious...)
 
-Fiddly in that it touches multiple subsystems. I guess routing it via
-the iommu tree (Joerg) might be the best bet.
+This is completely redundant. The compatible has already been looked
+up once to match the driver, and you can associate a void * pointer to
+any compatible you register in the of_device_id array.
 
-Will
+So you can just retrieve the compatible that probed you in the first
+place, and use it's private data pointer to store whatever you want,
+without the numerous (and expensive) calls to of_device_is_compatible.
+
+It's also easier to maintain in the long term, since you can simply
+add a new field to the structure you would register there, instead of
+keeping adding more conditions.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160725/6c7dc35d/attachment.sig>
