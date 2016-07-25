@@ -1,21 +1,40 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 25 Jul 2016 11:09:48 +0900
-Subject: [PATCH 0/2] Add R8A7792 I2C support
-In-Reply-To: <17288006.ERHB6654v5@wasted.cogentembedded.com>
-References: <17288006.ERHB6654v5@wasted.cogentembedded.com>
-Message-ID: <20160725020947.GI12825@verge.net.au>
+From: tanxiaojun@huawei.com (Tan Xiaojun)
+Date: Mon, 25 Jul 2016 10:09:44 +0800
+Subject: [RFC PATCH v1 0/2] Add Hisilicon Djtag driver
+In-Reply-To: <11848764.OZ77lJYCM4@wuerfel>
+References: <1469177332-72156-1-git-send-email-tanxiaojun@huawei.com>
+ <20160722105648.GD17584@leverpostej> <11848764.OZ77lJYCM4@wuerfel>
+Message-ID: <579574E8.4080201@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 23, 2016 at 10:15:56PM +0300, Sergei Shtylyov wrote:
-> Hello.
+On 2016/7/22 21:27, Arnd Bergmann wrote:
+> On Friday, July 22, 2016 11:56:49 AM CEST Mark Rutland wrote:
+>> Hi,
+>>
+>> I understand that some SoC/socket level PMU is accessed via these
+>> registers. It doesn't make sense to review either in isolation. Please
+>> put together a unified series, with both the djtag accessors and the
+>> PMU code.
+>>
+>> On it's own, it's *very* difficult to understand how this fits into the
+>> SoC, and how it is to be used.
 > 
->    Here's the set of 2 patches against Simon Horman's 'renesas.git' repo,
-> 'renesas-devel-20160722-v4.7-rc7' tag plus the SDHI/I2C patches just posted.
-> We're adding the R8A7792 VIN clocks and device nodes. The patches have been
-> tested on the Blanche board with the switches set to the HDMI input mode...
+> Is there anything else that the driver is used for?
 > 
-> [1/2] ARM: dts: r8a7792: add VIN clocks
-> [2/2] ARM: dts: r8a7792: add VIN support
+> Having it in drivers/soc/ feels wrong to me, and if there is only
+> one user, I'd recommend having it as part of the same driver module
+> as the code accessing it.
+> 
+> 	Arnd
+> 
 
-Thanks, I have queued these up for v4.9.
+Many modules will use it, and they are waiting for djtag upstream. Maybe
+it should not have been presented separately. I will think about it.
+
+Thanks,
+Xiaojun.
+
+> 
+> .
+> 
