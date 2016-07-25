@@ -1,67 +1,47 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 25 Jul 2016 15:41:38 +0200
-Subject: [RFC 6/6] bus: Add support for Tegra NOR controller
-In-Reply-To: <CALw8SCU5s8BAg6B8dT=QokY-D-CcokmMEkYqz1GJWHkX-XWpRQ@mail.gmail.com>
-References: <1468935397-11926-1-git-send-email-mirza.krak@gmail.com>
- <1468935397-11926-7-git-send-email-mirza.krak@gmail.com>
- <20160725111443.GB21170@ulmo.ba.sec>
- <CALw8SCU5s8BAg6B8dT=QokY-D-CcokmMEkYqz1GJWHkX-XWpRQ@mail.gmail.com>
-Message-ID: <20160725134138.GL21170@ulmo.ba.sec>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 25 Jul 2016 14:46:26 +0100
+Subject: [PATCH 1/2] arm64: mm: make create_mapping_late() non-allocating
+In-Reply-To: <1469208745-6693-2-git-send-email-ard.biesheuvel@linaro.org>
+References: <1469208745-6693-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1469208745-6693-2-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20160725134550.GA14465@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 25, 2016 at 02:17:11PM +0200, Mirza Krak wrote:
-> 2016-07-25 13:14 GMT+02:00 Thierry Reding <thierry.reding@gmail.com>:
-> > On Tue, Jul 19, 2016 at 03:36:37PM +0200, Mirza Krak wrote:
-[...]
-> >> +
-> >> +     if (of_get_child_count(of_node))
-> >> +             ret = of_platform_populate(of_node,
-> >> +                                of_default_bus_match_table,
-> >> +                                NULL, &pdev->dev);
-> >
-> > Why the extra check? of_platform_populate() is almost a no-op if there
-> > aren't any children anyway. What it will do is set the OF_POPULATED_BUS
-> > flag, but I think we want that irrespective of whether or not there are
-> > any children.
-> >
-> > Was there any problem with calling it unconditionally that made you opt
-> > for the extra check?
+Hi Ard,
+
+On Fri, Jul 22, 2016 at 07:32:24PM +0200, Ard Biesheuvel wrote:
+> The only purpose served by create_mapping_late() is to remap the already
+> mapped .text and .rodata kernel segments with read-only permissions. Since
+> we no longer allow block mappings to be split or merged,
+> create_mapping_late() should not pass an allocation function pointer into
+> __create_pgd_mapping(). So pass NULL instead.
 > 
-> I have not tested calling it unconditionally. Used another driver as
-> reference and they had that condition (drivers/bus/imx-weim.c), that
-> driver does not mention why the condition is there. But will test
-> removing the condition and see what happens.
-
-If that works fine for Tegra, it might be a good idea to get rid of the
-call in the imx-weim.c driver, too.
-
-> >> +static struct platform_driver nor_driver = {
-> >> +     .driver = {
-> >> +             .name           = "tegra-nor",
-> >> +             .of_match_table = nor_id_table,
-> >> +     },
-> >> +};
-> >> +module_platform_driver_probe(nor_driver, nor_probe);
-> >> +
-> >> +MODULE_AUTHOR("Mirza Krak <mirza.krak@gmail.com");
-> >> +MODULE_DESCRIPTION("NVIDIA Tegra NOR Bus Driver");
-> >> +MODULE_LICENSE("GPL");
-> >
-> > You're header comment says GPL version 2, which means that the
-> > MODULE_LICENSE needs to be "GPL v2". "GPL" means "version 2 or later".
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  arch/arm64/mm/mmu.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> Ok, I do not really mind it being GPL version 2 or later so will
-> change the header comment instead if that is ok.
+> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+> index a96a2413fa18..33f36cede02d 100644
+> --- a/arch/arm64/mm/mmu.c
+> +++ b/arch/arm64/mm/mmu.c
+> @@ -312,7 +312,7 @@ static void create_mapping_late(phys_addr_t phys, unsigned long virt,
+>  	}
+>  
+>  	__create_pgd_mapping(init_mm.pgd, phys, virt, size, prot,
+> -			     late_pgtable_alloc, !debug_pagealloc_enabled());
+> +			     NULL, !debug_pagealloc_enabled());
+>  }
 
-I think "GPL v2" is traditionally more common in kernel code, but as the
-author the decision is obviously yours.
+How about we drop the __init marker from create_mapping_noalloc(), and
+update the callers in mark_rodata_ro() to use that, so that we can drop
+create_mapping_late() entirely.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160725/daba8235/attachment.sig>
+Other than the __init marker and name, create_mapping_late() and
+create_mapping_noalloc() would be identical after this change, and the
+naming of create_mapping_noalloc() does better describe what we're
+trying to achieve in mark_rodata_ro().
+
+Thanks,
+Mark.
