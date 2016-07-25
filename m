@@ -1,72 +1,114 @@
-From: paulo@inutilfutil.com (paulo at inutilfutil.com)
-Date: Mon, 25 Jul 2016 06:16:45 -0700 (PDT)
-Subject: [PATCH v2 0/5] net-next: ethernet: add sun8i-emac driver
-In-Reply-To: <1469001800-11615-1-git-send-email-clabbe.montjoie@gmail.com>
-References: <1469001800-11615-1-git-send-email-clabbe.montjoie@gmail.com>
-Message-ID: <668e8915-109e-431e-96d0-908b1c6553ad@googlegroups.com>
+From: mirza.krak@gmail.com (Mirza Krak)
+Date: Mon, 25 Jul 2016 15:20:44 +0200
+Subject: [RFC 3/6] dt/bindings: Add bindings for Tegra20/30 NOR bus driver
+In-Reply-To: <20160725113638.GE21170@ulmo.ba.sec>
+References: <1468935397-11926-1-git-send-email-mirza.krak@gmail.com>
+ <1468935397-11926-4-git-send-email-mirza.krak@gmail.com>
+ <20160720124408.GA19113@rob-hp-laptop>
+ <CALw8SCXFexogJn3BwrZm63yEL0rtTpYsYYb0O9D_ibhginVLqw@mail.gmail.com>
+ <1f280c99-156f-59d3-308f-b4c8ff0f8f7c@nvidia.com>
+ <20160725113638.GE21170@ulmo.ba.sec>
+Message-ID: <CALw8SCUxbpWGz0Mrp-Wf=jxa84Frk6mubeL9+KAYFAbq+-9CZQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, July 20, 2016 at 5:03:41 AM UTC-3, clabbe.montjoie wrote:
-> Hello
-> 
-> This patch series add the driver for sun8i-emac which handle the Ethernet MAC
-> present on Allwinner H3/A83T/A64 SoCs.
-> 
-> It supports 10/100/1000 Mbit/s speed with half/full duplex.
-> It can use an internal PHY (MII 10/100) or an external PHY
-> via RGMII/RMII.
-> 
-> This patch series enable the driver only for the H3 SoC since A83T and A64
-> doesn't have the necessary clocks present in mainline.
-> 
-> This patch series enable the driver only for the OrangePiPC board since other
-> board with H3 use external PHY which need optional regulators that will be
-> supported later.
-> 
-> The driver have been tested on the following boards:
-> - H3 Orange PI PC, Orange PI Plus, BananaPI-M2+
-> - A64 Pine64
-> - A83T BananaPI-M3
-> 
-> I would like to thanks Chen-Yu Tsai for his help on developing this driver.
-> 
-> Regards
-> 
-> Changes since v1
-> - Implement NAPI
-> - Sorted and reworded all define
-> - Reworked ethtools stats strings
-> - Removed all unneeded __packked and __aligned
-> - Added tuning of RX/TX ring size via ethtool
-> - Corrected use of sk/skb naming
-> - Added some wmb when needed
-> - Moved irq claim/free to emac_open/close
-> - Lots of code refactoring
-> 
-> LABBE Corentin (5):
->   ethernet: add sun8i-emac driver
->   MAINTAINERS: Add myself as maintainers of sun8i-emac
->   ARM: sun8i: dt: Add DT bindings documentation for Allwinner sun8i-emac
->   ARM: dts: sun8i-h3: add sun8i-emac ethernet driver
->   ARM: dts: sun8i: Enable sun8i-emac on the Orange PI PC
-> 
->  .../bindings/net/allwinner,sun8i-emac.txt          |   65 +
->  MAINTAINERS                                        |    6 +
->  arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts         |   11 +
->  arch/arm/boot/dts/sun8i-h3.dtsi                    |   14 +
->  drivers/net/ethernet/allwinner/Kconfig             |   13 +
->  drivers/net/ethernet/allwinner/Makefile            |    1 +
->  drivers/net/ethernet/allwinner/sun8i-emac.c        | 2127 ++++++++++++++++++++
->  7 files changed, 2237 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/net/allwinner,sun8i-emac.txt
->  create mode 100644 drivers/net/ethernet/allwinner/sun8i-emac.c
-> 
-> -- 
-> 2.7.3
+2016-07-25 13:36 GMT+02:00 Thierry Reding <thierry.reding@gmail.com>:
+> On Thu, Jul 21, 2016 at 11:26:09AM +0100, Jon Hunter wrote:
+>>
+>> On 20/07/16 20:28, Mirza Krak wrote:
+>> > 2016-07-20 14:44 GMT+02:00 Rob Herring <robh@kernel.org>:
+>> >> On Tue, Jul 19, 2016 at 03:36:34PM +0200, Mirza Krak wrote:
+>> >>> From: Mirza Krak <mirza.krak@gmail.com>
+>> >>>
+>> >>> Document the devicetree bindings for NOR bus driver found on Tegra20 and
+>> >>> Tegra30 SOCs
+>> >>>
+>> >>> Signed-off-by: Mirza Krak <mirza.krak@gmail.com>
+>> >>> ---
+>> >>>  .../devicetree/bindings/bus/nvidia,tegra20-nor.txt | 73 ++++++++++++++++++++++
+>> >>>  1 file changed, 73 insertions(+)
+>> >>>  create mode 100644 Documentation/devicetree/bindings/bus/nvidia,tegra20-nor.txt
+>> >>>
+>> >>> diff --git a/Documentation/devicetree/bindings/bus/nvidia,tegra20-nor.txt b/Documentation/devicetree/bindings/bus/nvidia,tegra20-nor.txt
+>> >>> new file mode 100644
+>> >>> index 0000000..9ee4a66
+>> >>> --- /dev/null
+>> >>> +++ b/Documentation/devicetree/bindings/bus/nvidia,tegra20-nor.txt
+>> >>> @@ -0,0 +1,73 @@
+>> >>> +Device tree bindings for NVIDIA Tegra20/30 NOR Bus
+>> >>> +
+>> >>> +The NOR controller supports a number of memory types, including synchronous NOR,
+>> >>> +asynchronous NOR, and other flash memories with similar interfaces, such as
+>> >>> +MuxOneNAND. One could also connect high speed devices like FPGAs, DSPs,
+>> >>> +CAN chips, Wi-Fi chips etc.
+>> >>> +
+>> >>> +The actual devices are instantiated from the child nodes of a NOR node.
+>> >>> +
+>> >>> +Required properties:
+>> >>> +
+>> >>> + - compatible: should be "nvidia,tegra20-nor", "nvidia,tegra30-nor"
+>> >>> + - reg: Should contain NOR controller registers location and length.
+>> >>> + - clocks: Must contain one entry, for the module clock.
+>> >>> +   See ../clocks/clock-bindings.txt for details.
+>> >>> + - resets : Must contain an entry for each entry in reset-names.
+>> >>> +   See ../reset/reset.txt for details.
+>> >>> + - reset-names : Must include the following entries:
+>> >>> +  - nor
+>> >>> + - #address-cells: Must be set to 2 to allow memory address translation
+>> >>> + - #size-cells:      Must be set to 1 to allow CS address passing
+>> >>> + - ranges: Must be set up to reflect the memory layout with four integer
+>> >>> +             values for each chip-select line in use.
+>> >>> + - nvidia,config: This property represents the SNOR_CONFIG_0 register.
+>> >>> +
+>> >>> +Note that the NOR controller does not have any internal chip-select address
+>> >>> +decoding and if you want to access multiple devices external chip-select
+>> >>> +decoding must be provided.
+>> >>
+>> >> Then what are the 2 chip selects in ranges?
+>> >>
+>> >> Rob
+>> >
+>> > Those two chip selects are actually a representation of a external
+>> > decoding logic based on what we use on our board. Even though it the
+>> > NOR controller only supports one single chip select I wanted to give
+>> > an example on how one could create more chip-selects with an external
+>> > logic and what it would look like in the device tree representation.
+>>
+>> Technically, the GMI/SNOR controller supports 8 chip-selects, however,
+>> unlike some devices, it appears that software has to select the active
+>> chip-select. Although this sounds odd, I believe that the idea is that
+>> in order to support devices greater than 256MB (external address space
+>> for available NOR/async devices) you can use the chip-selects to page
+>> through memory greater than this 256MB range. At least that it my
+>> (limited) understanding!
+>
+> Actually I had assumed that software would at some point need to select
+> the active chip to switch between multiple connected chips. I suppose it
+> could be possible to have multiple chips share the same chip-select and
+> decode the address lines to determine whether they're being accessed or
+> not.
+>
+> What I don't understand, and it's further complicated by the fact that
+> external chip-selects are being used, is how does the controller get
+> told what chip to select? It seems to me like it would always access the
+> same chips because the SNOR_CONFIG_0 register is only ever written on
+> ->probe().
+>
+> For external chip selects, how do they tie in with all this? Who gets to
+> implement this logic? Wouldn't we need to abstract this away somehow so
+> that we can support whatever board designers will come up with?
+>
+> Thierry
 
-Works on my Orange Pi PC. Thank you!
+You answered it your self :).
 
-IMHO, we should enable this module on sunxi_defconfig.
+>I suppose it
+> could be possible to have multiple chips share the same chip-select and
+> decode the address lines to determine whether they're being accessed or
+> not.
 
-Paulo
+That is what we do and is what I refer to as external chip-selects.
+
+
+Best Regards,
+Mirza
