@@ -1,192 +1,42 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 25 Jul 2016 16:15:44 +0200
-Subject: [RFC 3/6] dt/bindings: Add bindings for Tegra20/30 NOR bus driver
-In-Reply-To: <CALw8SCWEFVu__8Gyr5q995h+=oMQEz1VUNB=Ne7MRb0O-tZXqg@mail.gmail.com>
-References: <1468935397-11926-1-git-send-email-mirza.krak@gmail.com>
- <1468935397-11926-4-git-send-email-mirza.krak@gmail.com>
- <20160725113034.GD21170@ulmo.ba.sec>
- <CALw8SCWEFVu__8Gyr5q995h+=oMQEz1VUNB=Ne7MRb0O-tZXqg@mail.gmail.com>
-Message-ID: <20160725141544.GN21170@ulmo.ba.sec>
+From: dianders@chromium.org (Doug Anderson)
+Date: Mon, 25 Jul 2016 07:19:03 -0700
+Subject: [PATCH 2/3] phy: rockchip-emmc: Be tolerant to card clock of 0 in
+ power on
+In-Reply-To: <5795AA41.7070604@ti.com>
+References: <1467049167-14628-1-git-send-email-dianders@chromium.org>
+ <1467049167-14628-3-git-send-email-dianders@chromium.org>
+ <5773D1FD.8020601@ti.com>
+ <CAD=FV=U_-8HJRjWa8ktT=7tmM5RB4OVnDce-Bv2teDibYfbCeA@mail.gmail.com>
+ <CAPDyKFqPHB2O=-hDxVda-h04WS9xYpJ3MyzH8bk5Fc4ogTfB5A@mail.gmail.com>
+ <5795AA41.7070604@ti.com>
+Message-ID: <CAD=FV=X1uZCH2273fR3VcYiD4_K2w2CPRgyejomQ-KoYrkHLjg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 25, 2016 at 03:16:28PM +0200, Mirza Krak wrote:
-> 2016-07-25 13:30 GMT+02:00 Thierry Reding <thierry.reding@gmail.com>:
-[...]
-> > The above suggests that one of the CAN controllers gets mapped to an
-> > address 0x48000000 and the other gets mapped to 0x48040000. But why do
-> > we even need a chip-select at all in that case? If both chips don't use
-> > any overlapping memory region, what good does the chip-select do?
-> 
-> If we take a look on similar controllers found on others SOCs they
-> usually define an address range / chip-select.
-> 
-> Example (weim):
-> ranges = <
-> 0 0 0x10000000 0x02000000
-> 1 0 0x12000000 0x01000000
-> 2 0 0x13000000 0x01000000
-> 3 0 0x14000000 0x01000000
-> 4 0 0x15000000 0x01000000
-> 5 0 0x16000000 0x01000000
-> >;
-> 
-> Which means that you all ready have an address mapped to PIN function.
-> 
-> But Tegra GMI controller is a first for me, where you do not have this
-> kind of setup in hardware. Usually you also have a timing register /
-> chip-select so that you can connect different chip types.
-> 
-> The lack of hardware support do decode an address to a chip-select PIN
-> function, we have implemented this our self externally.
-> 
-> We actually have 6 different chips connected to the GMI bus and the
-> "ranges" would be:
->   ranges = <
->    0 0 0x48000000 0x00000100
->    1 0 0x48040000 0x00000100
->    2 0 0x48080000 0x00000100
->    3 0 0x480A0000 0x00000100
->    4 0 0x480C0000 0x00000100
->    5 0 0x480E0000 0x00000100
->   >;
-> 
-> And this not nothing complicated, small number of AND gates and that is it.
-> 
-> The chip-select signal is necessary for the access characteristics, so
-> we need to translate an address to an chip-select so that the chip
-> knows the host CPU wants to talk to it.
-> 
-> Do not know if I made anything more clear here :).
+Hi,
 
-Yes, that clarifies many things. The presence of an external, address-
-based chip-select is essential information in order to describe this
-setup properly.
+On Sun, Jul 24, 2016 at 10:57 PM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+>> Did you agree on how to move forward with this change?
+>
+> I think still few things are not very clear especially on what should be
+> handled in PHY when the clock rate changes or if any new PHY APIs are required
+> to handle any clock changes etc..
+> But since this actually gets MMC working in rockchip, I'd be okay to merge this
+> now. Though I'd expect this to be refined in the future release cycles.
+>
+> FWIW:
+> Reviewed-by: Kishon Vijay Abraham I <kishon@ti.com>
 
-Given that the external chip select is entirely invisible to software, I
-think a more accurate description of your setup would be:
+Thank you.  Agreed that I don't particularly like the revert and last
+I checked with Shawn at Rockchip he was trying to find a better
+solution.  ...but I also agree that landing the revert is better than
+not landing it while we wait for a better solution.
 
-	gmi at 70090000 {
-		...
+IMHO in this particular case PHY API changes shouldn't be needed since
+we should be able to use the CCF notifications.  ...but we need to
+figure out how to do that in the case of the current card clock since
+it's not really a fully fledged clock and doesn't support
+notifications.  We might need to get advice from CCF guys...
 
-		/* for the chip select */
-		#address-cells = <1>;
-		#size-cells = <0>;
 
-		/*
-		 * Technically this could be used to translate the range from
-		 * 0x48000000 to 0x4fffffff into a different range, but that
-		 * no longer works because of the #address-cells. Does this
-		 * matter?
-		 */
-		ranges;
-
-		bus at 0 {
-			compatible = "simple-bus";
-			reg = <0>;
-
-			#address-cells = <1>;
-			#size-cells = <1>;
-
-			can at 48000000 {
-				reg = <0x48000000 0x100>;
-				...
-			};
-
-			can at 48040000 {
-				reg = <0x48040000 0x100>;
-				...
-			};
-		};
-	};
-
-That omits any reference to the external chip select, which I think
-makes sense because it's something that software is completely unaware
-of.
-
-Perhaps one important question: does your setup use the GMI's CS lines
-in any way? Or does it simply get ignored?
-
-If it gets ignored, I suppose one could encode this as a special case:
-
-	gmi at 70090000 {
-		...
-
-		/* simple address translation */
-		#address-cells = <1>;
-		#size-cells = <1>;
-
-		ranges = <0x48000000 0x48000000 0x08000000>;
-
-		can at 48000000 {
-			...
-			reg = <0x48000000 0x100>;
-			...
-		};
-
-		can at 48040000 {
-			...
-			reg = <0x48000000 0x100>;
-			...
-		};
-	};
-
-We could use that special case in order to make the driver behave in a
-special way that suits your setup, namely without explicit chip-select.
-The case where #size-cells = <0> could be treated as the explicit chip-
-select case, that somebody could implement in the future if they need
-it. All other cases could be treated as meaning that the chip-select is
-automatically handled externally (like in your setup) and we simply
-statically configure the controller with chip select 0 (kind of in the
-way your current patch series does).
-
-Rob, what do you think about the above?
-
-> > Also, it seems to me that you'd have to program the SNOR_CONFIG_0
-> > register in order to select a specific chip, but I don't see anything in
-> > the driver access that register after the initial write of the register.
-> 
-> This is only setup at probe.
-> 
-> >
-> > I would've expected this to require some sort of infrastructure to allow
-> > devices connected to the GMI controller to acquire the bus via some API
-> > to select their chip.
-> 
-> Yes, ultimately you would need some sort of infrastructure to allow
-> devices to acquire the GMI bus if you want to solve this in software.
-> But at the moment I do not see such an infrastructure in place, and is
-> it feasible to add one specifically for the GMI controller? If one
-> such infrastructure was in place we would need to modify all the
-> drivers that want to use to include Tegra specific infrastructure to
-> access the GMI bus?
-> 
-> Since my knowledge is limited it hard for me to comment on this, maybe
-> there is a simple way of doing this?
-
-I don't think there's a simple way to do this. In order to properly
-implement it we'd need to implement a generic infrastructure for chip
-selects so that drivers such as the one for your CAN controller can be
-written without tying them specifically to the Tegra GMI controller.
-
->From what you and Jon were saying it sounds like the drivers are
-completely agnostic of any chip-select, so conversion won't be easy.
-But technically if these chips take a chip-select as input then it's
-always possible to hook them up to a controller that doesn't do this
-automatic translation of address to chip-select, so eventually some
-setup is bound to come along where they'd need explicit chip-select
-handling as well.
-
-I don't think it's fair to require you to implement this infrastructure
-if you don't actually need it. At the same time I want to be cautious
-and make sure we keep the driver and binding flexible enough to allow
-us to implement explicit chip-selects should we later need them.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160725/374df929/attachment.sig>
+-Doug
