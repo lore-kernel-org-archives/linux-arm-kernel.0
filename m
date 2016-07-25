@@ -1,42 +1,135 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Mon, 25 Jul 2016 07:19:03 -0700
-Subject: [PATCH 2/3] phy: rockchip-emmc: Be tolerant to card clock of 0 in
- power on
-In-Reply-To: <5795AA41.7070604@ti.com>
-References: <1467049167-14628-1-git-send-email-dianders@chromium.org>
- <1467049167-14628-3-git-send-email-dianders@chromium.org>
- <5773D1FD.8020601@ti.com>
- <CAD=FV=U_-8HJRjWa8ktT=7tmM5RB4OVnDce-Bv2teDibYfbCeA@mail.gmail.com>
- <CAPDyKFqPHB2O=-hDxVda-h04WS9xYpJ3MyzH8bk5Fc4ogTfB5A@mail.gmail.com>
- <5795AA41.7070604@ti.com>
-Message-ID: <CAD=FV=X1uZCH2273fR3VcYiD4_K2w2CPRgyejomQ-KoYrkHLjg@mail.gmail.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Mon, 25 Jul 2016 10:19:44 -0400
+Subject: [PATCH] dmaengine: qcom_hidma: release the descriptor before the
+ callback
+In-Reply-To: <20160724062425.GW9681@localhost>
+References: <1468465076-27324-1-git-send-email-okaya@codeaurora.org>
+ <ccffcabf-1448-57a1-d18b-715cfd46e906@codeaurora.org>
+ <20160724062425.GW9681@localhost>
+Message-ID: <971733d9-fd18-2a1b-07c0-349b47747d49@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Sun, Jul 24, 2016 at 10:57 PM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
->> Did you agree on how to move forward with this change?
->
-> I think still few things are not very clear especially on what should be
-> handled in PHY when the clock rate changes or if any new PHY APIs are required
-> to handle any clock changes etc..
-> But since this actually gets MMC working in rockchip, I'd be okay to merge this
-> now. Though I'd expect this to be refined in the future release cycles.
->
-> FWIW:
-> Reviewed-by: Kishon Vijay Abraham I <kishon@ti.com>
+On 7/24/2016 2:24 AM, Vinod Koul wrote:
+> On Fri, Jul 15, 2016 at 09:00:52PM -0400, Sinan Kaya wrote:
+>> Hi Vinod,
+>>
+>> On 7/13/2016 10:57 PM, Sinan Kaya wrote:
+>>> There is a race condition between data transfer callback and descriptor
+>>> free code. The callback routine may decide to clear the resources even
+>>> though the descriptor has not yet been freed.
+>>>
+>>> Instead of calling the callback first and then releasing the memory,
+>>> this code is changing the order to return the descriptor back to the
+>>> free pool and then call the user provided callback.
+>>>
+>>> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+>>> ---
+>>>  drivers/dma/qcom/hidma.c | 26 +++++++++++++++-----------
+>>>  1 file changed, 15 insertions(+), 11 deletions(-)
+>>>
+>>> diff --git a/drivers/dma/qcom/hidma.c b/drivers/dma/qcom/hidma.c
+>>> index 41b5c6d..c41696e 100644
+>>> --- a/drivers/dma/qcom/hidma.c
+>>> +++ b/drivers/dma/qcom/hidma.c
+>>> @@ -111,6 +111,7 @@ static void hidma_process_completed(struct hidma_chan *mchan)
+>>>  	struct dma_async_tx_descriptor *desc;
+>>>  	dma_cookie_t last_cookie;
+>>>  	struct hidma_desc *mdesc;
+>>> +	struct hidma_desc *next;
+>>>  	unsigned long irqflags;
+>>>  	struct list_head list;
+>>>  
+>>> @@ -122,28 +123,31 @@ static void hidma_process_completed(struct hidma_chan *mchan)
+>>>  	spin_unlock_irqrestore(&mchan->lock, irqflags);
+>>>  
+>>>  	/* Execute callbacks and run dependencies */
+>>> -	list_for_each_entry(mdesc, &list, node) {
+>>> -		enum dma_status llstat;
+>>> +	list_for_each_entry_safe(mdesc, next, &list, node) {
+>>> +		dma_async_tx_callback callback;
+>>> +		void *param;
+>>>  
+>>>  		desc = &mdesc->desc;
+>>>  
+>>>  		spin_lock_irqsave(&mchan->lock, irqflags);
+>>> -		dma_cookie_complete(desc);
+>>> +		if (hidma_ll_status(mdma->lldev, mdesc->tre_ch)
+>>> +			== DMA_COMPLETE)
+>>> +			dma_cookie_complete(desc);
+>>
+>> It looks like I introduced a behavioral change while refactoring the code.
+>> The previous one would call the callback only if the transfer was successful
+>> but it would always call dma_cookie_complete.
+>>
+>> The new behavior is to call dma_cookie_complete only if the transfer is successful
+>> and it calls the callback even in the case of error cases. Then, the client has
+>> to query if transfer was successful.
+>>
+>> Which one is the correct behavior?
+> 
+> Hi Sinan,
+> 
+> Cookie is always completed. That simply means trasactions was completed and
+> has no indication if the transaction was successfull or not.
+> 
+> Uptill now we had no way of reporting error, Dave's series adds that up, so
+> you can use it.
+> 
+> Callback is optional for users. Again we didnt convey success of
+> transaction, but a callback for reporting that trasaction was completed. So
+> invoking callback makes sense everytime.
+> 
+> HTH
+> 
 
-Thank you.  Agreed that I don't particularly like the revert and last
-I checked with Shawn at Rockchip he was trying to find a better
-solution.  ...but I also agree that landing the revert is better than
-not landing it while we wait for a better solution.
+Let's put Dave's series aside for the moment and assume an error case where
+something bad happened during the transfer. I can add the error code once Dave's
+series get merged.
 
-IMHO in this particular case PHY API changes shouldn't be needed since
-we should be able to use the CCF notifications.  ...but we need to
-figure out how to do that in the case of the current card clock since
-it's not really a fully fledged clock and doesn't support
-notifications.  We might need to get advice from CCF guys...
+Here is the callback from dmatest.
+
+static void dmatest_callback(void *arg)
+{ 
+	done->done = true;
+}
+
+Here is how the request is made.
+
+dma_async_issue_pending(chan);
+
+wait_event_freezable_timeout(done_wait, done.done,
+			     msecs_to_jiffies(params->timeout));
+
+status = dma_async_is_tx_complete(chan, cookie, NULL, NULL);
+if (!done.done) {
+	timeout
+} else if (status != DMA_COMPLETE) { 
+	error
+}
+
+success.
+
+Based on what I see here, receiving callback all the time is OK. The client
+checks if the callback is received or not first. 
+
+Next, the client checks the status of the tx_status. 
+
+In the error case mentioned, the callback will be executed. done.done will be true.
+
+If I set dma_cookie_complete(desc) in error case, it would be wrong to tell the client
+that the transfer is successful. 
+
+In my opinion, the new behavior is correct. Calling dma_cookie_complete(desc) all the time
+is not. Do you agree?
+
+If yes, I can divide this patch into two. One to correct the ordering. Another one
+for behavioral change.
 
 
--Doug
+-- 
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
