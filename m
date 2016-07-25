@@ -1,114 +1,72 @@
-From: mirza.krak@gmail.com (Mirza Krak)
-Date: Mon, 25 Jul 2016 15:20:44 +0200
-Subject: [RFC 3/6] dt/bindings: Add bindings for Tegra20/30 NOR bus driver
-In-Reply-To: <20160725113638.GE21170@ulmo.ba.sec>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 25 Jul 2016 15:23:06 +0200
+Subject: [RFC 1/6] clk: tegra: add TEGRA20_CLK_NOR to init table
+In-Reply-To: <CALw8SCUPn2xzToHbPC2FPr7rVutcFOq7dwhqREmxoG=L4gT5ew@mail.gmail.com>
 References: <1468935397-11926-1-git-send-email-mirza.krak@gmail.com>
- <1468935397-11926-4-git-send-email-mirza.krak@gmail.com>
- <20160720124408.GA19113@rob-hp-laptop>
- <CALw8SCXFexogJn3BwrZm63yEL0rtTpYsYYb0O9D_ibhginVLqw@mail.gmail.com>
- <1f280c99-156f-59d3-308f-b4c8ff0f8f7c@nvidia.com>
- <20160725113638.GE21170@ulmo.ba.sec>
-Message-ID: <CALw8SCUxbpWGz0Mrp-Wf=jxa84Frk6mubeL9+KAYFAbq+-9CZQ@mail.gmail.com>
+ <1468935397-11926-2-git-send-email-mirza.krak@gmail.com>
+ <20160725111735.GC21170@ulmo.ba.sec>
+ <CALw8SCUPn2xzToHbPC2FPr7rVutcFOq7dwhqREmxoG=L4gT5ew@mail.gmail.com>
+Message-ID: <20160725132306.GH21170@ulmo.ba.sec>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-07-25 13:36 GMT+02:00 Thierry Reding <thierry.reding@gmail.com>:
-> On Thu, Jul 21, 2016 at 11:26:09AM +0100, Jon Hunter wrote:
->>
->> On 20/07/16 20:28, Mirza Krak wrote:
->> > 2016-07-20 14:44 GMT+02:00 Rob Herring <robh@kernel.org>:
->> >> On Tue, Jul 19, 2016 at 03:36:34PM +0200, Mirza Krak wrote:
->> >>> From: Mirza Krak <mirza.krak@gmail.com>
->> >>>
->> >>> Document the devicetree bindings for NOR bus driver found on Tegra20 and
->> >>> Tegra30 SOCs
->> >>>
->> >>> Signed-off-by: Mirza Krak <mirza.krak@gmail.com>
->> >>> ---
->> >>>  .../devicetree/bindings/bus/nvidia,tegra20-nor.txt | 73 ++++++++++++++++++++++
->> >>>  1 file changed, 73 insertions(+)
->> >>>  create mode 100644 Documentation/devicetree/bindings/bus/nvidia,tegra20-nor.txt
->> >>>
->> >>> diff --git a/Documentation/devicetree/bindings/bus/nvidia,tegra20-nor.txt b/Documentation/devicetree/bindings/bus/nvidia,tegra20-nor.txt
->> >>> new file mode 100644
->> >>> index 0000000..9ee4a66
->> >>> --- /dev/null
->> >>> +++ b/Documentation/devicetree/bindings/bus/nvidia,tegra20-nor.txt
->> >>> @@ -0,0 +1,73 @@
->> >>> +Device tree bindings for NVIDIA Tegra20/30 NOR Bus
->> >>> +
->> >>> +The NOR controller supports a number of memory types, including synchronous NOR,
->> >>> +asynchronous NOR, and other flash memories with similar interfaces, such as
->> >>> +MuxOneNAND. One could also connect high speed devices like FPGAs, DSPs,
->> >>> +CAN chips, Wi-Fi chips etc.
->> >>> +
->> >>> +The actual devices are instantiated from the child nodes of a NOR node.
->> >>> +
->> >>> +Required properties:
->> >>> +
->> >>> + - compatible: should be "nvidia,tegra20-nor", "nvidia,tegra30-nor"
->> >>> + - reg: Should contain NOR controller registers location and length.
->> >>> + - clocks: Must contain one entry, for the module clock.
->> >>> +   See ../clocks/clock-bindings.txt for details.
->> >>> + - resets : Must contain an entry for each entry in reset-names.
->> >>> +   See ../reset/reset.txt for details.
->> >>> + - reset-names : Must include the following entries:
->> >>> +  - nor
->> >>> + - #address-cells: Must be set to 2 to allow memory address translation
->> >>> + - #size-cells:      Must be set to 1 to allow CS address passing
->> >>> + - ranges: Must be set up to reflect the memory layout with four integer
->> >>> +             values for each chip-select line in use.
->> >>> + - nvidia,config: This property represents the SNOR_CONFIG_0 register.
->> >>> +
->> >>> +Note that the NOR controller does not have any internal chip-select address
->> >>> +decoding and if you want to access multiple devices external chip-select
->> >>> +decoding must be provided.
->> >>
->> >> Then what are the 2 chip selects in ranges?
->> >>
->> >> Rob
->> >
->> > Those two chip selects are actually a representation of a external
->> > decoding logic based on what we use on our board. Even though it the
->> > NOR controller only supports one single chip select I wanted to give
->> > an example on how one could create more chip-selects with an external
->> > logic and what it would look like in the device tree representation.
->>
->> Technically, the GMI/SNOR controller supports 8 chip-selects, however,
->> unlike some devices, it appears that software has to select the active
->> chip-select. Although this sounds odd, I believe that the idea is that
->> in order to support devices greater than 256MB (external address space
->> for available NOR/async devices) you can use the chip-selects to page
->> through memory greater than this 256MB range. At least that it my
->> (limited) understanding!
->
-> Actually I had assumed that software would at some point need to select
-> the active chip to switch between multiple connected chips. I suppose it
-> could be possible to have multiple chips share the same chip-select and
-> decode the address lines to determine whether they're being accessed or
-> not.
->
-> What I don't understand, and it's further complicated by the fact that
-> external chip-selects are being used, is how does the controller get
-> told what chip to select? It seems to me like it would always access the
-> same chips because the SNOR_CONFIG_0 register is only ever written on
-> ->probe().
->
-> For external chip selects, how do they tie in with all this? Who gets to
-> implement this logic? Wouldn't we need to abstract this away somehow so
-> that we can support whatever board designers will come up with?
->
-> Thierry
+On Mon, Jul 25, 2016 at 02:28:48PM +0200, Mirza Krak wrote:
+> 2016-07-25 13:17 GMT+02:00 Thierry Reding <thierry.reding@gmail.com>:
+> > On Tue, Jul 19, 2016 at 03:36:32PM +0200, Mirza Krak wrote:
+> >> From: Mirza Krak <mirza.krak@gmail.com>
+> >>
+> >> Add TEGRA20_CLK_NOR to init tabel and set a "sane" default rate.
+> >>
+> >> Signed-off-by: Mirza Krak <mirza.krak@gmail.com>
+> >> ---
+> >>  drivers/clk/tegra/clk-tegra20.c | 1 +
+> >>  1 file changed, 1 insertion(+)
+> >>
+> >> diff --git a/drivers/clk/tegra/clk-tegra20.c b/drivers/clk/tegra/clk-tegra20.c
+> >> index 837e5cb..aefc044 100644
+> >> --- a/drivers/clk/tegra/clk-tegra20.c
+> >> +++ b/drivers/clk/tegra/clk-tegra20.c
+> >> @@ -1047,6 +1047,7 @@ static struct tegra_clk_init_table init_table[] __initdata = {
+> >>       { TEGRA20_CLK_SDMMC3, TEGRA20_CLK_PLL_P, 48000000, 0 },
+> >>       { TEGRA20_CLK_SDMMC4, TEGRA20_CLK_PLL_P, 48000000, 0 },
+> >>       { TEGRA20_CLK_SPI, TEGRA20_CLK_PLL_P, 20000000, 0 },
+> >> +     { TEGRA20_CLK_NOR, TEGRA20_CLK_PLL_P, 86500000, 0 },
+> >
+> > Yay for inconsistent naming in the hardware. It would've been nice if
+> > this clock was called GMI. Oh well...
+> 
+> I am allowed to change clk name? Can do that when I re-spin this series.
 
-You answered it your self :).
+No, leave it as-is. The clock is referred to as NOR in the clock and
+reset controller. I was just saying that it would've been nice if it had
+been named GMI consistently.
 
->I suppose it
-> could be possible to have multiple chips share the same chip-select and
-> decode the address lines to determine whether they're being accessed or
-> not.
+> > Could you perhaps explain in the commit message why 86.5 MHz is a sane
+> > default? I'm totally unfamiliar with this controller, so maybe it's
+> > self-explanatory, but it seems a rather odd value for a clock frequency.
+> 
+> I used a value that I have in a downstream kernel based on the L4T.
+> This frequency is well tested and has worked for me, and wanted to
+> avoid setting it to maximum rate. My guess is that they used 86.5 MHz
+> because 92 MHz is max rate on Tegra2 and they put it slightly below
+> that.
+> 
+> What is otherwise recommended when initializing clocks? The rate could
+> depend on the chip that is attached but otherwise I would like to set
+> it close to max (or max) rate for performance.
 
-That is what we do and is what I refer to as external chip-selects.
+I think we usually set the default rate to the maximum and let drivers
+clock them down as they see fit. This is so that things run fast by
+default and we often don't have much in the way of power management, at
+least not when drivers are first merged. Maximum clock rate ensure that
+we get good performance by default, rather than having to rely on
+drivers to kick it up a notch.
 
-
-Best Regards,
-Mirza
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160725/0a60c906/attachment.sig>
