@@ -1,73 +1,61 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 25 Jul 2016 15:39:22 +0200
-Subject: [RFC 3/6] dt/bindings: Add bindings for Tegra20/30 NOR bus driver
-In-Reply-To: <CALw8SCU6vWeDyoy+t53k2+tmnrZd+ieBV88Vc6FSL9x3FzSm5g@mail.gmail.com>
+Date: Mon, 25 Jul 2016 15:41:38 +0200
+Subject: [RFC 6/6] bus: Add support for Tegra NOR controller
+In-Reply-To: <CALw8SCU5s8BAg6B8dT=QokY-D-CcokmMEkYqz1GJWHkX-XWpRQ@mail.gmail.com>
 References: <1468935397-11926-1-git-send-email-mirza.krak@gmail.com>
- <1468935397-11926-4-git-send-email-mirza.krak@gmail.com>
- <434561ec-510e-a3bf-c7b6-c961db299bd6@nvidia.com>
- <20160725115923.GF21170@ulmo.ba.sec>
- <CALw8SCU6vWeDyoy+t53k2+tmnrZd+ieBV88Vc6FSL9x3FzSm5g@mail.gmail.com>
-Message-ID: <20160725133922.GK21170@ulmo.ba.sec>
+ <1468935397-11926-7-git-send-email-mirza.krak@gmail.com>
+ <20160725111443.GB21170@ulmo.ba.sec>
+ <CALw8SCU5s8BAg6B8dT=QokY-D-CcokmMEkYqz1GJWHkX-XWpRQ@mail.gmail.com>
+Message-ID: <20160725134138.GL21170@ulmo.ba.sec>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 25, 2016 at 03:30:34PM +0200, Mirza Krak wrote:
-> 2016-07-25 13:59 GMT+02:00 Thierry Reding <thierry.reding@gmail.com>:
-> > On Thu, Jul 21, 2016 at 10:56:44AM +0100, Jon Hunter wrote:
-> >>
+On Mon, Jul 25, 2016 at 02:17:11PM +0200, Mirza Krak wrote:
+> 2016-07-25 13:14 GMT+02:00 Thierry Reding <thierry.reding@gmail.com>:
+> > On Tue, Jul 19, 2016 at 03:36:37PM +0200, Mirza Krak wrote:
+[...]
+> >> +
+> >> +     if (of_get_child_count(of_node))
+> >> +             ret = of_platform_populate(of_node,
+> >> +                                of_default_bus_match_table,
+> >> +                                NULL, &pdev->dev);
 > >
-> >> > +Note that the NOR controller does not have any internal chip-select address
-> >> > +decoding and if you want to access multiple devices external chip-select
-> >> > +decoding must be provided.
-> >>
-> >> Although it is true, you do have the MIO address space and so you could
-> >> support two devices via the SNOR address space and MIO address space
-> >> (assuming that the MIO can be used for the 2nd device).
+> > Why the extra check? of_platform_populate() is almost a no-op if there
+> > aren't any children anyway. What it will do is set the OF_POPULATED_BUS
+> > flag, but I think we want that irrespective of whether or not there are
+> > any children.
 > >
-> > Now I'm even more confused. If the GMI controller itself can't select a
-> > chip, what is the SNOR_SEL field in the SNOR_CONFIG_0 register for? Does
-> > that not select a specific chip?
-> >
-> >> Furthermore, if you do have external logic to support multiple devices
-> >> this would assume that the devices use the same timing and so are
-> >> probably the same type. It also assumes both can fit in the 256MB
-> >> address range. May be worth mentioning.
-> >
-> > Similarly if you switch between different devices, wouldn't you have to
-> > reprogram the timing registers if they are different?
-> >
-> > The way I remember this kind of interface to work (it's been a long time
-> > since I used one) is that in order to operate on a chip you need to
-> > acquire the bus first. Typically that would be an API exposed by the bus
-> > driver or some framework that the bus driver registers with. That API
-> > arbitrates between multiple devices on the bus and makes sure that the
-> > proper chip select is asserted and timing is programmed when you're
-> > granted access. A driver that has acquired the bus can then perform what
-> > operations they need and release the bus when done.
-> >
-> > SPI uses a mechanism like this, for example.
-> >
-> > Thierry
+> > Was there any problem with calling it unconditionally that made you opt
+> > for the extra check?
 > 
-> From my experience (maybe not as long as yours :)) but these kind of
-> things would be handled by the controller. At least with previous SOCs
-> that I have used, PXA270, PXA300 and i.MX SOCs.
+> I have not tested calling it unconditionally. Used another driver as
+> reference and they had that condition (drivers/bus/imx-weim.c), that
+> driver does not mention why the condition is there. But will test
+> removing the condition and see what happens.
+
+If that works fine for Tegra, it might be a good idea to get rid of the
+call in the imx-weim.c driver, too.
+
+> >> +static struct platform_driver nor_driver = {
+> >> +     .driver = {
+> >> +             .name           = "tegra-nor",
+> >> +             .of_match_table = nor_id_table,
+> >> +     },
+> >> +};
+> >> +module_platform_driver_probe(nor_driver, nor_probe);
+> >> +
+> >> +MODULE_AUTHOR("Mirza Krak <mirza.krak@gmail.com");
+> >> +MODULE_DESCRIPTION("NVIDIA Tegra NOR Bus Driver");
+> >> +MODULE_LICENSE("GPL");
+> >
+> > You're header comment says GPL version 2, which means that the
+> > MODULE_LICENSE needs to be "GPL v2". "GPL" means "version 2 or later".
 > 
-> That it has an address range per chip-select PIN and timing registers
-> per chip-select. And thus eliminating a need for a infrastructure or
-> framework.
+> Ok, I do not really mind it being GPL version 2 or later so will
+> change the header comment instead if that is ok.
 
-Okay, so the controllers have a translation table that needs to be
-programmed and which maps address ranges to chip-selects. That's a nifty
-feature, but I think it's also fairly specialized. In such a setup there
-doesn't need to be a concept of chip-selects in software because it's
-all transparently handled by the controller. Effectively the only time a
-chip-select is needed is during the initial programming of the
-controller when the translation table is set up.
-
->From a software point of view the devices are then addressed by memory
-address alone, so they aren't on a "manually switched" bus using chip-
-selects.
+I think "GPL v2" is traditionally more common in kernel code, but as the
+author the decision is obviously yours.
 
 Thierry
 -------------- next part --------------
@@ -76,4 +64,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160725/e85f0eda/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160725/daba8235/attachment.sig>
