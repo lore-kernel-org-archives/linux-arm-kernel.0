@@ -1,105 +1,61 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 25 Jul 2016 18:33:58 +0200
-Subject: [PATCH v3 0/6]  Add clock support for Armada 37xx SoCs
-In-Reply-To: <1468935742-11218-1-git-send-email-gregory.clement@free-electrons.com>
- (Gregory CLEMENT's message of "Tue, 19 Jul 2016 15:42:16 +0200")
-References: <1468935742-11218-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <878twppthl.fsf@free-electrons.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Mon, 25 Jul 2016 10:36:24 -0600
+Subject: [PATCH] coresight: tmc: Delete an unnecessary check before the
+ function call "kfree"
+In-Reply-To: <5c1330e9-351f-0401-5018-5e6a7aa56a32@users.sourceforge.net>
+References: <5307CAA2.8060406@users.sourceforge.net>
+ <alpine.DEB.2.02.1402212321410.2043@localhost6.localdomain6>
+ <530A086E.8010901@users.sourceforge.net>
+ <alpine.DEB.2.02.1402231635510.1985@localhost6.localdomain6>
+ <530A72AA.3000601@users.sourceforge.net>
+ <alpine.DEB.2.02.1402240658210.2090@localhost6.localdomain6>
+ <530B5FB6.6010207@users.sourceforge.net>
+ <alpine.DEB.2.10.1402241710370.2074@hadrien>
+ <530C5E18.1020800@users.sourceforge.net>
+ <alpine.DEB.2.10.1402251014170.2080@hadrien>
+ <530CD2C4.4050903@users.sourceforge.net>
+ <alpine.DEB.2.10.1402251840450.7035@hadrien>
+ <530CF8FF.8080600@users.sourceforge.net>
+ <alpine.DEB.2.02.1402252117150.2047@localhost6.localdomain6>
+ <530DD06F.4090703@users.sourceforge.net>
+ <alpine.DEB.2.02.1402262129250.2221@localhost6.localdomain6>
+ <5317A59D.4@users.sourceforge.net>
+ <5c1330e9-351f-0401-5018-5e6a7aa56a32@users.sourceforge.net>
+Message-ID: <CANLsYkxx6dUN8PFQ8tzXugqahcQTLViyssX=P101WqEeAyGL8A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike and Stephen,
-
- On mar., juil. 19 2016, Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
-
-> Hi,
+On 23 July 2016 at 12:08, SF Markus Elfring
+<elfring@users.sourceforge.net> wrote:
+> From: Markus Elfring <elfring@users.sourceforge.net>
+> Date: Sat, 23 Jul 2016 20:04:09 +0200
 >
-> this is the third version of the series adding clock support for the
-> Armada 37xx SoCs.
+> The kfree() function tests whether its argument is NULL and then
+> returns immediately. Thus the test around the call is not needed.
 >
-> The main change is the use of static data for the peripheral clocks
-> when possible, it lead to a use of many macro to define all the needed
-> variables.
+> This issue was detected by using the Coccinelle software.
 >
-> The design of the drivers is as close as possible as the hardware is,
-> with some clocks made of several layers: muxing, divider and gating.
+> Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
+> ---
+>  drivers/hwtracing/coresight/coresight-tmc-etf.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 >
-> The device tree binding was written in a way that even if we discover
-> some change inside the clocks, the binding should not be
-> affected. Especially, there are some holes in the clocks, but we
-> should be able to add them seamless.
+> diff --git a/drivers/hwtracing/coresight/coresight-tmc-etf.c b/drivers/hwtracing/coresight/coresight-tmc-etf.c
+> index e68289b..5fa49c4 100644
+> --- a/drivers/hwtracing/coresight/coresight-tmc-etf.c
+> +++ b/drivers/hwtracing/coresight/coresight-tmc-etf.c
+> @@ -168,7 +168,7 @@ out:
+>         spin_unlock_irqrestore(&drvdata->spinlock, flags);
 >
-> The full series is available on the branch Armada-3700-Clocks-v3 at
-> git at github.com:MISL-EBU-System-SW/mainline-public.git
-
-I think that with this series I took into account all the comments, do
-you think there is a chance that it will be merged in v4.8?
-
-Thanks,
-
-Gregory
-
+>         /* Free memory outside the spinlock if need be */
+> -       if (!used && buf)
+> +       if (!used)
+>                 kfree(buf);
 >
-> Thanks,
->
-> Changelog:
->
-> v2 -> v3
->
-> - used marvell,armada-3700-gpio instead of marvell,mvebu-gpio-3700 in
->   the binding as pointed by Thomas,
-> - removed the unnecessary include of clk.h in the 3 drivers, suggested
->   by Mike Turquette
-> - removed the modular reference in the 3 drivers, suggested by Paul
->   Gortmaker
-> - used static data for the peripheral driver when possible, suggested
->   by Mike Turquette
->
-> v1 -> v2
->
-> - Move to clk_hw based registration for the 3 clock driver as
->   requested by Stephen Boyd
-> - Fixed typo noticed by Stephen Boyd
-> - Added const and static when they were missing: suggested by Stephen
->   Boyd
-> - Allocated the driver variable during probe instead of using a global
->   one as requested by Stephen Boyd
-> - Managed the failure of the of_clk_add_hw_provider call
-> - Added the Acked-by from Rob Herring on the dt binding patchs
->
->
->
-> Gregory CLEMENT (6):
->   dt-bindings: clock: add DT binding for the Xtal clock on Armada 3700
->   clk: mvebu: Add the xtal clock for Armada 3700 SoC
->   dt-bindings: clock: add DT binding for the TBG clocks on Armada 3700
->   clk: mvebu Add the time base generator clocks for Armada 3700
->   dt-bindings: clock: add DT binding for the peripheral clocks on Armada
->     3700
->   clk: mvebu: Add the peripheral clock driver for Armada 3700
->
->  .../bindings/clock/armada3700-periph-clock.txt     |  70 ++++
->  .../bindings/clock/armada3700-tbg-clock.txt        |  27 ++
->  .../bindings/clock/armada3700-xtal-clock.txt       |  28 ++
->  drivers/clk/mvebu/Kconfig                          |   3 +
->  drivers/clk/mvebu/Makefile                         |   3 +
->  drivers/clk/mvebu/armada-37xx-periph.c             | 449 +++++++++++++++++++++
->  drivers/clk/mvebu/armada-37xx-tbg.c                | 158 ++++++++
->  drivers/clk/mvebu/armada-37xx-xtal.c               |  91 +++++
->  8 files changed, 829 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/clock/armada3700-periph-clock.txt
->  create mode 100644 Documentation/devicetree/bindings/clock/armada3700-tbg-clock.txt
->  create mode 100644 Documentation/devicetree/bindings/clock/armada3700-xtal-clock.txt
->  create mode 100644 drivers/clk/mvebu/armada-37xx-periph.c
->  create mode 100644 drivers/clk/mvebu/armada-37xx-tbg.c
->  create mode 100644 drivers/clk/mvebu/armada-37xx-xtal.c
->
-> -- 
-> 2.5.0
+>         if (!ret)
+> --
+> 2.9.2
 >
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Applied - thanks.
+Mathieu
