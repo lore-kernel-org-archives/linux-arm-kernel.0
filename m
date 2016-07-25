@@ -1,62 +1,67 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 25 Jul 2016 11:15:52 +0900
-Subject: [GIT PULL] Renesas ARM Based SoC DT Fixes for v4.8
-In-Reply-To: <4175400.eEqji2rNII@wuerfel>
-References: <cover.1468808109.git.horms+renesas@verge.net.au>
- <7322553.kXvQYPfzzh@wuerfel> <20160722015924.GH21943@verge.net.au>
- <4175400.eEqji2rNII@wuerfel>
-Message-ID: <20160725021552.GJ12825@verge.net.au>
+From: paul.gortmaker@windriver.com (Paul Gortmaker)
+Date: Sun, 24 Jul 2016 23:42:37 -0400
+Subject: [PATCH 04/14] arm64: migrate exception table users off module.h and
+ onto extable.h
+In-Reply-To: <20160725034247.109173-1-paul.gortmaker@windriver.com>
+References: <20160725034247.109173-1-paul.gortmaker@windriver.com>
+Message-ID: <20160725034247.109173-5-paul.gortmaker@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 22, 2016 at 09:30:58PM +0200, Arnd Bergmann wrote:
-> On Friday, July 22, 2016 10:59:24 AM CEST Simon Horman wrote:
-> > On Thu, Jul 21, 2016 at 02:41:52PM +0200, Arnd Bergmann wrote:
-> > > On Monday, July 18, 2016 11:39:35 AM CEST Simon Horman wrote:
-> > > > Renesas ARM Based SoC DT Fixes for v4.8
-> > > > 
-> > > > * Corrections to r8a7792
-> > > > 
-> > > 
-> > > Merged into next/dt, thanks!
-> > 
-> > Thanks!
-> > 
-> > I have queued up another fix for v4.8 since sending the above to you.
-> > This time it is an SoC (C-code) rather than a DT fix. I am wondering
-> > if you could offer guidance on:
-> > 
-> > * If you would prefer me to split fixes out into separate (DT, SoC, ...)
-> >   branches? If so is that until around rc1 when everything has been
-> >   merged into the forthcoming release and thereafter you would prefer
-> >   a single fixes branch?
-> 
-> I prefer a separate fixes branch. It's fine for all other branches
-> to be based on top of this branch so you have a working baseline
-> for testing.
+These files were only including module.h for exception table
+related functions.  We've now separated that content out into its
+own file "extable.h" so now move over to that and avoid all the
+extra header content in module.h that we don't really need to compile
+these files.
 
-Is some sort of minimal base for the fixes branch desired?
-If should the base be a merge of all the tags you have pulled for v4.8?
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
+---
+ arch/arm64/kernel/probes/kprobes.c | 2 +-
+ arch/arm64/mm/extable.c            | 2 +-
+ arch/arm64/mm/fault.c              | 2 +-
+ 3 files changed, 3 insertions(+), 3 deletions(-)
 
-Currently I have DT fixes and SoC fixes which depend on
-respective tags that have been accepted for v4.8.
-
-> > * What pace you would like me to send fixes. I guess it depends on
-> >   where we are in the cycle. Currently I put the changes in next and
-> >   send what I have about once a week (or not if there are none :).
-> > 
-> > Typically there are very few fixes. But as I already have 3 for v4.8,
-> > including those in this pull request, I get the feeling a few more could
-> > emerge before v4.8 is released.
-> 
-> I'd say don't wait longer than a week before forwarding bugfixes.
-> If you find something urgent, just send that right away along with
-> whatever less urgent patches you have accumulated.
-> 
-> It's possible we won't merge it right away as we might all be busy
-> for a couple of days, but in the worst case that means you send
-> another fixes pull request that is a superset before we have merged
-> the first one.
-> 
-> 	Arnd
-> 
+diff --git a/arch/arm64/kernel/probes/kprobes.c b/arch/arm64/kernel/probes/kprobes.c
+index bf9768588288..9c1866ef3271 100644
+--- a/arch/arm64/kernel/probes/kprobes.c
++++ b/arch/arm64/kernel/probes/kprobes.c
+@@ -19,7 +19,7 @@
+ #include <linux/kasan.h>
+ #include <linux/kernel.h>
+ #include <linux/kprobes.h>
+-#include <linux/module.h>
++#include <linux/extable.h>
+ #include <linux/slab.h>
+ #include <linux/stop_machine.h>
+ #include <linux/stringify.h>
+diff --git a/arch/arm64/mm/extable.c b/arch/arm64/mm/extable.c
+index 81acd4706878..c9f118cd812b 100644
+--- a/arch/arm64/mm/extable.c
++++ b/arch/arm64/mm/extable.c
+@@ -2,7 +2,7 @@
+  * Based on arch/arm/mm/extable.c
+  */
+ 
+-#include <linux/module.h>
++#include <linux/extable.h>
+ #include <linux/uaccess.h>
+ 
+ int fixup_exception(struct pt_regs *regs)
+diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+index c8beaa0da7df..427f2fd49463 100644
+--- a/arch/arm64/mm/fault.c
++++ b/arch/arm64/mm/fault.c
+@@ -18,7 +18,7 @@
+  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+  */
+ 
+-#include <linux/module.h>
++#include <linux/extable.h>
+ #include <linux/signal.h>
+ #include <linux/mm.h>
+ #include <linux/hardirq.h>
+-- 
+2.8.4
