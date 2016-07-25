@@ -1,61 +1,60 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Mon, 25 Jul 2016 10:36:24 -0600
-Subject: [PATCH] coresight: tmc: Delete an unnecessary check before the
- function call "kfree"
-In-Reply-To: <5c1330e9-351f-0401-5018-5e6a7aa56a32@users.sourceforge.net>
-References: <5307CAA2.8060406@users.sourceforge.net>
- <alpine.DEB.2.02.1402212321410.2043@localhost6.localdomain6>
- <530A086E.8010901@users.sourceforge.net>
- <alpine.DEB.2.02.1402231635510.1985@localhost6.localdomain6>
- <530A72AA.3000601@users.sourceforge.net>
- <alpine.DEB.2.02.1402240658210.2090@localhost6.localdomain6>
- <530B5FB6.6010207@users.sourceforge.net>
- <alpine.DEB.2.10.1402241710370.2074@hadrien>
- <530C5E18.1020800@users.sourceforge.net>
- <alpine.DEB.2.10.1402251014170.2080@hadrien>
- <530CD2C4.4050903@users.sourceforge.net>
- <alpine.DEB.2.10.1402251840450.7035@hadrien>
- <530CF8FF.8080600@users.sourceforge.net>
- <alpine.DEB.2.02.1402252117150.2047@localhost6.localdomain6>
- <530DD06F.4090703@users.sourceforge.net>
- <alpine.DEB.2.02.1402262129250.2221@localhost6.localdomain6>
- <5317A59D.4@users.sourceforge.net>
- <5c1330e9-351f-0401-5018-5e6a7aa56a32@users.sourceforge.net>
-Message-ID: <CANLsYkxx6dUN8PFQ8tzXugqahcQTLViyssX=P101WqEeAyGL8A@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 25 Jul 2016 17:46:55 +0100
+Subject: [PATCH 2/2] arm64: mm: run pgtable_page_ctor() on non-swapper
+ translation table pages
+In-Reply-To: <962833c8-0f5d-57bc-786e-9a832ed457d5@arm.com>
+References: <1469208745-6693-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1469208745-6693-3-git-send-email-ard.biesheuvel@linaro.org>
+ <26dd79ee-8c0b-6302-85bf-3c6d69cab933@arm.com>
+ <962833c8-0f5d-57bc-786e-9a832ed457d5@arm.com>
+Message-ID: <20160725164654.GD2423@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23 July 2016 at 12:08, SF Markus Elfring
-<elfring@users.sourceforge.net> wrote:
-> From: Markus Elfring <elfring@users.sourceforge.net>
-> Date: Sat, 23 Jul 2016 20:04:09 +0200
->
-> The kfree() function tests whether its argument is NULL and then
-> returns immediately. Thus the test around the call is not needed.
->
-> This issue was detected by using the Coccinelle software.
->
-> Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
-> ---
->  drivers/hwtracing/coresight/coresight-tmc-etf.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/hwtracing/coresight/coresight-tmc-etf.c b/drivers/hwtracing/coresight/coresight-tmc-etf.c
-> index e68289b..5fa49c4 100644
-> --- a/drivers/hwtracing/coresight/coresight-tmc-etf.c
-> +++ b/drivers/hwtracing/coresight/coresight-tmc-etf.c
-> @@ -168,7 +168,7 @@ out:
->         spin_unlock_irqrestore(&drvdata->spinlock, flags);
->
->         /* Free memory outside the spinlock if need be */
-> -       if (!used && buf)
-> +       if (!used)
->                 kfree(buf);
->
->         if (!ret)
-> --
-> 2.9.2
->
+On Mon, Jul 25, 2016 at 03:43:21PM +0100, Suzuki K. Poulose wrote:
+> On 25/07/16 15:31, Suzuki K Poulose wrote:
+> >On 22/07/16 18:32, Ard Biesheuvel wrote:
+> >>The kernel page table creation routines are accessible to other subsystems
+> >>(e.g., EFI) via the create_pgd_mapping() entry point, which allows mappings
+> >>to be created that are not covered by init_mm.
+> >>
+> >>Since generic code such as apply_to_page_range() may expect translation
+> >>table pages that are not associated with init_mm to be covered by fully
+> >>constructed struct pages, add a call to pgtable_page_ctor() in the alloc
+> >>function used by create_pgd_mapping. Since it is no longer used by
+> >>create_mapping_late(), also update the name of this function to better
+> >>reflect its purpose.
+> >>
+> >>Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> >>---
+> >> arch/arm64/mm/mmu.c | 9 ++++++---
+> >> 1 file changed, 6 insertions(+), 3 deletions(-)
+> >>
+> >>diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+> >>index 33f36cede02d..51a558195bb9 100644
+> >>--- a/arch/arm64/mm/mmu.c
+> >>+++ b/arch/arm64/mm/mmu.c
+> >>@@ -268,10 +268,11 @@ static void __create_pgd_mapping(pgd_t *pgdir, phys_addr_t phys,
+> >>     } while (pgd++, addr = next, addr != end);
+> >> }
+> >>
+> >>-static phys_addr_t late_pgtable_alloc(void)
+> >>+static phys_addr_t pgd_pgtable_alloc(void)
+> >> {
+> >>     void *ptr = (void *)__get_free_page(PGALLOC_GFP);
+> >>-    BUG_ON(!ptr);
+> >>+    if (!ptr || !pgtable_page_ctor(virt_to_page(ptr)))
+> >
+> >Should we free the page and return NULL when we encounter an error
+> >in pgtable_page_ctor(), like the rest of the callers ?
+> >
+> >
+> >>+        BUG();
+> 
+> Just to clarify, of course with the BUG() retained.
 
-Applied - thanks.
-Mathieu
+But then, if we return, we no longer trigger BUG(). The callers of this
+function assume that it always succeeds or does not return.
+
+-- 
+Catalin
