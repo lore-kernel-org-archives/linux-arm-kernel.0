@@ -1,235 +1,107 @@
-From: fu.wei@linaro.org (Fu Wei)
-Date: Tue, 26 Jul 2016 00:06:10 +0800
-Subject: [PATCH v8 7/9] acpi/arm64: Add memory-mapped timer support in
- GTDT driver
-In-Reply-To: <20160721124053.GB7982@red-moon>
-References: <1468952284-28942-1-git-send-email-fu.wei@linaro.org>
- <1468952284-28942-8-git-send-email-fu.wei@linaro.org>
- <20160721124053.GB7982@red-moon>
-Message-ID: <CADyBb7uuYrKu6=3kQm0HbqSHZocW7YBooh+PRGB7_rADyfGEkg@mail.gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 25 Jul 2016 17:12:23 +0100
+Subject: [RFC PATCH v3 05/13] drivers: iommu: make iommu_fwspec OF agnostic
+In-Reply-To: <856415fc-b9bf-ca44-cc70-85d454574e53@arm.com>
+References: <1469013815-24380-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1469013815-24380-6-git-send-email-lorenzo.pieralisi@arm.com>
+ <1499f802-5f98-b0c0-d3aa-dabcac81e84e@arm.com>
+ <20160725154103.GA28507@red-moon>
+ <856415fc-b9bf-ca44-cc70-85d454574e53@arm.com>
+Message-ID: <20160725161223.GA28870@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lorenzo,
+On Mon, Jul 25, 2016 at 04:51:00PM +0100, Robin Murphy wrote:
+> On 25/07/16 16:41, Lorenzo Pieralisi wrote:
+> [...]
+> >>> diff --git a/include/linux/of_iommu.h b/include/linux/of_iommu.h
+> >>> index 308791f..2362232 100644
+> >>> --- a/include/linux/of_iommu.h
+> >>> +++ b/include/linux/of_iommu.h
+> >>> @@ -15,13 +15,8 @@ extern void of_iommu_init(void);
+> >>>  extern const struct iommu_ops *of_iommu_configure(struct device *dev,
+> >>>  					struct device_node *master_np);
+> >>>  
+> >>> -struct iommu_fwspec {
+> >>> -	const struct iommu_ops	*iommu_ops;
+> >>> -	struct device_node	*iommu_np;
+> >>> -	void			*iommu_priv;
+> >>> -	unsigned int		num_ids;
+> >>> -	u32			ids[];
+> >>> -};
+> >>> +void of_iommu_set_ops(struct device_node *np, const struct iommu_ops *ops);
+> >>> +const struct iommu_ops *of_iommu_get_ops(struct device_node *np);
+> >>
+> >> Is there some reason we need to retain the existing definitions of
+> >> these? I was assuming we'd be able to move the entire implementation
+> >> over to the fwspec code and leave behind nothing more than trivial
+> >> wrappers, e.g.:
+> >>
+> >> #define of_iommu_get_ops(np) iommu_fwspec_get_ops(&(np)->fwnode_handle)
+> > 
+> > Yep, that's exactly what I did but then I was bitten by config
+> > dependencies. If we implement of_iommu_get/set_ops() as wrappers,
+> > we have to compile iommu_fwspec_get/set_ops() on arches that may
+> > not have struct dev_archdata.iommu, unless we introduce yet another
+> > config symbol to avoid compiling that code (see eg iommu_fwspec_init(),
+> > we can't compile it on eg x86 even though we do need of_iommu_get_ops()
+> > on it - so iommu_fwspec_get_ops(), that lives in the same compilation
+> > unit as eg iommu_fwspec_init()).
+> > 
+> > So short answer is: there is no reason apart from dev_archdata.iommu
+> > being arch specific, if we were able to move iommu_fwspec to generic
+> > code (ie struct device, somehow) I would certainly get rid of this
+> > stupid code duplication (or as I said I can add a config entry for
+> > that, more ideas are welcome).
+> 
+> OK, given Rob's comment as well, I guess breaking that dependency is to
+> everyone's benefit. Since it's quite closely related, how about if we
+> follow the arch_setup_dma_ops() pattern with an
+> arch_{get,set}_iommu_fwspec(dev) type thing?
 
-On 21 July 2016 at 20:40, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
-> On Wed, Jul 20, 2016 at 02:18:02AM +0800, fu.wei at linaro.org wrote:
->> From: Fu Wei <fu.wei@linaro.org>
->>
->> This driver adds support for parsing memory-mapped timer in GTDT:
->> provide a kernel APIs to parse GT Block Structure in GTDT,
->> export all the info by filling the struct which provided
->> by parameter(pointer of the struct).
->>
->> By this driver, we can add ACPI support for memory-mapped timer in
->> arm_arch_timer drivers, and separate the ACPI GTDT knowledge from it.
->
-> "On platforms booting with ACPI, architected memory timers configuration
-> data is provided by firmware through the ACPI GTDT static table.
->
-> The clocksource architected timer kernel driver requires a firmware
-> interface to collect timer configuration and configure its driver;
-> this infrastructure is present for device tree systems but it is
-> missing on systems booting with ACPI.
->
-> Implement the kernel infrastructure required to parse the static
-> ACPI GTDT table so that the architected timer clocksource driver can
-> make use of it on systems booting with ACPI, therefore enabling
-> the corresponding timers configuration."
+Yes we can do that too as an intermediate step, that solves the
+problem (and it makes this patch much simpler), it is cleaner
+than doing it with a(nother) Kconfig entry.
 
-Thanks , I  have used it in my v9 patchset
+Thanks,
+Lorenzo
 
->
->> Signed-off-by: Fu Wei <fu.wei@linaro.org>
->> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
->> ---
->>  drivers/acpi/arm64/acpi_gtdt.c       | 72 ++++++++++++++++++++++++++++++++++++
->>  include/clocksource/arm_arch_timer.h | 15 ++++++++
->>  include/linux/acpi.h                 |  1 +
->>  3 files changed, 88 insertions(+)
->>
->> diff --git a/drivers/acpi/arm64/acpi_gtdt.c b/drivers/acpi/arm64/acpi_gtdt.c
->> index e1cfc9e..b48e443 100644
->> --- a/drivers/acpi/arm64/acpi_gtdt.c
->> +++ b/drivers/acpi/arm64/acpi_gtdt.c
->> @@ -150,3 +150,75 @@ int __init acpi_gtdt_init(struct acpi_table_header *table)
->>
->>       return gtdt->platform_timer_count;
->>  }
->> +
->> +static int __init gtdt_parse_gt_block(void *platform_timer,
->> +                                   struct gt_block_data *data)
->> +{
->
-> Nit: you can directly pass a struct acpi_gtdt_timer_block* pointer.
-
-good idea, :-)
->
->> +     struct acpi_gtdt_timer_block *block = platform_timer;
->> +     struct acpi_gtdt_timer_entry *frame;
->> +     int i;
->> +
->> +     if (!block || !data)
->> +             return -EINVAL;
->> +
->> +     if (!block->block_address || !block->timer_count)
->> +             goto error;
->
-> Here we jump to print an error and bail out. The only reason
-> why we need a goto is to print a common error message and that's
-> exactly what we do _not_ need, if there is a FW error we want
-> to understand which one is that, otherwise the information you
-> are printing is useless for debugging (provided we can make use
-> of this info, which is questionable anyway).
-
-yes, I have fixed in my v9
-
->
->> +     data->cntctlbase_phy = (phys_addr_t)block->block_address;
->> +     data->timer_count = block->timer_count;
->> +
->> +     frame = (void *)block + block->timer_offset;
->> +     if (frame + block->timer_count != (void *)block + block->header.length)
->> +             goto error;
->
-> See above.
->
->> +     /*
->> +      * Get the GT timer Frame data for every GT Block Timer
->> +      */
->> +     for (i = 0; i < block->timer_count; i++) {
->> +             frame += i;
->
-> This is wrong, if you have multiple frames, pointers would add up and
-> that's not correct.
-
-Great thanks for pointing it out, this is a bug, I have fixed it in my v9.
-
-Thanks for your help
-
->
->> +             if (!frame->base_address || !frame->timer_interrupt)
->> +                     goto error;
->
-> See above.
->
->> +             data->timer[i].frame_nr = frame->frame_number;
->> +             data->timer[i].cntbase_phy = frame->base_address;
->> +             data->timer[i].irq =
->> +                     map_generic_timer_interrupt(frame->timer_interrupt,
->> +                                                 frame->timer_flags);
->
-> AFAIK map_generic_timer_interrupt() may fail, you should cater for that.
->
->> +             if (frame->virtual_timer_interrupt)
->> +                     data->timer[i].virt_irq =
->> +                             map_generic_timer_interrupt(
->> +                                     frame->virtual_timer_interrupt,
->> +                                     frame->virtual_timer_flags);
->
-> Ditto.
->
->> +     }
->> +     return 0;
->> +
->> +error:
->> +     pr_err(FW_BUG "invalid GT Block data.\n");
->> +     return -EINVAL;
->
-> See above.
->
->> +}
->> +
->> +/*
->> + * Get the GT block info for memory-mapped timer from GTDT table.
->> + * Please make sure we have called acpi_gtdt_init, because it helps to
->> + * init the global variables.
->
-> I already commented on this. I think the second part of this comment
-> is useless (it is a function with one caller, make sure you respect
-> the calling sequence and be done with this).
-
-I have deleted the second part  in my v9 , thanks :-)
-
->
-> Thanks,
-> Lorenzo
->
->> + */
->> +int __init gtdt_arch_timer_mem_init(struct gt_block_data *data)
->> +{
->> +     void *platform_timer;
->> +     int index = 0;
->> +     int ret;
->> +
->> +     for_each_platform_timer(platform_timer) {
->> +             if (!is_timer_block(platform_timer))
->> +                     continue;
->> +             ret = gtdt_parse_gt_block(platform_timer, data + index);
->> +             if (ret)
->> +                     return ret;
->> +             index++;
->> +     }
->> +
->> +     if (index)
->> +             pr_info("found %d memory-mapped timer block(s).\n", index);
->> +
->> +     return index;
->> +}
->> diff --git a/include/clocksource/arm_arch_timer.h b/include/clocksource/arm_arch_timer.h
->> index 16dcd10..ece6b3b 100644
->> --- a/include/clocksource/arm_arch_timer.h
->> +++ b/include/clocksource/arm_arch_timer.h
->> @@ -56,6 +56,8 @@ enum spi_nr {
->>  #define ARCH_TIMER_MEM_PHYS_ACCESS   2
->>  #define ARCH_TIMER_MEM_VIRT_ACCESS   3
->>
->> +#define ARCH_TIMER_MEM_MAX_FRAME     8
->> +
->>  #define ARCH_TIMER_USR_PCT_ACCESS_EN (1 << 0) /* physical counter */
->>  #define ARCH_TIMER_USR_VCT_ACCESS_EN (1 << 1) /* virtual counter */
->>  #define ARCH_TIMER_VIRT_EVT_EN               (1 << 2)
->> @@ -71,6 +73,19 @@ struct arch_timer_kvm_info {
->>       int virtual_irq;
->>  };
->>
->> +struct gt_timer_data {
->> +     int frame_nr;
->> +     phys_addr_t cntbase_phy;
->> +     int irq;
->> +     int virt_irq;
->> +};
->> +
->> +struct gt_block_data {
->> +     phys_addr_t cntctlbase_phy;
->> +     int timer_count;
->> +     struct gt_timer_data timer[ARCH_TIMER_MEM_MAX_FRAME];
->> +};
->> +
->>  #ifdef CONFIG_ARM_ARCH_TIMER
->>
->>  extern u32 arch_timer_get_rate(void);
->> diff --git a/include/linux/acpi.h b/include/linux/acpi.h
->> index fb8b689..24b1750 100644
->> --- a/include/linux/acpi.h
->> +++ b/include/linux/acpi.h
->> @@ -536,6 +536,7 @@ struct platform_device *acpi_create_platform_device(struct acpi_device *);
->>  int acpi_gtdt_init(struct acpi_table_header *table);
->>  int acpi_gtdt_map_ppi(int type);
->>  bool acpi_gtdt_c3stop(void);
->> +int gtdt_arch_timer_mem_init(struct gt_block_data *data);
->>  #endif
->>
->>  #else        /* !CONFIG_ACPI */
->> --
->> 2.5.5
->>
-
-
-
--- 
-Best regards,
-
-Fu Wei
-Software Engineer
-Red Hat
+> Robin.
+> 
+> > 
+> > Thanks,
+> > Lorenzo
+> > 
+> >>
+> >> Robin.
+> >>
+> >>>  #else
+> >>>  
+> >>> @@ -39,17 +34,14 @@ static inline const struct iommu_ops *of_iommu_configure(struct device *dev,
+> >>>  	return NULL;
+> >>>  }
+> >>>  
+> >>> -struct iommu_fwspec;
+> >>> -
+> >>> -#endif	/* CONFIG_OF_IOMMU */
+> >>> +static inline void of_iommu_set_ops(struct device_node *np,
+> >>> +				    const struct iommu_ops *ops)
+> >>> +{ }
+> >>>  
+> >>> -int iommu_fwspec_init(struct device *dev, struct device_node *iommu_np);
+> >>> -void iommu_fwspec_free(struct device *dev);
+> >>> -int iommu_fwspec_add_ids(struct device *dev, u32 *ids, int num_ids);
+> >>> -struct iommu_fwspec *dev_iommu_fwspec(struct device *dev);
+> >>> +static inline const struct iommu_ops *
+> >>> +of_iommu_get_ops(struct device_node *np) { return NULL; }
+> >>>  
+> >>> -void of_iommu_set_ops(struct device_node *np, const struct iommu_ops *ops);
+> >>> -const struct iommu_ops *of_iommu_get_ops(struct device_node *np);
+> >>> +#endif	/* CONFIG_OF_IOMMU */
+> >>>  
+> >>>  extern struct of_device_id __iommu_of_table;
+> >>>  
+> >>>
+> >>
+> > 
+> 
