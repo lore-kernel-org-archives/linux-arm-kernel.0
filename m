@@ -1,86 +1,71 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 25 Jul 2016 10:52:54 +0200
-Subject: [PATCH v3] thermal: tango: add resume support
-In-Reply-To: <5795CB4E.4000909@free.fr>
-References: <57726196.5060909@free.fr> <m2wpkd1gfg.fsf@baylibre.com>
- <5795CB4E.4000909@free.fr>
-Message-ID: <4062048.3qHsMMf8fO@wuerfel>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Mon, 25 Jul 2016 10:00:24 +0100
+Subject: Tegra baseline test results for v4.7
+Message-ID: <34b07bcc-d1c4-85cc-bef9-4d8ce4a48480@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, July 25, 2016 10:18:22 AM CEST Mason wrote:
-> On 23/07/2016 00:00, Kevin Hilman wrote:
-> 
-> > Mason wrote:
-> > 
-> >> +#ifdef CONFIG_PM_SLEEP
-> >> +static int tango_thermal_resume(struct device *dev)
-> >> +{
-> >> +    tango_thermal_init(dev_get_drvdata(dev));
-> >> +    return 0;
-> >> +}
-> >> +
-> >> +static SIMPLE_DEV_PM_OPS(tango_thermal_pm, NULL, tango_thermal_resume);
-> >> +#endif
-> > 
-> > #else
-> > #define tango_thermal_resume NULL
-> > #endif
+Here are some basic Tegra test results for Linux v4.7.
+Logs and other details at:
 
-That's what SIMPLE_DEV_PM_OPS does internally already.
+    https://nvtb.github.io//linux/test_v4.7/20160724130103/
 
-> > And then move the SIMPLE_DEV_PM_OPS here...
-> 
-> Moving the SIMPLE_DEV_PM_OPS macro outside the CONFIG_PM_SLEEP guard
-> would unconditionally define a struct dev_pm_ops, which just wastes
-> space when CONFIG_PM_SLEEP is undefined (if I'm not mistaken).
-> 
-> That's why I put SIMPLE_DEV_PM_OPS inside the CONFIG_PM_SLEEP guard.
 
-If you want to avoid the extra few bytes, just use the trick I
-suggested:
+Test summary
+------------
 
-	.pm = IS_ENABLED(CONFIG_PM_SLEEP) ? &tango_thermal_pm : NULL,
+Build: zImage:
+    Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
 
-> >> +
-> >>  static const struct of_device_id tango_sensor_ids[] = {
-> >>      {
-> >>              .compatible = "sigma,smp8758-thermal",
-> >> @@ -99,6 +115,9 @@ static struct platform_driver tango_thermal_driver = {
-> >>      .driver = {
-> >>              .name           = "tango-thermal",
-> >>              .of_match_table = tango_sensor_ids,
-> >> +#ifdef CONFIG_PM_SLEEP
-> >> +            .pm             = &tango_thermal_pm,
-> >> +#endif
-> > 
-> > ... which allows you to get rid of the ugly ifdef here.
-> > (c.f. CodingStyle, Chapter 20,)
-> 
-> The previous solution (v2) avoided duplicating the ifdef block,
-> but Arnd and Thierry objected to the code. Later, they agreed
-> that it should work; but if they didn't catch the code's intent
-> at a glance, maybe there is a problem with it anyway.
-> 
-> What do you think?
-> 
-> I copied the DEV_PM_OPS "trick" from drivers/thermal/ti-soc-thermal/ti-bandgap.c
-> (which was done by Eduardo, a thermal maintainer, so maybe he
-> prefers that solution after all? commit 8feaf0ce1a043)
+Build: Image:
+    Pass: ( 1/ 1): defconfig
 
-You should basically never have that #ifdef inside of the
-platform_driver definition. The normal way to do it is to have
-__maybe_unused markers for the functions so gcc can silently drop
-them when they are unused, or to have (slightly uglier and easier
-to get wrong) #ifdef around the function, but not around the
-references, but nowhere else.
+Boot to userspace: defconfig:
+    Pass: ( 4/ 4): qemu-vexpress64, tegra132-norrin,
+		   tegra210-p2371-0000, tegra210-smaug
 
-The SIMPLE_DEV_PM_OPS macro is suboptimal because it requires the
-__maybe_unused tags and because it leaves more data around than
-necessary. Feel free to suggest improvements for those macros
-(others have tried before and failed because of the hundreds or
-thousands of users that exist), just don't try to be extra clever
-in your one driver, it would only make it harder for readers to
-understand.
+Boot to userspace: multi_v7_defconfig:
+    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
 
-	Arnd
+Boot to userspace: tegra_defconfig:
+    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+
+PM: System suspend: multi_v7_defconfig:
+    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+
+PM: System suspend: tegra_defconfig:
+    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+
+
+vmlinux object size
+(delta in bytes from test_v4.7-rc7 (92d21ac74a9e3c09b0b01c764e530657e4c85c49)):
+   text     data      bss    total  kernel
+   -225        0     +128      -97  defconfig
+   +759        0        0     +759  multi_v7_defconfig
+   +603     +128        0     +731  tegra_defconfig
+
+
+Boot-time memory difference
+(delta in bytes from test_v4.7-rc7 (92d21ac74a9e3c09b0b01c764e530657e4c85c49))
+    avail    rsrvd     high    freed                board              kconfig                  dtb
+        .        .        .        .      qemu-vexpress64            defconfig           __internal
+        .        .        .        . tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
+        .        .        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
+        .        .        .        .  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
+        .        .        .        .  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
+        .        .        .        .    tegra124-nyan-big   multi_v7_defconfig    tegra124-nyan-big
+        .        .        .        .    tegra124-nyan-big      tegra_defconfig    tegra124-nyan-big
+        .        .        .        .      tegra132-norrin            defconfig      tegra132-norrin
+        .        .        .        .    tegra20-trimslice   multi_v7_defconfig    tegra20-trimslice
+        .        .        .        .    tegra20-trimslice      tegra_defconfig    tegra20-trimslice
+        .        .        .        .  tegra210-p2371-0000            defconfig  tegra210-p2371-0000
+        .        .        .        .       tegra210-smaug            defconfig       tegra210-smaug
+        .        .        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
+        .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
+
+--
+nvpublic
