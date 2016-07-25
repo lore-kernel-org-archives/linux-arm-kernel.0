@@ -1,75 +1,110 @@
-From: bibby.hsieh@mediatek.com (Bibby Hsieh)
-Date: Mon, 25 Jul 2016 14:25:37 +0800
-Subject: [PATCH 3/4] drm/mediatek: fix the wrong pixel clock when
- resolution is 4K
-In-Reply-To: <1469007718.5809.32.camel@pengutronix.de>
-References: <1468987385-37353-1-git-send-email-bibby.hsieh@mediatek.com>
- <1468987385-37353-4-git-send-email-bibby.hsieh@mediatek.com>
- <1469007718.5809.32.camel@pengutronix.de>
-Message-ID: <1469427937.26205.19.camel@mtksdaap41>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 25 Jul 2016 08:40:33 +0200
+Subject: [PATCH 1/4] ARM: dts: sun8i: Extend Orange Pi PC dt to also
+ handle the PC Plus
+In-Reply-To: <bce2b340-a930-8771-4560-dc61bf5828d5@redhat.com>
+References: <1468095718-18515-1-git-send-email-hdegoede@redhat.com>
+ <20160713084505.GE4761@lukather>
+ <bce2b340-a930-8771-4560-dc61bf5828d5@redhat.com>
+Message-ID: <20160725064033.GA7419@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Philipp,
+Hi,
 
-Thanks for your comment.
+On Wed, Jul 13, 2016 at 12:01:41PM +0200, Hans de Goede wrote:
+> Hi,
+> 
+> On 13-07-16 10:45, Maxime Ripard wrote:
+> >On Sat, Jul 09, 2016 at 10:21:55PM +0200, Hans de Goede wrote:
+> >>There is a new Orange Pi PC Plus available now, rather then adding
+> >>yet another dts file for this variant, extend the existing
+> >>Orange Pi PC to support the sdio wifi and emmc found on this variant.
+> >>
+> >>Downside of this approach is the following messages in dmesg when run
+> >>on the non Plus Orange Pi PC:
+> >>
+> >>sunxi-mmc 1c10000.mmc: fatal err update clk timeout
+> >>sunxi-mmc 1c11000.mmc: smc 2 err, cmd 8, RTO !!
+> >>sunxi-mmc 1c11000.mmc: smc 2 err, cmd 55, RTO !!
+> >>sunxi-mmc 1c11000.mmc: smc 2 err, cmd 55, RTO !!
+> >>sunxi-mmc 1c11000.mmc: smc 2 err, cmd 55, RTO !!
+> >>sunxi-mmc 1c11000.mmc: smc 2 err, cmd 55, RTO !!
+> >>sunxi-mmc 1c11000.mmc: smc 2 err, cmd 1, RTO !!
+> >>
+> >>Note these are completely harmless and there is no adverse effect
+> >>to the functioning of the non Plus Orange Pi PC.
+> >>
+> >>Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> >>---
+> >> arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts | 40 +++++++++++++++++++++++++++++-
+> >> 1 file changed, 39 insertions(+), 1 deletion(-)
+> >>
+> >>diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
+> >>index b8340f7..f9bf260 100644
+> >>--- a/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
+> >>+++ b/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
+> >>@@ -49,11 +49,13 @@
+> >> #include <dt-bindings/pinctrl/sun4i-a10.h>
+> >>
+> >> / {
+> >>-	model = "Xunlong Orange Pi PC";
+> >>+	model = "Xunlong Orange Pi PC / PC Plus";
+> >> 	compatible = "xunlong,orangepi-pc", "allwinner,sun8i-h3";
+> >>
+> >> 	aliases {
+> >> 		serial0 = &uart0;
+> >>+		/* ethernet0 is the H3 emac, defined in sun8i-h3.dtsi */
+> >>+		ethernet1 = &rtl8189ftv;
+> >> 	};
+> >>
+> >> 	chosen {
+> >>@@ -118,6 +120,42 @@
+> >> 	status = "okay";
+> >> };
+> >>
+> >>+/* Note only present on orangepi pc *plus* */
+> >>+&mmc1 {
+> >>+	pinctrl-names = "default";
+> >>+	pinctrl-0 = <&mmc1_pins_a>;
+> >>+	vmmc-supply = <&reg_vcc3v3>;
+> >>+	bus-width = <4>;
+> >>+	non-removable;
+> >>+	status = "okay";
+> >>+
+> >>+	/*
+> >>+	 * Explicitly define the sdio device, so that we can add an ethernet
+> >>+	 * alias for it (which e.g. makes u-boot set a mac-address).
+> >>+	 */
+> >>+	rtl8189ftv: sdio_wifi at 1 {
+> >>+		reg = <1>;
+> >>+	};
+> >>+};
+> >
+> >Nothing prevents you from including the orange pi pc dts, from the
+> >orange pi plus dts.
+> >
+> >It prevents the duplication you were trying to avoid, and it doesn't
+> >create all those spurious errors and devices.
+> 
+> That would solve the copy paste problem on the kernel side, but that
+> would still mean adding a new u-boot defconfig for this, which means that
+> all the distro's which ship with prebuild u-boot binaries need to build
+> for yet another board, something which I would like to avoid.
 
-On Wed, 2016-07-20 at 11:41 +0200, Philipp Zabel wrote:
-> Am Mittwoch, den 20.07.2016, 12:03 +0800 schrieb Bibby Hsieh:
-> > From: Junzhi Zhao <junzhi.zhao@mediatek.com>
-> > 
-> > Pixel clock should be 297MHz when resolution is 4K.
-> > 
-> > Signed-off-by: Junzhi Zhao <junzhi.zhao@mediatek.com>
-> > Signed-off-by: Bibby Hsieh <bibby.hsieh@mediatek.com>
-> > ---
-> >  drivers/gpu/drm/mediatek/mtk_dpi.c |  184 +++++++++++++++++++++++++-----------
-> >  1 file changed, 131 insertions(+), 53 deletions(-)
-> > 
-> > diff --git a/drivers/gpu/drm/mediatek/mtk_dpi.c b/drivers/gpu/drm/mediatek/mtk_dpi.c
-> > index d05ca79..c0f04d2 100644
-> > --- a/drivers/gpu/drm/mediatek/mtk_dpi.c
-> > +++ b/drivers/gpu/drm/mediatek/mtk_dpi.c
-> > @@ -60,14 +60,35 @@ enum mtk_dpi_out_color_format {
-> >  	MTK_DPI_COLOR_FORMAT_YCBCR_422_FULL
-> >  };
-> >  
-> > +enum mtk_dpi_clk_id {
-> > +	MTK_DPI_CLK_DPI_ENGINE,
-> > +	MTK_DPI_CLK_DPI_PIXEL,
-> > +	MTK_DPI_CLK_TVD_PLL,
-> > +	MTK_DPI_CLK_TVDPLL_MUX,
-> > +	MTK_DPI_CLK_TVDPLL_D2,
-> > +	MTK_DPI_CLK_TVDPLL_D4,
-> > +	MTK_DPI_CLK_TVDPLL_D8,
-> > +	MTK_DPI_CLK_TVDPLL_D16,
-> > +	MTK_DPI_CLK_COUNT,
-> > +};
-> 
-> I think this is going in the wrong direction. If the pixel clock output
-> isn't correct after a clk_set_rate(dpi->pixel_clk, rate), the clock
-> drivers should be fixed, not worked around in the dpi driver.
-> 
-> The TVDPLL_* mux and dividers are not direct inputs to the DPI module:
-> 
->    tvdpll ("pll")
->      |               ..|\
->      v               ..| | mm_sel ----> mm_dpi_engine ("engine")
->    tvdpll_594m(1/3)  ..|/
->      |
->      |`-> tvdpll_d2 -->|\
->      |`-> tvdpll_d4 -->| | dpi0_sel --> mm_dpi_pixel ("pixel")
->      |`-> tvdpll_d8 -->| |
->      `--> tvdpll_d16 ->|/
-> 
-> Currently the code first sets the "pll" to the desired multiple of the
-> pixel clock manually (*3*4, *3*8) and than calls clk_set_rate on the
-> "pixel" clock which gets propagated by the clock framework up to
-> dpi0_sel. Since dpi0_sel doesn't have the CLK_SET_RATE_PARENT flag set,
-> it should just choose the tvdpll_d* input divider. I'd like not to give
-> the dpi driver direct access to all the intermediate clocks.
-> 
-Ok, I will make some modifications according to your comment.
+Still, registering devices that are not present on the board is not an
+option.
 
-> regards
-> Philipp
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160725/b9319e9a/attachment.sig>
