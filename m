@@ -1,75 +1,114 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 25 Jul 2016 10:21:10 -0500
-Subject: [RFC PATCH v3 05/13] drivers: iommu: make iommu_fwspec OF agnostic
-In-Reply-To: <1499f802-5f98-b0c0-d3aa-dabcac81e84e@arm.com>
-References: <1469013815-24380-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1469013815-24380-6-git-send-email-lorenzo.pieralisi@arm.com>
- <1499f802-5f98-b0c0-d3aa-dabcac81e84e@arm.com>
-Message-ID: <CAL_JsqKc4aJ1xiJAS6HRKeVO8mrZWpBF0uugvmCgNuUamJF=Eg@mail.gmail.com>
+From: fu.wei@linaro.org (fu.wei at linaro.org)
+Date: Mon, 25 Jul 2016 23:26:58 +0800
+Subject: [PATCH v9 0/9] acpi,
+ clocksource: add GTDT driver and GTDT support in arm_arch_timer
+Message-ID: <1469460427-8643-1-git-send-email-fu.wei@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 25, 2016 at 10:09 AM, Robin Murphy <robin.murphy@arm.com> wrote:
-> Hi Lorenzo,
->
-> On 20/07/16 12:23, Lorenzo Pieralisi wrote:
->> The iommu_fwspec structure, used to hold per device iommu configuration
->> data is not OF specific and therefore can be moved to a generic
->> and OF independent compilation unit.
->>
->> In particular, the iommu_fwspec handling hinges on the device_node
->> pointer to identify the IOMMU device associated with the iommu_fwspec
->> structure, that is easily converted to a more generic fwnode_handle
->> pointer that can cater for OF and non-OF (ie ACPI) systems.
->>
->> Create the files and related Kconfig entry to decouple iommu_fwspec
->> structure from the OF iommu kernel layer.
->>
->> Given that the current iommu_fwspec implementation relies on
->> the arch specific struct device.archdata.iommu field in its
->> implementation, by making the code standalone and independent
->> of the OF layer this patch makes sure that the iommu_fwspec
->> kernel code can be selected only on arches implementing the
->> struct device.archdata.iommu field by adding an explicit
->> arch dependency in its config entry.
->>
->> Current drivers using the iommu_fwspec for streamid translation
->> are converted to the new iommu_fwspec API by simply converting
->> the device_node to its fwnode_handle pointer.
->>
->> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
->> Cc: Will Deacon <will.deacon@arm.com>
->> Cc: Hanjun Guo <hanjun.guo@linaro.org>
->> Cc: Robin Murphy <robin.murphy@arm.com>
->> Cc: Joerg Roedel <joro@8bytes.org>
->> ---
->>  drivers/iommu/Kconfig        |   4 ++
->>  drivers/iommu/Makefile       |   1 +
->>  drivers/iommu/arm-smmu-v3.c  |  13 +++--
->>  drivers/iommu/iommu-fwspec.c | 114 +++++++++++++++++++++++++++++++++++++++++++
->>  drivers/iommu/of_iommu.c     |  52 --------------------
->>  include/linux/iommu-fwspec.h |  60 +++++++++++++++++++++++
->>  include/linux/of_iommu.h     |  24 +++------
->>  7 files changed, 196 insertions(+), 72 deletions(-)
->>  create mode 100644 drivers/iommu/iommu-fwspec.c
->>  create mode 100644 include/linux/iommu-fwspec.h
->>
->> diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
->> index d1c66af..2b26bfb 100644
->> --- a/drivers/iommu/Kconfig
->> +++ b/drivers/iommu/Kconfig
->> @@ -67,6 +67,10 @@ config OF_IOMMU
->>         def_bool y
->>         depends on OF && IOMMU_API
->>
->> +config IOMMU_FWSPEC
->> +       def_bool y
->> +       depends on ARM64 && IOMMU_API
->
-> I think that could be at least (ARM || ARM64).
+From: Fu Wei <fu.wei@linaro.org>
 
-Why any arch dependency?
+This patchset:
+    (1)Preparation for adding GTDT support in arm_arch_timer:
+        1. Move some enums and marcos to header file;
+        2. Add a new enum for spi type;
+        3. Improve printk relevant code;
+        4. use readq to get 64-bit CNTVCT.
 
-Seems like OF_IOMMU (and ACPI?) should select this.
+    (2)Introduce ACPI GTDT parser: drivers/acpi/arm64/acpi_gtdt.c
+    Parse all kinds of timer in GTDT table of ACPI:arch timer,
+    memory-mapped timer and SBSA Generic Watchdog timer.
+    This driver can help to simplify all the relevant timer drivers,
+    and separate all the ACPI GTDT knowledge from them.
 
-Rob
+    (3)Simplify ACPI code for arm_arch_timer
+
+    (4)Add GTDT support for ARM memory-mapped timer
+
+This patchset has been tested on the following platforms:
+    (1)ARM Foundation v8 model
+
+Changelog:
+V9: https://lkml.org/lkml/2016/7/25/
+    Improve pr_err message in acpi gtdt driver.
+    Update Commit message for 7/9
+    shorten the irq mapping function name
+    Improve GTDT driver for memory-mapped timer
+
+v8: https://lkml.org/lkml/2016/7/19/660
+    Improve "pr_fmt(fmt)" definition: add "ACPI" in front of "GTDT",
+    and also improve printk message.
+    Simplify is_timer_block and is_watchdog.
+    Merge acpi_gtdt_desc_init and gtdt_arch_timer_init into acpi_gtdt_init();
+    Delete __init in include/linux/acpi.h for GTDT API
+    Make ARM64 select GTDT.
+    Delete "#include <linux/module.h>" from acpi_gtdt.c
+    Simplify GT block parse code.
+
+v7: https://lkml.org/lkml/2016/7/13/769
+    Move the GTDT driver to drivers/acpi/arm64
+    Add add the ARM64-specific ACPI Support maintainers in MAINTAINERS
+    Merge 3 patches of GTDT parser driver.
+    Fix the for_each_platform_timer bug.
+
+v6: https://lkml.org/lkml/2016/6/29/580
+    split the GTDT driver to 4 parts: basic, arch_timer, memory-mapped timer,
+    and SBSA Generic Watchdog timer
+    Improve driver by suggestions and example code from Daniel Lezcano
+
+v5: https://lkml.org/lkml/2016/5/24/356
+    Sorting out all patches, simplify the API of GTDT driver:
+    GTDT driver just fills the data struct for arm_arch_timer driver.
+
+v4: https://lists.linaro.org/pipermail/linaro-acpi/2016-March/006667.html
+    Delete the kvm relevant patches
+    Separate two patches for sorting out the code for arm_arch_timer.
+    Improve irq info export code to allow missing irq info in GTDT table.
+
+v3: https://lkml.org/lkml/2016/2/1/658
+    Improve GTDT driver code:
+      (1)improve pr_* by defining pr_fmt(fmt)
+      (2)simplify gtdt_sbsa_gwdt_init
+      (3)improve gtdt_arch_timer_data_init, if table is NULL, it will try
+      to get GTDT table.
+    Move enum ppi_nr to arm_arch_timer.h, and add enum spi_nr.
+    Add arm_arch_timer get ppi from DT and GTDT support for kvm.
+
+v2: https://lkml.org/lkml/2015/12/2/10
+    Rebase to latest kernel version(4.4-rc3).
+    Fix the bug about the config problem,
+    use CONFIG_ACPI_GTDT instead of CONFIG_ACPI in arm_arch_timer.c
+
+v1: The first upstreaming version: https://lkml.org/lkml/2015/10/28/553
+
+Fu Wei (9):
+  clocksource/drivers/arm_arch_timer: Move enums and defines to header
+    file
+  clocksource/drivers/arm_arch_timer: Add a new enum for spi type
+  clocksource/drivers/arm_arch_timer: Improve printk relevant code
+  clocksource/drivers/arm_arch_timer: use readq to get 64-bit CNTVCT
+  acpi/arm64: Add GTDT table parse driver
+  clocksource/drivers/arm_arch_timer: Simplify ACPI support code.
+  acpi/arm64: Add memory-mapped timer support in GTDT driver
+  clocksource/drivers/arm_arch_timer: Add GTDT support for memory-mapped
+    timer
+  acpi/arm64: Add SBSA Generic Watchdog support in GTDT driver
+
+ arch/arm64/Kconfig                   |   1 +
+ drivers/acpi/Kconfig                 |   5 +
+ drivers/acpi/Makefile                |   1 +
+ drivers/acpi/arm64/Kconfig           |   5 +
+ drivers/acpi/arm64/Makefile          |   1 +
+ drivers/acpi/arm64/acpi_gtdt.c       | 309 +++++++++++++++++++++++++++++++++++
+ drivers/clocksource/Kconfig          |   2 +-
+ drivers/clocksource/arm_arch_timer.c | 233 +++++++++++++++++---------
+ drivers/watchdog/Kconfig             |   1 +
+ include/clocksource/arm_arch_timer.h |  32 ++++
+ include/linux/acpi.h                 |   7 +
+ 11 files changed, 519 insertions(+), 78 deletions(-)
+ create mode 100644 drivers/acpi/arm64/Kconfig
+ create mode 100644 drivers/acpi/arm64/Makefile
+ create mode 100644 drivers/acpi/arm64/acpi_gtdt.c
+
+-- 
+2.5.5
