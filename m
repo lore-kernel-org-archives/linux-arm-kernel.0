@@ -1,110 +1,151 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 25 Jul 2016 08:40:33 +0200
-Subject: [PATCH 1/4] ARM: dts: sun8i: Extend Orange Pi PC dt to also
- handle the PC Plus
-In-Reply-To: <bce2b340-a930-8771-4560-dc61bf5828d5@redhat.com>
-References: <1468095718-18515-1-git-send-email-hdegoede@redhat.com>
- <20160713084505.GE4761@lukather>
- <bce2b340-a930-8771-4560-dc61bf5828d5@redhat.com>
-Message-ID: <20160725064033.GA7419@lukather>
+From: ck.hu@mediatek.com (CK Hu)
+Date: Mon, 25 Jul 2016 14:49:35 +0800
+Subject: [PATCH 3/4] drm/mediatek: fix the wrong pixel clock when
+ resolution is 4K
+In-Reply-To: <1469427845.26205.17.camel@mtksdaap41>
+References: <1468987385-37353-1-git-send-email-bibby.hsieh@mediatek.com>
+ <1468987385-37353-4-git-send-email-bibby.hsieh@mediatek.com>
+ <1469001443.11841.59.camel@mtksdaap41>
+ <1469427845.26205.17.camel@mtksdaap41>
+Message-ID: <1469429375.11841.69.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi, Bibby:
 
-On Wed, Jul 13, 2016 at 12:01:41PM +0200, Hans de Goede wrote:
-> Hi,
+On Mon, 2016-07-25 at 14:24 +0800, Bibby Hsieh wrote:
+> Hi, CK,
 > 
-> On 13-07-16 10:45, Maxime Ripard wrote:
-> >On Sat, Jul 09, 2016 at 10:21:55PM +0200, Hans de Goede wrote:
-> >>There is a new Orange Pi PC Plus available now, rather then adding
-> >>yet another dts file for this variant, extend the existing
-> >>Orange Pi PC to support the sdio wifi and emmc found on this variant.
-> >>
-> >>Downside of this approach is the following messages in dmesg when run
-> >>on the non Plus Orange Pi PC:
-> >>
-> >>sunxi-mmc 1c10000.mmc: fatal err update clk timeout
-> >>sunxi-mmc 1c11000.mmc: smc 2 err, cmd 8, RTO !!
-> >>sunxi-mmc 1c11000.mmc: smc 2 err, cmd 55, RTO !!
-> >>sunxi-mmc 1c11000.mmc: smc 2 err, cmd 55, RTO !!
-> >>sunxi-mmc 1c11000.mmc: smc 2 err, cmd 55, RTO !!
-> >>sunxi-mmc 1c11000.mmc: smc 2 err, cmd 55, RTO !!
-> >>sunxi-mmc 1c11000.mmc: smc 2 err, cmd 1, RTO !!
-> >>
-> >>Note these are completely harmless and there is no adverse effect
-> >>to the functioning of the non Plus Orange Pi PC.
-> >>
-> >>Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> >>---
-> >> arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts | 40 +++++++++++++++++++++++++++++-
-> >> 1 file changed, 39 insertions(+), 1 deletion(-)
-> >>
-> >>diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
-> >>index b8340f7..f9bf260 100644
-> >>--- a/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
-> >>+++ b/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
-> >>@@ -49,11 +49,13 @@
-> >> #include <dt-bindings/pinctrl/sun4i-a10.h>
-> >>
-> >> / {
-> >>-	model = "Xunlong Orange Pi PC";
-> >>+	model = "Xunlong Orange Pi PC / PC Plus";
-> >> 	compatible = "xunlong,orangepi-pc", "allwinner,sun8i-h3";
-> >>
-> >> 	aliases {
-> >> 		serial0 = &uart0;
-> >>+		/* ethernet0 is the H3 emac, defined in sun8i-h3.dtsi */
-> >>+		ethernet1 = &rtl8189ftv;
-> >> 	};
-> >>
-> >> 	chosen {
-> >>@@ -118,6 +120,42 @@
-> >> 	status = "okay";
-> >> };
-> >>
-> >>+/* Note only present on orangepi pc *plus* */
-> >>+&mmc1 {
-> >>+	pinctrl-names = "default";
-> >>+	pinctrl-0 = <&mmc1_pins_a>;
-> >>+	vmmc-supply = <&reg_vcc3v3>;
-> >>+	bus-width = <4>;
-> >>+	non-removable;
-> >>+	status = "okay";
-> >>+
-> >>+	/*
-> >>+	 * Explicitly define the sdio device, so that we can add an ethernet
-> >>+	 * alias for it (which e.g. makes u-boot set a mac-address).
-> >>+	 */
-> >>+	rtl8189ftv: sdio_wifi at 1 {
-> >>+		reg = <1>;
-> >>+	};
-> >>+};
-> >
-> >Nothing prevents you from including the orange pi pc dts, from the
-> >orange pi plus dts.
-> >
-> >It prevents the duplication you were trying to avoid, and it doesn't
-> >create all those spurious errors and devices.
+> Thanks for your comments.
 > 
-> That would solve the copy paste problem on the kernel side, but that
-> would still mean adding a new u-boot defconfig for this, which means that
-> all the distro's which ship with prebuild u-boot binaries need to build
-> for yet another board, something which I would like to avoid.
+> On Wed, 2016-07-20 at 15:57 +0800, CK Hu wrote:
+> > Hi, Bibby:
+> > 
+> > Some comments inline.
+> > 
+> > On Wed, 2016-07-20 at 12:03 +0800, Bibby Hsieh wrote:
+> > > From: Junzhi Zhao <junzhi.zhao@mediatek.com>
+> > > 
+> > > Pixel clock should be 297MHz when resolution is 4K.
+> > > 
+> > > Signed-off-by: Junzhi Zhao <junzhi.zhao@mediatek.com>
+> > > Signed-off-by: Bibby Hsieh <bibby.hsieh@mediatek.com>
+> > > ---
+> > >  drivers/gpu/drm/mediatek/mtk_dpi.c |  184 +++++++++++++++++++++++++-----------
+> > >  1 file changed, 131 insertions(+), 53 deletions(-)
+> > > 
 
-Still, registering devices that are not present on the board is not an
-option.
+[snip...]
 
-Maxime
+> > >  
+> > > +static int mt8173_parse_clk_from_dt(struct mtk_dpi *dpi, struct device_node *np)
+> > > +{
+> > > +	int i;
+> > > +
+> > > +	for (i = 0; i < ARRAY_SIZE(mtk_dpi_clk_names); i++) {
+> > > +		dpi->clk[i] = of_clk_get_by_name(np,
+> > > +						  mtk_dpi_clk_names[i]);
+> > > +		if (IS_ERR(dpi->clk[i]))
+> > > +			return PTR_ERR(dpi->clk[i]);
+> > > +	}
+> > > +	return 0;
+> > > +}
+> > 
+> > I think parsing device tree is a pure SW behavior. Would this vary for
+> > different MTK soc?
+> > 
+> Yes
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160725/b9319e9a/attachment.sig>
+I can not imaging that, so could you give me an example source code of
+other MTK soc for parse_clk_from_dt()?
+
+> > > +
+> > > +
+> > > +static const struct mtk_dpi_conf mt8173_conf = {
+> > > +	.parse_clk_from_dt = mt8173_parse_clk_from_dt,
+> > > +	.clk_config = mt8173_clk_config,
+> > > +};
+> > > +
+> > > +static const struct of_device_id mtk_dpi_of_ids[] = {
+> > > +	{ .compatible = "mediatek,mt8173-dpi",
+> > > +		.data = &mt8173_conf,
+> > > +	},
+> > > +	{}
+> > > +};
+> > > +
+> > >  static int mtk_dpi_probe(struct platform_device *pdev)
+> > >  {
+> > >  	struct device *dev = &pdev->dev;
+> > >  	struct mtk_dpi *dpi;
+> > >  	struct resource *mem;
+> > > +	struct device_node *np = dev->of_node;
+> > >  	struct device_node *ep, *bridge_node = NULL;
+> > >  	int comp_id;
+> > > +	const struct of_device_id *match;
+> > > +	struct mtk_dpi_conf *conf;
+> > >  	int ret;
+> > >  
+> > > +	match = of_match_node(mtk_dpi_of_ids, dev->of_node);
+> > > +	if (!match)
+> > > +		return -ENODEV;
+> > > +
+> > >  	dpi = devm_kzalloc(dev, sizeof(*dpi), GFP_KERNEL);
+> > >  	if (!dpi)
+> > >  		return -ENOMEM;
+> > >  
+> > >  	dpi->dev = dev;
+> > > +	dpi->data = (void *)match->data;
+> > > +	conf = (struct mtk_dpi_conf *)match->data;
+> > >  
+> > >  	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> > >  	dpi->regs = devm_ioremap_resource(dev, mem);
+> > > @@ -679,24 +777,9 @@ static int mtk_dpi_probe(struct platform_device *pdev)
+> > >  		return ret;
+> > >  	}
+> > >  
+> > > -	dpi->engine_clk = devm_clk_get(dev, "engine");
+> > > -	if (IS_ERR(dpi->engine_clk)) {
+> > > -		ret = PTR_ERR(dpi->engine_clk);
+> > > -		dev_err(dev, "Failed to get engine clock: %d\n", ret);
+> > > -		return ret;
+> > > -	}
+> > > -
+> > > -	dpi->pixel_clk = devm_clk_get(dev, "pixel");
+> > > -	if (IS_ERR(dpi->pixel_clk)) {
+> > > -		ret = PTR_ERR(dpi->pixel_clk);
+> > > -		dev_err(dev, "Failed to get pixel clock: %d\n", ret);
+> > > -		return ret;
+> > > -	}
+> > > -
+> > > -	dpi->tvd_clk = devm_clk_get(dev, "pll");
+> > > -	if (IS_ERR(dpi->tvd_clk)) {
+> > > -		ret = PTR_ERR(dpi->tvd_clk);
+> > > -		dev_err(dev, "Failed to get tvdpll clock: %d\n", ret);
+> > > +	ret = conf->parse_clk_from_dt(dpi, np);
+> > > +	if (ret) {
+> > > +		dev_err(dev, "parse tvd div clk failed!");
+> > >  		return ret;
+> > >  	}
+> > >  
+> > > @@ -754,11 +837,6 @@ static int mtk_dpi_remove(struct platform_device *pdev)
+> > >  	return 0;
+> > >  }
+> > >  
+> > > -static const struct of_device_id mtk_dpi_of_ids[] = {
+> > > -	{ .compatible = "mediatek,mt8173-dpi", },
+> > > -	{}
+> > > -};
+> > > -
+> > >  struct platform_driver mtk_dpi_driver = {
+> > >  	.probe = mtk_dpi_probe,
+> > >  	.remove = mtk_dpi_remove,
+> > 
+> > Regards,
+> > CK
+> > 
+> 
+
+
+Regards,
+CK
+> 
