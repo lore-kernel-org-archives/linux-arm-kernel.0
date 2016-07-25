@@ -1,103 +1,87 @@
-From: bharat.kumar.gogada@xilinx.com (Bharat Kumar Gogada)
-Date: Mon, 25 Jul 2016 05:23:58 +0000
-Subject: Why does BIOS assign memory to 16 byte BAR
-References: <8520D5D51A55D047800579B094147198258BB59B@XAP-PVEXMBX01.xlnx.xilinx.com>
- <20160722151546.GA20646@localhost> <20160722155133.GB20646@localhost>
-Message-ID: <8520D5D51A55D047800579B094147198258BBC40@XAP-PVEXMBX01.xlnx.xilinx.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Mon, 25 Jul 2016 13:19:47 +0800
+Subject: [PATCH] PM / OPP: optimize dev_pm_opp_set_rate() a bit
+In-Reply-To: <201607222230.DZObarhu%fengguang.wu@intel.com>
+References: <1469191370-1285-1-git-send-email-jszhang@marvell.com>
+ <201607222230.DZObarhu%fengguang.wu@intel.com>
+Message-ID: <20160725131947.644e6166@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Subject: RE: Why does BIOS assign memory to 16 byte BAR
-> 
-> > Subject: Re: Why does BIOS assign memory to 16 byte BAR
-> >
-> > On Fri, Jul 22, 2016 at 10:15:46AM -0500, Bjorn Helgaas wrote:
-> > > Hi Bharat,
-> > >
-> > > On Fri, Jul 22, 2016 at 09:24:22AM +0000, Bharat Kumar Gogada wrote:
-> > > > Hi,
-> > > >
-> > > > I'm observing that on x86 BIOS successfully assigns memory if an End
-> > > > point requests BAR of size 16byte.
-> > > >
-> > > > But as per Spec:
-> > > > The minimum memory address range requested by a BAR is 128 bytes.
-> > >
-> > > Can you provide the spec reference for this?  I don't see it in PCI
-> > > r3.0.
-> > >
-> > > PCI r3.0, sec 6.2.5.1, shows bits 4-31 of a memory BAR as writable,
-> > > which would correspond to a minimum size of 16 bytes.
-> >
-> > The reference above is to the conventional PCI spec.  I happened to trip
-> over
-> > a note in PCIe r3.0, sec 1.3.2.2, that for a PCI Express endpoint, "the
-> minimum
-> > memory address range requested by a BAR is 128 bytes."
-> >
-> > I don't think linux currently enforces this minimum.
-> >
-> 
-> Hi Bjorn Thanks for the reply.
-> 
-> Here is what the issue we are seeing.
-> 
-> We have total memory for BAR's on our SoC of 256 MB.
-> When an End Point request individually 16 byte BAR's our root port assigns
-> memory to BAR's successfully.
-> 
-> But if I have an End point which has 4 BAR's each 32 bit and request as
-> following:
-> When 1st BAR requests 1GB BAR it fails due to lack of memory. (We are
-> running this as part of SIG compliance test case)
-> 2nd BAR requests 1MB and other 2 BAR's request 16byte, but these are not
-> getting BAR's assigned. (Even though BAR space is available, since 1GB failed,
-> We have 256 MB still)
-> 
-> We have only one End point connected to our root port.
-> 
-> Here is the log:
-> [    2.319289] nwl-pcie fd0e0000.pcie: Link is UP
-> [    2.319332] PCI host bridge /amba/pcie at fd0e0000 ranges:
-> [    2.319349]   No bus range found for /amba/pcie at fd0e0000, using [bus 00-
-> ff]
-> [    2.319374]    IO 0xe0000000..0xe000ffff -> 0x00000000
-> [    2.319415]   MEM 0xe0100000..0xefffffff -> 0xe0100000
-> [    2.319431]   MEM 0x600000000..0x7ffffffff -> 0x600000000
-> [    2.319539] nwl-pcie fd0e0000.pcie: PCI host bridge to bus 0000:00
-> [    2.319557] pci_bus 0000:00: root bus resource [bus 00-ff]
-> [    2.319573] pci_bus 0000:00: root bus resource [io  0x0000-0xffff]
-> [    2.319589] pci_bus 0000:00: root bus resource [mem 0xe0100000-0xefffffff]
-> [    2.319606] pci_bus 0000:00: root bus resource [mem 0x600000000-
-> 0x7ffffffff pref]
-> [    2.319845] pci 0000:00:00.0: cannot attach to SMMU, is it on the same bus?
-> [    2.319861] iommu: Adding device 0000:00:00.0 to group 1
-> [    2.320243] pci 0000:01:00.0: cannot attach to SMMU, is it on the same bus?
-> [    2.320258] iommu: Adding device 0000:01:00.0 to group 1
-> [    2.320313] pci 0000:00:00.0: BAR 8: no space for [mem size 0x60000000]
-> [    2.320331] pci 0000:00:00.0: BAR 8: failed to assign [mem size 0x60000000]
-> [    2.320349] pci 0000:00:00.0: BAR 6: assigned [mem 0xe0100000-0xe01007ff
-> pref]
-> [    2.320374] pci 0000:01:00.0: BAR 0: no space for [mem size 0x40000000]
-> [    2.320390] pci 0000:01:00.0: BAR 0: failed to assign [mem size 0x40000000]
-> [    2.320407] pci 0000:01:00.0: BAR 4: no space for [mem size 0x00100000
-> 64bit]
-> [    2.320423] pci 0000:01:00.0: BAR 4: failed to assign [mem size 0x00100000
-> 64bit]
-> [    2.320446] pci 0000:01:00.0: BAR 2: no space for [mem size 0x00000010]
-> [    2.320461] pci 0000:01:00.0: BAR 2: failed to assign [mem size 0x00000010]
-> [    2.320477] pci 0000:01:00.0: BAR 3: no space for [mem size 0x00000010]
-> [    2.320493] pci 0000:01:00.0: BAR 3: failed to assign [mem size 0x00000010]
-> [    2.320509] pci 0000:00:00.0: PCI bridge to [bus 01-0c]
-> 
-> Please let me know, what might might be the issue.
-> 
+Dear all,
 
-Adding to the above will kernel allocate other memory BARs to an End Point if 
-one BAR assignment fails ?
+On Fri, 22 Jul 2016 22:30:53 +0800 kbuild test robot wrote:
 
-What if the End Point has multiple function and say first function BAR assignment failed,
-will the kernel assign BAR's to second function on same bus and device ?  
+> Hi,
+> 
+> [auto build test WARNING on pm/linux-next]
+> [also build test WARNING on v4.7-rc7 next-20160722]
+> [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+> 
+> url:    https://github.com/0day-ci/linux/commits/Jisheng-Zhang/PM-OPP-optimize-dev_pm_opp_set_rate-a-bit/20160722-205339
+> base:   https://git.kernel.org/pub/scm/linux/kernel/git/rafael/linux-pm.git linux-next
+> config: x86_64-allmodconfig (attached as .config)
+> compiler: gcc-6 (Debian 6.1.1-9) 6.1.1 20160705
+> reproduce:
+>         # save the attached .config to linux build tree
+>         make ARCH=x86_64 
+> 
+> Note: it may well be a FALSE warning. FWIW you are at least aware of it now.
+> http://gcc.gnu.org/wiki/Better_Uninitialized_Warnings
+> 
+> All warnings (new ones prefixed by >>):
+> 
+>    drivers/base/power/opp/core.c: In function 'dev_pm_opp_set_rate':
+> >> drivers/base/power/opp/core.c:666:3: warning: 'ou_volt_max' may be used uninitialized in this function [-Wmaybe-uninitialized]  
+>       _set_opp_voltage(dev, reg, ou_volt, ou_volt_min, ou_volt_max);
+>       ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+> >> drivers/base/power/opp/core.c:666:3: warning: 'ou_volt_min' may be used uninitialized in this function [-Wmaybe-uninitialized]
+> >> drivers/base/power/opp/core.c:666:3: warning: 'ou_volt' may be used uninitialized in this function [-Wmaybe-uninitialized]  
 
-Thanks & Regards,
-Bharat
+These warnings seem weired. We only use them when !IS_ERR(old_opp), and we
+should already set them if !IS_ERR(old_opp). Another weired thing is if
+we add something, printk e.g in _find_freq_ceil(), then these warnings disappear
+
+Could you please kindly give some suggestions about how to fix these warnings?
+
+Thanks,
+Jisheng
+
+> 
+> vim +/ou_volt_max +666 drivers/base/power/opp/core.c
+> 
+> 6a0712f6 drivers/base/power/opp/core.c Viresh Kumar 2016-02-09  650  	if (freq < old_freq) {
+> 6a0712f6 drivers/base/power/opp/core.c Viresh Kumar 2016-02-09  651  		ret = _set_opp_voltage(dev, reg, u_volt, u_volt_min,
+> 6a0712f6 drivers/base/power/opp/core.c Viresh Kumar 2016-02-09  652  				       u_volt_max);
+> 6a0712f6 drivers/base/power/opp/core.c Viresh Kumar 2016-02-09  653  		if (ret)
+> 6a0712f6 drivers/base/power/opp/core.c Viresh Kumar 2016-02-09  654  			goto restore_freq;
+> 6a0712f6 drivers/base/power/opp/core.c Viresh Kumar 2016-02-09  655  	}
+> 6a0712f6 drivers/base/power/opp/core.c Viresh Kumar 2016-02-09  656  
+> 6a0712f6 drivers/base/power/opp/core.c Viresh Kumar 2016-02-09  657  	return 0;
+> 6a0712f6 drivers/base/power/opp/core.c Viresh Kumar 2016-02-09  658  
+> 6a0712f6 drivers/base/power/opp/core.c Viresh Kumar 2016-02-09  659  restore_freq:
+> 6a0712f6 drivers/base/power/opp/core.c Viresh Kumar 2016-02-09  660  	if (clk_set_rate(clk, old_freq))
+> 6a0712f6 drivers/base/power/opp/core.c Viresh Kumar 2016-02-09  661  		dev_err(dev, "%s: failed to restore old-freq (%lu Hz)\n",
+> 6a0712f6 drivers/base/power/opp/core.c Viresh Kumar 2016-02-09  662  			__func__, old_freq);
+> 6a0712f6 drivers/base/power/opp/core.c Viresh Kumar 2016-02-09  663  restore_voltage:
+> 6a0712f6 drivers/base/power/opp/core.c Viresh Kumar 2016-02-09  664  	/* This shouldn't harm even if the voltages weren't updated earlier */
+> 6a0712f6 drivers/base/power/opp/core.c Viresh Kumar 2016-02-09  665  	if (!IS_ERR(old_opp))
+> 6a0712f6 drivers/base/power/opp/core.c Viresh Kumar 2016-02-09 @666  		_set_opp_voltage(dev, reg, ou_volt, ou_volt_min, ou_volt_max);
+> 6a0712f6 drivers/base/power/opp/core.c Viresh Kumar 2016-02-09  667  
+> 6a0712f6 drivers/base/power/opp/core.c Viresh Kumar 2016-02-09  668  	return ret;
+> 6a0712f6 drivers/base/power/opp/core.c Viresh Kumar 2016-02-09  669  }
+> 6a0712f6 drivers/base/power/opp/core.c Viresh Kumar 2016-02-09  670  EXPORT_SYMBOL_GPL(dev_pm_opp_set_rate);
+> 6a0712f6 drivers/base/power/opp/core.c Viresh Kumar 2016-02-09  671  
+> 2c2709dc drivers/base/power/opp/core.c Viresh Kumar 2016-02-16  672  /* OPP-dev Helpers */
+> 2c2709dc drivers/base/power/opp/core.c Viresh Kumar 2016-02-16  673  static void _kfree_opp_dev_rcu(struct rcu_head *head)
+> 06441658 drivers/base/power/opp.c      Viresh Kumar 2015-07-29  674  {
+> 
+> :::::: The code at line 666 was first introduced by commit
+> :::::: 6a0712f6f199e737aa5913d28ec4bd3a25de9660 PM / OPP: Add dev_pm_opp_set_rate()
+> 
+> :::::: TO: Viresh Kumar <viresh.kumar@linaro.org>
+> :::::: CC: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+> 
+> ---
+> 0-DAY kernel test infrastructure                Open Source Technology Center
+> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
