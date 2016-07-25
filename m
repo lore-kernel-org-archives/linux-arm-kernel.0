@@ -1,42 +1,58 @@
-From: slash.tmp@free.fr (Mason)
-Date: Mon, 25 Jul 2016 11:48:47 +0200
-Subject: [PATCH v3] thermal: tango: add resume support
-In-Reply-To: <4062048.3qHsMMf8fO@wuerfel>
-References: <57726196.5060909@free.fr> <m2wpkd1gfg.fsf@baylibre.com>
- <5795CB4E.4000909@free.fr> <4062048.3qHsMMf8fO@wuerfel>
-Message-ID: <5795E07F.6010506@free.fr>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 25 Jul 2016 10:50:13 +0100
+Subject: [PATCH v3 0/6] Add support for privileged mappings
+In-Reply-To: <vnkweg6l9zla.fsf@codeaurora.org>
+References: <20160719203655.16629-1-mitchelh@codeaurora.org>
+ <20160722165107.GH16837@arm.com> <vnkweg6l9zla.fsf@codeaurora.org>
+Message-ID: <20160725095012.GC15864@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/07/2016 10:52, Arnd Bergmann wrote:
-
-> On Monday, July 25, 2016 10:18:22 AM CEST Mason wrote:
+On Fri, Jul 22, 2016 at 01:39:45PM -0700, Mitchel Humpherys wrote:
+> On Fri, Jul 22 2016 at 05:51:07 PM, Will Deacon <will.deacon@arm.com> wrote:
+> > On Tue, Jul 19, 2016 at 01:36:49PM -0700, Mitchel Humpherys wrote:
+> >> The following patch to the ARM SMMU driver:
+> >> 
+> >>     commit d346180e70b91b3d5a1ae7e5603e65593d4622bc
+> >>     Author: Robin Murphy <robin.murphy@arm.com>
+> >>     Date:   Tue Jan 26 18:06:34 2016 +0000
+> >>     
+> >>         iommu/arm-smmu: Treat all device transactions as unprivileged
+> >> 
+> >> started forcing all SMMU transactions to come through as "unprivileged".
+> >> The rationale given was that:
+> >> 
+> >>   (1) There is no way in the IOMMU API to even request privileged mappings.
+> >> 
+> >>   (2) It's difficult to implement a DMA mapper that correctly models the
+> >>       ARM VMSAv8 behavior of unprivileged-writeable =>
+> >>       privileged-execute-never.
+> >> 
+> >> This series rectifies (1) by introducing an IOMMU API for privileged
+> >> mappings and implements it in io-pgtable-arm.
+> >> 
+> >> This series rectifies (2) by introducing a new dma attribute
+> >> (DMA_ATTR_PRIVILEGED) for users of the DMA API that need privileged
+> >> mappings which are inaccessible to lesser-privileged execution levels, and
+> >> implements it in the arm64 IOMMU DMA mapper.  The one known user (pl330.c)
+> >> is converted over to the new attribute.
+> >> 
+> >> Jordan and Jeremy can provide more info on the use case if needed, but the
+> >> high level is that it's a security feature to prevent attacks such as [1].
+> >
+> > This all looks good to me:
+> >
+> > Acked-by: Will Deacon <will.deacon@arm.com>
+> >
+> > It looks pretty fiddly to merge, however. How are you planning to get
+> > this upstream?
 > 
->> Moving the SIMPLE_DEV_PM_OPS macro outside the CONFIG_PM_SLEEP guard
->> would unconditionally define a struct dev_pm_ops, which just wastes
->> space when CONFIG_PM_SLEEP is undefined (if I'm not mistaken).
->>
->> That's why I put SIMPLE_DEV_PM_OPS inside the CONFIG_PM_SLEEP guard.
-> 
-> If you want to avoid the extra few bytes, just use the trick I
-> suggested:
-> 
-> 	.pm = IS_ENABLED(CONFIG_PM_SLEEP) ? &tango_thermal_pm : NULL,
+> Fiddly in what way?  Do you mean in relation to "dma-mapping: Use
+> unsigned long for dma_attrs" [1]?  I admit I wasn't aware of that
+> activity until Robin mentioned it.  It looks like it's merged on
+> next/master, shall I rebase/rework on that and resend?
 
-This would achieve the same result as the solution I proposed
-in my v2 patch, right?
+Fiddly in that it touches multiple subsystems. I guess routing it via
+the iommu tree (Joerg) might be the best bet.
 
-So you're saying you prefer the IS_ENABLED macro over using
-#ifdef ... #else define stuff as NULL #endif
-
-Did I get that right?
-
-Eduardo, Zhang, what do thermal maintainers prefer?
-
-> You should basically never have that #ifdef inside of the
-> platform_driver definition.
-
-Except when the fields don't exist, like the bug I introduced
-in struct smp_operations (which you fixed).
-
-Regards.
+Will
