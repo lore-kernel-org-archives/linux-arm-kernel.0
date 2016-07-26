@@ -1,144 +1,98 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 26 Jul 2016 16:05:17 +0100
-Subject: [PATCH v4 4/6] arm64/dma-mapping: Implement DMA_ATTR_PRIVILEGED
-In-Reply-To: <20160725191649.13414-5-mitchelh@codeaurora.org>
-References: <20160725191649.13414-1-mitchelh@codeaurora.org>
- <20160725191649.13414-5-mitchelh@codeaurora.org>
-Message-ID: <f6fa75a9-ce70-e6c5-fd51-2af502bc2f67@arm.com>
+From: appana.durga.rao@xilinx.com (Appana Durga Kedareswara Rao)
+Date: Tue, 26 Jul 2016 15:09:19 +0000
+Subject: [RFC PATCH v2 1/4] Documentation: DT: net: Add Xilinx
+ gmiitorgmii converter device tree binding documentation
+In-Reply-To: <03CA77BA8AF6F1469AEDFBDA1322A7B74A19393B@XAP-PVEXMBX02.xlnx.xilinx.com>
+References: <1467623084-15471-1-git-send-email-appanad@xilinx.com>
+ <1467623084-15471-2-git-send-email-appanad@xilinx.com>
+ <20160704140458.GC3282@lunn.ch>
+ <03CA77BA8AF6F1469AEDFBDA1322A7B74A193913@XAP-PVEXMBX02.xlnx.xilinx.com>
+ <20160706142121.GI19800@lunn.ch>
+ <03CA77BA8AF6F1469AEDFBDA1322A7B74A19393B@XAP-PVEXMBX02.xlnx.xilinx.com>
+Message-ID: <C246CAC1457055469EF09E3A7AC4E11A4A5C2387@XAP-PVEXMBX01.xlnx.xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mitch,
+Hi Andrew,
 
-On 25/07/16 20:16, Mitchel Humpherys wrote:
-> The newly added DMA_ATTR_PRIVILEGED is useful for creating mappings that
-> are only accessible to privileged DMA engines.  Implement it in
-> dma-iommu.c so that the ARM64 DMA IOMMU mapper can make use of it.
-> 
-> Signed-off-by: Mitchel Humpherys <mitchelh@codeaurora.org>
-> ---
-> 
-> Notes:
->     v3..v4
->     
->       - Reworked against the new dma attrs format
->     
->     v2..v3
->     
->       - Renamed and redocumented dma_direction_to_prot.
->       - Dropped the stuff making all privileged mappings read-only.
-> 
->  arch/arm64/mm/dma-mapping.c |  6 +++---
->  drivers/iommu/dma-iommu.c   | 16 +++++++++++-----
->  include/linux/dma-iommu.h   |  3 ++-
->  3 files changed, 16 insertions(+), 9 deletions(-)
-> 
-> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
-> index c4284c432ae8..1c6f85c56115 100644
-> --- a/arch/arm64/mm/dma-mapping.c
-> +++ b/arch/arm64/mm/dma-mapping.c
-> @@ -556,7 +556,7 @@ static void *__iommu_alloc_attrs(struct device *dev, size_t size,
->  				 unsigned long attrs)
->  {
->  	bool coherent = is_device_dma_coherent(dev);
-> -	int ioprot = dma_direction_to_prot(DMA_BIDIRECTIONAL, coherent);
-> +	int ioprot = dma_info_to_prot(DMA_BIDIRECTIONAL, coherent, attrs);
->  	size_t iosize = size;
->  	void *addr;
->  
-> @@ -710,7 +710,7 @@ static dma_addr_t __iommu_map_page(struct device *dev, struct page *page,
->  				   unsigned long attrs)
->  {
->  	bool coherent = is_device_dma_coherent(dev);
-> -	int prot = dma_direction_to_prot(dir, coherent);
-> +	int prot = dma_info_to_prot(dir, coherent, attrs);
->  	dma_addr_t dev_addr = iommu_dma_map_page(dev, page, offset, size, prot);
->  
->  	if (!iommu_dma_mapping_error(dev, dev_addr) &&
-> @@ -768,7 +768,7 @@ static int __iommu_map_sg_attrs(struct device *dev, struct scatterlist *sgl,
->  		__iommu_sync_sg_for_device(dev, sgl, nelems, dir);
->  
->  	return iommu_dma_map_sg(dev, sgl, nelems,
-> -			dma_direction_to_prot(dir, coherent));
-> +				dma_info_to_prot(dir, coherent, attrs));
->  }
->  
->  static void __iommu_unmap_sg_attrs(struct device *dev,
-> diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
-> index 08a1e2f3690f..5e1e495b35f8 100644
-> --- a/drivers/iommu/dma-iommu.c
-> +++ b/drivers/iommu/dma-iommu.c
-> @@ -129,26 +129,32 @@ int iommu_dma_init_domain(struct iommu_domain *domain, dma_addr_t base, u64 size
->  EXPORT_SYMBOL(iommu_dma_init_domain);
->  
->  /**
-> - * dma_direction_to_prot - Translate DMA API directions to IOMMU API page flags
-> + * dma_info_to_prot - Translate DMA API directions and attributes to IOMMU API
-> + *                    page flags.
->   * @dir: Direction of DMA transfer
->   * @coherent: Is the DMA master cache-coherent?
-> + * @attrs: DMA attributes for the mapping
->   *
->   * Return: corresponding IOMMU API page protection flags
->   */
-> -int dma_direction_to_prot(enum dma_data_direction dir, bool coherent)
-> +int dma_info_to_prot(enum dma_data_direction dir, bool coherent,
-> +		     unsigned long attrs)
->  {
->  	int prot = coherent ? IOMMU_CACHE : 0;
->  
+	Thanks for the inputs...
 
-+	if (attrs & DMA_ATTR_PRIVILEGED)
-+		prot |= IOMMU_PRIV;
-+
+> >
+> > > > Hi Kedareswara
+> > > >
+> > > > So looking at the device tree, you have the gmiitorgmii as an mdio
+> > > > device. It will get probed as an mdio device, and from that you
+> > > > know the address on the bus. However, your driver does not
+> > > > actually do this. xilinx_gmii2rgmii.c is just a library of two
+> > > > functions, and does not use any of this device tree information.
+> > > > You device tree binding is completely bogus.
+> > > >
+> > > > What i think is a much more logical structure, and fits the
+> > > > hardware, which is what DT is all about, is to make your driver an mdio
+> driver.
+> > > > Also, have a phy-handle pointing to the PHY in the gmii_to_rgmii node.
+> > > > You then no longer need the exported gmii2rgmii_phyprobe() function.
+> > > >
+> > > > Next, you want gmiitorgmii driver to register a phy. The MAC
+> > > > driver can then look this up using phy-handle:
+> > > >
+> > > >        mdio {
+> > > >                 #address-cells = <1>;
+> > > >                 #size-cells = <0>;
+> > > >
+> > > >                 phy: ethernet-phy at 0 {
+> > > >                         reg = <0>;
+> > > >                 };
+> > > >
+> > > >                 gmii_to_rgmii: gmii-to-rgmii at 8 {
+> > > >                         compatible = "xlnx,gmiitorgmii";
+> > > >                         reg = <8>;
+> > > > 			phy-handle = <&phy>;
+> > > >                 };
+> > > >        };
+> > >
+> > >
+> > > Thanks for your inputs initially we too thought the similar
+> > > implementation But the GMII2RGMII converter contains only one
+> > > register and it is  not compatible to the standard ethernet MII
+> > > interface. Also it doesn't have a standard VID and PID registers So,
+> > > during the mdio bus scan, this device
+> > will
+> > > not appear.
 
-then drop the rest of the changes to the switch statement below. It's
-taken me an embarrassingly long time to work out why things were blowing
-up in __iommu_sync_single_for_device() all with a VA of phys_to_virt(0) ;)
+I tried to implement the driver as you suggested but there are few limitations in this
+Implementation please correct me if my understanding is wrong...
 
-With that change, for the whole series:
+The device-tree will look like below...
+        mdio {
+                #address-cells = <1>;
+                 #size-cells = <0>;
+                 phy: ethernet-phy at 0 {
+                         reg = <0>;
+                 };
+                 gmii_to_rgmii: gmii-to-rgmii at 8 {
+                         compatible = "xlnx,gmiitorgmii";
+                         reg = <8>;
+		phy-handle = <&phy>;
+                 };
+      };
 
-Reviewed-by: Robin Murphy <robin.murphy@arm.com>
-Tested-by: Robin Murphy <robin.murphy@arm.com>
+The MAC driver does the below.
+	---> It creates a MDIO device for the gmii_to_rgmii node.
+	---> It creates a PHY device for the External PHY node.
 
-I guess at this point it may be worth waiting to repost based on -rc1.
-Be sure to CC patch 5 to Vinod as the current dmaengine maintainer, as
-it's his ack we'll need on that.
+The GMII2RGMII driver does the below.
+	1) It registers the gmii_to_rgmii node as a MDIO driver.
+	It contains the external phy as a phy-handle
+	2) Register a PHY Driver.
+	---> Register it as a phy driver (phy_register_driver): 
+	        For this implementation the converter won't have any VID or DID(PHY register 2 and 3)  
+	---> Register phy using of_phy_connect call: 
+	       For this implementation needed a netdev pointer to pass it to the of_phy_connect call.
+	      (Need to allocate a network device during probe and need to register it as netdev) 
+		
+	For the 2nd one implement I am facing above limitations...
+	Please correct me if my understanding is wrong...
 
-Cheers,
-Robin.
-
->  	switch (dir) {
->  	case DMA_BIDIRECTIONAL:
-> -		return prot | IOMMU_READ | IOMMU_WRITE;
-> +		prot |= IOMMU_READ | IOMMU_WRITE;
->  	case DMA_TO_DEVICE:
-> -		return prot | IOMMU_READ;
-> +		prot |= IOMMU_READ;
->  	case DMA_FROM_DEVICE:
-> -		return prot | IOMMU_WRITE;
-> +		prot |= IOMMU_WRITE;
->  	default:
->  		return 0;
->  	}
-> +	if (attrs & DMA_ATTR_PRIVILEGED)
-> +		prot |= IOMMU_PRIV;
-> +	return prot;
->  }
->  
->  static struct iova *__alloc_iova(struct iova_domain *iovad, size_t size,
-> diff --git a/include/linux/dma-iommu.h b/include/linux/dma-iommu.h
-> index 81c5c8d167ad..b367613d49ba 100644
-> --- a/include/linux/dma-iommu.h
-> +++ b/include/linux/dma-iommu.h
-> @@ -32,7 +32,8 @@ void iommu_put_dma_cookie(struct iommu_domain *domain);
->  int iommu_dma_init_domain(struct iommu_domain *domain, dma_addr_t base, u64 size);
->  
->  /* General helpers for DMA-API <-> IOMMU-API interaction */
-> -int dma_direction_to_prot(enum dma_data_direction dir, bool coherent);
-> +int dma_info_to_prot(enum dma_data_direction dir, bool coherent,
-> +		     unsigned long attrs);
->  
->  /*
->   * These implement the bulk of the relevant DMA mapping callbacks, but require
-> 
+Regards,
+Kedar.
