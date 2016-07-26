@@ -1,59 +1,44 @@
 From: tglx@linutronix.de (Thomas Gleixner)
-Date: Tue, 26 Jul 2016 11:04:18 +0200 (CEST)
-Subject: [PATCH v11 10/10] genirq/msi: use the MSI doorbell's IOVA when
- requested
-In-Reply-To: <08a930f2-8cc9-7d99-78c0-77d08ee40db3@redhat.com>
-References: <1468933367-23159-1-git-send-email-eric.auger@redhat.com>
- <1468933367-23159-11-git-send-email-eric.auger@redhat.com>
- <alpine.DEB.2.11.1607201105310.3564@nanos>
- <08a930f2-8cc9-7d99-78c0-77d08ee40db3@redhat.com>
-Message-ID: <alpine.DEB.2.11.1607261101340.19896@nanos>
+Date: Tue, 26 Jul 2016 11:07:37 +0200 (CEST)
+Subject: [PATCH] clocksource: sun4i: Clear interrupts after stopping
+ timer in probe function
+In-Reply-To: <CAGb2v65qoKXO8oQZBMumGZ_VM7KR_236wSNJZMd+VdSGTQu_xQ@mail.gmail.com>
+References: <1469502119-2344-1-git-send-email-wens@csie.org>
+ <20160726054937.GS7419@lukather>
+ <CAGb2v65qoKXO8oQZBMumGZ_VM7KR_236wSNJZMd+VdSGTQu_xQ@mail.gmail.com>
+Message-ID: <alpine.DEB.2.11.1607261106540.19896@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Eric,
-
-On Mon, 25 Jul 2016, Auger Eric wrote:
-> On 20/07/2016 11:09, Thomas Gleixner wrote:
-> > On Tue, 19 Jul 2016, Eric Auger wrote:
-> >> @@ -63,10 +63,18 @@ static int msi_compose(struct irq_data *irq_data,
-> >>  {
-> >>  	int ret = 0;
-> >>  
-> >> -	if (erase)
-> >> +	if (erase) {
-> >>  		memset(msg, 0, sizeof(*msg));
-> >> -	else
-> >> +	} else {
-> >> +		struct device *dev;
-> >> +
-> >>  		ret = irq_chip_compose_msi_msg(irq_data, msg);
-> >> +		if (ret)
-> >> +			return ret;
-> >> +
-> >> +		dev = msi_desc_to_dev(irq_data_get_msi_desc(irq_data));
-> >> +		WARN_ON(iommu_msi_msg_pa_to_va(dev, msg));
-> > 
-> > What the heck is this call doing? And why is there only a WARN_ON and not a
-> > proper error return code handling?
+On Tue, 26 Jul 2016, Chen-Yu Tsai wrote:
+> On Tue, Jul 26, 2016 at 1:49 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > On Tue, Jul 26, 2016 at 11:01:59AM +0800, Chen-Yu Tsai wrote:
+> >> The bootloader (U-boot) sometimes uses this timer for various delays.
+> >> It uses it as a ongoing counter, and does comparisons on the current
+> >> counter value. The timer counter is never stopped.
+> >>
+> >> In some cases when the user interacts with the bootloader, or lets
+> >> it idle for some time before loading Linux, the timer may expire,
+> >> and an interrupt will be pending. This results in an unexpected
+> >> interrupt when the timer interrupt is enabled by the kernel, at
+> >> which point the event_handler isn't set yet. This results in a NULL
+> >> pointer dereference exception, panic, and no way to reboot.
+> >>
+> >> Clear any pending interrupts after we stop the timer in the probe
+> >> function to avoid this.
+> >>
+> >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> >
+> > Awesome, thanks!
+> >
+> > You should put stable in Cc though for this kind of patches.
 > 
-> iommu_msi_msg_pa_to_va is part of the new iommu-msi API introduced in PART I
-> of this series. This helper function detects the physical address found in
-> the MSI message has a corresponding allocated IOVA. This happens if the MSI
-> doorbell is accessed through an IOMMU and this IOMMU do not bypass the MSI
-> addresses (ARM case). Allocation of this IOVA was performed in the previous
-> patch.
->
-> So, if this is the case, the physical address is swapped with the IOVA
-> address. That way the PCIe device will send the MSI with this IOVA and
-> the address will be translated by the IOMMU into the target MSI doorbell PA.
-> 
-> Hope this clarifies
+> AFAIK some maintainers prefer to add it themselves. Not sure about
+> clocksource so I left it out.
 
-No, it does not. You are explaining in great length what that function is
-doing, but you are not explaining WHY your don't do a proper return code
-handling and just do a WARN_ON() and happily proceed. If that function fails
-then the interrupt will not be functional, so WHY on earth are you continuing?
+At least you should tell the maintainer, that you consider this to be stable
+material. It's not an obvious stable candidate.
 
 Thanks,
 
