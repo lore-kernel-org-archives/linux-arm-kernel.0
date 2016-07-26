@@ -1,100 +1,69 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Tue, 26 Jul 2016 09:04:10 -0700
-Subject: [PATCH v3 1/4] hwmon: iio_hwmon: delay probing with late_initcall
-In-Reply-To: <2324970.FJcTUYNoO2@ws-stein>
-References: <1469519027-11387-1-git-send-email-quentin.schulz@free-electrons.com>
- <5277864.qlyRKbC1Zy@ws-stein>
- <ed5c1761-bdc7-df9c-96c8-998e83c49c4c@free-electrons.com>
- <2324970.FJcTUYNoO2@ws-stein>
-Message-ID: <20160726160410.GE30628@roeck-us.net>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 26 Jul 2016 10:21:56 -0600
+Subject: [PATCH 2/3] dt-bindings: allow child nodes inside the Tegra BPMP
+In-Reply-To: <20160726100302.GE2433@ulmo.ba.sec>
+References: <20160719191442.15439-1-swarren@wwwdotorg.org>
+ <20160719191442.15439-2-swarren@wwwdotorg.org>
+ <20160726100302.GE2433@ulmo.ba.sec>
+Message-ID: <f1ca284a-5332-3323-80b9-7cf61e7c97ac@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 26, 2016 at 12:00:33PM +0200, Alexander Stein wrote:
-> On Tuesday 26 July 2016 11:33:59, Quentin Schulz wrote:
-> > On 26/07/2016 11:05, Alexander Stein wrote:
-> > > On Tuesday 26 July 2016 10:24:48, Quentin Schulz wrote:
-> > >> On 26/07/2016 10:21, Alexander Stein wrote:
-> > >>> On Tuesday 26 July 2016 09:43:44, Quentin Schulz wrote:
-> > >>>> iio_channel_get_all returns -ENODEV when it cannot find either phandles
-> > >>>> and
-> > >>>> properties in the Device Tree or channels whose consumer_dev_name
-> > >>>> matches
-> > >>>> iio_hwmon in iio_map_list. The iio_map_list is filled in by iio drivers
-> > >>>> which might be probed after iio_hwmon.
-> > >>> 
-> > >>> Would it work if iio_channel_get_all returning ENODEV is used for
-> > >>> returning
-> > >>> EPROBE_DEFER in iio_channel_get_all? Using late initcalls for
-> > >>> driver/device
-> > >>> dependencies seems not right for me at this place.
-> > >> 
-> > >> Then what if the iio_channel_get_all is called outside of the probe of a
-> > >> driver? We'll have to change the error code, things we are apparently
-> > >> trying to avoid (see v2 patches' discussions).
-> > > 
-> > > Maybe I didn't express my idea enough. I don't want to change the behavior
-> > > of iio_channel_get_all at all. Just the result evaluation of
-> > > iio_channel_get_all in iio_hwmon_probe. I have something link the patch
-> > > below in mind.
-> > > 
-> > > Best regards,
-> > > Alexander
-> > > ---
-> > > diff --git a/drivers/hwmon/iio_hwmon.c b/drivers/hwmon/iio_hwmon.c
-> > > index b550ba5..e32d150 100644
-> > > --- a/drivers/hwmon/iio_hwmon.c
-> > > +++ b/drivers/hwmon/iio_hwmon.c
-> > > @@ -73,8 +73,12 @@ static int iio_hwmon_probe(struct platform_device
-> > > *pdev)
-> > > 
-> > >                 name = dev->of_node->name;
-> > >         
-> > >         channels = iio_channel_get_all(dev);
-> > > 
-> > > -       if (IS_ERR(channels))
-> > > -               return PTR_ERR(channels);
-> > > +       if (IS_ERR(channels)) {
-> > > +               if (PTR_ERR(channels) == -ENODEV)
-> > > +                       return -EPROBE_DEFER;
-> > > +               else
-> > > +                       return PTR_ERR(channels);
-> > > +       }
-> > > 
-> > >         st = devm_kzalloc(dev, sizeof(*st), GFP_KERNEL);
-> > >         if (st == NULL) {
-> > 
-> > Indeed, I misunderstood what you told me.
-> > 
-> > Actually, the patch you proposed is part of my v1
-> > (https://lkml.org/lkml/2016/6/28/203) and v2
-> > (https://lkml.org/lkml/2016/7/15/215).
-> > Jonathan and Guenter didn't really like the idea of changing the -ENODEV
-> > in -EPROBE_DEFER.
-> 
-> Thanks for the links.
-> 
-> > What I thought you were proposing was to change the -ENODEV return code
-> > inside iio_channel_get_all. This cannot be an option since the function
-> > might be called outside of a probe (it is not yet, but might be in the
-> > future?).
-> 
-> AFAICS this is a helper function not knowing about device probing itself. And 
-> it should stay at that.
-> 
-> > Of what I understood, two possibilities are then possible (proposed
-> > either by Guenter or Jonathan): either rework the iio framework to
-> > register iio map array earlier or to use late_initcall instead of init
-> > for the driver consuming the iio channels.
-> 
-> Interestingly using this problem would not arise due to module dependencies. 
-> But using late_initcall would mean this needs to be done on any driver using 
-> iio channels? I would rather keep those consumers simple.
-> 
-Me too, but that would imply a solution in iio. The change you propose above
-isn't exactly simple either, and would also be needed in each consumer driver.
+On 07/26/2016 04:03 AM, Thierry Reding wrote:
+> On Tue, Jul 19, 2016 at 01:14:41PM -0600, Stephen Warren wrote:
+>> From: Stephen Warren <swarren@nvidia.com>
+>>
+>> The BPMP implements some services which must be represented by separate
+>> nodes. For example, it can provide access to certain I2C controllers, and
+>> the I2C bindings represent each I2C controller as a device tree node.
+>> Update the binding to describe how the BPMP supports this.
+>>
+>> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+>> ---
+>>  .../bindings/firmware/nvidia,tegra186-bpmp.txt     | 23 ++++++++++++++++++++++
+>>  1 file changed, 23 insertions(+)
+>>
+>> diff --git a/Documentation/devicetree/bindings/firmware/nvidia,tegra186-bpmp.txt b/Documentation/devicetree/bindings/firmware/nvidia,tegra186-bpmp.txt
+>> index 9a3864f56955..142d363406f6 100644
+>> --- a/Documentation/devicetree/bindings/firmware/nvidia,tegra186-bpmp.txt
+>> +++ b/Documentation/devicetree/bindings/firmware/nvidia,tegra186-bpmp.txt
+>> @@ -38,6 +38,24 @@ implemented by this node:
+>>  - .../reset/reset.txt
+>>  - <dt-bindings/reset/tegra186-reset.h>
+>>
+>> +The BPMP implements some services which must be represented by separate nodes.
+>> +For example, it can provide access to certain I2C controllers, and the I2C
+>> +bindings represent each I2C controller as a device tree node. Such nodes should
+>> +be nested directly inside the main BPMP node.
+>> +
+>> +Software can determine whether a child node of the BPMP node represents a device
+>> +by checking for a compatible property. Any node with a compatible property
+>> +represents a device that can be instantiated. Nodes without a compatible
+>> +property may be used to provide configuration information regarding the BPMP
+>> +itself, although no such configuration nodes are currently defined by this
+>> +binding.
+>> +
+>> +The BPMP firmware defines no single global name-/numbering-space for such
+>> +services. Put another way, the numbering scheme for I2C buses is distinct from
+>> +the numbering scheme for any other service the BPMP may provide (e.g. a future
+>> +hypothetical SPI bus service). As such, child device nodes will have no reg
+>> +property, and the BPMP node will have no #address-cells or #size-cells property.
+>
+> My understanding is that the I2C bus number is passed as part of the
+> request to the BPMP firmware. Does that not count as addressing? Could
+> we not represent that generically using a device tree hierarchy? I'm
+> thinking something along these lines:
+>
+> 	bpmp {
+> 		...
+>
+> 		services {
+> 			i2c {
+> 				i2c at 0 {
+> 					reg = <0>;
 
-Just for the record, I dislike the late_initcall solution as well, but I prefer
-it over blindly converting ENODEV to EPROBE_DEFER.
+Technically, that is possible. However, Rob Herring rejected the idea of 
+multiple levels of sub-nodes.
 
-Guenter
+Can we please just go with what we have? DT bindings are frankly an 
+obstacle to getting anything done:-(
