@@ -1,37 +1,82 @@
-From: quentin.schulz@free-electrons.com (Quentin Schulz)
-Date: Tue, 26 Jul 2016 09:55:02 +0200
-Subject: [PATCH v3 1/4] hwmon: iio_hwmon: delay probing with late_initcall
-In-Reply-To: <20160726094858.3aa96e18@free-electrons.com>
-References: <1469519027-11387-1-git-send-email-quentin.schulz@free-electrons.com>
- <1469519027-11387-2-git-send-email-quentin.schulz@free-electrons.com>
- <20160726094858.3aa96e18@free-electrons.com>
-Message-ID: <37ffd544-5f83-3a4e-3db1-b774684d5fe8@free-electrons.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Tue, 26 Jul 2016 17:02:06 +0900
+Subject: [PATCH v23 9/9] Documentation: dt: chosen properties for arm64 kdump
+In-Reply-To: <20160726075659.2290-1-takahiro.akashi@linaro.org>
+References: <20160726075659.2290-1-takahiro.akashi@linaro.org>
+Message-ID: <20160726080206.2441-1-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: James Morse <james.morse@arm.com>
 
-On 26/07/2016 09:48, Thomas Petazzoni wrote:
-> Hello,
-> 
-> On Tue, 26 Jul 2016 09:43:44 +0200, Quentin Schulz wrote:
-> 
->> -module_platform_driver(iio_hwmon_driver);
->> +static struct platform_driver * const drivers[] = {
->> +	&iio_hwmon_driver,
->> +};
->> +
->> +static int __init iio_hwmon_late_init(void)
->> +{
->> +	return platform_register_drivers(drivers, ARRAY_SIZE(drivers));
-> 
-> Why not platform_register_driver() ?
-> 
-> This would avoid the need to declare an array with just one entry.
+Add documentation for
+	linux,crashkernel-base and crashkernel-size,
+	linux,usable-memory-range, and
+	linux,elfcorehdr
+used by arm64 kexec/kdump to decribe the kdump reserved area, and
+the elfcorehdr's location within it.
 
-Actually, it is named platform_driver_register() as you just showed me
-and that's the reason I didn't find it under platform_register_driver().
+Signed-off-by: James Morse <james.morse@arm.com>
+[takahiro.akashi at linaro.org:
+    renamed "usable-memory" to "usable-memory-range",
+    added "linux,crashkernel-base" and "-size" ]
+Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+---
+ Documentation/devicetree/bindings/chosen.txt | 45 ++++++++++++++++++++++++++++
+ 1 file changed, 45 insertions(+)
 
-Thanks!
-
-Quentin
+diff --git a/Documentation/devicetree/bindings/chosen.txt b/Documentation/devicetree/bindings/chosen.txt
+index 6ae9d82..d7a3a86 100644
+--- a/Documentation/devicetree/bindings/chosen.txt
++++ b/Documentation/devicetree/bindings/chosen.txt
+@@ -52,3 +52,48 @@ This property is set (currently only on PowerPC, and only needed on
+ book3e) by some versions of kexec-tools to tell the new kernel that it
+ is being booted by kexec, as the booting environment may differ (e.g.
+ a different secondary CPU release mechanism)
++
++linux,crashkernel-base
++linux,crashkernel-size
++----------------------
++These properties are set (on PowerPC and arm64) during kdump to tell
++use-space tools, like kexec-tools, the base address of the crash-dump
++kernel's reserved area of memory and the size. e.g.
++
++/ {
++	chosen {
++		linux,crashkernel-base = <0x9 0xf0000000>;
++		linux,crashkernel-size = <0x0 0x10000000>;
++	};
++};
++
++linux,usable-memory-range
++-------------------------
++
++This property is set (currently only on arm64) during kdump to tell
++the crash-dump kernel the base address of its reserved area of memory,
++and the size. e.g.
++
++/ {
++	chosen {
++		linux,usable-memory-range = <0x9 0xf0000000 0x0 0x10000000>;
++	};
++};
++
++Please note that, if this property is present, any memory regions under
++"memory" nodes will be ignored.
++
++linux,elfcorehdr
++----------------
++
++This property is set (currently only on arm64) during kdump to tell
++the crash-dump kernel the address and size of the elfcorehdr that describes
++the old kernel's memory as an elf file. This memory must reside within
++the area described by 'linux,usable-memory-range'. e.g.
++
++/ {
++	chosen {
++		linux,usable-memory = <0x9 0xf0000000 0x0 0x10000000>;
++		linux,elfcorehdr = <0x9 0xfffff000 0x0 0x800>;
++	};
++};
+-- 
+2.9.0
