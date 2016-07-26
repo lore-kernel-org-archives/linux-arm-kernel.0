@@ -1,53 +1,99 @@
 From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Tue, 26 Jul 2016 18:53:28 +0000
-Subject: [PATCH V2 RFC 1/6] usb: dwc2: core: Avoid nonsense error in gadget
- mode
+Date: Tue, 26 Jul 2016 18:53:29 +0000
+Subject: [PATCH V2 RFC 2/6] usb: dwc2: Add DT properties to specify fifo size
+ in host/otg mode
 In-Reply-To: <1469559213-16160-1-git-send-email-stefan.wahren@i2se.com>
 References: <1469559213-16160-1-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <1469559213-16160-2-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <1469559213-16160-3-git-send-email-stefan.wahren@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In gadget mode On bcm2835 platform the host tx fifo size could be zero.
-So add zero to range and avoid such nonsense errors:
+Currently the fifo sizes for host/otg mode are defined per platform
+and doesn't take the mode into account. So we will get errors
+like this:
 
-dwc2 20980000.usb: 0 invalid for host_nperio_tx_fifo_size.
-dwc2 20980000.usb: Setting host_nperio_tx_fifo_size to 0
-dwc2 20980000.usb: 0 invalid for host_perio_tx_fifo_size.
-dwc2 20980000.usb: Setting host_perio_tx_fifo_size to 0
+dwc2 20980000.usb: 256 invalid for host_nperio_tx_fifo_size.
+dwc2 20980000.usb: Setting host_nperio_tx_fifo_size to 32
+
+So add DT properties for these mode specific fifo sizes in order
+to define them in the devicetree and avoid these errors.
 
 Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
 ---
- drivers/usb/dwc2/core.c |   10 ++++++++--
- 1 file changed, 8 insertions(+), 2 deletions(-)
+ Documentation/devicetree/bindings/usb/dwc2.txt |    3 +++
+ drivers/usb/dwc2/core.c                        |   25 ++++++++++++++++++------
+ 2 files changed, 22 insertions(+), 6 deletions(-)
 
+diff --git a/Documentation/devicetree/bindings/usb/dwc2.txt b/Documentation/devicetree/bindings/usb/dwc2.txt
+index 20a68bf..298bac1 100644
+--- a/Documentation/devicetree/bindings/usb/dwc2.txt
++++ b/Documentation/devicetree/bindings/usb/dwc2.txt
+@@ -27,6 +27,9 @@ Refer to phy/phy-bindings.txt for generic phy consumer properties
+ - g-rx-fifo-size: size of rx fifo size in gadget mode.
+ - g-np-tx-fifo-size: size of non-periodic tx fifo size in gadget mode.
+ - g-tx-fifo-size: size of periodic tx fifo per endpoint (except ep0) in gadget mode.
++- h-rx-fifo-size: size of rx fifo size in host / otg mode.
++- h-np-tx-fifo-size: size of non-periodic tx fifo size in host / otg mode.
++- h-tx-fifo-size: size of periodic tx fifo per endpoint (except ep0) in host / otg mode.
+ 
+ Example:
+ 
 diff --git a/drivers/usb/dwc2/core.c b/drivers/usb/dwc2/core.c
-index 4135a5f..5645528 100644
+index 5645528..5dffc6e 100644
 --- a/drivers/usb/dwc2/core.c
 +++ b/drivers/usb/dwc2/core.c
-@@ -819,7 +819,10 @@ void dwc2_set_param_host_nperio_tx_fifo_size(struct dwc2_hsotg *hsotg, int val)
+@@ -47,6 +47,7 @@
+ #include <linux/dma-mapping.h>
+ #include <linux/delay.h>
+ #include <linux/io.h>
++#include <linux/of.h>
+ #include <linux/slab.h>
+ #include <linux/usb.h>
+ 
+@@ -1289,6 +1290,9 @@ static void dwc2_set_param_hibernation(struct dwc2_hsotg *hsotg,
+ void dwc2_set_parameters(struct dwc2_hsotg *hsotg,
+ 			 const struct dwc2_core_params *params)
  {
- 	int valid = 1;
- 
--	if (val < 16 || val > hsotg->hw_params.host_nperio_tx_fifo_size)
-+	if (val && (val < 16))
-+		valid = 0;
++	struct device_node *np = hsotg->dev->of_node;
++	u32 val = 0;
 +
-+	if (val > hsotg->hw_params.host_nperio_tx_fifo_size)
- 		valid = 0;
+ 	dev_dbg(hsotg->dev, "%s()\n", __func__);
  
- 	if (!valid) {
-@@ -839,7 +842,10 @@ void dwc2_set_param_host_perio_tx_fifo_size(struct dwc2_hsotg *hsotg, int val)
- {
- 	int valid = 1;
- 
--	if (val < 16 || val > hsotg->hw_params.host_perio_tx_fifo_size)
-+	if (val && (val < 16))
-+		valid = 0;
+ 	dwc2_set_param_otg_cap(hsotg, params->otg_cap);
+@@ -1299,12 +1303,6 @@ void dwc2_set_parameters(struct dwc2_hsotg *hsotg,
+ 			params->host_support_fs_ls_low_power);
+ 	dwc2_set_param_enable_dynamic_fifo(hsotg,
+ 			params->enable_dynamic_fifo);
+-	dwc2_set_param_host_rx_fifo_size(hsotg,
+-			params->host_rx_fifo_size);
+-	dwc2_set_param_host_nperio_tx_fifo_size(hsotg,
+-			params->host_nperio_tx_fifo_size);
+-	dwc2_set_param_host_perio_tx_fifo_size(hsotg,
+-			params->host_perio_tx_fifo_size);
+ 	dwc2_set_param_max_transfer_size(hsotg,
+ 			params->max_transfer_size);
+ 	dwc2_set_param_max_packet_count(hsotg,
+@@ -1329,6 +1327,21 @@ void dwc2_set_parameters(struct dwc2_hsotg *hsotg,
+ 	dwc2_set_param_uframe_sched(hsotg, params->uframe_sched);
+ 	dwc2_set_param_external_id_pin_ctl(hsotg, params->external_id_pin_ctl);
+ 	dwc2_set_param_hibernation(hsotg, params->hibernation);
 +
-+	if (val > hsotg->hw_params.host_perio_tx_fifo_size)
- 		valid = 0;
++	if (!IS_ENABLED(CONFIG_OF) ||
++	    of_property_read_u32(np, "h-rx-fifo-size", &val))
++		val = params->host_rx_fifo_size;
++	dwc2_set_param_host_rx_fifo_size(hsotg, val);
++
++	if (!IS_ENABLED(CONFIG_OF) ||
++	    of_property_read_u32(np, "h-np-tx-fifo-size", &val))
++		val = params->host_nperio_tx_fifo_size;
++	dwc2_set_param_host_nperio_tx_fifo_size(hsotg, val);
++
++	if (!IS_ENABLED(CONFIG_OF) ||
++	    of_property_read_u32(np, "h-tx-fifo-size", &val))
++		val = params->host_perio_tx_fifo_size;
++	dwc2_set_param_host_perio_tx_fifo_size(hsotg, val);
+ }
  
- 	if (!valid) {
+ /*
 -- 
 1.7.9.5
