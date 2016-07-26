@@ -1,76 +1,37 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Tue, 26 Jul 2016 16:56:59 +0900
-Subject: [PATCH v23 8/9] arm64: kdump: update a kernel doc
-In-Reply-To: <20160726075659.2290-1-takahiro.akashi@linaro.org>
-References: <20160726075659.2290-1-takahiro.akashi@linaro.org>
-Message-ID: <20160726075659.2290-9-takahiro.akashi@linaro.org>
+From: quentin.schulz@free-electrons.com (Quentin Schulz)
+Date: Tue, 26 Jul 2016 09:55:02 +0200
+Subject: [PATCH v3 1/4] hwmon: iio_hwmon: delay probing with late_initcall
+In-Reply-To: <20160726094858.3aa96e18@free-electrons.com>
+References: <1469519027-11387-1-git-send-email-quentin.schulz@free-electrons.com>
+ <1469519027-11387-2-git-send-email-quentin.schulz@free-electrons.com>
+ <20160726094858.3aa96e18@free-electrons.com>
+Message-ID: <37ffd544-5f83-3a4e-3db1-b774684d5fe8@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds arch specific descriptions about kdump usage on arm64
-to kdump.txt.
+Hi,
 
-Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-Reviewed-by: Baoquan He <bhe@redhat.com>
-Acked-by: Dave Young <dyoung@redhat.com>
----
- Documentation/kdump/kdump.txt | 16 +++++++++++++++-
- 1 file changed, 15 insertions(+), 1 deletion(-)
+On 26/07/2016 09:48, Thomas Petazzoni wrote:
+> Hello,
+> 
+> On Tue, 26 Jul 2016 09:43:44 +0200, Quentin Schulz wrote:
+> 
+>> -module_platform_driver(iio_hwmon_driver);
+>> +static struct platform_driver * const drivers[] = {
+>> +	&iio_hwmon_driver,
+>> +};
+>> +
+>> +static int __init iio_hwmon_late_init(void)
+>> +{
+>> +	return platform_register_drivers(drivers, ARRAY_SIZE(drivers));
+> 
+> Why not platform_register_driver() ?
+> 
+> This would avoid the need to declare an array with just one entry.
 
-diff --git a/Documentation/kdump/kdump.txt b/Documentation/kdump/kdump.txt
-index 88ff63d..c090531 100644
---- a/Documentation/kdump/kdump.txt
-+++ b/Documentation/kdump/kdump.txt
-@@ -18,7 +18,7 @@ memory image to a dump file on the local disk, or across the network to
- a remote system.
- 
- Kdump and kexec are currently supported on the x86, x86_64, ppc64, ia64,
--s390x and arm architectures.
-+s390x, arm and arm64 architectures.
- 
- When the system kernel boots, it reserves a small section of memory for
- the dump-capture kernel. This ensures that ongoing Direct Memory Access
-@@ -249,6 +249,13 @@ Dump-capture kernel config options (Arch Dependent, arm)
- 
-     AUTO_ZRELADDR=y
- 
-+Dump-capture kernel config options (Arch Dependent, arm64)
-+----------------------------------------------------------
-+
-+- Please note that kvm of the dump-capture kernel will not be enabled
-+  on non-VHE systems even if it is configured. This is because the CPU
-+  cannot be reset to EL2 on panic.
-+
- Extended crashkernel syntax
- ===========================
- 
-@@ -305,6 +312,8 @@ Boot into System Kernel
-    kernel will automatically locate the crash kernel image within the
-    first 512MB of RAM if X is not given.
- 
-+   On arm64, use "crashkernel=Y[@X]".  Note that the start address of
-+   the kernel, X if explicitly specified, must be aligned to 2MiB (0x200000).
- 
- Load the Dump-capture Kernel
- ============================
-@@ -327,6 +336,8 @@ For s390x:
- 	- Use image or bzImage
- For arm:
- 	- Use zImage
-+For arm64:
-+	- Use vmlinux or Image
- 
- If you are using a uncompressed vmlinux image then use following command
- to load dump-capture kernel.
-@@ -370,6 +381,9 @@ For s390x:
- For arm:
- 	"1 maxcpus=1 reset_devices"
- 
-+For arm64:
-+	"1 maxcpus=1 reset_devices"
-+
- Notes on loading the dump-capture kernel:
- 
- * By default, the ELF headers are stored in ELF64 format to support
--- 
-2.9.0
+Actually, it is named platform_driver_register() as you just showed me
+and that's the reason I didn't find it under platform_register_driver().
+
+Thanks!
+
+Quentin
