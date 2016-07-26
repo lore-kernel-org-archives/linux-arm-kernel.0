@@ -1,47 +1,116 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Tue, 26 Jul 2016 13:01:59 +0200 (CEST)
-Subject: [PATCH v11 09/10] genirq/msi: map/unmap the MSI doorbells on
- msi_domain_alloc/free_irqs
-In-Reply-To: <f8e83628-5fb0-70d4-c32c-237d190ec98f@redhat.com>
-References: <1468933367-23159-1-git-send-email-eric.auger@redhat.com>
- <1468933367-23159-10-git-send-email-eric.auger@redhat.com>
- <alpine.DEB.2.11.1607201016060.3564@nanos>
- <75f5e846-6ca4-4178-e7aa-fed90e45e546@redhat.com>
- <alpine.DEB.2.11.1607261022330.19896@nanos>
- <f8e83628-5fb0-70d4-c32c-237d190ec98f@redhat.com>
-Message-ID: <alpine.DEB.2.11.1607261202250.19896@nanos>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 26 Jul 2016 13:17:54 +0200
+Subject: [PATCH v5] KVM: arm/arm64: Add VGICv3 save/restore API
+ documentation
+In-Reply-To: <CAFEAcA_W4xkihrAUTsQ1k2Upw20+WpUK6KmrkQysQrpFGxJDQg@mail.gmail.com>
+References: <20160726103940.26243-1-christoffer.dall@linaro.org>
+ <CAFEAcA_W4xkihrAUTsQ1k2Upw20+WpUK6KmrkQysQrpFGxJDQg@mail.gmail.com>
+Message-ID: <20160726111754.GA26002@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 26 Jul 2016, Auger Eric wrote:
-> On 26/07/2016 11:00, Thomas Gleixner wrote:
-> > In your case you don't want to have a partial allocation, so instead of
-> > playing silly games with desc->irq you should add a flag which tells the PCI
-> > code that you are not interested in a partial allocation and that it should
-> > return an error code instead.
+On Tue, Jul 26, 2016 at 12:03:46PM +0100, Peter Maydell wrote:
+> On 26 July 2016 at 11:39, Christoffer Dall <christoffer.dall@linaro.org> wrote:
+> > Factor out the GICv3 and ITS-specific documentation into a separate
+> > documentation file.  Add description for how to access distributor,
+> > redistributor, and CPU interface registers for GICv3 in this new file,
+> > and add a group for accessing level triggered IRQ information for GICv3
+> > as well.
+> >
+> > Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> > ---
+> > Changes since v4:
+> >  - Clarify register reads as per Peter's comments on v4
+> >  - Factored out ITS documenation into separate file
+> >  - Clarified error conditions on all GRP_ADDR groups
+> >  - Renamed KVM_VGIC_V3_ADDR_TYPE_ITS to KVM_VGIC_ITS_ADDR_TYPE in the
+> >    documentation to be in line with the code.
+> >  - Did not apply Peter's reviewed-by due to the conflicts and updates
+> >    related to the ITS.
+> >
+> > Changes since v3:
+> >  - Fix typos
+> >  - Clarified level register containing 32 IRQs
+> >  - Removed limitations about priority support which are no longer true
+> >  - Special-case the SPENDR register accesses to access the latch state
+> >    and the CPENDR register accesses to be RAZ/WI.
+> >
+> > Changes since v2:
+> >  - Changed distributor access to be 32-bits in size
+> >  - Clearly specified data type pointed to by addr field
+> >  - Specified exception behavior for STATUSR registers
+> >  - Added group for level-triggered IRQ status info
+> >  - Removed acks from Marc/Peter as content has changed
+> >
+> >
+> >  Documentation/virtual/kvm/devices/arm-vgic-its.txt |  38 ++++
+> >  Documentation/virtual/kvm/devices/arm-vgic-v3.txt  | 207 +++++++++++++++++++++
+> >  Documentation/virtual/kvm/devices/arm-vgic.txt     |  52 ++----
+> >  3 files changed, 262 insertions(+), 35 deletions(-)
+> >  create mode 100644 Documentation/virtual/kvm/devices/arm-vgic-its.txt
+> >  create mode 100644 Documentation/virtual/kvm/devices/arm-vgic-v3.txt
+> >
+> > diff --git a/Documentation/virtual/kvm/devices/arm-vgic-its.txt b/Documentation/virtual/kvm/devices/arm-vgic-its.txt
+> > new file mode 100644
+> > index 0000000..ffae1cd
+> > --- /dev/null
+> > +++ b/Documentation/virtual/kvm/devices/arm-vgic-its.txt
+> > @@ -0,0 +1,38 @@
+> > +ARM Virtual Interrupt Translation Service (ITS)
+> > +===============================================
+> > +
+> > +Device types supported:
+> > +  KVM_DEV_TYPE_ARM_VGIC_ITS    ARM Interrupt Translation Service Controller
+> > +
+> > +Creating a virtual ITS controller also requires a host GICv3 (see
+> > +arm-vgic-v3.txt), but does not depend on having physical ITS controllers.
+> > +
+> > +There can be multiple ITS controllers per guest, each of them has to have
+> > +a separate, non-overlapping MMIO region.
+> > +
+> > +
+> > +Groups:
+> > +  KVM_DEV_ARM_VGIC_GRP_ADDR
+> > +  Attributes:
+> > +    KVM_VGIC_ITS_ADDR_TYPE (rw, 64-bit)
+> > +      Base address in the guest physical address space of the GICv3 ITS
+> > +      control register frame. The ITS allows MSI(-X) interrupts to be
+> > +      injected into guests. This extension is optional.
+> 
+> Shouldn't "The ITS allows MSI(-X) interrupts to be injected into guests.
+> This extension is optional." be in the introductory text above, not
+> the description of this attribute?
 > 
 
-> In that case can we consider we even succeeded in allocating 1 MSI? In case
-> the IOMMU mapping fails, the MSI transaction will never reach the target MSI
-> frame so it is not usable. So when you mean "partial" I understand we did
-> not succeed in allocating maxvec IRQs, correct? Here we succeeded in
-> allocating 0 IRQ and still msi_capability_init returns 1.
->
-> msi_capability_init doc-comment says "a positive return value indicates the
-> number of interrupts which could have been allocated."
+Yes it should.
+
+> > +      This address needs to be 64K aligned and the region covers 128K.
+> > +  Errors:
+> > +    -E2BIG:  Address outside of addressable IPA range
+> > +    -EINVAL: Incorrectly aligned address
+> > +    -EEXIST: Address already configured
+> > +    -EFAULT: Invalid user pointer for attr->addr.
+> > +    -ENODEV: Incrorect attribute or the ITS is not supported.
 > 
-> I understand allocation success currently only depends on the fact virq was
-> allocated and set to desc->irq. But with that IOMMU stuff doesn't the
-> criteria changes?
-
-Right. But then you need to express it differently in a consistent way. Not by
-hacking around it by setting desc->irq to 0.
-
-Something like a flag field in msi_desc which denotes various properties would
-be a possible solution. MSI_IRQ_ALLOCATED and MSI_IRQ_REMAPPED would be
-sufficient for now. And the deallocation/cleanup would rely on those flags
-rather than checking desc->irq.
-
-Thanks,
-
-	tglx
+> "Incorrect"
+> 
+> > +
+> > +
+> > +  KVM_DEV_ARM_VGIC_GRP_CTRL
+> > +  Attributes:
+> > +    KVM_DEV_ARM_VGIC_CTRL_INIT
+> > +      request the initialization of the ITS, no additional parameter in
+> > +      kvm_device_attr.addr.
+> > +  Errors:
+> > +    -ENXIO:  ITS not properly configured as required prior to calling
+> > +             this attribute
+> 
+> "setting this attribute".
+> 
+> > +    -ENOMEM: Memory shortage when allocating ITS internal data
+> 
+> Otherwise
+> Reviewed-by: Peter Maydell <peter.maydell@linaro.org>
+> 
+Thanks!
+-Christoffer
