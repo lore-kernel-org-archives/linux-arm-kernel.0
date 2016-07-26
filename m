@@ -1,58 +1,95 @@
-From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Tue, 26 Jul 2016 09:49:01 +0900
-Subject: mmc: dwmmc: exynos: Warn if HS400 is being used on non-Exynos5420
- chipset
-In-Reply-To: <5788637F.2070908@samsung.com>
-References: <1468502547-18571-1-git-send-email-k.kozlowski@samsung.com>
- <CGME20160715041625epcas1p311ac6e8f560ffd7a49a77171fd3368ca@epcas1p3.samsung.com>
- <5788637F.2070908@samsung.com>
-Message-ID: <5796B37D.70001@samsung.com>
+From: gerg@linux-m68k.org (Greg Ungerer)
+Date: Tue, 26 Jul 2016 10:53:28 +1000
+Subject: [PATCH v5 00/15] allow BFLT executables on systems with a MMU
+In-Reply-To: <1469374229-21585-1-git-send-email-nicolas.pitre@linaro.org>
+References: <1469374229-21585-1-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <1712235f-a4b3-3026-adc5-3f19e1a47ae4@linux-m68k.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/15/2016 01:15 PM, Alim Akhtar wrote:
-> Hi Krzysztof,
+On 25/07/16 01:30, Nicolas Pitre wrote:
+> This series provides the necessary changes to allow "flat" executable
+> binaries meant for no-MMU systems to actually run on systems with a MMU.
+> Also thrown in are various cleanups to binfmt_flat.c.
 > 
-> On 07/14/2016 06:52 PM, Krzysztof Kozlowski wrote:
->> Chipsets before Exynos5420 did not support HS400 so if MMC core tries to
->> configure HS400 timing, this might or might not work.  Warn in such
->> cases because this is DTB misconfiguration.
->>
->> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->> ---
+> This can also be found in the following git repo:
 > 
-> Reviewed-by: Alim Akhtar <alim.akhtar@samsung.com>
+> 	git://git.linaro.org/people/nicolas.pitre/linux binfmt_flat_with_mmu
 
-Applied on my repository. Thanks!
-Before applied, I modified the prefix of subject from "dwmmc" to "dw_mmc"
+So everyone is in the loop - I have pulled this into my for-linus branch
+at https://git.kernel.org/cgit/linux/kernel/git/gerg/m68knommu.git/ ,
+excepting patch 15 (ARM specific changes).
 
-Best Regards,
-Jaehoon Chung
+My continued testing hasn't found any issues on m68k platforms.
+I can completely boot up with a no-MMU user space and run on an
+MMU enabled ColdFire platform).
 
+I'll like to consider pushing this to Linus nearer the end of the
+merge window if no-one has any objections.
+
+Regards
+Greg
+
+
+> *Why?*
 > 
->>   drivers/mmc/host/dw_mmc-exynos.c | 6 +++++-
->>   1 file changed, 5 insertions(+), 1 deletion(-)
->>
->> diff --git a/drivers/mmc/host/dw_mmc-exynos.c b/drivers/mmc/host/dw_mmc-exynos.c
->> index da0ef1765735..7ab3d749b5ae 100644
->> --- a/drivers/mmc/host/dw_mmc-exynos.c
->> +++ b/drivers/mmc/host/dw_mmc-exynos.c
->> @@ -225,8 +225,12 @@ static void dw_mci_exynos_config_hs400(struct dw_mci *host, u32 timing)
->>        * Not supported to configure register
->>        * related to HS400
->>        */
->> -    if (priv->ctrl_type < DW_MCI_TYPE_EXYNOS5420)
->> +    if (priv->ctrl_type < DW_MCI_TYPE_EXYNOS5420) {
->> +        if (timing == MMC_TIMING_MMC_HS400)
->> +            dev_warn(host->dev,
->> +                 "cannot configure HS400, unsupported chipset\n");
->>           return;
->> +    }
->>
-> It is good to have extra bit of debug information handy.
+> Because developing and testing natively on a large system with lots of
+> RAM makes it so much more convenient to use all the existing profiling
+> tools and debugging facilities that a kernel with lots of RAM can give.
+> And incidentally, those systems with lots of RAM all have a MMU.
 > 
->>       dqs = priv->saved_dqs_en;
->>       strobe = priv->saved_strobe_ctrl;
->>
+> *Why not use elf_fdpic?*
 > 
+> The flat executable format is simple with very small footprint
+> overhead, either in the executables themselves or kernel support.
+> This makes the flat format more suitable than elf_fdpic for very small
+> single user-app embedded systems.
+> 
+> And while elf_fdpic binaries can run on MMU systems, flat binaries still
+> couldn't, which just felt wrong.
+> 
+> So here it is. The no-MMU support should remain unaffected, confirmed by
+> Greg Ungerer. Tested with MMU on ARM and M68K.
+> 
+> Changes since v4:
+> 
+> - Isolated architecture specific changes in their own patches for easier
+>   review through their own path to mainline.
+> 
+> - Added needed m68k register fixup from Greg Ungerer.
+> 
+> Changes since v3:
+> 
+> - Small cosmetic changes to pr_*().
+> 
+> - Addressed most important checkpatch complaints on the whole source file
+>   and patches in this seris.
+> 
+> Changes since  v2:
+> 
+> - Added protection against a corrupted header that could have caused nasty
+>   overflows etc. Suggested by Alan Cox.
+> 
+> - printk() modernization. Suggested by Greg Ungerer / Geert Uytterhoeven.
+> 
+> - Added Greg Ungerer's reviewed-by tag.
+> 
+> Changes since v1:
+> 
+> - Removed SuperH and Xtensa from the Kconfig rule as they fail to build
+>   due to lack of get/put_unaligned_user().
+> 
+> - Clarified some commit logs a bit.
+> 
+> diffstat:
+> 
+>  arch/arm/include/asm/flat.h       |   5 +-
+>  arch/m68k/include/asm/flat.h      |  11 +-
+>  arch/m68k/include/asm/processor.h |   2 -
+>  fs/Kconfig.binfmt                 |   3 +-
+>  fs/binfmt_elf_fdpic.c             |  38 +--
+>  fs/binfmt_flat.c                  | 525 ++++++++++++++++++--------------
+>  fs/exec.c                         |  33 ++
+>  include/linux/binfmts.h           |   2 +
+>  8 files changed, 345 insertions(+), 274 deletions(-)
 > 
