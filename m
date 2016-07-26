@@ -1,40 +1,138 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Tue, 26 Jul 2016 18:53:27 +0000
-Subject: =?UTF-8?q?=5BPATCH=20V2=20RFC=200/6=5D=20ARM=3A=20dts=3A=20bcm2835=3A=20Add=20Raspberry=20Pi=20Zero?=
-Message-ID: <1469559213-16160-1-git-send-email-stefan.wahren@i2se.com>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 26 Jul 2016 13:54:34 -0500
+Subject: [PATCH v2 2/4] dt-bindings: Add a binding for Mediatek MDP
+In-Reply-To: <1469176383-35210-3-git-send-email-minghsiu.tsai@mediatek.com>
+References: <1469176383-35210-1-git-send-email-minghsiu.tsai@mediatek.com>
+ <1469176383-35210-3-git-send-email-minghsiu.tsai@mediatek.com>
+Message-ID: <20160726185433.GA14609@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series is only a draft and not intended to be merged. Patches 1 and 2
-aren't bcm2835 specific and should be helpful for other platforms. 
-The patches 2 - 4 are required for otg / gadget mode. The last patch
-based on the work of Lubomir Rintel [1] and Noralf Tr?nnes [2].
+On Fri, Jul 22, 2016 at 04:33:01PM +0800, Minghsiu Tsai wrote:
+> Add a DT binding documentation of MDP for the MT8173 SoC
+> from Mediatek
+> 
+> Signed-off-by: Minghsiu Tsai <minghsiu.tsai@mediatek.com>
+> ---
+>  .../devicetree/bindings/media/mediatek-mdp.txt     |   96 ++++++++++++++++++++
+>  1 file changed, 96 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/media/mediatek-mdp.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/media/mediatek-mdp.txt b/Documentation/devicetree/bindings/media/mediatek-mdp.txt
+> new file mode 100644
+> index 0000000..2dad031
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/media/mediatek-mdp.txt
+> @@ -0,0 +1,96 @@
+> +* Mediatek Media Data Path
+> +
+> +Media Data Path is used for scaling and color space conversion.
+> +
+> +Required properties (all function blocks):
+> +- compatible: "mediatek,<chip>-mdp"
 
-Changes since V1:
-- rebase to current linux-next
-- add patches 1 - 4 for otg/gadget support
-- add patch 5 with model compatible
-- use polarity define for ACT LED
+What is this, ...
 
-[1] - http://lists.infradead.org/pipermail/linux-rpi-kernel/2016-February/003221.html
-[2] - https://github.com/raspberrypi/linux/pull/1239/
+> +        "mediatek,<chip>-mdp-<function>", one of
 
-Stefan Wahren (6):
-  usb: dwc2: core: Avoid nonsense error in gadget mode
-  usb: dwc2: Add DT properties to specify fifo size in host/otg mode
-  ARM: dts: bcm283x: Add missing usb clock
-  ARM: dts: bcm283x: Add generic USB PHY
-  DT: bindings: bcm: Add Raspberry Pi Zero
-  ARM: dts: bcm2835: Add Raspberry Pi Zero
+and this?
 
- .../devicetree/bindings/arm/bcm/brcm,bcm2835.txt   |    4 ++
- Documentation/devicetree/bindings/usb/dwc2.txt     |    3 ++
- arch/arm/boot/dts/Makefile                         |    3 +-
- arch/arm/boot/dts/bcm2835-rpi-zero.dts             |   57 ++++++++++++++++++++
- arch/arm/boot/dts/bcm283x.dtsi                     |   15 ++++++
- drivers/usb/dwc2/core.c                            |   35 +++++++++---
- 6 files changed, 108 insertions(+), 9 deletions(-)
- create mode 100644 arch/arm/boot/dts/bcm2835-rpi-zero.dts
+> +        "mediatek,<chip>-mdp-rdma"  - read DMA
+> +        "mediatek,<chip>-mdp-rsz"   - resizer
+> +        "mediatek,<chip>-mdp-wdma"  - write DMA
+> +        "mediatek,<chip>-mdp-wrot"  - write DMA with rotation
 
--- 
-1.7.9.5
+List what are valid values of <chip>.
+
+> +- reg: Physical base address and length of the function block register space
+> +- clocks: device clocks
+> +- power-domains: a phandle to the power domain.
+> +- mediatek,vpu: the node of video processor unit
+> +
+> +Required properties (DMA function blocks):
+> +- compatible: Should be one of
+> +        "mediatek,<chip>-mdp-rdma"
+> +        "mediatek,<chip>-mdp-wdma"
+> +        "mediatek,<chip>-mdp-wrot"
+> +- iommus: should point to the respective IOMMU block with master port as
+> +  argument, see Documentation/devicetree/bindings/iommu/mediatek,iommu.txt
+> +  for details.
+> +- mediatek,larb: must contain the local arbiters in the current Socs.
+
+It is still not clear which properties apply to which compatible 
+strings.
+
+> +
+> +Example:
+> +	mdp_rdma0: rdma at 14001000 {
+> +		compatible = "mediatek,mt8173-mdp-rdma",
+> +			     "mediatek,mt8173-mdp";
+> +		reg = <0 0x14001000 0 0x1000>;
+> +		clocks = <&mmsys CLK_MM_MDP_RDMA0>,
+> +			 <&mmsys CLK_MM_MUTEX_32K>;
+> +		power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
+> +		iommus = <&iommu M4U_PORT_MDP_RDMA0>;
+> +		mediatek,larb = <&larb0>;
+> +		mediatek,vpu = <&vpu>;
+> +	};
+> +
+> +	mdp_rdma1: rdma at 14002000 {
+> +		compatible = "mediatek,mt8173-mdp-rdma";
+> +		reg = <0 0x14002000 0 0x1000>;
+> +		clocks = <&mmsys CLK_MM_MDP_RDMA1>,
+> +			 <&mmsys CLK_MM_MUTEX_32K>;
+> +		power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
+> +		iommus = <&iommu M4U_PORT_MDP_RDMA1>;
+> +		mediatek,larb = <&larb4>;
+> +	};
+> +
+> +	mdp_rsz0: rsz at 14003000 {
+> +		compatible = "mediatek,mt8173-mdp-rsz";
+> +		reg = <0 0x14003000 0 0x1000>;
+> +		clocks = <&mmsys CLK_MM_MDP_RSZ0>;
+> +		power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
+> +	};
+> +
+> +	mdp_rsz1: rsz at 14004000 {
+> +		compatible = "mediatek,mt8173-mdp-rsz";
+> +		reg = <0 0x14004000 0 0x1000>;
+> +		clocks = <&mmsys CLK_MM_MDP_RSZ1>;
+> +		power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
+> +	};
+> +
+> +	mdp_rsz2: rsz at 14005000 {
+> +		compatible = "mediatek,mt8173-mdp-rsz";
+> +		reg = <0 0x14005000 0 0x1000>;
+> +		clocks = <&mmsys CLK_MM_MDP_RSZ2>;
+> +		power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
+> +	};
+> +
+> +	mdp_wdma0: wdma at 14006000 {
+> +		compatible = "mediatek,mt8173-mdp-wdma";
+> +		reg = <0 0x14006000 0 0x1000>;
+> +		clocks = <&mmsys CLK_MM_MDP_WDMA>;
+> +		power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
+> +		iommus = <&iommu M4U_PORT_MDP_WDMA>;
+> +		mediatek,larb = <&larb0>;
+> +	};
+> +
+> +	mdp_wrot0: wrot at 14007000 {
+> +		compatible = "mediatek,mt8173-mdp-wrot";
+> +		reg = <0 0x14007000 0 0x1000>;
+> +		clocks = <&mmsys CLK_MM_MDP_WROT0>;
+> +		power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
+> +		iommus = <&iommu M4U_PORT_MDP_WROT0>;
+> +		mediatek,larb = <&larb0>;
+> +	};
+> +
+> +	mdp_wrot1: wrot at 14008000 {
+> +		compatible = "mediatek,mt8173-mdp-wrot";
+> +		reg = <0 0x14008000 0 0x1000>;
+> +		clocks = <&mmsys CLK_MM_MDP_WROT1>;
+> +		power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
+> +		iommus = <&iommu M4U_PORT_MDP_WROT1>;
+> +		mediatek,larb = <&larb4>;
+> +	};
+> -- 
+> 1.7.9.5
+> 
