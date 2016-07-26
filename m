@@ -1,139 +1,63 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Tue, 26 Jul 2016 10:41:48 +0100
-Subject: [PATCH V3 01/10] Documentation: dt-bindings: mailbox: tegra: Add
- binding for HSP mailbox
-In-Reply-To: <20160719091723.30919-1-josephl@nvidia.com>
-References: <20160719091723.30919-1-josephl@nvidia.com>
-Message-ID: <c04f3281-ce63-7d53-898a-bbdb7bc8eb5d@nvidia.com>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Tue, 26 Jul 2016 10:50:08 +0100
+Subject: [PATCH v15 04/10] arm64: Kprobes with single stepping support
+In-Reply-To: <20160725171350.GE2423@e104818-lin.cambridge.arm.com>
+References: <1467995754-32508-1-git-send-email-dave.long@linaro.org>
+ <1467995754-32508-5-git-send-email-dave.long@linaro.org>
+ <578FA238.3050206@arm.com> <5790F960.5050007@linaro.org>
+ <57910528.7070902@arm.com> <57911590.50305@linaro.org>
+ <20160722101617.GA17821@e104818-lin.cambridge.arm.com>
+ <57924104.1080202@linaro.org>
+ <20160725171350.GE2423@e104818-lin.cambridge.arm.com>
+Message-ID: <ce78f577-d14a-7b12-c96f-a6ebd8866283@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 25/07/16 18:13, Catalin Marinas wrote:
+> On Fri, Jul 22, 2016 at 11:51:32AM -0400, David Long wrote:
+>> On 07/22/2016 06:16 AM, Catalin Marinas wrote:
+>>> On Thu, Jul 21, 2016 at 02:33:52PM -0400, David Long wrote:
+>>> [...]
+>>> The document states: "Up to MAX_STACK_SIZE bytes are copied". That means
+>>> the arch code could always copy less but never more than MAX_STACK_SIZE.
+>>> What we are proposing is that we should try to guess how much to copy
+>>> based on the FP value (caller's frame) and, if larger than
+>>> MAX_STACK_SIZE, skip the probe hook entirely. I don't think this goes
+>>> against the kprobes.txt document but at least it (a) may improve the
+>>> performance slightly by avoiding unnecessary copy and (b) it avoids
+>>> undefined behaviour if we ever encounter a jprobe with arguments passed
+>>> on the stack beyond MAX_STACK_SIZE.
+>>
+>> OK, it sounds like an improvement. I do worry a little about unexpected side
+>> effects.
+>
+> You get more unexpected side effects by not saving/restoring the whole
+> stack. We looked into this on Friday and came to the conclusion that
+> there is no safe way for kprobes to know which arguments passed on the
+> stack should be preserved, at least not with the current API.
+>
+> Basically the AArch64 PCS states that for arguments passed on the stack
+> (e.g. they can't fit in registers), the caller allocates memory for them
+> (on its own stack) and passes the pointer to the callee. Unfortunately,
+> the frame pointer seems to be decremented correspondingly to cover the
+> arguments, so we don't really have a way to tell how much to copy.
+> Copying just the caller's stack frame isn't safe either since a
+> callee/caller receiving such argument on the stack may passed it down to
+> a callee without copying (I couldn't find anything in the PCS stating
+> that this isn't allowed).
 
-On 19/07/16 10:17, Joseph Lo wrote:
-> Add DT binding for the Hardware Synchronization Primitives (HSP). The
-> HSP is designed for the processors to share resources and communicate
-> together. It provides a set of hardware synchronization primitives for
-> interprocessor communication. So the interprocessor communication (IPC)
-> protocols can use hardware synchronization primitive, when operating
-> between two processors not in an SMP relationship.
-> 
-> Signed-off-by: Joseph Lo <josephl@nvidia.com>
-> ---
-> Sorry. Please allow me just update the binding patches of this series.
-> Want to make sure the binding is acceptable first.
-> Thanks.
-> 
-> Changes in V3:
-> - use two cells for mboxes property
-> Changes in V2:
-> - revise the compatible string, interrupt-names, interrupts, and #mbox-cells
->   properties
-> - remove "nvidia,hsp-function" property
-> - fix the header file name
-> - the binding supports the concept of multiple HSP sub-modules on one HSP HW
->   block now.
-> ---
->  .../bindings/mailbox/nvidia,tegra186-hsp.txt       | 52 ++++++++++++++++++++++
->  include/dt-bindings/mailbox/tegra186-hsp.h         | 20 +++++++++
->  2 files changed, 72 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mailbox/nvidia,tegra186-hsp.txt
->  create mode 100644 include/dt-bindings/mailbox/tegra186-hsp.h
-> 
-> diff --git a/Documentation/devicetree/bindings/mailbox/nvidia,tegra186-hsp.txt b/Documentation/devicetree/bindings/mailbox/nvidia,tegra186-hsp.txt
-> new file mode 100644
-> index 000000000000..a9152380642d
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mailbox/nvidia,tegra186-hsp.txt
-> @@ -0,0 +1,52 @@
-> +NVIDIA Tegra Hardware Synchronization Primitives (HSP)
-> +
-> +The HSP modules are used for the processors to share resources and communicate
-> +together. It provides a set of hardware synchronization primitives for
-> +interprocessor communication. So the interprocessor communication (IPC)
-> +protocols can use hardware synchronization primitives, when operating between
-> +two processors not in an SMP relationship.
-> +
-> +The features that HSP supported are shared mailboxes, shared semaphores,
-> +arbitrated semaphores and doorbells.
-> +
-> +Required properties:
-> +- name : Should be hsp
-> +- compatible
-> +    Array of strings.
-> +    one of:
-> +    - "nvidia,tegra186-hsp"
-> +- reg : Offset and length of the register set for the device.
-> +- interrupt-names
-> +    Array of strings.
-> +    Contains a list of names for the interrupts described by the interrupt
-> +    property. May contain the following entries, in any order:
-> +    - "doorbell"
-> +    Users of this binding MUST look up entries in the interrupt property
-> +    by name, using this interrupt-names property to do so.
-> +- interrupts
-> +    Array of interrupt specifiers.
-> +    Must contain one entry per entry in the interrupt-names property,
-> +    in a matching order.
-> +- #mbox-cells : Should be 2.
-> +
-> +The mbox specifier of the "mboxes" property in the client node should
-> +contain two data. The first one should be the HSP type and the second
-> +one should be the ID that the client is going to use. Those information
-> +can be found in the following file.
-> +
-> +- <dt-bindings/mailbox/tegra186-hsp.h>.
-> +
-> +Example:
-> +
-> +hsp_top0: hsp at 3c00000 {
-> +	compatible = "nvidia,tegra186-hsp";
-> +	reg = <0x0 0x03c00000 0x0 0xa0000>;
-> +	interrupts = <GIC_SPI 176 IRQ_TYPE_LEVEL_HIGH>;
-> +	interrupt-names = "doorbell";
-> +	#mbox-cells = <2>;
-> +};
-> +
-> +client {
-> +	...
-> +	mboxes = <&hsp_top0 HSP_MBOX_TYPE_DB HSP_DB_MASTER_XXX>;
-> +};
-> diff --git a/include/dt-bindings/mailbox/tegra186-hsp.h b/include/dt-bindings/mailbox/tegra186-hsp.h
-> new file mode 100644
-> index 000000000000..d1c1432707cd
-> --- /dev/null
-> +++ b/include/dt-bindings/mailbox/tegra186-hsp.h
-> @@ -0,0 +1,20 @@
-> +/*
-> + * This header provides constants for binding nvidia,tegra186-hsp.
-> + *
-> + * The number with HSP_DB_MASTER prefix indicates the bit that is
-> + * associated with a master ID in the doorbell registers.
-> + */
-> +
-> +
-> +#ifndef _DT_BINDINGS_MAILBOX_TEGRA186_HSP_H
-> +#define _DT_BINDINGS_MAILBOX_TEGRA186_HSP_H
-> +
-> +#define HSP_MBOX_TYPE_DB 0x0
-> +#define HSP_MBOX_TYPE_SM 0x1
-> +#define HSP_MBOX_TYPE_SS 0x2
-> +#define HSP_MBOX_TYPE_AS 0x3
+The PCS[1] seems (at least to me) to be pretty clear that "the address 
+of the first stacked argument is defined to be the initial value of SP".
 
-Nit ... may be we should add a comment that describes what the above are?
+I think it is only the return value (when stacked via the x8 pointer) 
+that can be passed through an intermediate function in the way described 
+above. Isn't it OK for a jprobe to clobber this memory? The underlying 
+function will overwrite whatever the jprobe put there anyway.
 
-> +
-> +#define HSP_DB_MASTER_CCPLEX 17
-> +#define HSP_DB_MASTER_BPMP 19
+Am I overlooking some additional detail in the PCS?
 
-Nit ... I would be tempted to move the comment in the header to above
-these defines, as I missed it on my first pass of this.
 
-Otherwise ...
+Daniel.
 
-Acked-by: Jon Hunter <jonathanh@nvidia.com>
 
-Cheers
-Jon
-
--- 
-nvpublic
+[1] Google presented me revision IHI 0055B (via infocenter.arm.com)
