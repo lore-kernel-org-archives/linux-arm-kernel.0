@@ -1,45 +1,61 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 26 Jul 2016 18:45:56 +0100
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 26 Jul 2016 19:52:33 +0200
 Subject: [PATCH] arm64: Fix Kconfig dependencies for RANDOMIZE_BASE
-In-Reply-To: <1469553415-26839-1-git-send-email-jeffv@google.com>
+In-Reply-To: <20160726174556.GH2423@e104818-lin.cambridge.arm.com>
 References: <1469553415-26839-1-git-send-email-jeffv@google.com>
-Message-ID: <20160726174556.GH2423@e104818-lin.cambridge.arm.com>
+ <20160726174556.GH2423@e104818-lin.cambridge.arm.com>
+Message-ID: <CAKv+Gu-4i=8F3jJFjN3+_nbiYxGTvBTNqVJbF60nuL4REPJ+9Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 26, 2016 at 10:16:55AM -0700, Jeff Vander Stoep wrote:
-> Selecting CONFIG_RANDOMIZE_BASE=y and CONFIG_MODULES=n causes a
-> build error due to dependencies on modules. This patch makes KASLR
-> module config options dependent on CONFIG_MODULES=y.
-> 
-> Signed-off-by: Jeff Vander Stoep <jeffv@google.com>
-> ---
->  arch/arm64/Kconfig | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 7e23f95..c9eff79 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -891,7 +891,6 @@ config RELOCATABLE
->  
->  config RANDOMIZE_BASE
->  	bool "Randomize the address of the kernel image"
-> -	select ARM64_MODULE_PLTS
->  	select RELOCATABLE
->  	help
->  	  Randomizes the virtual address at which the kernel image is
+On 26 July 2016 at 19:45, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> On Tue, Jul 26, 2016 at 10:16:55AM -0700, Jeff Vander Stoep wrote:
+>> Selecting CONFIG_RANDOMIZE_BASE=y and CONFIG_MODULES=n causes a
+>> build error due to dependencies on modules. This patch makes KASLR
+>> module config options dependent on CONFIG_MODULES=y.
+>>
+>> Signed-off-by: Jeff Vander Stoep <jeffv@google.com>
+>> ---
+>>  arch/arm64/Kconfig | 3 ++-
+>>  1 file changed, 2 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+>> index 7e23f95..c9eff79 100644
+>> --- a/arch/arm64/Kconfig
+>> +++ b/arch/arm64/Kconfig
+>> @@ -891,7 +891,6 @@ config RELOCATABLE
+>>
+>>  config RANDOMIZE_BASE
+>>       bool "Randomize the address of the kernel image"
+>> -     select ARM64_MODULE_PLTS
+>>       select RELOCATABLE
+>>       help
+>>         Randomizes the virtual address at which the kernel image is
+>
+> I thought we need the module PLTs once we randomize the kernel base,
+> independent of whether we randomize the modules base or not.
 
-I thought we need the module PLTs once we randomize the kernel base,
-independent of whether we randomize the modules base or not. Could we do
-something like:
+Indeed. The module region is always randomized with KASLR, but either
+fully (i.e., anywhere in the vmalloc region) or partially, in which
+case a random 128 MB range is selected that also covers vmlinux's
+.text segment, allowing jumps without veneers. However, since this
+range is part of the ordinary vmalloc space, there is a >0 probability
+that other allocations may exhaust it before you have loaded all your
+modules, in which case the module loader will fall back to ordinary
+vmalloc region allocations, which are most likely too far away to be
+resolved without PLTs
 
-	select ARM64_MODULE_PLTS if MODULES
+> Could we do
+> something like:
+>
+>         select ARM64_MODULE_PLTS if MODULES
+>
+> Whichever way we fix this, we probably need:
+>
+> Fixes: f80fb3a3d508 ("arm64: add support for kernel ASLR")
+> Cc: <stable@vger.kernel.org> # 4.6+
+>
 
-Whichever way we fix this, we probably need:
+With these changes
 
-Fixes: f80fb3a3d508 ("arm64: add support for kernel ASLR")
-Cc: <stable@vger.kernel.org> # 4.6+
-
--- 
-Catalin
+Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
