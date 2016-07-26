@@ -1,64 +1,100 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 26 Jul 2016 16:47:28 +0100
-Subject: [PATCH] ARM: 8579/1: mm: Fix definition of pmd_mknotpresent
-Message-ID: <1469548048-12211-1-git-send-email-catalin.marinas@arm.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Tue, 26 Jul 2016 09:04:10 -0700
+Subject: [PATCH v3 1/4] hwmon: iio_hwmon: delay probing with late_initcall
+In-Reply-To: <2324970.FJcTUYNoO2@ws-stein>
+References: <1469519027-11387-1-git-send-email-quentin.schulz@free-electrons.com>
+ <5277864.qlyRKbC1Zy@ws-stein>
+ <ed5c1761-bdc7-df9c-96c8-998e83c49c4c@free-electrons.com>
+ <2324970.FJcTUYNoO2@ws-stein>
+Message-ID: <20160726160410.GE30628@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Steve Capper <steve.capper@arm.com>
+On Tue, Jul 26, 2016 at 12:00:33PM +0200, Alexander Stein wrote:
+> On Tuesday 26 July 2016 11:33:59, Quentin Schulz wrote:
+> > On 26/07/2016 11:05, Alexander Stein wrote:
+> > > On Tuesday 26 July 2016 10:24:48, Quentin Schulz wrote:
+> > >> On 26/07/2016 10:21, Alexander Stein wrote:
+> > >>> On Tuesday 26 July 2016 09:43:44, Quentin Schulz wrote:
+> > >>>> iio_channel_get_all returns -ENODEV when it cannot find either phandles
+> > >>>> and
+> > >>>> properties in the Device Tree or channels whose consumer_dev_name
+> > >>>> matches
+> > >>>> iio_hwmon in iio_map_list. The iio_map_list is filled in by iio drivers
+> > >>>> which might be probed after iio_hwmon.
+> > >>> 
+> > >>> Would it work if iio_channel_get_all returning ENODEV is used for
+> > >>> returning
+> > >>> EPROBE_DEFER in iio_channel_get_all? Using late initcalls for
+> > >>> driver/device
+> > >>> dependencies seems not right for me at this place.
+> > >> 
+> > >> Then what if the iio_channel_get_all is called outside of the probe of a
+> > >> driver? We'll have to change the error code, things we are apparently
+> > >> trying to avoid (see v2 patches' discussions).
+> > > 
+> > > Maybe I didn't express my idea enough. I don't want to change the behavior
+> > > of iio_channel_get_all at all. Just the result evaluation of
+> > > iio_channel_get_all in iio_hwmon_probe. I have something link the patch
+> > > below in mind.
+> > > 
+> > > Best regards,
+> > > Alexander
+> > > ---
+> > > diff --git a/drivers/hwmon/iio_hwmon.c b/drivers/hwmon/iio_hwmon.c
+> > > index b550ba5..e32d150 100644
+> > > --- a/drivers/hwmon/iio_hwmon.c
+> > > +++ b/drivers/hwmon/iio_hwmon.c
+> > > @@ -73,8 +73,12 @@ static int iio_hwmon_probe(struct platform_device
+> > > *pdev)
+> > > 
+> > >                 name = dev->of_node->name;
+> > >         
+> > >         channels = iio_channel_get_all(dev);
+> > > 
+> > > -       if (IS_ERR(channels))
+> > > -               return PTR_ERR(channels);
+> > > +       if (IS_ERR(channels)) {
+> > > +               if (PTR_ERR(channels) == -ENODEV)
+> > > +                       return -EPROBE_DEFER;
+> > > +               else
+> > > +                       return PTR_ERR(channels);
+> > > +       }
+> > > 
+> > >         st = devm_kzalloc(dev, sizeof(*st), GFP_KERNEL);
+> > >         if (st == NULL) {
+> > 
+> > Indeed, I misunderstood what you told me.
+> > 
+> > Actually, the patch you proposed is part of my v1
+> > (https://lkml.org/lkml/2016/6/28/203) and v2
+> > (https://lkml.org/lkml/2016/7/15/215).
+> > Jonathan and Guenter didn't really like the idea of changing the -ENODEV
+> > in -EPROBE_DEFER.
+> 
+> Thanks for the links.
+> 
+> > What I thought you were proposing was to change the -ENODEV return code
+> > inside iio_channel_get_all. This cannot be an option since the function
+> > might be called outside of a probe (it is not yet, but might be in the
+> > future?).
+> 
+> AFAICS this is a helper function not knowing about device probing itself. And 
+> it should stay at that.
+> 
+> > Of what I understood, two possibilities are then possible (proposed
+> > either by Guenter or Jonathan): either rework the iio framework to
+> > register iio map array earlier or to use late_initcall instead of init
+> > for the driver consuming the iio channels.
+> 
+> Interestingly using this problem would not arise due to module dependencies. 
+> But using late_initcall would mean this needs to be done on any driver using 
+> iio channels? I would rather keep those consumers simple.
+> 
+Me too, but that would imply a solution in iio. The change you propose above
+isn't exactly simple either, and would also be needed in each consumer driver.
 
-commit 56530f5d2ddc9b9fade7ef8db9cb886e9dc689b5 upstream.
+Just for the record, I dislike the late_initcall solution as well, but I prefer
+it over blindly converting ENODEV to EPROBE_DEFER.
 
-Currently pmd_mknotpresent will use a zero entry to respresent an
-invalidated pmd.
-
-Unfortunately this definition clashes with pmd_none, thus it is
-possible for a race condition to occur if zap_pmd_range sees pmd_none
-whilst __split_huge_pmd_locked is running too with pmdp_invalidate
-just called.
-
-This patch fixes the race condition by modifying pmd_mknotpresent to
-create non-zero faulting entries (as is done in other architectures),
-removing the ambiguity with pmd_none.
-
-[catalin.marinas at arm.com: using L_PMD_SECT_VALID instead of PMD_TYPE_SECT]
-
-Fixes: 8d9625070073 ("ARM: mm: Transparent huge page support for LPAE systems.")
-Cc: <stable@vger.kernel.org> # 3.11+: 624531886987: ARM: 8578/1: mm: ensure pmd_present only checks the valid bit
-Reported-by: Kirill A. Shutemov <kirill.shutemov@linux.intel.com>
-Acked-by: Will Deacon <will.deacon@arm.com>
-Cc: Russell King <linux@armlinux.org.uk>
-Signed-off-by: Steve Capper <steve.capper@arm.com>
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
-
-This is a backport of commit 56530f5d2ddc ("ARM: 8579/1: mm: Fix 
-definition of pmd_mknotpresent") to the 3.14.x  stable kernel and
-earlier because the original patch does not apply cleanly.
-
-As noted in the "Cc: stable" tag above, this patch requires commit 
-624531886987 ("ARM: 8578/1: mm: ensure pmd_present only checks the valid
-bit"), already queued for 3.14.x stable kernel.
-
- arch/arm/include/asm/pgtable-3level.h | 7 +++++--
- 1 file changed, 5 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/include/asm/pgtable-3level.h b/arch/arm/include/asm/pgtable-3level.h
-index ab7ee9205ca4..40d60a679fc8 100644
---- a/arch/arm/include/asm/pgtable-3level.h
-+++ b/arch/arm/include/asm/pgtable-3level.h
-@@ -243,8 +243,11 @@ PMD_BIT_FUNC(mkyoung,   |= PMD_SECT_AF);
- #define pfn_pmd(pfn,prot)	(__pmd(((phys_addr_t)(pfn) << PAGE_SHIFT) | pgprot_val(prot)))
- #define mk_pmd(page,prot)	pfn_pmd(page_to_pfn(page),prot)
- 
--/* represent a notpresent pmd by zero, this is used by pmdp_invalidate */
--#define pmd_mknotpresent(pmd)	(__pmd(0))
-+/* represent a notpresent pmd by faulting entry, this is used by pmdp_invalidate */
-+static inline pmd_t pmd_mknotpresent(pmd_t pmd)
-+{
-+	return __pmd(pmd_val(pmd) & ~L_PMD_SECT_VALID);
-+}
- 
- static inline pmd_t pmd_modify(pmd_t pmd, pgprot_t newprot)
- {
+Guenter
