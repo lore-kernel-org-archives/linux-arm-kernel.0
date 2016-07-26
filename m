@@ -1,138 +1,99 @@
-From: labbott@redhat.com (Laura Abbott)
-Date: Mon, 25 Jul 2016 17:54:25 -0700
-Subject: [PATCH v4 12/12] mm: SLUB hardened usercopy support
-In-Reply-To: <CAGXu5jJQQNDMK7vxKqhwQukL771uOT-2No7fnNreQVLWs8UBMA@mail.gmail.com>
-References: <1469046427-12696-1-git-send-email-keescook@chromium.org>
- <1469046427-12696-13-git-send-email-keescook@chromium.org>
- <0f980e84-b587-3d9e-3c26-ad57f947c08b@redhat.com>
- <CAGXu5jJQQNDMK7vxKqhwQukL771uOT-2No7fnNreQVLWs8UBMA@mail.gmail.com>
-Message-ID: <e19dd469-37c9-846f-43a6-f28ab0c6c547@redhat.com>
+From: hl@rock-chips.com (hl)
+Date: Tue, 26 Jul 2016 09:13:31 +0800
+Subject: [PATCH v3 1/7] firmware: rockchip: sip: Add rockchip SIP runtime
+ service
+In-Reply-To: <6d3827c1-976c-ba96-600d-a405da2f645c@arm.com>
+References: <1469178440-4668-1-git-send-email-hl@rock-chips.com>
+ <1469178440-4668-2-git-send-email-hl@rock-chips.com>
+ <1497407.KruMAzy5tb@diego> <6d3827c1-976c-ba96-600d-a405da2f645c@arm.com>
+Message-ID: <5796B93B.9070109@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/25/2016 01:45 PM, Kees Cook wrote:
-> On Mon, Jul 25, 2016 at 12:16 PM, Laura Abbott <labbott@redhat.com> wrote:
->> On 07/20/2016 01:27 PM, Kees Cook wrote:
->>>
->>> Under CONFIG_HARDENED_USERCOPY, this adds object size checking to the
->>> SLUB allocator to catch any copies that may span objects. Includes a
->>> redzone handling fix discovered by Michael Ellerman.
->>>
->>> Based on code from PaX and grsecurity.
->>>
->>> Signed-off-by: Kees Cook <keescook@chromium.org>
->>> Tested-by: Michael Ellerman <mpe@ellerman.id.au>
->>> ---
->>>  init/Kconfig |  1 +
->>>  mm/slub.c    | 36 ++++++++++++++++++++++++++++++++++++
->>>  2 files changed, 37 insertions(+)
->>>
->>> diff --git a/init/Kconfig b/init/Kconfig
->>> index 798c2020ee7c..1c4711819dfd 100644
->>> --- a/init/Kconfig
->>> +++ b/init/Kconfig
->>> @@ -1765,6 +1765,7 @@ config SLAB
->>>
->>>  config SLUB
->>>         bool "SLUB (Unqueued Allocator)"
->>> +       select HAVE_HARDENED_USERCOPY_ALLOCATOR
->>>         help
->>>            SLUB is a slab allocator that minimizes cache line usage
->>>            instead of managing queues of cached objects (SLAB approach).
->>> diff --git a/mm/slub.c b/mm/slub.c
->>> index 825ff4505336..7dee3d9a5843 100644
->>> --- a/mm/slub.c
->>> +++ b/mm/slub.c
->>> @@ -3614,6 +3614,42 @@ void *__kmalloc_node(size_t size, gfp_t flags, int
->>> node)
->>>  EXPORT_SYMBOL(__kmalloc_node);
->>>  #endif
->>>
->>> +#ifdef CONFIG_HARDENED_USERCOPY
+Hi Sudeep Holla,
+
+On 2016?07?26? 01:36, Sudeep Holla wrote:
+>
+>
+> On 22/07/16 21:50, Heiko St?bner wrote:
+>> Hi again,
+>>
+>> one bigger thing I noticed only now.
+>>
+>> Am Freitag, 22. Juli 2016, 17:07:14 schrieben Sie:
+>>> diff --git a/drivers/firmware/rockchip_sip.c
+>>> b/drivers/firmware/rockchip_sip.c new file mode 100644
+>>> index 0000000..7756af9
+>>> --- /dev/null
+>>> +++ b/drivers/firmware/rockchip_sip.c
+>>> @@ -0,0 +1,64 @@
 >>> +/*
->>> + * Rejects objects that are incorrectly sized.
+>>> + * This program is free software; you can redistribute it and/or 
+>>> modify
+>>> + * it under the terms of the GNU General Public License version 2 as
+>>> + * published by the Free Software Foundation.
 >>> + *
->>> + * Returns NULL if check passes, otherwise const char * to name of cache
->>> + * to indicate an error.
+>>> + * This program is distributed in the hope that it will be useful,
+>>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>>> + * GNU General Public License for more details.
+>>> + *
+>>> + * Copyright (C) 2016 ARM Limited
 >>> + */
->>> +const char *__check_heap_object(const void *ptr, unsigned long n,
->>> +                               struct page *page)
+>>> +#include <linux/errno.h>
+>>> +#include <linux/linkage.h>
+>>> +#include <linux/of.h>
+>>> +#include <linux/pm.h>
+>>> +#include <linux/printk.h>
+>>> +#include "rockchip_sip.h"
+>>> +
+>>> +typedef unsigned long (psci_fn)(unsigned long, unsigned long,
+>>> +                unsigned long, unsigned long);
+>>> +asmlinkage psci_fn __invoke_psci_fn_smc;
+>>> +
+>>> +#define CONFIG_DRAM_INIT    0x00
+>>> +#define CONFIG_DRAM_SET_RATE    0x01
+>>> +#define CONFIG_DRAM_ROUND_RATE    0x02
+>>> +#define CONFIG_DRAM_SET_AT_SR    0x03
+>>> +#define CONFIG_DRAM_GET_BW    0x04
+>>> +#define CONFIG_DRAM_GET_RATE    0x05
+>>> +#define CONFIG_DRAM_CLR_IRQ    0x06
+>>> +#define CONFIG_DRAM_SET_PARAM   0x07
+>>> +
+>>> +uint64_t sip_smc_ddr_init(void)
 >>> +{
->>> +       struct kmem_cache *s;
->>> +       unsigned long offset;
->>> +       size_t object_size;
->>> +
->>> +       /* Find object and usable object size. */
->>> +       s = page->slab_cache;
->>> +       object_size = slab_ksize(s);
->>> +
->>> +       /* Find offset within object. */
->>> +       offset = (ptr - page_address(page)) % s->size;
->>> +
->>> +       /* Adjust for redzone and reject if within the redzone. */
->>> +       if (kmem_cache_debug(s) && s->flags & SLAB_RED_ZONE) {
->>> +               if (offset < s->red_left_pad)
->>> +                       return s->name;
->>> +               offset -= s->red_left_pad;
->>> +       }
->>> +
->>> +       /* Allow address range falling entirely within object size. */
->>> +       if (offset <= object_size && n <= object_size - offset)
->>> +               return NULL;
->>> +
->>> +       return s->name;
->>> +}
->>> +#endif /* CONFIG_HARDENED_USERCOPY */
->>> +
+>>> +    return __invoke_psci_fn_smc(SIP_DDR_FREQ, 0,
+>>> +                    0, CONFIG_DRAM_INIT);
 >>
+>> I don't think that is legal to use. For one this function itself is 
+>> declared
+>> static in the psci code - most likely for a specific reason.
 >>
->> I compared this against what check_valid_pointer does for SLUB_DEBUG
->> checking. I was hoping we could utilize that function to avoid
->> duplication but a) __check_heap_object needs to allow accesses anywhere
->> in the object, not just the beginning b) accessing page->objects
->> is racy without the addition of locking in SLUB_DEBUG.
+>> And also if anything invoke_psci_fn would hold the correct pointer 
+>> depending
+>> on the calling method.
 >>
->> Still, the ptr < page_address(page) check from __check_heap_object would
->> be good to add to avoid generating garbage large offsets and trying to
->> infer C math.
+>> But as said above, accessing psci static stuff is most likely wrong. 
+>> Maybe the
+>> two psci people I've included can tell us how this is to be accessed.
 >>
->> diff --git a/mm/slub.c b/mm/slub.c
->> index 7dee3d9..5370e4f 100644
->> --- a/mm/slub.c
->> +++ b/mm/slub.c
->> @@ -3632,6 +3632,9 @@ const char *__check_heap_object(const void *ptr,
->> unsigned long n,
->>         s = page->slab_cache;
->>         object_size = slab_ksize(s);
->>  +       if (ptr < page_address(page))
->> +               return s->name;
->> +
->>         /* Find offset within object. */
->>         offset = (ptr - page_address(page)) % s->size;
->>
->> With that, you can add
->>
->> Reviwed-by: Laura Abbott <labbott@redhat.com>
 >
-> Cool, I'll add that.
+> Thanks Heiko for looping us in this thread.
 >
-> Should I add your reviewed-by for this patch only or for the whole series?
+> The feature being added in this series is completely out of scope of
+> PSCI specification and hence PSCI can't be used. Firstly we need to
+> audit if these are need in Linux and why they can't be handled within
+> the existing PSCI APIs. But yes, this series is misuse of PSCI.
 >
-> Thanks!
+> I also see to know that ARM Trusted Firmware community has not accepted
+> this PSCI approach, so this patches are useless without that.
 >
-> -Kees
->
+> If they are still needed they need to make use of SMC Calling Convention
+> (arm_smccc_smc). Either make these smc function identifiers standard on
+> their platforms and use them directly in the driver. If they tend to
+> change too much across their platforms, use the DT approach with
+> appropriate bindings.
+Thanks for your suggestion, i will update the code in next version.
 
-Just this patch for now, I'm working through a couple of others
-
->>
->>>  static size_t __ksize(const void *object)
->>>  {
->>>         struct page *page;
->>>
->>
->> Thanks,
->> Laura
->
->
->
+-- 
+Lin Huang
