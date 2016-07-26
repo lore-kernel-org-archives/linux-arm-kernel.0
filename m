@@ -1,46 +1,40 @@
 From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Tue, 26 Jul 2016 18:53:30 +0000
-Subject: [PATCH V2 RFC 3/6] ARM: dts: bcm283x: Add missing usb clock
-In-Reply-To: <1469559213-16160-1-git-send-email-stefan.wahren@i2se.com>
-References: <1469559213-16160-1-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <1469559213-16160-4-git-send-email-stefan.wahren@i2se.com>
+Date: Tue, 26 Jul 2016 18:53:27 +0000
+Subject: =?UTF-8?q?=5BPATCH=20V2=20RFC=200/6=5D=20ARM=3A=20dts=3A=20bcm2835=3A=20Add=20Raspberry=20Pi=20Zero?=
+Message-ID: <1469559213-16160-1-git-send-email-stefan.wahren@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to the DWC2 binding an appropriate clock is required.
-This clock isn't handled by bcm2835 clock driver, so add a fixed
-clock to the bcm283x DT.
+This patch series is only a draft and not intended to be merged. Patches 1 and 2
+aren't bcm2835 specific and should be helpful for other platforms. 
+The patches 2 - 4 are required for otg / gadget mode. The last patch
+based on the work of Lubomir Rintel [1] and Noralf Tr?nnes [2].
 
-Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
----
- arch/arm/boot/dts/bcm283x.dtsi |    9 +++++++++
- 1 file changed, 9 insertions(+)
+Changes since V1:
+- rebase to current linux-next
+- add patches 1 - 4 for otg/gadget support
+- add patch 5 with model compatible
+- use polarity define for ACT LED
 
-diff --git a/arch/arm/boot/dts/bcm283x.dtsi b/arch/arm/boot/dts/bcm283x.dtsi
-index b982522..5472800 100644
---- a/arch/arm/boot/dts/bcm283x.dtsi
-+++ b/arch/arm/boot/dts/bcm283x.dtsi
-@@ -289,6 +289,8 @@
- 			interrupts = <1 9>;
- 			#address-cells = <1>;
- 			#size-cells = <0>;
-+			clocks = <&clk_usb>;
-+			clock-names = "otg";
- 		};
- 
- 		v3d: v3d at 7ec00000 {
-@@ -316,5 +318,12 @@
- 			clock-frequency = <19200000>;
- 		};
- 
-+		clk_usb: clock at 4 {
-+			compatible = "fixed-clock";
-+			reg = <4>;
-+			#clock-cells = <0>;
-+			clock-output-names = "otg";
-+			clock-frequency = <480000000>;
-+		};
- 	};
- };
+[1] - http://lists.infradead.org/pipermail/linux-rpi-kernel/2016-February/003221.html
+[2] - https://github.com/raspberrypi/linux/pull/1239/
+
+Stefan Wahren (6):
+  usb: dwc2: core: Avoid nonsense error in gadget mode
+  usb: dwc2: Add DT properties to specify fifo size in host/otg mode
+  ARM: dts: bcm283x: Add missing usb clock
+  ARM: dts: bcm283x: Add generic USB PHY
+  DT: bindings: bcm: Add Raspberry Pi Zero
+  ARM: dts: bcm2835: Add Raspberry Pi Zero
+
+ .../devicetree/bindings/arm/bcm/brcm,bcm2835.txt   |    4 ++
+ Documentation/devicetree/bindings/usb/dwc2.txt     |    3 ++
+ arch/arm/boot/dts/Makefile                         |    3 +-
+ arch/arm/boot/dts/bcm2835-rpi-zero.dts             |   57 ++++++++++++++++++++
+ arch/arm/boot/dts/bcm283x.dtsi                     |   15 ++++++
+ drivers/usb/dwc2/core.c                            |   35 +++++++++---
+ 6 files changed, 108 insertions(+), 9 deletions(-)
+ create mode 100644 arch/arm/boot/dts/bcm2835-rpi-zero.dts
+
 -- 
 1.7.9.5
