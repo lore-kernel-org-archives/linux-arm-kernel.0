@@ -1,49 +1,43 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 26 Jul 2016 15:04:25 +0800
-Subject: [PATCH 3/9] clk: sunxi-ng: mux: Increase fixed pre-divider div size
+Date: Tue, 26 Jul 2016 15:04:24 +0800
+Subject: [PATCH 2/9] clk: sunxi-ng: nk: Make ccu_nk_find_best static
 In-Reply-To: <1469516671-19377-1-git-send-email-wens@csie.org>
 References: <1469516671-19377-1-git-send-email-wens@csie.org>
-Message-ID: <1469516671-19377-4-git-send-email-wens@csie.org>
+Message-ID: <1469516671-19377-3-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some clocks have a predivider value that is larger than what u8 can
-store. One such example is the OUT clk found on A20/A31, which has
-a /750 pre-divider on one of the osc24M parents.
+make C=2 reports:
 
-Increase the size of the div field to u16.
+  CHECK   drivers/clk/sunxi-ng/ccu_nk.c
+drivers/clk/sunxi-ng/ccu_nk.c:17:6: warning: symbol 'ccu_nk_find_best' was
+not declared. Should it be static?
 
+ccu_nk_find_best is only used within ccu_nk.c. So make it static to get
+rid of this warning.
+
+Fixes: adbfb0056e03 ("clk: sunxi-ng: Add N-K-factor clock support")
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- drivers/clk/sunxi-ng/ccu_mux.c | 2 +-
- drivers/clk/sunxi-ng/ccu_mux.h | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ drivers/clk/sunxi-ng/ccu_nk.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/clk/sunxi-ng/ccu_mux.c b/drivers/clk/sunxi-ng/ccu_mux.c
-index 58fc36e7dcce..1329b9ab481e 100644
---- a/drivers/clk/sunxi-ng/ccu_mux.c
-+++ b/drivers/clk/sunxi-ng/ccu_mux.c
-@@ -18,7 +18,7 @@ void ccu_mux_helper_adjust_parent_for_prediv(struct ccu_common *common,
- 					     int parent_index,
- 					     unsigned long *parent_rate)
+diff --git a/drivers/clk/sunxi-ng/ccu_nk.c b/drivers/clk/sunxi-ng/ccu_nk.c
+index 4470ffc8cf0d..d6fafb397489 100644
+--- a/drivers/clk/sunxi-ng/ccu_nk.c
++++ b/drivers/clk/sunxi-ng/ccu_nk.c
+@@ -14,9 +14,9 @@
+ #include "ccu_gate.h"
+ #include "ccu_nk.h"
+ 
+-void ccu_nk_find_best(unsigned long parent, unsigned long rate,
+-		      unsigned int max_n, unsigned int max_k,
+-		      unsigned int *n, unsigned int *k)
++static void ccu_nk_find_best(unsigned long parent, unsigned long rate,
++			     unsigned int max_n, unsigned int max_k,
++			     unsigned int *n, unsigned int *k)
  {
--	u8 prediv = 1;
-+	u16 prediv = 1;
- 	u32 reg;
- 
- 	if (!((common->features & CCU_FEATURE_FIXED_PREDIV) ||
-diff --git a/drivers/clk/sunxi-ng/ccu_mux.h b/drivers/clk/sunxi-ng/ccu_mux.h
-index 945082631e7d..d35ce5e93840 100644
---- a/drivers/clk/sunxi-ng/ccu_mux.h
-+++ b/drivers/clk/sunxi-ng/ccu_mux.h
-@@ -11,7 +11,7 @@ struct ccu_mux_internal {
- 
- 	struct {
- 		u8	index;
--		u8	div;
-+		u16	div;
- 	} fixed_prediv;
- 
- 	struct {
+ 	unsigned long best_rate = 0;
+ 	unsigned int best_k = 0, best_n = 0;
 -- 
 2.8.1
