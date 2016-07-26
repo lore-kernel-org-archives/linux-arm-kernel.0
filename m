@@ -1,50 +1,44 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 26 Jul 2016 14:13:07 +0200
-Subject: [PATCH v3] thermal: tango: add resume support
-In-Reply-To: <5795E07F.6010506@free.fr>
-References: <57726196.5060909@free.fr> <4062048.3qHsMMf8fO@wuerfel>
- <5795E07F.6010506@free.fr>
-Message-ID: <8406200.nXRkviT67W@wuerfel>
+From: wxt@rock-chips.com (Caesar Wang)
+Date: Tue, 26 Jul 2016 20:13:13 +0800
+Subject: [PATCH v2 2/4] arm64: dts: rockchip: add the saradc for rk3399
+In-Reply-To: <1469535195-5227-1-git-send-email-wxt@rock-chips.com>
+References: <1469535195-5227-1-git-send-email-wxt@rock-chips.com>
+Message-ID: <1469535195-5227-2-git-send-email-wxt@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, July 25, 2016 11:48:47 AM CEST Mason wrote:
-> On 25/07/2016 10:52, Arnd Bergmann wrote:
-> 
-> > On Monday, July 25, 2016 10:18:22 AM CEST Mason wrote:
-> > 
-> >> Moving the SIMPLE_DEV_PM_OPS macro outside the CONFIG_PM_SLEEP guard
-> >> would unconditionally define a struct dev_pm_ops, which just wastes
-> >> space when CONFIG_PM_SLEEP is undefined (if I'm not mistaken).
-> >>
-> >> That's why I put SIMPLE_DEV_PM_OPS inside the CONFIG_PM_SLEEP guard.
-> > 
-> > If you want to avoid the extra few bytes, just use the trick I
-> > suggested:
-> > 
-> >       .pm = IS_ENABLED(CONFIG_PM_SLEEP) ? &tango_thermal_pm : NULL,
-> 
-> This would achieve the same result as the solution I proposed
-> in my v2 patch, right?
-> 
-> So you're saying you prefer the IS_ENABLED macro over using
-> #ifdef ... #else define stuff as NULL #endif
-> 
-> Did I get that right?
+This patch adds saradc needed information on rk3399 SoCs.
 
-Yes, but I'd also prefer not to hide the operations structure
-at all and just rely on the __maybe_unused (ideally) or
-#ifdef (not as good, but commonly used) to leave out the
-functions.
+Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+---
 
-> Eduardo, Zhang, what do thermal maintainers prefer?
-> 
-> > You should basically never have that #ifdef inside of the
-> > platform_driver definition.
-> 
-> Except when the fields don't exist, like the bug I introduced
-> in struct smp_operations (which you fixed).
+Changes in v2: None
 
-Right.
+ arch/arm64/boot/dts/rockchip/rk3399.dtsi | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-	Arnd
+diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+index 4c84229..b81f84b 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+@@ -299,6 +299,18 @@
+ 		};
+ 	};
+ 
++	saradc: saradc at ff100000 {
++		compatible = "rockchip,rk3399-saradc";
++		reg = <0x0 0xff100000 0x0 0x100>;
++		interrupts = <GIC_SPI 62 IRQ_TYPE_LEVEL_HIGH>;
++		#io-channel-cells = <1>;
++		clocks = <&cru SCLK_SARADC>, <&cru PCLK_SARADC>;
++		clock-names = "saradc", "apb_pclk";
++		resets = <&cru SRST_P_SARADC>;
++		reset-names = "saradc-apb";
++		status = "disabled";
++	};
++
+ 	i2c1: i2c at ff110000 {
+ 		compatible = "rockchip,rk3399-i2c";
+ 		reg = <0x0 0xff110000 0x0 0x1000>;
+-- 
+1.9.1
