@@ -1,36 +1,27 @@
-From: ruslan.bilovol@gmail.com (Ruslan Bilovol)
-Date: Tue, 26 Jul 2016 04:36:01 +0300
-Subject: [PATCH v1.2 3/4] arm64: Add arm64 kexec support
-In-Reply-To: <1469479817.2889.4.camel@infradead.org>
-References: <cover.1468970114.git.geoff@infradead.org>
- <9ed513fd44a19b2f49b4da99477cedfff7341bf0.1468970114.git.geoff@infradead.org>
- <1469048065.2977.124.camel@infradead.org>
- <CAB=otbSObtEE7n4LjWWZZ0G=oA1Xd5QUmHnX44+uyUiWP4qXpw@mail.gmail.com>
- <1469479817.2889.4.camel@infradead.org>
-Message-ID: <CAB=otbS8Okq+f2SvWkXX1rHO6N+nYTjsF7=Qo9MVU5NSV5Xfsg@mail.gmail.com>
+From: thloh@altera.com (thloh at altera.com)
+Date: Mon, 25 Jul 2016 18:43:09 -0700
+Subject: [PATCH 1/1] socfpga: defconfig: Enable Altera GPIO driver as module
+Message-ID: <1469497389-11322-1-git-send-email-thloh@altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geoff,
+From: Tien Hock Loh <thloh@altera.com>
 
-On Mon, Jul 25, 2016 at 11:50 PM, Geoff Levand <geoff@infradead.org> wrote:
-> Hi Ruslan,
->
-> On Mon, 2016-07-25 at 17:28 +0300, Ruslan Bilovol wrote:
->> And I use kexec next way:
->> kexec --type Image -p /Image --ramdisk=/ramdisk.cpio.gz
->> --dtb=dtb-arm64.dtb --append="root=/dev/ram0 1 maxcpus=1
->> reset_devices"
->
-> This patch set only supports re-boot.  '-p' is not supported.
->
-> I'll look into emiting a message when -p is passed.
->
+This patch enables Altera GPIO driver as module in socfpga_defconfig
 
-Thanks for explanation.
+Signed-off-by: Tien Hock Loh <thloh@altera.com>
+---
+ arch/arm/configs/socfpga_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-By the way, do you know if there is any work ongoing on '-p' option
-support for ARM64? I would be happy to test it on my setup
-
-Best regards,
-Ruslan
+diff --git a/arch/arm/configs/socfpga_defconfig b/arch/arm/configs/socfpga_defconfig
+index 753f1a5..241ce4ca 100644
+--- a/arch/arm/configs/socfpga_defconfig
++++ b/arch/arm/configs/socfpga_defconfig
+@@ -108,3 +108,4 @@ CONFIG_DETECT_HUNG_TASK=y
+ # CONFIG_SCHED_DEBUG is not set
+ CONFIG_ENABLE_DEFAULT_TRACERS=y
+ CONFIG_DEBUG_USER=y
++CONFIG_GPIO_ALTERA=m
+-- 
+1.7.11.GIT
