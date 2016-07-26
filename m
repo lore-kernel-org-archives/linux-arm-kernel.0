@@ -1,84 +1,210 @@
-From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Tue, 26 Jul 2016 15:34:08 +0800
-Subject: usb keyboard and mouse can't work on QEMU ARM64 with KVM
-Message-ID: <57971270.1010008@huawei.com>
+From: kwangwoo.lee@sk.com (Kwangwoo Lee)
+Date: Tue, 26 Jul 2016 16:34:56 +0900
+Subject: [PATCH v2] arm64: mm: convert __dma_* routines to use start, size
+Message-ID: <1469518496-8177-1-git-send-email-kwangwoo.lee@sk.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi?
+v2)
+change __dma_* routine names using the terminoloy guidance:
+    area: takes a start and size
+    range: takes a start and end
+use __dma_flush_area() instead of __dma_flush_range() in dma-mapping.c
 
-Recently I'm trying to use usb keyboard and mouse with QEMU on ARM64. Below is my QEMU command line,
-host and guest kernel both are 4.7.0-rc7+, and I ran it on Hikey board.
+v1)
+__dma_* routines have been converted to use start and size instread of
+start and end addresses. The patch was origianlly for adding
+__clean_dcache_area_poc() which will be used in pmem driver to clean
+dcache to the PoC(Point of Coherency) in arch_wb_cache_pmem().
 
-    qemu-system-aarch64 \
-    -smp 1 -cpu host -enable-kvm \
-    -m 256 -M virt \
-    -k en-us \
-    -nographic \
-    -device usb-ehci -device usb-kbd -device usb-mouse -usb\
-    -kernel Image \
-    -initrd guestfs.cpio.gz \
-    -append "rdinit=/sbin/init console=ttyAMA0 root=/dev/ram earlycon=pl011,0x9000000 rw"
+The functionality of __clean_dcache_area_poc()  was equivalent to
+__dma_clean_range(). The difference was __dma_clean_range() uses the end
+address, but __clean_dcache_area_poc() uses the size to clean.
 
-The following guest log shows that usb controller can be probed but the keyboard and mouse can't be
-found.
+Thus, __clean_dcache_area_poc() has been revised with a fall through
+function of __dma_clean_range() after the change that __dma_* routines
+use start and size instead of using start and end.
 
-[    1.597433] ehci_hcd: USB 2.0 'Enhanced' Host Controller (EHCI) Driver
-[    1.599562] ehci-pci: EHCI PCI platform driver
-[    1.608082] ehci-pci 0000:00:03.0: EHCI Host Controller
-[    1.609485] ehci-pci 0000:00:03.0: new USB bus registered, assigned bus number 1
-[    1.611833] ehci-pci 0000:00:03.0: irq 49, io mem 0x10041000
-[    1.623599] ehci-pci 0000:00:03.0: USB 2.0 started, EHCI 1.00
-[    1.625867] hub 1-0:1.0: USB hub found
-[    1.626906] hub 1-0:1.0: 6 ports detected
-[    1.628685] ehci-platform: EHCI generic platform driver
-[    1.630263] ehci-msm: Qualcomm On-Chip EHCI Host Controller
-[    1.631947] ohci_hcd: USB 1.1 'Open' Host Controller (OHCI) Driver
-[    1.633547] ohci-pci: OHCI PCI platform driver
-[    1.634807] ohci-platform: OHCI generic platform driver
-[...]
-[    1.939001] usb 1-1: new high-speed USB device number 2 using ehci-pci
-[   17.467040] usb 1-1: device not accepting address 2, error -110
-[   17.579165] usb 1-1: new high-speed USB device number 3 using ehci-pci
-[   32.287242] random: dd urandom read with 7 bits of entropy available
-[   33.110970] usb 1-1: device not accepting address 3, error -110
-[   33.223030] usb 1-1: new high-speed USB device number 4 using ehci-pci
-[   43.635185] usb 1-1: device not accepting address 4, error -110
-[   43.747033] usb 1-1: new high-speed USB device number 5 using ehci-pci
-[   54.159043] usb 1-1: device not accepting address 5, error -110
-[   54.160752] usb usb1-port1: unable to enumerate USB device
-[   54.307290] usb 1-2: new high-speed USB device number 6 using ehci-pci
-[   69.839052] usb 1-2: device not accepting address 6, error -110
-[   69.951249] usb 1-2: new high-speed USB device number 7 using ehci-pci
-[   85.483171] usb 1-2: device not accepting address 7, error -110
-[   85.595035] usb 1-2: new high-speed USB device number 8 using ehci-pci
-[   90.619247] usb 1-2: device descriptor read/8, error -110
-[   95.743482] usb 1-2: device descriptor read/8, error -110
-[   95.959165] usb 1-2: new high-speed USB device number 9 using ehci-pci
-[  106.371177] usb 1-2: device not accepting address 9, error -110
-[  106.372894] usb usb1-port2: unable to enumerate USB device
+Signed-off-by: Kwangwoo Lee <kwangwoo.lee@sk.com>
+---
+ arch/arm64/include/asm/cacheflush.h |  3 +-
+ arch/arm64/mm/cache.S               | 71 +++++++++++++++++++------------------
+ arch/arm64/mm/dma-mapping.c         |  6 ++--
+ 3 files changed, 41 insertions(+), 39 deletions(-)
 
-lsusb shows:
-root at genericarmv8:~# lsusb
-Bus 001 Device 001: ID 1d6b:0002
-
-Besides, I have also tried QEMU TCG without KVM. The guest can successfully probe usb controller,
-keyboard and mouse.
-lsusb shows:
-root at genericarmv8:~# lsusb
-Bus 001 Device 002: ID 0627:0001
-Bus 001 Device 003: ID 0627:0001
-Bus 001 Device 001: ID 1d6b:0002
-
-So it looks like that usb keyboard and mouse don't work with KVM on QEMU ARM64 while they can work
-with TCG. IIUC, all the usb devices are emulated by QEMU, it has nothing with KVM. So it really
-confused me and I'm not familiar with usb devices. Also I have seen someone else reports this issue
-before[1].
-
-[1]https://lists.gnu.org/archive/html/qemu-arm/2016-06/msg00110.html
-
-Any comments and help are welcome. Thanks in advance.
-
-Thanks,
+diff --git a/arch/arm64/include/asm/cacheflush.h b/arch/arm64/include/asm/cacheflush.h
+index c64268d..2e5fb97 100644
+--- a/arch/arm64/include/asm/cacheflush.h
++++ b/arch/arm64/include/asm/cacheflush.h
+@@ -68,6 +68,7 @@
+ extern void flush_cache_range(struct vm_area_struct *vma, unsigned long start, unsigned long end);
+ extern void flush_icache_range(unsigned long start, unsigned long end);
+ extern void __flush_dcache_area(void *addr, size_t len);
++extern void __clean_dcache_area_poc(void *addr, size_t len);
+ extern void __clean_dcache_area_pou(void *addr, size_t len);
+ extern long __flush_cache_user_range(unsigned long start, unsigned long end);
+ 
+@@ -85,7 +86,7 @@ static inline void flush_cache_page(struct vm_area_struct *vma,
+  */
+ extern void __dma_map_area(const void *, size_t, int);
+ extern void __dma_unmap_area(const void *, size_t, int);
+-extern void __dma_flush_range(const void *, const void *);
++extern void __dma_flush_area(const void *, size_t);
+ 
+ /*
+  * Copy user data from/to a page which is mapped into a different
+diff --git a/arch/arm64/mm/cache.S b/arch/arm64/mm/cache.S
+index 50ff9ba..4415c1b 100644
+--- a/arch/arm64/mm/cache.S
++++ b/arch/arm64/mm/cache.S
+@@ -110,14 +110,16 @@ ENDPROC(__clean_dcache_area_pou)
+  *	- end     - end address of region
+  */
+ ENTRY(__inval_cache_range)
++	sub	x1, x1, x0
+ 	/* FALLTHROUGH */
+ 
+ /*
+- *	__dma_inv_range(start, end)
++ *	__dma_inv_area(start, size)
+  *	- start   - virtual start address of region
+- *	- end     - virtual end address of region
++ *	- size    - size in question
+  */
+-__dma_inv_range:
++__dma_inv_area:
++	add	x1, x1, x0
+ 	dcache_line_size x2, x3
+ 	sub	x3, x2, #1
+ 	tst	x1, x3				// end cache line aligned?
+@@ -136,46 +138,47 @@ __dma_inv_range:
+ 	dsb	sy
+ 	ret
+ ENDPIPROC(__inval_cache_range)
+-ENDPROC(__dma_inv_range)
++ENDPROC(__dma_inv_area)
++
++/*
++ *	__clean_dcache_area_poc(kaddr, size)
++ *
++ * 	Ensure that any D-cache lines for the interval [kaddr, kaddr+size)
++ * 	are cleaned to the PoC.
++ *
++ *	- kaddr   - kernel address
++ *	- size    - size in question
++ */
++ENTRY(__clean_dcache_area_poc)
++	/* FALLTHROUGH */
+ 
+ /*
+- *	__dma_clean_range(start, end)
++ *	__dma_clean_area(start, size)
+  *	- start   - virtual start address of region
+- *	- end     - virtual end address of region
++ *	- size    - size in question
+  */
+-__dma_clean_range:
+-	dcache_line_size x2, x3
+-	sub	x3, x2, #1
+-	bic	x0, x0, x3
+-1:
++__dma_clean_area:
+ alternative_if_not ARM64_WORKAROUND_CLEAN_CACHE
+-	dc	cvac, x0
++	dcache_by_line_op cvac, sy, x0, x1, x2, x3
+ alternative_else
+-	dc	civac, x0
++	dcache_by_line_op civac, sy, x0, x1, x2, x3
+ alternative_endif
+-	add	x0, x0, x2
+-	cmp	x0, x1
+-	b.lo	1b
+-	dsb	sy
+ 	ret
+-ENDPROC(__dma_clean_range)
++ENDPIPROC(__clean_dcache_area_poc)
++ENDPROC(__dma_clean_area)
+ 
+ /*
+- *	__dma_flush_range(start, end)
++ *	__dma_flush_area(start, size)
++ *
++ *	clean & invalidate D / U line
++ *
+  *	- start   - virtual start address of region
+- *	- end     - virtual end address of region
++ *	- size    - size in question
+  */
+-ENTRY(__dma_flush_range)
+-	dcache_line_size x2, x3
+-	sub	x3, x2, #1
+-	bic	x0, x0, x3
+-1:	dc	civac, x0			// clean & invalidate D / U line
+-	add	x0, x0, x2
+-	cmp	x0, x1
+-	b.lo	1b
+-	dsb	sy
++ENTRY(__dma_flush_area)
++	dcache_by_line_op civac, sy, x0, x1, x2, x3
+ 	ret
+-ENDPIPROC(__dma_flush_range)
++ENDPIPROC(__dma_flush_area)
+ 
+ /*
+  *	__dma_map_area(start, size, dir)
+@@ -184,10 +187,9 @@ ENDPIPROC(__dma_flush_range)
+  *	- dir	- DMA direction
+  */
+ ENTRY(__dma_map_area)
+-	add	x1, x1, x0
+ 	cmp	w2, #DMA_FROM_DEVICE
+-	b.eq	__dma_inv_range
+-	b	__dma_clean_range
++	b.eq	__dma_inv_area
++	b	__dma_clean_area
+ ENDPIPROC(__dma_map_area)
+ 
+ /*
+@@ -197,8 +199,7 @@ ENDPIPROC(__dma_map_area)
+  *	- dir	- DMA direction
+  */
+ ENTRY(__dma_unmap_area)
+-	add	x1, x1, x0
+ 	cmp	w2, #DMA_TO_DEVICE
+-	b.ne	__dma_inv_range
++	b.ne	__dma_inv_area
+ 	ret
+ ENDPIPROC(__dma_unmap_area)
+diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+index c566ec8..e0b0712 100644
+--- a/arch/arm64/mm/dma-mapping.c
++++ b/arch/arm64/mm/dma-mapping.c
+@@ -165,7 +165,7 @@ static void *__dma_alloc(struct device *dev, size_t size,
+ 		return ptr;
+ 
+ 	/* remove any dirty cache lines on the kernel alias */
+-	__dma_flush_range(ptr, ptr + size);
++	__dma_flush_area(ptr, size);
+ 
+ 	/* create a coherent mapping */
+ 	page = virt_to_page(ptr);
+@@ -377,7 +377,7 @@ static int __init atomic_pool_init(void)
+ 		void *page_addr = page_address(page);
+ 
+ 		memset(page_addr, 0, atomic_pool_size);
+-		__dma_flush_range(page_addr, page_addr + atomic_pool_size);
++		__dma_flush_area(page_addr, atomic_pool_size);
+ 
+ 		atomic_pool = gen_pool_create(PAGE_SHIFT, -1);
+ 		if (!atomic_pool)
+@@ -535,7 +535,7 @@ fs_initcall(dma_debug_do_init);
+ /* Thankfully, all cache ops are by VA so we can ignore phys here */
+ static void flush_page(struct device *dev, const void *virt, phys_addr_t phys)
+ {
+-	__dma_flush_range(virt, virt + PAGE_SIZE);
++	__dma_flush_area(virt, PAGE_SIZE);
+ }
+ 
+ static void *__iommu_alloc_attrs(struct device *dev, size_t size,
 -- 
-Shannon
+2.5.0
