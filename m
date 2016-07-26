@@ -1,91 +1,90 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Tue, 26 Jul 2016 17:09:26 +0900
-Subject: [PATCH v23 0/9] arm64: add kdump support
-In-Reply-To: <20160726075659.2290-1-takahiro.akashi@linaro.org>
-References: <20160726075659.2290-1-takahiro.akashi@linaro.org>
-Message-ID: <20160726080925.GA2363@linaro.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 26 Jul 2016 10:07:47 +0200
+Subject: usb keyboard and mouse can't work on QEMU ARM64 with KVM
+In-Reply-To: <57971270.1010008@huawei.com>
+References: <57971270.1010008@huawei.com>
+Message-ID: <CAKv+Gu8jzjLjpC7FR4fq13H+4rThQsW=fpMZ0F3Qfc45Gj1XSw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 26, 2016 at 04:56:51PM +0900, AKASHI Takahiro wrote:
-> This patch series adds kdump support on arm64.
-> 
-> To load a crash-dump kernel to the systems, a series of patches to
-> kexec-tools, which have not yet been merged upstream, are needed.
-> Please pick Geoff's kexec patches [1] and my kdump patches [2].
-> 
-> To examine vmcore (/proc/vmcore) on a crash-dump kernel, you can use
->   - crash utility (coming v7.1.6 or later) [3]
->     (Necessary patches have already been queued in the master.)
-> 
-> [1]  http://lists.infradead.org/pipermail/kexec/2016-July/016532.html
-> [2]  TBD
+On 26 July 2016 at 09:34, Shannon Zhao <zhaoshenglong@huawei.com> wrote:
+> Hi?
+>
+> Recently I'm trying to use usb keyboard and mouse with QEMU on ARM64. Below is my QEMU command line,
+> host and guest kernel both are 4.7.0-rc7+, and I ran it on Hikey board.
+>
+>     qemu-system-aarch64 \
+>     -smp 1 -cpu host -enable-kvm \
+>     -m 256 -M virt \
+>     -k en-us \
+>     -nographic \
+>     -device usb-ehci -device usb-kbd -device usb-mouse -usb\
+>     -kernel Image \
+>     -initrd guestfs.cpio.gz \
+>     -append "rdinit=/sbin/init console=ttyAMA0 root=/dev/ram earlycon=pl011,0x9000000 rw"
+>
+> The following guest log shows that usb controller can be probed but the keyboard and mouse can't be
+> found.
+>
+> [    1.597433] ehci_hcd: USB 2.0 'Enhanced' Host Controller (EHCI) Driver
+> [    1.599562] ehci-pci: EHCI PCI platform driver
+> [    1.608082] ehci-pci 0000:00:03.0: EHCI Host Controller
+> [    1.609485] ehci-pci 0000:00:03.0: new USB bus registered, assigned bus number 1
+> [    1.611833] ehci-pci 0000:00:03.0: irq 49, io mem 0x10041000
+> [    1.623599] ehci-pci 0000:00:03.0: USB 2.0 started, EHCI 1.00
+> [    1.625867] hub 1-0:1.0: USB hub found
+> [    1.626906] hub 1-0:1.0: 6 ports detected
+> [    1.628685] ehci-platform: EHCI generic platform driver
+> [    1.630263] ehci-msm: Qualcomm On-Chip EHCI Host Controller
+> [    1.631947] ohci_hcd: USB 1.1 'Open' Host Controller (OHCI) Driver
+> [    1.633547] ohci-pci: OHCI PCI platform driver
+> [    1.634807] ohci-platform: OHCI generic platform driver
+> [...]
+> [    1.939001] usb 1-1: new high-speed USB device number 2 using ehci-pci
+> [   17.467040] usb 1-1: device not accepting address 2, error -110
+> [   17.579165] usb 1-1: new high-speed USB device number 3 using ehci-pci
+> [   32.287242] random: dd urandom read with 7 bits of entropy available
+> [   33.110970] usb 1-1: device not accepting address 3, error -110
+> [   33.223030] usb 1-1: new high-speed USB device number 4 using ehci-pci
+> [   43.635185] usb 1-1: device not accepting address 4, error -110
+> [   43.747033] usb 1-1: new high-speed USB device number 5 using ehci-pci
+> [   54.159043] usb 1-1: device not accepting address 5, error -110
+> [   54.160752] usb usb1-port1: unable to enumerate USB device
+> [   54.307290] usb 1-2: new high-speed USB device number 6 using ehci-pci
+> [   69.839052] usb 1-2: device not accepting address 6, error -110
+> [   69.951249] usb 1-2: new high-speed USB device number 7 using ehci-pci
+> [   85.483171] usb 1-2: device not accepting address 7, error -110
+> [   85.595035] usb 1-2: new high-speed USB device number 8 using ehci-pci
+> [   90.619247] usb 1-2: device descriptor read/8, error -110
+> [   95.743482] usb 1-2: device descriptor read/8, error -110
+> [   95.959165] usb 1-2: new high-speed USB device number 9 using ehci-pci
+> [  106.371177] usb 1-2: device not accepting address 9, error -110
+> [  106.372894] usb usb1-port2: unable to enumerate USB device
+>
+> lsusb shows:
+> root at genericarmv8:~# lsusb
+> Bus 001 Device 001: ID 1d6b:0002
+>
+> Besides, I have also tried QEMU TCG without KVM. The guest can successfully probe usb controller,
+> keyboard and mouse.
+> lsusb shows:
+> root at genericarmv8:~# lsusb
+> Bus 001 Device 002: ID 0627:0001
+> Bus 001 Device 003: ID 0627:0001
+> Bus 001 Device 001: ID 1d6b:0002
+>
+> So it looks like that usb keyboard and mouse don't work with KVM on QEMU ARM64 while they can work
+> with TCG. IIUC, all the usb devices are emulated by QEMU, it has nothing with KVM. So it really
+> confused me and I'm not familiar with usb devices. Also I have seen someone else reports this issue
+> before[1].
+>
+> [1]https://lists.gnu.org/archive/html/qemu-arm/2016-06/msg00110.html
+>
+> Any comments and help are welcome. Thanks in advance.
+>
 
-See my kexec-tools patches in:
-http://lists.infradead.org/pipermail/kexec/2016-July/016642.html
+Does your QEMU have this patch?
+http://git.qemu.org/?p=qemu.git;a=commitdiff;h=5d636e21c44ecf982a22a7bc4ca89186079ac283
 
-Thanks,
--Takahiro AKASHI
-
-> [3]  https://github.com/crash-utility/crash.git
-> 
-> Changes for v23 (July 26, 2016):
-> 
->   o Move memblock_reserve() to a single place in reserve_crashkernel()
->   o Use  cpu_park_loop() in ipi_cpu_crash_stop()
->   o Always enforce ARCH_LOW_ADDRESS_LIMIT to the memory range of crash kernel
->   o Re-implement fdt_enforce_memory_region() to remove non-reserve regions
->     (for ACPI) from usable memory at crash kernel
-> 
-> Changes for v22 (July 12, 2016):
-> 
->   o Export "crashkernel-base" and "crashkernel-size" via device-tree,
->     and add some descriptions about them in chosen.txt
->   o Rename "usable-memory" to "usable-memory-range" to avoid inconsistency
->     with powerpc's "usable-memory"
->   o Make cosmetic changes regarding "ifdef" usage
->   o Correct some wordings in kdump.txt
-> 
-> Changes for v21 (July 6, 2016):
-> 
->   o Remove kexec patches.
->   o Rebase to arm64's for-next/core (Linux-4.7-rc4 based).
->   o Clarify the description about kvm in kdump.txt.
-> 
-> See the following link [3] for older changes:
-> [3]  http://lists.infradead.org/pipermail/linux-arm-kernel/2016-June/438780.html
-> 
-> AKASHI Takahiro (8):
->   arm64: kdump: reserve memory for crash dump kernel
->   memblock: add memblock_cap_memory_range()
->   arm64: limit memory regions based on DT property, usable-memory-range
->   arm64: kdump: implement machine_crash_shutdown()
->   arm64: kdump: add kdump support
->   arm64: kdump: add VMCOREINFO's for user-space coredump tools
->   arm64: kdump: enable kdump in the arm64 defconfig
->   arm64: kdump: update a kernel doc
-> 
-> James Morse (1):
->   Documentation: dt: chosen properties for arm64 kdump
-> 
->  Documentation/devicetree/bindings/chosen.txt |  45 ++++++
->  Documentation/kdump/kdump.txt                |  16 ++-
->  arch/arm64/Kconfig                           |  11 ++
->  arch/arm64/configs/defconfig                 |   1 +
->  arch/arm64/include/asm/hardirq.h             |   2 +-
->  arch/arm64/include/asm/kexec.h               |  41 +++++-
->  arch/arm64/include/asm/smp.h                 |   2 +
->  arch/arm64/kernel/Makefile                   |   1 +
->  arch/arm64/kernel/crash_dump.c               |  71 ++++++++++
->  arch/arm64/kernel/machine_kexec.c            |  67 ++++++++-
->  arch/arm64/kernel/setup.c                    |   7 +-
->  arch/arm64/kernel/smp.c                      |  63 +++++++++
->  arch/arm64/mm/init.c                         | 202 +++++++++++++++++++++++++++
->  include/linux/memblock.h                     |   1 +
->  mm/memblock.c                                |  28 ++++
->  15 files changed, 551 insertions(+), 7 deletions(-)
->  create mode 100644 arch/arm64/kernel/crash_dump.c
-> 
-> -- 
-> 2.9.0
-> 
+-- 
+Ard.
