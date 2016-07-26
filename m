@@ -1,24 +1,71 @@
-From: michael.weiser@gmx.de (Michael Weiser)
-Date: Tue, 26 Jul 2016 21:26:09 +0200
-Subject: [PATCH 3/3] ARM: sunxi: enable big-endian
-In-Reply-To: <20160725122522.GL7419@lukather>
-References: <20160721182329.13478-1-michael.weiser@gmx.de>
- <20160721182329.13478-4-michael.weiser@gmx.de>
- <20160722090101.GB7687@lukather>
- <20160722135658.GA18977@weiser.dinsnail.net>
- <20160725122522.GL7419@lukather>
-Message-ID: <20160726192609.GA27782@weiser.dinsnail.net>
+From: geoff@infradead.org (Geoff Levand)
+Date: Tue, 26 Jul 2016 20:18:57 +0000
+Subject: [PATCH v2 4/4] arm64: Add support for binary image files
+In-Reply-To: <cover.1469559530.git.geoff@infradead.org>
+References: <cover.1469559530.git.geoff@infradead.org>
+Message-ID: <f352dcfc827a4cbb3878dd1043877a4154b1bd08.1469559530.git.geoff@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+From: Pratyush Anand <panand@redhat.com>
 
-On Mon, Jul 25, 2016 at 02:25:22PM +0200, Maxime Ripard wrote:
+Signed-off-by: Pratyush Anand <panand@redhat.com>
+[Reworked and cleaned up]
+Signed-off-by: Geoff Levand <geoff@infradead.org>
+---
+ kexec/arch/arm64/kexec-image-arm64.c | 31 +++++++++++++++++++++++++------
+ 1 file changed, 25 insertions(+), 6 deletions(-)
 
-> > via I2C. I have not deliberately/synthetically tested the DMA engine. It's
-> > enabled in the my kernel config and seems happy but was not selected by
-> > any other driver so seems to be unused currently.
-> You can test the DMA using the audio components, either the codec, i2s
-> or spdif.
-
-I've enabled the codec and it's currently playing some King Khan to me.
+diff --git a/kexec/arch/arm64/kexec-image-arm64.c b/kexec/arch/arm64/kexec-image-arm64.c
+index 84386f7..cad7c73 100644
+--- a/kexec/arch/arm64/kexec-image-arm64.c
++++ b/kexec/arch/arm64/kexec-image-arm64.c
+@@ -24,21 +24,40 @@ int image_arm64_probe(const char *kernel_buf, off_t kernel_size)
+ 		return -1;
+ 	}
+ 
+-	fprintf(stderr, "kexec: ARM64 binary image files are currently NOT SUPPORTED.\n");
+-
+-	return -1;
++	return 0;
+ }
+ 
+ int image_arm64_load(int argc, char **argv, const char *kernel_buf,
+ 	off_t kernel_size, struct kexec_info *info)
+ {
+-	return -EFAILED;
++	const struct arm64_image_header *h;
++	unsigned long image_base;
++
++	h = (const struct arm64_image_header *)(kernel_buf);
++
++	if (arm64_process_image_header(h))
++		return -EINVAL;
++
++	dbgprintf("%s: text_offset:   %016lx\n", __func__,
++		arm64_mem.text_offset);
++	dbgprintf("%s: image_size:    %016lx\n", __func__,
++		arm64_mem.image_size);
++	dbgprintf("%s: phys_offset:   %016lx\n", __func__,
++		arm64_mem.phys_offset);
++	dbgprintf("%s: PE format:     %s\n", __func__,
++		(arm64_header_check_pe_sig(h) ? "yes" : "no"));
++
++	image_base = get_phys_offset() + arm64_mem.text_offset;
++	
++	add_segment_phys_virt(info, kernel_buf, kernel_size, image_base,
++		arm64_mem.image_size, 0);
++
++	return arm64_load_other_segments(info, image_base);
+ }
+ 
+ void image_arm64_usage(void)
+ {
+ 	printf(
+ "     An ARM64 binary image, compressed or not, big or little endian.\n"
+-"     Typically an Image, Image.gz or Image.lzma file.\n"
+-"     This file type is currently NOT SUPPORTED.\n\n");
++"     Typically an Image, Image.gz or Image.lzma file.\n\n");
+ }
+-- 
+2.5.0
