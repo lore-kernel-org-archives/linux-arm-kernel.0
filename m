@@ -1,27 +1,42 @@
-From: thloh@altera.com (thloh at altera.com)
-Date: Mon, 25 Jul 2016 18:43:09 -0700
-Subject: [PATCH 1/1] socfpga: defconfig: Enable Altera GPIO driver as module
-Message-ID: <1469497389-11322-1-git-send-email-thloh@altera.com>
+From: mpe@ellerman.id.au (Michael Ellerman)
+Date: Tue, 26 Jul 2016 12:09:14 +1000
+Subject: [PATCH v3 02/11] mm: Hardened usercopy
+In-Reply-To: <063D6719AE5E284EB5DD2968C1650D6D5F502102@AcuExch.aculab.com>
+References: <1468619065-3222-1-git-send-email-keescook@chromium.org>
+ <1468619065-3222-3-git-send-email-keescook@chromium.org>
+ <5790711f.2350420a.b4287.2cc0SMTPIN_ADDED_BROKEN@mx.google.com>
+ <CAGXu5jLCu1Vv0uugKZrsjSEsoABgXJSOJ8GkKmrHbvj9jkC2YA@mail.gmail.com>
+ <20160722174551.jddle6mf7zlq6xmb@treble>
+ <063D6719AE5E284EB5DD2968C1650D6D5F502102@AcuExch.aculab.com>
+Message-ID: <87mvl5jgl1.fsf@concordia.ellerman.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tien Hock Loh <thloh@altera.com>
+David Laight <David.Laight@ACULAB.COM> writes:
 
-This patch enables Altera GPIO driver as module in socfpga_defconfig
+> From: Josh Poimboeuf
+>> Sent: 22 July 2016 18:46
+>> >
+>> > e.g. then if the pointer was in the thread_info, the second test would
+>> > fail, triggering the protection.
+>> 
+>> FWIW, this won't work right on x86 after Andy's
+>> CONFIG_THREAD_INFO_IN_TASK patches get merged.
+>
+> What ends up in the 'thread_info' area?
 
-Signed-off-by: Tien Hock Loh <thloh@altera.com>
----
- arch/arm/configs/socfpga_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+It depends on the arch.
 
-diff --git a/arch/arm/configs/socfpga_defconfig b/arch/arm/configs/socfpga_defconfig
-index 753f1a5..241ce4ca 100644
---- a/arch/arm/configs/socfpga_defconfig
-+++ b/arch/arm/configs/socfpga_defconfig
-@@ -108,3 +108,4 @@ CONFIG_DETECT_HUNG_TASK=y
- # CONFIG_SCHED_DEBUG is not set
- CONFIG_ENABLE_DEFAULT_TRACERS=y
- CONFIG_DEBUG_USER=y
-+CONFIG_GPIO_ALTERA=m
--- 
-1.7.11.GIT
+> If it contains the fp save area then programs like gdb may end up requesting
+> copy_in/out directly from that area.
+
+On the arches I've seen thread_info doesn't usually contain register save areas,
+but if it did then it would be up to the arch helper to allow that copy to go
+through.
+
+However given thread_info generally contains lots of low level flags that would
+be a good target for an attacker, the best way to cope with ptrace wanting to
+copy to/from it would be to use a temporary, and prohibit copying directly
+to/from thread_info - IMHO.
+
+cheers
