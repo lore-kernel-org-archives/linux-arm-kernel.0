@@ -1,123 +1,107 @@
-From: jolsa@redhat.com (Jiri Olsa)
-Date: Tue, 26 Jul 2016 22:41:39 +0200
-Subject: [PATCH V2 3/6] perf tools: add infrastructure for PMU specific
- configuration
-In-Reply-To: <CANLsYkwx+iOE6uwOVPtsHFMmNaH0=NjeDP8z0GZhHja2oibt8g@mail.gmail.com>
-References: <1469047100-18131-1-git-send-email-mathieu.poirier@linaro.org>
- <1469047100-18131-4-git-send-email-mathieu.poirier@linaro.org>
- <20160721074722.GB7192@krava>
- <CANLsYkxj+kccmvTtOLAYwyN9fOp0pMxdPcWy5cJHQDQLoj-NmQ@mail.gmail.com>
- <20160721145434.GA15915@krava>
- <CANLsYkwx+iOE6uwOVPtsHFMmNaH0=NjeDP8z0GZhHja2oibt8g@mail.gmail.com>
-Message-ID: <20160726204139.GA13377@krava>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Tue, 26 Jul 2016 23:00:52 +0200
+Subject: [PATCH 1/4] ARM: dts: sun8i: Extend Orange Pi PC dt to also
+ handle the PC Plus
+In-Reply-To: <20160725064033.GA7419@lukather>
+References: <1468095718-18515-1-git-send-email-hdegoede@redhat.com>
+ <20160713084505.GE4761@lukather>
+ <bce2b340-a930-8771-4560-dc61bf5828d5@redhat.com>
+ <20160725064033.GA7419@lukather>
+Message-ID: <785086e6-c50c-ed1c-6de1-13a2234c3f58@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 22, 2016 at 12:24:48PM -0600, Mathieu Poirier wrote:
+Hi,
 
-SNIP
+On 07/25/2016 08:40 AM, Maxime Ripard wrote:
+> Hi,
+>
+> On Wed, Jul 13, 2016 at 12:01:41PM +0200, Hans de Goede wrote:
+>> Hi,
+>>
+>> On 13-07-16 10:45, Maxime Ripard wrote:
+>>> On Sat, Jul 09, 2016 at 10:21:55PM +0200, Hans de Goede wrote:
+>>>> There is a new Orange Pi PC Plus available now, rather then adding
+>>>> yet another dts file for this variant, extend the existing
+>>>> Orange Pi PC to support the sdio wifi and emmc found on this variant.
+>>>>
+>>>> Downside of this approach is the following messages in dmesg when run
+>>>> on the non Plus Orange Pi PC:
+>>>>
+>>>> sunxi-mmc 1c10000.mmc: fatal err update clk timeout
+>>>> sunxi-mmc 1c11000.mmc: smc 2 err, cmd 8, RTO !!
+>>>> sunxi-mmc 1c11000.mmc: smc 2 err, cmd 55, RTO !!
+>>>> sunxi-mmc 1c11000.mmc: smc 2 err, cmd 55, RTO !!
+>>>> sunxi-mmc 1c11000.mmc: smc 2 err, cmd 55, RTO !!
+>>>> sunxi-mmc 1c11000.mmc: smc 2 err, cmd 55, RTO !!
+>>>> sunxi-mmc 1c11000.mmc: smc 2 err, cmd 1, RTO !!
+>>>>
+>>>> Note these are completely harmless and there is no adverse effect
+>>>> to the functioning of the non Plus Orange Pi PC.
+>>>>
+>>>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>>>> ---
+>>>> arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts | 40 +++++++++++++++++++++++++++++-
+>>>> 1 file changed, 39 insertions(+), 1 deletion(-)
+>>>>
+>>>> diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
+>>>> index b8340f7..f9bf260 100644
+>>>> --- a/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
+>>>> +++ b/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
+>>>> @@ -49,11 +49,13 @@
+>>>> #include <dt-bindings/pinctrl/sun4i-a10.h>
+>>>>
+>>>> / {
+>>>> -	model = "Xunlong Orange Pi PC";
+>>>> +	model = "Xunlong Orange Pi PC / PC Plus";
+>>>> 	compatible = "xunlong,orangepi-pc", "allwinner,sun8i-h3";
+>>>>
+>>>> 	aliases {
+>>>> 		serial0 = &uart0;
+>>>> +		/* ethernet0 is the H3 emac, defined in sun8i-h3.dtsi */
+>>>> +		ethernet1 = &rtl8189ftv;
+>>>> 	};
+>>>>
+>>>> 	chosen {
+>>>> @@ -118,6 +120,42 @@
+>>>> 	status = "okay";
+>>>> };
+>>>>
+>>>> +/* Note only present on orangepi pc *plus* */
+>>>> +&mmc1 {
+>>>> +	pinctrl-names = "default";
+>>>> +	pinctrl-0 = <&mmc1_pins_a>;
+>>>> +	vmmc-supply = <&reg_vcc3v3>;
+>>>> +	bus-width = <4>;
+>>>> +	non-removable;
+>>>> +	status = "okay";
+>>>> +
+>>>> +	/*
+>>>> +	 * Explicitly define the sdio device, so that we can add an ethernet
+>>>> +	 * alias for it (which e.g. makes u-boot set a mac-address).
+>>>> +	 */
+>>>> +	rtl8189ftv: sdio_wifi at 1 {
+>>>> +		reg = <1>;
+>>>> +	};
+>>>> +};
+>>>
+>>> Nothing prevents you from including the orange pi pc dts, from the
+>>> orange pi plus dts.
+>>>
+>>> It prevents the duplication you were trying to avoid, and it doesn't
+>>> create all those spurious errors and devices.
+>>
+>> That would solve the copy paste problem on the kernel side, but that
+>> would still mean adding a new u-boot defconfig for this, which means that
+>> all the distro's which ship with prebuild u-boot binaries need to build
+>> for yet another board, something which I would like to avoid.
+>
+> Still, registering devices that are not present on the board is not an
+> option.
 
-> > diff --git a/tools/perf/util/parse-events.y b/tools/perf/util/parse-events.y
-> > --- a/tools/perf/util/parse-events.y
-> > +++ b/tools/perf/util/parse-events.y
-> > @@ -602,12 +602,12 @@ PE_NAME array '=' PE_VALUE
-> >         $$ = term;
-> >  }
-> >  |
-> > -PE_DRV_CFG_TERM
-> > +'@' PE_DRV_CFG_TERM
-> >  {
-> >         struct parse_events_term *term;
-> >
-> >         ABORT_ON(parse_events_term__str(&term, PARSE_EVENTS__TERM_TYPE_DRV_CFG,
-> > -                                       $1, $1, &@1, NULL));
-> > +                                       $2, $2, &@2, NULL));
-> >         $$ = term;
-> >  }
-> >
-> 
-> I've been experimenting with the above solution and it is not yielding
-> the results one might think at first glance.
-> 
-> If we use the example: -e event/@cfg1/ ...
-> 
-> First if we leave things exactly the way they are suggested in the
-> code snippet flex doesn't know what do to with the '@' character and
-> returns an error.  To deal with that a new clause
-> 
-> "@"        { return '@'; }
-> 
-> can be inserted in the config state.  But that doesn't link '@' with
-> 'cfg1', and 'cfg1' gets interpreted as a PE_NAME.  Introducing a new
-> state upon hitting '@' would get us around that but we are moving away
-> from our initial goal of keeping things simple.
+Ok, I'll send a new patch which adds a separate dts file for the Orange Pi
+PC Plus.
 
-hum, then how about keeping the flex atoms simple like for the
-other terms and do something like below.. untested ;-)
+Regards,
 
-thanks,
-jirka
-
-
----
-diff --git a/tools/perf/util/parse-events.l b/tools/perf/util/parse-events.l
-index 1f7e11a6c5b3..8ba228e1c150 100644
---- a/tools/perf/util/parse-events.l
-+++ b/tools/perf/util/parse-events.l
-@@ -53,16 +53,6 @@ static int str(yyscan_t scanner, int token)
- 	return token;
- }
- 
--static int drv_str(yyscan_t scanner, int token)
--{
--	YYSTYPE *yylval = parse_events_get_lval(scanner);
--	char *text = parse_events_get_text(scanner);
--
--	/* Strip off the '@' */
--	yylval->str = strdup(text + 1);
--	return token;
--}
--
- #define REWIND(__alloc)				\
- do {								\
- 	YYSTYPE *__yylval = parse_events_get_lval(yyscanner);	\
-@@ -134,7 +124,6 @@ num_hex		0x[a-fA-F0-9]+
- num_raw_hex	[a-fA-F0-9]+
- name		[a-zA-Z_*?][a-zA-Z0-9_*?.]*
- name_minus	[a-zA-Z_*?][a-zA-Z0-9\-_*?.:]*
--drv_cfg_term	[a-zA-Z0-9_\.]+(=[a-zA-Z0-9_*?\.:]+)?
- /* If you add a modifier you need to update check_modifier() */
- modifier_event	[ukhpPGHSDI]+
- modifier_bp	[rwx]{1,3}
-@@ -216,11 +205,11 @@ no-inherit		{ return term(yyscanner, PARSE_EVENTS__TERM_TYPE_NOINHERIT); }
- overwrite		{ return term(yyscanner, PARSE_EVENTS__TERM_TYPE_OVERWRITE); }
- no-overwrite		{ return term(yyscanner, PARSE_EVENTS__TERM_TYPE_NOOVERWRITE); }
- ,			{ return ','; }
-+"@"			{ return '@'; }
- "/"			{ BEGIN(INITIAL); return '/'; }
- {name_minus}		{ return str(yyscanner, PE_NAME); }
- \[all\]			{ return PE_ARRAY_ALL; }
- "["			{ BEGIN(array); return '['; }
--@{drv_cfg_term}		{ return drv_str(yyscanner, PE_DRV_CFG_TERM); }
- }
- 
- <mem>{
-diff --git a/tools/perf/util/parse-events.y b/tools/perf/util/parse-events.y
-index 879115f93edc..7e03e93dabca 100644
---- a/tools/perf/util/parse-events.y
-+++ b/tools/perf/util/parse-events.y
-@@ -602,12 +602,12 @@ PE_NAME array '=' PE_VALUE
- 	$$ = term;
- }
- |
--PE_DRV_CFG_TERM
-+'@' PE_NAME '=' PE_NAME
- {
- 	struct parse_events_term *term;
- 
- 	ABORT_ON(parse_events_term__str(&term, PARSE_EVENTS__TERM_TYPE_DRV_CFG,
--					$1, $1, &@1, NULL));
-+					$2, $4, &@2, &@4));
- 	$$ = term;
- }
- 
+Hans
