@@ -1,86 +1,109 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Tue, 26 Jul 2016 11:54:55 +0200
-Subject: [PATCH v11 09/10] genirq/msi: map/unmap the MSI doorbells on
- msi_domain_alloc/free_irqs
-In-Reply-To: <alpine.DEB.2.11.1607261022330.19896@nanos>
-References: <1468933367-23159-1-git-send-email-eric.auger@redhat.com>
- <1468933367-23159-10-git-send-email-eric.auger@redhat.com>
- <alpine.DEB.2.11.1607201016060.3564@nanos>
- <75f5e846-6ca4-4178-e7aa-fed90e45e546@redhat.com>
- <alpine.DEB.2.11.1607261022330.19896@nanos>
-Message-ID: <f8e83628-5fb0-70d4-c32c-237d190ec98f@redhat.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 26 Jul 2016 11:57:13 +0200
+Subject: [RESEND PATCH v4] KVM: arm/arm64: Add VGICv3 save/restore API
+ documentation
+In-Reply-To: <CAFEAcA_OJh+sS-adVP9Z7TDZmPQfsNwfmS1Gxm5EzdVi2FjAwQ@mail.gmail.com>
+References: <20160706113725.32437-1-christoffer.dall@linaro.org>
+ <CAFEAcA_OJh+sS-adVP9Z7TDZmPQfsNwfmS1Gxm5EzdVi2FjAwQ@mail.gmail.com>
+Message-ID: <20160726095713.GB17252@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
-
-On 26/07/2016 11:00, Thomas Gleixner wrote:
-> B1;2802;0cEric,
+On Wed, Jul 06, 2016 at 01:03:18PM +0100, Peter Maydell wrote:
+> On 6 July 2016 at 12:37, Christoffer Dall <christoffer.dall@linaro.org> wrote:
+> > Factor out the GICv3-specific documentation into a separate
+> > documentation file.  Add description for how to access distributor,
+> > redistributor, and CPU interface registers for GICv3 in this new file,
+> > and add a group for accessing level triggered IRQ information for GICv3
+> > as well.
+> >
+> > Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 > 
-> On Mon, 25 Jul 2016, Auger Eric wrote:
->> On 20/07/2016 11:04, Thomas Gleixner wrote:
->>> On Tue, 19 Jul 2016, Eric Auger wrote:
->>>> +		if (ret) {
->>>> +			for (; i >= 0; i--) {
->>>> +				struct irq_data *d = irq_get_irq_data(virq + i);
->>>> +
->>>> +				msi_handle_doorbell_mappings(d, false);
->>>> +			}
->>>> +			irq_domain_free_irqs(virq, desc->nvec_used);
->>>> +			desc->irq = 0;
->>>> +			goto error;
->>>
->>> How is that supposed to work? You clear desc->irq and then you call
->>> ops->handle_error.
->>
->> if I don't clear the desc->irq I enter an infinite loop in
->> pci_enable_msix_range.
->>
->> This happens because msix_capability_init and pcie_enable_msix returns 1.
->> In msix_capability_init, at out_avail: we enumerate the msi_desc which have
->> a non zero irq, hence the returned value equal to 1.
->>
->> Currently the only handle_error ops I found, pci_msi_domain_handle_error
->> does not use irq field so works although questionable.
+> > +    Accesses (reads and writes) to the GICD_ISPENDR register region and
+> > +    GICR_ISPENDR0 registers get/set the value of the latched pending state for
+> > +    the interrupts.
+> > +
+> > +    This is identical to the value read from ISPENDR for an edge triggered
+> > +    interrupt, but may differ for level triggered interrupts. For edge triggered
+> > +    interrupts, once an interrupt becomes pending (whether because of an edge
+> > +    detected on the input line or because of a guest write to ISPENDR) this
+> > +    state is "latched", and only cleared when either the interrupt is activated
+> > +    or when the guest writes to ICPENDR. A level triggered interrupt may be
+> > +    pending either because the level input is held high by a device, or because
+> > +    of a guest write to the ISPENDR register. Only ISPENDR writes are latched;
+> > +    if the device lowers the line level then the interrupt is no longer pending
+> > +    unless the guest also wrote to ISPENDR, and conversely writes to ICPENDR or
+> > +    activations of the interrupt do not clear the pending status if the line
+> > +    level is still being held high.  (These rules are documented in the GICv3
+> > +    specification descriptions of the ICPENDR and ISPENDR registers.)
+> > +    For a level triggered interrupt the value accessed here
+> > +    is that of the latch which is set by ISPENDR and cleared by ICPENDR or
+> > +    interrupt activation, whereas the value read from ISPENDR is the logical OR
+> > +    of the latch value and the input line level.
 > 
-> The logic here is: If the allocation does not succeed for the requested number
-> of interrupts, we tell the caller how many interrupts we were able to set up.
-> So the caller can decide what to do.
+> Rereading these paragraphs I think
+>  "This is identical to the value returned by a guest read from ISPENDR..."
+> (in the first line) and
+>  "the value returned by a guest read from the ISPENDR register is the
+> logical OR..."
+> (at the end) would be clearer, just to make sure we're clear between
+> when we're describing the behaviour of the hardware register as seen
+> by the guest, and when we're describing the behaviour of a read/write
+> through this API. I misread the intention the first time around
+> even though  I wrote this text :-)
+
+right, I've added the clarification.
+
+> > +  KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO
+> > +  Attributes:
+> > +    The attr field of kvm_device_attr encodes the following values:
+> > +    bits:     | 63      ....       32 | 31   ....    10 | 9  ....  0 |
+> > +    values:   |         mpidr         |      info       |   vINTID   |
+> > +
+> > +    The vINTID specifies which set of IRQs is reported on.
+> > +
+> > +    The info field specifies which information userspace wants to get or set
+> > +    using this interface.  Currently we support two different pieces of
+> > +    information:
+> > +
+> > +      VGIC_LEVEL_INFO_LINE_LEVEL:
+> > +       Get/Set the input level of the IRQ line for a set of 32 contiguously
+> > +       numbered interrupts.
+> > +       vINTID must be a multiple of 32.
+> > +
+> > +        kvm_device_attr.addr points to a __u32 value which will contain a
 > 
-> In your case you don't want to have a partial allocation, so instead of
-> playing silly games with desc->irq you should add a flag which tells the PCI
-> code that you are not interested in a partial allocation and that it should
-> return an error code instead.
-
-In that case can we consider we even succeeded in allocating 1 MSI? In case the
-IOMMU mapping fails, the MSI transaction will never reach the target MSI frame
-so it is not usable. So when you mean "partial" I understand we did not succeed
-in allocating maxvec IRQs, correct? Here we succeeded in allocating 0 IRQ and still
-msi_capability_init returns 1.
-
-msi_capability_init doc-comment says "a positive return value indicates the number of
-interrupts which could have been allocated."
-
-I understand allocation success currently only depends on the fact virq was allocated
-and set to desc->irq. But with that IOMMU stuff doesn't the criteria changes?
-
-
-> Something like PCI_DEV_FLAGS_MSI_NO_PARTIAL_ALLOC should do the trick.
+> stray extra space at start of line?
 > 
->> As for the irq_domain_free_irqs I think I can remove it since handled later.
+
+It's actually because one of the lines was using a tab and the other
+spaces, but I've fixed them to both use tabs.
+
+> > +       bitmap where a set bit means the interrupt level is asserted.
+> > +
+> > +       Bit[n] indicates the status for interrupt vINTID + n.
+> > +
+> > +    SGIs and any interrupt with a higher ID than the number of interrupts
+> > +    supported, will be RAZ/WI.  LPIs are always edge-triggered and are
+> > +    therefore not supported by this interface.
+> > +
+> > +    PPIs are reported per VCPU as specified in the mpidr field, and SPIs are
+> > +    reported with the same value regardless of the mpidr specified.
+> > +
+> > +    The mpidr field encodes the CPU ID based on the affinity information in the
+> > +    architecture defined MPIDR, and the field is encoded as follows:
+> > +      | 63 .... 56 | 55 .... 48 | 47 .... 40 | 39 .... 32 |
+> > +      |    Aff3    |    Aff2    |    Aff1    |    Aff0   |
 > 
-> Not only the free_irqs(). You should let the teardown function handle
-> everything including your doorbell mapping teardown. It's nothing special and
-> free_msi_irqs() at the end of msix_capability_init() will take care of it.
-Yep I was forced to call free_irqs myself since free_msi_irqs was doing nothing
-due the fact I resetted the irq field. Wrong thing loop ;-)
+> Missing space -- ASCII art doesn't quite line up.
 
-Thanks
-
-Eric
+ack
 
 > 
-> Thanks,
+> Otherwise
+> Reviewed-by: Peter Maydell <peter.maydell@linaro.org>
 > 
-> 	tglx
 > 
+
+Thanks!
+-Christoffer
