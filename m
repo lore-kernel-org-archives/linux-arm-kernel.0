@@ -1,125 +1,108 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Tue, 26 Jul 2016 23:04:31 +0200
-Subject: [PATCH] ARM: dts: sun8i: Add dts file for the Orange Pi PC Plus SBC
-Message-ID: <1469567071-5346-1-git-send-email-hdegoede@redhat.com>
+Date: Tue, 26 Jul 2016 23:07:23 +0200
+Subject: [PATCH 1/4] ARM: dts: sun8i: Extend Orange Pi PC dt to also
+ handle the PC Plus
+In-Reply-To: <20160725064033.GA7419@lukather>
+References: <1468095718-18515-1-git-send-email-hdegoede@redhat.com>
+ <20160713084505.GE4761@lukather>
+ <bce2b340-a930-8771-4560-dc61bf5828d5@redhat.com>
+ <20160725064033.GA7419@lukather>
+Message-ID: <74d3b5eb-601a-cc1d-a44e-fea2895fd8b2@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is a new Orange Pi PC *Plus* version available now,
-this is an extended version of the regular Orange Pi PC
-with sdio wifi and an eMMC.
+Hi,
 
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
- arch/arm/boot/dts/Makefile                      |  1 +
- arch/arm/boot/dts/sun8i-h3-orangepi-pc-plus.dts | 87 +++++++++++++++++++++++++
- 2 files changed, 88 insertions(+)
- create mode 100644 arch/arm/boot/dts/sun8i-h3-orangepi-pc-plus.dts
+On 07/25/2016 08:40 AM, Maxime Ripard wrote:
+> Hi,
+>
+> On Wed, Jul 13, 2016 at 12:01:41PM +0200, Hans de Goede wrote:
+>> Hi,
+>>
+>> On 13-07-16 10:45, Maxime Ripard wrote:
+>>> On Sat, Jul 09, 2016 at 10:21:55PM +0200, Hans de Goede wrote:
+>>>> There is a new Orange Pi PC Plus available now, rather then adding
+>>>> yet another dts file for this variant, extend the existing
+>>>> Orange Pi PC to support the sdio wifi and emmc found on this variant.
+>>>>
+>>>> Downside of this approach is the following messages in dmesg when run
+>>>> on the non Plus Orange Pi PC:
+>>>>
+>>>> sunxi-mmc 1c10000.mmc: fatal err update clk timeout
+>>>> sunxi-mmc 1c11000.mmc: smc 2 err, cmd 8, RTO !!
+>>>> sunxi-mmc 1c11000.mmc: smc 2 err, cmd 55, RTO !!
+>>>> sunxi-mmc 1c11000.mmc: smc 2 err, cmd 55, RTO !!
+>>>> sunxi-mmc 1c11000.mmc: smc 2 err, cmd 55, RTO !!
+>>>> sunxi-mmc 1c11000.mmc: smc 2 err, cmd 55, RTO !!
+>>>> sunxi-mmc 1c11000.mmc: smc 2 err, cmd 1, RTO !!
+>>>>
+>>>> Note these are completely harmless and there is no adverse effect
+>>>> to the functioning of the non Plus Orange Pi PC.
+>>>>
+>>>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>>>> ---
+>>>> arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts | 40 +++++++++++++++++++++++++++++-
+>>>> 1 file changed, 39 insertions(+), 1 deletion(-)
+>>>>
+>>>> diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
+>>>> index b8340f7..f9bf260 100644
+>>>> --- a/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
+>>>> +++ b/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
+>>>> @@ -49,11 +49,13 @@
+>>>> #include <dt-bindings/pinctrl/sun4i-a10.h>
+>>>>
+>>>> / {
+>>>> -	model = "Xunlong Orange Pi PC";
+>>>> +	model = "Xunlong Orange Pi PC / PC Plus";
+>>>> 	compatible = "xunlong,orangepi-pc", "allwinner,sun8i-h3";
+>>>>
+>>>> 	aliases {
+>>>> 		serial0 = &uart0;
+>>>> +		/* ethernet0 is the H3 emac, defined in sun8i-h3.dtsi */
+>>>> +		ethernet1 = &rtl8189ftv;
+>>>> 	};
+>>>>
+>>>> 	chosen {
+>>>> @@ -118,6 +120,42 @@
+>>>> 	status = "okay";
+>>>> };
+>>>>
+>>>> +/* Note only present on orangepi pc *plus* */
+>>>> +&mmc1 {
+>>>> +	pinctrl-names = "default";
+>>>> +	pinctrl-0 = <&mmc1_pins_a>;
+>>>> +	vmmc-supply = <&reg_vcc3v3>;
+>>>> +	bus-width = <4>;
+>>>> +	non-removable;
+>>>> +	status = "okay";
+>>>> +
+>>>> +	/*
+>>>> +	 * Explicitly define the sdio device, so that we can add an ethernet
+>>>> +	 * alias for it (which e.g. makes u-boot set a mac-address).
+>>>> +	 */
+>>>> +	rtl8189ftv: sdio_wifi at 1 {
+>>>> +		reg = <1>;
+>>>> +	};
+>>>> +};
+>>>
+>>> Nothing prevents you from including the orange pi pc dts, from the
+>>> orange pi plus dts.
+>>>
+>>> It prevents the duplication you were trying to avoid, and it doesn't
+>>> create all those spurious errors and devices.
+>>
+>> That would solve the copy paste problem on the kernel side, but that
+>> would still mean adding a new u-boot defconfig for this, which means that
+>> all the distro's which ship with prebuild u-boot binaries need to build
+>> for yet another board, something which I would like to avoid.
+>
+> Still, registering devices that are not present on the board is not an
+> option.
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 0d60794..3b280f4 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -770,6 +770,7 @@ dtb-$(CONFIG_MACH_SUN8I) += \
- 	sun8i-h3-orangepi-lite.dtb \
- 	sun8i-h3-orangepi-one.dtb \
- 	sun8i-h3-orangepi-pc.dtb \
-+	sun8i-h3-orangepi-pc-plus.dtb \
- 	sun8i-h3-orangepi-plus.dtb \
- 	sun8i-h3-sinovoip-bpi-m2-plus.dtb \
- 	sun8i-r16-parrot.dtb
-diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-pc-plus.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-pc-plus.dts
-new file mode 100644
-index 0000000..9a8cdd4
---- /dev/null
-+++ b/arch/arm/boot/dts/sun8i-h3-orangepi-pc-plus.dts
-@@ -0,0 +1,87 @@
-+/*
-+ * Copyright (C) 2016 Hans de Goede <hdegoede@redhat.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/* The Orange Pi PC Plus is an extended version of the regular PC */
-+#include "sun8i-h3-orangepi-pc.dts"
-+
-+/ {
-+	model = "Xunlong Orange Pi PC / PC Plus";
-+
-+	aliases {
-+		/* ethernet0 is the H3 emac, defined in sun8i-h3.dtsi */
-+		ethernet1 = &rtl8189ftv;
-+	};
-+};
-+
-+&mmc1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc1_pins_a>;
-+	vmmc-supply = <&reg_vcc3v3>;
-+	bus-width = <4>;
-+	non-removable;
-+	status = "okay";
-+
-+	/*
-+	 * Explicitly define the sdio device, so that we can add an ethernet
-+	 * alias for it (which e.g. makes u-boot set a mac-address).
-+	 */
-+	rtl8189ftv: sdio_wifi at 1 {
-+		reg = <1>;
-+	};
-+};
-+
-+&mmc2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc2_8bit_pins>;
-+	vmmc-supply = <&reg_vcc3v3>;
-+	bus-width = <8>;
-+	non-removable;
-+	cap-mmc-hw-reset;
-+	status = "okay";
-+};
-+
-+&mmc2_8bit_pins {
-+	/* Increase drive strength for DDR modes */
-+	allwinner,drive = <SUN4I_PINCTRL_40_MA>;
-+	/* eMMC is missing pull-ups */
-+	allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
-+};
--- 
-2.7.4
+Ok, new version send.
+
+What about the other 3 patches in this series ?
+
+Regards,
+
+Hans
