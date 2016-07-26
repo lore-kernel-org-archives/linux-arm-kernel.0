@@ -1,28 +1,45 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Tue, 26 Jul 2016 19:43:06 +0200
-Subject: [PATCH 4/9] clk: sunxi-ng: mux: Add support for mux tables
-In-Reply-To: <1469516671-19377-5-git-send-email-wens@csie.org>
-References: <1469516671-19377-1-git-send-email-wens@csie.org>
- <1469516671-19377-5-git-send-email-wens@csie.org>
-Message-ID: <20160726194306.9b6aadd3d1669bd6f5a54d99@free.fr>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 26 Jul 2016 18:45:56 +0100
+Subject: [PATCH] arm64: Fix Kconfig dependencies for RANDOMIZE_BASE
+In-Reply-To: <1469553415-26839-1-git-send-email-jeffv@google.com>
+References: <1469553415-26839-1-git-send-email-jeffv@google.com>
+Message-ID: <20160726174556.GH2423@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 26 Jul 2016 15:04:26 +0800
-Chen-Yu Tsai <wens@csie.org> wrote:
-
-> Some clock muxes have holes, i.e. invalid or unconnected inputs,
-> between parent mux values.
+On Tue, Jul 26, 2016 at 10:16:55AM -0700, Jeff Vander Stoep wrote:
+> Selecting CONFIG_RANDOMIZE_BASE=y and CONFIG_MODULES=n causes a
+> build error due to dependencies on modules. This patch makes KASLR
+> module config options dependent on CONFIG_MODULES=y.
 > 
-> Add support for specifying a mux table to map clock parents to
-> mux values.
+> Signed-off-by: Jeff Vander Stoep <jeffv@google.com>
+> ---
+>  arch/arm64/Kconfig | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index 7e23f95..c9eff79 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -891,7 +891,6 @@ config RELOCATABLE
+>  
+>  config RANDOMIZE_BASE
+>  	bool "Randomize the address of the kernel image"
+> -	select ARM64_MODULE_PLTS
+>  	select RELOCATABLE
+>  	help
+>  	  Randomizes the virtual address at which the kernel image is
 
-Putting empty strings in the holes should work. No?
-Ex:
+I thought we need the module PLTs once we randomize the kernel base,
+independent of whether we randomize the modules base or not. Could we do
+something like:
 
-static const char * const csi_mclk_parents[] =
-	{ "pll-video0", "pll-video1", "", "", "", "osc24M" };
+	select ARM64_MODULE_PLTS if MODULES
+
+Whichever way we fix this, we probably need:
+
+Fixes: f80fb3a3d508 ("arm64: add support for kernel ASLR")
+Cc: <stable@vger.kernel.org> # 4.6+
 
 -- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+Catalin
