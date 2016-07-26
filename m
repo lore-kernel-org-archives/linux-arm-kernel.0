@@ -1,100 +1,70 @@
-From: wxt@rock-chips.com (Caesar Wang)
-Date: Tue, 26 Jul 2016 22:47:16 +0800
-Subject: [PATCH v2 1/4] iio: adc: rockchip_saradc: reset saradc controller
- before programming it
-In-Reply-To: <57976814.3040605@roeck-us.net>
-References: <1469535195-5227-1-git-send-email-wxt@rock-chips.com>
- <57976814.3040605@roeck-us.net>
-Message-ID: <579777F4.2090002@rock-chips.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 26 Jul 2016 15:48:49 +0100
+Subject: [PATCH V7 1/8] ACPI: I/O Remapping Table (IORT) initial support
+In-Reply-To: <57976353.7080500@codeaurora.org>
+References: <1466420541-20101-2-git-send-email-tn@semihalf.com>
+ <1466598909-27504-1-git-send-email-tn@semihalf.com>
+ <576A91CC.3000101@arm.com> <576A9824.1060400@semihalf.com>
+ <576AA603.3080505@arm.com> <576B3CBD.60309@huawei.com>
+ <57976353.7080500@codeaurora.org>
+Message-ID: <20160726154849.350d9c1c@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, 26 Jul 2016 09:19:15 -0400
+Christopher Covington <cov@codeaurora.org> wrote:
 
-On 2016?07?26? 21:39, Guenter Roeck wrote:
->
->> static int rockchip_saradc_probe(struct platform_device *pdev)
->> {
->> struct rockchip_saradc *info = NULL;
->> @@ -218,6 +231,21 @@ static int rockchip_saradc_probe(struct 
->> platform_device *pdev)
->> if (IS_ERR(info->regs))
->> return PTR_ERR(info->regs);
->>
->> + /*
->> + * The reset should be an optional property, as it should work
->> + * with old devicetrees as well
->> + */
->> + info->reset = devm_reset_control_get_optional(&pdev->dev,
->> + "saradc-apb");
->
-> Does anyone know what the _optional API is for ? It seems to be 
-> exactly the same
-> as devm_reset_control_get().
+Hi Christopher,
 
-?
-As far as I see, the difference is WARN_ON(1)
-when CONFIG_RESET_CONTROLLER is not defined.
+> Hi Marc,
+> 
+> On 06/22/2016 09:34 PM, Hanjun Guo wrote:
+> > On 2016/6/22 22:51, Marc Zyngier wrote:  
+> >> On 22/06/16 14:52, Tomasz Nowicki wrote:  
+> >>> On 22.06.2016 15:25, Marc Zyngier wrote:  
+> >>>> On 22/06/16 13:35, Tomasz Nowicki wrote:  
+> >>>>> IORT shows representation of IO topology for ARM based systems.
+> >>>>> It describes how various components are connected together on
+> >>>>> parent-child basis e.g. PCI RC -> SMMU -> ITS. Also see IORT spec.
+> >>>>> http://infocenter.arm.com/help/topic/com.arm.doc.den0049b/DEN0049B_IO_Remapping_Table.pdf
+> >>>>>
+> >>>>> Initial support allows to detect IORT table presence and save its
+> >>>>> root pointer obtained through acpi_get_table(). The pointer validity
+> >>>>> depends on acpi_gbl_permanent_mmap because if acpi_gbl_permanent_mmap
+> >>>>> is not set while using IORT nodes we would dereference unmapped pointers.
+> >>>>>
+> >>>>> For the aforementioned reason call iort_table_detect() from acpi_init()
+> >>>>> which guarantees acpi_gbl_permanent_mmap to be set at that point.
+> >>>>>
+> >>>>> Add generic helpers which are helpful for scanning and retrieving
+> >>>>> information from IORT table content. List of the most important helpers:
+> >>>>> - iort_find_dev_node() finds IORT node for a given device
+> >>>>> - iort_node_map_rid() maps device RID and returns IORT node which provides
+> >>>>>    final translation
+> >>>>>
+> >>>>> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+> >>>>> ---
+> >>>>>   drivers/acpi/Kconfig  |   3 +
+> >>>>>   drivers/acpi/Makefile |   1 +
+> >>>>>   drivers/acpi/bus.c    |   2 +
+> >>>>>   drivers/acpi/iort.c   | 217 ++++++++++++++++++++++++++++++++++++++++++++++++++
+> >>>>>   include/linux/iort.h  |  30 +++++++
+> >>>>>   5 files changed, 253 insertions(+)
+> >>>>>   create mode 100644 drivers/acpi/iort.c
+> >>>>>   create mode 100644 include/linux/iort.h  
+> 
+> > I tracked Marc's tree on git.kernel.org, it's  acpi_os_free(buffer.pointer) there so
+> > my worry is gone :)  
+> 
+> Do you plan on submitting this during the 4.8 merge window?
 
+Short of having received the necessary Ack from the ACPI maintainer,
+the answer is unfortunately negative. I'm hoping that the new split
+ACPI maintenance between generic code and arm64 will help getting
+things moving for 4.9.
 
-The _optional functions were introduced by the following commit:
+Thanks,
 
------------------>8-----------------
-commit b424080a9e086e683ad5fdc624a7cf3c024e0c0f
-Author: Philipp Zabel <p.zabel@xxxxxxxxxxxxxx>
-Date: Fri Mar 7 15:18:47 2014 +0100
-
-reset: Add optional resets and stubs
-
-This patch adds device_reset_optional and (devm_)reset_control_get_optional
-variants that drivers can use to indicate they can function without control
-over the reset line. For those functions, stubs are added so the drivers 
-can
-be compiled with CONFIG_RESET_CONTROLLER disabled.
-Also, device_reset is annotated with __must_check. Drivers
-ignoring the return
-value should use device_reset_optional instead.
-
-Signed-off-by: Philipp Zabel <p.zabel@xxxxxxxxxxxxxx>
-------------------8<-----------------------------
-?
-
-for more information on 
-http://www.spinics.net/lists/kernel/msg2306677.html :-)
-
->
-> Guenter
->
->> + if (IS_ERR(info->reset)) {
->> + ret = PTR_ERR(info->reset);
->> + if (ret != -ENOENT)
->> + return ret;
->> +
->> + dev_dbg(&pdev->dev, "no reset control found\n");
->> + info->reset = NULL;
->> + }
->> +
->> init_completion(&info->completion);
->>
->> irq = platform_get_irq(pdev, 0);
->> @@ -252,6 +280,9 @@ static int rockchip_saradc_probe(struct 
->> platform_device *pdev)
->> return PTR_ERR(info->vref);
->> }
->>
->> + if (info->reset)
->> + rockchip_saradc_reset_controller(info->reset);
->> +
->> /*
->> * Use a default value for the converter clock.
->> * This may become user-configurable in the future.
->>
->
->
-> _______________________________________________
-> Linux-rockchip mailing list
-> Linux-rockchip at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-rockchip
-
-
+	M.
 -- 
-caesar wang | software engineer | wxt at rock-chip.com
+Jazz is not dead. It just smells funny.
