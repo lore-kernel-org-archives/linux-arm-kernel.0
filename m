@@ -1,48 +1,100 @@
-From: seanpaul@chromium.org (Sean Paul)
-Date: Tue, 26 Jul 2016 10:27:09 -0400
-Subject: [STLinux Kernel] [PATCH 1/1] drm/sti: use new Reset API
-In-Reply-To: <20160725104015.GK14925@dell>
-References: <20160725100933.9261-1-lee.jones@linaro.org>
- <20160725103232.GA4278@griffinp-ThinkPad-X1-Carbon-2nd>
- <20160725104015.GK14925@dell>
-Message-ID: <CAOw6vbLCQG6CJ2adntdSDsV2djmOKv0hS3Ks6niNEanXOR1u9w@mail.gmail.com>
+From: wxt@rock-chips.com (Caesar Wang)
+Date: Tue, 26 Jul 2016 22:47:16 +0800
+Subject: [PATCH v2 1/4] iio: adc: rockchip_saradc: reset saradc controller
+ before programming it
+In-Reply-To: <57976814.3040605@roeck-us.net>
+References: <1469535195-5227-1-git-send-email-wxt@rock-chips.com>
+ <57976814.3040605@roeck-us.net>
+Message-ID: <579777F4.2090002@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 25, 2016 at 6:40 AM, Lee Jones <lee.jones@linaro.org> wrote:
-> On Mon, 25 Jul 2016, Peter Griffin wrote:
->> On Mon, 25 Jul 2016, Lee Jones wrote:
->>
->> > Since 0b52297f228 ("reset: Add support for shared reset controls") the
->> > new Reset API now demands consumers choose either an *_exclusive or a
->> > *_shared line when requesting reset lines.
->> >
->> > This issue was found when running a kernel containing the aforementioned
->> > patch  which includes an informitive WARN().  It implies that one or
->> > more used reset lines are in fact shared.  This is why we're using the
->> > *_shared variant.
->> >
->> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
->> > ---
->> >  drivers/gpu/drm/sti/sti_compositor.c | 4 ++--
->> >  1 file changed, 2 insertions(+), 2 deletions(-)
->>
->> Your missing a changelog on the v2 version.
->
-> This isn't really a v2, hence the lack if [PATCH vX] increment.
->
-> This is v1 with a more verbose changelog.
->
->> Apart from that:
->>  Acked-by: Peter Griffin <peter.griffin@linaro.org>
->
-> Ta.
 
-Applied to drm-misc, thanks for revising.
+On 2016?07?26? 21:39, Guenter Roeck wrote:
+>
+>> static int rockchip_saradc_probe(struct platform_device *pdev)
+>> {
+>> struct rockchip_saradc *info = NULL;
+>> @@ -218,6 +231,21 @@ static int rockchip_saradc_probe(struct 
+>> platform_device *pdev)
+>> if (IS_ERR(info->regs))
+>> return PTR_ERR(info->regs);
+>>
+>> + /*
+>> + * The reset should be an optional property, as it should work
+>> + * with old devicetrees as well
+>> + */
+>> + info->reset = devm_reset_control_get_optional(&pdev->dev,
+>> + "saradc-apb");
+>
+> Does anyone know what the _optional API is for ? It seems to be 
+> exactly the same
+> as devm_reset_control_get().
+
+?
+As far as I see, the difference is WARN_ON(1)
+when CONFIG_RESET_CONTROLLER is not defined.
+
+
+The _optional functions were introduced by the following commit:
+
+----------------->8-----------------
+commit b424080a9e086e683ad5fdc624a7cf3c024e0c0f
+Author: Philipp Zabel <p.zabel@xxxxxxxxxxxxxx>
+Date: Fri Mar 7 15:18:47 2014 +0100
+
+reset: Add optional resets and stubs
+
+This patch adds device_reset_optional and (devm_)reset_control_get_optional
+variants that drivers can use to indicate they can function without control
+over the reset line. For those functions, stubs are added so the drivers 
+can
+be compiled with CONFIG_RESET_CONTROLLER disabled.
+Also, device_reset is annotated with __must_check. Drivers
+ignoring the return
+value should use device_reset_optional instead.
+
+Signed-off-by: Philipp Zabel <p.zabel@xxxxxxxxxxxxxx>
+------------------8<-----------------------------
+?
+
+for more information on 
+http://www.spinics.net/lists/kernel/msg2306677.html :-)
 
 >
-> --
-> Lee Jones
-> Linaro STMicroelectronics Landing Team Lead
-> Linaro.org ? Open source software for ARM SoCs
-> Follow Linaro: Facebook | Twitter | Blog
+> Guenter
+>
+>> + if (IS_ERR(info->reset)) {
+>> + ret = PTR_ERR(info->reset);
+>> + if (ret != -ENOENT)
+>> + return ret;
+>> +
+>> + dev_dbg(&pdev->dev, "no reset control found\n");
+>> + info->reset = NULL;
+>> + }
+>> +
+>> init_completion(&info->completion);
+>>
+>> irq = platform_get_irq(pdev, 0);
+>> @@ -252,6 +280,9 @@ static int rockchip_saradc_probe(struct 
+>> platform_device *pdev)
+>> return PTR_ERR(info->vref);
+>> }
+>>
+>> + if (info->reset)
+>> + rockchip_saradc_reset_controller(info->reset);
+>> +
+>> /*
+>> * Use a default value for the converter clock.
+>> * This may become user-configurable in the future.
+>>
+>
+>
+> _______________________________________________
+> Linux-rockchip mailing list
+> Linux-rockchip at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-rockchip
+
+
+-- 
+caesar wang | software engineer | wxt at rock-chip.com
