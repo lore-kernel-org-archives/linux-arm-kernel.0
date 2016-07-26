@@ -1,62 +1,78 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 26 Jul 2016 22:30:34 +0200
-Subject: [PATCH 06/13] clk: sunxi-ng: sun8i: Move fixed factors around
+Date: Tue, 26 Jul 2016 22:30:29 +0200
+Subject: [PATCH 01/13] clk: sunxi-ng: mux: Rename mux macro to be consistent
 In-Reply-To: <20160726203041.29366-1-maxime.ripard@free-electrons.com>
 References: <20160726203041.29366-1-maxime.ripard@free-electrons.com>
-Message-ID: <20160726203041.29366-7-maxime.ripard@free-electrons.com>
+Message-ID: <20160726203041.29366-2-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move the fixed factors clocks before the ccu_common list so that we can
-separate the clocks definitions and the registration part.
+Rename the internal mux macro to be consistent with the other internal
+structure macros.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/clk/sunxi-ng/ccu-sun8i-h3.c | 25 +++++++++++++------------
- 1 file changed, 13 insertions(+), 12 deletions(-)
+ drivers/clk/sunxi-ng/ccu_div.h | 2 +-
+ drivers/clk/sunxi-ng/ccu_mp.h  | 2 +-
+ drivers/clk/sunxi-ng/ccu_mux.h | 6 +++---
+ 3 files changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/clk/sunxi-ng/ccu-sun8i-h3.c b/drivers/clk/sunxi-ng/ccu-sun8i-h3.c
-index f61d2e245ac4..ec8c67201e8e 100644
---- a/drivers/clk/sunxi-ng/ccu-sun8i-h3.c
-+++ b/drivers/clk/sunxi-ng/ccu-sun8i-h3.c
-@@ -484,6 +484,19 @@ static SUNXI_CCU_M_WITH_MUX_GATE(mbus_h3_clk, "mbus", mbus_h3_parents,
- static SUNXI_CCU_M_WITH_GATE(gpu_clk, "gpu", "pll-gpu",
- 			     0x1a0, 0, 3, BIT(31), 0);
- 
-+/* Fixed Factor clocks */
-+/* We hardcode the divider to 4 for now */
-+static CLK_FIXED_FACTOR(pll_audio_clk, "pll-audio",
-+			"pll-audio-base", 4, 1, CLK_SET_RATE_PARENT);
-+static CLK_FIXED_FACTOR(pll_audio_2x_clk, "pll-audio-2x",
-+			"pll-audio-base", 2, 1, CLK_SET_RATE_PARENT);
-+static CLK_FIXED_FACTOR(pll_audio_4x_clk, "pll-audio-4x",
-+			"pll-audio-base", 1, 1, CLK_SET_RATE_PARENT);
-+static CLK_FIXED_FACTOR(pll_audio_8x_clk, "pll-audio-8x",
-+			"pll-audio-base", 1, 2, CLK_SET_RATE_PARENT);
-+static CLK_FIXED_FACTOR(pll_periph0_2x_clk, "pll-periph0-2x",
-+			"pll-periph0", 1, 2, 0);
-+
- static struct ccu_common *sun8i_h3_ccu_clks[] = {
- 	&pll_cpux_clk.common,
- 	&pll_audio_base_clk.common,
-@@ -597,18 +610,6 @@ static struct ccu_common *sun8i_h3_ccu_clks[] = {
- 	&gpu_clk.common,
+diff --git a/drivers/clk/sunxi-ng/ccu_div.h b/drivers/clk/sunxi-ng/ccu_div.h
+index 653ade5769b3..5d98549e23a6 100644
+--- a/drivers/clk/sunxi-ng/ccu_div.h
++++ b/drivers/clk/sunxi-ng/ccu_div.h
+@@ -83,7 +83,7 @@ struct ccu_div {
+ 	struct ccu_div _struct = {					\
+ 		.enable	= _gate,					\
+ 		.div	= _SUNXI_CCU_DIV(_mshift, _mwidth),		\
+-		.mux	= SUNXI_CLK_MUX(_muxshift, _muxwidth),		\
++		.mux	= _SUNXI_CCU_MUX(_muxshift, _muxwidth),		\
+ 		.common	= {						\
+ 			.reg		= _reg,				\
+ 			.hw.init	= CLK_HW_INIT_PARENTS(_name,	\
+diff --git a/drivers/clk/sunxi-ng/ccu_mp.h b/drivers/clk/sunxi-ng/ccu_mp.h
+index 3cf12bf95962..edf9215ea8cc 100644
+--- a/drivers/clk/sunxi-ng/ccu_mp.h
++++ b/drivers/clk/sunxi-ng/ccu_mp.h
+@@ -44,7 +44,7 @@ struct ccu_mp {
+ 		.enable	= _gate,					\
+ 		.m	= _SUNXI_CCU_DIV(_mshift, _mwidth),		\
+ 		.p	= _SUNXI_CCU_DIV(_pshift, _pwidth),		\
+-		.mux	= SUNXI_CLK_MUX(_muxshift, _muxwidth),		\
++		.mux	= _SUNXI_CCU_MUX(_muxshift, _muxwidth),		\
+ 		.common	= {						\
+ 			.reg		= _reg,				\
+ 			.hw.init	= CLK_HW_INIT_PARENTS(_name,	\
+diff --git a/drivers/clk/sunxi-ng/ccu_mux.h b/drivers/clk/sunxi-ng/ccu_mux.h
+index 945082631e7d..95cfecec3c39 100644
+--- a/drivers/clk/sunxi-ng/ccu_mux.h
++++ b/drivers/clk/sunxi-ng/ccu_mux.h
+@@ -21,7 +21,7 @@ struct ccu_mux_internal {
+ 	} variable_prediv;
  };
  
--/* We hardcode the divider to 4 for now */
--static CLK_FIXED_FACTOR(pll_audio_clk, "pll-audio",
--			"pll-audio-base", 4, 1, CLK_SET_RATE_PARENT);
--static CLK_FIXED_FACTOR(pll_audio_2x_clk, "pll-audio-2x",
--			"pll-audio-base", 2, 1, CLK_SET_RATE_PARENT);
--static CLK_FIXED_FACTOR(pll_audio_4x_clk, "pll-audio-4x",
--			"pll-audio-base", 1, 1, CLK_SET_RATE_PARENT);
--static CLK_FIXED_FACTOR(pll_audio_8x_clk, "pll-audio-8x",
--			"pll-audio-base", 1, 2, CLK_SET_RATE_PARENT);
--static CLK_FIXED_FACTOR(pll_periph0_2x_clk, "pll-periph0-2x",
--			"pll-periph0", 1, 2, 0);
--
- static struct clk_hw_onecell_data sun8i_h3_hw_clks = {
- 	.hws	= {
- 		[CLK_PLL_CPUX]		= &pll_cpux_clk.common.hw,
+-#define SUNXI_CLK_MUX(_shift, _width)	\
++#define _SUNXI_CCU_MUX(_shift, _width)		\
+ 	{					\
+ 		.shift	= _shift,		\
+ 		.width	= _width,		\
+@@ -37,7 +37,7 @@ struct ccu_mux {
+ 
+ #define SUNXI_CCU_MUX(_struct, _name, _parents, _reg, _shift, _width, _flags) \
+ 	struct ccu_mux _struct = {					\
+-		.mux	= SUNXI_CLK_MUX(_shift, _width),		\
++		.mux	= _SUNXI_CCU_MUX(_shift, _width),		\
+ 		.common	= {						\
+ 			.reg		= _reg,				\
+ 			.hw.init	= CLK_HW_INIT_PARENTS(_name,	\
+@@ -51,7 +51,7 @@ struct ccu_mux {
+ 				_shift, _width, _gate, _flags)		\
+ 	struct ccu_mux _struct = {					\
+ 		.enable	= _gate,					\
+-		.mux	= SUNXI_CLK_MUX(_shift, _width),		\
++		.mux	= _SUNXI_CCU_MUX(_shift, _width),		\
+ 		.common	= {						\
+ 			.reg		= _reg,				\
+ 			.hw.init	= CLK_HW_INIT_PARENTS(_name,	\
 -- 
 2.9.2
