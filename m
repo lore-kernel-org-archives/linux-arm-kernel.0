@@ -1,88 +1,79 @@
-From: rsahu@apm.com (Rameshwar Prasad Sahu)
-Date: Tue, 26 Jul 2016 14:50:57 +0530
-Subject: [PATCH] ata: xgene: Enable NCQ support for APM X-Gene SATA controller
- hardware v1.1
-Message-ID: <1469524857-3720-1-git-send-email-rsahu@apm.com>
+From: quentin.schulz@free-electrons.com (Quentin Schulz)
+Date: Tue, 26 Jul 2016 11:33:59 +0200
+Subject: [PATCH v3 1/4] hwmon: iio_hwmon: delay probing with late_initcall
+In-Reply-To: <5277864.qlyRKbC1Zy@ws-stein>
+References: <1469519027-11387-1-git-send-email-quentin.schulz@free-electrons.com>
+ <209942367.uny0GxrY2s@ws-stein>
+ <10d14cc4-26f1-8f2d-2997-3b2bc323c40e@free-electrons.com>
+ <5277864.qlyRKbC1Zy@ws-stein>
+Message-ID: <ed5c1761-bdc7-df9c-96c8-998e83c49c4c@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables NCQ support for APM X-Gene SATA controller
-hardware v1.1 that was broken with hardware v1.0.
+On 26/07/2016 11:05, Alexander Stein wrote:
+> On Tuesday 26 July 2016 10:24:48, Quentin Schulz wrote:
+>> On 26/07/2016 10:21, Alexander Stein wrote:
+>>> On Tuesday 26 July 2016 09:43:44, Quentin Schulz wrote:
+>>>> iio_channel_get_all returns -ENODEV when it cannot find either phandles
+>>>> and
+>>>> properties in the Device Tree or channels whose consumer_dev_name matches
+>>>> iio_hwmon in iio_map_list. The iio_map_list is filled in by iio drivers
+>>>> which might be probed after iio_hwmon.
+>>>
+>>> Would it work if iio_channel_get_all returning ENODEV is used for
+>>> returning
+>>> EPROBE_DEFER in iio_channel_get_all? Using late initcalls for
+>>> driver/device
+>>> dependencies seems not right for me at this place.
+>>
+>> Then what if the iio_channel_get_all is called outside of the probe of a
+>> driver? We'll have to change the error code, things we are apparently
+>> trying to avoid (see v2 patches' discussions).
+> 
+> Maybe I didn't express my idea enough. I don't want to change the behavior of  
+> iio_channel_get_all at all. Just the result evaluation of iio_channel_get_all 
+> in iio_hwmon_probe. I have something link the patch below in mind.
+> 
+> Best regards,
+> Alexander
+> ---
+> diff --git a/drivers/hwmon/iio_hwmon.c b/drivers/hwmon/iio_hwmon.c
+> index b550ba5..e32d150 100644
+> --- a/drivers/hwmon/iio_hwmon.c
+> +++ b/drivers/hwmon/iio_hwmon.c
+> @@ -73,8 +73,12 @@ static int iio_hwmon_probe(struct platform_device *pdev)
+>                 name = dev->of_node->name;
+>  
+>         channels = iio_channel_get_all(dev);
+> -       if (IS_ERR(channels))
+> -               return PTR_ERR(channels);
+> +       if (IS_ERR(channels)) {
+> +               if (PTR_ERR(channels) == -ENODEV)
+> +                       return -EPROBE_DEFER;
+> +               else
+> +                       return PTR_ERR(channels);
+> +       }
+>  
+>         st = devm_kzalloc(dev, sizeof(*st), GFP_KERNEL);
+>         if (st == NULL) {
 
-Signed-off-by: Rameshwar Prasad Sahu <rsahu@apm.com>
----
- drivers/ata/ahci_xgene.c |   14 ++++++++------
- 1 files changed, 8 insertions(+), 6 deletions(-)
+Indeed, I misunderstood what you told me.
 
-diff --git a/drivers/ata/ahci_xgene.c b/drivers/ata/ahci_xgene.c
-index 73b19b2..8b88be9 100644
---- a/drivers/ata/ahci_xgene.c
-+++ b/drivers/ata/ahci_xgene.c
-@@ -87,6 +87,7 @@
+Actually, the patch you proposed is part of my v1
+(https://lkml.org/lkml/2016/6/28/203) and v2
+(https://lkml.org/lkml/2016/7/15/215).
+Jonathan and Guenter didn't really like the idea of changing the -ENODEV
+in -EPROBE_DEFER.
 
- enum xgene_ahci_version {
- 	XGENE_AHCI_V1 = 1,
-+	XGENE_AHCI_V1_1,
- 	XGENE_AHCI_V2,
- };
+What I thought you were proposing was to change the -ENODEV return code
+inside iio_channel_get_all. This cannot be an option since the function
+might be called outside of a probe (it is not yet, but might be in the
+future?).
 
-@@ -734,6 +735,7 @@ static struct scsi_host_template ahci_platform_sht = {
- #ifdef CONFIG_ACPI
- static const struct acpi_device_id xgene_ahci_acpi_match[] = {
- 	{ "APMC0D0D", XGENE_AHCI_V1},
-+	{ "APMC0D67", XGENE_AHCI_V1_1},
- 	{ "APMC0D32", XGENE_AHCI_V2},
- 	{},
- };
-@@ -742,6 +744,7 @@ MODULE_DEVICE_TABLE(acpi, xgene_ahci_acpi_match);
+Of what I understood, two possibilities are then possible (proposed
+either by Guenter or Jonathan): either rework the iio framework to
+register iio map array earlier or to use late_initcall instead of init
+for the driver consuming the iio channels.
 
- static const struct of_device_id xgene_ahci_of_match[] = {
- 	{.compatible = "apm,xgene-ahci", .data = (void *) XGENE_AHCI_V1},
-+	{.compatible = "apm,xgene-ahci-v1-1", .data = (void *) XGENE_AHCI_V1_1},
- 	{.compatible = "apm,xgene-ahci-v2", .data = (void *) XGENE_AHCI_V2},
- 	{},
- };
-@@ -755,8 +758,7 @@ static int xgene_ahci_probe(struct platform_device *pdev)
- 	struct resource *res;
- 	const struct of_device_id *of_devid;
- 	enum xgene_ahci_version version = XGENE_AHCI_V1;
--	const struct ata_port_info *ppi[] = { &xgene_ahci_v1_port_info,
--					      &xgene_ahci_v2_port_info };
-+	const struct ata_port_info *ppi;
- 	int rc;
-
- 	hpriv = ahci_platform_get_resources(pdev);
-@@ -821,8 +823,6 @@ static int xgene_ahci_probe(struct platform_device *pdev)
- 				dev_warn(&pdev->dev, "%s: Error reading device info. Assume version1\n",
- 					__func__);
- 				version = XGENE_AHCI_V1;
--			} else if (info->valid & ACPI_VALID_CID) {
--				version = XGENE_AHCI_V2;
- 			}
- 		}
- 	}
-@@ -858,18 +858,20 @@ skip_clk_phy:
-
- 	switch (version) {
- 	case XGENE_AHCI_V1:
-+		ppi = &xgene_ahci_v1_port_info;
- 		hpriv->flags = AHCI_HFLAG_NO_NCQ;
- 		break;
- 	case XGENE_AHCI_V2:
-+		ppi = &xgene_ahci_v2_port_info;
- 		hpriv->flags |= AHCI_HFLAG_YES_FBS;
- 		hpriv->irq_handler = xgene_ahci_irq_intr;
- 		break;
- 	default:
-+		ppi = &xgene_ahci_v1_port_info;
- 		break;
- 	}
-
--	rc = ahci_platform_init_host(pdev, hpriv, ppi[version - 1],
--				     &ahci_platform_sht);
-+	rc = ahci_platform_init_host(pdev, hpriv, ppi, &ahci_platform_sht);
- 	if (rc)
- 		goto disable_resources;
-
---
-1.7.1
+Thanks,
+Quentin
