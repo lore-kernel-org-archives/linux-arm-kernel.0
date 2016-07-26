@@ -1,82 +1,40 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Tue, 26 Jul 2016 10:01:32 +0200
-Subject: [PATCH 1/2] ARM: dts: alpine: add valid clock-frequency values
-Message-ID: <20160726080133.31686-1-antoine.tenart@free-electrons.com>
+Date: Tue, 26 Jul 2016 10:01:33 +0200
+Subject: [PATCH 2/2] ARM: dts: alpine: remove 0x's from the node unit addresses
+In-Reply-To: <20160726080133.31686-1-antoine.tenart@free-electrons.com>
+References: <20160726080133.31686-1-antoine.tenart@free-electrons.com>
+Message-ID: <20160726080133.31686-2-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update the Alpine clock-frequency values with valid default values. The
-bootloader can still update these values if needed, but at least we can
-boot if it does not.
+Remove 0x's from the node unit addresses to be have consistent nodes.
 
 Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 ---
- arch/arm/boot/dts/alpine.dtsi | 14 +++++++-------
- 1 file changed, 7 insertions(+), 7 deletions(-)
+ arch/arm/boot/dts/alpine.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm/boot/dts/alpine.dtsi b/arch/arm/boot/dts/alpine.dtsi
-index db8752fc480e..feb41cdafaea 100644
+index feb41cdafaea..d885ceb08f2a 100644
 --- a/arch/arm/boot/dts/alpine.dtsi
 +++ b/arch/arm/boot/dts/alpine.dtsi
-@@ -41,28 +41,28 @@
- 			compatible = "arm,cortex-a15";
- 			device_type = "cpu";
- 			reg = <0>;
--			clock-frequency = <0>; /* Filled by loader */
-+			clock-frequency = <1700000000>;
- 		};
- 
- 		cpu at 1 {
- 			compatible = "arm,cortex-a15";
- 			device_type = "cpu";
- 			reg = <1>;
--			clock-frequency = <0>; /* Filled by loader */
-+			clock-frequency = <1700000000>;
- 		};
- 
- 		cpu at 2 {
- 			compatible = "arm,cortex-a15";
- 			device_type = "cpu";
- 			reg = <2>;
--			clock-frequency = <0>; /* Filled by loader */
-+			clock-frequency = <1700000000>;
- 		};
- 
- 		cpu at 3 {
- 			compatible = "arm,cortex-a15";
- 			device_type = "cpu";
- 			reg = <3>;
--			clock-frequency = <0>; /* Filled by loader */
-+			clock-frequency = <1700000000>;
- 		};
- 	};
- 
-@@ -81,7 +81,7 @@
- 				<GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
- 				<GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
- 				<GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
--			clock-frequency = <0>; /* Filled by loader */
-+			clock-frequency = <50000000>;
- 		};
- 
- 		/* Interrupt Controller */
-@@ -123,7 +123,7 @@
- 		uart0:uart at fd883000 {
- 			compatible = "ns16550a";
- 			reg = <0x0 0xfd883000 0x0 0x1000>;
--			clock-frequency = <0>; /* Filled by loader */
-+			clock-frequency = <375000000>;
- 			interrupts = <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>;
- 			reg-shift = <2>;
+@@ -129,7 +129,7 @@
  			reg-io-width = <4>;
-@@ -132,7 +132,7 @@
- 		uart1:uart at 0xfd884000 {
+ 		};
+ 
+-		uart1:uart at 0xfd884000 {
++		uart1:uart at fd884000 {
  			compatible = "ns16550a";
  			reg = <0x0 0xfd884000 0x0 0x1000>;
--			clock-frequency = <0>; /* Filled by loader */
-+			clock-frequency = <375000000>;
- 			interrupts = <GIC_SPI 18 IRQ_TYPE_LEVEL_HIGH>;
- 			reg-shift = <2>;
- 			reg-io-width = <4>;
+ 			clock-frequency = <375000000>;
+@@ -139,7 +139,7 @@
+ 		};
+ 
+ 		/* Internal PCIe Controller */
+-		pcie-internal at 0xfbc00000 {
++		pcie-internal at fbc00000 {
+ 			compatible = "pci-host-ecam-generic";
+ 			device_type = "pci";
+ 			#size-cells = <2>;
 -- 
 2.9.2
