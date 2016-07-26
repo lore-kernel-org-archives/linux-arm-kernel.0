@@ -1,100 +1,88 @@
-From: fu.wei@linaro.org (Fu Wei)
-Date: Tue, 26 Jul 2016 17:21:03 +0800
-Subject: [PATCH v9 4/9] clocksource/drivers/arm_arch_timer: use readq to
- get 64-bit CNTVCT
-In-Reply-To: <20160725224957.GU1041@n2100.armlinux.org.uk>
-References: <1469460427-8643-1-git-send-email-fu.wei@linaro.org>
- <1469460427-8643-5-git-send-email-fu.wei@linaro.org>
- <20160725153118.GD19209@arm.com>
- <CADyBb7ubKceQiB7+u7sSA=1+9_VMUrGjiabf_FkN2-n4rq7Kgg@mail.gmail.com>
- <20160725163144.GE19209@arm.com> <20160725224957.GU1041@n2100.armlinux.org.uk>
-Message-ID: <CADyBb7s__Cr1v1UBS+CdSNGcAAZTgPYG+DmzcmwMsDDy8sDnxg@mail.gmail.com>
+From: rsahu@apm.com (Rameshwar Prasad Sahu)
+Date: Tue, 26 Jul 2016 14:50:57 +0530
+Subject: [PATCH] ata: xgene: Enable NCQ support for APM X-Gene SATA controller
+ hardware v1.1
+Message-ID: <1469524857-3720-1-git-send-email-rsahu@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell King,
+This patch enables NCQ support for APM X-Gene SATA controller
+hardware v1.1 that was broken with hardware v1.0.
 
-On 26 July 2016 at 06:49, Russell King - ARM Linux
-<linux@armlinux.org.uk> wrote:
-> On Mon, Jul 25, 2016 at 05:31:45PM +0100, Will Deacon wrote:
->> On Mon, Jul 25, 2016 at 11:55:49PM +0800, Fu Wei wrote:
->> > On 25 July 2016 at 23:31, Will Deacon <will.deacon@arm.com> wrote:
->> > > On Mon, Jul 25, 2016 at 11:27:02PM +0800, fu.wei at linaro.org wrote:
->> > >> From: Fu Wei <fu.wei@linaro.org>
->> > >>
->> > >> This patch simplify arch_counter_get_cntvct_mem function by
->> > >> using readq to get 64-bit CNTVCT value instead of readl_relaxed.
->> > >>
->> > >> Signed-off-by: Fu Wei <fu.wei@linaro.org>
->> > >> ---
->> > >>  drivers/clocksource/arm_arch_timer.c | 10 +---------
->> > >>  1 file changed, 1 insertion(+), 9 deletions(-)
->> > >>
->> > >> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
->> > >> index e6fd42d..483d2f9 100644
->> > >> --- a/drivers/clocksource/arm_arch_timer.c
->> > >> +++ b/drivers/clocksource/arm_arch_timer.c
->> > >> @@ -418,15 +418,7 @@ u32 arch_timer_get_rate(void)
->> > >>
->> > >>  static u64 arch_counter_get_cntvct_mem(void)
->> > >>  {
->> > >> -     u32 vct_lo, vct_hi, tmp_hi;
->> > >> -
->> > >> -     do {
->> > >> -             vct_hi = readl_relaxed(arch_counter_base + CNTVCT_HI);
->> > >> -             vct_lo = readl_relaxed(arch_counter_base + CNTVCT_LO);
->> > >> -             tmp_hi = readl_relaxed(arch_counter_base + CNTVCT_HI);
->> > >> -     } while (vct_hi != tmp_hi);
->> > >> -
->> > >> -     return ((u64) vct_hi << 32) | vct_lo;
->> > >> +     return readq(arch_counter_base + CNTVCT_LO);
->> > >
->> > > Please drop this patch. It doesn't work.
->> >
->> > I am OK to drop this, but could you let me know why it doesn't work?
->> >
->> > I did get some problem on Foundation model about readq, but it works on Seattle.
->> > I guess that is a problem of model, but not a code problem.
->> > So I just got confused, why readq  doesn't work,  :-)
->>
->> The kernel really needs to support both of those platforms :/
->>
->> For the memory-mapped counter registers, the architecture says:
->>
->>   `If the implementation supports 64-bit atomic accesses, then the
->>    CNTV_CVAL register must be accessible as an atomic 64-bit value.'
->>
->> which is borderline tautological. If we take the generous reading that
->> this means AArch64 CPUs can use readq (and I'm not completely
->> comfortable with that assertion, particularly as you say that it breaks
->> the model), then you still need to use readq_relaxed here to avoid a
->> DSB. Furthermore, what are you going to do for AArch32? readq doesn't
->> exist over there, and if you use the generic implementation then it's
->> not atomic. In which case, we end up with the current code, as well as a
->> readq_relaxed guarded by a questionable #ifdef that is known to break a
->> supported platform for an unknown performance improvement. Hardly a big
->> win.
->>
->> Did you see any performance advantage from this? Given that you've added
->> a DSB, this looks to be extremely premature.
->
-> +1, absolutely agreed on the 32-bit ARM bits.
+Signed-off-by: Rameshwar Prasad Sahu <rsahu@apm.com>
+---
+ drivers/ata/ahci_xgene.c |   14 ++++++++------
+ 1 files changed, 8 insertions(+), 6 deletions(-)
 
-Sorry for misunderstanding it, will drop it in v10.
+diff --git a/drivers/ata/ahci_xgene.c b/drivers/ata/ahci_xgene.c
+index 73b19b2..8b88be9 100644
+--- a/drivers/ata/ahci_xgene.c
++++ b/drivers/ata/ahci_xgene.c
+@@ -87,6 +87,7 @@
 
-Great thanks for your help! :-)
+ enum xgene_ahci_version {
+ 	XGENE_AHCI_V1 = 1,
++	XGENE_AHCI_V1_1,
+ 	XGENE_AHCI_V2,
+ };
 
->
-> --
-> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-> FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-> according to speedtest.net.
+@@ -734,6 +735,7 @@ static struct scsi_host_template ahci_platform_sht = {
+ #ifdef CONFIG_ACPI
+ static const struct acpi_device_id xgene_ahci_acpi_match[] = {
+ 	{ "APMC0D0D", XGENE_AHCI_V1},
++	{ "APMC0D67", XGENE_AHCI_V1_1},
+ 	{ "APMC0D32", XGENE_AHCI_V2},
+ 	{},
+ };
+@@ -742,6 +744,7 @@ MODULE_DEVICE_TABLE(acpi, xgene_ahci_acpi_match);
 
+ static const struct of_device_id xgene_ahci_of_match[] = {
+ 	{.compatible = "apm,xgene-ahci", .data = (void *) XGENE_AHCI_V1},
++	{.compatible = "apm,xgene-ahci-v1-1", .data = (void *) XGENE_AHCI_V1_1},
+ 	{.compatible = "apm,xgene-ahci-v2", .data = (void *) XGENE_AHCI_V2},
+ 	{},
+ };
+@@ -755,8 +758,7 @@ static int xgene_ahci_probe(struct platform_device *pdev)
+ 	struct resource *res;
+ 	const struct of_device_id *of_devid;
+ 	enum xgene_ahci_version version = XGENE_AHCI_V1;
+-	const struct ata_port_info *ppi[] = { &xgene_ahci_v1_port_info,
+-					      &xgene_ahci_v2_port_info };
++	const struct ata_port_info *ppi;
+ 	int rc;
 
+ 	hpriv = ahci_platform_get_resources(pdev);
+@@ -821,8 +823,6 @@ static int xgene_ahci_probe(struct platform_device *pdev)
+ 				dev_warn(&pdev->dev, "%s: Error reading device info. Assume version1\n",
+ 					__func__);
+ 				version = XGENE_AHCI_V1;
+-			} else if (info->valid & ACPI_VALID_CID) {
+-				version = XGENE_AHCI_V2;
+ 			}
+ 		}
+ 	}
+@@ -858,18 +858,20 @@ skip_clk_phy:
 
--- 
-Best regards,
+ 	switch (version) {
+ 	case XGENE_AHCI_V1:
++		ppi = &xgene_ahci_v1_port_info;
+ 		hpriv->flags = AHCI_HFLAG_NO_NCQ;
+ 		break;
+ 	case XGENE_AHCI_V2:
++		ppi = &xgene_ahci_v2_port_info;
+ 		hpriv->flags |= AHCI_HFLAG_YES_FBS;
+ 		hpriv->irq_handler = xgene_ahci_irq_intr;
+ 		break;
+ 	default:
++		ppi = &xgene_ahci_v1_port_info;
+ 		break;
+ 	}
 
-Fu Wei
-Software Engineer
-Red Hat
+-	rc = ahci_platform_init_host(pdev, hpriv, ppi[version - 1],
+-				     &ahci_platform_sht);
++	rc = ahci_platform_init_host(pdev, hpriv, ppi, &ahci_platform_sht);
+ 	if (rc)
+ 		goto disable_resources;
+
+--
+1.7.1
