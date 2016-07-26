@@ -1,383 +1,283 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 26 Jul 2016 13:21:03 +0200
-Subject: [PATCH v6] KVM: arm/arm64: Add VGICv3 save/restore API documentation
-Message-ID: <20160726112103.27799-1-christoffer.dall@linaro.org>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Tue, 26 Jul 2016 13:50:39 +0200
+Subject: [PATCH v9 5/9] acpi/arm64: Add GTDT table parse driver
+In-Reply-To: <1469460427-8643-6-git-send-email-fu.wei@linaro.org>
+References: <1469460427-8643-1-git-send-email-fu.wei@linaro.org>
+ <1469460427-8643-6-git-send-email-fu.wei@linaro.org>
+Message-ID: <1754781.CC9jSrYt2s@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Factor out the GICv3 and ITS-specific documentation into a separate
-documentation file.  Add description for how to access distributor,
-redistributor, and CPU interface registers for GICv3 in this new file,
-and add a group for accessing level triggered IRQ information for GICv3
-as well.
+On Monday, July 25, 2016 11:27:03 PM fu.wei at linaro.org wrote:
+> From: Fu Wei <fu.wei@linaro.org>
+> 
+> This patch adds support for parsing arch timer in GTDT,
+> provides some kernel APIs to parse all the PPIs and
+> always-on info in GTDT and export them.
+> 
+> By this driver, we can simplify arm_arch_timer drivers, and
+> separate the ACPI GTDT knowledge from it.
+> 
+> Signed-off-by: Fu Wei <fu.wei@linaro.org>
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
 
-Reviewed-by: Peter Maydell <peter.maydell@linaro.org>
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
----
-Changes since v5:
- - Rearrange ITS description
- - Fix typos
- - Add Peter's reviewed-by tag.
+>From the ACPI perspective:
 
-Changes since v4:
- - Clarify register reads as per Peter's comments on v4
- - Factored out ITS documenation into separate file
- - Clarified error conditions on all GRP_ADDR groups
- - Renamed KVM_VGIC_V3_ADDR_TYPE_ITS to KVM_VGIC_ITS_ADDR_TYPE in the
-   documentation to be in line with the code.
- - Did not apply Peter's reviewed-by due to the conflicts and updates
-   related to the ITS.
+Acked-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
 
-Changes since v3:
- - Fix typos
- - Clarified level register containing 32 IRQs
- - Removed limitations about priority support which are no longer true
- - Special-case the SPENDR register accesses to access the latch state
-   and the CPENDR register accesses to be RAZ/WI.
+and I'm assuming that the patches will go in via some other (non-ACPI) tree.
 
-Changes since v2:
- - Changed distributor access to be 32-bits in size
- - Clearly specified data type pointed to by addr field
- - Specified exception behavior for STATUSR registers
- - Added group for level-triggered IRQ status info
- - Removed acks from Marc/Peter as content has changed
-
- Documentation/virtual/kvm/devices/arm-vgic-its.txt |  38 ++++
- Documentation/virtual/kvm/devices/arm-vgic-v3.txt  | 207 +++++++++++++++++++++
- Documentation/virtual/kvm/devices/arm-vgic.txt     |  52 ++----
- 3 files changed, 262 insertions(+), 35 deletions(-)
- create mode 100644 Documentation/virtual/kvm/devices/arm-vgic-its.txt
- create mode 100644 Documentation/virtual/kvm/devices/arm-vgic-v3.txt
-
-diff --git a/Documentation/virtual/kvm/devices/arm-vgic-its.txt b/Documentation/virtual/kvm/devices/arm-vgic-its.txt
-new file mode 100644
-index 0000000..6081a5b
---- /dev/null
-+++ b/Documentation/virtual/kvm/devices/arm-vgic-its.txt
-@@ -0,0 +1,38 @@
-+ARM Virtual Interrupt Translation Service (ITS)
-+===============================================
-+
-+Device types supported:
-+  KVM_DEV_TYPE_ARM_VGIC_ITS    ARM Interrupt Translation Service Controller
-+
-+The ITS allows MSI(-X) interrupts to be injected into guests. This extension is
-+optional.  Creating a virtual ITS controller also requires a host GICv3 (see
-+arm-vgic-v3.txt), but does not depend on having physical ITS controllers.
-+
-+There can be multiple ITS controllers per guest, each of them has to have
-+a separate, non-overlapping MMIO region.
-+
-+
-+Groups:
-+  KVM_DEV_ARM_VGIC_GRP_ADDR
-+  Attributes:
-+    KVM_VGIC_ITS_ADDR_TYPE (rw, 64-bit)
-+      Base address in the guest physical address space of the GICv3 ITS
-+      control register frame.
-+      This address needs to be 64K aligned and the region covers 128K.
-+  Errors:
-+    -E2BIG:  Address outside of addressable IPA range
-+    -EINVAL: Incorrectly aligned address
-+    -EEXIST: Address already configured
-+    -EFAULT: Invalid user pointer for attr->addr.
-+    -ENODEV: Incorrect attribute or the ITS is not supported.
-+
-+
-+  KVM_DEV_ARM_VGIC_GRP_CTRL
-+  Attributes:
-+    KVM_DEV_ARM_VGIC_CTRL_INIT
-+      request the initialization of the ITS, no additional parameter in
-+      kvm_device_attr.addr.
-+  Errors:
-+    -ENXIO:  ITS not properly configured as required prior to setting
-+             this attribute
-+    -ENOMEM: Memory shortage when allocating ITS internal data
-diff --git a/Documentation/virtual/kvm/devices/arm-vgic-v3.txt b/Documentation/virtual/kvm/devices/arm-vgic-v3.txt
-new file mode 100644
-index 0000000..017e085
---- /dev/null
-+++ b/Documentation/virtual/kvm/devices/arm-vgic-v3.txt
-@@ -0,0 +1,207 @@
-+ARM Virtual Generic Interrupt Controller v3 and later (VGICv3)
-+==============================================================
-+
-+
-+Device types supported:
-+  KVM_DEV_TYPE_ARM_VGIC_V3     ARM Generic Interrupt Controller v3.0
-+
-+Only one VGIC instance may be instantiated through this API.  The created VGIC
-+will act as the VM interrupt controller, requiring emulated user-space devices
-+to inject interrupts to the VGIC instead of directly to CPUs.  It is not
-+possible to create both a GICv3 and GICv2 on the same VM.
-+
-+Creating a guest GICv3 device requires a host GICv3 as well.
-+
-+
-+Groups:
-+  KVM_DEV_ARM_VGIC_GRP_ADDR
-+  Attributes:
-+    KVM_VGIC_V3_ADDR_TYPE_DIST (rw, 64-bit)
-+      Base address in the guest physical address space of the GICv3 distributor
-+      register mappings. Only valid for KVM_DEV_TYPE_ARM_VGIC_V3.
-+      This address needs to be 64K aligned and the region covers 64 KByte.
-+
-+    KVM_VGIC_V3_ADDR_TYPE_REDIST (rw, 64-bit)
-+      Base address in the guest physical address space of the GICv3
-+      redistributor register mappings. There are two 64K pages for each
-+      VCPU and all of the redistributor pages are contiguous.
-+      Only valid for KVM_DEV_TYPE_ARM_VGIC_V3.
-+      This address needs to be 64K aligned.
-+  Errors:
-+    -E2BIG:  Address outside of addressable IPA range
-+    -EINVAL: Incorrectly aligned address
-+    -EEXIST: Address already configured
-+    -ENXIO:  The group or attribute is unknown/unsupported for this device
-+             or hardware support is missing.
-+    -EFAULT: Invalid user pointer for attr->addr.
-+
-+
-+
-+  KVM_DEV_ARM_VGIC_GRP_DIST_REGS
-+  KVM_DEV_ARM_VGIC_GRP_REDIST_REGS
-+  Attributes:
-+    The attr field of kvm_device_attr encodes two values:
-+    bits:     | 63   ....  32  |  31   ....    0 |
-+    values:   |      mpidr     |      offset     |
-+
-+    All distributor regs are (rw, 32-bit) and kvm_device_attr.addr points to a
-+    __u32 value.  64-bit registers must be accessed by separately accessing the
-+    lower and higher word.
-+
-+    Writes to read-only registers are ignored by the kernel.
-+
-+    KVM_DEV_ARM_VGIC_GRP_DIST_REGS accesses the main distributor registers.
-+    KVM_DEV_ARM_VGIC_GRP_REDIST_REGS accesses the redistributor of the CPU
-+    specified by the mpidr.
-+
-+    The offset is relative to the "[Re]Distributor base address" as defined
-+    in the GICv3/4 specs.  Getting or setting such a register has the same
-+    effect as reading or writing the register on real hardware, except for the
-+    following registers: GICD_STATUSR, GICR_STATUSR, GICD_ISPENDR,
-+    GICR_ISPENDR0, GICD_ICPENDR, and GICR_ICPENDR0.  These registers behave
-+    differently when accessed via this interface compared to their
-+    architecturally defined behavior to allow software a full view of the
-+    VGIC's internal state.
-+
-+    The mpidr field is used to specify which
-+    redistributor is accessed.  The mpidr is ignored for the distributor.
-+
-+    The mpidr encoding is based on the affinity information in the
-+    architecture defined MPIDR, and the field is encoded as follows:
-+      | 63 .... 56 | 55 .... 48 | 47 .... 40 | 39 .... 32 |
-+      |    Aff3    |    Aff2    |    Aff1    |    Aff0    |
-+
-+    Note that distributor fields are not banked, but return the same value
-+    regardless of the mpidr used to access the register.
-+
-+    The GICD_STATUSR and GICR_STATUSR registers are architecturally defined such
-+    that a write of a clear bit has no effect, whereas a write with a set bit
-+    clears that value.  To allow userspace to freely set the values of these two
-+    registers, setting the attributes with the register offsets for these two
-+    registers simply sets the non-reserved bits to the value written.
-+
-+
-+    Accesses (reads and writes) to the GICD_ISPENDR register region and
-+    GICR_ISPENDR0 registers get/set the value of the latched pending state for
-+    the interrupts.
-+
-+    This is identical to the value returned by a guest read from ISPENDR for an
-+    edge triggered interrupt, but may differ for level triggered interrupts.
-+    For edge triggered interrupts, once an interrupt becomes pending (whether
-+    because of an edge detected on the input line or because of a guest write
-+    to ISPENDR) this state is "latched", and only cleared when either the
-+    interrupt is activated or when the guest writes to ICPENDR. A level
-+    triggered interrupt may be pending either because the level input is held
-+    high by a device, or because of a guest write to the ISPENDR register. Only
-+    ISPENDR writes are latched; if the device lowers the line level then the
-+    interrupt is no longer pending unless the guest also wrote to ISPENDR, and
-+    conversely writes to ICPENDR or activations of the interrupt do not clear
-+    the pending status if the line level is still being held high.  (These
-+    rules are documented in the GICv3 specification descriptions of the ICPENDR
-+    and ISPENDR registers.) For a level triggered interrupt the value accessed
-+    here is that of the latch which is set by ISPENDR and cleared by ICPENDR or
-+    interrupt activation, whereas the value returned by a guest read from
-+    ISPENDR is the logical OR of the latch value and the input line level.
-+
-+    Raw access to the latch state is provided to userspace so that it can save
-+    and restore the entire GIC internal state (which is defined by the
-+    combination of the current input line level and the latch state, and cannot
-+    be deduced from purely the line level and the value of the ISPENDR
-+    registers).
-+
-+    Accesses to GICD_ICPENDR register region and GICR_ICPENDR0 registers have
-+    RAZ/WI semantics, meaning that reads always return 0 and writes are always
-+    ignored.
-+
-+  Errors:
-+    -ENXIO: Getting or setting this register is not yet supported
-+    -EBUSY: One or more VCPUs are running
-+
-+
-+  KVM_DEV_ARM_VGIC_CPU_SYSREGS
-+  Attributes:
-+    The attr field of kvm_device_attr encodes two values:
-+    bits:     | 63      ....       32 | 31  ....  16 | 15  ....  0 |
-+    values:   |         mpidr         |      RES     |    instr    |
-+
-+    The mpidr field encodes the CPU ID based on the affinity information in the
-+    architecture defined MPIDR, and the field is encoded as follows:
-+      | 63 .... 56 | 55 .... 48 | 47 .... 40 | 39 .... 32 |
-+      |    Aff3    |    Aff2    |    Aff1    |    Aff0    |
-+
-+    The instr field encodes the system register to access based on the fields
-+    defined in the A64 instruction set encoding for system register access
-+    (RES means the bits are reserved for future use and should be zero):
-+
-+      | 15 ... 14 | 13 ... 11 | 10 ... 7 | 6 ... 3 | 2 ... 0 |
-+      |   Op 0    |    Op1    |    CRn   |   CRm   |   Op2   |
-+
-+    All system regs accessed through this API are (rw, 64-bit) and
-+    kvm_device_attr.addr points to a __u64 value.
-+
-+    KVM_DEV_ARM_VGIC_CPU_SYSREGS accesses the CPU interface registers for the
-+    CPU specified by the mpidr field.
-+
-+  Errors:
-+    -ENXIO: Getting or setting this register is not yet supported
-+    -EBUSY: VCPU is running
-+    -EINVAL: Invalid mpidr supplied
-+
-+
-+  KVM_DEV_ARM_VGIC_GRP_NR_IRQS
-+  Attributes:
-+    A value describing the number of interrupts (SGI, PPI and SPI) for
-+    this GIC instance, ranging from 64 to 1024, in increments of 32.
-+
-+    kvm_device_attr.addr points to a __u32 value.
-+
-+  Errors:
-+    -EINVAL: Value set is out of the expected range
-+    -EBUSY: Value has already be set.
-+
-+
-+  KVM_DEV_ARM_VGIC_GRP_CTRL
-+  Attributes:
-+    KVM_DEV_ARM_VGIC_CTRL_INIT
-+      request the initialization of the VGIC, no additional parameter in
-+      kvm_device_attr.addr.
-+  Errors:
-+    -ENXIO: VGIC not properly configured as required prior to calling
-+     this attribute
-+    -ENODEV: no online VCPU
-+    -ENOMEM: memory shortage when allocating vgic internal data
-+
-+
-+  KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO
-+  Attributes:
-+    The attr field of kvm_device_attr encodes the following values:
-+    bits:     | 63      ....       32 | 31   ....    10 | 9  ....  0 |
-+    values:   |         mpidr         |      info       |   vINTID   |
-+
-+    The vINTID specifies which set of IRQs is reported on.
-+
-+    The info field specifies which information userspace wants to get or set
-+    using this interface.  Currently we support two different pieces of
-+    information:
-+
-+      VGIC_LEVEL_INFO_LINE_LEVEL:
-+	Get/Set the input level of the IRQ line for a set of 32 contiguously
-+	numbered interrupts.
-+	vINTID must be a multiple of 32.
-+
-+	kvm_device_attr.addr points to a __u32 value which will contain a
-+	bitmap where a set bit means the interrupt level is asserted.
-+
-+	Bit[n] indicates the status for interrupt vINTID + n.
-+
-+    SGIs and any interrupt with a higher ID than the number of interrupts
-+    supported, will be RAZ/WI.  LPIs are always edge-triggered and are
-+    therefore not supported by this interface.
-+
-+    PPIs are reported per VCPU as specified in the mpidr field, and SPIs are
-+    reported with the same value regardless of the mpidr specified.
-+
-+    The mpidr field encodes the CPU ID based on the affinity information in the
-+    architecture defined MPIDR, and the field is encoded as follows:
-+      | 63 .... 56 | 55 .... 48 | 47 .... 40 | 39 .... 32 |
-+      |    Aff3    |    Aff2    |    Aff1    |    Aff0    |
-diff --git a/Documentation/virtual/kvm/devices/arm-vgic.txt b/Documentation/virtual/kvm/devices/arm-vgic.txt
-index 89182f8..76e61c8 100644
---- a/Documentation/virtual/kvm/devices/arm-vgic.txt
-+++ b/Documentation/virtual/kvm/devices/arm-vgic.txt
-@@ -1,24 +1,19 @@
--ARM Virtual Generic Interrupt Controller (VGIC)
--===============================================
-+ARM Virtual Generic Interrupt Controller v2 (VGIC)
-+==================================================
- 
- Device types supported:
-   KVM_DEV_TYPE_ARM_VGIC_V2     ARM Generic Interrupt Controller v2.0
--  KVM_DEV_TYPE_ARM_VGIC_V3     ARM Generic Interrupt Controller v3.0
--  KVM_DEV_TYPE_ARM_VGIC_ITS    ARM Interrupt Translation Service Controller
- 
--Only one VGIC instance of the V2/V3 types above may be instantiated through
--either this API or the legacy KVM_CREATE_IRQCHIP api.  The created VGIC will
--act as the VM interrupt controller, requiring emulated user-space devices to
--inject interrupts to the VGIC instead of directly to CPUs.
-+Only one VGIC instance may be instantiated through either this API or the
-+legacy KVM_CREATE_IRQCHIP API.  The created VGIC will act as the VM interrupt
-+controller, requiring emulated user-space devices to inject interrupts to the
-+VGIC instead of directly to CPUs.
- 
--Creating a guest GICv3 device requires a host GICv3 as well.
--GICv3 implementations with hardware compatibility support allow a guest GICv2
--as well.
-+GICv3 implementations with hardware compatibility support allow creating a
-+guest GICv2 through this interface.  For information on creating a guest GICv3
-+device and guest ITS devices, see arm-vgic-v3.txt.  It is not possible to
-+create both a GICv3 and GICv2 device on the same VM.
- 
--Creating a virtual ITS controller requires a host GICv3 (but does not depend
--on having physical ITS controllers).
--There can be multiple ITS controllers per guest, each of them has to have
--a separate, non-overlapping MMIO region.
- 
- Groups:
-   KVM_DEV_ARM_VGIC_GRP_ADDR
-@@ -32,26 +27,13 @@ Groups:
-       Base address in the guest physical address space of the GIC virtual cpu
-       interface register mappings. Only valid for KVM_DEV_TYPE_ARM_VGIC_V2.
-       This address needs to be 4K aligned and the region covers 4 KByte.
--
--    KVM_VGIC_V3_ADDR_TYPE_DIST (rw, 64-bit)
--      Base address in the guest physical address space of the GICv3 distributor
--      register mappings. Only valid for KVM_DEV_TYPE_ARM_VGIC_V3.
--      This address needs to be 64K aligned and the region covers 64 KByte.
--
--    KVM_VGIC_V3_ADDR_TYPE_REDIST (rw, 64-bit)
--      Base address in the guest physical address space of the GICv3
--      redistributor register mappings. There are two 64K pages for each
--      VCPU and all of the redistributor pages are contiguous.
--      Only valid for KVM_DEV_TYPE_ARM_VGIC_V3.
--      This address needs to be 64K aligned.
--
--    KVM_VGIC_V3_ADDR_TYPE_ITS (rw, 64-bit)
--      Base address in the guest physical address space of the GICv3 ITS
--      control register frame. The ITS allows MSI(-X) interrupts to be
--      injected into guests. This extension is optional. If the kernel
--      does not support the ITS, the call returns -ENODEV.
--      Only valid for KVM_DEV_TYPE_ARM_VGIC_ITS.
--      This address needs to be 64K aligned and the region covers 128K.
-+  Errors:
-+    -E2BIG:  Address outside of addressable IPA range
-+    -EINVAL: Incorrectly aligned address
-+    -EEXIST: Address already configured
-+    -ENXIO:  The group or attribute is unknown/unsupported for this device
-+             or hardware support is missing.
-+    -EFAULT: Invalid user pointer for attr->addr.
- 
-   KVM_DEV_ARM_VGIC_GRP_DIST_REGS
-   Attributes:
--- 
-2.9.0
+> ---
+>  arch/arm64/Kconfig             |   1 +
+>  drivers/acpi/Kconfig           |   5 ++
+>  drivers/acpi/Makefile          |   1 +
+>  drivers/acpi/arm64/Kconfig     |   5 ++
+>  drivers/acpi/arm64/Makefile    |   1 +
+>  drivers/acpi/arm64/acpi_gtdt.c | 152 +++++++++++++++++++++++++++++++++++++++++
+>  drivers/clocksource/Kconfig    |   1 -
+>  include/linux/acpi.h           |   6 ++
+>  8 files changed, 171 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index 5a0a691..0b9fba7 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -2,6 +2,7 @@ config ARM64
+>  	def_bool y
+>  	select ACPI_CCA_REQUIRED if ACPI
+>  	select ACPI_GENERIC_GSI if ACPI
+> +	select ACPI_GTDT if ACPI
+>  	select ACPI_REDUCED_HARDWARE_ONLY if ACPI
+>  	select ARCH_HAS_DEVMEM_IS_ALLOWED
+>  	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
+> diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
+> index b7e2e77..1cdc7d2 100644
+> --- a/drivers/acpi/Kconfig
+> +++ b/drivers/acpi/Kconfig
+> @@ -521,4 +521,9 @@ config XPOWER_PMIC_OPREGION
+>  
+>  endif
+>  
+> +if ARM64
+> +source "drivers/acpi/arm64/Kconfig"
+> +
+> +endif
+> +
+>  endif	# ACPI
+> diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
+> index 251ce85..1a94ff7 100644
+> --- a/drivers/acpi/Makefile
+> +++ b/drivers/acpi/Makefile
+> @@ -99,5 +99,6 @@ obj-$(CONFIG_ACPI_EXTLOG)	+= acpi_extlog.o
+>  obj-$(CONFIG_PMIC_OPREGION)	+= pmic/intel_pmic.o
+>  obj-$(CONFIG_CRC_PMIC_OPREGION) += pmic/intel_pmic_crc.o
+>  obj-$(CONFIG_XPOWER_PMIC_OPREGION) += pmic/intel_pmic_xpower.o
+> +obj-$(CONFIG_ARM64)	+= arm64/
+>  
+>  video-objs			+= acpi_video.o video_detect.o
+> diff --git a/drivers/acpi/arm64/Kconfig b/drivers/acpi/arm64/Kconfig
+> new file mode 100644
+> index 0000000..80201be
+> --- /dev/null
+> +++ b/drivers/acpi/arm64/Kconfig
+> @@ -0,0 +1,5 @@
+> +#
+> +# ACPI Configuration for ARM64
+> +#
+> +config ACPI_GTDT
+> +	bool
+> diff --git a/drivers/acpi/arm64/Makefile b/drivers/acpi/arm64/Makefile
+> new file mode 100644
+> index 0000000..466de6b
+> --- /dev/null
+> +++ b/drivers/acpi/arm64/Makefile
+> @@ -0,0 +1 @@
+> +obj-$(CONFIG_ACPI_GTDT)		+= acpi_gtdt.o
+> diff --git a/drivers/acpi/arm64/acpi_gtdt.c b/drivers/acpi/arm64/acpi_gtdt.c
+> new file mode 100644
+> index 0000000..cdb2fb1
+> --- /dev/null
+> +++ b/drivers/acpi/arm64/acpi_gtdt.c
+> @@ -0,0 +1,152 @@
+> +/*
+> + * ARM Specific GTDT table Support
+> + *
+> + * Copyright (C) 2016, Linaro Ltd.
+> + * Author: Daniel Lezcano <daniel.lezcano@linaro.org>
+> + *         Fu Wei <fu.wei@linaro.org>
+> + *         Hanjun Guo <hanjun.guo@linaro.org>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#include <linux/acpi.h>
+> +#include <linux/init.h>
+> +#include <linux/kernel.h>
+> +
+> +#include <clocksource/arm_arch_timer.h>
+> +
+> +#undef pr_fmt
+> +#define pr_fmt(fmt) "ACPI GTDT: " fmt
+> +
+> +typedef struct {
+> +	struct acpi_table_gtdt *gtdt;
+> +	void *platform_timer_start;
+> +	void *gtdt_end;
+> +} acpi_gtdt_desc_t;
+> +
+> +static acpi_gtdt_desc_t acpi_gtdt_desc __initdata;
+> +
+> +static inline void *next_platform_timer(void *platform_timer)
+> +{
+> +	struct acpi_gtdt_header *gh = platform_timer;
+> +
+> +	platform_timer += gh->length;
+> +	if (platform_timer < acpi_gtdt_desc.gtdt_end)
+> +		return platform_timer;
+> +
+> +	return NULL;
+> +}
+> +
+> +#define for_each_platform_timer(_g)				\
+> +	for (_g = acpi_gtdt_desc.platform_timer_start; _g;	\
+> +	     _g = next_platform_timer(_g))
+> +
+> +static inline bool is_timer_block(void *platform_timer)
+> +{
+> +	struct acpi_gtdt_header *gh = platform_timer;
+> +
+> +	return gh->type == ACPI_GTDT_TYPE_TIMER_BLOCK;
+> +}
+> +
+> +static inline bool is_watchdog(void *platform_timer)
+> +{
+> +	struct acpi_gtdt_header *gh = platform_timer;
+> +
+> +	return gh->type == ACPI_GTDT_TYPE_WATCHDOG;
+> +}
+> +
+> +static int __init map_gt_gsi(u32 interrupt, u32 flags)
+> +{
+> +	int trigger, polarity;
+> +
+> +	if (!interrupt)
+> +		return 0;
+> +
+> +	trigger = (flags & ACPI_GTDT_INTERRUPT_MODE) ? ACPI_EDGE_SENSITIVE
+> +			: ACPI_LEVEL_SENSITIVE;
+> +
+> +	polarity = (flags & ACPI_GTDT_INTERRUPT_POLARITY) ? ACPI_ACTIVE_LOW
+> +			: ACPI_ACTIVE_HIGH;
+> +
+> +	return acpi_register_gsi(NULL, interrupt, trigger, polarity);
+> +}
+> +
+> +/*
+> + * Map the PPIs of per-cpu arch_timer.
+> + * @type: the type of PPI
+> + * Returns 0 if error.
+> + */
+> +int __init acpi_gtdt_map_ppi(int type)
+> +{
+> +	struct acpi_table_gtdt *gtdt = acpi_gtdt_desc.gtdt;
+> +
+> +	switch (type) {
+> +	case PHYS_SECURE_PPI:
+> +		return map_gt_gsi(gtdt->secure_el1_interrupt,
+> +				  gtdt->secure_el1_flags);
+> +	case PHYS_NONSECURE_PPI:
+> +		return map_gt_gsi(gtdt->non_secure_el1_interrupt,
+> +				  gtdt->non_secure_el1_flags);
+> +	case VIRT_PPI:
+> +		return map_gt_gsi(gtdt->virtual_timer_interrupt,
+> +				  gtdt->virtual_timer_flags);
+> +
+> +	case HYP_PPI:
+> +		return map_gt_gsi(gtdt->non_secure_el2_interrupt,
+> +				  gtdt->non_secure_el2_flags);
+> +	default:
+> +		pr_err("Failed to map timer interrupt: invalid type.\n");
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +/*
+> + * acpi_gtdt_c3stop - got c3stop info from GTDT
+> + *
+> + * Returns 1 if the timer is powered in deep idle state, 0 otherwise.
+> + */
+> +bool __init acpi_gtdt_c3stop(void)
+> +{
+> +	struct acpi_table_gtdt *gtdt = acpi_gtdt_desc.gtdt;
+> +
+> +	return !(gtdt->non_secure_el1_flags & ACPI_GTDT_ALWAYS_ON);
+> +}
+> +
+> +/*
+> + * Get some basic info from GTDT table, and init the global variables above
+> + * for all timers initialization of Generic Timer.
+> + * This function does some validation on GTDT table.
+> + */
+> +int __init acpi_gtdt_init(struct acpi_table_header *table)
+> +{
+> +	void *start;
+> +	struct acpi_table_gtdt *gtdt;
+> +
+> +	gtdt = container_of(table, struct acpi_table_gtdt, header);
+> +
+> +	acpi_gtdt_desc.gtdt = gtdt;
+> +	acpi_gtdt_desc.gtdt_end = (void *)table + table->length;
+> +
+> +	if (table->revision < 2) {
+> +		pr_debug("Revision:%d doesn't support Platform Timers.\n",
+> +			 table->revision);
+> +		return 0;
+> +	}
+> +
+> +	if (!gtdt->platform_timer_count) {
+> +		pr_debug("No Platform Timer.\n");
+> +		return 0;
+> +	}
+> +
+> +	start = (void *)gtdt + gtdt->platform_timer_offset;
+> +	if (start < (void *)table + sizeof(struct acpi_table_gtdt)) {
+> +		pr_err(FW_BUG "Failed to retrieve timer info from firmware: invalid data.\n");
+> +		return -EINVAL;
+> +	}
+> +	acpi_gtdt_desc.platform_timer_start = start;
+> +
+> +	return gtdt->platform_timer_count;
+> +}
+> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+> index 47352d2..108dbc3 100644
+> --- a/drivers/clocksource/Kconfig
+> +++ b/drivers/clocksource/Kconfig
+> @@ -205,7 +205,6 @@ config CLKSRC_MPS2
+>  config ARM_ARCH_TIMER
+>  	bool
+>  	select CLKSRC_OF if OF
+> -	select CLKSRC_ACPI if ACPI
+>  
+>  config ARM_ARCH_TIMER_EVTSTREAM
+>  	bool "Support for ARM architected timer event stream generation"
+> diff --git a/include/linux/acpi.h b/include/linux/acpi.h
+> index 288fac5..fb8b689 100644
+> --- a/include/linux/acpi.h
+> +++ b/include/linux/acpi.h
+> @@ -532,6 +532,12 @@ void acpi_walk_dep_device_list(acpi_handle handle);
+>  struct platform_device *acpi_create_platform_device(struct acpi_device *);
+>  #define ACPI_PTR(_ptr)	(_ptr)
+>  
+> +#ifdef CONFIG_ACPI_GTDT
+> +int acpi_gtdt_init(struct acpi_table_header *table);
+> +int acpi_gtdt_map_ppi(int type);
+> +bool acpi_gtdt_c3stop(void);
+> +#endif
+> +
+>  #else	/* !CONFIG_ACPI */
+>  
+>  #define acpi_disabled 1
+> 
