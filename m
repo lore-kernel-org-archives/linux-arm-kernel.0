@@ -1,51 +1,66 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 26 Jul 2016 18:53:51 +0100
-Subject: [PATCH] arm64: Fix Kconfig dependencies for RANDOMIZE_BASE
-In-Reply-To: <20160726174556.GH2423@e104818-lin.cambridge.arm.com>
-References: <1469553415-26839-1-git-send-email-jeffv@google.com>
- <20160726174556.GH2423@e104818-lin.cambridge.arm.com>
-Message-ID: <20160726175351.GI2423@e104818-lin.cambridge.arm.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Wed, 27 Jul 2016 02:53:06 +0900
+Subject: [PATCH v4 0/2] clk: uniphier: add clock drivers for UniPhier SoCs
+Message-ID: <1469555588-9114-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 26, 2016 at 06:45:56PM +0100, Catalin Marinas wrote:
-> On Tue, Jul 26, 2016 at 10:16:55AM -0700, Jeff Vander Stoep wrote:
-> > Selecting CONFIG_RANDOMIZE_BASE=y and CONFIG_MODULES=n causes a
-> > build error due to dependencies on modules. This patch makes KASLR
-> > module config options dependent on CONFIG_MODULES=y.
-> > 
-> > Signed-off-by: Jeff Vander Stoep <jeffv@google.com>
-> > ---
-> >  arch/arm64/Kconfig | 3 ++-
-> >  1 file changed, 2 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> > index 7e23f95..c9eff79 100644
-> > --- a/arch/arm64/Kconfig
-> > +++ b/arch/arm64/Kconfig
-> > @@ -891,7 +891,6 @@ config RELOCATABLE
-> >  
-> >  config RANDOMIZE_BASE
-> >  	bool "Randomize the address of the kernel image"
-> > -	select ARM64_MODULE_PLTS
-> >  	select RELOCATABLE
-> >  	help
-> >  	  Randomizes the virtual address at which the kernel image is
-> 
-> I thought we need the module PLTs once we randomize the kernel base,
-> independent of whether we randomize the modules base or not.
 
-Looking at the code, I think we don't really need the PLTs when the
-modules are randomised together with the kernel image. So I think your
-original patch is fine.
+I split into two patches to make review easier.
 
-> Fixes: f80fb3a3d508 ("arm64: add support for kernel ASLR")
-> Cc: <stable@vger.kernel.org> # 4.6+
+ 1/2: core support code
+ 2/2: data arrays
 
-I'll add these myself. Unless Ard has any objections, I'll queue this
-for 4.8.
 
-Thanks.
+Changes in v4:
+  - Unify module_platform_driver() boilerplate into a single place
+  - Add binding document
+  - Add USB3 clocks
+
+Changes in v3:
+  - Change to platform drivers instead of OF_CLK_DECLARE
+  - Split into a core part + SoC drivers
+    SoC drivers just consist of tables of SoC-specific data.
+    This allows reviewer to concentrate on the core-part
+  - Hard-code parent clock names for cascading
+
+Changes in v2:
+  - split emmc_hw_reset
+  - make SD clock rate-controllable
+  - add CLK_SET_RATE_PARENT flag to mux, gate, fixed-factor clocks
+
+Masahiro Yamada (2):
+  clk: uniphier: add core support code for UniPhier clock drivers
+  clk: uniphier: add clock data for UniPhier SoCs
+
+ .../devicetree/bindings/clock/uniphier-clock.txt   | 123 ++++
+ MAINTAINERS                                        |   1 +
+ drivers/clk/Kconfig                                |   1 +
+ drivers/clk/Makefile                               |   1 +
+ drivers/clk/uniphier/Kconfig                       |   9 +
+ drivers/clk/uniphier/Makefile                      |   9 +
+ drivers/clk/uniphier/clk-uniphier-core.c           | 216 +++++++
+ drivers/clk/uniphier/clk-uniphier-fixed-factor.c   |  49 ++
+ drivers/clk/uniphier/clk-uniphier-fixed-rate.c     |  48 ++
+ drivers/clk/uniphier/clk-uniphier-gate.c           |  97 ++++
+ drivers/clk/uniphier/clk-uniphier-mio.c            | 195 +++++++
+ drivers/clk/uniphier/clk-uniphier-mux.c            |  95 ++++
+ drivers/clk/uniphier/clk-uniphier-peri.c           |  95 ++++
+ drivers/clk/uniphier/clk-uniphier-sys.c            | 626 +++++++++++++++++++++
+ drivers/clk/uniphier/clk-uniphier.h                |  96 ++++
+ 15 files changed, 1661 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/uniphier-clock.txt
+ create mode 100644 drivers/clk/uniphier/Kconfig
+ create mode 100644 drivers/clk/uniphier/Makefile
+ create mode 100644 drivers/clk/uniphier/clk-uniphier-core.c
+ create mode 100644 drivers/clk/uniphier/clk-uniphier-fixed-factor.c
+ create mode 100644 drivers/clk/uniphier/clk-uniphier-fixed-rate.c
+ create mode 100644 drivers/clk/uniphier/clk-uniphier-gate.c
+ create mode 100644 drivers/clk/uniphier/clk-uniphier-mio.c
+ create mode 100644 drivers/clk/uniphier/clk-uniphier-mux.c
+ create mode 100644 drivers/clk/uniphier/clk-uniphier-peri.c
+ create mode 100644 drivers/clk/uniphier/clk-uniphier-sys.c
+ create mode 100644 drivers/clk/uniphier/clk-uniphier.h
 
 -- 
-Catalin
+1.9.1
