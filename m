@@ -1,83 +1,49 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 26 Jul 2016 15:04:26 +0800
-Subject: [PATCH 4/9] clk: sunxi-ng: mux: Add support for mux tables
+Date: Tue, 26 Jul 2016 15:04:25 +0800
+Subject: [PATCH 3/9] clk: sunxi-ng: mux: Increase fixed pre-divider div size
 In-Reply-To: <1469516671-19377-1-git-send-email-wens@csie.org>
 References: <1469516671-19377-1-git-send-email-wens@csie.org>
-Message-ID: <1469516671-19377-5-git-send-email-wens@csie.org>
+Message-ID: <1469516671-19377-4-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some clock muxes have holes, i.e. invalid or unconnected inputs,
-between parent mux values.
+Some clocks have a predivider value that is larger than what u8 can
+store. One such example is the OUT clk found on A20/A31, which has
+a /750 pre-divider on one of the osc24M parents.
 
-Add support for specifying a mux table to map clock parents to
-mux values.
+Increase the size of the div field to u16.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- drivers/clk/sunxi-ng/ccu_mux.c | 12 ++++++++++++
- drivers/clk/sunxi-ng/ccu_mux.h | 12 ++++++++++--
- 2 files changed, 22 insertions(+), 2 deletions(-)
+ drivers/clk/sunxi-ng/ccu_mux.c | 2 +-
+ drivers/clk/sunxi-ng/ccu_mux.h | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/clk/sunxi-ng/ccu_mux.c b/drivers/clk/sunxi-ng/ccu_mux.c
-index 1329b9ab481e..68b32f168a74 100644
+index 58fc36e7dcce..1329b9ab481e 100644
 --- a/drivers/clk/sunxi-ng/ccu_mux.c
 +++ b/drivers/clk/sunxi-ng/ccu_mux.c
-@@ -107,6 +107,15 @@ u8 ccu_mux_helper_get_parent(struct ccu_common *common,
- 	parent = reg >> cm->shift;
- 	parent &= (1 << cm->width) - 1;
- 
-+	if (cm->table) {
-+		int num_parents = clk_hw_get_num_parents(&common->hw);
-+		int i;
-+
-+		for (i = 0; i < num_parents; i++)
-+			if (cm->table[i] == parent)
-+				return i;
-+	}
-+
- 	return parent;
- }
- 
-@@ -117,6 +126,9 @@ int ccu_mux_helper_set_parent(struct ccu_common *common,
- 	unsigned long flags;
+@@ -18,7 +18,7 @@ void ccu_mux_helper_adjust_parent_for_prediv(struct ccu_common *common,
+ 					     int parent_index,
+ 					     unsigned long *parent_rate)
+ {
+-	u8 prediv = 1;
++	u16 prediv = 1;
  	u32 reg;
  
-+	if (cm->table)
-+		index = cm->table[index];
-+
- 	spin_lock_irqsave(common->lock, flags);
- 
- 	reg = readl(common->base + common->reg);
+ 	if (!((common->features & CCU_FEATURE_FIXED_PREDIV) ||
 diff --git a/drivers/clk/sunxi-ng/ccu_mux.h b/drivers/clk/sunxi-ng/ccu_mux.h
-index d35ce5e93840..f0078de78712 100644
+index 945082631e7d..d35ce5e93840 100644
 --- a/drivers/clk/sunxi-ng/ccu_mux.h
 +++ b/drivers/clk/sunxi-ng/ccu_mux.h
-@@ -6,8 +6,9 @@
- #include "ccu_common.h"
- 
- struct ccu_mux_internal {
--	u8	shift;
--	u8	width;
-+	u8		shift;
-+	u8		width;
-+	const u8	*table;
+@@ -11,7 +11,7 @@ struct ccu_mux_internal {
  
  	struct {
  		u8	index;
-@@ -21,6 +22,13 @@ struct ccu_mux_internal {
- 	} variable_prediv;
- };
+-		u8	div;
++		u16	div;
+ 	} fixed_prediv;
  
-+#define SUNXI_CLK_MUX_TABLE(_shift, _width, _table)	\
-+	{						\
-+		.shift	= _shift,			\
-+		.width	= _width,			\
-+		.table	= _table,			\
-+	}
-+
- #define SUNXI_CLK_MUX(_shift, _width)	\
- 	{					\
- 		.shift	= _shift,		\
+ 	struct {
 -- 
 2.8.1
