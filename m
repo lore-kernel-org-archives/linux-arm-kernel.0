@@ -1,210 +1,63 @@
-From: kwangwoo.lee@sk.com (Kwangwoo Lee)
-Date: Tue, 26 Jul 2016 16:34:56 +0900
-Subject: [PATCH v2] arm64: mm: convert __dma_* routines to use start, size
-Message-ID: <1469518496-8177-1-git-send-email-kwangwoo.lee@sk.com>
+From: j.anaszewski@samsung.com (Jacek Anaszewski)
+Date: Tue, 26 Jul 2016 09:38:36 +0200
+Subject: [RFC] User-defined leds
+In-Reply-To: <57965C15.1070705@lechnology.com>
+References: <57965C15.1070705@lechnology.com>
+Message-ID: <5797137C.9090304@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-v2)
-change __dma_* routine names using the terminoloy guidance:
-    area: takes a start and size
-    range: takes a start and end
-use __dma_flush_area() instead of __dma_flush_range() in dma-mapping.c
+Hi David,
 
-v1)
-__dma_* routines have been converted to use start and size instread of
-start and end addresses. The patch was origianlly for adding
-__clean_dcache_area_poc() which will be used in pmem driver to clean
-dcache to the PoC(Point of Coherency) in arch_wb_cache_pmem().
+On 07/25/2016 08:36 PM, David Lechner wrote:
+> short version: I have a use case for leds where I want to be able to use
+> the triggers in the leds subsystem without having a physical hardware led.
+>
+> long version: I am working on a program to make one embedded system
+> (http://fatcatlab.com/product/evb/) compatible with another
+> (http://mindstorms.lego.com). One has physical red/green LEDs, that use
+> the gpio leds driver to control them. The other system does not have
+> physical leds. However, it does have a color screen. So, my idea is
+> to create virtual LEDs on the screen that emulate the physical LEDs on
+> the other device.
+>
+> I would like to make a userspace program that works the same on both
+> devices. If the leds were simple on-off, then it would of course be
+> simpler to make the virtual leds completely in userspace. However, we
+> are currently using other triggers (disk activity/heatbeat/etc.) with
+> the leds. I would like for the virtual LEDs to be able to use these
+> triggers as well.
+>
+>
+> Proposed implementation:
+>
+> My thought is to create a new module that can be used to create
+> user-defined leds using configfs. Below is some sample code that I have
+> been experimenting with. Be aware, it does not quite match the
+> description I am about to give.
+>
+> In configfs you simply create a new node for each leds and assign the
+> name. We could have separate attributes for devicename, color and
+> function to enforce the naming convention or we could just allow
+> arbitrary names.
+>
+> Once the leds class devices are configured in configfs and exported, it
+> will create the usual leds class device in sysfs as well as a character
+> device that can be polled by the userspace program. The character device
+> would work a bit like evdev where any time the brightness is changed, it
+> spits out an event on the character device.
+>
+> It would probably be simplest to have a single character device for all
+> virtual leds. In this case the leds device name or some other id would
+> need to be part of the event structure.
+>
+> Any thoughts? Does this seem like a sane thing to do? Or maybe there is
+> a different way to accomplish the same thing using existing drivers?
 
-The functionality of __clean_dcache_area_poc()  was equivalent to
-__dma_clean_range(). The difference was __dma_clean_range() uses the end
-address, but __clean_dcache_area_poc() uses the size to clean.
+The idea sounds reasonable. Please also compare the solutions spotted
+by Marcel. After that please submit the patch officially, along with
+the sample user space application.
 
-Thus, __clean_dcache_area_poc() has been revised with a fall through
-function of __dma_clean_range() after the change that __dma_* routines
-use start and size instead of using start and end.
-
-Signed-off-by: Kwangwoo Lee <kwangwoo.lee@sk.com>
----
- arch/arm64/include/asm/cacheflush.h |  3 +-
- arch/arm64/mm/cache.S               | 71 +++++++++++++++++++------------------
- arch/arm64/mm/dma-mapping.c         |  6 ++--
- 3 files changed, 41 insertions(+), 39 deletions(-)
-
-diff --git a/arch/arm64/include/asm/cacheflush.h b/arch/arm64/include/asm/cacheflush.h
-index c64268d..2e5fb97 100644
---- a/arch/arm64/include/asm/cacheflush.h
-+++ b/arch/arm64/include/asm/cacheflush.h
-@@ -68,6 +68,7 @@
- extern void flush_cache_range(struct vm_area_struct *vma, unsigned long start, unsigned long end);
- extern void flush_icache_range(unsigned long start, unsigned long end);
- extern void __flush_dcache_area(void *addr, size_t len);
-+extern void __clean_dcache_area_poc(void *addr, size_t len);
- extern void __clean_dcache_area_pou(void *addr, size_t len);
- extern long __flush_cache_user_range(unsigned long start, unsigned long end);
- 
-@@ -85,7 +86,7 @@ static inline void flush_cache_page(struct vm_area_struct *vma,
-  */
- extern void __dma_map_area(const void *, size_t, int);
- extern void __dma_unmap_area(const void *, size_t, int);
--extern void __dma_flush_range(const void *, const void *);
-+extern void __dma_flush_area(const void *, size_t);
- 
- /*
-  * Copy user data from/to a page which is mapped into a different
-diff --git a/arch/arm64/mm/cache.S b/arch/arm64/mm/cache.S
-index 50ff9ba..4415c1b 100644
---- a/arch/arm64/mm/cache.S
-+++ b/arch/arm64/mm/cache.S
-@@ -110,14 +110,16 @@ ENDPROC(__clean_dcache_area_pou)
-  *	- end     - end address of region
-  */
- ENTRY(__inval_cache_range)
-+	sub	x1, x1, x0
- 	/* FALLTHROUGH */
- 
- /*
-- *	__dma_inv_range(start, end)
-+ *	__dma_inv_area(start, size)
-  *	- start   - virtual start address of region
-- *	- end     - virtual end address of region
-+ *	- size    - size in question
-  */
--__dma_inv_range:
-+__dma_inv_area:
-+	add	x1, x1, x0
- 	dcache_line_size x2, x3
- 	sub	x3, x2, #1
- 	tst	x1, x3				// end cache line aligned?
-@@ -136,46 +138,47 @@ __dma_inv_range:
- 	dsb	sy
- 	ret
- ENDPIPROC(__inval_cache_range)
--ENDPROC(__dma_inv_range)
-+ENDPROC(__dma_inv_area)
-+
-+/*
-+ *	__clean_dcache_area_poc(kaddr, size)
-+ *
-+ * 	Ensure that any D-cache lines for the interval [kaddr, kaddr+size)
-+ * 	are cleaned to the PoC.
-+ *
-+ *	- kaddr   - kernel address
-+ *	- size    - size in question
-+ */
-+ENTRY(__clean_dcache_area_poc)
-+	/* FALLTHROUGH */
- 
- /*
-- *	__dma_clean_range(start, end)
-+ *	__dma_clean_area(start, size)
-  *	- start   - virtual start address of region
-- *	- end     - virtual end address of region
-+ *	- size    - size in question
-  */
--__dma_clean_range:
--	dcache_line_size x2, x3
--	sub	x3, x2, #1
--	bic	x0, x0, x3
--1:
-+__dma_clean_area:
- alternative_if_not ARM64_WORKAROUND_CLEAN_CACHE
--	dc	cvac, x0
-+	dcache_by_line_op cvac, sy, x0, x1, x2, x3
- alternative_else
--	dc	civac, x0
-+	dcache_by_line_op civac, sy, x0, x1, x2, x3
- alternative_endif
--	add	x0, x0, x2
--	cmp	x0, x1
--	b.lo	1b
--	dsb	sy
- 	ret
--ENDPROC(__dma_clean_range)
-+ENDPIPROC(__clean_dcache_area_poc)
-+ENDPROC(__dma_clean_area)
- 
- /*
-- *	__dma_flush_range(start, end)
-+ *	__dma_flush_area(start, size)
-+ *
-+ *	clean & invalidate D / U line
-+ *
-  *	- start   - virtual start address of region
-- *	- end     - virtual end address of region
-+ *	- size    - size in question
-  */
--ENTRY(__dma_flush_range)
--	dcache_line_size x2, x3
--	sub	x3, x2, #1
--	bic	x0, x0, x3
--1:	dc	civac, x0			// clean & invalidate D / U line
--	add	x0, x0, x2
--	cmp	x0, x1
--	b.lo	1b
--	dsb	sy
-+ENTRY(__dma_flush_area)
-+	dcache_by_line_op civac, sy, x0, x1, x2, x3
- 	ret
--ENDPIPROC(__dma_flush_range)
-+ENDPIPROC(__dma_flush_area)
- 
- /*
-  *	__dma_map_area(start, size, dir)
-@@ -184,10 +187,9 @@ ENDPIPROC(__dma_flush_range)
-  *	- dir	- DMA direction
-  */
- ENTRY(__dma_map_area)
--	add	x1, x1, x0
- 	cmp	w2, #DMA_FROM_DEVICE
--	b.eq	__dma_inv_range
--	b	__dma_clean_range
-+	b.eq	__dma_inv_area
-+	b	__dma_clean_area
- ENDPIPROC(__dma_map_area)
- 
- /*
-@@ -197,8 +199,7 @@ ENDPIPROC(__dma_map_area)
-  *	- dir	- DMA direction
-  */
- ENTRY(__dma_unmap_area)
--	add	x1, x1, x0
- 	cmp	w2, #DMA_TO_DEVICE
--	b.ne	__dma_inv_range
-+	b.ne	__dma_inv_area
- 	ret
- ENDPIPROC(__dma_unmap_area)
-diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
-index c566ec8..e0b0712 100644
---- a/arch/arm64/mm/dma-mapping.c
-+++ b/arch/arm64/mm/dma-mapping.c
-@@ -165,7 +165,7 @@ static void *__dma_alloc(struct device *dev, size_t size,
- 		return ptr;
- 
- 	/* remove any dirty cache lines on the kernel alias */
--	__dma_flush_range(ptr, ptr + size);
-+	__dma_flush_area(ptr, size);
- 
- 	/* create a coherent mapping */
- 	page = virt_to_page(ptr);
-@@ -377,7 +377,7 @@ static int __init atomic_pool_init(void)
- 		void *page_addr = page_address(page);
- 
- 		memset(page_addr, 0, atomic_pool_size);
--		__dma_flush_range(page_addr, page_addr + atomic_pool_size);
-+		__dma_flush_area(page_addr, atomic_pool_size);
- 
- 		atomic_pool = gen_pool_create(PAGE_SHIFT, -1);
- 		if (!atomic_pool)
-@@ -535,7 +535,7 @@ fs_initcall(dma_debug_do_init);
- /* Thankfully, all cache ops are by VA so we can ignore phys here */
- static void flush_page(struct device *dev, const void *virt, phys_addr_t phys)
- {
--	__dma_flush_range(virt, virt + PAGE_SIZE);
-+	__dma_flush_area(virt, PAGE_SIZE);
- }
- 
- static void *__iommu_alloc_attrs(struct device *dev, size_t size,
 -- 
-2.5.0
+Best regards,
+Jacek Anaszewski
