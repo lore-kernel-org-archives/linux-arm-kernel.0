@@ -1,54 +1,139 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Tue, 26 Jul 2016 11:36:42 +0200
-Subject: [PATCH] usb: ehci-platform: switch over to shared reset
-In-Reply-To: <1468927970-32240-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1468927970-32240-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <44a5bed2-3e58-1abb-f184-07c664c54a7b@redhat.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Tue, 26 Jul 2016 10:41:48 +0100
+Subject: [PATCH V3 01/10] Documentation: dt-bindings: mailbox: tegra: Add
+ binding for HSP mailbox
+In-Reply-To: <20160719091723.30919-1-josephl@nvidia.com>
+References: <20160719091723.30919-1-josephl@nvidia.com>
+Message-ID: <c04f3281-ce63-7d53-898a-bbdb7bc8eb5d@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-usb-next already has:
-
-https://git.kernel.org/cgit/linux/kernel/git/gregkh/usb.git/commit/drivers/usb/host/ehci-platform.c?h=usb-next&id=76d15c8fba655c9b2d60cf01834858f2c44483dc
-https://git.kernel.org/cgit/linux/kernel/git/gregkh/usb.git/commit/drivers/usb/host/ohci-platform.c?h=usb-next&id=62d9694a003dba585026df36c181e3ca930aeafc
-
-Regards,
-
-Hans
-
-
-
-On 19-07-16 13:32, Masahiro Yamada wrote:
-> The recent update in the reset subsystem requires all reset consumers
-> to be explicit when requesting reset lines.  For detail, see the log
-> of commit 3c35f6edc09b ("reset: Reorder inline reset_control_get*()
-> wrappers").
->
-> The devm_reset_control_get_optional() is deprecated, and falls into
-> the _exclusive variant during the migration, but the reset control
-> in this driver is apparently shared-tolerate.  Besides, this driver
-> is for generic platforms, so actually should be able to work with a
-> shared reset line.
->
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+On 19/07/16 10:17, Joseph Lo wrote:
+> Add DT binding for the Hardware Synchronization Primitives (HSP). The
+> HSP is designed for the processors to share resources and communicate
+> together. It provides a set of hardware synchronization primitives for
+> interprocessor communication. So the interprocessor communication (IPC)
+> protocols can use hardware synchronization primitive, when operating
+> between two processors not in an SMP relationship.
+> 
+> Signed-off-by: Joseph Lo <josephl@nvidia.com>
 > ---
->
->  drivers/usb/host/ehci-platform.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/usb/host/ehci-platform.c b/drivers/usb/host/ehci-platform.c
-> index 1757ebb..2f5a16c 100644
-> --- a/drivers/usb/host/ehci-platform.c
-> +++ b/drivers/usb/host/ehci-platform.c
-> @@ -234,7 +234,7 @@ static int ehci_platform_probe(struct platform_device *dev)
->  		}
->  	}
->
-> -	priv->rst = devm_reset_control_get_optional(&dev->dev, NULL);
-> +	priv->rst = devm_reset_control_get_optional_shared(&dev->dev, NULL);
->  	if (IS_ERR(priv->rst)) {
->  		err = PTR_ERR(priv->rst);
->  		if (err == -EPROBE_DEFER)
->
+> Sorry. Please allow me just update the binding patches of this series.
+> Want to make sure the binding is acceptable first.
+> Thanks.
+> 
+> Changes in V3:
+> - use two cells for mboxes property
+> Changes in V2:
+> - revise the compatible string, interrupt-names, interrupts, and #mbox-cells
+>   properties
+> - remove "nvidia,hsp-function" property
+> - fix the header file name
+> - the binding supports the concept of multiple HSP sub-modules on one HSP HW
+>   block now.
+> ---
+>  .../bindings/mailbox/nvidia,tegra186-hsp.txt       | 52 ++++++++++++++++++++++
+>  include/dt-bindings/mailbox/tegra186-hsp.h         | 20 +++++++++
+>  2 files changed, 72 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mailbox/nvidia,tegra186-hsp.txt
+>  create mode 100644 include/dt-bindings/mailbox/tegra186-hsp.h
+> 
+> diff --git a/Documentation/devicetree/bindings/mailbox/nvidia,tegra186-hsp.txt b/Documentation/devicetree/bindings/mailbox/nvidia,tegra186-hsp.txt
+> new file mode 100644
+> index 000000000000..a9152380642d
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mailbox/nvidia,tegra186-hsp.txt
+> @@ -0,0 +1,52 @@
+> +NVIDIA Tegra Hardware Synchronization Primitives (HSP)
+> +
+> +The HSP modules are used for the processors to share resources and communicate
+> +together. It provides a set of hardware synchronization primitives for
+> +interprocessor communication. So the interprocessor communication (IPC)
+> +protocols can use hardware synchronization primitives, when operating between
+> +two processors not in an SMP relationship.
+> +
+> +The features that HSP supported are shared mailboxes, shared semaphores,
+> +arbitrated semaphores and doorbells.
+> +
+> +Required properties:
+> +- name : Should be hsp
+> +- compatible
+> +    Array of strings.
+> +    one of:
+> +    - "nvidia,tegra186-hsp"
+> +- reg : Offset and length of the register set for the device.
+> +- interrupt-names
+> +    Array of strings.
+> +    Contains a list of names for the interrupts described by the interrupt
+> +    property. May contain the following entries, in any order:
+> +    - "doorbell"
+> +    Users of this binding MUST look up entries in the interrupt property
+> +    by name, using this interrupt-names property to do so.
+> +- interrupts
+> +    Array of interrupt specifiers.
+> +    Must contain one entry per entry in the interrupt-names property,
+> +    in a matching order.
+> +- #mbox-cells : Should be 2.
+> +
+> +The mbox specifier of the "mboxes" property in the client node should
+> +contain two data. The first one should be the HSP type and the second
+> +one should be the ID that the client is going to use. Those information
+> +can be found in the following file.
+> +
+> +- <dt-bindings/mailbox/tegra186-hsp.h>.
+> +
+> +Example:
+> +
+> +hsp_top0: hsp at 3c00000 {
+> +	compatible = "nvidia,tegra186-hsp";
+> +	reg = <0x0 0x03c00000 0x0 0xa0000>;
+> +	interrupts = <GIC_SPI 176 IRQ_TYPE_LEVEL_HIGH>;
+> +	interrupt-names = "doorbell";
+> +	#mbox-cells = <2>;
+> +};
+> +
+> +client {
+> +	...
+> +	mboxes = <&hsp_top0 HSP_MBOX_TYPE_DB HSP_DB_MASTER_XXX>;
+> +};
+> diff --git a/include/dt-bindings/mailbox/tegra186-hsp.h b/include/dt-bindings/mailbox/tegra186-hsp.h
+> new file mode 100644
+> index 000000000000..d1c1432707cd
+> --- /dev/null
+> +++ b/include/dt-bindings/mailbox/tegra186-hsp.h
+> @@ -0,0 +1,20 @@
+> +/*
+> + * This header provides constants for binding nvidia,tegra186-hsp.
+> + *
+> + * The number with HSP_DB_MASTER prefix indicates the bit that is
+> + * associated with a master ID in the doorbell registers.
+> + */
+> +
+> +
+> +#ifndef _DT_BINDINGS_MAILBOX_TEGRA186_HSP_H
+> +#define _DT_BINDINGS_MAILBOX_TEGRA186_HSP_H
+> +
+> +#define HSP_MBOX_TYPE_DB 0x0
+> +#define HSP_MBOX_TYPE_SM 0x1
+> +#define HSP_MBOX_TYPE_SS 0x2
+> +#define HSP_MBOX_TYPE_AS 0x3
+
+Nit ... may be we should add a comment that describes what the above are?
+
+> +
+> +#define HSP_DB_MASTER_CCPLEX 17
+> +#define HSP_DB_MASTER_BPMP 19
+
+Nit ... I would be tempted to move the comment in the header to above
+these defines, as I missed it on my first pass of this.
+
+Otherwise ...
+
+Acked-by: Jon Hunter <jonathanh@nvidia.com>
+
+Cheers
+Jon
+
+-- 
+nvpublic
