@@ -1,46 +1,95 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Tue, 26 Jul 2016 10:50:11 +0100
-Subject: [PATCH V3 3/10] Documentation: dt-bindings: firmware: tegra: add
- bindings of the BPMP
-In-Reply-To: <20160719091723.30919-2-josephl@nvidia.com>
-References: <20160719091723.30919-1-josephl@nvidia.com>
- <20160719091723.30919-2-josephl@nvidia.com>
-Message-ID: <03fb588e-344c-fba9-cfc8-f005162d713e@nvidia.com>
+From: mark.yao@rock-chips.com (Mark yao)
+Date: Tue, 26 Jul 2016 17:51:46 +0800
+Subject: [PATCH 1/3] drm: introduce share plane
+In-Reply-To: <20160726082635.GA31475@phenom.ffwll.local>
+References: <1469519194-23133-1-git-send-email-mark.yao@rock-chips.com>
+ <20160726082635.GA31475@phenom.ffwll.local>
+Message-ID: <579732B2.80600@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 2016?07?26? 16:26, Daniel Vetter wrote:
+> On Tue, Jul 26, 2016 at 03:46:32PM +0800, Mark Yao wrote:
+>> >What is share plane:
+>> >Plane hardware only be used when the display scanout run into plane active
+>> >scanout, that means we can reuse the plane hardware resources on plane
+>> >non-active scanout.
+>> >
+>> >      --------------------------------------------------
+>> >     |  scanout                                       |
+>> >     |         ------------------                     |
+>> >     |         | parent plane   |                     |
+>> >     |         | active scanout |                     |
+>> >     |         |                |   ----------------- |
+>> >     |         ------------------   | share plane 1 | |
+>> >     |  -----------------           |active scanout | |
+>> >     |  | share plane 0 |           |               | |
+>> >     |  |active scanout |           ----------------- |
+>> >     |  |               |                             |
+>> >     |  -----------------                             |
+>> >     --------------------------------------------------
+>> >One plane hardware can be reuse for multi-planes, we assume the first
+>> >plane is parent plane, other planes share the resource with first one.
+>> >     parent plane
+>> >         |---share plane 0
+>> >         |---share plane 1
+>> >         ...
+>> >
+>> >Because resource share, There are some limit on share plane: one group
+>> >of share planes need use same zpos, can not overlap, etc.
+>> >
+>> >We assume share plane is a universal plane with some limit flags.
+>> >people who use the share plane need know the limit, should call the ioctl
+>> >DRM_CLIENT_CAP_SHARE_PLANES, and judge the planes limit before use it.
+>> >
+>> >A group of share planes would has same shard id, so userspace can
+>> >group them, judge share plane's limit.
+>> >
+>> >Signed-off-by: Mark Yao<mark.yao@rock-chips.com>
+> This seems extremely hw specific, why exactly do we need to add a new
+> relationship on planes? What does this buy on_other_  drivers?
+Yes, now it's plane hardware specific, maybe others have same design, 
+because this design
+would save hardware resource to support multi-planes.
 
-On 19/07/16 10:17, Joseph Lo wrote:
-> The BPMP is a specific processor in Tegra chip, which is designed for
-> booting process handling and offloading the power management, clock
-> management, and reset control tasks from the CPU. The binding document
-> defines the resources that would be used by the BPMP firmware driver,
-> which can create the interprocessor communication (IPC) between the CPU
-> and BPMP.
-> 
-> Signed-off-by: Joseph Lo <josephl@nvidia.com>
-> ---
-> Changes in V3:
-> - s/mmio-ram/mmio-sram/
-> - revise the file path of the reference binding documents and header files
->   for more generic viem in different SW projects
-> Changes in V2:
-> - update the message that the BPMP is clock and reset control provider
-> - add tegra186-clock.h and tegra186-reset.h header files
-> - revise the description of the required properties
-> ---
->  .../bindings/firmware/nvidia,tegra186-bpmp.txt     |  77 ++
->  include/dt-bindings/clock/tegra186-clock.h         | 940 +++++++++++++++++++++
->  include/dt-bindings/reset/tegra186-reset.h         | 217 +++++
->  3 files changed, 1234 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/firmware/nvidia,tegra186-bpmp.txt
->  create mode 100644 include/dt-bindings/clock/tegra186-clock.h
->  create mode 100644 include/dt-bindings/reset/tegra186-reset.h
+> Imo this should be solved by virtualizing planes in the driver. Start out
+> by assigning planes, and if you can reuse one for sharing then do that,
+> otherwise allocate a new one. If there's not enough real planes, fail the
+> atomic_check.
+I think that is too complex, trying with atomic_check I think it's not a 
+good idea, userspace try planes every commit would be a heavy work.
 
-Acked-by: Jon Hunter <jonathanh@nvidia.com>
+Userspace need  know all planes relationship, group them, some display 
+windows can put together, some can't,
+too many permutation and combination, I think can't just commit with try.
 
-Cheers
-Jon
+example:
+userspace:
+windows 1: pos(0, 0)  size(1024, 100)
+windows 2: pos(0, 50) size(400, 500)
+windows 3: pos(0, 200) size(800, 300)
+
+drm plane resources:
+plane 0 and plane 1 is a group of share planes
+plane 2 is common plane.
+
+if userspace know the relationship, then they can assign windows 1 and 
+window 3 to plane0 and plane 1. that would be success.
+but if they don't know, assign window 1/2 to plane 0/1, failed, assign 
+window 2/3 to plane 0/1, failed. mostly would get failed.
+
+>
+> This seems way to hw specific to be useful as a generic concept.
+
+We want to change the drm_mode_getplane_res behavior, if userspace call 
+DRM_CLIENT_CAP_SHARE_PLANES, that means userspace know hardware limit,
+then we return full planes support to userspace, if don't, just make a 
+group of share planes as one plane.
+this work is on generic place.
+
+> -Daniel
+>
+>
 
 -- 
-nvpublic
+?ark Yao
