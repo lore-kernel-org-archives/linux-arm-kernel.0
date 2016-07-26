@@ -1,98 +1,64 @@
-From: appana.durga.rao@xilinx.com (Appana Durga Kedareswara Rao)
-Date: Tue, 26 Jul 2016 15:09:19 +0000
-Subject: [RFC PATCH v2 1/4] Documentation: DT: net: Add Xilinx
- gmiitorgmii converter device tree binding documentation
-In-Reply-To: <03CA77BA8AF6F1469AEDFBDA1322A7B74A19393B@XAP-PVEXMBX02.xlnx.xilinx.com>
-References: <1467623084-15471-1-git-send-email-appanad@xilinx.com>
- <1467623084-15471-2-git-send-email-appanad@xilinx.com>
- <20160704140458.GC3282@lunn.ch>
- <03CA77BA8AF6F1469AEDFBDA1322A7B74A193913@XAP-PVEXMBX02.xlnx.xilinx.com>
- <20160706142121.GI19800@lunn.ch>
- <03CA77BA8AF6F1469AEDFBDA1322A7B74A19393B@XAP-PVEXMBX02.xlnx.xilinx.com>
-Message-ID: <C246CAC1457055469EF09E3A7AC4E11A4A5C2387@XAP-PVEXMBX01.xlnx.xilinx.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 26 Jul 2016 17:13:11 +0200
+Subject: [PATCH 4/5] input: touchscreen: support Allwinner SoCs'
+ touchscreen
+In-Reply-To: <20160725170839.GA27415@dtor-ws>
+References: <1469003351-15263-1-git-send-email-quentin.schulz@free-electrons.com>
+ <1469003351-15263-5-git-send-email-quentin.schulz@free-electrons.com>
+ <20160721062950.GB5993@lukather> <20160721064140.GA17658@dtor-ws>
+ <20160725094542.GI7419@lukather> <20160725170839.GA27415@dtor-ws>
+Message-ID: <20160726151311.GG7190@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
+Hi,
 
-	Thanks for the inputs...
+On Mon, Jul 25, 2016 at 10:08:39AM -0700, Dmitry Torokhov wrote:
+> > > > ... but your driver isn't registered yet. How does input_report and
+> > > > input_sync behave in such a case?
+> > > 
+> > > This is explicitly allowed:
+> > > 
+> > > "
+> > > ...
+> > >  * NOTE: input_event() may be safely used right after input device was
+> > >  * allocated with input_allocate_device(), even before it is registered
+> > >  * with input_register_device(), but the event will not reach any of the
+> > >  * input handlers. Such early invocation of input_event() may be used
+> > >  * to 'seed' initial state of a switch or initial position of absolute
+> > >  * axis, etc.
+> > >  */
+> > > "
+> > 
+> > Good to know. Still, it feels like it should be handled explicitly,
+> > instead of relying on the fact that we only call input_event in our
+> > handler and that it works that way.
+> 
+> Why? It is the documented property of input API and it is done so
+> precisely so that you can register interrupt before registering input
+> device. That is done because once registered input device is supposed to
+> be fully-functional.  It does not matter for this driver but there are
+> drivers out there that require interrupt handling as part of their
+> "open" method.
 
-> >
-> > > > Hi Kedareswara
-> > > >
-> > > > So looking at the device tree, you have the gmiitorgmii as an mdio
-> > > > device. It will get probed as an mdio device, and from that you
-> > > > know the address on the bus. However, your driver does not
-> > > > actually do this. xilinx_gmii2rgmii.c is just a library of two
-> > > > functions, and does not use any of this device tree information.
-> > > > You device tree binding is completely bogus.
-> > > >
-> > > > What i think is a much more logical structure, and fits the
-> > > > hardware, which is what DT is all about, is to make your driver an mdio
-> driver.
-> > > > Also, have a phy-handle pointing to the PHY in the gmii_to_rgmii node.
-> > > > You then no longer need the exported gmii2rgmii_phyprobe() function.
-> > > >
-> > > > Next, you want gmiitorgmii driver to register a phy. The MAC
-> > > > driver can then look this up using phy-handle:
-> > > >
-> > > >        mdio {
-> > > >                 #address-cells = <1>;
-> > > >                 #size-cells = <0>;
-> > > >
-> > > >                 phy: ethernet-phy at 0 {
-> > > >                         reg = <0>;
-> > > >                 };
-> > > >
-> > > >                 gmii_to_rgmii: gmii-to-rgmii at 8 {
-> > > >                         compatible = "xlnx,gmiitorgmii";
-> > > >                         reg = <8>;
-> > > > 			phy-handle = <&phy>;
-> > > >                 };
-> > > >        };
-> > >
-> > >
-> > > Thanks for your inputs initially we too thought the similar
-> > > implementation But the GMII2RGMII converter contains only one
-> > > register and it is  not compatible to the standard ethernet MII
-> > > interface. Also it doesn't have a standard VID and PID registers So,
-> > > during the mdio bus scan, this device
-> > will
-> > > not appear.
+I'm not questionning the input framework itself, and it works right
+now because we all looked at that issue and found that it would work
+even in the event of an early interrupt.
 
-I tried to implement the driver as you suggested but there are few limitations in this
-Implementation please correct me if my understanding is wrong...
+What I'm afraid of is that in a few weeks /monthes / years / decades,
+someone will add something new in the driver without taking care of
+that, and we will miss it because we won't have enough context.
 
-The device-tree will look like below...
-        mdio {
-                #address-cells = <1>;
-                 #size-cells = <0>;
-                 phy: ethernet-phy at 0 {
-                         reg = <0>;
-                 };
-                 gmii_to_rgmii: gmii-to-rgmii at 8 {
-                         compatible = "xlnx,gmiitorgmii";
-                         reg = <8>;
-		phy-handle = <&phy>;
-                 };
-      };
+Maxime
 
-The MAC driver does the below.
-	---> It creates a MDIO device for the gmii_to_rgmii node.
-	---> It creates a PHY device for the External PHY node.
-
-The GMII2RGMII driver does the below.
-	1) It registers the gmii_to_rgmii node as a MDIO driver.
-	It contains the external phy as a phy-handle
-	2) Register a PHY Driver.
-	---> Register it as a phy driver (phy_register_driver): 
-	        For this implementation the converter won't have any VID or DID(PHY register 2 and 3)  
-	---> Register phy using of_phy_connect call: 
-	       For this implementation needed a netdev pointer to pass it to the of_phy_connect call.
-	      (Need to allocate a network device during probe and need to register it as netdev) 
-		
-	For the 2nd one implement I am facing above limitations...
-	Please correct me if my understanding is wrong...
-
-Regards,
-Kedar.
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160726/e9555d8b/attachment.sig>
