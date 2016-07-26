@@ -1,60 +1,73 @@
 From: quentin.schulz@free-electrons.com (Quentin Schulz)
-Date: Tue, 26 Jul 2016 09:43:44 +0200
-Subject: [PATCH v3 1/4] hwmon: iio_hwmon: delay probing with late_initcall
-In-Reply-To: <1469519027-11387-1-git-send-email-quentin.schulz@free-electrons.com>
-References: <1469519027-11387-1-git-send-email-quentin.schulz@free-electrons.com>
-Message-ID: <1469519027-11387-2-git-send-email-quentin.schulz@free-electrons.com>
+Date: Tue, 26 Jul 2016 09:43:43 +0200
+Subject: [PATCH v3 0/4] add support for Allwinner SoCs ADC
+Message-ID: <1469519027-11387-1-git-send-email-quentin.schulz@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-iio_channel_get_all returns -ENODEV when it cannot find either phandles and
-properties in the Device Tree or channels whose consumer_dev_name matches
-iio_hwmon in iio_map_list. The iio_map_list is filled in by iio drivers
-which might be probed after iio_hwmon.
+The Allwinner SoCs all have an ADC that can also act as a touchscreen
+controller and a thermal sensor. The first four channels can be used either
+for the ADC or the touchscreen and the fifth channel is used for the
+thermal sensor. We currently have a driver for the two latter functions in
+drivers/input/touchscreen/sun4i-ts.c but we don't have access to the ADC
+feature at all. It is meant to replace the current driver by using MFD and
+subdrivers.
 
-This makes sure iio_hwmon is probed after all iio drivers which provides
-channels to iio_hwmon are probed, be they present in the DT or using
-iio_map_list.
+This adds initial support for Allwinner SoCs ADC with all features. Yet,
+the touchscreen is not implemented but will be added later. To switch
+between touchscreen and ADC modes, you need to poke a few bits in registers
+and (de)activate an interrupt (pen-up).
+An MFD is provided to let the input driver activate the pen-up interrupt
+through a virtual interrupt, poke a few bits via regmap and read data from
+the ADC driver while both (and iio_hwmon) are probed by the MFD.
 
-This replaces module_platform_driver() by an explicit code variant which
-calls late_initcall() install of module_init(), meaning it probes after
-all the drivers using module_init() as their init.
+There are slight variations between the different SoCs ADC like the address
+of some registers and the scale and offset to apply to raw thermal sensor
+values. These variations are handled by using different platform_device_id,
+passed to the sub-drivers when they are probed by the MFD.
 
-Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
----
+Currently when no iio channel is found, the probing of iio-hwmon fails.
+This is problematic when iio-hwmon probes before the iio driver could
+register iio channels to share. Thus, this modifies iio-hwmon to probe late
+with late_initcall making sure all drivers which provides iio channels have
+probed before iio_hwmon.
 
-v3:
- - use late_initcall instead of deferring probe,
+When an MFD cell has an of_compatible (meaning it is present in the Device
+Tree), other nodes can reference it using a phandle.
+However when the MFD cell is not declared in the Device Tree, the only way
+other nodes can reference it are by using a phandle to the MFD. Then when
+this MFD cell tries to register itself in one framework, the registration
+is denied by the framework because it is not matching the of_node of the
+node which is referenced by the phandle in one of the other nodes.
+This reattaches the of_node of the MFD to the MFD cell device structure
+when the MFD cell has no of_compatible.
+We need this modification to register the thermal sensor in the thermal
+framework.
 
- drivers/hwmon/iio_hwmon.c | 16 +++++++++++++++-
- 1 file changed, 15 insertions(+), 1 deletion(-)
+Removal of proposed patch for iio_hwmon's iio channel's label in v3. The
+patch induces irreversible ABI changes and will be handled as a separate
+patch since I think it is not absolutely necessary to have labels yet in
+iio_hwmon.
 
-diff --git a/drivers/hwmon/iio_hwmon.c b/drivers/hwmon/iio_hwmon.c
-index b550ba5..0a00bfb 100644
---- a/drivers/hwmon/iio_hwmon.c
-+++ b/drivers/hwmon/iio_hwmon.c
-@@ -192,7 +192,21 @@ static struct platform_driver __refdata iio_hwmon_driver = {
- 	.remove = iio_hwmon_remove,
- };
- 
--module_platform_driver(iio_hwmon_driver);
-+static struct platform_driver * const drivers[] = {
-+	&iio_hwmon_driver,
-+};
-+
-+static int __init iio_hwmon_late_init(void)
-+{
-+	return platform_register_drivers(drivers, ARRAY_SIZE(drivers));
-+}
-+late_initcall(iio_hwmon_late_init);
-+
-+static void __exit iio_hwmon_exit(void)
-+{
-+	platform_unregister_drivers(drivers, ARRAY_SIZE(drivers));
-+}
-+module_exit(iio_hwmon_exit);
- 
- MODULE_AUTHOR("Jonathan Cameron <jic23@kernel.org>");
- MODULE_DESCRIPTION("IIO to hwmon driver");
+Quentin Schulz (4):
+  hwmon: iio_hwmon: delay probing with late_initcall
+  mfd: add support for Allwinner SoCs ADC
+  mfd: mfd-core: reattach mfd of_node to cells without of_compatible
+  iio: adc: add support for Allwinner SoCs ADC
+
+ drivers/hwmon/iio_hwmon.c           |  16 +-
+ drivers/iio/adc/Kconfig             |  12 +
+ drivers/iio/adc/Makefile            |   1 +
+ drivers/iio/adc/sunxi-gpadc-iio.c   | 513 ++++++++++++++++++++++++++++++++++++
+ drivers/mfd/Kconfig                 |  15 ++
+ drivers/mfd/Makefile                |   2 +
+ drivers/mfd/mfd-core.c              |  14 +-
+ drivers/mfd/sunxi-gpadc-mfd.c       | 189 +++++++++++++
+ include/linux/mfd/sunxi-gpadc-mfd.h |  94 +++++++
+ 9 files changed, 850 insertions(+), 6 deletions(-)
+ create mode 100644 drivers/iio/adc/sunxi-gpadc-iio.c
+ create mode 100644 drivers/mfd/sunxi-gpadc-mfd.c
+ create mode 100644 include/linux/mfd/sunxi-gpadc-mfd.h
+
 -- 
 2.5.0
