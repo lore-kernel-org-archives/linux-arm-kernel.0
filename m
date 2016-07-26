@@ -1,78 +1,50 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 26 Jul 2016 22:30:29 +0200
-Subject: [PATCH 01/13] clk: sunxi-ng: mux: Rename mux macro to be consistent
+Date: Tue, 26 Jul 2016 22:30:32 +0200
+Subject: [PATCH 04/13] clk: sunxi-ng: sun8i: Fix register offset
 In-Reply-To: <20160726203041.29366-1-maxime.ripard@free-electrons.com>
 References: <20160726203041.29366-1-maxime.ripard@free-electrons.com>
-Message-ID: <20160726203041.29366-2-maxime.ripard@free-electrons.com>
+Message-ID: <20160726203041.29366-5-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rename the internal mux macro to be consistent with the other internal
-structure macros.
+Some registers offset were having one 0 too many compared to the others.
+Remove it.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/clk/sunxi-ng/ccu_div.h | 2 +-
- drivers/clk/sunxi-ng/ccu_mp.h  | 2 +-
- drivers/clk/sunxi-ng/ccu_mux.h | 6 +++---
- 3 files changed, 5 insertions(+), 5 deletions(-)
+ drivers/clk/sunxi-ng/ccu-sun8i-h3.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/clk/sunxi-ng/ccu_div.h b/drivers/clk/sunxi-ng/ccu_div.h
-index 653ade5769b3..5d98549e23a6 100644
---- a/drivers/clk/sunxi-ng/ccu_div.h
-+++ b/drivers/clk/sunxi-ng/ccu_div.h
-@@ -83,7 +83,7 @@ struct ccu_div {
- 	struct ccu_div _struct = {					\
- 		.enable	= _gate,					\
- 		.div	= _SUNXI_CCU_DIV(_mshift, _mwidth),		\
--		.mux	= SUNXI_CLK_MUX(_muxshift, _muxwidth),		\
-+		.mux	= _SUNXI_CCU_MUX(_muxshift, _muxwidth),		\
- 		.common	= {						\
- 			.reg		= _reg,				\
- 			.hw.init	= CLK_HW_INIT_PARENTS(_name,	\
-diff --git a/drivers/clk/sunxi-ng/ccu_mp.h b/drivers/clk/sunxi-ng/ccu_mp.h
-index 3cf12bf95962..edf9215ea8cc 100644
---- a/drivers/clk/sunxi-ng/ccu_mp.h
-+++ b/drivers/clk/sunxi-ng/ccu_mp.h
-@@ -44,7 +44,7 @@ struct ccu_mp {
- 		.enable	= _gate,					\
- 		.m	= _SUNXI_CCU_DIV(_mshift, _mwidth),		\
- 		.p	= _SUNXI_CCU_DIV(_pshift, _pwidth),		\
--		.mux	= SUNXI_CLK_MUX(_muxshift, _muxwidth),		\
-+		.mux	= _SUNXI_CCU_MUX(_muxshift, _muxwidth),		\
- 		.common	= {						\
- 			.reg		= _reg,				\
- 			.hw.init	= CLK_HW_INIT_PARENTS(_name,	\
-diff --git a/drivers/clk/sunxi-ng/ccu_mux.h b/drivers/clk/sunxi-ng/ccu_mux.h
-index 945082631e7d..95cfecec3c39 100644
---- a/drivers/clk/sunxi-ng/ccu_mux.h
-+++ b/drivers/clk/sunxi-ng/ccu_mux.h
-@@ -21,7 +21,7 @@ struct ccu_mux_internal {
- 	} variable_prediv;
- };
+diff --git a/drivers/clk/sunxi-ng/ccu-sun8i-h3.c b/drivers/clk/sunxi-ng/ccu-sun8i-h3.c
+index 68492808e5fc..3c236eefbb3a 100644
+--- a/drivers/clk/sunxi-ng/ccu-sun8i-h3.c
++++ b/drivers/clk/sunxi-ng/ccu-sun8i-h3.c
+@@ -70,7 +70,7 @@ static SUNXI_CCU_NM_WITH_FRAC_GATE_LOCK(pll_video0_clk, "pll-video0",
+ 					0);
  
--#define SUNXI_CLK_MUX(_shift, _width)	\
-+#define _SUNXI_CCU_MUX(_shift, _width)		\
- 	{					\
- 		.shift	= _shift,		\
- 		.width	= _width,		\
-@@ -37,7 +37,7 @@ struct ccu_mux {
+ static SUNXI_CCU_NM_WITH_FRAC_GATE_LOCK(pll_ve_clk, "pll-ve",
+-					"osc24M", 0x0018,
++					"osc24M", 0x018,
+ 					8, 7,		/* N */
+ 					0, 4,		/* M */
+ 					BIT(24),	/* frac enable */
+@@ -100,7 +100,7 @@ static SUNXI_CCU_NK_WITH_GATE_LOCK_POSTDIV(pll_periph0_clk, "pll-periph0",
+ 					   0);
  
- #define SUNXI_CCU_MUX(_struct, _name, _parents, _reg, _shift, _width, _flags) \
- 	struct ccu_mux _struct = {					\
--		.mux	= SUNXI_CLK_MUX(_shift, _width),		\
-+		.mux	= _SUNXI_CCU_MUX(_shift, _width),		\
- 		.common	= {						\
- 			.reg		= _reg,				\
- 			.hw.init	= CLK_HW_INIT_PARENTS(_name,	\
-@@ -51,7 +51,7 @@ struct ccu_mux {
- 				_shift, _width, _gate, _flags)		\
- 	struct ccu_mux _struct = {					\
- 		.enable	= _gate,					\
--		.mux	= SUNXI_CLK_MUX(_shift, _width),		\
-+		.mux	= _SUNXI_CCU_MUX(_shift, _width),		\
- 		.common	= {						\
- 			.reg		= _reg,				\
- 			.hw.init	= CLK_HW_INIT_PARENTS(_name,	\
+ static SUNXI_CCU_NM_WITH_FRAC_GATE_LOCK(pll_gpu_clk, "pll-gpu",
+-					"osc24M", 0x0038,
++					"osc24M", 0x038,
+ 					8, 7,		/* N */
+ 					0, 4,		/* M */
+ 					BIT(24),	/* frac enable */
+@@ -121,7 +121,7 @@ static SUNXI_CCU_NK_WITH_GATE_LOCK_POSTDIV(pll_periph1_clk, "pll-periph1",
+ 					   0);
+ 
+ static SUNXI_CCU_NM_WITH_FRAC_GATE_LOCK(pll_de_clk, "pll-de",
+-					"osc24M", 0x0048,
++					"osc24M", 0x048,
+ 					8, 7,		/* N */
+ 					0, 4,		/* M */
+ 					BIT(24),	/* frac enable */
 -- 
 2.9.2
