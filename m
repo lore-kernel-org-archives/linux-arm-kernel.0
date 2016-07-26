@@ -1,99 +1,44 @@
-From: quentin.schulz@free-electrons.com (Quentin Schulz)
-Date: Tue, 26 Jul 2016 12:07:43 +0200
-Subject: [PATCH v3 1/4] hwmon: iio_hwmon: delay probing with late_initcall
-In-Reply-To: <2324970.FJcTUYNoO2@ws-stein>
-References: <1469519027-11387-1-git-send-email-quentin.schulz@free-electrons.com>
- <5277864.qlyRKbC1Zy@ws-stein>
- <ed5c1761-bdc7-df9c-96c8-998e83c49c4c@free-electrons.com>
- <2324970.FJcTUYNoO2@ws-stein>
-Message-ID: <e90406c3-da8a-896f-edf4-a550a441a5f8@free-electrons.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 26 Jul 2016 11:20:18 +0100
+Subject: [PATCH v2 1/6] firmware: Amlogic: Add secure monitor driver
+In-Reply-To: <1467203656-14381-2-git-send-email-carlo@caione.org>
+References: <1467203656-14381-1-git-send-email-carlo@caione.org>
+ <1467203656-14381-2-git-send-email-carlo@caione.org>
+Message-ID: <20160726102017.GA12241@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/07/2016 12:00, Alexander Stein wrote:
-> On Tuesday 26 July 2016 11:33:59, Quentin Schulz wrote:
->> On 26/07/2016 11:05, Alexander Stein wrote:
->>> On Tuesday 26 July 2016 10:24:48, Quentin Schulz wrote:
->>>> On 26/07/2016 10:21, Alexander Stein wrote:
->>>>> On Tuesday 26 July 2016 09:43:44, Quentin Schulz wrote:
->>>>>> iio_channel_get_all returns -ENODEV when it cannot find either phandles
->>>>>> and
->>>>>> properties in the Device Tree or channels whose consumer_dev_name
->>>>>> matches
->>>>>> iio_hwmon in iio_map_list. The iio_map_list is filled in by iio drivers
->>>>>> which might be probed after iio_hwmon.
->>>>>
->>>>> Would it work if iio_channel_get_all returning ENODEV is used for
->>>>> returning
->>>>> EPROBE_DEFER in iio_channel_get_all? Using late initcalls for
->>>>> driver/device
->>>>> dependencies seems not right for me at this place.
->>>>
->>>> Then what if the iio_channel_get_all is called outside of the probe of a
->>>> driver? We'll have to change the error code, things we are apparently
->>>> trying to avoid (see v2 patches' discussions).
->>>
->>> Maybe I didn't express my idea enough. I don't want to change the behavior
->>> of iio_channel_get_all at all. Just the result evaluation of
->>> iio_channel_get_all in iio_hwmon_probe. I have something link the patch
->>> below in mind.
->>>
->>> Best regards,
->>> Alexander
->>> ---
->>> diff --git a/drivers/hwmon/iio_hwmon.c b/drivers/hwmon/iio_hwmon.c
->>> index b550ba5..e32d150 100644
->>> --- a/drivers/hwmon/iio_hwmon.c
->>> +++ b/drivers/hwmon/iio_hwmon.c
->>> @@ -73,8 +73,12 @@ static int iio_hwmon_probe(struct platform_device
->>> *pdev)
->>>
->>>                 name = dev->of_node->name;
->>>         
->>>         channels = iio_channel_get_all(dev);
->>>
->>> -       if (IS_ERR(channels))
->>> -               return PTR_ERR(channels);
->>> +       if (IS_ERR(channels)) {
->>> +               if (PTR_ERR(channels) == -ENODEV)
->>> +                       return -EPROBE_DEFER;
->>> +               else
->>> +                       return PTR_ERR(channels);
->>> +       }
->>>
->>>         st = devm_kzalloc(dev, sizeof(*st), GFP_KERNEL);
->>>         if (st == NULL) {
->>
->> Indeed, I misunderstood what you told me.
->>
->> Actually, the patch you proposed is part of my v1
->> (https://lkml.org/lkml/2016/6/28/203) and v2
->> (https://lkml.org/lkml/2016/7/15/215).
->> Jonathan and Guenter didn't really like the idea of changing the -ENODEV
->> in -EPROBE_DEFER.
-> 
-> Thanks for the links.
-> 
->> What I thought you were proposing was to change the -ENODEV return code
->> inside iio_channel_get_all. This cannot be an option since the function
->> might be called outside of a probe (it is not yet, but might be in the
->> future?).
-> 
-> AFAICS this is a helper function not knowing about device probing itself. And 
-> it should stay at that.
-> 
->> Of what I understood, two possibilities are then possible (proposed
->> either by Guenter or Jonathan): either rework the iio framework to
->> register iio map array earlier or to use late_initcall instead of init
->> for the driver consuming the iio channels.
-> 
-> Interestingly using this problem would not arise due to module dependencies. 
-> But using late_initcall would mean this needs to be done on any driver using 
-> iio channels? I would rather keep those consumers simple.
+Hi,
 
-This would mean this needs to be done in any driver *using iio_map
-array* to get iio channels. The other way of getting iio channels is
-using properties in the Device Tree so no need for late_initcall in that
-case.
+Sorry for the delay.
 
-Quentin
+I don't have any major comments, there are jsut a couple of minor
+details.
+
+> +config MESON_SM
+> +	bool
+> +	default ARCH_MESON
+> +	depends on ARM64_4K_PAGES
+
+It would be good to have a commentin the code as to why we depend on
+ARM64_4K_PAGES.
+
+That way it's possible for others to figure out without having to go
+digging through mail archives and/or git logs.
+
+[...]
+
+> +struct meson_sm_chip gxbb_chip = {
+> +	.shmem_size		= 0x1000,
+
+If you include <linux/sizes.h>, you can use SZ_4K here.
+
+Immediately above this is probably the best place for the comment
+regarding the 4K page restriction imposed by the FW interface.
+
+Other than that this looks fine, so FWIW:
+
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+
+Thanks,
+Mark.
