@@ -1,33 +1,33 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 26 Jul 2016 22:30:38 +0200
-Subject: [PATCH 10/13] arm64: Kconfig: sunxi: add PINCTRL
+Date: Tue, 26 Jul 2016 22:30:39 +0200
+Subject: [PATCH 11/13] Documentation: devicetree: add vendor prefix for Pine64
 In-Reply-To: <20160726203041.29366-1-maxime.ripard@free-electrons.com>
 References: <20160726203041.29366-1-maxime.ripard@free-electrons.com>
-Message-ID: <20160726203041.29366-11-maxime.ripard@free-electrons.com>
+Message-ID: <20160726203041.29366-12-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Andre Przywara <andre.przywara@arm.com>
 
-Add required PINCTRL symbol to cover non-defconfig setups.
-
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+Acked-by: Rob Herring <robh@kernel.org>
+[Maxime: Change title prefix to match the usual style]
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm64/Kconfig.platforms | 1 +
+ Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
  1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
-index 4cc444c3c2e9..83bc4bf3513b 100644
---- a/arch/arm64/Kconfig.platforms
-+++ b/arch/arm64/Kconfig.platforms
-@@ -3,6 +3,7 @@ menu "Platform selection"
- config ARCH_SUNXI
- 	bool "Allwinner sunxi 64-bit SoC Family"
- 	select GENERIC_IRQ_CHIP
-+	select PINCTRL
- 	select PINCTRL_SUN50I_A64
- 	help
- 	  This enables support for Allwinner sunxi based SoCs like the A64.
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index a7440bcd67ff..f25502b28b55 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -198,6 +198,7 @@ parade	Parade Technologies Inc.
+ pericom	Pericom Technology Inc.
+ phytec	PHYTEC Messtechnik GmbH
+ picochip	Picochip Ltd
++pine64	Pine64
+ plathome	Plat'Home Co., Ltd.
+ plda	PLDA
+ pixcir  PIXCIR MICROELECTRONICS Co., Ltd
 -- 
 2.9.2
