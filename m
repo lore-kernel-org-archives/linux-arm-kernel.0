@@ -1,79 +1,54 @@
-From: quentin.schulz@free-electrons.com (Quentin Schulz)
-Date: Tue, 26 Jul 2016 11:33:59 +0200
-Subject: [PATCH v3 1/4] hwmon: iio_hwmon: delay probing with late_initcall
-In-Reply-To: <5277864.qlyRKbC1Zy@ws-stein>
-References: <1469519027-11387-1-git-send-email-quentin.schulz@free-electrons.com>
- <209942367.uny0GxrY2s@ws-stein>
- <10d14cc4-26f1-8f2d-2997-3b2bc323c40e@free-electrons.com>
- <5277864.qlyRKbC1Zy@ws-stein>
-Message-ID: <ed5c1761-bdc7-df9c-96c8-998e83c49c4c@free-electrons.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Tue, 26 Jul 2016 11:36:42 +0200
+Subject: [PATCH] usb: ehci-platform: switch over to shared reset
+In-Reply-To: <1468927970-32240-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1468927970-32240-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <44a5bed2-3e58-1abb-f184-07c664c54a7b@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/07/2016 11:05, Alexander Stein wrote:
-> On Tuesday 26 July 2016 10:24:48, Quentin Schulz wrote:
->> On 26/07/2016 10:21, Alexander Stein wrote:
->>> On Tuesday 26 July 2016 09:43:44, Quentin Schulz wrote:
->>>> iio_channel_get_all returns -ENODEV when it cannot find either phandles
->>>> and
->>>> properties in the Device Tree or channels whose consumer_dev_name matches
->>>> iio_hwmon in iio_map_list. The iio_map_list is filled in by iio drivers
->>>> which might be probed after iio_hwmon.
->>>
->>> Would it work if iio_channel_get_all returning ENODEV is used for
->>> returning
->>> EPROBE_DEFER in iio_channel_get_all? Using late initcalls for
->>> driver/device
->>> dependencies seems not right for me at this place.
->>
->> Then what if the iio_channel_get_all is called outside of the probe of a
->> driver? We'll have to change the error code, things we are apparently
->> trying to avoid (see v2 patches' discussions).
-> 
-> Maybe I didn't express my idea enough. I don't want to change the behavior of  
-> iio_channel_get_all at all. Just the result evaluation of iio_channel_get_all 
-> in iio_hwmon_probe. I have something link the patch below in mind.
-> 
-> Best regards,
-> Alexander
+Hi,
+
+usb-next already has:
+
+https://git.kernel.org/cgit/linux/kernel/git/gregkh/usb.git/commit/drivers/usb/host/ehci-platform.c?h=usb-next&id=76d15c8fba655c9b2d60cf01834858f2c44483dc
+https://git.kernel.org/cgit/linux/kernel/git/gregkh/usb.git/commit/drivers/usb/host/ohci-platform.c?h=usb-next&id=62d9694a003dba585026df36c181e3ca930aeafc
+
+Regards,
+
+Hans
+
+
+
+On 19-07-16 13:32, Masahiro Yamada wrote:
+> The recent update in the reset subsystem requires all reset consumers
+> to be explicit when requesting reset lines.  For detail, see the log
+> of commit 3c35f6edc09b ("reset: Reorder inline reset_control_get*()
+> wrappers").
+>
+> The devm_reset_control_get_optional() is deprecated, and falls into
+> the _exclusive variant during the migration, but the reset control
+> in this driver is apparently shared-tolerate.  Besides, this driver
+> is for generic platforms, so actually should be able to work with a
+> shared reset line.
+>
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 > ---
-> diff --git a/drivers/hwmon/iio_hwmon.c b/drivers/hwmon/iio_hwmon.c
-> index b550ba5..e32d150 100644
-> --- a/drivers/hwmon/iio_hwmon.c
-> +++ b/drivers/hwmon/iio_hwmon.c
-> @@ -73,8 +73,12 @@ static int iio_hwmon_probe(struct platform_device *pdev)
->                 name = dev->of_node->name;
->  
->         channels = iio_channel_get_all(dev);
-> -       if (IS_ERR(channels))
-> -               return PTR_ERR(channels);
-> +       if (IS_ERR(channels)) {
-> +               if (PTR_ERR(channels) == -ENODEV)
-> +                       return -EPROBE_DEFER;
-> +               else
-> +                       return PTR_ERR(channels);
-> +       }
->  
->         st = devm_kzalloc(dev, sizeof(*st), GFP_KERNEL);
->         if (st == NULL) {
-
-Indeed, I misunderstood what you told me.
-
-Actually, the patch you proposed is part of my v1
-(https://lkml.org/lkml/2016/6/28/203) and v2
-(https://lkml.org/lkml/2016/7/15/215).
-Jonathan and Guenter didn't really like the idea of changing the -ENODEV
-in -EPROBE_DEFER.
-
-What I thought you were proposing was to change the -ENODEV return code
-inside iio_channel_get_all. This cannot be an option since the function
-might be called outside of a probe (it is not yet, but might be in the
-future?).
-
-Of what I understood, two possibilities are then possible (proposed
-either by Guenter or Jonathan): either rework the iio framework to
-register iio map array earlier or to use late_initcall instead of init
-for the driver consuming the iio channels.
-
-Thanks,
-Quentin
+>
+>  drivers/usb/host/ehci-platform.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/drivers/usb/host/ehci-platform.c b/drivers/usb/host/ehci-platform.c
+> index 1757ebb..2f5a16c 100644
+> --- a/drivers/usb/host/ehci-platform.c
+> +++ b/drivers/usb/host/ehci-platform.c
+> @@ -234,7 +234,7 @@ static int ehci_platform_probe(struct platform_device *dev)
+>  		}
+>  	}
+>
+> -	priv->rst = devm_reset_control_get_optional(&dev->dev, NULL);
+> +	priv->rst = devm_reset_control_get_optional_shared(&dev->dev, NULL);
+>  	if (IS_ERR(priv->rst)) {
+>  		err = PTR_ERR(priv->rst);
+>  		if (err == -EPROBE_DEFER)
+>
