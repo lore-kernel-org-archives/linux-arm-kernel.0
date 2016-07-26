@@ -1,103 +1,84 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 26 Jul 2016 15:04:29 +0800
-Subject: [PATCH 7/9] clk: sunxi-ng: mux: Add clk notifier functions
-In-Reply-To: <1469516671-19377-1-git-send-email-wens@csie.org>
-References: <1469516671-19377-1-git-send-email-wens@csie.org>
-Message-ID: <1469516671-19377-8-git-send-email-wens@csie.org>
+From: zhaoshenglong@huawei.com (Shannon Zhao)
+Date: Tue, 26 Jul 2016 15:34:08 +0800
+Subject: usb keyboard and mouse can't work on QEMU ARM64 with KVM
+Message-ID: <57971270.1010008@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On sunxi we support cpufreq by changing the clock rate of PLL-CPU.
-It's possible the clock output of the PLL goes out of the CPU's
-operational limits when the PLL's multipliers / dividers are changed
-and it hasn't stabilized yet. This would result in the CPU hanging.
+Hi?
 
-To circumvent this, we temporarily switch the CPU mux clock to another
-stable clock before the rate change, and switch it back after the PLL
-stabilizes. This is done with clk notifiers registered on the PLL.
+Recently I'm trying to use usb keyboard and mouse with QEMU on ARM64. Below is my QEMU command line,
+host and guest kernel both are 4.7.0-rc7+, and I ran it on Hikey board.
 
-This patch adds common functions for notifiers to reparent mux clocks.
+    qemu-system-aarch64 \
+    -smp 1 -cpu host -enable-kvm \
+    -m 256 -M virt \
+    -k en-us \
+    -nographic \
+    -device usb-ehci -device usb-kbd -device usb-mouse -usb\
+    -kernel Image \
+    -initrd guestfs.cpio.gz \
+    -append "rdinit=/sbin/init console=ttyAMA0 root=/dev/ram earlycon=pl011,0x9000000 rw"
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- drivers/clk/sunxi-ng/ccu_mux.c | 36 ++++++++++++++++++++++++++++++++++++
- drivers/clk/sunxi-ng/ccu_mux.h | 14 ++++++++++++++
- 2 files changed, 50 insertions(+)
+The following guest log shows that usb controller can be probed but the keyboard and mouse can't be
+found.
 
-diff --git a/drivers/clk/sunxi-ng/ccu_mux.c b/drivers/clk/sunxi-ng/ccu_mux.c
-index f96eabb5d1f3..8a6e9065cb85 100644
---- a/drivers/clk/sunxi-ng/ccu_mux.c
-+++ b/drivers/clk/sunxi-ng/ccu_mux.c
-@@ -8,7 +8,9 @@
-  * the License, or (at your option) any later version.
-  */
- 
-+#include <linux/clk.h>
- #include <linux/clk-provider.h>
-+#include <linux/delay.h>
- 
- #include "ccu_gate.h"
- #include "ccu_mux.h"
-@@ -199,3 +201,37 @@ const struct clk_ops ccu_mux_ops = {
- 	.determine_rate	= __clk_mux_determine_rate,
- 	.recalc_rate	= ccu_mux_recalc_rate,
- };
-+
-+/*
-+ * This clock notifier is called when the frequency of the of the parent
-+ * PLL clock is to be changed. The idea is to switch the parent to a
-+ * stable clock, such as the main oscillator, while the PLL frequency
-+ * stabilizes.
-+ */
-+static int ccu_mux_notifier_cb(struct notifier_block *nb,
-+			       unsigned long event, void *data)
-+{
-+	struct ccu_mux_nb *mux = to_ccu_mux_nb(nb);
-+	int ret = 0;
-+
-+	if (event == PRE_RATE_CHANGE) {
-+		mux->original_index = ccu_mux_helper_get_parent(mux->common,
-+								mux->cm);
-+		ret = ccu_mux_helper_set_parent(mux->common, mux->cm,
-+						mux->bypass_index);
-+	} else if (event == POST_RATE_CHANGE) {
-+		ret = ccu_mux_helper_set_parent(mux->common, mux->cm,
-+						mux->original_index);
-+	}
-+
-+	udelay(mux->delay_us);
-+
-+	return notifier_from_errno(ret);
-+}
-+
-+int ccu_mux_notifier_register(struct clk *clk, struct ccu_mux_nb *mux_nb)
-+{
-+	mux_nb->clk_nb.notifier_call = ccu_mux_notifier_cb;
-+
-+	return clk_notifier_register(clk, &mux_nb->clk_nb);
-+}
-diff --git a/drivers/clk/sunxi-ng/ccu_mux.h b/drivers/clk/sunxi-ng/ccu_mux.h
-index 28d16ec18d55..7ddd9b2c6dbc 100644
---- a/drivers/clk/sunxi-ng/ccu_mux.h
-+++ b/drivers/clk/sunxi-ng/ccu_mux.h
-@@ -98,4 +98,18 @@ int ccu_mux_helper_set_parent(struct ccu_common *common,
- 			      struct ccu_mux_internal *cm,
- 			      u8 index);
- 
-+struct ccu_mux_nb {
-+	struct notifier_block	clk_nb;
-+	struct ccu_common	*common;
-+	struct ccu_mux_internal	*cm;
-+
-+	u32	delay_us;	/* How many us to wait after reparenting */
-+	u8	bypass_index;	/* Which parent to temporarily use */
-+	u8	original_index;	/* This is set by the notifier callback */
-+};
-+
-+#define to_ccu_mux_nb(_nb) container_of(_nb, struct ccu_mux_nb, clk_nb)
-+
-+int ccu_mux_notifier_register(struct clk *clk, struct ccu_mux_nb *mux_nb);
-+
- #endif /* _CCU_MUX_H_ */
+[    1.597433] ehci_hcd: USB 2.0 'Enhanced' Host Controller (EHCI) Driver
+[    1.599562] ehci-pci: EHCI PCI platform driver
+[    1.608082] ehci-pci 0000:00:03.0: EHCI Host Controller
+[    1.609485] ehci-pci 0000:00:03.0: new USB bus registered, assigned bus number 1
+[    1.611833] ehci-pci 0000:00:03.0: irq 49, io mem 0x10041000
+[    1.623599] ehci-pci 0000:00:03.0: USB 2.0 started, EHCI 1.00
+[    1.625867] hub 1-0:1.0: USB hub found
+[    1.626906] hub 1-0:1.0: 6 ports detected
+[    1.628685] ehci-platform: EHCI generic platform driver
+[    1.630263] ehci-msm: Qualcomm On-Chip EHCI Host Controller
+[    1.631947] ohci_hcd: USB 1.1 'Open' Host Controller (OHCI) Driver
+[    1.633547] ohci-pci: OHCI PCI platform driver
+[    1.634807] ohci-platform: OHCI generic platform driver
+[...]
+[    1.939001] usb 1-1: new high-speed USB device number 2 using ehci-pci
+[   17.467040] usb 1-1: device not accepting address 2, error -110
+[   17.579165] usb 1-1: new high-speed USB device number 3 using ehci-pci
+[   32.287242] random: dd urandom read with 7 bits of entropy available
+[   33.110970] usb 1-1: device not accepting address 3, error -110
+[   33.223030] usb 1-1: new high-speed USB device number 4 using ehci-pci
+[   43.635185] usb 1-1: device not accepting address 4, error -110
+[   43.747033] usb 1-1: new high-speed USB device number 5 using ehci-pci
+[   54.159043] usb 1-1: device not accepting address 5, error -110
+[   54.160752] usb usb1-port1: unable to enumerate USB device
+[   54.307290] usb 1-2: new high-speed USB device number 6 using ehci-pci
+[   69.839052] usb 1-2: device not accepting address 6, error -110
+[   69.951249] usb 1-2: new high-speed USB device number 7 using ehci-pci
+[   85.483171] usb 1-2: device not accepting address 7, error -110
+[   85.595035] usb 1-2: new high-speed USB device number 8 using ehci-pci
+[   90.619247] usb 1-2: device descriptor read/8, error -110
+[   95.743482] usb 1-2: device descriptor read/8, error -110
+[   95.959165] usb 1-2: new high-speed USB device number 9 using ehci-pci
+[  106.371177] usb 1-2: device not accepting address 9, error -110
+[  106.372894] usb usb1-port2: unable to enumerate USB device
+
+lsusb shows:
+root at genericarmv8:~# lsusb
+Bus 001 Device 001: ID 1d6b:0002
+
+Besides, I have also tried QEMU TCG without KVM. The guest can successfully probe usb controller,
+keyboard and mouse.
+lsusb shows:
+root at genericarmv8:~# lsusb
+Bus 001 Device 002: ID 0627:0001
+Bus 001 Device 003: ID 0627:0001
+Bus 001 Device 001: ID 1d6b:0002
+
+So it looks like that usb keyboard and mouse don't work with KVM on QEMU ARM64 while they can work
+with TCG. IIUC, all the usb devices are emulated by QEMU, it has nothing with KVM. So it really
+confused me and I'm not familiar with usb devices. Also I have seen someone else reports this issue
+before[1].
+
+[1]https://lists.gnu.org/archive/html/qemu-arm/2016-06/msg00110.html
+
+Any comments and help are welcome. Thanks in advance.
+
+Thanks,
 -- 
-2.8.1
+Shannon
