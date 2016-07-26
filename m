@@ -1,229 +1,110 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 26 Jul 2016 11:43:03 +0100
-Subject: [PATCH v2] arm64: mm: convert __dma_* routines to use start, size
-In-Reply-To: <1469518496-8177-1-git-send-email-kwangwoo.lee@sk.com>
-References: <1469518496-8177-1-git-send-email-kwangwoo.lee@sk.com>
-Message-ID: <b978e732-f5c3-4b77-01d9-dd5f7e2303e3@arm.com>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Tue, 26 Jul 2016 12:03:46 +0100
+Subject: [PATCH v5] KVM: arm/arm64: Add VGICv3 save/restore API
+ documentation
+In-Reply-To: <20160726103940.26243-1-christoffer.dall@linaro.org>
+References: <20160726103940.26243-1-christoffer.dall@linaro.org>
+Message-ID: <CAFEAcA_W4xkihrAUTsQ1k2Upw20+WpUK6KmrkQysQrpFGxJDQg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/07/16 08:34, Kwangwoo Lee wrote:
-> v2)
-> change __dma_* routine names using the terminoloy guidance:
->     area: takes a start and size
->     range: takes a start and end
-> use __dma_flush_area() instead of __dma_flush_range() in dma-mapping.c
-> 
-> v1)
-> __dma_* routines have been converted to use start and size instread of
-> start and end addresses. The patch was origianlly for adding
-> __clean_dcache_area_poc() which will be used in pmem driver to clean
-> dcache to the PoC(Point of Coherency) in arch_wb_cache_pmem().
-> 
-> The functionality of __clean_dcache_area_poc()  was equivalent to
-> __dma_clean_range(). The difference was __dma_clean_range() uses the end
-> address, but __clean_dcache_area_poc() uses the size to clean.
-> 
-> Thus, __clean_dcache_area_poc() has been revised with a fall through
-> function of __dma_clean_range() after the change that __dma_* routines
-> use start and size instead of using start and end.
-> 
-> Signed-off-by: Kwangwoo Lee <kwangwoo.lee@sk.com>
+On 26 July 2016 at 11:39, Christoffer Dall <christoffer.dall@linaro.org> wrote:
+> Factor out the GICv3 and ITS-specific documentation into a separate
+> documentation file.  Add description for how to access distributor,
+> redistributor, and CPU interface registers for GICv3 in this new file,
+> and add a group for accessing level triggered IRQ information for GICv3
+> as well.
+>
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 > ---
-
-Nit: the changelog relative to the previous posting wants to be here,
-under the "---" separator; the commit message above should describe the
-_current_ state of the patch, as that's all we'll really care about once
-it's in the Git history.
-
->  arch/arm64/include/asm/cacheflush.h |  3 +-
->  arch/arm64/mm/cache.S               | 71 +++++++++++++++++++------------------
->  arch/arm64/mm/dma-mapping.c         |  6 ++--
->  3 files changed, 41 insertions(+), 39 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/cacheflush.h b/arch/arm64/include/asm/cacheflush.h
-> index c64268d..2e5fb97 100644
-> --- a/arch/arm64/include/asm/cacheflush.h
-> +++ b/arch/arm64/include/asm/cacheflush.h
-> @@ -68,6 +68,7 @@
->  extern void flush_cache_range(struct vm_area_struct *vma, unsigned long start, unsigned long end);
->  extern void flush_icache_range(unsigned long start, unsigned long end);
->  extern void __flush_dcache_area(void *addr, size_t len);
-> +extern void __clean_dcache_area_poc(void *addr, size_t len);
->  extern void __clean_dcache_area_pou(void *addr, size_t len);
->  extern long __flush_cache_user_range(unsigned long start, unsigned long end);
->  
-> @@ -85,7 +86,7 @@ static inline void flush_cache_page(struct vm_area_struct *vma,
->   */
->  extern void __dma_map_area(const void *, size_t, int);
->  extern void __dma_unmap_area(const void *, size_t, int);
-> -extern void __dma_flush_range(const void *, const void *);
-> +extern void __dma_flush_area(const void *, size_t);
->  
->  /*
->   * Copy user data from/to a page which is mapped into a different
-> diff --git a/arch/arm64/mm/cache.S b/arch/arm64/mm/cache.S
-> index 50ff9ba..4415c1b 100644
-> --- a/arch/arm64/mm/cache.S
-> +++ b/arch/arm64/mm/cache.S
-> @@ -110,14 +110,16 @@ ENDPROC(__clean_dcache_area_pou)
->   *	- end     - end address of region
->   */
->  ENTRY(__inval_cache_range)
-> +	sub	x1, x1, x0
-
-Rather than doing this, I think it would be more sensible to simply swap
-the entry points.
-
->  	/* FALLTHROUGH */
->  
->  /*
-> - *	__dma_inv_range(start, end)
-> + *	__dma_inv_area(start, size)
->   *	- start   - virtual start address of region
-> - *	- end     - virtual end address of region
-> + *	- size    - size in question
->   */
-> -__dma_inv_range:
-> +__dma_inv_area:
-> +	add	x1, x1, x0
->  	dcache_line_size x2, x3
->  	sub	x3, x2, #1
->  	tst	x1, x3				// end cache line aligned?
-> @@ -136,46 +138,47 @@ __dma_inv_range:
->  	dsb	sy
->  	ret
->  ENDPIPROC(__inval_cache_range)
-> -ENDPROC(__dma_inv_range)
-> +ENDPROC(__dma_inv_area)
+> Changes since v4:
+>  - Clarify register reads as per Peter's comments on v4
+>  - Factored out ITS documenation into separate file
+>  - Clarified error conditions on all GRP_ADDR groups
+>  - Renamed KVM_VGIC_V3_ADDR_TYPE_ITS to KVM_VGIC_ITS_ADDR_TYPE in the
+>    documentation to be in line with the code.
+>  - Did not apply Peter's reviewed-by due to the conflicts and updates
+>    related to the ITS.
+>
+> Changes since v3:
+>  - Fix typos
+>  - Clarified level register containing 32 IRQs
+>  - Removed limitations about priority support which are no longer true
+>  - Special-case the SPENDR register accesses to access the latch state
+>    and the CPENDR register accesses to be RAZ/WI.
+>
+> Changes since v2:
+>  - Changed distributor access to be 32-bits in size
+>  - Clearly specified data type pointed to by addr field
+>  - Specified exception behavior for STATUSR registers
+>  - Added group for level-triggered IRQ status info
+>  - Removed acks from Marc/Peter as content has changed
+>
+>
+>  Documentation/virtual/kvm/devices/arm-vgic-its.txt |  38 ++++
+>  Documentation/virtual/kvm/devices/arm-vgic-v3.txt  | 207 +++++++++++++++++++++
+>  Documentation/virtual/kvm/devices/arm-vgic.txt     |  52 ++----
+>  3 files changed, 262 insertions(+), 35 deletions(-)
+>  create mode 100644 Documentation/virtual/kvm/devices/arm-vgic-its.txt
+>  create mode 100644 Documentation/virtual/kvm/devices/arm-vgic-v3.txt
+>
+> diff --git a/Documentation/virtual/kvm/devices/arm-vgic-its.txt b/Documentation/virtual/kvm/devices/arm-vgic-its.txt
+> new file mode 100644
+> index 0000000..ffae1cd
+> --- /dev/null
+> +++ b/Documentation/virtual/kvm/devices/arm-vgic-its.txt
+> @@ -0,0 +1,38 @@
+> +ARM Virtual Interrupt Translation Service (ITS)
+> +===============================================
 > +
-> +/*
-> + *	__clean_dcache_area_poc(kaddr, size)
-> + *
-> + * 	Ensure that any D-cache lines for the interval [kaddr, kaddr+size)
-> + * 	are cleaned to the PoC.
-> + *
-> + *	- kaddr   - kernel address
-> + *	- size    - size in question
-> + */
-> +ENTRY(__clean_dcache_area_poc)
-> +	/* FALLTHROUGH */
->  
->  /*
-> - *	__dma_clean_range(start, end)
-> + *	__dma_clean_area(start, size)
->   *	- start   - virtual start address of region
-> - *	- end     - virtual end address of region
-> + *	- size    - size in question
->   */
-> -__dma_clean_range:
-> -	dcache_line_size x2, x3
-> -	sub	x3, x2, #1
-> -	bic	x0, x0, x3
-> -1:
-> +__dma_clean_area:
->  alternative_if_not ARM64_WORKAROUND_CLEAN_CACHE
-> -	dc	cvac, x0
-> +	dcache_by_line_op cvac, sy, x0, x1, x2, x3
->  alternative_else
-> -	dc	civac, x0
-> +	dcache_by_line_op civac, sy, x0, x1, x2, x3
+> +Device types supported:
+> +  KVM_DEV_TYPE_ARM_VGIC_ITS    ARM Interrupt Translation Service Controller
+> +
+> +Creating a virtual ITS controller also requires a host GICv3 (see
+> +arm-vgic-v3.txt), but does not depend on having physical ITS controllers.
+> +
+> +There can be multiple ITS controllers per guest, each of them has to have
+> +a separate, non-overlapping MMIO region.
+> +
+> +
+> +Groups:
+> +  KVM_DEV_ARM_VGIC_GRP_ADDR
+> +  Attributes:
+> +    KVM_VGIC_ITS_ADDR_TYPE (rw, 64-bit)
+> +      Base address in the guest physical address space of the GICv3 ITS
+> +      control register frame. The ITS allows MSI(-X) interrupts to be
+> +      injected into guests. This extension is optional.
 
-dcache_by_line_op is a relatively large macro - is there any way we can
-still apply the alternative to just the one instruction which needs it,
-as opposed to having to patch the entire mostly-identical routine?
+Shouldn't "The ITS allows MSI(-X) interrupts to be injected into guests.
+This extension is optional." be in the introductory text above, not
+the description of this attribute?
 
-Robin.
+> +      This address needs to be 64K aligned and the region covers 128K.
+> +  Errors:
+> +    -E2BIG:  Address outside of addressable IPA range
+> +    -EINVAL: Incorrectly aligned address
+> +    -EEXIST: Address already configured
+> +    -EFAULT: Invalid user pointer for attr->addr.
+> +    -ENODEV: Incrorect attribute or the ITS is not supported.
 
->  alternative_endif
-> -	add	x0, x0, x2
-> -	cmp	x0, x1
-> -	b.lo	1b
-> -	dsb	sy
->  	ret
-> -ENDPROC(__dma_clean_range)
-> +ENDPIPROC(__clean_dcache_area_poc)
-> +ENDPROC(__dma_clean_area)
->  
->  /*
-> - *	__dma_flush_range(start, end)
-> + *	__dma_flush_area(start, size)
-> + *
-> + *	clean & invalidate D / U line
-> + *
->   *	- start   - virtual start address of region
-> - *	- end     - virtual end address of region
-> + *	- size    - size in question
->   */
-> -ENTRY(__dma_flush_range)
-> -	dcache_line_size x2, x3
-> -	sub	x3, x2, #1
-> -	bic	x0, x0, x3
-> -1:	dc	civac, x0			// clean & invalidate D / U line
-> -	add	x0, x0, x2
-> -	cmp	x0, x1
-> -	b.lo	1b
-> -	dsb	sy
-> +ENTRY(__dma_flush_area)
-> +	dcache_by_line_op civac, sy, x0, x1, x2, x3
->  	ret
-> -ENDPIPROC(__dma_flush_range)
-> +ENDPIPROC(__dma_flush_area)
->  
->  /*
->   *	__dma_map_area(start, size, dir)
-> @@ -184,10 +187,9 @@ ENDPIPROC(__dma_flush_range)
->   *	- dir	- DMA direction
->   */
->  ENTRY(__dma_map_area)
-> -	add	x1, x1, x0
->  	cmp	w2, #DMA_FROM_DEVICE
-> -	b.eq	__dma_inv_range
-> -	b	__dma_clean_range
-> +	b.eq	__dma_inv_area
-> +	b	__dma_clean_area
->  ENDPIPROC(__dma_map_area)
->  
->  /*
-> @@ -197,8 +199,7 @@ ENDPIPROC(__dma_map_area)
->   *	- dir	- DMA direction
->   */
->  ENTRY(__dma_unmap_area)
-> -	add	x1, x1, x0
->  	cmp	w2, #DMA_TO_DEVICE
-> -	b.ne	__dma_inv_range
-> +	b.ne	__dma_inv_area
->  	ret
->  ENDPIPROC(__dma_unmap_area)
-> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
-> index c566ec8..e0b0712 100644
-> --- a/arch/arm64/mm/dma-mapping.c
-> +++ b/arch/arm64/mm/dma-mapping.c
-> @@ -165,7 +165,7 @@ static void *__dma_alloc(struct device *dev, size_t size,
->  		return ptr;
->  
->  	/* remove any dirty cache lines on the kernel alias */
-> -	__dma_flush_range(ptr, ptr + size);
-> +	__dma_flush_area(ptr, size);
->  
->  	/* create a coherent mapping */
->  	page = virt_to_page(ptr);
-> @@ -377,7 +377,7 @@ static int __init atomic_pool_init(void)
->  		void *page_addr = page_address(page);
->  
->  		memset(page_addr, 0, atomic_pool_size);
-> -		__dma_flush_range(page_addr, page_addr + atomic_pool_size);
-> +		__dma_flush_area(page_addr, atomic_pool_size);
->  
->  		atomic_pool = gen_pool_create(PAGE_SHIFT, -1);
->  		if (!atomic_pool)
-> @@ -535,7 +535,7 @@ fs_initcall(dma_debug_do_init);
->  /* Thankfully, all cache ops are by VA so we can ignore phys here */
->  static void flush_page(struct device *dev, const void *virt, phys_addr_t phys)
->  {
-> -	__dma_flush_range(virt, virt + PAGE_SIZE);
-> +	__dma_flush_area(virt, PAGE_SIZE);
->  }
->  
->  static void *__iommu_alloc_attrs(struct device *dev, size_t size,
-> 
+"Incorrect"
+
+> +
+> +
+> +  KVM_DEV_ARM_VGIC_GRP_CTRL
+> +  Attributes:
+> +    KVM_DEV_ARM_VGIC_CTRL_INIT
+> +      request the initialization of the ITS, no additional parameter in
+> +      kvm_device_attr.addr.
+> +  Errors:
+> +    -ENXIO:  ITS not properly configured as required prior to calling
+> +             this attribute
+
+"setting this attribute".
+
+> +    -ENOMEM: Memory shortage when allocating ITS internal data
+
+Otherwise
+Reviewed-by: Peter Maydell <peter.maydell@linaro.org>
+
+-- PMM
