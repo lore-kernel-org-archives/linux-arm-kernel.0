@@ -1,108 +1,52 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Tue, 26 Jul 2016 23:07:23 +0200
-Subject: [PATCH 1/4] ARM: dts: sun8i: Extend Orange Pi PC dt to also
- handle the PC Plus
-In-Reply-To: <20160725064033.GA7419@lukather>
-References: <1468095718-18515-1-git-send-email-hdegoede@redhat.com>
- <20160713084505.GE4761@lukather>
- <bce2b340-a930-8771-4560-dc61bf5828d5@redhat.com>
- <20160725064033.GA7419@lukather>
-Message-ID: <74d3b5eb-601a-cc1d-a44e-fea2895fd8b2@redhat.com>
+From: ruslan.bilovol@gmail.com (Ruslan Bilovol)
+Date: Wed, 27 Jul 2016 00:26:18 +0300
+Subject: [PATCH v1.2 3/4] arm64: Add arm64 kexec support
+In-Reply-To: <20160726081602.GB2363@linaro.org>
+References: <cover.1468970114.git.geoff@infradead.org>
+ <9ed513fd44a19b2f49b4da99477cedfff7341bf0.1468970114.git.geoff@infradead.org>
+ <1469048065.2977.124.camel@infradead.org>
+ <CAB=otbSObtEE7n4LjWWZZ0G=oA1Xd5QUmHnX44+uyUiWP4qXpw@mail.gmail.com>
+ <1469479817.2889.4.camel@infradead.org>
+ <CAB=otbS8Okq+f2SvWkXX1rHO6N+nYTjsF7=Qo9MVU5NSV5Xfsg@mail.gmail.com>
+ <20160726081602.GB2363@linaro.org>
+Message-ID: <CAB=otbRyTrmVHapv-==2ta_JLy8dqJwVZjDJagQiHRcvKUiVyg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On 07/25/2016 08:40 AM, Maxime Ripard wrote:
-> Hi,
->
-> On Wed, Jul 13, 2016 at 12:01:41PM +0200, Hans de Goede wrote:
->> Hi,
+On Tue, Jul 26, 2016 at 11:16 AM, AKASHI Takahiro
+<takahiro.akashi@linaro.org> wrote:
+> On Tue, Jul 26, 2016 at 04:36:01AM +0300, Ruslan Bilovol wrote:
+>> Hi Geoff,
 >>
->> On 13-07-16 10:45, Maxime Ripard wrote:
->>> On Sat, Jul 09, 2016 at 10:21:55PM +0200, Hans de Goede wrote:
->>>> There is a new Orange Pi PC Plus available now, rather then adding
->>>> yet another dts file for this variant, extend the existing
->>>> Orange Pi PC to support the sdio wifi and emmc found on this variant.
->>>>
->>>> Downside of this approach is the following messages in dmesg when run
->>>> on the non Plus Orange Pi PC:
->>>>
->>>> sunxi-mmc 1c10000.mmc: fatal err update clk timeout
->>>> sunxi-mmc 1c11000.mmc: smc 2 err, cmd 8, RTO !!
->>>> sunxi-mmc 1c11000.mmc: smc 2 err, cmd 55, RTO !!
->>>> sunxi-mmc 1c11000.mmc: smc 2 err, cmd 55, RTO !!
->>>> sunxi-mmc 1c11000.mmc: smc 2 err, cmd 55, RTO !!
->>>> sunxi-mmc 1c11000.mmc: smc 2 err, cmd 55, RTO !!
->>>> sunxi-mmc 1c11000.mmc: smc 2 err, cmd 1, RTO !!
->>>>
->>>> Note these are completely harmless and there is no adverse effect
->>>> to the functioning of the non Plus Orange Pi PC.
->>>>
->>>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->>>> ---
->>>> arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts | 40 +++++++++++++++++++++++++++++-
->>>> 1 file changed, 39 insertions(+), 1 deletion(-)
->>>>
->>>> diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
->>>> index b8340f7..f9bf260 100644
->>>> --- a/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
->>>> +++ b/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
->>>> @@ -49,11 +49,13 @@
->>>> #include <dt-bindings/pinctrl/sun4i-a10.h>
->>>>
->>>> / {
->>>> -	model = "Xunlong Orange Pi PC";
->>>> +	model = "Xunlong Orange Pi PC / PC Plus";
->>>> 	compatible = "xunlong,orangepi-pc", "allwinner,sun8i-h3";
->>>>
->>>> 	aliases {
->>>> 		serial0 = &uart0;
->>>> +		/* ethernet0 is the H3 emac, defined in sun8i-h3.dtsi */
->>>> +		ethernet1 = &rtl8189ftv;
->>>> 	};
->>>>
->>>> 	chosen {
->>>> @@ -118,6 +120,42 @@
->>>> 	status = "okay";
->>>> };
->>>>
->>>> +/* Note only present on orangepi pc *plus* */
->>>> +&mmc1 {
->>>> +	pinctrl-names = "default";
->>>> +	pinctrl-0 = <&mmc1_pins_a>;
->>>> +	vmmc-supply = <&reg_vcc3v3>;
->>>> +	bus-width = <4>;
->>>> +	non-removable;
->>>> +	status = "okay";
->>>> +
->>>> +	/*
->>>> +	 * Explicitly define the sdio device, so that we can add an ethernet
->>>> +	 * alias for it (which e.g. makes u-boot set a mac-address).
->>>> +	 */
->>>> +	rtl8189ftv: sdio_wifi at 1 {
->>>> +		reg = <1>;
->>>> +	};
->>>> +};
->>>
->>> Nothing prevents you from including the orange pi pc dts, from the
->>> orange pi plus dts.
->>>
->>> It prevents the duplication you were trying to avoid, and it doesn't
->>> create all those spurious errors and devices.
+>> On Mon, Jul 25, 2016 at 11:50 PM, Geoff Levand <geoff@infradead.org> wrote:
+>> > Hi Ruslan,
+>> >
+>> > On Mon, 2016-07-25 at 17:28 +0300, Ruslan Bilovol wrote:
+>> >> And I use kexec next way:
+>> >> kexec --type Image -p /Image --ramdisk=/ramdisk.cpio.gz
+>> >> --dtb=dtb-arm64.dtb --append="root=/dev/ram0 1 maxcpus=1
+>> >> reset_devices"
+>> >
+>> > This patch set only supports re-boot.  '-p' is not supported.
+>> >
+>> > I'll look into emiting a message when -p is passed.
+>> >
 >>
->> That would solve the copy paste problem on the kernel side, but that
->> would still mean adding a new u-boot defconfig for this, which means that
->> all the distro's which ship with prebuild u-boot binaries need to build
->> for yet another board, something which I would like to avoid.
+>> Thanks for explanation.
+>>
+>> By the way, do you know if there is any work ongoing on '-p' option
+>> support for ARM64? I would be happy to test it on my setup
 >
-> Still, registering devices that are not present on the board is not an
-> option.
+> See my patches (kernel and kexec-tools) that I've just sent out.
+> It is very kind of you to report your test result.
+>
 
-Ok, new version send.
+Thank you for updates, I see the patches and will try to test them
+tomorrow.
 
-What about the other 3 patches in this series ?
+Another question: have you tested it in big endian mode as well?
 
-Regards,
-
-Hans
+Best regards,
+Ruslan Bilovol
