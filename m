@@ -1,63 +1,48 @@
-From: tfiga@google.com (Tomasz Figa)
-Date: Tue, 26 Jul 2016 11:30:42 +0900
-Subject: [PATCH 1/3] memory: mediatek: Add a new interface
- mtk_smi_larb_is_ready
-In-Reply-To: <cd01b829-f869-606b-5c1a-8077fbddb085@gmail.com>
-References: <1468983721-3627-1-git-send-email-yong.wu@mediatek.com>
- <cd01b829-f869-606b-5c1a-8077fbddb085@gmail.com>
-Message-ID: <CAAFQd5AXXpVQU7+ek0Jb_aNm5md=1GVrysEDD5GO7erLUByzrw@mail.gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 26 Jul 2016 11:01:59 +0800
+Subject: [PATCH] clocksource: sun4i: Clear interrupts after stopping timer in
+ probe function
+Message-ID: <1469502119-2344-1-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The bootloader (U-boot) sometimes uses this timer for various delays.
+It uses it as a ongoing counter, and does comparisons on the current
+counter value. The timer counter is never stopped.
 
-On Mon, Jul 25, 2016 at 5:39 PM, Matthias Brugger
-<matthias.bgg@gmail.com> wrote:
->
->
-> On 20/07/16 05:01, Yong Wu wrote:
->>
->> Currently the iommu consumer always call iommu_present to get whether
->> the iommu is ready. But in MTK IOMMU, this function can't indicate
->> this. The IOMMU call bus_set_iommu->mtk_iommu_add_device->
->> mtk_iommu_attach_device to parse the iommu data, then it's able to
->> transfer "struct mtk_smi_iommu" to SMI-LARB, and the iommu uses the
->> larbs as compoents, the iommu will finish its probe until all the larbs
->> probe done.
->>
->> If the iommu consumer(like DRM) begin to probe after the time of
->> calling bus_set_iommu and before the time of SMI probe finish, it
->> will hang like this:
->>
->> [    7.832359] Call trace:
->> [    7.834778] [<ffffffc000764424>] mtk_smi_larb_get+0x24/0xa8
->> [    7.840300] [<ffffffc0005a1390>] mtk_drm_crtc_enable+0x6c/0x450
->>
->> Because the larb->mmu is NULL at that time.
->>
->> In order to avoid this issue, we add a new interface
->> (mtk_smi_larb_is_ready) for checking whether the IOMMU and SMI have
->> finished their probe. If it return false, the iommu consumer should
->> probe-defer for the IOMMU and SMI.
->>
->
-> Can't we just skip the functions in the probe and call bus_set_iommu only if
-> we were able to bind all components?
-> Something like this:
+In some cases when the user interacts with the bootloader, or lets
+it idle for some time before loading Linux, the timer may expire,
+and an interrupt will be pending. This results in an unexpected
+interrupt when the timer interrupt is enabled by the kernel, at
+which point the event_handler isn't set yet. This results in a NULL
+pointer dereference exception, panic, and no way to reboot.
 
-Note that we have to call bus_set_iommu() and actually have
-.add_device() and .attach_device() called before any of the slave
-devices probe. I found a similar problem with rockchip IOMMU after
-adding power domain and runtime PM handling there. I also found that
-current design of IOMMU core and related DMA mapping code is utterly
-broken regarding the device add/probe ordering (no support for
-deferring things properly).
+Clear any pending interrupts after we stop the timer in the probe
+function to avoid this.
 
-So my idea is to keep .add_device() as is, since typically it doesn't
-seem to require anything from the IOMMU hardware and just initializes
-some per-device data, but make .attach_device() being able to defer
-probe of that device if respective IOMMU has not probed yet. I'm still
-in process of figuring out the right way to achieve it, though...
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
 
-Best regards,
-Tomasz
+I've run into this many times while working on U-boot. Finally
+made time to figure it out.
+
+---
+ drivers/clocksource/sun4i_timer.c | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/drivers/clocksource/sun4i_timer.c b/drivers/clocksource/sun4i_timer.c
+index 6f3719d73390..d5725c82401d 100644
+--- a/drivers/clocksource/sun4i_timer.c
++++ b/drivers/clocksource/sun4i_timer.c
+@@ -193,6 +193,9 @@ static void __init sun4i_timer_init(struct device_node *node)
+ 	/* Make sure timer is stopped before playing with interrupts */
+ 	sun4i_clkevt_time_stop(0);
+ 
++	/* clear timer0 interrupt */
++	writel(0x1, timer_base + TIMER_IRQ_ST_REG);
++
+ 	sun4i_clockevent.cpumask = cpu_possible_mask;
+ 	sun4i_clockevent.irq = irq;
+ 
+-- 
+2.8.1
