@@ -1,78 +1,98 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Tue, 26 Jul 2016 12:02:28 +0200
-Subject: [PATCH v11 10/10] genirq/msi: use the MSI doorbell's IOVA when
- requested
-In-Reply-To: <alpine.DEB.2.11.1607261101340.19896@nanos>
-References: <1468933367-23159-1-git-send-email-eric.auger@redhat.com>
- <1468933367-23159-11-git-send-email-eric.auger@redhat.com>
- <alpine.DEB.2.11.1607201105310.3564@nanos>
- <08a930f2-8cc9-7d99-78c0-77d08ee40db3@redhat.com>
- <alpine.DEB.2.11.1607261101340.19896@nanos>
-Message-ID: <33b72799-2408-054b-bbe6-2b7e3b67948f@redhat.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Tue, 26 Jul 2016 12:03:02 +0200
+Subject: [PATCH 2/3] dt-bindings: allow child nodes inside the Tegra BPMP
+In-Reply-To: <20160719191442.15439-2-swarren@wwwdotorg.org>
+References: <20160719191442.15439-1-swarren@wwwdotorg.org>
+ <20160719191442.15439-2-swarren@wwwdotorg.org>
+Message-ID: <20160726100302.GE2433@ulmo.ba.sec>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+On Tue, Jul 19, 2016 at 01:14:41PM -0600, Stephen Warren wrote:
+> From: Stephen Warren <swarren@nvidia.com>
+> 
+> The BPMP implements some services which must be represented by separate
+> nodes. For example, it can provide access to certain I2C controllers, and
+> the I2C bindings represent each I2C controller as a device tree node.
+> Update the binding to describe how the BPMP supports this.
+> 
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> ---
+>  .../bindings/firmware/nvidia,tegra186-bpmp.txt     | 23 ++++++++++++++++++++++
+>  1 file changed, 23 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/firmware/nvidia,tegra186-bpmp.txt b/Documentation/devicetree/bindings/firmware/nvidia,tegra186-bpmp.txt
+> index 9a3864f56955..142d363406f6 100644
+> --- a/Documentation/devicetree/bindings/firmware/nvidia,tegra186-bpmp.txt
+> +++ b/Documentation/devicetree/bindings/firmware/nvidia,tegra186-bpmp.txt
+> @@ -38,6 +38,24 @@ implemented by this node:
+>  - .../reset/reset.txt
+>  - <dt-bindings/reset/tegra186-reset.h>
+>  
+> +The BPMP implements some services which must be represented by separate nodes.
+> +For example, it can provide access to certain I2C controllers, and the I2C
+> +bindings represent each I2C controller as a device tree node. Such nodes should
+> +be nested directly inside the main BPMP node.
+> +
+> +Software can determine whether a child node of the BPMP node represents a device
+> +by checking for a compatible property. Any node with a compatible property
+> +represents a device that can be instantiated. Nodes without a compatible
+> +property may be used to provide configuration information regarding the BPMP
+> +itself, although no such configuration nodes are currently defined by this
+> +binding.
+> +
+> +The BPMP firmware defines no single global name-/numbering-space for such
+> +services. Put another way, the numbering scheme for I2C buses is distinct from
+> +the numbering scheme for any other service the BPMP may provide (e.g. a future
+> +hypothetical SPI bus service). As such, child device nodes will have no reg
+> +property, and the BPMP node will have no #address-cells or #size-cells property.
 
-On 26/07/2016 11:04, Thomas Gleixner wrote:
-> Eric,
-> 
-> On Mon, 25 Jul 2016, Auger Eric wrote:
->> On 20/07/2016 11:09, Thomas Gleixner wrote:
->>> On Tue, 19 Jul 2016, Eric Auger wrote:
->>>> @@ -63,10 +63,18 @@ static int msi_compose(struct irq_data *irq_data,
->>>>  {
->>>>  	int ret = 0;
->>>>  
->>>> -	if (erase)
->>>> +	if (erase) {
->>>>  		memset(msg, 0, sizeof(*msg));
->>>> -	else
->>>> +	} else {
->>>> +		struct device *dev;
->>>> +
->>>>  		ret = irq_chip_compose_msi_msg(irq_data, msg);
->>>> +		if (ret)
->>>> +			return ret;
->>>> +
->>>> +		dev = msi_desc_to_dev(irq_data_get_msi_desc(irq_data));
->>>> +		WARN_ON(iommu_msi_msg_pa_to_va(dev, msg));
->>>
->>> What the heck is this call doing? And why is there only a WARN_ON and not a
->>> proper error return code handling?
->>
->> iommu_msi_msg_pa_to_va is part of the new iommu-msi API introduced in PART I
->> of this series. This helper function detects the physical address found in
->> the MSI message has a corresponding allocated IOVA. This happens if the MSI
->> doorbell is accessed through an IOMMU and this IOMMU do not bypass the MSI
->> addresses (ARM case). Allocation of this IOVA was performed in the previous
->> patch.
->>
->> So, if this is the case, the physical address is swapped with the IOVA
->> address. That way the PCIe device will send the MSI with this IOVA and
->> the address will be translated by the IOMMU into the target MSI doorbell PA.
->>
->> Hope this clarifies
-> 
-> No, it does not. You are explaining in great length what that function is
-> doing, but you are not explaining WHY your don't do a proper return code
-> handling and just do a WARN_ON() and happily proceed. If that function fails
-> then the interrupt will not be functional, so WHY on earth are you continuing?
-Oh sorry I focused on the function's goal. Originally I could not return an
-error since there is a BUG_ON(ret) afterwards. And typically the userspace can
-willingly omit to pass IPA range that map MSIs. But now we have this 2 phases where
-we first map the MSIs on pci_enable_msi_range and use the IOVA at compose time
-I need to analyze again if the userspace can induce a BUG_ON.
+My understanding is that the I2C bus number is passed as part of the
+request to the BPMP firmware. Does that not count as addressing? Could
+we not represent that generically using a device tree hierarchy? I'm
+thinking something along these lines:
 
-Thanks
+	bpmp {
+		...
 
-Eric
-> 
-> Thanks,
-> 
-> 	tglx
-> --
-> To unsubscribe from this list: send the line "unsubscribe kvm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+		services {
+			i2c {
+				i2c at 0 {
+					reg = <0>;
+					...
+				};
+
+				i2c at 1 {
+					reg = <1>;
+					...
+				};
+
+				...
+			};
+
+			spi {
+				...
+			};
+
+			...
+		};
+
+		...
+	};
+
+Note that we could probably do without the "services" node, but this is
+explicit in categorizing these as services exposed by the BPMP. We might
+need the extra node to work around the issue that some child nodes of
+the BPMP node don't have a reg property (configuration nodes), whereas
+any of the services would have those. Although you could make the top-
+level "i2c" and "spi" nodes take #address-cells and #size-cells
+properties.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160726/a1f4f97b/attachment.sig>
