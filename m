@@ -1,64 +1,47 @@
-From: wxt@rock-chips.com (Caesar Wang)
-Date: Tue, 26 Jul 2016 20:13:15 +0800
-Subject: [PATCH v2 4/4] arm: dts: rockchip: add reset node for the exist
- saradc SoCs
-In-Reply-To: <1469535195-5227-1-git-send-email-wxt@rock-chips.com>
-References: <1469535195-5227-1-git-send-email-wxt@rock-chips.com>
-Message-ID: <1469535195-5227-4-git-send-email-wxt@rock-chips.com>
+From: peppe.cavallaro@st.com (Giuseppe CAVALLARO)
+Date: Tue, 26 Jul 2016 14:13:45 +0200
+Subject: [PATCH 2/3] stmmac: change dma descriptors to __le32
+In-Reply-To: <20160721182329.13478-3-michael.weiser@gmx.de>
+References: <20160721182329.13478-1-michael.weiser@gmx.de>
+ <20160721182329.13478-3-michael.weiser@gmx.de>
+Message-ID: <e5229894-45fc-671e-641a-e41c7ab176d7@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-SARADC controller needs to be reset before programming it, otherwise
-it will not function properly.
+On 7/21/2016 8:23 PM, Michael Weiser wrote:
+> The stmmac driver does not take into account the processor may be big
+> endian when writing the DMA descriptors. This causes the ethernet
+> interface not to be initialised correctly when running a big-endian
+> kernel. Change the descriptors for DMA to use __le32 and ensure they are
+> suitably swapped before writing. Tested successfully on the
+> Cubieboard2.
 
-Signed-off-by: Caesar Wang <wxt@rock-chips.com>
----
+Thx for the effort on big endian platform.
+>
+> Signed-off-by: Michael Weiser <michael.weiser@gmx.de>
+> Cc: Giuseppe Cavallaro <peppe.cavallaro@st.com>
+> Cc: Alexandre Torgue <alexandre.torgue@st.com>
+> Cc: netdev at vger.kernel.org
+> ---
+...
+>
+> @@ -2880,14 +2876,17 @@ static void sysfs_display_ring(void *head, int size, int extend_desc,
+>  			x = *(u64 *) ep;
+>  			seq_printf(seq, "%d [0x%x]: 0x%x 0x%x 0x%x 0x%x\n",
+>  				   i, (unsigned int)virt_to_phys(ep),
+> -				   ep->basic.des0, ep->basic.des1,
+> -				   ep->basic.des2, ep->basic.des3);
+> -			ep++;
+> +				   le32_to_cpu(ep->basic.des0),
+> +				   le32_to_cpu(ep->basic.des1),
+> +				   le32_to_cpu(ep->basic.des2),
+> +				   le32_to_cpu(ep->basic.des3));
+> +			ep++);
 
-Changes in v2: None
 
- arch/arm/boot/dts/rk3066a.dtsi | 2 ++
- arch/arm/boot/dts/rk3288.dtsi  | 2 ++
- arch/arm/boot/dts/rk3xxx.dtsi  | 2 ++
- 3 files changed, 6 insertions(+)
+there is a build problem here.
 
-diff --git a/arch/arm/boot/dts/rk3066a.dtsi b/arch/arm/boot/dts/rk3066a.dtsi
-index c0ba86c..0d0dae3 100644
---- a/arch/arm/boot/dts/rk3066a.dtsi
-+++ b/arch/arm/boot/dts/rk3066a.dtsi
-@@ -197,6 +197,8 @@
- 		clock-names = "saradc", "apb_pclk";
- 		interrupts = <GIC_SPI 21 IRQ_TYPE_LEVEL_HIGH>;
- 		#io-channel-cells = <1>;
-+		resets = <&cru SRST_SARADC>;
-+		reset-names = "saradc-apb";
- 		status = "disabled";
- 	};
- 
-diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
-index cd33f01..91c4b3c 100644
---- a/arch/arm/boot/dts/rk3288.dtsi
-+++ b/arch/arm/boot/dts/rk3288.dtsi
-@@ -279,6 +279,8 @@
- 		#io-channel-cells = <1>;
- 		clocks = <&cru SCLK_SARADC>, <&cru PCLK_SARADC>;
- 		clock-names = "saradc", "apb_pclk";
-+		resets = <&cru SRST_SARADC>;
-+		reset-names = "saradc-apb";
- 		status = "disabled";
- 	};
- 
-diff --git a/arch/arm/boot/dts/rk3xxx.dtsi b/arch/arm/boot/dts/rk3xxx.dtsi
-index 99bbcc2..e2cd683 100644
---- a/arch/arm/boot/dts/rk3xxx.dtsi
-+++ b/arch/arm/boot/dts/rk3xxx.dtsi
-@@ -399,6 +399,8 @@
- 		#io-channel-cells = <1>;
- 		clocks = <&cru SCLK_SARADC>, <&cru PCLK_SARADC>;
- 		clock-names = "saradc", "apb_pclk";
-+		resets = <&cru SRST_SARADC>;
-+		reset-names = "saradc-apb";
- 		status = "disabled";
- 	};
- 
--- 
-1.9.1
+Pls fix it.
+
+
+Peppe
