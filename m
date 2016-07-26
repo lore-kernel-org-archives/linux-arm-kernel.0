@@ -1,95 +1,138 @@
-From: gerg@linux-m68k.org (Greg Ungerer)
-Date: Tue, 26 Jul 2016 10:53:28 +1000
-Subject: [PATCH v5 00/15] allow BFLT executables on systems with a MMU
-In-Reply-To: <1469374229-21585-1-git-send-email-nicolas.pitre@linaro.org>
-References: <1469374229-21585-1-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <1712235f-a4b3-3026-adc5-3f19e1a47ae4@linux-m68k.org>
+From: labbott@redhat.com (Laura Abbott)
+Date: Mon, 25 Jul 2016 17:54:25 -0700
+Subject: [PATCH v4 12/12] mm: SLUB hardened usercopy support
+In-Reply-To: <CAGXu5jJQQNDMK7vxKqhwQukL771uOT-2No7fnNreQVLWs8UBMA@mail.gmail.com>
+References: <1469046427-12696-1-git-send-email-keescook@chromium.org>
+ <1469046427-12696-13-git-send-email-keescook@chromium.org>
+ <0f980e84-b587-3d9e-3c26-ad57f947c08b@redhat.com>
+ <CAGXu5jJQQNDMK7vxKqhwQukL771uOT-2No7fnNreQVLWs8UBMA@mail.gmail.com>
+Message-ID: <e19dd469-37c9-846f-43a6-f28ab0c6c547@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/07/16 01:30, Nicolas Pitre wrote:
-> This series provides the necessary changes to allow "flat" executable
-> binaries meant for no-MMU systems to actually run on systems with a MMU.
-> Also thrown in are various cleanups to binfmt_flat.c.
-> 
-> This can also be found in the following git repo:
-> 
-> 	git://git.linaro.org/people/nicolas.pitre/linux binfmt_flat_with_mmu
+On 07/25/2016 01:45 PM, Kees Cook wrote:
+> On Mon, Jul 25, 2016 at 12:16 PM, Laura Abbott <labbott@redhat.com> wrote:
+>> On 07/20/2016 01:27 PM, Kees Cook wrote:
+>>>
+>>> Under CONFIG_HARDENED_USERCOPY, this adds object size checking to the
+>>> SLUB allocator to catch any copies that may span objects. Includes a
+>>> redzone handling fix discovered by Michael Ellerman.
+>>>
+>>> Based on code from PaX and grsecurity.
+>>>
+>>> Signed-off-by: Kees Cook <keescook@chromium.org>
+>>> Tested-by: Michael Ellerman <mpe@ellerman.id.au>
+>>> ---
+>>>  init/Kconfig |  1 +
+>>>  mm/slub.c    | 36 ++++++++++++++++++++++++++++++++++++
+>>>  2 files changed, 37 insertions(+)
+>>>
+>>> diff --git a/init/Kconfig b/init/Kconfig
+>>> index 798c2020ee7c..1c4711819dfd 100644
+>>> --- a/init/Kconfig
+>>> +++ b/init/Kconfig
+>>> @@ -1765,6 +1765,7 @@ config SLAB
+>>>
+>>>  config SLUB
+>>>         bool "SLUB (Unqueued Allocator)"
+>>> +       select HAVE_HARDENED_USERCOPY_ALLOCATOR
+>>>         help
+>>>            SLUB is a slab allocator that minimizes cache line usage
+>>>            instead of managing queues of cached objects (SLAB approach).
+>>> diff --git a/mm/slub.c b/mm/slub.c
+>>> index 825ff4505336..7dee3d9a5843 100644
+>>> --- a/mm/slub.c
+>>> +++ b/mm/slub.c
+>>> @@ -3614,6 +3614,42 @@ void *__kmalloc_node(size_t size, gfp_t flags, int
+>>> node)
+>>>  EXPORT_SYMBOL(__kmalloc_node);
+>>>  #endif
+>>>
+>>> +#ifdef CONFIG_HARDENED_USERCOPY
+>>> +/*
+>>> + * Rejects objects that are incorrectly sized.
+>>> + *
+>>> + * Returns NULL if check passes, otherwise const char * to name of cache
+>>> + * to indicate an error.
+>>> + */
+>>> +const char *__check_heap_object(const void *ptr, unsigned long n,
+>>> +                               struct page *page)
+>>> +{
+>>> +       struct kmem_cache *s;
+>>> +       unsigned long offset;
+>>> +       size_t object_size;
+>>> +
+>>> +       /* Find object and usable object size. */
+>>> +       s = page->slab_cache;
+>>> +       object_size = slab_ksize(s);
+>>> +
+>>> +       /* Find offset within object. */
+>>> +       offset = (ptr - page_address(page)) % s->size;
+>>> +
+>>> +       /* Adjust for redzone and reject if within the redzone. */
+>>> +       if (kmem_cache_debug(s) && s->flags & SLAB_RED_ZONE) {
+>>> +               if (offset < s->red_left_pad)
+>>> +                       return s->name;
+>>> +               offset -= s->red_left_pad;
+>>> +       }
+>>> +
+>>> +       /* Allow address range falling entirely within object size. */
+>>> +       if (offset <= object_size && n <= object_size - offset)
+>>> +               return NULL;
+>>> +
+>>> +       return s->name;
+>>> +}
+>>> +#endif /* CONFIG_HARDENED_USERCOPY */
+>>> +
+>>
+>>
+>> I compared this against what check_valid_pointer does for SLUB_DEBUG
+>> checking. I was hoping we could utilize that function to avoid
+>> duplication but a) __check_heap_object needs to allow accesses anywhere
+>> in the object, not just the beginning b) accessing page->objects
+>> is racy without the addition of locking in SLUB_DEBUG.
+>>
+>> Still, the ptr < page_address(page) check from __check_heap_object would
+>> be good to add to avoid generating garbage large offsets and trying to
+>> infer C math.
+>>
+>> diff --git a/mm/slub.c b/mm/slub.c
+>> index 7dee3d9..5370e4f 100644
+>> --- a/mm/slub.c
+>> +++ b/mm/slub.c
+>> @@ -3632,6 +3632,9 @@ const char *__check_heap_object(const void *ptr,
+>> unsigned long n,
+>>         s = page->slab_cache;
+>>         object_size = slab_ksize(s);
+>>  +       if (ptr < page_address(page))
+>> +               return s->name;
+>> +
+>>         /* Find offset within object. */
+>>         offset = (ptr - page_address(page)) % s->size;
+>>
+>> With that, you can add
+>>
+>> Reviwed-by: Laura Abbott <labbott@redhat.com>
+>
+> Cool, I'll add that.
+>
+> Should I add your reviewed-by for this patch only or for the whole series?
+>
+> Thanks!
+>
+> -Kees
+>
 
-So everyone is in the loop - I have pulled this into my for-linus branch
-at https://git.kernel.org/cgit/linux/kernel/git/gerg/m68knommu.git/ ,
-excepting patch 15 (ARM specific changes).
+Just this patch for now, I'm working through a couple of others
 
-My continued testing hasn't found any issues on m68k platforms.
-I can completely boot up with a no-MMU user space and run on an
-MMU enabled ColdFire platform).
-
-I'll like to consider pushing this to Linus nearer the end of the
-merge window if no-one has any objections.
-
-Regards
-Greg
-
-
-> *Why?*
-> 
-> Because developing and testing natively on a large system with lots of
-> RAM makes it so much more convenient to use all the existing profiling
-> tools and debugging facilities that a kernel with lots of RAM can give.
-> And incidentally, those systems with lots of RAM all have a MMU.
-> 
-> *Why not use elf_fdpic?*
-> 
-> The flat executable format is simple with very small footprint
-> overhead, either in the executables themselves or kernel support.
-> This makes the flat format more suitable than elf_fdpic for very small
-> single user-app embedded systems.
-> 
-> And while elf_fdpic binaries can run on MMU systems, flat binaries still
-> couldn't, which just felt wrong.
-> 
-> So here it is. The no-MMU support should remain unaffected, confirmed by
-> Greg Ungerer. Tested with MMU on ARM and M68K.
-> 
-> Changes since v4:
-> 
-> - Isolated architecture specific changes in their own patches for easier
->   review through their own path to mainline.
-> 
-> - Added needed m68k register fixup from Greg Ungerer.
-> 
-> Changes since v3:
-> 
-> - Small cosmetic changes to pr_*().
-> 
-> - Addressed most important checkpatch complaints on the whole source file
->   and patches in this seris.
-> 
-> Changes since  v2:
-> 
-> - Added protection against a corrupted header that could have caused nasty
->   overflows etc. Suggested by Alan Cox.
-> 
-> - printk() modernization. Suggested by Greg Ungerer / Geert Uytterhoeven.
-> 
-> - Added Greg Ungerer's reviewed-by tag.
-> 
-> Changes since v1:
-> 
-> - Removed SuperH and Xtensa from the Kconfig rule as they fail to build
->   due to lack of get/put_unaligned_user().
-> 
-> - Clarified some commit logs a bit.
-> 
-> diffstat:
-> 
->  arch/arm/include/asm/flat.h       |   5 +-
->  arch/m68k/include/asm/flat.h      |  11 +-
->  arch/m68k/include/asm/processor.h |   2 -
->  fs/Kconfig.binfmt                 |   3 +-
->  fs/binfmt_elf_fdpic.c             |  38 +--
->  fs/binfmt_flat.c                  | 525 ++++++++++++++++++--------------
->  fs/exec.c                         |  33 ++
->  include/linux/binfmts.h           |   2 +
->  8 files changed, 345 insertions(+), 274 deletions(-)
-> 
+>>
+>>>  static size_t __ksize(const void *object)
+>>>  {
+>>>         struct page *page;
+>>>
+>>
+>> Thanks,
+>> Laura
+>
+>
+>
