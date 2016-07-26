@@ -1,93 +1,78 @@
-From: alexander.stein@systec-electronic.com (Alexander Stein)
-Date: Tue, 26 Jul 2016 12:00:33 +0200
-Subject: [PATCH v3 1/4] hwmon: iio_hwmon: delay probing with late_initcall
-In-Reply-To: <ed5c1761-bdc7-df9c-96c8-998e83c49c4c@free-electrons.com>
-References: <1469519027-11387-1-git-send-email-quentin.schulz@free-electrons.com>
- <5277864.qlyRKbC1Zy@ws-stein>
- <ed5c1761-bdc7-df9c-96c8-998e83c49c4c@free-electrons.com>
-Message-ID: <2324970.FJcTUYNoO2@ws-stein>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Tue, 26 Jul 2016 12:02:28 +0200
+Subject: [PATCH v11 10/10] genirq/msi: use the MSI doorbell's IOVA when
+ requested
+In-Reply-To: <alpine.DEB.2.11.1607261101340.19896@nanos>
+References: <1468933367-23159-1-git-send-email-eric.auger@redhat.com>
+ <1468933367-23159-11-git-send-email-eric.auger@redhat.com>
+ <alpine.DEB.2.11.1607201105310.3564@nanos>
+ <08a930f2-8cc9-7d99-78c0-77d08ee40db3@redhat.com>
+ <alpine.DEB.2.11.1607261101340.19896@nanos>
+Message-ID: <33b72799-2408-054b-bbe6-2b7e3b67948f@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 26 July 2016 11:33:59, Quentin Schulz wrote:
-> On 26/07/2016 11:05, Alexander Stein wrote:
-> > On Tuesday 26 July 2016 10:24:48, Quentin Schulz wrote:
-> >> On 26/07/2016 10:21, Alexander Stein wrote:
-> >>> On Tuesday 26 July 2016 09:43:44, Quentin Schulz wrote:
-> >>>> iio_channel_get_all returns -ENODEV when it cannot find either phandles
-> >>>> and
-> >>>> properties in the Device Tree or channels whose consumer_dev_name
-> >>>> matches
-> >>>> iio_hwmon in iio_map_list. The iio_map_list is filled in by iio drivers
-> >>>> which might be probed after iio_hwmon.
-> >>> 
-> >>> Would it work if iio_channel_get_all returning ENODEV is used for
-> >>> returning
-> >>> EPROBE_DEFER in iio_channel_get_all? Using late initcalls for
-> >>> driver/device
-> >>> dependencies seems not right for me at this place.
-> >> 
-> >> Then what if the iio_channel_get_all is called outside of the probe of a
-> >> driver? We'll have to change the error code, things we are apparently
-> >> trying to avoid (see v2 patches' discussions).
-> > 
-> > Maybe I didn't express my idea enough. I don't want to change the behavior
-> > of iio_channel_get_all at all. Just the result evaluation of
-> > iio_channel_get_all in iio_hwmon_probe. I have something link the patch
-> > below in mind.
-> > 
-> > Best regards,
-> > Alexander
-> > ---
-> > diff --git a/drivers/hwmon/iio_hwmon.c b/drivers/hwmon/iio_hwmon.c
-> > index b550ba5..e32d150 100644
-> > --- a/drivers/hwmon/iio_hwmon.c
-> > +++ b/drivers/hwmon/iio_hwmon.c
-> > @@ -73,8 +73,12 @@ static int iio_hwmon_probe(struct platform_device
-> > *pdev)
-> > 
-> >                 name = dev->of_node->name;
-> >         
-> >         channels = iio_channel_get_all(dev);
-> > 
-> > -       if (IS_ERR(channels))
-> > -               return PTR_ERR(channels);
-> > +       if (IS_ERR(channels)) {
-> > +               if (PTR_ERR(channels) == -ENODEV)
-> > +                       return -EPROBE_DEFER;
-> > +               else
-> > +                       return PTR_ERR(channels);
-> > +       }
-> > 
-> >         st = devm_kzalloc(dev, sizeof(*st), GFP_KERNEL);
-> >         if (st == NULL) {
+Hi Thomas,
+
+On 26/07/2016 11:04, Thomas Gleixner wrote:
+> Eric,
 > 
-> Indeed, I misunderstood what you told me.
+> On Mon, 25 Jul 2016, Auger Eric wrote:
+>> On 20/07/2016 11:09, Thomas Gleixner wrote:
+>>> On Tue, 19 Jul 2016, Eric Auger wrote:
+>>>> @@ -63,10 +63,18 @@ static int msi_compose(struct irq_data *irq_data,
+>>>>  {
+>>>>  	int ret = 0;
+>>>>  
+>>>> -	if (erase)
+>>>> +	if (erase) {
+>>>>  		memset(msg, 0, sizeof(*msg));
+>>>> -	else
+>>>> +	} else {
+>>>> +		struct device *dev;
+>>>> +
+>>>>  		ret = irq_chip_compose_msi_msg(irq_data, msg);
+>>>> +		if (ret)
+>>>> +			return ret;
+>>>> +
+>>>> +		dev = msi_desc_to_dev(irq_data_get_msi_desc(irq_data));
+>>>> +		WARN_ON(iommu_msi_msg_pa_to_va(dev, msg));
+>>>
+>>> What the heck is this call doing? And why is there only a WARN_ON and not a
+>>> proper error return code handling?
+>>
+>> iommu_msi_msg_pa_to_va is part of the new iommu-msi API introduced in PART I
+>> of this series. This helper function detects the physical address found in
+>> the MSI message has a corresponding allocated IOVA. This happens if the MSI
+>> doorbell is accessed through an IOMMU and this IOMMU do not bypass the MSI
+>> addresses (ARM case). Allocation of this IOVA was performed in the previous
+>> patch.
+>>
+>> So, if this is the case, the physical address is swapped with the IOVA
+>> address. That way the PCIe device will send the MSI with this IOVA and
+>> the address will be translated by the IOMMU into the target MSI doorbell PA.
+>>
+>> Hope this clarifies
 > 
-> Actually, the patch you proposed is part of my v1
-> (https://lkml.org/lkml/2016/6/28/203) and v2
-> (https://lkml.org/lkml/2016/7/15/215).
-> Jonathan and Guenter didn't really like the idea of changing the -ENODEV
-> in -EPROBE_DEFER.
+> No, it does not. You are explaining in great length what that function is
+> doing, but you are not explaining WHY your don't do a proper return code
+> handling and just do a WARN_ON() and happily proceed. If that function fails
+> then the interrupt will not be functional, so WHY on earth are you continuing?
+Oh sorry I focused on the function's goal. Originally I could not return an
+error since there is a BUG_ON(ret) afterwards. And typically the userspace can
+willingly omit to pass IPA range that map MSIs. But now we have this 2 phases where
+we first map the MSIs on pci_enable_msi_range and use the IOVA at compose time
+I need to analyze again if the userspace can induce a BUG_ON.
 
-Thanks for the links.
+Thanks
 
-> What I thought you were proposing was to change the -ENODEV return code
-> inside iio_channel_get_all. This cannot be an option since the function
-> might be called outside of a probe (it is not yet, but might be in the
-> future?).
-
-AFAICS this is a helper function not knowing about device probing itself. And 
-it should stay at that.
-
-> Of what I understood, two possibilities are then possible (proposed
-> either by Guenter or Jonathan): either rework the iio framework to
-> register iio map array earlier or to use late_initcall instead of init
-> for the driver consuming the iio channels.
-
-Interestingly using this problem would not arise due to module dependencies. 
-But using late_initcall would mean this needs to be done on any driver using 
-iio channels? I would rather keep those consumers simple.
-
-Best regards,
-Alexander
+Eric
+> 
+> Thanks,
+> 
+> 	tglx
+> --
+> To unsubscribe from this list: send the line "unsubscribe kvm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
