@@ -1,39 +1,28 @@
-From: jeffv@google.com (Jeff Vander Stoep)
-Date: Tue, 26 Jul 2016 10:16:55 -0700
-Subject: [PATCH] arm64: Fix Kconfig dependencies for RANDOMIZE_BASE
-Message-ID: <1469553415-26839-1-git-send-email-jeffv@google.com>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Tue, 26 Jul 2016 19:43:06 +0200
+Subject: [PATCH 4/9] clk: sunxi-ng: mux: Add support for mux tables
+In-Reply-To: <1469516671-19377-5-git-send-email-wens@csie.org>
+References: <1469516671-19377-1-git-send-email-wens@csie.org>
+ <1469516671-19377-5-git-send-email-wens@csie.org>
+Message-ID: <20160726194306.9b6aadd3d1669bd6f5a54d99@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Selecting CONFIG_RANDOMIZE_BASE=y and CONFIG_MODULES=n causes a
-build error due to dependencies on modules. This patch makes KASLR
-module config options dependent on CONFIG_MODULES=y.
+On Tue, 26 Jul 2016 15:04:26 +0800
+Chen-Yu Tsai <wens@csie.org> wrote:
 
-Signed-off-by: Jeff Vander Stoep <jeffv@google.com>
----
- arch/arm64/Kconfig | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+> Some clock muxes have holes, i.e. invalid or unconnected inputs,
+> between parent mux values.
+> 
+> Add support for specifying a mux table to map clock parents to
+> mux values.
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 7e23f95..c9eff79 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -891,7 +891,6 @@ config RELOCATABLE
- 
- config RANDOMIZE_BASE
- 	bool "Randomize the address of the kernel image"
--	select ARM64_MODULE_PLTS
- 	select RELOCATABLE
- 	help
- 	  Randomizes the virtual address at which the kernel image is
-@@ -911,6 +910,8 @@ config RANDOMIZE_BASE
- config RANDOMIZE_MODULE_REGION_FULL
- 	bool "Randomize the module region independently from the core kernel"
- 	depends on RANDOMIZE_BASE
-+	depends on MODULES
-+	select ARM64_MODULE_PLTS
- 	default y
- 	help
- 	  Randomizes the location of the module region without considering the
+Putting empty strings in the holes should work. No?
+Ex:
+
+static const char * const csi_mclk_parents[] =
+	{ "pll-video0", "pll-video1", "", "", "", "osc24M" };
+
 -- 
-2.8.0.rc3.226.g39d4020
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
