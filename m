@@ -1,305 +1,435 @@
 From: mark.yao@rock-chips.com (Mark Yao)
-Date: Tue, 26 Jul 2016 15:46:32 +0800
-Subject: [PATCH 1/3] drm: introduce share plane
-Message-ID: <1469519194-23133-1-git-send-email-mark.yao@rock-chips.com>
+Date: Tue, 26 Jul 2016 15:46:33 +0800
+Subject: [PATCH 2/3] drm/rockchip: vop: support multi area plane
+In-Reply-To: <1469519194-23133-1-git-send-email-mark.yao@rock-chips.com>
+References: <1469519194-23133-1-git-send-email-mark.yao@rock-chips.com>
+Message-ID: <1469519194-23133-2-git-send-email-mark.yao@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-What is share plane:
-Plane hardware only be used when the display scanout run into plane active
-scanout, that means we can reuse the plane hardware resources on plane
-non-active scanout.
-
-     --------------------------------------------------
-    |  scanout                                       |
-    |         ------------------                     |
-    |         | parent plane   |                     |
-    |         | active scanout |                     |
-    |         |                |   ----------------- |
-    |         ------------------   | share plane 1 | |
-    |  -----------------           |active scanout | |
-    |  | share plane 0 |           |               | |
-    |  |active scanout |           ----------------- |
-    |  |               |                             |
-    |  -----------------                             |
-    --------------------------------------------------
-One plane hardware can be reuse for multi-planes, we assume the first
-plane is parent plane, other planes share the resource with first one.
-    parent plane
-        |---share plane 0
-        |---share plane 1
-        ...
-
-Because resource share, There are some limit on share plane: one group
-of share planes need use same zpos, can not overlap, etc.
-
-We assume share plane is a universal plane with some limit flags.
-people who use the share plane need know the limit, should call the ioctl
-DRM_CLIENT_CAP_SHARE_PLANES, and judge the planes limit before use it.
-
-A group of share planes would has same shard id, so userspace can
-group them, judge share plane's limit.
+The series vop of VOP_FULL framework support area plane, such as
+RK3288 and RK3399, one group of area planes share same hardware,
+reuse the hardware on different scanout time, this design is
+useful to support mulit planes with low hardware consume.
 
 Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
 ---
- drivers/gpu/drm/drm_crtc.c  | 110 ++++++++++++++++++++++++++++++++++++++++++++
- drivers/gpu/drm/drm_ioctl.c |   5 ++
- include/drm/drmP.h          |   5 ++
- include/drm/drm_crtc.h      |  14 ++++++
- include/uapi/drm/drm.h      |   7 +++
- 5 files changed, 141 insertions(+)
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 191 +++++++++++++++++-----------
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.h |   4 +-
+ 2 files changed, 123 insertions(+), 72 deletions(-)
 
-diff --git a/drivers/gpu/drm/drm_crtc.c b/drivers/gpu/drm/drm_crtc.c
-index 9d3f80e..3a8257e 100644
---- a/drivers/gpu/drm/drm_crtc.c
-+++ b/drivers/gpu/drm/drm_crtc.c
-@@ -1426,6 +1426,96 @@ int drm_plane_init(struct drm_device *dev, struct drm_plane *plane,
- EXPORT_SYMBOL(drm_plane_init);
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+index 91305eb..bd084c0 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+@@ -41,17 +41,19 @@
+ #define __REG_SET_NORMAL(x, off, mask, shift, v) \
+ 		vop_mask_write(x, off, (mask) << shift, (v) << shift)
  
- /**
-+ * drm_share_plane_init - Initialize a share plane
-+ * @dev: DRM device
-+ * @plane: plane object to init
-+ * @parent: this plane share some resources with parent plane.
-+ * @possible_crtcs: bitmask of possible CRTCs
-+ * @funcs: callbacks for the new plane
-+ * @formats: array of supported formats (%DRM_FORMAT_*)
-+ * @format_count: number of elements in @formats
-+ * @type: type of plane (overlay, primary, cursor)
-+ *
-+ * With this API, the plane can share hardware resources with other planes.
-+ *
-+ *   --------------------------------------------------
-+ *   |  scanout                                       |
-+ *   |         ------------------                     |
-+ *   |         |  parent plane  |                     |
-+ *   |         | active scanout |                     |
-+ *   |         |                |   ----------------- |
-+ *   |         ------------------   | share plane 1 | |
-+ *   |  -----------------           |active scanout | |
-+ *   |  | share plane 0 |           |               | |
-+ *   |  |active scanout |           ----------------- |
-+ *   |  |               |                             |
-+ *   |  -----------------                             |
-+ *   --------------------------------------------------
-+ *
-+ *    parent plane
-+ *        |---share plane 0
-+ *        |---share plane 1
-+ *        ...
-+ *
-+ * The plane hardware is used when the display scanout run into plane active
-+ * scanout, that means we can reuse the plane hardware resources on plane
-+ * non-active scanout.
-+ *
-+ * Because resource share, There are some limit on share plane: one group
-+ * of share planes need use same zpos, can't not overlap, etc.
-+ *
-+ * Here assume share plane is a universal plane with some limit flags.
-+ * people who use the share plane need know the limit, should call the ioctl
-+ * DRM_CLIENT_CAP_SHARE_PLANES, and judge the planes limit before use it.
-+ *
-+ * Returns:
-+ * Zero on success, error code on failure.
-+ */
+-#define REG_SET(x, base, reg, v, mode) \
+-		__REG_SET_##mode(x, base + reg.offset, reg.mask, reg.shift, v)
+-#define REG_SET_MASK(x, base, reg, mask, v, mode) \
+-		__REG_SET_##mode(x, base + reg.offset, mask, reg.shift, v)
++#define REG_SET(x, off, reg, v, mode) \
++		__REG_SET_##mode(x, off + reg.offset, \
++				 reg.mask, reg.shift, v)
++#define REG_SET_MASK(x, off, reg, mask, v, mode) \
++		__REG_SET_##mode(x, off + reg.offset, mask, reg.shift, v)
+ 
+ #define VOP_WIN_SET(x, win, name, v) \
+-		REG_SET(x, win->base, win->phy->name, v, RELAXED)
++		REG_SET(x, win->offset, VOP_WIN_NAME(win, name), v, RELAXED)
+ #define VOP_SCL_SET(x, win, name, v) \
+-		REG_SET(x, win->base, win->phy->scl->name, v, RELAXED)
++		REG_SET(x, win->offset, win->phy->scl->name, v, RELAXED)
+ #define VOP_SCL_SET_EXT(x, win, name, v) \
+-		REG_SET(x, win->base, win->phy->scl->ext->name, v, RELAXED)
++		REG_SET(x, win->offset, win->phy->scl->ext->name, v, RELAXED)
 +
-+int drm_share_plane_init(struct drm_device *dev, struct drm_plane *plane,
-+			 struct drm_plane *parent,
-+			 unsigned long possible_crtcs,
-+			 const struct drm_plane_funcs *funcs,
-+			 const uint32_t *formats, unsigned int format_count,
-+			 enum drm_plane_type type)
+ #define VOP_CTRL_SET(x, name, v) \
+ 		REG_SET(x, 0, (x)->data->ctrl->name, v, NORMAL)
+ 
+@@ -75,10 +77,13 @@
+ 		vop_get_intr_type(vop, &vop->data->intr->name, type)
+ 
+ #define VOP_WIN_GET(x, win, name) \
+-		vop_read_reg(x, win->base, &win->phy->name)
++		vop_read_reg(x, win->offset, &VOP_WIN_NAME(win, name))
++
++#define VOP_WIN_NAME(win, name) \
++		(vop_get_win_phy(win, &win->phy->name)->name)
+ 
+ #define VOP_WIN_GET_YRGBADDR(vop, win) \
+-		vop_readl(vop, win->base + win->phy->yrgb_mst.offset)
++		vop_readl(vop, win->offset + VOP_WIN_NAME(win, yrgb_mst).offset)
+ 
+ #define to_vop(x) container_of(x, struct vop, crtc)
+ #define to_vop_win(x) container_of(x, struct vop_win, base)
+@@ -94,8 +99,14 @@ struct vop_plane_state {
+ };
+ 
+ struct vop_win {
++	struct vop_win *parent;
+ 	struct drm_plane base;
+-	const struct vop_win_data *data;
++
++	uint32_t offset;
++	enum drm_plane_type type;
++	const struct vop_win_phy *phy;
++	const uint32_t *data_formats;
++	uint32_t nformats;
+ 	struct vop *vop;
+ 
+ 	/* protected by dev->event_lock */
+@@ -119,6 +130,7 @@ struct vop {
+ 	struct drm_pending_vblank_event *event;
+ 
+ 	const struct vop_data *data;
++	int num_wins;
+ 
+ 	uint32_t *regsbak;
+ 	void __iomem *regs;
+@@ -187,6 +199,15 @@ static inline void vop_mask_write_relaxed(struct vop *vop, uint32_t offset,
+ 	}
+ }
+ 
++static inline const struct vop_win_phy *
++vop_get_win_phy(struct vop_win *win, const struct vop_reg *reg)
 +{
-+	struct drm_mode_config *config = &dev->mode_config;
++	if (!reg->mask && win->parent)
++		return win->parent->phy;
++
++	return win->phy;
++}
++
+ static inline uint32_t vop_get_intr_type(struct vop *vop,
+ 					 const struct vop_reg *reg, int type)
+ {
+@@ -299,9 +320,9 @@ static uint16_t scl_vop_cal_scale(enum scale_mode mode, uint32_t src,
+ 	return val;
+ }
+ 
+-static void scl_vop_cal_scl_fac(struct vop *vop, const struct vop_win_data *win,
+-			     uint32_t src_w, uint32_t src_h, uint32_t dst_w,
+-			     uint32_t dst_h, uint32_t pixel_format)
++static void scl_vop_cal_scl_fac(struct vop *vop, struct vop_win *win,
++				uint32_t src_w, uint32_t src_h, uint32_t dst_w,
++				uint32_t dst_h, uint32_t pixel_format)
+ {
+ 	uint16_t yrgb_hor_scl_mode, yrgb_ver_scl_mode;
+ 	uint16_t cbcr_hor_scl_mode = SCALE_NONE;
+@@ -316,6 +337,9 @@ static void scl_vop_cal_scl_fac(struct vop *vop, const struct vop_win_data *win,
+ 	uint32_t val;
+ 	int vskiplines = 0;
+ 
++	if (!win->phy->scl)
++		return;
++
+ 	if (dst_w > 3840) {
+ 		DRM_ERROR("Maximum destination width (3840) exceeded\n");
+ 		return;
+@@ -509,9 +533,8 @@ static void vop_crtc_disable(struct drm_crtc *crtc)
+ 	 * disable that crtc. Otherwise we might try to scan from a destroyed
+ 	 * buffer later.
+ 	 */
+-	for (i = 0; i < vop->data->win_size; i++) {
+-		struct vop_win *vop_win = &vop->win[i];
+-		const struct vop_win_data *win = vop_win->data;
++	for (i = 0; i < vop->num_wins; i++) {
++		struct vop_win *win = &vop->win[i];
+ 
+ 		spin_lock(&vop->reg_lock);
+ 		VOP_WIN_SET(vop, win, enable, 0);
+@@ -590,9 +613,8 @@ static int vop_plane_atomic_check(struct drm_plane *plane,
+ 	struct drm_crtc *crtc = state->crtc;
+ 	struct drm_crtc_state *crtc_state;
+ 	struct drm_framebuffer *fb = state->fb;
+-	struct vop_win *vop_win = to_vop_win(plane);
++	struct vop_win *win = to_vop_win(plane);
+ 	struct vop_plane_state *vop_plane_state = to_vop_plane_state(state);
+-	const struct vop_win_data *win = vop_win->data;
+ 	bool visible;
+ 	int ret;
+ 	struct drm_rect *dest = &vop_plane_state->dest;
+@@ -660,16 +682,15 @@ static void vop_plane_atomic_disable(struct drm_plane *plane,
+ 				     struct drm_plane_state *old_state)
+ {
+ 	struct vop_plane_state *vop_plane_state = to_vop_plane_state(old_state);
+-	struct vop_win *vop_win = to_vop_win(plane);
+-	const struct vop_win_data *win = vop_win->data;
++	struct vop_win *win = to_vop_win(plane);
+ 	struct vop *vop = to_vop(old_state->crtc);
+ 
+ 	if (!old_state->crtc)
+ 		return;
+ 
+ 	spin_lock_irq(&plane->dev->event_lock);
+-	vop_win->enable = false;
+-	vop_win->yrgb_mst = 0;
++	win->enable = false;
++	win->yrgb_mst = 0;
+ 	spin_unlock_irq(&plane->dev->event_lock);
+ 
+ 	spin_lock(&vop->reg_lock);
+@@ -686,9 +707,8 @@ static void vop_plane_atomic_update(struct drm_plane *plane,
+ {
+ 	struct drm_plane_state *state = plane->state;
+ 	struct drm_crtc *crtc = state->crtc;
+-	struct vop_win *vop_win = to_vop_win(plane);
++	struct vop_win *win = to_vop_win(plane);
+ 	struct vop_plane_state *vop_plane_state = to_vop_plane_state(state);
+-	const struct vop_win_data *win = vop_win->data;
+ 	struct vop *vop = to_vop(state->crtc);
+ 	struct drm_framebuffer *fb = state->fb;
+ 	unsigned int actual_w, actual_h;
+@@ -736,8 +756,8 @@ static void vop_plane_atomic_update(struct drm_plane *plane,
+ 	vop_plane_state->yrgb_mst = rk_obj->dma_addr + offset + fb->offsets[0];
+ 
+ 	spin_lock_irq(&plane->dev->event_lock);
+-	vop_win->enable = true;
+-	vop_win->yrgb_mst = vop_plane_state->yrgb_mst;
++	win->enable = true;
++	win->yrgb_mst = vop_plane_state->yrgb_mst;
+ 	spin_unlock_irq(&plane->dev->event_lock);
+ 
+ 	spin_lock(&vop->reg_lock);
+@@ -761,10 +781,9 @@ static void vop_plane_atomic_update(struct drm_plane *plane,
+ 		VOP_WIN_SET(vop, win, uv_mst, dma_addr);
+ 	}
+ 
+-	if (win->phy->scl)
+-		scl_vop_cal_scl_fac(vop, win, actual_w, actual_h,
+-				    drm_rect_width(dest), drm_rect_height(dest),
+-				    fb->pixel_format);
++	scl_vop_cal_scl_fac(vop, win, actual_w, actual_h,
++			    drm_rect_width(dest), drm_rect_height(dest),
++			    fb->pixel_format);
+ 
+ 	VOP_WIN_SET(vop, win, act_info, act_info);
+ 	VOP_WIN_SET(vop, win, dsp_info, dsp_info);
+@@ -1098,9 +1117,9 @@ static bool vop_win_pending_is_complete(struct vop_win *vop_win)
+ 	dma_addr_t yrgb_mst;
+ 
+ 	if (!vop_win->enable)
+-		return VOP_WIN_GET(vop_win->vop, vop_win->data, enable) == 0;
++		return VOP_WIN_GET(vop_win->vop, vop_win, enable) == 0;
+ 
+-	yrgb_mst = VOP_WIN_GET_YRGBADDR(vop_win->vop, vop_win->data);
++	yrgb_mst = VOP_WIN_GET_YRGBADDR(vop_win->vop, vop_win);
+ 
+ 	return yrgb_mst == vop_win->yrgb_mst;
+ }
+@@ -1112,7 +1131,7 @@ static void vop_handle_vblank(struct vop *vop)
+ 	unsigned long flags;
+ 	int i;
+ 
+-	for (i = 0; i < vop->data->win_size; i++) {
++	for (i = 0; i < vop->num_wins; i++) {
+ 		if (!vop_win_pending_is_complete(&vop->win[i]))
+ 			return;
+ 	}
+@@ -1176,15 +1195,35 @@ static irqreturn_t vop_isr(int irq, void *data)
+ 	return ret;
+ }
+ 
++static int vop_plane_init(struct vop *vop, struct vop_win *win,
++			  unsigned long possible_crtcs)
++{
++	struct drm_plane *share = NULL;
 +	int ret;
-+	int share_id;
 +
-+	/*
-+	 * TODO: only verified on ATOMIC drm driver.
-+	 */
-+	if (!drm_core_check_feature(dev, DRIVER_ATOMIC))
-+		return -EINVAL;
++	if (win->parent)
++		share = &win->parent->base;
 +
-+	ret = drm_universal_plane_init(dev, plane, possible_crtcs, funcs,
-+				       formats, format_count, type, NULL);
-+	if (ret)
++	ret = drm_share_plane_init(vop->drm_dev, &win->base, share,
++				   possible_crtcs, &vop_plane_funcs,
++				   win->data_formats, win->nformats, win->type);
++	if (ret) {
++		DRM_ERROR("failed to initialize plane\n");
 +		return ret;
-+
-+	if (parent) {
-+		/*
-+		 * Can't support more than two level plane share.
-+		 */
-+		WARN_ON(parent->parent);
-+		share_id = parent->base.id;
-+		plane->parent = parent;
-+
-+		config->num_share_plane++;
-+		if (plane->type == DRM_PLANE_TYPE_OVERLAY)
-+			config->num_share_overlay_plane++;
-+	} else {
-+		share_id = plane->base.id;
 +	}
++	drm_plane_helper_add(&win->base, &plane_helper_funcs);
 +
-+	drm_object_attach_property(&plane->base,
-+				   config->prop_share_id, share_id);
 +	return 0;
 +}
-+EXPORT_SYMBOL(drm_share_plane_init);
 +
-+/**
-  * drm_plane_cleanup - Clean up the core plane usage
-  * @plane: plane to cleanup
-  *
-@@ -1452,6 +1542,11 @@ void drm_plane_cleanup(struct drm_plane *plane)
- 	dev->mode_config.num_total_plane--;
- 	if (plane->type == DRM_PLANE_TYPE_OVERLAY)
- 		dev->mode_config.num_overlay_plane--;
-+	if (plane->parent) {
-+		dev->mode_config.num_share_plane--;
-+		if (plane->type == DRM_PLANE_TYPE_OVERLAY)
-+			dev->mode_config.num_share_overlay_plane--;
-+	}
- 	drm_modeset_unlock_all(dev);
+ static int vop_create_crtc(struct vop *vop)
+ {
+-	const struct vop_data *vop_data = vop->data;
+ 	struct device *dev = vop->dev;
+ 	struct drm_device *drm_dev = vop->drm_dev;
+ 	struct drm_plane *primary = NULL, *cursor = NULL, *plane, *tmp;
+ 	struct drm_crtc *crtc = &vop->crtc;
+ 	struct device_node *port;
+-	int ret;
++	int ret = 0;
+ 	int i;
  
- 	WARN_ON(plane->state && !plane->funcs->atomic_destroy_state);
-@@ -1600,6 +1695,13 @@ static int drm_mode_create_standard_properties(struct drm_device *dev)
+ 	/*
+@@ -1192,30 +1231,22 @@ static int vop_create_crtc(struct vop *vop)
+ 	 * to pass them to drm_crtc_init_with_planes, which sets the
+ 	 * "possible_crtcs" to the newly initialized crtc.
+ 	 */
+-	for (i = 0; i < vop_data->win_size; i++) {
+-		struct vop_win *vop_win = &vop->win[i];
+-		const struct vop_win_data *win_data = vop_win->data;
++	for (i = 0; i < vop->num_wins; i++) {
++		struct vop_win *win = &vop->win[i];
+ 
+-		if (win_data->type != DRM_PLANE_TYPE_PRIMARY &&
+-		    win_data->type != DRM_PLANE_TYPE_CURSOR)
++		if (win->type != DRM_PLANE_TYPE_PRIMARY &&
++		    win->type != DRM_PLANE_TYPE_CURSOR)
+ 			continue;
+ 
+-		ret = drm_universal_plane_init(vop->drm_dev, &vop_win->base,
+-					       0, &vop_plane_funcs,
+-					       win_data->phy->data_formats,
+-					       win_data->phy->nformats,
+-					       win_data->type, NULL);
+-		if (ret) {
+-			DRM_ERROR("failed to initialize plane\n");
++		if (vop_plane_init(vop, win, 0))
+ 			goto err_cleanup_planes;
+-		}
+ 
+-		plane = &vop_win->base;
+-		drm_plane_helper_add(plane, &plane_helper_funcs);
++		plane = &win->base;
+ 		if (plane->type == DRM_PLANE_TYPE_PRIMARY)
+ 			primary = plane;
+ 		else if (plane->type == DRM_PLANE_TYPE_CURSOR)
+ 			cursor = plane;
++
+ 	}
+ 
+ 	ret = drm_crtc_init_with_planes(drm_dev, crtc, primary, cursor,
+@@ -1229,25 +1260,15 @@ static int vop_create_crtc(struct vop *vop)
+ 	 * Create drm_planes for overlay windows with possible_crtcs restricted
+ 	 * to the newly created crtc.
+ 	 */
+-	for (i = 0; i < vop_data->win_size; i++) {
+-		struct vop_win *vop_win = &vop->win[i];
+-		const struct vop_win_data *win_data = vop_win->data;
++	for (i = 0; i < vop->num_wins; i++) {
++		struct vop_win *win = &vop->win[i];
+ 		unsigned long possible_crtcs = 1 << drm_crtc_index(crtc);
+ 
+-		if (win_data->type != DRM_PLANE_TYPE_OVERLAY)
++		if (win->type != DRM_PLANE_TYPE_OVERLAY)
+ 			continue;
+ 
+-		ret = drm_universal_plane_init(vop->drm_dev, &vop_win->base,
+-					       possible_crtcs,
+-					       &vop_plane_funcs,
+-					       win_data->phy->data_formats,
+-					       win_data->phy->nformats,
+-					       win_data->type, NULL);
+-		if (ret) {
+-			DRM_ERROR("failed to initialize overlay plane\n");
++		if (vop_plane_init(vop, win, possible_crtcs))
+ 			goto err_cleanup_crtc;
+-		}
+-		drm_plane_helper_add(&vop_win->base, &plane_helper_funcs);
+ 	}
+ 
+ 	port = of_get_child_by_name(dev->of_node, "port");
+@@ -1362,8 +1383,8 @@ static int vop_initial(struct vop *vop)
+ 	for (i = 0; i < vop_data->table_size; i++)
+ 		vop_writel(vop, init_table[i].offset, init_table[i].value);
+ 
+-	for (i = 0; i < vop_data->win_size; i++) {
+-		const struct vop_win_data *win = &vop_data->win[i];
++	for (i = 0; i < vop->num_wins; i++) {
++		struct vop_win *win = &vop->win[i];
+ 
+ 		VOP_WIN_SET(vop, win, enable, 0);
+ 	}
+@@ -1405,14 +1426,34 @@ err_unprepare_dclk:
+ static void vop_win_init(struct vop *vop)
+ {
+ 	const struct vop_data *vop_data = vop->data;
+-	unsigned int i;
++	unsigned int i, j;
++	unsigned int num_wins = 0;
+ 
+ 	for (i = 0; i < vop_data->win_size; i++) {
+-		struct vop_win *vop_win = &vop->win[i];
++		struct vop_win *vop_win = &vop->win[num_wins];
+ 		const struct vop_win_data *win_data = &vop_data->win[i];
+ 
+-		vop_win->data = win_data;
++		vop_win->phy = win_data->phy;
++		vop_win->offset = win_data->base;
++		vop_win->type = win_data->type;
++		vop_win->data_formats = win_data->phy->data_formats;
++		vop_win->nformats = win_data->phy->nformats;
+ 		vop_win->vop = vop;
++		num_wins++;
++
++		for (j = 0; j < win_data->area_size; j++) {
++			struct vop_win *vop_area = &vop->win[num_wins];
++			const struct vop_win_phy *area = win_data->area[j];
++
++			vop_area->parent = vop_win;
++			vop_area->offset = vop_win->offset;
++			vop_area->phy = area;
++			vop_area->type = DRM_PLANE_TYPE_OVERLAY;
++			vop_area->data_formats = vop_win->data_formats;
++			vop_area->nformats = vop_win->nformats;
++			vop_area->vop = vop;
++			num_wins++;
++		}
+ 	}
+ }
+ 
+@@ -1424,14 +1465,21 @@ static int vop_bind(struct device *dev, struct device *master, void *data)
+ 	struct vop *vop;
+ 	struct resource *res;
+ 	size_t alloc_size;
+-	int ret, irq;
++	int ret, irq, i;
++	int num_wins = 0;
+ 
+ 	vop_data = of_device_get_match_data(dev);
+ 	if (!vop_data)
+ 		return -ENODEV;
+ 
++	for (i = 0; i < vop_data->win_size; i++) {
++		const struct vop_win_data *win_data = &vop_data->win[i];
++
++		num_wins += win_data->area_size + 1;
++	}
++
+ 	/* Allocate vop struct and its vop_win array */
+-	alloc_size = sizeof(*vop) + sizeof(*vop->win) * vop_data->win_size;
++	alloc_size = sizeof(*vop) + sizeof(*vop->win) * num_wins;
+ 	vop = devm_kzalloc(dev, alloc_size, GFP_KERNEL);
+ 	if (!vop)
  		return -ENOMEM;
- 	dev->mode_config.plane_type_property = prop;
+@@ -1439,6 +1487,7 @@ static int vop_bind(struct device *dev, struct device *master, void *data)
+ 	vop->dev = dev;
+ 	vop->data = vop_data;
+ 	vop->drm_dev = drm_dev;
++	vop->num_wins = num_wins;
+ 	dev_set_drvdata(dev, vop);
  
-+	prop = drm_property_create_range(dev, DRM_MODE_PROP_IMMUTABLE,
-+					 "SHARE_ID", 0, UINT_MAX);
-+	if (!prop)
-+		return -ENOMEM;
-+
-+	dev->mode_config.prop_share_id = prop;
-+
- 	prop = drm_property_create_range(dev, DRM_MODE_PROP_ATOMIC,
- 			"SRC_X", 0, UINT_MAX);
- 	if (!prop)
-@@ -2431,6 +2533,12 @@ int drm_mode_getplane_res(struct drm_device *dev, void *data,
- 		num_planes = config->num_total_plane;
- 	else
- 		num_planes = config->num_overlay_plane;
-+	if (!file_priv->share_planes) {
-+		if (file_priv->universal_planes)
-+			num_planes -= config->num_share_plane;
-+		else
-+			num_planes -= config->num_share_overlay_plane;
-+	}
+ 	vop_win_init(vop);
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.h b/drivers/gpu/drm/rockchip/rockchip_drm_vop.h
+index 071ff0b..def5afa 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.h
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.h
+@@ -122,8 +122,10 @@ struct vop_win_phy {
  
- 	/*
- 	 * This ioctl is called twice, once to determine how much space is
-@@ -2449,6 +2557,8 @@ int drm_mode_getplane_res(struct drm_device *dev, void *data,
- 			if (plane->type != DRM_PLANE_TYPE_OVERLAY &&
- 			    !file_priv->universal_planes)
- 				continue;
-+			if (plane->parent && !file_priv->share_planes)
-+				continue;
+ struct vop_win_data {
+ 	uint32_t base;
+-	const struct vop_win_phy *phy;
+ 	enum drm_plane_type type;
++	const struct vop_win_phy *phy;
++	const struct vop_win_phy **area;
++	unsigned int area_size;
+ };
  
- 			if (put_user(plane->base.id, plane_ptr + copied))
- 				return -EFAULT;
-diff --git a/drivers/gpu/drm/drm_ioctl.c b/drivers/gpu/drm/drm_ioctl.c
-index 33af4a5..8b0120d 100644
---- a/drivers/gpu/drm/drm_ioctl.c
-+++ b/drivers/gpu/drm/drm_ioctl.c
-@@ -294,6 +294,11 @@ drm_setclientcap(struct drm_device *dev, void *data, struct drm_file *file_priv)
- 			return -EINVAL;
- 		file_priv->universal_planes = req->value;
- 		break;
-+	case DRM_CLIENT_CAP_SHARE_PLANES:
-+		if (req->value > 1)
-+			return -EINVAL;
-+		file_priv->share_planes = req->value;
-+		break;
- 	case DRM_CLIENT_CAP_ATOMIC:
- 		if (!drm_core_check_feature(dev, DRIVER_ATOMIC))
- 			return -EINVAL;
-diff --git a/include/drm/drmP.h b/include/drm/drmP.h
-index c2fe2cf..285d177 100644
---- a/include/drm/drmP.h
-+++ b/include/drm/drmP.h
-@@ -314,6 +314,11 @@ struct drm_file {
- 	/* true if client understands atomic properties */
- 	unsigned atomic:1;
- 	/*
-+	 * true if client understands share planes and
-+	 * hardware support share planes.
-+	 */
-+	unsigned share_planes:1;
-+	/*
- 	 * This client is the creator of @master.
- 	 * Protected by struct drm_device::master_mutex.
- 	 */
-diff --git a/include/drm/drm_crtc.h b/include/drm/drm_crtc.h
-index 9e6ab4a..a3fe9b0 100644
---- a/include/drm/drm_crtc.h
-+++ b/include/drm/drm_crtc.h
-@@ -1660,6 +1660,7 @@ enum drm_plane_type {
- /**
-  * struct drm_plane - central DRM plane control structure
-  * @dev: DRM device this plane belongs to
-+ * @parent: this plane share some resources with parent plane.
-  * @head: for list management
-  * @name: human readable name, can be overwritten by the driver
-  * @base: base mode object
-@@ -1679,6 +1680,7 @@ enum drm_plane_type {
-  */
- struct drm_plane {
- 	struct drm_device *dev;
-+	struct drm_plane *parent;
- 	struct list_head head;
- 
- 	char *name;
-@@ -2408,6 +2410,8 @@ struct drm_mode_config {
- 	 */
- 	int num_overlay_plane;
- 	int num_total_plane;
-+	int num_share_plane;
-+	int num_share_overlay_plane;
- 	struct list_head plane_list;
- 
- 	int num_crtc;
-@@ -2428,6 +2432,9 @@ struct drm_mode_config {
- 
- 	struct mutex blob_lock;
- 
-+	/* pointers to share properties */
-+	struct drm_property *prop_share_id;
-+
- 	/* pointers to standard properties */
- 	struct list_head property_blob_list;
- 	struct drm_property *edid_property;
-@@ -2636,6 +2643,13 @@ extern int drm_plane_init(struct drm_device *dev,
- 			  const struct drm_plane_funcs *funcs,
- 			  const uint32_t *formats, unsigned int format_count,
- 			  bool is_primary);
-+extern int drm_share_plane_init(struct drm_device *dev, struct drm_plane *plane,
-+				struct drm_plane *parent,
-+				unsigned long possible_crtcs,
-+				const struct drm_plane_funcs *funcs,
-+				const uint32_t *formats,
-+				unsigned int format_count,
-+				enum drm_plane_type type);
- extern void drm_plane_cleanup(struct drm_plane *plane);
- 
- /**
-diff --git a/include/uapi/drm/drm.h b/include/uapi/drm/drm.h
-index 452675f..01979a4 100644
---- a/include/uapi/drm/drm.h
-+++ b/include/uapi/drm/drm.h
-@@ -677,6 +677,13 @@ struct drm_get_cap {
-  */
- #define DRM_CLIENT_CAP_ATOMIC	3
- 
-+/**
-+ * DRM_CLIENT_CAP_SHARE_PLANES
-+ *
-+ * If set to 1, the DRM core will expose share planes to userspace.
-+ */
-+#define DRM_CLIENT_CAP_SHARE_PLANES	4
-+
- /** DRM_IOCTL_SET_CLIENT_CAP ioctl argument type */
- struct drm_set_client_cap {
- 	__u64 capability;
+ struct vop_data {
 -- 
 1.9.1
