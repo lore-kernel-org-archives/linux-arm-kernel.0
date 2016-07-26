@@ -1,71 +1,202 @@
 From: geoff@infradead.org (Geoff Levand)
 Date: Tue, 26 Jul 2016 20:18:57 +0000
-Subject: [PATCH v2 4/4] arm64: Add support for binary image files
+Subject: [PATCH v2 2/4] kexec: Add common device tree routines
 In-Reply-To: <cover.1469559530.git.geoff@infradead.org>
 References: <cover.1469559530.git.geoff@infradead.org>
-Message-ID: <f352dcfc827a4cbb3878dd1043877a4154b1bd08.1469559530.git.geoff@infradead.org>
+Message-ID: <8f5422ff52aa0ebe1b6ef9dae6489865eab5e741.1469559530.git.geoff@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Pratyush Anand <panand@redhat.com>
+Common device tree routines that can be shared between all arches
+that have device tree support.
 
-Signed-off-by: Pratyush Anand <panand@redhat.com>
-[Reworked and cleaned up]
 Signed-off-by: Geoff Levand <geoff@infradead.org>
 ---
- kexec/arch/arm64/kexec-image-arm64.c | 31 +++++++++++++++++++++++++------
- 1 file changed, 25 insertions(+), 6 deletions(-)
+ kexec/Makefile |   4 ++
+ kexec/dt-ops.c | 139 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ kexec/dt-ops.h |  13 ++++++
+ 3 files changed, 156 insertions(+)
+ create mode 100644 kexec/dt-ops.c
+ create mode 100644 kexec/dt-ops.h
 
-diff --git a/kexec/arch/arm64/kexec-image-arm64.c b/kexec/arch/arm64/kexec-image-arm64.c
-index 84386f7..cad7c73 100644
---- a/kexec/arch/arm64/kexec-image-arm64.c
-+++ b/kexec/arch/arm64/kexec-image-arm64.c
-@@ -24,21 +24,40 @@ int image_arm64_probe(const char *kernel_buf, off_t kernel_size)
- 		return -1;
- 	}
+diff --git a/kexec/Makefile b/kexec/Makefile
+index e2aee84..cc3f08b 100644
+--- a/kexec/Makefile
++++ b/kexec/Makefile
+@@ -73,6 +73,10 @@ dist				+= kexec/mem_regions.c kexec/mem_regions.h
+ $(ARCH)_MEM_REGIONS		=
+ KEXEC_SRCS			+= $($(ARCH)_MEM_REGIONS)
  
--	fprintf(stderr, "kexec: ARM64 binary image files are currently NOT SUPPORTED.\n");
--
--	return -1;
++dist				+= kexec/dt-ops.c kexec/dt-ops.h
++$(ARCH)_DT_OPS		=
++KEXEC_SRCS			+= $($(ARCH)_DT_OPS)
++
+ include $(srcdir)/kexec/arch/alpha/Makefile
+ include $(srcdir)/kexec/arch/arm/Makefile
+ include $(srcdir)/kexec/arch/i386/Makefile
+diff --git a/kexec/dt-ops.c b/kexec/dt-ops.c
+new file mode 100644
+index 0000000..060776a
+--- /dev/null
++++ b/kexec/dt-ops.c
+@@ -0,0 +1,139 @@
++#include <assert.h>
++#include <errno.h>
++#include <inttypes.h>
++#include <libfdt.h>
++#include <stdio.h>
++#include <stdlib.h>
++
++#include "kexec.h"
++#include "dt-ops.h"
++
++static const char n_chosen[] = "/chosen";
++
++static const char p_bootargs[] = "bootargs";
++static const char p_initrd_start[] = "linux,initrd-start";
++static const char p_initrd_end[] = "linux,initrd-end";
++
++int dtb_set_initrd(char **dtb, off_t *dtb_size, off_t start, off_t end)
++{
++	int result;
++	uint64_t value;
++
++	dbgprintf("%s: start %jd, end %jd, size %jd (%jd KiB)\n",
++		__func__, (intmax_t)start, (intmax_t)end,
++		(intmax_t)(end - start),
++		(intmax_t)(end - start) / 1024);
++
++	value = cpu_to_fdt64(start);
++
++	result = dtb_set_property(dtb, dtb_size, n_chosen, p_initrd_start,
++		&value, sizeof(value));
++
++	if (result)
++		return result;
++
++	value = cpu_to_fdt64(end);
++
++	result = dtb_set_property(dtb, dtb_size, n_chosen, p_initrd_end,
++		&value, sizeof(value));
++
++	if (result) {
++		dtb_delete_property(*dtb, n_chosen, p_initrd_start);
++		return result;
++	}
++
 +	return 0;
- }
- 
- int image_arm64_load(int argc, char **argv, const char *kernel_buf,
- 	off_t kernel_size, struct kexec_info *info)
- {
--	return -EFAILED;
-+	const struct arm64_image_header *h;
-+	unsigned long image_base;
++}
 +
-+	h = (const struct arm64_image_header *)(kernel_buf);
++int dtb_set_bootargs(char **dtb, off_t *dtb_size, const char *command_line)
++{
++	return dtb_set_property(dtb, dtb_size, n_chosen, p_bootargs,
++		command_line, strlen(command_line) + 1);
++}
 +
-+	if (arm64_process_image_header(h))
-+		return -EINVAL;
++int dtb_set_property(char **dtb, off_t *dtb_size, const char *node,
++	const char *prop, const void *value, int value_len)
++{
++	int result;
++	int nodeoffset;
++	void *new_dtb;
++	int new_size;
 +
-+	dbgprintf("%s: text_offset:   %016lx\n", __func__,
-+		arm64_mem.text_offset);
-+	dbgprintf("%s: image_size:    %016lx\n", __func__,
-+		arm64_mem.image_size);
-+	dbgprintf("%s: phys_offset:   %016lx\n", __func__,
-+		arm64_mem.phys_offset);
-+	dbgprintf("%s: PE format:     %s\n", __func__,
-+		(arm64_header_check_pe_sig(h) ? "yes" : "no"));
++	value_len = FDT_TAGALIGN(value_len);
 +
-+	image_base = get_phys_offset() + arm64_mem.text_offset;
++	new_size = FDT_TAGALIGN(*dtb_size + fdt_node_len(node)
++		+ fdt_prop_len(prop, value_len));
++
++	new_dtb = malloc(new_size);
++
++	if (!new_dtb) {
++		dbgprintf("%s: malloc failed\n", __func__);
++		return -ENOMEM;
++	}
++
++	result = fdt_open_into(*dtb, new_dtb, new_size);
++
++	if (result) {
++		dbgprintf("%s: fdt_open_into failed: %s\n", __func__,
++			fdt_strerror(result));
++		goto on_error;
++	}
++
++	nodeoffset = fdt_path_offset(new_dtb, node);
 +	
-+	add_segment_phys_virt(info, kernel_buf, kernel_size, image_base,
-+		arm64_mem.image_size, 0);
++	if (nodeoffset == -FDT_ERR_NOTFOUND) {
++		result = fdt_add_subnode(new_dtb, nodeoffset, node);
 +
-+	return arm64_load_other_segments(info, image_base);
- }
- 
- void image_arm64_usage(void)
- {
- 	printf(
- "     An ARM64 binary image, compressed or not, big or little endian.\n"
--"     Typically an Image, Image.gz or Image.lzma file.\n"
--"     This file type is currently NOT SUPPORTED.\n\n");
-+"     Typically an Image, Image.gz or Image.lzma file.\n\n");
- }
++		if (result) {
++			dbgprintf("%s: fdt_add_subnode failed: %s\n", __func__,
++				fdt_strerror(result));
++			goto on_error;
++		}
++	} else if (nodeoffset < 0) {
++		dbgprintf("%s: fdt_path_offset failed: %s\n", __func__,
++			fdt_strerror(nodeoffset));
++		goto on_error;
++	}
++
++	result = fdt_setprop(new_dtb, nodeoffset, prop, value, value_len);
++
++	if (result) {
++		dbgprintf("%s: fdt_setprop failed: %s\n", __func__,
++			fdt_strerror(result));
++		goto on_error;
++	}
++
++	/*
++	 * Can't call free on dtb since dtb may have been mmaped by
++	 * slurp_file().
++	 */
++
++	*dtb = new_dtb;
++	*dtb_size = new_size;
++
++	return 0;
++
++on_error:
++	free(new_dtb);
++	return result;
++}
++
++int dtb_delete_property(char *dtb, const char *node, const char *prop)
++{
++	int result;
++	int nodeoffset = fdt_path_offset(dtb, node);
++
++	if (nodeoffset < 0) {
++		dbgprintf("%s: fdt_path_offset failed: %s\n", __func__,
++			fdt_strerror(nodeoffset));
++		return nodeoffset;
++	}
++
++	result = fdt_delprop(dtb, nodeoffset, prop);
++
++	if (result)
++		dbgprintf("%s: fdt_delprop failed: %s\n", __func__,
++			fdt_strerror(nodeoffset));
++
++	return result;
++}
+diff --git a/kexec/dt-ops.h b/kexec/dt-ops.h
+new file mode 100644
+index 0000000..e70d15d
+--- /dev/null
++++ b/kexec/dt-ops.h
+@@ -0,0 +1,13 @@
++#if !defined(KEXEC_DT_OPS_H)
++#define KEXEC_DT_OPS_H
++
++#include <sys/types.h>
++
++int dtb_set_initrd(char **dtb, off_t *dtb_size, off_t start, off_t end);
++int dtb_set_bootargs(char **dtb, off_t *dtb_size, const char *command_line);
++int dtb_set_property(char **dtb, off_t *dtb_size, const char *node,
++	const char *prop, const void *value, int value_len);
++
++int dtb_delete_property(char *dtb, const char *node, const char *prop);
++
++#endif
 -- 
 2.5.0
