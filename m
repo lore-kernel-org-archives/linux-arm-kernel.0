@@ -1,31 +1,58 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Wed, 27 Jul 2016 10:46:23 +0200
-Subject: [PATCH 00/13] arm64: Allwinner A64 support based on sunxi-ng
-In-Reply-To: <20160726203041.29366-1-maxime.ripard@free-electrons.com>
-References: <20160726203041.29366-1-maxime.ripard@free-electrons.com>
-Message-ID: <20160727104623.e9ca7b708e5c6462f44a5d01@free.fr>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Wed, 27 Jul 2016 11:14:30 +0200 (CEST)
+Subject: [PATCH 08/14] timer: Export next wake up of a CPU
+In-Reply-To: <1466624209-27432-9-git-send-email-lina.iyer@linaro.org>
+References: <1466624209-27432-1-git-send-email-lina.iyer@linaro.org>
+ <1466624209-27432-9-git-send-email-lina.iyer@linaro.org>
+Message-ID: <alpine.DEB.2.11.1607271110140.19896@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 26 Jul 2016 22:30:28 +0200
-Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+On Wed, 22 Jun 2016, Lina Iyer wrote:
+> +static inline ktime_t tick_nohz_get_next_wakeup(int cpu)
+> +{
+> +	ktime_t len = { .tv64 = NSEC_PER_SEC/HZ };
+> +
+> +	/* Next wake up is the tick period, assume it starts now */
+> +	return ktime_add(len, ktime_get());
 
-> ere is the previous A64 patches made by Andre [1], reworked to use
-> the new sunxi-ng clock framework.
-> 
-> This uses the current H3 clock code, as both are really similar. The
-> first patches are just meant to rework slightly the H3 code, before
-> introducing the A64-related patches.
-> 
-> Some WiP stuff have been removed, such as the MMC part, but this serie
-> already has a decent amount of devices supported: uart, i2c, rsb, etc.
-> 
-> Let me know what you think,
+  return tick_next_period;
 
-I don't see the interest to have common code for 32bits and 64bits.
-The clock driver of a SoC will never evolve, so, it is simpler to
-copy the source common with the H3 into a clean A64 clock driver.
+Will tell you the point where the next tick interrupt is due.
 
--- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+> +}
+> +
+>  static inline u64 get_cpu_idle_time_us(int cpu, u64 *unused) { return -1; }
+>  static inline u64 get_cpu_iowait_time_us(int cpu, u64 *unused) { return -1; }
+>  #endif /* !CONFIG_NO_HZ_COMMON */
+> diff --git a/kernel/time/tick-sched.c b/kernel/time/tick-sched.c
+> index 536ada8..addf3235 100644
+> --- a/kernel/time/tick-sched.c
+> +++ b/kernel/time/tick-sched.c
+> @@ -979,6 +979,19 @@ ktime_t tick_nohz_get_sleep_length(void)
+>  	return ts->sleep_length;
+>  }
+>  
+> +/**
+> + * tick_nohz_get_next_wakeup - return the next wake up of the CPU
+> + *
+> + * Called with interrupts disabled on the cpu
+
+So why are you handing in the (undocumented) cpu argument if its called on
+that cpu anyway?
+
+> + */
+> +ktime_t tick_nohz_get_next_wakeup(int cpu)
+> +{
+> +	struct clock_event_device *dev =
+> +			per_cpu(tick_cpu_device.evtdev, cpu);
+> +
+> +	return dev->next_event;
+
+Then this becomes
+
+     return __this_cpu_read(tick_cpu_device.evtdev)->nextevt;
+
+Thanks,
+
+	tglx
