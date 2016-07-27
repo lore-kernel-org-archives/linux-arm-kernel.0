@@ -1,27 +1,34 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 27 Jul 2016 07:33:31 +0100
-Subject: [PATCH v6] KVM: arm/arm64: Add VGICv3 save/restore API
- documentation
-In-Reply-To: <20160726112103.27799-1-christoffer.dall@linaro.org>
-References: <20160726112103.27799-1-christoffer.dall@linaro.org>
-Message-ID: <20160727073331.4d0e1018@why.wild-wind.fr.eu.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 27 Jul 2016 08:43:44 +0200
+Subject: [PATCH 3/9] clk: sunxi-ng: mux: Increase fixed pre-divider div
+ size
+In-Reply-To: <1469516671-19377-4-git-send-email-wens@csie.org>
+References: <1469516671-19377-1-git-send-email-wens@csie.org>
+ <1469516671-19377-4-git-send-email-wens@csie.org>
+Message-ID: <20160727064344.GB6560@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 26 Jul 2016 13:21:03 +0200
-Christoffer Dall <christoffer.dall@linaro.org> wrote:
-
-> Factor out the GICv3 and ITS-specific documentation into a separate
-> documentation file.  Add description for how to access distributor,
-> redistributor, and CPU interface registers for GICv3 in this new file,
-> and add a group for accessing level triggered IRQ information for GICv3
-> as well.
+On Tue, Jul 26, 2016 at 03:04:25PM +0800, Chen-Yu Tsai wrote:
+> Some clocks have a predivider value that is larger than what u8 can
+> store. One such example is the OUT clk found on A20/A31, which has
+> a /750 pre-divider on one of the osc24M parents.
 > 
-> Reviewed-by: Peter Maydell <peter.maydell@linaro.org>
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> Increase the size of the div field to u16.
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+Applied, thanks!
+Maxime
 
-	M.
 -- 
-Without deviation from the norm, progress is not possible.
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160727/97cfdea4/attachment.sig>
