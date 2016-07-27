@@ -1,68 +1,48 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 27 Jul 2016 07:55:32 +0100
-Subject: [PATCH] arm64: Fix Kconfig dependencies for RANDOMIZE_BASE
-In-Reply-To: <CAKv+Gu-4i=8F3jJFjN3+_nbiYxGTvBTNqVJbF60nuL4REPJ+9Q@mail.gmail.com>
-References: <1469553415-26839-1-git-send-email-jeffv@google.com>
- <20160726174556.GH2423@e104818-lin.cambridge.arm.com>
- <CAKv+Gu-4i=8F3jJFjN3+_nbiYxGTvBTNqVJbF60nuL4REPJ+9Q@mail.gmail.com>
-Message-ID: <20160727065531.GA14658@MBP.local>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 27 Jul 2016 08:59:34 +0200
+Subject: [PATCH 4/9] clk: sunxi-ng: mux: Add support for mux tables
+In-Reply-To: <20160726194306.9b6aadd3d1669bd6f5a54d99@free.fr>
+References: <1469516671-19377-1-git-send-email-wens@csie.org>
+ <1469516671-19377-5-git-send-email-wens@csie.org>
+ <20160726194306.9b6aadd3d1669bd6f5a54d99@free.fr>
+Message-ID: <20160727065934.GD6560@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 26, 2016 at 07:52:33PM +0200, Ard Biesheuvel wrote:
-> On 26 July 2016 at 19:45, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> > On Tue, Jul 26, 2016 at 10:16:55AM -0700, Jeff Vander Stoep wrote:
-> >> Selecting CONFIG_RANDOMIZE_BASE=y and CONFIG_MODULES=n causes a
-> >> build error due to dependencies on modules. This patch makes KASLR
-> >> module config options dependent on CONFIG_MODULES=y.
-> >>
-> >> Signed-off-by: Jeff Vander Stoep <jeffv@google.com>
-> >> ---
-> >>  arch/arm64/Kconfig | 3 ++-
-> >>  1 file changed, 2 insertions(+), 1 deletion(-)
-> >>
-> >> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> >> index 7e23f95..c9eff79 100644
-> >> --- a/arch/arm64/Kconfig
-> >> +++ b/arch/arm64/Kconfig
-> >> @@ -891,7 +891,6 @@ config RELOCATABLE
-> >>
-> >>  config RANDOMIZE_BASE
-> >>       bool "Randomize the address of the kernel image"
-> >> -     select ARM64_MODULE_PLTS
-> >>       select RELOCATABLE
-> >>       help
-> >>         Randomizes the virtual address at which the kernel image is
-> >
-> > I thought we need the module PLTs once we randomize the kernel base,
-> > independent of whether we randomize the modules base or not.
+On Tue, Jul 26, 2016 at 07:43:06PM +0200, Jean-Francois Moine wrote:
+> On Tue, 26 Jul 2016 15:04:26 +0800
+> Chen-Yu Tsai <wens@csie.org> wrote:
 > 
-> Indeed. The module region is always randomized with KASLR, but either
-> fully (i.e., anywhere in the vmalloc region) or partially, in which
-> case a random 128 MB range is selected that also covers vmlinux's
-> .text segment, allowing jumps without veneers. However, since this
-> range is part of the ordinary vmalloc space, there is a >0 probability
-> that other allocations may exhaust it before you have loaded all your
-> modules, in which case the module loader will fall back to ordinary
-> vmalloc region allocations, which are most likely too far away to be
-> resolved without PLTs
+> > Some clock muxes have holes, i.e. invalid or unconnected inputs,
+> > between parent mux values.
+> > 
+> > Add support for specifying a mux table to map clock parents to
+> > mux values.
 > 
-> > Could we do
-> > something like:
-> >
-> >         select ARM64_MODULE_PLTS if MODULES
-> >
-> > Whichever way we fix this, we probably need:
-> >
-> > Fixes: f80fb3a3d508 ("arm64: add support for kernel ASLR")
-> > Cc: <stable@vger.kernel.org> # 4.6+
-> >
+> Putting empty strings in the holes should work. No?
+> Ex:
 > 
-> With these changes
-> 
-> Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> static const char * const csi_mclk_parents[] =
+> 	{ "pll-video0", "pll-video1", "", "", "", "osc24M" };
 
-Thanks. I pushed my variant above to arm64 for-next/core.
+Not really. The clock would be declared as orphan, while it's really
+not.
+
+Parenting functions would also not work as expected,
+clk_hw_get_parent_by_index being the obvious example, in that case
+returning the empty string for an invalid parent, while it should
+really return NULL.
+
+Maxime
 
 -- 
-Catalin
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160727/99c10432/attachment.sig>
