@@ -1,46 +1,226 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Wed, 27 Jul 2016 14:57:52 +0900
-Subject: [PATCH v1 0/4] arm64 kexec-tools patches
-In-Reply-To: <20160726230526.GD28591@verge.net.au>
-References: <cover.1468970114.git.geoff@infradead.org>
- <20160726230526.GD28591@verge.net.au>
-Message-ID: <20160727055751.GD2363@linaro.org>
+From: sr@denx.de (Stefan Roese)
+Date: Wed, 27 Jul 2016 08:14:15 +0200
+Subject: [RFC PATCH] dmaengine: mv_xor: Add support for IO (PCIe) src/dst
+ areas
+In-Reply-To: <5773AF5B.1020403@denx.de>
+References: <20160603162429.8760-1-sr@denx.de> <5773AF5B.1020403@denx.de>
+Message-ID: <7a533938-c03b-a286-8750-4f92e0aa9451@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Simon,
+Hi,
 
-On Wed, Jul 27, 2016 at 08:05:27AM +0900, Simon Horman wrote:
-> Hi Geoff.
+On 29.06.2016 13:22, Stefan Roese wrote:
+> Hi!
 > 
-> On Tue, Jul 19, 2016 at 11:28:13PM +0000, Geoff Levand wrote:
-> > This series adds the core support for kexec re-boot on ARM64.
-> > 
-> > Linux kernel support for kexec reboot [1] has been merged to the ARM64
-> > for-next/core branch with the expectation that it will be included in the v4.8
-> > stable kernel release.
-> > 
-> > [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-June/438780.html
+> On 03.06.2016 18:24, Stefan Roese wrote:
+>> To enable the access to a specific area, the MVEBU XOR controllers needs
+>> to have this area enabled / mapped via an address window. Right now,
+>> only the DRAM memory area is enabled via such memory windows. So
+>> using this driver to DMA to / from a e.g. PCIe memory region is
+>> currently not supported.
+>>
+>> This patch now adds support for such PCIe / IO regions by checking
+>> if the src / dst address is located in an IO memory area in contrast
+>> to being located in DRAM. This is done by using the newly introduced
+>> MBus function mvebu_mbus_get_io_win_info(). If the src / dst address
+>> is located in such an IO area, a new address window is created in
+>> the XOR DMA controller. Enabling the controller to access this area.
+>>
+>> Signed-off-by: Stefan Roese <sr@denx.de>
+>> Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
+>> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+>> Cc: Marcin Wojtas <mw@semihalf.com>
+>> Cc: Vinod Koul <vinod.koul@intel.com>
+>> ---
+>>   drivers/dma/mv_xor.c | 107
+>> ++++++++++++++++++++++++++++++++++++++++++++++++++-
+>>   1 file changed, 106 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/dma/mv_xor.c b/drivers/dma/mv_xor.c
+>> index f4c9f98..2671b11 100644
+>> --- a/drivers/dma/mv_xor.c
+>> +++ b/drivers/dma/mv_xor.c
+>> @@ -470,12 +470,107 @@ static int mv_xor_alloc_chan_resources(struct
+>> dma_chan *chan)
+>>       return mv_chan->slots_allocated ? : -ENOMEM;
+>>   }
+>>
+>> +/*
+>> + * Check if source or destination is an PCIe/IO address (non-SDRAM)
+>> and add
+>> + * a new MBus window if necessary
+>> + */
+>> +static int mv_xor_add_io_win(struct mv_xor_chan *mv_chan, u32 addr)
+>> +{
+>> +    void __iomem *base = mv_chan->mmr_high_base;
+>> +    u32 win_enable;
+>> +    u32 size;
+>> +    u8 target, attr;
+>> +    int ret;
+>> +    int i;
+>> +
+>> +    /* If no IO window is found that addr has to be located in SDRAM */
+>> +    ret = mvebu_mbus_get_io_win_info(addr, &size, &target, &attr);
+>> +    if (ret < 0)
+>> +        return 0;
+>> +
+>> +    /*
+>> +     * Mask the base addr 'addr' according to 'size' read back from the
+>> +     * MBus window. Otherwise we might end up with an address located
+>> +     * somewhere in the middle of this area here.
+>> +     */
+>> +    size -= 1;
+>> +    addr &= ~size;
+>> +
+>> +    /*
+>> +     * Reading one of both enabled register is enough, as they are
+>> always
+>> +     * programmed to the identical values
+>> +     */
+>> +    win_enable = readl(base + WINDOW_BAR_ENABLE(0));
+>> +
+>> +    /*
+>> +     * Loop over all windows to find a matching window (area wise). If
+>> +     * one is found it will get disabled and later newly created.
+>> +     */
+>> +    for (i = 0; i < 8; i++) {
+>> +        u32 wbase;
+>> +        u32 wsize;
+>> +
+>> +        /* Continue if the window is not enabled */
+>> +        if (!(win_enable | (1 << i)))
+>> +            continue;
+>> +
+>> +        wbase = readl(base + WINDOW_BASE(i)) & 0xffff0000;
+>> +        wsize = readl(base + WINDOW_SIZE(i)) & 0xffff0000;
+>> +
+>> +        /* Continue if 'addr' is not in this window */
+>> +        if (addr < wbase || addr > (wbase + wsize))
+>> +            continue;
+>> +
+>> +        /*
+>> +         * If addr and size match, then this window is already
+>> +         * configured and we are done
+>> +         */
+>> +        if (addr == wbase && (size & 0xffff0000) == wsize)
+>> +            return 0;
+>> +
+>> +        /*
+>> +         * The window is already configured, but the size does not
+>> +         * match, so lets disable it
+>> +         */
+>> +        writel(0, base + WINDOW_BASE(i));
+>> +        writel(0, base + WINDOW_SIZE(i));
+>> +        if (i < 4)
+>> +            writel(0, base + WINDOW_REMAP_HIGH(i));
+>> +        win_enable &= ~(1 << i);
+>> +        win_enable &= ~(3 << (16 + (2 * i)));
+>> +        writel(win_enable, base + WINDOW_BAR_ENABLE(0));
+>> +        writel(win_enable, base + WINDOW_BAR_ENABLE(1));
+>> +
+>> +        /*
+>> +         * We can stop here since we have found and disabled the window
+>> +         */
+>> +        break;
+>> +    }
+>> +
+>> +    /* Set 'i' to the first free window to write the new values to */
+>> +    i = ffs(~win_enable) - 1;
+>> +    if (i >= 8)
+>> +        return -ENOMEM;
+>> +
+>> +    writel((addr & 0xffff0000) | (attr << 8) | target,
+>> +           base + WINDOW_BASE(i));
+>> +    writel(size & 0xffff0000, base + WINDOW_SIZE(i));
+>> +
+>> +    win_enable |= (1 << i);
+>> +    win_enable |= 3 << (16 + (2 * i));
+>> +    writel(win_enable, base + WINDOW_BAR_ENABLE(0));
+>> +    writel(win_enable, base + WINDOW_BAR_ENABLE(1));
+>> +
+>> +    return 0;
+>> +}
+>> +
+>>   static struct dma_async_tx_descriptor *
+>>   mv_xor_prep_dma_xor(struct dma_chan *chan, dma_addr_t dest,
+>> dma_addr_t *src,
+>>               unsigned int src_cnt, size_t len, unsigned long flags)
+>>   {
+>>       struct mv_xor_chan *mv_chan = to_mv_xor_chan(chan);
+>>       struct mv_xor_desc_slot *sw_desc;
+>> +    int ret;
+>>
+>>       if (unlikely(len < MV_XOR_MIN_BYTE_COUNT))
+>>           return NULL;
+>> @@ -486,6 +581,11 @@ mv_xor_prep_dma_xor(struct dma_chan *chan,
+>> dma_addr_t dest, dma_addr_t *src,
+>>           "%s src_cnt: %d len: %zu dest %pad flags: %ld\n",
+>>           __func__, src_cnt, len, &dest, flags);
+>>
+>> +    /* Check if a new window needs to get added for 'dest' */
+>> +    ret = mv_xor_add_io_win(mv_chan, dest);
+>> +    if (ret)
+>> +        return NULL;
+>> +
+>>       sw_desc = mv_chan_alloc_slot(mv_chan);
+>>       if (sw_desc) {
+>>           sw_desc->type = DMA_XOR;
+>> @@ -493,8 +593,13 @@ mv_xor_prep_dma_xor(struct dma_chan *chan,
+>> dma_addr_t dest, dma_addr_t *src,
+>>           mv_desc_init(sw_desc, dest, len, flags);
+>>           if (mv_chan->op_in_desc == XOR_MODE_IN_DESC)
+>>               mv_desc_set_mode(sw_desc);
+>> -        while (src_cnt--)
+>> +        while (src_cnt--) {
+>> +            /* Check if a new window needs to get added for 'src' */
+>> +            ret = mv_xor_add_io_win(mv_chan, src[src_cnt]);
+>> +            if (ret)
+>> +                return NULL;
+>>               mv_desc_set_src_addr(sw_desc, src_cnt, src[src_cnt]);
+>> +        }
+>>       }
+>>
+>>       dev_dbg(mv_chan_to_devp(mv_chan),
+>>
 > 
-> There seems to have been quite a bit of discussion of this patchset.
+> I didn't receive any comments on this patch so far. How should we
+> proceed? Is this approach to enable DMA support to and from regions
+> in PCI space acceptable? If yes, do I need to resend this patch as
+> a non-RFC patch?
 
-This patchset consists of Geoff's kexec support and my kdump support.
-Since the former has already been queued in arm64 subtree's for-next
-branch, it will go into v4.8.
+Thomas and I discussed this patch a bit off-list in the meantime
+(thanks Thomas). Here a short summary of the last ideas (Thomas,
+please correct me, if you feel I didn't summarize it correctly):
 
-So please note it is solely my kdump patches that is under reviews now
-as v23[1].
+Thomas raised some concerns, as this patch adds a big number of
+register reads in the middle of the submission path for XOR requests.
+To solve this, I suggested to add a DT property to enable this
+PCI / IO window check in the XOR driver. But as DT should describe
+the HW and this is not a "HW feature", acceptance of such a new
+DT property is very unlikely.
 
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-July/445558.htmlk
+Another idea was to add a similar mechanism for the PCI spaces
+as done for the DDR space(s) to the MBus driver. So that drivers
+interested in these PCI windows could query the MBus driver about
+the currently configured windows:
+
+    mv_mbus_dram_info()
+->     mv_mbus_pci_info() 
+
+But as the XOR engine only has a limited number of windows, it
+might happen that on a system with numerous PCI devices, all
+the MBus PCI windows plus the DRAM windows will exhaust the number
+of the XOR engine windows. Plus the dynamic nature of PCI devices
+in hotplug systems. So this won't work either.
+
+Currently we are out of good ideas on how to get this feature added
+to this XOR engine driver. Perhaps the only way is to accept the
+additional register accesses introduced by this patch? Thomas
+explicitly suggested to ask you Arnd, if you had some ideas on this.
+So here we go:
+
+Arnd, do you have some ideas how to better solve this problem?
 
 Thanks,
--Takahiro AKASHI
-
-> I am of a mind to release kexec-tools v2.0.12-rc1 (and thus v2.0.12)
-> without these changes as the v4.7 kernel is already out and that
-> is the timing I had in mind for kexec-tools v2.0.12 (the lateness on
-> my shoulders).
-> 
-> The implication is the arm64 patches would likely end up in the v2.0.13
-> release of kexec-tools which I aim to release around the time of the v4.9
-> kernel.
+Stefan
