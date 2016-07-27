@@ -1,321 +1,171 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Wed, 27 Jul 2016 22:38:45 +0200
-Subject: [PATCH v11 4/8] iommu/msi-iommu: initialization
-In-Reply-To: <20160720114337.GB1915@arm.com>
-References: <1468932911-23062-1-git-send-email-eric.auger@redhat.com>
- <1468932911-23062-5-git-send-email-eric.auger@redhat.com>
- <20160720114337.GB1915@arm.com>
-Message-ID: <f9309368-3c11-c2fc-d7c3-90df8fed1123@redhat.com>
+From: paul.gortmaker@windriver.com (Paul Gortmaker)
+Date: Wed, 27 Jul 2016 16:40:26 -0400
+Subject: [RFC PATCH v1 2/2] drivers: soc: Add support for Hisilicon Djtag
+ driver
+In-Reply-To: <57957161.1050504@huawei.com>
+References: <1469177332-72156-1-git-send-email-tanxiaojun@huawei.com>
+ <1469177332-72156-3-git-send-email-tanxiaojun@huawei.com>
+ <CAP=VYLpfsMqPZL4J0K2+NMkxG+RHKchDBA+ZGhza9ZfWAa4VnQ@mail.gmail.com>
+ <57957161.1050504@huawei.com>
+Message-ID: <CAP=VYLqvD=nj9HHTrYUsezyw9Rd_Qi+aZ4vSRP3gUBn5HwR=+Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dennis,
+On Sun, Jul 24, 2016 at 9:54 PM, Tan Xiaojun <tanxiaojun@huawei.com> wrote:
+> On 2016/7/23 4:37, Paul Gortmaker wrote:
+>> On Fri, Jul 22, 2016 at 4:48 AM, Tan Xiaojun <tanxiaojun@huawei.com> wrote:
+>>> The Hisilicon Djtag is an independent module which connects with some modules
+>>> in the SoC by Debug Bus. This module can be configured to access the registers
+>>> of connecting modules (like L3 cache) during real time debugging.
+>>>
+>>> This patch add the driver of Hisilicon Djtag.
+>>>
+>>> Signed-off-by: Tan Xiaojun <tanxiaojun@huawei.com>
+>>> ---
+>>>  drivers/soc/Kconfig                 |    1 +
+>>>  drivers/soc/Makefile                |    1 +
+>>>  drivers/soc/hisilicon/Kconfig       |   12 ++
+>>>  drivers/soc/hisilicon/Makefile      |    1 +
+>>>  drivers/soc/hisilicon/djtag.c       |  373 +++++++++++++++++++++++++++++++++++
+>>>  include/linux/soc/hisilicon/djtag.h |   18 ++
+>>>  6 files changed, 406 insertions(+)
+>>>  create mode 100644 drivers/soc/hisilicon/Kconfig
+>>>  create mode 100644 drivers/soc/hisilicon/Makefile
+>>>  create mode 100644 drivers/soc/hisilicon/djtag.c
+>>>  create mode 100644 include/linux/soc/hisilicon/djtag.h
+>>>
+>>> diff --git a/drivers/soc/Kconfig b/drivers/soc/Kconfig
+>>> index cb58ef0..f5982ec 100644
+>>> --- a/drivers/soc/Kconfig
+>>> +++ b/drivers/soc/Kconfig
+>>> @@ -3,6 +3,7 @@ menu "SOC (System On Chip) specific Drivers"
+>>>  source "drivers/soc/bcm/Kconfig"
+>>>  source "drivers/soc/brcmstb/Kconfig"
+>>>  source "drivers/soc/fsl/qe/Kconfig"
+>>> +source "drivers/soc/hisilicon/Kconfig"
+>>>  source "drivers/soc/mediatek/Kconfig"
+>>>  source "drivers/soc/qcom/Kconfig"
+>>>  source "drivers/soc/rockchip/Kconfig"
+>>> diff --git a/drivers/soc/Makefile b/drivers/soc/Makefile
+>>> index 380230f..373449d 100644
+>>> --- a/drivers/soc/Makefile
+>>> +++ b/drivers/soc/Makefile
+>>> @@ -7,6 +7,7 @@ obj-$(CONFIG_SOC_BRCMSTB)       += brcmstb/
+>>>  obj-$(CONFIG_ARCH_DOVE)                += dove/
+>>>  obj-$(CONFIG_MACH_DOVE)                += dove/
+>>>  obj-y                          += fsl/
+>>> +obj-$(CONFIG_ARCH_HISI)                += hisilicon/
+>>>  obj-$(CONFIG_ARCH_MEDIATEK)    += mediatek/
+>>>  obj-$(CONFIG_ARCH_QCOM)                += qcom/
+>>>  obj-$(CONFIG_ARCH_RENESAS)     += renesas/
+>>> diff --git a/drivers/soc/hisilicon/Kconfig b/drivers/soc/hisilicon/Kconfig
+>>> new file mode 100644
+>>> index 0000000..3644aab
+>>> --- /dev/null
+>>> +++ b/drivers/soc/hisilicon/Kconfig
+>>> @@ -0,0 +1,12 @@
+>>> +#
+>>> +# Hisilicon SoC drivers
+>>> +#
+>>> +config HISI_DJTAG
+>>> +       bool "Hisilicon Djtag Support"
+>>> +       depends on ARCH_HISI || COMPILE_TEST
+>>> +       help
+>>> +         Say y here to enable the Hisilicon Djtag support. It is an
+>>> +         independent module which connects with some modules in the
+>>> +         SoC by Debug Bus. This module can be configured to access
+>>> +         the registers of connecting modules during real time
+>>> +         debugging.
+>>
+>> Choice of word "module" here is probably confusing since it normally
+>> means a ".ko" when used in Kconfig help.   Maybe instead, use:
+>>
+>> ...independent component...
+>>
+>> ...connects with some other components....
+>>
+>> This driver can be configured to ....
+>>
+>> --hopefully  the above will clarify against such confusion.   Also....
+>>
+>
+> Yes, your suggestion is nice.
+>
+>>> diff --git a/drivers/soc/hisilicon/Makefile b/drivers/soc/hisilicon/Makefile
+>>> new file mode 100644
+>>> index 0000000..35a7b4b
+>>> --- /dev/null
+>>> +++ b/drivers/soc/hisilicon/Makefile
+>>> @@ -0,0 +1 @@
+>>> +obj-$(CONFIG_HISI_DJTAG)       += djtag.o
+>>> diff --git a/drivers/soc/hisilicon/djtag.c b/drivers/soc/hisilicon/djtag.c
+>>> new file mode 100644
+>>> index 0000000..41e11ed
+>>> --- /dev/null
+>>> +++ b/drivers/soc/hisilicon/djtag.c
+>>> @@ -0,0 +1,373 @@
+>>> +/*
+>>> + * Driver for Hisilicon Djtag r/w via System Controller.
+>>> + *
+>>> + * Copyright (C) 2016 Hisilicon Ltd.
+>>> + *
+>>> + * This program is free software; you can redistribute it and/or modify
+>>> + * it under the terms of the GNU General Public License version 2 as
+>>> + * published by the Free Software Foundation.
+>>> + */
+>>> +
+>>> +#include <linux/bitops.h>
+>>> +#include <linux/init.h>
+>>> +#include <linux/list.h>
+>>> +#include <linux/mfd/syscon.h>
+>>> +#include <linux/module.h>
+>>
+>> ...since you add the driver as a bool Kconfig item, you should
+>> avoid using module.h and any MODULE_<xyz> tags.  Use the
+>> builtin registration functions instead.
+>>
+>> Alternatively, if there is a genuine use case for this to really be
+>> a dynamically loadable .ko module, then convert it to tristate.
+>>
+>> Thanks,
+>> Paul.
+>> --
+>
+> It is depended by hisilicon L3 cache or other components. And some
+> functions of these components may be called by kernel functions. So
+> it need to be set "bool". It looks like "mbigen" driver.
+>
+> Could you give me some examples for the builtin registration functions
+> what you said? Maybe it is better for me.
 
-On 20/07/2016 13:43, Dennis Chen wrote:
-> Hi Eric,
-> Some small questions/comments below:
-> 
-> On Tue, Jul 19, 2016 at 12:55:07PM +0000, Eric Auger wrote:
->> iommu_get/put_msi_cookie allocates/frees the resource used to store
->> and ref count the MSI doorbell mappings. iommu_msi_set_aperture
->> initializes the iova domain used for MSI IOVA allocation and sets the
->> iommu domain's msi geometry.
->>
->> The implementation relies on dma-iommu API and iova API.
->>
->> New msi functions are fully implemented if CONFIG_IOMMU_MSI is set.
->>
->> Signed-off-by: Eric Auger <eric.auger@redhat.com>
->>
->> ---
->> v10:
->> - split error management in iommu_msi_set_aperture
->>
->> v9:
->> - remove is_aperture_set and use iommu_domain_msi_aperture_valid helper
->>   instead
->> - set iommu domain's msi geometry
->>
->> v8:
->> - new design where msi-iommu relies on dma-iommu
->> - remove the iommu_domain * from the doorbell_mapping struct
->> - added is_aperture_set
->>
->> v7:
->> - fix locking
->> - add iova_cache_get/put
->> - static inline functions when CONFIG_IOMMU_DMA_RESERVED is not set
->> - introduce struct reserved_iova_domain to encapsulate prot info &
->>   add prot parameter in alloc_reserved_iova_domain
->>
->> v5 -> v6:
->> - use spin lock instead of mutex
->>
->> v3 -> v4:
->> - formerly in "iommu/arm-smmu: implement alloc/free_reserved_iova_domain" &
->>   "iommu: add alloc/free_reserved_iova_domain"
->>
->> v2 -> v3:
->> - remove iommu_alloc_reserved_iova_domain & iommu_free_reserved_iova_domain
->>   static implementation in case CONFIG_IOMMU_API is not set
->>
->> v1 -> v2:
->> - moved from vfio API to IOMMU API
->> ---
->>  drivers/iommu/Kconfig     |   7 ++++
->>  drivers/iommu/Makefile    |   1 +
->>  drivers/iommu/msi-iommu.c | 100 ++++++++++++++++++++++++++++++++++++++++++++++
->>  include/linux/msi-iommu.h |  65 ++++++++++++++++++++++++++++++
->>  4 files changed, 173 insertions(+)
->>  create mode 100644 drivers/iommu/msi-iommu.c
->>  create mode 100644 include/linux/msi-iommu.h
->>
->> diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
->> index ad08603..5ea1610 100644
->> --- a/drivers/iommu/Kconfig
->> +++ b/drivers/iommu/Kconfig
->> @@ -74,6 +74,11 @@ config IOMMU_DMA
->>  	select IOMMU_IOVA
->>  	select NEED_SG_DMA_LENGTH
->>  
->> +# IOMMU MSI mapping
->> +config IOMMU_MSI
->> +	bool
->> +	select IOMMU_DMA
->> +
->>  config FSL_PAMU
->>  	bool "Freescale IOMMU support"
->>  	depends on PPC_E500MC || (COMPILE_TEST && PPC)
->> @@ -296,6 +301,7 @@ config SPAPR_TCE_IOMMU
->>  config ARM_SMMU
->>  	bool "ARM Ltd. System MMU (SMMU) Support"
->>  	depends on (ARM64 || ARM) && MMU
->> +	select IOMMU_MSI
->>  	select IOMMU_API
->>  	select IOMMU_IO_PGTABLE_LPAE
->>  	select ARM_DMA_USE_IOMMU if ARM
->> @@ -309,6 +315,7 @@ config ARM_SMMU
->>  config ARM_SMMU_V3
->>  	bool "ARM Ltd. System MMU Version 3 (SMMUv3) Support"
->>  	depends on ARM64 && PCI
->> +	select IOMMU_MSI
->>  	select IOMMU_API
->>  	select IOMMU_IO_PGTABLE_LPAE
->>  	select GENERIC_MSI_IRQ_DOMAIN
->> diff --git a/drivers/iommu/Makefile b/drivers/iommu/Makefile
->> index c6edb31..a381e66 100644
->> --- a/drivers/iommu/Makefile
->> +++ b/drivers/iommu/Makefile
->> @@ -2,6 +2,7 @@ obj-$(CONFIG_IOMMU_API) += iommu.o
->>  obj-$(CONFIG_IOMMU_API) += iommu-traces.o
->>  obj-$(CONFIG_IOMMU_API) += iommu-sysfs.o
->>  obj-$(CONFIG_IOMMU_DMA) += dma-iommu.o
->> +obj-$(CONFIG_IOMMU_MSI) += msi-iommu.o
->>  obj-$(CONFIG_IOMMU_IO_PGTABLE) += io-pgtable.o
->>  obj-$(CONFIG_IOMMU_IO_PGTABLE_ARMV7S) += io-pgtable-arm-v7s.o
->>  obj-$(CONFIG_IOMMU_IO_PGTABLE_LPAE) += io-pgtable-arm.o
->> diff --git a/drivers/iommu/msi-iommu.c b/drivers/iommu/msi-iommu.c
->> new file mode 100644
->> index 0000000..de02ede
->> --- /dev/null
->> +++ b/drivers/iommu/msi-iommu.c
->> @@ -0,0 +1,100 @@
->> +/*
->> + * Reserved IOVA Management
->> + *
->> + * Copyright (c) 2015 Linaro Ltd.
->> + *              www.linaro.org
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + *
->> + * This program is distributed in the hope that it will be useful,
->> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + * GNU General Public License for more details.
->> + *
->> + */
->> +
->> +#include <linux/iommu.h>
->> +#include <linux/dma-iommu.h>
->> +#include <linux/msi-iommu.h>
->> +#include <linux/spinlock.h>
->> +#include <linux/iova.h>
->> +
->> +struct doorbell_mapping {
->> +	struct kref		kref;
->> +	struct list_head	next;
->> +	phys_addr_t		addr;
->> +	dma_addr_t		iova;
->> +	size_t			size;
->> +};
->> +
->> +struct doorbell_mapping_info {
->> +	struct list_head list; /* list of doorbell mapping entries */
->> +	spinlock_t lock;
->> +};
->> +
->> +int iommu_get_msi_cookie(struct iommu_domain *domain)
->> +{
->> +	struct doorbell_mapping_info *dmi;
->> +	int ret;
->> +
->> +	if (domain->msi_cookie || domain->iova_cookie)
->> +		return -EINVAL;
->> +
->> +	ret = iommu_get_dma_cookie(domain);
->> +	if (ret)
->> +		return ret;
->> +
->> +	dmi = kzalloc(sizeof(*dmi), GFP_KERNEL);
-> 
-> if dmi == NULL here, 
-> 
->> +
->> +	INIT_LIST_HEAD(&dmi->list);
->> +	spin_lock_init(&dmi->lock);
-> 
-> will the above 2-line codes triger kernel NULL pointer dereference panic message?
-> if so why don't we check dmi immediately after the kzalloc call like this:
-Yes definitively. Thanks for spotting the oversight!
+You can do "git log --author=Gortmaker" to see lots of examples.  Do a
+"git show" on any of the commit IDs that look relevant to this driver.
 
-Regards
+Generally, you delete the MODULE_<xyz>  and module.h and replace it
+with init.h if you use __init.   Also add export.h if you use EXPORT_SYMBOL.
 
-Eric
-> 
-> 	dmi = kzalloc(sizeof(*dmi), GFP_KERNEL);
-> 	domain->msi_cookie = dmi;
-> 	if (!dmi)
-> 		return -ENOMEM;
-> 
->> +	iova_cache_get();
-> 
-> 	return iova_cache_get();
->> +
->> +	domain->msi_cookie = dmi;
->> +
->> +	return dmi ? 0 : -ENOMEM;
->> +}
->> +EXPORT_SYMBOL(iommu_get_msi_cookie);
->> +
->> +void iommu_put_msi_cookie(struct iommu_domain *domain)
->> +{
->> +	struct doorbell_mapping_info *dmi = domain->msi_cookie;
->> +
->> +	if (!dmi)
->> +		return;
->> +
->> +	domain->msi_cookie = NULL;
->> +
->> +	WARN_ON(!list_empty(&dmi->list));
->> +
->> +	kfree(dmi);
->> +	iommu_put_dma_cookie(domain);
->> +	iova_cache_put();
->> +}
->> +EXPORT_SYMBOL(iommu_put_msi_cookie);
->> +
->> +int iommu_msi_set_aperture(struct iommu_domain *domain,
->> +			   dma_addr_t start, dma_addr_t end)
->> +{
->> +	struct doorbell_mapping_info *dmi = domain->msi_cookie;
->> +	int ret;
->> +
->> +	if (!dmi)
->> +		return -ENODEV;
->> +
->> +	if (iommu_domain_msi_aperture_valid(domain))
->> +		return -EINVAL;
->> +
->> +	ret = iommu_dma_init_domain(domain, start, end - start + 1);
->> +
->> +	if (!ret) {
->> +		domain->msi_geometry.aperture_start = start;
->> +		domain->msi_geometry.aperture_end = end;
->> +	}
->> +
->> +	return ret;
->> +}
->> +EXPORT_SYMBOL_GPL(iommu_msi_set_aperture);
->> +
->> diff --git a/include/linux/msi-iommu.h b/include/linux/msi-iommu.h
->> new file mode 100644
->> index 0000000..392aa6f
->> --- /dev/null
->> +++ b/include/linux/msi-iommu.h
->> @@ -0,0 +1,65 @@
->> +/*
->> + * Copyright (c) 2015 Linaro Ltd.
->> + *              www.linaro.org
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + *
->> + * This program is distributed in the hope that it will be useful,
->> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + * GNU General Public License for more details.
->> + *
->> + */
->> +#ifndef __MSI_IOMMU_H
->> +#define __MSI_IOMMU_H
->> +
->> +#include <linux/types.h>
->> +#include <linux/kernel.h>
->> +
->> +struct iommu_domain;
->> +
->> +#ifdef CONFIG_IOMMU_MSI
->> +
->> +/**
->> + * iommu_get_msi_cookie - Acquire MSI mapping resources for a domain
->> + * @domain: IOMMU domain to prepare for MSI mapping
->> + *
->> + * IOMMU drivers which require MSI mapping should normally call this
->> + * from their domain_alloc callback when domain->type ==
->> + * IOMMU_DOMAIN_UNMANAGED.
->> + */
->> +int iommu_get_msi_cookie(struct iommu_domain *domain);
->> +
->> +/**
->> + * iommu_put_msi_cookie - Release a domain's MSI mapping resources
->> + * @domain: IOMMU domain previously prepared by iommu_get_msi_cookie()
->> + *
->> + * IOMMU drivers requesting MSI mapping should normally call this from
->> + * their domain_free callback.
->> + */
->> +void iommu_put_msi_cookie(struct iommu_domain *domain);
->> +
->> +/**
->> + * iommu_msi_set_aperture: allocate the msi iova domain
->> + * according to the specified start/end IOVAs
->> + *
->> + * @domain: iommu domain handle
->> + * @start: MSI iova start address
->> + * @end: MSI iova end address
->> + */
->> +int iommu_msi_set_aperture(struct iommu_domain *domain,
->> +			   dma_addr_t start, dma_addr_t end);
->> +
->> +#else
->> +
->> +static inline int
->> +iommu_msi_set_aperture(struct iommu_domain *domain,
->> +		       dma_addr_t start, dma_addr_t end)
->> +{
->> +	return -ENOENT;
->> +}
->> +
->> +#endif	/* CONFIG_IOMMU_MSI */
->> +#endif	/* __MSI_IOMMU_H */
->> -- 
->> 1.9.1
+module_init becomes device_initcall, module_platform_driver becomes
+builtin_platform_driver and so on.
+
+Paul.
+--
+
+>
+> Thanks.
+> Xiaojun.
+>
+>>> +#include <linux/of.h>
+>>> +#include <linux/of_address.h>
+>>> +#include <linux/of_device.h>
+>>> +#include <linux/platform_device.h>
+>>> +#include <linux/regmap.h>
+>>> +#include <linux/slab.h>
+>>> +#include <linux/spinlock.h>
+>>> +
+>>> +#include <asm-generic/delay.h>
+>>> +#include <linux/soc/hisilicon/djtag.h>
 >>
->> _______________________________________________
->> kvmarm mailing list
->> kvmarm at lists.cs.columbia.edu
->> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
+>> .
 >>
-> 
+>
+>
