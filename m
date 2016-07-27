@@ -1,171 +1,249 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Wed, 27 Jul 2016 12:50:06 +0100
-Subject: [PATCH v15 04/10] arm64: Kprobes with single stepping support
-In-Reply-To: <57969234.1070201@linaro.org>
-References: <1467995754-32508-1-git-send-email-dave.long@linaro.org>
- <1467995754-32508-5-git-send-email-dave.long@linaro.org>
- <578FA238.3050206@arm.com> <5790F960.5050007@linaro.org>
- <57910528.7070902@arm.com> <57911590.50305@linaro.org>
- <20160722101617.GA17821@e104818-lin.cambridge.arm.com>
- <57924104.1080202@linaro.org>
- <20160725171350.GE2423@e104818-lin.cambridge.arm.com>
- <57969234.1070201@linaro.org>
-Message-ID: <22b277ba-6812-a0dd-9e8e-c29bdb3aa672@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 27 Jul 2016 14:11:01 +0200
+Subject: [RFC PATCH] dmaengine: mv_xor: Add support for IO (PCIe) src/dst
+ areas
+In-Reply-To: <7a533938-c03b-a286-8750-4f92e0aa9451@denx.de>
+References: <20160603162429.8760-1-sr@denx.de> <5773AF5B.1020403@denx.de>
+ <7a533938-c03b-a286-8750-4f92e0aa9451@denx.de>
+Message-ID: <4330031.lrbVYzKFjS@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/07/16 23:27, David Long wrote:
-> On 07/25/2016 01:13 PM, Catalin Marinas wrote:
->> On Fri, Jul 22, 2016 at 11:51:32AM -0400, David Long wrote:
->>> On 07/22/2016 06:16 AM, Catalin Marinas wrote:
->>>> On Thu, Jul 21, 2016 at 02:33:52PM -0400, David Long wrote:
->>>>> On 07/21/2016 01:23 PM, Marc Zyngier wrote:
->>>>>> On 21/07/16 17:33, David Long wrote:
->>>>>>> On 07/20/2016 12:09 PM, Marc Zyngier wrote:
->>>>>>>> On 08/07/16 17:35, David Long wrote:
->>>>>>>>> +#define MAX_INSN_SIZE            1
->>>>>>>>> +#define MAX_STACK_SIZE            128
->>>>>>>>
->>>>>>>> Where is that value coming from? Because even on my 6502, I have
->>>>>>>> a 256
->>>>>>>> byte stack.
->>>>>>>>
->>>>>>>
->>>>>>> Although I don't claim to know the original author's thoughts I
->>>>>>> would
->>>>>>> guess it is based on the seven other existing implementations for
->>>>>>> kprobes on various architectures, all of which appear to use
->>>>>>> either 64
->>>>>>> or 128 for MAX_STACK_SIZE.  The code is not trying to duplicate the
->>>>>>> whole stack.
->>>> [...]
->>>>>> My main worry is that whatever value you pick, it is always going
->>>>>> to be
->>>>>> wrong. This is used to preserve arguments that are passed on the
->>>>>> stack,
->>>>>> as opposed to passed by registers). We have no idea of what is
->>>>>> getting
->>>>>> passed there so saving nothing, 128 bytes or 2kB is about the
->>>>>> same. It
->>>>>> is always wrong.
->>>>>>
->>>>>> A much better solution would be to check the frame pointer, and
->>>>>> copy the
->>>>>> delta between FP and SP, assuming it fits inside the allocated
->>>>>> buffer.
->>>>>> If it doesn't, or if FP is invalid, we just skip the hook, because we
->>>>>> can't reliably execute it.
->>>>>
->>>>> Well, this is the way it works literally everywhere else. It is a
->>>>> documented
->>>>> limitation (Documentation/kprobes.txt). Said documentation may need
->>>>> to be
->>>>> changed along with the suggested fix.
->>>>
->>>> The document states: "Up to MAX_STACK_SIZE bytes are copied". That
->>>> means
->>>> the arch code could always copy less but never more than
->>>> MAX_STACK_SIZE.
->>>> What we are proposing is that we should try to guess how much to copy
->>>> based on the FP value (caller's frame) and, if larger than
->>>> MAX_STACK_SIZE, skip the probe hook entirely. I don't think this goes
->>>> against the kprobes.txt document but at least it (a) may improve the
->>>> performance slightly by avoiding unnecessary copy and (b) it avoids
->>>> undefined behaviour if we ever encounter a jprobe with arguments passed
->>>> on the stack beyond MAX_STACK_SIZE.
->>>
->>> OK, it sounds like an improvement. I do worry a little about
->>> unexpected side
->>> effects.
->>
->> You get more unexpected side effects by not saving/restoring the whole
->> stack. We looked into this on Friday and came to the conclusion that
->> there is no safe way for kprobes to know which arguments passed on the
->> stack should be preserved, at least not with the current API.
->>
->> Basically the AArch64 PCS states that for arguments passed on the stack
->> (e.g. they can't fit in registers), the caller allocates memory for them
->> (on its own stack) and passes the pointer to the callee. Unfortunately,
->> the frame pointer seems to be decremented correspondingly to cover the
->> arguments, so we don't really have a way to tell how much to copy.
->> Copying just the caller's stack frame isn't safe either since a
->> callee/caller receiving such argument on the stack may passed it down to
->> a callee without copying (I couldn't find anything in the PCS stating
->> that this isn't allowed).
->
-> OK, so I think we're pretty much back to our starting point.
->>
->>> I'm just asking if we can accept the existing code as now complete
->>> enough (in that I believe it matches the other implementations) and make
->>> this enhancement something for the next release cycle, allowing the
->>> existing
->>> code to be exercised by a wider audience and providing ample time to
->>> test
->>> the new modification? I'd hate to get stuck in a mode where this
->>> patch gets
->>> repeatedly delayed for changes that go above and beyond the original
->>> design.
->>
->> The problem is that the original design was done on x86 for its PCS and
->> it doesn't always fit other architectures. So we could either ignore the
->> problem, hoping that no probed function requires argument passing on
->> stack or we copy all the valid data on the kernel stack:
->>
->> diff --git a/arch/arm64/include/asm/kprobes.h
->> b/arch/arm64/include/asm/kprobes.h
->> index 61b49150dfa3..157fd0d0aa08 100644
->> --- a/arch/arm64/include/asm/kprobes.h
->> +++ b/arch/arm64/include/asm/kprobes.h
->> @@ -22,7 +22,7 @@
->>
->>   #define __ARCH_WANT_KPROBES_INSN_SLOT
->>   #define MAX_INSN_SIZE            1
->> -#define MAX_STACK_SIZE            128
->> +#define MAX_STACK_SIZE            THREAD_SIZE
->>
->>   #define flush_insn_slot(p)        do { } while (0)
->>   #define kretprobe_blacklist_size    0
->>
->
-> I doubt the ARM PCS is unusual.  At any rate I'm certain there are other
-> architectures that pass aggregate parameters on the stack. I suspect
-> other RISC(-ish) architectures have similar PCS issues and I think this
-> is at least a big part of where this simple copy with a 64/128 limit
-> comes from, or at least why it continues to exist.  That said, I'm not
-> enthusiastic about researching that assertion in detail as it could be
-> time consuming.
+On Wednesday, July 27, 2016 8:14:15 AM CEST Stefan Roese wrote:
+> Hi,
+> 
+> On 29.06.2016 13:22, Stefan Roese wrote:
+> > Hi!
+> > 
+> > On 03.06.2016 18:24, Stefan Roese wrote:
+> >> To enable the access to a specific area, the MVEBU XOR controllers needs
+> >> to have this area enabled / mapped via an address window. Right now,
+> >> only the DRAM memory area is enabled via such memory windows. So
+> >> using this driver to DMA to / from a e.g. PCIe memory region is
+> >> currently not supported.
+> >>
+> >> This patch now adds support for such PCIe / IO regions by checking
+> >> if the src / dst address is located in an IO memory area in contrast
+> >> to being located in DRAM. This is done by using the newly introduced
+> >> MBus function mvebu_mbus_get_io_win_info(). If the src / dst address
+> >> is located in such an IO area, a new address window is created in
+> >> the XOR DMA controller. Enabling the controller to access this area.
+> >>
+> >> Signed-off-by: Stefan Roese <sr@denx.de>
+> >> Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> >> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> >> Cc: Marcin Wojtas <mw@semihalf.com>
+> >> Cc: Vinod Koul <vinod.koul@intel.com>
+> >> ---
+> >>   drivers/dma/mv_xor.c | 107
+> >> ++++++++++++++++++++++++++++++++++++++++++++++++++-
+> >>   1 file changed, 106 insertions(+), 1 deletion(-)
+> >>
+> >> diff --git a/drivers/dma/mv_xor.c b/drivers/dma/mv_xor.c
+> >> index f4c9f98..2671b11 100644
+> >> --- a/drivers/dma/mv_xor.c
+> >> +++ b/drivers/dma/mv_xor.c
+> >> @@ -470,12 +470,107 @@ static int mv_xor_alloc_chan_resources(struct
+> >> dma_chan *chan)
+> >>       return mv_chan->slots_allocated ? : -ENOMEM;
+> >>   }
+> >>
+> >> +/*
+> >> + * Check if source or destination is an PCIe/IO address (non-SDRAM)
+> >> and add
+> >> + * a new MBus window if necessary
+> >> + */
+> >> +static int mv_xor_add_io_win(struct mv_xor_chan *mv_chan, u32 addr)
+> >> +{
+> >> +    void __iomem *base = mv_chan->mmr_high_base;
+> >> +    u32 win_enable;
+> >> +    u32 size;
+> >> +    u8 target, attr;
+> >> +    int ret;
+> >> +    int i;
+> >> +
+> >> +    /* If no IO window is found that addr has to be located in SDRAM */
+> >> +    ret = mvebu_mbus_get_io_win_info(addr, &size, &target, &attr);
+> >> +    if (ret < 0)
+> >> +        return 0;
+> >> +
+> >> +    /*
+> >> +     * Mask the base addr 'addr' according to 'size' read back from the
+> >> +     * MBus window. Otherwise we might end up with an address located
+> >> +     * somewhere in the middle of this area here.
+> >> +     */
+> >> +    size -= 1;
+> >> +    addr &= ~size;
+> >> +
+> >> +    /*
+> >> +     * Reading one of both enabled register is enough, as they are
+> >> always
+> >> +     * programmed to the identical values
+> >> +     */
+> >> +    win_enable = readl(base + WINDOW_BAR_ENABLE(0));
+> >> +
+> >> +    /*
+> >> +     * Loop over all windows to find a matching window (area wise). If
+> >> +     * one is found it will get disabled and later newly created.
+> >> +     */
+> >> +    for (i = 0; i < 8; i++) {
+> >> +        u32 wbase;
+> >> +        u32 wsize;
+> >> +
+> >> +        /* Continue if the window is not enabled */
+> >> +        if (!(win_enable | (1 << i)))
+> >> +            continue;
+> >> +
+> >> +        wbase = readl(base + WINDOW_BASE(i)) & 0xffff0000;
+> >> +        wsize = readl(base + WINDOW_SIZE(i)) & 0xffff0000;
+> >> +
+> >> +        /* Continue if 'addr' is not in this window */
+> >> +        if (addr < wbase || addr > (wbase + wsize))
+> >> +            continue;
+> >> +
+> >> +        /*
+> >> +         * If addr and size match, then this window is already
+> >> +         * configured and we are done
+> >> +         */
+> >> +        if (addr == wbase && (size & 0xffff0000) == wsize)
+> >> +            return 0;
+> >> +
+> >> +        /*
+> >> +         * The window is already configured, but the size does not
+> >> +         * match, so lets disable it
+> >> +         */
+> >> +        writel(0, base + WINDOW_BASE(i));
+> >> +        writel(0, base + WINDOW_SIZE(i));
+> >> +        if (i < 4)
+> >> +            writel(0, base + WINDOW_REMAP_HIGH(i));
+> >> +        win_enable &= ~(1 << i);
+> >> +        win_enable &= ~(3 << (16 + (2 * i)));
+> >> +        writel(win_enable, base + WINDOW_BAR_ENABLE(0));
+> >> +        writel(win_enable, base + WINDOW_BAR_ENABLE(1));
+> >> +
+> >> +        /*
+> >> +         * We can stop here since we have found and disabled the window
+> >> +         */
+> >> +        break;
+> >> +    }
+> >> +
+> >> +    /* Set 'i' to the first free window to write the new values to */
+> >> +    i = ffs(~win_enable) - 1;
+> >> +    if (i >= 8)
+> >> +        return -ENOMEM;
+> >> +
+> >> +    writel((addr & 0xffff0000) | (attr << 8) | target,
+> >> +           base + WINDOW_BASE(i));
+> >> +    writel(size & 0xffff0000, base + WINDOW_SIZE(i));
+> >> +
+> >> +    win_enable |= (1 << i);
+> >> +    win_enable |= 3 << (16 + (2 * i));
+> >> +    writel(win_enable, base + WINDOW_BAR_ENABLE(0));
+> >> +    writel(win_enable, base + WINDOW_BAR_ENABLE(1));
+> >> +
+> >> +    return 0;
+> >> +}
+> >> +
+> >>   static struct dma_async_tx_descriptor *
+> >>   mv_xor_prep_dma_xor(struct dma_chan *chan, dma_addr_t dest,
+> >> dma_addr_t *src,
+> >>               unsigned int src_cnt, size_t len, unsigned long flags)
+> >>   {
+> >>       struct mv_xor_chan *mv_chan = to_mv_xor_chan(chan);
+> >>       struct mv_xor_desc_slot *sw_desc;
+> >> +    int ret;
+> >>
+> >>       if (unlikely(len < MV_XOR_MIN_BYTE_COUNT))
+> >>           return NULL;
+> >> @@ -486,6 +581,11 @@ mv_xor_prep_dma_xor(struct dma_chan *chan,
+> >> dma_addr_t dest, dma_addr_t *src,
+> >>           "%s src_cnt: %d len: %zu dest %pad flags: %ld\n",
+> >>           __func__, src_cnt, len, &dest, flags);
+> >>
+> >> +    /* Check if a new window needs to get added for 'dest' */
+> >> +    ret = mv_xor_add_io_win(mv_chan, dest);
+> >> +    if (ret)
+> >> +        return NULL;
+> >> +
+> >>       sw_desc = mv_chan_alloc_slot(mv_chan);
+> >>       if (sw_desc) {
+> >>           sw_desc->type = DMA_XOR;
+> >> @@ -493,8 +593,13 @@ mv_xor_prep_dma_xor(struct dma_chan *chan,
+> >> dma_addr_t dest, dma_addr_t *src,
+> >>           mv_desc_init(sw_desc, dest, len, flags);
+> >>           if (mv_chan->op_in_desc == XOR_MODE_IN_DESC)
+> >>               mv_desc_set_mode(sw_desc);
+> >> -        while (src_cnt--)
+> >> +        while (src_cnt--) {
+> >> +            /* Check if a new window needs to get added for 'src' */
+> >> +            ret = mv_xor_add_io_win(mv_chan, src[src_cnt]);
+> >> +            if (ret)
+> >> +                return NULL;
+> >>               mv_desc_set_src_addr(sw_desc, src_cnt, src[src_cnt]);
+> >> +        }
+> >>       }
+> >>
+> >>       dev_dbg(mv_chan_to_devp(mv_chan),
+> >>
+> > 
+> > I didn't receive any comments on this patch so far. How should we
+> > proceed? Is this approach to enable DMA support to and from regions
+> > in PCI space acceptable? If yes, do I need to resend this patch as
+> > a non-RFC patch?
+> 
+> Thomas and I discussed this patch a bit off-list in the meantime
+> (thanks Thomas). Here a short summary of the last ideas (Thomas,
+> please correct me, if you feel I didn't summarize it correctly):
+> 
+> Thomas raised some concerns, as this patch adds a big number of
+> register reads in the middle of the submission path for XOR requests.
+> To solve this, I suggested to add a DT property to enable this
+> PCI / IO window check in the XOR driver. But as DT should describe
+> the HW and this is not a "HW feature", acceptance of such a new
+> DT property is very unlikely.
+> 
+> Another idea was to add a similar mechanism for the PCI spaces
+> as done for the DDR space(s) to the MBus driver. So that drivers
+> interested in these PCI windows could query the MBus driver about
+> the currently configured windows:
+> 
+>     mv_mbus_dram_info()
+> ->     mv_mbus_pci_info() 
+> 
+> But as the XOR engine only has a limited number of windows, it
+> might happen that on a system with numerous PCI devices, all
+> the MBus PCI windows plus the DRAM windows will exhaust the number
+> of the XOR engine windows. Plus the dynamic nature of PCI devices
+> in hotplug systems. So this won't work either.
+> 
+> Currently we are out of good ideas on how to get this feature added
+> to this XOR engine driver. Perhaps the only way is to accept the
+> additional register accesses introduced by this patch? Thomas
+> explicitly suggested to ask you Arnd, if you had some ideas on this.
+> So here we go:
+> 
+> Arnd, do you have some ideas how to better solve this problem?
 
-Given Mark shared a test program I *was* curious enough to take a look 
-at this.
+I'm not sure I completely understand the problem yet, but my first
+thought would be caching: have a copy of the ranges in RAM and loop
+over that in order to decide whether to evict one entry or not,
+avoiding the need for mmio register reads completely, and most of
+the register writes as well.
 
-The only architecture I can find that behaves like arm64 with the 
-implicit pass-by-reference described by Catalin/Mark is sparc64.
+The mv_mbus_pci_info() should work as well, but it's possible you
+can actually express that in a more generic way, since the
+location of the PCI memory space should also be known to the PCI
+core.
 
-In contrast alpha, arm (32-bit), hppa64, mips64 and powerpc64 all use a 
-hybrid approach where the first fragments of the structure are passed in 
-registers and the remainder on the stack.
+Finally, what is the specific limitation on the number and size
+of the windows? Could you just create static mappings that span
+all of the potential address space, e.g. a single entry for
+any address visibile to the CPU? I can't tell if you just need
+the physical address as seen by the CPU (which would be easy)
+or if you need the mbus address with their register numbers
+(which probably doesn't have a single contiguous representation?
 
+Do you just need to cover PCI or also things like the SPI-NOR
+direct mapping address?
 
-> I think this (unchecked) limitation for stack frames is something users
-> of jprobes understand, or at least should understand from the
-> documentation.  At any rate it doesn't sound like we have a way of
-> improving it, and I think that's OK.
-
-I don't think that this limitation could be inferred from the current 
-jprobes documentation. Most architectures (include arm64 when handling 
- >8 parameters) place arguments at the top of the stack. For these 
-architectures we need only consider the memory consumed by the (padded) 
-arguments in the function signature to determine if the jprobe will be safe.
-
-On arm64 large structures/unions end up being allocated like normal 
-local variables and need not be near the top of the stack. This gives 
-the caller much greater flexibility and makes safety a property of the 
-caller not the callee.
-
-So if it turns out to be too slow to store the whole of the stack then 
-it should at the very least be mentioned in the list of architecture 
-support that jprobes on functions that take structure/union arguments 
- >16 bytes are unsafe/unsupported.
-
-
-Daniel.
+	Arnd
