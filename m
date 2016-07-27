@@ -1,20 +1,87 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 27 Jul 2016 09:32:51 +0200
-Subject: debug tip after earlycon is closed?
-In-Reply-To: <CAK7LNASrqbt+RzD64zcAMjmBjJqa2sc2UG+mnEX8npZ9DBJodQ@mail.gmail.com>
-References: <CAK7LNASrqbt+RzD64zcAMjmBjJqa2sc2UG+mnEX8npZ9DBJodQ@mail.gmail.com>
-Message-ID: <3860396.RT1mlU0LAT@wuerfel>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 27 Jul 2016 15:32:58 +0800
+Subject: [PATCH 7/9] clk: sunxi-ng: mux: Add clk notifier functions
+In-Reply-To: <20160727073005.GG6560@lukather>
+References: <1469516671-19377-1-git-send-email-wens@csie.org>
+ <1469516671-19377-8-git-send-email-wens@csie.org>
+ <20160727073005.GG6560@lukather>
+Message-ID: <CAGb2v67KcvzxadXYTWSg42+gpRxt4fhNmiWmtAD5D7r0+K4T8g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, July 27, 2016 10:23:09 AM CEST Masahiro Yamada wrote:
-> [    0.000004] sched_clock: 56 bits at 50MHz, resolution 20ns, wraps
-> every 4398046511100ns
-> [    0.008254] Console: colour dummy device 80x25
-> [    0.012700] console [tty0] enabled
-> [    0.016110] bootconsole [uniphier0] disabled
+On Wed, Jul 27, 2016 at 3:30 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> On Tue, Jul 26, 2016 at 03:04:29PM +0800, Chen-Yu Tsai wrote:
+>> On sunxi we support cpufreq by changing the clock rate of PLL-CPU.
+>> It's possible the clock output of the PLL goes out of the CPU's
+>> operational limits when the PLL's multipliers / dividers are changed
+>> and it hasn't stabilized yet. This would result in the CPU hanging.
+>>
+>> To circumvent this, we temporarily switch the CPU mux clock to another
+>> stable clock before the rate change, and switch it back after the PLL
+>> stabilizes. This is done with clk notifiers registered on the PLL.
+>>
+>> This patch adds common functions for notifiers to reparent mux clocks.
+>>
+>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>> ---
+>>  drivers/clk/sunxi-ng/ccu_mux.c | 36 ++++++++++++++++++++++++++++++++++++
+>>  drivers/clk/sunxi-ng/ccu_mux.h | 14 ++++++++++++++
+>>  2 files changed, 50 insertions(+)
+>>
+>> diff --git a/drivers/clk/sunxi-ng/ccu_mux.c b/drivers/clk/sunxi-ng/ccu_mux.c
+>> index f96eabb5d1f3..8a6e9065cb85 100644
+>> --- a/drivers/clk/sunxi-ng/ccu_mux.c
+>> +++ b/drivers/clk/sunxi-ng/ccu_mux.c
+>> @@ -8,7 +8,9 @@
+>>   * the License, or (at your option) any later version.
+>>   */
+>>
+>> +#include <linux/clk.h>
+>>  #include <linux/clk-provider.h>
+>> +#include <linux/delay.h>
+>>
+>>  #include "ccu_gate.h"
+>>  #include "ccu_mux.h"
+>> @@ -199,3 +201,37 @@ const struct clk_ops ccu_mux_ops = {
+>>       .determine_rate = __clk_mux_determine_rate,
+>>       .recalc_rate    = ccu_mux_recalc_rate,
+>>  };
+>> +
+>> +/*
+>> + * This clock notifier is called when the frequency of the of the parent
+>> + * PLL clock is to be changed. The idea is to switch the parent to a
+>> + * stable clock, such as the main oscillator, while the PLL frequency
+>> + * stabilizes.
+>> + */
+>> +static int ccu_mux_notifier_cb(struct notifier_block *nb,
+>> +                            unsigned long event, void *data)
+>> +{
+>> +     struct ccu_mux_nb *mux = to_ccu_mux_nb(nb);
+>> +     int ret = 0;
+>> +
+>> +     if (event == PRE_RATE_CHANGE) {
+>> +             mux->original_index = ccu_mux_helper_get_parent(mux->common,
+>> +                                                             mux->cm);
+>> +             ret = ccu_mux_helper_set_parent(mux->common, mux->cm,
+>> +                                             mux->bypass_index);
+>> +     } else if (event == POST_RATE_CHANGE) {
+>> +             ret = ccu_mux_helper_set_parent(mux->common, mux->cm,
+>> +                                             mux->original_index);
+>> +     }
+>> +
+>> +     udelay(mux->delay_us);
+>
+> Are you sure we need that delay?
+>
+> set_rate will end and notify you once the PLL rate is stable, so it
+> looks redundant.
 
-I assume that the original console is on a uart, while the new console
-appears to be on the framebuffer. Maybe you have no screen attached?
+The delay requirement is on the cpu mux clk, not the PLL. The
+datasheet says you should wait for up to 8 clock cycles after
+changing the parent. Not sure how this factors with the CPU
+actually doing the waiting though.
 
-	Arnd
+So this is separate from the PLL lock delay.
+
+ChenYu
