@@ -1,46 +1,43 @@
-From: wxt@rock-chips.com (Caesar Wang)
-Date: Wed, 27 Jul 2016 22:10:43 +0800
-Subject: [PATCH 2/2] thermal: rockchip: optimize sensor auto accessing period
-In-Reply-To: <1469628643-29661-1-git-send-email-wxt@rock-chips.com>
-References: <1469628643-29661-1-git-send-email-wxt@rock-chips.com>
-Message-ID: <1469628643-29661-2-git-send-email-wxt@rock-chips.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 27 Jul 2016 16:12:56 +0200
+Subject: [GIT PULL] ARM: mvebu: dt-late for v4.8
+Message-ID: <87popznp93.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rocky Hao <rocky.hao@rock-chips.com>
+Hi,
 
-In less than 10 ms, the temperature of soc will arise 10 degree. 250 ms
-is too big for soc tempeture control. Setting 2.5 ms will speed up
-temperature accessing speed but introduce no more cpu's computing overhead.
-We set AUTO_PERIOD_TIME and TSADCV3_AUTO_PERIOD_HT_TIME the same value,
-because normal temperature update speed is also our consern in IPA.
+Here is a late pull request for a device tree fix on mvebu for v4.8.
 
-Signed-off-by: Rocky Hao <rocky.hao@rock-chips.com>
-Signed-off-by: Caesar Wang <wxt@rock-chips.com>
-Cc: Zhang Rui <rui.zhang@intel.com>
-Cc: Eduardo Valentin <edubezval@gmail.com>
-Cc: Heiko Stuebner <heiko@sntech.de>
-Cc: linux-pm at vger.kernel.org
+If it is too late to have it for v4.8-rc1, I will send it again as fix
+for v4.8-rc2.
 
----
+Thanks,
 
- drivers/thermal/rockchip_thermal.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Gregory
 
-diff --git a/drivers/thermal/rockchip_thermal.c b/drivers/thermal/rockchip_thermal.c
-index a90423d..1f165c9 100644
---- a/drivers/thermal/rockchip_thermal.c
-+++ b/drivers/thermal/rockchip_thermal.c
-@@ -213,8 +213,8 @@ struct rockchip_thermal_data {
- #define TSADCV2_HIGHT_TSHUT_DEBOUNCE_COUNT	4
- #define TSADCV2_AUTO_PERIOD_TIME		250 /* 250ms */
- #define TSADCV2_AUTO_PERIOD_HT_TIME		50  /* 50ms */
--#define TSADCV3_AUTO_PERIOD_TIME		187500 /* 250ms */
--#define TSADCV3_AUTO_PERIOD_HT_TIME		37500  /* 50ms */
-+#define TSADCV3_AUTO_PERIOD_TIME		1875 /* 2.5ms */
-+#define TSADCV3_AUTO_PERIOD_HT_TIME		1875 /* 2.5ms */
- 
- #define TSADCV2_USER_INTER_PD_SOC		0x340 /* 13 clocks */
- 
--- 
-1.9.1
+The following changes since commit d261861ab52623e34a25fe6ae76714456edda033:
+
+  ARM: dts: armada-388-clearfog: remove duplicate mdio entry (2016-07-11 18:05:48 +0200)
+
+are available in the git repository at:
+
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-dt-late-4.8
+
+for you to fetch changes up to 1f5b6fd2942ca2a063655fbeea5a922bc08f9e21:
+
+  ARM: dts: armada388-clearfog: number LAN ports properly (2016-07-27 15:12:02 +0200)
+
+----------------------------------------------------------------
+Late mvebu dt for v4.8
+
+The commit correct the led name on the clearfog board and should be
+applied as soon as possible to avoid spread the port renumbering over
+a large range of kernels.
+
+----------------------------------------------------------------
+Russell King (1):
+      ARM: dts: armada388-clearfog: number LAN ports properly
+
+ arch/arm/boot/dts/armada-388-clearfog.dts | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
