@@ -1,42 +1,50 @@
 From: mitchelh@codeaurora.org (Mitchel Humpherys)
-Date: Wed, 27 Jul 2016 16:39:39 -0700
-Subject: [PATCH v4 4/6] arm64/dma-mapping: Implement DMA_ATTR_PRIVILEGED
-In-Reply-To: <f6fa75a9-ce70-e6c5-fd51-2af502bc2f67@arm.com> (Robin Murphy's
- message of "Tue, 26 Jul 2016 16:05:17 +0100")
-References: <20160725191649.13414-1-mitchelh@codeaurora.org>
- <20160725191649.13414-5-mitchelh@codeaurora.org>
- <f6fa75a9-ce70-e6c5-fd51-2af502bc2f67@arm.com>
-Message-ID: <vnkweg6e6478.fsf@codeaurora.org>
+Date: Wed, 27 Jul 2016 16:42:04 -0700
+Subject: [PATCH v5 2/6] iommu/io-pgtable-arm: add support for the IOMMU_PRIV
+ flag
+In-Reply-To: <20160727234208.2101-1-mitchelh@codeaurora.org>
+References: <20160727234208.2101-1-mitchelh@codeaurora.org>
+Message-ID: <20160727234208.2101-3-mitchelh@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 26 2016 at 04:05:17 PM, Robin Murphy <robin.murphy@arm.com> wrote:
-> +	if (attrs & DMA_ATTR_PRIVILEGED)
-> +		prot |= IOMMU_PRIV;
-> +
->
-> then drop the rest of the changes to the switch statement below. It's
-> taken me an embarrassingly long time to work out why things were blowing
-> up in __iommu_sync_single_for_device() all with a VA of phys_to_virt(0) ;)
+From: Jeremy Gebben <jgebben@codeaurora.org>
 
-Ah yes, that is much nicer!  Nice catch...
+Allow the creation of privileged mode mappings, for stage 1 only.
 
-> With that change, for the whole series:
->
-> Reviewed-by: Robin Murphy <robin.murphy@arm.com>
-> Tested-by: Robin Murphy <robin.murphy@arm.com>
->
-> I guess at this point it may be worth waiting to repost based on -rc1.
-> Be sure to CC patch 5 to Vinod as the current dmaengine maintainer, as
-> it's his ack we'll need on that.
+Reviewed-by: Robin Murphy <robin.murphy@arm.com>
+Tested-by: Robin Murphy <robin.murphy@arm.com>
+Signed-off-by: Jeremy Gebben <jgebben@codeaurora.org>
+---
 
-Thanks for the review and test.  I'll go ahead and send a v5 series
-since I'm actually leaving QuIC this Friday and so I won't be around to
-send it next week...
+Notes:
+    v2..v3
+    
+      - Use existing bit definitions.
 
+ drivers/iommu/io-pgtable-arm.c | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
--Mitch
-
+diff --git a/drivers/iommu/io-pgtable-arm.c b/drivers/iommu/io-pgtable-arm.c
+index f5c90e1366ce..69ba83a135f1 100644
+--- a/drivers/iommu/io-pgtable-arm.c
++++ b/drivers/iommu/io-pgtable-arm.c
+@@ -350,11 +350,14 @@ static arm_lpae_iopte arm_lpae_prot_to_pte(struct arm_lpae_io_pgtable *data,
+ 
+ 	if (data->iop.fmt == ARM_64_LPAE_S1 ||
+ 	    data->iop.fmt == ARM_32_LPAE_S1) {
+-		pte = ARM_LPAE_PTE_AP_UNPRIV | ARM_LPAE_PTE_nG;
++		pte = ARM_LPAE_PTE_nG;
+ 
+ 		if (!(prot & IOMMU_WRITE) && (prot & IOMMU_READ))
+ 			pte |= ARM_LPAE_PTE_AP_RDONLY;
+ 
++		if (!(prot & IOMMU_PRIV))
++			pte |= ARM_LPAE_PTE_AP_UNPRIV;
++
+ 		if (prot & IOMMU_MMIO)
+ 			pte |= (ARM_LPAE_MAIR_ATTR_IDX_DEV
+ 				<< ARM_LPAE_PTE_ATTRINDX_SHIFT);
 -- 
 Qualcomm Innovation Center, Inc.
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
