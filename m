@@ -1,82 +1,43 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 28 Jul 2016 00:23:31 +0100
-Subject: [PATCH v1 1/4] kexec: (bugfix) calc correct end address of
- memory ranges in device tree
-In-Reply-To: <3562841.ROYbCgkeeq@hactar>
-References: <cover.1468970114.git.geoff@infradead.org>
- <c4af21ba365767f88a2516719dd0f3b70777b549.1468970114.git.geoff@infradead.org>
- <3562841.ROYbCgkeeq@hactar>
-Message-ID: <20160727232331.GY1041@n2100.armlinux.org.uk>
+From: mitchelh@codeaurora.org (Mitchel Humpherys)
+Date: Wed, 27 Jul 2016 16:39:39 -0700
+Subject: [PATCH v4 4/6] arm64/dma-mapping: Implement DMA_ATTR_PRIVILEGED
+In-Reply-To: <f6fa75a9-ce70-e6c5-fd51-2af502bc2f67@arm.com> (Robin Murphy's
+ message of "Tue, 26 Jul 2016 16:05:17 +0100")
+References: <20160725191649.13414-1-mitchelh@codeaurora.org>
+ <20160725191649.13414-5-mitchelh@codeaurora.org>
+ <f6fa75a9-ce70-e6c5-fd51-2af502bc2f67@arm.com>
+Message-ID: <vnkweg6e6478.fsf@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 27, 2016 at 07:45:13PM -0300, Thiago Jung Bauermann wrote:
-> Hello,
-> 
-> Am Dienstag, 19 Juli 2016, 23:28:13 schrieb Geoff Levand:
-> > From: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> > 
-> > The end address of "reg" attribute in device tree's memory should be
-> > inclusive.
-> 
-> Actually, there's a bug/inconsistency in kexec-tools right now.
-> 
-> crashdump-arm.c expect usablemem_rgns.ranges[i].end to be the last byte in 
-> the range, but crashdump-powerpc.c, crashdump-ppc64.c and fs2dt.c expect it 
-> to be the first byte after the range.
+On Tue, Jul 26 2016 at 04:05:17 PM, Robin Murphy <robin.murphy@arm.com> wrote:
+> +	if (attrs & DMA_ATTR_PRIVILEGED)
+> +		prot |= IOMMU_PRIV;
+> +
+>
+> then drop the rest of the changes to the switch statement below. It's
+> taken me an embarrassingly long time to work out why things were blowing
+> up in __iommu_sync_single_for_device() all with a VA of phys_to_virt(0) ;)
 
-Well, ARM (and the generic code I introduced for mem_ranges) follows
-what i386, ia64, mips, s390, and sh all do with struct memory_range
-when used for crashdump.
+Ah yes, that is much nicer!  Nice catch...
 
-It is extremely bad for a project to have a single structure used
-inconsistently like this - even with generic helpers, you can't be
-sure that the right helpers are used on the right structures, and
-it will lead to off-by-one errors all over the place.  Just don't
-pull crap like this, it's asking for trouble - settle on one way
-and stick to it.
+> With that change, for the whole series:
+>
+> Reviewed-by: Robin Murphy <robin.murphy@arm.com>
+> Tested-by: Robin Murphy <robin.murphy@arm.com>
+>
+> I guess at this point it may be worth waiting to repost based on -rc1.
+> Be sure to CC patch 5 to Vinod as the current dmaengine maintainer, as
+> it's his ack we'll need on that.
 
-Given that the majority of architectures treat .end as inclusive, I
-think ppc* and fs2dt need to conform to the convention establised by
-the other architectures for this structure.
+Thanks for the review and test.  I'll go ahead and send a v5 series
+since I'm actually leaving QuIC this Friday and so I won't be around to
+send it next week...
 
-It's also interesting to note that crashdump-powerpc has this:
 
-        /* On powerpc memory ranges in device-tree is denoted as start
-         * and size rather than start and end, as is the case with
-         * other architectures like i386 . Because of this when loading
-         * the memory ranges in crashdump-elf.c the filesz calculation
-         * [ end - start + 1 ] goes for a toss.
-         *
-         * To be in sync with other archs adjust the end value for
-         * every crash memory range before calling the generic function
-         */
-
-        for (i = 0; i < nr_ranges; i++) {
-                end = crash_memory_range[i].end - 1;
-                crash_memory_range[i].end = end;
-        }
-
-to convert from powerpc end-exclusive to end-inclusive mode -
-something that could be killed if it were to conform throughout
-to the established convention.  Same goes for ppc64 too:
-
-        /* On ppc64 memory ranges in device-tree is denoted as start
-         * and size rather than start and end, as is the case with
-         * other architectures like i386 . Because of this when loading
-         * the memory ranges in crashdump-elf.c the filesz calculation
-         * [ end - start + 1 ] goes for a toss.
-         *
-         * To be in sync with other archs adjust the end value for
-         * every crash memory range before calling the generic function
-         */
-
-        for (i = 0; i < nr_ranges; i++) {
-                end = crash_memory_range[i].end - 1;
-                crash_memory_range[i].end = end;
-        }
+-Mitch
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently@9.6Mbps down 400kbps up
-according to speedtest.net.
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
