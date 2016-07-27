@@ -1,100 +1,181 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Wed, 27 Jul 2016 10:23:09 +0900
-Subject: debug tip after earlycon is closed?
-Message-ID: <CAK7LNASrqbt+RzD64zcAMjmBjJqa2sc2UG+mnEX8npZ9DBJodQ@mail.gmail.com>
+From: minghsiu.tsai@mediatek.com (Minghsiu Tsai)
+Date: Wed, 27 Jul 2016 09:44:46 +0800
+Subject: [PATCH v2 2/4] dt-bindings: Add a binding for Mediatek MDP
+In-Reply-To: <20160726185433.GA14609@rob-hp-laptop>
+References: <1469176383-35210-1-git-send-email-minghsiu.tsai@mediatek.com>
+ <1469176383-35210-3-git-send-email-minghsiu.tsai@mediatek.com>
+ <20160726185433.GA14609@rob-hp-laptop>
+Message-ID: <1469583886.27630.18.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi.
+On Tue, 2016-07-26 at 13:54 -0500, Rob Herring wrote:
+> On Fri, Jul 22, 2016 at 04:33:01PM +0800, Minghsiu Tsai wrote:
+> > Add a DT binding documentation of MDP for the MT8173 SoC
+> > from Mediatek
+> > 
+> > Signed-off-by: Minghsiu Tsai <minghsiu.tsai@mediatek.com>
+> > ---
+> >  .../devicetree/bindings/media/mediatek-mdp.txt     |   96 ++++++++++++++++++++
+> >  1 file changed, 96 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/media/mediatek-mdp.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/media/mediatek-mdp.txt b/Documentation/devicetree/bindings/media/mediatek-mdp.txt
+> > new file mode 100644
+> > index 0000000..2dad031
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/media/mediatek-mdp.txt
+> > @@ -0,0 +1,96 @@
+> > +* Mediatek Media Data Path
+> > +
+> > +Media Data Path is used for scaling and color space conversion.
+> > +
+> > +Required properties (all function blocks):
+> > +- compatible: "mediatek,<chip>-mdp"
+> 
+> What is this, ...
+> 
+
+It is used to match platform driver.
 
 
-When the kernel fails to boot and its log console is silent,
-I use earlycon and I often find the cause of error with it.
+> > +        "mediatek,<chip>-mdp-<function>", one of
+> 
+> and this?
+> 
+
+It is string format of HW block. <chip> could be "mt8173", and
+<function> are "rdma", "rsz", "wdma", and "wrot".  
 
 
-But, I have been wondering if there is an easy-to-use
-debug tip which is available after earlycon is disabled.
+> > +        "mediatek,<chip>-mdp-rdma"  - read DMA
+> > +        "mediatek,<chip>-mdp-rsz"   - resizer
+> > +        "mediatek,<chip>-mdp-wdma"  - write DMA
+> > +        "mediatek,<chip>-mdp-wrot"  - write DMA with rotation
+> 
+> List what are valid values of <chip>.
+> 
+
+<chip> - mt8173. There should be other chip added in future.
+I will change the property as blow:
+
+- compatible: "mediatek,<chip>-mdp"
+        Should be one of
+        "mediatek,<chip>-mdp-rdma"  - read DMA
+        "mediatek,<chip>-mdp-rsz"   - resizer
+        "mediatek,<chip>-mdp-wdma"  - write DMA
+        "mediatek,<chip>-mdp-wrot"  - write DMA with rotation
+        <chip> - could be 8173
 
 
-I noticed the current mainline would not boot on my ARMv8 board.
-According to the following log, I am guessing something wrong
-is happening after the "bootconsole [uniphier0] disabled" log.
-
-Is there a good practice to see more log?
-
-
-
-
-
-[    0.000000] Booting Linux on physical CPU 0x0
-[    0.000000] Linux version 4.7.0-02346-g3601fbc-dirty
-(yamada at beagle) (gcc version 4.9.4 20151028 (prerelease) (Linaro GCC
-4.9-2016.02) ) #19 SMP PREEMPT Wed Jul 27 10:01:35 JST 2016
-[    0.000000] Boot CPU: AArch64 Processor [410fd034]
-[    0.000000] earlycon: uniphier0 at MMIO 0x0000000054006800 (options
-'115200n8')
-[    0.000000] bootconsole [uniphier0] enabled
-[    0.000000] efi: Getting EFI parameters from FDT:
-[    0.000000] efi: UEFI not found.
-[    0.000000] cma: Reserved 16 MiB at 0x00000000bec00000
-[    0.000000] percpu: Embedded 21 pages/cpu @ffff80003ffb3000 s48128
-r8192 d29696 u86016
-[    0.000000] Detected VIPT I-cache on CPU0
-[    0.000000] CPU features: enabling workaround for ARM erratum 845719
-[    0.000000] Built 1 zonelists in Zone order, mobility grouping on.
-Total pages: 258048
-[    0.000000] Kernel command line: earlycon
-[    0.000000] PID hash table entries: 4096 (order: 3, 32768 bytes)
-[    0.000000] Dentry cache hash table entries: 131072 (order: 8, 1048576 bytes)
-[    0.000000] Inode-cache hash table entries: 65536 (order: 7, 524288 bytes)
-[    0.000000] software IO TLB [mem 0xb9c00000-0xbdc00000] (64MB)
-mapped at [ffff800039c00000-ffff80003dbfffff]
-[    0.000000] Memory: 933680K/1048576K available (7512K kernel code,
-648K rwdata, 3172K rodata, 960K init, 259K bss, 98512K reserved,
-16384K cma-reserved)
-[    0.000000] Virtual kernel memory layout:
-[    0.000000]     modules : 0xffff000000000000 - 0xffff000008000000
-(   128 MB)
-[    0.000000]     vmalloc : 0xffff000008000000 - 0xffff7dffbfff0000
-(129022 GB)
-[    0.000000]       .text : 0xffff000008080000 - 0xffff0000087d0000
-(  7488 KB)
-[    0.000000]     .rodata : 0xffff0000087d0000 - 0xffff000008af0000
-(  3200 KB)
-[    0.000000]       .init : 0xffff000008af0000 - 0xffff000008be0000
-(   960 KB)
-[    0.000000]       .data : 0xffff000008be0000 - 0xffff000008c82000
-(   648 KB)
-[    0.000000]        .bss : 0xffff000008c82000 - 0xffff000008cc2d40
-(   260 KB)
-[    0.000000]     fixed   : 0xffff7dfffe7fd000 - 0xffff7dfffec00000
-(  4108 KB)
-[    0.000000]     PCI I/O : 0xffff7dfffee00000 - 0xffff7dffffe00000
-(    16 MB)
-[    0.000000]     vmemmap : 0xffff7e0000000000 - 0xffff800000000000
-(  2048 GB maximum)
-[    0.000000]               0xffff7e0000000000 - 0xffff7e0001000000
-(    16 MB actual)
-[    0.000000]     memory  : 0xffff800000000000 - 0xffff800040000000
-(  1024 MB)
-[    0.000000] SLUB: HWalign=64, Order=0-3, MinObjects=0, CPUs=2, Nodes=1
-[    0.000000] Preemptible hierarchical RCU implementation.
-[    0.000000]  Build-time adjustment of leaf fanout to 64.
-[    0.000000]  RCU restricting CPUs from NR_CPUS=64 to nr_cpu_ids=2.
-[    0.000000] RCU: Adjusting geometry for rcu_fanout_leaf=64, nr_cpu_ids=2
-[    0.000000] NR_IRQS:64 nr_irqs:64 0
-[    0.000000] GICv3: GIC: Using split EOI/Deactivate mode
-[    0.000000] GICv3: CPU0: found redistributor 0 region 0:0x000000005fe40000
-[    0.000000] Architected cp15 timer(s) running at 50.00MHz (phys).
-[    0.000000] clocksource: arch_sys_counter: mask: 0xffffffffffffff
-max_cycles: 0xb8812736b, max_idle_ns: 440795202655 ns
-[    0.000004] sched_clock: 56 bits at 50MHz, resolution 20ns, wraps
-every 4398046511100ns
-[    0.008254] Console: colour dummy device 80x25
-[    0.012700] console [tty0] enabled
-[    0.016110] bootconsole [uniphier0] disabled
+If don't need <chip>, I also can change it as below. It is more clear.
+- compatible: "mediatek,mt8173-mdp"
+        Should be one of
+        "mediatek,mt8173-mdp-rdma"  - read DMA
+        "mediatek,mt8173-mdp-rsz"   - resizer
+        "mediatek,mt8173-mdp-wdma"  - write DMA
+        "mediatek,mt8173-mdp-wrot"  - write DMA with rotation
 
 
--- 
-Best Regards
-Masahiro Yamada
+> > +- reg: Physical base address and length of the function block register space
+> > +- clocks: device clocks
+> > +- power-domains: a phandle to the power domain.
+> > +- mediatek,vpu: the node of video processor unit
+> > +
+> > +Required properties (DMA function blocks):
+> > +- compatible: Should be one of
+> > +        "mediatek,<chip>-mdp-rdma"
+> > +        "mediatek,<chip>-mdp-wdma"
+> > +        "mediatek,<chip>-mdp-wrot"
+> > +- iommus: should point to the respective IOMMU block with master port as
+> > +  argument, see Documentation/devicetree/bindings/iommu/mediatek,iommu.txt
+> > +  for details.
+> > +- mediatek,larb: must contain the local arbiters in the current Socs.
+> 
+> It is still not clear which properties apply to which compatible 
+> strings.
+> 
+
+I found out the document for larb. 
+I will change the property as below:
+
+- mediatek,larb: must contain the local arbiters in the current Socs,
+see
+Documentation/devicetree/bindings/memory-controllers/mediatek,smi-larb.txt 
+  for details.
+
+
+> > +
+> > +Example:
+> > +	mdp_rdma0: rdma at 14001000 {
+> > +		compatible = "mediatek,mt8173-mdp-rdma",
+> > +			     "mediatek,mt8173-mdp";
+> > +		reg = <0 0x14001000 0 0x1000>;
+> > +		clocks = <&mmsys CLK_MM_MDP_RDMA0>,
+> > +			 <&mmsys CLK_MM_MUTEX_32K>;
+> > +		power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
+> > +		iommus = <&iommu M4U_PORT_MDP_RDMA0>;
+> > +		mediatek,larb = <&larb0>;
+> > +		mediatek,vpu = <&vpu>;
+> > +	};
+> > +
+> > +	mdp_rdma1: rdma at 14002000 {
+> > +		compatible = "mediatek,mt8173-mdp-rdma";
+> > +		reg = <0 0x14002000 0 0x1000>;
+> > +		clocks = <&mmsys CLK_MM_MDP_RDMA1>,
+> > +			 <&mmsys CLK_MM_MUTEX_32K>;
+> > +		power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
+> > +		iommus = <&iommu M4U_PORT_MDP_RDMA1>;
+> > +		mediatek,larb = <&larb4>;
+> > +	};
+> > +
+> > +	mdp_rsz0: rsz at 14003000 {
+> > +		compatible = "mediatek,mt8173-mdp-rsz";
+> > +		reg = <0 0x14003000 0 0x1000>;
+> > +		clocks = <&mmsys CLK_MM_MDP_RSZ0>;
+> > +		power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
+> > +	};
+> > +
+> > +	mdp_rsz1: rsz at 14004000 {
+> > +		compatible = "mediatek,mt8173-mdp-rsz";
+> > +		reg = <0 0x14004000 0 0x1000>;
+> > +		clocks = <&mmsys CLK_MM_MDP_RSZ1>;
+> > +		power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
+> > +	};
+> > +
+> > +	mdp_rsz2: rsz at 14005000 {
+> > +		compatible = "mediatek,mt8173-mdp-rsz";
+> > +		reg = <0 0x14005000 0 0x1000>;
+> > +		clocks = <&mmsys CLK_MM_MDP_RSZ2>;
+> > +		power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
+> > +	};
+> > +
+> > +	mdp_wdma0: wdma at 14006000 {
+> > +		compatible = "mediatek,mt8173-mdp-wdma";
+> > +		reg = <0 0x14006000 0 0x1000>;
+> > +		clocks = <&mmsys CLK_MM_MDP_WDMA>;
+> > +		power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
+> > +		iommus = <&iommu M4U_PORT_MDP_WDMA>;
+> > +		mediatek,larb = <&larb0>;
+> > +	};
+> > +
+> > +	mdp_wrot0: wrot at 14007000 {
+> > +		compatible = "mediatek,mt8173-mdp-wrot";
+> > +		reg = <0 0x14007000 0 0x1000>;
+> > +		clocks = <&mmsys CLK_MM_MDP_WROT0>;
+> > +		power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
+> > +		iommus = <&iommu M4U_PORT_MDP_WROT0>;
+> > +		mediatek,larb = <&larb0>;
+> > +	};
+> > +
+> > +	mdp_wrot1: wrot at 14008000 {
+> > +		compatible = "mediatek,mt8173-mdp-wrot";
+> > +		reg = <0 0x14008000 0 0x1000>;
+> > +		clocks = <&mmsys CLK_MM_MDP_WROT1>;
+> > +		power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
+> > +		iommus = <&iommu M4U_PORT_MDP_WROT1>;
+> > +		mediatek,larb = <&larb4>;
+> > +	};
+> > -- 
+> > 1.7.9.5
+> > 
