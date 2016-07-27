@@ -1,82 +1,57 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 27 Jul 2016 18:04:18 +0200
-Subject: [PATCH 05/18] ARM: mvebu: a385-db-ap: add default partition
- description for NAND
-In-Reply-To: <1469105055-25181-6-git-send-email-jaz@semihalf.com> (Grzegorz
- Jaszczyk's message of "Thu, 21 Jul 2016 14:44:01 +0200")
-References: <1469105055-25181-1-git-send-email-jaz@semihalf.com>
- <1469105055-25181-6-git-send-email-jaz@semihalf.com>
-Message-ID: <87k2g7m5j1.fsf@free-electrons.com>
+From: julia.lawall@lip6.fr (Julia Lawall)
+Date: Wed, 27 Jul 2016 18:07:55 +0200 (CEST)
+Subject: [xlnx:master 2553/2625]
+ drivers/gpu/drm/xilinx/xilinx_drm_dp.c:1005:31-32:
+ WARNING: Unsigned expression compared with zero: i >= 0
+Message-ID: <alpine.DEB.2.10.1607271806290.3117@hadrien>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Grzegorz,
- 
- On jeu., juil. 21 2016, Grzegorz Jaszczyk <jaz@semihalf.com> wrote:
+This looks like an infinite loop, unless the break is guaranteed to
+occur.
 
-> Signed-off-by: Grzegorz Jaszczyk <jaz@semihalf.com>
-It looks good:
-
-Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-
-Thanks,
-
-Gregory
+julia
 
 
-> ---
->  arch/arm/boot/dts/armada-385-db-ap.dts | 26 +++++++++++++++++++++++---
->  1 file changed, 23 insertions(+), 3 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/armada-385-db-ap.dts b/arch/arm/boot/dts/armada-385-db-ap.dts
-> index a18f516..6648a3f 100644
-> --- a/arch/arm/boot/dts/armada-385-db-ap.dts
-> +++ b/arch/arm/boot/dts/armada-385-db-ap.dts
-> @@ -182,15 +182,35 @@
->  
->  			nfc: flash at d0000 {
->  				status = "okay";
-> -				#address-cells = <1>;
-> -				#size-cells = <1>;
-> -
->  				num-cs = <1>;
->  				nand-ecc-strength = <4>;
->  				nand-ecc-step-size = <512>;
->  				marvell,nand-keep-config;
->  				marvell,nand-enable-arbiter;
->  				nand-on-flash-bbt;
-> +
-> +				partitions {
-> +					compatible = "fixed-partitions";
-> +					#address-cells = <1>;
-> +					#size-cells = <1>;
-> +
-> +					partition at 0 {
-> +						label = "U-Boot";
-> +						reg = <0x00000000 0x00800000>;
-> +						read-only;
-> +					};
-> +
-> +					partition at 800000 {
-> +						label = "uImage";
-> +						reg = <0x00800000 0x00400000>;
-> +						read-only;
-> +					};
-> +
-> +					partition at c00000 {
-> +						label = "Root";
-> +						reg = <0x00c00000 0x3f400000>;
-> +					};
-> +				};
->  			};
->  
->  			usb3 at f0000 {
-> -- 
-> 1.8.3.1
->
+tree:   https://github.com/Xilinx/linux-xlnx master
+head:   4dcc2058b8620d77b8be9940626b339d848c0dfc
+commit: 28f06f4dd82e9915e7ee2cae6cf52b9e2666c68c [2553/2625] drm: xilinx: dp: Reduce the bit rate if the link training fails
+:::::: branch date: 4 hours ago
+:::::: commit date: 5 weeks ago
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+>> drivers/gpu/drm/xilinx/xilinx_drm_dp.c:1005:31-32: WARNING: Unsigned expression compared with zero: i >= 0
+
+git remote add xlnx https://github.com/Xilinx/linux-xlnx
+git remote update xlnx
+git checkout 28f06f4dd82e9915e7ee2cae6cf52b9e2666c68c
+vim +1005 drivers/gpu/drm/xilinx/xilinx_drm_dp.c
+
+1ec84245 Hyun Kwon 2014-05-05   989   * Find the link configuration values, rate and lane count for requested pixel
+1ec84245 Hyun Kwon 2014-05-05   990   * clock @pclock.
+28f06f4d Hyun Kwon 2016-06-17   991   *
+28f06f4d Hyun Kwon 2016-06-17   992   * Return: Current link rate code, or -EINVAL.
+1ec84245 Hyun Kwon 2014-05-05   993   */
+28f06f4d Hyun Kwon 2016-06-17   994  static int xilinx_drm_dp_mode_configure(struct xilinx_drm_dp *dp, int pclock,
+28f06f4d Hyun Kwon 2016-06-17   995  					u8 current_bw)
+1ec84245 Hyun Kwon 2014-05-05   996  {
+1ec84245 Hyun Kwon 2014-05-05   997  	int max_rate = dp->link_config.max_rate;
+1ec84245 Hyun Kwon 2014-05-05   998  	u8 bws[3] = { DP_LINK_BW_1_62, DP_LINK_BW_2_7, DP_LINK_BW_5_4 };
+1ec84245 Hyun Kwon 2014-05-05   999  	u8 max_lanes = dp->link_config.max_lanes;
+1ec84245 Hyun Kwon 2014-05-05  1000  	u8 max_link_rate_code = drm_dp_link_rate_to_bw_code(max_rate);
+1ec84245 Hyun Kwon 2014-05-05  1001  	u8 bpp = dp->config.bpp;
+1ec84245 Hyun Kwon 2014-05-05  1002  	u8 lane_cnt, i;
+1ec84245 Hyun Kwon 2014-05-05  1003  	s8 clock;
+1ec84245 Hyun Kwon 2014-05-05  1004
+28f06f4d Hyun Kwon 2016-06-17 @1005  	for (i = ARRAY_SIZE(bws) - 1; i >= 0; i--) {
+28f06f4d Hyun Kwon 2016-06-17  1006  		if (current_bw && bws[i] >= current_bw)
+28f06f4d Hyun Kwon 2016-06-17  1007  			continue;
+28f06f4d Hyun Kwon 2016-06-17  1008
+28f06f4d Hyun Kwon 2016-06-17  1009  		if (bws[i] <= max_link_rate_code)
+1ec84245 Hyun Kwon 2014-05-05  1010  			break;
+28f06f4d Hyun Kwon 2016-06-17  1011  	}
+1ec84245 Hyun Kwon 2014-05-05  1012
+1ec84245 Hyun Kwon 2014-05-05  1013  	for (lane_cnt = 1; lane_cnt <= max_lanes; lane_cnt <<= 1)
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
