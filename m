@@ -1,192 +1,82 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Thu, 28 Jul 2016 01:12:46 +0200
-Subject: [PATCH v11] acpi, apei, arm64: APEI initial support for aarch64.
-In-Reply-To: <1469640545-5848-1-git-send-email-fu.wei@linaro.org>
-References: <1469640545-5848-1-git-send-email-fu.wei@linaro.org>
-Message-ID: <7173434.pR4ItzAsEj@vostro.rjw.lan>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 28 Jul 2016 00:23:31 +0100
+Subject: [PATCH v1 1/4] kexec: (bugfix) calc correct end address of
+ memory ranges in device tree
+In-Reply-To: <3562841.ROYbCgkeeq@hactar>
+References: <cover.1468970114.git.geoff@infradead.org>
+ <c4af21ba365767f88a2516719dd0f3b70777b549.1468970114.git.geoff@infradead.org>
+ <3562841.ROYbCgkeeq@hactar>
+Message-ID: <20160727232331.GY1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, July 28, 2016 01:29:05 AM fu.wei at linaro.org wrote:
-> From: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+On Wed, Jul 27, 2016 at 07:45:13PM -0300, Thiago Jung Bauermann wrote:
+> Hello,
 > 
-> This commit provides APEI arch-specific bits for aarch64
+> Am Dienstag, 19 Juli 2016, 23:28:13 schrieb Geoff Levand:
+> > From: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> > 
+> > The end address of "reg" attribute in device tree's memory should be
+> > inclusive.
 > 
-> Meanwhile,
-> (1)add a new subfunction "hest_ia32_init" for
-> "acpi_disable_cmcff" which is used by IA-32 Architecture
-> Corrected Machine Check (CMC).
-> (2)move HEST type (ACPI_HEST_TYPE_IA32_CORRECTED_CHECK) checking to
-> a generic place.
-> (3)select HAVE_ACPI_APEI when EFI and ACPI is set on ARM64,
-> because arch_apei_get_mem_attribute is using efi_mem_attributes on ARM64.
+> Actually, there's a bug/inconsistency in kexec-tools right now.
 > 
-> [Fu Wei: improve && upstream]
-> 
-> Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
-> Tested-by: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
-> Signed-off-by: Fu Wei <fu.wei@linaro.org>
-> Acked-by: Hanjun Guo <hanjun.guo@linaro.org>
-> Tested-by: Tyler Baicar <tbaicar@codeaurora.org>
-> Acked-by: Will Deacon <will.deacon@arm.com>
+> crashdump-arm.c expect usablemem_rgns.ranges[i].end to be the last byte in 
+> the range, but crashdump-powerpc.c, crashdump-ppc64.c and fs2dt.c expect it 
+> to be the first byte after the range.
 
-You have an impressive list of addresses in the CC, the majority of them
-probably quite irrelevant.  Any chance to reduce that next time?
+Well, ARM (and the generic code I introduced for mem_ranges) follows
+what i386, ia64, mips, s390, and sh all do with struct memory_range
+when used for crashdump.
 
-Boris and Tony need to be CCed, though.
+It is extremely bad for a project to have a single structure used
+inconsistently like this - even with generic helpers, you can't be
+sure that the right helpers are used on the right structures, and
+it will lead to off-by-one errors all over the place.  Just don't
+pull crap like this, it's asking for trouble - settle on one way
+and stick to it.
 
-> ---
-> Changelog:
-> v11:https://lkml.org/lkml/2016/7
->     Rebase to v4.7-0e06f5c0
-> 
-> v10:https://lkml.org/lkml/2016/4/14
->     Fix the Alphabetical order problem in arch/arm64/Kconfig
-> 
-> v9: https://lkml.org/lkml/2016/4/5/522
->     Improve the comment for arch_apei_flush_tlb_one.
->     Using select "HAVE_ACPI_APEI if (ACPI && EFI)" to fix the EFI dependence
->     problem.
-> 
-> v8: https://lkml.org/lkml/2016/3/29/132
->     Fix a "undefined reference" bug by selecting EFI when ACPI_APEI is set
->     on ARM64.
-> 
-> v7: https://lkml.org/lkml/2016/3/17/183
->     Add comment for arch_apei_flush_tlb_one in arch/arm64/include/asm/acpi.h
-> 
-> v6: https://lists.linaro.org/pipermail/linaro-acpi/2016-March/006644.html
->     Move HEST type (ACPI_HEST_TYPE_IA32_CORRECTED_CHECK) checking to
->     a generic place.
->     Delete HAVE_ACPI_APEI_HEST_IA32.
-> 
-> v5: https://lkml.org/lkml/2015/12/10/131
->     Add "HAVE_ACPI_APEI_HEST_IA32" instead of
->     "#if defined(__i386__) || defined(__x86_64__)".
-> 
-> v4: https://lkml.org/lkml/2015/12/8/188
->     Rebase to latest kernel version(4.4-rc4).
->     Move arch_apei_flush_tlb_one into header file as a inline function
->     Add a new subfunction "hest_ia_init" for "acpi_disable_cmcff".
-> 
-> v3: https://lkml.org/lkml/2015/12/3/521
->     Remove "acpi_disable_cmcff" from arm64 code,
->     and wrap it in hest.c by "#if defined(__i386__) || defined(__x86_64__)"
-> 
-> v2: https://lkml.org/lkml/2015/12/2/432
->     Rebase to latest kernel version(4.4-rc3).
->     Move arch_apei_flush_tlb_one() to arch/arm64/kernel/acpi.c
-> 
-> v1: https://lkml.org/lkml/2015/8/14/199
->     Move arch_apei_flush_tlb_one() to arch/arm64/include/asm/apci.h.
->     Delete arch/arm64/kernel/apei.c.
->     Add "#ifdef CONFIG_ACPI_APEI" for "acpi_disable_cmcff".
-> 
->  arch/arm64/Kconfig            |  1 +
->  arch/arm64/include/asm/acpi.h | 16 +++++++++++++++-
->  arch/x86/kernel/acpi/apei.c   |  3 ---
->  drivers/acpi/apei/hest.c      | 18 +++++++++++++++---
->  4 files changed, 31 insertions(+), 7 deletions(-)
-> 
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 20d5a60..a301765 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -49,6 +49,7 @@ config ARM64
->  	select GENERIC_TIME_VSYSCALL
->  	select HANDLE_DOMAIN_IRQ
->  	select HARDIRQS_SW_RESEND
-> +	select HAVE_ACPI_APEI if (ACPI && EFI)
->  	select HAVE_ALIGNED_STRUCT_PAGE if SLUB
->  	select HAVE_ARCH_AUDITSYSCALL
->  	select HAVE_ARCH_BITREVERSE
-> diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
-> index 5420cb0..d3d02dc 100644
-> --- a/arch/arm64/include/asm/acpi.h
-> +++ b/arch/arm64/include/asm/acpi.h
-> @@ -17,6 +17,7 @@
->  
->  #include <asm/cputype.h>
->  #include <asm/smp_plat.h>
-> +#include <asm/tlbflush.h>
->  
->  /* Macros for consistency checks of the GICC subtable of MADT */
->  #define ACPI_MADT_GICC_LENGTH	\
-> @@ -110,8 +111,21 @@ static inline const char *acpi_get_enable_method(int cpu)
->  }
->  
->  #ifdef	CONFIG_ACPI_APEI
-> +#define acpi_disable_cmcff 1
->  pgprot_t arch_apei_get_mem_attribute(phys_addr_t addr);
-> -#endif
-> +
-> +/*
-> + * Despite its name, this function must still broadcast the TLB
-> + * invalidation in order to ensure other CPUs don't up with with junk
-> + * entries as a result of speculation. Unusually, its also called in
-> + * IRQ context (ghes_iounmap_irq) so if we ever need to use IPIs for
-> + * TLB broadcasting, then we're in trouble here.
-> + */
-> +static inline void arch_apei_flush_tlb_one(unsigned long addr)
-> +{
-> +	flush_tlb_kernel_range(addr, addr + PAGE_SIZE);
-> +}
-> +#endif /* CONFIG_ACPI_APEI */
->  
->  #ifdef CONFIG_ACPI_NUMA
->  int arm64_acpi_numa_init(void);
-> diff --git a/arch/x86/kernel/acpi/apei.c b/arch/x86/kernel/acpi/apei.c
-> index c280df6..ea3046e 100644
-> --- a/arch/x86/kernel/acpi/apei.c
-> +++ b/arch/x86/kernel/acpi/apei.c
-> @@ -24,9 +24,6 @@ int arch_apei_enable_cmcff(struct acpi_hest_header *hest_hdr, void *data)
->  	struct acpi_hest_ia_corrected *cmc;
->  	struct acpi_hest_ia_error_bank *mc_bank;
->  
-> -	if (hest_hdr->type != ACPI_HEST_TYPE_IA32_CORRECTED_CHECK)
-> -		return 0;
-> -
->  	cmc = (struct acpi_hest_ia_corrected *)hest_hdr;
->  	if (!cmc->enabled)
->  		return 0;
-> diff --git a/drivers/acpi/apei/hest.c b/drivers/acpi/apei/hest.c
-> index 20b3fcf..792a0d9 100644
-> --- a/drivers/acpi/apei/hest.c
-> +++ b/drivers/acpi/apei/hest.c
-> @@ -123,7 +123,18 @@ EXPORT_SYMBOL_GPL(apei_hest_parse);
->   */
->  static int __init hest_parse_cmc(struct acpi_hest_header *hest_hdr, void *data)
->  {
-> -	return arch_apei_enable_cmcff(hest_hdr, data);
-> +	if (hest_hdr->type != ACPI_HEST_TYPE_IA32_CORRECTED_CHECK)
-> +		return 0;
-> +
-> +	if (!acpi_disable_cmcff)
-> +		return !arch_apei_enable_cmcff(hest_hdr, data);
-> +
-> +	return 0;
-> +}
-> +
-> +static inline int __init hest_ia32_init(void)
-> +{
-> +	return apei_hest_parse(hest_parse_cmc, NULL);
->  }
->  
->  struct ghes_arr {
-> @@ -232,8 +243,9 @@ void __init acpi_hest_init(void)
->  		goto err;
->  	}
->  
-> -	if (!acpi_disable_cmcff)
-> -		apei_hest_parse(hest_parse_cmc, NULL);
-> +	rc = hest_ia32_init();
-> +	if (rc)
-> +		goto err;
->  
->  	if (!ghes_disable) {
->  		rc = apei_hest_parse(hest_parse_ghes_count, &ghes_count);
-> 
+Given that the majority of architectures treat .end as inclusive, I
+think ppc* and fs2dt need to conform to the convention establised by
+the other architectures for this structure.
+
+It's also interesting to note that crashdump-powerpc has this:
+
+        /* On powerpc memory ranges in device-tree is denoted as start
+         * and size rather than start and end, as is the case with
+         * other architectures like i386 . Because of this when loading
+         * the memory ranges in crashdump-elf.c the filesz calculation
+         * [ end - start + 1 ] goes for a toss.
+         *
+         * To be in sync with other archs adjust the end value for
+         * every crash memory range before calling the generic function
+         */
+
+        for (i = 0; i < nr_ranges; i++) {
+                end = crash_memory_range[i].end - 1;
+                crash_memory_range[i].end = end;
+        }
+
+to convert from powerpc end-exclusive to end-inclusive mode -
+something that could be killed if it were to conform throughout
+to the established convention.  Same goes for ppc64 too:
+
+        /* On ppc64 memory ranges in device-tree is denoted as start
+         * and size rather than start and end, as is the case with
+         * other architectures like i386 . Because of this when loading
+         * the memory ranges in crashdump-elf.c the filesz calculation
+         * [ end - start + 1 ] goes for a toss.
+         *
+         * To be in sync with other archs adjust the end value for
+         * every crash memory range before calling the generic function
+         */
+
+        for (i = 0; i < nr_ranges; i++) {
+                end = crash_memory_range[i].end - 1;
+                crash_memory_range[i].end = end;
+        }
 
 -- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently@9.6Mbps down 400kbps up
+according to speedtest.net.
