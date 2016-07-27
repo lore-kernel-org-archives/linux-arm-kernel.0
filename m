@@ -1,181 +1,172 @@
-From: minghsiu.tsai@mediatek.com (Minghsiu Tsai)
-Date: Wed, 27 Jul 2016 09:44:46 +0800
-Subject: [PATCH v2 2/4] dt-bindings: Add a binding for Mediatek MDP
-In-Reply-To: <20160726185433.GA14609@rob-hp-laptop>
-References: <1469176383-35210-1-git-send-email-minghsiu.tsai@mediatek.com>
- <1469176383-35210-3-git-send-email-minghsiu.tsai@mediatek.com>
- <20160726185433.GA14609@rob-hp-laptop>
-Message-ID: <1469583886.27630.18.camel@mtksdaap41>
+From: kwangwoo.lee@sk.com (kwangwoo.lee at sk.com)
+Date: Wed, 27 Jul 2016 01:55:31 +0000
+Subject: [PATCH v2] arm64: mm: convert __dma_* routines to use start, size
+In-Reply-To: <b978e732-f5c3-4b77-01d9-dd5f7e2303e3@arm.com>
+References: <1469518496-8177-1-git-send-email-kwangwoo.lee@sk.com>
+ <b978e732-f5c3-4b77-01d9-dd5f7e2303e3@arm.com>
+Message-ID: <15c12f9900fd4b31a875250c478023c6@nmail01.hynixad.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2016-07-26 at 13:54 -0500, Rob Herring wrote:
-> On Fri, Jul 22, 2016 at 04:33:01PM +0800, Minghsiu Tsai wrote:
-> > Add a DT binding documentation of MDP for the MT8173 SoC
-> > from Mediatek
-> > 
-> > Signed-off-by: Minghsiu Tsai <minghsiu.tsai@mediatek.com>
+Hi Robin,
+
+Thanks a lot for your comments! Please, find my comments below.
+
+> -----Original Message-----
+> From: Robin Murphy [mailto:robin.murphy at arm.com]
+> Sent: Tuesday, July 26, 2016 7:43 PM
+> To: ???(LEE KWANGWOO) MS SW; Russell King - ARM Linux; Catalin Marinas; Will Deacon; Mark Rutland;
+> linux-arm-kernel at lists.infradead.org
+> Cc: ???(KIM HYUNCHUL) MS SW; linux-kernel at vger.kernel.org; ???(CHUNG WOO SUK) MS SW
+> Subject: Re: [PATCH v2] arm64: mm: convert __dma_* routines to use start, size
+> 
+> On 26/07/16 08:34, Kwangwoo Lee wrote:
+> > v2)
+> > change __dma_* routine names using the terminoloy guidance:
+> >     area: takes a start and size
+> >     range: takes a start and end
+> > use __dma_flush_area() instead of __dma_flush_range() in dma-mapping.c
+> >
+> > v1)
+> > __dma_* routines have been converted to use start and size instread of
+> > start and end addresses. The patch was origianlly for adding
+> > __clean_dcache_area_poc() which will be used in pmem driver to clean
+> > dcache to the PoC(Point of Coherency) in arch_wb_cache_pmem().
+> >
+> > The functionality of __clean_dcache_area_poc()  was equivalent to
+> > __dma_clean_range(). The difference was __dma_clean_range() uses the end
+> > address, but __clean_dcache_area_poc() uses the size to clean.
+> >
+> > Thus, __clean_dcache_area_poc() has been revised with a fall through
+> > function of __dma_clean_range() after the change that __dma_* routines
+> > use start and size instead of using start and end.
+> >
+> > Signed-off-by: Kwangwoo Lee <kwangwoo.lee@sk.com>
 > > ---
-> >  .../devicetree/bindings/media/mediatek-mdp.txt     |   96 ++++++++++++++++++++
-> >  1 file changed, 96 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/media/mediatek-mdp.txt
-> > 
-> > diff --git a/Documentation/devicetree/bindings/media/mediatek-mdp.txt b/Documentation/devicetree/bindings/media/mediatek-mdp.txt
-> > new file mode 100644
-> > index 0000000..2dad031
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/media/mediatek-mdp.txt
-> > @@ -0,0 +1,96 @@
-> > +* Mediatek Media Data Path
-> > +
-> > +Media Data Path is used for scaling and color space conversion.
-> > +
-> > +Required properties (all function blocks):
-> > +- compatible: "mediatek,<chip>-mdp"
 > 
-> What is this, ...
+> Nit: the changelog relative to the previous posting wants to be here,
+> under the "---" separator; the commit message above should describe the
+> _current_ state of the patch, as that's all we'll really care about once
+> it's in the Git history.
+
+OK. I'll follow the convention and use the feature.
+Thank you very much for letting me know!
+
+> >  arch/arm64/include/asm/cacheflush.h |  3 +-
+> >  arch/arm64/mm/cache.S               | 71 +++++++++++++++++++------------------
+> >  arch/arm64/mm/dma-mapping.c         |  6 ++--
+> >  3 files changed, 41 insertions(+), 39 deletions(-)
+> >
+> > diff --git a/arch/arm64/include/asm/cacheflush.h b/arch/arm64/include/asm/cacheflush.h
+> > index c64268d..2e5fb97 100644
+> > --- a/arch/arm64/include/asm/cacheflush.h
+> > +++ b/arch/arm64/include/asm/cacheflush.h
+> > @@ -68,6 +68,7 @@
+> >  extern void flush_cache_range(struct vm_area_struct *vma, unsigned long start, unsigned long end);
+> >  extern void flush_icache_range(unsigned long start, unsigned long end);
+> >  extern void __flush_dcache_area(void *addr, size_t len);
+> > +extern void __clean_dcache_area_poc(void *addr, size_t len);
+> >  extern void __clean_dcache_area_pou(void *addr, size_t len);
+> >  extern long __flush_cache_user_range(unsigned long start, unsigned long end);
+> >
+> > @@ -85,7 +86,7 @@ static inline void flush_cache_page(struct vm_area_struct *vma,
+> >   */
+> >  extern void __dma_map_area(const void *, size_t, int);
+> >  extern void __dma_unmap_area(const void *, size_t, int);
+> > -extern void __dma_flush_range(const void *, const void *);
+> > +extern void __dma_flush_area(const void *, size_t);
+> >
+> >  /*
+> >   * Copy user data from/to a page which is mapped into a different
+> > diff --git a/arch/arm64/mm/cache.S b/arch/arm64/mm/cache.S
+> > index 50ff9ba..4415c1b 100644
+> > --- a/arch/arm64/mm/cache.S
+> > +++ b/arch/arm64/mm/cache.S
+> > @@ -110,14 +110,16 @@ ENDPROC(__clean_dcache_area_pou)
+> >   *	- end     - end address of region
+> >   */
+> >  ENTRY(__inval_cache_range)
+> > +	sub	x1, x1, x0
 > 
+> Rather than doing this, I think it would be more sensible to simply swap
+> the entry points.
 
-It is used to match platform driver.
+This is much better idea instead of adding sub instruction! :) Thanks!
 
-
-> > +        "mediatek,<chip>-mdp-<function>", one of
+> >  	/* FALLTHROUGH */
+> >
+> >  /*
+> > - *	__dma_inv_range(start, end)
+> > + *	__dma_inv_area(start, size)
+> >   *	- start   - virtual start address of region
+> > - *	- end     - virtual end address of region
+> > + *	- size    - size in question
+> >   */
+> > -__dma_inv_range:
+> > +__dma_inv_area:
+> > +	add	x1, x1, x0
+> >  	dcache_line_size x2, x3
+> >  	sub	x3, x2, #1
+> >  	tst	x1, x3				// end cache line aligned?
+> > @@ -136,46 +138,47 @@ __dma_inv_range:
+> >  	dsb	sy
+> >  	ret
+> >  ENDPIPROC(__inval_cache_range)
+> > -ENDPROC(__dma_inv_range)
+> > +ENDPROC(__dma_inv_area)
+> > +
+> > +/*
+> > + *	__clean_dcache_area_poc(kaddr, size)
+> > + *
+> > + * 	Ensure that any D-cache lines for the interval [kaddr, kaddr+size)
+> > + * 	are cleaned to the PoC.
+> > + *
+> > + *	- kaddr   - kernel address
+> > + *	- size    - size in question
+> > + */
+> > +ENTRY(__clean_dcache_area_poc)
+> > +	/* FALLTHROUGH */
+> >
+> >  /*
+> > - *	__dma_clean_range(start, end)
+> > + *	__dma_clean_area(start, size)
+> >   *	- start   - virtual start address of region
+> > - *	- end     - virtual end address of region
+> > + *	- size    - size in question
+> >   */
+> > -__dma_clean_range:
+> > -	dcache_line_size x2, x3
+> > -	sub	x3, x2, #1
+> > -	bic	x0, x0, x3
+> > -1:
+> > +__dma_clean_area:
+> >  alternative_if_not ARM64_WORKAROUND_CLEAN_CACHE
+> > -	dc	cvac, x0
+> > +	dcache_by_line_op cvac, sy, x0, x1, x2, x3
+> >  alternative_else
+> > -	dc	civac, x0
+> > +	dcache_by_line_op civac, sy, x0, x1, x2, x3
 > 
-> and this?
-> 
+> dcache_by_line_op is a relatively large macro - is there any way we can
+> still apply the alternative to just the one instruction which needs it,
+> as opposed to having to patch the entire mostly-identical routine?
 
-It is string format of HW block. <chip> could be "mt8173", and
-<function> are "rdma", "rsz", "wdma", and "wrot".  
+I agree with your opinion. Then, how do you think about using CONFIG_* options
+like below? I think that alternative_* macros seems to keep the space for
+unused instruction. Is it necessary? Please, share your thought about the
+space. Thanks!
 
++__dma_clean_area:
++#if    defined(CONFIG_ARM64_ERRATUM_826319) || \
++       defined(CONFIG_ARM64_ERRATUM_827319) || \
++       defined(CONFIG_ARM64_ERRATUM_824069) || \
++       defined(CONFIG_ARM64_ERRATUM_819472)
++       dcache_by_line_op civac, sy, x0, x1, x2, x3
++#else
++       dcache_by_line_op cvac, sy, x0, x1, x2, x3
++#endif
 
-> > +        "mediatek,<chip>-mdp-rdma"  - read DMA
-> > +        "mediatek,<chip>-mdp-rsz"   - resizer
-> > +        "mediatek,<chip>-mdp-wdma"  - write DMA
-> > +        "mediatek,<chip>-mdp-wrot"  - write DMA with rotation
-> 
-> List what are valid values of <chip>.
-> 
+> Robin.
 
-<chip> - mt8173. There should be other chip added in future.
-I will change the property as blow:
-
-- compatible: "mediatek,<chip>-mdp"
-        Should be one of
-        "mediatek,<chip>-mdp-rdma"  - read DMA
-        "mediatek,<chip>-mdp-rsz"   - resizer
-        "mediatek,<chip>-mdp-wdma"  - write DMA
-        "mediatek,<chip>-mdp-wrot"  - write DMA with rotation
-        <chip> - could be 8173
-
-
-If don't need <chip>, I also can change it as below. It is more clear.
-- compatible: "mediatek,mt8173-mdp"
-        Should be one of
-        "mediatek,mt8173-mdp-rdma"  - read DMA
-        "mediatek,mt8173-mdp-rsz"   - resizer
-        "mediatek,mt8173-mdp-wdma"  - write DMA
-        "mediatek,mt8173-mdp-wrot"  - write DMA with rotation
-
-
-> > +- reg: Physical base address and length of the function block register space
-> > +- clocks: device clocks
-> > +- power-domains: a phandle to the power domain.
-> > +- mediatek,vpu: the node of video processor unit
-> > +
-> > +Required properties (DMA function blocks):
-> > +- compatible: Should be one of
-> > +        "mediatek,<chip>-mdp-rdma"
-> > +        "mediatek,<chip>-mdp-wdma"
-> > +        "mediatek,<chip>-mdp-wrot"
-> > +- iommus: should point to the respective IOMMU block with master port as
-> > +  argument, see Documentation/devicetree/bindings/iommu/mediatek,iommu.txt
-> > +  for details.
-> > +- mediatek,larb: must contain the local arbiters in the current Socs.
-> 
-> It is still not clear which properties apply to which compatible 
-> strings.
-> 
-
-I found out the document for larb. 
-I will change the property as below:
-
-- mediatek,larb: must contain the local arbiters in the current Socs,
-see
-Documentation/devicetree/bindings/memory-controllers/mediatek,smi-larb.txt 
-  for details.
-
-
-> > +
-> > +Example:
-> > +	mdp_rdma0: rdma at 14001000 {
-> > +		compatible = "mediatek,mt8173-mdp-rdma",
-> > +			     "mediatek,mt8173-mdp";
-> > +		reg = <0 0x14001000 0 0x1000>;
-> > +		clocks = <&mmsys CLK_MM_MDP_RDMA0>,
-> > +			 <&mmsys CLK_MM_MUTEX_32K>;
-> > +		power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
-> > +		iommus = <&iommu M4U_PORT_MDP_RDMA0>;
-> > +		mediatek,larb = <&larb0>;
-> > +		mediatek,vpu = <&vpu>;
-> > +	};
-> > +
-> > +	mdp_rdma1: rdma at 14002000 {
-> > +		compatible = "mediatek,mt8173-mdp-rdma";
-> > +		reg = <0 0x14002000 0 0x1000>;
-> > +		clocks = <&mmsys CLK_MM_MDP_RDMA1>,
-> > +			 <&mmsys CLK_MM_MUTEX_32K>;
-> > +		power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
-> > +		iommus = <&iommu M4U_PORT_MDP_RDMA1>;
-> > +		mediatek,larb = <&larb4>;
-> > +	};
-> > +
-> > +	mdp_rsz0: rsz at 14003000 {
-> > +		compatible = "mediatek,mt8173-mdp-rsz";
-> > +		reg = <0 0x14003000 0 0x1000>;
-> > +		clocks = <&mmsys CLK_MM_MDP_RSZ0>;
-> > +		power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
-> > +	};
-> > +
-> > +	mdp_rsz1: rsz at 14004000 {
-> > +		compatible = "mediatek,mt8173-mdp-rsz";
-> > +		reg = <0 0x14004000 0 0x1000>;
-> > +		clocks = <&mmsys CLK_MM_MDP_RSZ1>;
-> > +		power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
-> > +	};
-> > +
-> > +	mdp_rsz2: rsz at 14005000 {
-> > +		compatible = "mediatek,mt8173-mdp-rsz";
-> > +		reg = <0 0x14005000 0 0x1000>;
-> > +		clocks = <&mmsys CLK_MM_MDP_RSZ2>;
-> > +		power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
-> > +	};
-> > +
-> > +	mdp_wdma0: wdma at 14006000 {
-> > +		compatible = "mediatek,mt8173-mdp-wdma";
-> > +		reg = <0 0x14006000 0 0x1000>;
-> > +		clocks = <&mmsys CLK_MM_MDP_WDMA>;
-> > +		power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
-> > +		iommus = <&iommu M4U_PORT_MDP_WDMA>;
-> > +		mediatek,larb = <&larb0>;
-> > +	};
-> > +
-> > +	mdp_wrot0: wrot at 14007000 {
-> > +		compatible = "mediatek,mt8173-mdp-wrot";
-> > +		reg = <0 0x14007000 0 0x1000>;
-> > +		clocks = <&mmsys CLK_MM_MDP_WROT0>;
-> > +		power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
-> > +		iommus = <&iommu M4U_PORT_MDP_WROT0>;
-> > +		mediatek,larb = <&larb0>;
-> > +	};
-> > +
-> > +	mdp_wrot1: wrot at 14008000 {
-> > +		compatible = "mediatek,mt8173-mdp-wrot";
-> > +		reg = <0 0x14008000 0 0x1000>;
-> > +		clocks = <&mmsys CLK_MM_MDP_WROT1>;
-> > +		power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
-> > +		iommus = <&iommu M4U_PORT_MDP_WROT1>;
-> > +		mediatek,larb = <&larb4>;
-> > +	};
-> > -- 
-> > 1.7.9.5
-> > 
+Best Regards,
+Kwangwoo Lee
