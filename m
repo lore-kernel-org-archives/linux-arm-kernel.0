@@ -1,55 +1,104 @@
-From: ck.hu@mediatek.com (CK Hu)
-Date: Wed, 27 Jul 2016 17:25:56 +0800
-Subject: [PATCH v3] arm64: dts: mt8173: add mmsel clocks for 4K support
-In-Reply-To: <1469607914-64831-1-git-send-email-bibby.hsieh@mediatek.com>
-References: <1469607914-64831-1-git-send-email-bibby.hsieh@mediatek.com>
-Message-ID: <1469611556.11841.77.camel@mtksdaap41>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Wed, 27 Jul 2016 11:25:50 +0200
+Subject: [PATCH v2 2/3] drm/mediatek: enhance the HDMI driving current
+In-Reply-To: <1469608292-6106-3-git-send-email-bibby.hsieh@mediatek.com>
+References: <1469608292-6106-1-git-send-email-bibby.hsieh@mediatek.com>
+ <1469608292-6106-3-git-send-email-bibby.hsieh@mediatek.com>
+Message-ID: <1469611550.2470.22.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Bibby:
-
-On Wed, 2016-07-27 at 16:25 +0800, Bibby Hsieh wrote:
-> If MT8173 can support HDMI 4K resoultion, the
-> VENCPLL should be configured to 800MHZ.
-> We didn't set VENCPLL directly, we set the
-> mm_sel to 400MHz statically in the board device tree.
-
-You may rewrite the description as below:
-
-'To support HDMI 4K resolution, mmsys need clock mm_sel to be 400MHz.'
-
-You need not to mention VENCPLL because it's controlled by clock driver.
-
+Am Mittwoch, den 27.07.2016, 16:31 +0800 schrieb Bibby Hsieh:
+> From: Junzhi Zhao <junzhi.zhao@mediatek.com>
 > 
+> In order to improve 4K resolution performance,
+> we have to enhance the HDMI driving currend
+                                           ^
+Typo, s/currend/current/
+
+Besides that, this patch looks good to me.
+
+regards
+Philipp
+
+> when clock rate is greater than 165MHz.
+> 
+> Signed-off-by: Junzhi Zhao <junzhi.zhao@mediatek.com>
 > Signed-off-by: Bibby Hsieh <bibby.hsieh@mediatek.com>
 > ---
-> Changes since v2:
->  - Align the clocks of dpi0 node.
+>  drivers/gpu/drm/mediatek/mtk_mt8173_hdmi_phy.c |   42 +++++++++++++++++-------
+>  1 file changed, 30 insertions(+), 12 deletions(-)
 > 
-> Changes since v1:
->  - Do not set the VENCPLL by clk_set_rate
->    at display driver.
->  - Configure the mm_sel to 400MHz statically
->    in the board device tree.
-> ---
->  arch/arm64/boot/dts/mediatek/mt8173.dtsi |    2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> index 78529e4..9c22204 100644
-> --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> @@ -690,7 +690,9 @@
->  			compatible = "mediatek,mt8173-mmsys", "syscon";
->  			reg = <0 0x14000000 0 0x1000>;
->  			power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
-> +			clocks = <&topckgen CLK_TOP_MM_SEL>;
->  			#clock-cells = <1>;
-> +			clock-frequency  = <400000000>;
->  		};
+> diff --git a/drivers/gpu/drm/mediatek/mtk_mt8173_hdmi_phy.c b/drivers/gpu/drm/mediatek/mtk_mt8173_hdmi_phy.c
+> index 8a24754..51cb9cf 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_mt8173_hdmi_phy.c
+> +++ b/drivers/gpu/drm/mediatek/mtk_mt8173_hdmi_phy.c
+> @@ -265,6 +265,9 @@ static int mtk_hdmi_pll_set_rate(struct clk_hw *hw, unsigned long rate,
+>  	struct mtk_hdmi_phy *hdmi_phy = to_mtk_hdmi_phy(hw);
+>  	unsigned int pre_div;
+>  	unsigned int div;
+> +	unsigned int pre_ibias;
+> +	unsigned int hdmi_ibias;
+> +	unsigned int imp_en;
 >  
->  		ovl0: ovl at 1400c000 {
-
-Regards,
-CK
+>  	dev_dbg(hdmi_phy->dev, "%s: %lu Hz, parent: %lu Hz\n", __func__,
+>  		rate, parent_rate);
+> @@ -298,18 +301,31 @@ static int mtk_hdmi_pll_set_rate(struct clk_hw *hw, unsigned long rate,
+>  			  (0x1 << PLL_BR_SHIFT),
+>  			  RG_HDMITX_PLL_BP | RG_HDMITX_PLL_BC |
+>  			  RG_HDMITX_PLL_BR);
+> -	mtk_hdmi_phy_clear_bits(hdmi_phy, HDMI_CON3, RG_HDMITX_PRD_IMP_EN);
+> +	if (rate < 165000000) {
+> +		mtk_hdmi_phy_clear_bits(hdmi_phy, HDMI_CON3,
+> +					RG_HDMITX_PRD_IMP_EN);
+> +		pre_ibias = 0x3;
+> +		imp_en = 0x0;
+> +		hdmi_ibias = hdmi_phy->ibias;
+> +	} else {
+> +		mtk_hdmi_phy_set_bits(hdmi_phy, HDMI_CON3,
+> +				      RG_HDMITX_PRD_IMP_EN);
+> +		pre_ibias = 0x6;
+> +		imp_en = 0xf;
+> +		hdmi_ibias = hdmi_phy->ibias_up;
+> +	}
+>  	mtk_hdmi_phy_mask(hdmi_phy, HDMI_CON4,
+> -			  (0x3 << PRD_IBIAS_CLK_SHIFT) |
+> -			  (0x3 << PRD_IBIAS_D2_SHIFT) |
+> -			  (0x3 << PRD_IBIAS_D1_SHIFT) |
+> -			  (0x3 << PRD_IBIAS_D0_SHIFT),
+> +			  (pre_ibias << PRD_IBIAS_CLK_SHIFT) |
+> +			  (pre_ibias << PRD_IBIAS_D2_SHIFT) |
+> +			  (pre_ibias << PRD_IBIAS_D1_SHIFT) |
+> +			  (pre_ibias << PRD_IBIAS_D0_SHIFT),
+>  			  RG_HDMITX_PRD_IBIAS_CLK |
+>  			  RG_HDMITX_PRD_IBIAS_D2 |
+>  			  RG_HDMITX_PRD_IBIAS_D1 |
+>  			  RG_HDMITX_PRD_IBIAS_D0);
+>  	mtk_hdmi_phy_mask(hdmi_phy, HDMI_CON3,
+> -			  (0x0 << DRV_IMP_EN_SHIFT), RG_HDMITX_DRV_IMP_EN);
+> +			  (imp_en << DRV_IMP_EN_SHIFT),
+> +			  RG_HDMITX_DRV_IMP_EN);
+>  	mtk_hdmi_phy_mask(hdmi_phy, HDMI_CON6,
+>  			  (hdmi_phy->drv_imp_clk << DRV_IMP_CLK_SHIFT) |
+>  			  (hdmi_phy->drv_imp_d2 << DRV_IMP_D2_SHIFT) |
+> @@ -318,12 +334,14 @@ static int mtk_hdmi_pll_set_rate(struct clk_hw *hw, unsigned long rate,
+>  			  RG_HDMITX_DRV_IMP_CLK | RG_HDMITX_DRV_IMP_D2 |
+>  			  RG_HDMITX_DRV_IMP_D1 | RG_HDMITX_DRV_IMP_D0);
+>  	mtk_hdmi_phy_mask(hdmi_phy, HDMI_CON5,
+> -			  (hdmi_phy->ibias << DRV_IBIAS_CLK_SHIFT) |
+> -			  (hdmi_phy->ibias << DRV_IBIAS_D2_SHIFT) |
+> -			  (hdmi_phy->ibias << DRV_IBIAS_D1_SHIFT) |
+> -			  (hdmi_phy->ibias << DRV_IBIAS_D0_SHIFT),
+> -			  RG_HDMITX_DRV_IBIAS_CLK | RG_HDMITX_DRV_IBIAS_D2 |
+> -			  RG_HDMITX_DRV_IBIAS_D1 | RG_HDMITX_DRV_IBIAS_D0);
+> +			  (hdmi_ibias << DRV_IBIAS_CLK_SHIFT) |
+> +			  (hdmi_ibias << DRV_IBIAS_D2_SHIFT) |
+> +			  (hdmi_ibias << DRV_IBIAS_D1_SHIFT) |
+> +			  (hdmi_ibias << DRV_IBIAS_D0_SHIFT),
+> +			  RG_HDMITX_DRV_IBIAS_CLK |
+> +			  RG_HDMITX_DRV_IBIAS_D2 |
+> +			  RG_HDMITX_DRV_IBIAS_D1 |
+> +			  RG_HDMITX_DRV_IBIAS_D0);
+>  	return 0;
+>  }
+>  
