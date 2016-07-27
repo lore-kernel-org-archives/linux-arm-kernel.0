@@ -1,37 +1,67 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 27 Jul 2016 09:55:11 +0800
-Subject: [PATCH 3/3] ARM: sunxi: enable big-endian
-In-Reply-To: <20160726192609.GA27782@weiser.dinsnail.net>
-References: <20160721182329.13478-1-michael.weiser@gmx.de>
- <20160721182329.13478-4-michael.weiser@gmx.de>
- <20160722090101.GB7687@lukather> <20160722135658.GA18977@weiser.dinsnail.net>
- <20160725122522.GL7419@lukather> <20160726192609.GA27782@weiser.dinsnail.net>
-Message-ID: <CAGb2v67O5vrqN4m3rZVBGA+ee1bg2iTxiggNJF+t5Lszd=mW=A@mail.gmail.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Tue, 26 Jul 2016 19:00:18 -0700
+Subject: [PATCH v2 1/4] iio: adc: rockchip_saradc: reset saradc controller
+ before programming it
+In-Reply-To: <57980362.3000406@rock-chips.com>
+References: <1469535195-5227-1-git-send-email-wxt@rock-chips.com>
+ <57976814.3040605@roeck-us.net> <579777F4.2090002@rock-chips.com>
+ <20160726170023.GA6590@roeck-us.net> <57980362.3000406@rock-chips.com>
+Message-ID: <579815B2.5010205@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 27, 2016 at 3:26 AM, Michael Weiser <michael.weiser@gmx.de> wrote:
-> Hi Maxime,
+On 07/26/2016 05:42 PM, Caesar Wang wrote:
 >
-> On Mon, Jul 25, 2016 at 02:25:22PM +0200, Maxime Ripard wrote:
+> On 2016?07?27? 01:00, Guenter Roeck wrote:
+>> On Tue, Jul 26, 2016 at 10:47:16PM +0800, Caesar Wang wrote:
+>>> On 2016?07?26? 21:39, Guenter Roeck wrote:
+>>>>> static int rockchip_saradc_probe(struct platform_device *pdev)
+>>>>> {
+>>>>> struct rockchip_saradc *info = NULL;
+>>>>> @@ -218,6 +231,21 @@ static int rockchip_saradc_probe(struct
+>>>>> platform_device *pdev)
+>>>>> if (IS_ERR(info->regs))
+>>>>> return PTR_ERR(info->regs);
+>>>>>
+>>>>> + /*
+>>>>> + * The reset should be an optional property, as it should work
+>>>>> + * with old devicetrees as well
+>>>>> + */
+>>>>> + info->reset = devm_reset_control_get_optional(&pdev->dev,
+>>>>> + "saradc-apb");
+>>>> Does anyone know what the _optional API is for ? It seems to be exactly
+>>>> the same
+>>>> as devm_reset_control_get().
+>>> ?
+>>> As far as I see, the difference is WARN_ON(1)
+>>> when CONFIG_RESET_CONTROLLER is not defined.
+>>>
+>>>
+>>> The _optional functions were introduced by the following commit:
+>>>
+>>> ----------------->8-----------------
+>>> commit b424080a9e086e683ad5fdc624a7cf3c024e0c0f
+>>> Author: Philipp Zabel <p.zabel@xxxxxxxxxxxxxx>
+>>> Date: Fri Mar 7 15:18:47 2014 +0100
+>>>
+>>> reset: Add optional resets and stubs
+>>>
+>>> This patch adds device_reset_optional and (devm_)reset_control_get_optional
+>>> variants that drivers can use to indicate they can function without control
+>>> over the reset line. For those functions, stubs are added so the drivers can
+>>> be compiled with CONFIG_RESET_CONTROLLER disabled.
+>>> Also, device_reset is annotated with __must_check. Drivers
+>>> ignoring the return
+>>> value should use device_reset_optional instead.
+>>>
+>> Is that really what we are looking for here ? CONFIG_RESET_CONTROLLER
+>> is required for other functions of rk3399, isn't it ?
 >
->> > via I2C. I have not deliberately/synthetically tested the DMA engine. It's
->> > enabled in the my kernel config and seems happy but was not selected by
->> > any other driver so seems to be unused currently.
->> You can test the DMA using the audio components, either the codec, i2s
->> or spdif.
+> Right, as the DRM and thermal are depend on the CONFIG_RESET_CONTROLLER .....
 >
-> I've enabled the codec and it's currently playing some King Khan to me.
-> From looking at sun4i-dma.c it seems that all communication with the
-> silicon is via registers, including transfer of the DMA descriptors, and
-> all is done using {read,write}l{,_relaxed} already.
->
->> EMAC would be worth testing too.
->
-> As far as I gather, the Cubieboard2 does not route the EMAC pins anywhere.
-> So I can't connect a PHY to it for testing.
 
-The EMAC pins are muxed with the GMAC pins. All you need to do is disable
-the GMAC, enable the EMAC, and use emac_pins_a for the pinctrl.
+Since "optional" doesn't really mean "the reset property is optional"
+but "CONFIG_RESET_CONTROLLER is optional", I would suggest to use
+devm_reset_control_get().
 
-ChenYu
+Guenter
