@@ -1,84 +1,71 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 27 Jul 2016 10:56:18 +0100
-Subject: [PATCH v2] arm64: mm: convert __dma_* routines to use start, size
-In-Reply-To: <15c12f9900fd4b31a875250c478023c6@nmail01.hynixad.com>
-References: <1469518496-8177-1-git-send-email-kwangwoo.lee@sk.com>
- <b978e732-f5c3-4b77-01d9-dd5f7e2303e3@arm.com>
- <15c12f9900fd4b31a875250c478023c6@nmail01.hynixad.com>
-Message-ID: <c355debc-0238-ff51-ca90-6e0c8085366b@arm.com>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Wed, 27 Jul 2016 11:57:51 +0200
+Subject: at_xdmac: txd used outside spinlock after being released?
+In-Reply-To: <CAP+RiCAXKmFAzWoow_g=LR=tML7kxAi_dG0w4Z6X9KrvSypD9w@mail.gmail.com>
+References: <CAP+RiCAXKmFAzWoow_g=LR=tML7kxAi_dG0w4Z6X9KrvSypD9w@mail.gmail.com>
+Message-ID: <20160727095751.GA3700@odux.rfo.atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/07/16 02:55, kwangwoo.lee at sk.com wrote:
-[...]
->>>  /*
->>> - *	__dma_clean_range(start, end)
->>> + *	__dma_clean_area(start, size)
->>>   *	- start   - virtual start address of region
->>> - *	- end     - virtual end address of region
->>> + *	- size    - size in question
->>>   */
->>> -__dma_clean_range:
->>> -	dcache_line_size x2, x3
->>> -	sub	x3, x2, #1
->>> -	bic	x0, x0, x3
->>> -1:
->>> +__dma_clean_area:
->>>  alternative_if_not ARM64_WORKAROUND_CLEAN_CACHE
->>> -	dc	cvac, x0
->>> +	dcache_by_line_op cvac, sy, x0, x1, x2, x3
->>>  alternative_else
->>> -	dc	civac, x0
->>> +	dcache_by_line_op civac, sy, x0, x1, x2, x3
->>
->> dcache_by_line_op is a relatively large macro - is there any way we can
->> still apply the alternative to just the one instruction which needs it,
->> as opposed to having to patch the entire mostly-identical routine?
+Hi Brent,
+
+On Tue, Jul 19, 2016 at 10:58:40PM -0500, Brent Taylor wrote:
+> Hi Ludovic,
+>    I'm learning about the dmaengine subsystem and I was using the
+> at_xdmac as a reference.    I'm not real familiar with tasklets
+> because I have used threaded interrupt handlers instead of them.
+>    I noticed that the variable "txd" in the following block of code
+> (from the function at_xdmac_tasklet) is used after releasing the
+> atchan->lock and after the "desc" the txd is associated with is
+> returned back to the free descriptor list.
 > 
-> I agree with your opinion. Then, how do you think about using CONFIG_* options
-> like below? I think that alternative_* macros seems to keep the space for
-> unused instruction. Is it necessary? Please, share your thought about the
-> space. Thanks!
+>       spin_lock_bh(&atchan->lock);
+>       desc = list_first_entry(&atchan->xfers_list,
+>                struct at_xdmac_desc,
+>                xfer_node);
+>      ...
+>      txd = &desc->tx_dma_desc;
 > 
-> +__dma_clean_area:
-> +#if    defined(CONFIG_ARM64_ERRATUM_826319) || \
-> +       defined(CONFIG_ARM64_ERRATUM_827319) || \
-> +       defined(CONFIG_ARM64_ERRATUM_824069) || \
-> +       defined(CONFIG_ARM64_ERRATUM_819472)
-> +       dcache_by_line_op civac, sy, x0, x1, x2, x3
-> +#else
-> +       dcache_by_line_op cvac, sy, x0, x1, x2, x3
-> +#endif
+>       at_xdmac_remove_xfer(atchan, desc);
+>       spin_unlock_bh(&atchan->lock);
+> 
+>       if (!at_xdmac_chan_is_cyclic(atchan)) {
+>          dma_cookie_complete(txd);
+>          if (txd->callback && (txd->flags & DMA_PREP_INTERRUPT))
+>             txd->callback(txd->callback_param);
+>       }
+> 
+>       dma_run_dependencies(txd);
+> 
+> Is there any danger of another process (maybe running on another
+> processor) changing desc->txd after it has been put back on the
+> free_list?
 
-That's not ideal, because we still only really want to use the
-workaround if we detect a CPU which needs it, rather than baking it in
-at compile time. I was thinking more along the lines of pushing the
-alternative down into dcache_by_line_op, something like the idea below
-(compile-tested only, may not actually be viable).
+To be honest, I have already thought about it and I have probably been
+lucky!
 
-Robin.
+> My first thought was to move the spin_unlock_bh(&atchan->lock) untill
+> after dma_run_dependencies(txd), but a deadlock will be introduced
+> because dma_run_dependencies could invoke at_xdmac_issue_pending which
+> could eventually call spin_lock_irqsave(&atchan->lock).  A deadlock
+> could also be created if the "callback" function invoked another
+> "device_prep_*" function.
+> 
+> If I'm miss-understanding something, I apologize for the noise.
 
------8<-----
-diff --git a/arch/arm64/include/asm/assembler.h
-b/arch/arm64/include/asm/assembler.h
-index 10b017c4bdd8..1c005c90387e 100644
---- a/arch/arm64/include/asm/assembler.h
-+++ b/arch/arm64/include/asm/assembler.h
-@@ -261,7 +261,16 @@ lr	.req	x30		// link register
- 	add	\size, \kaddr, \size
- 	sub	\tmp2, \tmp1, #1
- 	bic	\kaddr, \kaddr, \tmp2
--9998:	dc	\op, \kaddr
-+9998:
-+	.ifeqs "\op", "cvac"
-+alternative_if_not ARM64_WORKAROUND_CLEAN_CACHE
-+	dc	cvac, \kaddr
-+alternative_else
-+	dc	civac, \kaddr
-+alternative_endif
-+	.else
-+	dc	\op, \kaddr
-+	.endif
- 	add	\kaddr, \kaddr, \tmp1
- 	cmp	\kaddr, \size
- 	b.lo	9998b
+You're right. At the moment, I had no feedback about a bug related to
+this. A customer tested hardly the current driver, much more than I. Since
+locking issues are not trivial to debug and to trigger, I am not really
+in favour to anticipate it but I keep in mind there is a weakness here.
+It doesn't mean I am not open to all good suggestions of course!
+
+One way (which is not too risky) to fix it would be to put descriptors
+which are no longer used at the end of the free descriptors list instead
+of putting them back at the beginning.
+
+> 
+> -- Brent Taylor
+
+Regards
+
+Ludovic
