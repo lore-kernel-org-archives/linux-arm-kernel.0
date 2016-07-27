@@ -1,180 +1,282 @@
-From: fu.wei@linaro.org (fu.wei at linaro.org)
-Date: Thu, 28 Jul 2016 01:29:05 +0800
-Subject: [PATCH v11] acpi, apei, arm64: APEI initial support for aarch64.
-Message-ID: <1469640545-5848-1-git-send-email-fu.wei@linaro.org>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Thu, 28 Jul 2016 01:39:16 +0800
+Subject: [xlnx:master 2616/2625]
+ drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/common/mali_timeline.h:186:33:
+ error: field 'sync_fence_waiter' has incomplete type
+Message-ID: <201607280109.XPweA599%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+tree:   https://github.com/Xilinx/linux-xlnx master
+head:   4dcc2058b8620d77b8be9940626b339d848c0dfc
+commit: 9eb0420ec8683897b7fcea28e3b915c575a01e36 [2616/2625] Merge tag 'v4.6' into master
+config: i386-allmodconfig (attached as .config)
+compiler: gcc-6 (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        git checkout 9eb0420ec8683897b7fcea28e3b915c575a01e36
+        # save the attached .config to linux build tree
+        make ARCH=i386 
 
-This commit provides APEI arch-specific bits for aarch64
+All error/warnings (new ones prefixed by >>):
 
-Meanwhile,
-(1)add a new subfunction "hest_ia32_init" for
-"acpi_disable_cmcff" which is used by IA-32 Architecture
-Corrected Machine Check (CMC).
-(2)move HEST type (ACPI_HEST_TYPE_IA32_CORRECTED_CHECK) checking to
-a generic place.
-(3)select HAVE_ACPI_APEI when EFI and ACPI is set on ARM64,
-because arch_apei_get_mem_attribute is using efi_mem_attributes on ARM64.
+   In file included from drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/common/mali_timeline.h:19:0,
+                    from drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/common/mali_soft_job.h:16,
+                    from drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/linux/mali_ukk_soft_job.c:19:
+>> drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/linux/mali_sync.h:59:37: warning: 'struct sync_fence' declared inside parameter list will not be visible outside of this definition or declaration
+    s32 mali_sync_fence_fd_alloc(struct sync_fence *sync_fence);
+                                        ^~~~~~~~~~
+   In file included from drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/common/mali_soft_job.h:16:0,
+                    from drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/linux/mali_ukk_soft_job.c:19:
+>> drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/common/mali_timeline.h:186:33: error: field 'sync_fence_waiter' has incomplete type
+     struct sync_fence_waiter       sync_fence_waiter; /**< Used to connect sync fence and tracker in sync fence wait callback. */
+                                    ^~~~~~~~~~~~~~~~~
+--
+   In file included from drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/common/mali_timeline.h:19:0,
+                    from drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/common/mali_timeline.c:11:
+>> drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/linux/mali_sync.h:59:37: warning: 'struct sync_fence' declared inside parameter list will not be visible outside of this definition or declaration
+    s32 mali_sync_fence_fd_alloc(struct sync_fence *sync_fence);
+                                        ^~~~~~~~~~
+   In file included from drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/common/mali_timeline.c:11:0:
+>> drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/common/mali_timeline.h:186:33: error: field 'sync_fence_waiter' has incomplete type
+     struct sync_fence_waiter       sync_fence_waiter; /**< Used to connect sync fence and tracker in sync fence wait callback. */
+                                    ^~~~~~~~~~~~~~~~~
+   drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/common/mali_timeline.c: In function 'mali_timeline_sync_fence_callback':
+>> drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/common/mali_timeline.c:82:44: error: dereferencing pointer to incomplete type 'struct sync_fence'
+     int fence_status = atomic_read(&sync_fence->status);
+                                               ^~
+>> drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/common/mali_timeline.c:145:2: error: implicit declaration of function 'sync_fence_put' [-Werror=implicit-function-declaration]
+     sync_fence_put(sync_fence);
+     ^~~~~~~~~~~~~~
+   drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/common/mali_timeline.c: In function 'mali_timeline_cancel_sync_fence_waiters':
+>> drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/common/mali_timeline.c:844:13: error: implicit declaration of function 'sync_fence_cancel_async' [-Werror=implicit-function-declaration]
+       if (0 == sync_fence_cancel_async(tracker->sync_fence, &tracker->sync_fence_waiter)) {
+                ^~~~~~~~~~~~~~~~~~~~~~~
+   drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/common/mali_timeline.c: In function 'mali_timeline_system_create_waiters_and_unlock':
+>> drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/common/mali_timeline.c:1130:16: error: implicit declaration of function 'sync_fence_fdget' [-Werror=implicit-function-declaration]
+      sync_fence = sync_fence_fdget(tracker->fence.sync_fd);
+                   ^~~~~~~~~~~~~~~~
+>> drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/common/mali_timeline.c:1130:14: warning: assignment makes pointer from integer without a cast [-Wint-conversion]
+      sync_fence = sync_fence_fdget(tracker->fence.sync_fd);
+                 ^
+>> drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/common/mali_timeline.c:1143:3: error: implicit declaration of function 'sync_fence_waiter_init' [-Werror=implicit-function-declaration]
+      sync_fence_waiter_init(&tracker->sync_fence_waiter, mali_timeline_sync_fence_callback);
+      ^~~~~~~~~~~~~~~~~~~~~~
+>> drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/common/mali_timeline.c:1144:9: error: implicit declaration of function 'sync_fence_wait_async' [-Werror=implicit-function-declaration]
+      ret = sync_fence_wait_async(sync_fence, &tracker->sync_fence_waiter);
+            ^~~~~~~~~~~~~~~~~~~~~
+   cc1: some warnings being treated as errors
+--
+   In file included from drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/common/mali_timeline.h:19:0,
+                    from drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/common/mali_timeline_fence_wait.h:21,
+                    from drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/common/mali_timeline_fence_wait.c:11:
+>> drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/linux/mali_sync.h:59:37: warning: 'struct sync_fence' declared inside parameter list will not be visible outside of this definition or declaration
+    s32 mali_sync_fence_fd_alloc(struct sync_fence *sync_fence);
+                                        ^~~~~~~~~~
+   In file included from drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/common/mali_timeline_fence_wait.h:21:0,
+                    from drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/common/mali_timeline_fence_wait.c:11:
+>> drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/common/mali_timeline.h:186:33: error: field 'sync_fence_waiter' has incomplete type
+     struct sync_fence_waiter       sync_fence_waiter; /**< Used to connect sync fence and tracker in sync fence wait callback. */
+                                    ^~~~~~~~~~~~~~~~~
+   drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/common/mali_timeline_fence_wait.c: In function 'mali_timeline_fence_wait_check_status':
+>> drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/common/mali_timeline_fence_wait.c:102:16: error: implicit declaration of function 'sync_fence_fdget' [-Werror=implicit-function-declaration]
+      sync_fence = sync_fence_fdget(fence->sync_fd);
+                   ^~~~~~~~~~~~~~~~
+>> drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/common/mali_timeline_fence_wait.c:102:14: warning: assignment makes pointer from integer without a cast [-Wint-conversion]
+      sync_fence = sync_fence_fdget(fence->sync_fd);
+                 ^
+>> drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/common/mali_timeline_fence_wait.c:107:36: error: dereferencing pointer to incomplete type 'struct sync_fence'
+       if (0 == atomic_read(&sync_fence->status)) {
+                                       ^~
+>> drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/common/mali_timeline_fence_wait.c:122:3: error: implicit declaration of function 'sync_fence_put' [-Werror=implicit-function-declaration]
+      sync_fence_put(sync_fence);
+      ^~~~~~~~~~~~~~
+   cc1: some warnings being treated as errors
+--
+   In file included from drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/common/mali_timeline.h:19:0,
+                    from drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/common/mali_timeline_sync_fence.h:20,
+                    from drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/common/mali_timeline_sync_fence.c:11:
+>> drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/linux/mali_sync.h:59:37: warning: 'struct sync_fence' declared inside parameter list will not be visible outside of this definition or declaration
+    s32 mali_sync_fence_fd_alloc(struct sync_fence *sync_fence);
+                                        ^~~~~~~~~~
+   In file included from drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/common/mali_timeline_sync_fence.h:20:0,
+                    from drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/common/mali_timeline_sync_fence.c:11:
+>> drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/common/mali_timeline.h:186:33: error: field 'sync_fence_waiter' has incomplete type
+     struct sync_fence_waiter       sync_fence_waiter; /**< Used to connect sync fence and tracker in sync fence wait callback. */
+                                    ^~~~~~~~~~~~~~~~~
+   drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/common/mali_timeline_sync_fence.c: In function 'mali_timeline_sync_fence_create':
+>> drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/common/mali_timeline_sync_fence.c:107:16: error: implicit declaration of function 'sync_fence_fdget' [-Werror=implicit-function-declaration]
+      sync_fence = sync_fence_fdget(fence->sync_fd);
+                   ^~~~~~~~~~~~~~~~
+>> drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/common/mali_timeline_sync_fence.c:107:14: warning: assignment makes pointer from integer without a cast [-Wint-conversion]
+      sync_fence = sync_fence_fdget(fence->sync_fd);
+                 ^
+>> drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/common/mali_timeline_sync_fence.c:128:34: warning: passing argument 1 of 'mali_sync_fence_fd_alloc' from incompatible pointer type [-Wincompatible-pointer-types]
+     return mali_sync_fence_fd_alloc(sync_fence_acc);
+                                     ^~~~~~~~~~~~~~
+   In file included from drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/common/mali_timeline.h:19:0,
+                    from drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/common/mali_timeline_sync_fence.h:20,
+                    from drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/common/mali_timeline_sync_fence.c:11:
+   drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/linux/mali_sync.h:59:5: note: expected 'struct sync_fence *' but argument is of type 'struct sync_fence *'
+    s32 mali_sync_fence_fd_alloc(struct sync_fence *sync_fence);
+        ^~~~~~~~~~~~~~~~~~~~~~~~
+>> drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/common/mali_timeline_sync_fence.c:132:3: error: implicit declaration of function 'sync_fence_put' [-Werror=implicit-function-declaration]
+      sync_fence_put(sync_fence_acc);
+      ^~~~~~~~~~~~~~
+   cc1: some warnings being treated as errors
+--
+   In file included from drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/linux/mali_sync.c:11:0:
+>> drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/linux/mali_sync.h:59:37: warning: 'struct sync_fence' declared inside parameter list will not be visible outside of this definition or declaration
+    s32 mali_sync_fence_fd_alloc(struct sync_fence *sync_fence);
+                                        ^~~~~~~~~~
+   In file included from drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/linux/mali_sync.c:15:0:
+>> drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/common/mali_timeline.h:186:33: error: field 'sync_fence_waiter' has incomplete type
+     struct sync_fence_waiter       sync_fence_waiter; /**< Used to connect sync fence and tracker in sync fence wait callback. */
+                                    ^~~~~~~~~~~~~~~~~
+>> drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/linux/mali_sync.c:22:25: error: field 'sync_pt' has incomplete type
+     struct sync_pt         sync_pt;
+                            ^~~~~~~
+   In file included from include/asm-generic/bug.h:13:0,
+                    from arch/x86/include/asm/bug.h:35,
+                    from include/linux/bug.h:4,
+                    from include/linux/seq_file.h:6,
+                    from drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/linux/mali_sync.h:22,
+                    from drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/linux/mali_sync.c:11:
+   drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/linux/mali_sync.c: In function 'to_mali_sync_pt':
+   include/linux/kernel.h:824:48: warning: initialization from incompatible pointer type [-Wincompatible-pointer-types]
+     const typeof( ((type *)0)->member ) *__mptr = (ptr); \
+                                                   ^
+>> drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/linux/mali_sync.c:49:9: note: in expansion of macro 'container_of'
+     return container_of(pt, struct mali_sync_pt, sync_pt);
+            ^~~~~~~~~~~~
+   drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/linux/mali_sync.c: In function 'timeline_dup':
+>> drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/linux/mali_sync.c:65:9: warning: assignment from incompatible pointer type [-Wincompatible-pointer-types]
+     new_pt = sync_pt_create(mpt->sync_tl, sizeof(struct mali_sync_pt));
+            ^
+   drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/linux/mali_sync.c: At top level:
+>> drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/linux/mali_sync.c:186:2: error: unknown field 'dup' specified in initializer
+     .dup            = timeline_dup,
+     ^
+>> drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/linux/mali_sync.c:186:20: warning: initialization from incompatible pointer type [-Wincompatible-pointer-types]
+     .dup            = timeline_dup,
+                       ^~~~~~~~~~~~
+   drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/linux/mali_sync.c:186:20: note: (near initialization for 'mali_timeline_ops.has_signaled')
+   drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/linux/mali_sync.c:187:20: warning: initialization from incompatible pointer type [-Wincompatible-pointer-types]
+     .has_signaled   = timeline_has_signaled,
+                       ^~~~~~~~~~~~~~~~~~~~~
+   drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/linux/mali_sync.c:187:20: note: (near initialization for 'mali_timeline_ops.has_signaled')
+>> drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/linux/mali_sync.c:188:2: error: unknown field 'compare' specified in initializer
+     .compare        = timeline_compare,
+     ^
+   drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/linux/mali_sync.c:188:20: warning: initialization from incompatible pointer type [-Wincompatible-pointer-types]
+     .compare        = timeline_compare,
+                       ^~~~~~~~~~~~~~~~
+   drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/linux/mali_sync.c:188:20: note: (near initialization for 'mali_timeline_ops.timeline_value_str')
+>> drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/linux/mali_sync.c:189:2: error: unknown field 'free_pt' specified in initializer
+     .free_pt        = timeline_free_pt,
+     ^
+   drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/linux/mali_sync.c:189:20: warning: initialization from incompatible pointer type [-Wincompatible-pointer-types]
+     .free_pt        = timeline_free_pt,
+                       ^~~~~~~~~~~~~~~~
+   drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/linux/mali_sync.c:189:20: note: (near initialization for 'mali_timeline_ops.fence_value_str')
+>> drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/linux/mali_sync.c:190:2: error: unknown field 'release_obj' specified in initializer
+     .release_obj    = timeline_release,
+     ^
+>> drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/linux/mali_sync.c:190:20: warning: excess elements in struct initializer
+     .release_obj    = timeline_release,
+                       ^~~~~~~~~~~~~~~~
+   drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/linux/mali_sync.c:190:20: note: (near initialization for 'mali_timeline_ops')
+>> drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/linux/mali_sync.c:194:2: error: unknown field 'pt_value_str' specified in initializer
+     .pt_value_str = timeline_pt_value_str,
+     ^
+   drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/linux/mali_sync.c:194:18: warning: excess elements in struct initializer
+     .pt_value_str = timeline_pt_value_str,
+                     ^~~~~~~~~~~~~~~~~~~~~
+   drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/linux/mali_sync.c:194:18: note: (near initialization for 'mali_timeline_ops')
+>> drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/linux/mali_sync.c:226:5: error: conflicting types for 'mali_sync_fence_fd_alloc'
+    s32 mali_sync_fence_fd_alloc(struct sync_fence *sync_fence)
+        ^~~~~~~~~~~~~~~~~~~~~~~~
+   In file included from drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/linux/mali_sync.c:11:0:
+   drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/linux/mali_sync.h:59:5: note: previous declaration of 'mali_sync_fence_fd_alloc' was here
+    s32 mali_sync_fence_fd_alloc(struct sync_fence *sync_fence);
+        ^~~~~~~~~~~~~~~~~~~~~~~~
+   drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/linux/mali_sync.c: In function 'mali_sync_fence_fd_alloc':
+   drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/linux/mali_sync.c:230:7: error: implicit declaration of function 'get_unused_fd' [-Werror=implicit-function-declaration]
+     fd = get_unused_fd();
+          ^~~~~~~~~~~~~
+>> drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/linux/mali_sync.c:232:3: error: implicit declaration of function 'sync_fence_put' [-Werror=implicit-function-declaration]
+      sync_fence_put(sync_fence);
+      ^~~~~~~~~~~~~~
+>> drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/linux/mali_sync.c:235:2: error: implicit declaration of function 'sync_fence_install' [-Werror=implicit-function-declaration]
+     sync_fence_install(sync_fence, fd);
+     ^~~~~~~~~~~~~~~~~~
+   drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/linux/mali_sync.c: In function 'mali_sync_fence_merge':
+>> drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/linux/mali_sync.c:247:15: error: implicit declaration of function 'sync_fence_merge' [-Werror=implicit-function-declaration]
+     sync_fence = sync_fence_merge("mali_merge_fence", sync_fence1, sync_fence2);
+                  ^~~~~~~~~~~~~~~~
+>> drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/linux/mali_sync.c:247:13: warning: assignment makes pointer from integer without a cast [-Wint-conversion]
+     sync_fence = sync_fence_merge("mali_merge_fence", sync_fence1, sync_fence2);
+                ^
+   drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/linux/mali_sync.c: In function 'mali_sync_flag_create_pt':
+   drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/linux/mali_sync.c:345:5: warning: assignment from incompatible pointer type [-Wincompatible-pointer-types]
+     pt = sync_pt_create(flag->sync_tl, sizeof(struct mali_sync_pt));
+        ^
+   drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/linux/mali_sync.c: In function 'mali_sync_flag_create_fence':
+>> drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/linux/mali_sync.c:368:15: error: implicit declaration of function 'sync_fence_create' [-Werror=implicit-function-declaration]
+     sync_fence = sync_fence_create("mali_flag_fence", sync_pt);
+                  ^~~~~~~~~~~~~~~~~
+   drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/linux/mali_sync.c:368:13: warning: assignment makes pointer from integer without a cast [-Wint-conversion]
+     sync_fence = sync_fence_create("mali_flag_fence", sync_pt);
+                ^
+>> drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/linux/mali_sync.c:370:3: error: implicit declaration of function 'sync_pt_free' [-Werror=implicit-function-declaration]
+      sync_pt_free(sync_pt);
+      ^~~~~~~~~~~~
+   drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/linux/mali_sync.c: In function 'to_mali_sync_pt':
+>> drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/linux/mali_sync.c:50:1: warning: control reaches end of non-void function [-Wreturn-type]
+    }
+    ^
+   cc1: some warnings being treated as errors
 
-[Fu Wei: improve && upstream]
+vim +/sync_fence_waiter +186 drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/common/mali_timeline.h
 
-Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
-Tested-by: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
-Signed-off-by: Fu Wei <fu.wei@linaro.org>
-Acked-by: Hanjun Guo <hanjun.guo@linaro.org>
-Tested-by: Tyler Baicar <tbaicar@codeaurora.org>
-Acked-by: Will Deacon <will.deacon@arm.com>
+8e905b3b Michal Simek 2015-06-10  170  
+8e905b3b Michal Simek 2015-06-10  171  	struct mali_timeline_tracker  *timeline_next; /**< Next tracker on timeline's tracker list */
+8e905b3b Michal Simek 2015-06-10  172  	struct mali_timeline_tracker  *timeline_prev; /**< Previous tracker on timeline's tracker list */
+8e905b3b Michal Simek 2015-06-10  173  
+8e905b3b Michal Simek 2015-06-10  174  	u32                            trigger_ref_count; /**< When zero tracker will be activated */
+8e905b3b Michal Simek 2015-06-10  175  	mali_timeline_activation_error activation_error;  /**< Activation error. */
+8e905b3b Michal Simek 2015-06-10  176  	struct mali_timeline_fence     fence;             /**< Fence used to create this tracker */
+8e905b3b Michal Simek 2015-06-10  177  
+8e905b3b Michal Simek 2015-06-10  178  	/* Single-linked list of waiters.  Sorted in order of insertions with
+8e905b3b Michal Simek 2015-06-10  179  	 * tail pointing to first waiter. */
+8e905b3b Michal Simek 2015-06-10  180  	struct mali_timeline_waiter   *waiter_head;
+8e905b3b Michal Simek 2015-06-10  181  	struct mali_timeline_waiter   *waiter_tail;
+8e905b3b Michal Simek 2015-06-10  182  
+8e905b3b Michal Simek 2015-06-10  183  #if defined(CONFIG_SYNC)
+8e905b3b Michal Simek 2015-06-10  184  	/* These are only used if the tracker is waiting on a sync fence. */
+8e905b3b Michal Simek 2015-06-10  185  	struct mali_timeline_waiter   *waiter_sync; /**< A direct pointer to timeline waiter representing sync fence. */
+8e905b3b Michal Simek 2015-06-10 @186  	struct sync_fence_waiter       sync_fence_waiter; /**< Used to connect sync fence and tracker in sync fence wait callback. */
+8e905b3b Michal Simek 2015-06-10  187  	struct sync_fence             *sync_fence;   /**< The sync fence this tracker is waiting on. */
+8e905b3b Michal Simek 2015-06-10  188  	_mali_osk_list_t               sync_fence_cancel_list; /**< List node used to cancel sync fence waiters. */
+8e905b3b Michal Simek 2015-06-10  189  #endif /* defined(CONFIG_SYNC) */
+8e905b3b Michal Simek 2015-06-10  190  
+8e905b3b Michal Simek 2015-06-10  191  	struct mali_timeline_system   *system;       /**< Timeline system. */
+8e905b3b Michal Simek 2015-06-10  192  	struct mali_timeline          *timeline;     /**< Timeline, or NULL if not on a timeline. */
+8e905b3b Michal Simek 2015-06-10  193  	enum mali_timeline_tracker_type type;        /**< Type of tracker. */
+8e905b3b Michal Simek 2015-06-10  194  	void                          *job;          /**< Owner of tracker. */
+
+:::::: The code at line 186 was first introduced by commit
+:::::: 8e905b3b33fa6f3f2f97591500b53d8a8245df29 staging: mali: Add r5p1-01rel0 and r5p2-00rel0 drivers
+
+:::::: TO: Michal Simek <michal.simek@xilinx.com>
+:::::: CC: Michal Simek <michal.simek@xilinx.com>
+
 ---
-Changelog:
-v11:https://lkml.org/lkml/2016/7
-    Rebase to v4.7-0e06f5c0
-
-v10:https://lkml.org/lkml/2016/4/14
-    Fix the Alphabetical order problem in arch/arm64/Kconfig
-
-v9: https://lkml.org/lkml/2016/4/5/522
-    Improve the comment for arch_apei_flush_tlb_one.
-    Using select "HAVE_ACPI_APEI if (ACPI && EFI)" to fix the EFI dependence
-    problem.
-
-v8: https://lkml.org/lkml/2016/3/29/132
-    Fix a "undefined reference" bug by selecting EFI when ACPI_APEI is set
-    on ARM64.
-
-v7: https://lkml.org/lkml/2016/3/17/183
-    Add comment for arch_apei_flush_tlb_one in arch/arm64/include/asm/acpi.h
-
-v6: https://lists.linaro.org/pipermail/linaro-acpi/2016-March/006644.html
-    Move HEST type (ACPI_HEST_TYPE_IA32_CORRECTED_CHECK) checking to
-    a generic place.
-    Delete HAVE_ACPI_APEI_HEST_IA32.
-
-v5: https://lkml.org/lkml/2015/12/10/131
-    Add "HAVE_ACPI_APEI_HEST_IA32" instead of
-    "#if defined(__i386__) || defined(__x86_64__)".
-
-v4: https://lkml.org/lkml/2015/12/8/188
-    Rebase to latest kernel version(4.4-rc4).
-    Move arch_apei_flush_tlb_one into header file as a inline function
-    Add a new subfunction "hest_ia_init" for "acpi_disable_cmcff".
-
-v3: https://lkml.org/lkml/2015/12/3/521
-    Remove "acpi_disable_cmcff" from arm64 code,
-    and wrap it in hest.c by "#if defined(__i386__) || defined(__x86_64__)"
-
-v2: https://lkml.org/lkml/2015/12/2/432
-    Rebase to latest kernel version(4.4-rc3).
-    Move arch_apei_flush_tlb_one() to arch/arm64/kernel/acpi.c
-
-v1: https://lkml.org/lkml/2015/8/14/199
-    Move arch_apei_flush_tlb_one() to arch/arm64/include/asm/apci.h.
-    Delete arch/arm64/kernel/apei.c.
-    Add "#ifdef CONFIG_ACPI_APEI" for "acpi_disable_cmcff".
-
- arch/arm64/Kconfig            |  1 +
- arch/arm64/include/asm/acpi.h | 16 +++++++++++++++-
- arch/x86/kernel/acpi/apei.c   |  3 ---
- drivers/acpi/apei/hest.c      | 18 +++++++++++++++---
- 4 files changed, 31 insertions(+), 7 deletions(-)
-
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 20d5a60..a301765 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -49,6 +49,7 @@ config ARM64
- 	select GENERIC_TIME_VSYSCALL
- 	select HANDLE_DOMAIN_IRQ
- 	select HARDIRQS_SW_RESEND
-+	select HAVE_ACPI_APEI if (ACPI && EFI)
- 	select HAVE_ALIGNED_STRUCT_PAGE if SLUB
- 	select HAVE_ARCH_AUDITSYSCALL
- 	select HAVE_ARCH_BITREVERSE
-diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
-index 5420cb0..d3d02dc 100644
---- a/arch/arm64/include/asm/acpi.h
-+++ b/arch/arm64/include/asm/acpi.h
-@@ -17,6 +17,7 @@
- 
- #include <asm/cputype.h>
- #include <asm/smp_plat.h>
-+#include <asm/tlbflush.h>
- 
- /* Macros for consistency checks of the GICC subtable of MADT */
- #define ACPI_MADT_GICC_LENGTH	\
-@@ -110,8 +111,21 @@ static inline const char *acpi_get_enable_method(int cpu)
- }
- 
- #ifdef	CONFIG_ACPI_APEI
-+#define acpi_disable_cmcff 1
- pgprot_t arch_apei_get_mem_attribute(phys_addr_t addr);
--#endif
-+
-+/*
-+ * Despite its name, this function must still broadcast the TLB
-+ * invalidation in order to ensure other CPUs don't up with with junk
-+ * entries as a result of speculation. Unusually, its also called in
-+ * IRQ context (ghes_iounmap_irq) so if we ever need to use IPIs for
-+ * TLB broadcasting, then we're in trouble here.
-+ */
-+static inline void arch_apei_flush_tlb_one(unsigned long addr)
-+{
-+	flush_tlb_kernel_range(addr, addr + PAGE_SIZE);
-+}
-+#endif /* CONFIG_ACPI_APEI */
- 
- #ifdef CONFIG_ACPI_NUMA
- int arm64_acpi_numa_init(void);
-diff --git a/arch/x86/kernel/acpi/apei.c b/arch/x86/kernel/acpi/apei.c
-index c280df6..ea3046e 100644
---- a/arch/x86/kernel/acpi/apei.c
-+++ b/arch/x86/kernel/acpi/apei.c
-@@ -24,9 +24,6 @@ int arch_apei_enable_cmcff(struct acpi_hest_header *hest_hdr, void *data)
- 	struct acpi_hest_ia_corrected *cmc;
- 	struct acpi_hest_ia_error_bank *mc_bank;
- 
--	if (hest_hdr->type != ACPI_HEST_TYPE_IA32_CORRECTED_CHECK)
--		return 0;
--
- 	cmc = (struct acpi_hest_ia_corrected *)hest_hdr;
- 	if (!cmc->enabled)
- 		return 0;
-diff --git a/drivers/acpi/apei/hest.c b/drivers/acpi/apei/hest.c
-index 20b3fcf..792a0d9 100644
---- a/drivers/acpi/apei/hest.c
-+++ b/drivers/acpi/apei/hest.c
-@@ -123,7 +123,18 @@ EXPORT_SYMBOL_GPL(apei_hest_parse);
-  */
- static int __init hest_parse_cmc(struct acpi_hest_header *hest_hdr, void *data)
- {
--	return arch_apei_enable_cmcff(hest_hdr, data);
-+	if (hest_hdr->type != ACPI_HEST_TYPE_IA32_CORRECTED_CHECK)
-+		return 0;
-+
-+	if (!acpi_disable_cmcff)
-+		return !arch_apei_enable_cmcff(hest_hdr, data);
-+
-+	return 0;
-+}
-+
-+static inline int __init hest_ia32_init(void)
-+{
-+	return apei_hest_parse(hest_parse_cmc, NULL);
- }
- 
- struct ghes_arr {
-@@ -232,8 +243,9 @@ void __init acpi_hest_init(void)
- 		goto err;
- 	}
- 
--	if (!acpi_disable_cmcff)
--		apei_hest_parse(hest_parse_cmc, NULL);
-+	rc = hest_ia32_init();
-+	if (rc)
-+		goto err;
- 
- 	if (!ghes_disable) {
- 		rc = apei_hest_parse(hest_parse_ghes_count, &ghes_count);
--- 
-2.5.5
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 54724 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160728/282613de/attachment-0001.obj>
