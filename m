@@ -1,69 +1,52 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Wed, 27 Jul 2016 11:33:42 +0800
-Subject: [PATCH v9 4/9] clocksource/drivers/arm_arch_timer: use readq to
- get 64-bit CNTVCT
-In-Reply-To: <57976FA5.2070802@codeaurora.org>
-References: <1469460427-8643-1-git-send-email-fu.wei@linaro.org>
- <1469460427-8643-5-git-send-email-fu.wei@linaro.org>
- <20160725153118.GD19209@arm.com>
- <CADyBb7ubKceQiB7+u7sSA=1+9_VMUrGjiabf_FkN2-n4rq7Kgg@mail.gmail.com>
- <20160725163144.GE19209@arm.com>	<57976FA5.2070802@codeaurora.org>
-Message-ID: <20160727113342.2a839c1a@xhacker>
+From: dianders@chromium.org (Doug Anderson)
+Date: Tue, 26 Jul 2016 21:07:59 -0700
+Subject: [PATCH v2 2/4] arm64: dts: rockchip: add the saradc for rk3399
+In-Reply-To: <1469535195-5227-2-git-send-email-wxt@rock-chips.com>
+References: <1469535195-5227-1-git-send-email-wxt@rock-chips.com>
+ <1469535195-5227-2-git-send-email-wxt@rock-chips.com>
+Message-ID: <CAD=FV=W=rNP2h_8Z1TGK0A_KEhL19TKtWz-u0-_ZGH8jF5Zn9Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+1
+Hi,
 
-On Tue, 26 Jul 2016 09:11:49 -0500 Timur Tabi  wrote:
 
-> Will Deacon wrote:
-> > The kernel really needs to support both of those platforms :/
-> >
-> > For the memory-mapped counter registers, the architecture says:
-> >
-> >    `If the implementation supports 64-bit atomic accesses, then the
-> >     CNTV_CVAL register must be accessible as an atomic 64-bit value.'
-> >
-> > which is borderline tautological. If we take the generous reading that
-> > this means AArch64 CPUs can use readq (and I'm not completely
-> > comfortable with that assertion, particularly as you say that it breaks
-> > the model), then you still need to use readq_relaxed here to avoid a
-> > DSB. Furthermore, what are you going to do for AArch32? readq doesn't
-> > exist over there, and if you use the generic implementation then it's
-> > not atomic. In which case, we end up with the current code, as well as a
-> > readq_relaxed guarded by a questionable #ifdef that is known to break a
-> > supported platform for an unknown performance improvement. Hardly a big
-> > win.  
-> 
-> I know Fu dropped this patch, and I don't want to kick a dead horse, but 
-> I was wondering if it would be okay to do this:
-> 
-> static u64 arch_counter_get_cntvct_mem(void)
-> {
-> #ifdef readq_relaxed
-> 	return readq_relaxed(arch_counter_base + CNTVCT_LO);
-> #else
-> 	u32 vct_lo, vct_hi, tmp_hi;
-> 
-> 	do {
-> 		vct_hi = readl_relaxed(arch_counter_base + CNTVCT_HI);
-> 		vct_lo = readl_relaxed(arch_counter_base + CNTVCT_LO);
-> 		tmp_hi = readl_relaxed(arch_counter_base + CNTVCT_HI);
-> 	} while (vct_hi != tmp_hi);
-> 
-> 	return ((u64) vct_hi << 32) | vct_lo;
-> #endif
-> }
-> 
-> readq and readq_relaxed are defined in arch/arm64/include/asm/io.h.  Why 
-> would the function exist if AArch64 CPUs can't use it?
+On Tue, Jul 26, 2016 at 5:13 AM, Caesar Wang <wxt@rock-chips.com> wrote:
+> This patch adds saradc needed information on rk3399 SoCs.
+>
+> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+> ---
+>
+> Changes in v2: None
+>
+>  arch/arm64/boot/dts/rockchip/rk3399.dtsi | 12 ++++++++++++
+>  1 file changed, 12 insertions(+)
+>
+> diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+> index 4c84229..b81f84b 100644
+> --- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+> +++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+> @@ -299,6 +299,18 @@
+>                 };
+>         };
+>
+> +       saradc: saradc at ff100000 {
+> +               compatible = "rockchip,rk3399-saradc";
+> +               reg = <0x0 0xff100000 0x0 0x100>;
+> +               interrupts = <GIC_SPI 62 IRQ_TYPE_LEVEL_HIGH>;
+> +               #io-channel-cells = <1>;
+> +               clocks = <&cru SCLK_SARADC>, <&cru PCLK_SARADC>;
+> +               clock-names = "saradc", "apb_pclk";
+> +               resets = <&cru SRST_P_SARADC>;
+> +               reset-names = "saradc-apb";
+> +               status = "disabled";
+> +       };
+> +
 
-+1
+Seems reasonable to me.  I'll let Heiko comment if he cares about the
+sort ordering.  I can never quite figure out what it should be so I've
+sorta given up on it...  ;)
 
-I measured the performance on berlin arm64 platforms:
+Reviewed-by: Douglas Anderson <dianders@chromium.org>
 
-compared with original version, using readq_relaxed could reduce
-time of arch_counter_get_cntvct_mem() by about 42%!
-
-Thanks,
-Jisheng
+-Doug
