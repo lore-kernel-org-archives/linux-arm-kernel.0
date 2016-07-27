@@ -1,99 +1,68 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 27 Jul 2016 08:48:09 +0200
-Subject: [PATCH 4/9] clk: sunxi-ng: mux: Add support for mux tables
-In-Reply-To: <1469516671-19377-5-git-send-email-wens@csie.org>
-References: <1469516671-19377-1-git-send-email-wens@csie.org>
- <1469516671-19377-5-git-send-email-wens@csie.org>
-Message-ID: <20160727064809.GC6560@lukather>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 27 Jul 2016 07:55:32 +0100
+Subject: [PATCH] arm64: Fix Kconfig dependencies for RANDOMIZE_BASE
+In-Reply-To: <CAKv+Gu-4i=8F3jJFjN3+_nbiYxGTvBTNqVJbF60nuL4REPJ+9Q@mail.gmail.com>
+References: <1469553415-26839-1-git-send-email-jeffv@google.com>
+ <20160726174556.GH2423@e104818-lin.cambridge.arm.com>
+ <CAKv+Gu-4i=8F3jJFjN3+_nbiYxGTvBTNqVJbF60nuL4REPJ+9Q@mail.gmail.com>
+Message-ID: <20160727065531.GA14658@MBP.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 26, 2016 at 03:04:26PM +0800, Chen-Yu Tsai wrote:
-> Some clock muxes have holes, i.e. invalid or unconnected inputs,
-> between parent mux values.
+On Tue, Jul 26, 2016 at 07:52:33PM +0200, Ard Biesheuvel wrote:
+> On 26 July 2016 at 19:45, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> > On Tue, Jul 26, 2016 at 10:16:55AM -0700, Jeff Vander Stoep wrote:
+> >> Selecting CONFIG_RANDOMIZE_BASE=y and CONFIG_MODULES=n causes a
+> >> build error due to dependencies on modules. This patch makes KASLR
+> >> module config options dependent on CONFIG_MODULES=y.
+> >>
+> >> Signed-off-by: Jeff Vander Stoep <jeffv@google.com>
+> >> ---
+> >>  arch/arm64/Kconfig | 3 ++-
+> >>  1 file changed, 2 insertions(+), 1 deletion(-)
+> >>
+> >> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> >> index 7e23f95..c9eff79 100644
+> >> --- a/arch/arm64/Kconfig
+> >> +++ b/arch/arm64/Kconfig
+> >> @@ -891,7 +891,6 @@ config RELOCATABLE
+> >>
+> >>  config RANDOMIZE_BASE
+> >>       bool "Randomize the address of the kernel image"
+> >> -     select ARM64_MODULE_PLTS
+> >>       select RELOCATABLE
+> >>       help
+> >>         Randomizes the virtual address at which the kernel image is
+> >
+> > I thought we need the module PLTs once we randomize the kernel base,
+> > independent of whether we randomize the modules base or not.
 > 
-> Add support for specifying a mux table to map clock parents to
-> mux values.
+> Indeed. The module region is always randomized with KASLR, but either
+> fully (i.e., anywhere in the vmalloc region) or partially, in which
+> case a random 128 MB range is selected that also covers vmlinux's
+> .text segment, allowing jumps without veneers. However, since this
+> range is part of the ordinary vmalloc space, there is a >0 probability
+> that other allocations may exhaust it before you have loaded all your
+> modules, in which case the module loader will fall back to ordinary
+> vmalloc region allocations, which are most likely too far away to be
+> resolved without PLTs
 > 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> ---
->  drivers/clk/sunxi-ng/ccu_mux.c | 12 ++++++++++++
->  drivers/clk/sunxi-ng/ccu_mux.h | 12 ++++++++++--
->  2 files changed, 22 insertions(+), 2 deletions(-)
+> > Could we do
+> > something like:
+> >
+> >         select ARM64_MODULE_PLTS if MODULES
+> >
+> > Whichever way we fix this, we probably need:
+> >
+> > Fixes: f80fb3a3d508 ("arm64: add support for kernel ASLR")
+> > Cc: <stable@vger.kernel.org> # 4.6+
+> >
 > 
-> diff --git a/drivers/clk/sunxi-ng/ccu_mux.c b/drivers/clk/sunxi-ng/ccu_mux.c
-> index 1329b9ab481e..68b32f168a74 100644
-> --- a/drivers/clk/sunxi-ng/ccu_mux.c
-> +++ b/drivers/clk/sunxi-ng/ccu_mux.c
-> @@ -107,6 +107,15 @@ u8 ccu_mux_helper_get_parent(struct ccu_common *common,
->  	parent = reg >> cm->shift;
->  	parent &= (1 << cm->width) - 1;
->  
-> +	if (cm->table) {
-> +		int num_parents = clk_hw_get_num_parents(&common->hw);
-> +		int i;
-> +
-> +		for (i = 0; i < num_parents; i++)
-> +			if (cm->table[i] == parent)
-> +				return i;
-> +	}
-> +
->  	return parent;
->  }
->  
-> @@ -117,6 +126,9 @@ int ccu_mux_helper_set_parent(struct ccu_common *common,
->  	unsigned long flags;
->  	u32 reg;
->  
-> +	if (cm->table)
-> +		index = cm->table[index];
-> +
->  	spin_lock_irqsave(common->lock, flags);
->  
->  	reg = readl(common->base + common->reg);
-> diff --git a/drivers/clk/sunxi-ng/ccu_mux.h b/drivers/clk/sunxi-ng/ccu_mux.h
-> index d35ce5e93840..f0078de78712 100644
-> --- a/drivers/clk/sunxi-ng/ccu_mux.h
-> +++ b/drivers/clk/sunxi-ng/ccu_mux.h
-> @@ -6,8 +6,9 @@
->  #include "ccu_common.h"
->  
->  struct ccu_mux_internal {
-> -	u8	shift;
-> -	u8	width;
-> +	u8		shift;
-> +	u8		width;
-> +	const u8	*table;
->  
->  	struct {
->  		u8	index;
-> @@ -21,6 +22,13 @@ struct ccu_mux_internal {
->  	} variable_prediv;
->  };
->  
-> +#define SUNXI_CLK_MUX_TABLE(_shift, _width, _table)	\
-> +	{						\
-> +		.shift	= _shift,			\
-> +		.width	= _width,			\
-> +		.table	= _table,			\
-> +	}
-> +
+> With these changes
+> 
+> Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-I basically had the exact same patch done a few days ago :)
-
-This is in my A64 serie, together with some cleanup on that macro that
-is not consistent with the other internal structures.
-
-Maxime
+Thanks. I pushed my variant above to arm64 for-next/core.
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160727/50002853/attachment.sig>
+Catalin
