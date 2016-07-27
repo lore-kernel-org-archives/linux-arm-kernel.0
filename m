@@ -1,90 +1,42 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 27 Jul 2016 10:05:26 +0200
-Subject: [RFC PATCH v2 1/4] Documentation: DT: net: Add Xilinx
- gmiitorgmii converter device tree binding documentation
-In-Reply-To: <C246CAC1457055469EF09E3A7AC4E11A4A5C2387@XAP-PVEXMBX01.xlnx.xilinx.com>
-References: <1467623084-15471-1-git-send-email-appanad@xilinx.com>
- <1467623084-15471-2-git-send-email-appanad@xilinx.com>
- <20160704140458.GC3282@lunn.ch>
- <03CA77BA8AF6F1469AEDFBDA1322A7B74A193913@XAP-PVEXMBX02.xlnx.xilinx.com>
- <20160706142121.GI19800@lunn.ch>
- <03CA77BA8AF6F1469AEDFBDA1322A7B74A19393B@XAP-PVEXMBX02.xlnx.xilinx.com>
- <C246CAC1457055469EF09E3A7AC4E11A4A5C2387@XAP-PVEXMBX01.xlnx.xilinx.com>
-Message-ID: <20160727080526.GH11538@lunn.ch>
+From: bibby.hsieh@mediatek.com (Bibby Hsieh)
+Date: Wed, 27 Jul 2016 16:25:14 +0800
+Subject: [PATCH v3] arm64: dts: mt8173: add mmsel clocks for 4K support
+Message-ID: <1469607914-64831-1-git-send-email-bibby.hsieh@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Appana
+If MT8173 can support HDMI 4K resoultion, the
+VENCPLL should be configured to 800MHZ.
+We didn't set VENCPLL directly, we set the
+mm_sel to 400MHz statically in the board device tree.
 
-Here is roughly what i was thinking:
+Signed-off-by: Bibby Hsieh <bibby.hsieh@mediatek.com>
+---
+Changes since v2:
+ - Align the clocks of dpi0 node.
 
-struct priv {
-       phy_device *master;
-       phy_device *slave;
-       struct phy_driver *slave_drv;
-};
+Changes since v1:
+ - Do not set the VENCPLL by clk_set_rate
+   at display driver.
+ - Configure the mm_sel to 400MHz statically
+   in the board device tree.
+---
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi |    2 ++
+ 1 file changed, 2 insertions(+)
 
-phy_status_clone(phy_device *master, phy_device *slave)
-{
-	master->speed = slave->speed;
-	master->duplex = slave->duplex;
-	master->pause = slave->pause;
-}
-
-read_status(struct phy_device *phydev)
-{
-	struct priv *priv = phydev->priv;
-
-	/* Get the status from the slave, and duplicate in into the
-	 * master */
-	 slave_drv->read_status(priv->slave);
-	 phy_status_clone(priv->master, priv->slave);
-
-	 /* Update the gmiitorgmii with the current link parameters */
-	 update_link(master);
-}
-
-config_init(struct phy_device *phydev)
-{
-	struct priv *priv = phydev->priv;
-
-	/* Configure the slave, and duplicate in into the master */
-	slave_drv->config_init(priv->slave);
-	phy_status_clone(priv->master, priv->slave);
-}
-
-struct phy_driver master_drv = {
-       .read_status = read_status,
-       .config_init = config_init,
-       .soft_reset  = ...
-       .suspend = ...
-};
-
-probe(mdio_device *mdio)
-{
-	struct priv *priv = devm_alloc();
-
-	/* Use the phy-handle property to find the slave phy */
-	node_phy = of_parse_phandle(mdio->of_node, "phy", 0);
-	priv->slave = of_phy_find_device(node_phy);
-
-	/* Create the master phy on the control address. Use the phy
-	   ID from the slave. */
-	priv->master = phy_device_create(mdio->bus, mdio->addr,
-	  				 phy->slave->phy_id,
-					 phy->slave->is_c45,
-					 phy->slave->c45_ids);
-
-	slave_dev_drv = phydev->mdio.dev.driver;
-	priv->slave_drv = to_phy_driver(slave_dev_drv);
-	priv->master->mdio.dev.driver = master_drv;
-}
-
-It would however be nice to only have one phydev structure, so you are
-not copying status and settings backwards and forwards from one to the
-other all the time, and need a wrapper for every function in
-phy_driver. Studying the structures a bit, that might be possible. You
-would then only need to wrap the read_status(), so that when the link
-speed/duplex changes, you can configure the converter as appropriate.
-
-	     Andrew
+diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+index 78529e4..9c22204 100644
+--- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
++++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+@@ -690,7 +690,9 @@
+ 			compatible = "mediatek,mt8173-mmsys", "syscon";
+ 			reg = <0 0x14000000 0 0x1000>;
+ 			power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
++			clocks = <&topckgen CLK_TOP_MM_SEL>;
+ 			#clock-cells = <1>;
++			clock-frequency  = <400000000>;
+ 		};
+ 
+ 		ovl0: ovl at 1400c000 {
+-- 
+1.7.9.5
