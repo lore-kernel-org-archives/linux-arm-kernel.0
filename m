@@ -1,39 +1,157 @@
 From: hs.liao@mediatek.com (HS Liao)
-Date: Wed, 27 Jul 2016 15:14:12 +0800
-Subject: [PATCH v11 3/4] arm64: dts: mt8173: Add GCE node
+Date: Wed, 27 Jul 2016 15:14:13 +0800
+Subject: [PATCH v11 4/4] CMDQ: save more energy in idle
 In-Reply-To: <1469603653-9733-1-git-send-email-hs.liao@mediatek.com>
 References: <1469603653-9733-1-git-send-email-hs.liao@mediatek.com>
-Message-ID: <1469603653-9733-4-git-send-email-hs.liao@mediatek.com>
+Message-ID: <1469603653-9733-5-git-send-email-hs.liao@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the device node of the GCE hardware for CMDQ module.
+Use clk_disable_unprepare instead of clk_disable to save more energy
+when CMDQ is idle.
 
 Signed-off-by: HS Liao <hs.liao@mediatek.com>
 ---
- arch/arm64/boot/dts/mediatek/mt8173.dtsi | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ drivers/soc/mediatek/mtk-cmdq.c | 55 +++++++++++++++++++++++++++++++++++------
+ 1 file changed, 47 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-index 05f89c4..a68207c 100644
---- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-+++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-@@ -343,6 +343,16 @@
- 			#clock-cells = <1>;
- 		};
+diff --git a/drivers/soc/mediatek/mtk-cmdq.c b/drivers/soc/mediatek/mtk-cmdq.c
+index ec384f9..155caf7 100644
+--- a/drivers/soc/mediatek/mtk-cmdq.c
++++ b/drivers/soc/mediatek/mtk-cmdq.c
+@@ -31,6 +31,7 @@
+ #include <linux/spinlock.h>
+ #include <linux/suspend.h>
+ #include <linux/timer.h>
++#include <linux/workqueue.h>
+ #include <soc/mediatek/cmdq.h>
  
-+		gce: gce at 10212000 {
-+			compatible = "mediatek,mt8173-gce";
-+			reg = <0 0x10212000 0 0x1000>;
-+			interrupts = <GIC_SPI 135 IRQ_TYPE_LEVEL_LOW>;
-+			clocks = <&infracfg CLK_INFRA_GCE>;
-+			clock-names = "gce";
+ #define CMDQ_THR_MAX_COUNT		3 /* main, sub, general(misc) */
+@@ -131,10 +132,16 @@ struct cmdq_task {
+ 	struct cmdq_task_cb	cb;
+ };
+ 
++struct cmdq_clk_release {
++	struct cmdq		*cmdq;
++	struct work_struct	release_work;
++};
 +
-+			#mbox-cells = <2>;
-+		};
+ struct cmdq {
+ 	struct mbox_controller	mbox;
+ 	void __iomem		*base;
+ 	u32			irq;
++	struct workqueue_struct	*clk_release_wq;
+ 	struct cmdq_thread	thread[CMDQ_THR_MAX_COUNT];
+ 	struct mutex		task_mutex;
+ 	struct clk		*clock;
+@@ -300,11 +307,19 @@ static void cmdq_thread_wait_end(struct cmdq_thread *thread,
+ static void cmdq_task_exec(struct cmdq_task *task, struct cmdq_thread *thread)
+ {
+ 	struct cmdq *cmdq = task->cmdq;
+-	unsigned long curr_pa, end_pa;
++	unsigned long curr_pa, end_pa, flags;
+ 
+ 	task->thread = thread;
+ 	if (list_empty(&thread->task_busy_list)) {
+-		WARN_ON(clk_enable(cmdq->clock) < 0);
++		/*
++		 * Unlock for clk prepare (sleeping function).
++		 * We are safe to do that since we have task_mutex and
++		 * only flush will add task.
++		 */
++		spin_unlock_irqrestore(&thread->chan->lock, flags);
++		WARN_ON(clk_prepare_enable(cmdq->clock) < 0);
++		spin_lock_irqsave(&thread->chan->lock, flags);
 +
- 		gic: interrupt-controller at 10220000 {
- 			compatible = "arm,gic-400";
- 			#interrupt-cells = <3>;
+ 		WARN_ON(cmdq_thread_reset(cmdq, thread) < 0);
+ 
+ 		writel(task->pa_base, thread->base + CMDQ_THR_CURR_ADDR);
+@@ -386,6 +401,26 @@ static void cmdq_task_handle_error(struct cmdq_task *task)
+ 	cmdq_thread_resume(thread);
+ }
+ 
++static void cmdq_clk_release_work(struct work_struct *work_item)
++{
++	struct cmdq_clk_release *clk_release = container_of(work_item,
++			struct cmdq_clk_release, release_work);
++	struct cmdq *cmdq = clk_release->cmdq;
++
++	clk_disable_unprepare(cmdq->clock);
++	kfree(clk_release);
++}
++
++static void cmdq_clk_release_schedule(struct cmdq *cmdq)
++{
++	struct cmdq_clk_release *clk_release;
++
++	clk_release = kmalloc(sizeof(*clk_release), GFP_ATOMIC);
++	clk_release->cmdq = cmdq;
++	INIT_WORK(&clk_release->release_work, cmdq_clk_release_work);
++	queue_work(cmdq->clk_release_wq, &clk_release->release_work);
++}
++
+ static void cmdq_thread_irq_handler(struct cmdq *cmdq,
+ 				    struct cmdq_thread *thread)
+ {
+@@ -435,7 +470,7 @@ static void cmdq_thread_irq_handler(struct cmdq *cmdq,
+ 
+ 	if (list_empty(&thread->task_busy_list)) {
+ 		cmdq_thread_disable(cmdq, thread);
+-		clk_disable(cmdq->clock);
++		cmdq_clk_release_schedule(cmdq);
+ 	} else {
+ 		mod_timer(&thread->timeout,
+ 			  jiffies + msecs_to_jiffies(CMDQ_TIMEOUT_MS));
+@@ -494,7 +529,7 @@ static void cmdq_thread_handle_timeout(unsigned long data)
+ 
+ 	cmdq_thread_resume(thread);
+ 	cmdq_thread_disable(cmdq, thread);
+-	clk_disable(cmdq->clock);
++	cmdq_clk_release_schedule(cmdq);
+ 	spin_unlock_irqrestore(&thread->chan->lock, flags);
+ }
+ 
+@@ -782,7 +817,7 @@ static int cmdq_suspend(struct device *dev)
+ 		msleep(20);
+ 	}
+ 
+-	clk_unprepare(cmdq->clock);
++	flush_workqueue(cmdq->clk_release_wq);
+ 	return 0;
+ }
+ 
+@@ -790,7 +825,6 @@ static int cmdq_resume(struct device *dev)
+ {
+ 	struct cmdq *cmdq = dev_get_drvdata(dev);
+ 
+-	WARN_ON(clk_prepare(cmdq->clock) < 0);
+ 	cmdq->suspended = false;
+ 	return 0;
+ }
+@@ -799,8 +833,8 @@ static int cmdq_remove(struct platform_device *pdev)
+ {
+ 	struct cmdq *cmdq = platform_get_drvdata(pdev);
+ 
++	destroy_workqueue(cmdq->clk_release_wq);
+ 	mbox_controller_unregister(&cmdq->mbox);
+-	clk_unprepare(cmdq->clock);
+ 	return 0;
+ }
+ 
+@@ -918,8 +952,13 @@ static int cmdq_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	mutex_init(&cmdq->task_mutex);
++
++	cmdq->clk_release_wq = alloc_ordered_workqueue(
++			"%s", WQ_MEM_RECLAIM | WQ_HIGHPRI,
++			"cmdq_clk_release");
++
+ 	platform_set_drvdata(pdev, cmdq);
+-	WARN_ON(clk_prepare(cmdq->clock) < 0);
++
+ 	return 0;
+ }
+ 
 -- 
 1.9.1
