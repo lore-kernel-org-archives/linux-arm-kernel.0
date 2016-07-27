@@ -1,72 +1,57 @@
 From: mitchelh@codeaurora.org (Mitchel Humpherys)
-Date: Wed, 27 Jul 2016 16:42:05 -0700
-Subject: [PATCH v5 3/6] common: DMA-mapping: add DMA_ATTR_PRIVILEGED attribute
+Date: Wed, 27 Jul 2016 16:42:07 -0700
+Subject: [PATCH v5 5/6] dmaengine: pl330: Make sure microcode is privileged
 In-Reply-To: <20160727234208.2101-1-mitchelh@codeaurora.org>
 References: <20160727234208.2101-1-mitchelh@codeaurora.org>
-Message-ID: <20160727234208.2101-4-mitchelh@codeaurora.org>
+Message-ID: <20160727234208.2101-6-mitchelh@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the DMA_ATTR_PRIVILEGED attribute to the DMA-mapping
-subsystem.
+The PL330 performs privileged instruction fetches.  This can result in
+SMMU permission faults on SMMUs that implement the ARMv8 VMSA, which
+specifies that mappings that are writeable at one execution level shall
+not be executable at any higher-privileged level.  Fix this by using the
+DMA_ATTR_PRIVILEGED attribute, which will ensure that the microcode
+IOMMU mapping is only accessible to the privileged level.
 
-Some advanced peripherals such as remote processors and GPUs perform
-accesses to DMA buffers in both privileged "supervisor" and unprivileged
-"user" modes.  This attribute is used to indicate to the DMA-mapping
-subsystem that the buffer is fully accessible at the elevated privilege
-level (and ideally inaccessible or at least read-only at the
-lesser-privileged levels).
-
-Cc: linux-doc at vger.kernel.org
+Cc: Dan Williams <dan.j.williams@intel.com>
+Cc: Vinod Koul <vinod.koul@intel.com>
 Reviewed-by: Robin Murphy <robin.murphy@arm.com>
 Tested-by: Robin Murphy <robin.murphy@arm.com>
 Signed-off-by: Mitchel Humpherys <mitchelh@codeaurora.org>
 ---
 
 Notes:
-    v2..v3
+    v3..v4
     
-      - Not worrying about executability.
+      - Reworked against the new dma attrs format.
 
- Documentation/DMA-attributes.txt | 10 ++++++++++
- include/linux/dma-mapping.h      |  6 ++++++
- 2 files changed, 16 insertions(+)
+ drivers/dma/pl330.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/DMA-attributes.txt b/Documentation/DMA-attributes.txt
-index 2d455a5cf671..7728bda278c9 100644
---- a/Documentation/DMA-attributes.txt
-+++ b/Documentation/DMA-attributes.txt
-@@ -126,3 +126,13 @@ means that we won't try quite as hard to get them.
+diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
+index 4fc3ffbd5ca0..8cd624fc3760 100644
+--- a/drivers/dma/pl330.c
++++ b/drivers/dma/pl330.c
+@@ -1854,14 +1854,16 @@ static int dmac_alloc_resources(struct pl330_dmac *pl330)
+ {
+ 	int chans = pl330->pcfg.num_chan;
+ 	int ret;
++	unsigned long dma_attrs = DMA_ATTR_PRIVILEGED;
  
- NOTE: At the moment DMA_ATTR_ALLOC_SINGLE_PAGES is only implemented on ARM,
- though ARM64 patches will likely be posted soon.
-+
-+DMA_ATTR_PRIVILEGED
-+------------------------------
-+
-+Some advanced peripherals such as remote processors and GPUs perform
-+accesses to DMA buffers in both privileged "supervisor" and unprivileged
-+"user" modes.  This attribute is used to indicate to the DMA-mapping
-+subsystem that the buffer is fully accessible at the elevated privilege
-+level (and ideally inaccessible or at least read-only at the
-+lesser-privileged levels).
-diff --git a/include/linux/dma-mapping.h b/include/linux/dma-mapping.h
-index 66533e18276c..73f477609262 100644
---- a/include/linux/dma-mapping.h
-+++ b/include/linux/dma-mapping.h
-@@ -56,6 +56,12 @@
-  * that gives better TLB efficiency.
-  */
- #define DMA_ATTR_ALLOC_SINGLE_PAGES	(1UL << 7)
-+/*
-+ * DMA_ATTR_PRIVILEGED: used to indicate that the buffer is fully
-+ * accessible at an elevated privilege level (and ideally inaccessible or
-+ * at least read-only@lesser-privileged levels).
-+ */
-+#define DMA_ATTR_PRIVILEGED		(1UL << 8)
- 
- /*
-  * A dma_addr_t can hold any valid DMA or bus address for the platform.
+ 	/*
+ 	 * Alloc MicroCode buffer for 'chans' Channel threads.
+ 	 * A channel's buffer offset is (Channel_Id * MCODE_BUFF_PERCHAN)
+ 	 */
+-	pl330->mcode_cpu = dma_alloc_coherent(pl330->ddma.dev,
++	pl330->mcode_cpu = dma_alloc_attrs(pl330->ddma.dev,
+ 				chans * pl330->mcbufsz,
+-				&pl330->mcode_bus, GFP_KERNEL);
++				&pl330->mcode_bus, GFP_KERNEL,
++				dma_attrs);
+ 	if (!pl330->mcode_cpu) {
+ 		dev_err(pl330->ddma.dev, "%s:%d Can't allocate memory!\n",
+ 			__func__, __LINE__);
 -- 
 Qualcomm Innovation Center, Inc.
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
