@@ -1,574 +1,143 @@
-From: lucile.quirion@savoirfairelinux.com (Lucile Quirion)
-Date: Wed, 27 Jul 2016 13:53:02 -0400
-Subject: [PATCH 2/2] ARM: dts: TS-4900: add basic device tree
-In-Reply-To: <1469641982-19558-1-git-send-email-lucile.quirion@savoirfairelinux.com>
-References: <1469641982-19558-1-git-send-email-lucile.quirion@savoirfairelinux.com>
-Message-ID: <1469641982-19558-3-git-send-email-lucile.quirion@savoirfairelinux.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Wed, 27 Jul 2016 11:59:50 -0600
+Subject: [PATCH V2 3/6] perf tools: add infrastructure for PMU specific
+ configuration
+In-Reply-To: <20160726204139.GA13377@krava>
+References: <1469047100-18131-1-git-send-email-mathieu.poirier@linaro.org>
+ <1469047100-18131-4-git-send-email-mathieu.poirier@linaro.org>
+ <20160721074722.GB7192@krava>
+ <CANLsYkxj+kccmvTtOLAYwyN9fOp0pMxdPcWy5cJHQDQLoj-NmQ@mail.gmail.com>
+ <20160721145434.GA15915@krava>
+ <CANLsYkwx+iOE6uwOVPtsHFMmNaH0=NjeDP8z0GZhHja2oibt8g@mail.gmail.com>
+ <20160726204139.GA13377@krava>
+Message-ID: <CANLsYkzr0iFFEUoeR8-58E02DyqdGndfNBL8v0tS2tQqBszN_A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These device trees add support for TS-4900 by Technologic Systems.
+On 26 July 2016 at 14:41, Jiri Olsa <jolsa@redhat.com> wrote:
+> On Fri, Jul 22, 2016 at 12:24:48PM -0600, Mathieu Poirier wrote:
+>
+> SNIP
+>
+>> > diff --git a/tools/perf/util/parse-events.y b/tools/perf/util/parse-events.y
+>> > --- a/tools/perf/util/parse-events.y
+>> > +++ b/tools/perf/util/parse-events.y
+>> > @@ -602,12 +602,12 @@ PE_NAME array '=' PE_VALUE
+>> >         $$ = term;
+>> >  }
+>> >  |
+>> > -PE_DRV_CFG_TERM
+>> > +'@' PE_DRV_CFG_TERM
+>> >  {
+>> >         struct parse_events_term *term;
+>> >
+>> >         ABORT_ON(parse_events_term__str(&term, PARSE_EVENTS__TERM_TYPE_DRV_CFG,
+>> > -                                       $1, $1, &@1, NULL));
+>> > +                                       $2, $2, &@2, NULL));
+>> >         $$ = term;
+>> >  }
+>> >
+>>
+>> I've been experimenting with the above solution and it is not yielding
+>> the results one might think at first glance.
+>>
+>> If we use the example: -e event/@cfg1/ ...
+>>
+>> First if we leave things exactly the way they are suggested in the
+>> code snippet flex doesn't know what do to with the '@' character and
+>> returns an error.  To deal with that a new clause
+>>
+>> "@"        { return '@'; }
+>>
+>> can be inserted in the config state.  But that doesn't link '@' with
+>> 'cfg1', and 'cfg1' gets interpreted as a PE_NAME.  Introducing a new
+>> state upon hitting '@' would get us around that but we are moving away
+>> from our initial goal of keeping things simple.
+>
+> hum, then how about keeping the flex atoms simple like for the
+> other terms and do something like below.. untested ;-)
+>
+> thanks,
+> jirka
+>
+>
+> ---
+> diff --git a/tools/perf/util/parse-events.l b/tools/perf/util/parse-events.l
+> index 1f7e11a6c5b3..8ba228e1c150 100644
+> --- a/tools/perf/util/parse-events.l
+> +++ b/tools/perf/util/parse-events.l
+> @@ -53,16 +53,6 @@ static int str(yyscan_t scanner, int token)
+>         return token;
+>  }
+>
+> -static int drv_str(yyscan_t scanner, int token)
+> -{
+> -       YYSTYPE *yylval = parse_events_get_lval(scanner);
+> -       char *text = parse_events_get_text(scanner);
+> -
+> -       /* Strip off the '@' */
+> -       yylval->str = strdup(text + 1);
+> -       return token;
+> -}
+> -
+>  #define REWIND(__alloc)                                \
+>  do {                                                           \
+>         YYSTYPE *__yylval = parse_events_get_lval(yyscanner);   \
+> @@ -134,7 +124,6 @@ num_hex             0x[a-fA-F0-9]+
+>  num_raw_hex    [a-fA-F0-9]+
+>  name           [a-zA-Z_*?][a-zA-Z0-9_*?.]*
+>  name_minus     [a-zA-Z_*?][a-zA-Z0-9\-_*?.:]*
+> -drv_cfg_term   [a-zA-Z0-9_\.]+(=[a-zA-Z0-9_*?\.:]+)?
+>  /* If you add a modifier you need to update check_modifier() */
+>  modifier_event [ukhpPGHSDI]+
+>  modifier_bp    [rwx]{1,3}
+> @@ -216,11 +205,11 @@ no-inherit                { return term(yyscanner, PARSE_EVENTS__TERM_TYPE_NOINHERIT); }
+>  overwrite              { return term(yyscanner, PARSE_EVENTS__TERM_TYPE_OVERWRITE); }
+>  no-overwrite           { return term(yyscanner, PARSE_EVENTS__TERM_TYPE_NOOVERWRITE); }
+>  ,                      { return ','; }
+> +"@"                    { return '@'; }
+>  "/"                    { BEGIN(INITIAL); return '/'; }
+>  {name_minus}           { return str(yyscanner, PE_NAME); }
+>  \[all\]                        { return PE_ARRAY_ALL; }
+>  "["                    { BEGIN(array); return '['; }
+> -@{drv_cfg_term}                { return drv_str(yyscanner, PE_DRV_CFG_TERM); }
+>  }
+>
+>  <mem>{
+> diff --git a/tools/perf/util/parse-events.y b/tools/perf/util/parse-events.y
+> index 879115f93edc..7e03e93dabca 100644
+> --- a/tools/perf/util/parse-events.y
+> +++ b/tools/perf/util/parse-events.y
+> @@ -602,12 +602,12 @@ PE_NAME array '=' PE_VALUE
+>         $$ = term;
+>  }
+>  |
+> -PE_DRV_CFG_TERM
+> +'@' PE_NAME '=' PE_NAME
+>  {
+>         struct parse_events_term *term;
+>
+>         ABORT_ON(parse_events_term__str(&term, PARSE_EVENTS__TERM_TYPE_DRV_CFG,
+> -                                       $1, $1, &@1, NULL));
+> +                                       $2, $4, &@2, &@4));
+>         $$ = term;
+>  }
+>
 
-More details here:
-   http://wiki.embeddedarm.com/wiki/TS-4900
+The problem here is that the correlation between the first and the
+second PE_NAME is lost and instead of seeing "PE_NAME=PE_NAME", the
+kernel only gets the value associated with the second PE_NAME.
 
-Signed-off-by: Lucile Quirion <lucile.quirion@gmail.com>
-Signed-off-by: Lucile Quirion <lucile.quirion@savoirfairelinux.com>
----
- arch/arm/boot/dts/Makefile            |   2 +
- arch/arm/boot/dts/imx6dl-ts4900.dts   |  21 ++
- arch/arm/boot/dts/imx6q-ts4900.dts    |  25 ++
- arch/arm/boot/dts/imx6qdl-ts4900.dtsi | 462 ++++++++++++++++++++++++++++++++++
- 4 files changed, 510 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx6dl-ts4900.dts
- create mode 100644 arch/arm/boot/dts/imx6q-ts4900.dts
- create mode 100644 arch/arm/boot/dts/imx6qdl-ts4900.dtsi
+For example,
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 414b427..8dbc8ab 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -327,6 +327,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
- 	imx6dl-sabreauto.dtb \
- 	imx6dl-sabrelite.dtb \
- 	imx6dl-sabresd.dtb \
-+	imx6dl-ts4900.dtb \
- 	imx6dl-tx6dl-comtft.dtb \
- 	imx6dl-tx6s-8034.dtb \
- 	imx6dl-tx6s-8035.dtb \
-@@ -369,6 +370,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
- 	imx6q-sabresd.dtb \
- 	imx6q-sbc6x.dtb \
- 	imx6q-tbs2910.dtb \
-+	imx6q-ts4900.dtb \
- 	imx6q-tx6q-1010.dtb \
- 	imx6q-tx6q-1010-comtft.dtb \
- 	imx6q-tx6q-1020.dtb \
-diff --git a/arch/arm/boot/dts/imx6dl-ts4900.dts b/arch/arm/boot/dts/imx6dl-ts4900.dts
-new file mode 100644
-index 0000000..e327b0e
---- /dev/null
-+++ b/arch/arm/boot/dts/imx6dl-ts4900.dts
-@@ -0,0 +1,21 @@
-+/*
-+ * Copyright 2011 Freescale Semiconductor, Inc.
-+ * Copyright 2011 Linaro Ltd.
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+
-+/dts-v1/;
-+#include "imx6dl.dtsi"
-+#include "imx6qdl-ts4900.dtsi"
-+#include <dt-bindings/interrupt-controller/irq.h>
-+
-+/ {
-+	model = "Technologic Systems i.MX6 Solo/DualLite TS-4900 (Default Device Tree)";
-+	compatible = "technologic,imx6dl-ts4900", "fsl,imx6dl";
-+};
-diff --git a/arch/arm/boot/dts/imx6q-ts4900.dts b/arch/arm/boot/dts/imx6q-ts4900.dts
-new file mode 100644
-index 0000000..0ea0b1a
---- /dev/null
-+++ b/arch/arm/boot/dts/imx6q-ts4900.dts
-@@ -0,0 +1,25 @@
-+/*
-+ * Copyright 2011 Freescale Semiconductor, Inc.
-+ * Copyright 2011 Linaro Ltd.
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+
-+/dts-v1/;
-+#include "imx6q.dtsi"
-+#include "imx6qdl-ts4900.dtsi"
-+#include <dt-bindings/interrupt-controller/irq.h>
-+
-+/ {
-+	model = "Technologic Systems i.MX6 Quad TS-4900 (Default Device Tree)";
-+	compatible = "technologic,imx6q-ts4900", "fsl,imx6q";
-+};
-+
-+&sata {
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/imx6qdl-ts4900.dtsi b/arch/arm/boot/dts/imx6qdl-ts4900.dtsi
-new file mode 100644
-index 0000000..9a5abbd
---- /dev/null
-+++ b/arch/arm/boot/dts/imx6qdl-ts4900.dtsi
-@@ -0,0 +1,462 @@
-+/*
-+ * Copyright 2011 Freescale Semiconductor, Inc.
-+ * Copyright 2015 Technologic Systems
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+
-+#include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/interrupt-controller/irq.h>
-+
-+/ {
-+	aliases {
-+		ethernet0 = &fec;
-+	};
-+
-+	leds {
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_leds1>;
-+		compatible = "gpio-leds";
-+
-+		green-led {
-+			label = "green-led";
-+			gpios = <&gpio2 24 GPIO_ACTIVE_LOW>;
-+			default-state = "on";
-+		};
-+
-+		red-led {
-+			label = "red-led";
-+			gpios = <&gpio1 2 GPIO_ACTIVE_LOW>;
-+			default-state = "off";
-+		};
-+	};
-+
-+	reg_3p3v: regulator-3p3v {
-+		compatible = "regulator-fixed";
-+		regulator-name = "3p3v";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		regulator-always-on;
-+	};
-+
-+	reg_usb_otg_vbus: regulator-usb-otg-vbus {
-+		compatible = "regulator-fixed";
-+		regulator-name = "usb_otg_vbus";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		gpio = <&gpio3 22 GPIO_ACTIVE_HIGH>;
-+		enable-active-high;
-+	};
-+};
-+
-+&can1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_flexcan1>;
-+	status = "okay";
-+};
-+
-+&can2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_flexcan2>;
-+	status = "okay";
-+};
-+
-+&ecspi1 {
-+	fsl,spi-num-chipselects = <1>;
-+	cs-gpios = <&gpio3 19 GPIO_ACTIVE_HIGH>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_ecspi1>;
-+	status = "okay";
-+
-+	flash: n25q064 at 0 {
-+		compatible = "micron,n25q064", "jedec,spi-nor";
-+		spi-max-frequency = <20000000>;
-+		reg = <0>;
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+
-+		partition at 0000000 {
-+			label = "U-Boot";
-+			reg = <0x0000000 0x0100000>;
-+		};
-+		partition at 0100000 {
-+			label = "env";
-+			reg = <0x0100000 0x0020000>;
-+		};
-+		partition at 0400000 {
-+			label = "user-data";
-+			reg = <0x0400000 0x0400000>;
-+		};
-+	};
-+};
-+
-+&ecspi2 {
-+	fsl,spi-num-chipselects = <1>;
-+	cs-gpios = <&gpio6 2 GPIO_ACTIVE_HIGH>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_ecspi2>;
-+	status = "okay";
-+};
-+
-+&fec {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_enet>;
-+	phy-mode = "rgmii";
-+	status = "okay";
-+};
-+
-+&i2c1 {
-+	status = "okay";
-+	clock-frequency = <100000>;
-+	pinctrl-names = "default", "gpio";
-+	pinctrl-0 = <&pinctrl_i2c1>;
-+	pinctrl-1 = <&pinctrl_i2c1_gpio>;
-+	scl-gpios = <&gpio3 21 GPIO_ACTIVE_HIGH>;
-+	sda-gpios = <&gpio3 28 GPIO_ACTIVE_HIGH>;
-+
-+	rtc: isl12022 at 6f {
-+		compatible = "isil,isl12022";
-+		reg = <0x6f>;
-+	};
-+};
-+
-+&i2c2 {
-+	status = "okay";
-+	clock-frequency = <100000>;
-+	pinctrl-names = "default", "gpio";
-+	pinctrl-0 = <&pinctrl_i2c2>;
-+	pinctrl-1 = <&pinctrl_i2c2_gpio>;
-+	scl-gpios = <&gpio4 12 GPIO_ACTIVE_HIGH>;
-+	sda-gpios = <&gpio4 13 GPIO_ACTIVE_HIGH>;
-+};
-+
-+&iomuxc {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_hog>;
-+
-+	pinctrl_ecspi1: ecspi1grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_EIM_D17__ECSPI1_MISO		0x100b1
-+			MX6QDL_PAD_EIM_D18__ECSPI1_MOSI		0x100b1
-+			MX6QDL_PAD_EIM_D16__ECSPI1_SCLK		0x100b1
-+			MX6QDL_PAD_EIM_D19__GPIO3_IO19		0x100b1 /* Onboard flash CS1# */
-+		>;
-+	};
-+
-+	pinctrl_ecspi2: ecspi2 {
-+		fsl,pins = <
-+			MX6QDL_PAD_CSI0_DAT8__ECSPI2_SCLK	0x100b1
-+			MX6QDL_PAD_CSI0_DAT9__ECSPI2_MOSI	0x100b1
-+			MX6QDL_PAD_CSI0_DAT10__ECSPI2_MISO	0x100b1
-+			MX6QDL_PAD_CSI0_DAT11__GPIO5_IO29	0x100b1 /* Offboard CS0# */
-+			MX6QDL_PAD_CSI0_DAT16__GPIO6_IO02	0x100b1 /* FPGA CS1# */
-+			MX6QDL_PAD_CSI0_VSYNC__GPIO5_IO21	0x1b0b1 /* FPGA_RESET# */
-+			MX6QDL_PAD_CSI0_DATA_EN__GPIO5_IO20	0x1b0b1 /* FPGA_DONE */
-+			MX6QDL_PAD_GPIO_3__XTALOSC_REF_CLK_24M	0x10    /* FPGA 24MHZ */
-+			MX6QDL_PAD_GPIO_4__GPIO1_IO04		0x1b0b1 /* FPGA_IRQ */
-+		>;
-+	};
-+
-+	pinctrl_enet: enet {
-+		fsl,pins = <
-+			MX6QDL_PAD_ENET_MDIO__ENET_MDIO		0x1b0b0
-+			MX6QDL_PAD_ENET_MDC__ENET_MDC		0x1b0b0
-+			MX6QDL_PAD_RGMII_TXC__RGMII_TXC		0x1b0b0
-+			MX6QDL_PAD_RGMII_TD0__RGMII_TD0		0x1b0b0
-+			MX6QDL_PAD_RGMII_TD1__RGMII_TD1		0x1b0b0
-+			MX6QDL_PAD_RGMII_TD2__RGMII_TD2		0x1b0b0
-+			MX6QDL_PAD_RGMII_TD3__RGMII_TD3		0x1b0b0
-+			MX6QDL_PAD_RGMII_TX_CTL__RGMII_TX_CTL	0x1b0b0
-+			MX6QDL_PAD_ENET_REF_CLK__ENET_TX_CLK	0x1b0b0
-+			MX6QDL_PAD_RGMII_RXC__RGMII_RXC		0x1b0b0
-+			MX6QDL_PAD_RGMII_RD0__RGMII_RD0		0x1b0b0
-+			MX6QDL_PAD_RGMII_RD1__RGMII_RD1		0x1b0b0
-+			MX6QDL_PAD_RGMII_RD2__RGMII_RD2		0x1b0b0
-+			MX6QDL_PAD_RGMII_RD3__RGMII_RD3		0x1b0b0
-+			MX6QDL_PAD_RGMII_RX_CTL__RGMII_RX_CTL	0x1b0b0
-+			MX6QDL_PAD_ENET_REF_CLK__ENET_TX_CLK	0x4001b0a8
-+			MX6QDL_PAD_ENET_TX_EN__GPIO1_IO28	0x1b0b1
-+			MX6QDL_PAD_DI0_PIN4__GPIO4_IO20		0x1b0b1 /* ETH_PHY_RESET */
-+		>;
-+	};
-+
-+	pinctrl_flexcan1: flexcan1grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_KEY_ROW2__FLEXCAN1_RX	0x1b0b1
-+			MX6QDL_PAD_KEY_COL2__FLEXCAN1_TX	0x1b0b1
-+		>;
-+	};
-+
-+	pinctrl_flexcan2: flexcan2grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_KEY_COL4__FLEXCAN2_TX	0x1b0b1
-+			MX6QDL_PAD_KEY_ROW4__FLEXCAN2_RX	0x1b0b1
-+		>;
-+	};
-+
-+	pinctrl_hog: hoggrp {
-+		fsl,pins = <
-+			MX6QDL_PAD_EIM_A17__GPIO2_IO21		0x1b0b1 /* OFF_BD_RESET# */
-+			MX6QDL_PAD_EIM_A16__GPIO2_IO22		0x1b0b1 /* EN_USB_5V# */
-+			MX6QDL_PAD_EIM_A19__GPIO2_IO19		0x1b0b1 /* EN_LCD_3.3V */
-+			MX6QDL_PAD_GPIO_0__CCM_CLKO1		0x130b0 /* Audio CLK */
-+			MX6QDL_PAD_GPIO_5__GPIO1_IO05		0x1b0b1 /* DIO_1 */
-+			MX6QDL_PAD_GPIO_6__GPIO1_IO06		0x1b0b1 /* DIO_2 */
-+			MX6QDL_PAD_GPIO_9__GPIO1_IO09		0x1b0b1 /* DIO_3 */
-+			MX6QDL_PAD_GPIO_16__GPIO7_IO11		0x1b0b1 /* DIO_4 */
-+			MX6QDL_PAD_GPIO_17__GPIO7_IO12		0x1b0b1 /* DIO_5 */
-+			MX6QDL_PAD_GPIO_19__GPIO4_IO05		0x1b0b1 /* DIO_7 */
-+			MX6QDL_PAD_CSI0_MCLK__GPIO5_IO19	0x1b0b1 /* DIO_8 */
-+			MX6QDL_PAD_CSI0_PIXCLK__GPIO5_IO18	0x1b0b1 /* DIO_9 */
-+			MX6QDL_PAD_CSI0_DAT12__GPIO5_IO30	0x1b0b1 /* DIO_0 */
-+			MX6QDL_PAD_CSI0_DAT13__GPIO5_IO31	0x1b0b1 /* DIO_6 */
-+			MX6QDL_PAD_CSI0_DAT17__GPIO6_IO03	0x1b0b1 /* CPU_DIO_A */
-+			MX6QDL_PAD_SD4_DAT7__GPIO2_IO15		0x1b0b1 /* DIO_2 */
-+			MX6QDL_PAD_SD3_RST__GPIO7_IO08		0x1b0b1 /* CPU_DIO_B */
-+			MX6QDL_PAD_EIM_LBA__GPIO2_IO27		0x1b0b1 /* BUS_ALE# */
-+			MX6QDL_PAD_EIM_OE__GPIO2_IO25		0x1b0b1 /* DIO_15 */
-+			MX6QDL_PAD_EIM_RW__GPIO2_IO26		0x1b0b1 /* BUS_DIR */
-+			MX6QDL_PAD_EIM_CS0__GPIO2_IO23		0x1b0b1 /* BUS_CS# */
-+			MX6QDL_PAD_EIM_A18__GPIO2_IO20		0x1b0b1 /* DIO_14 */
-+			MX6QDL_PAD_EIM_A20__GPIO2_IO18		0x1b0b1 /* DIO_16 */
-+			MX6QDL_PAD_EIM_A21__GPIO2_IO17		0x1b0b1 /* DIO_12 */
-+			MX6QDL_PAD_EIM_A22__GPIO2_IO16		0x1b0b1 /* DIO_18 */
-+			MX6QDL_PAD_EIM_A23__GPIO6_IO06		0x1b0b1 /* DIO_19 */
-+			MX6QDL_PAD_EIM_A24__GPIO5_IO04		0x1b0b1 /* DIO_20 */
-+			MX6QDL_PAD_EIM_D31__GPIO3_IO31		0x1b0b1 /* BUS_BHE# */
-+			MX6QDL_PAD_EIM_BCLK__GPIO6_IO31		0x1b0b1 /* DIO_13 */
-+			MX6QDL_PAD_EIM_WAIT__GPIO5_IO00		0x1b0b1 /* EIM_WAIT# */
-+			MX6QDL_PAD_EIM_EB1__GPIO2_IO29		0x1b0b1 /* DIO_10 */
-+			MX6QDL_PAD_EIM_DA0__GPIO3_IO00		0x1b0b1 /* MUX_AD_00 */
-+			MX6QDL_PAD_EIM_DA1__GPIO3_IO01		0x1b0b1 /* MUX_AD_01 */
-+			MX6QDL_PAD_EIM_DA2__GPIO3_IO02		0x1b0b1 /* MUX_AD_02 */
-+			MX6QDL_PAD_EIM_DA3__GPIO3_IO03		0x1b0b1 /* MUX_AD_03 */
-+			MX6QDL_PAD_EIM_DA4__GPIO3_IO04		0x1b0b1 /* MUX_AD_04 */
-+			MX6QDL_PAD_EIM_DA5__GPIO3_IO05		0x1b0b1 /* MUX_AD_05 */
-+			MX6QDL_PAD_EIM_DA6__GPIO3_IO06		0x1b0b1 /* MUX_AD_06 */
-+			MX6QDL_PAD_EIM_DA7__GPIO3_IO07		0x1b0b1 /* MUX_AD_07 */
-+			MX6QDL_PAD_EIM_DA8__GPIO3_IO08		0x1b0b1 /* MUX_AD_08 */
-+			MX6QDL_PAD_EIM_DA9__GPIO3_IO09		0x1b0b1 /* MUX_AD_09 */
-+			MX6QDL_PAD_EIM_DA10__GPIO3_IO10		0x1b0b1 /* MUX_AD_10 */
-+			MX6QDL_PAD_EIM_DA11__GPIO3_IO11		0x1b0b1 /* MUX_AD_11 */
-+			MX6QDL_PAD_EIM_DA12__GPIO3_IO12		0x1b0b1 /* MUX_AD_12 */
-+			MX6QDL_PAD_EIM_DA13__GPIO3_IO13		0x1b0b1 /* MUX_AD_13 */
-+			MX6QDL_PAD_EIM_DA14__GPIO3_IO14		0x1b0b1 /* MUX_AD_14 */
-+			MX6QDL_PAD_EIM_DA15__GPIO3_IO15		0x1b0b1 /* MUX_AD_15 */
-+			MX6QDL_PAD_DI0_DISP_CLK__GPIO4_IO16	0x1b0b1 /* LCD_CLK */
-+			MX6QDL_PAD_DI0_PIN15__GPIO4_IO17	0x1b0b1 /* DE */
-+			MX6QDL_PAD_DI0_PIN2__GPIO4_IO18		0x1b0b1 /* Hsync */
-+			MX6QDL_PAD_DI0_PIN3__GPIO4_IO19		0x1b0b1 /* Vsync */
-+			MX6QDL_PAD_DISP0_DAT0__GPIO4_IO21	0x1b0b1
-+			MX6QDL_PAD_DISP0_DAT1__GPIO4_IO22	0x1b0b1
-+			MX6QDL_PAD_DISP0_DAT2__GPIO4_IO23	0x1b0b1
-+			MX6QDL_PAD_DISP0_DAT3__GPIO4_IO24	0x1b0b1
-+			MX6QDL_PAD_DISP0_DAT4__GPIO4_IO25	0x1b0b1
-+			MX6QDL_PAD_DISP0_DAT5__GPIO4_IO26	0x1b0b1
-+			MX6QDL_PAD_DISP0_DAT6__GPIO4_IO27	0x1b0b1
-+			MX6QDL_PAD_DISP0_DAT7__GPIO4_IO28	0x1b0b1
-+			MX6QDL_PAD_DISP0_DAT8__GPIO4_IO29	0x1b0b1
-+			MX6QDL_PAD_DISP0_DAT9__GPIO4_IO30	0x1b0b1
-+			MX6QDL_PAD_DISP0_DAT10__GPIO4_IO31	0x1b0b1
-+			MX6QDL_PAD_DISP0_DAT11__GPIO5_IO05	0x1b0b1
-+			MX6QDL_PAD_DISP0_DAT12__GPIO5_IO06	0x1b0b1
-+			MX6QDL_PAD_DISP0_DAT13__GPIO5_IO07	0x1b0b1
-+			MX6QDL_PAD_DISP0_DAT14__GPIO5_IO08	0x1b0b1
-+			MX6QDL_PAD_DISP0_DAT15__GPIO5_IO09	0x1b0b1
-+			MX6QDL_PAD_DISP0_DAT16__GPIO5_IO10	0x1b0b1
-+			MX6QDL_PAD_DISP0_DAT17__GPIO5_IO11	0x1b0b1
-+			MX6QDL_PAD_DISP0_DAT18__GPIO5_IO12	0x1b0b1
-+			MX6QDL_PAD_DISP0_DAT19__GPIO5_IO13	0x1b0b1
-+			MX6QDL_PAD_DISP0_DAT20__GPIO5_IO14	0x1b0b1
-+			MX6QDL_PAD_DISP0_DAT21__GPIO5_IO15	0x1b0b1
-+			MX6QDL_PAD_DISP0_DAT22__GPIO5_IO16	0x1b0b1
-+			MX6QDL_PAD_DISP0_DAT23__GPIO5_IO17	0x1b0b1
-+		>;
-+	};
-+
-+	pinctrl_i2c1: i2c1grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_EIM_D21__I2C1_SCL		0x4001b8b1
-+			MX6QDL_PAD_EIM_D28__I2C1_SDA		0x4001b8b1
-+		>;
-+	};
-+
-+	pinctrl_i2c1_gpio: i2c1gpiogrp {
-+		fsl,pins = <
-+			MX6QDL_PAD_EIM_D21__GPIO3_IO21		0x4001b8b1
-+			MX6QDL_PAD_EIM_D28__GPIO3_IO28		0x4001b8b1
-+		>;
-+	};
-+
-+	pinctrl_i2c2: i2c2grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_KEY_COL3__I2C2_SCL		0x4001b8b1
-+			MX6QDL_PAD_KEY_ROW3__I2C2_SDA		0x4001b8b1
-+		>;
-+	};
-+
-+	pinctrl_i2c2_gpio: i2c2gpiogrp {
-+		fsl,pins = <
-+			MX6QDL_PAD_KEY_COL3__GPIO4_IO12		0x4001b8b1
-+			MX6QDL_PAD_KEY_ROW3__GPIO4_IO13		0x4001b8b1
-+		>;
-+	};
-+
-+	pinctrl_leds1: leds1grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_GPIO_2__GPIO1_IO02		0x1b0b1 /* RED_LED# */
-+			MX6QDL_PAD_EIM_CS1__GPIO2_IO24		0x1b0b1 /* GREEN_LED# */
-+		>;
-+	};
-+
-+	pinctrl_uart1: uart1-grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_SD3_DAT7__UART1_TX_DATA	0x1b0b1
-+			MX6QDL_PAD_SD3_DAT6__UART1_RX_DATA	0x1b0b1
-+		>;
-+	};
-+
-+	pinctrl_uart2: uart2-grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_GPIO_7__UART2_TX_DATA	0x1b0b1
-+			MX6QDL_PAD_GPIO_8__UART2_RX_DATA	0x1b0b1
-+			MX6QDL_PAD_SD4_DAT6__UART2_CTS_B	0x1b0b1
-+			MX6QDL_PAD_SD4_DAT5__UART2_RTS_B	0x1b0b1
-+		>;
-+	};
-+
-+	pinctrl_uart3: uart3-grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_EIM_D24__UART3_TX_DATA	0x1b0b1
-+			MX6QDL_PAD_EIM_D25__UART3_RX_DATA	0x1b0b1
-+		>;
-+	};
-+
-+	pinctrl_uart4: uart4-grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_KEY_COL0__UART4_TX_DATA	0x1b0b1
-+			MX6QDL_PAD_KEY_ROW0__UART4_RX_DATA	0x1b0b1
-+		>;
-+	};
-+
-+	pinctrl_uart5: uart5-grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_KEY_COL1__UART5_TX_DATA	0x1b0b1
-+			MX6QDL_PAD_KEY_ROW1__UART5_RX_DATA	0x1b0b1
-+		>;
-+	};
-+
-+	pinctrl_usbotg: usbotggrp {
-+		fsl,pins = <
-+			MX6QDL_PAD_GPIO_1__USB_OTG_ID		0x17059
-+		>;
-+	};
-+
-+	pinctrl_usdhc1: usdhc1grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_SD1_CMD__SD1_CMD		0x17059
-+			MX6QDL_PAD_SD1_CLK__SD1_CLK		0x10059
-+			MX6QDL_PAD_SD1_DAT0__SD1_DATA0		0x17059
-+			MX6QDL_PAD_SD1_DAT1__SD1_DATA1		0x17059
-+			MX6QDL_PAD_SD1_DAT2__SD1_DATA2		0x17059
-+			MX6QDL_PAD_SD1_DAT3__SD1_DATA3		0x17059
-+			MX6QDL_PAD_ENET_RXD1__GPIO1_IO26	0x17059 /* WIFI IRQ */
-+		>;
-+	};
-+
-+	pinctrl_usdhc2: usdhc2grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_SD2_CMD__SD2_CMD		0x17059
-+			MX6QDL_PAD_SD2_CLK__SD2_CLK		0x10059
-+			MX6QDL_PAD_SD2_DAT0__SD2_DATA0		0x17059
-+			MX6QDL_PAD_SD2_DAT1__SD2_DATA1		0x17059
-+			MX6QDL_PAD_SD2_DAT2__SD2_DATA2		0x17059
-+			MX6QDL_PAD_SD2_DAT3__SD2_DATA3		0x17059
-+			MX6QDL_PAD_EIM_EB0__GPIO2_IO28		0x1b0b1 /* EN_SD_POWER# */
-+		>;
-+	};
-+
-+	pinctrl_usdhc3: usdhc3grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_SD3_CMD__SD3_CMD		0x17059
-+			MX6QDL_PAD_SD3_CLK__SD3_CLK		0x10059
-+			MX6QDL_PAD_SD3_DAT0__SD3_DATA0		0x17059
-+			MX6QDL_PAD_SD3_DAT1__SD3_DATA1		0x17059
-+			MX6QDL_PAD_SD3_DAT2__SD3_DATA2		0x17059
-+			MX6QDL_PAD_SD3_DAT3__SD3_DATA3		0x17059
-+		>;
-+	};
-+};
-+
-+&pcie {
-+	status = "okay";
-+};
-+
-+&uart1 {
-+	status = "okay";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart1>;
-+};
-+
-+&uart2 {
-+	status = "okay";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart2>;
-+	fsl,uart-has-rtscts;
-+};
-+
-+&uart3 {
-+	status = "okay";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart3>;
-+};
-+
-+&uart4 {
-+	status = "okay";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart4>;
-+};
-+
-+&uart5 {
-+	status = "okay";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart5>;
-+};
-+
-+&usbh1 {
-+	status = "okay";
-+};
-+
-+&usbotg {
-+	vbus-supply = <&reg_usb_otg_vbus>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_usbotg>;
-+	disable-over-current;
-+	status = "okay";
-+};
-+
-+/* SD */
-+&usdhc2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_usdhc2>;
-+	vmmc-supply = <&reg_3p3v>;
-+	bus-width = <4>;
-+	status = "okay";
-+	fsl,wp-controller;
-+};
-+
-+/* eMMC */
-+&usdhc3 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_usdhc3>;
-+	vmmc-supply = <&reg_3p3v>;
-+	bus-width = <4>;
-+	status = "okay";
-+	fsl,wp-controller;
-+	non-removable;
-+};
--- 
-2.5.5
+-e event/@cfg1=value1, at cfg2=value2/ ...
+
+The above code will send "value1" and "value2" to the kernel driver
+where there is no way to know what configurable the values correspond
+to.  To go around that we'd have to concatenate $2 and $4 in function
+parse_events_term__str() (or new_term()) when @type_term ==
+PARSE_EVENTS__TERM_TYPE_DRV_CFG, something that definitely looks
+hackish to me.
+
+Thanks,
+Mathieu
