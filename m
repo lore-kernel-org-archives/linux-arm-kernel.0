@@ -1,42 +1,57 @@
-From: zhiyong.tao@mediatek.com (Zhiyong Tao)
-Date: Wed, 27 Jul 2016 18:03:01 +0800
-Subject: [PATCH v6 3/3] arm: dts: mt2701: Add auxadc node.
-In-Reply-To: <1469613781-1296-1-git-send-email-zhiyong.tao@mediatek.com>
-References: <1469613781-1296-1-git-send-email-zhiyong.tao@mediatek.com>
-Message-ID: <1469613781-1296-4-git-send-email-zhiyong.tao@mediatek.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Wed, 27 Jul 2016 12:03:36 +0200
+Subject: [PATCH v4 4/8] drm/mediatek: add support for Mediatek SoC MT2701
+In-Reply-To: <1469529774.4678.34.camel@mtksdaap41>
+References: <1468577274-6178-1-git-send-email-yt.shen@mediatek.com>
+ <1468577274-6178-5-git-send-email-yt.shen@mediatek.com>
+ <1468997599.11841.49.camel@mtksdaap41>
+ <1469529774.4678.34.camel@mtksdaap41>
+Message-ID: <1469613816.2470.50.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The commit adds auxadc nodes to the Mediatek MT2701 dtsi file.
+Am Dienstag, den 26.07.2016, 18:42 +0800 schrieb YT Shen:
+> Hi CK,
+> 
+> On Wed, 2016-07-20 at 14:53 +0800, CK Hu wrote:
+> > Hi, YT:
+> > 
+> > Some comments inline.
+> > 
+> > On Fri, 2016-07-15 at 18:07 +0800, YT Shen wrote:
+> > > This patch add support for the Mediatek MT2701 DISP subsystem.
+> > > There is only one OVL engine in MT2701.
+> > > 
+> > > Signed-off-by: YT Shen <yt.shen@mediatek.com>
+> > > ---
+> > >  drivers/gpu/drm/mediatek/mtk_disp_ovl.c     |    6 ++++
+> > >  drivers/gpu/drm/mediatek/mtk_disp_rdma.c    |    6 ++++
+> > >  drivers/gpu/drm/mediatek/mtk_drm_ddp.c      |   41 +++++++++++++++++++++++++++
+> > >  drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c |    7 +++++
+> > >  drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h |    1 +
+> > >  drivers/gpu/drm/mediatek/mtk_drm_drv.c      |   31 ++++++++++++++++++++
+> > >  6 files changed, 92 insertions(+)
+> > > 
+> > 
+> > [snip...]
+> > 
+> > >  
+> > >  static const struct of_device_id mtk_ddp_comp_dt_ids[] = {
+> > > +	{ .compatible = "mediatek,mt2701-disp-ovl",   .data = (void *)MTK_DISP_OVL },
+> > >  	{ .compatible = "mediatek,mt8173-disp-ovl",   .data = (void *)MTK_DISP_OVL },
+> > > +	{ .compatible = "mediatek,mt2701-disp-rdma",  .data = (void *)MTK_DISP_RDMA },
+> > >  	{ .compatible = "mediatek,mt8173-disp-rdma",  .data = (void *)MTK_DISP_RDMA },
+> > > +	{ .compatible = "mediatek,mt2701-disp-wdma",  .data = (void *)MTK_DISP_WDMA },
+> > 
+> > Is WDMA different from MT8173 to MT2701. If they are the same, you need
+> > not to add compatible of 'mediatek,mt2701-disp-wdma' because use
+> > 'mediatek,mt8173-disp-wdma' is enough.
+> Yes, the hardware has differences, so we need add new compatible
+> 'mt2701-disp-wdma'
 
-Signed-off-by: Zhiyong Tao <zhiyong.tao@mediatek.com>
----
-This patch dependents on "Add clock support for Mediatek MT2701"[1].
-Please accept this patch together with [1].
-[1]http://lists.infradead.org/pipermail/linux-mediatek/2016-June/005969.html
----
- arch/arm/boot/dts/mt2701.dtsi |    9 +++++++++
- 1 file changed, 9 insertions(+)
+It would be nice if you could add a short paragraph to the patch
+description about what the hardware differences are (probably just
+changed register layout in most cases).
 
-diff --git a/arch/arm/boot/dts/mt2701.dtsi b/arch/arm/boot/dts/mt2701.dtsi
-index 42d5a37..c0a2644 100644
---- a/arch/arm/boot/dts/mt2701.dtsi
-+++ b/arch/arm/boot/dts/mt2701.dtsi
-@@ -187,6 +187,15 @@
- 		      <0 0x10216000 0 0x2000>;
- 	};
- 
-+	auxadc: adc at 11001000 {
-+		compatible = "mediatek,mt2701-auxadc";
-+		reg = <0 0x11001000 0 0x1000>;
-+		clocks = <&pericfg CLK_PERI_AUXADC>;
-+		clock-names = "main";
-+		#io-channel-cells = <1>;
-+		status = "disabled";
-+	};
-+
- 	uart0: serial at 11002000 {
- 		compatible = "mediatek,mt2701-uart",
- 			     "mediatek,mt6577-uart";
--- 
-1.7.9.5
+regards
+Philipp
