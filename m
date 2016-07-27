@@ -1,14 +1,16 @@
 From: mitchelh@codeaurora.org (Mitchel Humpherys)
-Date: Wed, 27 Jul 2016 16:42:03 -0700
-Subject: [PATCH v5 1/6] iommu: add IOMMU_PRIV attribute
+Date: Wed, 27 Jul 2016 16:42:08 -0700
+Subject: [PATCH v5 6/6] Revert "iommu/arm-smmu: Treat all device transactions
+ as unprivileged"
 In-Reply-To: <20160727234208.2101-1-mitchelh@codeaurora.org>
 References: <20160727234208.2101-1-mitchelh@codeaurora.org>
-Message-ID: <20160727234208.2101-2-mitchelh@codeaurora.org>
+Message-ID: <20160727234208.2101-7-mitchelh@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the IOMMU_PRIV attribute, which is used to indicate privileged
-mappings.
+This reverts commit d346180e70b9 ("iommu/arm-smmu: Treat all device
+transactions as unprivileged") since some platforms actually make use of
+privileged transactions.
 
 Reviewed-by: Robin Murphy <robin.murphy@arm.com>
 Tested-by: Robin Murphy <robin.murphy@arm.com>
@@ -18,23 +20,34 @@ Signed-off-by: Mitchel Humpherys <mitchelh@codeaurora.org>
 Notes:
     v2..v3
     
-      - Added comment
+      - Moved to the end of the series.
 
- include/linux/iommu.h | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/iommu/arm-smmu.c | 5 +----
+ 1 file changed, 1 insertion(+), 4 deletions(-)
 
-diff --git a/include/linux/iommu.h b/include/linux/iommu.h
-index a35fb8b42e1a..35804abbd6cf 100644
---- a/include/linux/iommu.h
-+++ b/include/linux/iommu.h
-@@ -31,6 +31,7 @@
- #define IOMMU_CACHE	(1 << 2) /* DMA cache coherency */
- #define IOMMU_NOEXEC	(1 << 3)
- #define IOMMU_MMIO	(1 << 4) /* e.g. things like MSI doorbells */
-+#define IOMMU_PRIV	(1 << 5) /* privileged */
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index 4f49fe29f202..46059b06f48d 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -178,9 +178,6 @@
+ #define S2CR_TYPE_BYPASS		(1 << S2CR_TYPE_SHIFT)
+ #define S2CR_TYPE_FAULT			(2 << S2CR_TYPE_SHIFT)
  
- struct iommu_ops;
- struct iommu_group;
+-#define S2CR_PRIVCFG_SHIFT		24
+-#define S2CR_PRIVCFG_UNPRIV		(2 << S2CR_PRIVCFG_SHIFT)
+-
+ /* Context bank attribute registers */
+ #define ARM_SMMU_GR1_CBAR(n)		(0x0 + ((n) << 2))
+ #define CBAR_VMID_SHIFT			0
+@@ -1175,7 +1172,7 @@ static int arm_smmu_domain_add_master(struct arm_smmu_domain *smmu_domain,
+ 		u32 idx, s2cr;
+ 
+ 		idx = cfg->smrs ? cfg->smrs[i].idx : cfg->streamids[i];
+-		s2cr = S2CR_TYPE_TRANS | S2CR_PRIVCFG_UNPRIV |
++		s2cr = S2CR_TYPE_TRANS |
+ 		       (smmu_domain->cfg.cbndx << S2CR_CBNDX_SHIFT);
+ 		writel_relaxed(s2cr, gr0_base + ARM_SMMU_GR0_S2CR(idx));
+ 	}
 -- 
 Qualcomm Innovation Center, Inc.
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
