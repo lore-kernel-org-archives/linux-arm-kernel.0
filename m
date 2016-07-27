@@ -1,232 +1,211 @@
-From: stillcompiling@gmail.com (Joshua Clayton)
-Date: Wed, 27 Jul 2016 09:25:11 -0700
-Subject: [PATCH v3 4/6] usb: core: add power sequence handling for USB
- devices
-In-Reply-To: <1469007629-31757-5-git-send-email-peter.chen@nxp.com>
-References: <1469007629-31757-1-git-send-email-peter.chen@nxp.com>
- <1469007629-31757-5-git-send-email-peter.chen@nxp.com>
-Message-ID: <5798E067.90207@gmail.com>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Thu, 28 Jul 2016 00:54:07 +0800
+Subject: [xlnx:master 2556/2625] drivers/gpu/drm/xylon/xylon_encoder.c:171:8:
+ error: too few arguments to function 'drm_encoder_init'
+Message-ID: <201607280059.ent4RfiF%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+tree:   https://github.com/Xilinx/linux-xlnx master
+head:   4dcc2058b8620d77b8be9940626b339d848c0dfc
+commit: ef0a1fd5ad14a1373f9c483a9426e277ca213cab [2556/2625] Merge tag 'v4.5' into master
+config: i386-allmodconfig (attached as .config)
+compiler: gcc-6 (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        git checkout ef0a1fd5ad14a1373f9c483a9426e277ca213cab
+        # save the attached .config to linux build tree
+        make ARCH=i386 
 
+All error/warnings (new ones prefixed by >>):
 
-On 07/20/2016 02:40 AM, Peter Chen wrote:
-> Some hard-wired USB devices need to do power sequence to let the
-> device work normally, the typical power sequence like: enable USB
-> PHY clock, toggle reset pin, etc. But current Linux USB driver
-> lacks of such code to do it, it may cause some hard-wired USB devices
-> works abnormal or can't be recognized by controller at all.
->
-> In this patch, it calls power sequence library APIs to finish
-> the power sequence events. At first, it calls pwrseq_alloc_generic
-> to create a generic power sequence instance, then it will do power
-> on sequence at hub's probe for all devices under this hub
-> (includes root hub).
->
-> At hub_disconnect, it will do power off sequence which is at powered
-> on list.
->
-> Signed-off-by: Peter Chen <peter.chen@nxp.com>
-> ---
->  drivers/usb/core/Makefile |   1 +
->  drivers/usb/core/hub.c    |  12 ++++--
->  drivers/usb/core/hub.h    |  12 ++++++
->  drivers/usb/core/pwrseq.c | 100 ++++++++++++++++++++++++++++++++++++++++++++++
->  4 files changed, 122 insertions(+), 3 deletions(-)
->  create mode 100644 drivers/usb/core/pwrseq.c
->
-> diff --git a/drivers/usb/core/Makefile b/drivers/usb/core/Makefile
-> index da36b78..5fd2f54 100644
-> --- a/drivers/usb/core/Makefile
-> +++ b/drivers/usb/core/Makefile
-> @@ -10,5 +10,6 @@ usbcore-y += port.o
->  usbcore-$(CONFIG_OF)		+= of.o
->  usbcore-$(CONFIG_PCI)		+= hcd-pci.o
->  usbcore-$(CONFIG_ACPI)		+= usb-acpi.o
-> +usbcore-$(CONFIG_PWRSEQ_GENERIC) += pwrseq.o
->  
->  obj-$(CONFIG_USB)		+= usbcore.o
-> diff --git a/drivers/usb/core/hub.c b/drivers/usb/core/hub.c
-> index bee1351..a346a8b 100644
-> --- a/drivers/usb/core/hub.c
-> +++ b/drivers/usb/core/hub.c
-> @@ -1700,6 +1700,7 @@ static void hub_disconnect(struct usb_interface *intf)
->  	hub->error = 0;
->  	hub_quiesce(hub, HUB_DISCONNECT);
->  
-> +	hub_pwrseq_off(hub);
->  	mutex_lock(&usb_port_peer_mutex);
->  
->  	/* Avoid races with recursively_mark_NOTATTACHED() */
-> @@ -1733,6 +1734,7 @@ static int hub_probe(struct usb_interface *intf, const struct usb_device_id *id)
->  	struct usb_endpoint_descriptor *endpoint;
->  	struct usb_device *hdev;
->  	struct usb_hub *hub;
-> +	int ret = -ENODEV;
->  
->  	desc = intf->cur_altsetting;
->  	hdev = interface_to_usbdev(intf);
-> @@ -1839,6 +1841,7 @@ descriptor_error:
->  	INIT_DELAYED_WORK(&hub->leds, led_work);
->  	INIT_DELAYED_WORK(&hub->init_work, NULL);
->  	INIT_WORK(&hub->events, hub_event);
-> +	INIT_LIST_HEAD(&hub->pwrseq_on_list);
->  	usb_get_intf(intf);
->  	usb_get_dev(hdev);
->  
-> @@ -1852,11 +1855,14 @@ descriptor_error:
->  	if (id->driver_info & HUB_QUIRK_CHECK_PORT_AUTOSUSPEND)
->  		hub->quirk_check_port_auto_suspend = 1;
->  
-> -	if (hub_configure(hub, endpoint) >= 0)
-> -		return 0;
-> +	if (hub_configure(hub, endpoint) >= 0) {
-> +		ret = hub_pwrseq_on(hub);
-> +		if (!ret)
-> +			return 0;
-> +	}
->  
->  	hub_disconnect(intf);
-> -	return -ENODEV;
-> +	return ret;
->  }
->  
->  static int
-> diff --git a/drivers/usb/core/hub.h b/drivers/usb/core/hub.h
-> index 34c1a7e..9473f6f 100644
-> --- a/drivers/usb/core/hub.h
-> +++ b/drivers/usb/core/hub.h
-> @@ -78,6 +78,7 @@ struct usb_hub {
->  	struct delayed_work	init_work;
->  	struct work_struct      events;
->  	struct usb_port		**ports;
-> +	struct list_head	pwrseq_on_list; /* powered pwrseq node list */
->  };
->  
->  /**
-> @@ -166,3 +167,14 @@ static inline int hub_port_debounce_be_stable(struct usb_hub *hub,
->  {
->  	return hub_port_debounce(hub, port1, false);
->  }
-> +
-> +#if IS_ENABLED(CONFIG_PWRSEQ_GENERIC)
-> +int hub_pwrseq_on(struct usb_hub *hub);
-> +void hub_pwrseq_off(struct usb_hub *hub);
-> +#else
-> +static inline int hub_pwrseq_on(struct usb_hub *hub)
-> +{
-> +	return 0;
-> +}
-> +static inline void hub_pwrseq_off(struct usb_hub *hub) {}
-> +#endif /* CONFIG_PWRSEQ_GENERIC */
-> diff --git a/drivers/usb/core/pwrseq.c b/drivers/usb/core/pwrseq.c
-> new file mode 100644
-> index 0000000..837fe66
-> --- /dev/null
-> +++ b/drivers/usb/core/pwrseq.c
-> @@ -0,0 +1,100 @@
-> +/*
-> + * pwrseq.c	USB device power sequence management
-> + *
-> + * Copyright (C) 2016 Freescale Semiconductor, Inc.
-> + * Author: Peter Chen <peter.chen@nxp.com>
-> + *
-> + * This program is free software: you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2  of
-> + * the License as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> + */
-> +
-> +#include <linux/list.h>
-> +#include <linux/of.h>
-> +#include <linux/power/pwrseq.h>
-> +#include <linux/slab.h>
-> +#include <linux/usb.h>
-> +#include <linux/usb/hcd.h>
-> +
-> +#include "hub.h"
-> +
-> +struct usb_pwrseq_node {
-> +	struct pwrseq *pwrseq;
-> +	struct list_head list;
-> +};
-> +
-> +static int hub_of_pwrseq_on(struct device_node *np, struct usb_hub *hub)
-> +{
-> +	struct pwrseq *pwrseq;
-> +	struct usb_pwrseq_node *pwrseq_node;
-> +	int ret;
-> +
-> +	pwrseq = pwrseq_alloc_generic();
-> +	if (IS_ERR(pwrseq))
-> +		return PTR_ERR(pwrseq);
-> +
-> +	ret = pwrseq_get(np, pwrseq);
-> +	if (ret)
-> +		goto pwr_free;
-> +
-> +	ret = pwrseq_on(np, pwrseq);
-> +	if (ret)
-> +		goto pwr_put;
-> +
-> +	pwrseq_node = kzalloc(sizeof(*pwrseq_node), GFP_KERNEL);
-> +	pwrseq_node->pwrseq = pwrseq;
-> +	list_add(&pwrseq_node->list, &hub->pwrseq_on_list);
-> +
-> +	return 0;
-> +
-> +pwr_put:
-> +	pwrseq_put(pwrseq);
-> +pwr_free:
-> +	pwrseq_free(pwrseq);
-> +	return ret;
-> +}
-> +
-> +int hub_pwrseq_on(struct usb_hub *hub)
-> +{
-> +	struct device *parent;
-> +	struct usb_device *hdev = hub->hdev;
-> +	struct device_node *np;
-> +	int ret;
-> +
-> +	if (hdev->parent)
-> +		parent = &hdev->dev;
-> +	else
-> +		parent = bus_to_hcd(hdev->bus)->self.controller;
-> +
-> +	for_each_child_of_node(parent->of_node, np) {
-> +		ret = hub_of_pwrseq_on(np, hub);
-> +		if (ret)
-> +			return ret;
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +void hub_pwrseq_off(struct usb_hub *hub)
-> +{
-> +	struct pwrseq *pwrseq;
-> +	struct usb_pwrseq_node *pwrseq_node, *tmp_node;
-> +
-> +	list_for_each_entry_safe(pwrseq_node, tmp_node,
-> +			&hub->pwrseq_on_list, list) {
-> +		pwrseq = pwrseq_node->pwrseq;
-> +		pwrseq_off(pwrseq);
-> +		pwrseq_put(pwrseq);
-> +		pwrseq_free(pwrseq);
-> +		list_del(&pwrseq_node->list);
-> +		kfree(pwrseq_node);
-> +	}
-> +}
-Patch 4 does not apply for me
-(The Makefile has  a "usbcore-$(CONFIG_OF) += of.o"
-line which I don't see in 4.7 or linux/next master).
-Is there another patch set this series depends on?
+   drivers/gpu/drm/xylon/xylon_encoder.c: In function 'xylon_drm_encoder_dpms':
+>> drivers/gpu/drm/xylon/xylon_encoder.c:49:17: warning: assignment discards 'const' qualifier from pointer target type [-Wdiscarded-qualifiers]
+     encoder_sfuncs = encoder_slave->slave_funcs;
+                    ^
+   drivers/gpu/drm/xylon/xylon_encoder.c: In function 'xylon_drm_encoder_mode_fixup':
+   drivers/gpu/drm/xylon/xylon_encoder.c:70:17: warning: assignment discards 'const' qualifier from pointer target type [-Wdiscarded-qualifiers]
+     encoder_sfuncs = encoder_slave->slave_funcs;
+                    ^
+   drivers/gpu/drm/xylon/xylon_encoder.c: In function 'xylon_drm_encoder_mode_set':
+   drivers/gpu/drm/xylon/xylon_encoder.c:108:17: warning: assignment discards 'const' qualifier from pointer target type [-Wdiscarded-qualifiers]
+     encoder_sfuncs = encoder_slave->slave_funcs;
+                    ^
+   drivers/gpu/drm/xylon/xylon_encoder.c: In function 'xylon_drm_encoder_create':
+>> drivers/gpu/drm/xylon/xylon_encoder.c:171:8: error: too few arguments to function 'drm_encoder_init'
+     ret = drm_encoder_init(dev, &encoder->slave.base,
+           ^~~~~~~~~~~~~~~~
+   In file included from include/drm/drmP.h:68:0,
+                    from drivers/gpu/drm/xylon/xylon_encoder.c:20:
+   include/drm/drm_crtc.h:2230:5: note: declared here
+    int drm_encoder_init(struct drm_device *dev,
+        ^~~~~~~~~~~~~~~~
+--
+   drivers/gpu/drm/xylon/xylon_connector.c: In function 'xylon_drm_connector_get_modes':
+>> drivers/gpu/drm/xylon/xylon_connector.c:44:3: warning: initialization discards 'const' qualifier from pointer target type [-Wdiscarded-qualifiers]
+      encoder_slave->slave_funcs;
+      ^~~~~~~~~~~~~
+   drivers/gpu/drm/xylon/xylon_connector.c: In function 'xylon_drm_connector_mode_valid':
+   drivers/gpu/drm/xylon/xylon_connector.c:61:3: warning: initialization discards 'const' qualifier from pointer target type [-Wdiscarded-qualifiers]
+      encoder_slave->slave_funcs;
+      ^~~~~~~~~~~~~
+   drivers/gpu/drm/xylon/xylon_connector.c: In function 'xylon_drm_connector_detect':
+   drivers/gpu/drm/xylon/xylon_connector.c:94:3: warning: initialization discards 'const' qualifier from pointer target type [-Wdiscarded-qualifiers]
+      encoder_slave->slave_funcs;
+      ^~~~~~~~~~~~~
+--
+>> drivers/gpu/drm/xylon/xylon_fb.c:132:15: warning: initialization from incompatible pointer type [-Wincompatible-pointer-types]
+     .fb_create = xylon_drm_fb_create,
+                  ^~~~~~~~~~~~~~~~~~~
+   drivers/gpu/drm/xylon/xylon_fb.c:132:15: note: (near initialization for 'xylon_drm_mode_config_funcs.fb_create')
+
+vim +/drm_encoder_init +171 drivers/gpu/drm/xylon/xylon_encoder.c
+
+d743a182d Davor Joja 2014-03-24   43  {
+d743a182d Davor Joja 2014-03-24   44  	struct xylon_drm_encoder *encoder;
+d743a182d Davor Joja 2014-03-24   45  	struct drm_encoder_slave *encoder_slave;
+d743a182d Davor Joja 2014-03-24   46  	struct drm_encoder_slave_funcs *encoder_sfuncs;
+d743a182d Davor Joja 2014-03-24   47  
+d743a182d Davor Joja 2014-03-24   48  	encoder_slave = to_encoder_slave(base_encoder);
+d743a182d Davor Joja 2014-03-24  @49  	encoder_sfuncs = encoder_slave->slave_funcs;
+d743a182d Davor Joja 2014-03-24   50  	encoder = to_xylon_encoder(encoder_slave);
+d743a182d Davor Joja 2014-03-24   51  
+d743a182d Davor Joja 2014-03-24   52  	if (encoder->dpms == dpms)
+d743a182d Davor Joja 2014-03-24   53  		return;
+d743a182d Davor Joja 2014-03-24   54  
+d743a182d Davor Joja 2014-03-24   55  	encoder->dpms = dpms;
+d743a182d Davor Joja 2014-03-24   56  	if (encoder_sfuncs->dpms)
+d743a182d Davor Joja 2014-03-24   57  		encoder_sfuncs->dpms(base_encoder, dpms);
+d743a182d Davor Joja 2014-03-24   58  }
+d743a182d Davor Joja 2014-03-24   59  
+d743a182d Davor Joja 2014-03-24   60  static bool
+d743a182d Davor Joja 2014-03-24   61  xylon_drm_encoder_mode_fixup(struct drm_encoder *base_encoder,
+d743a182d Davor Joja 2014-03-24   62  			     const struct drm_display_mode *mode,
+d743a182d Davor Joja 2014-03-24   63  			     struct drm_display_mode *adjusted_mode)
+d743a182d Davor Joja 2014-03-24   64  {
+d743a182d Davor Joja 2014-03-24   65  	struct drm_encoder_slave *encoder_slave;
+d743a182d Davor Joja 2014-03-24   66  	struct drm_encoder_slave_funcs *encoder_sfuncs;
+d743a182d Davor Joja 2014-03-24   67  	bool ret = true;
+d743a182d Davor Joja 2014-03-24   68  
+d743a182d Davor Joja 2014-03-24   69  	encoder_slave = to_encoder_slave(base_encoder);
+d743a182d Davor Joja 2014-03-24  @70  	encoder_sfuncs = encoder_slave->slave_funcs;
+d743a182d Davor Joja 2014-03-24   71  	if (encoder_sfuncs->mode_fixup)
+d743a182d Davor Joja 2014-03-24   72  		ret = encoder_sfuncs->mode_fixup(base_encoder, mode,
+d743a182d Davor Joja 2014-03-24   73  						 adjusted_mode);
+d743a182d Davor Joja 2014-03-24   74  
+d743a182d Davor Joja 2014-03-24   75  	return ret;
+d743a182d Davor Joja 2014-03-24   76  }
+d743a182d Davor Joja 2014-03-24   77  
+d743a182d Davor Joja 2014-03-24   78  static void xylon_drm_encoder_mode_set(struct drm_encoder *base_encoder,
+d743a182d Davor Joja 2014-03-24   79  				       struct drm_display_mode *mode,
+d743a182d Davor Joja 2014-03-24   80  				       struct drm_display_mode *adjusted_mode)
+d743a182d Davor Joja 2014-03-24   81  {
+d743a182d Davor Joja 2014-03-24   82  	struct xylon_drm_encoder *encoder;
+d743a182d Davor Joja 2014-03-24   83  	struct drm_device *dev = base_encoder->dev;
+d743a182d Davor Joja 2014-03-24   84  	struct drm_encoder_slave *encoder_slave;
+d743a182d Davor Joja 2014-03-24   85  	struct drm_encoder_slave_funcs *encoder_sfuncs;
+d743a182d Davor Joja 2014-03-24   86  	struct drm_connector *iter;
+d743a182d Davor Joja 2014-03-24   87  	struct drm_connector *connector = NULL;
+d743a182d Davor Joja 2014-03-24   88  
+d743a182d Davor Joja 2014-03-24   89  	DRM_DEBUG("h: %d, v: %d\n",
+d743a182d Davor Joja 2014-03-24   90  		  adjusted_mode->hdisplay, adjusted_mode->vdisplay);
+d743a182d Davor Joja 2014-03-24   91  	DRM_DEBUG("refresh: %d, pclock: %d khz\n",
+d743a182d Davor Joja 2014-03-24   92  		  adjusted_mode->vrefresh, adjusted_mode->clock);
+d743a182d Davor Joja 2014-03-24   93  
+d743a182d Davor Joja 2014-03-24   94  	encoder_slave = to_encoder_slave(base_encoder);
+d743a182d Davor Joja 2014-03-24   95  	encoder = to_xylon_encoder(encoder_slave);
+d743a182d Davor Joja 2014-03-24   96  
+d743a182d Davor Joja 2014-03-24   97  	list_for_each_entry(iter, &dev->mode_config.connector_list, head) {
+d743a182d Davor Joja 2014-03-24   98  		if (iter->encoder == base_encoder) {
+d743a182d Davor Joja 2014-03-24   99  			connector = iter;
+d743a182d Davor Joja 2014-03-24  100  			break;
+d743a182d Davor Joja 2014-03-24  101  		}
+d743a182d Davor Joja 2014-03-24  102  	}
+d743a182d Davor Joja 2014-03-24  103  	if (!connector) {
+d743a182d Davor Joja 2014-03-24  104  		DRM_ERROR("failed find a connector\n");
+d743a182d Davor Joja 2014-03-24  105  		return;
+d743a182d Davor Joja 2014-03-24  106  	}
+d743a182d Davor Joja 2014-03-24  107  
+d743a182d Davor Joja 2014-03-24  108  	encoder_sfuncs = encoder_slave->slave_funcs;
+d743a182d Davor Joja 2014-03-24  109  	if (encoder_sfuncs->mode_set)
+d743a182d Davor Joja 2014-03-24  110  		encoder_sfuncs->mode_set(base_encoder, mode, adjusted_mode);
+d743a182d Davor Joja 2014-03-24  111  }
+d743a182d Davor Joja 2014-03-24  112  
+d743a182d Davor Joja 2014-03-24  113  static void xylon_drm_encoder_commit(struct drm_encoder *base_encoder)
+d743a182d Davor Joja 2014-03-24  114  {
+d743a182d Davor Joja 2014-03-24  115  	xylon_drm_encoder_dpms(base_encoder, DRM_MODE_DPMS_ON);
+d743a182d Davor Joja 2014-03-24  116  }
+d743a182d Davor Joja 2014-03-24  117  
+d743a182d Davor Joja 2014-03-24  118  static void xylon_drm_encoder_prepare(struct drm_encoder *base_encoder)
+d743a182d Davor Joja 2014-03-24  119  {
+d743a182d Davor Joja 2014-03-24  120  	xylon_drm_encoder_dpms(base_encoder, DRM_MODE_DPMS_OFF);
+d743a182d Davor Joja 2014-03-24  121  }
+d743a182d Davor Joja 2014-03-24  122  
+d743a182d Davor Joja 2014-03-24  123  static struct drm_crtc *
+d743a182d Davor Joja 2014-03-24  124  xylon_drm_encoder_get_crtc(struct drm_encoder *base_encoder)
+d743a182d Davor Joja 2014-03-24  125  {
+d743a182d Davor Joja 2014-03-24  126  	return base_encoder->crtc;
+d743a182d Davor Joja 2014-03-24  127  }
+d743a182d Davor Joja 2014-03-24  128  
+d743a182d Davor Joja 2014-03-24  129  static struct drm_encoder_helper_funcs xylon_drm_encoder_helper_funcs = {
+d743a182d Davor Joja 2014-03-24  130  	.dpms = xylon_drm_encoder_dpms,
+d743a182d Davor Joja 2014-03-24  131  	.mode_fixup = xylon_drm_encoder_mode_fixup,
+d743a182d Davor Joja 2014-03-24  132  	.mode_set = xylon_drm_encoder_mode_set,
+d743a182d Davor Joja 2014-03-24  133  	.prepare = xylon_drm_encoder_prepare,
+d743a182d Davor Joja 2014-03-24  134  	.commit = xylon_drm_encoder_commit,
+d743a182d Davor Joja 2014-03-24  135  	.get_crtc = xylon_drm_encoder_get_crtc,
+d743a182d Davor Joja 2014-03-24  136  };
+d743a182d Davor Joja 2014-03-24  137  
+c0e6d299c Davor Joja 2014-12-10  138  static void xylon_drm_encoder_destroy(struct drm_encoder *base_encoder)
+d743a182d Davor Joja 2014-03-24  139  {
+d743a182d Davor Joja 2014-03-24  140  	struct xylon_drm_encoder *encoder;
+d743a182d Davor Joja 2014-03-24  141  	struct drm_encoder_slave *encoder_slave;
+d743a182d Davor Joja 2014-03-24  142  
+d743a182d Davor Joja 2014-03-24  143  	encoder_slave = to_encoder_slave(base_encoder);
+d743a182d Davor Joja 2014-03-24  144  	encoder = to_xylon_encoder(encoder_slave);
+d743a182d Davor Joja 2014-03-24  145  
+d743a182d Davor Joja 2014-03-24  146  	xylon_drm_encoder_dpms(base_encoder, DRM_MODE_DPMS_OFF);
+d743a182d Davor Joja 2014-03-24  147  
+d743a182d Davor Joja 2014-03-24  148  	drm_encoder_cleanup(base_encoder);
+d743a182d Davor Joja 2014-03-24  149  	put_device(&encoder->client->dev);
+d743a182d Davor Joja 2014-03-24  150  }
+d743a182d Davor Joja 2014-03-24  151  
+d743a182d Davor Joja 2014-03-24  152  static struct drm_encoder_funcs xylon_drm_encoder_funcs = {
+d743a182d Davor Joja 2014-03-24  153  	.destroy = xylon_drm_encoder_destroy,
+d743a182d Davor Joja 2014-03-24  154  };
+d743a182d Davor Joja 2014-03-24  155  
+d743a182d Davor Joja 2014-03-24  156  struct drm_encoder *xylon_drm_encoder_create(struct drm_device *dev)
+d743a182d Davor Joja 2014-03-24  157  {
+d743a182d Davor Joja 2014-03-24  158  	struct xylon_drm_encoder *encoder;
+d743a182d Davor Joja 2014-03-24  159  	struct device_node *sub_node;
+d743a182d Davor Joja 2014-03-24  160  	struct i2c_driver *i2c_driver;
+d743a182d Davor Joja 2014-03-24  161  	struct drm_i2c_encoder_driver *drm_i2c_driver;
+d743a182d Davor Joja 2014-03-24  162  	int ret;
+d743a182d Davor Joja 2014-03-24  163  
+d743a182d Davor Joja 2014-03-24  164  	encoder = devm_kzalloc(dev->dev, sizeof(*encoder), GFP_KERNEL);
+d743a182d Davor Joja 2014-03-24  165  	if (!encoder)
+d743a182d Davor Joja 2014-03-24  166  		return ERR_PTR(-ENOMEM);
+d743a182d Davor Joja 2014-03-24  167  
+d743a182d Davor Joja 2014-03-24  168  	encoder->dpms = DRM_MODE_DPMS_OFF;
+d743a182d Davor Joja 2014-03-24  169  
+3cd8d627b Davor Joja 2015-05-19  170  	encoder->slave.base.possible_crtcs = 1;
+3cd8d627b Davor Joja 2015-05-19 @171  	ret = drm_encoder_init(dev, &encoder->slave.base,
+3cd8d627b Davor Joja 2015-05-19  172  			       &xylon_drm_encoder_funcs,
+3cd8d627b Davor Joja 2015-05-19  173  			       DRM_MODE_ENCODER_TMDS);
+3cd8d627b Davor Joja 2015-05-19  174  	if (ret) {
+
+:::::: The code at line 171 was first introduced by commit
+:::::: 3cd8d627ba42366d755122d8d9d3384f476fffc6 gpu: drm: xylon: Fixed encoder client registration
+
+:::::: TO: Davor Joja <davorjoja@logicbricks.com>
+:::::: CC: Michal Simek <michal.simek@xilinx.com>
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 53771 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160728/57a1e924/attachment-0001.obj>
