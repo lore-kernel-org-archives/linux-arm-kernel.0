@@ -1,68 +1,90 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Wed, 27 Jul 2016 15:57:45 +0800
-Subject: [PATCH 03/13] clk: sunxi-ng: sun8i: Rename DDR and video plls
-In-Reply-To: <20160726203041.29366-4-maxime.ripard@free-electrons.com>
-Message-ID: <201607271553.cFusOPwu%fengguang.wu@intel.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 27 Jul 2016 10:05:26 +0200
+Subject: [RFC PATCH v2 1/4] Documentation: DT: net: Add Xilinx
+ gmiitorgmii converter device tree binding documentation
+In-Reply-To: <C246CAC1457055469EF09E3A7AC4E11A4A5C2387@XAP-PVEXMBX01.xlnx.xilinx.com>
+References: <1467623084-15471-1-git-send-email-appanad@xilinx.com>
+ <1467623084-15471-2-git-send-email-appanad@xilinx.com>
+ <20160704140458.GC3282@lunn.ch>
+ <03CA77BA8AF6F1469AEDFBDA1322A7B74A193913@XAP-PVEXMBX02.xlnx.xilinx.com>
+ <20160706142121.GI19800@lunn.ch>
+ <03CA77BA8AF6F1469AEDFBDA1322A7B74A19393B@XAP-PVEXMBX02.xlnx.xilinx.com>
+ <C246CAC1457055469EF09E3A7AC4E11A4A5C2387@XAP-PVEXMBX01.xlnx.xilinx.com>
+Message-ID: <20160727080526.GH11538@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Appana
 
-[auto build test ERROR on clk/clk-next]
-[also build test ERROR on next-20160726]
-[cannot apply to v4.7]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+Here is roughly what i was thinking:
 
-url:    https://github.com/0day-ci/linux/commits/Maxime-Ripard/arm64-Allwinner-A64-support-based-on-sunxi-ng/20160727-084745
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git clk-next
-config: arm64-allmodconfig (attached as .config)
-compiler: aarch64-linux-gnu-gcc (Debian 5.4.0-6) 5.4.0 20160609
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm64 
+struct priv {
+       phy_device *master;
+       phy_device *slave;
+       struct phy_driver *slave_drv;
+};
 
-Note: the linux-review/Maxime-Ripard/arm64-Allwinner-A64-support-based-on-sunxi-ng/20160727-084745 HEAD b4837ac76808c0a3584aef785ddfe74589c1b8fb builds fine.
-      It only hurts bisectibility.
+phy_status_clone(phy_device *master, phy_device *slave)
+{
+	master->speed = slave->speed;
+	master->duplex = slave->duplex;
+	master->pause = slave->pause;
+}
 
-All errors (new ones prefixed by >>):
+read_status(struct phy_device *phydev)
+{
+	struct priv *priv = phydev->priv;
 
->> drivers/clk/sunxi-ng/ccu-sun8i-h3.c:620:23: error: 'pll_video_clk' undeclared here (not in a function)
-      [CLK_PLL_VIDEO]  = &pll_video_clk.common.hw,
-                          ^
->> drivers/clk/sunxi-ng/ccu-sun8i-h3.c:622:21: error: 'pll_ddr_clk' undeclared here (not in a function)
-      [CLK_PLL_DDR]  = &pll_ddr_clk.common.hw,
-                        ^
+	/* Get the status from the slave, and duplicate in into the
+	 * master */
+	 slave_drv->read_status(priv->slave);
+	 phy_status_clone(priv->master, priv->slave);
 
-vim +/pll_video_clk +620 drivers/clk/sunxi-ng/ccu-sun8i-h3.c
+	 /* Update the gmiitorgmii with the current link parameters */
+	 update_link(master);
+}
 
-0577e485 Maxime Ripard 2016-06-29  614  		[CLK_PLL_CPUX]		= &pll_cpux_clk.common.hw,
-0577e485 Maxime Ripard 2016-06-29  615  		[CLK_PLL_AUDIO_BASE]	= &pll_audio_base_clk.common.hw,
-0577e485 Maxime Ripard 2016-06-29  616  		[CLK_PLL_AUDIO]		= &pll_audio_clk.hw,
-0577e485 Maxime Ripard 2016-06-29  617  		[CLK_PLL_AUDIO_2X]	= &pll_audio_2x_clk.hw,
-0577e485 Maxime Ripard 2016-06-29  618  		[CLK_PLL_AUDIO_4X]	= &pll_audio_4x_clk.hw,
-0577e485 Maxime Ripard 2016-06-29  619  		[CLK_PLL_AUDIO_8X]	= &pll_audio_8x_clk.hw,
-0577e485 Maxime Ripard 2016-06-29 @620  		[CLK_PLL_VIDEO]		= &pll_video_clk.common.hw,
-0577e485 Maxime Ripard 2016-06-29  621  		[CLK_PLL_VE]		= &pll_ve_clk.common.hw,
-0577e485 Maxime Ripard 2016-06-29 @622  		[CLK_PLL_DDR]		= &pll_ddr_clk.common.hw,
-0577e485 Maxime Ripard 2016-06-29  623  		[CLK_PLL_PERIPH0]	= &pll_periph0_clk.common.hw,
-0577e485 Maxime Ripard 2016-06-29  624  		[CLK_PLL_PERIPH0_2X]	= &pll_periph0_2x_clk.hw,
-0577e485 Maxime Ripard 2016-06-29  625  		[CLK_PLL_GPU]		= &pll_gpu_clk.common.hw,
+config_init(struct phy_device *phydev)
+{
+	struct priv *priv = phydev->priv;
 
-:::::: The code at line 620 was first introduced by commit
-:::::: 0577e4853bfb4c65f620fa56d3157692df7f766e clk: sunxi-ng: Add H3 clocks
+	/* Configure the slave, and duplicate in into the master */
+	slave_drv->config_init(priv->slave);
+	phy_status_clone(priv->master, priv->slave);
+}
 
-:::::: TO: Maxime Ripard <maxime.ripard@free-electrons.com>
-:::::: CC: Michael Turquette <mturquette@baylibre.com>
+struct phy_driver master_drv = {
+       .read_status = read_status,
+       .config_init = config_init,
+       .soft_reset  = ...
+       .suspend = ...
+};
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 50253 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160727/6ed10be2/attachment-0001.obj>
+probe(mdio_device *mdio)
+{
+	struct priv *priv = devm_alloc();
+
+	/* Use the phy-handle property to find the slave phy */
+	node_phy = of_parse_phandle(mdio->of_node, "phy", 0);
+	priv->slave = of_phy_find_device(node_phy);
+
+	/* Create the master phy on the control address. Use the phy
+	   ID from the slave. */
+	priv->master = phy_device_create(mdio->bus, mdio->addr,
+	  				 phy->slave->phy_id,
+					 phy->slave->is_c45,
+					 phy->slave->c45_ids);
+
+	slave_dev_drv = phydev->mdio.dev.driver;
+	priv->slave_drv = to_phy_driver(slave_dev_drv);
+	priv->master->mdio.dev.driver = master_drv;
+}
+
+It would however be nice to only have one phydev structure, so you are
+not copying status and settings backwards and forwards from one to the
+other all the time, and need a wrapper for every function in
+phy_driver. Studying the structures a bit, that might be possible. You
+would then only need to wrap the read_status(), so that when the link
+speed/duplex changes, you can configure the converter as appropriate.
+
+	     Andrew
