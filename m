@@ -1,58 +1,42 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed, 27 Jul 2016 11:01:05 +0100
-Subject: [PATCH v15 04/10] arm64: Kprobes with single stepping support
-In-Reply-To: <20160726165543.GG2423@e104818-lin.cambridge.arm.com>
-Message-ID: <20160727100048.GA7147@e103592.cambridge.arm.com>
+From: stefan.mavrodiev@gmail.com (stefan.mavrodiev at gmail.com)
+Date: Wed, 27 Jul 2016 13:02:41 +0300
+Subject: [PATCH v4] ARM: dts: sun8i: Add dts file for Olimex A33-OLinuXino
+In-Reply-To: <20160727062146.GA6560@lukather>
+References: <1469450243-19138-1-git-send-email-stefan.mavrodiev@gmail.com>
+ <30014119.IrjfP0xFry@linux-cigu> <20160727062146.GA6560@lukather>
+Message-ID: <1604486.mrBvLz4HRZ@linux-cigu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 26, 2016 at 05:55:43PM +0100, Catalin Marinas wrote:
-> On Tue, Jul 26, 2016 at 10:50:08AM +0100, Daniel Thompson wrote:
-> > On 25/07/16 18:13, Catalin Marinas wrote:
-> > >On Fri, Jul 22, 2016 at 11:51:32AM -0400, David Long wrote:
-> > >>OK, it sounds like an improvement. I do worry a little about unexpected side
-> > >>effects.
-> > >
-> > >You get more unexpected side effects by not saving/restoring the whole
-> > >stack. We looked into this on Friday and came to the conclusion that
-> > >there is no safe way for kprobes to know which arguments passed on the
-> > >stack should be preserved, at least not with the current API.
+On Wednesday, July 27, 2016 8:21:46 AM EEST Maxime Ripard wrote:
+> On Wed, Jul 27, 2016 at 08:12:29AM +0300, stefan.mavrodiev at gmail.com wrote:
+> > > > +&reg_dcdc1 {
+> > > > +	regulator-always-on;
+> > > > +	regulator-min-microvolt = <3300000>;
+> > > > +	regulator-max-microvolt = <3300000>;
+> > > > +	regulator-name = "vcc-dsi";
+> > > > +};
+> > > 
+> > > What is it used for? Is it really necessary to keep it on at all time?
+> > 
+> > I think so.
+> > This is the supply for the MMC.
+> 
+> Then it's poorly named, and you should tie it to the MMC, and remove
+> the always-on if it's only used by the mmc. always-on is supposed to
+> be for regulators that shouldn't but turned off for the system to stay
+> running. Some MMC regulator doesn't fit that description.
+> 
+It's named upon the A33 power pin - "VCC-DSI". 
+If I remove "always-on" the board still will work, since dcdc1 is tied to 
+mmc0. 
+vmmc-supply = <&reg_dcdc1>;
 
-[...]
+We assume this voltage will be always present and there are some pullups that 
+are tied to it (on i2c0 and i2c1 bus).  In this case should I remove "always-
+on" from the regulator node?
 
-Jumping cheekily onto this thread, what if some function does this:
+> Maxime
 
-void go_on_jprobe_me()
-{
-}
-
-void foo()
-{
-	struct bar baz;
-
-	start_io(&baz);
-
-	/* ... */
-
-	go_on_jprobe_me();
-
-	end_io(&baz);
-}
-
-If some I/O is being done on baz asynchronously, via DMA or via another
-thread, a jprobe implementation that attempts to save/restore the stack
-beyond the arguments of the probed function is going to race with such
-I/O and can corrupt data.
-
-This is a risk whenever any thread triggers some other master to operate
-on objects on the first thread's stack -- I/O is a contrived example, but
-there are likely other ways similar asynchronous access can happen to
-a thread's stack.
-
-Worse, annotating go_on_jprobe_me() as un-jprobeable doesn't help --
-the un-jprobeableness is a property not of the function itself, but
-rather a property of the set of callers of that function.  That set can
-change at runtime (consider out-of-tree modules).
-
-Cheers
----Dave
+Best regards,
+Stefan Mavrodiev
