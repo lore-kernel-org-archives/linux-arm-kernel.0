@@ -1,31 +1,60 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 27 Jul 2016 21:57:00 +0200
-Subject: [PATCH 2/3] video: fbdev: imxfb: enable lcd regulator in .probe
-In-Reply-To: <20160705100902.GM16643@pengutronix.de>
-References: <1457380425-20244-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <1457380425-20244-3-git-send-email-u.kleine-koenig@pengutronix.de>
- <56E2AA80.4050908@ti.com> <20160420191727.GS29108@pengutronix.de>
- <20160705100902.GM16643@pengutronix.de>
-Message-ID: <20160727195700.GE5629@pengutronix.de>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 27 Jul 2016 16:10:34 -0400 (EDT)
+Subject: [PATCH] asm/memory.h: remove dead definitions
+Message-ID: <alpine.LFD.2.20.1607271604500.17623@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
 
-On Tue, Jul 05, 2016 at 12:09:02PM +0200, Uwe Kleine-K?nig wrote:
-> To reach my goal to keep the display on (showing whatever the bootloader
-> initialized the display with) until the application starts caring for
-> the display some driver must enable the regulator. The only candidates
-> are the lcd driver (i.e. the patch under discussion) or some mechanism
-> in the fb core. As there doesn't seem to be code in the core (and the
-> core is dead?) what do you suggest me to do?
+The last ad-hoc __phys_to_virt definition was removed in commit fd0053c9
+("ARM: realview: remove sparsemem hack"). Therefore we can remove the
+unneeded definitions and unduplicate the virt_to_pfn macro from
+asm/memory.h.
 
-Unfortunately I didn't get an answer here. Do you still have this mail
-on your radar?
+Signed-off-by: Nicolas Pitre <nico@linaro.org>
 
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
+index 31c07a2cc1..76cbd9c674 100644
+--- a/arch/arm/include/asm/memory.h
++++ b/arch/arm/include/asm/memory.h
+@@ -159,13 +159,8 @@
+  * PFNs are used to describe any physical page; this means
+  * PFN 0 == physical address 0.
+  */
+-#if defined(__virt_to_phys)
+-#define PHYS_OFFSET	PLAT_PHYS_OFFSET
+-#define PHYS_PFN_OFFSET	((unsigned long)(PHYS_OFFSET >> PAGE_SHIFT))
+-
+-#define virt_to_pfn(kaddr) (__pa(kaddr) >> PAGE_SHIFT)
+ 
+-#elif defined(CONFIG_ARM_PATCH_PHYS_VIRT)
++#if defined(CONFIG_ARM_PATCH_PHYS_VIRT)
+ 
+ /*
+  * Constants used to force the right instruction encodings and shifts
+@@ -182,10 +177,6 @@ extern const void *__pv_table_begin, *__pv_table_end;
+ #define PHYS_OFFSET	((phys_addr_t)__pv_phys_pfn_offset << PAGE_SHIFT)
+ #define PHYS_PFN_OFFSET	(__pv_phys_pfn_offset)
+ 
+-#define virt_to_pfn(kaddr) \
+-	((((unsigned long)(kaddr) - PAGE_OFFSET) >> PAGE_SHIFT) + \
+-	 PHYS_PFN_OFFSET)
+-
+ #define __pv_stub(from,to,instr,type)			\
+ 	__asm__("@ __pv_stub\n"				\
+ 	"1:	" instr "	%0, %1, %2\n"		\
+@@ -257,12 +248,12 @@ static inline unsigned long __phys_to_virt(phys_addr_t x)
+ 	return x - PHYS_OFFSET + PAGE_OFFSET;
+ }
+ 
++#endif
++
+ #define virt_to_pfn(kaddr) \
+ 	((((unsigned long)(kaddr) - PAGE_OFFSET) >> PAGE_SHIFT) + \
+ 	 PHYS_PFN_OFFSET)
+ 
+-#endif
+-
+ /*
+  * These are *only* valid on the kernel direct mapped RAM memory.
+  * Note: Drivers should NOT use these.  They are the wrong
