@@ -1,67 +1,55 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 27 Jul 2016 20:13:33 +0100
-Subject: Applied "spi: mediatek: remove spi_master_put in mtk_spi_remove()" to
- the spi tree
-In-Reply-To: <1469545010-32327-1-git-send-email-weiyj.lk@gmail.com>
-Message-ID: <E1bSUGr-00051R-Fx@debutante>
+From: jolsa@redhat.com (Jiri Olsa)
+Date: Wed, 27 Jul 2016 21:26:39 +0200
+Subject: [PATCH V2 3/6] perf tools: add infrastructure for PMU specific
+ configuration
+In-Reply-To: <CANLsYkzr0iFFEUoeR8-58E02DyqdGndfNBL8v0tS2tQqBszN_A@mail.gmail.com>
+References: <1469047100-18131-1-git-send-email-mathieu.poirier@linaro.org>
+ <1469047100-18131-4-git-send-email-mathieu.poirier@linaro.org>
+ <20160721074722.GB7192@krava>
+ <CANLsYkxj+kccmvTtOLAYwyN9fOp0pMxdPcWy5cJHQDQLoj-NmQ@mail.gmail.com>
+ <20160721145434.GA15915@krava>
+ <CANLsYkwx+iOE6uwOVPtsHFMmNaH0=NjeDP8z0GZhHja2oibt8g@mail.gmail.com>
+ <20160726204139.GA13377@krava>
+ <CANLsYkzr0iFFEUoeR8-58E02DyqdGndfNBL8v0tS2tQqBszN_A@mail.gmail.com>
+Message-ID: <20160727192639.GC23264@krava>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch
+On Wed, Jul 27, 2016 at 11:59:50AM -0600, Mathieu Poirier wrote:
 
-   spi: mediatek: remove spi_master_put in mtk_spi_remove()
+SNIP
 
-has been applied to the spi tree at
+> > -PE_DRV_CFG_TERM
+> > +'@' PE_NAME '=' PE_NAME
+> >  {
+> >         struct parse_events_term *term;
+> >
+> >         ABORT_ON(parse_events_term__str(&term, PARSE_EVENTS__TERM_TYPE_DRV_CFG,
+> > -                                       $1, $1, &@1, NULL));
+> > +                                       $2, $4, &@2, &@4));
+> >         $$ = term;
+> >  }
+> >
+> 
+> The problem here is that the correlation between the first and the
+> second PE_NAME is lost and instead of seeing "PE_NAME=PE_NAME", the
+> kernel only gets the value associated with the second PE_NAME.
+> 
+> For example,
+> 
+> -e event/@cfg1=value1, at cfg2=value2/ ...
+> 
+> The above code will send "value1" and "value2" to the kernel driver
+> where there is no way to know what configurable the values correspond
 
-   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/spi.git 
+hum.. you get the 'cfg1' and 'cfg2' strings in $1 no?
 
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
+jirka
 
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
-
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
-
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
-
-Thanks,
-Mark
-
->From c2b08cede727387a5e19b40fa8e1a1e3a53e8527 Mon Sep 17 00:00:00 2001
-From: Wei Yongjun <weiyj.lk@gmail.com>
-Date: Tue, 26 Jul 2016 14:56:50 +0000
-Subject: [PATCH] spi: mediatek: remove spi_master_put in mtk_spi_remove()
-
-The call to spi_master_put() in mtk_spi_remove() is redundant since
-the master is registered using devm_spi_register_master() and no
-reference hold by using spi_master_get() in mtk_spi_remove().
-
-This is detected by Coccinelle semantic patch.
-
-Signed-off-by: Wei Yongjun <weiyj.lk@gmail.com>
-Signed-off-by: Mark Brown <broonie@kernel.org>
----
- drivers/spi/spi-mt65xx.c | 1 -
- 1 file changed, 1 deletion(-)
-
-diff --git a/drivers/spi/spi-mt65xx.c b/drivers/spi/spi-mt65xx.c
-index 0be89e052428..899d7a8f0889 100644
---- a/drivers/spi/spi-mt65xx.c
-+++ b/drivers/spi/spi-mt65xx.c
-@@ -685,7 +685,6 @@ static int mtk_spi_remove(struct platform_device *pdev)
- 	pm_runtime_disable(&pdev->dev);
- 
- 	mtk_spi_reset(mdata);
--	spi_master_put(master);
- 
- 	return 0;
- }
--- 
-2.8.1
+> to.  To go around that we'd have to concatenate $2 and $4 in function
+> parse_events_term__str() (or new_term()) when @type_term ==
+> PARSE_EVENTS__TERM_TYPE_DRV_CFG, something that definitely looks
+> hackish to me.
+> 
+> Thanks,
+> Mathieu
