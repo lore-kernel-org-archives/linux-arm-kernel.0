@@ -1,143 +1,92 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Wed, 27 Jul 2016 11:59:50 -0600
-Subject: [PATCH V2 3/6] perf tools: add infrastructure for PMU specific
- configuration
-In-Reply-To: <20160726204139.GA13377@krava>
-References: <1469047100-18131-1-git-send-email-mathieu.poirier@linaro.org>
- <1469047100-18131-4-git-send-email-mathieu.poirier@linaro.org>
- <20160721074722.GB7192@krava>
- <CANLsYkxj+kccmvTtOLAYwyN9fOp0pMxdPcWy5cJHQDQLoj-NmQ@mail.gmail.com>
- <20160721145434.GA15915@krava>
- <CANLsYkwx+iOE6uwOVPtsHFMmNaH0=NjeDP8z0GZhHja2oibt8g@mail.gmail.com>
- <20160726204139.GA13377@krava>
-Message-ID: <CANLsYkzr0iFFEUoeR8-58E02DyqdGndfNBL8v0tS2tQqBszN_A@mail.gmail.com>
+From: geoff@infradead.org (Geoff Levand)
+Date: Wed, 27 Jul 2016 11:11:47 -0700
+Subject: [PATCH v1 2/4] kexec: Add common device tree routines
+In-Reply-To: <20160722071924.GQ20774@linaro.org>
+References: <cover.1468970114.git.geoff@infradead.org>
+ <8ed220ee82b4819a9107a6ce0f020497d1688c7b.1468970114.git.geoff@infradead.org>
+ <20160722071924.GQ20774@linaro.org>
+Message-ID: <1469643107.2889.65.camel@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 July 2016 at 14:41, Jiri Olsa <jolsa@redhat.com> wrote:
-> On Fri, Jul 22, 2016 at 12:24:48PM -0600, Mathieu Poirier wrote:
->
-> SNIP
->
->> > diff --git a/tools/perf/util/parse-events.y b/tools/perf/util/parse-events.y
->> > --- a/tools/perf/util/parse-events.y
->> > +++ b/tools/perf/util/parse-events.y
->> > @@ -602,12 +602,12 @@ PE_NAME array '=' PE_VALUE
->> >         $$ = term;
->> >  }
->> >  |
->> > -PE_DRV_CFG_TERM
->> > +'@' PE_DRV_CFG_TERM
->> >  {
->> >         struct parse_events_term *term;
->> >
->> >         ABORT_ON(parse_events_term__str(&term, PARSE_EVENTS__TERM_TYPE_DRV_CFG,
->> > -                                       $1, $1, &@1, NULL));
->> > +                                       $2, $2, &@2, NULL));
->> >         $$ = term;
->> >  }
->> >
->>
->> I've been experimenting with the above solution and it is not yielding
->> the results one might think at first glance.
->>
->> If we use the example: -e event/@cfg1/ ...
->>
->> First if we leave things exactly the way they are suggested in the
->> code snippet flex doesn't know what do to with the '@' character and
->> returns an error.  To deal with that a new clause
->>
->> "@"        { return '@'; }
->>
->> can be inserted in the config state.  But that doesn't link '@' with
->> 'cfg1', and 'cfg1' gets interpreted as a PE_NAME.  Introducing a new
->> state upon hitting '@' would get us around that but we are moving away
->> from our initial goal of keeping things simple.
->
-> hum, then how about keeping the flex atoms simple like for the
-> other terms and do something like below.. untested ;-)
->
-> thanks,
-> jirka
->
->
-> ---
-> diff --git a/tools/perf/util/parse-events.l b/tools/perf/util/parse-events.l
-> index 1f7e11a6c5b3..8ba228e1c150 100644
-> --- a/tools/perf/util/parse-events.l
-> +++ b/tools/perf/util/parse-events.l
-> @@ -53,16 +53,6 @@ static int str(yyscan_t scanner, int token)
->         return token;
->  }
->
-> -static int drv_str(yyscan_t scanner, int token)
-> -{
-> -       YYSTYPE *yylval = parse_events_get_lval(scanner);
-> -       char *text = parse_events_get_text(scanner);
-> -
-> -       /* Strip off the '@' */
-> -       yylval->str = strdup(text + 1);
-> -       return token;
-> -}
-> -
->  #define REWIND(__alloc)                                \
->  do {                                                           \
->         YYSTYPE *__yylval = parse_events_get_lval(yyscanner);   \
-> @@ -134,7 +124,6 @@ num_hex             0x[a-fA-F0-9]+
->  num_raw_hex    [a-fA-F0-9]+
->  name           [a-zA-Z_*?][a-zA-Z0-9_*?.]*
->  name_minus     [a-zA-Z_*?][a-zA-Z0-9\-_*?.:]*
-> -drv_cfg_term   [a-zA-Z0-9_\.]+(=[a-zA-Z0-9_*?\.:]+)?
->  /* If you add a modifier you need to update check_modifier() */
->  modifier_event [ukhpPGHSDI]+
->  modifier_bp    [rwx]{1,3}
-> @@ -216,11 +205,11 @@ no-inherit                { return term(yyscanner, PARSE_EVENTS__TERM_TYPE_NOINHERIT); }
->  overwrite              { return term(yyscanner, PARSE_EVENTS__TERM_TYPE_OVERWRITE); }
->  no-overwrite           { return term(yyscanner, PARSE_EVENTS__TERM_TYPE_NOOVERWRITE); }
->  ,                      { return ','; }
-> +"@"                    { return '@'; }
->  "/"                    { BEGIN(INITIAL); return '/'; }
->  {name_minus}           { return str(yyscanner, PE_NAME); }
->  \[all\]                        { return PE_ARRAY_ALL; }
->  "["                    { BEGIN(array); return '['; }
-> -@{drv_cfg_term}                { return drv_str(yyscanner, PE_DRV_CFG_TERM); }
->  }
->
->  <mem>{
-> diff --git a/tools/perf/util/parse-events.y b/tools/perf/util/parse-events.y
-> index 879115f93edc..7e03e93dabca 100644
-> --- a/tools/perf/util/parse-events.y
-> +++ b/tools/perf/util/parse-events.y
-> @@ -602,12 +602,12 @@ PE_NAME array '=' PE_VALUE
->         $$ = term;
->  }
->  |
-> -PE_DRV_CFG_TERM
-> +'@' PE_NAME '=' PE_NAME
->  {
->         struct parse_events_term *term;
->
->         ABORT_ON(parse_events_term__str(&term, PARSE_EVENTS__TERM_TYPE_DRV_CFG,
-> -                                       $1, $1, &@1, NULL));
-> +                                       $2, $4, &@2, &@4));
->         $$ = term;
->  }
->
+Hi,
 
-The problem here is that the correlation between the first and the
-second PE_NAME is lost and instead of seeing "PE_NAME=PE_NAME", the
-kernel only gets the value associated with the second PE_NAME.
+On Fri, 2016-07-22 at 16:19 +0900, AKASHI Takahiro wrote:
+> On Tue, Jul 19, 2016 at 11:28:13PM +0000, Geoff Levand wrote:
+> > --- /dev/null
+> > +++ b/kexec/dt-ops.c
+> > +int dtb_set_property(char **dtb, off_t *dtb_size, const char *node,
+> > +> > 	> > const char *prop, const void *value, int value_len)
+> > +{
+> > +> > 	> > int result;
+> > +> > 	> > int nodeoffset;
+> > +> > 	> > void *new_dtb;
+> > +> > 	> > int new_size;
+> > +
+> > +> > 	> > value_len = FDT_TAGALIGN(value_len);
+> > +
+> > +> > 	> > new_size = FDT_TAGALIGN(*dtb_size + fdt_node_len(node)
+> > +> > 	> > 	> > + fdt_prop_len(prop, value_len));
+> 
+> As James pointed out before, this will increase the size of dtb
+> if kexec is executed repeatedly.
 
-For example,
+I will look into this later, as it will take some time to
+do, and I don't think it should hold up merge of the arm64
+support.
 
--e event/@cfg1=value1, at cfg2=value2/ ...
+> > +> > 	> > new_dtb = malloc(new_size);
+> > +
+> > +> > 	> > if (!new_dtb) {
+> > +> > 	> > 	> > dbgprintf("%s: malloc failed\n", __func__);
+> > +> > 	> > 	> > return -ENOMEM;
+> > +> > 	> > }
+> > +
+> > +> > 	> > result = fdt_open_into(*dtb, new_dtb, new_size);
+> > +
+> > +> > 	> > if (result) {
+> > +> > 	> > 	> > dbgprintf("%s: fdt_open_into failed: %s\n", __func__,
+> > +> > 	> > 	> > 	> > fdt_strerror(result));
+> > +> > 	> > 	> > goto on_error;
+> > +> > 	> > }
+> > +
+> > +> > 	> > nodeoffset = fdt_path_offset(new_dtb, node);
+> > +> > 	
+> > +> > 	> > if (nodeoffset == -FDT_ERR_NOTFOUND) {
+> > +> > 	> > 	> > result = fdt_add_subnode(new_dtb, nodeoffset, node);
+> > +
+> > +> > 	> > 	> > if (result) {
+> > +> > 	> > 	> > 	> > dbgprintf("%s: fdt_add_subnode failed: %s\n", __func__,
+> > +> > 	> > 	> > 	> > 	> > fdt_strerror(result));
+> > +> > 	> > 	> > 	> > goto on_error;
+> > +> > 	> > 	> > }
+> > +> > 	> > } else if (nodeoffset < 0) {
+> > +> > 	> > 	> > dbgprintf("%s: fdt_path_offset failed: %s\n", __func__,
+> > +> > 	> > 	> > 	> > fdt_strerror(nodeoffset));
+> > +> > 	> > 	> > goto on_error;
+> > +> > 	> > }
+> > +
+> > +> > 	> > result = fdt_setprop(new_dtb, nodeoffset, prop, value, value_len);
+> > +
+> > +> > 	> > if (result) {
+> > +> > 	> > 	> > dbgprintf("%s: fdt_setprop failed: %s\n", __func__,
+> > +> > 	> > 	> > 	> > fdt_strerror(result));
+> > +> > 	> > 	> > goto on_error;
+> > +> > 	> > }
+> > +
+> > +> > 	> > /*
+> > +> > 	> >  * Can't call free on dtb since dtb may have been mmaped by
+> > +> > 	> >  * slurp_file().
+> > +> > 	> >  */
+> > +
+> > +> > 	> > *dtb = new_dtb;
+> > +> > 	> > *dtb_size = new_size;
+> 
+> So you might better call fdt_pack(), which will set "totalsize" of
+> the blob to an appropriate value.
 
-The above code will send "value1" and "value2" to the kernel driver
-where there is no way to know what configurable the values correspond
-to.  To go around that we'd have to concatenate $2 and $4 in function
-parse_events_term__str() (or new_term()) when @type_term ==
-PARSE_EVENTS__TERM_TYPE_DRV_CFG, something that definitely looks
-hackish to me.
+I fixed this.  It is in my master branch now, and will post with v3.
 
-Thanks,
-Mathieu
+Thanks for the review.
+
+-Geoff
