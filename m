@@ -1,46 +1,39 @@
 From: wxt@rock-chips.com (Caesar Wang)
-Date: Wed, 27 Jul 2016 22:24:05 +0800
-Subject: [PATCH v3 2/4] arm64: dts: rockchip: add the saradc for rk3399
+Date: Wed, 27 Jul 2016 22:24:06 +0800
+Subject: [PATCH v3 3/4] arm64: dts: rockchip: add reset saradc node for rk3368
+ SoCs
 In-Reply-To: <1469629447-544-1-git-send-email-wxt@rock-chips.com>
 References: <1469629447-544-1-git-send-email-wxt@rock-chips.com>
-Message-ID: <1469629447-544-2-git-send-email-wxt@rock-chips.com>
+Message-ID: <1469629447-544-3-git-send-email-wxt@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds saradc needed information on rk3399 SoCs.
+SARADC controller needs to be reset before programming it, otherwise
+it will not function properly.
 
 Signed-off-by: Caesar Wang <wxt@rock-chips.com>
-Reviewed-by: Douglas Anderson <dianders@chromium.org>
 ---
 
-Changes in v3: None
+Changes in v3:
+- add Doug's reviewed tag.
+
 Changes in v2: None
 
- arch/arm64/boot/dts/rockchip/rk3399.dtsi | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ arch/arm64/boot/dts/rockchip/rk3368.dtsi | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-index 4c84229..b81f84b 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-+++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-@@ -299,6 +299,18 @@
- 		};
+diff --git a/arch/arm64/boot/dts/rockchip/rk3368.dtsi b/arch/arm64/boot/dts/rockchip/rk3368.dtsi
+index d02a9003..4f44d11 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3368.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3368.dtsi
+@@ -270,6 +270,8 @@
+ 		#io-channel-cells = <1>;
+ 		clocks = <&cru SCLK_SARADC>, <&cru PCLK_SARADC>;
+ 		clock-names = "saradc", "apb_pclk";
++		resets = <&cru SRST_SARADC>;
++		reset-names = "saradc-apb";
+ 		status = "disabled";
  	};
  
-+	saradc: saradc at ff100000 {
-+		compatible = "rockchip,rk3399-saradc";
-+		reg = <0x0 0xff100000 0x0 0x100>;
-+		interrupts = <GIC_SPI 62 IRQ_TYPE_LEVEL_HIGH>;
-+		#io-channel-cells = <1>;
-+		clocks = <&cru SCLK_SARADC>, <&cru PCLK_SARADC>;
-+		clock-names = "saradc", "apb_pclk";
-+		resets = <&cru SRST_P_SARADC>;
-+		reset-names = "saradc-apb";
-+		status = "disabled";
-+	};
-+
- 	i2c1: i2c at ff110000 {
- 		compatible = "rockchip,rk3399-i2c";
- 		reg = <0x0 0xff110000 0x0 0x1000>;
 -- 
 1.9.1
