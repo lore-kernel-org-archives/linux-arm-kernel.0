@@ -1,65 +1,44 @@
-From: wxt@rock-chips.com (Caesar Wang)
-Date: Wed, 27 Jul 2016 22:24:07 +0800
-Subject: [PATCH v3 4/4] arm: dts: rockchip: add reset node for the exist
- saradc SoCs
-In-Reply-To: <1469629447-544-1-git-send-email-wxt@rock-chips.com>
-References: <1469629447-544-1-git-send-email-wxt@rock-chips.com>
-Message-ID: <1469629447-544-4-git-send-email-wxt@rock-chips.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 27 Jul 2016 16:42:41 +0200
+Subject: [PATCH] ARM: orion: remove unreferenced board-d2net.c
+In-Reply-To: <20160609153935.44323b8e@free-electrons.com> (Thomas Petazzoni's
+ message of "Thu, 9 Jun 2016 15:39:35 +0200")
+References: <1465466656-30002-1-git-send-email-ben.dooks@codethink.co.uk>
+ <20160609133116.GH30205@lunn.ch>
+ <20160609153935.44323b8e@free-electrons.com>
+Message-ID: <87invrnnvi.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-SARADC controller needs to be reset before programming it, otherwise
-it will not function properly.
-
-Signed-off-by: Caesar Wang <wxt@rock-chips.com>
----
-
-Changes in v3: None
-Changes in v2: None
-
- arch/arm/boot/dts/rk3066a.dtsi | 2 ++
- arch/arm/boot/dts/rk3288.dtsi  | 2 ++
- arch/arm/boot/dts/rk3xxx.dtsi  | 2 ++
- 3 files changed, 6 insertions(+)
-
-diff --git a/arch/arm/boot/dts/rk3066a.dtsi b/arch/arm/boot/dts/rk3066a.dtsi
-index c0ba86c..0d0dae3 100644
---- a/arch/arm/boot/dts/rk3066a.dtsi
-+++ b/arch/arm/boot/dts/rk3066a.dtsi
-@@ -197,6 +197,8 @@
- 		clock-names = "saradc", "apb_pclk";
- 		interrupts = <GIC_SPI 21 IRQ_TYPE_LEVEL_HIGH>;
- 		#io-channel-cells = <1>;
-+		resets = <&cru SRST_SARADC>;
-+		reset-names = "saradc-apb";
- 		status = "disabled";
- 	};
+Hi Thomas,
  
-diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
-index cd33f01..91c4b3c 100644
---- a/arch/arm/boot/dts/rk3288.dtsi
-+++ b/arch/arm/boot/dts/rk3288.dtsi
-@@ -279,6 +279,8 @@
- 		#io-channel-cells = <1>;
- 		clocks = <&cru SCLK_SARADC>, <&cru PCLK_SARADC>;
- 		clock-names = "saradc", "apb_pclk";
-+		resets = <&cru SRST_SARADC>;
-+		reset-names = "saradc-apb";
- 		status = "disabled";
- 	};
- 
-diff --git a/arch/arm/boot/dts/rk3xxx.dtsi b/arch/arm/boot/dts/rk3xxx.dtsi
-index 99bbcc2..e2cd683 100644
---- a/arch/arm/boot/dts/rk3xxx.dtsi
-+++ b/arch/arm/boot/dts/rk3xxx.dtsi
-@@ -399,6 +399,8 @@
- 		#io-channel-cells = <1>;
- 		clocks = <&cru SCLK_SARADC>, <&cru PCLK_SARADC>;
- 		clock-names = "saradc", "apb_pclk";
-+		resets = <&cru SRST_SARADC>;
-+		reset-names = "saradc-apb";
- 		status = "disabled";
- 	};
- 
+ On jeu., juin 09 2016, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
+
+> Hello,
+>
+> On Thu, 9 Jun 2016 15:31:16 +0200, Andrew Lunn wrote:
+>> On Thu, Jun 09, 2016 at 11:04:16AM +0100, Ben Dooks wrote:
+>> > Either this has been mis-converted (and needs to be fixed) or
+>> > is no longer referenced and can be safely removed.  
+>> 
+>> Hi Thomas
+>> 
+>> You added this code, which Ben is removing. It does look like you
+>> forgot to call d2net_init() from orion5x_dt_init().
+>> 
+>> Please could you look at this.
+>
+> You are correct: d2net_init() should be called from orion5x_dt_init(),
+> or called through some initcall mechanism.
+
+So should we apply the patch as is or wait for the needed fix for this
+board?
+
+Gregory
+
+
 -- 
-1.9.1
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
