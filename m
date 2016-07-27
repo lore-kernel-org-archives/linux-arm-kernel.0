@@ -1,45 +1,34 @@
-From: bibby.hsieh@mediatek.com (Bibby Hsieh)
-Date: Wed, 27 Jul 2016 16:31:29 +0800
-Subject: [PATCH v2 0/3] MT8173 HDMI 4K support
-Message-ID: <1469608292-6106-1-git-send-email-bibby.hsieh@mediatek.com>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Wed, 27 Jul 2016 10:36:49 +0200
+Subject: [PATCH 4/9] clk: sunxi-ng: mux: Add support for mux tables
+In-Reply-To: <20160727074020.GH6560@lukather>
+References: <1469516671-19377-1-git-send-email-wens@csie.org>
+ <1469516671-19377-5-git-send-email-wens@csie.org>
+ <20160726194306.9b6aadd3d1669bd6f5a54d99@free.fr>
+ <20160727065934.GD6560@lukather>
+ <20160727091827.e26f72701ce5758fa29aff7a@free.fr>
+ <20160727074020.GH6560@lukather>
+Message-ID: <20160727103649.9e6ef332847b5a5c8fac66af@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is MT8173 HDMI 4K support PATCH v2, based on 4.7-rc1.
+On Wed, 27 Jul 2016 09:40:20 +0200
+Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
 
-In order to support HDMI 4K on MT8173,
-we have to make some modifications.
-1) Make sure that mtk_hdmi_send_infoframe is sent successfully.
-2) Enhance the HDMI driving current to improve performance.
-3) Make sure that pixel clock is 297MHz when resolution is 4K.
+> > > Parenting functions would also not work as expected,
+> > > clk_hw_get_parent_by_index being the obvious example, in that case
+> > > returning the empty string for an invalid parent, while it should
+> > > really return NULL.
+> > 
+> > I don't see why the clock should be orphan.
+> > Then, when a parent is "", clk_hw_get_parent_by_index() returns NULL.
+> 
+> Why? It should return NULL when there's no parent, while you
+> explicitly registered a parent.
 
-Changes since v1:
- - According to the suggestion from philipp, We use the new
-   dpi0_sel rate set method.
- - calls clk_set_rate to set the dpi0_sel according to the
-   pixel clock.
- - Remove the direct access to all the intermediate clock part.
- - Remove the intermediate tvdpll_d* clocks in dts.
- - According to suggestion from CK, we rename the clock parse
-   function and remove it from mtk_dpi_conf struct.
- - Merges the hdmi Pll set rate for pixel clock greater than
-   165MHz and smaller parts.
-
-The PATCH depends on the following patch:
-https://patchwork.kernel.org/patch/9249445/ (arm64: dts: mt8173: add mmsel clocks for 4K support)
-
-Thank you.
-Bibby Hsieh
-
-Junzhi Zhao (3):
-  drm/mediatek: do mtk_hdmi_send_infoframe after HDMI clock enable
-  drm/mediatek: enhance the HDMI driving current
-  drm/mediatek: fix the wrong pixel clock when resolution is 4K
-
- drivers/gpu/drm/mediatek/mtk_dpi.c             |  149 +++++++++++++++---------
- drivers/gpu/drm/mediatek/mtk_hdmi.c            |   19 +--
- drivers/gpu/drm/mediatek/mtk_mt8173_hdmi_phy.c |   42 +++++--
- 3 files changed, 138 insertions(+), 72 deletions(-)
+"" is not an existing parent. It could be "none" / "dum" / "toto" / ...
+with the same result: 'this index cannot be used in mux'.
 
 -- 
-1.7.9.5
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
