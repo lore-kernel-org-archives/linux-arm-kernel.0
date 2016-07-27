@@ -1,277 +1,193 @@
-From: sr@denx.de (Stefan Roese)
-Date: Wed, 27 Jul 2016 14:57:17 +0200
-Subject: [RFC PATCH] dmaengine: mv_xor: Add support for IO (PCIe) src/dst
- areas
-In-Reply-To: <4330031.lrbVYzKFjS@wuerfel>
-References: <20160603162429.8760-1-sr@denx.de> <5773AF5B.1020403@denx.de>
- <7a533938-c03b-a286-8750-4f92e0aa9451@denx.de> <4330031.lrbVYzKFjS@wuerfel>
-Message-ID: <49b991d2-f7c4-5f09-0f28-b483d21c8934@denx.de>
+From: zyw@rock-chips.com (Chris Zhong)
+Date: Wed, 27 Jul 2016 21:07:10 +0800
+Subject: [v7 PATCH 0/6] Rockchip Type-C and DisplayPort driver
+Message-ID: <1469624836-22792-1-git-send-email-zyw@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
 
-On 27.07.2016 14:11, Arnd Bergmann wrote:
-> On Wednesday, July 27, 2016 8:14:15 AM CEST Stefan Roese wrote:
->> Hi,
->>
->> On 29.06.2016 13:22, Stefan Roese wrote:
->>> Hi!
->>>
->>> On 03.06.2016 18:24, Stefan Roese wrote:
->>>> To enable the access to a specific area, the MVEBU XOR controllers needs
->>>> to have this area enabled / mapped via an address window. Right now,
->>>> only the DRAM memory area is enabled via such memory windows. So
->>>> using this driver to DMA to / from a e.g. PCIe memory region is
->>>> currently not supported.
->>>>
->>>> This patch now adds support for such PCIe / IO regions by checking
->>>> if the src / dst address is located in an IO memory area in contrast
->>>> to being located in DRAM. This is done by using the newly introduced
->>>> MBus function mvebu_mbus_get_io_win_info(). If the src / dst address
->>>> is located in such an IO area, a new address window is created in
->>>> the XOR DMA controller. Enabling the controller to access this area.
->>>>
->>>> Signed-off-by: Stefan Roese <sr@denx.de>
->>>> Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
->>>> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
->>>> Cc: Marcin Wojtas <mw@semihalf.com>
->>>> Cc: Vinod Koul <vinod.koul@intel.com>
->>>> ---
->>>>   drivers/dma/mv_xor.c | 107
->>>> ++++++++++++++++++++++++++++++++++++++++++++++++++-
->>>>   1 file changed, 106 insertions(+), 1 deletion(-)
->>>>
->>>> diff --git a/drivers/dma/mv_xor.c b/drivers/dma/mv_xor.c
->>>> index f4c9f98..2671b11 100644
->>>> --- a/drivers/dma/mv_xor.c
->>>> +++ b/drivers/dma/mv_xor.c
->>>> @@ -470,12 +470,107 @@ static int mv_xor_alloc_chan_resources(struct
->>>> dma_chan *chan)
->>>>       return mv_chan->slots_allocated ? : -ENOMEM;
->>>>   }
->>>>
->>>> +/*
->>>> + * Check if source or destination is an PCIe/IO address (non-SDRAM)
->>>> and add
->>>> + * a new MBus window if necessary
->>>> + */
->>>> +static int mv_xor_add_io_win(struct mv_xor_chan *mv_chan, u32 addr)
->>>> +{
->>>> +    void __iomem *base = mv_chan->mmr_high_base;
->>>> +    u32 win_enable;
->>>> +    u32 size;
->>>> +    u8 target, attr;
->>>> +    int ret;
->>>> +    int i;
->>>> +
->>>> +    /* If no IO window is found that addr has to be located in SDRAM */
->>>> +    ret = mvebu_mbus_get_io_win_info(addr, &size, &target, &attr);
->>>> +    if (ret < 0)
->>>> +        return 0;
->>>> +
->>>> +    /*
->>>> +     * Mask the base addr 'addr' according to 'size' read back from the
->>>> +     * MBus window. Otherwise we might end up with an address located
->>>> +     * somewhere in the middle of this area here.
->>>> +     */
->>>> +    size -= 1;
->>>> +    addr &= ~size;
->>>> +
->>>> +    /*
->>>> +     * Reading one of both enabled register is enough, as they are
->>>> always
->>>> +     * programmed to the identical values
->>>> +     */
->>>> +    win_enable = readl(base + WINDOW_BAR_ENABLE(0));
->>>> +
->>>> +    /*
->>>> +     * Loop over all windows to find a matching window (area wise). If
->>>> +     * one is found it will get disabled and later newly created.
->>>> +     */
->>>> +    for (i = 0; i < 8; i++) {
->>>> +        u32 wbase;
->>>> +        u32 wsize;
->>>> +
->>>> +        /* Continue if the window is not enabled */
->>>> +        if (!(win_enable | (1 << i)))
->>>> +            continue;
->>>> +
->>>> +        wbase = readl(base + WINDOW_BASE(i)) & 0xffff0000;
->>>> +        wsize = readl(base + WINDOW_SIZE(i)) & 0xffff0000;
->>>> +
->>>> +        /* Continue if 'addr' is not in this window */
->>>> +        if (addr < wbase || addr > (wbase + wsize))
->>>> +            continue;
->>>> +
->>>> +        /*
->>>> +         * If addr and size match, then this window is already
->>>> +         * configured and we are done
->>>> +         */
->>>> +        if (addr == wbase && (size & 0xffff0000) == wsize)
->>>> +            return 0;
->>>> +
->>>> +        /*
->>>> +         * The window is already configured, but the size does not
->>>> +         * match, so lets disable it
->>>> +         */
->>>> +        writel(0, base + WINDOW_BASE(i));
->>>> +        writel(0, base + WINDOW_SIZE(i));
->>>> +        if (i < 4)
->>>> +            writel(0, base + WINDOW_REMAP_HIGH(i));
->>>> +        win_enable &= ~(1 << i);
->>>> +        win_enable &= ~(3 << (16 + (2 * i)));
->>>> +        writel(win_enable, base + WINDOW_BAR_ENABLE(0));
->>>> +        writel(win_enable, base + WINDOW_BAR_ENABLE(1));
->>>> +
->>>> +        /*
->>>> +         * We can stop here since we have found and disabled the window
->>>> +         */
->>>> +        break;
->>>> +    }
->>>> +
->>>> +    /* Set 'i' to the first free window to write the new values to */
->>>> +    i = ffs(~win_enable) - 1;
->>>> +    if (i >= 8)
->>>> +        return -ENOMEM;
->>>> +
->>>> +    writel((addr & 0xffff0000) | (attr << 8) | target,
->>>> +           base + WINDOW_BASE(i));
->>>> +    writel(size & 0xffff0000, base + WINDOW_SIZE(i));
->>>> +
->>>> +    win_enable |= (1 << i);
->>>> +    win_enable |= 3 << (16 + (2 * i));
->>>> +    writel(win_enable, base + WINDOW_BAR_ENABLE(0));
->>>> +    writel(win_enable, base + WINDOW_BAR_ENABLE(1));
->>>> +
->>>> +    return 0;
->>>> +}
->>>> +
->>>>   static struct dma_async_tx_descriptor *
->>>>   mv_xor_prep_dma_xor(struct dma_chan *chan, dma_addr_t dest,
->>>> dma_addr_t *src,
->>>>               unsigned int src_cnt, size_t len, unsigned long flags)
->>>>   {
->>>>       struct mv_xor_chan *mv_chan = to_mv_xor_chan(chan);
->>>>       struct mv_xor_desc_slot *sw_desc;
->>>> +    int ret;
->>>>
->>>>       if (unlikely(len < MV_XOR_MIN_BYTE_COUNT))
->>>>           return NULL;
->>>> @@ -486,6 +581,11 @@ mv_xor_prep_dma_xor(struct dma_chan *chan,
->>>> dma_addr_t dest, dma_addr_t *src,
->>>>           "%s src_cnt: %d len: %zu dest %pad flags: %ld\n",
->>>>           __func__, src_cnt, len, &dest, flags);
->>>>
->>>> +    /* Check if a new window needs to get added for 'dest' */
->>>> +    ret = mv_xor_add_io_win(mv_chan, dest);
->>>> +    if (ret)
->>>> +        return NULL;
->>>> +
->>>>       sw_desc = mv_chan_alloc_slot(mv_chan);
->>>>       if (sw_desc) {
->>>>           sw_desc->type = DMA_XOR;
->>>> @@ -493,8 +593,13 @@ mv_xor_prep_dma_xor(struct dma_chan *chan,
->>>> dma_addr_t dest, dma_addr_t *src,
->>>>           mv_desc_init(sw_desc, dest, len, flags);
->>>>           if (mv_chan->op_in_desc == XOR_MODE_IN_DESC)
->>>>               mv_desc_set_mode(sw_desc);
->>>> -        while (src_cnt--)
->>>> +        while (src_cnt--) {
->>>> +            /* Check if a new window needs to get added for 'src' */
->>>> +            ret = mv_xor_add_io_win(mv_chan, src[src_cnt]);
->>>> +            if (ret)
->>>> +                return NULL;
->>>>               mv_desc_set_src_addr(sw_desc, src_cnt, src[src_cnt]);
->>>> +        }
->>>>       }
->>>>
->>>>       dev_dbg(mv_chan_to_devp(mv_chan),
->>>>
->>>
->>> I didn't receive any comments on this patch so far. How should we
->>> proceed? Is this approach to enable DMA support to and from regions
->>> in PCI space acceptable? If yes, do I need to resend this patch as
->>> a non-RFC patch?
->>
->> Thomas and I discussed this patch a bit off-list in the meantime
->> (thanks Thomas). Here a short summary of the last ideas (Thomas,
->> please correct me, if you feel I didn't summarize it correctly):
->>
->> Thomas raised some concerns, as this patch adds a big number of
->> register reads in the middle of the submission path for XOR requests.
->> To solve this, I suggested to add a DT property to enable this
->> PCI / IO window check in the XOR driver. But as DT should describe
->> the HW and this is not a "HW feature", acceptance of such a new
->> DT property is very unlikely.
->>
->> Another idea was to add a similar mechanism for the PCI spaces
->> as done for the DDR space(s) to the MBus driver. So that drivers
->> interested in these PCI windows could query the MBus driver about
->> the currently configured windows:
->>
->>     mv_mbus_dram_info()
->> ->     mv_mbus_pci_info()
->>
->> But as the XOR engine only has a limited number of windows, it
->> might happen that on a system with numerous PCI devices, all
->> the MBus PCI windows plus the DRAM windows will exhaust the number
->> of the XOR engine windows. Plus the dynamic nature of PCI devices
->> in hotplug systems. So this won't work either.
->>
->> Currently we are out of good ideas on how to get this feature added
->> to this XOR engine driver. Perhaps the only way is to accept the
->> additional register accesses introduced by this patch? Thomas
->> explicitly suggested to ask you Arnd, if you had some ideas on this.
->> So here we go:
->>
->> Arnd, do you have some ideas how to better solve this problem?
->
-> I'm not sure I completely understand the problem yet, but my first
-> thought would be caching: have a copy of the ranges in RAM and loop
-> over that in order to decide whether to evict one entry or not,
-> avoiding the need for mmio register reads completely, and most of
-> the register writes as well.
+Hi all
 
-Good idea. I would still need to call mvebu_mbus_get_io_win_info(),
-but the mmio accessed in this XOR driver could be minimized this
-way.
+This series patch is for rockchip Type-C phy and DisplayPort controller
+driver.
 
-> The mv_mbus_pci_info() should work as well, but it's possible you
-> can actually express that in a more generic way, since the
-> location of the PCI memory space should also be known to the PCI
-> core.
+The USB Type-C PHY is designed to support the USB3 and DP applications.
+The PHY basically has two main components: USB3 and DisplyPort. USB3
+operates in SuperSpeed mode and the DP can operate at RBR, HBR and HBR2
+data rates. The Type-C cable orientation detection and Power Delivery
+(PD) is accomplished using a PD PHY or a exernal PD chip.
 
-But we need the MBus target and attr for these different windows
-as well. So querying the MBus driver seems the only way for me.
+The DP controller is compliant with DisplayPort Specification,
+Version 1.3, This IP is compatible with the rockchip type-c PHY IP.
+There is a uCPU in DP controller, it need a firmware to work, please
+put the firmware file[0] to /lib/firmware/rockchip/dptx.bin. The uCPU
+in charge of aux communication and link training, the host use mailbox
+to communicate with the ucpu.
 
-> Finally, what is the specific limitation on the number and size
-> of the windows?
+The DP contoller has register a notification with extcon API, to get the
+alt mode from PD, the PD driver need call the devm_extcon_dev_allocate
+to create a extcon device and use extcon_set_state to notify DP
+controller. And call extcon_set_cable_property to set orientation.
 
-A max. of 8 windows. The windows can be from 64KiB to 4GiB.
+About the DP audio, cdn-dp registered 2 DAIs: 0 is I2S, 1 is SPDIF.
+We can reference them in simple-card.
 
-> Could you just create static mappings that span
-> all of the potential address space, e.g. a single entry for
-> any address visibile to the CPU? I can't tell if you just need
-> the physical address as seen by the CPU (which would be easy)
-> or if you need the mbus address with their register numbers
-> (which probably doesn't have a single contiguous representation?
+This series is based on Mark Yao's branch[1] and Chanwoo Choi's
+extcon-test branch[2]. The extcon patch is base on a test branch, so
+please do not review the "1/6 extcon: Add Type-C and DP support".
 
-Unfortunately we need the MBus target and attribute values for
-each window. So a summarized representation probably won't
-work.
+I test this patches on the rk3399-evb board, with a fusb302 driver,
+this branch has no rk3399.dtsi, so the patch about dts is not included
+in this series.
 
-> Do you just need to cover PCI or also things like the SPI-NOR
-> direct mapping address?
+[0]
+https://patchwork.kernel.org/patch/9249693/
+[1]
+https://github.com/markyzq/kernel-drm-rockchip/tree/drm-rockchip-next-2016-05-23
+[2]
+https://git.kernel.org/cgit/linux/kernel/git/chanwoo/extcon.git/log/?h=extcon-test
+- extcon: Add the extcon_type to gather each connector into five category
+- extcon: Add the support for extcon property according to extcon type
+- extcon: Add the support for the capability of each property
+- extcon: Rename the extcon_set/get_state() to maintain the function naming
+pattern
+- extcon: Add the synchronization extcon APIs to support the notification
 
-My current use-case is just PCI.
 
-Perhaps the cached mmio version would be acceptable? If I get
-an "go for it and I'll ack the patch v2" from someone, then
-I will gladly invest some time in this. :)
+Changes in v7:
+- support new API of extcon
+- support firmware standby when no dptx connection
+- optimization the calculation of tu size and valid symbol
 
-Thanks,
-Stefan
+Changes in v6:
+- add assigned-clocks and assigned-clock-rates
+- delete the support of PIN_ASSIGN_A/B
+- set the default mode to MODE_DFP_USB
+- disable DP PLL at USB3 only mode
+- add assigned-clocks and assigned-clock-rates
+- add power-domains
+- add a port struct
+- select SND_SOC_HDMI_CODEC
+- force reset the phy when hpd detected
 
-PS: I'm just now leaving for a vacation. So my answers may
-be a bit slow.
+Changes in v5:
+- support get property from extcon
+- remove PIN ASSIGN A/B support
+- alphabetical order
+- do not use long, use u32 or u64
+- return MODE_CLOCK_HIGH when requested > actual
+- Optimized Coding Style
+- add a formula to get better tu size and symbol value.
+- modify according to Sean Paul's comments
+- fixed the fw_wait always 0
+
+Changes in v4:
+- add a #phy-cells node
+- select EXTCON
+- use phy framework to control the USB3 and DP function
+- rename PIN_MAP_ to PIN_ASSIGN_
+- add a reset node
+- support 2 phys
+- use phy framework to control DP phy
+- support 2 phys
+
+Changes in v3:
+- use compatible: rockchip,rk3399-typec-phy
+- use dashes instead of underscores.
+- remove the phy framework(Kishon Vijay Abraham I)
+- add parentheses around the macro
+- use a single space between type and name
+- add spaces after opening and before closing braces.
+- use u16 for register value
+- remove type-c phy header file
+- CodingStyle optimization
+- use some cable extcon to get type-c port information
+- add a extcon to notify Display Port
+- add SoC specific compatible string
+- remove reg = <1>;
+- use EXTCON_DISP_DP and EXTCON_DISP_DP_ALT cable to get dp port state.
+- reset spdif before config it
+- modify the firmware clk to 100Mhz
+- retry load firmware if fw file is requested too early
+
+Changes in v2:
+- add some registers description
+- select RESET_CONTROLLER
+- alphabetic order
+- modify some spelling mistakes
+- make mode cleaner
+- use bool for enable/disable
+- check all of the return value
+- return a better err number
+- use more readx_poll_timeout()
+- clk_disable_unprepare(tcphy->clk_ref);
+- remove unuse functions, rockchip_typec_phy_power_on/off
+- remove unnecessary typecast from void *
+- use dts node to distinguish between phys.
+- Alphabetic order
+- remove excess error message
+- use define clk_rate
+- check all return value
+- remove dev_set_name(dp->dev, "cdn-dp");
+- use schedule_delayed_work
+- remove never-called functions
+- remove some unnecessary ()
+
+Changes in v1:
+- add extcon node description
+- move the registers in phy driver
+- remove the suffix of reset
+- update the licence note
+- init core clock to 50MHz
+- use extcon API
+- remove unused global
+- add some comments for magic num
+- change usleep_range(1000, 2000) tousleep_range(1000, 1050)
+- remove __func__ from dev_err
+- return err number when get clk failed
+- remove ADDR_ADJ define
+- use devm_clk_get(&pdev->dev, "tcpdcore")
+- add extcon node description
+- add #sound-dai-cells description
+- use extcon API
+- use hdmi-codec for the DP Asoc
+- do not initialize the "ret"
+- printk a err log when drm_of_encoder_active_endpoint_id
+- modify the dclk pin_pol to a single line
+
+Chris Zhong (6):
+  extcon: Add EXTCON_DISP_DP and the property for USB Type-C
+  Documentation: bindings: add dt doc for Rockchip USB Type-C PHY
+  phy: Add USB Type-C PHY driver for rk3399
+  arm64: dts: rockchip: add Type-C phy for RK3399
+  Documentation: bindings: add dt documentation for cdn DP controller
+  drm/rockchip: cdn-dp: add cdn DP support for rk3399
+
+ .../bindings/display/rockchip/cdn-dp-rockchip.txt  |  74 ++
+ .../devicetree/bindings/phy/phy-rockchip-typec.txt |  84 ++
+ arch/arm64/boot/dts/rockchip/rk3399.dtsi           |  44 +
+ drivers/extcon/extcon.c                            |   5 +
+ drivers/gpu/drm/rockchip/Kconfig                   |  10 +
+ drivers/gpu/drm/rockchip/Makefile                  |   1 +
+ drivers/gpu/drm/rockchip/cdn-dp-core.c             | 877 +++++++++++++++++++
+ drivers/gpu/drm/rockchip/cdn-dp-core.h             | 103 +++
+ drivers/gpu/drm/rockchip/cdn-dp-reg.c              | 916 ++++++++++++++++++++
+ drivers/gpu/drm/rockchip/cdn-dp-reg.h              | 482 +++++++++++
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.c        |  13 +-
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.h        |   9 +
+ drivers/gpu/drm/rockchip/rockchip_vop_reg.c        |   2 +
+ drivers/phy/Kconfig                                |   9 +
+ drivers/phy/Makefile                               |   1 +
+ drivers/phy/phy-rockchip-typec.c                   | 961 +++++++++++++++++++++
+ include/linux/extcon.h                             |   8 +-
+ 17 files changed, 3595 insertions(+), 4 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/display/rockchip/cdn-dp-rockchip.txt
+ create mode 100644 Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt
+ create mode 100644 drivers/gpu/drm/rockchip/cdn-dp-core.c
+ create mode 100644 drivers/gpu/drm/rockchip/cdn-dp-core.h
+ create mode 100644 drivers/gpu/drm/rockchip/cdn-dp-reg.c
+ create mode 100644 drivers/gpu/drm/rockchip/cdn-dp-reg.h
+ create mode 100644 drivers/phy/phy-rockchip-typec.c
+
+-- 
+2.6.3
