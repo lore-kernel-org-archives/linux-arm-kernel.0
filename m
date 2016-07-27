@@ -1,71 +1,58 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Wed, 27 Jul 2016 11:57:51 +0200
-Subject: at_xdmac: txd used outside spinlock after being released?
-In-Reply-To: <CAP+RiCAXKmFAzWoow_g=LR=tML7kxAi_dG0w4Z6X9KrvSypD9w@mail.gmail.com>
-References: <CAP+RiCAXKmFAzWoow_g=LR=tML7kxAi_dG0w4Z6X9KrvSypD9w@mail.gmail.com>
-Message-ID: <20160727095751.GA3700@odux.rfo.atmel.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Wed, 27 Jul 2016 11:01:05 +0100
+Subject: [PATCH v15 04/10] arm64: Kprobes with single stepping support
+In-Reply-To: <20160726165543.GG2423@e104818-lin.cambridge.arm.com>
+Message-ID: <20160727100048.GA7147@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Brent,
+On Tue, Jul 26, 2016 at 05:55:43PM +0100, Catalin Marinas wrote:
+> On Tue, Jul 26, 2016 at 10:50:08AM +0100, Daniel Thompson wrote:
+> > On 25/07/16 18:13, Catalin Marinas wrote:
+> > >On Fri, Jul 22, 2016 at 11:51:32AM -0400, David Long wrote:
+> > >>OK, it sounds like an improvement. I do worry a little about unexpected side
+> > >>effects.
+> > >
+> > >You get more unexpected side effects by not saving/restoring the whole
+> > >stack. We looked into this on Friday and came to the conclusion that
+> > >there is no safe way for kprobes to know which arguments passed on the
+> > >stack should be preserved, at least not with the current API.
 
-On Tue, Jul 19, 2016 at 10:58:40PM -0500, Brent Taylor wrote:
-> Hi Ludovic,
->    I'm learning about the dmaengine subsystem and I was using the
-> at_xdmac as a reference.    I'm not real familiar with tasklets
-> because I have used threaded interrupt handlers instead of them.
->    I noticed that the variable "txd" in the following block of code
-> (from the function at_xdmac_tasklet) is used after releasing the
-> atchan->lock and after the "desc" the txd is associated with is
-> returned back to the free descriptor list.
-> 
->       spin_lock_bh(&atchan->lock);
->       desc = list_first_entry(&atchan->xfers_list,
->                struct at_xdmac_desc,
->                xfer_node);
->      ...
->      txd = &desc->tx_dma_desc;
-> 
->       at_xdmac_remove_xfer(atchan, desc);
->       spin_unlock_bh(&atchan->lock);
-> 
->       if (!at_xdmac_chan_is_cyclic(atchan)) {
->          dma_cookie_complete(txd);
->          if (txd->callback && (txd->flags & DMA_PREP_INTERRUPT))
->             txd->callback(txd->callback_param);
->       }
-> 
->       dma_run_dependencies(txd);
-> 
-> Is there any danger of another process (maybe running on another
-> processor) changing desc->txd after it has been put back on the
-> free_list?
+[...]
 
-To be honest, I have already thought about it and I have probably been
-lucky!
+Jumping cheekily onto this thread, what if some function does this:
 
-> My first thought was to move the spin_unlock_bh(&atchan->lock) untill
-> after dma_run_dependencies(txd), but a deadlock will be introduced
-> because dma_run_dependencies could invoke at_xdmac_issue_pending which
-> could eventually call spin_lock_irqsave(&atchan->lock).  A deadlock
-> could also be created if the "callback" function invoked another
-> "device_prep_*" function.
-> 
-> If I'm miss-understanding something, I apologize for the noise.
+void go_on_jprobe_me()
+{
+}
 
-You're right. At the moment, I had no feedback about a bug related to
-this. A customer tested hardly the current driver, much more than I. Since
-locking issues are not trivial to debug and to trigger, I am not really
-in favour to anticipate it but I keep in mind there is a weakness here.
-It doesn't mean I am not open to all good suggestions of course!
+void foo()
+{
+	struct bar baz;
 
-One way (which is not too risky) to fix it would be to put descriptors
-which are no longer used at the end of the free descriptors list instead
-of putting them back at the beginning.
+	start_io(&baz);
 
-> 
-> -- Brent Taylor
+	/* ... */
 
-Regards
+	go_on_jprobe_me();
 
-Ludovic
+	end_io(&baz);
+}
+
+If some I/O is being done on baz asynchronously, via DMA or via another
+thread, a jprobe implementation that attempts to save/restore the stack
+beyond the arguments of the probed function is going to race with such
+I/O and can corrupt data.
+
+This is a risk whenever any thread triggers some other master to operate
+on objects on the first thread's stack -- I/O is a contrived example, but
+there are likely other ways similar asynchronous access can happen to
+a thread's stack.
+
+Worse, annotating go_on_jprobe_me() as un-jprobeable doesn't help --
+the un-jprobeableness is a property not of the function itself, but
+rather a property of the set of callers of that function.  That set can
+change at runtime (consider out-of-tree modules).
+
+Cheers
+---Dave
