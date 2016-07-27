@@ -1,41 +1,56 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 27 Jul 2016 08:21:46 +0200
-Subject: [PATCH v4] ARM: dts: sun8i: Add dts file for Olimex A33-OLinuXino
-In-Reply-To: <30014119.IrjfP0xFry@linux-cigu>
-References: <1469450243-19138-1-git-send-email-stefan.mavrodiev@gmail.com>
- <20160726153352.GH7190@lukather> <30014119.IrjfP0xFry@linux-cigu>
-Message-ID: <20160727062146.GA6560@lukather>
+From: bharat.kumar.gogada@xilinx.com (Bharat Kumar Gogada)
+Date: Wed, 27 Jul 2016 06:33:29 +0000
+Subject: Why does BIOS assign memory to 16 byte BAR
+In-Reply-To: <CAE9FiQWaFAD0+biMmnKqSQ2K4AdRJJmeEZ=ASSsvEgiDsKAP6Q@mail.gmail.com>
+References: <8520D5D51A55D047800579B094147198258BB59B@XAP-PVEXMBX01.xlnx.xilinx.com>
+ <20160722151546.GA20646@localhost> <20160722155133.GB20646@localhost>
+ <8520D5D51A55D047800579B094147198258BC23C@XAP-PVEXMBX01.xlnx.xilinx.com>
+ <8520D5D51A55D047800579B094147198258BC2BB@XAP-PVEXMBX01.xlnx.xilinx.com>
+ <CAE9FiQWaFAD0+biMmnKqSQ2K4AdRJJmeEZ=ASSsvEgiDsKAP6Q@mail.gmail.com>
+Message-ID: <8520D5D51A55D047800579B094147198258BC5E3@XAP-PVEXMBX01.xlnx.xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 27, 2016 at 08:12:29AM +0300, stefan.mavrodiev at gmail.com wrote:
-> > > +&reg_dcdc1 {
-> > > +	regulator-always-on;
-> > > +	regulator-min-microvolt = <3300000>;
-> > > +	regulator-max-microvolt = <3300000>;
-> > > +	regulator-name = "vcc-dsi";
-> > > +};
-> > 
-> > What is it used for? Is it really necessary to keep it on at all time?
+> Your system host bridge: has resource
+> pci_bus 0000:00: root bus resource [mem 0xe0100000-0xefffffff] pci_bus
+> 0000:00: root bus resource [mem 0x600000000-0x7ffffffff pref] then one pci
+> bridge:
+> pci 0000:00:00.0
+> then 0000:01:00.0 have four bars:
+> pci 0000:01:00.0: BAR 0:  [mem size 0x40000000] pci 0000:01:00.0: BAR 4:
+> [mem size 0x00100000 64bit] pci 0000:01:00.0: BAR 2:  [mem size 0x00000010]
+> pci 0000:01:00.0: BAR 3:  [mem size 0x00000010]
 > 
-> I think so.
-> This is the supply for the MMC.
+> 
+> kernel need to get allocation for pci 0000:00:00.0 at first
+> 
+> but can not find big enough space.
+> 
+> pci 0000:00:00.0: BAR 8: no space for [mem size 0x60000000] as it should
+> come from [mem 0xe0100000-0xefffffff], and that is less 1.5G.
+> 
+> so all children resource from pci 0000:01:00.0 all fail.
+> 
+> 
+> please check if you modify your FPGA code to make pci 0000:01:00.0
+> 
+> BAR 0, and BAR 4 to use 64bit pref instead non-pref mmio.
+> 
+> or you can check if can increase root bus mmio range
+> 
+>  MEM 0xe0100000..0xefffffff -> 0xe0100000 nwl-pcie fd0e0000.pcie: PCI host
+> bridge to bus 0000:00
+> 
+> to have more than 1.5G.
+> 
+Thanks Yinghai Lu.
+We see that similar test is passing in x86 machine, where function one requesting 1GB BAR's is failing,
+but function two requesting BAR's with 16byte is getting assigned BAR's.
 
-Then it's poorly named, and you should tie it to the MMC, and remove
-the always-on if it's only used by the mmc. always-on is supposed to
-be for regulators that shouldn't but turned off for the system to stay
-running. Some MMC regulator doesn't fit that description.
+To my knowledge on x86 BIOS assigns resources, or will kernel assign reosurces on x86 ?
+If kernel does is there any difference between x86 and arm64 resource assignment logic ?
 
-Maxime
+Thanks & Regards,
+Bharat
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160727/bf0be398/attachment.sig>
+  
