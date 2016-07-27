@@ -1,53 +1,77 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Wed, 27 Jul 2016 11:32:44 +0200
-Subject: [PATCH v3] arm64: dts: mt8173: add mmsel clocks for 4K support
-In-Reply-To: <1469607914-64831-1-git-send-email-bibby.hsieh@mediatek.com>
-References: <1469607914-64831-1-git-send-email-bibby.hsieh@mediatek.com>
-Message-ID: <1469611964.2470.30.camel@pengutronix.de>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 27 Jul 2016 10:34:22 +0100
+Subject: Why does BIOS assign memory to 16 byte BAR
+In-Reply-To: <8520D5D51A55D047800579B094147198258BC5E3@XAP-PVEXMBX01.xlnx.xilinx.com>
+References: <8520D5D51A55D047800579B094147198258BB59B@XAP-PVEXMBX01.xlnx.xilinx.com>
+ <20160722151546.GA20646@localhost>
+ <20160722155133.GB20646@localhost>
+ <8520D5D51A55D047800579B094147198258BC23C@XAP-PVEXMBX01.xlnx.xilinx.com>
+ <8520D5D51A55D047800579B094147198258BC2BB@XAP-PVEXMBX01.xlnx.xilinx.com>
+ <CAE9FiQWaFAD0+biMmnKqSQ2K4AdRJJmeEZ=ASSsvEgiDsKAP6Q@mail.gmail.com>
+ <8520D5D51A55D047800579B094147198258BC5E3@XAP-PVEXMBX01.xlnx.xilinx.com>
+Message-ID: <20160727093422.GA8334@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, den 27.07.2016, 16:25 +0800 schrieb Bibby Hsieh:
-> If MT8173 can support HDMI 4K resoultion, the
-> VENCPLL should be configured to 800MHZ.
-> We didn't set VENCPLL directly, we set the
-> mm_sel to 400MHz statically in the board device tree.
-
-Maybe add a comment that the board .dts file should override the clock
-rate property with the higher VENCPLL frequency the board supports HDMI
-4K resolution.
-
-> Signed-off-by: Bibby Hsieh <bibby.hsieh@mediatek.com>
-> ---
-> Changes since v2:
->  - Align the clocks of dpi0 node.
+On Wed, Jul 27, 2016 at 06:33:29AM +0000, Bharat Kumar Gogada wrote:
+> > Your system host bridge: has resource
+> > pci_bus 0000:00: root bus resource [mem 0xe0100000-0xefffffff] pci_bus
+> > 0000:00: root bus resource [mem 0x600000000-0x7ffffffff pref] then one pci
+> > bridge:
+> > pci 0000:00:00.0
+> > then 0000:01:00.0 have four bars:
+> > pci 0000:01:00.0: BAR 0:  [mem size 0x40000000] pci 0000:01:00.0: BAR 4:
+> > [mem size 0x00100000 64bit] pci 0000:01:00.0: BAR 2:  [mem size 0x00000010]
+> > pci 0000:01:00.0: BAR 3:  [mem size 0x00000010]
+> > 
+> > 
+> > kernel need to get allocation for pci 0000:00:00.0 at first
+> > 
+> > but can not find big enough space.
+> > 
+> > pci 0000:00:00.0: BAR 8: no space for [mem size 0x60000000] as it should
+> > come from [mem 0xe0100000-0xefffffff], and that is less 1.5G.
+> > 
+> > so all children resource from pci 0000:01:00.0 all fail.
+> > 
+> > 
+> > please check if you modify your FPGA code to make pci 0000:01:00.0
+> > 
+> > BAR 0, and BAR 4 to use 64bit pref instead non-pref mmio.
+> > 
+> > or you can check if can increase root bus mmio range
+> > 
+> >  MEM 0xe0100000..0xefffffff -> 0xe0100000 nwl-pcie fd0e0000.pcie: PCI host
+> > bridge to bus 0000:00
+> > 
+> > to have more than 1.5G.
+> > 
+> Thanks Yinghai Lu.
+> We see that similar test is passing in x86 machine, where function one
+> requesting 1GB BAR's is failing, but function two requesting BAR's
+> with 16byte is getting assigned BAR's.
 > 
-> Changes since v1:
->  - Do not set the VENCPLL by clk_set_rate
->    at display driver.
->  - Configure the mm_sel to 400MHz statically
->    in the board device tree.
-> ---
->  arch/arm64/boot/dts/mediatek/mt8173.dtsi |    2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> index 78529e4..9c22204 100644
-> --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> @@ -690,7 +690,9 @@
->  			compatible = "mediatek,mt8173-mmsys", "syscon";
->  			reg = <0 0x14000000 0 0x1000>;
->  			power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
-> +			clocks = <&topckgen CLK_TOP_MM_SEL>;
->  			#clock-cells = <1>;
-> +			clock-frequency  = <400000000>;
+> To my knowledge on x86 BIOS assigns resources, or will kernel assign
+> reosurces on x86 ?  If kernel does is there any difference between x86
+> and arm64 resource assignment logic ?
 
-According to the "Assigned clock parents and rates" section in
-Documentation/devicetree/bindings/clock/clock-bindings.txt,
-this should be:
-			assigned-clocks = <&topckgen CLK_TOP_MM_SEL>;
-			assigned-clock-rates = <400000000>;
+We can't answer your question if you do not provide a full log
+of x86 and ARM PCI configurations you are testing I am afraid.
 
-regards
-Philipp
+It is also unclear to me what "a similar test is passing in x86
+machine" means, in particular in relation to the HW configuration
+you are testing on x86.
+
+Yes, there are differences between x86 and ARM resources assignments,
+x86 tries to claim PCI resources as set-up by BIOS and assign them
+iff the claiming fails whereas on ARM (and that's done in the host
+bridge driver) FW configuration is always discarded and the kernel
+reassigns the whole PCI resource hierarchy entirely, but to help we
+need more data as I said above.
+
+I suspect the issue you are facing has to do as Yinghai mentioned
+with the prefetchable memory window set-up, saying that "it works"
+on x86 does not really help unless you provide data to debug it.
+
+Thanks,
+Lorenzo
