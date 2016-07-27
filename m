@@ -1,98 +1,60 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 27 Jul 2016 18:10:41 +0200
-Subject: [PATCH 05/18] ARM: mvebu: a385-db-ap: add default partition
- description for NAND
-In-Reply-To: <87k2g7m5j1.fsf@free-electrons.com> (Gregory CLEMENT's message of
- "Wed, 27 Jul 2016 18:04:18 +0200")
+Date: Wed, 27 Jul 2016 18:13:52 +0200
+Subject: [PATCH 06/18] ARM: mvebu: a390: add missing compatibility string
+ and add missing bracket
+In-Reply-To: <1469105055-25181-7-git-send-email-jaz@semihalf.com> (Grzegorz
+ Jaszczyk's message of "Thu, 21 Jul 2016 14:44:02 +0200")
 References: <1469105055-25181-1-git-send-email-jaz@semihalf.com>
- <1469105055-25181-6-git-send-email-jaz@semihalf.com>
- <87k2g7m5j1.fsf@free-electrons.com>
-Message-ID: <8760rrm58e.fsf@free-electrons.com>
+ <1469105055-25181-7-git-send-email-jaz@semihalf.com>
+Message-ID: <871t2fm533.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Grzegorz,
  
- On mer., juil. 27 2016, Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
+ On jeu., juil. 21 2016, Grzegorz Jaszczyk <jaz@semihalf.com> wrote:
 
-> Hi Grzegorz,
->  
->  On jeu., juil. 21 2016, Grzegorz Jaszczyk <jaz@semihalf.com> wrote:
+> The armada-390.dtsi was broken since the first patch which adds Device Tree
+> files for Armada 39x SoC was introduced.
 >
->> Signed-off-by: Grzegorz Jaszczyk <jaz@semihalf.com>
-> It looks good:
->
-> Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> Signed-off-by: Grzegorz Jaszczyk <jaz@semihalf.com>
+> Cc: <stable@vger.kernel.org> # 4.0+
+> Fixes 538da83 ("ARM: mvebu: add Device Tree files for Armada 39x SoC and board")
 
-And here again the title prefix should be change to:
-"ARM: dts: mvebu: a385-db-ap:" also do not forget fo add a commit log.
+Change the title prefix to "ARM: dts: mvebu:". Alos usually we use
+armada-390 instead of a390 to match the file name.
+
+Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
 Thanks,
 
 Gregory
-
+> ---
+>  arch/arm/boot/dts/armada-390.dtsi | 3 +++
+>  1 file changed, 3 insertions(+)
 >
->> ---
->>  arch/arm/boot/dts/armada-385-db-ap.dts | 26 +++++++++++++++++++++++---
->>  1 file changed, 23 insertions(+), 3 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/armada-385-db-ap.dts b/arch/arm/boot/dts/armada-385-db-ap.dts
->> index a18f516..6648a3f 100644
->> --- a/arch/arm/boot/dts/armada-385-db-ap.dts
->> +++ b/arch/arm/boot/dts/armada-385-db-ap.dts
->> @@ -182,15 +182,35 @@
->>  
->>  			nfc: flash at d0000 {
->>  				status = "okay";
->> -				#address-cells = <1>;
->> -				#size-cells = <1>;
->> -
->>  				num-cs = <1>;
->>  				nand-ecc-strength = <4>;
->>  				nand-ecc-step-size = <512>;
->>  				marvell,nand-keep-config;
->>  				marvell,nand-enable-arbiter;
->>  				nand-on-flash-bbt;
->> +
->> +				partitions {
->> +					compatible = "fixed-partitions";
->> +					#address-cells = <1>;
->> +					#size-cells = <1>;
->> +
->> +					partition at 0 {
->> +						label = "U-Boot";
->> +						reg = <0x00000000 0x00800000>;
->> +						read-only;
->> +					};
->> +
->> +					partition at 800000 {
->> +						label = "uImage";
->> +						reg = <0x00800000 0x00400000>;
->> +						read-only;
->> +					};
->> +
->> +					partition at c00000 {
->> +						label = "Root";
->> +						reg = <0x00c00000 0x3f400000>;
->> +					};
->> +				};
->>  			};
->>  
->>  			usb3 at f0000 {
->> -- 
->> 1.8.3.1
->>
->
+> diff --git a/arch/arm/boot/dts/armada-390.dtsi b/arch/arm/boot/dts/armada-390.dtsi
+> index 094e39c..6cd18d8 100644
+> --- a/arch/arm/boot/dts/armada-390.dtsi
+> +++ b/arch/arm/boot/dts/armada-390.dtsi
+> @@ -47,6 +47,8 @@
+>  #include "armada-39x.dtsi"
+>  
+>  / {
+> +	compatible = "marvell,armada390";
+> +
+>  	soc {
+>  		internal-regs {
+>  			pinctrl at 18000 {
+> @@ -54,4 +56,5 @@
+>  				reg = <0x18000 0x20>;
+>  			};
+>  		};
+> +	};
+>  };
 > -- 
-> Gregory Clement, Free Electrons
-> Kernel, drivers, real-time and embedded Linux
-> development, consulting, training and support.
-> http://free-electrons.com
+> 1.8.3.1
 >
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
 -- 
 Gregory Clement, Free Electrons
