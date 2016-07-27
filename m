@@ -1,5 +1,5 @@
 From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Wed, 27 Jul 2016 00:51:27 +0000
+Date: Wed, 27 Jul 2016 00:51:58 +0000
 Subject: [alsa-devel] [PATCH v2] clkdev: add devm_of_clk_get()
 In-Reply-To: <871t34hlin.wl%kuninori.morimoto.gx@renesas.com>
 References: <87wpl2yyuw.wl%kuninori.morimoto.gx@renesas.com>
@@ -9,7 +9,7 @@ References: <87wpl2yyuw.wl%kuninori.morimoto.gx@renesas.com>
  <8760shgfzu.wl%kuninori.morimoto.gx@renesas.com>
  <146794140875.73491.7115209079607438738@resonance>
  <871t34hlin.wl%kuninori.morimoto.gx@renesas.com>
-Message-ID: <87a8h3di61.wl%kuninori.morimoto.gx@renesas.com>
+Message-ID: <878twndi54.wl%kuninori.morimoto.gx@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
