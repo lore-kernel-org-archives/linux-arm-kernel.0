@@ -1,78 +1,106 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 28 Jul 2016 14:53:21 +0100
-Subject: [PATCH v9 4/9] clocksource/drivers/arm_arch_timer: use readq to
- get 64-bit CNTVCT
-In-Reply-To: <57976FA5.2070802@codeaurora.org>
-References: <1469460427-8643-1-git-send-email-fu.wei@linaro.org>
- <1469460427-8643-5-git-send-email-fu.wei@linaro.org>
- <20160725153118.GD19209@arm.com>
- <CADyBb7ubKceQiB7+u7sSA=1+9_VMUrGjiabf_FkN2-n4rq7Kgg@mail.gmail.com>
- <20160725163144.GE19209@arm.com> <57976FA5.2070802@codeaurora.org>
-Message-ID: <20160728135321.GH1085@arm.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Thu, 28 Jul 2016 16:08:47 +0200
+Subject: [PATCH 2/3] dt-bindings: allow child nodes inside the Tegra BPMP
+In-Reply-To: <36967d69-cb2a-654e-9a4c-2021fd476464@wwwdotorg.org>
+References: <20160719191442.15439-1-swarren@wwwdotorg.org>
+ <20160719191442.15439-2-swarren@wwwdotorg.org>
+ <20160726100302.GE2433@ulmo.ba.sec>
+ <f1ca284a-5332-3323-80b9-7cf61e7c97ac@wwwdotorg.org>
+ <36967d69-cb2a-654e-9a4c-2021fd476464@wwwdotorg.org>
+Message-ID: <20160728140847.GA28342@ulmo.ba.sec>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 26, 2016 at 09:11:49AM -0500, Timur Tabi wrote:
-> Will Deacon wrote:
-> >The kernel really needs to support both of those platforms :/
-> >
-> >For the memory-mapped counter registers, the architecture says:
-> >
-> >   `If the implementation supports 64-bit atomic accesses, then the
-> >    CNTV_CVAL register must be accessible as an atomic 64-bit value.'
-> >
-> >which is borderline tautological. If we take the generous reading that
-> >this means AArch64 CPUs can use readq (and I'm not completely
-> >comfortable with that assertion, particularly as you say that it breaks
-> >the model), then you still need to use readq_relaxed here to avoid a
-> >DSB. Furthermore, what are you going to do for AArch32? readq doesn't
-> >exist over there, and if you use the generic implementation then it's
-> >not atomic. In which case, we end up with the current code, as well as a
-> >readq_relaxed guarded by a questionable #ifdef that is known to break a
-> >supported platform for an unknown performance improvement. Hardly a big
-> >win.
+On Wed, Jul 27, 2016 at 03:50:52PM -0600, Stephen Warren wrote:
+> On 07/26/2016 10:21 AM, Stephen Warren wrote:
+> > On 07/26/2016 04:03 AM, Thierry Reding wrote:
+> > > On Tue, Jul 19, 2016 at 01:14:41PM -0600, Stephen Warren wrote:
+> > > > From: Stephen Warren <swarren@nvidia.com>
+> > > > 
+> > > > The BPMP implements some services which must be represented by separate
+> > > > nodes. For example, it can provide access to certain I2C controllers,
+> > > > and
+> > > > the I2C bindings represent each I2C controller as a device tree node.
+> > > > Update the binding to describe how the BPMP supports this.
+> > > > 
+> > > > Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> > > > ---
+> > > >  .../bindings/firmware/nvidia,tegra186-bpmp.txt     | 23
+> > > > ++++++++++++++++++++++
+> > > >  1 file changed, 23 insertions(+)
+> > > > 
+> > > > diff --git
+> > > > a/Documentation/devicetree/bindings/firmware/nvidia,tegra186-bpmp.txt
+> > > > b/Documentation/devicetree/bindings/firmware/nvidia,tegra186-bpmp.txt
+> > > > index 9a3864f56955..142d363406f6 100644
+> > > > ---
+> > > > a/Documentation/devicetree/bindings/firmware/nvidia,tegra186-bpmp.txt
+> > > > +++
+> > > > b/Documentation/devicetree/bindings/firmware/nvidia,tegra186-bpmp.txt
+> > > > @@ -38,6 +38,24 @@ implemented by this node:
+> > > >  - .../reset/reset.txt
+> > > >  - <dt-bindings/reset/tegra186-reset.h>
+> > > > 
+> > > > +The BPMP implements some services which must be represented by
+> > > > separate nodes.
+> > > > +For example, it can provide access to certain I2C controllers, and
+> > > > the I2C
+> > > > +bindings represent each I2C controller as a device tree node. Such
+> > > > nodes should
+> > > > +be nested directly inside the main BPMP node.
+> > > > +
+> > > > +Software can determine whether a child node of the BPMP node
+> > > > represents a device
+> > > > +by checking for a compatible property. Any node with a compatible
+> > > > property
+> > > > +represents a device that can be instantiated. Nodes without a
+> > > > compatible
+> > > > +property may be used to provide configuration information regarding
+> > > > the BPMP
+> > > > +itself, although no such configuration nodes are currently defined
+> > > > by this
+> > > > +binding.
+> > > > +
+> > > > +The BPMP firmware defines no single global name-/numbering-space for
+> > > > such
+> > > > +services. Put another way, the numbering scheme for I2C buses is
+> > > > distinct from
+> > > > +the numbering scheme for any other service the BPMP may provide
+> > > > (e.g. a future
+> > > > +hypothetical SPI bus service). As such, child device nodes will have
+> > > > no reg
+> > > > +property, and the BPMP node will have no #address-cells or
+> > > > #size-cells property.
+> > > 
+> > > My understanding is that the I2C bus number is passed as part of the
+> > > request to the BPMP firmware. Does that not count as addressing? Could
+> > > we not represent that generically using a device tree hierarchy? I'm
+> > > thinking something along these lines:
+> > > 
+> > >     bpmp {
+> > >         ...
+> > > 
+> > >         services {
+> > >             i2c {
+> > >                 i2c at 0 {
+> > >                     reg = <0>;
+> > 
+> > Technically, that is possible. However, Rob Herring rejected the idea of
+> > multiple levels of sub-nodes.
+> > 
+> > Can we please just go with what we have? DT bindings are frankly an
+> > obstacle to getting anything done:-(
 > 
-> I know Fu dropped this patch, and I don't want to kick a dead horse, but I
-> was wondering if it would be okay to do this:
-> 
-> static u64 arch_counter_get_cntvct_mem(void)
-> {
-> #ifdef readq_relaxed
-> 	return readq_relaxed(arch_counter_base + CNTVCT_LO);
-> #else
-> 	u32 vct_lo, vct_hi, tmp_hi;
-> 
-> 	do {
-> 		vct_hi = readl_relaxed(arch_counter_base + CNTVCT_HI);
-> 		vct_lo = readl_relaxed(arch_counter_base + CNTVCT_LO);
-> 		tmp_hi = readl_relaxed(arch_counter_base + CNTVCT_HI);
-> 	} while (vct_hi != tmp_hi);
-> 
-> 	return ((u64) vct_hi << 32) | vct_lo;
-> #endif
-> }
-> 
-> readq and readq_relaxed are defined in arch/arm64/include/asm/io.h.  Why
-> would the function exist if AArch64 CPUs can't use it?
-> 
-> Do we need something like ARCH_HAS_64BIT_ATOMIC_READ in order to decide
-> whether readq is safe?
+> Thierry, any further thoughts here? I really need to get these DT bindings
+> finalized so that I can use them in U-Boot, which is very urgent. Thanks.
 
-No, I'm still not ok with this. If you want to use readq_relaxed we need
-the following guarantees:
+If everyone else is fine with these bindings, let's go ahead with them.
 
-  1. readq_relaxed is provided by the architecture
-  2. readq_relaxed is single-copy atomic from the CPU's perspective
-  3. The memory-mapped timer has been integrated in such a way that it
-     can be accessed using 64-bit transactions.
-
-(1) is easy, and you have that above. For (2), we just need to avoid
-include/linux/io-64-nonatomic-*.h. (3), however, is not something we
-can safely probe. If this optimisation really is worthwhile, then we
-need to extend the device-tree binding for the counter so that we can
-tell the kernel that it's ok to use 64-bit accesses for the counter
-without tearing.
-
-I have confirmed this with the architects here at ARM.
-
-Will
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160728/e2991667/attachment.sig>
