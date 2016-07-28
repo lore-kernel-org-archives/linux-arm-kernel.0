@@ -1,33 +1,33 @@
-From: weiyj.lk@gmail.com (Wei Yongjun)
-Date: Thu, 28 Jul 2016 16:17:14 +0000
-Subject: [PATCH -next] PCI: aardvark: Remove redundant dev_err call in
- advk_pcie_probe()
-Message-ID: <1469722634-15049-1-git-send-email-weiyj.lk@gmail.com>
+From: stillcompiling@gmail.com (Joshua Clayton)
+Date: Thu, 28 Jul 2016 09:18:45 -0700
+Subject: [PATCH v3 4/6] usb: core: add power sequence handling for USB
+ devices
+In-Reply-To: <20160728014521.GB26186@shlinux2>
+References: <1469007629-31757-1-git-send-email-peter.chen@nxp.com>
+ <1469007629-31757-5-git-send-email-peter.chen@nxp.com>
+ <5798E067.90207@gmail.com> <20160728014521.GB26186@shlinux2>
+Message-ID: <579A3065.2080402@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is a error message within devm_ioremap_resource
-already, so remove the dev_err call to avoid redundant
-error message.
+Peter,
 
-Signed-off-by: Wei Yongjun <weiyj.lk@gmail.com>
----
- drivers/pci/host/pci-aardvark.c | 4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
+On 07/27/2016 06:45 PM, Peter Chen wrote:
+> On Wed, Jul 27, 2016 at 09:25:11AM -0700, Joshua Clayton wrote:
+>> Patch 4 does not apply for me
+>> (The Makefile has  a "usbcore-$(CONFIG_OF) += of.o"
+>> line which I don't see in 4.7 or linux/next master).
+>> Is there another patch set this series depends on?
+> It seems below patch has not been queued:
+>
+> https://git.kernel.org/cgit/linux/kernel/git/peter.chen/usb.git/commit/?h=add_pwrseq_for_usb&id=2efd73d0f935ffbc66135553da0ac807c0b4c3fe
+>
+> This pwrseq-lib patch set does not depend on it, I will send patch set
+> on top of a clean mainline next time, sorry for confusing. 
+>
+Good to know.
+I just wanted to make sure I wasn't missing something important.
 
-diff --git a/drivers/pci/host/pci-aardvark.c b/drivers/pci/host/pci-aardvark.c
-index ef9893f..05c33b5 100644
---- a/drivers/pci/host/pci-aardvark.c
-+++ b/drivers/pci/host/pci-aardvark.c
-@@ -925,10 +925,8 @@ static int advk_pcie_probe(struct platform_device *pdev)
- 
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	pcie->base = devm_ioremap_resource(&pdev->dev, res);
--	if (IS_ERR(pcie->base)) {
--		dev_err(&pdev->dev, "Failed to map registers\n");
-+	if (IS_ERR(pcie->base))
- 		return PTR_ERR(pcie->base);
--	}
- 
- 	irq = platform_get_irq(pdev, 0);
- 	ret = devm_request_irq(&pdev->dev, irq, advk_pcie_irq_handler,
+Thanks,
+
+Joshua Clayton
