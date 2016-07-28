@@ -1,97 +1,96 @@
 From: yt.shen@mediatek.com (YT Shen)
-Date: Thu, 28 Jul 2016 17:27:54 +0800
-Subject: [PATCH v5 00/10] MT2701 DRM support
-Message-ID: <1469698084-20185-1-git-send-email-yt.shen@mediatek.com>
+Date: Thu, 28 Jul 2016 17:27:55 +0800
+Subject: [PATCH v5 01/10] drm/mediatek: rename macros, add chip prefix
+In-Reply-To: <1469698084-20185-1-git-send-email-yt.shen@mediatek.com>
+References: <1469698084-20185-1-git-send-email-yt.shen@mediatek.com>
+Message-ID: <1469698084-20185-2-git-send-email-yt.shen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is MT2701 DRM support PATCH v5, based on 4.7-rc1.
-We add DSI interrupt control, transfer function for MIPI DSI panel support.
-Most codes are the same, except some register changed.
+Add MT8173 prefix for hardware related macros.
 
-For example:
- - DISP_OVL address offset changed, color format definition changed.
- - DISP_RDMA fifo size changed.
- - DISP_COLOR offset changed.
- - MIPI_TX setting changed.
+Signed-off-by: YT Shen <yt.shen@mediatek.com>
+---
+ drivers/gpu/drm/mediatek/mtk_drm_ddp.c |   60 ++++++++++++++++----------------
+ 1 file changed, 30 insertions(+), 30 deletions(-)
 
-We add a new component DDP_COMPONENT_BLS, and the connections are updated.
-OVL -> RDMA -> COLOR -> BLS -> DSI
-RDMA -> DPI
-And we have shadow register support in MT2701.
-
-Changes since v4:
-- Add messages when timeout in mtk_disp_mutex_acquire()
-- Add descriptions for DISP_REG_MUTEX registers
-- Move connection settings for display modules to a separate patch
-- Remove 'mt2701-disp-wdma' because it is unused
-- Move cleaning up and renaming to a separate patch
-- Use wait_event_interruptible_timeout() to replace polling
-- Remove irq_num from mtk_dsi structure
-- Remove redundant and debug codes
-
-Changes since v3:
-- Add DSI support for MIPI DSI panels
-- Update BLS binding to PWM nodes
-- Remove ufoe device nodes
-- Remove redundant parentheses
-- Remove global variable initialization
-
-Changes since v2:
-- Rename mtk_ddp_mux_sel to mtk_ddp_sout_sel
-- Update mt2701_mtk_ddp_ext components
-- Changed to prefix naming
-- Reorder the patch series
-- Use of_device_get_match_data() to get driver private data
-- Use iopoll macros to implement mtk_disp_mutex_acquire()
-- Removed empty device tree nodes
-
-Changes since v1:
-- Removed BLS bindings and codes, which belong to pwm driver
-- Moved mtk_disp_mutex_acquire() just before mtk_crtc_ddp_config()
-- Split patch into smaller parts
-- Added const keyword to constant structure
-- Removed codes for special memory align
-
-The PATCH depends on the following patch:
-https://patchwork.kernel.org/patch/8832441/ ("dt-bindings: ARM: Mediatek: Document bindings for MT2701")
-https://patchwork.kernel.org/patch/9222997/ ("dt-bindings: pwm: Add MediaTek display PWM bindings")
-https://patchwork.kernel.org/patch/9164029/ ("dt-bindings: mediatek: add descriptions for mediatek mt2701 iommu and smi")
-https://patchwork.kernel.org/patch/9164017/ ("iommu/mediatek: move the common struct into header file")
-https://patchwork.kernel.org/patch/9164025/ ("memory/mediatek: add support for mt2701")
-https://patchwork.kernel.org/patch/9164041/ ("iommu/mediatek: add support for mtk iommu generation one HW")
-https://patchwork.kernel.org/patch/9164013/ ("ARM: dts: mt2701: add iommu/smi dtsi node for mt2701")
-
-Thanks,
-yt.shen
-
-YT Shen (8):
-  drm/mediatek: rename macros, add chip prefix
-  drm/mediatek: add *driver_data for different hardware settings
-  drm/mediatek: add shadow register support
-  drm/mediatek: update display module connections
-  drm/mediatek: cleaning up and refine
-  drm/mediatek: update DSI sub driver flow
-  drm/mediatek: add support for Mediatek SoC MT2701
-  arm: dts: mt2701: Add display subsystem related nodes for MT2701
-
-shaoming chen (2):
-  drm/mediatek: add dsi interrupt control
-  drm/mediatek: add dsi transfer function
-
- arch/arm/boot/dts/mt2701.dtsi               |  100 +++++
- drivers/gpu/drm/mediatek/mtk_disp_ovl.c     |   32 +-
- drivers/gpu/drm/mediatek/mtk_disp_rdma.c    |   17 +-
- drivers/gpu/drm/mediatek/mtk_drm_crtc.c     |   75 ++--
- drivers/gpu/drm/mediatek/mtk_drm_ddp.c      |  137 +++++--
- drivers/gpu/drm/mediatek/mtk_drm_ddp.h      |    2 +
- drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c |   34 +-
- drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h |   14 +
- drivers/gpu/drm/mediatek/mtk_drm_drv.c      |   55 ++-
- drivers/gpu/drm/mediatek/mtk_drm_drv.h      |    9 +
- drivers/gpu/drm/mediatek/mtk_dsi.c          |  548 ++++++++++++++++++++++++---
- drivers/gpu/drm/mediatek/mtk_mipi_tx.c      |   67 +++-
- 12 files changed, 930 insertions(+), 160 deletions(-)
-
+diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+index 17ba935..2fc4321 100644
+--- a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
++++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+@@ -36,21 +36,21 @@
+ #define DISP_REG_MUTEX_MOD(n)	(0x2c + 0x20 * (n))
+ #define DISP_REG_MUTEX_SOF(n)	(0x30 + 0x20 * (n))
+ 
+-#define MUTEX_MOD_DISP_OVL0		BIT(11)
+-#define MUTEX_MOD_DISP_OVL1		BIT(12)
+-#define MUTEX_MOD_DISP_RDMA0		BIT(13)
+-#define MUTEX_MOD_DISP_RDMA1		BIT(14)
+-#define MUTEX_MOD_DISP_RDMA2		BIT(15)
+-#define MUTEX_MOD_DISP_WDMA0		BIT(16)
+-#define MUTEX_MOD_DISP_WDMA1		BIT(17)
+-#define MUTEX_MOD_DISP_COLOR0		BIT(18)
+-#define MUTEX_MOD_DISP_COLOR1		BIT(19)
+-#define MUTEX_MOD_DISP_AAL		BIT(20)
+-#define MUTEX_MOD_DISP_GAMMA		BIT(21)
+-#define MUTEX_MOD_DISP_UFOE		BIT(22)
+-#define MUTEX_MOD_DISP_PWM0		BIT(23)
+-#define MUTEX_MOD_DISP_PWM1		BIT(24)
+-#define MUTEX_MOD_DISP_OD		BIT(25)
++#define MT8173_MUTEX_MOD_DISP_OVL0		BIT(11)
++#define MT8173_MUTEX_MOD_DISP_OVL1		BIT(12)
++#define MT8173_MUTEX_MOD_DISP_RDMA0		BIT(13)
++#define MT8173_MUTEX_MOD_DISP_RDMA1		BIT(14)
++#define MT8173_MUTEX_MOD_DISP_RDMA2		BIT(15)
++#define MT8173_MUTEX_MOD_DISP_WDMA0		BIT(16)
++#define MT8173_MUTEX_MOD_DISP_WDMA1		BIT(17)
++#define MT8173_MUTEX_MOD_DISP_COLOR0		BIT(18)
++#define MT8173_MUTEX_MOD_DISP_COLOR1		BIT(19)
++#define MT8173_MUTEX_MOD_DISP_AAL		BIT(20)
++#define MT8173_MUTEX_MOD_DISP_GAMMA		BIT(21)
++#define MT8173_MUTEX_MOD_DISP_UFOE		BIT(22)
++#define MT8173_MUTEX_MOD_DISP_PWM0		BIT(23)
++#define MT8173_MUTEX_MOD_DISP_PWM1		BIT(24)
++#define MT8173_MUTEX_MOD_DISP_OD		BIT(25)
+ 
+ #define MUTEX_SOF_SINGLE_MODE		0
+ #define MUTEX_SOF_DSI0			1
+@@ -80,21 +80,21 @@ struct mtk_ddp {
+ };
+ 
+ static const unsigned int mutex_mod[DDP_COMPONENT_ID_MAX] = {
+-	[DDP_COMPONENT_AAL] = MUTEX_MOD_DISP_AAL,
+-	[DDP_COMPONENT_COLOR0] = MUTEX_MOD_DISP_COLOR0,
+-	[DDP_COMPONENT_COLOR1] = MUTEX_MOD_DISP_COLOR1,
+-	[DDP_COMPONENT_GAMMA] = MUTEX_MOD_DISP_GAMMA,
+-	[DDP_COMPONENT_OD] = MUTEX_MOD_DISP_OD,
+-	[DDP_COMPONENT_OVL0] = MUTEX_MOD_DISP_OVL0,
+-	[DDP_COMPONENT_OVL1] = MUTEX_MOD_DISP_OVL1,
+-	[DDP_COMPONENT_PWM0] = MUTEX_MOD_DISP_PWM0,
+-	[DDP_COMPONENT_PWM1] = MUTEX_MOD_DISP_PWM1,
+-	[DDP_COMPONENT_RDMA0] = MUTEX_MOD_DISP_RDMA0,
+-	[DDP_COMPONENT_RDMA1] = MUTEX_MOD_DISP_RDMA1,
+-	[DDP_COMPONENT_RDMA2] = MUTEX_MOD_DISP_RDMA2,
+-	[DDP_COMPONENT_UFOE] = MUTEX_MOD_DISP_UFOE,
+-	[DDP_COMPONENT_WDMA0] = MUTEX_MOD_DISP_WDMA0,
+-	[DDP_COMPONENT_WDMA1] = MUTEX_MOD_DISP_WDMA1,
++	[DDP_COMPONENT_AAL] = MT8173_MUTEX_MOD_DISP_AAL,
++	[DDP_COMPONENT_COLOR0] = MT8173_MUTEX_MOD_DISP_COLOR0,
++	[DDP_COMPONENT_COLOR1] = MT8173_MUTEX_MOD_DISP_COLOR1,
++	[DDP_COMPONENT_GAMMA] = MT8173_MUTEX_MOD_DISP_GAMMA,
++	[DDP_COMPONENT_OD] = MT8173_MUTEX_MOD_DISP_OD,
++	[DDP_COMPONENT_OVL0] = MT8173_MUTEX_MOD_DISP_OVL0,
++	[DDP_COMPONENT_OVL1] = MT8173_MUTEX_MOD_DISP_OVL1,
++	[DDP_COMPONENT_PWM0] = MT8173_MUTEX_MOD_DISP_PWM0,
++	[DDP_COMPONENT_PWM1] = MT8173_MUTEX_MOD_DISP_PWM1,
++	[DDP_COMPONENT_RDMA0] = MT8173_MUTEX_MOD_DISP_RDMA0,
++	[DDP_COMPONENT_RDMA1] = MT8173_MUTEX_MOD_DISP_RDMA1,
++	[DDP_COMPONENT_RDMA2] = MT8173_MUTEX_MOD_DISP_RDMA2,
++	[DDP_COMPONENT_UFOE] = MT8173_MUTEX_MOD_DISP_UFOE,
++	[DDP_COMPONENT_WDMA0] = MT8173_MUTEX_MOD_DISP_WDMA0,
++	[DDP_COMPONENT_WDMA1] = MT8173_MUTEX_MOD_DISP_WDMA1,
+ };
+ 
+ static unsigned int mtk_ddp_mout_en(enum mtk_ddp_comp_id cur,
 -- 
 1.7.9.5
