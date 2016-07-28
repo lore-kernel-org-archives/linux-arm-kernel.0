@@ -1,79 +1,83 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 28 Jul 2016 13:32:56 -0500
-Subject: [PATCH v6] input: touchscreen: Add generic driver for Silead
- touchscreens
-In-Reply-To: <20160727213555.GC24351@dtor-ws>
-References: <1468252304-22850-1-git-send-email-hdegoede@redhat.com>
- <20160716175605.GA4873@rob-hp-laptop> <20160719184425.GC19250@dtor-ws>
- <20160727213555.GC24351@dtor-ws>
-Message-ID: <CAL_Jsq+46tz+onVR=Az8Xwcb7NOLX2EkRJGxqvUsp2nFm+P-Hg@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 28 Jul 2016 20:49:16 +0200
+Subject: [PATCH v2 3/5] ARM: sun8i: dt: Add DT bindings documentation for
+ Allwinner sun8i-emac
+In-Reply-To: <20160728134031.GC7582@Red>
+References: <1469001800-11615-1-git-send-email-clabbe.montjoie@gmail.com>
+ <1469001800-11615-4-git-send-email-clabbe.montjoie@gmail.com>
+ <20160721075519.GC5993@lukather> <20160728134031.GC7582@Red>
+Message-ID: <20160728184916.GF6682@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 27, 2016 at 4:35 PM, Dmitry Torokhov
-<dmitry.torokhov@gmail.com> wrote:
-> On Tue, Jul 19, 2016 at 11:44:25AM -0700, Dmitry Torokhov wrote:
->> On Sat, Jul 16, 2016 at 12:56:05PM -0500, Rob Herring wrote:
->> > On Mon, Jul 11, 2016 at 05:51:44PM +0200, Hans de Goede wrote:
->> > > From: Robert Dolca <robert.dolca@intel.com>
->> > >
->> > > This driver adds support for Silead touchscreens. It has been tested
->> > > with GSL1680 and GSL3680 touch panels.
->> > >
->> > > It supports ACPI and device tree enumeration. Screen resolution,
->> > > the maximum number of fingers supported and firmware name are
->> > > configurable.
->> > >
->> > > Signed-off-by: Robert Dolca <robert.dolca@intel.com>
->> > > Signed-off-by: Daniel Jansen <djaniboe@gmail.com>
->> > > Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->> > > ---
->> > > Changes in v6:
->> > > -Default to 5 fingers if max-fingers is not specified
->> > > -Improve devicetree binding doc: improve wake-gpios description, use
->> > >  "See touchscreen.txt" where applicable
->> > > ---
->> > >  .../bindings/input/touchscreen/silead_gsl1680.txt  |  36 ++
->> > >  drivers/input/touchscreen/Kconfig                  |  13 +
->> > >  drivers/input/touchscreen/Makefile                 |   1 +
->> > >  drivers/input/touchscreen/silead.c                 | 652 +++++++++++++++++++++
->> > >  4 files changed, 702 insertions(+)
->> > >  create mode 100644 Documentation/devicetree/bindings/input/touchscreen/silead_gsl1680.txt
->> > >  create mode 100644 drivers/input/touchscreen/silead.c
->> > >
->> > > diff --git a/Documentation/devicetree/bindings/input/touchscreen/silead_gsl1680.txt b/Documentation/devicetree/bindings/input/touchscreen/silead_gsl1680.txt
->> > > new file mode 100644
->> > > index 0000000..1e58d37
->> > > --- /dev/null
->> > > +++ b/Documentation/devicetree/bindings/input/touchscreen/silead_gsl1680.txt
->> > > @@ -0,0 +1,36 @@
->> > > +* GSL 1680 touchscreen controller
->> > > +
->> > > +Required properties:
->> > > +- compatible               : "silead,gsl1680"
->> > > +- reg                      : I2C slave address of the chip (0x40)
->> > > +- interrupt-parent         : a phandle pointing to the interrupt controller
->> > > +                     serving the interrupt for this chip
->> > > +- interrupts               : interrupt specification for the gsl1680 interrupt
->> > > +- power-gpios              : Specification for the pin connected to the gsl1680's
->> > > +                     shutdown input. This needs to be driven high to take the
->> > > +                     gsl1680 out of its low power state
->> > > +- touchscreen-size-x       : See touchscreen.txt
->> > > +- touchscreen-size-y       : See touchscreen.txt
->> > > +- touchscreen-max-fingers : maximum number of fingers the touchscreen can detect
->> >
->> > If you name it like a standard property, then it should be documented in
->> > touchscreen.txt.
->>
->> Actually this is very much Silead-specific wart, I'd rather we called it
->> "max-fingers" or "silead,max-fingers" to illustrate that it is not at
->> all a generic property.
->>
->> Rob, will you be OK with it?
->
-> Rob, ping? I'd like to get it into the tree and this is only outstanding
-> question.
+On Thu, Jul 28, 2016 at 03:40:31PM +0200, LABBE Corentin wrote:
+> On Thu, Jul 21, 2016 at 09:55:19AM +0200, Maxime Ripard wrote:
+> > Hi,
+> > 
+> > On Wed, Jul 20, 2016 at 10:03:18AM +0200, LABBE Corentin wrote:
+> > > This patch adds documentation for Device-Tree bindings for the
+> > > Allwinner sun8i-emac driver.
+> > > 
+> > > Signed-off-by: LABBE Corentin <clabbe.montjoie@gmail.com>
+> > > ---
+> > >  .../bindings/net/allwinner,sun8i-emac.txt          | 65 ++++++++++++++++++++++
+> > >  1 file changed, 65 insertions(+)
+> > >  create mode 100644 Documentation/devicetree/bindings/net/allwinner,sun8i-emac.txt
+> > > 
+> > > diff --git a/Documentation/devicetree/bindings/net/allwinner,sun8i-emac.txt b/Documentation/devicetree/bindings/net/allwinner,sun8i-emac.txt
+> > > new file mode 100644
+> > > index 0000000..4bf4e53
+> > > --- /dev/null
+> > > +++ b/Documentation/devicetree/bindings/net/allwinner,sun8i-emac.txt
+> > > @@ -0,0 +1,65 @@
+> > > +* Allwinner sun8i EMAC ethernet controller
+> > > +
+> > > +Required properties:
+> > > +- compatible: "allwinner,sun8i-a83t-emac", "allwinner,sun8i-h3-emac",
+> > > +		or "allwinner,sun50i-a64-emac"
+> > > +- reg: address and length of the register sets for the device.
+> > > +- reg-names: should be "emac" and "syscon", matching the register sets
+> > 
+> > Blindly mapping a register of some other device on the SoC doesn't
+> > look very reasonable.
+> 
+> As we discuss after this mail on IRC, this register is dedicated to EMAC.
 
-Okay. With vendor prefix please.
+I don't think we did. It's still right in the middle of some other
+hardware block register space. You actually have a syscon driver to do
+just that, why not use it?
 
-Rob
+> > > +See ethernet.txt in the same directory for generic bindings for ethernet
+> > > +controllers.
+> > > +
+> > > +The device node referenced by "phy" or "phy-handle" should be a child node
+> > > +of this node. See phy.txt for the generic PHY bindings.
+> > > +
+> > > +Optional properties:
+> > > +- phy-supply: phandle to a regulator if the PHY needs one
+> > > +- phy-io-supply: phandle to a regulator if the PHY needs a another one for I/O.
+> > > +		 This is sometimes found with RGMII PHYs, which use a second
+> > > +		 regulator for the lower I/O voltage.
+> > > +- allwinner,tx-delay: The setting of the TX clock delay chain
+> > > +- allwinner,rx-delay: The setting of the RX clock delay chain
+> > 
+> > In which unit? What is the default value?
+> 
+> The unit is unknown to me, but I have added a comment for the
+> default and acceptable range value.
+
+That's unfortunate. We'll see how the DT maintainers feel about that.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160728/2ad95a30/attachment-0001.sig>
