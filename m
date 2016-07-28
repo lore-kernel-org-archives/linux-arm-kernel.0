@@ -1,60 +1,60 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 28 Jul 2016 19:53:30 +0200
-Subject: [PATCH v4] ARM: dts: sun8i: Add dts file for Olimex A33-OLinuXino
-In-Reply-To: <1604486.mrBvLz4HRZ@linux-cigu>
-References: <1469450243-19138-1-git-send-email-stefan.mavrodiev@gmail.com>
- <30014119.IrjfP0xFry@linux-cigu> <20160727062146.GA6560@lukather>
- <1604486.mrBvLz4HRZ@linux-cigu>
-Message-ID: <20160728175330.GC6682@lukather>
+From: geoff@infradead.org (Geoff Levand)
+Date: Thu, 28 Jul 2016 11:04:43 -0700
+Subject: [PATCH v2 4/4] arm64: Add support for binary image files
+In-Reply-To: <20160728040125.GA27150@localhost.localdomain>
+References: <cover.1469559530.git.geoff@infradead.org>
+ <f352dcfc827a4cbb3878dd1043877a4154b1bd08.1469559530.git.geoff@infradead.org>
+ <20160728040125.GA27150@localhost.localdomain>
+Message-ID: <1469729083.16559.26.camel@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 27, 2016 at 01:02:41PM +0300, stefan.mavrodiev at gmail.com wrote:
-> On Wednesday, July 27, 2016 8:21:46 AM EEST Maxime Ripard wrote:
-> > On Wed, Jul 27, 2016 at 08:12:29AM +0300, stefan.mavrodiev at gmail.com wrote:
-> > > > > +&reg_dcdc1 {
-> > > > > +	regulator-always-on;
-> > > > > +	regulator-min-microvolt = <3300000>;
-> > > > > +	regulator-max-microvolt = <3300000>;
-> > > > > +	regulator-name = "vcc-dsi";
-> > > > > +};
-> > > > 
-> > > > What is it used for? Is it really necessary to keep it on at all time?
-> > > 
-> > > I think so.
-> > > This is the supply for the MMC.
-> > 
-> > Then it's poorly named, and you should tie it to the MMC, and remove
-> > the always-on if it's only used by the mmc. always-on is supposed to
-> > be for regulators that shouldn't but turned off for the system to stay
-> > running. Some MMC regulator doesn't fit that description.
->
-> It's named upon the A33 power pin - "VCC-DSI".
+Hi Pratyush,
 
-Usually, it's based on the name of the output in the schematics,
-precisely because, from one board to another, it might have different
-usage.
+On Thu, 2016-07-28 at 09:31 +0530, Pratyush Anand wrote:
+> On 26/07/2016:08:18:57 PM, Geoff Levand wrote:
 
-> If I remove "always-on" the board still will work, since dcdc1 is tied to 
-> mmc0. 
-> vmmc-supply = <&reg_dcdc1>;
+> You removed page_offset calculation in rework.
+> I am unable to understand that how arm64_mem.page_offset will be filled up now
+> for binary image case.
 > 
-> We assume this voltage will be always present and there are some pullups that 
-> are tied to it (on i2c0 and i2c1 bus).  In this case should I remove "always-
-> on" from the regulator node?
+> I think, we still need to keep page_offset user input. 
 
-No, you should just tie that regulator to the i2c buses as well.
+The current kernel linker scripts are setup to output virtual
+address values to the vmlinux elf file.  
 
-Maxime
+To load the elf sections of vmlinux using the provided elf
+file loader, elf_exec_load(), we need to convert those elf
+header values to physical addresses since we work with
+physical addresses in the kernel's kimage structure.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160728/9626bdc1/attachment.sig>
+That conversion is 
+
+  p = v - page_offset + phys_offset;
+
+We get phys_offset from the memory ranges, and we calculate
+page_offset from the elf header info.
+
+As for the binary image file, we load that with
+add_segment_phys_virt(), which can put the binary data of the
+Image file into memory at a physical address we specify:
+
+  image_base = phys_offset + text_offset.
+
+phys_offset is again from the memory ranges, and text_offset
+from the arm64 image header.
+
+
+> You may take following
+> two patches which does this, or you may leave binary image support patch which I
+> will send after your patches are merged.
+> 
+> https://github.com/pratyushanand/kexec-tools/commit/5b7e49a75d1d6cd4ac846f50ff10275fd54cb545
+
+This one may be useful, for debugging if anything.
+
+> https://github.com/pratyushanand/kexec-tools/commit/a0ce0ce673755c4061c1f081170a3a75dfa1d1fb
+
+We do not need, nor want, a PAGE_OFFSET option.
+
+-Geoff
