@@ -1,67 +1,87 @@
-From: jolsa@redhat.com (Jiri Olsa)
-Date: Thu, 28 Jul 2016 18:52:41 +0200
-Subject: [PATCH V2 3/6] perf tools: add infrastructure for PMU specific
- configuration
-In-Reply-To: <CANLsYkxzSBHXGwe2y-593D4yDyLy9+vdcTHmP_rqF30x0qTiug@mail.gmail.com>
-References: <1469047100-18131-1-git-send-email-mathieu.poirier@linaro.org>
- <1469047100-18131-4-git-send-email-mathieu.poirier@linaro.org>
- <20160721074722.GB7192@krava>
- <CANLsYkxj+kccmvTtOLAYwyN9fOp0pMxdPcWy5cJHQDQLoj-NmQ@mail.gmail.com>
- <20160721145434.GA15915@krava>
- <CANLsYkwx+iOE6uwOVPtsHFMmNaH0=NjeDP8z0GZhHja2oibt8g@mail.gmail.com>
- <20160726204139.GA13377@krava>
- <CANLsYkzr0iFFEUoeR8-58E02DyqdGndfNBL8v0tS2tQqBszN_A@mail.gmail.com>
- <20160727192639.GC23264@krava>
- <CANLsYkxzSBHXGwe2y-593D4yDyLy9+vdcTHmP_rqF30x0qTiug@mail.gmail.com>
-Message-ID: <20160728165241.GA9720@krava>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Thu, 28 Jul 2016 09:55:39 -0700
+Subject: [Patch v2 1/5] ARM: dts: qcom: Add initial DTS for LG Nexus 5
+ Phone
+In-Reply-To: <20160719050414.31704-2-bshah@kde.org>
+References: <20160719050414.31704-1-bshah@kde.org>
+ <20160719050414.31704-2-bshah@kde.org>
+Message-ID: <20160728165539.GO13516@tuxbot>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 28, 2016 at 10:15:52AM -0600, Mathieu Poirier wrote:
-> On 27 July 2016 at 13:26, Jiri Olsa <jolsa@redhat.com> wrote:
-> > On Wed, Jul 27, 2016 at 11:59:50AM -0600, Mathieu Poirier wrote:
-> >
-> > SNIP
-> >
-> >> > -PE_DRV_CFG_TERM
-> >> > +'@' PE_NAME '=' PE_NAME
-> >> >  {
-> >> >         struct parse_events_term *term;
-> >> >
-> >> >         ABORT_ON(parse_events_term__str(&term, PARSE_EVENTS__TERM_TYPE_DRV_CFG,
-> >> > -                                       $1, $1, &@1, NULL));
-> >> > +                                       $2, $4, &@2, &@4));
-> >> >         $$ = term;
-> >> >  }
-> >> >
-> >>
-> >> The problem here is that the correlation between the first and the
-> >> second PE_NAME is lost and instead of seeing "PE_NAME=PE_NAME", the
-> >> kernel only gets the value associated with the second PE_NAME.
-> >>
-> >> For example,
-> >>
-> >> -e event/@cfg1=value1, at cfg2=value2/ ...
-> >>
-> >> The above code will send "value1" and "value2" to the kernel driver
-> >> where there is no way to know what configurable the values correspond
-> >
-> > hum.. you get the 'cfg1' and 'cfg2' strings in $1 no?
+On Mon 18 Jul 22:04 PDT 2016, Bhushan Shah wrote:
+
+> This DTS file have support LG Nexus 5 (codenamed hammerhead).
+> Initial version have support for just serial console over headphone
+> jack.
 > 
-> Indeed you do.
+> Cc: Andy Gross <andy.gross@linaro.org>
+> Cc: Bjorn Andersson <bjorn.andersson@linaro.org>
+> Cc: David Brown <david.brown@linaro.org>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Russell King <linux@armlinux.org.uk>
+> Cc: devicetree at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-arm-msm at vger.kernel.org
+> Signed-off-by: Bhushan Shah <bshah@kde.org>
+
+Reviewed-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+
+Regards,
+Bjorn
+
+> ---
+> Changes in v2
+>     - Removed qcom,msm-id
+>     - Added "lge,hammerhead" in the compatible
 > 
-> Macro ADD_CONFIG_TERM in function get_config_terms() only account for
-> the __val parameter and struct parse_events_term::config is completely
-> ignored.  We could concatenate the fields before calling
-> ADD_CONFIG_TERM() but between that and freeing the reserved memory, I
-> think it is cleaner to let flex do the work.
-
-ah you need that whole string in one piece.. ok
-let's do it by your original way then
-
-please add some comments for in drv_str function describing
-the usage of @ and the fact we're doing this because we need
-whole assignment as single string
-
-thanks,
-jirka
+>  arch/arm/boot/dts/Makefile                         |  1 +
+>  .../dts/qcom-msm8974-lge-nexus5-hammerhead.dts     | 23 ++++++++++++++++++++++
+>  2 files changed, 24 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/qcom-msm8974-lge-nexus5-hammerhead.dts
+> 
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 414b427..13947ec 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -584,6 +584,7 @@ dtb-$(CONFIG_ARCH_QCOM) += \
+>  	qcom-ipq8064-ap148.dtb \
+>  	qcom-msm8660-surf.dtb \
+>  	qcom-msm8960-cdp.dtb \
+> +	qcom-msm8974-lge-nexus5-hammerhead.dtb \
+>  	qcom-msm8974-sony-xperia-honami.dtb
+>  dtb-$(CONFIG_ARCH_REALVIEW) += \
+>  	arm-realview-pb1176.dtb \
+> diff --git a/arch/arm/boot/dts/qcom-msm8974-lge-nexus5-hammerhead.dts b/arch/arm/boot/dts/qcom-msm8974-lge-nexus5-hammerhead.dts
+> new file mode 100644
+> index 0000000..68f3a8a
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/qcom-msm8974-lge-nexus5-hammerhead.dts
+> @@ -0,0 +1,23 @@
+> +#include "qcom-msm8974.dtsi"
+> +#include "qcom-pm8841.dtsi"
+> +#include "qcom-pm8941.dtsi"
+> +
+> +/ {
+> +	model = "LGE MSM 8974 HAMMERHEAD";
+> +	compatible = "lge,hammerhead", "qcom,msm8974";
+> +
+> +	aliases {
+> +		serial0 = &blsp1_uart1;
+> +	};
+> +
+> +	chosen {
+> +		stdout-path = "serial0:115200n8";
+> +	};
+> +};
+> +
+> +&soc {
+> +	serial at f991d000 {
+> +		status = "ok";
+> +	};
+> +
+> +};
+> -- 
+> 2.9.0
+> 
