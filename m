@@ -1,63 +1,90 @@
-From: julian.calaby@gmail.com (Julian Calaby)
-Date: Thu, 28 Jul 2016 20:24:41 +1000
-Subject: [linux-sunxi] [PATCH] regulator: axp20x: support AXP813 variant
-In-Reply-To: <5799d673.58a51c0a.97cf9.b9c0SMTPIN_ADDED_MISSING@gmr-mx.google.com>
-References: <5799d673.58a51c0a.97cf9.b9c0SMTPIN_ADDED_MISSING@gmr-mx.google.com>
-Message-ID: <CAGRGNgUeORYesjLAeaO=GGhC1rv9FUU5ZUdjRx8+Pz=vCggsEw@mail.gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 28 Jul 2016 12:25:13 +0200
+Subject: [PATCH 11/18] ARM: mvebu: a39x: add missing nodes describing
+ GPIO's
+In-Reply-To: <1469105055-25181-13-git-send-email-jaz@semihalf.com> (Grzegorz
+ Jaszczyk's message of "Thu, 21 Jul 2016 14:44:08 +0200")
+References: <1469105055-25181-1-git-send-email-jaz@semihalf.com>
+ <1469105055-25181-13-git-send-email-jaz@semihalf.com>
+Message-ID: <87bn1ikqk6.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All,
+Hi Grzegorz,
+ 
+ On jeu., juil. 21 2016, Grzegorz Jaszczyk <jaz@semihalf.com> wrote:
 
-On Thu, Jul 28, 2016 at 5:28 PM, Jean-Francois Moine <moinejf@free.fr> wrote:
-> The X-Powers AXP813 PMIC is close enough to the AXP809 with some
-> more outputs.
+> The whole Armada 39x SoC family of processors has GPIO's which all can be
+> supported with existing driver.
 >
-> Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
-> ---
->  Documentation/devicetree/bindings/mfd/axp20x.txt | 32 ++++++++-
->  drivers/mfd/axp20x-rsb.c                         |  1 +
->  drivers/mfd/axp20x.c                             |  3 +
->  drivers/regulator/axp20x-regulator.c             | 82 +++++++++++++++++++++++-
->  include/linux/mfd/axp20x.h                       | 38 +++++++++++
->  5 files changed, 153 insertions(+), 3 deletions(-)
->
-> diff --git a/drivers/regulator/axp20x-regulator.c b/drivers/regulator/axp20x-regulator.c
-> index 6d9ac76..c3287c9 100644
-> --- a/drivers/regulator/axp20x-regulator.c
-> +++ b/drivers/regulator/axp20x-regulator.c
-> @@ -467,7 +543,8 @@ static int axp20x_regulator_probe(struct platform_device *pdev)
->                  * name.
->                  */
->                 if ((regulators == axp22x_regulators && i == AXP22X_DC1SW) ||
-> -                   (regulators == axp809_regulators && i == AXP809_DC1SW)) {
-> +                   (regulators == axp809_regulators && i == AXP809_DC1SW) ||
-> +                   (regulators == axp813_regulators && i == AXP813_DC1SW)) {
 
-Are we getting to the point now where we need some other way to flag
-these? Maybe a set of flags per regulator?
+Change the prefix to "ARM: dts: mvebu: armada-39x:"
 
->                         new_desc = devm_kzalloc(&pdev->dev, sizeof(*desc),
->                                                 GFP_KERNEL);
->                         *new_desc = regulators[i];
-> @@ -505,7 +582,8 @@ static int axp20x_regulator_probe(struct platform_device *pdev)
->                  * Save AXP22X DCDC1 / DCDC5 regulator names for later.
->                  */
->                 if ((regulators == axp22x_regulators && i == AXP22X_DCDC1) ||
-> -                   (regulators == axp809_regulators && i == AXP809_DCDC1))
-> +                   (regulators == axp809_regulators && i == AXP809_DCDC1) ||
-> +                   (regulators == axp813_regulators && i == AXP813_DCDC1))
-
-Ditto.
-
->                         of_property_read_string(rdev->dev.of_node,
->                                                 "regulator-name",
->                                                 &dcdc1_name);
+Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
 Thanks,
 
--- 
-Julian Calaby
+Gregory
 
-Email: julian.calaby at gmail.com
-Profile: http://www.google.com/profiles/julian.calaby/
+> Signed-off-by: Grzegorz Jaszczyk <jaz@semihalf.com>
+> ---
+>  arch/arm/boot/dts/armada-39x.dtsi | 30 ++++++++++++++++++++++++++++++
+>  1 file changed, 30 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/armada-39x.dtsi b/arch/arm/boot/dts/armada-39x.dtsi
+> index 5e01438..0749878 100644
+> --- a/arch/arm/boot/dts/armada-39x.dtsi
+> +++ b/arch/arm/boot/dts/armada-39x.dtsi
+> @@ -55,6 +55,8 @@
+>  	compatible = "marvell,armada390";
+>  
+>  	aliases {
+> +		gpio0 = &gpio0;
+> +		gpio1 = &gpio1;
+>  		serial0 = &uart0;
+>  		serial1 = &uart1;
+>  		serial2 = &uart2;
+> @@ -274,6 +276,34 @@
+>  				};
+>  			};
+>  
+> +			gpio0: gpio at 18100 {
+> +				compatible = "marvell,orion-gpio";
+> +				reg = <0x18100 0x40>;
+> +				ngpios = <32>;
+> +				gpio-controller;
+> +				#gpio-cells = <2>;
+> +				interrupt-controller;
+> +				#interrupt-cells = <2>;
+> +				interrupts = <GIC_SPI 53 IRQ_TYPE_LEVEL_HIGH>,
+> +					     <GIC_SPI 54 IRQ_TYPE_LEVEL_HIGH>,
+> +					     <GIC_SPI 55 IRQ_TYPE_LEVEL_HIGH>,
+> +					     <GIC_SPI 56 IRQ_TYPE_LEVEL_HIGH>;
+> +			};
+> +
+> +			gpio1: gpio at 18140 {
+> +				compatible = "marvell,orion-gpio";
+> +				reg = <0x18140 0x40>;
+> +				ngpios = <28>;
+> +				gpio-controller;
+> +				#gpio-cells = <2>;
+> +				interrupt-controller;
+> +				#interrupt-cells = <2>;
+> +				interrupts = <GIC_SPI 58 IRQ_TYPE_LEVEL_HIGH>,
+> +					     <GIC_SPI 59 IRQ_TYPE_LEVEL_HIGH>,
+> +					     <GIC_SPI 60 IRQ_TYPE_LEVEL_HIGH>,
+> +					     <GIC_SPI 61 IRQ_TYPE_LEVEL_HIGH>;
+> +			};
+> +
+>  			system-controller at 18200 {
+>  				compatible = "marvell,armada-390-system-controller",
+>  					     "marvell,armada-370-xp-system-controller";
+> -- 
+> 1.8.3.1
+>
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
