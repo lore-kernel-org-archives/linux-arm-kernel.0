@@ -1,139 +1,183 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Thu, 28 Jul 2016 15:42:22 -0600
-Subject: [PATCH V3 5/6] coresight: adding sink parameter to function
- coresight_build_path()
+Date: Thu, 28 Jul 2016 15:42:23 -0600
+Subject: [PATCH V3 6/6] coresight: etm-perf: incorporating sink definition
+ from cmd line
 In-Reply-To: <1469742143-22245-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1469742143-22245-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1469742143-22245-6-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1469742143-22245-7-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Up to now function coresight_build_path() was counting on a sink to
-have been selected (from sysFS) prior to being called.  This patch
-adds a string argument so that a sink matching the argument can be
-selected.
+Now that PMU specific configuration is available as part of the event,
+lookup the sink identified by users from the perf command line and build
+a path from source to sink.
+
+With this functionality it is no longer required to select a sink in a
+separate step (from sysFS) before a perf trace session can be started.
 
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- drivers/hwtracing/coresight/coresight-etm-perf.c |  2 +-
- drivers/hwtracing/coresight/coresight-priv.h     |  3 +-
- drivers/hwtracing/coresight/coresight.c          | 43 ++++++++++++++++--------
- 3 files changed, 32 insertions(+), 16 deletions(-)
+ drivers/hwtracing/coresight/coresight-etm-perf.c | 101 ++++++++++++++++++++++-
+ 1 file changed, 100 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/hwtracing/coresight/coresight-etm-perf.c b/drivers/hwtracing/coresight/coresight-etm-perf.c
-index f4174f36c5a0..f8c7a8733b23 100644
+index f8c7a8733b23..5658a7411a66 100644
 --- a/drivers/hwtracing/coresight/coresight-etm-perf.c
 +++ b/drivers/hwtracing/coresight/coresight-etm-perf.c
-@@ -184,7 +184,7 @@ static void *etm_setup_aux(struct perf_event *event, void **pages,
- 		 * list of devices from source to sink that can be
- 		 * referenced later when the path is actually needed.
- 		 */
--		event_data->path[cpu] = coresight_build_path(csdev);
-+		event_data->path[cpu] = coresight_build_path(csdev, NULL);
- 		if (!event_data->path[cpu])
- 			goto err;
- 	}
-diff --git a/drivers/hwtracing/coresight/coresight-priv.h b/drivers/hwtracing/coresight/coresight-priv.h
-index ad975c58080d..3cb574b3cdd9 100644
---- a/drivers/hwtracing/coresight/coresight-priv.h
-+++ b/drivers/hwtracing/coresight/coresight-priv.h
-@@ -94,7 +94,8 @@ static inline void CS_UNLOCK(void __iomem *addr)
- void coresight_disable_path(struct list_head *path);
- int coresight_enable_path(struct list_head *path, u32 mode);
- struct coresight_device *coresight_get_sink(struct list_head *path);
--struct list_head *coresight_build_path(struct coresight_device *csdev);
-+struct list_head *coresight_build_path(struct coresight_device *csdev,
-+				       const char *sink);
- void coresight_release_path(struct list_head *path);
+@@ -22,6 +22,7 @@
+ #include <linux/list.h>
+ #include <linux/mm.h>
+ #include <linux/init.h>
++#include <linux/parser.h>
+ #include <linux/perf_event.h>
+ #include <linux/slab.h>
+ #include <linux/types.h>
+@@ -71,11 +72,20 @@ static const struct attribute_group *etm_pmu_attr_groups[] = {
  
- #ifdef CONFIG_CORESIGHT_SOURCE_ETM3X
-diff --git a/drivers/hwtracing/coresight/coresight.c b/drivers/hwtracing/coresight/coresight.c
-index d08d1ab9bba5..2b7196aa54c3 100644
---- a/drivers/hwtracing/coresight/coresight.c
-+++ b/drivers/hwtracing/coresight/coresight.c
-@@ -372,30 +372,44 @@ struct coresight_device *coresight_get_sink(struct list_head *path)
-  * _coresight_build_path - recursively build a path from a @csdev to a sink.
-  * @csdev:	The device to start from.
-  * @path:	The list to add devices to.
-+ * @sink:	The name of the sink this path should connect with.
-  *
-- * The tree of Coresight device is traversed until an activated sink is
-- * found.  From there the sink is added to the list along with all the
-- * devices that led to that point - the end result is a list from source
-- * to sink. In that list the source is the first device and the sink the
-- * last one.
-+ * The tree of Coresight device is traversed until an activated sink or
-+ * the one specified by @sink is found.
-+ * From there the sink is added to the list along with all the devices that
-+ * led to that point - the end result is a list from source to sink. In that
-+ * list the source is the first device and the sink the last one.
-  */
- static int _coresight_build_path(struct coresight_device *csdev,
--				 struct list_head *path)
-+				 struct list_head *path, const char *sink)
+ static void etm_event_read(struct perf_event *event) {}
+ 
++static void etm_event_destroy(struct perf_event *event)
++{
++	kfree(event->hw.drv_configs);
++	event->hw.drv_configs = NULL;
++}
++
+ static int etm_event_init(struct perf_event *event)
  {
- 	int i;
- 	bool found = false;
- 	struct coresight_node *node;
+ 	if (event->attr.type != etm_pmu.type)
+ 		return -ENOENT;
  
--	/* An activated sink has been found.  Enqueue the element */
--	if ((csdev->type == CORESIGHT_DEV_TYPE_SINK ||
--	     csdev->type == CORESIGHT_DEV_TYPE_LINKSINK) && csdev->activated)
--		goto out;
-+	/*
-+	 * First see if we are dealing with a sink.  If we have one check if
-+	 * it was selected via sysFS or the perf cmd line.
-+	 */
-+	if (csdev->type == CORESIGHT_DEV_TYPE_SINK ||
-+	    csdev->type == CORESIGHT_DEV_TYPE_LINKSINK) {
-+		/* Discourage meddling in sysFS if using the perf interface */
-+		if (sink && csdev->activated)
-+			return -EINVAL;
-+		/* Activated via perf cmd line */
-+		if (sink && !strcmp(dev_name(&csdev->dev), sink))
-+			goto out;
-+		/* Activated via sysFS */
-+		if (csdev->activated)
-+			goto out;
-+	}
- 
- 	/* Not a sink - recursively explore each port found on this element */
- 	for (i = 0; i < csdev->nr_outport; i++) {
- 		struct coresight_device *child_dev = csdev->conns[i].child_dev;
- 
--		if (child_dev && _coresight_build_path(child_dev, path) == 0) {
-+		if (child_dev &&
-+		    _coresight_build_path(child_dev, path, sink) == 0) {
- 			found = true;
- 			break;
- 		}
-@@ -422,7 +436,8 @@ out:
++	event->destroy = etm_event_destroy;
++	event->hw.drv_configs = NULL;
++
  	return 0;
  }
  
--struct list_head *coresight_build_path(struct coresight_device *csdev)
-+struct list_head *coresight_build_path(struct coresight_device *csdev,
-+				       const char *sink)
+@@ -159,6 +169,7 @@ static void *etm_setup_aux(struct perf_event *event, void **pages,
+ 			   int nr_pages, bool overwrite)
  {
- 	struct list_head *path;
- 	int rc;
-@@ -433,7 +448,7 @@ struct list_head *coresight_build_path(struct coresight_device *csdev)
+ 	int cpu;
++	char *cmdl_sink;
+ 	cpumask_t *mask;
+ 	struct coresight_device *sink;
+ 	struct etm_event_data *event_data = NULL;
+@@ -171,6 +182,12 @@ static void *etm_setup_aux(struct perf_event *event, void **pages,
  
- 	INIT_LIST_HEAD(path);
+ 	mask = &event_data->mask;
  
--	rc = _coresight_build_path(csdev, path);
-+	rc = _coresight_build_path(csdev, path, sink);
- 	if (rc) {
- 		kfree(path);
- 		return ERR_PTR(rc);
-@@ -508,7 +523,7 @@ int coresight_enable(struct coresight_device *csdev)
- 	if (csdev->enable)
- 		goto out;
++	/*
++	 * If a sink was specified from the perf cmdline it will be part of
++	 * the event's drv_configs.
++	 */
++	cmdl_sink = (char *)event->hw.drv_configs;
++
+ 	/* Setup the path for each CPU in a trace session */
+ 	for_each_cpu(cpu, mask) {
+ 		struct coresight_device *csdev;
+@@ -184,7 +201,7 @@ static void *etm_setup_aux(struct perf_event *event, void **pages,
+ 		 * list of devices from source to sink that can be
+ 		 * referenced later when the path is actually needed.
+ 		 */
+-		event_data->path[cpu] = coresight_build_path(csdev, NULL);
++		event_data->path[cpu] = coresight_build_path(csdev, cmdl_sink);
+ 		if (!event_data->path[cpu])
+ 			goto err;
+ 	}
+@@ -342,6 +359,87 @@ static void etm_event_del(struct perf_event *event, int mode)
+ 	etm_event_stop(event, PERF_EF_UPDATE);
+ }
  
--	path = coresight_build_path(csdev);
-+	path = coresight_build_path(csdev, NULL);
- 	if (IS_ERR(path)) {
- 		pr_err("building path(s) failed\n");
- 		ret = PTR_ERR(path);
++enum {
++	ETM_TOKEN_SINK_CPU,
++	ETM_TOKEN_SINK,
++	ETM_TOKEN_ERR,
++};
++
++static const match_table_t drv_cfg_tokens = {
++	{ETM_TOKEN_SINK_CPU, "sink=cpu%d:%s"},
++	{ETM_TOKEN_SINK, "sink=%s"},
++	{ETM_TOKEN_ERR, NULL},
++};
++
++static int etm_set_drv_configs(struct perf_event *event, void __user *arg)
++{
++	char *config, *sink = NULL;
++	int cpu = -1, token, ret = 0;
++	substring_t args[MAX_OPT_ARGS];
++
++	/* Only one sink per event */
++	if (event->hw.drv_configs != NULL) {
++		ret = -EINVAL;
++		goto err;
++	}
++
++	/* Make user supplied input usable */
++	config = strndup_user(arg, PAGE_SIZE);
++	if (IS_ERR(config)) {
++		ret = PTR_ERR(config);
++		goto err;
++	}
++
++	/* See above declared @drv_cfg_tokens for the usable formats */
++	token = match_token(config, drv_cfg_tokens, args);
++	switch (token) {
++	case ETM_TOKEN_SINK:
++		/* Just a sink has been specified */
++		sink = match_strdup(&args[0]);
++		if (IS_ERR(sink)) {
++			ret = PTR_ERR(sink);
++			goto err;
++		}
++		break;
++	case ETM_TOKEN_SINK_CPU:
++		/* We have a sink and a CPU */
++
++		/* First get the cpu */
++		if (match_int(&args[0], &cpu)) {
++			ret = -EINVAL;
++			goto err;
++		}
++
++		/* Then the sink */
++		sink = match_strdup(&args[1]);
++		if (IS_ERR(sink)) {
++			ret = PTR_ERR(sink);
++			goto err;
++		}
++		break;
++	default:
++		ret = -EINVAL;
++		goto err;
++	}
++
++	/*
++	 * If the CPUs don't match the sink is destined to another path.  This
++	 * isn't as an error hence not setting @ret.
++	 */
++	if (event->cpu != cpu)
++		goto err;
++
++	/* We have a valid configuration */
++	event->hw.drv_configs = sink;
++
++out:
++	return ret;
++
++err:
++	kfree(sink);
++	goto out;
++}
++
+ int etm_perf_symlink(struct coresight_device *csdev, bool link)
+ {
+ 	char entry[sizeof("cpu9999999")];
+@@ -383,6 +481,7 @@ static int __init etm_perf_init(void)
+ 	etm_pmu.stop		= etm_event_stop;
+ 	etm_pmu.add		= etm_event_add;
+ 	etm_pmu.del		= etm_event_del;
++	etm_pmu.set_drv_configs	= etm_set_drv_configs;
+ 
+ 	ret = perf_pmu_register(&etm_pmu, CORESIGHT_ETM_PMU_NAME, -1);
+ 	if (ret == 0)
 -- 
 2.7.4
