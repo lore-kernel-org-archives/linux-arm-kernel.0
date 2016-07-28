@@ -1,139 +1,134 @@
-From: kwangwoo.lee@sk.com (kwangwoo.lee at sk.com)
-Date: Thu, 28 Jul 2016 00:08:09 +0000
-Subject: [PATCH v2] arm64: mm: convert __dma_* routines to use start, size
-In-Reply-To: <c355debc-0238-ff51-ca90-6e0c8085366b@arm.com>
-References: <1469518496-8177-1-git-send-email-kwangwoo.lee@sk.com>
- <b978e732-f5c3-4b77-01d9-dd5f7e2303e3@arm.com>
- <15c12f9900fd4b31a875250c478023c6@nmail01.hynixad.com>
- <c355debc-0238-ff51-ca90-6e0c8085366b@arm.com>
-Message-ID: <b0d9ef6b59364c4587f8d7c2493160ed@nmail01.hynixad.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Thu, 28 Jul 2016 02:30:31 +0200
+Subject: [PATCH v2 02/10] driver core: Functional dependencies tracking
+ support
+In-Reply-To: <20160724224832.GB9516@wunner.de>
+References: <1466144820-6286-1-git-send-email-m.szyprowski@samsung.com>
+ <4258432.JNKr9zJtMp@vostro.rjw.lan> <20160724224832.GB9516@wunner.de>
+Message-ID: <2841548.NIYVpJFBcH@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Robin Murphy [mailto:robin.murphy at arm.com]
-> Sent: Wednesday, July 27, 2016 6:56 PM
-> To: ???(LEE KWANGWOO) MS SW; Russell King - ARM Linux; Catalin Marinas; Will Deacon; Mark Rutland;
-> linux-arm-kernel at lists.infradead.org
-> Cc: ???(KIM HYUNCHUL) MS SW; linux-kernel at vger.kernel.org; ???(CHUNG WOO SUK) MS SW
-> Subject: Re: [PATCH v2] arm64: mm: convert __dma_* routines to use start, size
+On Monday, July 25, 2016 12:48:32 AM Lukas Wunner wrote:
+> On Thu, Jul 21, 2016 at 02:25:15AM +0200, Rafael J. Wysocki wrote:
+> > On Thursday, July 21, 2016 01:25:53 AM Lukas Wunner wrote:
+> > > On Thu, Jul 21, 2016 at 12:51:31AM +0200, Rafael J. Wysocki wrote:
+> > > > On Wednesday, July 20, 2016 05:23:40 PM Lukas Wunner wrote:
+> > > > > On Wed, Jul 20, 2016 at 02:52:42PM +0200, Rafael J. Wysocki wrote:
+> > > > > > On Wednesday, July 20, 2016 08:24:50 AM Lukas Wunner wrote:
+> > > > > > > On Wed, Jul 20, 2016 at 02:33:18AM +0200, Rafael J. Wysocki wrote:
+> > > > > > > > On Friday, June 17, 2016 04:07:38 PM Lukas Wunner wrote:
+> > > > > > > > > On Fri, Jun 17, 2016 at 02:54:56PM +0200, Rafael J. Wysocki wrote:
+> > > > > > > > > > On Fri, Jun 17, 2016 at 12:36 PM, Lukas Wunner <lukas@wunner.de> wrote:
+> > > > > > > > > > > On Fri, Jun 17, 2016 at 08:26:52AM +0200, Marek Szyprowski wrote:
+> > > > > > > > > > > > From: "Rafael J. Wysocki" <rafael.j.wysocki@intel.com>
+> > > > > > > > > > > We also have such a functional dependency for Thunderbolt on Macs:
+> > > > > > > > > > > On resume from system sleep, the PCIe hotplug ports may not resume
+> > > > > > > > > > > before the thunderbolt driver has reestablished the PCI tunnels.
+> > > > > > > > > > > Currently this is enforced by quirk_apple_wait_for_thunderbolt()
+> > > > > > > > > > > in drivers/pci/quirks.c. It would be good if we could represent
+> > > > > > > > > > > this dependency using something like Rafael's approach instead of
+> > > > > > > > > > > open coding it, however one detail in Rafael's patches is problematic:
+> > > > > > > > > > >
+> > > > > > > > > > > > New links are added by calling device_link_add() which may happen
+> > > > > > > > > > > > either before the consumer device is probed or when probing it, in
+> > > > > > > > > > > > which case the caller needs to ensure that the driver of the
+> > > > > > > > > > > > supplier device is present and functional and the DEVICE_LINK_PROBE_TIME
+> > > > > > > > > > > > flag should be passed to device_link_add() to reflect that.
+> > > > > > > > > > >
+> > > > > > > > > > > The thunderbolt driver cannot call device_link_add() before the
+> > > > > > > > > > > PCIe hotplug ports are bound to a driver unless we amend portdrv
+> > > > > > > > > > > to return -EPROBE_DEFER for Thunderbolt hotplug ports on Macs
+> > > > > > > > > > > if the thunderbolt driver isn't loaded.
+> > > > > > > > > > >
+> > > > > > > > > > > It would therefore be beneficial if device_link_add() can be
+> > > > > > > > > > > called even *after* the consumer is bound.
+> > > > > > > > > > 
+> > > > > > > > > > I don't quite follow.
+> > > > > > > > > > 
+> > > > > > > > > > Who's the provider and who's the consumer here?
+> > > > > > > > > 
+> > > > > > > > > thunderbolt.ko is the supplier.
+> > > > > > > > 
+> > > > > > > > But it binds to the children of the ports that are supposed to be its
+> > > > > > > > consumers?
+> > > > > > > > 
+> > > > > > > > Why is that even expected to work?
+> > > > > > > 
+> > > > > > > No, the consumers are aunts (or uncles) of the supplier, if you will. :-)
+> > > > > > > 
+> > > > > > > The consumers are the hotplug ports (named "Downstream Bridge 1 / 2" in
+> > > > > > > the drawing below). The supplier is the NHI:
+> > > > > > > 
+> > > > > > >       (Root Port) ---- Upstream Bridge --+-- Downstream Bridge 0 ---- NHI
+> > > > > > >                                          +-- Downstream Bridge 1 --
+> > > > > > >                                          +-- Downstream Bridge 2 --
+> > > > > > >                                          ...
+> > > > > > > 
+> > > > > > > We're calling pci_power_up() and pci_restore_state() from
+> > > > > > > pci_pm_resume_noirq(). And that will fail for devices below
+> > > > > > > the hotplug ports if the PCI tunnels haven't been re-established
+> > > > > > > yet by the NHI.
+> > > > > > 
+> > > > > > So the NHI is a PCIe device, right?
+> > > > > > 
+> > > > > > Does the Thunderbolt driver bind to that device?
+> > > > > 
+> > > > > The NHI is a PCI device but not a bridge. It has class 0x88000.
+> > > > > Yes, thunderbolt.ko binds to the NHI.
+> > > > > 
+> > > > > And portdrv binds to the upstream bridge and downstream bridges.
+> > > > > Those have class 0x60400.
+> > > > 
+> > > > OK, so why would there be a problem with creating links from the NHI
+> > > > (producer) to the ports (consumers) before binding portdrv to them?
+> > > 
+> > > Because the ordering in which drivers bind isn't guaranteed. At least
+> > > on my machine (Debian), portdrv always binds before thunderbolt.
+> > 
+> > But what drivers have to do with that really?  Do you need drivers to
+> > know that the dependency is there?
+> > 
+> > Just add likns *before* even probing for drivers (yes, you can do that)
+> > and the core will handle that for you.
 > 
-> On 27/07/16 02:55, kwangwoo.lee at sk.com wrote:
-> [...]
-> >>>  /*
-> >>> - *	__dma_clean_range(start, end)
-> >>> + *	__dma_clean_area(start, size)
-> >>>   *	- start   - virtual start address of region
-> >>> - *	- end     - virtual end address of region
-> >>> + *	- size    - size in question
-> >>>   */
-> >>> -__dma_clean_range:
-> >>> -	dcache_line_size x2, x3
-> >>> -	sub	x3, x2, #1
-> >>> -	bic	x0, x0, x3
-> >>> -1:
-> >>> +__dma_clean_area:
-> >>>  alternative_if_not ARM64_WORKAROUND_CLEAN_CACHE
-> >>> -	dc	cvac, x0
-> >>> +	dcache_by_line_op cvac, sy, x0, x1, x2, x3
-> >>>  alternative_else
-> >>> -	dc	civac, x0
-> >>> +	dcache_by_line_op civac, sy, x0, x1, x2, x3
-> >>
-> >> dcache_by_line_op is a relatively large macro - is there any way we can
-> >> still apply the alternative to just the one instruction which needs it,
-> >> as opposed to having to patch the entire mostly-identical routine?
-> >
-> > I agree with your opinion. Then, how do you think about using CONFIG_* options
-> > like below? I think that alternative_* macros seems to keep the space for
-> > unused instruction. Is it necessary? Please, share your thought about the
-> > space. Thanks!
-> >
-> > +__dma_clean_area:
-> > +#if    defined(CONFIG_ARM64_ERRATUM_826319) || \
-> > +       defined(CONFIG_ARM64_ERRATUM_827319) || \
-> > +       defined(CONFIG_ARM64_ERRATUM_824069) || \
-> > +       defined(CONFIG_ARM64_ERRATUM_819472)
-> > +       dcache_by_line_op civac, sy, x0, x1, x2, x3
-> > +#else
-> > +       dcache_by_line_op cvac, sy, x0, x1, x2, x3
-> > +#endif
+> Forgive me for being dense: How do you suggest to add links before
+> probing drivers? Only way I could think of is with a PCI quirk.
 > 
-> That's not ideal, because we still only really want to use the
-> workaround if we detect a CPU which needs it, rather than baking it in
-> at compile time. I was thinking more along the lines of pushing the
-> alternative down into dcache_by_line_op, something like the idea below
-> (compile-tested only, may not actually be viable).
+> Which is what we're already doing right now (see drivers/pci/quirk.c:
+> quirk_apple_wait_for_thunderbolt()). And it ain't pretty.
 
-OK. Using the capability of CPU features seems to be preferred.
+Well, maybe not, but doing it once during enumeration would be better than
+on every resume.
 
-> Robin.
+Plus there is runtime PM to cover.
+
+> > > I guess I could amend portdrv to return -EPROBE_DEFER on Macs if
+> > > no driver is bound to the NHI. Doesn't feel pretty to me though.
+> > > 
+> > > Ultimately this seems to be the same issue as with calling
+> > > dev_pm_domain_set() for a bound device. Perhaps device_link_add()
+> > > can likewise be allowed if a runtime PM ref is held for the devices
+> > > and the call happens under lock_system_sleep()?
+> > 
+> > No, the whole synchronization scheme in the links code would have had to be
+> > changed for that to really work.
+> > 
+> > And it really is about what is needed (at least in principle) to run your
+> > device.  If you think you need device X with a driver to handle device Y
+> > correctly, then either you need it all the time, from probe to remove, or
+> > you just don't really need it at all.
 > 
-> -----8<-----
-> diff --git a/arch/arm64/include/asm/assembler.h
-> b/arch/arm64/include/asm/assembler.h
-> index 10b017c4bdd8..1c005c90387e 100644
-> --- a/arch/arm64/include/asm/assembler.h
-> +++ b/arch/arm64/include/asm/assembler.h
-> @@ -261,7 +261,16 @@ lr	.req	x30		// link register
->  	add	\size, \kaddr, \size
->  	sub	\tmp2, \tmp1, #1
->  	bic	\kaddr, \kaddr, \tmp2
-> -9998:	dc	\op, \kaddr
-> +9998:
-> +	.ifeqs "\op", "cvac"
-> +alternative_if_not ARM64_WORKAROUND_CLEAN_CACHE
-> +	dc	cvac, \kaddr
-> +alternative_else
-> +	dc	civac, \kaddr
-> +alternative_endif
-> +	.else
-> +	dc	\op, \kaddr
-> +	.endif
->  	add	\kaddr, \kaddr, \tmp1
->  	cmp	\kaddr, \size
->  	b.lo	9998b
+> Real life isn't as simple as that.
+> 
+> In this case, we have consumers (hotplug ports) which are doing fine
+> if the driver for the supplier (NHI) is not loaded. But once it loads,
+> the links must be in place.
 
-I agree that it looks not viable because it makes the macro bigger and
-conditional specifically with CVAC op.
+Hmm.
 
-Then.. if the number of the usage of alternative_* macros for erratum is
-few (just one in this case for cache clean), I think only small change like
-below seems to be optimal and there is no need to create a variant macro of
-dcache_cache_by_line_op. How do you think about it?
+What if it is not loaded and the system suspends.  Will everything work
+as expected after the subsequent resume?
 
-/*
-- *     __dma_clean_range(start, end)
-+ *     __clean_dcache_area_poc(kaddr, size)
-+ *
-+ *     Ensure that any D-cache lines for the interval [kaddr, kaddr+size)
-+ *     are cleaned to the PoC.
-+ *
-+ *     - kaddr   - kernel address
-+ *     - size    - size in question
-+ */
-+ENTRY(__clean_dcache_area_poc)
-+       /* FALLTHROUGH */
-+
-+/*
-+ *     __dma_clean_area(start, size)
-  *     - start   - virtual start address of region
-- *     - end     - virtual end address of region
-+ *     - size    - size in question
-  */
--__dma_clean_range:
-+__dma_clean_area:
-+       add     x1, x1, x0
-        dcache_line_size x2, x3
-        sub     x3, x2, #1
-        bic     x0, x0, x3
-@@ -158,24 +172,21 @@ alternative_endif
-        b.lo    1b
-        dsb     sy
-        ret
--ENDPROC(__dma_clean_range)
-+ENDPIPROC(__clean_dcache_area_poc)
-+ENDPROC(__dma_clean_area)
-
-Regards,
-Kwangwoo Lee
+Thanks,
+Rafael
