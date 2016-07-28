@@ -1,63 +1,55 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 28 Jul 2016 11:39:14 +0200
-Subject: [PATCH 07/18] ARM: mvebu: a39x: update the SDHCI node on Armada
- 39x
-In-Reply-To: <1469105055-25181-8-git-send-email-jaz@semihalf.com> (Grzegorz
- Jaszczyk's message of "Thu, 21 Jul 2016 14:44:03 +0200")
-References: <1469105055-25181-1-git-send-email-jaz@semihalf.com>
- <1469105055-25181-8-git-send-email-jaz@semihalf.com>
-Message-ID: <87wpk6ksot.fsf@free-electrons.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Thu, 28 Jul 2016 10:39:51 +0100
+Subject: [PATCH v11] acpi, apei, arm64: APEI initial support for aarch64.
+In-Reply-To: <1469640545-5848-1-git-send-email-fu.wei@linaro.org>
+References: <1469640545-5848-1-git-send-email-fu.wei@linaro.org>
+Message-ID: <f018fd18-03e7-3247-7d65-af430092230e@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Grzegorz,
- 
- On jeu., juil. 21 2016, Grzegorz Jaszczyk <jaz@semihalf.com> wrote:
-
-> Commit 1140011ee9d9 ("mmc: sdhci-pxav3: Modify clock settings
-> for the SDR50 and DDR50 modes") has extended the Device Tree
-> binding used to describe PXAv3 SDHCI controllers in order to be
-> able to use the SDR50 and DDR50 modes.
+On 27/07/16 18:29, fu.wei at linaro.org wrote:
+> From: Tomasz Nowicki <tomasz.nowicki@linaro.org>
 >
-> This commit updates the Device Tree description of the Armada
-> 39x SDHCI controller in other to take advantage of this
-> functionality.
+> This commit provides APEI arch-specific bits for aarch64
 >
-> Signed-off-by: Grzegorz Jaszczyk <jaz@semihalf.com>
-
-Change the prefix title to "ARM: dts: mvebu: armada-39x". With this:
-
-Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-
-Thanks,
-
-Gregory
-> ---
->  arch/arm/boot/dts/armada-39x.dtsi | 5 ++++-
->  1 file changed, 4 insertions(+), 1 deletion(-)
+> Meanwhile,
+> (1)add a new subfunction "hest_ia32_init" for
+> "acpi_disable_cmcff" which is used by IA-32 Architecture
+> Corrected Machine Check (CMC).
+> (2)move HEST type (ACPI_HEST_TYPE_IA32_CORRECTED_CHECK) checking to
+> a generic place.
+> (3)select HAVE_ACPI_APEI when EFI and ACPI is set on ARM64,
+> because arch_apei_get_mem_attribute is using efi_mem_attributes on ARM64.
 >
-> diff --git a/arch/arm/boot/dts/armada-39x.dtsi b/arch/arm/boot/dts/armada-39x.dtsi
-> index dc6efd3..cb66f20 100644
-> --- a/arch/arm/boot/dts/armada-39x.dtsi
-> +++ b/arch/arm/boot/dts/armada-39x.dtsi
-> @@ -380,7 +380,10 @@
->  
->  			sdhci at d8000 {
->  				compatible = "marvell,armada-380-sdhci";
-> -				reg = <0xd8000 0x1000>, <0xdc000 0x100>;
-> +				reg-names = "sdhci", "mbus", "conf-sdio3";
-> +				reg = <0xd8000 0x1000>,
-> +					<0xdc000 0x100>,
-> +					<0x18454 0x4>;
->  				interrupts = <GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>;
->  				clocks = <&gateclk 17>;
->  				mrvl,clk-delay-cycles = <0x1F>;
-> -- 
-> 1.8.3.1
+> [Fu Wei: improve && upstream]
 >
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+
+> diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
+> index 5420cb0..d3d02dc 100644
+> --- a/arch/arm64/include/asm/acpi.h
+> +++ b/arch/arm64/include/asm/acpi.h
+> @@ -17,6 +17,7 @@
+>
+>  #include <asm/cputype.h>
+>  #include <asm/smp_plat.h>
+> +#include <asm/tlbflush.h>
+>
+>  /* Macros for consistency checks of the GICC subtable of MADT */
+>  #define ACPI_MADT_GICC_LENGTH	\
+> @@ -110,8 +111,21 @@ static inline const char *acpi_get_enable_method(int cpu)
+>  }
+>
+>  #ifdef	CONFIG_ACPI_APEI
+> +#define acpi_disable_cmcff 1
+>  pgprot_t arch_apei_get_mem_attribute(phys_addr_t addr);
+> -#endif
+> +
+> +/*
+> + * Despite its name, this function must still broadcast the TLB
+> + * invalidation in order to ensure other CPUs don't up with with junk
+
+Please fix the comment above ^^^.
+
+
+Suzuki
