@@ -1,116 +1,78 @@
-From: clabbe.montjoie@gmail.com (LABBE Corentin)
-Date: Thu, 28 Jul 2016 15:40:31 +0200
-Subject: [PATCH v2 3/5] ARM: sun8i: dt: Add DT bindings documentation for
- Allwinner sun8i-emac
-In-Reply-To: <20160721075519.GC5993@lukather>
-References: <1469001800-11615-1-git-send-email-clabbe.montjoie@gmail.com>
- <1469001800-11615-4-git-send-email-clabbe.montjoie@gmail.com>
- <20160721075519.GC5993@lukather>
-Message-ID: <20160728134031.GC7582@Red>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 28 Jul 2016 14:53:21 +0100
+Subject: [PATCH v9 4/9] clocksource/drivers/arm_arch_timer: use readq to
+ get 64-bit CNTVCT
+In-Reply-To: <57976FA5.2070802@codeaurora.org>
+References: <1469460427-8643-1-git-send-email-fu.wei@linaro.org>
+ <1469460427-8643-5-git-send-email-fu.wei@linaro.org>
+ <20160725153118.GD19209@arm.com>
+ <CADyBb7ubKceQiB7+u7sSA=1+9_VMUrGjiabf_FkN2-n4rq7Kgg@mail.gmail.com>
+ <20160725163144.GE19209@arm.com> <57976FA5.2070802@codeaurora.org>
+Message-ID: <20160728135321.GH1085@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 21, 2016 at 09:55:19AM +0200, Maxime Ripard wrote:
-> Hi,
+On Tue, Jul 26, 2016 at 09:11:49AM -0500, Timur Tabi wrote:
+> Will Deacon wrote:
+> >The kernel really needs to support both of those platforms :/
+> >
+> >For the memory-mapped counter registers, the architecture says:
+> >
+> >   `If the implementation supports 64-bit atomic accesses, then the
+> >    CNTV_CVAL register must be accessible as an atomic 64-bit value.'
+> >
+> >which is borderline tautological. If we take the generous reading that
+> >this means AArch64 CPUs can use readq (and I'm not completely
+> >comfortable with that assertion, particularly as you say that it breaks
+> >the model), then you still need to use readq_relaxed here to avoid a
+> >DSB. Furthermore, what are you going to do for AArch32? readq doesn't
+> >exist over there, and if you use the generic implementation then it's
+> >not atomic. In which case, we end up with the current code, as well as a
+> >readq_relaxed guarded by a questionable #ifdef that is known to break a
+> >supported platform for an unknown performance improvement. Hardly a big
+> >win.
 > 
-> On Wed, Jul 20, 2016 at 10:03:18AM +0200, LABBE Corentin wrote:
-> > This patch adds documentation for Device-Tree bindings for the
-> > Allwinner sun8i-emac driver.
-> > 
-> > Signed-off-by: LABBE Corentin <clabbe.montjoie@gmail.com>
-> > ---
-> >  .../bindings/net/allwinner,sun8i-emac.txt          | 65 ++++++++++++++++++++++
-> >  1 file changed, 65 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/net/allwinner,sun8i-emac.txt
-> > 
-> > diff --git a/Documentation/devicetree/bindings/net/allwinner,sun8i-emac.txt b/Documentation/devicetree/bindings/net/allwinner,sun8i-emac.txt
-> > new file mode 100644
-> > index 0000000..4bf4e53
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/net/allwinner,sun8i-emac.txt
-> > @@ -0,0 +1,65 @@
-> > +* Allwinner sun8i EMAC ethernet controller
-> > +
-> > +Required properties:
-> > +- compatible: "allwinner,sun8i-a83t-emac", "allwinner,sun8i-h3-emac",
-> > +		or "allwinner,sun50i-a64-emac"
-> > +- reg: address and length of the register sets for the device.
-> > +- reg-names: should be "emac" and "syscon", matching the register sets
+> I know Fu dropped this patch, and I don't want to kick a dead horse, but I
+> was wondering if it would be okay to do this:
 > 
-> Blindly mapping a register of some other device on the SoC doesn't
-> look very reasonable.
+> static u64 arch_counter_get_cntvct_mem(void)
+> {
+> #ifdef readq_relaxed
+> 	return readq_relaxed(arch_counter_base + CNTVCT_LO);
+> #else
+> 	u32 vct_lo, vct_hi, tmp_hi;
 > 
-
-As we discuss after this mail on IRC, this register is dedicated to EMAC.
-
-> > +- interrupts: interrupt for the device
-> > +- clocks: A phandle to the reference clock for this device
-> > +- clock-names: should be "ahb"
-> > +- resets: A phandle to the reset control for this device
-> > +- reset-names: should be "ahb"
-> > +- phy-mode: See ethernet.txt
-> > +- phy or phy-handle: See ethernet.txt
-> > +- #address-cells: shall be 1
-> > +- #size-cells: shall be 0
-> > +
-> > +"allwinner,sun8i-h3-emac" also requires:
-> > +- clocks: an extra phandle to the reference clock for the EPHY
-> > +- clock-names: an extra "ephy" entry matching the clocks property
-> > +- resets: an extra phandle to the reset control for the EPHY
-> > +- resets-names: an extra "ephy" entry matching the resets property
+> 	do {
+> 		vct_hi = readl_relaxed(arch_counter_base + CNTVCT_HI);
+> 		vct_lo = readl_relaxed(arch_counter_base + CNTVCT_LO);
+> 		tmp_hi = readl_relaxed(arch_counter_base + CNTVCT_HI);
+> 	} while (vct_hi != tmp_hi);
 > 
-> Shouldn't that be attached to the phy itself?
+> 	return ((u64) vct_hi << 32) | vct_lo;
+> #endif
+> }
 > 
-
-Ok I will move them.
-
-> > +See ethernet.txt in the same directory for generic bindings for ethernet
-> > +controllers.
-> > +
-> > +The device node referenced by "phy" or "phy-handle" should be a child node
-> > +of this node. See phy.txt for the generic PHY bindings.
-> > +
-> > +Optional properties:
-> > +- phy-supply: phandle to a regulator if the PHY needs one
-> > +- phy-io-supply: phandle to a regulator if the PHY needs a another one for I/O.
-> > +		 This is sometimes found with RGMII PHYs, which use a second
-> > +		 regulator for the lower I/O voltage.
-> > +- allwinner,tx-delay: The setting of the TX clock delay chain
-> > +- allwinner,rx-delay: The setting of the RX clock delay chain
+> readq and readq_relaxed are defined in arch/arm64/include/asm/io.h.  Why
+> would the function exist if AArch64 CPUs can't use it?
 > 
-> In which unit? What is the default value?
-> 
+> Do we need something like ARCH_HAS_64BIT_ATOMIC_READ in order to decide
+> whether readq is safe?
 
-The unit is unknown to me, but I have added a comment for the default and acceptable range value.
+No, I'm still not ok with this. If you want to use readq_relaxed we need
+the following guarantees:
 
-> > +
-> > +The TX/RX clock delay chain settings are board specific.
-> > +
-> > +Optional properties for "allwinner,sun8i-h3-emac":
-> > +- allwinner,use-internal-phy: Use the H3 SoC's internal E(thernet) PHY
-> 
-> Can't that be derived from the presence of the phy property?
-> 
+  1. readq_relaxed is provided by the architecture
+  2. readq_relaxed is single-copy atomic from the CPU's perspective
+  3. The memory-mapped timer has been integrated in such a way that it
+     can be accessed using 64-bit transactions.
 
-Yes, I have reworked the "variant" of the driver for easily handling this.
+(1) is easy, and you have that above. For (2), we just need to avoid
+include/linux/io-64-nonatomic-*.h. (3), however, is not something we
+can safely probe. If this optimisation really is worthwhile, then we
+need to extend the device-tree binding for the counter so that we can
+tell the kernel that it's ok to use 64-bit accesses for the counter
+without tearing.
 
-> > +- allwinner,leds-active-low: EPHY LEDs are active low
-> 
-> That also seems PHY related. Overall, I feel like we really need a phy
-> node for the internal phy.
-> 
+I have confirmed this with the architects here at ARM.
 
-Moved also in the phy node.
-
-> Maxime
-> 
-> -- 
-> Maxime Ripard, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
-
-Best regards
-
-Thanks
-
-LABBE Corentin
+Will
