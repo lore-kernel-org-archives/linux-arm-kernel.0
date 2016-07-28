@@ -1,100 +1,150 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Thu, 28 Jul 2016 16:08:47 +0200
-Subject: [PATCH 2/3] dt-bindings: allow child nodes inside the Tegra BPMP
-In-Reply-To: <36967d69-cb2a-654e-9a4c-2021fd476464@wwwdotorg.org>
-References: <20160719191442.15439-1-swarren@wwwdotorg.org>
- <20160719191442.15439-2-swarren@wwwdotorg.org>
- <20160726100302.GE2433@ulmo.ba.sec>
- <f1ca284a-5332-3323-80b9-7cf61e7c97ac@wwwdotorg.org>
- <36967d69-cb2a-654e-9a4c-2021fd476464@wwwdotorg.org>
-Message-ID: <20160728140847.GA28342@ulmo.ba.sec>
+Date: Thu, 28 Jul 2016 16:13:25 +0200
+Subject: [PATCH 2/2] dt-bindings: add simple-panel-dsi and simple-panel
+In-Reply-To: <57982469.6030201@rock-chips.com>
+References: <1468984730-23186-1-git-send-email-mark.yao@rock-chips.com>
+ <1468984730-23186-2-git-send-email-mark.yao@rock-chips.com>
+ <20160725152125.GS21170@ulmo.ba.sec>
+ <5796C47C.5040208@rock-chips.com>
+ <20160726090226.GB2433@ulmo.ba.sec>
+ <57982469.6030201@rock-chips.com>
+Message-ID: <20160728141325.GB28342@ulmo.ba.sec>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 27, 2016 at 03:50:52PM -0600, Stephen Warren wrote:
-> On 07/26/2016 10:21 AM, Stephen Warren wrote:
-> > On 07/26/2016 04:03 AM, Thierry Reding wrote:
-> > > On Tue, Jul 19, 2016 at 01:14:41PM -0600, Stephen Warren wrote:
-> > > > From: Stephen Warren <swarren@nvidia.com>
-> > > > 
-> > > > The BPMP implements some services which must be represented by separate
-> > > > nodes. For example, it can provide access to certain I2C controllers,
-> > > > and
-> > > > the I2C bindings represent each I2C controller as a device tree node.
-> > > > Update the binding to describe how the BPMP supports this.
-> > > > 
-> > > > Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> > > > ---
-> > > >  .../bindings/firmware/nvidia,tegra186-bpmp.txt     | 23
-> > > > ++++++++++++++++++++++
-> > > >  1 file changed, 23 insertions(+)
-> > > > 
-> > > > diff --git
-> > > > a/Documentation/devicetree/bindings/firmware/nvidia,tegra186-bpmp.txt
-> > > > b/Documentation/devicetree/bindings/firmware/nvidia,tegra186-bpmp.txt
-> > > > index 9a3864f56955..142d363406f6 100644
-> > > > ---
-> > > > a/Documentation/devicetree/bindings/firmware/nvidia,tegra186-bpmp.txt
-> > > > +++
-> > > > b/Documentation/devicetree/bindings/firmware/nvidia,tegra186-bpmp.txt
-> > > > @@ -38,6 +38,24 @@ implemented by this node:
-> > > >  - .../reset/reset.txt
-> > > >  - <dt-bindings/reset/tegra186-reset.h>
-> > > > 
-> > > > +The BPMP implements some services which must be represented by
-> > > > separate nodes.
-> > > > +For example, it can provide access to certain I2C controllers, and
-> > > > the I2C
-> > > > +bindings represent each I2C controller as a device tree node. Such
-> > > > nodes should
-> > > > +be nested directly inside the main BPMP node.
-> > > > +
-> > > > +Software can determine whether a child node of the BPMP node
-> > > > represents a device
-> > > > +by checking for a compatible property. Any node with a compatible
-> > > > property
-> > > > +represents a device that can be instantiated. Nodes without a
-> > > > compatible
-> > > > +property may be used to provide configuration information regarding
-> > > > the BPMP
-> > > > +itself, although no such configuration nodes are currently defined
-> > > > by this
-> > > > +binding.
-> > > > +
-> > > > +The BPMP firmware defines no single global name-/numbering-space for
-> > > > such
-> > > > +services. Put another way, the numbering scheme for I2C buses is
-> > > > distinct from
-> > > > +the numbering scheme for any other service the BPMP may provide
-> > > > (e.g. a future
-> > > > +hypothetical SPI bus service). As such, child device nodes will have
-> > > > no reg
-> > > > +property, and the BPMP node will have no #address-cells or
-> > > > #size-cells property.
+On Wed, Jul 27, 2016 at 11:03:05AM +0800, Mark yao wrote:
+> On 2016?07?26? 17:02, Thierry Reding wrote:
+> > On Tue, Jul 26, 2016 at 10:01:32AM +0800, Mark yao wrote:
+> > > On 2016?07?25? 23:21, Thierry Reding wrote:
 > > > 
-> > > My understanding is that the I2C bus number is passed as part of the
-> > > request to the BPMP firmware. Does that not count as addressing? Could
-> > > we not represent that generically using a device tree hierarchy? I'm
-> > > thinking something along these lines:
+> > >      On Wed, Jul 20, 2016 at 11:18:50AM +0800, Mark Yao wrote:
 > > > 
-> > >     bpmp {
-> > >         ...
+> > >          Allow user add display timing on device tree with simple-panel-dsi
+> > >          or simple-panel.
 > > > 
-> > >         services {
-> > >             i2c {
-> > >                 i2c at 0 {
-> > >                     reg = <0>;
+> > >          Cc: Thierry Reding <thierry.reding@gmail.com>
+> > >          Cc: Rob Herring <robh+dt@kernel.org>
+> > >          Cc: Mark Rutland <mark.rutland@arm.com>
+> > > 
+> > >          Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
+> > >          ---
+> > >           .../bindings/display/panel/simple-panel.txt        | 48 ++++++++++++++++++++++
+> > >           1 file changed, 48 insertions(+)
+> > > 
+> > >      Sorry, not going to happen. Read this for an explanation of why not:
+> > > 
+> > >              https://sietch-tagr.blogspot.de/2016/04/display-panels-are-not-special.html
+> > > 
+> > >      Thierry
+> > > 
+> > > 
+> > > Hi Thierry
+> > > 
+> > > The blog actually not persuade me why can't use display timing on
+> > > device tree.
+> > Okay, perhaps read it again, it addresses most of your points below.
 > > 
-> > Technically, that is possible. However, Rob Herring rejected the idea of
-> > multiple levels of sub-nodes.
+> > > 1, Binding panel as a simple string on device tree seems simple on device tree,
+> > > but it's complex on kernel code, and kernel code would became bigger and
+> > > bigger.
+> > I don't think the video timings in the simple-panel driver are very
+> > complex. They also don't use very much space. And if you're really
+> > concerned about space you can always use conditional compilation and
+> > Kconfig symbols to remove timings for panels that you don't use.
 > > 
-> > Can we please just go with what we have? DT bindings are frankly an
-> > obstacle to getting anything done:-(
+> > Also, panels are characterized by much more than just video timings.
+> > There were attempts, way back, to fully describe panels in device tree
+> > and that failed. What you propose here is a partial solution to a much
+> > more complex problem.
+> > 
+> > This is all explained in the blog post.
+> > 
+> > > 2, Our customer always ask me, where is the display timing? They only find a
+> > > simple panel string on device tree,  need search the kernel code to find the
+> > > actually timing. They are used to find all device info on device tree, but
+> > > panel timing info is not, this would confuse them. They don't want to know how
+> > > code work, just want a easier interface.
+> > That's not a very good argument. There's plenty of data that's not in
+> > device tree for other devices, why should panels be different? Also, I
+> > would hope that any customer of yours knows their way around kernel
+> > code and can therefore easily add video timings for new panels. It's
+> > quite trivial to do, and there are many examples on how to do it.
+> > 
+> > > 3, I think device tree not only can use for kernel, other module also can use
+> > > it. on our project, we use uboot + kernel, the uboot support fdt, that function
+> > > can parsing device tree. So if describe the display timing on device tree, both
+> > > uboot and kernel can share same display timing, not need to describe twice, it
+> > > would save work and not easy to make mistake.
+> > That's a bit of a stretch. Video timings is fairly straightforward data
+> > and can be easily added to any other piece of code that you want to run.
+> > Yes you will have to duplicate the data, but how is that different from
+> > duplicating all the driver code?
+> > 
+> > > 4, For differentiation product, we face many different panel, every once in a
+> > > while, need to add a new panel, we can't convert all the panel , code the panel
+> > > on kernel seems too bad, and the kernel image became bigger and bigger.
+> > Why can't you convert all the panels? We already support a bunch of them
+> > and haven't yet run into any problems. If you do encounter any issues
+> > trying to port panels to the DRM panel infrastructure, please let me
+> > know and I can help sort them out.
+> > 
+> > The kernel image size isn't a problem either. In any modern kernel the
+> > video timing data in the panel driver is tiny compared to the rest.
+> > 
+> > > Generally, Our customer don't want to do any modify on kernel, they just modify
+> > > device tree to bring up their device. Describe the panel timing on device tree,
+> > > would make customer easy to use and reuse it.
+> > Yes, that would perhaps make it easier for them to bring up the device.
+> > But soon after they'll notice that there are glitches when turning the
+> > panel on and off, and then they'll realize that they can't fix that
+> > using their simple device tree.
+> About the panel on and off, I don't think the panel-simple do the good
+> enough.
 > 
-> Thierry, any further thoughts here? I really need to get these DT bindings
-> finalized so that I can use them in U-Boot, which is very urgent. Thanks.
+> panel-simple only have one gpio and one regulator, and their sequence is
+> hard code, Why not a panel have two gpio or two regulator? On our project,
+> we find many customer don't use the RC to do panel reset, they directly use
+> gpio reset, so they need a gpio to do panel reset.
 
-If everyone else is fine with these bindings, let's go ahead with them.
+The driver is called panel-simple for a reason. It's not meant to cover
+all possible use-cases, only the simple ones.
+
+> the device tree panel's on and off function is what the next step I want to
+> upstream, on our downstream kernel, we do like that:
+> 
+> panel {
+>     power_ctrl {
+>           power0 {
+>                   gpios = <xxx>;
+>                   delay,ms = <3>;
+>           }
+>           power1 {
+>                   regulator = <xxx>;
+>                   delay,ms = <3>;
+>           }
+>           power2 {
+>                   backlight = <xxx>;
+>                   delay,ms = <3>;
+>           }
+>     }
+> }
+> and on driver, power on sequence with power0->power1->power2, power down
+> with power2->power1->power0.
+> if user want to swap the power, can easy do that by  adjust dts power
+> sequence.
+> 
+> this method can easy order the gpio, regulator, backlight sequence, judge
+> the delay time and add new regulator or gpio.
+> I think this panel power on and off method is better than panel-simple
+> driver currently using.
+
+That's almost exactly like the power sequences that Alex Courbot had
+proposed about three years ago. The concept of such a thing was rejected
+by device tree binding maintainers, which is why we ended up with what
+we have now. I'm sure you can find a link to the discussion if you want
+the details about why it got rejected.
+
+All of that's described in the blog, by the way.
 
 Thierry
 -------------- next part --------------
@@ -103,4 +153,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160728/e2991667/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160728/1e412141/attachment.sig>
