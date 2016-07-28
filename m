@@ -1,133 +1,135 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 28 Jul 2016 10:55:05 -0500
-Subject: [PATCH v2 2/4] dt-bindings: Add a binding for Mediatek MDP
-In-Reply-To: <1469583886.27630.18.camel@mtksdaap41>
-References: <1469176383-35210-1-git-send-email-minghsiu.tsai@mediatek.com>
- <1469176383-35210-3-git-send-email-minghsiu.tsai@mediatek.com>
- <20160726185433.GA14609@rob-hp-laptop> <1469583886.27630.18.camel@mtksdaap41>
-Message-ID: <CAL_JsqK4Lz9mSJ+EXAY1g9L-CzBmbsed+MfCjkf_545y1Ov0iw@mail.gmail.com>
+From: stillcompiling@gmail.com (Joshua Clayton)
+Date: Thu, 28 Jul 2016 08:56:40 -0700
+Subject: [PATCH v3 0/6] power: add power sequence library
+In-Reply-To: <1469007629-31757-1-git-send-email-peter.chen@nxp.com>
+References: <1469007629-31757-1-git-send-email-peter.chen@nxp.com>
+Message-ID: <579A2B38.3000202@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 26, 2016 at 8:44 PM, Minghsiu Tsai
-<minghsiu.tsai@mediatek.com> wrote:
-> On Tue, 2016-07-26 at 13:54 -0500, Rob Herring wrote:
->> On Fri, Jul 22, 2016 at 04:33:01PM +0800, Minghsiu Tsai wrote:
->> > Add a DT binding documentation of MDP for the MT8173 SoC
->> > from Mediatek
->> >
->> > Signed-off-by: Minghsiu Tsai <minghsiu.tsai@mediatek.com>
->> > ---
->> >  .../devicetree/bindings/media/mediatek-mdp.txt     |   96 ++++++++++++++++++++
->> >  1 file changed, 96 insertions(+)
->> >  create mode 100644 Documentation/devicetree/bindings/media/mediatek-mdp.txt
->> >
->> > diff --git a/Documentation/devicetree/bindings/media/mediatek-mdp.txt b/Documentation/devicetree/bindings/media/mediatek-mdp.txt
->> > new file mode 100644
->> > index 0000000..2dad031
->> > --- /dev/null
->> > +++ b/Documentation/devicetree/bindings/media/mediatek-mdp.txt
->> > @@ -0,0 +1,96 @@
->> > +* Mediatek Media Data Path
->> > +
->> > +Media Data Path is used for scaling and color space conversion.
->> > +
->> > +Required properties (all function blocks):
->> > +- compatible: "mediatek,<chip>-mdp"
->>
->> What is this, ...
->>
->
-> It is used to match platform driver.
+Hi, Peter
 
-Would structuring things like this work instead:
+On 07/20/2016 02:40 AM, Peter Chen wrote:
+> Hi all,
+>
+> This is a follow-up for my last power sequence framework patch set [1].
+> According to Rob Herring and Ulf Hansson's comments[2], I use a generic
+> power sequence library for parsing the power sequence elements on DT,
+> and implement generic power sequence on library. The host driver
+> can allocate power sequence instance, and calls pwrseq APIs accordingly.
+>
+> In future, if there are special power sequence requirements, the special
+> power sequence library can be created.
+>
+> This patch set is tested on i.mx6 sabresx evk using a dts change, I use
+> two hot-plug devices to simulate this use case, the related binding
+> change is updated at patch [1/6], The udoo board changes were tested
+> using my last power sequence patch set.[3]
+>
+> Except for hard-wired MMC and USB devices, I find the USB ULPI PHY also
+> need to power on itself before it can be found by ULPI bus.
+>
+> [1] http://www.spinics.net/lists/linux-usb/msg142755.html
+> [2] http://www.spinics.net/lists/linux-usb/msg143106.html
+> [3] http://www.spinics.net/lists/linux-usb/msg142815.html
+>
+> Changes for v3:
+> - Delete "power-sequence" property at binding-doc, and change related code
+>   at both library and user code.
+> - Change binding-doc example node name with Rob's comments
+> - of_get_named_gpio_flags only gets the gpio, but without setting gpio flags,
+>   add additional code request gpio with proper gpio flags
+> - Add Philipp Zabel's Ack and MAINTAINER's entry
+>
+> Changes for v2:
+> - Delete "pwrseq" prefix and clock-names for properties at dt binding
+> - Should use structure not but its pointer for kzalloc
+> - Since chipidea core has no of_node, let core's of_node equals glue
+>   layer's at core's probe
+>
+> Peter Chen (6):
+>   binding-doc: power: pwrseq-generic: add binding doc for generic power
+>     sequence library
+>   power: add power sequence library
+>   binding-doc: usb: usb-device: add optional properties for power
+>     sequencediff --git a/drivers/usb/core/Makefile b/drivers/usb/core/Makefile
+> index 9780877..da36b78 100644
+> --- a/drivers/usb/core/Makefile
+> +++ b/drivers/usb/core/Makefile
+> @@ -5,8 +5,9 @@
+>  usbcore-y := usb.o hub.o hcd.o urb.o message.o driver.o
+>  usbcore-y += config.o file.o buffer.o sysfs.o endpoint.o
+>  usbcore-y += devio.o notify.o generic.o quirks.o devices.o
+> -usbcore-y += port.o of.o
+> +usbcore-y += port.o
+>  
+> +usbcore-$(CONFIG_OF)		+= of.o
+>  usbcore-$(CONFIG_PCI)		+= hcd-pci.o
+>  usbcore-$(CONFIG_ACPI)		+= usb-acpi.o
+>  
+> diff --git a/drivers/usb/core/of.c b/drivers/usb/core/of.c
+> index 2289700..3de4f88 100644
+> --- a/drivers/usb/core/of.c
+> +++ b/drivers/usb/core/of.c
+> @@ -18,6 +18,7 @@
+>   */
+>  
+>  #include <linux/of.h>
+> +#include <linux/usb/of.h>
+>   usb: core: add power sequence handling for USB devices
+>   usb: chipidea: let chipidea core device of_node equal's glue layer
+>     device of_node
+>   ARM: dts: imx6qdl-udoo.dtsi: fix onboard USB HUB property
+>
+>  .../bindings/power/pwrseq/pwrseq-generic.txt       |  48 +++++++
+>  .../devicetree/bindings/usb/usb-device.txt         |  10 +-
+>  MAINTAINERS                                        |   9 ++
+>  arch/arm/boot/dts/imx6qdl-udoo.dtsi                |  26 ++--
+>  drivers/power/Kconfig                              |   1 +
+>  drivers/power/Makefile                             |   1 +
+>  drivers/power/pwrseq/Kconfig                       |  20 +++
+>  drivers/power/pwrseq/Makefile                      |   2 +
+>  drivers/power/pwrseq/core.c                        |  71 ++++++++++
+>  drivers/power/pwrseq/pwrseq_generic.c              | 151 +++++++++++++++++++++
+>  drivers/usb/chipidea/core.c                        |  10 ++
+>  drivers/usb/core/Makefile                          |   1 +
+>  drivers/usb/core/hub.c                             |  12 +-
+>  drivers/usb/core/hub.h                             |  12 ++
+>  drivers/usb/core/pwrseq.c                          | 100 ++++++++++++++
+>  include/linux/power/pwrseq.h                       |  50 +++++++
+>  16 files changed, 507 insertions(+), 17 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/power/pwrseq/pwrseq-generic.txt
+>  create mode 100644 drivers/power/pwrseq/Kconfig
+>  create mode 100644 drivers/power/pwrseq/Makefile
+>  create mode 100644 drivers/power/pwrseq/core.c
+>  create mode 100644 drivers/power/pwrseq/pwrseq_generic.c
+>  create mode 100644 drivers/usb/core/pwrseq.c
+>  create mode 100644 include/linux/power/pwrseq.h
+>
 
-{
-  compatible = "mediatek,<chip>-mdp";
-  ranges = ...;
-  {
-    compatible = "mediatek,<chip>-mdp-rdma";
-    ...
-  };
-  {
-    compatible = "mediatek,<chip>-mdp-wdma";
-    ...
-  };
-  ...
-};
+With these patches our on-board USB hub,
+a Microchip USB2513BI-AEZG,  works exactly as it does
+with the fake regulator kludge, so...
+Tested-by Joshua Clayton <stillcompiling@gmail.com>
 
->
->
->> > +        "mediatek,<chip>-mdp-<function>", one of
->>
->> and this?
->>
->
-> It is string format of HW block. <chip> could be "mt8173", and
-> <function> are "rdma", "rsz", "wdma", and "wrot".
->
->
->> > +        "mediatek,<chip>-mdp-rdma"  - read DMA
->> > +        "mediatek,<chip>-mdp-rsz"   - resizer
->> > +        "mediatek,<chip>-mdp-wdma"  - write DMA
->> > +        "mediatek,<chip>-mdp-wrot"  - write DMA with rotation
->>
->> List what are valid values of <chip>.
->>
->
-> <chip> - mt8173. There should be other chip added in future.
-> I will change the property as blow:
->
-> - compatible: "mediatek,<chip>-mdp"
->         Should be one of
->         "mediatek,<chip>-mdp-rdma"  - read DMA
->         "mediatek,<chip>-mdp-rsz"   - resizer
->         "mediatek,<chip>-mdp-wdma"  - write DMA
->         "mediatek,<chip>-mdp-wrot"  - write DMA with rotation
->         <chip> - could be 8173
->
->
-> If don't need <chip>, I also can change it as below. It is more clear.
+I assume there is a v4 coming due to rmk's comments on patch 5.
+I couldn't figure out where to null the of_node in error paths, but in testing
+we did put a line of code to null the of_node on release.
 
-Up to you. Depends on how many different chips you will have.
+but...
+As an aside,
+I was hoping this series would magically fix a problem
+with the imx6q-evi which has forced us to disable
+runtime power management. But it did not. :(
 
-> - compatible: "mediatek,mt8173-mdp"
->         Should be one of
->         "mediatek,mt8173-mdp-rdma"  - read DMA
->         "mediatek,mt8173-mdp-rsz"   - resizer
->         "mediatek,mt8173-mdp-wdma"  - write DMA
->         "mediatek,mt8173-mdp-wrot"  - write DMA with rotation
->
->
->> > +- reg: Physical base address and length of the function block register space
->> > +- clocks: device clocks
->> > +- power-domains: a phandle to the power domain.
->> > +- mediatek,vpu: the node of video processor unit
->> > +
->> > +Required properties (DMA function blocks):
->> > +- compatible: Should be one of
->> > +        "mediatek,<chip>-mdp-rdma"
->> > +        "mediatek,<chip>-mdp-wdma"
->> > +        "mediatek,<chip>-mdp-wrot"
->> > +- iommus: should point to the respective IOMMU block with master port as
->> > +  argument, see Documentation/devicetree/bindings/iommu/mediatek,iommu.txt
->> > +  for details.
->> > +- mediatek,larb: must contain the local arbiters in the current Socs.
->>
->> It is still not clear which properties apply to which compatible
->> strings.
->>
->
-> I found out the document for larb.
-> I will change the property as below:
->
-> - mediatek,larb: must contain the local arbiters in the current Socs,
-> see
-> Documentation/devicetree/bindings/memory-controllers/mediatek,smi-larb.txt
->   for details.
+If runtime power management is enabled,  when nothing is
+connected to the hub it disconnects and immediately reconnects
+about every 2 seconds, and after some seemingly random number
+of these events the whole system hangs (possibly udev related?).
 
-That's good, but not what I meant. You still have properties which
-only apply to certain blocks, but are listed for all blocks like
-mediatek,vpu for example.
+Our board has the vbus detect on the hub connected directly to 3.3v,
+rather than to the imx6's usbh1_vbus line. This is listed as a supported
+configuration, but might be the source of the problem.
 
-Rob
+Thanks,
+Joshua
