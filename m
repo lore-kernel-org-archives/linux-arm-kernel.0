@@ -1,83 +1,77 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 28 Jul 2016 20:49:16 +0200
-Subject: [PATCH v2 3/5] ARM: sun8i: dt: Add DT bindings documentation for
- Allwinner sun8i-emac
-In-Reply-To: <20160728134031.GC7582@Red>
-References: <1469001800-11615-1-git-send-email-clabbe.montjoie@gmail.com>
- <1469001800-11615-4-git-send-email-clabbe.montjoie@gmail.com>
- <20160721075519.GC5993@lukather> <20160728134031.GC7582@Red>
-Message-ID: <20160728184916.GF6682@lukather>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Thu, 28 Jul 2016 14:00:21 -0500
+Subject: [PATCH 2/2] dt-bindings: add simple-panel-dsi and simple-panel
+In-Reply-To: <20160726090226.GB2433@ulmo.ba.sec>
+References: <1468984730-23186-1-git-send-email-mark.yao@rock-chips.com>
+ <1468984730-23186-2-git-send-email-mark.yao@rock-chips.com>
+ <20160725152125.GS21170@ulmo.ba.sec> <5796C47C.5040208@rock-chips.com>
+ <20160726090226.GB2433@ulmo.ba.sec>
+Message-ID: <CAL_JsqL8D3OK_JQcY+dLTcqcvmgB2Vuc0Tknf1zsR=8Pa3F4jw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 28, 2016 at 03:40:31PM +0200, LABBE Corentin wrote:
-> On Thu, Jul 21, 2016 at 09:55:19AM +0200, Maxime Ripard wrote:
-> > Hi,
-> > 
-> > On Wed, Jul 20, 2016 at 10:03:18AM +0200, LABBE Corentin wrote:
-> > > This patch adds documentation for Device-Tree bindings for the
-> > > Allwinner sun8i-emac driver.
-> > > 
-> > > Signed-off-by: LABBE Corentin <clabbe.montjoie@gmail.com>
-> > > ---
-> > >  .../bindings/net/allwinner,sun8i-emac.txt          | 65 ++++++++++++++++++++++
-> > >  1 file changed, 65 insertions(+)
-> > >  create mode 100644 Documentation/devicetree/bindings/net/allwinner,sun8i-emac.txt
-> > > 
-> > > diff --git a/Documentation/devicetree/bindings/net/allwinner,sun8i-emac.txt b/Documentation/devicetree/bindings/net/allwinner,sun8i-emac.txt
-> > > new file mode 100644
-> > > index 0000000..4bf4e53
-> > > --- /dev/null
-> > > +++ b/Documentation/devicetree/bindings/net/allwinner,sun8i-emac.txt
-> > > @@ -0,0 +1,65 @@
-> > > +* Allwinner sun8i EMAC ethernet controller
-> > > +
-> > > +Required properties:
-> > > +- compatible: "allwinner,sun8i-a83t-emac", "allwinner,sun8i-h3-emac",
-> > > +		or "allwinner,sun50i-a64-emac"
-> > > +- reg: address and length of the register sets for the device.
-> > > +- reg-names: should be "emac" and "syscon", matching the register sets
-> > 
-> > Blindly mapping a register of some other device on the SoC doesn't
-> > look very reasonable.
-> 
-> As we discuss after this mail on IRC, this register is dedicated to EMAC.
+On Tue, Jul 26, 2016 at 4:02 AM, Thierry Reding
+<thierry.reding@gmail.com> wrote:
+> On Tue, Jul 26, 2016 at 10:01:32AM +0800, Mark yao wrote:
+>> On 2016?07?25? 23:21, Thierry Reding wrote:
+>>
+>>     On Wed, Jul 20, 2016 at 11:18:50AM +0800, Mark Yao wrote:
+>>
+>>         Allow user add display timing on device tree with simple-panel-dsi
+>>         or simple-panel.
+>>
+>>         Cc: Thierry Reding <thierry.reding@gmail.com>
+>>         Cc: Rob Herring <robh+dt@kernel.org>
+>>         Cc: Mark Rutland <mark.rutland@arm.com>
+>>
+>>         Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
+>>         ---
+>>          .../bindings/display/panel/simple-panel.txt        | 48 ++++++++++++++++++++++
+>>          1 file changed, 48 insertions(+)
+>>
+>>     Sorry, not going to happen. Read this for an explanation of why not:
+>>
+>>             https://sietch-tagr.blogspot.de/2016/04/display-panels-are-not-special.html
+>>
+>>     Thierry
+>>
+>>
+>> Hi Thierry
+>>
+>> The blog actually not persuade me why can't use display timing on
+>> device tree.
+>
+> Okay, perhaps read it again, it addresses most of your points below.
+>
+>> 1, Binding panel as a simple string on device tree seems simple on device tree,
+>> but it's complex on kernel code, and kernel code would became bigger and
+>> bigger.
+>
+> I don't think the video timings in the simple-panel driver are very
+> complex. They also don't use very much space. And if you're really
+> concerned about space you can always use conditional compilation and
+> Kconfig symbols to remove timings for panels that you don't use.
+>
+> Also, panels are characterized by much more than just video timings.
+> There were attempts, way back, to fully describe panels in device tree
+> and that failed. What you propose here is a partial solution to a much
+> more complex problem.
+>
+> This is all explained in the blog post.
 
-I don't think we did. It's still right in the middle of some other
-hardware block register space. You actually have a syscon driver to do
-just that, why not use it?
+While I agree with everything Thierry has said in this thread, there
+is an argument to be made for timing information in DT.
 
-> > > +See ethernet.txt in the same directory for generic bindings for ethernet
-> > > +controllers.
-> > > +
-> > > +The device node referenced by "phy" or "phy-handle" should be a child node
-> > > +of this node. See phy.txt for the generic PHY bindings.
-> > > +
-> > > +Optional properties:
-> > > +- phy-supply: phandle to a regulator if the PHY needs one
-> > > +- phy-io-supply: phandle to a regulator if the PHY needs a another one for I/O.
-> > > +		 This is sometimes found with RGMII PHYs, which use a second
-> > > +		 regulator for the lower I/O voltage.
-> > > +- allwinner,tx-delay: The setting of the TX clock delay chain
-> > > +- allwinner,rx-delay: The setting of the RX clock delay chain
-> > 
-> > In which unit? What is the default value?
-> 
-> The unit is unknown to me, but I have added a comment for the
-> default and acceptable range value.
+Maybe most vendors have now learned that flexible clock frequencies
+are needed to generate the correct timings, but I have worked on parts
+without fine resolution (i.e. a dedicated pll). Even HiKey with HDMI
+suffers from this. In that case you can be tuning the timings
+(increasing the h and/or v blanks) to get the desired refresh rates.
+So in that case, the panel compatible would not determine the display
+timings and you could have the same panel with different timings on
+different boards. That's maybe rare enough that putting timing info in
+DT still wouldn't make sense.
 
-That's unfortunate. We'll see how the DT maintainers feel about that.
+But that is not the problem here, and everything else about this is wrong.
 
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160728/2ad95a30/attachment-0001.sig>
+Rob
