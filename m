@@ -1,62 +1,133 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 28 Jul 2016 09:44:53 +0200
-Subject: debug tip after earlycon is closed?
-In-Reply-To: <CAK7LNARtm_2uT3nbga4X0dMYs9jhKa8a2FTGJrYbVRg8P3vHQw@mail.gmail.com>
-References: <CAK7LNASrqbt+RzD64zcAMjmBjJqa2sc2UG+mnEX8npZ9DBJodQ@mail.gmail.com>
- <3860396.RT1mlU0LAT@wuerfel>
- <CAK7LNARtm_2uT3nbga4X0dMYs9jhKa8a2FTGJrYbVRg8P3vHQw@mail.gmail.com>
-Message-ID: <7034241.kLArk8ex69@wuerfel>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Thu, 28 Jul 2016 10:03:02 +0200
+Subject: [PATCH 1/3] drm: introduce share plane
+In-Reply-To: <57997570.5070806@rock-chips.com>
+References: <1469519194-23133-1-git-send-email-mark.yao@rock-chips.com>
+ <20160726082635.GA31475@phenom.ffwll.local>
+ <579732B2.80600@rock-chips.com> <57997570.5070806@rock-chips.com>
+Message-ID: <20160728080302.GG31475@phenom.ffwll.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, July 28, 2016 11:08:13 AM CEST Masahiro Yamada wrote:
-> Hi Arnd,
+On Thu, Jul 28, 2016 at 11:01:04AM +0800, Mark yao wrote:
+> Any ideas for the share planes?
 > 
+> This function is important for our series of vop full design.
+>     The series of vop is:
+>     IP version    chipname
+>     3.1           rk3288
+>     3.2           rk3368
+>     3.4           rk3366
+>     3.5           rk3399 big
+>     3.6           rk3399 lit
+>     3.7           rk322x
 > 
-> 2016-07-27 16:32 GMT+09:00 Arnd Bergmann <arnd@arndb.de>:
-> > On Wednesday, July 27, 2016 10:23:09 AM CEST Masahiro Yamada wrote:
-> >> [    0.000004] sched_clock: 56 bits at 50MHz, resolution 20ns, wraps
-> >> every 4398046511100ns
-> >> [    0.008254] Console: colour dummy device 80x25
-> >> [    0.012700] console [tty0] enabled
-> >> [    0.016110] bootconsole [uniphier0] disabled
-> >
-> > I assume that the original console is on a uart, while the new console
-> > appears to be on the framebuffer. Maybe you have no screen attached?
-> >
-> 
-> 
-> I use 8250-compat serial console for both.
-> 
-> 
-> The following is the full boot log when success.
-> 
-> 
-> I am not sure about:
-> [    0.000141] Console: colour dummy device 80x25
-> [    0.000550] console [tty0] enabled
-> 
-> 
-> 
-> This is the UART console I am really using.
-> [    0.234743] 54006800.serial: ttyS0 at MMIO 0x54006800 (irq = 6,
-> base_baud = 3676470) is a 16550A
-> [    0.994393] console [ttyS0] enabled
+> example on rk3288:  if not support share plane, each vop only support four
+> planes, but if support this function, each vop can support ten planes.
 
-I think the problem is that you have three consoles:
+Like I said, register 10 planes in the kernel driver, figure out a good
+way to actually allocate them to hw resources. We have a similar issue on
+skl/bxt in the i915 driver where there's only a limited amount of
+scalers, and we need to dynamically allocate them to drm_plane. Here you
+have fancy amount of scanout engines which you need to dynamically
+allocate.
 
-- the boot console that stays active until a real console comes up
-- the framebuffer console that is initialized early and goes on to
-  disable the bootconsole
-- the serial console that you are looking at but which doesn't get
-  initialized until much later
+> On 2016?07?26? 17:51, Mark yao wrote:
+> > On 2016?07?26? 16:26, Daniel Vetter wrote:
+> > > On Tue, Jul 26, 2016 at 03:46:32PM +0800, Mark Yao wrote:
+> > > > >What is share plane:
+> > > > >Plane hardware only be used when the display scanout run into
+> > > > plane active
+> > > > >scanout, that means we can reuse the plane hardware resources on plane
+> > > > >non-active scanout.
+> > > > >
+> > > > >      --------------------------------------------------
+> > > > >     |  scanout                                       |
+> > > > >     |         ------------------                     |
+> > > > >     |         | parent plane   |                     |
+> > > > >     |         | active scanout |                     |
+> > > > >     |         |                |   ----------------- |
+> > > > >     |         ------------------   | share plane 1 | |
+> > > > >     |  -----------------           |active scanout | |
+> > > > >     |  | share plane 0 |           |               | |
+> > > > >     |  |active scanout |           ----------------- |
+> > > > >     |  |               |                             |
+> > > > >     |  -----------------                             |
+> > > > >     --------------------------------------------------
+> > > > >One plane hardware can be reuse for multi-planes, we assume the first
+> > > > >plane is parent plane, other planes share the resource with first one.
+> > > > >     parent plane
+> > > > >         |---share plane 0
+> > > > >         |---share plane 1
+> > > > >         ...
+> > > > >
+> > > > >Because resource share, There are some limit on share plane: one group
+> > > > >of share planes need use same zpos, can not overlap, etc.
+> > > > >
+> > > > >We assume share plane is a universal plane with some limit flags.
+> > > > >people who use the share plane need know the limit, should call
+> > > > the ioctl
+> > > > >DRM_CLIENT_CAP_SHARE_PLANES, and judge the planes limit before use it.
+> > > > >
+> > > > >A group of share planes would has same shard id, so userspace can
+> > > > >group them, judge share plane's limit.
+> > > > >
+> > > > >Signed-off-by: Mark Yao<mark.yao@rock-chips.com>
+> > > This seems extremely hw specific, why exactly do we need to add a new
+> > > relationship on planes? What does this buy on_other_  drivers?
+> > Yes, now it's plane hardware specific, maybe others have same design,
+> > because this design
+> > would save hardware resource to support multi-planes.
+> > 
+> > > Imo this should be solved by virtualizing planes in the driver.
+> > > Start out
+> > > by assigning planes, and if you can reuse one for sharing then do that,
+> > > otherwise allocate a new one. If there's not enough real planes,
+> > > fail the
+> > > atomic_check.
+> > I think that is too complex, trying with atomic_check I think it's not a
+> > good idea, userspace try planes every commit would be a heavy work.
+> > 
+> > Userspace need  know all planes relationship, group them, some display
+> > windows can put together, some can't,
+> > too many permutation and combination, I think can't just commit with try.
+> > 
+> > example:
+> > userspace:
+> > windows 1: pos(0, 0)  size(1024, 100)
+> > windows 2: pos(0, 50) size(400, 500)
+> > windows 3: pos(0, 200) size(800, 300)
+> > 
+> > drm plane resources:
+> > plane 0 and plane 1 is a group of share planes
+> > plane 2 is common plane.
+> > 
+> > if userspace know the relationship, then they can assign windows 1 and
+> > window 3 to plane0 and plane 1. that would be success.
+> > but if they don't know, assign window 1/2 to plane 0/1, failed, assign
+> > window 2/3 to plane 0/1, failed. mostly would get failed.
 
-Clearly something is wrong in this setup and we don't want to
-disable the boot console before the serial console is up.
+You can still do this with the design I describe. The only difference is
+that you allow generic userspace to make optimal use of your planes, too.
 
-I guess you could work around it by disabling the framebuffer console
-at compile time, or by having the serial console initialized earlier
-than the framebuffer, but I wonder if this is something that could
-use a more general solution.
+> > > This seems way to hw specific to be useful as a generic concept.
+> > 
+> > We want to change the drm_mode_getplane_res behavior, if userspace call
+> > DRM_CLIENT_CAP_SHARE_PLANES, that means userspace know hardware limit,
+> > then we return full planes support to userspace, if don't, just make a
+> > group of share planes as one plane.
+> > this work is on generic place.
 
-	Arnd
+So ... do you have patches for all the generic kms userspace that's out
+there? Are those reviewed and ready for merging?
+
+Adding new userspace abi is much, much, much harder than sovling this in
+the vop driver. I'm working on some documentation to make this all clear
+(since many arm folks seem unaware of the uapi rules we have in the drm
+subsystem). But really, you're trying the much harder route with this
+patch.
+-Daniel
+-- 
+Daniel Vetter
+Software Engineer, Intel Corporation
+http://blog.ffwll.ch
