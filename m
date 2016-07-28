@@ -1,104 +1,78 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Thu, 28 Jul 2016 11:43:00 +0200
-Subject: Why do we need reset_control_get_optional() ?
-In-Reply-To: <CAK7LNAQnitMMp5wMXXvVeS-UFF=Fo9m=M1hL=5f4=RF8JYCnGg@mail.gmail.com>
-References: <CAK7LNAQnitMMp5wMXXvVeS-UFF=Fo9m=M1hL=5f4=RF8JYCnGg@mail.gmail.com>
-Message-ID: <1469698980.12835.18.camel@pengutronix.de>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 28 Jul 2016 11:44:10 +0200
+Subject: [PATCH 08/18] ARM: mvebu: a39x: enable PMU,
+ CA9 MPcore SoC Controller and Coherency fabric
+In-Reply-To: <1469105055-25181-9-git-send-email-jaz@semihalf.com> (Grzegorz
+ Jaszczyk's message of "Thu, 21 Jul 2016 14:44:04 +0200")
+References: <1469105055-25181-1-git-send-email-jaz@semihalf.com>
+ <1469105055-25181-9-git-send-email-jaz@semihalf.com>
+Message-ID: <87shuuksgl.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Samstag, den 23.07.2016, 20:22 +0900 schrieb Masahiro Yamada:
-> Hi.
-> 
-> 
-> Now the reset subsystem provides
-> a bunch of reset_control_get variants.
-> 
-> I am still wondering why we need to have _optional ones.
-> 
-> As far as I see, the difference is WARN_ON(1)
-> when CONFIG_RESET_CONTROLLER is not defined.
-> 
-> 
-> 
-> [1] When the reset is mandatory,
-> the code of the reset consumer is probably like follows:
-> 
->   rst = devm_reset_control_get(dev, NULL);
->   if (IS_ERR(rst)) {
->           dev_err(dev, "failed to get reset\n");
->           return PTR_ERR(rst);
->   }
-> 
->   ret = reset_control_deassert(rst);
->   if (ret) {
->           dev_err(dev, "failed to deassert reset\n");
->           return ret;
->   }
-> 
->    ...
-> 
-> 
-> 
-> [2] When the reset is optional,
->   the code should be something like follows:
-> 
->    rst = devm_reset_control_get(dev, NULL);
->    if (ERR_PTR(rst) == -EPROBE_DEFER)
->            return -EPROBE_DEFER;
-> 
->    /* deassert reset if it is available */
->    if (!IS_ERR(rst)) {
->            ret = reset_control_deassert(rst);
->            if (ret) {
->                   dev_err(dev, "failed to deassert reset\n");
->                   return ret;
->            }
->     }
-> 
-> 
-> 
-> 
-> What I mean is, we can write a driver in either way
-> without using the _optional one.
-> 
-> No need to call WARN_ON(1).
-> 
-> 
-> What does _optional buy us?
+Hi Grzegorz,
+ 
+ On jeu., juil. 21 2016, Grzegorz Jaszczyk <jaz@semihalf.com> wrote:
 
-It will complain loudly with a backtrace if a driver requests a
-non-optional reset on a kernel/platform with the reset framework
-disabled.
+> This commit enables:
+> - CA9's Performance Monitor Unit
+> - CA9 MPcore SoC Controller
+> - Coherency fabric
+> on Armada 39x, basing on the Armada 38x (which has the same CA9 CPU).
+>
+> Signed-off-by: Grzegorz Jaszczyk <jaz@semihalf.com>
+> Reviewed-by: Lior Amsalem <alior@marvell.com>
 
-> One more thing.
-> WARN_ON(1) is only useful on run-time,
-> but run-time test is more expensive than compile-time test.
-> 
-> If a driver really needs reset control,
-> it should not be complied without CONFIG_RESET_CONTROLLER.
-> So, the driver should have "depends on RESET_CONTROLLER" in Kconfig.
+Rename prefix to "ARM: dts: mvebu: armada-39x:" then 
+Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-If we do that, we can't compile test those drivers anymore in
-configurations without RESET_CONTROLLER enabled.
+Thanks,
 
-[...]
-> I want to deprecate _optional variants in the following steps:
-> 
-> [1] Add "depends on RESET_CONTROLLER" to drivers
->     for which reset_control is mandatory.
-> 
->     We can find those driver easily by grepping
->     the reference to non-optional reset_control_get().
+Gregory
 
-Since we have the stubs, the RESET_CONTROLLER dependency is only at
-runtime, not at build time.
+> ---
+>  arch/arm/boot/dts/armada-39x.dtsi | 15 +++++++++++++++
+>  1 file changed, 15 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/armada-39x.dtsi b/arch/arm/boot/dts/armada-39x.dtsi
+> index cb66f20..8a22c02 100644
+> --- a/arch/arm/boot/dts/armada-39x.dtsi
+> +++ b/arch/arm/boot/dts/armada-39x.dtsi
+> @@ -78,6 +78,11 @@
+>  		};
+>  	};
+>  
+> +	pmu {
+> +		compatible = "arm,cortex-a9-pmu";
+> +		interrupts-extended = <&mpic 3>;
+> +	};
+> +
+>  	soc {
+>  		compatible = "marvell,armada390-mbus", "marvell,armadaxp-mbus",
+>  			     "simple-bus";
+> @@ -322,6 +327,16 @@
+>  				reg = <0x20800 0x10>;
+>  			};
+>  
+> +			mpcore-soc-ctrl at 20d20 {
+> +				compatible = "marvell,armada-380-mpcore-soc-ctrl";
+> +				reg = <0x20d20 0x6c>;
+> +			};
+> +
+> +			coherency-fabric at 21010 {
+> +				compatible = "marvell,armada-380-coherency-fabric";
+> +				reg = <0x21010 0x1c>;
+> +			};
+> +
+>  			pmsu at 22000 {
+>  				compatible = "marvell,armada-390-pmsu",
+>  					     "marvell,armada-380-pmsu";
+> -- 
+> 1.8.3.1
+>
 
-I think Arnd wanted to move this in the opposite direction and remove
-the configurable RESET_CONTROLLER symbol. Maybe we should let all
-drivers that currently request non-optional resets have:
-	depends on (ARCH_HAS_)RESET_CONTROLLER || COMPILE_TEST
-?
-
-regards
-Philipp
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
