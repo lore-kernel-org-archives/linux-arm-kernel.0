@@ -1,37 +1,30 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 28 Jul 2016 15:28:42 +0200
-Subject: [PATCH 4/9] clk: sunxi-ng: mux: Add support for mux tables
-In-Reply-To: <20160727103649.9e6ef332847b5a5c8fac66af@free.fr>
+Date: Thu, 28 Jul 2016 15:31:45 +0200
+Subject: [PATCH 8/9] clk: sunxi-ng: Add A31/A31s clocks
+In-Reply-To: <1469516671-19377-9-git-send-email-wens@csie.org>
 References: <1469516671-19377-1-git-send-email-wens@csie.org>
- <1469516671-19377-5-git-send-email-wens@csie.org>
- <20160726194306.9b6aadd3d1669bd6f5a54d99@free.fr>
- <20160727065934.GD6560@lukather>
- <20160727091827.e26f72701ce5758fa29aff7a@free.fr>
- <20160727074020.GH6560@lukather>
- <20160727103649.9e6ef332847b5a5c8fac66af@free.fr>
-Message-ID: <20160728132842.GA6682@lukather>
+ <1469516671-19377-9-git-send-email-wens@csie.org>
+Message-ID: <20160728133145.GB6682@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 27, 2016 at 10:36:49AM +0200, Jean-Francois Moine wrote:
-> On Wed, 27 Jul 2016 09:40:20 +0200
-> Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+On Tue, Jul 26, 2016 at 03:04:30PM +0800, Chen-Yu Tsai wrote:
+> Add a new style driver for the clock control unit in Allwinner A31/A31s.
 > 
-> > > > Parenting functions would also not work as expected,
-> > > > clk_hw_get_parent_by_index being the obvious example, in that case
-> > > > returning the empty string for an invalid parent, while it should
-> > > > really return NULL.
-> > > 
-> > > I don't see why the clock should be orphan.
-> > > Then, when a parent is "", clk_hw_get_parent_by_index() returns NULL.
-> > 
-> > Why? It should return NULL when there's no parent, while you
-> > explicitly registered a parent.
+> A few clocks are still missing:
 > 
-> "" is not an existing parent. It could be "none" / "dum" / "toto" / ...
-> with the same result: 'this index cannot be used in mux'.
+>     - EMAC clock
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
-And the clock is marked as orphan, while it really isn't.
+Looks good to me, aside from the comment made by Jean-Francois.
+
+I guess I'd prefer to have the SoC names in the define, just in case
+we need to introduce support for another SoC, but this can always be
+done later.
+
+Thanks!
+Maxime
 
 -- 
 Maxime Ripard, Free Electrons
@@ -43,4 +36,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160728/82b5fabd/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160728/34b3f29b/attachment.sig>
