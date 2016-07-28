@@ -1,80 +1,171 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Thu, 28 Jul 2016 13:00:49 +0200
-Subject: Why do we need reset_control_get_optional() ?
-In-Reply-To: <CAK7LNAQ0nCQymq+M+FTUXoK7yBj_5CJp9nqDjO3u5wcnckXtmw@mail.gmail.com>
-References: <CAK7LNAQnitMMp5wMXXvVeS-UFF=Fo9m=M1hL=5f4=RF8JYCnGg@mail.gmail.com>
- <1469698980.12835.18.camel@pengutronix.de> <5955443.3UvZHD6laK@wuerfel>
- <CAK7LNAQ0nCQymq+M+FTUXoK7yBj_5CJp9nqDjO3u5wcnckXtmw@mail.gmail.com>
-Message-ID: <1469703649.12835.34.camel@pengutronix.de>
+From: julien.grall@arm.com (Julien Grall)
+Date: Thu, 28 Jul 2016 12:17:12 +0100
+Subject: [Xen-devel] [PATCH v4] xen/arm: Add a clock property
+In-Reply-To: <dbd46fe5-6f53-d11e-6363-a2c9905d6c8e@gmail.com>
+References: <1468309605-19522-1-git-send-email-dirk.behme@de.bosch.com>
+ <146836236759.73491.11707389619985827497@resonance>
+ <c320f820-8749-f4a4-435e-ddd9379655b5@de.bosch.com>
+ <alpine.DEB.2.10.1607131941200.26575@sstabellini-ThinkPad-X260>
+ <57868EDE.6060406@gmail.com>
+ <146844380895.73491.4867379517577413421@resonance>
+ <7df784ab-d0c0-939b-393e-214535c4b191@de.bosch.com>
+ <alpine.DEB.2.10.1607141132000.26575@sstabellini-ThinkPad-X260>
+ <146914607316.8780.7961396342647226841@resonance>
+ <alpine.DEB.2.10.1607211804000.6667@sstabellini-ThinkPad-X260>
+ <dbd46fe5-6f53-d11e-6363-a2c9905d6c8e@gmail.com>
+Message-ID: <1a486d3b-0dda-d545-ca6a-031a8bf932e9@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, den 28.07.2016, 19:52 +0900 schrieb Masahiro Yamada:
-> Hi Arnd,
-> 
-> 
-> 2016-07-28 19:09 GMT+09:00 Arnd Bergmann <arnd@arndb.de>:
-> > On Thursday, July 28, 2016 11:43:00 AM CEST Philipp Zabel wrote:
-> >> > I want to deprecate _optional variants in the following steps:
-> >> >
-> >> > [1] Add "depends on RESET_CONTROLLER" to drivers
-> >> >     for which reset_control is mandatory.
-> >> >
-> >> >     We can find those driver easily by grepping
-> >> >     the reference to non-optional reset_control_get().
-> >>
-> >> Since we have the stubs, the RESET_CONTROLLER dependency is only at
-> >> runtime, not at build time.
-> >>
-> >> I think Arnd wanted to move this in the opposite direction and remove
-> >> the configurable RESET_CONTROLLER symbol. Maybe we should let all
-> >> drivers that currently request non-optional resets have:
-> >>         depends on (ARCH_HAS_)RESET_CONTROLLER || COMPILE_TEST
-> >> ?
-> >
-> > There are various ways to improve the current situation.
-> >
-> > I think it's important that a driver that has an optional
-> > reset line behaves in exactly the same way whether the reset
-> > subsystem is enabled or disabled when no reset line is
-> > provided for a machine.
-> >
-> > When a driver requires a reset line, we can either have a
-> > build-time failure when the reset subsystem is disabled
-> > (enforcing the Kconfig dependency), or cause a runtime
-> > failure if either there is no reset line or the subsystem
-> > is disabled.
-> 
-> Yes.  I am suggesting the "enforcing the Kconfig dependency".
-> 
-> "I will let you build this driver, but it would never work"
-> is not the right thing to do, I think.
+Hi Dirk,
 
-We'd loose randconfig build coverage though. I think allowing to build
-unusable drivers in COMPILE_TEST scenarios is ok.
+On 27/07/16 06:05, Dirk Behme wrote:
+> Hi Michael, Stefano and Julien,
+>
+> On 22.07.2016 03:16, Stefano Stabellini wrote:
+>> On Thu, 21 Jul 2016, Michael Turquette wrote:
+>>> Quoting Stefano Stabellini (2016-07-14 03:38:04)
+>>>> On Thu, 14 Jul 2016, Dirk Behme wrote:
+>>>>> On 13.07.2016 23:03, Michael Turquette wrote:
+>>>>>> Quoting Dirk Behme (2016-07-13 11:56:30)
+>>>>>>> On 13.07.2016 20:43, Stefano Stabellini wrote:
+>>>>>>>> On Wed, 13 Jul 2016, Dirk Behme wrote:
+>>>>>>>>> On 13.07.2016 00:26, Michael Turquette wrote:
+>>>>>>>>>> Quoting Dirk Behme (2016-07-12 00:46:45)
+>>>>>>>>>>> Clocks described by this property are reserved for use by
+>>>>>>>>>>> Xen, and
+>>>>>>>>>>> the OS
+>>>>>>>>>>> must not alter their state any way, such as disabling or
+>>>>>>>>>>> gating a
+>>>>>>>>>>> clock,
+>>>>>>>>>>> or modifying its rate. Ensuring this may impose constraints on
+>>>>>>>>>>> parent
+>>>>>>>>>>> clocks or other resources used by the clock tree.
+>>>>>>>>>>
+>>>>>>>>>> Note that clk_prepare_enable will not prevent the rate from
+>>>>>>>>>> changing
+>>>>>>>>>> (clk_set_rate) or a parent from changing (clk_set_parent). The
+>>>>>>>>>> only
+>>>>>>>>>> way
+>>>>>>>>>> to do this currently would be to set the following flags on the
+>>>>>>>>>> effected
+>>>>>>>>>> clocks:
+>>>>>>>>>>
+>>>>>>>>>>     CLK_SET_RATE_GATE
+>>>>>>>>>>     CLK_SET_PARENT_GATE
+>>>>>>>>>
+>>>>>>>>>
+>>>>>>>>>
+>>>>>>>>> Regarding setting flags, I think we already talked about that.
+>>>>>>>>> I think
+>>>>>>>>> the
+>>>>>>>>> conclusion was that in our case its not possible to manipulate the
+>>>>>>>>> flags in
+>>>>>>>>> the OS as this isn't intended to be done in cases like ours.
+>>>>>>>>> Therefore
+>>>>>>>>> no API
+>>>>>>>>> is exported for this.
+>>>>>>>>>
+>>>>>>>>> I.e. if we need to set these flags, we have to do that in Xen
+>>>>>>>>> where we
+>>>>>>>>> add the
+>>>>>>>>> clocks to the hypervisor node in the device tree. And not in the
+>>>>>>>>> kernel patch
+>>>>>>>>> discussed here.
+>>>>>>>>
+>>>>>>>> These are internal Linux flags, aren't they?
+>>>>>>>
+>>>>>>>
+>>>>>>> I've been under the impression that you can set clock "flags" via
+>>>>>>> the
+>>>>>>> device tree. Seems I need to re-check that ;)
+>>>>>>
+>>>>>> Right, you cannot set flags from the device tree. Also, setting these
+>>>>>> flags is done by the clock provider driver, not a consumer. Xen is
+>>>>>> the
+>>>>>> consumer.
+>>>>>
+>>>>>
+>>>>> Ok, thanks, then I think we can forget about using flags for the
+>>>>> issue we are
+>>>>> discussing here.
+>>>>>
+>>>>> Best regards
+>>>>>
+>>>>> Dirk
+>>>>>
+>>>>> P.S.: Would it be an option to merge the v4 patch we are discussing
+>>>>> here,
+>>>>> then? From the discussion until here, it sounds to me that it's the
+>>>>> best
+>>>>> option we have at the moment. Maybe improving it in the future, then.
+>>>>
+>>>> It might be a step in the right direction, but it doesn't really
+>>>> prevent
+>>>> clk_set_rate from changing properties of a clock owned by Xen.  This
+>>>> patch is incomplete. We need to understand at least what it would take
+>>>> to have a complete solution.
+>>>>
+>>>> Michael, do you have any suggestions on how it would be possible to set
+>>>> CLK_SET_RATE_GATE and CLK_SET_PARENT_GATE for those clocks in a proper
+>>>> way?
+>>>
+>>> No, there is no way for a consumer to do that. The provider must do it.
+>>
+>> All right. But could we design a new device tree binding which the Xen
+>> hypervisor would use to politely ask the clock provider in Linux to set
+>> CLK_SET_RATE_GATE and CLK_SET_PARENT_GATE for a given clock?
+>>
+>> Xen would have to modify the DTB before booting Linux with the new
+>> binding.
+>>
+>>
+>>>> Like you wrote, I would imagine it needs to be done by the clock
+>>>> provider driver. Maybe to do that, it would be easier to have a new
+>>>> device tree property on the clock node, rather than listing phandle and
+>>>> clock-specifier pairs under the Xen node?
+>>>
+>>> Upon further reflection, I think that your clock consumer can probably
+>>> use clk_set_rate_range() to "lock" in a rate. This is good because it is
+>>> exactly what a clock consumer should do:
+>>>
+>>> 1) get the clk
+>>> 2) enable the clk
+>>> 3) set the required rate for the clock
+>>> 4) set rate range constraints, or conversely,
+>>> 5) lock in an exact rate; set the min/max rate to the same value
+>>>
+>>> The problem with this solution is that it requires the consumer to have
+>>> knowledge of the rates that it wants for that clock, which I guess is
+>>> something that Linux kernels in a Xen setup do not want/need?
+>>
+>> Who is usually the component with knowledge of the clock rate to set? If
+>> it's a device driver, then neither the Xen hypervisor, nor the Xen core
+>> drivers in Linux would know anything about it. (Unless the clock rate is
+>> specified on device tree via assigned-clock-rates of course.)
+>>
+>>
+>>> Is it correct that you would prefer some sort of never_touch_this_clk()
+>>> api?
+>>
+>>> From my understading, yes, never_touch_this_clk() would make things
+>>> easier.
+>
+>
+> Would it be somehow worth to wait for anything like this
+> never_touch_this_clk() api? Or should we try to proceed with
+> clk_prepare_enable() like done in this patch for the moment?
 
-> > In my experimental patch, I make the _optional functions
-> > return NULL if no "resets" property is provided but return
-> > an error if there are reset lines but the subsystem is
-> > disabled, i.e. an optional reset must be used if it's in the
-> > DT, but can be ignored otherwise.
-> 
-> I do not like this idea.
-> 
-> reset_control_get() (or variants) should not return NULL, it is ambiguous.
-> It should return ERR_PTR(-ENOENT) if no "resets" property.
-> 
-> I only want two types for functions that return a pointer.
-> 
-> [1] return a valid pointer on success, or return NULL on failure
->     (for example, kmalloc())
-> [2] return a valid pointer on success, or return error pointer on failure
->    (many of _register() functions)
-> 
-> Mixing [1] and [2] will be a mess.
+I am not sure who will write the new api never_touch_this_clk(). Could 
+you suggest an implementation based on the discussion?
 
-I too would prefer to keep that as-is. The reset_control_get_optional
-stub could return -ENOENT if there is no resets device tree property.
+Regards,
 
-regards
-Philipp
+>
+> Best regards
+>
+> Dirk
+>
+
+-- 
+Julien Grall
