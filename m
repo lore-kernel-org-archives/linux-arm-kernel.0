@@ -1,12 +1,12 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 28 Jul 2016 15:01:12 +0200
-Subject: [PATCH 17/18] ARM: mvebu: a390-db: add support for the Armada 390
- DB board
-In-Reply-To: <1469105055-25181-19-git-send-email-jaz@semihalf.com> (Grzegorz
- Jaszczyk's message of "Thu, 21 Jul 2016 14:44:14 +0200")
+Date: Thu, 28 Jul 2016 15:15:46 +0200
+Subject: [PATCH 18/18] ARM: mvebu: a395-gp: add support for the Armada 395
+ GP Board
+In-Reply-To: <1469105055-25181-20-git-send-email-jaz@semihalf.com> (Grzegorz
+ Jaszczyk's message of "Thu, 21 Jul 2016 14:44:15 +0200")
 References: <1469105055-25181-1-git-send-email-jaz@semihalf.com>
- <1469105055-25181-19-git-send-email-jaz@semihalf.com>
-Message-ID: <87lh0lkjc7.fsf@free-electrons.com>
+ <1469105055-25181-20-git-send-email-jaz@semihalf.com>
+Message-ID: <87h9b9kinx.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,45 +14,37 @@ Hi Grzegorz,
  
  On jeu., juil. 21 2016, Grzegorz Jaszczyk <jaz@semihalf.com> wrote:
 
-Change the prefix to "ARM: dts: mvebu: armada-390-db:"
+Change the prefix to "ARM: dts: mvebu: armada-395-gp:"
 
-> This commit adds description for following features for this board:
+> This commit adds description for the following features for this board:
 >
 > - Serial port
-> - I2C buses
-> - 16MB SPI-NOR
+> - PCIe interfaces
 > - USB2.0
 > - USB3.0
-> - PCIe interfaces
+> - SDIO
+> - 1024 MiB NAND-FLASH
+> - SATA
+> - I2C buses
 >
 > Signed-off-by: Grzegorz Jaszczyk <jaz@semihalf.com>
-> ---
->  arch/arm/boot/dts/armada-390-db.dts | 164 ++++++++++++++++++++++++++++++++++++
->  1 file changed, 164 insertions(+)
->  create mode 100644 arch/arm/boot/dts/armada-390-db.dts
->
 [...]
 
-> +
-> +			i2c at 11000 {
+As for the other board, try to add information about the connector used:
 
-It would be interesting to know if there is something connected on this
-bus.
-
-> +				status = "okay";
-> +				clock-frequency = <100000>;
-> +			};
-> +
 > +			serial at 12000 {
-
-It would be nice to indicate the name of the connector on the board.
+Here,
 
 > +				status = "okay";
 > +			};
 > +
 > +			usb at 58000 {
-Here to
-
+here
+> +				status = "okay";
+> +			};
+> +
+> +			sata at a8000 {
+here
 > +				status = "okay";
 > +			};
 > +
@@ -64,7 +56,7 @@ Here to
 > +				marvell,nand-keep-config;
 > +				marvell,nand-enable-arbiter;
 > +				nand-on-flash-bbt;
-> +				nand-ecc-strength = <8>;
+> +				nand-ecc-strength = <4>;
 > +				nand-ecc-step-size = <512>;
 > +
 > +				partitions {
@@ -74,23 +66,35 @@ Here to
 > +
 > +					partition at 0 {
 > +						label = "U-Boot";
-> +						reg = <0 0x800000>;
+> +						reg = <0x00000000 0x00600000>;
+> +						read-only;
 > +					};
+> +
 > +					partition at 800000 {
-> +						label = "Linux";
-> +						reg = <0x800000 0x800000>;
+> +						label = "uImage";
+> +						reg = <0x00600000 0x00400000>;
+> +						read-only;
 > +					};
+> +
 > +					partition at 1000000 {
-> +						label = "Filesystem";
-> +						reg = <0x1000000 0x3f000000>;
+> +						label = "Root";
+> +						reg = <0x00a00000 0x3f600000>;
 > +					};
 > +				};
 > +			};
 > +
-> +			usb3 at f8000 {
-
-Ditto
-
+> +			sdhci at d8000 {
+here
+> +				clock-frequency = <200000000>;
+> +				broken-cd;
+> +				wp-inverted;
+> +				bus-width = <8>;
+> +				status = "okay";
+> +				no-1-8-v;
+> +			};
+> +
+> +			usb3 at f0000 {
+here
 > +				status = "okay";
 > +			};
 > +		};
@@ -98,35 +102,30 @@ Ditto
 > +		pcie-controller {
 > +			status = "okay";
 > +
-And the same for the following PCIe ports.
-
-> +			pcie at 1,0 {
-> +				status = "okay";
-> +			};
-> +
+> +			/*
+> +			 * The two PCIe units are accessible through
+> +			 * mini PCIe slot on the board.
+> +			 */
+and here for each slot
 > +			pcie at 2,0 {
+> +				/* Port 1, Lane 0 */
 > +				status = "okay";
 > +			};
 > +
-> +			pcie at 3,0 {
+> +			pcie at 4,0 {
+> +				/* Port 3, Lane 0 */
 > +				status = "okay";
 > +			};
 > +		};
 > +	};
 > +};
 
-Then you can add my
-
+then you can add my:
 Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
 Thanks,
 
 Gregory
-
-
-> -- 
-> 1.8.3.1
->
 
 -- 
 Gregory Clement, Free Electrons
