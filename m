@@ -1,121 +1,273 @@
-From: mirza.krak@gmail.com (Mirza Krak)
-Date: Thu, 28 Jul 2016 11:29:03 +0200
-Subject: [RFC 3/6] dt/bindings: Add bindings for Tegra20/30 NOR bus driver
-In-Reply-To: <20160725141544.GN21170@ulmo.ba.sec>
-References: <1468935397-11926-1-git-send-email-mirza.krak@gmail.com>
- <1468935397-11926-4-git-send-email-mirza.krak@gmail.com>
- <20160725113034.GD21170@ulmo.ba.sec>
- <CALw8SCWEFVu__8Gyr5q995h+=oMQEz1VUNB=Ne7MRb0O-tZXqg@mail.gmail.com>
- <20160725141544.GN21170@ulmo.ba.sec>
-Message-ID: <CALw8SCX+Sktdij7AKFtkAh3To6qA16xtZNFi4GpkzHE8256N_w@mail.gmail.com>
+From: yt.shen@mediatek.com (YT Shen)
+Date: Thu, 28 Jul 2016 17:27:59 +0800
+Subject: [PATCH v5 05/10] drm/mediatek: cleaning up and refine
+In-Reply-To: <1469698084-20185-1-git-send-email-yt.shen@mediatek.com>
+References: <1469698084-20185-1-git-send-email-yt.shen@mediatek.com>
+Message-ID: <1469698084-20185-6-git-send-email-yt.shen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-07-25 16:15 GMT+02:00 Thierry Reding <thierry.reding@gmail.com>:
-> On Mon, Jul 25, 2016 at 03:16:28PM +0200, Mirza Krak wrote:
->> 2016-07-25 13:30 GMT+02:00 Thierry Reding <thierry.reding@gmail.com>:
-> Yes, that clarifies many things. The presence of an external, address-
-> based chip-select is essential information in order to describe this
-> setup properly.
->
-> Given that the external chip select is entirely invisible to software, I
-> think a more accurate description of your setup would be:
->
->         gmi at 70090000 {
->                 ...
->
->                 /* for the chip select */
->                 #address-cells = <1>;
->                 #size-cells = <0>;
->
->                 /*
->                  * Technically this could be used to translate the range from
->                  * 0x48000000 to 0x4fffffff into a different range, but that
->                  * no longer works because of the #address-cells. Does this
->                  * matter?
->                  */
->                 ranges;
->
->                 bus at 0 {
->                         compatible = "simple-bus";
->                         reg = <0>;
->
->                         #address-cells = <1>;
->                         #size-cells = <1>;
->
->                         can at 48000000 {
->                                 reg = <0x48000000 0x100>;
->                                 ...
->                         };
->
->                         can at 48040000 {
->                                 reg = <0x48040000 0x100>;
->                                 ...
->                         };
->                 };
->         };
->
+cleaning up unused define and refine function name and variable
 
-Finally got around to test this. Above example had some issues, or I
-am doing something wrong.
+Signed-off-by: shaoming chen <shaoming.chen@mediatek.com>
+Signed-off-by: YT Shen <yt.shen@mediatek.com>
+---
+ drivers/gpu/drm/mediatek/mtk_dsi.c     |   77 +++++++++++++++-----------------
+ drivers/gpu/drm/mediatek/mtk_mipi_tx.c |    8 ++--
+ 2 files changed, 41 insertions(+), 44 deletions(-)
 
-First of, the address parser does not seem to like that #size-cells =
-<0> when ranges are empty. Got following warning from device tree
-compiler:
-Warning (ranges_format): /nor at 70009000 has empty "ranges" property but
-its #size-cells (0) differs from / (1)
-
-and on boot:
-[    0.399357] prom_parse: Bad cell count for /nor at 70009000/bus at 0
-
-Got it to work if I changed to (also had to add an empty ranges prop
-in bus node):
-
-gmi at 70009000 {
-    #address-cells = <1>;
-    #size-cells = <1>;
-    ranges;
-
-    bus at 0,0 {
-                compatible = "simple-bus";
-                reg = <0 0>;
-                ranges;
-
-                #address-cells = <1>;
-                #size-cells = <1>;
-
-                can at 48000000 {
-                    reg = <0x48000000 0x100>;
-                    ...
-                };
-
-
-                can at 48040000 {
-                    reg = <0x48040000 0x100>;
-                    ...
-                };
-}
-
-But I wonder is there something wrong with below example (which does
-work), that is omitting the bus node:
-
-gmi at 70009000 {
-    #address-cells = <1>;
-    #size-cells = <1>;
-    ranges;
-
-    can at 48000000 {
-        reg = <0x48000000 0x100>;
-        ...
-    };
-
-    can at 48040000 {
-        reg = <0x48040000 0x100>;
-        ...
-    };
-}
-
-Just feel that I need to duplicate information if add an bus node.
-
-Best Regards,
-Mirza
+diff --git a/drivers/gpu/drm/mediatek/mtk_dsi.c b/drivers/gpu/drm/mediatek/mtk_dsi.c
+index 2d808e5..a9cf5a1 100644
+--- a/drivers/gpu/drm/mediatek/mtk_dsi.c
++++ b/drivers/gpu/drm/mediatek/mtk_dsi.c
+@@ -27,9 +27,6 @@
+ 
+ #include "mtk_drm_ddp_comp.h"
+ 
+-#define DSI_VIDEO_FIFO_DEPTH	(1920 / 4)
+-#define DSI_HOST_FIFO_DEPTH	64
+-
+ #define DSI_START		0x00
+ 
+ #define DSI_CON_CTRL		0x10
+@@ -46,7 +43,7 @@
+ #define MIX_MODE			BIT(17)
+ 
+ #define DSI_TXRX_CTRL		0x18
+-#define VC_NUM				(2 << 0)
++#define VC_NUM				BIT(1)
+ #define LANE_NUM			(0xf << 2)
+ #define DIS_EOT				BIT(6)
+ #define NULL_EN				BIT(7)
+@@ -158,11 +155,11 @@ static void mtk_dsi_mask(struct mtk_dsi *dsi, u32 offset, u32 mask, u32 data)
+ 	writel((temp & ~mask) | (data & mask), dsi->regs + offset);
+ }
+ 
+-static void dsi_phy_timconfig(struct mtk_dsi *dsi)
++static void mtk_dsi_phy_timconfig(struct mtk_dsi *dsi)
+ {
+ 	u32 timcon0, timcon1, timcon2, timcon3;
+-	unsigned int ui, cycle_time;
+-	unsigned int lpx;
++	u32 ui, cycle_time;
++	u32 lpx;
+ 
+ 	ui = 1000 / dsi->data_rate + 0x01;
+ 	cycle_time = 8000 / dsi->data_rate + 0x01;
+@@ -192,7 +189,7 @@ static void mtk_dsi_disable(struct mtk_dsi *dsi)
+ 	mtk_dsi_mask(dsi, DSI_CON_CTRL, DSI_EN, 0);
+ }
+ 
+-static void mtk_dsi_reset(struct mtk_dsi *dsi)
++static void mtk_dsi_reset_engine(struct mtk_dsi *dsi)
+ {
+ 	mtk_dsi_mask(dsi, DSI_CON_CTRL, DSI_RESET, DSI_RESET);
+ 	mtk_dsi_mask(dsi, DSI_CON_CTRL, DSI_RESET, 0);
+@@ -235,8 +232,8 @@ static int mtk_dsi_poweron(struct mtk_dsi *dsi)
+ 	}
+ 
+ 	mtk_dsi_enable(dsi);
+-	mtk_dsi_reset(dsi);
+-	dsi_phy_timconfig(dsi);
++	mtk_dsi_reset_engine(dsi);
++	mtk_dsi_phy_timconfig(dsi);
+ 
+ 	return 0;
+ 
+@@ -249,33 +246,33 @@ err_refcount:
+ 	return ret;
+ }
+ 
+-static void dsi_clk_ulp_mode_enter(struct mtk_dsi *dsi)
++static void mtk_dsi_clk_ulp_mode_enter(struct mtk_dsi *dsi)
+ {
+ 	mtk_dsi_mask(dsi, DSI_PHY_LCCON, LC_HS_TX_EN, 0);
+ 	mtk_dsi_mask(dsi, DSI_PHY_LCCON, LC_ULPM_EN, 0);
+ }
+ 
+-static void dsi_clk_ulp_mode_leave(struct mtk_dsi *dsi)
++static void mtk_dsi_clk_ulp_mode_leave(struct mtk_dsi *dsi)
+ {
+ 	mtk_dsi_mask(dsi, DSI_PHY_LCCON, LC_ULPM_EN, 0);
+ 	mtk_dsi_mask(dsi, DSI_PHY_LCCON, LC_WAKEUP_EN, LC_WAKEUP_EN);
+ 	mtk_dsi_mask(dsi, DSI_PHY_LCCON, LC_WAKEUP_EN, 0);
+ }
+ 
+-static void dsi_lane0_ulp_mode_enter(struct mtk_dsi *dsi)
++static void mtk_dsi_lane0_ulp_mode_enter(struct mtk_dsi *dsi)
+ {
+ 	mtk_dsi_mask(dsi, DSI_PHY_LD0CON, LD0_HS_TX_EN, 0);
+ 	mtk_dsi_mask(dsi, DSI_PHY_LD0CON, LD0_ULPM_EN, 0);
+ }
+ 
+-static void dsi_lane0_ulp_mode_leave(struct mtk_dsi *dsi)
++static void mtk_dsi_lane0_ulp_mode_leave(struct mtk_dsi *dsi)
+ {
+ 	mtk_dsi_mask(dsi, DSI_PHY_LD0CON, LD0_ULPM_EN, 0);
+ 	mtk_dsi_mask(dsi, DSI_PHY_LD0CON, LD0_WAKEUP_EN, LD0_WAKEUP_EN);
+ 	mtk_dsi_mask(dsi, DSI_PHY_LD0CON, LD0_WAKEUP_EN, 0);
+ }
+ 
+-static bool dsi_clk_hs_state(struct mtk_dsi *dsi)
++static bool mtk_dsi_clk_hs_state(struct mtk_dsi *dsi)
+ {
+ 	u32 tmp_reg1;
+ 
+@@ -283,15 +280,15 @@ static bool dsi_clk_hs_state(struct mtk_dsi *dsi)
+ 	return ((tmp_reg1 & LC_HS_TX_EN) == 1) ? true : false;
+ }
+ 
+-static void dsi_clk_hs_mode(struct mtk_dsi *dsi, bool enter)
++static void mtk_dsi_clk_hs_mode(struct mtk_dsi *dsi, bool enter)
+ {
+-	if (enter && !dsi_clk_hs_state(dsi))
++	if (enter && !mtk_dsi_clk_hs_state(dsi))
+ 		mtk_dsi_mask(dsi, DSI_PHY_LCCON, LC_HS_TX_EN, LC_HS_TX_EN);
+-	else if (!enter && dsi_clk_hs_state(dsi))
++	else if (!enter && mtk_dsi_clk_hs_state(dsi))
+ 		mtk_dsi_mask(dsi, DSI_PHY_LCCON, LC_HS_TX_EN, 0);
+ }
+ 
+-static void dsi_set_mode(struct mtk_dsi *dsi)
++static void mtk_dsi_set_mode(struct mtk_dsi *dsi)
+ {
+ 	u32 vid_mode = CMD_MODE;
+ 
+@@ -306,7 +303,7 @@ static void dsi_set_mode(struct mtk_dsi *dsi)
+ 	writel(vid_mode, dsi->regs + DSI_MODE_CTRL);
+ }
+ 
+-static void dsi_ps_control_vact(struct mtk_dsi *dsi)
++static void mtk_dsi_ps_control_vact(struct mtk_dsi *dsi)
+ {
+ 	struct videomode *vm = &dsi->vm;
+ 	u32 dsi_buf_bpp, ps_wc;
+@@ -340,7 +337,7 @@ static void dsi_ps_control_vact(struct mtk_dsi *dsi)
+ 	writel(ps_wc, dsi->regs + DSI_HSTX_CKL_WC);
+ }
+ 
+-static void dsi_rxtx_control(struct mtk_dsi *dsi)
++static void mtk_dsi_rxtx_control(struct mtk_dsi *dsi)
+ {
+ 	u32 tmp_reg;
+ 
+@@ -365,9 +362,9 @@ static void dsi_rxtx_control(struct mtk_dsi *dsi)
+ 	writel(tmp_reg, dsi->regs + DSI_TXRX_CTRL);
+ }
+ 
+-static void dsi_ps_control(struct mtk_dsi *dsi)
++static void mtk_dsi_ps_control(struct mtk_dsi *dsi)
+ {
+-	unsigned int dsi_tmp_buf_bpp;
++	u32 dsi_tmp_buf_bpp;
+ 	u32 tmp_reg;
+ 
+ 	switch (dsi->format) {
+@@ -397,12 +394,12 @@ static void dsi_ps_control(struct mtk_dsi *dsi)
+ 	writel(tmp_reg, dsi->regs + DSI_PSCTRL);
+ }
+ 
+-static void dsi_config_vdo_timing(struct mtk_dsi *dsi)
++static void mtk_dsi_config_vdo_timing(struct mtk_dsi *dsi)
+ {
+-	unsigned int horizontal_sync_active_byte;
+-	unsigned int horizontal_backporch_byte;
+-	unsigned int horizontal_frontporch_byte;
+-	unsigned int dsi_tmp_buf_bpp;
++	u32 horizontal_sync_active_byte;
++	u32 horizontal_backporch_byte;
++	u32 horizontal_frontporch_byte;
++	u32 dsi_tmp_buf_bpp;
+ 
+ 	struct videomode *vm = &dsi->vm;
+ 
+@@ -431,7 +428,7 @@ static void dsi_config_vdo_timing(struct mtk_dsi *dsi)
+ 	writel(horizontal_backporch_byte, dsi->regs + DSI_HBP_WC);
+ 	writel(horizontal_frontporch_byte, dsi->regs + DSI_HFP_WC);
+ 
+-	dsi_ps_control(dsi);
++	mtk_dsi_ps_control(dsi);
+ }
+ 
+ static void mtk_dsi_start(struct mtk_dsi *dsi)
+@@ -448,8 +445,8 @@ static void mtk_dsi_poweroff(struct mtk_dsi *dsi)
+ 	if (--dsi->refcount != 0)
+ 		return;
+ 
+-	dsi_lane0_ulp_mode_enter(dsi);
+-	dsi_clk_ulp_mode_enter(dsi);
++	mtk_dsi_lane0_ulp_mode_enter(dsi);
++	mtk_dsi_clk_ulp_mode_enter(dsi);
+ 
+ 	mtk_dsi_disable(dsi);
+ 
+@@ -479,18 +476,18 @@ static void mtk_output_dsi_enable(struct mtk_dsi *dsi)
+ 		return;
+ 	}
+ 
+-	dsi_rxtx_control(dsi);
++	mtk_dsi_rxtx_control(dsi);
+ 
+-	dsi_clk_ulp_mode_leave(dsi);
+-	dsi_lane0_ulp_mode_leave(dsi);
+-	dsi_clk_hs_mode(dsi, 0);
+-	dsi_set_mode(dsi);
++	mtk_dsi_clk_ulp_mode_leave(dsi);
++	mtk_dsi_lane0_ulp_mode_leave(dsi);
++	mtk_dsi_clk_hs_mode(dsi, 0);
++	mtk_dsi_set_mode(dsi);
+ 
+-	dsi_ps_control_vact(dsi);
+-	dsi_config_vdo_timing(dsi);
++	mtk_dsi_ps_control_vact(dsi);
++	mtk_dsi_config_vdo_timing(dsi);
+ 
+-	dsi_set_mode(dsi);
+-	dsi_clk_hs_mode(dsi, 1);
++	mtk_dsi_set_mode(dsi);
++	mtk_dsi_clk_hs_mode(dsi, 1);
+ 
+ 	mtk_dsi_start(dsi);
+ 
+diff --git a/drivers/gpu/drm/mediatek/mtk_mipi_tx.c b/drivers/gpu/drm/mediatek/mtk_mipi_tx.c
+index cf8f38d..19481c7 100644
+--- a/drivers/gpu/drm/mediatek/mtk_mipi_tx.c
++++ b/drivers/gpu/drm/mediatek/mtk_mipi_tx.c
+@@ -126,7 +126,7 @@
+ struct mtk_mipi_tx {
+ 	struct device *dev;
+ 	void __iomem *regs;
+-	unsigned int data_rate;
++	u32 data_rate;
+ 	struct clk_hw pll_hw;
+ 	struct clk *pll;
+ };
+@@ -163,7 +163,7 @@ static void mtk_mipi_tx_update_bits(struct mtk_mipi_tx *mipi_tx, u32 offset,
+ static int mtk_mipi_tx_pll_prepare(struct clk_hw *hw)
+ {
+ 	struct mtk_mipi_tx *mipi_tx = mtk_mipi_tx_from_clk_hw(hw);
+-	unsigned int txdiv, txdiv0, txdiv1;
++	u8 txdiv, txdiv0, txdiv1;
+ 	u64 pcw;
+ 
+ 	dev_dbg(mipi_tx->dev, "prepare: %u Hz\n", mipi_tx->data_rate);
+@@ -310,7 +310,7 @@ static const struct clk_ops mtk_mipi_tx_pll_ops = {
+ static int mtk_mipi_tx_power_on_signal(struct phy *phy)
+ {
+ 	struct mtk_mipi_tx *mipi_tx = phy_get_drvdata(phy);
+-	unsigned int reg;
++	u32 reg;
+ 
+ 	for (reg = MIPITX_DSI_CLOCK_LANE;
+ 	     reg <= MIPITX_DSI_DATA_LANE3; reg += 4)
+@@ -341,7 +341,7 @@ static int mtk_mipi_tx_power_on(struct phy *phy)
+ static void mtk_mipi_tx_power_off_signal(struct phy *phy)
+ {
+ 	struct mtk_mipi_tx *mipi_tx = phy_get_drvdata(phy);
+-	unsigned int reg;
++	u32 reg;
+ 
+ 	mtk_mipi_tx_set_bits(mipi_tx, MIPITX_DSI_TOP_CON,
+ 			     RG_DSI_PAD_TIE_LOW_EN);
+-- 
+1.7.9.5
