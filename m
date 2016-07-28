@@ -1,34 +1,29 @@
 From: bibby.hsieh@mediatek.com (Bibby Hsieh)
-Date: Thu, 28 Jul 2016 10:47:17 +0800
+Date: Thu, 28 Jul 2016 10:49:25 +0800
 Subject: [PATCH v3] arm64: dts: mt8173: add mmsel clocks for 4K support
-In-Reply-To: <1469611556.11841.77.camel@mtksdaap41>
+In-Reply-To: <1469611964.2470.30.camel@pengutronix.de>
 References: <1469607914-64831-1-git-send-email-bibby.hsieh@mediatek.com>
- <1469611556.11841.77.camel@mtksdaap41>
-Message-ID: <1469674037.29230.0.camel@mtksdaap41>
+ <1469611964.2470.30.camel@pengutronix.de>
+Message-ID: <1469674165.29230.1.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, CK,
+Hi, Philipp,
 
 Thanks for your comments.
 
-On Wed, 2016-07-27 at 17:25 +0800, CK Hu wrote:
-> Hi, Bibby:
-> 
-> On Wed, 2016-07-27 at 16:25 +0800, Bibby Hsieh wrote:
+On Wed, 2016-07-27 at 11:32 +0200, Philipp Zabel wrote:
+> Am Mittwoch, den 27.07.2016, 16:25 +0800 schrieb Bibby Hsieh:
 > > If MT8173 can support HDMI 4K resoultion, the
 > > VENCPLL should be configured to 800MHZ.
 > > We didn't set VENCPLL directly, we set the
 > > mm_sel to 400MHz statically in the board device tree.
 > 
-> You may rewrite the description as below:
+> Maybe add a comment that the board .dts file should override the clock
+> rate property with the higher VENCPLL frequency the board supports HDMI
+> 4K resolution.
 > 
-> 'To support HDMI 4K resolution, mmsys need clock mm_sel to be 400MHz.'
-> 
-> You need not to mention VENCPLL because it's controlled by clock driver.
-> 
-Ok, I will modify that.
-> > 
+Ok, I will add that.
 > > Signed-off-by: Bibby Hsieh <bibby.hsieh@mediatek.com>
 > > ---
 > > Changes since v2:
@@ -54,13 +49,17 @@ Ok, I will modify that.
 > > +			clocks = <&topckgen CLK_TOP_MM_SEL>;
 > >  			#clock-cells = <1>;
 > > +			clock-frequency  = <400000000>;
-> >  		};
-> >  
-> >  		ovl0: ovl at 1400c000 {
 > 
-> Regards,
-> CK
+> According to the "Assigned clock parents and rates" section in
+> Documentation/devicetree/bindings/clock/clock-bindings.txt,
+> this should be:
+> 			assigned-clocks = <&topckgen CLK_TOP_MM_SEL>;
+> 			assigned-clock-rates = <400000000>;
+> 
+Ok, will do.
+> regards
+> Philipp
 > 
 
-
+-- 
 Bibby
