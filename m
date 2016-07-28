@@ -1,33 +1,43 @@
-From: stillcompiling@gmail.com (Joshua Clayton)
-Date: Thu, 28 Jul 2016 09:18:45 -0700
-Subject: [PATCH v3 4/6] usb: core: add power sequence handling for USB
- devices
-In-Reply-To: <20160728014521.GB26186@shlinux2>
-References: <1469007629-31757-1-git-send-email-peter.chen@nxp.com>
- <1469007629-31757-5-git-send-email-peter.chen@nxp.com>
- <5798E067.90207@gmail.com> <20160728014521.GB26186@shlinux2>
-Message-ID: <579A3065.2080402@gmail.com>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Thu, 28 Jul 2016 12:29:48 -0400
+Subject: [PATCH -next] PCI: keystone: Fix error return code in
+ ks_add_pcie_port()
+In-Reply-To: <1469722578-14863-1-git-send-email-weiyj.lk@gmail.com>
+References: <1469722578-14863-1-git-send-email-weiyj.lk@gmail.com>
+Message-ID: <579A32FC.4070907@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Peter,
+On 07/28/2016 12:16 PM, Wei Yongjun wrote:
+> Fix to return a negative error code from the request IRQ error
+> handling case instead of 0, as done elsewhere in this function.
+> 
+> Signed-off-by: Wei Yongjun <weiyj.lk@gmail.com>
+> ---
+>  drivers/pci/host/pci-keystone.c | 5 +++--
+>  1 file changed, 3 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/pci/host/pci-keystone.c b/drivers/pci/host/pci-keystone.c
+> index 8ba2883..82b461b 100644
+> --- a/drivers/pci/host/pci-keystone.c
+> +++ b/drivers/pci/host/pci-keystone.c
+> @@ -334,8 +334,9 @@ static int __init ks_add_pcie_port(struct keystone_pcie *ks_pcie,
+>  	if (ks_pcie->error_irq <= 0)
+>  		dev_info(&pdev->dev, "no error IRQ defined\n");
+>  	else {
+> -		if (request_irq(ks_pcie->error_irq, pcie_err_irq_handler,
+> -				IRQF_SHARED, "pcie-error-irq", ks_pcie) < 0) {
+> +		ret = request_irq(ks_pcie->error_irq, pcie_err_irq_handler,
+> +				  IRQF_SHARED, "pcie-error-irq", ks_pcie);
+> +		if (ret < 0) {
+>  			dev_err(&pdev->dev, "failed to request error IRQ %d\n",
+>  				ks_pcie->error_irq);
+>  			return ret;
+> 
+Thanks
 
-On 07/27/2016 06:45 PM, Peter Chen wrote:
-> On Wed, Jul 27, 2016 at 09:25:11AM -0700, Joshua Clayton wrote:
->> Patch 4 does not apply for me
->> (The Makefile has  a "usbcore-$(CONFIG_OF) += of.o"
->> line which I don't see in 4.7 or linux/next master).
->> Is there another patch set this series depends on?
-> It seems below patch has not been queued:
->
-> https://git.kernel.org/cgit/linux/kernel/git/peter.chen/usb.git/commit/?h=add_pwrseq_for_usb&id=2efd73d0f935ffbc66135553da0ac807c0b4c3fe
->
-> This pwrseq-lib patch set does not depend on it, I will send patch set
-> on top of a clean mainline next time, sorry for confusing. 
->
-Good to know.
-I just wanted to make sure I wasn't missing something important.
+Acked-By: Murali Karicheri <m-karicheri2@ti.com>
 
-Thanks,
-
-Joshua Clayton
+-- 
+Murali Karicheri
+Linux Kernel, Keystone
