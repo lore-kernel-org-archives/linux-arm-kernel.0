@@ -1,148 +1,209 @@
-From: mark.yao@rock-chips.com (Mark yao)
-Date: Thu, 28 Jul 2016 17:28:24 +0800
-Subject: [PATCH 1/3] drm: introduce share plane
-In-Reply-To: <20160728080302.GG31475@phenom.ffwll.local>
-References: <1469519194-23133-1-git-send-email-mark.yao@rock-chips.com>
- <20160726082635.GA31475@phenom.ffwll.local> <579732B2.80600@rock-chips.com>
- <57997570.5070806@rock-chips.com> <20160728080302.GG31475@phenom.ffwll.local>
-Message-ID: <5799D038.5000906@rock-chips.com>
+From: yt.shen@mediatek.com (YT Shen)
+Date: Thu, 28 Jul 2016 17:27:57 +0800
+Subject: [PATCH v5 03/10] drm/mediatek: add shadow register support
+In-Reply-To: <1469698084-20185-1-git-send-email-yt.shen@mediatek.com>
+References: <1469698084-20185-1-git-send-email-yt.shen@mediatek.com>
+Message-ID: <1469698084-20185-4-git-send-email-yt.shen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016?07?28? 16:03, Daniel Vetter wrote:
-> On Thu, Jul 28, 2016 at 11:01:04AM +0800, Mark yao wrote:
->> Any ideas for the share planes?
->>
->> This function is important for our series of vop full design.
->>      The series of vop is:
->>      IP version    chipname
->>      3.1           rk3288
->>      3.2           rk3368
->>      3.4           rk3366
->>      3.5           rk3399 big
->>      3.6           rk3399 lit
->>      3.7           rk322x
->>
->> example on rk3288:  if not support share plane, each vop only support four
->> planes, but if support this function, each vop can support ten planes.
-> Like I said, register 10 planes in the kernel driver, figure out a good
-> way to actually allocate them to hw resources. We have a similar issue on
-> skl/bxt in the i915 driver where there's only a limited amount of
-> scalers, and we need to dynamically allocate them to drm_plane. Here you
-> have fancy amount of scanout engines which you need to dynamically
-> allocate.
->
->> On 2016?07?26? 17:51, Mark yao wrote:
->>> On 2016?07?26? 16:26, Daniel Vetter wrote:
->>>> On Tue, Jul 26, 2016 at 03:46:32PM +0800, Mark Yao wrote:
->>>>>> What is share plane:
->>>>>> Plane hardware only be used when the display scanout run into
->>>>> plane active
->>>>>> scanout, that means we can reuse the plane hardware resources on plane
->>>>>> non-active scanout.
->>>>>>
->>>>>>       --------------------------------------------------
->>>>>>      |  scanout                                       |
->>>>>>      |         ------------------                     |
->>>>>>      |         | parent plane   |                     |
->>>>>>      |         | active scanout |                     |
->>>>>>      |         |                |   ----------------- |
->>>>>>      |         ------------------   | share plane 1 | |
->>>>>>      |  -----------------           |active scanout | |
->>>>>>      |  | share plane 0 |           |               | |
->>>>>>      |  |active scanout |           ----------------- |
->>>>>>      |  |               |                             |
->>>>>>      |  -----------------                             |
->>>>>>      --------------------------------------------------
->>>>>> One plane hardware can be reuse for multi-planes, we assume the first
->>>>>> plane is parent plane, other planes share the resource with first one.
->>>>>>      parent plane
->>>>>>          |---share plane 0
->>>>>>          |---share plane 1
->>>>>>          ...
->>>>>>
->>>>>> Because resource share, There are some limit on share plane: one group
->>>>>> of share planes need use same zpos, can not overlap, etc.
->>>>>>
->>>>>> We assume share plane is a universal plane with some limit flags.
->>>>>> people who use the share plane need know the limit, should call
->>>>> the ioctl
->>>>>> DRM_CLIENT_CAP_SHARE_PLANES, and judge the planes limit before use it.
->>>>>>
->>>>>> A group of share planes would has same shard id, so userspace can
->>>>>> group them, judge share plane's limit.
->>>>>>
->>>>>> Signed-off-by: Mark Yao<mark.yao@rock-chips.com>
->>>> This seems extremely hw specific, why exactly do we need to add a new
->>>> relationship on planes? What does this buy on_other_  drivers?
->>> Yes, now it's plane hardware specific, maybe others have same design,
->>> because this design
->>> would save hardware resource to support multi-planes.
->>>
->>>> Imo this should be solved by virtualizing planes in the driver.
->>>> Start out
->>>> by assigning planes, and if you can reuse one for sharing then do that,
->>>> otherwise allocate a new one. If there's not enough real planes,
->>>> fail the
->>>> atomic_check.
->>> I think that is too complex, trying with atomic_check I think it's not a
->>> good idea, userspace try planes every commit would be a heavy work.
->>>
->>> Userspace need  know all planes relationship, group them, some display
->>> windows can put together, some can't,
->>> too many permutation and combination, I think can't just commit with try.
->>>
->>> example:
->>> userspace:
->>> windows 1: pos(0, 0)  size(1024, 100)
->>> windows 2: pos(0, 50) size(400, 500)
->>> windows 3: pos(0, 200) size(800, 300)
->>>
->>> drm plane resources:
->>> plane 0 and plane 1 is a group of share planes
->>> plane 2 is common plane.
->>>
->>> if userspace know the relationship, then they can assign windows 1 and
->>> window 3 to plane0 and plane 1. that would be success.
->>> but if they don't know, assign window 1/2 to plane 0/1, failed, assign
->>> window 2/3 to plane 0/1, failed. mostly would get failed.
-> You can still do this with the design I describe. The only difference is
-> that you allow generic userspace to make optimal use of your planes, too.
->
->>>> This seems way to hw specific to be useful as a generic concept.
->>> We want to change the drm_mode_getplane_res behavior, if userspace call
->>> DRM_CLIENT_CAP_SHARE_PLANES, that means userspace know hardware limit,
->>> then we return full planes support to userspace, if don't, just make a
->>> group of share planes as one plane.
->>> this work is on generic place.
-> So ... do you have patches for all the generic kms userspace that's out
-> there? Are those reviewed and ready for merging?
-No, we have no other patches send to generic kms userspace upstream.
+We need to acquire mutex before using the resources,
+and need to release it after finished.
+So we don't need to write registers in the blanking period.
 
-We use it on our internal userspace application now.
+Signed-off-by: YT Shen <yt.shen@mediatek.com>
+---
+ drivers/gpu/drm/mediatek/mtk_drm_crtc.c |   75 +++++++++++++++++++------------
+ drivers/gpu/drm/mediatek/mtk_drm_ddp.c  |   25 +++++++++++
+ drivers/gpu/drm/mediatek/mtk_drm_ddp.h  |    2 +
+ drivers/gpu/drm/mediatek/mtk_drm_drv.h  |    1 +
+ 4 files changed, 74 insertions(+), 29 deletions(-)
 
-on our userspace application:
-1, directly call drmSetClientCap(fd(), DRM_CLIENT_CAP_SHARE_PLANES, 1);
-2, get planes with drmModeGetResources(fd());
-3, get plane share id with drmModeObjectGetProperties,
-4, group the planes with share id, if two plane use same "share id", 
-that means these plane is on the same group
-5, judge the plane's limit when doing plane commit.
-
-on userspace only add a new ioctl macro DRM_CLIENT_CAP_SHARE_PLANES.
-
-> Adding new userspace abi is much, much, much harder than sovling this in
-> the vop driver. I'm working on some documentation to make this all clear
-> (since many arm folks seem unaware of the uapi rules we have in the drm
-> subsystem). But really, you're trying the much harder route with this
-> patch.
-Hmmm, So sad, you are right, change the generic api is a harder work.
-
-Ok, I will try your advice.
-
-Thanks.
-
-> -Daniel
-
+diff --git a/drivers/gpu/drm/mediatek/mtk_drm_crtc.c b/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
+index 24aa3ba..80d9641 100644
+--- a/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
++++ b/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
+@@ -315,6 +315,42 @@ static void mtk_crtc_ddp_hw_fini(struct mtk_drm_crtc *mtk_crtc)
+ 	pm_runtime_put(drm->dev);
+ }
+ 
++static void mtk_crtc_ddp_config(struct drm_crtc *crtc)
++{
++	struct mtk_drm_crtc *mtk_crtc = to_mtk_crtc(crtc);
++	struct mtk_crtc_state *state = to_mtk_crtc_state(mtk_crtc->base.state);
++	struct mtk_ddp_comp *ovl = mtk_crtc->ddp_comp[0];
++	unsigned int i;
++
++	/*
++	 * TODO: instead of updating the registers here, we should prepare
++	 * working registers in atomic_commit and let the hardware command
++	 * queue update module registers on vblank.
++	 */
++	if (state->pending_config) {
++		mtk_ddp_comp_config(ovl, state->pending_width,
++				    state->pending_height,
++				    state->pending_vrefresh);
++
++		state->pending_config = false;
++	}
++
++	if (mtk_crtc->pending_planes) {
++		for (i = 0; i < OVL_LAYER_NR; i++) {
++			struct drm_plane *plane = &mtk_crtc->planes[i].base;
++			struct mtk_plane_state *plane_state;
++
++			plane_state = to_mtk_plane_state(plane->state);
++
++			if (plane_state->pending.config) {
++				mtk_ddp_comp_layer_config(ovl, i, plane_state);
++				plane_state->pending.config = false;
++			}
++		}
++		mtk_crtc->pending_planes = false;
++	}
++}
++
+ static void mtk_drm_crtc_enable(struct drm_crtc *crtc)
+ {
+ 	struct mtk_drm_crtc *mtk_crtc = to_mtk_crtc(crtc);
+@@ -391,6 +427,7 @@ static void mtk_drm_crtc_atomic_flush(struct drm_crtc *crtc,
+ 				      struct drm_crtc_state *old_crtc_state)
+ {
+ 	struct mtk_drm_crtc *mtk_crtc = to_mtk_crtc(crtc);
++	struct mtk_drm_private *priv = crtc->dev->dev_private;
+ 	unsigned int pending_planes = 0;
+ 	int i;
+ 
+@@ -409,6 +446,12 @@ static void mtk_drm_crtc_atomic_flush(struct drm_crtc *crtc,
+ 	}
+ 	if (pending_planes)
+ 		mtk_crtc->pending_planes = true;
++
++	if (priv->data->shadow_register) {
++		mtk_disp_mutex_acquire(mtk_crtc->mutex);
++		mtk_crtc_ddp_config(crtc);
++		mtk_disp_mutex_release(mtk_crtc->mutex);
++	}
+ }
+ 
+ static const struct drm_crtc_funcs mtk_crtc_funcs = {
+@@ -453,36 +496,10 @@ err_cleanup_crtc:
+ void mtk_crtc_ddp_irq(struct drm_crtc *crtc, struct mtk_ddp_comp *ovl)
+ {
+ 	struct mtk_drm_crtc *mtk_crtc = to_mtk_crtc(crtc);
+-	struct mtk_crtc_state *state = to_mtk_crtc_state(mtk_crtc->base.state);
+-	unsigned int i;
++	struct mtk_drm_private *priv = crtc->dev->dev_private;
+ 
+-	/*
+-	 * TODO: instead of updating the registers here, we should prepare
+-	 * working registers in atomic_commit and let the hardware command
+-	 * queue update module registers on vblank.
+-	 */
+-	if (state->pending_config) {
+-		mtk_ddp_comp_config(ovl, state->pending_width,
+-				    state->pending_height,
+-				    state->pending_vrefresh);
+-
+-		state->pending_config = false;
+-	}
+-
+-	if (mtk_crtc->pending_planes) {
+-		for (i = 0; i < OVL_LAYER_NR; i++) {
+-			struct drm_plane *plane = &mtk_crtc->planes[i].base;
+-			struct mtk_plane_state *plane_state;
+-
+-			plane_state = to_mtk_plane_state(plane->state);
+-
+-			if (plane_state->pending.config) {
+-				mtk_ddp_comp_layer_config(ovl, i, plane_state);
+-				plane_state->pending.config = false;
+-			}
+-		}
+-		mtk_crtc->pending_planes = false;
+-	}
++	if (!priv->data->shadow_register)
++		mtk_crtc_ddp_config(crtc);
+ 
+ 	mtk_drm_finish_page_flip(mtk_crtc);
+ }
+diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+index 8030769..b77d456 100644
+--- a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
++++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+@@ -12,6 +12,7 @@
+  */
+ 
+ #include <linux/clk.h>
++#include <linux/iopoll.h>
+ #include <linux/module.h>
+ #include <linux/of_device.h>
+ #include <linux/platform_device.h>
+@@ -32,10 +33,13 @@
+ #define DISP_REG_CONFIG_MMSYS_CG_CON0		0x100
+ 
+ #define DISP_REG_MUTEX_EN(n)	(0x20 + 0x20 * (n))
++#define DISP_REG_MUTEX(n)	(0x24 + 0x20 * (n))
+ #define DISP_REG_MUTEX_RST(n)	(0x28 + 0x20 * (n))
+ #define DISP_REG_MUTEX_MOD(n)	(0x2c + 0x20 * (n))
+ #define DISP_REG_MUTEX_SOF(n)	(0x30 + 0x20 * (n))
+ 
++#define INT_MUTEX				BIT(1)
++
+ #define MT8173_MUTEX_MOD_DISP_OVL0		BIT(11)
+ #define MT8173_MUTEX_MOD_DISP_OVL1		BIT(12)
+ #define MT8173_MUTEX_MOD_DISP_RDMA0		BIT(13)
+@@ -300,6 +304,27 @@ void mtk_disp_mutex_disable(struct mtk_disp_mutex *mutex)
+ 	writel(0, ddp->regs + DISP_REG_MUTEX_EN(mutex->id));
+ }
+ 
++void mtk_disp_mutex_acquire(struct mtk_disp_mutex *mutex)
++{
++	struct mtk_ddp *ddp = container_of(mutex, struct mtk_ddp,
++					   mutex[mutex->id]);
++	u32 tmp;
++
++	writel(1, ddp->regs + DISP_REG_MUTEX_EN(mutex->id));
++	writel(1, ddp->regs + DISP_REG_MUTEX(mutex->id));
++	if (readl_poll_timeout_atomic(ddp->regs + DISP_REG_MUTEX(mutex->id),
++				      tmp, tmp & INT_MUTEX, 1, 10000))
++		pr_err("could not acquire mutex %d\n", mutex->id);
++}
++
++void mtk_disp_mutex_release(struct mtk_disp_mutex *mutex)
++{
++	struct mtk_ddp *ddp = container_of(mutex, struct mtk_ddp,
++					   mutex[mutex->id]);
++
++	writel(0, ddp->regs + DISP_REG_MUTEX(mutex->id));
++}
++
+ static int mtk_ddp_probe(struct platform_device *pdev)
+ {
+ 	struct device *dev = &pdev->dev;
+diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp.h b/drivers/gpu/drm/mediatek/mtk_drm_ddp.h
+index 92c1175..f9a7991 100644
+--- a/drivers/gpu/drm/mediatek/mtk_drm_ddp.h
++++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp.h
+@@ -37,5 +37,7 @@ void mtk_disp_mutex_remove_comp(struct mtk_disp_mutex *mutex,
+ 				enum mtk_ddp_comp_id id);
+ void mtk_disp_mutex_unprepare(struct mtk_disp_mutex *mutex);
+ void mtk_disp_mutex_put(struct mtk_disp_mutex *mutex);
++void mtk_disp_mutex_acquire(struct mtk_disp_mutex *mutex);
++void mtk_disp_mutex_release(struct mtk_disp_mutex *mutex);
+ 
+ #endif /* MTK_DRM_DDP_H */
+diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.h b/drivers/gpu/drm/mediatek/mtk_drm_drv.h
+index fa0b106..94f8b66 100644
+--- a/drivers/gpu/drm/mediatek/mtk_drm_drv.h
++++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.h
+@@ -33,6 +33,7 @@ struct mtk_mmsys_driver_data {
+ 	unsigned int main_len;
+ 	const enum mtk_ddp_comp_id *ext_path;
+ 	unsigned int ext_len;
++	bool shadow_register;
+ };
+ 
+ struct mtk_drm_private {
 -- 
-?ark Yao
+1.7.9.5
