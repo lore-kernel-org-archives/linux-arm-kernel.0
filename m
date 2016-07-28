@@ -1,77 +1,72 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 28 Jul 2016 12:15:33 +0200
-Subject: [RFC PATCH] dmaengine: mv_xor: Add support for IO (PCIe) src/dst
- areas
-In-Reply-To: <49b991d2-f7c4-5f09-0f28-b483d21c8934@denx.de>
-References: <20160603162429.8760-1-sr@denx.de> <4330031.lrbVYzKFjS@wuerfel>
- <49b991d2-f7c4-5f09-0f28-b483d21c8934@denx.de>
-Message-ID: <3800626.8dI3J7PQb7@wuerfel>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 28 Jul 2016 12:18:45 +0200
+Subject: [PATCH 10/18] ARM: mvebu: a39x: enable watchdog for all
+ Armada-39x SoCs
+In-Reply-To: <1469105055-25181-12-git-send-email-jaz@semihalf.com> (Grzegorz
+ Jaszczyk's message of "Thu, 21 Jul 2016 14:44:07 +0200")
+References: <1469105055-25181-1-git-send-email-jaz@semihalf.com>
+ <1469105055-25181-12-git-send-email-jaz@semihalf.com>
+Message-ID: <87fuqukquy.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, July 27, 2016 2:57:17 PM CEST Stefan Roese wrote:
-> >>
-> >> Arnd, do you have some ideas how to better solve this problem?
-> >
-> > I'm not sure I completely understand the problem yet, but my first
-> > thought would be caching: have a copy of the ranges in RAM and loop
-> > over that in order to decide whether to evict one entry or not,
-> > avoiding the need for mmio register reads completely, and most of
-> > the register writes as well.
-> 
-> Good idea. I would still need to call mvebu_mbus_get_io_win_info(),
-> but the mmio accessed in this XOR driver could be minimized this
-> way.
+Hi Grzegorz,
+ 
+ On jeu., juil. 21 2016, Grzegorz Jaszczyk <jaz@semihalf.com> wrote:
 
-Right, this would only be needed on a cache miss. We can probably
-assume that almost always the eight available windows are sufficient
-for all I/O, so that would be once per window we actually need
-and we never end up having to flush an entry in the cache.
+Add a commit log here and change the prefix to "ARM: dts: mvebu:
+armada-39x:"
 
-One problem that you could hit is if the mbus windows get torn
-down and reassigned (e.g. after unloading and reloading the PCI
-driver in case we ever support that).
+Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-> > The mv_mbus_pci_info() should work as well, but it's possible you
-> > can actually express that in a more generic way, since the
-> > location of the PCI memory space should also be known to the PCI
-> > core.
-> 
-> But we need the MBus target and attr for these different windows
-> as well. So querying the MBus driver seems the only way for me.
+Thanks,
 
-Ok, makes sense.
+Gregory
 
-> > Finally, what is the specific limitation on the number and size
-> > of the windows?
-> 
-> A max. of 8 windows. The windows can be from 64KiB to 4GiB.
+> Signed-off-by: Grzegorz Jaszczyk <jaz@semihalf.com>
+> Reviewed-by: Lior Amsalem <alior@marvell.com>
+> ---
+>  arch/arm/boot/dts/armada-39x.dtsi | 15 +++++++++++++++
+>  1 file changed, 15 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/armada-39x.dtsi b/arch/arm/boot/dts/armada-39x.dtsi
+> index 03dc0ec..5e01438 100644
+> --- a/arch/arm/boot/dts/armada-39x.dtsi
+> +++ b/arch/arm/boot/dts/armada-39x.dtsi
+> @@ -322,6 +322,14 @@
+>  				clock-names = "nbclk", "fixed";
+>  			};
+>  
+> +			watchdog at 20300 {
+> +				compatible = "marvell,armada-380-wdt";
+> +				reg = <0x20300 0x34>, <0x20704 0x4>,
+> +				      <0x18260 0x4>;
+> +				clocks = <&coreclk 2>, <&refclk>;
+> +				clock-names = "nbclk", "fixed";
+> +			};
+> +
+>  			cpurst at 20800 {
+>  				compatible = "marvell,armada-370-cpu-reset";
+>  				reg = <0x20800 0x10>;
+> @@ -534,5 +542,12 @@
+>  			#clock-cells = <0>;
+>  			clock-frequency = <1000000000>;
+>  		};
+> +
+> +		/* 25 MHz reference crystal */
+> +		refclk: oscillator {
+> +			compatible = "fixed-clock";
+> +			#clock-cells = <0>;
+> +			clock-frequency = <25000000>;
+> +		};
+>  	};
+>  };
+> -- 
+> 1.8.3.1
+>
 
-And I assume that there are more avaialable MBUS windows than those?
-
-Otherwise we could always program the same translations into
-the xor engine that are present in MBUS.
-
-> > Could you just create static mappings that span
-> > all of the potential address space, e.g. a single entry for
-> > any address visibile to the CPU? I can't tell if you just need
-> > the physical address as seen by the CPU (which would be easy)
-> > or if you need the mbus address with their register numbers
-> > (which probably doesn't have a single contiguous representation?
-> 
-> Unfortunately we need the MBus target and attribute values for
-> each window. So a summarized representation probably won't
-> work.
-> 
-> > Do you just need to cover PCI or also things like the SPI-NOR
-> > direct mapping address?
-> 
-> My current use-case is just PCI.
-> 
-> Perhaps the cached mmio version would be acceptable? If I get
-> an "go for it and I'll ack the patch v2" from someone, then
-> I will gladly invest some time in this. 
-
-I think that's the best option then.
-
-	Arnd
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
