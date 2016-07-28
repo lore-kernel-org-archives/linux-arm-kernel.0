@@ -1,83 +1,133 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Thu, 28 Jul 2016 17:42:05 +0200
-Subject: [PATCH v6] input: touchscreen: Add generic driver for Silead
- touchscreens
-In-Reply-To: <20160727213555.GC24351@dtor-ws>
-References: <1468252304-22850-1-git-send-email-hdegoede@redhat.com>
- <20160716175605.GA4873@rob-hp-laptop> <20160719184425.GC19250@dtor-ws>
- <20160727213555.GC24351@dtor-ws>
-Message-ID: <c4b48718-4dd8-9637-b5a0-e3226895f78a@redhat.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 28 Jul 2016 10:55:05 -0500
+Subject: [PATCH v2 2/4] dt-bindings: Add a binding for Mediatek MDP
+In-Reply-To: <1469583886.27630.18.camel@mtksdaap41>
+References: <1469176383-35210-1-git-send-email-minghsiu.tsai@mediatek.com>
+ <1469176383-35210-3-git-send-email-minghsiu.tsai@mediatek.com>
+ <20160726185433.GA14609@rob-hp-laptop> <1469583886.27630.18.camel@mtksdaap41>
+Message-ID: <CAL_JsqK4Lz9mSJ+EXAY1g9L-CzBmbsed+MfCjkf_545y1Ov0iw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 27-07-16 23:35, Dmitry Torokhov wrote:
-> On Tue, Jul 19, 2016 at 11:44:25AM -0700, Dmitry Torokhov wrote:
->> On Sat, Jul 16, 2016 at 12:56:05PM -0500, Rob Herring wrote:
->>> On Mon, Jul 11, 2016 at 05:51:44PM +0200, Hans de Goede wrote:
->>>> From: Robert Dolca <robert.dolca@intel.com>
->>>>
->>>> This driver adds support for Silead touchscreens. It has been tested
->>>> with GSL1680 and GSL3680 touch panels.
->>>>
->>>> It supports ACPI and device tree enumeration. Screen resolution,
->>>> the maximum number of fingers supported and firmware name are
->>>> configurable.
->>>>
->>>> Signed-off-by: Robert Dolca <robert.dolca@intel.com>
->>>> Signed-off-by: Daniel Jansen <djaniboe@gmail.com>
->>>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->>>> ---
->>>> Changes in v6:
->>>> -Default to 5 fingers if max-fingers is not specified
->>>> -Improve devicetree binding doc: improve wake-gpios description, use
->>>>  "See touchscreen.txt" where applicable
->>>> ---
->>>>  .../bindings/input/touchscreen/silead_gsl1680.txt  |  36 ++
->>>>  drivers/input/touchscreen/Kconfig                  |  13 +
->>>>  drivers/input/touchscreen/Makefile                 |   1 +
->>>>  drivers/input/touchscreen/silead.c                 | 652 +++++++++++++++++++++
->>>>  4 files changed, 702 insertions(+)
->>>>  create mode 100644 Documentation/devicetree/bindings/input/touchscreen/silead_gsl1680.txt
->>>>  create mode 100644 drivers/input/touchscreen/silead.c
->>>>
->>>> diff --git a/Documentation/devicetree/bindings/input/touchscreen/silead_gsl1680.txt b/Documentation/devicetree/bindings/input/touchscreen/silead_gsl1680.txt
->>>> new file mode 100644
->>>> index 0000000..1e58d37
->>>> --- /dev/null
->>>> +++ b/Documentation/devicetree/bindings/input/touchscreen/silead_gsl1680.txt
->>>> @@ -0,0 +1,36 @@
->>>> +* GSL 1680 touchscreen controller
->>>> +
->>>> +Required properties:
->>>> +- compatible		  : "silead,gsl1680"
->>>> +- reg			  : I2C slave address of the chip (0x40)
->>>> +- interrupt-parent	  : a phandle pointing to the interrupt controller
->>>> +			    serving the interrupt for this chip
->>>> +- interrupts		  : interrupt specification for the gsl1680 interrupt
->>>> +- power-gpios		  : Specification for the pin connected to the gsl1680's
->>>> +			    shutdown input. This needs to be driven high to take the
->>>> +			    gsl1680 out of its low power state
->>>> +- touchscreen-size-x	  : See touchscreen.txt
->>>> +- touchscreen-size-y	  : See touchscreen.txt
->>>> +- touchscreen-max-fingers : maximum number of fingers the touchscreen can detect
->>>
->>> If you name it like a standard property, then it should be documented in
->>> touchscreen.txt.
+On Tue, Jul 26, 2016 at 8:44 PM, Minghsiu Tsai
+<minghsiu.tsai@mediatek.com> wrote:
+> On Tue, 2016-07-26 at 13:54 -0500, Rob Herring wrote:
+>> On Fri, Jul 22, 2016 at 04:33:01PM +0800, Minghsiu Tsai wrote:
+>> > Add a DT binding documentation of MDP for the MT8173 SoC
+>> > from Mediatek
+>> >
+>> > Signed-off-by: Minghsiu Tsai <minghsiu.tsai@mediatek.com>
+>> > ---
+>> >  .../devicetree/bindings/media/mediatek-mdp.txt     |   96 ++++++++++++++++++++
+>> >  1 file changed, 96 insertions(+)
+>> >  create mode 100644 Documentation/devicetree/bindings/media/mediatek-mdp.txt
+>> >
+>> > diff --git a/Documentation/devicetree/bindings/media/mediatek-mdp.txt b/Documentation/devicetree/bindings/media/mediatek-mdp.txt
+>> > new file mode 100644
+>> > index 0000000..2dad031
+>> > --- /dev/null
+>> > +++ b/Documentation/devicetree/bindings/media/mediatek-mdp.txt
+>> > @@ -0,0 +1,96 @@
+>> > +* Mediatek Media Data Path
+>> > +
+>> > +Media Data Path is used for scaling and color space conversion.
+>> > +
+>> > +Required properties (all function blocks):
+>> > +- compatible: "mediatek,<chip>-mdp"
 >>
->> Actually this is very much Silead-specific wart, I'd rather we called it
->> "max-fingers" or "silead,max-fingers" to illustrate that it is not at
->> all a generic property.
+>> What is this, ...
 >>
->> Rob, will you be OK with it?
 >
-> Rob, ping? I'd like to get it into the tree and this is only outstanding
-> question.
+> It is used to match platform driver.
 
-I think that your suggestion to make this "silead,max-fingers" is a good idea,
-I will do a v8 with this soon (or feel free to fixup v7 yourself).
+Would structuring things like this work instead:
 
-Regards,
+{
+  compatible = "mediatek,<chip>-mdp";
+  ranges = ...;
+  {
+    compatible = "mediatek,<chip>-mdp-rdma";
+    ...
+  };
+  {
+    compatible = "mediatek,<chip>-mdp-wdma";
+    ...
+  };
+  ...
+};
 
-Hans
+>
+>
+>> > +        "mediatek,<chip>-mdp-<function>", one of
+>>
+>> and this?
+>>
+>
+> It is string format of HW block. <chip> could be "mt8173", and
+> <function> are "rdma", "rsz", "wdma", and "wrot".
+>
+>
+>> > +        "mediatek,<chip>-mdp-rdma"  - read DMA
+>> > +        "mediatek,<chip>-mdp-rsz"   - resizer
+>> > +        "mediatek,<chip>-mdp-wdma"  - write DMA
+>> > +        "mediatek,<chip>-mdp-wrot"  - write DMA with rotation
+>>
+>> List what are valid values of <chip>.
+>>
+>
+> <chip> - mt8173. There should be other chip added in future.
+> I will change the property as blow:
+>
+> - compatible: "mediatek,<chip>-mdp"
+>         Should be one of
+>         "mediatek,<chip>-mdp-rdma"  - read DMA
+>         "mediatek,<chip>-mdp-rsz"   - resizer
+>         "mediatek,<chip>-mdp-wdma"  - write DMA
+>         "mediatek,<chip>-mdp-wrot"  - write DMA with rotation
+>         <chip> - could be 8173
+>
+>
+> If don't need <chip>, I also can change it as below. It is more clear.
+
+Up to you. Depends on how many different chips you will have.
+
+> - compatible: "mediatek,mt8173-mdp"
+>         Should be one of
+>         "mediatek,mt8173-mdp-rdma"  - read DMA
+>         "mediatek,mt8173-mdp-rsz"   - resizer
+>         "mediatek,mt8173-mdp-wdma"  - write DMA
+>         "mediatek,mt8173-mdp-wrot"  - write DMA with rotation
+>
+>
+>> > +- reg: Physical base address and length of the function block register space
+>> > +- clocks: device clocks
+>> > +- power-domains: a phandle to the power domain.
+>> > +- mediatek,vpu: the node of video processor unit
+>> > +
+>> > +Required properties (DMA function blocks):
+>> > +- compatible: Should be one of
+>> > +        "mediatek,<chip>-mdp-rdma"
+>> > +        "mediatek,<chip>-mdp-wdma"
+>> > +        "mediatek,<chip>-mdp-wrot"
+>> > +- iommus: should point to the respective IOMMU block with master port as
+>> > +  argument, see Documentation/devicetree/bindings/iommu/mediatek,iommu.txt
+>> > +  for details.
+>> > +- mediatek,larb: must contain the local arbiters in the current Socs.
+>>
+>> It is still not clear which properties apply to which compatible
+>> strings.
+>>
+>
+> I found out the document for larb.
+> I will change the property as below:
+>
+> - mediatek,larb: must contain the local arbiters in the current Socs,
+> see
+> Documentation/devicetree/bindings/memory-controllers/mediatek,smi-larb.txt
+>   for details.
+
+That's good, but not what I meant. You still have properties which
+only apply to certain blocks, but are listed for all blocks like
+mediatek,vpu for example.
+
+Rob
