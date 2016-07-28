@@ -1,58 +1,51 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 28 Jul 2016 22:21:18 +0200
-Subject: [linux-sunxi] [PATCH] regulator: axp20x: support AXP813 variant
-In-Reply-To: <CAGRGNgUeORYesjLAeaO=GGhC1rv9FUU5ZUdjRx8+Pz=vCggsEw@mail.gmail.com>
-References: <5799d673.58a51c0a.97cf9.b9c0SMTPIN_ADDED_MISSING@gmr-mx.google.com>
- <CAGRGNgUeORYesjLAeaO=GGhC1rv9FUU5ZUdjRx8+Pz=vCggsEw@mail.gmail.com>
-Message-ID: <20160728202118.GI6682@lukather>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Thu, 28 Jul 2016 22:36:01 +0200
+Subject: [PATCH 1/4] ARM: dts: sun8i: Extend Orange Pi PC dt to also
+ handle the PC Plus
+In-Reply-To: <20160728181757.GD6682@lukather>
+References: <1468095718-18515-1-git-send-email-hdegoede@redhat.com>
+ <20160713084505.GE4761@lukather>
+ <bce2b340-a930-8771-4560-dc61bf5828d5@redhat.com>
+ <20160725064033.GA7419@lukather>
+ <74d3b5eb-601a-cc1d-a44e-fea2895fd8b2@redhat.com>
+ <20160728181757.GD6682@lukather>
+Message-ID: <f71f9d2b-00d4-27b8-1535-1ddc58f04ca3@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 28, 2016 at 08:24:41PM +1000, Julian Calaby wrote:
-> Hi All,
-> 
-> On Thu, Jul 28, 2016 at 5:28 PM, Jean-Francois Moine <moinejf@free.fr> wrote:
-> > The X-Powers AXP813 PMIC is close enough to the AXP809 with some
-> > more outputs.
-> >
-> > Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
-> > ---
-> >  Documentation/devicetree/bindings/mfd/axp20x.txt | 32 ++++++++-
-> >  drivers/mfd/axp20x-rsb.c                         |  1 +
-> >  drivers/mfd/axp20x.c                             |  3 +
-> >  drivers/regulator/axp20x-regulator.c             | 82 +++++++++++++++++++++++-
-> >  include/linux/mfd/axp20x.h                       | 38 +++++++++++
-> >  5 files changed, 153 insertions(+), 3 deletions(-)
-> >
-> > diff --git a/drivers/regulator/axp20x-regulator.c b/drivers/regulator/axp20x-regulator.c
-> > index 6d9ac76..c3287c9 100644
-> > --- a/drivers/regulator/axp20x-regulator.c
-> > +++ b/drivers/regulator/axp20x-regulator.c
-> > @@ -467,7 +543,8 @@ static int axp20x_regulator_probe(struct platform_device *pdev)
-> >                  * name.
-> >                  */
-> >                 if ((regulators == axp22x_regulators && i == AXP22X_DC1SW) ||
-> > -                   (regulators == axp809_regulators && i == AXP809_DC1SW)) {
-> > +                   (regulators == axp809_regulators && i == AXP809_DC1SW) ||
-> > +                   (regulators == axp813_regulators && i == AXP813_DC1SW)) {
-> 
-> Are we getting to the point now where we need some other way to flag
-> these? Maybe a set of flags per regulator?
+Hi,
 
-I'd be inclined to say yes. We can also associate a structure to the
-compatible, and store a bunch of infos there (like does it have a
-DC1SW regulator in this case).
+On 28-07-16 20:17, Maxime Ripard wrote:
+> Hi Hans,
+>
+> On Tue, Jul 26, 2016 at 11:07:23PM +0200, Hans de Goede wrote:
+>>>>> Nothing prevents you from including the orange pi pc dts, from the
+>>>>> orange pi plus dts.
+>>>>>
+>>>>> It prevents the duplication you were trying to avoid, and it doesn't
+>>>>> create all those spurious errors and devices.
+>>>>
+>>>> That would solve the copy paste problem on the kernel side, but that
+>>>> would still mean adding a new u-boot defconfig for this, which means that
+>>>> all the distro's which ship with prebuild u-boot binaries need to build
+>>>> for yet another board, something which I would like to avoid.
+>>>
+>>> Still, registering devices that are not present on the board is not an
+>>> option.
+>>
+>> Ok, new version send.
+>>
+>> What about the other 3 patches in this series ?
+>
+> I guess the same comment applies for patch 2.
 
-Maxime
+The difference is that there really is no harm at all from
+enabling the extra usb controllers used on the plus 2e
+on the plus and plus 2 as well, no errors, no nothing, they
+just sit their as usb controllers without an usb device plugged
+in. But if you insist I can do a separate dts + u-boot defconfig
+for the plus 2e as well (but I would rather not).
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160728/e3c453e7/attachment.sig>
+Regards,
+
+Hans
