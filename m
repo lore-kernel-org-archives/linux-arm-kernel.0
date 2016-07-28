@@ -1,52 +1,68 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 28 Jul 2016 10:59:38 -0500
-Subject: [PATCH 14/18] ARM: mvebu: add support for the Armada 395 SoC
- family
-In-Reply-To: <87y44mj9h8.fsf@free-electrons.com>
-References: <1469105055-25181-1-git-send-email-jaz@semihalf.com>
- <1469105055-25181-16-git-send-email-jaz@semihalf.com>
- <20160721221605.GA21883@rob-hp-laptop>
- <CAH76GKOidxFZ7R1pQZ2W9BRBCxEnLXNHQGrXbAUmouozBUj51Q@mail.gmail.com>
- <CAL_JsqJeObuS8OWeErRA5MX-SrMtu_254A-LtP9-A=xdPO7p1Q@mail.gmail.com>
- <20160725155050.3aee974e@free-electrons.com>
- <CAL_JsqL=bkzhjOTcOCeGNvKsAfYg0D=CypZs4sCsQ01pnbitoQ@mail.gmail.com>
- <20160725202209.5fae4d98@free-electrons.com>
- <87y44mj9h8.fsf@free-electrons.com>
-Message-ID: <CAL_Jsq+Or4=Oa5+OMw5pZh6CBgHktiTL89UcZcw6pJ1VBWB8cg@mail.gmail.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Thu, 28 Jul 2016 10:15:52 -0600
+Subject: [PATCH V2 3/6] perf tools: add infrastructure for PMU specific
+ configuration
+In-Reply-To: <20160727192639.GC23264@krava>
+References: <1469047100-18131-1-git-send-email-mathieu.poirier@linaro.org>
+ <1469047100-18131-4-git-send-email-mathieu.poirier@linaro.org>
+ <20160721074722.GB7192@krava>
+ <CANLsYkxj+kccmvTtOLAYwyN9fOp0pMxdPcWy5cJHQDQLoj-NmQ@mail.gmail.com>
+ <20160721145434.GA15915@krava>
+ <CANLsYkwx+iOE6uwOVPtsHFMmNaH0=NjeDP8z0GZhHja2oibt8g@mail.gmail.com>
+ <20160726204139.GA13377@krava>
+ <CANLsYkzr0iFFEUoeR8-58E02DyqdGndfNBL8v0tS2tQqBszN_A@mail.gmail.com>
+ <20160727192639.GC23264@krava>
+Message-ID: <CANLsYkxzSBHXGwe2y-593D4yDyLy9+vdcTHmP_rqF30x0qTiug@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 28, 2016 at 6:19 AM, Gregory CLEMENT
-<gregory.clement@free-electrons.com> wrote:
-> Hi Rob,
+On 27 July 2016 at 13:26, Jiri Olsa <jolsa@redhat.com> wrote:
+> On Wed, Jul 27, 2016 at 11:59:50AM -0600, Mathieu Poirier wrote:
 >
->  On lun., juil. 25 2016, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
+> SNIP
 >
->> Hello,
+>> > -PE_DRV_CFG_TERM
+>> > +'@' PE_NAME '=' PE_NAME
+>> >  {
+>> >         struct parse_events_term *term;
+>> >
+>> >         ABORT_ON(parse_events_term__str(&term, PARSE_EVENTS__TERM_TYPE_DRV_CFG,
+>> > -                                       $1, $1, &@1, NULL));
+>> > +                                       $2, $4, &@2, &@4));
+>> >         $$ = term;
+>> >  }
+>> >
 >>
->> On Mon, 25 Jul 2016 10:12:43 -0500, Rob Herring wrote:
+>> The problem here is that the correlation between the first and the
+>> second PE_NAME is lost and instead of seeing "PE_NAME=PE_NAME", the
+>> kernel only gets the value associated with the second PE_NAME.
 >>
->>> Yes, I get that, but that is only meaningful if you want to run an OS
->>> that is only aware of 395 on a 398 SoC/board (though I'd guess the 390
->>> compat is enough for that). Otherwise, that property is not really
->>> meaningful as the additional nodes are enough to handle what is the
->>> superset.
->>>
->>> I would agree both are fine if both chips are in fact the same die,
->>> just fused or packaged differently. I've seen a lot of chips that are
->>> supposed to be sub/supersets of each other, but have different errata
->>> lists because they are different die.
+>> For example,
 >>
->> Unfortunately HW vendors are rarely willing to publicly indicate whether
->> the different chips in their families are actually the same die fused
->> differently, or really different dies.
+>> -e event/@cfg1=value1, at cfg2=value2/ ...
+>>
+>> The above code will send "value1" and "value2" to the kernel driver
+>> where there is no way to know what configurable the values correspond
+>
+> hum.. you get the 'cfg1' and 'cfg2' strings in $1 no?
 
-Then it is safest to assume they are different.
+Indeed you do.
 
-> So do you want that we keep both "marvell,armada398" and
-> "marvell,armada395" or do you xant we use only "marvell,armada398" ?
+Macro ADD_CONFIG_TERM in function get_config_terms() only account for
+the __val parameter and struct parse_events_term::config is completely
+ignored.  We could concatenate the fields before calling
+ADD_CONFIG_TERM() but between that and freeing the reserved memory, I
+think it is cleaner to let flex do the work.
 
-For the 398 based boards, I think it should only have
-"marvell,armada398" and don't add "marvell,armada395".
+Mathieu
 
-Rob
+>
+> jirka
+>
+>> to.  To go around that we'd have to concatenate $2 and $4 in function
+>> parse_events_term__str() (or new_term()) when @type_term ==
+>> PARSE_EVENTS__TERM_TYPE_DRV_CFG, something that definitely looks
+>> hackish to me.
+>>
+>> Thanks,
+>> Mathieu
