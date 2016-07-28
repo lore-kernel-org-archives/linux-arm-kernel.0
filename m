@@ -1,246 +1,74 @@
-From: hzpeterchen@gmail.com (Peter Chen)
-Date: Thu, 28 Jul 2016 09:45:21 +0800
-Subject: [PATCH v3 4/6] usb: core: add power sequence handling for USB
- devices
-In-Reply-To: <5798E067.90207@gmail.com>
-References: <1469007629-31757-1-git-send-email-peter.chen@nxp.com>
- <1469007629-31757-5-git-send-email-peter.chen@nxp.com>
- <5798E067.90207@gmail.com>
-Message-ID: <20160728014521.GB26186@shlinux2>
+From: ck.hu@mediatek.com (CK Hu)
+Date: Thu, 28 Jul 2016 10:07:35 +0800
+Subject: [PATCH v4 4/8] drm/mediatek: add support for Mediatek SoC MT2701
+In-Reply-To: <1469613816.2470.50.camel@pengutronix.de>
+References: <1468577274-6178-1-git-send-email-yt.shen@mediatek.com>
+ <1468577274-6178-5-git-send-email-yt.shen@mediatek.com>
+ <1468997599.11841.49.camel@mtksdaap41>
+ <1469529774.4678.34.camel@mtksdaap41>
+ <1469613816.2470.50.camel@pengutronix.de>
+Message-ID: <1469671655.11841.85.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 27, 2016 at 09:25:11AM -0700, Joshua Clayton wrote:
+Hi, YT:
+
+On Wed, 2016-07-27 at 12:03 +0200, Philipp Zabel wrote:
+> Am Dienstag, den 26.07.2016, 18:42 +0800 schrieb YT Shen:
+> > Hi CK,
+> > 
+> > On Wed, 2016-07-20 at 14:53 +0800, CK Hu wrote:
+> > > Hi, YT:
+> > > 
+> > > Some comments inline.
+> > > 
+> > > On Fri, 2016-07-15 at 18:07 +0800, YT Shen wrote:
+> > > > This patch add support for the Mediatek MT2701 DISP subsystem.
+> > > > There is only one OVL engine in MT2701.
+> > > > 
+> > > > Signed-off-by: YT Shen <yt.shen@mediatek.com>
+> > > > ---
+> > > >  drivers/gpu/drm/mediatek/mtk_disp_ovl.c     |    6 ++++
+> > > >  drivers/gpu/drm/mediatek/mtk_disp_rdma.c    |    6 ++++
+> > > >  drivers/gpu/drm/mediatek/mtk_drm_ddp.c      |   41 +++++++++++++++++++++++++++
+> > > >  drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c |    7 +++++
+> > > >  drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h |    1 +
+> > > >  drivers/gpu/drm/mediatek/mtk_drm_drv.c      |   31 ++++++++++++++++++++
+> > > >  6 files changed, 92 insertions(+)
+> > > > 
+> > > 
+> > > [snip...]
+> > > 
+> > > >  
+> > > >  static const struct of_device_id mtk_ddp_comp_dt_ids[] = {
+> > > > +	{ .compatible = "mediatek,mt2701-disp-ovl",   .data = (void *)MTK_DISP_OVL },
+> > > >  	{ .compatible = "mediatek,mt8173-disp-ovl",   .data = (void *)MTK_DISP_OVL },
+> > > > +	{ .compatible = "mediatek,mt2701-disp-rdma",  .data = (void *)MTK_DISP_RDMA },
+> > > >  	{ .compatible = "mediatek,mt8173-disp-rdma",  .data = (void *)MTK_DISP_RDMA },
+> > > > +	{ .compatible = "mediatek,mt2701-disp-wdma",  .data = (void *)MTK_DISP_WDMA },
+> > > 
+> > > Is WDMA different from MT8173 to MT2701. If they are the same, you need
+> > > not to add compatible of 'mediatek,mt2701-disp-wdma' because use
+> > > 'mediatek,mt8173-disp-wdma' is enough.
+> > Yes, the hardware has differences, so we need add new compatible
+> > 'mt2701-disp-wdma'
 > 
+> It would be nice if you could add a short paragraph to the patch
+> description about what the hardware differences are (probably just
+> changed register layout in most cases).
+
+If you don't want to add description, you may separate the modification
+of OVL, RDMA, WDMA, PWM to different patch. And you send patch of OVL
+and RDMA first because you have related code modification for these two.
+You temporarily treat WDMA and PWM as MT8173 and it works. And one day
+you need to modify code of WDMA and PWM for MT2701, then you send the
+patch of WDMA and PWM and you need not to add any description because we
+can find out the difference from source code.
+
 > 
-> On 07/20/2016 02:40 AM, Peter Chen wrote:
-> > Some hard-wired USB devices need to do power sequence to let the
-> > device work normally, the typical power sequence like: enable USB
-> > PHY clock, toggle reset pin, etc. But current Linux USB driver
-> > lacks of such code to do it, it may cause some hard-wired USB devices
-> > works abnormal or can't be recognized by controller at all.
-> >
-> > In this patch, it calls power sequence library APIs to finish
-> > the power sequence events. At first, it calls pwrseq_alloc_generic
-> > to create a generic power sequence instance, then it will do power
-> > on sequence at hub's probe for all devices under this hub
-> > (includes root hub).
-> >
-> > At hub_disconnect, it will do power off sequence which is at powered
-> > on list.
-> >
-> > Signed-off-by: Peter Chen <peter.chen@nxp.com>
-> > ---
-> >  drivers/usb/core/Makefile |   1 +
-> >  drivers/usb/core/hub.c    |  12 ++++--
-> >  drivers/usb/core/hub.h    |  12 ++++++
-> >  drivers/usb/core/pwrseq.c | 100 ++++++++++++++++++++++++++++++++++++++++++++++
-> >  4 files changed, 122 insertions(+), 3 deletions(-)
-> >  create mode 100644 drivers/usb/core/pwrseq.c
-> >
-> > diff --git a/drivers/usb/core/Makefile b/drivers/usb/core/Makefile
-> > index da36b78..5fd2f54 100644
-> > --- a/drivers/usb/core/Makefile
-> > +++ b/drivers/usb/core/Makefile
-> > @@ -10,5 +10,6 @@ usbcore-y += port.o
-> >  usbcore-$(CONFIG_OF)		+= of.o
-> >  usbcore-$(CONFIG_PCI)		+= hcd-pci.o
-> >  usbcore-$(CONFIG_ACPI)		+= usb-acpi.o
-> > +usbcore-$(CONFIG_PWRSEQ_GENERIC) += pwrseq.o
-> >  
-> >  obj-$(CONFIG_USB)		+= usbcore.o
-> > diff --git a/drivers/usb/core/hub.c b/drivers/usb/core/hub.c
-> > index bee1351..a346a8b 100644
-> > --- a/drivers/usb/core/hub.c
-> > +++ b/drivers/usb/core/hub.c
-> > @@ -1700,6 +1700,7 @@ static void hub_disconnect(struct usb_interface *intf)
-> >  	hub->error = 0;
-> >  	hub_quiesce(hub, HUB_DISCONNECT);
-> >  
-> > +	hub_pwrseq_off(hub);
-> >  	mutex_lock(&usb_port_peer_mutex);
-> >  
-> >  	/* Avoid races with recursively_mark_NOTATTACHED() */
-> > @@ -1733,6 +1734,7 @@ static int hub_probe(struct usb_interface *intf, const struct usb_device_id *id)
-> >  	struct usb_endpoint_descriptor *endpoint;
-> >  	struct usb_device *hdev;
-> >  	struct usb_hub *hub;
-> > +	int ret = -ENODEV;
-> >  
-> >  	desc = intf->cur_altsetting;
-> >  	hdev = interface_to_usbdev(intf);
-> > @@ -1839,6 +1841,7 @@ descriptor_error:
-> >  	INIT_DELAYED_WORK(&hub->leds, led_work);
-> >  	INIT_DELAYED_WORK(&hub->init_work, NULL);
-> >  	INIT_WORK(&hub->events, hub_event);
-> > +	INIT_LIST_HEAD(&hub->pwrseq_on_list);
-> >  	usb_get_intf(intf);
-> >  	usb_get_dev(hdev);
-> >  
-> > @@ -1852,11 +1855,14 @@ descriptor_error:
-> >  	if (id->driver_info & HUB_QUIRK_CHECK_PORT_AUTOSUSPEND)
-> >  		hub->quirk_check_port_auto_suspend = 1;
-> >  
-> > -	if (hub_configure(hub, endpoint) >= 0)
-> > -		return 0;
-> > +	if (hub_configure(hub, endpoint) >= 0) {
-> > +		ret = hub_pwrseq_on(hub);
-> > +		if (!ret)
-> > +			return 0;
-> > +	}
-> >  
-> >  	hub_disconnect(intf);
-> > -	return -ENODEV;
-> > +	return ret;
-> >  }
-> >  
-> >  static int
-> > diff --git a/drivers/usb/core/hub.h b/drivers/usb/core/hub.h
-> > index 34c1a7e..9473f6f 100644
-> > --- a/drivers/usb/core/hub.h
-> > +++ b/drivers/usb/core/hub.h
-> > @@ -78,6 +78,7 @@ struct usb_hub {
-> >  	struct delayed_work	init_work;
-> >  	struct work_struct      events;
-> >  	struct usb_port		**ports;
-> > +	struct list_head	pwrseq_on_list; /* powered pwrseq node list */
-> >  };
-> >  
-> >  /**
-> > @@ -166,3 +167,14 @@ static inline int hub_port_debounce_be_stable(struct usb_hub *hub,
-> >  {
-> >  	return hub_port_debounce(hub, port1, false);
-> >  }
-> > +
-> > +#if IS_ENABLED(CONFIG_PWRSEQ_GENERIC)
-> > +int hub_pwrseq_on(struct usb_hub *hub);
-> > +void hub_pwrseq_off(struct usb_hub *hub);
-> > +#else
-> > +static inline int hub_pwrseq_on(struct usb_hub *hub)
-> > +{
-> > +	return 0;
-> > +}
-> > +static inline void hub_pwrseq_off(struct usb_hub *hub) {}
-> > +#endif /* CONFIG_PWRSEQ_GENERIC */
-> > diff --git a/drivers/usb/core/pwrseq.c b/drivers/usb/core/pwrseq.c
-> > new file mode 100644
-> > index 0000000..837fe66
-> > --- /dev/null
-> > +++ b/drivers/usb/core/pwrseq.c
-> > @@ -0,0 +1,100 @@
-> > +/*
-> > + * pwrseq.c	USB device power sequence management
-> > + *
-> > + * Copyright (C) 2016 Freescale Semiconductor, Inc.
-> > + * Author: Peter Chen <peter.chen@nxp.com>
-> > + *
-> > + * This program is free software: you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License version 2  of
-> > + * the License as published by the Free Software Foundation.
-> > + *
-> > + * This program is distributed in the hope that it will be useful,
-> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> > + * GNU General Public License for more details.
-> > + *
-> > + * You should have received a copy of the GNU General Public License
-> > + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> > + */
-> > +
-> > +#include <linux/list.h>
-> > +#include <linux/of.h>
-> > +#include <linux/power/pwrseq.h>
-> > +#include <linux/slab.h>
-> > +#include <linux/usb.h>
-> > +#include <linux/usb/hcd.h>
-> > +
-> > +#include "hub.h"
-> > +
-> > +struct usb_pwrseq_node {
-> > +	struct pwrseq *pwrseq;
-> > +	struct list_head list;
-> > +};
-> > +
-> > +static int hub_of_pwrseq_on(struct device_node *np, struct usb_hub *hub)
-> > +{
-> > +	struct pwrseq *pwrseq;
-> > +	struct usb_pwrseq_node *pwrseq_node;
-> > +	int ret;
-> > +
-> > +	pwrseq = pwrseq_alloc_generic();
-> > +	if (IS_ERR(pwrseq))
-> > +		return PTR_ERR(pwrseq);
-> > +
-> > +	ret = pwrseq_get(np, pwrseq);
-> > +	if (ret)
-> > +		goto pwr_free;
-> > +
-> > +	ret = pwrseq_on(np, pwrseq);
-> > +	if (ret)
-> > +		goto pwr_put;
-> > +
-> > +	pwrseq_node = kzalloc(sizeof(*pwrseq_node), GFP_KERNEL);
-> > +	pwrseq_node->pwrseq = pwrseq;
-> > +	list_add(&pwrseq_node->list, &hub->pwrseq_on_list);
-> > +
-> > +	return 0;
-> > +
-> > +pwr_put:
-> > +	pwrseq_put(pwrseq);
-> > +pwr_free:
-> > +	pwrseq_free(pwrseq);
-> > +	return ret;
-> > +}
-> > +
-> > +int hub_pwrseq_on(struct usb_hub *hub)
-> > +{
-> > +	struct device *parent;
-> > +	struct usb_device *hdev = hub->hdev;
-> > +	struct device_node *np;
-> > +	int ret;
-> > +
-> > +	if (hdev->parent)
-> > +		parent = &hdev->dev;
-> > +	else
-> > +		parent = bus_to_hcd(hdev->bus)->self.controller;
-> > +
-> > +	for_each_child_of_node(parent->of_node, np) {
-> > +		ret = hub_of_pwrseq_on(np, hub);
-> > +		if (ret)
-> > +			return ret;
-> > +	}
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +void hub_pwrseq_off(struct usb_hub *hub)
-> > +{
-> > +	struct pwrseq *pwrseq;
-> > +	struct usb_pwrseq_node *pwrseq_node, *tmp_node;
-> > +
-> > +	list_for_each_entry_safe(pwrseq_node, tmp_node,
-> > +			&hub->pwrseq_on_list, list) {
-> > +		pwrseq = pwrseq_node->pwrseq;
-> > +		pwrseq_off(pwrseq);
-> > +		pwrseq_put(pwrseq);
-> > +		pwrseq_free(pwrseq);
-> > +		list_del(&pwrseq_node->list);
-> > +		kfree(pwrseq_node);
-> > +	}
-> > +}
-> Patch 4 does not apply for me
-> (The Makefile has  a "usbcore-$(CONFIG_OF) += of.o"
-> line which I don't see in 4.7 or linux/next master).
-> Is there another patch set this series depends on?
+> regards
+> Philipp
+> 
 
-It seems below patch has not been queued:
-
-https://git.kernel.org/cgit/linux/kernel/git/peter.chen/usb.git/commit/?h=add_pwrseq_for_usb&id=2efd73d0f935ffbc66135553da0ac807c0b4c3fe
-
-This pwrseq-lib patch set does not depend on it, I will send patch set
-on top of a clean mainline next time, sorry for confusing. 
-
--- 
-
-Best Regards,
-Peter Chen
+Regards,
+CK
