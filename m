@@ -1,74 +1,77 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 28 Jul 2016 12:34:49 +0200
-Subject: [PATCH 12/18] ARM: mvebu: a39x: add missing nodes describing
- USB2.0 and USB3.0
-In-Reply-To: <1469105055-25181-14-git-send-email-jaz@semihalf.com> (Grzegorz
- Jaszczyk's message of "Thu, 21 Jul 2016 14:44:09 +0200")
-References: <1469105055-25181-1-git-send-email-jaz@semihalf.com>
- <1469105055-25181-14-git-send-email-jaz@semihalf.com>
-Message-ID: <877fc6kq46.fsf@free-electrons.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Thu, 28 Jul 2016 19:52:06 +0900
+Subject: Why do we need reset_control_get_optional() ?
+In-Reply-To: <5955443.3UvZHD6laK@wuerfel>
+References: <CAK7LNAQnitMMp5wMXXvVeS-UFF=Fo9m=M1hL=5f4=RF8JYCnGg@mail.gmail.com>
+ <1469698980.12835.18.camel@pengutronix.de> <5955443.3UvZHD6laK@wuerfel>
+Message-ID: <CAK7LNAQ0nCQymq+M+FTUXoK7yBj_5CJp9nqDjO3u5wcnckXtmw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Grzegorz,
- 
- On jeu., juil. 21 2016, Grzegorz Jaszczyk <jaz@semihalf.com> wrote:
+Hi Arnd,
 
-> The whole Armada 39x SoC family of processors has one USB2.0 and one
-> USB3.0 which all can be supported with existing drivers.
+
+2016-07-28 19:09 GMT+09:00 Arnd Bergmann <arnd@arndb.de>:
+> On Thursday, July 28, 2016 11:43:00 AM CEST Philipp Zabel wrote:
+>> > I want to deprecate _optional variants in the following steps:
+>> >
+>> > [1] Add "depends on RESET_CONTROLLER" to drivers
+>> >     for which reset_control is mandatory.
+>> >
+>> >     We can find those driver easily by grepping
+>> >     the reference to non-optional reset_control_get().
+>>
+>> Since we have the stubs, the RESET_CONTROLLER dependency is only at
+>> runtime, not at build time.
+>>
+>> I think Arnd wanted to move this in the opposite direction and remove
+>> the configurable RESET_CONTROLLER symbol. Maybe we should let all
+>> drivers that currently request non-optional resets have:
+>>         depends on (ARCH_HAS_)RESET_CONTROLLER || COMPILE_TEST
+>> ?
 >
-Change the prefix to "ARM: dts: mvebu: armada-39x:"
-
-Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-
-Thanks,
-
-Gregory
-> Signed-off-by: Grzegorz Jaszczyk <jaz@semihalf.com>
-> ---
->  arch/arm/boot/dts/armada-39x.dtsi | 16 ++++++++++++++++
->  1 file changed, 16 insertions(+)
+> There are various ways to improve the current situation.
 >
-> diff --git a/arch/arm/boot/dts/armada-39x.dtsi b/arch/arm/boot/dts/armada-39x.dtsi
-> index 0749878..1225cd8 100644
-> --- a/arch/arm/boot/dts/armada-39x.dtsi
-> +++ b/arch/arm/boot/dts/armada-39x.dtsi
-> @@ -381,6 +381,14 @@
->  				reg = <0x22000 0x1000>;
->  			};
->  
-> +			usb at 58000 {
-> +				compatible = "marvell,orion-ehci";
-> +				reg = <0x58000 0x500>;
-> +				interrupts = <GIC_SPI 18 IRQ_TYPE_LEVEL_HIGH>;
-> +				clocks = <&gateclk 18>;
-> +				status = "disabled";
-> +			};
-> +
->  			xor at 60800 {
->  				compatible = "marvell,armada-380-xor", "marvell,orion-xor";
->  				reg = <0x60800 0x100
-> @@ -457,6 +465,14 @@
->  				reg = <0xe4078 0x4>, <0xe4074 0x4>;
->  				status = "okay";
->  			};
-> +
-> +			usb3 at f8000 {
-> +				compatible = "marvell,armada-380-xhci";
-> +				reg = <0xf8000 0x4000>,<0xfc000 0x4000>;
-> +				interrupts = <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>;
-> +				clocks = <&gateclk 10>;
-> +				status = "disabled";
-> +			};
->  		};
->  
->  		pcie-controller {
-> -- 
-> 1.8.3.1
+> I think it's important that a driver that has an optional
+> reset line behaves in exactly the same way whether the reset
+> subsystem is enabled or disabled when no reset line is
+> provided for a machine.
 >
+> When a driver requires a reset line, we can either have a
+> build-time failure when the reset subsystem is disabled
+> (enforcing the Kconfig dependency), or cause a runtime
+> failure if either there is no reset line or the subsystem
+> is disabled.
+
+Yes.  I am suggesting the "enforcing the Kconfig dependency".
+
+"I will let you build this driver, but it would never work"
+is not the right thing to do, I think.
+
+
+
+> In my experimental patch, I make the _optional functions
+> return NULL if no "resets" property is provided but return
+> an error if there are reset lines but the subsystem is
+> disabled, i.e. an optional reset must be used if it's in the
+> DT, but can be ignored otherwise.
+
+I do not like this idea.
+
+reset_control_get() (or variants) should not return NULL, it is ambiguous.
+It should return ERR_PTR(-ENOENT) if no "resets" property.
+
+I only want two types for functions that return a pointer.
+
+[1] return a valid pointer on success, or return NULL on failure
+    (for example, kmalloc())
+[2] return a valid pointer on success, or return error pointer on failure
+   (many of _register() functions)
+
+Mixing [1] and [2] will be a mess.
+
+
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Best Regards
+Masahiro Yamada
