@@ -1,87 +1,31 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Thu, 28 Jul 2016 09:55:39 -0700
-Subject: [Patch v2 1/5] ARM: dts: qcom: Add initial DTS for LG Nexus 5
- Phone
-In-Reply-To: <20160719050414.31704-2-bshah@kde.org>
-References: <20160719050414.31704-1-bshah@kde.org>
- <20160719050414.31704-2-bshah@kde.org>
-Message-ID: <20160728165539.GO13516@tuxbot>
+From: geoff@infradead.org (Geoff Levand)
+Date: Thu, 28 Jul 2016 10:33:12 -0700
+Subject: [PATCH v2 3/4] arm64: Add arm64 kexec support
+In-Reply-To: <20160728041053.GB27150@localhost.localdomain>
+References: <cover.1469559530.git.geoff@infradead.org>
+ <fbb0f30aa1493b40c53264c9b5ae62b46606bd61.1469559530.git.geoff@infradead.org>
+ <20160728041053.GB27150@localhost.localdomain>
+Message-ID: <1469727192.16559.1.camel@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon 18 Jul 22:04 PDT 2016, Bhushan Shah wrote:
-
-> This DTS file have support LG Nexus 5 (codenamed hammerhead).
-> Initial version have support for just serial console over headphone
-> jack.
+On Thu, 2016-07-28 at 09:40 +0530, Pratyush Anand wrote:
+> On 26/07/2016:08:18:57 PM, Geoff Levand wrote:
+> > Add kexec reboot support for ARM64 platforms.
+> > 
+> > Signed-off-by: Geoff Levand <geoff@infradead.org>
+> > ---
 > 
-> Cc: Andy Gross <andy.gross@linaro.org>
-> Cc: Bjorn Andersson <bjorn.andersson@linaro.org>
-> Cc: David Brown <david.brown@linaro.org>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Russell King <linux@armlinux.org.uk>
-> Cc: devicetree at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-arm-msm at vger.kernel.org
-> Signed-off-by: Bhushan Shah <bshah@kde.org>
-
-Reviewed-by: Bjorn Andersson <bjorn.andersson@linaro.org>
-
-Regards,
-Bjorn
-
-> ---
-> Changes in v2
->     - Removed qcom,msm-id
->     - Added "lge,hammerhead" in the compatible
+> [...]
 > 
->  arch/arm/boot/dts/Makefile                         |  1 +
->  .../dts/qcom-msm8974-lge-nexus5-hammerhead.dts     | 23 ++++++++++++++++++++++
->  2 files changed, 24 insertions(+)
->  create mode 100644 arch/arm/boot/dts/qcom-msm8974-lge-nexus5-hammerhead.dts
+> > +
+> > +#define OPT_APPEND		((OPT_MAX)+0)
+> > +#define OPT_DTB			((OPT_MAX)+1)
+> > +#define OPT_INITRD		((OPT_MAX)+2)
+> > +#define OPT_REUSE_CMDLINE	((OPT_MAX)+4)
 > 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index 414b427..13947ec 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -584,6 +584,7 @@ dtb-$(CONFIG_ARCH_QCOM) += \
->  	qcom-ipq8064-ap148.dtb \
->  	qcom-msm8660-surf.dtb \
->  	qcom-msm8960-cdp.dtb \
-> +	qcom-msm8974-lge-nexus5-hammerhead.dtb \
->  	qcom-msm8974-sony-xperia-honami.dtb
->  dtb-$(CONFIG_ARCH_REALVIEW) += \
->  	arm-realview-pb1176.dtb \
-> diff --git a/arch/arm/boot/dts/qcom-msm8974-lge-nexus5-hammerhead.dts b/arch/arm/boot/dts/qcom-msm8974-lge-nexus5-hammerhead.dts
-> new file mode 100644
-> index 0000000..68f3a8a
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/qcom-msm8974-lge-nexus5-hammerhead.dts
-> @@ -0,0 +1,23 @@
-> +#include "qcom-msm8974.dtsi"
-> +#include "qcom-pm8841.dtsi"
-> +#include "qcom-pm8941.dtsi"
-> +
-> +/ {
-> +	model = "LGE MSM 8974 HAMMERHEAD";
-> +	compatible = "lge,hammerhead", "qcom,msm8974";
-> +
-> +	aliases {
-> +		serial0 = &blsp1_uart1;
-> +	};
-> +
-> +	chosen {
-> +		stdout-path = "serial0:115200n8";
-> +	};
-> +};
-> +
-> +&soc {
-> +	serial at f991d000 {
-> +		status = "ok";
-> +	};
-> +
-> +};
-> -- 
-> 2.9.0
-> 
+> Option count 3 is missing. 
+
+>From the recently removed OPT_PORT.
+
+Thanks for checking.
