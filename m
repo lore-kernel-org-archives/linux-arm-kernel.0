@@ -1,60 +1,29 @@
 From: geoff@infradead.org (Geoff Levand)
-Date: Thu, 28 Jul 2016 11:04:43 -0700
-Subject: [PATCH v2 4/4] arm64: Add support for binary image files
-In-Reply-To: <20160728040125.GA27150@localhost.localdomain>
-References: <cover.1469559530.git.geoff@infradead.org>
- <f352dcfc827a4cbb3878dd1043877a4154b1bd08.1469559530.git.geoff@infradead.org>
- <20160728040125.GA27150@localhost.localdomain>
-Message-ID: <1469729083.16559.26.camel@infradead.org>
+Date: Thu, 28 Jul 2016 11:09:14 -0700
+Subject: [PATCH v1 0/4] arm64 kexec-tools patches
+In-Reply-To: <20160726230526.GD28591@verge.net.au>
+References: <cover.1468970114.git.geoff@infradead.org>
+ <20160726230526.GD28591@verge.net.au>
+Message-ID: <1469729354.16559.30.camel@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pratyush,
+Hi Simon,
 
-On Thu, 2016-07-28 at 09:31 +0530, Pratyush Anand wrote:
-> On 26/07/2016:08:18:57 PM, Geoff Levand wrote:
+On Wed, 2016-07-27 at 08:05 +0900, Simon Horman wrote:
 
-> You removed page_offset calculation in rework.
-> I am unable to understand that how arm64_mem.page_offset will be filled up now
-> for binary image case.
+> There seems to have been quite a bit of discussion of this patchset.
 > 
-> I think, we still need to keep page_offset user input. 
-
-The current kernel linker scripts are setup to output virtual
-address values to the vmlinux elf file.  
-
-To load the elf sections of vmlinux using the provided elf
-file loader, elf_exec_load(), we need to convert those elf
-header values to physical addresses since we work with
-physical addresses in the kernel's kimage structure.
-
-That conversion is 
-
-  p = v - page_offset + phys_offset;
-
-We get phys_offset from the memory ranges, and we calculate
-page_offset from the elf header info.
-
-As for the binary image file, we load that with
-add_segment_phys_virt(), which can put the binary data of the
-Image file into memory at a physical address we specify:
-
-  image_base = phys_offset + text_offset.
-
-phys_offset is again from the memory ranges, and text_offset
-from the arm64 image header.
-
-
-> You may take following
-> two patches which does this, or you may leave binary image support patch which I
-> will send after your patches are merged.
+> I am of a mind to release kexec-tools v2.0.12-rc1 (and thus v2.0.12)
+> without these changes as the v4.7 kernel is already out and that
+> is the timing I had in mind for kexec-tools v2.0.12 (the lateness on
+> my shoulders).
 > 
-> https://github.com/pratyushanand/kexec-tools/commit/5b7e49a75d1d6cd4ac846f50ff10275fd54cb545
+> The implication is the arm64 patches would likely end up in the v2.0.13
+> release of kexec-tools which I aim to release around the time of the v4.9
+> kernel.
 
-This one may be useful, for debugging if anything.
+OK, this seems reasonable.  Early users can build from your sources
+once the patches are merged if they need support.
 
-> https://github.com/pratyushanand/kexec-tools/commit/a0ce0ce673755c4061c1f081170a3a75dfa1d1fb
-
-We do not need, nor want, a PAGE_OFFSET option.
-
--Geoff
+-Geoff 
