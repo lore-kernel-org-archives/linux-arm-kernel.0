@@ -1,72 +1,63 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 28 Jul 2016 12:18:45 +0200
-Subject: [PATCH 10/18] ARM: mvebu: a39x: enable watchdog for all
- Armada-39x SoCs
-In-Reply-To: <1469105055-25181-12-git-send-email-jaz@semihalf.com> (Grzegorz
- Jaszczyk's message of "Thu, 21 Jul 2016 14:44:07 +0200")
-References: <1469105055-25181-1-git-send-email-jaz@semihalf.com>
- <1469105055-25181-12-git-send-email-jaz@semihalf.com>
-Message-ID: <87fuqukquy.fsf@free-electrons.com>
+From: julian.calaby@gmail.com (Julian Calaby)
+Date: Thu, 28 Jul 2016 20:24:41 +1000
+Subject: [linux-sunxi] [PATCH] regulator: axp20x: support AXP813 variant
+In-Reply-To: <5799d673.58a51c0a.97cf9.b9c0SMTPIN_ADDED_MISSING@gmr-mx.google.com>
+References: <5799d673.58a51c0a.97cf9.b9c0SMTPIN_ADDED_MISSING@gmr-mx.google.com>
+Message-ID: <CAGRGNgUeORYesjLAeaO=GGhC1rv9FUU5ZUdjRx8+Pz=vCggsEw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Grzegorz,
- 
- On jeu., juil. 21 2016, Grzegorz Jaszczyk <jaz@semihalf.com> wrote:
+Hi All,
 
-Add a commit log here and change the prefix to "ARM: dts: mvebu:
-armada-39x:"
+On Thu, Jul 28, 2016 at 5:28 PM, Jean-Francois Moine <moinejf@free.fr> wrote:
+> The X-Powers AXP813 PMIC is close enough to the AXP809 with some
+> more outputs.
+>
+> Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
+> ---
+>  Documentation/devicetree/bindings/mfd/axp20x.txt | 32 ++++++++-
+>  drivers/mfd/axp20x-rsb.c                         |  1 +
+>  drivers/mfd/axp20x.c                             |  3 +
+>  drivers/regulator/axp20x-regulator.c             | 82 +++++++++++++++++++++++-
+>  include/linux/mfd/axp20x.h                       | 38 +++++++++++
+>  5 files changed, 153 insertions(+), 3 deletions(-)
+>
+> diff --git a/drivers/regulator/axp20x-regulator.c b/drivers/regulator/axp20x-regulator.c
+> index 6d9ac76..c3287c9 100644
+> --- a/drivers/regulator/axp20x-regulator.c
+> +++ b/drivers/regulator/axp20x-regulator.c
+> @@ -467,7 +543,8 @@ static int axp20x_regulator_probe(struct platform_device *pdev)
+>                  * name.
+>                  */
+>                 if ((regulators == axp22x_regulators && i == AXP22X_DC1SW) ||
+> -                   (regulators == axp809_regulators && i == AXP809_DC1SW)) {
+> +                   (regulators == axp809_regulators && i == AXP809_DC1SW) ||
+> +                   (regulators == axp813_regulators && i == AXP813_DC1SW)) {
 
-Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Are we getting to the point now where we need some other way to flag
+these? Maybe a set of flags per regulator?
+
+>                         new_desc = devm_kzalloc(&pdev->dev, sizeof(*desc),
+>                                                 GFP_KERNEL);
+>                         *new_desc = regulators[i];
+> @@ -505,7 +582,8 @@ static int axp20x_regulator_probe(struct platform_device *pdev)
+>                  * Save AXP22X DCDC1 / DCDC5 regulator names for later.
+>                  */
+>                 if ((regulators == axp22x_regulators && i == AXP22X_DCDC1) ||
+> -                   (regulators == axp809_regulators && i == AXP809_DCDC1))
+> +                   (regulators == axp809_regulators && i == AXP809_DCDC1) ||
+> +                   (regulators == axp813_regulators && i == AXP813_DCDC1))
+
+Ditto.
+
+>                         of_property_read_string(rdev->dev.of_node,
+>                                                 "regulator-name",
+>                                                 &dcdc1_name);
 
 Thanks,
 
-Gregory
-
-> Signed-off-by: Grzegorz Jaszczyk <jaz@semihalf.com>
-> Reviewed-by: Lior Amsalem <alior@marvell.com>
-> ---
->  arch/arm/boot/dts/armada-39x.dtsi | 15 +++++++++++++++
->  1 file changed, 15 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/armada-39x.dtsi b/arch/arm/boot/dts/armada-39x.dtsi
-> index 03dc0ec..5e01438 100644
-> --- a/arch/arm/boot/dts/armada-39x.dtsi
-> +++ b/arch/arm/boot/dts/armada-39x.dtsi
-> @@ -322,6 +322,14 @@
->  				clock-names = "nbclk", "fixed";
->  			};
->  
-> +			watchdog at 20300 {
-> +				compatible = "marvell,armada-380-wdt";
-> +				reg = <0x20300 0x34>, <0x20704 0x4>,
-> +				      <0x18260 0x4>;
-> +				clocks = <&coreclk 2>, <&refclk>;
-> +				clock-names = "nbclk", "fixed";
-> +			};
-> +
->  			cpurst at 20800 {
->  				compatible = "marvell,armada-370-cpu-reset";
->  				reg = <0x20800 0x10>;
-> @@ -534,5 +542,12 @@
->  			#clock-cells = <0>;
->  			clock-frequency = <1000000000>;
->  		};
-> +
-> +		/* 25 MHz reference crystal */
-> +		refclk: oscillator {
-> +			compatible = "fixed-clock";
-> +			#clock-cells = <0>;
-> +			clock-frequency = <25000000>;
-> +		};
->  	};
->  };
-> -- 
-> 1.8.3.1
->
-
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Julian Calaby
+
+Email: julian.calaby at gmail.com
+Profile: http://www.google.com/profiles/julian.calaby/
