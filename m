@@ -1,43 +1,33 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Thu, 28 Jul 2016 12:29:48 -0400
-Subject: [PATCH -next] PCI: keystone: Fix error return code in
- ks_add_pcie_port()
-In-Reply-To: <1469722578-14863-1-git-send-email-weiyj.lk@gmail.com>
-References: <1469722578-14863-1-git-send-email-weiyj.lk@gmail.com>
-Message-ID: <579A32FC.4070907@ti.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 28 Jul 2016 13:41:23 -0300
+Subject: [PATCH v3 0/6] power: add power sequence library
+In-Reply-To: <579A2B38.3000202@gmail.com>
+References: <1469007629-31757-1-git-send-email-peter.chen@nxp.com>
+ <579A2B38.3000202@gmail.com>
+Message-ID: <CAOMZO5Dv_X-u6qKqAWtysAqmMw91bVoAaRvnc81yUGDxbd27rA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/28/2016 12:16 PM, Wei Yongjun wrote:
-> Fix to return a negative error code from the request IRQ error
-> handling case instead of 0, as done elsewhere in this function.
-> 
-> Signed-off-by: Wei Yongjun <weiyj.lk@gmail.com>
-> ---
->  drivers/pci/host/pci-keystone.c | 5 +++--
->  1 file changed, 3 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/pci/host/pci-keystone.c b/drivers/pci/host/pci-keystone.c
-> index 8ba2883..82b461b 100644
-> --- a/drivers/pci/host/pci-keystone.c
-> +++ b/drivers/pci/host/pci-keystone.c
-> @@ -334,8 +334,9 @@ static int __init ks_add_pcie_port(struct keystone_pcie *ks_pcie,
->  	if (ks_pcie->error_irq <= 0)
->  		dev_info(&pdev->dev, "no error IRQ defined\n");
->  	else {
-> -		if (request_irq(ks_pcie->error_irq, pcie_err_irq_handler,
-> -				IRQF_SHARED, "pcie-error-irq", ks_pcie) < 0) {
-> +		ret = request_irq(ks_pcie->error_irq, pcie_err_irq_handler,
-> +				  IRQF_SHARED, "pcie-error-irq", ks_pcie);
-> +		if (ret < 0) {
->  			dev_err(&pdev->dev, "failed to request error IRQ %d\n",
->  				ks_pcie->error_irq);
->  			return ret;
-> 
-Thanks
+Hi Joshua,
 
-Acked-By: Murali Karicheri <m-karicheri2@ti.com>
+On Thu, Jul 28, 2016 at 12:56 PM, Joshua Clayton
+<stillcompiling@gmail.com> wrote:
 
--- 
-Murali Karicheri
-Linux Kernel, Keystone
+> I assume there is a v4 coming due to rmk's comments on patch 5.
+> I couldn't figure out where to null the of_node in error paths, but in testing
+> we did put a line of code to null the of_node on release.
+>
+> but...
+> As an aside,
+> I was hoping this series would magically fix a problem
+> with the imx6q-evi which has forced us to disable
+> runtime power management. But it did not. :(
+
+I also see a similar problem on a mx28 board with a hub.
+
+Does it help in your case if you pass 'usbcore.autosuspend=-1' in the
+kernel command line?
+
+Regards,
+
+Fabio Estevam
