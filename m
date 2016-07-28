@@ -1,112 +1,62 @@
-From: yt.shen@mediatek.com (YT Shen)
-Date: Thu, 28 Jul 2016 15:17:36 +0800
-Subject: [PATCH v4 4/8] drm/mediatek: add support for Mediatek SoC MT2701
-In-Reply-To: <1469671655.11841.85.camel@mtksdaap41>
-References: <1468577274-6178-1-git-send-email-yt.shen@mediatek.com>
- <1468577274-6178-5-git-send-email-yt.shen@mediatek.com>
- <1468997599.11841.49.camel@mtksdaap41>
- <1469529774.4678.34.camel@mtksdaap41>
- <1469613816.2470.50.camel@pengutronix.de>
- <1469671655.11841.85.camel@mtksdaap41>
-Message-ID: <1469690256.28644.42.camel@mtksdaap41>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 28 Jul 2016 09:44:53 +0200
+Subject: debug tip after earlycon is closed?
+In-Reply-To: <CAK7LNARtm_2uT3nbga4X0dMYs9jhKa8a2FTGJrYbVRg8P3vHQw@mail.gmail.com>
+References: <CAK7LNASrqbt+RzD64zcAMjmBjJqa2sc2UG+mnEX8npZ9DBJodQ@mail.gmail.com>
+ <3860396.RT1mlU0LAT@wuerfel>
+ <CAK7LNARtm_2uT3nbga4X0dMYs9jhKa8a2FTGJrYbVRg8P3vHQw@mail.gmail.com>
+Message-ID: <7034241.kLArk8ex69@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Philipp, CK,
-
-On Thu, 2016-07-28 at 10:07 +0800, CK Hu wrote:
-> Hi, YT:
+On Thursday, July 28, 2016 11:08:13 AM CEST Masahiro Yamada wrote:
+> Hi Arnd,
 > 
-> On Wed, 2016-07-27 at 12:03 +0200, Philipp Zabel wrote:
-> > Am Dienstag, den 26.07.2016, 18:42 +0800 schrieb YT Shen:
-> > > Hi CK,
-> > > 
-> > > On Wed, 2016-07-20 at 14:53 +0800, CK Hu wrote:
-> > > > Hi, YT:
-> > > > 
-> > > > Some comments inline.
-> > > > 
-> > > > On Fri, 2016-07-15 at 18:07 +0800, YT Shen wrote:
-> > > > > This patch add support for the Mediatek MT2701 DISP subsystem.
-> > > > > There is only one OVL engine in MT2701.
-> > > > > 
-> > > > > Signed-off-by: YT Shen <yt.shen@mediatek.com>
-> > > > > ---
-> > > > >  drivers/gpu/drm/mediatek/mtk_disp_ovl.c     |    6 ++++
-> > > > >  drivers/gpu/drm/mediatek/mtk_disp_rdma.c    |    6 ++++
-> > > > >  drivers/gpu/drm/mediatek/mtk_drm_ddp.c      |   41 +++++++++++++++++++++++++++
-> > > > >  drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c |    7 +++++
-> > > > >  drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h |    1 +
-> > > > >  drivers/gpu/drm/mediatek/mtk_drm_drv.c      |   31 ++++++++++++++++++++
-> > > > >  6 files changed, 92 insertions(+)
-> > > > > 
-> > > > 
-> > > > [snip...]
-> > > > 
-> > > > >  
-> > > > >  static const struct of_device_id mtk_ddp_comp_dt_ids[] = {
-> > > > > +	{ .compatible = "mediatek,mt2701-disp-ovl",   .data = (void *)MTK_DISP_OVL },
-> > > > >  	{ .compatible = "mediatek,mt8173-disp-ovl",   .data = (void *)MTK_DISP_OVL },
-> > > > > +	{ .compatible = "mediatek,mt2701-disp-rdma",  .data = (void *)MTK_DISP_RDMA },
-> > > > >  	{ .compatible = "mediatek,mt8173-disp-rdma",  .data = (void *)MTK_DISP_RDMA },
-> > > > > +	{ .compatible = "mediatek,mt2701-disp-wdma",  .data = (void *)MTK_DISP_WDMA },
-> > > > 
-> > > > Is WDMA different from MT8173 to MT2701. If they are the same, you need
-> > > > not to add compatible of 'mediatek,mt2701-disp-wdma' because use
-> > > > 'mediatek,mt8173-disp-wdma' is enough.
-> > > Yes, the hardware has differences, so we need add new compatible
-> > > 'mt2701-disp-wdma'
-> > 
-> > It would be nice if you could add a short paragraph to the patch
-> > description about what the hardware differences are (probably just
-> > changed register layout in most cases).
-Thanks for the suggestions, we will add more descriptions in the future.
-
 > 
-> If you don't want to add description, you may separate the modification
-> of OVL, RDMA, WDMA, PWM to different patch. And you send patch of OVL
-> and RDMA first because you have related code modification for these two.
-> You temporarily treat WDMA and PWM as MT8173 and it works. And one day
-> you need to modify code of WDMA and PWM for MT2701, then you send the
-> patch of WDMA and PWM and you need not to add any description because we
-> can find out the difference from source code.
-
-The display module connections is shown in mt2701_mtk_ddp_main[] and
-mt2701_mtk_ddp_ext[].
-OVL -> RDMA -> COLOR -> BLS(pwm) -> DSI
-RDMA -> DPI
-
-This patch series mainly focus on DSI support for MT2701 SoC and the
-basic functions.  The BLS(pwm) and DPI parts are not included here.
-
-We will remove 'mt2701-disp-wdma'. We didn't implement its driver and it
-is unused now.
-
-For the pwm part, we need the device node to establish the display
-module connections.  The pwm compatible string is described in
-"dt-bindings: pwm: Add MediaTek display PWM bindings" [1] and the
-control is implemented in "pwm: Add MediaTek MT2701 display PWM driver
-support" [2].
-
-For the dpi part, we need the device node to establish the display
-module connections.  The dpi patch will be in another patch series,
-split out from "drm/mediatek: fix the wrong pixel clock when resolution
-is 4K" [3].
-
-
-[1] https://patchwork.kernel.org/patch/9222997/
-[2] https://patchwork.kernel.org/patch/9223001/
-[3] https://patchwork.kernel.org/patch/9249471/ 
-
-Regards,
-yt.shen
-
+> 2016-07-27 16:32 GMT+09:00 Arnd Bergmann <arnd@arndb.de>:
+> > On Wednesday, July 27, 2016 10:23:09 AM CEST Masahiro Yamada wrote:
+> >> [    0.000004] sched_clock: 56 bits at 50MHz, resolution 20ns, wraps
+> >> every 4398046511100ns
+> >> [    0.008254] Console: colour dummy device 80x25
+> >> [    0.012700] console [tty0] enabled
+> >> [    0.016110] bootconsole [uniphier0] disabled
+> >
+> > I assume that the original console is on a uart, while the new console
+> > appears to be on the framebuffer. Maybe you have no screen attached?
+> >
 > 
-> > 
-> > regards
-> > Philipp
-> > 
 > 
-> Regards,
-> CK
+> I use 8250-compat serial console for both.
 > 
+> 
+> The following is the full boot log when success.
+> 
+> 
+> I am not sure about:
+> [    0.000141] Console: colour dummy device 80x25
+> [    0.000550] console [tty0] enabled
+> 
+> 
+> 
+> This is the UART console I am really using.
+> [    0.234743] 54006800.serial: ttyS0 at MMIO 0x54006800 (irq = 6,
+> base_baud = 3676470) is a 16550A
+> [    0.994393] console [ttyS0] enabled
+
+I think the problem is that you have three consoles:
+
+- the boot console that stays active until a real console comes up
+- the framebuffer console that is initialized early and goes on to
+  disable the bootconsole
+- the serial console that you are looking at but which doesn't get
+  initialized until much later
+
+Clearly something is wrong in this setup and we don't want to
+disable the boot console before the serial console is up.
+
+I guess you could work around it by disabling the framebuffer console
+at compile time, or by having the serial console initialized earlier
+than the framebuffer, but I wonder if this is something that could
+use a more general solution.
+
+	Arnd
