@@ -1,210 +1,95 @@
-From: rui.zhang@intel.com (Zhang Rui)
-Date: Thu, 28 Jul 2016 16:55:20 +0800
-Subject: [PATCH v6 00/11] qcom: Add support for TSENS driver
-In-Reply-To: <1469694828.2367.102.camel@intel.com>
-References: <1462438309-11196-1-git-send-email-rnayak@codeaurora.org>
- <575A57F8.6060004@codeaurora.org> <576391B3.7090508@codeaurora.org>
- <57749F20.4010700@codeaurora.org> <1469694828.2367.102.camel@intel.com>
-Message-ID: <1469696120.2367.107.camel@intel.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Thu, 28 Jul 2016 11:23:11 +0200
+Subject: [PATCH v2] reset: uniphier: add reset controller drivers for
+ UniPhier SoCs
+In-Reply-To: <CAK7LNAShnmaZ-Gd8yDEvJwdiEbf6ceWkabsFVtMz3hjfzJG2rw@mail.gmail.com>
+References: <1469557209-13089-1-git-send-email-yamada.masahiro@socionext.com>
+ <1469611051.2470.15.camel@pengutronix.de>
+ <CAK7LNAShnmaZ-Gd8yDEvJwdiEbf6ceWkabsFVtMz3hjfzJG2rw@mail.gmail.com>
+Message-ID: <1469697791.12835.8.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On ?, 2016-07-28 at 16:33 +0800, Zhang Rui wrote:
-> Hi, Rajendra,
-> 
-> On ?, 2016-06-30 at 09:55 +0530, Rajendra Nayak wrote:
-> > 
-> > Rui,
-> > 
-> > On 06/17/2016 11:29 AM, Nayak, Rajendra wrote:
-> > > 
-> > > 
-> > > Hey Eduardo,
-> > > 
-> > > On 6/10/2016 11:32 AM, Rajendra Nayak wrote:
-> > > > 
-> > > > 
-> > > > Eduardo,
-> > > > 
-> > > > On 05/05/2016 02:21 PM, Rajendra Nayak wrote:
-> > > > > 
-> > > > > 
-> > > > > Current set of patches apply on 4.6-rc6. Fixes for the nvmem
-> > > > > apis
-> > > > > are now posted [1] and queued in -next [2]
-> > > > > Patches [1-6] will need to be merged via thermal
-> > > > > tree/Eduardo.
-> > > > Any plans to pull these in for 4.8?
-> > > These patches have been on the list for quite a while, and they
-> > > do not have any outstanding dependencies or comments to be
-> > > addressed. I would really hope to see these in for 4.8.
-> > > Let me know if there is something you want me to address before
-> > > you pull them in.
-> > Would you be able to pull this driver in? I haven't heard back
-> > anything from Eduardo despite multiple pings.
-> > These patches (v6) have been on the list for a couple months now,
-> > which address all issues/concerns that were raised by Eduardo
-> > in his previous reviews.
-> > 
-> Sorry for my late response as I took medical leave earlier this month
-> for a noise surgery and I'm just back to work.
-> 
-> I synced with Eduardo yesterday, he was also really busy recently,
-> but
-> he will go through the pending patches soon.
-> So, for this patch set, I still prefer to let Eduardo to take it if
-> he
-> has time, and I will take them if you still don't get feedback from
-> Eduardo after the merge window, does this sound okay for you?
-> 
-Hah, it seems that Eduardo has already took your patches, sorry for the
-noise. :)
+Hi Masahiro,
 
-thanks,
-rui
-> thanks,
-> rui
+Am Donnerstag, den 28.07.2016, 11:40 +0900 schrieb Masahiro Yamada:
+> >> +static int uniphier_reset_update(struct reset_controller_dev *rcdev,
+> >> +                              unsigned long id, bool assert)
+> >> +{
+> >> +     struct uniphier_reset_priv *priv = to_uniphier_reset_priv(rcdev);
+> >> +     const struct uniphier_reset_data *p;
+> >> +     bool handled = false;
+> >> +
+> >> +     for (p = priv->data; p->id != UNIPHIER_RESET_ID_END; p++) {
+> >> +             unsigned int val;
+> >> +             int ret;
+> >> +
+> >> +             if (p->id != id)
+> >> +                     continue;
+> >> +
+> >> +             val = p->assert_val;
+> >> +             if (!assert)
+> >> +                     val = ~val;
+> >> +
+> >> +             ret = regmap_write_bits(priv->regmap, p->reg, p->mask, val);
+> >> +             if (ret)
+> >> +                     return ret;
+> >> +
+> >> +             handled = true;
+> >
+> > Why does this continue to walk through the list after the correct id was
+> > found?
 > 
-> > 
-> > regards,
-> > Rajendra
-> > 
-> > > 
-> > > 
-> > > 
-> > > regards,
-> > > Rajendra
-> > > 
-> > > > 
-> > > > 
-> > > > 
-> > > > regards,
-> > > > Rajendra
-> > > > 
-> > > > > 
-> > > > > 
-> > > > > Patches [7-11] will need to go via qcom-msm tree/Andy.
-> > > > > 
-> > > > > Changes since v5:
-> > > > > * Minor review fixes from Eduardo
-> > > > > 
-> > > > > Changes since v4:
-> > > > > * dropped qcom,tsens-slopes binding, used coefficients
-> > > > > instead
-> > > > > * dropped qcom,sensor-id binding
-> > > > > * Added support for msm8996 family
-> > > > > * Other minor review fixes from v4
-> > > > > 
-> > > > > Changes since v3:
-> > > > > * Dropped 'clk: qcom: create virtual child device for TSENS'
-> > > > > which
-> > > > > is picked up by Stephen
-> > > > > * Updated GCC bindings with optional TSENS properties
-> > > > > 
-> > > > > Changes since v2:
-> > > > > * Minor review fixes from Stephen/Punit and rebase on 4.3-rc4
-> > > > > 
-> > > > > Changes since v1:
-> > > > > * Created virtual tsens device from gcc driver for 8960,
-> > > > > with DT having a single node for gcc and tsens
-> > > > > * Minor fixes with rebasing on 4.3-rc1
-> > > > > 
-> > > > > Changes since RFC:
-> > > > > * Added support for 8916 and 8084
-> > > > > * Based off the latest nvmem framework patches [1]
-> > > > > * Minor review fixes for comments mostly from Lina
-> > > > > 
-> > > > > This is an attempt to have a single TSENS driver for
-> > > > > the different versions of the TSENS IP that exist, on
-> > > > > different qcom msm/apq SoCs'
-> > > > > Support is added for msm8916, msm8960, msm8974 and msm8996
-> > > > > families.
-> > > > > 
-> > > > > A lot of the work is based of original code from Stephen Boyd
-> > > > > and Siddartha Mohanadoss. I have also picked some of what
-> > > > > Narendran Rajan did in his attempt to upstream the support
-> > > > > for 8960 family. I could not keep the original authorship on
-> > > > > any of the patches because I ended up moving the code around
-> > > > > quite a bit in an effort to have a single driver for the
-> > > > > various devices. I would be glad to change the authorship
-> > > > > for any of the patches if needed.
-> > > > > 
-> > > > > [1] https://lkml.org/lkml/2016/4/24/103
-> > > > > [2]
-> > > > > git://git.kernel.org/pub/scm/linux/kernel/git/gregkh/char-
-> > > > > misc.git char-misc-next
-> > > > > 
-> > > > > Rajendra Nayak (11):
-> > > > > ???thermal: qcom: tsens: Add a skeletal TSENS drivers
-> > > > > ???thermal: qcom: tsens-8916: Add support for 8916 family of
-> > > > > SoCs
-> > > > > ???thermal: qcom: tsens-8974: Add support for 8974 family of
-> > > > > SoCs
-> > > > > ???thermal: core: export apis to get slope and offset
-> > > > > ???thermal: qcom: tsens-8960: Add support for 8960 family of
-> > > > > SoCs
-> > > > > ???thermal: qcom: tsens-8996: Add support for 8996 family of
-> > > > > SoCs
-> > > > > ???arm: dts: msm8974: Add thermal zones, tsens and qfprom
-> > > > > nodes
-> > > > > ???arm: dts: apq8064: Add thermal zones, tsens and qfprom
-> > > > > nodes
-> > > > > ???arm: dts: apq8084: Add thermal zones, tsens and qfprom
-> > > > > nodes
-> > > > > ???arm64: dts: msm8916: Add thermal zones, tsens and qfprom
-> > > > > nodes
-> > > > > ???arm64: dts: msm8996: Add thermal zones, tsens and qfprom
-> > > > > nodes
-> > > > > 
-> > > > > ? .../devicetree/bindings/clock/qcom,gcc.txt?????????|??18 ++
-> > > > > ? .../devicetree/bindings/thermal/qcom-tsens.txt?????|??21 ++
-> > > > > ? Documentation/thermal/sysfs-api.txt????????????????|??12 +
-> > > > > ? arch/arm/boot/dts/qcom-apq8064.dtsi????????????????| 103
-> > > > > ++++++++
-> > > > > ? arch/arm/boot/dts/qcom-apq8084.dtsi????????????????| 103
-> > > > > ++++++++
-> > > > > ? arch/arm/boot/dts/qcom-msm8974.dtsi????????????????| 103
-> > > > > ++++++++
-> > > > > ? arch/arm64/boot/dts/qcom/msm8916.dtsi??????????????|??64
-> > > > > +++++
-> > > > > ? arch/arm64/boot/dts/qcom/msm8996.dtsi??????????????|??92
-> > > > > +++++++
-> > > > > ? drivers/thermal/Kconfig????????????????????????????|???5 +
-> > > > > ? drivers/thermal/Makefile???????????????????????????|???1 +
-> > > > > ? drivers/thermal/qcom/Kconfig???????????????????????|??11 +
-> > > > > ? drivers/thermal/qcom/Makefile??????????????????????|???2 +
-> > > > > ? drivers/thermal/qcom/tsens-8916.c??????????????????| 113
-> > > > > ++++++++
-> > > > > ? drivers/thermal/qcom/tsens-8960.c??????????????????| 292
-> > > > > +++++++++++++++++++++
-> > > > > ? drivers/thermal/qcom/tsens-8974.c??????????????????| 244
-> > > > > +++++++++++++++++
-> > > > > ? drivers/thermal/qcom/tsens-8996.c??????????????????|??84
-> > > > > ++++++
-> > > > > ? drivers/thermal/qcom/tsens-common.c????????????????| 141
-> > > > > ++++++++++
-> > > > > ? drivers/thermal/qcom/tsens.c???????????????????????| 200
-> > > > > ++++++++++++++
-> > > > > ? drivers/thermal/qcom/tsens.h???????????????????????|??92
-> > > > > +++++++
-> > > > > ? drivers/thermal/thermal_core.c?????????????????????|??30
-> > > > > +++
-> > > > > ? include/linux/thermal.h????????????????????????????|???8 +
-> > > > > ? 21 files changed, 1739 insertions(+)
-> > > > > ? create mode 100644
-> > > > > Documentation/devicetree/bindings/thermal/qcom-tsens.txt
-> > > > > ? create mode 100644 drivers/thermal/qcom/Kconfig
-> > > > > ? create mode 100644 drivers/thermal/qcom/Makefile
-> > > > > ? create mode 100644 drivers/thermal/qcom/tsens-8916.c
-> > > > > ? create mode 100644 drivers/thermal/qcom/tsens-8960.c
-> > > > > ? create mode 100644 drivers/thermal/qcom/tsens-8974.c
-> > > > > ? create mode 100644 drivers/thermal/qcom/tsens-8996.c
-> > > > > ? create mode 100644 drivers/thermal/qcom/tsens-common.c
-> > > > > ? create mode 100644 drivers/thermal/qcom/tsens.c
-> > > > > ? create mode 100644 drivers/thermal/qcom/tsens.h
-> > > > > 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pm"
-> in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at??http://vger.kernel.org/majordomo-info.html
+> Looks like you already found the answer for this.
+
+Yes.
+
+[...]
+> >> +#define UNIPHIER_MIO_RESET_USB2(index, ch)                           \
+> >> +     UNIPHIER_RESETX_SIMPLE((index), 0x110 + 0x200 * (ch), BIT(24)), \
+> >> +     UNIPHIER_RESETX_SIMPLE((index), 0x114 + 0x200 * (ch), BIT(0))
+> >
+> > Ah, so for USB2 reset you have two reset bits in separate registers. Are
+> > you sure these are controlling the same reset line?
+> 
+> I am not a hardware guy, so I am not sure about the hardware design.
+> 
+> From my best guess, I think each bit controls a different block.
+> But both of them must be de-asserted before starting up USB.
+>
+> There is no use-case where they are asserted/de-asserted independently.
+> 
+> So, I thought it made sense to couple them into a single ID.
+
+If it turns out to be useful for drivers to bundle resets, I'd prefer to
+do this in the framework rather than in the individual drivers, maybe
+have a reset_assert/deassert_array, similarly to gpiod.
+
+> > If the USB core does in fact have two separate reset inputs that just
+> > happen to need asserting at the same time, this should still get two
+> > separate ids. Same issue for the SD reset above, if the reset lines are
+> > physically separate, please don't combine them in the driver.
+> 
+> Right.
+> From the view of point of Device Tree interface,
+> it should reflect the hardware design.
+> I believe they are separate reset signals, so should be given with separate IDs.
+> 
+> But, as a software engineer, it is sometimes difficult to fully understand
+> the hardware structure.
+> 
+> The hardware document often just says "how to use USB",
+> but "how clock/reset signals are connected in each block" is not mentioned,
+> or at least very unclear.
+
+I understand the problem. If you have any way of finding out whether
+these are in fact separate resets, please do. Otherwise we'll have to
+guess.
+
+> Probably, I will come back with real per-reset-line ID,
+> but I need some time to take a look.
+
+Ok, thanks.
+
+regards
+Philipp
