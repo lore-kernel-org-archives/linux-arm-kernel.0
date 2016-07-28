@@ -1,33 +1,67 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 28 Jul 2016 13:41:23 -0300
-Subject: [PATCH v3 0/6] power: add power sequence library
-In-Reply-To: <579A2B38.3000202@gmail.com>
-References: <1469007629-31757-1-git-send-email-peter.chen@nxp.com>
- <579A2B38.3000202@gmail.com>
-Message-ID: <CAOMZO5Dv_X-u6qKqAWtysAqmMw91bVoAaRvnc81yUGDxbd27rA@mail.gmail.com>
+From: jolsa@redhat.com (Jiri Olsa)
+Date: Thu, 28 Jul 2016 18:52:41 +0200
+Subject: [PATCH V2 3/6] perf tools: add infrastructure for PMU specific
+ configuration
+In-Reply-To: <CANLsYkxzSBHXGwe2y-593D4yDyLy9+vdcTHmP_rqF30x0qTiug@mail.gmail.com>
+References: <1469047100-18131-1-git-send-email-mathieu.poirier@linaro.org>
+ <1469047100-18131-4-git-send-email-mathieu.poirier@linaro.org>
+ <20160721074722.GB7192@krava>
+ <CANLsYkxj+kccmvTtOLAYwyN9fOp0pMxdPcWy5cJHQDQLoj-NmQ@mail.gmail.com>
+ <20160721145434.GA15915@krava>
+ <CANLsYkwx+iOE6uwOVPtsHFMmNaH0=NjeDP8z0GZhHja2oibt8g@mail.gmail.com>
+ <20160726204139.GA13377@krava>
+ <CANLsYkzr0iFFEUoeR8-58E02DyqdGndfNBL8v0tS2tQqBszN_A@mail.gmail.com>
+ <20160727192639.GC23264@krava>
+ <CANLsYkxzSBHXGwe2y-593D4yDyLy9+vdcTHmP_rqF30x0qTiug@mail.gmail.com>
+Message-ID: <20160728165241.GA9720@krava>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joshua,
+On Thu, Jul 28, 2016 at 10:15:52AM -0600, Mathieu Poirier wrote:
+> On 27 July 2016 at 13:26, Jiri Olsa <jolsa@redhat.com> wrote:
+> > On Wed, Jul 27, 2016 at 11:59:50AM -0600, Mathieu Poirier wrote:
+> >
+> > SNIP
+> >
+> >> > -PE_DRV_CFG_TERM
+> >> > +'@' PE_NAME '=' PE_NAME
+> >> >  {
+> >> >         struct parse_events_term *term;
+> >> >
+> >> >         ABORT_ON(parse_events_term__str(&term, PARSE_EVENTS__TERM_TYPE_DRV_CFG,
+> >> > -                                       $1, $1, &@1, NULL));
+> >> > +                                       $2, $4, &@2, &@4));
+> >> >         $$ = term;
+> >> >  }
+> >> >
+> >>
+> >> The problem here is that the correlation between the first and the
+> >> second PE_NAME is lost and instead of seeing "PE_NAME=PE_NAME", the
+> >> kernel only gets the value associated with the second PE_NAME.
+> >>
+> >> For example,
+> >>
+> >> -e event/@cfg1=value1, at cfg2=value2/ ...
+> >>
+> >> The above code will send "value1" and "value2" to the kernel driver
+> >> where there is no way to know what configurable the values correspond
+> >
+> > hum.. you get the 'cfg1' and 'cfg2' strings in $1 no?
+> 
+> Indeed you do.
+> 
+> Macro ADD_CONFIG_TERM in function get_config_terms() only account for
+> the __val parameter and struct parse_events_term::config is completely
+> ignored.  We could concatenate the fields before calling
+> ADD_CONFIG_TERM() but between that and freeing the reserved memory, I
+> think it is cleaner to let flex do the work.
 
-On Thu, Jul 28, 2016 at 12:56 PM, Joshua Clayton
-<stillcompiling@gmail.com> wrote:
+ah you need that whole string in one piece.. ok
+let's do it by your original way then
 
-> I assume there is a v4 coming due to rmk's comments on patch 5.
-> I couldn't figure out where to null the of_node in error paths, but in testing
-> we did put a line of code to null the of_node on release.
->
-> but...
-> As an aside,
-> I was hoping this series would magically fix a problem
-> with the imx6q-evi which has forced us to disable
-> runtime power management. But it did not. :(
+please add some comments for in drv_str function describing
+the usage of @ and the fact we're doing this because we need
+whole assignment as single string
 
-I also see a similar problem on a mx28 board with a hub.
-
-Does it help in your case if you pass 'usbcore.autosuspend=-1' in the
-kernel command line?
-
-Regards,
-
-Fabio Estevam
+thanks,
+jirka
