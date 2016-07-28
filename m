@@ -1,104 +1,76 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 28 Jul 2016 15:24:22 -0600
-Subject: [PATCH 2/3] dt-bindings: allow child nodes inside the Tegra BPMP
-In-Reply-To: <CAL_JsqLfs5jnO9DkP5io5qbuCfhojfspkHQbHBttgWfTeokYkQ@mail.gmail.com>
-References: <20160719191442.15439-1-swarren@wwwdotorg.org>
- <20160719191442.15439-2-swarren@wwwdotorg.org>
- <20160726100302.GE2433@ulmo.ba.sec>
- <f1ca284a-5332-3323-80b9-7cf61e7c97ac@wwwdotorg.org>
- <CAL_JsqLfs5jnO9DkP5io5qbuCfhojfspkHQbHBttgWfTeokYkQ@mail.gmail.com>
-Message-ID: <6db4ff47-974b-94ac-3739-e630b6d38c0e@wwwdotorg.org>
+From: austinwc@codeaurora.org (Christ, Austin)
+Date: Thu, 28 Jul 2016 15:28:17 -0600
+Subject: [PATCH] efi: capsule: allocate whole capsule into virtual memory
+In-Reply-To: <20160728060704.GE21549@linux-rxt1.site>
+References: <1468600891-15794-1-git-send-email-austinwc@codeaurora.org>
+ <20160728060704.GE21549@linux-rxt1.site>
+Message-ID: <7721d488-7c0f-4cbb-62ba-8b3e1bd823a5@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/28/2016 01:07 PM, Rob Herring wrote:
-> On Tue, Jul 26, 2016 at 11:21 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
->> On 07/26/2016 04:03 AM, Thierry Reding wrote:
->>>
->>> On Tue, Jul 19, 2016 at 01:14:41PM -0600, Stephen Warren wrote:
->>>>
->>>> From: Stephen Warren <swarren@nvidia.com>
->>>>
->>>> The BPMP implements some services which must be represented by separate
->>>> nodes. For example, it can provide access to certain I2C controllers, and
->>>> the I2C bindings represent each I2C controller as a device tree node.
->>>> Update the binding to describe how the BPMP supports this.
->>>>
->>>> Signed-off-by: Stephen Warren <swarren@nvidia.com>
->>>> ---
->>>>  .../bindings/firmware/nvidia,tegra186-bpmp.txt     | 23
->>>> ++++++++++++++++++++++
->>>>  1 file changed, 23 insertions(+)
->>>>
->>>> diff --git
->>>> a/Documentation/devicetree/bindings/firmware/nvidia,tegra186-bpmp.txt
->>>> b/Documentation/devicetree/bindings/firmware/nvidia,tegra186-bpmp.txt
->>>> index 9a3864f56955..142d363406f6 100644
->>>> --- a/Documentation/devicetree/bindings/firmware/nvidia,tegra186-bpmp.txt
->>>> +++ b/Documentation/devicetree/bindings/firmware/nvidia,tegra186-bpmp.txt
->>>> @@ -38,6 +38,24 @@ implemented by this node:
->>>>  - .../reset/reset.txt
->>>>  - <dt-bindings/reset/tegra186-reset.h>
->>>>
->>>> +The BPMP implements some services which must be represented by separate
->>>> nodes.
->>>> +For example, it can provide access to certain I2C controllers, and the
->>>> I2C
->>>> +bindings represent each I2C controller as a device tree node. Such nodes
->>>> should
->>>> +be nested directly inside the main BPMP node.
->>>> +
->>>> +Software can determine whether a child node of the BPMP node represents
->>>> a device
->>>> +by checking for a compatible property. Any node with a compatible
->>>> property
->>>> +represents a device that can be instantiated. Nodes without a compatible
->>>> +property may be used to provide configuration information regarding the
->>>> BPMP
->>>> +itself, although no such configuration nodes are currently defined by
->>>> this
->>>> +binding.
->>>> +
->>>> +The BPMP firmware defines no single global name-/numbering-space for
->>>> such
->>>> +services. Put another way, the numbering scheme for I2C buses is
->>>> distinct from
->>>> +the numbering scheme for any other service the BPMP may provide (e.g. a
->>>> future
->>>> +hypothetical SPI bus service). As such, child device nodes will have no
->>>> reg
->>>> +property, and the BPMP node will have no #address-cells or #size-cells
->>>> property.
->>>
->>>
->>> My understanding is that the I2C bus number is passed as part of the
->>> request to the BPMP firmware. Does that not count as addressing? Could
->>> we not represent that generically using a device tree hierarchy? I'm
->>> thinking something along these lines:
->>>
->>>         bpmp {
->>>                 ...
->>>
->>>                 services {
->>>                         i2c {
->>>                                 i2c at 0 {
->>>                                         reg = <0>;
->>
->>
->> Technically, that is possible. However, Rob Herring rejected the idea of
->> multiple levels of sub-nodes.
->
-> I think I questioned the need, not rejected. What about the above, but
-> remove serivces level:
->
->          bpmp {
->                  ...
->
->                  i2c {
->                          i2c at 0 {
->                                  reg = <0>;
+Hello,
 
-Sigh. Can you please talk to Thierry and work out what the binding would 
-be (perhaps on IRC to expedite things?) and I'll just implement whatever 
-you two agree upon. I don't really care much what the binding looks like 
-any more; I just need something that will pass review. Thanks.
+
+On 7/28/2016 12:07 AM, joeyli wrote:
+> Hi Austin,
+>
+> On Fri, Jul 15, 2016 at 10:41:31AM -0600, Austin Christ wrote:
+>> According to UEFI 2.6 section 7.5.3, the capsule should be in contiguous
+>> virtual memory and firmware may consume the capsule immediately. To
+>> correctly implement this functionality, the kernel driver needs to vmap
+>> the entire capsule at the time it is made available to firmware.
+>>
+>> The virtual allocation of the capsule update has been changed from kmap,
+>> which was only allocating the first page of the update, to vmap and
+>> allocates the entire data payload.
+>>
+>> Signed-off-by: Austin Christ <austinwc@codeaurora.org>
+>> ---
+>>   drivers/firmware/efi/capsule-loader.c | 6 ++++--
+>>   1 file changed, 4 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/firmware/efi/capsule-loader.c b/drivers/firmware/efi/capsule-loader.c
+>> index c99c24b..c4f3c20 100644
+>> --- a/drivers/firmware/efi/capsule-loader.c
+>> +++ b/drivers/firmware/efi/capsule-loader.c
+>> @@ -16,6 +16,7 @@
+>>   #include <linux/slab.h>
+>>   #include <linux/mutex.h>
+>>   #include <linux/efi.h>
+>> +#include <linux/vmalloc.h>
+>>   
+>>   #define NO_FURTHER_WRITE_ACTION -1
+>>   
+>> @@ -108,14 +109,15 @@ static ssize_t efi_capsule_submit_update(struct capsule_info *cap_info)
+>>   	int ret;
+>>   	void *cap_hdr_temp;
+>>   
+>> -	cap_hdr_temp = kmap(cap_info->pages[0]);
+>> +	cap_hdr_temp = vmap(cap_info->pages, cap_info->index,
+>> +			VM_MAP, PAGE_KERNEL);
+>>   	if (!cap_hdr_temp) {
+>>   		pr_debug("%s: kmap() failed\n", __func__);
+>                               ^^^^^^^^ use vmap()?
+>
+> I have only a minor suggestion as above.
+>
+> Reviewed-by: Lee, Chun-Yi <jlee@suse.com>
+
+Thanks, this will be fixed in v2.
+>
+>>   		return -EFAULT;
+>>   	}
+>>   
+>>   	ret = efi_capsule_update(cap_hdr_temp, cap_info->pages);
+>> -	kunmap(cap_info->pages[0]);
+>> +	vunmap(cap_hdr_temp);
+>>   	if (ret) {
+>>   		pr_err("%s: efi_capsule_update() failed\n", __func__);
+>>   		return ret;
+>> --
+> Thanks a lot!
+> Joey Lee
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-efi" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
