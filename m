@@ -1,66 +1,70 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 28 Jul 2016 13:20:22 +0100
-Subject: debug tip after earlycon is closed?
-In-Reply-To: <7034241.kLArk8ex69@wuerfel>
-References: <CAK7LNASrqbt+RzD64zcAMjmBjJqa2sc2UG+mnEX8npZ9DBJodQ@mail.gmail.com>
- <3860396.RT1mlU0LAT@wuerfel>
- <CAK7LNARtm_2uT3nbga4X0dMYs9jhKa8a2FTGJrYbVRg8P3vHQw@mail.gmail.com>
- <7034241.kLArk8ex69@wuerfel>
-Message-ID: <20160728122022.GZ1041@n2100.armlinux.org.uk>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 28 Jul 2016 14:55:02 +0200
+Subject: [PATCH 15/18] ARM: mvebu: a398: update the dtsi about missing
+ interfaces
+In-Reply-To: <1469105055-25181-17-git-send-email-jaz@semihalf.com> (Grzegorz
+ Jaszczyk's message of "Thu, 21 Jul 2016 14:44:12 +0200")
+References: <1469105055-25181-1-git-send-email-jaz@semihalf.com>
+ <1469105055-25181-17-git-send-email-jaz@semihalf.com>
+Message-ID: <87twf9kjmh.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 28, 2016 at 09:44:53AM +0200, Arnd Bergmann wrote:
-> I think the problem is that you have three consoles:
-> 
-> - the boot console that stays active until a real console comes up
-> - the framebuffer console that is initialized early and goes on to
->   disable the bootconsole
-> - the serial console that you are looking at but which doesn't get
->   initialized until much later
-> 
-> Clearly something is wrong in this setup and we don't want to
-> disable the boot console before the serial console is up.
-> 
-> I guess you could work around it by disabling the framebuffer console
-> at compile time, or by having the serial console initialized earlier
-> than the framebuffer, but I wonder if this is something that could
-> use a more general solution.
+Hi Grzegorz,
+ 
+ On jeu., juil. 21 2016, Grzegorz Jaszczyk <jaz@semihalf.com> wrote:
 
-I think this is down to how the linux,stdout property is handled.
+> Beside interfaces described in the armada-39x.dtsi and armada-395.dtsi, the
+> Armada 398 SoC family supports 2 additional SATA port (2 ports in one unit)
+>
+> Signed-off-by: Grzegorz Jaszczyk <jaz@semihalf.com>
 
-Normally, with command line specified consoles, if you don't specify
-anything, you get the framebuffer console (actually, it's the first
-registered console, but practically this is the framebuffer if enabled)
-by default.
+Change the prefix to "ARM: dts: mvebu: armada-398:"
 
-If you specify a console (or consoles) on the command line, you get
-all of those you specified, (iirc) with /dev/console's input connected
-to the first specified console.
+Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-This happens because the command line is parsed for consoles, and
-add_preferred_console() is called for each that are found, whether or
-not drivers are discovered for them.  __add_preferred_console()
-prevents the first registered console being automatically initialised
-by setting selected_console to a non-negative number.
+Thanks,
 
-However, the parsing of DT specified consoles occurs at driver
-initialisation time - in uart_add_one_port() via of_console_check().
-Only at this time is add_preferred_console() called, which means that
-the first console registered prior to _any_ selected UART console
-driver mentioned in DT will become active.
+Gregory
 
-When the first console becomes active, the earlycon is disabled, which
-means that in the DT case, if we have a framebuffer enabled which
-registers prior to any selected UART console, the framebuffer will
-stop the earlycon output immediately.
-
-To me, what this means is that the DT parsing of linux,stdout is
-broken - while it may look nice from a design point of view, the
-design is wrong and fails to take account of non-UART consoles in
-the system.
+> ---
+>  arch/arm/boot/dts/armada-398.dtsi | 10 +++++++++-
+>  1 file changed, 9 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/boot/dts/armada-398.dtsi b/arch/arm/boot/dts/armada-398.dtsi
+> index fdc2591..234a998 100644
+> --- a/arch/arm/boot/dts/armada-398.dtsi
+> +++ b/arch/arm/boot/dts/armada-398.dtsi
+> @@ -44,7 +44,7 @@
+>   *     OTHER DEALINGS IN THE SOFTWARE.
+>   */
+>  
+> -#include "armada-39x.dtsi"
+> +#include "armada-395.dtsi"
+>  
+>  / {
+>  	compatible = "marvell,armada398", "marvell,armada390";
+> @@ -55,6 +55,14 @@
+>  				compatible = "marvell,mv88f6928-pinctrl";
+>  				reg = <0x18000 0x20>;
+>  			};
+> +
+> +			sata at e0000 {
+> +				compatible = "marvell,armada-380-ahci";
+> +				reg = <0xe0000 0x2000>;
+> +				interrupts = <GIC_SPI 28 IRQ_TYPE_LEVEL_HIGH>;
+> +				clocks = <&gateclk 30>;
+> +				status = "disabled";
+> +			};
+>  		};
+>  	};
+>  };
+> -- 
+> 1.8.3.1
+>
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
