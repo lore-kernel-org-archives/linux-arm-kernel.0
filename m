@@ -1,53 +1,53 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Thu, 28 Jul 2016 16:23:05 +0200
-Subject: [PATCH 4/9] clk: sunxi-ng: mux: Add support for mux tables
-In-Reply-To: <20160728132842.GA6682@lukather>
-References: <1469516671-19377-1-git-send-email-wens@csie.org>
- <1469516671-19377-5-git-send-email-wens@csie.org>
- <20160726194306.9b6aadd3d1669bd6f5a54d99@free.fr>
- <20160727065934.GD6560@lukather>
- <20160727091827.e26f72701ce5758fa29aff7a@free.fr>
- <20160727074020.GH6560@lukather>
- <20160727103649.9e6ef332847b5a5c8fac66af@free.fr>
- <20160728132842.GA6682@lukather>
-Message-ID: <20160728162305.b157e6a8073c7db375f2b5d3@free.fr>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Thu, 28 Jul 2016 16:29:18 +0200
+Subject: [PATCH v2 3/4] drivers: reset: Add STM32 reset driver
+In-Reply-To: <4648059.qaGUNaKlSl@wuerfel>
+References: <1469092768-17489-1-git-send-email-gabriel.fernandez@st.com>
+ <34955897.5sjo821nJx@wuerfel> <20160721231602.GK21225@windriver.com>
+ <4648059.qaGUNaKlSl@wuerfel>
+Message-ID: <1469716158.12835.54.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 28 Jul 2016 15:28:42 +0200
-Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
-
-> On Wed, Jul 27, 2016 at 10:36:49AM +0200, Jean-Francois Moine wrote:
-> > On Wed, 27 Jul 2016 09:40:20 +0200
-> > Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
-> > 
-> > > > > Parenting functions would also not work as expected,
-> > > > > clk_hw_get_parent_by_index being the obvious example, in that case
-> > > > > returning the empty string for an invalid parent, while it should
-> > > > > really return NULL.
-> > > > 
-> > > > I don't see why the clock should be orphan.
-> > > > Then, when a parent is "", clk_hw_get_parent_by_index() returns NULL.
-> > > 
-> > > Why? It should return NULL when there's no parent, while you
-> > > explicitly registered a parent.
-> > 
-> > "" is not an existing parent. It could be "none" / "dum" / "toto" / ...
-> > with the same result: 'this index cannot be used in mux'.
+Am Freitag, den 22.07.2016, 21:25 +0200 schrieb Arnd Bergmann:
+> On Thursday, July 21, 2016 7:16:02 PM CEST Paul Gortmaker wrote:
 > 
-> And the clock is marked as orphan, while it really isn't.
+> > > > ...we probably don't need module.h here or any of the other
+> > > > MODULE_<blah> tags/macros either.  Use the builtin for the
+> > > > register and all should be good.
+> > > 
+> > > I wonder if we should have separate symbols for each reset driver
+> > > instead. Those could be allowed to be tristate, and could also
+> > > be enabled for compile testing on other architectures.
+> > 
+> > I'm not quite clear on what you mean by the above.  Maybe if you have a
+> > pointer to an example -- say like the work you mention below -- then
+> > I'll understand what you have in mind.
+> 
+> I mean instead of having each driver compiled implicitly when the
+> ARCH_* symbol is enabled, make the drivers user-selectable
+> and just default to 'y' when the platform is enabled. This would
+> let us actually use modular reset drivers where appropriate
+> (which might be nowhere, but at least we wouldn't forbid it
+> for no reason).
 
-Sorry for I don't follow you.
+I agree with this for the drivers that could be built as a module
+(which is most of them).
+I don't think it is useful for the builtin drivers to have user visible
+Kconfig symbols.
 
-A clock is orphan when it has no parent. In our case, there are many
-possible parents and, at startup time, the hardware or the boot sets
-the mux to point to a real parent, with an index out of the usused
-values.
-Yes, the clock may be orphan, as the other clocks, but just the time
-this real parent becomes visible.
+> Another annoying thing is that all platforms today need to
+> select two symbols
+> 
+>  	select ARCH_HAS_RESET_CONTROLLER
+> 	select RESET_CONTROLLER
+> 
+> in order to actually build the driver, and the second one is
+> user-selectable, meaning you can still disable all of them today,
+> just not individual drivers.
 
-So, how could such a clock stay marked as orphan?
+RESET_CONTROLLER is default y if ARCH_HAS_RESET_CONTROLLER, so if
+platforms select ARCH_HAS_RESET_CONTROLLER, that should be enough.
 
--- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+regards
+Philipp
