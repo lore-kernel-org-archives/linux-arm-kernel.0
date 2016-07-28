@@ -1,36 +1,79 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 28 Jul 2016 20:21:29 +0200
-Subject: [PATCH 4/4] ARM: dts: sun8i: Add dts file for the Orange Pi Lite
- SBC
-In-Reply-To: <1468095718-18515-4-git-send-email-hdegoede@redhat.com>
-References: <1468095718-18515-1-git-send-email-hdegoede@redhat.com>
- <1468095718-18515-4-git-send-email-hdegoede@redhat.com>
-Message-ID: <20160728182129.GB26326@lukather>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 28 Jul 2016 13:32:56 -0500
+Subject: [PATCH v6] input: touchscreen: Add generic driver for Silead
+ touchscreens
+In-Reply-To: <20160727213555.GC24351@dtor-ws>
+References: <1468252304-22850-1-git-send-email-hdegoede@redhat.com>
+ <20160716175605.GA4873@rob-hp-laptop> <20160719184425.GC19250@dtor-ws>
+ <20160727213555.GC24351@dtor-ws>
+Message-ID: <CAL_Jsq+46tz+onVR=Az8Xwcb7NOLX2EkRJGxqvUsp2nFm+P-Hg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Jul 27, 2016 at 4:35 PM, Dmitry Torokhov
+<dmitry.torokhov@gmail.com> wrote:
+> On Tue, Jul 19, 2016 at 11:44:25AM -0700, Dmitry Torokhov wrote:
+>> On Sat, Jul 16, 2016 at 12:56:05PM -0500, Rob Herring wrote:
+>> > On Mon, Jul 11, 2016 at 05:51:44PM +0200, Hans de Goede wrote:
+>> > > From: Robert Dolca <robert.dolca@intel.com>
+>> > >
+>> > > This driver adds support for Silead touchscreens. It has been tested
+>> > > with GSL1680 and GSL3680 touch panels.
+>> > >
+>> > > It supports ACPI and device tree enumeration. Screen resolution,
+>> > > the maximum number of fingers supported and firmware name are
+>> > > configurable.
+>> > >
+>> > > Signed-off-by: Robert Dolca <robert.dolca@intel.com>
+>> > > Signed-off-by: Daniel Jansen <djaniboe@gmail.com>
+>> > > Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>> > > ---
+>> > > Changes in v6:
+>> > > -Default to 5 fingers if max-fingers is not specified
+>> > > -Improve devicetree binding doc: improve wake-gpios description, use
+>> > >  "See touchscreen.txt" where applicable
+>> > > ---
+>> > >  .../bindings/input/touchscreen/silead_gsl1680.txt  |  36 ++
+>> > >  drivers/input/touchscreen/Kconfig                  |  13 +
+>> > >  drivers/input/touchscreen/Makefile                 |   1 +
+>> > >  drivers/input/touchscreen/silead.c                 | 652 +++++++++++++++++++++
+>> > >  4 files changed, 702 insertions(+)
+>> > >  create mode 100644 Documentation/devicetree/bindings/input/touchscreen/silead_gsl1680.txt
+>> > >  create mode 100644 drivers/input/touchscreen/silead.c
+>> > >
+>> > > diff --git a/Documentation/devicetree/bindings/input/touchscreen/silead_gsl1680.txt b/Documentation/devicetree/bindings/input/touchscreen/silead_gsl1680.txt
+>> > > new file mode 100644
+>> > > index 0000000..1e58d37
+>> > > --- /dev/null
+>> > > +++ b/Documentation/devicetree/bindings/input/touchscreen/silead_gsl1680.txt
+>> > > @@ -0,0 +1,36 @@
+>> > > +* GSL 1680 touchscreen controller
+>> > > +
+>> > > +Required properties:
+>> > > +- compatible               : "silead,gsl1680"
+>> > > +- reg                      : I2C slave address of the chip (0x40)
+>> > > +- interrupt-parent         : a phandle pointing to the interrupt controller
+>> > > +                     serving the interrupt for this chip
+>> > > +- interrupts               : interrupt specification for the gsl1680 interrupt
+>> > > +- power-gpios              : Specification for the pin connected to the gsl1680's
+>> > > +                     shutdown input. This needs to be driven high to take the
+>> > > +                     gsl1680 out of its low power state
+>> > > +- touchscreen-size-x       : See touchscreen.txt
+>> > > +- touchscreen-size-y       : See touchscreen.txt
+>> > > +- touchscreen-max-fingers : maximum number of fingers the touchscreen can detect
+>> >
+>> > If you name it like a standard property, then it should be documented in
+>> > touchscreen.txt.
+>>
+>> Actually this is very much Silead-specific wart, I'd rather we called it
+>> "max-fingers" or "silead,max-fingers" to illustrate that it is not at
+>> all a generic property.
+>>
+>> Rob, will you be OK with it?
+>
+> Rob, ping? I'd like to get it into the tree and this is only outstanding
+> question.
 
-On Sat, Jul 09, 2016 at 10:21:58PM +0200, Hans de Goede wrote:
-> +	aliases {
-> +		/* The H3 emac is not used so the wifi is ethernet0 */
-> +		ethernet1 = &rtl8189ftv;
+Okay. With vendor prefix please.
 
-There's a mismatch between your comment and what you did here.
-
-The rest is fine though.
-
-Thanks!
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160728/94f42fe9/attachment.sig>
+Rob
