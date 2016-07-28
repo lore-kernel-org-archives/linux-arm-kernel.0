@@ -1,134 +1,65 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 28 Jul 2016 15:15:46 +0200
-Subject: [PATCH 18/18] ARM: mvebu: a395-gp: add support for the Armada 395
- GP Board
-In-Reply-To: <1469105055-25181-20-git-send-email-jaz@semihalf.com> (Grzegorz
- Jaszczyk's message of "Thu, 21 Jul 2016 14:44:15 +0200")
-References: <1469105055-25181-1-git-send-email-jaz@semihalf.com>
- <1469105055-25181-20-git-send-email-jaz@semihalf.com>
-Message-ID: <87h9b9kinx.fsf@free-electrons.com>
+From: clabbe.montjoie@gmail.com (LABBE Corentin)
+Date: Thu, 28 Jul 2016 15:18:26 +0200
+Subject: [PATCH v2 1/5] ethernet: add sun8i-emac driver
+In-Reply-To: <4697175.RMdFEWr9V5@wuerfel>
+References: <1469001800-11615-1-git-send-email-clabbe.montjoie@gmail.com>
+ <1469001800-11615-2-git-send-email-clabbe.montjoie@gmail.com>
+ <4697175.RMdFEWr9V5@wuerfel>
+Message-ID: <20160728131826.GA7582@Red>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Grzegorz,
- 
- On jeu., juil. 21 2016, Grzegorz Jaszczyk <jaz@semihalf.com> wrote:
+On Wed, Jul 20, 2016 at 11:56:12AM +0200, Arnd Bergmann wrote:
+> On Wednesday, July 20, 2016 10:03:16 AM CEST LABBE Corentin wrote:
+> > +
+> > +       /* Benched on OPIPC with 100M, setting more than 256 does not give any
+> > +        * perf boost
+> > +        */
+> > +       priv->nbdesc_rx = 128;
+> > +       priv->nbdesc_tx = 256;
+> > +
+> > 
+> 
+> 256 tx descriptors can introduce a significant latency. Can you add
+> support for BQL (netdev_sent_queue/netdev_completed_queue) to limit
+> the queue size to the minimum?
 
-Change the prefix to "ARM: dts: mvebu: armada-395-gp:"
+Done, since setting below 256 give lower performance with iperf.
 
-> This commit adds description for the following features for this board:
->
-> - Serial port
-> - PCIe interfaces
-> - USB2.0
-> - USB3.0
-> - SDIO
-> - 1024 MiB NAND-FLASH
-> - SATA
-> - I2C buses
->
-> Signed-off-by: Grzegorz Jaszczyk <jaz@semihalf.com>
-[...]
+> 
+> I also noticed that your tx_lock() prevents you from concurrently
+> running sun8i_emac_complete_xmit() and sun8i_emac_xmit(). Is that
+> necessary? I'd think that you can find a way to make them work
+> concurrently.
+> 
+> 	Arnd
 
-As for the other board, try to add information about the connector used:
+I will reworked locking and it seems that no locking is necessary.
+I have added the following comment about the locking strategy:
 
-> +			serial at 12000 {
-Here,
+/* Locking strategy:
+ * RX queue does not need any lock since only sun8i_emac_poll() access it.
+ * (All other RX modifiers (ringparam/ndo_stop) disable NAPI and so sun8i_emac_poll())
+ * TX queue is handled by sun8i_emac_xmit(), sun8i_emac_complete_xmit() and sun8i_emac_tx_timeout()
+ * (All other RX modifiers (ringparam/ndo_stop) disable NAPI and stop queue)
+ *
+ * sun8i_emac_xmit() could fire only once (netif_tx_lock)
+ * sun8i_emac_complete_xmit() could fire only once (called from NAPI)
+ * sun8i_emac_tx_timeout() could fire only once (netif_tx_lock) and couldnt
+ * race with sun8i_emac_xmit (due to netif_tx_lock) and with sun8i_emac_complete_xmit which disable NAPI.
+ *
+ * So only sun8i_emac_xmit and sun8i_emac_complete_xmit could fire at the same time.
+ * But they never could modify the same descriptors:
+ * - sun8i_emac_complete_xmit() will modify only descriptors with empty status
+ * - sun8i_emac_xmit() will modify only descriptors set to DCLEAN
+ * Proper memory barriers ensure that descriptor set to DCLEAN could not be
+ * modified latter by sun8i_emac_complete_xmit().
+ * */
 
-> +				status = "okay";
-> +			};
-> +
-> +			usb at 58000 {
-here
-> +				status = "okay";
-> +			};
-> +
-> +			sata at a8000 {
-here
-> +				status = "okay";
-> +			};
-> +
-> +			flash at d0000 {
-> +				status = "okay";
-> +				pinctrl-0 = <&nand_pins>;
-> +				pinctrl-names = "default";
-> +				num-cs = <1>;
-> +				marvell,nand-keep-config;
-> +				marvell,nand-enable-arbiter;
-> +				nand-on-flash-bbt;
-> +				nand-ecc-strength = <4>;
-> +				nand-ecc-step-size = <512>;
-> +
-> +				partitions {
-> +					compatible = "fixed-partitions";
-> +					#address-cells = <1>;
-> +					#size-cells = <1>;
-> +
-> +					partition at 0 {
-> +						label = "U-Boot";
-> +						reg = <0x00000000 0x00600000>;
-> +						read-only;
-> +					};
-> +
-> +					partition at 800000 {
-> +						label = "uImage";
-> +						reg = <0x00600000 0x00400000>;
-> +						read-only;
-> +					};
-> +
-> +					partition at 1000000 {
-> +						label = "Root";
-> +						reg = <0x00a00000 0x3f600000>;
-> +					};
-> +				};
-> +			};
-> +
-> +			sdhci at d8000 {
-here
-> +				clock-frequency = <200000000>;
-> +				broken-cd;
-> +				wp-inverted;
-> +				bus-width = <8>;
-> +				status = "okay";
-> +				no-1-8-v;
-> +			};
-> +
-> +			usb3 at f0000 {
-here
-> +				status = "okay";
-> +			};
-> +		};
-> +
-> +		pcie-controller {
-> +			status = "okay";
-> +
-> +			/*
-> +			 * The two PCIe units are accessible through
-> +			 * mini PCIe slot on the board.
-> +			 */
-and here for each slot
-> +			pcie at 2,0 {
-> +				/* Port 1, Lane 0 */
-> +				status = "okay";
-> +			};
-> +
-> +			pcie at 4,0 {
-> +				/* Port 3, Lane 0 */
-> +				status = "okay";
-> +			};
-> +		};
-> +	};
-> +};
+Does I am right ?
 
-then you can add my:
-Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Thanks for your review.
 
-Thanks,
+Regards
 
-Gregory
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+LABBE Corentin
