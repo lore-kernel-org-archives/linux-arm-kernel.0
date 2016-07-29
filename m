@@ -1,138 +1,86 @@
-From: lina.iyer@linaro.org (Lina Iyer)
-Date: Fri, 29 Jul 2016 15:56:21 -0600
-Subject: [PATCH v2 10/14] doc / cpu_domains: Describe CPU PM domains setup and
- governor
-In-Reply-To: <1469829385-11511-1-git-send-email-lina.iyer@linaro.org>
-References: <1469829385-11511-1-git-send-email-lina.iyer@linaro.org>
-Message-ID: <1469829385-11511-11-git-send-email-lina.iyer@linaro.org>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Fri, 29 Jul 2016 17:41:54 -0500
+Subject: [PATCH v3 2/2] pci/aer: interrupt fixup in the quirk
+In-Reply-To: <1465892645-32381-2-git-send-email-po.liu@nxp.com>
+References: <1464242406-20203-1-git-send-email-po.liu@nxp.com>
+ <1465892645-32381-1-git-send-email-po.liu@nxp.com>
+ <1465892645-32381-2-git-send-email-po.liu@nxp.com>
+Message-ID: <20160729224154.GC13632@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A generic CPU PM domain functionality is provided by
-drivers/base/power/cpu_domains.c. This document describes the generic
-usecase of CPU's PM domains, the setup of such domains and a CPU
-specific genpd governor.
+On Tue, Jun 14, 2016 at 04:24:05PM +0800, Po Liu wrote:
+> On some platforms, root port doesn't support MSI/MSI-X/INTx in RC mode.
+> When chip support the aer interrupt with none MSI/MSI-X/INTx mode,
+> maybe there is interrupt line for aer pme etc. Search the interrupt
+> number in the fdt file. Then fixup the dev->irq with it.
+> 
+> Signed-off-by: Po Liu <po.liu@nxp.com>
 
-Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
----
- Documentation/power/cpu_domains.txt | 109 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 109 insertions(+)
- create mode 100644 Documentation/power/cpu_domains.txt
+I'm not sure where we're at with this.  Dongdong had some issue
+(possibly with a version of the quirk on a different platform?), and I
+think the suggestion of explicitly checking for a root port device was
+a good one.
 
-diff --git a/Documentation/power/cpu_domains.txt b/Documentation/power/cpu_domains.txt
-new file mode 100644
-index 0000000..6a39a64
---- /dev/null
-+++ b/Documentation/power/cpu_domains.txt
-@@ -0,0 +1,109 @@
-+CPU PM domains
-+==============
-+
-+Newer CPUs are grouped in SoCs as clusters. A cluster in addition to the CPUs
-+may have caches, floating point units and other architecture specific power
-+controller that share resources when any of the CPUs are active. When the CPUs
-+are in idle, some of these cluster components may also idle. A cluster may
-+also be nested inside another cluster that provides common coherency
-+interfaces to share data between the clusters. The organization of such
-+clusters and CPU may be descibed in DT, since they are SoC specific.
-+
-+CPUIdle framework enables the CPUs to determine the sleep time and enter low
-+power state to save power during periods of idle. CPUs in a cluster may enter
-+and exit idle state independently of each other. During the time when all the
-+CPUs are in idle state, the cluster may safely put some of the shared
-+resources in their idle state. The time between the last CPU to enter idle and
-+the first CPU to wake up is the time available for the cluster to enter its
-+idle state.
-+
-+When SoCs power down the CPU during cpuidle, they generally have supplemental
-+hardware that can handshake with the CPU with a signal that indicates that the
-+CPU has stopped execution. The hardware is also responsible for warm booting
-+the CPU on receiving an interrupt. In a cluster architecture, common resources
-+that are shared by a cluster may also be powered down by an external
-+microcontroller or a processor. The microcontroller may be programmed in
-+advance to put the hardware blocks in a low power state, when the last active
-+CPU sends the idle signal. When the signal is received, the microcontroller
-+may trigger the hardware blocks to enter their low power state. When an
-+interrupt to wakeup the processor is received, the microcontroller is
-+responsible for bringing up the hardware blocks to its active state, before
-+waking up the CPU. The timelines for such operations should be in the
-+acceptable range for for CPU idle to get power benefits.
-+
-+CPU PM Domain Setup
-+-------------------
-+
-+PM domains are represented in the DT as domain consumers and providers. A
-+device may have a domain provider and a domain provider may support multiple
-+domain consumers. Domains like clusters, may also be nested inside one
-+another. A domain that has no active consumer, may be powered off and any
-+resuming consumer would trigger the domain back to active. Parent domains may
-+be powered off when the child domains are powered off. The CPU cluster can be
-+fashioned as a PM domain. When the CPU devices are powered off, the PM domain
-+may be powered off.
-+
-+Device idle is reference counted by runtime PM. When there is no active need
-+for the device, runtime PM invokes callbacks to suspend the parent domain.
-+Generic PM domain (genpd) handles the hierarchy of devices, domains and the
-+reference counting of objects leading to last man down and first man up in the
-+domain. The CPU domains helper functions defines PM domains for each CPU
-+cluster and attaches the CPU devices to the respective PM domains.
-+
-+Platform drivers may use the following API to register their CPU PM domains.
-+
-+of_setup_cpu_pd() -
-+Provides a single step registration of the CPU PM domain and attach CPUs to
-+the genpd. Platform drivers may additionally register callbacks for power_on
-+and power_off operations for the PM domain.
-+
-+of_setup_cpu_pd_single() -
-+Define PM domain for a single CPU and attach the CPU to its domain.
-+
-+
-+CPU PM Domain governor
-+----------------------
-+
-+CPUs have a unique ability to determine their next wakeup. CPUs may wake up
-+for known timer interrupts and unknown interrupts from idle. Prediction
-+algorithms and heuristic based algorithms like the Menu governor for cpuidle
-+can determine the next wakeup of the CPU. However, determining the wakeup
-+across a group of CPUs is a tough problem to solve.
-+
-+A simplistic approach would be to resort to known wakeups of the CPUs in
-+determining the next wakeup of any CPU in the cluster. The CPU PM domain
-+governor does just that. By looking into the tick device of the CPUs, the
-+governor can determine the sleep time between the last CPU and the first
-+scheduled wakeup of any CPU in that domain. This combined with the PM QoS
-+requirement for CPU_DMA_LATENCY can be used to determine the deepest possible
-+idle state of the CPU domain.
-+
-+
-+PSCI based CPU PM Domains
-+-------------------------
-+
-+ARM PSCI v1.0 supports PM domains for CPU clusters like in big.Little
-+architecture. It is supported as part of the OS-Initiated (OSI) mode of the
-+PSCI firmware. Since the control of domains is abstracted in the firmware,
-+Linux does not need even a driver to control these domains. The complexity of
-+determining the idle state of the PM domain is handled by the CPU PM domains.
-+
-+Every PSCI CPU PM domain idle state has a unique PSCI state id. The state id
-+is read from the DT and specified using the arm,psci-suspend-param property.
-+This makes it easy for big.Little SoCs to just specify the PM domain idle
-+states for the CPU along with the psci-suspend-param and everything else is
-+handled by the PSCI fimrware drivers and the firmware.
-+
-+
-+DT definitions for PSCI CPU PM Domains
-+--------------------------------------
-+
-+A PM domain's idle state can be defined in DT, the description of which is
-+available in [1]. PSCI based CPU PM domains may define their idle states as
-+part of the psci node. The additional parameter arm,psci-suspend-param is used
-+to indicate to the firmwware the addition cluster state that would be achieved
-+after the last CPU makes the PSCI call to suspend the CPU. The description of
-+PSCI domain states is available in [2].
-+
-+[1]. Documentation/devicetree/bindings/arm/idle-states.txt
-+[2]. Documentation/devicetree/bindings/arm/psci.txt
--- 
-2.7.4
+So please update and repost this for next cycle.
+
+> ---
+> changes for V3:
+> 	- Move to quirk;
+> 	- Only correct the irq in RC mode;
+> 
+>  drivers/pci/quirks.c | 29 +++++++++++++++++++++++++++++
+>  1 file changed, 29 insertions(+)
+> 
+> diff --git a/drivers/pci/quirks.c b/drivers/pci/quirks.c
+> index ee72ebe..8b39cce 100644
+> --- a/drivers/pci/quirks.c
+> +++ b/drivers/pci/quirks.c
+> @@ -25,6 +25,7 @@
+>  #include <linux/sched.h>
+>  #include <linux/ktime.h>
+>  #include <linux/mm.h>
+> +#include <linux/of_irq.h>
+>  #include <asm/dma.h>	/* isa_dma_bridge_buggy */
+>  #include "pci.h"
+>  
+> @@ -4419,3 +4420,31 @@ static void quirk_intel_qat_vf_cap(struct pci_dev *pdev)
+>  	}
+>  }
+>  DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL, 0x443, quirk_intel_qat_vf_cap);
+> +
+> +/* If root port doesn't support MSI/MSI-X/INTx in RC mode,
+> + * but use standalone irq. Read the device tree for the aer
+> + * interrupt number.
+> + */
+> +static void quirk_aer_interrupt(struct pci_dev *dev)
+> +{
+> +	int ret;
+> +	u8 header_type;
+> +	struct device_node *np = NULL;
+> +
+> +	/* Only for the RC mode device */
+> +	pci_read_config_byte(dev, PCI_HEADER_TYPE, &header_type);
+> +	if ((header_type & 0x7F) != PCI_HEADER_TYPE_BRIDGE)
+> +		return;
+> +
+> +	if (dev->bus->dev.of_node)
+> +		np = dev->bus->dev.of_node;
+> +
+> +	if (IS_ENABLED(CONFIG_OF_IRQ) && np) {
+> +		ret = of_irq_get_byname(np, "aer");
+> +		if (ret > 0) {
+> +			dev->no_msi = 1;
+> +			dev->irq = ret;
+> +		}
+> +	}
+> +}
+> +DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_FREESCALE, PCI_ANY_ID, quirk_aer_interrupt);
+> -- 
+> 2.1.0.27.g96db324
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
