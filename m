@@ -1,29 +1,40 @@
 From: robh@kernel.org (Rob Herring)
-Date: Fri, 29 Jul 2016 16:15:11 -0500
-Subject: [PATCH 08/13] clk: sunxi-ng: Add A64 clocks
-In-Reply-To: <20160726203041.29366-9-maxime.ripard@free-electrons.com>
-References: <20160726203041.29366-1-maxime.ripard@free-electrons.com>
- <20160726203041.29366-9-maxime.ripard@free-electrons.com>
-Message-ID: <20160729211511.GA5571@rob-hp-laptop>
+Date: Fri, 29 Jul 2016 16:28:33 -0500
+Subject: [PATCH v3 1/4] iio: adc: rockchip_saradc: reset saradc
+ controller before programming it
+In-Reply-To: <1469629447-544-1-git-send-email-wxt@rock-chips.com>
+References: <1469629447-544-1-git-send-email-wxt@rock-chips.com>
+Message-ID: <20160729212833.GA12688@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 26, 2016 at 10:30:36PM +0200, Maxime Ripard wrote:
-> Add the A64 CCU clocks set.
+On Wed, Jul 27, 2016 at 10:24:04PM +0800, Caesar Wang wrote:
+> SARADC controller needs to be reset before programming it, otherwise
+> it will not function properly.
 > 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+> Cc: Jonathan Cameron <jic23@kernel.org>
+> Cc: Heiko Stuebner <heiko@sntech.de>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: linux-iio at vger.kernel.org
+> Cc: linux-rockchip at lists.infradead.org
+> Tested-by: Guenter Roeck <linux@roeck-us.net>
+> 
 > ---
->  .../devicetree/bindings/clock/sunxi-ccu.txt        |   1 +
+> 
+> Changes in v3:
+> - %s/devm_reset_control_get_optional()/devm_reset_control_get()
+> - add Guente's test tag.
+> 
+> Changes in v2:
+> - Make the reset as an optional property, since it should work
+> with old devicetrees as well.
+> 
+>  .../bindings/iio/adc/rockchip-saradc.txt           |  7 +++++
+>  drivers/iio/adc/Kconfig                            |  1 +
+>  drivers/iio/adc/rockchip_saradc.c                  | 30 ++++++++++++++++++++++
+>  3 files changed, 38 insertions(+)
 
-Acked-by: Rob Herring <robh@kernel.org>
+Please add acks when posting new versions.
 
->  drivers/clk/sunxi-ng/Kconfig                       |  13 +-
->  drivers/clk/sunxi-ng/Makefile                      |   2 +-
->  drivers/clk/sunxi-ng/ccu-sun50i-a64.h              |  68 +++
->  drivers/clk/sunxi-ng/ccu-sun8i-h3.c                | 483 +++++++++++++++++++++
->  include/dt-bindings/clock/sun50i-a64-ccu.h         | 132 ++++++
->  include/dt-bindings/reset/sun50i-a64-ccu.h         |  97 +++++
->  7 files changed, 793 insertions(+), 3 deletions(-)
->  create mode 100644 drivers/clk/sunxi-ng/ccu-sun50i-a64.h
->  create mode 100644 include/dt-bindings/clock/sun50i-a64-ccu.h
->  create mode 100644 include/dt-bindings/reset/sun50i-a64-ccu.h
+Rob
