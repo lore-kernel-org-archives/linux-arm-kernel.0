@@ -1,87 +1,29 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 29 Jul 2016 13:01:55 +0200
-Subject: [PATCH] arm64: vmlinux.lds: make __rela_offset and
- __dynsym_offset ABSOLUTE
-In-Reply-To: <20160729105747.GF16593@arm.com>
-References: <1469715314-23260-1-git-send-email-ard.biesheuvel@linaro.org>
- <20160729090634.GA16593@arm.com>
- <CAKv+Gu-c0sdAb2KgbOv6OwA+PmDJ1biaL592009LXgHgY34X+Q@mail.gmail.com>
- <CAKv+Gu-z7=McQqziGqztjhfhavB5qqBdbGmARA6z10q5h+QXdg@mail.gmail.com>
- <20160729104947.GE16593@arm.com>
- <CAKv+Gu-bGGxQoNv3zZQYpPaN2idavFa7V+tkvgO-wfWkN-BKyw@mail.gmail.com>
- <20160729105747.GF16593@arm.com>
-Message-ID: <CAKv+Gu-Fd1UdUEGPLz+4G+LFjZNAhWrEW9hCJpCduG_5iLV6Wg@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 29 Jul 2016 13:11:23 +0100
+Subject: SPI: performance regression when using the common message
+ queuing infrastructure
+In-Reply-To: <41cb8a2a-7138-d2c0-e668-6c03add1882e@atmel.com>
+References: <577CD464.6050506@atmel.com> <577CD767.2080309@ti.com>
+ <577E0EF3.6000308@atmel.com> <57959ADD.40700@denx.de>
+ <41cb8a2a-7138-d2c0-e668-6c03add1882e@atmel.com>
+Message-ID: <20160729121123.GD10376@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29 July 2016 at 12:57, Will Deacon <will.deacon@arm.com> wrote:
-> On Fri, Jul 29, 2016 at 12:52:12PM +0200, Ard Biesheuvel wrote:
->> On 29 July 2016 at 12:49, Will Deacon <will.deacon@arm.com> wrote:
->> > On Fri, Jul 29, 2016 at 12:46:49PM +0200, Ard Biesheuvel wrote:
->> >> On 29 July 2016 at 11:30, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->> >> > On 29 July 2016 at 11:06, Will Deacon <will.deacon@arm.com> wrote:
->> >> >> Hi Ard,
->> >> >>
->> >> >> On Thu, Jul 28, 2016 at 04:15:14PM +0200, Ard Biesheuvel wrote:
->> >> >>> Due to the untyped KIMAGE_VADDR constant, the linker may not notice
->> >> >>> that the __rela_offset and __dynsym_offset expressions are absolute
->> >> >>> values (i.e., are not subject to relocation). This does not matter for
->> >> >>> KASLR, but it does confuse kallsyms in relative mode, since it uses
->> >> >>> the lowest non-absolute symbol address as the anchor point, and expects
->> >> >>> all other symbol addresses to be within 4 GB of it.
->> >> >>>
->> >> >>> Fix this by qualifying these expressions as ABSOLUTE() explicitly.
->> >> >>>
->> >> >>> Fixes: 0cd3defe0af4 ("arm64: kernel: perform relocation processing from ID map")
->> >> >>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> >> >>> ---
->> >> >>>  arch/arm64/kernel/vmlinux.lds.S | 4 ++--
->> >> >>>  1 file changed, 2 insertions(+), 2 deletions(-)
->> >> >>>
->> >> >>> diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
->> >> >>> index 89d6e177ecbd..d49492179967 100644
->> >> >>> --- a/arch/arm64/kernel/vmlinux.lds.S
->> >> >>> +++ b/arch/arm64/kernel/vmlinux.lds.S
->> >> >>> @@ -184,9 +184,9 @@ SECTIONS
->> >> >>>               *(.hash)
->> >> >>>       }
->> >> >>>
->> >> >>> -     __rela_offset   = ADDR(.rela) - KIMAGE_VADDR;
->> >> >>> +     __rela_offset   = ABSOLUTE(ADDR(.rela) - KIMAGE_VADDR);
->> >> >>>       __rela_size     = SIZEOF(.rela);
->> >> >>> -     __dynsym_offset = ADDR(.dynsym) - KIMAGE_VADDR;
->> >> >>> +     __dynsym_offset = ABSOLUTE(ADDR(.dynsym) - KIMAGE_VADDR);
->> >> >>
->> >> >> You removed the __dynsym_offset entry entirely in "arm64: relocatable:
->> >> >> suppress R_AARCH64_ABS64 relocations in vmlinux", so I'll drop this part
->> >> >> of the patch and assume you'll do a separate backport for stable. Ok?
->> >> >>
->> >> >
->> >> > If you are ok with fixing up patches manually while applying, could we
->> >> > just reorder them instead?
->> >>
->> >> Actually, this should go into v4.8-late not -stable
->> >
->> > Then the fixes tag is pretty confusing, since that's a commit from v4.7.
->> >
->>
->> Sorry, my bad. I managed to confuse myself here.
->> The tag is accurate, I was wrong. This should go into v4.7 as well.
->
-> Haha, ok! So if this is v4.7 material, what *should* the fixes tag be?
->
+On Fri, Jul 29, 2016 at 11:33:00AM +0200, Cyrille Pitchen wrote:
 
-As I said, the fixes tag is accurate. So it should still go into
-4.8-late but with a cc:stable. The [tweaked] "suppress R_AARCH64_ABS64
-relocations in vmlinux" could simply go on top, with no backport (it
-is just an optimization, not a bugfix)
+> We talked about moving back to a tasklet implementation but nothing was done
+> yet so nothing new for now, sorry.
+> Also, I will be out of office for the next 3 weeks: I will be back on August,
+> 22th.
 
->> Note that the breakage I experienced was only with an LD built from
->> binutils-gdb HEAD (2.28), so I guess there is no urgency here.
->
-> Sure, but people might upgrade their binutils before their kernel Image,
-> so the backport is worthwhile.
->
-
-That was my reasoning as well, but I was just highlighting that
-nothing is broken currently with released toolchains.
+To repeat what I said before the thing to do here is to improve the
+performance of the core implementation rather than just open coding
+something.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160729/05ddab58/attachment.sig>
