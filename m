@@ -1,20 +1,22 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 29 Jul 2016 16:29:30 -0500
-Subject: [PATCH 1/2] of: documentation: add bindings documentation for
- TS-4900
-In-Reply-To: <1469641982-19558-2-git-send-email-lucile.quirion@savoirfairelinux.com>
-References: <1469641982-19558-1-git-send-email-lucile.quirion@savoirfairelinux.com>
- <1469641982-19558-2-git-send-email-lucile.quirion@savoirfairelinux.com>
-Message-ID: <20160729212930.GA13316@rob-hp-laptop>
+From: jsun@junsun.net (Jun Sun)
+Date: Fri, 29 Jul 2016 14:30:54 -0700
+Subject: Can cores have different CPU features in a SMP system?
+Message-ID: <CAP5Nno430Jt3Ax2jUPP6ELpVBF-pK0Akxsa8sZ55f8GL7LQt=g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 27, 2016 at 01:53:01PM -0400, Lucile Quirion wrote:
-> This adds the documentation for the TS-4900 by Technologic Systems.
-> 
-> Signed-off-by: Lucile Quirion <lucile.quirion@savoirfairelinux.com>
-> ---
->  Documentation/devicetree/bindings/arm/technologic.txt | 6 ++++++
->  1 file changed, 6 insertions(+)
+One specific example is that if a phone has two clusters.  Cores in
+one cluster has v8 crypto extension and cores in the other don't.
+Will this work?
 
-Acked-by: Rob Herring <robh@kernel.org>
+My gut feeling is no, since many apps query cpu features at run-time.
+And process can migrate among cores.  If an app starts on a core with
+CE and migrates to another core without CE.  Illegal instruction fault
+will happen.
+
+Just wanna confirm if this is indeed the case.  Surprisingly google
+search did not yield any meaningful answers.
+
+Cheers.
+
+Jun
