@@ -1,29 +1,32 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 29 Jul 2016 13:11:23 +0100
-Subject: SPI: performance regression when using the common message
- queuing infrastructure
-In-Reply-To: <41cb8a2a-7138-d2c0-e668-6c03add1882e@atmel.com>
-References: <577CD464.6050506@atmel.com> <577CD767.2080309@ti.com>
- <577E0EF3.6000308@atmel.com> <57959ADD.40700@denx.de>
- <41cb8a2a-7138-d2c0-e668-6c03add1882e@atmel.com>
-Message-ID: <20160729121123.GD10376@sirena.org.uk>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Fri, 29 Jul 2016 15:08:15 +0200
+Subject: Why do we need reset_control_get_optional() ?
+In-Reply-To: <CAK7LNAS82QLZg40qjnkftES_Cd5AeyTAEdw3_Tms+8W6cK3QKw@mail.gmail.com>
+References: <CAK7LNAQnitMMp5wMXXvVeS-UFF=Fo9m=M1hL=5f4=RF8JYCnGg@mail.gmail.com>
+ <1469698980.12835.18.camel@pengutronix.de>
+ <CAK7LNAS82QLZg40qjnkftES_Cd5AeyTAEdw3_Tms+8W6cK3QKw@mail.gmail.com>
+Message-ID: <1469797695.3012.48.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 29, 2016 at 11:33:00AM +0200, Cyrille Pitchen wrote:
+Hi Masahiro,
 
-> We talked about moving back to a tasklet implementation but nothing was done
-> yet so nothing new for now, sorry.
-> Also, I will be out of office for the next 3 weeks: I will be back on August,
-> 22th.
+Am Donnerstag, den 28.07.2016, 19:29 +0900 schrieb Masahiro Yamada:
+[...]
+> However, I think the following makes more sense:
+> 
+> 
+> menuconfig RESET_CONTROLLER
+>         bool "Reset Controller Support"
+>         depends on (ARCH_HAS_RESET_CONTROLLER || COMPILE_TEST)
+>         default y
+>         help
+>           Generic Reset Controller support.
 
-To repeat what I said before the thing to do here is to improve the
-performance of the core implementation rather than just open coding
-something.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160729/05ddab58/attachment.sig>
+That looks sensible to me. You'll only have to enable the reset
+controller framework if either some enabled architecture has a reset
+controller (in which case you want the driver for it to be activated by
+default), or if you want to compile test some of the reset drivers.
+
+regards
+Philipp
