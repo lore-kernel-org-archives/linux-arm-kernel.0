@@ -1,115 +1,49 @@
 From: bibby.hsieh@mediatek.com (Bibby Hsieh)
-Date: Fri, 29 Jul 2016 17:04:12 +0800
-Subject: [PATCH 5/7] drm/mediatek: plane: Merge mtk_plane_enable into
- mtk_plane_atomic_update
+Date: Fri, 29 Jul 2016 17:04:11 +0800
+Subject: [PATCH 4/7] drm/mediatek: Use drm_atomic destroy_state helpers
 In-Reply-To: <1469783054-54567-1-git-send-email-bibby.hsieh@mediatek.com>
 References: <1469783054-54567-1-git-send-email-bibby.hsieh@mediatek.com>
-Message-ID: <1469783054-54567-6-git-send-email-bibby.hsieh@mediatek.com>
+Message-ID: <1469783054-54567-5-git-send-email-bibby.hsieh@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Daniel Kurtz <djkurtz@chromium.org>
+Use the core destroy_state helpers to destroy core state to ensure we don't
+leak if/when more fields get added later.
 
-The mtk_plane_enable is just called once by mtk_plane_atomic_update.
-So, merge mtk_plane_enable into mtk_plane_atomic_update.
-
-While we are here, also clean up the function a bit by using an fb local
-variables.
-
-Signed-off-by: Bibby Hsieh <bibby.hsieh@mediatek.com>
 Signed-off-by: Daniel Kurtz <djkurtz@chromium.org>
+Signed-off-by: Bibby Hsieh <bibby.hsieh@mediatek.com>
 ---
- drivers/gpu/drm/mediatek/mtk_drm_plane.c |   65 +++++++++++-------------------
- 1 file changed, 23 insertions(+), 42 deletions(-)
+ drivers/gpu/drm/mediatek/mtk_drm_crtc.c  |    3 +--
+ drivers/gpu/drm/mediatek/mtk_drm_plane.c |    3 +--
+ 2 files changed, 2 insertions(+), 4 deletions(-)
 
+diff --git a/drivers/gpu/drm/mediatek/mtk_drm_crtc.c b/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
+index d6fbefa..733b2a3 100644
+--- a/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
++++ b/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
+@@ -112,8 +112,7 @@ static void mtk_drm_crtc_reset(struct drm_crtc *crtc)
+ 	struct mtk_crtc_state *state;
+ 
+ 	if (crtc->state) {
+-		if (crtc->state->mode_blob)
+-			drm_property_unreference_blob(crtc->state->mode_blob);
++		__drm_atomic_helper_crtc_destroy_state(crtc->state);
+ 
+ 		state = to_mtk_crtc_state(crtc->state);
+ 		memset(state, 0, sizeof(*state));
 diff --git a/drivers/gpu/drm/mediatek/mtk_drm_plane.c b/drivers/gpu/drm/mediatek/mtk_drm_plane.c
-index 17172ba..b3ddb20 100644
+index 86b7aed..17172ba 100644
 --- a/drivers/gpu/drm/mediatek/mtk_drm_plane.c
 +++ b/drivers/gpu/drm/mediatek/mtk_drm_plane.c
-@@ -30,44 +30,6 @@ static const u32 formats[] = {
- 	DRM_FORMAT_RGB565,
- };
- 
--static void mtk_plane_enable(struct drm_plane *plane,
--			     dma_addr_t addr)
--{
--	struct mtk_plane_state *state = to_mtk_plane_state(plane->state);
--	unsigned int pitch, format;
--	bool enable;
--
--	if (WARN_ON(!plane->state))
--		return;
--
--	enable = state->base.visible;
--
--	if (WARN_ON(enable && !plane->state->fb))
--		return;
--
--	if (plane->state->fb) {
--		pitch = plane->state->fb->pitches[0];
--		format = plane->state->fb->pixel_format;
--	} else {
--		pitch = 0;
--		format = DRM_FORMAT_RGBA8888;
--	}
--
--	addr += (state->base.src.x1 >> 16) * 4;
--	addr += (state->base.src.y1 >> 16) * pitch;
--
--	state->pending.enable = enable;
--	state->pending.pitch = pitch;
--	state->pending.format = format;
--	state->pending.addr = addr;
--	state->pending.x = state->base.dst.x1;
--	state->pending.y = state->base.dst.y1;
--	state->pending.width = drm_rect_width(&state->base.dst);
--	state->pending.height = drm_rect_height(&state->base.dst);
--	wmb(); /* Make sure the above parameters are set before update */
--	state->pending.dirty = true;
--}
--
- static void mtk_plane_reset(struct drm_plane *plane)
- {
+@@ -73,8 +73,7 @@ static void mtk_plane_reset(struct drm_plane *plane)
  	struct mtk_plane_state *state;
-@@ -157,16 +119,35 @@ static void mtk_plane_atomic_update(struct drm_plane *plane,
- 				    struct drm_plane_state *old_state)
- {
- 	struct mtk_plane_state *state = to_mtk_plane_state(plane->state);
--	struct drm_crtc *crtc = state->base.crtc;
-+	struct drm_crtc *crtc = plane->state->crtc;
-+	struct drm_framebuffer *fb = plane->state->fb;
- 	struct drm_gem_object *gem;
- 	struct mtk_drm_gem_obj *mtk_gem;
-+	unsigned int pitch, format;
-+	dma_addr_t addr;
  
--	if (!crtc)
-+	if (!crtc || WARN_ON(!fb))
- 		return;
+ 	if (plane->state) {
+-		if (plane->state->fb)
+-			drm_framebuffer_unreference(plane->state->fb);
++		__drm_atomic_helper_plane_destroy_state(plane->state);
  
--	gem = mtk_fb_get_gem_obj(state->base.fb);
-+	gem = mtk_fb_get_gem_obj(fb);
- 	mtk_gem = to_mtk_gem_obj(gem);
--	mtk_plane_enable(plane, mtk_gem->dma_addr);
-+	addr = mtk_gem->dma_addr;
-+	pitch = fb->pitches[0];
-+	format = fb->pixel_format;
-+
-+	addr += (plane->state->src.x1 >> 16) * 4;
-+	addr += (plane->state->src.y1 >> 16) * pitch;
-+
-+	state->pending.enable = true;
-+	state->pending.pitch = pitch;
-+	state->pending.format = format;
-+	state->pending.addr = addr;
-+	state->pending.x = plane->state->dst.x1;
-+	state->pending.y = plane->state->dst.y1;
-+	state->pending.width = drm_rect_width(&plane->state->dst);
-+	state->pending.height = drm_rect_height(&plane->state->dst);
-+	wmb(); /* Make sure the above parameters are set before update */
-+	state->pending.dirty = true;
- }
- 
- static void mtk_plane_atomic_disable(struct drm_plane *plane,
+ 		state = to_mtk_plane_state(plane->state);
+ 		memset(state, 0, sizeof(*state));
 -- 
 1.7.9.5
