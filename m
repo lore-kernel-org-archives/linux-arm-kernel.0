@@ -1,74 +1,73 @@
-From: fu.wei@linaro.org (Fu Wei)
-Date: Fri, 29 Jul 2016 10:25:45 +0800
-Subject: [PATCH v11] acpi, apei, arm64: APEI initial support for aarch64.
-In-Reply-To: <f018fd18-03e7-3247-7d65-af430092230e@arm.com>
-References: <1469640545-5848-1-git-send-email-fu.wei@linaro.org>
- <f018fd18-03e7-3247-7d65-af430092230e@arm.com>
-Message-ID: <CADyBb7vWiX1zSkxF4Z3A+LUBuC3dAhr0G8z_dNogakJM1KTJ0w@mail.gmail.com>
+From: panand@redhat.com (Pratyush Anand)
+Date: Fri, 29 Jul 2016 09:05:14 +0530
+Subject: [PATCH v2 4/4] arm64: Add support for binary image files
+In-Reply-To: <1469729083.16559.26.camel@infradead.org>
+References: <cover.1469559530.git.geoff@infradead.org>
+ <f352dcfc827a4cbb3878dd1043877a4154b1bd08.1469559530.git.geoff@infradead.org>
+ <20160728040125.GA27150@localhost.localdomain>
+ <1469729083.16559.26.camel@infradead.org>
+Message-ID: <20160729033514.GC27150@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Suzuki,
+Hi Geoff,
 
-On 28 July 2016 at 17:39, Suzuki K Poulose <Suzuki.Poulose@arm.com> wrote:
-> On 27/07/16 18:29, fu.wei at linaro.org wrote:
->>
->> From: Tomasz Nowicki <tomasz.nowicki@linaro.org>
->>
->> This commit provides APEI arch-specific bits for aarch64
->>
->> Meanwhile,
->> (1)add a new subfunction "hest_ia32_init" for
->> "acpi_disable_cmcff" which is used by IA-32 Architecture
->> Corrected Machine Check (CMC).
->> (2)move HEST type (ACPI_HEST_TYPE_IA32_CORRECTED_CHECK) checking to
->> a generic place.
->> (3)select HAVE_ACPI_APEI when EFI and ACPI is set on ARM64,
->> because arch_apei_get_mem_attribute is using efi_mem_attributes on ARM64.
->>
->> [Fu Wei: improve && upstream]
->>
->
->
->> diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
->> index 5420cb0..d3d02dc 100644
->> --- a/arch/arm64/include/asm/acpi.h
->> +++ b/arch/arm64/include/asm/acpi.h
->> @@ -17,6 +17,7 @@
->>
->>  #include <asm/cputype.h>
->>  #include <asm/smp_plat.h>
->> +#include <asm/tlbflush.h>
->>
->>  /* Macros for consistency checks of the GICC subtable of MADT */
->>  #define ACPI_MADT_GICC_LENGTH  \
->> @@ -110,8 +111,21 @@ static inline const char *acpi_get_enable_method(int
->> cpu)
->>  }
->>
->>  #ifdef CONFIG_ACPI_APEI
->> +#define acpi_disable_cmcff 1
->>  pgprot_t arch_apei_get_mem_attribute(phys_addr_t addr);
->> -#endif
->> +
->> +/*
->> + * Despite its name, this function must still broadcast the TLB
->> + * invalidation in order to ensure other CPUs don't up with with junk
->
->
-> Please fix the comment above ^^^.
+On 28/07/2016:11:04:43 AM, Geoff Levand wrote:
+> Hi Pratyush,
+> 
+> On Thu, 2016-07-28 at 09:31 +0530, Pratyush Anand wrote:
+> > On 26/07/2016:08:18:57 PM, Geoff Levand wrote:
+> 
+> > You removed page_offset calculation in rework.
+> > I am unable to understand that how arm64_mem.page_offset will be filled up now
+> > for binary image case.
+> > 
+> > I think, we still need to keep page_offset user input. 
+> 
+> The current kernel linker scripts are setup to output virtual
+> address values to the vmlinux elf file.  
+> 
+> To load the elf sections of vmlinux using the provided elf
+> file loader, elf_exec_load(), we need to convert those elf
+> header values to physical addresses since we work with
+> physical addresses in the kernel's kimage structure.
+> 
+> That conversion is 
+> 
+>   p = v - page_offset + phys_offset;
+> 
+> We get phys_offset from the memory ranges, and we calculate
+> page_offset from the elf header info.
+> 
+> As for the binary image file, we load that with
+> add_segment_phys_virt(), which can put the binary data of the
+> Image file into memory at a physical address we specify:
+> 
+>   image_base = phys_offset + text_offset.
+> 
+> phys_offset is again from the memory ranges, and text_offset
+> from the arm64 image header.
+> 
+> 
+> > You may take following
+> > two patches which does this, or you may leave binary image support patch which I
+> > will send after your patches are merged.
+> > 
+> > https://github.com/pratyushanand/kexec-tools/commit/5b7e49a75d1d6cd4ac846f50ff10275fd54cb545
+> 
+> This one may be useful, for debugging if anything.
+> 
+> > https://github.com/pratyushanand/kexec-tools/commit/a0ce0ce673755c4061c1f081170a3a75dfa1d1fb
+> 
+> We do not need, nor want, a PAGE_OFFSET option.
 
-Thanks for pointing it out, the fixed patch will out in minutes.
+See kexec/crashdump-elf.c:FUNC()
+We have:
+223                 phdr->p_vaddr = phys_to_virt(elf_info, mstart);
 
->
->
-> Suzuki
+Now, if we do not have page_offset then we will not have correct p_vaddr, and
+then vmcore-dmesg/vmcore-dmesg.c:vaddr_to_offset() fails with
 
+No program header covering vaddr 0xfffffc0008c312f0found kexec bug?
 
-
--- 
-Best regards,
-
-Fu Wei
-Software Engineer
-Red Hat
+~Pratyush
