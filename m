@@ -1,91 +1,81 @@
-From: ck.hu@mediatek.com (CK Hu)
-Date: Fri, 29 Jul 2016 18:14:45 +0800
-Subject: [PATCH 2/7] drm/mediatek: plane: Remove plane zpos/index
-In-Reply-To: <1469783054-54567-3-git-send-email-bibby.hsieh@mediatek.com>
-References: <1469783054-54567-1-git-send-email-bibby.hsieh@mediatek.com>
- <1469783054-54567-3-git-send-email-bibby.hsieh@mediatek.com>
-Message-ID: <1469787285.11841.97.camel@mtksdaap41>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 29 Jul 2016 11:18:11 +0100
+Subject: [PATCH] clocksource: arm_arch_timer: Support reading clock rate
+ from a driver
+In-Reply-To: <1469784191-3998-1-git-send-email-zajec5@gmail.com>
+References: <1469784191-3998-1-git-send-email-zajec5@gmail.com>
+Message-ID: <20160729101811.GB21580@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Bibby:
+[adding Marc to Cc]
 
-On Fri, 2016-07-29 at 17:04 +0800, Bibby Hsieh wrote:
-> From: Daniel Kurtz <djkurtz@chromium.org>
+On Fri, Jul 29, 2016 at 11:23:11AM +0200, Rafa? Mi?ecki wrote:
+> From: Rafa? Mi?ecki <rafal@milecki.pl>
 > 
-> It is not actually useful to a mtk plane to know its zpos/index, so just
-> remove this field.
+> On some devices using arch code for reading clock rate doesn't work. So
+> far the only option was to specify clock-frequency in a DT. This works
+> only if a clock frequency doesn't have to be calculated on runtime.
 > 
-> This let's us completely remove struct mtk_drm_plane in a follow up patch.
+> On BCM53573 SoC (with Cortex-A7) there is ILP clock that needs its own
+> driver. With this change we can query such clocks by using a standard:
+> clocks = <&foo>;
 
-'let's us'? My English is not as good as native English speaker.
-Otherwise, this patch looks good to me.
+The clock for the architected timer(s) are supposed to be configured
+before entering Linux. The clock-frequency property is at best a dodgy
+workaround, and this is even worse.
+
+Please fix your firmware to configure and enabled this clock before
+entering Linux, and to program CNTFRQ appropriately.
+
+As this path stands, NAK.
+
+As a more general note, you *must* update device tree bidnings if adding
+properties.
+
+Thanks,
+Mark.
 
 > 
-> Signed-off-by: Daniel Kurtz <djkurtz@chromium.org>
-> Signed-off-by: Bibby Hsieh <bibby.hsieh@mediatek.com>
+> Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
 > ---
->  drivers/gpu/drm/mediatek/mtk_drm_crtc.c  |    2 +-
->  drivers/gpu/drm/mediatek/mtk_drm_plane.c |    4 +---
->  drivers/gpu/drm/mediatek/mtk_drm_plane.h |    4 +---
->  3 files changed, 3 insertions(+), 7 deletions(-)
+>  drivers/clocksource/arm_arch_timer.c | 11 +++++++++++
+>  1 file changed, 11 insertions(+)
 > 
-> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_crtc.c b/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
-> index 24aa3ba..18211ab 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
-> +++ b/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
-> @@ -559,7 +559,7 @@ int mtk_drm_crtc_create(struct drm_device *drm_dev,
->  				(zpos == 1) ? DRM_PLANE_TYPE_CURSOR :
->  						DRM_PLANE_TYPE_OVERLAY;
->  		ret = mtk_plane_init(drm_dev, &mtk_crtc->planes[zpos],
-> -				     BIT(pipe), type, zpos);
-> +				     BIT(pipe), type);
->  		if (ret)
->  			goto unprepare;
->  	}
-> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_plane.c b/drivers/gpu/drm/mediatek/mtk_drm_plane.c
-> index 093db07..d28db57 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_drm_plane.c
-> +++ b/drivers/gpu/drm/mediatek/mtk_drm_plane.c
-> @@ -189,8 +189,7 @@ static const struct drm_plane_helper_funcs mtk_plane_helper_funcs = {
->  };
->  
->  int mtk_plane_init(struct drm_device *dev, struct mtk_drm_plane *mtk_plane,
-> -		   unsigned long possible_crtcs, enum drm_plane_type type,
-> -		   unsigned int zpos)
-> +		   unsigned long possible_crtcs, enum drm_plane_type type)
->  {
->  	int err;
->  
-> @@ -203,7 +202,6 @@ int mtk_plane_init(struct drm_device *dev, struct mtk_drm_plane *mtk_plane,
+> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+> index 5effd30..5ed98a2 100644
+> --- a/drivers/clocksource/arm_arch_timer.c
+> +++ b/drivers/clocksource/arm_arch_timer.c
+> @@ -14,6 +14,7 @@
+>  #include <linux/smp.h>
+>  #include <linux/cpu.h>
+>  #include <linux/cpu_pm.h>
+> +#include <linux/clk.h>
+>  #include <linux/clockchips.h>
+>  #include <linux/clocksource.h>
+>  #include <linux/interrupt.h>
+> @@ -405,6 +406,16 @@ arch_timer_detect_rate(void __iomem *cntbase, struct device_node *np)
+>  			arch_timer_rate = arch_timer_get_cntfrq();
 >  	}
 >  
->  	drm_plane_helper_add(&mtk_plane->base, &mtk_plane_helper_funcs);
-> -	mtk_plane->idx = zpos;
->  
->  	return 0;
->  }
-> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_plane.h b/drivers/gpu/drm/mediatek/mtk_drm_plane.h
-> index 72a7b3e..74dbeda 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_drm_plane.h
-> +++ b/drivers/gpu/drm/mediatek/mtk_drm_plane.h
-> @@ -20,7 +20,6 @@
->  
->  struct mtk_drm_plane {
->  	struct drm_plane		base;
-> -	unsigned int			idx;
->  };
->  
->  struct mtk_plane_pending_state {
-> @@ -53,7 +52,6 @@ to_mtk_plane_state(struct drm_plane_state *state)
->  }
->  
->  int mtk_plane_init(struct drm_device *dev, struct mtk_drm_plane *mtk_plane,
-> -		   unsigned long possible_crtcs, enum drm_plane_type type,
-> -		   unsigned int zpos);
-> +		   unsigned long possible_crtcs, enum drm_plane_type type);
->  
->  #endif
-
-Regards,
-CK
+> +	/* Get clk rate through clk driver if present */
+> +	if (!arch_timer_rate) {
+> +		struct clk *clk = of_clk_get(np, 0);
+> +
+> +		if (!IS_ERR(clk)) {
+> +			if (!clk_prepare_enable(clk))
+> +				arch_timer_rate = clk_get_rate(clk);
+> +		}
+> +	}
+> +
+>  	/* Check the timer frequency. */
+>  	if (arch_timer_rate == 0)
+>  		pr_warn("Architected timer frequency not available\n");
+> -- 
+> 1.8.4.5
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
