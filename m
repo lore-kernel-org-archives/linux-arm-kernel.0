@@ -1,184 +1,111 @@
-From: fu.wei@linaro.org (fu.wei at linaro.org)
-Date: Fri, 29 Jul 2016 16:57:44 +0800
-Subject: [PATCH v12] acpi, apei, arm64: APEI initial support for aarch64.
-Message-ID: <1469782664-12611-1-git-send-email-fu.wei@linaro.org>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Fri, 29 Jul 2016 10:01:02 +0100
+Subject: [PATCH v15 04/10] arm64: Kprobes with single stepping support
+In-Reply-To: <20160728144053.GA26510@e104818-lin.cambridge.arm.com>
+References: <578FA238.3050206@arm.com> <5790F960.5050007@linaro.org>
+ <57910528.7070902@arm.com> <57911590.50305@linaro.org>
+ <20160722101617.GA17821@e104818-lin.cambridge.arm.com>
+ <57924104.1080202@linaro.org>
+ <20160725171350.GE2423@e104818-lin.cambridge.arm.com>
+ <57969234.1070201@linaro.org>
+ <22b277ba-6812-a0dd-9e8e-c29bdb3aa672@linaro.org>
+ <57993211.1040600@linaro.org>
+ <20160728144053.GA26510@e104818-lin.cambridge.arm.com>
+Message-ID: <360d582b-5401-7126-ef40-bd78369c0a34@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+On 28/07/16 15:40, Catalin Marinas wrote:
+> On Wed, Jul 27, 2016 at 06:13:37PM -0400, David Long wrote:
+>> On 07/27/2016 07:50 AM, Daniel Thompson wrote:
+>>> On 25/07/16 23:27, David Long wrote:
+>>>> On 07/25/2016 01:13 PM, Catalin Marinas wrote:
+>>>>> The problem is that the original design was done on x86 for its PCS and
+>>>>> it doesn't always fit other architectures. So we could either ignore the
+>>>>> problem, hoping that no probed function requires argument passing on
+>>>>> stack or we copy all the valid data on the kernel stack:
+>>>>>
+>>>>> diff --git a/arch/arm64/include/asm/kprobes.h
+>>>>> b/arch/arm64/include/asm/kprobes.h
+>>>>> index 61b49150dfa3..157fd0d0aa08 100644
+>>>>> --- a/arch/arm64/include/asm/kprobes.h
+>>>>> +++ b/arch/arm64/include/asm/kprobes.h
+>>>>> @@ -22,7 +22,7 @@
+>>>>>
+>>>>>  #define __ARCH_WANT_KPROBES_INSN_SLOT
+>>>>>  #define MAX_INSN_SIZE            1
+>>>>> -#define MAX_STACK_SIZE            128
+>>>>> +#define MAX_STACK_SIZE            THREAD_SIZE
+>>>>>
+>>>>>  #define flush_insn_slot(p)        do { } while (0)
+>>>>>  #define kretprobe_blacklist_size    0
+>>>>
+>>>> I doubt the ARM PCS is unusual.  At any rate I'm certain there are other
+>>>> architectures that pass aggregate parameters on the stack. I suspect
+>>>> other RISC(-ish) architectures have similar PCS issues and I think this
+>>>> is at least a big part of where this simple copy with a 64/128 limit
+>>>> comes from, or at least why it continues to exist.  That said, I'm not
+>>>> enthusiastic about researching that assertion in detail as it could be
+>>>> time consuming.
+>>>
+>>> Given Mark shared a test program I *was* curious enough to take a look
+>>> at this.
+>>>
+>>> The only architecture I can find that behaves like arm64 with the
+>>> implicit pass-by-reference described by Catalin/Mark is sparc64.
+>>>
+>>> In contrast alpha, arm (32-bit), hppa64, mips64 and powerpc64 all use a
+>>> hybrid approach where the first fragments of the structure are passed in
+>>> registers and the remainder on the stack.
+>>
+>> That's interesting.  It also looks like sparc64 does not copy any stack for
+>> jprobes. I guess that approach at least makes it clear what will and won't
+>> work.
+>
+> I suggest we do the same for arm64 - avoid the copying entirely as it's
+> not safe anyway. We don't know how much to copy, nor can we be sure it
+> is safe (see Dave's DMA to the stack example). This would need to be
+> documented in the kprobes.txt file and MAX_STACK_SIZE removed from the
+> arm64 kprobes support.
+>
+> There is also the case that Daniel was talking about - passing more than
+> 8 arguments. I don't think it's worth handling this
 
-This commit provides APEI arch-specific bits for aarch64
+Its actually quite hard to document the (architecture specific) "no big 
+structures" *and* the "8 argument" limits. It ends up as something like:
 
-Meanwhile,
-(1)add a new subfunction "hest_ia32_init" for
-"acpi_disable_cmcff" which is used by IA-32 Architecture
-Corrected Machine Check (CMC).
-(2)move HEST type (ACPI_HEST_TYPE_IA32_CORRECTED_CHECK) checking to
-a generic place.
-(3)select HAVE_ACPI_APEI when EFI and ACPI is set on ARM64,
-because arch_apei_get_mem_attribute is using efi_mem_attributes on ARM64.
+   Structures/unions >16 bytes must not be passed by value and the
+   size of all arguments, after padding each to an 8 byte boundary, must
+   be less than 64 bytes.
 
-[Fu Wei: improve && upstream]
+We cannot avoid tackling big structures through documentation but when 
+we impose additional limits like "only 8 arguments" we are swapping an 
+architecture neutral "gotcha" that affects almost all jprobes uses (and 
+can be inferred from the documentation) with an architecture specific one!
 
-Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
-Tested-by: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
-Signed-off-by: Fu Wei <fu.wei@linaro.org>
-Acked-by: Hanjun Guo <hanjun.guo@linaro.org>
-Tested-by: Tyler Baicar <tbaicar@codeaurora.org>
-Acked-by: Will Deacon <will.deacon@arm.com>
----
-Changelog:
-v12:https://lkml.org/lkml/2016/7/29/
-    Fix a comment problem(redundant "with")
-    Rebase to 4.7.0-g680eee2
 
-v11:https://lkml.org/lkml/2016/7/27/427
-    Rebase to v4.7-0e06f5c0
+ > but we should at
+> least add a warning and skip the probe:
+>
+> diff --git a/arch/arm64/kernel/probes/kprobes.c b/arch/arm64/kernel/probes/kprobes.c
+> index bf9768588288..84e02606ec3d 100644
+> --- a/arch/arm64/kernel/probes/kprobes.c
+> +++ b/arch/arm64/kernel/probes/kprobes.c
+> @@ -491,6 +491,10 @@ int __kprobes setjmp_pre_handler(struct kprobe *p, struct pt_regs *regs)
+>  	struct kprobe_ctlblk *kcb = get_kprobe_ctlblk();
+>  	long stack_ptr = kernel_stack_pointer(regs);
+>
+> +	/* do not allow arguments passed on the stack */
+> +	if (WARN_ON_ONCE(regs->sp != regs->regs[29]))
+> +		return 0;
+> +
 
-v10:https://lkml.org/lkml/2016/4/14
-    Fix the Alphabetical order problem in arch/arm64/Kconfig
+I don't really understand this test.
 
-v9: https://lkml.org/lkml/2016/4/5/522
-    Improve the comment for arch_apei_flush_tlb_one.
-    Using select "HAVE_ACPI_APEI if (ACPI && EFI)" to fix the EFI dependence
-    problem.
+If we could reliably assume that the frame record was at the lowest 
+address within a stack frame then we could exploit that to store the 
+stacked arguments without risking overwriting volatile variables on the 
+stack.
 
-v8: https://lkml.org/lkml/2016/3/29/132
-    Fix a "undefined reference" bug by selecting EFI when ACPI_APEI is set
-    on ARM64.
 
-v7: https://lkml.org/lkml/2016/3/17/183
-    Add comment for arch_apei_flush_tlb_one in arch/arm64/include/asm/acpi.h
-
-v6: https://lists.linaro.org/pipermail/linaro-acpi/2016-March/006644.html
-    Move HEST type (ACPI_HEST_TYPE_IA32_CORRECTED_CHECK) checking to
-    a generic place.
-    Delete HAVE_ACPI_APEI_HEST_IA32.
-
-v5: https://lkml.org/lkml/2015/12/10/131
-    Add "HAVE_ACPI_APEI_HEST_IA32" instead of
-    "#if defined(__i386__) || defined(__x86_64__)".
-
-v4: https://lkml.org/lkml/2015/12/8/188
-    Rebase to latest kernel version(4.4-rc4).
-    Move arch_apei_flush_tlb_one into header file as a inline function
-    Add a new subfunction "hest_ia_init" for "acpi_disable_cmcff".
-
-v3: https://lkml.org/lkml/2015/12/3/521
-    Remove "acpi_disable_cmcff" from arm64 code,
-    and wrap it in hest.c by "#if defined(__i386__) || defined(__x86_64__)"
-
-v2: https://lkml.org/lkml/2015/12/2/432
-    Rebase to latest kernel version(4.4-rc3).
-    Move arch_apei_flush_tlb_one() to arch/arm64/kernel/acpi.c
-
-v1: https://lkml.org/lkml/2015/8/14/199
-    Move arch_apei_flush_tlb_one() to arch/arm64/include/asm/apci.h.
-    Delete arch/arm64/kernel/apei.c.
-    Add "#ifdef CONFIG_ACPI_APEI" for "acpi_disable_cmcff".
-
- arch/arm64/Kconfig            |  1 +
- arch/arm64/include/asm/acpi.h | 16 +++++++++++++++-
- arch/x86/kernel/acpi/apei.c   |  3 ---
- drivers/acpi/apei/hest.c      | 18 +++++++++++++++---
- 4 files changed, 31 insertions(+), 7 deletions(-)
-
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 9f8b99e..3268299 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -50,6 +50,7 @@ config ARM64
- 	select GENERIC_TIME_VSYSCALL
- 	select HANDLE_DOMAIN_IRQ
- 	select HARDIRQS_SW_RESEND
-+	select HAVE_ACPI_APEI if (ACPI && EFI)
- 	select HAVE_ALIGNED_STRUCT_PAGE if SLUB
- 	select HAVE_ARCH_AUDITSYSCALL
- 	select HAVE_ARCH_BITREVERSE
-diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
-index 5420cb0..7cdf681 100644
---- a/arch/arm64/include/asm/acpi.h
-+++ b/arch/arm64/include/asm/acpi.h
-@@ -17,6 +17,7 @@
- 
- #include <asm/cputype.h>
- #include <asm/smp_plat.h>
-+#include <asm/tlbflush.h>
- 
- /* Macros for consistency checks of the GICC subtable of MADT */
- #define ACPI_MADT_GICC_LENGTH	\
-@@ -110,8 +111,21 @@ static inline const char *acpi_get_enable_method(int cpu)
- }
- 
- #ifdef	CONFIG_ACPI_APEI
-+#define acpi_disable_cmcff 1
- pgprot_t arch_apei_get_mem_attribute(phys_addr_t addr);
--#endif
-+
-+/*
-+ * Despite its name, this function must still broadcast the TLB
-+ * invalidation in order to ensure other CPUs don't up with junk
-+ * entries as a result of speculation. Unusually, its also called in
-+ * IRQ context (ghes_iounmap_irq) so if we ever need to use IPIs for
-+ * TLB broadcasting, then we're in trouble here.
-+ */
-+static inline void arch_apei_flush_tlb_one(unsigned long addr)
-+{
-+	flush_tlb_kernel_range(addr, addr + PAGE_SIZE);
-+}
-+#endif /* CONFIG_ACPI_APEI */
- 
- #ifdef CONFIG_ACPI_NUMA
- int arm64_acpi_numa_init(void);
-diff --git a/arch/x86/kernel/acpi/apei.c b/arch/x86/kernel/acpi/apei.c
-index c280df6..ea3046e 100644
---- a/arch/x86/kernel/acpi/apei.c
-+++ b/arch/x86/kernel/acpi/apei.c
-@@ -24,9 +24,6 @@ int arch_apei_enable_cmcff(struct acpi_hest_header *hest_hdr, void *data)
- 	struct acpi_hest_ia_corrected *cmc;
- 	struct acpi_hest_ia_error_bank *mc_bank;
- 
--	if (hest_hdr->type != ACPI_HEST_TYPE_IA32_CORRECTED_CHECK)
--		return 0;
--
- 	cmc = (struct acpi_hest_ia_corrected *)hest_hdr;
- 	if (!cmc->enabled)
- 		return 0;
-diff --git a/drivers/acpi/apei/hest.c b/drivers/acpi/apei/hest.c
-index 20b3fcf..792a0d9 100644
---- a/drivers/acpi/apei/hest.c
-+++ b/drivers/acpi/apei/hest.c
-@@ -123,7 +123,18 @@ EXPORT_SYMBOL_GPL(apei_hest_parse);
-  */
- static int __init hest_parse_cmc(struct acpi_hest_header *hest_hdr, void *data)
- {
--	return arch_apei_enable_cmcff(hest_hdr, data);
-+	if (hest_hdr->type != ACPI_HEST_TYPE_IA32_CORRECTED_CHECK)
-+		return 0;
-+
-+	if (!acpi_disable_cmcff)
-+		return !arch_apei_enable_cmcff(hest_hdr, data);
-+
-+	return 0;
-+}
-+
-+static inline int __init hest_ia32_init(void)
-+{
-+	return apei_hest_parse(hest_parse_cmc, NULL);
- }
- 
- struct ghes_arr {
-@@ -232,8 +243,9 @@ void __init acpi_hest_init(void)
- 		goto err;
- 	}
- 
--	if (!acpi_disable_cmcff)
--		apei_hest_parse(hest_parse_cmc, NULL);
-+	rc = hest_ia32_init();
-+	if (rc)
-+		goto err;
- 
- 	if (!ghes_disable) {
- 		rc = apei_hest_parse(hest_parse_ghes_count, &ghes_count);
--- 
-2.5.5
+Daniel.
