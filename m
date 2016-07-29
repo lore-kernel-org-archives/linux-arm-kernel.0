@@ -1,177 +1,87 @@
 From: lina.iyer@linaro.org (Lina Iyer)
-Date: Fri, 29 Jul 2016 15:56:23 -0600
-Subject: [PATCH v2 12/14] drivers: firmware: psci: Support cluster idle states
- for OS-Initiated
+Date: Fri, 29 Jul 2016 15:56:25 -0600
+Subject: [PATCH v2 14/14] ARM64: dts: Define CPU power domain for MSM8916
 In-Reply-To: <1469829385-11511-1-git-send-email-lina.iyer@linaro.org>
 References: <1469829385-11511-1-git-send-email-lina.iyer@linaro.org>
-Message-ID: <1469829385-11511-13-git-send-email-lina.iyer@linaro.org>
+Message-ID: <1469829385-11511-15-git-send-email-lina.iyer@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PSCI OS initiated firmware may allow Linux to determine the state of the
-CPU cluster and the cluster at coherency level to enter idle states when
-there are no active CPUs. Since Linux has a better idea of the QoS and
-the wakeup pattern of the CPUs, the cluster idle states may be better
-determined by the OS instead of the firmware.
+Define power domain and the power states for the domain as defined by
+the PSCI firmware. The 8916 firmware supports OS initiated method of
+powering off the CPU clusters.
 
-The last CPU entering idle in a cluster, is responsible for selecting
-the state of the cluster. Only one CPU in a cluster may provide the
-cluster idle state to the firmware. Similarly, the last CPU in the
-system may provide the state of the coherency domain along with the
-cluster and the CPU state IDs.
-
-Utilize the CPU PM domain framework's helper functions to build up the
-hierarchy of cluster topology using Generic PM domains. We provide
-callbacks for domain power_on and power_off. By appending the state IDs
-at each domain level in the -power_off() callbacks, we build up a
-composite state ID that can be passed onto the firmware to idle the CPU,
-the cluster and the coherency interface.
-
-Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: <devicetree@vger.kernel.org>
 Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
 ---
- drivers/firmware/psci.c | 76 +++++++++++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 73 insertions(+), 3 deletions(-)
+ arch/arm64/boot/dts/qcom/msm8916.dtsi | 27 +++++++++++++++++++++++++++
+ 1 file changed, 27 insertions(+)
 
-diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
-index 3920aba..d73af98 100644
---- a/drivers/firmware/psci.c
-+++ b/drivers/firmware/psci.c
-@@ -15,6 +15,7 @@
+diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
+index 3029773..d122fa1 100644
+--- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
++++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
+@@ -64,6 +64,7 @@
+ 			next-level-cache = <&L2_0>;
+ 			enable-method = "psci";
+ 			cpu-idle-states = <&CPU_SPC>;
++			power-domains = <&CPU_PD>;
+ 		};
  
- #include <linux/arm-smccc.h>
- #include <linux/cpuidle.h>
-+#include <linux/cpu_domains.h>
- #include <linux/errno.h>
- #include <linux/linkage.h>
- #include <linux/of.h>
-@@ -53,6 +54,17 @@
-  */
- static int resident_cpu = -1;
- static bool psci_has_osi_pd;
-+static DEFINE_PER_CPU(u32, cluster_state_id);
-+
-+static inline u32 psci_get_composite_state_id(u32 cpu_state)
-+{
-+	return cpu_state | this_cpu_read(cluster_state_id);
-+}
-+
-+static inline void psci_reset_composite_state_id(void)
-+{
-+	this_cpu_write(cluster_state_id, 0);
-+}
+ 		CPU1: cpu at 1 {
+@@ -73,6 +74,7 @@
+ 			next-level-cache = <&L2_0>;
+ 			enable-method = "psci";
+ 			cpu-idle-states = <&CPU_SPC>;
++			power-domains = <&CPU_PD>;
+ 		};
  
- bool psci_tos_resident_on(int cpu)
- {
-@@ -179,6 +191,8 @@ static int psci_cpu_on(unsigned long cpuid, unsigned long entry_point)
+ 		CPU2: cpu at 2 {
+@@ -82,6 +84,7 @@
+ 			next-level-cache = <&L2_0>;
+ 			enable-method = "psci";
+ 			cpu-idle-states = <&CPU_SPC>;
++			power-domains = <&CPU_PD>;
+ 		};
  
- 	fn = psci_function_id[PSCI_FN_CPU_ON];
- 	err = invoke_psci_fn(fn, cpuid, entry_point, 0);
-+	/* Reset CPU cluster states */
-+	psci_reset_composite_state_id();
- 	return psci_to_linux_errno(err);
- }
+ 		CPU3: cpu at 3 {
+@@ -91,6 +94,7 @@
+ 			next-level-cache = <&L2_0>;
+ 			enable-method = "psci";
+ 			cpu-idle-states = <&CPU_SPC>;
++			power-domains = <&CPU_PD>;
+ 		};
  
-@@ -250,6 +264,39 @@ static int __init psci_features(u32 psci_func_id)
+ 		L2_0: l2-cache {
+@@ -110,6 +114,29 @@
+ 		};
+ 	};
  
- #ifdef CONFIG_CPU_IDLE
- static DEFINE_PER_CPU_READ_MOSTLY(u32 *, psci_power_state);
-+static bool psci_suspend_mode_is_osi;
++	CPU_PD: cpu-pd at 0 {
++		#power-domain-cells = <0>;
++		domain-idle-states = <&CLUSTER_RET>, <&CLUSTER_PWR_DWN>;
++	};
 +
-+static int psci_set_suspend_mode_osi(bool enable)
-+{
-+	int ret;
-+	int mode;
++	cpu-domain-states {
++		CLUSTER_RET: domain_ret {
++			compatible = "arm,idle-state";
++			arm,psci-suspend-param = <0x1000010>;
++			entry-latency-us = <500>;
++			exit-latency-us = <500>;
++			residency-us = <2000>;
++		 };
 +
-+	if (enable && !psci_has_osi_pd)
-+		return -ENODEV;
-+
-+	if (enable == psci_suspend_mode_is_osi)
-+		return 0;
-+
-+	mode = enable ? PSCI_1_0_SUSPEND_MODE_OSI : PSCI_1_0_SUSPEND_MODE_PC;
-+	ret = invoke_psci_fn(PSCI_1_0_FN_SET_SUSPEND_MODE,
-+			     mode, 0, 0);
-+	if (!ret)
-+		psci_suspend_mode_is_osi = enable;
-+
-+	return psci_to_linux_errno(ret);
-+}
-+
-+static int psci_pd_populate_state_data(struct device_node *np, u32 *param)
-+{
-+	return of_property_read_u32(np, "arm,psci-suspend-param", param);
-+}
-+
-+static int psci_pd_power_off(u32 state_idx, u32 param,
-+		const struct cpumask *mask)
-+{
-+	__this_cpu_add(cluster_state_id, param);
-+	return 0;
-+}
- 
- static int psci_dt_cpu_init_idle(struct device_node *cpu_node, int cpu)
- {
-@@ -304,6 +351,21 @@ static int psci_dt_cpu_init_idle(struct device_node *cpu_node, int cpu)
- 	}
- 	/* Idle states parsed correctly, initialize per-cpu pointer */
- 	per_cpu(psci_power_state, cpu) = psci_states;
-+
-+	if (psci_has_osi_pd) {
-+		int ret;
-+		const struct cpu_pd_ops psci_pd_ops = {
-+			.populate_state_data = psci_pd_populate_state_data,
-+			.power_off = psci_pd_power_off,
++		CLUSTER_PWR_DWN: domain_gdhs {
++			compatible = "arm,idle-state";
++			arm,psci-suspend-param = <0x1000030>;
++			entry-latency-us = <2000>;
++			exit-latency-us = <2000>;
++			residency-us = <6000>;
 +		};
++	};
 +
-+		ret = of_setup_cpu_pd_single(cpu, &psci_pd_ops);
-+		if (!ret)
-+			ret = psci_set_suspend_mode_osi(true);
-+		if (ret)
-+			pr_warn("CPU%d: Error setting PSCI OSI mode\n", cpu);
-+	}
-+
- 	return 0;
- 
- free_mem:
-@@ -330,15 +392,17 @@ int psci_cpu_init_idle(unsigned int cpu)
- static int psci_suspend_finisher(unsigned long index)
- {
- 	u32 *state = __this_cpu_read(psci_power_state);
-+	u32 ext_state = psci_get_composite_state_id(state[index - 1]);
- 
--	return psci_ops.cpu_suspend(state[index - 1],
--				    virt_to_phys(cpu_resume));
-+	return psci_ops.cpu_suspend(ext_state, virt_to_phys(cpu_resume));
- }
- 
- int psci_cpu_suspend_enter(unsigned long index)
- {
- 	int ret;
- 	u32 *state = __this_cpu_read(psci_power_state);
-+	u32 ext_state = psci_get_composite_state_id(state[index - 1]);
-+
- 	/*
- 	 * idle state index 0 corresponds to wfi, should never be called
- 	 * from the cpu_suspend operations
-@@ -347,10 +411,16 @@ int psci_cpu_suspend_enter(unsigned long index)
- 		return -EINVAL;
- 
- 	if (!psci_power_state_loses_context(state[index - 1]))
--		ret = psci_ops.cpu_suspend(state[index - 1], 0);
-+		ret = psci_ops.cpu_suspend(ext_state, 0);
- 	else
- 		ret = cpu_suspend(index, psci_suspend_finisher);
- 
-+	/*
-+	 * Clear the CPU's cluster states, we start afresh after coming
-+	 * out of idle.
-+	 */
-+	psci_reset_composite_state_id();
-+
- 	return ret;
- }
- 
+ 	psci {
+ 		compatible = "arm,psci-1.0";
+ 		method = "smc";
 -- 
 2.7.4
