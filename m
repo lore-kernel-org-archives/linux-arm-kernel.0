@@ -1,32 +1,52 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Fri, 29 Jul 2016 15:08:15 +0200
-Subject: Why do we need reset_control_get_optional() ?
-In-Reply-To: <CAK7LNAS82QLZg40qjnkftES_Cd5AeyTAEdw3_Tms+8W6cK3QKw@mail.gmail.com>
-References: <CAK7LNAQnitMMp5wMXXvVeS-UFF=Fo9m=M1hL=5f4=RF8JYCnGg@mail.gmail.com>
- <1469698980.12835.18.camel@pengutronix.de>
- <CAK7LNAS82QLZg40qjnkftES_Cd5AeyTAEdw3_Tms+8W6cK3QKw@mail.gmail.com>
-Message-ID: <1469797695.3012.48.camel@pengutronix.de>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri, 29 Jul 2016 10:38:43 -0300
+Subject: [PATCH 2/2] ARM: dts: TS-4900: add basic device tree
+In-Reply-To: <1469641982-19558-3-git-send-email-lucile.quirion@savoirfairelinux.com>
+References: <1469641982-19558-1-git-send-email-lucile.quirion@savoirfairelinux.com>
+ <1469641982-19558-3-git-send-email-lucile.quirion@savoirfairelinux.com>
+Message-ID: <CAOMZO5AxNvQJv+JyfZDhv97FLmXZ8aMhvG8oPh6N4N1Njsci3g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Masahiro,
+Hi Lucile,
 
-Am Donnerstag, den 28.07.2016, 19:29 +0900 schrieb Masahiro Yamada:
-[...]
-> However, I think the following makes more sense:
-> 
-> 
-> menuconfig RESET_CONTROLLER
->         bool "Reset Controller Support"
->         depends on (ARCH_HAS_RESET_CONTROLLER || COMPILE_TEST)
->         default y
->         help
->           Generic Reset Controller support.
+This looks good. Only some minor nits:
 
-That looks sensible to me. You'll only have to enable the reset
-controller framework if either some enabled architecture has a reset
-controller (in which case you want the driver for it to be activated by
-default), or if you want to compile test some of the reset drivers.
+On Wed, Jul 27, 2016 at 2:53 PM, Lucile Quirion
+<lucile.quirion@savoirfairelinux.com> wrote:
 
-regards
-Philipp
+> @@ -0,0 +1,21 @@
+> +/*
+> + * Copyright 2011 Freescale Semiconductor, Inc.
+> + * Copyright 2011 Linaro Ltd.
+> + *
+> + * The code contained herein is licensed under the GNU General Public
+> + * License. You may obtain a copy of the GNU General Public License
+> + * Version 2 or later at the following locations:
+> + *
+> + * http://www.opensource.org/licenses/gpl-license.html
+> + * http://www.gnu.org/copyleft/gpl.html
+> + */
+
+If possible, please consider dual GPL/X11 license. Same applies to other files.
+
+> +       reg_3p3v: regulator-3p3v {
+> +               compatible = "regulator-fixed";
+> +               regulator-name = "3p3v";
+> +               regulator-min-microvolt = <3300000>;
+> +               regulator-max-microvolt = <3300000>;
+> +               regulator-always-on;
+
+This 'regulator-always-on' can be removed.
+
+> +&i2c1 {
+> +       status = "okay";
+> +       clock-frequency = <100000>;
+> +       pinctrl-names = "default", "gpio";
+> +       pinctrl-0 = <&pinctrl_i2c1>;
+> +       pinctrl-1 = <&pinctrl_i2c1_gpio>;
+> +       scl-gpios = <&gpio3 21 GPIO_ACTIVE_HIGH>;
+> +       sda-gpios = <&gpio3 28 GPIO_ACTIVE_HIGH>;
+
+Please move 'status = "okay"' line to the end of the properties list.
+Same apply to other nodes in this file.
