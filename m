@@ -1,686 +1,198 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 29 Jul 2016 09:12:30 +0200
-Subject: [PATCH v3 4/4] iio: adc: add support for Allwinner SoCs ADC
-In-Reply-To: <1469519027-11387-5-git-send-email-quentin.schulz@free-electrons.com>
-References: <1469519027-11387-1-git-send-email-quentin.schulz@free-electrons.com>
- <1469519027-11387-5-git-send-email-quentin.schulz@free-electrons.com>
-Message-ID: <20160729071230.GB6215@lukather>
+From: zyw@rock-chips.com (Chris Zhong)
+Date: Fri, 29 Jul 2016 15:48:17 +0800
+Subject: [v8 PATCH 0/6] Rockchip Type-C and DisplayPort driver
+Message-ID: <1469778503-29193-1-git-send-email-zyw@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 26, 2016 at 09:43:47AM +0200, Quentin Schulz wrote:
-> The Allwinner SoCs all have an ADC that can also act as a touchscreen
-> controller and a thermal sensor. This patch adds the ADC driver which is
-> based on the MFD for the same SoCs ADC.
-> 
-> This also registers the thermal adc channel in the iio map array so
-> iio_hwmon could use it without modifying the Device Tree. This registers
-> the driver in the thermal framework.
-> 
-> This driver probes on three different platform_device_id to take into
-> account slight differences (registers bit and temperature computation)
-> between Allwinner SoCs ADCs.
-> 
-> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
-> ---
-> 
-> I don't like how I get the temperature for the thermal framework
-> (sunxi_gpadc_get_temp). I am doing the exact same process as the iio_hwmon
-> but in this function. This is duplicated code. I could use
-> iio_read_channel_processed but it needs to have the iio_channel structure
-> of the thermal sensor which I can only get with iio_channel_get which
-> matches the device name with the consumer_dev_name in the iio_map array.
-> And frankly, I do not see myself declaring the driver both as the producer
-> and the consumer of IIO channels.
-> 
-> Moreover, since the thermal sensor is configured to throw an interrupt
-> every X seconds, only the first request within these X seconds will not
-> time out. This means that because the thermal framework regularly poll the
-> thermal sensor, it is really difficult to get a value from sysfs without
-> getting first a tonne of times out. I don't know if we can do something
-> about that?
-> 
-> v3:
->  - correct wrapping,
->  - add comment about thermal sensor inner working,
->  - move defines in mfd header,
->  - use structure to define SoC specific registers or behaviour,
->  - attach this structure to the device according to of_device_id of the
->    platform device,
->  - use new mutex instead of iio_dev mutex,
->  - use atomic flags to avoid race between request_irq and disable_irq in
->    probe,
->  - switch from processed value to raw, offset and scale values for
->    temperature ADC channel,
->  - remove faulty sentinel in iio_chan_spec array,
->  - add pm_runtime support,
->  - register thermal sensor in thermal framework (forgotten since the
->    beginning whereas it is present in current sun4i-ts driver),
->  - remove useless ret variables to store return value of regmap_reads,
->  - move comments on thermal sensor acquisition period in code instead of
->    header,
->  - adding goto label to unregister iio_map_array when failing to register
->    iio_dev,
-> 
-> v2:
->  - add SUNXI_GPADC_ prefixes for defines,
->  - correct typo in Kconfig,
->  - reorder alphabetically includes, makefile,
->  - add license header,
->  - fix architecture variations not being handled in interrupt handlers or
->    read raw functions,
->  - fix unability to return negative values from thermal sensor,
->  - add gotos to reduce code repetition,
->  - fix irq variable being unsigned int instead of int,
->  - remove useless dev_err and dev_info,
->  - deactivate all interrupts if probe fails,
->  - fix iio_device_register on NULL variable,
->  - deactivate ADC in the IP when probe fails or when removing driver,
-> 
->  drivers/iio/adc/Kconfig           |  12 +
->  drivers/iio/adc/Makefile          |   1 +
->  drivers/iio/adc/sunxi-gpadc-iio.c | 513 ++++++++++++++++++++++++++++++++++++++
->  3 files changed, 526 insertions(+)
->  create mode 100644 drivers/iio/adc/sunxi-gpadc-iio.c
-> 
-> diff --git a/drivers/iio/adc/Kconfig b/drivers/iio/adc/Kconfig
-> index 25378c5..429ef16 100644
-> --- a/drivers/iio/adc/Kconfig
-> +++ b/drivers/iio/adc/Kconfig
-> @@ -384,6 +384,18 @@ config ROCKCHIP_SARADC
->  	  To compile this driver as a module, choose M here: the
->  	  module will be called rockchip_saradc.
->  
-> +config SUN4I_GPADC
-> +	tristate "Support for the Allwinner SoCs GPADC"
-> +	depends on IIO
-> +	depends on MFD_SUN4I_GPADC
-> +	help
-> +	  Say yes here to build support for Allwinner (A10, A13 and A31) SoCs
-> +	  GPADC. This ADC provides 4 channels which can be used as an ADC or as
-> +	  a touchscreen input and one channel for thermal sensor.
-> +
-> +	  To compile this driver as a module, choose M here: the module will be
-> +	  called sunxi-gpadc-iio.
-> +
->  config TI_ADC081C
->  	tristate "Texas Instruments ADC081C/ADC101C/ADC121C family"
->  	depends on I2C
-> diff --git a/drivers/iio/adc/Makefile b/drivers/iio/adc/Makefile
-> index 38638d4..14d1739 100644
-> --- a/drivers/iio/adc/Makefile
-> +++ b/drivers/iio/adc/Makefile
-> @@ -37,6 +37,7 @@ obj-$(CONFIG_PALMAS_GPADC) += palmas_gpadc.o
->  obj-$(CONFIG_QCOM_SPMI_IADC) += qcom-spmi-iadc.o
->  obj-$(CONFIG_QCOM_SPMI_VADC) += qcom-spmi-vadc.o
->  obj-$(CONFIG_ROCKCHIP_SARADC) += rockchip_saradc.o
-> +obj-$(CONFIG_SUN4I_GPADC) += sunxi-gpadc-iio.o
->  obj-$(CONFIG_TI_ADC081C) += ti-adc081c.o
->  obj-$(CONFIG_TI_ADC0832) += ti-adc0832.o
->  obj-$(CONFIG_TI_ADC128S052) += ti-adc128s052.o
-> diff --git a/drivers/iio/adc/sunxi-gpadc-iio.c b/drivers/iio/adc/sunxi-gpadc-iio.c
-> new file mode 100644
-> index 0000000..5647688
-> --- /dev/null
-> +++ b/drivers/iio/adc/sunxi-gpadc-iio.c
-> @@ -0,0 +1,513 @@
-> +/* ADC driver for sunxi platforms' (A10, A13 and A31) GPADC
-> + *
-> + * Copyright (c) 2016 Quentin Schulz <quentin.schulz@free-electrons>
-> + *
-> + * This program is free software; you can redistribute it and/or modify it under
-> + * the terms of the GNU General Public License version 2 as published by the
-> + * Free Software Foundation.
-> + *
-> + * The Allwinner SoCs all have an ADC that can also act as a touchscreen
-> + * controller and a thermal sensor.
-> + * The thermal sensor works only when the ADC acts as a touchscreen controller
-> + * and is configured to throw an interrupt every fixed periods of time (let say
-> + * every X seconds).
-> + * One would be tempted to disable the IP on the hardware side rather than
-> + * disabling interrupts to save some power but that reset the internal clock of
-> + * the IP, resulting in having to wait X seconds every time we want to read the
-> + * value of the thermal sensor.
-> + * This is also the reason of using autosuspend in pm_runtime. If there were no
-> + * autosuspend, the thermal sensor would need X seconds after every
-> + * pm_runtime_get_sync to get a value from the ADC. The autosuspend allows the
-> + * thermal sensor to be requested again in a certain time span before it gets
-> + * shutdown for not being used.
-> + */
-> +
-> +#include <linux/completion.h>
-> +#include <linux/interrupt.h>
-> +#include <linux/io.h>
-> +#include <linux/module.h>
-> +#include <linux/of.h>
-> +#include <linux/of_device.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/pm_runtime.h>
-> +#include <linux/regmap.h>
-> +#include <linux/thermal.h>
-> +
-> +#include <linux/iio/iio.h>
-> +#include <linux/iio/driver.h>
-> +#include <linux/iio/machine.h>
-> +#include <linux/mfd/sunxi-gpadc-mfd.h>
-> +
-> +const unsigned int sun4i_gpadc_chan_select(unsigned int chan)
-> +{
-> +	return SUNXI_GPADC_TP_CTRL1_ADC_CHAN_SELECT(chan);
-> +}
-> +
-> +const unsigned int sun6i_gpadc_chan_select(unsigned int chan)
-> +{
-> +	return SUNXI_GPADC_TP_CTRL1_SUN6I_ADC_CHAN_SELECT(chan);
-> +}
-> +
-> +struct sunxi_gpadc_soc_specific {
-> +	const int		temp_offset;
-> +	const int		temp_scale;
-> +	const unsigned int	tp_mode_en;
-> +	const unsigned int	tp_adc_select;
-> +	const unsigned int	(*adc_chan_select)(unsigned int chan);
-> +};
-> +
-> +static const struct sunxi_gpadc_soc_specific sun4i_gpadc_soc_specific = {
-> +	.temp_offset = -1932,
-> +	.temp_scale = 133,
-> +	.tp_mode_en = SUNXI_GPADC_TP_CTRL1_TP_MODE_EN,
-> +	.tp_adc_select = SUNXI_GPADC_TP_CTRL1_TP_ADC_SELECT,
-> +	.adc_chan_select = &sun4i_gpadc_chan_select,
-> +};
-> +
-> +static const struct sunxi_gpadc_soc_specific sun5i_gpadc_soc_specific = {
-> +	.temp_offset = -1447,
-> +	.temp_scale = 100,
-> +	.tp_mode_en = SUNXI_GPADC_TP_CTRL1_TP_MODE_EN,
-> +	.tp_adc_select = SUNXI_GPADC_TP_CTRL1_TP_ADC_SELECT,
-> +	.adc_chan_select = &sun4i_gpadc_chan_select,
-> +};
-> +
-> +static const struct sunxi_gpadc_soc_specific sun6i_gpadc_soc_specific = {
-> +	.temp_offset = -1623,
-> +	.temp_scale = 167,
-> +	.tp_mode_en = SUNXI_GPADC_TP_CTRL1_SUN6I_TP_MODE_EN,
-> +	.tp_adc_select = SUNXI_GPADC_TP_CTRL1_SUN6I_TP_ADC_SELECT,
-> +	.adc_chan_select = &sun6i_gpadc_chan_select,
-> +};
-> +
-> +struct sunxi_gpadc_dev {
-> +	struct iio_dev				*indio_dev;
-> +	void __iomem				*regs;
-> +	struct completion			completion;
-> +	int					temp_data;
-> +	u32					adc_data;
-> +	struct regmap				*regmap;
-> +	unsigned int				fifo_data_irq;
-> +	atomic_t				ignore_fifo_data_irq;
-> +	unsigned int				temp_data_irq;
-> +	atomic_t				ignore_temp_data_irq;
-> +	const struct sunxi_gpadc_soc_specific	*soc_specific;
-> +	struct mutex				mutex;
-> +};
-> +
-> +#define SUNXI_GPADC_ADC_CHANNEL(_channel, _name) {		\
-> +	.type = IIO_VOLTAGE,					\
-> +	.indexed = 1,						\
-> +	.channel = _channel,					\
-> +	.info_mask_separate = BIT(IIO_CHAN_INFO_RAW),		\
-> +	.datasheet_name = _name,				\
-> +}
-> +
-> +static struct iio_map sunxi_gpadc_hwmon_maps[] = {
-> +	{
-> +		.adc_channel_label = "temp_adc",
-> +		.consumer_dev_name = "iio_hwmon.0",
-> +	},
-> +	{ /* sentinel */ },
-> +};
-> +
-> +static const struct iio_chan_spec sunxi_gpadc_channels[] = {
-> +	SUNXI_GPADC_ADC_CHANNEL(0, "adc_chan0"),
-> +	SUNXI_GPADC_ADC_CHANNEL(1, "adc_chan1"),
-> +	SUNXI_GPADC_ADC_CHANNEL(2, "adc_chan2"),
-> +	SUNXI_GPADC_ADC_CHANNEL(3, "adc_chan3"),
-> +	{
-> +		.type = IIO_TEMP,
-> +		.info_mask_separate = BIT(IIO_CHAN_INFO_RAW) |
-> +				      BIT(IIO_CHAN_INFO_SCALE) |
-> +				      BIT(IIO_CHAN_INFO_OFFSET),
-> +		.datasheet_name = "temp_adc",
-> +	},
-> +};
-> +
-> +static int sunxi_gpadc_adc_read(struct iio_dev *indio_dev, int channel,
-> +				int *val)
-> +{
-> +	struct sunxi_gpadc_dev *info = iio_priv(indio_dev);
-> +	int ret = 0;
-> +
-> +	pm_runtime_get_sync(indio_dev->dev.parent);
-> +	mutex_lock(&info->mutex);
-> +
-> +	reinit_completion(&info->completion);
-> +	regmap_write(info->regmap, SUNXI_GPADC_TP_CTRL1,
-> +		     info->soc_specific->tp_mode_en |
-> +		     info->soc_specific->tp_adc_select |
-> +		     info->soc_specific->adc_chan_select(channel));
-> +	regmap_write(info->regmap, SUNXI_GPADC_TP_INT_FIFOC,
-> +		     SUNXI_GPADC_TP_INT_FIFOC_TP_FIFO_TRIG_LEVEL(1) |
-> +		     SUNXI_GPADC_TP_INT_FIFOC_TP_FIFO_FLUSH);
-> +	enable_irq(info->fifo_data_irq);
-> +
-> +	if (!wait_for_completion_timeout(&info->completion,
-> +					 msecs_to_jiffies(100))) {
-> +		ret = -ETIMEDOUT;
-> +		goto out;
-> +	}
-> +
-> +	*val = info->adc_data;
-> +
-> +out:
-> +	disable_irq(info->fifo_data_irq);
-> +	mutex_unlock(&info->mutex);
-> +	pm_runtime_mark_last_busy(indio_dev->dev.parent);
-> +	pm_runtime_put_autosuspend(indio_dev->dev.parent);
-> +
-> +	return ret;
-> +}
-> +
-> +static int sunxi_gpadc_temp_read(struct iio_dev *indio_dev, int *val)
-> +{
-> +	struct sunxi_gpadc_dev *info = iio_priv(indio_dev);
-> +	int ret = 0;
-> +
-> +	pm_runtime_get_sync(indio_dev->dev.parent);
-> +	mutex_lock(&info->mutex);
-> +
-> +	reinit_completion(&info->completion);
-> +
-> +	regmap_write(info->regmap, SUNXI_GPADC_TP_INT_FIFOC,
-> +		     SUNXI_GPADC_TP_INT_FIFOC_TP_FIFO_TRIG_LEVEL(1) |
-> +		     SUNXI_GPADC_TP_INT_FIFOC_TP_FIFO_FLUSH);
-> +	/*
-> +	 * The temperature sensor returns valid data only when the ADC operates
-> +	 * in touchscreen mode.
-> +	 */
-> +	regmap_write(info->regmap, SUNXI_GPADC_TP_CTRL1,
-> +		     info->soc_specific->tp_mode_en);
-> +	enable_irq(info->temp_data_irq);
-> +
-> +	if (!wait_for_completion_timeout(&info->completion,
-> +					 msecs_to_jiffies(100))) {
-> +		ret = -ETIMEDOUT;
-> +		goto out;
-> +	}
-> +
-> +	*val = info->temp_data;
-> +
-> +out:
-> +	disable_irq(info->temp_data_irq);
-> +	mutex_unlock(&info->mutex);
-> +	pm_runtime_mark_last_busy(indio_dev->dev.parent);
-> +	pm_runtime_put_autosuspend(indio_dev->dev.parent);
-> +
-> +	return ret;
-> +}
 
-This looks like the exact same function than above, can't that be
-factored (for example by passing the interrupt number as argument, and
-giving it a way to know if it's going to be used for the ADC or
-temperature as an argument?)
+Hi all
 
-> +static int sunxi_gpadc_temp_offset(struct iio_dev *indio_dev, int *val)
-> +{
-> +	struct sunxi_gpadc_dev *info = iio_priv(indio_dev);
-> +
-> +	*val = info->soc_specific->temp_offset;
-> +
-> +	return 0;
-> +}
-> +
-> +static int sunxi_gpadc_temp_scale(struct iio_dev *indio_dev, int *val)
-> +{
-> +	struct sunxi_gpadc_dev *info = iio_priv(indio_dev);
-> +
-> +	*val = info->soc_specific->temp_scale;
-> +
-> +	return 0;
-> +}
-> +
-> +static int sunxi_gpadc_read_raw(struct iio_dev *indio_dev,
-> +				struct iio_chan_spec const *chan, int *val,
-> +				int *val2, long mask)
-> +{
-> +	int ret;
-> +
-> +	switch (mask) {
-> +	case IIO_CHAN_INFO_OFFSET:
-> +		ret = sunxi_gpadc_temp_offset(indio_dev, val);
-> +		if (ret)
-> +			return ret;
-> +
-> +		return IIO_VAL_INT;
-> +	case IIO_CHAN_INFO_RAW:
-> +		if (chan->type == IIO_VOLTAGE) {
-> +			ret = sunxi_gpadc_adc_read(indio_dev, chan->channel,
-> +						   val);
-> +			if (ret)
-> +				return ret;
-> +		} else {
-> +			ret = sunxi_gpadc_temp_read(indio_dev, val);
-> +			if (ret)
-> +				return ret;
-> +		}
-> +
-> +		return IIO_VAL_INT;
-> +	case IIO_CHAN_INFO_SCALE:
-> +		ret = sunxi_gpadc_temp_scale(indio_dev, val);
-> +		if (ret)
-> +			return ret;
-> +
-> +		return IIO_VAL_INT;
-> +	default:
-> +		return -EINVAL;
-> +	}
-> +
-> +	return -EINVAL;
-> +}
-> +
-> +static const struct iio_info sunxi_gpadc_iio_info = {
-> +	.read_raw = sunxi_gpadc_read_raw,
-> +	.driver_module = THIS_MODULE,
-> +};
-> +
-> +static irqreturn_t sunxi_gpadc_temp_data_irq_handler(int irq, void *dev_id)
-> +{
-> +	struct sunxi_gpadc_dev *info = dev_id;
-> +
-> +	if (atomic_read(&info->ignore_temp_data_irq))
-> +		return IRQ_HANDLED;
-> +
-> +	if (!regmap_read(info->regmap, SUNXI_GPADC_TEMP_DATA, &info->temp_data))
-> +		complete(&info->completion);
-> +
-> +	return IRQ_HANDLED;
-> +}
-> +
-> +static irqreturn_t sunxi_gpadc_fifo_data_irq_handler(int irq, void *dev_id)
-> +{
-> +	struct sunxi_gpadc_dev *info = dev_id;
-> +
-> +	if (atomic_read(&info->ignore_fifo_data_irq))
-> +		return IRQ_HANDLED;
-> +
-> +	if (!regmap_read(info->regmap, SUNXI_GPADC_TP_DATA, &info->adc_data))
-> +		complete(&info->completion);
-> +
-> +	return IRQ_HANDLED;
-> +}
-> +
-> +static int sunxi_gpadc_runtime_suspend(struct device *dev)
-> +{
-> +	struct sunxi_gpadc_dev *info = iio_priv(dev_get_drvdata(dev));
-> +
-> +	mutex_lock(&info->mutex);
-> +
-> +	/* Disable the ADC on IP */
-> +	regmap_write(info->regmap, SUNXI_GPADC_TP_CTRL1, 0);
-> +	/* Disable temperature sensor on IP */
-> +	regmap_write(info->regmap, SUNXI_GPADC_TP_TPR, 0);
-> +
-> +	mutex_unlock(&info->mutex);
+This series patch is for rockchip Type-C phy and DisplayPort controller
+driver.
 
-Having some comments somewhere about what this mutex protects would be
-great (just like checkpatch tells you about).
+The USB Type-C PHY is designed to support the USB3 and DP applications.
+The PHY basically has two main components: USB3 and DisplyPort. USB3
+operates in SuperSpeed mode and the DP can operate at RBR, HBR and HBR2
+data rates. The Type-C cable orientation detection and Power Delivery
+(PD) is accomplished using a PD PHY or a exernal PD chip.
 
-However, I'm not sure this is even possible. Isn't the point of the
-runtime_pm precisely to not be called while you're using the device?
+The DP controller is compliant with DisplayPort Specification,
+Version 1.3, This IP is compatible with the rockchip type-c PHY IP.
+There is a uCPU in DP controller, it need a firmware to work, please
+put the firmware file[0] to /lib/firmware/rockchip/dptx.bin. The uCPU
+in charge of aux communication and link training, the host use mailbox
+to communicate with the ucpu.
 
-> +
-> +	return 0;
-> +}
-> +
-> +static int sunxi_gpadc_runtime_resume(struct device *dev)
-> +{
-> +	struct sunxi_gpadc_dev *info = iio_priv(dev_get_drvdata(dev));
-> +
-> +	mutex_lock(&info->mutex);
-> +
-> +	/* clkin = 6MHz */
-> +	regmap_write(info->regmap, SUNXI_GPADC_TP_CTRL0,
-> +		     SUNXI_GPADC_TP_CTRL0_ADC_CLK_DIVIDER(2) |
-> +		     SUNXI_GPADC_TP_CTRL0_FS_DIV(7) |
-> +		     SUNXI_GPADC_TP_CTRL0_T_ACQ(63));
-> +	regmap_write(info->regmap, SUNXI_GPADC_TP_CTRL1,
-> +		     info->soc_specific->tp_mode_en);
-> +	regmap_write(info->regmap, SUNXI_GPADC_TP_CTRL3,
-> +		     SUNXI_GPADC_TP_CTRL3_FILTER_EN |
-> +		     SUNXI_GPADC_TP_CTRL3_FILTER_TYPE(1));
-> +	/* period = SUNXI_GPADC_TP_TPR_TEMP_PERIOD * 256 * 16 / clkin; ~1.3s */
-> +	regmap_write(info->regmap, SUNXI_GPADC_TP_TPR,
-> +		     SUNXI_GPADC_TP_TPR_TEMP_ENABLE |
-> +		     SUNXI_GPADC_TP_TPR_TEMP_PERIOD(1953));
-> +
-> +	mutex_unlock(&info->mutex);
-> +
-> +	return 0;
-> +}
-> +
-> +static int sunxi_gpadc_get_temp(void *data, int *temp)
-> +{
-> +	struct sunxi_gpadc_dev *info = (struct sunxi_gpadc_dev *)data;
-> +	int val, scale, offset;
-> +
-> +	/* If reading temperature times out, take stored previous value. */
-> +	if (sunxi_gpadc_temp_read(info->indio_dev, &val))
-> +		val = info->temp_data;
-> +	sunxi_gpadc_temp_scale(info->indio_dev, &scale);
-> +	sunxi_gpadc_temp_offset(info->indio_dev, &offset);
-> +
-> +	*temp = (val + offset) * scale;
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct thermal_zone_of_device_ops sunxi_ts_tz_ops = {
-> +	.get_temp = &sunxi_gpadc_get_temp,
-> +};
-> +
-> +static const struct dev_pm_ops sunxi_gpadc_pm_ops = {
-> +	.runtime_suspend = &sunxi_gpadc_runtime_suspend,
-> +	.runtime_resume = &sunxi_gpadc_runtime_resume,
-> +};
-> +
-> +static int sunxi_gpadc_probe(struct platform_device *pdev)
-> +{
-> +	struct sunxi_gpadc_dev *info;
-> +	struct iio_dev *indio_dev;
-> +	int ret, irq;
-> +	struct sunxi_gpadc_mfd_dev *sunxi_gpadc_mfd_dev;
-> +	struct thermal_zone_device *tzd;
-> +
-> +	sunxi_gpadc_mfd_dev = dev_get_drvdata(pdev->dev.parent);
-> +
-> +	indio_dev = devm_iio_device_alloc(&pdev->dev, sizeof(*info));
-> +	if (!indio_dev)
-> +		return -ENOMEM;
-> +
-> +	info = iio_priv(indio_dev);
-> +
-> +	mutex_init(&info->mutex);
-> +	info->regmap = sunxi_gpadc_mfd_dev->regmap;
-> +	info->indio_dev = indio_dev;
-> +	atomic_set(&info->ignore_fifo_data_irq, 1);
-> +	atomic_set(&info->ignore_temp_data_irq, 1);
-> +	init_completion(&info->completion);
-> +	indio_dev->name = dev_name(&pdev->dev);
-> +	indio_dev->dev.parent = &pdev->dev;
-> +	indio_dev->dev.of_node = pdev->dev.of_node;
-> +	indio_dev->info = &sunxi_gpadc_iio_info;
-> +	indio_dev->modes = INDIO_DIRECT_MODE;
-> +	indio_dev->num_channels = ARRAY_SIZE(sunxi_gpadc_channels);
-> +	indio_dev->channels = sunxi_gpadc_channels;
-> +
-> +	info->soc_specific = (struct sunxi_gpadc_soc_specific *)platform_get_device_id(pdev)->driver_data;
+The DP contoller has register a notification with extcon API, to get the
+alt mode from PD, the PD driver need call the devm_extcon_dev_allocate
+to create a extcon device and use extcon_set_state to notify DP
+controller. And call extcon_set_cable_property to set orientation.
 
-I'm not sure that cast is necessary (and you can probably shorten that
-structure name).
+About the DP audio, cdn-dp registered 2 DAIs: 0 is I2S, 1 is SPDIF.
+We can reference them in simple-card.
 
-> +
-> +	tzd = devm_thermal_zone_of_sensor_register(&pdev->dev, 0, info,
-> +						   &sunxi_ts_tz_ops);
-> +	if (IS_ERR(tzd)) {
-> +		dev_err(&pdev->dev, "could not register thermal sensor: %ld\n",
-> +			PTR_ERR(tzd));
-> +		return PTR_ERR(tzd);
-> +	}
-> +
-> +	pm_runtime_set_autosuspend_delay(&pdev->dev,
-> +					 SUNXI_GPADC_AUTOSUSPEND_DELAY);
-> +	pm_runtime_use_autosuspend(&pdev->dev);
-> +	pm_runtime_set_suspended(&pdev->dev);
-> +	pm_runtime_enable(&pdev->dev);
-> +
-> +	irq = platform_get_irq_byname(pdev, "TEMP_DATA_PENDING");
-> +	if (irq < 0) {
-> +		dev_err(&pdev->dev,
-> +			"no TEMP_DATA_PENDING interrupt registered\n");
-> +		ret = irq;
-> +		goto err;
-> +	}
-> +
-> +	irq = regmap_irq_get_virq(sunxi_gpadc_mfd_dev->regmap_irqc, irq);
-> +	ret = devm_request_any_context_irq(&pdev->dev, irq,
-> +					   sunxi_gpadc_temp_data_irq_handler, 0,
-> +					   "temp_data", info);
-> +	if (ret < 0) {
-> +		dev_err(&pdev->dev,
-> +			"could not request TEMP_DATA_PENDING interrupt: %d\n",
-> +			ret);
-> +		goto err;
-> +	}
-> +
-> +	disable_irq(irq);
-> +	info->temp_data_irq = irq;
-> +	atomic_set(&info->ignore_temp_data_irq, 0);
-> +
-> +	irq = platform_get_irq_byname(pdev, "FIFO_DATA_PENDING");
-> +	if (irq < 0) {
-> +		dev_err(&pdev->dev,
-> +			"no FIFO_DATA_PENDING interrupt registered\n");
-> +		ret = irq;
-> +		goto err;
-> +	}
-> +
-> +	irq = regmap_irq_get_virq(sunxi_gpadc_mfd_dev->regmap_irqc, irq);
-> +	ret = devm_request_any_context_irq(&pdev->dev, irq,
-> +					   sunxi_gpadc_fifo_data_irq_handler, 0,
-> +					   "fifo_data", info);
-> +	if (ret < 0) {
-> +		dev_err(&pdev->dev,
-> +			"could not request FIFO_DATA_PENDING interrupt: %d\n",
-> +			ret);
-> +		goto err;
-> +	}
-> +
-> +	disable_irq(irq);
-> +	info->fifo_data_irq = irq;
-> +	atomic_set(&info->ignore_fifo_data_irq, 0);
+This series is based on Mark Yao's branch[1] and Chanwoo Choi's
+extcon-test branch[2]. The extcon patch is base on a test branch, so
+please do not review the "1/6 extcon: Add Type-C and DP support".
 
-These two blocks to handle the IRQs look very similar, you porbably
-want to factor them.
+I test this patches on the rk3399-evb board, with a fusb302 driver,
+this branch has no rk3399.dtsi, so the patch about dts is not included
+in this series.
 
-> +	ret = iio_map_array_register(indio_dev, sunxi_gpadc_hwmon_maps);
-> +	if (ret < 0) {
-> +		dev_err(&pdev->dev, "failed to register iio map array\n");
-> +		goto err;
-> +	}
-> +
-> +	platform_set_drvdata(pdev, indio_dev);
-> +
-> +	ret = iio_device_register(indio_dev);
-> +	if (ret < 0) {
-> +		dev_err(&pdev->dev, "could not register the device\n");
-> +		goto err_map;
-> +	}
-
-> +
-> +	return 0;
-> +
-> +err_map:
-> +	iio_map_array_unregister(indio_dev);
-> +
-> +err:
-> +	pm_runtime_put(&pdev->dev);
-
-You're never disabling it?
+[0]
+https://patchwork.kernel.org/patch/9249693/
+[1]
+https://github.com/markyzq/kernel-drm-rockchip/tree/drm-rockchip-next-2016-05-23
+[2]
+https://git.kernel.org/cgit/linux/kernel/git/chanwoo/extcon.git/log/?h=extcon-test
+- extcon: Add the extcon_type to gather each connector into five category
+- extcon: Add the support for extcon property according to extcon type
+- extcon: Add the support for the capability of each property
+- extcon: Rename the extcon_set/get_state() to maintain the function naming
+pattern
+- extcon: Add the synchronization extcon APIs to support the notification
 
 
-> +	/* Disable all hardware interrupts */
-> +	regmap_write(info->regmap, SUNXI_GPADC_TP_INT_FIFOC, 0);
+Changes in v8:
+- set the default cable id to EXTCON_USB_HOST
+- optimization Error log
+- optimization the err log
 
-This looks like the wrong place to do that. You'll disable the
-interrupts of all the devices of the MFD, which is probbaly not what
-you want to do (and if you do, you want to do it in the MFD driver).
+Changes in v7:
+- support new API of extcon
+- support firmware standby when no dptx connection
+- optimization the calculation of tu size and valid symbol
 
-> +
-> +	return ret;
-> +}
-> +
-> +static int sunxi_gpadc_remove(struct platform_device *pdev)
-> +{
-> +	struct sunxi_gpadc_dev *info;
-> +	struct iio_dev *indio_dev = platform_get_drvdata(pdev);
-> +
-> +	info = iio_priv(indio_dev);
-> +	iio_device_unregister(indio_dev);
-> +	iio_map_array_unregister(indio_dev);
-> +	pm_runtime_put(&pdev->dev);
-> +	pm_runtime_disable(&pdev->dev);
-> +	/* Disable all hardware interrupts */
-> +	regmap_write(info->regmap, SUNXI_GPADC_TP_INT_FIFOC, 0);
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct platform_device_id sunxi_gpadc_id[] = {
-> +	{ "sun4i-a10-gpadc-iio", (kernel_ulong_t)&sun4i_gpadc_soc_specific },
-> +	{ "sun5i-a13-gpadc-iio", (kernel_ulong_t)&sun5i_gpadc_soc_specific },
-> +	{ "sun6i-a31-gpadc-iio", (kernel_ulong_t)&sun6i_gpadc_soc_specific },
+Changes in v6:
+- add assigned-clocks and assigned-clock-rates
+- delete the support of PIN_ASSIGN_A/B
+- set the default mode to MODE_DFP_USB
+- disable DP PLL at USB3 only mode
+- add assigned-clocks and assigned-clock-rates
+- add power-domains
+- add a port struct
+- select SND_SOC_HDMI_CODEC
+- force reset the phy when hpd detected
 
-kernel_ulong_t ? that's weird.
+Changes in v5:
+- support get property from extcon
+- remove PIN ASSIGN A/B support
+- alphabetical order
+- do not use long, use u32 or u64
+- return MODE_CLOCK_HIGH when requested > actual
+- Optimized Coding Style
+- add a formula to get better tu size and symbol value.
+- modify according to Sean Paul's comments
+- fixed the fw_wait always 0
 
+Changes in v4:
+- add a #phy-cells node
+- select EXTCON
+- use phy framework to control the USB3 and DP function
+- rename PIN_MAP_ to PIN_ASSIGN_
+- add a reset node
+- support 2 phys
+- use phy framework to control DP phy
+- support 2 phys
 
-> +	{ /* sentinel */ },
-> +};
-> +
-> +static struct platform_driver sunxi_gpadc_driver = {
-> +	.driver = {
-> +		.name = "sunxi-gpadc-iio",
-> +		.pm = &sunxi_gpadc_pm_ops,
-> +	},
-> +	.id_table = sunxi_gpadc_id,
-> +	.probe = sunxi_gpadc_probe,
-> +	.remove = sunxi_gpadc_remove,
-> +};
-> +
-> +module_platform_driver(sunxi_gpadc_driver);
-> +
-> +MODULE_DESCRIPTION("ADC driver for sunxi platforms");
-> +MODULE_AUTHOR("Quentin Schulz <quentin.schulz@free-electrons.com>");
-> +MODULE_LICENSE("GPL v2");
+Changes in v3:
+- use compatible: rockchip,rk3399-typec-phy
+- use dashes instead of underscores.
+- remove the phy framework(Kishon Vijay Abraham I)
+- add parentheses around the macro
+- use a single space between type and name
+- add spaces after opening and before closing braces.
+- use u16 for register value
+- remove type-c phy header file
+- CodingStyle optimization
+- use some cable extcon to get type-c port information
+- add a extcon to notify Display Port
+- add SoC specific compatible string
+- remove reg = <1>;
+- use EXTCON_DISP_DP and EXTCON_DISP_DP_ALT cable to get dp port state.
+- reset spdif before config it
+- modify the firmware clk to 100Mhz
+- retry load firmware if fw file is requested too early
 
-Maxime
+Changes in v2:
+- add some registers description
+- select RESET_CONTROLLER
+- alphabetic order
+- modify some spelling mistakes
+- make mode cleaner
+- use bool for enable/disable
+- check all of the return value
+- return a better err number
+- use more readx_poll_timeout()
+- clk_disable_unprepare(tcphy->clk_ref);
+- remove unuse functions, rockchip_typec_phy_power_on/off
+- remove unnecessary typecast from void *
+- use dts node to distinguish between phys.
+- Alphabetic order
+- remove excess error message
+- use define clk_rate
+- check all return value
+- remove dev_set_name(dp->dev, "cdn-dp");
+- use schedule_delayed_work
+- remove never-called functions
+- remove some unnecessary ()
+
+Changes in v1:
+- add extcon node description
+- move the registers in phy driver
+- remove the suffix of reset
+- update the licence note
+- init core clock to 50MHz
+- use extcon API
+- remove unused global
+- add some comments for magic num
+- change usleep_range(1000, 2000) tousleep_range(1000, 1050)
+- remove __func__ from dev_err
+- return err number when get clk failed
+- remove ADDR_ADJ define
+- use devm_clk_get(&pdev->dev, "tcpdcore")
+- add extcon node description
+- add #sound-dai-cells description
+- use extcon API
+- use hdmi-codec for the DP Asoc
+- do not initialize the "ret"
+- printk a err log when drm_of_encoder_active_endpoint_id
+- modify the dclk pin_pol to a single line
+
+Chris Zhong (6):
+  extcon: Add EXTCON_DISP_DP and the property for USB Type-C
+  Documentation: bindings: add dt doc for Rockchip USB Type-C PHY
+  phy: Add USB Type-C PHY driver for rk3399
+  arm64: dts: rockchip: add Type-C phy for RK3399
+  Documentation: bindings: add dt documentation for cdn DP controller
+  drm/rockchip: cdn-dp: add cdn DP support for rk3399
+
+ .../bindings/display/rockchip/cdn-dp-rockchip.txt  |  74 ++
+ .../devicetree/bindings/phy/phy-rockchip-typec.txt |  84 ++
+ arch/arm64/boot/dts/rockchip/rk3399.dtsi           |  44 +
+ drivers/extcon/extcon.c                            |   5 +
+ drivers/gpu/drm/rockchip/Kconfig                   |  10 +
+ drivers/gpu/drm/rockchip/Makefile                  |   1 +
+ drivers/gpu/drm/rockchip/cdn-dp-core.c             | 867 +++++++++++++++++++
+ drivers/gpu/drm/rockchip/cdn-dp-core.h             | 103 +++
+ drivers/gpu/drm/rockchip/cdn-dp-reg.c              | 961 +++++++++++++++++++++
+ drivers/gpu/drm/rockchip/cdn-dp-reg.h              | 482 +++++++++++
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.c        |  13 +-
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.h        |   9 +
+ drivers/gpu/drm/rockchip/rockchip_vop_reg.c        |   2 +
+ drivers/phy/Kconfig                                |   9 +
+ drivers/phy/Makefile                               |   1 +
+ drivers/phy/phy-rockchip-typec.c                   | 951 ++++++++++++++++++++
+ include/linux/extcon.h                             |   8 +-
+ 17 files changed, 3620 insertions(+), 4 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/display/rockchip/cdn-dp-rockchip.txt
+ create mode 100644 Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt
+ create mode 100644 drivers/gpu/drm/rockchip/cdn-dp-core.c
+ create mode 100644 drivers/gpu/drm/rockchip/cdn-dp-core.h
+ create mode 100644 drivers/gpu/drm/rockchip/cdn-dp-reg.c
+ create mode 100644 drivers/gpu/drm/rockchip/cdn-dp-reg.h
+ create mode 100644 drivers/phy/phy-rockchip-typec.c
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160729/9bd2fdc1/attachment-0001.sig>
+2.6.3
