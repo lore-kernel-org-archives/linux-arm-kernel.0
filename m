@@ -1,118 +1,114 @@
-From: Jean-Philippe.Brucker@arm.com (Jean-Philippe Brucker)
-Date: Fri, 29 Jul 2016 15:46:55 +0100
-Subject: [PATCH v4 6/8] iommu/arm-smmu: Implement of_xlate() for SMMUv3
-In-Reply-To: <925b054b1e96dc83c0b1dc9607785d0346187366.1467388950.git.robin.murphy@arm.com>
-References: <cover.1467388950.git.robin.murphy@arm.com>
- <925b054b1e96dc83c0b1dc9607785d0346187366.1467388950.git.robin.murphy@arm.com>
-Message-ID: <20160729144655.GA3359@e106794-lin.localdomain>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 29 Jul 2016 10:06:41 -0600
+Subject: [PATCH 2/3] dt-bindings: allow child nodes inside the Tegra BPMP
+In-Reply-To: <20160729134831.GA3864@ulmo.ba.sec>
+References: <20160719191442.15439-1-swarren@wwwdotorg.org>
+ <20160719191442.15439-2-swarren@wwwdotorg.org>
+ <20160726100302.GE2433@ulmo.ba.sec>
+ <f1ca284a-5332-3323-80b9-7cf61e7c97ac@wwwdotorg.org>
+ <CAL_JsqLfs5jnO9DkP5io5qbuCfhojfspkHQbHBttgWfTeokYkQ@mail.gmail.com>
+ <6db4ff47-974b-94ac-3739-e630b6d38c0e@wwwdotorg.org>
+ <20160729134831.GA3864@ulmo.ba.sec>
+Message-ID: <a86a95d0-8d4b-2abe-f2ef-870c29b3334e@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
+On 07/29/2016 07:48 AM, Thierry Reding wrote:
+> On Thu, Jul 28, 2016 at 03:24:22PM -0600, Stephen Warren wrote:
+>> On 07/28/2016 01:07 PM, Rob Herring wrote:
+>>> On Tue, Jul 26, 2016 at 11:21 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>>>> On 07/26/2016 04:03 AM, Thierry Reding wrote:
+>>>>>
+>>>>> On Tue, Jul 19, 2016 at 01:14:41PM -0600, Stephen Warren wrote:
+>>>>>>
+>>>>>> From: Stephen Warren <swarren@nvidia.com>
+>>>>>>
+>>>>>> The BPMP implements some services which must be represented by separate
+>>>>>> nodes. For example, it can provide access to certain I2C controllers, and
+>>>>>> the I2C bindings represent each I2C controller as a device tree node.
+>>>>>> Update the binding to describe how the BPMP supports this.
+>>>>>>
+>>>>>> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+>>>>>> ---
+>>>>>>  .../bindings/firmware/nvidia,tegra186-bpmp.txt     | 23
+>>>>>> ++++++++++++++++++++++
+>>>>>>  1 file changed, 23 insertions(+)
+>>>>>>
+>>>>>> diff --git
+>>>>>> a/Documentation/devicetree/bindings/firmware/nvidia,tegra186-bpmp.txt
+>>>>>> b/Documentation/devicetree/bindings/firmware/nvidia,tegra186-bpmp.txt
+>>>>>> index 9a3864f56955..142d363406f6 100644
+>>>>>> --- a/Documentation/devicetree/bindings/firmware/nvidia,tegra186-bpmp.txt
+>>>>>> +++ b/Documentation/devicetree/bindings/firmware/nvidia,tegra186-bpmp.txt
+>>>>>> @@ -38,6 +38,24 @@ implemented by this node:
+>>>>>>  - .../reset/reset.txt
+>>>>>>  - <dt-bindings/reset/tegra186-reset.h>
+>>>>>>
+>>>>>> +The BPMP implements some services which must be represented by separate
+>>>>>> nodes.
+>>>>>> +For example, it can provide access to certain I2C controllers, and the
+>>>>>> I2C
+>>>>>> +bindings represent each I2C controller as a device tree node. Such nodes
+>>>>>> should
+>>>>>> +be nested directly inside the main BPMP node.
+>>>>>> +
+>>>>>> +Software can determine whether a child node of the BPMP node represents
+>>>>>> a device
+>>>>>> +by checking for a compatible property. Any node with a compatible
+>>>>>> property
+>>>>>> +represents a device that can be instantiated. Nodes without a compatible
+>>>>>> +property may be used to provide configuration information regarding the
+>>>>>> BPMP
+>>>>>> +itself, although no such configuration nodes are currently defined by
+>>>>>> this
+>>>>>> +binding.
+>>>>>> +
+>>>>>> +The BPMP firmware defines no single global name-/numbering-space for
+>>>>>> such
+>>>>>> +services. Put another way, the numbering scheme for I2C buses is
+>>>>>> distinct from
+>>>>>> +the numbering scheme for any other service the BPMP may provide (e.g. a
+>>>>>> future
+>>>>>> +hypothetical SPI bus service). As such, child device nodes will have no
+>>>>>> reg
+>>>>>> +property, and the BPMP node will have no #address-cells or #size-cells
+>>>>>> property.
+>>>>>
+>>>>>
+>>>>> My understanding is that the I2C bus number is passed as part of the
+>>>>> request to the BPMP firmware. Does that not count as addressing? Could
+>>>>> we not represent that generically using a device tree hierarchy? I'm
+>>>>> thinking something along these lines:
+>>>>>
+>>>>>         bpmp {
+>>>>>                 ...
+>>>>>
+>>>>>                 services {
+>>>>>                         i2c {
+>>>>>                                 i2c at 0 {
+>>>>>                                         reg = <0>;
+>>>>
+>>>>
+>>>> Technically, that is possible. However, Rob Herring rejected the idea of
+>>>> multiple levels of sub-nodes.
+>>>
+>>> I think I questioned the need, not rejected. What about the above, but
+>>> remove serivces level:
+>>>
+>>>          bpmp {
+>>>                  ...
+>>>
+>>>                  i2c {
+>>>                          i2c at 0 {
+>>>                                  reg = <0>;
+>>
+>> Sigh. Can you please talk to Thierry and work out what the binding would be
+>> (perhaps on IRC to expedite things?) and I'll just implement whatever you
+>> two agree upon. I don't really care much what the binding looks like any
+>> more; I just need something that will pass review. Thanks.
+>
+> Like I said, I'm fine going with what you proposed.
 
-Very sorry about the delay, I forgot about this minor comment, below
-
-On Fri, Jul 01, 2016 at 05:50:15PM +0100, Robin Murphy wrote:
-> Now that we can properly describe the mapping between PCI RIDs and
-> stream IDs via "iommu-map", and have it fed it to the driver
-> automatically via of_xlate(), rework the SMMUv3 driver to benefit from
-> that, and get rid of the current misuse of the "iommus" binding.
-> 
-> Since having of_xlate wired up means that masters will now be given the
-> appropriate DMA ops, we also need to make sure that default domains work
-> properly. This necessitates dispensing with the "whole group at a time"
-> notion for attaching to a domain, as devices which share a group get
-> attached to the group's default domain one by one as they are initially
-> probed.
-> 
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-> ---
-> 
-> v4: Add explicit device probe in of_init callback.
-> 
->  drivers/iommu/arm-smmu-v3.c | 278 +++++++++++++++++++-------------------------
->  1 file changed, 121 insertions(+), 157 deletions(-)
-> 
-> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-> index 94b68213c50d..fb438664b9f0 100644
-> --- a/drivers/iommu/arm-smmu-v3.c
-> +++ b/drivers/iommu/arm-smmu-v3.c
-[...]
-> @@ -1800,94 +1752,74 @@ static bool arm_smmu_sid_in_range(struct arm_smmu_device *smmu, u32 sid)
->  	return sid < limit;
->  }
->  
-> +static struct iommu_ops arm_smmu_ops;
-> +
->  static int arm_smmu_add_device(struct device *dev)
->  {
->  	int i, ret;
-> -	u32 sid, *sids;
-> -	struct pci_dev *pdev;
-> -	struct iommu_group *group;
-> -	struct arm_smmu_group *smmu_group;
->  	struct arm_smmu_device *smmu;
-> +	struct arm_smmu_master_data *master;
-> +	struct iommu_fwspec *fwspec = dev_iommu_fwspec(dev);
-> +	struct iommu_group *group;
->  
-> -	/* We only support PCI, for now */
-> -	if (!dev_is_pci(dev))
-> +	if (!fwspec || fwspec->iommu_ops != &arm_smmu_ops)
->  		return -ENODEV;
-> -
-> -	pdev = to_pci_dev(dev);
-> -	group = iommu_group_get_for_dev(dev);
-> -	if (IS_ERR(group))
-> -		return PTR_ERR(group);
-> -
-> -	smmu_group = iommu_group_get_iommudata(group);
-> -	if (!smmu_group) {
-> -		smmu = arm_smmu_get_for_pci_dev(pdev);
-> -		if (!smmu) {
-> -			ret = -ENOENT;
-> -			goto out_remove_dev;
-> -		}
-> -
-> -		smmu_group = kzalloc(sizeof(*smmu_group), GFP_KERNEL);
-> -		if (!smmu_group) {
-> -			ret = -ENOMEM;
-> -			goto out_remove_dev;
-> -		}
-> -
-> -		smmu_group->ste.valid	= true;
-> -		smmu_group->smmu	= smmu;
-> -		iommu_group_set_iommudata(group, smmu_group,
-> -					  __arm_smmu_release_pci_iommudata);
-> +	/*
-> +	 * We _can_ actually withstand dodgy bus code re-calling add_device()
-> +	 * without an intervening remove_device()/of_xlate() sequence, but
-> +	 * we're not going to do so quietly...
-> +	 */
-> +	if (WARN_ON_ONCE(fwspec->iommu_priv)) {
-> +		master = fwspec->iommu_priv;
-> +		smmu = master->smmu;
->  	} else {
-> -		smmu = smmu_group->smmu;
-> +		smmu = arm_smmu_get_by_node(fwspec->iommu_np);
-> +		if (!smmu)
-> +			return -ENODEV;
-> +		master = kzalloc(sizeof(*master), GFP_KERNEL);
-> +		if (!master)
-> +			return -ENOMEM;
-> +
-> +		master->smmu = smmu;
-> +		fwspec->iommu_priv = master;
-
-It's probably best to initialise master->ste.bypass = true here, to
-reflect the initial state of STEs. Otherwise attach_dev always calls
-detach_dev first for nothing.
-
-Apart from that, this version works fine with my twisted setup. Note
-that we might have to add a master->fwspec reference in the future, to
-access those SIDs from various places. If I understood correctly, it
-should be fine as those objects have the same lifetime after the
-add_device call.
-
-Thanks,
-Jean-Philippe
+OK, great. For the record, I'm going to send U-Boot patches today that 
+apply this binding patch (the original one I sent, unmodified) to the 
+U-Boot tree, and implement it in the U-Boot driver.
