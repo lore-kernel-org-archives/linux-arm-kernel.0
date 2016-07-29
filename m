@@ -1,49 +1,61 @@
 From: bibby.hsieh@mediatek.com (Bibby Hsieh)
-Date: Fri, 29 Jul 2016 17:04:11 +0800
-Subject: [PATCH 4/7] drm/mediatek: Use drm_atomic destroy_state helpers
+Date: Fri, 29 Jul 2016 17:04:14 +0800
+Subject: [PATCH 7/7] drm/mediatek: Fix mtk_atomic_complete for runtime_pm
 In-Reply-To: <1469783054-54567-1-git-send-email-bibby.hsieh@mediatek.com>
 References: <1469783054-54567-1-git-send-email-bibby.hsieh@mediatek.com>
-Message-ID: <1469783054-54567-5-git-send-email-bibby.hsieh@mediatek.com>
+Message-ID: <1469783054-54567-8-git-send-email-bibby.hsieh@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the core destroy_state helpers to destroy core state to ensure we don't
-leak if/when more fields get added later.
+To properly implement atomic w/ runtime pm, we move
+drm_atomic_helper_commit_modeset_enables() above
+drm_atomic_helper_commit_planes() to ensure CRTCs are enabled before
+modifying plane registers, and set active_only to true to filter out
+plane update notifications when the CRTC is disabled.
 
-Signed-off-by: Daniel Kurtz <djkurtz@chromium.org>
+According to the document from linux kernel:
+Set the active_only parameters to true in order not to receive plane
+update notifications related to a disabled CRTC. This avoids the need
+to manually ignore plane updates in driver code when the driver and/or
+hardware can't or just don't need to deal with updates on disabled
+CRTCs, for example when supporting runtime PM.
+
 Signed-off-by: Bibby Hsieh <bibby.hsieh@mediatek.com>
+Signed-off-by: Daniel Kurtz <djkurtz@chromium.org>
 ---
- drivers/gpu/drm/mediatek/mtk_drm_crtc.c  |    3 +--
- drivers/gpu/drm/mediatek/mtk_drm_plane.c |    3 +--
- 2 files changed, 2 insertions(+), 4 deletions(-)
+ drivers/gpu/drm/mediatek/mtk_drm_drv.c |   17 ++++++++++++++++-
+ 1 file changed, 16 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/gpu/drm/mediatek/mtk_drm_crtc.c b/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
-index d6fbefa..733b2a3 100644
---- a/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
-+++ b/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
-@@ -112,8 +112,7 @@ static void mtk_drm_crtc_reset(struct drm_crtc *crtc)
- 	struct mtk_crtc_state *state;
+diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.c b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
+index b1223d5..507392a 100644
+--- a/drivers/gpu/drm/mediatek/mtk_drm_drv.c
++++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
+@@ -61,10 +61,25 @@ static void mtk_atomic_complete(struct mtk_drm_private *private,
  
- 	if (crtc->state) {
--		if (crtc->state->mode_blob)
--			drm_property_unreference_blob(crtc->state->mode_blob);
-+		__drm_atomic_helper_crtc_destroy_state(crtc->state);
+ 	mtk_atomic_wait_for_fences(state);
  
- 		state = to_mtk_crtc_state(crtc->state);
- 		memset(state, 0, sizeof(*state));
-diff --git a/drivers/gpu/drm/mediatek/mtk_drm_plane.c b/drivers/gpu/drm/mediatek/mtk_drm_plane.c
-index 86b7aed..17172ba 100644
---- a/drivers/gpu/drm/mediatek/mtk_drm_plane.c
-+++ b/drivers/gpu/drm/mediatek/mtk_drm_plane.c
-@@ -73,8 +73,7 @@ static void mtk_plane_reset(struct drm_plane *plane)
- 	struct mtk_plane_state *state;
- 
- 	if (plane->state) {
--		if (plane->state->fb)
--			drm_framebuffer_unreference(plane->state->fb);
-+		__drm_atomic_helper_plane_destroy_state(plane->state);
- 
- 		state = to_mtk_plane_state(plane->state);
- 		memset(state, 0, sizeof(*state));
++	/*
++	 * Mediatek drm supports runtime PM, so plane registers cannot be
++	 * written when their crtc is disabled.
++	 *
++	 * The comment for drm_atomic_helper_commit states:
++	 *     For drivers supporting runtime PM the recommended sequence is
++	 *
++	 *     drm_atomic_helper_commit_modeset_disables(dev, state);
++	 *     drm_atomic_helper_commit_modeset_enables(dev, state);
++	 *     drm_atomic_helper_commit_planes(dev, state, true);
++	 *
++	 * See the kerneldoc entries for these three functions for more details.
++	 */
+ 	drm_atomic_helper_commit_modeset_disables(drm, state);
+-	drm_atomic_helper_commit_planes(drm, state, false);
+ 	drm_atomic_helper_commit_modeset_enables(drm, state);
++	drm_atomic_helper_commit_planes(drm, state, true);
++
+ 	drm_atomic_helper_wait_for_vblanks(drm, state);
++
+ 	drm_atomic_helper_cleanup_planes(drm, state);
+ 	drm_atomic_state_free(state);
+ }
 -- 
 1.7.9.5
