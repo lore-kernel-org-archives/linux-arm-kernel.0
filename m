@@ -1,142 +1,41 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 29 Jul 2016 19:55:33 +0100
-Subject: [PATCH v4 6/8] iommu/arm-smmu: Implement of_xlate() for SMMUv3
-In-Reply-To: <20160729144655.GA3359@e106794-lin.localdomain>
-References: <cover.1467388950.git.robin.murphy@arm.com>
- <925b054b1e96dc83c0b1dc9607785d0346187366.1467388950.git.robin.murphy@arm.com>
- <20160729144655.GA3359@e106794-lin.localdomain>
-Message-ID: <1d570682-d815-657e-2119-b706e0034e2c@arm.com>
+From: michael.weiser@gmx.de (Michael Weiser)
+Date: Fri, 29 Jul 2016 20:55:38 +0200
+Subject: [PATCH 3/3] ARM: sunxi: enable big-endian
+In-Reply-To: <20160729163907.GD6215@lukather>
+References: <20160721182329.13478-1-michael.weiser@gmx.de>
+ <20160721182329.13478-4-michael.weiser@gmx.de>
+ <20160722090101.GB7687@lukather>
+ <20160722135658.GA18977@weiser.dinsnail.net>
+ <20160725122522.GL7419@lukather>
+ <20160726192609.GA27782@weiser.dinsnail.net>
+ <CAGb2v67O5vrqN4m3rZVBGA+ee1bg2iTxiggNJF+t5Lszd=mW=A@mail.gmail.com>
+ <20160729075923.GE415@weiser.dinsnail.net>
+ <20160729163907.GD6215@lukather>
+Message-ID: <20160729185538.GA7042@weiser.dinsnail.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/07/16 15:46, Jean-Philippe Brucker wrote:
-> Hi Robin,
-> 
-> Very sorry about the delay, I forgot about this minor comment, below
-> 
-> On Fri, Jul 01, 2016 at 05:50:15PM +0100, Robin Murphy wrote:
->> Now that we can properly describe the mapping between PCI RIDs and
->> stream IDs via "iommu-map", and have it fed it to the driver
->> automatically via of_xlate(), rework the SMMUv3 driver to benefit from
->> that, and get rid of the current misuse of the "iommus" binding.
->>
->> Since having of_xlate wired up means that masters will now be given the
->> appropriate DMA ops, we also need to make sure that default domains work
->> properly. This necessitates dispensing with the "whole group at a time"
->> notion for attaching to a domain, as devices which share a group get
->> attached to the group's default domain one by one as they are initially
->> probed.
->>
->> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
->> ---
->>
->> v4: Add explicit device probe in of_init callback.
->>
->>  drivers/iommu/arm-smmu-v3.c | 278 +++++++++++++++++++-------------------------
->>  1 file changed, 121 insertions(+), 157 deletions(-)
->>
->> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
->> index 94b68213c50d..fb438664b9f0 100644
->> --- a/drivers/iommu/arm-smmu-v3.c
->> +++ b/drivers/iommu/arm-smmu-v3.c
-> [...]
->> @@ -1800,94 +1752,74 @@ static bool arm_smmu_sid_in_range(struct arm_smmu_device *smmu, u32 sid)
->>  	return sid < limit;
->>  }
->>  
->> +static struct iommu_ops arm_smmu_ops;
->> +
->>  static int arm_smmu_add_device(struct device *dev)
->>  {
->>  	int i, ret;
->> -	u32 sid, *sids;
->> -	struct pci_dev *pdev;
->> -	struct iommu_group *group;
->> -	struct arm_smmu_group *smmu_group;
->>  	struct arm_smmu_device *smmu;
->> +	struct arm_smmu_master_data *master;
->> +	struct iommu_fwspec *fwspec = dev_iommu_fwspec(dev);
->> +	struct iommu_group *group;
->>  
->> -	/* We only support PCI, for now */
->> -	if (!dev_is_pci(dev))
->> +	if (!fwspec || fwspec->iommu_ops != &arm_smmu_ops)
->>  		return -ENODEV;
->> -
->> -	pdev = to_pci_dev(dev);
->> -	group = iommu_group_get_for_dev(dev);
->> -	if (IS_ERR(group))
->> -		return PTR_ERR(group);
->> -
->> -	smmu_group = iommu_group_get_iommudata(group);
->> -	if (!smmu_group) {
->> -		smmu = arm_smmu_get_for_pci_dev(pdev);
->> -		if (!smmu) {
->> -			ret = -ENOENT;
->> -			goto out_remove_dev;
->> -		}
->> -
->> -		smmu_group = kzalloc(sizeof(*smmu_group), GFP_KERNEL);
->> -		if (!smmu_group) {
->> -			ret = -ENOMEM;
->> -			goto out_remove_dev;
->> -		}
->> -
->> -		smmu_group->ste.valid	= true;
->> -		smmu_group->smmu	= smmu;
->> -		iommu_group_set_iommudata(group, smmu_group,
->> -					  __arm_smmu_release_pci_iommudata);
->> +	/*
->> +	 * We _can_ actually withstand dodgy bus code re-calling add_device()
->> +	 * without an intervening remove_device()/of_xlate() sequence, but
->> +	 * we're not going to do so quietly...
->> +	 */
->> +	if (WARN_ON_ONCE(fwspec->iommu_priv)) {
->> +		master = fwspec->iommu_priv;
->> +		smmu = master->smmu;
->>  	} else {
->> -		smmu = smmu_group->smmu;
->> +		smmu = arm_smmu_get_by_node(fwspec->iommu_np);
->> +		if (!smmu)
->> +			return -ENODEV;
->> +		master = kzalloc(sizeof(*master), GFP_KERNEL);
->> +		if (!master)
->> +			return -ENOMEM;
->> +
->> +		master->smmu = smmu;
->> +		fwspec->iommu_priv = master;
-> 
-> It's probably best to initialise master->ste.bypass = true here, to
-> reflect the initial state of STEs. Otherwise attach_dev always calls
-> detach_dev first for nothing.
+Hi Maxime,
 
-I'm actually now thinking that that check in attach_dev() should be for
-ste->valid, rather than ste->bypass. That matches the similar check in
-remove_device(), and looking at old local branches I apparently did have
-it that way at some point, and I now can't quite remember why it ended
-up differently. I'll have a proper dig into it next week.
+On Fri, Jul 29, 2016 at 06:39:07PM +0200, Maxime Ripard wrote:
 
-> Apart from that, this version works fine with my twisted setup. Note
-> that we might have to add a master->fwspec reference in the future, to
-> access those SIDs from various places. If I understood correctly, it
-> should be fine as those objects have the same lifetime after the
-> add_device call.
+> > it doesn't seem to accept incoming packets. I suspect that programming
+> > of its own MAC address (which the driver chooses randomly) suffers from
+> > an endianness issue. I'm somewhat stumped as to what is causing it since
+> Maybe a good way to confirm that would be to generate outgoing
+> traffic, dump that and see what the mac address is? If it's not
+> programmed properly, you should see it in the packets.
 
-That sounds reasonable, although I can't think offhand where we might
-have a master_data without having got it via the containing device
-(unless we also add some other means of keeping track of them). Since
-this series doesn't need any kind of reverse-lookup capabilities I'm
-just keeping things as simple as possible for the time being.
+That's what I've done: When trying to ping another machine, with tcpdump
+I see ARP requests coming from the cubieboard with the right MAC and I
+see the target machine sending ARP responses to the right MAC. But I do
+not see them coming in with tcpdump on the cubieboard.
 
-Robin.
+The same process works fine with a little-endian kernel (same .config and
+dtb) and userland, so I'm sure it's an endianess issue somewhere.
 
-> 
-> Thanks,
-> Jean-Philippe
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+I'll do some more comparison of little- and big-endian kernel behaviour
+and dig a bit deeper into the code.
+-- 
+Thanks,
+Michael
