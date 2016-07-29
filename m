@@ -1,137 +1,100 @@
 From: lina.iyer@linaro.org (Lina Iyer)
-Date: Fri, 29 Jul 2016 15:56:20 -0600
-Subject: [PATCH v2 09/14] PM / cpu_domains: Add PM Domain governor for CPUs
+Date: Fri, 29 Jul 2016 15:56:22 -0600
+Subject: [PATCH v2 11/14] drivers: firmware: psci: Allow OS Initiated suspend
+ mode
 In-Reply-To: <1469829385-11511-1-git-send-email-lina.iyer@linaro.org>
 References: <1469829385-11511-1-git-send-email-lina.iyer@linaro.org>
-Message-ID: <1469829385-11511-10-git-send-email-lina.iyer@linaro.org>
+Message-ID: <1469829385-11511-12-git-send-email-lina.iyer@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A PM domain comprising of CPUs may be powered off when all the CPUs in
-the domain are powered down. Powering down a CPU domain is generally a
-expensive operation and therefore the power performance trade offs
-should be considered. The time between the last CPU powering down and
-the first CPU powering up in a domain, is the time available for the
-domain to sleep. Ideally, the sleep time of the domain should fulfill
-the residency requirement of the domains' idle state.
+PSCI firmware v1.0 onwards may support 2 different modes for
+CPU_SUSPEND. Platform coordinated mode is the default and every firmware
+should support it. OS Initiated mode is optional for the firmware to
+implement and allow Linux to make an better decision on the state of
+the CPU cluster heirarchy.
 
-To do this effectively, read the time before the wakeup of the cluster's
-CPUs and ensure that the domain's idle state sleep time guarantees the
-QoS requirements of each of the CPU, the PM QoS CPU_DMA_LATENCY and the
-state's residency.
+With the kernel capable of deciding the state for CPU cluster and
+coherency domains, the OS Initiated mode may now be used by the kernel,
+provided the firmware supports it. SET_SUSPEND_MODE is a PSCI function
+available on v1.0 onwards and can be used to set the mode in the
+firmware.
 
+Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
 Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+[Ulf: Rebased on 4.7 rc1]
+Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
- drivers/base/power/cpu_domains.c | 80 +++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 79 insertions(+), 1 deletion(-)
+ drivers/firmware/psci.c   | 22 +++++++++++++++++++++-
+ include/uapi/linux/psci.h |  5 +++++
+ 2 files changed, 26 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/base/power/cpu_domains.c b/drivers/base/power/cpu_domains.c
-index f80b308..089c8d6 100644
---- a/drivers/base/power/cpu_domains.c
-+++ b/drivers/base/power/cpu_domains.c
-@@ -17,9 +17,12 @@
- #include <linux/list.h>
- #include <linux/of.h>
- #include <linux/pm_domain.h>
-+#include <linux/pm_qos.h>
-+#include <linux/pm_runtime.h>
- #include <linux/rculist.h>
- #include <linux/rcupdate.h>
- #include <linux/slab.h>
-+#include <linux/tick.h>
+diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
+index 03e0458..3920aba 100644
+--- a/drivers/firmware/psci.c
++++ b/drivers/firmware/psci.c
+@@ -52,6 +52,7 @@
+  * require cooperation with a Trusted OS driver.
+  */
+ static int resident_cpu = -1;
++static bool psci_has_osi_pd;
  
- #define CPU_PD_NAME_MAX 36
- 
-@@ -52,6 +55,81 @@ struct cpu_pm_domain *to_cpu_pd(struct generic_pm_domain *d)
- 	return res;
+ bool psci_tos_resident_on(int cpu)
+ {
+@@ -563,10 +564,29 @@ out_put_node:
+ 	return err;
  }
  
-+static bool cpu_pd_down_ok(struct dev_pm_domain *pd)
++static int __init psci_1_0_init(struct device_node *np)
 +{
-+	struct generic_pm_domain *genpd = pd_to_genpd(pd);
-+	struct cpu_pm_domain *cpu_pd = to_cpu_pd(genpd);
-+	int qos_ns = pm_qos_request(PM_QOS_CPU_DMA_LATENCY);
-+	u64 sleep_ns;
-+	ktime_t earliest, next_wakeup;
-+	int cpu;
-+	int i;
++	int ret;
 +
-+	/* Reset the last set genpd state, default to index 0 */
-+	genpd->state_idx = 0;
++	ret = psci_0_2_init(np);
++	if (ret)
++		return ret;
 +
-+	/* We don't want to power down, if QoS is 0 */
-+	if (!qos_ns)
-+		return false;
-+
-+	/*
-+	 * Find the sleep time for the cluster.
-+	 * The time between now and the first wake up of any CPU that
-+	 * are in this domain hierarchy is the time available for the
-+	 * domain to be idle.
-+	 *
-+	 * We only care about the next wakeup for any online CPU in that
-+	 * cluster. Hotplug off any of the CPUs that we care about will
-+	 * wait on the genpd lock, until we are done. Any other CPU hotplug
-+	 * is not of consequence to our sleep time.
-+	 */
-+	earliest = ktime_set(KTIME_SEC_MAX, 0);
-+	for_each_cpu_and(cpu, cpu_pd->cpus, cpu_online_mask) {
-+		next_wakeup = tick_nohz_get_next_wakeup(cpu);
-+		if (earliest.tv64 > next_wakeup.tv64)
-+			earliest = next_wakeup;
++	/* Check if PSCI OSI mode is available */
++	ret = psci_features(psci_function_id[PSCI_FN_CPU_SUSPEND]);
++	if (ret & PSCI_1_0_OS_INITIATED) {
++		ret = psci_features(PSCI_1_0_FN_SET_SUSPEND_MODE);
++		if (!ret)
++			psci_has_osi_pd = true;
 +	}
 +
-+	sleep_ns = ktime_to_ns(ktime_sub(earliest, ktime_get()));
-+	if (sleep_ns <= 0)
-+		return false;
-+
-+	/*
-+	 * Find the deepest sleep state that satisfies the residency
-+	 * requirement and the QoS constraint
-+	 */
-+	for (i = genpd->state_count - 1; i >= 0; i--) {
-+		u64 state_sleep_ns;
-+
-+		state_sleep_ns = genpd->states[i].power_off_latency_ns +
-+			genpd->states[i].power_on_latency_ns +
-+			genpd->states[i].residency_ns;
-+
-+		/*
-+		 * If we can't sleep to save power in the state, move on
-+		 * to the next lower idle state.
-+		 */
-+		if (state_sleep_ns > sleep_ns)
-+			continue;
-+
-+		/*
-+		 * We also don't want to sleep more than we should to
-+		 * gaurantee QoS.
-+		 */
-+		if (state_sleep_ns < (qos_ns * NSEC_PER_USEC))
-+			break;
-+	}
-+
-+	if (i >= 0)
-+		genpd->state_idx = i;
-+
-+	return (i >= 0);
++	return 0;
 +}
 +
-+static struct dev_power_governor cpu_pd_gov = {
-+	.power_down_ok = cpu_pd_down_ok,
-+};
-+
- static int cpu_pd_attach_cpu(struct cpu_pm_domain *cpu_pd, int cpu)
- {
- 	int ret;
-@@ -166,7 +244,7 @@ static struct generic_pm_domain *of_init_cpu_pm_domain(struct device_node *dn,
+ static const struct of_device_id psci_of_match[] __initconst = {
+ 	{ .compatible = "arm,psci",	.data = psci_0_1_init},
+ 	{ .compatible = "arm,psci-0.2",	.data = psci_0_2_init},
+-	{ .compatible = "arm,psci-1.0",	.data = psci_0_2_init},
++	{ .compatible = "arm,psci-1.0",	.data = psci_1_0_init},
+ 	{},
+ };
  
- 	/* Register the CPU genpd */
- 	pr_debug("adding %s as CPU PM domain\n", pd->genpd->name);
--	ret = pm_genpd_init(pd->genpd, &simple_qos_governor, false);
-+	ret = pm_genpd_init(pd->genpd, &cpu_pd_gov, false);
- 	if (ret) {
- 		pr_err("Unable to initialize domain %s\n", dn->full_name);
- 		goto fail;
+diff --git a/include/uapi/linux/psci.h b/include/uapi/linux/psci.h
+index 3d7a0fc..7dd778e 100644
+--- a/include/uapi/linux/psci.h
++++ b/include/uapi/linux/psci.h
+@@ -48,6 +48,7 @@
+ 
+ #define PSCI_1_0_FN_PSCI_FEATURES		PSCI_0_2_FN(10)
+ #define PSCI_1_0_FN_SYSTEM_SUSPEND		PSCI_0_2_FN(14)
++#define PSCI_1_0_FN_SET_SUSPEND_MODE		PSCI_0_2_FN(15)
+ 
+ #define PSCI_1_0_FN64_SYSTEM_SUSPEND		PSCI_0_2_FN64(14)
+ 
+@@ -93,6 +94,10 @@
+ #define PSCI_1_0_FEATURES_CPU_SUSPEND_PF_MASK	\
+ 			(0x1 << PSCI_1_0_FEATURES_CPU_SUSPEND_PF_SHIFT)
+ 
++#define PSCI_1_0_OS_INITIATED			BIT(0)
++#define PSCI_1_0_SUSPEND_MODE_PC		0
++#define PSCI_1_0_SUSPEND_MODE_OSI		1
++
+ /* PSCI return values (inclusive of all PSCI versions) */
+ #define PSCI_RET_SUCCESS			0
+ #define PSCI_RET_NOT_SUPPORTED			-1
 -- 
 2.7.4
