@@ -1,153 +1,76 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 29 Jul 2016 15:16:25 -0500
-Subject: [PATCH v2] reset: uniphier: add reset controller drivers for
- UniPhier SoCs
-In-Reply-To: <1469557209-13089-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1469557209-13089-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <20160729201625.GA4308@rob-hp-laptop>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 29 Jul 2016 22:22:47 +0200
+Subject: [PATCH v3 00/13] sunxi spi fixes
+In-Reply-To: <CAOMqctQybJoOfUHGtpmpB_koQ=iY+GpQ_BOL2o0QBbwC_HXC0g@mail.gmail.com>
+References: <cover.1465490774.git.hramrach@gmail.com>
+ <20160613195716.GD9354@lukather>
+ <CAOMqctS6ZQ3_a97sE2e7H34ZCny2aDE38V1tQA=-SBZwF2sbDQ@mail.gmail.com>
+ <20160725073204.GD7419@lukather>
+ <CAOMqctQybJoOfUHGtpmpB_koQ=iY+GpQ_BOL2o0QBbwC_HXC0g@mail.gmail.com>
+Message-ID: <20160729202247.GJ6215@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 27, 2016 at 03:20:08AM +0900, Masahiro Yamada wrote:
-> This is the initial commit for UniPhier reset controller drivers.
+On Mon, Jul 25, 2016 at 10:03:14AM +0200, Michal Suchanek wrote:
+> Hello,
 > 
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-> ---
+> On 25 July 2016 at 09:32, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > On Fri, Jun 17, 2016 at 12:34:44PM +0200, Michal Suchanek wrote:
+> >> Hello,
+> >>
+> >> On 13 June 2016 at 21:57, Maxime Ripard
+> >> <maxime.ripard@free-electrons.com> wrote:
+> >> > On Mon, Jun 13, 2016 at 05:46:48PM -0000, Michal Suchanek wrote:
+> >> >> Hello,
+> >> >>
+> >> >> This is update of the sunxi spi patches that should give full-featured SPI
+> >> >> driver.
+> >> >>
+> >> >> First three patches fix issues with the current driver and can be of use for
+> >> >> stable kernels so adding cc for those.
+> >> >>
+> >> >> I merged the sun4i and sun6i driver because there several issues that need to
+> >> >> be fixed in both separately and they are even out of sync wrt some fixes.
+> >> >> I guess some of the merge patches can be squashed.
+> >> >>
+> >> >> I tested this with A10s Olinuxino Micro. I have no sun6i device so I cannot
+> >> >> tell if that side was broken by this patchset - especially the last patch that
+> >> >> adds DMA was afaik never tested on sun6i.
+> >> >
+> >> >
+> >> > For the record, I'm still very much opposed to such a merge.
+> >>
+> >> What is the reason against the merge? I did not find the original
+> >> discussion.
+> >
+> > I really prefer some code that is concise and clear but a little
+> > duplicated over some code that shares every possible lines of code but
+> > is a giant mess impossible to understand.
 > 
-> Changes in v2 (mostly suggested by Philipp Zabel):
->   - Unify multiple module_platform_driver() boilerplates into one
->   - Unify tiny driver code and decrease the number of files
->   - Invert the logic of .deassert_val, changing it into .assert_val
->   - Show error code when failed to get regmap
->   - Add a binding document
->   - Support more reset signals
+> Yes, it's been tried. In the case of this driver there is more duplication
+> than differences. Also bitrot due to different variants receiving different
+> updates and fixes crept in already.
 > 
->  .../devicetree/bindings/reset/uniphier-reset.txt   |  99 ++++++++
->  MAINTAINERS                                        |   1 +
->  drivers/reset/Kconfig                              |   1 +
->  drivers/reset/Makefile                             |   1 +
->  drivers/reset/uniphier/Kconfig                     |   9 +
->  drivers/reset/uniphier/Makefile                    |   5 +
->  drivers/reset/uniphier/reset-uniphier-core.c       | 270 +++++++++++++++++++++
->  drivers/reset/uniphier/reset-uniphier-mio.c        |  55 +++++
->  drivers/reset/uniphier/reset-uniphier-peri.c       |  55 +++++
->  drivers/reset/uniphier/reset-uniphier-sys.c        |  77 ++++++
->  drivers/reset/uniphier/reset-uniphier.h            |  57 +++++
->  11 files changed, 630 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/reset/uniphier-reset.txt
->  create mode 100644 drivers/reset/uniphier/Kconfig
->  create mode 100644 drivers/reset/uniphier/Makefile
->  create mode 100644 drivers/reset/uniphier/reset-uniphier-core.c
->  create mode 100644 drivers/reset/uniphier/reset-uniphier-mio.c
->  create mode 100644 drivers/reset/uniphier/reset-uniphier-peri.c
->  create mode 100644 drivers/reset/uniphier/reset-uniphier-sys.c
->  create mode 100644 drivers/reset/uniphier/reset-uniphier.h
-> 
-> diff --git a/Documentation/devicetree/bindings/reset/uniphier-reset.txt b/Documentation/devicetree/bindings/reset/uniphier-reset.txt
-> new file mode 100644
-> index 0000000..c2fb0d0
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/reset/uniphier-reset.txt
-> @@ -0,0 +1,99 @@
-> +UniPhier reset controller
-> +
-> +
-> +System reset
-> +------------
-> +
-> +Required properties:
-> +- compatible: should be one of the following:
-> +    "socionext,uniphier-sld3-reset" - for PH1-sLD3 SoC.
-> +    "socionext,uniphier-ld4-reset"  - for PH1-LD4 SoC.
-> +    "socionext,uniphier-pro4-reset" - for PH1-Pro4 SoC.
-> +    "socionext,uniphier-sld8-reset" - for PH1-sLD8 SoC.
-> +    "socionext,uniphier-pro5-reset" - for PH1-Pro5 SoC.
-> +    "socionext,uniphier-pxs2-reset" - for ProXstream2/PH1-LD6b SoC.
-> +    "socionext,uniphier-ld11-reset" - for PH1-LD11 SoC.
-> +    "socionext,uniphier-ld20-reset" - for PH1-LD20 SoC.
-> +- #reset-cells: should be 1.
-> +
-> +Note:
-> +The reset node should be a child of a syscon node.
-> +
-> +Example:
-> +
-> +	sysctrl at 61840000 {
-> +		compatible = "simple-mfd", "syscon";
+> Adding the remap layer certainly does not make the driver easier to
+> understand but it's not becoming giant mess either.
 
-This needs a specific compatible string.
+Well, when you say that you're not quite fond of using your structure
+all over the place because "it makes your eyes bleed", I wouldn't call
+that a good sales pitch.
 
-> +		reg = <0x61840000 0x4000>;
-> +
-> +		reset {
-> +			compatible = "socionext,uniphier-ld20-reset";
-> +			#reset-cells = <1>;
-> +		};
-> +
-> +		other nodes ...
-> +	};
-> +
-> +
-> +Media I/O (MIO) reset
-> +---------------------
-> +
-> +Required properties:
-> +- compatible: should be one of the following:
-> +    "socionext,uniphier-sld3-mio-reset" - for PH1-sLD3 SoC.
-> +    "socionext,uniphier-ld4-mio-reset"  - for PH1-LD4 SoC.
-> +    "socionext,uniphier-pro4-mio-reset" - for PH1-Pro4 SoC.
-> +    "socionext,uniphier-sld8-mio-reset" - for PH1-sLD8 SoC.
-> +    "socionext,uniphier-pro5-mio-reset" - for PH1-Pro5 SoC.
-> +    "socionext,uniphier-pxs2-mio-reset" - for ProXstream2/PH1-LD6b SoC.
-> +    "socionext,uniphier-ld11-mio-reset" - for PH1-LD11 SoC.
-> +    "socionext,uniphier-ld20-mio-reset" - for PH1-LD20 SoC.
-> +- #reset-cells: should be 1.
-> +
-> +Note:
-> +The reset node should be a child of a syscon node.
-> +
-> +Example:
-> +
-> +	mioctrl at 59810000 {
-> +		compatible = "simple-mfd", "syscon";
-> +		reg = <0x59810000 0x800>;
-> +
-> +		reset {
-> +			compatible = "socionext,uniphier-ld20-mio-reset";
-> +			#reset-cells = <1>;
-> +		};
-> +
-> +		other nodes ...
-> +	};
-> +
-> +
-> +Peripheral reset
-> +----------------
-> +
-> +Required properties:
-> +- compatible: should be one of the following:
-> +    "socionext,uniphier-ld4-peri-reset"  - for PH1-LD4 SoC.
-> +    "socionext,uniphier-pro4-peri-reset" - for PH1-Pro4 SoC.
-> +    "socionext,uniphier-sld8-peri-reset" - for PH1-sLD8 SoC.
-> +    "socionext,uniphier-pro5-peri-reset" - for PH1-Pro5 SoC.
-> +    "socionext,uniphier-pxs2-peri-reset" - for ProXstream2/PH1-LD6b SoC.
-> +    "socionext,uniphier-ld11-peri-reset" - for PH1-LD11 SoC.
-> +    "socionext,uniphier-ld20-peri-reset" - for PH1-LD20 SoC.
-> +- #reset-cells: should be 1.
-> +
-> +Note:
-> +The reset node should be a child of a syscon node.
-> +
-> +Example:
-> +
-> +	perictrl at 59820000 {
-> +		compatible = "simple-mfd", "syscon";
-> +		reg = <0x59820000 0x200>;
-> +
-> +		reset {
-> +			compatible = "socionext,uniphier-ld20-peri-reset";
-> +			#reset-cells = <1>;
-> +		};
-> +
-> +		other nodes ...
-> +	};
+But again, reg_field seems like a good solution for that.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160729/3298104f/attachment.sig>
