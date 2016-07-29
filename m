@@ -1,48 +1,77 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 29 Jul 2016 11:06:53 +0100
-Subject: [PATCH v5 0/6] Add support for privileged mappings
-In-Reply-To: <20160727234208.2101-1-mitchelh@codeaurora.org>
-References: <20160727234208.2101-1-mitchelh@codeaurora.org>
-Message-ID: <20160729100653.GC16593@arm.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Fri, 29 Jul 2016 11:12:02 +0100
+Subject: [PATCH v2 1/5] ethernet: add sun8i-emac driver
+In-Reply-To: <20160725195455.GQ7419@lukather>
+References: <1469001800-11615-1-git-send-email-clabbe.montjoie@gmail.com>
+ <1469001800-11615-2-git-send-email-clabbe.montjoie@gmail.com>
+ <20160725195455.GQ7419@lukather>
+Message-ID: <0dbea4a5-6f76-5dc2-6745-dccea31072ef@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 27, 2016 at 04:42:02PM -0700, Mitchel Humpherys wrote:
-> The following patch to the ARM SMMU driver:
-> 
->     commit d346180e70b91b3d5a1ae7e5603e65593d4622bc
->     Author: Robin Murphy <robin.murphy@arm.com>
->     Date:   Tue Jan 26 18:06:34 2016 +0000
->     
->         iommu/arm-smmu: Treat all device transactions as unprivileged
-> 
-> started forcing all SMMU transactions to come through as "unprivileged".
-> The rationale given was that:
-> 
->   (1) There is no way in the IOMMU API to even request privileged mappings.
-> 
->   (2) It's difficult to implement a DMA mapper that correctly models the
->       ARM VMSAv8 behavior of unprivileged-writeable =>
->       privileged-execute-never.
-> 
-> This series rectifies (1) by introducing an IOMMU API for privileged
-> mappings and implements it in io-pgtable-arm.
-> 
-> This series rectifies (2) by introducing a new dma attribute
-> (DMA_ATTR_PRIVILEGED) for users of the DMA API that need privileged
-> mappings which are inaccessible to lesser-privileged execution levels, and
-> implements it in the arm64 IOMMU DMA mapper.  The one known user (pl330.c)
-> is converted over to the new attribute.
-> 
-> Jordan and Jeremy can provide more info on the use case if needed, but the
-> high level is that it's a security feature to prevent attacks such as [1].
-> 
-> Joerg, the v3 series was previously acked by Will [2].  He also recommended
-> that we take all of this through your tree since it's touching multiple
-> subsystems [3].  Can you please take a look?  Thanks!
+Hi,
 
-You forgot to add my ack to the patches, so if you need it again:
+On 25/07/16 20:54, Maxime Ripard wrote:
+> On Wed, Jul 20, 2016 at 10:03:16AM +0200, LABBE Corentin wrote:
+>> This patch add support for sun8i-emac ethernet MAC hardware.
+>> It could be found in Allwinner H3/A83T/A64 SoCs.
+>>
+>> It supports 10/100/1000 Mbit/s speed with half/full duplex.
+>> It can use an internal PHY (MII 10/100) or an external PHY
+>> via RGMII/RMII.
+>>
+>> Signed-off-by: LABBE Corentin <clabbe.montjoie@gmail.com>
+>> ---
+>>  drivers/net/ethernet/allwinner/Kconfig      |   13 +
+>>  drivers/net/ethernet/allwinner/Makefile     |    1 +
+>>  drivers/net/ethernet/allwinner/sun8i-emac.c | 2129 +++++++++++++++++++++++++++
+>>  3 files changed, 2143 insertions(+)
+>>  create mode 100644 drivers/net/ethernet/allwinner/sun8i-emac.c
 
-Acked-by: Will Deacon <will.deacon@arm.com>
+...
 
-Will
+>> diff --git a/drivers/net/ethernet/allwinner/sun8i-emac.c b/drivers/net/ethernet/allwinner/sun8i-emac.c
+>> new file mode 100644
+>> index 0000000..fc0c1dd
+>> --- /dev/null
+>> +++ b/drivers/net/ethernet/allwinner/sun8i-emac.c
+
+...
+
+>> +
+>> +/* struct dma_desc - Structure of DMA descriptor used by the hardware
+>> + * @status: Status of the frame written by HW, so RO for the
+>> + *	driver (except for BIT(31) which is R/W)
+>> + * @ctl: Information on the frame written by the driver (INT, len,...)
+>> + * @buf_addr: physical address of the frame data
+>> + * @next: physical address of next dma_desc
+>> + */
+>> +struct dma_desc {
+>> +	u32 status;
+>> +	u32 ctl;
+>> +	u32 buf_addr;
+>> +	u32 next;
+>> +};
+> 
+> You should use the endian-aware variants here.
+
+For the records: just doing the sparse annotation with __le32 here will
+of course not be sufficient to make it work on BE kernels. I added
+proper endianness conversion to all accesses to the descriptors and got
+it to work with an arm64 big-endian kernel on the Pine64.
+
+I put a patch here:
+https://gist.github.com/apritzel/bc792c4dbbd8789f5f18aef538e8c440
+
+This particular version is untested (though it compiles), since I just
+adapted the working patch against the newer driver code and couldn't
+test it yet.
+I am not really an endianness expert, so don't know if there are smarter
+ways to tackle this, if we should for instance provide access wrappers
+to the DMA descriptor fields.
+
+I will try to test this later today, if that works, feel free to merge
+those changes into your driver.
+
+Cheers,
+Andre.
