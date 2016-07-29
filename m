@@ -1,41 +1,50 @@
-From: michael.weiser@gmx.de (Michael Weiser)
-Date: Fri, 29 Jul 2016 20:55:38 +0200
-Subject: [PATCH 3/3] ARM: sunxi: enable big-endian
-In-Reply-To: <20160729163907.GD6215@lukather>
-References: <20160721182329.13478-1-michael.weiser@gmx.de>
- <20160721182329.13478-4-michael.weiser@gmx.de>
- <20160722090101.GB7687@lukather>
- <20160722135658.GA18977@weiser.dinsnail.net>
- <20160725122522.GL7419@lukather>
- <20160726192609.GA27782@weiser.dinsnail.net>
- <CAGb2v67O5vrqN4m3rZVBGA+ee1bg2iTxiggNJF+t5Lszd=mW=A@mail.gmail.com>
- <20160729075923.GE415@weiser.dinsnail.net>
- <20160729163907.GD6215@lukather>
-Message-ID: <20160729185538.GA7042@weiser.dinsnail.net>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Fri, 29 Jul 2016 15:05:02 -0400
+Subject: [PATCH v10 7/7] ACPI : enable ACPI_PROCESSOR_IDLE on ARM64
+In-Reply-To: <1468950779-21745-8-git-send-email-sudeep.holla@arm.com>
+References: <1468950779-21745-1-git-send-email-sudeep.holla@arm.com>
+ <1468950779-21745-8-git-send-email-sudeep.holla@arm.com>
+Message-ID: <579BA8DE.3050802@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+Hi Sudeep,
 
-On Fri, Jul 29, 2016 at 06:39:07PM +0200, Maxime Ripard wrote:
+On 07/19/2016 01:52 PM, Sudeep Holla wrote:
+> Now that ACPI processor idle driver supports LPI(Low Power Idle), lets
+> enable ACPI_PROCESSOR_IDLE for ARM64 too.
+> 
+> This patch just removes the IA64 and X86 dependency on ACPI_PROCESSOR_IDLE
+> 
+> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+> ---
+>  drivers/acpi/Kconfig | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
+> index 1358fb7d7a68..d74275c0f374 100644
+> --- a/drivers/acpi/Kconfig
+> +++ b/drivers/acpi/Kconfig
+> @@ -238,7 +238,7 @@ config ACPI_CPPC_LIB
+>  config ACPI_PROCESSOR
+>  	tristate "Processor"
+>  	depends on X86 || IA64 || ARM64
+> -	select ACPI_PROCESSOR_IDLE if X86 || IA64
+> +	select ACPI_PROCESSOR_IDLE
+>  	select ACPI_CPU_FREQ_PSS if X86 || IA64
+>  	default y
+>  	help
+> 
 
-> > it doesn't seem to accept incoming packets. I suspect that programming
-> > of its own MAC address (which the driver chooses randomly) suffers from
-> > an endianness issue. I'm somewhat stumped as to what is causing it since
-> Maybe a good way to confirm that would be to generate outgoing
-> traffic, dump that and see what the mac address is? If it's not
-> programmed properly, you should see it in the packets.
+This causes a boot hang on QDF2432. cpuidle.off=1 works around the
+problem. I understand you're working on a fix to the problem in GICv3
+code. If there's anything I can do to help, please let me know.
 
-That's what I've done: When trying to ping another machine, with tcpdump
-I see ARP requests coming from the cubieboard with the right MAC and I
-see the target machine sending ARP responses to the right MAC. But I do
-not see them coming in with tcpdump on the cubieboard.
-
-The same process works fine with a little-endian kernel (same .config and
-dtb) and userland, so I'm sure it's an endianess issue somewhere.
-
-I'll do some more comparison of little- and big-endian kernel behaviour
-and dig a bit deeper into the code.
--- 
 Thanks,
-Michael
+Christopher Covington
+
+-- 
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
+Technologies, Inc. Qualcomm Technologies, Inc. is a member of the Code
+Aurora Forum, a Linux Foundation Collaborative Project.
