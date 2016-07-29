@@ -1,164 +1,89 @@
-From: wxt@rock-chips.com (Caesar Wang)
-Date: Sat, 30 Jul 2016 07:21:45 +0800
-Subject: [PATCH v3 1/4] iio: adc: rockchip_saradc: reset saradc controller
- before programming it
-In-Reply-To: <alpine.DEB.2.02.1607271642110.22647@pmeerw.net>
-References: <1469629447-544-1-git-send-email-wxt@rock-chips.com>
- <alpine.DEB.2.02.1607271642110.22647@pmeerw.net>
-Message-ID: <579BE509.8010104@rock-chips.com>
+From: briannorris@chromium.org (Brian Norris)
+Date: Fri, 29 Jul 2016 16:39:51 -0700
+Subject: [PATCH] arm64: dts: rockchip: add spiX aliases for rk3399
+In-Reply-To: <3484113.eKHnDqRbfE@diego>
+References: <1468545873-134339-1-git-send-email-briannorris@chromium.org>
+ <20160719192912.GA142821@google.com> <1841177.NDa9D09EGz@diego>
+ <3484113.eKHnDqRbfE@diego>
+Message-ID: <20160729233950.GA102046@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
++ Mark
 
-On 2016?07?27? 22:47, Peter Meerwald-Stadler wrote:
->> SARADC controller needs to be reset before programming it, otherwise
->> it will not function properly.
-> nitpicking on wording below
->   
->> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
->> Cc: Jonathan Cameron <jic23@kernel.org>
->> Cc: Heiko Stuebner <heiko@sntech.de>
->> Cc: Rob Herring <robh+dt@kernel.org>
->> Cc: linux-iio at vger.kernel.org
->> Cc: linux-rockchip at lists.infradead.org
->> Tested-by: Guenter Roeck <linux@roeck-us.net>
->>
->> ---
->>
->> Changes in v3:
->> - %s/devm_reset_control_get_optional()/devm_reset_control_get()
->> - add Guente's test tag.
->>
->> Changes in v2:
->> - Make the reset as an optional property, since it should work
->> with old devicetrees as well.
->>
->>   .../bindings/iio/adc/rockchip-saradc.txt           |  7 +++++
->>   drivers/iio/adc/Kconfig                            |  1 +
->>   drivers/iio/adc/rockchip_saradc.c                  | 30 ++++++++++++++++++++++
->>   3 files changed, 38 insertions(+)
->>
->> diff --git a/Documentation/devicetree/bindings/iio/adc/rockchip-saradc.txt b/Documentation/devicetree/bindings/iio/adc/rockchip-saradc.txt
->> index bf99e2f..205593f 100644
->> --- a/Documentation/devicetree/bindings/iio/adc/rockchip-saradc.txt
->> +++ b/Documentation/devicetree/bindings/iio/adc/rockchip-saradc.txt
->> @@ -16,6 +16,11 @@ Required properties:
->>   - vref-supply: The regulator supply ADC reference voltage.
->>   - #io-channel-cells: Should be 1, see ../iio-bindings.txt
->>   
->> +Optional properties:
->> +- resets: Must contain an entry for each entry in reset-names if need support
->> +	  this option. See ../reset/reset.txt for details.
-> '... if need support this option.' doesn't sound right, maybe
-> simply: '... if needed.' or drop this clause.
+On Wed, Jul 20, 2016 at 10:11:11AM +0200, Heiko Stuebner wrote:
+> Am Mittwoch, 20. Juli 2016, 00:18:40 schrieb Heiko St?bner:
+> > Am Dienstag, 19. Juli 2016, 12:29:14 schrieb Brian Norris:
+> > > On Tue, Jul 19, 2016 at 12:27:54PM -0700, Brian Norris wrote:
+> > > > On Tue, Jul 19, 2016 at 08:56:47PM +0200, Heiko Stuebner wrote:
+> > > > > Am Dienstag, 19. Juli 2016, 08:39:55 schrieb Uwe Kleine-K?nig:
+> > > > > > > --- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+> > > > > > > +++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+> > > > > > > @@ -70,6 +70,12 @@
+> > > > > > > 
+> > > > > > >  		serial2 = &uart2;
+> > > > > > >  		serial3 = &uart3;
+> > > > > > >  		serial4 = &uart4;
+> > > > > > > 
+> > > > > > > +		spi0 = &spi0;
+> > > > > > > +		spi1 = &spi1;
+> > > > > > > +		spi2 = &spi2;
+> > > > > > > +		spi3 = &spi3;
+> > > > > > > +		spi4 = &spi4;
+> > > > > > > +		spi5 = &spi5;
+> > > > > > 
+> > > > > > Note that Rob Herring (with his dt-maintainer hat on) doesn't like
+> > > > > > these
+> > > > > > aliases.
+> > > > > > 
+> > > > > > See for example:
+> > > > > > 	http://mid.gmane.org/20160705140546.GA10601 at rob-hp-laptop
+> > > > 
+> > > > But why? I believe half the arguments in the linked thread were
+> > > > Catch-22's -- there were no "mainline" users (which is a false target
+> > > > IMO anyway, as Christer Weinigel mentioned somewhere in the thread Rob
+> > > > linked), and so we couldn't accept more documentation (or users) for the
+> > > > feature. FWIW, my quick grep now shows there are currently 43 mainline
+> > > > users.
+> > > > 
+> > > > This feature is very useful. Some of the thread Rob pointed to argued
+> > > > that the indexing isn't HW documentation; in this case, it most
+> > > > certainly is. The RK3399 TRM explicitly has these SPI buses named SPI0,
+> > > > SPI1, SPI2, SPI3, SPI4, and SPI5, and schematics that I've seen use the
+> > > > same terminology. It is therefore *much* nicer to have my device show up
+> > > > as 'spi2.0' (reflecting their correct HW name) rather than spi32764.0.
+> > > > Sometimes I can't even get as far as mounting sysfs to check what this
+> > > > maps to, but having spi2.0 in the kernel log can clearly tell me what
+> > > > device is causing problems.
+> > > > 
+> > > > If Rob can support a better alternative solution, I'd be happy to
+> > > > switch. But I don't understand why we can't use a useful (not just to
+> > > > me, but presumably to at least 43 other independent users, and many
+> > > > more out of tree), existing, and long-supported feature here.
+> > 
+> > Personally, I don't have any real opinion on this but the argument sounds
+> > plausible to me (aka they are named with numbers in every manual,
+> > schematics) so it might be helpful to have that around - similar to i2c
+> > that is in the dtsi already.
+> > 
+> > I think I remember Doug having a similar discussion around mmc-aliases some
+> > time ago - that met opposition as well [0] - although I guess the numbering
+> > was a bit more arbitary there.
+> > 
+> > I guess we'll just see what Rob says.
+> 
+> Uwe pointed me to a very similar discussion and response from Rob about spi 
+> aliases at:
+> https://lkml.org/lkml/2016/5/25/566
 
-I don't plan to resend this series patches.
-I'm assuming that Jonathan will help me fix it when ready to apply it.:-)
+I had read that already. I figured that was just rationale for not
+documenting the feature (still silly IMO), and not for avoiding using
+the existing feature.
 
-Glad to resend this series patches if Jonathan boss ask me to do.
+What is this "label" feature Rob speaks of? Does it exist in practice
+(AFAICT the answer is "no")? The description doesn't seem terrible,
+depending on the implementation. Would that become the actual device
+name (i.e., dev_name(dev))? Or just a filesystem symlink? And how does
+one assign such a label?
 
-Thanks,
-
-Caesar
-
->
->> +- reset-names: Must include the name "saradc-apb".
->> +
->>   Example:
->>   	saradc: saradc at 2006c000 {
->>   		compatible = "rockchip,saradc";
->> @@ -23,6 +28,8 @@ Example:
->>   		interrupts = <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>;
->>   		clocks = <&cru SCLK_SARADC>, <&cru PCLK_SARADC>;
->>   		clock-names = "saradc", "apb_pclk";
->> +		resets = <&cru SRST_SARADC>;
->> +		reset-names = "saradc-apb";
->>   		#io-channel-cells = <1>;
->>   		vref-supply = <&vcc18>;
->>   	};
->> diff --git a/drivers/iio/adc/Kconfig b/drivers/iio/adc/Kconfig
->> index 1de31bd..7675772 100644
->> --- a/drivers/iio/adc/Kconfig
->> +++ b/drivers/iio/adc/Kconfig
->> @@ -389,6 +389,7 @@ config QCOM_SPMI_VADC
->>   config ROCKCHIP_SARADC
->>   	tristate "Rockchip SARADC driver"
->>   	depends on ARCH_ROCKCHIP || (ARM && COMPILE_TEST)
->> +	depends on RESET_CONTROLLER
->>   	help
->>   	  Say yes here to build support for the SARADC found in SoCs from
->>   	  Rockchip.
->> diff --git a/drivers/iio/adc/rockchip_saradc.c b/drivers/iio/adc/rockchip_saradc.c
->> index f9ad6c2..85d7012 100644
->> --- a/drivers/iio/adc/rockchip_saradc.c
->> +++ b/drivers/iio/adc/rockchip_saradc.c
->> @@ -21,6 +21,8 @@
->>   #include <linux/of_device.h>
->>   #include <linux/clk.h>
->>   #include <linux/completion.h>
->> +#include <linux/delay.h>
->> +#include <linux/reset.h>
->>   #include <linux/regulator/consumer.h>
->>   #include <linux/iio/iio.h>
->>   
->> @@ -53,6 +55,7 @@ struct rockchip_saradc {
->>   	struct clk		*clk;
->>   	struct completion	completion;
->>   	struct regulator	*vref;
->> +	struct reset_control	*reset;
->>   	const struct rockchip_saradc_data *data;
->>   	u16			last_val;
->>   };
->> @@ -190,6 +193,16 @@ static const struct of_device_id rockchip_saradc_match[] = {
->>   };
->>   MODULE_DEVICE_TABLE(of, rockchip_saradc_match);
->>   
->> +/**
->> + * Reset SARADC Controller.
->> + */
->> +static void rockchip_saradc_reset_controller(struct reset_control *reset)
->> +{
->> +	reset_control_assert(reset);
->> +	usleep_range(10, 20);
->> +	reset_control_deassert(reset);
->> +}
->> +
->>   static int rockchip_saradc_probe(struct platform_device *pdev)
->>   {
->>   	struct rockchip_saradc *info = NULL;
->> @@ -218,6 +231,20 @@ static int rockchip_saradc_probe(struct platform_device *pdev)
->>   	if (IS_ERR(info->regs))
->>   		return PTR_ERR(info->regs);
->>   
->> +	/*
->> +	 * The reset should be an optional property, as it should work
->> +	 * with old devicetrees as well
->> +	 */
->> +	info->reset = devm_reset_control_get(&pdev->dev, "saradc-apb");
->> +	if (IS_ERR(info->reset)) {
->> +		ret = PTR_ERR(info->reset);
->> +		if (ret != -ENOENT)
->> +			return ret;
->> +
->> +		dev_dbg(&pdev->dev, "no reset control found\n");
->> +		info->reset = NULL;
->> +	}
->> +
->>   	init_completion(&info->completion);
->>   
->>   	irq = platform_get_irq(pdev, 0);
->> @@ -252,6 +279,9 @@ static int rockchip_saradc_probe(struct platform_device *pdev)
->>   		return PTR_ERR(info->vref);
->>   	}
->>   
->> +	if (info->reset)
->> +		rockchip_saradc_reset_controller(info->reset);
->> +
->>   	/*
->>   	 * Use a default value for the converter clock.
->>   	 * This may become user-configurable in the future.
->>
-
-
--- 
-caesar wang | software engineer | wxt at rock-chip.com
+Brian
