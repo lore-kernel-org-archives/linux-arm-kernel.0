@@ -1,24 +1,40 @@
-From: vijaykumar@zilogic.com (Vijay Kumar B.)
-Date: Fri, 29 Jul 2016 15:14:22 +0530
-Subject: Contributing to PXA2xx pinctrl Driver
-In-Reply-To: <20160729091932.GB1041@n2100.armlinux.org.uk>
-References: <579B1E0F.9040601@zilogic.com>
- <20160729091932.GB1041@n2100.armlinux.org.uk>
-Message-ID: <579B2576.4020609@zilogic.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Fri, 29 Jul 2016 11:53:10 +0200
+Subject: [PATCH v4] arm64: dts: mt8173: add mmsel clocks for 4K support
+In-Reply-To: <1469783388-56804-1-git-send-email-bibby.hsieh@mediatek.com>
+References: <1469783388-56804-1-git-send-email-bibby.hsieh@mediatek.com>
+Message-ID: <1469785990.3012.35.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 29 July 2016 02:49 PM, Russell King - ARM Linux wrote:
-> On Fri, Jul 29, 2016 at 02:42:47PM +0530, Vijay Kumar B. wrote:
->> Hi Everyone,
->> I am looking at the pinctrl driver for drivers/pinctrl/pxa/pxa2xx.c. The
->> driver in mainline git and pxa2xx git (rjarzmik/linux on github) seems to
->> write to allocated memory rather than to registers.
-> Please explain why you think that.
->
+Hi Bibby,
 
-OK, I was wrong. I misread the purpose of the allocations done in the 
-init() function. Sorry for the trouble.
+Am Freitag, den 29.07.2016, 17:09 +0800 schrieb Bibby Hsieh:
+> To support HDMI 4K resolution, mmsys need clcok
+> mm_sel to be 400MHz.
+> 
+> The board .dts file should override the clock rate
+> property with the higher VENCPLL frequency the board
+> supports HDMI 4K resolution.
+> 
+> Signed-off-by: Bibby Hsieh <bibby.hsieh@mediatek.com>
+> ---
+>  arch/arm64/boot/dts/mediatek/mt8173.dtsi |    2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> index 78529e4..93d4d17 100644
+> --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> @@ -690,6 +690,8 @@
+>  			compatible = "mediatek,mt8173-mmsys", "syscon";
+>  			reg = <0 0x14000000 0 0x1000>;
+>  			power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
+> +			clocks = <&topckgen CLK_TOP_MM_SEL>;
+> +			clock-frequency  = <400000000>;
 
-Regards,
-Vijay
+This is unchanged compared to v3, I suggest to use assigned-clocks /
+assigned-clock-rates properties instead.
+
+best regards
+Philipp
