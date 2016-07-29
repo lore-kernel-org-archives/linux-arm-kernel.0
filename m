@@ -1,119 +1,100 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 29 Jul 2016 15:48:31 +0200
-Subject: [PATCH 2/3] dt-bindings: allow child nodes inside the Tegra BPMP
-In-Reply-To: <6db4ff47-974b-94ac-3739-e630b6d38c0e@wwwdotorg.org>
-References: <20160719191442.15439-1-swarren@wwwdotorg.org>
- <20160719191442.15439-2-swarren@wwwdotorg.org>
- <20160726100302.GE2433@ulmo.ba.sec>
- <f1ca284a-5332-3323-80b9-7cf61e7c97ac@wwwdotorg.org>
- <CAL_JsqLfs5jnO9DkP5io5qbuCfhojfspkHQbHBttgWfTeokYkQ@mail.gmail.com>
- <6db4ff47-974b-94ac-3739-e630b6d38c0e@wwwdotorg.org>
-Message-ID: <20160729134831.GA3864@ulmo.ba.sec>
+Date: Fri, 29 Jul 2016 16:24:27 +0200
+Subject: [PATCH 2/2] dt-bindings: add simple-panel-dsi and simple-panel
+In-Reply-To: <CAL_JsqL8D3OK_JQcY+dLTcqcvmgB2Vuc0Tknf1zsR=8Pa3F4jw@mail.gmail.com>
+References: <1468984730-23186-1-git-send-email-mark.yao@rock-chips.com>
+ <1468984730-23186-2-git-send-email-mark.yao@rock-chips.com>
+ <20160725152125.GS21170@ulmo.ba.sec>
+ <5796C47C.5040208@rock-chips.com>
+ <20160726090226.GB2433@ulmo.ba.sec>
+ <CAL_JsqL8D3OK_JQcY+dLTcqcvmgB2Vuc0Tknf1zsR=8Pa3F4jw@mail.gmail.com>
+Message-ID: <20160729142427.GB3864@ulmo.ba.sec>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 28, 2016 at 03:24:22PM -0600, Stephen Warren wrote:
-> On 07/28/2016 01:07 PM, Rob Herring wrote:
-> > On Tue, Jul 26, 2016 at 11:21 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> > > On 07/26/2016 04:03 AM, Thierry Reding wrote:
-> > > > 
-> > > > On Tue, Jul 19, 2016 at 01:14:41PM -0600, Stephen Warren wrote:
-> > > > > 
-> > > > > From: Stephen Warren <swarren@nvidia.com>
-> > > > > 
-> > > > > The BPMP implements some services which must be represented by separate
-> > > > > nodes. For example, it can provide access to certain I2C controllers, and
-> > > > > the I2C bindings represent each I2C controller as a device tree node.
-> > > > > Update the binding to describe how the BPMP supports this.
-> > > > > 
-> > > > > Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> > > > > ---
-> > > > >  .../bindings/firmware/nvidia,tegra186-bpmp.txt     | 23
-> > > > > ++++++++++++++++++++++
-> > > > >  1 file changed, 23 insertions(+)
-> > > > > 
-> > > > > diff --git
-> > > > > a/Documentation/devicetree/bindings/firmware/nvidia,tegra186-bpmp.txt
-> > > > > b/Documentation/devicetree/bindings/firmware/nvidia,tegra186-bpmp.txt
-> > > > > index 9a3864f56955..142d363406f6 100644
-> > > > > --- a/Documentation/devicetree/bindings/firmware/nvidia,tegra186-bpmp.txt
-> > > > > +++ b/Documentation/devicetree/bindings/firmware/nvidia,tegra186-bpmp.txt
-> > > > > @@ -38,6 +38,24 @@ implemented by this node:
-> > > > >  - .../reset/reset.txt
-> > > > >  - <dt-bindings/reset/tegra186-reset.h>
-> > > > > 
-> > > > > +The BPMP implements some services which must be represented by separate
-> > > > > nodes.
-> > > > > +For example, it can provide access to certain I2C controllers, and the
-> > > > > I2C
-> > > > > +bindings represent each I2C controller as a device tree node. Such nodes
-> > > > > should
-> > > > > +be nested directly inside the main BPMP node.
-> > > > > +
-> > > > > +Software can determine whether a child node of the BPMP node represents
-> > > > > a device
-> > > > > +by checking for a compatible property. Any node with a compatible
-> > > > > property
-> > > > > +represents a device that can be instantiated. Nodes without a compatible
-> > > > > +property may be used to provide configuration information regarding the
-> > > > > BPMP
-> > > > > +itself, although no such configuration nodes are currently defined by
-> > > > > this
-> > > > > +binding.
-> > > > > +
-> > > > > +The BPMP firmware defines no single global name-/numbering-space for
-> > > > > such
-> > > > > +services. Put another way, the numbering scheme for I2C buses is
-> > > > > distinct from
-> > > > > +the numbering scheme for any other service the BPMP may provide (e.g. a
-> > > > > future
-> > > > > +hypothetical SPI bus service). As such, child device nodes will have no
-> > > > > reg
-> > > > > +property, and the BPMP node will have no #address-cells or #size-cells
-> > > > > property.
-> > > > 
-> > > > 
-> > > > My understanding is that the I2C bus number is passed as part of the
-> > > > request to the BPMP firmware. Does that not count as addressing? Could
-> > > > we not represent that generically using a device tree hierarchy? I'm
-> > > > thinking something along these lines:
-> > > > 
-> > > >         bpmp {
-> > > >                 ...
-> > > > 
-> > > >                 services {
-> > > >                         i2c {
-> > > >                                 i2c at 0 {
-> > > >                                         reg = <0>;
-> > > 
-> > > 
-> > > Technically, that is possible. However, Rob Herring rejected the idea of
-> > > multiple levels of sub-nodes.
-> > 
-> > I think I questioned the need, not rejected. What about the above, but
-> > remove serivces level:
-> > 
-> >          bpmp {
-> >                  ...
-> > 
-> >                  i2c {
-> >                          i2c at 0 {
-> >                                  reg = <0>;
+On Thu, Jul 28, 2016 at 02:00:21PM -0500, Rob Herring wrote:
+> On Tue, Jul 26, 2016 at 4:02 AM, Thierry Reding
+> <thierry.reding@gmail.com> wrote:
+> > On Tue, Jul 26, 2016 at 10:01:32AM +0800, Mark yao wrote:
+> >> On 2016?07?25? 23:21, Thierry Reding wrote:
+> >>
+> >>     On Wed, Jul 20, 2016 at 11:18:50AM +0800, Mark Yao wrote:
+> >>
+> >>         Allow user add display timing on device tree with simple-panel-dsi
+> >>         or simple-panel.
+> >>
+> >>         Cc: Thierry Reding <thierry.reding@gmail.com>
+> >>         Cc: Rob Herring <robh+dt@kernel.org>
+> >>         Cc: Mark Rutland <mark.rutland@arm.com>
+> >>
+> >>         Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
+> >>         ---
+> >>          .../bindings/display/panel/simple-panel.txt        | 48 ++++++++++++++++++++++
+> >>          1 file changed, 48 insertions(+)
+> >>
+> >>     Sorry, not going to happen. Read this for an explanation of why not:
+> >>
+> >>             https://sietch-tagr.blogspot.de/2016/04/display-panels-are-not-special.html
+> >>
+> >>     Thierry
+> >>
+> >>
+> >> Hi Thierry
+> >>
+> >> The blog actually not persuade me why can't use display timing on
+> >> device tree.
+> >
+> > Okay, perhaps read it again, it addresses most of your points below.
+> >
+> >> 1, Binding panel as a simple string on device tree seems simple on device tree,
+> >> but it's complex on kernel code, and kernel code would became bigger and
+> >> bigger.
+> >
+> > I don't think the video timings in the simple-panel driver are very
+> > complex. They also don't use very much space. And if you're really
+> > concerned about space you can always use conditional compilation and
+> > Kconfig symbols to remove timings for panels that you don't use.
+> >
+> > Also, panels are characterized by much more than just video timings.
+> > There were attempts, way back, to fully describe panels in device tree
+> > and that failed. What you propose here is a partial solution to a much
+> > more complex problem.
+> >
+> > This is all explained in the blog post.
 > 
-> Sigh. Can you please talk to Thierry and work out what the binding would be
-> (perhaps on IRC to expedite things?) and I'll just implement whatever you
-> two agree upon. I don't really care much what the binding looks like any
-> more; I just need something that will pass review. Thanks.
+> While I agree with everything Thierry has said in this thread, there
+> is an argument to be made for timing information in DT.
+> 
+> Maybe most vendors have now learned that flexible clock frequencies
+> are needed to generate the correct timings, but I have worked on parts
+> without fine resolution (i.e. a dedicated pll). Even HiKey with HDMI
+> suffers from this. In that case you can be tuning the timings
+> (increasing the h and/or v blanks) to get the desired refresh rates.
+> So in that case, the panel compatible would not determine the display
+> timings and you could have the same panel with different timings on
+> different boards. That's maybe rare enough that putting timing info in
+> DT still wouldn't make sense.
 
-Like I said, I'm fine going with what you proposed. I'm sure by now the
-BPMP has long been frozen and if the proposed binding works fine that's
-good. No need to over-engineer.
+There's another mechanism, though not very popular (possibly because it
+is indeed a very rare usecase), that we introduced a while ago. The idea
+is that we don't specify the mode per panel, as we do now, but rather a
+range of values that are valid for the various video timing parameters.
+These set can usually be copied from some datasheet and are represented
+by (minimum, typical, maximum) triplets. So drivers for display hardware
+would query the timings in this way, try to establish a working mode
+from the typical values and tweak as necessary by adjusting the values
+within the limits given by (minimum, maximum).
 
-If we ever need more than one I2C (or expose other busses) I'm sure we
-can find a way to switch to something like the above later on. Like I
-said, that's very unlikely to happen on Tegra186, so we'll have a new
-compatible string (and hence an easy way to differentiate between these
-bindings) anyway.
+One disadvantage of this is that it becomes somewhat more complicated to
+write the display driver, but I think that's an easy problem to solve by
+adding some common helpers (I'm thinking one that takes as input the
+target clock frequency and the timing ranges and outputs a mode with the
+porches adjusted to match the target clock frequency as closely as
+possible).
+
+The big advantage is, of course, that device trees become trivial to
+write and people don't have to manually stitch together timings to get
+to the desired result.
 
 Thierry
 -------------- next part --------------
@@ -122,4 +103,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160729/1209e25e/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160729/fd6558a0/attachment-0001.sig>
