@@ -1,47 +1,34 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 29 Jul 2016 10:06:35 +0100
-Subject: [PATCH] arm64: vmlinux.lds: make __rela_offset and
- __dynsym_offset ABSOLUTE
-In-Reply-To: <1469715314-23260-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1469715314-23260-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20160729090634.GA16593@arm.com>
+From: bibby.hsieh@mediatek.com (Bibby Hsieh)
+Date: Fri, 29 Jul 2016 17:09:48 +0800
+Subject: [PATCH v4] arm64: dts: mt8173: add mmsel clocks for 4K support
+Message-ID: <1469783388-56804-1-git-send-email-bibby.hsieh@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard,
+To support HDMI 4K resolution, mmsys need clcok
+mm_sel to be 400MHz.
 
-On Thu, Jul 28, 2016 at 04:15:14PM +0200, Ard Biesheuvel wrote:
-> Due to the untyped KIMAGE_VADDR constant, the linker may not notice
-> that the __rela_offset and __dynsym_offset expressions are absolute
-> values (i.e., are not subject to relocation). This does not matter for
-> KASLR, but it does confuse kallsyms in relative mode, since it uses
-> the lowest non-absolute symbol address as the anchor point, and expects
-> all other symbol addresses to be within 4 GB of it.
-> 
-> Fix this by qualifying these expressions as ABSOLUTE() explicitly.
-> 
-> Fixes: 0cd3defe0af4 ("arm64: kernel: perform relocation processing from ID map")
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  arch/arm64/kernel/vmlinux.lds.S | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
-> index 89d6e177ecbd..d49492179967 100644
-> --- a/arch/arm64/kernel/vmlinux.lds.S
-> +++ b/arch/arm64/kernel/vmlinux.lds.S
-> @@ -184,9 +184,9 @@ SECTIONS
->  		*(.hash)
->  	}
->  
-> -	__rela_offset	= ADDR(.rela) - KIMAGE_VADDR;
-> +	__rela_offset	= ABSOLUTE(ADDR(.rela) - KIMAGE_VADDR);
->  	__rela_size	= SIZEOF(.rela);
-> -	__dynsym_offset	= ADDR(.dynsym) - KIMAGE_VADDR;
-> +	__dynsym_offset	= ABSOLUTE(ADDR(.dynsym) - KIMAGE_VADDR);
+The board .dts file should override the clock rate
+property with the higher VENCPLL frequency the board
+supports HDMI 4K resolution.
 
-You removed the __dynsym_offset entry entirely in "arm64: relocatable:
-suppress R_AARCH64_ABS64 relocations in vmlinux", so I'll drop this part
-of the patch and assume you'll do a separate backport for stable. Ok?
+Signed-off-by: Bibby Hsieh <bibby.hsieh@mediatek.com>
+---
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi |    2 ++
+ 1 file changed, 2 insertions(+)
 
-Will
+diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+index 78529e4..93d4d17 100644
+--- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
++++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+@@ -690,6 +690,8 @@
+ 			compatible = "mediatek,mt8173-mmsys", "syscon";
+ 			reg = <0 0x14000000 0 0x1000>;
+ 			power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
++			clocks = <&topckgen CLK_TOP_MM_SEL>;
++			clock-frequency  = <400000000>;
+ 			#clock-cells = <1>;
+ 		};
+ 
+-- 
+1.7.9.5
