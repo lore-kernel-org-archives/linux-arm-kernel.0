@@ -1,66 +1,39 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 29 Jul 2016 20:12:32 +0200
-Subject: [PATCH v2 3/5] ARM: sun8i: dt: Add DT bindings documentation for
- Allwinner sun8i-emac
-In-Reply-To: <20160729081519.GA31878@Red>
-References: <1469001800-11615-1-git-send-email-clabbe.montjoie@gmail.com>
- <1469001800-11615-4-git-send-email-clabbe.montjoie@gmail.com>
- <20160721075519.GC5993@lukather> <20160728134031.GC7582@Red>
- <20160728184916.GF6682@lukather> <20160729081519.GA31878@Red>
-Message-ID: <20160729181232.GF6215@lukather>
+From: cmetcalf@mellanox.com (Chris Metcalf)
+Date: Fri, 29 Jul 2016 14:16:07 -0400
+Subject: [PATCH]: arm64: factor work_pending state machine to C
+In-Reply-To: <20160711121953.GH31221@leverpostej>
+References: <1459877922-15512-1-git-send-email-cmetcalf@mellanox.com>
+ <1459877922-15512-13-git-send-email-cmetcalf@mellanox.com>
+ <e19d6de0-c754-d53b-3420-16d460a4cb33@mellanox.com>
+ <20160708154901.GF6493@arm.com> <20160711114237.GE17735@arm.com>
+ <20160711121953.GH31221@leverpostej>
+Message-ID: <b2af2833-3e4f-10a9-f568-9f19efc9186f@mellanox.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 29, 2016 at 10:15:19AM +0200, LABBE Corentin wrote:
-> > > > > +See ethernet.txt in the same directory for generic bindings for ethernet
-> > > > > +controllers.
-> > > > > +
-> > > > > +The device node referenced by "phy" or "phy-handle" should be a child node
-> > > > > +of this node. See phy.txt for the generic PHY bindings.
-> > > > > +
-> > > > > +Optional properties:
-> > > > > +- phy-supply: phandle to a regulator if the PHY needs one
-> > > > > +- phy-io-supply: phandle to a regulator if the PHY needs a another one for I/O.
-> > > > > +		 This is sometimes found with RGMII PHYs, which use a second
-> > > > > +		 regulator for the lower I/O voltage.
-> > > > > +- allwinner,tx-delay: The setting of the TX clock delay chain
-> > > > > +- allwinner,rx-delay: The setting of the RX clock delay chain
-> > > > 
-> > > > In which unit? What is the default value?
-> > > 
-> > > The unit is unknown to me, but I have added a comment for the
-> > > default and acceptable range value.
-> > 
-> > That's unfortunate. We'll see how the DT maintainers feel about that.
-> > 
-> 
-> I have searched for txdelay in Documentation, and found a few driver
-> that give the units (us/ps).
->
-> But in that case, the value in ps/us must be found in a table
-> indexed by the Xxdelay value.
->
-> So the settings seems always a raw number, and for sun8i-emac
-> nothing in user manual could help to find what each value is/related
-> to.
-> 
-> So the good value is either found by "try and test" or "copy the
-> value found in fex file".
+On 7/11/2016 8:19 AM, Mark Rutland wrote:
+> On Mon, Jul 11, 2016 at 12:42:37PM +0100, Will Deacon wrote:
+>> On Fri, Jul 08, 2016 at 04:49:01PM +0100, Will Deacon wrote:
+>>> On Fri, Jul 08, 2016 at 11:43:50AM -0400, Chris Metcalf wrote:
+>>>> I am hopeful that this patch [1] can be picked up for the 4.8 merge window
+>>>> in the arm64 tree.  As I mentioned in my last patch series that included
+>>>> this patch [2], I'm hopeful that this version addresses the performance
+>>>> issues that were seen with Mark's original patch.  This version tests the
+>>>> TIF flags prior to calling out to the loop in C code.
+>>> I still need to get round to measuring that again. This might also
+>>> conflict with a late fix I just sent for 4.7.
+>> FWIW, I've failed to measure any performance overhead from this change,
+>> so it certainly looks better thsn Mark's original patch from that angle.
+> FWIW, likewise, with perf bench sched atop of v4.7-rc6.
 
-What I meant was that, just like you found out already, most of the
-time the properties should be in absolute units, so that it doesn't
-depend on some clock rate most likely in that case.
+I don't see this commit pushed up as part of what's in 4.8 so far. Any chance
+it's going to go in later in the merge window?  I'm just hoping to trim down the
+task-isolation series by being able to drop this patch from its next iteration... :-)
 
-Maxime
+Thanks!
+
+[1] https://lkml.kernel.org/r/1459877922-15512-13-git-send-email-cmetcalf at mellanox.com
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160729/ab6e7f57/attachment.sig>
+Chris Metcalf, Mellanox Technologies
+http://www.mellanox.com
