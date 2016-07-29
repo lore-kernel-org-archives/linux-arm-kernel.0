@@ -1,37 +1,29 @@
-From: geoff@infradead.org (Geoff Levand)
-Date: Fri, 29 Jul 2016 10:19:55 -0700
-Subject: [PATCH v2 4/4] arm64: Add support for binary image files
-In-Reply-To: <20160729171552.GB478@localhost.localdomain>
-References: <cover.1469559530.git.geoff@infradead.org>
- <f352dcfc827a4cbb3878dd1043877a4154b1bd08.1469559530.git.geoff@infradead.org>
- <20160728040125.GA27150@localhost.localdomain>
- <1469729083.16559.26.camel@infradead.org>
- <20160729033514.GC27150@localhost.localdomain>
- <1469811760.16559.33.camel@infradead.org>
- <20160729171552.GB478@localhost.localdomain>
-Message-ID: <1469812795.16559.42.camel@infradead.org>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 29 Jul 2016 18:23:56 +0100
+Subject: [PATCH v1 1/4] kexec: (bugfix) calc correct end address of
+ memory ranges in device tree
+In-Reply-To: <1469812346.16559.40.camel@infradead.org>
+References: <cover.1468970114.git.geoff@infradead.org>
+ <3562841.ROYbCgkeeq@hactar>
+ <20160727232331.GY1041@n2100.armlinux.org.uk>
+ <1860371.lT9GInp2C3@hactar>
+ <20160729082714.GA1041@n2100.armlinux.org.uk>
+ <1469812346.16559.40.camel@infradead.org>
+Message-ID: <20160729172356.GD1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2016-07-29 at 22:45 +0530, Pratyush Anand wrote:
-> Hi Geoff,
+On Fri, Jul 29, 2016 at 10:12:26AM -0700, Geoff Levand wrote:
+> On Fri, 2016-07-29 at 09:27 +0100, Russell King - ARM Linux wrote:
 > 
-> On 29/07/2016:10:02:40 AM, Geoff Levand wrote:
-> > On Fri, 2016-07-29 at 09:05 +0530, Pratyush Anand wrote:
-> > 
-> > > See kexec/crashdump-elf.c:FUNC()
-> > > We have:
-> > > 223                 phdr->p_vaddr = phys_to_virt(elf_info,
-> > > mstart);
-> > > 
-> > 
-> > These patches don't support kdump.
+> > So, these functions are a mess and need fixing.
 > 
-> OK, so you suggest that I should keep this patch as it is and add -
-> -page-offset
-> in corresponding kdump patch. I can do that, no issue.
+> Since this change isn't really related to arm64 support, I'll
+> drop this patch from my series.
 
-Yes, this is an issue related to kdump, so let's discuss it in that
-context.
+Do you have a case which triggers bugs in this code?
 
--Geoff
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
