@@ -1,22 +1,53 @@
-From: jsun@junsun.net (Jun Sun)
-Date: Fri, 29 Jul 2016 14:30:54 -0700
-Subject: Can cores have different CPU features in a SMP system?
-Message-ID: <CAP5Nno430Jt3Ax2jUPP6ELpVBF-pK0Akxsa8sZ55f8GL7LQt=g@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 29 Jul 2016 16:40:20 -0500
+Subject: [PATCH v3 7/7] doc: bindings: act8945a-charger: Update properties
+In-Reply-To: <1469755528-8413-8-git-send-email-wenyou.yang@atmel.com>
+References: <1469755528-8413-1-git-send-email-wenyou.yang@atmel.com>
+ <1469755528-8413-8-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <20160729214020.GA18140@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-One specific example is that if a phone has two clusters.  Cores in
-one cluster has v8 crypto extension and cores in the other don't.
-Will this work?
+On Fri, Jul 29, 2016 at 09:25:28AM +0800, Wenyou Yang wrote:
+> Due the driver improvements, update the properties,
+>  - Remove "active-semi,check-battery-temperature" property.
+>  - Add the properties, "active-semi,irq_gpio"
+>    and "active-semi,lbo-gpios".
+> 
+> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+> ---
+> 
+> Changes in v3: None
+> Changes in v2: None
+> 
+>  Documentation/devicetree/bindings/power/act8945a-charger.txt | 6 ++++--
+>  1 file changed, 4 insertions(+), 2 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/power/act8945a-charger.txt b/Documentation/devicetree/bindings/power/act8945a-charger.txt
+> index bea254c..d7cf05b 100644
+> --- a/Documentation/devicetree/bindings/power/act8945a-charger.txt
+> +++ b/Documentation/devicetree/bindings/power/act8945a-charger.txt
+> @@ -4,10 +4,12 @@ Required properties:
+>   - compatible: "active-semi,act8945a", please refer to ../mfd/act8945a.txt.
+>   - active-semi,chglev-gpios: charge current level phandle with args
+>     as described in ../gpio/gpio.txt.
+> + - active-semi,irq_gpios: specify the charger interrupt input phanle
+> +   with args as as described in ../gpio/gpio.txt.
 
-My gut feeling is no, since many apps query cpu features at run-time.
-And process can migrate among cores.  If an app starts on a core with
-CE and migrates to another core without CE.  Illegal instruction fault
-will happen.
+As I said in v2, this should be an interrupt property instead.
 
-Just wanna confirm if this is indeed the case.  Surprisingly google
-search did not yield any meaningful answers.
+> + - active-semi,lbo-gpios: specify the low battery voltage detect phandle
+> +   with args as as described in ../gpio/gpio.txt.
 
-Cheers.
+Maybe this one too.
 
-Jun
+>  
+>  Optional properties:
+> - - active-semi,check-battery-temperature: boolean to check the battery
+> -   temperature or not.
+>   - active-semi,input-voltage-threshold-microvolt: unit: mV;
+>     Specifies the charger's input over-voltage threshold value;
+>     The value can be: 6600, 7000, 7500, 8000; default: 6600
+> -- 
+> 2.7.4
+> 
