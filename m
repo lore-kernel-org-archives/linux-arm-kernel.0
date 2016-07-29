@@ -1,39 +1,142 @@
-From: cmetcalf@mellanox.com (Chris Metcalf)
-Date: Fri, 29 Jul 2016 14:16:07 -0400
-Subject: [PATCH]: arm64: factor work_pending state machine to C
-In-Reply-To: <20160711121953.GH31221@leverpostej>
-References: <1459877922-15512-1-git-send-email-cmetcalf@mellanox.com>
- <1459877922-15512-13-git-send-email-cmetcalf@mellanox.com>
- <e19d6de0-c754-d53b-3420-16d460a4cb33@mellanox.com>
- <20160708154901.GF6493@arm.com> <20160711114237.GE17735@arm.com>
- <20160711121953.GH31221@leverpostej>
-Message-ID: <b2af2833-3e4f-10a9-f568-9f19efc9186f@mellanox.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Fri, 29 Jul 2016 19:55:33 +0100
+Subject: [PATCH v4 6/8] iommu/arm-smmu: Implement of_xlate() for SMMUv3
+In-Reply-To: <20160729144655.GA3359@e106794-lin.localdomain>
+References: <cover.1467388950.git.robin.murphy@arm.com>
+ <925b054b1e96dc83c0b1dc9607785d0346187366.1467388950.git.robin.murphy@arm.com>
+ <20160729144655.GA3359@e106794-lin.localdomain>
+Message-ID: <1d570682-d815-657e-2119-b706e0034e2c@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7/11/2016 8:19 AM, Mark Rutland wrote:
-> On Mon, Jul 11, 2016 at 12:42:37PM +0100, Will Deacon wrote:
->> On Fri, Jul 08, 2016 at 04:49:01PM +0100, Will Deacon wrote:
->>> On Fri, Jul 08, 2016 at 11:43:50AM -0400, Chris Metcalf wrote:
->>>> I am hopeful that this patch [1] can be picked up for the 4.8 merge window
->>>> in the arm64 tree.  As I mentioned in my last patch series that included
->>>> this patch [2], I'm hopeful that this version addresses the performance
->>>> issues that were seen with Mark's original patch.  This version tests the
->>>> TIF flags prior to calling out to the loop in C code.
->>> I still need to get round to measuring that again. This might also
->>> conflict with a late fix I just sent for 4.7.
->> FWIW, I've failed to measure any performance overhead from this change,
->> so it certainly looks better thsn Mark's original patch from that angle.
-> FWIW, likewise, with perf bench sched atop of v4.7-rc6.
+On 29/07/16 15:46, Jean-Philippe Brucker wrote:
+> Hi Robin,
+> 
+> Very sorry about the delay, I forgot about this minor comment, below
+> 
+> On Fri, Jul 01, 2016 at 05:50:15PM +0100, Robin Murphy wrote:
+>> Now that we can properly describe the mapping between PCI RIDs and
+>> stream IDs via "iommu-map", and have it fed it to the driver
+>> automatically via of_xlate(), rework the SMMUv3 driver to benefit from
+>> that, and get rid of the current misuse of the "iommus" binding.
+>>
+>> Since having of_xlate wired up means that masters will now be given the
+>> appropriate DMA ops, we also need to make sure that default domains work
+>> properly. This necessitates dispensing with the "whole group at a time"
+>> notion for attaching to a domain, as devices which share a group get
+>> attached to the group's default domain one by one as they are initially
+>> probed.
+>>
+>> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+>> ---
+>>
+>> v4: Add explicit device probe in of_init callback.
+>>
+>>  drivers/iommu/arm-smmu-v3.c | 278 +++++++++++++++++++-------------------------
+>>  1 file changed, 121 insertions(+), 157 deletions(-)
+>>
+>> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+>> index 94b68213c50d..fb438664b9f0 100644
+>> --- a/drivers/iommu/arm-smmu-v3.c
+>> +++ b/drivers/iommu/arm-smmu-v3.c
+> [...]
+>> @@ -1800,94 +1752,74 @@ static bool arm_smmu_sid_in_range(struct arm_smmu_device *smmu, u32 sid)
+>>  	return sid < limit;
+>>  }
+>>  
+>> +static struct iommu_ops arm_smmu_ops;
+>> +
+>>  static int arm_smmu_add_device(struct device *dev)
+>>  {
+>>  	int i, ret;
+>> -	u32 sid, *sids;
+>> -	struct pci_dev *pdev;
+>> -	struct iommu_group *group;
+>> -	struct arm_smmu_group *smmu_group;
+>>  	struct arm_smmu_device *smmu;
+>> +	struct arm_smmu_master_data *master;
+>> +	struct iommu_fwspec *fwspec = dev_iommu_fwspec(dev);
+>> +	struct iommu_group *group;
+>>  
+>> -	/* We only support PCI, for now */
+>> -	if (!dev_is_pci(dev))
+>> +	if (!fwspec || fwspec->iommu_ops != &arm_smmu_ops)
+>>  		return -ENODEV;
+>> -
+>> -	pdev = to_pci_dev(dev);
+>> -	group = iommu_group_get_for_dev(dev);
+>> -	if (IS_ERR(group))
+>> -		return PTR_ERR(group);
+>> -
+>> -	smmu_group = iommu_group_get_iommudata(group);
+>> -	if (!smmu_group) {
+>> -		smmu = arm_smmu_get_for_pci_dev(pdev);
+>> -		if (!smmu) {
+>> -			ret = -ENOENT;
+>> -			goto out_remove_dev;
+>> -		}
+>> -
+>> -		smmu_group = kzalloc(sizeof(*smmu_group), GFP_KERNEL);
+>> -		if (!smmu_group) {
+>> -			ret = -ENOMEM;
+>> -			goto out_remove_dev;
+>> -		}
+>> -
+>> -		smmu_group->ste.valid	= true;
+>> -		smmu_group->smmu	= smmu;
+>> -		iommu_group_set_iommudata(group, smmu_group,
+>> -					  __arm_smmu_release_pci_iommudata);
+>> +	/*
+>> +	 * We _can_ actually withstand dodgy bus code re-calling add_device()
+>> +	 * without an intervening remove_device()/of_xlate() sequence, but
+>> +	 * we're not going to do so quietly...
+>> +	 */
+>> +	if (WARN_ON_ONCE(fwspec->iommu_priv)) {
+>> +		master = fwspec->iommu_priv;
+>> +		smmu = master->smmu;
+>>  	} else {
+>> -		smmu = smmu_group->smmu;
+>> +		smmu = arm_smmu_get_by_node(fwspec->iommu_np);
+>> +		if (!smmu)
+>> +			return -ENODEV;
+>> +		master = kzalloc(sizeof(*master), GFP_KERNEL);
+>> +		if (!master)
+>> +			return -ENOMEM;
+>> +
+>> +		master->smmu = smmu;
+>> +		fwspec->iommu_priv = master;
+> 
+> It's probably best to initialise master->ste.bypass = true here, to
+> reflect the initial state of STEs. Otherwise attach_dev always calls
+> detach_dev first for nothing.
 
-I don't see this commit pushed up as part of what's in 4.8 so far. Any chance
-it's going to go in later in the merge window?  I'm just hoping to trim down the
-task-isolation series by being able to drop this patch from its next iteration... :-)
+I'm actually now thinking that that check in attach_dev() should be for
+ste->valid, rather than ste->bypass. That matches the similar check in
+remove_device(), and looking at old local branches I apparently did have
+it that way at some point, and I now can't quite remember why it ended
+up differently. I'll have a proper dig into it next week.
 
-Thanks!
+> Apart from that, this version works fine with my twisted setup. Note
+> that we might have to add a master->fwspec reference in the future, to
+> access those SIDs from various places. If I understood correctly, it
+> should be fine as those objects have the same lifetime after the
+> add_device call.
 
-[1] https://lkml.kernel.org/r/1459877922-15512-13-git-send-email-cmetcalf at mellanox.com
+That sounds reasonable, although I can't think offhand where we might
+have a master_data without having got it via the containing device
+(unless we also add some other means of keeping track of them). Since
+this series doesn't need any kind of reverse-lookup capabilities I'm
+just keeping things as simple as possible for the time being.
 
--- 
-Chris Metcalf, Mellanox Technologies
-http://www.mellanox.com
+Robin.
+
+> 
+> Thanks,
+> Jean-Philippe
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
