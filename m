@@ -1,45 +1,55 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 29 Jul 2016 11:31:44 +0100
-Subject: [PATCH] clocksource: arm_arch_timer: Support reading clock rate
- from a driver
-In-Reply-To: <20160729101811.GB21580@leverpostej>
-References: <1469784191-3998-1-git-send-email-zajec5@gmail.com>
- <20160729101811.GB21580@leverpostej>
-Message-ID: <579B3090.1070709@arm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 29 Jul 2016 12:46:49 +0200
+Subject: [PATCH] arm64: vmlinux.lds: make __rela_offset and
+ __dynsym_offset ABSOLUTE
+In-Reply-To: <CAKv+Gu-c0sdAb2KgbOv6OwA+PmDJ1biaL592009LXgHgY34X+Q@mail.gmail.com>
+References: <1469715314-23260-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20160729090634.GA16593@arm.com>
+ <CAKv+Gu-c0sdAb2KgbOv6OwA+PmDJ1biaL592009LXgHgY34X+Q@mail.gmail.com>
+Message-ID: <CAKv+Gu-z7=McQqziGqztjhfhavB5qqBdbGmARA6z10q5h+QXdg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/07/16 11:18, Mark Rutland wrote:
-> [adding Marc to Cc]
-> 
-> On Fri, Jul 29, 2016 at 11:23:11AM +0200, Rafa? Mi?ecki wrote:
->> From: Rafa? Mi?ecki <rafal@milecki.pl>
+On 29 July 2016 at 11:30, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> On 29 July 2016 at 11:06, Will Deacon <will.deacon@arm.com> wrote:
+>> Hi Ard,
 >>
->> On some devices using arch code for reading clock rate doesn't work. So
->> far the only option was to specify clock-frequency in a DT. This works
->> only if a clock frequency doesn't have to be calculated on runtime.
+>> On Thu, Jul 28, 2016 at 04:15:14PM +0200, Ard Biesheuvel wrote:
+>>> Due to the untyped KIMAGE_VADDR constant, the linker may not notice
+>>> that the __rela_offset and __dynsym_offset expressions are absolute
+>>> values (i.e., are not subject to relocation). This does not matter for
+>>> KASLR, but it does confuse kallsyms in relative mode, since it uses
+>>> the lowest non-absolute symbol address as the anchor point, and expects
+>>> all other symbol addresses to be within 4 GB of it.
+>>>
+>>> Fix this by qualifying these expressions as ABSOLUTE() explicitly.
+>>>
+>>> Fixes: 0cd3defe0af4 ("arm64: kernel: perform relocation processing from ID map")
+>>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>>> ---
+>>>  arch/arm64/kernel/vmlinux.lds.S | 4 ++--
+>>>  1 file changed, 2 insertions(+), 2 deletions(-)
+>>>
+>>> diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
+>>> index 89d6e177ecbd..d49492179967 100644
+>>> --- a/arch/arm64/kernel/vmlinux.lds.S
+>>> +++ b/arch/arm64/kernel/vmlinux.lds.S
+>>> @@ -184,9 +184,9 @@ SECTIONS
+>>>               *(.hash)
+>>>       }
+>>>
+>>> -     __rela_offset   = ADDR(.rela) - KIMAGE_VADDR;
+>>> +     __rela_offset   = ABSOLUTE(ADDR(.rela) - KIMAGE_VADDR);
+>>>       __rela_size     = SIZEOF(.rela);
+>>> -     __dynsym_offset = ADDR(.dynsym) - KIMAGE_VADDR;
+>>> +     __dynsym_offset = ABSOLUTE(ADDR(.dynsym) - KIMAGE_VADDR);
 >>
->> On BCM53573 SoC (with Cortex-A7) there is ILP clock that needs its own
->> driver. With this change we can query such clocks by using a standard:
->> clocks = <&foo>;
-> 
-> The clock for the architected timer(s) are supposed to be configured
-> before entering Linux. The clock-frequency property is at best a dodgy
-> workaround, and this is even worse.
-> 
-> Please fix your firmware to configure and enabled this clock before
-> entering Linux, and to program CNTFRQ appropriately.
+>> You removed the __dynsym_offset entry entirely in "arm64: relocatable:
+>> suppress R_AARCH64_ABS64 relocations in vmlinux", so I'll drop this part
+>> of the patch and assume you'll do a separate backport for stable. Ok?
+>>
+>
+> If you are ok with fixing up patches manually while applying, could we
+> just reorder them instead?
 
-I'll add that failure to do so breaks other subsystems which do rely on
-CNTFRQ to be correctly programmed *on each CPU* (like KVM and Xen).
-
-Please follow the requirements of the architecture and don't just paper
-over such a bug.
-
-> As this path stands, NAK.
-
-Seconded.
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Actually, this should go into v4.8-late not -stable
