@@ -1,34 +1,34 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 29 Jul 2016 09:31:30 +0900
-Subject: [PATCH v1 0/4] arm64 kexec-tools patches
-In-Reply-To: <1469729354.16559.30.camel@infradead.org>
-References: <cover.1468970114.git.geoff@infradead.org>
- <20160726230526.GD28591@verge.net.au>
- <1469729354.16559.30.camel@infradead.org>
-Message-ID: <20160729003130.GB14228@verge.net.au>
+From: andrew.smirnov@gmail.com (Andrey Smirnov)
+Date: Thu, 28 Jul 2016 17:48:41 -0700
+Subject: [RESEND PATCH 1/2] ARM: cache-l2x0.c: Replace magic numbers
+Message-ID: <1469753322-11407-1-git-send-email-andrew.smirnov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 28, 2016 at 11:09:14AM -0700, Geoff Levand wrote:
-> Hi Simon,
-> 
-> On Wed, 2016-07-27 at 08:05 +0900, Simon Horman wrote:
-> 
-> > There seems to have been quite a bit of discussion of this patchset.
-> > 
-> > I am of a mind to release kexec-tools v2.0.12-rc1 (and thus v2.0.12)
-> > without these changes as the v4.7 kernel is already out and that
-> > is the timing I had in mind for kexec-tools v2.0.12 (the lateness on
-> > my shoulders).
-> > 
-> > The implication is the arm64 patches would likely end up in the v2.0.13
-> > release of kexec-tools which I aim to release around the time of the v4.9
-> > kernel.
-> 
-> OK, this seems reasonable.  Early users can build from your sources
-> once the patches are merged if they need support.
+Replace magic numbers used for L310 Prefetch Control Register
 
-Thanks, I will go ahead with that plan.
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
+---
+ arch/arm/mm/cache-l2x0.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
 
-N.B.: I mixed up the kexec-tools release numbers, they should all be +1.
-It is v2.0.13 that is coming soon and v2.0.14 somewhat latter.
+diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+index 9f9d542..30e2012 100644
+--- a/arch/arm/mm/cache-l2x0.c
++++ b/arch/arm/mm/cache-l2x0.c
+@@ -716,8 +716,10 @@ static void __init l2c310_fixup(void __iomem *base, u32 cache_id,
+ 	    revision < L310_CACHE_ID_RTL_R3P2) {
+ 		u32 val = l2x0_saved_regs.prefetch_ctrl;
+ 		/* I don't think bit23 is required here... but iMX6 does so */
+-		if (val & (BIT(30) | BIT(23))) {
+-			val &= ~(BIT(30) | BIT(23));
++		if (val & (L310_PREFETCH_CTRL_DBL_LINEFILL |
++			   L310_PREFETCH_CTRL_DBL_LINEFILL_INCR)) {
++			val &= ~(L310_PREFETCH_CTRL_DBL_LINEFILL |
++				 L310_PREFETCH_CTRL_DBL_LINEFILL_INCR);
+ 			l2x0_saved_regs.prefetch_ctrl = val;
+ 			errata[n++] = "752271";
+ 		}
+-- 
+2.5.5
