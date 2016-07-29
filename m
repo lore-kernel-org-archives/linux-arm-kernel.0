@@ -1,27 +1,62 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Fri, 29 Jul 2016 07:56:08 +0200
-Subject: [PATCH] regulator: axp20x: support AXP813 variant
-In-Reply-To: <20160728201944.GH6682@lukather>
-References: <20160728095531.81F5D441@mail.free-electrons.com>
- <20160728201944.GH6682@lukather>
-Message-ID: <20160729075608.d87c520483cd7b054a001ce5@free.fr>
+From: bshah@kde.org (Bhushan Shah)
+Date: Fri, 29 Jul 2016 11:39:05 +0530
+Subject: [PATCH v3 0/5] Initial support for LG Nexus 5 phone (hammerhead)
+Message-ID: <20160729060910.16943-1-bshah@kde.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 28 Jul 2016 22:19:44 +0200
-Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+This patchset adds support for LG Nexus 5 phone, codenamed hammerhead.
 
-> >  Documentation/devicetree/bindings/mfd/axp20x.txt | 32 ++++++++-
-> >  drivers/mfd/axp20x-rsb.c                         |  1 +
-> >  drivers/mfd/axp20x.c                             |  3 +
-> >  drivers/regulator/axp20x-regulator.c             | 82 +++++++++++++++++++++++-
-> >  include/linux/mfd/axp20x.h                       | 38 +++++++++++
-> >  5 files changed, 153 insertions(+), 3 deletions(-)
-> 
-> And this needs to be split per logical changes.
+Initial version have following supported,
 
-There is only one logical change: support the AXP813.
+    - Serial console over headphone jack
+    - pm8841 and pm8941 regulator nodes
+    - Hardware keys (volume_up and volume_down)
+
+Values for the regulator nodes are taken from following files in downstream msm
+kernel tree, branch android-msm-hammerhead-3.4-marshmallow-mr2
+
+    - arch/arm/boot/dts/msm8974-regulator.dtsi
+    - arch/arm/boot/dts/msm8974-hammerhead/msm8974-hammerhead.dtsi
+
+Values are verified against kmsg from downstream kernel as well.
+
+Cc: Andy Gross <andy.gross@linaro.org>
+Cc: Bjorn Andersson <bjorn.andersson@linaro.org>
+Cc: David Brown <david.brown@linaro.org>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Russell King <linux@armlinux.org.uk>
+Cc: devicetree at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-arm-msm at vger.kernel.org
+
+Changes since v2:
+
+    - rename vph-pwr-reg node to vreg-vph-pwr
+    - also move pinctrl stuff to msm8974.dtsi
+
+Changes since v1:
+
+    - Remove qcom,msm-id from dts file
+    - Add "lge,hammerhead" to compatible
+    - move vreg_boost node from honami.dts file to msm8974.dtsi
+    - move vph-pwr-reg node to msm8974.dtsi
+
+Bhushan Shah (5):
+  ARM: dts: qcom: Add initial DTS for LG Nexus 5 Phone
+  ARM: dts: msm8974: Move vreg_boost node from the honami to msm8974
+  ARM: dts: qcom: msm8974: Add fixed regulator node for vph-pwr-reg
+  ARM: dts: msm8974-hammerhead: Add regulator nodes for hammerhead
+  ARM: dts: msm8974-hammerhead: Introduce gpio-keys nodes
+
+ arch/arm/boot/dts/Makefile                         |   1 +
+ .../dts/qcom-msm8974-lge-nexus5-hammerhead.dts     | 262 +++++++++++++++++++++
+ .../boot/dts/qcom-msm8974-sony-xperia-honami.dts   |  21 --
+ arch/arm/boot/dts/qcom-msm8974.dtsi                |  28 +++
+ arch/arm/boot/dts/qcom-pm8941.dtsi                 |   6 +
+ 5 files changed, 297 insertions(+), 21 deletions(-)
+ create mode 100644 arch/arm/boot/dts/qcom-msm8974-lge-nexus5-hammerhead.dts
 
 -- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+2.9.0
