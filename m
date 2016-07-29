@@ -1,53 +1,46 @@
 From: robh@kernel.org (Rob Herring)
-Date: Fri, 29 Jul 2016 16:40:20 -0500
-Subject: [PATCH v3 7/7] doc: bindings: act8945a-charger: Update properties
-In-Reply-To: <1469755528-8413-8-git-send-email-wenyou.yang@atmel.com>
-References: <1469755528-8413-1-git-send-email-wenyou.yang@atmel.com>
- <1469755528-8413-8-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <20160729214020.GA18140@rob-hp-laptop>
+Date: Fri, 29 Jul 2016 16:44:54 -0500
+Subject: [PATCH v7 2/2] [media] atmel-isc: DT binding for Image Sensor
+ Controller driver
+In-Reply-To: <1469778856-24253-3-git-send-email-songjun.wu@microchip.com>
+References: <1469778856-24253-1-git-send-email-songjun.wu@microchip.com>
+ <1469778856-24253-3-git-send-email-songjun.wu@microchip.com>
+Message-ID: <20160729214454.GA21408@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 29, 2016 at 09:25:28AM +0800, Wenyou Yang wrote:
-> Due the driver improvements, update the properties,
->  - Remove "active-semi,check-battery-temperature" property.
->  - Add the properties, "active-semi,irq_gpio"
->    and "active-semi,lbo-gpios".
+On Fri, Jul 29, 2016 at 03:54:08PM +0800, Songjun Wu wrote:
+> DT binding documentation for ISC driver.
 > 
-> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+> Signed-off-by: Songjun Wu <songjun.wu@microchip.com>
 > ---
 > 
-> Changes in v3: None
-> Changes in v2: None
+> Changes in v7: None
+> Changes in v6:
+> - Add "iscck" and "gck" to clock-names.
 > 
->  Documentation/devicetree/bindings/power/act8945a-charger.txt | 6 ++++--
->  1 file changed, 4 insertions(+), 2 deletions(-)
+> Changes in v5:
+> - Add clock-output-names.
 > 
-> diff --git a/Documentation/devicetree/bindings/power/act8945a-charger.txt b/Documentation/devicetree/bindings/power/act8945a-charger.txt
-> index bea254c..d7cf05b 100644
-> --- a/Documentation/devicetree/bindings/power/act8945a-charger.txt
-> +++ b/Documentation/devicetree/bindings/power/act8945a-charger.txt
-> @@ -4,10 +4,12 @@ Required properties:
->   - compatible: "active-semi,act8945a", please refer to ../mfd/act8945a.txt.
->   - active-semi,chglev-gpios: charge current level phandle with args
->     as described in ../gpio/gpio.txt.
-> + - active-semi,irq_gpios: specify the charger interrupt input phanle
-> +   with args as as described in ../gpio/gpio.txt.
-
-As I said in v2, this should be an interrupt property instead.
-
-> + - active-semi,lbo-gpios: specify the low battery voltage detect phandle
-> +   with args as as described in ../gpio/gpio.txt.
-
-Maybe this one too.
-
->  
->  Optional properties:
-> - - active-semi,check-battery-temperature: boolean to check the battery
-> -   temperature or not.
->   - active-semi,input-voltage-threshold-microvolt: unit: mV;
->     Specifies the charger's input over-voltage threshold value;
->     The value can be: 6600, 7000, 7500, 8000; default: 6600
-> -- 
-> 2.7.4
+> Changes in v4:
+> - Remove the isc clock nodes.
 > 
+> Changes in v3:
+> - Remove the 'atmel,sensor-preferred'.
+> - Modify the isc clock node according to the Rob's remarks.
+> 
+> Changes in v2:
+> - Remove the unit address of the endpoint.
+> - Add the unit address to the clock node.
+> - Avoid using underscores in node names.
+> - Drop the "0x" in the unit address of the i2c node.
+> - Modify the description of 'atmel,sensor-preferred'.
+> - Add the description for the ISC internal clock.
+> 
+>  .../devicetree/bindings/media/atmel-isc.txt        | 65 ++++++++++++++++++++++
+>  1 file changed, 65 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/media/atmel-isc.txt
+
+Please add acks when posting new versions.
+
+Rob
