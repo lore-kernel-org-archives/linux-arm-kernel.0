@@ -1,77 +1,91 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 29 Jul 2016 11:12:02 +0100
-Subject: [PATCH v2 1/5] ethernet: add sun8i-emac driver
-In-Reply-To: <20160725195455.GQ7419@lukather>
-References: <1469001800-11615-1-git-send-email-clabbe.montjoie@gmail.com>
- <1469001800-11615-2-git-send-email-clabbe.montjoie@gmail.com>
- <20160725195455.GQ7419@lukather>
-Message-ID: <0dbea4a5-6f76-5dc2-6745-dccea31072ef@arm.com>
+From: ck.hu@mediatek.com (CK Hu)
+Date: Fri, 29 Jul 2016 18:14:45 +0800
+Subject: [PATCH 2/7] drm/mediatek: plane: Remove plane zpos/index
+In-Reply-To: <1469783054-54567-3-git-send-email-bibby.hsieh@mediatek.com>
+References: <1469783054-54567-1-git-send-email-bibby.hsieh@mediatek.com>
+ <1469783054-54567-3-git-send-email-bibby.hsieh@mediatek.com>
+Message-ID: <1469787285.11841.97.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi, Bibby:
 
-On 25/07/16 20:54, Maxime Ripard wrote:
-> On Wed, Jul 20, 2016 at 10:03:16AM +0200, LABBE Corentin wrote:
->> This patch add support for sun8i-emac ethernet MAC hardware.
->> It could be found in Allwinner H3/A83T/A64 SoCs.
->>
->> It supports 10/100/1000 Mbit/s speed with half/full duplex.
->> It can use an internal PHY (MII 10/100) or an external PHY
->> via RGMII/RMII.
->>
->> Signed-off-by: LABBE Corentin <clabbe.montjoie@gmail.com>
->> ---
->>  drivers/net/ethernet/allwinner/Kconfig      |   13 +
->>  drivers/net/ethernet/allwinner/Makefile     |    1 +
->>  drivers/net/ethernet/allwinner/sun8i-emac.c | 2129 +++++++++++++++++++++++++++
->>  3 files changed, 2143 insertions(+)
->>  create mode 100644 drivers/net/ethernet/allwinner/sun8i-emac.c
-
-...
-
->> diff --git a/drivers/net/ethernet/allwinner/sun8i-emac.c b/drivers/net/ethernet/allwinner/sun8i-emac.c
->> new file mode 100644
->> index 0000000..fc0c1dd
->> --- /dev/null
->> +++ b/drivers/net/ethernet/allwinner/sun8i-emac.c
-
-...
-
->> +
->> +/* struct dma_desc - Structure of DMA descriptor used by the hardware
->> + * @status: Status of the frame written by HW, so RO for the
->> + *	driver (except for BIT(31) which is R/W)
->> + * @ctl: Information on the frame written by the driver (INT, len,...)
->> + * @buf_addr: physical address of the frame data
->> + * @next: physical address of next dma_desc
->> + */
->> +struct dma_desc {
->> +	u32 status;
->> +	u32 ctl;
->> +	u32 buf_addr;
->> +	u32 next;
->> +};
+On Fri, 2016-07-29 at 17:04 +0800, Bibby Hsieh wrote:
+> From: Daniel Kurtz <djkurtz@chromium.org>
 > 
-> You should use the endian-aware variants here.
+> It is not actually useful to a mtk plane to know its zpos/index, so just
+> remove this field.
+> 
+> This let's us completely remove struct mtk_drm_plane in a follow up patch.
 
-For the records: just doing the sparse annotation with __le32 here will
-of course not be sufficient to make it work on BE kernels. I added
-proper endianness conversion to all accesses to the descriptors and got
-it to work with an arm64 big-endian kernel on the Pine64.
+'let's us'? My English is not as good as native English speaker.
+Otherwise, this patch looks good to me.
 
-I put a patch here:
-https://gist.github.com/apritzel/bc792c4dbbd8789f5f18aef538e8c440
+> 
+> Signed-off-by: Daniel Kurtz <djkurtz@chromium.org>
+> Signed-off-by: Bibby Hsieh <bibby.hsieh@mediatek.com>
+> ---
+>  drivers/gpu/drm/mediatek/mtk_drm_crtc.c  |    2 +-
+>  drivers/gpu/drm/mediatek/mtk_drm_plane.c |    4 +---
+>  drivers/gpu/drm/mediatek/mtk_drm_plane.h |    4 +---
+>  3 files changed, 3 insertions(+), 7 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_crtc.c b/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
+> index 24aa3ba..18211ab 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
+> +++ b/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
+> @@ -559,7 +559,7 @@ int mtk_drm_crtc_create(struct drm_device *drm_dev,
+>  				(zpos == 1) ? DRM_PLANE_TYPE_CURSOR :
+>  						DRM_PLANE_TYPE_OVERLAY;
+>  		ret = mtk_plane_init(drm_dev, &mtk_crtc->planes[zpos],
+> -				     BIT(pipe), type, zpos);
+> +				     BIT(pipe), type);
+>  		if (ret)
+>  			goto unprepare;
+>  	}
+> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_plane.c b/drivers/gpu/drm/mediatek/mtk_drm_plane.c
+> index 093db07..d28db57 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_drm_plane.c
+> +++ b/drivers/gpu/drm/mediatek/mtk_drm_plane.c
+> @@ -189,8 +189,7 @@ static const struct drm_plane_helper_funcs mtk_plane_helper_funcs = {
+>  };
+>  
+>  int mtk_plane_init(struct drm_device *dev, struct mtk_drm_plane *mtk_plane,
+> -		   unsigned long possible_crtcs, enum drm_plane_type type,
+> -		   unsigned int zpos)
+> +		   unsigned long possible_crtcs, enum drm_plane_type type)
+>  {
+>  	int err;
+>  
+> @@ -203,7 +202,6 @@ int mtk_plane_init(struct drm_device *dev, struct mtk_drm_plane *mtk_plane,
+>  	}
+>  
+>  	drm_plane_helper_add(&mtk_plane->base, &mtk_plane_helper_funcs);
+> -	mtk_plane->idx = zpos;
+>  
+>  	return 0;
+>  }
+> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_plane.h b/drivers/gpu/drm/mediatek/mtk_drm_plane.h
+> index 72a7b3e..74dbeda 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_drm_plane.h
+> +++ b/drivers/gpu/drm/mediatek/mtk_drm_plane.h
+> @@ -20,7 +20,6 @@
+>  
+>  struct mtk_drm_plane {
+>  	struct drm_plane		base;
+> -	unsigned int			idx;
+>  };
+>  
+>  struct mtk_plane_pending_state {
+> @@ -53,7 +52,6 @@ to_mtk_plane_state(struct drm_plane_state *state)
+>  }
+>  
+>  int mtk_plane_init(struct drm_device *dev, struct mtk_drm_plane *mtk_plane,
+> -		   unsigned long possible_crtcs, enum drm_plane_type type,
+> -		   unsigned int zpos);
+> +		   unsigned long possible_crtcs, enum drm_plane_type type);
+>  
+>  #endif
 
-This particular version is untested (though it compiles), since I just
-adapted the working patch against the newer driver code and couldn't
-test it yet.
-I am not really an endianness expert, so don't know if there are smarter
-ways to tackle this, if we should for instance provide access wrappers
-to the DMA descriptor fields.
-
-I will try to test this later today, if that works, feel free to merge
-those changes into your driver.
-
-Cheers,
-Andre.
+Regards,
+CK
