@@ -1,100 +1,138 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 29 Jul 2016 16:24:27 +0200
-Subject: [PATCH 2/2] dt-bindings: add simple-panel-dsi and simple-panel
-In-Reply-To: <CAL_JsqL8D3OK_JQcY+dLTcqcvmgB2Vuc0Tknf1zsR=8Pa3F4jw@mail.gmail.com>
-References: <1468984730-23186-1-git-send-email-mark.yao@rock-chips.com>
- <1468984730-23186-2-git-send-email-mark.yao@rock-chips.com>
- <20160725152125.GS21170@ulmo.ba.sec>
- <5796C47C.5040208@rock-chips.com>
- <20160726090226.GB2433@ulmo.ba.sec>
- <CAL_JsqL8D3OK_JQcY+dLTcqcvmgB2Vuc0Tknf1zsR=8Pa3F4jw@mail.gmail.com>
-Message-ID: <20160729142427.GB3864@ulmo.ba.sec>
+Date: Fri, 29 Jul 2016 16:45:02 +0200
+Subject: [PATCH v2 3/3] drm/mediatek: fix the wrong pixel clock when
+ resolution is 4K
+In-Reply-To: <1469608292-6106-4-git-send-email-bibby.hsieh@mediatek.com>
+References: <1469608292-6106-1-git-send-email-bibby.hsieh@mediatek.com>
+ <1469608292-6106-4-git-send-email-bibby.hsieh@mediatek.com>
+Message-ID: <20160729144502.GC3864@ulmo.ba.sec>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 28, 2016 at 02:00:21PM -0500, Rob Herring wrote:
-> On Tue, Jul 26, 2016 at 4:02 AM, Thierry Reding
-> <thierry.reding@gmail.com> wrote:
-> > On Tue, Jul 26, 2016 at 10:01:32AM +0800, Mark yao wrote:
-> >> On 2016?07?25? 23:21, Thierry Reding wrote:
-> >>
-> >>     On Wed, Jul 20, 2016 at 11:18:50AM +0800, Mark Yao wrote:
-> >>
-> >>         Allow user add display timing on device tree with simple-panel-dsi
-> >>         or simple-panel.
-> >>
-> >>         Cc: Thierry Reding <thierry.reding@gmail.com>
-> >>         Cc: Rob Herring <robh+dt@kernel.org>
-> >>         Cc: Mark Rutland <mark.rutland@arm.com>
-> >>
-> >>         Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
-> >>         ---
-> >>          .../bindings/display/panel/simple-panel.txt        | 48 ++++++++++++++++++++++
-> >>          1 file changed, 48 insertions(+)
-> >>
-> >>     Sorry, not going to happen. Read this for an explanation of why not:
-> >>
-> >>             https://sietch-tagr.blogspot.de/2016/04/display-panels-are-not-special.html
-> >>
-> >>     Thierry
-> >>
-> >>
-> >> Hi Thierry
-> >>
-> >> The blog actually not persuade me why can't use display timing on
-> >> device tree.
-> >
-> > Okay, perhaps read it again, it addresses most of your points below.
-> >
-> >> 1, Binding panel as a simple string on device tree seems simple on device tree,
-> >> but it's complex on kernel code, and kernel code would became bigger and
-> >> bigger.
-> >
-> > I don't think the video timings in the simple-panel driver are very
-> > complex. They also don't use very much space. And if you're really
-> > concerned about space you can always use conditional compilation and
-> > Kconfig symbols to remove timings for panels that you don't use.
-> >
-> > Also, panels are characterized by much more than just video timings.
-> > There were attempts, way back, to fully describe panels in device tree
-> > and that failed. What you propose here is a partial solution to a much
-> > more complex problem.
-> >
-> > This is all explained in the blog post.
+On Wed, Jul 27, 2016 at 04:31:32PM +0800, Bibby Hsieh wrote:
+> From: Junzhi Zhao <junzhi.zhao@mediatek.com>
 > 
-> While I agree with everything Thierry has said in this thread, there
-> is an argument to be made for timing information in DT.
+> Pixel clock should be 297MHz when resolution is 4K.
 > 
-> Maybe most vendors have now learned that flexible clock frequencies
-> are needed to generate the correct timings, but I have worked on parts
-> without fine resolution (i.e. a dedicated pll). Even HiKey with HDMI
-> suffers from this. In that case you can be tuning the timings
-> (increasing the h and/or v blanks) to get the desired refresh rates.
-> So in that case, the panel compatible would not determine the display
-> timings and you could have the same panel with different timings on
-> different boards. That's maybe rare enough that putting timing info in
-> DT still wouldn't make sense.
+> Signed-off-by: Junzhi Zhao <junzhi.zhao@mediatek.com>
+> Signed-off-by: Bibby Hsieh <bibby.hsieh@mediatek.com>
+> ---
+>  drivers/gpu/drm/mediatek/mtk_dpi.c |  149 +++++++++++++++++++++++-------------
+>  1 file changed, 96 insertions(+), 53 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/mediatek/mtk_dpi.c b/drivers/gpu/drm/mediatek/mtk_dpi.c
+> index d05ca79..fa390e0 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_dpi.c
+> +++ b/drivers/gpu/drm/mediatek/mtk_dpi.c
+> @@ -60,14 +60,25 @@ enum mtk_dpi_out_color_format {
+>  	MTK_DPI_COLOR_FORMAT_YCBCR_422_FULL
+>  };
+>  
+> +enum mtk_dpi_clk_id {
+> +	MTK_DPI_CLK_DPI_ENGINE,
+> +	MTK_DPI_CLK_DPI_PIXEL,
+> +	MTK_DPI_CLK_TVD_PLL,
+> +	MTK_DPI_CLK_COUNT,
+> +};
+> +
+> +static const char * const mtk_dpi_clk_names[MTK_DPI_CLK_COUNT] = {
+> +	[MTK_DPI_CLK_DPI_ENGINE] = "engine",
+> +	[MTK_DPI_CLK_DPI_PIXEL] = "pixel",
+> +	[MTK_DPI_CLK_TVD_PLL] = "pll",
+> +};
+> +
+>  struct mtk_dpi {
+>  	struct mtk_ddp_comp ddp_comp;
+>  	struct drm_encoder encoder;
+>  	void __iomem *regs;
+>  	struct device *dev;
+> -	struct clk *engine_clk;
+> -	struct clk *pixel_clk;
+> -	struct clk *tvd_clk;
+> +	struct clk *clk[MTK_DPI_CLK_COUNT];
 
-There's another mechanism, though not very popular (possibly because it
-is indeed a very rare usecase), that we introduced a while ago. The idea
-is that we don't specify the mode per panel, as we do now, but rather a
-range of values that are valid for the various video timing parameters.
-These set can usually be copied from some datasheet and are represented
-by (minimum, typical, maximum) triplets. So drivers for display hardware
-would query the timings in this way, try to establish a working mode
-from the typical values and tweak as necessary by adjusting the values
-within the limits given by (minimum, maximum).
+This looks to me like a step backwards. All accesses to these clocks are
+now very clumsy and I don't see any advantage in using this array rather
+than individually named clocks.
 
-One disadvantage of this is that it becomes somewhat more complicated to
-write the display driver, but I think that's an easy problem to solve by
-adding some common helpers (I'm thinking one that takes as input the
-target clock frequency and the timing ranges and outputs a mode with the
-porches adjusted to match the target clock frequency as closely as
-possible).
+Also, that change seems completely unrelated to the description in the
+commit message.
 
-The big advantage is, of course, that device trees become trivial to
-write and people don't have to manually stitch together timings to get
-to the desired result.
+>  	int irq;
+>  	struct drm_display_mode mode;
+>  	enum mtk_dpi_out_color_format color_format;
+> @@ -76,6 +87,7 @@ struct mtk_dpi {
+>  	enum mtk_dpi_out_channel_swap channel_swap;
+>  	bool power_sta;
+>  	u8 power_ctl;
+> +	void *data;
+
+This should probably be const. It's a bad idea to cast away the const
+from the of_device_id.data that this is assigned from.
+
+> +static const struct of_device_id mtk_dpi_of_ids[] = {
+> +	{ .compatible = "mediatek,mt8173-dpi",
+> +		.data = &mt8173_conf,
+> +	},
+
+Please align this in some standard way. It all fits on one line, so the
+most obvious choice would've been:
+
+	{ .compatible = "mediatek,mt8173-dpi", .data = &mt8173_conf },
+
+> +	{}
+> +};
+> +
+>  static int mtk_dpi_probe(struct platform_device *pdev)
+>  {
+>  	struct device *dev = &pdev->dev;
+>  	struct mtk_dpi *dpi;
+>  	struct resource *mem;
+> +	struct device_node *np = dev->of_node;
+>  	struct device_node *ep, *bridge_node = NULL;
+>  	int comp_id;
+> +	const struct of_device_id *match;
+> +	struct mtk_dpi_conf *conf;
+>  	int ret;
+>  
+> +	match = of_match_node(mtk_dpi_of_ids, dev->of_node);
+> +	if (!match)
+> +		return -ENODEV;
+
+You introduce a variable np = dev->of_node above, but then you add code
+that uses dev->of_node directly?
+
+That said, you should use of_device_get_match_data() anyway, so that you
+can omit...
+
+> +
+>  	dpi = devm_kzalloc(dev, sizeof(*dpi), GFP_KERNEL);
+>  	if (!dpi)
+>  		return -ENOMEM;
+>  
+>  	dpi->dev = dev;
+> +	dpi->data = (void *)match->data;
+> +	conf = (struct mtk_dpi_conf *)match->data;
+
+... the dereferences here. Also, like I said before you should make
+dpi->data and conf both const to avoid casting away the constness of the
+data. If you do that you can even drop the casts because you'd be
+casting from a const void * to a const foo *, which gets casted
+automatically.
+
+> @@ -754,11 +802,6 @@ static int mtk_dpi_remove(struct platform_device *pdev)
+>  	return 0;
+>  }
+>  
+> -static const struct of_device_id mtk_dpi_of_ids[] = {
+> -	{ .compatible = "mediatek,mt8173-dpi", },
+> -	{}
+> -};
+
+Another advantage of using of_device_get_match_data() is that it doesn't
+need direct access to the of_device_id table (it'll obtain it via an
+indirect dev->driver->of_match_table), so you don't have to move this
+around and make this patch overall less churn.
 
 Thierry
 -------------- next part --------------
@@ -103,4 +141,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160729/fd6558a0/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160729/de5bab71/attachment.sig>
