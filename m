@@ -1,37 +1,51 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 29 Jul 2016 11:26:57 +0200
-Subject: [PATCH v2 1/5] ethernet: add sun8i-emac driver
-In-Reply-To: <20160728131826.GA7582@Red>
-References: <1469001800-11615-1-git-send-email-clabbe.montjoie@gmail.com>
- <4697175.RMdFEWr9V5@wuerfel> <20160728131826.GA7582@Red>
-Message-ID: <4552489.XcKoxjnXeP@wuerfel>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 29 Jul 2016 11:30:34 +0200
+Subject: [PATCH] arm64: vmlinux.lds: make __rela_offset and
+ __dynsym_offset ABSOLUTE
+In-Reply-To: <20160729090634.GA16593@arm.com>
+References: <1469715314-23260-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20160729090634.GA16593@arm.com>
+Message-ID: <CAKv+Gu-c0sdAb2KgbOv6OwA+PmDJ1biaL592009LXgHgY34X+Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, July 28, 2016 3:18:26 PM CEST LABBE Corentin wrote:
-> 
-> I will reworked locking and it seems that no locking is necessary.
-> I have added the following comment about the locking strategy:
-> 
-> /* Locking strategy:
->  * RX queue does not need any lock since only sun8i_emac_poll() access it.
->  * (All other RX modifiers (ringparam/ndo_stop) disable NAPI and so sun8i_emac_poll())
->  * TX queue is handled by sun8i_emac_xmit(), sun8i_emac_complete_xmit() and sun8i_emac_tx_timeout()
->  * (All other RX modifiers (ringparam/ndo_stop) disable NAPI and stop queue)
->  *
->  * sun8i_emac_xmit() could fire only once (netif_tx_lock)
->  * sun8i_emac_complete_xmit() could fire only once (called from NAPI)
->  * sun8i_emac_tx_timeout() could fire only once (netif_tx_lock) and couldnt
->  * race with sun8i_emac_xmit (due to netif_tx_lock) and with sun8i_emac_complete_xmit which disable NAPI.
->  *
->  * So only sun8i_emac_xmit and sun8i_emac_complete_xmit could fire at the same time.
->  * But they never could modify the same descriptors:
->  * - sun8i_emac_complete_xmit() will modify only descriptors with empty status
->  * - sun8i_emac_xmit() will modify only descriptors set to DCLEAN
->  * Proper memory barriers ensure that descriptor set to DCLEAN could not be
->  * modified latter by sun8i_emac_complete_xmit().
->  * */
+On 29 July 2016 at 11:06, Will Deacon <will.deacon@arm.com> wrote:
+> Hi Ard,
+>
+> On Thu, Jul 28, 2016 at 04:15:14PM +0200, Ard Biesheuvel wrote:
+>> Due to the untyped KIMAGE_VADDR constant, the linker may not notice
+>> that the __rela_offset and __dynsym_offset expressions are absolute
+>> values (i.e., are not subject to relocation). This does not matter for
+>> KASLR, but it does confuse kallsyms in relative mode, since it uses
+>> the lowest non-absolute symbol address as the anchor point, and expects
+>> all other symbol addresses to be within 4 GB of it.
+>>
+>> Fix this by qualifying these expressions as ABSOLUTE() explicitly.
+>>
+>> Fixes: 0cd3defe0af4 ("arm64: kernel: perform relocation processing from ID map")
+>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> ---
+>>  arch/arm64/kernel/vmlinux.lds.S | 4 ++--
+>>  1 file changed, 2 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
+>> index 89d6e177ecbd..d49492179967 100644
+>> --- a/arch/arm64/kernel/vmlinux.lds.S
+>> +++ b/arch/arm64/kernel/vmlinux.lds.S
+>> @@ -184,9 +184,9 @@ SECTIONS
+>>               *(.hash)
+>>       }
+>>
+>> -     __rela_offset   = ADDR(.rela) - KIMAGE_VADDR;
+>> +     __rela_offset   = ABSOLUTE(ADDR(.rela) - KIMAGE_VADDR);
+>>       __rela_size     = SIZEOF(.rela);
+>> -     __dynsym_offset = ADDR(.dynsym) - KIMAGE_VADDR;
+>> +     __dynsym_offset = ABSOLUTE(ADDR(.dynsym) - KIMAGE_VADDR);
+>
+> You removed the __dynsym_offset entry entirely in "arm64: relocatable:
+> suppress R_AARCH64_ABS64 relocations in vmlinux", so I'll drop this part
+> of the patch and assume you'll do a separate backport for stable. Ok?
+>
 
-Sounds good, the comment is certainly very helpful here.
-
-	Arnd
+If you are ok with fixing up patches manually while applying, could we
+just reorder them instead?
