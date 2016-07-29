@@ -1,86 +1,63 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Fri, 29 Jul 2016 17:41:54 -0500
-Subject: [PATCH v3 2/2] pci/aer: interrupt fixup in the quirk
-In-Reply-To: <1465892645-32381-2-git-send-email-po.liu@nxp.com>
-References: <1464242406-20203-1-git-send-email-po.liu@nxp.com>
- <1465892645-32381-1-git-send-email-po.liu@nxp.com>
- <1465892645-32381-2-git-send-email-po.liu@nxp.com>
-Message-ID: <20160729224154.GC13632@localhost>
+From: wxt@rock-chips.com (Caesar Wang)
+Date: Sat, 30 Jul 2016 07:13:41 +0800
+Subject: [PATCH v3 1/4] iio: adc: rockchip_saradc: reset saradc controller
+ before programming it
+In-Reply-To: <20160729212833.GA12688@rob-hp-laptop>
+References: <1469629447-544-1-git-send-email-wxt@rock-chips.com>
+ <20160729212833.GA12688@rob-hp-laptop>
+Message-ID: <579BE325.4010103@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 14, 2016 at 04:24:05PM +0800, Po Liu wrote:
-> On some platforms, root port doesn't support MSI/MSI-X/INTx in RC mode.
-> When chip support the aer interrupt with none MSI/MSI-X/INTx mode,
-> maybe there is interrupt line for aer pme etc. Search the interrupt
-> number in the fdt file. Then fixup the dev->irq with it.
-> 
-> Signed-off-by: Po Liu <po.liu@nxp.com>
 
-I'm not sure where we're at with this.  Dongdong had some issue
-(possibly with a version of the quirk on a different platform?), and I
-think the suggestion of explicitly checking for a root port device was
-a good one.
+On 2016?07?30? 05:28, Rob Herring wrote:
+> On Wed, Jul 27, 2016 at 10:24:04PM +0800, Caesar Wang wrote:
+>> SARADC controller needs to be reset before programming it, otherwise
+>> it will not function properly.
+>>
+>> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+>> Cc: Jonathan Cameron <jic23@kernel.org>
+>> Cc: Heiko Stuebner <heiko@sntech.de>
+>> Cc: Rob Herring <robh+dt@kernel.org>
+>> Cc: linux-iio at vger.kernel.org
+>> Cc: linux-rockchip at lists.infradead.org
+>> Tested-by: Guenter Roeck <linux@roeck-us.net>
+>>
+>> ---
+>>
+>> Changes in v3:
+>> - %s/devm_reset_control_get_optional()/devm_reset_control_get()
+>> - add Guente's test tag.
+>>
+>> Changes in v2:
+>> - Make the reset as an optional property, since it should work
+>> with old devicetrees as well.
+>>
+>>   .../bindings/iio/adc/rockchip-saradc.txt           |  7 +++++
+>>   drivers/iio/adc/Kconfig                            |  1 +
+>>   drivers/iio/adc/rockchip_saradc.c                  | 30 ++++++++++++++++++++++
+>>   3 files changed, 38 insertions(+)
+> Please add acks when posting new versions.
 
-So please update and repost this for next cycle.
+I didn't get your ACK when posting the V3. :-P
 
-> ---
-> changes for V3:
-> 	- Move to quirk;
-> 	- Only correct the irq in RC mode;
-> 
->  drivers/pci/quirks.c | 29 +++++++++++++++++++++++++++++
->  1 file changed, 29 insertions(+)
-> 
-> diff --git a/drivers/pci/quirks.c b/drivers/pci/quirks.c
-> index ee72ebe..8b39cce 100644
-> --- a/drivers/pci/quirks.c
-> +++ b/drivers/pci/quirks.c
-> @@ -25,6 +25,7 @@
->  #include <linux/sched.h>
->  #include <linux/ktime.h>
->  #include <linux/mm.h>
-> +#include <linux/of_irq.h>
->  #include <asm/dma.h>	/* isa_dma_bridge_buggy */
->  #include "pci.h"
->  
-> @@ -4419,3 +4420,31 @@ static void quirk_intel_qat_vf_cap(struct pci_dev *pdev)
->  	}
->  }
->  DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL, 0x443, quirk_intel_qat_vf_cap);
-> +
-> +/* If root port doesn't support MSI/MSI-X/INTx in RC mode,
-> + * but use standalone irq. Read the device tree for the aer
-> + * interrupt number.
-> + */
-> +static void quirk_aer_interrupt(struct pci_dev *dev)
-> +{
-> +	int ret;
-> +	u8 header_type;
-> +	struct device_node *np = NULL;
-> +
-> +	/* Only for the RC mode device */
-> +	pci_read_config_byte(dev, PCI_HEADER_TYPE, &header_type);
-> +	if ((header_type & 0x7F) != PCI_HEADER_TYPE_BRIDGE)
-> +		return;
-> +
-> +	if (dev->bus->dev.of_node)
-> +		np = dev->bus->dev.of_node;
-> +
-> +	if (IS_ENABLED(CONFIG_OF_IRQ) && np) {
-> +		ret = of_irq_get_byname(np, "aer");
-> +		if (ret > 0) {
-> +			dev->no_msi = 1;
-> +			dev->irq = ret;
-> +		}
-> +	}
-> +}
-> +DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_FREESCALE, PCI_ANY_ID, quirk_aer_interrupt);
-> -- 
-> 2.1.0.27.g96db324
-> 
-> 
+---
+Your ack on 2016-07-27 23:12
+
+  .../bindings/iio/adc/rockchip-saradc.txt           |  7 +++++
+
+Acked-by: Rob Herring<robh@kernel.org>
+
+
+
+>
+> Rob
+>
 > _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Linux-rockchip mailing list
+> Linux-rockchip at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-rockchip
+
+
+-- 
+caesar wang | software engineer | wxt at rock-chip.com
