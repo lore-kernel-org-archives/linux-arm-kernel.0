@@ -1,11 +1,11 @@
-From: wxt@rock-chips.com (Caesar Wang)
-Date: Sat, 30 Jul 2016 07:13:41 +0800
+From: sasukewxt@163.com (Caesar Wang)
+Date: Sat, 30 Jul 2016 07:13:33 +0800
 Subject: [PATCH v3 1/4] iio: adc: rockchip_saradc: reset saradc controller
  before programming it
 In-Reply-To: <20160729212833.GA12688@rob-hp-laptop>
 References: <1469629447-544-1-git-send-email-wxt@rock-chips.com>
  <20160729212833.GA12688@rob-hp-laptop>
-Message-ID: <579BE325.4010103@rock-chips.com>
+Message-ID: <579BE31D.6020802@163.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -57,7 +57,3 @@ Acked-by: Rob Herring<robh@kernel.org>
 > Linux-rockchip mailing list
 > Linux-rockchip at lists.infradead.org
 > http://lists.infradead.org/mailman/listinfo/linux-rockchip
-
-
--- 
-caesar wang | software engineer | wxt at rock-chip.com
