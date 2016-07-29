@@ -1,17 +1,21 @@
-From: vijaykumar@zilogic.com (Vijay Kumar B.)
-Date: Fri, 29 Jul 2016 14:42:47 +0530
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 29 Jul 2016 10:19:32 +0100
 Subject: Contributing to PXA2xx pinctrl Driver
-Message-ID: <579B1E0F.9040601@zilogic.com>
+In-Reply-To: <579B1E0F.9040601@zilogic.com>
+References: <579B1E0F.9040601@zilogic.com>
+Message-ID: <20160729091932.GB1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Everyone,
-I am looking at the pinctrl driver for drivers/pinctrl/pxa/pxa2xx.c. The 
-driver in mainline git and pxa2xx git (rjarzmik/linux on github) seems 
-to write to allocated memory rather than to registers. I am planning to 
-help out with the pinctrl drivers. It will be great if people can point 
-me to the latest version of the driver, so that I can base my work on 
-top of it.
+On Fri, Jul 29, 2016 at 02:42:47PM +0530, Vijay Kumar B. wrote:
+> Hi Everyone,
+> I am looking at the pinctrl driver for drivers/pinctrl/pxa/pxa2xx.c. The
+> driver in mainline git and pxa2xx git (rjarzmik/linux on github) seems to
+> write to allocated memory rather than to registers.
 
-Regards,
-Vijay
+Please explain why you think that.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
