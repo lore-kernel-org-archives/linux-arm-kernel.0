@@ -1,50 +1,72 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Fri, 29 Jul 2016 15:05:02 -0400
-Subject: [PATCH v10 7/7] ACPI : enable ACPI_PROCESSOR_IDLE on ARM64
-In-Reply-To: <1468950779-21745-8-git-send-email-sudeep.holla@arm.com>
-References: <1468950779-21745-1-git-send-email-sudeep.holla@arm.com>
- <1468950779-21745-8-git-send-email-sudeep.holla@arm.com>
-Message-ID: <579BA8DE.3050802@codeaurora.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 29 Jul 2016 21:17:30 +0200
+Subject: [PATCH 2/3] mmc: sunxi: Set the 'New Timing' register for 8 bits
+ DDR transfers
+In-Reply-To: <20160721112655.941b1dad04f7a5b94d4172c1@free.fr>
+References: <cover.1469082481.git.moinejf@free.fr>
+ <bc7b767cad6db159a44c4b98d5b1f3eb53c26bd3.1469082481.git.moinejf@free.fr>
+ <20160721085615.GG5993@lukather>
+ <20160721112655.941b1dad04f7a5b94d4172c1@free.fr>
+Message-ID: <20160729191730.GG6215@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sudeep,
+On Thu, Jul 21, 2016 at 11:26:55AM +0200, Jean-Francois Moine wrote:
+> On Thu, 21 Jul 2016 10:56:15 +0200
+> Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+> 
+> > On Wed, Jul 20, 2016 at 08:16:28PM +0200, Jean-Francois Moine wrote:
+> > > The 'new timing mode' with 8 bits DDR works correctly when the NewTiming
+> > > register is set.
+> > 
+> > What does that mode brings to the table?
+> 
+> From my tests, the eMMC of the Banana Pi M3 (A83T) cannot work when the
+> new mode is not used.
+> 
+> > > 
+> > > Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
+> > > ---
+> > > Note about the 'new timing mode'.
+> > > 
+> > > This patch assumes that, when the new mode is used, the clock driver
+> > > sets the mode select in the MMC clock and multiplies the clock rate
+> > > by 2:
+> > > - MMC side:
+> > >   - with a timing 8 bits DDR at 50MHz, the MMC driver calls
+> > >     clk_set_rate() with a rate 50*2 = 100MHz,
+> > > - clock side:
+> > >   - the clock driver sets the hardware MMC clock to 100*2 = 200MHz,
+> > >   - setting the 'mode select' of the hardware MMC clock divides the
+> > >     rate by 2,
+> > > - MMC side:
+> > >   - setting the MMC clock divider register to 1 divides the rate by 2.
+> > > So, the final rate is 50MHz.
+> > 
+> > What happens if you actually want to set it to 100MHz?
+> 
+> There is no SDXC_CLK_100M in the mainline driver, and 100MHz is asked
+> only for 8 bits DDR at 50MHz.
 
-On 07/19/2016 01:52 PM, Sudeep Holla wrote:
-> Now that ACPI processor idle driver supports LPI(Low Power Idle), lets
-> enable ACPI_PROCESSOR_IDLE for ARM64 too.
-> 
-> This patch just removes the IA64 and X86 dependency on ACPI_PROCESSOR_IDLE
-> 
-> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
-> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
-> ---
->  drivers/acpi/Kconfig | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
-> index 1358fb7d7a68..d74275c0f374 100644
-> --- a/drivers/acpi/Kconfig
-> +++ b/drivers/acpi/Kconfig
-> @@ -238,7 +238,7 @@ config ACPI_CPPC_LIB
->  config ACPI_PROCESSOR
->  	tristate "Processor"
->  	depends on X86 || IA64 || ARM64
-> -	select ACPI_PROCESSOR_IDLE if X86 || IA64
-> +	select ACPI_PROCESSOR_IDLE
->  	select ACPI_CPU_FREQ_PSS if X86 || IA64
->  	default y
->  	help
-> 
+You're missing the point.
 
-This causes a boot hang on QDF2432. cpuidle.off=1 works around the
-problem. I understand you're working on a fix to the problem in GICv3
-code. If there's anything I can do to help, please let me know.
+clk_set_rate is supposed to apply a rate as close as possible as
+requested, there's no reason why you would request a rate twice as
+high as need.
 
-Thanks,
-Christopher Covington
+You want to switch the clock from one mode to another, fine, create a
+new function for that. But don't hack an existing one.
+
+Maxime
 
 -- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
-Technologies, Inc. Qualcomm Technologies, Inc. is a member of the Code
-Aurora Forum, a Linux Foundation Collaborative Project.
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160729/9761ce2a/attachment.sig>
