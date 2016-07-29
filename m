@@ -1,40 +1,48 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Fri, 29 Jul 2016 11:53:10 +0200
-Subject: [PATCH v4] arm64: dts: mt8173: add mmsel clocks for 4K support
-In-Reply-To: <1469783388-56804-1-git-send-email-bibby.hsieh@mediatek.com>
-References: <1469783388-56804-1-git-send-email-bibby.hsieh@mediatek.com>
-Message-ID: <1469785990.3012.35.camel@pengutronix.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 29 Jul 2016 11:06:53 +0100
+Subject: [PATCH v5 0/6] Add support for privileged mappings
+In-Reply-To: <20160727234208.2101-1-mitchelh@codeaurora.org>
+References: <20160727234208.2101-1-mitchelh@codeaurora.org>
+Message-ID: <20160729100653.GC16593@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bibby,
-
-Am Freitag, den 29.07.2016, 17:09 +0800 schrieb Bibby Hsieh:
-> To support HDMI 4K resolution, mmsys need clcok
-> mm_sel to be 400MHz.
+On Wed, Jul 27, 2016 at 04:42:02PM -0700, Mitchel Humpherys wrote:
+> The following patch to the ARM SMMU driver:
 > 
-> The board .dts file should override the clock rate
-> property with the higher VENCPLL frequency the board
-> supports HDMI 4K resolution.
+>     commit d346180e70b91b3d5a1ae7e5603e65593d4622bc
+>     Author: Robin Murphy <robin.murphy@arm.com>
+>     Date:   Tue Jan 26 18:06:34 2016 +0000
+>     
+>         iommu/arm-smmu: Treat all device transactions as unprivileged
 > 
-> Signed-off-by: Bibby Hsieh <bibby.hsieh@mediatek.com>
-> ---
->  arch/arm64/boot/dts/mediatek/mt8173.dtsi |    2 ++
->  1 file changed, 2 insertions(+)
+> started forcing all SMMU transactions to come through as "unprivileged".
+> The rationale given was that:
 > 
-> diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> index 78529e4..93d4d17 100644
-> --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> @@ -690,6 +690,8 @@
->  			compatible = "mediatek,mt8173-mmsys", "syscon";
->  			reg = <0 0x14000000 0 0x1000>;
->  			power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
-> +			clocks = <&topckgen CLK_TOP_MM_SEL>;
-> +			clock-frequency  = <400000000>;
+>   (1) There is no way in the IOMMU API to even request privileged mappings.
+> 
+>   (2) It's difficult to implement a DMA mapper that correctly models the
+>       ARM VMSAv8 behavior of unprivileged-writeable =>
+>       privileged-execute-never.
+> 
+> This series rectifies (1) by introducing an IOMMU API for privileged
+> mappings and implements it in io-pgtable-arm.
+> 
+> This series rectifies (2) by introducing a new dma attribute
+> (DMA_ATTR_PRIVILEGED) for users of the DMA API that need privileged
+> mappings which are inaccessible to lesser-privileged execution levels, and
+> implements it in the arm64 IOMMU DMA mapper.  The one known user (pl330.c)
+> is converted over to the new attribute.
+> 
+> Jordan and Jeremy can provide more info on the use case if needed, but the
+> high level is that it's a security feature to prevent attacks such as [1].
+> 
+> Joerg, the v3 series was previously acked by Will [2].  He also recommended
+> that we take all of this through your tree since it's touching multiple
+> subsystems [3].  Can you please take a look?  Thanks!
 
-This is unchanged compared to v3, I suggest to use assigned-clocks /
-assigned-clock-rates properties instead.
+You forgot to add my ack to the patches, so if you need it again:
 
-best regards
-Philipp
+Acked-by: Will Deacon <will.deacon@arm.com>
+
+Will
