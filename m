@@ -1,44 +1,39 @@
-From: codekipper@gmail.com (codekipper at gmail.com)
-Date: Sat, 30 Jul 2016 16:20:22 +0200
-Subject: [PATCH] pinctrl: sun6i: add SPDIF to pin description.
-Message-ID: <20160730142022.29205-1-codekipper@gmail.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Sat, 30 Jul 2016 16:25:40 +0200
+Subject: [PATCH 2/4] mmc: sunxi: Make sample clocks optional
+In-Reply-To: <20160725081830.GF7419@lukather>
+References: <1468665964-27142-1-git-send-email-hdegoede@redhat.com>
+ <1468665964-27142-3-git-send-email-hdegoede@redhat.com>
+ <20160725081830.GF7419@lukather>
+Message-ID: <abe8e074-e58f-78c3-64d2-4f7870a58c28@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marcus Cooper <codekipper@gmail.com>
+Hi,
 
-Add the SPDIF mux functionality to the pinctrl for the Allwinner A31
-SoC.
+On 25-07-16 10:18, Maxime Ripard wrote:
+> Hi,
+>
+> On Sat, Jul 16, 2016 at 12:46:02PM +0200, Hans de Goede wrote:
+>> It turns out that sun4i (A10) and sun5i (A13 & co) do not have sample
+>> clocks, so make them optional.
+>>
+>> Since these do not have sample clocks, they cannot (reliably) do
+>> DDR rates, so only set MMC_CAP_1_8V_DDR when we do have sample clks.
+>>
+>> Note this patch only changes the devm_clk_get error checking and sets
+>> the clocks to NULL if they don't exists. All the clk_foo calls accept
+>> a NULL clk and will return success when called with a NULL clk, so this
+>> is all that is necessary.
+>
+> The clocks aren't really optional. They're not needed for the A10 /
+> A13, and mandatory for the A20 and later.
+>
+> Having a new compatible for the A20 that would require that clock and
+> not require it for the A10/A13 anymore seems more appropriate.
 
-Signed-off-by: Marcus Cooper <codekipper@gmail.com>
----
- drivers/pinctrl/sunxi/pinctrl-sun6i-a31.c | 12 ++++++++++--
- 1 file changed, 10 insertions(+), 2 deletions(-)
+Ok, I've prepared a new version using a new compatible.
 
-diff --git a/drivers/pinctrl/sunxi/pinctrl-sun6i-a31.c b/drivers/pinctrl/sunxi/pinctrl-sun6i-a31.c
-index 022863a..a70b529 100644
---- a/drivers/pinctrl/sunxi/pinctrl-sun6i-a31.c
-+++ b/drivers/pinctrl/sunxi/pinctrl-sun6i-a31.c
-@@ -896,10 +896,18 @@ static const struct sunxi_desc_pin sun6i_a31_pins[] = {
- 		  SUNXI_FUNCTION(0x1, "gpio_out")),
- 	SUNXI_PIN(SUNXI_PINCTRL_PIN(H, 27),
- 		  SUNXI_FUNCTION(0x0, "gpio_in"),
--		  SUNXI_FUNCTION(0x1, "gpio_out")),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		/*
-+		 * The SPDIF block is not referenced at all in the A31 user
-+		 * manual. However it is described in the code leaked and the
-+		 * configuration files supplied by vendors.
-+		 */
-+		  SUNXI_FUNCTION(0x3, "spdif")),        /* SPDIF IN */
- 	SUNXI_PIN(SUNXI_PINCTRL_PIN(H, 28),
- 		  SUNXI_FUNCTION(0x0, "gpio_in"),
--		  SUNXI_FUNCTION(0x1, "gpio_out")),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		/* Undocumented mux function - see above */
-+		  SUNXI_FUNCTION(0x3, "spdif")),        /* SPDIF OUT */
- 	SUNXI_PIN(SUNXI_PINCTRL_PIN(H, 29),
- 		  SUNXI_FUNCTION(0x0, "gpio_in"),
- 		  SUNXI_FUNCTION(0x1, "gpio_out"),
--- 
-2.9.2
+Regards,
+
+Hans
