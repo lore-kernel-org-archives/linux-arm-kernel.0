@@ -1,77 +1,87 @@
-From: codekipper@gmail.com (codekipper at gmail.com)
-Date: Sat, 30 Jul 2016 17:56:38 +0200
-Subject: [PATCH v2 2/2] ASoC: sunxi: compatibility for sun6i to SPDIF
-In-Reply-To: <20160730155638.24455-1-codekipper@gmail.com>
-References: <20160730155638.24455-1-codekipper@gmail.com>
-Message-ID: <20160730155638.24455-3-codekipper@gmail.com>
+From: joe@perches.com (Joe Perches)
+Date: Sat, 30 Jul 2016 09:30:45 -0700
+Subject: [PATCH v2] ARM: pxa: fix GPIO double shifts
+In-Reply-To: <1469877735-30127-1-git-send-email-robert.jarzmik@free.fr>
+References: <1469877735-30127-1-git-send-email-robert.jarzmik@free.fr>
+Message-ID: <1469896245.3998.113.camel@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marcus Cooper <codekipper@gmail.com>
+On Sat, 2016-07-30 at 13:22 +0200, Robert Jarzmik wrote:
+> The commit 9bf448c66d4b ("ARM: pxa: use generic gpio operation instead of
+> gpio register") from Oct 17, 2011, leads to the following static checker
+> warning:
+> ? arch/arm/mach-pxa/spitz_pm.c:172 spitz_charger_wakeup()
+> ? warn: double left shift '!gpio_get_value(SPITZ_GPIO_KEY_INT)
+> ????????<< (1 << ((SPITZ_GPIO_KEY_INT) & 31))'
+> 
+> As Dan reported, the value is shifted three times :
+> ?- once by gpio_get_value(), which returns either 0 or BIT(gpio)
+> ?- once by the shift operation '<<'
+> ?- a last time by GPIO_bit(gpio) which is BIT(gpio)
+> 
+> Therefore the calculation lead to a chained or operator of :
+> ?- (1 << gpio) << (1 << gpio) = (2^gpio)^gpio = 2 ^ (gpio * gpio)
+> 
+> It is be sheer luck the former statement works, only because each gpio
+> used is strictly smaller than 6, and therefore 2^(gpio^2) never
+> overflows a 32 bits value, and because it is used as a boolean value to
+> check a gpio activation.
 
-The A31 SoC uses the same SPDIF block as found in earlier SoCs, but its
-reset is controlled via a separate reset controller.
+It may be better to change the charger_wakeup callback return
+value from unsigned long to bool and modify the other use in
+spitz_pm.c?
 
-The DMA also complains when the maxburst is set to 4 so it's been adjusted
-to 8 which suites both the older and newer SoCs.
+$ git grep -w charger_wakeup
+arch/arm/mach-pxa/corgi_pm.c:???.charger_wakeup??= corgi_charger_wakeup,
+arch/arm/mach-pxa/sharpsl_pm.c:?????????????????if (sharpsl_pm.machinfo->charger_wakeup() != 0)
+arch/arm/mach-pxa/sharpsl_pm.c:?????????if (sharpsl_pm.machinfo->charger_wakeup())
+arch/arm/mach-pxa/sharpsl_pm.h: unsigned long (*charger_wakeup)(void);
+arch/arm/mach-pxa/spitz_pm.c:???.charger_wakeup???= spitz_charger_wakeup,
 
-Signed-off-by: Marcus Cooper <codekipper@gmail.com>
----
- sound/soc/sunxi/sun4i-spdif.c | 17 ++++++++++++++++-
- 1 file changed, 16 insertions(+), 1 deletion(-)
-
-diff --git a/sound/soc/sunxi/sun4i-spdif.c b/sound/soc/sunxi/sun4i-spdif.c
-index 0b04fb0..88fbb3a 100644
---- a/sound/soc/sunxi/sun4i-spdif.c
-+++ b/sound/soc/sunxi/sun4i-spdif.c
-@@ -29,6 +29,7 @@
- #include <linux/module.h>
- #include <linux/platform_device.h>
- #include <linux/pm_runtime.h>
-+#include <linux/reset.h>
- #include <sound/dmaengine_pcm.h>
- #include <sound/pcm_params.h>
- #include <sound/soc.h>
-@@ -162,6 +163,7 @@ struct sun4i_spdif_dev {
- 	struct platform_device *pdev;
- 	struct clk *spdif_clk;
- 	struct clk *apb_clk;
-+	struct reset_control *rst;
- 	struct snd_soc_dai_driver cpu_dai_drv;
- 	struct regmap *regmap;
- 	struct snd_dmaengine_dai_dma_data dma_params_tx;
-@@ -411,6 +413,7 @@ static const struct snd_soc_dapm_route dit_routes[] = {
- 
- static const struct of_device_id sun4i_spdif_of_match[] = {
- 	{ .compatible = "allwinner,sun4i-a10-spdif", },
-+	{ .compatible = "allwinner,sun6i-a31-spdif", },
- 	{ /* sentinel */ }
- };
- MODULE_DEVICE_TABLE(of, sun4i_spdif_of_match);
-@@ -482,11 +485,23 @@ static int sun4i_spdif_probe(struct platform_device *pdev)
- 	}
- 
- 	host->dma_params_tx.addr = res->start + SUN4I_SPDIF_TXFIFO;
--	host->dma_params_tx.maxburst = 4;
-+	host->dma_params_tx.maxburst = 8;
- 	host->dma_params_tx.addr_width = DMA_SLAVE_BUSWIDTH_2_BYTES;
- 
- 	platform_set_drvdata(pdev, host);
- 
-+	if (of_device_is_compatible(pdev->dev.of_node,
-+				    "allwinner,sun6i-a31-spdif")) {
-+		host->rst = devm_reset_control_get_optional(&pdev->dev, NULL);
-+		if (IS_ERR(host->rst) && PTR_ERR(host->rst) == -EPROBE_DEFER) {
-+			ret = -EPROBE_DEFER;
-+			dev_err(&pdev->dev, "Failed to get reset: %d\n", ret);
-+			goto err_disable_apb_clk;
-+		}
-+		if (!IS_ERR(host->rst))
-+			reset_control_deassert(host->rst);
-+	}
-+
- 	ret = devm_snd_soc_register_component(&pdev->dev,
- 				&sun4i_spdif_component, &sun4i_spdif_dai, 1);
- 	if (ret)
--- 
-2.9.2
+> Fixes: 9bf448c66d4b ("ARM: pxa: use generic gpio operation instead of
+> gpio register")
+> Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
+> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+> ---
+> Since v1: replaced binary ORs with logical ORs after assembly comparison
+> ---
+> ?arch/arm/mach-pxa/corgi_pm.c | 8 +++-----
+> ?arch/arm/mach-pxa/spitz_pm.c | 5 ++---
+> ?2 files changed, 5 insertions(+), 8 deletions(-)
+> 
+> diff --git a/arch/arm/mach-pxa/corgi_pm.c b/arch/arm/mach-pxa/corgi_pm.c
+> index d9206811be9b..8dc39d602884 100644
+> --- a/arch/arm/mach-pxa/corgi_pm.c
+> +++ b/arch/arm/mach-pxa/corgi_pm.c
+> @@ -135,11 +135,9 @@ static unsigned long corgi_charger_wakeup(void)
+> ?{
+> ?	unsigned long ret;
+> ?
+> -	ret = (!gpio_get_value(CORGI_GPIO_AC_IN) << GPIO_bit(CORGI_GPIO_AC_IN))
+> -		| (!gpio_get_value(CORGI_GPIO_KEY_INT)
+> -		<< GPIO_bit(CORGI_GPIO_KEY_INT))
+> -		| (!gpio_get_value(CORGI_GPIO_WAKEUP)
+> -		<< GPIO_bit(CORGI_GPIO_WAKEUP));
+> +	ret = !gpio_get_value(CORGI_GPIO_AC_IN)
+> +		|| !gpio_get_value(CORGI_GPIO_KEY_INT)
+> +		|| !gpio_get_value(CORGI_GPIO_WAKEUP);
+> ?	return ret;
+> ?}
+> ?
+> diff --git a/arch/arm/mach-pxa/spitz_pm.c b/arch/arm/mach-pxa/spitz_pm.c
+> index ea9f9034cb54..dd85869f6f99 100644
+> --- a/arch/arm/mach-pxa/spitz_pm.c
+> +++ b/arch/arm/mach-pxa/spitz_pm.c
+> @@ -168,9 +168,8 @@ static int spitz_should_wakeup(unsigned int resume_on_alarm)
+> ?static unsigned long spitz_charger_wakeup(void)
+> ?{
+> ?	unsigned long ret;
+> -	ret = ((!gpio_get_value(SPITZ_GPIO_KEY_INT)
+> -		<< GPIO_bit(SPITZ_GPIO_KEY_INT))
+> -		| gpio_get_value(SPITZ_GPIO_SYNC));
+> +	ret = !gpio_get_value(SPITZ_GPIO_KEY_INT)
+> +		|| gpio_get_value(SPITZ_GPIO_SYNC);
+> ?	return ret;
+> ?}
+> ?
