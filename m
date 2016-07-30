@@ -1,89 +1,59 @@
-From: briannorris@chromium.org (Brian Norris)
-Date: Fri, 29 Jul 2016 16:39:51 -0700
-Subject: [PATCH] arm64: dts: rockchip: add spiX aliases for rk3399
-In-Reply-To: <3484113.eKHnDqRbfE@diego>
-References: <1468545873-134339-1-git-send-email-briannorris@chromium.org>
- <20160719192912.GA142821@google.com> <1841177.NDa9D09EGz@diego>
- <3484113.eKHnDqRbfE@diego>
-Message-ID: <20160729233950.GA102046@google.com>
+From: isubramanian@apm.com (Iyappan Subramanian)
+Date: Fri, 29 Jul 2016 17:33:53 -0700
+Subject: [PATCH net-next 00/10] Fix warning and issues
+Message-ID: <1469838843-19943-1-git-send-email-isubramanian@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ Mark
+This patch set fixes the following warning and issues,
 
-On Wed, Jul 20, 2016 at 10:11:11AM +0200, Heiko Stuebner wrote:
-> Am Mittwoch, 20. Juli 2016, 00:18:40 schrieb Heiko St?bner:
-> > Am Dienstag, 19. Juli 2016, 12:29:14 schrieb Brian Norris:
-> > > On Tue, Jul 19, 2016 at 12:27:54PM -0700, Brian Norris wrote:
-> > > > On Tue, Jul 19, 2016 at 08:56:47PM +0200, Heiko Stuebner wrote:
-> > > > > Am Dienstag, 19. Juli 2016, 08:39:55 schrieb Uwe Kleine-K?nig:
-> > > > > > > --- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-> > > > > > > +++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-> > > > > > > @@ -70,6 +70,12 @@
-> > > > > > > 
-> > > > > > >  		serial2 = &uart2;
-> > > > > > >  		serial3 = &uart3;
-> > > > > > >  		serial4 = &uart4;
-> > > > > > > 
-> > > > > > > +		spi0 = &spi0;
-> > > > > > > +		spi1 = &spi1;
-> > > > > > > +		spi2 = &spi2;
-> > > > > > > +		spi3 = &spi3;
-> > > > > > > +		spi4 = &spi4;
-> > > > > > > +		spi5 = &spi5;
-> > > > > > 
-> > > > > > Note that Rob Herring (with his dt-maintainer hat on) doesn't like
-> > > > > > these
-> > > > > > aliases.
-> > > > > > 
-> > > > > > See for example:
-> > > > > > 	http://mid.gmane.org/20160705140546.GA10601 at rob-hp-laptop
-> > > > 
-> > > > But why? I believe half the arguments in the linked thread were
-> > > > Catch-22's -- there were no "mainline" users (which is a false target
-> > > > IMO anyway, as Christer Weinigel mentioned somewhere in the thread Rob
-> > > > linked), and so we couldn't accept more documentation (or users) for the
-> > > > feature. FWIW, my quick grep now shows there are currently 43 mainline
-> > > > users.
-> > > > 
-> > > > This feature is very useful. Some of the thread Rob pointed to argued
-> > > > that the indexing isn't HW documentation; in this case, it most
-> > > > certainly is. The RK3399 TRM explicitly has these SPI buses named SPI0,
-> > > > SPI1, SPI2, SPI3, SPI4, and SPI5, and schematics that I've seen use the
-> > > > same terminology. It is therefore *much* nicer to have my device show up
-> > > > as 'spi2.0' (reflecting their correct HW name) rather than spi32764.0.
-> > > > Sometimes I can't even get as far as mounting sysfs to check what this
-> > > > maps to, but having spi2.0 in the kernel log can clearly tell me what
-> > > > device is causing problems.
-> > > > 
-> > > > If Rob can support a better alternative solution, I'd be happy to
-> > > > switch. But I don't understand why we can't use a useful (not just to
-> > > > me, but presumably to at least 43 other independent users, and many
-> > > > more out of tree), existing, and long-supported feature here.
-> > 
-> > Personally, I don't have any real opinion on this but the argument sounds
-> > plausible to me (aka they are named with numbers in every manual,
-> > schematics) so it might be helpful to have that around - similar to i2c
-> > that is in the dtsi already.
-> > 
-> > I think I remember Doug having a similar discussion around mmc-aliases some
-> > time ago - that met opposition as well [0] - although I guess the numbering
-> > was a bit more arbitary there.
-> > 
-> > I guess we'll just see what Rob says.
-> 
-> Uwe pointed me to a very similar discussion and response from Rob about spi 
-> aliases at:
-> https://lkml.org/lkml/2016/5/25/566
+  1. Fix kbuild warning
+	- drivers: net: xgene: Fix kbuild warning
+  2. unmap DMA memory on xgene_Enet_delete_bufpoool() 
+	- drivers: net: xgene: fix: Add dma_unmap_single
+  3. Delete descriptor rings and buffer pools on error
+	- drivers: net: xgene: fix: Delete descriptor rings and buffer pools
+  4. Fix error desconstruction on probe()
+ 	- drivers: net: xgene: Fix error deconstruction path
+  5. Fix RSS indirection table fields
+ 	- drivers: net: xgene: Fix RSS indirection table fields
+  6. Change the port init sequence as per hardware specification
+	- drivers: net: xgene: Change port init sequence
+  7. Fix link not recovered after link is down issue
+	- drivers: net: xgene: XFI PCS reset when link is down
+  8. Fix link up is reported when no SFP+ module is plugged in issue
+	- drivers: net: xgene: Poll link status via GPIO
+	- dtb: xgene: Add rxlos-gpios property
+	- Documentation: dtb: xgene: Add rxlos GPIO mapping
 
-I had read that already. I figured that was just rationale for not
-documenting the feature (still silly IMO), and not for avoiding using
-the existing feature.
+Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
+Tested-by: Fushen Chen <fchen@apm.com>
+---
 
-What is this "label" feature Rob speaks of? Does it exist in practice
-(AFAICT the answer is "no")? The description doesn't seem terrible,
-depending on the implementation. Would that become the actual device
-name (i.e., dev_name(dev))? Or just a filesystem symlink? And how does
-one assign such a label?
+Iyappan Subramanian (10):
+  drivers: net: xgene: Fix kbuild warning
+  drivers: net: xgene: fix: Add dma_unmap_single
+  drivers: net: xgene: fix: Delete descriptor rings and buffer pools
+  drivers: net: xgene: Fix error deconstruction path
+  drivers: net: xgene: Fix RSS indirection table fields
+  drivers: net: xgene: Change port init sequence
+  drivers: net: xgene: XFI PCS reset when link is down
+  drivers: net: xgene: Poll link status via GPIO
+  dtb: xgene: Add rxlos-gpios property
+  Documentation: dtb: xgene: Add rxlos GPIO mapping
 
-Brian
+ .../devicetree/bindings/net/apm-xgene-enet.txt     |  1 +
+ arch/arm64/boot/dts/apm/apm-mustang.dts            |  1 +
+ drivers/net/ethernet/apm/xgene/Kconfig             |  1 +
+ drivers/net/ethernet/apm/xgene/xgene_enet_cle.c    | 17 ++++--
+ drivers/net/ethernet/apm/xgene/xgene_enet_cle.h    | 10 +++-
+ drivers/net/ethernet/apm/xgene/xgene_enet_hw.c     |  7 +--
+ drivers/net/ethernet/apm/xgene/xgene_enet_hw.h     |  6 ++
+ drivers/net/ethernet/apm/xgene/xgene_enet_main.c   | 69 +++++++++++++++++-----
+ drivers/net/ethernet/apm/xgene/xgene_enet_main.h   |  2 +
+ drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.c  | 53 ++++++++++++++++-
+ drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.h  |  4 ++
+ 11 files changed, 140 insertions(+), 31 deletions(-)
+
+-- 
+1.9.1
