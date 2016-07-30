@@ -1,38 +1,37 @@
 From: moinejf@free.fr (Jean-Francois Moine)
-Date: Sat, 30 Jul 2016 07:18:14 +0200
+Date: Sat, 30 Jul 2016 07:20:02 +0200
 Subject: [PATCH 2/3] mmc: sunxi: Set the 'New Timing' register for 8
  bits DDR transfers
-In-Reply-To: <20160729191730.GG6215@lukather>
+In-Reply-To: <20160729193634.GA27116@lukather>
 References: <cover.1469082481.git.moinejf@free.fr>
  <bc7b767cad6db159a44c4b98d5b1f3eb53c26bd3.1469082481.git.moinejf@free.fr>
  <20160721085615.GG5993@lukather>
  <20160721112655.941b1dad04f7a5b94d4172c1@free.fr>
- <20160729191730.GG6215@lukather>
-Message-ID: <20160730071814.92d803eaa5bd8303a87bd5e5@free.fr>
+ <20160729193634.GA27116@lukather>
+Message-ID: <20160730072002.4aec7254bca2d6ee2013ac0c@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 29 Jul 2016 21:17:30 +0200
+On Fri, 29 Jul 2016 21:36:34 +0200
 Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
 
-> > > What happens if you actually want to set it to 100MHz?
+> On Thu, Jul 21, 2016 at 11:26:55AM +0200, Jean-Francois Moine wrote:
+> > On Thu, 21 Jul 2016 10:56:15 +0200
+> > Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
 > > 
-> > There is no SDXC_CLK_100M in the mainline driver, and 100MHz is asked
-> > only for 8 bits DDR at 50MHz.
+> > > On Wed, Jul 20, 2016 at 08:16:28PM +0200, Jean-Francois Moine wrote:
+> > > > The 'new timing mode' with 8 bits DDR works correctly when the NewTiming
+> > > > register is set.
+> > > 
+> > > What does that mode brings to the table?
+> > 
+> > From my tests, the eMMC of the Banana Pi M3 (A83T) cannot work when the
+> > new mode is not used.
 > 
-> You're missing the point.
-> 
-> clk_set_rate is supposed to apply a rate as close as possible as
-> requested, there's no reason why you would request a rate twice as
-> high as need.
-> 
-> You want to switch the clock from one mode to another, fine, create a
-> new function for that. But don't hack an existing one.
+> That's odd. The one in the Pine64 seems to work just fine, and yet
+> there's only the new mode on the A64.
 
-I will not change the core clock stuff for this marginal case.
-Flagging the clock as 'new mode capable' is enough.
-Anyway, setting the 'new mode' bit to the clock divides the rate by
-two, so, there is no reason to not use it.
+I spent 2 weeks on this problem. You may try it by yourself.
 
 -- 
 Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
