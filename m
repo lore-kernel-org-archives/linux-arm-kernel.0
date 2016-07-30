@@ -1,26 +1,45 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sat, 30 Jul 2016 17:16:19 +0200
-Subject: [PATCH v2 5/5] ARM: dts: sunxi: Use new sun7i-a20-mmc compatible
- on sun7i and newer
-In-Reply-To: <1469888748-26085-6-git-send-email-hdegoede@redhat.com>
-References: <1469888748-26085-1-git-send-email-hdegoede@redhat.com>
- <1469888748-26085-6-git-send-email-hdegoede@redhat.com>
-Message-ID: <20160730151619.GR6215@lukather>
+Date: Sat, 30 Jul 2016 17:17:24 +0200
+Subject: [PATCH 1/2] ASoC: sunxi: Add bindings for sun6i to SPDIF
+In-Reply-To: <20160730142716.29377-2-codekipper@gmail.com>
+References: <20160730142716.29377-1-codekipper@gmail.com>
+ <20160730142716.29377-2-codekipper@gmail.com>
+Message-ID: <20160730151724.GS6215@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 30, 2016 at 04:25:48PM +0200, Hans de Goede wrote:
-> Use the new sun7i-a20-mmc compatible for the mmc controllers on sun7i
-> and newer.
+On Sat, Jul 30, 2016 at 04:27:15PM +0200, codekipper at gmail.com wrote:
+> From: Marcus Cooper <codekipper@gmail.com>
 > 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> The A31 SoC uses the same SPDIF block as found in earlier SoCs, but its
+> reset is controlled via a separate reset controller.
+> 
+> Signed-off-by: Marcus Cooper <codekipper@gmail.com>
+> ---
+>  Documentation/devicetree/bindings/sound/sunxi,sun4i-spdif.txt | 3 +++
+>  1 file changed, 3 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/sound/sunxi,sun4i-spdif.txt b/Documentation/devicetree/bindings/sound/sunxi,sun4i-spdif.txt
+> index 13503aa..4fe80f7 100644
+> --- a/Documentation/devicetree/bindings/sound/sunxi,sun4i-spdif.txt
+> +++ b/Documentation/devicetree/bindings/sound/sunxi,sun4i-spdif.txt
+> @@ -9,6 +9,7 @@ Required properties:
+>  
+>    - compatible		: should be one of the following:
+>      - "allwinner,sun4i-a10-spdif": for the Allwinner A10 SoC
+> +    - "allwinner,sun6i-a31-spdif": for the Allwinner A31 SoC
+>  
+>    - reg			: Offset and length of the register set for the device.
+>  
+> @@ -25,6 +26,8 @@ Required properties:
+>  	"apb"		  clock for the spdif bus.
+>  	"spdif"		  clock for spdif controller.
+>  
+> +  - reset		: reset specifier for the ahb reset (A31 and newer only)
 
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Isn't it resets ? (plural)
 
-This should probably go through Ulf tree together with the rest of
-that serie to maintain the bisectability.
-
-Thanks a lot for this work,
+Thanks,
 Maxime
 
 -- 
@@ -33,4 +52,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160730/90437885/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160730/535a77d7/attachment.sig>
