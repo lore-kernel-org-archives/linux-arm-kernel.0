@@ -1,55 +1,110 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sat, 30 Jul 2016 17:17:24 +0200
-Subject: [PATCH 1/2] ASoC: sunxi: Add bindings for sun6i to SPDIF
-In-Reply-To: <20160730142716.29377-2-codekipper@gmail.com>
-References: <20160730142716.29377-1-codekipper@gmail.com>
- <20160730142716.29377-2-codekipper@gmail.com>
-Message-ID: <20160730151724.GS6215@lukather>
+From: icenowy@aosc.xyz (Icenowy Zheng)
+Date: Sat, 30 Jul 2016 23:18:15 +0800
+Subject: [PATCH v2 3/5] mmc: sunxi: Factor out clock phase setting code
+ into a helper function
+In-Reply-To: <1469888748-26085-4-git-send-email-hdegoede@redhat.com>
+References: <1469888748-26085-1-git-send-email-hdegoede@redhat.com>
+ <1469888748-26085-4-git-send-email-hdegoede@redhat.com>
+Message-ID: <195421469891895@web9j.yandex.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 30, 2016 at 04:27:15PM +0200, codekipper at gmail.com wrote:
-> From: Marcus Cooper <codekipper@gmail.com>
-> 
-> The A31 SoC uses the same SPDIF block as found in earlier SoCs, but its
-> reset is controlled via a separate reset controller.
-> 
-> Signed-off-by: Marcus Cooper <codekipper@gmail.com>
+
+
+30.07.2016, 22:26, "Hans de Goede" <hdegoede@redhat.com>:
+> Add a sunxi_mmc_clk_set_phase() helper function.
+Thanks! It's useful for A64 MMC implementation.
+
+>
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 > ---
->  Documentation/devicetree/bindings/sound/sunxi,sun4i-spdif.txt | 3 +++
->  1 file changed, 3 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/sound/sunxi,sun4i-spdif.txt b/Documentation/devicetree/bindings/sound/sunxi,sun4i-spdif.txt
-> index 13503aa..4fe80f7 100644
-> --- a/Documentation/devicetree/bindings/sound/sunxi,sun4i-spdif.txt
-> +++ b/Documentation/devicetree/bindings/sound/sunxi,sun4i-spdif.txt
-> @@ -9,6 +9,7 @@ Required properties:
->  
->    - compatible		: should be one of the following:
->      - "allwinner,sun4i-a10-spdif": for the Allwinner A10 SoC
-> +    - "allwinner,sun6i-a31-spdif": for the Allwinner A31 SoC
->  
->    - reg			: Offset and length of the register set for the device.
->  
-> @@ -25,6 +26,8 @@ Required properties:
->  	"apb"		  clock for the spdif bus.
->  	"spdif"		  clock for spdif controller.
->  
-> +  - reset		: reset specifier for the ahb reset (A31 and newer only)
-
-Isn't it resets ? (plural)
-
-Thanks,
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160730/535a77d7/attachment.sig>
+> Changes in v2:
+> -New patch in v2 of this patch-set
+> ---
+> ?drivers/mmc/host/sunxi-mmc.c | 61 ++++++++++++++++++++++++--------------------
+> ?1 file changed, 33 insertions(+), 28 deletions(-)
+>
+> diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
+> index 9f44c83..b631b5c 100644
+> --- a/drivers/mmc/host/sunxi-mmc.c
+> +++ b/drivers/mmc/host/sunxi-mmc.c
+> @@ -657,12 +657,39 @@ static int sunxi_mmc_oclk_onoff(struct sunxi_mmc_host *host, u32 oclk_en)
+> ?????????return 0;
+> ?}
+>
+> +static int sunxi_mmc_clk_set_phase(struct sunxi_mmc_host *host,
+> + struct mmc_ios *ios, u32 rate)
+> +{
+> + int index;
+> +
+> + /* determine delays */
+> + if (rate <= 400000) {
+> + index = SDXC_CLK_400K;
+> + } else if (rate <= 25000000) {
+> + index = SDXC_CLK_25M;
+> + } else if (rate <= 52000000) {
+> + if (ios->timing != MMC_TIMING_UHS_DDR50 &&
+> + ios->timing != MMC_TIMING_MMC_DDR52) {
+> + index = SDXC_CLK_50M;
+> + } else if (ios->bus_width == MMC_BUS_WIDTH_8) {
+> + index = SDXC_CLK_50M_DDR_8BIT;
+> + } else {
+> + index = SDXC_CLK_50M_DDR;
+> + }
+> + } else {
+> + return -EINVAL;
+> + }
+> +
+> + clk_set_phase(host->clk_sample, host->cfg->clk_delays[index].sample);
+> + clk_set_phase(host->clk_output, host->cfg->clk_delays[index].output);
+> +
+> + return 0;
+> +}
+> +
+> ?static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
+> ???????????????????????????????????struct mmc_ios *ios)
+> ?{
+> - const struct sunxi_mmc_clk_delay *clk_delays = host->cfg->clk_delays;
+> - u32 rate, oclk_dly, rval, sclk_dly;
+> - u32 clock = ios->clock;
+> + u32 rate, rval, clock = ios->clock;
+> ?????????int ret;
+>
+> ?????????/* 8 bit DDR requires a higher module clock */
+> @@ -697,31 +724,9 @@ static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
+> ?????????}
+> ?????????mmc_writel(host, REG_CLKCR, rval);
+>
+> - /* determine delays */
+> - if (rate <= 400000) {
+> - oclk_dly = clk_delays[SDXC_CLK_400K].output;
+> - sclk_dly = clk_delays[SDXC_CLK_400K].sample;
+> - } else if (rate <= 25000000) {
+> - oclk_dly = clk_delays[SDXC_CLK_25M].output;
+> - sclk_dly = clk_delays[SDXC_CLK_25M].sample;
+> - } else if (rate <= 52000000) {
+> - if (ios->timing != MMC_TIMING_UHS_DDR50 &&
+> - ios->timing != MMC_TIMING_MMC_DDR52) {
+> - oclk_dly = clk_delays[SDXC_CLK_50M].output;
+> - sclk_dly = clk_delays[SDXC_CLK_50M].sample;
+> - } else if (ios->bus_width == MMC_BUS_WIDTH_8) {
+> - oclk_dly = clk_delays[SDXC_CLK_50M_DDR_8BIT].output;
+> - sclk_dly = clk_delays[SDXC_CLK_50M_DDR_8BIT].sample;
+> - } else {
+> - oclk_dly = clk_delays[SDXC_CLK_50M_DDR].output;
+> - sclk_dly = clk_delays[SDXC_CLK_50M_DDR].sample;
+> - }
+> - } else {
+> - return -EINVAL;
+> - }
+> -
+> - clk_set_phase(host->clk_sample, sclk_dly);
+> - clk_set_phase(host->clk_output, oclk_dly);
+> + ret = sunxi_mmc_clk_set_phase(host, ios, rate);
+> + if (ret)
+> + return ret;
+>
+> ?????????return sunxi_mmc_oclk_onoff(host, 1);
+> ?}
+> --
+> 2.7.4
