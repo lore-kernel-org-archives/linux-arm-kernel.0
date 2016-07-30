@@ -1,37 +1,42 @@
 From: codekipper@gmail.com (codekipper at gmail.com)
-Date: Sat, 30 Jul 2016 17:56:36 +0200
-Subject: [PATCH v2 0/2] ASoC: Extended SPDIF support to Allwinner A31 SoCs
-Message-ID: <20160730155638.24455-1-codekipper@gmail.com>
+Date: Sat, 30 Jul 2016 17:56:37 +0200
+Subject: [PATCH v2 1/2] ASoC: sunxi: Add bindings for sun6i to SPDIF
+In-Reply-To: <20160730155638.24455-1-codekipper@gmail.com>
+References: <20160730155638.24455-1-codekipper@gmail.com>
+Message-ID: <20160730155638.24455-2-codekipper@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Marcus Cooper <codekipper@gmail.com>
 
-This patch set extends the current support of the Allwinner SPDIF
-transceiver to include the A31 SoC.
+The A31 SoC uses the same SPDIF block as found in earlier SoCs, but its
+reset is controlled via a separate reset controller.
 
-For now just the SPDIF transmitter has been tested on the Mele I7.
-
-In order for this patch set to be functional then we require changes
-to the clocks and the device tree. For those that are interested I've
-pushed all the required patches here
-
-https://github.com/codekipper/linux-sunxi/commits/a31-spdif
-
-Thanks in advance,
-CK
-
+Signed-off-by: Marcus Cooper <codekipper@gmail.com>
 ---
-Changes since v1:
- - Corrected mistake in bindings documentation
+ Documentation/devicetree/bindings/sound/sunxi,sun4i-spdif.txt | 3 +++
+ 1 file changed, 3 insertions(+)
 
-Marcus Cooper (2):
-  ASoC: sunxi: Add bindings for sun6i to SPDIF
-  ASoC: sunxi: compatibility for sun6i to SPDIF
-
- .../devicetree/bindings/sound/sunxi,sun4i-spdif.txt     |  3 +++
- sound/soc/sunxi/sun4i-spdif.c                           | 17 ++++++++++++++++-
- 2 files changed, 19 insertions(+), 1 deletion(-)
-
+diff --git a/Documentation/devicetree/bindings/sound/sunxi,sun4i-spdif.txt b/Documentation/devicetree/bindings/sound/sunxi,sun4i-spdif.txt
+index 13503aa..0230c4d 100644
+--- a/Documentation/devicetree/bindings/sound/sunxi,sun4i-spdif.txt
++++ b/Documentation/devicetree/bindings/sound/sunxi,sun4i-spdif.txt
+@@ -9,6 +9,7 @@ Required properties:
+ 
+   - compatible		: should be one of the following:
+     - "allwinner,sun4i-a10-spdif": for the Allwinner A10 SoC
++    - "allwinner,sun6i-a31-spdif": for the Allwinner A31 SoC
+ 
+   - reg			: Offset and length of the register set for the device.
+ 
+@@ -25,6 +26,8 @@ Required properties:
+ 	"apb"		  clock for the spdif bus.
+ 	"spdif"		  clock for spdif controller.
+ 
++  - resets		: reset specifier for the ahb reset (A31 and newer only)
++
+ Example:
+ 
+ spdif: spdif at 01c21000 {
 -- 
 2.9.2
