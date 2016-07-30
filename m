@@ -1,87 +1,79 @@
-From: joe@perches.com (Joe Perches)
-Date: Sat, 30 Jul 2016 09:30:45 -0700
-Subject: [PATCH v2] ARM: pxa: fix GPIO double shifts
-In-Reply-To: <1469877735-30127-1-git-send-email-robert.jarzmik@free.fr>
-References: <1469877735-30127-1-git-send-email-robert.jarzmik@free.fr>
-Message-ID: <1469896245.3998.113.camel@perches.com>
+From: hramrach@gmail.com (Michal Suchanek)
+Date: Sat, 30 Jul 2016 19:32:51 +0200
+Subject: [PATCH v3 00/13] sunxi spi fixes
+In-Reply-To: <20160729202247.GJ6215@lukather>
+References: <cover.1465490774.git.hramrach@gmail.com>
+ <20160613195716.GD9354@lukather>
+ <CAOMqctS6ZQ3_a97sE2e7H34ZCny2aDE38V1tQA=-SBZwF2sbDQ@mail.gmail.com>
+ <20160725073204.GD7419@lukather>
+ <CAOMqctQybJoOfUHGtpmpB_koQ=iY+GpQ_BOL2o0QBbwC_HXC0g@mail.gmail.com>
+ <20160729202247.GJ6215@lukather>
+Message-ID: <CAOMqctQkaQnEt6U3dd_kzi8GtfS_G3=hue3sz_TomMATn8o3iA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2016-07-30 at 13:22 +0200, Robert Jarzmik wrote:
-> The commit 9bf448c66d4b ("ARM: pxa: use generic gpio operation instead of
-> gpio register") from Oct 17, 2011, leads to the following static checker
-> warning:
-> ? arch/arm/mach-pxa/spitz_pm.c:172 spitz_charger_wakeup()
-> ? warn: double left shift '!gpio_get_value(SPITZ_GPIO_KEY_INT)
-> ????????<< (1 << ((SPITZ_GPIO_KEY_INT) & 31))'
-> 
-> As Dan reported, the value is shifted three times :
-> ?- once by gpio_get_value(), which returns either 0 or BIT(gpio)
-> ?- once by the shift operation '<<'
-> ?- a last time by GPIO_bit(gpio) which is BIT(gpio)
-> 
-> Therefore the calculation lead to a chained or operator of :
-> ?- (1 << gpio) << (1 << gpio) = (2^gpio)^gpio = 2 ^ (gpio * gpio)
-> 
-> It is be sheer luck the former statement works, only because each gpio
-> used is strictly smaller than 6, and therefore 2^(gpio^2) never
-> overflows a 32 bits value, and because it is used as a boolean value to
-> check a gpio activation.
+On 29 July 2016 at 22:22, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> On Mon, Jul 25, 2016 at 10:03:14AM +0200, Michal Suchanek wrote:
+>> Hello,
+>>
+>> On 25 July 2016 at 09:32, Maxime Ripard
+>> <maxime.ripard@free-electrons.com> wrote:
+>> > On Fri, Jun 17, 2016 at 12:34:44PM +0200, Michal Suchanek wrote:
+>> >> Hello,
+>> >>
+>> >> On 13 June 2016 at 21:57, Maxime Ripard
+>> >> <maxime.ripard@free-electrons.com> wrote:
+>> >> > On Mon, Jun 13, 2016 at 05:46:48PM -0000, Michal Suchanek wrote:
+>> >> >> Hello,
+>> >> >>
+>> >> >> This is update of the sunxi spi patches that should give full-featured SPI
+>> >> >> driver.
+>> >> >>
+>> >> >> First three patches fix issues with the current driver and can be of use for
+>> >> >> stable kernels so adding cc for those.
+>> >> >>
+>> >> >> I merged the sun4i and sun6i driver because there several issues that need to
+>> >> >> be fixed in both separately and they are even out of sync wrt some fixes.
+>> >> >> I guess some of the merge patches can be squashed.
+>> >> >>
+>> >> >> I tested this with A10s Olinuxino Micro. I have no sun6i device so I cannot
+>> >> >> tell if that side was broken by this patchset - especially the last patch that
+>> >> >> adds DMA was afaik never tested on sun6i.
+>> >> >
+>> >> >
+>> >> > For the record, I'm still very much opposed to such a merge.
+>> >>
+>> >> What is the reason against the merge? I did not find the original
+>> >> discussion.
+>> >
+>> > I really prefer some code that is concise and clear but a little
+>> > duplicated over some code that shares every possible lines of code but
+>> > is a giant mess impossible to understand.
+>>
+>> Yes, it's been tried. In the case of this driver there is more duplication
+>> than differences. Also bitrot due to different variants receiving different
+>> updates and fixes crept in already.
+>>
+>> Adding the remap layer certainly does not make the driver easier to
+>> understand but it's not becoming giant mess either.
+>
+> Well, when you say that you're not quite fond of using your structure
+> all over the place because "it makes your eyes bleed", I wouldn't call
+> that a good sales pitch.
 
-It may be better to change the charger_wakeup callback return
-value from unsigned long to bool and modify the other use in
-spitz_pm.c?
+That's why put dereferencing it inside the read function. It reduces the noise
+throughout the code and make it easier to add checks or change the remap
+implementation.
 
-$ git grep -w charger_wakeup
-arch/arm/mach-pxa/corgi_pm.c:???.charger_wakeup??= corgi_charger_wakeup,
-arch/arm/mach-pxa/sharpsl_pm.c:?????????????????if (sharpsl_pm.machinfo->charger_wakeup() != 0)
-arch/arm/mach-pxa/sharpsl_pm.c:?????????if (sharpsl_pm.machinfo->charger_wakeup())
-arch/arm/mach-pxa/sharpsl_pm.h: unsigned long (*charger_wakeup)(void);
-arch/arm/mach-pxa/spitz_pm.c:???.charger_wakeup???= spitz_charger_wakeup,
+>
+> But again, reg_field seems like a good solution for that.
 
-> Fixes: 9bf448c66d4b ("ARM: pxa: use generic gpio operation instead of
-> gpio register")
-> Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
-> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
-> ---
-> Since v1: replaced binary ORs with logical ORs after assembly comparison
-> ---
-> ?arch/arm/mach-pxa/corgi_pm.c | 8 +++-----
-> ?arch/arm/mach-pxa/spitz_pm.c | 5 ++---
-> ?2 files changed, 5 insertions(+), 8 deletions(-)
-> 
-> diff --git a/arch/arm/mach-pxa/corgi_pm.c b/arch/arm/mach-pxa/corgi_pm.c
-> index d9206811be9b..8dc39d602884 100644
-> --- a/arch/arm/mach-pxa/corgi_pm.c
-> +++ b/arch/arm/mach-pxa/corgi_pm.c
-> @@ -135,11 +135,9 @@ static unsigned long corgi_charger_wakeup(void)
-> ?{
-> ?	unsigned long ret;
-> ?
-> -	ret = (!gpio_get_value(CORGI_GPIO_AC_IN) << GPIO_bit(CORGI_GPIO_AC_IN))
-> -		| (!gpio_get_value(CORGI_GPIO_KEY_INT)
-> -		<< GPIO_bit(CORGI_GPIO_KEY_INT))
-> -		| (!gpio_get_value(CORGI_GPIO_WAKEUP)
-> -		<< GPIO_bit(CORGI_GPIO_WAKEUP));
-> +	ret = !gpio_get_value(CORGI_GPIO_AC_IN)
-> +		|| !gpio_get_value(CORGI_GPIO_KEY_INT)
-> +		|| !gpio_get_value(CORGI_GPIO_WAKEUP);
-> ?	return ret;
-> ?}
-> ?
-> diff --git a/arch/arm/mach-pxa/spitz_pm.c b/arch/arm/mach-pxa/spitz_pm.c
-> index ea9f9034cb54..dd85869f6f99 100644
-> --- a/arch/arm/mach-pxa/spitz_pm.c
-> +++ b/arch/arm/mach-pxa/spitz_pm.c
-> @@ -168,9 +168,8 @@ static int spitz_should_wakeup(unsigned int resume_on_alarm)
-> ?static unsigned long spitz_charger_wakeup(void)
-> ?{
-> ?	unsigned long ret;
-> -	ret = ((!gpio_get_value(SPITZ_GPIO_KEY_INT)
-> -		<< GPIO_bit(SPITZ_GPIO_KEY_INT))
-> -		| gpio_get_value(SPITZ_GPIO_SYNC));
-> +	ret = !gpio_get_value(SPITZ_GPIO_KEY_INT)
-> +		|| gpio_get_value(SPITZ_GPIO_SYNC);
-> ?	return ret;
-> ?}
-> ?
+I will look at reg_field.
+
+I saw some drivers using remap layers that are way more heavyweight than
+looking up an integer in a table so I wanted to avoid that.
+
+Thanks
+
+Michal
