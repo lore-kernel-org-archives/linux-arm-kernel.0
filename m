@@ -1,119 +1,62 @@
-From: isubramanian@apm.com (Iyappan Subramanian)
-Date: Fri, 29 Jul 2016 17:34:01 -0700
-Subject: [PATCH net-next 08/10] drivers: net: xgene: Poll link status via GPIO
-In-Reply-To: <1469838843-19943-1-git-send-email-isubramanian@apm.com>
-References: <1469838843-19943-1-git-send-email-isubramanian@apm.com>
-Message-ID: <1469838843-19943-9-git-send-email-isubramanian@apm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Sat, 30 Jul 2016 02:05:36 +0100
+Subject: [PATCH] arm64: dts: rockchip: add spiX aliases for rk3399
+In-Reply-To: <20160729233950.GA102046@google.com>
+References: <1468545873-134339-1-git-send-email-briannorris@chromium.org>
+ <20160719192912.GA142821@google.com> <1841177.NDa9D09EGz@diego>
+ <3484113.eKHnDqRbfE@diego> <20160729233950.GA102046@google.com>
+Message-ID: <20160730010535.GO10376@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When 10GbE SFP+ module is not plugged in or cable is not connected,
-the link status register does not report the proper state due
-to floating signal. This patch checks the module present status via an
-GPIO to determine whether to ignore the link status register and report
-link down.
+On Fri, Jul 29, 2016 at 04:39:51PM -0700, Brian Norris wrote:
 
-Signed-off-by: Quan Nguyen <qnguyen@apm.com>
-Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
-Tested-by: Fushen Chen <fchen@apm.com>
----
- drivers/net/ethernet/apm/xgene/Kconfig            |  1 +
- drivers/net/ethernet/apm/xgene/xgene_enet_main.c  | 15 +++++++++++++++
- drivers/net/ethernet/apm/xgene/xgene_enet_main.h  |  1 +
- drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.c |  6 ++++++
- 4 files changed, 23 insertions(+)
+> + Mark
 
-diff --git a/drivers/net/ethernet/apm/xgene/Kconfig b/drivers/net/ethernet/apm/xgene/Kconfig
-index 300e3b5..6c60a7d 100644
---- a/drivers/net/ethernet/apm/xgene/Kconfig
-+++ b/drivers/net/ethernet/apm/xgene/Kconfig
-@@ -4,6 +4,7 @@ config NET_XGENE
- 	depends on ARCH_XGENE || COMPILE_TEST
- 	select PHYLIB
- 	select MDIO_XGENE
-+	select GPIO_XGENE_SB
- 	help
- 	  This is the Ethernet driver for the on-chip ethernet interface on the
- 	  APM X-Gene SoC.
-diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_main.c b/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
-index 383e7ad..bda386d 100644
---- a/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
-+++ b/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
-@@ -19,6 +19,7 @@
-  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
- 
-+#include <linux/gpio.h>
- #include "xgene_enet_main.h"
- #include "xgene_enet_hw.h"
- #include "xgene_enet_sgmac.h"
-@@ -1322,6 +1323,18 @@ static int xgene_enet_check_phy_handle(struct xgene_enet_pdata *pdata)
- 	return 0;
- }
- 
-+static void xgene_enet_gpiod_get(struct xgene_enet_pdata *pdata)
-+{
-+	struct device *dev = &pdata->pdev->dev;
-+
-+	if (pdata->phy_mode != PHY_INTERFACE_MODE_XGMII)
-+		return;
-+
-+	pdata->sfp_rdy = gpiod_get(dev, "rxlos", GPIOD_IN);
-+	if (IS_ERR(pdata->sfp_rdy))
-+		pdata->sfp_rdy = gpiod_get(dev, "sfp", GPIOD_IN);
-+}
-+
- static int xgene_enet_get_resources(struct xgene_enet_pdata *pdata)
- {
- 	struct platform_device *pdev;
-@@ -1411,6 +1424,8 @@ static int xgene_enet_get_resources(struct xgene_enet_pdata *pdata)
- 	if (ret)
- 		return ret;
- 
-+	xgene_enet_gpiod_get(pdata);
-+
- 	pdata->clk = devm_clk_get(&pdev->dev, NULL);
- 	if (IS_ERR(pdata->clk)) {
- 		/* Firmware may have set up the clock already. */
-diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_main.h b/drivers/net/ethernet/apm/xgene/xgene_enet_main.h
-index 53f4a16..b339fc1 100644
---- a/drivers/net/ethernet/apm/xgene/xgene_enet_main.h
-+++ b/drivers/net/ethernet/apm/xgene/xgene_enet_main.h
-@@ -217,6 +217,7 @@ struct xgene_enet_pdata {
- 	u8 tx_delay;
- 	u8 rx_delay;
- 	bool mdio_driver;
-+	struct gpio_desc *sfp_rdy;
- };
- 
- struct xgene_indirect_ctl {
-diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.c b/drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.c
-index 4087dba..d672e71 100644
---- a/drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.c
-+++ b/drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.c
-@@ -18,6 +18,8 @@
-  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
- 
-+#include <linux/of_gpio.h>
-+#include <linux/gpio.h>
- #include "xgene_enet_main.h"
- #include "xgene_enet_hw.h"
- #include "xgene_enet_xgmac.h"
-@@ -399,10 +401,14 @@ static void xgene_enet_link_state(struct work_struct *work)
- {
- 	struct xgene_enet_pdata *pdata = container_of(to_delayed_work(work),
- 					 struct xgene_enet_pdata, link_work);
-+	struct gpio_desc *sfp_rdy = pdata->sfp_rdy;
- 	struct net_device *ndev = pdata->ndev;
- 	u32 link_status, poll_interval;
- 
- 	link_status = xgene_enet_link_status(pdata);
-+	if (link_status && !IS_ERR(sfp_rdy) && !gpiod_get_value(sfp_rdy))
-+		link_status = 0;
-+
- 	if (link_status) {
- 		if (!netif_carrier_ok(ndev)) {
- 			netif_carrier_on(ndev);
--- 
-1.9.1
+I very nearly deleted this unread based on the subject line...
+
+> I had read that already. I figured that was just rationale for not
+> documenting the feature (still silly IMO), and not for avoiding using
+> the existing feature.
+
+All in tree aliases provided for SPI buses are strings so if we're doing
+anything with aliases we really ought to be parsing them as strings not
+numbers (they're people describing the use of buses on their board).  
+
+I quite seriously am more inclined to remove the numbering functionality
+as stands than document it as stands given how many layers of
+implementation specifics are required to make practical use of it and
+the existing practical use for human readable purposes, all we're doing
+is trying to be helpful with some random string we found somewhere and
+we don't want to encourage people to do that rather than doing what
+they're currently doing any providing human readable names.  We
+shouldn't preclude being more helpful if we get better ideas and we
+shouldn't encourage people to make bad decisions about identifying
+things from userspace.  Or I suppose we could go the way of all
+standards and document useful behaviour without implementing it but that
+doesn't seem awesome either.
+
+> What is this "label" feature Rob speaks of? Does it exist in practice
+> (AFAICT the answer is "no")? The description doesn't seem terrible,
+
+It's a property called "label" which is a standard thing in DT for
+providing descriptive labels, if you look in git you can see quite a few
+examples for other subsystems.  I'd expect to see it show up in the
+string for the device name in place of the numbers (both if used for a
+device, the bus number for the bus).  Nobody has written any code yet,
+I've never personally found the motivation and nobody sent me any
+patches.
+
+> depending on the implementation. Would that become the actual device
+> name (i.e., dev_name(dev))? Or just a filesystem symlink? And how does
+> one assign such a label?
+
+It should really show up in dev_name() since for most devices it'll be
+more likely to show up in a log message than anywhere else.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160730/9c5babf6/attachment.sig>
