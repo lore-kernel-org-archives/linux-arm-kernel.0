@@ -1,89 +1,55 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Sat, 30 Jul 2016 22:52:45 +0800
-Subject: [PATCH 2/2] ASoC: sunxi: compatibility for sun6i to SPDIF
-In-Reply-To: <20160730142716.29377-3-codekipper@gmail.com>
-References: <20160730142716.29377-1-codekipper@gmail.com>
- <20160730142716.29377-3-codekipper@gmail.com>
-Message-ID: <170941469890365@web9j.yandex.ru>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Sat, 30 Jul 2016 17:03:50 +0200
+Subject: [PATCH v2] dt: bindings: Make compatible optional for mmc function
+ nodes
+Message-ID: <1469891030-28838-1-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On some boards (android tablets) different batches use different sdio
+wifi modules. This is not a problem since mmc/sdio is an enumerable bus,
+so we only need to describe and activate the mmc controller in dt and
+then the kernel will automatically load the right driver.
 
+Sometimes it is useful to specify certain ethernet properties for these
+"unknown" sdio devices, specifically we want the boot-loader to be able
+to set "local-mac-address" as some of these sdio wifi modules come without
+an eeprom / without a factory programmed mac address.
 
-30.07.2016, 22:45, "codekipper at gmail.com" <codekipper@gmail.com>:
-> From: Marcus Cooper <codekipper@gmail.com>
->
-> The A31 SoC uses the same SPDIF block as found in earlier SoCs, but its
-> reset is controlled via a separate reset controller.
->
-> The DMA also complains when the maxburst is set to 4 so it's been adjusted
-> to 8 which suites both the older and newer SoCs.
->
-> Signed-off-by: Marcus Cooper <codekipper@gmail.com>
-> ---
-> ?sound/soc/sunxi/sun4i-spdif.c | 17 ++++++++++++++++-
-> ?1 file changed, 16 insertions(+), 1 deletion(-)
->
-> diff --git a/sound/soc/sunxi/sun4i-spdif.c b/sound/soc/sunxi/sun4i-spdif.c
-> index 0b04fb0..88fbb3a 100644
-> --- a/sound/soc/sunxi/sun4i-spdif.c
-> +++ b/sound/soc/sunxi/sun4i-spdif.c
-> @@ -29,6 +29,7 @@
-> ?#include <linux/module.h>
-> ?#include <linux/platform_device.h>
-> ?#include <linux/pm_runtime.h>
-> +#include <linux/reset.h>
-> ?#include <sound/dmaengine_pcm.h>
-> ?#include <sound/pcm_params.h>
-> ?#include <sound/soc.h>
-> @@ -162,6 +163,7 @@ struct sun4i_spdif_dev {
-> ?????????struct platform_device *pdev;
-> ?????????struct clk *spdif_clk;
-> ?????????struct clk *apb_clk;
-> + struct reset_control *rst;
-> ?????????struct snd_soc_dai_driver cpu_dai_drv;
-> ?????????struct regmap *regmap;
-> ?????????struct snd_dmaengine_dai_dma_data dma_params_tx;
-> @@ -411,6 +413,7 @@ static const struct snd_soc_dapm_route dit_routes[] = {
->
-> ?static const struct of_device_id sun4i_spdif_of_match[] = {
-> ?????????{ .compatible = "allwinner,sun4i-a10-spdif", },
-> + { .compatible = "allwinner,sun6i-a31-spdif", },
-> ?????????{ /* sentinel */ }
-> ?};
-> ?MODULE_DEVICE_TABLE(of, sun4i_spdif_of_match);
-> @@ -482,11 +485,23 @@ static int sun4i_spdif_probe(struct platform_device *pdev)
-> ?????????}
->
-> ?????????host->dma_params_tx.addr = res->start + SUN4I_SPDIF_TXFIFO;
-> - host->dma_params_tx.maxburst = 4;
-> + host->dma_params_tx.maxburst = 8;
-> ?????????host->dma_params_tx.addr_width = DMA_SLAVE_BUSWIDTH_2_BYTES;
->
-> ?????????platform_set_drvdata(pdev, host);
->
-> + if (of_device_is_compatible(pdev->dev.of_node,
-> + "allwinner,sun6i-a31-spdif")) {
-> + host->rst = devm_reset_control_get_optional(&pdev->dev, NULL);
-> + if (IS_ERR(host->rst) && PTR_ERR(host->rst) == -EPROBE_DEFER) {
-> + ret = -EPROBE_DEFER;
-> + dev_err(&pdev->dev, "Failed to get reset: %d\n", ret);
-> + goto err_disable_apb_clk;
-> + }
-> + if (!IS_ERR(host->rst))
-> + reset_control_deassert(host->rst);
-> + }
-> +
-I think you do not need the compatible.
-You can just detect whether the reset is present.
+Since the exact device is unknown (differs per batch) we cannot use
+a wifi-chip specific compatible, thus sometimes it is desirable to have a
+mmc function node, without having to make up an otherwise unused compatible
+for the node, so make the compatible property optional.
 
-> ?????????ret = devm_snd_soc_register_component(&pdev->dev,
-> ?????????????????????????????????&sun4i_spdif_component, &sun4i_spdif_dai, 1);
-> ?????????if (ret)
-> --
-> 2.9.2
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+Changes in v2:
+-Change the commit-msg to explain why it sometimes is desirable to have a
+ mmc function node without a compatible
+---
+ Documentation/devicetree/bindings/mmc/mmc.txt | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/Documentation/devicetree/bindings/mmc/mmc.txt b/Documentation/devicetree/bindings/mmc/mmc.txt
+index ed23b9b..a96c338 100644
+--- a/Documentation/devicetree/bindings/mmc/mmc.txt
++++ b/Documentation/devicetree/bindings/mmc/mmc.txt
+@@ -98,11 +98,13 @@ Required host node properties when using function subnodes:
+ - #size-cells: should be zero.
+ 
+ Required function subnode properties:
+-- compatible: name of SDIO function following generic names recommended practice
+ - reg: Must contain the SDIO function number of the function this subnode
+        describes. A value of 0 denotes the memory SD function, values from
+        1 to 7 denote the SDIO functions.
+ 
++Optional function subnode properties:
++- compatible: name of SDIO function following generic names recommended practice
++
+ 
+ Examples
+ --------
+-- 
+2.7.4
