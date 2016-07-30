@@ -1,126 +1,95 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Sat, 30 Jul 2016 13:42:32 +0800
-Subject: [PATCH net-next 08/10] drivers: net: xgene: Poll link status via
- GPIO
-In-Reply-To: <1469838843-19943-9-git-send-email-isubramanian@apm.com>
-Message-ID: <201607301308.jiblYX9G%fengguang.wu@intel.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sat, 30 Jul 2016 09:34:12 +0200
+Subject: [PATCH v2 1/5] ethernet: add sun8i-emac driver
+In-Reply-To: <CAGb2v678MidsiV=QJjk1bvAPL-hRFyNzZy636aObEG+HC908xw@mail.gmail.com>
+References: <1469001800-11615-1-git-send-email-clabbe.montjoie@gmail.com>
+ <1469001800-11615-2-git-send-email-clabbe.montjoie@gmail.com>
+ <20160725195455.GQ7419@lukather> <20160728145734.GD7582@Red>
+ <20160729172526.GE6215@lukather>
+ <CAGb2v678MidsiV=QJjk1bvAPL-hRFyNzZy636aObEG+HC908xw@mail.gmail.com>
+Message-ID: <20160730073412.GL6215@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Sat, Jul 30, 2016 at 09:30:01AM +0800, Chen-Yu Tsai wrote:
+> >> > > +static void sun8i_emac_unset_syscon(struct net_device *ndev)
+> >> > > +{
+> >> > > + struct sun8i_emac_priv *priv = netdev_priv(ndev);
+> >> > > + u32 reg = 0;
+> >> > > +
+> >> > > + if (priv->variant == H3_EMAC)
+> >> > > +         reg = H3_EPHY_DEFAULT_VALUE;
+> >> >
+> >> > Why do you need that?
+> >> >
+> >> For resetting the syscon to the factory default.
+> >
+> > Yes, but does it matter? Does it have any side effect? Is that
+> > register shared with another device?
+> >
+> > Otherwise, either it won't be used anymore, and you don't care, or you
+> > will reload the driver later, and the driver should work whatever
+> > state is programmed in there. In both cases, you don't need to reset
+> > that value.
+> 
+> The "default" setting also disables and powers down the internal PHY.
+> I think that's a good thing? The naming could be better.
 
-[auto build test ERROR on net-next/master]
+Ah, it might, and that would obviously be the right thing to do. Using
+a define for those enable and power down bits would be better though.
 
-url:    https://github.com/0day-ci/linux/commits/Iyappan-Subramanian/Fix-warning-and-issues/20160730-083713
-config: mips-allmodconfig (attached as .config)
-compiler: mips-linux-gnu-gcc (Debian 5.4.0-6) 5.4.0 20160609
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=mips 
+> >> > > +static irqreturn_t sun8i_emac_dma_interrupt(int irq, void *dev_id)
+> >> > > +{
+> >> > > + struct net_device *ndev = dev_id;
+> >> > > + struct sun8i_emac_priv *priv = netdev_priv(ndev);
+> >> > > + u32 v, u;
+> >> > > +
+> >> > > + v = readl(priv->base + SUN8I_EMAC_INT_STA);
+> >> > > +
+> >> > > + /* When this bit is asserted, a frame transmission is completed. */
+> >> > > + if (v & BIT(0)) {
+> >> > > +         priv->estats.tx_int++;
+> >> > > +         writel(0, priv->base + SUN8I_EMAC_INT_EN);
+> >> > > +         napi_schedule(&priv->napi);
+> >> > > + }
+> >> > > +
+> >> > > + /* When this bit is asserted, the TX DMA FSM is stopped. */
+> >> > > + if (v & BIT(1))
+> >> > > +         priv->estats.tx_dma_stop++;
+> >> > > +
+> >> > > + /* When this asserted, the TX DMA can not acquire next TX descriptor
+> >> > > +  * and TX DMA FSM is suspended.
+> >> > > + */
+> >> > > + if (v & BIT(2))
+> >> > > +         priv->estats.tx_dma_ua++;
+> >> > > +
+> >> > > + if (v & BIT(3))
+> >> > > +         netif_dbg(priv, intr, ndev, "Unhandled interrupt TX TIMEOUT\n");
+> >> >
+> >> > Why do you enable that interrupt if you can't handle it?
+> >>
+> >> Some interrupt fire even when not enabled (like RX_BUF_UA_INT/TX_BUF_UA_INT)
+> >
+> > So the bits 9 and 2, respectively, in the interrupt enable register
+> > are useless?
+> 
+> Does it actually fire, i.e. pull the interrupt line on the GIC? Or is it just
+> the interrupt state showing an event? IIRC some other hardware blocks have this
+> behavior, such as the timer.
 
-All errors (new ones prefixed by >>):
+That's quite easy to implement, you can do a bitwise and on the status
+and enable registers.
 
-   drivers/gpio/gpio-xgene-sb.c: In function 'xgene_gpio_sb_irq_set_type':
-   drivers/gpio/gpio-xgene-sb.c:111:10: error: implicit declaration of function 'irq_chip_set_type_parent' [-Werror=implicit-function-declaration]
-      return irq_chip_set_type_parent(d, IRQ_TYPE_EDGE_RISING);
-             ^
-   drivers/gpio/gpio-xgene-sb.c: At top level:
-   drivers/gpio/gpio-xgene-sb.c:118:13: error: 'irq_chip_eoi_parent' undeclared here (not in a function)
-     .irq_eoi = irq_chip_eoi_parent,
-                ^
-   drivers/gpio/gpio-xgene-sb.c:119:20: error: 'irq_chip_mask_parent' undeclared here (not in a function)
-     .irq_mask       = irq_chip_mask_parent,
-                       ^
-   drivers/gpio/gpio-xgene-sb.c:120:20: error: 'irq_chip_unmask_parent' undeclared here (not in a function)
-     .irq_unmask     = irq_chip_unmask_parent,
-                       ^
-   drivers/gpio/gpio-xgene-sb.c: In function 'xgene_gpio_sb_domain_alloc':
-   drivers/gpio/gpio-xgene-sb.c:198:3: error: implicit declaration of function 'irq_domain_set_hwirq_and_chip' [-Werror=implicit-function-declaration]
-      irq_domain_set_hwirq_and_chip(domain, virq + i, hwirq + i,
-      ^
-   drivers/gpio/gpio-xgene-sb.c:201:31: error: 'struct irq_domain' has no member named 'parent'
-     parent_fwspec.fwnode = domain->parent->fwnode;
-                                  ^
-   drivers/gpio/gpio-xgene-sb.c:215:9: error: implicit declaration of function 'irq_domain_alloc_irqs_parent' [-Werror=implicit-function-declaration]
-     return irq_domain_alloc_irqs_parent(domain, virq, nr_irqs,
-            ^
-   drivers/gpio/gpio-xgene-sb.c: At top level:
-   drivers/gpio/gpio-xgene-sb.c:220:2: error: unknown field 'translate' specified in initializer
-     .translate      = xgene_gpio_sb_domain_translate,
-     ^
->> drivers/gpio/gpio-xgene-sb.c:220:20: error: initialization from incompatible pointer type [-Werror=incompatible-pointer-types]
-     .translate      = xgene_gpio_sb_domain_translate,
-                       ^
-   drivers/gpio/gpio-xgene-sb.c:220:20: note: (near initialization for 'xgene_gpio_sb_domain_ops.match')
-   drivers/gpio/gpio-xgene-sb.c:221:2: error: unknown field 'alloc' specified in initializer
-     .alloc          = xgene_gpio_sb_domain_alloc,
-     ^
-   drivers/gpio/gpio-xgene-sb.c:221:20: error: initialization from incompatible pointer type [-Werror=incompatible-pointer-types]
-     .alloc          = xgene_gpio_sb_domain_alloc,
-                       ^
-   drivers/gpio/gpio-xgene-sb.c:221:20: note: (near initialization for 'xgene_gpio_sb_domain_ops.select')
-   drivers/gpio/gpio-xgene-sb.c:222:2: error: unknown field 'free' specified in initializer
-     .free           = irq_domain_free_irqs_common,
-     ^
-   drivers/gpio/gpio-xgene-sb.c:222:20: error: 'irq_domain_free_irqs_common' undeclared here (not in a function)
-     .free           = irq_domain_free_irqs_common,
-                       ^
-   drivers/gpio/gpio-xgene-sb.c:223:2: error: unknown field 'activate' specified in initializer
-     .activate = xgene_gpio_sb_domain_activate,
-     ^
-   drivers/gpio/gpio-xgene-sb.c:223:14: error: initialization from incompatible pointer type [-Werror=incompatible-pointer-types]
-     .activate = xgene_gpio_sb_domain_activate,
-                 ^
-   drivers/gpio/gpio-xgene-sb.c:223:14: note: (near initialization for 'xgene_gpio_sb_domain_ops.unmap')
-   drivers/gpio/gpio-xgene-sb.c:224:2: error: unknown field 'deactivate' specified in initializer
-     .deactivate = xgene_gpio_sb_domain_deactivate,
-     ^
-   drivers/gpio/gpio-xgene-sb.c:224:16: error: initialization from incompatible pointer type [-Werror=incompatible-pointer-types]
-     .deactivate = xgene_gpio_sb_domain_deactivate,
-                   ^
-   drivers/gpio/gpio-xgene-sb.c:224:16: note: (near initialization for 'xgene_gpio_sb_domain_ops.xlate')
-   drivers/gpio/gpio-xgene-sb.c: In function 'xgene_gpio_sb_probe':
-   drivers/gpio/gpio-xgene-sb.c:293:21: error: implicit declaration of function 'irq_domain_create_hierarchy' [-Werror=implicit-function-declaration]
-     priv->irq_domain = irq_domain_create_hierarchy(parent_domain,
-                        ^
-   drivers/gpio/gpio-xgene-sb.c:293:19: warning: assignment makes pointer from integer without a cast [-Wint-conversion]
-     priv->irq_domain = irq_domain_create_hierarchy(parent_domain,
-                      ^
-   cc1: some warnings being treated as errors
+Maxime
 
-vim +220 drivers/gpio/gpio-xgene-sb.c
-
-1013fc41 Quan Nguyen 2016-02-17  209  		parent_fwspec.param_count = 2;
-1013fc41 Quan Nguyen 2016-02-17  210  		parent_fwspec.param[0] = hwirq + priv->parent_irq_base;
-1013fc41 Quan Nguyen 2016-02-17  211  		parent_fwspec.param[1] = fwspec->param[1];
-1013fc41 Quan Nguyen 2016-02-17  212  	} else
-1013fc41 Quan Nguyen 2016-02-17  213  		return -EINVAL;
-1013fc41 Quan Nguyen 2016-02-17  214  
-1013fc41 Quan Nguyen 2016-02-17 @215  	return irq_domain_alloc_irqs_parent(domain, virq, nr_irqs,
-1013fc41 Quan Nguyen 2016-02-17  216  			&parent_fwspec);
-1013fc41 Quan Nguyen 2016-02-17  217  }
-1013fc41 Quan Nguyen 2016-02-17  218  
-1013fc41 Quan Nguyen 2016-02-17  219  static const struct irq_domain_ops xgene_gpio_sb_domain_ops = {
-1013fc41 Quan Nguyen 2016-02-17 @220  	.translate      = xgene_gpio_sb_domain_translate,
-1013fc41 Quan Nguyen 2016-02-17  221  	.alloc          = xgene_gpio_sb_domain_alloc,
-c6cc75fe Axel Lin    2016-03-17  222  	.free           = irq_domain_free_irqs_common,
-1013fc41 Quan Nguyen 2016-02-17  223  	.activate	= xgene_gpio_sb_domain_activate,
-
-:::::: The code at line 220 was first introduced by commit
-:::::: 1013fc417cc15ead7c3a9091a47617f357db71a4 gpio: xgene: Enable X-Gene standby GPIO as interrupt controller
-
-:::::: TO: Quan Nguyen <qnguyen@apm.com>
-:::::: CC: Linus Walleij <linus.walleij@linaro.org>
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 42688 bytes
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160730/f6bb2a14/attachment-0001.obj>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160730/3f4b2761/attachment.sig>
