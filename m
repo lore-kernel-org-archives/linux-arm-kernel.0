@@ -1,50 +1,63 @@
 From: isubramanian@apm.com (Iyappan Subramanian)
-Date: Fri, 29 Jul 2016 17:33:54 -0700
-Subject: [PATCH net-next 01/10] drivers: net: xgene: Fix kbuild warning
+Date: Fri, 29 Jul 2016 17:33:55 -0700
+Subject: [PATCH net-next 02/10] drivers: net: xgene: fix: Add dma_unmap_single
 In-Reply-To: <1469838843-19943-1-git-send-email-isubramanian@apm.com>
 References: <1469838843-19943-1-git-send-email-isubramanian@apm.com>
-Message-ID: <1469838843-19943-2-git-send-email-isubramanian@apm.com>
+Message-ID: <1469838843-19943-3-git-send-email-isubramanian@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes the following kbuild warning, when ACPI was not enabled.
-
->> drivers/net/ethernet/apm/xgene/xgene_enet_hw.c:878:23: warning: 'phy_dev' may be used uninitialized in this function [-Wmaybe-uninitialized]
-     phy_dev->advertising = phy_dev->supported;
+In addition to xgene_enet_delete_bufpool() freeing skbs, their associated
+dma memory should also be unmapped.
 
 Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
 ---
- drivers/net/ethernet/apm/xgene/xgene_enet_hw.c | 7 ++-----
- 1 file changed, 2 insertions(+), 5 deletions(-)
+ drivers/net/ethernet/apm/xgene/xgene_enet_main.c | 14 ++++++++++++--
+ 1 file changed, 12 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c b/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c
-index 7714b7d..b6bc6fa 100644
---- a/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c
-+++ b/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c
-@@ -776,15 +776,11 @@ int xgene_enet_phy_connect(struct net_device *ndev)
- 			netdev_err(ndev, "Could not connect to PHY\n");
- 			return -ENODEV;
+diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_main.c b/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
+index d1d6b5e..5246457 100644
+--- a/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
++++ b/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
+@@ -72,7 +72,6 @@ static int xgene_enet_refill_bufpool(struct xgene_enet_desc_ring *buf_pool,
+ 		skb = netdev_alloc_skb_ip_align(ndev, len);
+ 		if (unlikely(!skb))
+ 			return -ENOMEM;
+-		buf_pool->rx_skb[tail] = skb;
+ 
+ 		dma_addr = dma_map_single(dev, skb->data, len, DMA_FROM_DEVICE);
+ 		if (dma_mapping_error(dev, dma_addr)) {
+@@ -81,6 +80,8 @@ static int xgene_enet_refill_bufpool(struct xgene_enet_desc_ring *buf_pool,
+ 			return -EINVAL;
  		}
--
--		pdata->phy_dev = phy_dev;
- 	} else {
- #ifdef CONFIG_ACPI
- 		struct acpi_device *adev = acpi_phy_find_device(dev);
- 		if (adev)
--			pdata->phy_dev =  adev->driver_data;
--
--		phy_dev = pdata->phy_dev;
-+			phy_dev =  adev->driver_data;
  
- 		if (!phy_dev ||
- 		    phy_connect_direct(ndev, phy_dev, &xgene_enet_adjust_link,
-@@ -795,6 +791,7 @@ int xgene_enet_phy_connect(struct net_device *ndev)
- #endif
++		buf_pool->rx_skb[tail] = skb;
++
+ 		raw_desc->m1 = cpu_to_le64(SET_VAL(DATAADDR, dma_addr) |
+ 					   SET_VAL(BUFDATALEN, bufdatalen) |
+ 					   SET_BIT(COHERENT));
+@@ -102,12 +103,21 @@ static u8 xgene_enet_hdr_len(const void *data)
+ 
+ static void xgene_enet_delete_bufpool(struct xgene_enet_desc_ring *buf_pool)
+ {
++	struct device *dev = ndev_to_dev(buf_pool->ndev);
++	struct xgene_enet_raw_desc16 *raw_desc;
++	dma_addr_t dma_addr;
+ 	int i;
+ 
+ 	/* Free up the buffers held by hardware */
+ 	for (i = 0; i < buf_pool->slots; i++) {
+-		if (buf_pool->rx_skb[i])
++		if (buf_pool->rx_skb[i]) {
+ 			dev_kfree_skb_any(buf_pool->rx_skb[i]);
++
++			raw_desc = &buf_pool->raw_desc16[i];
++			dma_addr = GET_VAL(DATAADDR, le64_to_cpu(raw_desc->m1));
++			dma_unmap_single(dev, dma_addr, XGENE_ENET_MAX_MTU,
++					 DMA_FROM_DEVICE);
++		}
  	}
+ }
  
-+	pdata->phy_dev = phy_dev;
- 	pdata->phy_speed = SPEED_UNKNOWN;
- 	phy_dev->supported &= ~SUPPORTED_10baseT_Half &
- 			      ~SUPPORTED_100baseT_Half &
 -- 
 1.9.1
