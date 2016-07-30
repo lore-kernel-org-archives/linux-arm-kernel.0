@@ -1,12 +1,12 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Sat, 30 Jul 2016 13:40:42 +0200
+Date: Sat, 30 Jul 2016 15:12:12 +0200
 Subject: [PATCH 2/2] mmc: host: sunxi: add support for A64 mmc controller
 In-Reply-To: <382321469878507@web3g.yandex.ru>
 References: <20160730093652.10578-1-icenowy@aosc.xyz>
  <20160730093652.10578-2-icenowy@aosc.xyz>
  <c3b3a172-4194-08e4-5ac9-594d77452ff5@redhat.com>
  <382321469878507@web3g.yandex.ru>
-Message-ID: <c4d41de3-a0c8-6717-18fe-ed2fe119a0fb@redhat.com>
+Message-ID: <49360635-76bb-2597-ba9b-db3ddbbe16cf@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -151,162 +151,12 @@ On 30-07-16 13:35, Icenowy Zheng wrote:
 > If your A10/13 mmc clock driver can be merged ASAP, then I will be
 > able to drop some bits from the patch.
 
-I need to do a v2 of that, I will hopefully send that out today.
+Ok, I'm working on v2 now, and it looks like factoring out the
+clk_delay / phase stuff is useful for my v2 too, so I'm going to
+do a patch factoring this out myself. I'll send my v2 in 1 - 2
+hours from now, you may want to base your v2 on my work (it contains
+some other refactoring which should make things easier too).
 
 Regards,
 
 Hans
-
-
-
-
->
->>
->> Regards,
->>
->> Hans
->>
->>>   static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
->>>                                     struct mmc_ios *ios)
->>>   {
->>>  - u32 rate, oclk_dly, rval, sclk_dly;
->>>  + u32 rate, rval;
->>>           u32 clock = ios->clock;
->>>           int ret;
->>>
->>>  @@ -692,32 +768,18 @@ static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
->>>           }
->>>           mmc_writel(host, REG_CLKCR, rval);
->>>
->>>  - /* determine delays */
->>>  - if (rate <= 400000) {
->>>  - oclk_dly = host->clk_delays[SDXC_CLK_400K].output;
->>>  - sclk_dly = host->clk_delays[SDXC_CLK_400K].sample;
->>>  - } else if (rate <= 25000000) {
->>>  - oclk_dly = host->clk_delays[SDXC_CLK_25M].output;
->>>  - sclk_dly = host->clk_delays[SDXC_CLK_25M].sample;
->>>  - } else if (rate <= 52000000) {
->>>  - if (ios->timing != MMC_TIMING_UHS_DDR50 &&
->>>  - ios->timing != MMC_TIMING_MMC_DDR52) {
->>>  - oclk_dly = host->clk_delays[SDXC_CLK_50M].output;
->>>  - sclk_dly = host->clk_delays[SDXC_CLK_50M].sample;
->>>  - } else if (ios->bus_width == MMC_BUS_WIDTH_8) {
->>>  - oclk_dly = host->clk_delays[SDXC_CLK_50M_DDR_8BIT].output;
->>>  - sclk_dly = host->clk_delays[SDXC_CLK_50M_DDR_8BIT].sample;
->>>  - } else {
->>>  - oclk_dly = host->clk_delays[SDXC_CLK_50M_DDR].output;
->>>  - sclk_dly = host->clk_delays[SDXC_CLK_50M_DDR].sample;
->>>  - }
->>>  + if (host->can_calibrate) {
->>>  + ret = sunxi_mmc_calibrate(host, ios, SDXC_REG_SAMP_DL_REG);
->>>  + if (ret)
->>>  + return ret;
->>>  +
->>>  + /* TODO: enable calibrate on sdc2 SDXC_REG_DS_DL_REG of A64 */
->>>           } else {
->>>  - return -EINVAL;
->>>  + ret = sunxi_mmc_determine_delays(host, ios, rate);
->>>  + if (ret)
->>>  + return ret;
->>>           }
->>>
->>>  - clk_set_phase(host->clk_sample, sclk_dly);
->>>  - clk_set_phase(host->clk_output, oclk_dly);
->>>  -
->>>           return sunxi_mmc_oclk_onoff(host, 1);
->>>   }
->>>
->>>  @@ -942,6 +1004,7 @@ static const struct of_device_id sunxi_mmc_of_match[] = {
->>>           { .compatible = "allwinner,sun4i-a10-mmc", },
->>>           { .compatible = "allwinner,sun5i-a13-mmc", },
->>>           { .compatible = "allwinner,sun9i-a80-mmc", },
->>>  + { .compatible = "allwinner,sun50i-a64-mmc", },
->>>           { /* sentinel */ }
->>>   };
->>>   MODULE_DEVICE_TABLE(of, sunxi_mmc_of_match);
->>>  @@ -990,6 +1053,11 @@ static int sunxi_mmc_resource_request(struct sunxi_mmc_host *host,
->>>           else
->>>                   host->clk_delays = sunxi_mmc_clk_delays;
->>>
->>>  + if (of_device_is_compatible(np, "allwinner,sun50i-a64-mmc"))
->>>  + host->can_calibrate = true;
->>>  + else
->>>  + host->can_calibrate = false;
->>>  +
->>>           ret = mmc_regulator_get_supply(host->mmc);
->>>           if (ret) {
->>>                   if (ret != -EPROBE_DEFER)
->>>  @@ -1014,16 +1082,22 @@ static int sunxi_mmc_resource_request(struct sunxi_mmc_host *host,
->>>                   return PTR_ERR(host->clk_mmc);
->>>           }
->>>
->>>  - host->clk_output = devm_clk_get(&pdev->dev, "output");
->>>  - if (IS_ERR(host->clk_output)) {
->>>  - dev_err(&pdev->dev, "Could not get output clock\n");
->>>  - return PTR_ERR(host->clk_output);
->>>  - }
->>>  + /* self-calibrate version of the IP block needs no output/sample */
->>>  + if (!host->can_calibrate) {
->>>  + host->clk_output = devm_clk_get(&pdev->dev, "output");
->>>  + if (IS_ERR(host->clk_output)) {
->>>  + dev_err(&pdev->dev, "Could not get output clock\n");
->>>  + return PTR_ERR(host->clk_output);
->>>  + }
->>>
->>>  - host->clk_sample = devm_clk_get(&pdev->dev, "sample");
->>>  - if (IS_ERR(host->clk_sample)) {
->>>  - dev_err(&pdev->dev, "Could not get sample clock\n");
->>>  - return PTR_ERR(host->clk_sample);
->>>  + host->clk_sample = devm_clk_get(&pdev->dev, "sample");
->>>  + if (IS_ERR(host->clk_sample)) {
->>>  + dev_err(&pdev->dev, "Could not get sample clock\n");
->>>  + return PTR_ERR(host->clk_sample);
->>>  + }
->>>  + } else {
->>>  + host->clk_sample = NULL;
->>>  + host->clk_output = NULL;
->>>           }
->>>
->>>           host->reset = devm_reset_control_get_optional(&pdev->dev, "ahb");
->>>  @@ -1042,16 +1116,18 @@ static int sunxi_mmc_resource_request(struct sunxi_mmc_host *host,
->>>                   goto error_disable_clk_ahb;
->>>           }
->>>
->>>  - ret = clk_prepare_enable(host->clk_output);
->>>  - if (ret) {
->>>  - dev_err(&pdev->dev, "Enable output clk err %d\n", ret);
->>>  - goto error_disable_clk_mmc;
->>>  - }
->>>  + if (!host->can_calibrate) {
->>>  + ret = clk_prepare_enable(host->clk_output);
->>>  + if (ret) {
->>>  + dev_err(&pdev->dev, "Enable output clk err %d\n", ret);
->>>  + goto error_disable_clk_mmc;
->>>  + }
->>>
->>>  - ret = clk_prepare_enable(host->clk_sample);
->>>  - if (ret) {
->>>  - dev_err(&pdev->dev, "Enable sample clk err %d\n", ret);
->>>  - goto error_disable_clk_output;
->>>  + ret = clk_prepare_enable(host->clk_sample);
->>>  + if (ret) {
->>>  + dev_err(&pdev->dev, "Enable sample clk err %d\n", ret);
->>>  + goto error_disable_clk_output;
->>>  + }
->>>           }
->>>
->>>           if (!IS_ERR(host->reset)) {
->>>  @@ -1078,9 +1154,11 @@ error_assert_reset:
->>>           if (!IS_ERR(host->reset))
->>>                   reset_control_assert(host->reset);
->>>   error_disable_clk_sample:
->>>  - clk_disable_unprepare(host->clk_sample);
->>>  + if (!host->can_calibrate)
->>>  + clk_disable_unprepare(host->clk_sample);
->>>   error_disable_clk_output:
->>>  - clk_disable_unprepare(host->clk_output);
->>>  + if (!host->can_calibrate)
->>>  + clk_disable_unprepare(host->clk_output);
->>>   error_disable_clk_mmc:
->>>           clk_disable_unprepare(host->clk_mmc);
->>>   error_disable_clk_ahb:
