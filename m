@@ -1,34 +1,74 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Sun, 31 Jul 2016 21:18:12 +0800
-Subject: [PATCH 2/3] phy: sun4i: add support for A64 usb phy
-In-Reply-To: <CABHD4K9awH3moyCktEq3acYN=GS74nhThuFDsYt10UTqOHSw3Q@mail.gmail.com>
-References: <20160731112536.4625-1-icenowy@aosc.xyz>
- <20160731112536.4625-2-icenowy@aosc.xyz>
- <CABHD4K9awH3moyCktEq3acYN=GS74nhThuFDsYt10UTqOHSw3Q@mail.gmail.com>
-Message-ID: <48021469971092@web25g.yandex.ru>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Sun, 31 Jul 2016 10:11:06 -0400
+Subject: [PATCH V2] dmaengine: qcom_hidma: release the descriptor before the
+ callback
+Message-ID: <1469974266-28023-1-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+There is a race condition between data transfer callback and descriptor
+free code. The callback routine may decide to clear the resources even
+though the descriptor has not yet been freed.
 
+Instead of calling the callback first and then releasing the memory,
+this code is changing the order to return the descriptor back to the
+free pool and then call the user provided callback.
 
-31.07.2016, 20:39, "Amit Tomer" <amittomer25@gmail.com>:
-> Hello ,
->
->> ?@@ -264,6 +266,12 @@ static int sun4i_usb_phy_init(struct phy *_phy)
->> ?????????????????val = readl(phy->pmu + REG_PMU_UNK_H3);
->> ?????????????????writel(val & ~2, phy->pmu + REG_PMU_UNK_H3);
->> ?????????} else {
->> ?+ /* A64 needs also this unknown bit */
->> ?+ if (data->cfg->type == sun50i_a64_phy) {
->> ?+ val = readl(phy->pmu + REG_PMU_UNK_H3);
->> ?+ writel(val & ~2, phy->pmu + REG_PMU_UNK_H3);
->> ?+ }
->> ?+
->
-> This bit is also set for H3, shall we reuse it or we should enclose it
-> in else-if part ?
-To be honest, I don't know which format is better...
-I'm not so familiar about the tradition of Linux kernel coding style...
->
-> Thanks
-> Amit.
+Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+---
+ drivers/dma/qcom/hidma.c | 20 ++++++++++++--------
+ 1 file changed, 12 insertions(+), 8 deletions(-)
+
+diff --git a/drivers/dma/qcom/hidma.c b/drivers/dma/qcom/hidma.c
+index 41b5c6d..4aaceab 100644
+--- a/drivers/dma/qcom/hidma.c
++++ b/drivers/dma/qcom/hidma.c
+@@ -111,6 +111,7 @@ static void hidma_process_completed(struct hidma_chan *mchan)
+ 	struct dma_async_tx_descriptor *desc;
+ 	dma_cookie_t last_cookie;
+ 	struct hidma_desc *mdesc;
++	struct hidma_desc *next;
+ 	unsigned long irqflags;
+ 	struct list_head list;
+ 
+@@ -122,8 +123,10 @@ static void hidma_process_completed(struct hidma_chan *mchan)
+ 	spin_unlock_irqrestore(&mchan->lock, irqflags);
+ 
+ 	/* Execute callbacks and run dependencies */
+-	list_for_each_entry(mdesc, &list, node) {
++	list_for_each_entry_safe(mdesc, next, &list, node) {
+ 		enum dma_status llstat;
++		dma_async_tx_callback callback;
++		void *param;
+ 
+ 		desc = &mdesc->desc;
+ 
+@@ -132,18 +135,19 @@ static void hidma_process_completed(struct hidma_chan *mchan)
+ 		spin_unlock_irqrestore(&mchan->lock, irqflags);
+ 
+ 		llstat = hidma_ll_status(mdma->lldev, mdesc->tre_ch);
+-		if (desc->callback && (llstat == DMA_COMPLETE))
+-			desc->callback(desc->callback_param);
++		callback = desc->callback;
++		param = desc->callback_param;
+ 
+ 		last_cookie = desc->cookie;
+ 		dma_run_dependencies(desc);
+-	}
+ 
+-	/* Free descriptors */
+-	spin_lock_irqsave(&mchan->lock, irqflags);
+-	list_splice_tail_init(&list, &mchan->free);
+-	spin_unlock_irqrestore(&mchan->lock, irqflags);
++		spin_lock_irqsave(&mchan->lock, irqflags);
++		list_move(&mdesc->node, &mchan->free);
++		spin_unlock_irqrestore(&mchan->lock, irqflags);
+ 
++		if (callback && (llstat == DMA_COMPLETE))
++			callback(param);
++	}
+ }
+ 
+ /*
+-- 
+1.8.2.1
