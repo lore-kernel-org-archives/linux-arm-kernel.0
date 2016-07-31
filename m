@@ -1,74 +1,33 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Sun, 31 Jul 2016 10:11:06 -0400
-Subject: [PATCH V2] dmaengine: qcom_hidma: release the descriptor before the
- callback
-Message-ID: <1469974266-28023-1-git-send-email-okaya@codeaurora.org>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Sun, 31 Jul 2016 09:13:48 -0500
+Subject: [PATCH V2] dmaengine: qcom_hidma: release the descriptor before
+ the callback
+In-Reply-To: <1469974266-28023-1-git-send-email-okaya@codeaurora.org>
+References: <1469974266-28023-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <579E079C.2040500@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is a race condition between data transfer callback and descriptor
-free code. The callback routine may decide to clear the resources even
-though the descriptor has not yet been freed.
+Sinan Kaya wrote:
+> +	list_for_each_entry_safe(mdesc, next, &list, node) {
+>   		enum dma_status llstat;
+> +		dma_async_tx_callback callback;
+> +		void *param;
+>
+>   		desc = &mdesc->desc;
+>
+> @@ -132,18 +135,19 @@ static void hidma_process_completed(struct hidma_chan *mchan)
+>   		spin_unlock_irqrestore(&mchan->lock, irqflags);
+>
+>   		llstat = hidma_ll_status(mdma->lldev, mdesc->tre_ch);
+> -		if (desc->callback && (llstat == DMA_COMPLETE))
+> -			desc->callback(desc->callback_param);
+> +		callback = desc->callback;
+> +		param = desc->callback_param;
 
-Instead of calling the callback first and then releasing the memory,
-this code is changing the order to return the descriptor back to the
-free pool and then call the user provided callback.
+It looks to me like 'callback' and 'param' are never actually used.
 
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
----
- drivers/dma/qcom/hidma.c | 20 ++++++++++++--------
- 1 file changed, 12 insertions(+), 8 deletions(-)
-
-diff --git a/drivers/dma/qcom/hidma.c b/drivers/dma/qcom/hidma.c
-index 41b5c6d..4aaceab 100644
---- a/drivers/dma/qcom/hidma.c
-+++ b/drivers/dma/qcom/hidma.c
-@@ -111,6 +111,7 @@ static void hidma_process_completed(struct hidma_chan *mchan)
- 	struct dma_async_tx_descriptor *desc;
- 	dma_cookie_t last_cookie;
- 	struct hidma_desc *mdesc;
-+	struct hidma_desc *next;
- 	unsigned long irqflags;
- 	struct list_head list;
- 
-@@ -122,8 +123,10 @@ static void hidma_process_completed(struct hidma_chan *mchan)
- 	spin_unlock_irqrestore(&mchan->lock, irqflags);
- 
- 	/* Execute callbacks and run dependencies */
--	list_for_each_entry(mdesc, &list, node) {
-+	list_for_each_entry_safe(mdesc, next, &list, node) {
- 		enum dma_status llstat;
-+		dma_async_tx_callback callback;
-+		void *param;
- 
- 		desc = &mdesc->desc;
- 
-@@ -132,18 +135,19 @@ static void hidma_process_completed(struct hidma_chan *mchan)
- 		spin_unlock_irqrestore(&mchan->lock, irqflags);
- 
- 		llstat = hidma_ll_status(mdma->lldev, mdesc->tre_ch);
--		if (desc->callback && (llstat == DMA_COMPLETE))
--			desc->callback(desc->callback_param);
-+		callback = desc->callback;
-+		param = desc->callback_param;
- 
- 		last_cookie = desc->cookie;
- 		dma_run_dependencies(desc);
--	}
- 
--	/* Free descriptors */
--	spin_lock_irqsave(&mchan->lock, irqflags);
--	list_splice_tail_init(&list, &mchan->free);
--	spin_unlock_irqrestore(&mchan->lock, irqflags);
-+		spin_lock_irqsave(&mchan->lock, irqflags);
-+		list_move(&mdesc->node, &mchan->free);
-+		spin_unlock_irqrestore(&mchan->lock, irqflags);
- 
-+		if (callback && (llstat == DMA_COMPLETE))
-+			callback(param);
-+	}
- }
- 
- /*
 -- 
-1.8.2.1
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the
+Code Aurora Forum, hosted by The Linux Foundation.
