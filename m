@@ -1,33 +1,23 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sun, 31 Jul 2016 11:12:32 +0200
-Subject: [PATCH v2] ARM: pxa: fix GPIO double shifts
-In-Reply-To: <1469896245.3998.113.camel@perches.com> (Joe Perches's message of
- "Sat, 30 Jul 2016 09:30:45 -0700")
-References: <1469877735-30127-1-git-send-email-robert.jarzmik@free.fr>
- <1469896245.3998.113.camel@perches.com>
-Message-ID: <8760rmyxvj.fsf@belgarion.home>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Sun, 31 Jul 2016 12:52:55 +0300
+Subject: [PATCH] net: thunderx: correct bound check in nic_config_loopback
+In-Reply-To: <1469933384-16827-1-git-send-email-alexander.levin@verizon.com>
+References: <1469933384-16827-1-git-send-email-alexander.levin@verizon.com>
+Message-ID: <8826fedc-8419-19a9-28d0-faf46ccc9f9f@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Joe Perches <joe@perches.com> writes:
+Hello.
 
-> On Sat, 2016-07-30 at 13:22 +0200, Robert Jarzmik wrote:
-...zip...
-> $ git grep -w charger_wakeup
-> arch/arm/mach-pxa/corgi_pm.c:???.charger_wakeup??= corgi_charger_wakeup,
-> arch/arm/mach-pxa/sharpsl_pm.c:?????????????????if (sharpsl_pm.machinfo->charger_wakeup() != 0)
-> arch/arm/mach-pxa/sharpsl_pm.c:?????????if (sharpsl_pm.machinfo->charger_wakeup())
-> arch/arm/mach-pxa/sharpsl_pm.h: unsigned long (*charger_wakeup)(void);
-> arch/arm/mach-pxa/spitz_pm.c:???.charger_wakeup???= spitz_charger_wakeup,
-...zip...
+On 7/31/2016 5:49 AM, Levin, Alexander wrote:
 
-> It may be better to change the charger_wakeup callback return
-> value from unsigned long to bool and modify the other use in
-> spitz_pm.c?
+> Off by one in nic_config_loopback would access an invalid arrat variable when
 
-You're most probably right. I'll do that for v3.
+    Array?
 
-Cheers.
+> vf id == MAX_LMAC.
+>
+> Signed-off-by: Sasha Levin <alexander.levin@verizon.com>
+[...]
 
--- 
-Robert
+MBR, Sergei
