@@ -1,75 +1,52 @@
-From: peter.senna@collabora.com (Peter Senna Tschudin)
-Date: Sun, 31 Jul 2016 21:55:38 +0200
-Subject: [PATCH V3 5/5] dts/imx6q-b850v3: Use GE B850v3 LVDS/DP++ Bridge
-In-Reply-To: <cover.1469993472.git.peter.senna@collabora.com>
-References: <1464626385-19253-1-git-send-email-peter.senna@collabora.com>
- <cover.1469993472.git.peter.senna@collabora.com>
-Message-ID: <4cf8120ec5a41f1db8dec60807839fb59ab0b925.1469993472.git.peter.senna@collabora.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sun, 31 Jul 2016 10:51:40 +0200
+Subject: [PATCH 00/13] arm64: Allwinner A64 support based on sunxi-ng
+In-Reply-To: <20160729074800.44b8860cc0a3d2dfcdde32ce@free.fr>
+References: <20160726203041.29366-1-maxime.ripard@free-electrons.com>
+ <20160727104623.e9ca7b708e5c6462f44a5d01@free.fr>
+ <20160728200705.GG6682@lukather>
+ <20160729074800.44b8860cc0a3d2dfcdde32ce@free.fr>
+Message-ID: <20160731085140.GX6215@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Configures the GE B850v3 LVDS/DP++ bridge on the dts file.
+On Fri, Jul 29, 2016 at 07:48:00AM +0200, Jean-Francois Moine wrote:
+> On Thu, 28 Jul 2016 22:07:05 +0200
+> Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+> 
+> > > > Let me know what you think,
+> > > 
+> > > I don't see the interest to have common code for 32bits and 64bits.
+> > > The clock driver of a SoC will never evolve, so, it is simpler to
+> > > copy the source common with the H3 into a clean A64 clock driver.
+> > 
+> > I'm not sure why 32 bits vs 64 bits matters here. We're going to share
+> > a significant number of drivers already between armv7 and armv8, like
+> > MMC, EMAC, I2C, and so on.
+> > 
+> > And I expect to share the data in other SoCs for the A10, A13 and A20
+> > for example, or A23/A33, which have a lot of clocks in common too.
+> 
+> The interest of your sunxi-ng approach is that the clocks of each SoC
+> is described in one file. Here you are mixing 2 SoCs in the same source
+> file. The advantage is lost.
 
-Cc: Javier Martinez Canillas <javier@dowhile0.org>
-Cc: Enric Balletbo i Serra <enric.balletbo@collabora.com>
-Cc: Philipp Zabel <p.zabel@pengutronix.de>
-Cc: Rob Herring <robh@kernel.org>
-Cc: Fabio Estevam <fabio.estevam@nxp.com>
-Signed-off-by: Peter Senna Tschudin <peter.senna@collabora.com>
----
-Unchanged from V2.
+Because (and only because) the huge majority of those clocks are
+shared between these SoCs.
 
-Changes from V1:
- - Replaced '_' by '-' in node names or compatible strings
- - Added missing @73 to b850v3-lvds-dp-bridge
+If it differs in a significant way (like for the A31 that is currently
+submitted), there's of course no reason to merge it in the same file.
 
- arch/arm/boot/dts/imx6q-b850v3.dts | 30 ++++++++++++++++++++++++++++++
- 1 file changed, 30 insertions(+)
+Maxime
 
-diff --git a/arch/arm/boot/dts/imx6q-b850v3.dts b/arch/arm/boot/dts/imx6q-b850v3.dts
-index 88a70de..10dfc3b 100644
---- a/arch/arm/boot/dts/imx6q-b850v3.dts
-+++ b/arch/arm/boot/dts/imx6q-b850v3.dts
-@@ -77,6 +77,13 @@
- 		fsl,data-mapping = "spwg";
- 		fsl,data-width = <24>;
- 		status = "okay";
-+
-+		port at 4 {
-+			reg = <4>;
-+			lvds0_out: endpoint {
-+				remote-endpoint = <&b850v3_lvds_dp_bridge_in>;
-+			};
-+		};
- 	};
- };
- 
-@@ -147,3 +154,26 @@
- 		reg = <0x4a>;
- 	};
- };
-+
-+&mux2_i2c2 {
-+	status = "okay";
-+	clock-frequency = <100000>;
-+
-+	b850v3-lvds-dp-bridge at 73 {
-+		compatible = "ge,b850v3-lvds-dp";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		reg = <0x73>;
-+		interrupt-parent = <&gpio2>;
-+		interrupts = <0 IRQ_TYPE_LEVEL_HIGH>;
-+
-+		edid-reg = <0x72>;
-+
-+		port {
-+			b850v3_lvds_dp_bridge_in: endpoint {
-+				remote-endpoint = <&lvds0_out>;
-+			};
-+		};
-+	};
-+};
 -- 
-2.5.5
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160731/2bf59356/attachment.sig>
