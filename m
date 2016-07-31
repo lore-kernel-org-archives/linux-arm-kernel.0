@@ -1,31 +1,35 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Sun, 31 Jul 2016 19:25:36 +0800
-Subject: [PATCH 3/3] ehci-platform: add the max clock number to 4
-In-Reply-To: <20160731112536.4625-1-icenowy@aosc.xyz>
-References: <20160731112536.4625-1-icenowy@aosc.xyz>
-Message-ID: <20160731112536.4625-3-icenowy@aosc.xyz>
+From: jolsa@redhat.com (Jiri Olsa)
+Date: Sun, 31 Jul 2016 14:02:19 +0200
+Subject: [PATCH V3 3/6] perf tools: add infrastructure for PMU specific
+ configuration
+In-Reply-To: <1469742143-22245-4-git-send-email-mathieu.poirier@linaro.org>
+References: <1469742143-22245-1-git-send-email-mathieu.poirier@linaro.org>
+ <1469742143-22245-4-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <20160731120219.GA12673@krava>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allwinner A64 EHCI requires 4 clocks to be enabled.
+On Thu, Jul 28, 2016 at 03:42:20PM -0600, Mathieu Poirier wrote:
+> This patch adds PMU driver specific configuration to the parser
+> infrastructure by preceding any term with the '@' letter.  As such
+> doing something like:
+> 
+> perf record -e some_event/@cfg1, at cfg2=config/ ...
+> 
+> will see 'cfg1' and 'cfg2=config' being added to the list of evsel config
+> terms.  Token 'cfg1' and 'cfg2=config' are not processed in user space
+> and are meant to be interpreted by the PMU driver.
+> 
+> First the lexer/parser are supplemented with the required definitions to
+> recognise the driver specific configuration.  From there they are simply
+> added to the list of event terms.  The bulk of the work is done in
+> function "parse_events_add_pmu()" where driver config event terms are
+> added to a new list of driver config terms, which in turn spliced with
+> the event's new driver configuration list.
+> 
+> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
----
- drivers/usb/host/ehci-platform.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Acked-by: Jiri Olsa <jolsa@kernel.org>
 
-diff --git a/drivers/usb/host/ehci-platform.c b/drivers/usb/host/ehci-platform.c
-index 6816b8c..876dca4 100644
---- a/drivers/usb/host/ehci-platform.c
-+++ b/drivers/usb/host/ehci-platform.c
-@@ -38,7 +38,7 @@
- #include "ehci.h"
- 
- #define DRIVER_DESC "EHCI generic platform driver"
--#define EHCI_MAX_CLKS 3
-+#define EHCI_MAX_CLKS 4
- #define EHCI_MAX_RSTS 3
- #define hcd_to_ehci_priv(h) ((struct ehci_platform_priv *)hcd_to_ehci(h)->priv)
- 
--- 
-2.9.0
+thanks,
+jirka
