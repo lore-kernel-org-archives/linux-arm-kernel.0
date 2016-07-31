@@ -1,37 +1,57 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 30 Jul 2016 22:13:54 +0200
-Subject: Why do we need reset_control_get_optional() ?
-In-Reply-To: <1469797695.3012.48.camel@pengutronix.de>
-References: <CAK7LNAQnitMMp5wMXXvVeS-UFF=Fo9m=M1hL=5f4=RF8JYCnGg@mail.gmail.com>
- <CAK7LNAS82QLZg40qjnkftES_Cd5AeyTAEdw3_Tms+8W6cK3QKw@mail.gmail.com>
- <1469797695.3012.48.camel@pengutronix.de>
-Message-ID: <3400649.NoVKUzu81R@wuerfel>
+From: lkp@intel.com (kbuild test robot)
+Date: Sun, 31 Jul 2016 09:45:17 +0800
+Subject: [PATCH 1/2] Support SD UHS for hikey-mainline-rebase
+In-Reply-To: <1468914713-63347-1-git-send-email-kid.jin@hisilicon.com>
+Message-ID: <201607310944.V1louHVl%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, July 29, 2016 3:08:15 PM CEST Philipp Zabel wrote:
-> Hi Masahiro,
-> 
-> Am Donnerstag, den 28.07.2016, 19:29 +0900 schrieb Masahiro Yamada:
-> [...]
-> > However, I think the following makes more sense:
-> > 
-> > 
-> > menuconfig RESET_CONTROLLER
-> >         bool "Reset Controller Support"
-> >         depends on (ARCH_HAS_RESET_CONTROLLER || COMPILE_TEST)
-> >         default y
-> >         help
-> >           Generic Reset Controller support.
-> 
-> That looks sensible to me. You'll only have to enable the reset
-> controller framework if either some enabled architecture has a reset
-> controller (in which case you want the driver for it to be activated by
-> default), or if you want to compile test some of the reset drivers.
+Hi,
 
-This still doesn't let a platform 'select RESET_FOO', unless they
-also select RESET_CONTROLLER and ARCH_HAS_RESET_CONTROLLER.
+[auto build test ERROR on robh/for-next]
+[also build test ERROR on v4.7 next-20160729]
+[cannot apply to ulf.hansson-mmc/next]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-Why do we need to guard all drivers inside of two symbols?
+url:    https://github.com/0day-ci/linux/commits/Jin-Guojun/Support-SD-UHS-for-hikey-mainline-rebase/20160725-102555
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git for-next
+config: i386-allmodconfig (attached as .config)
+compiler: gcc-6 (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=i386 
 
-	Arnd
+All errors (new ones prefixed by >>):
+
+>> drivers/mmc/host/dw_mmc-k3.c:137:2: error: unknown field 'prepare_command' specified in initializer
+     .prepare_command        = dw_mci_hi6220_prepare_command,
+     ^
+>> drivers/mmc/host/dw_mmc-k3.c:137:28: error: initialization from incompatible pointer type [-Werror=incompatible-pointer-types]
+     .prepare_command        = dw_mci_hi6220_prepare_command,
+                               ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   drivers/mmc/host/dw_mmc-k3.c:137:28: note: (near initialization for 'hi6220_data.execute_tuning')
+   cc1: some warnings being treated as errors
+
+vim +/prepare_command +137 drivers/mmc/host/dw_mmc-k3.c
+
+   131	}
+   132	
+   133	static const struct dw_mci_drv_data hi6220_data = {
+   134		.switch_voltage		= dw_mci_hi6220_switch_voltage,
+   135		.set_ios		= dw_mci_hi6220_set_ios,
+   136		.parse_dt		= dw_mci_hi6220_parse_dt,
+ > 137		.prepare_command        = dw_mci_hi6220_prepare_command,
+   138	};
+   139	
+   140	static const struct of_device_id dw_mci_k3_match[] = {
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 55034 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160731/60fdfa7a/attachment-0001.obj>
