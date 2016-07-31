@@ -1,24 +1,75 @@
-From: davem@davemloft.net (David Miller)
-Date: Sun, 31 Jul 2016 11:54:55 -0700 (PDT)
-Subject: [PATCH v3 00/15] net: thunderx: Add support for 81xx and 83xx
-In-Reply-To: <CA+sq2CcMrU0OcZK7oTF8dtpoojafgjCCA5dBqc6h5RKYZZ2h6Q@mail.gmail.com>
-References: <1468587500-32103-1-git-send-email-sunil.kovvuri@gmail.com>
- <CA+sq2Cf4mQdPkOy9cNw6FyAQokKHYjEjMbQF+MuTiE7=3mUtbg@mail.gmail.com>
- <CA+sq2CcMrU0OcZK7oTF8dtpoojafgjCCA5dBqc6h5RKYZZ2h6Q@mail.gmail.com>
-Message-ID: <20160731.115455.391582659417641368.davem@davemloft.net>
+From: peter.senna@collabora.com (Peter Senna Tschudin)
+Date: Sun, 31 Jul 2016 21:55:36 +0200
+Subject: [PATCH V3 3/5] Documentation/devicetree/bindings: b850v3_lvds_dp
+In-Reply-To: <cover.1469993472.git.peter.senna@collabora.com>
+References: <1464626385-19253-1-git-send-email-peter.senna@collabora.com>
+ <cover.1469993472.git.peter.senna@collabora.com>
+Message-ID: <cd3180af2c0f35b4a36624124f4d564cd1f35dec.1469993472.git.peter.senna@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sunil Kovvuri <sunil.kovvuri@gmail.com>
-Date: Mon, 1 Aug 2016 00:44:08 +0800
+Devicetree bindings documentation for the GE B850v3 LVDS/DP++
+display bridge.
 
-> A gentle reminder.
-> 
-> David,
-> Let me know if I need to resubmit the patches on top of latest net-next.
-> Will do that.
+Cc: Javier Martinez Canillas <javier@dowhile0.org>
+Cc: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+Cc: Philipp Zabel <p.zabel@pengutronix.de>
+Cc: Rob Herring <robh@kernel.org>
+Cc: Fabio Estevam <fabio.estevam@nxp.com>
+Signed-off-by: Peter Senna Tschudin <peter.senna@collabora.com>
+---
+Unchanged from V2.
 
-Your patches are marked appropriately in patchwork and tell you everything
-you need to know about the state of your patch series.
+Changes from V1:
+ - Replaced '_' by '-' in node names or compatible strings
+ - Added missing @73 to the example
 
-You never need to ask me questions like this, ever.
+ .../devicetree/bindings/ge/b850v3-lvds-dp.txt      | 37 ++++++++++++++++++++++
+ 1 file changed, 37 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/ge/b850v3-lvds-dp.txt
+
+diff --git a/Documentation/devicetree/bindings/ge/b850v3-lvds-dp.txt b/Documentation/devicetree/bindings/ge/b850v3-lvds-dp.txt
+new file mode 100644
+index 0000000..f05c3e9
+--- /dev/null
++++ b/Documentation/devicetree/bindings/ge/b850v3-lvds-dp.txt
+@@ -0,0 +1,37 @@
++Driver for GE B850v3 LVDS/DP++ display bridge
++
++Required properties:
++  - compatible : should be "ge,b850v3-lvds-dp".
++  - reg : should contain the address used to ack the interrupts.
++  - interrupt-parent : phandle of the interrupt controller that services
++    interrupts to the device
++  - interrupts : one interrupt should be described here, as in
++    <0 IRQ_TYPE_LEVEL_HIGH>.
++  - edid-reg : should contain the address used to read edid information
++  - port : should describe the video signal connection between the host
++    and the bridge.
++
++Example:
++
++&mux2_i2c2 {
++	status = "okay";
++	clock-frequency = <100000>;
++
++	b850v3-lvds-dp-bridge at 73  {
++		compatible = "ge,b850v3-lvds-dp";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		reg = <0x73>;
++		interrupt-parent = <&gpio2>;
++		interrupts = <0 IRQ_TYPE_LEVEL_HIGH>;
++
++		edid-reg = <0x72>;
++
++		port {
++			b850v3_dp_bridge_in: endpoint {
++				remote-endpoint = <&lvds0_out>;
++			};
++		};
++	};
++};
+-- 
+2.5.5
