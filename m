@@ -1,30 +1,33 @@
-From: xypron.glpk@gmx.de (Heinrich Schuchardt)
-Date: Sun, 31 Jul 2016 10:24:29 +0200
-Subject: [PATCH 1/1] net: bcm63xx: avoid possible null pointer dereference
-Message-ID: <1469953469-20782-1-git-send-email-xypron.glpk@gmx.de>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Sun, 31 Jul 2016 11:12:32 +0200
+Subject: [PATCH v2] ARM: pxa: fix GPIO double shifts
+In-Reply-To: <1469896245.3998.113.camel@perches.com> (Joe Perches's message of
+ "Sat, 30 Jul 2016 09:30:45 -0700")
+References: <1469877735-30127-1-git-send-email-robert.jarzmik@free.fr>
+ <1469896245.3998.113.camel@perches.com>
+Message-ID: <8760rmyxvj.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If dev_get_platdata has failed pd is null.
-Do not dereference a null pointer.
+Joe Perches <joe@perches.com> writes:
 
-Signed-off-by: Heinrich Schuchardt <xypron.glpk@gmx.de>
----
- drivers/net/ethernet/broadcom/bcm63xx_enet.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+> On Sat, 2016-07-30 at 13:22 +0200, Robert Jarzmik wrote:
+...zip...
+> $ git grep -w charger_wakeup
+> arch/arm/mach-pxa/corgi_pm.c:???.charger_wakeup??= corgi_charger_wakeup,
+> arch/arm/mach-pxa/sharpsl_pm.c:?????????????????if (sharpsl_pm.machinfo->charger_wakeup() != 0)
+> arch/arm/mach-pxa/sharpsl_pm.c:?????????if (sharpsl_pm.machinfo->charger_wakeup())
+> arch/arm/mach-pxa/sharpsl_pm.h: unsigned long (*charger_wakeup)(void);
+> arch/arm/mach-pxa/spitz_pm.c:???.charger_wakeup???= spitz_charger_wakeup,
+...zip...
 
-diff --git a/drivers/net/ethernet/broadcom/bcm63xx_enet.c b/drivers/net/ethernet/broadcom/bcm63xx_enet.c
-index 87c6b5b..6c8bc5f 100644
---- a/drivers/net/ethernet/broadcom/bcm63xx_enet.c
-+++ b/drivers/net/ethernet/broadcom/bcm63xx_enet.c
-@@ -1859,7 +1859,7 @@ static int bcm_enet_probe(struct platform_device *pdev)
- 	} else {
- 
- 		/* run platform code to initialize PHY device */
--		if (pd->mii_config &&
-+		if (pd && pd->mii_config &&
- 		    pd->mii_config(dev, 1, bcm_enet_mdio_read_mii,
- 				   bcm_enet_mdio_write_mii)) {
- 			dev_err(&pdev->dev, "unable to configure mdio bus\n");
+> It may be better to change the charger_wakeup callback return
+> value from unsigned long to bool and modify the other use in
+> spitz_pm.c?
+
+You're most probably right. I'll do that for v3.
+
+Cheers.
+
 -- 
-2.8.1
+Robert
