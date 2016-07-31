@@ -1,75 +1,57 @@
 From: peter.senna@collabora.com (Peter Senna Tschudin)
-Date: Sun, 31 Jul 2016 21:55:36 +0200
-Subject: [PATCH V3 3/5] Documentation/devicetree/bindings: b850v3_lvds_dp
-In-Reply-To: <cover.1469993472.git.peter.senna@collabora.com>
+Date: Sun, 31 Jul 2016 21:55:33 +0200
+Subject: [PATCH V3 0/5] Add driver for GE B850v3 LVDS/DP++ Bridge
+In-Reply-To: <1464626385-19253-1-git-send-email-peter.senna@collabora.com>
 References: <1464626385-19253-1-git-send-email-peter.senna@collabora.com>
- <cover.1469993472.git.peter.senna@collabora.com>
-Message-ID: <cd3180af2c0f35b4a36624124f4d564cd1f35dec.1469993472.git.peter.senna@collabora.com>
+Message-ID: <cover.1469993472.git.peter.senna@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Devicetree bindings documentation for the GE B850v3 LVDS/DP++
-display bridge.
+The series adds a driver that creates a drm_bridge and a drm_connector for the
+LVDS to DP++ display bridge of the GE B850v3.
 
-Cc: Javier Martinez Canillas <javier@dowhile0.org>
-Cc: Enric Balletbo i Serra <enric.balletbo@collabora.com>
-Cc: Philipp Zabel <p.zabel@pengutronix.de>
-Cc: Rob Herring <robh@kernel.org>
-Cc: Fabio Estevam <fabio.estevam@nxp.com>
-Signed-off-by: Peter Senna Tschudin <peter.senna@collabora.com>
----
-Unchanged from V2.
+There are two physical bridges on the video signal pipeline: a STDP4028(LVDS to
+DP) and a STDP2690(DP to DP++).  The hardware and firmware made it complicated
+for this binding to comprise two device tree nodes, as the design goal is to
+configure both bridges based on the LVDS signal, which leave the driver
+powerless to control the video processing pipeline. The two bridges behaves as
+a single bridge, and the driver is only needed for telling the host about EDID /
+HPD, and for giving the host powers to ack interrupts. The video signal
+pipeline is as follows:
 
-Changes from V1:
- - Replaced '_' by '-' in node names or compatible strings
- - Added missing @73 to the example
+  Host -> LVDS|--(STDP4028)--|DP -> DP|--(STDP2690)--|DP++ -> Video output
 
- .../devicetree/bindings/ge/b850v3-lvds-dp.txt      | 37 ++++++++++++++++++++++
- 1 file changed, 37 insertions(+)
+The patches from the series:
+ [1/5] Change the imx-ldb driver to allow attaching a bridge and not only a LVDS
+       panel.
+
+ [2/5] Configure the mapping between IPUs and external displays on the dts file
+       of the B850v3. Needed to support two simultaneos Full-HD monitors.
+
+ [3/5] Devicetree documentation for the GE B850v3 LVDS/DP++ Bridge
+
+ [4/5] Add the driver, make changes to MAINTAINERS, Kconfig and Makefile
+
+ [5/5] Make the changes to the B850v3 dts file to enable the GE B850v3
+       LVDS/DP++ Bridge.
+
+Peter Senna Tschudin (5):
+  drm/imx-ldb: Add support to drm-bridge
+  dts/imx6q-b850v3: Configure IPU assignment order
+  Documentation/devicetree/bindings: b850v3_lvds_dp
+  drm/bridge: Add driver for GE B850v3 LVDS/DP++ Bridge
+  dts/imx6q-b850v3: Use GE B850v3 LVDS/DP++ Bridge
+
+ .../devicetree/bindings/ge/b850v3-lvds-dp.txt      |  37 ++
+ MAINTAINERS                                        |   8 +
+ arch/arm/boot/dts/imx6q-b850v3.dts                 |  35 ++
+ drivers/gpu/drm/bridge/Kconfig                     |  11 +
+ drivers/gpu/drm/bridge/Makefile                    |   1 +
+ drivers/gpu/drm/bridge/ge_b850v3_lvds_dp.c         | 397 +++++++++++++++++++++
+ drivers/gpu/drm/imx/imx-ldb.c                      | 111 +++---
+ 7 files changed, 559 insertions(+), 41 deletions(-)
  create mode 100644 Documentation/devicetree/bindings/ge/b850v3-lvds-dp.txt
+ create mode 100644 drivers/gpu/drm/bridge/ge_b850v3_lvds_dp.c
 
-diff --git a/Documentation/devicetree/bindings/ge/b850v3-lvds-dp.txt b/Documentation/devicetree/bindings/ge/b850v3-lvds-dp.txt
-new file mode 100644
-index 0000000..f05c3e9
---- /dev/null
-+++ b/Documentation/devicetree/bindings/ge/b850v3-lvds-dp.txt
-@@ -0,0 +1,37 @@
-+Driver for GE B850v3 LVDS/DP++ display bridge
-+
-+Required properties:
-+  - compatible : should be "ge,b850v3-lvds-dp".
-+  - reg : should contain the address used to ack the interrupts.
-+  - interrupt-parent : phandle of the interrupt controller that services
-+    interrupts to the device
-+  - interrupts : one interrupt should be described here, as in
-+    <0 IRQ_TYPE_LEVEL_HIGH>.
-+  - edid-reg : should contain the address used to read edid information
-+  - port : should describe the video signal connection between the host
-+    and the bridge.
-+
-+Example:
-+
-+&mux2_i2c2 {
-+	status = "okay";
-+	clock-frequency = <100000>;
-+
-+	b850v3-lvds-dp-bridge at 73  {
-+		compatible = "ge,b850v3-lvds-dp";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		reg = <0x73>;
-+		interrupt-parent = <&gpio2>;
-+		interrupts = <0 IRQ_TYPE_LEVEL_HIGH>;
-+
-+		edid-reg = <0x72>;
-+
-+		port {
-+			b850v3_dp_bridge_in: endpoint {
-+				remote-endpoint = <&lvds0_out>;
-+			};
-+		};
-+	};
-+};
 -- 
 2.5.5
