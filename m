@@ -1,213 +1,47 @@
 From: peter.senna@collabora.com (Peter Senna Tschudin)
-Date: Sun, 31 Jul 2016 21:55:34 +0200
-Subject: [PATCH V3 1/5] drm/imx-ldb: Add support to drm-bridge
+Date: Sun, 31 Jul 2016 21:55:35 +0200
+Subject: [PATCH V3 2/5] dts/imx6q-b850v3: Configure IPU assignment order
 In-Reply-To: <cover.1469993472.git.peter.senna@collabora.com>
 References: <1464626385-19253-1-git-send-email-peter.senna@collabora.com>
  <cover.1469993472.git.peter.senna@collabora.com>
-Message-ID: <5d55969a1509de751dc550d9a02bd5070455f99b.1469993472.git.peter.senna@collabora.com>
+Message-ID: <7e5985c0b25505eeaf50294ea04ed750c6c0f576.1469993472.git.peter.senna@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support to attach a drm_bridge to imx-ldb in addition to
-existing support to attach a LVDS panel.
-
-This patch does a simple code refactoring by moving code
-from for_each_child_of_node iterator to a new function named
-imx_ldb_panel_ddc(). This was necessary to allow the panel ddc
-code to run only when the imx_ldb is not attached to a bridge.
+As the IPU has combined limitations across multiple crtcs, and as that
+can't be communicated to userspace at the moment, reorder the crtcs to
+allow support to two Full-HD monitors by avoiding assigning two
+monitors to a single IPU.
 
 Cc: Enric Balletbo i Serra <enric.balletbo@collabora.com>
 Cc: Philipp Zabel <p.zabel@pengutronix.de>
 Cc: Rob Herring <robh@kernel.org>
 Cc: Fabio Estevam <fabio.estevam@nxp.com>
-Cc: David Airlie <airlied@linux.ie>
-Cc: Thierry Reding <treding@nvidia.com>
-Cc: Thierry Reding <thierry.reding@gmail.com>
 Signed-off-by: Peter Senna Tschudin <peter.senna@collabora.com>
 ---
-Changes from V2:
- - Updated to be aplied on top of Liu Ying changes that made imx-ldb atomic.
- - Tested on next-20160729.
+Unchanged from V2.
 
 Changes from V1:
- - Reanmed ext_bridge to bridge
- - Removed empty entry point imx_ldb_encoder_enable()
- - Adapted the code to apply to the latest linux next: next-20160609
+ - New commit message
 
- drivers/gpu/drm/imx/imx-ldb.c | 111 ++++++++++++++++++++++++++----------------
- 1 file changed, 70 insertions(+), 41 deletions(-)
+ arch/arm/boot/dts/imx6q-b850v3.dts | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/drivers/gpu/drm/imx/imx-ldb.c b/drivers/gpu/drm/imx/imx-ldb.c
-index 5d2831d..ebe9abd 100644
---- a/drivers/gpu/drm/imx/imx-ldb.c
-+++ b/drivers/gpu/drm/imx/imx-ldb.c
-@@ -57,7 +57,11 @@ struct imx_ldb_channel {
- 	struct imx_ldb *ldb;
- 	struct drm_connector connector;
- 	struct drm_encoder encoder;
+diff --git a/arch/arm/boot/dts/imx6q-b850v3.dts b/arch/arm/boot/dts/imx6q-b850v3.dts
+index 167f744..88a70de 100644
+--- a/arch/arm/boot/dts/imx6q-b850v3.dts
++++ b/arch/arm/boot/dts/imx6q-b850v3.dts
+@@ -51,6 +51,11 @@
+ 	chosen {
+ 		stdout-path = &uart3;
+ 	};
 +
-+	/* Defines what is connected to the ldb, only one at a time */
- 	struct drm_panel *panel;
-+	struct drm_bridge *bridge;
-+
- 	struct device_node *child;
- 	struct i2c_adapter *ddc;
- 	int chno;
-@@ -469,19 +473,28 @@ static int imx_ldb_register(struct drm_device *drm,
- 	drm_encoder_init(drm, encoder, &imx_ldb_encoder_funcs,
- 			 DRM_MODE_ENCODER_LVDS, NULL);
- 
--	drm_connector_helper_add(&imx_ldb_ch->connector,
--			&imx_ldb_connector_helper_funcs);
--	drm_connector_init(drm, &imx_ldb_ch->connector,
--			   &imx_ldb_connector_funcs, DRM_MODE_CONNECTOR_LVDS);
--
- 	if (imx_ldb_ch->panel) {
-+		drm_connector_helper_add(&imx_ldb_ch->connector,
-+				&imx_ldb_connector_helper_funcs);
-+		drm_connector_init(drm, &imx_ldb_ch->connector,
-+				&imx_ldb_connector_funcs,
-+				DRM_MODE_CONNECTOR_LVDS);
- 		ret = drm_panel_attach(imx_ldb_ch->panel,
--				       &imx_ldb_ch->connector);
-+				&imx_ldb_ch->connector);
- 		if (ret)
- 			return ret;
- 	}
- 
--	drm_mode_connector_attach_encoder(&imx_ldb_ch->connector, encoder);
-+	if (imx_ldb_ch->bridge) {
-+		imx_ldb_ch->bridge->encoder = encoder;
-+
-+		imx_ldb_ch->encoder.bridge = imx_ldb_ch->bridge;
-+		ret = drm_bridge_attach(drm, imx_ldb_ch->bridge);
-+		if (ret) {
-+			DRM_ERROR("Failed to initialize bridge with drm\n");
-+			return ret;
-+		}
-+	}
- 
- 	return 0;
- }
-@@ -551,6 +564,45 @@ static const struct of_device_id imx_ldb_dt_ids[] = {
++	display-subsystem {
++		compatible = "fsl,imx-display-subsystem";
++		ports = <&ipu1_di0>, <&ipu2_di0>, <&ipu1_di1>, <&ipu2_di1>;
++	};
  };
- MODULE_DEVICE_TABLE(of, imx_ldb_dt_ids);
  
-+static int imx_ldb_panel_ddc(struct device *dev,
-+		struct imx_ldb_channel *channel, struct device_node *child)
-+{
-+	struct device_node *ddc_node;
-+	const u8 *edidp;
-+	int ret;
-+
-+	ddc_node = of_parse_phandle(child, "ddc-i2c-bus", 0);
-+	if (ddc_node) {
-+		channel->ddc = of_find_i2c_adapter_by_node(ddc_node);
-+		of_node_put(ddc_node);
-+		if (!channel->ddc) {
-+			dev_warn(dev, "failed to get ddc i2c adapter\n");
-+			return -EPROBE_DEFER;
-+		}
-+	}
-+
-+	if (!channel->ddc) {
-+		/* if no DDC available, fallback to hardcoded EDID */
-+		dev_dbg(dev, "no ddc available\n");
-+
-+		edidp = of_get_property(child, "edid",
-+					&channel->edid_len);
-+		if (edidp) {
-+			channel->edid = kmemdup(edidp,
-+						channel->edid_len,
-+						GFP_KERNEL);
-+		} else if (!channel->panel) {
-+			/* fallback to display-timings node */
-+			ret = of_get_drm_display_mode(child,
-+						      &channel->mode,
-+						      OF_USE_NATIVE_MODE);
-+			if (!ret)
-+				channel->mode_valid = 1;
-+		}
-+	}
-+	return 0;
-+}
-+
- static int imx_ldb_bind(struct device *dev, struct device *master, void *data)
- {
- 	struct drm_device *drm = data;
-@@ -558,7 +610,6 @@ static int imx_ldb_bind(struct device *dev, struct device *master, void *data)
- 	const struct of_device_id *of_id =
- 			of_match_device(imx_ldb_dt_ids, dev);
- 	struct device_node *child;
--	const u8 *edidp;
- 	struct imx_ldb *imx_ldb;
- 	int dual;
- 	int ret;
-@@ -608,7 +659,6 @@ static int imx_ldb_bind(struct device *dev, struct device *master, void *data)
- 
- 	for_each_child_of_node(np, child) {
- 		struct imx_ldb_channel *channel;
--		struct device_node *ddc_node;
- 		struct device_node *ep;
- 		int bus_format;
- 
-@@ -641,46 +691,25 @@ static int imx_ldb_bind(struct device *dev, struct device *master, void *data)
- 
- 			remote = of_graph_get_remote_port_parent(ep);
- 			of_node_put(ep);
--			if (remote)
-+			if (remote) {
- 				channel->panel = of_drm_find_panel(remote);
--			else
-+				channel->bridge = of_drm_find_bridge(remote);
-+			} else
- 				return -EPROBE_DEFER;
- 			of_node_put(remote);
--			if (!channel->panel) {
--				dev_err(dev, "panel not found: %s\n",
--					remote->full_name);
--				return -EPROBE_DEFER;
--			}
--		}
- 
--		ddc_node = of_parse_phandle(child, "ddc-i2c-bus", 0);
--		if (ddc_node) {
--			channel->ddc = of_find_i2c_adapter_by_node(ddc_node);
--			of_node_put(ddc_node);
--			if (!channel->ddc) {
--				dev_warn(dev, "failed to get ddc i2c adapter\n");
-+			if (!channel->panel && !channel->bridge) {
-+				dev_err(dev, "panel/bridge not found: %s\n",
-+					remote->full_name);
- 				return -EPROBE_DEFER;
- 			}
- 		}
- 
--		if (!channel->ddc) {
--			/* if no DDC available, fallback to hardcoded EDID */
--			dev_dbg(dev, "no ddc available\n");
--
--			edidp = of_get_property(child, "edid",
--						&channel->edid_len);
--			if (edidp) {
--				channel->edid = kmemdup(edidp,
--							channel->edid_len,
--							GFP_KERNEL);
--			} else if (!channel->panel) {
--				/* fallback to display-timings node */
--				ret = of_get_drm_display_mode(child,
--							      &channel->mode,
--							      OF_USE_NATIVE_MODE);
--				if (!ret)
--					channel->mode_valid = 1;
--			}
-+		/* panel ddc only if there is no bridge */
-+		if (!channel->bridge) {
-+			ret = imx_ldb_panel_ddc(dev, channel, child);
-+			if (ret)
-+				return ret;
- 		}
- 
- 		bus_format = of_get_bus_format(dev, child);
+ &clks {
 -- 
 2.5.5
