@@ -1,26 +1,24 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Sun, 31 Jul 2016 17:24:48 +0200
-Subject: [PATCH 2/3] phy: sun4i: add support for A64 usb phy
-In-Reply-To: <CAGb2v65tbM=-4HthAiN2hLvKYCSQg_WDCXrFcAO94cohd1FfDA@mail.gmail.com>
-References: <20160731112536.4625-1-icenowy@aosc.xyz>
- <20160731112536.4625-2-icenowy@aosc.xyz>
- <706a0517-a2bf-ee67-338d-859f67105cee@redhat.com>
- <CAGb2v65tbM=-4HthAiN2hLvKYCSQg_WDCXrFcAO94cohd1FfDA@mail.gmail.com>
-Message-ID: <3c258405-fab0-a1b1-478f-2f61121012fc@redhat.com>
+From: davem@davemloft.net (David Miller)
+Date: Sun, 31 Jul 2016 11:54:55 -0700 (PDT)
+Subject: [PATCH v3 00/15] net: thunderx: Add support for 81xx and 83xx
+In-Reply-To: <CA+sq2CcMrU0OcZK7oTF8dtpoojafgjCCA5dBqc6h5RKYZZ2h6Q@mail.gmail.com>
+References: <1468587500-32103-1-git-send-email-sunil.kovvuri@gmail.com>
+ <CA+sq2Cf4mQdPkOy9cNw6FyAQokKHYjEjMbQF+MuTiE7=3mUtbg@mail.gmail.com>
+ <CA+sq2CcMrU0OcZK7oTF8dtpoojafgjCCA5dBqc6h5RKYZZ2h6Q@mail.gmail.com>
+Message-ID: <20160731.115455.391582659417641368.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Sunil Kovvuri <sunil.kovvuri@gmail.com>
+Date: Mon, 1 Aug 2016 00:44:08 +0800
 
-On 31-07-16 16:50, Chen-Yu Tsai wrote:
+> A gentle reminder.
+> 
+> David,
+> Let me know if I need to resubmit the patches on top of latest net-next.
+> Will do that.
 
-> FYI: H3 USB PHY support is not complete. USB0 PHY is not supported, and
-> it does not work. I did a preliminary comparison of this PHY driver and
-> the code in Allwinner's SDK. There are some bits missing.
+Your patches are marked appropriately in patchwork and tell you everything
+you need to know about the state of your patch series.
 
-Right that is a known issue, I believe someone was working on an
-otg support patch series for the H3 though ?
-
-Regards,
-
-Hans
+You never need to ask me questions like this, ever.
