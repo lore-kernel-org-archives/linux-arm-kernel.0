@@ -1,23 +1,20 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sun, 31 Jul 2016 12:52:55 +0300
-Subject: [PATCH] net: thunderx: correct bound check in nic_config_loopback
-In-Reply-To: <1469933384-16827-1-git-send-email-alexander.levin@verizon.com>
-References: <1469933384-16827-1-git-send-email-alexander.levin@verizon.com>
-Message-ID: <8826fedc-8419-19a9-28d0-faf46ccc9f9f@cogentembedded.com>
+From: icenowy@aosc.xyz (Icenowy Zheng)
+Date: Sun, 31 Jul 2016 19:02:32 +0800
+Subject: [PATCH v2 0/2] Add support for Allwinner A64 mmc controller
+Message-ID: <20160731110234.3593-1-icenowy@aosc.xyz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Allwinner A64 has a slightly modified version of the Allwinner MMC controller.
 
-On 7/31/2016 5:49 AM, Levin, Alexander wrote:
+It do not have "output" or "sample" clock input, instead, it can calibrate the
+delay internally.
 
-> Off by one in nic_config_loopback would access an invalid arrat variable when
+This series of patch added the calibrate feature to the sunxi-mmc driver. It
+is based on works by Andre Przywara <andre.przywara@arm.com>, and now it
+depends on the patch set sent recently by Hans de Geode <hdegoede@redhat.com>,
+which disabled "output" and "sample" clock on A10/13.
+( http://lists.infradead.org/pipermail/linux-arm-kernel/2016-July/446187.html )
 
-    Array?
-
-> vf id == MAX_LMAC.
->
-> Signed-off-by: Sasha Levin <alexander.levin@verizon.com>
-[...]
-
-MBR, Sergei
+As the clock and device tree patch for Allwinner A64 is not yet merged, the
+patch set contains no patch to enable it.
