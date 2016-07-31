@@ -1,52 +1,133 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Sun, 31 Jul 2016 17:23:09 +0200
-Subject: [PATCH 3/4] input: touchscreen: edt-ft5x06: Add support for
- softbuttons
+Date: Sun, 31 Jul 2016 17:23:08 +0200
+Subject: [PATCH 2/4] input: touchscreen: Add LED trigger support to the
+ softbutton code
 In-Reply-To: <1469978590-14081-1-git-send-email-hdegoede@redhat.com>
 References: <1469978590-14081-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1469978590-14081-4-git-send-email-hdegoede@redhat.com>
+Message-ID: <1469978590-14081-3-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for softbuttons to the edt-ft5x06 driver.
+In some hardware there are 1 or more LEDs behind the touchscreen
+softbuttons, which are intended to provide visual feedback to the
+user that the softbutton has been pressed, this commit adds support
+for this.
 
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
- drivers/input/touchscreen/edt-ft5x06.c | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ .../bindings/input/touchscreen/softbuttons.txt     |  4 ++
+ drivers/input/touchscreen/softbuttons.c            | 49 +++++++++++++++++++++-
+ 2 files changed, 52 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/input/touchscreen/edt-ft5x06.c b/drivers/input/touchscreen/edt-ft5x06.c
-index 703e295..d19bf45 100644
---- a/drivers/input/touchscreen/edt-ft5x06.c
-+++ b/drivers/input/touchscreen/edt-ft5x06.c
-@@ -86,6 +86,7 @@ struct edt_reg_addr {
- struct edt_ft5x06_ts_data {
- 	struct i2c_client *client;
- 	struct input_dev *input;
-+	struct touchscreen_softbutton_info *buttons;
- 	struct touchscreen_properties prop;
- 	u16 num_x;
- 	u16 num_y;
-@@ -241,6 +242,9 @@ static irqreturn_t edt_ft5x06_ts_isr(int irq, void *dev_id)
- 		id = (buf[2] >> 4) & 0x0f;
- 		down = type != TOUCH_EVENT_UP;
+diff --git a/Documentation/devicetree/bindings/input/touchscreen/softbuttons.txt b/Documentation/devicetree/bindings/input/touchscreen/softbuttons.txt
+index 3eb6f4c..b425b95 100644
+--- a/Documentation/devicetree/bindings/input/touchscreen/softbuttons.txt
++++ b/Documentation/devicetree/bindings/input/touchscreen/softbuttons.txt
+@@ -17,6 +17,10 @@ Required subnode-properties:
+  - softbutton-min-y		: Y start of the area the softbutton area covers
+  - softbutton-max-y		: Y end of the area the softbutton area covers
  
-+		if (touchscreen_handle_softbuttons(tsdata->buttons, x, y, down))
-+			continue;
++Optional subnode-properties:
++- linux,led-trigger		: String for a LED trigger for providing visual
++				  feedback that the softbutton has been pressed
 +
- 		input_mt_slot(tsdata->input, id);
- 		input_mt_report_slot_state(tsdata->input, MT_TOOL_FINGER, down);
+ Example:
  
-@@ -975,6 +979,10 @@ static int edt_ft5x06_ts_probe(struct i2c_client *client,
+ #include <dt-bindings/input/input.h>
+diff --git a/drivers/input/touchscreen/softbuttons.c b/drivers/input/touchscreen/softbuttons.c
+index 47aea18..9a3fbfa 100644
+--- a/drivers/input/touchscreen/softbuttons.c
++++ b/drivers/input/touchscreen/softbuttons.c
+@@ -11,6 +11,7 @@
  
- 	touchscreen_parse_properties(input, true, &tsdata->prop);
+ #include <linux/input.h>
+ #include <linux/input/touchscreen.h>
++#include <linux/leds.h>
+ #include <linux/of.h>
  
-+	tsdata->buttons = devm_touchscreen_alloc_softbuttons(input);
-+	if (IS_ERR(tsdata->buttons))
-+		return PTR_ERR(tsdata->buttons);
+ struct touchscreen_softbutton {
+@@ -19,6 +20,8 @@ struct touchscreen_softbutton {
+ 	u32 min_y;
+ 	u32 max_y;
+ 	u32 keycode;
++	const char *ledtrigger_name;
++	struct led_trigger *ledtrigger;
+ };
+ 
+ struct touchscreen_softbutton_info {
+@@ -48,7 +51,7 @@ struct touchscreen_softbutton_info *devm_touchscreen_alloc_softbuttons(
+ 	struct device *dev = input->dev.parent;
+ 	struct device_node *np, *pp;
+ 	struct touchscreen_softbutton_info *info;
+-	int i, err, button_count;
++	int i, j, err, button_count;
+ 
+ 	np = dev->of_node;
+ 	if (!np)
+@@ -103,6 +106,36 @@ struct touchscreen_softbutton_info *devm_touchscreen_alloc_softbuttons(
+ 			dev_err(dev, "%s: Inval max-y prop\n", pp->name);
+ 			return ERR_PTR(-EINVAL);
+ 		}
 +
- 	error = input_mt_init_slots(input, tsdata->max_support_points,
- 				INPUT_MT_DIRECT);
- 	if (error) {
++		err = of_property_read_string(pp, "linux,led-trigger",
++					      &btn->ledtrigger_name);
++		if (err)
++			continue; /* The LED trigger is optional */
++
++		/* Check if another softbutton uses the same trigger */
++		for (j = 0; j < i; j++) {
++			if (info->buttons[j].ledtrigger_name &&
++			    strcmp(info->buttons[j].ledtrigger_name,
++				   btn->ledtrigger_name) == 0) {
++				btn->ledtrigger = info->buttons[j].ledtrigger;
++				break;
++			}
++		}
++		if (!btn->ledtrigger) {
++			btn->ledtrigger =
++				devm_kzalloc(dev, sizeof(*btn->ledtrigger),
++					     GFP_KERNEL);
++			if (!btn->ledtrigger)
++				return ERR_PTR(-ENOMEM);
++
++			btn->ledtrigger->name = btn->ledtrigger_name;
++			err = devm_led_trigger_register(dev, btn->ledtrigger);
++			if (err) {
++				dev_err(dev, "%s: Ledtrigger register error\n",
++					pp->name);
++				return ERR_PTR(err);
++			}
++		}
+ 	}
+ 
+ 	__set_bit(EV_KEY, input->evbit);
+@@ -126,6 +159,7 @@ bool touchscreen_handle_softbuttons(struct touchscreen_softbutton_info *info,
+ 				    unsigned int x, unsigned int y, bool down)
+ {
+ 	int i;
++	unsigned long led_delay = 1000; /* Keep the led on 1s after release */
+ 
+ 	if (info == NULL)
+ 		return false;
+@@ -137,6 +171,19 @@ bool touchscreen_handle_softbuttons(struct touchscreen_softbutton_info *info,
+ 		    y <= info->buttons[i].max_y) {
+ 			input_report_key(info->input,
+ 					 info->buttons[i].keycode, down);
++
++			if (info->buttons[i].ledtrigger && down) {
++				led_trigger_event(info->buttons[i].ledtrigger,
++						  LED_FULL);
++			} else if (info->buttons[i].ledtrigger && !down) {
++				/* Led must be off before calling blink */
++				led_trigger_event(info->buttons[i].ledtrigger,
++						  LED_OFF);
++				led_trigger_blink_oneshot(
++					info->buttons[i].ledtrigger,
++					&led_delay, &led_delay, 0);
++			}
++
+ 			return true;
+ 		}
+ 	}
 -- 
 2.7.4
