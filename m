@@ -1,56 +1,35 @@
-From: oss@buserror.net (Scott Wood)
-Date: Fri, 01 Jul 2016 01:51:45 -0500
-Subject: [PATCH v2 1/2] ARM64: arch_timer: Work around QorIQ Erratum
- A-008585
-In-Reply-To: <5771267D.7030102@arm.com>
-References: <1463114260-8724-1-git-send-email-oss@buserror.net>
- <20160513112441.200f4349@arm.com> <1466559926.22191.203.camel@buserror.net>
- <5771267D.7030102@arm.com>
-Message-ID: <1467355905.32358.31.camel@buserror.net>
+From: icenowy@aosc.xyz (Icenowy Zheng)
+Date: Mon, 01 Aug 2016 15:05:52 +0800
+Subject: [PATCH 3/3] ehci-platform: add the max clock number to 4
+In-Reply-To: <2477355.hXm3xYUusy@wuerfel>
+References: <20160731112536.4625-1-icenowy@aosc.xyz>
+ <20160731112536.4625-3-icenowy@aosc.xyz> <2477355.hXm3xYUusy@wuerfel>
+Message-ID: <414101470035152@web9j.yandex.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2016-06-27 at 14:13 +0100, Marc Zyngier wrote:
-> On 22/06/16 02:45, Scott Wood wrote:
-> > 
-> > On Fri, 2016-05-13 at 11:24 +0100, Marc Zyngier wrote:
-> > > 
-> > > On Thu, 12 May 2016 23:37:39 -0500
-> > > Scott Wood <oss@buserror.net> wrote:
-> > > 
-> > > > +#ifdef CONFIG_ARM64
-> > > > +static __always_inline void rewrite_tval(const int access,
-> > > > +		unsigned long evt, struct clock_event_device *clk)
-> > > > +{
-> > > > +	u64 cval_old, cval_new;
-> > > > +	int timeout = 200;
-> > > > +
-> > > > +	do {
-> > > > +		cval_old = __arch_counter_get_cntvct();
-> > > > +		arch_timer_reg_write(access, ARCH_TIMER_REG_TVAL,
-> > > > evt,
-> > > > clk);
-> > > > +		cval_new = __arch_counter_get_cntvct();
-> > > Don't you need to guarantee the order of accesses here?
-> > I'm not 100% sure.??The erratum workaround sample code doesn't show any
-> > barriers, and adding more barriers could make it harder for the loop to
-> > successfully complete.??There's already a barrier after the write, so the
-> > only
-> > concern should be whether the timer read could be reordered after the
-> > timer
-> > write, which could cause the loop to exit even if the write was bad.??Do
-> > you
-> > know if A53 or A57 will reorder a counter read relative to a tval write?
-> I can't see any absolute guarantee that they wouldn't be reordered (but
-> I have no insight on the micro-architecture either). I'd rather err on
-> the side of caution here.
+			clocks = <&ccu CLK_A64_BUS_OHCI1>,
+				 <&ccu CLK_A64_BUS_EHCI1>,
+				 <&ccu CLK_A64_USB_OHCI0>,
+				 <&ccu CLK_A64_USB_OHCI1>;
 
-Adding another isb() before arch_timer_reg_write() causes the loop to not
-complete with any reasonable timeout. ?A testing loop (that repeatedly writes
-to TVAL (using the workaround code), reads it back, and checks that the value
-read back is not greater than the value that was written) shows that the
-workaround without the extra isb() is effective -- lots of assertions without
-the workaround, and none with it -- but I'll go with the cval workaround
-instead.
+On A64, EHCI requires the matched OHCI to work.
+And OHCI1 clock requires OHCI0 clock to work.
 
--Scott
+(But from the SoC's user manual we cannot get any infomation
+about the relationship between OHCI1 clock and OHCI0 clock,
+and in the manual OHCI0 clock is called OTG-OHCI)
+
+01.08.2016, 15:01, "Arnd Bergmann" <arnd@arndb.de>:
+> On Sunday, July 31, 2016 7:25:36 PM CEST Icenowy Zheng wrote:
+>> ?Allwinner A64 EHCI requires 4 clocks to be enabled.
+>>
+>> ?Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+>
+> Can you say what those four clocks are?
+>
+> Are you sure that it's not just a case of a clock being
+> incorrectly described in the clk driver, i.e. you reference
+> one clock along with its parent here?
+>
+> ????????Arnd
