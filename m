@@ -1,66 +1,32 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 1 Aug 2016 11:54:30 -0500
-Subject: [PATCH 1/4] input: touchscreen: Add generic touchscreen
- softbutton handling code
-In-Reply-To: <1469978590-14081-2-git-send-email-hdegoede@redhat.com>
-References: <1469978590-14081-1-git-send-email-hdegoede@redhat.com>
- <1469978590-14081-2-git-send-email-hdegoede@redhat.com>
-Message-ID: <20160801165430.GA30345@rob-hp-laptop>
+Date: Mon, 1 Aug 2016 11:59:23 -0500
+Subject: [PATCH V3 3/5] Documentation/devicetree/bindings: b850v3_lvds_dp
+In-Reply-To: <cd3180af2c0f35b4a36624124f4d564cd1f35dec.1469993472.git.peter.senna@collabora.com>
+References: <cover.1469993472.git.peter.senna@collabora.com>
+ <cd3180af2c0f35b4a36624124f4d564cd1f35dec.1469993472.git.peter.senna@collabora.com>
+Message-ID: <20160801165923.GA5529@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 31, 2016 at 05:23:07PM +0200, Hans de Goede wrote:
-> Some touchscreens extend over the display they cover and have a number
-> of capacative softbuttons outside of the display the cover.
+On Sun, Jul 31, 2016 at 09:55:36PM +0200, Peter Senna Tschudin wrote:
+> Devicetree bindings documentation for the GE B850v3 LVDS/DP++
+> display bridge.
 > 
-> With some hardware these softbuttons simply report touches with
-> coordinates outside of the normal coordinate space for touches on the
-> display.
-> 
-> This commit adds a devicetree binding for describing such buttons in
-> devicetree and a bunch of helper functions to easily add support for
-> these to existing touchscreen drivers.
-> 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> Cc: Javier Martinez Canillas <javier@dowhile0.org>
+> Cc: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+> Cc: Philipp Zabel <p.zabel@pengutronix.de>
+> Cc: Rob Herring <robh@kernel.org>
+> Cc: Fabio Estevam <fabio.estevam@nxp.com>
+> Signed-off-by: Peter Senna Tschudin <peter.senna@collabora.com>
 > ---
->  .../bindings/input/touchscreen/softbuttons.txt     |  58 +++++++++
->  drivers/input/touchscreen/Makefile                 |   2 +-
->  drivers/input/touchscreen/softbuttons.c            | 145 +++++++++++++++++++++
->  include/linux/input/touchscreen.h                  |   9 ++
->  4 files changed, 213 insertions(+), 1 deletion(-)
->  create mode 100644 Documentation/devicetree/bindings/input/touchscreen/softbuttons.txt
->  create mode 100644 drivers/input/touchscreen/softbuttons.c
+> Unchanged from V2.
 > 
-> diff --git a/Documentation/devicetree/bindings/input/touchscreen/softbuttons.txt b/Documentation/devicetree/bindings/input/touchscreen/softbuttons.txt
-> new file mode 100644
-> index 0000000..3eb6f4c
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/input/touchscreen/softbuttons.txt
-> @@ -0,0 +1,58 @@
-> +General Touchscreen Softbutton Properties:
-> +
-> +Some touchscreens extend over the display they cover and have a number
-> +of capacative softbuttons outside of the display the cover.
-> +
-> +Some of these softbuttons simply report touches with coordinates outside of
-> +the normal coordinate space for touches on the display. This binding is for
-> +describing such buttons in devicetree.
-> +
-> +Each softkey is represented as a sub-node of the touchscreen node.
-> +
-> +Required subnode-properties:
-> + - label			: Descriptive name of the key.
-> + - linux,code			: Keycode to emit.
-> + - softbutton-min-x		: X start of the area the softbutton area covers
-> + - softbutton-max-x		: X end of the area the softbutton area covers
-> + - softbutton-min-y		: Y start of the area the softbutton area covers
-> + - softbutton-max-y		: Y end of the area the softbutton area covers
+> Changes from V1:
+>  - Replaced '_' by '-' in node names or compatible strings
+>  - Added missing @73 to the example
+> 
+>  .../devicetree/bindings/ge/b850v3-lvds-dp.txt      | 37 ++++++++++++++++++++++
+>  1 file changed, 37 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/ge/b850v3-lvds-dp.txt
 
-This generally looks fine to me, but I am wondering one thing. If the 
-buttons are located at the origin of an axis, can we handle that case? I 
-don't think you can unless you assume softbutton-max-? is 0 for the 
-touchscreen. To put it another way, you have a gap from 1024 to 1084 
-which you can't express for buttons at the origin unless you do negative 
-numbers.
-
-Rob
+Acked-by: Rob Herring <robh@kernel.org>
