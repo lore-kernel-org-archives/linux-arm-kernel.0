@@ -1,418 +1,414 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon,  1 Aug 2016 14:39:23 -0700
-Subject: [GIT PULL 2/7] ARM: SoC platform updates for v4.8
+Date: Mon,  1 Aug 2016 14:39:26 -0700
+Subject: [GIT PULL 5/7] ARM: SoC driver updates for v4.8
 In-Reply-To: <1470087568-4222-1-git-send-email-olof@lixom.net>
 References: <1470087568-4222-1-git-send-email-olof@lixom.net>
-Message-ID: <1470087568-4222-3-git-send-email-olof@lixom.net>
+Message-ID: <1470087568-4222-6-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Improved and new platform support for various SoCs:
+Driver updates for ARM SoCs.
 
-- New SoC support:
-- Broadcom BCM23550
-- Freescale i.MX7Solo
-- Qualcomm MDM9615
-- Renesas r8a7792
-- Conversion of clps711x to multiplatform
-- debug uart improvements for Atmel platforms
-- Tango platform improvements: HOTPLUG_CPU, Suspend-to-ram
-- OMAP tweaks and improvements to hwmod
-- OMAP support for kexec on SMP
+A slew of changes this release cycle. The reset driver tree, that we merge
+through arm-soc for historical reasons, is also sizable this time around.
+
+Among the changes:
+
+- clps711x: Treewide changes to compatible strings, merged here for simplicity.
+- Qualcomm: SCM firmware driver cleanups, move to platform driver
+- ux500: Major cleanups, removal of old mach-specific infrastructure.
+- Atmel external bus memory driver
+- Move of brcmstb platform to the rest of bcm
+- PMC driver updates for tegra, various fixes and improvements
+- Samsung platform driver updates to support 64-bit Exynos platforms
+- Reset controller cleanups moving to devm_reset_controller_register() APIs
+- Reset controller driver for Amlogic Meson
+- Reset controller driver for Hisilicon hi6220
+- ARM SCPI power domain support
 
 
 
 Conflicts:
 
-arch/arm/Kconfig:
-Remove/change conflict. Contents moved to arch/arm/mach-clps711x/Kconfig.
-Either add CLPS711X_TIMER and GPIOLIB selects there, or we'll send a fix to
-do it later.
+arch/arm/mach-exynos/Kconfig:
+Add/add. Keep both sides. Feel free to fix sorting.
 
-arch/arm/mach-bcm/board_bcm21664.c:
-Remove/remove conflict. Delete both sides.
-
-arch/arm/mach-imx/mach-imx51.c:
-Add/remove conflict. Remove of_platform_populate(), keep
-imx_aips_allow_unprivileged_access().
-
-drivers/net/ethernet/freescale/fec.h:
-Add/add conflict. Keep both sides, but bump one to (1 << 14).
+drivers/soc/samsung/pm_domains.c:
+Conflict between *_relaxed() changes and
+INT_LOCAL_PWR_EN->pd->local_pwr_cfg changes. Keep the *relaxed version
+but replace INT_LOCAL_PWR_EN with the variable.
 
 ----------------------------------------------------------------
 
-The following changes since commit 02dde306d1113b6e161eb77946159d9ec41f725b:
+The following changes since commit fa8fc918c695d84b6f14a940ac7b7eac779bcef5:
 
-  Merge branch 'next/cleanup' into HEAD
+  Merge branch 'next/defconfig' into HEAD
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/armsoc-soc
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/armsoc-drivers
 
-for you to fetch changes up to 4756f881ba303e4dada613feeacf44d26c3e35b9:
+for you to fetch changes up to f8c6d88b2c874295f49b9ad1ca0826b9a8ef3180:
 
-  Merge tag 'samsung-soc-4.8-3' of git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux into next/soc
+  Merge tag 'samsung-drivers-4.8-3' of git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux into next/drivers
 
 ----------------------------------------------------------------
 
-Alexander Shiyan (6):
-      ARM: i.MX: Fix FIQ interrupt handling for TZIC
-      ARM: i.MX: Disable supervisor protect for i.MX51
-      ARM: clps711x: Reduce static map size
-      ARM: clps711x: Add basic DT support
-      ARM: clps711x: Remove boards support
-      ARM: clps711x: Switch to MULTIPLATFORM
+Alexander Shiyan (7):
+      clk: clps711x: Changing the compatibility string to match with the smallest supported chip
+      clocksource: clps711x: Changing the compatibility string to match with the smallest supported chip
+      irqchip: clps711x: Changing the compatibility string to match with the smallest supported chip
+      serial: clps711x: Changing the compatibility string to match with the smallest supported chip
+      pwm: clps711x: Changing the compatibility string to match with the smallest supported chip
+      input: clps711x-keypad: Changing the compatibility string to match with the smallest supported chip
+      video: clps711x-fb: Changing the compatibility string to match with the smallest supported chip
 
-Alexandre Belloni (2):
-      ARM: at91: debug: use DEBUG_UART_VIRT
-      ARM: at91: debug: add default DEBUG_LL addresses
+Amitoj Kaur Chawla (2):
+      memory: tegra: tegra124-emc: Add missing of_node_put()
+      memory: tegra: mc: Add missing of_node_put()
 
-Andrea Gelmini (7):
-      ARM: OMAP1: Fix typo in fiq.c
-      ARM: OMAP1: Fix typo in mtd-xip.h
-      ARM: OMAP2+: Fix typo in cm3xxx.c
-      ARM: OMAP2+: Fix typo in mux34xx.c
-      ARM: OMAP2+: Fix typo in omap4-common.c
-      ARM: OMAP2+: Fix typo in omap_device.c
-      ARM: OMAP2+: Fix typo in sdrc.h
+Andrew F. Davis (2):
+      Documentation: dt: reset: Add TI syscon reset binding
+      reset: add TI SYSCON based reset driver
 
-Arnd Bergmann (8):
-      Merge ARCH_[WANT_OPTIONAL|REQUIRE]_GPIOLIB changes into next/soc
-      ARM: tango: fix CONFIG_HOTPLUG_CPU=n build
-      Merge tag 'omap-for-v4.8/soc-pt2-signed' of git://git.kernel.org/.../tmlind/linux-omap into next/soc
-      Merge tag 'hisi-armv7-soc-for-4.8-v3' of git://github.com/hisilicon/linux-hisi into next/soc
-      Merge tag 'arm-soc/for-4.8/soc-part2' of http://github.com/Broadcom/stblinux into next/soc
-      Merge tag 'arm-soc/for-4.8/maintainers-part2' of http://github.com/Broadcom/stblinux into next/soc
-      Merge tag 'sti-soc-for-v4.8' of git://git.kernel.org/.../pchotard/sti into next/soc
-      Merge tag 'samsung-soc-4.8-3' of git://git.kernel.org/.../krzk/linux into next/soc
+Andy Gross (7):
+      firmware: qcom: scm: Convert SCM to platform driver
+      firmware: qcom: scm: Use atomic SCM for cold boot
+      firmware: qcom: scm: Generalize shared error map
+      firmware: qcom: scm: Convert to streaming DMA APIS
+      Merge tag 'qcom-drivers-for-4.8' into HEAD
+      firmware: qcom_scm: Add missing is_available API
+      firmware: qcom: scm: Change initcall to subsys
 
-Ben Dooks (16):
-      ARM: bcm: fix missing include of kona_l2_cache.h
-      ARM: imx: fix missing includes
-      ARM: imx: fix missing include of common.h
-      ARM: imx6: fix static declaration in include/soc/imx/cpuidle.h
-      ARM: EXYNOS: Fixup debug macros for big-endian
-      ARM: SAMSUNG: Fixup endian issues in CPU detection
-      ARM: EXYNOS: Fixups for big-endian operation
-      ARM: EXYNOS: Fixup endian in pm/pmu
-      ARM: SAMSUNG: Fixup usage of __raw IO in PM
-      ARM: EXYNOS: Fixup for __raw operations in suspend.c
-      ARM: imx6: fix missing <soc/imx/cpuidle.h> in cpuidle-imx6q.c
-      ARM: at91: fix warnings in pm.c
-      ARM: keystone: fix missing keystone.h in pm_domain.c
-      ARM: OMAP: make ti81xx_rtc_hwmod static
-      ARM: SAMSUNG: Fix missing s5p_init_cpu() declaration
-      ARM: hisi: make unexported symbols static
+Arnd Bergmann (19):
+      Merge tag 'reset-for-4.8-3' of git://git.pengutronix.de/git/pza/linux into next/drivers
+      Merge tag 'omap-for-v4.8/ir-rx51-signed' of git://git.kernel.org/.../tmlind/linux-omap into next/drivers
+      firmware: scpi: add CONFIG_OF dependency
+      soc: raspberrypi-power: add CONFIG_OF dependency
+      Merge tag 'arm-soc/for-4.8/maintainers-part2' of http://github.com/Broadcom/stblinux into next/drivers
+      ARM: ux500: remove unused regulator data
+      ARM: ux500: move ab8500_regulator_plat_data into driver
+      ASoC: ab8500-codec: remove platform data based probe
+      mfd: db8500 stop passing around platform data
+      ARM: ux500: move l2x0 init to .init_irq
+      ARM: ux500: use CLK_OF_DECLARE()
+      ARM: ux500: remove cpu_is_u* helpers
+      ARM: ux500: consolidate soc_device code in id.c
+      ARM: ux500: call ux500_setup_id later
+      ARM: ux500: move soc_id driver to drivers/soc
+      ARM: ux500: consolidate base platform files
+      Merge tag 'qcom-drivers-for-4.8-2' of git://git.kernel.org/.../agross/linux into next/drivers
+      Merge tag 'ux500-cleanup-bundle' of git://git.kernel.org/.../linusw/linux-stericsson into next/drivers
+      Merge tag 'samsung-drivers-4.8-3' of git://git.kernel.org/.../krzk/linux into next/drivers
 
-Chris Brand (3):
-      ARM: bcm21664: Remove reset code
-      ARM: Add support for Broadcom BCM23550 SoC
-      ARM: BCM23550 SMP support
+Ben Dooks (3):
+      soc: brcmstb: fix warning from missing include
+      memory: samsung: endian fixes for IO
+      cpufreq: s5pv210: use relaxed IO accesors
 
-Florian Fainelli (2):
-      ARM: debug: Enable DEBUG_BCM_5301X for Northstar Plus SoCs
-      MAINTAINERS: Change L to M for Broadcom ARM/ARM64 SoC entries
+Bjorn Andersson (6):
+      soc: qcom: wcnss_ctrl: Make wcnss_ctrl parent the other components
+      soc: qcom: smp2p: Correct addressing of outgoing value
+      soc: qcom: smp2p: Drop io-accessors
+      soc: qcom: Update properties for smem state referencing
+      firmware: qcom: scm: Peripheral Authentication Service
+      firmware: qcom: scm: Expose PAS command 10 as reset-controller
 
-Franklin S Cooper Jr (2):
-      clk: ti: am335x/am4372: Add tbclk to pwm node
-      ARM: AM335x/AM437x: hwmod: Remove eQEP, ePWM and eCAP hwmod entries
+Boris Brezillon (2):
+      memory: add Atmel EBI (External Bus Interface) driver
+      memory: atmel-ebi: add DT bindings documentation
 
-Geert Uytterhoeven (12):
-      ARM: shmobile: pm-rmobile: Postpone call to pm_genpd_init()
-      ARM: shmobile: rcar-gen2: Use ICRAM1 for jump stub on all SoCs
-      soc: renesas: rcar-sysc: Document r8a7796 support
-      soc: renesas: Add r8a7796 SYSC PM Domain Binding Definitions
-      soc: renesas: rcar-sysc: Add support for R-Car M3-W power areas
-      soc: renesas: rcar-sysc: Fix uninitialized error code in rcar_sysc_pd_init()
-      soc: renesas: rcar-sysc: Make rcar_sysc_init() init the PM domains
-      soc: renesas: rcar-sysc: Move SYSC interrupt config to rcar-sysc driver
-      soc: renesas: rcar-sysc: Improve SYSC interrupt config in legacy wrapper
-      ARM: shmobile: rcar-gen2: Obtain extal frequency from DT
-      ARM: shmobile: rcar-gen2: Correct arch timer frequency on R-Car V2H
-      ARM: shmobile: apmu: Move #ifdef CONFIG_SMP to cover more functions
+Chen Feng (1):
+      reset: hisilicon: Change to syscon register access
 
-Jean Guyomarc'h (1):
-      ARM: mach-imx6q: fix spelling mistake in error message
+Chris Brand (1):
+      power: Introduce Broadcom kona reset driver
 
-Jiancheng Xue (1):
-      ARM: hisi: consolidate the hisilicon machine entries
+Florian Fainelli (1):
+      soc: Move brcmstb to bcm/brcmstb
 
-Jon Mason (4):
-      MAINTAINERS: Fix nsp false-positives
-      MAINTAINERS: Add NS2 entry
-      MAINTAINERS: Update BCM63XX entry
-      MAINTAINERS: Update BCM281XX/BCM11XXX/BCM216XX entry
+Geert Uytterhoeven (1):
+      MAINTAINERS: Add file patterns for qcom device tree bindings
 
-Joonyoung Shim (1):
-      ARM: EXYNOS: Fix UART address selection for DEBUG_LL
+Ivaylo Dimitrov (5):
+      ir-rx51: Fix build after multiarch changes broke it
+      pwm: omap-dmtimer: Allow for setting dmtimer clock source
+      ir-rx51: use PWM framework instead of OMAP dmtimer
+      ir-rx51: add DT support to driver
+      ir-rx51: use hrtimer instead of dmtimer
 
-Keerthy (2):
-      ARM: AM43XX: hwmod: Fix RSTST register offset for pruss
-      ARM: dts: am43xx: Remove wrongly defined RSTST offset for PER Domain
+John Youn (1):
+      reset: Return -ENOTSUPP when not configured
 
-Krzysztof Kozlowski (2):
-      MAINTAINERS: Extend Samsung SoC entry with S3C/S5P drivers
-      ARM: SAMSUNG: Constify iomem address passed to s5p_init_cpu
+Jon Hunter (12):
+      soc/tegra: pmc: Initialise resets associated with a power partition
+      soc/tegra: pmc: Ensure powergate is available when powering on
+      soc/tegra: pmc: Fix early initialisation of PMC
+      soc/tegra: pmc: Don't populate SoC data until register space is mapped
+      soc/tegra: pmc: Ensure mutex is always initialised
+      soc/tegra: pmc: Add missing of_node_put()
+      soc/tegra: pmc: Don't probe PMC if early initialisation fails
+      soc/tegra: pmc: Add specific error messages
+      soc/tegra: pmc: Initialise power partitions early
+      soc/tegra: pmc: Enable XUSB partitions on boot
+      dt-bindings: bus: Add documentation for Tegra210 ACONNECT
+      bus: Add support for Tegra ACONNECT
 
-Lucas Stach (1):
-      ARM: imx6: disable deeper idle states when FEC is active w/o HW workaround
+Julia Lawall (1):
+      memory: tegra: Delete unneeded of_node_put()
 
-Magnus Damm (4):
-      ARM: shmobile: apmu: Add APMU DT support via Enable method
-      ARM: shmobile: smp: Add function to prioritize DT SMP
-      ARM: shmobile: r8a7790: Prioritize DT APMU support
-      ARM: shmobile: r8a7791: Prioritize DT APMU support
+Krzysztof Kozlowski (5):
+      ARM: EXYNOS: Move pm_domains driver to drivers/soc/samsung
+      soc: samsung: pm_domains: Prepare for supporting ARMv8 Exynos
+      soc: samsung: pm_domains: Enable COMPILE_TEST for build coverage
+      Merge branch 'for-v4.8/media/exynos-mfc' of git://linuxtv.org/snawrocki/samsung into for-v4.8/exynos-mfc
+      soc: samsung: pmu: Constify arrays with PMU data
 
-Marc Gonzalez (3):
-      ARM: tango: add HOTPLUG_CPU support
-      Update ARM/TANGO section
-      ARM: tango: add Suspend-to-RAM support
+Kumar Gala (1):
+      firmware: qcom: scm: Add support for ARM64 SoCs
 
-Masahiro Yamada (1):
-      ARM: uniphier: remove empty DT machine descriptor
+Marek Szyprowski (3):
+      ARM: EXYNOS: Remove code for MFC custom reserved memory handling
+      ARM: dts: exynos: Convert MFC device to generic reserved memory bindings
+      ARM: dts: exynos: Enable MFC device on Exynos4412 Odroid boards
 
-Michael Turquette (1):
-      arm: meson: explicitly select clk drivers
+Masahiro Yamada (7):
+      reset: add devm_reset_controller_register API
+      reset: ath79: use devm_reset_controller_register()
+      reset: pistachio: use devm_reset_controller_register()
+      reset: sunxi: use devm_reset_controller_register()
+      reset: socfpga: use devm_reset_controller_register()
+      reset: zynq: use devm_reset_controller_register()
+      reset: fix Kconfig menu to include reset drivers in sub-menu
 
-Neil Armstrong (2):
-      ARM: qcom: Add support for MDM9615
-      ARM: oxnas: Change OX810SE default driver config
+Neil Armstrong (3):
+      reset: oxnas: Use devm register API and get rid of platform remove
+      reset: Add support for the Amlogic Meson SoC Reset Controller
+      dt-bindings: reset: Add bindings for the Meson SoC Reset Controller
 
-Nicolas Ferre (1):
-      ARM: at91: Documentation: update the sama5d2 entry
+Olof Johansson (16):
+      Merge tag 'reset-for-4.8' of git://git.pengutronix.de/git/pza/linux into next/drivers
+      Merge tag 'samsung-drivers-4.8' of git://git.kernel.org/.../krzk/linux into next/drivers
+      Merge tag 'renesas-rcar-sysc-for-v4.8' of git://git.kernel.org/.../horms/renesas into next/drivers
+      Merge tag 'at91-ab-4.8-drivers' of git://git.kernel.org/.../abelloni/linux into next/drivers
+      Merge tag 'reset-for-4.8-2' of git://git.pengutronix.de/git/pza/linux into next/drivers
+      Merge tag 'samsung-drivers-exynos-mfc-4.8' of git://git.kernel.org/.../krzk/linux into next/drivers
+      Merge tag 'arm-soc/for-4.8/drivers' of http://github.com/Broadcom/stblinux into next/drivers
+      Merge tag 'at91-ab-4.8-drivers2' of git://git.kernel.org/.../abelloni/linux into next/drivers
+      Merge tag 'scpi-updates-4.8' of git://git.kernel.org/.../sudeep.holla/linux into next/drivers
+      Merge tag 'gpmc-omap-for-v4.8' of https://github.com/rogerq/linux into next/drivers
+      Merge tag 'qcom-drivers-for-4.8' of git://git.kernel.org/.../agross/linux into next/drivers
+      Merge tag 'samsung-drivers-4.8-2' of git://git.kernel.org/.../krzk/linux into next/drivers
+      Merge tag 'renesas-rcar-sysc2-for-v4.8' of git://git.kernel.org/.../horms/renesas into next/drivers
+      Merge tag 'tegra-for-4.8-bus' of git://git.kernel.org/.../tegra/linux into next/drivers
+      Merge tag 'tegra-for-4.8-memory' of git://git.kernel.org/.../tegra/linux into next/drivers
+      Merge tag 'tegra-for-4.8-soc' of git://git.kernel.org/.../tegra/linux into next/drivers
 
-Olof Johansson (11):
-      Merge tag 'renesas-soc-for-v4.8' of git://git.kernel.org/.../horms/renesas into next/soc
-      Merge tag 'at91-ab-4.8-soc' of git://git.kernel.org/.../abelloni/linux into next/soc
-      Merge tag 'arm-soc/for-4.8/soc' of http://github.com/Broadcom/stblinux into next/soc
-      Merge tag 'keystone_for_4.8' of git://git.kernel.org/.../ssantosh/linux-keystone into next/soc
-      Merge tag 'at91-ab-4.8-soc2' of git://git.kernel.org/.../abelloni/linux into next/soc
-      Merge tag 'davinci-for-v4.8' of git://git.kernel.org/.../nsekhar/linux-davinci into next/soc
-      Merge tag 'qcom-soc-for-4.8' of git://git.kernel.org/.../agross/linux into next/soc
-      Merge tag 'imx-soc-4.8' of git://git.kernel.org/.../shawnguo/linux into next/soc
-      Merge tag 'omap-for-v4.8/soc-signed' of git://git.kernel.org/.../tmlind/linux-omap into next/soc
-      Merge tag 'samsung-soc-4.8-2' of git://git.kernel.org/.../krzk/linux into next/soc
-      Merge tag 'renesas-soc2-for-v4.8' of git://git.kernel.org/.../horms/renesas into next/soc
+Paul Gortmaker (4):
+      memory: omap-gpmc: make it explicitly non-modular
+      memory: samsung: exynos-srom: make it explicitly non-modular
+      memory: atmel-sdramc: make it explicitly non-modular
+      memory: atmel-ebi: make it explicitly non-modular
 
-Patrice Chotard (1):
-      ARM: sti: Implement dummy L2 cache's write_sec
+Philipp Zabel (1):
+      Merge branch 'reset/explicit-api' into reset/next
 
-Peter Griffin (1):
-      ARM: STi: Update machine _namestr to be more generic.
+Roger Quadros (1):
+      memory: omap-gpmc: Move gpio functions out of #ifdef CONFIG_OF
 
-Peter Ujfalusi (10):
-      ARM: OMAP: rx51-video: Do not set TV connector_type
-      ARM/video: omap2: Move omap_display_init declaration to mach-omap2/display.h
-      video/platform_data: omapdss: Create new header file for platform data
-      ARM: OMAP2: Use the platform_data header for omapdss
-      ARM: OMAP3: hwmod data: Fix McBSP2/3 sidetone data
-      ARM: OMAP3: McBSP: New callback for McBSP2/3 ICLK idle configuration
-      ARM: OMAP3: pdata-quirks: Add support for McBSP2/3 sidetone handling
-      ASoC: omap-mcbsp: Rename omap_mcbsp_sysfs_remove() to omap_mcbsp_cleanup()
-      ASoC: omap-mcbsp: sidetone: Use the new callback for iclk handling
-      ARM: OMAP2+: McBSP: Remove the old iclk allow/deny idle code
+Seung-Woo Kim (1):
+      memory: samsung: exynos-srom: Fix wrong count of registers
 
-Petr Kulhavy (2):
-      ARM: davinci: da850: add clocks for mcbsp0 and 1
-      ARM: davinci: remove unused davinci-i2s pdata
+Sudeep Holla (6):
+      firmware: arm_scpi: remove dvfs_get packed structure
+      firmware: arm_scpi: mark scpi_get_sensor_value as static
+      firmware: arm_scpi: make it depend on MAILBOX instead of ARM_MHU
+      firmware: arm_scpi: add support for device power state management
+      Documentation: add DT bindings for ARM SCPI power domains
+      firmware: scpi: add device power domain support using genpd
 
-Rafa? Mi?ecki (1):
-      MAINTAINERS: Update entry for BCM5301X ARM
+Thierry Reding (3):
+      soc/tegra: pmc: Use register definitions instead of magic values
+      soc/tegra: pmc: Use whitespace more consistently
+      soc/tegra: Stub out PCIe IRQ workaround on 64-bit ARM
 
-Sekhar Nori (1):
-      ARM: davinci: fix build break because of undeclared dm365_evm_snd_data
-
-Sergei Shtylyov (2):
-      soc: renesas: rcar-sysc: add R8A7792 support
-      ARM: shmobile: r8a7792: basic SoC support
-
-Shawn Guo (1):
-      ARM: imx6q: export cpuidle functions needed by fec driver
-
-Simon Horman (1):
-      Merge branch 'rcar-sysc-for-v4.8' into HEAD
-
-Stefan Agner (1):
-      ARM: imx: add support for i.MX 7Solo
-
-Tero Kristo (5):
-      ARM: OMAP2+: omap_device: create clock alias purely from DT data
-      ARM: OMAP2+: hwmod: fetch main_clk based on hwmod name
-      ARM: OMAP2+: timer: change order of hwmod data handling
-      ARM: OMAP2+: clockdomain: add usecounting support to autoidle APIs
-      ARM: AM33xx: fix module_wait_ready without clkctrl register
-
-Thierry Reding (1):
-      ARM: s3c64xx: smartq: Avoid sparse warnings
-
-Tomi Valkeinen (1):
-      ARM: DRA7: hwmod: remove DSS addresses from hwmod
-
-Tony Lindgren (8):
-      Merge branch 'peter/for-4.8_omapdss_part1' of https://github.com/omap-audio/linux-audio into omap-for-v4.8/soc
-      Merge commit 'c0053bd50af5' into omap-for-v4.8/soc
-      ARM: OMAP4+: Initialize SAR RAM base early for proper CPU1 reset for kexec
-      ARM: OMAP4+: Prevent CPU1 related hang with kexec
-      ARM: OMAP4+: Reset CPU1 properly for kexec
-      ARM: OMAP4+: Allow kexec on SMP variants
-      ARM: OMAP2+: Fix build if CONFIG_SMP is not set
-      ARM: OMAP2+: Fix build with CONFIG_SMP and CONFIG_PM is not set
-
-Vignesh R (1):
-      ARM: DRA7: hwmod: Remove QSPI address space entry from hwmod
+Xinliang Liu (3):
+      reset: hisilicon: Add media reset controller binding
+      arm64: dts: hi6220: Add media subsystem reset dts
+      reset: hisilicon: Add hi6220 media subsystem reset support
 
 
- Documentation/arm/Atmel/README                  |  10 +-
- .../devicetree/bindings/net/fsl-fec.txt         |   3 +
- .../bindings/power/renesas,rcar-sysc.txt        |   1 +
- MAINTAINERS                                     |  42 ++--
- arch/arm/Kconfig                                |  14 --
- arch/arm/Kconfig.debug                          |  65 ++++--
- arch/arm/Makefile                               |   1 -
- arch/arm/include/debug/at91.S                   |  10 +-
- arch/arm/include/debug/clps711x.S               |   4 +-
- arch/arm/include/debug/exynos.S                 |   6 +-
- arch/arm/include/debug/samsung.S                |   8 +
- arch/arm/mach-at91/pm.c                         |   5 +-
- arch/arm/mach-bcm/Kconfig                       |  12 +-
- arch/arm/mach-bcm/Makefile                      |   5 +-
- arch/arm/mach-bcm/board_bcm21664.c              |  43 ----
- arch/arm/mach-bcm/board_bcm23550.c              |  25 +++
- arch/arm/mach-bcm/kona_l2_cache.c               |   1 +
- arch/arm/mach-bcm/platsmp.c                     |  58 ++++++
- arch/arm/mach-clps711x/Kconfig                  |  53 ++---
- arch/arm/mach-clps711x/Makefile                 |  14 +-
- arch/arm/mach-clps711x/Makefile.boot            |   5 -
- arch/arm/mach-clps711x/board-dt.c               |  82 ++++++++
- arch/arm/mach-clps711x/common.c                 |   4 +-
- arch/arm/mach-clps711x/include/mach/clps711x.h  | 204 -------------------
- arch/arm/mach-clps711x/include/mach/hardware.h  |  53 -----
- .../arm/mach-clps711x/include/mach/uncompress.h |  55 -----
- arch/arm/mach-davinci/board-dm355-evm.c         |   4 +-
- arch/arm/mach-davinci/board-dm365-evm.c         |   8 +-
- arch/arm/mach-davinci/board-dm644x-evm.c        |   4 +-
- arch/arm/mach-davinci/board-neuros-osd2.c       |   4 +-
- arch/arm/mach-davinci/da850.c                   |  16 ++
- arch/arm/mach-davinci/davinci.h                 |   8 +-
- arch/arm/mach-davinci/dm355.c                   |   3 +-
- arch/arm/mach-davinci/dm365.c                   |   6 +-
- arch/arm/mach-davinci/dm644x.c                  |   3 +-
- arch/arm/mach-davinci/psc.h                     |   2 +
- arch/arm/mach-exynos/common.h                   |   5 +-
- arch/arm/mach-exynos/exynos.c                   |   1 +
- arch/arm/mach-exynos/firmware.c                 |  18 +-
- arch/arm/mach-exynos/headsmp.S                  |   3 +
- arch/arm/mach-exynos/platsmp.c                  |   4 +-
- arch/arm/mach-exynos/pm.c                       |   6 +-
- arch/arm/mach-exynos/pm_domains.c               |   6 +-
- arch/arm/mach-exynos/suspend.c                  |  12 +-
- arch/arm/mach-hisi/hisilicon.c                  |  28 ---
- arch/arm/mach-hisi/platsmp.c                    |   4 +-
- arch/arm/mach-imx/avic.c                        |  19 +-
- arch/arm/mach-imx/cpuidle-imx6q.c               |  20 ++
- arch/arm/mach-imx/devices/devices.c             |   3 +
- arch/arm/mach-imx/devices/platform-gpio-mxc.c   |   1 +
- arch/arm/mach-imx/irq-common.c                  |   6 +-
- arch/arm/mach-imx/mach-imx51.c                  |   2 +
- arch/arm/mach-imx/mach-imx6q.c                  |   2 +-
- arch/arm/mach-imx/mach-imx7d.c                  |   1 +
- arch/arm/mach-imx/tzic.c                        |   6 +-
- arch/arm/mach-keystone/pm_domain.c              |   2 +
- arch/arm/mach-meson/Kconfig                     |   3 +
- arch/arm/mach-omap1/ams-delta-fiq.c             |   2 +-
- arch/arm/mach-omap1/include/mach/mtd-xip.h      |   2 +-
- arch/arm/mach-omap2/Makefile                    |   9 +-
- arch/arm/mach-omap2/board-ldp.c                 |   3 +-
- arch/arm/mach-omap2/board-rx51-video.c          |   4 +-
- arch/arm/mach-omap2/clockdomain.c               |  36 ++--
- arch/arm/mach-omap2/clockdomain.h               |   2 +
- arch/arm/mach-omap2/cm33xx.c                    |   3 +
- arch/arm/mach-omap2/cm3xxx.c                    |   2 +-
- arch/arm/mach-omap2/common.h                    |   8 +-
- arch/arm/mach-omap2/cpuidle44xx.c               |   2 +-
- arch/arm/mach-omap2/display.c                   |   2 +-
- arch/arm/mach-omap2/display.h                   |   5 +
- arch/arm/mach-omap2/dss-common.c                |   2 +-
- arch/arm/mach-omap2/io.c                        |   3 +
- arch/arm/mach-omap2/mcbsp.c                     |  31 +--
- arch/arm/mach-omap2/mux34xx.c                   |   4 +-
- arch/arm/mach-omap2/omap-headsmp.S              |  18 +-
- arch/arm/mach-omap2/omap-hotplug.c              |   6 +
- arch/arm/mach-omap2/omap-mpuss-lowpower.c       |  31 ++-
- arch/arm/mach-omap2/omap-smp.c                  |  98 ++++++---
- arch/arm/mach-omap2/omap4-common.c              |  16 +-
- arch/arm/mach-omap2/omap_device.c               |  19 +-
- arch/arm/mach-omap2/omap_hwmod.c                |  82 ++++++--
- .../omap_hwmod_33xx_43xx_common_data.h          |  18 --
- .../omap_hwmod_33xx_43xx_interconnect_data.c    |  64 ------
- .../omap_hwmod_33xx_43xx_ipblock_data.c         |  85 +-------
- arch/arm/mach-omap2/omap_hwmod_33xx_data.c      |   9 -
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c      |  24 +--
- arch/arm/mach-omap2/omap_hwmod_43xx_data.c      |  54 -----
- arch/arm/mach-omap2/omap_hwmod_7xx_data.c       |  41 ----
- arch/arm/mach-omap2/omap_hwmod_81xx_data.c      |   2 +-
- arch/arm/mach-omap2/pdata-quirks.c              |  18 ++
- arch/arm/mach-omap2/pm.c                        |   8 +-
- arch/arm/mach-omap2/powerdomain.c               |  20 +-
- arch/arm/mach-omap2/prcm43xx.h                  |   1 +
- arch/arm/mach-omap2/prm33xx.h                   |   2 -
- arch/arm/mach-omap2/sdrc.h                      |   4 +-
- arch/arm/mach-omap2/timer.c                     |   3 +-
- arch/arm/mach-oxnas/Kconfig                     |   2 +-
- arch/arm/mach-qcom/Kconfig                      |   4 +
- arch/arm/mach-qcom/board.c                      |   1 +
- arch/arm/mach-s3c64xx/mach-smartq.c             |   1 +
- arch/arm/mach-shmobile/Kconfig                  |   4 +
- arch/arm/mach-shmobile/Makefile                 |   1 +
- arch/arm/mach-shmobile/common.h                 |   1 +
- arch/arm/mach-shmobile/platsmp-apmu.c           |  94 ++++++++-
- arch/arm/mach-shmobile/platsmp.c                |   6 +
- arch/arm/mach-shmobile/pm-r8a7779.c             |   6 +-
- arch/arm/mach-shmobile/pm-rcar-gen2.c           |  19 +-
- arch/arm/mach-shmobile/pm-rmobile.c             |   2 +-
- arch/arm/mach-shmobile/setup-r8a7790.c          |   1 +
- arch/arm/mach-shmobile/setup-r8a7791.c          |   1 +
- arch/arm/mach-shmobile/setup-r8a7792.c          |  35 ++++
- arch/arm/mach-shmobile/setup-rcar-gen2.c        |  45 ++--
- arch/arm/mach-sti/board-dt.c                    |  11 +-
- arch/arm/mach-tango/Makefile                    |   1 +
- arch/arm/mach-tango/platsmp.c                   |  35 ++++
- arch/arm/mach-tango/pm.c                        |  32 +++
- arch/arm/mach-tango/smc.h                       |   5 +-
- arch/arm/mach-uniphier/Makefile                 |   1 -
- arch/arm/mach-uniphier/uniphier.c               |  30 ---
- arch/arm/plat-samsung/cpu.c                     |  10 +-
- arch/arm/plat-samsung/include/plat/cpu.h        |   1 +
- arch/arm/plat-samsung/pm-common.c               |   8 +-
- drivers/clk/ti/clk-33xx.c                       |   3 +
- drivers/clk/ti/clk-43xx.c                       |   6 +
- drivers/net/ethernet/freescale/fec.h            |   2 +
- drivers/net/ethernet/freescale/fec_main.c       |  12 ++
- drivers/soc/renesas/Makefile                    |   2 +
- drivers/soc/renesas/r8a7792-sysc.c              |  34 ++++
- drivers/soc/renesas/r8a7796-sysc.c              |  48 +++++
- drivers/soc/renesas/rcar-sysc.c                 |  45 +++-
- drivers/soc/renesas/rcar-sysc.h                 |   2 +
- include/dt-bindings/power/r8a7796-sysc.h        |  36 ++++
- include/linux/platform_data/asoc-ti-mcbsp.h     |   4 +-
- include/linux/platform_data/omapdss.h           |  42 ++++
- include/linux/soc/renesas/rcar-sysc.h           |   2 +-
- include/soc/imx/cpuidle.h                       |  25 +++
- include/video/omapdss.h                         |  31 +--
- sound/soc/omap/mcbsp.c                          |  21 +-
- sound/soc/omap/mcbsp.h                          |   3 +-
- sound/soc/omap/omap-mcbsp.c                     |   5 +-
- 140 files changed, 1267 insertions(+), 1149 deletions(-)
- create mode 100644 arch/arm/mach-bcm/board_bcm23550.c
- create mode 100644 arch/arm/mach-clps711x/board-dt.c
- delete mode 100644 arch/arm/mach-clps711x/include/mach/clps711x.h
- delete mode 100644 arch/arm/mach-clps711x/include/mach/hardware.h
- delete mode 100644 arch/arm/mach-clps711x/include/mach/uncompress.h
- create mode 100644 arch/arm/mach-shmobile/setup-r8a7792.c
- create mode 100644 arch/arm/mach-tango/pm.c
- delete mode 100644 arch/arm/mach-uniphier/uniphier.c
- create mode 100644 drivers/soc/renesas/r8a7792-sysc.c
- create mode 100644 drivers/soc/renesas/r8a7796-sysc.c
- create mode 100644 include/dt-bindings/power/r8a7796-sysc.h
- create mode 100644 include/linux/platform_data/omapdss.h
- create mode 100644 include/soc/imx/cpuidle.h
+ .../devicetree/bindings/arm/arm,scpi.txt        |   34 +
+ .../bindings/bus/nvidia,tegra210-aconnect.txt   |   45 +
+ .../bindings/clock/clps711x-clock.txt           |    4 +-
+ .../bindings/display/cirrus,clps711x-fb.txt     |    4 +-
+ .../bindings/input/clps711x-keypad.txt          |    4 +-
+ .../cirrus,clps711x-intc.txt                    |    4 +-
+ .../devicetree/bindings/media/nokia,n900-ir     |   20 +
+ .../bindings/memory-controllers/atmel,ebi.txt   |  136 +++
+ .../bindings/pwm/cirrus,clps711x-pwm.txt        |    5 +-
+ .../bindings/pwm/pwm-omap-dmtimer.txt           |    4 +
+ .../bindings/reset/amlogic,meson-reset.txt      |   18 +
+ .../bindings/reset/hisilicon,hi6220-reset.txt   |    4 +-
+ .../bindings/reset/ti-syscon-reset.txt          |   91 ++
+ .../bindings/serial/cirrus,clps711x-uart.txt    |    4 +-
+ .../devicetree/bindings/soc/qcom/qcom,smp2p.txt |    4 +-
+ .../devicetree/bindings/soc/qcom/qcom,smsm.txt  |    4 +-
+ .../bindings/timer/cirrus,clps711x-timer.txt    |    6 +-
+ Documentation/driver-model/devres.txt           |    4 +
+ MAINTAINERS                                     |    2 +-
+ .../boot/dts/exynos-mfc-reserved-memory.dtsi    |   29 +
+ arch/arm/boot/dts/exynos4210-origen.dts         |    4 +-
+ arch/arm/boot/dts/exynos4210-smdkv310.dts       |    4 +-
+ arch/arm/boot/dts/exynos4412-odroid-common.dtsi |    6 +
+ arch/arm/boot/dts/exynos4412-origen.dts         |    4 +-
+ arch/arm/boot/dts/exynos4412-smdk4412.dts       |    4 +-
+ arch/arm/boot/dts/exynos5250-arndale.dts        |    4 +-
+ arch/arm/boot/dts/exynos5250-smdk5250.dts       |    4 +-
+ arch/arm/boot/dts/exynos5250-spring.dts         |    4 +-
+ arch/arm/boot/dts/exynos5420-arndale-octa.dts   |    4 +-
+ arch/arm/boot/dts/exynos5420-peach-pit.dts      |    4 +-
+ arch/arm/boot/dts/exynos5420-smdk5420.dts       |    4 +-
+ .../boot/dts/exynos5422-odroidxu3-common.dtsi   |    4 +-
+ arch/arm/boot/dts/exynos5800-peach-pi.dts       |    4 +-
+ arch/arm/mach-exynos/Kconfig                    |    1 +
+ arch/arm/mach-exynos/Makefile                   |    3 -
+ arch/arm/mach-exynos/exynos.c                   |   19 -
+ arch/arm/mach-exynos/mfc.h                      |   16 -
+ arch/arm/mach-exynos/s5p-dev-mfc.c              |   93 --
+ arch/arm/mach-omap2/board-rx51-peripherals.c    |    5 -
+ arch/arm/mach-omap2/pdata-quirks.c              |   10 +-
+ arch/arm/mach-ux500/Makefile                    |    6 +-
+ arch/arm/mach-ux500/board-mop500-regulators.c   | 1065 ------------------
+ arch/arm/mach-ux500/board-mop500-regulators.h   |   24 -
+ arch/arm/mach-ux500/cache-l2x0.c                |   67 --
+ arch/arm/mach-ux500/cpu-db8500.c                |  139 ++-
+ arch/arm/mach-ux500/cpu.c                       |  148 ---
+ arch/arm/mach-ux500/id.c                        |  116 --
+ arch/arm/mach-ux500/id.h                        |  144 ---
+ arch/arm/mach-ux500/platsmp.c                   |    1 -
+ arch/arm/mach-ux500/setup.h                     |   12 -
+ arch/arm64/boot/dts/hisilicon/hi6220.dtsi       |    2 +
+ drivers/bus/Kconfig                             |   13 +
+ drivers/bus/Makefile                            |    1 +
+ drivers/bus/tegra-aconnect.c                    |  112 ++
+ drivers/clk/clk-clps711x.c                      |    2 +-
+ drivers/clk/ux500/u8500_of_clk.c                |   16 +-
+ drivers/clk/ux500/u8540_clk.c                   |   16 +-
+ drivers/clk/ux500/u9540_clk.c                   |    4 +-
+ drivers/clocksource/clps711x-timer.c            |    2 +-
+ drivers/cpufreq/s5pv210-cpufreq.c               |   68 +-
+ drivers/firmware/Kconfig                        |   12 +-
+ drivers/firmware/Makefile                       |    1 +
+ drivers/firmware/arm_scpi.c                     |   42 +-
+ drivers/firmware/qcom_scm-32.c                  |  327 +++---
+ drivers/firmware/qcom_scm-64.c                  |  307 ++++-
+ drivers/firmware/qcom_scm.c                     |  353 +++++-
+ drivers/firmware/qcom_scm.h                     |   47 +-
+ drivers/firmware/scpi_pm_domain.c               |  163 +++
+ drivers/input/keyboard/clps711x-keypad.c        |    4 +-
+ drivers/irqchip/irq-clps711x.c                  |    2 +-
+ drivers/media/rc/Kconfig                        |    2 +-
+ drivers/media/rc/ir-rx51.c                      |  229 ++--
+ drivers/memory/Kconfig                          |   11 +
+ drivers/memory/Makefile                         |    1 +
+ drivers/memory/atmel-ebi.c                      |  766 +++++++++++++
+ drivers/memory/atmel-sdramc.c                   |   11 +-
+ drivers/memory/omap-gpmc.c                      |  136 ++-
+ drivers/memory/samsung/exynos-srom.c            |   41 +-
+ drivers/memory/tegra/mc.c                       |   10 +-
+ drivers/memory/tegra/tegra124-emc.c             |    8 +-
+ drivers/mfd/ab8500-core.c                       |    4 -
+ drivers/mfd/ab8500-sysctrl.c                    |   34 -
+ drivers/mfd/db8500-prcmu.c                      |   10 +-
+ drivers/power/reset/Kconfig                     |   10 +
+ drivers/power/reset/Makefile                    |    1 +
+ drivers/power/reset/brcm-kona-reset.c           |   73 ++
+ drivers/pwm/pwm-clps711x.c                      |    2 +-
+ drivers/pwm/pwm-omap-dmtimer.c                  |   12 +-
+ drivers/regulator/ab8500-ext.c                  |  465 +++++++-
+ drivers/reset/Kconfig                           |   14 +
+ drivers/reset/Makefile                          |    2 +
+ drivers/reset/core.c                            |   37 +
+ drivers/reset/hisilicon/hi6220_reset.c          |  122 +-
+ drivers/reset/reset-ath79.c                     |    3 +-
+ drivers/reset/reset-meson.c                     |  136 +++
+ drivers/reset/reset-oxnas.c                     |   12 +-
+ drivers/reset/reset-pistachio.c                 |   12 +-
+ drivers/reset/reset-socfpga.c                   |   12 +-
+ drivers/reset/reset-sunxi.c                     |   12 +-
+ drivers/reset/reset-ti-syscon.c                 |  237 ++++
+ drivers/reset/reset-zynq.c                      |   12 +-
+ drivers/reset/sti/Kconfig                       |    1 -
+ drivers/soc/Kconfig                             |    2 +-
+ drivers/soc/Makefile                            |    2 +-
+ drivers/soc/bcm/Kconfig                         |   18 +-
+ drivers/soc/bcm/Makefile                        |    1 +
+ drivers/soc/{ => bcm}/brcmstb/Makefile          |    0
+ drivers/soc/{ => bcm}/brcmstb/biuctrl.c         |    1 +
+ drivers/soc/{ => bcm}/brcmstb/common.c          |    0
+ drivers/soc/brcmstb/Kconfig                     |   10 -
+ drivers/soc/qcom/smem_state.c                   |   12 +-
+ drivers/soc/qcom/smp2p.c                        |    7 +-
+ drivers/soc/qcom/smsm.c                         |    2 +-
+ drivers/soc/qcom/wcnss_ctrl.c                   |  125 +-
+ drivers/soc/samsung/Kconfig                     |    4 +
+ drivers/soc/samsung/Makefile                    |    1 +
+ drivers/soc/samsung/exynos3250-pmu.c            |    2 +-
+ drivers/soc/samsung/exynos5420-pmu.c            |    2 +-
+ .../soc/samsung}/pm_domains.c                   |   34 +-
+ drivers/soc/tegra/pmc.c                         |  149 ++-
+ drivers/soc/ux500/Kconfig                       |    7 +
+ drivers/soc/ux500/Makefile                      |    1 +
+ drivers/soc/ux500/ux500-soc-id.c                |  222 ++++
+ drivers/tty/serial/clps711x.c                   |    2 +-
+ drivers/video/fbdev/clps711x-fb.c               |    4 +-
+ .../reset/amlogic,meson-gxbb-reset.h            |  210 ++++
+ .../dt-bindings/reset/amlogic,meson8b-reset.h   |  175 +++
+ include/dt-bindings/reset/hisi,hi6220-resets.h  |    8 +
+ include/dt-bindings/reset/ti-syscon.h           |   38 +
+ include/linux/mfd/abx500/ab8500-sysctrl.h       |    6 -
+ include/linux/mfd/dbx500-prcmu.h                |   10 -
+ include/linux/platform_data/clk-ux500.h         |   17 -
+ include/linux/platform_data/media/ir-rx51.h     |    3 -
+ include/linux/qcom_scm.h                        |    8 +
+ include/linux/reset-controller.h                |    4 +
+ include/linux/reset.h                           |    4 +-
+ include/linux/scpi_protocol.h                   |    2 +
+ include/linux/soc/qcom/wcnss_ctrl.h             |    8 +
+ include/soc/tegra/cpuidle.h                     |    2 +-
+ sound/soc/codecs/ab8500-codec.c                 |   33 +-
+ 140 files changed, 4776 insertions(+), 2641 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/bus/nvidia,tegra210-aconnect.txt
+ create mode 100644 Documentation/devicetree/bindings/media/nokia,n900-ir
+ create mode 100644 Documentation/devicetree/bindings/memory-controllers/atmel,ebi.txt
+ create mode 100644 Documentation/devicetree/bindings/reset/amlogic,meson-reset.txt
+ create mode 100644 Documentation/devicetree/bindings/reset/ti-syscon-reset.txt
+ create mode 100644 arch/arm/boot/dts/exynos-mfc-reserved-memory.dtsi
+ delete mode 100644 arch/arm/mach-exynos/mfc.h
+ delete mode 100644 arch/arm/mach-exynos/s5p-dev-mfc.c
+ delete mode 100644 arch/arm/mach-ux500/board-mop500-regulators.c
+ delete mode 100644 arch/arm/mach-ux500/board-mop500-regulators.h
+ delete mode 100644 arch/arm/mach-ux500/cache-l2x0.c
+ delete mode 100644 arch/arm/mach-ux500/cpu.c
+ delete mode 100644 arch/arm/mach-ux500/id.c
+ delete mode 100644 arch/arm/mach-ux500/id.h
+ create mode 100644 drivers/bus/tegra-aconnect.c
+ create mode 100644 drivers/firmware/scpi_pm_domain.c
+ create mode 100644 drivers/memory/atmel-ebi.c
+ create mode 100644 drivers/power/reset/brcm-kona-reset.c
+ create mode 100644 drivers/reset/reset-meson.c
+ create mode 100644 drivers/reset/reset-ti-syscon.c
+ rename drivers/soc/{ => bcm}/brcmstb/Makefile (100%)
+ rename drivers/soc/{ => bcm}/brcmstb/biuctrl.c (98%)
+ rename drivers/soc/{ => bcm}/brcmstb/common.c (100%)
+ delete mode 100644 drivers/soc/brcmstb/Kconfig
+ rename {arch/arm/mach-exynos => drivers/soc/samsung}/pm_domains.c (85%)
+ create mode 100644 drivers/soc/ux500/Kconfig
+ create mode 100644 drivers/soc/ux500/Makefile
+ create mode 100644 drivers/soc/ux500/ux500-soc-id.c
+ create mode 100644 include/dt-bindings/reset/amlogic,meson-gxbb-reset.h
+ create mode 100644 include/dt-bindings/reset/amlogic,meson8b-reset.h
+ create mode 100644 include/dt-bindings/reset/ti-syscon.h
+ delete mode 100644 include/linux/platform_data/clk-ux500.h
+ create mode 100644 include/linux/soc/qcom/wcnss_ctrl.h
