@@ -1,124 +1,53 @@
-From: tiffany.lin@mediatek.com (Tiffany Lin)
-Date: Mon, 1 Aug 2016 19:28:24 +0800
-Subject: [PATCH v3 5/9] vcodec: mediatek: Add Mediatek V4L2 Video
- Decoder Driver
-In-Reply-To: <8bd71dee-62ec-beba-c1d1-fc7e586d593b@xs4all.nl>
-References: <1464611363-14936-1-git-send-email-tiffany.lin@mediatek.com>
- <1464611363-14936-2-git-send-email-tiffany.lin@mediatek.com>
- <1464611363-14936-3-git-send-email-tiffany.lin@mediatek.com>
- <1464611363-14936-4-git-send-email-tiffany.lin@mediatek.com>
- <1464611363-14936-5-git-send-email-tiffany.lin@mediatek.com>
- <1464611363-14936-6-git-send-email-tiffany.lin@mediatek.com>
- <32112952-6a34-ac8b-9d06-198c6c653611@xs4all.nl>
- <1470044307.30651.18.camel@mtksdaap41>
- <8bd71dee-62ec-beba-c1d1-fc7e586d593b@xs4all.nl>
-Message-ID: <1470050904.30651.47.camel@mtksdaap41>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon,  1 Aug 2016 13:29:31 +0200
+Subject: [PATCH] arm64: mm: avoid fdt_check_header() before the FDT is fully
+ mapped
+Message-ID: <1470050971-30103-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hans,
+As reported by Zijun, the fdt_check_header() call in __fixmap_remap_fdt()
+is not safe since it is not guaranteed that the FDT header is mapped
+completely. Due to the minimum alignment of 8 bytes, the only fields we
+can assume to be mapped are 'magic' and 'totalsize'.
 
-On Mon, 2016-08-01 at 12:39 +0200, Hans Verkuil wrote:
-> Hi Tiffany,
-> 
-> On 08/01/2016 11:38 AM, Tiffany Lin wrote:
-> > Hi Hans,
-> 
-> <snip>
-> 
-> >>> +static int vidioc_vdec_g_selection(struct file *file, void *priv,
-> >>> +			struct v4l2_selection *s)
-> >>> +{
-> >>> +	struct mtk_vcodec_ctx *ctx = fh_to_ctx(priv);
-> >>> +
-> >>> +	if (V4L2_TYPE_IS_OUTPUT(s->type))
-> >>> +		return -EINVAL;
-> >>> +
-> >>> +	if (s->target != V4L2_SEL_TGT_CROP)
-> >>> +		return -EINVAL;
-> >>
-> >> How does the cropping rectangle relate to the format size? There is no s_selection,
-> >> so this doesn't make sense.
-> >>
-> > I want to return encoded crop information or real display region that
-> > display driver could know where is padding region.
-> 
-> Sorry, I don't understand this.
-> 
-> This is a decoder, so based on the bitstream it decodes to a certain width
-> and height. I assume that is what you refer to as coded_width and coded_height?
-> 
-> If so, then what is the 'real display region' and how does it relate to the
-> coded width/height?
-> 
-> This is probably a terminology issue but I need to understand this before I
-> can decide what should be done here.
-> 
-We define coded_width and coded_height as frame buffer width and height.
-Coded resolution is stream resolution in pixels aligned to codec format
-and hardware requirements.
-And we assign bytesperline as coded_width.
+Since the OF layer is in charge of validating the FDT image, and we are
+only interested in making reasonably sure that the size field contains
+a meaningful value, replace the fdt_check_header() call with an explicit
+comparison of the magic field's value against the expected value.
 
-g_selection is for getting visible resolution for user space.
-visible resolution - stream resolution of the visible picture, in
-pixels, to be used for display purposes; must be smaller or equal to
-coded resolution;
-visible height - height for given visible resolution
-visible width - width for given visible resolution
+Reported-by: Zijun Hu <zijun_hu@htc.com>
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/arm64/mm/mmu.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-For my understand, g_fmt should return coded width/height in
-pix_mp->width, pix_mp->height.
-And bytesperline is coded with.
-g_selection return visible width/height.
-Is this understanding correct?
-
-
-best regards,
-Tiffany
-> Regards,
-> 
-> 	Hans
-> 
-> > User space use s_fmt/g_fmt  to set/get coded_width and coded_height, and
-> > use g_crop to get real display region.
-> > That's why I do not add s_selection.
-> > 
-> >> Alternatively, it could be that you are really returning V4L2_SEL_TGT_COMPOSE_PADDED.
-> >>
-> > 
-> > V4L2_SEL_TGT_COMPOSE_PADDED means
-> > "The active area and all padding pixels that are inserted or modified by
-> > hardware."
-> > But I just want to return active area to user space.
-> > 
-> >>> +
-> >>> +	if (ctx->state < MTK_STATE_HEADER)
-> >>> +		return -EINVAL;
-> >>> +
-> >>> +	if ((ctx->q_data[MTK_Q_DATA_SRC].fmt->fourcc == V4L2_PIX_FMT_H264) ||
-> >>> +	    (ctx->q_data[MTK_Q_DATA_SRC].fmt->fourcc == V4L2_PIX_FMT_VP8) ||
-> >>> +	    (ctx->q_data[MTK_Q_DATA_SRC].fmt->fourcc == V4L2_PIX_FMT_VP9)) {
-> >>> +
-> >>> +		if (vdec_if_get_param(ctx, GET_PARAM_CROP_INFO, &(s->r))) {
-> >>> +			mtk_v4l2_debug(2,
-> >>> +					"[%d]Error!! Cannot get param : GET_PARAM_CROP_INFO ERR",
-> >>> +					ctx->id);
-> >>> +			s->r.left = 0;
-> >>> +			s->r.top = 0;
-> >>> +			s->r.width = ctx->picinfo.buf_w;
-> >>> +			s->r.height = ctx->picinfo.buf_h;
-> >>> +		}
-> >>> +		mtk_v4l2_debug(2, "Cropping info: l=%d t=%d w=%d h=%d",
-> >>> +				s->r.left, s->r.top, s->r.width,
-> >>> +				s->r.height);
-> >>> +	} else {
-> >>> +		s->r.left = 0;
-> >>> +		s->r.top = 0;
-> >>> +		s->r.width = ctx->picinfo.pic_w;
-> >>> +		s->r.height = ctx->picinfo.pic_h;
-> >>> +		mtk_v4l2_debug(2, "Cropping info: w=%d h=%d fw=%d fh=%d",
-> >>> +				s->r.width, s->r.height, ctx->picinfo.buf_w,
-> >>> +				ctx->picinfo.buf_h);
-> >>> +	}
-> >>> +	return 0;
-> >>> +}
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index 0f85a46c3e18..3e90a2cad995 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -748,9 +748,9 @@ void *__init __fixmap_remap_fdt(phys_addr_t dt_phys, int *size, pgprot_t prot)
+ 	/*
+ 	 * Check whether the physical FDT address is set and meets the minimum
+ 	 * alignment requirement. Since we are relying on MIN_FDT_ALIGN to be
+-	 * at least 8 bytes so that we can always access the size field of the
+-	 * FDT header after mapping the first chunk, double check here if that
+-	 * is indeed the case.
++	 * at least 8 bytes so that we can always access the magic and size
++	 * fields of the FDT header after mapping the first chunk, double check
++	 * here if that is indeed the case.
+ 	 */
+ 	BUILD_BUG_ON(MIN_FDT_ALIGN < 8);
+ 	if (!dt_phys || dt_phys % MIN_FDT_ALIGN)
+@@ -778,7 +778,7 @@ void *__init __fixmap_remap_fdt(phys_addr_t dt_phys, int *size, pgprot_t prot)
+ 	create_mapping_noalloc(round_down(dt_phys, SWAPPER_BLOCK_SIZE),
+ 			dt_virt_base, SWAPPER_BLOCK_SIZE, prot);
+ 
+-	if (fdt_check_header(dt_virt) != 0)
++	if (fdt_magic(dt_virt) != FDT_MAGIC)
+ 		return NULL;
+ 
+ 	*size = fdt_totalsize(dt_virt);
+-- 
+2.7.4
