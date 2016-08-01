@@ -1,54 +1,67 @@
-From: peter.senna@collabora.co.uk (Peter Senna Tschudin)
-Date: Mon, 01 Aug 2016 13:30:57 +0100
-Subject: =?utf-8?q?Re=3A?==?utf-8?q?_=5BPATCH?= V3 =?utf-8?q?2=2F5=5D?=
- =?utf-8?q?_dts=2Fimx6q-b850v3=3A?= Configure IPU assignment order
-In-Reply-To: <1470041647.6640.3.camel@pengutronix.de>
-Message-ID: <70b6-579f4100-9-6ce4f380@208251793>
+From: vanessa.maegima@nxp.com (Vanessa Maegima)
+Date: Mon, 1 Aug 2016 09:54:14 -0300
+Subject: [PATCH v2] ARM: dts: imx6ul-pico-hobbit: Add Wifi support
+Message-ID: <1470056054-5133-1-git-send-email-vanessa.maegima@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lucas,
+imx6ul-pico-hobbit has a bcm4339 wifi chip connected to usdhc2 port.
 
-Thank you for the prompt review.
+Add support for the WL_REG_ON regulator, so that Wifi can be functional
+on this board.
+
+Signed-off-by: Vanessa Maegima <vanessa.maegima@nxp.com>
+---
+Changes since v1:
+- Improve commit log
+- Remove WL_HOST_WAKE
+
+ arch/arm/boot/dts/imx6ul-pico-hobbit.dts | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
+
+diff --git a/arch/arm/boot/dts/imx6ul-pico-hobbit.dts b/arch/arm/boot/dts/imx6ul-pico-hobbit.dts
+index 8ce1fec..af2e06b 100644
+--- a/arch/arm/boot/dts/imx6ul-pico-hobbit.dts
++++ b/arch/arm/boot/dts/imx6ul-pico-hobbit.dts
+@@ -100,6 +100,18 @@
+ 		gpio = <&gpio1 6 0>;
+ 	};
  
-On Monday, August 1, 2016 10:54 CEST, Lucas Stach <l.stach@pengutronix.de> wrote: 
++	reg_brcm: brcm-reg {
++		compatible = "regulator-fixed";
++		enable-active-high;
++		gpio = <&gpio4 8 GPIO_ACTIVE_HIGH>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_brcm_reg>;
++		regulator-name = "brcm_reg";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		startup-delay-us = <200000>;
++	};
++
+ 	sound {
+ 		compatible = "fsl,imx-audio-sgtl5000";
+ 		model = "imx6ul-sgtl5000";
+@@ -325,12 +337,20 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_usdhc2>;
+ 	no-1-8-v;
++	non-removable;
+ 	keep-power-in-suspend;
+ 	wakeup-source;
++	vmmc-supply = <&reg_brcm>;
+ 	status = "okay";
+ };
  
-> Am Sonntag, den 31.07.2016, 21:55 +0200 schrieb Peter Senna Tschudin:
-> > As the IPU has combined limitations across multiple crtcs, and as that
-> > can't be communicated to userspace at the moment, reorder the crtcs to
-> > allow support to two Full-HD monitors by avoiding assigning two
-> > monitors to a single IPU.
-> > 
-> > Cc: Enric Balletbo i Serra <enric.balletbo@collabora.com>
-> > Cc: Philipp Zabel <p.zabel@pengutronix.de>
-> > Cc: Rob Herring <robh@kernel.org>
-> > Cc: Fabio Estevam <fabio.estevam@nxp.com>
-> > Signed-off-by: Peter Senna Tschudin <peter.senna@collabora.com>
-> 
-> NACK. This is a userspace issue. Changing the assignment order of the
-> CRTCs just shifts the failure to a userspace that want to use CRTC 0 and
-> 2 now.
-
-Err, yeah user space issue... But how the kernel is currently telling user space about what exactly went wrong and how user space might fix it? How Weston(our user space) is going to know  that reshuffling crtcs is going to lead to success; how could it? I guess some  platform-specific code in user space is needed for this to work...
-
-> 
-> imx-drm just got atomic support and with the atomic check it should be
-> possible to inform userspace in a reasonable way about such issues.
-
-Should be possible, but I guess it isn't, and wont be until a considerable effort is put on both kernel and user space. Or am I missing something? What do you propose?
-
-I got inspiration from: arch/arm/boot/dts/imx6q.dtsi
-...
-        display-subsystem {
-                compatible = "fsl,imx-display-subsystem";
-                ports = <&ipu1_di0>, <&ipu1_di1>, <&ipu2_di0>, <&ipu2_di1>;
-        };
-...
-
-This is there for more than 2 years now, and I get that the idea here is not ordering, but just declaring.
-
-However even if this patch is not the perfect solution, it allows us to stay close to upstream now without creating problems(does it create any issue?).
-
-Can you reconsider or propose a concrete solution that is not more complex than our entire driver?
-
-Thanks a lot!
+ &iomuxc {
++	pinctrl_brcm_reg: brcmreggrp {
++		fsl,pins = <
++			MX6UL_PAD_NAND_DATA06__GPIO4_IO08	0x10b0	/* WL_REG_ON */
++		>;
++	};
++
+ 	pinctrl_enet2: enet2grp {
+ 		fsl,pins = <
+ 			MX6UL_PAD_ENET1_TX_DATA1__ENET2_MDIO	0x1b0b0
+-- 
+2.7.4
