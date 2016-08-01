@@ -1,48 +1,59 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 1 Aug 2016 11:18:06 -0500
-Subject: [PATCH v18 2/6] ARM: socfpga: add bindings document for fpga
- bridge drivers
-In-Reply-To: <20160712193645.9098-3-atull@opensource.altera.com>
-References: <20160712193645.9098-1-atull@opensource.altera.com>
- <20160712193645.9098-3-atull@opensource.altera.com>
-Message-ID: <20160801161806.GA16067@rob-hp-laptop>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Mon, 1 Aug 2016 18:26:03 +0200
+Subject: [PATCH v2] mmc: sunxi: Handle the 'New Timings'
+In-Reply-To: <20160801153016.GB17146@leverpostej>
+References: <E1bUDNG-0000pR-Fv@bombadil.infradead.org>
+ <20160801153016.GB17146@leverpostej>
+Message-ID: <20160801182603.6f44af17e0bb801353f4b5e0@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 12, 2016 at 02:36:41PM -0500, Alan Tull wrote:
-> Add bindings documentation for Altera SOCFPGA bridges:
->  * fpga2sdram
->  * fpga2hps
->  * hps2fpga
->  * lwhps2fpga
-> 
-> Signed-off-by: Alan Tull <atull@opensource.altera.com>
-> Signed-off-by: Matthew Gerlach <mgerlach@altera.com>
-> Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
-> ---
-> v2:  separate into 2 documents for the 2 drivers
-> v12: bump version to line up with simple-fpga-bus version
->      remove Linux specific notes such as references to sysfs
->      move non-DT specific documentation elsewhere
->      remove bindings that would have been used to pass configuration
->      clean up formatting
-> v13: Remove 'label' property
->      Change property from init-val to bridge-enable
->      Fix email address
-> v14: Add resets
->      Change order of bridges to put lw bridge (controlling bridge) first
-> v15: No change in this patch for v15 of this patch set
-> v16: Added regs property, cleaned up unit addresses
-> v17: No change to this patch in v17 of patch set
-> v18: Changed to not need reset-names property
->      node names as fpga-bridge at ...
->      labels as fpga_bridge
->      Add address of fpgaportrst to give and address for f2s bridge
-> ---
->  .../bindings/fpga/altera-fpga2sdram-bridge.txt     | 16 +++++++++
->  .../bindings/fpga/altera-hps2fpga-bridge.txt       | 39 ++++++++++++++++++++++
->  2 files changed, 55 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/fpga/altera-fpga2sdram-bridge.txt
->  create mode 100644 Documentation/devicetree/bindings/fpga/altera-hps2fpga-bridge.txt
+On Mon, 1 Aug 2016 16:30:19 +0100
+Mark Rutland <mark.rutland@arm.com> wrote:
 
-Acked-by: Rob Herring <robh@kernel.org>
+> On Mon, Aug 01, 2016 at 03:10:29PM +0200, Jean-Francois Moine wrote:
+> > Some MMC devices as mmc2 in the A83T or mmc1 and mmc2 in the H3 have
+> > a 'New Timings' mode.
+> > Set this capacity in the DT and use it when possible.
+> 
+> What exactly is this "New Timings" mode?
+> 
+> Why do we wnat to set it? Improved performance, power?
+> 
+> Is it *necessary* to use it?
+
+This mode is described at least in the Allwinner's documentation of the
+A83T, A64 and H3.
+>From my tests, it is required to access the eMMC of the Banana Pi M3
+(mmc2).
+
+> > Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
+> > ---
+> > I don't know if this mode works or is needed at 25MHz.
+> > ---
+> >  Documentation/devicetree/bindings/mmc/sunxi-mmc.txt |  1 +
+> >  drivers/mmc/host/sunxi-mmc.c                        | 21 +++++++++++++++++++--
+> >  2 files changed, 20 insertions(+), 2 deletions(-)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt b/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt
+> > index 4bf41d8..a541bf4 100644
+> > --- a/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt
+> > +++ b/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt
+> > @@ -19,6 +19,7 @@ Optional properties:
+> >   - reset-names : must contain "ahb"
+> >   - for cd, bus-width and additional generic mmc parameters
+> >     please refer to mmc.txt within this directory
+> > + - allwinner,new-timings: the controller may accept the "New Timings" mode
+> 
+> It's not at all clear to me what this means. This needs a better
+> description.
+> 
+> Which devices have this? Can we determine this based on compatible
+> string?
+
+No, only some devices of the SoCs have this capability: the mmc2 of the
+A83T, the smhc0 and smhc1 of the A64, and the mmc1 and mmc2 of the H3.
+
+-- 
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
