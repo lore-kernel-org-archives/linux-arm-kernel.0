@@ -1,159 +1,59 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Mon,  1 Aug 2016 23:13:51 +0800
-Subject: [PATCH v3 2/2] mmc: host: sunxi: add support for A64 mmc controller
-In-Reply-To: <20160801151351.51854-1-icenowy@aosc.xyz>
-References: <20160801151351.51854-1-icenowy@aosc.xyz>
-Message-ID: <20160801151351.51854-3-icenowy@aosc.xyz>
+From: seanpaul@chromium.org (Sean Paul)
+Date: Mon, 1 Aug 2016 11:17:19 -0400
+Subject: [PATCH 0/7] drm/mediatek: cleaning up and refine
+In-Reply-To: <1469783054-54567-1-git-send-email-bibby.hsieh@mediatek.com>
+References: <1469783054-54567-1-git-send-email-bibby.hsieh@mediatek.com>
+Message-ID: <CAOw6vbKvnLiBfHLRvCp3GAzZ8N8cT0iEEDiGi_54vyTDLF8ZWQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A64 SoC features a MMC controller which need only the mod clock, and can
-calibrate delay by itself. This patch adds support for the new MMC
-controller IP core.
+On Fri, Jul 29, 2016 at 5:04 AM, Bibby Hsieh <bibby.hsieh@mediatek.com> wrote:
+> These patches based on 4.7-rc1 to clean up unused function & variable
+> and use drm core function instead.
+>
+> The following patches are needed to cleanly apply on top of v4.7-rc1:
+>  - https://patchwork.kernel.org/patch/8044001/
+>    (drm: Deal with rotation in drm_plane_helper_check_update())
+>  - https://patchwork.kernel.org/patch/9248373/
+>    (drm: Warn about negative sizes when calculating scale factor)
+>  - https://patchwork.kernel.org/patch/9248371/
+>    (drm: Store clipped src/dst coordinatee in drm_plane_state)
+>  - https://patchwork.kernel.org/patch/9248363/
+>    (drm/plane-helper: Add drm_plane_helper_check_state())
+>  - https://patchwork.kernel.org/patch/9248361/
+>    (drm/mediatek: Use drm_plane_helper_check_state())
+>
+> Bibby Hsieh (2):
+>   drm/mediatek: Use drm_atomic destroy_state helpers
+>   drm/mediatek: Fix mtk_atomic_complete for runtime_pm
+>
+> Daniel Kurtz (5):
+>   drm/mediatek: Remove mtk_drm_crtc_check_flush
+>   drm/mediatek: plane: Remove plane zpos/index
+>   drm/mediatek: Remove mtk_drm_plane
+>   drm/mediatek: plane: Merge mtk_plane_enable into
+>     mtk_plane_atomic_update
+>   drm/mediatek: plane: Use FB's format's cpp to compute x offset
+>
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
----
-Changes in v2:
-- Rebased on Hans de Goede's patchset.
-Changes in v3:
-- Tidy up based on Hans de Goede's opinions.
 
- drivers/mmc/host/sunxi-mmc.c | 66 ++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 66 insertions(+)
+The whole set looks good to me.
 
-diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
-index 2ec91ce..3c26180 100644
---- a/drivers/mmc/host/sunxi-mmc.c
-+++ b/drivers/mmc/host/sunxi-mmc.c
-@@ -72,6 +72,13 @@
- #define SDXC_REG_CHDA	(0x90)
- #define SDXC_REG_CBDA	(0x94)
- 
-+/* New registers introduced in A64 */
-+#define SDXC_REG_A12A		0x058 /* SMC Auto Command 12 Register */
-+#define SDXC_REG_SD_NTSR	0x05C /* SMC New Timing Set Register */
-+#define SDXC_REG_DRV_DL		0x140 /* Drive Delay Control Register */
-+#define SDXC_REG_SAMP_DL_REG	0x144 /* SMC sample delay control */
-+#define SDXC_REG_DS_DL_REG	0x148 /* SMC data strobe delay control */
-+
- #define mmc_readl(host, reg) \
- 	readl((host)->reg_base + SDXC_##reg)
- #define mmc_writel(host, reg, value) \
-@@ -217,6 +224,15 @@
- #define SDXC_CLK_50M_DDR	3
- #define SDXC_CLK_50M_DDR_8BIT	4
- 
-+#define SDXC_2X_TIMING_MODE	BIT(31)
-+
-+#define SDXC_CAL_START		BIT(15)
-+#define SDXC_CAL_DONE		BIT(14)
-+#define SDXC_CAL_DL_SHIFT	8
-+#define SDXC_CAL_DL_SW_EN	BIT(7)
-+#define SDXC_CAL_DL_SW_SHIFT	0
-+#define SDXC_CAL_DL_MASK	0x3f
-+
- struct sunxi_mmc_clk_delay {
- 	u32 output;
- 	u32 sample;
-@@ -232,6 +248,9 @@ struct sunxi_idma_des {
- struct sunxi_mmc_cfg {
- 	u32 idma_des_size_bits;
- 	const struct sunxi_mmc_clk_delay *clk_delays;
-+
-+	/* does the IP block support autocalibration? */
-+	bool can_calibrate;
- };
- 
- struct sunxi_mmc_host {
-@@ -657,6 +676,38 @@ static int sunxi_mmc_oclk_onoff(struct sunxi_mmc_host *host, u32 oclk_en)
- 	return 0;
- }
- 
-+static int sunxi_mmc_calibrate(struct sunxi_mmc_host *host,
-+			       struct mmc_ios *ios, int reg_off)
-+{
-+	u32 reg = readl(host->reg_base + reg_off);
-+	u32 delay;
-+
-+	if (!host->cfg->can_calibrate)
-+		return 0;
-+
-+	reg &= ~(SDXC_CAL_DL_MASK << SDXC_CAL_DL_SW_SHIFT);
-+	reg &= ~SDXC_CAL_DL_SW_EN;
-+
-+	writel(reg | SDXC_CAL_START, host->reg_base + reg_off);
-+
-+	dev_dbg(mmc_dev(host->mmc), "calibration started\n");
-+
-+	while (!((reg = readl(host->reg_base + reg_off)) & SDXC_CAL_DONE))
-+		cpu_relax();
-+
-+	delay = (reg >> SDXC_CAL_DL_SHIFT) & SDXC_CAL_DL_MASK;
-+
-+	reg &= ~SDXC_CAL_START;
-+	reg |= (delay << SDXC_CAL_DL_SW_SHIFT) | SDXC_CAL_DL_SW_EN;
-+
-+	writel(reg, host->reg_base + reg_off);
-+
-+	dev_dbg(mmc_dev(host->mmc), "calibration ended, res is 0x%x\n", reg);
-+
-+	/* TODO: enable calibrate on sdc2 SDXC_REG_DS_DL_REG of A64 */
-+	return 0;
-+}
-+
- static int sunxi_mmc_clk_set_phase(struct sunxi_mmc_host *host,
- 				   struct mmc_ios *ios, u32 rate)
- {
-@@ -731,6 +782,10 @@ static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
- 	if (ret)
- 		return ret;
- 
-+	ret = sunxi_mmc_calibrate(host, ios, SDXC_REG_SAMP_DL_REG);
-+	if (ret)
-+		return ret;
-+
- 	return sunxi_mmc_oclk_onoff(host, 1);
- }
- 
-@@ -982,21 +1037,31 @@ static const struct sunxi_mmc_clk_delay sun9i_mmc_clk_delays[] = {
- static const struct sunxi_mmc_cfg sun4i_a10_cfg = {
- 	.idma_des_size_bits = 13,
- 	.clk_delays = NULL,
-+	.can_calibrate = false,
- };
- 
- static const struct sunxi_mmc_cfg sun5i_a13_cfg = {
- 	.idma_des_size_bits = 16,
- 	.clk_delays = NULL,
-+	.can_calibrate = false,
- };
- 
- static const struct sunxi_mmc_cfg sun7i_a20_cfg = {
- 	.idma_des_size_bits = 16,
- 	.clk_delays = sunxi_mmc_clk_delays,
-+	.can_calibrate = false,
- };
- 
- static const struct sunxi_mmc_cfg sun9i_a80_cfg = {
- 	.idma_des_size_bits = 16,
- 	.clk_delays = sun9i_mmc_clk_delays,
-+	.can_calibrate = false,
-+};
-+
-+static const struct sunxi_mmc_cfg sun50i_a64_cfg = {
-+	.idma_des_size_bits = 16,
-+	.clk_delays = NULL,
-+	.can_calibrate = true,
- };
- 
- static const struct of_device_id sunxi_mmc_of_match[] = {
-@@ -1004,6 +1069,7 @@ static const struct of_device_id sunxi_mmc_of_match[] = {
- 	{ .compatible = "allwinner,sun5i-a13-mmc", .data = &sun5i_a13_cfg },
- 	{ .compatible = "allwinner,sun7i-a20-mmc", .data = &sun7i_a20_cfg },
- 	{ .compatible = "allwinner,sun9i-a80-mmc", .data = &sun9i_a80_cfg },
-+	{ .compatible = "allwinner,sun50i-a64-mmc", .data = &sun50i_a64_cfg },
- 	{ /* sentinel */ }
- };
- MODULE_DEVICE_TABLE(of, sunxi_mmc_of_match);
--- 
-2.9.0
+
+Reviewed-by: Sean Paul <seanpaul@chromium.org>
+
+
+>  drivers/gpu/drm/mediatek/mtk_drm_crtc.c  |   21 ++++----
+>  drivers/gpu/drm/mediatek/mtk_drm_crtc.h  |    1 -
+>  drivers/gpu/drm/mediatek/mtk_drm_drv.c   |   17 ++++++-
+>  drivers/gpu/drm/mediatek/mtk_drm_plane.c |   80 +++++++++++-------------------
+>  drivers/gpu/drm/mediatek/mtk_drm_plane.h |   15 +-----
+>  5 files changed, 56 insertions(+), 78 deletions(-)
+>
+> --
+> 1.7.9.5
+>
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
