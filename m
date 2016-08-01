@@ -1,105 +1,93 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Mon, 1 Aug 2016 11:49:27 +0200
-Subject: [PATCH 3/3] ehci-platform: add the max clock number to 4
-In-Reply-To: <255931470039489@web30j.yandex.ru>
-References: <20160731112536.4625-1-icenowy@aosc.xyz>
- <20160731112536.4625-3-icenowy@aosc.xyz> <2477355.hXm3xYUusy@wuerfel>
- <414101470035152@web9j.yandex.ru>
- <01a348da-3b26-68a6-9d9f-c37d81b4fd64@redhat.com>
- <255931470039489@web30j.yandex.ru>
-Message-ID: <8f85d8c6-761d-ac37-2ae3-1a3a2f21542f@redhat.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 1 Aug 2016 11:50:39 +0200
+Subject: [PATCH] arm64: fix address fault during mapping fdt region
+In-Reply-To: <579F197B.80101@zoho.com>
+References: <579F197B.80101@zoho.com>
+Message-ID: <CAKv+Gu9QQdncCD_T8+tpdVP8qx=EKM9-PGLvb8J9RNA2qHddFw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 01-08-16 10:18, Icenowy Zheng wrote:
+On 1 August 2016 at 11:42, zijun_hu <zijun_hu@zoho.com> wrote:
+> From 07b9216ec3494515e7a6c41e0333eb8782427db3 Mon Sep 17 00:00:00 2001
+> From: zijun_hu <zijun_hu@htc.com>
+> Date: Mon, 1 Aug 2016 17:04:59 +0800
+> Subject: [PATCH] arm64: fix address fault during mapping fdt region
 >
+> fdt_check_header() accesses other fileds of fdt header but
+> the first 8 bytes such as version; so accessing unmapped
+> address fault happens if fdt region locates below align
+> boundary nearly during mapping fdt region, or expressed as
+> (offset + sizeof(struct fdt_header)) > SWAPPER_BLOCK_SIZE
 >
-> 01.08.2016, 15:27, "Hans de Goede" <hdegoede@redhat.com>:
->> Hi,
->>
->> On 01-08-16 09:05, Icenowy Zheng wrote:
->>>                          clocks = <&ccu CLK_A64_BUS_OHCI1>,
->>>                                   <&ccu CLK_A64_BUS_EHCI1>,
->>>                                   <&ccu CLK_A64_USB_OHCI0>,
->>>                                   <&ccu CLK_A64_USB_OHCI1>;
->>>
->>>  On A64, EHCI requires the matched OHCI to work.
->>
->> Ah, so just like on the H3 (where this also is needed
->> and not documented).
-> Yes, I feeled that A64 is like a hybrid of H3 and A33.
->>
->>>  And OHCI1 clock requires OHCI0 clock to work.
->>
->> Hmm, that one is new, can you double check this ?
-> SCLK_GATING_OHCI.
-> Gating Special Clock For OHCI(48M and 12M)
-> 00: Clock is OFF
-> 01: OTG-OHCI Clock is ON
-> 10: Clock is OFF
-> 11:OTG-OHCI and OHCI0 Clock is ON
+> fdt header size at least is mapped in order to avoid the issue
 >
-> P.113 of A64 user manual 1.0
+> Signed-off-by: zijun_hu <zijun_hu@htc.com>
+> ---
+>  arch/arm64/mm/mmu.c | 14 ++++++++++++--
+>  1 file changed, 12 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+> index 0f85a46..0d72b71 100644
+> --- a/arch/arm64/mm/mmu.c
+> +++ b/arch/arm64/mm/mmu.c
+> @@ -744,6 +744,7 @@ void *__init __fixmap_remap_fdt(phys_addr_t dt_phys, int *size, pgprot_t prot)
+>         const u64 dt_virt_base = __fix_to_virt(FIX_FDT);
+>         int offset;
+>         void *dt_virt;
+> +       int dt_header_map_size;
+>
+>         /*
+>          * Check whether the physical FDT address is set and meets the minimum
+> @@ -774,9 +775,18 @@ void *__init __fixmap_remap_fdt(phys_addr_t dt_phys, int *size, pgprot_t prot)
+>         offset = dt_phys % SWAPPER_BLOCK_SIZE;
+>         dt_virt = (void *)dt_virt_base + offset;
+>
+> +       /*
+> +        * fdt_check_header() maybe access any field of fdt header not
+> +        * the first 8 bytes only, so map fdt header size at least for
+> +        * checking fdt header without address fault more portably
+> +        */
+> +       BUILD_BUG_ON(sizeof(struct fdt_header) > SWAPPER_BLOCK_SIZE);
+> +       dt_header_map_size = round_up(offset + sizeof(struct fdt_header),
+> +                       SWAPPER_BLOCK_SIZE);
+> +
+>         /* map the first chunk so we can read the size from the header */
+>         create_mapping_noalloc(round_down(dt_phys, SWAPPER_BLOCK_SIZE),
+> -                       dt_virt_base, SWAPPER_BLOCK_SIZE, prot);
+> +                       dt_virt_base, dt_header_map_size, prot);
+>
+>         if (fdt_check_header(dt_virt) != 0)
+>                 return NULL;
+> @@ -785,7 +795,7 @@ void *__init __fixmap_remap_fdt(phys_addr_t dt_phys, int *size, pgprot_t prot)
+>         if (*size > MAX_FDT_SIZE)
+>                 return NULL;
+>
+> -       if (offset + *size > SWAPPER_BLOCK_SIZE)
+> +       if (offset + *size > dt_header_map_size)
+>                 create_mapping_noalloc(round_down(dt_phys, SWAPPER_BLOCK_SIZE), dt_virt_base,
+>                                round_up(offset + *size, SWAPPER_BLOCK_SIZE), prot);
+>
 
-Ah I see that looks weird, I assume that you're working
-on getting the regular usb host on the A64 to work, iow
-the "HCI0" block in the usb block diagram at p. 580, right ?
+Couldn't we simply do this instead?
 
-It could be that the ohci clock for that somehow is
-tapped from the ohci clock for the "USB-OTG-HCI" block,
-but:
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index 0f85a46c3e18..e8d3b04a2b57 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -778,7 +778,7 @@ void *__init __fixmap_remap_fdt(phys_addr_t
+dt_phys, int *size, pgprot_t prot)
+        create_mapping_noalloc(round_down(dt_phys, SWAPPER_BLOCK_SIZE),
+                        dt_virt_base, SWAPPER_BLOCK_SIZE, prot);
 
-P.113, other bits of the USBPHY_CFG_REG register:
+-       if (fdt_check_header(dt_virt) != 0)
++       if (fdt_magic(dt_virt) != FDT_MAGIC)
+                return NULL;
 
-23:22 R/W 0x0 OHCI1_12M_SRC_SEL. OHCI1 12M Source Select
-00: 12M divided from 48M
-01: 12M divided from 24M
-10: LOSC
-11: /
+        *size = fdt_totalsize(dt_virt);
 
-21:20 R/W 0x0 OHCI0_12M_SRC_SEL. OHCI0 12M Source Select
-00: 12M divided from 48M
-01: 12M divided from 24M
-10: LOSC
-11: /
+We are simply looking for a size field. The OF code will call
+fdt_check_header() again, so anything that is checked there in
+addition to the magic field will still be checked.
 
-Suggests that they are independent...
-
-Have you tried to simply drop
-
-                              <&ccu CLK_A64_USB_OHCI0>,
-
- From the clocks list and check that usb-1 devices
-(e.g. a mouse / keyboard) plugged directly into the
-board still work ?
-
-If it does we can simply drop it, of it does not work
-then indeed we need 4 clocks because allwinner has
-done something weird again.
-
-###
-
-Also it seems that the CLK_A64_USB_OHCI0 /
-CLK_A64_USB_OHCI1 names are wrong, the datasheet
-consistently (*) refers to "usb-otg-ohci" and an
-"usb-ohci0" rather then ohci0 and ohci1 (**)
-
-Except for the USBPHY_CFG_REG documentation for bits 20:23,
-which I believe is an error in the datasheet.
-
-So we should do the same in the dt-bindings IMHO.
-
-Regards,
-
-Hans
-
-
-
-*) In the system address map (p. 73), "Interrupt Source" list (p.210)
-in the "Bus Clock Gating Register0" doc (p. 100) and
-in the usb block diagram (p. 580).
-
-**) Unlike the H3 where usb-otg-ohci is called usb-ohci0 and
-the first non otg host controller is called usb-ohci1.
+-- 
+Ard.
