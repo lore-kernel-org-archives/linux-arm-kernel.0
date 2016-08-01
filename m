@@ -1,35 +1,74 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Mon, 1 Aug 2016 14:24:24 +0200
-Subject: [PATCH] arm64: fix address fault during mapping fdt region
-In-Reply-To: <579F197B.80101@zoho.com>
-References: <579F197B.80101@zoho.com>
-Message-ID: <20160801122424.GA18162@kroah.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 01 Aug 2016 14:25:04 +0200
+Subject: [PATCH 2/2] soc: nxp: Add a RCPM driver
+In-Reply-To: <1470044943-3814-2-git-send-email-chenhui.zhao@nxp.com>
+References: <1470044943-3814-1-git-send-email-chenhui.zhao@nxp.com>
+ <1470044943-3814-2-git-send-email-chenhui.zhao@nxp.com>
+Message-ID: <2024386.Ra8uvttlE9@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 01, 2016 at 05:42:19PM +0800, zijun_hu wrote:
-> >From 07b9216ec3494515e7a6c41e0333eb8782427db3 Mon Sep 17 00:00:00 2001
-> From: zijun_hu <zijun_hu@htc.com>
-> Date: Mon, 1 Aug 2016 17:04:59 +0800
-> Subject: [PATCH] arm64: fix address fault during mapping fdt region
+On Monday, August 1, 2016 5:49:03 PM CEST Chenhui Zhao wrote:
+> The NXP's QorIQ Processors based on ARM Core have a RCPM module
+> (Run Control and Power Management), which performs all device-level
+> tasks associated with power management.
 > 
-> fdt_check_header() accesses other fileds of fdt header but
-> the first 8 bytes such as version; so accessing unmapped
-> address fault happens if fdt region locates below align
-> boundary nearly during mapping fdt region, or expressed as
-> (offset + sizeof(struct fdt_header)) > SWAPPER_BLOCK_SIZE
+> This patch mainly implements the wakeup sources configuration before
+> entering LPM20, a low power state of device-level. The devices can be
+> waked up by specified sources, such as Flextimer, GPIO and so on.
 > 
-> fdt header size at least is mapped in order to avoid the issue
-> 
-> Signed-off-by: zijun_hu <zijun_hu@htc.com>
-> ---
->  arch/arm64/mm/mmu.c | 14 ++++++++++++--
->  1 file changed, 12 insertions(+), 2 deletions(-)
+> Signed-off-by: Chenhui Zhao <chenhui.zhao@nxp.com>
 
-<formletter>
+Adding irqchip maintainers to cc, as this wakeup handling is normally
+part of the irq controller.
 
-This is not the correct way to submit patches for inclusion in the
-stable kernel tree.  Please read Documentation/stable_kernel_rules.txt
-for how to do this properly.
+> +
+> +#include <linux/kernel.h>
+> +#include <linux/io.h>
+> +#include <linux/of_platform.h>
+> +#include <linux/of_address.h>
+> +#include <linux/suspend.h>
+> +
+> +/* So far there are not more than two registers */
+> +#define RCPM_IPPDEXPCR0		0x140
+> +#define RCPM_IPPDEXPCR1		0x144
+> +#define RCPM_IPPDEXPCR(x)	(RCPM_IPPDEXPCR0 + 4 * x)
+> +#define RCPM_WAKEUP_CELL_MAX_SIZE	2
+> +
+> +/* it reprents the number of the registers RCPM_IPPDEXPCR */
+> +static unsigned int rcpm_wakeup_cells;
+> +static void __iomem *rcpm_reg_base;
+> +static u32 ippdexpcr[RCPM_WAKEUP_CELL_MAX_SIZE];
 
-</formletter>
+Can you make these local to the context of whoever
+calls into the driver?
+
+
+> +static void rcpm_wakeup_fixup(struct device *dev, void *data)
+> +{
+> +	struct device_node *node = dev ? dev->of_node : NULL;
+> +	u32 value[RCPM_WAKEUP_CELL_MAX_SIZE + 1];
+> +	int ret;
+> +	int i;
+> +
+> +	if (!dev || !node || !device_may_wakeup(dev))
+> +		return;
+> +
+> +	/*
+> +	 * Get the values in the "rcpm-wakeup" property.
+> +	 * Refer to Documentation/devicetree/bindings/soc/fsl/rcpm.txt
+> +	 */
+> +	ret = of_property_read_u32_array(node, "rcpm-wakeup",
+> +					 value, rcpm_wakeup_cells + 1);
+
+My first impression is that you are trying to do something
+in a platform specific way that should be handled by common
+code here.
+
+You are parsing rcpm_wakeup_cells once for the global node,
+but you don't check whether the device that has the rcpm-wakeup
+node actually refers to this instance, and that would require
+an incompatible change if we ever get an implementation that
+has multiple such nodes.
+
+	Arnd
