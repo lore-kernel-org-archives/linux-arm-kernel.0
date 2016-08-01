@@ -1,100 +1,69 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 1 Aug 2016 14:13:50 -0700
-Subject: [PATCH v5 09/11] dtb: xgene: Add MDIO node
-In-Reply-To: <1467932579-14320-10-git-send-email-isubramanian@apm.com>
-References: <1467932579-14320-1-git-send-email-isubramanian@apm.com>
- <1467932579-14320-10-git-send-email-isubramanian@apm.com>
-Message-ID: <CAOesGMiF0PQocy2jj9Fpz_K-dYRtJDnd789DOCLz35y5g+KVzw@mail.gmail.com>
+Date: Mon,  1 Aug 2016 14:39:21 -0700
+Subject: [GIT PULL 0/7] ARM: SoC changes for v4.8
+Message-ID: <1470087568-4222-1-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Linus,
 
-I came across this now when looking at merge conflicts when preparing
-this. I wish I had seen it sooner.
+Here's our set of branches for this release. As usual, each pull request describes
+the conflicts that will show up and brief descriptions on how to resolve. I've
+also pushed a sample-merge branch to the repo to compare final results with.
 
-On Thu, Jul 7, 2016 at 4:02 PM, Iyappan Subramanian
-<isubramanian@apm.com> wrote:
-> Added mdio node for mdio driver.  Also added phy-handle
-> reference to the ethernet nodes.
->
-> Removed unused mdio subnode within storm menet ethernet node.
-> Removed unused clock node from storm sgenet1.
->
-> Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
-> Tested-by: Fushen Chen <fchen@apm.com>
-> Tested-by: Toan Le <toanle@apm.com>
-> Tested-by: Matthias Brugger <mbrugger@suse.com>
-> ---
->  arch/arm64/boot/dts/apm/apm-mustang.dts | 12 +++++++++++
->  arch/arm64/boot/dts/apm/apm-storm.dtsi  | 36 ++++++++++++---------------------
->  2 files changed, 25 insertions(+), 23 deletions(-)
->
-> diff --git a/arch/arm64/boot/dts/apm/apm-mustang.dts b/arch/arm64/boot/dts/apm/apm-mustang.dts
-> index 44db32e..b7fb5d9 100644
-> --- a/arch/arm64/boot/dts/apm/apm-mustang.dts
-> +++ b/arch/arm64/boot/dts/apm/apm-mustang.dts
-> @@ -79,3 +79,15 @@
->  &mmc0 {
->         status = "ok";
->  };
-> +
-> +&mdio {
-> +       menet0phy: phy at 3 {
-> +               reg = <0x3>;
-> +       };
-> +       sgenet0phy: phy at 4 {
-> +               reg = <0x4>;
-> +       };
-> +       sgenet1phy: phy at 5 {
-> +               reg = <0x5>;
-> +       };
-> +};
-> diff --git a/arch/arm64/boot/dts/apm/apm-storm.dtsi b/arch/arm64/boot/dts/apm/apm-storm.dtsi
-> index 5147d76..a415b3a 100644
-> --- a/arch/arm64/boot/dts/apm/apm-storm.dtsi
-> +++ b/arch/arm64/boot/dts/apm/apm-storm.dtsi
-> @@ -237,20 +237,11 @@
->                                 clocks = <&socplldiv2 0>;
->                                 reg = <0x0 0x1f21c000 0x0 0x1000>;
->                                 reg-names = "csr-reg";
-> -                               csr-mask = <0x3>;
-> +                               csr-mask = <0xa>;
-> +                               enable-mask = <0xf>;
->                                 clock-output-names = "sge0clk";
->                         };
->
-> -                       sge1clk: sge1clk at 1f21c000 {
-> -                               compatible = "apm,xgene-device-clock";
-> -                               #clock-cells = <1>;
-> -                               clocks = <&socplldiv2 0>;
-> -                               reg = <0x0 0x1f21c000 0x0 0x1000>;
-> -                               reg-names = "csr-reg";
-> -                               csr-mask = <0xc>;
-> -                               clock-output-names = "sge1clk";
-> -                       };
-> -
->                         xge0clk: xge0clk at 1f61c000 {
->                                 compatible = "apm,xgene-device-clock";
->                                 #clock-cells = <1>;
-> @@ -921,6 +912,14 @@
->                         clocks = <&rtcclk 0>;
->                 };
->
-> +               mdio: mdio at 0x17020000 {
-> +                       compatible = "apm,xgene-mdio-rgmii";
-> +                       #address-cells = <1>;
-> +                       #size-cells = <0>;
-> +                       reg = <0x0 0x17020000 0x0 0xd100>;
-> +                       clocks = <&menetclk 0>;
-> +               };
-> +
->                 menet: ethernet at 17020000 {
+When it comes to contents, this is a release cycle that's on the small
+side for us at "only" 858 patches merged that haven't already gone in
+through other trees.
+
+New platforms for this cycle are:
+
+32-bit:
+ - Broadcom BCM23550
+ - Freescale i.MX7Solo
+ - Qualcomm MDM9615
+ - Renesas r8a7792
+
+64-bit:
+ - Broadcom BCM2837
+ - Renesas r8a7796
+
+Out of those, BCM2837 might be worth pointing out since it is the SoC
+used on Raspberry Pi 3, so it's great to start seeing support there.
+
+As contributors go, the top 15 authors of patches are:
+
+Geert Uytterhoeven (73)
+Krzysztof Kozlowski (41)
+Javier Martinez Canillas (36)
+Ben Dooks (33)
+Hans de Goede (33)
+Alexandre Belloni (29)
+Arnd Bergmann (25)
+Chen-Yu Tsai (23)
+Srinivas Kandagatla (21)
+Thierry Reding (20)
+Jon Hunter (19)
+Andy Gross (18)
+Alexander Shiyan (17)
+Florian Fainelli (17)
+Sergei Shtylyov (17)
+
+And dirstat speaks pretty clearly about where the bulk of changes are for us
+now: 32-bit device-tree contents. 64-bit platforms are slowly picking up but
+have nowhere near the rate of change:
+
+  61.8% arch/arm/boot/dts/
+   4.3% arch/arm/mach-ux500/
+   8.0% arch/arm/
+   9.2% arch/arm64/boot/dts/
+  11.4% drivers/
+
+Driver stand out this release cycle in part due to an active time for reset
+driver conversions, and that tree is normally merged through us.
 
 
-This new mmio node has the same unit address, and claims the same
-register window as the ethernet controller.
-That's doesn't seem correct?
+Please merge!
 
+Thanks,
 
--Olof
+Olof (and Arnd and Kevin)
