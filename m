@@ -1,32 +1,81 @@
 From: peter.griffin@linaro.org (Peter Griffin)
-Date: Mon,  1 Aug 2016 18:10:44 +0100
-Subject: [PATCH v7 07/16] MAINTAINERS: Add FDMA driver files to STi section.
+Date: Mon,  1 Aug 2016 18:10:43 +0100
+Subject: [PATCH v7 06/16] ARM: STi: DT: STiH407: Add FDMA driver dt nodes.
 In-Reply-To: <1470071453-10730-1-git-send-email-peter.griffin@linaro.org>
 References: <1470071453-10730-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <1470071453-10730-8-git-send-email-peter.griffin@linaro.org>
+Message-ID: <1470071453-10730-7-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the FDMA driver files to the STi
-section of the maintainers file.
+These nodes are required to get the fdma driver working
+on STiH407 based silicon.
 
 Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
-Acked-by: Lee Jones <lee.jones@linaro.org>
 ---
- MAINTAINERS | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/stih407-family.dtsi | 52 +++++++++++++++++++++++++++++++++++
+ 1 file changed, 52 insertions(+)
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 0b35e8b..dbdba21 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1705,6 +1705,7 @@ F:	drivers/char/hw_random/st-rng.c
- F:	drivers/clocksource/arm_global_timer.c
- F:	drivers/clocksource/clksrc_st_lpc.c
- F:	drivers/cpufreq/sti-cpufreq.c
-+F:	drivers/dma/st_fdma*
- F:	drivers/i2c/busses/i2c-st.c
- F:	drivers/media/rc/st_rc.c
- F:	drivers/media/platform/sti/c8sectpfe/
+diff --git a/arch/arm/boot/dts/stih407-family.dtsi b/arch/arm/boot/dts/stih407-family.dtsi
+index d294e82..45cab30 100644
+--- a/arch/arm/boot/dts/stih407-family.dtsi
++++ b/arch/arm/boot/dts/stih407-family.dtsi
+@@ -821,5 +821,57 @@
+ 			clock-frequency	= <600000000>;
+ 			st,syscfg	= <&syscfg_core 0x224>;
+ 		};
++
++		/* fdma audio */
++		fdma0: dma-controller at 8e20000 {
++			compatible = "st,stih407-fdma-mpe31-11", "st,slim-rproc";
++			reg = <0x8e20000 0x8000>,
++			      <0x8e30000 0x3000>,
++			      <0x8e37000 0x1000>,
++			      <0x8e38000 0x8000>;
++			reg-names = "slimcore", "dmem", "peripherals", "imem";
++			clocks = <&clk_s_c0_flexgen CLK_FDMA>,
++				 <&clk_s_c0_flexgen CLK_EXT2F_A9>,
++				 <&clk_s_c0_flexgen CLK_EXT2F_A9>,
++				 <&clk_s_c0_flexgen CLK_EXT2F_A9>;
++			interrupts = <GIC_SPI 5 IRQ_TYPE_NONE>;
++			dma-channels = <16>;
++			#dma-cells = <3>;
++		};
++
++		/* fdma app */
++		fdma1: dma-controller at 8e40000 {
++			compatible = "st,stih407-fdma-mpe31-12", "st,slim-rproc";
++			reg = <0x8e40000 0x8000>,
++			      <0x8e50000 0x3000>,
++			      <0x8e57000 0x1000>,
++			      <0x8e58000 0x8000>;
++			reg-names = "slimcore", "dmem", "peripherals", "imem";
++			clocks = <&clk_s_c0_flexgen CLK_FDMA>,
++				<&clk_s_c0_flexgen CLK_TX_ICN_DMU>,
++				<&clk_s_c0_flexgen CLK_TX_ICN_DMU>,
++				<&clk_s_c0_flexgen CLK_EXT2F_A9>;
++
++			interrupts = <GIC_SPI 7 IRQ_TYPE_NONE>;
++			dma-channels = <16>;
++			#dma-cells = <3>;
++		};
++
++		/* fdma free running */
++		fdma2: dma-controller at 8e60000 {
++			compatible = "st,stih407-fdma-mpe31-13", "st,slim-rproc";
++			reg = <0x8e60000 0x8000>,
++			      <0x8e70000 0x3000>,
++			      <0x8e77000 0x1000>,
++			      <0x8e78000 0x8000>;
++			reg-names = "slimcore", "dmem", "peripherals", "imem";
++			interrupts = <GIC_SPI 9 IRQ_TYPE_NONE>;
++			dma-channels = <16>;
++			#dma-cells = <3>;
++			clocks = <&clk_s_c0_flexgen CLK_FDMA>,
++				<&clk_s_c0_flexgen CLK_EXT2F_A9>,
++				<&clk_s_c0_flexgen CLK_TX_ICN_DISP_0>,
++				<&clk_s_c0_flexgen CLK_EXT2F_A9>;
++		};
+ 	};
+ };
 -- 
 1.9.1
