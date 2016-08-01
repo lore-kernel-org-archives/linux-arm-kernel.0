@@ -1,45 +1,48 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 1 Aug 2016 21:39:34 +0800
-Subject: [linux-sunxi] Re: [PATCH 2/2] ASoC: sunxi: compatibility for
- sun6i to SPDIF
-In-Reply-To: <20160730152049.GU6215@lukather>
-References: <20160730142716.29377-1-codekipper@gmail.com>
- <20160730142716.29377-3-codekipper@gmail.com>
- <170941469890365@web9j.yandex.ru> <20160730152049.GU6215@lukather>
-Message-ID: <CAGb2v65Hyp8U1OMrfy0Bo9-qC0eO5de+NjWQzch87_2Ty+fBqQ@mail.gmail.com>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Mon, 1 Aug 2016 15:52:46 +0200
+Subject: [linux-sunxi] Re: [PATCH 2/3] mmc: sunxi: Set the 'New Timing'
+ register for 8 bits DDR transfers
+In-Reply-To: <9414aab0-ac2b-01c2-e16b-8f7394ea7b68@redhat.com>
+References: <cover.1469082481.git.moinejf@free.fr>
+ <bc7b767cad6db159a44c4b98d5b1f3eb53c26bd3.1469082481.git.moinejf@free.fr>
+ <20160721085615.GG5993@lukather>
+ <20160721112655.941b1dad04f7a5b94d4172c1@free.fr>
+ <20160729191730.GG6215@lukather>
+ <9414aab0-ac2b-01c2-e16b-8f7394ea7b68@redhat.com>
+Message-ID: <20160801155246.b7b3c7f0f582394b4c25f6dc@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Sat, 30 Jul 2016 12:19:03 +0200
+Hans de Goede <hdegoede@redhat.com> wrote:
 
-On Sat, Jul 30, 2016 at 11:20 PM, maxime.ripard at free-electrons.com
-<maxime.ripard@free-electrons.com> wrote:
-> On Sat, Jul 30, 2016 at 10:52:45PM +0800, Icenowy Zheng wrote:
->> > + if (of_device_is_compatible(pdev->dev.of_node,
->> > + "allwinner,sun6i-a31-spdif")) {
->> > + host->rst = devm_reset_control_get_optional(&pdev->dev, NULL);
->> > + if (IS_ERR(host->rst) && PTR_ERR(host->rst) == -EPROBE_DEFER) {
->> > + ret = -EPROBE_DEFER;
->> > + dev_err(&pdev->dev, "Failed to get reset: %d\n", ret);
->> > + goto err_disable_apb_clk;
->> > + }
->> > + if (!IS_ERR(host->rst))
->> > + reset_control_deassert(host->rst);
->> > + }
->> > +
->> I think you do not need the compatible.
->> You can just detect whether the reset is present.
->
-> That would weaken the error check. If we're running on the A31 and are
-> missing our reset property, it would go unnoticed.
+> Jean-Francois, can you submit a v2 of your patch and make the writing of
+> SDXC_REG_NTSR depend on a new sun8i-a83t-mmc compatible ?
+> 
+> Also you should probably drop the bits about the clock stuff from the
+> commit message as that just seems to confuse people.
 
-We've been doing it this way with the mmc controller and the usb hosts though.
-IIRC you once said in the older SoCs, the reset control is tied to the clock
-gate in the hardware.
+Hi Hans,
 
-The _optional variant is also funny, though I understand it is a design
-of the reset controller framework.
+I submitted a new patch (sorry, I forgot the history), but it asks for
+some explanation.
 
+- in the old timings, the phase delays are set in the clock.
+  That's why there is a function clk_set_phase() which is called from
+  the MMC side.
 
-Regards
-ChenYu
+- in the new timings, the delays are in the MMC register SDXC_REG_NTSR
+  only.
+  In this case, the function clk_set_phase() is of no use
+  (also, by test, it seems that the phase delays set by hardware
+   reset do work, so, there is no need to set them), but,
+
+- there is a bit in the clock telling that the new timings are used,
+  i.e. that the phase delays of the clock must be ignored.
+
+  Not setting this bit prevents the device to work (at least in the
+  A83T, the H3 seems more helpful).
+
+-- 
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
