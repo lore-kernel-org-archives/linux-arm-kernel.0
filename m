@@ -1,71 +1,23 @@
-From: robh@kernel.org (Rob Herring)
-Date: Sun, 31 Jul 2016 20:57:20 -0500
-Subject: [PATCH v7 2/2] [media] atmel-isc: DT binding for Image Sensor
- Controller driver
-In-Reply-To: <5a2cea98-dd8a-159b-7adb-a2533cfde1b0@microchip.com>
-References: <1469778856-24253-1-git-send-email-songjun.wu@microchip.com>
- <1469778856-24253-3-git-send-email-songjun.wu@microchip.com>
- <20160729214454.GA21408@rob-hp-laptop>
- <5a2cea98-dd8a-159b-7adb-a2533cfde1b0@microchip.com>
-Message-ID: <CAL_JsqLH9wHMuLJ5Q-rCecM3i2OUgWJ8A3U-z8UZORN-PQOvBA@mail.gmail.com>
+From: davem@davemloft.net (David Miller)
+Date: Sun, 31 Jul 2016 20:36:41 -0700 (PDT)
+Subject: [PATCH v3 00/15] net: thunderx: Add support for 81xx and 83xx
+In-Reply-To: <CA+sq2CfGDgw=4VuhUfnKEwKkLrEXxKMWmEX4P5hKSsj4pmBGXA@mail.gmail.com>
+References: <CA+sq2CcMrU0OcZK7oTF8dtpoojafgjCCA5dBqc6h5RKYZZ2h6Q@mail.gmail.com>
+ <20160731.115455.391582659417641368.davem@davemloft.net>
+ <CA+sq2CfGDgw=4VuhUfnKEwKkLrEXxKMWmEX4P5hKSsj4pmBGXA@mail.gmail.com>
+Message-ID: <20160731.203641.335462360411404621.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 31, 2016 at 8:23 PM, Wu, Songjun <Songjun.Wu@microchip.com> wrote:
->
->
-> On 7/30/2016 05:44, Rob Herring wrote:
->>
->> On Fri, Jul 29, 2016 at 03:54:08PM +0800, Songjun Wu wrote:
->>>
->>> DT binding documentation for ISC driver.
->>>
->>> Signed-off-by: Songjun Wu <songjun.wu@microchip.com>
->>> ---
->>>
->>> Changes in v7: None
->>> Changes in v6:
->>> - Add "iscck" and "gck" to clock-names.
->>>
->>> Changes in v5:
->>> - Add clock-output-names.
->>>
->>> Changes in v4:
->>> - Remove the isc clock nodes.
->>>
->>> Changes in v3:
->>> - Remove the 'atmel,sensor-preferred'.
->>> - Modify the isc clock node according to the Rob's remarks.
->>>
->>> Changes in v2:
->>> - Remove the unit address of the endpoint.
->>> - Add the unit address to the clock node.
->>> - Avoid using underscores in node names.
->>> - Drop the "0x" in the unit address of the i2c node.
->>> - Modify the description of 'atmel,sensor-preferred'.
->>> - Add the description for the ISC internal clock.
->>>
->>>  .../devicetree/bindings/media/atmel-isc.txt        | 65
->>> ++++++++++++++++++++++
->>>  1 file changed, 65 insertions(+)
->>>  create mode 100644 Documentation/devicetree/bindings/media/atmel-isc.txt
->>
->>
->> Please add acks when posting new versions.
->>
->> Rob
->>
-> Hi Rob,
->
-> Thank you for your reminder.
->
-> Should I Add 'Acked-by: Rob Herring <robh@kernel.org>' behind
-> 'Signed-off-by: Songjun Wu <songjun.wu@microchip.com>'?
+From: Sunil Kovvuri <sunil.kovvuri@gmail.com>
+Date: Mon, 1 Aug 2016 08:59:16 +0530
 
-Before or after is fine.
+> Understood but unfortunately I don't see these patches in patchwork.
+> http://patchwork.ozlabs.org/project/netdev/list/?submitter=&state=*&q=thunderx&archive=both&delegate=
+> http://patchwork.ozlabs.org/project/netdev/list/?submitter=62159&state=*&q=&archive=both&delegate=
 
-> Should I resend this patch?
+Then you'll need to resubmit them.
 
-Not just to add acks, but if you send v8, add the acks.
-
-Rob
+But net-next is closed at this time, so new feature submissions are
+not appropriate.  You need to wait until the net-next tree opens
+again.
