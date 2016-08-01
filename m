@@ -1,77 +1,80 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Mon,  1 Aug 2016 18:10:53 +0100
-Subject: [PATCH v7 16/16] ARM: DT: STi: stihxxx-b2120: Add DT nodes for STi
- audio card
-In-Reply-To: <1470071453-10730-1-git-send-email-peter.griffin@linaro.org>
-References: <1470071453-10730-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <1470071453-10730-17-git-send-email-peter.griffin@linaro.org>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Mon, 1 Aug 2016 10:41:54 -0700
+Subject: [PATCH 1/4] input: touchscreen: Add generic touchscreen
+ softbutton handling code
+In-Reply-To: <20160801165430.GA30345@rob-hp-laptop>
+References: <1469978590-14081-1-git-send-email-hdegoede@redhat.com>
+ <1469978590-14081-2-git-send-email-hdegoede@redhat.com>
+ <20160801165430.GA30345@rob-hp-laptop>
+Message-ID: <20160801174154.GA3231@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables the uniperif players 2 & 3 for b2120 boards
-and also adds the "simple-audio-card" device node to interconnect
-the SoC sound device and the codec.
+On Mon, Aug 01, 2016 at 11:54:30AM -0500, Rob Herring wrote:
+> On Sun, Jul 31, 2016 at 05:23:07PM +0200, Hans de Goede wrote:
+> > Some touchscreens extend over the display they cover and have a number
+> > of capacative softbuttons outside of the display the cover.
+> > 
+> > With some hardware these softbuttons simply report touches with
+> > coordinates outside of the normal coordinate space for touches on the
+> > display.
+> > 
+> > This commit adds a devicetree binding for describing such buttons in
+> > devicetree and a bunch of helper functions to easily add support for
+> > these to existing touchscreen drivers.
+> > 
+> > Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> > ---
+> >  .../bindings/input/touchscreen/softbuttons.txt     |  58 +++++++++
+> >  drivers/input/touchscreen/Makefile                 |   2 +-
+> >  drivers/input/touchscreen/softbuttons.c            | 145 +++++++++++++++++++++
+> >  include/linux/input/touchscreen.h                  |   9 ++
+> >  4 files changed, 213 insertions(+), 1 deletion(-)
+> >  create mode 100644 Documentation/devicetree/bindings/input/touchscreen/softbuttons.txt
+> >  create mode 100644 drivers/input/touchscreen/softbuttons.c
+> > 
+> > diff --git a/Documentation/devicetree/bindings/input/touchscreen/softbuttons.txt b/Documentation/devicetree/bindings/input/touchscreen/softbuttons.txt
+> > new file mode 100644
+> > index 0000000..3eb6f4c
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/input/touchscreen/softbuttons.txt
+> > @@ -0,0 +1,58 @@
+> > +General Touchscreen Softbutton Properties:
+> > +
+> > +Some touchscreens extend over the display they cover and have a number
+> > +of capacative softbuttons outside of the display the cover.
+> > +
+> > +Some of these softbuttons simply report touches with coordinates outside of
+> > +the normal coordinate space for touches on the display. This binding is for
+> > +describing such buttons in devicetree.
+> > +
+> > +Each softkey is represented as a sub-node of the touchscreen node.
+> > +
+> > +Required subnode-properties:
+> > + - label			: Descriptive name of the key.
+> > + - linux,code			: Keycode to emit.
+> > + - softbutton-min-x		: X start of the area the softbutton area covers
+> > + - softbutton-max-x		: X end of the area the softbutton area covers
+> > + - softbutton-min-y		: Y start of the area the softbutton area covers
+> > + - softbutton-max-y		: Y end of the area the softbutton area covers
+> 
+> This generally looks fine to me, but I am wondering one thing. If the 
+> buttons are located at the origin of an axis, can we handle that case? I 
+> don't think you can unless you assume softbutton-max-? is 0 for the 
+> touchscreen. To put it another way, you have a gap from 1024 to 1084 
+> which you can't express for buttons at the origin unless you do negative 
+> numbers.
 
-Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
-Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
----
- arch/arm/boot/dts/stihxxx-b2120.dtsi | 45 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 45 insertions(+)
+I do not this this should be done in kernel: I do not see nay difference
+in softbuttons or sliders or circular controls or... They are not
+controller-specific and I think are better handled in userspace. We do
+that for Synaptics touchpads with softbuttons, we can do that for other
+controllers.
 
-diff --git a/arch/arm/boot/dts/stihxxx-b2120.dtsi b/arch/arm/boot/dts/stihxxx-b2120.dtsi
-index 722c63f..1f64bb6 100644
---- a/arch/arm/boot/dts/stihxxx-b2120.dtsi
-+++ b/arch/arm/boot/dts/stihxxx-b2120.dtsi
-@@ -131,5 +131,50 @@
- 				dvb-card	= <STV0367_TDA18212_NIMA_1>;
- 			};
- 		};
-+
-+		sti_uni_player2: sti-uni-player at 2 {
-+			status = "okay";
-+		};
-+
-+		sti_uni_player3: sti-uni-player at 3 {
-+			status = "okay";
-+		};
-+
-+		sti_sasg_codec: sti-sasg-codec {
-+			status = "okay";
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_spdif_out>;
-+		};
-+
-+		sound {
-+			compatible = "simple-audio-card";
-+			simple-audio-card,name = "sti audio card";
-+			status = "okay";
-+
-+			simple-audio-card,dai-link at 0 {
-+				/* DAC */
-+				format = "i2s";
-+				mclk-fs = <256>;
-+				cpu {
-+					sound-dai = <&sti_uni_player2>;
-+				};
-+
-+				codec {
-+					sound-dai = <&sti_sasg_codec 1>;
-+				};
-+			};
-+			simple-audio-card,dai-link at 1 {
-+				/* SPDIF */
-+				format = "left_j";
-+				mclk-fs = <128>;
-+				cpu {
-+					sound-dai = <&sti_uni_player3>;
-+				};
-+
-+				codec {
-+					sound-dai = <&sti_sasg_codec 0>;
-+				};
-+			};
-+		};
- 	};
- };
+Also, what is or stance when there is no bezel and we sill want to have
+the softbutons (i.e. all Nexus phones and tablets)?
+
+Thanks.
+
 -- 
-1.9.1
+Dmitry
