@@ -1,51 +1,76 @@
-From: amitoj1606@gmail.com (Amitoj Kaur Chawla)
-Date: Mon, 1 Aug 2016 11:48:38 +0530
-Subject: [PATCH] iommu/exynos: Modify error handling
-Message-ID: <20160801061838.GA17805@amitoj-Inspiron-3542>
+From: panand@redhat.com (Pratyush Anand)
+Date: Mon, 1 Aug 2016 11:51:12 +0530
+Subject: [PATCH v23 0/9] arm64: add kdump support
+In-Reply-To: <20160801043725.GC7995@linaro.org>
+References: <20160726075659.2290-1-takahiro.akashi@linaro.org>
+ <20160726080925.GA2363@linaro.org>
+ <CAB=otbTODnOwFiLZT7bm1_MLyORQ1cx-gaeg7bm+bReaMRhYwg@mail.gmail.com>
+ <20160729171300.GA478@localhost.localdomain>
+ <20160801043725.GC7995@linaro.org>
+Message-ID: <20160801062112.GA25203@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-of_platform_device_create returns NULL on error so an IS_ERR test is
-incorrect here and a NULL check is required.
+Hi Takahiro,
 
-The Coccinelle semantic patch used to make this change is as follows:
-@@
-expression e;
-@@
+On 01/08/2016:01:37:26 PM, AKASHI Takahiro wrote:
+> Pratyush,
+> 
+> On Fri, Jul 29, 2016 at 10:43:00PM +0530, Pratyush Anand wrote:
+> > Hi Ruslan,
+> > 
+> > On 29/07/2016:07:26:03 PM, Ruslan Bilovol wrote:
+> > > Hi,
+> > > 
+> > > On Tue, Jul 26, 2016 at 11:09 AM, AKASHI Takahiro
+> > > <takahiro.akashi@linaro.org> wrote:
+> > > > On Tue, Jul 26, 2016 at 04:56:51PM +0900, AKASHI Takahiro wrote:
+> > > >> This patch series adds kdump support on arm64.
+> > > >>
+> > > >> To load a crash-dump kernel to the systems, a series of patches to
+> > > >> kexec-tools, which have not yet been merged upstream, are needed.
+> > > >> Please pick Geoff's kexec patches [1] and my kdump patches [2].
+> > > >>
+> > > >> To examine vmcore (/proc/vmcore) on a crash-dump kernel, you can use
+> > > >>   - crash utility (coming v7.1.6 or later) [3]
+> > > >>     (Necessary patches have already been queued in the master.)
+> > > >>
+> > > >> [1]  http://lists.infradead.org/pipermail/kexec/2016-July/016532.html
+> > > >> [2]  TBD
+> > > >
+> > > > See my kexec-tools patches in:
+> > > > http://lists.infradead.org/pipermail/kexec/2016-July/016642.html
+> > > 
+> > > I tired this patch series with mentioned Geoff's kexec patches and
+> > > your kdump patches, but unfortunately it doesn't work for me.
+> > > 
+> > > While I can successfully load and kexec the kernel ('kexec --load' +
+> > > 'kexec -e'), same combination of kernel+ramdisk+dtb doesn't boot
+> > > if I do kdump combination ('kexec -p' + sysrq crash), there is no
+> > > any output after sysrq crash trace.
+> > > Unfortunately I don't have any debugger here for deep investigation
+> > > of this issue.
+> > 
+> > Which type of image do you have? I did face issue with binary image which I
+> > fixed in my branch, while elf would work fine for kdump as well.
+> 
+> Can you describe in more details, please?
+> I don't see any problems with either vmlinux or image
+> in my environment.
 
-  e = of_platform_device_create(...);
-if(
--    IS_ERR(e)
-+    !e
-    )
-    {
-  <+...
-  return
-- PTR_ERR(e)
-+ -ENODEV
-  ;
-  ...+>
-  }
+See kexec/crashdump-elf.c:FUNC()
+We have:
+223                 phdr->p_vaddr = phys_to_virt(elf_info, mstart);
+Now, if we do not have page_offset then we will not have correct p_vaddr, and
+then vmcore-dmesg/vmcore-dmesg.c:vaddr_to_offset() fails with
 
-Signed-off-by: Amitoj Kaur Chawla <amitoj1606@gmail.com>
----
- drivers/iommu/exynos-iommu.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+No program header covering vaddr 0xfffffc0008c312f0found kexec bug?
 
-diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
-index 97c41b8..2888bbf 100644
---- a/drivers/iommu/exynos-iommu.c
-+++ b/drivers/iommu/exynos-iommu.c
-@@ -1242,8 +1242,8 @@ static int __init exynos_iommu_of_setup(struct device_node *np)
- 		exynos_iommu_init();
- 
- 	pdev = of_platform_device_create(np, NULL, platform_bus_type.dev_root);
--	if (IS_ERR(pdev))
--		return PTR_ERR(pdev);
-+	if (!pdev)
-+		return -ENODEV;
- 
- 	of_iommu_set_ops(np, &exynos_iommu_ops);
- 	return 0;
--- 
-1.9.1
+Fedora/RHEL kexec-tools saves vmcore only when dmesg save is OK.
+
+I have updated [1] with the modification where --page-offset addition has been
+moved to kdump binary image support patch.
+
+[1] https://github.com/pratyushanand/kexec-tools.git : upstream_arm64_devel
+
+~Pratyush
