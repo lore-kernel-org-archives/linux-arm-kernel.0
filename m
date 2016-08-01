@@ -1,313 +1,89 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Mon, 1 Aug 2016 09:29:40 +0200
-Subject: [PATCH v2 2/2] mmc: host: sunxi: add support for A64 mmc
- controller
-In-Reply-To: <24941470008912@web11j.yandex.ru>
-References: <20160731110234.3593-1-icenowy@aosc.xyz>
- <20160731110234.3593-3-icenowy@aosc.xyz>
- <aaeda3c8-1487-cb6c-bfc6-44a63fed5ea2@redhat.com>
- <24941470008912@web11j.yandex.ru>
-Message-ID: <deab2689-1341-283a-38b1-f91dfe450e7c@redhat.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Mon, 01 Aug 2016 16:39:42 +0900
+Subject: [PATCH v4 0/7] rk3399 support ddr frequency scaling
+In-Reply-To: <1469779021-10426-1-git-send-email-hl@rock-chips.com>
+References: <CGME20160729075805epcas1p2fa2fab53fc8cdfdf42f53e99a0a72e6a@epcas1p2.samsung.com>
+ <1469779021-10426-1-git-send-email-hl@rock-chips.com>
+Message-ID: <579EFCBE.4080600@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Lin,
 
-On 01-08-16 01:48, Icenowy Zheng wrote:
->
-> Hi,
-> 31.07.2016, 22:30, "Hans de Goede" <hdegoede@redhat.com>:
->> Hi,
->>
->> On 31-07-16 13:02, Icenowy Zheng wrote:
->>>  A64 SoC features a MMC controller which need only the mod clock, and can
->>>  calibrate delay by itself. This patch adds support for the new MMC
->>>  controller IP core.
->>>
->>>  Based on work by Andre Przywara <andre.przywara@arm.com>.
->>>
->>>  Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
->>
->> Looks good, some minor remarks (see comments inline) after those
->> are addressed this is ready to be merged IMHO.
->>
->>>  ---
->>>   drivers/mmc/host/sunxi-mmc.c | 106 ++++++++++++++++++++++++++++++++++++-------
->>>   1 file changed, 90 insertions(+), 16 deletions(-)
->>>
->>>  diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
->>>  index 2ec91ce..aa2abf3 100644
->>>  --- a/drivers/mmc/host/sunxi-mmc.c
->>>  +++ b/drivers/mmc/host/sunxi-mmc.c
->>>  @@ -72,6 +72,14 @@
->>>   #define SDXC_REG_CHDA (0x90)
->>>   #define SDXC_REG_CBDA (0x94)
->>>
->>>  +/* New registers introduced in A64 */
->>>  +#define SDXC_REG_A12A 0x058 /* SMC Auto Command 12 Register */
->>>  +#define SDXC_REG_SD_NTSR 0x05C /* SMC New Timing Set Register */
->>>  +#define SDXC_REG_DRV_DL 0x140 /* Drive Delay Control Register */
->>>  +#define SDXC_REG_SAMP_DL_REG 0x144 /* SMC sample delay control */
->>>  +#define SDXC_REG_DS_DL_REG 0x148 /* SMC data strobe delay control */
->>>  +
->>>  +
->>
->> Please drop 1 empty line here.
-> Thanks for you notice... I forgot to checkout the empty line...
->>
->>>   #define mmc_readl(host, reg) \
->>>           readl((host)->reg_base + SDXC_##reg)
->>>   #define mmc_writel(host, reg, value) \
->>>  @@ -217,6 +225,15 @@
->>>   #define SDXC_CLK_50M_DDR 3
->>>   #define SDXC_CLK_50M_DDR_8BIT 4
->>>
->>>  +#define SDXC_2X_TIMING_MODE BIT(31)
->>>  +
->>>  +#define SDXC_CAL_START BIT(15)
->>>  +#define SDXC_CAL_DONE BIT(14)
->>>  +#define SDXC_CAL_DL_SHIFT 8
->>>  +#define SDXC_CAL_DL_SW_EN BIT(7)
->>>  +#define SDXC_CAL_DL_SW_SHIFT 0
->>>  +#define SDXC_CAL_DL_MASK 0x3f
->>>  +
->>>   struct sunxi_mmc_clk_delay {
->>>           u32 output;
->>>           u32 sample;
->>>  @@ -232,6 +249,9 @@ struct sunxi_idma_des {
->>>   struct sunxi_mmc_cfg {
->>>           u32 idma_des_size_bits;
->>>           const struct sunxi_mmc_clk_delay *clk_delays;
->>>  +
->>
->> I would not insert an empty line here.
-> I'm only feeling that a empty before such a comment line is a
-> kind of separator...
-> (Refer to struct sunxi_mmc_host)
+On 2016? 07? 29? 16:56, Lin Huang wrote:
+> rk3399 platform have dfi controller can monitor ddr load,
+> and dcf controller to handle ddr register so we can get the
+> right ddr frequency and make ddr controller happy work(which
+> will implement in bl31). So we do ddr frequency scaling with
+> following flow:
+> 
+> 	     kernel                                bl31
+> 
+> 	monitor ddr load
+> 		|
+> 		|
+> 	get_target_rate
+> 		|
+> 		|           pass rate to bl31
+> 	clk_set_rate(ddr) --------------------->run dcf flow
+> 		|                                   |
+> 		|                                   |
+> 	wait dcf interrupt<-------------------trigger dcf interrupt  
+> 		|
+> 		|
+> 	      return
+> 
+> Lin Huang (6):
+>   clk: rockchip: add new clock-type for the ddrclk
+>   clk: rockchip: rk3399: add SCLK_DDRCLK ID for ddrc
+>   clk: rockchip: rk3399: add ddrc clock support
+>   PM / devfreq: event: support rockchip dfi controller
+>   PM / devfreq: rockchip: add devfreq driver for rk3399 dmc
+>   drm/rockchip: Add dmc notifier in vop driver
+> 
+> 
+> Heiko St?bner (1):
+>   clk: rockchip: add clock flag parameter when register pll
+> 
+> Lin Huang (6):
+>   clk: rockchip: add new clock-type for the ddrclk
+>   clk: rockchip: rk3399: add SCLK_DDRCLK ID for ddrc
+>   clk: rockchip: rk3399: add ddrc clock support
+>   PM / devfreq: event: support rockchip dfi controller
+>   PM / devfreq: rockchip: add devfreq driver for rk3399 dmc
+>   drm/rockchip: Add dmc notifier in vop driver
 
-Ok.
+The cover-letter includes the duplicate list of patches.
 
->>
->>>  + /* does the IP block support autocalibration? */
->>>  + bool can_calibrate;
->>>   };
->>>
->>>   struct sunxi_mmc_host {
->>>  @@ -657,6 +677,34 @@ static int sunxi_mmc_oclk_onoff(struct sunxi_mmc_host *host, u32 oclk_en)
->>>           return 0;
->>>   }
->>>
->>>  +static int sunxi_mmc_calibrate(struct sunxi_mmc_host *host,
->>>  + struct mmc_ios *ios, int reg_off)
->>>  +{
->>>  + u32 reg = readl(host->reg_base + reg_off);
->>>  + u32 delay;
->>>  +
->>
->> I would add:
->>
->>         if (!host->cfg->can_calibrate)
->>                 return 0;
->>
->> Here; and ...
-> I agree with it. It's some kind of error checking.
->>
->>>  + reg &= ~(SDXC_CAL_DL_MASK << SDXC_CAL_DL_SW_SHIFT);
->>>  + reg &= ~SDXC_CAL_DL_SW_EN;
->>>  +
->>>  + writel(reg | SDXC_CAL_START, host->reg_base + reg_off);
->>>  +
->>>  + dev_dbg(mmc_dev(host->mmc), "calibration started\n");
->>>  +
->>>  + while (!((reg = readl(host->reg_base + reg_off)) & SDXC_CAL_DONE))
->>>  + cpu_relax();
->>>  +
->>>  + delay = (reg >> SDXC_CAL_DL_SHIFT) & SDXC_CAL_DL_MASK;
->>>  +
->>>  + reg &= ~SDXC_CAL_START;
->>>  + reg |= (delay << SDXC_CAL_DL_SW_SHIFT) | SDXC_CAL_DL_SW_EN;
->>>  +
->>>  + writel(reg, host->reg_base + reg_off);
->>>  +
->>>  + dev_dbg(mmc_dev(host->mmc), "calibration ended, res is 0x%x\n", reg);
->>
->> Add:
->>
->>         /* TODO: enable calibrate on sdc2 SDXC_REG_DS_DL_REG of A64 */
->>
->> here; and ...
-> The function only received a register address as a parameter...
-> It do not know the difference between different regs to calibrate.
-
-We can change the parameters the function gets, or even introduce
-a new function once we fix the TODO.
-
-For now we just need a place to put the TODO and this seems like
-the best place.
-
->>
->>>  +
->>>  + return 0;
->>>  +}
->>>  +
->>>   static int sunxi_mmc_clk_set_phase(struct sunxi_mmc_host *host,
->>>                                      struct mmc_ios *ios, u32 rate)
->>>   {
->>>  @@ -727,9 +775,17 @@ static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
->>>           }
->>>           mmc_writel(host, REG_CLKCR, rval);
->>>
->>>  - ret = sunxi_mmc_clk_set_phase(host, ios, rate);
->>>  - if (ret)
->>>  - return ret;
->>
->> Keep this as is; and add:
->>
->>                 ret = sunxi_mmc_calibrate(host, ios, SDXC_REG_SAMP_DL_REG);
->>                 if (ret)
->>                         return ret;
->>
-> It's a good idea :-)
->> Instead of:
->>
->>>  + if (host->cfg->can_calibrate) {
->>>  + ret = sunxi_mmc_calibrate(host, ios, SDXC_REG_SAMP_DL_REG);
->>>  + if (ret)
->>>  + return ret;
->>>  +
->>>  + /* TODO: enable calibrate on sdc2 SDXC_REG_DS_DL_REG of A64 */
->>>  + } else {
->>>  + ret = sunxi_mmc_clk_set_phase(host, ios, rate);
->>>  + if (ret)
->>>  + return ret;
->>>  + }
->>>
->>>           return sunxi_mmc_oclk_onoff(host, 1);
->>>   }
->>>  @@ -982,21 +1038,31 @@ static const struct sunxi_mmc_clk_delay sun9i_mmc_clk_delays[] = {
->>>   static const struct sunxi_mmc_cfg sun4i_a10_cfg = {
->>>           .idma_des_size_bits = 13,
->>>           .clk_delays = NULL,
->>>  + .can_calibrate = false,
->>>   };
->>>
->>>   static const struct sunxi_mmc_cfg sun5i_a13_cfg = {
->>>           .idma_des_size_bits = 16,
->>>           .clk_delays = NULL,
->>>  + .can_calibrate = false,
->>>   };
->>>
->>>   static const struct sunxi_mmc_cfg sun7i_a20_cfg = {
->>>           .idma_des_size_bits = 16,
->>>           .clk_delays = sunxi_mmc_clk_delays,
->>>  + .can_calibrate = false,
->>>   };
->>>
->>>   static const struct sunxi_mmc_cfg sun9i_a80_cfg = {
->>>           .idma_des_size_bits = 16,
->>>           .clk_delays = sun9i_mmc_clk_delays,
->>>  + .can_calibrate = false,
->>>  +};
->>>  +
->>>  +static const struct sunxi_mmc_cfg sun50i_a64_cfg = {
->>>  + .idma_des_size_bits = 16,
->>>  + .clk_delays = NULL,
->>>  + .can_calibrate = true,
->>>   };
->>>
->>>   static const struct of_device_id sunxi_mmc_of_match[] = {
->>>  @@ -1004,6 +1070,7 @@ static const struct of_device_id sunxi_mmc_of_match[] = {
->>>           { .compatible = "allwinner,sun5i-a13-mmc", .data = &sun5i_a13_cfg },
->>>           { .compatible = "allwinner,sun7i-a20-mmc", .data = &sun7i_a20_cfg },
->>>           { .compatible = "allwinner,sun9i-a80-mmc", .data = &sun9i_a80_cfg },
->>>  + { .compatible = "allwinner,sun50i-a64-mmc", .data = &sun50i_a64_cfg },
->>>           { /* sentinel */ }
->>>   };
->>>   MODULE_DEVICE_TABLE(of, sunxi_mmc_of_match);
->>
->> Not sure why all the below hunks are here, they certainly do not belong
->> in this patch; and they are not necessary. As I mentioned in the
->> commit msg of "mmc: sunxi: sun4i / sun5i do not have sample clocks" :
->>
->>     "Note this patch leaves the clk_prepare_enable() / clk_disable_unprepare()
->>      calls to the sample clks as-is, without adding checks for them being
->>      NULL. All the clk_foo calls accept a NULL clk and will return success when
->>      called with a NULL clk."
->>
->> So please drop these.
->>
-> Thanks! I will drop these!
-> (I don't know that the clk functions can accept NULL...)
-
-Great.
+Also, I want to test the build test. but, When I apply these patches,
+merge conflict happen. Could you give the information about base git repository?
 
 Regards,
-
-Hans
-
+Chanwoo Choi
 
 
->
->> Thanks & Regards,
->>
->> Hans
->>
->>>  @@ -1071,16 +1138,18 @@ static int sunxi_mmc_resource_request(struct sunxi_mmc_host *host,
->>>                   goto error_disable_clk_ahb;
->>>           }
->>>
->>>  - ret = clk_prepare_enable(host->clk_output);
->>>  - if (ret) {
->>>  - dev_err(&pdev->dev, "Enable output clk err %d\n", ret);
->>>  - goto error_disable_clk_mmc;
->>>  - }
->>>  + if (host->cfg->clk_delays) {
->>>  + ret = clk_prepare_enable(host->clk_output);
->>>  + if (ret) {
->>>  + dev_err(&pdev->dev, "Enable output clk err %d\n", ret);
->>>  + goto error_disable_clk_mmc;
->>>  + }
->>>
->>>  - ret = clk_prepare_enable(host->clk_sample);
->>>  - if (ret) {
->>>  - dev_err(&pdev->dev, "Enable sample clk err %d\n", ret);
->>>  - goto error_disable_clk_output;
->>>  + ret = clk_prepare_enable(host->clk_sample);
->>>  + if (ret) {
->>>  + dev_err(&pdev->dev, "Enable sample clk err %d\n", ret);
->>>  + goto error_disable_clk_output;
->>>  + }
->>>           }
->>>
->>>           if (!IS_ERR(host->reset)) {
->>>  @@ -1107,9 +1176,11 @@ error_assert_reset:
->>>           if (!IS_ERR(host->reset))
->>>                   reset_control_assert(host->reset);
->>>   error_disable_clk_sample:
->>>  - clk_disable_unprepare(host->clk_sample);
->>>  + if (host->cfg->clk_delays)
->>>  + clk_disable_unprepare(host->clk_sample);
->>>   error_disable_clk_output:
->>>  - clk_disable_unprepare(host->clk_output);
->>>  + if (host->cfg->clk_delays)
->>>  + clk_disable_unprepare(host->clk_output);
->>>   error_disable_clk_mmc:
->>>           clk_disable_unprepare(host->clk_mmc);
->>>   error_disable_clk_ahb:
->>>  @@ -1191,8 +1262,11 @@ static int sunxi_mmc_remove(struct platform_device *pdev)
->>>           if (!IS_ERR(host->reset))
->>>                   reset_control_assert(host->reset);
->>>
->>>  - clk_disable_unprepare(host->clk_sample);
->>>  - clk_disable_unprepare(host->clk_output);
->>>  + if (host->cfg->clk_delays) {
->>>  + clk_disable_unprepare(host->clk_sample);
->>>  + clk_disable_unprepare(host->clk_output);
->>>  + }
->>>  +
->>>           clk_disable_unprepare(host->clk_mmc);
->>>           clk_disable_unprepare(host->clk_ahb);
->
-> Thanks,
-> Icenowy
->
+>  drivers/clk/rockchip/Makefile               |   1 +
+>  drivers/clk/rockchip/clk-ddr.c              | 146 +++++++++
+>  drivers/clk/rockchip/clk-pll.c              |   4 +-
+>  drivers/clk/rockchip/clk-rk3399.c           |  19 ++
+>  drivers/clk/rockchip/clk.c                  |  11 +-
+>  drivers/clk/rockchip/clk.h                  |  29 +-
+>  drivers/devfreq/Kconfig                     |   1 +
+>  drivers/devfreq/Makefile                    |   1 +
+>  drivers/devfreq/event/Kconfig               |   7 +
+>  drivers/devfreq/event/Makefile              |   1 +
+>  drivers/devfreq/event/rockchip-dfi.c        | 253 +++++++++++++++
+>  drivers/devfreq/rockchip/Kconfig            |   8 +
+>  drivers/devfreq/rockchip/Makefile           |   1 +
+>  drivers/devfreq/rockchip/rk3399_dmc.c       | 473 ++++++++++++++++++++++++++++
+>  drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 124 +++++++-
+>  include/dt-bindings/clock/rk3399-cru.h      |   1 +
+>  include/soc/rockchip/rockchip_sip.h         |  27 ++
+>  17 files changed, 1098 insertions(+), 9 deletions(-)
+>  create mode 100644 drivers/clk/rockchip/clk-ddr.c
+>  create mode 100644 drivers/devfreq/event/rockchip-dfi.c
+>  create mode 100644 drivers/devfreq/rockchip/Kconfig
+>  create mode 100644 drivers/devfreq/rockchip/Makefile
+>  create mode 100644 drivers/devfreq/rockchip/rk3399_dmc.c
+>  create mode 100644 include/soc/rockchip/rockchip_sip.h
+> 
