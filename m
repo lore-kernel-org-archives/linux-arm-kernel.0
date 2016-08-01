@@ -1,55 +1,33 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Mon, 1 Aug 2016 08:40:57 +0530
-Subject: [GIT PULL] Mailbox changes for v4.8
-Message-ID: <CABb+yY2MFEPTc_Xi+3sT4pqP3ECXSJ6Tby3BRz-jmFQAPLYxUg@mail.gmail.com>
+From: sunil.kovvuri@gmail.com (Sunil Kovvuri)
+Date: Mon, 1 Aug 2016 08:59:16 +0530
+Subject: [PATCH v3 00/15] net: thunderx: Add support for 81xx and 83xx
+In-Reply-To: <20160731.115455.391582659417641368.davem@davemloft.net>
+References: <1468587500-32103-1-git-send-email-sunil.kovvuri@gmail.com>
+ <CA+sq2Cf4mQdPkOy9cNw6FyAQokKHYjEjMbQF+MuTiE7=3mUtbg@mail.gmail.com>
+ <CA+sq2CcMrU0OcZK7oTF8dtpoojafgjCCA5dBqc6h5RKYZZ2h6Q@mail.gmail.com>
+ <20160731.115455.391582659417641368.davem@davemloft.net>
+Message-ID: <CA+sq2CfGDgw=4VuhUfnKEwKkLrEXxKMWmEX4P5hKSsj4pmBGXA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Understood but unfortunately I don't see these patches in patchwork.
+http://patchwork.ozlabs.org/project/netdev/list/?submitter=&state=*&q=thunderx&archive=both&delegate=
+http://patchwork.ozlabs.org/project/netdev/list/?submitter=62159&state=*&q=&archive=both&delegate=
 
-The following changes since commit 8714f8f5fe396ca513ccaaac2304497439c181fb:
+Thanks,
+Sunil.
 
-  Merge branch 'for-linus' of git://git.kernel.dk/linux-block
-(2016-06-11 18:42:59 -0700)
-
-are available in the git repository at:
-
-  git://git.linaro.org/landing-teams/working/fujitsu/integration.git
-mailbox-for-next
-
-for you to fetch changes up to a68b216676e89fa959a23b583b56f9ce7df81b37:
-
-  mailbox: Fix format and type mismatches in Broadcom PDC driver
-(2016-07-28 21:27:31 +0530)
-
-----------------------------------------------------------------
-- Broadcom
-       New PDC controller driver and bindings
-- Misc
-     PL320 - Convert from 'raw' IO to 'relaxed' version
-     Test - fix dangling pointer
-
-----------------------------------------------------------------
-Ben Dooks (1):
-      mailbox: pl320: remove __raw IO
-
-Rob Rice (3):
-      dt-bindings: add bindings documentation for PDC driver.
-      mailbox: Add Broadcom PDC mailbox driver
-      mailbox: Fix format and type mismatches in Broadcom PDC driver
-
-Sudeep Holla (1):
-      mailbox: mailbox-test: set tdev->signal to NULL after freeing
-
- .../bindings/mailbox/brcm,iproc-pdc-mbox.txt       |   23 +
- drivers/mailbox/Kconfig                            |    9 +
- drivers/mailbox/Makefile                           |    2 +
- drivers/mailbox/bcm-pdc-mailbox.c                  | 1531 ++++++++++++++++++++
- drivers/mailbox/mailbox-test.c                     |    1 +
- drivers/mailbox/pl320-ipc.c                        |   46 +-
- include/linux/mailbox/brcm-message.h               |   56 +
- 7 files changed, 1645 insertions(+), 23 deletions(-)
- create mode 100644
-Documentation/devicetree/bindings/mailbox/brcm,iproc-pdc-mbox.txt
- create mode 100644 drivers/mailbox/bcm-pdc-mailbox.c
- create mode 100644 include/linux/mailbox/brcm-message.h
+On Mon, Aug 1, 2016 at 12:24 AM, David Miller <davem@davemloft.net> wrote:
+> From: Sunil Kovvuri <sunil.kovvuri@gmail.com>
+> Date: Mon, 1 Aug 2016 00:44:08 +0800
+>
+>> A gentle reminder.
+>>
+>> David,
+>> Let me know if I need to resubmit the patches on top of latest net-next.
+>> Will do that.
+>
+> Your patches are marked appropriately in patchwork and tell you everything
+> you need to know about the state of your patch series.
+>
+> You never need to ask me questions like this, ever.
