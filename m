@@ -1,53 +1,58 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Mon, 1 Aug 2016 11:51:17 +0300
-Subject: [GIT PULL] omap-gpmc changes for v4.8 merge window
-In-Reply-To: <20160705052111.GO1669@localhost>
-References: <5770E51B.8040206@ti.com> <20160705052111.GO1669@localhost>
-Message-ID: <edc2a5dc-c831-b05a-5745-c1e361441b41@ti.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Mon, 01 Aug 2016 10:54:07 +0200
+Subject: [PATCH V3 2/5] dts/imx6q-b850v3: Configure IPU assignment order
+In-Reply-To: <7e5985c0b25505eeaf50294ea04ed750c6c0f576.1469993472.git.peter.senna@collabora.com>
+References: <1464626385-19253-1-git-send-email-peter.senna@collabora.com>
+ <cover.1469993472.git.peter.senna@collabora.com>
+ <7e5985c0b25505eeaf50294ea04ed750c6c0f576.1469993472.git.peter.senna@collabora.com>
+Message-ID: <1470041647.6640.3.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/07/16 08:21, Olof Johansson wrote:
-> On Mon, Jun 27, 2016 at 11:34:35AM +0300, Roger Quadros wrote:
->> Hi Arnd/Olof,
->>
->> The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
->>
->>   Linux 4.7-rc1 (2016-05-29 09:29:24 -0700)
->>
->> are available in the git repository at:
->>
->>   https://github.com/rogerq/linux.git gpmc-omap-for-v4.8
->>
->> for you to fetch changes up to 32dd625a9f3541ee6d390f12f810f28531d016c7:
->>
->>   memory: omap-gpmc: Move gpio functions out of #ifdef CONFIG_OF (2016-06-17 10:26:48 +0300)
->>
->> ----------------------------------------------------------------
->> OMAP-GPMC: driver updates for v4.8
->>
->> * Make GPMC driver non modular as it is going to
->> be built-in only till arch/arm/mach-omap2 users
->> are removed.
->>
->> * Fix build if CONFIG_OF is not defined.
+Am Sonntag, den 31.07.2016, 21:55 +0200 schrieb Peter Senna Tschudin:
+> As the IPU has combined limitations across multiple crtcs, and as that
+> can't be communicated to userspace at the moment, reorder the crtcs to
+> allow support to two Full-HD monitors by avoiding assigning two
+> monitors to a single IPU.
 > 
-> Merged into next/drivers.
-> 
->>
->> ----------------------------------------------------------------
->> Paul Gortmaker (1):
->>       memory: omap-gpmc: make it explicitly non-modular
->>
->> Roger Quadros (1):
->>       memory: omap-gpmc: Move gpio functions out of #ifdef CONFIG_OF
->>
->>  drivers/memory/omap-gpmc.c | 136 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-------------------------------------------------------------------------
-> 
-> Tip for the future: If you redirect the output through cat, you get the
-> diffstat at 80 character lines.
+> Cc: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+> Cc: Philipp Zabel <p.zabel@pengutronix.de>
+> Cc: Rob Herring <robh@kernel.org>
+> Cc: Fabio Estevam <fabio.estevam@nxp.com>
+> Signed-off-by: Peter Senna Tschudin <peter.senna@collabora.com>
 
-Thanks :).
+NACK. This is a userspace issue. Changing the assignment order of the
+CRTCs just shifts the failure to a userspace that want to use CRTC 0 and
+2 now.
 
-cheers,
--roger
+imx-drm just got atomic support and with the atomic check it should be
+possible to inform userspace in a reasonable way about such issues.
+
+Regards,
+Lucas
+
+> ---
+> Unchanged from V2.
+> 
+> Changes from V1:
+>  - New commit message
+> 
+>  arch/arm/boot/dts/imx6q-b850v3.dts | 5 +++++
+>  1 file changed, 5 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/imx6q-b850v3.dts b/arch/arm/boot/dts/imx6q-b850v3.dts
+> index 167f744..88a70de 100644
+> --- a/arch/arm/boot/dts/imx6q-b850v3.dts
+> +++ b/arch/arm/boot/dts/imx6q-b850v3.dts
+> @@ -51,6 +51,11 @@
+>  	chosen {
+>  		stdout-path = &uart3;
+>  	};
+> +
+> +	display-subsystem {
+> +		compatible = "fsl,imx-display-subsystem";
+> +		ports = <&ipu1_di0>, <&ipu2_di0>, <&ipu1_di1>, <&ipu2_di1>;
+> +	};
+>  };
+>  
+>  &clks {
