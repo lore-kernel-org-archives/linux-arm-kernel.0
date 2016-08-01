@@ -1,51 +1,313 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Mon, 1 Aug 2016 09:27:12 +0200
-Subject: [PATCH 3/3] ehci-platform: add the max clock number to 4
-In-Reply-To: <414101470035152@web9j.yandex.ru>
-References: <20160731112536.4625-1-icenowy@aosc.xyz>
- <20160731112536.4625-3-icenowy@aosc.xyz> <2477355.hXm3xYUusy@wuerfel>
- <414101470035152@web9j.yandex.ru>
-Message-ID: <01a348da-3b26-68a6-9d9f-c37d81b4fd64@redhat.com>
+Date: Mon, 1 Aug 2016 09:29:40 +0200
+Subject: [PATCH v2 2/2] mmc: host: sunxi: add support for A64 mmc
+ controller
+In-Reply-To: <24941470008912@web11j.yandex.ru>
+References: <20160731110234.3593-1-icenowy@aosc.xyz>
+ <20160731110234.3593-3-icenowy@aosc.xyz>
+ <aaeda3c8-1487-cb6c-bfc6-44a63fed5ea2@redhat.com>
+ <24941470008912@web11j.yandex.ru>
+Message-ID: <deab2689-1341-283a-38b1-f91dfe450e7c@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On 01-08-16 09:05, Icenowy Zheng wrote:
-> 			clocks = <&ccu CLK_A64_BUS_OHCI1>,
-> 				 <&ccu CLK_A64_BUS_EHCI1>,
-> 				 <&ccu CLK_A64_USB_OHCI0>,
-> 				 <&ccu CLK_A64_USB_OHCI1>;
+On 01-08-16 01:48, Icenowy Zheng wrote:
 >
-> On A64, EHCI requires the matched OHCI to work.
+> Hi,
+> 31.07.2016, 22:30, "Hans de Goede" <hdegoede@redhat.com>:
+>> Hi,
+>>
+>> On 31-07-16 13:02, Icenowy Zheng wrote:
+>>>  A64 SoC features a MMC controller which need only the mod clock, and can
+>>>  calibrate delay by itself. This patch adds support for the new MMC
+>>>  controller IP core.
+>>>
+>>>  Based on work by Andre Przywara <andre.przywara@arm.com>.
+>>>
+>>>  Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+>>
+>> Looks good, some minor remarks (see comments inline) after those
+>> are addressed this is ready to be merged IMHO.
+>>
+>>>  ---
+>>>   drivers/mmc/host/sunxi-mmc.c | 106 ++++++++++++++++++++++++++++++++++++-------
+>>>   1 file changed, 90 insertions(+), 16 deletions(-)
+>>>
+>>>  diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
+>>>  index 2ec91ce..aa2abf3 100644
+>>>  --- a/drivers/mmc/host/sunxi-mmc.c
+>>>  +++ b/drivers/mmc/host/sunxi-mmc.c
+>>>  @@ -72,6 +72,14 @@
+>>>   #define SDXC_REG_CHDA (0x90)
+>>>   #define SDXC_REG_CBDA (0x94)
+>>>
+>>>  +/* New registers introduced in A64 */
+>>>  +#define SDXC_REG_A12A 0x058 /* SMC Auto Command 12 Register */
+>>>  +#define SDXC_REG_SD_NTSR 0x05C /* SMC New Timing Set Register */
+>>>  +#define SDXC_REG_DRV_DL 0x140 /* Drive Delay Control Register */
+>>>  +#define SDXC_REG_SAMP_DL_REG 0x144 /* SMC sample delay control */
+>>>  +#define SDXC_REG_DS_DL_REG 0x148 /* SMC data strobe delay control */
+>>>  +
+>>>  +
+>>
+>> Please drop 1 empty line here.
+> Thanks for you notice... I forgot to checkout the empty line...
+>>
+>>>   #define mmc_readl(host, reg) \
+>>>           readl((host)->reg_base + SDXC_##reg)
+>>>   #define mmc_writel(host, reg, value) \
+>>>  @@ -217,6 +225,15 @@
+>>>   #define SDXC_CLK_50M_DDR 3
+>>>   #define SDXC_CLK_50M_DDR_8BIT 4
+>>>
+>>>  +#define SDXC_2X_TIMING_MODE BIT(31)
+>>>  +
+>>>  +#define SDXC_CAL_START BIT(15)
+>>>  +#define SDXC_CAL_DONE BIT(14)
+>>>  +#define SDXC_CAL_DL_SHIFT 8
+>>>  +#define SDXC_CAL_DL_SW_EN BIT(7)
+>>>  +#define SDXC_CAL_DL_SW_SHIFT 0
+>>>  +#define SDXC_CAL_DL_MASK 0x3f
+>>>  +
+>>>   struct sunxi_mmc_clk_delay {
+>>>           u32 output;
+>>>           u32 sample;
+>>>  @@ -232,6 +249,9 @@ struct sunxi_idma_des {
+>>>   struct sunxi_mmc_cfg {
+>>>           u32 idma_des_size_bits;
+>>>           const struct sunxi_mmc_clk_delay *clk_delays;
+>>>  +
+>>
+>> I would not insert an empty line here.
+> I'm only feeling that a empty before such a comment line is a
+> kind of separator...
+> (Refer to struct sunxi_mmc_host)
 
-Ah, so just like on the H3 (where this also is needed
-and not documented).
+Ok.
 
-> And OHCI1 clock requires OHCI0 clock to work.
+>>
+>>>  + /* does the IP block support autocalibration? */
+>>>  + bool can_calibrate;
+>>>   };
+>>>
+>>>   struct sunxi_mmc_host {
+>>>  @@ -657,6 +677,34 @@ static int sunxi_mmc_oclk_onoff(struct sunxi_mmc_host *host, u32 oclk_en)
+>>>           return 0;
+>>>   }
+>>>
+>>>  +static int sunxi_mmc_calibrate(struct sunxi_mmc_host *host,
+>>>  + struct mmc_ios *ios, int reg_off)
+>>>  +{
+>>>  + u32 reg = readl(host->reg_base + reg_off);
+>>>  + u32 delay;
+>>>  +
+>>
+>> I would add:
+>>
+>>         if (!host->cfg->can_calibrate)
+>>                 return 0;
+>>
+>> Here; and ...
+> I agree with it. It's some kind of error checking.
+>>
+>>>  + reg &= ~(SDXC_CAL_DL_MASK << SDXC_CAL_DL_SW_SHIFT);
+>>>  + reg &= ~SDXC_CAL_DL_SW_EN;
+>>>  +
+>>>  + writel(reg | SDXC_CAL_START, host->reg_base + reg_off);
+>>>  +
+>>>  + dev_dbg(mmc_dev(host->mmc), "calibration started\n");
+>>>  +
+>>>  + while (!((reg = readl(host->reg_base + reg_off)) & SDXC_CAL_DONE))
+>>>  + cpu_relax();
+>>>  +
+>>>  + delay = (reg >> SDXC_CAL_DL_SHIFT) & SDXC_CAL_DL_MASK;
+>>>  +
+>>>  + reg &= ~SDXC_CAL_START;
+>>>  + reg |= (delay << SDXC_CAL_DL_SW_SHIFT) | SDXC_CAL_DL_SW_EN;
+>>>  +
+>>>  + writel(reg, host->reg_base + reg_off);
+>>>  +
+>>>  + dev_dbg(mmc_dev(host->mmc), "calibration ended, res is 0x%x\n", reg);
+>>
+>> Add:
+>>
+>>         /* TODO: enable calibrate on sdc2 SDXC_REG_DS_DL_REG of A64 */
+>>
+>> here; and ...
+> The function only received a register address as a parameter...
+> It do not know the difference between different regs to calibrate.
 
-Hmm, that one is new, can you double check this ?
+We can change the parameters the function gets, or even introduce
+a new function once we fix the TODO.
+
+For now we just need a place to put the TODO and this seems like
+the best place.
+
+>>
+>>>  +
+>>>  + return 0;
+>>>  +}
+>>>  +
+>>>   static int sunxi_mmc_clk_set_phase(struct sunxi_mmc_host *host,
+>>>                                      struct mmc_ios *ios, u32 rate)
+>>>   {
+>>>  @@ -727,9 +775,17 @@ static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
+>>>           }
+>>>           mmc_writel(host, REG_CLKCR, rval);
+>>>
+>>>  - ret = sunxi_mmc_clk_set_phase(host, ios, rate);
+>>>  - if (ret)
+>>>  - return ret;
+>>
+>> Keep this as is; and add:
+>>
+>>                 ret = sunxi_mmc_calibrate(host, ios, SDXC_REG_SAMP_DL_REG);
+>>                 if (ret)
+>>                         return ret;
+>>
+> It's a good idea :-)
+>> Instead of:
+>>
+>>>  + if (host->cfg->can_calibrate) {
+>>>  + ret = sunxi_mmc_calibrate(host, ios, SDXC_REG_SAMP_DL_REG);
+>>>  + if (ret)
+>>>  + return ret;
+>>>  +
+>>>  + /* TODO: enable calibrate on sdc2 SDXC_REG_DS_DL_REG of A64 */
+>>>  + } else {
+>>>  + ret = sunxi_mmc_clk_set_phase(host, ios, rate);
+>>>  + if (ret)
+>>>  + return ret;
+>>>  + }
+>>>
+>>>           return sunxi_mmc_oclk_onoff(host, 1);
+>>>   }
+>>>  @@ -982,21 +1038,31 @@ static const struct sunxi_mmc_clk_delay sun9i_mmc_clk_delays[] = {
+>>>   static const struct sunxi_mmc_cfg sun4i_a10_cfg = {
+>>>           .idma_des_size_bits = 13,
+>>>           .clk_delays = NULL,
+>>>  + .can_calibrate = false,
+>>>   };
+>>>
+>>>   static const struct sunxi_mmc_cfg sun5i_a13_cfg = {
+>>>           .idma_des_size_bits = 16,
+>>>           .clk_delays = NULL,
+>>>  + .can_calibrate = false,
+>>>   };
+>>>
+>>>   static const struct sunxi_mmc_cfg sun7i_a20_cfg = {
+>>>           .idma_des_size_bits = 16,
+>>>           .clk_delays = sunxi_mmc_clk_delays,
+>>>  + .can_calibrate = false,
+>>>   };
+>>>
+>>>   static const struct sunxi_mmc_cfg sun9i_a80_cfg = {
+>>>           .idma_des_size_bits = 16,
+>>>           .clk_delays = sun9i_mmc_clk_delays,
+>>>  + .can_calibrate = false,
+>>>  +};
+>>>  +
+>>>  +static const struct sunxi_mmc_cfg sun50i_a64_cfg = {
+>>>  + .idma_des_size_bits = 16,
+>>>  + .clk_delays = NULL,
+>>>  + .can_calibrate = true,
+>>>   };
+>>>
+>>>   static const struct of_device_id sunxi_mmc_of_match[] = {
+>>>  @@ -1004,6 +1070,7 @@ static const struct of_device_id sunxi_mmc_of_match[] = {
+>>>           { .compatible = "allwinner,sun5i-a13-mmc", .data = &sun5i_a13_cfg },
+>>>           { .compatible = "allwinner,sun7i-a20-mmc", .data = &sun7i_a20_cfg },
+>>>           { .compatible = "allwinner,sun9i-a80-mmc", .data = &sun9i_a80_cfg },
+>>>  + { .compatible = "allwinner,sun50i-a64-mmc", .data = &sun50i_a64_cfg },
+>>>           { /* sentinel */ }
+>>>   };
+>>>   MODULE_DEVICE_TABLE(of, sunxi_mmc_of_match);
+>>
+>> Not sure why all the below hunks are here, they certainly do not belong
+>> in this patch; and they are not necessary. As I mentioned in the
+>> commit msg of "mmc: sunxi: sun4i / sun5i do not have sample clocks" :
+>>
+>>     "Note this patch leaves the clk_prepare_enable() / clk_disable_unprepare()
+>>      calls to the sample clks as-is, without adding checks for them being
+>>      NULL. All the clk_foo calls accept a NULL clk and will return success when
+>>      called with a NULL clk."
+>>
+>> So please drop these.
+>>
+> Thanks! I will drop these!
+> (I don't know that the clk functions can accept NULL...)
+
+Great.
 
 Regards,
 
 Hans
 
 
+
 >
-> (But from the SoC's user manual we cannot get any infomation
-> about the relationship between OHCI1 clock and OHCI0 clock,
-> and in the manual OHCI0 clock is called OTG-OHCI)
->
-> 01.08.2016, 15:01, "Arnd Bergmann" <arnd@arndb.de>:
->> On Sunday, July 31, 2016 7:25:36 PM CEST Icenowy Zheng wrote:
->>>  Allwinner A64 EHCI requires 4 clocks to be enabled.
+>> Thanks & Regards,
+>>
+>> Hans
+>>
+>>>  @@ -1071,16 +1138,18 @@ static int sunxi_mmc_resource_request(struct sunxi_mmc_host *host,
+>>>                   goto error_disable_clk_ahb;
+>>>           }
 >>>
->>>  Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
->>
->> Can you say what those four clocks are?
->>
->> Are you sure that it's not just a case of a clock being
->> incorrectly described in the clk driver, i.e. you reference
->> one clock along with its parent here?
->>
->>         Arnd
+>>>  - ret = clk_prepare_enable(host->clk_output);
+>>>  - if (ret) {
+>>>  - dev_err(&pdev->dev, "Enable output clk err %d\n", ret);
+>>>  - goto error_disable_clk_mmc;
+>>>  - }
+>>>  + if (host->cfg->clk_delays) {
+>>>  + ret = clk_prepare_enable(host->clk_output);
+>>>  + if (ret) {
+>>>  + dev_err(&pdev->dev, "Enable output clk err %d\n", ret);
+>>>  + goto error_disable_clk_mmc;
+>>>  + }
+>>>
+>>>  - ret = clk_prepare_enable(host->clk_sample);
+>>>  - if (ret) {
+>>>  - dev_err(&pdev->dev, "Enable sample clk err %d\n", ret);
+>>>  - goto error_disable_clk_output;
+>>>  + ret = clk_prepare_enable(host->clk_sample);
+>>>  + if (ret) {
+>>>  + dev_err(&pdev->dev, "Enable sample clk err %d\n", ret);
+>>>  + goto error_disable_clk_output;
+>>>  + }
+>>>           }
+>>>
+>>>           if (!IS_ERR(host->reset)) {
+>>>  @@ -1107,9 +1176,11 @@ error_assert_reset:
+>>>           if (!IS_ERR(host->reset))
+>>>                   reset_control_assert(host->reset);
+>>>   error_disable_clk_sample:
+>>>  - clk_disable_unprepare(host->clk_sample);
+>>>  + if (host->cfg->clk_delays)
+>>>  + clk_disable_unprepare(host->clk_sample);
+>>>   error_disable_clk_output:
+>>>  - clk_disable_unprepare(host->clk_output);
+>>>  + if (host->cfg->clk_delays)
+>>>  + clk_disable_unprepare(host->clk_output);
+>>>   error_disable_clk_mmc:
+>>>           clk_disable_unprepare(host->clk_mmc);
+>>>   error_disable_clk_ahb:
+>>>  @@ -1191,8 +1262,11 @@ static int sunxi_mmc_remove(struct platform_device *pdev)
+>>>           if (!IS_ERR(host->reset))
+>>>                   reset_control_assert(host->reset);
+>>>
+>>>  - clk_disable_unprepare(host->clk_sample);
+>>>  - clk_disable_unprepare(host->clk_output);
+>>>  + if (host->cfg->clk_delays) {
+>>>  + clk_disable_unprepare(host->clk_sample);
+>>>  + clk_disable_unprepare(host->clk_output);
+>>>  + }
+>>>  +
+>>>           clk_disable_unprepare(host->clk_mmc);
+>>>           clk_disable_unprepare(host->clk_ahb);
+>
+> Thanks,
+> Icenowy
+>
