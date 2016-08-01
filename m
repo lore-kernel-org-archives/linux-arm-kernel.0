@@ -1,95 +1,45 @@
-From: lina.iyer@linaro.org (Lina Iyer)
-Date: Mon, 1 Aug 2016 08:53:03 -0600
-Subject: [PATCH v2 14/14] ARM64: dts: Define CPU power domain for MSM8916
-In-Reply-To: <1469829385-11511-15-git-send-email-lina.iyer@linaro.org>
-References: <1469829385-11511-1-git-send-email-lina.iyer@linaro.org>
- <1469829385-11511-15-git-send-email-lina.iyer@linaro.org>
-Message-ID: <20160801145303.GH1369@linaro.org>
+From: stillcompiling@gmail.com (Joshua Clayton)
+Date: Mon, 1 Aug 2016 07:55:10 -0700
+Subject: [PATCH v3 0/6] power: add power sequence library
+In-Reply-To: <CAOMZO5Dv_X-u6qKqAWtysAqmMw91bVoAaRvnc81yUGDxbd27rA@mail.gmail.com>
+References: <1469007629-31757-1-git-send-email-peter.chen@nxp.com>
+ <579A2B38.3000202@gmail.com>
+ <CAOMZO5Dv_X-u6qKqAWtysAqmMw91bVoAaRvnc81yUGDxbd27rA@mail.gmail.com>
+Message-ID: <579F62CE.1050900@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 29 2016 at 15:57 -0600, Lina Iyer wrote:
->Define power domain and the power states for the domain as defined by
->the PSCI firmware. The 8916 firmware supports OS initiated method of
->powering off the CPU clusters.
->
->Cc: <devicetree@vger.kernel.org>
->Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
->---
-> arch/arm64/boot/dts/qcom/msm8916.dtsi | 27 +++++++++++++++++++++++++++
-> 1 file changed, 27 insertions(+)
->
->diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
->index 3029773..d122fa1 100644
->--- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
->+++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
->@@ -64,6 +64,7 @@
-> 			next-level-cache = <&L2_0>;
-> 			enable-method = "psci";
-> 			cpu-idle-states = <&CPU_SPC>;
->+			power-domains = <&CPU_PD>;
-> 		};
->
-> 		CPU1: cpu at 1 {
->@@ -73,6 +74,7 @@
-> 			next-level-cache = <&L2_0>;
-> 			enable-method = "psci";
-> 			cpu-idle-states = <&CPU_SPC>;
->+			power-domains = <&CPU_PD>;
-> 		};
->
-> 		CPU2: cpu at 2 {
->@@ -82,6 +84,7 @@
-> 			next-level-cache = <&L2_0>;
-> 			enable-method = "psci";
-> 			cpu-idle-states = <&CPU_SPC>;
->+			power-domains = <&CPU_PD>;
-> 		};
->
-> 		CPU3: cpu at 3 {
->@@ -91,6 +94,7 @@
-> 			next-level-cache = <&L2_0>;
-> 			enable-method = "psci";
-> 			cpu-idle-states = <&CPU_SPC>;
->+			power-domains = <&CPU_PD>;
-> 		};
->
-> 		L2_0: l2-cache {
->@@ -110,6 +114,29 @@
-> 		};
-> 	};
->
->+	CPU_PD: cpu-pd at 0 {
->+		#power-domain-cells = <0>;
->+		domain-idle-states = <&CLUSTER_RET>, <&CLUSTER_PWR_DWN>;
->+	};
->+
->+	cpu-domain-states {
-I think, these state nodes should be a child of the psci node.
 
-Mark, do you think, that makes sense?
 
--- Lina
->+		CLUSTER_RET: domain_ret {
->+			compatible = "arm,idle-state";
->+			arm,psci-suspend-param = <0x1000010>;
->+			entry-latency-us = <500>;
->+			exit-latency-us = <500>;
->+			residency-us = <2000>;
->+		 };
->+
->+		CLUSTER_PWR_DWN: domain_gdhs {
->+			compatible = "arm,idle-state";
->+			arm,psci-suspend-param = <0x1000030>;
->+			entry-latency-us = <2000>;
->+			exit-latency-us = <2000>;
->+			residency-us = <6000>;
->+		};
->+	};
->+
-> 	psci {
-> 		compatible = "arm,psci-1.0";
-> 		method = "smc";
->-- 
->2.7.4
+On 07/28/2016 09:41 AM, Fabio Estevam wrote:
+> Hi Joshua,
 >
+> On Thu, Jul 28, 2016 at 12:56 PM, Joshua Clayton
+> <stillcompiling@gmail.com> wrote:
+>
+>> I assume there is a v4 coming due to rmk's comments on patch 5.
+>> I couldn't figure out where to null the of_node in error paths, but in testing
+>> we did put a line of code to null the of_node on release.
+>>
+>> but...
+>> As an aside,
+>> I was hoping this series would magically fix a problem
+>> with the imx6q-evi which has forced us to disable
+>> runtime power management. But it did not. :(
+> I also see a similar problem on a mx28 board with a hub.
+>
+> Does it help in your case if you pass 'usbcore.autosuspend=-1' in the
+> kernel command line?
+>
+> Regards,
+>
+> Fabio Estevam
+Thanks a million, Fabio!
+
+'usbcore.autosuspend=-1' quiets the errors.
+
+~joshua
+
+P.S. I guess this technically is a bug in chipidea usb.
+I'll give it a quick once over, though I am not very familiar
+with USB core or the CI driver.
