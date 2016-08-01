@@ -1,156 +1,99 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Mon, 01 Aug 2016 19:31:20 +0900
-Subject: [PATCH v4 5/7] PM / devfreq: event: support rockchip dfi
- controller
-In-Reply-To: <579F07D9.1050106@rock-chips.com>
-References: <1469779021-10426-1-git-send-email-hl@rock-chips.com>
- <CGME20160729075807epcas1p23ff4e931fe4f4cef2bcf59540394bf28@epcas1p2.samsung.com>
- <1469779021-10426-6-git-send-email-hl@rock-chips.com>
- <579EFD28.5070404@samsung.com> <579F0387.5070303@samsung.com>
- <579F07D9.1050106@rock-chips.com>
-Message-ID: <579F24F8.8060002@samsung.com>
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Mon, 1 Aug 2016 12:39:44 +0200
+Subject: [PATCH v3 5/9] vcodec: mediatek: Add Mediatek V4L2 Video Decoder
+ Driver
+In-Reply-To: <1470044307.30651.18.camel@mtksdaap41>
+References: <1464611363-14936-1-git-send-email-tiffany.lin@mediatek.com>
+ <1464611363-14936-2-git-send-email-tiffany.lin@mediatek.com>
+ <1464611363-14936-3-git-send-email-tiffany.lin@mediatek.com>
+ <1464611363-14936-4-git-send-email-tiffany.lin@mediatek.com>
+ <1464611363-14936-5-git-send-email-tiffany.lin@mediatek.com>
+ <1464611363-14936-6-git-send-email-tiffany.lin@mediatek.com>
+ <32112952-6a34-ac8b-9d06-198c6c653611@xs4all.nl>
+ <1470044307.30651.18.camel@mtksdaap41>
+Message-ID: <8bd71dee-62ec-beba-c1d1-fc7e586d593b@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lin,
+Hi Tiffany,
 
-On 2016? 08? 01? 17:27, hl wrote:
-> Hi Chanwoo Choi,
-> 
-> On 2016?08?01? 16:08, Chanwoo Choi wrote:
->> Hi Lin,
+On 08/01/2016 11:38 AM, Tiffany Lin wrote:
+> Hi Hans,
+
+<snip>
+
+>>> +static int vidioc_vdec_g_selection(struct file *file, void *priv,
+>>> +			struct v4l2_selection *s)
+>>> +{
+>>> +	struct mtk_vcodec_ctx *ctx = fh_to_ctx(priv);
+>>> +
+>>> +	if (V4L2_TYPE_IS_OUTPUT(s->type))
+>>> +		return -EINVAL;
+>>> +
+>>> +	if (s->target != V4L2_SEL_TGT_CROP)
+>>> +		return -EINVAL;
 >>
->> I add the one minor comment for full name of 'DRI'.
+>> How does the cropping rectangle relate to the format size? There is no s_selection,
+>> so this doesn't make sense.
 >>
->> On 2016? 08? 01? 16:41, Chanwoo Choi wrote:
->>> Hi Lin,
->>>
->>> Because you remove the 'RFC' prefix on patch title,
->>> I think that you better to make the documentation as following:
->>> - Documentation/devicetree/bindings/devfreq/event/rockchip-dfi.txt
->>>
->>> Regards,
->>> Chanwoo Choi
->>>
->>> On 2016? 07? 29? 16:56, Lin Huang wrote:
->>>> on rk3399 platform, there is dfi conroller can monitor
->>>> ddr load, base on this result, we can do ddr freqency
->>>> scaling.
->>>>
->>>> Signed-off-by: Lin Huang <hl@rock-chips.com>
->>>> Acked-by: Chanwoo Choi <cw00.choi@samsung.com>
->>>> ---
->>>> Changes in v4:
->>>> - None
->>>>
->>>> Changes in v3:
->>>> - None
->>>>
->>>> Changes in v2:
->>>> - use clk_disable_unprepare and clk_enable_prepare
->>>> - remove clk_enable_prepare in probe
->>>> - remove rockchip_dfi_remove function
->>>>
->>>> Changes in v1:
->>>> - None
->>>>
->>>>   drivers/devfreq/event/Kconfig        |   7 +
->>>>   drivers/devfreq/event/Makefile       |   1 +
->>>>   drivers/devfreq/event/rockchip-dfi.c | 253 +++++++++++++++++++++++++++++++++++
->>>>   3 files changed, 261 insertions(+)
->>>>   create mode 100644 drivers/devfreq/event/rockchip-dfi.c
->>>>
->>>> diff --git a/drivers/devfreq/event/Kconfig b/drivers/devfreq/event/Kconfig
->>>> index a11720a..ff9279f 100644
->>>> --- a/drivers/devfreq/event/Kconfig
->>>> +++ b/drivers/devfreq/event/Kconfig
->>>> @@ -22,4 +22,11 @@ config DEVFREQ_EVENT_EXYNOS_PPMU
->>>>         (Platform Performance Monitoring Unit) counters to estimate the
->>>>         utilization of each module.
->>>>   +config DEVFREQ_EVENT_ROCKCHIP_DFI
->>>> +    tristate "ROCKCHIP DFI DEVFREQ event Driver"
->>>> +    depends on ARCH_ROCKCHIP
->>>> +    help
->>>> +      This add the devfreq-event driver for Rockchip SoC. It provides DFI
->>>> +      (DDR Monitor Module) driver to count ddr load.
->> The DFI is "DDR Monitor Module" full name? I need the correct abbreviation
->> and full name.
-> We just call this module DFI in datasheet, and this module function is ddr monitor module,
-> yes, it is do not fit the full name, but i think it is better follow the datasheet name.
+> I want to return encoded crop information or real display region that
+> display driver could know where is padding region.
 
-Are there any full name of DFI? If the people who don't know the detailed history about
-this workd (DFI), it causes the confusion and they don't understand it.
+Sorry, I don't understand this.
 
-I think that if you want to use the DFI work, you need to add the more detailed description
-why DFI word is used.
+This is a decoder, so based on the bitstream it decodes to a certain width
+and height. I assume that is what you refer to as coded_width and coded_height?
 
->>
->>>> +
->>>>   endif # PM_DEVFREQ_EVENT
->>>> diff --git a/drivers/devfreq/event/Makefile b/drivers/devfreq/event/Makefile
->>>> index be146ea..e3f88fc 100644
->>>> --- a/drivers/devfreq/event/Makefile
->>>> +++ b/drivers/devfreq/event/Makefile
->>>> @@ -1,2 +1,3 @@
->>>>   # Exynos DEVFREQ Event Drivers
->>>>   obj-$(CONFIG_DEVFREQ_EVENT_EXYNOS_PPMU) += exynos-ppmu.o
->>>> +obj-$(CONFIG_DEVFREQ_EVENT_ROCKCHIP_DFI) += rockchip-dfi.o
->>>> diff --git a/drivers/devfreq/event/rockchip-dfi.c b/drivers/devfreq/event/rockchip-dfi.c
->>>> new file mode 100644
->>>> index 0000000..96a0307
->>>> --- /dev/null
->>>> +++ b/drivers/devfreq/event/rockchip-dfi.c
->>>> @@ -0,0 +1,253 @@
->>>> +/*
->>>> + * Copyright (c) 2016, Fuzhou Rockchip Electronics Co., Ltd
->>>> + * Author: Lin Huang <hl@rock-chips.com>
->>>> + *
->>>> + * This program is free software; you can redistribute it and/or modify it
->>>> + * under the terms and conditions of the GNU General Public License,
->>>> + * version 2, as published by the Free Software Foundation.
->>>> + *
->>>> + * This program is distributed in the hope it will be useful, but WITHOUT
->>>> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
->>>> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
->>>> + * more details.
->>>> + */
->>>> +
->>>> +#include <linux/clk.h>
->>>> +#include <linux/devfreq-event.h>
->>>> +#include <linux/kernel.h>
->>>> +#include <linux/err.h>
->>>> +#include <linux/init.h>
->>>> +#include <linux/io.h>
->>>> +#include <linux/mfd/syscon.h>
->>>> +#include <linux/module.h>
->>>> +#include <linux/platform_device.h>
->>>> +#include <linux/regmap.h>
->>>> +#include <linux/slab.h>
->>>> +#include <linux/list.h>
->>>> +#include <linux/of.h>
->>>> +
->>>> +#define RK3399_DMC_NUM_CH    2
->>>> +
->>>> +/* DDRMON_CTRL */
->>>> +#define DDRMON_CTRL    0x04
->>>> +#define CLR_DDRMON_CTRL    (0x1f0000 << 0)
->>>> +#define LPDDR4_EN    (0x10001 << 4)
->>>> +#define HARDWARE_EN    (0x10001 << 3)
->>>> +#define LPDDR3_EN    (0x10001 << 2)
->>>> +#define SOFTWARE_EN    (0x10001 << 1)
->>>> +#define TIME_CNT_EN    (0x10001 << 0)
+If so, then what is the 'real display region' and how does it relate to the
+coded width/height?
 
-[snip]
-
->>>> +};
->>>> +module_platform_driver(rockchip_dfi_driver);
->>>> +
->>>> +MODULE_LICENSE("GPL v2");
->>>> +MODULE_AUTHOR("Lin Huang <hl@rock-chips.com>");
->>>> +MODULE_DESCRIPTION("Rockchip dfi driver");
->> s/dfi -> DFI
-
-You should use the capital letter.
+This is probably a terminology issue but I need to understand this before I
+can decide what should be done here.
 
 Regards,
-Chanwoo Choi
+
+	Hans
+
+> User space use s_fmt/g_fmt  to set/get coded_width and coded_height, and
+> use g_crop to get real display region.
+> That's why I do not add s_selection.
+> 
+>> Alternatively, it could be that you are really returning V4L2_SEL_TGT_COMPOSE_PADDED.
+>>
+> 
+> V4L2_SEL_TGT_COMPOSE_PADDED means
+> "The active area and all padding pixels that are inserted or modified by
+> hardware."
+> But I just want to return active area to user space.
+> 
+>>> +
+>>> +	if (ctx->state < MTK_STATE_HEADER)
+>>> +		return -EINVAL;
+>>> +
+>>> +	if ((ctx->q_data[MTK_Q_DATA_SRC].fmt->fourcc == V4L2_PIX_FMT_H264) ||
+>>> +	    (ctx->q_data[MTK_Q_DATA_SRC].fmt->fourcc == V4L2_PIX_FMT_VP8) ||
+>>> +	    (ctx->q_data[MTK_Q_DATA_SRC].fmt->fourcc == V4L2_PIX_FMT_VP9)) {
+>>> +
+>>> +		if (vdec_if_get_param(ctx, GET_PARAM_CROP_INFO, &(s->r))) {
+>>> +			mtk_v4l2_debug(2,
+>>> +					"[%d]Error!! Cannot get param : GET_PARAM_CROP_INFO ERR",
+>>> +					ctx->id);
+>>> +			s->r.left = 0;
+>>> +			s->r.top = 0;
+>>> +			s->r.width = ctx->picinfo.buf_w;
+>>> +			s->r.height = ctx->picinfo.buf_h;
+>>> +		}
+>>> +		mtk_v4l2_debug(2, "Cropping info: l=%d t=%d w=%d h=%d",
+>>> +				s->r.left, s->r.top, s->r.width,
+>>> +				s->r.height);
+>>> +	} else {
+>>> +		s->r.left = 0;
+>>> +		s->r.top = 0;
+>>> +		s->r.width = ctx->picinfo.pic_w;
+>>> +		s->r.height = ctx->picinfo.pic_h;
+>>> +		mtk_v4l2_debug(2, "Cropping info: w=%d h=%d fw=%d fh=%d",
+>>> +				s->r.width, s->r.height, ctx->picinfo.buf_w,
+>>> +				ctx->picinfo.buf_h);
+>>> +	}
+>>> +	return 0;
+>>> +}
