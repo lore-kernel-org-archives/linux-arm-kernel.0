@@ -1,45 +1,57 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 1 Aug 2016 16:30:19 +0100
-Subject: [PATCH v2] mmc: sunxi: Handle the 'New Timings'
-In-Reply-To: <E1bUDNG-0000pR-Fv@bombadil.infradead.org>
-References: <E1bUDNG-0000pR-Fv@bombadil.infradead.org>
-Message-ID: <20160801153016.GB17146@leverpostej>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 1 Aug 2016 17:32:11 +0200
+Subject: [PATCH] ARM: dts: at91: sama5d4ek: remove useless lcd_bus
+In-Reply-To: <1468433313-8192-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1468433313-8192-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <579F6B7B.9050201@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 01, 2016 at 03:10:29PM +0200, Jean-Francois Moine wrote:
-> Some MMC devices as mmc2 in the A83T or mmc1 and mmc2 in the H3 have
-> a 'New Timings' mode.
-> Set this capacity in the DT and use it when possible.
-
-What exactly is this "New Timings" mode?
-
-Why do we wnat to set it? Improved performance, power?
-
-Is it *necessary* to use it?
-
-> Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
-> ---
-> I don't know if this mode works or is needed at 25MHz.
-> ---
->  Documentation/devicetree/bindings/mmc/sunxi-mmc.txt |  1 +
->  drivers/mmc/host/sunxi-mmc.c                        | 21 +++++++++++++++++++--
->  2 files changed, 20 insertions(+), 2 deletions(-)
+Le 13/07/2016 20:08, Alexandre Belloni a ?crit :
+> lcd_bus has never been mainlined and is replaced by the atmel_hlcdc driver.
+> Remove stale nodes.
 > 
-> diff --git a/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt b/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt
-> index 4bf41d8..a541bf4 100644
-> --- a/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt
-> +++ b/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt
-> @@ -19,6 +19,7 @@ Optional properties:
->   - reset-names : must contain "ahb"
->   - for cd, bus-width and additional generic mmc parameters
->     please refer to mmc.txt within this directory
-> + - allwinner,new-timings: the controller may accept the "New Timings" mode
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
-It's not at all clear to me what this means. This needs a better
-description.
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-Which devices have this? Can we determine this based on compatible
-string?
+> ---
+>  arch/arm/boot/dts/at91-sama5d4ek.dts | 20 --------------------
+>  1 file changed, 20 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/at91-sama5d4ek.dts b/arch/arm/boot/dts/at91-sama5d4ek.dts
+> index 4e98cda97403..f8b96cef5e1a 100644
+> --- a/arch/arm/boot/dts/at91-sama5d4ek.dts
+> +++ b/arch/arm/boot/dts/at91-sama5d4ek.dts
+> @@ -69,26 +69,6 @@
+>  
+>  	ahb {
+>  		apb {
+> -			lcd_bus at f0000000 {
+> -				status = "okay";
+> -
+> -				lcd at f0000000 {
+> -					status = "okay";
+> -				};
+> -
+> -				lcdovl1 at f0000140 {
+> -					status = "okay";
+> -				};
+> -
+> -				lcdovl2 at f0000240 {
+> -					status = "okay";
+> -				};
+> -
+> -				lcdheo1 at f0000340 {
+> -					status = "okay";
+> -				};
+> -			};
+> -
+>  			adc0: adc at fc034000 {
+>  				pinctrl-names = "default";
+>  				pinctrl-0 = <
+> 
 
-Mark.
+
+-- 
+Nicolas Ferre
