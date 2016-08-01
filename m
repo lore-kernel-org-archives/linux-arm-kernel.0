@@ -1,17 +1,19 @@
 From: zhengxing@rock-chips.com (Xing Zheng)
-Date: Mon,  1 Aug 2016 17:53:37 +0800
-Subject: [RESEND PATCH v2 2/8] clk: rockchip: rk3399: export 480M_SRC clock id
- for usbphy0/usbphy1
+Date: Mon,  1 Aug 2016 17:53:38 +0800
+Subject: [RESEND PATCH v2 3/8] clk: rockchip: rk3399: fix incorrect parent for
+ rk3399's {c, g}pll_aclk_perihp_src
 In-Reply-To: <1470045224-31854-1-git-send-email-zhengxing@rock-chips.com>
 References: <1470045224-31854-1-git-send-email-zhengxing@rock-chips.com>
-Message-ID: <1470045224-31854-3-git-send-email-zhengxing@rock-chips.com>
+Message-ID: <1470045224-31854-4-git-send-email-zhengxing@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Export these source clocks for usbphy.
+There was a typo, swapping 'c' <--> 'g'.
+(This patch is updated and am from https://patchwork.kernel.org/patch/9254067/)
 
 Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
-
+Signed-off-by: Brian Norris <briannorris@chromium.org>
+Reviewed-by: Douglas Anderson <dianders@chromium.org>
 ---
 
 Changes in v2: None
@@ -20,20 +22,20 @@ Changes in v2: None
  1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/clk/rockchip/clk-rk3399.c b/drivers/clk/rockchip/clk-rk3399.c
-index 78e51cb..f55f967f 100644
+index f55f967f..2182391 100644
 --- a/drivers/clk/rockchip/clk-rk3399.c
 +++ b/drivers/clk/rockchip/clk-rk3399.c
-@@ -403,9 +403,9 @@ static struct rockchip_clk_branch rk3399_clk_branches[] __initdata = {
- 	GATE(SCLK_USB2PHY1_REF, "clk_usb2phy1_ref", "xin24m", CLK_IGNORE_UNUSED,
- 			RK3399_CLKGATE_CON(6), 6, GFLAGS),
+@@ -832,9 +832,9 @@ static struct rockchip_clk_branch rk3399_clk_branches[] __initdata = {
+ 			RK3399_CLKGATE_CON(13), 1, GFLAGS),
  
--	GATE(0, "clk_usbphy0_480m_src", "clk_usbphy0_480m", CLK_IGNORE_UNUSED,
-+	GATE(SCLK_USBPHY0_480M_SRC, "clk_usbphy0_480m_src", "clk_usbphy0_480m", CLK_IGNORE_UNUSED,
- 			RK3399_CLKGATE_CON(13), 12, GFLAGS),
--	GATE(0, "clk_usbphy1_480m_src", "clk_usbphy1_480m", CLK_IGNORE_UNUSED,
-+	GATE(SCLK_USBPHY1_480M_SRC, "clk_usbphy1_480m_src", "clk_usbphy1_480m", CLK_IGNORE_UNUSED,
- 			RK3399_CLKGATE_CON(13), 12, GFLAGS),
- 	MUX(0, "clk_usbphy_480m", mux_usbphy_480m_p, CLK_IGNORE_UNUSED,
- 			RK3399_CLKSEL_CON(14), 6, 1, MFLAGS),
+ 	/* perihp */
+-	GATE(0, "cpll_aclk_perihp_src", "gpll", CLK_IGNORE_UNUSED,
++	GATE(0, "cpll_aclk_perihp_src", "cpll", CLK_IGNORE_UNUSED,
+ 			RK3399_CLKGATE_CON(5), 0, GFLAGS),
+-	GATE(0, "gpll_aclk_perihp_src", "cpll", CLK_IGNORE_UNUSED,
++	GATE(0, "gpll_aclk_perihp_src", "gpll", CLK_IGNORE_UNUSED,
+ 			RK3399_CLKGATE_CON(5), 1, GFLAGS),
+ 	COMPOSITE(ACLK_PERIHP, "aclk_perihp", mux_aclk_perihp_p, CLK_IGNORE_UNUSED,
+ 			RK3399_CLKSEL_CON(14), 7, 1, MFLAGS, 0, 5, DFLAGS,
 -- 
 1.7.9.5
