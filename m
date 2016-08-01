@@ -1,22 +1,18 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon,  1 Aug 2016 14:39:24 -0700
-Subject: [GIT PULL 3/7] ARM: SoC 64-bit changes for v4.8
+Date: Mon,  1 Aug 2016 14:39:25 -0700
+Subject: [GIT PULL 4/7] ARM: SoC defconfig updates for v4.8
 In-Reply-To: <1470087568-4222-1-git-send-email-olof@lixom.net>
 References: <1470087568-4222-1-git-send-email-olof@lixom.net>
-Message-ID: <1470087568-4222-4-git-send-email-olof@lixom.net>
+Message-ID: <1470087568-4222-5-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Changes to platform code for 64-bit ARM platforms.
+Defconfig additions, removals, etc. Most of these are small changes adding
+the options for newly upstreamed drivers, or drivers needed for new board
+support.
 
-Nearlt all of these are defconfig updates to enable new drivers or old
-drivers still used on these 64-bit platforms.
-
-Added platforms for this release are:
-
-- Broadcom BCM2837
-- Renesas R8A7796
-
+- Removed Broadcom bcm_defconfig, targets are all covered in multi_v7_defconfig
+- New defconfig: multi_v4t_defconfig
 
 
 Conflicts:
@@ -25,101 +21,144 @@ None
 
 ----------------------------------------------------------------
 
-The following changes since commit bb7e7cc3d1f576a01ff64fdfe8d2986c29183220:
+The following changes since commit 993595177ce9565aa9f6f7a914a2e7b5a1c86262:
 
-  Merge branch 'next/soc' into HEAD
+  Merge branch 'next/arm64' into HEAD
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/armsoc-arm64
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/armsoc-defconfig
 
-for you to fetch changes up to 7e03e116e7603fa30e150df889e8daccd429facf:
+for you to fetch changes up to 772a7f22978bccb88b8ba2685a9f37648da615fc:
 
-  arm64: remove duplicate PWM entry in defconfig
+  Merge tag 'omap-for-v4.8/defconfig-v2-signed' of git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap into next/defconfig
 
 ----------------------------------------------------------------
 
-Alexander Graf (1):
-      arm64: Allow for different DMA and CPU bus offsets
+Alexander Shiyan (1):
+      ARM: config: Add a multi_v4t_defconfig
 
-Alim Akhtar (1):
-      arm64: defconfig: Enable S2MPS11 clock and S3C RTC driver
+Alexandre Belloni (2):
+      ARM: multi_v5_defconfig: enable Atmel platforms
+      ARM: multi_v7_defconfig: add ACT8945A
 
-Andy Gross (1):
-      arm: defconfig: Enable PM8941 pwr key
+Andrzej Hajda (1):
+      ARM: multi_v7_defconfig: Enable Exynos DRM Mixer driver
 
-Ard Biesheuvel (1):
-      arm64: defconfig: disable plain NEON implementation of AES
+Arnd Bergmann (4):
+      Merge tag 'at91-ab-4.8-defconfig2' of git://git.kernel.org/.../abelloni/linux into next/defconfig
+      Merge tag 'sunxi-defconfig-for-4.8' of https://git.kernel.org/.../mripard/linux into next/defconfig
+      Merge tag 'sti-defconfig-for-v4.8' of git://git.kernel.org/.../pchotard/sti into next/defconfig
+      Merge tag 'omap-for-v4.8/defconfig-v2-signed' of git://git.kernel.org/.../tmlind/linux-omap into next/defconfig
 
-Arnd Bergmann (5):
-      Merge tag 'mvebu-arm64-4.8-1' of git://git.infradead.org/linux-mvebu into next/arm64
-      Merge tag 'arm-soc/for-4.8/soc-arm64-part2' of http://github.com/Broadcom/stblinux into next/arm64
-      Merge tag 'samsung-defconfig64-4.8' of git://git.kernel.org/.../krzk/linux into next/arm64
-      Merge tag 'tegra-for-4.8-arm64-defconfig' of git://git.kernel.org/.../tegra/linux into next/arm64
-      arm64: remove duplicate PWM entry in defconfig
+Bartlomiej Zolnierkiewicz (1):
+      ARM: exynos_defconfig: Disable big.LITTLE switcher
 
-Carlo Caione (1):
-      ARM64: Kconfig: Select the Amlogic Meson pin controller driver
+Diego Dorta (1):
+      ARM: imx_v6_v7_defconfig: Select ADS7846 support
 
-Chanho Min (1):
-      arm64: defconfig: Enable Cadence MACB/GEM support
+Dinh Nguyen (1):
+      ARM: socfpga: enable PL330 DMA in socfpga_defconfig
 
-Eric Anholt (2):
-      Merge remote-tracking branch 'irqchip/irqchip/bcm' into bcm2835-arm64-next
-      arm64: Add platform selection for BCM2835.
+Florian Fainelli (7):
+      ARM: multi_v7_defconfig: Enable BCM63xx
+      ARM: multi_v7_defconfig: Enable BRCMSTB networking
+      ARM: multi_v7_defconfig: Enable Broadcom AHCI
+      ARM: multi_v7_defconfig: Enable BCM7038 Watchdog
+      ARM: multi_v7_defconfig: Enable Broadcom STB PWM
+      ARM: multi_v7_defconfig: Enable Broadcom Kona watchdog
+      ARM: Remove bcm_defconfig
 
-Florian Fainelli (1):
-      Merge tag 'bcm2835-arm64-next-2016-07-03' into soc-arm64/next
+Franklin S Cooper Jr (1):
+      ARM: keystone: Enable PINCTRL_SINGLE Config
 
-Gregory CLEMENT (1):
-      arm64: marvell: enable Armada 3700 clock drivers
+Gary Bisson (1):
+      ARM: imx_v6_v7_defconfig: enable USB FFS gadget
 
-Javi Merino (1):
-      arm64: defconfig: enable SENSORS_ARM_SCPI
+Javier Martinez Canillas (6):
+      ARM: exynos_defconfig: Enable Samsung media platform drivers as modules
+      ARM: multi_v7_defconfig: Enable Samsung media platform drivers as modules
+      ARM: exynos_defconfig: Enable MFC driver as module
+      ARM: multi_v7_defconfig: Enable Exynos MFC driver as module
+      ARM: exynos_defconfig: Enable vivid driver as a module
+      ARM: multi_v7_defconfig: Enable vivid driver as a module
 
-Kamlakant Patel (1):
-      arm64: vulcan: enable GPIOLIB in Kconfig
+Joachim Eastwood (1):
+      ARM: configs: lpc18xx: enable adc and dac iio drivers
 
-Kevin Hilman (1):
-      arm64: defconfig: enable stmmac and realtek PHY as modules
+Krzysztof Kozlowski (5):
+      ARM: multi_v7_defconfig: Switch max77693 to module
+      ARM: multi_v7_defconfig: Enable Trats2 audio codec, touchscreen and sensors
+      ARM: multi_v7_defconfig: Enable drivers for Exynos4210 Universal C210 board
+      ARM: multi_v7_defconfig: Enable s5p-secss driver
+      ARM: exynos_defconfig: Save defconfig on current linux-next
 
-Krzysztof Kozlowski (2):
-      arm64: exynos: Select SOC specific drivers
-      arm64: defconfig: Enable more IP blocks for Exynos7 and Exynos5433
+Ley Foon Tan (1):
+      ARM: socfpga: add PCIe to socfpga_defconfig
 
-Michael Turquette (1):
-      arm64: amlogic: select gxbb clk driver
+Linus Walleij (1):
+      ARM: defconfig: enable the MSM8660 pin controller
 
-Olof Johansson (7):
-      Merge tag 'samsung-soc64-4.8' of git://git.kernel.org/.../krzk/linux into next/arm64
-      Merge tag 'amlogic-soc' of git://git.kernel.org/.../khilman/linux-amlogic into next/arm64
-      Merge tag 'arm-soc/for-4.8/soc-arm64' of http://github.com/Broadcom/stblinux into next/arm64
-      Merge tag 'mvebu-defconfig64-4.8-1' of git://git.infradead.org/linux-mvebu into next/arm64
-      Merge tag 'juno-defconfig-4.8' of git://git.kernel.org/.../sudeep.holla/linux into next/arm64
-      Merge tag 'qcom-arm64-defconfig-for-4.8' of git://git.kernel.org/.../agross/linux into next/arm64
-      Merge tag 'renesas-arm64-defconfig-for-v4.8' of git://git.kernel.org/.../horms/renesas into next/arm64
+Lokesh Vutla (1):
+      ARM: keystone: Enable PINCTRL config
 
-Srinivas Kandagatla (1):
-      arm64: defconfig: enable msm8996 pinctrl support
+Marek Vasut (1):
+      ARM: socfpga: Update socfpga_defconfig
 
-Stephen Boyd (1):
-      arm64: defconfig: Enable qcom msm8996 clk drivers
+Masahiro Yamada (1):
+      ARM: keystone: remove redundant depends on ARM_PATCH_PHYS_VIRT
 
-Sudeep Holla (2):
-      arm64: defconfig: enable Generic on-chip SRAM driver
-      arm64: Kconfig: select PM{,_GENERIC_DOMAINS} for ARCH_VEXPRESS
+Maxime Ripard (2):
+      ARM: multi_v7: Enable sun4i DRM driver
+      ARM: sunxi: Enable sun4i DRM driver
 
-Takeshi Kihara (1):
-      arm64: defconfig: enable Renesas R8A7796 SoC
+Neil Armstrong (1):
+      ARM: configs: qualcomm: Add MDM9615 missing defconfigs
 
-Thierry Reding (1):
-      arm64: Update default configuration
+Olof Johansson (9):
+      Merge tag 'samsung-defconfig-4.8' of git://git.kernel.org/.../krzk/linux into next/defconfig
+      Merge tag 'at91-ab-4.8-defconfig' of git://git.kernel.org/.../abelloni/linux into next/defconfig
+      Merge tag 'arm-soc/for-4.8/defconfig' of http://github.com/Broadcom/stblinux into next/defconfig
+      Merge tag 'keystone_config_for_4.8' of git://git.kernel.org/.../ssantosh/linux-keystone into next/defconfig
+      Merge tag 'socfpga_defconfig_updates_for_v4.8' of git://git.kernel.org/.../dinguyen/linux into next/defconfig
+      Merge tag 'qcom-defconfig-for-4.8' of git://git.kernel.org/.../agross/linux into next/defconfig
+      Merge tag 'imx-defconfig-4.8' of git://git.kernel.org/.../shawnguo/linux into next/defconfig
+      Merge tag 'samsung-defconfig-4.8-2' of git://git.kernel.org/.../krzk/linux into next/defconfig
+      Merge tag 'renesas-defconfig-for-v4.8' of git://git.kernel.org/.../horms/renesas into next/defconfig
 
-Thomas Petazzoni (1):
-      arm64: configs: enable PCIe driver for Armada 7K/8K
+Patrice Chotard (2):
+      ARM: multi_v7_defconfig: enable STMicroelectronics BDISP 2D blitter driver
+      ARM: multi_v7_defconfig: enable STMicroelectronics DRM Support
+
+Peter Chen (1):
+      ARM: imx_v6_v7_defconfig: build in usbnet to support NFS for non-ethernet board
+
+Simon Horman (2):
+      ARM: shmobile: defconfig: Enable r8a7792 SoC
+      ARM: multi_v7_defconfig: defconfig: Enable r8a7792 SoC
+
+Tony Lindgren (1):
+      ARM: omap2plus_defconfig: Fix USB selection to keep Ethernet working
+
+Wenyou Yang (1):
+      ARM: at91/defconfig: Add ACT8945A driver
 
 
- arch/arm64/Kconfig.platforms         | 22 ++++++++++++++
- arch/arm64/configs/defconfig         | 49 ++++++++++++++++++++++++++++++-
- arch/arm64/include/asm/dma-mapping.h | 17 +++++++++--
- 3 files changed, 85 insertions(+), 3 deletions(-)
+ arch/arm/configs/bcm_defconfig       | 141 ------------------------------
+ arch/arm/configs/exynos_defconfig    |  29 +++---
+ arch/arm/configs/imx_v6_v7_defconfig |   4 +-
+ arch/arm/configs/keystone_defconfig  |   1 +
+ arch/arm/configs/lpc18xx_defconfig   |   2 +
+ arch/arm/configs/multi_v4t_defconfig | 106 ++++++++++++++++++++++
+ arch/arm/configs/multi_v5_defconfig  |  54 +++++++++++-
+ arch/arm/configs/multi_v7_defconfig  |  52 +++++++++--
+ arch/arm/configs/omap2plus_defconfig |   5 +-
+ arch/arm/configs/qcom_defconfig      |   8 ++
+ arch/arm/configs/sama5_defconfig     |   3 +
+ arch/arm/configs/shmobile_defconfig  |   1 +
+ arch/arm/configs/socfpga_defconfig   |  16 +++-
+ arch/arm/configs/sunxi_defconfig     |   2 +
+ arch/arm/mach-keystone/Kconfig       |   2 +-
+ 15 files changed, 263 insertions(+), 163 deletions(-)
+ delete mode 100644 arch/arm/configs/bcm_defconfig
+ create mode 100644 arch/arm/configs/multi_v4t_defconfig
