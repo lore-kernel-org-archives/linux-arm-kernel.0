@@ -1,104 +1,48 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 1 Aug 2016 12:06:44 +0100
-Subject: [PATCH] arm64: fix address fault during mapping fdt region
-In-Reply-To: <CAKv+Gu9QQdncCD_T8+tpdVP8qx=EKM9-PGLvb8J9RNA2qHddFw@mail.gmail.com>
-References: <579F197B.80101@zoho.com>
- <CAKv+Gu9QQdncCD_T8+tpdVP8qx=EKM9-PGLvb8J9RNA2qHddFw@mail.gmail.com>
-Message-ID: <20160801110643.GC11119@leverpostej>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Mon, 1 Aug 2016 16:42:27 +0530
+Subject: [PATCH v2 0/3] ARM: cleanup PCI specific configs
+Message-ID: <1470049950-4697-1-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 01, 2016 at 11:50:39AM +0200, Ard Biesheuvel wrote:
-> On 1 August 2016 at 11:42, zijun_hu <zijun_hu@zoho.com> wrote:
-> > From 07b9216ec3494515e7a6c41e0333eb8782427db3 Mon Sep 17 00:00:00 2001
-> > From: zijun_hu <zijun_hu@htc.com>
-> > Date: Mon, 1 Aug 2016 17:04:59 +0800
-> > Subject: [PATCH] arm64: fix address fault during mapping fdt region
-> >
-> > fdt_check_header() accesses other fileds of fdt header but
-> > the first 8 bytes such as version; so accessing unmapped
-> > address fault happens if fdt region locates below align
-> > boundary nearly during mapping fdt region, or expressed as
-> > (offset + sizeof(struct fdt_header)) > SWAPPER_BLOCK_SIZE
-> >
-> > fdt header size at least is mapped in order to avoid the issue
-> >
-> > Signed-off-by: zijun_hu <zijun_hu@htc.com>
-> > ---
-> >  arch/arm64/mm/mmu.c | 14 ++++++++++++--
-> >  1 file changed, 12 insertions(+), 2 deletions(-)
-> >
-> > diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-> > index 0f85a46..0d72b71 100644
-> > --- a/arch/arm64/mm/mmu.c
-> > +++ b/arch/arm64/mm/mmu.c
-> > @@ -744,6 +744,7 @@ void *__init __fixmap_remap_fdt(phys_addr_t dt_phys, int *size, pgprot_t prot)
-> >         const u64 dt_virt_base = __fix_to_virt(FIX_FDT);
-> >         int offset;
-> >         void *dt_virt;
-> > +       int dt_header_map_size;
-> >
-> >         /*
-> >          * Check whether the physical FDT address is set and meets the minimum
-> > @@ -774,9 +775,18 @@ void *__init __fixmap_remap_fdt(phys_addr_t dt_phys, int *size, pgprot_t prot)
-> >         offset = dt_phys % SWAPPER_BLOCK_SIZE;
-> >         dt_virt = (void *)dt_virt_base + offset;
-> >
-> > +       /*
-> > +        * fdt_check_header() maybe access any field of fdt header not
-> > +        * the first 8 bytes only, so map fdt header size at least for
-> > +        * checking fdt header without address fault more portably
-> > +        */
-> > +       BUILD_BUG_ON(sizeof(struct fdt_header) > SWAPPER_BLOCK_SIZE);
-> > +       dt_header_map_size = round_up(offset + sizeof(struct fdt_header),
-> > +                       SWAPPER_BLOCK_SIZE);
-> > +
-> >         /* map the first chunk so we can read the size from the header */
-> >         create_mapping_noalloc(round_down(dt_phys, SWAPPER_BLOCK_SIZE),
-> > -                       dt_virt_base, SWAPPER_BLOCK_SIZE, prot);
-> > +                       dt_virt_base, dt_header_map_size, prot);
-> >
-> >         if (fdt_check_header(dt_virt) != 0)
-> >                 return NULL;
-> > @@ -785,7 +795,7 @@ void *__init __fixmap_remap_fdt(phys_addr_t dt_phys, int *size, pgprot_t prot)
-> >         if (*size > MAX_FDT_SIZE)
-> >                 return NULL;
-> >
-> > -       if (offset + *size > SWAPPER_BLOCK_SIZE)
-> > +       if (offset + *size > dt_header_map_size)
-> >                 create_mapping_noalloc(round_down(dt_phys, SWAPPER_BLOCK_SIZE), dt_virt_base,
-> >                                round_up(offset + *size, SWAPPER_BLOCK_SIZE), prot);
-> >
-> 
-> Couldn't we simply do this instead?
-> 
-> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-> index 0f85a46c3e18..e8d3b04a2b57 100644
-> --- a/arch/arm64/mm/mmu.c
-> +++ b/arch/arm64/mm/mmu.c
-> @@ -778,7 +778,7 @@ void *__init __fixmap_remap_fdt(phys_addr_t
-> dt_phys, int *size, pgprot_t prot)
->         create_mapping_noalloc(round_down(dt_phys, SWAPPER_BLOCK_SIZE),
->                         dt_virt_base, SWAPPER_BLOCK_SIZE, prot);
-> 
-> -       if (fdt_check_header(dt_virt) != 0)
-> +       if (fdt_magic(dt_virt) != FDT_MAGIC)
->                 return NULL;
-> 
->         *size = fdt_totalsize(dt_virt);
-> 
-> We are simply looking for a size field. The OF code will call
-> fdt_check_header() again, so anything that is checked there in
-> addition to the magic field will still be checked.
+This series was initially sent to add support for two PCIe
+ports in dra7. This included selecting PCI_DOMAINS config
+in SOC_DRA7XX.
 
-That looks much nicer to me, and deferring the header check also looks
-fine.
+However from the review, PCI_DOMAINS can instead be selected
+from ARCH_MULTIPLATFORM. This is fixed in this series along
+with removing PCI_DOMAINS from other configs.
 
-If you add a comment above the fdt_magic() check, pointing out why we
-can only safely access the magic and totalsize fields (and thus can't
-call fdt_check_header() yet):
+Since this series was initially sent to add support for
+two PCIe ports in dra7, it has been tested to see if there
+are regressions with 1 PCIe port. Though testing of 2 PCIe ports
+is not done while sending this patch series, it has been verified
+before in few of the customer boards.
 
-Acked-by: Mark Rutland <mark.rutland@arm.com>
+The 2nd and 3rd patch has been marked as RFT since it modifies
+the configs of other platforms I can't test though this
+series shouldn't break anything.
 
-Thanks,
-Mark.
+Kishon Vijay Abraham I (3):
+  ARM: dts: DRA7: Add "linux,pci-domain" property for pci dt nodes
+  ARM: Fix *MIGHT_HAVE_PCI* config from being selected redundantly
+  ARM: select PCI_DOMAINS config from ARCH_MULTIPLATFORM
+
+ arch/arm/Kconfig                 |    3 +--
+ arch/arm/boot/dts/dra7.dtsi      |    2 ++
+ arch/arm/mach-at91/Kconfig       |    1 -
+ arch/arm/mach-axxia/Kconfig      |    2 --
+ arch/arm/mach-cns3xxx/Kconfig    |    1 -
+ arch/arm/mach-exynos/Kconfig     |    2 --
+ arch/arm/mach-imx/Kconfig        |    2 --
+ arch/arm/mach-integrator/Kconfig |    1 -
+ arch/arm/mach-keystone/Kconfig   |    2 --
+ arch/arm/mach-ks8695/Kconfig     |    5 -----
+ arch/arm/mach-pxa/Kconfig        |    1 -
+ arch/arm/mach-shmobile/Kconfig   |    1 -
+ arch/arm/mach-spear/Kconfig      |    1 -
+ arch/arm/mach-versatile/Kconfig  |    1 -
+ 14 files changed, 3 insertions(+), 22 deletions(-)
+
+-- 
+1.7.9.5
