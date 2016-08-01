@@ -1,99 +1,58 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Mon, 1 Aug 2016 15:10:29 +0200
-Subject: [PATCH v2] mmc: sunxi: Handle the 'New Timings'
-Message-ID: <mailman.30.1470058473.1636.linux-arm-kernel@lists.infradead.org>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Mon, 1 Aug 2016 14:36:19 +0100
+Subject: [PATCH v2] arm64: mm: convert __dma_* routines to use start, size
+In-Reply-To: <1c4ec01bd3594485b6a4b386994dc6ca@nmail01.hynixad.com>
+References: <1469518496-8177-1-git-send-email-kwangwoo.lee@sk.com>
+ <b978e732-f5c3-4b77-01d9-dd5f7e2303e3@arm.com>
+ <15c12f9900fd4b31a875250c478023c6@nmail01.hynixad.com>
+ <c355debc-0238-ff51-ca90-6e0c8085366b@arm.com>
+ <b0d9ef6b59364c4587f8d7c2493160ed@nmail01.hynixad.com>
+ <c4ee86f4-e7c4-aeee-f3eb-cb4477a95bf6@arm.com>
+ <1c4ec01bd3594485b6a4b386994dc6ca@nmail01.hynixad.com>
+Message-ID: <21272fb2-bffb-15ee-41a9-af0251a33fd0@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some MMC devices as mmc2 in the A83T or mmc1 and mmc2 in the H3 have
-a 'New Timings' mode.
-Set this capacity in the DT and use it when possible.
+On 01/08/16 00:45, kwangwoo.lee at sk.com wrote:
+[...]
+>>>> -----8<-----
+>>>> diff --git a/arch/arm64/include/asm/assembler.h
+>>>> b/arch/arm64/include/asm/assembler.h
+>>>> index 10b017c4bdd8..1c005c90387e 100644
+>>>> --- a/arch/arm64/include/asm/assembler.h
+>>>> +++ b/arch/arm64/include/asm/assembler.h
+>>>> @@ -261,7 +261,16 @@ lr	.req	x30		// link register
+>>>>  	add	\size, \kaddr, \size
+>>>>  	sub	\tmp2, \tmp1, #1
+>>>>  	bic	\kaddr, \kaddr, \tmp2
+>>>> -9998:	dc	\op, \kaddr
+>>>> +9998:
+>>>> +	.ifeqs "\op", "cvac"
+>>>> +alternative_if_not ARM64_WORKAROUND_CLEAN_CACHE
+>>>> +	dc	cvac, \kaddr
+>>>> +alternative_else
+>>>> +	dc	civac, \kaddr
+>>>> +alternative_endif
+>>>> +	.else
+>>>> +	dc	\op, \kaddr
+>>>> +	.endif
+>>>>  	add	\kaddr, \kaddr, \tmp1
+>>>>  	cmp	\kaddr, \size
+>>>>  	b.lo	9998b
+>>>
+>>> I agree that it looks not viable because it makes the macro bigger and
+>>> conditional specifically with CVAC op.
+>>
+>> Actually, having had a poke around in the resulting disassembly, it
+>> looks like this does work correctly. I can't think of a viable reason
+>> for the whole dcache_by_line_op to ever be wrapped in yet another
+>> alternative (which almost certainly would go horribly wrong), and it
+>> would mean that any other future users are automatically covered for
+>> free. It's just horrible to look at at the source level.
+> 
+> Then, Are you going to send a patch for this? Or should I include this change?
 
-Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
----
-I don't know if this mode works or is needed at 25MHz.
----
- Documentation/devicetree/bindings/mmc/sunxi-mmc.txt |  1 +
- drivers/mmc/host/sunxi-mmc.c                        | 21 +++++++++++++++++++--
- 2 files changed, 20 insertions(+), 2 deletions(-)
+I'll do a bit more testing just to make sure, then spin a separate patch
+(and try to remember to keep you on CC..)
 
-diff --git a/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt b/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt
-index 4bf41d8..a541bf4 100644
---- a/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt
-+++ b/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt
-@@ -19,6 +19,7 @@ Optional properties:
-  - reset-names : must contain "ahb"
-  - for cd, bus-width and additional generic mmc parameters
-    please refer to mmc.txt within this directory
-+ - allwinner,new-timings: the controller may accept the "New Timings" mode
- 
- Examples:
- 	- Within .dtsi:
-diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
-index 2ee4c21..98922b5 100644
---- a/drivers/mmc/host/sunxi-mmc.c
-+++ b/drivers/mmc/host/sunxi-mmc.c
-@@ -64,6 +64,7 @@
- #define SDXC_REG_CBCR	(0x48) /* SMC CIU Byte Count Register */
- #define SDXC_REG_BBCR	(0x4C) /* SMC BIU Byte Count Register */
- #define SDXC_REG_DBGC	(0x50) /* SMC Debug Enable Register */
-+#define SDXC_REG_NTSR	(0x5c) /* SMC NewTiming Set Register */
- #define SDXC_REG_HWRST	(0x78) /* SMC Card Hardware Reset for Register */
- #define SDXC_REG_DMAC	(0x80) /* SMC IDMAC Control Register */
- #define SDXC_REG_DLBA	(0x84) /* SMC IDMAC Descriptor List Base Addre */
-@@ -171,6 +172,9 @@
- #define SDXC_SEND_AUTO_STOPCCSD		BIT(9)
- #define SDXC_CEATA_DEV_IRQ_ENABLE	BIT(10)
- 
-+/* NewTiming Set Register */
-+#define SDXC_NEWMODE_ENABLE		BIT(31)
-+
- /* IDMA controller bus mod bit field */
- #define SDXC_IDMAC_SOFT_RESET		BIT(0)
- #define SDXC_IDMAC_FIX_BURST		BIT(1)
-@@ -261,6 +265,9 @@ struct sunxi_mmc_host {
- 
- 	/* vqmmc */
- 	bool		vqmmc_enabled;
-+
-+	/* misc */
-+	bool		new_timings;	/* new timings capable */
- };
- 
- static int sunxi_mmc_reset_host(struct sunxi_mmc_host *host)
-@@ -715,8 +722,13 @@ static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
- 		return -EINVAL;
- 	}
- 
--	clk_set_phase(host->clk_sample, sclk_dly);
--	clk_set_phase(host->clk_output, oclk_dly);
-+	if (host->new_timings && rate >= 50000000) {
-+		mmc_writel(host, REG_NTSR,
-+			mmc_readl(host, REG_NTSR) | SDXC_NEWMODE_ENABLE);
-+	} else {
-+		clk_set_phase(host->clk_sample, sclk_dly);
-+		clk_set_phase(host->clk_output, oclk_dly);
-+	}
- 
- 	return sunxi_mmc_oclk_onoff(host, 1);
- }
-@@ -1133,12 +1145,17 @@ static int sunxi_mmc_probe(struct platform_device *pdev)
- 	if (ret)
- 		goto error_free_dma;
- 
-+	if (pdev->dev.of_node &&
-+	    of_property_read_bool(pdev->dev.of_node, "allwinner,new-timings"))
-+		host->new_timings = true;
-+
- 	ret = mmc_add_host(mmc);
- 	if (ret)
- 		goto error_free_dma;
- 
- 	dev_info(&pdev->dev, "base:0x%p irq:%u\n", host->reg_base, host->irq);
- 	platform_set_drvdata(pdev, mmc);
-+
- 	return 0;
- 
- error_free_dma:
--- 
-2.9.2
+Robin.
