@@ -1,39 +1,40 @@
 From: zhengxing@rock-chips.com (Xing Zheng)
-Date: Mon,  1 Aug 2016 12:23:06 +0800
-Subject: [RESEND PATCH 3/6] clk: rockchip: rk3399: fix incorrect aclk_emmc
- source gate bits
+Date: Mon,  1 Aug 2016 12:24:45 +0800
+Subject: [RESEND PATCH 5/6] clk: rockchip: rk3399: delete the
+ CLK_IGNORE_UNUSED for aclk_pcie
 In-Reply-To: <1470025389-4094-1-git-send-email-zhengxing@rock-chips.com>
 References: <1470025389-4094-1-git-send-email-zhengxing@rock-chips.com>
-Message-ID: <1470025389-4094-4-git-send-email-zhengxing@rock-chips.com>
+Message-ID: <1470025485-4218-1-git-send-email-zhengxing@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dues to incorrect diagram, we need to fix incorrect bits for
-(c/g)pll_aclk_emmc_src:
-cpll_aclk_emmc_src --> G6[13]
-gpll_aclk_emmc_src --> G6[12]
+From: Elaine Zhang <zhangqing@rock-chips.com>
 
+allow aclk_pcie and aclk_perf_pcie disabled when unused.
+
+Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
 Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
+
 ---
 
  drivers/clk/rockchip/clk-rk3399.c |    4 ++--
  1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/clk/rockchip/clk-rk3399.c b/drivers/clk/rockchip/clk-rk3399.c
-index f55f967f..ad3860a 100644
+index 74afec0..4a15ce5b 100644
 --- a/drivers/clk/rockchip/clk-rk3399.c
 +++ b/drivers/clk/rockchip/clk-rk3399.c
-@@ -923,9 +923,9 @@ static struct rockchip_clk_branch rk3399_clk_branches[] __initdata = {
- 			RK3399_CLKGATE_CON(6), 14, GFLAGS),
+@@ -848,9 +848,9 @@ static struct rockchip_clk_branch rk3399_clk_branches[] __initdata = {
+ 			RK3399_CLKSEL_CON(14), 12, 2, DFLAGS,
+ 			RK3399_CLKGATE_CON(5), 4, GFLAGS),
  
- 	GATE(0, "cpll_aclk_emmc_src", "cpll", CLK_IGNORE_UNUSED,
--			RK3399_CLKGATE_CON(6), 12, GFLAGS),
--	GATE(0, "gpll_aclk_emmc_src", "gpll", CLK_IGNORE_UNUSED,
- 			RK3399_CLKGATE_CON(6), 13, GFLAGS),
-+	GATE(0, "gpll_aclk_emmc_src", "gpll", CLK_IGNORE_UNUSED,
-+			RK3399_CLKGATE_CON(6), 12, GFLAGS),
- 	COMPOSITE_NOGATE(ACLK_EMMC, "aclk_emmc", mux_aclk_emmc_p, CLK_IGNORE_UNUSED,
- 			RK3399_CLKSEL_CON(21), 7, 1, MFLAGS, 0, 5, DFLAGS),
- 	GATE(ACLK_EMMC_CORE, "aclk_emmccore", "aclk_emmc", CLK_IGNORE_UNUSED,
+-	GATE(ACLK_PERF_PCIE, "aclk_perf_pcie", "aclk_perihp", CLK_IGNORE_UNUSED,
++	GATE(ACLK_PERF_PCIE, "aclk_perf_pcie", "aclk_perihp", 0,
+ 			RK3399_CLKGATE_CON(20), 2, GFLAGS),
+-	GATE(ACLK_PCIE, "aclk_pcie", "aclk_perihp", CLK_IGNORE_UNUSED,
++	GATE(ACLK_PCIE, "aclk_pcie", "aclk_perihp", 0,
+ 			RK3399_CLKGATE_CON(20), 10, GFLAGS),
+ 	GATE(0, "aclk_perihp_noc", "aclk_perihp", CLK_IGNORE_UNUSED,
+ 			RK3399_CLKGATE_CON(20), 12, GFLAGS),
 -- 
 1.7.9.5
