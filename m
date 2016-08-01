@@ -1,53 +1,128 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Mon, 1 Aug 2016 21:21:01 +0800
-Subject: [PATCH v3 2/3] hwmon: xgene: Add hwmon driver
-In-Reply-To: <1469134557-26869-3-git-send-email-hotran@apm.com>
-Message-ID: <201608012126.BWziGkjc%fengguang.wu@intel.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 1 Aug 2016 14:22:26 +0100
+Subject: [PATCH 2/2] soc: nxp: Add a RCPM driver
+In-Reply-To: <1470044943-3814-2-git-send-email-chenhui.zhao@nxp.com>
+References: <1470044943-3814-1-git-send-email-chenhui.zhao@nxp.com>
+ <1470044943-3814-2-git-send-email-chenhui.zhao@nxp.com>
+Message-ID: <579F4D12.4000004@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hoan,
+On 01/08/16 10:49, Chenhui Zhao wrote:
+> The NXP's QorIQ Processors based on ARM Core have a RCPM module
+> (Run Control and Power Management), which performs all device-level
+> tasks associated with power management.
+> 
+> This patch mainly implements the wakeup sources configuration before
+> entering LPM20, a low power state of device-level. The devices can be
+> waked up by specified sources, such as Flextimer, GPIO and so on.
+> 
+> Signed-off-by: Chenhui Zhao <chenhui.zhao@nxp.com>
+> ---
+>  drivers/soc/fsl/Makefile     |   1 +
+>  drivers/soc/fsl/pm/Makefile  |   1 +
+>  drivers/soc/fsl/pm/ls-rcpm.c | 144 +++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 146 insertions(+)
+>  create mode 100644 drivers/soc/fsl/pm/Makefile
+>  create mode 100644 drivers/soc/fsl/pm/ls-rcpm.c
+> 
+> diff --git a/drivers/soc/fsl/Makefile b/drivers/soc/fsl/Makefile
+> index 203307f..b5adbaf 100644
+> --- a/drivers/soc/fsl/Makefile
+> +++ b/drivers/soc/fsl/Makefile
+> @@ -4,3 +4,4 @@
+>  
+>  obj-$(CONFIG_QUICC_ENGINE)		+= qe/
+>  obj-$(CONFIG_CPM)			+= qe/
+> +obj-$(CONFIG_SUSPEND)			+= pm/
+> diff --git a/drivers/soc/fsl/pm/Makefile b/drivers/soc/fsl/pm/Makefile
+> new file mode 100644
+> index 0000000..e275d63
+> --- /dev/null
+> +++ b/drivers/soc/fsl/pm/Makefile
+> @@ -0,0 +1 @@
+> +obj-$(CONFIG_ARCH_LAYERSCAPE) += ls-rcpm.o
+> diff --git a/drivers/soc/fsl/pm/ls-rcpm.c b/drivers/soc/fsl/pm/ls-rcpm.c
+> new file mode 100644
+> index 0000000..c5f2b97
+> --- /dev/null
+> +++ b/drivers/soc/fsl/pm/ls-rcpm.c
+> @@ -0,0 +1,144 @@
+> +/*
+> + * Run Control and Power Management (RCPM) driver
+> + *
+> + * Copyright 2016 Freescale Semiconductor, Inc.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + */
+> +#define pr_fmt(fmt) "RCPM: %s: " fmt, __func__
+> +
+> +#include <linux/kernel.h>
+> +#include <linux/io.h>
+> +#include <linux/of_platform.h>
+> +#include <linux/of_address.h>
+> +#include <linux/suspend.h>
+> +
+> +/* So far there are not more than two registers */
+> +#define RCPM_IPPDEXPCR0		0x140
+> +#define RCPM_IPPDEXPCR1		0x144
+> +#define RCPM_IPPDEXPCR(x)	(RCPM_IPPDEXPCR0 + 4 * x)
+> +#define RCPM_WAKEUP_CELL_MAX_SIZE	2
+> +
+> +/* it reprents the number of the registers RCPM_IPPDEXPCR */
+> +static unsigned int rcpm_wakeup_cells;
+> +static void __iomem *rcpm_reg_base;
+> +static u32 ippdexpcr[RCPM_WAKEUP_CELL_MAX_SIZE];
+> +
+> +static inline void rcpm_reg_write(u32 offset, u32 value)
+> +{
+> +	iowrite32be(value, rcpm_reg_base + offset);
+> +}
+> +
+> +static inline u32 rcpm_reg_read(u32 offset)
+> +{
+> +	return ioread32be(rcpm_reg_base + offset);
+> +}
+> +
+> +static void rcpm_wakeup_fixup(struct device *dev, void *data)
+> +{
+> +	struct device_node *node = dev ? dev->of_node : NULL;
+> +	u32 value[RCPM_WAKEUP_CELL_MAX_SIZE + 1];
+> +	int ret;
+> +	int i;
+> +
+> +	if (!dev || !node || !device_may_wakeup(dev))
+> +		return;
+> +
+> +	/*
+> +	 * Get the values in the "rcpm-wakeup" property.
+> +	 * Refer to Documentation/devicetree/bindings/soc/fsl/rcpm.txt
+> +	 */
+> +	ret = of_property_read_u32_array(node, "rcpm-wakeup",
+> +					 value, rcpm_wakeup_cells + 1);
+> +	if (ret)
+> +		return;
+> +
+> +	pr_debug("wakeup source: the device %s\n", node->full_name);
 
-[auto build test ERROR on hwmon/hwmon-next]
-[also build test ERROR on v4.7]
-[cannot apply to next-20160801]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+This looks absolutely dreadful. You are parsing every node for each
+device, and apply a set-in-stone configuration.
 
-url:    https://github.com/0day-ci/linux/commits/Hoan-Tran/hwmon-xgene-Add-support-for-X-Gene-hwmon-driver/20160725-015356
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/groeck/linux-staging.git hwmon-next
-config: arm64-allmodconfig (attached as .config)
-compiler: aarch64-linux-gnu-gcc (Debian 5.4.0-6) 5.4.0 20160609
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm64 
+The normal way to handle this is by making this device an interrupt
+controller, and honour the irq_set_wake API. This has already been done
+on other FSL/NXP hardware (see the iMX GPC stuff).
 
-All errors (new ones prefixed by >>):
+Thanks,
 
->> drivers/hwmon/xgene-hwmon.c:38:22: fatal error: acpi/pcc.h: No such file or directory
-   compilation terminated.
-
-vim +38 drivers/hwmon/xgene-hwmon.c
-
-    32	#include <linux/mailbox_controller.h>
-    33	#include <linux/mailbox_client.h>
-    34	#include <linux/module.h>
-    35	#include <linux/of.h>
-    36	#include <linux/platform_device.h>
-    37	#include <acpi/acpi_io.h>
-  > 38	#include <acpi/pcc.h>
-    39	
-    40	/* SLIMpro message defines */
-    41	#define MSG_TYPE_DBG			0
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 50305 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160801/b7c0a236/attachment-0001.obj>
+	M.
+-- 
+Jazz is not dead. It just smells funny...
