@@ -1,40 +1,53 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Mon, 1 Aug 2016 10:30:24 +0200
-Subject: [PATCH 00/13] arm64: Allwinner A64 support based on sunxi-ng
-In-Reply-To: <fb559224-561c-3476-1146-96f7aea427f0@arm.com>
-References: <20160726203041.29366-1-maxime.ripard@free-electrons.com>
- <fb559224-561c-3476-1146-96f7aea427f0@arm.com>
-Message-ID: <20160801103024.cc74c093466d7fdfd91a2587@free.fr>
+From: shawn.lin@rock-chips.com (Shawn Lin)
+Date: Mon, 1 Aug 2016 16:47:32 +0800
+Subject: [RESEND PATCH 5/6] clk: rockchip: rk3399: delete the
+ CLK_IGNORE_UNUSED for aclk_pcie
+In-Reply-To: <1470025485-4218-1-git-send-email-zhengxing@rock-chips.com>
+References: <1470025389-4094-1-git-send-email-zhengxing@rock-chips.com>
+ <1470025485-4218-1-git-send-email-zhengxing@rock-chips.com>
+Message-ID: <8ee66f8c-f758-45ef-6e21-f757157d2fe4@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 1 Aug 2016 02:43:06 +0100
-Andr? Przywara <andre.przywara@arm.com> wrote:
+On 2016/8/1 12:24, Xing Zheng wrote:
+> From: Elaine Zhang <zhangqing@rock-chips.com>
+>
+> allow aclk_pcie and aclk_perf_pcie disabled when unused.
+>
 
-> As this became quite a long read, here a TL;DR:
-> - We consider using an SCPI based clock system for the A64, alongside
-> allwinner,simple-gates and fixed clocks. We try to avoid any Allwinner
-> specific clocks (apart from the simple-gates).
-> - ARM Trusted Firmware provides the SCPI implementation - for now, later
-> we may move this into a possible arisc firmware.
-> - We upstream some basic DT first, possibly omitting any controversial
-> clock parts at all.
-> 
-> Let me know what you think!
+Thanks for landing it. Yes, my pcie driver will control it
+manually, and this patch looks the same as what we land on
+the downstream tree, so
 
-Hi Andr?,
+Reviewed-by: Shawn Lin <shawn.lin@rock-chips.com>
 
-This looks interesting.
-As I understand, the clock enable/rate setting functions would be in
-the arisc. The arisc firmware would be loaded only once in the Soc and
-would contain the code for handling this specific SoC.
->From my calculations, this would save about 1Mb of clock descriptions
-in the kernel for a universal Allwinner kernel.
+> Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
+> Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
+>
+> ---
+>
+>  drivers/clk/rockchip/clk-rk3399.c |    4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/clk/rockchip/clk-rk3399.c b/drivers/clk/rockchip/clk-rk3399.c
+> index 74afec0..4a15ce5b 100644
+> --- a/drivers/clk/rockchip/clk-rk3399.c
+> +++ b/drivers/clk/rockchip/clk-rk3399.c
+> @@ -848,9 +848,9 @@ static struct rockchip_clk_branch rk3399_clk_branches[] __initdata = {
+>  			RK3399_CLKSEL_CON(14), 12, 2, DFLAGS,
+>  			RK3399_CLKGATE_CON(5), 4, GFLAGS),
+>
+> -	GATE(ACLK_PERF_PCIE, "aclk_perf_pcie", "aclk_perihp", CLK_IGNORE_UNUSED,
+> +	GATE(ACLK_PERF_PCIE, "aclk_perf_pcie", "aclk_perihp", 0,
+>  			RK3399_CLKGATE_CON(20), 2, GFLAGS),
+> -	GATE(ACLK_PCIE, "aclk_pcie", "aclk_perihp", CLK_IGNORE_UNUSED,
+> +	GATE(ACLK_PCIE, "aclk_pcie", "aclk_perihp", 0,
+>  			RK3399_CLKGATE_CON(20), 10, GFLAGS),
+>  	GATE(0, "aclk_perihp_noc", "aclk_perihp", CLK_IGNORE_UNUSED,
+>  			RK3399_CLKGATE_CON(20), 12, GFLAGS),
+>
 
-But I don't see why you are keeping the simple-gates. The bus gate may
-be ungated/gated when the clock is enabled/disabled, and that's what
-Allwinner's software does.
 
 -- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+Best Regards
+Shawn Lin
