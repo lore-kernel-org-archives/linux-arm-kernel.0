@@ -1,74 +1,54 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 01 Aug 2016 14:25:04 +0200
-Subject: [PATCH 2/2] soc: nxp: Add a RCPM driver
-In-Reply-To: <1470044943-3814-2-git-send-email-chenhui.zhao@nxp.com>
-References: <1470044943-3814-1-git-send-email-chenhui.zhao@nxp.com>
- <1470044943-3814-2-git-send-email-chenhui.zhao@nxp.com>
-Message-ID: <2024386.Ra8uvttlE9@wuerfel>
+From: peter.senna@collabora.co.uk (Peter Senna Tschudin)
+Date: Mon, 01 Aug 2016 13:30:57 +0100
+Subject: =?utf-8?q?Re=3A?==?utf-8?q?_=5BPATCH?= V3 =?utf-8?q?2=2F5=5D?=
+ =?utf-8?q?_dts=2Fimx6q-b850v3=3A?= Configure IPU assignment order
+In-Reply-To: <1470041647.6640.3.camel@pengutronix.de>
+Message-ID: <70b6-579f4100-9-6ce4f380@208251793>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, August 1, 2016 5:49:03 PM CEST Chenhui Zhao wrote:
-> The NXP's QorIQ Processors based on ARM Core have a RCPM module
-> (Run Control and Power Management), which performs all device-level
-> tasks associated with power management.
+Hi Lucas,
+
+Thank you for the prompt review.
+ 
+On Monday, August 1, 2016 10:54 CEST, Lucas Stach <l.stach@pengutronix.de> wrote: 
+ 
+> Am Sonntag, den 31.07.2016, 21:55 +0200 schrieb Peter Senna Tschudin:
+> > As the IPU has combined limitations across multiple crtcs, and as that
+> > can't be communicated to userspace at the moment, reorder the crtcs to
+> > allow support to two Full-HD monitors by avoiding assigning two
+> > monitors to a single IPU.
+> > 
+> > Cc: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+> > Cc: Philipp Zabel <p.zabel@pengutronix.de>
+> > Cc: Rob Herring <robh@kernel.org>
+> > Cc: Fabio Estevam <fabio.estevam@nxp.com>
+> > Signed-off-by: Peter Senna Tschudin <peter.senna@collabora.com>
 > 
-> This patch mainly implements the wakeup sources configuration before
-> entering LPM20, a low power state of device-level. The devices can be
-> waked up by specified sources, such as Flextimer, GPIO and so on.
+> NACK. This is a userspace issue. Changing the assignment order of the
+> CRTCs just shifts the failure to a userspace that want to use CRTC 0 and
+> 2 now.
+
+Err, yeah user space issue... But how the kernel is currently telling user space about what exactly went wrong and how user space might fix it? How Weston(our user space) is going to know  that reshuffling crtcs is going to lead to success; how could it? I guess some  platform-specific code in user space is needed for this to work...
+
 > 
-> Signed-off-by: Chenhui Zhao <chenhui.zhao@nxp.com>
+> imx-drm just got atomic support and with the atomic check it should be
+> possible to inform userspace in a reasonable way about such issues.
 
-Adding irqchip maintainers to cc, as this wakeup handling is normally
-part of the irq controller.
+Should be possible, but I guess it isn't, and wont be until a considerable effort is put on both kernel and user space. Or am I missing something? What do you propose?
 
-> +
-> +#include <linux/kernel.h>
-> +#include <linux/io.h>
-> +#include <linux/of_platform.h>
-> +#include <linux/of_address.h>
-> +#include <linux/suspend.h>
-> +
-> +/* So far there are not more than two registers */
-> +#define RCPM_IPPDEXPCR0		0x140
-> +#define RCPM_IPPDEXPCR1		0x144
-> +#define RCPM_IPPDEXPCR(x)	(RCPM_IPPDEXPCR0 + 4 * x)
-> +#define RCPM_WAKEUP_CELL_MAX_SIZE	2
-> +
-> +/* it reprents the number of the registers RCPM_IPPDEXPCR */
-> +static unsigned int rcpm_wakeup_cells;
-> +static void __iomem *rcpm_reg_base;
-> +static u32 ippdexpcr[RCPM_WAKEUP_CELL_MAX_SIZE];
+I got inspiration from: arch/arm/boot/dts/imx6q.dtsi
+...
+        display-subsystem {
+                compatible = "fsl,imx-display-subsystem";
+                ports = <&ipu1_di0>, <&ipu1_di1>, <&ipu2_di0>, <&ipu2_di1>;
+        };
+...
 
-Can you make these local to the context of whoever
-calls into the driver?
+This is there for more than 2 years now, and I get that the idea here is not ordering, but just declaring.
 
+However even if this patch is not the perfect solution, it allows us to stay close to upstream now without creating problems(does it create any issue?).
 
-> +static void rcpm_wakeup_fixup(struct device *dev, void *data)
-> +{
-> +	struct device_node *node = dev ? dev->of_node : NULL;
-> +	u32 value[RCPM_WAKEUP_CELL_MAX_SIZE + 1];
-> +	int ret;
-> +	int i;
-> +
-> +	if (!dev || !node || !device_may_wakeup(dev))
-> +		return;
-> +
-> +	/*
-> +	 * Get the values in the "rcpm-wakeup" property.
-> +	 * Refer to Documentation/devicetree/bindings/soc/fsl/rcpm.txt
-> +	 */
-> +	ret = of_property_read_u32_array(node, "rcpm-wakeup",
-> +					 value, rcpm_wakeup_cells + 1);
+Can you reconsider or propose a concrete solution that is not more complex than our entire driver?
 
-My first impression is that you are trying to do something
-in a platform specific way that should be handled by common
-code here.
-
-You are parsing rcpm_wakeup_cells once for the global node,
-but you don't check whether the device that has the rcpm-wakeup
-node actually refers to this instance, and that would require
-an incompatible change if we ever get an implementation that
-has multiple such nodes.
-
-	Arnd
+Thanks a lot!
