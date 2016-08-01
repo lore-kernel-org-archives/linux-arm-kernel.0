@@ -1,47 +1,124 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 1 Aug 2016 12:24:53 +0100
-Subject: [PATCH] arm64: fix address fault during mapping fdt region
-In-Reply-To: <579F2BA6.1010203@zoho.com>
-References: <579F197B.80101@zoho.com>
- <CAKv+Gu9QQdncCD_T8+tpdVP8qx=EKM9-PGLvb8J9RNA2qHddFw@mail.gmail.com>
- <579F2BA6.1010203@zoho.com>
-Message-ID: <20160801112450.GD11119@leverpostej>
+From: tiffany.lin@mediatek.com (Tiffany Lin)
+Date: Mon, 1 Aug 2016 19:28:24 +0800
+Subject: [PATCH v3 5/9] vcodec: mediatek: Add Mediatek V4L2 Video
+ Decoder Driver
+In-Reply-To: <8bd71dee-62ec-beba-c1d1-fc7e586d593b@xs4all.nl>
+References: <1464611363-14936-1-git-send-email-tiffany.lin@mediatek.com>
+ <1464611363-14936-2-git-send-email-tiffany.lin@mediatek.com>
+ <1464611363-14936-3-git-send-email-tiffany.lin@mediatek.com>
+ <1464611363-14936-4-git-send-email-tiffany.lin@mediatek.com>
+ <1464611363-14936-5-git-send-email-tiffany.lin@mediatek.com>
+ <1464611363-14936-6-git-send-email-tiffany.lin@mediatek.com>
+ <32112952-6a34-ac8b-9d06-198c6c653611@xs4all.nl>
+ <1470044307.30651.18.camel@mtksdaap41>
+ <8bd71dee-62ec-beba-c1d1-fc7e586d593b@xs4all.nl>
+Message-ID: <1470050904.30651.47.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 01, 2016 at 06:59:50PM +0800, zijun_hu wrote:
-> On 08/01/2016 05:50 PM, Ard Biesheuvel wrote:
-> > On 1 August 2016 at 11:42, zijun_hu <zijun_hu@zoho.com> wrote:
-> > Couldn't we simply do this instead?
-> this solution maybe better, my reason as follows?
+Hi Hans,
+
+On Mon, 2016-08-01 at 12:39 +0200, Hans Verkuil wrote:
+> Hi Tiffany,
 > 
-> 1?it can achieve our original purpose, namely, checking whether fdt
-> header is corrupted before fetching fdt size field; good fdt header can
-> ensure good fdt size field included more rightly than only a magic filed
-> normally
+> On 08/01/2016 11:38 AM, Tiffany Lin wrote:
+> > Hi Hans,
+> 
+> <snip>
+> 
+> >>> +static int vidioc_vdec_g_selection(struct file *file, void *priv,
+> >>> +			struct v4l2_selection *s)
+> >>> +{
+> >>> +	struct mtk_vcodec_ctx *ctx = fh_to_ctx(priv);
+> >>> +
+> >>> +	if (V4L2_TYPE_IS_OUTPUT(s->type))
+> >>> +		return -EINVAL;
+> >>> +
+> >>> +	if (s->target != V4L2_SEL_TGT_CROP)
+> >>> +		return -EINVAL;
+> >>
+> >> How does the cropping rectangle relate to the format size? There is no s_selection,
+> >> so this doesn't make sense.
+> >>
+> > I want to return encoded crop information or real display region that
+> > display driver could know where is padding region.
+> 
+> Sorry, I don't understand this.
+> 
+> This is a decoder, so based on the bitstream it decodes to a certain width
+> and height. I assume that is what you refer to as coded_width and coded_height?
+> 
+> If so, then what is the 'real display region' and how does it relate to the
+> coded width/height?
+> 
+> This is probably a terminology issue but I need to understand this before I
+> can decide what should be done here.
+> 
+We define coded_width and coded_height as frame buffer width and height.
+Coded resolution is stream resolution in pixels aligned to codec format
+and hardware requirements.
+And we assign bytesperline as coded_width.
 
-The only additional fields fdt_check_header checks are version and
-last_comp_version. In the absence of corruption, deferring these checks
-should be ok. We assume that the header is compatible regardless (or
-those fields would be meaningless).
+g_selection is for getting visible resolution for user space.
+visible resolution - stream resolution of the visible picture, in
+pixels, to be used for display purposes; must be smaller or equal to
+coded resolution;
+visible height - height for given visible resolution
+visible width - width for given visible resolution
 
-Even with corruption, it's possible for these to appear valid to
-fdt_check_header(). For the purpose of best-effort corruption detection,
-checking the magic alone in this early codepath seems ok to me. It seems
-unlikely that we'd have a valid magic yet a corrupted totalsize.
+For my understand, g_fmt should return coded width/height in
+pix_mp->width, pix_mp->height.
+And bytesperline is coded with.
+g_selection return visible width/height.
+Is this understanding correct?
 
-That all said, I'm not against mapping the whole header if it's simple
-enough to do so.
 
-> 2?it is more portable; we only need to call fdt_check_header() and don't
-> care about fdt header filed layout; moreover,fdt module is another independent
-> module and arm64 only uses it and should not depend on more details of fdt
-> such as size and magic fields locate within the first MIN_FDT_ALIGN bytes;
-> the decision whether a fdt header is corrupted should be left to fdt team
-
-While it's true that we assume knowledge of the FDT format, and ideally
-we'd leave this to common code, we do so regardless by requiring the
-header size. So both approaches assume details regarding the FDT format.
-
-Thanks,
-Mark.
+best regards,
+Tiffany
+> Regards,
+> 
+> 	Hans
+> 
+> > User space use s_fmt/g_fmt  to set/get coded_width and coded_height, and
+> > use g_crop to get real display region.
+> > That's why I do not add s_selection.
+> > 
+> >> Alternatively, it could be that you are really returning V4L2_SEL_TGT_COMPOSE_PADDED.
+> >>
+> > 
+> > V4L2_SEL_TGT_COMPOSE_PADDED means
+> > "The active area and all padding pixels that are inserted or modified by
+> > hardware."
+> > But I just want to return active area to user space.
+> > 
+> >>> +
+> >>> +	if (ctx->state < MTK_STATE_HEADER)
+> >>> +		return -EINVAL;
+> >>> +
+> >>> +	if ((ctx->q_data[MTK_Q_DATA_SRC].fmt->fourcc == V4L2_PIX_FMT_H264) ||
+> >>> +	    (ctx->q_data[MTK_Q_DATA_SRC].fmt->fourcc == V4L2_PIX_FMT_VP8) ||
+> >>> +	    (ctx->q_data[MTK_Q_DATA_SRC].fmt->fourcc == V4L2_PIX_FMT_VP9)) {
+> >>> +
+> >>> +		if (vdec_if_get_param(ctx, GET_PARAM_CROP_INFO, &(s->r))) {
+> >>> +			mtk_v4l2_debug(2,
+> >>> +					"[%d]Error!! Cannot get param : GET_PARAM_CROP_INFO ERR",
+> >>> +					ctx->id);
+> >>> +			s->r.left = 0;
+> >>> +			s->r.top = 0;
+> >>> +			s->r.width = ctx->picinfo.buf_w;
+> >>> +			s->r.height = ctx->picinfo.buf_h;
+> >>> +		}
+> >>> +		mtk_v4l2_debug(2, "Cropping info: l=%d t=%d w=%d h=%d",
+> >>> +				s->r.left, s->r.top, s->r.width,
+> >>> +				s->r.height);
+> >>> +	} else {
+> >>> +		s->r.left = 0;
+> >>> +		s->r.top = 0;
+> >>> +		s->r.width = ctx->picinfo.pic_w;
+> >>> +		s->r.height = ctx->picinfo.pic_h;
+> >>> +		mtk_v4l2_debug(2, "Cropping info: w=%d h=%d fw=%d fh=%d",
+> >>> +				s->r.width, s->r.height, ctx->picinfo.buf_w,
+> >>> +				ctx->picinfo.buf_h);
+> >>> +	}
+> >>> +	return 0;
+> >>> +}
