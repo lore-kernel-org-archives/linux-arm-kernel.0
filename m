@@ -1,92 +1,53 @@
-From: zijun_hu@zoho.com (zijun_hu)
-Date: Mon, 1 Aug 2016 21:17:09 +0800
-Subject: [PATCH] arm64: fix address fault during mapping fdt region
-In-Reply-To: <20160801112450.GD11119@leverpostej>
-References: <579F197B.80101@zoho.com>
- <CAKv+Gu9QQdncCD_T8+tpdVP8qx=EKM9-PGLvb8J9RNA2qHddFw@mail.gmail.com>
- <579F2BA6.1010203@zoho.com> <20160801112450.GD11119@leverpostej>
-Message-ID: <579F4BD5.9060300@zoho.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Mon, 1 Aug 2016 21:21:01 +0800
+Subject: [PATCH v3 2/3] hwmon: xgene: Add hwmon driver
+In-Reply-To: <1469134557-26869-3-git-send-email-hotran@apm.com>
+Message-ID: <201608012126.BWziGkjc%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/01/2016 07:24 PM, Mark Rutland wrote:
-> On Mon, Aug 01, 2016 at 06:59:50PM +0800, zijun_hu wrote:
->> On 08/01/2016 05:50 PM, Ard Biesheuvel wrote:
->>> On 1 August 2016 at 11:42, zijun_hu <zijun_hu@zoho.com> wrote:
->>> Couldn't we simply do this instead?
->> this solution maybe better, my reason as follows?
->>
->> 1?it can achieve our original purpose, namely, checking whether fdt
->> header is corrupted before fetching fdt size field; good fdt header can
->> ensure good fdt size field included more rightly than only a magic filed
->> normally
-> 
-> The only additional fields fdt_check_header checks are version and
-> last_comp_version. In the absence of corruption, deferring these checks
-> should be ok. We assume that the header is compatible regardless (or
-> those fields would be meaningless).
-> 
-> Even with corruption, it's possible for these to appear valid to
-> fdt_check_header(). For the purpose of best-effort corruption detection,
-> checking the magic alone in this early codepath seems ok to me. It seems
-> unlikely that we'd have a valid magic yet a corrupted totalsize.
-> 
-> That all said, I'm not against mapping the whole header if it's simple
-> enough to do so.
->
- 
-okay, as indicated by another mail sent by ard.biesheuvel, "the only fields we
-can assume to be mapped are 'magic' and 'totalsize'", accessing last_comp_version
-or version maybe causes address fault under some extreme conditions
+Hi Hoan,
 
-according to current fdt_check_header definition, another case is regard as 
-good fdt header, condition (fdt_magic(dt_virt) != FDT_MAGIC) don't cover
-as marked within below function body
+[auto build test ERROR on hwmon/hwmon-next]
+[also build test ERROR on v4.7]
+[cannot apply to next-20160801]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-int fdt_check_header(const void *fdt)
-{
-	if (fdt_magic(fdt) == FDT_MAGIC) {
-		/* Complete tree */
-		if (fdt_version(fdt) < FDT_FIRST_SUPPORTED_VERSION)
-			return -FDT_ERR_BADVERSION;
-		if (fdt_last_comp_version(fdt) > FDT_LAST_SUPPORTED_VERSION)
-			return -FDT_ERR_BADVERSION;
-	} else if (fdt_magic(fdt) == FDT_SW_MAGIC) {
-		/* Unfinished sequential-write blob */
-		if (fdt_size_dt_struct(fdt) == 0)  
-			return -FDT_ERR_BADSTATE;
+url:    https://github.com/0day-ci/linux/commits/Hoan-Tran/hwmon-xgene-Add-support-for-X-Gene-hwmon-driver/20160725-015356
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/groeck/linux-staging.git hwmon-next
+config: arm64-allmodconfig (attached as .config)
+compiler: aarch64-linux-gnu-gcc (Debian 5.4.0-6) 5.4.0 20160609
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm64 
 
-acess field size_dt_struct too, this condition is regarded as good fdt header too
+All errors (new ones prefixed by >>):
 
+>> drivers/hwmon/xgene-hwmon.c:38:22: fatal error: acpi/pcc.h: No such file or directory
+   compilation terminated.
 
-	} else {
-		return -FDT_ERR_BADMAGIC;
-	}
+vim +38 drivers/hwmon/xgene-hwmon.c
 
-	return 0;
-}
+    32	#include <linux/mailbox_controller.h>
+    33	#include <linux/mailbox_client.h>
+    34	#include <linux/module.h>
+    35	#include <linux/of.h>
+    36	#include <linux/platform_device.h>
+    37	#include <acpi/acpi_io.h>
+  > 38	#include <acpi/pcc.h>
+    39	
+    40	/* SLIMpro message defines */
+    41	#define MSG_TYPE_DBG			0
 
->> 2?it is more portable; we only need to call fdt_check_header() and don't
->> care about fdt header filed layout; moreover,fdt module is another independent
->> module and arm64 only uses it and should not depend on more details of fdt
->> such as size and magic fields locate within the first MIN_FDT_ALIGN bytes;
->> the decision whether a fdt header is corrupted should be left to fdt team
-> 
-> While it's true that we assume knowledge of the FDT format, and ideally
-> we'd leave this to common code, we do so regardless by requiring the
-> header size. So both approaches assume details regarding the FDT format.
-> 
-okay, the only thing my solution is depends on is the fdt header struct name
-which maybe remain unchanged in further fdt source modification
-regardless of fields layout or position or header size;
-
-by the way, my solution only maps more one SWAPPER_BLOCK_SIZE at extreme condition
-(offset + sizeof(struct fdt_header)) > SWAPPER_BLOCK_SIZE, it can occurs very rarely,
-even it happens, it is no matter due to the fast mapping operations
-
-That all said, ard.biesheuvel's can resolves address fault too, you can decide which
-solution to used, maybe ask fdt team for some advisements
-
-> Thanks,
-> Mark.
-> 
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 50305 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160801/b7c0a236/attachment-0001.obj>
