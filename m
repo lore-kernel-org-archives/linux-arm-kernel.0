@@ -1,43 +1,99 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 1 Aug 2016 14:31:20 +0100
-Subject: [PATCH] arm64: fix address fault during mapping fdt region
-In-Reply-To: <579F4BD5.9060300@zoho.com>
-References: <579F197B.80101@zoho.com>
- <CAKv+Gu9QQdncCD_T8+tpdVP8qx=EKM9-PGLvb8J9RNA2qHddFw@mail.gmail.com>
- <579F2BA6.1010203@zoho.com> <20160801112450.GD11119@leverpostej>
- <579F4BD5.9060300@zoho.com>
-Message-ID: <20160801133120.GA14267@leverpostej>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Mon, 1 Aug 2016 15:10:29 +0200
+Subject: [PATCH v2] mmc: sunxi: Handle the 'New Timings'
+Message-ID: <mailman.30.1470058473.1636.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 01, 2016 at 09:17:09PM +0800, zijun_hu wrote:
-> On 08/01/2016 07:24 PM, Mark Rutland wrote:
-> > On Mon, Aug 01, 2016 at 06:59:50PM +0800, zijun_hu wrote:
-> >> 2?it is more portable; we only need to call fdt_check_header() and don't
-> >> care about fdt header filed layout; moreover,fdt module is another independent
-> >> module and arm64 only uses it and should not depend on more details of fdt
-> >> such as size and magic fields locate within the first MIN_FDT_ALIGN bytes;
-> >> the decision whether a fdt header is corrupted should be left to fdt team
-> > 
-> > While it's true that we assume knowledge of the FDT format, and ideally
-> > we'd leave this to common code, we do so regardless by requiring the
-> > header size. So both approaches assume details regarding the FDT format.
-> > 
-> okay, the only thing my solution is depends on is the fdt header struct name
-> which maybe remain unchanged in further fdt source modification
-> regardless of fields layout or position or header size;
-> 
-> by the way, my solution only maps more one SWAPPER_BLOCK_SIZE at extreme condition
-> (offset + sizeof(struct fdt_header)) > SWAPPER_BLOCK_SIZE, it can occurs very rarely,
-> even it happens, it is no matter due to the fast mapping operations
-> 
-> That all said, ard.biesheuvel's can resolves address fault too, you can decide which
-> solution to used, maybe ask fdt team for some advisements
+Some MMC devices as mmc2 in the A83T or mmc1 and mmc2 in the H3 have
+a 'New Timings' mode.
+Set this capacity in the DT and use it when possible.
 
-As a member of the "fdt team" (at least for bindings and the spec), I'm
-happy with Ard's patch. ;)
+Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
+---
+I don't know if this mode works or is needed at 25MHz.
+---
+ Documentation/devicetree/bindings/mmc/sunxi-mmc.txt |  1 +
+ drivers/mmc/host/sunxi-mmc.c                        | 21 +++++++++++++++++++--
+ 2 files changed, 20 insertions(+), 2 deletions(-)
 
-Regardless, many thanks for the report, and the proposed fix!
-
-Thanks,
-Mark.
+diff --git a/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt b/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt
+index 4bf41d8..a541bf4 100644
+--- a/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt
++++ b/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt
+@@ -19,6 +19,7 @@ Optional properties:
+  - reset-names : must contain "ahb"
+  - for cd, bus-width and additional generic mmc parameters
+    please refer to mmc.txt within this directory
++ - allwinner,new-timings: the controller may accept the "New Timings" mode
+ 
+ Examples:
+ 	- Within .dtsi:
+diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
+index 2ee4c21..98922b5 100644
+--- a/drivers/mmc/host/sunxi-mmc.c
++++ b/drivers/mmc/host/sunxi-mmc.c
+@@ -64,6 +64,7 @@
+ #define SDXC_REG_CBCR	(0x48) /* SMC CIU Byte Count Register */
+ #define SDXC_REG_BBCR	(0x4C) /* SMC BIU Byte Count Register */
+ #define SDXC_REG_DBGC	(0x50) /* SMC Debug Enable Register */
++#define SDXC_REG_NTSR	(0x5c) /* SMC NewTiming Set Register */
+ #define SDXC_REG_HWRST	(0x78) /* SMC Card Hardware Reset for Register */
+ #define SDXC_REG_DMAC	(0x80) /* SMC IDMAC Control Register */
+ #define SDXC_REG_DLBA	(0x84) /* SMC IDMAC Descriptor List Base Addre */
+@@ -171,6 +172,9 @@
+ #define SDXC_SEND_AUTO_STOPCCSD		BIT(9)
+ #define SDXC_CEATA_DEV_IRQ_ENABLE	BIT(10)
+ 
++/* NewTiming Set Register */
++#define SDXC_NEWMODE_ENABLE		BIT(31)
++
+ /* IDMA controller bus mod bit field */
+ #define SDXC_IDMAC_SOFT_RESET		BIT(0)
+ #define SDXC_IDMAC_FIX_BURST		BIT(1)
+@@ -261,6 +265,9 @@ struct sunxi_mmc_host {
+ 
+ 	/* vqmmc */
+ 	bool		vqmmc_enabled;
++
++	/* misc */
++	bool		new_timings;	/* new timings capable */
+ };
+ 
+ static int sunxi_mmc_reset_host(struct sunxi_mmc_host *host)
+@@ -715,8 +722,13 @@ static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
+ 		return -EINVAL;
+ 	}
+ 
+-	clk_set_phase(host->clk_sample, sclk_dly);
+-	clk_set_phase(host->clk_output, oclk_dly);
++	if (host->new_timings && rate >= 50000000) {
++		mmc_writel(host, REG_NTSR,
++			mmc_readl(host, REG_NTSR) | SDXC_NEWMODE_ENABLE);
++	} else {
++		clk_set_phase(host->clk_sample, sclk_dly);
++		clk_set_phase(host->clk_output, oclk_dly);
++	}
+ 
+ 	return sunxi_mmc_oclk_onoff(host, 1);
+ }
+@@ -1133,12 +1145,17 @@ static int sunxi_mmc_probe(struct platform_device *pdev)
+ 	if (ret)
+ 		goto error_free_dma;
+ 
++	if (pdev->dev.of_node &&
++	    of_property_read_bool(pdev->dev.of_node, "allwinner,new-timings"))
++		host->new_timings = true;
++
+ 	ret = mmc_add_host(mmc);
+ 	if (ret)
+ 		goto error_free_dma;
+ 
+ 	dev_info(&pdev->dev, "base:0x%p irq:%u\n", host->reg_base, host->irq);
+ 	platform_set_drvdata(pdev, mmc);
++
+ 	return 0;
+ 
+ error_free_dma:
+-- 
+2.9.2
