@@ -1,67 +1,33 @@
-From: vanessa.maegima@nxp.com (Vanessa Maegima)
-Date: Mon, 1 Aug 2016 09:54:14 -0300
-Subject: [PATCH v2] ARM: dts: imx6ul-pico-hobbit: Add Wifi support
-Message-ID: <1470056054-5133-1-git-send-email-vanessa.maegima@nxp.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 1 Aug 2016 13:55:27 +0100
+Subject: [PATCH 2/2] soc: nxp: Add a RCPM driver
+In-Reply-To: <2024386.Ra8uvttlE9@wuerfel>
+References: <1470044943-3814-1-git-send-email-chenhui.zhao@nxp.com>
+ <1470044943-3814-2-git-send-email-chenhui.zhao@nxp.com>
+ <2024386.Ra8uvttlE9@wuerfel>
+Message-ID: <579F46BF.4080604@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-imx6ul-pico-hobbit has a bcm4339 wifi chip connected to usdhc2 port.
+On 01/08/16 13:25, Arnd Bergmann wrote:
+> On Monday, August 1, 2016 5:49:03 PM CEST Chenhui Zhao wrote:
+>> The NXP's QorIQ Processors based on ARM Core have a RCPM module
+>> (Run Control and Power Management), which performs all device-level
+>> tasks associated with power management.
+>>
+>> This patch mainly implements the wakeup sources configuration before
+>> entering LPM20, a low power state of device-level. The devices can be
+>> waked up by specified sources, such as Flextimer, GPIO and so on.
+>>
+>> Signed-off-by: Chenhui Zhao <chenhui.zhao@nxp.com>
+> 
+> Adding irqchip maintainers to cc, as this wakeup handling is normally
+> part of the irq controller.
 
-Add support for the WL_REG_ON regulator, so that Wifi can be functional
-on this board.
+Thanks for looping me in. This very much look like it should be a
+stacked irqchip, just like we handle everything else. I'll go and review
+the actual patch.
 
-Signed-off-by: Vanessa Maegima <vanessa.maegima@nxp.com>
----
-Changes since v1:
-- Improve commit log
-- Remove WL_HOST_WAKE
-
- arch/arm/boot/dts/imx6ul-pico-hobbit.dts | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
-
-diff --git a/arch/arm/boot/dts/imx6ul-pico-hobbit.dts b/arch/arm/boot/dts/imx6ul-pico-hobbit.dts
-index 8ce1fec..af2e06b 100644
---- a/arch/arm/boot/dts/imx6ul-pico-hobbit.dts
-+++ b/arch/arm/boot/dts/imx6ul-pico-hobbit.dts
-@@ -100,6 +100,18 @@
- 		gpio = <&gpio1 6 0>;
- 	};
- 
-+	reg_brcm: brcm-reg {
-+		compatible = "regulator-fixed";
-+		enable-active-high;
-+		gpio = <&gpio4 8 GPIO_ACTIVE_HIGH>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_brcm_reg>;
-+		regulator-name = "brcm_reg";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		startup-delay-us = <200000>;
-+	};
-+
- 	sound {
- 		compatible = "fsl,imx-audio-sgtl5000";
- 		model = "imx6ul-sgtl5000";
-@@ -325,12 +337,20 @@
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_usdhc2>;
- 	no-1-8-v;
-+	non-removable;
- 	keep-power-in-suspend;
- 	wakeup-source;
-+	vmmc-supply = <&reg_brcm>;
- 	status = "okay";
- };
- 
- &iomuxc {
-+	pinctrl_brcm_reg: brcmreggrp {
-+		fsl,pins = <
-+			MX6UL_PAD_NAND_DATA06__GPIO4_IO08	0x10b0	/* WL_REG_ON */
-+		>;
-+	};
-+
- 	pinctrl_enet2: enet2grp {
- 		fsl,pins = <
- 			MX6UL_PAD_ENET1_TX_DATA1__ENET2_MDIO	0x1b0b0
+	M.
 -- 
-2.7.4
+Jazz is not dead. It just smells funny...
