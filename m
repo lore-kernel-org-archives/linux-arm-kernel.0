@@ -1,60 +1,114 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Mon, 1 Aug 2016 19:00:50 +0900
-Subject: [PATCH v2 2/2] arm64: dts: Fix broken architected timer interrupt
- trigger
-In-Reply-To: <1470045256-9032-3-git-send-email-marc.zyngier@arm.com>
-References: <1470045256-9032-1-git-send-email-marc.zyngier@arm.com>
- <1470045256-9032-3-git-send-email-marc.zyngier@arm.com>
-Message-ID: <CAK7LNARVw+mDhHT2+WjDtHpBvsxauUQpRCJeNLrQxrj0Oo=hrQ@mail.gmail.com>
+From: zhengxing@rock-chips.com (Xing Zheng)
+Date: Mon, 1 Aug 2016 18:08:10 +0800
+Subject: [PATCH 2/2] clk: rockchip: fix incorrect parent for rk3399's
+ {c,g}pll_aclk_perihp_src
+In-Reply-To: <CAD=FV=Wda=kXYf4MnjXsW6g8sPAAEv7JO1ZoGXOnJW=aL0yv-w@mail.gmail.com>
+References: <1463164937-91089-1-git-send-email-briannorris@chromium.org>
+ <1463164937-91089-2-git-send-email-briannorris@chromium.org>
+ <CAD=FV=XstYhqpStSGw5PObWvpsvd3Nwp_hfEE-56bpFoVUyu+g@mail.gmail.com>
+ <57369D2E.3030002@rock-chips.com>
+ <CAD=FV=Wda=kXYf4MnjXsW6g8sPAAEv7JO1ZoGXOnJW=aL0yv-w@mail.gmail.com>
+Message-ID: <579F1F8A.8030704@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-08-01 18:54 GMT+09:00 Marc Zyngier <marc.zyngier@arm.com>:
-> The ARM architected timer specification mandates that the interrupt
-> associated with each timer is level triggered (which corresponds to
-> the "counter >= comparator" condition).
+Hi Doug,
+     It is so sorry that our IC folks re-correct these bits, they need 
+to be recovered like these:
+----
+In the definition of CRU_CLKGATE_CON5:
+     bit 1 - shows aclk_perihp_cpll_src_en
+     bit 0 - shows aclk_perihp_gpll_src_en
+----
+     And the new TRM will be updated.
+
+     FYI.
+
+Thanks.
+
+On 2016?05?16? 23:49, Doug Anderson wrote:
+> Hi,
 >
-> A number of DTs are being remarkably creative, declaring the interrupt
-> to be edge triggered. A quick look at the TRM for the corresponding ARM
-> CPUs clearly shows that this is wrong, and I've corrected those.
-> For non-ARM designs (and in the absence of a publicly available TRM),
-> I've made them active low as well, which can't be completely wrong
-> as the GIC cannot disinguish between level low and level high.
+> On Fri, May 13, 2016 at 8:36 PM, Xing Zheng <zhengxing@rock-chips.com> wrote:
+>> Hi Doug,
+>>
+>>
+>> On 2016?05?14? 04:10, Doug Anderson wrote:
+>>> Hi,
+>>>
+>>> On Fri, May 13, 2016 at 11:42 AM, Brian Norris <briannorris@chromium.org>
+>>> wrote:
+>>>> From: Xing Zheng <zhengxing@rock-chips.com>
+>>>>
+>>>> There was a typo, swapping 'c' <--> 'g'.
+>>>>
+>>>> Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
+>>>> Signed-off-by: Brian Norris <briannorris@chromium.org>
+>>>> ---
+>>>>    drivers/clk/rockchip/clk-rk3399.c | 4 ++--
+>>>>    1 file changed, 2 insertions(+), 2 deletions(-)
+>>>>
+>>>> diff --git a/drivers/clk/rockchip/clk-rk3399.c
+>>>> b/drivers/clk/rockchip/clk-rk3399.c
+>>>> index 145756c4f3c8..9f86bfef70f7 100644
+>>>> --- a/drivers/clk/rockchip/clk-rk3399.c
+>>>> +++ b/drivers/clk/rockchip/clk-rk3399.c
+>>>> @@ -832,9 +832,9 @@ static struct rockchip_clk_branch
+>>>> rk3399_clk_branches[] __initdata = {
+>>>>                           RK3399_CLKGATE_CON(13), 1, GFLAGS),
+>>>>
+>>>>           /* perihp */
+>>>> -       GATE(0, "cpll_aclk_perihp_src", "gpll", CLK_IGNORE_UNUSED,
+>>>> +       GATE(0, "cpll_aclk_perihp_src", "cpll", CLK_IGNORE_UNUSED,
+>>>>                           RK3399_CLKGATE_CON(5), 0, GFLAGS),
+>>>> -       GATE(0, "gpll_aclk_perihp_src", "cpll", CLK_IGNORE_UNUSED,
+>>>> +       GATE(0, "gpll_aclk_perihp_src", "gpll", CLK_IGNORE_UNUSED,
+>>>>                           RK3399_CLKGATE_CON(5), 1, GFLAGS),
+>>>>           COMPOSITE(ACLK_PERIHP, "aclk_perihp", mux_aclk_perihp_p,
+>>>> CLK_IGNORE_UNUSED,
+>>>>                           RK3399_CLKSEL_CON(14), 7, 1, MFLAGS, 0, 5,
+>>>> DFLAGS,
+>>> Definitely there was a bug since this table itself was inconsistent.
+>>> ...and I _think_ this fix is correct, but I'll note that the TRM has
+>>> more inconsistency here.
+>>>
+>>> In the big clock table 'CRU Clock Architecture Diagram', I see:
+>>>     CLK 4 is CPLL
+>>>     CLK 5 is GPLL
+>>>     CLK 125 is aclk_perihp_cpll_src and has 4 (CPLL) as source, with
+>>> g5[0] as the bit
+>>>     CLK 126 is aclk_perihp_gpll_src and has 5 (GPLL) as source, with
+>>> g5[1] as the bit
+>>>
+>>> In the definition of CRU_CLKGATE_CON5:
+>>>     bit 0 shows aclk_perihp_gpll_src_en
+>>>     bit 1 shows aclk_perihp_cpll_src_en
+>>>
+>>>
+>>> Thus the table shows CPLL as gate5[0] and GPLL as gate5[1].  The
+>>> register definition shows the opposite.  I'll tend to believe the
+>>> table over the register definition, but I figured I'd bring it up
+>>> anyway.
+>>>
+>>>
+>>> Xing Zheng: can you confirm that the table is correct and ask
+>>> documentation folks to fix the register definition for
+>>> CRU_CLKGATE_CON5?
+>> Yes, previously, our IC & DOC partner confirmed that the definition of
+>> CRU_CLKGATE_CON5 should be:
+>>    bit 0 shows aclk_perihp_cpll_src_en
+>>    bit 1 shows aclk_perihp_gpll_src_en
+>>
+>> Sorry to the incorrect register definition, we will fix them and review the
+>> TRM again.
+> Great!
 >
-> The respective maintainers are of course welcome to prove me wrong.
+> Since we now have extra confirmation that Brian's patch is indeed correct:
 >
-> While I was at it, I took the liberty to fix a couple of related issue,
-> such as some spurious affinity bits on ThunderX, and their complete
-> absence on ls1043a (both of which seem to be related to copy-pasting
-> from other DTs).
+> Reviewed-by: Douglas Anderson <dianders@chromium.org>
 >
-> Acked-by: Duc Dang <dhdang@apm.com>
-> Acked-by: Carlo Caione <carlo@endlessm.com>
-> Acked-by: Michal Simek <michal.simek@xilinx.com>
-> Acked-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> Acked-by: Dinh Nguyen <dinguyen@opensource.altera.com>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi    | 8 ++++----
->  arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi          | 8 ++++----
->  arch/arm64/boot/dts/apm/apm-storm.dtsi               | 8 ++++----
->  arch/arm64/boot/dts/broadcom/ns2.dtsi                | 8 ++++----
->  arch/arm64/boot/dts/cavium/thunder-88xx.dtsi         | 8 ++++----
->  arch/arm64/boot/dts/exynos/exynos7.dtsi              | 8 ++++----
->  arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi       | 8 ++++----
->  arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi       | 8 ++++----
->  arch/arm64/boot/dts/marvell/armada-ap806.dtsi        | 8 ++++----
->  arch/arm64/boot/dts/socionext/uniphier-ph1-ld20.dtsi | 8 ++++----
-
-
-For uniphier-ph1-ld20.dtsi,
-
-Acked-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-
-
-Thank you!!
-
+>
+>
 
 -- 
-Best Regards
-Masahiro Yamada
+- Xing Zheng
