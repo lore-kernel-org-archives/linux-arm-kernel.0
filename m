@@ -1,114 +1,83 @@
-From: zhengxing@rock-chips.com (Xing Zheng)
-Date: Mon, 1 Aug 2016 18:08:10 +0800
-Subject: [PATCH 2/2] clk: rockchip: fix incorrect parent for rk3399's
- {c,g}pll_aclk_perihp_src
-In-Reply-To: <CAD=FV=Wda=kXYf4MnjXsW6g8sPAAEv7JO1ZoGXOnJW=aL0yv-w@mail.gmail.com>
-References: <1463164937-91089-1-git-send-email-briannorris@chromium.org>
- <1463164937-91089-2-git-send-email-briannorris@chromium.org>
- <CAD=FV=XstYhqpStSGw5PObWvpsvd3Nwp_hfEE-56bpFoVUyu+g@mail.gmail.com>
- <57369D2E.3030002@rock-chips.com>
- <CAD=FV=Wda=kXYf4MnjXsW6g8sPAAEv7JO1ZoGXOnJW=aL0yv-w@mail.gmail.com>
-Message-ID: <579F1F8A.8030704@rock-chips.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Mon, 01 Aug 2016 12:21:10 +0200
+Subject: [PATCH V3 1/5] drm/imx-ldb: Add support to drm-bridge
+In-Reply-To: <5d55969a1509de751dc550d9a02bd5070455f99b.1469993472.git.peter.senna@collabora.com>
+References: <1464626385-19253-1-git-send-email-peter.senna@collabora.com>
+ <cover.1469993472.git.peter.senna@collabora.com>
+ <5d55969a1509de751dc550d9a02bd5070455f99b.1469993472.git.peter.senna@collabora.com>
+Message-ID: <1470046870.3025.36.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Doug,
-     It is so sorry that our IC folks re-correct these bits, they need 
-to be recovered like these:
-----
-In the definition of CRU_CLKGATE_CON5:
-     bit 1 - shows aclk_perihp_cpll_src_en
-     bit 0 - shows aclk_perihp_gpll_src_en
-----
-     And the new TRM will be updated.
+Am Sonntag, den 31.07.2016, 21:55 +0200 schrieb Peter Senna Tschudin:
+> Add support to attach a drm_bridge to imx-ldb in addition to
+> existing support to attach a LVDS panel.
+> 
+> This patch does a simple code refactoring by moving code
+> from for_each_child_of_node iterator to a new function named
+> imx_ldb_panel_ddc(). This was necessary to allow the panel ddc
+> code to run only when the imx_ldb is not attached to a bridge.
+> 
+> Cc: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+> Cc: Philipp Zabel <p.zabel@pengutronix.de>
+> Cc: Rob Herring <robh@kernel.org>
+> Cc: Fabio Estevam <fabio.estevam@nxp.com>
+> Cc: David Airlie <airlied@linux.ie>
+> Cc: Thierry Reding <treding@nvidia.com>
+> Cc: Thierry Reding <thierry.reding@gmail.com>
+> Signed-off-by: Peter Senna Tschudin <peter.senna@collabora.com>
+> ---
+> Changes from V2:
+>  - Updated to be aplied on top of Liu Ying changes that made imx-ldb atomic.
+>  - Tested on next-20160729.
+[...]
+> @@ -469,19 +473,28 @@ static int imx_ldb_register(struct drm_device *drm,
+>  	drm_encoder_init(drm, encoder, &imx_ldb_encoder_funcs,
+>  			 DRM_MODE_ENCODER_LVDS, NULL);
+>  
+> -	drm_connector_helper_add(&imx_ldb_ch->connector,
+> -			&imx_ldb_connector_helper_funcs);
+> -	drm_connector_init(drm, &imx_ldb_ch->connector,
+> -			   &imx_ldb_connector_funcs, DRM_MODE_CONNECTOR_LVDS);
+> -
+>  	if (imx_ldb_ch->panel) {
+> +		drm_connector_helper_add(&imx_ldb_ch->connector,
+> +				&imx_ldb_connector_helper_funcs);
+> +		drm_connector_init(drm, &imx_ldb_ch->connector,
+> +				&imx_ldb_connector_funcs,
+> +				DRM_MODE_CONNECTOR_LVDS);
 
-     FYI.
+This is still not right. We want to add the connector whenever there is
+no bridge that brings its own, not only when there is a panel. For
+historical reasons, the ldb driver can also work without a panel.
 
-Thanks.
+>  		ret = drm_panel_attach(imx_ldb_ch->panel,
+> -				       &imx_ldb_ch->connector);
+> +				&imx_ldb_ch->connector);
 
-On 2016?05?16? 23:49, Doug Anderson wrote:
-> Hi,
->
-> On Fri, May 13, 2016 at 8:36 PM, Xing Zheng <zhengxing@rock-chips.com> wrote:
->> Hi Doug,
->>
->>
->> On 2016?05?14? 04:10, Doug Anderson wrote:
->>> Hi,
->>>
->>> On Fri, May 13, 2016 at 11:42 AM, Brian Norris <briannorris@chromium.org>
->>> wrote:
->>>> From: Xing Zheng <zhengxing@rock-chips.com>
->>>>
->>>> There was a typo, swapping 'c' <--> 'g'.
->>>>
->>>> Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
->>>> Signed-off-by: Brian Norris <briannorris@chromium.org>
->>>> ---
->>>>    drivers/clk/rockchip/clk-rk3399.c | 4 ++--
->>>>    1 file changed, 2 insertions(+), 2 deletions(-)
->>>>
->>>> diff --git a/drivers/clk/rockchip/clk-rk3399.c
->>>> b/drivers/clk/rockchip/clk-rk3399.c
->>>> index 145756c4f3c8..9f86bfef70f7 100644
->>>> --- a/drivers/clk/rockchip/clk-rk3399.c
->>>> +++ b/drivers/clk/rockchip/clk-rk3399.c
->>>> @@ -832,9 +832,9 @@ static struct rockchip_clk_branch
->>>> rk3399_clk_branches[] __initdata = {
->>>>                           RK3399_CLKGATE_CON(13), 1, GFLAGS),
->>>>
->>>>           /* perihp */
->>>> -       GATE(0, "cpll_aclk_perihp_src", "gpll", CLK_IGNORE_UNUSED,
->>>> +       GATE(0, "cpll_aclk_perihp_src", "cpll", CLK_IGNORE_UNUSED,
->>>>                           RK3399_CLKGATE_CON(5), 0, GFLAGS),
->>>> -       GATE(0, "gpll_aclk_perihp_src", "cpll", CLK_IGNORE_UNUSED,
->>>> +       GATE(0, "gpll_aclk_perihp_src", "gpll", CLK_IGNORE_UNUSED,
->>>>                           RK3399_CLKGATE_CON(5), 1, GFLAGS),
->>>>           COMPOSITE(ACLK_PERIHP, "aclk_perihp", mux_aclk_perihp_p,
->>>> CLK_IGNORE_UNUSED,
->>>>                           RK3399_CLKSEL_CON(14), 7, 1, MFLAGS, 0, 5,
->>>> DFLAGS,
->>> Definitely there was a bug since this table itself was inconsistent.
->>> ...and I _think_ this fix is correct, but I'll note that the TRM has
->>> more inconsistency here.
->>>
->>> In the big clock table 'CRU Clock Architecture Diagram', I see:
->>>     CLK 4 is CPLL
->>>     CLK 5 is GPLL
->>>     CLK 125 is aclk_perihp_cpll_src and has 4 (CPLL) as source, with
->>> g5[0] as the bit
->>>     CLK 126 is aclk_perihp_gpll_src and has 5 (GPLL) as source, with
->>> g5[1] as the bit
->>>
->>> In the definition of CRU_CLKGATE_CON5:
->>>     bit 0 shows aclk_perihp_gpll_src_en
->>>     bit 1 shows aclk_perihp_cpll_src_en
->>>
->>>
->>> Thus the table shows CPLL as gate5[0] and GPLL as gate5[1].  The
->>> register definition shows the opposite.  I'll tend to believe the
->>> table over the register definition, but I figured I'd bring it up
->>> anyway.
->>>
->>>
->>> Xing Zheng: can you confirm that the table is correct and ask
->>> documentation folks to fix the register definition for
->>> CRU_CLKGATE_CON5?
->> Yes, previously, our IC & DOC partner confirmed that the definition of
->> CRU_CLKGATE_CON5 should be:
->>    bit 0 shows aclk_perihp_cpll_src_en
->>    bit 1 shows aclk_perihp_gpll_src_en
->>
->> Sorry to the incorrect register definition, we will fix them and review the
->> TRM again.
-> Great!
->
-> Since we now have extra confirmation that Brian's patch is indeed correct:
->
-> Reviewed-by: Douglas Anderson <dianders@chromium.org>
->
->
->
+What is the purpose of this change?
 
--- 
-- Xing Zheng
+>  		if (ret)
+>  			return ret;
+>  	}
+>  
+> -	drm_mode_connector_attach_encoder(&imx_ldb_ch->connector, encoder);
+
+Where is this gone?
+
+> +	if (imx_ldb_ch->bridge) {
+> +		imx_ldb_ch->bridge->encoder = encoder;
+> +
+> +		imx_ldb_ch->encoder.bridge = imx_ldb_ch->bridge;
+> +		ret = drm_bridge_attach(drm, imx_ldb_ch->bridge);
+> +		if (ret) {
+> +			DRM_ERROR("Failed to initialize bridge with drm\n");
+> +			return ret;
+> +		}
+> +	}
+>  
+>  	return 0;
+>  }
+
+regards
+Philipp
