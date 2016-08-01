@@ -1,62 +1,94 @@
-From: zhengxing@rock-chips.com (Xing Zheng)
-Date: Mon,  1 Aug 2016 12:25:01 +0800
-Subject: [RESEND PATCH 6/6] clk: rockchip: rk3399: Add support frac mode
- frequencies
-In-Reply-To: <1470025389-4094-1-git-send-email-zhengxing@rock-chips.com>
-References: <1470025389-4094-1-git-send-email-zhengxing@rock-chips.com>
-Message-ID: <1470025501-4259-1-git-send-email-zhengxing@rock-chips.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Mon, 1 Aug 2016 13:37:26 +0900
+Subject: [PATCH v23 0/9] arm64: add kdump support
+In-Reply-To: <20160729171300.GA478@localhost.localdomain>
+References: <20160726075659.2290-1-takahiro.akashi@linaro.org>
+ <20160726080925.GA2363@linaro.org>
+ <CAB=otbTODnOwFiLZT7bm1_MLyORQ1cx-gaeg7bm+bReaMRhYwg@mail.gmail.com>
+ <20160729171300.GA478@localhost.localdomain>
+Message-ID: <20160801043725.GC7995@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We need to support various display resolutions for external
-display devices like HDMI/DP, the frac mode can help us to
-acquire almost any frequencies, and need higher VCOs to reduce
-clock jitters.
+Pratyush,
 
-Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
----
+On Fri, Jul 29, 2016 at 10:43:00PM +0530, Pratyush Anand wrote:
+> Hi Ruslan,
+> 
+> On 29/07/2016:07:26:03 PM, Ruslan Bilovol wrote:
+> > Hi,
+> > 
+> > On Tue, Jul 26, 2016 at 11:09 AM, AKASHI Takahiro
+> > <takahiro.akashi@linaro.org> wrote:
+> > > On Tue, Jul 26, 2016 at 04:56:51PM +0900, AKASHI Takahiro wrote:
+> > >> This patch series adds kdump support on arm64.
+> > >>
+> > >> To load a crash-dump kernel to the systems, a series of patches to
+> > >> kexec-tools, which have not yet been merged upstream, are needed.
+> > >> Please pick Geoff's kexec patches [1] and my kdump patches [2].
+> > >>
+> > >> To examine vmcore (/proc/vmcore) on a crash-dump kernel, you can use
+> > >>   - crash utility (coming v7.1.6 or later) [3]
+> > >>     (Necessary patches have already been queued in the master.)
+> > >>
+> > >> [1]  http://lists.infradead.org/pipermail/kexec/2016-July/016532.html
+> > >> [2]  TBD
+> > >
+> > > See my kexec-tools patches in:
+> > > http://lists.infradead.org/pipermail/kexec/2016-July/016642.html
+> > 
+> > I tired this patch series with mentioned Geoff's kexec patches and
+> > your kdump patches, but unfortunately it doesn't work for me.
+> > 
+> > While I can successfully load and kexec the kernel ('kexec --load' +
+> > 'kexec -e'), same combination of kernel+ramdisk+dtb doesn't boot
+> > if I do kdump combination ('kexec -p' + sysrq crash), there is no
+> > any output after sysrq crash trace.
+> > Unfortunately I don't have any debugger here for deep investigation
+> > of this issue.
+> 
+> Which type of image do you have? I did face issue with binary image which I
+> fixed in my branch, while elf would work fine for kdump as well.
 
- drivers/clk/rockchip/clk-rk3399.c |   21 ++++++++++++++++++++-
- 1 file changed, 20 insertions(+), 1 deletion(-)
+Can you describe in more details, please?
+I don't see any problems with either vmlinux or image
+in my environment.
 
-diff --git a/drivers/clk/rockchip/clk-rk3399.c b/drivers/clk/rockchip/clk-rk3399.c
-index 4a15ce5b..3daa164 100644
---- a/drivers/clk/rockchip/clk-rk3399.c
-+++ b/drivers/clk/rockchip/clk-rk3399.c
-@@ -109,6 +109,25 @@ static struct rockchip_pll_rate_table rk3399_pll_rates[] = {
- 	{ /* sentinel */ },
- };
- 
-+static struct rockchip_pll_rate_table rk3399_pll_frates[] = {
-+	/* _mhz, _refdiv, _fbdiv, _postdiv1, _postdiv2, _dsmpd, _frac */
-+	RK3036_PLL_RATE( 594000000, 1, 123, 5, 1, 0, 12582912),  /* vco = 2970000000 */
-+	RK3036_PLL_RATE( 593406593, 1, 123, 5, 1, 0, 10508804),  /* vco = 2967032965 */
-+	RK3036_PLL_RATE( 297000000, 1, 123, 5, 2, 0, 12582912),  /* vco = 2970000000 */
-+	RK3036_PLL_RATE( 296703297, 1, 123, 5, 2, 0, 10508807),  /* vco = 2967032970 */
-+	RK3036_PLL_RATE( 148500000, 1, 129, 7, 3, 0, 15728640),  /* vco = 3118500000 */
-+	RK3036_PLL_RATE( 148351648, 1, 123, 5, 4, 0, 10508800),  /* vco = 2967032960 */
-+	RK3036_PLL_RATE( 106500000, 1, 124, 7, 4, 0,  4194304),  /* vco = 2982000000 */
-+	RK3036_PLL_RATE(  74250000, 1, 129, 7, 6, 0, 15728640),  /* vco = 3118500000 */
-+	RK3036_PLL_RATE(  74175824, 1, 129, 7, 6, 0, 13550823),  /* vco = 3115384608 */
-+	RK3036_PLL_RATE(  65000000, 1, 113, 7, 6, 0, 12582912),  /* vco = 2730000000 */
-+	RK3036_PLL_RATE(  59340659, 1, 121, 7, 7, 0,  2581098),  /* vco = 2907692291 */
-+	RK3036_PLL_RATE(  54000000, 1, 110, 7, 7, 0,  4194304),  /* vco = 2646000000 */
-+	RK3036_PLL_RATE(  27000000, 1,  55, 7, 7, 0,  2097152),  /* vco = 1323000000 */
-+	RK3036_PLL_RATE(  26973027, 1,  55, 7, 7, 0,  1173232),  /* vco = 1321678323 */
-+	{ /* sentinel */ },
-+};
-+
- /* CRU parents */
- PNAME(mux_pll_p)				= { "xin24m", "xin32k" };
- 
-@@ -229,7 +248,7 @@ static struct rockchip_pll_clock rk3399_pll_clks[] __initdata = {
- 	[npll] = PLL(pll_rk3399, PLL_NPLL, "npll",  mux_pll_p, 0, RK3399_PLL_CON(40),
- 		     RK3399_PLL_CON(43), 8, 31, ROCKCHIP_PLL_SYNC_RATE, rk3399_pll_rates),
- 	[vpll] = PLL(pll_rk3399, PLL_VPLL, "vpll",  mux_pll_p, 0, RK3399_PLL_CON(48),
--		     RK3399_PLL_CON(51), 8, 31, ROCKCHIP_PLL_SYNC_RATE, rk3399_pll_rates),
-+		     RK3399_PLL_CON(51), 8, 31, ROCKCHIP_PLL_SYNC_RATE, rk3399_pll_frates),
- };
- 
- static struct rockchip_pll_clock rk3399_pmu_pll_clks[] __initdata = {
--- 
-1.7.9.5
+Thanks,
+-Takahiro AKASHI
+
+> > 
+> > Also for some reason in case of 'load and kexec the kernel' it
+> > takes 1-2 minutes to start booting after I do kexec -e, need to
+> > investigate it further.
+> 
+> Because, D-cache is disabled.
+> 
+> > 
+> > Which hardware do you use for validating your patches?
+> > 
+> > Also, could you please share exact commands you use for
+> > kdump validation?
+> 
+> Well, I have some patches for D-cache enabling, which will be sent for review
+> after these set of kexec and kdump patches are merged.
+> 
+> Meanwhile, you can use them and give your feedback. They are here:
+> https://github.com/pratyushanand/kexec-tools.git : upstream_arm64_devel
+> 
+> I use following command with my test branch. You can ignore --port and
+> --port-lsr in your setup. You may use --enable-dcache and  let me know if it
+> works for you and improves execution speed. You may need to change vmlinux and
+> inird name as per your setup.
+> 
+> for kexec test:
+> kexec -l /boot/vmlinuz-`uname -r` --initrd=/boot/initramfs-`uname -r`.img
+> --reuse-cmdline --enable-dcache --port=0x1c020000
+> --port-lsr=0x1c020014,0x60;kexec -e
+> 
+> for kdump test:
+> kexec -p /boot/vmlinuz-`uname -r` --initrd=/boot/initramfs-`uname -r`kdump.img
+> --reuse-cmdline --enable-dcache --port=0x1c020000 --port-lsr=0x1c020014,0x60
+> --append="irqpoll maxcpus=1 reset_devices"; echo c > /proc/sysrq-trigger
+> 
+> ~Pratyush
