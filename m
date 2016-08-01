@@ -1,121 +1,79 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Tue,  2 Aug 2016 00:01:32 +0200
-Subject: [PATCH v4] ARM: pxa: fix GPIO double shifts
-Message-ID: <1470088892-31373-1-git-send-email-robert.jarzmik@free.fr>
+From: kwangwoo.lee@sk.com (kwangwoo.lee at sk.com)
+Date: Mon, 1 Aug 2016 23:24:21 +0000
+Subject: [PATCH v2] arm64: mm: convert __dma_* routines to use start, size
+In-Reply-To: <c2dd1a34-c97a-3865-cd5e-ccc4877bfe3e@arm.com>
+References: <1469518496-8177-1-git-send-email-kwangwoo.lee@sk.com>
+ <b978e732-f5c3-4b77-01d9-dd5f7e2303e3@arm.com>
+ <15c12f9900fd4b31a875250c478023c6@nmail01.hynixad.com>
+ <c355debc-0238-ff51-ca90-6e0c8085366b@arm.com>
+ <b0d9ef6b59364c4587f8d7c2493160ed@nmail01.hynixad.com>
+ <c4ee86f4-e7c4-aeee-f3eb-cb4477a95bf6@arm.com>
+ <1c4ec01bd3594485b6a4b386994dc6ca@nmail01.hynixad.com>
+ <21272fb2-bffb-15ee-41a9-af0251a33fd0@arm.com>
+ <c2dd1a34-c97a-3865-cd5e-ccc4877bfe3e@arm.com>
+Message-ID: <c7f9cb77566b45f78c91403329f7e0c8@nmail01.hynixad.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The commit 9bf448c66d4b ("ARM: pxa: use generic gpio operation instead of
-gpio register") from Oct 17, 2011, leads to the following static checker
-warning:
-  arch/arm/mach-pxa/spitz_pm.c:172 spitz_charger_wakeup()
-  warn: double left shift '!gpio_get_value(SPITZ_GPIO_KEY_INT)
-        << (1 << ((SPITZ_GPIO_KEY_INT) & 31))'
+> -----Original Message-----
+> From: Robin Murphy [mailto:robin.murphy at arm.com]
+> Sent: Monday, August 01, 2016 10:53 PM
+> To: ???(LEE KWANGWOO) MS SW; Russell King - ARM Linux; Catalin Marinas; Will Deacon; Mark Rutland;
+> linux-arm-kernel at lists.infradead.org
+> Cc: ???(KIM HYUNCHUL) MS SW; linux-kernel at vger.kernel.org; ???(CHUNG WOO SUK) MS SW
+> Subject: Re: [PATCH v2] arm64: mm: convert __dma_* routines to use start, size
+> 
+> On 01/08/16 14:36, Robin Murphy wrote:
+> > On 01/08/16 00:45, kwangwoo.lee at sk.com wrote:
+> > [...]
+> >>>>> -----8<-----
+> >>>>> diff --git a/arch/arm64/include/asm/assembler.h
+> >>>>> b/arch/arm64/include/asm/assembler.h
+> >>>>> index 10b017c4bdd8..1c005c90387e 100644
+> >>>>> --- a/arch/arm64/include/asm/assembler.h
+> >>>>> +++ b/arch/arm64/include/asm/assembler.h
+> >>>>> @@ -261,7 +261,16 @@ lr	.req	x30		// link register
+> >>>>>  	add	\size, \kaddr, \size
+> >>>>>  	sub	\tmp2, \tmp1, #1
+> >>>>>  	bic	\kaddr, \kaddr, \tmp2
+> >>>>> -9998:	dc	\op, \kaddr
+> >>>>> +9998:
+> >>>>> +	.ifeqs "\op", "cvac"
+> >>>>> +alternative_if_not ARM64_WORKAROUND_CLEAN_CACHE
+> >>>>> +	dc	cvac, \kaddr
+> >>>>> +alternative_else
+> >>>>> +	dc	civac, \kaddr
+> >>>>> +alternative_endif
+> >>>>> +	.else
+> >>>>> +	dc	\op, \kaddr
+> >>>>> +	.endif
+> >>>>>  	add	\kaddr, \kaddr, \tmp1
+> >>>>>  	cmp	\kaddr, \size
+> >>>>>  	b.lo	9998b
+> >>>>
+> >>>> I agree that it looks not viable because it makes the macro bigger and
+> >>>> conditional specifically with CVAC op.
+> >>>
+> >>> Actually, having had a poke around in the resulting disassembly, it
+> >>> looks like this does work correctly. I can't think of a viable reason
+> >>> for the whole dcache_by_line_op to ever be wrapped in yet another
+> >>> alternative (which almost certainly would go horribly wrong), and it
+> >>> would mean that any other future users are automatically covered for
+> >>> free. It's just horrible to look at at the source level.
+> >>
+> >> Then, Are you going to send a patch for this? Or should I include this change?
+> >
+> > I'll do a bit more testing just to make sure, then spin a separate patch
+> > (and try to remember to keep you on CC..)
+> 
+> ...and said patch turns out to conflict with 823066d9edcd, since I
+> hadn't realised it's already been fixed! So you can go ahead with the
+> dcache_by_line_op cleanup as well, just rebase onto arm64/for-next/core
+> (or linux/master, since it's been pulled already).
 
-As Dan reported, the value is shifted three times :
- - once by gpio_get_value(), which returns either 0 or BIT(gpio)
- - once by the shift operation '<<'
- - a last time by GPIO_bit(gpio) which is BIT(gpio)
+Thank you very much for the information! I'll rebase with it. 
 
-Therefore the calculation lead to a chained or operator of :
- - (1 << gpio) << (1 << gpio) = (2^gpio)^gpio = 2 ^ (gpio * gpio)
+> Robin.
 
-It is be sheer luck the former statement works, only because each gpio
-used is strictly smaller than 6, and therefore 2^(gpio^2) never
-overflows a 32 bits value, and because it is used as a boolean value to
-check a gpio activation.
-
-As the xxx_charger_wakeup() functions are used as a true/false detection
-mechanism, take that opportunity to change their prototypes from integer
-return value to boolean one.
-
-Fixes: 9bf448c66d4b ("ARM: pxa: use generic gpio operation instead of
-gpio register")
-Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
-Cc: Joe Perches <joe@perches.com>
-Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
----
-Since v1: replaced binary ORs with logical ORs after assembly comparison
-Since v2: changed charger_wakeup prototype to bool foo()
-Since v3: direct return statements in xxx_charger_wakeup()
----
- arch/arm/mach-pxa/corgi_pm.c   | 13 ++++---------
- arch/arm/mach-pxa/sharpsl_pm.c |  2 +-
- arch/arm/mach-pxa/sharpsl_pm.h |  2 +-
- arch/arm/mach-pxa/spitz_pm.c   |  9 +++------
- 4 files changed, 9 insertions(+), 17 deletions(-)
-
-diff --git a/arch/arm/mach-pxa/corgi_pm.c b/arch/arm/mach-pxa/corgi_pm.c
-index d9206811be9b..c71c483f410e 100644
---- a/arch/arm/mach-pxa/corgi_pm.c
-+++ b/arch/arm/mach-pxa/corgi_pm.c
-@@ -131,16 +131,11 @@ static int corgi_should_wakeup(unsigned int resume_on_alarm)
- 	return is_resume;
- }
- 
--static unsigned long corgi_charger_wakeup(void)
-+static bool corgi_charger_wakeup(void)
- {
--	unsigned long ret;
--
--	ret = (!gpio_get_value(CORGI_GPIO_AC_IN) << GPIO_bit(CORGI_GPIO_AC_IN))
--		| (!gpio_get_value(CORGI_GPIO_KEY_INT)
--		<< GPIO_bit(CORGI_GPIO_KEY_INT))
--		| (!gpio_get_value(CORGI_GPIO_WAKEUP)
--		<< GPIO_bit(CORGI_GPIO_WAKEUP));
--	return ret;
-+	return !gpio_get_value(CORGI_GPIO_AC_IN) ||
-+		!gpio_get_value(CORGI_GPIO_KEY_INT) ||
-+		!gpio_get_value(CORGI_GPIO_WAKEUP);
- }
- 
- unsigned long corgipm_read_devdata(int type)
-diff --git a/arch/arm/mach-pxa/sharpsl_pm.c b/arch/arm/mach-pxa/sharpsl_pm.c
-index b80eab9993c5..249b7bd5fbc4 100644
---- a/arch/arm/mach-pxa/sharpsl_pm.c
-+++ b/arch/arm/mach-pxa/sharpsl_pm.c
-@@ -744,7 +744,7 @@ static int sharpsl_off_charge_battery(void)
- 		time = RCNR;
- 		while (1) {
- 			/* Check if any wakeup event had occurred */
--			if (sharpsl_pm.machinfo->charger_wakeup() != 0)
-+			if (sharpsl_pm.machinfo->charger_wakeup())
- 				return 0;
- 			/* Check for timeout */
- 			if ((RCNR - time) > SHARPSL_WAIT_CO_TIME)
-diff --git a/arch/arm/mach-pxa/sharpsl_pm.h b/arch/arm/mach-pxa/sharpsl_pm.h
-index 905be6755f04..fa75b6df8134 100644
---- a/arch/arm/mach-pxa/sharpsl_pm.h
-+++ b/arch/arm/mach-pxa/sharpsl_pm.h
-@@ -34,7 +34,7 @@ struct sharpsl_charger_machinfo {
- #define SHARPSL_STATUS_LOCK     5
- #define SHARPSL_STATUS_CHRGFULL 6
- #define SHARPSL_STATUS_FATAL    7
--	unsigned long (*charger_wakeup)(void);
-+	bool (*charger_wakeup)(void);
- 	int (*should_wakeup)(unsigned int resume_on_alarm);
- 	void (*backlight_limit)(int);
- 	int (*backlight_get_status) (void);
-diff --git a/arch/arm/mach-pxa/spitz_pm.c b/arch/arm/mach-pxa/spitz_pm.c
-index ea9f9034cb54..4e64a140252e 100644
---- a/arch/arm/mach-pxa/spitz_pm.c
-+++ b/arch/arm/mach-pxa/spitz_pm.c
-@@ -165,13 +165,10 @@ static int spitz_should_wakeup(unsigned int resume_on_alarm)
- 	return is_resume;
- }
- 
--static unsigned long spitz_charger_wakeup(void)
-+static bool spitz_charger_wakeup(void)
- {
--	unsigned long ret;
--	ret = ((!gpio_get_value(SPITZ_GPIO_KEY_INT)
--		<< GPIO_bit(SPITZ_GPIO_KEY_INT))
--		| gpio_get_value(SPITZ_GPIO_SYNC));
--	return ret;
-+	return !gpio_get_value(SPITZ_GPIO_KEY_INT) ||
-+		gpio_get_value(SPITZ_GPIO_SYNC);
- }
- 
- unsigned long spitzpm_read_devdata(int type)
--- 
-2.1.4
+Best Regards,
+Kwangwoo Lee
