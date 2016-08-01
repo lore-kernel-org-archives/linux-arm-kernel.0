@@ -1,39 +1,51 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Mon, 01 Aug 2016 21:10:22 +0200
-Subject: [RFT PATCH v2 2/3] ARM: Fix *MIGHT_HAVE_PCI* config from being
- selected redundantly
-In-Reply-To: <1470049950-4697-3-git-send-email-kishon@ti.com> (Kishon Vijay
- Abraham, I's message of "Mon, 1 Aug 2016 16:42:29 +0530")
-References: <1470049950-4697-1-git-send-email-kishon@ti.com>
- <1470049950-4697-3-git-send-email-kishon@ti.com>
-Message-ID: <87oa5cxq3l.fsf@belgarion.home>
+From: briannorris@chromium.org (Brian Norris)
+Date: Mon, 1 Aug 2016 13:13:50 -0700
+Subject: [RESEND PATCH v2 3/8] clk: rockchip: rk3399: fix incorrect
+ parent for rk3399's {c, g}pll_aclk_perihp_src
+In-Reply-To: <1470045224-31854-4-git-send-email-zhengxing@rock-chips.com>
+References: <1470045224-31854-1-git-send-email-zhengxing@rock-chips.com>
+ <1470045224-31854-4-git-send-email-zhengxing@rock-chips.com>
+Message-ID: <20160801201349.GA129313@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kishon Vijay Abraham I <kishon@ti.com> writes:
+On Mon, Aug 01, 2016 at 05:53:38PM +0800, Xing Zheng wrote:
+> There was a typo, swapping 'c' <--> 'g'.
+> (This patch is updated and am from https://patchwork.kernel.org/patch/9254067/)
+> 
+> Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
+> Signed-off-by: Brian Norris <briannorris@chromium.org>
+> Reviewed-by: Douglas Anderson <dianders@chromium.org>
+> ---
+> 
+> Changes in v2: None
 
-> *MIGHT_HAVE_PCI* config is already selected in ARCH_MULTIPLATFORM.
-> Fix it from getting redundantly selected in all
-> ARCH_MULTIPLATFORM based machines.
+I believe this patch was already applied upstream; otherwise, it
+wouldn't make sense to have both this patch and patch 4 -- we would
+probably squash them together.
 
-If that's the purpose, then CM-X255 and CM-X270 don't fall in that category, as
-they are not part of ARCH_MULTIPLATFORM nor ready for it AFAIK. So the change
-below shouldn't be done according to the commit message.
+Brian
 
-> diff --git a/arch/arm/mach-pxa/Kconfig b/arch/arm/mach-pxa/Kconfig
-> index cd894d6..39f7755 100644
-> --- a/arch/arm/mach-pxa/Kconfig
-> +++ b/arch/arm/mach-pxa/Kconfig
-> @@ -113,7 +113,6 @@ config MACH_ARMCORE
->  	bool "CompuLab CM-X255/CM-X270 modules"
->  	select ARCH_HAS_DMA_SET_COHERENT_MASK if PCI
->  	select IWMMXT
-> -	select MIGHT_HAVE_PCI
->  	select NEED_MACH_IO_H if PCI
->  	select PXA25x
->  	select PXA27x
-
-Cheers.
-
---
-Robert
+>  drivers/clk/rockchip/clk-rk3399.c |    4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/clk/rockchip/clk-rk3399.c b/drivers/clk/rockchip/clk-rk3399.c
+> index f55f967f..2182391 100644
+> --- a/drivers/clk/rockchip/clk-rk3399.c
+> +++ b/drivers/clk/rockchip/clk-rk3399.c
+> @@ -832,9 +832,9 @@ static struct rockchip_clk_branch rk3399_clk_branches[] __initdata = {
+>  			RK3399_CLKGATE_CON(13), 1, GFLAGS),
+>  
+>  	/* perihp */
+> -	GATE(0, "cpll_aclk_perihp_src", "gpll", CLK_IGNORE_UNUSED,
+> +	GATE(0, "cpll_aclk_perihp_src", "cpll", CLK_IGNORE_UNUSED,
+>  			RK3399_CLKGATE_CON(5), 0, GFLAGS),
+> -	GATE(0, "gpll_aclk_perihp_src", "cpll", CLK_IGNORE_UNUSED,
+> +	GATE(0, "gpll_aclk_perihp_src", "gpll", CLK_IGNORE_UNUSED,
+>  			RK3399_CLKGATE_CON(5), 1, GFLAGS),
+>  	COMPOSITE(ACLK_PERIHP, "aclk_perihp", mux_aclk_perihp_p, CLK_IGNORE_UNUSED,
+>  			RK3399_CLKSEL_CON(14), 7, 1, MFLAGS, 0, 5, DFLAGS,
+> -- 
+> 1.7.9.5
+> 
+> 
