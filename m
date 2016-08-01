@@ -1,62 +1,47 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Mon, 01 Aug 2016 16:18:09 +0800
-Subject: [PATCH 3/3] ehci-platform: add the max clock number to 4
-In-Reply-To: <01a348da-3b26-68a6-9d9f-c37d81b4fd64@redhat.com>
-References: <20160731112536.4625-1-icenowy@aosc.xyz>
- <20160731112536.4625-3-icenowy@aosc.xyz> <2477355.hXm3xYUusy@wuerfel>
- <414101470035152@web9j.yandex.ru>
- <01a348da-3b26-68a6-9d9f-c37d81b4fd64@redhat.com>
-Message-ID: <255931470039489@web30j.yandex.ru>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 1 Aug 2016 09:18:41 +0100
+Subject: [Urgent PATCH] arm64: dts: uniphier: fix IRQ trigger type of
+ ARMv8 timer
+In-Reply-To: <1470039140-3801-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1470039140-3801-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <579F05E1.9020300@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Please keep me cc-ed on this.
 
+On 01/08/16 09:12, Masahiro Yamada wrote:
+> Since commit 1e2a7d78499e ("irqdomain: Don't set type when mapping
+> an IRQ"), the interrupt type is strictly checked.  Without this
+> patch, this board would not boot any more.
+> 
+> Documentation/devicetree/bindings/interrupt-controller/arm,gic-v3.txt
+> says that the 3rd cell should be either 1 (edge) or 4 (level)
+> depending on the trigger type.  As the CA72 Generic Timer provides
+> active-low interrupts, the value of the 3rd cell should be 4.
+> 
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> Suggested-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+> Arnd, Olof,
+> 
+> I guess you are about to send pull-reqs for v4.8 cycle.
+> Could you include this one in them?
+> After IRQ updates for 4.8 were merged, my board would not
+> boot at all.  I consulted experts and looks like my DT
+> was wrong.
+> 
+> I could do this after -rc1 is out because it is apparently a
+> bug fix, but in that case the for-next branch in ASOC will be
+> broken for me, which would make bisect-ability difficult for me.
 
-01.08.2016, 15:27, "Hans de Goede" <hdegoede@redhat.com>:
-> Hi,
->
-> On 01-08-16 09:05, Icenowy Zheng wrote:
->> ?????????????????????????clocks = <&ccu CLK_A64_BUS_OHCI1>,
->> ??????????????????????????????????<&ccu CLK_A64_BUS_EHCI1>,
->> ??????????????????????????????????<&ccu CLK_A64_USB_OHCI0>,
->> ??????????????????????????????????<&ccu CLK_A64_USB_OHCI1>;
->>
->> ?On A64, EHCI requires the matched OHCI to work.
->
-> Ah, so just like on the H3 (where this also is needed
-> and not documented).
-Yes, I feeled that A64 is like a hybrid of H3 and A33.
->
->> ?And OHCI1 clock requires OHCI0 clock to work.
->
-> Hmm, that one is new, can you double check this ?
-SCLK_GATING_OHCI.
-Gating Special Clock For OHCI(48M and 12M)
-00: Clock is OFF
-01: OTG-OHCI Clock is ON
-10: Clock is OFF
-11:OTG-OHCI and OHCI0 Clock is ON
+I have a patch that addresses all platforms in one go (there is really
+no point in fixing one at a time for a bug that is so widespread).
 
-P.113 of A64 user manual 1.0
->
-> Regards,
->
-> Hans
->
->> ?(But from the SoC's user manual we cannot get any infomation
->> ?about the relationship between OHCI1 clock and OHCI0 clock,
->> ?and in the manual OHCI0 clock is called OTG-OHCI)
->>
->> ?01.08.2016, 15:01, "Arnd Bergmann" <arnd@arndb.de>:
->>> ?On Sunday, July 31, 2016 7:25:36 PM CEST Icenowy Zheng wrote:
->>>> ??Allwinner A64 EHCI requires 4 clocks to be enabled.
->>>>
->>>> ??Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
->>>
->>> ?Can you say what those four clocks are?
->>>
->>> ?Are you sure that it's not just a case of a clock being
->>> ?incorrectly described in the clk driver, i.e. you reference
->>> ?one clock along with its parent here?
->>>
->>> ?????????Arnd
+I'll repost it later today.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
