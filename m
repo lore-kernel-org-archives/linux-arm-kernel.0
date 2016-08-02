@@ -1,34 +1,58 @@
-From: baolex.ni@intel.com (Baole Ni)
-Date: Tue,  2 Aug 2016 18:52:46 +0800
-Subject: [PATCH 0244/1285] Replace numeric parameter like 0444 with macro
-Message-ID: <20160802105246.30008-1-baolex.ni@intel.com>
+From: sunil.kovvuri@gmail.com (Sunil Kovvuri)
+Date: Tue, 2 Aug 2016 17:02:54 +0530
+Subject: [PATCH] net: thunderx: correct bound check in nic_config_loopback
+In-Reply-To: <6b86fd8a-e97a-8b71-1786-50aa9e667873@verizon.com>
+References: <1469933384-16827-1-git-send-email-alexander.levin@verizon.com>
+ <CA+sq2Cc-MTtoncAcL6MS-YVdeVVK=aqEmZakzkX6_CwsXvpRCQ@mail.gmail.com>
+ <6b86fd8a-e97a-8b71-1786-50aa9e667873@verizon.com>
+Message-ID: <CA+sq2Cd39o2S7qm65gVb=TmYydNPES-TYO4CdhgKuVRC6fgozg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I find that the developers often just specified the numeric value
-when calling a macro which is defined with a parameter for access permission.
-As we know, these numeric value for access permission have had the corresponding macro,
-and that using macro can improve the robustness and readability of the code,
-thus, I suggest replacing the numeric parameter with the macro.
+Yes, it's incorrect at other places as well.
+That went in the very early stages of development and didn't change it because
+that out of bounds issue will never happen as no of logical interfaces
+will never be
+morethan  MAX_LMAC i.e 8, so max vf_id will be 7.
 
-Signed-off-by: Chuansheng Liu <chuansheng.liu@intel.com>
-Signed-off-by: Baole Ni <baolex.ni@intel.com>
----
- drivers/i2c/busses/i2c-stu300.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+But with addition of support for newer platforms with different set HW
+capabilities we
+are slowly getting rid of most of the macros i.e static info.
+Attached is the patch which will get rid of MAX_LMAC and also allows
+support for 16LMACs (supported on newer platforms) or more.
 
-diff --git a/drivers/i2c/busses/i2c-stu300.c b/drivers/i2c/busses/i2c-stu300.c
-index 460c134..8128e25 100644
---- a/drivers/i2c/busses/i2c-stu300.c
-+++ b/drivers/i2c/busses/i2c-stu300.c
-@@ -133,7 +133,7 @@ enum stu300_error {
- 
- /* I2C clock speed, in Hz 0-400kHz*/
- static unsigned int scl_frequency = 100000;
--module_param(scl_frequency, uint,  0644);
-+module_param(scl_frequency, uint,  S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
- 
- /**
-  * struct stu300_dev - the stu300 driver state holder
--- 
-2.9.2
+I hope currently you are not facing any issue with below check.
+>>> if (lbk->vf_id > MAX_LMAC)
+
+I will submit the attached patch along with other patches when net-next is open.
+https://lkml.org/lkml/2016/7/15/362
+
+Thanks,
+Sunil.
+
+On Mon, Aug 1, 2016 at 9:27 PM, Levin, Alexander
+<alexander.levin@verizon.com> wrote:
+> On 07/31/2016 12:41 PM, Sunil Kovvuri wrote:
+>> Thanks for finding.
+>> A much better fix would be,
+>>
+>> -       if (lbk->vf_id > MAX_LMAC)
+>> +       if (lbk->vf_id >= nic->num_vf_en)
+>>                 return -1;
+>>
+>> where 'num_vf_en' reflects the exact number of physical interfaces or
+>> LMACs on the system.
+>
+> Right. I see quite a few more places that compare to MAX_LMAC vs
+> num_vf_en. What was the reasoning behind it then?
+>
+>
+> Thanks,
+> Sasha
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0001-net-thunderx-Add-support-for-16-LMACs-of-83xx.patch
+Type: text/x-patch
+Size: 5390 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160802/405d6f9f/attachment-0001.bin>
