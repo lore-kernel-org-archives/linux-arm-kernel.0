@@ -1,160 +1,109 @@
-From: seanpaul@chromium.org (Sean Paul)
-Date: Tue, 2 Aug 2016 13:04:54 -0400
-Subject: [PATCH 5/7] drm/mediatek: plane: Merge mtk_plane_enable into
- mtk_plane_atomic_update
-In-Reply-To: <CAOw6vbJjqOPL86vk5A_17ugWzgdTYH4kZmm5oOqwGtNDeSDX6w@mail.gmail.com>
-References: <1469783054-54567-1-git-send-email-bibby.hsieh@mediatek.com>
- <1469783054-54567-6-git-send-email-bibby.hsieh@mediatek.com>
- <CAOw6vbJjqOPL86vk5A_17ugWzgdTYH4kZmm5oOqwGtNDeSDX6w@mail.gmail.com>
-Message-ID: <CAOw6vbLC3hHR3eHGqWqLV+eJf9ebmRJGncEis1xV_g9u2iAODQ@mail.gmail.com>
+From: eric.auger@redhat.com (Eric Auger)
+Date: Tue,  2 Aug 2016 17:15:30 +0000
+Subject: [PATCH v12 1/8] iommu: Add iommu_domain_msi_geometry and
+ DOMAIN_ATTR_MSI_GEOMETRY
+In-Reply-To: <1470158137-6931-1-git-send-email-eric.auger@redhat.com>
+References: <1470158137-6931-1-git-send-email-eric.auger@redhat.com>
+Message-ID: <1470158137-6931-2-git-send-email-eric.auger@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 2, 2016 at 1:02 PM, Sean Paul <seanpaul@chromium.org> wrote:
-> On Fri, Jul 29, 2016 at 5:04 AM, Bibby Hsieh <bibby.hsieh@mediatek.com> wrote:
->> From: Daniel Kurtz <djkurtz@chromium.org>
->>
->> The mtk_plane_enable is just called once by mtk_plane_atomic_update.
->> So, merge mtk_plane_enable into mtk_plane_atomic_update.
->>
->> While we are here, also clean up the function a bit by using an fb local
->> variables.
->>
->> Signed-off-by: Bibby Hsieh <bibby.hsieh@mediatek.com>
->> Signed-off-by: Daniel Kurtz <djkurtz@chromium.org>
->> ---
->>  drivers/gpu/drm/mediatek/mtk_drm_plane.c |   65 +++++++++++-------------------
->>  1 file changed, 23 insertions(+), 42 deletions(-)
->>
->> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_plane.c b/drivers/gpu/drm/mediatek/mtk_drm_plane.c
->> index 17172ba..b3ddb20 100644
->> --- a/drivers/gpu/drm/mediatek/mtk_drm_plane.c
->> +++ b/drivers/gpu/drm/mediatek/mtk_drm_plane.c
->> @@ -30,44 +30,6 @@ static const u32 formats[] = {
->>         DRM_FORMAT_RGB565,
->>  };
->>
->> -static void mtk_plane_enable(struct drm_plane *plane,
->
->
-> Hi Bibby,
-> This doesn't merge cleanly.
->
->
-> It seems like upstream has:
->
-> static void mtk_plane_enable(struct mtk_drm_plane *mtk_plane,
->
->
-> Whereas your version of "is based on some downstream version of
-> "drm/mediatek: Use drm_plane_helper_check_state()" which changed this
-> to struct drm_plane. Can you respin the set such that the
-> mtk_drm_plane removal patch fixes this?
+Introduce a new DOMAIN_ATTR_MSI_GEOMETRY domain attribute. It enables
+to query the aperture of the IOVA window dedicated to MSIs and
+test whether the MSIs must be mapped with the IOMMU-MSI API.
 
+x86 IOMMUs will typically expose an MSI aperture matching the 1MB
+region [FEE0_0000h - FEF0_000h] corresponding to the the APIC
+configuration space and no support of the IOMMU-MSI API.
 
-Let me try that again, looks like I mangled my cut/paste:
+On ARM, the support of the IOMMU-MSI API will be advertised. Aperture
+will refect the setting performed with the IOMMU-MSI API.
 
-Whereas your version of "drm/mediatek: Use
-drm_plane_helper_check_state()" is based on some downstream version
-which changed this to struct drm_plane. Can you respin the set such
-that the mtk_drm_plane removal patch fixes this?
+A helper function is added to allow testing if the aperture is valid.
 
-Sean
+Signed-off-by: Eric Auger <eric.auger@redhat.com>
+Suggested-by: Alex Williamson <alex.williamson@redhat.com>
 
->
-> Your set should apply cleanly to
-> https://cgit.freedesktop.org/~seanpaul/birch/?h=for-misc
->
-> Thanks,
->
-> Sean
->
->
->
->> -                            dma_addr_t addr)
->> -{
->> -       struct mtk_plane_state *state = to_mtk_plane_state(plane->state);
->> -       unsigned int pitch, format;
->> -       bool enable;
->> -
->> -       if (WARN_ON(!plane->state))
->> -               return;
->> -
->> -       enable = state->base.visible;
->> -
->> -       if (WARN_ON(enable && !plane->state->fb))
->> -               return;
->> -
->> -       if (plane->state->fb) {
->> -               pitch = plane->state->fb->pitches[0];
->> -               format = plane->state->fb->pixel_format;
->> -       } else {
->> -               pitch = 0;
->> -               format = DRM_FORMAT_RGBA8888;
->> -       }
->> -
->> -       addr += (state->base.src.x1 >> 16) * 4;
->> -       addr += (state->base.src.y1 >> 16) * pitch;
->> -
->> -       state->pending.enable = enable;
->> -       state->pending.pitch = pitch;
->> -       state->pending.format = format;
->> -       state->pending.addr = addr;
->> -       state->pending.x = state->base.dst.x1;
->> -       state->pending.y = state->base.dst.y1;
->> -       state->pending.width = drm_rect_width(&state->base.dst);
->> -       state->pending.height = drm_rect_height(&state->base.dst);
->> -       wmb(); /* Make sure the above parameters are set before update */
->> -       state->pending.dirty = true;
->> -}
->> -
->>  static void mtk_plane_reset(struct drm_plane *plane)
->>  {
->>         struct mtk_plane_state *state;
->> @@ -157,16 +119,35 @@ static void mtk_plane_atomic_update(struct drm_plane *plane,
->>                                     struct drm_plane_state *old_state)
->>  {
->>         struct mtk_plane_state *state = to_mtk_plane_state(plane->state);
->> -       struct drm_crtc *crtc = state->base.crtc;
->> +       struct drm_crtc *crtc = plane->state->crtc;
->> +       struct drm_framebuffer *fb = plane->state->fb;
->>         struct drm_gem_object *gem;
->>         struct mtk_drm_gem_obj *mtk_gem;
->> +       unsigned int pitch, format;
->> +       dma_addr_t addr;
->>
->> -       if (!crtc)
->> +       if (!crtc || WARN_ON(!fb))
->>                 return;
->>
->> -       gem = mtk_fb_get_gem_obj(state->base.fb);
->> +       gem = mtk_fb_get_gem_obj(fb);
->>         mtk_gem = to_mtk_gem_obj(gem);
->> -       mtk_plane_enable(plane, mtk_gem->dma_addr);
->> +       addr = mtk_gem->dma_addr;
->> +       pitch = fb->pitches[0];
->> +       format = fb->pixel_format;
->> +
->> +       addr += (plane->state->src.x1 >> 16) * 4;
->> +       addr += (plane->state->src.y1 >> 16) * pitch;
->> +
->> +       state->pending.enable = true;
->> +       state->pending.pitch = pitch;
->> +       state->pending.format = format;
->> +       state->pending.addr = addr;
->> +       state->pending.x = plane->state->dst.x1;
->> +       state->pending.y = plane->state->dst.y1;
->> +       state->pending.width = drm_rect_width(&plane->state->dst);
->> +       state->pending.height = drm_rect_height(&plane->state->dst);
->> +       wmb(); /* Make sure the above parameters are set before update */
->> +       state->pending.dirty = true;
->>  }
->>
->>  static void mtk_plane_atomic_disable(struct drm_plane *plane,
->> --
->> 1.7.9.5
->>
->> _______________________________________________
->> dri-devel mailing list
->> dri-devel at lists.freedesktop.org
->> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+---
+v8 -> v9:
+- rename programmable into iommu_msi_supported
+- add iommu_domain_msi_aperture_valid
+
+v8: creation
+- deprecates DOMAIN_ATTR_MSI_MAPPING flag
+---
+ drivers/iommu/iommu.c |  5 +++++
+ include/linux/iommu.h | 14 ++++++++++++++
+ 2 files changed, 19 insertions(+)
+
+diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
+index 3000051..feab3cc 100644
+--- a/drivers/iommu/iommu.c
++++ b/drivers/iommu/iommu.c
+@@ -1496,6 +1496,7 @@ int iommu_domain_get_attr(struct iommu_domain *domain,
+ 			  enum iommu_attr attr, void *data)
+ {
+ 	struct iommu_domain_geometry *geometry;
++	struct iommu_domain_msi_geometry *msi_geometry;
+ 	bool *paging;
+ 	int ret = 0;
+ 	u32 *count;
+@@ -1506,6 +1507,10 @@ int iommu_domain_get_attr(struct iommu_domain *domain,
+ 		*geometry = domain->geometry;
+ 
+ 		break;
++	case DOMAIN_ATTR_MSI_GEOMETRY:
++		msi_geometry  = data;
++		*msi_geometry = domain->msi_geometry;
++		break;
+ 	case DOMAIN_ATTR_PAGING:
+ 		paging  = data;
+ 		*paging = (domain->pgsize_bitmap != 0UL);
+diff --git a/include/linux/iommu.h b/include/linux/iommu.h
+index 664683a..1b553ee 100644
+--- a/include/linux/iommu.h
++++ b/include/linux/iommu.h
+@@ -52,6 +52,12 @@ struct iommu_domain_geometry {
+ 	bool force_aperture;       /* DMA only allowed in mappable range? */
+ };
+ 
++struct iommu_domain_msi_geometry {
++	dma_addr_t aperture_start; /* First address used for MSI IOVA    */
++	dma_addr_t aperture_end;   /* Last address used for MSI IOVA     */
++	bool iommu_msi_supported;  /* Is MSI mapping supported?		 */
++};
++
+ /* Domain feature flags */
+ #define __IOMMU_DOMAIN_PAGING	(1U << 0)  /* Support for iommu_map/unmap */
+ #define __IOMMU_DOMAIN_DMA_API	(1U << 1)  /* Domain for use in DMA-API
+@@ -83,6 +89,7 @@ struct iommu_domain {
+ 	iommu_fault_handler_t handler;
+ 	void *handler_token;
+ 	struct iommu_domain_geometry geometry;
++	struct iommu_domain_msi_geometry msi_geometry;
+ 	void *iova_cookie;
+ };
+ 
+@@ -108,6 +115,7 @@ enum iommu_cap {
+ 
+ enum iommu_attr {
+ 	DOMAIN_ATTR_GEOMETRY,
++	DOMAIN_ATTR_MSI_GEOMETRY,
+ 	DOMAIN_ATTR_PAGING,
+ 	DOMAIN_ATTR_WINDOWS,
+ 	DOMAIN_ATTR_FSL_PAMU_STASH,
+@@ -328,6 +336,12 @@ extern struct iommu_group *pci_device_group(struct device *dev);
+ /* Generic device grouping function */
+ extern struct iommu_group *generic_device_group(struct device *dev);
+ 
++static inline bool iommu_domain_msi_aperture_valid(struct iommu_domain *domain)
++{
++	return (domain->msi_geometry.aperture_end >
++		domain->msi_geometry.aperture_start);
++}
++
+ #else /* CONFIG_IOMMU_API */
+ 
+ struct iommu_ops {};
+-- 
+1.9.1
