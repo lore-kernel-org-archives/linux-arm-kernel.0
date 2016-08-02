@@ -1,46 +1,133 @@
-From: peter.chen@nxp.com (Peter Chen)
-Date: Tue, 2 Aug 2016 16:22:06 +0800
-Subject: [PATCH 1/1] ARM: imx_v6_v7_defconfig: enable more USB configurations
-Message-ID: <1470126126-19011-1-git-send-email-peter.chen@nxp.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Tue, 2 Aug 2016 10:33:39 +0200
+Subject: [PATCH 1/4] input: touchscreen: Add generic touchscreen
+ softbutton handling code
+In-Reply-To: <20160801174154.GA3231@dtor-ws>
+References: <1469978590-14081-1-git-send-email-hdegoede@redhat.com>
+ <1469978590-14081-2-git-send-email-hdegoede@redhat.com>
+ <20160801165430.GA30345@rob-hp-laptop> <20160801174154.GA3231@dtor-ws>
+Message-ID: <58cfd727-bb46-3ea8-85b9-8c17fbed72c5@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-- USB test module
-- USB gadget functions using configfs which are just ready within
-  several release cycles.
-- USB audio gadget
+Hi,
 
-Signed-off-by: Peter Chen <peter.chen@nxp.com>
----
- arch/arm/configs/imx_v6_v7_defconfig | 8 ++++++++
- 1 file changed, 8 insertions(+)
+On 01-08-16 19:41, Dmitry Torokhov wrote:
+> On Mon, Aug 01, 2016 at 11:54:30AM -0500, Rob Herring wrote:
+>> On Sun, Jul 31, 2016 at 05:23:07PM +0200, Hans de Goede wrote:
+>>> Some touchscreens extend over the display they cover and have a number
+>>> of capacative softbuttons outside of the display the cover.
+>>>
+>>> With some hardware these softbuttons simply report touches with
+>>> coordinates outside of the normal coordinate space for touches on the
+>>> display.
+>>>
+>>> This commit adds a devicetree binding for describing such buttons in
+>>> devicetree and a bunch of helper functions to easily add support for
+>>> these to existing touchscreen drivers.
+>>>
+>>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>>> ---
+>>>  .../bindings/input/touchscreen/softbuttons.txt     |  58 +++++++++
+>>>  drivers/input/touchscreen/Makefile                 |   2 +-
+>>>  drivers/input/touchscreen/softbuttons.c            | 145 +++++++++++++++++++++
+>>>  include/linux/input/touchscreen.h                  |   9 ++
+>>>  4 files changed, 213 insertions(+), 1 deletion(-)
+>>>  create mode 100644 Documentation/devicetree/bindings/input/touchscreen/softbuttons.txt
+>>>  create mode 100644 drivers/input/touchscreen/softbuttons.c
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/input/touchscreen/softbuttons.txt b/Documentation/devicetree/bindings/input/touchscreen/softbuttons.txt
+>>> new file mode 100644
+>>> index 0000000..3eb6f4c
+>>> --- /dev/null
+>>> +++ b/Documentation/devicetree/bindings/input/touchscreen/softbuttons.txt
+>>> @@ -0,0 +1,58 @@
+>>> +General Touchscreen Softbutton Properties:
+>>> +
+>>> +Some touchscreens extend over the display they cover and have a number
+>>> +of capacative softbuttons outside of the display the cover.
+>>> +
+>>> +Some of these softbuttons simply report touches with coordinates outside of
+>>> +the normal coordinate space for touches on the display. This binding is for
+>>> +describing such buttons in devicetree.
+>>> +
+>>> +Each softkey is represented as a sub-node of the touchscreen node.
+>>> +
+>>> +Required subnode-properties:
+>>> + - label			: Descriptive name of the key.
+>>> + - linux,code			: Keycode to emit.
+>>> + - softbutton-min-x		: X start of the area the softbutton area covers
+>>> + - softbutton-max-x		: X end of the area the softbutton area covers
+>>> + - softbutton-min-y		: Y start of the area the softbutton area covers
+>>> + - softbutton-max-y		: Y end of the area the softbutton area covers
+>>
+>> This generally looks fine to me, but I am wondering one thing. If the
+>> buttons are located at the origin of an axis, can we handle that case? I
+>> don't think you can unless you assume softbutton-max-? is 0 for the
+>> touchscreen. To put it another way, you have a gap from 1024 to 1084
+>> which you can't express for buttons at the origin unless you do negative
+>> numbers.
+>
+> I do not this this should be done in kernel: I do not see nay difference
+> in softbuttons or sliders or circular controls or... They are not
+> controller-specific and I think are better handled in userspace. We do
+> that for Synaptics touchpads with softbuttons, we can do that for other
+> controllers.
+>
+> Also, what is or stance when there is no bezel and we sill want to have
+> the softbutons (i.e. all Nexus phones and tablets)?
 
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index 4eaf023..f5b2e31 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -276,6 +276,7 @@ CONFIG_USB_SERIAL=m
- CONFIG_USB_SERIAL_GENERIC=y
- CONFIG_USB_SERIAL_FTDI_SIO=m
- CONFIG_USB_SERIAL_OPTION=m
-+CONFIG_USB_TEST=m
- CONFIG_USB_EHSET_TEST_FIXTURE=m
- CONFIG_NOP_USB_XCEIV=y
- CONFIG_USB_MXS_PHY=y
-@@ -293,7 +294,14 @@ CONFIG_USB_CONFIGFS_EEM=y
- CONFIG_USB_CONFIGFS_MASS_STORAGE=y
- CONFIG_USB_CONFIGFS_F_LB_SS=y
- CONFIG_USB_CONFIGFS_F_FS=y
-+CONFIG_USB_CONFIGFS_F_UAC1=y
-+CONFIG_USB_CONFIGFS_F_UAC2=y
-+CONFIG_USB_CONFIGFS_F_MIDI=y
-+CONFIG_USB_CONFIGFS_F_HID=y
-+CONFIG_USB_CONFIGFS_F_UVC=y
-+CONFIG_USB_CONFIGFS_F_PRINTER=y
- CONFIG_USB_ZERO=m
-+CONFIG_USB_AUDIO=m
- CONFIG_USB_ETH=m
- CONFIG_USB_G_NCM=m
- CONFIG_USB_GADGETFS=m
--- 
-1.9.1
+Maybe softbuttons is not the best name (I googled and it seemed to match),
+so first lets make clear what I'm talking about here, I wrote this patch-set
+for this tablet:
+
+https://content.hwigroup.net/images/products_xl/157078/dserve-dsrv-9703c.jpg
+
+I decided to make it generic, since it seemed to me that there will likely
+be other hardware which is similar (but uses a different touch screen
+controller) out there, so keeping this generic seemed best.
+
+Now back to the kernelspace vs userspace solution question, if you look at
+the picture you will see 3 clearly marked buttons on the front of the tablet,
+outside of the display: menu, home and back. These are not buttons which get
+generated / drawn on the display when you touch the bottom of the screen, these
+are separate single-purpose buttons which happen to report presses via the
+touchscreen controller then via a separate hw mechanism.
+
+If these buttons used a separate capacative button controller as used in
+e.g. capacitive numpads, say something like this:
+
+http://www.ebay.com/itm/2PCS-TTP223-Capacitive-Touch-Switch-Button-Self-Lock-Module-for-Arduino-/131662428748
+
+Then there would be no question that this belongs in the kernel. I do not
+see how these are any different really. These cannot be runtime re-configured,
+they are separate dedicated buttons which happens to report presses via
+the touchscreen controllers.
+
+There also is the question of hardware description, no matter where we
+put support for this, we need some place were we describe the presence
+of these buttons to the software bits which end up dealing with them.
+
+And we already have a mechanism for describing "fixed" hardware for a
+certain model machine / board in the form of devicetree. To me putting
+the hardware description for this anywhere but in devicetree makes
+no sense because then we start scattering the description of a single
+device-type over multiple places which seems like a bad idea.
+
+And once we decided to put the description in devicetree, then dealing
+with this in the kernel becomes the logical thing to do.
+
+Regards,
+
+Hans
+
+
+p.s.
+
+One other example of buttons like these are those on the nexus one:
+
+http://www.informatica.com.do/7BZ-PortalImageUpload/image/2010151059110.google-nexus-one-01.jpg
+
+Note I'm not saying this binding will work for those, I've no idea how
+they are hooked up, but they are the same in that they are really
+4 dedicated separate buttons which happen to be part of the main digitizer.
