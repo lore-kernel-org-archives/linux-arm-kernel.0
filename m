@@ -1,183 +1,55 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Tue,  2 Aug 2016 15:58:45 +0200
-Subject: [PATCH v3] ARM: dts: sunxi: Use new sun7i-a20-mmc compatible on sun7i
- and newer
-Message-ID: <1470146325-28876-1-git-send-email-hdegoede@redhat.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 2 Aug 2016 16:04:21 +0200
+Subject: [RFC PATCH v1] arm/arm64: vgic-new: Create dist and redist
+ iodevs earlier
+In-Reply-To: <1467731491-6458-1-git-send-email-vijay.kilari@gmail.com>
+References: <1467731491-6458-1-git-send-email-vijay.kilari@gmail.com>
+Message-ID: <20160802140421.GK32244@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the new sun7i-a20-mmc compatible for the mmc controllers on sun7i
-and newer.
+Hi Vijaya,
 
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
-Changes in v2:
--New patch in v2 of this patch-set
-Changes in v3:
--Make the new compatible: "allwinner,sun7i-a20-mmc", "allwinner,sun5i-a13-mmc"
- so that the new dt will work with older kernels
----
- arch/arm/boot/dts/sun6i-a31.dtsi     | 12 ++++++++----
- arch/arm/boot/dts/sun7i-a20.dtsi     | 12 ++++++++----
- arch/arm/boot/dts/sun8i-a23-a33.dtsi |  9 ++++++---
- arch/arm/boot/dts/sun8i-h3.dtsi      |  9 ++++++---
- 4 files changed, 28 insertions(+), 14 deletions(-)
+On Tue, Jul 05, 2016 at 08:41:31PM +0530, vijay.kilari at gmail.com wrote:
+> From: Vijaya Kumar K <vijayak@caviumnetworks.com>
+> 
+> The dist and redist regions are created and registered in
+> vgic_register_dist_iodevs() and vgic_v3_init_redist_iodev()
+> calls for distributor and redistributor respectively when
+> vgic_v3_map_resources() is called. This mapping of resources
+> is done when vcpu run ioctl is called.
+> 
+> Below is the call stack of the same.
+> 
+> [<ffff0000080b2e8c>] vgic_register_redist_iodevs+0x94/0x27c
+> [<ffff0000080b0fd8>] vgic_v3_map_resources+0x138/0x188
+> [<ffff0000080affa4>] kvm_vgic_map_resources+0xb0/0xb8
+> [<ffff0000080a3888>] kvm_arch_vcpu_ioctl_run+0x4a8/0x550
+> [<ffff00000809c218>] kvm_vcpu_ioctl+0x304/0x74c
+> [<ffff000008232cac>] do_vfs_ioctl+0xc0/0x754
+> [<ffff0000082333d0>] SyS_ioctl+0x90/0xa4
+> [<ffff000008084af0>] el0_svc_naked+0x24/0x28
+> 
+> During live migration, the destination VM first restores the all the
+> GIC registers(dist, rdist and cpuif registers) using ioctl's before
+> resuming the VM.So no vcpu run ioctl is called untill complete
+> GIC context is restored.
+> 
+> Hence, In case of live migration, when ioctls are called to write
+> dist/rdist registers the ioctls fails as
+> vcpu->kvm->arch.vgic.dist_iodev andkvm->arch.vgic.redist_iodevs
+> are NULL.
+> 
 
-diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
-index 1867af2..b674bf7 100644
---- a/arch/arm/boot/dts/sun6i-a31.dtsi
-+++ b/arch/arm/boot/dts/sun6i-a31.dtsi
-@@ -469,7 +469,8 @@
- 		};
- 
- 		mmc0: mmc at 01c0f000 {
--			compatible = "allwinner,sun5i-a13-mmc";
-+			compatible = "allwinner,sun7i-a20-mmc",
-+				     "allwinner,sun5i-a13-mmc";
- 			reg = <0x01c0f000 0x1000>;
- 			clocks = <&ahb1_gates 8>,
- 				 <&mmc0_clk 0>,
-@@ -488,7 +489,8 @@
- 		};
- 
- 		mmc1: mmc at 01c10000 {
--			compatible = "allwinner,sun5i-a13-mmc";
-+			compatible = "allwinner,sun7i-a20-mmc",
-+				     "allwinner,sun5i-a13-mmc";
- 			reg = <0x01c10000 0x1000>;
- 			clocks = <&ahb1_gates 9>,
- 				 <&mmc1_clk 0>,
-@@ -507,7 +509,8 @@
- 		};
- 
- 		mmc2: mmc at 01c11000 {
--			compatible = "allwinner,sun5i-a13-mmc";
-+			compatible = "allwinner,sun7i-a20-mmc",
-+				     "allwinner,sun5i-a13-mmc";
- 			reg = <0x01c11000 0x1000>;
- 			clocks = <&ahb1_gates 10>,
- 				 <&mmc2_clk 0>,
-@@ -526,7 +529,8 @@
- 		};
- 
- 		mmc3: mmc at 01c12000 {
--			compatible = "allwinner,sun5i-a13-mmc";
-+			compatible = "allwinner,sun7i-a20-mmc",
-+				     "allwinner,sun5i-a13-mmc";
- 			reg = <0x01c12000 0x1000>;
- 			clocks = <&ahb1_gates 11>,
- 				 <&mmc3_clk 0>,
-diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
-index bd0c476..4394711e 100644
---- a/arch/arm/boot/dts/sun7i-a20.dtsi
-+++ b/arch/arm/boot/dts/sun7i-a20.dtsi
-@@ -905,7 +905,8 @@
- 		};
- 
- 		mmc0: mmc at 01c0f000 {
--			compatible = "allwinner,sun5i-a13-mmc";
-+			compatible = "allwinner,sun7i-a20-mmc",
-+				     "allwinner,sun5i-a13-mmc";
- 			reg = <0x01c0f000 0x1000>;
- 			clocks = <&ahb_gates 8>,
- 				 <&mmc0_clk 0>,
-@@ -922,7 +923,8 @@
- 		};
- 
- 		mmc1: mmc at 01c10000 {
--			compatible = "allwinner,sun5i-a13-mmc";
-+			compatible = "allwinner,sun7i-a20-mmc",
-+				     "allwinner,sun5i-a13-mmc";
- 			reg = <0x01c10000 0x1000>;
- 			clocks = <&ahb_gates 9>,
- 				 <&mmc1_clk 0>,
-@@ -939,7 +941,8 @@
- 		};
- 
- 		mmc2: mmc at 01c11000 {
--			compatible = "allwinner,sun5i-a13-mmc";
-+			compatible = "allwinner,sun7i-a20-mmc",
-+				     "allwinner,sun5i-a13-mmc";
- 			reg = <0x01c11000 0x1000>;
- 			clocks = <&ahb_gates 10>,
- 				 <&mmc2_clk 0>,
-@@ -956,7 +959,8 @@
- 		};
- 
- 		mmc3: mmc at 01c12000 {
--			compatible = "allwinner,sun5i-a13-mmc";
-+			compatible = "allwinner,sun7i-a20-mmc",
-+				     "allwinner,sun5i-a13-mmc";
- 			reg = <0x01c12000 0x1000>;
- 			clocks = <&ahb_gates 11>,
- 				 <&mmc3_clk 0>,
-diff --git a/arch/arm/boot/dts/sun8i-a23-a33.dtsi b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-index 7e05e09..f97c38f 100644
---- a/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-+++ b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-@@ -266,7 +266,8 @@
- 		};
- 
- 		mmc0: mmc at 01c0f000 {
--			compatible = "allwinner,sun5i-a13-mmc";
-+			compatible = "allwinner,sun7i-a20-mmc",
-+				     "allwinner,sun5i-a13-mmc";
- 			reg = <0x01c0f000 0x1000>;
- 			clocks = <&ahb1_gates 8>,
- 				 <&mmc0_clk 0>,
-@@ -285,7 +286,8 @@
- 		};
- 
- 		mmc1: mmc at 01c10000 {
--			compatible = "allwinner,sun5i-a13-mmc";
-+			compatible = "allwinner,sun7i-a20-mmc",
-+				     "allwinner,sun5i-a13-mmc";
- 			reg = <0x01c10000 0x1000>;
- 			clocks = <&ahb1_gates 9>,
- 				 <&mmc1_clk 0>,
-@@ -304,7 +306,8 @@
- 		};
- 
- 		mmc2: mmc at 01c11000 {
--			compatible = "allwinner,sun5i-a13-mmc";
-+			compatible = "allwinner,sun7i-a20-mmc",
-+				     "allwinner,sun5i-a13-mmc";
- 			reg = <0x01c11000 0x1000>;
- 			clocks = <&ahb1_gates 10>,
- 				 <&mmc2_clk 0>,
-diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
-index 93c88f3..2b6b511 100644
---- a/arch/arm/boot/dts/sun8i-h3.dtsi
-+++ b/arch/arm/boot/dts/sun8i-h3.dtsi
-@@ -154,7 +154,8 @@
- 		};
- 
- 		mmc0: mmc at 01c0f000 {
--			compatible = "allwinner,sun5i-a13-mmc";
-+			compatible = "allwinner,sun7i-a20-mmc",
-+				     "allwinner,sun5i-a13-mmc";
- 			reg = <0x01c0f000 0x1000>;
- 			clocks = <&ccu CLK_BUS_MMC0>,
- 				 <&ccu CLK_MMC0>,
-@@ -173,7 +174,8 @@
- 		};
- 
- 		mmc1: mmc at 01c10000 {
--			compatible = "allwinner,sun5i-a13-mmc";
-+			compatible = "allwinner,sun7i-a20-mmc",
-+				     "allwinner,sun5i-a13-mmc";
- 			reg = <0x01c10000 0x1000>;
- 			clocks = <&ccu CLK_BUS_MMC1>,
- 				 <&ccu CLK_MMC1>,
-@@ -192,7 +194,8 @@
- 		};
- 
- 		mmc2: mmc at 01c11000 {
--			compatible = "allwinner,sun5i-a13-mmc";
-+			compatible = "allwinner,sun7i-a20-mmc",
-+				     "allwinner,sun5i-a13-mmc";
- 			reg = <0x01c11000 0x1000>;
- 			clocks = <&ccu CLK_BUS_MMC2>,
- 				 <&ccu CLK_MMC2>,
--- 
-2.7.4
+Is this for GICv3 only?  Can you give me a more specific pointer to the
+place where this fails or a traceback?
+
+Definitely the approach of registering things early doesn't work,
+because it breaks all sorts of other things.
+
+So the trick is to make sure userspace accesses can work without a
+registers kvm iodev.  I will have a look at this, but some more conceret
+info as requested above will be helpful.
+
+Thanks,
+-Christoffer
