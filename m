@@ -1,143 +1,63 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Tue,  2 Aug 2016 13:56:05 +0100
-Subject: [PATCH v2] KVM: arm64: ITS: return 1 on successful MSI injection
-Message-ID: <20160802125605.31665-1-andre.przywara@arm.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 2 Aug 2016 14:00:16 +0100
+Subject: [PATCH v10 7/7] ACPI : enable ACPI_PROCESSOR_IDLE on ARM64
+In-Reply-To: <579BA8DE.3050802@codeaurora.org>
+References: <1468950779-21745-1-git-send-email-sudeep.holla@arm.com>
+ <1468950779-21745-8-git-send-email-sudeep.holla@arm.com>
+ <579BA8DE.3050802@codeaurora.org>
+Message-ID: <4963f55a-d014-ec7b-2d9d-471fb3f29204@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to the KVM API documentation a successful MSI injection
-should return a value > 0 on success.
-Return possible errors in vgic_its_trigger_msi() and report a
-successful injection back to userland, while also reporting the
-case where the MSI could not be delivered due to the guest not
-having the LPI mapped, for instance.
 
-Signed-off-by: Andre Przywara <andre.przywara@arm.com>
----
-Hi,
 
-my brain is too toasted at the moment to find the proper error values
-that we should return in vgic_its_trigger_msi() for the various cases
-that could go wrong, so please feel free to suggest better values.
-In the end we return either 0 or 1 (and ignore any error value at the
-ITS level), so it shouldn't really make much difference.
+On 29/07/16 20:05, Christopher Covington wrote:
+> Hi Sudeep,
+>
+> On 07/19/2016 01:52 PM, Sudeep Holla wrote:
+>> Now that ACPI processor idle driver supports LPI(Low Power Idle), lets
+>> enable ACPI_PROCESSOR_IDLE for ARM64 too.
+>>
+>> This patch just removes the IA64 and X86 dependency on ACPI_PROCESSOR_IDLE
+>>
+>> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+>> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+>> ---
+>>  drivers/acpi/Kconfig | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
+>> index 1358fb7d7a68..d74275c0f374 100644
+>> --- a/drivers/acpi/Kconfig
+>> +++ b/drivers/acpi/Kconfig
+>> @@ -238,7 +238,7 @@ config ACPI_CPPC_LIB
+>>  config ACPI_PROCESSOR
+>>  	tristate "Processor"
+>>  	depends on X86 || IA64 || ARM64
+>> -	select ACPI_PROCESSOR_IDLE if X86 || IA64
+>> +	select ACPI_PROCESSOR_IDLE
+>>  	select ACPI_CPU_FREQ_PSS if X86 || IA64
+>>  	default y
+>>  	help
+>>
+>
+> This causes a boot hang on QDF2432. cpuidle.off=1 works around the
+> problem. I understand you're working on a fix to the problem in GICv3
+> code. If there's anything I can do to help, please let me know.
 
-Cheers,
-Andre.
+Sorry for the late response, I was away. Yes it's to do with GICv3 and
+retention states. I exchanged mails with QCOM guys in private. To summarize:
 
-Changelog v1 .. v2:
-- rework vgic_its_trigger_msi() to return proper error values
-- return 0 to userland if the LPI could not be injected
+We don't need any additional support in Linux to support that. Infact we
+need to remove disabling the redistributor in the powerdown path. PSCI
+implementation also do the same for Group0(aka secure/EL3 interrupts)
+and we currently do that for Group1(aka EL1N interrupts) in Linux. The
+plan was to move that to EL3 code, to align with GICv2 code.
 
- include/linux/irqchip/arm-gic-v3.h |  1 +
- virt/kvm/arm/vgic/vgic-its.c       | 48 +++++++++++++++++++++++---------------
- 2 files changed, 30 insertions(+), 19 deletions(-)
+Hence the changes in Linux is just removal of the GICv3 PM notifier
+partially. I will need to check with Trusted Firmware team and do some
+testing before I post that change. I will plan to do that later this week.
 
-diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
-index 56b0b7e..99ac022 100644
---- a/include/linux/irqchip/arm-gic-v3.h
-+++ b/include/linux/irqchip/arm-gic-v3.h
-@@ -337,6 +337,7 @@
-  */
- #define E_ITS_MOVI_UNMAPPED_INTERRUPT		0x010107
- #define E_ITS_MOVI_UNMAPPED_COLLECTION		0x010109
-+#define E_ITS_INT_UNMAPPED_INTERRUPT		0x010307
- #define E_ITS_CLEAR_UNMAPPED_INTERRUPT		0x010507
- #define E_ITS_MAPD_DEVICE_OOR			0x010801
- #define E_ITS_MAPC_PROCNUM_OOR			0x010902
-diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-index 07411cf..456903c 100644
---- a/virt/kvm/arm/vgic/vgic-its.c
-+++ b/virt/kvm/arm/vgic/vgic-its.c
-@@ -441,39 +441,48 @@ static unsigned long vgic_mmio_read_its_idregs(struct kvm *kvm,
-  * Find the target VCPU and the LPI number for a given devid/eventid pair
-  * and make this IRQ pending, possibly injecting it.
-  * Must be called with the its_lock mutex held.
-+ * Returns 0 on success, a positive error value for any ITS mapping
-+ * related errors and negative error values for generic errors.
-  */
--static void vgic_its_trigger_msi(struct kvm *kvm, struct vgic_its *its,
--				 u32 devid, u32 eventid)
-+static int vgic_its_trigger_msi(struct kvm *kvm, struct vgic_its *its,
-+				u32 devid, u32 eventid)
- {
-+	struct kvm_vcpu *vcpu;
- 	struct its_itte *itte;
- 
- 	if (!its->enabled)
--		return;
-+		return -EBUSY;
- 
- 	itte = find_itte(its, devid, eventid);
--	/* Triggering an unmapped IRQ gets silently dropped. */
--	if (itte && its_is_collection_mapped(itte->collection)) {
--		struct kvm_vcpu *vcpu;
--
--		vcpu = kvm_get_vcpu(kvm, itte->collection->target_addr);
--		if (vcpu && vcpu->arch.vgic_cpu.lpis_enabled) {
--			spin_lock(&itte->irq->irq_lock);
--			itte->irq->pending = true;
--			vgic_queue_irq_unlock(kvm, itte->irq);
--		}
--	}
-+	if (!itte || !its_is_collection_mapped(itte->collection))
-+		return E_ITS_INT_UNMAPPED_INTERRUPT;
-+
-+	vcpu = kvm_get_vcpu(kvm, itte->collection->target_addr);
-+	if (!vcpu)
-+		return E_ITS_INT_UNMAPPED_INTERRUPT;
-+
-+	if (!vcpu->arch.vgic_cpu.lpis_enabled)
-+		return -EBUSY;
-+
-+	spin_lock(&itte->irq->irq_lock);
-+	itte->irq->pending = true;
-+	vgic_queue_irq_unlock(kvm, itte->irq);
-+
-+	return 0;
- }
- 
- /*
-  * Queries the KVM IO bus framework to get the ITS pointer from the given
-  * doorbell address.
-  * We then call vgic_its_trigger_msi() with the decoded data.
-+ * According to the KVM_SIGNAL_MSI API description returns 1 on success.
-  */
- int vgic_its_inject_msi(struct kvm *kvm, struct kvm_msi *msi)
- {
- 	u64 address;
- 	struct kvm_io_device *kvm_io_dev;
- 	struct vgic_io_device *iodev;
-+	int ret;
- 
- 	if (!vgic_has_its(kvm))
- 		return -ENODEV;
-@@ -490,10 +499,13 @@ int vgic_its_inject_msi(struct kvm *kvm, struct kvm_msi *msi)
- 	iodev = container_of(kvm_io_dev, struct vgic_io_device, dev);
- 
- 	mutex_lock(&iodev->its->its_lock);
--	vgic_its_trigger_msi(kvm, iodev->its, msi->devid, msi->data);
-+	ret = vgic_its_trigger_msi(kvm, iodev->its, msi->devid, msi->data);
- 	mutex_unlock(&iodev->its->its_lock);
- 
--	return 0;
-+	if (ret)
-+		return 0;
-+	else
-+		return 1;
- }
- 
- /* Requires the its_lock to be held. */
-@@ -981,9 +993,7 @@ static int vgic_its_cmd_handle_int(struct kvm *kvm, struct vgic_its *its,
- 	u32 msi_data = its_cmd_get_id(its_cmd);
- 	u64 msi_devid = its_cmd_get_deviceid(its_cmd);
- 
--	vgic_its_trigger_msi(kvm, its, msi_devid, msi_data);
--
--	return 0;
-+	return vgic_its_trigger_msi(kvm, its, msi_devid, msi_data);
- }
- 
- /*
 -- 
-2.9.0
+Regards,
+Sudeep
