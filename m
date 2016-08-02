@@ -1,114 +1,49 @@
-From: eric.auger@redhat.com (Eric Auger)
-Date: Tue,  2 Aug 2016 17:15:37 +0000
-Subject: [PATCH v12 8/8] iommu/arm-smmu: get/put the msi cookie
-In-Reply-To: <1470158137-6931-1-git-send-email-eric.auger@redhat.com>
-References: <1470158137-6931-1-git-send-email-eric.auger@redhat.com>
-Message-ID: <1470158137-6931-9-git-send-email-eric.auger@redhat.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 2 Aug 2016 11:19:00 -0600
+Subject: [PATCH V2 RFC 6/6] ARM: dts: bcm2835: Add Raspberry Pi Zero
+In-Reply-To: <1469559213-16160-7-git-send-email-stefan.wahren@i2se.com>
+References: <1469559213-16160-1-git-send-email-stefan.wahren@i2se.com>
+ <1469559213-16160-7-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <597f3289-91c3-7c19-8992-d6b386d50c02@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For IOMMU_DOMAIN_UNMANAGED type we now also get the msi
-cookie in both arm-smmu and arm-smmu-v3. This initializes
-resources for MSI doorbell mapping.
+On 07/26/2016 12:53 PM, Stefan Wahren wrote:
+> The Raspberry Pi Zero is a minified version of model A+. It's
+> notable there is no PWR LED and the ACT LED is inverted.
 
-Signed-off-by: Eric Auger <eric.auger@redhat.com>
----
- drivers/iommu/arm-smmu-v3.c | 16 ++++++++++++----
- drivers/iommu/arm-smmu.c    | 15 +++++++++++----
- 2 files changed, 23 insertions(+), 8 deletions(-)
+Patches 3-6,
+Acked-by: Stephen Warren <swarren@nvidia.com>
 
-diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index 066d92c..960d377 100644
---- a/drivers/iommu/arm-smmu-v3.c
-+++ b/drivers/iommu/arm-smmu-v3.c
-@@ -22,6 +22,7 @@
- 
- #include <linux/delay.h>
- #include <linux/dma-iommu.h>
-+#include <linux/msi-iommu.h>
- #include <linux/err.h>
- #include <linux/interrupt.h>
- #include <linux/iommu.h>
-@@ -1412,15 +1413,21 @@ static struct iommu_domain *arm_smmu_domain_alloc(unsigned type)
- 		return NULL;
- 
- 	if (type == IOMMU_DOMAIN_DMA &&
--	    iommu_get_dma_cookie(&smmu_domain->domain)) {
--		kfree(smmu_domain);
--		return NULL;
--	}
-+	    iommu_get_dma_cookie(&smmu_domain->domain))
-+		goto err;
-+
-+	if (type == IOMMU_DOMAIN_UNMANAGED &&
-+		iommu_get_msi_cookie(&smmu_domain->domain))
-+		goto err;
-+
- 	smmu_domain->domain.msi_geometry = msi_geometry;
- 
- 	mutex_init(&smmu_domain->init_mutex);
- 	spin_lock_init(&smmu_domain->pgtbl_lock);
- 	return &smmu_domain->domain;
-+err:
-+	kfree(smmu_domain);
-+	return NULL;
- }
- 
- static int arm_smmu_bitmap_alloc(unsigned long *map, int span)
-@@ -1446,6 +1453,7 @@ static void arm_smmu_domain_free(struct iommu_domain *domain)
- 	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
- 	struct arm_smmu_device *smmu = smmu_domain->smmu;
- 
-+	iommu_put_msi_cookie(domain);
- 	iommu_put_dma_cookie(domain);
- 	free_io_pgtable_ops(smmu_domain->pgtbl_ops);
- 
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index 9755a1b..867910b 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -30,6 +30,7 @@
- 
- #include <linux/delay.h>
- #include <linux/dma-iommu.h>
-+#include <linux/msi-iommu.h>
- #include <linux/dma-mapping.h>
- #include <linux/err.h>
- #include <linux/interrupt.h>
-@@ -1052,10 +1053,12 @@ static struct iommu_domain *arm_smmu_domain_alloc(unsigned type)
- 		return NULL;
- 
- 	if (type == IOMMU_DOMAIN_DMA &&
--	    iommu_get_dma_cookie(&smmu_domain->domain)) {
--		kfree(smmu_domain);
--		return NULL;
--	}
-+	    iommu_get_dma_cookie(&smmu_domain->domain))
-+		goto err;
-+
-+	if (type == IOMMU_DOMAIN_UNMANAGED &&
-+		iommu_get_msi_cookie(&smmu_domain->domain))
-+		goto err;
- 
- 	smmu_domain->domain.msi_geometry = msi_geometry;
- 
-@@ -1063,6 +1066,9 @@ static struct iommu_domain *arm_smmu_domain_alloc(unsigned type)
- 	spin_lock_init(&smmu_domain->pgtbl_lock);
- 
- 	return &smmu_domain->domain;
-+err:
-+	kfree(smmu_domain);
-+	return NULL;
- }
- 
- static void arm_smmu_domain_free(struct iommu_domain *domain)
-@@ -1073,6 +1079,7 @@ static void arm_smmu_domain_free(struct iommu_domain *domain)
- 	 * Free the domain resources. We assume that all devices have
- 	 * already been detached.
- 	 */
-+	iommu_put_msi_cookie(domain);
- 	iommu_put_dma_cookie(domain);
- 	arm_smmu_destroy_domain_context(domain);
- 	kfree(smmu_domain);
--- 
-1.9.1
+> diff --git a/arch/arm/boot/dts/bcm2835-rpi-zero.dts b/arch/arm/boot/dts/bcm2835-rpi-zero.dts
+
+The following comment format is a bit strange, but I'm not sure there's 
+anything objectively better...
+
+> +&usb {
+> +	dr_mode = "host";
+> +	h-rx-fifo-size = <774>;
+> +	h-np-tx-fifo-size = <256>;
+> +	h-tx-fifo-size = <512>;
+> +/*
+> + * Settings for otg
+> + *
+> +	dr_mode = "otg";
+> +	h-rx-fifo-size = <774>;
+> +	h-np-tx-fifo-size = <32>;
+> +	h-tx-fifo-size = <0>;
+> +	g-np-tx-fifo-size = <16>;
+> +	g-rx-fifo-size = <256>;
+> +	g-tx-fifo-size = <256 128 128 64 64 64 32>;
+> + *
+> + * Settings for peripheral
+> + *
+> +	dr_mode = "peripheral";
+> +	h-rx-fifo-size = <774>;
+> +	h-np-tx-fifo-size = <0>;
+> +	h-tx-fifo-size = <0>;
+> +	g-np-tx-fifo-size = <16>;
+> +	g-rx-fifo-size = <256>;
+> +	g-tx-fifo-size = <256 128 128 64 64 64 32>;
+> + */
+> +};
