@@ -1,65 +1,46 @@
-From: zhengxing@rock-chips.com (Xing Zheng)
-Date: Tue,  2 Aug 2016 15:22:59 +0800
-Subject: [PATCH v3 7/7] clk: rockchip: rk3399: Add support frac mode
- frequencies
-In-Reply-To: <1470122401-31934-1-git-send-email-zhengxing@rock-chips.com>
-References: <1470122401-31934-1-git-send-email-zhengxing@rock-chips.com>
-Message-ID: <1470122579-32083-1-git-send-email-zhengxing@rock-chips.com>
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Tue, 2 Aug 2016 09:32:44 +0200
+Subject: [PATCH v7 1/2] [media] atmel-isc: add the Image Sensor Controller
+ code
+In-Reply-To: <b32b2346-cc11-521e-c2f8-6d9e951c7a16@microchip.com>
+References: <1469778856-24253-1-git-send-email-songjun.wu@microchip.com>
+ <1469778856-24253-2-git-send-email-songjun.wu@microchip.com>
+ <f77652aa-3d41-d85f-11a9-9f5290223834@xs4all.nl>
+ <b32b2346-cc11-521e-c2f8-6d9e951c7a16@microchip.com>
+Message-ID: <cdb406b8-bb1e-9a78-e07c-f5df3dbcfe34@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We need to support various display resolutions for external
-display devices like HDMI/DP, the frac mode can help us to
-acquire almost any frequencies, and need higher VCOs to reduce
-clock jitters.
 
-Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
----
 
-Changes in v3: None
-Changes in v2: None
+On 08/02/2016 08:20 AM, Wu, Songjun wrote:
+>>> +static unsigned int sensor_preferred = 1;
+>>> +module_param(sensor_preferred, uint, S_IRUGO|S_IWUSR);
+>>> +MODULE_PARM_DESC(sensor_preferred,
+>>> +		 "Sensor is preferred to output the specified format (1-on 0-off) default 1");
+>>
+>> I have no idea what this means. Can you elaborate? Why would you want to set this to 0?
+>>
+> ISC can convert the raw format to the other format, e.g. YUYV.
+> If we want to output YUYV format, there are two choices, one is the 
+> sensor output YUYV format, ISC bypass the data to the memory, the other 
+> is the sensor output raw format, ISC convert raw format to YUYV.
+> 
+> So I provide a module parameter to user to select.
+> I prefer to select the sensor to output the specified format, then I set 
+> this parameter to '1', not '0'.
 
- drivers/clk/rockchip/clk-rk3399.c |   21 ++++++++++++++++++++-
- 1 file changed, 20 insertions(+), 1 deletion(-)
+Does this only apply to YUYV?
 
-diff --git a/drivers/clk/rockchip/clk-rk3399.c b/drivers/clk/rockchip/clk-rk3399.c
-index 2792404..ddd209b 100644
---- a/drivers/clk/rockchip/clk-rk3399.c
-+++ b/drivers/clk/rockchip/clk-rk3399.c
-@@ -109,6 +109,25 @@ static struct rockchip_pll_rate_table rk3399_pll_rates[] = {
- 	{ /* sentinel */ },
- };
- 
-+static struct rockchip_pll_rate_table rk3399_pll_frates[] = {
-+	/* _mhz, _refdiv, _fbdiv, _postdiv1, _postdiv2, _dsmpd, _frac */
-+	RK3036_PLL_RATE( 594000000, 1, 123, 5, 1, 0, 12582912),  /* vco = 2970000000 */
-+	RK3036_PLL_RATE( 593406593, 1, 123, 5, 1, 0, 10508804),  /* vco = 2967032965 */
-+	RK3036_PLL_RATE( 297000000, 1, 123, 5, 2, 0, 12582912),  /* vco = 2970000000 */
-+	RK3036_PLL_RATE( 296703297, 1, 123, 5, 2, 0, 10508807),  /* vco = 2967032970 */
-+	RK3036_PLL_RATE( 148500000, 1, 129, 7, 3, 0, 15728640),  /* vco = 3118500000 */
-+	RK3036_PLL_RATE( 148351648, 1, 123, 5, 4, 0, 10508800),  /* vco = 2967032960 */
-+	RK3036_PLL_RATE( 106500000, 1, 124, 7, 4, 0,  4194304),  /* vco = 2982000000 */
-+	RK3036_PLL_RATE(  74250000, 1, 129, 7, 6, 0, 15728640),  /* vco = 3118500000 */
-+	RK3036_PLL_RATE(  74175824, 1, 129, 7, 6, 0, 13550823),  /* vco = 3115384608 */
-+	RK3036_PLL_RATE(  65000000, 1, 113, 7, 6, 0, 12582912),  /* vco = 2730000000 */
-+	RK3036_PLL_RATE(  59340659, 1, 121, 7, 7, 0,  2581098),  /* vco = 2907692291 */
-+	RK3036_PLL_RATE(  54000000, 1, 110, 7, 7, 0,  4194304),  /* vco = 2646000000 */
-+	RK3036_PLL_RATE(  27000000, 1,  55, 7, 7, 0,  2097152),  /* vco = 1323000000 */
-+	RK3036_PLL_RATE(  26973027, 1,  55, 7, 7, 0,  1173232),  /* vco = 1321678323 */
-+	{ /* sentinel */ },
-+};
-+
- /* CRU parents */
- PNAME(mux_pll_p)				= { "xin24m", "xin32k" };
- 
-@@ -229,7 +248,7 @@ static struct rockchip_pll_clock rk3399_pll_clks[] __initdata = {
- 	[npll] = PLL(pll_rk3399, PLL_NPLL, "npll",  mux_pll_p, 0, RK3399_PLL_CON(40),
- 		     RK3399_PLL_CON(43), 8, 31, ROCKCHIP_PLL_SYNC_RATE, rk3399_pll_rates),
- 	[vpll] = PLL(pll_rk3399, PLL_VPLL, "vpll",  mux_pll_p, 0, RK3399_PLL_CON(48),
--		     RK3399_PLL_CON(51), 8, 31, ROCKCHIP_PLL_SYNC_RATE, rk3399_pll_rates),
-+		     RK3399_PLL_CON(51), 8, 31, ROCKCHIP_PLL_SYNC_RATE, rk3399_pll_frates),
- };
- 
- static struct rockchip_pll_clock rk3399_pmu_pll_clks[] __initdata = {
--- 
-1.7.9.5
+The reason I am hesitant about this option is that I am not convinced you need
+it. The default (sensor preferred) makes sense and that's what other drivers
+do as well. Unless you know of a real use-case where you want to set this to 0,
+I would just drop this option.
+
+If there *is* a real use-case, then split off adding this module option into a
+separate patch so we can discuss it more without blocking getting this driver
+into mainline. I don't like the way this is done here.
+
+Regards,
+
+	Hans
