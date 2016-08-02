@@ -1,34 +1,42 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Tue, 2 Aug 2016 19:54:30 +0200
-Subject: [PATCH 0001/1285] Replace numeric parameter like 0444 with macro
-In-Reply-To: <1470160338.3998.193.camel@perches.com>
-References: <20160802103322.13810-1-baolex.ni@intel.com>
- <20160802174253.GA4628@amd> <1470160338.3998.193.camel@perches.com>
-Message-ID: <20160802175430.GA22232@amd>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Tue,  2 Aug 2016 11:36:37 -0700
+Subject: [PATCH 2/2] ARM: davinci_all_defconfig: enable DA850 audio as modules
+In-Reply-To: <20160802183637.4860-1-khilman@baylibre.com>
+References: <20160802183637.4860-1-khilman@baylibre.com>
+Message-ID: <20160802183637.4860-2-khilman@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue 2016-08-02 10:52:18, Joe Perches wrote:
-> On Tue, 2016-08-02 at 19:42 +0200, Pavel Machek wrote:
-> > > I find that the developers often just specified the numeric value
-> > > when calling a macro which is defined with a parameter for access permission.
-> > > As we know, these numeric value for access permission have had the corresponding macro,
-> > > and that using macro can improve the robustness and readability of the code,
-> > > thus, I suggest replacing the numeric parameter with the macro.
-> > > 
-> > > -core_param(no_bL_switcher, no_bL_switcher, bool, 0644);
-> > > +core_param(no_bL_switcher, no_bL_switcher, bool, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
-> 
-> > Everyone knows what 0644 is, but noone can read S_IRUSR | S_IWUSR |
-> > S_IRCRP | S_IROTH (*). Please don't do this.
-> 
-> Perhaps this conversion is best done in reverse with
-> most all of the S_[A-Z]{5,5} uses converted to octal.
+Build audio support for DA850-based devices as modules in the default
+defconfig.
 
-I'd prefer that, yes.. But lets discuss that before another 1200 patch
-patchbomb...
+Cc: Sekhar Nori <nsekhar@ti.com>
+Signed-off-by: Kevin Hilman <khilman@baylibre.com>
+---
+ arch/arm/configs/davinci_all_defconfig | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-									Pavel
+diff --git a/arch/arm/configs/davinci_all_defconfig b/arch/arm/configs/davinci_all_defconfig
+index 67c90373ba1d..91eb0b2f8d61 100644
+--- a/arch/arm/configs/davinci_all_defconfig
++++ b/arch/arm/configs/davinci_all_defconfig
+@@ -118,6 +118,7 @@ CONFIG_DAVINCI_WATCHDOG=m
+ CONFIG_MFD_DM355EVM_MSP=y
+ CONFIG_TPS6507X=y
+ CONFIG_REGULATOR=y
++CONFIG_REGULATOR_FIXED_VOLTAGE=y
+ CONFIG_REGULATOR_TPS6507X=y
+ CONFIG_FB=y
+ CONFIG_FIRMWARE_EDID=y
+@@ -127,6 +128,9 @@ CONFIG_LOGO=y
+ CONFIG_SOUND=m
+ CONFIG_SND=m
+ CONFIG_SND_SOC=m
++CONFIG_SND_EDMA_SOC=m
++CONFIG_SND_DA850_SOC_EVM=m
++CONFIG_SND_SIMPLE_CARD=m
+ CONFIG_HID=m
+ CONFIG_HID_A4TECH=m
+ CONFIG_HID_APPLE=m
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+2.9.0
