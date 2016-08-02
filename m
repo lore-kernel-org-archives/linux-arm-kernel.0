@@ -1,156 +1,48 @@
-From: minghsiu.tsai@mediatek.com (Minghsiu Tsai)
-Date: Tue, 2 Aug 2016 13:49:46 +0800
-Subject: [PATCH v2 2/4] dt-bindings: Add a binding for Mediatek MDP
-In-Reply-To: <CAL_JsqK4Lz9mSJ+EXAY1g9L-CzBmbsed+MfCjkf_545y1Ov0iw@mail.gmail.com>
-References: <1469176383-35210-1-git-send-email-minghsiu.tsai@mediatek.com>
- <1469176383-35210-3-git-send-email-minghsiu.tsai@mediatek.com>
- <20160726185433.GA14609@rob-hp-laptop>
- <1469583886.27630.18.camel@mtksdaap41>
- <CAL_JsqK4Lz9mSJ+EXAY1g9L-CzBmbsed+MfCjkf_545y1Ov0iw@mail.gmail.com>
-Message-ID: <1470116986.16982.5.camel@mtksdaap41>
+From: qnguyen@apm.com (Quan Nguyen)
+Date: Tue, 2 Aug 2016 13:03:01 +0700
+Subject: [PATCH net-next 10/10] Documentation: dtb: xgene: Add rxlos GPIO
+ mapping
+In-Reply-To: <20160801163525.GA25767@rob-hp-laptop>
+References: <1469838843-19943-1-git-send-email-isubramanian@apm.com>
+ <1469838843-19943-11-git-send-email-isubramanian@apm.com>
+ <20160801163525.GA25767@rob-hp-laptop>
+Message-ID: <CAFopSPRePt_xnNK-fuesjX5AjCcK1rVbhdDYhFo7VVuX6PsRxA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2016-07-28 at 10:55 -0500, Rob Herring wrote:
-> On Tue, Jul 26, 2016 at 8:44 PM, Minghsiu Tsai
-> <minghsiu.tsai@mediatek.com> wrote:
-> > On Tue, 2016-07-26 at 13:54 -0500, Rob Herring wrote:
-> >> On Fri, Jul 22, 2016 at 04:33:01PM +0800, Minghsiu Tsai wrote:
-> >> > Add a DT binding documentation of MDP for the MT8173 SoC
-> >> > from Mediatek
-> >> >
-> >> > Signed-off-by: Minghsiu Tsai <minghsiu.tsai@mediatek.com>
-> >> > ---
-> >> >  .../devicetree/bindings/media/mediatek-mdp.txt     |   96 ++++++++++++++++++++
-> >> >  1 file changed, 96 insertions(+)
-> >> >  create mode 100644 Documentation/devicetree/bindings/media/mediatek-mdp.txt
-> >> >
-> >> > diff --git a/Documentation/devicetree/bindings/media/mediatek-mdp.txt b/Documentation/devicetree/bindings/media/mediatek-mdp.txt
-> >> > new file mode 100644
-> >> > index 0000000..2dad031
-> >> > --- /dev/null
-> >> > +++ b/Documentation/devicetree/bindings/media/mediatek-mdp.txt
-> >> > @@ -0,0 +1,96 @@
-> >> > +* Mediatek Media Data Path
-> >> > +
-> >> > +Media Data Path is used for scaling and color space conversion.
-> >> > +
-> >> > +Required properties (all function blocks):
-> >> > +- compatible: "mediatek,<chip>-mdp"
-> >>
-> >> What is this, ...
-> >>
-> >
-> > It is used to match platform driver.
-> 
-> Would structuring things like this work instead:
-> 
-> {
->   compatible = "mediatek,<chip>-mdp";
->   ranges = ...;
->   {
->     compatible = "mediatek,<chip>-mdp-rdma";
->     ...
->   };
->   {
->     compatible = "mediatek,<chip>-mdp-wdma";
->     ...
->   };
->   ...
-> };
-> 
+On Mon, Aug 1, 2016 at 11:35 PM, Rob Herring <robh@kernel.org> wrote:
+> On Fri, Jul 29, 2016 at 05:34:03PM -0700, Iyappan Subramanian wrote:
+>> Signed-off-by: Quan Nguyen <qnguyen@apm.com>
+>> Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
+>> Tested-by: Fushen Chen <fchen@apm.com>
+>> ---
+>>  Documentation/devicetree/bindings/net/apm-xgene-enet.txt | 1 +
+>>  1 file changed, 1 insertion(+)
+>>
+>> diff --git a/Documentation/devicetree/bindings/net/apm-xgene-enet.txt b/Documentation/devicetree/bindings/net/apm-xgene-enet.txt
+>> index 05f705e3..b83ae67 100644
+>> --- a/Documentation/devicetree/bindings/net/apm-xgene-enet.txt
+>> +++ b/Documentation/devicetree/bindings/net/apm-xgene-enet.txt
+>> @@ -24,6 +24,7 @@ Required properties for all the ethernet interfaces:
+>>  - clocks: Reference to the clock entry.
+>>  - local-mac-address: MAC address assigned to this device
+>>  - phy-connection-type: Interface type between ethernet device and PHY device
+>> +- rxlos-gpios: rxlos GPIO mapping
+>
+> Needs a vendor prefix and some definition of what rxlos is. Direction
+> and active state is needed as well.
+>
 
-I am trying to modify it as structured node. But mdp failed to convert
-image. Under debugging.
+Hi Rob,
 
+This gpio signal is from SFP+ module which will tell whether incoming
+fiber signal available. As this is gpio, it must have the form of
+"xxxx-gpios" as stated in Documentation/gpio/board.txt. As per this
+document, the active state is also included in this property.
 
-> >
-> >
-> >> > +        "mediatek,<chip>-mdp-<function>", one of
-> >>
-> >> and this?
-> >>
-> >
-> > It is string format of HW block. <chip> could be "mt8173", and
-> > <function> are "rdma", "rsz", "wdma", and "wrot".
-> >
-> >
-> >> > +        "mediatek,<chip>-mdp-rdma"  - read DMA
-> >> > +        "mediatek,<chip>-mdp-rsz"   - resizer
-> >> > +        "mediatek,<chip>-mdp-wdma"  - write DMA
-> >> > +        "mediatek,<chip>-mdp-wrot"  - write DMA with rotation
-> >>
-> >> List what are valid values of <chip>.
-> >>
-> >
-> > <chip> - mt8173. There should be other chip added in future.
-> > I will change the property as blow:
-> >
-> > - compatible: "mediatek,<chip>-mdp"
-> >         Should be one of
-> >         "mediatek,<chip>-mdp-rdma"  - read DMA
-> >         "mediatek,<chip>-mdp-rsz"   - resizer
-> >         "mediatek,<chip>-mdp-wdma"  - write DMA
-> >         "mediatek,<chip>-mdp-wrot"  - write DMA with rotation
-> >         <chip> - could be 8173
-> >
-> >
-> > If don't need <chip>, I also can change it as below. It is more clear.
-> 
-> Up to you. Depends on how many different chips you will have.
-> 
+About definition for "rxlos-gpios", I suggested as below :
+"- rxlos-gpios: Optional, input gpio from SFP+ module to indicate
+availability of incoming signal"
 
-I will replace "<chip>" with "mt8173"
-
-
-> > - compatible: "mediatek,mt8173-mdp"
-> >         Should be one of
-> >         "mediatek,mt8173-mdp-rdma"  - read DMA
-> >         "mediatek,mt8173-mdp-rsz"   - resizer
-> >         "mediatek,mt8173-mdp-wdma"  - write DMA
-> >         "mediatek,mt8173-mdp-wrot"  - write DMA with rotation
-> >
-> >
-> >> > +- reg: Physical base address and length of the function block register space
-> >> > +- clocks: device clocks
-> >> > +- power-domains: a phandle to the power domain.
-> >> > +- mediatek,vpu: the node of video processor unit
-> >> > +
-> >> > +Required properties (DMA function blocks):
-> >> > +- compatible: Should be one of
-> >> > +        "mediatek,<chip>-mdp-rdma"
-> >> > +        "mediatek,<chip>-mdp-wdma"
-> >> > +        "mediatek,<chip>-mdp-wrot"
-> >> > +- iommus: should point to the respective IOMMU block with master port as
-> >> > +  argument, see Documentation/devicetree/bindings/iommu/mediatek,iommu.txt
-> >> > +  for details.
-> >> > +- mediatek,larb: must contain the local arbiters in the current Socs.
-> >>
-> >> It is still not clear which properties apply to which compatible
-> >> strings.
-> >>
-> >
-> > I found out the document for larb.
-> > I will change the property as below:
-> >
-> > - mediatek,larb: must contain the local arbiters in the current Socs,
-> > see
-> > Documentation/devicetree/bindings/memory-controllers/mediatek,smi-larb.txt
-> >   for details.
-> 
-> That's good, but not what I meant. You still have properties which
-> only apply to certain blocks, but are listed for all blocks like
-> mediatek,vpu for example.
-> 
-> Rob
-
-
-I find out other properties' document. 
-
-- clocks: device clocks, see
-  Documentation/devicetree/bindings/clock/clock-bindings.txt for
-details.
-- power-domains: a phandle to the power domain, see
-  Documentation/devicetree/bindings/power/power_domain.txt for details.
-- mediatek,vpu: the node of video processor unit, see
-  Documentation/devicetree/bindings/media/mediatek-vpu.txt for details.
+Thank you,
+Quan
