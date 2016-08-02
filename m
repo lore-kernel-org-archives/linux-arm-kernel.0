@@ -1,127 +1,34 @@
-From: zyw@rock-chips.com (Chris Zhong)
-Date: Tue,  2 Aug 2016 20:45:12 +0800
-Subject: [v9 PATCH 5/6] Documentation: bindings: add dt documentation for cdn
- DP controller
-In-Reply-To: <1470141913-1082-1-git-send-email-zyw@rock-chips.com>
-References: <1470141913-1082-1-git-send-email-zyw@rock-chips.com>
-Message-ID: <1470141913-1082-6-git-send-email-zyw@rock-chips.com>
+From: baolex.ni@intel.com (Baole Ni)
+Date: Tue,  2 Aug 2016 20:08:36 +0800
+Subject: [PATCH 1016/1285] Replace numeric parameter like 0444 with macro
+Message-ID: <20160802120836.17828-1-baolex.ni@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a binding that describes the cdn DP controller for
-rk3399.
+I find that the developers often just specified the numeric value
+when calling a macro which is defined with a parameter for access permission.
+As we know, these numeric value for access permission have had the corresponding macro,
+and that using macro can improve the robustness and readability of the code,
+thus, I suggest replacing the numeric parameter with the macro.
 
-Signed-off-by: Chris Zhong <zyw@rock-chips.com>
-Acked-by: Rob Herring <robh@kernel.org>
-
+Signed-off-by: Chuansheng Liu <chuansheng.liu@intel.com>
+Signed-off-by: Baole Ni <baolex.ni@intel.com>
 ---
+ drivers/video/fbdev/s3c2410fb.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Changes in v9:
-- modify the reference phy = <&tcphy0 0>, <&tcphy1 0>;
-
-Changes in v8: None
-Changes in v7: None
-Changes in v6:
-- add assigned-clocks and assigned-clock-rates
-- add power-domains
-
-Changes in v5: None
-Changes in v4:
-- add a reset node
-- support 2 phys
-
-Changes in v3:
-- add SoC specific compatible string
-- remove reg = <1>;
-
-Changes in v2: None
-Changes in v1:
-- add extcon node description
-- add #sound-dai-cells description
-
- .../bindings/display/rockchip/cdn-dp-rockchip.txt  | 74 ++++++++++++++++++++++
- 1 file changed, 74 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/display/rockchip/cdn-dp-rockchip.txt
-
-diff --git a/Documentation/devicetree/bindings/display/rockchip/cdn-dp-rockchip.txt b/Documentation/devicetree/bindings/display/rockchip/cdn-dp-rockchip.txt
-new file mode 100644
-index 0000000..5ff982a
---- /dev/null
-+++ b/Documentation/devicetree/bindings/display/rockchip/cdn-dp-rockchip.txt
-@@ -0,0 +1,74 @@
-+Rockchip RK3399 specific extensions to the cdn Display Port
-+================================
-+
-+Required properties:
-+- compatible: must be "rockchip,rk3399-cdn-dp"
-+
-+- reg: physical base address of the controller and length
-+
-+- clocks: from common clock binding: handle to dp clock.
-+
-+- clock-names: from common clock binding:
-+	       Required elements: "core-clk" "pclk" "spdif"
-+
-+- resets : a list of phandle + reset specifier pairs
-+- reset-names : string reset name, must be:
-+		"spdif"
-+- power-domains : power-domain property defined with a phandle
-+		  to respective power domain.
-+- assigned-clocks: main clock, should be <&cru SCLK_DP_CORE>
-+- assigned-clock-rates : the DP core clk frequency, shall be: 100000000
-+
-+- rockchip,grf: this soc should set GRF regs, so need get grf here.
-+
-+- ports: contain a port nodes with endpoint definitions as defined in
-+	 Documentation/devicetree/bindings/media/video-interfaces.txt.
-+	 contained 2 endpoints, connecting to the output of vop.
-+
-+- phys: from general PHY binding: the phandle for the PHY device.
-+
-+- extcon: extcon specifier for the Power Delivery
-+
-+- #sound-dai-cells = it must be 1 if your system is using 2 DAIs: I2S, SPDIF
-+
-+-------------------------------------------------------------------------------
-+
-+Example:
-+	cdn_dp: dp at fec00000 {
-+		compatible = "rockchip,rk3399-cdn-dp";
-+		reg = <0x0 0xfec00000 0x0 0x100000>;
-+		interrupts = <GIC_SPI 9 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&cru SCLK_DP_CORE>, <&cru PCLK_DP_CTRL>,
-+			 <&cru SCLK_SPDIF_REC_DPTX>;
-+		clock-names = "core-clk", "pclk", "spdif";
-+		assigned-clocks = <&cru SCLK_DP_CORE>;
-+		assigned-clock-rates = <100000000>;
-+		power-domains = <&power RK3399_PD_HDCP>;
-+		phys = <&tcphy0 0>, <&tcphy1 0>;
-+		resets = <&cru SRST_DPTX_SPDIF_REC>;
-+		reset-names = "spdif";
-+		extcon = <&fusb0>, <&fusb1>;
-+		rockchip,grf = <&grf>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		#sound-dai-cells = <1>;
-+
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			dp_in: port {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				dp_in_vopb: endpoint at 0 {
-+					reg = <0>;
-+					remote-endpoint = <&vopb_out_dp>;
-+				};
-+
-+				dp_in_vopl: endpoint at 1 {
-+					reg = <1>;
-+					remote-endpoint = <&vopl_out_dp>;
-+				};
-+			};
-+		};
-+	};
+diff --git a/drivers/video/fbdev/s3c2410fb.c b/drivers/video/fbdev/s3c2410fb.c
+index 0dd86be..9f955a2 100644
+--- a/drivers/video/fbdev/s3c2410fb.c
++++ b/drivers/video/fbdev/s3c2410fb.c
+@@ -616,7 +616,7 @@ static int s3c2410fb_debug_store(struct device *dev,
+ 	return len;
+ }
+ 
+-static DEVICE_ATTR(debug, 0664, s3c2410fb_debug_show, s3c2410fb_debug_store);
++static DEVICE_ATTR(debug, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH, s3c2410fb_debug_show, s3c2410fb_debug_store);
+ 
+ static struct fb_ops s3c2410fb_ops = {
+ 	.owner		= THIS_MODULE,
 -- 
-2.6.3
+2.9.2
