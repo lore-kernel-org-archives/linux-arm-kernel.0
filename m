@@ -1,278 +1,147 @@
-From: tthayer@opensource.altera.com (tthayer at opensource.altera.com)
-Date: Tue, 2 Aug 2016 10:56:20 -0500
-Subject: [PATCH 2/3] EDAC, altera: Add Arria10 SD-MMC EDAC support
-In-Reply-To: <1470153381-20517-1-git-send-email-tthayer@opensource.altera.com>
-References: <1470153381-20517-1-git-send-email-tthayer@opensource.altera.com>
-Message-ID: <1470153381-20517-3-git-send-email-tthayer@opensource.altera.com>
+From: seanpaul@chromium.org (Sean Paul)
+Date: Tue, 2 Aug 2016 13:02:36 -0400
+Subject: [PATCH 5/7] drm/mediatek: plane: Merge mtk_plane_enable into
+ mtk_plane_atomic_update
+In-Reply-To: <1469783054-54567-6-git-send-email-bibby.hsieh@mediatek.com>
+References: <1469783054-54567-1-git-send-email-bibby.hsieh@mediatek.com>
+ <1469783054-54567-6-git-send-email-bibby.hsieh@mediatek.com>
+Message-ID: <CAOw6vbJjqOPL86vk5A_17ugWzgdTYH4kZmm5oOqwGtNDeSDX6w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thor Thayer <tthayer@opensource.altera.com>
+On Fri, Jul 29, 2016 at 5:04 AM, Bibby Hsieh <bibby.hsieh@mediatek.com> wrote:
+> From: Daniel Kurtz <djkurtz@chromium.org>
+>
+> The mtk_plane_enable is just called once by mtk_plane_atomic_update.
+> So, merge mtk_plane_enable into mtk_plane_atomic_update.
+>
+> While we are here, also clean up the function a bit by using an fb local
+> variables.
+>
+> Signed-off-by: Bibby Hsieh <bibby.hsieh@mediatek.com>
+> Signed-off-by: Daniel Kurtz <djkurtz@chromium.org>
+> ---
+>  drivers/gpu/drm/mediatek/mtk_drm_plane.c |   65 +++++++++++-------------------
+>  1 file changed, 23 insertions(+), 42 deletions(-)
+>
+> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_plane.c b/drivers/gpu/drm/mediatek/mtk_drm_plane.c
+> index 17172ba..b3ddb20 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_drm_plane.c
+> +++ b/drivers/gpu/drm/mediatek/mtk_drm_plane.c
+> @@ -30,44 +30,6 @@ static const u32 formats[] = {
+>         DRM_FORMAT_RGB565,
+>  };
+>
+> -static void mtk_plane_enable(struct drm_plane *plane,
 
-Add Altera Arria10 SD-MMC FIFO memory EDAC support. The SD-MMC
-is a dual port RAM implementation which is different than any
-of the other peripherals and therefore requires additional code.
 
-Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
----
- drivers/edac/Kconfig       |    7 ++
- drivers/edac/altera_edac.c |  188 +++++++++++++++++++++++++++++++++++++++++++-
- drivers/edac/altera_edac.h |    5 ++
- 3 files changed, 199 insertions(+), 1 deletion(-)
+Hi Bibby,
+This doesn't merge cleanly.
 
-diff --git a/drivers/edac/Kconfig b/drivers/edac/Kconfig
-index 72752f4..394cd16 100644
---- a/drivers/edac/Kconfig
-+++ b/drivers/edac/Kconfig
-@@ -426,6 +426,13 @@ config EDAC_ALTERA_QSPI
- 	  Support for error detection and correction on the
- 	  Altera QSPI FIFO Memory for Altera SoCs.
- 
-+config EDAC_ALTERA_SDMMC
-+	bool "Altera SDMMC FIFO ECC"
-+	depends on EDAC_ALTERA=y && MMC_DW
-+	help
-+	  Support for error detection and correction on the
-+	  Altera SDMMC FIFO Memory for Altera SoCs.
-+
- config EDAC_SYNOPSYS
- 	tristate "Synopsys DDR Memory Controller"
- 	depends on EDAC_MM_EDAC && ARCH_ZYNQ
-diff --git a/drivers/edac/altera_edac.c b/drivers/edac/altera_edac.c
-index 28247f8..8b5177e 100644
---- a/drivers/edac/altera_edac.c
-+++ b/drivers/edac/altera_edac.c
-@@ -1393,6 +1393,188 @@ early_initcall(socfpga_init_qspi_ecc);
- 
- #endif	/* CONFIG_EDAC_ALTERA_QSPI */
- 
-+/********************* SDMMC Device Functions **********************/
-+
-+#ifdef CONFIG_EDAC_ALTERA_SDMMC
-+
-+static const struct edac_device_prv_data a10_sdmmceccb_data;
-+static int altr_portb_setup(struct altr_edac_device_dev *device)
-+{
-+	struct edac_device_ctl_info *dci;
-+	struct altr_edac_device_dev *altdev;
-+	char *ecc_name = "sdmmcb-ecc";
-+	int edac_idx, rc;
-+	struct device_node *np;
-+	const struct edac_device_prv_data *prv = &a10_sdmmceccb_data;
-+
-+	rc = altr_check_ecc_deps(device);
-+	if (rc)
-+		return rc;
-+
-+	/* Create the PortB EDAC device */
-+	edac_idx = edac_device_alloc_index();
-+	dci = edac_device_alloc_ctl_info(sizeof(*altdev), ecc_name, 1,
-+					 ecc_name, 1, 0, NULL, 0, edac_idx);
-+	if (!dci) {
-+		edac_printk(KERN_ERR, EDAC_DEVICE,
-+			    "%s: Unable to allocate PortB EDAC device\n",
-+			    ecc_name);
-+		return -ENOMEM;
-+	}
-+
-+	/* Initialize the PortB EDAC device structure from PortA structure */
-+	altdev = dci->pvt_info;
-+	*altdev = *device;
-+
-+	if (!devres_open_group(&altdev->ddev, altr_portb_setup, GFP_KERNEL))
-+		return -ENOMEM;
-+
-+	/* Update PortB specific values */
-+	altdev->edac_dev_name = ecc_name;
-+	altdev->edac_idx = edac_idx;
-+	altdev->edac_dev = dci;
-+	altdev->data = prv;
-+	dci->dev = &altdev->ddev;
-+	dci->ctl_name = "Altera ECC Manager";
-+	dci->mod_name = ecc_name;
-+	dci->dev_name = ecc_name;
-+
-+	/* Find the SD/MMC device tree Node then update the IRQs for PortB */
-+	np = of_find_compatible_node(NULL, NULL, "altr,socfpga-sdmmc-ecc");
-+	if (!np) {
-+		rc = -ENODEV;
-+		goto err_release_group_1;
-+	}
-+
-+	altdev->sb_irq = irq_of_parse_and_map(np, 2);
-+	if (!altdev->sb_irq) {
-+		edac_printk(KERN_ERR, EDAC_DEVICE, "Error PortB SBIRQ alloc\n");
-+		rc = -ENODEV;
-+		goto err_release_group_1;
-+	}
-+	rc = devm_request_irq(&altdev->ddev, altdev->sb_irq,
-+			      prv->ecc_irq_handler,
-+			      IRQF_SHARED, ecc_name, altdev);
-+	if (rc) {
-+		edac_printk(KERN_ERR, EDAC_DEVICE, "PortB SBERR IRQ error\n");
-+		goto err_release_group_1;
-+	}
-+
-+	altdev->db_irq = irq_of_parse_and_map(np, 3);
-+	if (!altdev->db_irq) {
-+		edac_printk(KERN_ERR, EDAC_DEVICE, "Error PortB DBIRQ alloc\n");
-+		rc = -ENODEV;
-+		goto err_release_group_1;
-+	}
-+	rc = devm_request_irq(&altdev->ddev, altdev->db_irq,
-+			      prv->ecc_irq_handler,
-+			      IRQF_SHARED, ecc_name, altdev);
-+	if (rc) {
-+		edac_printk(KERN_ERR, EDAC_DEVICE, "PortB DBERR IRQ error\n");
-+		goto err_release_group_1;
-+	}
-+
-+	rc = edac_device_add_device(dci);
-+	if (rc) {
-+		edac_printk(KERN_ERR, EDAC_DEVICE,
-+			    "edac_device_add_device portB failed\n");
-+		rc = -ENOMEM;
-+		goto err_release_group_1;
-+	}
-+	altr_create_edacdev_dbgfs(dci, prv);
-+
-+	list_add(&altdev->next, &altdev->edac->a10_ecc_devices);
-+
-+	devres_remove_group(&altdev->ddev, altr_portb_setup);
-+
-+	return 0;
-+
-+err_release_group_1:
-+	edac_device_free_ctl_info(dci);
-+	devres_release_group(&altdev->ddev, altr_portb_setup);
-+	edac_printk(KERN_ERR, EDAC_DEVICE,
-+		    "%s:Error setting up EDAC device: %d\n", ecc_name, rc);
-+	return rc;
-+}
-+
-+static irqreturn_t  altr_edac_a10_ecc_irq_portb(int irq, void *dev_id)
-+{
-+	struct altr_edac_device_dev *ad = dev_id;
-+	void __iomem  *base = ad->base;
-+	const struct edac_device_prv_data *priv = ad->data;
-+
-+	if (irq == ad->sb_irq) {
-+		writel(priv->ce_clear_mask,
-+		       base + ALTR_A10_ECC_INTSTAT_OFST);
-+		edac_device_handle_ce(ad->edac_dev, 0, 0, ad->edac_dev_name);
-+		return IRQ_HANDLED;
-+	} else if (irq == ad->db_irq) {
-+		writel(priv->ue_clear_mask,
-+		       base + ALTR_A10_ECC_INTSTAT_OFST);
-+		edac_device_handle_ue(ad->edac_dev, 0, 0, ad->edac_dev_name);
-+		return IRQ_HANDLED;
-+	}
-+
-+	WARN_ON(1);
-+
-+	return IRQ_NONE;
-+}
-+
-+static const struct edac_device_prv_data a10_sdmmcecca_data = {
-+	.setup = altr_portb_setup,
-+	.ce_clear_mask = ALTR_A10_ECC_SERRPENA,
-+	.ue_clear_mask = ALTR_A10_ECC_DERRPENA,
-+	.dbgfs_name = "altr_trigger",
-+	.ecc_enable_mask = ALTR_A10_COMMON_ECC_EN_CTL,
-+	.ecc_en_ofst = ALTR_A10_ECC_CTRL_OFST,
-+	.ce_set_mask = ALTR_A10_ECC_SERRPENA,
-+	.ue_set_mask = ALTR_A10_ECC_DERRPENA,
-+	.set_err_ofst = ALTR_A10_ECC_INTTEST_OFST,
-+	.ecc_irq_handler = altr_edac_a10_ecc_irq,
-+	.inject_fops = &altr_edac_a10_device_inject_fops,
-+};
-+
-+static const struct edac_device_prv_data a10_sdmmceccb_data = {
-+	.setup = altr_portb_setup,
-+	.ce_clear_mask = ALTR_A10_ECC_SERRPENB,
-+	.ue_clear_mask = ALTR_A10_ECC_DERRPENB,
-+	.dbgfs_name = "altr_trigger",
-+	.ecc_enable_mask = ALTR_A10_COMMON_ECC_EN_CTL,
-+	.ecc_en_ofst = ALTR_A10_ECC_CTRL_OFST,
-+	.ce_set_mask = ALTR_A10_ECC_TSERRB,
-+	.ue_set_mask = ALTR_A10_ECC_TDERRB,
-+	.set_err_ofst = ALTR_A10_ECC_INTTEST_OFST,
-+	.ecc_irq_handler = altr_edac_a10_ecc_irq_portb,
-+	.inject_fops = &altr_edac_a10_device_inject_fops,
-+};
-+
-+static int __init socfpga_init_sdmmc_ecc(void)
-+{
-+	int rc = -ENODEV;
-+	struct device_node *child = of_find_compatible_node(NULL, NULL,
-+						"altr,socfpga-sdmmc-ecc");
-+	if (!child) {
-+		edac_printk(KERN_ERR, EDAC_DEVICE, "SDMMC node not found\n");
-+		return -ENODEV;
-+	}
-+
-+	if (!of_device_is_available(child))
-+		goto exit;
-+
-+	if (validate_parent_available(child))
-+		goto exit;
-+
-+	rc = altr_init_a10_ecc_block(child, ALTR_A10_SDMMC_IRQ_MASK,
-+				     a10_sdmmcecca_data.ecc_enable_mask, 1);
-+exit:
-+	of_node_put(child);
-+	return rc;
-+}
-+
-+early_initcall(socfpga_init_sdmmc_ecc);
-+
-+#endif	/* CONFIG_EDAC_ALTERA_SDMMC */
-+
- /********************* Arria10 EDAC Device Functions *************************/
- static const struct of_device_id altr_edac_a10_device_of_match[] = {
- #ifdef CONFIG_EDAC_ALTERA_L2C
-@@ -1418,6 +1600,9 @@ static const struct of_device_id altr_edac_a10_device_of_match[] = {
- #ifdef CONFIG_EDAC_ALTERA_QSPI
- 	{ .compatible = "altr,socfpga-qspi-ecc", .data = &a10_qspiecc_data },
- #endif
-+#ifdef CONFIG_EDAC_ALTERA_SDMMC
-+	{ .compatible = "altr,socfpga-sdmmc-ecc", .data = &a10_sdmmcecca_data },
-+#endif
- 	{},
- };
- MODULE_DEVICE_TABLE(of, altr_edac_a10_device_of_match);
-@@ -1711,7 +1896,8 @@ static int altr_edac_a10_probe(struct platform_device *pdev)
- 		    of_device_is_compatible(child, "altr,socfpga-nand-ecc") ||
- 		    of_device_is_compatible(child, "altr,socfpga-dma-ecc") ||
- 		    of_device_is_compatible(child, "altr,socfpga-usb-ecc") ||
--		    of_device_is_compatible(child, "altr,socfpga-qspi-ecc"))
-+		    of_device_is_compatible(child, "altr,socfpga-qspi-ecc") ||
-+		    of_device_is_compatible(child, "altr,socfpga-sdmmc-ecc"))
- 
- 			altr_edac_a10_device_add(edac, child);
- 
-diff --git a/drivers/edac/altera_edac.h b/drivers/edac/altera_edac.h
-index 687d8e7..cf3a68b 100644
---- a/drivers/edac/altera_edac.h
-+++ b/drivers/edac/altera_edac.h
-@@ -250,6 +250,8 @@ struct altr_sdram_mc_data {
- #define ALTR_A10_ECC_INTTEST_OFST       0x24
- #define ALTR_A10_ECC_TSERRA             BIT(0)
- #define ALTR_A10_ECC_TDERRA             BIT(8)
-+#define ALTR_A10_ECC_TSERRB             BIT(16)
-+#define ALTR_A10_ECC_TDERRB             BIT(24)
- 
- /* ECC Manager Defines */
- #define A10_SYSMGR_ECC_INTMASK_SET_OFST   0x94
-@@ -288,6 +290,9 @@ struct altr_sdram_mc_data {
- /* Arria 10 Ethernet ECC Management Group Defines */
- #define ALTR_A10_COMMON_ECC_EN_CTL      BIT(0)
- 
-+/* Arria 10 SDMMC ECC Management Group Defines */
-+#define ALTR_A10_SDMMC_IRQ_MASK         (BIT(16) | BIT(15))
-+
- /* A10 ECC Controller memory initialization timeout */
- #define ALTR_A10_ECC_INIT_WATCHDOG_10US      10000
- 
--- 
-1.7.9.5
+
+It seems like upstream has:
+
+static void mtk_plane_enable(struct mtk_drm_plane *mtk_plane,
+
+
+Whereas your version of "is based on some downstream version of
+"drm/mediatek: Use drm_plane_helper_check_state()" which changed this
+to struct drm_plane. Can you respin the set such that the
+mtk_drm_plane removal patch fixes this?
+
+Your set should apply cleanly to
+https://cgit.freedesktop.org/~seanpaul/birch/?h=for-misc
+
+Thanks,
+
+Sean
+
+
+
+> -                            dma_addr_t addr)
+> -{
+> -       struct mtk_plane_state *state = to_mtk_plane_state(plane->state);
+> -       unsigned int pitch, format;
+> -       bool enable;
+> -
+> -       if (WARN_ON(!plane->state))
+> -               return;
+> -
+> -       enable = state->base.visible;
+> -
+> -       if (WARN_ON(enable && !plane->state->fb))
+> -               return;
+> -
+> -       if (plane->state->fb) {
+> -               pitch = plane->state->fb->pitches[0];
+> -               format = plane->state->fb->pixel_format;
+> -       } else {
+> -               pitch = 0;
+> -               format = DRM_FORMAT_RGBA8888;
+> -       }
+> -
+> -       addr += (state->base.src.x1 >> 16) * 4;
+> -       addr += (state->base.src.y1 >> 16) * pitch;
+> -
+> -       state->pending.enable = enable;
+> -       state->pending.pitch = pitch;
+> -       state->pending.format = format;
+> -       state->pending.addr = addr;
+> -       state->pending.x = state->base.dst.x1;
+> -       state->pending.y = state->base.dst.y1;
+> -       state->pending.width = drm_rect_width(&state->base.dst);
+> -       state->pending.height = drm_rect_height(&state->base.dst);
+> -       wmb(); /* Make sure the above parameters are set before update */
+> -       state->pending.dirty = true;
+> -}
+> -
+>  static void mtk_plane_reset(struct drm_plane *plane)
+>  {
+>         struct mtk_plane_state *state;
+> @@ -157,16 +119,35 @@ static void mtk_plane_atomic_update(struct drm_plane *plane,
+>                                     struct drm_plane_state *old_state)
+>  {
+>         struct mtk_plane_state *state = to_mtk_plane_state(plane->state);
+> -       struct drm_crtc *crtc = state->base.crtc;
+> +       struct drm_crtc *crtc = plane->state->crtc;
+> +       struct drm_framebuffer *fb = plane->state->fb;
+>         struct drm_gem_object *gem;
+>         struct mtk_drm_gem_obj *mtk_gem;
+> +       unsigned int pitch, format;
+> +       dma_addr_t addr;
+>
+> -       if (!crtc)
+> +       if (!crtc || WARN_ON(!fb))
+>                 return;
+>
+> -       gem = mtk_fb_get_gem_obj(state->base.fb);
+> +       gem = mtk_fb_get_gem_obj(fb);
+>         mtk_gem = to_mtk_gem_obj(gem);
+> -       mtk_plane_enable(plane, mtk_gem->dma_addr);
+> +       addr = mtk_gem->dma_addr;
+> +       pitch = fb->pitches[0];
+> +       format = fb->pixel_format;
+> +
+> +       addr += (plane->state->src.x1 >> 16) * 4;
+> +       addr += (plane->state->src.y1 >> 16) * pitch;
+> +
+> +       state->pending.enable = true;
+> +       state->pending.pitch = pitch;
+> +       state->pending.format = format;
+> +       state->pending.addr = addr;
+> +       state->pending.x = plane->state->dst.x1;
+> +       state->pending.y = plane->state->dst.y1;
+> +       state->pending.width = drm_rect_width(&plane->state->dst);
+> +       state->pending.height = drm_rect_height(&plane->state->dst);
+> +       wmb(); /* Make sure the above parameters are set before update */
+> +       state->pending.dirty = true;
+>  }
+>
+>  static void mtk_plane_atomic_disable(struct drm_plane *plane,
+> --
+> 1.7.9.5
+>
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
