@@ -1,40 +1,38 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 2 Aug 2016 12:35:24 -0700
-Subject: [PATCH] Fix shmobile build with CONFIG_SMP=n
-In-Reply-To: <20160720231416.GC9599@verge.net.au>
-References: <20160719115703.GJ1041@n2100.armlinux.org.uk>
- <CAMuHMdWfqbv4MXuThRPL2hsdN4Hq53Ng=1cp8DBB7o7XGzM9Zw@mail.gmail.com>
- <20160720231416.GC9599@verge.net.au>
-Message-ID: <20160802193524.GA6423@localhost>
+Date: Tue, 2 Aug 2016 13:13:23 -0700
+Subject: [PATCH] ARM: do away with final ARCH_REQUIRE_GPIOLIB
+In-Reply-To: <20160802185539.GB5288@localhost>
+References: <1470123873-8073-1-git-send-email-linus.walleij@linaro.org>
+ <4971362.dFskjWhYAq@wuerfel> <20160802185539.GB5288@localhost>
+Message-ID: <CAOesGMjGgjPU1aMAV815ti1CPZhoG8-4tvzCCOQwgaXn9zLXJA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Aug 2, 2016 at 11:55 AM, Olof Johansson <olof@lixom.net> wrote:
+> On Tue, Aug 02, 2016 at 09:47:50AM +0200, Arnd Bergmann wrote:
+>> On Tuesday, August 2, 2016 9:44:33 AM CEST Linus Walleij wrote:
+>> > A new user of the Kconfig selection of ARCH_REQUIRE_GPIOLIB
+>> > has appeared. Replace with just selecting GPIOLIB.
+>> >
+>> > Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+>> > ---
+>> > ARM SoC folks: I plan to send this directly in this merge
+>> > window to get rid of the old Kconfig symbols, please ACK
+>> > it.
+>>
+>> Acked-by: Arnd Bergmann <arnd@arndb.de>
+>>
+>> Note that sending this one along with your patches requires
+>> you to base on top of our branches (which are now merged).
+>>
+>> Alternatively we could queue this up as a bugfix: there is no
+>> harm in selecting a symbol that has been removed, so we don't
+>> have a strict dependency that requries it this one to go
+>> in before the removal.
+>
+> We'll need to start building a fixes branch shortly so we can include
+> this with it.
 
-On Thu, Jul 21, 2016 at 08:14:17AM +0900, Simon Horman wrote:
-> On Tue, Jul 19, 2016 at 02:02:53PM +0200, Geert Uytterhoeven wrote:
-> > Hi Russell,
-> > 
-> > On Tue, Jul 19, 2016 at 1:57 PM, Russell King - ARM Linux
-> > <linux@armlinux.org.uk> wrote:
-> > > Shmobile currently fails to build when CONFIG_SMP is disabled:
-> > >
-> > > arch/arm/mach-shmobile/built-in.o: In function `shmobile_smp_init_fallback_ops':
-> > > pm-rcar-gen2.c:(.init.text+0x744): undefined reference to `platform_can_secondary_boot'
-> > > make[1]: *** [vmlinux] Error 1
-> > >
-> > > Fix this by providing a stub for this function.
-> > >
-> > > Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
-> > 
-> > Arnd send a smaller one https://patchwork.kernel.org/patch/9207413/,
-> > which seems have fallen through the cracks.
-> 
-> Sorry for missing that. I have queued up Arnd's patch as a fix for v4.8
-> with Acked-by Geert and a Reported-by Russel tags.
-
-Since I haven't seen this patch yet, I've applied it (Arnd's version) directly
-to our fixes branch.
-
+Applied to fixes.
 
 -Olof
