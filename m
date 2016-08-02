@@ -1,629 +1,230 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Tue,  2 Aug 2016 13:18:29 +0900
-Subject: [PATCH v3] reset: uniphier: add reset controller driver for UniPhier
- SoCs
-Message-ID: <1470111510-21247-1-git-send-email-yamada.masahiro@socionext.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Tue, 02 Aug 2016 13:21:38 +0900
+Subject: [PATCH v4 6/7] PM / devfreq: rockchip: add devfreq driver for
+ rk3399 dmc
+In-Reply-To: <579FF164.2000907@rock-chips.com>
+References: <1469779021-10426-1-git-send-email-hl@rock-chips.com>
+ <CGME20160729075807epcas1p2432f667d41dadcaae7b813e151f2ab0b@epcas1p2.samsung.com>
+ <1469779021-10426-7-git-send-email-hl@rock-chips.com>
+ <579F2445.1020200@samsung.com> <579FF164.2000907@rock-chips.com>
+Message-ID: <57A01FD2.2060806@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is the initial commit for UniPhier reset controller driver.
+Hi Lin,
 
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
----
+On the next version, I'd like you to add the 'linux-pm at vger.kernel.org'
+because devfreq is a subsystem of power management.
 
-Changes in v3:
-  - Fix examples in binding document to add specific compatible string
-  - Assign each reset signal with a separate ID
-  - Simplify reset_control operations
-  - Unify to a single file because code is short enough now.
+On 2016? 08? 02? 10:03, hl wrote:
+> Hi Chanwoo Choi,
+> 
+>     Thanks for reviewing so carefully. And i have some question:
+> 
+> On 2016?08?01? 18:28, Chanwoo Choi wrote:
+>> Hi Lin,
+>>
+>> As I mentioned on patch5, you better to make the documentation as following:
+>> - Documentation/devicetree/bindings/devfreq/rk3399_dmc.txt
+>> And, I add the comments.
+>>
+>>
+>> On 2016? 07? 29? 16:57, Lin Huang wrote:
+>>> base on dfi result, we do ddr frequency scaling, register
+>>> dmc driver to devfreq framework, and use simple-ondemand
+>>> policy.
+>>>
+>>> Signed-off-by: Lin Huang <hl@rock-chips.com>
+>>> ---
+>>> Changes in v4:
+>>> - use arm_smccc_smc() function talk to bl31
+>>> - delete rockchip_dmc.c file and config
+>>> - delete dmc_notify
+>>> - adjust probe order
+>>>   Changes in v3:
+>>> - operate dram setting through sip call
+>>> - imporve set rate flow
+>>>
+>>> Changes in v2:
+>>> - None
+>>>   Changes in v1:
+>>> - move dfi controller to event
+>>> - fix set voltage sequence when set rate fail
+>>> - change Kconfig type from tristate to bool
+>>> - move unuse EXPORT_SYMBOL_GPL()
+>>>
+>>>   drivers/devfreq/Kconfig               |   1 +
+>>>   drivers/devfreq/Makefile              |   1 +
+>>>   drivers/devfreq/rockchip/Kconfig      |   8 +
+>>>   drivers/devfreq/rockchip/Makefile     |   1 +
+>>>   drivers/devfreq/rockchip/rk3399_dmc.c | 473 ++++++++++++++++++++++++++++++++++
+>>>   5 files changed, 484 insertions(+)
+>>>   create mode 100644 drivers/devfreq/rockchip/Kconfig
+>>>   create mode 100644 drivers/devfreq/rockchip/Makefile
+>>>   create mode 100644 drivers/devfreq/rockchip/rk3399_dmc.c
+>>>
 
-Changes in v2:
-  Changes suggested by Philipp Zabel:
-  - Unify multiple module_platform_driver() boilerplates into one
-  - Unify tiny driver code and decrease the number of files
-  - Invert the logic of .deassert_val, changing it into .assert_val
-  - Show error code when failed to get regmap
-  - Add a binding document
-  - Support more reset signals
+[snip]
 
- .../devicetree/bindings/reset/uniphier-reset.txt   |  93 +++++
- MAINTAINERS                                        |   1 +
- drivers/reset/Kconfig                              |  10 +
- drivers/reset/Makefile                             |   1 +
- drivers/reset/reset-uniphier.c                     | 440 +++++++++++++++++++++
- 5 files changed, 545 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/reset/uniphier-reset.txt
- create mode 100644 drivers/reset/reset-uniphier.c
+>>> +
+>>> +static int rk3399_dmcfreq_target(struct device *dev, unsigned long *freq,
+>>> +                 u32 flags)
+>>> +{
+>>> +    struct platform_device *pdev = container_of(dev, struct platform_device,
+>>> +                            dev);
+>>> +    struct rk3399_dmcfreq *dmcfreq = platform_get_drvdata(pdev);
+>> You can use the 'dev_get_drvdata()' to simplify it instead of 'platform_get_drvdata()'.
+>>
+>>     struct rk3399_dmcfreq *dmcfreq = dev_get_drvdata(dev);
+>>
+>>> +    struct dev_pm_opp *opp;
+>>> +    unsigned long old_clk_rate = dmcfreq->rate;
+>>> +    unsigned long target_volt, target_rate;
+>>> +    int err;
+>>> +
+>>> +    rcu_read_lock();
+>>> +    opp = devfreq_recommended_opp(dev, freq, flags);
+>>> +    if (IS_ERR(opp)) {
+>>> +        rcu_read_unlock();
+>>> +        return PTR_ERR(opp);
+>>> +    }
+>>> +
+>>> +    target_rate = dev_pm_opp_get_freq(opp);
+>>> +    target_volt = dev_pm_opp_get_voltage(opp);
+>>> +    opp = devfreq_recommended_opp(dev, &dmcfreq->rate, flags);
+>>> +    if (IS_ERR(opp)) {
+>>> +        rcu_read_unlock();
+>>> +        return PTR_ERR(opp);
+>>> +    }
+>>> +    dmcfreq->volt = dev_pm_opp_get_voltage(opp);
+>> If you add the 'curr_opp' variable to struct rk3399_dmcfreq,
+>> you can remove the calling of devfreq_recommended_opp().
+>>     dmcfreq->rate = dev_pm_opp_get_freq(dmcfreq->curr_opp);
+>>     dmcfreq->volt = dev_pm_opp_get_freq(dmcfreq->curr_opp);
+>>
+>> Because the current rate and voltage is already decided on previous polling cycle,
+>> So we don't need to get the opp with devfreq_recommended_opp().
 
-diff --git a/Documentation/devicetree/bindings/reset/uniphier-reset.txt b/Documentation/devicetree/bindings/reset/uniphier-reset.txt
-new file mode 100644
-index 0000000..e6bbfcc
---- /dev/null
-+++ b/Documentation/devicetree/bindings/reset/uniphier-reset.txt
-@@ -0,0 +1,93 @@
-+UniPhier reset controller
-+
-+
-+System reset
-+------------
-+
-+Required properties:
-+- compatible: should be one of the following:
-+    "socionext,uniphier-sld3-reset" - for PH1-sLD3 SoC.
-+    "socionext,uniphier-ld4-reset"  - for PH1-LD4 SoC.
-+    "socionext,uniphier-pro4-reset" - for PH1-Pro4 SoC.
-+    "socionext,uniphier-sld8-reset" - for PH1-sLD8 SoC.
-+    "socionext,uniphier-pro5-reset" - for PH1-Pro5 SoC.
-+    "socionext,uniphier-pxs2-reset" - for ProXstream2/PH1-LD6b SoC.
-+    "socionext,uniphier-ld11-reset" - for PH1-LD11 SoC.
-+    "socionext,uniphier-ld20-reset" - for PH1-LD20 SoC.
-+- #reset-cells: should be 1.
-+
-+Example:
-+
-+	sysctrl at 61840000 {
-+		compatible = "socionext,uniphier-ld20-sysctrl",
-+			     "simple-mfd", "syscon";
-+		reg = <0x61840000 0x4000>;
-+
-+		reset {
-+			compatible = "socionext,uniphier-ld20-reset";
-+			#reset-cells = <1>;
-+		};
-+
-+		other nodes ...
-+	};
-+
-+
-+Media I/O (MIO) reset
-+---------------------
-+
-+Required properties:
-+- compatible: should be one of the following:
-+    "socionext,uniphier-sld3-mio-reset" - for PH1-sLD3 SoC.
-+    "socionext,uniphier-ld4-mio-reset"  - for PH1-LD4 SoC.
-+    "socionext,uniphier-pro4-mio-reset" - for PH1-Pro4 SoC.
-+    "socionext,uniphier-sld8-mio-reset" - for PH1-sLD8 SoC.
-+    "socionext,uniphier-pro5-mio-reset" - for PH1-Pro5 SoC.
-+    "socionext,uniphier-pxs2-mio-reset" - for ProXstream2/PH1-LD6b SoC.
-+    "socionext,uniphier-ld11-mio-reset" - for PH1-LD11 SoC.
-+    "socionext,uniphier-ld20-mio-reset" - for PH1-LD20 SoC.
-+- #reset-cells: should be 1.
-+
-+Example:
-+
-+	mioctrl at 59810000 {
-+		compatible = "socionext,uniphier-ld20-mioctrl",
-+			     "simple-mfd", "syscon";
-+		reg = <0x59810000 0x800>;
-+
-+		reset {
-+			compatible = "socionext,uniphier-ld20-mio-reset";
-+			#reset-cells = <1>;
-+		};
-+
-+		other nodes ...
-+	};
-+
-+
-+Peripheral reset
-+----------------
-+
-+Required properties:
-+- compatible: should be one of the following:
-+    "socionext,uniphier-ld4-peri-reset"  - for PH1-LD4 SoC.
-+    "socionext,uniphier-pro4-peri-reset" - for PH1-Pro4 SoC.
-+    "socionext,uniphier-sld8-peri-reset" - for PH1-sLD8 SoC.
-+    "socionext,uniphier-pro5-peri-reset" - for PH1-Pro5 SoC.
-+    "socionext,uniphier-pxs2-peri-reset" - for ProXstream2/PH1-LD6b SoC.
-+    "socionext,uniphier-ld11-peri-reset" - for PH1-LD11 SoC.
-+    "socionext,uniphier-ld20-peri-reset" - for PH1-LD20 SoC.
-+- #reset-cells: should be 1.
-+
-+Example:
-+
-+	perictrl at 59820000 {
-+		compatible = "socionext,uniphier-ld20-perictrl",
-+			     "simple-mfd", "syscon";
-+		reg = <0x59820000 0x200>;
-+
-+		reset {
-+			compatible = "socionext,uniphier-ld20-peri-reset";
-+			#reset-cells = <1>;
-+		};
-+
-+		other nodes ...
-+	};
-diff --git a/MAINTAINERS b/MAINTAINERS
-index f87eac3..96d4e99 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1825,6 +1825,7 @@ F:	drivers/clk/uniphier/
- F:	drivers/i2c/busses/i2c-uniphier*
- F:	drivers/mmc/host/uniphier-sd.c
- F:	drivers/pinctrl/uniphier/
-+F:	drivers/reset/reset-uniphier.c
- F:	drivers/tty/serial/8250/8250_uniphier.c
- N:	uniphier
- 
-diff --git a/drivers/reset/Kconfig b/drivers/reset/Kconfig
-index 4be1b8c..7dfe8d8 100644
---- a/drivers/reset/Kconfig
-+++ b/drivers/reset/Kconfig
-@@ -27,6 +27,16 @@ config TI_SYSCON_RESET
- 	  you wish to use the reset framework for such memory-mapped devices,
- 	  say Y here. Otherwise, say N.
- 
-+config RESET_UNIPHIER
-+	tristate "Reset controller driver for UniPhier SoCs"
-+	depends on ARCH_UNIPHIER || COMPILE_TEST
-+	depends on OF && MFD_SYSCON
-+	default ARCH_UNIPHIER
-+	help
-+	  Support for reset controllers on UniPhier SoCs.
-+	  Say Y if you want to control reset signals provided by System Control
-+	  block, Media I/O block, Peripheral Block.
-+
- source "drivers/reset/sti/Kconfig"
- source "drivers/reset/hisilicon/Kconfig"
- 
-diff --git a/drivers/reset/Makefile b/drivers/reset/Makefile
-index 5d65a93..a92cbde 100644
---- a/drivers/reset/Makefile
-+++ b/drivers/reset/Makefile
-@@ -7,6 +7,7 @@ obj-$(CONFIG_ARCH_MESON) += reset-meson.o
- obj-$(CONFIG_ARCH_SUNXI) += reset-sunxi.o
- obj-$(CONFIG_ARCH_STI) += sti/
- obj-$(CONFIG_ARCH_HISI) += hisilicon/
-+obj-$(CONFIG_RESET_UNIPHIER) += reset-uniphier.o
- obj-$(CONFIG_ARCH_ZYNQ) += reset-zynq.o
- obj-$(CONFIG_ATH79) += reset-ath79.o
- obj-$(CONFIG_RESET_OXNAS) += reset-oxnas.o
-diff --git a/drivers/reset/reset-uniphier.c b/drivers/reset/reset-uniphier.c
-new file mode 100644
-index 0000000..9de071f
---- /dev/null
-+++ b/drivers/reset/reset-uniphier.c
-@@ -0,0 +1,440 @@
-+/*
-+ * Copyright (C) 2016 Socionext Inc.
-+ *   Author: Masahiro Yamada <yamada.masahiro@socionext.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <linux/mfd/syscon.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/platform_device.h>
-+#include <linux/regmap.h>
-+#include <linux/reset-controller.h>
-+
-+struct uniphier_reset_data {
-+	unsigned int id;
-+	unsigned int reg;
-+	unsigned int bit;
-+	unsigned int flags;
-+#define UNIPHIER_RESET_ACTIVE_LOW		BIT(0)
-+};
-+
-+#define UNIPHIER_RESET_ID_END		(unsigned int)(-1)
-+
-+#define UNIPHIER_RESET_END				\
-+	{ .id = UNIPHIER_RESET_ID_END }
-+
-+#define UNIPHIER_RESET(_id, _reg, _bit)			\
-+	{						\
-+		.id = (_id),				\
-+		.reg = (_reg),				\
-+		.bit = (_bit),				\
-+	}
-+
-+#define UNIPHIER_RESETX(_id, _reg, _bit)		\
-+	{						\
-+		.id = (_id),				\
-+		.reg = (_reg),				\
-+		.bit = (_bit),				\
-+		.flags = UNIPHIER_RESET_ACTIVE_LOW,	\
-+	}
-+
-+/* System reset data */
-+#define UNIPHIER_SLD3_SYS_RESET_STDMAC(id)		\
-+	UNIPHIER_RESETX((id), 0x2000, 10)
-+
-+#define UNIPHIER_LD11_SYS_RESET_STDMAC(id)		\
-+	UNIPHIER_RESETX((id), 0x200c, 8)
-+
-+#define UNIPHIER_PRO4_SYS_RESET_GIO(id)			\
-+	UNIPHIER_RESETX((id), 0x2000, 6)
-+
-+#define UNIPHIER_LD20_SYS_RESET_GIO(id)			\
-+	UNIPHIER_RESETX((id), 0x200c, 5)
-+
-+#define UNIPHIER_PRO4_SYS_RESET_USB3(id, ch)		\
-+	UNIPHIER_RESETX((id), 0x2000 + 0x4 * (ch), 17)
-+
-+const struct uniphier_reset_data uniphier_sld3_sys_reset_data[] = {
-+	UNIPHIER_SLD3_SYS_RESET_STDMAC(8),	/* Ether, HSC, MIO */
-+	UNIPHIER_RESET_END,
-+};
-+
-+const struct uniphier_reset_data uniphier_pro4_sys_reset_data[] = {
-+	UNIPHIER_SLD3_SYS_RESET_STDMAC(8),	/* HSC, MIO, RLE */
-+	UNIPHIER_PRO4_SYS_RESET_GIO(12),	/* Ether, SATA, USB3 */
-+	UNIPHIER_PRO4_SYS_RESET_USB3(14, 0),
-+	UNIPHIER_PRO4_SYS_RESET_USB3(15, 1),
-+	UNIPHIER_RESET_END,
-+};
-+
-+const struct uniphier_reset_data uniphier_pro5_sys_reset_data[] = {
-+	UNIPHIER_SLD3_SYS_RESET_STDMAC(8),	/* HSC */
-+	UNIPHIER_PRO4_SYS_RESET_GIO(12),	/* PCIe, USB3 */
-+	UNIPHIER_PRO4_SYS_RESET_USB3(14, 0),
-+	UNIPHIER_PRO4_SYS_RESET_USB3(15, 1),
-+	UNIPHIER_RESET_END,
-+};
-+
-+const struct uniphier_reset_data uniphier_pxs2_sys_reset_data[] = {
-+	UNIPHIER_SLD3_SYS_RESET_STDMAC(8),	/* HSC, RLE */
-+	UNIPHIER_PRO4_SYS_RESET_USB3(14, 0),
-+	UNIPHIER_PRO4_SYS_RESET_USB3(15, 1),
-+	UNIPHIER_RESETX(16, 0x2014, 4),		/* USB30-PHY0 */
-+	UNIPHIER_RESETX(17, 0x2014, 0),		/* USB30-PHY1 */
-+	UNIPHIER_RESETX(18, 0x2014, 2),		/* USB30-PHY2 */
-+	UNIPHIER_RESETX(20, 0x2014, 5),		/* USB31-PHY0 */
-+	UNIPHIER_RESETX(21, 0x2014, 1),		/* USB31-PHY1 */
-+	UNIPHIER_RESETX(28, 0x2014, 12),	/* SATA */
-+	UNIPHIER_RESET(29, 0x2014, 8),		/* SATA-PHY (active high) */
-+	UNIPHIER_RESET_END,
-+};
-+
-+const struct uniphier_reset_data uniphier_ld11_sys_reset_data[] = {
-+	UNIPHIER_LD11_SYS_RESET_STDMAC(8),	/* HSC, MIO */
-+	UNIPHIER_RESET_END,
-+};
-+
-+const struct uniphier_reset_data uniphier_ld20_sys_reset_data[] = {
-+	UNIPHIER_LD11_SYS_RESET_STDMAC(8),	/* HSC */
-+	UNIPHIER_LD20_SYS_RESET_GIO(12),	/* PCIe, USB3 */
-+	UNIPHIER_RESETX(16, 0x200c, 12),	/* USB30-PHY0 */
-+	UNIPHIER_RESETX(17, 0x200c, 13),	/* USB30-PHY1 */
-+	UNIPHIER_RESETX(18, 0x200c, 14),	/* USB30-PHY2 */
-+	UNIPHIER_RESETX(19, 0x200c, 15),	/* USB30-PHY3 */
-+	UNIPHIER_RESET_END,
-+};
-+
-+/* Media I/O reset data */
-+#define UNIPHIER_MIO_RESET_SD(id, ch)			\
-+	UNIPHIER_RESETX((id), 0x110 + 0x200 * (ch), 0)
-+
-+#define UNIPHIER_MIO_RESET_SD_BRIDGE(id, ch)		\
-+	UNIPHIER_RESETX((id), 0x110 + 0x200 * (ch), 26)
-+
-+#define UNIPHIER_MIO_RESET_EMMC_HW_RESET(id, ch)	\
-+	UNIPHIER_RESETX((id), 0x80 + 0x200 * (ch), 0)
-+
-+#define UNIPHIER_MIO_RESET_USB2(id, ch)			\
-+	UNIPHIER_RESETX((id), 0x114 + 0x200 * (ch), 0)
-+
-+#define UNIPHIER_MIO_RESET_USB2_BRIDGE(id, ch)		\
-+	UNIPHIER_RESETX((id), 0x110 + 0x200 * (ch), 24)
-+
-+#define UNIPHIER_MIO_RESET_DMAC(id)			\
-+	UNIPHIER_RESETX((id), 0x110, 17)
-+
-+const struct uniphier_reset_data uniphier_sld3_mio_reset_data[] = {
-+	UNIPHIER_MIO_RESET_SD(0, 0),
-+	UNIPHIER_MIO_RESET_SD(1, 1),
-+	UNIPHIER_MIO_RESET_SD(2, 2),
-+	UNIPHIER_MIO_RESET_SD_BRIDGE(3, 0),
-+	UNIPHIER_MIO_RESET_SD_BRIDGE(4, 1),
-+	UNIPHIER_MIO_RESET_SD_BRIDGE(5, 2),
-+	UNIPHIER_MIO_RESET_EMMC_HW_RESET(6, 1),
-+	UNIPHIER_MIO_RESET_DMAC(7),
-+	UNIPHIER_MIO_RESET_USB2(8, 0),
-+	UNIPHIER_MIO_RESET_USB2(9, 1),
-+	UNIPHIER_MIO_RESET_USB2(10, 2),
-+	UNIPHIER_MIO_RESET_USB2(11, 3),
-+	UNIPHIER_MIO_RESET_USB2_BRIDGE(12, 0),
-+	UNIPHIER_MIO_RESET_USB2_BRIDGE(13, 1),
-+	UNIPHIER_MIO_RESET_USB2_BRIDGE(14, 2),
-+	UNIPHIER_MIO_RESET_USB2_BRIDGE(15, 3),
-+	UNIPHIER_RESET_END,
-+};
-+
-+const struct uniphier_reset_data uniphier_pro5_mio_reset_data[] = {
-+	UNIPHIER_MIO_RESET_SD(0, 0),
-+	UNIPHIER_MIO_RESET_SD(1, 1),
-+	UNIPHIER_MIO_RESET_EMMC_HW_RESET(6, 1),
-+	UNIPHIER_RESET_END,
-+};
-+
-+/* Peripheral reset data */
-+#define UNIPHIER_PERI_RESET_UART(id, ch)		\
-+	UNIPHIER_RESETX((id), 0x114, 19 + (ch))
-+
-+#define UNIPHIER_PERI_RESET_I2C(id, ch)			\
-+	UNIPHIER_RESETX((id), 0x114, 5 + (ch))
-+
-+#define UNIPHIER_PERI_RESET_FI2C(id, ch)		\
-+	UNIPHIER_RESETX((id), 0x114, 24 + (ch))
-+
-+const struct uniphier_reset_data uniphier_ld4_peri_reset_data[] = {
-+	UNIPHIER_PERI_RESET_UART(0, 0),
-+	UNIPHIER_PERI_RESET_UART(1, 1),
-+	UNIPHIER_PERI_RESET_UART(2, 2),
-+	UNIPHIER_PERI_RESET_UART(3, 3),
-+	UNIPHIER_PERI_RESET_I2C(4, 0),
-+	UNIPHIER_PERI_RESET_I2C(5, 1),
-+	UNIPHIER_PERI_RESET_I2C(6, 2),
-+	UNIPHIER_PERI_RESET_I2C(7, 3),
-+	UNIPHIER_PERI_RESET_I2C(8, 4),
-+	UNIPHIER_RESET_END,
-+};
-+
-+const struct uniphier_reset_data uniphier_pro4_peri_reset_data[] = {
-+	UNIPHIER_PERI_RESET_UART(0, 0),
-+	UNIPHIER_PERI_RESET_UART(1, 1),
-+	UNIPHIER_PERI_RESET_UART(2, 2),
-+	UNIPHIER_PERI_RESET_UART(3, 3),
-+	UNIPHIER_PERI_RESET_FI2C(4, 0),
-+	UNIPHIER_PERI_RESET_FI2C(5, 1),
-+	UNIPHIER_PERI_RESET_FI2C(6, 2),
-+	UNIPHIER_PERI_RESET_FI2C(7, 3),
-+	UNIPHIER_PERI_RESET_FI2C(8, 4),
-+	UNIPHIER_PERI_RESET_FI2C(9, 5),
-+	UNIPHIER_PERI_RESET_FI2C(10, 6),
-+	UNIPHIER_RESET_END,
-+};
-+
-+/* core implementaton */
-+struct uniphier_reset_priv {
-+	struct reset_controller_dev rcdev;
-+	struct device *dev;
-+	struct regmap *regmap;
-+	const struct uniphier_reset_data *data;
-+};
-+
-+#define to_uniphier_reset_priv(_rcdev) \
-+			container_of(_rcdev, struct uniphier_reset_priv, rcdev)
-+
-+static int uniphier_reset_update(struct reset_controller_dev *rcdev,
-+				 unsigned long id, int assert)
-+{
-+	struct uniphier_reset_priv *priv = to_uniphier_reset_priv(rcdev);
-+	const struct uniphier_reset_data *p;
-+
-+	for (p = priv->data; p->id != UNIPHIER_RESET_ID_END; p++) {
-+		unsigned int mask, val;
-+
-+		if (p->id != id)
-+			continue;
-+
-+		mask = BIT(p->bit);
-+
-+		if (assert)
-+			val = mask;
-+		else
-+			val = ~mask;
-+
-+		if (p->flags & UNIPHIER_RESET_ACTIVE_LOW)
-+			val = ~val;
-+
-+		return regmap_write_bits(priv->regmap, p->reg, mask, val);
-+	}
-+
-+	dev_err(priv->dev, "reset_id=%lu was not handled\n", id);
-+	return -EINVAL;
-+}
-+
-+static int uniphier_reset_assert(struct reset_controller_dev *rcdev,
-+				 unsigned long id)
-+{
-+	return uniphier_reset_update(rcdev, id, 1);
-+}
-+
-+static int uniphier_reset_deassert(struct reset_controller_dev *rcdev,
-+				   unsigned long id)
-+{
-+	return uniphier_reset_update(rcdev, id, 0);
-+}
-+
-+static int uniphier_reset_status(struct reset_controller_dev *rcdev,
-+				 unsigned long id)
-+{
-+	struct uniphier_reset_priv *priv = to_uniphier_reset_priv(rcdev);
-+	const struct uniphier_reset_data *p;
-+
-+	for (p = priv->data; p->id != UNIPHIER_RESET_ID_END; p++) {
-+		unsigned int val;
-+		int ret, asserted;
-+
-+		if (p->id != id)
-+			continue;
-+
-+		ret = regmap_read(priv->regmap, p->reg, &val);
-+		if (ret)
-+			return ret;
-+
-+		asserted = !!(val & BIT(p->bit));
-+
-+		if (p->flags & UNIPHIER_RESET_ACTIVE_LOW)
-+			asserted = !asserted;
-+
-+		return asserted;
-+	}
-+
-+	dev_err(priv->dev, "reset_id=%lu was not found\n", id);
-+	return -EINVAL;
-+}
-+
-+static const struct reset_control_ops uniphier_reset_ops = {
-+	.assert = uniphier_reset_assert,
-+	.deassert = uniphier_reset_deassert,
-+	.status = uniphier_reset_status,
-+};
-+
-+static const struct of_device_id uniphier_reset_match[] = {
-+	/* System reset */
-+	{
-+		.compatible = "socionext,uniphier-sld3-reset",
-+		.data = uniphier_sld3_sys_reset_data,
-+	},
-+	{
-+		.compatible = "socionext,uniphier-ld4-reset",
-+		.data = uniphier_sld3_sys_reset_data,
-+	},
-+	{
-+		.compatible = "socionext,uniphier-pro4-reset",
-+		.data = uniphier_pro4_sys_reset_data,
-+	},
-+	{
-+		.compatible = "socionext,uniphier-sld8-reset",
-+		.data = uniphier_sld3_sys_reset_data,
-+	},
-+	{
-+		.compatible = "socionext,uniphier-pro5-reset",
-+		.data = uniphier_pro5_sys_reset_data,
-+	},
-+	{
-+		.compatible = "socionext,uniphier-pxs2-reset",
-+		.data = uniphier_pxs2_sys_reset_data,
-+	},
-+	{
-+		.compatible = "socionext,uniphier-ld11-reset",
-+		.data = uniphier_ld11_sys_reset_data,
-+	},
-+	{
-+		.compatible = "socionext,uniphier-ld20-reset",
-+		.data = uniphier_ld20_sys_reset_data,
-+	},
-+	/* Media I/O reset */
-+	{
-+		.compatible = "socionext,uniphier-sld3-mio-reset",
-+		.data = uniphier_sld3_mio_reset_data,
-+	},
-+	{
-+		.compatible = "socionext,uniphier-ld4-mio-reset",
-+		.data = uniphier_sld3_mio_reset_data,
-+	},
-+	{
-+		.compatible = "socionext,uniphier-pro4-mio-reset",
-+		.data = uniphier_sld3_mio_reset_data,
-+	},
-+	{
-+		.compatible = "socionext,uniphier-sld8-mio-reset",
-+		.data = uniphier_sld3_mio_reset_data,
-+	},
-+	{
-+		.compatible = "socionext,uniphier-pro5-mio-reset",
-+		.data = uniphier_pro5_mio_reset_data,
-+	},
-+	{
-+		.compatible = "socionext,uniphier-pxs2-mio-reset",
-+		.data = uniphier_pro5_mio_reset_data,
-+	},
-+	{
-+		.compatible = "socionext,uniphier-ld11-mio-reset",
-+		.data = uniphier_sld3_mio_reset_data,
-+	},
-+	{
-+		.compatible = "socionext,uniphier-ld20-mio-reset",
-+		.data = uniphier_pro5_mio_reset_data,
-+	},
-+	/* Peripheral reset */
-+	{
-+		.compatible = "socionext,uniphier-ld4-peri-reset",
-+		.data = uniphier_ld4_peri_reset_data,
-+	},
-+	{
-+		.compatible = "socionext,uniphier-pro4-peri-reset",
-+		.data = uniphier_pro4_peri_reset_data,
-+	},
-+	{
-+		.compatible = "socionext,uniphier-sld8-peri-reset",
-+		.data = uniphier_ld4_peri_reset_data,
-+	},
-+	{
-+		.compatible = "socionext,uniphier-pro5-peri-reset",
-+		.data = uniphier_pro4_peri_reset_data,
-+	},
-+	{
-+		.compatible = "socionext,uniphier-pxs2-peri-reset",
-+		.data = uniphier_pro4_peri_reset_data,
-+	},
-+	{
-+		.compatible = "socionext,uniphier-ld11-peri-reset",
-+		.data = uniphier_pro4_peri_reset_data,
-+	},
-+	{
-+		.compatible = "socionext,uniphier-ld20-peri-reset",
-+		.data = uniphier_pro4_peri_reset_data,
-+	},
-+	{ /* sentinel */ }
-+};
-+MODULE_DEVICE_TABLE(of, uniphier_reset_match);
-+
-+int uniphier_reset_probe(struct platform_device *pdev)
-+{
-+	struct device *dev = &pdev->dev;
-+	const struct of_device_id *match;
-+	struct uniphier_reset_priv *priv;
-+	const struct uniphier_reset_data *p;
-+	struct regmap *regmap;
-+	struct device_node *parent;
-+	unsigned int nr_resets = 0;
-+
-+	match = of_match_node(uniphier_reset_match, pdev->dev.of_node);
-+	if (!match)
-+		return -ENODEV;
-+
-+	parent = of_get_parent(dev->of_node); /* parent should be syscon node */
-+	regmap = syscon_node_to_regmap(parent);
-+	of_node_put(parent);
-+	if (IS_ERR(regmap)) {
-+		dev_err(dev, "failed to get regmap (error %ld)\n",
-+			PTR_ERR(regmap));
-+		return PTR_ERR(regmap);
-+	}
-+
-+	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
-+	if (!priv)
-+		return -ENOMEM;
-+
-+	for (p = match->data; p->id != UNIPHIER_RESET_ID_END; p++)
-+		nr_resets = max(nr_resets, p->id + 1);
-+
-+	priv->rcdev.ops = &uniphier_reset_ops;
-+	priv->rcdev.owner = dev->driver->owner;
-+	priv->rcdev.of_node = dev->of_node;
-+	priv->rcdev.nr_resets = nr_resets;
-+	priv->dev = dev;
-+	priv->regmap = regmap;
-+	priv->data = match->data;
-+
-+	return devm_reset_controller_register(&pdev->dev, &priv->rcdev);
-+}
-+
-+static struct platform_driver uniphier_reset_driver = {
-+	.probe = uniphier_reset_probe,
-+	.driver = {
-+		.name = "uniphier-reset",
-+		.of_match_table = uniphier_reset_match,
-+	},
-+};
-+module_platform_driver(uniphier_reset_driver);
-+
-+MODULE_AUTHOR("Masahiro Yamada <yamada.masahiro@socionext.com>");
-+MODULE_DESCRIPTION("UniPhier Reset Controller Driver");
-+MODULE_LICENSE("GPL");
--- 
-1.9.1
+> I prefer the way now use, since we get the dmcfreq->rate use clk_get_rate() after,
+> Base on that,  i do not care the set_rate success or fail. use curr_opp i need to
+> care about set_rate status, when fail, i must set some rate, when success i must
+> set other rate.
+
+I think that it is not good to get the alrady decided opp
+by devfreq_recommended_opp(). Usually, devfreq_recommended_opp() is used
+to get the proper opp which get the close frequency (dmcfreq->rate).
+
+Also, When finishing the rk3399_dmcfreq_target(), the rk3399_dmc.c
+have to know the current opp or rate without any finding sequence.
+The additional finding procedure is un-needed.
+
+>>> +    rcu_read_unlock();
+>>> +
+>>> +    if (dmcfreq->rate == target_rate)
+>>> +        return 0;
+>>> +
+>>> +    mutex_lock(&dmcfreq->lock);
+>>> +
+>>> +    /*
+>>> +     * if frequency scaling from low to high, adjust voltage first;
+>>> +     * if frequency scaling from high to low, adjuset frequency first;
+>>> +     */
+>> s/adjuset/adjust
+>>
+>> I recommend that you use a captital letter for first character and use the '.'
+>> instead of ';'.
+>>
+>>> +    if (old_clk_rate < target_rate) {
+>>> +        err = regulator_set_voltage(dmcfreq->vdd_center, target_volt,
+>>> +                        target_volt);
+>>> +        if (err) {
+>>> +            dev_err(dev, "Unable to set vol %lu\n", target_volt);
+>> To readability, you better to use the corrent word to pass the precise the log message.
+>> - s/vol/voltage
+>>
+>> And, this patch uses the 'Unable to' or 'Cannot' to show the error log.
+>> I recommend that you use the consistent expression if there is not any specific reason.
+>>
+>>     dev_err(dev, "Cannot set the voltage %lu uV\n", target_volt);
+>>
+>>> +            goto out;
+>>> +        }
+>>> +    }
+>>> +    dmcfreq->wait_dcf_flag = 1;
+>>> +    err = clk_set_rate(dmcfreq->dmc_clk, target_rate);
+>>> +    if (err) {
+>>> +        dev_err(dev,
+>>> +            "Unable to set freq %lu. Current freq %lu. Error %d\n",
+>>> +            target_rate, old_clk_rate, err);
+>>     dev_err(dev, "Cannot set the frequency %lu (%d)\n", target_rate, err);
+>>
+>>> +        regulator_set_voltage(dmcfreq->vdd_center, dmcfreq->volt,
+>>> +                      dmcfreq->volt);
+>>> +        goto out;
+>>> +    }
+>>> +
+>>> +    /*
+>>> +     * wait until bcf irq happen, it means freq scaling finish in bl31,
+>> ditto.
+>>
+>>> +     * use 100ms as timeout time
+>> s/time/time.
+>>
+>>> +     */
+>>> +    if (!wait_event_timeout(dmcfreq->wait_dcf_queue,
+>>> +                !dmcfreq->wait_dcf_flag, HZ / 10))
+>>> +        dev_warn(dev, "Timeout waiting for dcf irq\n");
+>> If the timeout happen, are there any problem?
+
+> When timeout happen , may be we miss interrupt, but it do not affect this
+> process, since we will check the rate whether success later.
+
+OK. But I'd like you to modify the warning message.
+
+One more thing, is the dcf interrupt related to the change of clock rate?
+When the clock rate is changed, the dcf interrupt happen?
+
+>> After setting the frequency and voltage, store the current opp entry on .curr_opp.
+>>     dmcfreq->curr_opp = opp;
+>>
+>>> +    /*
+>>> +     * check the dpll rate
+>>> +     * there only two result we will get,
+>>> +     * 1. ddr frequency scaling fail, we still get the old rate
+>>> +     * 2, ddr frequency scaling sucessful, we get the rate we set
+>>> +     */
+>>> +    dmcfreq->rate = clk_get_rate(dmcfreq->dmc_clk);
+>>> +
+>>> +    /* if get the incorrect rate, set voltage to old value */
+>>> +    if (dmcfreq->rate != target_rate) {
+>>> +        dev_err(dev, "get wrong ddr frequency, Request freq %lu,\
+>>> +            Current freq %lu\n", target_rate, dmcfreq->rate);
+>>> +        regulator_set_voltage(dmcfreq->vdd_center, dmcfreq->volt,
+>>> +                      dmcfreq->volt);
+>> [Without force, it is just my opion about this code:]
+>> I think that this checking code it is un-needed.
+>> If this case occur, the rk3399_dmc.c never set the specific frequency
+>> because the rk3399 clock don't support the specific frequency for rk3399 dmc.
+>>
+>> If you want to set the correct frequency,
+>> When verifying the rk3399 dmc driver, you should check the rk3399 clock driver.
+>>
+>> Basically, if the the clock driver don't support the correct same frequency ,
+>> CCF(Common Clock Framework) set the close frequency. It is not a bad thing.
+
+> May be i should remove the regulator_set_voltage() here, but still need to
+> check whether we get the right frequency, since if we do not get the right frequency,
+
+When calling clk_set_rate(), the final frequency only depend on the rk3399 clock driver.
+But, if you want to check the new rate, I think that you should move this code
+right after clk_set_rate() when there is any dependency of dcf interrupt.
+
+> we should send a warn message, to remind that maybe you pass a frequency which
+> do not support in bl31.
+
+Also, I'd like you to explain the 'bl31' and add the description on next version.
+
+[snip]
+
+Regards,
+Chanwoo Choi
