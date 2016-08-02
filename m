@@ -1,74 +1,74 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Tue,  2 Aug 2016 13:30:18 +0900
-Subject: [PATCH v6 0/2] clk: uniphier: add clock drivers for UniPhier SoCs
-Message-ID: <1470112223-24835-1-git-send-email-yamada.masahiro@socionext.com>
+From: vigneshr@ti.com (Vignesh R)
+Date: Tue, 2 Aug 2016 10:51:47 +0530
+Subject: [PATCH] ARM: dts: am57xx-idk-common: Enable support for QSPI
+Message-ID: <20160802052147.11085-1-vigneshr@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+AM572x IDK has a Spansion s25fl256s1 QSPI flash on the EVM connected to
+TI QSPI IP over CS0. Hence, add QSPI and flash slave DT nodes.
 
-I split into two patches to make review easier.
+Signed-off-by: Vignesh R <vigneshr@ti.com>
+---
+ arch/arm/boot/dts/am57xx-idk-common.dtsi | 49 ++++++++++++++++++++++++++++++++
+ 1 file changed, 49 insertions(+)
 
- 1/2: core support code
- 2/2: data arrays
-
-
-Changes in v6:
-  - Fix provided clock description a bit
-
-Changes in v5:
-  - Assign each gating register bit with a separate clk
-  - Fix examples in binding document to add specific compatible
-  - Document provided clocks for system clock
-
-Changes in v4:
-  - Unify module_platform_driver() boilerplate into a single place
-  - Add binding document
-  - Add USB3 clocks
-
-Changes in v3:
-  - Change to platform drivers instead of OF_CLK_DECLARE
-  - Split into a core part + SoC drivers
-    SoC drivers just consist of tables of SoC-specific data.
-    This allows reviewer to concentrate on the core-part
-  - Hard-code parent clock names for cascading
-
-Changes in v2:
-  - split emmc_hw_reset
-  - make SD clock rate-controllable
-  - add CLK_SET_RATE_PARENT flag to mux, gate, fixed-factor clocks
-
-Masahiro Yamada (2):
-  clk: uniphier: add core support code for UniPhier clock driver
-  clk: uniphier: add clock data for UniPhier SoCs
-
- .../devicetree/bindings/clock/uniphier-clock.txt   | 134 +++++++++++++
- MAINTAINERS                                        |   1 +
- drivers/clk/Kconfig                                |   1 +
- drivers/clk/Makefile                               |   1 +
- drivers/clk/uniphier/Kconfig                       |   9 +
- drivers/clk/uniphier/Makefile                      |   9 +
- drivers/clk/uniphier/clk-uniphier-core.c           | 215 +++++++++++++++++++++
- drivers/clk/uniphier/clk-uniphier-fixed-factor.c   |  49 +++++
- drivers/clk/uniphier/clk-uniphier-fixed-rate.c     |  48 +++++
- drivers/clk/uniphier/clk-uniphier-gate.c           |  97 ++++++++++
- drivers/clk/uniphier/clk-uniphier-mio.c            | 103 ++++++++++
- drivers/clk/uniphier/clk-uniphier-mux.c            |  95 +++++++++
- drivers/clk/uniphier/clk-uniphier-peri.c           |  59 ++++++
- drivers/clk/uniphier/clk-uniphier-sys.c            | 151 +++++++++++++++
- drivers/clk/uniphier/clk-uniphier.h                | 122 ++++++++++++
- 15 files changed, 1094 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/clock/uniphier-clock.txt
- create mode 100644 drivers/clk/uniphier/Kconfig
- create mode 100644 drivers/clk/uniphier/Makefile
- create mode 100644 drivers/clk/uniphier/clk-uniphier-core.c
- create mode 100644 drivers/clk/uniphier/clk-uniphier-fixed-factor.c
- create mode 100644 drivers/clk/uniphier/clk-uniphier-fixed-rate.c
- create mode 100644 drivers/clk/uniphier/clk-uniphier-gate.c
- create mode 100644 drivers/clk/uniphier/clk-uniphier-mio.c
- create mode 100644 drivers/clk/uniphier/clk-uniphier-mux.c
- create mode 100644 drivers/clk/uniphier/clk-uniphier-peri.c
- create mode 100644 drivers/clk/uniphier/clk-uniphier-sys.c
- create mode 100644 drivers/clk/uniphier/clk-uniphier.h
-
+diff --git a/arch/arm/boot/dts/am57xx-idk-common.dtsi b/arch/arm/boot/dts/am57xx-idk-common.dtsi
+index 0e63b9dff6e7..03cec62260e1 100644
+--- a/arch/arm/boot/dts/am57xx-idk-common.dtsi
++++ b/arch/arm/boot/dts/am57xx-idk-common.dtsi
+@@ -304,3 +304,52 @@
+ 	ti,non-removable;
+ 	max-frequency = <96000000>;
+ };
++
++&qspi {
++	status = "okay";
++
++	spi-max-frequency = <76800000>;
++	m25p80 at 0 {
++		compatible = "s25fl256s1", "jedec,spi-nor";
++		spi-max-frequency = <76800000>;
++		reg = <0>;
++		spi-tx-bus-width = <1>;
++		spi-rx-bus-width = <4>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++
++		/* MTD partition table.
++		 * The ROM checks the first four physical blocks
++		 * for a valid file to boot and the flash here is
++		 * 64KiB block size.
++		 */
++		partition at 0 {
++			label = "QSPI.SPL";
++			reg = <0x00000000 0x000040000>;
++		};
++		partition at 1 {
++			label = "QSPI.u-boot";
++			reg = <0x00040000 0x00100000>;
++		};
++		partition at 2 {
++			label = "QSPI.u-boot-spl-os";
++			reg = <0x00140000 0x00080000>;
++		};
++		partition at 3 {
++			label = "QSPI.u-boot-env";
++			reg = <0x001c0000 0x00010000>;
++		};
++		partition at 4 {
++			label = "QSPI.u-boot-env.backup1";
++			reg = <0x001d0000 0x0010000>;
++		};
++		partition at 5 {
++			label = "QSPI.kernel";
++			reg = <0x001e0000 0x0800000>;
++		};
++		partition at 6 {
++			label = "QSPI.file-system";
++			reg = <0x009e0000 0x01620000>;
++		};
++	};
++};
 -- 
-1.9.1
+2.9.2
