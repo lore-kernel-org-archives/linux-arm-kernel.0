@@ -1,34 +1,67 @@
-From: baolex.ni@intel.com (Baole Ni)
-Date: Tue,  2 Aug 2016 18:43:10 +0800
-Subject: [PATCH 0133/1285] Replace numeric parameter like 0444 with macro
-Message-ID: <20160802104310.22614-1-baolex.ni@intel.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 2 Aug 2016 12:20:48 +0100
+Subject: [PATCH v2] mmc: sunxi: Handle the 'New Timings'
+In-Reply-To: <20160801182603.6f44af17e0bb801353f4b5e0@free.fr>
+References: <E1bUDNG-0000pR-Fv@bombadil.infradead.org>
+ <20160801153016.GB17146@leverpostej>
+ <20160801182603.6f44af17e0bb801353f4b5e0@free.fr>
+Message-ID: <20160802112048.GA20134@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I find that the developers often just specified the numeric value
-when calling a macro which is defined with a parameter for access permission.
-As we know, these numeric value for access permission have had the corresponding macro,
-and that using macro can improve the robustness and readability of the code,
-thus, I suggest replacing the numeric parameter with the macro.
+On Mon, Aug 01, 2016 at 06:26:03PM +0200, Jean-Francois Moine wrote:
+> On Mon, 1 Aug 2016 16:30:19 +0100
+> Mark Rutland <mark.rutland@arm.com> wrote:
+> 
+> > On Mon, Aug 01, 2016 at 03:10:29PM +0200, Jean-Francois Moine wrote:
+> > > Some MMC devices as mmc2 in the A83T or mmc1 and mmc2 in the H3 have
+> > > a 'New Timings' mode.
+> > > Set this capacity in the DT and use it when possible.
+> > 
+> > What exactly is this "New Timings" mode?
+> > 
+> > Why do we wnat to set it? Improved performance, power?
+> > 
+> > Is it *necessary* to use it?
+> 
+> This mode is described at least in the Allwinner's documentation of the
+> A83T, A64 and H3.
 
-Signed-off-by: Chuansheng Liu <chuansheng.liu@intel.com>
-Signed-off-by: Baole Ni <baolex.ni@intel.com>
----
- drivers/dma/at_xdmac.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Is this publicly available? If not, can the gist of it be described?
 
-diff --git a/drivers/dma/at_xdmac.c b/drivers/dma/at_xdmac.c
-index 75bd662..3c26e23 100644
---- a/drivers/dma/at_xdmac.c
-+++ b/drivers/dma/at_xdmac.c
-@@ -314,7 +314,7 @@ static inline u8 at_xdmac_get_dwidth(u32 cfg)
- };
- 
- static unsigned int init_nr_desc_per_channel = 64;
--module_param(init_nr_desc_per_channel, uint, 0644);
-+module_param(init_nr_desc_per_channel, uint, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
- MODULE_PARM_DESC(init_nr_desc_per_channel,
- 		 "initial descriptors per channel (default: 64)");
- 
--- 
-2.9.2
+> From my tests, it is required to access the eMMC of the Banana Pi M3
+> (mmc2).
+
+Ok.
+
+> > > Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
+> > > ---
+> > > I don't know if this mode works or is needed at 25MHz.
+> > > ---
+> > >  Documentation/devicetree/bindings/mmc/sunxi-mmc.txt |  1 +
+> > >  drivers/mmc/host/sunxi-mmc.c                        | 21 +++++++++++++++++++--
+> > >  2 files changed, 20 insertions(+), 2 deletions(-)
+> > > 
+> > > diff --git a/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt b/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt
+> > > index 4bf41d8..a541bf4 100644
+> > > --- a/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt
+> > > +++ b/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt
+> > > @@ -19,6 +19,7 @@ Optional properties:
+> > >   - reset-names : must contain "ahb"
+> > >   - for cd, bus-width and additional generic mmc parameters
+> > >     please refer to mmc.txt within this directory
+> > > + - allwinner,new-timings: the controller may accept the "New Timings" mode
+> > 
+> > It's not at all clear to me what this means. This needs a better
+> > description.
+> > 
+> > Which devices have this? Can we determine this based on compatible
+> > string?
+> 
+> No, only some devices of the SoCs have this capability: the mmc2 of the
+> A83T, the smhc0 and smhc1 of the A64, and the mmc1 and mmc2 of the H3.
+
+Ok.
+
+Thanks,
+Mark.
