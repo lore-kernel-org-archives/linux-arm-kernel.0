@@ -1,7 +1,7 @@
 From: baolex.ni@intel.com (Baole Ni)
-Date: Tue,  2 Aug 2016 18:33:34 +0800
-Subject: [PATCH 0004/1285] Replace numeric parameter like 0444 with macro
-Message-ID: <20160802103334.14014-1-baolex.ni@intel.com>
+Date: Tue,  2 Aug 2016 18:33:38 +0800
+Subject: [PATCH 0005/1285] Replace numeric parameter like 0444 with macro
+Message-ID: <20160802103338.14081-1-baolex.ni@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,21 +14,21 @@ thus, I suggest replacing the numeric parameter with the macro.
 Signed-off-by: Chuansheng Liu <chuansheng.liu@intel.com>
 Signed-off-by: Baole Ni <baolex.ni@intel.com>
 ---
- arch/arm/mach-imx/mach-mx31lite.c | 2 +-
+ arch/arm/mach-imx/mach-mx31moboard.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-imx/mach-mx31lite.c b/arch/arm/mach-imx/mach-mx31lite.c
-index 4822a17..0da699c 100644
---- a/arch/arm/mach-imx/mach-mx31lite.c
-+++ b/arch/arm/mach-imx/mach-mx31lite.c
-@@ -224,7 +224,7 @@ void __init mx31lite_map_io(void)
+diff --git a/arch/arm/mach-imx/mach-mx31moboard.c b/arch/arm/mach-imx/mach-mx31moboard.c
+index 4f2d998..64c2acb 100644
+--- a/arch/arm/mach-imx/mach-mx31moboard.c
++++ b/arch/arm/mach-imx/mach-mx31moboard.c
+@@ -513,7 +513,7 @@ static void mx31moboard_poweroff(void)
  }
  
- static int mx31lite_baseboard;
--core_param(mx31lite_baseboard, mx31lite_baseboard, int, 0444);
-+core_param(mx31lite_baseboard, mx31lite_baseboard, int, S_IRUSR | S_IRGRP | S_IROTH);
+ static int mx31moboard_baseboard;
+-core_param(mx31moboard_baseboard, mx31moboard_baseboard, int, 0444);
++core_param(mx31moboard_baseboard, mx31moboard_baseboard, int, S_IRUSR | S_IRGRP | S_IROTH);
  
- static struct regulator_consumer_supply dummy_supplies[] = {
- 	REGULATOR_SUPPLY("vdd33a", "smsc911x"),
+ /*
+  * Board specific initialization.
 -- 
 2.9.2
