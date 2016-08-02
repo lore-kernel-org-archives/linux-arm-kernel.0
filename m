@@ -1,67 +1,34 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 2 Aug 2016 12:20:48 +0100
-Subject: [PATCH v2] mmc: sunxi: Handle the 'New Timings'
-In-Reply-To: <20160801182603.6f44af17e0bb801353f4b5e0@free.fr>
-References: <E1bUDNG-0000pR-Fv@bombadil.infradead.org>
- <20160801153016.GB17146@leverpostej>
- <20160801182603.6f44af17e0bb801353f4b5e0@free.fr>
-Message-ID: <20160802112048.GA20134@leverpostej>
+From: baolex.ni@intel.com (Baole Ni)
+Date: Tue,  2 Aug 2016 18:48:31 +0800
+Subject: [PATCH 0194/1285] Replace numeric parameter like 0444 with macro
+Message-ID: <20160802104831.26685-1-baolex.ni@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 01, 2016 at 06:26:03PM +0200, Jean-Francois Moine wrote:
-> On Mon, 1 Aug 2016 16:30:19 +0100
-> Mark Rutland <mark.rutland@arm.com> wrote:
-> 
-> > On Mon, Aug 01, 2016 at 03:10:29PM +0200, Jean-Francois Moine wrote:
-> > > Some MMC devices as mmc2 in the A83T or mmc1 and mmc2 in the H3 have
-> > > a 'New Timings' mode.
-> > > Set this capacity in the DT and use it when possible.
-> > 
-> > What exactly is this "New Timings" mode?
-> > 
-> > Why do we wnat to set it? Improved performance, power?
-> > 
-> > Is it *necessary* to use it?
-> 
-> This mode is described at least in the Allwinner's documentation of the
-> A83T, A64 and H3.
+I find that the developers often just specified the numeric value
+when calling a macro which is defined with a parameter for access permission.
+As we know, these numeric value for access permission have had the corresponding macro,
+and that using macro can improve the robustness and readability of the code,
+thus, I suggest replacing the numeric parameter with the macro.
 
-Is this publicly available? If not, can the gist of it be described?
+Signed-off-by: Chuansheng Liu <chuansheng.liu@intel.com>
+Signed-off-by: Baole Ni <baolex.ni@intel.com>
+---
+ drivers/gpu/drm/exynos/exynos_drm_vidi.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-> From my tests, it is required to access the eMMC of the Banana Pi M3
-> (mmc2).
-
-Ok.
-
-> > > Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
-> > > ---
-> > > I don't know if this mode works or is needed at 25MHz.
-> > > ---
-> > >  Documentation/devicetree/bindings/mmc/sunxi-mmc.txt |  1 +
-> > >  drivers/mmc/host/sunxi-mmc.c                        | 21 +++++++++++++++++++--
-> > >  2 files changed, 20 insertions(+), 2 deletions(-)
-> > > 
-> > > diff --git a/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt b/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt
-> > > index 4bf41d8..a541bf4 100644
-> > > --- a/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt
-> > > +++ b/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt
-> > > @@ -19,6 +19,7 @@ Optional properties:
-> > >   - reset-names : must contain "ahb"
-> > >   - for cd, bus-width and additional generic mmc parameters
-> > >     please refer to mmc.txt within this directory
-> > > + - allwinner,new-timings: the controller may accept the "New Timings" mode
-> > 
-> > It's not at all clear to me what this means. This needs a better
-> > description.
-> > 
-> > Which devices have this? Can we determine this based on compatible
-> > string?
-> 
-> No, only some devices of the SoCs have this capability: the mmc2 of the
-> A83T, the smhc0 and smhc1 of the A64, and the mmc1 and mmc2 of the H3.
-
-Ok.
-
-Thanks,
-Mark.
+diff --git a/drivers/gpu/drm/exynos/exynos_drm_vidi.c b/drivers/gpu/drm/exynos/exynos_drm_vidi.c
+index 608b0af..8f1bd21 100644
+--- a/drivers/gpu/drm/exynos/exynos_drm_vidi.c
++++ b/drivers/gpu/drm/exynos/exynos_drm_vidi.c
+@@ -269,7 +269,7 @@ static ssize_t vidi_store_connection(struct device *dev,
+ 	return len;
+ }
+ 
+-static DEVICE_ATTR(connection, 0644, vidi_show_connection,
++static DEVICE_ATTR(connection, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH, vidi_show_connection,
+ 			vidi_store_connection);
+ 
+ int vidi_connection_ioctl(struct drm_device *drm_dev, void *data,
+-- 
+2.9.2
