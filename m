@@ -1,74 +1,29 @@
-From: peter.chen@nxp.com (Peter Chen)
-Date: Tue, 2 Aug 2016 11:30:52 +0800
-Subject: [PATCH v4 6/6] ARM: dts: imx6qdl-udoo.dtsi: fix onboard USB HUB
- property
-In-Reply-To: <1470108652-16812-1-git-send-email-peter.chen@nxp.com>
-References: <1470108652-16812-1-git-send-email-peter.chen@nxp.com>
-Message-ID: <1470108652-16812-7-git-send-email-peter.chen@nxp.com>
+From: hzpeterchen@gmail.com (Peter Chen)
+Date: Tue, 2 Aug 2016 11:32:15 +0800
+Subject: [v3,2/6] power: add power sequence library
+In-Reply-To: <c2e3679b-4522-d403-0a98-eb09c5a2c02d@chromium.org>
+References: <1469007629-31757-3-git-send-email-peter.chen@nxp.com>
+ <c2e3679b-4522-d403-0a98-eb09c5a2c02d@chromium.org>
+Message-ID: <20160802033215.GB26831@shlinux2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current dts describes USB HUB's property at USB controller's
-entry, it is improper. The USB HUB should be the child node
-under USB controller, and power sequence properties are under
-it.
+On Fri, Jul 29, 2016 at 01:06:48PM -0700, Matthias Kaehlcke wrote:
+> >...
+> >
+> >+static int pwrseq_generic_get(struct device_node *np, struct pwrseq *pwrseq)
+> >+{
+> >+	struct pwrseq_generic *pwrseq_gen = to_generic_pwrseq(pwrseq);
+> >+	enum of_gpio_flags flags;
+> >+	int reset_gpio, ret = 0;
+> >+
+> >+	pwrseq_gen->clk = of_clk_get_by_name(np, NULL);
+> This only gets the first of potentially multiple clocks, is that intended?
 
-Signed-off-by: Peter Chen <peter.chen@nxp.com>
----
- arch/arm/boot/dts/imx6qdl-udoo.dtsi | 26 +++++++++++++-------------
- 1 file changed, 13 insertions(+), 13 deletions(-)
+Matthias, I have added multiple input clocks support at v4 patch set,
+and you are at cc list.
 
-diff --git a/arch/arm/boot/dts/imx6qdl-udoo.dtsi b/arch/arm/boot/dts/imx6qdl-udoo.dtsi
-index 3bee2f9..f29a72c2f 100644
---- a/arch/arm/boot/dts/imx6qdl-udoo.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-udoo.dtsi
-@@ -9,6 +9,8 @@
-  *
-  */
- 
-+#include <dt-bindings/gpio/gpio.h>
-+
- / {
- 	aliases {
- 		backlight = &backlight;
-@@ -58,17 +60,6 @@
- 		#address-cells = <1>;
- 		#size-cells = <0>;
- 
--		reg_usb_h1_vbus: regulator at 0 {
--			compatible = "regulator-fixed";
--			reg = <0>;
--			regulator-name = "usb_h1_vbus";
--			regulator-min-microvolt = <5000000>;
--			regulator-max-microvolt = <5000000>;
--			enable-active-high;
--			startup-delay-us = <2>; /* USB2415 requires a POR of 1 us minimum */
--			gpio = <&gpio7 12 0>;
--		};
--
- 		reg_panel: regulator at 1 {
- 			compatible = "regulator-fixed";
- 			reg = <1>;
-@@ -259,9 +250,18 @@
- &usbh1 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_usbh>;
--	vbus-supply = <&reg_usb_h1_vbus>;
--	clocks = <&clks IMX6QDL_CLK_CKO>;
- 	status = "okay";
-+
-+	#address-cells = <1>;
-+	#size-cells = <0>;
-+	usb2415: hub at 1 {
-+		compatible = "usb424,2514";
-+		reg = <1>;
-+
-+		clocks = <&clks IMX6QDL_CLK_CKO>;
-+		reset-gpios = <&gpio7 12 GPIO_ACTIVE_LOW>;
-+		reset-duration-us = <3000>;
-+	};
- };
- 
- &usdhc3 {
 -- 
-1.9.1
+
+Best Regards,
+Peter Chen
