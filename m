@@ -1,38 +1,34 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Tue, 02 Aug 2016 19:55:44 +0800
-Subject: [PATCH v2] mmc: sunxi: Handle the 'New Timings'
-In-Reply-To: <20160802134301.efd5b08412714d94ee966717@free.fr>
-References: <E1bUDNG-0000pR-Fv@bombadil.infradead.org>
- <20160801153016.GB17146@leverpostej>
- <20160801182603.6f44af17e0bb801353f4b5e0@free.fr>
- <20160802112048.GA20134@leverpostej>
- <20160802134301.efd5b08412714d94ee966717@free.fr>
-Message-ID: <1762921470138944@web20g.yandex.ru>
+From: baolex.ni@intel.com (Baole Ni)
+Date: Tue,  2 Aug 2016 19:20:45 +0800
+Subject: [PATCH 0524/1285] Replace numeric parameter like 0444 with macro
+Message-ID: <20160802112045.16892-1-baolex.ni@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+I find that the developers often just specified the numeric value
+when calling a macro which is defined with a parameter for access permission.
+As we know, these numeric value for access permission have had the corresponding macro,
+and that using macro can improve the robustness and readability of the code,
+thus, I suggest replacing the numeric parameter with the macro.
 
+Signed-off-by: Chuansheng Liu <chuansheng.liu@intel.com>
+Signed-off-by: Baole Ni <baolex.ni@intel.com>
+---
+ drivers/media/platform/exynos4-is/fimc-lite.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-02.08.2016, 19:48, "Jean-Francois Moine" <moinejf@free.fr>:
-> On Tue, 2 Aug 2016 12:20:48 +0100
-> Mark Rutland <mark.rutland@arm.com> wrote:
->
->> ?> This mode is described at least in the Allwinner's documentation of the
->> ?> A83T, A64 and H3.
->>
->> ?Is this publicly available? If not, can the gist of it be described?
->
-> The links are in the kernel Documentation/arm/sunxi/README
-
-All the SoCs you mentioned here have no data sheet link in the file.
-I may submit a patch to fix this.
-
->
-> --
-> Ken ar c'henta? | ** Breizh ha Linux atav! **
-> Jef | http://moinejf.free.fr/
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+diff --git a/drivers/media/platform/exynos4-is/fimc-lite.c b/drivers/media/platform/exynos4-is/fimc-lite.c
+index dc1b929..02fddb4 100644
+--- a/drivers/media/platform/exynos4-is/fimc-lite.c
++++ b/drivers/media/platform/exynos4-is/fimc-lite.c
+@@ -38,7 +38,7 @@
+ #include "fimc-lite-reg.h"
+ 
+ static int debug;
+-module_param(debug, int, 0644);
++module_param(debug, int, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+ 
+ static const struct fimc_fmt fimc_lite_formats[] = {
+ 	{
+-- 
+2.9.2
