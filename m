@@ -1,63 +1,197 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 2 Aug 2016 15:57:40 +0200
-Subject: [PATCH] KVM: arm64: ITS: return 1 on successful MSI injection
-In-Reply-To: <57A091FC.9070607@arm.com>
-References: <20160802111058.31496-1-andre.przywara@arm.com>
- <20160802122309.GH32244@cbox> <57A091FC.9070607@arm.com>
-Message-ID: <20160802135740.GI32244@cbox>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Tue, 2 Aug 2016 15:58:40 +0200
+Subject: [PATCH v2 5/5] ARM: dts: sunxi: Use new sun7i-a20-mmc compatible
+ on sun7i and newer
+In-Reply-To: <9b6ed836-27ff-c8c8-d886-d86c787605fc@arm.com>
+References: <1469888748-26085-1-git-send-email-hdegoede@redhat.com>
+ <1469888748-26085-6-git-send-email-hdegoede@redhat.com>
+ <9b6ed836-27ff-c8c8-d886-d86c787605fc@arm.com>
+Message-ID: <cc932ae0-3198-38cc-b6fa-2c97530cdb3b@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 02, 2016 at 01:28:44PM +0100, Marc Zyngier wrote:
-> On 02/08/16 13:23, Christoffer Dall wrote:
-> > On Tue, Aug 02, 2016 at 12:10:58PM +0100, Andre Przywara wrote:
-> >> According to the KVM API documentation a successful MSI injection
-> >> should return a value > 0 on success.
-> >> Since we pass the return value of vgic_its_inject_msi() directly on
-> >> to upper layers and userland, we need to use the same semantics here.
-> >> Briefly tested with QEMU and kvmtool on GICv3 hardware and the model.
-> >>
-> >> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> >> ---
-> >> Applies on top of next-20160728. Let me know if I should use a
-> >> different base.
-> >>
-> >> Cheers,
-> >> Andre.
-> >>
-> >>  virt/kvm/arm/vgic/vgic-its.c | 3 ++-
-> >>  1 file changed, 2 insertions(+), 1 deletion(-)
-> >>
-> >> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-> >> index 07411cf..3268250 100644
-> >> --- a/virt/kvm/arm/vgic/vgic-its.c
-> >> +++ b/virt/kvm/arm/vgic/vgic-its.c
-> >> @@ -468,6 +468,7 @@ static void vgic_its_trigger_msi(struct kvm *kvm, struct vgic_its *its,
-> >>   * Queries the KVM IO bus framework to get the ITS pointer from the given
-> >>   * doorbell address.
-> >>   * We then call vgic_its_trigger_msi() with the decoded data.
-> >> + * According to the KVM_SIGNAL_MSI API description returns > 0 on success.
-> >>   */
-> >>  int vgic_its_inject_msi(struct kvm *kvm, struct kvm_msi *msi)
-> >>  {
-> >> @@ -493,7 +494,7 @@ int vgic_its_inject_msi(struct kvm *kvm, struct kvm_msi *msi)
-> >>  	vgic_its_trigger_msi(kvm, iodev->its, msi->devid, msi->data);
-> >>  	mutex_unlock(&iodev->its->its_lock);
-> >>  
-> >> -	return 0;
-> >> +	return 1;
-> >>  }
-> >>  
-> >>  /* Requires the its_lock to be held. */
-> > 
-> > Do we have a clear understanding of what 'guest blocked the MSI'
-> > constitutes in the ARM world?
-> 
-> I would define it as "the guest has not configured the ITS so that the
-> corresponding LPI could be successfully delivered". Which is any of the
-> conditions where the interrupt cannot make it into the pending table,
-> and is dropped on the floor.
-> 
-sounds good to me.
+Hi,
 
--Christoffer
+On 01-08-16 15:11, Andre Przywara wrote:
+> Hi Hans,
+>
+> On 30/07/16 15:25, Hans de Goede wrote:
+>> Use the new sun7i-a20-mmc compatible for the mmc controllers on sun7i
+>> and newer.
+>>
+>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>> ---
+>> Changes in v2:
+>> -New patch in v2 of this patch-set
+>> ---
+>>  arch/arm/boot/dts/sun6i-a31.dtsi     | 8 ++++----
+>>  arch/arm/boot/dts/sun7i-a20.dtsi     | 8 ++++----
+>>  arch/arm/boot/dts/sun8i-a23-a33.dtsi | 6 +++---
+>>  arch/arm/boot/dts/sun8i-h3.dtsi      | 6 +++---
+>>  4 files changed, 14 insertions(+), 14 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
+>> index 1867af2..0d24f10 100644
+>> --- a/arch/arm/boot/dts/sun6i-a31.dtsi
+>> +++ b/arch/arm/boot/dts/sun6i-a31.dtsi
+>> @@ -469,7 +469,7 @@
+>>  		};
+>>
+>>  		mmc0: mmc at 01c0f000 {
+>> -			compatible = "allwinner,sun5i-a13-mmc";
+>> +			compatible = "allwinner,sun7i-a20-mmc";
+>
+> But that breaks systems with newer DTs on older kernels, which do not
+> know about sun7i-a20-mmc. I assume this somehow worked before(?), so why
+> not use:
+> 	compatible = "allwinner,sun7i-a20-mmc",
+> 		     "allwinner,sun5i-a13-mmc";
+>
+> So newer kernels would pick up the new name and behaviour, while older
+> kernels would revert to the old name and use the existing driver.
+
+Good idea, I'll send a v3 with this change.
+
+Regards,
+
+Hans
+
+
+
+>
+> Cheers,
+> Andre.
+>
+>>  			reg = <0x01c0f000 0x1000>;
+>>  			clocks = <&ahb1_gates 8>,
+>>  				 <&mmc0_clk 0>,
+>> @@ -488,7 +488,7 @@
+>>  		};
+>>
+>>  		mmc1: mmc at 01c10000 {
+>> -			compatible = "allwinner,sun5i-a13-mmc";
+>> +			compatible = "allwinner,sun7i-a20-mmc";
+>>  			reg = <0x01c10000 0x1000>;
+>>  			clocks = <&ahb1_gates 9>,
+>>  				 <&mmc1_clk 0>,
+>> @@ -507,7 +507,7 @@
+>>  		};
+>>
+>>  		mmc2: mmc at 01c11000 {
+>> -			compatible = "allwinner,sun5i-a13-mmc";
+>> +			compatible = "allwinner,sun7i-a20-mmc";
+>>  			reg = <0x01c11000 0x1000>;
+>>  			clocks = <&ahb1_gates 10>,
+>>  				 <&mmc2_clk 0>,
+>> @@ -526,7 +526,7 @@
+>>  		};
+>>
+>>  		mmc3: mmc at 01c12000 {
+>> -			compatible = "allwinner,sun5i-a13-mmc";
+>> +			compatible = "allwinner,sun7i-a20-mmc";
+>>  			reg = <0x01c12000 0x1000>;
+>>  			clocks = <&ahb1_gates 11>,
+>>  				 <&mmc3_clk 0>,
+>> diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+>> index bd0c476..94cf5a1 100644
+>> --- a/arch/arm/boot/dts/sun7i-a20.dtsi
+>> +++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+>> @@ -905,7 +905,7 @@
+>>  		};
+>>
+>>  		mmc0: mmc at 01c0f000 {
+>> -			compatible = "allwinner,sun5i-a13-mmc";
+>> +			compatible = "allwinner,sun7i-a20-mmc";
+>>  			reg = <0x01c0f000 0x1000>;
+>>  			clocks = <&ahb_gates 8>,
+>>  				 <&mmc0_clk 0>,
+>> @@ -922,7 +922,7 @@
+>>  		};
+>>
+>>  		mmc1: mmc at 01c10000 {
+>> -			compatible = "allwinner,sun5i-a13-mmc";
+>> +			compatible = "allwinner,sun7i-a20-mmc";
+>>  			reg = <0x01c10000 0x1000>;
+>>  			clocks = <&ahb_gates 9>,
+>>  				 <&mmc1_clk 0>,
+>> @@ -939,7 +939,7 @@
+>>  		};
+>>
+>>  		mmc2: mmc at 01c11000 {
+>> -			compatible = "allwinner,sun5i-a13-mmc";
+>> +			compatible = "allwinner,sun7i-a20-mmc";
+>>  			reg = <0x01c11000 0x1000>;
+>>  			clocks = <&ahb_gates 10>,
+>>  				 <&mmc2_clk 0>,
+>> @@ -956,7 +956,7 @@
+>>  		};
+>>
+>>  		mmc3: mmc at 01c12000 {
+>> -			compatible = "allwinner,sun5i-a13-mmc";
+>> +			compatible = "allwinner,sun7i-a20-mmc";
+>>  			reg = <0x01c12000 0x1000>;
+>>  			clocks = <&ahb_gates 11>,
+>>  				 <&mmc3_clk 0>,
+>> diff --git a/arch/arm/boot/dts/sun8i-a23-a33.dtsi b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
+>> index 7e05e09..e3b196e 100644
+>> --- a/arch/arm/boot/dts/sun8i-a23-a33.dtsi
+>> +++ b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
+>> @@ -266,7 +266,7 @@
+>>  		};
+>>
+>>  		mmc0: mmc at 01c0f000 {
+>> -			compatible = "allwinner,sun5i-a13-mmc";
+>> +			compatible = "allwinner,sun7i-a20-mmc";
+>>  			reg = <0x01c0f000 0x1000>;
+>>  			clocks = <&ahb1_gates 8>,
+>>  				 <&mmc0_clk 0>,
+>> @@ -285,7 +285,7 @@
+>>  		};
+>>
+>>  		mmc1: mmc at 01c10000 {
+>> -			compatible = "allwinner,sun5i-a13-mmc";
+>> +			compatible = "allwinner,sun7i-a20-mmc";
+>>  			reg = <0x01c10000 0x1000>;
+>>  			clocks = <&ahb1_gates 9>,
+>>  				 <&mmc1_clk 0>,
+>> @@ -304,7 +304,7 @@
+>>  		};
+>>
+>>  		mmc2: mmc at 01c11000 {
+>> -			compatible = "allwinner,sun5i-a13-mmc";
+>> +			compatible = "allwinner,sun7i-a20-mmc";
+>>  			reg = <0x01c11000 0x1000>;
+>>  			clocks = <&ahb1_gates 10>,
+>>  				 <&mmc2_clk 0>,
+>> diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
+>> index 93c88f3..b5cc2dc 100644
+>> --- a/arch/arm/boot/dts/sun8i-h3.dtsi
+>> +++ b/arch/arm/boot/dts/sun8i-h3.dtsi
+>> @@ -154,7 +154,7 @@
+>>  		};
+>>
+>>  		mmc0: mmc at 01c0f000 {
+>> -			compatible = "allwinner,sun5i-a13-mmc";
+>> +			compatible = "allwinner,sun7i-a20-mmc";
+>>  			reg = <0x01c0f000 0x1000>;
+>>  			clocks = <&ccu CLK_BUS_MMC0>,
+>>  				 <&ccu CLK_MMC0>,
+>> @@ -173,7 +173,7 @@
+>>  		};
+>>
+>>  		mmc1: mmc at 01c10000 {
+>> -			compatible = "allwinner,sun5i-a13-mmc";
+>> +			compatible = "allwinner,sun7i-a20-mmc";
+>>  			reg = <0x01c10000 0x1000>;
+>>  			clocks = <&ccu CLK_BUS_MMC1>,
+>>  				 <&ccu CLK_MMC1>,
+>> @@ -192,7 +192,7 @@
+>>  		};
+>>
+>>  		mmc2: mmc at 01c11000 {
+>> -			compatible = "allwinner,sun5i-a13-mmc";
+>> +			compatible = "allwinner,sun7i-a20-mmc";
+>>  			reg = <0x01c11000 0x1000>;
+>>  			clocks = <&ccu CLK_BUS_MMC2>,
+>>  				 <&ccu CLK_MMC2>,
+>>
