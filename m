@@ -1,230 +1,635 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Tue, 02 Aug 2016 13:21:38 +0900
-Subject: [PATCH v4 6/7] PM / devfreq: rockchip: add devfreq driver for
- rk3399 dmc
-In-Reply-To: <579FF164.2000907@rock-chips.com>
-References: <1469779021-10426-1-git-send-email-hl@rock-chips.com>
- <CGME20160729075807epcas1p2432f667d41dadcaae7b813e151f2ab0b@epcas1p2.samsung.com>
- <1469779021-10426-7-git-send-email-hl@rock-chips.com>
- <579F2445.1020200@samsung.com> <579FF164.2000907@rock-chips.com>
-Message-ID: <57A01FD2.2060806@samsung.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Tue,  2 Aug 2016 13:28:30 +0900
+Subject: [PATCH v6 2/2] clk: uniphier: add clock data for UniPhier SoCs
+In-Reply-To: <1470112128-24513-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1470112128-24513-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <1470112128-24513-3-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lin,
+Add clock data arrays for all UniPhier SoCs.
 
-On the next version, I'd like you to add the 'linux-pm at vger.kernel.org'
-because devfreq is a subsystem of power management.
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+---
 
-On 2016? 08? 02? 10:03, hl wrote:
-> Hi Chanwoo Choi,
-> 
->     Thanks for reviewing so carefully. And i have some question:
-> 
-> On 2016?08?01? 18:28, Chanwoo Choi wrote:
->> Hi Lin,
->>
->> As I mentioned on patch5, you better to make the documentation as following:
->> - Documentation/devicetree/bindings/devfreq/rk3399_dmc.txt
->> And, I add the comments.
->>
->>
->> On 2016? 07? 29? 16:57, Lin Huang wrote:
->>> base on dfi result, we do ddr frequency scaling, register
->>> dmc driver to devfreq framework, and use simple-ondemand
->>> policy.
->>>
->>> Signed-off-by: Lin Huang <hl@rock-chips.com>
->>> ---
->>> Changes in v4:
->>> - use arm_smccc_smc() function talk to bl31
->>> - delete rockchip_dmc.c file and config
->>> - delete dmc_notify
->>> - adjust probe order
->>>   Changes in v3:
->>> - operate dram setting through sip call
->>> - imporve set rate flow
->>>
->>> Changes in v2:
->>> - None
->>>   Changes in v1:
->>> - move dfi controller to event
->>> - fix set voltage sequence when set rate fail
->>> - change Kconfig type from tristate to bool
->>> - move unuse EXPORT_SYMBOL_GPL()
->>>
->>>   drivers/devfreq/Kconfig               |   1 +
->>>   drivers/devfreq/Makefile              |   1 +
->>>   drivers/devfreq/rockchip/Kconfig      |   8 +
->>>   drivers/devfreq/rockchip/Makefile     |   1 +
->>>   drivers/devfreq/rockchip/rk3399_dmc.c | 473 ++++++++++++++++++++++++++++++++++
->>>   5 files changed, 484 insertions(+)
->>>   create mode 100644 drivers/devfreq/rockchip/Kconfig
->>>   create mode 100644 drivers/devfreq/rockchip/Makefile
->>>   create mode 100644 drivers/devfreq/rockchip/rk3399_dmc.c
->>>
+ .../devicetree/bindings/clock/uniphier-clock.txt   | 134 ++++++++++++++++++
+ drivers/clk/uniphier/Makefile                      |   3 +
+ drivers/clk/uniphier/clk-uniphier-core.c           |  91 +++++++++++++
+ drivers/clk/uniphier/clk-uniphier-mio.c            | 103 ++++++++++++++
+ drivers/clk/uniphier/clk-uniphier-peri.c           |  59 ++++++++
+ drivers/clk/uniphier/clk-uniphier-sys.c            | 151 +++++++++++++++++++++
+ drivers/clk/uniphier/clk-uniphier.h                |  13 ++
+ 7 files changed, 554 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/uniphier-clock.txt
+ create mode 100644 drivers/clk/uniphier/clk-uniphier-mio.c
+ create mode 100644 drivers/clk/uniphier/clk-uniphier-peri.c
+ create mode 100644 drivers/clk/uniphier/clk-uniphier-sys.c
 
-[snip]
-
->>> +
->>> +static int rk3399_dmcfreq_target(struct device *dev, unsigned long *freq,
->>> +                 u32 flags)
->>> +{
->>> +    struct platform_device *pdev = container_of(dev, struct platform_device,
->>> +                            dev);
->>> +    struct rk3399_dmcfreq *dmcfreq = platform_get_drvdata(pdev);
->> You can use the 'dev_get_drvdata()' to simplify it instead of 'platform_get_drvdata()'.
->>
->>     struct rk3399_dmcfreq *dmcfreq = dev_get_drvdata(dev);
->>
->>> +    struct dev_pm_opp *opp;
->>> +    unsigned long old_clk_rate = dmcfreq->rate;
->>> +    unsigned long target_volt, target_rate;
->>> +    int err;
->>> +
->>> +    rcu_read_lock();
->>> +    opp = devfreq_recommended_opp(dev, freq, flags);
->>> +    if (IS_ERR(opp)) {
->>> +        rcu_read_unlock();
->>> +        return PTR_ERR(opp);
->>> +    }
->>> +
->>> +    target_rate = dev_pm_opp_get_freq(opp);
->>> +    target_volt = dev_pm_opp_get_voltage(opp);
->>> +    opp = devfreq_recommended_opp(dev, &dmcfreq->rate, flags);
->>> +    if (IS_ERR(opp)) {
->>> +        rcu_read_unlock();
->>> +        return PTR_ERR(opp);
->>> +    }
->>> +    dmcfreq->volt = dev_pm_opp_get_voltage(opp);
->> If you add the 'curr_opp' variable to struct rk3399_dmcfreq,
->> you can remove the calling of devfreq_recommended_opp().
->>     dmcfreq->rate = dev_pm_opp_get_freq(dmcfreq->curr_opp);
->>     dmcfreq->volt = dev_pm_opp_get_freq(dmcfreq->curr_opp);
->>
->> Because the current rate and voltage is already decided on previous polling cycle,
->> So we don't need to get the opp with devfreq_recommended_opp().
-
-> I prefer the way now use, since we get the dmcfreq->rate use clk_get_rate() after,
-> Base on that,  i do not care the set_rate success or fail. use curr_opp i need to
-> care about set_rate status, when fail, i must set some rate, when success i must
-> set other rate.
-
-I think that it is not good to get the alrady decided opp
-by devfreq_recommended_opp(). Usually, devfreq_recommended_opp() is used
-to get the proper opp which get the close frequency (dmcfreq->rate).
-
-Also, When finishing the rk3399_dmcfreq_target(), the rk3399_dmc.c
-have to know the current opp or rate without any finding sequence.
-The additional finding procedure is un-needed.
-
->>> +    rcu_read_unlock();
->>> +
->>> +    if (dmcfreq->rate == target_rate)
->>> +        return 0;
->>> +
->>> +    mutex_lock(&dmcfreq->lock);
->>> +
->>> +    /*
->>> +     * if frequency scaling from low to high, adjust voltage first;
->>> +     * if frequency scaling from high to low, adjuset frequency first;
->>> +     */
->> s/adjuset/adjust
->>
->> I recommend that you use a captital letter for first character and use the '.'
->> instead of ';'.
->>
->>> +    if (old_clk_rate < target_rate) {
->>> +        err = regulator_set_voltage(dmcfreq->vdd_center, target_volt,
->>> +                        target_volt);
->>> +        if (err) {
->>> +            dev_err(dev, "Unable to set vol %lu\n", target_volt);
->> To readability, you better to use the corrent word to pass the precise the log message.
->> - s/vol/voltage
->>
->> And, this patch uses the 'Unable to' or 'Cannot' to show the error log.
->> I recommend that you use the consistent expression if there is not any specific reason.
->>
->>     dev_err(dev, "Cannot set the voltage %lu uV\n", target_volt);
->>
->>> +            goto out;
->>> +        }
->>> +    }
->>> +    dmcfreq->wait_dcf_flag = 1;
->>> +    err = clk_set_rate(dmcfreq->dmc_clk, target_rate);
->>> +    if (err) {
->>> +        dev_err(dev,
->>> +            "Unable to set freq %lu. Current freq %lu. Error %d\n",
->>> +            target_rate, old_clk_rate, err);
->>     dev_err(dev, "Cannot set the frequency %lu (%d)\n", target_rate, err);
->>
->>> +        regulator_set_voltage(dmcfreq->vdd_center, dmcfreq->volt,
->>> +                      dmcfreq->volt);
->>> +        goto out;
->>> +    }
->>> +
->>> +    /*
->>> +     * wait until bcf irq happen, it means freq scaling finish in bl31,
->> ditto.
->>
->>> +     * use 100ms as timeout time
->> s/time/time.
->>
->>> +     */
->>> +    if (!wait_event_timeout(dmcfreq->wait_dcf_queue,
->>> +                !dmcfreq->wait_dcf_flag, HZ / 10))
->>> +        dev_warn(dev, "Timeout waiting for dcf irq\n");
->> If the timeout happen, are there any problem?
-
-> When timeout happen , may be we miss interrupt, but it do not affect this
-> process, since we will check the rate whether success later.
-
-OK. But I'd like you to modify the warning message.
-
-One more thing, is the dcf interrupt related to the change of clock rate?
-When the clock rate is changed, the dcf interrupt happen?
-
->> After setting the frequency and voltage, store the current opp entry on .curr_opp.
->>     dmcfreq->curr_opp = opp;
->>
->>> +    /*
->>> +     * check the dpll rate
->>> +     * there only two result we will get,
->>> +     * 1. ddr frequency scaling fail, we still get the old rate
->>> +     * 2, ddr frequency scaling sucessful, we get the rate we set
->>> +     */
->>> +    dmcfreq->rate = clk_get_rate(dmcfreq->dmc_clk);
->>> +
->>> +    /* if get the incorrect rate, set voltage to old value */
->>> +    if (dmcfreq->rate != target_rate) {
->>> +        dev_err(dev, "get wrong ddr frequency, Request freq %lu,\
->>> +            Current freq %lu\n", target_rate, dmcfreq->rate);
->>> +        regulator_set_voltage(dmcfreq->vdd_center, dmcfreq->volt,
->>> +                      dmcfreq->volt);
->> [Without force, it is just my opion about this code:]
->> I think that this checking code it is un-needed.
->> If this case occur, the rk3399_dmc.c never set the specific frequency
->> because the rk3399 clock don't support the specific frequency for rk3399 dmc.
->>
->> If you want to set the correct frequency,
->> When verifying the rk3399 dmc driver, you should check the rk3399 clock driver.
->>
->> Basically, if the the clock driver don't support the correct same frequency ,
->> CCF(Common Clock Framework) set the close frequency. It is not a bad thing.
-
-> May be i should remove the regulator_set_voltage() here, but still need to
-> check whether we get the right frequency, since if we do not get the right frequency,
-
-When calling clk_set_rate(), the final frequency only depend on the rk3399 clock driver.
-But, if you want to check the new rate, I think that you should move this code
-right after clk_set_rate() when there is any dependency of dcf interrupt.
-
-> we should send a warn message, to remind that maybe you pass a frequency which
-> do not support in bl31.
-
-Also, I'd like you to explain the 'bl31' and add the description on next version.
-
-[snip]
-
-Regards,
-Chanwoo Choi
+diff --git a/Documentation/devicetree/bindings/clock/uniphier-clock.txt b/Documentation/devicetree/bindings/clock/uniphier-clock.txt
+new file mode 100644
+index 0000000..1a4db8b
+--- /dev/null
++++ b/Documentation/devicetree/bindings/clock/uniphier-clock.txt
+@@ -0,0 +1,134 @@
++UniPhier clock controller
++
++
++System clock
++------------
++
++Required properties:
++- compatible: should be one of the following:
++    "socionext,uniphier-sld3-clock" - for PH1-sLD3 SoC.
++    "socionext,uniphier-ld4-clock"  - for PH1-LD4 SoC.
++    "socionext,uniphier-pro4-clock" - for PH1-Pro4 SoC.
++    "socionext,uniphier-sld8-clock" - for PH1-sLD8 SoC.
++    "socionext,uniphier-pro5-clock" - for PH1-Pro5 SoC.
++    "socionext,uniphier-pxs2-clock" - for ProXstream2/PH1-LD6b SoC.
++    "socionext,uniphier-ld11-clock" - for PH1-LD11 SoC.
++    "socionext,uniphier-ld20-clock" - for PH1-LD20 SoC.
++- #clock-cells: should be 1.
++
++Example:
++
++	sysctrl at 61840000 {
++		compatible = "socionext,uniphier-ld20-sysctrl",
++			     "simple-mfd", "syscon";
++		reg = <0x61840000 0x4000>;
++
++		clock {
++			compatible = "socionext,uniphier-ld20-clock";
++			#clock-cells = <1>;
++		};
++
++		other nodes ...
++	};
++
++Provided clocks:
++
++ 8: ST DMAC
++12: GIO (Giga bit stream I/O)
++14: USB3 ch0 host
++15: USB3 ch1 host
++16: USB3 ch0 PHY0
++17: USB3 ch0 PHY1
++20: USB3 ch1 PHY0
++21: USB3 ch1 PHY1
++
++
++Media I/O (MIO) clock
++---------------------
++
++Required properties:
++- compatible: should be one of the following:
++    "socionext,uniphier-sld3-mio-clock" - for PH1-sLD3 SoC.
++    "socionext,uniphier-ld4-mio-clock"  - for PH1-LD4 SoC.
++    "socionext,uniphier-pro4-mio-clock" - for PH1-Pro4 SoC.
++    "socionext,uniphier-sld8-mio-clock" - for PH1-sLD8 SoC.
++    "socionext,uniphier-pro5-mio-clock" - for PH1-Pro5 SoC.
++    "socionext,uniphier-pxs2-mio-clock" - for ProXstream2/PH1-LD6b SoC.
++    "socionext,uniphier-ld11-mio-clock" - for PH1-LD11 SoC.
++    "socionext,uniphier-ld20-mio-clock" - for PH1-LD20 SoC.
++- #clock-cells: should be 1.
++
++Example:
++
++	mioctrl at 59810000 {
++		compatible = "socionext,uniphier-ld20-mioctrl",
++			     "simple-mfd", "syscon";
++		reg = <0x59810000 0x800>;
++
++		clock {
++			compatible = "socionext,uniphier-ld20-mio-clock";
++			#clock-cells = <1>;
++		};
++
++		other nodes ...
++	};
++
++Provided clocks:
++
++ 0: SD ch0 host
++ 1: eMMC host
++ 2: SD ch1 host
++ 7: MIO DMAC
++ 8: USB2 ch0 host
++ 9: USB2 ch1 host
++10: USB2 ch2 host
++11: USB2 ch3 host
++12: USB2 ch0 PHY
++13: USB2 ch1 PHY
++14: USB2 ch2 PHY
++15: USB2 ch3 PHY
++
++
++Peripheral clock
++----------------
++
++Required properties:
++- compatible: should be one of the following:
++    "socionext,uniphier-sld3-peri-clock" - for PH1-sLD3 SoC.
++    "socionext,uniphier-ld4-peri-clock"  - for PH1-LD4 SoC.
++    "socionext,uniphier-pro4-peri-clock" - for PH1-Pro4 SoC.
++    "socionext,uniphier-sld8-peri-clock" - for PH1-sLD8 SoC.
++    "socionext,uniphier-pro5-peri-clock" - for PH1-Pro5 SoC.
++    "socionext,uniphier-pxs2-peri-clock" - for ProXstream2/PH1-LD6b SoC.
++    "socionext,uniphier-ld11-peri-clock" - for PH1-LD11 SoC.
++    "socionext,uniphier-ld20-peri-clock" - for PH1-LD20 SoC.
++- #clock-cells: should be 1.
++
++Example:
++
++	perictrl at 59820000 {
++		compatible = "socionext,uniphier-ld20-perictrl",
++			     "simple-mfd", "syscon";
++		reg = <0x59820000 0x200>;
++
++		clock {
++			compatible = "socionext,uniphier-ld20-peri-clock";
++			#clock-cells = <1>;
++		};
++
++		other nodes ...
++	};
++
++Provided clocks:
++
++ 0: UART ch0
++ 1: UART ch1
++ 2: UART ch2
++ 3: UART ch3
++ 4: I2C ch0
++ 5: I2C ch1
++ 6: I2C ch2
++ 7: I2C ch3
++ 8: I2C ch4
++ 9: I2C ch5
++10: I2C ch6
+diff --git a/drivers/clk/uniphier/Makefile b/drivers/clk/uniphier/Makefile
+index 8f359aa..6822691 100644
+--- a/drivers/clk/uniphier/Makefile
++++ b/drivers/clk/uniphier/Makefile
+@@ -4,3 +4,6 @@ clk-uniphier-y			+= clk-uniphier-fixed-factor.o
+ clk-uniphier-y			+= clk-uniphier-fixed-rate.o
+ clk-uniphier-y			+= clk-uniphier-gate.o
+ clk-uniphier-y			+= clk-uniphier-mux.o
++clk-uniphier-y			+= clk-uniphier-sys.o
++clk-uniphier-y			+= clk-uniphier-mio.o
++clk-uniphier-y			+= clk-uniphier-peri.o
+diff --git a/drivers/clk/uniphier/clk-uniphier-core.c b/drivers/clk/uniphier/clk-uniphier-core.c
+index d6dfa4d..2f331aa 100644
+--- a/drivers/clk/uniphier/clk-uniphier-core.c
++++ b/drivers/clk/uniphier/clk-uniphier-core.c
+@@ -45,6 +45,97 @@ static struct clk_hw *uniphier_clk_register(struct device *dev,
+ }
+ 
+ static const struct of_device_id uniphier_clk_match[] = {
++	/* System clock */
++	{
++		.compatible = "socionext,uniphier-ld4-clock",
++		.data = uniphier_ld4_sys_clk_data,
++	},
++	{
++		.compatible = "socionext,uniphier-pro4-clock",
++		.data = uniphier_pro4_sys_clk_data,
++	},
++	{
++		.compatible = "socionext,uniphier-sld8-clock",
++		.data = uniphier_sld8_sys_clk_data,
++	},
++	{
++		.compatible = "socionext,uniphier-pro5-clock",
++		.data = uniphier_pro5_sys_clk_data,
++	},
++	{
++		.compatible = "socionext,uniphier-pxs2-clock",
++		.data = uniphier_pxs2_sys_clk_data,
++	},
++	{
++		.compatible = "socionext,uniphier-ld11-clock",
++		.data = uniphier_ld11_sys_clk_data,
++	},
++	{
++		.compatible = "socionext,uniphier-ld20-clock",
++		.data = uniphier_ld20_sys_clk_data,
++	},
++	/* Media I/O clock */
++	{
++		.compatible = "socionext,uniphier-sld3-mio-clock",
++		.data = uniphier_sld3_mio_clk_data,
++	},
++	{
++		.compatible = "socionext,uniphier-ld4-mio-clock",
++		.data = uniphier_sld3_mio_clk_data,
++	},
++	{
++		.compatible = "socionext,uniphier-pro4-mio-clock",
++		.data = uniphier_sld3_mio_clk_data,
++	},
++	{
++		.compatible = "socionext,uniphier-sld8-mio-clock",
++		.data = uniphier_sld3_mio_clk_data,
++	},
++	{
++		.compatible = "socionext,uniphier-pro5-mio-clock",
++		.data = uniphier_pro5_mio_clk_data,
++	},
++	{
++		.compatible = "socionext,uniphier-pxs2-mio-clock",
++		.data = uniphier_pro5_mio_clk_data,
++	},
++	{
++		.compatible = "socionext,uniphier-ld11-mio-clock",
++		.data = uniphier_sld3_mio_clk_data,
++	},
++	{
++		.compatible = "socionext,uniphier-ld20-mio-clock",
++		.data = uniphier_pro5_mio_clk_data,
++	},
++	/* Peripheral clock */
++	{
++		.compatible = "socionext,uniphier-ld4-peri-clock",
++		.data = uniphier_ld4_peri_clk_data,
++	},
++	{
++		.compatible = "socionext,uniphier-pro4-peri-clock",
++		.data = uniphier_pro4_peri_clk_data,
++	},
++	{
++		.compatible = "socionext,uniphier-sld8-peri-clock",
++		.data = uniphier_ld4_peri_clk_data,
++	},
++	{
++		.compatible = "socionext,uniphier-pro5-peri-clock",
++		.data = uniphier_pro4_peri_clk_data,
++	},
++	{
++		.compatible = "socionext,uniphier-pxs2-peri-clock",
++		.data = uniphier_pro4_peri_clk_data,
++	},
++	{
++		.compatible = "socionext,uniphier-ld11-peri-clock",
++		.data = uniphier_pro4_peri_clk_data,
++	},
++	{
++		.compatible = "socionext,uniphier-ld20-peri-clock",
++		.data = uniphier_pro4_peri_clk_data,
++	},
+ 	{ /* sentinel */ }
+ };
+ MODULE_DEVICE_TABLE(of, uniphier_clk_match);
+diff --git a/drivers/clk/uniphier/clk-uniphier-mio.c b/drivers/clk/uniphier/clk-uniphier-mio.c
+new file mode 100644
+index 0000000..928a563
+--- /dev/null
++++ b/drivers/clk/uniphier/clk-uniphier-mio.c
+@@ -0,0 +1,103 @@
++/*
++ * Copyright (C) 2016 Socionext Inc.
++ *   Author: Masahiro Yamada <yamada.masahiro@socionext.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/bitops.h>
++
++#include "clk-uniphier.h"
++
++#define UNIPHIER_MIO_CLK_SD_FIXED					\
++	UNIPHIER_CLK_FACTOR("sd-44m", -1, "sd-133m", 1, 3),		\
++	UNIPHIER_CLK_FACTOR("sd-33m", -1, "sd-200m", 1, 6),		\
++	UNIPHIER_CLK_FACTOR("sd-50m", -1, "sd-200m", 1, 4),		\
++	UNIPHIER_CLK_FACTOR("sd-67m", -1, "sd-200m", 1, 3),		\
++	UNIPHIER_CLK_FACTOR("sd-100m", -1, "sd-200m", 1, 2),		\
++	UNIPHIER_CLK_FACTOR("sd-40m", -1, "sd-200m", 1, 5),		\
++	UNIPHIER_CLK_FACTOR("sd-25m", -1, "sd-200m", 1, 8),		\
++	UNIPHIER_CLK_FACTOR("sd-22m", -1, "sd-133m", 1, 6)
++
++#define UNIPHIER_MIO_CLK_SD(_idx, ch)					\
++	{								\
++		.name = "sd" #ch "-sel",				\
++		.type = UNIPHIER_CLK_TYPE_MUX,				\
++		.idx = -1,						\
++		.data.mux = {						\
++			.parent_names = {				\
++				"sd-44m",				\
++				"sd-33m",				\
++				"sd-50m",				\
++				"sd-67m",				\
++				"sd-100m",				\
++				"sd-40m",				\
++				"sd-25m",				\
++				"sd-22m",				\
++			},						\
++			.num_parents = 8,				\
++			.reg = 0x30 + 0x200 * (ch),			\
++			.masks = {					\
++				0x00031000,				\
++				0x00031000,				\
++				0x00031000,				\
++				0x00031000,				\
++				0x00001300,				\
++				0x00001300,				\
++				0x00001300,				\
++				0x00001300,				\
++			},						\
++			.vals = {					\
++				0x00000000,				\
++				0x00010000,				\
++				0x00020000,				\
++				0x00030000,				\
++				0x00001000,				\
++				0x00001100,				\
++				0x00001200,				\
++				0x00001300,				\
++			},						\
++		},							\
++	},								\
++	UNIPHIER_CLK_GATE("sd" #ch, (_idx), "sd" #ch "-sel", 0x20 + 0x200 * (ch), 8)
++
++#define UNIPHIER_MIO_CLK_USB2(idx, ch)					\
++	UNIPHIER_CLK_GATE("usb2" #ch, (idx), "usb2", 0x20 + 0x200 * (ch), 28)
++
++#define UNIPHIER_MIO_CLK_USB2_PHY(idx, ch)				\
++	UNIPHIER_CLK_GATE("usb2" #ch "-phy", (idx), "usb2", 0x20 + 0x200 * (ch), 29)
++
++#define UNIPHIER_MIO_CLK_DMAC(idx)					\
++	UNIPHIER_CLK_GATE("miodmac", (idx), "stdmac", 0x20, 25)
++
++const struct uniphier_clk_data uniphier_sld3_mio_clk_data[] = {
++	UNIPHIER_MIO_CLK_SD_FIXED,
++	UNIPHIER_MIO_CLK_SD(0, 0),
++	UNIPHIER_MIO_CLK_SD(1, 1),
++	UNIPHIER_MIO_CLK_SD(2, 2),
++	UNIPHIER_MIO_CLK_DMAC(7),
++	UNIPHIER_MIO_CLK_USB2(8, 0),
++	UNIPHIER_MIO_CLK_USB2(9, 1),
++	UNIPHIER_MIO_CLK_USB2(10, 2),
++	UNIPHIER_MIO_CLK_USB2(11, 3),
++	UNIPHIER_MIO_CLK_USB2_PHY(12, 0),
++	UNIPHIER_MIO_CLK_USB2_PHY(13, 1),
++	UNIPHIER_MIO_CLK_USB2_PHY(14, 2),
++	UNIPHIER_MIO_CLK_USB2_PHY(15, 3),
++	{ /* sentinel */ }
++};
++
++const struct uniphier_clk_data uniphier_pro5_mio_clk_data[] = {
++	UNIPHIER_MIO_CLK_SD_FIXED,
++	UNIPHIER_MIO_CLK_SD(0, 0),
++	UNIPHIER_MIO_CLK_SD(1, 1),
++	{ /* sentinel */ }
++};
+diff --git a/drivers/clk/uniphier/clk-uniphier-peri.c b/drivers/clk/uniphier/clk-uniphier-peri.c
+new file mode 100644
+index 0000000..13c05bc
+--- /dev/null
++++ b/drivers/clk/uniphier/clk-uniphier-peri.c
+@@ -0,0 +1,59 @@
++/*
++ * Copyright (C) 2016 Socionext Inc.
++ *   Author: Masahiro Yamada <yamada.masahiro@socionext.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/bitops.h>
++
++#include "clk-uniphier.h"
++
++#define UNIPHIER_PERI_CLK_UART(idx, ch)					\
++	UNIPHIER_CLK_GATE("uart" #ch, (idx), "uart", 0x24, 19 + (ch))
++
++#define UNIPHIER_PERI_CLK_I2C_COMMON					\
++	UNIPHIER_CLK_GATE("i2c-common", -1, "i2c", 0x20, 1)
++
++#define UNIPHIER_PERI_CLK_I2C(idx, ch)					\
++	UNIPHIER_CLK_GATE("i2c" #ch, (idx), "i2c-common", 0x24, 5 + (ch))
++
++#define UNIPHIER_PERI_CLK_FI2C(idx, ch)					\
++	UNIPHIER_CLK_GATE("i2c" #ch, (idx), "i2c", 0x24, 24 + (ch))
++
++const struct uniphier_clk_data uniphier_ld4_peri_clk_data[] = {
++	UNIPHIER_PERI_CLK_UART(0, 0),
++	UNIPHIER_PERI_CLK_UART(1, 1),
++	UNIPHIER_PERI_CLK_UART(2, 2),
++	UNIPHIER_PERI_CLK_UART(3, 3),
++	UNIPHIER_PERI_CLK_I2C_COMMON,
++	UNIPHIER_PERI_CLK_I2C(4, 0),
++	UNIPHIER_PERI_CLK_I2C(5, 1),
++	UNIPHIER_PERI_CLK_I2C(6, 2),
++	UNIPHIER_PERI_CLK_I2C(7, 3),
++	UNIPHIER_PERI_CLK_I2C(8, 4),
++	{ /* sentinel */ }
++};
++
++const struct uniphier_clk_data uniphier_pro4_peri_clk_data[] = {
++	UNIPHIER_PERI_CLK_UART(0, 0),
++	UNIPHIER_PERI_CLK_UART(1, 1),
++	UNIPHIER_PERI_CLK_UART(2, 2),
++	UNIPHIER_PERI_CLK_UART(3, 3),
++	UNIPHIER_PERI_CLK_FI2C(4, 0),
++	UNIPHIER_PERI_CLK_FI2C(5, 1),
++	UNIPHIER_PERI_CLK_FI2C(6, 2),
++	UNIPHIER_PERI_CLK_FI2C(7, 3),
++	UNIPHIER_PERI_CLK_FI2C(8, 4),
++	UNIPHIER_PERI_CLK_FI2C(9, 5),
++	UNIPHIER_PERI_CLK_FI2C(10, 6),
++	{ /* sentinel */ }
++};
+diff --git a/drivers/clk/uniphier/clk-uniphier-sys.c b/drivers/clk/uniphier/clk-uniphier-sys.c
+new file mode 100644
+index 0000000..60453ab
+--- /dev/null
++++ b/drivers/clk/uniphier/clk-uniphier-sys.c
+@@ -0,0 +1,151 @@
++/*
++ * Copyright (C) 2016 Socionext Inc.
++ *   Author: Masahiro Yamada <yamada.masahiro@socionext.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/bitops.h>
++
++#include "clk-uniphier.h"
++
++#define UNIPHIER_SLD3_SYS_CLK_SD					\
++	UNIPHIER_CLK_FACTOR("sd-200m", -1, "spll", 1, 8),		\
++	UNIPHIER_CLK_FACTOR("sd-133m", -1, "vpll27a", 1, 2)
++
++#define UNIPHIER_PRO5_SYS_CLK_SD					\
++	UNIPHIER_CLK_FACTOR("sd-200m", -1, "spll", 1, 12),		\
++	UNIPHIER_CLK_FACTOR("sd-133m", -1, "spll", 1, 18)
++
++#define UNIPHIER_LD20_SYS_CLK_SD					\
++	UNIPHIER_CLK_FACTOR("sd-200m", -1, "spll", 1, 10),		\
++	UNIPHIER_CLK_FACTOR("sd-133m", -1, "spll", 1, 15)
++
++#define UNIPHIER_SLD3_SYS_CLK_STDMAC(idx)				\
++	UNIPHIER_CLK_GATE("stdmac", (idx), NULL, 0x2104, 10)
++
++#define UNIPHIER_LD11_SYS_CLK_STDMAC(idx)				\
++	UNIPHIER_CLK_GATE("stdmac", (idx), NULL, 0x210c, 8)
++
++#define UNIPHIER_PRO4_SYS_CLK_GIO(idx)					\
++	UNIPHIER_CLK_GATE("gio", (idx), NULL, 0x2104, 6)
++
++#define UNIPHIER_PRO4_SYS_CLK_USB3(idx, ch)				\
++	UNIPHIER_CLK_GATE("usb3" #ch, (idx), NULL, 0x2104, 16 + (ch))
++
++const struct uniphier_clk_data uniphier_sld3_sys_clk_data[] = {
++	UNIPHIER_CLK_FACTOR("spll", -1, "ref", 65, 1),		/* 1597.44 MHz */
++	UNIPHIER_CLK_FACTOR("upll", -1, "ref", 6000, 512),	/* 288 MHz */
++	UNIPHIER_CLK_FACTOR("a2pll", -1, "ref", 24, 1),		/* 589.824 MHz */
++	UNIPHIER_CLK_FACTOR("vpll27a", -1, "ref", 5625, 512),	/* 270 MHz */
++	UNIPHIER_CLK_FACTOR("uart", 0, "a2pll", 1, 16),
++	UNIPHIER_CLK_FACTOR("i2c", 1, "spll", 1, 16),
++	UNIPHIER_SLD3_SYS_CLK_SD,
++	UNIPHIER_CLK_FACTOR("usb2", -1, "upll", 1, 12),
++	UNIPHIER_SLD3_SYS_CLK_STDMAC(8),
++	{ /* sentinel */ }
++};
++
++const struct uniphier_clk_data uniphier_ld4_sys_clk_data[] = {
++	UNIPHIER_CLK_FACTOR("spll", -1, "ref", 65, 1),		/* 1597.44 MHz */
++	UNIPHIER_CLK_FACTOR("upll", -1, "ref", 6000, 512),	/* 288 MHz */
++	UNIPHIER_CLK_FACTOR("a2pll", -1, "ref", 24, 1),		/* 589.824 MHz */
++	UNIPHIER_CLK_FACTOR("vpll27a", -1, "ref", 5625, 512),	/* 270 MHz */
++	UNIPHIER_CLK_FACTOR("uart", 0, "a2pll", 1, 16),
++	UNIPHIER_CLK_FACTOR("i2c", 1, "spll", 1, 16),
++	UNIPHIER_SLD3_SYS_CLK_SD,
++	UNIPHIER_CLK_FACTOR("usb2", -1, "upll", 1, 12),
++	UNIPHIER_SLD3_SYS_CLK_STDMAC(8),		/* Ether, HSC, MIO */
++	{ /* sentinel */ }
++};
++
++const struct uniphier_clk_data uniphier_pro4_sys_clk_data[] = {
++	UNIPHIER_CLK_FACTOR("spll", -1, "ref", 64, 1),		/* 1600 MHz */
++	UNIPHIER_CLK_FACTOR("upll", -1, "ref", 288, 25),	/* 288 MHz */
++	UNIPHIER_CLK_FACTOR("a2pll", -1, "upll", 256, 125),	/* 589.824 MHz */
++	UNIPHIER_CLK_FACTOR("vpll27a", -1, "ref", 270, 25),	/* 270 MHz */
++	UNIPHIER_CLK_FACTOR("uart", 0, "a2pll", 1, 8),
++	UNIPHIER_CLK_FACTOR("i2c", 1, "spll", 1, 32),
++	UNIPHIER_SLD3_SYS_CLK_SD,
++	UNIPHIER_CLK_FACTOR("usb2", -1, "upll", 1, 12),
++	UNIPHIER_SLD3_SYS_CLK_STDMAC(8),		/* HSC, MIO, RLE */
++	UNIPHIER_PRO4_SYS_CLK_GIO(12),			/* Ether, SATA, USB3 */
++	UNIPHIER_PRO4_SYS_CLK_USB3(16, 0),
++	UNIPHIER_PRO4_SYS_CLK_USB3(17, 1),
++	{ /* sentinel */ }
++};
++
++const struct uniphier_clk_data uniphier_sld8_sys_clk_data[] = {
++	UNIPHIER_CLK_FACTOR("spll", -1, "ref", 64, 1),		/* 1600 MHz */
++	UNIPHIER_CLK_FACTOR("upll", -1, "ref", 288, 25),	/* 288 MHz */
++	UNIPHIER_CLK_FACTOR("vpll27a", -1, "ref", 270, 25),	/* 270 MHz */
++	UNIPHIER_CLK_FACTOR("uart", 0, "spll", 1, 20),
++	UNIPHIER_CLK_FACTOR("i2c", 1, "spll", 1, 16),
++	UNIPHIER_SLD3_SYS_CLK_SD,
++	UNIPHIER_CLK_FACTOR("usb2", -1, "upll", 1, 12),
++	UNIPHIER_SLD3_SYS_CLK_STDMAC(8),		/* Ether, HSC, MIO */
++	{ /* sentinel */ }
++};
++
++const struct uniphier_clk_data uniphier_pro5_sys_clk_data[] = {
++	UNIPHIER_CLK_FACTOR("spll", -1, "ref", 120, 1),		/* 2400 MHz */
++	UNIPHIER_CLK_FACTOR("dapll1", -1, "ref", 128, 1),	/* 2560 MHz */
++	UNIPHIER_CLK_FACTOR("dapll2", -1, "ref", 144, 125),	/* 2949.12 MHz */
++	UNIPHIER_CLK_FACTOR("uart", 0, "dapll2", 1, 40),
++	UNIPHIER_CLK_FACTOR("i2c", 1, "spll", 1, 48),
++	UNIPHIER_PRO5_SYS_CLK_SD,
++	UNIPHIER_SLD3_SYS_CLK_STDMAC(8),			/* HSC */
++	UNIPHIER_PRO4_SYS_CLK_GIO(12),				/* PCIe, USB3 */
++	UNIPHIER_PRO4_SYS_CLK_USB3(16, 0),
++	UNIPHIER_PRO4_SYS_CLK_USB3(17, 1),
++	{ /* sentinel */ }
++};
++
++const struct uniphier_clk_data uniphier_pxs2_sys_clk_data[] = {
++	UNIPHIER_CLK_FACTOR("spll", -1, "ref", 96, 1),		/* 2400 MHz */
++	UNIPHIER_CLK_FACTOR("uart", 0, "spll", 1, 27),
++	UNIPHIER_CLK_FACTOR("i2c", 1, "spll", 1, 48),
++	UNIPHIER_PRO5_SYS_CLK_SD,
++	UNIPHIER_SLD3_SYS_CLK_STDMAC(8),			/* HSC, RLE */
++	/* GIO is always clock-enabled: no function for 0x2104 bit6 */
++	UNIPHIER_PRO4_SYS_CLK_USB3(14, 0),
++	UNIPHIER_PRO4_SYS_CLK_USB3(15, 1),
++	/* The document mentions 0x2104 bit 18, but not functional */
++	UNIPHIER_CLK_GATE("usb30-phy", 16, NULL, 0x2104, 19),
++	UNIPHIER_CLK_GATE("usb31-phy", 20, NULL, 0x2104, 20),
++	{ /* sentinel */ }
++};
++
++const struct uniphier_clk_data uniphier_ld11_sys_clk_data[] = {
++	UNIPHIER_CLK_FACTOR("spll", -1, "ref", 80, 1),		/* 2000 MHz */
++	UNIPHIER_CLK_FACTOR("uart", 0, "spll", 1, 34),
++	UNIPHIER_CLK_FACTOR("i2c", 1, "spll", 1, 40),
++	UNIPHIER_LD11_SYS_CLK_STDMAC(8),			/* HSC, MIO */
++	UNIPHIER_CLK_FACTOR("usb2", -1, "ref", 24, 25),
++	{ /* sentinel */ }
++};
++
++const struct uniphier_clk_data uniphier_ld20_sys_clk_data[] = {
++	UNIPHIER_CLK_FACTOR("spll", -1, "ref", 80, 1),		/* 2000 MHz */
++	UNIPHIER_CLK_FACTOR("uart", 0, "spll", 1, 34),
++	UNIPHIER_CLK_FACTOR("i2c", 1, "spll", 1, 40),
++	UNIPHIER_LD20_SYS_CLK_SD,
++	UNIPHIER_LD11_SYS_CLK_STDMAC(8),			/* HSC */
++	/* GIO is always clock-enabled: no function for 0x210c bit5 */
++	/*
++	 * clock for USB Link is enabled by the logic "OR" of bit 14 and bit 15.
++	 * We do not use bit 15 here.
++	 */
++	UNIPHIER_CLK_GATE("usb30", 14, NULL, 0x210c, 14),
++	UNIPHIER_CLK_GATE("usb30-phy0", 16, NULL, 0x210c, 12),
++	UNIPHIER_CLK_GATE("usb30-phy1", 17, NULL, 0x210c, 13),
++	{ /* sentinel */ }
++};
+diff --git a/drivers/clk/uniphier/clk-uniphier.h b/drivers/clk/uniphier/clk-uniphier.h
+index 3e354e9..3ae1840 100644
+--- a/drivers/clk/uniphier/clk-uniphier.h
++++ b/drivers/clk/uniphier/clk-uniphier.h
+@@ -106,4 +106,17 @@ struct clk_hw *uniphier_clk_register_mux(struct device *dev,
+ 					 const char *name,
+ 				const struct uniphier_clk_mux_data *data);
+ 
++extern const struct uniphier_clk_data uniphier_sld3_sys_clk_data[];
++extern const struct uniphier_clk_data uniphier_ld4_sys_clk_data[];
++extern const struct uniphier_clk_data uniphier_pro4_sys_clk_data[];
++extern const struct uniphier_clk_data uniphier_sld8_sys_clk_data[];
++extern const struct uniphier_clk_data uniphier_pro5_sys_clk_data[];
++extern const struct uniphier_clk_data uniphier_pxs2_sys_clk_data[];
++extern const struct uniphier_clk_data uniphier_ld11_sys_clk_data[];
++extern const struct uniphier_clk_data uniphier_ld20_sys_clk_data[];
++extern const struct uniphier_clk_data uniphier_sld3_mio_clk_data[];
++extern const struct uniphier_clk_data uniphier_pro5_mio_clk_data[];
++extern const struct uniphier_clk_data uniphier_ld4_peri_clk_data[];
++extern const struct uniphier_clk_data uniphier_pro4_peri_clk_data[];
++
+ #endif /* __CLK_UNIPHIER_H__ */
+-- 
+1.9.1
