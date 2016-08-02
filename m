@@ -1,34 +1,34 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Tue,  2 Aug 2016 20:01:17 +0800
-Subject: [PATCH] Documentation: sunxi: Update Allwinner SoC documentation
-Message-ID: <20160802120117.4848-1-icenowy@aosc.xyz>
+From: baolex.ni@intel.com (Baole Ni)
+Date: Tue,  2 Aug 2016 19:38:45 +0800
+Subject: [PATCH 0709/1285] Replace numeric parameter like 0444 with macro
+Message-ID: <20160802113845.29322-1-baolex.ni@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now, the A83T and A64 SoC user manuals are available.
-Update the documentation to add the links.
+I find that the developers often just specified the numeric value
+when calling a macro which is defined with a parameter for access permission.
+As we know, these numeric value for access permission have had the corresponding macro,
+and that using macro can improve the robustness and readability of the code,
+thus, I suggest replacing the numeric parameter with the macro.
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+Signed-off-by: Chuansheng Liu <chuansheng.liu@intel.com>
+Signed-off-by: Baole Ni <baolex.ni@intel.com>
 ---
- Documentation/arm/sunxi/README | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ drivers/net/ethernet/allwinner/sun4i-emac.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/Documentation/arm/sunxi/README b/Documentation/arm/sunxi/README
-index e5a115f..302d947 100644
---- a/Documentation/arm/sunxi/README
-+++ b/Documentation/arm/sunxi/README
-@@ -74,3 +74,12 @@ SunXi family
-       - Allwinner A83T
-         + Datasheet
-           http://dl.linux-sunxi.org/A83T/A83T_datasheet_Revision_1.1.pdf
-+        + User Manual
-+          https://github.com/allwinner-zh/documents/raw/master/A83T/A83T_User_Manual_v1.5.1_20150513.pdf
-+
-+    * Quad ARM Cortex-A53 based SoCs
-+      - Allwinner A64
-+        + Datasheet
-+          http://dl.linux-sunxi.org/A64/A64_Datasheet_V1.1.pdf
-+        + User Manual
-+          http://dl.linux-sunxi.org/A64/Allwinner%20A64%20User%20Manual%20v1.0.pdf
+diff --git a/drivers/net/ethernet/allwinner/sun4i-emac.c b/drivers/net/ethernet/allwinner/sun4i-emac.c
+index de2c4bf..c502059 100644
+--- a/drivers/net/ethernet/allwinner/sun4i-emac.c
++++ b/drivers/net/ethernet/allwinner/sun4i-emac.c
+@@ -39,7 +39,7 @@
+ 
+ /* Transmit timeout, default 5 seconds. */
+ static int watchdog = 5000;
+-module_param(watchdog, int, 0400);
++module_param(watchdog, int, S_IRUSR);
+ MODULE_PARM_DESC(watchdog, "transmit timeout in milliseconds");
+ 
+ /* EMAC register address locking.
 -- 
-2.9.0
+2.9.2
