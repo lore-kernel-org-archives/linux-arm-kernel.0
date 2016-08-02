@@ -1,7 +1,7 @@
 From: baolex.ni@intel.com (Baole Ni)
-Date: Tue,  2 Aug 2016 18:33:52 +0800
-Subject: [PATCH 0008/1285] Replace numeric parameter like 0444 with macro
-Message-ID: <20160802103352.14282-1-baolex.ni@intel.com>
+Date: Tue,  2 Aug 2016 18:33:30 +0800
+Subject: [PATCH 0003/1285] Replace numeric parameter like 0444 with macro
+Message-ID: <20160802103330.13946-1-baolex.ni@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,23 +14,21 @@ thus, I suggest replacing the numeric parameter with the macro.
 Signed-off-by: Chuansheng Liu <chuansheng.liu@intel.com>
 Signed-off-by: Baole Ni <baolex.ni@intel.com>
 ---
- arch/arm/mach-pxa/sharpsl_pm.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/mach-imx/mach-mx31lilly.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-pxa/sharpsl_pm.c b/arch/arm/mach-pxa/sharpsl_pm.c
-index b80eab9..35a7472 100644
---- a/arch/arm/mach-pxa/sharpsl_pm.c
-+++ b/arch/arm/mach-pxa/sharpsl_pm.c
-@@ -802,8 +802,8 @@ static ssize_t battery_voltage_show(struct device *dev, struct device_attribute
- 	return sprintf(buf, "%d\n", sharpsl_pm.battstat.mainbat_voltage);
- }
+diff --git a/arch/arm/mach-imx/mach-mx31lilly.c b/arch/arm/mach-imx/mach-mx31lilly.c
+index e9549a3..05e0312 100644
+--- a/arch/arm/mach-imx/mach-mx31lilly.c
++++ b/arch/arm/mach-imx/mach-mx31lilly.c
+@@ -241,7 +241,7 @@ static struct platform_device *devices[] __initdata = {
+ };
  
--static DEVICE_ATTR(battery_percentage, 0444, battery_percentage_show, NULL);
--static DEVICE_ATTR(battery_voltage, 0444, battery_voltage_show, NULL);
-+static DEVICE_ATTR(battery_percentage, S_IRUSR | S_IRGRP | S_IROTH, battery_percentage_show, NULL);
-+static DEVICE_ATTR(battery_voltage, S_IRUSR | S_IRGRP | S_IROTH, battery_voltage_show, NULL);
+ static int mx31lilly_baseboard;
+-core_param(mx31lilly_baseboard, mx31lilly_baseboard, int, 0444);
++core_param(mx31lilly_baseboard, mx31lilly_baseboard, int, S_IRUSR | S_IRGRP | S_IROTH);
  
- extern void (*apm_get_power_status)(struct apm_power_info *);
- 
+ static struct regulator_consumer_supply dummy_supplies[] = {
+ 	REGULATOR_SUPPLY("vdd33a", "smsc911x"),
 -- 
 2.9.2
