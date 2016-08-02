@@ -1,7 +1,7 @@
 From: baolex.ni@intel.com (Baole Ni)
-Date: Tue,  2 Aug 2016 18:33:27 +0800
-Subject: [PATCH 0002/1285] Replace numeric parameter like 0444 with macro
-Message-ID: <20160802103327.13880-1-baolex.ni@intel.com>
+Date: Tue,  2 Aug 2016 18:33:34 +0800
+Subject: [PATCH 0004/1285] Replace numeric parameter like 0444 with macro
+Message-ID: <20160802103334.14014-1-baolex.ni@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,21 +14,21 @@ thus, I suggest replacing the numeric parameter with the macro.
 Signed-off-by: Chuansheng Liu <chuansheng.liu@intel.com>
 Signed-off-by: Baole Ni <baolex.ni@intel.com>
 ---
- arch/arm/common/dmabounce.c | 2 +-
+ arch/arm/mach-imx/mach-mx31lite.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/common/dmabounce.c b/arch/arm/common/dmabounce.c
-index 1143c4d..22d7a9a 100644
---- a/arch/arm/common/dmabounce.c
-+++ b/arch/arm/common/dmabounce.c
-@@ -98,7 +98,7 @@ static ssize_t dmabounce_show(struct device *dev, struct device_attribute *attr,
- 		device_info->bounce_count);
+diff --git a/arch/arm/mach-imx/mach-mx31lite.c b/arch/arm/mach-imx/mach-mx31lite.c
+index 4822a17..0da699c 100644
+--- a/arch/arm/mach-imx/mach-mx31lite.c
++++ b/arch/arm/mach-imx/mach-mx31lite.c
+@@ -224,7 +224,7 @@ void __init mx31lite_map_io(void)
  }
  
--static DEVICE_ATTR(dmabounce_stats, 0400, dmabounce_show, NULL);
-+static DEVICE_ATTR(dmabounce_stats, S_IRUSR, dmabounce_show, NULL);
- #endif
+ static int mx31lite_baseboard;
+-core_param(mx31lite_baseboard, mx31lite_baseboard, int, 0444);
++core_param(mx31lite_baseboard, mx31lite_baseboard, int, S_IRUSR | S_IRGRP | S_IROTH);
  
- 
+ static struct regulator_consumer_supply dummy_supplies[] = {
+ 	REGULATOR_SUPPLY("vdd33a", "smsc911x"),
 -- 
 2.9.2
