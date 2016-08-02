@@ -1,74 +1,168 @@
-From: joerg.krause@embedded.rocks (=?ISO-8859-1?Q?J=F6rg?= Krause)
-Date: Tue, 02 Aug 2016 17:08:30 +0200
-Subject: mxs-mmc 80014000.ssp: mxs_mmc_probe: failed to request dma
-Message-ID: <1470150510.13930.16.camel@embedded.rocks>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 2 Aug 2016 16:18:46 +0100
+Subject: [PATCH] KVM: arm64: vgic-its: Handle errors from vgic_add_lpi
+In-Reply-To: <20160802150834.GT32244@cbox>
+References: <20160801182952.3005-1-christoffer.dall@linaro.org>
+ <57A0776F.5070401@arm.com> <20160802150834.GT32244@cbox>
+Message-ID: <57A0B9D6.8070304@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 02/08/16 16:08, Christoffer Dall wrote:
+> On Tue, Aug 02, 2016 at 11:35:27AM +0100, Marc Zyngier wrote:
+>> On 01/08/16 19:29, Christoffer Dall wrote:
+>>> During low memory conditions, we could be dereferencing a NULL pointer
+>>> when vgic_add_lpi fails to allocate memory.
+>>>
+>>> Consider for example this call sequence:
+>>>
+>>>   vgic_its_cmd_handle_mapi
+>>>       itte->irq = vgic_add_lpi(kvm, lpi_nr);
+>>>           update_lpi_config(kvm, itte->irq, NULL);
+>>>               ret = kvm_read_guest(kvm, propbase + irq->intid
+>>> 	                                             ^^^^
+>>> 						     kaboom?
+>>>
+>>> Instead, return an error pointer from vgic_add_lpi and check the return
+>>> value from its single caller.
+>>>
+>>> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+>>> ---
+>>>  virt/kvm/arm/vgic/vgic-its.c | 42 +++++++++++++++++++++++++++++-------------
+>>>  1 file changed, 29 insertions(+), 13 deletions(-)
+>>>
+>>> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+>>> index 07411cf..3515bdb 100644
+>>> --- a/virt/kvm/arm/vgic/vgic-its.c
+>>> +++ b/virt/kvm/arm/vgic/vgic-its.c
+>>> @@ -51,7 +51,7 @@ static struct vgic_irq *vgic_add_lpi(struct kvm *kvm, u32 intid)
+>>>  
+>>>  	irq = kzalloc(sizeof(struct vgic_irq), GFP_KERNEL);
+>>>  	if (!irq)
+>>> -		return NULL;
+>>> +		return ERR_PTR(-ENOMEM);
+>>>  
+>>>  	INIT_LIST_HEAD(&irq->lpi_list);
+>>>  	INIT_LIST_HEAD(&irq->ap_list);
+>>> @@ -697,24 +697,33 @@ static int vgic_its_cmd_handle_mapi(struct kvm *kvm, struct vgic_its *its,
+>>>  	struct its_device *device;
+>>>  	struct its_collection *collection, *new_coll = NULL;
+>>>  	int lpi_nr;
+>>> -
+>>> -	device = find_its_device(its, device_id);
+>>> -	if (!device)
+>>> -		return E_ITS_MAPTI_UNMAPPED_DEVICE;
+>>> +	struct vgic_irq *irq = NULL;
+>>> +	int err = 0;
+>>>  
+>>>  	if (its_cmd_get_command(its_cmd) == GITS_CMD_MAPTI)
+>>>  		lpi_nr = its_cmd_get_physical_id(its_cmd);
+>>>  	else
+>>>  		lpi_nr = event_id;
+>>> +
+>>>  	if (lpi_nr < GIC_LPI_OFFSET ||
+>>>  	    lpi_nr >= max_lpis_propbaser(kvm->arch.vgic.propbaser))
+>>>  		return E_ITS_MAPTI_PHYSICALID_OOR;
+>>>  
+>>> +	irq = vgic_add_lpi(kvm, lpi_nr);
+>>> +	if (IS_ERR(irq))
+>>> +		return PTR_ERR(irq);
+>>> +
+>>> +	device = find_its_device(its, device_id);
+>>> +	if (!device) {
+>>> +		err = E_ITS_MAPTI_UNMAPPED_DEVICE;
+>>> +		goto out;
+>>> +	}
+>>> +
+>>>  	collection = find_collection(its, coll_id);
+>>>  	if (!collection) {
+>>> -		int ret = vgic_its_alloc_collection(its, &collection, coll_id);
+>>> -		if (ret)
+>>> -			return ret;
+>>> +		err = vgic_its_alloc_collection(its, &collection, coll_id);
+>>> +		if (err)
+>>> +			goto out;
+>>>  		new_coll = collection;
+>>>  	}
+>>>  
+>>> @@ -722,9 +731,8 @@ static int vgic_its_cmd_handle_mapi(struct kvm *kvm, struct vgic_its *its,
+>>>  	if (!itte) {
+>>>  		itte = kzalloc(sizeof(struct its_itte), GFP_KERNEL);
+>>>  		if (!itte) {
+>>> -			if (new_coll)
+>>> -				vgic_its_free_collection(its, coll_id);
+>>> -			return -ENOMEM;
+>>> +			err = -ENOMEM;
+>>> +			goto out;
+>>>  		}
+>>>  
+>>>  		itte->event_id	= event_id;
+>>> @@ -733,7 +741,8 @@ static int vgic_its_cmd_handle_mapi(struct kvm *kvm, struct vgic_its *its,
+>>>  
+>>>  	itte->collection = collection;
+>>>  	itte->lpi = lpi_nr;
+>>> -	itte->irq = vgic_add_lpi(kvm, lpi_nr);
+>>> +	vgic_get_irq_kref(irq);
+>>> +	itte->irq = irq;
+>>>  	update_affinity_itte(kvm, itte);
+>>>  
+>>>  	/*
+>>> @@ -742,8 +751,15 @@ static int vgic_its_cmd_handle_mapi(struct kvm *kvm, struct vgic_its *its,
+>>>  	 * the respective config data from memory here upon mapping the LPI.
+>>>  	 */
+>>>  	update_lpi_config(kvm, itte->irq, NULL);
+>>> +	new_coll = NULL;
+>>> +	irq = NULL;
+>>>  
+>>> -	return 0;
+>>> +out:
+>>> +	if (new_coll)
+>>> +		vgic_its_free_collection(its, coll_id);
+>>> +	if (irq)
+>>> +		vgic_put_irq(kvm, irq);
+>>
+>> Ah, it took me a moment to understand why you had the
+>> vgic_irq_get_kref() above. Maybe a small comment?
+>>
+> 
+> actually, now I'm confused.
+> 
+> vgic_add_lpi returns a struct vgic_irq with a reference count for the
+> reference in the itte struct, right?
 
-I am trying set up a custom i.MX28 board with an BCM43362 wifi chip
-connected over the SDIO interface to SSP2 using "mmc-pwrseq".
+It either returns a vgic_irq with a refcount set to 1 (freshly
+allocated), or a previously allocated one with the refcount already
+incremented.
 
-The MCU toggles the power to the wifi chip with GPIO 1,16 with is
-connected to an external 3.9V regulator which provides the power for
-the chip.
+> So we never get a reference for the irq->lpi_list/dist->lpi_list_head ?
 
-Furthermore, the CPU is directly connected to the wifi chip via GPIO
-1,17 to the WL_RST_N.
+I don't think so. being part of the lpi_list is a part of the LPI
+"existence".
 
-This is a snippet of the device tree, which shoud be okay so far:
+> In which case my code above is wrong and I should not be getting the
+> extra reference.  Right?
 
-/ {
-	regulators {
-		compatible = "simple-bus";
-		#address-cells = <1>;
-		#size-cells = <0>;
+Ah, I just noticed that you are nullifying "irq". Either you don't
+nullify it (and keep the kref_get), or remove both kref_get/kref_put,
+but that makes your error handling a bit mot complicated.
 
-		reg_wlan: regulator-wlan {
-			pinctrl-names = "default";
-			pinctrl-0 = <&pinctrl_reg_wlan>;
-			compatible = "regulator-fixed";
-			regulator-name = "regulator-wlan";
-			regulator-min-microvolt = <3300000>;
-			regulator-max-microvolt = <3300000>;
-			startup-delay-us = <70000>;
-			gpio = <&gpio1 16 GPIO_ACTIVE_HIGH>;
-			enable-active-high;
-		};
-	};
+> Now, this made me think of another issue.  vgic_add_lpi has a blurb in
+> there about racing with another vgic_add_lpi and then it returns an irq
+> with an additional reference.  But I don't understand how this can
+> happen, given that the function only has a single caller which has to
+> run with a mutex held???
 
-	ssp2_pwrseq: ssp2-pwrseq {
-		compatible = "mmc-pwrseq-simple";
-		reset-gpios = <&gpio1 17 GPIO_ACTIVE_LOW>;
-	};
-};
+The mutex is per-ITS, and you can have several ITSs mapping the same LPI
+(provided that they are generated by the same devid/evid).
 
-&ssp2 {
-	compatible = "fsl,imx28-mmc";
-	pinctrl-names = "default";
-	pinctrl-0 = <&ssp2_4bit_pins_a &ssp2_sck_cfg>;
-	bus-width = <4>;
-	vmmc-supply = <&reg_wlan>;
-	mmc-pwrseq = <&ssp2_pwrseq>;
-	non-removable;
-	status = "okay";
+> Can two different itte's point to the same struct vgic_irq ?
 
-	brcmf: bcrmf at 1 {
-		reg = <1>;
-		compatible = "brcm,bcm4329-fmac";
-	};
-};
+Definitely, if they are on different ITSs.
 
-However, when booting the device the following error message is shown
-and the wifi chip is not ready:
+Does it help?
 
-mxs-mmc 80014000.ssp: mxs_mmc_probe: failed to request dma
+Thanks,
 
-Note, that the wifi chip works if I do the GPIO handling in the
-bootloader.
-
-Any ideas what's missing here?
-
-Best regards
-J?rg Krause
+	M.
+-- 
+Jazz is not dead. It just smells funny...
