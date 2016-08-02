@@ -1,7 +1,7 @@
 From: baolex.ni@intel.com (Baole Ni)
-Date: Tue,  2 Aug 2016 18:42:56 +0800
-Subject: [PATCH 0130/1285] Replace numeric parameter like 0444 with macro
-Message-ID: <20160802104256.22416-1-baolex.ni@intel.com>
+Date: Tue,  2 Aug 2016 18:43:05 +0800
+Subject: [PATCH 0132/1285] Replace numeric parameter like 0444 with macro
+Message-ID: <20160802104305.22548-1-baolex.ni@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,21 +14,21 @@ thus, I suggest replacing the numeric parameter with the macro.
 Signed-off-by: Chuansheng Liu <chuansheng.liu@intel.com>
 Signed-off-by: Baole Ni <baolex.ni@intel.com>
 ---
- drivers/crypto/picoxcell_crypto.c | 2 +-
+ drivers/dma/at_hdmac.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/crypto/picoxcell_crypto.c b/drivers/crypto/picoxcell_crypto.c
-index 3b1c7ec..e535d10 100644
---- a/drivers/crypto/picoxcell_crypto.c
-+++ b/drivers/crypto/picoxcell_crypto.c
-@@ -1224,7 +1224,7 @@ static ssize_t spacc_stat_irq_thresh_store(struct device *dev,
+diff --git a/drivers/dma/at_hdmac.c b/drivers/dma/at_hdmac.c
+index 53d22eb..a8c2c2c 100644
+--- a/drivers/dma/at_hdmac.c
++++ b/drivers/dma/at_hdmac.c
+@@ -55,7 +55,7 @@
+  * be increased during dma usage.
+  */
+ static unsigned int init_nr_desc_per_channel = 64;
+-module_param(init_nr_desc_per_channel, uint, 0644);
++module_param(init_nr_desc_per_channel, uint, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+ MODULE_PARM_DESC(init_nr_desc_per_channel,
+ 		 "initial descriptors per channel (default: 64)");
  
- 	return len;
- }
--static DEVICE_ATTR(stat_irq_thresh, 0644, spacc_stat_irq_thresh_show,
-+static DEVICE_ATTR(stat_irq_thresh, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH, spacc_stat_irq_thresh_show,
- 		   spacc_stat_irq_thresh_store);
- 
- static struct spacc_alg ipsec_engine_algs[] = {
 -- 
 2.9.2
