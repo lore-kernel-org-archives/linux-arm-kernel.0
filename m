@@ -1,28 +1,14 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Tue, 2 Aug 2016 10:45:46 +0200
-Subject: [PATCH v3 0/2] Add support for Allwinner A64 mmc controller
-In-Reply-To: <20160801151351.51854-1-icenowy@aosc.xyz>
-References: <20160801151351.51854-1-icenowy@aosc.xyz>
-Message-ID: <ce72fd4e-33c0-7ec4-c142-f6e057c1645d@redhat.com>
+Date: Tue, 2 Aug 2016 10:45:57 +0200
+Subject: [PATCH v2 1/3] dt: bindings: add bindings for Allwinner A64 usb
+ phy
+In-Reply-To: <20160801163448.54921-1-icenowy@aosc.xyz>
+References: <20160801163448.54921-1-icenowy@aosc.xyz>
+Message-ID: <82b383c2-b4f8-f7ee-6781-41d9efff11af@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
-
-On 01-08-16 17:13, Icenowy Zheng wrote:
-> Allwinner A64 has a slightly modified version of the Allwinner MMC controller.
->
-> It do not have "output" or "sample" clock input, instead, it can calibrate the
-> delay internally.
->
-> This series of patch added the calibrate feature to the sunxi-mmc driver. It
-> is based on works by Andre Przywara <andre.przywara@arm.com>, and now it
-> depends on the patch set sent recently by Hans de Goede <hdegoede@redhat.com>,
-> which disabled "output" and "sample" clock on A10/13.
-> ( http://lists.infradead.org/pipermail/linux-arm-kernel/2016-July/446187.html )
->
-> As the clock and device tree patch for Allwinner A64 is not yet merged, the
-> patch set contains no patch to enable it.
 
 Series looks good to me and is:
 
@@ -31,3 +17,24 @@ Reviewed-by: Hans de Goede <hdegoede@redhat.com>
 Regards,
 
 Hans
+
+
+On 01-08-16 18:34, Icenowy Zheng wrote:
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+> ---
+>  Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt | 1 +
+>  1 file changed, 1 insertion(+)
+>
+> diff --git a/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt b/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
+> index 95736d7..287150d 100644
+> --- a/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
+> +++ b/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
+> @@ -10,6 +10,7 @@ Required properties:
+>    * allwinner,sun8i-a23-usb-phy
+>    * allwinner,sun8i-a33-usb-phy
+>    * allwinner,sun8i-h3-usb-phy
+> +  * allwinner,sun50i-a64-usb-phy
+>  - reg : a list of offset + length pairs
+>  - reg-names :
+>    * "phy_ctrl"
+>
