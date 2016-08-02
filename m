@@ -1,201 +1,76 @@
-From: eric.auger@redhat.com (Eric Auger)
-Date: Tue,  2 Aug 2016 17:30:08 +0000
-Subject: [PATCH v12 5/8] vfio: allow reserved msi iova registration
-In-Reply-To: <1470159012-7110-1-git-send-email-eric.auger@redhat.com>
-References: <1470159012-7110-1-git-send-email-eric.auger@redhat.com>
-Message-ID: <1470159012-7110-6-git-send-email-eric.auger@redhat.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Tue, 2 Aug 2016 19:42:54 +0200
+Subject: [PATCH 0001/1285] Replace numeric parameter like 0444 with macro
+In-Reply-To: <20160802103322.13810-1-baolex.ni@intel.com>
+References: <20160802103322.13810-1-baolex.ni@intel.com>
+Message-ID: <20160802174253.GA4628@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The user is allowed to register a reserved MSI IOVA range by using the
-DMA MAP API and setting the new flag: VFIO_DMA_MAP_FLAG_MSI_RESERVED_IOVA.
-This region is stored in the vfio_dma rb tree. At that point the iova
-range is not mapped to any target address yet. The host kernel will use
-those iova when needed, typically when MSIs are allocated.
+Hi!
 
-Signed-off-by: Eric Auger <eric.auger@redhat.com>
-Signed-off-by: Bharat Bhushan <Bharat.Bhushan@freescale.com>
+> I find that the developers often just specified the numeric value
+> when calling a macro which is defined with a parameter for access permission.
+> As we know, these numeric value for access permission have had the corresponding macro,
+> and that using macro can improve the robustness and readability of the code,
+> thus, I suggest replacing the numeric parameter with the macro.
 
----
-v9 -> v10
-- use VFIO_IOVA_RESERVED_MSI enum value
+> -core_param(no_bL_switcher, no_bL_switcher, bool, 0644);
+> +core_param(no_bL_switcher, no_bL_switcher, bool, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
 
-v7 -> v8:
-- use iommu_msi_set_aperture function. There is no notion of
-  unregistration anymore since the reserved msi slot remains
-  until the container gets closed.
+Everyone knows what 0644 is, but noone can read S_IRUSR | S_IWUSR |
+S_IRCRP | S_IROTH (*). Please don't do this.
 
-v6 -> v7:
-- use iommu_free_reserved_iova_domain
-- convey prot attributes downto dma-reserved-iommu iova domain creation
-- reserved bindings teardown now performed on iommu domain destruction
-- rename VFIO_DMA_MAP_FLAG_MSI_RESERVED_IOVA into
-         VFIO_DMA_MAP_FLAG_RESERVED_MSI_IOVA
-- change title
-- pass the protection attribute to dma-reserved-iommu API
+									Pavel
 
-v3 -> v4:
-- use iommu_alloc/free_reserved_iova_domain exported by dma-reserved-iommu
-- protect vfio_register_reserved_iova_range implementation with
-  CONFIG_IOMMU_DMA_RESERVED
-- handle unregistration by user-space and on vfio_iommu_type1 release
 
-v1 -> v2:
-- set returned value according to alloc_reserved_iova_domain result
-- free the iova domains in case any error occurs
 
-RFC v1 -> v1:
-- takes into account Alex comments, based on
-  [RFC PATCH 1/6] vfio: Add interface for add/del reserved iova region:
-- use the existing dma map/unmap ioctl interface with a flag to register
-  a reserved IOVA range. A single reserved iova region is allowed.
----
- drivers/vfio/vfio_iommu_type1.c | 77 ++++++++++++++++++++++++++++++++++++++++-
- include/uapi/linux/vfio.h       | 10 +++++-
- 2 files changed, 85 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/vfio/vfio_iommu_type1.c b/drivers/vfio/vfio_iommu_type1.c
-index 69c775e..14dc9ef 100644
---- a/drivers/vfio/vfio_iommu_type1.c
-+++ b/drivers/vfio/vfio_iommu_type1.c
-@@ -442,6 +442,20 @@ static void vfio_unmap_unpin(struct vfio_iommu *iommu, struct vfio_dma *dma)
- 	vfio_lock_acct(-unlocked);
- }
- 
-+static int vfio_set_msi_aperture(struct vfio_iommu *iommu,
-+				dma_addr_t iova, size_t size)
-+{
-+	struct vfio_domain *d;
-+	int ret = 0;
-+
-+	list_for_each_entry(d, &iommu->domain_list, next) {
-+		ret = iommu_msi_set_aperture(d->domain, iova, iova + size - 1);
-+		if (ret)
-+			break;
-+	}
-+	return ret;
-+}
-+
- static void vfio_remove_dma(struct vfio_iommu *iommu, struct vfio_dma *dma)
- {
- 	vfio_unmap_unpin(iommu, dma);
-@@ -691,6 +705,63 @@ static int vfio_dma_do_map(struct vfio_iommu *iommu,
- 	return ret;
- }
- 
-+static int vfio_register_msi_range(struct vfio_iommu *iommu,
-+				   struct vfio_iommu_type1_dma_map *map)
-+{
-+	dma_addr_t iova = map->iova;
-+	size_t size = map->size;
-+	int ret = 0;
-+	struct vfio_dma *dma;
-+	unsigned long order;
-+	uint64_t mask;
-+
-+	/* Verify that none of our __u64 fields overflow */
-+	if (map->size != size || map->iova != iova)
-+		return -EINVAL;
-+
-+	order =  __ffs(vfio_pgsize_bitmap(iommu));
-+	mask = ((uint64_t)1 << order) - 1;
-+
-+	WARN_ON(mask & PAGE_MASK);
-+
-+	if (!size || (size | iova) & mask)
-+		return -EINVAL;
-+
-+	/* Don't allow IOVA address wrap */
-+	if (iova + size - 1 < iova)
-+		return -EINVAL;
-+
-+	mutex_lock(&iommu->lock);
-+
-+	if (vfio_find_dma(iommu, iova, size, VFIO_IOVA_ANY)) {
-+		ret =  -EEXIST;
-+		goto unlock;
-+	}
-+
-+	dma = kzalloc(sizeof(*dma), GFP_KERNEL);
-+	if (!dma) {
-+		ret = -ENOMEM;
-+		goto unlock;
-+	}
-+
-+	dma->iova = iova;
-+	dma->size = size;
-+	dma->type = VFIO_IOVA_RESERVED_MSI;
-+
-+	ret = vfio_set_msi_aperture(iommu, iova, size);
-+	if (ret)
-+		goto free_unlock;
-+
-+	vfio_link_dma(iommu, dma);
-+	goto unlock;
-+
-+free_unlock:
-+	kfree(dma);
-+unlock:
-+	mutex_unlock(&iommu->lock);
-+	return ret;
-+}
-+
- static int vfio_bus_type(struct device *dev, void *data)
- {
- 	struct bus_type **bus = data;
-@@ -1065,7 +1136,8 @@ static long vfio_iommu_type1_ioctl(void *iommu_data,
- 	} else if (cmd == VFIO_IOMMU_MAP_DMA) {
- 		struct vfio_iommu_type1_dma_map map;
- 		uint32_t mask = VFIO_DMA_MAP_FLAG_READ |
--				VFIO_DMA_MAP_FLAG_WRITE;
-+				VFIO_DMA_MAP_FLAG_WRITE |
-+				VFIO_DMA_MAP_FLAG_RESERVED_MSI_IOVA;
- 
- 		minsz = offsetofend(struct vfio_iommu_type1_dma_map, size);
- 
-@@ -1075,6 +1147,9 @@ static long vfio_iommu_type1_ioctl(void *iommu_data,
- 		if (map.argsz < minsz || map.flags & ~mask)
- 			return -EINVAL;
- 
-+		if (map.flags & VFIO_DMA_MAP_FLAG_RESERVED_MSI_IOVA)
-+			return vfio_register_msi_range(iommu, &map);
-+
- 		return vfio_dma_do_map(iommu, &map);
- 
- 	} else if (cmd == VFIO_IOMMU_UNMAP_DMA) {
-diff --git a/include/uapi/linux/vfio.h b/include/uapi/linux/vfio.h
-index 255a211..4a9dbc2 100644
---- a/include/uapi/linux/vfio.h
-+++ b/include/uapi/linux/vfio.h
-@@ -498,12 +498,19 @@ struct vfio_iommu_type1_info {
-  *
-  * Map process virtual addresses to IO virtual addresses using the
-  * provided struct vfio_dma_map. Caller sets argsz. READ &/ WRITE required.
-+ *
-+ * In case RESERVED_MSI_IOVA flag is set, the API only aims@registering an
-+ * IOVA region that will be used on some platforms to map the host MSI frames.
-+ * In that specific case, vaddr is ignored. Once registered, an MSI reserved
-+ * IOVA region stays until the container is closed.
-  */
- struct vfio_iommu_type1_dma_map {
- 	__u32	argsz;
- 	__u32	flags;
- #define VFIO_DMA_MAP_FLAG_READ (1 << 0)		/* readable from device */
- #define VFIO_DMA_MAP_FLAG_WRITE (1 << 1)	/* writable from device */
-+/* reserved iova for MSI vectors*/
-+#define VFIO_DMA_MAP_FLAG_RESERVED_MSI_IOVA (1 << 2)
- 	__u64	vaddr;				/* Process virtual address */
- 	__u64	iova;				/* IO virtual address */
- 	__u64	size;				/* Size of mapping (bytes) */
-@@ -519,7 +526,8 @@ struct vfio_iommu_type1_dma_map {
-  * Caller sets argsz.  The actual unmapped size is returned in the size
-  * field.  No guarantee is made to the user that arbitrary unmaps of iova
-  * or size different from those used in the original mapping call will
-- * succeed.
-+ * succeed. Once registered, an MSI region cannot be unmapped and stays
-+ * until the container is closed.
-  */
- struct vfio_iommu_type1_dma_unmap {
- 	__u32	argsz;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+(*) I deliberately included an error there. Did you spot the error?
 -- 
-1.9.1
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
