@@ -1,7 +1,7 @@
 From: baolex.ni@intel.com (Baole Ni)
-Date: Tue,  2 Aug 2016 18:43:05 +0800
-Subject: [PATCH 0132/1285] Replace numeric parameter like 0444 with macro
-Message-ID: <20160802104305.22548-1-baolex.ni@intel.com>
+Date: Tue,  2 Aug 2016 18:43:10 +0800
+Subject: [PATCH 0133/1285] Replace numeric parameter like 0444 with macro
+Message-ID: <20160802104310.22614-1-baolex.ni@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,16 +14,16 @@ thus, I suggest replacing the numeric parameter with the macro.
 Signed-off-by: Chuansheng Liu <chuansheng.liu@intel.com>
 Signed-off-by: Baole Ni <baolex.ni@intel.com>
 ---
- drivers/dma/at_hdmac.c | 2 +-
+ drivers/dma/at_xdmac.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/dma/at_hdmac.c b/drivers/dma/at_hdmac.c
-index 53d22eb..a8c2c2c 100644
---- a/drivers/dma/at_hdmac.c
-+++ b/drivers/dma/at_hdmac.c
-@@ -55,7 +55,7 @@
-  * be increased during dma usage.
-  */
+diff --git a/drivers/dma/at_xdmac.c b/drivers/dma/at_xdmac.c
+index 75bd662..3c26e23 100644
+--- a/drivers/dma/at_xdmac.c
++++ b/drivers/dma/at_xdmac.c
+@@ -314,7 +314,7 @@ static inline u8 at_xdmac_get_dwidth(u32 cfg)
+ };
+ 
  static unsigned int init_nr_desc_per_channel = 64;
 -module_param(init_nr_desc_per_channel, uint, 0644);
 +module_param(init_nr_desc_per_channel, uint, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
