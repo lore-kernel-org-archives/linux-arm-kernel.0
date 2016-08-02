@@ -1,74 +1,55 @@
-From: vigneshr@ti.com (Vignesh R)
-Date: Tue, 2 Aug 2016 10:51:47 +0530
-Subject: [PATCH] ARM: dts: am57xx-idk-common: Enable support for QSPI
-Message-ID: <20160802052147.11085-1-vigneshr@ti.com>
+From: panand@redhat.com (Pratyush Anand)
+Date: Tue,  2 Aug 2016 11:00:04 +0530
+Subject: [PATCH 0/5] ARM64: Uprobe support added 
+Message-ID: <cover.1470114993.git.panand@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-AM572x IDK has a Spansion s25fl256s1 QSPI flash on the EVM connected to
-TI QSPI IP over CS0. Hence, add QSPI and flash slave DT nodes.
+ARM64 kprobe support is lying in torvalds/linux.git:master now. Therefore
+sending my uprobe patches which were dependent on decode-insn code of kprobe
+patches.
 
-Signed-off-by: Vignesh R <vigneshr@ti.com>
----
- arch/arm/boot/dts/am57xx-idk-common.dtsi | 49 ++++++++++++++++++++++++++++++++
- 1 file changed, 49 insertions(+)
+Unit tests for following have been done so far and they have been found
+working.
+     1. Step-able instructions, like sub, ldr, add etc.
+     2. Simulation-able like ret, cbnz, cbz etc.
+     3. uretprobe
+     4. Reject-able instructions like sev, wfe etc.
+     5. trapped and abort xol path
+     6. probe at unaligned user address.
+     7. longjump test cases
+ 
+Currently it does not support aarch32 instruction probing.
 
-diff --git a/arch/arm/boot/dts/am57xx-idk-common.dtsi b/arch/arm/boot/dts/am57xx-idk-common.dtsi
-index 0e63b9dff6e7..03cec62260e1 100644
---- a/arch/arm/boot/dts/am57xx-idk-common.dtsi
-+++ b/arch/arm/boot/dts/am57xx-idk-common.dtsi
-@@ -304,3 +304,52 @@
- 	ti,non-removable;
- 	max-frequency = <96000000>;
- };
-+
-+&qspi {
-+	status = "okay";
-+
-+	spi-max-frequency = <76800000>;
-+	m25p80 at 0 {
-+		compatible = "s25fl256s1", "jedec,spi-nor";
-+		spi-max-frequency = <76800000>;
-+		reg = <0>;
-+		spi-tx-bus-width = <1>;
-+		spi-rx-bus-width = <4>;
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+
-+		/* MTD partition table.
-+		 * The ROM checks the first four physical blocks
-+		 * for a valid file to boot and the flash here is
-+		 * 64KiB block size.
-+		 */
-+		partition at 0 {
-+			label = "QSPI.SPL";
-+			reg = <0x00000000 0x000040000>;
-+		};
-+		partition at 1 {
-+			label = "QSPI.u-boot";
-+			reg = <0x00040000 0x00100000>;
-+		};
-+		partition at 2 {
-+			label = "QSPI.u-boot-spl-os";
-+			reg = <0x00140000 0x00080000>;
-+		};
-+		partition at 3 {
-+			label = "QSPI.u-boot-env";
-+			reg = <0x001c0000 0x00010000>;
-+		};
-+		partition at 4 {
-+			label = "QSPI.u-boot-env.backup1";
-+			reg = <0x001d0000 0x0010000>;
-+		};
-+		partition at 5 {
-+			label = "QSPI.kernel";
-+			reg = <0x001e0000 0x0800000>;
-+		};
-+		partition at 6 {
-+			label = "QSPI.file-system";
-+			reg = <0x009e0000 0x01620000>;
-+		};
-+	};
-+};
+RFC patches were sent long back, and all review comments for RFCs have been
+incorporated. RFCs were here: https://lwn.net/Articles/648514/
+
+Pratyush Anand (5):
+  arm64: kprobe: protect/rename few definitions to be reused by uprobe
+  arm64: kgdb_step_brk_fn: ignore other's exception
+  arm64: Handle TRAP_HWBRKPT for user mode as well
+  arm64: Handle TRAP_BRKPT for user mode as well
+  arm64: Add uprobe support
+
+ arch/arm64/Kconfig                      |   3 +
+ arch/arm64/include/asm/debug-monitors.h |   3 +
+ arch/arm64/include/asm/probes.h         |  23 ++--
+ arch/arm64/include/asm/ptrace.h         |   8 ++
+ arch/arm64/include/asm/thread_info.h    |   5 +-
+ arch/arm64/include/asm/uprobes.h        |  37 ++++++
+ arch/arm64/kernel/debug-monitors.c      |  40 +++---
+ arch/arm64/kernel/entry.S               |   6 +-
+ arch/arm64/kernel/kgdb.c                |   3 +
+ arch/arm64/kernel/probes/Makefile       |   2 +
+ arch/arm64/kernel/probes/decode-insn.c  |  31 ++---
+ arch/arm64/kernel/probes/decode-insn.h  |   8 +-
+ arch/arm64/kernel/probes/kprobes.c      |  36 ++---
+ arch/arm64/kernel/probes/uprobes.c      | 227 ++++++++++++++++++++++++++++++++
+ arch/arm64/kernel/signal.c              |   4 +-
+ arch/arm64/mm/flush.c                   |   6 +
+ 16 files changed, 378 insertions(+), 64 deletions(-)
+ create mode 100644 arch/arm64/include/asm/uprobes.h
+ create mode 100644 arch/arm64/kernel/probes/uprobes.c
+
 -- 
-2.9.2
+2.5.5
