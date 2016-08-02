@@ -1,479 +1,242 @@
-From: panand@redhat.com (Pratyush Anand)
-Date: Tue,  2 Aug 2016 11:00:09 +0530
-Subject: [PATCH 5/5] arm64: Add uprobe support
-In-Reply-To: <cover.1470114993.git.panand@redhat.com>
-References: <cover.1470114993.git.panand@redhat.com>
-Message-ID: <abaac6ebaa5dd63889803ec568663bc8c8c65b02.1470114993.git.panand@redhat.com>
+From: maitysanchayan@gmail.com (maitysanchayan at gmail.com)
+Date: Tue, 2 Aug 2016 11:04:28 +0530
+Subject: [PATCH v4 3/5] nvmem: core: Add consumer API to get nvmem cell
+ from node
+In-Reply-To: <577FE19E.4000100@linaro.org>
+References: <cover.1467872014.git.maitysanchayan@gmail.com>
+ <0e6294d931bf181376a6f4e1a86df3f6c6a5d575.1467872014.git.maitysanchayan@gmail.com>
+ <577E1E79.4090809@linaro.org>
+ <20160707123350.GA18563@Sanchayan-Arch.localdomain>
+ <577E5634.7020805@linaro.org>
+ <20160707134811.GA2692@Sanchayan-Arch.localdomain>
+ <577FC9BA.2020402@linaro.org>
+ <951a63bf305d7df6486b652974cdb3c0@agner.ch>
+ <577FE19E.4000100@linaro.org>
+Message-ID: <20160802053428.GA1554@Sanchayan-Arch.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for uprobe on ARM64 architecture.
+On 16-07-08 18:23:42, Srinivas Kandagatla wrote:
+> 
+> 
+> On 08/07/16 17:42, Stefan Agner wrote:
+> > On 2016-07-08 08:41, Srinivas Kandagatla wrote:
+> > > On 07/07/16 14:48, maitysanchayan at gmail.com wrote:
+> > > > Hello Srinivas,
+> > > > 
+> > > > On 16-07-07 1
+> 
+> ...
+> 
+> > > > > > 
+> > > > > > Our requirement is to be able to pass the soc node pointer and then
+> > > > > > be able to get a nvmem cell by specifying it's name. So for our case
+> > > > > 
+> > > > > Why?
+> > > > 
+> > > > Sorry for not providing the background directly. The patches before this
+> > > > series used that approach. In the previous discussions it has been pointed
+> > > > out that it is not acceptable to have additional device tree bindings for
+> > > > providing data that the driver wants at the SoC node level or to have bindings
+> > > > just for the SoC bus driver alone since we aren't really describing the
+> > > > hardware.
+> > > > 
+> > > SOC driver seems to search for an arbitrary node by its name, which is
+> > > not a binding and can break anytime in cases If the scope of nvmem
+> > > provider is out of soc node or if the nvmem cells are not named as
+> > > expected. That looks very fragile.
+> > 
+> > In that case, that just "won't happen" because the soc driver is a very
+> > soc specific driver only used for this device tree. We it will always
+> > bind to that high level soc node.
+> > 
+> > > 
+> > > If the soc node is actual consumer of nvmem cells, I see no reason why
+> > > we should not use proper nvmem bindings?
+> > 
+> > There is a reason: We don't describe the hardware with it...
+> > 
+> > The cfg0/cfg1 register which Sanchayan needs to read in the soc bus
+> > driver are just two register with a unique ID of the SoC. In whatever
+> 
+> "Unique ID of the SOC" doesn't this mean that its a part of soc hw
+> description/configuration/setup?
+> 
+> Am still not clear why this setup any different to other use cases like mac
+> address/calibration data?
+> 
+> I still feel that this should be described in the DT.
+> 
+> Rob,
+>  What do you think?
 
-Unit test for following has been done so far and they have been found
-working
-    1. Step-able instructions, like sub, ldr, add etc.
-    2. Simulation-able like ret, cbnz, cbz etc.
-    3. uretprobe
-    4. Reject-able instructions like sev, wfe etc.
-    5. trapped and abort xol path
-    6. probe at unaligned user address.
-    7. longjump test cases
+Hello Rob,
 
-Currently it does not support aarch32 instruction probing.
+Can you please comment?
 
-Thanks to Shi Yang <yang.shi at linaro.org, for suggesting to define
-TIF_UPROBE as 5 in stead of 4, since 4 has already been used in -rt kernel.
+Regards,
+Sanchayan.
 
-Signed-off-by: Pratyush Anand <panand@redhat.com>
-Cc: Shi Yang <yang.shi@linaro.org>
----
- arch/arm64/Kconfig                      |   3 +
- arch/arm64/include/asm/debug-monitors.h |   3 +
- arch/arm64/include/asm/probes.h         |   4 +
- arch/arm64/include/asm/ptrace.h         |   8 ++
- arch/arm64/include/asm/thread_info.h    |   5 +-
- arch/arm64/include/asm/uprobes.h        |  37 ++++++
- arch/arm64/kernel/entry.S               |   6 +-
- arch/arm64/kernel/probes/Makefile       |   2 +
- arch/arm64/kernel/probes/uprobes.c      | 227 ++++++++++++++++++++++++++++++++
- arch/arm64/kernel/signal.c              |   4 +-
- arch/arm64/mm/flush.c                   |   6 +
- 11 files changed, 301 insertions(+), 4 deletions(-)
- create mode 100644 arch/arm64/include/asm/uprobes.h
- create mode 100644 arch/arm64/kernel/probes/uprobes.c
-
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 9f8b99e20557..77be79cb123b 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -232,6 +232,9 @@ config PGTABLE_LEVELS
- 	default 3 if ARM64_16K_PAGES && ARM64_VA_BITS_47
- 	default 4 if !ARM64_64K_PAGES && ARM64_VA_BITS_48
- 
-+config ARCH_SUPPORTS_UPROBES
-+	def_bool y
-+
- source "init/Kconfig"
- 
- source "kernel/Kconfig.freezer"
-diff --git a/arch/arm64/include/asm/debug-monitors.h b/arch/arm64/include/asm/debug-monitors.h
-index 4b6b3f72a215..d04248b749a8 100644
---- a/arch/arm64/include/asm/debug-monitors.h
-+++ b/arch/arm64/include/asm/debug-monitors.h
-@@ -70,6 +70,9 @@
- #define BRK64_ESR_MASK		0xFFFF
- #define BRK64_ESR_KPROBES	0x0004
- #define BRK64_OPCODE_KPROBES	(AARCH64_BREAK_MON | (BRK64_ESR_KPROBES << 5))
-+/* uprobes BRK opcodes with ESR encoding  */
-+#define BRK64_ESR_UPROBES	0x0008
-+#define BRK64_OPCODE_UPROBES	(AARCH64_BREAK_MON | (BRK64_ESR_UPROBES << 5))
- 
- /* AArch32 */
- #define DBG_ESR_EVT_BKPT	0x4
-diff --git a/arch/arm64/include/asm/probes.h b/arch/arm64/include/asm/probes.h
-index e175a825b187..3d8fbca3f556 100644
---- a/arch/arm64/include/asm/probes.h
-+++ b/arch/arm64/include/asm/probes.h
-@@ -35,4 +35,8 @@ struct arch_specific_insn {
- };
- #endif
- 
-+#ifdef CONFIG_UPROBES
-+typedef u32 uprobe_opcode_t;
-+#endif
-+
- #endif
-diff --git a/arch/arm64/include/asm/ptrace.h b/arch/arm64/include/asm/ptrace.h
-index ada08b5b036d..513daf050e84 100644
---- a/arch/arm64/include/asm/ptrace.h
-+++ b/arch/arm64/include/asm/ptrace.h
-@@ -217,6 +217,14 @@ int valid_user_regs(struct user_pt_regs *regs, struct task_struct *task);
- 
- #include <asm-generic/ptrace.h>
- 
-+#define procedure_link_pointer(regs)	((regs)->regs[30])
-+
-+static inline void procedure_link_pointer_set(struct pt_regs *regs,
-+					   unsigned long val)
-+{
-+	procedure_link_pointer(regs) = val;
-+}
-+
- #undef profile_pc
- extern unsigned long profile_pc(struct pt_regs *regs);
- 
-diff --git a/arch/arm64/include/asm/thread_info.h b/arch/arm64/include/asm/thread_info.h
-index abd64bd1f6d9..d5ebf2ee5024 100644
---- a/arch/arm64/include/asm/thread_info.h
-+++ b/arch/arm64/include/asm/thread_info.h
-@@ -109,6 +109,7 @@ static inline struct thread_info *current_thread_info(void)
- #define TIF_NEED_RESCHED	1
- #define TIF_NOTIFY_RESUME	2	/* callback before returning to user */
- #define TIF_FOREIGN_FPSTATE	3	/* CPU's FP state is not current's */
-+#define TIF_UPROBE		5	/* uprobe breakpoint or singlestep */
- #define TIF_NOHZ		7
- #define TIF_SYSCALL_TRACE	8
- #define TIF_SYSCALL_AUDIT	9
-@@ -129,10 +130,12 @@ static inline struct thread_info *current_thread_info(void)
- #define _TIF_SYSCALL_AUDIT	(1 << TIF_SYSCALL_AUDIT)
- #define _TIF_SYSCALL_TRACEPOINT	(1 << TIF_SYSCALL_TRACEPOINT)
- #define _TIF_SECCOMP		(1 << TIF_SECCOMP)
-+#define _TIF_UPROBE		(1 << TIF_UPROBE)
- #define _TIF_32BIT		(1 << TIF_32BIT)
- 
- #define _TIF_WORK_MASK		(_TIF_NEED_RESCHED | _TIF_SIGPENDING | \
--				 _TIF_NOTIFY_RESUME | _TIF_FOREIGN_FPSTATE)
-+				 _TIF_NOTIFY_RESUME | _TIF_FOREIGN_FPSTATE | \
-+				 _TIF_UPROBE)
- 
- #define _TIF_SYSCALL_WORK	(_TIF_SYSCALL_TRACE | _TIF_SYSCALL_AUDIT | \
- 				 _TIF_SYSCALL_TRACEPOINT | _TIF_SECCOMP | \
-diff --git a/arch/arm64/include/asm/uprobes.h b/arch/arm64/include/asm/uprobes.h
-new file mode 100644
-index 000000000000..434a3afebcd1
---- /dev/null
-+++ b/arch/arm64/include/asm/uprobes.h
-@@ -0,0 +1,37 @@
-+/*
-+ * Copyright (C) 2014-2015 Pratyush Anand <panand@redhat.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#ifndef _ASM_UPROBES_H
-+#define _ASM_UPROBES_H
-+
-+#include <asm/debug-monitors.h>
-+#include <asm/insn.h>
-+#include <asm/probes.h>
-+
-+#define MAX_UINSN_BYTES		AARCH64_INSN_SIZE
-+
-+#define UPROBE_SWBP_INSN	BRK64_OPCODE_UPROBES
-+#define UPROBE_SWBP_INSN_SIZE	4
-+#define UPROBE_XOL_SLOT_BYTES	MAX_UINSN_BYTES
-+
-+struct arch_uprobe_task {
-+	unsigned long saved_fault_code;
-+};
-+
-+struct arch_uprobe {
-+	union {
-+		u8 insn[MAX_UINSN_BYTES];
-+		u8 ixol[MAX_UINSN_BYTES];
-+	};
-+	struct arch_probe_insn api;
-+	bool simulate;
-+};
-+
-+extern void flush_uprobe_xol_access(struct page *page, unsigned long uaddr,
-+		void *kaddr, unsigned long len);
-+#endif
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index 96e4a2b64cc1..801b9064b89a 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -688,7 +688,8 @@ ret_fast_syscall:
- 	ldr	x1, [tsk, #TI_FLAGS]		// re-check for syscall tracing
- 	and	x2, x1, #_TIF_SYSCALL_WORK
- 	cbnz	x2, ret_fast_syscall_trace
--	and	x2, x1, #_TIF_WORK_MASK
-+	mov     x2, #_TIF_WORK_MASK
-+	and     x2, x1, x2
- 	cbnz	x2, work_pending
- 	enable_step_tsk x1, x2
- 	kernel_exit 0
-@@ -718,7 +719,8 @@ work_resched:
- ret_to_user:
- 	disable_irq				// disable interrupts
- 	ldr	x1, [tsk, #TI_FLAGS]
--	and	x2, x1, #_TIF_WORK_MASK
-+	mov     x2, #_TIF_WORK_MASK
-+	and     x2, x1, x2
- 	cbnz	x2, work_pending
- 	enable_step_tsk x1, x2
- 	kernel_exit 0
-diff --git a/arch/arm64/kernel/probes/Makefile b/arch/arm64/kernel/probes/Makefile
-index ce06312e3d34..89b6df613dde 100644
---- a/arch/arm64/kernel/probes/Makefile
-+++ b/arch/arm64/kernel/probes/Makefile
-@@ -1,3 +1,5 @@
- obj-$(CONFIG_KPROBES)		+= kprobes.o decode-insn.o	\
- 				   kprobes_trampoline.o		\
- 				   simulate-insn.o
-+obj-$(CONFIG_UPROBES)		+= uprobes.o decode-insn.o	\
-+				   simulate-insn.o
-diff --git a/arch/arm64/kernel/probes/uprobes.c b/arch/arm64/kernel/probes/uprobes.c
-new file mode 100644
-index 000000000000..4d9d21f6e22e
---- /dev/null
-+++ b/arch/arm64/kernel/probes/uprobes.c
-@@ -0,0 +1,227 @@
-+/*
-+ * Copyright (C) 2014-2015 Pratyush Anand <panand@redhat.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+#include <linux/highmem.h>
-+#include <linux/ptrace.h>
-+#include <linux/uprobes.h>
-+
-+#include "decode-insn.h"
-+
-+#define UPROBE_INV_FAULT_CODE	UINT_MAX
-+
-+void arch_uprobe_copy_ixol(struct page *page, unsigned long vaddr,
-+		void *src, unsigned long len)
-+{
-+	void *xol_page_kaddr = kmap_atomic(page);
-+	void *dst = xol_page_kaddr + (vaddr & ~PAGE_MASK);
-+
-+	preempt_disable();
-+
-+	/* Initialize the slot */
-+	memcpy(dst, src, len);
-+
-+	/* flush caches (dcache/icache) */
-+	flush_uprobe_xol_access(page, vaddr, dst, len);
-+
-+	preempt_enable();
-+
-+	kunmap_atomic(xol_page_kaddr);
-+}
-+
-+unsigned long uprobe_get_swbp_addr(struct pt_regs *regs)
-+{
-+	return instruction_pointer(regs);
-+}
-+
-+int arch_uprobe_analyze_insn(struct arch_uprobe *auprobe, struct mm_struct *mm,
-+		unsigned long addr)
-+{
-+	probe_opcode_t insn;
-+
-+	/* TODO: Currently we do not support AARCH32 instruction probing */
-+
-+	if (!IS_ALIGNED(addr, AARCH64_INSN_SIZE))
-+		return -EINVAL;
-+
-+	insn = *(probe_opcode_t *)(&auprobe->insn[0]);
-+
-+	switch (arm_probe_decode_insn(insn, &auprobe->api)) {
-+	case INSN_REJECTED:
-+		return -EINVAL;
-+
-+	case INSN_GOOD_NO_SLOT:
-+		auprobe->simulate = true;
-+		break;
-+
-+	case INSN_GOOD:
-+	default:
-+		break;
-+	}
-+
-+	return 0;
-+}
-+
-+int arch_uprobe_pre_xol(struct arch_uprobe *auprobe, struct pt_regs *regs)
-+{
-+	struct uprobe_task *utask = current->utask;
-+
-+	/* saved fault code is restored in post_xol */
-+	utask->autask.saved_fault_code = current->thread.fault_code;
-+
-+	/* An invalid fault code between pre/post xol event */
-+	current->thread.fault_code = UPROBE_INV_FAULT_CODE;
-+
-+	/* Instruction point to execute ol */
-+	instruction_pointer_set(regs, utask->xol_vaddr);
-+
-+	user_enable_single_step(current);
-+
-+	return 0;
-+}
-+
-+int arch_uprobe_post_xol(struct arch_uprobe *auprobe, struct pt_regs *regs)
-+{
-+	struct uprobe_task *utask = current->utask;
-+
-+	WARN_ON_ONCE(current->thread.fault_code != UPROBE_INV_FAULT_CODE);
-+
-+	/* restore fault code */
-+	current->thread.fault_code = utask->autask.saved_fault_code;
-+
-+	/* Instruction point to execute next to breakpoint address */
-+	instruction_pointer_set(regs, utask->vaddr + 4);
-+
-+	user_disable_single_step(current);
-+
-+	return 0;
-+}
-+bool arch_uprobe_xol_was_trapped(struct task_struct *t)
-+{
-+	/*
-+	 * Between arch_uprobe_pre_xol and arch_uprobe_post_xol, if an xol
-+	 * insn itself is trapped, then detect the case with the help of
-+	 * invalid fault code which is being set in arch_uprobe_pre_xol and
-+	 * restored in arch_uprobe_post_xol.
-+	 */
-+	if (t->thread.fault_code != UPROBE_INV_FAULT_CODE)
-+		return true;
-+
-+	return false;
-+}
-+
-+bool arch_uprobe_skip_sstep(struct arch_uprobe *auprobe, struct pt_regs *regs)
-+{
-+	probe_opcode_t insn;
-+	unsigned long addr;
-+
-+	if (!auprobe->simulate)
-+		return false;
-+
-+	insn = *(probe_opcode_t *)(&auprobe->insn[0]);
-+	addr = instruction_pointer(regs);
-+
-+	if (auprobe->api.handler)
-+		auprobe->api.handler(insn, addr, regs);
-+
-+	return true;
-+}
-+
-+void arch_uprobe_abort_xol(struct arch_uprobe *auprobe, struct pt_regs *regs)
-+{
-+	struct uprobe_task *utask = current->utask;
-+
-+	current->thread.fault_code = utask->autask.saved_fault_code;
-+	/*
-+	 * Task has received a fatal signal, so reset back to probbed
-+	 * address.
-+	 */
-+	instruction_pointer_set(regs, utask->vaddr);
-+
-+	user_disable_single_step(current);
-+}
-+
-+bool arch_uretprobe_is_alive(struct return_instance *ret, enum rp_check ctx,
-+		struct pt_regs *regs)
-+{
-+	/*
-+	 * If a simple branch instruction (B) was called for retprobed
-+	 * assembly label then return true even when regs->sp and ret->stack
-+	 * are same. It will insure that cleanup and reporting of return
-+	 * instances corresponding to callee label is done when
-+	 * handle_trampoline for called function is executed.
-+	 */
-+	if (ctx == RP_CHECK_CHAIN_CALL)
-+		return regs->sp <= ret->stack;
-+	else
-+		return regs->sp < ret->stack;
-+}
-+
-+unsigned long
-+arch_uretprobe_hijack_return_addr(unsigned long trampoline_vaddr,
-+				  struct pt_regs *regs)
-+{
-+	unsigned long orig_ret_vaddr;
-+
-+	orig_ret_vaddr = procedure_link_pointer(regs);
-+	/* Replace the return addr with trampoline addr */
-+	procedure_link_pointer_set(regs, trampoline_vaddr);
-+
-+	return orig_ret_vaddr;
-+}
-+
-+int arch_uprobe_exception_notify(struct notifier_block *self,
-+				 unsigned long val, void *data)
-+{
-+	return NOTIFY_DONE;
-+}
-+
-+static int __kprobes uprobe_breakpoint_handler(struct pt_regs *regs,
-+		unsigned int esr)
-+{
-+	if (user_mode(regs) && uprobe_pre_sstep_notifier(regs))
-+		return DBG_HOOK_HANDLED;
-+
-+	return DBG_HOOK_ERROR;
-+}
-+
-+static int __kprobes uprobe_single_step_handler(struct pt_regs *regs,
-+		unsigned int esr)
-+{
-+	struct uprobe_task *utask = current->utask;
-+
-+	if (user_mode(regs)) {
-+		WARN_ON(utask &&
-+			(instruction_pointer(regs) != utask->xol_vaddr + 4));
-+
-+		if (uprobe_post_sstep_notifier(regs))
-+			return DBG_HOOK_HANDLED;
-+	}
-+
-+	return DBG_HOOK_ERROR;
-+}
-+
-+/* uprobe breakpoint handler hook */
-+static struct break_hook uprobes_break_hook = {
-+	.esr_mask = BRK64_ESR_MASK,
-+	.esr_val = BRK64_ESR_UPROBES,
-+	.fn = uprobe_breakpoint_handler,
-+};
-+
-+/* uprobe single step handler hook */
-+static struct step_hook uprobes_step_hook = {
-+	.fn = uprobe_single_step_handler,
-+};
-+
-+static int __init arch_init_uprobes(void)
-+{
-+	register_break_hook(&uprobes_break_hook);
-+	register_step_hook(&uprobes_step_hook);
-+
-+	return 0;
-+}
-+
-+device_initcall(arch_init_uprobes);
-diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
-index a8eafdbc7cb8..0ff1208929c0 100644
---- a/arch/arm64/kernel/signal.c
-+++ b/arch/arm64/kernel/signal.c
-@@ -402,6 +402,9 @@ static void do_signal(struct pt_regs *regs)
- asmlinkage void do_notify_resume(struct pt_regs *regs,
- 				 unsigned int thread_flags)
- {
-+	if (thread_flags & _TIF_UPROBE)
-+		uprobe_notify_resume(regs);
-+
- 	if (thread_flags & _TIF_SIGPENDING)
- 		do_signal(regs);
- 
-@@ -412,5 +415,4 @@ asmlinkage void do_notify_resume(struct pt_regs *regs,
- 
- 	if (thread_flags & _TIF_FOREIGN_FPSTATE)
- 		fpsimd_restore_current_state();
--
- }
-diff --git a/arch/arm64/mm/flush.c b/arch/arm64/mm/flush.c
-index 43a76b07eb32..179587614756 100644
---- a/arch/arm64/mm/flush.c
-+++ b/arch/arm64/mm/flush.c
-@@ -54,6 +54,12 @@ static void flush_ptrace_access(struct vm_area_struct *vma, struct page *page,
- 		sync_icache_aliases(kaddr, len);
- }
- 
-+void flush_uprobe_xol_access(struct page *page, unsigned long uaddr,
-+		void *kaddr, unsigned long len)
-+{
-+	sync_icache_aliases(kaddr, len);
-+}
-+
- /*
-  * Copy user data from/to a page which is mapped into a different processes
-  * address space.  Really, we want to allow our "user space" model to handle
--- 
-2.5.5
+> 
+> 
+> > driver throughout the system we use that ID (e.g. in a random generator
+> > for initialization) we never describe an actual hardware relation... Its
+> > just software and how we use that unique ID. The device tree is ment to
+> > describe hardware. Hence the NVMEM consumer binding is not suited for
+> > such NVMEM cells...
+> > 
+> > By describing the NVMEM cells location in device tree (producer API, the
+> > NVMEM cells are in hardware at that location, so using the device tree
+> > for that part is fine) and hard coding the NVMEM cell we need in the
+> > driver code we don't violate the device tree matra "describe the
+> > hardware"...
+> 
+> IMHO, We should indeed describe the SOC hardware and its relationship w.r.t
+> to nvmem provider in device tree. Reasoning being these both are some form
+> of IP blocks/hw which depend on each other.
+> 
+> > 
+> > Looking-up the nodes direcly is what Rob suggested here:
+> > https://lkml.org/lkml/2016/5/23/573
+> 
+> I did read this, I was not convinced that we should do a direct lookup for
+> nvmem cells.
+> 
+> thanks,
+> srini
+> > 
+> > > 
+> > > Given the fact that the patch is potentially bypassing the nvmem
+> > > bindings, am not happy to take it!
+> > 
+> > If you can provide a solution acceptable by the device tree folks and
+> > works without this patch, I am happy to do it...
+> 
+> 
+> > 
+> > Btw, I am not entirely happy with the API name, but did not had a better
+> > idea... And we we should probably add a note that the device tree
+> > consumer binding is the preferred way to do it.
+> > 
+> > --
+> > Stefan
+> > 
+> > 
+> > > 
+> > > thanks,
+> > > srini
+> > > 
+> > > > For the discussion,
+> > > > https://lkml.org/lkml/2016/5/23/573
+> > > > https://lkml.org/lkml/2016/5/2/71
+> > > > 
+> > > > Regards,
+> > > > Sanchayan.
+> > > > 
+> > > > 
+> > > > > 
+> > > > > > ocotp node has cfg0 and cfg1 which we want but we cannot use existing
+> > > > > > nvmem consumer API since that requires having the nvmem consumer properties
+> > > > > > in the node we are binding to viz. is a direct nvmem consumer.
+> > > > > > 
+> > > > > > Regards,
+> > > > > > Sanchayan.
+> > > > > > 
+> > > > > > > 
+> > > > > > > thanks,
+> > > > > > > srini
+> > > > > > > > 
+> > > > > > > > Parent node can also be the of_node of the main SoC device
+> > > > > > > > node.
+> > > > > > > > 
+> > > > > > > > Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
+> > > > > > > > ---
+> > > > > > > >      drivers/nvmem/core.c           | 44 +++++++++++++++++++++++++++++-------------
+> > > > > > > >      include/linux/nvmem-consumer.h |  1 +
+> > > > > > > >      2 files changed, 32 insertions(+), 13 deletions(-)
+> > > > > > > > 
+> > > > > > > > diff --git a/drivers/nvmem/core.c b/drivers/nvmem/core.c
+> > > > > > > > index 965911d..470abee 100644
+> > > > > > > > --- a/drivers/nvmem/core.c
+> > > > > > > > +++ b/drivers/nvmem/core.c
+> > > > > > > > @@ -743,29 +743,21 @@ static struct nvmem_cell *nvmem_cell_get_from_list(const char *cell_id)
+> > > > > > > > 
+> > > > > > > >      #if IS_ENABLED(CONFIG_NVMEM) && IS_ENABLED(CONFIG_OF)
+> > > > > > > >      /**
+> > > > > > > > - * of_nvmem_cell_get() - Get a nvmem cell from given device node and cell id
+> > > > > > > > + * of_nvmem_cell_get_direct() - Get a nvmem cell from given device node
+> > > > > > > >       *
+> > > > > > > > - * @dev node: Device tree node that uses the nvmem cell
+> > > > > > > > - * @id: nvmem cell name from nvmem-cell-names property.
+> > > > > > > > + * @dev node: Device tree node that uses nvmem cell
+> > > > > > > >       *
+> > > > > > > >       * Return: Will be an ERR_PTR() on error or a valid pointer
+> > > > > > > >       * to a struct nvmem_cell.  The nvmem_cell will be freed by the
+> > > > > > > >       * nvmem_cell_put().
+> > > > > > > >       */
+> > > > > > > > -struct nvmem_cell *of_nvmem_cell_get(struct device_node *np,
+> > > > > > > > -					    const char *name)
+> > > > > > > > +struct nvmem_cell *of_nvmem_cell_get_direct(struct device_node *cell_np)
+> > > > > > > >      {
+> > > > > > > > -	struct device_node *cell_np, *nvmem_np;
+> > > > > > > > +	struct device_node *nvmem_np;
+> > > > > > > >      	struct nvmem_cell *cell;
+> > > > > > > >      	struct nvmem_device *nvmem;
+> > > > > > > >      	const __be32 *addr;
+> > > > > > > > -	int rval, len, index;
+> > > > > > > > -
+> > > > > > > > -	index = of_property_match_string(np, "nvmem-cell-names", name);
+> > > > > > > > -
+> > > > > > > > -	cell_np = of_parse_phandle(np, "nvmem-cells", index);
+> > > > > > > > -	if (!cell_np)
+> > > > > > > > -		return ERR_PTR(-EINVAL);
+> > > > > > > > +	int rval, len;
+> > > > > > > > 
+> > > > > > > >      	nvmem_np = of_get_next_parent(cell_np);
+> > > > > > > >      	if (!nvmem_np)
+> > > > > > > > @@ -824,6 +816,32 @@ err_mem:
+> > > > > > > > 
+> > > > > > > >      	return ERR_PTR(rval);
+> > > > > > > >      }
+> > > > > > > > +EXPORT_SYMBOL_GPL(of_nvmem_cell_get_direct);
+> > > > > > > > +
+> > > > > > > > +/**
+> > > > > > > > + * of_nvmem_cell_get() - Get a nvmem cell from given device node and cell id
+> > > > > > > > + *
+> > > > > > > > + * @dev node: Device tree node that uses the nvmem cell
+> > > > > > > > + * @id: nvmem cell name from nvmem-cell-names property.
+> > > > > > > > + *
+> > > > > > > > + * Return: Will be an ERR_PTR() on error or a valid pointer
+> > > > > > > > + * to a struct nvmem_cell.  The nvmem_cell will be freed by the
+> > > > > > > > + * nvmem_cell_put().
+> > > > > > > > + */
+> > > > > > > > +struct nvmem_cell *of_nvmem_cell_get(struct device_node *np,
+> > > > > > > > +					    const char *name)
+> > > > > > > > +{
+> > > > > > > > +	struct device_node *cell_np;
+> > > > > > > > +	int index;
+> > > > > > > > +
+> > > > > > > > +	index = of_property_match_string(np, "nvmem-cell-names", name);
+> > > > > > > > +
+> > > > > > > > +	cell_np = of_parse_phandle(np, "nvmem-cells", index);
+> > > > > > > > +	if (!cell_np)
+> > > > > > > > +		return ERR_PTR(-EINVAL);
+> > > > > > > > +
+> > > > > > > > +	return of_nvmem_cell_get_direct(cell_np);
+> > > > > > > > +}
+> > > > > > > >      EXPORT_SYMBOL_GPL(of_nvmem_cell_get);
+> > > > > > > >      #endif
+> > > > > > > > 
+> > > > > > > > diff --git a/include/linux/nvmem-consumer.h b/include/linux/nvmem-consumer.h
+> > > > > > > > index 9bb77d3..bf879fc 100644
+> > > > > > > > --- a/include/linux/nvmem-consumer.h
+> > > > > > > > +++ b/include/linux/nvmem-consumer.h
+> > > > > > > > @@ -136,6 +136,7 @@ static inline int nvmem_device_write(struct nvmem_device *nvmem,
+> > > > > > > >      #endif /* CONFIG_NVMEM */
+> > > > > > > > 
+> > > > > > > >      #if IS_ENABLED(CONFIG_NVMEM) && IS_ENABLED(CONFIG_OF)
+> > > > > > > > +struct nvmem_cell *of_nvmem_cell_get_direct(struct device_node *cell_np);
+> > > > > > > >      struct nvmem_cell *of_nvmem_cell_get(struct device_node *np,
+> > > > > > > >      				     const char *name);
+> > > > > > > >      struct nvmem_device *of_nvmem_device_get(struct device_node *np,
+> > > > > > > > 
