@@ -1,55 +1,117 @@
-From: sw0312.kim@samsung.com (Seung-Woo Kim)
-Date: Tue, 02 Aug 2016 19:16:46 +0900
-Subject: [PATCH] pwm: samsung: fix to use lowest div for large enough
- modulation bits
-Message-ID: <1470133006-4272-1-git-send-email-sw0312.kim@samsung.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 2 Aug 2016 11:18:03 +0100
+Subject: [PATCH 41/55] KVM: arm64: vgic-its: Implement MSI injection in
+ ITS emulation
+In-Reply-To: <20160801182006.GB32244@cbox>
+References: <1469208552-4155-1-git-send-email-marc.zyngier@arm.com>
+ <1469208552-4155-42-git-send-email-marc.zyngier@arm.com>
+ <20160801182006.GB32244@cbox>
+Message-ID: <57A0735B.7060403@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->From pwm_samsung_calc_tin(), there is routine to find the lowest
-divider possible to generate lower frequency than requested one.
-But it is always possible to generate requested frequency with
-large enough modulation bits, so this patch fixes to use lowest
-div for the case. This patch removes following UBSAN warning:
+On 01/08/16 19:20, Christoffer Dall wrote:
+> On Fri, Jul 22, 2016 at 06:28:58PM +0100, Marc Zyngier wrote:
+>> From: Andre Przywara <andre.przywara@arm.com>
+>>
+>> When userland wants to inject an MSI into the guest, it uses the
+>> KVM_SIGNAL_MSI ioctl, which carries the doorbell address along with
+>> the payload and the device ID.
+>> With the help of the KVM IO bus framework we learn the corresponding
+>> ITS from the doorbell address. We then use our wrapper functions to
+>> iterate the linked lists and find the proper Interrupt Translation Table
+>> Entry (ITTE) and thus the corresponding struct vgic_irq to finally set
+>> the pending bit.
+>> We also provide the handler for the ITS "INT" command, which allows a
+>> guest to trigger an MSI via the ITS command queue. Since this one knows
+>> about the right ITS already, we directly call the MMIO handler function
+>> without using the kvm_io_bus framework.
+>>
+>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+>> Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+>> Tested-by: Eric Auger <eric.auger@redhat.com>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  virt/kvm/arm/vgic/vgic-its.c | 77 ++++++++++++++++++++++++++++++++++++++++++++
+>>  virt/kvm/arm/vgic/vgic.h     |  6 ++++
+>>  2 files changed, 83 insertions(+)
+>>
+>> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+>> index 1408c88..d8e8f14 100644
+>> --- a/virt/kvm/arm/vgic/vgic-its.c
+>> +++ b/virt/kvm/arm/vgic/vgic-its.c
+>> @@ -437,6 +437,65 @@ static unsigned long vgic_mmio_read_its_idregs(struct kvm *kvm,
+>>  	return 0;
+>>  }
+>>  
+>> +/*
+>> + * Find the target VCPU and the LPI number for a given devid/eventid pair
+>> + * and make this IRQ pending, possibly injecting it.
+>> + * Must be called with the its_lock mutex held.
+>> + */
+>> +static void vgic_its_trigger_msi(struct kvm *kvm, struct vgic_its *its,
+>> +				 u32 devid, u32 eventid)
+>> +{
+>> +	struct its_itte *itte;
+>> +
+>> +	if (!its->enabled)
+>> +		return;
+>> +
+>> +	itte = find_itte(its, devid, eventid);
+>> +	/* Triggering an unmapped IRQ gets silently dropped. */
+>> +	if (itte && its_is_collection_mapped(itte->collection)) {
+>> +		struct kvm_vcpu *vcpu;
+>> +
+>> +		vcpu = kvm_get_vcpu(kvm, itte->collection->target_addr);
+>> +		if (vcpu && vcpu->arch.vgic_cpu.lpis_enabled) {
+>> +			spin_lock(&itte->irq->irq_lock);
+>> +			itte->irq->pending = true;
+>> +			vgic_queue_irq_unlock(kvm, itte->irq);
+>> +		}
+>> +	}
+>> +}
+>> +
+>> +/*
+>> + * Queries the KVM IO bus framework to get the ITS pointer from the given
+>> + * doorbell address.
+>> + * We then call vgic_its_trigger_msi() with the decoded data.
+>> + */
+>> +int vgic_its_inject_msi(struct kvm *kvm, struct kvm_msi *msi)
+>> +{
+>> +	u64 address;
+>> +	struct kvm_io_device *kvm_io_dev;
+>> +	struct vgic_io_device *iodev;
+>> +
+>> +	if (!vgic_has_its(kvm))
+>> +		return -ENODEV;
+>> +
+>> +	if (!(msi->flags & KVM_MSI_VALID_DEVID))
+>> +		return -EINVAL;
+>> +
+>> +	address = (u64)msi->address_hi << 32 | msi->address_lo;
+>> +
+>> +	kvm_io_dev = kvm_io_bus_get_dev(kvm, KVM_MMIO_BUS, address);
+>> +	if (!kvm_io_dev)
+>> +		return -ENODEV;
+>> +
+>> +	iodev = container_of(kvm_io_dev, struct vgic_io_device, dev);
+>> +
+>> +	mutex_lock(&iodev->its->its_lock);
+>> +	vgic_its_trigger_msi(kvm, iodev->its, msi->devid, msi->data);
+>> +	mutex_unlock(&iodev->its->its_lock);
+>> +
+>> +	return 0;
+> 
+> According to KVM_SIGNAL_MSI this means that the guest blocked the MSI.
+> Is this the intention, or is the return value translated somewhere
+> higher in the call stack?
 
-   UBSAN: Undefined behaviour in drivers/pwm/pwm-samsung.c:197:13
-   shift exponent 32 is too large for 32-bit type 'long unsigned int'
-   [...]
-   [<c0670248>] (ubsan_epilogue) from [<c06707b4>] (__ubsan_handle_shift_out_of_bounds+0xd8/0x120)
-   [<c06707b4>] (__ubsan_handle_shift_out_of_bounds) from [<c0694b28>] (pwm_samsung_config+0x508/0x6a4)
-   [<c0694b28>] (pwm_samsung_config) from [<c069286c>] (pwm_apply_state+0x174/0x40c)
-   [<c069286c>] (pwm_apply_state) from [<c0b2e070>] (pwm_fan_probe+0xc8/0x488)
-   [<c0b2e070>] (pwm_fan_probe) from [<c07ba8b0>] (platform_drv_probe+0x70/0x150)
-   [...]
+I'm afraid it is not, and this is definitely a bug. Andre, can you
+please address this one urgently, as this has a direct impact on the
+userspace API?
 
-Signed-off-by: Seung-Woo Kim <sw0312.kim@samsung.com>
----
-The UBSAN warning from ARM is reported with the patch in following link:
-https://patchwork.kernel.org/patch/9189575/
----
- drivers/pwm/pwm-samsung.c |   10 +++++++---
- 1 file changed, 7 insertions(+), 3 deletions(-)
+Thanks,
 
-diff --git a/drivers/pwm/pwm-samsung.c b/drivers/pwm/pwm-samsung.c
-index ada2d32..ff0def6 100644
---- a/drivers/pwm/pwm-samsung.c
-+++ b/drivers/pwm/pwm-samsung.c
-@@ -193,9 +193,13 @@ static unsigned long pwm_samsung_calc_tin(struct samsung_pwm_chip *chip,
- 	 * divider settings and choose the lowest divisor that can generate
- 	 * frequencies lower than requested.
- 	 */
--	for (div = variant->div_base; div < 4; ++div)
--		if ((rate >> (variant->bits + div)) < freq)
--			break;
-+	if (fls(rate) <= variant->bits) {
-+		div = variant->div_base;
-+	} else {
-+		for (div = variant->div_base; div < 4; ++div)
-+			if ((rate >> (variant->bits + div)) < freq)
-+				break;
-+	}
- 
- 	pwm_samsung_set_divisor(chip, chan, BIT(div));
- 
+	M.
 -- 
-1.7.9.5
+Jazz is not dead. It just smells funny...
