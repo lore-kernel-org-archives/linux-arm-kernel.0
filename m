@@ -1,138 +1,203 @@
-From: mingo@kernel.org (Ingo Molnar)
-Date: Wed, 3 Aug 2016 10:11:40 +0200
-Subject: [PATCH] Add file permission mode helpers
-In-Reply-To: <CA+55aFw5v23T-zvDZp-MmD_EYxF8WbafwwB59934FV7g21uMGQ@mail.gmail.com>
-References: <CA+55aFw5v23T-zvDZp-MmD_EYxF8WbafwwB59934FV7g21uMGQ@mail.gmail.com>
-Message-ID: <20160803081140.GA7833@gmail.com>
+From: mark.yao@rock-chips.com (Mark Yao)
+Date: Wed,  3 Aug 2016 16:13:45 +0800
+Subject: [PATCH] drm/rockchip: fix fbdev crash when not use DRM_FBDEV_EMULATION
+Message-ID: <1470212025-30336-1-git-send-email-mark.yao@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+[    1.162571] Unable to handle kernel NULL pointer dereference at virtual address 00000200
+[    1.165656] Modules linked in:
+[    1.165941] CPU: 5 PID: 143 Comm: kworker/5:2 Not tainted 4.4.15 #237
+[    1.166506] Hardware name: Rockchip RK3399 Evaluation Board v1 (Android) (DT)
+[    1.167153] Workqueue: events output_poll_execute
+[    1.168231] PC is at mutex_lock+0x14/0x44
+[    1.168586] LR is at drm_fb_helper_hotplug_event+0x28/0xcc
+[    1.172192] [<ffffff8008982110>] mutex_lock+0x14/0x44
+[    1.172196] [<ffffff80084025a4>] drm_fb_helper_hotplug_event+0x28/0xcc
+[    1.172201] [<ffffff8008427ae4>] rockchip_drm_output_poll_changed+0x14/0x1c
+[    1.172204] [<ffffff80083f7c4c>] drm_kms_helper_hotplug_event+0x28/0x34
+[    1.172207] [<ffffff80083f7ddc>] output_poll_execute+0x150/0x198
+[    1.172212] [<ffffff80080b0ea8>] process_one_work+0x218/0x3dc
+[    1.172215] [<ffffff80080b1578>] worker_thread+0x24c/0x374
+[    1.172217] [<ffffff80080b5bcc>] kthread+0xdc/0xe4
+[    1.172222] [<ffffff8008084cd0>] ret_from_fork+0x10/0x40
 
-* Linus Torvalds <torvalds@linux-foundation.org> wrote:
+Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
+---
+ drivers/gpu/drm/rockchip/rockchip_drm_drv.c   | 13 ++++++++++---
+ drivers/gpu/drm/rockchip/rockchip_drm_drv.h   |  8 ++++++--
+ drivers/gpu/drm/rockchip/rockchip_drm_fb.c    |  6 +++---
+ drivers/gpu/drm/rockchip/rockchip_drm_fbdev.c | 26 +++++++++++++++++---------
+ 4 files changed, 36 insertions(+), 17 deletions(-)
 
-> [ So I answered similarly to another patch, but I'll just re-iterate
-> and change the subject line so that it stands out a bit from the
-> millions of actual patches ]
-> 
-> On Tue, Aug 2, 2016 at 1:42 PM, Pavel Machek <pavel@ucw.cz> wrote:
-> >
-> > Everyone knows what 0644 is, but noone can read S_IRUSR | S_IWUSR |
-> > S_IRCRP | S_IROTH (*). Please don't do this.
-> 
-> Absolutely. It's *much* easier to parse and understand the octal
-> numbers, while the symbolic macro names are just random line noise and
-> hard as hell to understand. You really have to think about it.
-> 
-> So we should rather go the other way: convert existing bad symbolic
-> permission bit macro use to just use the octal numbers.
-
-In addition to that I'd love to have something even easier to read, a few common 
-variants of the permissions field of 'ls -l' pre-defined. I did some quick 
-grepping, and collected the main variants that are in use:
-
-		PERM_r________	0400
-		PERM_r__r_____	0440
-		PERM_r__r__r__	0444
-
-		PERM_rw_______	0600
-		PERM_rw_r_____	0640
-		PERM_rw_r__r__	0644
-		PERM_rw_rw_r__	0664
-		PERM_rw_rw_rw_	0666
-
-		PERM__w_______	0200
-		PERM__w__w____	0220
-		PERM__w__w__w_	0222
-
-		PERM_r_x______	0500
-		PERM_r_xr_x___	0550
-		PERM_r_xr_xr_x	0555
-
-		PERM_rwx______	0700
-		PERM_rwxr_x___	0750
-		PERM_rwxr_xr_x	0755
-		PERM_rwxrwxr_x	0775
-		PERM_rwxrwxrwx	0777
-
-		PERM__wx______	0300
-		PERM__wx_wx___	0330
-		PERM__wx_wx_wx	0333
-
-Allowing these would be nice too, because there were cases in the past where 
-people messed up the octal representation or our internal symbolic helpers,
-but this representation is fundamentally self-describing and pretty 'fool proof'.
-
-An added advantage would be that during review it would stick out like a sore 
-thumb if anyone used a 'weird' permission variant.
-
-For example, if you saw these lines in a driver patch:
-
-+	__ATTR(l1, 0444, driver_show_l4, NULL);
-+		__ATTR(l3, 0446, driver_show_l4, NULL);
-+			__ATTR(l2, 04444, driver_show_l4, NULL);
-+		__ATTR(l4, 0444, driver_show_l4, NULL);
-
-... would you notice it at a glance that it contains two security holes?
-
-While the weird permissions in this:
-
-+		__ATTR(l1, PERM_r__r__r__,  driver_show_l4, NULL);
-+		__ATTR(l3, PERM_r__r__rw_,  driver_show_l4, NULL);
-+		__ATTR(l2, PERM_sr__r__r__, driver_show_l4, NULL);
-+		__ATTR(l4, PERM_r__r__r__,  driver_show_l4, NULL);
-
-Wouln't even build, because the dangerous patterns of PERM_r__r__rw_ or 
-PERM_sr__r__r__ are not defined to begin with.
-
-The patch below adds them to stat.h.
-
-Thanks,
-
-	Ingo
-
- include/linux/stat.h | 32 ++++++++++++++++++++++++++++++++
- 1 file changed, 32 insertions(+)
-
-diff --git a/include/linux/stat.h b/include/linux/stat.h
-index 075cb0c7eb2a..863d5563427f 100644
---- a/include/linux/stat.h
-+++ b/include/linux/stat.h
-@@ -5,6 +5,38 @@
- #include <asm/stat.h>
- #include <uapi/linux/stat.h>
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
+index a822d49..1a4dad6 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
+@@ -261,7 +261,10 @@ static void rockchip_drm_lastclose(struct drm_device *dev)
+ {
+ 	struct rockchip_drm_private *priv = dev->dev_private;
  
-+/*
-+ * Human readable symbolic definitions for common
-+ * file permissions:
-+ */
-+#define PERM_r________	0400
-+#define PERM_r__r_____	0440
-+#define PERM_r__r__r__	0444
+-	drm_fb_helper_restore_fbdev_mode_unlocked(&priv->fbdev_helper);
++	if (!priv->fbdev)
++		return;
 +
-+#define PERM_rw_______	0600
-+#define PERM_rw_r_____	0640
-+#define PERM_rw_r__r__	0644
-+#define PERM_rw_rw_r__	0664
-+#define PERM_rw_rw_rw_	0666
++	drm_fb_helper_restore_fbdev_mode_unlocked(&priv->fbdev->fbdev_helper);
+ }
+ 
+ static const struct file_operations rockchip_drm_driver_fops = {
+@@ -310,8 +313,10 @@ void rockchip_drm_fb_suspend(struct drm_device *drm)
+ {
+ 	struct rockchip_drm_private *priv = drm->dev_private;
+ 
++	if (!priv->fbdev)
++		return;
+ 	console_lock();
+-	drm_fb_helper_set_suspend(&priv->fbdev_helper, 1);
++	drm_fb_helper_set_suspend(&priv->fbdev->fbdev_helper, 1);
+ 	console_unlock();
+ }
+ 
+@@ -319,8 +324,10 @@ void rockchip_drm_fb_resume(struct drm_device *drm)
+ {
+ 	struct rockchip_drm_private *priv = drm->dev_private;
+ 
++	if (!priv->fbdev)
++		return;
+ 	console_lock();
+-	drm_fb_helper_set_suspend(&priv->fbdev_helper, 0);
++	drm_fb_helper_set_suspend(&priv->fbdev->fbdev_helper, 0);
+ 	console_unlock();
+ }
+ 
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_drv.h b/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
+index ea39329..c054fc2 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
+@@ -50,6 +50,11 @@ struct rockchip_crtc_state {
+ #define to_rockchip_crtc_state(s) \
+ 		container_of(s, struct rockchip_crtc_state, base)
+ 
++struct rockchip_drm_fbdev {
++	struct drm_fb_helper fbdev_helper;
++	struct drm_gem_object *fbdev_bo;
++};
 +
-+#define PERM__w_______	0200
-+#define PERM__w__w____	0220
-+#define PERM__w__w__w_	0222
+ /*
+  * Rockchip drm private structure.
+  *
+@@ -57,8 +62,7 @@ struct rockchip_crtc_state {
+  * @num_pipe: number of pipes for this device.
+  */
+ struct rockchip_drm_private {
+-	struct drm_fb_helper fbdev_helper;
+-	struct drm_gem_object *fbdev_bo;
++	struct rockchip_drm_fbdev *fbdev;
+ 	const struct rockchip_crtc_funcs *crtc_funcs[ROCKCHIP_MAX_CRTC];
+ 	struct drm_atomic_state *state;
+ };
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_fb.c b/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
+index 55c5273..fef6f8d 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
+@@ -156,10 +156,10 @@ err_gem_object_unreference:
+ static void rockchip_drm_output_poll_changed(struct drm_device *dev)
+ {
+ 	struct rockchip_drm_private *private = dev->dev_private;
+-	struct drm_fb_helper *fb_helper = &private->fbdev_helper;
++	struct rockchip_drm_fbdev *fbdev = private->fbdev;
+ 
+-	if (fb_helper)
+-		drm_fb_helper_hotplug_event(fb_helper);
++	if (fbdev)
++		drm_fb_helper_hotplug_event(&fbdev->fbdev_helper);
+ }
+ 
+ static void rockchip_crtc_wait_for_update(struct drm_crtc *crtc)
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_fbdev.c b/drivers/gpu/drm/rockchip/rockchip_drm_fbdev.c
+index 207e01d..cc5781a 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_fbdev.c
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_fbdev.c
+@@ -22,16 +22,16 @@
+ #include "rockchip_drm_fb.h"
+ 
+ #define PREFERRED_BPP		32
+-#define to_drm_private(x) \
+-		container_of(x, struct rockchip_drm_private, fbdev_helper)
++#define to_rockchip_fbdev(x) \
++		container_of(x, struct rockchip_drm_fbdev, fbdev_helper)
+ 
+ static int rockchip_fbdev_mmap(struct fb_info *info,
+ 			       struct vm_area_struct *vma)
+ {
+ 	struct drm_fb_helper *helper = info->par;
+-	struct rockchip_drm_private *private = to_drm_private(helper);
++	struct rockchip_drm_fbdev *fbdev = to_rockchip_fbdev(helper);
+ 
+-	return rockchip_gem_mmap_buf(private->fbdev_bo, vma);
++	return rockchip_gem_mmap_buf(fbdev->fbdev_bo, vma);
+ }
+ 
+ static struct fb_ops rockchip_drm_fbdev_ops = {
+@@ -50,7 +50,7 @@ static struct fb_ops rockchip_drm_fbdev_ops = {
+ static int rockchip_drm_fbdev_create(struct drm_fb_helper *helper,
+ 				     struct drm_fb_helper_surface_size *sizes)
+ {
+-	struct rockchip_drm_private *private = to_drm_private(helper);
++	struct rockchip_drm_fbdev *fbdev = to_rockchip_fbdev(helper);
+ 	struct drm_mode_fb_cmd2 mode_cmd = { 0 };
+ 	struct drm_device *dev = helper->dev;
+ 	struct rockchip_gem_object *rk_obj;
+@@ -75,7 +75,7 @@ static int rockchip_drm_fbdev_create(struct drm_fb_helper *helper,
+ 	if (IS_ERR(rk_obj))
+ 		return -ENOMEM;
+ 
+-	private->fbdev_bo = &rk_obj->base;
++	fbdev->fbdev_bo = &rk_obj->base;
+ 
+ 	fbi = drm_fb_helper_alloc_fbi(helper);
+ 	if (IS_ERR(fbi)) {
+@@ -85,7 +85,7 @@ static int rockchip_drm_fbdev_create(struct drm_fb_helper *helper,
+ 	}
+ 
+ 	helper->fb = rockchip_drm_framebuffer_init(dev, &mode_cmd,
+-						   private->fbdev_bo);
++						   fbdev->fbdev_bo);
+ 	if (IS_ERR(helper->fb)) {
+ 		dev_err(dev->dev, "Failed to allocate DRM framebuffer.\n");
+ 		ret = PTR_ERR(helper->fb);
+@@ -130,6 +130,7 @@ static const struct drm_fb_helper_funcs rockchip_drm_fb_helper_funcs = {
+ int rockchip_drm_fbdev_init(struct drm_device *dev)
+ {
+ 	struct rockchip_drm_private *private = dev->dev_private;
++	struct rockchip_drm_fbdev *fbdev;
+ 	struct drm_fb_helper *helper;
+ 	unsigned int num_crtc;
+ 	int ret;
+@@ -139,7 +140,12 @@ int rockchip_drm_fbdev_init(struct drm_device *dev)
+ 
+ 	num_crtc = dev->mode_config.num_crtc;
+ 
+-	helper = &private->fbdev_helper;
++	fbdev = devm_kzalloc(dev->dev, sizeof(*fbdev), GFP_KERNEL);
++	if (!fbdev)
++		return -ENOMEM;
 +
-+#define PERM_r_x______	0500
-+#define PERM_r_xr_x___	0550
-+#define PERM_r_xr_xr_x	0555
-+
-+#define PERM_rwx______	0700
-+#define PERM_rwxr_x___	0750
-+#define PERM_rwxr_xr_x	0755
-+#define PERM_rwxrwxr_x	0775
-+#define PERM_rwxrwxrwx	0777
-+
-+#define PERM__wx______	0300
-+#define PERM__wx_wx___	0330
-+#define PERM__wx_wx_wx	0333
-+
- #define S_IRWXUGO	(S_IRWXU|S_IRWXG|S_IRWXO)
- #define S_IALLUGO	(S_ISUID|S_ISGID|S_ISVTX|S_IRWXUGO)
- #define S_IRUGO		(S_IRUSR|S_IRGRP|S_IROTH)
++	private->fbdev = fbdev;
++	helper = &fbdev->fbdev_helper;
+ 
+ 	drm_fb_helper_prepare(dev, helper, &rockchip_drm_fb_helper_funcs);
+ 
+@@ -175,7 +181,9 @@ void rockchip_drm_fbdev_fini(struct drm_device *dev)
+ 	struct rockchip_drm_private *private = dev->dev_private;
+ 	struct drm_fb_helper *helper;
+ 
+-	helper = &private->fbdev_helper;
++	if (!private || private->fbdev)
++		return;
++	helper = &private->fbdev->fbdev_helper;
+ 
+ 	drm_fb_helper_unregister_fbi(helper);
+ 	drm_fb_helper_release_fbi(helper);
+-- 
+1.9.1
