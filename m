@@ -1,80 +1,58 @@
-From: ijc@hellion.org.uk (Ian Campbell)
-Date: Wed,  3 Aug 2016 15:12:44 +0100
-Subject: [PATCH v2 1/2] ARM: dts: Remove use of skeleton.dtsi from bcm283x.dtsi
-Message-ID: <1470233565-30154-1-git-send-email-ijc@hellion.org.uk>
+From: fabien.lahoudere@collabora.co.uk (Fabien Lahoudere)
+Date: Wed,  3 Aug 2016 16:13:13 +0200
+Subject: [PATCH 2/2] imx53.dtsi : Add DMA configuration for UART
+In-Reply-To: <1470233593-4513-1-git-send-email-fabien.lahoudere@collabora.co.uk>
+References: <1470233593-4513-1-git-send-email-fabien.lahoudere@collabora.co.uk>
+Message-ID: <1470233593-4513-2-git-send-email-fabien.lahoudere@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This file is included from DTS files under arch/arm64 too (via
-broadcom/bcm2837-rpi-3-b.dts and broadcom/bcm2837.dtsi). There is a desire
-not to have skeleton.dtsi for ARM64. See commit 3ebee5a2e141 ("arm64: dts:
-kill skeleton.dtsi") for rationale for its removal.
+In order to use sdma with UART, we need to add DMA configuration in device tree.
 
-As well as the addition of #*-cells also requires adding the device_type to
-the rpi memory node explicitly.
-
-Note that this change results in the removal of an empty /aliases node from
-bcm2835-rpi-a.dtb and bcm2835-rpi-a-plus.dtb. I have no hardware to check
-if this is a problem or not.
-
-It also results in some reordering of the nodes in the DTBs (the /aliases
-and /memory nodes come later). This isn't supposed to matter but, again,
-I've no hardware to check if it is true in this particular case.
-
-Signed-off-by: Ian Campbell <ijc@hellion.org.uk>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Frank Rowand <frowand.list@gmail.com>
-Cc: Eric Anholt <eric@anholt.net>
-Cc: Stephen Warren <swarren@wwwdotorg.org>
-Cc: Lee Jones <lee@kernel.org>
-Cc: Gerd Hoffmann <kraxel@redhat.com>
-Cc: devicetree at vger.kernel.org
-Cc: linux-kernel at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-rpi-kernel at lists.infradead.org
-Cc: arm at kernel.org
+Signed-off-by: Fabien Lahoudere <fabien.lahoudere@collabora.co.uk>
 ---
-v2: New patch to avoid needing to add skeleton.dtsi to arch/arm64
----
- arch/arm/boot/dts/bcm2835-rpi.dtsi | 1 +
- arch/arm/boot/dts/bcm283x.dtsi     | 3 ++-
- 2 files changed, 3 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/imx53.dtsi | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/arch/arm/boot/dts/bcm2835-rpi.dtsi b/arch/arm/boot/dts/bcm2835-rpi.dtsi
-index caf2707..e9b47b2 100644
---- a/arch/arm/boot/dts/bcm2835-rpi.dtsi
-+++ b/arch/arm/boot/dts/bcm2835-rpi.dtsi
-@@ -2,6 +2,7 @@
+diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
+index cd17037..de545e2 100644
+--- a/arch/arm/boot/dts/imx53.dtsi
++++ b/arch/arm/boot/dts/imx53.dtsi
+@@ -217,6 +217,8 @@
+ 					clocks = <&clks IMX5_CLK_UART3_IPG_GATE>,
+ 					         <&clks IMX5_CLK_UART3_PER_GATE>;
+ 					clock-names = "ipg", "per";
++					dmas = <&sdma 42 4 0>, <&sdma 43 4 0>;
++					dma-names = "rx", "tx";
+ 					status = "disabled";
+ 				};
  
- / {
- 	memory {
-+		device_type = "memory";
- 		reg = <0 0x10000000>;
- 	};
+@@ -508,6 +510,8 @@
+ 				clocks = <&clks IMX5_CLK_UART2_IPG_GATE>,
+ 				         <&clks IMX5_CLK_UART2_PER_GATE>;
+ 				clock-names = "ipg", "per";
++				dmas = <&sdma 12 4 0>, <&sdma 13 4 0>;
++				dma-names = "rx", "tx";
+ 				status = "disabled";
+ 			};
  
-diff --git a/arch/arm/boot/dts/bcm283x.dtsi b/arch/arm/boot/dts/bcm283x.dtsi
-index b982522..445624a 100644
---- a/arch/arm/boot/dts/bcm283x.dtsi
-+++ b/arch/arm/boot/dts/bcm283x.dtsi
-@@ -2,7 +2,6 @@
- #include <dt-bindings/clock/bcm2835.h>
- #include <dt-bindings/clock/bcm2835-aux.h>
- #include <dt-bindings/gpio/gpio.h>
--#include "skeleton.dtsi"
+@@ -591,6 +595,8 @@
+ 				clocks = <&clks IMX5_CLK_UART4_IPG_GATE>,
+ 				         <&clks IMX5_CLK_UART4_PER_GATE>;
+ 				clock-names = "ipg", "per";
++				dmas = <&sdma 2 4 0>, <&sdma 3 4 0>;
++				dma-names = "rx", "tx";
+ 				status = "disabled";
+ 			};
+ 		};
+@@ -621,6 +627,8 @@
+ 				clocks = <&clks IMX5_CLK_UART5_IPG_GATE>,
+ 				         <&clks IMX5_CLK_UART5_PER_GATE>;
+ 				clock-names = "ipg", "per";
++				dmas = <&sdma 16 4 0>, <&sdma 17 4 0>;
++				dma-names = "rx", "tx";
+ 				status = "disabled";
+ 			};
  
- /* This include file covers the common peripherals and configuration between
-  * bcm2835 and bcm2836 implementations, leaving the CPU configuration to
-@@ -13,6 +12,8 @@
- 	compatible = "brcm,bcm2835";
- 	model = "BCM2835";
- 	interrupt-parent = <&intc>;
-+	#address-cells = <1>;
-+	#size-cells = <1>;
- 
- 	chosen {
- 		bootargs = "earlyprintk console=ttyAMA0";
 -- 
-2.8.1
+2.7.4
