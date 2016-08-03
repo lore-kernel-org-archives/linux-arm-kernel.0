@@ -1,34 +1,42 @@
-From: marcel@holtmann.org (Marcel Holtmann)
-Date: Wed, 3 Aug 2016 11:53:06 +0200
-Subject: [PATCH] Add file permission mode helpers
-In-Reply-To: <20160803082855.GA32280@kroah.com>
-References: <CA+55aFw5v23T-zvDZp-MmD_EYxF8WbafwwB59934FV7g21uMGQ@mail.gmail.com>
- <20160803081140.GA7833@gmail.com> <20160803082855.GA32280@kroah.com>
-Message-ID: <20EC504F-F679-4244-8C04-00165236D028@holtmann.org>
+From: rogerq@ti.com (Roger Quadros)
+Date: Wed, 3 Aug 2016 12:55:33 +0300
+Subject: [PATCH 0/3] ARM: omap: fix 4.7 gpmc networking regression
+In-Reply-To: <20160803080149.GB15860@localhost>
+References: <1469362260-20066-1-git-send-email-johan@kernel.org>
+ <20160802103505.GD28140@atomide.com>
+ <9cf04231-091c-4ac3-bfb8-8d8be3d591eb@ti.com>
+ <20160803080149.GB15860@localhost>
+Message-ID: <2fde63f3-62b1-75a0-524a-f858ff1de459@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Greg,
-
->> An added advantage would be that during review it would stick out like a sore 
->> thumb if anyone used a 'weird' permission variant.
->> 
->> For example, if you saw these lines in a driver patch:
->> 
->> +	__ATTR(l1, 0444, driver_show_l4, NULL);
->> +		__ATTR(l3, 0446, driver_show_l4, NULL);
->> +			__ATTR(l2, 04444, driver_show_l4, NULL);
->> +		__ATTR(l4, 0444, driver_show_l4, NULL);
->> 
->> ... would you notice it at a glance that it contains two security holes?
+On 03/08/16 11:01, Johan Hovold wrote:
+> On Wed, Aug 03, 2016 at 10:46:24AM +0300, Roger Quadros wrote:
+>> On 02/08/16 13:35, Tony Lindgren wrote:
+>>> * Johan Hovold <johan@kernel.org> [160724 05:11]:
+>>>> Networking is currently broken for Overo boards due to a regression in
+>>>> 4.7. I bisected it down to
+>>>>
+>>>> 	d2d00862dfbb ("memory: omap-gpmc: Support general purpose input
+>>>> 	for WAITPINs")
+>>> ...
+>>>
+>>>> Note that simply fixing the Overo NAND issue would fix the Overo
+>>>> networking regression, but by restoring the 4.6 gpmc-probe behaviour
+>>>> similar regressions on other OMAP systems are also avoided.
+>>>
+>>> Roger, got a better fix in mind?
+>>>
+>>
+>> Nope. I'll take patch 1 in my omap-gpmc queue for v4.8.
+>> Thanks for the fixes Johan.
 > 
-> I've tried to deal with that in the past with the __ATTR_RW() and
-> __ATTR_RO() and __ATTR_WO() macros that more should be using.  I swept
-> the tree a few years ago to try to fix up most of them, but I know I
-> didn't catch them all, and more files have been added since then.
+> Now that 4.7 has been released, you may want to consider adding a stable
+> tag also for the first patch to avoid similar issues on other systems
+> when they get updated to 4.7-stable.
+> 
 
-I said in another response that maybe module_param_rw and module_param_ro will make some sense. Not sure if they are easier to read or not. I mean for each usage, we could look at the tree and see what values are actually used. My bet is that for module_param only a few ones are used. I have the feeling it is 0444 or 0644 and nothing else. Maybe some outlaws with 0400 and 0600 that don't even need to be that secretive.
+Yes, that was my plan as well.
 
-Regards
-
-Marcel
+cheers,
+-roger
