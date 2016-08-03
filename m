@@ -1,172 +1,143 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Wed,  3 Aug 2016 15:57:45 +0100
-Subject: [PATCH] KVM: arm64: ITS: move ITS registration into first VCPU run
-Message-ID: <20160803145745.7556-1-andre.przywara@arm.com>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Wed, 3 Aug 2016 16:58:26 +0200
+Subject: [PATCH] i2c: at91: fix support of the "alternative command" feature
+Message-ID: <20160803145826.11927-1-ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently we register ITS devices upon userland issuing the CTRL_INIT
-ioctl to mark initialization of the ITS as done.
-This deviates from the initialization sequence of the existing GIC
-devices and does not play well with the way QEMU handles things.
-To be more in line with what we are used to, register the ITS(es) just
-before the first VCPU is about to run, so in the map_resources() call.
-This involves iterating through the list of KVM devices and handle each
-ITS that we find.
+From: Cyrille Pitchen <cyrille.pitchen@atmel.com>
 
-Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+The "alternative command" feature was introduced with sama5d2 SoCs.
+
+Its purpose is to let the hardware i2c controller automatically send the
+STOP condition on the i2c bus at the end of a data transfer.
+Without this feature, the i2c driver has to write the 'STOP' bit into the
+Control Register so the hardware i2c controller is triggered to send the
+STOP condition on the bus.
+
+Using the "alternative command" feature requires to set the transfer data
+length into the 8bit DATAL field of the Alternative Command Register.
+Hence only data transfers up to 255 bytes can take advantage of the
+"alternative command" feature. For greater data transfer sizes, the driver
+should use the previous implementation, when the "alternative command"
+support was not implemented yet.
+
+Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
 ---
-Hi,
+ drivers/i2c/busses/i2c-at91.c | 24 ++++++++++++++----------
+ 1 file changed, 14 insertions(+), 10 deletions(-)
 
-this is based upon next-20160728 plus Christoffer's kvm_device locking
-fix from today. Please let me know what tree I should base upon and I
-will rebase.
-Eric, Christoffer: does that do what you expect? Can QEMU live with that?
-
-Cheers,
-Andre.
-
- virt/kvm/arm/vgic/vgic-its.c | 56 ++++++++++++++++++++++++++++++++++++--------
- virt/kvm/arm/vgic/vgic-v3.c  |  6 +++++
- virt/kvm/arm/vgic/vgic.h     |  6 +++++
- 3 files changed, 58 insertions(+), 10 deletions(-)
-
-diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-index 07411cf..e677a60 100644
---- a/virt/kvm/arm/vgic/vgic-its.c
-+++ b/virt/kvm/arm/vgic/vgic-its.c
-@@ -1288,13 +1288,13 @@ void vgic_enable_lpis(struct kvm_vcpu *vcpu)
- 		its_sync_lpi_pending_table(vcpu);
+diff --git a/drivers/i2c/busses/i2c-at91.c b/drivers/i2c/busses/i2c-at91.c
+index f233726..1bb97f6 100644
+--- a/drivers/i2c/busses/i2c-at91.c
++++ b/drivers/i2c/busses/i2c-at91.c
+@@ -38,6 +38,7 @@
+ #define AT91_I2C_TIMEOUT	msecs_to_jiffies(100)	/* transfer timeout */
+ #define AT91_I2C_DMA_THRESHOLD	8			/* enable DMA if transfer size is bigger than this threshold */
+ #define AUTOSUSPEND_TIMEOUT		2000
++#define AT91_I2C_MAX_ALT_CMD_DATA_SIZE	256
+ 
+ /* AT91 TWI register definitions */
+ #define	AT91_TWI_CR		0x0000	/* Control Register */
+@@ -141,6 +142,7 @@ struct at91_twi_dev {
+ 	unsigned twi_cwgr_reg;
+ 	struct at91_twi_pdata *pdata;
+ 	bool use_dma;
++	bool use_alt_cmd;
+ 	bool recv_len_abort;
+ 	u32 fifo_size;
+ 	struct at91_twi_dma dma;
+@@ -269,7 +271,7 @@ static void at91_twi_write_next_byte(struct at91_twi_dev *dev)
+ 
+ 	/* send stop when last byte has been written */
+ 	if (--dev->buf_len == 0)
+-		if (!dev->pdata->has_alt_cmd)
++		if (!dev->use_alt_cmd)
+ 			at91_twi_write(dev, AT91_TWI_CR, AT91_TWI_STOP);
+ 
+ 	dev_dbg(dev->dev, "wrote 0x%x, to go %d\n", *dev->buf, dev->buf_len);
+@@ -292,7 +294,7 @@ static void at91_twi_write_data_dma_callback(void *data)
+ 	 * we just have to enable TXCOMP one.
+ 	 */
+ 	at91_twi_write(dev, AT91_TWI_IER, AT91_TWI_TXCOMP);
+-	if (!dev->pdata->has_alt_cmd)
++	if (!dev->use_alt_cmd)
+ 		at91_twi_write(dev, AT91_TWI_CR, AT91_TWI_STOP);
  }
  
--static int vgic_its_init_its(struct kvm *kvm, struct vgic_its *its)
-+static int vgic_register_its_iodev(struct kvm *kvm, struct vgic_its *its)
- {
- 	struct vgic_io_device *iodev = &its->iodev;
+@@ -410,7 +412,7 @@ static void at91_twi_read_next_byte(struct at91_twi_dev *dev)
+ 	}
+ 
+ 	/* send stop if second but last byte has been read */
+-	if (!dev->pdata->has_alt_cmd && dev->buf_len == 1)
++	if (!dev->use_alt_cmd && dev->buf_len == 1)
+ 		at91_twi_write(dev, AT91_TWI_CR, AT91_TWI_STOP);
+ 
+ 	dev_dbg(dev->dev, "read 0x%x, to go %d\n", *dev->buf, dev->buf_len);
+@@ -426,7 +428,7 @@ static void at91_twi_read_data_dma_callback(void *data)
+ 	dma_unmap_single(dev->dev, sg_dma_address(&dev->dma.sg[0]),
+ 			 dev->buf_len, DMA_FROM_DEVICE);
+ 
+-	if (!dev->pdata->has_alt_cmd) {
++	if (!dev->use_alt_cmd) {
+ 		/* The last two bytes have to be read without using dma */
+ 		dev->buf += dev->buf_len - 2;
+ 		dev->buf_len = 2;
+@@ -443,7 +445,7 @@ static void at91_twi_read_data_dma(struct at91_twi_dev *dev)
+ 	struct dma_chan *chan_rx = dma->chan_rx;
+ 	size_t buf_len;
+ 
+-	buf_len = (dev->pdata->has_alt_cmd) ? dev->buf_len : dev->buf_len - 2;
++	buf_len = (dev->use_alt_cmd) ? dev->buf_len : dev->buf_len - 2;
+ 	dma->direction = DMA_FROM_DEVICE;
+ 
+ 	/* Keep in mind that we won't use dma to read the last two bytes */
+@@ -651,7 +653,7 @@ static int at91_do_twi_transfer(struct at91_twi_dev *dev)
+ 		unsigned start_flags = AT91_TWI_START;
+ 
+ 		/* if only one byte is to be read, immediately stop transfer */
+-		if (!has_alt_cmd && dev->buf_len <= 1 &&
++		if (!dev->use_alt_cmd && dev->buf_len <= 1 &&
+ 		    !(dev->msg->flags & I2C_M_RECV_LEN))
+ 			start_flags |= AT91_TWI_STOP;
+ 		at91_twi_write(dev, AT91_TWI_CR, start_flags);
+@@ -745,7 +747,7 @@ static int at91_twi_xfer(struct i2c_adapter *adap, struct i2c_msg *msg, int num)
  	int ret;
+ 	unsigned int_addr_flag = 0;
+ 	struct i2c_msg *m_start = msg;
+-	bool is_read, use_alt_cmd = false;
++	bool is_read;
  
--	if (its->initialized)
--		return 0;
-+	if (!its->initialized)
-+		return -EBUSY;
+ 	dev_dbg(&adap->dev, "at91_xfer: processing %d messages:\n", num);
  
- 	if (IS_VGIC_ADDR_UNDEF(its->vgic_its_base))
- 		return -ENXIO;
-@@ -1311,9 +1311,6 @@ static int vgic_its_init_its(struct kvm *kvm, struct vgic_its *its)
- 				      KVM_VGIC_V3_ITS_SIZE, &iodev->dev);
- 	mutex_unlock(&kvm->slots_lock);
+@@ -768,14 +770,16 @@ static int at91_twi_xfer(struct i2c_adapter *adap, struct i2c_msg *msg, int num)
+ 		at91_twi_write(dev, AT91_TWI_IADR, internal_address);
+ 	}
  
--	if (!ret)
--		its->initialized = true;
--
- 	return ret;
- }
- 
-@@ -1435,9 +1432,6 @@ static int vgic_its_set_attr(struct kvm_device *dev,
- 		if (type != KVM_VGIC_ITS_ADDR_TYPE)
- 			return -ENODEV;
- 
--		if (its->initialized)
--			return -EBUSY;
--
- 		if (copy_from_user(&addr, uaddr, sizeof(addr)))
- 			return -EFAULT;
- 
-@@ -1453,7 +1447,9 @@ static int vgic_its_set_attr(struct kvm_device *dev,
- 	case KVM_DEV_ARM_VGIC_GRP_CTRL:
- 		switch (attr->attr) {
- 		case KVM_DEV_ARM_VGIC_CTRL_INIT:
--			return vgic_its_init_its(dev->kvm, its);
-+			its->initialized = true;
-+
-+			return 0;
++	dev->use_alt_cmd = false;
+ 	is_read = (m_start->flags & I2C_M_RD);
+ 	if (dev->pdata->has_alt_cmd) {
+-		if (m_start->len > 0) {
++		if (m_start->len > 0 &&
++		    m_start->len < AT91_I2C_MAX_ALT_CMD_DATA_SIZE) {
+ 			at91_twi_write(dev, AT91_TWI_CR, AT91_TWI_ACMEN);
+ 			at91_twi_write(dev, AT91_TWI_ACR,
+ 				       AT91_TWI_ACR_DATAL(m_start->len) |
+ 				       ((is_read) ? AT91_TWI_ACR_DIR : 0));
+-			use_alt_cmd = true;
++			dev->use_alt_cmd = true;
+ 		} else {
+ 			at91_twi_write(dev, AT91_TWI_CR, AT91_TWI_ACMDIS);
  		}
- 		break;
- 	}
-@@ -1498,3 +1494,43 @@ int kvm_vgic_register_its_device(void)
- 	return kvm_register_device_ops(&kvm_arm_vgic_its_ops,
- 				       KVM_DEV_TYPE_ARM_VGIC_ITS);
- }
-+
-+/*
-+ * Registers all ITSes with the kvm_io_bus framework.
-+ * To follow the existing VGIC initialization sequence, this has to be
-+ * done as late as possible, just before the first VCPU runs.
-+ */
-+int vgic_register_its_iodevs(struct kvm *kvm)
-+{
-+	struct kvm_device *dev;
-+	int ret = 0;
-+
-+	mutex_lock(&kvm->devices_lock);
-+
-+	list_for_each_entry(dev, &kvm->devices, vm_node) {
-+		if (dev->ops != &kvm_arm_vgic_its_ops)
-+			continue;
-+
-+		ret = vgic_register_its_iodev(kvm, dev->private);
-+		if (ret)
-+			break;
-+	}
-+
-+	if (ret) {
-+		/* Iterate backwards to roll back previous registrations. */
-+		for (dev = list_prev_entry(dev, vm_node);
-+		     &dev->vm_node != &kvm->devices;
-+		     dev = list_prev_entry(dev, vm_node)) {
-+			struct vgic_its *its = dev->private;
-+
-+			if (dev->ops != &kvm_arm_vgic_its_ops)
-+				continue;
-+
-+			kvm_io_bus_unregister_dev(kvm, KVM_MMIO_BUS,
-+						  &its->iodev.dev);
-+		}
-+	}
-+
-+	mutex_unlock(&kvm->devices_lock);
-+	return ret;
-+}
-diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
-index 0506543..f0d9b2b 100644
---- a/virt/kvm/arm/vgic/vgic-v3.c
-+++ b/virt/kvm/arm/vgic/vgic-v3.c
-@@ -289,6 +289,12 @@ int vgic_v3_map_resources(struct kvm *kvm)
- 		goto out;
- 	}
+@@ -784,7 +788,7 @@ static int at91_twi_xfer(struct i2c_adapter *adap, struct i2c_msg *msg, int num)
+ 	at91_twi_write(dev, AT91_TWI_MMR,
+ 		       (m_start->addr << 16) |
+ 		       int_addr_flag |
+-		       ((!use_alt_cmd && is_read) ? AT91_TWI_MREAD : 0));
++		       ((!dev->use_alt_cmd && is_read) ? AT91_TWI_MREAD : 0));
  
-+	ret = vgic_register_its_iodevs(kvm);
-+	if (ret) {
-+		kvm_err("Unable to register VGIC ITS MMIO regions\n");
-+		goto out;
-+	}
-+
- 	dist->ready = true;
- 
- out:
-diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-index 1d8e21d..6c4625c 100644
---- a/virt/kvm/arm/vgic/vgic.h
-+++ b/virt/kvm/arm/vgic/vgic.h
-@@ -84,6 +84,7 @@ void vgic_v3_enable(struct kvm_vcpu *vcpu);
- int vgic_v3_probe(const struct gic_kvm_info *info);
- int vgic_v3_map_resources(struct kvm *kvm);
- int vgic_register_redist_iodevs(struct kvm *kvm, gpa_t dist_base_address);
-+int vgic_register_its_iodevs(struct kvm *kvm);
- bool vgic_has_its(struct kvm *kvm);
- int kvm_vgic_register_its_device(void);
- void vgic_enable_lpis(struct kvm_vcpu *vcpu);
-@@ -140,6 +141,11 @@ static inline int vgic_register_redist_iodevs(struct kvm *kvm,
- 	return -ENODEV;
- }
- 
-+static inline int vgic_register_its_iodevs(struct kvm *kvm)
-+{
-+	return -ENODEV;
-+}
-+
- static inline bool vgic_has_its(struct kvm *kvm)
- {
- 	return false;
+ 	dev->buf_len = m_start->len;
+ 	dev->buf = m_start->buf;
 -- 
 2.9.0
