@@ -1,133 +1,158 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 3 Aug 2016 18:36:45 +0100
-Subject: [PATCH] drivers/perf: arm-pmu: convert arm_pmu_mutex to spinlock
-In-Reply-To: <1470244135-979-1-git-send-email-sudeep.holla@arm.com>
-References: <1470244135-979-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <20160803173645.GB1267@leverpostej>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 3 Aug 2016 19:48:25 +0200
+Subject: [PATCH] KVM: arm64: ITS: move ITS registration into first VCPU run
+In-Reply-To: <0e2f3d1c-4f98-771c-4f8a-ff911b8cdfe5@arm.com>
+References: <20160803145745.7556-1-andre.przywara@arm.com>
+ <20160803171131.GY32244@cbox>
+ <0e2f3d1c-4f98-771c-4f8a-ff911b8cdfe5@arm.com>
+Message-ID: <20160803174825.GC32244@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Aug 03, 2016 at 06:18:48PM +0100, Andre Przywara wrote:
+> Hi,
+> 
+> On 03/08/16 18:11, Christoffer Dall wrote:
+> > On Wed, Aug 03, 2016 at 03:57:45PM +0100, Andre Przywara wrote:
+> >> Currently we register ITS devices upon userland issuing the CTRL_INIT
+> >> ioctl to mark initialization of the ITS as done.
+> >> This deviates from the initialization sequence of the existing GIC
+> >> devices and does not play well with the way QEMU handles things.
+> >> To be more in line with what we are used to, register the ITS(es) just
+> >> before the first VCPU is about to run, so in the map_resources() call.
+> >> This involves iterating through the list of KVM devices and handle each
+> >> ITS that we find.
+> >>
+> >> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> >> ---
+> >> Hi,
+> >>
+> >> this is based upon next-20160728 plus Christoffer's kvm_device locking
+> >> fix from today. Please let me know what tree I should base upon and I
+> >> will rebase.
+> >> Eric, Christoffer: does that do what you expect? Can QEMU live with that?
+> >>
+> >> Cheers,
+> >> Andre.
+> >>
+> >>  virt/kvm/arm/vgic/vgic-its.c | 56 ++++++++++++++++++++++++++++++++++++--------
+> >>  virt/kvm/arm/vgic/vgic-v3.c  |  6 +++++
+> >>  virt/kvm/arm/vgic/vgic.h     |  6 +++++
+> >>  3 files changed, 58 insertions(+), 10 deletions(-)
+> >>
+> >> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+> >> index 07411cf..e677a60 100644
+> >> --- a/virt/kvm/arm/vgic/vgic-its.c
+> >> +++ b/virt/kvm/arm/vgic/vgic-its.c
+> >> @@ -1288,13 +1288,13 @@ void vgic_enable_lpis(struct kvm_vcpu *vcpu)
+> >>  		its_sync_lpi_pending_table(vcpu);
+> >>  }
+> >>  
+> >> -static int vgic_its_init_its(struct kvm *kvm, struct vgic_its *its)
+> >> +static int vgic_register_its_iodev(struct kvm *kvm, struct vgic_its *its)
+> >>  {
+> >>  	struct vgic_io_device *iodev = &its->iodev;
+> >>  	int ret;
+> >>  
+> >> -	if (its->initialized)
+> >> -		return 0;
+> >> +	if (!its->initialized)
+> >> +		return -EBUSY;
+> >>  
+> >>  	if (IS_VGIC_ADDR_UNDEF(its->vgic_its_base))
+> >>  		return -ENXIO;
+> >> @@ -1311,9 +1311,6 @@ static int vgic_its_init_its(struct kvm *kvm, struct vgic_its *its)
+> >>  				      KVM_VGIC_V3_ITS_SIZE, &iodev->dev);
+> >>  	mutex_unlock(&kvm->slots_lock);
+> >>  
+> >> -	if (!ret)
+> >> -		its->initialized = true;
+> >> -
+> >>  	return ret;
+> >>  }
+> >>  
+> >> @@ -1435,9 +1432,6 @@ static int vgic_its_set_attr(struct kvm_device *dev,
+> >>  		if (type != KVM_VGIC_ITS_ADDR_TYPE)
+> >>  			return -ENODEV;
+> >>  
+> >> -		if (its->initialized)
+> >> -			return -EBUSY;
+> >> -
+> >>  		if (copy_from_user(&addr, uaddr, sizeof(addr)))
+> >>  			return -EFAULT;
+> >>  
+> >> @@ -1453,7 +1447,9 @@ static int vgic_its_set_attr(struct kvm_device *dev,
+> >>  	case KVM_DEV_ARM_VGIC_GRP_CTRL:
+> >>  		switch (attr->attr) {
+> >>  		case KVM_DEV_ARM_VGIC_CTRL_INIT:
+> >> -			return vgic_its_init_its(dev->kvm, its);
+> >> +			its->initialized = true;
+> >> +
+> >> +			return 0;
+> >>  		}
+> >>  		break;
+> >>  	}
+> >> @@ -1498,3 +1494,43 @@ int kvm_vgic_register_its_device(void)
+> >>  	return kvm_register_device_ops(&kvm_arm_vgic_its_ops,
+> >>  				       KVM_DEV_TYPE_ARM_VGIC_ITS);
+> >>  }
+> >> +
+> >> +/*
+> >> + * Registers all ITSes with the kvm_io_bus framework.
+> >> + * To follow the existing VGIC initialization sequence, this has to be
+> >> + * done as late as possible, just before the first VCPU runs.
+> >> + */
+> >> +int vgic_register_its_iodevs(struct kvm *kvm)
+> >> +{
+> >> +	struct kvm_device *dev;
+> >> +	int ret = 0;
+> >> +
+> >> +	mutex_lock(&kvm->devices_lock);
+> >> +
+> >> +	list_for_each_entry(dev, &kvm->devices, vm_node) {
+> >> +		if (dev->ops != &kvm_arm_vgic_its_ops)
+> >> +			continue;
+> >> +
+> >> +		ret = vgic_register_its_iodev(kvm, dev->private);
+> >> +		if (ret)
+> >> +			break;
+> >> +	}
+> >> +
+> >> +	if (ret) {
+> >> +		/* Iterate backwards to roll back previous registrations. */
+> >> +		for (dev = list_prev_entry(dev, vm_node);
+> >> +		     &dev->vm_node != &kvm->devices;
+> >> +		     dev = list_prev_entry(dev, vm_node)) {
+> >> +			struct vgic_its *its = dev->private;
+> >> +
+> >> +			if (dev->ops != &kvm_arm_vgic_its_ops)
+> >> +				continue;
+> >> +
+> >> +			kvm_io_bus_unregister_dev(kvm, KVM_MMIO_BUS,
+> >> +						  &its->iodev.dev);
+> >> +		}
+> >> +	}
+> > 
+> > is the unregister really necessary?
+> 
+> I was wondering the same, but we do it for the GICv3 redistributors as
+> well (though that was introduced by the same stupid author).
+> That being said I would be too happy to remove both these dodgy routines
+> if we agree that a failure will ultimately lead to a VM teardown and is
+> thus not needed.
 
-Sebastian, as a heads-up, the issue below issue may apply to over
-hotplug state machine conversions if a mutex was added.
+I think that the other architectures and places in KVM don't do this
+type of cleanup (I argued for this the last time around too), and this
+code here is particularly painful (not your fault, just the way it is),
+so I prefer getting rid of it.
 
-On Wed, Aug 03, 2016 at 06:08:55PM +0100, Sudeep Holla wrote:
-> arm_pmu_mutex is never held long and we don't want to sleep while the
-> lock is being held as it's executed in the context of hotplug notifiers.
-> So it can be converted to a simple spinlock instead.
-> 
-> Without this patch we get the following warning:
-> 
-> BUG: sleeping function called from invalid context at kernel/locking/mutex.c:620
-> in_atomic(): 1, irqs_disabled(): 128, pid: 0, name: swapper/2
-> no locks held by swapper/2/0.
-> irq event stamp: 381314
-> hardirqs last  enabled at (381313): _raw_spin_unlock_irqrestore+0x7c/0x88
-> hardirqs last disabled at (381314): cpu_die+0x28/0x48
-> softirqs last  enabled at (381294): _local_bh_enable+0x28/0x50
-> softirqs last disabled at (381293): irq_enter+0x58/0x78
-> CPU: 2 PID: 0 Comm: swapper/2 Not tainted 4.7.0 #12
-> Call trace:
->  dump_backtrace+0x0/0x220
->  show_stack+0x24/0x30
->  dump_stack+0xb4/0xf0
->  ___might_sleep+0x1d8/0x1f0
->  __might_sleep+0x5c/0x98
->  mutex_lock_nested+0x54/0x400
->  arm_perf_starting_cpu+0x34/0xb0
->  cpuhp_invoke_callback+0x88/0x3d8
->  notify_cpu_starting+0x78/0x98
->  secondary_start_kernel+0x108/0x1a8
-> 
-> This patch converts the mutex to spinlock to eliminate the above
-> warnings. This constraints pmu->reset to be non-blocking call which is
-> the case with all the ARM PMU backends.
-> Fixes: 37b502f121ad ("arm/perf: Fix hotplug state machine conversion")
-> Cc: Stephen Boyd <sboyd@codeaurora.org>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+Can you argue for why we'd need it?  Stuff failed, so even if userspace
+tries to do more stuff with a broken VM, what do we care if a few
+devices linger around registered on the IO bus?  That shouldn't be able
+to break anything.
 
-I haven't been able to come up with a race with hotplug that halted
-forward progress, and otherwise this is at least as structurally correct
-as the mutex, so FWIW:
+In fact, is it not similar to initializing a few ITSes with the current
+implementation and getting a failure on a later one?
 
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-
-Mark.
-
-> ---
->  drivers/perf/arm_pmu.c | 18 +++++++++---------
->  1 file changed, 9 insertions(+), 9 deletions(-)
-> 
-> diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
-> index 6ccb994bdfcb..4c9a537a1265 100644
-> --- a/drivers/perf/arm_pmu.c
-> +++ b/drivers/perf/arm_pmu.c
-> @@ -688,7 +688,7 @@ static int cpu_pmu_request_irq(struct arm_pmu *cpu_pmu, irq_handler_t handler)
->  	return 0;
->  }
-> 
-> -static DEFINE_MUTEX(arm_pmu_mutex);
-> +static DEFINE_SPINLOCK(arm_pmu_lock);
->  static LIST_HEAD(arm_pmu_list);
-> 
->  /*
-> @@ -701,7 +701,7 @@ static int arm_perf_starting_cpu(unsigned int cpu)
->  {
->  	struct arm_pmu *pmu;
-> 
-> -	mutex_lock(&arm_pmu_mutex);
-> +	spin_lock(&arm_pmu_lock);
->  	list_for_each_entry(pmu, &arm_pmu_list, entry) {
-> 
->  		if (!cpumask_test_cpu(cpu, &pmu->supported_cpus))
-> @@ -709,7 +709,7 @@ static int arm_perf_starting_cpu(unsigned int cpu)
->  		if (pmu->reset)
->  			pmu->reset(pmu);
->  	}
-> -	mutex_unlock(&arm_pmu_mutex);
-> +	spin_unlock(&arm_pmu_lock);
->  	return 0;
->  }
-> 
-> @@ -821,9 +821,9 @@ static int cpu_pmu_init(struct arm_pmu *cpu_pmu)
->  	if (!cpu_hw_events)
->  		return -ENOMEM;
-> 
-> -	mutex_lock(&arm_pmu_mutex);
-> +	spin_lock(&arm_pmu_lock);
->  	list_add_tail(&cpu_pmu->entry, &arm_pmu_list);
-> -	mutex_unlock(&arm_pmu_mutex);
-> +	spin_unlock(&arm_pmu_lock);
-> 
->  	err = cpu_pm_pmu_register(cpu_pmu);
->  	if (err)
-> @@ -859,9 +859,9 @@ static int cpu_pmu_init(struct arm_pmu *cpu_pmu)
->  	return 0;
-> 
->  out_unregister:
-> -	mutex_lock(&arm_pmu_mutex);
-> +	spin_lock(&arm_pmu_lock);
->  	list_del(&cpu_pmu->entry);
-> -	mutex_unlock(&arm_pmu_mutex);
-> +	spin_unlock(&arm_pmu_lock);
->  	free_percpu(cpu_hw_events);
->  	return err;
->  }
-> @@ -869,9 +869,9 @@ static int cpu_pmu_init(struct arm_pmu *cpu_pmu)
->  static void cpu_pmu_destroy(struct arm_pmu *cpu_pmu)
->  {
->  	cpu_pm_pmu_unregister(cpu_pmu);
-> -	mutex_lock(&arm_pmu_mutex);
-> +	spin_lock(&arm_pmu_lock);
->  	list_del(&cpu_pmu->entry);
-> -	mutex_unlock(&arm_pmu_mutex);
-> +	spin_unlock(&arm_pmu_lock);
->  	free_percpu(cpu_pmu->hw_events);
->  }
-> 
-> --
-> 2.7.4
-> 
+Thanks,
+-Christoffer
