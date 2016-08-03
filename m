@@ -1,42 +1,42 @@
 From: jon.mason@broadcom.com (Jon Mason)
-Date: Wed,  3 Aug 2016 14:39:03 -0400
-Subject: [PATCH 08/11] ARM: dts: NSP: Add new DT file for bcm958522er
+Date: Wed,  3 Aug 2016 14:39:04 -0400
+Subject: [PATCH 09/11] ARM: dts: NSP: Add new DT file for bcm988312hr
 In-Reply-To: <1470249546-12440-1-git-send-email-jon.mason@broadcom.com>
 References: <1470249546-12440-1-git-send-email-jon.mason@broadcom.com>
-Message-ID: <1470249546-12440-9-git-send-email-jon.mason@broadcom.com>
+Message-ID: <1470249546-12440-10-git-send-email-jon.mason@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Create a new device tree file for the Broadcom Northstar Plus
-bcm958522er SVK.  This SVK has 2GB RAM, 2 ports Ethernet, 2 PCI slots,
-and 1 UART.  Also, it has the ability to reboot via GPIO.  To be added
-in the future is support for the USB.
+bcm988312hr SVK.  This SVK has 2GB RAM, 5 ports Ethernet, 2 eSATA, 2 PCI
+slots, and 1 UART.  Also, it has the ability to reboot via GPIO.  To be
+added in the future is support for the USB.
 
 Signed-off-by: Jon Mason <jon.mason@broadcom.com>
 ---
  arch/arm/boot/dts/Makefile        |   1 +
- arch/arm/boot/dts/bcm958522er.dts | 130 ++++++++++++++++++++++++++++++++++++++
- 2 files changed, 131 insertions(+)
- create mode 100644 arch/arm/boot/dts/bcm958522er.dts
+ arch/arm/boot/dts/bcm988312hr.dts | 182 ++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 183 insertions(+)
+ create mode 100644 arch/arm/boot/dts/bcm988312hr.dts
 
 diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 8a05bf6..7c04e31 100644
+index 7c04e31..190528d 100644
 --- a/arch/arm/boot/dts/Makefile
 +++ b/arch/arm/boot/dts/Makefile
-@@ -99,6 +99,7 @@ dtb-$(CONFIG_ARCH_BCM_MOBILE) += \
- 	bcm21664-garnet.dtb \
- 	bcm23550-sparrow.dtb
- dtb-$(CONFIG_ARCH_BCM_NSP) += \
-+	bcm958522er.dtb \
+@@ -103,6 +103,7 @@ dtb-$(CONFIG_ARCH_BCM_NSP) += \
  	bcm958525er.dtb \
  	bcm958525xmc.dtb \
  	bcm958625hr.dtb \
-diff --git a/arch/arm/boot/dts/bcm958522er.dts b/arch/arm/boot/dts/bcm958522er.dts
++	bcm988312hr.dtb \
+ 	bcm958625k.dtb
+ dtb-$(CONFIG_ARCH_BERLIN) += \
+ 	berlin2-sony-nsz-gs7.dtb \
+diff --git a/arch/arm/boot/dts/bcm988312hr.dts b/arch/arm/boot/dts/bcm988312hr.dts
 new file mode 100644
-index 0000000..a21b0fd
+index 0000000..104afe9
 --- /dev/null
-+++ b/arch/arm/boot/dts/bcm958522er.dts
-@@ -0,0 +1,130 @@
++++ b/arch/arm/boot/dts/bcm988312hr.dts
+@@ -0,0 +1,182 @@
 +/*
 + *  BSD LICENSE
 + *
@@ -75,8 +75,8 @@ index 0000000..a21b0fd
 +#include <dt-bindings/gpio/gpio.h>
 +
 +/ {
-+	model = "NorthStar Plus SVK (BCM958522ER)";
-+	compatible = "brcm,bcm58522", "brcm,nsp";
++	model = "NorthStar Plus SVK (BCM988312HR)";
++	compatible = "brcm,bcm88312", "brcm,nsp";
 +
 +	aliases {
 +		serial0 = &uart0;
@@ -101,11 +101,6 @@ index 0000000..a21b0fd
 +/* USB 2/3 support needed to be complete */
 +
 +&amac0 {
-+	status = "okay";
-+};
-+
-+
-+&amac1 {
 +	status = "okay";
 +};
 +
@@ -161,6 +156,63 @@ index 0000000..a21b0fd
 +	nand_sel: nand_sel {
 +		function = "nand";
 +		groups = "nand_grp";
++	};
++};
++
++&sata_phy0 {
++	status = "okay";
++};
++
++&sata_phy1 {
++	status = "okay";
++};
++
++&sata {
++	status = "okay";
++};
++
++&srab {
++	compatible = "brcm,bcm88312-srab", "brcm,nsp-srab";
++	status = "okay";
++
++	ports {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		port at 0 {
++			label = "port0";
++			reg = <0>;
++		};
++
++		port at 1 {
++			label = "port1";
++			reg = <1>;
++		};
++
++		port at 2 {
++			label = "port2";
++			reg = <2>;
++		};
++
++		port at 3 {
++			label = "port3";
++			reg = <3>;
++		};
++
++		port at 4 {
++			label = "port4";
++			reg = <4>;
++		};
++
++		port at 5 {
++			ethernet = <&amac0>;
++			label = "cpu";
++			reg = <5>;
++			fixed-link {
++				speed = <1000>;
++				full-duplex;
++			};
++		};
 +	};
 +};
 +
