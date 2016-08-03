@@ -1,169 +1,57 @@
-From: jamesjj.liao@mediatek.com (James Liao)
-Date: Wed, 3 Aug 2016 13:46:22 +0800
-Subject: [PATCH v9 01/10] clk: fix initial state of critical clock's
- parents
-In-Reply-To: <1468225452.31247.7.camel@mtksdaap41>
-References: <1466581229-2342-1-git-send-email-erin.lo@mediatek.com>
- <1466581229-2342-2-git-send-email-erin.lo@mediatek.com>
- <20160702012140.GB17071@codeaurora.org>
- <1467604308.26485.4.camel@mtksdaap41>
- <146802073038.73491.6675612765998057903@resonance>
- <1468225452.31247.7.camel@mtksdaap41>
-Message-ID: <1470203182.17063.3.camel@mtksdaap41>
+From: lkp@intel.com (kbuild test robot)
+Date: Wed, 3 Aug 2016 13:49:31 +0800
+Subject: [PATCH v12 6/8] vfio/type1: check doorbell safety
+In-Reply-To: <1470159012-7110-7-git-send-email-eric.auger@redhat.com>
+Message-ID: <201608031314.kN4c6thc%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2016-07-11 at 16:24 +0800, James Liao wrote:
-> Hi Mike,
-> 
-> On Fri, 2016-07-08 at 16:32 -0700, Michael Turquette wrote:
-> > Hi James,
-> > 
-> > Quoting James Liao (2016-07-03 20:51:48)
-> > > On Fri, 2016-07-01 at 18:21 -0700, Stephen Boyd wrote:
-> > > > (Resending to everyone)
-> > > > 
-> > > > On 06/22, Erin Lo wrote:
-> > > > > From: James Liao <jamesjj.liao@mediatek.com>
-> > > > > 
-> > > > > This patch fixed wrong state of parent clocks if they are registered
-> > > > > after critical clocks.
-> > > > > 
-> > > > > Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
-> > > > > Signed-off-by: Erin Lo <erin.lo@mediatek.com>
-> > > > 
-> > > > It would be nice if you included the information about the
-> > > > problem from James' previous mail. This says what it does, but
-> > > > doesn't explain what the problem is and how it is fixing it.
-> > > > 
-> > > > > ---
-> > > > >  drivers/clk/clk.c | 9 ++++++++-
-> > > > >  1 file changed, 8 insertions(+), 1 deletion(-)
-> > > > > 
-> > > > > diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> > > > > index d584004..e9f5f89 100644
-> > > > > --- a/drivers/clk/clk.c
-> > > > > +++ b/drivers/clk/clk.c
-> > > > > @@ -2388,8 +2388,15 @@ static int __clk_core_init(struct clk_core *core)
-> > > > >     hlist_for_each_entry_safe(orphan, tmp2, &clk_orphan_list, child_node) {
-> > > > >             struct clk_core *parent = __clk_init_parent(orphan);
-> > > > >  
-> > > > > -           if (parent)
-> > > > > +           if (parent) {
-> > > > >                     clk_core_reparent(orphan, parent);
-> > > > > +
-> > > > > +                   if (orphan->prepare_count)
-> > > > > +                           clk_core_prepare(parent);
-> > > > > +
-> > > > > +                   if (orphan->enable_count)
-> > > > > +                           clk_core_enable(parent);
-> > > > > +           }
-> > > > >     }
-> > > > 
-> > > > I'm pretty sure I pointed this problem out to Mike when the
-> > > > critical clk patches were being pushed. I can't recall what the
-> > > > plan was though to fix the problem. I'm pretty sure he said that
-> > > > clk_core_reparent() would take care of it, but obviously it is
-> > > > not doing that. Or perhaps it was that clk handoff should figure
-> > > > out that the parents of a critical clk are also on and thus keep
-> > > > them on.
-> > > 
-> > > Hi Mike
-> > > 
-> > > Is there any other patch to fix this issue? Or did I misuse critical
-> > > clock flag?
-> > 
-> > There is no fix yes. Your fix is basically correct. I was mistaken back
-> > when I told you and Stephen that the framework already took care of
-> > this.
-> > 
-> > However, instead of "open coding" this solution, I would rather re-use
-> > the __clk_set_parent_{before,after} helpers instead. Can you review/test
-> > the following patch and let me know what you think?
-> > 
-> > Thanks,
-> > Mike
-> > 
-> > 
-> > 
-> > From c0163b3f719b1e219b28ad425f94f9ef54a25a8f Mon Sep 17 00:00:00 2001
-> > From: Michael Turquette <mturquette@baylibre.com>
-> > Date: Fri, 8 Jul 2016 16:05:22 -0700
-> > Subject: [PATCH] clk: migrate ref counts when orphans are reunited
-> > 
-> > It's always nice to see families reunited, and this is equally true when
-> > talking about parent clocks and their children. However, if the orphan
-> > clk had a positive prepare_count or enable_count, then we would not
-> > migrate those counts up the parent chain correctly.
-> > 
-> > This has manifested with the recent critical clocks feature, which often
-> > enables clocks very early, before their parents have been registered.
-> > 
-> > Fixed by replacing the call to clk_core_reparent with calls to
-> > __clk_set_parent_{before,after}.
-> > 
-> > Cc: James Liao <jamesjj.liao@mediatek.com>
-> > Cc: Erin Lo <erin.lo@mediatek.com>
-> > Signed-off-by: Michael Turquette <mturquette@baylibre.com>
-> > ---
-> >  drivers/clk/clk.c | 10 ++++++++--
-> >  1 file changed, 8 insertions(+), 2 deletions(-)
-> > 
-> > diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> > index 820a939fb6bb..70efe4c4e0cc 100644
-> > --- a/drivers/clk/clk.c
-> > +++ b/drivers/clk/clk.c
-> > @@ -2449,8 +2449,14 @@ static int __clk_core_init(struct clk_core *core)
-> >  	hlist_for_each_entry_safe(orphan, tmp2, &clk_orphan_list, child_node) {
-> >  		struct clk_core *parent = __clk_init_parent(orphan);
-> >  
-> > -		if (parent)
-> > -			clk_core_reparent(orphan, parent);
-> 
-> Is it correct to remove clk_core_reparent()? It lacks
-> __clk_recalc_accuracies() and __clk_recalc_rates(), so the new parent's
-> rate will not propagate correctly.
-> 
-> For example, I set vdec_sel as a critical clock. Without your patch, the
-> result was:
-> 
->     vdecpll         0            0   338000000
->        vdecpll_ck   1            1   338000000
->           vdec_sel  1            1   338000000
-> 
-> With your patch, it became:
-> 
->     vdecpll         1            1   338000000
->        vdecpll_ck   1            1           0
->           vdec_sel  1            1           0
-> 
-> The prepare_count and enable_count are correct with your patch, but the
-> rates of vdecpll_ck and vdec_sel become incorrect.
-> 
-> 
-> Best regards,
-> 
-> James
-> 
-> > +		/*
-> > +		 * we could call __clk_set_parent, but that would result in a
-> > +		 * reducant call to the .set_rate op, if it exists
-> > +		 */
-> > +		if (parent) {
-> > +			__clk_set_parent_before(orphan, parent);
-> > +			__clk_set_parent_after(orphan, parent, NULL);
-> > +		}
-> >  	}
-> >  
-> >  	/*
-> 
+Hi Eric,
 
-Hi Mike,
+[auto build test ERROR on vfio/next]
+[also build test ERROR on v4.7]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-Do you have new patches to fix new clock parents? If not, I think we can
-use my patch first. Is it okay?
+url:    https://github.com/0day-ci/linux/commits/Eric-Auger/KVM-PCIe-MSI-passthrough-on-ARM-ARM64-kernel-part-3-3-vfio-changes/20160803-122924
+base:   https://github.com/awilliam/linux-vfio.git next
+config: x86_64-randconfig-s1-08031247 (attached as .config)
+compiler: gcc-4.4 (Debian 4.4.7-8) 4.4.7
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=x86_64 
 
+All errors (new ones prefixed by >>):
 
-Best regards,
+   drivers/vfio/vfio_iommu_type1.c:39:29: error: linux/msi-iommu.h: No such file or directory
+>> drivers/vfio/vfio_iommu_type1.c:40:32: error: linux/msi-doorbell.h: No such file or directory
+   drivers/vfio/vfio_iommu_type1.c: In function 'vfio_set_msi_aperture':
+   drivers/vfio/vfio_iommu_type1.c:453: error: implicit declaration of function 'iommu_msi_set_aperture'
+   drivers/vfio/vfio_iommu_type1.c: In function 'vfio_iommu_type1_attach_group':
+>> drivers/vfio/vfio_iommu_type1.c:933: error: implicit declaration of function 'msi_doorbell_safe'
+   At top level:
+   cc1: warning: unrecognized command line option "-Wno-maybe-uninitialized"
 
-James
+vim +40 drivers/vfio/vfio_iommu_type1.c
+
+    33	#include <linux/rbtree.h>
+    34	#include <linux/sched.h>
+    35	#include <linux/slab.h>
+    36	#include <linux/uaccess.h>
+    37	#include <linux/vfio.h>
+    38	#include <linux/workqueue.h>
+  > 39	#include <linux/msi-iommu.h>
+  > 40	#include <linux/msi-doorbell.h>
+    41	
+    42	#define DRIVER_VERSION  "0.2"
+    43	#define DRIVER_AUTHOR   "Alex Williamson <alex.williamson@redhat.com>"
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 19855 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160803/b1f7903a/attachment-0001.obj>
