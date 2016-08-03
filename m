@@ -1,45 +1,44 @@
 From: wagi@monom.org (Daniel Wagner)
-Date: Wed,  3 Aug 2016 14:03:07 +0200
-Subject: [PATCH v0 0/4] Use complete() instead of complete_all()
-Message-ID: <1470225791-16613-1-git-send-email-wagi@monom.org>
+Date: Wed,  3 Aug 2016 14:03:09 +0200
+Subject: [PATCH v0 2/4] i2c: bcm-kona: Use complete() instead of complete_all()
+In-Reply-To: <1470225791-16613-1-git-send-email-wagi@monom.org>
+References: <1470225791-16613-1-git-send-email-wagi@monom.org>
+Message-ID: <1470225791-16613-3-git-send-email-wagi@monom.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Daniel Wagner <daniel.wagner@bmw-carit.de>
 
-Hi,
+There is only one waiter for the completion, therefore there
+is no need to use complete_all(). Let's make that clear by
+using complete() instead of complete_all().
 
-Using complete_all() is not wrong per se but it suggest that there
-might be more than one reader. For -rt I am reviewing all
-complete_all() users and would like to leave only the real ones in the
-tree. The main problem for -rt about complete_all() is that it can be
-uses inside IRQ context and that can lead to unbounded amount work
-inside the interrupt handler. That is a no no for -rt.
+The usage pattern of the completion is:
 
-The patches grouped per subsystem and in small batches to allow
-reviewing. Unfortanatly I am not so good in coming up with unique
-commit message, so please bear with me in that regard. I could also
-squash them together, although each patch containts a very short
-reasoning why there is only one waiter. Let me know what you rather
-prefer. One patch which updates all complete_all() users or those 4
-patches with some reasoning.
+bcm_kona_send_i2c_cmd()
+  reinit_completion()
+  ...
+  bcm_kona_i2c_send_cmd_to_ctrl()
+  ...
+  wait_for_completion_timeout()
 
-It is only test compiled because I don't have the all the hardware.
+Signed-off-by: Daniel Wagner <daniel.wagner@bmw-carit.de>
+---
+ drivers/i2c/busses/i2c-bcm-kona.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-cheers,
-daniel
-
-Daniel Wagner (4):
-  i2c: bcm-iproc: Use complete() instead of complete_all()
-  i2c: bcm-kona: Use complete() instead of complete_all()
-  i2c: brcmstb: Use complete() instead of complete_all()
-  i2c: meson: Use complete() instead of complete_all()
-
- drivers/i2c/busses/i2c-bcm-iproc.c | 2 +-
- drivers/i2c/busses/i2c-bcm-kona.c  | 2 +-
- drivers/i2c/busses/i2c-brcmstb.c   | 2 +-
- drivers/i2c/busses/i2c-meson.c     | 6 +++---
- 4 files changed, 6 insertions(+), 6 deletions(-)
-
+diff --git a/drivers/i2c/busses/i2c-bcm-kona.c b/drivers/i2c/busses/i2c-bcm-kona.c
+index ac9f476..f987432 100644
+--- a/drivers/i2c/busses/i2c-bcm-kona.c
++++ b/drivers/i2c/busses/i2c-bcm-kona.c
+@@ -229,7 +229,7 @@ static irqreturn_t bcm_kona_i2c_isr(int irq, void *devid)
+ 		       dev->base + TXFCR_OFFSET);
+ 
+ 	writel(status & ~ISR_RESERVED_MASK, dev->base + ISR_OFFSET);
+-	complete_all(&dev->done);
++	complete(&dev->done);
+ 
+ 	return IRQ_HANDLED;
+ }
 -- 
 2.7.4
