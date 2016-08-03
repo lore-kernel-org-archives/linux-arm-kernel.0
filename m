@@ -1,193 +1,558 @@
-From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Wed, 03 Aug 2016 08:43:36 +0900
-Subject: [PATCH v3 2/2] mmc: host: sunxi: add support for A64 mmc
- controller
-In-Reply-To: <20160801151351.51854-3-icenowy@aosc.xyz>
-References: <20160801151351.51854-1-icenowy@aosc.xyz>
- <CGME20160801151434epcas1p15f57862a238cf493445ed667f37a8a88@epcas1p1.samsung.com>
- <20160801151351.51854-3-icenowy@aosc.xyz>
-Message-ID: <57A13028.2030506@samsung.com>
+From: anurupvasu@gmail.com (Anurup M)
+Date: Wed, 3 Aug 2016 05:58:13 +0530
+Subject: [PATCH 4/8] arm64:perf: Add support for Hisilicon SoC event
+ counters
+In-Reply-To: <20160628104230.GE31744@leverpostej>
+References: <1467107429-55477-1-git-send-email-anurup.m@huawei.com>
+ <1467107429-55477-5-git-send-email-anurup.m@huawei.com>
+ <20160628104230.GE31744@leverpostej>
+Message-ID: <57A13A9D.6020006@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Icenowy,
+Hi Mark,
 
-On 08/02/2016 12:13 AM, Icenowy Zheng wrote:
-> A64 SoC features a MMC controller which need only the mod clock, and can
-> calibrate delay by itself. This patch adds support for the new MMC
-> controller IP core.
-> 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
-> ---
-> Changes in v2:
-> - Rebased on Hans de Goede's patchset.
-> Changes in v3:
-> - Tidy up based on Hans de Goede's opinions.
-> 
->  drivers/mmc/host/sunxi-mmc.c | 66 ++++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 66 insertions(+)
-> 
-> diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
-> index 2ec91ce..3c26180 100644
-> --- a/drivers/mmc/host/sunxi-mmc.c
-> +++ b/drivers/mmc/host/sunxi-mmc.c
-> @@ -72,6 +72,13 @@
->  #define SDXC_REG_CHDA	(0x90)
->  #define SDXC_REG_CBDA	(0x94)
->  
-> +/* New registers introduced in A64 */
-> +#define SDXC_REG_A12A		0x058 /* SMC Auto Command 12 Register */
-> +#define SDXC_REG_SD_NTSR	0x05C /* SMC New Timing Set Register */
-> +#define SDXC_REG_DRV_DL		0x140 /* Drive Delay Control Register */
-> +#define SDXC_REG_SAMP_DL_REG	0x144 /* SMC sample delay control */
-> +#define SDXC_REG_DS_DL_REG	0x148 /* SMC data strobe delay control */
-> +
->  #define mmc_readl(host, reg) \
->  	readl((host)->reg_base + SDXC_##reg)
->  #define mmc_writel(host, reg, value) \
-> @@ -217,6 +224,15 @@
->  #define SDXC_CLK_50M_DDR	3
->  #define SDXC_CLK_50M_DDR_8BIT	4
->  
-> +#define SDXC_2X_TIMING_MODE	BIT(31)
-> +
-> +#define SDXC_CAL_START		BIT(15)
-> +#define SDXC_CAL_DONE		BIT(14)
-> +#define SDXC_CAL_DL_SHIFT	8
-> +#define SDXC_CAL_DL_SW_EN	BIT(7)
-> +#define SDXC_CAL_DL_SW_SHIFT	0
-> +#define SDXC_CAL_DL_MASK	0x3f
-> +
->  struct sunxi_mmc_clk_delay {
->  	u32 output;
->  	u32 sample;
-> @@ -232,6 +248,9 @@ struct sunxi_idma_des {
->  struct sunxi_mmc_cfg {
->  	u32 idma_des_size_bits;
->  	const struct sunxi_mmc_clk_delay *clk_delays;
-> +
-> +	/* does the IP block support autocalibration? */
-> +	bool can_calibrate;
->  };
->  
->  struct sunxi_mmc_host {
-> @@ -657,6 +676,38 @@ static int sunxi_mmc_oclk_onoff(struct sunxi_mmc_host *host, u32 oclk_en)
->  	return 0;
->  }
->  
-> +static int sunxi_mmc_calibrate(struct sunxi_mmc_host *host,
-> +			       struct mmc_ios *ios, int reg_off)
+  sorry for delayed response.
 
-Where is mmc_ios structure used in this function?
-And why passing the reg_off?
+On Tuesday 28 June 2016 04:12 PM, Mark Rutland wrote:
+> On Tue, Jun 28, 2016 at 05:50:25AM -0400, Anurup M wrote:
+>> 	1. Hisilicon SoC PMU to support different hardware event
+>> 	   counters.
+>> 	2. Register with Perf PMU as RAW events.
+> NAK to use of PERF_TYPE_RAW. This should be a dynamic, non-ABI id.
+> Register with -1 as the type, and have the perf core allocate it.
+I shall change it.
+>> 	3. Hisilicon PMU shall use the DJTAG hardware interface
+>> 	   to access hardware event counters and configuration
+>> 	   register.
+> As mentioend for earlier patches, I cannot find the DJTAG code, so it'sn
+> ot possible to review this fully.
+I shall send the djtag and HIP05 L3 cache PMU patches together.
+>
+>> 	4. Routines to initialze and setup PMU.
+> Nit: initialize.
+OK.
+>
+>> 	5. Routines to enable/disable/add/del/start/stop hardware
+>> 	   event counting.
+>>
+>> Signed-off-by: Anurup M <anurup.m@huawei.com>
+>> Signed-off-by: Shaokun Zhang <zhangshaokun@hisilicon.com>
+>> ---
+>>   drivers/perf/hisilicon/hisi_uncore_pmu.c | 465 +++++++++++++++++++++++++++++++
+>>   drivers/perf/hisilicon/hisi_uncore_pmu.h | 125 +++++++++
+>>   2 files changed, 590 insertions(+)
+>>   create mode 100644 drivers/perf/hisilicon/hisi_uncore_pmu.c
+>>   create mode 100644 drivers/perf/hisilicon/hisi_uncore_pmu.h
+>  From a quick look at the code, there are a large number of "TBD"
+> comments, and the basic functionality required for this driver to
+> actually function is not present as of this patch.
+>
+> This is not helpful for review.
+OK.
+>
+>> diff --git a/drivers/perf/hisilicon/hisi_uncore_pmu.c b/drivers/perf/hisilicon/hisi_uncore_pmu.c
+>> new file mode 100644
+>> index 0000000..40bdc23
+>> --- /dev/null
+>> +++ b/drivers/perf/hisilicon/hisi_uncore_pmu.c
+>> @@ -0,0 +1,465 @@
+>> +/*
+>> + * HiSilicon SoC Hardware event counters support
+>> + *
+>> + * Copyright (C) 2016 Huawei Technologies Limited
+>> + * Author: Anurup M <anurup.m@huawei.com>
+>> + *
+>> + * This code is based heavily on the ARMv7 perf event code.
+> The CPU PMU code is very different to what's required for uncore/system
+> PMUs such as this. The arm-cci and arm-ccn drivers (currently under
+> drivers/bus/) are much better examples.
+OK. I shall change it.
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + *
+>> + * This program is distributed in the hope that it will be useful,
+>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + * GNU General Public License for more details.
+>> + *
+>> + * You should have received a copy of the GNU General Public License
+>> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+>> + */
+>> +#include <linux/kernel.h>
+>> +#include <linux/module.h>
+>> +#include <linux/bitmap.h>
+>> +#include <linux/of.h>
+>> +#include <linux/perf_event.h>
+> Minor nit: please sort these alphabetically (the linux/bitmap.h include
+> should be first).
+Ok.
+>> +#include "hisi_uncore_pmu.h"
+>> +
+>> +/* djtag read interface - Call djtag driver to access SoC registers */
+>> +int hisi_djtag_readreg(int module_id, int bank, u32 offset,
+>> +				struct device_node *djtag_node, u32 *pvalue)
+>> +{
+>> +	int ret;
+>> +	u32 chain_id = 0;
+>> +
+>> +	while (bank != 1) {
+>> +		bank = (bank >> 0x1);
+>> +		chain_id++;
+>> +	}
+>> +
+>> +	ret = djtag_readl(djtag_node, offset, module_id, chain_id, pvalue);
+>> +	if (ret)
+>> +		pr_warn("Djtag:%s Read failed!\n", djtag_node->full_name);
+>> +
+>> +	return ret;
+>> +}
+>> +
+>> +/* djtag write interface - Call djtag driver  to access SoC registers */
+>> +int hisi_djtag_writereg(int module_id, int bank,
+>> +				u32 offset, u32 value,
+>> +				struct device_node *djtag_node)
+>> +{
+>> +	int ret;
+>> +
+>> +	ret = djtag_writel(djtag_node, offset, module_id, 0, value);
+>> +	if (ret)
+>> +		pr_warn("Djtag:%s Write failed!\n", djtag_node->full_name);
+>> +
+>> +	return ret;
+>> +}
+>> +
+>> +void hisi_uncore_pmu_write_evtype(struct hisi_hwmod_unit *punit,
+>> +						int idx, u32 val)
+>> +{
+>> +	/* TBD: Select event based on Hardware counter Module */
+>> +}
+>> +
+>> +int hisi_pmu_get_event_idx(struct hw_perf_event *hwc,
+>> +						struct hisi_hwmod_unit *punit)
+>> +{
+>> +	int event_idx = -1;
+>> +
+>> +	/* TBD - Get the available hardware event counter index */
+>> +
+>> +	return event_idx;
+>> +}
+>> +
+>> +void hisi_pmu_clear_event_idx(struct hw_perf_event *hwc,
+>> +					struct hisi_hwmod_unit *punit,
+>> +								int idx)
+>> +{
+>> +	/* TBD - Release the hardware event counter index */
+>> +}
+> Please have some version of these implemented when this code is added.
+> Having empty stubs like this is not helpful for review.
+OK. shall modify it.
+>
+>> +
+>> +static int
+>> +__hw_perf_event_init(struct perf_event *event)
+>> +{
+>> +	struct hw_perf_event *hwc = &event->hw;
+>> +	int mapping;
+>> +
+>> +	mapping = pmu_map_event(event);
+>> +	if (mapping < 0) {
+>> +		pr_debug("event %x:%llx not supported\n", event->attr.type,
+>> +							 event->attr.config);
+>> +		return mapping;
+>> +	}
+>> +
+>> +	/*
+>> +	 * We don't assign an index until we actually place the event onto
+>> +	 * hardware. Use -1 to signify that we haven't decided where to put it
+>> +	 * yet.
+>> +	 */
+>> +	hwc->idx		= -1;
+>> +	hwc->config_base	= 0;
+>> +	hwc->config		= 0;
+>> +	hwc->event_base		= 0;
+>> +
+>> +	/*
+>> +	 * For HiSilicon SoC store the event encoding into the config_base
+>> +	 * field.
+>> +	 */
+>> +	hwc->config_base = event->attr.config;
+>> +
+>> +	/*
+>> +	 * Limit the sample_period to half of the counter width. That way, the
+>> +	 * new counter value is far less likely to overtake the previous one
+>> +	 * unless you have some serious IRQ latency issues.
+>> +	 */
+>> +	hwc->sample_period  = HISI_MAX_PERIOD >> 1;
+>> +	hwc->last_period    = hwc->sample_period;
+>> +	local64_set(&hwc->period_left, hwc->sample_period);
+>> +
+>> +	/* TBD: Initialize event counter variables to support multiple
+>> +	 * HiSilicon Soc SCCL and banks
+>> +	 */
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +void hw_perf_event_destroy(struct perf_event *event)
+>> +{
+>> +	struct hisi_pmu *phisi_pmu = to_hisi_pmu(event->pmu);
+>> +	struct hisi_hwmod_unit *punit;
+>> +	atomic_t *active_events;
+>> +	struct mutex *reserve_mutex;
+>> +	u32 unit_idx = GET_UNIT_IDX(event->hw.config_base);
+>> +
+>> +	punit = &phisi_pmu->hwmod_pmu_unit[unit_idx];
+>> +	active_events = &punit->active_events;
+>> +	reserve_mutex = &punit->reserve_mutex;
+>> +
+>> +	if (atomic_dec_and_mutex_lock(active_events, reserve_mutex)) {
+>> +		/* FIXME: Release IRQ here */
+>> +		mutex_unlock(reserve_mutex);
+>> +	}
+>> +}
+> Please either implement this, or don't bother dynamically acquiring and
+> freeing the IRQ.
+>
+> It looks like none of the other uncore PMU drivers bothers...
+Ok. shall add them with the counter overflow IRQ handling support.
+>
+>> +
+>> +int hisi_uncore_pmu_event_init(struct perf_event *event)
+>> +{
+>> +	struct hisi_pmu *phisi_pmu = to_hisi_pmu(event->pmu);
+>> +	struct hisi_hwmod_unit *punit;
+>> +	u32 raw_event_code = event->attr.config;
+>> +	u32 unit_idx = GET_UNIT_IDX(raw_event_code);
+>> +	int err;
+>> +
+>> +	if (event->attr.type != event->pmu->type)
+>> +		return -ENOENT;
+>> +
+>> +	/* we do not support sampling */
+>> +	if (is_sampling_event(event) || event->attach_state & PERF_ATTACH_TASK)
+>> +		return -EOPNOTSUPP;
+>> +
+>> +	/* counters do not have these bits */
+>> +	if (event->attr.exclude_user	||
+>> +	    event->attr.exclude_kernel	||
+>> +	    event->attr.exclude_host	||
+>> +	    event->attr.exclude_guest	||
+>> +	    event->attr.exclude_hv	||
+>> +	    event->attr.exclude_idle)
+>> +		return -EINVAL;
+> All of this crops up so much we should have common code to handle all of
+> this. Either a library function or an uncore flag that the core code can
+> check.
+>
+>> +
+>> +	punit = &phisi_pmu->hwmod_pmu_unit[unit_idx];
+>> +
+>> +	event->destroy = hw_perf_event_destroy;
+>> +
+>> +	err = __hw_perf_event_init(event);
+>> +	if (err)
+>> +		hw_perf_event_destroy(event);
+>> +
+>> +	return err;
+>> +}
+>> +
+>> +
+>> +/* Read hardware counter and update the Perf counter statistics */
+>> +u64 hisi_uncore_pmu_event_update(struct perf_event *event,
+>> +					struct hw_perf_event *hwc,
+>> +							int idx) {
+>> +	u64 new_raw_count = 0;
+>> +	/*
+>> +	 * TBD: Identify Event type and read appropriate hardware
+>> +	 * counter and sum the values
+>> +	 */
+>> +
+>> +	return new_raw_count;
+>> +}
+>> +
+>> +void hisi_uncore_pmu_enable(struct pmu *pmu)
+>> +{
+>> +	/* TBD: Enable all the PMU counters. */
+>> +}
+>> +
+>> +void hisi_uncore_pmu_disable(struct pmu *pmu)
+>> +{
+>> +	/* TBD: Disable all the PMU counters. */
+>> +}
+>> +
+>> +int hisi_pmu_enable_counter(struct hisi_hwmod_unit *punit,
+>> +							int idx)
+>> +{
+>> +	int ret = 0;
+>> +
+>> +	/* TBD - Enable the hardware event counting */
+>> +
+>> +	return ret;
+>> +}
+>> +
+>> +void hisi_pmu_disable_counter(struct hisi_hwmod_unit *punit,
+>> +							int idx)
+>> +{
+>> +	/* TBD - Disable the hardware event counting */
+>> +}
+> Please implement all of these.
+Ok.
+>
+>> +void hisi_uncore_pmu_enable_event(struct perf_event *event)
+>> +{
+>> +	struct hw_perf_event *hwc = &event->hw;
+>> +	struct hisi_pmu *phisi_pmu = to_hisi_pmu(event->pmu);
+>> +	struct hisi_hwmod_unit *punit;
+>> +	u32 unit_idx = GET_UNIT_IDX(hwc->config_base);
+>> +	int idx = hwc->idx;
+>> +
+>> +	punit = &phisi_pmu->hwmod_pmu_unit[unit_idx];
+>> +
+>> +	/*
+>> +	 * Enable counter and set the counter to count
+>> +	 * the event that we're interested in.
+>> +	 */
+>> +
+>> +	/*
+>> +	 * Disable counter
+>> +	 */
+>> +	hisi_pmu_disable_counter(punit, idx);
+>> +
+>> +	/*
+>> +	 * Set event (if destined for Hisilicon SoC counters).
+>> +	 */
+>> +	hisi_uncore_pmu_write_evtype(punit, idx, hwc->config_base);
+>> +
+>> +	/*
+>> +	 * Enable counter
+>> +	 */
+>> +	hisi_pmu_enable_counter(punit, idx);
+>> +
+>> +}
+>> +
+>> +int hisi_pmu_write_counter(struct hisi_hwmod_unit *punit,
+>> +						int idx,
+>> +						u32 value)
+>> +{
+>> +	int ret = 0;
+>> +
+>> +	/* TBD - Write to the hardware event counter */
+>> +
+>> +	return ret;
+>> +}
+>> +
+>> +void hisi_pmu_event_set_period(struct perf_event *event)
+>> +{
+>> +	struct hw_perf_event *hwc = &event->hw;
+>> +	struct hisi_pmu *phisi_pmu = to_hisi_pmu(event->pmu);
+>> +	struct hisi_hwmod_unit *punit;
+>> +	u32 unit_idx = GET_UNIT_IDX(hwc->config_base);
+>> +	int idx = hwc->idx;
+>> +
+>> +	/*
+>> +	 * The Hisilicon PMU counters have a period of 2^32. To account for the
+>> +	 * possiblity of extreme interrupt latency we program for a period of
+>> +	 * half that. Hopefully we can handle the interrupt before another 2^31
+>> +	 * events occur and the counter overtakes its previous value.
+>> +	 */
+>> +	u64 val = 1ULL << 31;
+>> +
+>> +	punit = &phisi_pmu->hwmod_pmu_unit[unit_idx];
+>> +	local64_set(&hwc->prev_count, val);
+>> +	hisi_pmu_write_counter(punit, idx, val);
+>> +}
+>> +
+>> +void hisi_uncore_pmu_start(struct perf_event *event,
+>> +						int pmu_flags)
+>> +{
+>> +	struct hw_perf_event *hwc = &event->hw;
+>> +	struct hisi_pmu *phisi_pmu = to_hisi_pmu(event->pmu);
+>> +	struct hisi_hwmod_unit *punit;
+>> +	struct hisi_pmu_hw_events *hw_events;
+>> +	u32 unit_idx = GET_UNIT_IDX(hwc->config_base);
+>> +	unsigned long flags;
+>> +
+>> +	if (unit_idx >= (HISI_SCCL_MAX - 1)) {
+>> +		pr_err("Invalid unitID=%d in event code=%lu!\n",
+>> +					unit_idx + 1, hwc->config_base);
+>> +		return;
+>> +	}
+>> +
+>> +	punit = &phisi_pmu->hwmod_pmu_unit[unit_idx];
+>> +	hw_events = &punit->hw_events;
+>> +
+>> +	/*
+>> +	 * To handle interrupt latency, we always reprogram the period
+>> +	 * regardlesss of PERF_EF_RELOAD.
+>> +	 */
+>> +	if (pmu_flags & PERF_EF_RELOAD)
+>> +		WARN_ON_ONCE(!(hwc->state & PERF_HES_UPTODATE));
+>> +
+>> +	hwc->state = 0;
+>> +
+>> +	raw_spin_lock_irqsave(&hw_events->pmu_lock, flags);
+>> +
+>> +	hisi_pmu_event_set_period(event);
+>> +	hisi_uncore_pmu_enable_event(event);
+>> +
+>> +	raw_spin_unlock_irqrestore(&hw_events->pmu_lock, flags);
+>> +}
+>> +
+>> +void hisi_uncore_pmu_stop(struct perf_event *event,
+>> +						int flags)
+>> +{
+>> +	struct hw_perf_event *hwc = &event->hw;
+>> +	struct hisi_pmu *phisi_pmu = to_hisi_pmu(event->pmu);
+>> +	struct hisi_hwmod_unit *punit = NULL;
+>> +	u32 unit_idx = GET_UNIT_IDX(hwc->config_base);
+>> +	int idx = hwc->idx;
+>> +
+>> +	if (hwc->state & PERF_HES_STOPPED)
+>> +		return;
+>> +
+>> +	punit = &phisi_pmu->hwmod_pmu_unit[unit_idx];
+>> +
+>> +	/*
+>> +	 * We always reprogram the counter, so ignore PERF_EF_UPDATE. See
+>> +	 * hisi_uncore_pmu_start()
+>> +	 */
+>> +	hisi_pmu_disable_counter(punit, idx);
+>> +	hisi_uncore_pmu_event_update(event, hwc, idx);
+>> +	hwc->state |= PERF_HES_STOPPED | PERF_HES_UPTODATE;
+>> +
+>> +}
+>> +
+>> +int hisi_uncore_pmu_add(struct perf_event *event, int flags)
+>> +{
+>> +	struct hw_perf_event *hwc = &event->hw;
+>> +	struct hisi_pmu *phisipmu = to_hisi_pmu(event->pmu);
+>> +	struct hisi_hwmod_unit *punit;
+>> +	struct hisi_pmu_hw_events *hw_events;
+>> +	u32 unit_idx = GET_UNIT_IDX(hwc->config_base);
+>> +	int idx, err = 0;
+>> +
+>> +	if (unit_idx >= (HISI_SCCL_MAX - 1)) {
+>> +		pr_err("Invalid unitID=%d in event code=%lu\n",
+>> +					unit_idx + 1, hwc->config_base);
+>> +		return -EINVAL;
+>> +	}
+>> +
+>> +	punit = &phisipmu->hwmod_pmu_unit[unit_idx];
+>> +	hw_events = &punit->hw_events;
+>> +
+>> +	/* If we don't have a free counter then return early. */
+>> +	idx = hisi_pmu_get_event_idx(hwc, punit);
+>> +	if (idx < 0) {
+>> +		err = idx;
+>> +		goto out;
+>> +	}
+>> +
+>> +	event->hw.idx = idx;
+>> +	hw_events->events[idx] = event;
+>> +
+>> +	hwc->state = PERF_HES_STOPPED | PERF_HES_UPTODATE;
+>> +	if (flags & PERF_EF_START)
+>> +		hisi_uncore_pmu_start(event, PERF_EF_RELOAD);
+>> +
+>> +	/* Propagate our changes to the userspace mapping. */
+>> +	perf_event_update_userpage(event);
+>> +
+>> +out:
+>> +	return err;
+>> +}
+>> +
+>> +void hisi_uncore_pmu_del(struct perf_event *event, int flags)
+>> +{
+>> +	struct hw_perf_event *hwc = &event->hw;
+>> +	struct hisi_pmu *phisipmu = to_hisi_pmu(event->pmu);
+>> +	struct hisi_hwmod_unit *punit;
+>> +	struct hisi_pmu_hw_events *hw_events;
+>> +	u32 unit_idx = GET_UNIT_IDX(hwc->config_base);
+>> +	int idx = hwc->idx;
+>> +
+>> +	punit = &phisipmu->hwmod_pmu_unit[unit_idx];
+>> +	hw_events = &punit->hw_events;
+>> +
+>> +	hisi_uncore_pmu_stop(event, PERF_EF_UPDATE);
+>> +	hw_events->events[idx] = NULL;
+>> +
+>> +	hisi_pmu_clear_event_idx(hwc, punit, idx);
+>> +
+>> +	perf_event_update_userpage(event);
+>> +}
+>> +
+>> +int pmu_map_event(struct perf_event *event)
+>> +{
+>> +	return (int)(event->attr.config & HISI_EVTYPE_EVENT);
+>> +}
+>> +
+>> +struct hisi_pmu *hisi_pmu_alloc(struct platform_device *pdev)
+>> +{
+>> +	struct hisi_pmu *phisipmu;
+>> +
+>> +	phisipmu = devm_kzalloc(&pdev->dev, sizeof(*phisipmu), GFP_KERNEL);
+>> +	if (!phisipmu)
+>> +		return ERR_PTR(-ENOMEM);
+>> +
+>> +	return phisipmu;
+>> +}
+>> +
+>> +int hisi_pmu_unit_init(struct platform_device *pdev,
+>> +				struct hisi_hwmod_unit *punit,
+>> +						int unit_id,
+>> +						int num_counters)
+>> +{
+>> +	punit->hw_events.events = devm_kcalloc(&pdev->dev,
+>> +				     num_counters,
+>> +				     sizeof(*punit->hw_events.events),
+>> +							     GFP_KERNEL);
+>> +	if (!punit->hw_events.events)
+>> +		return -ENOMEM;
+>> +
+>> +	raw_spin_lock_init(&punit->hw_events.pmu_lock);
+>> +	atomic_set(&punit->active_events, 0);
+>> +	mutex_init(&punit->reserve_mutex);
+>> +
+>> +	punit->unit_id = unit_id;
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +void hisi_uncore_pmu_read(struct perf_event *event)
+>> +{
+>> +	struct hw_perf_event *hwc = &event->hw;
+>> +	int idx = hwc->idx;
+>> +
+>> +	hisi_uncore_pmu_event_update(event, hwc, idx);
+>> +}
+>> +
+>> +int hisi_uncore_pmu_setup(struct hisi_pmu *hisipmu,
+>> +				struct platform_device *pdev,
+>> +						char *pmu_name)
+>> +{
+>> +	int ret;
+>> +
+>> +	/* Register the events are RAW events to support RAW events too */
+>> +	ret = perf_pmu_register(&hisipmu->pmu, pmu_name, PERF_TYPE_RAW);
+>> +	if (ret)
+>> +		goto fail;
+>> +
+>> +	return 0;
+>> +
+>> +fail:
+>> +	return ret;
+>> +}
+> Get rid of the goto and return ret in all cases. If you need the goto in
+> subsequent patches, you can introduce it as required.
+>
+> This is never called currently, so it's unclear to me precisely what is
+> being registered...
+OK. I shall modify it accordingly. Thanks.
 
-> +{
-> +	u32 reg = readl(host->reg_base + reg_off);
-> +	u32 delay;
-
-delay doesn't need to use u32..
-reg_off is only passed with SDXC_REG_SAMP_DL_REG..this function doesn't reuse anywhere.
-
-> +
-> +	if (!host->cfg->can_calibrate)
-> +		return 0;
-> +
-> +	reg &= ~(SDXC_CAL_DL_MASK << SDXC_CAL_DL_SW_SHIFT);
-> +	reg &= ~SDXC_CAL_DL_SW_EN;
-> +
-> +	writel(reg | SDXC_CAL_START, host->reg_base + reg_off);
-> +
-> +	dev_dbg(mmc_dev(host->mmc), "calibration started\n");
-> +
-> +	while (!((reg = readl(host->reg_base + reg_off)) & SDXC_CAL_DONE))
-> +		cpu_relax();
-
-If never hit this condition, infinite loop? 
-
-> +
-> +	delay = (reg >> SDXC_CAL_DL_SHIFT) & SDXC_CAL_DL_MASK;
-> +
-> +	reg &= ~SDXC_CAL_START;
-> +	reg |= (delay << SDXC_CAL_DL_SW_SHIFT) | SDXC_CAL_DL_SW_EN;
-
-Something is strange. It seems to maintain the  delay value.
-
-reg &= ~(SDXC_CAL_START | (SDXC_CAL_DL_MASK << SDXC_CAL_DL_SHIFT));
-reg |= SDXC_CAL_DL_SW_EN; 
-
-is it same thing?
-
-> +
-> +	writel(reg, host->reg_base + reg_off);
-> +
-> +	dev_dbg(mmc_dev(host->mmc), "calibration ended, res is 0x%x\n", reg);
-
-s/res is/reg is ?
-
-> +
-> +	/* TODO: enable calibrate on sdc2 SDXC_REG_DS_DL_REG of A64 */
-> +	return 0;
-> +}
-> +
->  static int sunxi_mmc_clk_set_phase(struct sunxi_mmc_host *host,
->  				   struct mmc_ios *ios, u32 rate)
->  {
-> @@ -731,6 +782,10 @@ static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
->  	if (ret)
->  		return ret;
->  
-> +	ret = sunxi_mmc_calibrate(host, ios, SDXC_REG_SAMP_DL_REG);
-> +	if (ret)
-> +		return ret;
-
-Never enter this condition. sunxi_mmc_calibrate() is always returned 0.
-
-
-Best Regards,
-Jaehoon Chung
-
-> +
->  	return sunxi_mmc_oclk_onoff(host, 1);
->  }
->  
-> @@ -982,21 +1037,31 @@ static const struct sunxi_mmc_clk_delay sun9i_mmc_clk_delays[] = {
->  static const struct sunxi_mmc_cfg sun4i_a10_cfg = {
->  	.idma_des_size_bits = 13,
->  	.clk_delays = NULL,
-> +	.can_calibrate = false,
->  };
->  
->  static const struct sunxi_mmc_cfg sun5i_a13_cfg = {
->  	.idma_des_size_bits = 16,
->  	.clk_delays = NULL,
-> +	.can_calibrate = false,
->  };
->  
->  static const struct sunxi_mmc_cfg sun7i_a20_cfg = {
->  	.idma_des_size_bits = 16,
->  	.clk_delays = sunxi_mmc_clk_delays,
-> +	.can_calibrate = false,
->  };
->  
->  static const struct sunxi_mmc_cfg sun9i_a80_cfg = {
->  	.idma_des_size_bits = 16,
->  	.clk_delays = sun9i_mmc_clk_delays,
-> +	.can_calibrate = false,
-> +};
-> +
-> +static const struct sunxi_mmc_cfg sun50i_a64_cfg = {
-> +	.idma_des_size_bits = 16,
-> +	.clk_delays = NULL,
-> +	.can_calibrate = true,
->  };
->  
->  static const struct of_device_id sunxi_mmc_of_match[] = {
-> @@ -1004,6 +1069,7 @@ static const struct of_device_id sunxi_mmc_of_match[] = {
->  	{ .compatible = "allwinner,sun5i-a13-mmc", .data = &sun5i_a13_cfg },
->  	{ .compatible = "allwinner,sun7i-a20-mmc", .data = &sun7i_a20_cfg },
->  	{ .compatible = "allwinner,sun9i-a80-mmc", .data = &sun9i_a80_cfg },
-> +	{ .compatible = "allwinner,sun50i-a64-mmc", .data = &sun50i_a64_cfg },
->  	{ /* sentinel */ }
->  };
->  MODULE_DEVICE_TABLE(of, sunxi_mmc_of_match);
-> 
+Thanks,
+Anurup
+> Thanks,
+> Mark.
