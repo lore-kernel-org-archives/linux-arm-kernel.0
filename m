@@ -1,37 +1,60 @@
-From: johan@kernel.org (Johan Hovold)
-Date: Wed, 3 Aug 2016 10:01:49 +0200
-Subject: [PATCH 0/3] ARM: omap: fix 4.7 gpmc networking regression
-In-Reply-To: <9cf04231-091c-4ac3-bfb8-8d8be3d591eb@ti.com>
-References: <1469362260-20066-1-git-send-email-johan@kernel.org>
- <20160802103505.GD28140@atomide.com>
- <9cf04231-091c-4ac3-bfb8-8d8be3d591eb@ti.com>
-Message-ID: <20160803080149.GB15860@localhost>
+From: koct9i@gmail.com (Konstantin Khlebnikov)
+Date: Wed, 3 Aug 2016 11:07:28 +0300
+Subject: Please don't replace numeric parameter like 0444 with macro
+In-Reply-To: <20160803004226.GF2356@ZenIV.linux.org.uk>
+References: <CA+55aFw5v23T-zvDZp-MmD_EYxF8WbafwwB59934FV7g21uMGQ@mail.gmail.com>
+ <20160803004226.GF2356@ZenIV.linux.org.uk>
+Message-ID: <CALYGNiPg9eXYdX209n8wEd03fh4Q45QT4EmUGjrZs+DEz-Jp5A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 03, 2016 at 10:46:24AM +0300, Roger Quadros wrote:
-> On 02/08/16 13:35, Tony Lindgren wrote:
-> > * Johan Hovold <johan@kernel.org> [160724 05:11]:
-> >> Networking is currently broken for Overo boards due to a regression in
-> >> 4.7. I bisected it down to
-> >>
-> >> 	d2d00862dfbb ("memory: omap-gpmc: Support general purpose input
-> >> 	for WAITPINs")
-> > ...
-> > 
-> >> Note that simply fixing the Overo NAND issue would fix the Overo
-> >> networking regression, but by restoring the 4.6 gpmc-probe behaviour
-> >> similar regressions on other OMAP systems are also avoided.
-> > 
-> > Roger, got a better fix in mind?
-> > 
-> 
-> Nope. I'll take patch 1 in my omap-gpmc queue for v4.8.
-> Thanks for the fixes Johan.
+On Wed, Aug 3, 2016 at 3:42 AM, Al Viro <viro@zeniv.linux.org.uk> wrote:
+> On Tue, Aug 02, 2016 at 04:58:29PM -0400, Linus Torvalds wrote:
+>> [ So I answered similarly to another patch, but I'll just re-iterate
+>> and change the subject line so that it stands out a bit from the
+>> millions of actual patches ]
+>>
+>> On Tue, Aug 2, 2016 at 1:42 PM, Pavel Machek <pavel@ucw.cz> wrote:
+>> >
+>> > Everyone knows what 0644 is, but noone can read S_IRUSR | S_IWUSR |
+>> > S_IRCRP | S_IROTH (*). Please don't do this.
+>>
+>> Absolutely. It's *much* easier to parse and understand the octal
+>> numbers, while the symbolic macro names are just random line noise and
+>> hard as hell to understand. You really have to think about it.
+>>
+>> So we should rather go the other way: convert existing bad symbolic
+>> permission bit macro use to just use the octal numbers.
+>>
+>> The symbolic names are good for the *other* bits (ie sticky bit, and
+>> the inode mode _type_ numbers etc), but for the permission bits, the
+>> symbolic names are just insane crap. Nobody sane should ever use them.
+>> Not in the kernel, not in user space.
+>
+> Except that you are inviting the mixes like S_IFDIR | 17 /* oops, should've
+> been 017, or do we spell it 0017? */ that way.  I certainly agree that this
+> patch series had been a huge pile of manure, but "let's convert it in other
+> direction" is inviting pretty much the same thing, with lovely potential for
+> typos, etc.
 
-Now that 4.7 has been released, you may want to consider adding a stable
-tag also for the first patch to avoid similar issues on other systems
-when they get updated to 4.7-stable.
+We could add several macro with readable names for really used rwx
+combinations, like:
 
-Thanks,
-Johan
+#define KERN_SECRET_RO 0400
+#define KERN_SECRET_RW 0600
+#define KERN_SECRET_WO 0200
+#define KERN_SECRET_DIR 0500
+
+#define KERN_PUBLIC_RO 0444
+#define KERN_PUBLIC_RW 0644
+#define KERN_PUBLIC_DIR 0555
+
+#define KERN_UNSAFE_RW 0666
+#define KERN_UNSAFE_WO 0222
+#define KERN_UNSAFE_DIR 0777
+
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
