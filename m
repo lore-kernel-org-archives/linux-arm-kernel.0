@@ -1,42 +1,38 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Wed, 3 Aug 2016 12:55:33 +0300
-Subject: [PATCH 0/3] ARM: omap: fix 4.7 gpmc networking regression
-In-Reply-To: <20160803080149.GB15860@localhost>
-References: <1469362260-20066-1-git-send-email-johan@kernel.org>
- <20160802103505.GD28140@atomide.com>
- <9cf04231-091c-4ac3-bfb8-8d8be3d591eb@ti.com>
- <20160803080149.GB15860@localhost>
-Message-ID: <2fde63f3-62b1-75a0-524a-f858ff1de459@ti.com>
+From: kid.jin@hisilicon.com (Jin Guojun)
+Date: Wed, 3 Aug 2016 18:22:13 +0800
+Subject: [PATCH] UHS-SD card for Hisilicon Hikey
+Message-ID: <1470219733-113975-1-git-send-email-kid.jin@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/08/16 11:01, Johan Hovold wrote:
-> On Wed, Aug 03, 2016 at 10:46:24AM +0300, Roger Quadros wrote:
->> On 02/08/16 13:35, Tony Lindgren wrote:
->>> * Johan Hovold <johan@kernel.org> [160724 05:11]:
->>>> Networking is currently broken for Overo boards due to a regression in
->>>> 4.7. I bisected it down to
->>>>
->>>> 	d2d00862dfbb ("memory: omap-gpmc: Support general purpose input
->>>> 	for WAITPINs")
->>> ...
->>>
->>>> Note that simply fixing the Overo NAND issue would fix the Overo
->>>> networking regression, but by restoring the 4.6 gpmc-probe behaviour
->>>> similar regressions on other OMAP systems are also avoided.
->>>
->>> Roger, got a better fix in mind?
->>>
->>
->> Nope. I'll take patch 1 in my omap-gpmc queue for v4.8.
->> Thanks for the fixes Johan.
-> 
-> Now that 4.7 has been released, you may want to consider adding a stable
-> tag also for the first patch to avoid similar issues on other systems
-> when they get updated to 4.7-stable.
-> 
+mmc: dw_mmc-k3: Hisilicon Hikey have no tuning function in dw_mmc-k3.c,so we must do the tuning function stub when we init UHS card.
 
-Yes, that was my plan as well.
+Signed-off-by: Jin Guojun <kid.jin@hisilicon.com>
+---
+ drivers/mmc/host/dw_mmc-k3.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-cheers,
--roger
+diff --git a/drivers/mmc/host/dw_mmc-k3.c b/drivers/mmc/host/dw_mmc-k3.c
+index 8e9d886..6247894 100644
+--- a/drivers/mmc/host/dw_mmc-k3.c
++++ b/drivers/mmc/host/dw_mmc-k3.c
+@@ -131,11 +131,17 @@ static void dw_mci_hi6220_set_ios(struct dw_mci *host, struct mmc_ios *ios)
+ 	host->bus_hz = clk_get_rate(host->biu_clk);
+ }
+ 
++static int dw_mci_hi6220_execute_tuning(struct dw_mci_slot *slot, u32 opcode)
++{
++	return 0;
++}
++
+ static const struct dw_mci_drv_data hi6220_data = {
+ 	.caps			= dw_mci_hi6220_caps,
+ 	.switch_voltage		= dw_mci_hi6220_switch_voltage,
+ 	.set_ios		= dw_mci_hi6220_set_ios,
+ 	.parse_dt		= dw_mci_hi6220_parse_dt,
++	.execute_tuning		= dw_mci_hi6220_execute_tuning,
+ };
+ 
+ static const struct of_device_id dw_mci_k3_match[] = {
+-- 
+1.9.1
