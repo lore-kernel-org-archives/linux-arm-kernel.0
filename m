@@ -1,143 +1,133 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 3 Aug 2016 19:32:50 +0200
-Subject: [PATCH v2] KVM: arm64: ITS: return 1 on successful MSI injection
-In-Reply-To: <20160802125605.31665-1-andre.przywara@arm.com>
-References: <20160802125605.31665-1-andre.przywara@arm.com>
-Message-ID: <20160803173250.GA32244@cbox>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 3 Aug 2016 18:36:45 +0100
+Subject: [PATCH] drivers/perf: arm-pmu: convert arm_pmu_mutex to spinlock
+In-Reply-To: <1470244135-979-1-git-send-email-sudeep.holla@arm.com>
+References: <1470244135-979-1-git-send-email-sudeep.holla@arm.com>
+Message-ID: <20160803173645.GB1267@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 02, 2016 at 01:56:05PM +0100, Andre Przywara wrote:
-> According to the KVM API documentation a successful MSI injection
-> should return a value > 0 on success.
-> Return possible errors in vgic_its_trigger_msi() and report a
-> successful injection back to userland, while also reporting the
-> case where the MSI could not be delivered due to the guest not
-> having the LPI mapped, for instance.
+Hi,
+
+Sebastian, as a heads-up, the issue below issue may apply to over
+hotplug state machine conversions if a mutex was added.
+
+On Wed, Aug 03, 2016 at 06:08:55PM +0100, Sudeep Holla wrote:
+> arm_pmu_mutex is never held long and we don't want to sleep while the
+> lock is being held as it's executed in the context of hotplug notifiers.
+> So it can be converted to a simple spinlock instead.
 > 
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> Without this patch we get the following warning:
+> 
+> BUG: sleeping function called from invalid context at kernel/locking/mutex.c:620
+> in_atomic(): 1, irqs_disabled(): 128, pid: 0, name: swapper/2
+> no locks held by swapper/2/0.
+> irq event stamp: 381314
+> hardirqs last  enabled at (381313): _raw_spin_unlock_irqrestore+0x7c/0x88
+> hardirqs last disabled at (381314): cpu_die+0x28/0x48
+> softirqs last  enabled at (381294): _local_bh_enable+0x28/0x50
+> softirqs last disabled at (381293): irq_enter+0x58/0x78
+> CPU: 2 PID: 0 Comm: swapper/2 Not tainted 4.7.0 #12
+> Call trace:
+>  dump_backtrace+0x0/0x220
+>  show_stack+0x24/0x30
+>  dump_stack+0xb4/0xf0
+>  ___might_sleep+0x1d8/0x1f0
+>  __might_sleep+0x5c/0x98
+>  mutex_lock_nested+0x54/0x400
+>  arm_perf_starting_cpu+0x34/0xb0
+>  cpuhp_invoke_callback+0x88/0x3d8
+>  notify_cpu_starting+0x78/0x98
+>  secondary_start_kernel+0x108/0x1a8
+> 
+> This patch converts the mutex to spinlock to eliminate the above
+> warnings. This constraints pmu->reset to be non-blocking call which is
+> the case with all the ARM PMU backends.
+> Fixes: 37b502f121ad ("arm/perf: Fix hotplug state machine conversion")
+> Cc: Stephen Boyd <sboyd@codeaurora.org>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+
+I haven't been able to come up with a race with hotplug that halted
+forward progress, and otherwise this is at least as structurally correct
+as the mutex, so FWIW:
+
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+
+Mark.
+
 > ---
-> Hi,
+>  drivers/perf/arm_pmu.c | 18 +++++++++---------
+>  1 file changed, 9 insertions(+), 9 deletions(-)
 > 
-> my brain is too toasted at the moment to find the proper error values
-> that we should return in vgic_its_trigger_msi() for the various cases
-> that could go wrong, so please feel free to suggest better values.
-> In the end we return either 0 or 1 (and ignore any error value at the
-> ITS level), so it shouldn't really make much difference.
-> 
-> Cheers,
-> Andre.
-> 
-> Changelog v1 .. v2:
-> - rework vgic_its_trigger_msi() to return proper error values
-> - return 0 to userland if the LPI could not be injected
-> 
->  include/linux/irqchip/arm-gic-v3.h |  1 +
->  virt/kvm/arm/vgic/vgic-its.c       | 48 +++++++++++++++++++++++---------------
->  2 files changed, 30 insertions(+), 19 deletions(-)
-> 
-> diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
-> index 56b0b7e..99ac022 100644
-> --- a/include/linux/irqchip/arm-gic-v3.h
-> +++ b/include/linux/irqchip/arm-gic-v3.h
-> @@ -337,6 +337,7 @@
->   */
->  #define E_ITS_MOVI_UNMAPPED_INTERRUPT		0x010107
->  #define E_ITS_MOVI_UNMAPPED_COLLECTION		0x010109
-> +#define E_ITS_INT_UNMAPPED_INTERRUPT		0x010307
->  #define E_ITS_CLEAR_UNMAPPED_INTERRUPT		0x010507
->  #define E_ITS_MAPD_DEVICE_OOR			0x010801
->  #define E_ITS_MAPC_PROCNUM_OOR			0x010902
-> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-> index 07411cf..456903c 100644
-> --- a/virt/kvm/arm/vgic/vgic-its.c
-> +++ b/virt/kvm/arm/vgic/vgic-its.c
-> @@ -441,39 +441,48 @@ static unsigned long vgic_mmio_read_its_idregs(struct kvm *kvm,
->   * Find the target VCPU and the LPI number for a given devid/eventid pair
->   * and make this IRQ pending, possibly injecting it.
->   * Must be called with the its_lock mutex held.
-> + * Returns 0 on success, a positive error value for any ITS mapping
-> + * related errors and negative error values for generic errors.
->   */
-> -static void vgic_its_trigger_msi(struct kvm *kvm, struct vgic_its *its,
-> -				 u32 devid, u32 eventid)
-> +static int vgic_its_trigger_msi(struct kvm *kvm, struct vgic_its *its,
-> +				u32 devid, u32 eventid)
->  {
-> +	struct kvm_vcpu *vcpu;
->  	struct its_itte *itte;
->  
->  	if (!its->enabled)
-> -		return;
-> +		return -EBUSY;
->  
->  	itte = find_itte(its, devid, eventid);
-> -	/* Triggering an unmapped IRQ gets silently dropped. */
-> -	if (itte && its_is_collection_mapped(itte->collection)) {
-> -		struct kvm_vcpu *vcpu;
-> -
-> -		vcpu = kvm_get_vcpu(kvm, itte->collection->target_addr);
-> -		if (vcpu && vcpu->arch.vgic_cpu.lpis_enabled) {
-> -			spin_lock(&itte->irq->irq_lock);
-> -			itte->irq->pending = true;
-> -			vgic_queue_irq_unlock(kvm, itte->irq);
-> -		}
-> -	}
-> +	if (!itte || !its_is_collection_mapped(itte->collection))
-> +		return E_ITS_INT_UNMAPPED_INTERRUPT;
-> +
-> +	vcpu = kvm_get_vcpu(kvm, itte->collection->target_addr);
-> +	if (!vcpu)
-> +		return E_ITS_INT_UNMAPPED_INTERRUPT;
-> +
-> +	if (!vcpu->arch.vgic_cpu.lpis_enabled)
-> +		return -EBUSY;
-> +
-> +	spin_lock(&itte->irq->irq_lock);
-> +	itte->irq->pending = true;
-> +	vgic_queue_irq_unlock(kvm, itte->irq);
-> +
-> +	return 0;
+> diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
+> index 6ccb994bdfcb..4c9a537a1265 100644
+> --- a/drivers/perf/arm_pmu.c
+> +++ b/drivers/perf/arm_pmu.c
+> @@ -688,7 +688,7 @@ static int cpu_pmu_request_irq(struct arm_pmu *cpu_pmu, irq_handler_t handler)
+>  	return 0;
 >  }
->  
+> 
+> -static DEFINE_MUTEX(arm_pmu_mutex);
+> +static DEFINE_SPINLOCK(arm_pmu_lock);
+>  static LIST_HEAD(arm_pmu_list);
+> 
 >  /*
->   * Queries the KVM IO bus framework to get the ITS pointer from the given
->   * doorbell address.
->   * We then call vgic_its_trigger_msi() with the decoded data.
-> + * According to the KVM_SIGNAL_MSI API description returns 1 on success.
->   */
->  int vgic_its_inject_msi(struct kvm *kvm, struct kvm_msi *msi)
+> @@ -701,7 +701,7 @@ static int arm_perf_starting_cpu(unsigned int cpu)
 >  {
->  	u64 address;
->  	struct kvm_io_device *kvm_io_dev;
->  	struct vgic_io_device *iodev;
-> +	int ret;
->  
->  	if (!vgic_has_its(kvm))
->  		return -ENODEV;
-> @@ -490,10 +499,13 @@ int vgic_its_inject_msi(struct kvm *kvm, struct kvm_msi *msi)
->  	iodev = container_of(kvm_io_dev, struct vgic_io_device, dev);
->  
->  	mutex_lock(&iodev->its->its_lock);
-> -	vgic_its_trigger_msi(kvm, iodev->its, msi->devid, msi->data);
-> +	ret = vgic_its_trigger_msi(kvm, iodev->its, msi->devid, msi->data);
->  	mutex_unlock(&iodev->its->its_lock);
->  
-> -	return 0;
-> +	if (ret)
-> +		return 0;
-> +	else
-> +		return 1;
-
-I think this should be:
-
-  if (ret < 0)
-  	return ret;
-  else if (ret)
-  	return 0;
-  else
-  	return 1;
-
-
-Thanks,
--Christoffer
+>  	struct arm_pmu *pmu;
+> 
+> -	mutex_lock(&arm_pmu_mutex);
+> +	spin_lock(&arm_pmu_lock);
+>  	list_for_each_entry(pmu, &arm_pmu_list, entry) {
+> 
+>  		if (!cpumask_test_cpu(cpu, &pmu->supported_cpus))
+> @@ -709,7 +709,7 @@ static int arm_perf_starting_cpu(unsigned int cpu)
+>  		if (pmu->reset)
+>  			pmu->reset(pmu);
+>  	}
+> -	mutex_unlock(&arm_pmu_mutex);
+> +	spin_unlock(&arm_pmu_lock);
+>  	return 0;
+>  }
+> 
+> @@ -821,9 +821,9 @@ static int cpu_pmu_init(struct arm_pmu *cpu_pmu)
+>  	if (!cpu_hw_events)
+>  		return -ENOMEM;
+> 
+> -	mutex_lock(&arm_pmu_mutex);
+> +	spin_lock(&arm_pmu_lock);
+>  	list_add_tail(&cpu_pmu->entry, &arm_pmu_list);
+> -	mutex_unlock(&arm_pmu_mutex);
+> +	spin_unlock(&arm_pmu_lock);
+> 
+>  	err = cpu_pm_pmu_register(cpu_pmu);
+>  	if (err)
+> @@ -859,9 +859,9 @@ static int cpu_pmu_init(struct arm_pmu *cpu_pmu)
+>  	return 0;
+> 
+>  out_unregister:
+> -	mutex_lock(&arm_pmu_mutex);
+> +	spin_lock(&arm_pmu_lock);
+>  	list_del(&cpu_pmu->entry);
+> -	mutex_unlock(&arm_pmu_mutex);
+> +	spin_unlock(&arm_pmu_lock);
+>  	free_percpu(cpu_hw_events);
+>  	return err;
+>  }
+> @@ -869,9 +869,9 @@ static int cpu_pmu_init(struct arm_pmu *cpu_pmu)
+>  static void cpu_pmu_destroy(struct arm_pmu *cpu_pmu)
+>  {
+>  	cpu_pm_pmu_unregister(cpu_pmu);
+> -	mutex_lock(&arm_pmu_mutex);
+> +	spin_lock(&arm_pmu_lock);
+>  	list_del(&cpu_pmu->entry);
+> -	mutex_unlock(&arm_pmu_mutex);
+> +	spin_unlock(&arm_pmu_lock);
+>  	free_percpu(cpu_pmu->hw_events);
+>  }
+> 
+> --
+> 2.7.4
+> 
