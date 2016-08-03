@@ -1,34 +1,48 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Wed, 3 Aug 2016 18:57:01 +0200 (CEST)
-Subject: [PATCH v2 1/2] ARM: dts: Remove use of skeleton.dtsi from
- bcm283x.dtsi
-In-Reply-To: <1470233565-30154-1-git-send-email-ijc@hellion.org.uk>
-References: <1470233565-30154-1-git-send-email-ijc@hellion.org.uk>
-Message-ID: <914380166.36980.cd778509-7d01-4a7c-93d2-94401387c355.open-xchange@email.1und1.de>
+From: kbeldan@baylibre.com (Karl Beldan)
+Date: Wed,  3 Aug 2016 17:06:27 +0000
+Subject: [PATCH] ARM: dts: da850: Adjust the pinctrl muxing for the NAND on CS3
+Message-ID: <20160803170627.1773-1-kbeldan@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ian,
+- Adjust the settings to also allow driving EMA_D[8..15] for 16bits
+  NANDs. These are shared with GPIO3[0..7] which have no in-tree user.
+- Remove the useless CS4 setting
 
-> Ian Campbell <ijc@hellion.org.uk> hat am 3. August 2016 um 16:12 geschrieben:
-> 
-> 
-> This file is included from DTS files under arch/arm64 too (via
-> broadcom/bcm2837-rpi-3-b.dts and broadcom/bcm2837.dtsi). There is a desire
-> not to have skeleton.dtsi for ARM64. See commit 3ebee5a2e141 ("arm64: dts:
-> kill skeleton.dtsi") for rationale for its removal.
-> 
-> As well as the addition of #*-cells also requires adding the device_type to
-> the rpi memory node explicitly.
-> 
-> Note that this change results in the removal of an empty /aliases node from
-> bcm2835-rpi-a.dtb and bcm2835-rpi-a-plus.dtb. I have no hardware to check
-> if this is a problem or not.
-> 
-> It also results in some reordering of the nodes in the DTBs (the /aliases
-> and /memory nodes come later). This isn't supposed to matter but, again,
-> I've no hardware to check if it is true in this particular case.
+Cc: Kevin Hilman <khilman@baylibre.com>
+Signed-off-by: Karl Beldan <kbeldan@baylibre.com>
+---
+ arch/arm/boot/dts/da850.dtsi | 12 ++++++++----
+ 1 file changed, 8 insertions(+), 4 deletions(-)
 
-i tested this patch with a Raspberry Pi Model B successfully.
-
-Tested-by: Stefan Wahren <stefan.wahren@i2se.com>
+diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
+index 3a00978..ae5dc18 100644
+--- a/arch/arm/boot/dts/da850.dtsi
++++ b/arch/arm/boot/dts/da850.dtsi
+@@ -43,16 +43,20 @@
+ 
+ 			nand_cs3_pins: pinmux_nand_pins {
+ 				pinctrl-single,bits = <
+-					/* EMA_OE, EMA_WE */
+-					0x1c 0x00110000  0x00ff0000
+-					/* EMA_CS[4],EMA_CS[3]*/
+-					0x1c 0x00000110  0x00000ff0
++					/* EMA_OE, EMA_WE, EMA_CS[3] */
++					0x1c 0x00110010  0x00ff00f0
+ 					/*
+ 					 * EMA_D[0], EMA_D[1], EMA_D[2],
+ 					 * EMA_D[3], EMA_D[4], EMA_D[5],
+ 					 * EMA_D[6], EMA_D[7]
+ 					 */
+ 					0x24 0x11111111  0xffffffff
++					/*
++					 * EMA_D[8],  EMA_D[9],  EMA_D[10],
++					 * EMA_D[11], EMA_D[12], EMA_D[13],
++					 * EMA_D[14], EMA_D[15]
++					 */
++					0x20 0x11111111  0xffffffff
+ 					/* EMA_A[1], EMA_A[2] */
+ 					0x30 0x01100000  0x0ff00000
+ 				>;
+-- 
+2.9.0.rc1
