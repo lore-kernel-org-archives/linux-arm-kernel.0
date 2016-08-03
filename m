@@ -1,81 +1,63 @@
-From: gg@slimlogic.co.uk (Graeme Gregory)
-Date: Wed, 3 Aug 2016 09:33:51 +0100
-Subject: [PATCH v8 4/4] serial: pl011: add console matching function
-In-Reply-To: <20160620151913.GR1041@n2100.armlinux.org.uk>
-References: <1463749405-11640-1-git-send-email-aleksey.makarov@linaro.org>
- <1463749405-11640-5-git-send-email-aleksey.makarov@linaro.org>
- <c37d62c7-1e1b-0b10-a083-c5207fbbb820@gmail.com>
- <fd9443e7-67f1-93e7-834b-445f9c29d876@linaro.org>
- <20160620151913.GR1041@n2100.armlinux.org.uk>
-Message-ID: <20160803083351.GD18515@xora-haswell.xora.org.uk>
+From: mingo@kernel.org (Ingo Molnar)
+Date: Wed, 3 Aug 2016 10:39:03 +0200
+Subject: [PATCH] Add file permission mode helpers
+In-Reply-To: <20160803082855.GA32280@kroah.com>
+References: <CA+55aFw5v23T-zvDZp-MmD_EYxF8WbafwwB59934FV7g21uMGQ@mail.gmail.com>
+ <20160803081140.GA7833@gmail.com>
+ <20160803082855.GA32280@kroah.com>
+Message-ID: <20160803083902.GA3643@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 20, 2016 at 04:19:14PM +0100, Russell King - ARM Linux wrote:
-> On Mon, Jun 20, 2016 at 03:26:39PM +0300, Aleksey Makarov wrote:
-> > 
-> > On 06/02/2016 09:02 PM, Aleksey Makarov wrote:
-> > > 
-> > > On 05/20/2016 04:03 PM, Aleksey Makarov wrote:
-> > 
-> > Hi Russell,
-> > 
-> > Can you review this patch please?
-> > 
-> > Thank you
-> > Aleksey Makarov
-> > 
-> > >> This patch adds function pl011_console_match() that implements
-> > >> method match of struct console.  It allows to match consoles against
-> > >> data specified in a string, for example taken from command line or
-> > >> compiled by ACPI SPCR table handler.
-> > >>
-> > >> Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
-> > >> Reviewed-by: Peter Hurley <peter@hurleysoftware.com>
-> > > 
-> > > Hi Greg, Russell,
-> > > 
-> > > Can you review this patch and consider ACKing it please?
-> > > It had an ACK from Greg in v7 but since then I changed it a bit.
-> > > 
-> > > The patch by Christopher Covington [1] specifies that SBSA uart 
-> > > does 32-bit access to registers and this breaks the match function.  
-> > > In this series the function was changed to match when SPCR specifies
-> > > both mmio32 and mmio access.  I removed Acked-by: Greg from this
-> > > patch because of these changes.
-> > > 
-> > > The difference between v7 and v8:
-> > > 
-> > > diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-> > > index 4139b64..388edc8 100644
-> > > --- a/drivers/tty/serial/amba-pl011.c
-> > > +++ b/drivers/tty/serial/amba-pl011.c
-> > > @@ -2328,10 +2329,10 @@ static int __init pl011_console_match(struct console *co, char *name, int idx,
-> > >  
-> > >                 port = &amba_ports[i]->port;
-> > >  
-> > > -               if (port->iotype != iotype)
-> > > +               if (iotype != UPIO_MEM && iotype != UPIO_MEM32)
-> > >                         continue;
-> > > -               if ((iotype == UPIO_MEM || iotype == UPIO_MEM32) &&
-> > > -                   (port->mapbase != addr))
-> > > +
-> > > +               if (port->mapbase != addr)
-> > >                         continue;
-> > >  
-> > >                 co->index = i;
-> 
-> I'm looking at this change, and I don't know what effect it ultimately
-> has.  This is kind of a problem, because I've zero knowledge of ACPI,
-> and so I can't say whether this change is appropriate or not.  I have
-> no ARM server platforms (yet), nor any access to them, so I can't even
-> try it out.
-> 
-> In short, I've no idea.  I guess it's up to those who have come up
-> with SBSA to decide whether this is an appropriate change or not.
-> 
 
-Lorenzo, Sudeep, as ARM ACPI maintainers and keepers of SBSA do you have
-any comment on this?
+* Greg Kroah-Hartman <gregkh@linuxfoundation.org> wrote:
 
-Graeme
+> On Wed, Aug 03, 2016 at 10:11:40AM +0200, Ingo Molnar wrote:
+> > An added advantage would be that during review it would stick out like a sore 
+> > thumb if anyone used a 'weird' permission variant.
+> > 
+> > For example, if you saw these lines in a driver patch:
+> > 
+> > +	__ATTR(l1, 0444, driver_show_l4, NULL);
+> > +		__ATTR(l3, 0446, driver_show_l4, NULL);
+> > +			__ATTR(l2, 04444, driver_show_l4, NULL);
+> > +		__ATTR(l4, 0444, driver_show_l4, NULL);
+> > 
+> > ... would you notice it at a glance that it contains two security holes?
+> 
+> I've tried to deal with that in the past with the __ATTR_RW() and
+> __ATTR_RO() and __ATTR_WO() macros that more should be using.  I swept
+> the tree a few years ago to try to fix up most of them, but I know I
+> didn't catch them all, and more files have been added since then.
+> 
+> > While the weird permissions in this:
+> > 
+> > +		__ATTR(l1, PERM_r__r__r__,  driver_show_l4, NULL);
+> > +		__ATTR(l3, PERM_r__r__rw_,  driver_show_l4, NULL);
+> > +		__ATTR(l2, PERM_sr__r__r__, driver_show_l4, NULL);
+> > +		__ATTR(l4, PERM_r__r__r__,  driver_show_l4, NULL);
+> > 
+> > Wouln't even build, because the dangerous patterns of PERM_r__r__rw_ or 
+> > PERM_sr__r__r__ are not defined to begin with.
+> 
+> Because of that, odds are people will just stick to the octal numbers,
+> because they think they want something other than the ones you defined
+> for foolish reasons :)
+
+For code I maintain I'd insist on contributors using the human readable versions, 
+because in the past I've mixed up octals (and the symbolic helpers we have today) 
+myself and I find the 'ls -l' format much easier to read because that's the 
+primary file permission format I see every day working on code.
+
+> That being said, I do like them much better than the macros we have today, which 
+> I always have to go and look up every time I see them...
+
+Same here!
+
+I'm sure core VFS developers know all of the octals and the helpers by heart, but 
+the set of maintainers accepting debugfs and sysfs file permission patches is much 
+wider than that, so every little bit of clarity helps.
+
+Thanks,
+
+	Ingo
