@@ -1,53 +1,92 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed,  3 Aug 2016 17:38:42 +0200
-Subject: [PATCH 0/8] ARM: clean up PC-relative arithmetic 
-Message-ID: <1470238730-30038-1-git-send-email-ard.biesheuvel@linaro.org>
+Date: Wed,  3 Aug 2016 17:38:43 +0200
+Subject: [PATCH 1/8] ARM: assembler: introduce adr_l, ldr_l and str_l macros
+In-Reply-To: <1470238730-30038-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1470238730-30038-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1470238730-30038-2-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are various places in the ARM kernel where the following pattern
-is used to create a PC-relative reference that is valid even before the
-MMU is on:
+Like arm64, ARM supports position independent code sequences that
+produce symbol references with a greater reach than the ordinary
+adr/ldr instructions.
 
-     adr    rX, 1f
-     ldr    rY, [rX]
-     add    rX, rX, rY
-     ...
-  1: .long  <symbol> - .   
+Introduce adr_l, that takes the address of a symbol in a PC relative
+manner, and ldr_l/str_l that perform a 32-bit loads/stores from a
+PC-relative offset.
 
-or
-     adr    rX, 1f
-     ldmia  rX, {rY .. rY+n}
-     sub    rX, rX, rY
-     add    rY+1, rY+1, rX
-     add    rY+2, rY+2, rX
-     ...
-  1: .long  .
-     .long  <symbolY>
-     .long  <symbolY+1>
-     ...
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/arm/include/asm/assembler.h | 59 ++++++++++++++++++++
+ 1 file changed, 59 insertions(+)
 
-Both cases can be greatly simplified by letting the linker do the
-calculations for us. This series implements adr_l, ldr_l and str_l
-macros, and uses them to simplify a couple of instances of the above
-patterns.
-
-Ard Biesheuvel (8):
-  ARM: assembler: introduce adr_l, ldr_l and str_l macros
-  ARM: head-common.S: use PC-relative insn sequence for __proc_info
-  ARM: head-common.S: use PC-relative insn sequence for __turn_mmu_on
-  ARM: head.S: use PC-relative insn sequence for secondary_data
-  ARM: head: use PC-relative insn sequence for __smp_alt
-  ARM: sleep.S: use PC-relative insn sequence for
-    sleep_save_sp/mpidr_hash
-  ARM: head.S: use PC-relative insn sequences for __fixup_pv_table
-  ARM: head.S: use PC relative insn sequence to calculate PHYS_OFFSET
-
- arch/arm/include/asm/assembler.h | 59 ++++++++++++++
- arch/arm/kernel/head-common.S    | 22 ++---
- arch/arm/kernel/head.S           | 86 +++++---------------
- arch/arm/kernel/sleep.S          | 15 +---
- 4 files changed, 88 insertions(+), 94 deletions(-)
-
+diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
+index 4eaea2173bf8..e1450889f96b 100644
+--- a/arch/arm/include/asm/assembler.h
++++ b/arch/arm/include/asm/assembler.h
+@@ -512,4 +512,63 @@ THUMB(	orr	\reg , \reg , #PSR_T_BIT	)
+ #endif
+ 	.endm
+ 
++/*
++ * Pseudo-ops for PC-relative adr/ldr/str <reg>, <symbol> operations
++ */
++
++	/*
++	 * @dst: destination register
++	 * @sym: name of the symbol
++	 */
++	.macro	adr_l, dst, sym
++#ifdef CONFIG_THUMB2_KERNEL
++	movw	\dst, #:lower16:(\sym) - (. + 12)
++	movt	\dst, #:upper16:(\sym) - (. + 8)
++	add	\dst, \dst, pc
++#else
++	add	\dst, pc, #:pc_g0_nc:(\sym) - 8
++	add	\dst, \dst, #:pc_g1_nc:(\sym) - 4
++	add	\dst, \dst, #:pc_g2:(\sym)
++#endif
++	.endm
++
++	/*
++	 * @dst: destination register
++	 * @sym: name of the symbol
++	 * @tmp: optional scratch register to be used if <dst> == sp, which
++	 *       is not allowed in a Thumb2 ldr instruction
++	 */
++	.macro	ldr_l, dst, sym, tmp
++#ifdef CONFIG_THUMB2_KERNEL
++	.ifnb	\tmp
++	adr_l	\tmp, \sym
++	ldr	\dst, [\tmp]
++	.else
++	adr_l	\dst, \sym
++	ldr	\dst, [\dst]
++	.endif
++#else
++	add	\dst, pc, #:pc_g0_nc:(\sym) - 8
++	add	\dst, \dst, #:pc_g1_nc:(\sym) - 4
++	ldr	\dst, [\dst, #:pc_g2:(\sym)]
++#endif
++	.endm
++
++	/*
++	 * @src: source register
++	 * @sym: name of the symbol
++	 * @tmp: mandatory scratch register to calculate the address
++	 *       while <src> needs to be preserved.
++	 */
++	.macro	str_l, src, sym, tmp:req
++#ifdef CONFIG_THUMB2_KERNEL
++	adr_l	\tmp, \sym
++	str	\src, [\tmp]
++#else
++	add	\tmp, pc, #:pc_g0_nc:(\sym) - 8
++	add	\tmp, \tmp, #:pc_g1_nc:(\sym) - 4
++	str	\src, [\tmp, #:pc_g2:(\sym)]
++#endif
++	.endm
++
+ #endif /* __ASM_ASSEMBLER_H__ */
 -- 
 2.7.4
