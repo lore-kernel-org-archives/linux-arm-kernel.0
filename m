@@ -1,29 +1,53 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Wed, 3 Aug 2016 08:27:48 -0700
-Subject: [PATCH 2/2] MMC: meson: inital support for GXBB platforms
-In-Reply-To: <57A13CB5.4000006@samsung.com>
-References: <20160803003045.24980-1-khilman@baylibre.com>
- <CGME20160803003156epcas1p2473ed7677a97642c892baefa5dcffddd@epcas1p2.samsung.com>
- <20160803003045.24980-2-khilman@baylibre.com> <57A13CB5.4000006@samsung.com>
-Message-ID: <CAOi56cXq2Vqz+7xT1J7NO01cV7HwMt=U-_7NPwEFf1D01R2VXQ@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed,  3 Aug 2016 17:38:42 +0200
+Subject: [PATCH 0/8] ARM: clean up PC-relative arithmetic 
+Message-ID: <1470238730-30038-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 2, 2016 at 5:37 PM, Jaehoon Chung <jh80.chung@samsung.com> wrote:
-> Hi Kevin,
->
-> On 08/03/2016 09:30 AM, Kevin Hilman wrote:
->> Initial support for the SD/eMMC controller in the Amlogic S905/GXBB
->> family of SoCs.
->>
->> Currently working for the SD and eMMC interfaces, but not yet tested for
->> SDIO.
->>
->> Tested external SD card and internal eMMC on meson-gxbb-p200 and
->> meson-gxbb-odroidc2.
->
-> Before sending patch, run the checkpatch.pl for your patch.
+There are various places in the ARM kernel where the following pattern
+is used to create a PC-relative reference that is valid even before the
+MMU is on:
 
-Yes, sorry about that.  This patch was sent prematurely.
+     adr    rX, 1f
+     ldr    rY, [rX]
+     add    rX, rX, rY
+     ...
+  1: .long  <symbol> - .   
 
-Kevin
+or
+     adr    rX, 1f
+     ldmia  rX, {rY .. rY+n}
+     sub    rX, rX, rY
+     add    rY+1, rY+1, rX
+     add    rY+2, rY+2, rX
+     ...
+  1: .long  .
+     .long  <symbolY>
+     .long  <symbolY+1>
+     ...
+
+Both cases can be greatly simplified by letting the linker do the
+calculations for us. This series implements adr_l, ldr_l and str_l
+macros, and uses them to simplify a couple of instances of the above
+patterns.
+
+Ard Biesheuvel (8):
+  ARM: assembler: introduce adr_l, ldr_l and str_l macros
+  ARM: head-common.S: use PC-relative insn sequence for __proc_info
+  ARM: head-common.S: use PC-relative insn sequence for __turn_mmu_on
+  ARM: head.S: use PC-relative insn sequence for secondary_data
+  ARM: head: use PC-relative insn sequence for __smp_alt
+  ARM: sleep.S: use PC-relative insn sequence for
+    sleep_save_sp/mpidr_hash
+  ARM: head.S: use PC-relative insn sequences for __fixup_pv_table
+  ARM: head.S: use PC relative insn sequence to calculate PHYS_OFFSET
+
+ arch/arm/include/asm/assembler.h | 59 ++++++++++++++
+ arch/arm/kernel/head-common.S    | 22 ++---
+ arch/arm/kernel/head.S           | 86 +++++---------------
+ arch/arm/kernel/sleep.S          | 15 +---
+ 4 files changed, 88 insertions(+), 94 deletions(-)
+
+-- 
+2.7.4
