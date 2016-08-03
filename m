@@ -1,99 +1,130 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Wed, 3 Aug 2016 18:38:33 +0200
-Subject: [PATCH] Add file permission mode helpers
-In-Reply-To: <20160803081140.GA7833@gmail.com>
-References: <CA+55aFw5v23T-zvDZp-MmD_EYxF8WbafwwB59934FV7g21uMGQ@mail.gmail.com>
- <20160803081140.GA7833@gmail.com>
-Message-ID: <20160803163832.GA18754@amd>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Wed, 3 Aug 2016 17:49:43 +0100
+Subject: [PATCH 1/8] ARM: assembler: introduce adr_l, ldr_l and str_l
+ macros
+In-Reply-To: <1470238730-30038-2-git-send-email-ard.biesheuvel@linaro.org>
+References: <1470238730-30038-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1470238730-30038-2-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20160803164940.GC7147@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 2016-08-03 10:11:40, Ingo Molnar wrote:
+On Wed, Aug 03, 2016 at 05:38:43PM +0200, Ard Biesheuvel wrote:
+> Like arm64, ARM supports position independent code sequences that
+> produce symbol references with a greater reach than the ordinary
+> adr/ldr instructions.
 > 
-> * Linus Torvalds <torvalds@linux-foundation.org> wrote:
+> Introduce adr_l, that takes the address of a symbol in a PC relative
+> manner, and ldr_l/str_l that perform a 32-bit loads/stores from a
+> PC-relative offset.
 > 
-> > [ So I answered similarly to another patch, but I'll just re-iterate
-> > and change the subject line so that it stands out a bit from the
-> > millions of actual patches ]
-> > 
-> > On Tue, Aug 2, 2016 at 1:42 PM, Pavel Machek <pavel@ucw.cz> wrote:
-> > >
-> > > Everyone knows what 0644 is, but noone can read S_IRUSR | S_IWUSR |
-> > > S_IRCRP | S_IROTH (*). Please don't do this.
-> > 
-> > Absolutely. It's *much* easier to parse and understand the octal
-> > numbers, while the symbolic macro names are just random line noise and
-> > hard as hell to understand. You really have to think about it.
-> > 
-> > So we should rather go the other way: convert existing bad symbolic
-> > permission bit macro use to just use the octal numbers.
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  arch/arm/include/asm/assembler.h | 59 ++++++++++++++++++++
+>  1 file changed, 59 insertions(+)
 > 
-> In addition to that I'd love to have something even easier to read, a few common 
-> variants of the permissions field of 'ls -l' pre-defined. I did some quick 
-> grepping, and collected the main variants that are in use:
-> 
-> 		PERM_r________	0400
-> 		PERM_r__r_____	0440
-> 		PERM_r__r__r__	0444
-
-I see 0400 and 0444 making sense, but does 0440 really make sense?
-I assume it will be uid/gid 0/0? Is gid 0 really estabilished well
-enough to give it special permissions?
-
-And yes, these macros actually help readability.
-
-> 		PERM__wx______	0300
-> 		PERM__wx_wx___	0330
-> 		PERM__wx_wx_wx	0333
-
-Uh. This is for sysfs. Do we event want any __x variants? _wx
-would certainly be strange.
-
-(And yes, we can keep people from using strange permissions by simply
-not defining those macros.)
-
-> Allowing these would be nice too, because there were cases in the past where 
-> people messed up the octal representation or our internal symbolic helpers,
-> but this representation is fundamentally self-describing and pretty 'fool proof'.
-> 
-> An added advantage would be that during review it would stick out like a sore 
-> thumb if anyone used a 'weird' permission variant.
-> 
-> For example, if you saw these lines in a driver patch:
-> 
-> +	__ATTR(l1, 0444, driver_show_l4, NULL);
-> +		__ATTR(l3, 0446, driver_show_l4, NULL);
-> +			__ATTR(l2, 04444, driver_show_l4, NULL);
-> +		__ATTR(l4, 0444, driver_show_l4, NULL);
-> 
-> ... would you notice it at a glance that it contains two security holes?
-
-I see two bugs but only one hole. How can you exploit s-bit without corresponding x-bit?
-
-I'd delete these: I don't think we should encourage their use:
-
-> +#define PERM_r__r_____	0440
-> +#define PERM_rw_r_____	0640
-> +#define PERM_rw_rw_r__	0664
+> diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
+> index 4eaea2173bf8..e1450889f96b 100644
+> --- a/arch/arm/include/asm/assembler.h
+> +++ b/arch/arm/include/asm/assembler.h
+> @@ -512,4 +512,63 @@ THUMB(	orr	\reg , \reg , #PSR_T_BIT	)
+>  #endif
+>  	.endm
+>  
+> +/*
+> + * Pseudo-ops for PC-relative adr/ldr/str <reg>, <symbol> operations
+> + */
 > +
-> +#define PERM__w__w__w_	0222
-> +
-> +#define PERM_r_x______	0500
-> +#define PERM_r_xr_x___	0550
-> +#define PERM_r_xr_xr_x	0555
-> +
-> +#define PERM_rwx______	0700
-> +#define PERM_rwxr_x___	0750
-> +#define PERM_rwxr_xr_x	0755
-> +#define PERM_rwxrwxr_x	0775
-> +#define PERM_rwxrwxrwx	0777
-> +
-> +#define PERM__wx______	0300
-> +#define PERM__wx_wx___	0330
-> +#define PERM__wx_wx_wx	0333
+> +	/*
+> +	 * @dst: destination register
+> +	 * @sym: name of the symbol
+> +	 */
+> +	.macro	adr_l, dst, sym
+> +#ifdef CONFIG_THUMB2_KERNEL
+> +	movw	\dst, #:lower16:(\sym) - (. + 12)
+> +	movt	\dst, #:upper16:(\sym) - (. + 8)
+> +	add	\dst, \dst, pc
 
-									Pavel
+pc always reads as the address of that add plus 4, right?  I remember
+some special case where it gets rounded down to a 4-byte boundary, but
+IIRC that only applies to certain ldr ..., [pc, ...] forms.
 
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+> +#else
+> +	add	\dst, pc, #:pc_g0_nc:(\sym) - 8
+> +	add	\dst, \dst, #:pc_g1_nc:(\sym) - 4
+> +	add	\dst, \dst, #:pc_g2:(\sym)
+
+Whoah.  I've never seen this syntax before...  does this work for any
+named reloc, or just for certain blessed relocs?  (I'm also _assuming_
+the assembler support for this functionality is ancient -- if not,
+there may be toolchain compatibility issues.)
+
+Based on my understanding of how these relocs work, this should do the
+right thing, though.
+
+
+Second question: for arm, this reduces the range addressable to
+pc +/- 26-bit offset (24-bit if sym is not word aligned, but that
+probably never happens).
+
+I can't remember the de facto limit on the size of vmlinux for arm --
+are you sure this extra limitation won't break some cases of huge
+initramfs where adr_l gets used for cross-section references?
+
+(For Thumb2, :lower16:/:upper16: give a full 32-bit range, so no problem
+there -- sad that this isn't available before ARMv7).
+
+Cheers
+---Dave
+
+> +#endif
+> +	.endm
+> +
+> +	/*
+> +	 * @dst: destination register
+> +	 * @sym: name of the symbol
+> +	 * @tmp: optional scratch register to be used if <dst> == sp, which
+> +	 *       is not allowed in a Thumb2 ldr instruction
+> +	 */
+> +	.macro	ldr_l, dst, sym, tmp
+> +#ifdef CONFIG_THUMB2_KERNEL
+> +	.ifnb	\tmp
+> +	adr_l	\tmp, \sym
+> +	ldr	\dst, [\tmp]
+> +	.else
+> +	adr_l	\dst, \sym
+> +	ldr	\dst, [\dst]
+> +	.endif
+> +#else
+> +	add	\dst, pc, #:pc_g0_nc:(\sym) - 8
+> +	add	\dst, \dst, #:pc_g1_nc:(\sym) - 4
+> +	ldr	\dst, [\dst, #:pc_g2:(\sym)]
+> +#endif
+> +	.endm
+> +
+> +	/*
+> +	 * @src: source register
+> +	 * @sym: name of the symbol
+> +	 * @tmp: mandatory scratch register to calculate the address
+> +	 *       while <src> needs to be preserved.
+> +	 */
+> +	.macro	str_l, src, sym, tmp:req
+> +#ifdef CONFIG_THUMB2_KERNEL
+> +	adr_l	\tmp, \sym
+> +	str	\src, [\tmp]
+> +#else
+> +	add	\tmp, pc, #:pc_g0_nc:(\sym) - 8
+> +	add	\tmp, \tmp, #:pc_g1_nc:(\sym) - 4
+> +	str	\src, [\tmp, #:pc_g2:(\sym)]
+> +#endif
+> +	.endm
+> +
+>  #endif /* __ASM_ASSEMBLER_H__ */
+> -- 
+> 2.7.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
