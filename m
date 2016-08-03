@@ -1,46 +1,116 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 3 Aug 2016 09:38:22 +0100
-Subject: "Failed to create /dev/root: -14" after commit e6978e4bf1 ("ARM:
- save and reset the address limit when entering an exception")
-In-Reply-To: <57A15C41.6000804@roeck-us.net>
-References: <57A15C41.6000804@roeck-us.net>
-Message-ID: <20160803083822.GI1041@n2100.armlinux.org.uk>
+From: ijc@hellion.org.uk (Ian Campbell)
+Date: Wed,  3 Aug 2016 09:40:35 +0100
+Subject: [PATCH] ARM64: dts: bcm: Use a symlink to R-Pi dtsi files from
+ arch=arm
+Message-ID: <1470213635-6934-1-git-send-email-ijc@hellion.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 02, 2016 at 07:51:45PM -0700, Guenter Roeck wrote:
-> Hi,
-> 
-> I see the following crash when running a qemu arm 'kzm' runtime test with
-> the current mainline.
->...
-> Failed to create /dev/root: -14
-> 
-> [ followed by panic ]
-> 
-> A complete log file is at [1].
+The ../../../arm... style cross-references added by commit 9d56c22a7861
+("ARM: bcm2835: Add devicetree for the Raspberry Pi 3.") do not work in the
+context of the split device-tree repository[0] (where the directory
+structure differs). As with commit 8ee57b8182c4 ("ARM64: dts: vexpress: Use
+a symlink to vexpress-v2m-rs1.dtsi from arch=arm") use symlinks instead.
 
-I think it's because of those undefined instructions you're hitting
-with the hw-breakpoint code... can you try the patch below please?
+These includes in turn require a skeleton.dtsi to be present, so add one as
+a real file (with the same contents as arch/arm) rather than a symlink.
 
- arch/arm/kernel/entry-armv.S | 1 +
- 1 file changed, 1 insertion(+)
+[0] https://git.kernel.org/cgit/linux/kernel/git/devicetree/devicetree-rebasing.git/
 
-diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
-index bc5f50799d75..9f157e7c51e7 100644
---- a/arch/arm/kernel/entry-armv.S
-+++ b/arch/arm/kernel/entry-armv.S
-@@ -295,6 +295,7 @@ __und_svc_fault:
- 	bl	__und_fault
+Signed-off-by: Ian Campbell <ijc@hellion.org.uk>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Frank Rowand <frowand.list@gmail.com>
+Cc: Eric Anholt <eric@anholt.net>
+Cc: Stephen Warren <swarren@wwwdotorg.org>
+Cc: Lee Jones <lee@kernel.org>
+Cc: Gerd Hoffmann <kraxel@redhat.com>
+Cc: devicetree at vger.kernel.org
+Cc: linux-kernel at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-rpi-kernel at lists.infradead.org
+Cc: arm at kernel.org
+---
+ arch/arm64/boot/dts/broadcom/bcm2835-rpi.dtsi          |  1 +
+ arch/arm64/boot/dts/broadcom/bcm2837-rpi-3-b.dts       |  4 ++--
+ arch/arm64/boot/dts/broadcom/bcm2837.dtsi              |  2 +-
+ arch/arm64/boot/dts/broadcom/bcm283x-rpi-smsc9514.dtsi |  1 +
+ arch/arm64/boot/dts/broadcom/bcm283x.dtsi              |  1 +
+ arch/arm64/boot/dts/skeleton.dtsi                      | 13 +++++++++++++
+ 6 files changed, 19 insertions(+), 3 deletions(-)
+ create mode 120000 arch/arm64/boot/dts/broadcom/bcm2835-rpi.dtsi
+ create mode 120000 arch/arm64/boot/dts/broadcom/bcm283x-rpi-smsc9514.dtsi
+ create mode 120000 arch/arm64/boot/dts/broadcom/bcm283x.dtsi
+ create mode 100644 arch/arm64/boot/dts/skeleton.dtsi
+
+diff --git a/arch/arm64/boot/dts/broadcom/bcm2835-rpi.dtsi b/arch/arm64/boot/dts/broadcom/bcm2835-rpi.dtsi
+new file mode 120000
+index 0000000..3937b77
+--- /dev/null
++++ b/arch/arm64/boot/dts/broadcom/bcm2835-rpi.dtsi
+@@ -0,0 +1 @@
++../../../../arm/boot/dts/bcm2835-rpi.dtsi
+\ No newline at end of file
+diff --git a/arch/arm64/boot/dts/broadcom/bcm2837-rpi-3-b.dts b/arch/arm64/boot/dts/broadcom/bcm2837-rpi-3-b.dts
+index 6f47dd2..7841b72 100644
+--- a/arch/arm64/boot/dts/broadcom/bcm2837-rpi-3-b.dts
++++ b/arch/arm64/boot/dts/broadcom/bcm2837-rpi-3-b.dts
+@@ -1,7 +1,7 @@
+ /dts-v1/;
+ #include "bcm2837.dtsi"
+-#include "../../../../arm/boot/dts/bcm2835-rpi.dtsi"
+-#include "../../../../arm/boot/dts/bcm283x-rpi-smsc9514.dtsi"
++#include "bcm2835-rpi.dtsi"
++#include "bcm283x-rpi-smsc9514.dtsi"
  
- __und_svc_finish:
-+	get_thread_info tsk
- 	ldr	r5, [sp, #S_PSR]		@ Get SVC cpsr
- 	svc_exit r5				@ return from exception
-  UNWIND(.fnend		)
-
-
+ / {
+ 	compatible = "raspberrypi,3-model-b", "brcm,bcm2837";
+diff --git a/arch/arm64/boot/dts/broadcom/bcm2837.dtsi b/arch/arm64/boot/dts/broadcom/bcm2837.dtsi
+index f2a31d0..8216bbb 100644
+--- a/arch/arm64/boot/dts/broadcom/bcm2837.dtsi
++++ b/arch/arm64/boot/dts/broadcom/bcm2837.dtsi
+@@ -1,4 +1,4 @@
+-#include "../../../../arm/boot/dts/bcm283x.dtsi"
++#include "bcm283x.dtsi"
+ 
+ / {
+ 	compatible = "brcm,bcm2836";
+diff --git a/arch/arm64/boot/dts/broadcom/bcm283x-rpi-smsc9514.dtsi b/arch/arm64/boot/dts/broadcom/bcm283x-rpi-smsc9514.dtsi
+new file mode 120000
+index 0000000..dca7c05
+--- /dev/null
++++ b/arch/arm64/boot/dts/broadcom/bcm283x-rpi-smsc9514.dtsi
+@@ -0,0 +1 @@
++../../../../arm/boot/dts/bcm283x-rpi-smsc9514.dtsi
+\ No newline at end of file
+diff --git a/arch/arm64/boot/dts/broadcom/bcm283x.dtsi b/arch/arm64/boot/dts/broadcom/bcm283x.dtsi
+new file mode 120000
+index 0000000..5f54e4c
+--- /dev/null
++++ b/arch/arm64/boot/dts/broadcom/bcm283x.dtsi
+@@ -0,0 +1 @@
++../../../../arm/boot/dts/bcm283x.dtsi
+\ No newline at end of file
+diff --git a/arch/arm64/boot/dts/skeleton.dtsi b/arch/arm64/boot/dts/skeleton.dtsi
+new file mode 100644
+index 0000000..b41d241
+--- /dev/null
++++ b/arch/arm64/boot/dts/skeleton.dtsi
+@@ -0,0 +1,13 @@
++/*
++ * Skeleton device tree; the bare minimum needed to boot; just include and
++ * add a compatible value.  The bootloader will typically populate the memory
++ * node.
++ */
++
++/ {
++	#address-cells = <1>;
++	#size-cells = <1>;
++	chosen { };
++	aliases { };
++	memory { device_type = "memory"; reg = <0 0>; };
++};
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+2.8.1
