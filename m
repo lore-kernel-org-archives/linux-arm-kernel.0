@@ -1,76 +1,82 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed,  3 Aug 2016 18:13:25 +0200
-Subject: [PATCH 3/3] KVM: arm64: vgic-its: Make updates to propbaser/pendbaser
- atomic
-In-Reply-To: <20160803161325.14933-1-christoffer.dall@linaro.org>
-References: <20160803161325.14933-1-christoffer.dall@linaro.org>
-Message-ID: <20160803161325.14933-4-christoffer.dall@linaro.org>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Wed,  3 Aug 2016 17:12:31 +0100
+Subject: [PATCH 1/2] coresight: etm4x: request to retain power to the trace
+ unit when active
+Message-ID: <1470240752-17331-1-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are two problems with the current implementation of the MMIO
-handlers for the propbaser and pendbaser:
+The Coresight ETMv4 architecture provides a way to request to keep the
+power to the trace unit. This might help to collect the traces without
+the need to disable the CPU power management(entering/exiting deeper
+idle states).
 
-First, the write to the value itself is not guaranteed to be an atomic
-64-bit write so two concurrent writes to the structure field could be
-intermixed.
+Trace PowerDown Control Register provides powerup request bit which when
+set requests the system to retain power to the trace unit and emulate
+the powerdown request.
 
-Second, because we do a read-modify-update operation without any
-synchronization, if we have two 32-bit accesses to separate parts of the
-register, we can loose one of them.
+Typically, a trace unit drives a signal to the power controller to
+request that the trace unit core power domain is powered up. However,
+if the trace unit and the CPU are in the same power domain then the
+implementation might combine the trace unit power up status with a
+signal from the CPU.
 
-We can take the KVM mutex to synchronize accesses to these registers.
+This patch requests to retain power to the trace unit when active and
+to remove when inactive. Note this change will only request but the
+behaviour depends on the implementation. However, it matches the
+exact behaviour expected when the external debugger is connected with
+respect to CPU power states.
 
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
 ---
- virt/kvm/arm/vgic/vgic-mmio-v3.c | 10 ++++++++--
- 1 file changed, 8 insertions(+), 2 deletions(-)
+ drivers/hwtracing/coresight/coresight-etm4x.c | 12 ++++++++++++
+ drivers/hwtracing/coresight/coresight-etm4x.h |  3 +++
+ 2 files changed, 15 insertions(+)
 
-diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-index ff668e0..e38b7a0 100644
---- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
-+++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-@@ -306,16 +306,19 @@ static void vgic_mmio_write_propbase(struct kvm_vcpu *vcpu,
- {
- 	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
- 	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
--	u64 propbaser = dist->propbaser;
-+	u64 propbaser;
- 
- 	/* Storing a value with LPIs already enabled is undefined */
- 	if (vgic_cpu->lpis_enabled)
- 		return;
- 
-+	mutex_lock(&vcpu->kvm->lock);
-+	propbaser = dist->propbaser;
- 	propbaser = update_64bit_reg(propbaser, addr & 4, len, val);
- 	propbaser = vgic_sanitise_propbaser(propbaser);
- 
- 	dist->propbaser = propbaser;
-+	mutex_unlock(&vcpu->kvm->lock);
- }
- 
- static unsigned long vgic_mmio_read_pendbase(struct kvm_vcpu *vcpu,
-@@ -331,16 +334,19 @@ static void vgic_mmio_write_pendbase(struct kvm_vcpu *vcpu,
- 				     unsigned long val)
- {
- 	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
--	u64 pendbaser = vgic_cpu->pendbaser;
-+	u64 pendbaser;
- 
- 	/* Storing a value with LPIs already enabled is undefined */
- 	if (vgic_cpu->lpis_enabled)
- 		return;
- 
-+	mutex_lock(&vcpu->kvm->lock);
-+	pendbaser = vgic_cpu->pendbaser;
- 	pendbaser = update_64bit_reg(pendbaser, addr & 4, len, val);
- 	pendbaser = vgic_sanitise_pendbaser(pendbaser);
- 
- 	vgic_cpu->pendbaser = pendbaser;
-+	mutex_unlock(&vcpu->kvm->lock);
- }
- 
- /*
--- 
-2.9.0
+diff --git a/drivers/hwtracing/coresight/coresight-etm4x.c b/drivers/hwtracing/coresight/coresight-etm4x.c
+index b3bde2aec2b9..c8c7829f7046 100644
+--- a/drivers/hwtracing/coresight/coresight-etm4x.c
++++ b/drivers/hwtracing/coresight/coresight-etm4x.c
+@@ -164,6 +164,13 @@ static void etm4_enable_hw(void *info)
+ 	writel_relaxed(config->vmid_mask0, drvdata->base + TRCVMIDCCTLR0);
+ 	writel_relaxed(config->vmid_mask1, drvdata->base + TRCVMIDCCTLR1);
+
++	/*
++	 * Request to keep the trace unit powered and also
++	 * emulation of powerdown
++	 */
++	writel_relaxed(readl_relaxed(drvdata->base + TRCPDCR) | TRCPDCR_PU,
++		       drvdata->base + TRCPDCR);
++
+ 	/* Enable the trace unit */
+ 	writel_relaxed(1, drvdata->base + TRCPRGCTLR);
+
+@@ -294,6 +301,11 @@ static void etm4_disable_hw(void *info)
+
+ 	CS_UNLOCK(drvdata->base);
+
++	/* power can be removed from the trace unit now */
++	control = readl_relaxed(drvdata->base + TRCPDCR);
++	control &= ~TRCPDCR_PU;
++	writel_relaxed(control, drvdata->base + TRCPDCR);
++
+ 	control = readl_relaxed(drvdata->base + TRCPRGCTLR);
+
+ 	/* EN, bit[0] Trace unit enable bit */
+diff --git a/drivers/hwtracing/coresight/coresight-etm4x.h b/drivers/hwtracing/coresight/coresight-etm4x.h
+index 5359c5197c1d..2629954429a1 100644
+--- a/drivers/hwtracing/coresight/coresight-etm4x.h
++++ b/drivers/hwtracing/coresight/coresight-etm4x.h
+@@ -183,6 +183,9 @@
+ #define TRCSTATR_IDLE_BIT		0
+ #define ETM_DEFAULT_ADDR_COMP		0
+
++/* PowerDown Control Register bits */
++#define TRCPDCR_PU			BIT(3)
++
+ /* secure state access levels */
+ #define ETM_EXLEVEL_S_APP		BIT(8)
+ #define ETM_EXLEVEL_S_OS		BIT(9)
+--
+2.7.4
