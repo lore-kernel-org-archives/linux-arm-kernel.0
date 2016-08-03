@@ -1,42 +1,42 @@
 From: jon.mason@broadcom.com (Jon Mason)
-Date: Wed,  3 Aug 2016 14:39:05 -0400
-Subject: [PATCH 10/11] ARM: dts: NSP: Add new DT file for bcm958623hr
+Date: Wed,  3 Aug 2016 14:39:06 -0400
+Subject: [PATCH 11/11] ARM: dts: NSP: Add new DT file for bcm958622hr
 In-Reply-To: <1470249546-12440-1-git-send-email-jon.mason@broadcom.com>
 References: <1470249546-12440-1-git-send-email-jon.mason@broadcom.com>
-Message-ID: <1470249546-12440-11-git-send-email-jon.mason@broadcom.com>
+Message-ID: <1470249546-12440-12-git-send-email-jon.mason@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Create a new device tree file for the Broadcom Northstar Plus
-bcm958623hr SVK.  This SVK has 2GB RAM, 5 ports Ethernet, SATA, 2 PCI
-slots, and 1 UART.  Also, it has the ability to reboot via GPIO.  To be
-added in the future are support for the USB and SLIC audio.
+bcm958622hr SVK.  This SVK has 2GB RAM, 5 port Ethernet, 2 PCI slots,
+and 1 UART.  Also, it has the ability to reboot via GPIO.  To be added
+in the future are support for the USB and SLIC audio.
 
 Signed-off-by: Jon Mason <jon.mason@broadcom.com>
 ---
  arch/arm/boot/dts/Makefile        |   1 +
- arch/arm/boot/dts/bcm958623hr.dts | 178 ++++++++++++++++++++++++++++++++++++++
- 2 files changed, 179 insertions(+)
- create mode 100644 arch/arm/boot/dts/bcm958623hr.dts
+ arch/arm/boot/dts/bcm958622hr.dts | 170 ++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 171 insertions(+)
+ create mode 100644 arch/arm/boot/dts/bcm958622hr.dts
 
 diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 190528d..6e41b49 100644
+index 6e41b49..291b551 100644
 --- a/arch/arm/boot/dts/Makefile
 +++ b/arch/arm/boot/dts/Makefile
 @@ -102,6 +102,7 @@ dtb-$(CONFIG_ARCH_BCM_NSP) += \
  	bcm958522er.dtb \
  	bcm958525er.dtb \
  	bcm958525xmc.dtb \
-+	bcm958623hr.dtb \
++	bcm958622hr.dtb \
+ 	bcm958623hr.dtb \
  	bcm958625hr.dtb \
  	bcm988312hr.dtb \
- 	bcm958625k.dtb
-diff --git a/arch/arm/boot/dts/bcm958623hr.dts b/arch/arm/boot/dts/bcm958623hr.dts
+diff --git a/arch/arm/boot/dts/bcm958622hr.dts b/arch/arm/boot/dts/bcm958622hr.dts
 new file mode 100644
-index 0000000..4ceb8fe
+index 0000000..ad2aa87
 --- /dev/null
-+++ b/arch/arm/boot/dts/bcm958623hr.dts
-@@ -0,0 +1,178 @@
++++ b/arch/arm/boot/dts/bcm958622hr.dts
+@@ -0,0 +1,170 @@
 +/*
 + *  BSD LICENSE
 + *
@@ -75,8 +75,8 @@ index 0000000..4ceb8fe
 +#include <dt-bindings/gpio/gpio.h>
 +
 +/ {
-+	model = "NorthStar Plus SVK (BCM958623HR)";
-+	compatible = "brcm,bcm58623", "brcm,nsp";
++	model = "NorthStar Plus SVK (BCM958622HR)";
++	compatible = "brcm,bcm58622", "brcm,nsp";
 +
 +	aliases {
 +		serial0 = &uart0;
@@ -160,7 +160,7 @@ index 0000000..4ceb8fe
 +};
 +
 +&srab {
-+	compatible = "brcm,bcm58623-srab", "brcm,nsp-srab";
++	compatible = "brcm,bcm58622-srab", "brcm,nsp-srab";
 +	status = "okay";
 +
 +	ports {
@@ -202,14 +202,6 @@ index 0000000..4ceb8fe
 +			};
 +		};
 +	};
-+};
-+
-+&sata_phy0 {
-+	status = "okay";
-+};
-+
-+&sata {
-+	status = "okay";
 +};
 +
 +&uart0 {
