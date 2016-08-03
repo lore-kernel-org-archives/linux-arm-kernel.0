@@ -1,40 +1,72 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed,  3 Aug 2016 15:29:34 +0100
-Subject: [PATCH 2/2] arm64: Kconfig: select HISILICON_IRQ_MBIGEN only if PCI
- is selected
-In-Reply-To: <1470234574-19027-1-git-send-email-sudeep.holla@arm.com>
-References: <1470234574-19027-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <1470234574-19027-2-git-send-email-sudeep.holla@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 3 Aug 2016 15:48:58 +0100
+Subject: [PATCH v2 1/2] ARM: dts: Remove use of skeleton.dtsi from
+ bcm283x.dtsi
+In-Reply-To: <1470233565-30154-1-git-send-email-ijc@hellion.org.uk>
+References: <1470233565-30154-1-git-send-email-ijc@hellion.org.uk>
+Message-ID: <20160803144858.GA29054@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Even when PCI is disabled, ARCH_HISI selects HISILICON_IRQ_MBIGEN
-triggerring the following config warning:
+On Wed, Aug 03, 2016 at 03:12:44PM +0100, Ian Campbell wrote:
+> This file is included from DTS files under arch/arm64 too (via
+> broadcom/bcm2837-rpi-3-b.dts and broadcom/bcm2837.dtsi). There is a desire
+> not to have skeleton.dtsi for ARM64. See commit 3ebee5a2e141 ("arm64: dts:
+> kill skeleton.dtsi") for rationale for its removal.
+> 
+> As well as the addition of #*-cells also requires adding the device_type to
+> the rpi memory node explicitly.
+> 
+> Note that this change results in the removal of an empty /aliases node from
+> bcm2835-rpi-a.dtb and bcm2835-rpi-a-plus.dtb. I have no hardware to check
+> if this is a problem or not.
+> 
+> It also results in some reordering of the nodes in the DTBs (the /aliases
+> and /memory nodes come later). This isn't supposed to matter but, again,
+> I've no hardware to check if it is true in this particular case.
+> 
+> Signed-off-by: Ian Campbell <ijc@hellion.org.uk>
 
-warning: (ARM64 && HISILICON_IRQ_MBIGEN) selects ARM_GIC_V3_ITS which
-	has unmet direct dependencies (PCI && PCI_MSI)
+I also don't have the relevant hardware to test with, but this looks
+generally like the right thing. So FWIW:
 
-This patch makes selection of HISILICON_IRQ_MBIGEN conditional on PCI.
+Acked-by: Mark Rutland <mark.rutland@arm.com>
 
-Cc: Ma Jun <majun258@huawei.com>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
----
- arch/arm64/Kconfig.platforms | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Mark.
 
-diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
-index b0e6850aa3e4..41d82b327e6a 100644
---- a/arch/arm64/Kconfig.platforms
-+++ b/arch/arm64/Kconfig.platforms
-@@ -66,7 +66,7 @@ config ARCH_LG1K
- config ARCH_HISI
- 	bool "Hisilicon SoC Family"
- 	select ARM_TIMER_SP804
--	select HISILICON_IRQ_MBIGEN
-+	select HISILICON_IRQ_MBIGEN if PCI
- 	help
- 	  This enables support for Hisilicon ARMv8 SoC family
-
---
-2.7.4
+> diff --git a/arch/arm/boot/dts/bcm2835-rpi.dtsi b/arch/arm/boot/dts/bcm2835-rpi.dtsi
+> index caf2707..e9b47b2 100644
+> --- a/arch/arm/boot/dts/bcm2835-rpi.dtsi
+> +++ b/arch/arm/boot/dts/bcm2835-rpi.dtsi
+> @@ -2,6 +2,7 @@
+>  
+>  / {
+>  	memory {
+> +		device_type = "memory";
+>  		reg = <0 0x10000000>;
+>  	};
+>  
+> diff --git a/arch/arm/boot/dts/bcm283x.dtsi b/arch/arm/boot/dts/bcm283x.dtsi
+> index b982522..445624a 100644
+> --- a/arch/arm/boot/dts/bcm283x.dtsi
+> +++ b/arch/arm/boot/dts/bcm283x.dtsi
+> @@ -2,7 +2,6 @@
+>  #include <dt-bindings/clock/bcm2835.h>
+>  #include <dt-bindings/clock/bcm2835-aux.h>
+>  #include <dt-bindings/gpio/gpio.h>
+> -#include "skeleton.dtsi"
+>  
+>  /* This include file covers the common peripherals and configuration between
+>   * bcm2835 and bcm2836 implementations, leaving the CPU configuration to
+> @@ -13,6 +12,8 @@
+>  	compatible = "brcm,bcm2835";
+>  	model = "BCM2835";
+>  	interrupt-parent = <&intc>;
+> +	#address-cells = <1>;
+> +	#size-cells = <1>;
+>  
+>  	chosen {
+>  		bootargs = "earlyprintk console=ttyAMA0";
+> -- 
+> 2.8.1
+> 
