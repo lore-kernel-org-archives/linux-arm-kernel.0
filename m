@@ -1,92 +1,60 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed,  3 Aug 2016 17:38:43 +0200
-Subject: [PATCH 1/8] ARM: assembler: introduce adr_l, ldr_l and str_l macros
+Date: Wed,  3 Aug 2016 17:38:44 +0200
+Subject: [PATCH 2/8] ARM: head-common.S: use PC-relative insn sequence for
+ __proc_info
 In-Reply-To: <1470238730-30038-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1470238730-30038-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1470238730-30038-2-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1470238730-30038-3-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Like arm64, ARM supports position independent code sequences that
-produce symbol references with a greater reach than the ordinary
-adr/ldr instructions.
-
-Introduce adr_l, that takes the address of a symbol in a PC relative
-manner, and ldr_l/str_l that perform a 32-bit loads/stores from a
-PC-relative offset.
+Replace the open coded PC relative offset calculations with adr_l
+invocations.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm/include/asm/assembler.h | 59 ++++++++++++++++++++
- 1 file changed, 59 insertions(+)
+ arch/arm/kernel/head-common.S | 22 ++++++--------------
+ 1 file changed, 6 insertions(+), 16 deletions(-)
 
-diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
-index 4eaea2173bf8..e1450889f96b 100644
---- a/arch/arm/include/asm/assembler.h
-+++ b/arch/arm/include/asm/assembler.h
-@@ -512,4 +512,63 @@ THUMB(	orr	\reg , \reg , #PSR_T_BIT	)
- #endif
- 	.endm
+diff --git a/arch/arm/kernel/head-common.S b/arch/arm/kernel/head-common.S
+index 8733012d231f..5e0cedd870a5 100644
+--- a/arch/arm/kernel/head-common.S
++++ b/arch/arm/kernel/head-common.S
+@@ -150,11 +150,12 @@ ENDPROC(lookup_processor_type)
+  *	r9 = cpuid (preserved)
+  */
+ __lookup_processor_type:
+-	adr	r3, __lookup_processor_type_data
+-	ldmia	r3, {r4 - r6}
+-	sub	r3, r3, r4			@ get offset between virt&phys
+-	add	r5, r5, r3			@ convert virt addresses to
+-	add	r6, r6, r3			@ physical address space
++	/*
++	 * Look in <asm/procinfo.h> for information about the __proc_info
++	 * structure.
++	 */
++	adr_l	r5, __proc_info_begin		@ __pa(__proc_info_begin)
++	adr_l	r6, __proc_info_end		@ __pa(__proc_info_end)
+ 1:	ldmia	r5, {r3, r4}			@ value, mask
+ 	and	r4, r4, r9			@ mask wanted bits
+ 	teq	r3, r4
+@@ -166,17 +167,6 @@ __lookup_processor_type:
+ 2:	ret	lr
+ ENDPROC(__lookup_processor_type)
  
-+/*
-+ * Pseudo-ops for PC-relative adr/ldr/str <reg>, <symbol> operations
-+ */
-+
-+	/*
-+	 * @dst: destination register
-+	 * @sym: name of the symbol
-+	 */
-+	.macro	adr_l, dst, sym
-+#ifdef CONFIG_THUMB2_KERNEL
-+	movw	\dst, #:lower16:(\sym) - (. + 12)
-+	movt	\dst, #:upper16:(\sym) - (. + 8)
-+	add	\dst, \dst, pc
-+#else
-+	add	\dst, pc, #:pc_g0_nc:(\sym) - 8
-+	add	\dst, \dst, #:pc_g1_nc:(\sym) - 4
-+	add	\dst, \dst, #:pc_g2:(\sym)
-+#endif
-+	.endm
-+
-+	/*
-+	 * @dst: destination register
-+	 * @sym: name of the symbol
-+	 * @tmp: optional scratch register to be used if <dst> == sp, which
-+	 *       is not allowed in a Thumb2 ldr instruction
-+	 */
-+	.macro	ldr_l, dst, sym, tmp
-+#ifdef CONFIG_THUMB2_KERNEL
-+	.ifnb	\tmp
-+	adr_l	\tmp, \sym
-+	ldr	\dst, [\tmp]
-+	.else
-+	adr_l	\dst, \sym
-+	ldr	\dst, [\dst]
-+	.endif
-+#else
-+	add	\dst, pc, #:pc_g0_nc:(\sym) - 8
-+	add	\dst, \dst, #:pc_g1_nc:(\sym) - 4
-+	ldr	\dst, [\dst, #:pc_g2:(\sym)]
-+#endif
-+	.endm
-+
-+	/*
-+	 * @src: source register
-+	 * @sym: name of the symbol
-+	 * @tmp: mandatory scratch register to calculate the address
-+	 *       while <src> needs to be preserved.
-+	 */
-+	.macro	str_l, src, sym, tmp:req
-+#ifdef CONFIG_THUMB2_KERNEL
-+	adr_l	\tmp, \sym
-+	str	\src, [\tmp]
-+#else
-+	add	\tmp, pc, #:pc_g0_nc:(\sym) - 8
-+	add	\tmp, \tmp, #:pc_g1_nc:(\sym) - 4
-+	str	\src, [\tmp, #:pc_g2:(\sym)]
-+#endif
-+	.endm
-+
- #endif /* __ASM_ASSEMBLER_H__ */
+-/*
+- * Look in <asm/procinfo.h> for information about the __proc_info structure.
+- */
+-	.align	2
+-	.type	__lookup_processor_type_data, %object
+-__lookup_processor_type_data:
+-	.long	.
+-	.long	__proc_info_begin
+-	.long	__proc_info_end
+-	.size	__lookup_processor_type_data, . - __lookup_processor_type_data
+-
+ __error_lpae:
+ #ifdef CONFIG_DEBUG_LL
+ 	adr	r0, str_lpae
 -- 
 2.7.4
