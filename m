@@ -1,48 +1,116 @@
-From: kbeldan@baylibre.com (Karl Beldan)
-Date: Wed,  3 Aug 2016 17:06:27 +0000
-Subject: [PATCH] ARM: dts: da850: Adjust the pinctrl muxing for the NAND on CS3
-Message-ID: <20160803170627.1773-1-kbeldan@baylibre.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Wed,  3 Aug 2016 18:08:55 +0100
+Subject: [PATCH] drivers/perf: arm-pmu: convert arm_pmu_mutex to spinlock
+Message-ID: <1470244135-979-1-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-- Adjust the settings to also allow driving EMA_D[8..15] for 16bits
-  NANDs. These are shared with GPIO3[0..7] which have no in-tree user.
-- Remove the useless CS4 setting
+arm_pmu_mutex is never held long and we don't want to sleep while the
+lock is being held as it's executed in the context of hotplug notifiers.
+So it can be converted to a simple spinlock instead.
 
-Cc: Kevin Hilman <khilman@baylibre.com>
-Signed-off-by: Karl Beldan <kbeldan@baylibre.com>
+Without this patch we get the following warning:
+
+BUG: sleeping function called from invalid context at kernel/locking/mutex.c:620
+in_atomic(): 1, irqs_disabled(): 128, pid: 0, name: swapper/2
+no locks held by swapper/2/0.
+irq event stamp: 381314
+hardirqs last  enabled at (381313): _raw_spin_unlock_irqrestore+0x7c/0x88
+hardirqs last disabled at (381314): cpu_die+0x28/0x48
+softirqs last  enabled at (381294): _local_bh_enable+0x28/0x50
+softirqs last disabled at (381293): irq_enter+0x58/0x78
+CPU: 2 PID: 0 Comm: swapper/2 Not tainted 4.7.0 #12
+Call trace:
+ dump_backtrace+0x0/0x220
+ show_stack+0x24/0x30
+ dump_stack+0xb4/0xf0
+ ___might_sleep+0x1d8/0x1f0
+ __might_sleep+0x5c/0x98
+ mutex_lock_nested+0x54/0x400
+ arm_perf_starting_cpu+0x34/0xb0
+ cpuhp_invoke_callback+0x88/0x3d8
+ notify_cpu_starting+0x78/0x98
+ secondary_start_kernel+0x108/0x1a8
+
+This patch converts the mutex to spinlock to eliminate the above
+warnings. This constraints pmu->reset to be non-blocking call which is
+the case with all the ARM PMU backends.
+
+Fixes: 37b502f121ad ("arm/perf: Fix hotplug state machine conversion")
+Cc: Stephen Boyd <sboyd@codeaurora.org>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
 ---
- arch/arm/boot/dts/da850.dtsi | 12 ++++++++----
- 1 file changed, 8 insertions(+), 4 deletions(-)
+ drivers/perf/arm_pmu.c | 18 +++++++++---------
+ 1 file changed, 9 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
-index 3a00978..ae5dc18 100644
---- a/arch/arm/boot/dts/da850.dtsi
-+++ b/arch/arm/boot/dts/da850.dtsi
-@@ -43,16 +43,20 @@
- 
- 			nand_cs3_pins: pinmux_nand_pins {
- 				pinctrl-single,bits = <
--					/* EMA_OE, EMA_WE */
--					0x1c 0x00110000  0x00ff0000
--					/* EMA_CS[4],EMA_CS[3]*/
--					0x1c 0x00000110  0x00000ff0
-+					/* EMA_OE, EMA_WE, EMA_CS[3] */
-+					0x1c 0x00110010  0x00ff00f0
- 					/*
- 					 * EMA_D[0], EMA_D[1], EMA_D[2],
- 					 * EMA_D[3], EMA_D[4], EMA_D[5],
- 					 * EMA_D[6], EMA_D[7]
- 					 */
- 					0x24 0x11111111  0xffffffff
-+					/*
-+					 * EMA_D[8],  EMA_D[9],  EMA_D[10],
-+					 * EMA_D[11], EMA_D[12], EMA_D[13],
-+					 * EMA_D[14], EMA_D[15]
-+					 */
-+					0x20 0x11111111  0xffffffff
- 					/* EMA_A[1], EMA_A[2] */
- 					0x30 0x01100000  0x0ff00000
- 				>;
--- 
-2.9.0.rc1
+diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
+index 6ccb994bdfcb..4c9a537a1265 100644
+--- a/drivers/perf/arm_pmu.c
++++ b/drivers/perf/arm_pmu.c
+@@ -688,7 +688,7 @@ static int cpu_pmu_request_irq(struct arm_pmu *cpu_pmu, irq_handler_t handler)
+ 	return 0;
+ }
+
+-static DEFINE_MUTEX(arm_pmu_mutex);
++static DEFINE_SPINLOCK(arm_pmu_lock);
+ static LIST_HEAD(arm_pmu_list);
+
+ /*
+@@ -701,7 +701,7 @@ static int arm_perf_starting_cpu(unsigned int cpu)
+ {
+ 	struct arm_pmu *pmu;
+
+-	mutex_lock(&arm_pmu_mutex);
++	spin_lock(&arm_pmu_lock);
+ 	list_for_each_entry(pmu, &arm_pmu_list, entry) {
+
+ 		if (!cpumask_test_cpu(cpu, &pmu->supported_cpus))
+@@ -709,7 +709,7 @@ static int arm_perf_starting_cpu(unsigned int cpu)
+ 		if (pmu->reset)
+ 			pmu->reset(pmu);
+ 	}
+-	mutex_unlock(&arm_pmu_mutex);
++	spin_unlock(&arm_pmu_lock);
+ 	return 0;
+ }
+
+@@ -821,9 +821,9 @@ static int cpu_pmu_init(struct arm_pmu *cpu_pmu)
+ 	if (!cpu_hw_events)
+ 		return -ENOMEM;
+
+-	mutex_lock(&arm_pmu_mutex);
++	spin_lock(&arm_pmu_lock);
+ 	list_add_tail(&cpu_pmu->entry, &arm_pmu_list);
+-	mutex_unlock(&arm_pmu_mutex);
++	spin_unlock(&arm_pmu_lock);
+
+ 	err = cpu_pm_pmu_register(cpu_pmu);
+ 	if (err)
+@@ -859,9 +859,9 @@ static int cpu_pmu_init(struct arm_pmu *cpu_pmu)
+ 	return 0;
+
+ out_unregister:
+-	mutex_lock(&arm_pmu_mutex);
++	spin_lock(&arm_pmu_lock);
+ 	list_del(&cpu_pmu->entry);
+-	mutex_unlock(&arm_pmu_mutex);
++	spin_unlock(&arm_pmu_lock);
+ 	free_percpu(cpu_hw_events);
+ 	return err;
+ }
+@@ -869,9 +869,9 @@ static int cpu_pmu_init(struct arm_pmu *cpu_pmu)
+ static void cpu_pmu_destroy(struct arm_pmu *cpu_pmu)
+ {
+ 	cpu_pm_pmu_unregister(cpu_pmu);
+-	mutex_lock(&arm_pmu_mutex);
++	spin_lock(&arm_pmu_lock);
+ 	list_del(&cpu_pmu->entry);
+-	mutex_unlock(&arm_pmu_mutex);
++	spin_unlock(&arm_pmu_lock);
+ 	free_percpu(cpu_pmu->hw_events);
+ }
+
+--
+2.7.4
