@@ -1,13 +1,14 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 3 Aug 2016 19:17:39 +0100
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 3 Aug 2016 14:27:58 -0400 (EDT)
 Subject: [PATCH 0/8] ARM: clean up PC-relative arithmetic
 In-Reply-To: <1470238730-30038-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1470238730-30038-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20160803181739.GL1041@n2100.armlinux.org.uk>
+Message-ID: <alpine.LFD.2.20.1608031336020.17623@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 03, 2016 at 05:38:42PM +0200, Ard Biesheuvel wrote:
+On Wed, 3 Aug 2016, Ard Biesheuvel wrote:
+
 > There are various places in the ARM kernel where the following pattern
 > is used to create a PC-relative reference that is valid even before the
 > MMU is on:
@@ -35,24 +36,16 @@ On Wed, Aug 03, 2016 at 05:38:42PM +0200, Ard Biesheuvel wrote:
 > macros, and uses them to simplify a couple of instances of the above
 > patterns.
 
-I don't buy that argument, sorry, and the argument is actually wrong.
-No, we're _not_ letting the linker do the calculations for us, we're
-letting the linker do _some_ of the calculation, but not all.
+I echo Dave's concern about the availability of the :pc_g*_nc: relocs.
 
-What you're replacing the above with is stuff like (I guess, because
-I've no idea what this :pc_g0: notation is):
+Could this be used to solve the XIP translation problem in some 
+universal way? Right now only a few cases are covered. For reference, see:
 
-	add	rX, pc, #(sym - . - 8) & 0xff
-	add	rX, rX, #(sym - . - 4) & 0xff00
-	add	rX, rX, #(sym - .) & 0xff0000
+http://lists.infradead.org/pipermail/linux-arm-kernel/2015-November/386273.html
 
-which I think is a more complex (and less obvious) way to calculate it.
-It's also buggy when we end up with a relative offset greater than 16MB,
-which we have in multi-zImage kernels.
+commit d7811455 ("ARM: 8512/1: proc-v7.S: Adjust stack address when XIP_KERNEL")
 
-So no, I don't like this at all.
+commit 8ff97fa3 ("ARM: make the physical-relative calculation more obvious")
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+
+Nicolas
