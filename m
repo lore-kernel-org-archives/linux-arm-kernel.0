@@ -1,56 +1,33 @@
-From: atull@opensource.altera.com (atull)
-Date: Wed, 3 Aug 2016 13:44:38 -0500
-Subject: [PATCH v18 2/6] ARM: socfpga: add bindings document for fpga
- bridge drivers
-In-Reply-To: <20160801161806.GA16067@rob-hp-laptop>
-References: <20160712193645.9098-1-atull@opensource.altera.com>
- <20160712193645.9098-3-atull@opensource.altera.com>
- <20160801161806.GA16067@rob-hp-laptop>
-Message-ID: <alpine.DEB.2.02.1608031344220.20611@linuxheads99>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 03 Aug 2016 21:38:23 +0200
+Subject: Support for configurable PCIe endpoint
+In-Reply-To: <20160803172736.GA12989@infradead.org>
+References: <57A18927.9070003@ti.com> <2460140.yVuTYYqBTX@wuerfel>
+ <20160803172736.GA12989@infradead.org>
+Message-ID: <8897954.gERmznGCsN@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 1 Aug 2016, Rob Herring wrote:
-
-> On Tue, Jul 12, 2016 at 02:36:41PM -0500, Alan Tull wrote:
-> > Add bindings documentation for Altera SOCFPGA bridges:
-> >  * fpga2sdram
-> >  * fpga2hps
-> >  * hps2fpga
-> >  * lwhps2fpga
-> > 
-> > Signed-off-by: Alan Tull <atull@opensource.altera.com>
-> > Signed-off-by: Matthew Gerlach <mgerlach@altera.com>
-> > Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
-> > ---
-> > v2:  separate into 2 documents for the 2 drivers
-> > v12: bump version to line up with simple-fpga-bus version
-> >      remove Linux specific notes such as references to sysfs
-> >      move non-DT specific documentation elsewhere
-> >      remove bindings that would have been used to pass configuration
-> >      clean up formatting
-> > v13: Remove 'label' property
-> >      Change property from init-val to bridge-enable
-> >      Fix email address
-> > v14: Add resets
-> >      Change order of bridges to put lw bridge (controlling bridge) first
-> > v15: No change in this patch for v15 of this patch set
-> > v16: Added regs property, cleaned up unit addresses
-> > v17: No change to this patch in v17 of patch set
-> > v18: Changed to not need reset-names property
-> >      node names as fpga-bridge at ...
-> >      labels as fpga_bridge
-> >      Add address of fpgaportrst to give and address for f2s bridge
-> > ---
-> >  .../bindings/fpga/altera-fpga2sdram-bridge.txt     | 16 +++++++++
-> >  .../bindings/fpga/altera-hps2fpga-bridge.txt       | 39 ++++++++++++++++++++++
-> >  2 files changed, 55 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/fpga/altera-fpga2sdram-bridge.txt
-> >  create mode 100644 Documentation/devicetree/bindings/fpga/altera-hps2fpga-bridge.txt
+On Wednesday, August 3, 2016 10:27:36 AM CEST Christoph Hellwig wrote:
+> On Wed, Aug 03, 2016 at 06:03:54PM +0200, Arnd Bergmann wrote:
+> > drivers/ntb seems like a reasonable start, while an alternative
+> > approach that we have discussed in the past would be based on top
+> > of virtio, so we could use the existing front-end drivers (net, block,
+> > v9fs, console, ...).
 > 
-> Acked-by: Rob Herring <robh@kernel.org>
-> 
+> I don't really think either is a good aproach for the lowest level
+> interface.  To be useful the EP driver needs to be able to implement
+> any (reasonable) thing a PCIe device could do.  Both NTB and virtio
+> can sit on top of that, though.
 
-Thanks!
+Good point. NTB tries to be the low-level interface, but I guess
+you are right that it really isn't (I have not looked in a long
+time, maybe Jon can comment).
 
-Alan
+While virtio transport over PCI would be great as the way to
+implement a lot of things on top of endpoint devices, it can't
+be the lowest level in the stack (see drivers/remoteproc) and
+building it on top of something that is useful for other things
+sounds like a good idea.
+
+	Arnd
