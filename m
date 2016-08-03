@@ -1,172 +1,90 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Tue, 02 Aug 2016 23:11:33 -0700
-Subject: [PATCH] KVM: arm/arm64: initialize new VGIC even without host GIC
-In-Reply-To: <20160802143445.14005-1-andre.przywara@arm.com>
-References: <20160802143445.14005-1-andre.przywara@arm.com>
-Message-ID: <889c440b4dd5e34f20d900ef5c5ba0b1@agner.ch>
+From: anurupvasu@gmail.com (Anurup M)
+Date: Wed,  3 Aug 2016 02:34:29 -0400
+Subject: [RFC PATCH v1 00/10] arm64:perf: Support for Hisilicon SoC Hardware
+ event counters
+Message-ID: <1470206079-73280-1-git-send-email-anurup.m@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016-08-02 07:34, Andre Przywara wrote:
-> The new VGIC code is always in the VCPU entry/exit path, even when the
-> actual GIC hardware initialization found the VGIC unusable (due to
-> non-aligned base addresses or a missing maintenance interrupt, for
-> instance).
-> Since in this case the VGIC structures aren't initialized properly, the
-> host kernel crashes on a NULL pointer dereference.
-> Initialize each VCPU's ap_list even with the VGIC unavailable, so the
-> VGIC code now just iterates an empty list in that case and no longer
-> crashes the kernel.
-> Also take care of the arch timer (which becomes unusable as well without
-> a VGIC) by using a static key to prevent arch timer code to run in the
-> hot path.
-> Much of the code was inspired by Marc Zyngier.
-> 
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> Reported-by: Stefan Agner <stefan@agner.ch>
-> ---
-> Hi Stefan, Drew,
-> 
-> can you test this on your systems which showed the issue?
+Provide Support for Hisilicon SoC Hip05 Hardware event counters.
+The Hisilicon SoC Hip05 series has many uncore or non-CPU performance
+events and counters units.
 
-Looks that this catches the issue nicely too, the guest kernel boots
-fine!
+This patch is implemented refering to arm-cci, Intel/AMD uncore and
+also the cavium thunderX pmu patches.
 
-Tested-by: Stefan Agner <stefan@agner.ch>
+Support for Hisilicon L3 cache(LLC) hardware events and counters are added
+in this implementation.
 
---
-Stefan
+The Hisilicon PMU datastructures are designed so as to support uncore
+and also CPU specific events in future.
 
+The Hisilicon LLC has four banks for a Super CPU Cluster(consists of
+ 16 CPU cores) and each LLC bank has separate hardware events and counters.
+In the current implementation, the count from all these banks are summarized
+and total count is output.
 
-> 
-> Cheers,
-> Andre.
-> 
->  arch/arm/kvm/arm.c            | 14 ++++++++++----
->  include/kvm/arm_arch_timer.h  |  2 ++
->  virt/kvm/arm/arch_timer.c     | 11 +++++++++++
->  virt/kvm/arm/vgic/vgic-init.c |  9 ++++-----
->  4 files changed, 27 insertions(+), 9 deletions(-)
-> 
-> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-> index f1bde7c..cef35ce 100644
-> --- a/arch/arm/kvm/arm.c
-> +++ b/arch/arm/kvm/arm.c
-> @@ -294,7 +294,8 @@ int kvm_arch_vcpu_init(struct kvm_vcpu *vcpu)
->  	bitmap_zero(vcpu->arch.features, KVM_VCPU_MAX_FEATURES);
->  
->  	/* Set up the timer */
-> -	kvm_timer_vcpu_init(vcpu);
-> +	if (vgic_present)
-> +		kvm_timer_vcpu_init(vcpu);
->  
->  	kvm_arm_reset_debug_ptr(vcpu);
->  
-> @@ -1208,6 +1209,7 @@ static int init_subsystems(void)
->  		break;
->  	case -ENODEV:
->  	case -ENXIO:
-> +		kvm_err("No useable vgic detected\n");
->  		vgic_present = false;
->  		err = 0;
->  		break;
-> @@ -1218,9 +1220,13 @@ static int init_subsystems(void)
->  	/*
->  	 * Init HYP architected timer support
->  	 */
-> -	err = kvm_timer_hyp_init();
-> -	if (err)
-> -		goto out;
-> +	if (vgic_present) {
-> +		err = kvm_timer_hyp_init();
-> +		if (err)
-> +			goto out;
-> +	} else {
-> +		static_branch_enable(&kvm_arch_timer_disabled);
-> +	}
->  
->  	kvm_perf_init();
->  	kvm_coproc_table_init();
-> diff --git a/include/kvm/arm_arch_timer.h b/include/kvm/arm_arch_timer.h
-> index dda39d8..64f361f 100644
-> --- a/include/kvm/arm_arch_timer.h
-> +++ b/include/kvm/arm_arch_timer.h
-> @@ -23,6 +23,8 @@
->  #include <linux/hrtimer.h>
->  #include <linux/workqueue.h>
->  
-> +extern struct static_key_false kvm_arch_timer_disabled;
-> +
->  struct arch_timer_kvm {
->  	/* Virtual offset */
->  	cycle_t			cntvoff;
-> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-> index 4fde8c7..71fb04c 100644
-> --- a/virt/kvm/arm/arch_timer.c
-> +++ b/virt/kvm/arm/arch_timer.c
-> @@ -34,6 +34,8 @@ static struct timecounter *timecounter;
->  static struct workqueue_struct *wqueue;
->  static unsigned int host_vtimer_irq;
->  
-> +DEFINE_STATIC_KEY_FALSE(kvm_arch_timer_disabled);
-> +
->  void kvm_timer_vcpu_put(struct kvm_vcpu *vcpu)
->  {
->  	vcpu->arch.timer_cpu.active_cleared_last = false;
-> @@ -41,6 +43,9 @@ void kvm_timer_vcpu_put(struct kvm_vcpu *vcpu)
->  
->  static cycle_t kvm_phys_timer_read(void)
->  {
-> +	if (static_branch_unlikely(&kvm_arch_timer_disabled))
-> +		return 0;
-> +
->  	return timecounter->cc->read(timecounter->cc);
->  }
->  
-> @@ -104,6 +109,9 @@ static u64 kvm_timer_compute_delta(struct kvm_vcpu *vcpu)
->  {
->  	cycle_t cval, now;
->  
-> +	if (static_branch_unlikely(&kvm_arch_timer_disabled))
-> +		return 0;
-> +
->  	cval = vcpu->arch.timer_cpu.cntv_cval;
->  	now = kvm_phys_timer_read() - vcpu->kvm->arch.timer.cntvoff;
->  
-> @@ -148,6 +156,9 @@ static bool kvm_timer_irq_can_fire(struct kvm_vcpu *vcpu)
->  {
->  	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
->  
-> +	if (static_branch_unlikely(&kvm_arch_timer_disabled))
-> +		return false;
-> +
->  	return !(timer->cntv_ctl & ARCH_TIMER_CTRL_IT_MASK) &&
->  		(timer->cntv_ctl & ARCH_TIMER_CTRL_ENABLE);
->  }
-> diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
-> index 2c7f0d5..b92133c 100644
-> --- a/virt/kvm/arm/vgic/vgic-init.c
-> +++ b/virt/kvm/arm/vgic/vgic-init.c
-> @@ -56,6 +56,10 @@ void kvm_vgic_early_init(struct kvm *kvm)
->  
->  void kvm_vgic_vcpu_early_init(struct kvm_vcpu *vcpu)
->  {
-> +	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
-> +
-> +	INIT_LIST_HEAD(&vgic_cpu->ap_list_head);
-> +	spin_lock_init(&vgic_cpu->ap_list_lock);
->  }
->  
->  /* CREATION */
-> @@ -392,11 +396,6 @@ int kvm_vgic_hyp_init(void)
->  	if (!gic_kvm_info)
->  		return -ENODEV;
->  
-> -	if (!gic_kvm_info->maint_irq) {
-> -		kvm_err("No vgic maintenance irq\n");
-> -		return -ENXIO;
-> -	}
-> -
->  	switch (gic_kvm_info->type) {
->  	case GIC_V2:
->  		ret = vgic_v2_probe(gic_kvm_info);
+Hisilicon SoC use Djtag interface for r/w access to SoC PMU registers
+
+The Hisilicon uncore PMUs can be found under /sys/bus/event_source/devices.
+The counters are exported via sysfs in the corresponding events files
+under the PMU directory so the perf tool can list the event names.
+
+Note:
+This is very initial patchset for Hisilicon Hip05 SoC PMU support shared for
+review. Please review and share comments.
+
+TODO:
+	1. Counter overflow interrupt handling support.
+	2. CPU notifier to migrate to available online CPU's in case
+	   of CPU DOWN. Also mapping CPU cores to the current SCCL.
+	3. Support for counting of individual LLC banks
+
+Anurup M (8):
+  arm64:perf: Add Documentaion for HIP05 PMU event counting.     
+    1. Documentaion for perf usage and PMU events.
+  arm64:perf: Add Devicetree bindings for Hisilicon SoC PMU
+  arm64:perf: Update Kconfig for Hisilicon PMU support
+  arm64:perf: Add support for Hisilicon SoC event counters
+  arm64:perf: Makefile for Hisilicon Hip05 PMU
+  arm64:perf: Update Makefile for Hisilicon PMU support
+  arm64:perf: L3 cache(LLC) event listing in perf
+  arm64: dts: hip05: Add L3 cache PMU support
+
+Tan Xiaojun (2):
+  Documentation: arm64: Add Hisilicon HiP05/06/07 Sysctrl and Djtag dts
+    bindings
+  drivers: soc: Add support for Hisilicon Djtag driver
+
+ .../bindings/arm/hisilicon/hisilicon.txt           |  97 ++++
+ .../devicetree/bindings/arm/hisilicon/pmu.txt      |  52 ++
+ Documentation/perf/hip05-pmu.txt                   |  70 +++
+ arch/arm64/boot/dts/hisilicon/hip05.dtsi           |  19 +
+ drivers/perf/Kconfig                               |   9 +
+ drivers/perf/Makefile                              |   1 +
+ drivers/perf/hisilicon/Makefile                    |   1 +
+ drivers/perf/hisilicon/hisi_uncore_l3c.c           | 561 +++++++++++++++++++++
+ drivers/perf/hisilicon/hisi_uncore_l3c.h           | 100 ++++
+ drivers/perf/hisilicon/hisi_uncore_pmu.c           | 504 ++++++++++++++++++
+ drivers/perf/hisilicon/hisi_uncore_pmu.h           | 148 ++++++
+ drivers/soc/Kconfig                                |   1 +
+ drivers/soc/Makefile                               |   1 +
+ drivers/soc/hisilicon/Kconfig                      |  12 +
+ drivers/soc/hisilicon/Makefile                     |   1 +
+ drivers/soc/hisilicon/djtag.c                      | 373 ++++++++++++++
+ include/linux/soc/hisilicon/djtag.h                |  18 +
+ 17 files changed, 1968 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/hisilicon/pmu.txt
+ create mode 100644 Documentation/perf/hip05-pmu.txt
+ create mode 100644 drivers/perf/hisilicon/Makefile
+ create mode 100644 drivers/perf/hisilicon/hisi_uncore_l3c.c
+ create mode 100644 drivers/perf/hisilicon/hisi_uncore_l3c.h
+ create mode 100644 drivers/perf/hisilicon/hisi_uncore_pmu.c
+ create mode 100644 drivers/perf/hisilicon/hisi_uncore_pmu.h
+ create mode 100644 drivers/soc/hisilicon/Kconfig
+ create mode 100644 drivers/soc/hisilicon/Makefile
+ create mode 100644 drivers/soc/hisilicon/djtag.c
+ create mode 100644 include/linux/soc/hisilicon/djtag.h
+
+-- 
+2.1.4
