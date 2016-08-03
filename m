@@ -1,54 +1,29 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Wed, 3 Aug 2016 08:07:02 -0700
-Subject: "Failed to create /dev/root: -14" after commit e6978e4bf1 ("ARM:
- save and reset the address limit when entering an exception")
-In-Reply-To: <20160803083822.GI1041@n2100.armlinux.org.uk>
-References: <57A15C41.6000804@roeck-us.net>
- <20160803083822.GI1041@n2100.armlinux.org.uk>
-Message-ID: <57A20896.30300@roeck-us.net>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Wed, 3 Aug 2016 08:27:48 -0700
+Subject: [PATCH 2/2] MMC: meson: inital support for GXBB platforms
+In-Reply-To: <57A13CB5.4000006@samsung.com>
+References: <20160803003045.24980-1-khilman@baylibre.com>
+ <CGME20160803003156epcas1p2473ed7677a97642c892baefa5dcffddd@epcas1p2.samsung.com>
+ <20160803003045.24980-2-khilman@baylibre.com> <57A13CB5.4000006@samsung.com>
+Message-ID: <CAOi56cXq2Vqz+7xT1J7NO01cV7HwMt=U-_7NPwEFf1D01R2VXQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/03/2016 01:38 AM, Russell King - ARM Linux wrote:
-> On Tue, Aug 02, 2016 at 07:51:45PM -0700, Guenter Roeck wrote:
->> Hi,
+On Tue, Aug 2, 2016 at 5:37 PM, Jaehoon Chung <jh80.chung@samsung.com> wrote:
+> Hi Kevin,
+>
+> On 08/03/2016 09:30 AM, Kevin Hilman wrote:
+>> Initial support for the SD/eMMC controller in the Amlogic S905/GXBB
+>> family of SoCs.
 >>
->> I see the following crash when running a qemu arm 'kzm' runtime test with
->> the current mainline.
->> ...
->> Failed to create /dev/root: -14
+>> Currently working for the SD and eMMC interfaces, but not yet tested for
+>> SDIO.
 >>
->> [ followed by panic ]
->>
->> A complete log file is at [1].
+>> Tested external SD card and internal eMMC on meson-gxbb-p200 and
+>> meson-gxbb-odroidc2.
 >
-> I think it's because of those undefined instructions you're hitting
-> with the hw-breakpoint code... can you try the patch below please?
->
->   arch/arm/kernel/entry-armv.S | 1 +
->   1 file changed, 1 insertion(+)
->
-> diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
-> index bc5f50799d75..9f157e7c51e7 100644
-> --- a/arch/arm/kernel/entry-armv.S
-> +++ b/arch/arm/kernel/entry-armv.S
-> @@ -295,6 +295,7 @@ __und_svc_fault:
->   	bl	__und_fault
->
->   __und_svc_finish:
-> +	get_thread_info tsk
->   	ldr	r5, [sp, #S_PSR]		@ Get SVC cpsr
->   	svc_exit r5				@ return from exception
->    UNWIND(.fnend		)
->
+> Before sending patch, run the checkpatch.pl for your patch.
 
-Yes, that fixes the problem.
+Yes, sorry about that.  This patch was sent prematurely.
 
-Assuming you'll create a patch:
-
-Tested-by: Guenter Roeck <linux@roeck-us.net>
-
-Does that need to be addressed in qemu, or is it a Linux bug ?
-
-Thanks,
-Guenter
+Kevin
