@@ -1,116 +1,48 @@
-From: songjun.wu@microchip.com (Songjun Wu)
-Date: Wed, 3 Aug 2016 16:08:04 +0800
-Subject: [PATCH v8 2/2] [media] atmel-isc: DT binding for Image Sensor
- Controller driver
-In-Reply-To: <1470211686-2198-1-git-send-email-songjun.wu@microchip.com>
-References: <1470211686-2198-1-git-send-email-songjun.wu@microchip.com>
-Message-ID: <1470211686-2198-3-git-send-email-songjun.wu@microchip.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Wed, 3 Aug 2016 10:28:55 +0200
+Subject: [PATCH] Add file permission mode helpers
+In-Reply-To: <20160803081140.GA7833@gmail.com>
+References: <CA+55aFw5v23T-zvDZp-MmD_EYxF8WbafwwB59934FV7g21uMGQ@mail.gmail.com>
+ <20160803081140.GA7833@gmail.com>
+Message-ID: <20160803082855.GA32280@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DT binding documentation for ISC driver.
+On Wed, Aug 03, 2016 at 10:11:40AM +0200, Ingo Molnar wrote:
+> An added advantage would be that during review it would stick out like a sore 
+> thumb if anyone used a 'weird' permission variant.
+> 
+> For example, if you saw these lines in a driver patch:
+> 
+> +	__ATTR(l1, 0444, driver_show_l4, NULL);
+> +		__ATTR(l3, 0446, driver_show_l4, NULL);
+> +			__ATTR(l2, 04444, driver_show_l4, NULL);
+> +		__ATTR(l4, 0444, driver_show_l4, NULL);
+> 
+> ... would you notice it at a glance that it contains two security holes?
 
-Acked-by: Rob Herring <robh@kernel.org>
-Signed-off-by: Songjun Wu <songjun.wu@microchip.com>
----
+I've tried to deal with that in the past with the __ATTR_RW() and
+__ATTR_RO() and __ATTR_WO() macros that more should be using.  I swept
+the tree a few years ago to try to fix up most of them, but I know I
+didn't catch them all, and more files have been added since then.
 
-Changes in v8: None
-Changes in v7: None
-Changes in v6:
-- Add "iscck" and "gck" to clock-names.
+> While the weird permissions in this:
+> 
+> +		__ATTR(l1, PERM_r__r__r__,  driver_show_l4, NULL);
+> +		__ATTR(l3, PERM_r__r__rw_,  driver_show_l4, NULL);
+> +		__ATTR(l2, PERM_sr__r__r__, driver_show_l4, NULL);
+> +		__ATTR(l4, PERM_r__r__r__,  driver_show_l4, NULL);
+> 
+> Wouln't even build, because the dangerous patterns of PERM_r__r__rw_ or 
+> PERM_sr__r__r__ are not defined to begin with.
 
-Changes in v5:
-- Add clock-output-names.
+Because of that, odds are people will just stick to the octal numbers,
+because they think they want something other than the ones you defined
+for foolish reasons :)
 
-Changes in v4:
-- Remove the isc clock nodes.
+That being said, I do like them much better than the macros we have
+today, which I always have to go and look up every time I see them...
 
-Changes in v3:
-- Remove the 'atmel,sensor-preferred'.
-- Modify the isc clock node according to the Rob's remarks.
+thanks,
 
-Changes in v2:
-- Remove the unit address of the endpoint.
-- Add the unit address to the clock node.
-- Avoid using underscores in node names.
-- Drop the "0x" in the unit address of the i2c node.
-- Modify the description of 'atmel,sensor-preferred'.
-- Add the description for the ISC internal clock.
-
- .../devicetree/bindings/media/atmel-isc.txt        | 65 ++++++++++++++++++++++
- 1 file changed, 65 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/media/atmel-isc.txt
-
-diff --git a/Documentation/devicetree/bindings/media/atmel-isc.txt b/Documentation/devicetree/bindings/media/atmel-isc.txt
-new file mode 100644
-index 0000000..bbe0e87c
---- /dev/null
-+++ b/Documentation/devicetree/bindings/media/atmel-isc.txt
-@@ -0,0 +1,65 @@
-+Atmel Image Sensor Controller (ISC)
-+----------------------------------------------
-+
-+Required properties for ISC:
-+- compatible
-+	Must be "atmel,sama5d2-isc".
-+- reg
-+	Physical base address and length of the registers set for the device.
-+- interrupts
-+	Should contain IRQ line for the ISC.
-+- clocks
-+	List of clock specifiers, corresponding to entries in
-+	the clock-names property;
-+	Please refer to clock-bindings.txt.
-+- clock-names
-+	Required elements: "hclock", "iscck", "gck".
-+- #clock-cells
-+	Should be 0.
-+- clock-output-names
-+	Should be "isc-mck".
-+- pinctrl-names, pinctrl-0
-+	Please refer to pinctrl-bindings.txt.
-+
-+ISC supports a single port node with parallel bus. It should contain one
-+'port' child node with child 'endpoint' node. Please refer to the bindings
-+defined in Documentation/devicetree/bindings/media/video-interfaces.txt.
-+
-+Example:
-+isc: isc at f0008000 {
-+	compatible = "atmel,sama5d2-isc";
-+	reg = <0xf0008000 0x4000>;
-+	interrupts = <46 IRQ_TYPE_LEVEL_HIGH 5>;
-+	clocks = <&isc_clk>, <&iscck>, <&isc_gclk>;
-+	clock-names = "hclock", "iscck", "gck";
-+	#clock-cells = <0>;
-+	clock-output-names = "isc-mck";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_isc_base &pinctrl_isc_data_8bit &pinctrl_isc_data_9_10 &pinctrl_isc_data_11_12>;
-+
-+	port {
-+		isc_0: endpoint {
-+			remote-endpoint = <&ov7740_0>;
-+			hsync-active = <1>;
-+			vsync-active = <0>;
-+			pclk-sample = <1>;
-+		};
-+	};
-+};
-+
-+i2c1: i2c at fc028000 {
-+	ov7740: camera at 21 {
-+		compatible = "ovti,ov7740";
-+		reg = <0x21>;
-+		clocks = <&isc>;
-+		clock-names = "xvclk";
-+		assigned-clocks = <&isc>;
-+		assigned-clock-rates = <24000000>;
-+
-+		port {
-+			ov7740_0: endpoint {
-+				remote-endpoint = <&isc_0>;
-+			};
-+		};
-+	};
-+};
--- 
-2.7.4
+greg k-h
