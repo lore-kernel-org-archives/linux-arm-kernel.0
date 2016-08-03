@@ -1,38 +1,61 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Wed, 3 Aug 2016 10:42:36 +0100
-Subject: Can cores have different CPU features in a SMP system?
-In-Reply-To: <c3706488-98db-9a71-22b1-0d56cfb3f2a7@arm.com>
-References: <CAP5Nno430Jt3Ax2jUPP6ELpVBF-pK0Akxsa8sZ55f8GL7LQt=g@mail.gmail.com>
- <CAP5Nno4CN18x_L-UQPm0Wp7hFSQAKtRobV94iBkcB9y4-UeRpg@mail.gmail.com>
- <b9577b33-0401-cf0f-bac2-f0315f520356@arm.com>
- <CAP5Nno6Taupawth4pghFt4aidQx=ib=3yswdV=QPZeY6c-6RmQ@mail.gmail.com>
- <c3706488-98db-9a71-22b1-0d56cfb3f2a7@arm.com>
-Message-ID: <0cfc0ca3-f056-c666-4a9b-4ebd8e0612d5@arm.com>
+From: hch@infradead.org (Christoph Hellwig)
+Date: Wed, 3 Aug 2016 02:47:47 -0700
+Subject: Support for configurable PCIe endpoint
+In-Reply-To: <57A18927.9070003@ti.com>
+References: <57A18927.9070003@ti.com>
+Message-ID: <20160803094747.GA10170@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/08/16 10:00, Suzuki K Poulose wrote:
-> On 02/08/16 18:23, Jun Sun wrote:
->> Hi, Suzuki,
->>
->> I was looking at kernel 3.18 and drew the earlier conclusion.
->>
->> I'm now looking at kernel v4.7-rc4.  It appears the logic is
->>
->>   - cpu 0 sets up elf_hwcap (init_cpu_ftr_reg(), init_cpu_features() )
->
-> On arm64 CPU 0 doesn't set up elf_hwcap. It initialises the CPU feature register
-> infrastructure which keeps track of the system wide safe values for the ID
-> registers. init_cpu_features() initialises the table with the values from
-> the boot CPU. This will also be used to detect if any secondary CPU has
-> variations in features which could affect the normal functioning of Linux (via
-> update_cpu_features() -> check_update_ftr_reg() ).
->
-> The elf_hwcap and the system CPU_HWCAP bits are initialised only after all
-> the boot time active CPUs are online, from
-> setup_cpu_features()-> { setup_elf_hwcaps(), setup_feature_capabilities() }
+On Wed, Aug 03, 2016 at 11:33:19AM +0530, Kishon Vijay Abraham I wrote:
+> Hi,
+> 
+> The PCIe controller present in TI's DRA7 SoC is capable of operating either in
+> Root Complex mode or Endpoint mode. (It uses Synopsys Designware Core).I'd
+> assume most of the PCIe controllers on other platforms that use Designware core
+> should also be capable to operate in endpoint mode. But linux kernel right now
+> supports only RC mode.
+> 
+> PCIe endpoint support discussion came up briefly before [1] but it was felt the
+> practical use case will find firmware more suitable and endpoint support in
+> kernel can be used only for validation or demo.
 
-And the values are set based on the system wide safe values from the CPU feature
-infrastructure (using read_system_reg()).
+I disagree.  It's highly useful for rapid prototyping of hardware
+interfaces, and I've been looking into PCIe EP drivers for exactly
+that reason recently.  Going a little offtopic: any good DRA7 eval
+boards you'd recommend to try for this purpose?
 
-Suzuki
+We already have a EP driver in the tree:
+
+drivers/misc/spear13xx_pcie_gadget.c
+
+but as far as I can tell it doesn't really work at the moment.
+
+> Validation or demo is itself a valid use case in my opinion (consider something
+> similar to gadget zero for USB). There can be other use cases as well. The RC
+> can use the SoC with EP mode support as an accelerator to accomplish specific
+> task. Here RC gives data to the EP. The EP processes the data. The processing
+> can be done either in ARM itself or it can use other hardware accelerators
+> (like DSP, IVA-HD etc..) present in the EP system. If HW accelerator is used,
+> the linux kernel running in ARM can be used to accomplish other tasks. Once EP
+> mode support is added, I think more use cases will be added.
+
+That sounds useful as well.
+
+> >From the high level this should look _similar_ to the gadget framework of USB.
+> One difference from USB would be this should allow HW components (like DSP, PRU
+> etc.. and maybe even some peripheral) in the EP system to be used by RC system.
+
+Indeed.
+
+> So these are the high-level steps that I thought would be needed to add EP
+> support in linux.
+> *) move pcie-designware.c out of drivers/pci/host (maybe create a
+> drivers/pci/designware/ folder?). All users of pcie-designware.c should be
+> moved here.
+> This is in preparation for adding EP mode support to designware.
+
+I'd use a new drivers/pci/controller.  Or maybe just skip the rename
+for now and see how this evolves.
+
+The rest of the plan sounds fine to me.
