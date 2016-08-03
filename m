@@ -1,69 +1,172 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 3 Aug 2016 11:33:19 +0530
-Subject: Support for configurable PCIe endpoint
-Message-ID: <57A18927.9070003@ti.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Tue, 02 Aug 2016 23:11:33 -0700
+Subject: [PATCH] KVM: arm/arm64: initialize new VGIC even without host GIC
+In-Reply-To: <20160802143445.14005-1-andre.przywara@arm.com>
+References: <20160802143445.14005-1-andre.przywara@arm.com>
+Message-ID: <889c440b4dd5e34f20d900ef5c5ba0b1@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 2016-08-02 07:34, Andre Przywara wrote:
+> The new VGIC code is always in the VCPU entry/exit path, even when the
+> actual GIC hardware initialization found the VGIC unusable (due to
+> non-aligned base addresses or a missing maintenance interrupt, for
+> instance).
+> Since in this case the VGIC structures aren't initialized properly, the
+> host kernel crashes on a NULL pointer dereference.
+> Initialize each VCPU's ap_list even with the VGIC unavailable, so the
+> VGIC code now just iterates an empty list in that case and no longer
+> crashes the kernel.
+> Also take care of the arch timer (which becomes unusable as well without
+> a VGIC) by using a static key to prevent arch timer code to run in the
+> hot path.
+> Much of the code was inspired by Marc Zyngier.
+> 
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> Reported-by: Stefan Agner <stefan@agner.ch>
+> ---
+> Hi Stefan, Drew,
+> 
+> can you test this on your systems which showed the issue?
 
-The PCIe controller present in TI's DRA7 SoC is capable of operating either in
-Root Complex mode or Endpoint mode. (It uses Synopsys Designware Core).I'd
-assume most of the PCIe controllers on other platforms that use Designware core
-should also be capable to operate in endpoint mode. But linux kernel right now
-supports only RC mode.
+Looks that this catches the issue nicely too, the guest kernel boots
+fine!
 
-PCIe endpoint support discussion came up briefly before [1] but it was felt the
-practical use case will find firmware more suitable and endpoint support in
-kernel can be used only for validation or demo.
+Tested-by: Stefan Agner <stefan@agner.ch>
 
-Validation or demo is itself a valid use case in my opinion (consider something
-similar to gadget zero for USB). There can be other use cases as well. The RC
-can use the SoC with EP mode support as an accelerator to accomplish specific
-task. Here RC gives data to the EP. The EP processes the data. The processing
-can be done either in ARM itself or it can use other hardware accelerators
-(like DSP, IVA-HD etc..) present in the EP system. If HW accelerator is used,
-the linux kernel running in ARM can be used to accomplish other tasks. Once EP
-mode support is added, I think more use cases will be added.
+--
+Stefan
 
->From the high level this should look _similar_ to the gadget framework of USB.
-One difference from USB would be this should allow HW components (like DSP, PRU
-etc.. and maybe even some peripheral) in the EP system to be used by RC system.
 
-So these are the high-level steps that I thought would be needed to add EP
-support in linux.
-*) move pcie-designware.c out of drivers/pci/host (maybe create a
-drivers/pci/designware/ folder?). All users of pcie-designware.c should be
-moved here.
-This is in preparation for adding EP mode support to designware.
-
-*) Add library functions in pcie-designware.c specific to EP mode like
-initializing general ecam registers, BAR registers etc.. These functions should
-be invoked from a *function* driver (function driver should determine the use
-of a particular EP).
-
-*) Add a sample *function* driver that can be used just for validation. This
-function driver will invoke the previously added functions in PCIe controller
-to initialize ecam, BAR etc.. This will invoke the PCIe controller functions
-through *ep-core* layer. That way the same function driver can be made to work
-with different PCIe controllers. (A PCIe driver corresponding to this function
-driver should also be implemented in RC side)
-
-*) Add *ep-core* layer to bind the function driver to the controller driver and
-using which the function driver will invoke controller driver callbacks (to
-initialize ecam, BAR registers etc..)
-
-*) Modify platform driver to support EP mode (in my case pci-dra7xx.c).
-
-*) dt binding specific to EP mode should be created.
-
-Once I complete the implementation and start posting RFC patches, a lot of
-these will become clear. But I want to check if this sounds okay to you guys
-before starting the implementation.
-
-Let me know if you have some other ideas too.
-
-Cheers
-Kishon
-
-[1] -> http://www.spinics.net/lists/linux-pci/msg26026.html
+> 
+> Cheers,
+> Andre.
+> 
+>  arch/arm/kvm/arm.c            | 14 ++++++++++----
+>  include/kvm/arm_arch_timer.h  |  2 ++
+>  virt/kvm/arm/arch_timer.c     | 11 +++++++++++
+>  virt/kvm/arm/vgic/vgic-init.c |  9 ++++-----
+>  4 files changed, 27 insertions(+), 9 deletions(-)
+> 
+> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+> index f1bde7c..cef35ce 100644
+> --- a/arch/arm/kvm/arm.c
+> +++ b/arch/arm/kvm/arm.c
+> @@ -294,7 +294,8 @@ int kvm_arch_vcpu_init(struct kvm_vcpu *vcpu)
+>  	bitmap_zero(vcpu->arch.features, KVM_VCPU_MAX_FEATURES);
+>  
+>  	/* Set up the timer */
+> -	kvm_timer_vcpu_init(vcpu);
+> +	if (vgic_present)
+> +		kvm_timer_vcpu_init(vcpu);
+>  
+>  	kvm_arm_reset_debug_ptr(vcpu);
+>  
+> @@ -1208,6 +1209,7 @@ static int init_subsystems(void)
+>  		break;
+>  	case -ENODEV:
+>  	case -ENXIO:
+> +		kvm_err("No useable vgic detected\n");
+>  		vgic_present = false;
+>  		err = 0;
+>  		break;
+> @@ -1218,9 +1220,13 @@ static int init_subsystems(void)
+>  	/*
+>  	 * Init HYP architected timer support
+>  	 */
+> -	err = kvm_timer_hyp_init();
+> -	if (err)
+> -		goto out;
+> +	if (vgic_present) {
+> +		err = kvm_timer_hyp_init();
+> +		if (err)
+> +			goto out;
+> +	} else {
+> +		static_branch_enable(&kvm_arch_timer_disabled);
+> +	}
+>  
+>  	kvm_perf_init();
+>  	kvm_coproc_table_init();
+> diff --git a/include/kvm/arm_arch_timer.h b/include/kvm/arm_arch_timer.h
+> index dda39d8..64f361f 100644
+> --- a/include/kvm/arm_arch_timer.h
+> +++ b/include/kvm/arm_arch_timer.h
+> @@ -23,6 +23,8 @@
+>  #include <linux/hrtimer.h>
+>  #include <linux/workqueue.h>
+>  
+> +extern struct static_key_false kvm_arch_timer_disabled;
+> +
+>  struct arch_timer_kvm {
+>  	/* Virtual offset */
+>  	cycle_t			cntvoff;
+> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+> index 4fde8c7..71fb04c 100644
+> --- a/virt/kvm/arm/arch_timer.c
+> +++ b/virt/kvm/arm/arch_timer.c
+> @@ -34,6 +34,8 @@ static struct timecounter *timecounter;
+>  static struct workqueue_struct *wqueue;
+>  static unsigned int host_vtimer_irq;
+>  
+> +DEFINE_STATIC_KEY_FALSE(kvm_arch_timer_disabled);
+> +
+>  void kvm_timer_vcpu_put(struct kvm_vcpu *vcpu)
+>  {
+>  	vcpu->arch.timer_cpu.active_cleared_last = false;
+> @@ -41,6 +43,9 @@ void kvm_timer_vcpu_put(struct kvm_vcpu *vcpu)
+>  
+>  static cycle_t kvm_phys_timer_read(void)
+>  {
+> +	if (static_branch_unlikely(&kvm_arch_timer_disabled))
+> +		return 0;
+> +
+>  	return timecounter->cc->read(timecounter->cc);
+>  }
+>  
+> @@ -104,6 +109,9 @@ static u64 kvm_timer_compute_delta(struct kvm_vcpu *vcpu)
+>  {
+>  	cycle_t cval, now;
+>  
+> +	if (static_branch_unlikely(&kvm_arch_timer_disabled))
+> +		return 0;
+> +
+>  	cval = vcpu->arch.timer_cpu.cntv_cval;
+>  	now = kvm_phys_timer_read() - vcpu->kvm->arch.timer.cntvoff;
+>  
+> @@ -148,6 +156,9 @@ static bool kvm_timer_irq_can_fire(struct kvm_vcpu *vcpu)
+>  {
+>  	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+>  
+> +	if (static_branch_unlikely(&kvm_arch_timer_disabled))
+> +		return false;
+> +
+>  	return !(timer->cntv_ctl & ARCH_TIMER_CTRL_IT_MASK) &&
+>  		(timer->cntv_ctl & ARCH_TIMER_CTRL_ENABLE);
+>  }
+> diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
+> index 2c7f0d5..b92133c 100644
+> --- a/virt/kvm/arm/vgic/vgic-init.c
+> +++ b/virt/kvm/arm/vgic/vgic-init.c
+> @@ -56,6 +56,10 @@ void kvm_vgic_early_init(struct kvm *kvm)
+>  
+>  void kvm_vgic_vcpu_early_init(struct kvm_vcpu *vcpu)
+>  {
+> +	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+> +
+> +	INIT_LIST_HEAD(&vgic_cpu->ap_list_head);
+> +	spin_lock_init(&vgic_cpu->ap_list_lock);
+>  }
+>  
+>  /* CREATION */
+> @@ -392,11 +396,6 @@ int kvm_vgic_hyp_init(void)
+>  	if (!gic_kvm_info)
+>  		return -ENODEV;
+>  
+> -	if (!gic_kvm_info->maint_irq) {
+> -		kvm_err("No vgic maintenance irq\n");
+> -		return -ENXIO;
+> -	}
+> -
+>  	switch (gic_kvm_info->type) {
+>  	case GIC_V2:
+>  		ret = vgic_v2_probe(gic_kvm_info);
