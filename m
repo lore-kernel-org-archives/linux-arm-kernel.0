@@ -1,76 +1,285 @@
-From: mka@chromium.org (Matthias Kaehlcke)
-Date: Wed, 3 Aug 2016 15:16:58 -0700
-Subject: [PATCH v4 2/6] power: add power sequence library
-In-Reply-To: <1470108652-16812-3-git-send-email-peter.chen@nxp.com>
-References: <1470108652-16812-1-git-send-email-peter.chen@nxp.com>
- <1470108652-16812-3-git-send-email-peter.chen@nxp.com>
-Message-ID: <20160803221658.GD1405@google.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Wed,  3 Aug 2016 16:18:42 -0700
+Subject: [PATCH v2 1/2] ARM64: dts: meson-gxbb: add MMC support
+Message-ID: <20160803231843.23012-1-khilman@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-El Tue, Aug 02, 2016 at 11:30:48AM +0800 Peter Chen ha dit:
+Add binding and basic support for the SD/eMMC controller on Amlogic
+S905/GXBB devices.
 
-> diff --git a/drivers/power/pwrseq/core.c b/drivers/power/pwrseq/core.c
->
-> ...
->
-> +static DEFINE_MUTEX(pwrseq_list_mutex);
-> +static LIST_HEAD(pwrseq_list);
-> +
-> +int pwrseq_get(struct device_node *np, struct pwrseq *p)
-> +{
-> +	if (p && p->get)
-> +		return p->get(np, p);
-> +
-> +	return -ENOTSUPP;
-> +}
-> +
-> +int pwrseq_on(struct device_node *np, struct pwrseq *p)
-> +{
-> +	if (p && p->on)
-> +		return p->on(np, p);
-> +
-> +	return -ENOTSUPP;
-> +}
-> +
-> +void pwrseq_off(struct pwrseq *p)
-> +{
-> +	if (p && p->off)
-> +		p->off(p);
-> +}
-> +
-> +void pwrseq_put(struct pwrseq *p)
-> +{
-> +	if (p && p->put)
-> +		p->put(p);
-> +}
-> +
-> +void pwrseq_free(struct pwrseq *p)
-> +{
-> +	if (p && p->free)
-> +		p->free(p);
-> +}
-> +
-> +void pwrseq_register(struct pwrseq *pwrseq)
-> +{
-> +	mutex_lock(&pwrseq_list_mutex);
-> +	list_add(&pwrseq->node, &pwrseq_list);
-> +	mutex_unlock(&pwrseq_list_mutex);
-> +}
-> +
-> +void pwrseq_unregister(struct pwrseq *pwrseq)
-> +{
-> +	mutex_lock(&pwrseq_list_mutex);
-> +	list_del(&pwrseq->node);
-> +	mutex_unlock(&pwrseq_list_mutex);
-> +}
+Signed-off-by: Kevin Hilman <khilman@baylibre.com>
+---
+ .../devicetree/bindings/mmc/amlogic,meson-gxbb.txt | 29 +++++++++
+ .../arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts | 74 ++++++++++++++++++++++
+ arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi   | 71 +++++++++++++++++++++
+ arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi        | 36 ++++++++++-
+ 4 files changed, 209 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/mmc/amlogic,meson-gxbb.txt
 
-What is the purpose of pwrseq_register/unregister()? The pwrseq
-structs are added and removed from pwrseq_list, but besides that
-pwrseq_list is not used.
-
-Looks like this is a remainder from the ancestor of this code
-(drivers/mmc/core/pwrseq.c) which uses the list to avoid having
-multiple pwrseq instances for the same device.
-
-Matthias
+diff --git a/Documentation/devicetree/bindings/mmc/amlogic,meson-gxbb.txt b/Documentation/devicetree/bindings/mmc/amlogic,meson-gxbb.txt
+new file mode 100644
+index 000000000000..2bfdf47018c5
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mmc/amlogic,meson-gxbb.txt
+@@ -0,0 +1,29 @@
++Amlogic SD / eMMC controller for S905/GXBB family SoCs
++
++The MMC 5.1 compliant host controller on Amlogic provides the
++interface for SD, eMMC and SDIO devices.
++
++This file documents the properties in addition to those available in
++the MMC core bindings, documented by mmc.txt.
++
++Required properties:
++- compatible : contains "amlogic,meson-gxbb"
++- clocks     : A list of phandle + clock-specifier pairs for the clocks listed in clock-names.
++- clock-names: Should contain the following:
++	"core" - Main peripheral bus clock
++	"clkin0" - Parent clock of internal mux
++	"clkin1" - Other parent clock of internal mux
++  The driver has an interal mux clock which switches between clkin0 and clkin1 depending on the
++  clock rate requested by the MMC core.
++
++Example:
++
++	sd_emmc_a: mmc at 70000 {
++        	compatible = "amlogic,meson-gxbb-mmc";
++		reg = <0x0 0x70000 0x0 0x2000>;
++                interrupts = < GIC_SPI 216 IRQ_TYPE_EDGE_RISING>;
++		clocks = <&clkc CLKID_SD_EMMC_A>, <&xtal>, <&clkc CLKID_FCLK_DIV2>;
++		clock-names = "core", "clkin0", "clkin1";
++		pinctrl-0 = <&emmc_pins>;
++	};
++
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
+index 90a84c514d3d..f41d8fe5c706 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
++++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
+@@ -73,6 +73,45 @@
+ 			default-state = "off";
+ 		};
+ 	};
++
++	mmc_iv: gpio-regulator {
++		compatible = "regulator-gpio";
++
++		regulator-name = "mmc-gpio-supply";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <3300000>;
++
++		gpios = <&gpio_ao GPIOAO_3 GPIO_ACTIVE_HIGH>;
++		gpio-states = <0 1>;
++
++		/*
++		 * Based on ODROID-C2 schematics:
++		 * signal name: IO_TF_3V3N_1V8, GPIOAO bit 3
++		 */
++		states = <3300000 0
++			  1800000 1>;
++	};
++
++	vcc1v8: regulator {
++		compatible = "regulator-fixed";
++		regulator-name = "VCC1V8";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <1800000>;
++		regulator-always-on;
++	};
++
++	vcc3v3: regulator {
++		compatible = "regulator-fixed";
++		regulator-name = "VCC3V3";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		regulator-always-on;
++	};
++
++	emmc_pwrseq: emmc-pwrseq {
++		compatible = "mmc-pwrseq-emmc";
++		reset-gpios = <&gpio BOOT_9 GPIO_ACTIVE_LOW>;
++	};
+ };
+ 
+ &uart_AO {
+@@ -87,3 +126,38 @@
+ 	pinctrl-names = "default";
+ };
+ 
++&sd_emmc_b {
++	status = "okay";
++	pinctrl-0 = <&sdcard_pins>;
++	pinctrl-names = "default";
++
++	bus-width = <4>;
++	cap-sd-highspeed;
++	max-frequency = <100000000>;
++
++	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_HIGH>;
++	cd-inverted;
++
++	vmmc-supply = <&mmc_iv>;
++	voltage-ranges = <1800 3300>;
++};
++
++&sd_emmc_c {
++	status = "okay";
++	pinctrl-0 = <&emmc_pins>;
++	pinctrl-names = "default";
++
++	bus-width = <8>;
++	cap-sd-highspeed;
++	max-frequency = <200000000>;
++	non-removable;
++	disable-wp;
++	cap-mmc-highspeed;
++	mmc-ddr-1_8v;
++	mmc-hs200-1_8v;
++
++	mmc-pwrseq = <&emmc_pwrseq>;
++	voltage-ranges = <1800 3300>;
++	vmmc-supply = <&vcc3v3>;
++	vmmcq-sumpply = <&vcc1v8>;
++};
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi
+index f4f30f674b4c..77698815943a 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi
+@@ -57,6 +57,42 @@
+ 		device_type = "memory";
+ 		reg = <0x0 0x0 0x0 0x40000000>;
+ 	};
++
++	mmc_iv: gpio-regulator {
++		compatible = "regulator-gpio";
++
++		regulator-name = "mmc-gpio-supply";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <3300000>;
++
++		gpios = <&gpio_ao GPIOAO_5 GPIO_ACTIVE_HIGH>;
++		gpio-states = <0 1>;
++
++		/* Based on P200 schematics, signal CARD_1.8V/3.3V_CTR */
++		states = <1800000 0
++			  3300000 1>;
++	};
++
++	vddio_boot: regulator {
++		compatible = "regulator-fixed";
++		regulator-name = "VDDIO_BOOT";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <1800000>;
++		regulator-always-on;
++	};
++
++	vcc_3v3: regulator {
++		compatible = "regulator-fixed";
++		regulator-name = "VCC_3V3";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		regulator-always-on;
++	};
++
++	emmc_pwrseq: emmc-pwrseq {
++		compatible = "mmc-pwrseq-emmc";
++		reset-gpios = <&gpio BOOT_9 GPIO_ACTIVE_LOW>;
++	};
+ };
+ 
+ /* This UART is brought out to the DB9 connector */
+@@ -72,3 +108,38 @@
+ 	pinctrl-names = "default";
+ };
+ 
++&sd_emmc_b {
++	status = "okay";
++	pinctrl-0 = <&sdcard_pins>;
++	pinctrl-names = "default";
++
++	bus-width = <4>;
++	cap-sd-highspeed;
++	max-frequency = <100000000>;
++
++	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_HIGH>;
++	cd-inverted;
++
++	voltage-ranges = <1800 3300>;
++	vmmc-supply = <&mmc_iv>;
++};
++
++&sd_emmc_c {
++	status = "okay";
++	pinctrl-0 = <&emmc_pins>;
++	pinctrl-names = "default";
++
++	bus-width = <8>;
++	cap-sd-highspeed;
++	cap-mmc-highspeed;
++	max-frequency = <200000000>;
++	non-removable;
++	disable-wp;
++	mmc-ddr-1_8v;
++	mmc-hs200-1_8v;
++
++	mmc-pwrseq = <&emmc_pwrseq>;
++	voltage-ranges = <1800 3300>;
++	vmmc-supply = <&vcc_3v3>;
++	vmmcq-sumpply = <&vddio_boot>;
++};
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+index 35c8b2beb05c..2c200f96467c 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+@@ -247,7 +247,8 @@
+ 					mux {
+ 						groups = "emmc_nand_d07",
+ 						       "emmc_cmd",
+-						       "emmc_clk";
++						       "emmc_clk",
++						       "emmc_ds";
+ 						function = "emmc";
+ 					};
+ 				};
+@@ -330,6 +331,39 @@
+ 			#address-cells = <2>;
+ 			#size-cells = <2>;
+ 			ranges = <0x0 0x0 0x0 0xd0000000 0x0 0x200000>;
++
++			sd_emmc_a: mmc at 70000 {
++				compatible = "amlogic,meson-gxbb-mmc";
++				reg = <0x0 0x70000 0x0 0x2000>;
++				interrupts = <GIC_SPI 216 IRQ_TYPE_EDGE_RISING>;
++				clocks = <&clkc CLKID_SD_EMMC_A>,
++					 <&xtal>,
++					 <&clkc CLKID_FCLK_DIV2>;
++				clock-names = "core", "clkin0", "clkin1";
++				status = "disabled";
++			};
++
++			sd_emmc_b: mmc at 72000 {
++				compatible = "amlogic,meson-gxbb-mmc";
++				reg = <0x0 0x72000 0x0 0x2000>;
++				interrupts = <GIC_SPI 217 IRQ_TYPE_EDGE_RISING>;
++				clocks = <&clkc CLKID_SD_EMMC_B>,
++					 <&xtal>,
++					 <&clkc CLKID_FCLK_DIV2>;
++				clock-names = "core", "clkin0", "clkin1";
++				status = "disabled";
++			};
++
++			sd_emmc_c: mmc at 74000 {
++				compatible = "amlogic,meson-gxbb-mmc";
++				reg = <0x0 0x74000 0x0 0x2000>;
++				interrupts = <GIC_SPI 218 IRQ_TYPE_EDGE_RISING>;
++				clocks = <&clkc CLKID_SD_EMMC_C>,
++					 <&xtal>,
++					 <&clkc CLKID_FCLK_DIV2>;
++				clock-names = "core", "clkin0", "clkin1";
++				status = "disabled";
++			};
+ 		};
+ 
+ 		ethmac: ethernet at c9410000 {
+-- 
+2.9.0
