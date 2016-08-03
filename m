@@ -1,59 +1,68 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Wed, 3 Aug 2016 13:06:00 +0100
-Subject: Kernel NFS boot failure
-In-Reply-To: <674e6841-d2c5-ccae-6633-a699e848e6d2@ti.com>
-References: <674e6841-d2c5-ccae-6633-a699e848e6d2@ti.com>
-Message-ID: <57A1DE28.7020604@arm.com>
+From: panand@redhat.com (Pratyush Anand)
+Date: Wed, 3 Aug 2016 17:52:55 +0530
+Subject: [PATCH 3/4] arm64: kprobes: WARN if attempting to step with
+ PSTATE.D=1
+In-Reply-To: <1468937260-23988-3-git-send-email-will.deacon@arm.com>
+References: <1468937260-23988-1-git-send-email-will.deacon@arm.com>
+ <1468937260-23988-3-git-send-email-will.deacon@arm.com>
+Message-ID: <CAHB_Guonf6qc-yCr2oKDZgX+5q7qXJpSpLU3qafChrBkBqk7FA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Will,
 
-On 03/08/16 12:41, Grygorii Strashko wrote:
-> Hi All,
-> 
-> We observe Kernel boot failure while running NFS boot stress test (1000 iterations):
-> - Linux version 4.7.0 
-> - am335x-evm (TI AM335x EVM)
-> - failure rate 10-20 times per test.
-> Originally this issue was reproduced using TI Kernel 4.4
-> ( git://git.ti.com/ti-linux-kernel/ti-linux-kernel.git, branch: ti-linux-4.4.y)
-> on both am335x-evm and am57xx-beagle-x15(am57xx-evm) platforms.
-> This issues has not been reproduced with TI Kernel 4.1 before.
-> 
-> The SysRq shows that system stuck in nfs_fs_mount()
-> 
-> [  207.904632] [<c07ab34c>] (schedule) from [<c0783554>] (rpc_wait_bit_killable+0x2c/0xd8)
-> [  207.912996] [<c0783554>] (rpc_wait_bit_killable) from [<c07ab7f0>] (__wait_on_bit+0x84/0xc0)
-> [  207.921812] [<c07ab7f0>] (__wait_on_bit) from [<c07ab890>] (out_of_line_wait_on_bit+0x64/0x70)
-> [  207.930810] [<c07ab890>] (out_of_line_wait_on_bit) from [<c07843f4>] (__rpc_execute+0x18c/0x544)
-> [  207.939988] [<c07843f4>] (__rpc_execute) from [<c0779f24>] (rpc_run_task+0x13c/0x158)
-> [  207.948166] [<c0779f24>] (rpc_run_task) from [<c0779f84>] (rpc_call_sync+0x44/0xc4)
-> [  207.956163] [<c0779f84>] (rpc_call_sync) from [<c077a04c>] (rpc_ping+0x48/0x68)
-> [  207.963796] [<c077a04c>] (rpc_ping) from [<c077a158>] (rpc_create_xprt+0xec/0x164)
-> [  207.971702] [<c077a158>] (rpc_create_xprt) from [<c077a2c0>] (rpc_create+0xf0/0x1a0)
-> [  207.979794] [<c077a2c0>] (rpc_create) from [<c0393088>] (nfs_create_rpc_client+0xd4/0xec)
-> [  207.988338] [<c0393088>] (nfs_create_rpc_client) from [<c0394d10>] (nfs_init_client+0x20/0x78)
-> [  207.997332] [<c0394d10>] (nfs_init_client) from [<c03949d4>] (nfs_create_server+0xa0/0x3bc)
-> [  208.006057] [<c03949d4>] (nfs_create_server) from [<c03b197c>] (nfs3_create_server+0x8/0x20)
-> [  208.014879] [<c03b197c>] (nfs3_create_server) from [<c03a34c4>] (nfs_try_mount+0xc4/0x1f0)
-> [  208.023513] [<c03a34c4>] (nfs_try_mount) from [<c03a2c48>] (nfs_fs_mount+0x290/0x910)
-> [  208.031702] [<c03a2c48>] (nfs_fs_mount) from [<c0294d24>] (mount_fs+0x44/0x168)
-> 
-> Has anyone else seen this issue?
-> 
-> I'd be appreciated for any help or advice related to this issue?
+Its already in torvalds/linux.git: master now. I have some related
+queries, so thought to discuss it here.
 
-I did not look at details, but because it is 4.4 and __wait_on_bit
-showed up you might want to look at [1]
+On Tue, Jul 19, 2016 at 7:37 PM, Will Deacon <will.deacon@arm.com> wrote:
+> Stepping with PSTATE.D=1 is bad news. The step won't generate a debug
+> exception and we'll likely walk off into random data structures. This
+> should never happen, but when it does, it's a PITA to debug. Add a
 
-[1] https://lkml.org/lkml/2015/11/20/472
+But it happens in many know scenarios, like:
 
-Just my 2p.
-Vladimir
+1) We are executing a WARN_ON(), which will call `BRK  BUG_BRK_IMM`.
+It prints warning messages through breakpoint handler. Now, suppose we
+have a kprobe instrumented at a print function branch, say
+print_worker_info(), we will land into
+kprobe_handler()->setup_singlestep() with D-bit set. In this case if
+we do not clear it, then we receive undefined exception before we
+could get single step exception.
 
-> 
-> Thanks in advance.
-> 
-> regards,
-> -grygorii
+2) Similarly, if we instrument kprobe at uprobe_breakpoint_handler()
+(code not yet in upstream),  we land into similar situation which
+leads to infinite "Unexpected kernel single-step exception at EL1".
+
+So, why can't we clear PSR_D_BIT in setup_singlestep unconditionally?
+I found that both of the above issue is resolved by doing that.
+
+~Pratyush
+
+> WARN_ON to shout if we realise this is about to take place.
+>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm64/kernel/probes/kprobes.c | 2 ++
+>  1 file changed, 2 insertions(+)
+>
+> diff --git a/arch/arm64/kernel/probes/kprobes.c b/arch/arm64/kernel/probes/kprobes.c
+> index 9c70e8812ea9..c89811d1e294 100644
+> --- a/arch/arm64/kernel/probes/kprobes.c
+> +++ b/arch/arm64/kernel/probes/kprobes.c
+> @@ -254,6 +254,8 @@ static void __kprobes setup_singlestep(struct kprobe *p,
+>
+>                 if (kcb->kprobe_status == KPROBE_REENTER)
+>                         spsr_set_debug_flag(regs, 0);
+> +               else
+> +                       WARN_ON(regs->pstate & PSR_D_BIT);
+>
+>                 /* IRQs and single stepping do not mix well. */
+>                 kprobes_save_local_irqflag(kcb, regs);
+> --
+> 2.1.4
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
