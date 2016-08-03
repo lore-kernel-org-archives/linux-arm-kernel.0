@@ -1,305 +1,226 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 3 Aug 2016 10:42:59 +0200
-Subject: [RFC PATCH v1 2/4] arm/arm64: vgic-new: Add distributor and
- redistributor access
-In-Reply-To: <CALicx6tXLJ=19b8gMGMdZnsmAh27mGTFDs4PSZWQGEVni-jQ3Q@mail.gmail.com>
-References: <1469019748-31005-1-git-send-email-vijay.kilari@gmail.com>
- <1469019748-31005-3-git-send-email-vijay.kilari@gmail.com>
- <20160802144349.GO32244@cbox>
- <CALicx6tXLJ=19b8gMGMdZnsmAh27mGTFDs4PSZWQGEVni-jQ3Q@mail.gmail.com>
-Message-ID: <20160803084259.GW32244@cbox>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Wed, 3 Aug 2016 10:43:21 +0200
+Subject: [PATCH] drm/rockchip: fix fbdev crash when not use
+ DRM_FBDEV_EMULATION
+In-Reply-To: <1470212025-30336-1-git-send-email-mark.yao@rock-chips.com>
+References: <1470212025-30336-1-git-send-email-mark.yao@rock-chips.com>
+Message-ID: <20160803084321.GJ6232@phenom.ffwll.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 03, 2016 at 02:03:39PM +0530, Vijay Kilari wrote:
-> On Tue, Aug 2, 2016 at 8:13 PM, Christoffer Dall
-> <christoffer.dall@linaro.org> wrote:
-> > On Wed, Jul 20, 2016 at 06:32:26PM +0530, vijay.kilari at gmail.com wrote:
-> >> From: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
-> >>
-> >> VGICv3 Distributor and Redistributor registers are accessed using
-> >> KVM_DEV_ARM_VGIC_GRP_DIST_REGS and KVM_DEV_ARM_VGIC_GRP_DIST_REGS
-> >> with KVM_SET_DEVICE_ATTR and KVM_GET_DEVICE_ATTR ioctls.
-> >> These registers are accessed as 32-bit and cpu mpidr
-> >> value passed along with register offset is used to identify the
-> >> cpu for redistributor registers access.
-> >>
-> >> The draft version of VGIC v3 specification is define here
-> >> https://lists.cs.columbia.edu/pipermail/kvmarm/2016-May/020355.html
-> >>
-> >> Signed-off-by: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
-> >> ---
-> >>  arch/arm64/include/uapi/asm/kvm.h   |    3 +
-> >>  virt/kvm/arm/vgic/vgic-kvm-device.c |   72 ++++++++++++++++++++++--
-> >>  virt/kvm/arm/vgic/vgic-mmio-v3.c    |  105 +++++++++++++++++++++++++++++++++++
-> >>  virt/kvm/arm/vgic/vgic-mmio.c       |    2 +-
-> >>  virt/kvm/arm/vgic/vgic.h            |    8 +++
-> >>  5 files changed, 183 insertions(+), 7 deletions(-)
-> >>
-> >> diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
-> >> index f209ea1..a6b996e 100644
-> >> --- a/arch/arm64/include/uapi/asm/kvm.h
-> >> +++ b/arch/arm64/include/uapi/asm/kvm.h
-> >> @@ -199,10 +199,13 @@ struct kvm_arch_memory_slot {
-> >>  #define KVM_DEV_ARM_VGIC_GRP_CPU_REGS        2
-> >>  #define   KVM_DEV_ARM_VGIC_CPUID_SHIFT       32
-> >>  #define   KVM_DEV_ARM_VGIC_CPUID_MASK        (0xffULL << KVM_DEV_ARM_VGIC_CPUID_SHIFT)
-> >> +#define   KVM_DEV_ARM_VGIC_V3_CPUID_MASK \
-> >> +                             (0xffffffffULL << KVM_DEV_ARM_VGIC_CPUID_SHIFT)
-> >>  #define   KVM_DEV_ARM_VGIC_OFFSET_SHIFT      0
-> >>  #define   KVM_DEV_ARM_VGIC_OFFSET_MASK       (0xffffffffULL << KVM_DEV_ARM_VGIC_OFFSET_SHIFT)
-> >>  #define KVM_DEV_ARM_VGIC_GRP_NR_IRQS 3
-> >>  #define KVM_DEV_ARM_VGIC_GRP_CTRL    4
-> >> +#define KVM_DEV_ARM_VGIC_GRP_REDIST_REGS 5
-> >>  #define   KVM_DEV_ARM_VGIC_CTRL_INIT 0
-> >>
-> >>  /* Device Control API on vcpu fd */
-> >> diff --git a/virt/kvm/arm/vgic/vgic-kvm-device.c b/virt/kvm/arm/vgic/vgic-kvm-device.c
-> >> index cace996..996a720 100644
-> >> --- a/virt/kvm/arm/vgic/vgic-kvm-device.c
-> >> +++ b/virt/kvm/arm/vgic/vgic-kvm-device.c
-> >> @@ -266,10 +266,17 @@ static int vgic_attr_regs_access(struct kvm_device *dev,
-> >>       int cpuid, ret, c;
-> >>       struct kvm_vcpu *vcpu, *tmp_vcpu;
-> >>       int vcpu_lock_idx = -1;
-> >> +     struct vgic_dist *vgic = &dev->kvm->arch.vgic;
-> >>
-> >> -     cpuid = (attr->attr & KVM_DEV_ARM_VGIC_CPUID_MASK) >>
-> >> -              KVM_DEV_ARM_VGIC_CPUID_SHIFT;
-> >> -     vcpu = kvm_get_vcpu(dev->kvm, cpuid);
-> >> +     if (vgic->vgic_model == KVM_DEV_TYPE_ARM_VGIC_V2) {
-> >> +             cpuid = (attr->attr & KVM_DEV_ARM_VGIC_CPUID_MASK) >>
-> >> +                      KVM_DEV_ARM_VGIC_CPUID_SHIFT;
-> >> +             vcpu = kvm_get_vcpu(dev->kvm, cpuid);
-> >> +     } else {
-> >> +             cpuid = (attr->attr & KVM_DEV_ARM_VGIC_V3_CPUID_MASK) >>
-> >> +                      KVM_DEV_ARM_VGIC_CPUID_SHIFT;
-> >> +             vcpu = kvm_mpidr_to_vcpu(dev->kvm, cpuid);
-> >> +     }
-> >>       addr = attr->attr & KVM_DEV_ARM_VGIC_OFFSET_MASK;
-> >>
-> >>       mutex_lock(&dev->kvm->lock);
-> >> @@ -301,7 +308,19 @@ static int vgic_attr_regs_access(struct kvm_device *dev,
-> >>               ret = vgic_v2_cpuif_uaccess(vcpu, is_write, addr, &reg->reg32);
-> >>               break;
-> >>       case KVM_DEV_ARM_VGIC_GRP_DIST_REGS:
-> >> -             ret = vgic_v2_dist_uaccess(vcpu, is_write, addr, &reg->reg32);
-> >> +             if (vgic->vgic_model == KVM_DEV_TYPE_ARM_VGIC_V2)
-> >> +                     ret = vgic_v2_dist_uaccess(vcpu, is_write, addr,
-> >> +                                                &reg->reg32);
-> >> +             else
-> >> +                     ret = vgic_v3_dist_uaccess(vcpu, is_write, addr,
-> >> +                                                &reg->reg32);
-> >> +             break;
-> >> +     case KVM_DEV_ARM_VGIC_GRP_REDIST_REGS:
-> >> +             if (vgic->vgic_model == KVM_DEV_TYPE_ARM_VGIC_V3)
-> >> +                     ret = vgic_v3_redist_uaccess(vcpu, is_write, addr,
-> >> +                                                  &reg->reg32);
-> >> +             else
-> >> +                     ret = -EINVAL;
-> >>               break;
-> >>       default:
-> >>               ret = -EINVAL;
-> >> @@ -411,13 +430,51 @@ struct kvm_device_ops kvm_arm_vgic_v2_ops = {
-> >>  static int vgic_v3_set_attr(struct kvm_device *dev,
-> >>                           struct kvm_device_attr *attr)
-> >>  {
-> >> -     return vgic_set_common_attr(dev, attr);
-> >> +     int ret;
-> >> +
-> >> +     ret = vgic_set_common_attr(dev, attr);
-> >> +     if (ret != -ENXIO)
-> >> +             return ret;
-> >> +
-> >> +     switch (attr->group) {
-> >> +     case KVM_DEV_ARM_VGIC_GRP_DIST_REGS:
-> >> +     case KVM_DEV_ARM_VGIC_GRP_REDIST_REGS: {
-> >> +             u32 __user *uaddr = (u32 __user *)(long)attr->addr;
-> >> +             union ureg reg;
-> >> +
-> >> +             if (get_user(reg.reg32, uaddr))
-> >> +                     return -EFAULT;
-> >> +
-> >> +             return vgic_attr_regs_access(dev, attr, &reg, true);
-> >> +     }
-> >> +     }
-> >> +     return -ENXIO;
-> >>  }
-> >>
-> >>  static int vgic_v3_get_attr(struct kvm_device *dev,
-> >>                           struct kvm_device_attr *attr)
-> >>  {
-> >> -     return vgic_get_common_attr(dev, attr);
-> >> +     int ret;
-> >> +
-> >> +     ret = vgic_get_common_attr(dev, attr);
-> >> +     if (ret != -ENXIO)
-> >> +             return ret;
-> >> +
-> >> +     switch (attr->group) {
-> >> +     case KVM_DEV_ARM_VGIC_GRP_DIST_REGS:
-> >> +     case KVM_DEV_ARM_VGIC_GRP_REDIST_REGS: {
-> >> +             u32 __user *uaddr = (u32 __user *)(long)attr->addr;
-> >> +             union ureg reg;
-> >> +
-> >> +             ret = vgic_attr_regs_access(dev, attr, &reg, false);
-> >> +             if (ret)
-> >> +                     return ret;
-> >> +             ret = put_user(reg.reg32, uaddr);
-> >> +             return ret;
-> >> +     }
-> >> +     }
-> >> +
-> >> +     return -ENXIO;
-> >>  }
-> >>
-> >>  static int vgic_v3_has_attr(struct kvm_device *dev,
-> >> @@ -431,6 +488,9 @@ static int vgic_v3_has_attr(struct kvm_device *dev,
-> >>                       return 0;
-> >>               }
-> >>               break;
-> >> +     case KVM_DEV_ARM_VGIC_GRP_DIST_REGS:
-> >> +     case KVM_DEV_ARM_VGIC_GRP_REDIST_REGS:
-> >> +             return vgic_v3_has_attr_regs(dev, attr);
-> >>       case KVM_DEV_ARM_VGIC_GRP_NR_IRQS:
-> >>               return 0;
-> >>       case KVM_DEV_ARM_VGIC_GRP_CTRL:
-> >> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-> >> index a0c515a..f6a4e97 100644
-> >> --- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
-> >> +++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-> >> @@ -18,6 +18,8 @@
-> >>  #include <kvm/arm_vgic.h>
-> >>
-> >>  #include <asm/kvm_emulate.h>
-> >> +#include <asm/kvm_arm.h>
-> >> +#include <asm/kvm_mmu.h>
-> >>
-> >>  #include "vgic.h"
-> >>  #include "vgic-mmio.h"
-> >> @@ -226,6 +228,9 @@ static const struct vgic_register_region vgic_v3_rdbase_registers[] = {
-> >>       REGISTER_DESC_WITH_LENGTH(GICR_TYPER,
-> >>               vgic_mmio_read_v3r_typer, vgic_mmio_write_wi, 8,
-> >>               VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
-> >> +     REGISTER_DESC_WITH_LENGTH(GICR_WAKER,
-> >> +             vgic_mmio_read_raz, vgic_mmio_write_wi, 8,
-> >> +             VGIC_ACCESS_32bit),
-> >>       REGISTER_DESC_WITH_LENGTH(GICR_PROPBASER,
-> >>               vgic_mmio_read_raz, vgic_mmio_write_wi, 8,
-> >>               VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
-> >> @@ -348,6 +353,52 @@ int vgic_register_redist_iodevs(struct kvm *kvm, gpa_t redist_base_address)
-> >>       return ret;
-> >>  }
-> >>
-> >> +int vgic_v3_has_attr_regs(struct kvm_device *dev, struct kvm_device_attr *attr)
-> >> +{
-> >> +     struct kvm_vcpu *vcpu;
-> >> +     int nr_irqs = dev->kvm->arch.vgic.nr_spis + VGIC_NR_PRIVATE_IRQS;
-> >> +     const struct vgic_register_region *regions;
-> >> +     gpa_t addr;
-> >> +     int nr_regions, i, len, cpuid;
-> >> +
-> >> +     addr = attr->attr & KVM_DEV_ARM_VGIC_OFFSET_MASK;
-> >> +     cpuid = (attr->attr & KVM_DEV_ARM_VGIC_V3_CPUID_MASK) >>
-> >> +              KVM_DEV_ARM_VGIC_CPUID_SHIFT;
-> >> +     vcpu = kvm_mpidr_to_vcpu(dev->kvm, cpuid);
-> >> +
-> >> +     switch (attr->group) {
-> >> +     case KVM_DEV_ARM_VGIC_GRP_DIST_REGS:
-> >> +             regions = vgic_v3_dist_registers;
-> >> +             nr_regions = ARRAY_SIZE(vgic_v3_dist_registers);
-> >> +             break;
-> >> +     case KVM_DEV_ARM_VGIC_GRP_REDIST_REGS:{
-> >> +             struct vgic_io_device *devices;
-> >> +             struct vgic_io_device *rd_dev;
-> >> +
-> >> +             devices = dev->kvm->arch.vgic.redist_iodevs;
-> >> +             rd_dev = &devices[vcpu->vcpu_id * 2];
-> >> +
-> >> +             regions = rd_dev->regions;
-> >> +             nr_regions = rd_dev->nr_regions;
-> >> +             break;
-> >> +     }
-> >> +     default:
-> >> +             return -ENXIO;
-> >> +     }
-> >> +
-> >> +     for (i = 0; i < nr_regions; i++) {
-> >> +             if (regions[i].bits_per_irq)
-> >> +                     len = (regions[i].bits_per_irq * nr_irqs) / 8;
-> >> +             else
-> >> +                     len = regions[i].len;
-> >> +
-> >> +             if (regions[i].reg_offset <= addr &&
-> >> +                 regions[i].reg_offset + len > addr)
-> >> +                     return 0;
-> >> +     }
-> >> +
-> >> +     return -ENXIO;
-> >> +}
-> >>  /*
-> >>   * Compare a given affinity (level 1-3 and a level 0 mask, from the SGI
-> >>   * generation register ICC_SGI1R_EL1) with a given VCPU.
-> >> @@ -453,3 +504,57 @@ void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg)
-> >>               vgic_queue_irq_unlock(vcpu->kvm, irq);
-> >>       }
-> >>  }
-> >> +
-> >> +/*
-> >> + * When userland tries to access the VGIC register handlers, we need to
-> >> + * create a usable struct vgic_io_device to be passed to the handlers and we
-> >> + * have to set up a buffer similar to what would have happened if a guest MMIO
-> >> + * access occurred, including doing endian conversions on BE systems.
-> >> + */
-> >> +static int vgic_v3_uaccess(struct kvm_vcpu *vcpu, struct vgic_io_device *dev,
-> >> +                        bool is_write, int offset, u32 *val)
-> >> +{
-> >> +     unsigned int len = 4;
-> >> +     u8 buf[4];
-> >> +     int ret;
-> >> +
-> >> +     if (is_write) {
-> >> +             vgic_data_host_to_mmio_bus(buf, len, *val);
-> >> +             ret = kvm_io_gic_ops.write(vcpu, &dev->dev,
-> >> +                                        dev->base_addr + offset, len, buf);
-> >> +     } else {
-> >> +             ret = kvm_io_gic_ops.read(vcpu, &dev->dev,
-> >> +                                       dev->base_addr + offset, len, buf);
-> >> +             if (!ret)
-> >> +                     *val = vgic_data_mmio_bus_to_host(buf, len);
-> >> +     }
-> >> +
-> >> +     return ret;
-> >> +}
-> >> +
-> >> +int vgic_v3_dist_uaccess(struct kvm_vcpu *vcpu, bool is_write,
-> >> +                      int offset, u32 *val)
-> >> +{
-> >> +     struct vgic_io_device *dev;
-> >> +
-> >> +     dev = &vcpu->kvm->arch.vgic.dist_iodev;
-> >
-> > You're not supposed to do this.
-> >
-> > You're supposed to create a temporary vgic_io_device for this, just like
-> > we do in vgic_v2_dist_uaccess().
-> >
-> > This is why we went down the road of all the init sequence problems.
-> >
-> > Any reason why you didn't just follow the lead from the v2
-> > implementation?
+On Wed, Aug 03, 2016 at 04:13:45PM +0800, Mark Yao wrote:
+> [    1.162571] Unable to handle kernel NULL pointer dereference at virtual address 00000200
+> [    1.165656] Modules linked in:
+> [    1.165941] CPU: 5 PID: 143 Comm: kworker/5:2 Not tainted 4.4.15 #237
+> [    1.166506] Hardware name: Rockchip RK3399 Evaluation Board v1 (Android) (DT)
+> [    1.167153] Workqueue: events output_poll_execute
+> [    1.168231] PC is at mutex_lock+0x14/0x44
+> [    1.168586] LR is at drm_fb_helper_hotplug_event+0x28/0xcc
+> [    1.172192] [<ffffff8008982110>] mutex_lock+0x14/0x44
+> [    1.172196] [<ffffff80084025a4>] drm_fb_helper_hotplug_event+0x28/0xcc
+> [    1.172201] [<ffffff8008427ae4>] rockchip_drm_output_poll_changed+0x14/0x1c
+> [    1.172204] [<ffffff80083f7c4c>] drm_kms_helper_hotplug_event+0x28/0x34
+> [    1.172207] [<ffffff80083f7ddc>] output_poll_execute+0x150/0x198
+> [    1.172212] [<ffffff80080b0ea8>] process_one_work+0x218/0x3dc
+> [    1.172215] [<ffffff80080b1578>] worker_thread+0x24c/0x374
+> [    1.172217] [<ffffff80080b5bcc>] kthread+0xdc/0xe4
+> [    1.172222] [<ffffff8008084cd0>] ret_from_fork+0x10/0x40
 > 
-> I have not looked at v2 implementation.
+> Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
 
-No need to reinvent the wheel, we're allowed to be inspired by each
-other.  In fact, symmetry between the v2 and v3 specific parts of the
-VGIC where it makes sense is a preference.
+Erhm, how exactly did you manage to blow up in there? Without fbdev
+support enable drm_fb_helper_hotplug_event() does nothing at all.
 
-> But you are right.
-> With v2 kind of implementation for v3, the init sequence patch is no
-> more required. I will drop the patch "arm/arm64: vgic-new: Create dist
-> and redist iodevs earlier"
+The fbdev helper is designed such that you _don't_ have to check for NULL
+everywhere in the driver, that would be pretty bad code.
+-Daniel
+
+> ---
+>  drivers/gpu/drm/rockchip/rockchip_drm_drv.c   | 13 ++++++++++---
+>  drivers/gpu/drm/rockchip/rockchip_drm_drv.h   |  8 ++++++--
+>  drivers/gpu/drm/rockchip/rockchip_drm_fb.c    |  6 +++---
+>  drivers/gpu/drm/rockchip/rockchip_drm_fbdev.c | 26 +++++++++++++++++---------
+>  4 files changed, 36 insertions(+), 17 deletions(-)
 > 
-Thanks, looking forward to the next version.
+> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
+> index a822d49..1a4dad6 100644
+> --- a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
+> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
+> @@ -261,7 +261,10 @@ static void rockchip_drm_lastclose(struct drm_device *dev)
+>  {
+>  	struct rockchip_drm_private *priv = dev->dev_private;
+>  
+> -	drm_fb_helper_restore_fbdev_mode_unlocked(&priv->fbdev_helper);
+> +	if (!priv->fbdev)
+> +		return;
+> +
+> +	drm_fb_helper_restore_fbdev_mode_unlocked(&priv->fbdev->fbdev_helper);
+>  }
+>  
+>  static const struct file_operations rockchip_drm_driver_fops = {
+> @@ -310,8 +313,10 @@ void rockchip_drm_fb_suspend(struct drm_device *drm)
+>  {
+>  	struct rockchip_drm_private *priv = drm->dev_private;
+>  
+> +	if (!priv->fbdev)
+> +		return;
+>  	console_lock();
+> -	drm_fb_helper_set_suspend(&priv->fbdev_helper, 1);
+> +	drm_fb_helper_set_suspend(&priv->fbdev->fbdev_helper, 1);
+>  	console_unlock();
+>  }
+>  
+> @@ -319,8 +324,10 @@ void rockchip_drm_fb_resume(struct drm_device *drm)
+>  {
+>  	struct rockchip_drm_private *priv = drm->dev_private;
+>  
+> +	if (!priv->fbdev)
+> +		return;
+>  	console_lock();
+> -	drm_fb_helper_set_suspend(&priv->fbdev_helper, 0);
+> +	drm_fb_helper_set_suspend(&priv->fbdev->fbdev_helper, 0);
+>  	console_unlock();
+>  }
+>  
+> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_drv.h b/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
+> index ea39329..c054fc2 100644
+> --- a/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
+> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
+> @@ -50,6 +50,11 @@ struct rockchip_crtc_state {
+>  #define to_rockchip_crtc_state(s) \
+>  		container_of(s, struct rockchip_crtc_state, base)
+>  
+> +struct rockchip_drm_fbdev {
+> +	struct drm_fb_helper fbdev_helper;
+> +	struct drm_gem_object *fbdev_bo;
+> +};
+> +
+>  /*
+>   * Rockchip drm private structure.
+>   *
+> @@ -57,8 +62,7 @@ struct rockchip_crtc_state {
+>   * @num_pipe: number of pipes for this device.
+>   */
+>  struct rockchip_drm_private {
+> -	struct drm_fb_helper fbdev_helper;
+> -	struct drm_gem_object *fbdev_bo;
+> +	struct rockchip_drm_fbdev *fbdev;
+>  	const struct rockchip_crtc_funcs *crtc_funcs[ROCKCHIP_MAX_CRTC];
+>  	struct drm_atomic_state *state;
+>  };
+> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_fb.c b/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
+> index 55c5273..fef6f8d 100644
+> --- a/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
+> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
+> @@ -156,10 +156,10 @@ err_gem_object_unreference:
+>  static void rockchip_drm_output_poll_changed(struct drm_device *dev)
+>  {
+>  	struct rockchip_drm_private *private = dev->dev_private;
+> -	struct drm_fb_helper *fb_helper = &private->fbdev_helper;
+> +	struct rockchip_drm_fbdev *fbdev = private->fbdev;
+>  
+> -	if (fb_helper)
+> -		drm_fb_helper_hotplug_event(fb_helper);
+> +	if (fbdev)
+> +		drm_fb_helper_hotplug_event(&fbdev->fbdev_helper);
+>  }
+>  
+>  static void rockchip_crtc_wait_for_update(struct drm_crtc *crtc)
+> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_fbdev.c b/drivers/gpu/drm/rockchip/rockchip_drm_fbdev.c
+> index 207e01d..cc5781a 100644
+> --- a/drivers/gpu/drm/rockchip/rockchip_drm_fbdev.c
+> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_fbdev.c
+> @@ -22,16 +22,16 @@
+>  #include "rockchip_drm_fb.h"
+>  
+>  #define PREFERRED_BPP		32
+> -#define to_drm_private(x) \
+> -		container_of(x, struct rockchip_drm_private, fbdev_helper)
+> +#define to_rockchip_fbdev(x) \
+> +		container_of(x, struct rockchip_drm_fbdev, fbdev_helper)
+>  
+>  static int rockchip_fbdev_mmap(struct fb_info *info,
+>  			       struct vm_area_struct *vma)
+>  {
+>  	struct drm_fb_helper *helper = info->par;
+> -	struct rockchip_drm_private *private = to_drm_private(helper);
+> +	struct rockchip_drm_fbdev *fbdev = to_rockchip_fbdev(helper);
+>  
+> -	return rockchip_gem_mmap_buf(private->fbdev_bo, vma);
+> +	return rockchip_gem_mmap_buf(fbdev->fbdev_bo, vma);
+>  }
+>  
+>  static struct fb_ops rockchip_drm_fbdev_ops = {
+> @@ -50,7 +50,7 @@ static struct fb_ops rockchip_drm_fbdev_ops = {
+>  static int rockchip_drm_fbdev_create(struct drm_fb_helper *helper,
+>  				     struct drm_fb_helper_surface_size *sizes)
+>  {
+> -	struct rockchip_drm_private *private = to_drm_private(helper);
+> +	struct rockchip_drm_fbdev *fbdev = to_rockchip_fbdev(helper);
+>  	struct drm_mode_fb_cmd2 mode_cmd = { 0 };
+>  	struct drm_device *dev = helper->dev;
+>  	struct rockchip_gem_object *rk_obj;
+> @@ -75,7 +75,7 @@ static int rockchip_drm_fbdev_create(struct drm_fb_helper *helper,
+>  	if (IS_ERR(rk_obj))
+>  		return -ENOMEM;
+>  
+> -	private->fbdev_bo = &rk_obj->base;
+> +	fbdev->fbdev_bo = &rk_obj->base;
+>  
+>  	fbi = drm_fb_helper_alloc_fbi(helper);
+>  	if (IS_ERR(fbi)) {
+> @@ -85,7 +85,7 @@ static int rockchip_drm_fbdev_create(struct drm_fb_helper *helper,
+>  	}
+>  
+>  	helper->fb = rockchip_drm_framebuffer_init(dev, &mode_cmd,
+> -						   private->fbdev_bo);
+> +						   fbdev->fbdev_bo);
+>  	if (IS_ERR(helper->fb)) {
+>  		dev_err(dev->dev, "Failed to allocate DRM framebuffer.\n");
+>  		ret = PTR_ERR(helper->fb);
+> @@ -130,6 +130,7 @@ static const struct drm_fb_helper_funcs rockchip_drm_fb_helper_funcs = {
+>  int rockchip_drm_fbdev_init(struct drm_device *dev)
+>  {
+>  	struct rockchip_drm_private *private = dev->dev_private;
+> +	struct rockchip_drm_fbdev *fbdev;
+>  	struct drm_fb_helper *helper;
+>  	unsigned int num_crtc;
+>  	int ret;
+> @@ -139,7 +140,12 @@ int rockchip_drm_fbdev_init(struct drm_device *dev)
+>  
+>  	num_crtc = dev->mode_config.num_crtc;
+>  
+> -	helper = &private->fbdev_helper;
+> +	fbdev = devm_kzalloc(dev->dev, sizeof(*fbdev), GFP_KERNEL);
+> +	if (!fbdev)
+> +		return -ENOMEM;
+> +
+> +	private->fbdev = fbdev;
+> +	helper = &fbdev->fbdev_helper;
+>  
+>  	drm_fb_helper_prepare(dev, helper, &rockchip_drm_fb_helper_funcs);
+>  
+> @@ -175,7 +181,9 @@ void rockchip_drm_fbdev_fini(struct drm_device *dev)
+>  	struct rockchip_drm_private *private = dev->dev_private;
+>  	struct drm_fb_helper *helper;
+>  
+> -	helper = &private->fbdev_helper;
+> +	if (!private || private->fbdev)
+> +		return;
+> +	helper = &private->fbdev->fbdev_helper;
+>  
+>  	drm_fb_helper_unregister_fbi(helper);
+>  	drm_fb_helper_release_fbi(helper);
+> -- 
+> 1.9.1
+> 
+> 
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
 
--Christoffer
+-- 
+Daniel Vetter
+Software Engineer, Intel Corporation
+http://blog.ffwll.ch
