@@ -1,45 +1,47 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed,  3 Aug 2016 17:38:47 +0200
-Subject: [PATCH 5/8] ARM: head: use PC-relative insn sequence for __smp_alt
+Date: Wed,  3 Aug 2016 17:38:50 +0200
+Subject: [PATCH 8/8] ARM: head.S: use PC relative insn sequence to calculate
+ PHYS_OFFSET
 In-Reply-To: <1470238730-30038-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1470238730-30038-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1470238730-30038-6-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1470238730-30038-9-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace the open coded PC relative offset calculations with adr_l
-invocations.
+Replace the open coded arithmetic with a simple adr_l/sub pair.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm/kernel/head.S | 12 ++----------
- 1 file changed, 2 insertions(+), 10 deletions(-)
+ arch/arm/kernel/head.S | 10 ++--------
+ 1 file changed, 2 insertions(+), 8 deletions(-)
 
 diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
-index 7a14622582de..a9d8f9004dfd 100644
+index b9746366b633..bd5a6151b3d7 100644
 --- a/arch/arm/kernel/head.S
 +++ b/arch/arm/kernel/head.S
-@@ -522,19 +522,11 @@ ARM_BE8(rev	r0, r0)			@ byteswap if big endian
- 	retne	lr
+@@ -106,10 +106,8 @@ ENTRY(stext)
+ #endif
  
- __fixup_smp_on_up:
--	adr	r0, 1f
--	ldmia	r0, {r3 - r5}
--	sub	r3, r0, r3
--	add	r4, r4, r3
--	add	r5, r5, r3
-+	adr_l	r4, __smpalt_begin
-+	adr_l	r5, __smpalt_end
- 	b	__do_fixup_smp_on_up
- ENDPROC(__fixup_smp)
+ #ifndef CONFIG_XIP_KERNEL
+-	adr	r3, 2f
+-	ldmia	r3, {r4, r8}
+-	sub	r4, r3, r4			@ (PHYS_OFFSET - PAGE_OFFSET)
+-	add	r8, r8, r4			@ PHYS_OFFSET
++	adr_l	r8, _text
++	sub	r8, r8, #TEXT_OFFSET		@ PHYS_OFFSET
+ #else
+ 	ldr	r8, =PLAT_PHYS_OFFSET		@ always constant in this case
+ #endif
+@@ -161,10 +159,6 @@ ENTRY(stext)
+ 1:	b	__enable_mmu
+ ENDPROC(stext)
+ 	.ltorg
+-#ifndef CONFIG_XIP_KERNEL
+-2:	.long	.
+-	.long	PAGE_OFFSET
+-#endif
  
--	.align
--1:	.word	.
--	.word	__smpalt_begin
--	.word	__smpalt_end
--
- 	.pushsection .data
- 	.globl	smp_on_up
- smp_on_up:
+ /*
+  * Setup the initial page tables.  We only setup the barest
 -- 
 2.7.4
