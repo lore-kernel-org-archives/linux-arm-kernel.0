@@ -1,35 +1,39 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 3 Aug 2016 17:47:07 +0200
-Subject: Extcon build failure in next
-In-Reply-To: <3746939.q8kt0ym6m3@wuerfel>
-References: <20160630053705.GM28140@atomide.com>
- <20160630054112.GN28140@atomide.com> <3746939.q8kt0ym6m3@wuerfel>
-Message-ID: <CAMuHMdW-3oLvirOEiFhXU=0JXt9K4ki52C16aX+8HB_9gPSxCQ@mail.gmail.com>
+From: joe@perches.com (Joe Perches)
+Date: Wed, 03 Aug 2016 08:49:26 -0700
+Subject: [PATCH] Add file permission mode helpers
+In-Reply-To: <20160803081140.GA7833@gmail.com>
+References: <CA+55aFw5v23T-zvDZp-MmD_EYxF8WbafwwB59934FV7g21uMGQ@mail.gmail.com>
+ <20160803081140.GA7833@gmail.com>
+Message-ID: <1470239366.3998.227.camel@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 30, 2016 at 1:37 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Wednesday, June 29, 2016 10:41:13 PM CEST Tony Lindgren wrote:
->> * Tony Lindgren <tony@atomide.com> [160629 22:41]:
->> Also I'm seeing:
->>
->> drivers/extcon/extcon.c: In function 'extcon_register_notifier':
->> drivers/extcon/extcon.c:455:6: warning: 'idx' may be used uninitialized in this function [-Wmaybe-uninitialized]
->>    if (idx >= 0) {
->>          ^
->
-> I don't see this one. Which compiler version do you use?
+On Wed, 2016-08-03 at 10:11 +0200, Ingo Molnar wrote:
+> * Linus Torvalds <torvalds@linux-foundation.org> wrote:
+> > [ So I answered similarly to another patch, but I'll just re-iterate
+> > and change the subject line so that it stands out a bit from the
+> > millions of actual patches ]
+> > 
+> > On Tue, Aug 2, 2016 at 1:42 PM, Pavel Machek <pavel@ucw.cz> wrote:
+> > > Everyone knows what 0644 is, but noone can read S_IRUSR | S_IWUSR |
+> > > S_IRCRP | S_IROTH (*). Please don't do this.
+> > Absolutely. It's *much* easier to parse and understand the octal
+> > numbers, while the symbolic macro names are just random line noise and
+> > hard as hell to understand. You really have to think about it.
+> > 
+> > So we should rather go the other way: convert existing bad symbolic
+> > permission bit macro use to just use the octal numbers.
+> In addition to that I'd love to have something even easier to read, a few common?
+> variants of the permissions field of 'ls -l' pre-defined. I did some quick?
+> grepping, and collected the main variants that are in use:
+> 
+> 		PERM_r________	0400
+> 		PERM_r__r_____	0440
+> 		PERM_r__r__r__	0444
 
-Also seen with m68k-linux-gnu-gcc-4.1 in current mainline (fix claimed
-to be applied).
+[etc]
 
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+While the proposed PERM_ variants are easily read,
+using a single style instead of 2+ incompatible
+symbolic styles makes treewide misuse identification
+via grep style tools easier.
