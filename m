@@ -1,88 +1,76 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed,  3 Aug 2016 18:13:23 +0200
-Subject: [PATCH v2 1/3] KVM: arm64: vgic-its: Handle errors from vgic_add_lpi
+Date: Wed,  3 Aug 2016 18:13:25 +0200
+Subject: [PATCH 3/3] KVM: arm64: vgic-its: Make updates to propbaser/pendbaser
+ atomic
 In-Reply-To: <20160803161325.14933-1-christoffer.dall@linaro.org>
 References: <20160803161325.14933-1-christoffer.dall@linaro.org>
-Message-ID: <20160803161325.14933-2-christoffer.dall@linaro.org>
+Message-ID: <20160803161325.14933-4-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-During low memory conditions, we could be dereferencing a NULL pointer
-when vgic_add_lpi fails to allocate memory.
+There are two problems with the current implementation of the MMIO
+handlers for the propbaser and pendbaser:
 
-Consider for example this call sequence:
+First, the write to the value itself is not guaranteed to be an atomic
+64-bit write so two concurrent writes to the structure field could be
+intermixed.
 
-  vgic_its_cmd_handle_mapi
-      itte->irq = vgic_add_lpi(kvm, lpi_nr);
-          update_lpi_config(kvm, itte->irq, NULL);
-              ret = kvm_read_guest(kvm, propbase + irq->intid
-	                                             ^^^^
-						     kaboom?
+Second, because we do a read-modify-update operation without any
+synchronization, if we have two 32-bit accesses to separate parts of the
+register, we can loose one of them.
 
-Instead, return an error pointer from vgic_add_lpi and check the return
-value from its single caller.
+We can take the KVM mutex to synchronize accesses to these registers.
 
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
-Changes since v1:
- - Don't errornously get an extra kref refernce for the struct vgic_irq
- - Don't rework the entire error handling of the function, but follow
-   what Marc suggested he prefers based on his fixup patch.
- virt/kvm/arm/vgic/vgic-its.c | 18 ++++++++++++++----
- 1 file changed, 14 insertions(+), 4 deletions(-)
+ virt/kvm/arm/vgic/vgic-mmio-v3.c | 10 ++++++++--
+ 1 file changed, 8 insertions(+), 2 deletions(-)
 
-diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-index 07411cf..424f7a5 100644
---- a/virt/kvm/arm/vgic/vgic-its.c
-+++ b/virt/kvm/arm/vgic/vgic-its.c
-@@ -51,7 +51,7 @@ static struct vgic_irq *vgic_add_lpi(struct kvm *kvm, u32 intid)
+diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+index ff668e0..e38b7a0 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
++++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+@@ -306,16 +306,19 @@ static void vgic_mmio_write_propbase(struct kvm_vcpu *vcpu,
+ {
+ 	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
+ 	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+-	u64 propbaser = dist->propbaser;
++	u64 propbaser;
  
- 	irq = kzalloc(sizeof(struct vgic_irq), GFP_KERNEL);
- 	if (!irq)
--		return NULL;
-+		return ERR_PTR(-ENOMEM);
+ 	/* Storing a value with LPIs already enabled is undefined */
+ 	if (vgic_cpu->lpis_enabled)
+ 		return;
  
- 	INIT_LIST_HEAD(&irq->lpi_list);
- 	INIT_LIST_HEAD(&irq->ap_list);
-@@ -693,10 +693,11 @@ static int vgic_its_cmd_handle_mapi(struct kvm *kvm, struct vgic_its *its,
- 	u32 device_id = its_cmd_get_deviceid(its_cmd);
- 	u32 event_id = its_cmd_get_id(its_cmd);
- 	u32 coll_id = its_cmd_get_collection(its_cmd);
--	struct its_itte *itte;
-+	struct its_itte *itte, *new_itte = NULL;
- 	struct its_device *device;
- 	struct its_collection *collection, *new_coll = NULL;
- 	int lpi_nr;
-+	struct vgic_irq *irq;
++	mutex_lock(&vcpu->kvm->lock);
++	propbaser = dist->propbaser;
+ 	propbaser = update_64bit_reg(propbaser, addr & 4, len, val);
+ 	propbaser = vgic_sanitise_propbaser(propbaser);
  
- 	device = find_its_device(its, device_id);
- 	if (!device)
-@@ -720,7 +721,7 @@ static int vgic_its_cmd_handle_mapi(struct kvm *kvm, struct vgic_its *its,
+ 	dist->propbaser = propbaser;
++	mutex_unlock(&vcpu->kvm->lock);
+ }
  
- 	itte = find_itte(its, device_id, event_id);
- 	if (!itte) {
--		itte = kzalloc(sizeof(struct its_itte), GFP_KERNEL);
-+		new_itte = itte = kzalloc(sizeof(struct its_itte), GFP_KERNEL);
- 		if (!itte) {
- 			if (new_coll)
- 				vgic_its_free_collection(its, coll_id);
-@@ -733,7 +734,16 @@ static int vgic_its_cmd_handle_mapi(struct kvm *kvm, struct vgic_its *its,
+ static unsigned long vgic_mmio_read_pendbase(struct kvm_vcpu *vcpu,
+@@ -331,16 +334,19 @@ static void vgic_mmio_write_pendbase(struct kvm_vcpu *vcpu,
+ 				     unsigned long val)
+ {
+ 	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+-	u64 pendbaser = vgic_cpu->pendbaser;
++	u64 pendbaser;
  
- 	itte->collection = collection;
- 	itte->lpi = lpi_nr;
--	itte->irq = vgic_add_lpi(kvm, lpi_nr);
-+
-+	irq = vgic_add_lpi(kvm, lpi_nr);
-+	if (IS_ERR(irq)) {
-+		if (new_coll)
-+			vgic_its_free_collection(its, coll_id);
-+		kfree(new_itte);
-+		return PTR_ERR(irq);
-+	}
-+	itte->irq = irq;
-+
- 	update_affinity_itte(kvm, itte);
+ 	/* Storing a value with LPIs already enabled is undefined */
+ 	if (vgic_cpu->lpis_enabled)
+ 		return;
  
- 	/*
++	mutex_lock(&vcpu->kvm->lock);
++	pendbaser = vgic_cpu->pendbaser;
+ 	pendbaser = update_64bit_reg(pendbaser, addr & 4, len, val);
+ 	pendbaser = vgic_sanitise_pendbaser(pendbaser);
+ 
+ 	vgic_cpu->pendbaser = pendbaser;
++	mutex_unlock(&vcpu->kvm->lock);
+ }
+ 
+ /*
 -- 
 2.9.0
