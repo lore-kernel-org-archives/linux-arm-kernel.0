@@ -1,8 +1,9 @@
 From: lkp@intel.com (kbuild test robot)
-Date: Wed, 3 Aug 2016 13:49:31 +0800
-Subject: [PATCH v12 6/8] vfio/type1: check doorbell safety
-In-Reply-To: <1470159012-7110-7-git-send-email-eric.auger@redhat.com>
-Message-ID: <201608031314.kN4c6thc%fengguang.wu@intel.com>
+Date: Wed, 3 Aug 2016 14:00:37 +0800
+Subject: [PATCH v12 8/8] vfio/type1: return MSI geometry through
+ VFIO_IOMMU_GET_INFO capability chains
+In-Reply-To: <1470159012-7110-9-git-send-email-eric.auger@redhat.com>
+Message-ID: <201608031302.KdveMA97%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -23,27 +24,33 @@ reproduce:
 All errors (new ones prefixed by >>):
 
    drivers/vfio/vfio_iommu_type1.c:39:29: error: linux/msi-iommu.h: No such file or directory
->> drivers/vfio/vfio_iommu_type1.c:40:32: error: linux/msi-doorbell.h: No such file or directory
+   drivers/vfio/vfio_iommu_type1.c:40:32: error: linux/msi-doorbell.h: No such file or directory
    drivers/vfio/vfio_iommu_type1.c: In function 'vfio_set_msi_aperture':
-   drivers/vfio/vfio_iommu_type1.c:453: error: implicit declaration of function 'iommu_msi_set_aperture'
+   drivers/vfio/vfio_iommu_type1.c:455: error: implicit declaration of function 'iommu_msi_set_aperture'
    drivers/vfio/vfio_iommu_type1.c: In function 'vfio_iommu_type1_attach_group':
->> drivers/vfio/vfio_iommu_type1.c:933: error: implicit declaration of function 'msi_doorbell_safe'
+   drivers/vfio/vfio_iommu_type1.c:935: error: implicit declaration of function 'msi_doorbell_safe'
+   drivers/vfio/vfio_iommu_type1.c: In function 'compute_msi_geometry_caps':
+   drivers/vfio/vfio_iommu_type1.c:1113: error: storage size of 'msi_geometry' isn't known
+   drivers/vfio/vfio_iommu_type1.c:1122: error: 'DOMAIN_ATTR_MSI_GEOMETRY' undeclared (first use in this function)
+   drivers/vfio/vfio_iommu_type1.c:1122: error: (Each undeclared identifier is reported only once
+   drivers/vfio/vfio_iommu_type1.c:1122: error: for each function it appears in.)
+>> drivers/vfio/vfio_iommu_type1.c:1152: error: implicit declaration of function 'msi_doorbell_calc_pages'
+   drivers/vfio/vfio_iommu_type1.c:1113: warning: unused variable 'msi_geometry'
    At top level:
    cc1: warning: unrecognized command line option "-Wno-maybe-uninitialized"
 
-vim +40 drivers/vfio/vfio_iommu_type1.c
+vim +/msi_doorbell_calc_pages +1152 drivers/vfio/vfio_iommu_type1.c
 
-    33	#include <linux/rbtree.h>
-    34	#include <linux/sched.h>
-    35	#include <linux/slab.h>
-    36	#include <linux/uaccess.h>
-    37	#include <linux/vfio.h>
-    38	#include <linux/workqueue.h>
-  > 39	#include <linux/msi-iommu.h>
-  > 40	#include <linux/msi-doorbell.h>
-    41	
-    42	#define DRIVER_VERSION  "0.2"
-    43	#define DRIVER_AUTHOR   "Alex Williamson <alex.williamson@redhat.com>"
+  1146		vfio_msi_geometry->order = order;
+  1147		/*
+  1148		 * we compute a system-wide requirement based on all the registered
+  1149		 * doorbells
+  1150		 */
+  1151		vfio_msi_geometry->size =
+> 1152			msi_doorbell_calc_pages(order) * ((uint64_t) 1 << order);
+  1153	
+  1154		return 0;
+  1155	}
 
 ---
 0-DAY kernel test infrastructure                Open Source Technology Center
@@ -54,4 +61,4 @@ Name: .config.gz
 Type: application/octet-stream
 Size: 19855 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160803/b1f7903a/attachment-0001.obj>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160803/1289b1fe/attachment-0001.obj>
