@@ -1,69 +1,60 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed,  3 Aug 2016 17:38:46 +0200
-Subject: [PATCH 4/8] ARM: head.S: use PC-relative insn sequence for
- secondary_data
+Date: Wed,  3 Aug 2016 17:38:48 +0200
+Subject: [PATCH 6/8] ARM: sleep.S: use PC-relative insn sequence for
+ sleep_save_sp/mpidr_hash
 In-Reply-To: <1470238730-30038-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1470238730-30038-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1470238730-30038-5-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1470238730-30038-7-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Replace the open coded PC relative offset calculations with adr_l
-and ldr_l invocations.
+invocations.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm/kernel/head.S | 20 ++++----------------
- 1 file changed, 4 insertions(+), 16 deletions(-)
+ arch/arm/kernel/sleep.S | 15 +++------------
+ 1 file changed, 3 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
-index f99360e5b004..7a14622582de 100644
---- a/arch/arm/kernel/head.S
-+++ b/arch/arm/kernel/head.S
-@@ -386,40 +386,28 @@ ENTRY(secondary_startup)
+diff --git a/arch/arm/kernel/sleep.S b/arch/arm/kernel/sleep.S
+index 0f6c1000582c..445011af9162 100644
+--- a/arch/arm/kernel/sleep.S
++++ b/arch/arm/kernel/sleep.S
+@@ -137,9 +137,8 @@ ARM_BE8(setend be)			@ ensure we are in BE mode
+ 	mov	r1, #0
+ 	ALT_SMP(mrc p15, 0, r0, c0, c0, 5)
+ 	ALT_UP_B(1f)
+-	adr	r2, mpidr_hash_ptr
+-	ldr	r3, [r2]
+-	add	r2, r2, r3		@ r2 = struct mpidr_hash phys address
++	adr_l	r2, mpidr_hash		@ r2 = struct mpidr_hash phys address
++
  	/*
- 	 * Use the page tables supplied from  __cpu_up.
- 	 */
--	adr	r4, __secondary_data
--	ldmia	r4, {r5, r7, r12}		@ address to jump to after
--	sub	lr, r4, r5			@ mmu has been enabled
--	add	r3, r7, lr
-+	adr_l	r3, secondary_data
- 	ldrd	r4, [r3, #0]			@ get secondary_data.pgdir
- ARM_BE8(eor	r4, r4, r5)			@ Swap r5 and r4 in BE:
- ARM_BE8(eor	r5, r4, r5)			@ it can be done in 3 steps
- ARM_BE8(eor	r4, r4, r5)			@ without using a temp reg.
- 	ldr	r8, [r3, #8]			@ get secondary_data.swapper_pg_dir
- 	badr	lr, __enable_mmu		@ return address
--	mov	r13, r12			@ __secondary_switched address
-+	ldr	r13, =__secondary_switched	@ __secondary_switched address
- 	ldr	r12, [r10, #PROCINFO_INITFUNC]
- 	add	r12, r12, r10			@ initialise processor
- 						@ (return control reg)
- 	ret	r12
- ENDPROC(secondary_startup)
- ENDPROC(secondary_startup_arm)
-+	.ltorg
+ 	 * This ldmia relies on the memory layout of the mpidr_hash
+ 	 * struct mpidr_hash.
+@@ -147,9 +146,7 @@ ARM_BE8(setend be)			@ ensure we are in BE mode
+ 	ldmia	r2, { r3-r6 }	@ r3 = mpidr mask (r4,r5,r6) = l[0,1,2] shifts
+ 	compute_mpidr_hash	r1, r4, r5, r6, r0, r3
+ 1:
+-	adr	r0, _sleep_save_sp
+-	ldr	r2, [r0]
+-	add	r0, r0, r2
++	adr_l	r0, sleep_save_sp
+ 	ldr	r0, [r0, #SLEEP_SAVE_SP_PHYS]
+ 	ldr	r0, [r0, r1, lsl #2]
  
--	/*
--	 * r6  = &secondary_data
--	 */
- ENTRY(__secondary_switched)
--	ldr	sp, [r7, #12]			@ get secondary_data.stack
-+	ldr_l	sp, secondary_data + 12, ip	@ get secondary_data.stack
- 	mov	fp, #0
- 	b	secondary_start_kernel
- ENDPROC(__secondary_switched)
+@@ -164,12 +161,6 @@ ENDPROC(cpu_resume)
+ ENDPROC(cpu_resume_arm)
+ #endif
  
--	.align
+-	.align 2
+-_sleep_save_sp:
+-	.long	sleep_save_sp - .
+-mpidr_hash_ptr:
+-	.long	mpidr_hash - .			@ mpidr_hash struct offset
 -
--	.type	__secondary_data, %object
--__secondary_data:
--	.long	.
--	.long	secondary_data
--	.long	__secondary_switched
- #endif /* defined(CONFIG_SMP) */
- 
- 
+ 	.data
+ 	.type	sleep_save_sp, #object
+ ENTRY(sleep_save_sp)
 -- 
 2.7.4
