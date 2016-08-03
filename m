@@ -1,64 +1,69 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Wed, 3 Aug 2016 14:00:37 +0800
-Subject: [PATCH v12 8/8] vfio/type1: return MSI geometry through
- VFIO_IOMMU_GET_INFO capability chains
-In-Reply-To: <1470159012-7110-9-git-send-email-eric.auger@redhat.com>
-Message-ID: <201608031302.KdveMA97%fengguang.wu@intel.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Wed, 3 Aug 2016 11:33:19 +0530
+Subject: Support for configurable PCIe endpoint
+Message-ID: <57A18927.9070003@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric,
+Hi,
 
-[auto build test ERROR on vfio/next]
-[also build test ERROR on v4.7]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+The PCIe controller present in TI's DRA7 SoC is capable of operating either in
+Root Complex mode or Endpoint mode. (It uses Synopsys Designware Core).I'd
+assume most of the PCIe controllers on other platforms that use Designware core
+should also be capable to operate in endpoint mode. But linux kernel right now
+supports only RC mode.
 
-url:    https://github.com/0day-ci/linux/commits/Eric-Auger/KVM-PCIe-MSI-passthrough-on-ARM-ARM64-kernel-part-3-3-vfio-changes/20160803-122924
-base:   https://github.com/awilliam/linux-vfio.git next
-config: x86_64-randconfig-s1-08031247 (attached as .config)
-compiler: gcc-4.4 (Debian 4.4.7-8) 4.4.7
-reproduce:
-        # save the attached .config to linux build tree
-        make ARCH=x86_64 
+PCIe endpoint support discussion came up briefly before [1] but it was felt the
+practical use case will find firmware more suitable and endpoint support in
+kernel can be used only for validation or demo.
 
-All errors (new ones prefixed by >>):
+Validation or demo is itself a valid use case in my opinion (consider something
+similar to gadget zero for USB). There can be other use cases as well. The RC
+can use the SoC with EP mode support as an accelerator to accomplish specific
+task. Here RC gives data to the EP. The EP processes the data. The processing
+can be done either in ARM itself or it can use other hardware accelerators
+(like DSP, IVA-HD etc..) present in the EP system. If HW accelerator is used,
+the linux kernel running in ARM can be used to accomplish other tasks. Once EP
+mode support is added, I think more use cases will be added.
 
-   drivers/vfio/vfio_iommu_type1.c:39:29: error: linux/msi-iommu.h: No such file or directory
-   drivers/vfio/vfio_iommu_type1.c:40:32: error: linux/msi-doorbell.h: No such file or directory
-   drivers/vfio/vfio_iommu_type1.c: In function 'vfio_set_msi_aperture':
-   drivers/vfio/vfio_iommu_type1.c:455: error: implicit declaration of function 'iommu_msi_set_aperture'
-   drivers/vfio/vfio_iommu_type1.c: In function 'vfio_iommu_type1_attach_group':
-   drivers/vfio/vfio_iommu_type1.c:935: error: implicit declaration of function 'msi_doorbell_safe'
-   drivers/vfio/vfio_iommu_type1.c: In function 'compute_msi_geometry_caps':
-   drivers/vfio/vfio_iommu_type1.c:1113: error: storage size of 'msi_geometry' isn't known
-   drivers/vfio/vfio_iommu_type1.c:1122: error: 'DOMAIN_ATTR_MSI_GEOMETRY' undeclared (first use in this function)
-   drivers/vfio/vfio_iommu_type1.c:1122: error: (Each undeclared identifier is reported only once
-   drivers/vfio/vfio_iommu_type1.c:1122: error: for each function it appears in.)
->> drivers/vfio/vfio_iommu_type1.c:1152: error: implicit declaration of function 'msi_doorbell_calc_pages'
-   drivers/vfio/vfio_iommu_type1.c:1113: warning: unused variable 'msi_geometry'
-   At top level:
-   cc1: warning: unrecognized command line option "-Wno-maybe-uninitialized"
+>From the high level this should look _similar_ to the gadget framework of USB.
+One difference from USB would be this should allow HW components (like DSP, PRU
+etc.. and maybe even some peripheral) in the EP system to be used by RC system.
 
-vim +/msi_doorbell_calc_pages +1152 drivers/vfio/vfio_iommu_type1.c
+So these are the high-level steps that I thought would be needed to add EP
+support in linux.
+*) move pcie-designware.c out of drivers/pci/host (maybe create a
+drivers/pci/designware/ folder?). All users of pcie-designware.c should be
+moved here.
+This is in preparation for adding EP mode support to designware.
 
-  1146		vfio_msi_geometry->order = order;
-  1147		/*
-  1148		 * we compute a system-wide requirement based on all the registered
-  1149		 * doorbells
-  1150		 */
-  1151		vfio_msi_geometry->size =
-> 1152			msi_doorbell_calc_pages(order) * ((uint64_t) 1 << order);
-  1153	
-  1154		return 0;
-  1155	}
+*) Add library functions in pcie-designware.c specific to EP mode like
+initializing general ecam registers, BAR registers etc.. These functions should
+be invoked from a *function* driver (function driver should determine the use
+of a particular EP).
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 19855 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160803/1289b1fe/attachment-0001.obj>
+*) Add a sample *function* driver that can be used just for validation. This
+function driver will invoke the previously added functions in PCIe controller
+to initialize ecam, BAR etc.. This will invoke the PCIe controller functions
+through *ep-core* layer. That way the same function driver can be made to work
+with different PCIe controllers. (A PCIe driver corresponding to this function
+driver should also be implemented in RC side)
+
+*) Add *ep-core* layer to bind the function driver to the controller driver and
+using which the function driver will invoke controller driver callbacks (to
+initialize ecam, BAR registers etc..)
+
+*) Modify platform driver to support EP mode (in my case pci-dra7xx.c).
+
+*) dt binding specific to EP mode should be created.
+
+Once I complete the implementation and start posting RFC patches, a lot of
+these will become clear. But I want to check if this sounds okay to you guys
+before starting the implementation.
+
+Let me know if you have some other ideas too.
+
+Cheers
+Kishon
+
+[1] -> http://www.spinics.net/lists/linux-pci/msg26026.html
