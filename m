@@ -1,60 +1,52 @@
-From: Joao.Pinto@synopsys.com (Joao Pinto)
-Date: Wed, 3 Aug 2016 14:39:00 +0100
-Subject: Support for configurable PCIe endpoint
-In-Reply-To: <57A18927.9070003@ti.com>
-References: <57A18927.9070003@ti.com>
-Message-ID: <7c696488-eb78-d6d9-dc70-49fa5b4e3317@synopsys.com>
+From: ijc@hellion.org.uk (Ian Campbell)
+Date: Wed, 03 Aug 2016 14:45:59 +0100
+Subject: [PATCH] ARM64: dts: bcm: Use a symlink to R-Pi dtsi files from
+ arch=arm
+In-Reply-To: <20160803133041.GA12499@leverpostej>
+References: <1470213635-6934-1-git-send-email-ijc@hellion.org.uk>
+ <CAL_JsqKs+9UxKa=_PZWM-AO8b+MqbxypO_3h6ZGQtYjHcB1Drg@mail.gmail.com>
+ <20160803133041.GA12499@leverpostej>
+Message-ID: <1470231959.4745.11.camel@hellion.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kishon,
+On Wed, 2016-08-03 at 14:30 +0100, Mark Rutland wrote:
+> On Wed, Aug 03, 2016 at 08:13:51AM -0500, Rob Herring wrote:
+> > 
+> > > > On Wed, Aug 3, 2016 at 3:40 AM, Ian Campbell <ijc@hellion.org.uk> wrote:
+> > > 
+> > > These includes in turn require a skeleton.dtsi to be present, so add one as
+> > > a real file (with the same contents as arch/arm) rather than a symlink.
+> > 
+> > I don't follow why skeleton.dtsi is needed. The 32-bit RPi dts files
+> > are including it?
 
-On 8/3/2016 7:03 AM, Kishon Vijay Abraham I wrote:
-> Hi,
-> 
-> The PCIe controller present in TI's DRA7 SoC is capable of operating either in
-> Root Complex mode or Endpoint mode. (It uses Synopsys Designware Core). I'd
-> assume most of the PCIe controllers on other platforms that use Designware core
-> should also be capable to operate in endpoint mode. But linux kernel right now
-> supports only RC mode.
-> 
-> PCIe endpoint support discussion came up briefly before [1] but it was felt the
-> practical use case will find firmware more suitable and endpoint support in
-> kernel can be used only for validation or demo.
-> 
-> *) Modify platform driver to support EP mode (in my case pci-dra7xx.c).
-> 
-> *) dt binding specific to EP mode should be created.
-> 
-> Once I complete the implementation and start posting RFC patches, a lot of
-> these will become clear. But I want to check if this sounds okay to you guys
-> before starting the implementation.
-> 
-> Let me know if you have some other ideas too.
-> 
-> Cheers
-> Kishon
-> 
-> [1] -> http://www.spinics.net/lists/linux-pci/msg26026.html
-> 
+Exactly.
 
-You are rising a topic that we are also addressing in Synopsys.
+> >  If so, can we just remove it. We decided
+> > skeleton.dtsi was a bad idea.
+> 
+> Yup. I don't want to see skeleton.dtsi reappear, and the necessary
+> fixups to source files are relatively simple.
+> 
+> Ian, see commit 3ebee5a2e141496b ("arm64: dts: kill skeleton.dtsi") for
+> the rationale, and hints as to what needs to be fixed up (e.g. if empty
+> > memory nodes are required, there should be a comment as to why).
 
-For the PCIe RC hardware validation we are currently using the standard
-pcie-designware and pcie-designware-plat drivers.
+Understood.
 
-For the Endpoint we have to use an internal software package. Its main purpose
-is to initialize the IP registers, eDMA channels and make data transfer to prove
-that the everything is working properly. This is done in 2 levels, a custom
-driver built and loaded and an application that makes some ioctl to the driver
-executing some interesting functions to check the Endpoint status and make some
-data exchange.
+I can make the mechanical fix to?arch/arm/boot/dts/bcm283x.dtsi (which
+is linked here as?arch/arm64/boot/dts/broadcom/bcm283x.dtsi which
+causes the need for skeleton.dtsi) but I don't have any R-Pi hardware
+with which to verify the need (or not) for empty memory nodes etc.
 
-We are very interest in the subject and we are available to participate in the
-development.
+> Perhaps this is a good time to attack the remaining 32-bit skeleton.dtsi
+> > users. I'll take another look come -rc1.
 
-I would suggest that also the IP eDMA initialization and manipulation be
-included in the framework and maybe produce a standard tool to test the endpoint.
+linux.git$ git grep skeleton.dtsi -- arch/arm??| wc -l
+148
+linux.git$
 
-Thanks
-Joao
+Good luck ;-)
+
+Ian.
