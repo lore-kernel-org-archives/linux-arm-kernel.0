@@ -1,65 +1,88 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed,  3 Aug 2016 18:13:24 +0200
-Subject: [PATCH 2/3] KVM: arm64: vgic-its: Plug race in vgic_put_irq
+Date: Wed,  3 Aug 2016 18:13:23 +0200
+Subject: [PATCH v2 1/3] KVM: arm64: vgic-its: Handle errors from vgic_add_lpi
 In-Reply-To: <20160803161325.14933-1-christoffer.dall@linaro.org>
 References: <20160803161325.14933-1-christoffer.dall@linaro.org>
-Message-ID: <20160803161325.14933-3-christoffer.dall@linaro.org>
+Message-ID: <20160803161325.14933-2-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Right now the following sequence of events can happen:
+During low memory conditions, we could be dereferencing a NULL pointer
+when vgic_add_lpi fails to allocate memory.
 
-  1. Thread X calls vgic_put_irq
-  2. Thread Y calls vgic_add_lpi
-  3. Thread Y gets lpi_list_lock
-  4. Thread X drops the ref count to 0 and blocks on lpi_list_lock
-  5. Thread Y finds the irq via the lpi_list_lock, raises the ref
-     count to 1, and release the lpi_list_lock.
-  6. Thread X proceeds and frees the irq.
+Consider for example this call sequence:
 
-Avoid this by holding the spinlock around the kref_put.
+  vgic_its_cmd_handle_mapi
+      itte->irq = vgic_add_lpi(kvm, lpi_nr);
+          update_lpi_config(kvm, itte->irq, NULL);
+              ret = kvm_read_guest(kvm, propbase + irq->intid
+	                                             ^^^^
+						     kaboom?
+
+Instead, return an error pointer from vgic_add_lpi and check the return
+value from its single caller.
 
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- virt/kvm/arm/vgic/vgic.c | 20 ++++++++++----------
- 1 file changed, 10 insertions(+), 10 deletions(-)
+Changes since v1:
+ - Don't errornously get an extra kref refernce for the struct vgic_irq
+ - Don't rework the entire error handling of the function, but follow
+   what Marc suggested he prefers based on his fixup patch.
+ virt/kvm/arm/vgic/vgic-its.c | 18 ++++++++++++++----
+ 1 file changed, 14 insertions(+), 4 deletions(-)
 
-diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
-index e7aeac7..fb8c0ab 100644
---- a/virt/kvm/arm/vgic/vgic.c
-+++ b/virt/kvm/arm/vgic/vgic.c
-@@ -117,22 +117,22 @@ static void vgic_irq_release(struct kref *ref)
+diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+index 07411cf..424f7a5 100644
+--- a/virt/kvm/arm/vgic/vgic-its.c
++++ b/virt/kvm/arm/vgic/vgic-its.c
+@@ -51,7 +51,7 @@ static struct vgic_irq *vgic_add_lpi(struct kvm *kvm, u32 intid)
  
- void vgic_put_irq(struct kvm *kvm, struct vgic_irq *irq)
- {
--	struct vgic_dist *dist;
-+	struct vgic_dist *dist = &kvm->arch.vgic;
+ 	irq = kzalloc(sizeof(struct vgic_irq), GFP_KERNEL);
+ 	if (!irq)
+-		return NULL;
++		return ERR_PTR(-ENOMEM);
  
- 	if (irq->intid < VGIC_MIN_LPI)
- 		return;
+ 	INIT_LIST_HEAD(&irq->lpi_list);
+ 	INIT_LIST_HEAD(&irq->ap_list);
+@@ -693,10 +693,11 @@ static int vgic_its_cmd_handle_mapi(struct kvm *kvm, struct vgic_its *its,
+ 	u32 device_id = its_cmd_get_deviceid(its_cmd);
+ 	u32 event_id = its_cmd_get_id(its_cmd);
+ 	u32 coll_id = its_cmd_get_collection(its_cmd);
+-	struct its_itte *itte;
++	struct its_itte *itte, *new_itte = NULL;
+ 	struct its_device *device;
+ 	struct its_collection *collection, *new_coll = NULL;
+ 	int lpi_nr;
++	struct vgic_irq *irq;
  
--	if (!kref_put(&irq->refcount, vgic_irq_release))
--		return;
--
--	dist = &kvm->arch.vgic;
--
- 	spin_lock(&dist->lpi_list_lock);
--	list_del(&irq->lpi_list);
--	dist->lpi_list_count--;
--	spin_unlock(&dist->lpi_list_lock);
-+	if (!kref_put(&irq->refcount, vgic_irq_release)) {
-+		spin_unlock(&dist->lpi_list_lock);
-+		return;
-+	} else {
-+		list_del(&irq->lpi_list);
-+		dist->lpi_list_count--;
-+		spin_unlock(&dist->lpi_list_lock);
+ 	device = find_its_device(its, device_id);
+ 	if (!device)
+@@ -720,7 +721,7 @@ static int vgic_its_cmd_handle_mapi(struct kvm *kvm, struct vgic_its *its,
  
--	kfree(irq);
-+		kfree(irq);
+ 	itte = find_itte(its, device_id, event_id);
+ 	if (!itte) {
+-		itte = kzalloc(sizeof(struct its_itte), GFP_KERNEL);
++		new_itte = itte = kzalloc(sizeof(struct its_itte), GFP_KERNEL);
+ 		if (!itte) {
+ 			if (new_coll)
+ 				vgic_its_free_collection(its, coll_id);
+@@ -733,7 +734,16 @@ static int vgic_its_cmd_handle_mapi(struct kvm *kvm, struct vgic_its *its,
+ 
+ 	itte->collection = collection;
+ 	itte->lpi = lpi_nr;
+-	itte->irq = vgic_add_lpi(kvm, lpi_nr);
++
++	irq = vgic_add_lpi(kvm, lpi_nr);
++	if (IS_ERR(irq)) {
++		if (new_coll)
++			vgic_its_free_collection(its, coll_id);
++		kfree(new_itte);
++		return PTR_ERR(irq);
 +	}
- }
++	itte->irq = irq;
++
+ 	update_affinity_itte(kvm, itte);
  
- /**
+ 	/*
 -- 
 2.9.0
