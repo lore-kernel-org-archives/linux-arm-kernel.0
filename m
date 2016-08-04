@@ -1,33 +1,49 @@
 From: bibby.hsieh@mediatek.com (Bibby Hsieh)
-Date: Thu, 4 Aug 2016 10:59:51 +0800
-Subject: [PATCH v2 1/7] drm/mediatek: Remove mtk_drm_crtc_check_flush
+Date: Thu, 4 Aug 2016 10:59:54 +0800
+Subject: [PATCH v2 4/7] drm/mediatek: Use drm_atomic destroy_state helpers
 In-Reply-To: <1470279597-60453-1-git-send-email-bibby.hsieh@mediatek.com>
 References: <1470279597-60453-1-git-send-email-bibby.hsieh@mediatek.com>
-Message-ID: <1470279597-60453-2-git-send-email-bibby.hsieh@mediatek.com>
+Message-ID: <1470279597-60453-5-git-send-email-bibby.hsieh@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Daniel Kurtz <djkurtz@chromium.org>
-
-This function no longer exists.
+Use the core destroy_state helpers to destroy core state to ensure we don't
+leak if/when more fields get added later.
 
 Signed-off-by: Daniel Kurtz <djkurtz@chromium.org>
 Signed-off-by: Bibby Hsieh <bibby.hsieh@mediatek.com>
 ---
- drivers/gpu/drm/mediatek/mtk_drm_crtc.h |    1 -
- 1 file changed, 1 deletion(-)
+ drivers/gpu/drm/mediatek/mtk_drm_crtc.c  |    3 +--
+ drivers/gpu/drm/mediatek/mtk_drm_plane.c |    3 +--
+ 2 files changed, 2 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/gpu/drm/mediatek/mtk_drm_crtc.h b/drivers/gpu/drm/mediatek/mtk_drm_crtc.h
-index 81e5566..4d32cf1 100644
---- a/drivers/gpu/drm/mediatek/mtk_drm_crtc.h
-+++ b/drivers/gpu/drm/mediatek/mtk_drm_crtc.h
-@@ -22,7 +22,6 @@
+diff --git a/drivers/gpu/drm/mediatek/mtk_drm_crtc.c b/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
+index d6fbefa..733b2a3 100644
+--- a/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
++++ b/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
+@@ -112,8 +112,7 @@ static void mtk_drm_crtc_reset(struct drm_crtc *crtc)
+ 	struct mtk_crtc_state *state;
  
- int mtk_drm_crtc_enable_vblank(struct drm_device *drm, unsigned int pipe);
- void mtk_drm_crtc_disable_vblank(struct drm_device *drm, unsigned int pipe);
--void mtk_drm_crtc_check_flush(struct drm_crtc *crtc);
- void mtk_drm_crtc_commit(struct drm_crtc *crtc);
- void mtk_crtc_ddp_irq(struct drm_crtc *crtc, struct mtk_ddp_comp *ovl);
- int mtk_drm_crtc_create(struct drm_device *drm_dev,
+ 	if (crtc->state) {
+-		if (crtc->state->mode_blob)
+-			drm_property_unreference_blob(crtc->state->mode_blob);
++		__drm_atomic_helper_crtc_destroy_state(crtc->state);
+ 
+ 		state = to_mtk_crtc_state(crtc->state);
+ 		memset(state, 0, sizeof(*state));
+diff --git a/drivers/gpu/drm/mediatek/mtk_drm_plane.c b/drivers/gpu/drm/mediatek/mtk_drm_plane.c
+index 86b7aed..17172ba 100644
+--- a/drivers/gpu/drm/mediatek/mtk_drm_plane.c
++++ b/drivers/gpu/drm/mediatek/mtk_drm_plane.c
+@@ -73,8 +73,7 @@ static void mtk_plane_reset(struct drm_plane *plane)
+ 	struct mtk_plane_state *state;
+ 
+ 	if (plane->state) {
+-		if (plane->state->fb)
+-			drm_framebuffer_unreference(plane->state->fb);
++		__drm_atomic_helper_plane_destroy_state(plane->state);
+ 
+ 		state = to_mtk_plane_state(plane->state);
+ 		memset(state, 0, sizeof(*state));
 -- 
 1.7.9.5
