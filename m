@@ -1,60 +1,145 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 4 Aug 2016 15:40:04 +0100
-Subject: [PATCH] dmaengine: qcom_hidma: release the descriptor before the
- callback
-In-Reply-To: <71a15611-645f-7523-1c26-14b420aff667@codeaurora.org>
-References: <1468465076-27324-1-git-send-email-okaya@codeaurora.org>
- <ccffcabf-1448-57a1-d18b-715cfd46e906@codeaurora.org>
- <20160724062425.GW9681@localhost>
- <971733d9-fd18-2a1b-07c0-349b47747d49@codeaurora.org>
- <20160804125525.GF9681@localhost>
- <71a15611-645f-7523-1c26-14b420aff667@codeaurora.org>
-Message-ID: <20160804144003.GV1041@n2100.armlinux.org.uk>
+From: kbeldan@baylibre.com (Karl Beldan)
+Date: Thu,  4 Aug 2016 14:43:32 +0000
+Subject: [PATCH] ARM: dts: da850: Add basic DTS for the L138/C6748 Dev Kit
+Message-ID: <20160804144332.4841-1-kbeldan@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 04, 2016 at 10:17:24AM -0400, Sinan Kaya wrote:
-> On 8/4/2016 8:55 AM, Vinod Koul wrote:
-> > Dmaengine tells transaction is complete. It does not say if the txn is
-> > success or failure. It can transfer data and not say if data was
-> > correct. A successful transaction implies data integrity as well, which
-> > dmaengine can't provide.
-> 
-> Thanks for describing this. I was confused about DMA_SUCCESS and DMA_COMPLETE.
-> I now understand that tx_success API just returns information that the request
-> was executed whether the result is error or not. This makes sense now.
-> 
-> However, if the txn is failure; then we should never call the client callback
-> since DMA engine cannot provide such feedback to the client without Dave's patch.
-> You are saying that the calling the callback is optional.
-> 
-> Then, the callback cannot be optional in the error case for old behavior.
-> 
-> How does the client know if memcpy executed or not? The client got its callback
-> and tx_status is also DMA_COMPLETE.
+The LCDK is the successor to the late Hawkboard and has the same machine
+number.
+Among the differences are the flash (16bits vs 8bits) and some pins
+(MMC, LEDs, buttons, some external connectors), however the main
+components remain the same (eth. PHY, Audio Codec, Video decoder and
+DAC) except for the main PMIC, different and hard-wired on the LCDK (the
+LDOs and DCDCs are always ON).
+A DT-only boot with this addition gives functional uart, reboot via
+watchdog, rtc, ethernet and MMC (I added the CD gpio for the MMC
+although davinci_mmc doesn't call yet the mmc core OF facilities).
 
-If an error occurred, then dma_async_is_tx_complete() is supposed to
-return DMA_ERROR.  It's up to the DMA engine driver to ensure that
-this happens if it has error detection abilities.
+Signed-off-by: Karl Beldan <kbeldan@baylibre.com>
+---
+ Documentation/devicetree/bindings/arm/davinci.txt |  4 ++
+ arch/arm/boot/dts/Makefile                        |  1 +
+ arch/arm/boot/dts/omapl138-lcdk.dts               | 71 +++++++++++++++++++++++
+ arch/arm/mach-davinci/da8xx-dt.c                  |  1 +
+ 4 files changed, 77 insertions(+)
+ create mode 100644 arch/arm/boot/dts/omapl138-lcdk.dts
 
-Most of the helpers in drivers/dma/dmaengine.h are there to _assist_
-the driver writer - they can't do magic.  dma_cookie_status() will
-return from the point of view of the generic DMA code what the status
-of a particular cookie is, and the cookie state.  It doesn't take
-care of whether a particular transaction associated with a cookie
-failed or not - that's up to the driver.
-
-So, if dma_cookie_status() says that a cookie has DMA_COMPLETED
-status, and the DMA engine is able to detect errors on individual
-transfers, then the driver needs to do further status lookup to
-determine whether the particular transaction referred to by the
-cookie did fail, and modify the returned status appropriately.
-
-If dma_cookie_status() says that the cookie is DMA_IN_PROGRESS,
-then the driver is expected to calculate and report the residue
-(the remaining number of bytes) of the referred to transaction.
-
+diff --git a/Documentation/devicetree/bindings/arm/davinci.txt b/Documentation/devicetree/bindings/arm/davinci.txt
+index cfaeda4..1482c74 100644
+--- a/Documentation/devicetree/bindings/arm/davinci.txt
++++ b/Documentation/devicetree/bindings/arm/davinci.txt
+@@ -5,6 +5,10 @@ DA850/OMAP-L138/AM18x Evaluation Module (EVM) board
+ Required root node properties:
+     - compatible = "ti,da850-evm", "ti,da850";
+ 
++DA850/OMAP-L138/AM18x L138/C6748 Development Kit (LCDK) board
++Required root node properties:
++    - compatible = "ti,omapl138-lcdk", "ti,da850";
++
+ EnBW AM1808 based CMC board
+ Required root node properties:
+     - compatible = "enbw,cmc", "ti,da850;
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 414b427..da3f69b 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -105,6 +105,7 @@ dtb-$(CONFIG_ARCH_BERLIN) += \
+ dtb-$(CONFIG_ARCH_BRCMSTB) += \
+ 	bcm7445-bcm97445svmb.dtb
+ dtb-$(CONFIG_ARCH_DAVINCI) += \
++	omapl138-lcdk.dtb \
+ 	da850-enbw-cmc.dtb \
+ 	da850-evm.dtb
+ dtb-$(CONFIG_ARCH_DIGICOLOR) += \
+diff --git a/arch/arm/boot/dts/omapl138-lcdk.dts b/arch/arm/boot/dts/omapl138-lcdk.dts
+new file mode 100644
+index 0000000..fad3b6d
+--- /dev/null
++++ b/arch/arm/boot/dts/omapl138-lcdk.dts
+@@ -0,0 +1,71 @@
++/*
++ * Copyright (c) 2016 BayLibre, Inc.
++ *
++ * Licensed under GPLv2 or later.
++ */
++/dts-v1/;
++#include "da850.dtsi"
++#include <dt-bindings/gpio/gpio.h>
++
++/ {
++	model = "DA850/AM1808/OMAP-L138 LCDK";
++	compatible = "ti,omapl138-lcdk", "ti,da850";
++
++	aliases {
++		serial2 = &serial2;
++	};
++
++	chosen {
++		bootargs = "console=ttyS2,115200n8 earlycon";
++		stdout-path = "serial2:115200n8";
++	};
++
++	memory {
++		device_type = "memory";
++		reg = <0xc0000000 0x08000000>;
++	};
++};
++
++&pmx_core {
++	status = "okay";
++};
++
++&serial2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&serial2_rxtx_pins>;
++	status = "okay";
++};
++
++&wdt {
++	status = "okay";
++};
++
++&rtc0 {
++	status = "okay";
++};
++
++&gpio {
++	status = "okay";
++};
++
++&mdio {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mdio_pins>;
++	bus_freq = <2200000>;
++	status = "okay";
++};
++
++&eth0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mii_pins>;
++	status = "okay";
++};
++
++&mmc0 {
++	max-frequency = <50000000>;
++	bus-width = <4>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc0_pins>;
++	cd-gpios = <&gpio 64 GPIO_ACTIVE_HIGH>;
++	status = "okay";
++};
+diff --git a/arch/arm/mach-davinci/da8xx-dt.c b/arch/arm/mach-davinci/da8xx-dt.c
+index 754f478..d5f710c 100644
+--- a/arch/arm/mach-davinci/da8xx-dt.c
++++ b/arch/arm/mach-davinci/da8xx-dt.c
+@@ -49,6 +49,7 @@ static void __init da850_init_machine(void)
+ 
+ static const char *const da850_boards_compat[] __initconst = {
+ 	"enbw,cmc",
++	"ti,omapl138-lcdk",
+ 	"ti,da850-evm",
+ 	"ti,da850",
+ 	NULL,
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+2.9.0.rc1
