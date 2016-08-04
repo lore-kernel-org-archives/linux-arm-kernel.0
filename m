@@ -1,40 +1,51 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Thu, 04 Aug 2016 09:45:58 +0900
-Subject: Extcon build failure in next
-In-Reply-To: <20160630054112.GN28140@atomide.com>
-References: <20160630053705.GM28140@atomide.com>
- <CGME20160630054118epcas1p449283c7fb5b5fc8df79144a9e8da2475@epcas1p4.samsung.com>
- <20160630054112.GN28140@atomide.com>
-Message-ID: <57A29046.3080107@samsung.com>
+From: jh80.chung@samsung.com (Jaehoon Chung)
+Date: Thu, 04 Aug 2016 10:18:42 +0900
+Subject: [PATCH] UHS-SD card for Hisilicon Hikey
+In-Reply-To: <1470219733-113975-1-git-send-email-kid.jin@hisilicon.com>
+References: <CGME20160803102743epcas1p463b9648675d7324251f7a504f419d4db@epcas1p4.samsung.com>
+ <1470219733-113975-1-git-send-email-kid.jin@hisilicon.com>
+Message-ID: <952b56f0-97b0-1e8f-ef54-b6b1264fc18d@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+Hi,
 
-On 2016? 06? 30? 14:41, Tony Lindgren wrote:
-> * Tony Lindgren <tony@atomide.com> [160629 22:41]:
->> Hi Chanwoo,
->>
->> Looks like current Linux next fails to build with at least
->> omap2plus_defconfig because of:
->>
->> ERROR: "extcon_dev_allocate" [drivers/extcon/devres.ko] undefined!
->> scripts/Makefile.modpost:91: recipe for target '__modpost' failed
->> make[1]: *** [__modpost] Error 1
->> Makefile:1163: recipe for target 'modules' failed
->> make: *** [modules] Error 2
->> Kernel build failed
->>
->> Probably extcon_dev_allocate just needs EXPORT_SYMBOL_GPL?
+On 08/03/2016 07:22 PM, Jin Guojun wrote:
+> mmc: dw_mmc-k3: Hisilicon Hikey have no tuning function in dw_mmc-k3.c,so we must do the tuning function stub when we init UHS card.
+
+Refer to Shawn's previous comment.
+"No, please amend the commit title line as "mmc: dw_mmc: xxxxx"
+And add "linux-mmc at vger.kernel.org", patch version, Changelog, etc..
+
+Best Regards,
+Jaehoon Chung
+
 > 
-> Also I'm seeing:
+> Signed-off-by: Jin Guojun <kid.jin@hisilicon.com>
+> ---
+>  drivers/mmc/host/dw_mmc-k3.c | 6 ++++++
+>  1 file changed, 6 insertions(+)
 > 
-> drivers/extcon/extcon.c: In function 'extcon_register_notifier':
-> drivers/extcon/extcon.c:455:6: warning: 'idx' may be used uninitialized in this function [-Wmaybe-uninitialized]
->    if (idx >= 0) {
-
-This issue is already fixed on patch[1] and merged it.
-[1] https://git.kernel.org/cgit/linux/kernel/git/chanwoo/extcon.git/commit/?h=extcon-next
-
-Regards,
-Chanwoo Choi
+> diff --git a/drivers/mmc/host/dw_mmc-k3.c b/drivers/mmc/host/dw_mmc-k3.c
+> index 8e9d886..6247894 100644
+> --- a/drivers/mmc/host/dw_mmc-k3.c
+> +++ b/drivers/mmc/host/dw_mmc-k3.c
+> @@ -131,11 +131,17 @@ static void dw_mci_hi6220_set_ios(struct dw_mci *host, struct mmc_ios *ios)
+>  	host->bus_hz = clk_get_rate(host->biu_clk);
+>  }
+>  
+> +static int dw_mci_hi6220_execute_tuning(struct dw_mci_slot *slot, u32 opcode)
+> +{
+> +	return 0;
+> +}
+> +
+>  static const struct dw_mci_drv_data hi6220_data = {
+>  	.caps			= dw_mci_hi6220_caps,
+>  	.switch_voltage		= dw_mci_hi6220_switch_voltage,
+>  	.set_ios		= dw_mci_hi6220_set_ios,
+>  	.parse_dt		= dw_mci_hi6220_parse_dt,
+> +	.execute_tuning		= dw_mci_hi6220_execute_tuning,
+>  };
+>  
+>  static const struct of_device_id dw_mci_k3_match[] = {
+> 
