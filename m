@@ -1,53 +1,68 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 4 Aug 2016 16:11:21 +0200
-Subject: [PATCH 0/8] ARM: clean up PC-relative arithmetic
-In-Reply-To: <alpine.LFD.2.20.1608031336020.17623@knanqh.ubzr>
-References: <1470238730-30038-1-git-send-email-ard.biesheuvel@linaro.org>
- <alpine.LFD.2.20.1608031336020.17623@knanqh.ubzr>
-Message-ID: <CAKv+Gu_=Drf=0UwRBw8J8kup0FZ8HwUM7Fqg6GyLBCmFKHk1UQ@mail.gmail.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Thu, 4 Aug 2016 10:17:24 -0400
+Subject: [PATCH] dmaengine: qcom_hidma: release the descriptor before the
+ callback
+In-Reply-To: <20160804125525.GF9681@localhost>
+References: <1468465076-27324-1-git-send-email-okaya@codeaurora.org>
+ <ccffcabf-1448-57a1-d18b-715cfd46e906@codeaurora.org>
+ <20160724062425.GW9681@localhost>
+ <971733d9-fd18-2a1b-07c0-349b47747d49@codeaurora.org>
+ <20160804125525.GF9681@localhost>
+Message-ID: <71a15611-645f-7523-1c26-14b420aff667@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3 August 2016 at 20:27, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> On Wed, 3 Aug 2016, Ard Biesheuvel wrote:
->
->> There are various places in the ARM kernel where the following pattern
->> is used to create a PC-relative reference that is valid even before the
->> MMU is on:
->>
->>      adr    rX, 1f
->>      ldr    rY, [rX]
->>      add    rX, rX, rY
->>      ...
->>   1: .long  <symbol> - .
->>
->> or
->>      adr    rX, 1f
->>      ldmia  rX, {rY .. rY+n}
->>      sub    rX, rX, rY
->>      add    rY+1, rY+1, rX
->>      add    rY+2, rY+2, rX
->>      ...
->>   1: .long  .
->>      .long  <symbolY>
->>      .long  <symbolY+1>
->>      ...
->>
->> Both cases can be greatly simplified by letting the linker do the
->> calculations for us. This series implements adr_l, ldr_l and str_l
->> macros, and uses them to simplify a couple of instances of the above
->> patterns.
->
-> I echo Dave's concern about the availability of the :pc_g*_nc: relocs.
->
-> Could this be used to solve the XIP translation problem in some
-> universal way? Right now only a few cases are covered. For reference, see:
->
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-November/386273.html
->
-> commit d7811455 ("ARM: 8512/1: proc-v7.S: Adjust stack address when XIP_KERNEL")
->
-> commit 8ff97fa3 ("ARM: make the physical-relative calculation more obvious")
->
+On 8/4/2016 8:55 AM, Vinod Koul wrote:
+> Dmaengine tells transaction is complete. It does not say if the txn is
+> success or failure. It can transfer data and not say if data was
+> correct. A successful transaction implies data integrity as well, which
+> dmaengine can't provide.
 
-I don't see how we could use this to improve that, tbh.
+Thanks for describing this. I was confused about DMA_SUCCESS and DMA_COMPLETE.
+I now understand that tx_success API just returns information that the request
+was executed whether the result is error or not. This makes sense now.
+
+However, if the txn is failure; then we should never call the client callback
+since DMA engine cannot provide such feedback to the client without Dave's patch.
+You are saying that the calling the callback is optional.
+
+Then, the callback cannot be optional in the error case for old behavior.
+
+How does the client know if memcpy executed or not? The client got its callback
+and tx_status is also DMA_COMPLETE.
+
+Is the client supposed to do a memcmp ? (BTW, it doesn't make sense).
+
+
+>> In my opinion, the new behavior is correct. Calling dma_cookie_complete(desc) all the time
+>> > is not. Do you agree?
+>> > 
+>> > If yes, I can divide this patch into two. One to correct the ordering. Another one
+>> > for behavioral change.
+> See above..
+> 
+> A callback or tx_status will only tell you the txn is completed. That is
+> why we have DMA_COMPLETE and not DMA_SUCCESS.
+> 
+
+Still calling the callback and returning DMA_COMPLETE isn't right. There is no indication
+of an actual DMA error. The transaction is complete but data integrity failed.
+
+> So current order seems fine to me!
+
+I posted v2 of this patch without introducing the behavior change leaving the behavior discussion
+out for another patch. The current code will not call the callback if error was observed.
+
+This patch is needed to fix a race condition as the commit message describes.
+The callback is called before returning the descriptor back to free pool. 
+
+If the client calls free resources, the descriptor that was not returned to free pool gets lost due
+to race condition.
+
+I'll refactor the code after Dave's change for passing the error code while calling the
+callback. That will be a different patch anyhow.
+
+-- 
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
