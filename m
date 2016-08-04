@@ -1,108 +1,30 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 4 Aug 2016 12:47:36 +0200
-Subject: [PATCH 41/55] KVM: arm64: vgic-its: Implement MSI injection in
- ITS emulation
-In-Reply-To: <1469208552-4155-42-git-send-email-marc.zyngier@arm.com>
-References: <1469208552-4155-1-git-send-email-marc.zyngier@arm.com>
- <1469208552-4155-42-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20160804104736.GA8211@lvm>
+From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
+Date: Thu, 04 Aug 2016 13:49:10 +0300
+Subject: =?UTF-8?B?UmU6IFtQQVRDSCB2MiAyLzJdIGlteDUzLmR0c2kgOiBBZGQgRE1BIGNvbmZp?=
+ =?UTF-8?B?Z3VyYXRpb24gZm9yIFVBUlQ=?=
+In-Reply-To: <1470306157-11181-2-git-send-email-fabien.lahoudere@collabora.co.uk>
+References: <CAOMZO5BoRsrHv-+5c9bAXO2NCya8sPqmmpy9DOfav6NvQ+VMLQ@mail.gmail.com>
+ <1470306157-11181-1-git-send-email-fabien.lahoudere@collabora.co.uk>
+ <1470306157-11181-2-git-send-email-fabien.lahoudere@collabora.co.uk>
+Message-ID: <1470307750.712399023@f361.i.mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andre and Marc,
+>???????,  4 ??????? 2016, 13:22 +03:00 ?? Fabien Lahoudere <fabien.lahoudere@collabora.co.uk>:
+>
+>In order to use sdma with UART, we need to add DMA configuration in device tree.
+>
+>Signed-off-by: Fabien Lahoudere < fabien.lahoudere@collabora.co.uk >
+>---
+>?arch/arm/boot/dts/imx53.dtsi | 10 ++++++++++
+>?1 file changed, 10 insertions(+)
+...
 
-On Fri, Jul 22, 2016 at 06:28:58PM +0100, Marc Zyngier wrote:
-> From: Andre Przywara <andre.przywara@arm.com>
-> 
-> When userland wants to inject an MSI into the guest, it uses the
-> KVM_SIGNAL_MSI ioctl, which carries the doorbell address along with
-> the payload and the device ID.
-> With the help of the KVM IO bus framework we learn the corresponding
-> ITS from the doorbell address. We then use our wrapper functions to
-> iterate the linked lists and find the proper Interrupt Translation Table
-> Entry (ITTE) and thus the corresponding struct vgic_irq to finally set
-> the pending bit.
-> We also provide the handler for the ITS "INT" command, which allows a
-> guest to trigger an MSI via the ITS command queue. Since this one knows
-> about the right ITS already, we directly call the MMIO handler function
-> without using the kvm_io_bus framework.
-> 
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
-> Tested-by: Eric Auger <eric.auger@redhat.com>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  virt/kvm/arm/vgic/vgic-its.c | 77 ++++++++++++++++++++++++++++++++++++++++++++
->  virt/kvm/arm/vgic/vgic.h     |  6 ++++
->  2 files changed, 83 insertions(+)
-> 
-> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-> index 1408c88..d8e8f14 100644
-> --- a/virt/kvm/arm/vgic/vgic-its.c
-> +++ b/virt/kvm/arm/vgic/vgic-its.c
-> @@ -437,6 +437,65 @@ static unsigned long vgic_mmio_read_its_idregs(struct kvm *kvm,
->  	return 0;
->  }
->  
-> +/*
-> + * Find the target VCPU and the LPI number for a given devid/eventid pair
-> + * and make this IRQ pending, possibly injecting it.
-> + * Must be called with the its_lock mutex held.
-> + */
-> +static void vgic_its_trigger_msi(struct kvm *kvm, struct vgic_its *its,
-> +				 u32 devid, u32 eventid)
-> +{
-> +	struct its_itte *itte;
-> +
-> +	if (!its->enabled)
-> +		return;
-> +
-> +	itte = find_itte(its, devid, eventid);
-> +	/* Triggering an unmapped IRQ gets silently dropped. */
-> +	if (itte && its_is_collection_mapped(itte->collection)) {
-> +		struct kvm_vcpu *vcpu;
-> +
-> +		vcpu = kvm_get_vcpu(kvm, itte->collection->target_addr);
-> +		if (vcpu && vcpu->arch.vgic_cpu.lpis_enabled) {
-> +			spin_lock(&itte->irq->irq_lock);
-> +			itte->irq->pending = true;
-> +			vgic_queue_irq_unlock(kvm, itte->irq);
-> +		}
-> +	}
-> +}
-> +
-> +/*
-> + * Queries the KVM IO bus framework to get the ITS pointer from the given
-> + * doorbell address.
-> + * We then call vgic_its_trigger_msi() with the decoded data.
-> + */
-> +int vgic_its_inject_msi(struct kvm *kvm, struct kvm_msi *msi)
-> +{
-> +	u64 address;
-> +	struct kvm_io_device *kvm_io_dev;
-> +	struct vgic_io_device *iodev;
-> +
-> +	if (!vgic_has_its(kvm))
-> +		return -ENODEV;
-> +
-> +	if (!(msi->flags & KVM_MSI_VALID_DEVID))
-> +		return -EINVAL;
-> +
-> +	address = (u64)msi->address_hi << 32 | msi->address_lo;
-> +
-> +	kvm_io_dev = kvm_io_bus_get_dev(kvm, KVM_MMIO_BUS, address);
-> +	if (!kvm_io_dev)
-> +		return -ENODEV;
-> +
-> +	iodev = container_of(kvm_io_dev, struct vgic_io_device, dev);
+Hello.
 
-This container_of bothers me; as far as I can tell, the address we use
-to look stuff up on the KVM_MMIO_BUS is purely given by userspace and we
-can have other stuff registered on the KVM_MMIO_BUS, which is not
-contained in a struct vgic_io_device (eventfd for example).
+UART SDMA has been tested by me for i.MX51.
+So, on my opinion, In the first part of the patch, we just need to remove is_imx6q_uart()
+check on and always let the devicetree decide about DMA usage.
 
-This smells like something that could be exploited, so if I'm right, we
-should plug this for -rc2 in some way.
-
-Thanks,
--Christoffer
+Thanks.
+---
