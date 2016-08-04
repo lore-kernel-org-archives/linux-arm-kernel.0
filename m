@@ -1,77 +1,26 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Thu, 4 Aug 2016 13:28:36 +0300
-Subject: [PATCHv3 01/11] crypto: omap-sham: avoid executing tasklet where not
- needed
-In-Reply-To: <1470306526-27219-1-git-send-email-t-kristo@ti.com>
-References: <1470306526-27219-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1470306526-27219-2-git-send-email-t-kristo@ti.com>
+Date: Thu, 4 Aug 2016 13:28:35 +0300
+Subject: [PATCHv3 00/11] crypto: omap HW crypto fixes
+Message-ID: <1470306526-27219-1-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some of the call paths of OMAP SHA driver can avoid executing the next
-step of the crypto queue under tasklet; instead, execute the next step
-directly via function call. This avoids a costly round-trip via the
-scheduler giving a slight performance boost.
+Hi,
 
-Signed-off-by: Tero Kristo <t-kristo@ti.com>
----
- drivers/crypto/omap-sham.c | 20 +++++++++++++++-----
- 1 file changed, 15 insertions(+), 5 deletions(-)
+This revision took quite a bit time to craft due to the rework needed
+for sham buffer handling and export/import. I ended up implementing
+a flush functionality for draining out the sham buffer when doing
+export/import; just shrinking the buffer to sufficiently small size
+impacted the performance with small data chunks too much so I dropped
+this approach.
 
-diff --git a/drivers/crypto/omap-sham.c b/drivers/crypto/omap-sham.c
-index 7fe4eef..fd50005 100644
---- a/drivers/crypto/omap-sham.c
-+++ b/drivers/crypto/omap-sham.c
-@@ -1005,9 +1005,6 @@ static void omap_sham_finish_req(struct ahash_request *req, int err)
- 
- 	if (req->base.complete)
- 		req->base.complete(&req->base, err);
--
--	/* handle new request */
--	tasklet_schedule(&dd->done_task);
- }
- 
- static int omap_sham_handle_queue(struct omap_sham_dev *dd,
-@@ -1018,6 +1015,7 @@ static int omap_sham_handle_queue(struct omap_sham_dev *dd,
- 	unsigned long flags;
- 	int err = 0, ret = 0;
- 
-+retry:
- 	spin_lock_irqsave(&dd->lock, flags);
- 	if (req)
- 		ret = ahash_enqueue_request(&dd->queue, req);
-@@ -1061,11 +1059,19 @@ static int omap_sham_handle_queue(struct omap_sham_dev *dd,
- 		err = omap_sham_final_req(dd);
- 	}
- err1:
--	if (err != -EINPROGRESS)
-+	dev_dbg(dd->dev, "exit, err: %d\n", err);
-+
-+	if (err != -EINPROGRESS) {
- 		/* done_task will not finish it, so do it here */
- 		omap_sham_finish_req(req, err);
-+		req = NULL;
- 
--	dev_dbg(dd->dev, "exit, err: %d\n", err);
-+		/*
-+		 * Execute next request immediately if there is anything
-+		 * in queue.
-+		 */
-+		goto retry;
-+	}
- 
- 	return ret;
- }
-@@ -1653,6 +1659,10 @@ finish:
- 	dev_dbg(dd->dev, "update done: err: %d\n", err);
- 	/* finish curent request */
- 	omap_sham_finish_req(dd->req, err);
-+
-+	/* If we are not busy, process next req */
-+	if (!test_bit(FLAGS_BUSY, &dd->flags))
-+		omap_sham_handle_queue(dd, NULL);
- }
- 
- static irqreturn_t omap_sham_irq_common(struct omap_sham_dev *dd)
--- 
-1.9.1
+The series also fixes a couple of existing issues with omap2/omap3
+hardware acceleration, I ran a full boot test / crypto manager
+test suite on all boards accessible to me now.
+
+Based on top of latest mainline, which is somewhere before 4.8-rc1
+as of writing this, I am unable to rebase the series during the next
+three weeks so wanted to get this out now. Targeted for 4.9 merge
+window, some fixes could be picked up earlier though if needed.
+
+-Tero
