@@ -1,103 +1,76 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu,  4 Aug 2016 10:21:49 +0100
-Subject: [PATCH 5/9] remoteproc: core: Add function to amend an existing
- resource table entry
+Date: Thu,  4 Aug 2016 10:21:53 +0100
+Subject: [PATCH 9/9] remoteproc: core: Support empty resource tables
 In-Reply-To: <20160804092153.23032-1-lee.jones@linaro.org>
 References: <20160804092153.23032-1-lee.jones@linaro.org>
-Message-ID: <20160804092153.23032-6-lee.jones@linaro.org>
+Message-ID: <20160804092153.23032-10-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sometimes the firmware does not know best.
-
-When a firmware is built, it can be loaded with a resource table, usually
-detailing shared; memory, virtual device, trace log information etc.
-However, some vendors require this hard-coded information to be amended
-with new/improved information obtained from Device Tree for instance.
-
-Until now, no method exists which allows the resource table to be amended.
-The addition of this function changes that.  It is now possible to pull in
-a resource table and amend it before it is finally shared with the remote
-device.
+Currently, when a remote processor does not require resources, the
+platform-specific remoteproc driver has to create a fake resource
+table in order to by-pass the strict checking.  But there is no hard
+requirement for a remote processor so require or support shared
+resources.  This patch removes the strict checking and skips
+resource table related operations if one is not provided.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/remoteproc/remoteproc_core.c | 63 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 63 insertions(+)
+ drivers/remoteproc/remoteproc_core.c | 19 ++++++++++---------
+ 1 file changed, 10 insertions(+), 9 deletions(-)
 
 diff --git a/drivers/remoteproc/remoteproc_core.c b/drivers/remoteproc/remoteproc_core.c
-index 0abfa2b..3318ebd 100644
+index 9a077e4..366e197 100644
 --- a/drivers/remoteproc/remoteproc_core.c
 +++ b/drivers/remoteproc/remoteproc_core.c
-@@ -917,6 +917,69 @@ int rproc_request_resource(struct rproc *rproc, u32 type, void *resource)
- }
- EXPORT_SYMBOL(rproc_request_resource);
+@@ -1104,9 +1104,6 @@ static int rproc_fw_boot(struct rproc *rproc, const struct firmware *fw)
+ 	struct resource_table *table, *loaded_table;
+ 	int ret, tablesz;
  
-+static int rproc_update_resource_table_entry(struct rproc *rproc,
-+				struct rproc_request_resource *request,
-+				struct resource_table *table, int size)
-+{
-+	struct fw_rsc_carveout *tblc, *newc;
-+	struct fw_rsc_devmem *tbld, *newd;
-+	struct fw_rsc_trace *tblt, *newt;
-+	int updated = true;
-+	int i;
+-	if (!rproc->table_ptr)
+-		return -ENOMEM;
+-
+ 	ret = rproc_fw_sanity_check(rproc, fw);
+ 	if (ret)
+ 		return ret;
+@@ -1130,12 +1127,10 @@ static int rproc_fw_boot(struct rproc *rproc, const struct firmware *fw)
+ 	if (!list_empty(&rproc->override_resources))
+ 		goto skip_table_check;
+ 
+-	/* look for the resource table */
++	/* Resource tables aren't compulsory. */
+ 	table = rproc_find_rsc_table(rproc, fw, &tablesz);
+-	if (!table) {
+-		dev_err(dev, "Failed to find resource table\n");
+-		goto clean_up;
+-	}
++	if (!table)
++		goto skip_resources;
+ 
+ 	/* Verify that resource table in loaded fw is unchanged */
+ 	if (rproc->table_csum != crc32(0, table, tablesz)) {
+@@ -1152,6 +1147,8 @@ static int rproc_fw_boot(struct rproc *rproc, const struct firmware *fw)
+ 		goto clean_up;
+ 	}
+ 
++ skip_resources:
 +
-+	for (i = 0; i < table->num; i++) {
-+		int offset = table->offset[i];
-+		struct fw_rsc_hdr *hdr = (void *)table + offset;
-+		void *rsc = (void *)hdr + sizeof(*hdr);
-+
-+		if (request->type != hdr->type)
-+			continue;
-+
-+		switch (hdr->type) {
-+		case RSC_CARVEOUT:
-+			tblc = rsc;
-+			newc = request->resource;
-+
-+			if (strncmp(newc->name, tblc->name,
-+				    sizeof(*tblc->name)))
-+				break;
-+
-+			memcpy(tblc, newc, request->size);
-+
-+			return updated;
-+		case RSC_DEVMEM:
-+			tbld = rsc;
-+			newd = request->resource;
-+
-+			if (strncmp(newd->name, tbld->name,
-+				    sizeof(*tbld->name)))
-+				break;
-+
-+			memcpy(tbld, newd, request->size);
-+
-+			return updated;
-+		case RSC_TRACE:
-+			tblt = rsc;
-+			newt = request->resource;
-+
-+			if (strncmp(newt->name, tblt->name,
-+				    sizeof(*tblt->name)))
-+				break;
-+
-+			memcpy(tblt, newt, request->size);
-+
-+			return updated;
-+		default:
-+			dev_err(&rproc->dev,
-+				"Unsupported resource type: %d\n",
-+				hdr->type);
-+			return -EINVAL;
-+		}
+ 	/* load the ELF segments to memory */
+ 	ret = rproc_load_segments(rproc, fw);
+ 	if (ret) {
+@@ -1213,8 +1210,12 @@ static void rproc_fw_config_virtio(const struct firmware *fw, void *context)
+ 	if (rproc_fw_sanity_check(rproc, fw) < 0)
+ 		goto out;
+ 
+-	/* look for the resource table */
+ 	table = rproc_find_rsc_table(rproc, fw,  &tablesz);
++	if (IS_ERR(table)) {
++		dev_err(&rproc->dev, "Resource table expected, but failed\n");
++		goto out;
 +	}
 +
-+	return !updated;
-+}
-+
- /*
-  * take a firmware and boot a remote processor with it.
-  */
+ 	if (!table)
+ 		goto out;
+ 
 -- 
 2.9.0
