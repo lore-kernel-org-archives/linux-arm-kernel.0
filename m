@@ -1,34 +1,35 @@
 From: bibby.hsieh@mediatek.com (Bibby Hsieh)
-Date: Thu, 4 Aug 2016 10:57:18 +0800
-Subject: [PATCH v5] arm64: dts: mt8173: add mmsel clocks for 4K support
-Message-ID: <1470279438-60372-1-git-send-email-bibby.hsieh@mediatek.com>
+Date: Thu, 4 Aug 2016 10:59:56 +0800
+Subject: [PATCH v2 6/7] drm/mediatek: plane: Use FB's format's cpp to compute
+ x offset
+In-Reply-To: <1470279597-60453-1-git-send-email-bibby.hsieh@mediatek.com>
+References: <1470279597-60453-1-git-send-email-bibby.hsieh@mediatek.com>
+Message-ID: <1470279597-60453-7-git-send-email-bibby.hsieh@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To support HDMI 4K resolution, mmsys need clcok
-mm_sel to be 400MHz.
+From: Daniel Kurtz <djkurtz@chromium.org>
 
-The board .dts file should override the clock rate
-property with the higher VENCPLL frequency the board
-supports HDMI 4K resolution.
+Use the framebuffer's format to compute its cpp, and use it when
+calculating the address shift value.
 
 Signed-off-by: Bibby Hsieh <bibby.hsieh@mediatek.com>
 ---
- arch/arm64/boot/dts/mediatek/mt8173.dtsi |    2 ++
- 1 file changed, 2 insertions(+)
+ drivers/gpu/drm/mediatek/mtk_drm_plane.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-index 78529e4..c3f32f3 100644
---- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-+++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-@@ -690,6 +690,8 @@
- 			compatible = "mediatek,mt8173-mmsys", "syscon";
- 			reg = <0 0x14000000 0 0x1000>;
- 			power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
-+			assigned-clocks = <&topckgen CLK_TOP_MM_SEL>;
-+			assigned-clock-rates = <400000000>;
- 			#clock-cells = <1>;
- 		};
+diff --git a/drivers/gpu/drm/mediatek/mtk_drm_plane.c b/drivers/gpu/drm/mediatek/mtk_drm_plane.c
+index b3ddb20..c461a23 100644
+--- a/drivers/gpu/drm/mediatek/mtk_drm_plane.c
++++ b/drivers/gpu/drm/mediatek/mtk_drm_plane.c
+@@ -135,7 +135,7 @@ static void mtk_plane_atomic_update(struct drm_plane *plane,
+ 	pitch = fb->pitches[0];
+ 	format = fb->pixel_format;
  
+-	addr += (plane->state->src.x1 >> 16) * 4;
++	addr += (plane->state->src.x1 >> 16) * drm_format_plane_cpp(format, 0);
+ 	addr += (plane->state->src.y1 >> 16) * pitch;
+ 
+ 	state->pending.enable = true;
 -- 
 1.7.9.5
