@@ -1,83 +1,192 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Thu, 4 Aug 2016 12:22:29 +0100
-Subject: [PATCH 1/8] ARM: assembler: introduce adr_l, ldr_l and str_l
- macros
-In-Reply-To: <CAKv+Gu-T9+fhvRk-RroDqr7QvQ24cUTuONL9uT-Ws24n_nHrCw@mail.gmail.com>
-References: <1470238730-30038-1-git-send-email-ard.biesheuvel@linaro.org>
- <1470238730-30038-2-git-send-email-ard.biesheuvel@linaro.org>
- <20160803164940.GC7147@e103592.cambridge.arm.com>
- <CAKv+Gu_3YKfdCyMuTdrk+t16qQOuMiSqWEHf-h1K2ajM5s1rxw@mail.gmail.com>
- <20160804094451.GE7147@e103592.cambridge.arm.com>
- <CAKv+Gu-T9+fhvRk-RroDqr7QvQ24cUTuONL9uT-Ws24n_nHrCw@mail.gmail.com>
-Message-ID: <20160804112229.GG7147@e103592.cambridge.arm.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 4 Aug 2016 13:24:50 +0200
+Subject: [PATCH] KVM: arm/arm64: initialize new VGIC even without host GIC
+In-Reply-To: <20160802143445.14005-1-andre.przywara@arm.com>
+References: <20160802143445.14005-1-andre.przywara@arm.com>
+Message-ID: <20160804112450.GC8211@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 04, 2016 at 12:34:58PM +0200, Ard Biesheuvel wrote:
-> On 4 August 2016 at 11:44, Dave Martin <Dave.Martin@arm.com> wrote:
-> > On Thu, Aug 04, 2016 at 09:40:31AM +0200, Ard Biesheuvel wrote:
-> >> On 3 August 2016 at 18:49, Dave Martin <Dave.Martin@arm.com> wrote:
-> >> > On Wed, Aug 03, 2016 at 05:38:43PM +0200, Ard Biesheuvel wrote:
-> [...]
-> >> >> +#else
-> >> >> +     add     \dst, pc, #:pc_g0_nc:(\sym) - 8
-> >> >> +     add     \dst, \dst, #:pc_g1_nc:(\sym) - 4
-> >> >> +     add     \dst, \dst, #:pc_g2:(\sym)
-> >> >
-> >> > Whoah.  I've never seen this syntax before...  does this work for any
-> >> > named reloc, or just for certain blessed relocs?  (I'm also _assuming_
-> >> > the assembler support for this functionality is ancient -- if not,
-> >> > there may be toolchain compatibility issues.)
-> >> >
-> >> > Based on my understanding of how these relocs work, this should do the
-> >> > right thing, though.
-> >> >
-> >> >
-> >> > Second question: for arm, this reduces the range addressable to
-> >> > pc +/- 26-bit offset (24-bit if sym is not word aligned, but that
-> >> > probably never happens).
-> >> >
-> >> > I can't remember the de facto limit on the size of vmlinux for arm --
-> >> > are you sure this extra limitation won't break some cases of huge
-> >> > initramfs where adr_l gets used for cross-section references?
-> >> >
-> >>
-> >> Yes, that seems a valid concern. We have +/- 64 MB for the adr_l
-> >> variant (as you say, for word aligned symbols), but this may be
-> >> insufficient. The ldr/str variants don't have the same limitation.
-> >
-> > True, but they're still limited, I think in effect to +/- 256 MB.
-> >
+On Tue, Aug 02, 2016 at 03:34:45PM +0100, Andre Przywara wrote:
+> The new VGIC code is always in the VCPU entry/exit path, even when the
+> actual GIC hardware initialization found the VGIC unusable (due to
+> non-aligned base addresses or a missing maintenance interrupt, for
+> instance).
+> Since in this case the VGIC structures aren't initialized properly, the
+> host kernel crashes on a NULL pointer dereference.
+> Initialize each VCPU's ap_list even with the VGIC unavailable, so the
+> VGIC code now just iterates an empty list in that case and no longer
+> crashes the kernel.
+> Also take care of the arch timer (which becomes unusable as well without
+> a VGIC) by using a static key to prevent arch timer code to run in the
+> hot path.
+> Much of the code was inspired by Marc Zyngier.
 > 
-> Yes. I managed to hack around the limitation by doing this
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> Reported-by: Stefan Agner <stefan@agner.ch>
+> ---
+> Hi Stefan, Drew,
 > 
-> .macro adr_fwd, dst, sym, tmp
-> add \dst, pc, #:pc_g0_nc:(\sym) - 8
-> add \dst, \dst, #:pc_g1_nc:(\sym) - 4
-> .reloc ., R_ARM_LDR_PC_G2, \sym
-> mov \tmp, #0
-> add \dst, \dst, \tmp
-> .endm
+> can you test this on your systems which showed the issue?
 > 
-> but it is becoming very hacky, and this only works for forward
-> references anyway.
+> Cheers,
+> Andre.
+> 
+>  arch/arm/kvm/arm.c            | 14 ++++++++++----
+>  include/kvm/arm_arch_timer.h  |  2 ++
+>  virt/kvm/arm/arch_timer.c     | 11 +++++++++++
+>  virt/kvm/arm/vgic/vgic-init.c |  9 ++++-----
+>  4 files changed, 27 insertions(+), 9 deletions(-)
+> 
+> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+> index f1bde7c..cef35ce 100644
+> --- a/arch/arm/kvm/arm.c
+> +++ b/arch/arm/kvm/arm.c
+> @@ -294,7 +294,8 @@ int kvm_arch_vcpu_init(struct kvm_vcpu *vcpu)
+>  	bitmap_zero(vcpu->arch.features, KVM_VCPU_MAX_FEATURES);
+>  
+>  	/* Set up the timer */
+> -	kvm_timer_vcpu_init(vcpu);
+> +	if (vgic_present)
+> +		kvm_timer_vcpu_init(vcpu);
+>  
+>  	kvm_arm_reset_debug_ptr(vcpu);
+>  
+> @@ -1208,6 +1209,7 @@ static int init_subsystems(void)
+>  		break;
+>  	case -ENODEV:
+>  	case -ENXIO:
+> +		kvm_err("No useable vgic detected\n");
+>  		vgic_present = false;
+>  		err = 0;
+>  		break;
+> @@ -1218,9 +1220,13 @@ static int init_subsystems(void)
+>  	/*
+>  	 * Init HYP architected timer support
+>  	 */
+> -	err = kvm_timer_hyp_init();
+> -	if (err)
+> -		goto out;
+> +	if (vgic_present) {
+> +		err = kvm_timer_hyp_init();
+> +		if (err)
+> +			goto out;
+> +	} else {
+> +		static_branch_enable(&kvm_arch_timer_disabled);
+> +	}
+>  
+>  	kvm_perf_init();
+>  	kvm_coproc_table_init();
+> diff --git a/include/kvm/arm_arch_timer.h b/include/kvm/arm_arch_timer.h
+> index dda39d8..64f361f 100644
+> --- a/include/kvm/arm_arch_timer.h
+> +++ b/include/kvm/arm_arch_timer.h
+> @@ -23,6 +23,8 @@
+>  #include <linux/hrtimer.h>
+>  #include <linux/workqueue.h>
+>  
+> +extern struct static_key_false kvm_arch_timer_disabled;
+> +
+>  struct arch_timer_kvm {
+>  	/* Virtual offset */
+>  	cycle_t			cntvoff;
+> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+> index 4fde8c7..71fb04c 100644
+> --- a/virt/kvm/arm/arch_timer.c
+> +++ b/virt/kvm/arm/arch_timer.c
+> @@ -34,6 +34,8 @@ static struct timecounter *timecounter;
+>  static struct workqueue_struct *wqueue;
+>  static unsigned int host_vtimer_irq;
+>  
+> +DEFINE_STATIC_KEY_FALSE(kvm_arch_timer_disabled);
+> +
+>  void kvm_timer_vcpu_put(struct kvm_vcpu *vcpu)
+>  {
+>  	vcpu->arch.timer_cpu.active_cleared_last = false;
+> @@ -41,6 +43,9 @@ void kvm_timer_vcpu_put(struct kvm_vcpu *vcpu)
+>  
+>  static cycle_t kvm_phys_timer_read(void)
+>  {
+> +	if (static_branch_unlikely(&kvm_arch_timer_disabled))
+> +		return 0;
+> +
+>  	return timecounter->cc->read(timecounter->cc);
+>  }
+>  
+> @@ -104,6 +109,9 @@ static u64 kvm_timer_compute_delta(struct kvm_vcpu *vcpu)
+>  {
+>  	cycle_t cval, now;
+>  
+> +	if (static_branch_unlikely(&kvm_arch_timer_disabled))
+> +		return 0;
+> +
+>  	cval = vcpu->arch.timer_cpu.cntv_cval;
+>  	now = kvm_phys_timer_read() - vcpu->kvm->arch.timer.cntvoff;
+>  
+> @@ -148,6 +156,9 @@ static bool kvm_timer_irq_can_fire(struct kvm_vcpu *vcpu)
+>  {
+>  	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+>  
+> +	if (static_branch_unlikely(&kvm_arch_timer_disabled))
+> +		return false;
+> +
+>  	return !(timer->cntv_ctl & ARCH_TIMER_CTRL_IT_MASK) &&
+>  		(timer->cntv_ctl & ARCH_TIMER_CTRL_ENABLE);
+>  }
 
-Indeed.  You can't use relocs on different insns than they're intended
-for.
+why do we have these hooks fairly deep into the arch timer static
+functions?
 
-The linker is allowed to assume that the initial insn is a valid one
-for the reloc -- without this, the addend couldn't be encoded reliably.
-In this case, the linker might replace the MOV with an LDR, a MOV with
-the wrong offset, or garbage.
+I would think that it makes more sense to catch stuff in the early entry
+points to the timer logic, which would be:
 
-> So I think this is a dead end. Series withdrawn.
+  kvm_timer_should_fire
+  kvm_timer_schedule
+  kvm_timer_unschedule
+  kvm_arm_timer_set_reg
+  kvm_arm_timer_get_reg
 
-Neat idea, but it's a shame about the limitations and compatibility
-issues.
+Also, most of these don't seem to be in a general critical path, so I'm
+not really sure why we're using static branches here?
 
-The more conventional literal-.long approach could still be macro-ised
-along the same lines, which might make the affected code more readable,
-but the idiom you'd be replacing is well-understood and not very common.
 
-Cheers
----Dave
+> diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
+> index 2c7f0d5..b92133c 100644
+> --- a/virt/kvm/arm/vgic/vgic-init.c
+> +++ b/virt/kvm/arm/vgic/vgic-init.c
+> @@ -56,6 +56,10 @@ void kvm_vgic_early_init(struct kvm *kvm)
+>  
+>  void kvm_vgic_vcpu_early_init(struct kvm_vcpu *vcpu)
+>  {
+> +	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+> +
+> +	INIT_LIST_HEAD(&vgic_cpu->ap_list_head);
+> +	spin_lock_init(&vgic_cpu->ap_list_lock);
+>  }
+
+there are two pieces of comments above that needs to be tweaked now (or
+just remove the remaining function and comment)
+
+>  
+>  /* CREATION */
+> @@ -392,11 +396,6 @@ int kvm_vgic_hyp_init(void)
+>  	if (!gic_kvm_info)
+>  		return -ENODEV;
+>  
+> -	if (!gic_kvm_info->maint_irq) {
+> -		kvm_err("No vgic maintenance irq\n");
+> -		return -ENXIO;
+> -	}
+> -
+
+I don't understand why we can remove this chunk?
+
+>  	switch (gic_kvm_info->type) {
+>  	case GIC_V2:
+>  		ret = vgic_v2_probe(gic_kvm_info);
+> -- 
+> 2.9.0
+> 
+
+Thanks,
+-Christoffer
