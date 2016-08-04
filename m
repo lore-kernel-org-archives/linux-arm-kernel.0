@@ -1,80 +1,209 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Thu, 4 Aug 2016 12:08:33 +0100
-Subject: [PATCH 1/8] ARM: assembler: introduce adr_l, ldr_l and str_l
- macros
-In-Reply-To: <CAKv+Gu8_5-VcBxnjLrJxgKcJfVFb785qvVzbB6kryqhhkCfQbA@mail.gmail.com>
-References: <1470238730-30038-1-git-send-email-ard.biesheuvel@linaro.org>
- <1470238730-30038-2-git-send-email-ard.biesheuvel@linaro.org>
- <20160803180934.GK1041@n2100.armlinux.org.uk>
- <CAKv+Gu9Wyiu38J=K00WKXSeFoDF2vS-3TJAvbz9Yo616GBXSwQ@mail.gmail.com>
- <20160804093851.GD7147@e103592.cambridge.arm.com>
- <CAKv+Gu8_5-VcBxnjLrJxgKcJfVFb785qvVzbB6kryqhhkCfQbA@mail.gmail.com>
-Message-ID: <20160804110832.GF7147@e103592.cambridge.arm.com>
+From: yt.shen@mediatek.com (YT Shen)
+Date: Thu, 4 Aug 2016 19:07:17 +0800
+Subject: [PATCH v6 03/10] drm/mediatek: add shadow register support
+In-Reply-To: <1470308844-20895-1-git-send-email-yt.shen@mediatek.com>
+References: <1470308844-20895-1-git-send-email-yt.shen@mediatek.com>
+Message-ID: <1470308844-20895-4-git-send-email-yt.shen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 04, 2016 at 12:12:07PM +0200, Ard Biesheuvel wrote:
-> On 4 August 2016 at 11:38, Dave Martin <Dave.Martin@arm.com> wrote:
-> > On Thu, Aug 04, 2016 at 09:40:50AM +0200, Ard Biesheuvel wrote:
-> >> On 3 August 2016 at 20:09, Russell King - ARM Linux
-> >> <linux@armlinux.org.uk> wrote:
-> >> > On Wed, Aug 03, 2016 at 05:38:43PM +0200, Ard Biesheuvel wrote:
-> >> >> +     add     \dst, pc, #:pc_g0_nc:(\sym) - 8
-> >> >> +     add     \dst, \dst, #:pc_g1_nc:(\sym) - 4
-> >> >> +     add     \dst, \dst, #:pc_g2:(\sym)
-> >> >
-> >> > What's this :pc_g0_nc: stuff?  What binutils versions is it supported
-> >> > in?  It doesn't appear documented in gas 2.23.91, so I don't think we
-> >> > can use it.
-> >> >
-> >>
-> >> binutils 2.18 and up
-> >
-> > I think this was contemporary with GCC 4.<some middling version>, which
-> > may be newer than the minimimum compiler we require for the kernel,
-> > particular for earlier arch versions.
-> >
-> > Using .reloc probably allows the same thing to be done in a more
-> > backwards-compatible way.
-> >
-> 
-> I don't see how LD would know how to handle these relocations if we do
-> manage to emit them from GAS in this way.
+We need to acquire mutex before using the resources,
+and need to release it after finished.
+So we don't need to write registers in the blanking period.
 
-0:	add	\dst, pc, #-8
-1:	add	\dst, \dst, #-4
-2:	add	\dst, \dst, #0
+Signed-off-by: YT Shen <yt.shen@mediatek.com>
+---
+ drivers/gpu/drm/mediatek/mtk_drm_crtc.c |   75 +++++++++++++++++++------------
+ drivers/gpu/drm/mediatek/mtk_drm_ddp.c  |   25 +++++++++++
+ drivers/gpu/drm/mediatek/mtk_drm_ddp.h  |    2 +
+ drivers/gpu/drm/mediatek/mtk_drm_drv.h  |    1 +
+ 4 files changed, 74 insertions(+), 29 deletions(-)
 
-.reloc	0b, R_ARM_ALU_PC_G0_NC, \sym
-.reloc	1b, R_ARM_ALU_PC_G1_NC, \sym
-.reloc	2b, R_ARM_ALU_PC_G2, \sym
-
-or, for ldr_l:
-
-0:	add	\dst, pc, #-8
-1:	add	\dst, \dst, #-4
-2:	ldr	[\dst, #0]
-
-.reloc	0b, R_ARM_ALU_PC_G0_NC, \sym
-.reloc	1b, R_ARM_ALU_PC_G1_NC, \sym
-.reloc	2b, R_ARM_LDR_PC_G2, \sym
-
-... should produce precisely the same result at the .o stage.
-
-
-This #:reloc: stuff is mostly a shorthand/convenience feature as I
-understand it -- however, you do have to know how to force the correct
-instruction encoding to be emitted to match the reloc type -- with
-#:reloc:, the assembler should take care of that.
-
-The reloc/insn match issue also means that the Thumb2 relocs are
-totally different (R_ARM_THM_<blah>).  
-
-
-For OABI, it would no doubt be different again.  I know nothing about
-OABI relocs.
-
-And we're still limited to <32-bit offset ranges.
-
-Cheers
----Dave
+diff --git a/drivers/gpu/drm/mediatek/mtk_drm_crtc.c b/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
+index 24aa3ba..80d9641 100644
+--- a/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
++++ b/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
+@@ -315,6 +315,42 @@ static void mtk_crtc_ddp_hw_fini(struct mtk_drm_crtc *mtk_crtc)
+ 	pm_runtime_put(drm->dev);
+ }
+ 
++static void mtk_crtc_ddp_config(struct drm_crtc *crtc)
++{
++	struct mtk_drm_crtc *mtk_crtc = to_mtk_crtc(crtc);
++	struct mtk_crtc_state *state = to_mtk_crtc_state(mtk_crtc->base.state);
++	struct mtk_ddp_comp *ovl = mtk_crtc->ddp_comp[0];
++	unsigned int i;
++
++	/*
++	 * TODO: instead of updating the registers here, we should prepare
++	 * working registers in atomic_commit and let the hardware command
++	 * queue update module registers on vblank.
++	 */
++	if (state->pending_config) {
++		mtk_ddp_comp_config(ovl, state->pending_width,
++				    state->pending_height,
++				    state->pending_vrefresh);
++
++		state->pending_config = false;
++	}
++
++	if (mtk_crtc->pending_planes) {
++		for (i = 0; i < OVL_LAYER_NR; i++) {
++			struct drm_plane *plane = &mtk_crtc->planes[i].base;
++			struct mtk_plane_state *plane_state;
++
++			plane_state = to_mtk_plane_state(plane->state);
++
++			if (plane_state->pending.config) {
++				mtk_ddp_comp_layer_config(ovl, i, plane_state);
++				plane_state->pending.config = false;
++			}
++		}
++		mtk_crtc->pending_planes = false;
++	}
++}
++
+ static void mtk_drm_crtc_enable(struct drm_crtc *crtc)
+ {
+ 	struct mtk_drm_crtc *mtk_crtc = to_mtk_crtc(crtc);
+@@ -391,6 +427,7 @@ static void mtk_drm_crtc_atomic_flush(struct drm_crtc *crtc,
+ 				      struct drm_crtc_state *old_crtc_state)
+ {
+ 	struct mtk_drm_crtc *mtk_crtc = to_mtk_crtc(crtc);
++	struct mtk_drm_private *priv = crtc->dev->dev_private;
+ 	unsigned int pending_planes = 0;
+ 	int i;
+ 
+@@ -409,6 +446,12 @@ static void mtk_drm_crtc_atomic_flush(struct drm_crtc *crtc,
+ 	}
+ 	if (pending_planes)
+ 		mtk_crtc->pending_planes = true;
++
++	if (priv->data->shadow_register) {
++		mtk_disp_mutex_acquire(mtk_crtc->mutex);
++		mtk_crtc_ddp_config(crtc);
++		mtk_disp_mutex_release(mtk_crtc->mutex);
++	}
+ }
+ 
+ static const struct drm_crtc_funcs mtk_crtc_funcs = {
+@@ -453,36 +496,10 @@ err_cleanup_crtc:
+ void mtk_crtc_ddp_irq(struct drm_crtc *crtc, struct mtk_ddp_comp *ovl)
+ {
+ 	struct mtk_drm_crtc *mtk_crtc = to_mtk_crtc(crtc);
+-	struct mtk_crtc_state *state = to_mtk_crtc_state(mtk_crtc->base.state);
+-	unsigned int i;
++	struct mtk_drm_private *priv = crtc->dev->dev_private;
+ 
+-	/*
+-	 * TODO: instead of updating the registers here, we should prepare
+-	 * working registers in atomic_commit and let the hardware command
+-	 * queue update module registers on vblank.
+-	 */
+-	if (state->pending_config) {
+-		mtk_ddp_comp_config(ovl, state->pending_width,
+-				    state->pending_height,
+-				    state->pending_vrefresh);
+-
+-		state->pending_config = false;
+-	}
+-
+-	if (mtk_crtc->pending_planes) {
+-		for (i = 0; i < OVL_LAYER_NR; i++) {
+-			struct drm_plane *plane = &mtk_crtc->planes[i].base;
+-			struct mtk_plane_state *plane_state;
+-
+-			plane_state = to_mtk_plane_state(plane->state);
+-
+-			if (plane_state->pending.config) {
+-				mtk_ddp_comp_layer_config(ovl, i, plane_state);
+-				plane_state->pending.config = false;
+-			}
+-		}
+-		mtk_crtc->pending_planes = false;
+-	}
++	if (!priv->data->shadow_register)
++		mtk_crtc_ddp_config(crtc);
+ 
+ 	mtk_drm_finish_page_flip(mtk_crtc);
+ }
+diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+index 8030769..b77d456 100644
+--- a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
++++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+@@ -12,6 +12,7 @@
+  */
+ 
+ #include <linux/clk.h>
++#include <linux/iopoll.h>
+ #include <linux/module.h>
+ #include <linux/of_device.h>
+ #include <linux/platform_device.h>
+@@ -32,10 +33,13 @@
+ #define DISP_REG_CONFIG_MMSYS_CG_CON0		0x100
+ 
+ #define DISP_REG_MUTEX_EN(n)	(0x20 + 0x20 * (n))
++#define DISP_REG_MUTEX(n)	(0x24 + 0x20 * (n))
+ #define DISP_REG_MUTEX_RST(n)	(0x28 + 0x20 * (n))
+ #define DISP_REG_MUTEX_MOD(n)	(0x2c + 0x20 * (n))
+ #define DISP_REG_MUTEX_SOF(n)	(0x30 + 0x20 * (n))
+ 
++#define INT_MUTEX				BIT(1)
++
+ #define MT8173_MUTEX_MOD_DISP_OVL0		BIT(11)
+ #define MT8173_MUTEX_MOD_DISP_OVL1		BIT(12)
+ #define MT8173_MUTEX_MOD_DISP_RDMA0		BIT(13)
+@@ -300,6 +304,27 @@ void mtk_disp_mutex_disable(struct mtk_disp_mutex *mutex)
+ 	writel(0, ddp->regs + DISP_REG_MUTEX_EN(mutex->id));
+ }
+ 
++void mtk_disp_mutex_acquire(struct mtk_disp_mutex *mutex)
++{
++	struct mtk_ddp *ddp = container_of(mutex, struct mtk_ddp,
++					   mutex[mutex->id]);
++	u32 tmp;
++
++	writel(1, ddp->regs + DISP_REG_MUTEX_EN(mutex->id));
++	writel(1, ddp->regs + DISP_REG_MUTEX(mutex->id));
++	if (readl_poll_timeout_atomic(ddp->regs + DISP_REG_MUTEX(mutex->id),
++				      tmp, tmp & INT_MUTEX, 1, 10000))
++		pr_err("could not acquire mutex %d\n", mutex->id);
++}
++
++void mtk_disp_mutex_release(struct mtk_disp_mutex *mutex)
++{
++	struct mtk_ddp *ddp = container_of(mutex, struct mtk_ddp,
++					   mutex[mutex->id]);
++
++	writel(0, ddp->regs + DISP_REG_MUTEX(mutex->id));
++}
++
+ static int mtk_ddp_probe(struct platform_device *pdev)
+ {
+ 	struct device *dev = &pdev->dev;
+diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp.h b/drivers/gpu/drm/mediatek/mtk_drm_ddp.h
+index 92c1175..f9a7991 100644
+--- a/drivers/gpu/drm/mediatek/mtk_drm_ddp.h
++++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp.h
+@@ -37,5 +37,7 @@ void mtk_disp_mutex_remove_comp(struct mtk_disp_mutex *mutex,
+ 				enum mtk_ddp_comp_id id);
+ void mtk_disp_mutex_unprepare(struct mtk_disp_mutex *mutex);
+ void mtk_disp_mutex_put(struct mtk_disp_mutex *mutex);
++void mtk_disp_mutex_acquire(struct mtk_disp_mutex *mutex);
++void mtk_disp_mutex_release(struct mtk_disp_mutex *mutex);
+ 
+ #endif /* MTK_DRM_DDP_H */
+diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.h b/drivers/gpu/drm/mediatek/mtk_drm_drv.h
+index fa0b106..94f8b66 100644
+--- a/drivers/gpu/drm/mediatek/mtk_drm_drv.h
++++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.h
+@@ -33,6 +33,7 @@ struct mtk_mmsys_driver_data {
+ 	unsigned int main_len;
+ 	const enum mtk_ddp_comp_id *ext_path;
+ 	unsigned int ext_len;
++	bool shadow_register;
+ };
+ 
+ struct mtk_drm_private {
+-- 
+1.7.9.5
