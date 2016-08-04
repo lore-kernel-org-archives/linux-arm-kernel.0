@@ -1,92 +1,54 @@
 From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Thu, 04 Aug 2016 15:38:46 +0200
-Subject: [PATCH 6/8] ASoC: samsung: Convert s3c24xx_uda134x to use
- devm_snd_soc_register_card()
+Date: Thu, 04 Aug 2016 15:38:43 +0200
+Subject: [PATCH 3/8] ASoC: uda134x: Optionally initialize L3 ops to default
+ GPIO ops
 In-Reply-To: <1470317928-25365-1-git-send-email-s.nawrocki@samsung.com>
 References: <1470317928-25365-1-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <1470317928-25365-7-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <1470317928-25365-4-git-send-email-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Suppreses a following kernel warning: "soc-audio soc-audio:
-ASoC: machine S3C24XX_UDA134X should use snd_soc_register_card()".
+The GPIO ops can be selected by platform_data which allows the
+codec platform device to probe without the sound card's driver
+intervention.
+
+The downside is that it will request GPIOs on behalf of the codec
+device and thus allow only one user on the bus, but it desn't seem
+to be a limitation with current code and usage of the GPIO ops is
+optional anyway.
+The proper approach would presumably be to create a proper Linux
+bus driver for L3, should this rather ancient bus specification
+suddenly gain more interest.
 
 Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
 ---
- sound/soc/samsung/s3c24xx_uda134x.c | 34 +++++++---------------------------
- 1 file changed, 7 insertions(+), 27 deletions(-)
+ sound/soc/codecs/uda134x.c | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/sound/soc/samsung/s3c24xx_uda134x.c b/sound/soc/samsung/s3c24xx_uda134x.c
-index 794e30d..a8102a7 100644
---- a/sound/soc/samsung/s3c24xx_uda134x.c
-+++ b/sound/soc/samsung/s3c24xx_uda134x.c
-@@ -54,8 +54,6 @@ static struct snd_pcm_hw_constraint_list hw_constraints_rates = {
- };
- #endif
- 
--static struct platform_device *s3c24xx_uda134x_snd_device;
--
- static int s3c24xx_uda134x_startup(struct snd_pcm_substream *substream)
+diff --git a/sound/soc/codecs/uda134x.c b/sound/soc/codecs/uda134x.c
+index e4c694c..b72c925 100644
+--- a/sound/soc/codecs/uda134x.c
++++ b/sound/soc/codecs/uda134x.c
+@@ -544,6 +544,7 @@ static int uda134x_codec_probe(struct platform_device *pdev)
  {
- 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-@@ -68,7 +66,7 @@ static int s3c24xx_uda134x_startup(struct snd_pcm_substream *substream)
- 	mutex_lock(&clk_lock);
- 	pr_debug("%s %d\n", __func__, clk_users);
- 	if (clk_users == 0) {
--		xtal = clk_get(&s3c24xx_uda134x_snd_device->dev, "xtal");
-+		xtal = clk_get(rtd->dev, "xtal");
- 		if (IS_ERR(xtal)) {
- 			printk(KERN_ERR "%s cannot get xtal\n", __func__);
- 			ret = PTR_ERR(xtal);
-@@ -229,43 +227,25 @@ static struct snd_soc_card snd_soc_s3c24xx_uda134x = {
+ 	struct uda134x_platform_data *pd = pdev->dev.platform_data;
+ 	struct uda134x_priv *uda134x;
++	int ret;
  
- static int s3c24xx_uda134x_probe(struct platform_device *pdev)
- {
-+	struct snd_soc_card *card = &snd_soc_s3c24xx_uda134x;
- 	int ret;
+ 	if (!pd) {
+ 		dev_err(&pdev->dev, "Missing L3 bitbang function\n");
+@@ -557,6 +558,12 @@ static int uda134x_codec_probe(struct platform_device *pdev)
+ 	uda134x->pd = pd;
+ 	platform_set_drvdata(pdev, uda134x);
  
--	printk(KERN_INFO "S3C24XX_UDA134X SoC Audio driver\n");
--
--	s3c24xx_uda134x_snd_device = platform_device_alloc("soc-audio", -1);
--	if (!s3c24xx_uda134x_snd_device) {
--		printk(KERN_ERR "S3C24XX_UDA134X SoC Audio: "
--		       "Unable to register\n");
--		return -ENOMEM;
--	}
-+	platform_set_drvdata(pdev, card);
-+	card->dev = &pdev->dev;
- 
--	platform_set_drvdata(s3c24xx_uda134x_snd_device,
--			     &snd_soc_s3c24xx_uda134x);
--
--	ret = platform_device_add(s3c24xx_uda134x_snd_device);
--	if (ret) {
--		printk(KERN_ERR "S3C24XX_UDA134X SoC Audio: Unable to add\n");
--		platform_device_put(s3c24xx_uda134x_snd_device);
--	}
-+	ret = devm_snd_soc_register_card(&pdev->dev, card);
-+	if (ret)
-+		dev_err(&pdev->dev, "failed to register card: %d\n", ret);
- 
- 	return ret;
- }
- 
--static int s3c24xx_uda134x_remove(struct platform_device *pdev)
--{
--	platform_device_unregister(s3c24xx_uda134x_snd_device);
--	return 0;
--}
--
- static struct platform_driver s3c24xx_uda134x_driver = {
- 	.probe  = s3c24xx_uda134x_probe,
--	.remove = s3c24xx_uda134x_remove,
- 	.driver = {
- 		.name = "s3c24xx_uda134x",
- 	},
- };
--
- module_platform_driver(s3c24xx_uda134x_driver);
- 
- MODULE_AUTHOR("Zoltan Devai, Christian Pellegrin <chripell@evolware.org>");
++	if (pd->l3.use_gpios) {
++		ret = l3_set_gpio_ops(&pdev->dev, &uda134x->pd->l3);
++		if (ret < 0)
++			return ret;
++	}
++
+ 	uda134x->regmap = devm_regmap_init(&pdev->dev, NULL, pd,
+ 		&uda134x_regmap_config);
+ 	if (IS_ERR(uda134x->regmap))
 -- 
 1.9.1
