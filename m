@@ -1,192 +1,68 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Thu, 4 Aug 2016 11:17:47 +0100
-Subject: [PATCH] KVM: arm64: ITS: move ITS registration into first VCPU run
-In-Reply-To: <8ef91ad8-d597-bcb7-db46-2a7194f79f32@redhat.com>
-References: <20160803145745.7556-1-andre.przywara@arm.com>
- <8ef91ad8-d597-bcb7-db46-2a7194f79f32@redhat.com>
-Message-ID: <894b8d50-f073-1835-372f-1d90856cc8f5@arm.com>
+From: fabien.lahoudere@collabora.co.uk (Fabien Lahoudere)
+Date: Thu,  4 Aug 2016 12:22:37 +0200
+Subject: [PATCH v2 2/2] imx53.dtsi : Add DMA configuration for UART
+In-Reply-To: <1470306157-11181-1-git-send-email-fabien.lahoudere@collabora.co.uk>
+References: <CAOMZO5BoRsrHv-+5c9bAXO2NCya8sPqmmpy9DOfav6NvQ+VMLQ@mail.gmail.com>
+ <1470306157-11181-1-git-send-email-fabien.lahoudere@collabora.co.uk>
+Message-ID: <1470306157-11181-2-git-send-email-fabien.lahoudere@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric,
+In order to use sdma with UART, we need to add DMA configuration in device tree.
 
-On 04/08/16 11:11, Auger Eric wrote:
-> Hi Andre,
-> 
-> On 03/08/2016 16:57, Andre Przywara wrote:
->> Currently we register ITS devices upon userland issuing the CTRL_INIT
->> ioctl to mark initialization of the ITS as done.
->> This deviates from the initialization sequence of the existing GIC
->> devices and does not play well with the way QEMU handles things.
->> To be more in line with what we are used to, register the ITS(es) just
->> before the first VCPU is about to run, so in the map_resources() call.
->> This involves iterating through the list of KVM devices and handle each
->> ITS that we find.
->>
->> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
->> ---
->> Hi,
->>
->> this is based upon next-20160728 plus Christoffer's kvm_device locking
->> fix from today. Please let me know what tree I should base upon and I
->> will rebase.
->> Eric, Christoffer: does that do what you expect? Can QEMU live with that?
->>
->> Cheers,
->> Andre.
->>
->>  virt/kvm/arm/vgic/vgic-its.c | 56 ++++++++++++++++++++++++++++++++++++--------
->>  virt/kvm/arm/vgic/vgic-v3.c  |  6 +++++
->>  virt/kvm/arm/vgic/vgic.h     |  6 +++++
->>  3 files changed, 58 insertions(+), 10 deletions(-)
->>
->> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
->> index 07411cf..e677a60 100644
->> --- a/virt/kvm/arm/vgic/vgic-its.c
->> +++ b/virt/kvm/arm/vgic/vgic-its.c
->> @@ -1288,13 +1288,13 @@ void vgic_enable_lpis(struct kvm_vcpu *vcpu)
->>  		its_sync_lpi_pending_table(vcpu);
->>  }
->>  
->> -static int vgic_its_init_its(struct kvm *kvm, struct vgic_its *its)
->> +static int vgic_register_its_iodev(struct kvm *kvm, struct vgic_its *its)
->>  {
->>  	struct vgic_io_device *iodev = &its->iodev;
->>  	int ret;
->>  
->> -	if (its->initialized)
->> -		return 0;
->> +	if (!its->initialized)
->> +		return -EBUSY;
->>  
->>  	if (IS_VGIC_ADDR_UNDEF(its->vgic_its_base))
->>  		return -ENXIO;
->> @@ -1311,9 +1311,6 @@ static int vgic_its_init_its(struct kvm *kvm, struct vgic_its *its)
->>  				      KVM_VGIC_V3_ITS_SIZE, &iodev->dev);
->>  	mutex_unlock(&kvm->slots_lock);
->>  
->> -	if (!ret)
->> -		its->initialized = true;
->> -
->>  	return ret;
->>  }
->>  
->> @@ -1435,9 +1432,6 @@ static int vgic_its_set_attr(struct kvm_device *dev,
->>  		if (type != KVM_VGIC_ITS_ADDR_TYPE)
->>  			return -ENODEV;
->>  
->> -		if (its->initialized)
->> -			return -EBUSY;
->> -
->>  		if (copy_from_user(&addr, uaddr, sizeof(addr)))
->>  			return -EFAULT;
->>  
->> @@ -1453,7 +1447,9 @@ static int vgic_its_set_attr(struct kvm_device *dev,
->>  	case KVM_DEV_ARM_VGIC_GRP_CTRL:
->>  		switch (attr->attr) {
->>  		case KVM_DEV_ARM_VGIC_CTRL_INIT:
->> -			return vgic_its_init_its(dev->kvm, its);
->> +			its->initialized = true;
->> +
->> +			return 0;
->>  		}
->>  		break;
->>  	}
->> @@ -1498,3 +1494,43 @@ int kvm_vgic_register_its_device(void)
->>  	return kvm_register_device_ops(&kvm_arm_vgic_its_ops,
->>  				       KVM_DEV_TYPE_ARM_VGIC_ITS);
->>  }
->> +
->> +/*
->> + * Registers all ITSes with the kvm_io_bus framework.
->> + * To follow the existing VGIC initialization sequence, this has to be
->> + * done as late as possible, just before the first VCPU runs.
->> + */
->> +int vgic_register_its_iodevs(struct kvm *kvm)
->> +{
->> +	struct kvm_device *dev;
->> +	int ret = 0;
->> +
->> +	mutex_lock(&kvm->devices_lock);
->> +
->> +	list_for_each_entry(dev, &kvm->devices, vm_node) {
->> +		if (dev->ops != &kvm_arm_vgic_its_ops)
->> +			continue;
->> +
->> +		ret = vgic_register_its_iodev(kvm, dev->private);
->> +		if (ret)
->> +			break;
->> +	}
->> +
->> +	if (ret) {
->> +		/* Iterate backwards to roll back previous registrations. */
->> +		for (dev = list_prev_entry(dev, vm_node);
->> +		     &dev->vm_node != &kvm->devices;
->> +		     dev = list_prev_entry(dev, vm_node)) {
->> +			struct vgic_its *its = dev->private;
->> +
->> +			if (dev->ops != &kvm_arm_vgic_its_ops)
->> +				continue;
->> +
->> +			kvm_io_bus_unregister_dev(kvm, KVM_MMIO_BUS,
->> +						  &its->iodev.dev);
->> +		}
->> +	}
->> +
->> +	mutex_unlock(&kvm->devices_lock);
->> +	return ret;
->> +}
->> diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
->> index 0506543..f0d9b2b 100644
->> --- a/virt/kvm/arm/vgic/vgic-v3.c
->> +++ b/virt/kvm/arm/vgic/vgic-v3.c
->> @@ -289,6 +289,12 @@ int vgic_v3_map_resources(struct kvm *kvm)
->>  		goto out;
->>  	}
->>  
-> don't you need to check vgic_has_its() first
+Signed-off-by: Fabien Lahoudere <fabien.lahoudere@collabora.co.uk>
+---
+ arch/arm/boot/dts/imx53.dtsi | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-I guess it's nice to do so, though technically it's not necessary, since
-we won't find any KVM devices which use the ITS ops if no ITS has been
-created.
-But since I respin this one anyway...
-
-Cheers,
-Andre.
-
-> Eric
->> +	ret = vgic_register_its_iodevs(kvm);
->> +	if (ret) {
->> +		kvm_err("Unable to register VGIC ITS MMIO regions\n");
->> +		goto out;
->> +	}
->> +
->>  	dist->ready = true;
->>  
->>  out:
->> diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
->> index 1d8e21d..6c4625c 100644
->> --- a/virt/kvm/arm/vgic/vgic.h
->> +++ b/virt/kvm/arm/vgic/vgic.h
->> @@ -84,6 +84,7 @@ void vgic_v3_enable(struct kvm_vcpu *vcpu);
->>  int vgic_v3_probe(const struct gic_kvm_info *info);
->>  int vgic_v3_map_resources(struct kvm *kvm);
->>  int vgic_register_redist_iodevs(struct kvm *kvm, gpa_t dist_base_address);
->> +int vgic_register_its_iodevs(struct kvm *kvm);
->>  bool vgic_has_its(struct kvm *kvm);
->>  int kvm_vgic_register_its_device(void);
->>  void vgic_enable_lpis(struct kvm_vcpu *vcpu);
->> @@ -140,6 +141,11 @@ static inline int vgic_register_redist_iodevs(struct kvm *kvm,
->>  	return -ENODEV;
->>  }
->>  
->> +static inline int vgic_register_its_iodevs(struct kvm *kvm)
->> +{
->> +	return -ENODEV;
->> +}
->> +
->>  static inline bool vgic_has_its(struct kvm *kvm)
->>  {
->>  	return false;
->>
-> 
+diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
+index cd17037..c1bc97c 100644
+--- a/arch/arm/boot/dts/imx53.dtsi
++++ b/arch/arm/boot/dts/imx53.dtsi
+@@ -217,6 +217,8 @@
+ 					clocks = <&clks IMX5_CLK_UART3_IPG_GATE>,
+ 					         <&clks IMX5_CLK_UART3_PER_GATE>;
+ 					clock-names = "ipg", "per";
++					dmas = <&sdma 42 4 0>, <&sdma 43 4 0>;
++					dma-names = "rx", "tx";
+ 					status = "disabled";
+ 				};
+ 
+@@ -498,6 +500,8 @@
+ 				clocks = <&clks IMX5_CLK_UART1_IPG_GATE>,
+ 				         <&clks IMX5_CLK_UART1_PER_GATE>;
+ 				clock-names = "ipg", "per";
++				dmas = <&sdma 18 4 0>, <&sdma 19 4 0>;
++				dma-names = "rx", "tx";
+ 				status = "disabled";
+ 			};
+ 
+@@ -508,6 +512,8 @@
+ 				clocks = <&clks IMX5_CLK_UART2_IPG_GATE>,
+ 				         <&clks IMX5_CLK_UART2_PER_GATE>;
+ 				clock-names = "ipg", "per";
++				dmas = <&sdma 12 4 0>, <&sdma 13 4 0>;
++				dma-names = "rx", "tx";
+ 				status = "disabled";
+ 			};
+ 
+@@ -591,6 +597,8 @@
+ 				clocks = <&clks IMX5_CLK_UART4_IPG_GATE>,
+ 				         <&clks IMX5_CLK_UART4_PER_GATE>;
+ 				clock-names = "ipg", "per";
++				dmas = <&sdma 2 4 0>, <&sdma 3 4 0>;
++				dma-names = "rx", "tx";
+ 				status = "disabled";
+ 			};
+ 		};
+@@ -621,6 +629,8 @@
+ 				clocks = <&clks IMX5_CLK_UART5_IPG_GATE>,
+ 				         <&clks IMX5_CLK_UART5_PER_GATE>;
+ 				clock-names = "ipg", "per";
++				dmas = <&sdma 16 4 0>, <&sdma 17 4 0>;
++				dma-names = "rx", "tx";
+ 				status = "disabled";
+ 			};
+ 
+-- 
+2.7.4
