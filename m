@@ -1,175 +1,55 @@
 From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Thu, 04 Aug 2016 15:38:41 +0200
-Subject: [PATCH 1/8] ASoC: L3 bus: Add default gpio ops
+Date: Thu, 04 Aug 2016 15:38:42 +0200
+Subject: [PATCH 2/8] ARM: S3C24XX: Specify audio codec platform_data for
+ mini2440 board
 In-Reply-To: <1470317928-25365-1-git-send-email-s.nawrocki@samsung.com>
 References: <1470317928-25365-1-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <1470317928-25365-2-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <1470317928-25365-3-git-send-email-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds aptional GPIO bit-bang based callback implementations
-for setting CLK, DATA and MODE L3 bus lines.  It is added here
-to avoid possible duplicate implementations across users of
-the bus.
+The L3 bus GPIOs are specified in the board file rather than through
+the sound card's device platform_data. This allows to ensure the codec
+driver doesn't get probed with uninitialized platform_data field of
+its corresponding platform device.
 
 Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
 ---
- include/sound/l3.h    | 15 ++++++++---
- sound/soc/codecs/l3.c | 71 ++++++++++++++++++++++++++++++++++++++++++---------
- 2 files changed, 71 insertions(+), 15 deletions(-)
+ arch/arm/mach-s3c24xx/mach-mini2440.c | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
 
-diff --git a/include/sound/l3.h b/include/sound/l3.h
-index 423a08f..1471da2 100644
---- a/include/sound/l3.h
-+++ b/include/sound/l3.h
-@@ -2,9 +2,15 @@
- #define _L3_H_ 1
- 
- struct l3_pins {
--	void (*setdat)(int);
--	void (*setclk)(int);
--	void (*setmode)(int);
-+	void (*setdat)(struct l3_pins *, int);
-+	void (*setclk)(struct l3_pins *, int);
-+	void (*setmode)(struct l3_pins *, int);
-+
-+	int gpio_data;
-+	int gpio_clk;
-+	int gpio_mode;
-+	int use_gpios;
-+
- 	int data_hold;
- 	int data_setup;
- 	int clock_high;
-@@ -13,6 +19,9 @@ struct l3_pins {
- 	int mode_setup;
+diff --git a/arch/arm/mach-s3c24xx/mach-mini2440.c b/arch/arm/mach-s3c24xx/mach-mini2440.c
+index a852168..13999c1 100644
+--- a/arch/arm/mach-s3c24xx/mach-mini2440.c
++++ b/arch/arm/mach-s3c24xx/mach-mini2440.c
+@@ -497,9 +497,28 @@ static struct i2c_board_info mini2440_i2c_devs[] __initdata = {
+ 	},
  };
  
-+struct device;
++static struct uda134x_platform_data s3c24xx_uda134x = {
++	.l3 = {
++		.gpio_clk = S3C2410_GPB(4),
++		.gpio_data = S3C2410_GPB(3),
++		.gpio_mode = S3C2410_GPB(2),
++		.use_gpios = 1,
++		.data_hold = 1,
++		.data_setup = 1,
++		.clock_high = 1,
++		.mode_hold = 1,
++		.mode = 1,
++		.mode_setup = 1,
++	},
++	.model = UDA134X_UDA1341,
++};
 +
- int l3_write(struct l3_pins *adap, u8 addr, u8 *data, int len);
-+int l3_set_gpio_ops(struct device *dev, struct l3_pins *adap);
+ static struct platform_device uda1340_codec = {
+ 		.name = "uda134x-codec",
+ 		.id = -1,
++		.dev = {
++			.platform_data	= &s3c24xx_uda134x,
++		},
+ };
  
- #endif
-diff --git a/sound/soc/codecs/l3.c b/sound/soc/codecs/l3.c
-index 5353af5..a10ea3c 100644
---- a/sound/soc/codecs/l3.c
-+++ b/sound/soc/codecs/l3.c
-@@ -20,6 +20,8 @@
- #include <linux/module.h>
- #include <linux/kernel.h>
- #include <linux/delay.h>
-+#include <linux/device.h>
-+#include <linux/gpio.h>
- 
- #include <sound/l3.h>
- 
-@@ -32,11 +34,11 @@ static void sendbyte(struct l3_pins *adap, unsigned int byte)
- 	int i;
- 
- 	for (i = 0; i < 8; i++) {
--		adap->setclk(0);
-+		adap->setclk(adap, 0);
- 		udelay(adap->data_hold);
--		adap->setdat(byte & 1);
-+		adap->setdat(adap, byte & 1);
- 		udelay(adap->data_setup);
--		adap->setclk(1);
-+		adap->setclk(adap, 1);
- 		udelay(adap->clock_high);
- 		byte >>= 1;
- 	}
-@@ -55,10 +57,10 @@ static void sendbytes(struct l3_pins *adap, const u8 *buf,
- 	for (i = 0; i < len; i++) {
- 		if (i) {
- 			udelay(adap->mode_hold);
--			adap->setmode(0);
-+			adap->setmode(adap, 0);
- 			udelay(adap->mode);
- 		}
--		adap->setmode(1);
-+		adap->setmode(adap, 1);
- 		udelay(adap->mode_setup);
- 		sendbyte(adap, buf[i]);
- 	}
-@@ -66,26 +68,71 @@ static void sendbytes(struct l3_pins *adap, const u8 *buf,
- 
- int l3_write(struct l3_pins *adap, u8 addr, u8 *data, int len)
- {
--	adap->setclk(1);
--	adap->setdat(1);
--	adap->setmode(1);
-+	adap->setclk(adap, 1);
-+	adap->setdat(adap, 1);
-+	adap->setmode(adap, 1);
- 	udelay(adap->mode);
- 
--	adap->setmode(0);
-+	adap->setmode(adap, 0);
- 	udelay(adap->mode_setup);
- 	sendbyte(adap, addr);
- 	udelay(adap->mode_hold);
- 
- 	sendbytes(adap, data, len);
- 
--	adap->setclk(1);
--	adap->setdat(1);
--	adap->setmode(0);
-+	adap->setclk(adap, 1);
-+	adap->setdat(adap, 1);
-+	adap->setmode(adap, 0);
- 
- 	return len;
- }
- EXPORT_SYMBOL_GPL(l3_write);
- 
-+
-+static void l3_set_clk(struct l3_pins *adap, int val)
-+{
-+	gpio_set_value(adap->gpio_clk, val);
-+}
-+
-+static void l3_set_data(struct l3_pins *adap, int val)
-+{
-+	gpio_set_value(adap->gpio_data, val);
-+}
-+
-+static void l3_set_mode(struct l3_pins *adap, int val)
-+{
-+	gpio_set_value(adap->gpio_mode, val);
-+}
-+
-+int l3_set_gpio_ops(struct device *dev, struct l3_pins *adap)
-+{
-+	int ret;
-+
-+	if (!adap->use_gpios)
-+		return -EINVAL;
-+
-+	ret = devm_gpio_request_one(dev, adap->gpio_data,
-+				GPIOF_OUT_INIT_LOW, "l3_data");
-+	if (ret < 0)
-+		return ret;
-+	adap->setdat = l3_set_data;
-+
-+	ret = devm_gpio_request_one(dev, adap->gpio_clk,
-+				GPIOF_OUT_INIT_LOW, "l3_clk");
-+	if (ret < 0)
-+		return ret;
-+	adap->setclk = l3_set_clk;
-+
-+	ret = devm_gpio_request_one(dev, adap->gpio_mode,
-+				GPIOF_OUT_INIT_LOW, "l3_mode");
-+	if (ret < 0)
-+		return ret;
-+	adap->setmode = l3_set_mode;
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(l3_set_gpio_ops);
-+
- MODULE_DESCRIPTION("L3 bit-banging driver");
- MODULE_AUTHOR("Christian Pellegrin <chripell@evolware.org>");
- MODULE_LICENSE("GPL");
+ static struct platform_device *mini2440_devices[] __initdata = {
 -- 
 1.9.1
