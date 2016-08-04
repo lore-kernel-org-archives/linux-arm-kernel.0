@@ -1,108 +1,66 @@
-From: appana.durga.rao@xilinx.com (Appana Durga Kedareswara Rao)
-Date: Thu, 4 Aug 2016 10:34:30 +0000
-Subject: [RFC PATCH v2 1/4] Documentation: DT: net: Add Xilinx
- gmiitorgmii converter device tree binding documentation
-In-Reply-To: <971c966a-5335-310b-0a1a-3f1b7ee2f841@gmail.com>
-References: <1467623084-15471-1-git-send-email-appanad@xilinx.com>
- <1467623084-15471-2-git-send-email-appanad@xilinx.com>
- <20160704140458.GC3282@lunn.ch>
- <03CA77BA8AF6F1469AEDFBDA1322A7B74A193913@XAP-PVEXMBX02.xlnx.xilinx.com>
- <20160706142121.GI19800@lunn.ch>
- <03CA77BA8AF6F1469AEDFBDA1322A7B74A19393B@XAP-PVEXMBX02.xlnx.xilinx.com>
- <C246CAC1457055469EF09E3A7AC4E11A4A5C2387@XAP-PVEXMBX01.xlnx.xilinx.com>
- <20160727080526.GH11538@lunn.ch>
- <971c966a-5335-310b-0a1a-3f1b7ee2f841@gmail.com>
-Message-ID: <C246CAC1457055469EF09E3A7AC4E11A4A5DCC2F@XAP-PVEXMBX01.xlnx.xilinx.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 4 Aug 2016 12:34:58 +0200
+Subject: [PATCH 1/8] ARM: assembler: introduce adr_l,
+ ldr_l and str_l macros
+In-Reply-To: <20160804094451.GE7147@e103592.cambridge.arm.com>
+References: <1470238730-30038-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1470238730-30038-2-git-send-email-ard.biesheuvel@linaro.org>
+ <20160803164940.GC7147@e103592.cambridge.arm.com>
+ <CAKv+Gu_3YKfdCyMuTdrk+t16qQOuMiSqWEHf-h1K2ajM5s1rxw@mail.gmail.com>
+ <20160804094451.GE7147@e103592.cambridge.arm.com>
+Message-ID: <CAKv+Gu-T9+fhvRk-RroDqr7QvQ24cUTuONL9uT-Ws24n_nHrCw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Florian,
+On 4 August 2016 at 11:44, Dave Martin <Dave.Martin@arm.com> wrote:
+> On Thu, Aug 04, 2016 at 09:40:31AM +0200, Ard Biesheuvel wrote:
+>> On 3 August 2016 at 18:49, Dave Martin <Dave.Martin@arm.com> wrote:
+>> > On Wed, Aug 03, 2016 at 05:38:43PM +0200, Ard Biesheuvel wrote:
+[...]
+>> >> +#else
+>> >> +     add     \dst, pc, #:pc_g0_nc:(\sym) - 8
+>> >> +     add     \dst, \dst, #:pc_g1_nc:(\sym) - 4
+>> >> +     add     \dst, \dst, #:pc_g2:(\sym)
+>> >
+>> > Whoah.  I've never seen this syntax before...  does this work for any
+>> > named reloc, or just for certain blessed relocs?  (I'm also _assuming_
+>> > the assembler support for this functionality is ancient -- if not,
+>> > there may be toolchain compatibility issues.)
+>> >
+>> > Based on my understanding of how these relocs work, this should do the
+>> > right thing, though.
+>> >
+>> >
+>> > Second question: for arm, this reduces the range addressable to
+>> > pc +/- 26-bit offset (24-bit if sym is not word aligned, but that
+>> > probably never happens).
+>> >
+>> > I can't remember the de facto limit on the size of vmlinux for arm --
+>> > are you sure this extra limitation won't break some cases of huge
+>> > initramfs where adr_l gets used for cross-section references?
+>> >
+>>
+>> Yes, that seems a valid concern. We have +/- 64 MB for the adr_l
+>> variant (as you say, for word aligned symbols), but this may be
+>> insufficient. The ldr/str variants don't have the same limitation.
+>
+> True, but they're still limited, I think in effect to +/- 256 MB.
+>
 
-> 
-> On 27/07/2016 01:05, Andrew Lunn wrote:
-> > Hi Appana
-> >
-> > Here is roughly what i was thinking:
-> >
-> > struct priv {
-> >        phy_device *master;
-> >        phy_device *slave;
-> >        struct phy_driver *slave_drv;
-> > };
-> >
-> > phy_status_clone(phy_device *master, phy_device *slave) {
-> > 	master->speed = slave->speed;
-> > 	master->duplex = slave->duplex;
-> > 	master->pause = slave->pause;
-> > }
-> >
-> > read_status(struct phy_device *phydev) {
-> > 	struct priv *priv = phydev->priv;
-> >
-> > 	/* Get the status from the slave, and duplicate in into the
-> > 	 * master */
-> > 	 slave_drv->read_status(priv->slave);
-> > 	 phy_status_clone(priv->master, priv->slave);
-> >
-> > 	 /* Update the gmiitorgmii with the current link parameters */
-> > 	 update_link(master);
-> > }
-> >
-> > config_init(struct phy_device *phydev) {
-> > 	struct priv *priv = phydev->priv;
-> >
-> > 	/* Configure the slave, and duplicate in into the master */
-> > 	slave_drv->config_init(priv->slave);
-> > 	phy_status_clone(priv->master, priv->slave); }
-> >
-> > struct phy_driver master_drv = {
-> >        .read_status = read_status,
-> >        .config_init = config_init,
-> >        .soft_reset  = ...
-> >        .suspend = ...
-> > };
-> >
-> > probe(mdio_device *mdio)
-> > {
-> > 	struct priv *priv = devm_alloc();
-> >
-> > 	/* Use the phy-handle property to find the slave phy */
-> > 	node_phy = of_parse_phandle(mdio->of_node, "phy", 0);
-> > 	priv->slave = of_phy_find_device(node_phy);
-> >
-> > 	/* Create the master phy on the control address. Use the phy
-> > 	   ID from the slave. */
-> > 	priv->master = phy_device_create(mdio->bus, mdio->addr,
-> > 	  				 phy->slave->phy_id,
-> > 					 phy->slave->is_c45,
-> > 					 phy->slave->c45_ids);
-> >
-> > 	slave_dev_drv = phydev->mdio.dev.driver;
-> > 	priv->slave_drv = to_phy_driver(slave_dev_drv);
-> > 	priv->master->mdio.dev.driver = master_drv;
-> 
-> The key here is really that except for the phy_driver::read_status callback, we
-> want to defer every operation to the slave (full MDIO register range compatible)
-> PHY.
+Yes. I managed to hack around the limitation by doing this
 
-Will fix it in the next version...
+.macro adr_fwd, dst, sym, tmp
+add \dst, pc, #:pc_g0_nc:(\sym) - 8
+add \dst, \dst, #:pc_g1_nc:(\sym) - 4
+.reloc ., R_ARM_LDR_PC_G2, \sym
+mov \tmp, #0
+add \dst, \dst, \tmp
+.endm
 
-> 
-> > }
-> >
-> > It would however be nice to only have one phydev structure, so you are
-> > not copying status and settings backwards and forwards from one to the
-> > other all the time, and need a wrapper for every function in
-> > phy_driver. Studying the structures a bit, that might be possible. You
-> > would then only need to wrap the read_status(), so that when the link
-> > speed/duplex changes, you can configure the converter as appropriate.
-> 
-> Agreed.
+but it is becoming very hacky, and this only works for forward
+references anyway.
 
-Will implement as suggested by Andrew...
+So I think this is a dead end. Series withdrawn.
 
-Regards,
-Kedar.
-
-> --
-> Florian
+Thanks for your time,
+Ard.
