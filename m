@@ -1,25 +1,35 @@
 From: khilman@baylibre.com (Kevin Hilman)
-Date: Wed, 3 Aug 2016 17:25:29 -0700
-Subject: [PATCH v2 0/4] pwm: Add Amlogic Meson SoC PWM Controller
-In-Reply-To: <1468142645-4360-1-git-send-email-narmstrong@baylibre.com>
-References: <1468142645-4360-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <CAOi56cVGRpSeAVwaATkx8Q2wz9hxocq6095opJQZucfDML2wSg@mail.gmail.com>
+Date: Wed, 03 Aug 2016 17:27:32 -0700
+Subject: [PATCH v3 3/3] ARM64: dts: amlogic: meson-gxbb: Add watchdog node
+In-Reply-To: <7hbn237aw7.fsf@baylibre.com> (Kevin Hilman's message of "Mon, 11
+ Jul 2016 21:12:08 -0700")
+References: <1468141867-4172-1-git-send-email-narmstrong@baylibre.com>
+ <1468141867-4172-4-git-send-email-narmstrong@baylibre.com>
+ <578271D3.4080704@roeck-us.net> <7hbn237aw7.fsf@baylibre.com>
+Message-ID: <m2bn19qsy3.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thierry,
+Hi Guenter,
 
-On Sun, Jul 10, 2016 at 2:27 AM, Neil Armstrong <narmstrong@baylibre.com> wrote:
-> Add support for the PWM controller found in Amlogic Meson SoCs.
-> This controller provides a dual PWM output with 4 selectable clock source
-> and a two level divider to achieve a better PWM range.
->
-> Currently Meson8b and GXBB SoCs are supported.
->
-> Changes since v1 at http://lkml.kernel.org/r/1466173784-15625-1-git-send-email-narmstrong at baylibre.com :
-> - fix meson8b dtsi
+Kevin Hilman <khilman@baylibre.com> writes:
 
-Gentle reminder ping on this series.
+> Guenter Roeck <linux@roeck-us.net> writes:
+>
+>> On 07/10/2016 02:11 AM, Neil Armstrong wrote:
+>>> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+>>
+>> Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+>>
+>> Would this go in through one of the arm trees ?
+>
+> You can take the driver through the watchdog tree, but I'll take the DT
+> stuff through the amlogic tree (and submit via arm-soc).  
+>
+> However, with your ack, and since this is a brand new driver, I could
+> take the driver as well.  Just let me know your preference.
+
+ping... do you have a prefernce here?
 
 Thanks,
 
