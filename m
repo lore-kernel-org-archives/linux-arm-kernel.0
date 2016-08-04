@@ -1,95 +1,113 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Thu, 04 Aug 2016 11:56:12 +0200
-Subject: [PATCH] ARM: S3C24XX: Add dma_mask assignments for DMA devices
-Message-ID: <1470304572-14937-1-git-send-email-s.nawrocki@samsung.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 4 Aug 2016 10:56:50 +0100
+Subject: [PATCH v3 4/4] iio: adc: add support for Allwinner SoCs ADC
+In-Reply-To: <1469519027-11387-5-git-send-email-quentin.schulz@free-electrons.com>
+References: <1469519027-11387-1-git-send-email-quentin.schulz@free-electrons.com>
+ <1469519027-11387-5-git-send-email-quentin.schulz@free-electrons.com>
+Message-ID: <20160804095650.GN1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The dma_mask assignments seem to be missed during refactoring
-of arch/arm/mach-s3c24xx. Add them to avoid DMA allocation
-failures. Without this patch sound is broken on s3c24xx
-with errors reported like:
+On Tue, Jul 26, 2016 at 09:43:47AM +0200, Quentin Schulz wrote:
+> +static int sunxi_gpadc_adc_read(struct iio_dev *indio_dev, int channel,
+> +				int *val)
+> +{
+> +	struct sunxi_gpadc_dev *info = iio_priv(indio_dev);
+> +	int ret = 0;
+> +
+> +	pm_runtime_get_sync(indio_dev->dev.parent);
+> +	mutex_lock(&info->mutex);
+> +
+> +	reinit_completion(&info->completion);
+> +	regmap_write(info->regmap, SUNXI_GPADC_TP_CTRL1,
+> +		     info->soc_specific->tp_mode_en |
+> +		     info->soc_specific->tp_adc_select |
+> +		     info->soc_specific->adc_chan_select(channel));
+> +	regmap_write(info->regmap, SUNXI_GPADC_TP_INT_FIFOC,
+> +		     SUNXI_GPADC_TP_INT_FIFOC_TP_FIFO_TRIG_LEVEL(1) |
+> +		     SUNXI_GPADC_TP_INT_FIFOC_TP_FIFO_FLUSH);
+> +	enable_irq(info->fifo_data_irq);
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-s3c24xx-dma s3c2410-dma.0: coherent DMA mask is unset
-ALSA pcmC0D0p,0:: cannot preallocate for size 524288
-s3c24xx-iis s3c24xx-iis: Failed to get DMA channel capabilities,
-falling back to period counting: -6
-s3c24xx-dma s3c2410-dma.0: coherent DMA mask is unset
+> +
+> +	if (!wait_for_completion_timeout(&info->completion,
+> +					 msecs_to_jiffies(100))) {
+> +		ret = -ETIMEDOUT;
+> +		goto out;
+> +	}
+> +
+> +	*val = info->adc_data;
+> +
+> +out:
+> +	disable_irq(info->fifo_data_irq);
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+I spotted this while skipping over the patch - and also noticed the
+below.
+
 ...
-ALSA pcmC0D0c,0:: cannot preallocate for size 524288
-s3c24xx-iis s3c24xx-iis: Failed to get DMA channel capabilities,
-falling back to period counting: -6
+> +	irq = platform_get_irq_byname(pdev, "TEMP_DATA_PENDING");
+> +	if (irq < 0) {
+> +		dev_err(&pdev->dev,
+> +			"no TEMP_DATA_PENDING interrupt registered\n");
+> +		ret = irq;
+> +		goto err;
+> +	}
+> +
+> +	irq = regmap_irq_get_virq(sunxi_gpadc_mfd_dev->regmap_irqc, irq);
+> +	ret = devm_request_any_context_irq(&pdev->dev, irq,
+> +					   sunxi_gpadc_temp_data_irq_handler, 0,
+> +					   "temp_data", info);
+> +	if (ret < 0) {
+> +		dev_err(&pdev->dev,
+> +			"could not request TEMP_DATA_PENDING interrupt: %d\n",
+> +			ret);
+> +		goto err;
+> +	}
+> +
+> +	disable_irq(irq);
+^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
----
- arch/arm/mach-s3c24xx/common.c | 20 +++++++++++++++-----
- 1 file changed, 15 insertions(+), 5 deletions(-)
+> +	info->temp_data_irq = irq;
+> +	atomic_set(&info->ignore_temp_data_irq, 0);
+> +
+> +	irq = platform_get_irq_byname(pdev, "FIFO_DATA_PENDING");
+> +	if (irq < 0) {
+> +		dev_err(&pdev->dev,
+> +			"no FIFO_DATA_PENDING interrupt registered\n");
+> +		ret = irq;
+> +		goto err;
+> +	}
+> +
+> +	irq = regmap_irq_get_virq(sunxi_gpadc_mfd_dev->regmap_irqc, irq);
+> +	ret = devm_request_any_context_irq(&pdev->dev, irq,
+> +					   sunxi_gpadc_fifo_data_irq_handler, 0,
+> +					   "fifo_data", info);
+> +	if (ret < 0) {
+> +		dev_err(&pdev->dev,
+> +			"could not request FIFO_DATA_PENDING interrupt: %d\n",
+> +			ret);
+> +		goto err;
+> +	}
+> +
+> +	disable_irq(irq);
+> +	info->fifo_data_irq = irq;
 
-diff --git a/arch/arm/mach-s3c24xx/common.c b/arch/arm/mach-s3c24xx/common.c
-index bf50328..fe7485d 100644
---- a/arch/arm/mach-s3c24xx/common.c
-+++ b/arch/arm/mach-s3c24xx/common.c
-@@ -21,7 +21,7 @@
-  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
- */
- 
--
-+#include <linux/dma-mapping.h>
- #include <linux/init.h>
- #include <linux/module.h>
- #include <linux/interrupt.h>
-@@ -304,6 +304,8 @@ struct s3c24xx_uart_resources s3c2410_uart_resources[] __initdata = {
- 	},
- };
- 
-+#define s3c24xx_device_dma_mask (*((u64[]) { DMA_BIT_MASK(32) }))
-+
- #if defined(CONFIG_CPU_S3C2410) || defined(CONFIG_CPU_S3C2412) || \
- 	defined(CONFIG_CPU_S3C2440) || defined(CONFIG_CPU_S3C2442)
- static struct resource s3c2410_dma_resource[] = {
-@@ -354,7 +356,9 @@ struct platform_device s3c2410_device_dma = {
- 	.num_resources	= ARRAY_SIZE(s3c2410_dma_resource),
- 	.resource	= s3c2410_dma_resource,
- 	.dev	= {
--		.platform_data	= &s3c2410_dma_platdata,
-+		.dma_mask = &s3c24xx_device_dma_mask,
-+		.coherent_dma_mask = DMA_BIT_MASK(32),
-+		.platform_data = &s3c2410_dma_platdata,
- 	},
- };
- #endif
-@@ -395,7 +399,9 @@ struct platform_device s3c2412_device_dma = {
- 	.num_resources	= ARRAY_SIZE(s3c2410_dma_resource),
- 	.resource	= s3c2410_dma_resource,
- 	.dev	= {
--		.platform_data	= &s3c2412_dma_platdata,
-+		.dma_mask = &s3c24xx_device_dma_mask,
-+		.coherent_dma_mask = DMA_BIT_MASK(32),
-+		.platform_data = &s3c2412_dma_platdata,
- 	},
- };
- #endif
-@@ -451,7 +457,9 @@ struct platform_device s3c2440_device_dma = {
- 	.num_resources	= ARRAY_SIZE(s3c2410_dma_resource),
- 	.resource	= s3c2410_dma_resource,
- 	.dev	= {
--		.platform_data	= &s3c2440_dma_platdata,
-+		.dma_mask = &s3c24xx_device_dma_mask,
-+		.coherent_dma_mask = DMA_BIT_MASK(32),
-+		.platform_data = &s3c2440_dma_platdata,
- 	},
- };
- #endif
-@@ -503,7 +511,9 @@ struct platform_device s3c2443_device_dma = {
- 	.num_resources	= ARRAY_SIZE(s3c2443_dma_resource),
- 	.resource	= s3c2443_dma_resource,
- 	.dev	= {
--		.platform_data	= &s3c2443_dma_platdata,
-+		.dma_mask = &s3c24xx_device_dma_mask,
-+		.coherent_dma_mask = DMA_BIT_MASK(32),
-+		.platform_data = &s3c2443_dma_platdata,
- 	},
- };
- #endif
+Firstly, claiming and then immediately disabling an interrupt handler
+looks very strange.  If you're disabling the interrupt because you're
+concerned that you may receive an unexpected interrupt, this is no
+good - consider what happens if the interrupt happens between you
+claiming and disabling it.
+
+Secondly, interrupts asserted while disabled are recorded and replayed
+when you enable the interrupt, no matter when they happened (eg, they
+could occur immediately after you disabled the interrupt.)
+
+I think you need to comment each of the sites in the driver, explaining
+why it's necessary to disable and enable the interrupt at the IRQ
+controller like this, or get rid of these enable/disable_irq() calls.
+
 -- 
-1.9.1
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
