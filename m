@@ -1,30 +1,99 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Thu, 04 Aug 2016 16:00:35 -0700
-Subject: [PATCH] ARM: dts: da850: Add missing pin muxing for the UARTs
-In-Reply-To: <20160804210045.GD15013@gobelin> (Karl Beldan's message of "Thu,
- 4 Aug 2016 21:00:45 +0000")
-References: <20160804110656.25318-1-kbeldan@baylibre.com>
- <m2eg64pchw.fsf@baylibre.com> <20160804210045.GD15013@gobelin>
-Message-ID: <m2fuqknnqk.fsf@baylibre.com>
+From: lina.iyer@linaro.org (Lina Iyer)
+Date: Thu,  4 Aug 2016 17:04:47 -0600
+Subject: [PATCH v3 00/15] PM: SoC idle support using PM domains
+Message-ID: <1470351902-43103-1-git-send-email-lina.iyer@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Karl Beldan <kbeldan@baylibre.com> writes:
+Hi all,
 
-> On Thu, Aug 04, 2016 at 12:20:27PM -0700, Kevin Hilman wrote:
->> Karl Beldan <kbeldan@baylibre.com> writes:
->> 
->> > This adds 2 pinctrl groups (rtscts, rxtx) for each of the 3 UARTs.
->> >
->> > Signed-off-by: Karl Beldan <kbeldan@baylibre.com>
->> 
->> Should da850-evm be updated to use the serial2_rxtx_pins also?
->> 
-> I could not find the EVM schematics on the net and I only have an LCDK,
-> but according to the code it should, however I can't tell whether flow
-> control pins are used.
+Changes since v2 [5]:
+- Update PSCI documentation to define OS-Initiated PM domains.
+- Nifty updates and bug fixes. Thanks Brendan!
+- Define PSCI PM domains under psci node in 8916 DT.
+- Documentation updates for domain definitions.
+- Updated series is at [4].
 
-Ok, let's just leave it for now, since it's working fine.  Sekhar can
-fix that up if he can dig up the schematics.
+Changes since v1 [6]:
+- Use arm,idle-state as the DT binding for domain idle state.
+- OS-Initated changes to support that and to read arm,psci-suspend-param
+(Thanks Mark Rutland and Kevin Hilman)
+- tick_nohz_get_next_wakeup() - suggestions from Thomas Gleixner.
+- The updated series is at [3].
 
-Kevin
+Changes since RFC-v3 [1]:
+- Reorganize the patches. Documentations have their own patch.
+- Moved code around with PSCI OS initiated so they would not have compiler
+  errors in other configuration.
+- Minor bug fixes with genpd power_on functionality.
+- Rebased on top of 4.7-rc1
+
+This is the submission of the SoC idle support in the kernel for CPU domains
+using genpd. The patches were submitted as RFC's earlier, the last of them is
+[1]. Since the RFC, multiple discussions have happened around making the
+patches generic across all architectures. For now, the patches address the
+needs of the ARM community, but sure enough can be extended to support other
+architectures. Some of the limitations in making this patch generic is the lack
+of device idle state description in the DT, but that in itself is a bigger
+topic for a future discussion.
+ 
+The patch has been tested on the 410c Dragonboard and the MTK EVB boards. Both
+show good power savings when used with OS Initiated PSCI f/w.
+
+Ulf is maintaining a branch tracking the PM/genpd changes that are in
+pipleline. This series sits well on his branch. You may find the entire series
+at [2].
+
+Thanks,
+Lina
+
+[1]. http://lists.infradead.org/pipermail/linux-arm-kernel/2016-March/412934.html
+[2]. https://git.linaro.org/people/lina.iyer/linux-next.git/shortlog/refs/heads/genpd-psci-v1
+[3]. https://git.linaro.org/people/lina.iyer/linux-next.git/shortlog/refs/heads/genpd-psci-v2
+[4]. https://git.linaro.org/people/lina.iyer/linux-next.git/shortlog/refs/heads/genpd-psci-v3
+[5]. https://lwn.net/Articles/695987/
+[6]. https://lwn.net/Articles/675674/
+
+
+Axel Haslam (2):
+  PM / Domains: Allow domain power states to be read from DT
+  dt/bindings: Update binding for PM domain idle states
+
+Lina Iyer (13):
+  PM / Domains: Abstract genpd locking
+  PM / Domains: Support IRQ safe PM domains
+  PM / doc: Update device documentation for devices in IRQ safe PM
+    domains
+  PM / cpu_domains: Setup PM domains for CPUs/clusters
+  ARM: cpuidle: Add runtime PM support for CPUs
+  timer: Export next wake up of a CPU
+  PM / cpu_domains: Add PM Domain governor for CPUs
+  doc / cpu_domains: Describe CPU PM domains setup and governor
+  drivers: firmware: psci: Allow OS Initiated suspend mode
+  drivers: firmware: psci: Support cluster idle states for OS-Initiated
+  dt/bindings: Add PSCI OS-Initiated PM Domains bindings
+  ARM64: dts: Add PSCI cpuidle support for MSM8916
+  ARM64: dts: Define CPU power domain for MSM8916
+
+ Documentation/devicetree/bindings/arm/psci.txt     |  64 ++++
+ .../devicetree/bindings/power/power_domain.txt     |  57 +++
+ Documentation/power/cpu_domains.txt                | 109 ++++++
+ Documentation/power/devices.txt                    |  12 +-
+ arch/arm64/boot/dts/qcom/msm8916.dtsi              |  51 +++
+ drivers/base/power/Makefile                        |   1 +
+ drivers/base/power/cpu_domains.c                   | 388 +++++++++++++++++++++
+ drivers/base/power/domain.c                        | 308 +++++++++++++---
+ drivers/cpuidle/cpuidle-arm.c                      |  55 +++
+ drivers/firmware/psci.c                            | 111 +++++-
+ include/linux/cpu_domains.h                        |  39 +++
+ include/linux/pm_domain.h                          |  24 +-
+ include/linux/tick.h                               |   7 +
+ include/uapi/linux/psci.h                          |   5 +
+ kernel/time/tick-sched.c                           |  11 +
+ 15 files changed, 1190 insertions(+), 52 deletions(-)
+ create mode 100644 Documentation/power/cpu_domains.txt
+ create mode 100644 drivers/base/power/cpu_domains.c
+ create mode 100644 include/linux/cpu_domains.h
+
+-- 
+2.7.4
