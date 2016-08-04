@@ -1,63 +1,91 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu,  4 Aug 2016 10:21:46 +0100
-Subject: [PATCH 2/9] remoteproc: core: Trivial: Improve error checking,
- spelling and debug prints
+Date: Thu,  4 Aug 2016 10:21:50 +0100
+Subject: [PATCH 6/9] remoteproc: core: Add function to append a new resource
+ table entry
 In-Reply-To: <20160804092153.23032-1-lee.jones@linaro.org>
 References: <20160804092153.23032-1-lee.jones@linaro.org>
-Message-ID: <20160804092153.23032-3-lee.jones@linaro.org>
+Message-ID: <20160804092153.23032-7-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Trivial patch to clean up a couple of minor misgivings.
+A new function now exists to pull in and amend and existing resource
+table entry.  But what if we wish to provide a new resource?  This
+function provides functionality to append a brand new resource entry
+onto the resource table.  All complexity related to shuffling parts
+of the table around, providing new offsets and incriminating number
+of entries in the resource table's top-level header is taken care of
+here.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/remoteproc/remoteproc_core.c | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
+ drivers/remoteproc/remoteproc_core.c | 55 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 55 insertions(+)
 
 diff --git a/drivers/remoteproc/remoteproc_core.c b/drivers/remoteproc/remoteproc_core.c
-index 3566dc9..5654a81 100644
+index 3318ebd..111350e 100644
 --- a/drivers/remoteproc/remoteproc_core.c
 +++ b/drivers/remoteproc/remoteproc_core.c
-@@ -457,8 +457,8 @@ static int rproc_handle_trace(struct rproc *rproc, struct fw_rsc_trace *rsc,
- 
- 	rproc->num_traces++;
- 
--	dev_dbg(dev, "%s added: va %p, da 0x%x, len 0x%x\n", name, ptr,
--						rsc->da, rsc->len);
-+	dev_dbg(dev, "%s added: va %p, da 0x%x, len 0x%x\n",
-+		name, ptr, rsc->da, rsc->len);
- 
- 	return 0;
+@@ -980,6 +980,61 @@ static int rproc_update_resource_table_entry(struct rproc *rproc,
+ 	return !updated;
  }
-@@ -581,8 +581,8 @@ static int rproc_handle_carveout(struct rproc *rproc,
- 		return -EINVAL;
- 	}
  
--	dev_dbg(dev, "carveout rsc: da %x, pa %x, len 0x%x, flags %x\n",
--			rsc->da, rsc->pa, rsc->len, rsc->flags);
-+	dev_dbg(dev, "carveout rsc: name: %s, da %x, pa %x, len 0x%x, flags %x\n",
-+		rsc->name, rsc->da, rsc->pa, rsc->len, rsc->flags);
- 
- 	carveout = kzalloc(sizeof(*carveout), GFP_KERNEL);
- 	if (!carveout)
-@@ -700,7 +700,7 @@ static rproc_handle_resource_t rproc_loading_handlers[RSC_LAST] = {
- 	[RSC_CARVEOUT] = (rproc_handle_resource_t)rproc_handle_carveout,
- 	[RSC_DEVMEM] = (rproc_handle_resource_t)rproc_handle_devmem,
- 	[RSC_TRACE] = (rproc_handle_resource_t)rproc_handle_trace,
--	[RSC_VDEV] = NULL, /* VDEVs were handled upon registrarion */
-+	[RSC_VDEV] = NULL, /* VDEVs were handled upon registration */
- };
- 
- static rproc_handle_resource_t rproc_vdev_handler[RSC_LAST] = {
-@@ -918,7 +918,7 @@ static void rproc_fw_config_virtio(const struct firmware *fw, void *context)
- 	 * Create a copy of the resource table. When a virtio device starts
- 	 * and calls vring_new_virtqueue() the address of the allocated vring
- 	 * will be stored in the cached_table. Before the device is started,
--	 * cached_table will be copied into devic memory.
-+	 * cached_table will be copied into device memory.
- 	 */
- 	rproc->cached_table = kmemdup(table, tablesz, GFP_KERNEL);
- 	if (!rproc->cached_table)
++static struct resource_table*
++rproc_add_resource_table_entry(struct rproc *rproc,
++			       struct rproc_request_resource *request,
++			       struct resource_table *old_table, int *tablesz)
++{
++	struct resource_table *table;
++	struct fw_rsc_hdr h;
++	void *new_rsc_loc;
++	void *fw_header_loc;
++	void *start_of_rscs;
++	int new_rsc_offset;
++	int size = *tablesz;
++	int i;
++
++	h.type = request->type;
++
++	new_rsc_offset = size;
++
++	/*
++	 * Allocate another contiguous chunk of memory, large enough to
++	 * contain the new, expanded resource table.
++	 *
++	 * The +4 is for the extra offset[] element in the top level header
++	 */
++	size += sizeof(struct fw_rsc_hdr) + request->size + 4;
++	table = devm_kmemdup(&rproc->dev, old_table, size, GFP_KERNEL);
++	if (!table)
++		return ERR_PTR(-ENOMEM);
++
++	/* Shunt table by 4 Bytes to account for the extra offset[] element */
++	start_of_rscs = (void *)table + table->offset[0];
++	memmove(start_of_rscs + 4,
++		start_of_rscs, new_rsc_offset - table->offset[0]);
++	new_rsc_offset += 4;
++
++	/* Update existing resource entry's offsets */
++	for (i = 0; i < table->num; i++)
++		table->offset[i] += 4;
++
++	/* Update the top level 'resource table' header */
++	table->offset[table->num] = new_rsc_offset;
++	table->num++;
++
++	/* Copy new firmware header into table */
++	fw_header_loc = (void *)table + new_rsc_offset;
++	memcpy(fw_header_loc, &h, sizeof(h));
++
++	/* Copy new resource entry into table */
++	new_rsc_loc = (void *)fw_header_loc + sizeof(h);
++	memcpy(new_rsc_loc, request->resource, request->size);
++
++	*tablesz = size;
++	return table;
++}
++
+ /*
+  * take a firmware and boot a remote processor with it.
+  */
 -- 
 2.9.0
