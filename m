@@ -1,76 +1,71 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Thu, 4 Aug 2016 13:28:46 +0300
-Subject: [PATCHv3 11/11] crypto: omap-des: fix crypto engine initialization
- order
+Date: Thu, 4 Aug 2016 13:28:43 +0300
+Subject: [PATCHv3 08/11] crypto: omap-aes: Add support for multiple cores
 In-Reply-To: <1470306526-27219-1-git-send-email-t-kristo@ti.com>
 References: <1470306526-27219-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1470306526-27219-12-git-send-email-t-kristo@ti.com>
+Message-ID: <1470306526-27219-9-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The crypto engine must be initialized before registering algorithms,
-otherwise the test manager will crash as it attempts to execute
-tests for the algos while they are being registered.
+From: Lokesh Vutla <lokeshvutla@ti.com>
 
-Fixes: f1b77aaca85a ("crypto: omap-des - Integrate with the crypto engine framework")
+Some SoCs like omap4/omap5/dra7 contain multiple AES crypto accelerator
+cores. Adapt the driver to support this. The driver picks the last used
+device from a list of AES devices.
+
+Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+[t-kristo at ti.com: forward ported to 4.7 kernel]
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- drivers/crypto/omap-des.c | 28 +++++++++++++++-------------
- 1 file changed, 15 insertions(+), 13 deletions(-)
+ drivers/crypto/omap-aes.c | 20 ++++++--------------
+ 1 file changed, 6 insertions(+), 14 deletions(-)
 
-diff --git a/drivers/crypto/omap-des.c b/drivers/crypto/omap-des.c
-index d0b59f6..2b07e60 100644
---- a/drivers/crypto/omap-des.c
-+++ b/drivers/crypto/omap-des.c
-@@ -1085,6 +1085,17 @@ static int omap_des_probe(struct platform_device *pdev)
- 	list_add_tail(&dd->list, &dev_list);
- 	spin_unlock(&list_lock);
+diff --git a/drivers/crypto/omap-aes.c b/drivers/crypto/omap-aes.c
+index f443042..3cf7b8f 100644
+--- a/drivers/crypto/omap-aes.c
++++ b/drivers/crypto/omap-aes.c
+@@ -329,20 +329,12 @@ static void omap_aes_dma_stop(struct omap_aes_dev *dd)
  
-+	/* Initialize des crypto engine */
-+	dd->engine = crypto_engine_alloc_init(dev, 1);
-+	if (!dd->engine)
-+		goto err_engine;
-+
-+	dd->engine->prepare_request = omap_des_prepare_req;
-+	dd->engine->crypt_one_request = omap_des_crypt_req;
-+	err = crypto_engine_start(dd->engine);
-+	if (err)
-+		goto err_engine;
-+
- 	for (i = 0; i < dd->pdata->algs_info_size; i++) {
- 		for (j = 0; j < dd->pdata->algs_info[i].size; j++) {
- 			algp = &dd->pdata->algs_info[i].algs_list[j];
-@@ -1100,27 +1111,18 @@ static int omap_des_probe(struct platform_device *pdev)
- 		}
- 	}
+ static struct omap_aes_dev *omap_aes_find_dev(struct omap_aes_ctx *ctx)
+ {
+-	struct omap_aes_dev *dd = NULL, *tmp;
++	struct omap_aes_dev *dd;
  
--	/* Initialize des crypto engine */
--	dd->engine = crypto_engine_alloc_init(dev, 1);
--	if (!dd->engine)
--		goto err_algs;
--
--	dd->engine->prepare_request = omap_des_prepare_req;
--	dd->engine->crypt_one_request = omap_des_crypt_req;
--	err = crypto_engine_start(dd->engine);
--	if (err)
--		goto err_engine;
--
- 	return 0;
+ 	spin_lock_bh(&list_lock);
+-	if (!ctx->dd) {
+-		list_for_each_entry(tmp, &dev_list, list) {
+-			/* FIXME: take fist available aes core */
+-			dd = tmp;
+-			break;
+-		}
+-		ctx->dd = dd;
+-	} else {
+-		/* already found before */
+-		dd = ctx->dd;
+-	}
++	dd = list_first_entry(&dev_list, struct omap_aes_dev, list);
++	list_move_tail(&dd->list, &dev_list);
++	ctx->dd = dd;
+ 	spin_unlock_bh(&list_lock);
  
--err_engine:
--	crypto_engine_exit(dd->engine);
- err_algs:
- 	for (i = dd->pdata->algs_info_size - 1; i >= 0; i--)
- 		for (j = dd->pdata->algs_info[i].registered - 1; j >= 0; j--)
- 			crypto_unregister_alg(
- 					&dd->pdata->algs_info[i].algs_list[j]);
+ 	return dd;
+@@ -615,7 +607,7 @@ static int omap_aes_prepare_req(struct crypto_engine *engine,
+ {
+ 	struct omap_aes_ctx *ctx = crypto_ablkcipher_ctx(
+ 			crypto_ablkcipher_reqtfm(req));
+-	struct omap_aes_dev *dd = omap_aes_find_dev(ctx);
++	struct omap_aes_dev *dd = ctx->dd;
+ 	struct omap_aes_reqctx *rctx;
  
-+err_engine:
-+	if (dd->engine)
-+		crypto_engine_exit(dd->engine);
-+
- 	omap_des_dma_cleanup(dd);
- err_irq:
- 	tasklet_kill(&dd->done_task);
+ 	if (!dd)
+@@ -661,7 +653,7 @@ static int omap_aes_crypt_req(struct crypto_engine *engine,
+ {
+ 	struct omap_aes_ctx *ctx = crypto_ablkcipher_ctx(
+ 			crypto_ablkcipher_reqtfm(req));
+-	struct omap_aes_dev *dd = omap_aes_find_dev(ctx);
++	struct omap_aes_dev *dd = ctx->dd;
+ 
+ 	if (!dd)
+ 		return -ENODEV;
 -- 
 1.9.1
