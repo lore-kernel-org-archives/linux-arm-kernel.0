@@ -1,82 +1,92 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 4 Aug 2016 14:19:07 +0530
-Subject: Support for configurable PCIe endpoint
-In-Reply-To: <20160803094747.GA10170@infradead.org>
-References: <57A18927.9070003@ti.com> <20160803094747.GA10170@infradead.org>
-Message-ID: <57A30183.2060800@ti.com>
+From: anurupvasu@gmail.com (Anurup M)
+Date: Thu,  4 Aug 2016 05:07:04 -0400
+Subject: [RFC PATCH v1 00/10] arm64:perf: Support for Hisilicon SoC Hardware
+ event counters
+Message-ID: <1470301634-79736-1-git-send-email-anurup.m@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+[Note: Resending the patch series as I missed to add Maintainers in --to field]
 
-On Wednesday 03 August 2016 03:17 PM, Christoph Hellwig wrote:
-> On Wed, Aug 03, 2016 at 11:33:19AM +0530, Kishon Vijay Abraham I wrote:
->> Hi,
->>
->> The PCIe controller present in TI's DRA7 SoC is capable of operating either in
->> Root Complex mode or Endpoint mode. (It uses Synopsys Designware Core).I'd
->> assume most of the PCIe controllers on other platforms that use Designware core
->> should also be capable to operate in endpoint mode. But linux kernel right now
->> supports only RC mode.
->>
->> PCIe endpoint support discussion came up briefly before [1] but it was felt the
->> practical use case will find firmware more suitable and endpoint support in
->> kernel can be used only for validation or demo.
-> 
-> I disagree.  It's highly useful for rapid prototyping of hardware
-> interfaces, and I've been looking into PCIe EP drivers for exactly
-> that reason recently.  Going a little offtopic: any good DRA7 eval
-> boards you'd recommend to try for this purpose?
+Provide Support for Hisilicon SoC Hip05 Hardware event counters.
+The Hisilicon SoC Hip05 series has many uncore or non-CPU performance
+events and counters units.
 
-I think the only publicly available DRA7 based board with PCIe (mPCIe slot) is
-AM572x EVM (http://www.ti.com/tool/TMDSEVM572X). The board comes only with a
-female PCIe slot. So a special cable would be required to connect it to a PCIe
-host.
+This patch is implemented refering to arm-cci, Intel/AMD uncore and
+also the cavium thunderX pmu patches.
 
-However for my development I'm planning to use dra7-evm which has standard
-female PCIe connector and I'll use a cable like PE-FLEX1 male-to-male (in
-http://www.adexelec.com/pciexp.htm) to connect back-to-back boards.
-> 
-> We already have a EP driver in the tree:
-> 
-> drivers/misc/spear13xx_pcie_gadget.c
-> 
-> but as far as I can tell it doesn't really work at the moment.
+Support for Hisilicon L3 cache(LLC) hardware events and counters are added
+in this implementation.
 
-Okay. I wasn't aware of that. I'll take a look at that one.
-> 
->> Validation or demo is itself a valid use case in my opinion (consider something
->> similar to gadget zero for USB). There can be other use cases as well. The RC
->> can use the SoC with EP mode support as an accelerator to accomplish specific
->> task. Here RC gives data to the EP. The EP processes the data. The processing
->> can be done either in ARM itself or it can use other hardware accelerators
->> (like DSP, IVA-HD etc..) present in the EP system. If HW accelerator is used,
->> the linux kernel running in ARM can be used to accomplish other tasks. Once EP
->> mode support is added, I think more use cases will be added.
-> 
-> That sounds useful as well.
-> 
->> >From the high level this should look _similar_ to the gadget framework of USB.
->> One difference from USB would be this should allow HW components (like DSP, PRU
->> etc.. and maybe even some peripheral) in the EP system to be used by RC system.
-> 
-> Indeed.
-> 
->> So these are the high-level steps that I thought would be needed to add EP
->> support in linux.
->> *) move pcie-designware.c out of drivers/pci/host (maybe create a
->> drivers/pci/designware/ folder?). All users of pcie-designware.c should be
->> moved here.
->> This is in preparation for adding EP mode support to designware.
-> 
-> I'd use a new drivers/pci/controller.  Or maybe just skip the rename
-> for now and see how this evolves.
+The Hisilicon PMU datastructures are designed so as to support uncore
+and also CPU specific events in future.
 
-Sure. That makes more sense.
-> 
-> The rest of the plan sounds fine to me.
+The Hisilicon LLC has four banks for a Super CPU Cluster(consists of
+ 16 CPU cores) and each LLC bank has separate hardware events and counters.
+In the current implementation, the count from all these banks are summarized
+and total count is output.
 
-cool.
+Hisilicon SoC use Djtag interface for r/w access to SoC PMU registers
 
-Thanks
-Kishon
+The Hisilicon uncore PMUs can be found under /sys/bus/event_source/devices.
+The counters are exported via sysfs in the corresponding events files
+under the PMU directory so the perf tool can list the event names.
+
+Note:
+This is very initial patchset for Hisilicon Hip05 SoC PMU support shared for
+review. Please review and share comments.
+
+TODO:
+	1. Counter overflow interrupt handling support.
+	2. CPU notifier to migrate to available online CPU's in case
+	   of CPU DOWN. Also mapping CPU cores to the current SCCL.
+	3. Support for counting of individual LLC banks
+
+Anurup M (8):
+  arm64:perf: Add Documentaion for HIP05 PMU event counting.     
+    1. Documentaion for perf usage and PMU events.
+  arm64:perf: Add Devicetree bindings for Hisilicon SoC PMU
+  arm64:perf: Update Kconfig for Hisilicon PMU support
+  arm64:perf: Add support for Hisilicon SoC event counters
+  arm64:perf: Makefile for Hisilicon Hip05 PMU
+  arm64:perf: Update Makefile for Hisilicon PMU support
+  arm64:perf: L3 cache(LLC) event listing in perf
+  arm64: dts: hip05: Add L3 cache PMU support
+
+Tan Xiaojun (2):
+  Documentation: arm64: Add Hisilicon HiP05/06/07 Sysctrl and Djtag dts
+    bindings
+  drivers: soc: Add support for Hisilicon Djtag driver
+
+ .../bindings/arm/hisilicon/hisilicon.txt           |  97 ++++
+ .../devicetree/bindings/arm/hisilicon/pmu.txt      |  52 ++
+ Documentation/perf/hip05-pmu.txt                   |  70 +++
+ arch/arm64/boot/dts/hisilicon/hip05.dtsi           |  19 +
+ drivers/perf/Kconfig                               |   9 +
+ drivers/perf/Makefile                              |   1 +
+ drivers/perf/hisilicon/Makefile                    |   1 +
+ drivers/perf/hisilicon/hisi_uncore_l3c.c           | 561 +++++++++++++++++++++
+ drivers/perf/hisilicon/hisi_uncore_l3c.h           | 100 ++++
+ drivers/perf/hisilicon/hisi_uncore_pmu.c           | 504 ++++++++++++++++++
+ drivers/perf/hisilicon/hisi_uncore_pmu.h           | 148 ++++++
+ drivers/soc/Kconfig                                |   1 +
+ drivers/soc/Makefile                               |   1 +
+ drivers/soc/hisilicon/Kconfig                      |  12 +
+ drivers/soc/hisilicon/Makefile                     |   1 +
+ drivers/soc/hisilicon/djtag.c                      | 373 ++++++++++++++
+ include/linux/soc/hisilicon/djtag.h                |  18 +
+ 17 files changed, 1968 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/hisilicon/pmu.txt
+ create mode 100644 Documentation/perf/hip05-pmu.txt
+ create mode 100644 drivers/perf/hisilicon/Makefile
+ create mode 100644 drivers/perf/hisilicon/hisi_uncore_l3c.c
+ create mode 100644 drivers/perf/hisilicon/hisi_uncore_l3c.h
+ create mode 100644 drivers/perf/hisilicon/hisi_uncore_pmu.c
+ create mode 100644 drivers/perf/hisilicon/hisi_uncore_pmu.h
+ create mode 100644 drivers/soc/hisilicon/Kconfig
+ create mode 100644 drivers/soc/hisilicon/Makefile
+ create mode 100644 drivers/soc/hisilicon/djtag.c
+ create mode 100644 include/linux/soc/hisilicon/djtag.h
+
+-- 
+2.1.4
