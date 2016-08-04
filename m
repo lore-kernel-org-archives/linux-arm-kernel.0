@@ -1,85 +1,93 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Thu, 4 Aug 2016 16:38:37 +0100
-Subject: [PATCH 1/8] ARM: assembler: introduce adr_l, ldr_l and str_l
- macros
-In-Reply-To: <CAKv+Gu85A12DYh3B9zAPOrNfozgv_Vw+RtSa90rLRn0jdhh5Mg@mail.gmail.com>
-References: <20160803180934.GK1041@n2100.armlinux.org.uk>
- <CAKv+Gu9Wyiu38J=K00WKXSeFoDF2vS-3TJAvbz9Yo616GBXSwQ@mail.gmail.com>
- <20160804093851.GD7147@e103592.cambridge.arm.com>
- <CAKv+Gu8_5-VcBxnjLrJxgKcJfVFb785qvVzbB6kryqhhkCfQbA@mail.gmail.com>
- <20160804110832.GF7147@e103592.cambridge.arm.com>
- <CAKv+Gu_JVX3erz6N64EGfu38TDi6PHsQVGY=nkfu7kF-8Hq=6Q@mail.gmail.com>
- <20160804113018.GH7147@e103592.cambridge.arm.com>
- <CAKv+Gu_r4Rx=pvZWNaE1f-_QDiwyn62uS+MzPyNUqndE5jCS2Q@mail.gmail.com>
- <20160804133134.GJ7147@e103592.cambridge.arm.com>
- <CAKv+Gu85A12DYh3B9zAPOrNfozgv_Vw+RtSa90rLRn0jdhh5Mg@mail.gmail.com>
-Message-ID: <20160804153837.GK7147@e103592.cambridge.arm.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 4 Aug 2016 16:38:35 +0100
+Subject: [PATCH] dmaengine: qcom_hidma: release the descriptor before the
+ callback
+In-Reply-To: <cff588a1-d85f-3d2c-ef61-1674d0d3ca92@codeaurora.org>
+References: <1468465076-27324-1-git-send-email-okaya@codeaurora.org>
+ <ccffcabf-1448-57a1-d18b-715cfd46e906@codeaurora.org>
+ <20160724062425.GW9681@localhost>
+ <971733d9-fd18-2a1b-07c0-349b47747d49@codeaurora.org>
+ <20160804125525.GF9681@localhost>
+ <71a15611-645f-7523-1c26-14b420aff667@codeaurora.org>
+ <20160804144003.GV1041@n2100.armlinux.org.uk>
+ <cff588a1-d85f-3d2c-ef61-1674d0d3ca92@codeaurora.org>
+Message-ID: <20160804153835.GY1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 04, 2016 at 03:46:53PM +0200, Ard Biesheuvel wrote:
-> On 4 August 2016 at 15:31, Dave Martin <Dave.Martin@arm.com> wrote:
-> > On Thu, Aug 04, 2016 at 01:34:03PM +0200, Ard Biesheuvel wrote:
-> >> On 4 August 2016 at 13:30, Dave Martin <Dave.Martin@arm.com> wrote:
-> >> > On Thu, Aug 04, 2016 at 01:10:55PM +0200, Ard Biesheuvel wrote:
-
-[...]
-
-> >> >> Yes, but how is LD going to perform the arithmetic involved in
-> >
-> > [...]
-> >
-> >> >> handling these relocations? That's is the more interesting part, and
-> >> >> that is not implemented either in binutils < 2.18
-> >> >
-> >> > What arithmetic?
-> >> >
+On Thu, Aug 04, 2016 at 11:27:46AM -0400, Sinan Kaya wrote:
+> On 8/4/2016 10:40 AM, Russell King - ARM Linux wrote:
+> > On Thu, Aug 04, 2016 at 10:17:24AM -0400, Sinan Kaya wrote:
+> >> Thanks for describing this. I was confused about DMA_SUCCESS and DMA_COMPLETE.
+> >> I now understand that tx_success API just returns information that the request
+> >> was executed whether the result is error or not. This makes sense now.
 > >>
-> >> The arithmetic involved in populating the immediate fields of these
-> >> instructions based on the actual offset between the Place and the
-> >> Symbol in the final image.
-> >
-> > <digression>
-> >
-> > Just for interest...
-> >
-> >
-> > For the linker this is just ordinary relocation processing -- there's
-> > nothing unusual going on, except that neither GCC nor gas usually
-> > emit these particular insn relocs automatically.
-> >
+> >> However, if the txn is failure; then we should never call the client callback
+> >> since DMA engine cannot provide such feedback to the client without Dave's patch.
+> >> You are saying that the calling the callback is optional.
+> >>
+> >> Then, the callback cannot be optional in the error case for old behavior.
+> >>
+> >> How does the client know if memcpy executed or not? The client got its callback
+> >> and tx_status is also DMA_COMPLETE.
+> > 
+> > If an error occurred, then dma_async_is_tx_complete() is supposed to
+> > return DMA_ERROR.  It's up to the DMA engine driver to ensure that
+> > this happens if it has error detection abilities.
+> > 
 > 
-> There is no such thing as 'ordinary' relocation processing. Each
+> Well, that's not what I'm getting from Vinod and also from the current usage
+> in most of the drivers that I looked.
+> 
+> The current drivers implement tx_status as follows.
+> 
+> static enum dma_status xyz_tx_status(struct dma_chan *chan,
+> 	dma_cookie_t cookie, struct dma_tx_state *state) 
+> {
+> ...
+> 	ret = dma_cookie_status(&c->vc.chan, cookie, state);
+> 	if (ret == DMA_COMPLETE)
+> 		return ret; 
+> ...
+> }
 
-"Ordinary" in the sense that the linker should cope with any standard
-reloc that it might receive, but...
+And... how many of those drivers detect an error occuring in the DMA?
+If they don't detect an error during DMA, I'm curious what would you
+expect the above to look like.
 
-> relocation type requires its own specific handling, and pre-2.18 LD
-> simply does not come equipped with the routines to perform the
-> calculations that the ARM/ELF spec defines for these particular
-> relocation types. Whether GAS or any other assembler can produce them
-> is irrelevant, my claim is that pre-2.18 LD does not know how to
-> /consume/ them.
+> I also made the argument that the driver should not call dma_cookie_complete
+> for failure cases and somehow return an error for transactions that failed. 
 
-you seem to be right about this.
+You can't omit individual dma_cookie_complete() calls like that (I think
+you have little understanding how the cookie system works.)
 
-There are some obsolete R_ARM_ALU_PCREL_* relocs which presumably are
-the OABI equivalents.
+The cookies consist of continuous pool of numbers.  Each transaction
+gets allocated a cookie which is incremented from the previous
+transaction.  Any transaction can be identified as complete or pending
+depending on whether the cookie value that it has is earlier or later
+than the current completion cookie value.
 
-However, ld does no overflow checking for them, silently fails to
-handle signed offsets, and also splat the target symbol address over
-the affected instruction instead of writing the carefully modified
-instruction there.  This has apparently been the behaviour ever since
-those relocs were implemented in 2004 (2.16).
+What this means is if you try to do this:
 
-So I'm guessing nobody ever really used these :/
+- transaction 1 completes successfully, call dma_cookie_complete()
+- transaction 2 completes with an error, omit dma_cookie_complete()
+- transaction 3 completes successfully, call dma_cookie_complete()
 
-The .reloc pseudo-op didn't exist before 2.18 either.
+The effect at the end of that sequence will be as if transaction 2 had
+called dma_cookie_complete() - because the completed cookie value will
+now be ahead of transaction 2's cookie.
 
-Which just about wraps this one up.
+So, playing bakes with dma_cookie_complete() really won't work.  Please
+forget this idea.  dma_cookie_complete() merely indicates whether the
+transaction completed or is still in progress.  It's got nothing to do
+with error status.
 
+What you instead need to do is to find some way to record in your
+driver that transaction 2 failed, and when dma_cookie_status() says
+that a transaction has DMA_COMPLETE status, you need to look up to
+see whether it failed.
 
-Serves me right for attempting to guess the history ;)
-
-Cheers
----Dave
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
