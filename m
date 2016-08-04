@@ -1,57 +1,78 @@
 From: peter.senna@collabora.com (Peter Senna Tschudin)
-Date: Fri,  5 Aug 2016 00:36:57 +0200
-Subject: [PATCH V4 0/4] Add driver for GE B850v3 LVDS/DP++ Bridge
-In-Reply-To: <1464626385-19253-1-git-send-email-peter.senna@collabora.com>
+Date: Fri,  5 Aug 2016 00:37:01 +0200
+Subject: [PATCH V4 4/4] dts/imx6q-b850v3: Use GE B850v3 LVDS/DP++ Bridge
+In-Reply-To: <cover.1470346720.git.peter.senna@collabora.com>
 References: <1464626385-19253-1-git-send-email-peter.senna@collabora.com>
-Message-ID: <cover.1470346720.git.peter.senna@collabora.com>
+ <cover.1470346720.git.peter.senna@collabora.com>
+Message-ID: <d992a694942e7b7b6a0dccf56a1f91e5d07a823d.1470346720.git.peter.senna@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The series adds a driver that creates a drm_bridge and a drm_connector for the
-LVDS to DP++ display bridge of the GE B850v3.
+Configures the GE B850v3 LVDS/DP++ bridge on the dts file.
 
-There are two physical bridges on the video signal pipeline: a STDP4028(LVDS to
-DP) and a STDP2690(DP to DP++).  The hardware and firmware made it complicated
-for this binding to comprise two device tree nodes, as the design goal is to
-configure both bridges based on the LVDS signal, which leave the driver
-powerless to control the video processing pipeline. The two bridges behaves as
-a single bridge, and the driver is only needed for telling the host about EDID /
-HPD, and for giving the host powers to ack interrupts. The video signal
-pipeline is as follows:
-
-  Host -> LVDS|--(STDP4028)--|DP -> DP|--(STDP2690)--|DP++ -> Video output
-
-The patches from the series:
- [1/4] Change the imx-ldb driver to allow attaching a bridge and not only a LVDS
-       panel.
-
- [2/4] Devicetree documentation for the GE B850v3 LVDS/DP++ Bridge
-
- [3/4] Add the driver, make changes to MAINTAINERS, Kconfig and Makefile
-
- [4/4] Make the changes to the B850v3 dts file to enable the GE B850v3
-       LVDS/DP++ Bridge.
-
+Cc: Javier Martinez Canillas <javier@dowhile0.org>
+Cc: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+Cc: Philipp Zabel <p.zabel@pengutronix.de>
+Cc: Rob Herring <robh@kernel.org>
+Cc: Fabio Estevam <fabio.estevam@nxp.com>
+Signed-off-by: Peter Senna Tschudin <peter.senna@collabora.com>
+---
 Changes from V3:
- - Removed the patch that was configuring the mapping between IPUs and external
-   displays on the dts file
+ - 4/4 instead of 5/5
 
-Peter Senna Tschudin (4):
-  drm/imx-ldb: Add support to drm-bridge
-  Documentation/devicetree/bindings: b850v3_lvds_dp
-  drm/bridge: Add driver for GE B850v3 LVDS/DP++ Bridge
-  dts/imx6q-b850v3: Use GE B850v3 LVDS/DP++ Bridge
+Unchanged from V2
 
- .../devicetree/bindings/ge/b850v3-lvds-dp.txt      |  37 ++
- MAINTAINERS                                        |   8 +
- arch/arm/boot/dts/imx6q-b850v3.dts                 |  30 ++
- drivers/gpu/drm/bridge/Kconfig                     |  11 +
- drivers/gpu/drm/bridge/Makefile                    |   1 +
- drivers/gpu/drm/bridge/ge_b850v3_lvds_dp.c         | 397 +++++++++++++++++++++
- drivers/gpu/drm/imx/imx-ldb.c                      | 118 +++---
- 7 files changed, 562 insertions(+), 40 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/ge/b850v3-lvds-dp.txt
- create mode 100644 drivers/gpu/drm/bridge/ge_b850v3_lvds_dp.c
+Changes from V1:
+ - Replaced '_' by '-' in node names or compatible strings
+ - Added missing @73 to b850v3-lvds-dp-bridge
 
+ arch/arm/boot/dts/imx6q-b850v3.dts | 30 ++++++++++++++++++++++++++++++
+ 1 file changed, 30 insertions(+)
+
+diff --git a/arch/arm/boot/dts/imx6q-b850v3.dts b/arch/arm/boot/dts/imx6q-b850v3.dts
+index 167f744..8db3bf2 100644
+--- a/arch/arm/boot/dts/imx6q-b850v3.dts
++++ b/arch/arm/boot/dts/imx6q-b850v3.dts
+@@ -72,6 +72,13 @@
+ 		fsl,data-mapping = "spwg";
+ 		fsl,data-width = <24>;
+ 		status = "okay";
++
++		port at 4 {
++			reg = <4>;
++			lvds0_out: endpoint {
++				remote-endpoint = <&b850v3_lvds_dp_bridge_in>;
++			};
++		};
+ 	};
+ };
+ 
+@@ -142,3 +149,26 @@
+ 		reg = <0x4a>;
+ 	};
+ };
++
++&mux2_i2c2 {
++	status = "okay";
++	clock-frequency = <100000>;
++
++	b850v3-lvds-dp-bridge at 73 {
++		compatible = "ge,b850v3-lvds-dp";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		reg = <0x73>;
++		interrupt-parent = <&gpio2>;
++		interrupts = <0 IRQ_TYPE_LEVEL_HIGH>;
++
++		edid-reg = <0x72>;
++
++		port {
++			b850v3_lvds_dp_bridge_in: endpoint {
++				remote-endpoint = <&lvds0_out>;
++			};
++		};
++	};
++};
 -- 
 2.5.5
