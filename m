@@ -1,37 +1,83 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 04 Aug 2016 13:13:06 +0200
-Subject: Support for configurable PCIe endpoint
-In-Reply-To: <57A31299.2040805@ti.com>
-References: <57A18927.9070003@ti.com>
- <7c696488-eb78-d6d9-dc70-49fa5b4e3317@synopsys.com> <57A31299.2040805@ti.com>
-Message-ID: <2422602.ltmdGR0pWX@wuerfel>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Thu, 4 Aug 2016 12:22:29 +0100
+Subject: [PATCH 1/8] ARM: assembler: introduce adr_l, ldr_l and str_l
+ macros
+In-Reply-To: <CAKv+Gu-T9+fhvRk-RroDqr7QvQ24cUTuONL9uT-Ws24n_nHrCw@mail.gmail.com>
+References: <1470238730-30038-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1470238730-30038-2-git-send-email-ard.biesheuvel@linaro.org>
+ <20160803164940.GC7147@e103592.cambridge.arm.com>
+ <CAKv+Gu_3YKfdCyMuTdrk+t16qQOuMiSqWEHf-h1K2ajM5s1rxw@mail.gmail.com>
+ <20160804094451.GE7147@e103592.cambridge.arm.com>
+ <CAKv+Gu-T9+fhvRk-RroDqr7QvQ24cUTuONL9uT-Ws24n_nHrCw@mail.gmail.com>
+Message-ID: <20160804112229.GG7147@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, August 4, 2016 3:32:01 PM CEST Kishon Vijay Abraham I wrote:
-> On Wednesday 03 August 2016 07:09 PM, Joao Pinto wrote:
-> > 
-> > You are rising a topic that we are also addressing in Synopsys.
-> > 
-> > For the PCIe RC hardware validation we are currently using the standard
-> > pcie-designware and pcie-designware-plat drivers.
-> > 
-> > For the Endpoint we have to use an internal software package. Its main purpose
-> > is to initialize the IP registers, eDMA channels and make data transfer to prove
-> > that the everything is working properly. This is done in 2 levels, a custom
-> > driver built and loaded and an application that makes some ioctl to the driver
-> > executing some interesting functions to check the Endpoint status and make some
-> > data exchange.
+On Thu, Aug 04, 2016 at 12:34:58PM +0200, Ard Biesheuvel wrote:
+> On 4 August 2016 at 11:44, Dave Martin <Dave.Martin@arm.com> wrote:
+> > On Thu, Aug 04, 2016 at 09:40:31AM +0200, Ard Biesheuvel wrote:
+> >> On 3 August 2016 at 18:49, Dave Martin <Dave.Martin@arm.com> wrote:
+> >> > On Wed, Aug 03, 2016 at 05:38:43PM +0200, Ard Biesheuvel wrote:
+> [...]
+> >> >> +#else
+> >> >> +     add     \dst, pc, #:pc_g0_nc:(\sym) - 8
+> >> >> +     add     \dst, \dst, #:pc_g1_nc:(\sym) - 4
+> >> >> +     add     \dst, \dst, #:pc_g2:(\sym)
+> >> >
+> >> > Whoah.  I've never seen this syntax before...  does this work for any
+> >> > named reloc, or just for certain blessed relocs?  (I'm also _assuming_
+> >> > the assembler support for this functionality is ancient -- if not,
+> >> > there may be toolchain compatibility issues.)
+> >> >
+> >> > Based on my understanding of how these relocs work, this should do the
+> >> > right thing, though.
+> >> >
+> >> >
+> >> > Second question: for arm, this reduces the range addressable to
+> >> > pc +/- 26-bit offset (24-bit if sym is not word aligned, but that
+> >> > probably never happens).
+> >> >
+> >> > I can't remember the de facto limit on the size of vmlinux for arm --
+> >> > are you sure this extra limitation won't break some cases of huge
+> >> > initramfs where adr_l gets used for cross-section references?
+> >> >
+> >>
+> >> Yes, that seems a valid concern. We have +/- 64 MB for the adr_l
+> >> variant (as you say, for word aligned symbols), but this may be
+> >> insufficient. The ldr/str variants don't have the same limitation.
+> >
+> > True, but they're still limited, I think in effect to +/- 256 MB.
+> >
 > 
-> hmm.. the platform I have doesn't have a DMA in PCIe IP
-> (http://www.ti.com/lit/ug/spruhz6g/spruhz6g.pdf). So in your testing does the
-> EP access RC memory? i.e the driver in the RC allocates memory from it's DDR
-> and gives it's DDR address to the EP. The EP then transfers data to this
-> address. (This is a typical use case with ethernet PCIe cards). IIUC that's not
-> simple with configurable EPs. I'd like to know more about your testing though.
+> Yes. I managed to hack around the limitation by doing this
+> 
+> .macro adr_fwd, dst, sym, tmp
+> add \dst, pc, #:pc_g0_nc:(\sym) - 8
+> add \dst, \dst, #:pc_g1_nc:(\sym) - 4
+> .reloc ., R_ARM_LDR_PC_G2, \sym
+> mov \tmp, #0
+> add \dst, \dst, \tmp
+> .endm
+> 
+> but it is becoming very hacky, and this only works for forward
+> references anyway.
 
+Indeed.  You can't use relocs on different insns than they're intended
+for.
 
-What's the difference between using the EDMA on that chip or a DMA engine
-that is part of the PCIe bridge?
+The linker is allowed to assume that the initial insn is a valid one
+for the reloc -- without this, the addend couldn't be encoded reliably.
+In this case, the linker might replace the MOV with an LDR, a MOV with
+the wrong offset, or garbage.
 
-	Arnd
+> So I think this is a dead end. Series withdrawn.
+
+Neat idea, but it's a shame about the limitations and compatibility
+issues.
+
+The more conventional literal-.long approach could still be macro-ised
+along the same lines, which might make the affected code more readable,
+but the idiom you'd be replacing is well-understood and not very common.
+
+Cheers
+---Dave
