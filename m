@@ -1,262 +1,39 @@
-From: mbrugger@suse.com (Matthias Brugger)
-Date: Thu,  4 Aug 2016 11:15:15 +0200
-Subject: [PATCH 2/4] arm64: Implement IPI based TLB invalidation
-In-Reply-To: <1470302117-32296-1-git-send-email-mbrugger@suse.com>
-References: <1470302117-32296-1-git-send-email-mbrugger@suse.com>
-Message-ID: <1470302117-32296-3-git-send-email-mbrugger@suse.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu,  4 Aug 2016 10:21:44 +0100
+Subject: [PATCH 0/9] remoteproc: Allow platform-specific drivers to request
+ resources
+Message-ID: <20160804092153.23032-1-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hardware may lack a sane implementation of TLB invalidation
-using broadcast TLBI command. Add a capability to enable TLB
-invalidation using IPI.
+Once this patch-set has been applied; platform-specific remoteproc
+drivers will be able to amend existing resource table entries,
+provide new entries to be appended to an existing resource table
+(if one already exists), start a new resource table (if one does
+not already exist), and dump out resource table contents during
+development/debugging.  It will also be possible to start remote
+processors which do not require a resource table without being
+forced to provide a fake one.
 
-Signed-off-by: David Daney <david.daney@cavium.com>
-Signed-off-by: Robert Richter <rrichter@cavium.com>
-Signed-off-by: Alexander Graf <agraf@suse.de>
-Signed-off-by: Matthias Brugger <mbrugger@suse.com>
----
- arch/arm64/include/asm/cpufeature.h |  3 +-
- arch/arm64/include/asm/tlbflush.h   | 94 ++++++++++++++++++++++++++++++++-----
- arch/arm64/mm/flush.c               | 46 ++++++++++++++++++
- 3 files changed, 129 insertions(+), 14 deletions(-)
+We're also taking the liberty to provide some simple fix-ups.
 
-diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-index 49dd1bd..c4bf72b 100644
---- a/arch/arm64/include/asm/cpufeature.h
-+++ b/arch/arm64/include/asm/cpufeature.h
-@@ -36,8 +36,9 @@
- #define ARM64_HAS_VIRT_HOST_EXTN		11
- #define ARM64_WORKAROUND_CAVIUM_27456		12
- #define ARM64_HAS_32BIT_EL0			13
-+#define ARM64_HAS_NO_BCAST_TLBI			14
- 
--#define ARM64_NCAPS				14
-+#define ARM64_NCAPS				15
- 
- #ifndef __ASSEMBLY__
- 
-diff --git a/arch/arm64/include/asm/tlbflush.h b/arch/arm64/include/asm/tlbflush.h
-index b460ae2..edc5495 100644
---- a/arch/arm64/include/asm/tlbflush.h
-+++ b/arch/arm64/include/asm/tlbflush.h
-@@ -71,7 +71,10 @@ static inline void local_flush_tlb_all(void)
- 	isb();
- }
- 
--static inline void flush_tlb_all(void)
-+void __flush_tlb_all_ipi(void);
-+void __flush_tlb_mm_ipi(struct mm_struct *mm);
-+
-+static inline void __flush_tlb_all_tlbi(void)
- {
- 	dsb(ishst);
- 	asm("tlbi	vmalle1is");
-@@ -79,7 +82,17 @@ static inline void flush_tlb_all(void)
- 	isb();
- }
- 
--static inline void flush_tlb_mm(struct mm_struct *mm)
-+static inline void flush_tlb_all(void)
-+{
-+	if (cpus_have_cap(ARM64_HAS_NO_BCAST_TLBI)) {
-+		__flush_tlb_all_ipi();
-+		return;
-+	}
-+
-+	__flush_tlb_all_tlbi();
-+}
-+
-+static inline void __flush_tlb_mm_tlbi(struct mm_struct *mm)
- {
- 	unsigned long asid = ASID(mm) << 48;
- 
-@@ -88,8 +101,18 @@ static inline void flush_tlb_mm(struct mm_struct *mm)
- 	dsb(ish);
- }
- 
--static inline void flush_tlb_page(struct vm_area_struct *vma,
--				  unsigned long uaddr)
-+static inline void flush_tlb_mm(struct mm_struct *mm)
-+{
-+	if (cpus_have_cap(ARM64_HAS_NO_BCAST_TLBI)) {
-+		__flush_tlb_mm_ipi(mm);
-+		return;
-+	}
-+
-+	__flush_tlb_mm_tlbi(mm);
-+}
-+
-+static inline void __flush_tlb_page_tlbi(struct vm_area_struct *vma,
-+		unsigned long uaddr)
- {
- 	unsigned long addr = uaddr >> 12 | (ASID(vma->vm_mm) << 48);
- 
-@@ -98,15 +121,26 @@ static inline void flush_tlb_page(struct vm_area_struct *vma,
- 	dsb(ish);
- }
- 
-+static inline void flush_tlb_page(struct vm_area_struct *vma,
-+		unsigned long uaddr)
-+{
-+	if (cpus_have_cap(ARM64_HAS_NO_BCAST_TLBI)) {
-+		__flush_tlb_mm_ipi(vma->vm_mm);
-+		return;
-+	}
-+
-+	__flush_tlb_page_tlbi(vma, uaddr);
-+}
-+
- /*
-  * This is meant to avoid soft lock-ups on large TLB flushing ranges and not
-  * necessarily a performance improvement.
-  */
- #define MAX_TLB_RANGE	(1024UL << PAGE_SHIFT)
- 
--static inline void __flush_tlb_range(struct vm_area_struct *vma,
--				     unsigned long start, unsigned long end,
--				     bool last_level)
-+static inline void __flush_tlb_range_tlbi(struct vm_area_struct *vma,
-+		unsigned long start, unsigned long end,
-+		bool last_level)
- {
- 	unsigned long asid = ASID(vma->vm_mm) << 48;
- 	unsigned long addr;
-@@ -129,13 +163,26 @@ static inline void __flush_tlb_range(struct vm_area_struct *vma,
- 	dsb(ish);
- }
- 
-+static inline void __flush_tlb_range(struct vm_area_struct *vma,
-+		unsigned long start, unsigned long end,
-+		bool last_level)
-+{
-+	if (cpus_have_cap(ARM64_HAS_NO_BCAST_TLBI)) {
-+		__flush_tlb_mm_ipi(vma->vm_mm);
-+		return;
-+	}
-+
-+	__flush_tlb_range_tlbi(vma, start, end, last_level);
-+}
-+
- static inline void flush_tlb_range(struct vm_area_struct *vma,
--				   unsigned long start, unsigned long end)
-+		unsigned long start, unsigned long end)
- {
- 	__flush_tlb_range(vma, start, end, false);
- }
- 
--static inline void flush_tlb_kernel_range(unsigned long start, unsigned long end)
-+static inline void __flush_tlb_kernel_range_tlbi(unsigned long start,
-+		unsigned long end)
- {
- 	unsigned long addr;
- 
-@@ -154,17 +201,38 @@ static inline void flush_tlb_kernel_range(unsigned long start, unsigned long end
- 	isb();
- }
- 
-+static inline void flush_tlb_kernel_range(unsigned long start, unsigned long end)
-+{
-+	if (cpus_have_cap(ARM64_HAS_NO_BCAST_TLBI)) {
-+		__flush_tlb_all_ipi();
-+		return;
-+	}
-+
-+	__flush_tlb_kernel_range_tlbi(start, end);
-+}
-+
-+static inline void __flush_tlb_pgtable_tlbi(struct mm_struct *mm,
-+		unsigned long uaddr)
-+{
-+	unsigned long addr = uaddr >> 12 | (ASID(mm) << 48);
-+
-+	asm("tlbi	vae1is, %0" : : "r" (addr));
-+	dsb(ish);
-+}
-+
- /*
-  * Used to invalidate the TLB (walk caches) corresponding to intermediate page
-  * table levels (pgd/pud/pmd).
-  */
- static inline void __flush_tlb_pgtable(struct mm_struct *mm,
--				       unsigned long uaddr)
-+		unsigned long uaddr)
- {
--	unsigned long addr = uaddr >> 12 | (ASID(mm) << 48);
-+	if (cpus_have_cap(ARM64_HAS_NO_BCAST_TLBI)) {
-+		__flush_tlb_mm_ipi(mm);
-+		return;
-+	}
- 
--	asm("tlbi	vae1is, %0" : : "r" (addr));
--	dsb(ish);
-+	__flush_tlb_pgtable_tlbi(mm, uaddr);
- }
- 
- #endif
-diff --git a/arch/arm64/mm/flush.c b/arch/arm64/mm/flush.c
-index 43a76b0..402036a 100644
---- a/arch/arm64/mm/flush.c
-+++ b/arch/arm64/mm/flush.c
-@@ -27,6 +27,24 @@
- 
- #include "mm.h"
- 
-+static void flush_tlb_local(void *info)
-+{
-+	local_flush_tlb_all();
-+}
-+
-+static void flush_tlb_mm_local(void *info)
-+{
-+	unsigned long asid = (unsigned long)info;
-+
-+	asm volatile("\n"
-+	"  dsb     nshst\n"
-+	"  tlbi    aside1, %0\n"
-+	"  dsb     nsh\n"
-+	"  isb     sy"
-+	: : "r" (asid)
-+	);
-+}
-+
- void flush_cache_range(struct vm_area_struct *vma, unsigned long start,
- 		       unsigned long end)
- {
-@@ -90,6 +108,34 @@ void flush_dcache_page(struct page *page)
- }
- EXPORT_SYMBOL(flush_dcache_page);
- 
-+void __flush_tlb_mm_ipi(struct mm_struct *mm)
-+{
-+	unsigned long asid;
-+
-+	if (!mm) {
-+		flush_tlb_all();
-+	} else {
-+		asid = ASID(mm) << 48;
-+		/* Make sure page table modifications are visible. */
-+		dsb(ishst);
-+		/* IPI to all CPUs to do local flush. */
-+		on_each_cpu(flush_tlb_mm_local, (void *)asid, 1);
-+	}
-+}
-+EXPORT_SYMBOL(__flush_tlb_mm_ipi);
-+
-+void __flush_tlb_all_ipi(void)
-+{
-+	/* Make sure page table modifications are visible. */
-+	dsb(ishst);
-+	if (num_online_cpus() <= 1)
-+		local_flush_tlb_all();
-+	else
-+		/* IPI to all CPUs to do local flush. */
-+		on_each_cpu(flush_tlb_local, NULL, 1);
-+}
-+EXPORT_SYMBOL(__flush_tlb_all_ipi);
-+
- /*
-  * Additional functions defined in assembly.
-  */
+Lee Jones (9):
+  remoteproc: core: Ensure error message is clear
+  remoteproc: core: Trivial: Improve error checking, spelling and debug
+    prints
+  remoteproc: core: Remove pointless OOM print
+  remoteproc: core: New API to add new resources to the resource table
+  remoteproc: core: Add function to amend an existing resource table
+    entry
+  remoteproc: core: Add function to append a new resource table entry
+  remoteproc: core: Add function to over-ride current resource table
+  remoteproc: core: Skip resource table integrity checks if there are
+    amendments
+  remoteproc: core: Support empty resource tables
+
+ drivers/remoteproc/remoteproc_core.c | 354 +++++++++++++++++++++++++++++++++--
+ include/linux/remoteproc.h           |  21 +++
+ 2 files changed, 358 insertions(+), 17 deletions(-)
+
 -- 
-2.6.6
+2.9.0
