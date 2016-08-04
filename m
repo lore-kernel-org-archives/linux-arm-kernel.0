@@ -1,70 +1,77 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Thu, 4 Aug 2016 13:28:38 +0300
-Subject: [PATCHv3 03/11] crypto: omap-sham: implement context export/import
- APIs
+Date: Thu, 4 Aug 2016 13:28:36 +0300
+Subject: [PATCHv3 01/11] crypto: omap-sham: avoid executing tasklet where not
+ needed
 In-Reply-To: <1470306526-27219-1-git-send-email-t-kristo@ti.com>
 References: <1470306526-27219-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1470306526-27219-4-git-send-email-t-kristo@ti.com>
+Message-ID: <1470306526-27219-2-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Context export/import are now required for ahash algorithms due to
-required support in algif_hash. Implement these for OMAP SHA driver,
-saving and restoring the internal state of the driver.
+Some of the call paths of OMAP SHA driver can avoid executing the next
+step of the crypto queue under tasklet; instead, execute the next step
+directly via function call. This avoids a costly round-trip via the
+scheduler giving a slight performance boost.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- drivers/crypto/omap-sham.c | 31 +++++++++++++++++++++++++++++--
- 1 file changed, 29 insertions(+), 2 deletions(-)
+ drivers/crypto/omap-sham.c | 20 +++++++++++++++-----
+ 1 file changed, 15 insertions(+), 5 deletions(-)
 
 diff --git a/drivers/crypto/omap-sham.c b/drivers/crypto/omap-sham.c
-index 6e53944..aa71e61 100644
+index 7fe4eef..fd50005 100644
 --- a/drivers/crypto/omap-sham.c
 +++ b/drivers/crypto/omap-sham.c
-@@ -1379,6 +1379,27 @@ exit_unlock:
- 	return ret;
+@@ -1005,9 +1005,6 @@ static void omap_sham_finish_req(struct ahash_request *req, int err)
+ 
+ 	if (req->base.complete)
+ 		req->base.complete(&req->base, err);
+-
+-	/* handle new request */
+-	tasklet_schedule(&dd->done_task);
  }
  
-+static int omap_sham_export(struct ahash_request *req, void *out)
-+{
-+	struct omap_sham_reqctx *rctx = ahash_request_ctx(req);
-+
-+	while (omap_sham_flush(req) == -EINPROGRESS)
-+		msleep(10);
-+
-+	memcpy(out, rctx, sizeof(*rctx) + SHA512_BLOCK_SIZE);
-+
-+	return 0;
-+}
-+
-+static int omap_sham_import(struct ahash_request *req, const void *in)
-+{
-+	struct omap_sham_reqctx *rctx = ahash_request_ctx(req);
-+
-+	memcpy(rctx, in, sizeof(*rctx) + SHA512_BLOCK_SIZE);
-+
-+	return 0;
-+}
-+
- static struct ahash_alg algs_sha1_md5[] = {
- {
- 	.init		= omap_sham_init,
-@@ -2037,8 +2058,14 @@ static int omap_sham_probe(struct platform_device *pdev)
+ static int omap_sham_handle_queue(struct omap_sham_dev *dd,
+@@ -1018,6 +1015,7 @@ static int omap_sham_handle_queue(struct omap_sham_dev *dd,
+ 	unsigned long flags;
+ 	int err = 0, ret = 0;
  
- 	for (i = 0; i < dd->pdata->algs_info_size; i++) {
- 		for (j = 0; j < dd->pdata->algs_info[i].size; j++) {
--			err = crypto_register_ahash(
--					&dd->pdata->algs_info[i].algs_list[j]);
-+			struct ahash_alg *alg;
++retry:
+ 	spin_lock_irqsave(&dd->lock, flags);
+ 	if (req)
+ 		ret = ahash_enqueue_request(&dd->queue, req);
+@@ -1061,11 +1059,19 @@ static int omap_sham_handle_queue(struct omap_sham_dev *dd,
+ 		err = omap_sham_final_req(dd);
+ 	}
+ err1:
+-	if (err != -EINPROGRESS)
++	dev_dbg(dd->dev, "exit, err: %d\n", err);
 +
-+			alg = &dd->pdata->algs_info[i].algs_list[j];
-+			alg->export = omap_sham_export;
-+			alg->import = omap_sham_import;
-+			alg->halg.statesize = sizeof(struct omap_sham_reqctx) +
-+				SHA512_BLOCK_SIZE;
-+			err = crypto_register_ahash(alg);
- 			if (err)
- 				goto err_algs;
++	if (err != -EINPROGRESS) {
+ 		/* done_task will not finish it, so do it here */
+ 		omap_sham_finish_req(req, err);
++		req = NULL;
  
+-	dev_dbg(dd->dev, "exit, err: %d\n", err);
++		/*
++		 * Execute next request immediately if there is anything
++		 * in queue.
++		 */
++		goto retry;
++	}
+ 
+ 	return ret;
+ }
+@@ -1653,6 +1659,10 @@ finish:
+ 	dev_dbg(dd->dev, "update done: err: %d\n", err);
+ 	/* finish curent request */
+ 	omap_sham_finish_req(dd->req, err);
++
++	/* If we are not busy, process next req */
++	if (!test_bit(FLAGS_BUSY, &dd->flags))
++		omap_sham_handle_queue(dd, NULL);
+ }
+ 
+ static irqreturn_t omap_sham_irq_common(struct omap_sham_dev *dd)
 -- 
 1.9.1
