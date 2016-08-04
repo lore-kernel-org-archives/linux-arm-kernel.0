@@ -1,87 +1,99 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu,  4 Aug 2016 10:21:50 +0100
-Subject: [PATCH 6/9] remoteproc: core: Add function to append a new resource
- table entry
+Date: Thu,  4 Aug 2016 10:21:49 +0100
+Subject: [PATCH 5/9] remoteproc: core: Add function to amend an existing
+ resource table entry
 In-Reply-To: <20160804092153.23032-1-lee.jones@linaro.org>
 References: <20160804092153.23032-1-lee.jones@linaro.org>
-Message-ID: <20160804092153.23032-7-lee.jones@linaro.org>
+Message-ID: <20160804092153.23032-6-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A new function now exists to pull in and amend and existing resource
-table entry.  But what if we wish to provide a new resource?  This
-function provides functionality to append a brand new resource entry
-onto the resource table.  All complexity related to shuffling parts
-of the table around, providing new offsets and incriminating number
-of entries in the resource table's top-level header is taken care of
-here.
+Sometimes the firmware does not know best.
+
+When a firmware is built, it can be loaded with a resource table, usually
+detailing shared; memory, virtual device, trace log information etc.
+However, some vendors require this hard-coded information to be amended
+with new/improved information obtained from Device Tree for instance.
+
+Until now, no method exists which allows the resource table to be amended.
+The addition of this function changes that.  It is now possible to pull in
+a resource table and amend it before it is finally shared with the remote
+device.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/remoteproc/remoteproc_core.c | 55 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 55 insertions(+)
+ drivers/remoteproc/remoteproc_core.c | 63 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 63 insertions(+)
 
 diff --git a/drivers/remoteproc/remoteproc_core.c b/drivers/remoteproc/remoteproc_core.c
-index 3318ebd..111350e 100644
+index 0abfa2b..3318ebd 100644
 --- a/drivers/remoteproc/remoteproc_core.c
 +++ b/drivers/remoteproc/remoteproc_core.c
-@@ -980,6 +980,61 @@ static int rproc_update_resource_table_entry(struct rproc *rproc,
- 	return !updated;
+@@ -917,6 +917,69 @@ int rproc_request_resource(struct rproc *rproc, u32 type, void *resource)
  }
+ EXPORT_SYMBOL(rproc_request_resource);
  
-+static struct resource_table*
-+rproc_add_resource_table_entry(struct rproc *rproc,
-+			       struct rproc_request_resource *request,
-+			       struct resource_table *old_table, int *tablesz)
++static int rproc_update_resource_table_entry(struct rproc *rproc,
++				struct rproc_request_resource *request,
++				struct resource_table *table, int size)
 +{
-+	struct resource_table *table;
-+	struct fw_rsc_hdr h;
-+	void *new_rsc_loc;
-+	void *fw_header_loc;
-+	void *start_of_rscs;
-+	int new_rsc_offset;
-+	int size = *tablesz;
++	struct fw_rsc_carveout *tblc, *newc;
++	struct fw_rsc_devmem *tbld, *newd;
++	struct fw_rsc_trace *tblt, *newt;
++	int updated = true;
 +	int i;
 +
-+	h.type = request->type;
++	for (i = 0; i < table->num; i++) {
++		int offset = table->offset[i];
++		struct fw_rsc_hdr *hdr = (void *)table + offset;
++		void *rsc = (void *)hdr + sizeof(*hdr);
 +
-+	new_rsc_offset = size;
++		if (request->type != hdr->type)
++			continue;
 +
-+	/*
-+	 * Allocate another contiguous chunk of memory, large enough to
-+	 * contain the new, expanded resource table.
-+	 *
-+	 * The +4 is for the extra offset[] element in the top level header
-+	 */
-+	size += sizeof(struct fw_rsc_hdr) + request->size + 4;
-+	table = devm_kmemdup(&rproc->dev, old_table, size, GFP_KERNEL);
-+	if (!table)
-+		return ERR_PTR(-ENOMEM);
++		switch (hdr->type) {
++		case RSC_CARVEOUT:
++			tblc = rsc;
++			newc = request->resource;
 +
-+	/* Shunt table by 4 Bytes to account for the extra offset[] element */
-+	start_of_rscs = (void *)table + table->offset[0];
-+	memmove(start_of_rscs + 4,
-+		start_of_rscs, new_rsc_offset - table->offset[0]);
-+	new_rsc_offset += 4;
++			if (strncmp(newc->name, tblc->name,
++				    sizeof(*tblc->name)))
++				break;
 +
-+	/* Update existing resource entry's offsets */
-+	for (i = 0; i < table->num; i++)
-+		table->offset[i] += 4;
++			memcpy(tblc, newc, request->size);
 +
-+	/* Update the top level 'resource table' header */
-+	table->offset[table->num] = new_rsc_offset;
-+	table->num++;
++			return updated;
++		case RSC_DEVMEM:
++			tbld = rsc;
++			newd = request->resource;
 +
-+	/* Copy new firmware header into table */
-+	fw_header_loc = (void *)table + new_rsc_offset;
-+	memcpy(fw_header_loc, &h, sizeof(h));
++			if (strncmp(newd->name, tbld->name,
++				    sizeof(*tbld->name)))
++				break;
 +
-+	/* Copy new resource entry into table */
-+	new_rsc_loc = (void *)fw_header_loc + sizeof(h);
-+	memcpy(new_rsc_loc, request->resource, request->size);
++			memcpy(tbld, newd, request->size);
 +
-+	*tablesz = size;
-+	return table;
++			return updated;
++		case RSC_TRACE:
++			tblt = rsc;
++			newt = request->resource;
++
++			if (strncmp(newt->name, tblt->name,
++				    sizeof(*tblt->name)))
++				break;
++
++			memcpy(tblt, newt, request->size);
++
++			return updated;
++		default:
++			dev_err(&rproc->dev,
++				"Unsupported resource type: %d\n",
++				hdr->type);
++			return -EINVAL;
++		}
++	}
++
++	return !updated;
 +}
 +
  /*
