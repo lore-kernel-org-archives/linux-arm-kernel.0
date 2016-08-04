@@ -1,49 +1,75 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Thu, 4 Aug 2016 13:28:40 +0300
-Subject: [PATCHv3 05/11] crypto: omap-sham: fix SW fallback HMAC handling for
- omap2/omap3
+Date: Thu, 4 Aug 2016 13:28:45 +0300
+Subject: [PATCHv3 10/11] crypto: omap-aes: fix crypto engine initialization
+ order
 In-Reply-To: <1470306526-27219-1-git-send-email-t-kristo@ti.com>
 References: <1470306526-27219-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1470306526-27219-6-git-send-email-t-kristo@ti.com>
+Message-ID: <1470306526-27219-11-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If software fallback is used on older hardware accelerator setup (OMAP2/
-OMAP3), the first block of data must be purged from the buffer. The
-first block contains the pre-generated ipad value required by the HW,
-but the software fallback algorithm generates its own, causing wrong
-results.
+The crypto engine must be initialized before registering algorithms,
+otherwise the test manager will crash as it attempts to execute
+tests for the algos while they are being registered.
 
+Fixes: 0529900a01cb ("crypto: omap-aes - Support crypto engine framework")
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- drivers/crypto/omap-sham.c | 13 ++++++++++++-
- 1 file changed, 12 insertions(+), 1 deletion(-)
+ drivers/crypto/omap-aes.c | 28 +++++++++++++++-------------
+ 1 file changed, 15 insertions(+), 13 deletions(-)
 
-diff --git a/drivers/crypto/omap-sham.c b/drivers/crypto/omap-sham.c
-index b4f5131..f9c5fe5 100644
---- a/drivers/crypto/omap-sham.c
-+++ b/drivers/crypto/omap-sham.c
-@@ -1145,9 +1145,20 @@ static int omap_sham_final_shash(struct ahash_request *req)
- {
- 	struct omap_sham_ctx *tctx = crypto_tfm_ctx(req->base.tfm);
- 	struct omap_sham_reqctx *ctx = ahash_request_ctx(req);
-+	int offset = 0;
+diff --git a/drivers/crypto/omap-aes.c b/drivers/crypto/omap-aes.c
+index 6ba4f70..8159523 100644
+--- a/drivers/crypto/omap-aes.c
++++ b/drivers/crypto/omap-aes.c
+@@ -1212,6 +1212,17 @@ static int omap_aes_probe(struct platform_device *pdev)
+ 	list_add_tail(&dd->list, &dev_list);
+ 	spin_unlock(&list_lock);
+ 
++	/* Initialize crypto engine */
++	dd->engine = crypto_engine_alloc_init(dev, 1);
++	if (!dd->engine)
++		goto err_engine;
 +
-+	/*
-+	 * If we are running HMAC on limited hardware support, skip
-+	 * the ipad in the beginning of the buffer if we are going for
-+	 * software fallback algorithm.
-+	 */
-+	if (test_bit(FLAGS_HMAC, &ctx->flags) &&
-+	    !test_bit(FLAGS_AUTO_XOR, &ctx->dd->flags))
-+		offset = get_block_size(ctx);
++	dd->engine->prepare_request = omap_aes_prepare_req;
++	dd->engine->crypt_one_request = omap_aes_crypt_req;
++	err = crypto_engine_start(dd->engine);
++	if (err)
++		goto err_engine;
++
+ 	for (i = 0; i < dd->pdata->algs_info_size; i++) {
+ 		if (!dd->pdata->algs_info[i].registered) {
+ 			for (j = 0; j < dd->pdata->algs_info[i].size; j++) {
+@@ -1229,26 +1240,17 @@ static int omap_aes_probe(struct platform_device *pdev)
+ 		}
+ 	}
  
- 	return omap_sham_shash_digest(tctx->fallback, req->base.flags,
--				      ctx->buffer, ctx->bufcnt, req->result);
-+				      ctx->buffer + offset,
-+				      ctx->bufcnt - offset, req->result);
- }
+-	/* Initialize crypto engine */
+-	dd->engine = crypto_engine_alloc_init(dev, 1);
+-	if (!dd->engine)
+-		goto err_algs;
+-
+-	dd->engine->prepare_request = omap_aes_prepare_req;
+-	dd->engine->crypt_one_request = omap_aes_crypt_req;
+-	err = crypto_engine_start(dd->engine);
+-	if (err)
+-		goto err_engine;
+-
+ 	return 0;
+-err_engine:
+-	crypto_engine_exit(dd->engine);
+ err_algs:
+ 	for (i = dd->pdata->algs_info_size - 1; i >= 0; i--)
+ 		for (j = dd->pdata->algs_info[i].registered - 1; j >= 0; j--)
+ 			crypto_unregister_alg(
+ 					&dd->pdata->algs_info[i].algs_list[j]);
  
- static int omap_sham_final(struct ahash_request *req)
++err_engine:
++	if (dd->engine)
++		crypto_engine_exit(dd->engine);
++
+ 	omap_aes_dma_cleanup(dd);
+ err_irq:
+ 	tasklet_kill(&dd->done_task);
 -- 
 1.9.1
