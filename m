@@ -1,122 +1,105 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Thu,  4 Aug 2016 10:53:19 -0600
-Subject: [PATCH V4 1/6] perf/core: Adding PMU driver specific configuration
-In-Reply-To: <1470329604-14356-1-git-send-email-mathieu.poirier@linaro.org>
-References: <1470329604-14356-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1470329604-14356-2-git-send-email-mathieu.poirier@linaro.org>
+Date: Thu,  4 Aug 2016 10:53:18 -0600
+Subject: [PATCH V4 0/6] perf: Driver specific configuration for PMU 
+Message-ID: <1470329604-14356-1-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch somewhat mimics the work done on address filters to
-add the infrastructure needed to pass PMU specific HW
-configuration to the driver before a session starts.
+This patchset adds the possiblity of specifying PMU driver configuration
+directly from the perf command line.  Anything that falls within the
+event specifiers '/.../' and that is preceded by the '@' symbol is
+treated as a configurable.  Two formats are supported, @cfg and
+@cfg=config.
 
-Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
----
- include/linux/perf_event.h            |  9 +++++++++
- include/uapi/linux/perf_event.h       |  1 +
- kernel/events/core.c                  | 16 ++++++++++++++++
- tools/include/uapi/linux/perf_event.h |  1 +
- 4 files changed, 27 insertions(+)
+For example:
 
-diff --git a/include/linux/perf_event.h b/include/linux/perf_event.h
-index 7921f4f20a58..59d61a12cf9d 100644
---- a/include/linux/perf_event.h
-+++ b/include/linux/perf_event.h
-@@ -168,6 +168,9 @@ struct hw_perf_event {
- 	/* Last sync'ed generation of filters */
- 	unsigned long			addr_filters_gen;
- 
-+	/* HW specific configuration */
-+	void				*drv_configs;
-+
- /*
-  * hw_perf_event::state flags; used to track the PERF_EF_* state.
-  */
-@@ -442,6 +445,12 @@ struct pmu {
- 	 * Filter events for PMU-specific reasons.
- 	 */
- 	int (*filter_match)		(struct perf_event *event); /* optional */
-+
-+	/*
-+	 * PMU driver specific configuration.
-+	 */
-+	int (*set_drv_configs)		(struct perf_event *event,
-+					 void __user *arg); /* optional */
- };
- 
- /**
-diff --git a/include/uapi/linux/perf_event.h b/include/uapi/linux/perf_event.h
-index c66a485a24ac..90fbc5fd3925 100644
---- a/include/uapi/linux/perf_event.h
-+++ b/include/uapi/linux/perf_event.h
-@@ -407,6 +407,7 @@ struct perf_event_attr {
- #define PERF_EVENT_IOC_ID		_IOR('$', 7, __u64 *)
- #define PERF_EVENT_IOC_SET_BPF		_IOW('$', 8, __u32)
- #define PERF_EVENT_IOC_PAUSE_OUTPUT	_IOW('$', 9, __u32)
-+#define PERF_EVENT_IOC_SET_DRV_CONFIGS	_IOW('$', 10, char *)
- 
- enum perf_event_ioc_flags {
- 	PERF_IOC_FLAG_GROUP		= 1U << 0,
-diff --git a/kernel/events/core.c b/kernel/events/core.c
-index 79dae188a987..9208e6ec036f 100644
---- a/kernel/events/core.c
-+++ b/kernel/events/core.c
-@@ -4457,6 +4457,8 @@ static int perf_event_set_output(struct perf_event *event,
- 				 struct perf_event *output_event);
- static int perf_event_set_filter(struct perf_event *event, void __user *arg);
- static int perf_event_set_bpf_prog(struct perf_event *event, u32 prog_fd);
-+static int perf_event_set_drv_configs(struct perf_event *event,
-+				      void __user *arg);
- 
- static long _perf_ioctl(struct perf_event *event, unsigned int cmd, unsigned long arg)
- {
-@@ -4526,6 +4528,10 @@ static long _perf_ioctl(struct perf_event *event, unsigned int cmd, unsigned lon
- 		rcu_read_unlock();
- 		return 0;
- 	}
-+
-+	case PERF_EVENT_IOC_SET_DRV_CONFIGS:
-+		return perf_event_set_drv_configs(event, (void __user *)arg);
-+
- 	default:
- 		return -ENOTTY;
- 	}
-@@ -4558,6 +4564,7 @@ static long perf_compat_ioctl(struct file *file, unsigned int cmd,
- 	switch (_IOC_NR(cmd)) {
- 	case _IOC_NR(PERF_EVENT_IOC_SET_FILTER):
- 	case _IOC_NR(PERF_EVENT_IOC_ID):
-+	case _IOC_NR(PERF_EVENT_IOC_SET_DRV_CONFIGS):
- 		/* Fix up pointer size (usually 4 -> 8 in 32-on-64-bit case */
- 		if (_IOC_SIZE(cmd) == sizeof(compat_uptr_t)) {
- 			cmd &= ~IOCSIZE_MASK;
-@@ -7633,6 +7640,15 @@ void perf_bp_event(struct perf_event *bp, void *data)
- }
- #endif
- 
-+static int perf_event_set_drv_configs(struct perf_event *event,
-+				  void __user *arg)
-+{
-+	if (!event->pmu->set_drv_configs)
-+		return -EINVAL;
-+
-+	return event->pmu->set_drv_configs(event, arg);
-+}
-+
- /*
-  * Allocate a new address filter
-  */
-diff --git a/tools/include/uapi/linux/perf_event.h b/tools/include/uapi/linux/perf_event.h
-index c66a485a24ac..90fbc5fd3925 100644
---- a/tools/include/uapi/linux/perf_event.h
-+++ b/tools/include/uapi/linux/perf_event.h
-@@ -407,6 +407,7 @@ struct perf_event_attr {
- #define PERF_EVENT_IOC_ID		_IOR('$', 7, __u64 *)
- #define PERF_EVENT_IOC_SET_BPF		_IOW('$', 8, __u32)
- #define PERF_EVENT_IOC_PAUSE_OUTPUT	_IOW('$', 9, __u32)
-+#define PERF_EVENT_IOC_SET_DRV_CONFIGS	_IOW('$', 10, char *)
- 
- enum perf_event_ioc_flags {
- 	PERF_IOC_FLAG_GROUP		= 1U << 0,
+perf record -e some_event/@cfg1/ ...
+
+or
+
+perf record -e some_event/@cfg2=config/ ...
+
+or
+
+perf record -e some_event/@cfg1, at cfg2=config/ ...
+
+The above are all valid configuration and will see the strings 'cfg1'
+and 'cfg2=config' sent to the PMU driver for parsing and interpretation
+using the existing ioctl() mechanism.
+
+The primary customers for this feature are the CoreSight drivers where
+the selection of a sink (where trace data is accumulated) needs to be
+done in a previous, and separated step, from the launching of the perf
+command.
+
+As such something that used to be a two-step process:
+
+# echo 1 > /sys/bus/coresight/devices/20070000.etr/enable_sink
+# perf record -e cs_etm//u --per-thread  uname
+
+is integrated in a single command:
+
+# perf record -e cs_etm/@sink=20070000.etr/u --per-thread  uname
+
+The patches include both the kernel and user space part so that the
+solution is complete and found in a single place.
+
+It is based on [1] and assumes this set [2] has been applied.  I will
+be happy to merge the patchsets if it easier for maintainers to apply,
+simply let me know.
+
+Thanks,
+Mathieu
+
+Changes for V4:
+- Pushing PMU driver configuration for 'perf top'.
+- Rebased to the latest perf/core branch[1]. 
+
+Changes for V3:
+- Added comment for function drv_str() that explains the reason for
+  keeping the entire token intact.
+- Added driver config terms to the existing list of config terms.
+- Added documenation for driver specific configuration.
+- Pushing PMU driver configuration for 'perf stat' as well.  
+- Preventing users from selecting a sink from sysFS _and_ perf.
+
+Changes for V2:
+- Rebased to [1] as per Jiri's request.
+
+[1]. git://git.kernel.org/pub/scm/linux/kernel/git/acme/linux.git perf/core (c369e0a1a8fa)
+[2]. https://lkml.org/lkml/2016/7/20/519
+
+Mathieu Poirier (6):
+  perf/core: Adding PMU driver specific configuration
+  perf: Passing struct perf_event to function setup_aux()
+  perf tools: add infrastructure for PMU specific configuration
+  perf tools: pushing driver configuration down to the kernel
+  coresight: adding sink parameter to function coresight_build_path()
+  coresight: etm-perf: incorporating sink definition from cmd line
+
+ arch/x86/events/intel/bts.c                      |   4 +-
+ arch/x86/events/intel/pt.c                       |   5 +-
+ drivers/hwtracing/coresight/coresight-etm-perf.c | 105 ++++++++++++++++++++++-
+ drivers/hwtracing/coresight/coresight-priv.h     |   3 +-
+ drivers/hwtracing/coresight/coresight.c          |  43 +++++++---
+ include/linux/perf_event.h                       |  11 ++-
+ include/uapi/linux/perf_event.h                  |   1 +
+ kernel/events/core.c                             |  16 ++++
+ kernel/events/ring_buffer.c                      |   2 +-
+ tools/include/uapi/linux/perf_event.h            |   1 +
+ tools/perf/Documentation/perf-record.txt         |  12 +++
+ tools/perf/builtin-record.c                      |   9 ++
+ tools/perf/builtin-stat.c                        |   8 ++
+ tools/perf/builtin-top.c                         |  11 +++
+ tools/perf/util/evlist.c                         |  21 +++++
+ tools/perf/util/evlist.h                         |   3 +
+ tools/perf/util/evsel.c                          |  24 ++++++
+ tools/perf/util/evsel.h                          |   5 ++
+ tools/perf/util/parse-events.c                   |   7 +-
+ tools/perf/util/parse-events.h                   |   1 +
+ tools/perf/util/parse-events.l                   |  22 +++++
+ tools/perf/util/parse-events.y                   |  11 +++
+ 22 files changed, 301 insertions(+), 24 deletions(-)
+
 -- 
 2.7.4
