@@ -1,98 +1,94 @@
-From: robert.richter@cavium.com (Robert Richter)
-Date: Thu, 4 Aug 2016 22:57:07 +0200
-Subject: [PATCH] arm64: Add workaround for Cavium erratum 26026
-In-Reply-To: <1470302117-32296-1-git-send-email-mbrugger@suse.com>
-References: <1470302117-32296-1-git-send-email-mbrugger@suse.com>
-Message-ID: <20160804205707.GJ2151@rric.localdomain>
+From: kbeldan@baylibre.com (Karl Beldan)
+Date: Thu, 4 Aug 2016 20:58:46 +0000
+Subject: [PATCH] ARM: dts: da850: Add basic DTS for the L138/C6748 Dev Kit
+In-Reply-To: <m2popopcqu.fsf@baylibre.com>
+References: <20160804144332.4841-1-kbeldan@baylibre.com>
+ <m2popopcqu.fsf@baylibre.com>
+Message-ID: <20160804205846.GC15013@gobelin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch below is on top of Matthias' patch series:
+On Thu, Aug 04, 2016 at 12:15:05PM -0700, Kevin Hilman wrote:
+> + Sekhar
+> 
+> Hi Karl,
+> 
+> Karl Beldan <kbeldan@baylibre.com> writes:
+> 
+> > The LCDK is the successor to the late Hawkboard and has the same machine
+> > number.
+> 
+> Machine number is only relevant for legacy (non-DT) boot and this is DT
+> boot, so the machine number bit really relevant for this changelog.
+> 
+Hi Kevin,
 
- arm64: Implement IPI based TLB invalidation
+It was purely informative.
 
-The series is used to enable a workaround for Cavium ThunderX pass 1.x
-systems.
+> BTW, have you tried legacy boot on LCDK with board-omapl138-hawk.c?  I
+> assume it mostly works?
+> 
+Yes.
 
--Robert
+> > Among the differences are the flash (16bits vs 8bits) and some pins
+> > (MMC, LEDs, buttons, some external connectors), however the main
+> > components remain the same (eth. PHY, Audio Codec, Video decoder and
+> > DAC) except for the main PMIC, different and hard-wired on the LCDK (the
+> > LDOs and DCDCs are always ON).
+> > A DT-only boot with this addition gives functional uart, reboot via
+> > watchdog, rtc, ethernet and MMC (I added the CD gpio for the MMC
+> > although davinci_mmc doesn't call yet the mmc core OF facilities).
+> >
+> > Signed-off-by: Karl Beldan <kbeldan@baylibre.com>
+> 
+> Tested with v4.7 on my LCDK board.
+> 
+> Tested-by: Kevin Hilman <khilman@baylibre.com>
+> 
+> Note that I also needed CONFIG_RTC_DRV_OMAP=m enabled in
+> davinci_all_defconfig for the RTC driver. Could you add a patch for that
+> to this series as well?
+> 
+No problem. BTW do you also consider CONFIG_ items not arch specific
+(like CONFIG_NET_VENDOR_SMSC) ?
 
+> Also, plese Cc the co-maintainer Sekhar Nori (now Cc'd) on all future
+> davinci patches.
+> 
+Sure.
 
+> > ---
+> >  Documentation/devicetree/bindings/arm/davinci.txt |  4 ++
+> >  arch/arm/boot/dts/Makefile                        |  1 +
+> >  arch/arm/boot/dts/omapl138-lcdk.dts               | 71 +++++++++++++++++++++++
+> 
+> I think this should be called da850-lcdk.dts.
+> 
+> The OMAP prefix in the DT directory is just going to cause confusion,
+> and the other DTs using this same SoC are already called da850.
+> 
+That's what I thought too, mainline U-Boot is using omapl138_lcdk but
+yes da850 is less confusing given the code already present (downside is
+when you search for da850 on the net there's nothing).
 
->From abb99ee83473d9ecffb4fdaae9c69435ca670bc8 Mon Sep 17 00:00:00 2001
-From: Robert Richter <rrichter@cavium.com>
-Date: Fri, 29 Jul 2016 09:40:04 +0200
-Subject: [PATCH] arm64: Add workaround for Cavium erratum 26026
-
-STX may return a wrong status value if the store was successful.
-
-This may happen on ThunderX T88 pass 1.x cpus if a broadcast TLBI is
-executed on another cpu in parallel to an STX. As a result atomic or
-non-blocking implementations can behave incorrectly. Use IPIs that
-call local TLBIs on other cpus to avoid this.
-
-Applies to ThunderX T88 pass 1.x cpus.
-
-Signed-off-by: Robert Richter <rrichter@cavium.com>
----
- Documentation/arm64/silicon-errata.txt |  1 +
- arch/arm64/Kconfig                     | 14 ++++++++++++++
- arch/arm64/kernel/cpu_errata.c         |  8 ++++++++
- 3 files changed, 23 insertions(+)
-
-diff --git a/Documentation/arm64/silicon-errata.txt b/Documentation/arm64/silicon-errata.txt
-index 4da60b463995..0d870d934528 100644
---- a/Documentation/arm64/silicon-errata.txt
-+++ b/Documentation/arm64/silicon-errata.txt
-@@ -58,5 +58,6 @@ stable kernels.
- | Cavium         | ThunderX ITS    | #22375, #24313  | CAVIUM_ERRATUM_22375    |
- | Cavium         | ThunderX ITS    | #23144          | CAVIUM_ERRATUM_23144    |
- | Cavium         | ThunderX GICv3  | #23154          | CAVIUM_ERRATUM_23154    |
-+| Cavium         | ThunderX Core   | #26026          | CAVIUM_ERRATUM_26026    |
- | Cavium         | ThunderX Core   | #27456          | CAVIUM_ERRATUM_27456    |
- | Cavium         | ThunderX SMMUv2 | #27704          | N/A		       |
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 5a0a691d4220..8cbd9043ec6f 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -457,6 +457,20 @@ config CAVIUM_ERRATUM_23154
+> Sekhar do you have any opinion here?
+> 
+> [...]
+> 
+> > +/ {
+> > +	model = "DA850/AM1808/OMAP-L138 LCDK";
+> > +	compatible = "ti,omapl138-lcdk", "ti,da850";
+> > +
+> > +	aliases {
+> > +		serial2 = &serial2;
+> > +	};
+> > +
+> > +	chosen {
+> > +		bootargs = "console=ttyS2,115200n8 earlycon";
+> 
+> earlycon is kind of a debug option, so probably should be left out of
+> the default DT.
+> 
+Sure.
  
- 	  If unsure, say Y.
- 
-+config CAVIUM_ERRATUM_26026
-+	bool "Cavium erratum 26026: STX may return wrong status value"
-+	default y
-+	help
-+	  STX may return a wrong status value if the store was
-+	  successful. This may happen on ThunderX T88 pass 1.x cpus if
-+	  a broadcast TLBI is executed on another cpu in parallel to
-+	  an STX. As a result atomic or non-blocking implementations
-+	  can behave incorrectly. Use IPIs that call local TLBIs on
-+	  other cpus to avoid this.
-+	  Applies to ThunderX T88 pass 1.x cpus.
-+
-+	  If unsure, say Y.
-+
- config CAVIUM_ERRATUM_27456
- 	bool "Cavium erratum 27456: Broadcast TLBI instructions may cause icache corruption"
- 	default y
-diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-index af716b65110d..1e1753a6408e 100644
---- a/arch/arm64/kernel/cpu_errata.c
-+++ b/arch/arm64/kernel/cpu_errata.c
-@@ -90,6 +90,14 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
- 		MIDR_RANGE(MIDR_THUNDERX, 0x00, 0x01),
- 	},
- #endif
-+#ifdef CONFIG_CAVIUM_ERRATUM_26026
-+	{
-+	/* Cavium ThunderX, pass 1.x */
-+		.desc = "Cavium erratum 26026",
-+		.capability = ARM64_HAS_NO_BCAST_TLBI,
-+		MIDR_RANGE(MIDR_THUNDERX, 0x00, 0x01),
-+	},
-+#endif
- #ifdef CONFIG_CAVIUM_ERRATUM_27456
- 	{
- 	/* Cavium ThunderX, T88 pass 1.x - 2.1 */
--- 
-2.7.0.rc3
+Karl
