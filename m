@@ -1,14 +1,15 @@
 From: peter.senna@collabora.com (Peter Senna Tschudin)
-Date: Fri,  5 Aug 2016 00:37:01 +0200
-Subject: [PATCH V4 4/4] dts/imx6q-b850v3: Use GE B850v3 LVDS/DP++ Bridge
+Date: Fri,  5 Aug 2016 00:36:59 +0200
+Subject: [PATCH V4 2/4] Documentation/devicetree/bindings: b850v3_lvds_dp
 In-Reply-To: <cover.1470346720.git.peter.senna@collabora.com>
 References: <1464626385-19253-1-git-send-email-peter.senna@collabora.com>
  <cover.1470346720.git.peter.senna@collabora.com>
-Message-ID: <d992a694942e7b7b6a0dccf56a1f91e5d07a823d.1470346720.git.peter.senna@collabora.com>
+Message-ID: <2faeaded0bc299ffbd01c408b813f9a730a6e6db.1470346720.git.peter.senna@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Configures the GE B850v3 LVDS/DP++ bridge on the dts file.
+Devicetree bindings documentation for the GE B850v3 LVDS/DP++
+display bridge.
 
 Cc: Javier Martinez Canillas <javier@dowhile0.org>
 Cc: Enric Balletbo i Serra <enric.balletbo@collabora.com>
@@ -18,45 +19,44 @@ Cc: Fabio Estevam <fabio.estevam@nxp.com>
 Signed-off-by: Peter Senna Tschudin <peter.senna@collabora.com>
 ---
 Changes from V3:
- - 4/4 instead of 5/5
+ - 2/4 instead of 3/5
 
 Unchanged from V2
 
 Changes from V1:
  - Replaced '_' by '-' in node names or compatible strings
- - Added missing @73 to b850v3-lvds-dp-bridge
+ - Added missing @73 to the example
 
- arch/arm/boot/dts/imx6q-b850v3.dts | 30 ++++++++++++++++++++++++++++++
- 1 file changed, 30 insertions(+)
+ .../devicetree/bindings/ge/b850v3-lvds-dp.txt      | 37 ++++++++++++++++++++++
+ 1 file changed, 37 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/ge/b850v3-lvds-dp.txt
 
-diff --git a/arch/arm/boot/dts/imx6q-b850v3.dts b/arch/arm/boot/dts/imx6q-b850v3.dts
-index 167f744..8db3bf2 100644
---- a/arch/arm/boot/dts/imx6q-b850v3.dts
-+++ b/arch/arm/boot/dts/imx6q-b850v3.dts
-@@ -72,6 +72,13 @@
- 		fsl,data-mapping = "spwg";
- 		fsl,data-width = <24>;
- 		status = "okay";
+diff --git a/Documentation/devicetree/bindings/ge/b850v3-lvds-dp.txt b/Documentation/devicetree/bindings/ge/b850v3-lvds-dp.txt
+new file mode 100644
+index 0000000..f05c3e9
+--- /dev/null
++++ b/Documentation/devicetree/bindings/ge/b850v3-lvds-dp.txt
+@@ -0,0 +1,37 @@
++Driver for GE B850v3 LVDS/DP++ display bridge
 +
-+		port at 4 {
-+			reg = <4>;
-+			lvds0_out: endpoint {
-+				remote-endpoint = <&b850v3_lvds_dp_bridge_in>;
-+			};
-+		};
- 	};
- };
- 
-@@ -142,3 +149,26 @@
- 		reg = <0x4a>;
- 	};
- };
++Required properties:
++  - compatible : should be "ge,b850v3-lvds-dp".
++  - reg : should contain the address used to ack the interrupts.
++  - interrupt-parent : phandle of the interrupt controller that services
++    interrupts to the device
++  - interrupts : one interrupt should be described here, as in
++    <0 IRQ_TYPE_LEVEL_HIGH>.
++  - edid-reg : should contain the address used to read edid information
++  - port : should describe the video signal connection between the host
++    and the bridge.
++
++Example:
 +
 +&mux2_i2c2 {
 +	status = "okay";
 +	clock-frequency = <100000>;
 +
-+	b850v3-lvds-dp-bridge at 73 {
++	b850v3-lvds-dp-bridge at 73  {
 +		compatible = "ge,b850v3-lvds-dp";
 +		#address-cells = <1>;
 +		#size-cells = <0>;
@@ -68,7 +68,7 @@ index 167f744..8db3bf2 100644
 +		edid-reg = <0x72>;
 +
 +		port {
-+			b850v3_lvds_dp_bridge_in: endpoint {
++			b850v3_dp_bridge_in: endpoint {
 +				remote-endpoint = <&lvds0_out>;
 +			};
 +		};
