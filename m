@@ -1,62 +1,95 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 4 Aug 2016 11:54:25 +0200
-Subject: [PATCH 0/8] ARM: clean up PC-relative arithmetic
-In-Reply-To: <20160804094940.GM1041@n2100.armlinux.org.uk>
-References: <1470238730-30038-1-git-send-email-ard.biesheuvel@linaro.org>
- <20160803181739.GL1041@n2100.armlinux.org.uk>
- <CAKv+Gu-+ib-XuQfg8ZL4D7nSk5YRSYaCQyf+UdZPmg+5CxPmJw@mail.gmail.com>
- <20160804094940.GM1041@n2100.armlinux.org.uk>
-Message-ID: <CAKv+Gu_6WhyStkOygiM2OLA6wgZsH2KEaV2L4-yPrRUfBGewtA@mail.gmail.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Thu, 04 Aug 2016 11:56:12 +0200
+Subject: [PATCH] ARM: S3C24XX: Add dma_mask assignments for DMA devices
+Message-ID: <1470304572-14937-1-git-send-email-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4 August 2016 at 11:49, Russell King - ARM Linux
-<linux@armlinux.org.uk> wrote:
-> On Thu, Aug 04, 2016 at 09:17:04AM +0200, Ard Biesheuvel wrote:
->> On 3 August 2016 at 20:17, Russell King - ARM Linux
->> <linux@armlinux.org.uk> wrote:
->> > I don't buy that argument, sorry, and the argument is actually wrong.
->> > No, we're _not_ letting the linker do the calculations for us, we're
->> > letting the linker do _some_ of the calculation, but not all.
->> >
->> > What you're replacing the above with is stuff like (I guess, because
->> > I've no idea what this :pc_g0: notation is):
->> >
->> >         add     rX, pc, #(sym - . - 8) & 0xff
->> >         add     rX, rX, #(sym - . - 4) & 0xff00
->> >         add     rX, rX, #(sym - .) & 0xff0000
->> >
->> > which I think is a more complex (and less obvious) way to calculate it.
->> > It's also buggy when we end up with a relative offset greater than 16MB,
->> > which we have in multi-zImage kernels.
->> >
->>
->> Even if you think this is a more complex way to calculate it, at least
->> it is encapsulated in a single macro instead of having similar but not
->> identical open coded instances all over the place.
->
-> ... and, it may come as a shocker, but I don't have a problem with
-> that.
->
->> As for the range: the ldr/str variants have 28 bits of range (2x
->> scaled 8 bit immediate for the adds and a single unscaled 12 bit
->> immediate for the ldr/str). The adr variant has 26 bits (3x scaled
->> immediate counting from bit 2) range for word aligned symbols, which
->> gives us +/- 64 MB, which should be plenty. The only pathological
->> outlier is allyesconfig, but that uses Thumb2 anyway.
->
-> Our existing code allows for a range of the full address space - the only
-> thing it relies upon is that the literal data is placed within reach of
-> the code - which it will be, because it's always placed near the code
-> which is using it.
->
->> The relocations documented here
->> http://infocenter.arm.com/help/topic/com.arm.doc.ihi0044f/IHI0044F_aaelf.pdf
->
-> Right, so it's an EABI thing, and I guess you haven't tested OABI
-> builds, where I suspect these relocations aren't supported.
->
+The dma_mask assignments seem to be missed during refactoring
+of arch/arm/mach-s3c24xx. Add them to avoid DMA allocation
+failures. Without this patch sound is broken on s3c24xx
+with errors reported like:
 
-I suppose that's a fair point. But then, I'm only 40 so I am too young
-to remember this OABI stuff anyway. Does it require GCC 2.95 from your
-toolchain museum?
+s3c24xx-dma s3c2410-dma.0: coherent DMA mask is unset
+ALSA pcmC0D0p,0:: cannot preallocate for size 524288
+s3c24xx-iis s3c24xx-iis: Failed to get DMA channel capabilities,
+falling back to period counting: -6
+s3c24xx-dma s3c2410-dma.0: coherent DMA mask is unset
+...
+ALSA pcmC0D0c,0:: cannot preallocate for size 524288
+s3c24xx-iis s3c24xx-iis: Failed to get DMA channel capabilities,
+falling back to period counting: -6
+
+Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+---
+ arch/arm/mach-s3c24xx/common.c | 20 +++++++++++++++-----
+ 1 file changed, 15 insertions(+), 5 deletions(-)
+
+diff --git a/arch/arm/mach-s3c24xx/common.c b/arch/arm/mach-s3c24xx/common.c
+index bf50328..fe7485d 100644
+--- a/arch/arm/mach-s3c24xx/common.c
++++ b/arch/arm/mach-s3c24xx/common.c
+@@ -21,7 +21,7 @@
+  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ */
+ 
+-
++#include <linux/dma-mapping.h>
+ #include <linux/init.h>
+ #include <linux/module.h>
+ #include <linux/interrupt.h>
+@@ -304,6 +304,8 @@ struct s3c24xx_uart_resources s3c2410_uart_resources[] __initdata = {
+ 	},
+ };
+ 
++#define s3c24xx_device_dma_mask (*((u64[]) { DMA_BIT_MASK(32) }))
++
+ #if defined(CONFIG_CPU_S3C2410) || defined(CONFIG_CPU_S3C2412) || \
+ 	defined(CONFIG_CPU_S3C2440) || defined(CONFIG_CPU_S3C2442)
+ static struct resource s3c2410_dma_resource[] = {
+@@ -354,7 +356,9 @@ struct platform_device s3c2410_device_dma = {
+ 	.num_resources	= ARRAY_SIZE(s3c2410_dma_resource),
+ 	.resource	= s3c2410_dma_resource,
+ 	.dev	= {
+-		.platform_data	= &s3c2410_dma_platdata,
++		.dma_mask = &s3c24xx_device_dma_mask,
++		.coherent_dma_mask = DMA_BIT_MASK(32),
++		.platform_data = &s3c2410_dma_platdata,
+ 	},
+ };
+ #endif
+@@ -395,7 +399,9 @@ struct platform_device s3c2412_device_dma = {
+ 	.num_resources	= ARRAY_SIZE(s3c2410_dma_resource),
+ 	.resource	= s3c2410_dma_resource,
+ 	.dev	= {
+-		.platform_data	= &s3c2412_dma_platdata,
++		.dma_mask = &s3c24xx_device_dma_mask,
++		.coherent_dma_mask = DMA_BIT_MASK(32),
++		.platform_data = &s3c2412_dma_platdata,
+ 	},
+ };
+ #endif
+@@ -451,7 +457,9 @@ struct platform_device s3c2440_device_dma = {
+ 	.num_resources	= ARRAY_SIZE(s3c2410_dma_resource),
+ 	.resource	= s3c2410_dma_resource,
+ 	.dev	= {
+-		.platform_data	= &s3c2440_dma_platdata,
++		.dma_mask = &s3c24xx_device_dma_mask,
++		.coherent_dma_mask = DMA_BIT_MASK(32),
++		.platform_data = &s3c2440_dma_platdata,
+ 	},
+ };
+ #endif
+@@ -503,7 +511,9 @@ struct platform_device s3c2443_device_dma = {
+ 	.num_resources	= ARRAY_SIZE(s3c2443_dma_resource),
+ 	.resource	= s3c2443_dma_resource,
+ 	.dev	= {
+-		.platform_data	= &s3c2443_dma_platdata,
++		.dma_mask = &s3c24xx_device_dma_mask,
++		.coherent_dma_mask = DMA_BIT_MASK(32),
++		.platform_data = &s3c2443_dma_platdata,
+ 	},
+ };
+ #endif
+-- 
+1.9.1
