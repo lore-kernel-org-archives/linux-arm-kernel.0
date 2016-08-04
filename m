@@ -1,198 +1,211 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Thu, 4 Aug 2016 11:02:26 -0400 (EDT)
-Subject: [PATCH v5] usb: ohci-at91: Forcibly suspend ports while USB
- suspend
-In-Reply-To: <1470284612-3336-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <Pine.LNX.4.44L0.1608041048460.1387-100000@iolanthe.rowland.org>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 4 Aug 2016 16:10:10 +0100
+Subject: [PATCH v2 09/10] mfd: Add STMPE1600 support
+In-Reply-To: <1461845589-4826-10-git-send-email-patrice.chotard@st.com>
+References: <1461845589-4826-1-git-send-email-patrice.chotard@st.com>
+ <1461845589-4826-10-git-send-email-patrice.chotard@st.com>
+Message-ID: <20160804151010.GD5154@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 4 Aug 2016, Wenyou Yang wrote:
+On Thu, 28 Apr 2016, patrice.chotard at st.com wrote:
 
-> The usb controller does not managed correctly the suspend mode for
-> the ehci. In echi mode, there is no way to have utmi_suspend_o_n[1]
-> suspend without any device connected to it. This is why this specific
-> control is added to fix this issue. The suspend mode works in ohci
-> mode.
-
-Why are you talking about EHCI mode?  This patch is only for the 
-ohci-at91 driver.
-
-> This specific control is by setting the SUSPEND_A/B/C fields of
-> SFR_OHCIICR(OHCI Interrupt Configuration Register) in the SFR
-> while OHCI USB suspend.
+> From: Patrice Chotard <patrice.chotard@st.com>
 > 
-> This setting operation must be done before the USB clock disabled,
-> clear them after the USB clock enabled.
+> STMPE1600 is a 16-bit port expander.
+> Datasheet is available here :
+> http://www2.st.com/content/st_com/en/products/interfaces-and-transceivers/
+> i-o-expanders-and-level-translators/i-o-expanders/stmpe1600.html
 > 
-> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-> Reviewed-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-
-I don't know if this is any better than before!  See the comments 
-below.
-
+> Signed-off-by: Amelie DELAUNAY <amelie.delaunay@st.com>
+> Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
 > ---
-> 
-> Changes in v5:
->  - Use the USB_PORT_FEAT_SUSPEND subcase of the SetPortFeature case
->    to take care it.
->  - Update the commit log.
-> 
-> Changes in v4:
->  - To check whether the SFR node with "atmel,sama5d2-sfr" compatible
->    is present or not to decide if this feature is applied or not
->    when USB OHCI suspend/resume, instead of new compatible.
->  - Drop the compatible "atmel,sama5d2-ohci".
->  - Drop [PATCH 2/2] ARM: at91/dt: sama5d2: Use new compatible for
->    ohci node.
->  - Drop include/soc/at91/at91_sfr.h, move the macro definitions to
->    atmel-sfr.h which already exists.
->  - Change the defines to align the exists.
-> 
-> Changes in v3:
->  - Change the compatible description for more precise.
-> 
-> Changes in v2:
->  - Add compatible to support forcibly suspend the ports.
->  - Add soc/at91/at91_sfr.h to accommodate the defines.
->  - Add error checking for .sfr_regmap.
->  - Remove unnecessary regmap_read() statement.
+>  drivers/mfd/stmpe-i2c.c   |  2 ++
+>  drivers/mfd/stmpe.c       | 65 +++++++++++++++++++++++++++++++++++++++++++----
+>  drivers/mfd/stmpe.h       | 21 +++++++++++++++
+>  include/linux/mfd/stmpe.h |  1 +
+>  4 files changed, 84 insertions(+), 5 deletions(-)
 
+If it's good enough for Linus ...
 
-> @@ -282,6 +301,28 @@ static int ohci_at91_hub_status_data(struct usb_hcd *hcd, char *buf)
->  	return length;
->  }
+Acked-by: Lee Jones <lee.jones@linaro.org>
+
+> diff --git a/drivers/mfd/stmpe-i2c.c b/drivers/mfd/stmpe-i2c.c
+> index c3f4aab..863c39a 100644
+> --- a/drivers/mfd/stmpe-i2c.c
+> +++ b/drivers/mfd/stmpe-i2c.c
+> @@ -57,6 +57,7 @@ static const struct of_device_id stmpe_of_match[] = {
+>  	{ .compatible = "st,stmpe610", .data = (void *)STMPE610, },
+>  	{ .compatible = "st,stmpe801", .data = (void *)STMPE801, },
+>  	{ .compatible = "st,stmpe811", .data = (void *)STMPE811, },
+> +	{ .compatible = "st,stmpe1600", .data = (void *)STMPE1600, },
+>  	{ .compatible = "st,stmpe1601", .data = (void *)STMPE1601, },
+>  	{ .compatible = "st,stmpe1801", .data = (void *)STMPE1801, },
+>  	{ .compatible = "st,stmpe2401", .data = (void *)STMPE2401, },
+> @@ -101,6 +102,7 @@ static const struct i2c_device_id stmpe_i2c_id[] = {
+>  	{ "stmpe610", STMPE610 },
+>  	{ "stmpe801", STMPE801 },
+>  	{ "stmpe811", STMPE811 },
+> +	{ "stmpe1600", STMPE1600 },
+>  	{ "stmpe1601", STMPE1601 },
+>  	{ "stmpe1801", STMPE1801 },
+>  	{ "stmpe2401", STMPE2401 },
+> diff --git a/drivers/mfd/stmpe.c b/drivers/mfd/stmpe.c
+> index a060809..3a65331 100644
+> --- a/drivers/mfd/stmpe.c
+> +++ b/drivers/mfd/stmpe.c
+> @@ -532,6 +532,59 @@ static struct stmpe_variant_info stmpe610 = {
+>  };
 >  
-> +static int ohci_at91_port_ctrl(struct regmap *regmap, u16 port, u8 set)
+>  /*
+> + * STMPE1600
+> + * Compared to all others STMPE variant, LSB and MSB regs are located in this
+> + * order :	LSB   addr
+> + *		MSB   addr + 1
+> + * As there is only 2 * 8bits registers for GPMR/GPSR/IEGPIOPR, CSB index is MSB registers
+> + */
+> +
+> +static const u8 stmpe1600_regs[] = {
+> +	[STMPE_IDX_CHIP_ID]	= STMPE1600_REG_CHIP_ID,
+> +	[STMPE_IDX_SYS_CTRL]	= STMPE1600_REG_SYS_CTRL,
+> +	[STMPE_IDX_ICR_LSB]	= STMPE1600_REG_SYS_CTRL,
+> +	[STMPE_IDX_GPMR_LSB]	= STMPE1600_REG_GPMR_LSB,
+> +	[STMPE_IDX_GPMR_CSB]	= STMPE1600_REG_GPMR_MSB,
+> +	[STMPE_IDX_GPSR_LSB]	= STMPE1600_REG_GPSR_LSB,
+> +	[STMPE_IDX_GPSR_CSB]	= STMPE1600_REG_GPSR_MSB,
+> +	[STMPE_IDX_GPDR_LSB]	= STMPE1600_REG_GPDR_LSB,
+> +	[STMPE_IDX_GPDR_CSB]	= STMPE1600_REG_GPDR_MSB,
+> +	[STMPE_IDX_IEGPIOR_LSB]	= STMPE1600_REG_IEGPIOR_LSB,
+> +	[STMPE_IDX_IEGPIOR_CSB]	= STMPE1600_REG_IEGPIOR_MSB,
+> +	[STMPE_IDX_ISGPIOR_LSB]	= STMPE1600_REG_ISGPIOR_LSB,
+> +};
+> +
+> +static struct stmpe_variant_block stmpe1600_blocks[] = {
+> +	{
+> +		.cell	= &stmpe_gpio_cell,
+> +		.irq	= 0,
+> +		.block	= STMPE_BLOCK_GPIO,
+> +	},
+> +};
+> +
+> +static int stmpe1600_enable(struct stmpe *stmpe, unsigned int blocks,
+> +			   bool enable)
 > +{
-> +	u32 regval;
-> +	int ret;
-> +
-> +	if (!regmap)
+> +	if (blocks & STMPE_BLOCK_GPIO)
 > +		return 0;
-> +
-> +	ret = regmap_read(regmap, AT91_SFR_OHCIICR, &regval);
-> +	if (ret)
-> +		return ret;
-> +
-> +	if (set)
-> +		regval |= AT91_OHCIICR_SUSPEND(port);
 > +	else
-> +		regval &= ~AT91_OHCIICR_SUSPEND(port);
-
-In the earlier versions of this patch, you did not use the port number.  
-Why has this changed?
-
-How many ports does this controller have?
-
-> +
-> +	regmap_write(regmap, AT91_SFR_OHCIICR, regval);
-> +
-> +	return 0;
+> +		return -EINVAL;
 > +}
 > +
->  /*
->   * Look at the control requests to the root hub and see if we need to override.
+> +static struct stmpe_variant_info stmpe1600 = {
+> +	.name		= "stmpe1600",
+> +	.id_val		= STMPE1600_ID,
+> +	.id_mask	= 0xffff,
+> +	.num_gpios	= 16,
+> +	.af_bits	= 0,
+> +	.regs		= stmpe1600_regs,
+> +	.blocks		= stmpe1600_blocks,
+> +	.num_blocks	= ARRAY_SIZE(stmpe1600_blocks),
+> +	.num_irqs	= STMPE1600_NR_INTERNAL_IRQS,
+> +	.enable		= stmpe1600_enable,
+> +};
+> +
+> +/*
+>   * STMPE1601
 >   */
-> @@ -289,6 +330,7 @@ static int ohci_at91_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
->  				 u16 wIndex, char *buf, u16 wLength)
->  {
->  	struct at91_usbh_data *pdata = dev_get_platdata(hcd->self.controller);
-> +	struct ohci_at91_priv *ohci_at91 = hcd_to_ohci_at91_priv(hcd);
->  	struct usb_hub_descriptor *desc;
->  	int ret = -EINVAL;
->  	u32 *data = (u32 *)buf;
-> @@ -301,7 +343,8 @@ static int ohci_at91_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
 >  
->  	switch (typeReq) {
->  	case SetPortFeature:
-> -		if (wValue == USB_PORT_FEAT_POWER) {
-> +		switch (wValue) {
-> +		case USB_PORT_FEAT_POWER:
->  			dev_dbg(hcd->self.controller, "SetPortFeat: POWER\n");
->  			if (valid_port(wIndex)) {
->  				ohci_at91_usb_set_power(pdata, wIndex, 1);
-> @@ -309,6 +352,11 @@ static int ohci_at91_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
->  			}
+> @@ -928,6 +981,7 @@ static struct stmpe_variant_info *stmpe_variant_info[STMPE_NBR_PARTS] = {
+>  	[STMPE610]	= &stmpe610,
+>  	[STMPE801]	= &stmpe801,
+>  	[STMPE811]	= &stmpe811,
+> +	[STMPE1600]	= &stmpe1600,
+>  	[STMPE1601]	= &stmpe1601,
+>  	[STMPE1801]	= &stmpe1801,
+>  	[STMPE2401]	= &stmpe2401,
+> @@ -954,7 +1008,8 @@ static irqreturn_t stmpe_irq(int irq, void *data)
+>  	int ret;
+>  	int i;
 >  
->  			goto out;
+> -	if (variant->id_val == STMPE801_ID) {
+> +	if (variant->id_val == STMPE801_ID ||
+> +	    variant->id_val == STMPE1600_ID) {
+>  		int base = irq_create_mapping(stmpe->domain, 0);
+>  
+>  		handle_nested_irq(base);
+> @@ -1128,13 +1183,13 @@ static int stmpe_chip_init(struct stmpe *stmpe)
+>  		return ret;
+>  
+>  	if (stmpe->irq >= 0) {
+> -		if (id == STMPE801_ID)
+> +		if (id == STMPE801_ID || id == STMPE1600_ID)
+>  			icr = STMPE_SYS_CTRL_INT_EN;
+>  		else
+>  			icr = STMPE_ICR_LSB_GIM;
+>  
+> -		/* STMPE801 doesn't support Edge interrupts */
+> -		if (id != STMPE801_ID) {
+> +		/* STMPE801 and STMPE1600 don't support Edge interrupts */
+> +		if (id != STMPE801_ID && id != STMPE1600_ID) {
+>  			if (irq_trigger == IRQF_TRIGGER_FALLING ||
+>  					irq_trigger == IRQF_TRIGGER_RISING)
+>  				icr |= STMPE_ICR_LSB_EDGE;
+> @@ -1142,7 +1197,7 @@ static int stmpe_chip_init(struct stmpe *stmpe)
+>  
+>  		if (irq_trigger == IRQF_TRIGGER_RISING ||
+>  				irq_trigger == IRQF_TRIGGER_HIGH) {
+> -			if (id == STMPE801_ID)
+> +			if (id == STMPE801_ID || id == STMPE1600_ID)
+>  				icr |= STMPE_SYS_CTRL_INT_HI;
+>  			else
+>  				icr |= STMPE_ICR_LSB_HIGH;
+> diff --git a/drivers/mfd/stmpe.h b/drivers/mfd/stmpe.h
+> index f127342..f7efdd8 100644
+> --- a/drivers/mfd/stmpe.h
+> +++ b/drivers/mfd/stmpe.h
+> @@ -164,6 +164,27 @@ int stmpe_remove(struct stmpe *stmpe);
+>  #define STMPE811_SYS_CTRL2_TS_OFF	(1 << 3)
+>  
+>  /*
+> + * STMPE1600
+> + */
+> +#define STMPE1600_ID			0x0016
+> +#define STMPE1600_NR_INTERNAL_IRQS	16
 > +
-> +		case USB_PORT_FEAT_SUSPEND:
-> +			dev_dbg(hcd->self.controller, "SetPortFeat: SUSPEND\n");
-> +			ohci_at91_port_ctrl(ohci_at91->sfr_regmap, wIndex, 1);
-> +			break;
->  		}
->  		break;
->  
-> @@ -342,6 +390,12 @@ static int ohci_at91_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
->  				ohci_at91_usb_set_power(pdata, wIndex, 0);
->  				return 0;
->  			}
-> +			break;
+> +#define STMPE1600_REG_CHIP_ID		0x00
+> +#define STMPE1600_REG_SYS_CTRL		0x03
+> +#define STMPE1600_REG_IEGPIOR_LSB	0x08
+> +#define STMPE1600_REG_IEGPIOR_MSB	0x09
+> +#define STMPE1600_REG_ISGPIOR_LSB	0x0A
+> +#define STMPE1600_REG_ISGPIOR_MSB	0x0B
+> +#define STMPE1600_REG_GPMR_LSB		0x10
+> +#define STMPE1600_REG_GPMR_MSB		0x11
+> +#define STMPE1600_REG_GPSR_LSB		0x12
+> +#define STMPE1600_REG_GPSR_MSB		0x13
+> +#define STMPE1600_REG_GPDR_LSB		0x14
+> +#define STMPE1600_REG_GPDR_MSB		0x15
+> +#define STMPE1600_REG_GPPIR_LSB		0x16
+> +#define STMPE1600_REG_GPPIR_MSB		0x17
 > +
-> +		case USB_PORT_FEAT_SUSPEND:
-> +			dev_dbg(hcd->self.controller, "ClearPortFeature: SUSPEND\n");
-> +			ohci_at91_port_ctrl(ohci_at91->sfr_regmap, wIndex, 0);
-> +			break;
->  		}
->  		break;
->  	}
-
-Note that after all this, the code goes ahead to call 
-ohci_bub_control().
-
-> @@ -587,7 +641,8 @@ ohci_hcd_at91_drv_suspend(struct device *dev)
->  	struct usb_hcd	*hcd = dev_get_drvdata(dev);
->  	struct ohci_hcd	*ohci = hcd_to_ohci(hcd);
->  	struct ohci_at91_priv *ohci_at91 = hcd_to_ohci_at91_priv(hcd);
-> -	int		ret;
-> +	u16 i;
-> +	int ret;
+> +/*
+>   * STMPE1601
+>   */
 >  
->  	/*
->  	 * Disable wakeup if we are going to sleep with slow clock mode
-> @@ -599,6 +654,11 @@ ohci_hcd_at91_drv_suspend(struct device *dev)
->  	if (ohci_at91->wakeup)
->  		enable_irq_wake(hcd->irq);
->  
-> +	for (i = 0; i < ohci->num_ports; i++) {
-> +		ohci_at91_hub_control(hcd, SetPortFeature,
-> +				      USB_PORT_FEAT_SUSPEND, (i + 1), NULL, 0);
-> +	}
-> +
->  	ret = ohci_suspend(hcd, ohci_at91->wakeup);
+> diff --git a/include/linux/mfd/stmpe.h b/include/linux/mfd/stmpe.h
+> index 3dced4a..0170bd6 100644
+> --- a/include/linux/mfd/stmpe.h
+> +++ b/include/linux/mfd/stmpe.h
+> @@ -26,6 +26,7 @@ enum stmpe_partnum {
+>  	STMPE610,
+>  	STMPE801,
+>  	STMPE811,
+> +	STMPE1600,
+>  	STMPE1601,
+>  	STMPE1801,
+>  	STMPE2401,
 
-Do you really want to call ohci_hub_control() for ports that don't have 
-a device attached?
-
->  	if (ret) {
->  		if (ohci_at91->wakeup)
-> @@ -630,7 +690,9 @@ static int __maybe_unused
->  ohci_hcd_at91_drv_resume(struct device *dev)
->  {
->  	struct usb_hcd	*hcd = dev_get_drvdata(dev);
-> +	struct ohci_hcd	*ohci = hcd_to_ohci(hcd);
->  	struct ohci_at91_priv *ohci_at91 = hcd_to_ohci_at91_priv(hcd);
-> +	u16 i;
->  
->  	if (ohci_at91->wakeup)
->  		disable_irq_wake(hcd->irq);
-> @@ -638,6 +700,12 @@ ohci_hcd_at91_drv_resume(struct device *dev)
->  	at91_start_clock(ohci_at91);
->  
->  	ohci_resume(hcd, false);
-> +
-> +	for (i = 0; i < ohci->num_ports; i++) {
-> +		ohci_at91_hub_control(hcd, ClearPortFeature,
-> +				      USB_PORT_FEAT_SUSPEND, i + 1, NULL, 0);
-> +	}
-
-Have you thought about how this will interact with runtime PM?
-
-If you intend to do this only for system suspend and not for runtime 
-suspend, why not set all the suspend bits for all the ports in the 
-OHCIICR register at once, in a single write, like you were doing 
-before?
-
-Alan Stern
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
