@@ -1,65 +1,37 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Thu, 4 Aug 2016 16:58:41 +0100
-Subject: [PATCH 2/2] coresight: fix handling of ETM trace register access
- via sysfs
-In-Reply-To: <CANLsYkxRS+2xGNtPBNVaddRXAbXZc+vnbj2VK=7ifD9PoV=0SQ@mail.gmail.com>
-References: <1470240752-17331-1-git-send-email-sudeep.holla@arm.com>
- <1470240752-17331-2-git-send-email-sudeep.holla@arm.com>
- <CANLsYkxRS+2xGNtPBNVaddRXAbXZc+vnbj2VK=7ifD9PoV=0SQ@mail.gmail.com>
-Message-ID: <37cade42-0cc0-e623-59a7-ecdc9e959ba8@arm.com>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Thu, 4 Aug 2016 17:59:30 +0200
+Subject: [PATCH] dmaengine: qcom_hidma: release the descriptor before the
+ callback
+In-Reply-To: <20160804153835.GY1041@n2100.armlinux.org.uk>
+References: <1468465076-27324-1-git-send-email-okaya@codeaurora.org>
+ <ccffcabf-1448-57a1-d18b-715cfd46e906@codeaurora.org>
+ <20160724062425.GW9681@localhost>
+ <971733d9-fd18-2a1b-07c0-349b47747d49@codeaurora.org>
+ <20160804125525.GF9681@localhost>
+ <71a15611-645f-7523-1c26-14b420aff667@codeaurora.org>
+ <20160804144003.GV1041@n2100.armlinux.org.uk>
+ <cff588a1-d85f-3d2c-ef61-1674d0d3ca92@codeaurora.org>
+ <20160804153835.GY1041@n2100.armlinux.org.uk>
+Message-ID: <32339445-5a1c-5a3e-cd07-d64e35dce2c4@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 08/04/2016 05:38 PM, Russell King - ARM Linux wrote:
+[...]
+> What you instead need to do is to find some way to record in your
+> driver that transaction 2 failed, and when dma_cookie_status() says
+> that a transaction has DMA_COMPLETE status, you need to look up to
+> see whether it failed.
 
+In my opinion this is where the current API is broken by design. For each
+transfer that fails you need to store the cookie associated with that
+transfer in some kind of lookup table. Since there is no lifetime associated
+with a cookie entries in this table would need to be retained forever and it
+will grow unbound.
 
-On 04/08/16 16:46, Mathieu Poirier wrote:
-> On 3 August 2016 at 10:12, Sudeep Holla <sudeep.holla@arm.com> wrote:
->> The ETM registers are classified into 2 categories: trace and management.
->> The core power domain contains most of the trace unit logic including
->> all(except TRCOSLAR and TRCOSLSR) the trace registers. The debug power
->> domain contains the external debugger interface including all management
->> registers.
->>
->> This patch adds coresight unit specific function coresight_simple_func
->> which can be used for ETM trace registers by providing a ETM specific
->> read function which does smp cross call to ensure the trace core is
->> powered up before the register is accessed.
->>
->> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
->> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
->
-> Hey Sudeep,
->
-> I'm good with this patch - just a few things to amend below.
->
-> Many thanks,
-> Mathieu
->
->> ---
->>  drivers/hwtracing/coresight/coresight-etb10.c      |  2 +-
->>  .../hwtracing/coresight/coresight-etm3x-sysfs.c    |  2 +-
->>  .../hwtracing/coresight/coresight-etm4x-sysfs.c    | 58 ++++++++++++++++------
->>  drivers/hwtracing/coresight/coresight-etm4x.h      |  1 +
->>  drivers/hwtracing/coresight/coresight-priv.h       |  9 +++-
->>  drivers/hwtracing/coresight/coresight-stm.c        |  2 +-
->>  drivers/hwtracing/coresight/coresight-tmc.c        |  2 +-
->>  7 files changed, 54 insertions(+), 22 deletions(-)
->>
->> Hi Mathieu,
->>
->> I think the latest release of the firmware(inparticular SCP v1.16.0) for
->
-> Is this public?  If so please give me the link so that we test with
-> the same environment.
->
+Ideally we'd mark error reporting through this interface as deprecated and
+discourage new users of the interface. As far as I can see most of the few
+drivers that do return DMA_ERROR get it wrong anyway, e.g. return it
+unconditionally for all cookies when an error occurred for any of them.
 
-Yes I believe so. You should be able to grab latest @[1]
-
-I agree with all the other comments, will repost v2 soon.
-
--- 
-Regards,
-Sudeep
-
-[1] 
-https://snapshots.linaro.org/member-builds/armlt-platforms-release/28/juno-uefi.zip
+- Lars
