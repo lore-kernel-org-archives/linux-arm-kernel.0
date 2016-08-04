@@ -1,70 +1,69 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Thu, 4 Aug 2016 13:55:45 +0100
-Subject: [PATCH 1/8] ARM: assembler: introduce adr_l, ldr_l and str_l
- macros
-In-Reply-To: <20160804121619.GS1041@n2100.armlinux.org.uk>
-References: <1470238730-30038-1-git-send-email-ard.biesheuvel@linaro.org>
- <1470238730-30038-2-git-send-email-ard.biesheuvel@linaro.org>
- <20160803164940.GC7147@e103592.cambridge.arm.com>
- <CAKv+Gu_3YKfdCyMuTdrk+t16qQOuMiSqWEHf-h1K2ajM5s1rxw@mail.gmail.com>
- <20160804094451.GE7147@e103592.cambridge.arm.com>
- <CAKv+Gu-T9+fhvRk-RroDqr7QvQ24cUTuONL9uT-Ws24n_nHrCw@mail.gmail.com>
- <20160804112229.GG7147@e103592.cambridge.arm.com>
- <20160804121619.GS1041@n2100.armlinux.org.uk>
-Message-ID: <20160804125544.GI7147@e103592.cambridge.arm.com>
+From: brendan.jackman@arm.com (Brendan Jackman)
+Date: Thu, 4 Aug 2016 14:24:07 +0100
+Subject: [PATCH v2 01/14] PM / Domains: Allow domain power states to be
+ read from DT
+In-Reply-To: <1469829385-11511-2-git-send-email-lina.iyer@linaro.org>
+References: <1469829385-11511-1-git-send-email-lina.iyer@linaro.org>
+ <1469829385-11511-2-git-send-email-lina.iyer@linaro.org>
+Message-ID: <20160804132407.GA1732@brendan-thinkstation>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 04, 2016 at 01:16:19PM +0100, Russell King - ARM Linux wrote:
-> On Thu, Aug 04, 2016 at 12:22:29PM +0100, Dave Martin wrote:
-> > The more conventional literal-.long approach could still be macro-ised
-> > along the same lines, which might make the affected code more readable,
-> > but the idiom you'd be replacing is well-understood and not very common.
-> 
-> I don't see how it could be.  You can't efficiently place the literal
-> data alongside the instructions dealing with it.
-> 
-> The only alternative is to use ldr rd, =foo, but that gets very stupid
-> when you want to calculate the relative offset, and you end up with
-> something like this for every relative load:
-> 
-> 	ldr rd, =.
-> 	sub rd, rd, #. - 4
-> 	ldr r1, =foo
-> 	add r1, r1, rd
+Hi Lina,
 
-In theory, it ought to be possible to combine the two approaches:
+Couple of nitpicks here:
 
-	ldr	rd, =foo - (1f + 8)	@ or =foo - (. + 12)
-1:	add	rd, pc, rd
+On Fri, Jul 29, 2016 at 03:56:12PM -0600, Lina Iyer wrote:
+> From: Axel Haslam <ahaslam+renesas@baylibre.com>
+>
+> This patch allows domains to define idle states in the DT. SoC's can
+> define domain idle states in DT using the "power-states" property of the
+> domain provider. Calling of_pm_genpd_init() will  read the idle states
+> and initialize the genpd for the domain.
+>
 
-But gas doesn't like the argument of ldr= to require a reloc (though it
-would work perfectly well).
+The commit message got out of sync here, the idle states property is not
+"power-states" but "domain-idle-states" now.
 
+> In addition to the entry and exit latency for idle state, also add
+> residency and state-param properties. A domain idling in a state is only
+> power effecient if it stays idle for a certain period in that state. The
+> residency provides this minimum time for the idle state to provide power
+> benefits. The state-param is a state specific u32 value that the
+> platform may use for that idle state.
+>
 
-A similar effect to automatic literal pool placement can be achieved by
-means of subsections:
+And "state-param" isn't used any more, since the patchset switched to using
+arm,idle-state.
 
-	.subsection 1
-	.align 2
-0:	.long	foo - (1f + 8)
-	.previous
+> [snip]
+> +int pm_genpd_of_parse_power_states(struct generic_pm_domain *genpd)
+> +{
+> +	struct device_node *np;
+> +	int i, err = 0;
+> +
+> +	for (i = 0; i < GENPD_MAX_NUM_STATES; i++) {
+> +		np = of_parse_phandle(genpd->of_node, "domain-idle-states", i);
+> +		if (!np)
+> +			break;
+> +
+> +		err = genpd_of_get_power_state(&genpd->states[i], np);
+> +		if (err) {
+> +			pr_err
+> +			    ("Parsing idle state node %s failed with err %d\n",
+> +			     np->full_name, err);
+> +			err = -EINVAL;
 
-	ldr	rd, 0b
-1:	add	r0, pc, r0
+I guess there should be an of_node_put here.
 
-... though this also has some shortcomings (including that .ltorg
-won't flush these literals, and that subsections are a rarely used
-assembler feature and will likely confuse people).
-
-> As I've already said, I prefer the existing solution.  It works, it's
-> been known to work for the last 22 years.
-> 
-> If it isn't broken, don't try to fix it.
-
-Indeed... the case for the change isn't very compelling -- just nice
-to have if it could be done without any unfortunate side-effects
-(which looks unlikely right now).
-
-Cheers
----Dave
+> +			break;
+> +		}
+> +		of_node_put(np);
+> +	}
+> +
+> +	if (err)
+> +		return err;
+> +
+> +	genpd->state_count = i;
+> +	return 0;
+> +}
