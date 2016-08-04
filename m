@@ -1,76 +1,79 @@
-From: cristian.birsan@microchip.com (Cristian Birsan)
-Date: Thu, 4 Aug 2016 17:55:58 +0300
-Subject: [PATCH 2/2] regmap: debugfs: Add support for dumping write only
- device registers
-In-Reply-To: <1470322558-7501-1-git-send-email-cristian.birsan@microchip.com>
-References: <1470322558-7501-1-git-send-email-cristian.birsan@microchip.com>
-Message-ID: <1470322558-7501-3-git-send-email-cristian.birsan@microchip.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 4 Aug 2016 16:05:34 +0100
+Subject: [PATCH v2 05/10] mfd: stmpe: use generic bit mask name
+In-Reply-To: <1461845589-4826-6-git-send-email-patrice.chotard@st.com>
+References: <1461845589-4826-1-git-send-email-patrice.chotard@st.com>
+ <1461845589-4826-6-git-send-email-patrice.chotard@st.com>
+Message-ID: <20160804150534.GC5154@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for dumping write only device registers in debugfs. This is
-useful for audio codecs that have write only registers (like WM8731).
-The logic that decides if a value can be printed is moved to
-regmap_printable() function to allow for easier future updates.
+On Thu, 28 Apr 2016, patrice.chotard at st.com wrote:
 
-Signed-off-by: Cristian Birsan <cristian.birsan@microchip.com>
----
- drivers/base/regmap/regmap-debugfs.c | 22 ++++++++++++++++++----
- 1 file changed, 18 insertions(+), 4 deletions(-)
+> From: Patrice Chotard <patrice.chotard@st.com>
+> 
+> In order to prepare the ground to STMPE1600,
+> as STMPE1600's SYS_CTRL register has the same layout as
+> STMPE801 variant, unify STMPExxx_REG_SYS_CTRL_RESET/INT_EN/INT_HI
+> bit masks to more generic STMPE_SYS_CTRL_RESET/INT_EN/INT_HI
+> 
+> Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
+> ---
+>  drivers/mfd/stmpe.c | 4 ++--
+>  drivers/mfd/stmpe.h | 6 ++----
+>  2 files changed, 4 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/base/regmap/regmap-debugfs.c b/drivers/base/regmap/regmap-debugfs.c
-index 3f0a7e2..8db10e9 100644
---- a/drivers/base/regmap/regmap-debugfs.c
-+++ b/drivers/base/regmap/regmap-debugfs.c
-@@ -77,6 +77,17 @@ static void regmap_debugfs_free_dump_cache(struct regmap *map)
- 	}
- }
- 
-+static bool regmap_printable(struct regmap *map, unsigned int reg)
-+{
-+	if (regmap_precious(map, reg))
-+		return false;
-+
-+	if (!regmap_readable(map, reg) && !regmap_cached(map, reg))
-+		return false;
-+
-+	return true;
-+}
-+
- /*
-  * Work out where the start offset maps into register numbers, bearing
-  * in mind that we suppress hidden registers.
-@@ -105,8 +116,7 @@ static unsigned int regmap_debugfs_get_dump_start(struct regmap *map,
- 	if (list_empty(&map->debugfs_off_cache)) {
- 		for (; i <= map->max_register; i += map->reg_stride) {
- 			/* Skip unprinted registers, closing off cache entry */
--			if (!regmap_readable(map, i) ||
--			    regmap_precious(map, i)) {
-+			if (!regmap_printable(map, i)) {
- 				if (c) {
- 					c->max = p - 1;
- 					c->max_reg = i - map->reg_stride;
-@@ -204,7 +214,7 @@ static ssize_t regmap_read_debugfs(struct regmap *map, unsigned int from,
- 	start_reg = regmap_debugfs_get_dump_start(map, from, *ppos, &p);
- 
- 	for (i = start_reg; i <= to; i += map->reg_stride) {
--		if (!regmap_readable(map, i))
-+		if (!regmap_readable(map, i) && !regmap_cached(map, i))
- 			continue;
- 
- 		if (regmap_precious(map, i))
-@@ -222,7 +232,11 @@ static ssize_t regmap_read_debugfs(struct regmap *map, unsigned int from,
- 			buf_pos += map->debugfs_reg_len + 2;
- 
- 			/* Format the value, write all X if we can't read */
--			ret = regmap_read(map, i, &val);
-+			if (regmap_readable(map, i))
-+				ret = regmap_read(map, i, &val);
-+			else
-+				ret = regcache_read(map, i, &val);
-+
- 			if (ret == 0)
- 				snprintf(buf + buf_pos, count - buf_pos,
- 					 "%.*x", map->debugfs_val_len, val);
+Acked-by: Lee Jones <lee.jones@linaro.org>
+
+> diff --git a/drivers/mfd/stmpe.c b/drivers/mfd/stmpe.c
+> index af682d0..2556463 100644
+> --- a/drivers/mfd/stmpe.c
+> +++ b/drivers/mfd/stmpe.c
+> @@ -1089,7 +1089,7 @@ static int stmpe_chip_init(struct stmpe *stmpe)
+>  
+>  	if (stmpe->irq >= 0) {
+>  		if (id == STMPE801_ID)
+> -			icr = STMPE801_REG_SYS_CTRL_INT_EN;
+> +			icr = STMPE_SYS_CTRL_INT_EN;
+>  		else
+>  			icr = STMPE_ICR_LSB_GIM;
+>  
+> @@ -1103,7 +1103,7 @@ static int stmpe_chip_init(struct stmpe *stmpe)
+>  		if (irq_trigger == IRQF_TRIGGER_RISING ||
+>  				irq_trigger == IRQF_TRIGGER_HIGH) {
+>  			if (id == STMPE801_ID)
+> -				icr |= STMPE801_REG_SYS_CTRL_INT_HI;
+> +				icr |= STMPE_SYS_CTRL_INT_HI;
+>  			else
+>  				icr |= STMPE_ICR_LSB_HIGH;
+>  		}
+> diff --git a/drivers/mfd/stmpe.h b/drivers/mfd/stmpe.h
+> index 4ae343d..4ba1123 100644
+> --- a/drivers/mfd/stmpe.h
+> +++ b/drivers/mfd/stmpe.h
+> @@ -105,6 +105,8 @@ int stmpe_remove(struct stmpe *stmpe);
+>  #define STMPE_ICR_LSB_GIM	(1 << 0)
+>  
+>  #define STMPE_SYS_CTRL_RESET	(1 << 7)
+> +#define STMPE_SYS_CTRL_INT_EN	(1 << 2)
+> +#define STMPE_SYS_CTRL_INT_HI	(1 << 0)
+>  
+>  /*
+>   * STMPE801
+> @@ -121,10 +123,6 @@ int stmpe_remove(struct stmpe *stmpe);
+>  #define STMPE801_REG_GPIO_SET_PIN	0x11
+>  #define STMPE801_REG_GPIO_DIR		0x12
+>  
+> -#define STMPE801_REG_SYS_CTRL_RESET	(1 << 7)
+> -#define STMPE801_REG_SYS_CTRL_INT_EN	(1 << 2)
+> -#define STMPE801_REG_SYS_CTRL_INT_HI	(1 << 0)
+> -
+>  /*
+>   * STMPE811
+>   */
+
 -- 
-1.9.1
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
