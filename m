@@ -1,63 +1,104 @@
-From: kbeldan@baylibre.com (Karl Beldan)
-Date: Thu,  4 Aug 2016 11:06:56 +0000
-Subject: [PATCH] ARM: dts: da850: Add missing pin muxing for the UARTs
-Message-ID: <20160804110656.25318-1-kbeldan@baylibre.com>
+From: yt.shen@mediatek.com (YT Shen)
+Date: Thu, 4 Aug 2016 19:07:14 +0800
+Subject: [PATCH v6 00/10] MT2701 DRM support
+Message-ID: <1470308844-20895-1-git-send-email-yt.shen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds 2 pinctrl groups (rtscts, rxtx) for each of the 3 UARTs.
+This is MT2701 DRM support PATCH v6, based on 4.7-rc1.
+We add DSI interrupt control, transfer function for MIPI DSI panel support.
+Most codes are the same, except some register changed.
 
-Signed-off-by: Karl Beldan <kbeldan@baylibre.com>
----
- arch/arm/boot/dts/da850.dtsi | 36 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 36 insertions(+)
+For example:
+ - DISP_OVL address offset changed, color format definition changed.
+ - DISP_RDMA fifo size changed.
+ - DISP_COLOR offset changed.
+ - MIPI_TX setting changed.
 
-diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
-index 25f0f8e..bc10e7e 100644
---- a/arch/arm/boot/dts/da850.dtsi
-+++ b/arch/arm/boot/dts/da850.dtsi
-@@ -41,6 +41,42 @@
- 			pinctrl-single,function-mask = <0xf>;
- 			status = "disabled";
- 
-+			serial0_rtscts_pins: pinmux_serial0_rtscts_pins {
-+				pinctrl-single,bits = <
-+					/* UART0_RTS UART0_CTS */
-+					0x0c 0x22000000 0xff000000
-+				>;
-+			};
-+			serial0_rxtx_pins: pinmux_serial0_rxtx_pins {
-+				pinctrl-single,bits = <
-+					/* UART0_TXD UART0_RXD */
-+					0x0c 0x00220000 0x00ff0000
-+				>;
-+			};
-+			serial1_rtscts_pins: pinmux_serial1_rtscts_pins {
-+				pinctrl-single,bits = <
-+					/* UART1_CTS UART1_RTS */
-+					0x00 0x00440000 0x00ff0000
-+				>;
-+			};
-+			serial1_rxtx_pins: pinmux_serial1_rxtx_pins {
-+				pinctrl-single,bits = <
-+					/* UART1_TXD UART1_RXD */
-+					0x10 0x22000000 0xff000000
-+				>;
-+			};
-+			serial2_rtscts_pins: pinmux_serial2_rtscts_pins {
-+				pinctrl-single,bits = <
-+					/* UART2_CTS UART2_RTS */
-+					0x00 0x44000000 0xff000000
-+				>;
-+			};
-+			serial2_rxtx_pins: pinmux_serial2_rxtx_pins {
-+				pinctrl-single,bits = <
-+					/* UART2_TXD UART2_RXD */
-+					0x10 0x00220000 0x00ff0000
-+				>;
-+			};
- 			nand_cs3_pins: pinmux_nand_pins {
- 				pinctrl-single,bits = <
- 					/* EMA_OE, EMA_WE */
+We add a new component DDP_COMPONENT_BLS, and the connections are updated.
+OVL -> RDMA -> COLOR -> BLS -> DSI
+RDMA -> DPI
+And we have shadow register support in MT2701.
+
+Changes since v5:
+- Remove DPI device tree and compatible string
+- Use one wait queue to handle interrupt status
+- Update the interrupt check flow and DSI_INT_ALL_BITS
+- Use same function for host read/write command
+- various fixes
+
+Changes since v4:
+- Add messages when timeout in mtk_disp_mutex_acquire()
+- Add descriptions for DISP_REG_MUTEX registers
+- Move connection settings for display modules to a separate patch
+- Remove 'mt2701-disp-wdma' because it is unused
+- Move cleaning up and renaming to a separate patch
+- Use wait_event_interruptible_timeout() to replace polling
+- Remove irq_num from mtk_dsi structure
+- Remove redundant and debug codes
+
+Changes since v3:
+- Add DSI support for MIPI DSI panels
+- Update BLS binding to PWM nodes
+- Remove ufoe device nodes
+- Remove redundant parentheses
+- Remove global variable initialization
+
+Changes since v2:
+- Rename mtk_ddp_mux_sel to mtk_ddp_sout_sel
+- Update mt2701_mtk_ddp_ext components
+- Changed to prefix naming
+- Reorder the patch series
+- Use of_device_get_match_data() to get driver private data
+- Use iopoll macros to implement mtk_disp_mutex_acquire()
+- Removed empty device tree nodes
+
+Changes since v1:
+- Removed BLS bindings and codes, which belong to pwm driver
+- Moved mtk_disp_mutex_acquire() just before mtk_crtc_ddp_config()
+- Split patch into smaller parts
+- Added const keyword to constant structure
+- Removed codes for special memory align
+
+The PATCH depends on the following patch:
+https://patchwork.kernel.org/patch/8832441/ ("dt-bindings: ARM: Mediatek: Document bindings for MT2701")
+https://patchwork.kernel.org/patch/9222997/ ("dt-bindings: pwm: Add MediaTek display PWM bindings")
+https://patchwork.kernel.org/patch/9164029/ ("dt-bindings: mediatek: add descriptions for mediatek mt2701 iommu and smi")
+https://patchwork.kernel.org/patch/9164017/ ("iommu/mediatek: move the common struct into header file")
+https://patchwork.kernel.org/patch/9164025/ ("memory/mediatek: add support for mt2701")
+https://patchwork.kernel.org/patch/9164041/ ("iommu/mediatek: add support for mtk iommu generation one HW")
+https://patchwork.kernel.org/patch/9164013/ ("ARM: dts: mt2701: add iommu/smi dtsi node for mt2701")
+
+Thanks,
+yt.shen
+
+YT Shen (8):
+  drm/mediatek: rename macros, add chip prefix
+  drm/mediatek: add *driver_data for different hardware settings
+  drm/mediatek: add shadow register support
+  drm/mediatek: update display module connections
+  drm/mediatek: cleaning up and refine
+  drm/mediatek: update DSI sub driver flow
+  drm/mediatek: add support for Mediatek SoC MT2701
+  arm: dts: mt2701: Add display subsystem related nodes for MT2701
+
+shaoming chen (2):
+  drm/mediatek: add dsi interrupt control
+  drm/mediatek: add dsi transfer function
+
+ arch/arm/boot/dts/mt2701.dtsi               |   86 +++++
+ drivers/gpu/drm/mediatek/mtk_disp_ovl.c     |   32 +-
+ drivers/gpu/drm/mediatek/mtk_disp_rdma.c    |   17 +-
+ drivers/gpu/drm/mediatek/mtk_drm_crtc.c     |   75 ++--
+ drivers/gpu/drm/mediatek/mtk_drm_ddp.c      |  138 ++++++--
+ drivers/gpu/drm/mediatek/mtk_drm_ddp.h      |    2 +
+ drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c |   34 +-
+ drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h |   14 +
+ drivers/gpu/drm/mediatek/mtk_drm_drv.c      |   54 ++-
+ drivers/gpu/drm/mediatek/mtk_drm_drv.h      |    9 +
+ drivers/gpu/drm/mediatek/mtk_dsi.c          |  506 ++++++++++++++++++++++++---
+ drivers/gpu/drm/mediatek/mtk_mipi_tx.c      |   71 ++--
+ 12 files changed, 878 insertions(+), 160 deletions(-)
+
 -- 
-2.9.0.rc1
+1.7.9.5
