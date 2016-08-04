@@ -1,160 +1,327 @@
 From: yt.shen@mediatek.com (YT Shen)
-Date: Thu, 4 Aug 2016 19:07:20 +0800
-Subject: [PATCH v6 06/10] drm/mediatek: add dsi interrupt control
+Date: Thu, 4 Aug 2016 19:07:21 +0800
+Subject: [PATCH v6 07/10] drm/mediatek: add dsi transfer function
 In-Reply-To: <1470308844-20895-1-git-send-email-yt.shen@mediatek.com>
 References: <1470308844-20895-1-git-send-email-yt.shen@mediatek.com>
-Message-ID: <1470308844-20895-7-git-send-email-yt.shen@mediatek.com>
+Message-ID: <1470308844-20895-8-git-send-email-yt.shen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: shaoming chen <shaoming.chen@mediatek.com>
 
-add dsi interrupt control
+add dsi read/write commands for transfer function
 
 Signed-off-by: shaoming chen <shaoming.chen@mediatek.com>
 ---
- drivers/gpu/drm/mediatek/mtk_dsi.c |   76 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 76 insertions(+)
+ drivers/gpu/drm/mediatek/mtk_dsi.c |  261 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 261 insertions(+)
 
 diff --git a/drivers/gpu/drm/mediatek/mtk_dsi.c b/drivers/gpu/drm/mediatek/mtk_dsi.c
-index a9cf5a1..eea6192 100644
+index eea6192..4541f59 100644
 --- a/drivers/gpu/drm/mediatek/mtk_dsi.c
 +++ b/drivers/gpu/drm/mediatek/mtk_dsi.c
-@@ -18,6 +18,7 @@
- #include <drm/drm_panel.h>
- #include <linux/clk.h>
- #include <linux/component.h>
-+#include <linux/irq.h>
- #include <linux/of.h>
- #include <linux/of_platform.h>
+@@ -24,6 +24,7 @@
  #include <linux/of_graph.h>
-@@ -29,6 +30,17 @@
+ #include <linux/phy/phy.h>
+ #include <linux/platform_device.h>
++#include <video/mipi_display.h>
+ #include <video/videomode.h>
  
- #define DSI_START		0x00
+ #include "mtk_drm_ddp_comp.h"
+@@ -81,8 +82,16 @@
+ #define DSI_HBP_WC		0x54
+ #define DSI_HFP_WC		0x58
  
-+#define DSI_INTEN		0x08
++#define DSI_CMDQ_SIZE		0x60
++#define CMDQ_SIZE		0x3f
 +
-+#define DSI_INTSTA		0x0c
-+#define LPRX_RD_RDY_INT_FLAG		BIT(0)
-+#define CMD_DONE_INT_FLAG		BIT(1)
-+#define TE_RDY_INT_FLAG			BIT(2)
-+#define VM_DONE_INT_FLAG		BIT(3)
-+#define EXT_TE_RDY_INT_FLAG		BIT(4)
-+#define DSI_INT_ALL_BITS		0x1f
-+#define DSI_BUSY			BIT(31)
-+
- #define DSI_CON_CTRL		0x10
- #define DSI_RESET			BIT(0)
- #define DSI_EN				BIT(1)
-@@ -71,6 +83,9 @@
- 
  #define DSI_HSTX_CKL_WC		0x64
  
-+#define DSI_RACK		0x84
-+#define RACK				BIT(0)
++#define DSI_RX_DATA0		0x74
++#define DSI_RX_DATA1		0x78
++#define DSI_RX_DATA2		0x7c
++#define DSI_RX_DATA3		0x80
 +
- #define DSI_PHY_LCCON		0x104
- #define LC_HS_TX_EN			BIT(0)
- #define LC_ULPM_EN			BIT(1)
-@@ -131,8 +146,11 @@ struct mtk_dsi {
- 	struct videomode vm;
- 	int refcount;
- 	bool enabled;
-+	int irq_data;
+ #define DSI_RACK		0x84
+ #define RACK				BIT(0)
+ 
+@@ -118,8 +127,25 @@
+ #define CLK_HS_POST			(0xff << 8)
+ #define CLK_HS_EXIT			(0xff << 16)
+ 
++#define DSI_CMDQ0		0x180
++
+ #define NS_TO_CYCLE(n, c)    ((n) / (c) + (((n) % (c)) ? 1 : 0))
+ 
++#define MTK_DSI_HOST_IS_READ(type) \
++	((type == MIPI_DSI_GENERIC_READ_REQUEST_0_PARAM) || \
++	(type == MIPI_DSI_GENERIC_READ_REQUEST_1_PARAM) || \
++	(type == MIPI_DSI_GENERIC_READ_REQUEST_2_PARAM) || \
++	(type == MIPI_DSI_DCS_READ))
++
++#define MTK_DSI_HOST_IS_WRITE(type) \
++	((type == MIPI_DSI_GENERIC_SHORT_WRITE_0_PARAM) || \
++	(type == MIPI_DSI_GENERIC_SHORT_WRITE_1_PARAM) || \
++	(type == MIPI_DSI_GENERIC_SHORT_WRITE_2_PARAM) || \
++	(type == MIPI_DSI_DCS_SHORT_WRITE) || \
++	(type == MIPI_DSI_DCS_SHORT_WRITE_PARAM) || \
++	(type == MIPI_DSI_GENERIC_LONG_WRITE) || \
++	(type == MIPI_DSI_DCS_LONG_WRITE))
++
+ struct phy;
+ 
+ struct mtk_dsi {
+@@ -149,6 +175,13 @@ struct mtk_dsi {
+ 	int irq_data;
  };
  
-+static wait_queue_head_t _dsi_irq_wait_queue;
++struct dsi_rxtx_data {
++	u8 byte0;
++	u8 byte1;
++	u8 byte2;
++	u8 byte3;
++};
 +
+ static wait_queue_head_t _dsi_irq_wait_queue;
+ 
  static inline struct mtk_dsi *encoder_to_dsi(struct drm_encoder *e)
- {
- 	return container_of(e, struct mtk_dsi, encoder);
-@@ -437,6 +455,43 @@ static void mtk_dsi_start(struct mtk_dsi *dsi)
- 	writel(1, dsi->regs + DSI_START);
+@@ -799,9 +832,237 @@ static int mtk_dsi_host_detach(struct mipi_dsi_host *host,
+ 	return 0;
  }
  
-+static void mtk_dsi_set_interrupt_enable(struct mtk_dsi *dsi)
++static void mtk_dsi_wait_for_idle(struct mtk_dsi *dsi)
 +{
-+	u32 inten = DSI_INT_ALL_BITS;
++	u32 timeout_ms = 500000; /* total 1s ~ 2s timeout */
 +
-+	if (dsi->mode_flags & MIPI_DSI_MODE_VIDEO)
-+		inten &= ~(TE_RDY_INT_FLAG | EXT_TE_RDY_INT_FLAG);
++	while (timeout_ms--) {
++		if (!(readl(dsi->regs + DSI_INTSTA) & DSI_BUSY))
++			break;
 +
-+	writel(inten, dsi->regs + DSI_INTEN);
-+}
-+
-+static void mtk_dsi_irq_wakeup(struct mtk_dsi *dsi, u32 irq_bit)
-+{
-+	dsi->irq_data |= irq_bit;
-+}
-+
-+static irqreturn_t mtk_dsi_irq(int irq, void *dev_id)
-+{
-+	struct mtk_dsi *dsi = dev_id;
-+	u32 status, tmp;
-+	u32 flag = LPRX_RD_RDY_INT_FLAG | CMD_DONE_INT_FLAG | VM_DONE_INT_FLAG;
-+
-+	status = readl(dsi->regs + DSI_INTSTA);
-+
-+	if (status & flag) {
-+		do {
-+			mtk_dsi_mask(dsi, DSI_RACK, RACK, RACK);
-+			tmp = readl(dsi->regs + DSI_INTSTA);
-+		} while (tmp & DSI_BUSY);
-+
-+		mtk_dsi_mask(dsi, DSI_INTSTA, status & flag, 0);
-+		mtk_dsi_irq_wakeup(dsi, status & flag);
-+		wake_up_interruptible(&_dsi_irq_wait_queue);
++		usleep_range(2, 4);
 +	}
 +
-+	return IRQ_HANDLED;
++	if (timeout_ms == 0) {
++		dev_info(dsi->dev, "polling dsi wait not busy timeout!\n");
++
++		mtk_dsi_enable(dsi);
++		mtk_dsi_reset_engine(dsi);
++	}
 +}
 +
- static void mtk_dsi_poweroff(struct mtk_dsi *dsi)
- {
- 	if (WARN_ON(dsi->refcount == 0))
-@@ -485,6 +540,7 @@ static void mtk_output_dsi_enable(struct mtk_dsi *dsi)
- 
- 	mtk_dsi_ps_control_vact(dsi);
- 	mtk_dsi_config_vdo_timing(dsi);
-+	mtk_dsi_set_interrupt_enable(dsi);
- 
- 	mtk_dsi_set_mode(dsi);
- 	mtk_dsi_clk_hs_mode(dsi, 1);
-@@ -804,6 +860,7 @@ static int mtk_dsi_probe(struct platform_device *pdev)
- 	struct device *dev = &pdev->dev;
- 	struct device_node *remote_node, *endpoint;
- 	struct resource *regs;
-+	int irq_num;
- 	int comp_id;
- 	int ret;
- 
-@@ -880,8 +937,27 @@ static int mtk_dsi_probe(struct platform_device *pdev)
- 		return ret;
- 	}
- 
-+	irq_num = platform_get_irq(pdev, 0);
-+	if (irq_num < 0) {
-+		dev_err(&pdev->dev, "failed to request dsi irq resource\n");
-+		return -EPROBE_DEFER;
++static void mtk_dsi_wait_for_cmd_done(struct mtk_dsi *dsi)
++{
++	s32 ret = 0;
++	unsigned long timeout = msecs_to_jiffies(500);
++
++	dsi->irq_data &= ~CMD_DONE_INT_FLAG;
++
++	ret = wait_event_interruptible_timeout(_dsi_irq_wait_queue,
++			dsi->irq_data & CMD_DONE_INT_FLAG, timeout);
++	if (ret == 0) {
++		dev_info(dsi->dev, "dsi wait engine cmd done fail\n");
++
++		mtk_dsi_enable(dsi);
++		mtk_dsi_reset_engine(dsi);
++	}
++}
++
++static void mtk_dsi_cmdq(struct mtk_dsi *dsi, const struct mipi_dsi_msg *msg)
++{
++	const char *tx_buf = msg->tx_buf;
++	u32 reg_val, i;
++	u16 wc16;
++	u8 config, data0, data1, type;
++
++	if (MTK_DSI_HOST_IS_READ(type)) {
++		config = 4;
++		data0 = tx_buf[0];
++
++		if (msg->rx_len < 3)
++			type = MIPI_DSI_DCS_READ;
++		else
++			type = MIPI_DSI_GENERIC_READ_REQUEST_1_PARAM;
++
++		data1 = 0;
++		reg_val = (data1 << 24) | (data0 << 16) | (type << 8) | config;
++
++		writel(reg_val, dsi->regs + DSI_CMDQ0);
++		mtk_dsi_mask(dsi, DSI_CMDQ_SIZE, CMDQ_SIZE, 1);
++	} else if (msg->tx_len > 2) {	/* send long packet */
++		config = 2;
++		type = msg->type;
++		wc16 = msg->tx_len;
++
++		reg_val = (wc16 << 16) | (type << 8) | config;
++
++		writel(reg_val, dsi->regs + DSI_CMDQ0);
++
++		for (i = 0; i < msg->tx_len; i++)
++			writeb(tx_buf[i], dsi->regs + DSI_CMDQ0 + 4 + i);
++
++		mtk_dsi_mask(dsi, DSI_CMDQ_SIZE, CMDQ_SIZE,
++			     1 + (msg->tx_len + 3) / 4);
++	} else {	/* send short packet */
++		config = 0;
++		data0 = tx_buf[0];
++
++		if (msg->tx_len == 2) {
++			type = MIPI_DSI_DCS_SHORT_WRITE_PARAM;
++			data1 = tx_buf[1];
++		} else {
++			type = MIPI_DSI_DCS_SHORT_WRITE;
++			data1 = 0;
++		}
++
++		reg_val = (data1 << 24) | (data0 << 16) | (type << 8) | config;
++
++		writel(reg_val, dsi->regs + DSI_CMDQ0);
++		mtk_dsi_mask(dsi, DSI_CMDQ_SIZE, CMDQ_SIZE, 1);
++	}
++}
++
++static ssize_t mtk_dsi_host_read_cmd(struct mtk_dsi *dsi,
++				     const struct mipi_dsi_msg *msg)
++{
++	u8 max_try_count = 5;
++	u32 recv_cnt;
++	struct dsi_rxtx_data read_data[4];
++	s32 ret;
++	unsigned long timeout = msecs_to_jiffies(2000);
++
++	u8 *buffer = msg->rx_buf;
++	u8 buffer_size = msg->rx_len;
++	u8 type;
++
++	if (readl(dsi->regs + DSI_MODE_CTRL) & MODE) {
++		dev_info(dsi->dev, "dsi engine is not command mode\n");
++		return -1;
 +	}
 +
-+	irq_set_status_flags(irq_num, IRQ_TYPE_LEVEL_LOW);
-+	ret = devm_request_irq(&pdev->dev, irq_num, mtk_dsi_irq,
-+			       IRQF_TRIGGER_LOW, dev_name(&pdev->dev), dsi);
-+	if (ret) {
-+		dev_err(&pdev->dev, "failed to request mediatek dsi irq\n");
-+		return -EPROBE_DEFER;
++	if (!buffer) {
++		dev_info(dsi->dev, "dsi receive buffer size may be NULL\n");
++		return -1;
 +	}
 +
-+	dsi->irq_data = 0;
-+	dev_info(dev, "dsi irq num is 0x%x\n", irq_num);
++	do {
++		if (max_try_count == 0) {
++			dev_info(dsi->dev, "dsi engine read counter has been maxinum\n");
++			return -1;
++		}
 +
- 	platform_set_drvdata(pdev, dsi);
- 
-+	init_waitqueue_head(&_dsi_irq_wait_queue);
++		max_try_count--;
++		recv_cnt = 0;
 +
- 	return component_add(&pdev->dev, &mtk_dsi_component_ops);
- }
++		mtk_dsi_wait_for_idle(dsi);
++		mtk_dsi_cmdq(dsi, msg);
++
++		dsi->irq_data &= ~LPRX_RD_RDY_INT_FLAG;
++
++		mtk_dsi_start(dsi);
++
++		/* 2s timeout*/
++		ret = wait_event_interruptible_timeout(_dsi_irq_wait_queue,
++				dsi->irq_data & LPRX_RD_RDY_INT_FLAG, timeout);
++		if (ret == 0) {
++			dev_info(dsi->dev, "Wait DSI read ready timeout!!!\n");
++
++			mtk_dsi_enable(dsi);
++			mtk_dsi_reset_engine(dsi);
++
++			return ret;
++		}
++
++		*(u32 *)(&read_data[0]) = readl(dsi->regs + DSI_RX_DATA0);
++		*(u32 *)(&read_data[1]) = readl(dsi->regs + DSI_RX_DATA1);
++		*(u32 *)(&read_data[2]) = readl(dsi->regs + DSI_RX_DATA2);
++		*(u32 *)(&read_data[3]) = readl(dsi->regs + DSI_RX_DATA3);
++
++		type = read_data[0].byte0;
++
++		if (type == MIPI_DSI_RX_GENERIC_LONG_READ_RESPONSE ||
++		    type == MIPI_DSI_RX_DCS_LONG_READ_RESPONSE) {
++			/*
++			 * Data ID(1 byte) + Word Count(2 bytes) + ECC(1 byte) +
++			 * data 0 + ...+ data WC-1 + CHECKSUM (2 bytes)
++			 */
++			recv_cnt = read_data[0].byte1 + read_data[0].byte2 * 16;
++			dev_info(dsi->dev, "long packet size: %d\n", recv_cnt);
++
++			/*
++			 * the buffer size is 16 bytes once, so the data payload
++			 * is, 16 - bytes(data ID + WC + ECC + CHECKSUM), if
++			 * over 10 bytes, it will be read again
++			 */
++			if (recv_cnt > 10)
++				recv_cnt = 10;
++
++			if (recv_cnt > buffer_size)
++				recv_cnt = buffer_size;
++
++			memcpy(buffer, &read_data[1], recv_cnt);
++		} else if (type == MIPI_DSI_RX_GENERIC_SHORT_READ_RESPONSE_1BYTE ||
++			   type == MIPI_DSI_RX_GENERIC_SHORT_READ_RESPONSE_2BYTE ||
++			   type == MIPI_DSI_RX_DCS_SHORT_READ_RESPONSE_1BYTE ||
++			   type == MIPI_DSI_RX_DCS_SHORT_READ_RESPONSE_2BYTE) {
++			if (type == MIPI_DSI_RX_GENERIC_SHORT_READ_RESPONSE_1BYTE ||
++			    type == MIPI_DSI_RX_DCS_SHORT_READ_RESPONSE_1BYTE)
++				recv_cnt = 1;
++			else
++				recv_cnt = 2;
++
++			if (recv_cnt > buffer_size)
++				recv_cnt = buffer_size;
++
++			memcpy(buffer, &read_data[0].byte1, recv_cnt);
++		} else if (type == MIPI_DSI_RX_ACKNOWLEDGE_AND_ERROR_REPORT) {
++			dev_info(dsi->dev, "packet type is 0x02, try again\n");
++		} else {
++			dev_info(dsi->dev, "packet type(0x%x) cannot be non-recognize\n",
++				 type);
++
++			return 0;
++		}
++	} while (type == MIPI_DSI_RX_ACKNOWLEDGE_AND_ERROR_REPORT);
++
++	dev_info(dsi->dev, "dsi get %d byte data from the panel address(0x%x)\n",
++		 recv_cnt, *((u8 *)(msg->tx_buf)));
++
++	return recv_cnt;
++}
++
++static ssize_t mtk_dsi_host_write_cmd(struct mtk_dsi *dsi,
++				      const struct mipi_dsi_msg *msg)
++{
++	mtk_dsi_wait_for_idle(dsi);
++
++	mtk_dsi_cmdq(dsi, msg);
++
++	mtk_dsi_start(dsi);
++	mtk_dsi_wait_for_cmd_done(dsi);
++
++	return 0;
++}
++
++static ssize_t mtk_dsi_host_transfer(struct mipi_dsi_host *host,
++				     const struct mipi_dsi_msg *msg)
++{
++	struct mtk_dsi *dsi = host_to_dsi(host);
++	u8 type = msg->type;
++	ssize_t ret = 0;
++
++	if (MTK_DSI_HOST_IS_READ(type))
++		ret = mtk_dsi_host_read_cmd(dsi, msg);
++	else if (MTK_DSI_HOST_IS_WRITE(type))
++		ret = mtk_dsi_host_write_cmd(dsi, msg);
++
++	return ret;
++}
++
+ static const struct mipi_dsi_host_ops mtk_dsi_ops = {
+ 	.attach = mtk_dsi_host_attach,
+ 	.detach = mtk_dsi_host_detach,
++	.transfer = mtk_dsi_host_transfer,
+ };
  
+ static int mtk_dsi_bind(struct device *dev, struct device *master, void *data)
 -- 
 1.7.9.5
