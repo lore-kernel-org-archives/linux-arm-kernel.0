@@ -1,115 +1,108 @@
-From: bp@suse.de (Borislav Petkov)
-Date: Thu, 4 Aug 2016 12:30:28 +0200
-Subject: [PATCH v12] acpi, apei, arm64: APEI initial support for aarch64.
-In-Reply-To: <20160804094838.GB8093@nazgul.tnic>
-References: <1469782664-12611-1-git-send-email-fu.wei@linaro.org>
- <20160804094838.GB8093@nazgul.tnic>
-Message-ID: <20160804103028.GA8152@nazgul.tnic>
+From: appana.durga.rao@xilinx.com (Appana Durga Kedareswara Rao)
+Date: Thu, 4 Aug 2016 10:34:30 +0000
+Subject: [RFC PATCH v2 1/4] Documentation: DT: net: Add Xilinx
+ gmiitorgmii converter device tree binding documentation
+In-Reply-To: <971c966a-5335-310b-0a1a-3f1b7ee2f841@gmail.com>
+References: <1467623084-15471-1-git-send-email-appanad@xilinx.com>
+ <1467623084-15471-2-git-send-email-appanad@xilinx.com>
+ <20160704140458.GC3282@lunn.ch>
+ <03CA77BA8AF6F1469AEDFBDA1322A7B74A193913@XAP-PVEXMBX02.xlnx.xilinx.com>
+ <20160706142121.GI19800@lunn.ch>
+ <03CA77BA8AF6F1469AEDFBDA1322A7B74A19393B@XAP-PVEXMBX02.xlnx.xilinx.com>
+ <C246CAC1457055469EF09E3A7AC4E11A4A5C2387@XAP-PVEXMBX01.xlnx.xilinx.com>
+ <20160727080526.GH11538@lunn.ch>
+ <971c966a-5335-310b-0a1a-3f1b7ee2f841@gmail.com>
+Message-ID: <C246CAC1457055469EF09E3A7AC4E11A4A5DCC2F@XAP-PVEXMBX01.xlnx.xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tomasz's linaro address bounces, adding one I've found on lkml to CC
-instead.
+Hi Florian,
 
-On Thu, Aug 04, 2016 at 11:48:38AM +0200, Borislav Petkov wrote:
-> On Fri, Jul 29, 2016 at 04:57:44PM +0800, fu.wei at linaro.org wrote:
-> > From: Tomasz Nowicki <tomasz.nowicki@linaro.org>
-> > 
-> > This commit provides APEI arch-specific bits for aarch64
-> > 
-> > Meanwhile,
-> > (1)add a new subfunction "hest_ia32_init" for
-> > "acpi_disable_cmcff" which is used by IA-32 Architecture
-> > Corrected Machine Check (CMC).
-> > (2)move HEST type (ACPI_HEST_TYPE_IA32_CORRECTED_CHECK) checking to
-> > a generic place.
-> > (3)select HAVE_ACPI_APEI when EFI and ACPI is set on ARM64,
-> > because arch_apei_get_mem_attribute is using efi_mem_attributes on ARM64.
-> > 
-> > [Fu Wei: improve && upstream]
-> > 
-> > Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
-> > Tested-by: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
-> > Signed-off-by: Fu Wei <fu.wei@linaro.org>
-> > Acked-by: Hanjun Guo <hanjun.guo@linaro.org>
-> > Tested-by: Tyler Baicar <tbaicar@codeaurora.org>
-> > Acked-by: Will Deacon <will.deacon@arm.com>
-> > ---
 > 
-> ...
+> On 27/07/2016 01:05, Andrew Lunn wrote:
+> > Hi Appana
+> >
+> > Here is roughly what i was thinking:
+> >
+> > struct priv {
+> >        phy_device *master;
+> >        phy_device *slave;
+> >        struct phy_driver *slave_drv;
+> > };
+> >
+> > phy_status_clone(phy_device *master, phy_device *slave) {
+> > 	master->speed = slave->speed;
+> > 	master->duplex = slave->duplex;
+> > 	master->pause = slave->pause;
+> > }
+> >
+> > read_status(struct phy_device *phydev) {
+> > 	struct priv *priv = phydev->priv;
+> >
+> > 	/* Get the status from the slave, and duplicate in into the
+> > 	 * master */
+> > 	 slave_drv->read_status(priv->slave);
+> > 	 phy_status_clone(priv->master, priv->slave);
+> >
+> > 	 /* Update the gmiitorgmii with the current link parameters */
+> > 	 update_link(master);
+> > }
+> >
+> > config_init(struct phy_device *phydev) {
+> > 	struct priv *priv = phydev->priv;
+> >
+> > 	/* Configure the slave, and duplicate in into the master */
+> > 	slave_drv->config_init(priv->slave);
+> > 	phy_status_clone(priv->master, priv->slave); }
+> >
+> > struct phy_driver master_drv = {
+> >        .read_status = read_status,
+> >        .config_init = config_init,
+> >        .soft_reset  = ...
+> >        .suspend = ...
+> > };
+> >
+> > probe(mdio_device *mdio)
+> > {
+> > 	struct priv *priv = devm_alloc();
+> >
+> > 	/* Use the phy-handle property to find the slave phy */
+> > 	node_phy = of_parse_phandle(mdio->of_node, "phy", 0);
+> > 	priv->slave = of_phy_find_device(node_phy);
+> >
+> > 	/* Create the master phy on the control address. Use the phy
+> > 	   ID from the slave. */
+> > 	priv->master = phy_device_create(mdio->bus, mdio->addr,
+> > 	  				 phy->slave->phy_id,
+> > 					 phy->slave->is_c45,
+> > 					 phy->slave->c45_ids);
+> >
+> > 	slave_dev_drv = phydev->mdio.dev.driver;
+> > 	priv->slave_drv = to_phy_driver(slave_dev_drv);
+> > 	priv->master->mdio.dev.driver = master_drv;
 > 
-> > @@ -110,8 +111,21 @@ static inline const char *acpi_get_enable_method(int cpu)
-> >  }
-> >  
-> >  #ifdef	CONFIG_ACPI_APEI
-> > +#define acpi_disable_cmcff 1
-> 
-> What does that mean? ARM doesn't have firmware-first mode?
-> 
-> A piece of comment please.
-> 
-> >  pgprot_t arch_apei_get_mem_attribute(phys_addr_t addr);
-> > -#endif
-> > +
-> > +/*
-> > + * Despite its name, this function must still broadcast the TLB
-> > + * invalidation in order to ensure other CPUs don't up with junk
-> 						      ^
-> 						     end
-> 
-> > + * entries as a result of speculation. Unusually, its also called in
-> > + * IRQ context (ghes_iounmap_irq) so if we ever need to use IPIs for
-> > + * TLB broadcasting, then we're in trouble here.
-> > + */
-> > +static inline void arch_apei_flush_tlb_one(unsigned long addr)
-> > +{
-> > +	flush_tlb_kernel_range(addr, addr + PAGE_SIZE);
-> > +}
-> > +#endif /* CONFIG_ACPI_APEI */
-> >  
-> >  #ifdef CONFIG_ACPI_NUMA
-> >  int arm64_acpi_numa_init(void);
-> > diff --git a/arch/x86/kernel/acpi/apei.c b/arch/x86/kernel/acpi/apei.c
-> > index c280df6..ea3046e 100644
-> > --- a/arch/x86/kernel/acpi/apei.c
-> > +++ b/arch/x86/kernel/acpi/apei.c
-> 
-> ...
-> 
-> > diff --git a/drivers/acpi/apei/hest.c b/drivers/acpi/apei/hest.c
-> > index 20b3fcf..792a0d9 100644
-> > --- a/drivers/acpi/apei/hest.c
-> > +++ b/drivers/acpi/apei/hest.c
-> > @@ -232,8 +243,9 @@ void __init acpi_hest_init(void)
-> >  		goto err;
-> >  	}
-> >  
-> > -	if (!acpi_disable_cmcff)
-> > -		apei_hest_parse(hest_parse_cmc, NULL);
-> > +	rc = hest_ia32_init();
-> 
-> Why do you need a separate hest_ia32_init() here?
-> 
-> You can do
-> 
-> 	rc = apei_hest_parse(hest_parse_cmc, NULL);
-> 
-> directly here AFAICT.
-> 
-> > +	if (rc)
-> > +		goto err;
-> >  
-> >  	if (!ghes_disable) {
-> >  		rc = apei_hest_parse(hest_parse_ghes_count, &ghes_count);
-> > -- 
-> > 2.5.5
-> > 
+> The key here is really that except for the phy_driver::read_status callback, we
+> want to defer every operation to the slave (full MDIO register range compatible)
+> PHY.
 
--- 
-Regards/Gruss,
-    Boris.
+Will fix it in the next version...
 
-ECO tip #101: Trim your mails when you reply.
+> 
+> > }
+> >
+> > It would however be nice to only have one phydev structure, so you are
+> > not copying status and settings backwards and forwards from one to the
+> > other all the time, and need a wrapper for every function in
+> > phy_driver. Studying the structures a bit, that might be possible. You
+> > would then only need to wrap the read_status(), so that when the link
+> > speed/duplex changes, you can configure the converter as appropriate.
+> 
+> Agreed.
 
-SUSE Linux GmbH, GF: Felix Imend?rffer, Jane Smithard, Graham Norton, HRB 21284 (AG N?rnberg)
---
+Will implement as suggested by Andrew...
+
+Regards,
+Kedar.
+
+> --
+> Florian
