@@ -1,79 +1,82 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 4 Aug 2016 16:05:34 +0100
-Subject: [PATCH v2 05/10] mfd: stmpe: use generic bit mask name
-In-Reply-To: <1461845589-4826-6-git-send-email-patrice.chotard@st.com>
-References: <1461845589-4826-1-git-send-email-patrice.chotard@st.com>
- <1461845589-4826-6-git-send-email-patrice.chotard@st.com>
-Message-ID: <20160804150534.GC5154@x1>
+From: lina.iyer@linaro.org (Lina Iyer)
+Date: Thu, 4 Aug 2016 09:06:24 -0600
+Subject: [PATCH v2 06/14] PM / cpu_domains: Setup PM domains for
+ CPUs/clusters
+In-Reply-To: <20160804101515.GA29537@brendan-thinkstation>
+References: <1469829385-11511-1-git-send-email-lina.iyer@linaro.org>
+ <1469829385-11511-7-git-send-email-lina.iyer@linaro.org>
+ <20160804101515.GA29537@brendan-thinkstation>
+Message-ID: <20160804150624.GA1207@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 28 Apr 2016, patrice.chotard at st.com wrote:
+On Thu, Aug 04 2016 at 04:15 -0600, Brendan Jackman wrote:
+>Hi Lina,
+>
+>On Fri, Jul 29, 2016 at 03:56:17PM -0600, Lina Iyer wrote:
+>> +static struct generic_pm_domain *of_get_cpu_domain(struct device_node *dn,
+>> +		const struct cpu_pd_ops *ops, int cpu)
+>> +{
+>> +	struct of_phandle_args args;
+>> +	struct generic_pm_domain *genpd, *parent;
+>> +	struct cpu_pm_domain *cpu_pd, *parent_cpu_pd;
+>> +	int ret;
+>> +
+>> +	/* Do we have this domain? If not, create the domain */
+>> +	args.np = dn;
+>> +	args.args_count = 0;
+>> +
+>> +	genpd = of_genpd_get_from_provider(&args);
+>> +	if (!IS_ERR(genpd))
+>> +		return genpd;
+>> +
+>> +	genpd = of_init_cpu_pm_domain(dn, ops);
+>> +	if (IS_ERR(genpd))
+>> +		return genpd;
+>> +
+>> +	/* Is there a domain provider for this domain? */
+>> +	ret = of_parse_phandle_with_args(dn, "power-domains",
+>> +			"#power-domain-cells", 0, &args);
+>> +	if (ret < 0)
+>> +		goto skip_parent;
+>> +
+>> +	/* Find its parent and attach this domain to it, recursively */
+>> +	parent = of_get_cpu_domain(args.np, ops, cpu);
+>> +	if (IS_ERR(parent))
+>> +		goto skip_parent;
+>> +
+>> +	ret = pm_genpd_add_subdomain(genpd, parent);
+>
+>Looks like the arguments are the wrong way around here, it should be:
+>
+>	ret = pm_genpd_add_subdomain(parent, genpd);
+>
+Right. Thanks, will fix.
 
-> From: Patrice Chotard <patrice.chotard@st.com>
-> 
-> In order to prepare the ground to STMPE1600,
-> as STMPE1600's SYS_CTRL register has the same layout as
-> STMPE801 variant, unify STMPExxx_REG_SYS_CTRL_RESET/INT_EN/INT_HI
-> bit masks to more generic STMPE_SYS_CTRL_RESET/INT_EN/INT_HI
-> 
-> Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
-> ---
->  drivers/mfd/stmpe.c | 4 ++--
->  drivers/mfd/stmpe.h | 6 ++----
->  2 files changed, 4 insertions(+), 6 deletions(-)
+Thanks,
+Lina
 
-Acked-by: Lee Jones <lee.jones@linaro.org>
-
-> diff --git a/drivers/mfd/stmpe.c b/drivers/mfd/stmpe.c
-> index af682d0..2556463 100644
-> --- a/drivers/mfd/stmpe.c
-> +++ b/drivers/mfd/stmpe.c
-> @@ -1089,7 +1089,7 @@ static int stmpe_chip_init(struct stmpe *stmpe)
->  
->  	if (stmpe->irq >= 0) {
->  		if (id == STMPE801_ID)
-> -			icr = STMPE801_REG_SYS_CTRL_INT_EN;
-> +			icr = STMPE_SYS_CTRL_INT_EN;
->  		else
->  			icr = STMPE_ICR_LSB_GIM;
->  
-> @@ -1103,7 +1103,7 @@ static int stmpe_chip_init(struct stmpe *stmpe)
->  		if (irq_trigger == IRQF_TRIGGER_RISING ||
->  				irq_trigger == IRQF_TRIGGER_HIGH) {
->  			if (id == STMPE801_ID)
-> -				icr |= STMPE801_REG_SYS_CTRL_INT_HI;
-> +				icr |= STMPE_SYS_CTRL_INT_HI;
->  			else
->  				icr |= STMPE_ICR_LSB_HIGH;
->  		}
-> diff --git a/drivers/mfd/stmpe.h b/drivers/mfd/stmpe.h
-> index 4ae343d..4ba1123 100644
-> --- a/drivers/mfd/stmpe.h
-> +++ b/drivers/mfd/stmpe.h
-> @@ -105,6 +105,8 @@ int stmpe_remove(struct stmpe *stmpe);
->  #define STMPE_ICR_LSB_GIM	(1 << 0)
->  
->  #define STMPE_SYS_CTRL_RESET	(1 << 7)
-> +#define STMPE_SYS_CTRL_INT_EN	(1 << 2)
-> +#define STMPE_SYS_CTRL_INT_HI	(1 << 0)
->  
->  /*
->   * STMPE801
-> @@ -121,10 +123,6 @@ int stmpe_remove(struct stmpe *stmpe);
->  #define STMPE801_REG_GPIO_SET_PIN	0x11
->  #define STMPE801_REG_GPIO_DIR		0x12
->  
-> -#define STMPE801_REG_SYS_CTRL_RESET	(1 << 7)
-> -#define STMPE801_REG_SYS_CTRL_INT_EN	(1 << 2)
-> -#define STMPE801_REG_SYS_CTRL_INT_HI	(1 << 0)
-> -
->  /*
->   * STMPE811
->   */
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+>> +	if (ret) {
+>> +		pr_err("%s: Unable to add sub-domain (%s)\n err: %d",
+>> +				__func__, genpd->name, ret);
+>> +		return ERR_PTR(ret);
+>> +	}
+>> +
+>> +	/*
+>> +	 * Reference parent domain for easy access.
+>> +	 * Note: We could be attached to a domain that is not a
+>> +	 * CPU PM domain in that case don't reference the parent.
+>> +	 */
+>> +	cpu_pd = to_cpu_pd(genpd);
+>> +	parent_cpu_pd = to_cpu_pd(parent);
+>> +
+>> +	if (cpu_pd && parent_cpu_pd)
+>> +		cpu_pd->parent = parent_cpu_pd;
+>> +
+>> +skip_parent:
+>> +	of_node_put(dn);
+>> +	return genpd;
+>> +}
+>
+>Cheers,
+>Brendan
