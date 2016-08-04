@@ -1,87 +1,37 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 4 Aug 2016 13:10:55 +0200
-Subject: [PATCH 1/8] ARM: assembler: introduce adr_l,
- ldr_l and str_l macros
-In-Reply-To: <20160804110832.GF7147@e103592.cambridge.arm.com>
-References: <1470238730-30038-1-git-send-email-ard.biesheuvel@linaro.org>
- <1470238730-30038-2-git-send-email-ard.biesheuvel@linaro.org>
- <20160803180934.GK1041@n2100.armlinux.org.uk>
- <CAKv+Gu9Wyiu38J=K00WKXSeFoDF2vS-3TJAvbz9Yo616GBXSwQ@mail.gmail.com>
- <20160804093851.GD7147@e103592.cambridge.arm.com>
- <CAKv+Gu8_5-VcBxnjLrJxgKcJfVFb785qvVzbB6kryqhhkCfQbA@mail.gmail.com>
- <20160804110832.GF7147@e103592.cambridge.arm.com>
-Message-ID: <CAKv+Gu_JVX3erz6N64EGfu38TDi6PHsQVGY=nkfu7kF-8Hq=6Q@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 04 Aug 2016 13:13:06 +0200
+Subject: Support for configurable PCIe endpoint
+In-Reply-To: <57A31299.2040805@ti.com>
+References: <57A18927.9070003@ti.com>
+ <7c696488-eb78-d6d9-dc70-49fa5b4e3317@synopsys.com> <57A31299.2040805@ti.com>
+Message-ID: <2422602.ltmdGR0pWX@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4 August 2016 at 13:08, Dave Martin <Dave.Martin@arm.com> wrote:
-> On Thu, Aug 04, 2016 at 12:12:07PM +0200, Ard Biesheuvel wrote:
->> On 4 August 2016 at 11:38, Dave Martin <Dave.Martin@arm.com> wrote:
->> > On Thu, Aug 04, 2016 at 09:40:50AM +0200, Ard Biesheuvel wrote:
->> >> On 3 August 2016 at 20:09, Russell King - ARM Linux
->> >> <linux@armlinux.org.uk> wrote:
->> >> > On Wed, Aug 03, 2016 at 05:38:43PM +0200, Ard Biesheuvel wrote:
->> >> >> +     add     \dst, pc, #:pc_g0_nc:(\sym) - 8
->> >> >> +     add     \dst, \dst, #:pc_g1_nc:(\sym) - 4
->> >> >> +     add     \dst, \dst, #:pc_g2:(\sym)
->> >> >
->> >> > What's this :pc_g0_nc: stuff?  What binutils versions is it supported
->> >> > in?  It doesn't appear documented in gas 2.23.91, so I don't think we
->> >> > can use it.
->> >> >
->> >>
->> >> binutils 2.18 and up
->> >
->> > I think this was contemporary with GCC 4.<some middling version>, which
->> > may be newer than the minimimum compiler we require for the kernel,
->> > particular for earlier arch versions.
->> >
->> > Using .reloc probably allows the same thing to be done in a more
->> > backwards-compatible way.
->> >
->>
->> I don't see how LD would know how to handle these relocations if we do
->> manage to emit them from GAS in this way.
->
-> 0:      add     \dst, pc, #-8
-> 1:      add     \dst, \dst, #-4
-> 2:      add     \dst, \dst, #0
->
-> .reloc  0b, R_ARM_ALU_PC_G0_NC, \sym
-> .reloc  1b, R_ARM_ALU_PC_G1_NC, \sym
-> .reloc  2b, R_ARM_ALU_PC_G2, \sym
->
-> or, for ldr_l:
->
-> 0:      add     \dst, pc, #-8
-> 1:      add     \dst, \dst, #-4
-> 2:      ldr     [\dst, #0]
->
-> .reloc  0b, R_ARM_ALU_PC_G0_NC, \sym
-> .reloc  1b, R_ARM_ALU_PC_G1_NC, \sym
-> .reloc  2b, R_ARM_LDR_PC_G2, \sym
->
-> ... should produce precisely the same result at the .o stage.
->
+On Thursday, August 4, 2016 3:32:01 PM CEST Kishon Vijay Abraham I wrote:
+> On Wednesday 03 August 2016 07:09 PM, Joao Pinto wrote:
+> > 
+> > You are rising a topic that we are also addressing in Synopsys.
+> > 
+> > For the PCIe RC hardware validation we are currently using the standard
+> > pcie-designware and pcie-designware-plat drivers.
+> > 
+> > For the Endpoint we have to use an internal software package. Its main purpose
+> > is to initialize the IP registers, eDMA channels and make data transfer to prove
+> > that the everything is working properly. This is done in 2 levels, a custom
+> > driver built and loaded and an application that makes some ioctl to the driver
+> > executing some interesting functions to check the Endpoint status and make some
+> > data exchange.
+> 
+> hmm.. the platform I have doesn't have a DMA in PCIe IP
+> (http://www.ti.com/lit/ug/spruhz6g/spruhz6g.pdf). So in your testing does the
+> EP access RC memory? i.e the driver in the RC allocates memory from it's DDR
+> and gives it's DDR address to the EP. The EP then transfers data to this
+> address. (This is a typical use case with ethernet PCIe cards). IIUC that's not
+> simple with configurable EPs. I'd like to know more about your testing though.
 
-Yes, but how is LD going to perform the arithmetic involved in
-handling these relocations? That's is the more interesting part, and
-that is not implemented either in binutils < 2.18
 
->
-> This #:reloc: stuff is mostly a shorthand/convenience feature as I
-> understand it -- however, you do have to know how to force the correct
-> instruction encoding to be emitted to match the reloc type -- with
-> #:reloc:, the assembler should take care of that.
->
-> The reloc/insn match issue also means that the Thumb2 relocs are
-> totally different (R_ARM_THM_<blah>).
->
->
-> For OABI, it would no doubt be different again.  I know nothing about
-> OABI relocs.
->
-> And we're still limited to <32-bit offset ranges.
->
+What's the difference between using the EDMA on that chip or a DMA engine
+that is part of the PCIe bridge?
 
-Indeed. As I said, a dead end ...
+	Arnd
