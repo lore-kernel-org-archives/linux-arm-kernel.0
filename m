@@ -1,90 +1,76 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Thu, 4 Aug 2016 13:28:41 +0300
-Subject: [PATCHv3 06/11] crypto: omap-des: Fix support for unequal lengths
+Date: Thu, 4 Aug 2016 13:28:46 +0300
+Subject: [PATCHv3 11/11] crypto: omap-des: fix crypto engine initialization
+ order
 In-Reply-To: <1470306526-27219-1-git-send-email-t-kristo@ti.com>
 References: <1470306526-27219-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1470306526-27219-7-git-send-email-t-kristo@ti.com>
+Message-ID: <1470306526-27219-12-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lokesh Vutla <a0131933@ti.com>
+The crypto engine must be initialized before registering algorithms,
+otherwise the test manager will crash as it attempts to execute
+tests for the algos while they are being registered.
 
-For cases where total length of an input SGs is not same as
-length of the input data for encryption, omap-des driver
-crashes. This happens in the case when IPsec is trying to use
-omap-des driver.
-
-To avoid this, we copy all the pages from the input SG list
-into a contiguous buffer and prepare a single element SG list
-for this buffer with length as the total bytes to crypt, which is
-similar thing that is done in case of unaligned lengths.
-
-Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
-Tested-by: Aparna Balasubramanian <aparnab@ti.com>
+Fixes: f1b77aaca85a ("crypto: omap-des - Integrate with the crypto engine framework")
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- drivers/crypto/omap-des.c | 27 +++++++++++++++++----------
- 1 file changed, 17 insertions(+), 10 deletions(-)
+ drivers/crypto/omap-des.c | 28 +++++++++++++++-------------
+ 1 file changed, 15 insertions(+), 13 deletions(-)
 
 diff --git a/drivers/crypto/omap-des.c b/drivers/crypto/omap-des.c
-index 5691434..d0b59f6 100644
+index d0b59f6..2b07e60 100644
 --- a/drivers/crypto/omap-des.c
 +++ b/drivers/crypto/omap-des.c
-@@ -521,29 +521,36 @@ static int omap_des_crypt_dma_stop(struct omap_des_dev *dd)
- 	return 0;
- }
+@@ -1085,6 +1085,17 @@ static int omap_des_probe(struct platform_device *pdev)
+ 	list_add_tail(&dd->list, &dev_list);
+ 	spin_unlock(&list_lock);
  
--static int omap_des_copy_needed(struct scatterlist *sg)
-+static int omap_des_copy_needed(struct scatterlist *sg, int total)
- {
-+	int len = 0;
++	/* Initialize des crypto engine */
++	dd->engine = crypto_engine_alloc_init(dev, 1);
++	if (!dd->engine)
++		goto err_engine;
 +
-+	if (!IS_ALIGNED(total, DES_BLOCK_SIZE))
-+		return -1;
++	dd->engine->prepare_request = omap_des_prepare_req;
++	dd->engine->crypt_one_request = omap_des_crypt_req;
++	err = crypto_engine_start(dd->engine);
++	if (err)
++		goto err_engine;
 +
- 	while (sg) {
- 		if (!IS_ALIGNED(sg->offset, 4))
- 			return -1;
- 		if (!IS_ALIGNED(sg->length, DES_BLOCK_SIZE))
- 			return -1;
-+
-+		len += sg->length;
- 		sg = sg_next(sg);
+ 	for (i = 0; i < dd->pdata->algs_info_size; i++) {
+ 		for (j = 0; j < dd->pdata->algs_info[i].size; j++) {
+ 			algp = &dd->pdata->algs_info[i].algs_list[j];
+@@ -1100,27 +1111,18 @@ static int omap_des_probe(struct platform_device *pdev)
+ 		}
  	}
-+
-+	if (len != total)
-+		return -1;
-+
+ 
+-	/* Initialize des crypto engine */
+-	dd->engine = crypto_engine_alloc_init(dev, 1);
+-	if (!dd->engine)
+-		goto err_algs;
+-
+-	dd->engine->prepare_request = omap_des_prepare_req;
+-	dd->engine->crypt_one_request = omap_des_crypt_req;
+-	err = crypto_engine_start(dd->engine);
+-	if (err)
+-		goto err_engine;
+-
  	return 0;
- }
  
- static int omap_des_copy_sgs(struct omap_des_dev *dd)
- {
- 	void *buf_in, *buf_out;
--	int pages;
--
--	pages = dd->total >> PAGE_SHIFT;
--
--	if (dd->total & (PAGE_SIZE-1))
--		pages++;
-+	int pages, total;
+-err_engine:
+-	crypto_engine_exit(dd->engine);
+ err_algs:
+ 	for (i = dd->pdata->algs_info_size - 1; i >= 0; i--)
+ 		for (j = dd->pdata->algs_info[i].registered - 1; j >= 0; j--)
+ 			crypto_unregister_alg(
+ 					&dd->pdata->algs_info[i].algs_list[j]);
  
--	BUG_ON(!pages);
-+	total = ALIGN(dd->total, DES_BLOCK_SIZE);
-+	pages = get_order(total);
- 
- 	buf_in = (void *)__get_free_pages(GFP_ATOMIC, pages);
- 	buf_out = (void *)__get_free_pages(GFP_ATOMIC, pages);
-@@ -605,8 +612,8 @@ static int omap_des_prepare_req(struct crypto_engine *engine,
- 	if (dd->out_sg_len < 0)
- 		return dd->out_sg_len;
- 
--	if (omap_des_copy_needed(dd->in_sg) ||
--	    omap_des_copy_needed(dd->out_sg)) {
-+	if (omap_des_copy_needed(dd->in_sg, dd->total) ||
-+	    omap_des_copy_needed(dd->out_sg, dd->total)) {
- 		if (omap_des_copy_sgs(dd))
- 			pr_err("Failed to copy SGs for unaligned cases\n");
- 		dd->sgs_copied = 1;
++err_engine:
++	if (dd->engine)
++		crypto_engine_exit(dd->engine);
++
+ 	omap_des_dma_cleanup(dd);
+ err_irq:
+ 	tasklet_kill(&dd->done_task);
 -- 
 1.9.1
