@@ -1,31 +1,104 @@
-From: lina.iyer@linaro.org (Lina Iyer)
-Date: Thu, 4 Aug 2016 15:23:59 -0600
-Subject: [PATCH v2 02/14] dt/bindings: update binding for PM domain idle
- states
-In-Reply-To: <20160804162844.GC1207@linaro.org>
-References: <1469829385-11511-1-git-send-email-lina.iyer@linaro.org>
- <1469829385-11511-3-git-send-email-lina.iyer@linaro.org>
- <20160804152453.GB1732@brendan-thinkstation>
- <20160804162844.GC1207@linaro.org>
-Message-ID: <20160804212359.GF1207@linaro.org>
+From: ddaney.cavm@gmail.com (David Daney)
+Date: Thu, 04 Aug 2016 14:40:48 -0700
+Subject: [PATCH] arm64: Add workaround for Cavium erratum 26026
+In-Reply-To: <20160804205707.GJ2151@rric.localdomain>
+References: <1470302117-32296-1-git-send-email-mbrugger@suse.com>
+ <20160804205707.GJ2151@rric.localdomain>
+Message-ID: <57A3B660.4040309@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 04 2016 at 10:28 -0600, Lina Iyer wrote:
->On Thu, Aug 04 2016 at 09:24 -0600, Brendan Jackman wrote:
+On 08/04/2016 01:57 PM, Robert Richter wrote:
+> The patch below is on top of Matthias' patch series:
+>
+>   arm64: Implement IPI based TLB invalidation
+>
+> The series is used to enable a workaround for Cavium ThunderX pass 1.x
+> systems.
 
->>idle-states.txt (to which this file refers) says that idle state nodes must come
->>under /cpus/idle-states. I don't think power domain idle states belong there, so
->>the documentation should be updated to reflect that.
->>
->Absolutely right. This should be fixed.
 
-Sorry, I take it back. idle-states are cpuidle specific idle states and
-possibly include Platform coordinated cluster modes as well (which is
-fine). Its rightful place is under /cpus/idle-states. However, domain
-idle states that are compatible with "arm,idle-state" would not have
-idle-states as the parent node. They would be defined under the domain
-provider node and not the CPUs.
+Where are the rest of the patches in the series?  I would have expected 
+something like "[PATCH 1/X] arm64:..." with X being greater than one.
 
-Thanks,
-Lina
+>
+> -Robert
+>
+>
+>
+>  From abb99ee83473d9ecffb4fdaae9c69435ca670bc8 Mon Sep 17 00:00:00 2001
+> From: Robert Richter <rrichter@cavium.com>
+> Date: Fri, 29 Jul 2016 09:40:04 +0200
+> Subject: [PATCH] arm64: Add workaround for Cavium erratum 26026
+>
+> STX may return a wrong status value if the store was successful.
+>
+> This may happen on ThunderX T88 pass 1.x cpus if a broadcast TLBI is
+> executed on another cpu in parallel to an STX. As a result atomic or
+> non-blocking implementations can behave incorrectly. Use IPIs that
+> call local TLBIs on other cpus to avoid this.
+>
+> Applies to ThunderX T88 pass 1.x cpus.
+>
+> Signed-off-by: Robert Richter <rrichter@cavium.com>
+> ---
+>   Documentation/arm64/silicon-errata.txt |  1 +
+>   arch/arm64/Kconfig                     | 14 ++++++++++++++
+>   arch/arm64/kernel/cpu_errata.c         |  8 ++++++++
+>   3 files changed, 23 insertions(+)
+>
+> diff --git a/Documentation/arm64/silicon-errata.txt b/Documentation/arm64/silicon-errata.txt
+> index 4da60b463995..0d870d934528 100644
+> --- a/Documentation/arm64/silicon-errata.txt
+> +++ b/Documentation/arm64/silicon-errata.txt
+> @@ -58,5 +58,6 @@ stable kernels.
+>   | Cavium         | ThunderX ITS    | #22375, #24313  | CAVIUM_ERRATUM_22375    |
+>   | Cavium         | ThunderX ITS    | #23144          | CAVIUM_ERRATUM_23144    |
+>   | Cavium         | ThunderX GICv3  | #23154          | CAVIUM_ERRATUM_23154    |
+> +| Cavium         | ThunderX Core   | #26026          | CAVIUM_ERRATUM_26026    |
+>   | Cavium         | ThunderX Core   | #27456          | CAVIUM_ERRATUM_27456    |
+>   | Cavium         | ThunderX SMMUv2 | #27704          | N/A		       |
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index 5a0a691d4220..8cbd9043ec6f 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -457,6 +457,20 @@ config CAVIUM_ERRATUM_23154
+>
+>   	  If unsure, say Y.
+>
+> +config CAVIUM_ERRATUM_26026
+> +	bool "Cavium erratum 26026: STX may return wrong status value"
+> +	default y
+> +	help
+> +	  STX may return a wrong status value if the store was
+> +	  successful. This may happen on ThunderX T88 pass 1.x cpus if
+> +	  a broadcast TLBI is executed on another cpu in parallel to
+> +	  an STX. As a result atomic or non-blocking implementations
+> +	  can behave incorrectly. Use IPIs that call local TLBIs on
+> +	  other cpus to avoid this.
+> +	  Applies to ThunderX T88 pass 1.x cpus.
+> +
+> +	  If unsure, say Y.
+> +
+>   config CAVIUM_ERRATUM_27456
+>   	bool "Cavium erratum 27456: Broadcast TLBI instructions may cause icache corruption"
+>   	default y
+> diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
+> index af716b65110d..1e1753a6408e 100644
+> --- a/arch/arm64/kernel/cpu_errata.c
+> +++ b/arch/arm64/kernel/cpu_errata.c
+> @@ -90,6 +90,14 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
+>   		MIDR_RANGE(MIDR_THUNDERX, 0x00, 0x01),
+>   	},
+>   #endif
+> +#ifdef CONFIG_CAVIUM_ERRATUM_26026
+> +	{
+> +	/* Cavium ThunderX, pass 1.x */
+> +		.desc = "Cavium erratum 26026",
+> +		.capability = ARM64_HAS_NO_BCAST_TLBI,
+> +		MIDR_RANGE(MIDR_THUNDERX, 0x00, 0x01),
+> +	},
+> +#endif
+>   #ifdef CONFIG_CAVIUM_ERRATUM_27456
+>   	{
+>   	/* Cavium ThunderX, T88 pass 1.x - 2.1 */
+>
