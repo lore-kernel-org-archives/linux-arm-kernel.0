@@ -1,68 +1,22 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Thu, 04 Aug 2016 12:04:36 -0700
-Subject: [PATCH] ARM: dts: da850: Add missing pin muxing for the UARTs
-In-Reply-To: <20160804110656.25318-1-kbeldan@baylibre.com> (Karl Beldan's
- message of "Thu, 4 Aug 2016 11:06:56 +0000")
-References: <20160804110656.25318-1-kbeldan@baylibre.com>
-Message-ID: <m27fbwqrsr.fsf@baylibre.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Thu, 04 Aug 2016 21:05:03 +0200
+Subject: [PATCH v3 5/7] clk: rockchip: rk3399: add 65MHz and 106.5MHz
+ clocks for HDMI
+In-Reply-To: <1470122546-32015-1-git-send-email-zhengxing@rock-chips.com>
+References: <1470122401-31934-1-git-send-email-zhengxing@rock-chips.com>
+ <1470122546-32015-1-git-send-email-zhengxing@rock-chips.com>
+Message-ID: <3547456.uj6fXio0Ds@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+Sekhar
+Am Dienstag, 2. August 2016, 15:22:26 schrieb Xing Zheng:
+> We need to add more clocks for supporting more display resolution
+> for HDMI.
+> 
+> Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
 
-Karl Beldan <kbeldan@baylibre.com> writes:
+applied to my clock-branch for 4.9
 
-> This adds 2 pinctrl groups (rtscts, rxtx) for each of the 3 UARTs.
->
-> Signed-off-by: Karl Beldan <kbeldan@baylibre.com>
-> ---
->  arch/arm/boot/dts/da850.dtsi | 36 ++++++++++++++++++++++++++++++++++++
->  1 file changed, 36 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
-> index 25f0f8e..bc10e7e 100644
-> --- a/arch/arm/boot/dts/da850.dtsi
-> +++ b/arch/arm/boot/dts/da850.dtsi
-> @@ -41,6 +41,42 @@
->  			pinctrl-single,function-mask = <0xf>;
->  			status = "disabled";
->  
-> +			serial0_rtscts_pins: pinmux_serial0_rtscts_pins {
-> +				pinctrl-single,bits = <
-> +					/* UART0_RTS UART0_CTS */
-> +					0x0c 0x22000000 0xff000000
-> +				>;
-> +			};
-> +			serial0_rxtx_pins: pinmux_serial0_rxtx_pins {
-> +				pinctrl-single,bits = <
-> +					/* UART0_TXD UART0_RXD */
-> +					0x0c 0x00220000 0x00ff0000
-> +				>;
-> +			};
-> +			serial1_rtscts_pins: pinmux_serial1_rtscts_pins {
-> +				pinctrl-single,bits = <
-> +					/* UART1_CTS UART1_RTS */
-> +					0x00 0x00440000 0x00ff0000
-> +				>;
-> +			};
-> +			serial1_rxtx_pins: pinmux_serial1_rxtx_pins {
-> +				pinctrl-single,bits = <
-> +					/* UART1_TXD UART1_RXD */
-> +					0x10 0x22000000 0xff000000
-> +				>;
-> +			};
-> +			serial2_rtscts_pins: pinmux_serial2_rtscts_pins {
-> +				pinctrl-single,bits = <
-> +					/* UART2_CTS UART2_RTS */
-> +					0x00 0x44000000 0xff000000
-> +				>;
-> +			};
-> +			serial2_rxtx_pins: pinmux_serial2_rxtx_pins {
-> +				pinctrl-single,bits = <
-> +					/* UART2_TXD UART2_RXD */
-> +					0x10 0x00220000 0x00ff0000
-> +				>;
-> +			};
->  			nand_cs3_pins: pinmux_nand_pins {
->  				pinctrl-single,bits = <
->  					/* EMA_OE, EMA_WE */
+
+Thanks
+Heiko
