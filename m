@@ -1,137 +1,87 @@
-From: yt.shen@mediatek.com (YT Shen)
-Date: Thu, 4 Aug 2016 19:07:24 +0800
-Subject: [PATCH v6 10/10] arm: dts: mt2701: Add display subsystem related
- nodes for MT2701
-In-Reply-To: <1470308844-20895-1-git-send-email-yt.shen@mediatek.com>
-References: <1470308844-20895-1-git-send-email-yt.shen@mediatek.com>
-Message-ID: <1470308844-20895-11-git-send-email-yt.shen@mediatek.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 4 Aug 2016 13:10:55 +0200
+Subject: [PATCH 1/8] ARM: assembler: introduce adr_l,
+ ldr_l and str_l macros
+In-Reply-To: <20160804110832.GF7147@e103592.cambridge.arm.com>
+References: <1470238730-30038-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1470238730-30038-2-git-send-email-ard.biesheuvel@linaro.org>
+ <20160803180934.GK1041@n2100.armlinux.org.uk>
+ <CAKv+Gu9Wyiu38J=K00WKXSeFoDF2vS-3TJAvbz9Yo616GBXSwQ@mail.gmail.com>
+ <20160804093851.GD7147@e103592.cambridge.arm.com>
+ <CAKv+Gu8_5-VcBxnjLrJxgKcJfVFb785qvVzbB6kryqhhkCfQbA@mail.gmail.com>
+ <20160804110832.GF7147@e103592.cambridge.arm.com>
+Message-ID: <CAKv+Gu_JVX3erz6N64EGfu38TDi6PHsQVGY=nkfu7kF-8Hq=6Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the device nodes for the DISP function blocks for MT2701
+On 4 August 2016 at 13:08, Dave Martin <Dave.Martin@arm.com> wrote:
+> On Thu, Aug 04, 2016 at 12:12:07PM +0200, Ard Biesheuvel wrote:
+>> On 4 August 2016 at 11:38, Dave Martin <Dave.Martin@arm.com> wrote:
+>> > On Thu, Aug 04, 2016 at 09:40:50AM +0200, Ard Biesheuvel wrote:
+>> >> On 3 August 2016 at 20:09, Russell King - ARM Linux
+>> >> <linux@armlinux.org.uk> wrote:
+>> >> > On Wed, Aug 03, 2016 at 05:38:43PM +0200, Ard Biesheuvel wrote:
+>> >> >> +     add     \dst, pc, #:pc_g0_nc:(\sym) - 8
+>> >> >> +     add     \dst, \dst, #:pc_g1_nc:(\sym) - 4
+>> >> >> +     add     \dst, \dst, #:pc_g2:(\sym)
+>> >> >
+>> >> > What's this :pc_g0_nc: stuff?  What binutils versions is it supported
+>> >> > in?  It doesn't appear documented in gas 2.23.91, so I don't think we
+>> >> > can use it.
+>> >> >
+>> >>
+>> >> binutils 2.18 and up
+>> >
+>> > I think this was contemporary with GCC 4.<some middling version>, which
+>> > may be newer than the minimimum compiler we require for the kernel,
+>> > particular for earlier arch versions.
+>> >
+>> > Using .reloc probably allows the same thing to be done in a more
+>> > backwards-compatible way.
+>> >
+>>
+>> I don't see how LD would know how to handle these relocations if we do
+>> manage to emit them from GAS in this way.
+>
+> 0:      add     \dst, pc, #-8
+> 1:      add     \dst, \dst, #-4
+> 2:      add     \dst, \dst, #0
+>
+> .reloc  0b, R_ARM_ALU_PC_G0_NC, \sym
+> .reloc  1b, R_ARM_ALU_PC_G1_NC, \sym
+> .reloc  2b, R_ARM_ALU_PC_G2, \sym
+>
+> or, for ldr_l:
+>
+> 0:      add     \dst, pc, #-8
+> 1:      add     \dst, \dst, #-4
+> 2:      ldr     [\dst, #0]
+>
+> .reloc  0b, R_ARM_ALU_PC_G0_NC, \sym
+> .reloc  1b, R_ARM_ALU_PC_G1_NC, \sym
+> .reloc  2b, R_ARM_LDR_PC_G2, \sym
+>
+> ... should produce precisely the same result at the .o stage.
+>
 
-Signed-off-by: YT Shen <yt.shen@mediatek.com>
----
- arch/arm/boot/dts/mt2701.dtsi |   86 +++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 86 insertions(+)
+Yes, but how is LD going to perform the arithmetic involved in
+handling these relocations? That's is the more interesting part, and
+that is not implemented either in binutils < 2.18
 
-diff --git a/arch/arm/boot/dts/mt2701.dtsi b/arch/arm/boot/dts/mt2701.dtsi
-index f3136bd..8f35a0d 100644
---- a/arch/arm/boot/dts/mt2701.dtsi
-+++ b/arch/arm/boot/dts/mt2701.dtsi
-@@ -24,6 +24,11 @@
- 	compatible = "mediatek,mt2701";
- 	interrupt-parent = <&sysirq>;
- 
-+	aliases {
-+		rdma0 = &rdma0;
-+		rdma1 = &rdma1;
-+	};
-+
- 	cpus {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-@@ -171,6 +176,16 @@
- 		power-domains = <&scpsys MT2701_POWER_DOMAIN_DISP>;
- 	};
- 
-+	mipi_tx0: mipi-dphy at 10010000 {
-+		compatible = "mediatek,mt2701-mipi-tx";
-+		reg = <0 0x10010000 0 0x90>;
-+		clocks = <&clk26m>;
-+		clock-output-names = "mipi_tx0_pll";
-+		#clock-cells = <0>;
-+		#phy-cells = <0>;
-+		status = "disabled";
-+	};
-+
- 	sysirq: interrupt-controller at 10200100 {
- 		compatible = "mediatek,mt2701-sysirq",
- 			     "mediatek,mt6577-sysirq";
-@@ -255,6 +270,68 @@
- 		status = "disabled";
- 	};
- 
-+	ovl at 14007000 {
-+		compatible = "mediatek,mt2701-disp-ovl";
-+		reg = <0 0x14007000 0 0x1000>;
-+		interrupts = <GIC_SPI 153 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&mmsys CLK_MM_DISP_OVL>;
-+		iommus = <&iommu MT2701_M4U_PORT_DISP_OVL_0>;
-+		mediatek,larb = <&larb0>;
-+	};
-+
-+	rdma0: rdma at 14008000 {
-+		compatible = "mediatek,mt2701-disp-rdma";
-+		reg = <0 0x14008000 0 0x1000>;
-+		interrupts = <GIC_SPI 152 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&mmsys CLK_MM_DISP_RDMA>;
-+		iommus = <&iommu MT2701_M4U_PORT_DISP_RDMA>;
-+		mediatek,larb = <&larb0>;
-+	};
-+
-+	wdma at 14009000 {
-+		compatible = "mediatek,mt2701-disp-wdma";
-+		reg = <0 0x14009000 0 0x1000>;
-+		interrupts = <GIC_SPI 154 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&mmsys CLK_MM_DISP_WDMA>;
-+		iommus = <&iommu MT2701_M4U_PORT_DISP_WDMA>;
-+		mediatek,larb = <&larb0>;
-+	};
-+
-+	bls at 1400a000 {
-+		compatible = "mediatek,mt2701-disp-pwm";
-+		reg = <0 0x1400a000 0 0x1000>;
-+		interrupts = <GIC_SPI 155 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&mmsys CLK_MM_DISP_BLS>;
-+	};
-+
-+	color at 1400b000 {
-+		compatible = "mediatek,mt2701-disp-color";
-+		reg = <0 0x1400b000 0 0x1000>;
-+		interrupts = <GIC_SPI 156 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&mmsys CLK_MM_DISP_COLOR>;
-+	};
-+
-+	dsi0: dsi at 1400c000 {
-+		compatible = "mediatek,mt2701-dsi";
-+		reg = <0 0x1400c000 0 0x1000>;
-+		interrupts = <GIC_SPI 157 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&mmsys CLK_MM_DSI_ENGINE>, <&mmsys CLK_MM_DSI_DIG>,
-+			 <&mipi_tx0>;
-+		clock-names = "engine", "digital", "hs";
-+		mediatek,syscon-dsi = <&mmsys 0x138>;
-+		mediatek,ssc-range = <5>;
-+		phys = <&mipi_tx0>;
-+		phy-names = "dphy";
-+		status = "disabled";
-+	};
-+
-+	mutex: mutex at 1400e000 {
-+		compatible = "mediatek,mt2701-disp-mutex";
-+		reg = <0 0x1400e000 0 0x1000>;
-+		interrupts = <GIC_SPI 161 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&mmsys CLK_MM_MUTEX_32K>;
-+	};
-+
- 	larb0: larb at 14010000 {
- 		compatible = "mediatek,mt2701-smi-larb";
- 		reg = <0 0x14010000 0 0x1000>;
-@@ -266,6 +343,15 @@
- 		power-domains = <&scpsys MT2701_POWER_DOMAIN_DISP>;
- 	};
- 
-+	rdma1: rdma at 14012000 {
-+		compatible = "mediatek,mt2701-disp-rdma";
-+		reg = <0 0x14012000 0 0x1000>;
-+		interrupts = <GIC_SPI 164 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&mmsys CLK_MM_DISP_RDMA1>;
-+		iommus = <&iommu MT2701_M4U_PORT_DISP_RDMA1>;
-+		mediatek,larb = <&larb0>;
-+	};
-+
- 	imgsys: syscon at 15000000 {
- 		compatible = "mediatek,mt2701-imgsys", "syscon";
- 		reg = <0 0x15000000 0 0x1000>;
--- 
-1.7.9.5
+>
+> This #:reloc: stuff is mostly a shorthand/convenience feature as I
+> understand it -- however, you do have to know how to force the correct
+> instruction encoding to be emitted to match the reloc type -- with
+> #:reloc:, the assembler should take care of that.
+>
+> The reloc/insn match issue also means that the Thumb2 relocs are
+> totally different (R_ARM_THM_<blah>).
+>
+>
+> For OABI, it would no doubt be different again.  I know nothing about
+> OABI relocs.
+>
+> And we're still limited to <32-bit offset ranges.
+>
+
+Indeed. As I said, a dead end ...
