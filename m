@@ -1,65 +1,30 @@
-From: york.sun@nxp.com (York Sun)
-Date: Thu, 4 Aug 2016 15:58:36 -0700
-Subject: [Patch v3 11/11] arm64: Update device tree for Layerscape SoCs
-In-Reply-To: <1470351518-22404-1-git-send-email-york.sun@nxp.com>
-References: <1470351518-22404-1-git-send-email-york.sun@nxp.com>
-Message-ID: <1470351518-22404-12-git-send-email-york.sun@nxp.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Thu, 04 Aug 2016 16:00:35 -0700
+Subject: [PATCH] ARM: dts: da850: Add missing pin muxing for the UARTs
+In-Reply-To: <20160804210045.GD15013@gobelin> (Karl Beldan's message of "Thu,
+ 4 Aug 2016 21:00:45 +0000")
+References: <20160804110656.25318-1-kbeldan@baylibre.com>
+ <m2eg64pchw.fsf@baylibre.com> <20160804210045.GD15013@gobelin>
+Message-ID: <m2fuqknnqk.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add DDR memory controller nodes to enable EDAC driver.
+Karl Beldan <kbeldan@baylibre.com> writes:
 
-Signed-off-by: York Sun <york.sun@nxp.com>
+> On Thu, Aug 04, 2016 at 12:20:27PM -0700, Kevin Hilman wrote:
+>> Karl Beldan <kbeldan@baylibre.com> writes:
+>> 
+>> > This adds 2 pinctrl groups (rtscts, rxtx) for each of the 3 UARTs.
+>> >
+>> > Signed-off-by: Karl Beldan <kbeldan@baylibre.com>
+>> 
+>> Should da850-evm be updated to use the serial2_rxtx_pins also?
+>> 
+> I could not find the EVM schematics on the net and I only have an LCDK,
+> but according to the code it should, however I can't tell whether flow
+> control pins are used.
 
----
-Change log
-  v3: no change
-  v2: no change
+Ok, let's just leave it for now, since it's working fine.  Sekhar can
+fix that up if he can dig up the schematics.
 
- arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi |  7 +++++++
- arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi | 14 ++++++++++++++
- 2 files changed, 21 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-index de0323b..cb33f23 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-@@ -196,6 +196,13 @@
- 			bus-width = <4>;
- 		};
- 
-+		ddr: memory-controller at 1080000 {
-+			compatible = "fsl,qoriq-memory-controller";
-+			reg = <0x0 0x1080000 0x0 0x1000>;
-+			interrupts = <0 144 0x4>;
-+			big-endian;
-+		};
-+
- 		dspi0: dspi at 2100000 {
- 			compatible = "fsl,ls1043a-dspi", "fsl,ls1021a-v1.0-dspi";
- 			#address-cells = <1>;
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
-index 3187c82..3221e5c 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
-@@ -689,4 +689,18 @@
- 			interrupts = <0 12 4>;
- 		};
- 	};
-+
-+	ddr1: memory-controller at 1080000 {
-+		compatible = "fsl,qoriq-memory-controller";
-+		reg = <0x0 0x1080000 0x0 0x1000>;
-+		interrupts = <0 17 0x4>;
-+		little-endian;
-+	};
-+
-+	ddr2: memory-controller at 1090000 {
-+		compatible = "fsl,qoriq-memory-controller";
-+		reg = <0x0 0x1090000 0x0 0x1000>;
-+		interrupts = <0 18 0x4>;
-+		little-endian;
-+	};
- };
--- 
-2.7.4
+Kevin
