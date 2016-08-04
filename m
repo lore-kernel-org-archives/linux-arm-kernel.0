@@ -1,42 +1,75 @@
-From: fabien.lahoudere@collabora.co.uk (Fabien Lahoudere)
-Date: Thu,  4 Aug 2016 15:47:32 +0200
-Subject: [PATCH 1/1] imx53.dtsi: Add IPU nodes for csi
-In-Reply-To: <CAOMZO5BoRsrHv-+5c9bAXO2NCya8sPqmmpy9DOfav6NvQ+VMLQ@mail.gmail.com>
-References: <CAOMZO5BoRsrHv-+5c9bAXO2NCya8sPqmmpy9DOfav6NvQ+VMLQ@mail.gmail.com>
-Message-ID: <1470318452-31391-1-git-send-email-fabien.lahoudere@collabora.co.uk>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 4 Aug 2016 15:58:25 +0200
+Subject: [PATCH 1/8] ARM: assembler: introduce adr_l,
+ ldr_l and str_l macros
+In-Reply-To: <20160804121619.GS1041@n2100.armlinux.org.uk>
+References: <1470238730-30038-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1470238730-30038-2-git-send-email-ard.biesheuvel@linaro.org>
+ <20160803164940.GC7147@e103592.cambridge.arm.com>
+ <CAKv+Gu_3YKfdCyMuTdrk+t16qQOuMiSqWEHf-h1K2ajM5s1rxw@mail.gmail.com>
+ <20160804094451.GE7147@e103592.cambridge.arm.com>
+ <CAKv+Gu-T9+fhvRk-RroDqr7QvQ24cUTuONL9uT-Ws24n_nHrCw@mail.gmail.com>
+ <20160804112229.GG7147@e103592.cambridge.arm.com>
+ <20160804121619.GS1041@n2100.armlinux.org.uk>
+Message-ID: <CAKv+Gu-XTg0+teZ4i3FbHdiFqZuKLxnEr299-4QOujY5xxytEQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We have the following messages that tell csi devices are not used:
-imx-ipuv3 18000000.ipu: no port at 0 node in /soc/ipu at 18000000, not using CSI0
-imx-ipuv3 18000000.ipu: no port at 1 node in /soc/ipu at 18000000, not using CSI1
+On 4 August 2016 at 14:16, Russell King - ARM Linux
+<linux@armlinux.org.uk> wrote:
+> On Thu, Aug 04, 2016 at 12:22:29PM +0100, Dave Martin wrote:
+>> The more conventional literal-.long approach could still be macro-ised
+>> along the same lines, which might make the affected code more readable,
+>> but the idiom you'd be replacing is well-understood and not very common.
+>
+> I don't see how it could be.  You can't efficiently place the literal
+> data alongside the instructions dealing with it.
+>
+> The only alternative is to use ldr rd, =foo, but that gets very stupid
+> when you want to calculate the relative offset, and you end up with
+> something like this for every relative load:
+>
+>         ldr rd, =.
+>         sub rd, rd, #. - 4
+>         ldr r1, =foo
+>         add r1, r1, rd
+>
 
-So we add them in the common device tree to make CSI ports available on
-imx53 boards.
+This does the trick
 
-Signed-off-by: Fabien Lahoudere <fabien.lahoudere@collabora.co.uk>
----
- arch/arm/boot/dts/imx53.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
+#ifdef CONFIG_THUMB2_KERNEL
+#define PC_BIAS 4
+#else
+#define PC_BIAS 8
+#endif
 
-diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
-index c1bc97c..0777b41 100644
---- a/arch/arm/boot/dts/imx53.dtsi
-+++ b/arch/arm/boot/dts/imx53.dtsi
-@@ -136,6 +136,14 @@
- 			clock-names = "bus", "di0", "di1";
- 			resets = <&src 2>;
- 
-+			ipu_csi0: port at 0 {
-+				reg = <0>;
-+			};
-+
-+			ipu_csi1: port at 1 {
-+				reg = <1>;
-+			};
-+
- 			ipu_di0: port at 2 {
- 				#address-cells = <1>;
- 				#size-cells = <0>;
--- 
-2.7.4
+/*
+* @dst: destination register
+* @sym: name of the symbol
+*/
+.macro adr_l, dst, sym, tmp:req
+#if __LINUX_ARM_ARCH__ >= 7
+movw \dst, #:lower16:(\sym) - (. + 8 + PC_BIAS)
+movt \dst, #:upper16:(\sym) - (. + 4 + PC_BIAS)
+add \dst, \dst, pc
+#else
+ldr \tmp, =\sym
+ldr \dst, =. + 12
+sub \dst, \dst, pc
+sub \dst, \tmp, \dst
+#endif
+.endm
+
+but it is suboptimal for v6 and earlier, and now the macro requires a
+temp register.
+
+> As I've already said, I prefer the existing solution.  It works, it's
+> been known to work for the last 22 years.
+>
+> If it isn't broken, don't try to fix it.
+>
+
+It seemed like low hanging fruit, but obviously not ...
+
+Thanks for your time,
+Ard.
