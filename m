@@ -1,33 +1,75 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Thu, 04 Aug 2016 21:19:08 +0200
-Subject: [PATCH v3 7/7] clk: rockchip: rk3399: Add support frac mode
- frequencies
-In-Reply-To: <1470122579-32083-1-git-send-email-zhengxing@rock-chips.com>
-References: <1470122401-31934-1-git-send-email-zhengxing@rock-chips.com>
- <1470122579-32083-1-git-send-email-zhengxing@rock-chips.com>
-Message-ID: <12790025.3tRiQgk9GG@diego>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Thu, 04 Aug 2016 12:20:27 -0700
+Subject: [PATCH] ARM: dts: da850: Add missing pin muxing for the UARTs
+In-Reply-To: <20160804110656.25318-1-kbeldan@baylibre.com> (Karl Beldan's
+ message of "Thu, 4 Aug 2016 11:06:56 +0000")
+References: <20160804110656.25318-1-kbeldan@baylibre.com>
+Message-ID: <m2eg64pchw.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Xing,
+Karl Beldan <kbeldan@baylibre.com> writes:
 
-Am Dienstag, 2. August 2016, 15:22:59 schrieb Xing Zheng:
-> We need to support various display resolutions for external
-> display devices like HDMI/DP, the frac mode can help us to
-> acquire almost any frequencies, and need higher VCOs to reduce
-> clock jitters.
-> 
-> Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
+> This adds 2 pinctrl groups (rtscts, rxtx) for each of the 3 UARTs.
+>
+> Signed-off-by: Karl Beldan <kbeldan@baylibre.com>
 
-why does this need to be a separate rate array and cannot live in the general 
-pll rate array?
+Should da850-evm be updated to use the serial2_rxtx_pins also?
 
-The plls are general purpose, so we shouldn't limit them arbitarily.
+Tested on LCDK (which uses the serial2 pins).
 
-I currently only see some frequencies (594MHz, 297MHz, 54MHz) that are present 
-in both arrays but have different settings. As your patch description says 
-that these settings reduce clock jitter, wouldn't the general frequencies also 
-profit from merging these new values into the general rate array?
+Tested-by: Kevin Hilman <khilman@baylibre.com>
 
+Kevin
 
-Heiko
+> ---
+>  arch/arm/boot/dts/da850.dtsi | 36 ++++++++++++++++++++++++++++++++++++
+>  1 file changed, 36 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
+> index 25f0f8e..bc10e7e 100644
+> --- a/arch/arm/boot/dts/da850.dtsi
+> +++ b/arch/arm/boot/dts/da850.dtsi
+> @@ -41,6 +41,42 @@
+>  			pinctrl-single,function-mask = <0xf>;
+>  			status = "disabled";
+>  
+> +			serial0_rtscts_pins: pinmux_serial0_rtscts_pins {
+> +				pinctrl-single,bits = <
+> +					/* UART0_RTS UART0_CTS */
+> +					0x0c 0x22000000 0xff000000
+> +				>;
+> +			};
+> +			serial0_rxtx_pins: pinmux_serial0_rxtx_pins {
+> +				pinctrl-single,bits = <
+> +					/* UART0_TXD UART0_RXD */
+> +					0x0c 0x00220000 0x00ff0000
+> +				>;
+> +			};
+> +			serial1_rtscts_pins: pinmux_serial1_rtscts_pins {
+> +				pinctrl-single,bits = <
+> +					/* UART1_CTS UART1_RTS */
+> +					0x00 0x00440000 0x00ff0000
+> +				>;
+> +			};
+> +			serial1_rxtx_pins: pinmux_serial1_rxtx_pins {
+> +				pinctrl-single,bits = <
+> +					/* UART1_TXD UART1_RXD */
+> +					0x10 0x22000000 0xff000000
+> +				>;
+> +			};
+> +			serial2_rtscts_pins: pinmux_serial2_rtscts_pins {
+> +				pinctrl-single,bits = <
+> +					/* UART2_CTS UART2_RTS */
+> +					0x00 0x44000000 0xff000000
+> +				>;
+> +			};
+> +			serial2_rxtx_pins: pinmux_serial2_rxtx_pins {
+> +				pinctrl-single,bits = <
+> +					/* UART2_TXD UART2_RXD */
+> +					0x10 0x00220000 0x00ff0000
+> +				>;
+> +			};
+>  			nand_cs3_pins: pinmux_nand_pins {
+>  				pinctrl-single,bits = <
+>  					/* EMA_OE, EMA_WE */
