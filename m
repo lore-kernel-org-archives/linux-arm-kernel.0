@@ -1,101 +1,237 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Thu, 4 Aug 2016 18:25:25 +0530
-Subject: [PATCH] dmaengine: qcom_hidma: release the descriptor before the
- callback
-In-Reply-To: <971733d9-fd18-2a1b-07c0-349b47747d49@codeaurora.org>
-References: <1468465076-27324-1-git-send-email-okaya@codeaurora.org>
- <ccffcabf-1448-57a1-d18b-715cfd46e906@codeaurora.org>
- <20160724062425.GW9681@localhost>
- <971733d9-fd18-2a1b-07c0-349b47747d49@codeaurora.org>
-Message-ID: <20160804125525.GF9681@localhost>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Thu, 4 Aug 2016 13:51:37 +0100
+Subject: [PATCH] KVM: arm/arm64: initialize new VGIC even without host GIC
+In-Reply-To: <20160804112450.GC8211@lvm>
+References: <20160802143445.14005-1-andre.przywara@arm.com>
+ <20160804112450.GC8211@lvm>
+Message-ID: <dda85147-d7a9-73b2-15bb-8de53782d1af@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 25, 2016 at 10:19:44AM -0400, Sinan Kaya wrote:
-> >>
-> >> It looks like I introduced a behavioral change while refactoring the code.
-> >> The previous one would call the callback only if the transfer was successful
-> >> but it would always call dma_cookie_complete.
-> >>
-> >> The new behavior is to call dma_cookie_complete only if the transfer is successful
-> >> and it calls the callback even in the case of error cases. Then, the client has
-> >> to query if transfer was successful.
-> >>
-> >> Which one is the correct behavior?
-> > 
-> > Hi Sinan,
-> > 
-> > Cookie is always completed. That simply means trasactions was completed and
-> > has no indication if the transaction was successfull or not.
-> > 
-> > Uptill now we had no way of reporting error, Dave's series adds that up, so
-> > you can use it.
-> > 
-> > Callback is optional for users. Again we didnt convey success of
-> > transaction, but a callback for reporting that trasaction was completed. So
-> > invoking callback makes sense everytime.
-> > 
-> 
-> Let's put Dave's series aside for the moment and assume an error case where
-> something bad happened during the transfer. I can add the error code once Dave's
-> series get merged.
+Hi,
 
-Fair enough..
-
-> Here is the callback from dmatest.
+On 04/08/16 12:24, Christoffer Dall wrote:
+> On Tue, Aug 02, 2016 at 03:34:45PM +0100, Andre Przywara wrote:
+>> The new VGIC code is always in the VCPU entry/exit path, even when the
+>> actual GIC hardware initialization found the VGIC unusable (due to
+>> non-aligned base addresses or a missing maintenance interrupt, for
+>> instance).
+>> Since in this case the VGIC structures aren't initialized properly, the
+>> host kernel crashes on a NULL pointer dereference.
+>> Initialize each VCPU's ap_list even with the VGIC unavailable, so the
+>> VGIC code now just iterates an empty list in that case and no longer
+>> crashes the kernel.
+>> Also take care of the arch timer (which becomes unusable as well without
+>> a VGIC) by using a static key to prevent arch timer code to run in the
+>> hot path.
+>> Much of the code was inspired by Marc Zyngier.
+>>
+>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+>> Reported-by: Stefan Agner <stefan@agner.ch>
+>> ---
+>> Hi Stefan, Drew,
+>>
+>> can you test this on your systems which showed the issue?
+>>
+>> Cheers,
+>> Andre.
+>>
+>>  arch/arm/kvm/arm.c            | 14 ++++++++++----
+>>  include/kvm/arm_arch_timer.h  |  2 ++
+>>  virt/kvm/arm/arch_timer.c     | 11 +++++++++++
+>>  virt/kvm/arm/vgic/vgic-init.c |  9 ++++-----
+>>  4 files changed, 27 insertions(+), 9 deletions(-)
+>>
+>> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+>> index f1bde7c..cef35ce 100644
+>> --- a/arch/arm/kvm/arm.c
+>> +++ b/arch/arm/kvm/arm.c
+>> @@ -294,7 +294,8 @@ int kvm_arch_vcpu_init(struct kvm_vcpu *vcpu)
+>>  	bitmap_zero(vcpu->arch.features, KVM_VCPU_MAX_FEATURES);
+>>  
+>>  	/* Set up the timer */
+>> -	kvm_timer_vcpu_init(vcpu);
+>> +	if (vgic_present)
+>> +		kvm_timer_vcpu_init(vcpu);
+>>  
+>>  	kvm_arm_reset_debug_ptr(vcpu);
+>>  
+>> @@ -1208,6 +1209,7 @@ static int init_subsystems(void)
+>>  		break;
+>>  	case -ENODEV:
+>>  	case -ENXIO:
+>> +		kvm_err("No useable vgic detected\n");
+>>  		vgic_present = false;
+>>  		err = 0;
+>>  		break;
+>> @@ -1218,9 +1220,13 @@ static int init_subsystems(void)
+>>  	/*
+>>  	 * Init HYP architected timer support
+>>  	 */
+>> -	err = kvm_timer_hyp_init();
+>> -	if (err)
+>> -		goto out;
+>> +	if (vgic_present) {
+>> +		err = kvm_timer_hyp_init();
+>> +		if (err)
+>> +			goto out;
+>> +	} else {
+>> +		static_branch_enable(&kvm_arch_timer_disabled);
+>> +	}
+>>  
+>>  	kvm_perf_init();
+>>  	kvm_coproc_table_init();
+>> diff --git a/include/kvm/arm_arch_timer.h b/include/kvm/arm_arch_timer.h
+>> index dda39d8..64f361f 100644
+>> --- a/include/kvm/arm_arch_timer.h
+>> +++ b/include/kvm/arm_arch_timer.h
+>> @@ -23,6 +23,8 @@
+>>  #include <linux/hrtimer.h>
+>>  #include <linux/workqueue.h>
+>>  
+>> +extern struct static_key_false kvm_arch_timer_disabled;
+>> +
+>>  struct arch_timer_kvm {
+>>  	/* Virtual offset */
+>>  	cycle_t			cntvoff;
+>> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+>> index 4fde8c7..71fb04c 100644
+>> --- a/virt/kvm/arm/arch_timer.c
+>> +++ b/virt/kvm/arm/arch_timer.c
+>> @@ -34,6 +34,8 @@ static struct timecounter *timecounter;
+>>  static struct workqueue_struct *wqueue;
+>>  static unsigned int host_vtimer_irq;
+>>  
+>> +DEFINE_STATIC_KEY_FALSE(kvm_arch_timer_disabled);
+>> +
+>>  void kvm_timer_vcpu_put(struct kvm_vcpu *vcpu)
+>>  {
+>>  	vcpu->arch.timer_cpu.active_cleared_last = false;
+>> @@ -41,6 +43,9 @@ void kvm_timer_vcpu_put(struct kvm_vcpu *vcpu)
+>>  
+>>  static cycle_t kvm_phys_timer_read(void)
+>>  {
+>> +	if (static_branch_unlikely(&kvm_arch_timer_disabled))
+>> +		return 0;
+>> +
+>>  	return timecounter->cc->read(timecounter->cc);
+>>  }
+>>  
+>> @@ -104,6 +109,9 @@ static u64 kvm_timer_compute_delta(struct kvm_vcpu *vcpu)
+>>  {
+>>  	cycle_t cval, now;
+>>  
+>> +	if (static_branch_unlikely(&kvm_arch_timer_disabled))
+>> +		return 0;
+>> +
+>>  	cval = vcpu->arch.timer_cpu.cntv_cval;
+>>  	now = kvm_phys_timer_read() - vcpu->kvm->arch.timer.cntvoff;
+>>  
+>> @@ -148,6 +156,9 @@ static bool kvm_timer_irq_can_fire(struct kvm_vcpu *vcpu)
+>>  {
+>>  	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+>>  
+>> +	if (static_branch_unlikely(&kvm_arch_timer_disabled))
+>> +		return false;
+>> +
+>>  	return !(timer->cntv_ctl & ARCH_TIMER_CTRL_IT_MASK) &&
+>>  		(timer->cntv_ctl & ARCH_TIMER_CTRL_ENABLE);
+>>  }
 > 
-> static void dmatest_callback(void *arg)
-> { 
-> 	done->done = true;
-> }
+> why do we have these hooks fairly deep into the arch timer static
+> functions?
 > 
-> Here is how the request is made.
+> I would think that it makes more sense to catch stuff in the early entry
+> points to the timer logic, which would be:
 > 
-> dma_async_issue_pending(chan);
+>   kvm_timer_should_fire
+>   kvm_timer_schedule
+>   kvm_timer_unschedule
+>   kvm_arm_timer_set_reg
+>   kvm_arm_timer_get_reg
 > 
-> wait_event_freezable_timeout(done_wait, done.done,
-> 			     msecs_to_jiffies(params->timeout));
+> Also, most of these don't seem to be in a general critical path, so I'm
+> not really sure why we're using static branches here?
+
+To be honest I am not of fan of those sprinkled static branches either.
+They should be fairly cheap, though, as they are a NOP normally and
+AFAICS we need at least one anyway, so adding some more users didn't
+seem overly problematic to me.
+In a previous version I got along without most of those, by just letting
+timecounter always point to something legal, thus avoiding all but one
+explicit "vgic/arch_timer enabled" check at all.
+I fixed this up after some comments from Marc, but agree that now it's
+not nice.
+
+But see below for a possible better solution.
+
+>> diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
+>> index 2c7f0d5..b92133c 100644
+>> --- a/virt/kvm/arm/vgic/vgic-init.c
+>> +++ b/virt/kvm/arm/vgic/vgic-init.c
+>> @@ -56,6 +56,10 @@ void kvm_vgic_early_init(struct kvm *kvm)
+>>  
+>>  void kvm_vgic_vcpu_early_init(struct kvm_vcpu *vcpu)
+>>  {
+>> +	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+>> +
+>> +	INIT_LIST_HEAD(&vgic_cpu->ap_list_head);
+>> +	spin_lock_init(&vgic_cpu->ap_list_lock);
+>>  }
 > 
-> status = dma_async_is_tx_complete(chan, cookie, NULL, NULL);
-> if (!done.done) {
-> 	timeout
-> } else if (status != DMA_COMPLETE) { 
-> 	error
-> }
+> there are two pieces of comments above that needs to be tweaked now (or
+> just remove the remaining function and comment)
+
+TBH hooking into here was an easy solution, which I chose to allow
+fixing this easily, for instance for a 4.7 stable fix.
+
+Somehow I feel this is an abuse and we can find another solution.
+What about explicit "disable arch timer/vgic" function(s), which could
+set this list and spin_lock up, also make sure timecounter in
+arch_timer.c points to something and toggle the static branch.
+Then we would use something like:
+	if (vgic_present)
+		kvm_timer_hyp_init();
+	else
+		kvm_disable_arch_timer();
+
+and similar for the VGIC.
+
+Does that sound useful or are we going totally off the tracks with this?
+
+>>  
+>>  /* CREATION */
+>> @@ -392,11 +396,6 @@ int kvm_vgic_hyp_init(void)
+>>  	if (!gic_kvm_info)
+>>  		return -ENODEV;
+>>  
+>> -	if (!gic_kvm_info->maint_irq) {
+>> -		kvm_err("No vgic maintenance irq\n");
+>> -		return -ENXIO;
+>> -	}
+>> -
 > 
-> success.
+> I don't understand why we can remove this chunk?
+
+This was in Marc's version of the fix originally and I didn't dare to
+question this ;-)
+Originally I was under the impression that we are reporting this
+condition in the host GIC driver already, but checking back this doesn't
+seem to be the case. In fact we just seem to report the unusable VGIC,
+without any further rationale.
+
+So if Marc agrees, should we remove this hunk and keep the message?
+
+Cheers,
+Andre.
+
+>>  	switch (gic_kvm_info->type) {
+>>  	case GIC_V2:
+>>  		ret = vgic_v2_probe(gic_kvm_info);
+>> -- 
+>> 2.9.0
+>>
 > 
-> Based on what I see here, receiving callback all the time is OK. The client
-> checks if the callback is received or not first. 
-
-Callback is optional from API PoV. Yes ppl do implement it :)
-
-> Next, the client checks the status of the tx_status. 
+> Thanks,
+> -Christoffer
 > 
-> In the error case mentioned, the callback will be executed. done.done will be true.
-> 
-> If I set dma_cookie_complete(desc) in error case, it would be wrong to tell the client
-> that the transfer is successful. 
-
-And here is the thing that you missed :)
-
-Dmaengine tells transaction is complete. It does not say if the txn is
-success or failure. It can transfer data and not say if data was
-correct. A successful transaction implies data integrity as well, which
-dmaengine can't provide.
-
-> In my opinion, the new behavior is correct. Calling dma_cookie_complete(desc) all the time
-> is not. Do you agree?
-> 
-> If yes, I can divide this patch into two. One to correct the ordering. Another one
-> for behavioral change.
-
-See above..
-
-A callback or tx_status will only tell you the txn is completed. That is
-why we have DMA_COMPLETE and not DMA_SUCCESS.
-
-So current order seems fine to me!
-
--- 
-~Vinod
