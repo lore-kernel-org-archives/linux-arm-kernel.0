@@ -1,72 +1,87 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed, 3 Aug 2016 20:33:08 -0700
-Subject: [PATCH v1] net: phy: micrel: Add specific suspend
-In-Reply-To: <1470270095-13131-1-git-send-email-wenyou.yang@atmel.com>
-References: <1470270095-13131-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <11f70064-11d6-47b9-6ec1-83b7b0dc5419@gmail.com>
+From: Wenyou.Yang@atmel.com (Yang, Wenyou)
+Date: Thu, 4 Aug 2016 03:39:53 +0000
+Subject: [PATCH] usb: ohci-at91: Suspend the ports while USB suspending
+In-Reply-To: <Pine.LNX.4.44L0.1605121359120.5957-100000@netrider.rowland.org>
+References: <1463015134-32364-1-git-send-email-wenyou.yang@atmel.com>,
+ <Pine.LNX.4.44L0.1605121359120.5957-100000@netrider.rowland.org>
+Message-ID: <B256D81BAE5131468A838E5D7A243641018CCD040F@penmbx01>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/08/2016 17:21, Wenyou Yang wrote:
-> Disable all interrupts when suspend, they will be enabled
-> when resume. Otherwise, the suspend/resume process will be
-> blocked occasionally.
+Hi Alan,
+________________________________________
+From: Alan Stern [stern at rowland.harvard.edu]
+Sent: Friday, May 13, 2016 2:11
+To: Yang, Wenyou
+Cc: Greg Kroah-Hartman; Ferre, Nicolas; linux-usb at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+Subject: Re: [PATCH] usb: ohci-at91: Suspend the ports while USB suspending
 
-This seems like something fairly generic actually, we could imagine
-having the core library do something like this:
+On Thu, 12 May 2016, Wenyou Yang wrote:
 
-- if interrupts are valid and enabled for the PHY, call
-phydrv->config_intr() with PHY_INTERRUPT_DISABLED
-- call genphy_suspend
+> In order to get lower consumption, as a workaround, suspend
+> the USB PORTA/B/C via set the SUSPEND_A/B/C bits of OHCI Interrupt
+> Configuration Register while OHCI USB suspending.
 
-Of course if none of this fits the generic model, the PHY driver can
-still provide a suspend callback. Might be worth auditing other drivers
-for that pattern and look at those that need specific handling like
-keeping specific interrupt sources active for e.g: wake-on-LAN.
+What does this mean?  What does suspending a port do?  Is it the same
+as a normal USB port suspend?
 
-> 
+If it is the same, why doesn't the USB_PORT_FEAT_SUSPEND subcase of the
+SetPortFeature case in ohci_hub_control() already take care of this?
+
+Yes, you are right. 
+
+We can use  the USB_PORT_FEAT_SUSPEND subcase of the
+SetPortFeature case to take care this.
+
+I will send a new patch, please help review it. Thanks a lot.
+
+> This suspend operation must be done before stopping the USB clock,
+> resume after the USB clock enabled.
+>
 > Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 > ---
-> 
->  drivers/net/phy/micrel.c | 19 ++++++++++++++++++-
->  1 file changed, 18 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/net/phy/micrel.c b/drivers/net/phy/micrel.c
-> index 5a8fefc..8cb778a 100644
-> --- a/drivers/net/phy/micrel.c
-> +++ b/drivers/net/phy/micrel.c
-> @@ -647,6 +647,23 @@ static void kszphy_get_stats(struct phy_device *phydev,
->  		data[i] = kszphy_get_stat(phydev, i);
->  }
->  
-> +int kszphy_suspend(struct phy_device *phydev)
+
+> @@ -132,6 +135,17 @@ static void at91_stop_hc(struct platform_device *pdev)
+>
+>  /*-------------------------------------------------------------------------*/
+>
+> +struct regmap *at91_dt_syscon_sfr(void)
 > +{
-> +	int value;
+> +     struct regmap *regmap;
 > +
-> +	mutex_lock(&phydev->lock);
+> +     regmap = syscon_regmap_lookup_by_compatible("atmel,sama5d2-sfr");
+> +     if (IS_ERR(regmap))
+> +             return NULL;
+
+If you get an error, the regmap pointer is set to NULL...
+
+> @@ -197,6 +211,8 @@ static int usb_hcd_at91_probe(const struct hc_driver *driver,
+>               goto err;
+>       }
+>
+> +     ohci_at91->sfr_regmap = at91_dt_syscon_sfr();
+
+With no other error checking...
+
 > +
-> +	/* disable interrupts */
-> +	phy_write(phydev, MII_KSZPHY_INTCS, 0x0);
+>       board = hcd->self.controller->platform_data;
+>       ohci = hcd_to_ohci(hcd);
+>       ohci->num_ports = board->ports;
+
+> +static int ohci_at91_port_ctrl(struct regmap *regmap, bool enable)
+> +{
+> +     u32 regval;
+> +     int ret;
 > +
-> +	value = phy_read(phydev, MII_BMCR);
-> +	phy_write(phydev, MII_BMCR, value | BMCR_PDOWN);
+> +     if (IS_ERR(regmap))
+> +             return PTR_ERR(regmap);
 > +
-> +	mutex_unlock(&phydev->lock);
-> +
-> +	return 0;
-> +}
-> +
->  static int kszphy_resume(struct phy_device *phydev)
->  {
->  	int value;
-> @@ -870,7 +887,7 @@ static struct phy_driver ksphy_driver[] = {
->  	.get_sset_count = kszphy_get_sset_count,
->  	.get_strings	= kszphy_get_strings,
->  	.get_stats	= kszphy_get_stats,
-> -	.suspend	= genphy_suspend,
-> +	.suspend	= kszphy_suspend,
->  	.resume		= kszphy_resume,
->  }, {
->  	.phy_id		= PHY_ID_KSZ8061,
-> 
+> +     ret = regmap_read(regmap, SFR_OHCIICR, &regval);
+
+And now what happens if regmap is NULL?  Hint: It won't be pretty...
+
+Alan Stern
+
+
+Best Regards,
+Wenyou Yang
