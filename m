@@ -1,61 +1,42 @@
-From: appana.durga.rao@xilinx.com (Kedareswara rao Appana)
-Date: Thu, 4 Aug 2016 17:43:08 +0530
-Subject: [RFC PATCH v3 1/2] Documentation: DT: net: Add Xilinx gmiitorgmii
- converter device tree binding documentation
-Message-ID: <1470312789-28275-1-git-send-email-appanad@xilinx.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 4 Aug 2016 13:16:19 +0100
+Subject: [PATCH 1/8] ARM: assembler: introduce adr_l, ldr_l and str_l
+ macros
+In-Reply-To: <20160804112229.GG7147@e103592.cambridge.arm.com>
+References: <1470238730-30038-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1470238730-30038-2-git-send-email-ard.biesheuvel@linaro.org>
+ <20160803164940.GC7147@e103592.cambridge.arm.com>
+ <CAKv+Gu_3YKfdCyMuTdrk+t16qQOuMiSqWEHf-h1K2ajM5s1rxw@mail.gmail.com>
+ <20160804094451.GE7147@e103592.cambridge.arm.com>
+ <CAKv+Gu-T9+fhvRk-RroDqr7QvQ24cUTuONL9uT-Ws24n_nHrCw@mail.gmail.com>
+ <20160804112229.GG7147@e103592.cambridge.arm.com>
+Message-ID: <20160804121619.GS1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Device-tree binding documentation for xilinx gmiitorgmii converter.
+On Thu, Aug 04, 2016 at 12:22:29PM +0100, Dave Martin wrote:
+> The more conventional literal-.long approach could still be macro-ised
+> along the same lines, which might make the affected code more readable,
+> but the idiom you'd be replacing is well-understood and not very common.
 
-Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
----
-Changes for v3:
---> None.
-Changes for v2:
---> New patch.
+I don't see how it could be.  You can't efficiently place the literal
+data alongside the instructions dealing with it.
 
- .../devicetree/bindings/net/xilinx_gmii2rgmii.txt  | 32 ++++++++++++++++++++++
- 1 file changed, 32 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/net/xilinx_gmii2rgmii.txt
+The only alternative is to use ldr rd, =foo, but that gets very stupid
+when you want to calculate the relative offset, and you end up with
+something like this for every relative load:
 
-diff --git a/Documentation/devicetree/bindings/net/xilinx_gmii2rgmii.txt b/Documentation/devicetree/bindings/net/xilinx_gmii2rgmii.txt
-new file mode 100644
-index 0000000..79fa504
---- /dev/null
-+++ b/Documentation/devicetree/bindings/net/xilinx_gmii2rgmii.txt
-@@ -0,0 +1,32 @@
-+XILINX GMIITORGMII Converter Driver Device Tree Bindings
-+--------------------------------------------------------
-+
-+The Gigabit Media Independent Interface (GMII) to Reduced Gigabit Media
-+Independent Interface (RGMII) core provides the RGMII between RGMII-compliant
-+Ethernet physical media devices (PHY) and the Gigabit Ethernet controller.
-+This core can be used in all three modes of operation(10/100/1000 Mb/s).
-+The Management Data Input/Output (MDIO) interface is used to configure the
-+Speed of operation. This core can switch dynamically between the three
-+Different speed modes by configuring the conveter register through mdio write.
-+
-+The MDIO is a bus to which the PHY devices are connected.  For each
-+device that exists on this bus, a child node should be created.  See
-+the definition of the PHY node in booting-without-of.txt for an example
-+of how to define a PHY.
-+
-+Required properties:
-+  - compatible : Should be "xilinx,gmiitorgmii"
-+  - reg : The ID number for the phy, usually a small integer
-+
-+Example:
-+	mdio {
-+                #address-cells = <1>;
-+                #size-cells = <0>;
-+		ethernet-phy at 0 {
-+			......
-+		};
-+                gmii_to_rgmii: gmii_to_rgmii at 8 {
-+                        compatible = "xilinx,gmiitorgmii";
-+                        reg = <8>;
-+                };
-+        };
+	ldr rd, =.
+	sub rd, rd, #. - 4
+	ldr r1, =foo
+	add r1, r1, rd
+
+As I've already said, I prefer the existing solution.  It works, it's
+been known to work for the last 22 years.
+
+If it isn't broken, don't try to fix it.
+
 -- 
-2.1.2
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
