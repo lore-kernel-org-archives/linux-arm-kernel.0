@@ -1,146 +1,234 @@
-From: brendan.jackman@arm.com (Brendan Jackman)
-Date: Thu, 4 Aug 2016 16:59:47 +0100
-Subject: [PATCH v2 06/14] PM / cpu_domains: Setup PM domains for
- CPUs/clusters
-In-Reply-To: <1469829385-11511-7-git-send-email-lina.iyer@linaro.org>
-References: <1469829385-11511-1-git-send-email-lina.iyer@linaro.org>
- <1469829385-11511-7-git-send-email-lina.iyer@linaro.org>
-Message-ID: <20160804155947.GD1732@brendan-thinkstation>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Thu, 4 Aug 2016 10:02:52 -0600
+Subject: [PATCH 2/2] coresight: fix handling of ETM trace register access
+ via sysfs
+In-Reply-To: <1470240752-17331-2-git-send-email-sudeep.holla@arm.com>
+References: <1470240752-17331-1-git-send-email-sudeep.holla@arm.com>
+ <1470240752-17331-2-git-send-email-sudeep.holla@arm.com>
+Message-ID: <CANLsYkyX--cokkFOQHDxyw1NeT1kPkkpCjHoyJrKpfYATGpuSg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lina,
-
-I spotted a couple more nits..
-
-> +static struct generic_pm_domain *of_init_cpu_pm_domain(struct device_node *dn,
-> +				const struct cpu_pd_ops *ops)
+On 3 August 2016 at 10:12, Sudeep Holla <sudeep.holla@arm.com> wrote:
+> The ETM registers are classified into 2 categories: trace and management.
+> The core power domain contains most of the trace unit logic including
+> all(except TRCOSLAR and TRCOSLSR) the trace registers. The debug power
+> domain contains the external debugger interface including all management
+> registers.
+>
+> This patch adds coresight unit specific function coresight_simple_func
+> which can be used for ETM trace registers by providing a ETM specific
+> read function which does smp cross call to ensure the trace core is
+> powered up before the register is accessed.
+>
+> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+> ---
+>  drivers/hwtracing/coresight/coresight-etb10.c      |  2 +-
+>  .../hwtracing/coresight/coresight-etm3x-sysfs.c    |  2 +-
+>  .../hwtracing/coresight/coresight-etm4x-sysfs.c    | 58 ++++++++++++++++------
+>  drivers/hwtracing/coresight/coresight-etm4x.h      |  1 +
+>  drivers/hwtracing/coresight/coresight-priv.h       |  9 +++-
+>  drivers/hwtracing/coresight/coresight-stm.c        |  2 +-
+>  drivers/hwtracing/coresight/coresight-tmc.c        |  2 +-
+>  7 files changed, 54 insertions(+), 22 deletions(-)
+>
+> Hi Mathieu,
+>
+> I think the latest release of the firmware(inparticular SCP v1.16.0) for
+> Juno fixes the issue you had previously encountered. However there's a
+> pending issue with A53 ETM management register access when it's powered
+> down.
+>
+> I don't think Juno platform should block these changes as ETMv4
+> specification is clear on the power management and register access
+> perspective.
+>
+> Regards,
+> Sudeep
+>
+> diff --git a/drivers/hwtracing/coresight/coresight-etb10.c b/drivers/hwtracing/coresight/coresight-etb10.c
+> index 8a4927ca9181..d7325c6534ad 100644
+> --- a/drivers/hwtracing/coresight/coresight-etb10.c
+> +++ b/drivers/hwtracing/coresight/coresight-etb10.c
+> @@ -559,7 +559,7 @@ static const struct file_operations etb_fops = {
+>  };
+>
+>  #define coresight_etb10_simple_func(name, offset)                       \
+> -       coresight_simple_func(struct etb_drvdata, name, offset)
+> +       coresight_simple_func(struct etb_drvdata, NULL, name, offset)
+>
+>  coresight_etb10_simple_func(rdp, ETB_RAM_DEPTH_REG);
+>  coresight_etb10_simple_func(sts, ETB_STATUS_REG);
+> diff --git a/drivers/hwtracing/coresight/coresight-etm3x-sysfs.c b/drivers/hwtracing/coresight/coresight-etm3x-sysfs.c
+> index 02d4b629891f..4856c8098416 100644
+> --- a/drivers/hwtracing/coresight/coresight-etm3x-sysfs.c
+> +++ b/drivers/hwtracing/coresight/coresight-etm3x-sysfs.c
+> @@ -1222,7 +1222,7 @@ static struct attribute *coresight_etm_attrs[] = {
+>  };
+>
+>  #define coresight_etm3x_simple_func(name, offset)                      \
+> -       coresight_simple_func(struct etm_drvdata, name, offset)
+> +       coresight_simple_func(struct etm_drvdata, NULL, name, offset)
+>
+>  coresight_etm3x_simple_func(etmccr, ETMCCR);
+>  coresight_etm3x_simple_func(etmccer, ETMCCER);
+> diff --git a/drivers/hwtracing/coresight/coresight-etm4x-sysfs.c b/drivers/hwtracing/coresight/coresight-etm4x-sysfs.c
+> index 7c84308c5564..2390ee43e3d9 100644
+> --- a/drivers/hwtracing/coresight/coresight-etm4x-sysfs.c
+> +++ b/drivers/hwtracing/coresight/coresight-etm4x-sysfs.c
+> @@ -2039,15 +2039,38 @@ static struct attribute *coresight_etmv4_attrs[] = {
+>         NULL,
+>  };
+>
+> +struct etm_reg {
+> +       void __iomem *addr;
+> +       u32 data;
+> +};
+> +
+> +static void do_smp_cross_read(void *data)
 > +{
-> +	struct cpu_pm_domain *pd = NULL;
-> +	struct generic_pm_domain *genpd = NULL;
-> +	int ret = -ENOMEM;
+> +       struct etm_reg *reg = data;
 > +
-> +	if (!of_device_is_available(dn))
-> +		return ERR_PTR(-ENODEV);
-> +
-> +	genpd = kzalloc(sizeof(*genpd), GFP_KERNEL);
-> +	if (!genpd)
-> +		goto fail;
-> +
-> +	genpd->name = kstrndup(dn->full_name, CPU_PD_NAME_MAX, GFP_KERNEL);
-> +	if (!genpd->name)
-> +		goto fail;
-> +
-> +	pd = kzalloc(sizeof(*pd), GFP_KERNEL);
-> +	if (!pd)
-> +		goto fail;
-> +
-> +	if (!zalloc_cpumask_var(&pd->cpus, GFP_KERNEL))
-> +		goto fail;
-> +
-> +	genpd->power_off = cpu_pd_power_off;
-> +	genpd->power_on = cpu_pd_power_on;
-> +	genpd->flags |= GENPD_FLAG_IRQ_SAFE;
-> +	genpd->of_node = dn;
-> +	pd->genpd = genpd;
-> +	pd->ops.power_on = ops->power_on;
-> +	pd->ops.power_off = ops->power_off;
-> +
-> +	INIT_LIST_HEAD_RCU(&pd->link);
-> +	mutex_lock(&cpu_pd_list_lock);
-> +	list_add_rcu(&pd->link, &of_cpu_pd_list);
-> +	mutex_unlock(&cpu_pd_list_lock);
-> +
-> +	/* Populate platform specific states from DT */
-> +	if (ops->populate_state_data) {
-> +		struct device_node *np;
-> +		int i;
-> +
-> +		/* Initialize the arm,idle-state properties */
-> +		ret = pm_genpd_of_parse_power_states(genpd);
-> +		if (ret) {
-> +			pr_warn("%s domain states not initialized (%d)\n",
-> +					dn->full_name, ret);
-> +			goto fail;
-> +		}
-> +		for (i = 0; i < genpd->state_count; i++) {
-> +			np = of_parse_phandle(dn, "domain-idle-states", i);
-> +			ret = ops->populate_state_data(np,
-> +					&genpd->states[i].param);
-> +			of_node_put(np);
-> +			if (ret)
-> +				goto fail;
-> +		}
-> +	}
-
-It seems a bit unfortunate to do of_parse_phandle for "domain-idle-states"
-again, when pm_genpd_of_parse_power_states has just done that. Maybe we could
-could add an `of_node` member to `struct genpd_power_state` and have
-pm_genpd_of_parse_power_states populate that?
-
-> +
-> +	/* Register the CPU genpd */
-> +	pr_debug("adding %s as CPU PM domain\n", pd->genpd->name);
-> +	ret = pm_genpd_init(pd->genpd, &simple_qos_governor, false);
-> +	if (ret) {
-> +		pr_err("Unable to initialize domain %s\n", dn->full_name);
-> +		goto fail;
-> +	}
-> +
-> +	ret = of_genpd_add_provider_simple(dn, pd->genpd);
-> +	if (ret)
-> +		pr_warn("Unable to add genpd %s as provider\n",
-> +				pd->genpd->name);
-> +
-> +	return pd->genpd;
-> +fail:
-> +
-> +	kfree(genpd->name);
-> +	kfree(genpd);
-> +	if (pd)
-> +		kfree(pd->cpus);
-> +	kfree(pd);
-> +	return ERR_PTR(ret);
+> +       reg->data = readl_relaxed(reg->addr);
 > +}
 > +
-
-
-> +int of_setup_cpu_pd_single(int cpu, const struct cpu_pd_ops *ops)
+> +static u32 etmv4_chk_trace_reg_access(const struct device *dev, u32 offset)
 > +{
+> +       struct etmv4_drvdata *drvdata = dev_get_drvdata(dev);
+> +       struct etm_reg reg;
 > +
-> +	struct device_node *dn;
-> +	struct generic_pm_domain *genpd;
-> +	struct cpu_pm_domain *cpu_pd;
-> +
-> +	dn = of_get_cpu_node(cpu, NULL);
-> +	if (!dn)
-> +		return -ENODEV;
-
-of_get_cpu_node increments the refcount so we need an of_node_put at some point.
-
-There are loads of instances around the kernel of of_get_cpu_node without
-corresponding of_node_put, though, I could be misunderstanding...
-
-> +
-> +	dn = of_parse_phandle(dn, "power-domains", 0);
-> +	if (!dn)
-> +		return -ENODEV;
-> +
-> +	/* Find the genpd for this CPU, create if not found */
-> +	genpd = of_get_cpu_domain(dn, ops, cpu);
-> +	if (IS_ERR(genpd))
-> +		return PTR_ERR(genpd);
-> +
-> +	of_node_put(dn);
-> +	cpu_pd = to_cpu_pd(genpd);
-> +	if (!cpu_pd) {
-> +		pr_err("%s: Genpd was created outside CPU PM domains\n",
-> +				__func__);
-> +		return -ENOENT;
-> +	}
-> +
-> +	return cpu_pd_attach_cpu(cpu_pd, cpu);
+> +       reg.addr = drvdata->base + offset;
+> +       smp_call_function_single(drvdata->cpu, do_smp_cross_read, &reg, 1);
+> +       return reg.data;
 > +}
+> +
+>  #define coresight_etm4x_simple_func(name, offset)                      \
+> -       coresight_simple_func(struct etmv4_drvdata, name, offset)
+> +       coresight_simple_func(struct etmv4_drvdata, NULL, name, offset)
+> +
+> +#define coresight_etm4x_trace_reg_func(name, offset)                   \
+> +       coresight_simple_func(struct etmv4_drvdata, etmv4_chk_trace_reg_access,\
+> +                             name, offset)
+>
+> -coresight_etm4x_simple_func(trcoslsr, TRCOSLSR);
+>  coresight_etm4x_simple_func(trcpdcr, TRCPDCR);
+>  coresight_etm4x_simple_func(trcpdsr, TRCPDSR);
+>  coresight_etm4x_simple_func(trclsr, TRCLSR);
+> -coresight_etm4x_simple_func(trcconfig, TRCCONFIGR);
+> -coresight_etm4x_simple_func(trctraceid, TRCTRACEIDR);
+>  coresight_etm4x_simple_func(trcauthstatus, TRCAUTHSTATUS);
+>  coresight_etm4x_simple_func(trcdevid, TRCDEVID);
+>  coresight_etm4x_simple_func(trcdevtype, TRCDEVTYPE);
+> @@ -2055,6 +2078,9 @@ coresight_etm4x_simple_func(trcpidr0, TRCPIDR0);
+>  coresight_etm4x_simple_func(trcpidr1, TRCPIDR1);
+>  coresight_etm4x_simple_func(trcpidr2, TRCPIDR2);
+>  coresight_etm4x_simple_func(trcpidr3, TRCPIDR3);
+> +coresight_etm4x_trace_reg_func(trcoslsr, TRCOSLSR);
+> +coresight_etm4x_trace_reg_func(trcconfig, TRCCONFIGR);
+> +coresight_etm4x_trace_reg_func(trctraceid, TRCTRACEIDR);
+>
+>  static struct attribute *coresight_etmv4_mgmt_attrs[] = {
+>         &dev_attr_trcoslsr.attr,
+> @@ -2073,19 +2099,19 @@ static struct attribute *coresight_etmv4_mgmt_attrs[] = {
+>         NULL,
+>  };
+>
+> -coresight_etm4x_simple_func(trcidr0, TRCIDR0);
+> -coresight_etm4x_simple_func(trcidr1, TRCIDR1);
+> -coresight_etm4x_simple_func(trcidr2, TRCIDR2);
+> -coresight_etm4x_simple_func(trcidr3, TRCIDR3);
+> -coresight_etm4x_simple_func(trcidr4, TRCIDR4);
+> -coresight_etm4x_simple_func(trcidr5, TRCIDR5);
+> +coresight_etm4x_trace_reg_func(trcidr0, TRCIDR0);
+> +coresight_etm4x_trace_reg_func(trcidr1, TRCIDR1);
+> +coresight_etm4x_trace_reg_func(trcidr2, TRCIDR2);
+> +coresight_etm4x_trace_reg_func(trcidr3, TRCIDR3);
+> +coresight_etm4x_trace_reg_func(trcidr4, TRCIDR4);
+> +coresight_etm4x_trace_reg_func(trcidr5, TRCIDR5);
+>  /* trcidr[6,7] are reserved */
+> -coresight_etm4x_simple_func(trcidr8, TRCIDR8);
+> -coresight_etm4x_simple_func(trcidr9, TRCIDR9);
+> -coresight_etm4x_simple_func(trcidr10, TRCIDR10);
+> -coresight_etm4x_simple_func(trcidr11, TRCIDR11);
+> -coresight_etm4x_simple_func(trcidr12, TRCIDR12);
+> -coresight_etm4x_simple_func(trcidr13, TRCIDR13);
+> +coresight_etm4x_trace_reg_func(trcidr8, TRCIDR8);
+> +coresight_etm4x_trace_reg_func(trcidr9, TRCIDR9);
+> +coresight_etm4x_trace_reg_func(trcidr10, TRCIDR10);
+> +coresight_etm4x_trace_reg_func(trcidr11, TRCIDR11);
+> +coresight_etm4x_trace_reg_func(trcidr12, TRCIDR12);
+> +coresight_etm4x_trace_reg_func(trcidr13, TRCIDR13);
+>
+>  static struct attribute *coresight_etmv4_trcidr_attrs[] = {
+>         &dev_attr_trcidr0.attr,
+> diff --git a/drivers/hwtracing/coresight/coresight-etm4x.h b/drivers/hwtracing/coresight/coresight-etm4x.h
+> index 2629954429a1..ba4dd2e820ea 100644
+> --- a/drivers/hwtracing/coresight/coresight-etm4x.h
+> +++ b/drivers/hwtracing/coresight/coresight-etm4x.h
+> @@ -185,6 +185,7 @@
+>
+>  /* PowerDown Control Register bits */
+>  #define TRCPDCR_PU                     BIT(3)
+> +#define TRCPDSR_POWER                  BIT(0)
 
-Cheers,
-Brendan
+I forgot - this isn't referenced anywhere.
+
+>
+>  /* secure state access levels */
+>  #define ETM_EXLEVEL_S_APP              BIT(8)
+> diff --git a/drivers/hwtracing/coresight/coresight-priv.h b/drivers/hwtracing/coresight/coresight-priv.h
+> index decfd52b5dc3..39841d1f58e0 100644
+> --- a/drivers/hwtracing/coresight/coresight-priv.h
+> +++ b/drivers/hwtracing/coresight/coresight-priv.h
+> @@ -38,14 +38,19 @@
+>  #define ETM_MODE_EXCL_KERN     BIT(30)
+>  #define ETM_MODE_EXCL_USER     BIT(31)
+>
+> -#define coresight_simple_func(type, name, offset)                      \
+> +typedef u32 (*coresight_read_fn)(const struct device *, u32 offset);
+> +#define coresight_simple_func(type, func, name, offset)                        \
+>  static ssize_t name##_show(struct device *_dev,                                \
+>                            struct device_attribute *attr, char *buf)    \
+>  {                                                                      \
+>         type *drvdata = dev_get_drvdata(_dev->parent);                  \
+> +       coresight_read_fn fn = func;                                    \
+>         u32 val;                                                        \
+>         pm_runtime_get_sync(_dev->parent);                              \
+> -       val = readl_relaxed(drvdata->base + offset);                    \
+> +       if (fn)                                                         \
+> +               val = fn(_dev->parent, offset);                         \
+> +       else                                                            \
+> +               val = readl_relaxed(drvdata->base + offset);            \
+>         pm_runtime_put_sync(_dev->parent);                              \
+>         return scnprintf(buf, PAGE_SIZE, "0x%x\n", val);                \
+>  }                                                                      \
+> diff --git a/drivers/hwtracing/coresight/coresight-stm.c b/drivers/hwtracing/coresight/coresight-stm.c
+> index 819629aed2f7..7949f0f6744a 100644
+> --- a/drivers/hwtracing/coresight/coresight-stm.c
+> +++ b/drivers/hwtracing/coresight/coresight-stm.c
+> @@ -635,7 +635,7 @@ static ssize_t traceid_store(struct device *dev,
+>  static DEVICE_ATTR_RW(traceid);
+>
+>  #define coresight_stm_simple_func(name, offset)        \
+> -       coresight_simple_func(struct stm_drvdata, name, offset)
+> +       coresight_simple_func(struct stm_drvdata, NULL, name, offset)
+>
+>  coresight_stm_simple_func(tcsr, STMTCSR);
+>  coresight_stm_simple_func(tsfreqr, STMTSFREQR);
+> diff --git a/drivers/hwtracing/coresight/coresight-tmc.c b/drivers/hwtracing/coresight/coresight-tmc.c
+> index 4cbcaf93c9d9..a4748630f5d6 100644
+> --- a/drivers/hwtracing/coresight/coresight-tmc.c
+> +++ b/drivers/hwtracing/coresight/coresight-tmc.c
+> @@ -218,7 +218,7 @@ static enum tmc_mem_intf_width tmc_get_memwidth(u32 devid)
+>  }
+>
+>  #define coresight_tmc_simple_func(name, offset)                        \
+> -       coresight_simple_func(struct tmc_drvdata, name, offset)
+> +       coresight_simple_func(struct tmc_drvdata, NULL, name, offset)
+>
+>  coresight_tmc_simple_func(rsz, TMC_RSZ);
+>  coresight_tmc_simple_func(sts, TMC_STS);
+> --
+> 2.7.4
+>
