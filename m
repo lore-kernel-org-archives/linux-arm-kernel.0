@@ -1,67 +1,108 @@
-From: eballetbo@gmail.com (Enric Balletbo Serra)
-Date: Thu, 4 Aug 2016 12:35:59 +0200
-Subject: [PATCH 2/2 v16] drm/bridge: Add I2C based driver for ps8640 bridge
-In-Reply-To: <CAKMK7uEkUOq1CB3tj_1Qx50fBpw9B39+c3asX6MPNexT=dv9fA@mail.gmail.com>
-References: <1464861445-11086-1-git-send-email-jitao.shi@mediatek.com>
- <1464861445-11086-2-git-send-email-jitao.shi@mediatek.com>
- <CACvgo53002XCPLufbJHQLC1uL1nNS7_0gh=napedetmvT6FoSw@mail.gmail.com>
- <CAGS+omDsDS5tx=+Efq8LWNd3-asU4r2h=-AE6vdKgfG-p6vdAA@mail.gmail.com>
- <CAKMK7uEkUOq1CB3tj_1Qx50fBpw9B39+c3asX6MPNexT=dv9fA@mail.gmail.com>
-Message-ID: <CAFqH_53PgPs3_h7XNFEu4u0W6GW7vyWCNFf2vq8Yn7sH2LbFwA@mail.gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 4 Aug 2016 12:47:36 +0200
+Subject: [PATCH 41/55] KVM: arm64: vgic-its: Implement MSI injection in
+ ITS emulation
+In-Reply-To: <1469208552-4155-42-git-send-email-marc.zyngier@arm.com>
+References: <1469208552-4155-1-git-send-email-marc.zyngier@arm.com>
+ <1469208552-4155-42-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20160804104736.GA8211@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-07-12 12:13 GMT+02:00 Daniel Vetter <daniel@ffwll.ch>:
-> On Wed, Jun 29, 2016 at 6:31 AM, Daniel Kurtz <djkurtz@chromium.org> wrote:
->> On Fri, Jun 17, 2016 at 3:14 AM, Emil Velikov <emil.l.velikov@gmail.com> wrote:
->>>> +static ssize_t ps8640_update_fw_store(struct device *dev,
->>>> +                                     struct device_attribute *attr,
->>>> +                                     const char *buf, size_t count)
->>>> +{
->>>> +       struct i2c_client *client = to_i2c_client(dev);
->>>> +       struct ps8640 *ps_bridge = i2c_get_clientdata(client);
->>>> +       const struct firmware *fw;
->>>> +       int error;
->>>> +
->>>> +       error = request_firmware(&fw, PS_FW_NAME, dev);
->>> Can the device operate without a firmware ? If not, why is the
->>> firmware loaded so later/after user interaction (via sysfs) ? I don't
->>> recall any other driver in DRM to use such an approach.
->>
->> The PS8640 has internal flash, so it should always already have a
->> working firmware.
->> This sysfs interface is useful for user space initiated field firmware updates.
->
-> Might be better to just do a request_firmware on driver load, and
-> simply proceed if it's not there. Adding a sysfs interface (which is
-> abi) seems way too much overkill for this imo. If you want to upgrade
-> the firmware you can then just drop it into the right directory, with
-> no further interaction needed.
+Hi Andre and Marc,
 
-IMHO I'm not sure if for this use case request_firmware on driver load
-is a good idea. Flash the non-volatile internal chip can be a slow
-operation and if you forget to remove the firmware after drop it into
-the right directory apart from slow down the driver probe you can
-damage the chip depending on the write endurance of the chip.
+On Fri, Jul 22, 2016 at 06:28:58PM +0100, Marc Zyngier wrote:
+> From: Andre Przywara <andre.przywara@arm.com>
+> 
+> When userland wants to inject an MSI into the guest, it uses the
+> KVM_SIGNAL_MSI ioctl, which carries the doorbell address along with
+> the payload and the device ID.
+> With the help of the KVM IO bus framework we learn the corresponding
+> ITS from the doorbell address. We then use our wrapper functions to
+> iterate the linked lists and find the proper Interrupt Translation Table
+> Entry (ITTE) and thus the corresponding struct vgic_irq to finally set
+> the pending bit.
+> We also provide the handler for the ITS "INT" command, which allows a
+> guest to trigger an MSI via the ITS command queue. Since this one knows
+> about the right ITS already, we directly call the MMIO handler function
+> without using the kvm_io_bus framework.
+> 
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+> Tested-by: Eric Auger <eric.auger@redhat.com>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  virt/kvm/arm/vgic/vgic-its.c | 77 ++++++++++++++++++++++++++++++++++++++++++++
+>  virt/kvm/arm/vgic/vgic.h     |  6 ++++
+>  2 files changed, 83 insertions(+)
+> 
+> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+> index 1408c88..d8e8f14 100644
+> --- a/virt/kvm/arm/vgic/vgic-its.c
+> +++ b/virt/kvm/arm/vgic/vgic-its.c
+> @@ -437,6 +437,65 @@ static unsigned long vgic_mmio_read_its_idregs(struct kvm *kvm,
+>  	return 0;
+>  }
+>  
+> +/*
+> + * Find the target VCPU and the LPI number for a given devid/eventid pair
+> + * and make this IRQ pending, possibly injecting it.
+> + * Must be called with the its_lock mutex held.
+> + */
+> +static void vgic_its_trigger_msi(struct kvm *kvm, struct vgic_its *its,
+> +				 u32 devid, u32 eventid)
+> +{
+> +	struct its_itte *itte;
+> +
+> +	if (!its->enabled)
+> +		return;
+> +
+> +	itte = find_itte(its, devid, eventid);
+> +	/* Triggering an unmapped IRQ gets silently dropped. */
+> +	if (itte && its_is_collection_mapped(itte->collection)) {
+> +		struct kvm_vcpu *vcpu;
+> +
+> +		vcpu = kvm_get_vcpu(kvm, itte->collection->target_addr);
+> +		if (vcpu && vcpu->arch.vgic_cpu.lpis_enabled) {
+> +			spin_lock(&itte->irq->irq_lock);
+> +			itte->irq->pending = true;
+> +			vgic_queue_irq_unlock(kvm, itte->irq);
+> +		}
+> +	}
+> +}
+> +
+> +/*
+> + * Queries the KVM IO bus framework to get the ITS pointer from the given
+> + * doorbell address.
+> + * We then call vgic_its_trigger_msi() with the decoded data.
+> + */
+> +int vgic_its_inject_msi(struct kvm *kvm, struct kvm_msi *msi)
+> +{
+> +	u64 address;
+> +	struct kvm_io_device *kvm_io_dev;
+> +	struct vgic_io_device *iodev;
+> +
+> +	if (!vgic_has_its(kvm))
+> +		return -ENODEV;
+> +
+> +	if (!(msi->flags & KVM_MSI_VALID_DEVID))
+> +		return -EINVAL;
+> +
+> +	address = (u64)msi->address_hi << 32 | msi->address_lo;
+> +
+> +	kvm_io_dev = kvm_io_bus_get_dev(kvm, KVM_MMIO_BUS, address);
+> +	if (!kvm_io_dev)
+> +		return -ENODEV;
+> +
+> +	iodev = container_of(kvm_io_dev, struct vgic_io_device, dev);
 
-This sysfs interface is used on other subsystems when there is a
-non-volatile memory, as example you can see at [1], [2]. Unfortunately
-not all are using the same sysfs interface and maybe this should be
-standardized (maybe it's an opportunity to define it)
+This container_of bothers me; as far as I can tell, the address we use
+to look stuff up on the KVM_MMIO_BUS is purely given by userspace and we
+can have other stuff registered on the KVM_MMIO_BUS, which is not
+contained in a struct vgic_io_device (eventfd for example).
 
-Regards,
- Enric
+This smells like something that could be exploited, so if I'm right, we
+should plug this for -rc2 in some way.
 
-[1] http://lxr.free-electrons.com/source/drivers/input/touchscreen/wdt87xx_i2c.c#L922
-[2] http://lxr.free-electrons.com/source/drivers/scsi/pm8001/pm8001_ctl.c#L732
-
-
-> -Daniel
-> --
-> Daniel Vetter
-> Software Engineer, Intel Corporation
-> +41 (0) 79 365 57 48 - http://blog.ffwll.ch
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+Thanks,
+-Christoffer
