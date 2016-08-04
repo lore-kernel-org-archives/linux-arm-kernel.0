@@ -1,37 +1,45 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 4 Aug 2016 13:23:29 +0100
-Subject: [PATCH 2/2 v16] drm/bridge: Add I2C based driver for ps8640 bridge
-In-Reply-To: <CAKMK7uEkUOq1CB3tj_1Qx50fBpw9B39+c3asX6MPNexT=dv9fA@mail.gmail.com>
-References: <1464861445-11086-1-git-send-email-jitao.shi@mediatek.com>
- <1464861445-11086-2-git-send-email-jitao.shi@mediatek.com>
- <CACvgo53002XCPLufbJHQLC1uL1nNS7_0gh=napedetmvT6FoSw@mail.gmail.com>
- <CAGS+omDsDS5tx=+Efq8LWNd3-asU4r2h=-AE6vdKgfG-p6vdAA@mail.gmail.com>
- <CAKMK7uEkUOq1CB3tj_1Qx50fBpw9B39+c3asX6MPNexT=dv9fA@mail.gmail.com>
-Message-ID: <20160804122329.GT1041@n2100.armlinux.org.uk>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Thu, 4 Aug 2016 18:16:41 +0530
+Subject: [PATCH 10/10] dmaengine: qcom_hidma: add MSI support for
+ interrupts
+In-Reply-To: <e6560c8b-e18e-9e32-5b51-c1c12d8551ce@codeaurora.org>
+References: <1468867177-15007-1-git-send-email-okaya@codeaurora.org>
+ <1468867177-15007-11-git-send-email-okaya@codeaurora.org>
+ <20160724064256.GA9681@localhost>
+ <e6560c8b-e18e-9e32-5b51-c1c12d8551ce@codeaurora.org>
+Message-ID: <20160804124641.GE9681@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 12, 2016 at 12:13:52PM +0200, Daniel Vetter wrote:
-> Might be better to just do a request_firmware on driver load, and
-> simply proceed if it's not there.
+On Sun, Jul 24, 2016 at 10:38:11AM -0400, Sinan Kaya wrote:
+> >> +       if (rc)
+> >> +               dev_warn(&pdev->dev,
+> >> +                        "failed to request MSI irq, falling back to wired IRQ\n");
+> >> +       return rc;
+> >> +#else
+> >> +       return -EINVAL;
+> > 
+> > -EINVAL doesnt sound apt here..
+> 
+> What should I use? -ENOENT ?
 
-That is almost never a good idea - if the driver is built-in, then
-the request_firmware call happens before the real rootfs is mounted,
-which makes it complicated to get the firmware delivered to the
-driver.
+that sounds okay or EIO
 
-Sure, it works nicely if the drivers are built as modules, but not
-everyone wants to deal with modules and initramfs images.
+> >> +                       return false;
+> >> +
+> >> +               ret = strcmp(of_compat, "qcom,hidma-1.1");
+> >> +       } else {
+> >> +               ret = strcmp(acpi_device_hid(adev), "QCOM8062");
+> > 
+> > Okay if you ahve a device ID then why do we need new binding? This device as
+> > you said implies the support for MSI interrupts.
+> 
+> 
+> Yes, I do have a new device ID for platforms with MSI capability. 
+> 
+> Which new binding are you referring to?
 
-If we're wanting to just update the firmware, that should be an
-explicit administrative decision requiring an explicit action by the
-system administrator, and not done by placing a file in some magic
-location so that request_firmware() can find it, which then gets
-picked up at boot time/driver load time.  Consider what could happen
-if linux-firmware picks up the file and places it in the appropriate
-location by default.
+If you have "QCOM8062" why do you need DT to tell hidma-1.1 ?
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+~Vinod
