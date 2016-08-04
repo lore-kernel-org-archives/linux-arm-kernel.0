@@ -1,40 +1,98 @@
-From: kbeldan@baylibre.com (Karl Beldan)
-Date: Thu, 4 Aug 2016 20:53:34 +0000
-Subject: [PATCH] ARM: dt: da850: add nand_cs3 node label in the dtsi
-In-Reply-To: <CAJaRCXNB+fC=0H_A4zSgQmeynZJsacY8kS2dLfstX=gfRzzfpA@mail.gmail.com>
-References: <20160803162528.2337-1-kbeldan@baylibre.com>
- <CAJaRCXNB+fC=0H_A4zSgQmeynZJsacY8kS2dLfstX=gfRzzfpA@mail.gmail.com>
-Message-ID: <20160804205334.GB15013@gobelin>
+From: robert.richter@cavium.com (Robert Richter)
+Date: Thu, 4 Aug 2016 22:57:07 +0200
+Subject: [PATCH] arm64: Add workaround for Cavium erratum 26026
+In-Reply-To: <1470302117-32296-1-git-send-email-mbrugger@suse.com>
+References: <1470302117-32296-1-git-send-email-mbrugger@suse.com>
+Message-ID: <20160804205707.GJ2151@rric.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 04, 2016 at 08:43:54PM +0000, Karl Beldan wrote:
-> 2016-08-03 16:25 GMT+00:00 Karl Beldan <kbeldan@baylibre.com>:
-> 
-> > This will allow to adjust the related settings in the board files.
-> >
-> > Cc: Kevin Hilman <khilman@baylibre.com>
-> > Signed-off-by: Karl Beldan <kbeldan@baylibre.com>
-> > ---
-> >  arch/arm/boot/dts/da850.dtsi | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> >
-> > diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
-> > index 25f0f8e..3a00978 100644
-> > --- a/arch/arm/boot/dts/da850.dtsi
-> > +++ b/arch/arm/boot/dts/da850.dtsi
-> > @@ -375,7 +375,7 @@
-> >                         dma-names = "tx", "rx";
-> >                 };
-> >         };
-> > -       nand_cs3 at 62000000 {
-> > +       nand_cs3: nand_cs3 at 62000000 {
-> >                 compatible = "ti,davinci-nand";
-> >                 reg = <0x62000000 0x807ff
-> >                        0x68000000 0x8000>;
-> > --
-> > 2.9.0.rc1
-> >
-Please discard this one, I think I'll move things around for the nand.
+The patch below is on top of Matthias' patch series:
+
+ arm64: Implement IPI based TLB invalidation
+
+The series is used to enable a workaround for Cavium ThunderX pass 1.x
+systems.
+
+-Robert
+
+
+
+>From abb99ee83473d9ecffb4fdaae9c69435ca670bc8 Mon Sep 17 00:00:00 2001
+From: Robert Richter <rrichter@cavium.com>
+Date: Fri, 29 Jul 2016 09:40:04 +0200
+Subject: [PATCH] arm64: Add workaround for Cavium erratum 26026
+
+STX may return a wrong status value if the store was successful.
+
+This may happen on ThunderX T88 pass 1.x cpus if a broadcast TLBI is
+executed on another cpu in parallel to an STX. As a result atomic or
+non-blocking implementations can behave incorrectly. Use IPIs that
+call local TLBIs on other cpus to avoid this.
+
+Applies to ThunderX T88 pass 1.x cpus.
+
+Signed-off-by: Robert Richter <rrichter@cavium.com>
+---
+ Documentation/arm64/silicon-errata.txt |  1 +
+ arch/arm64/Kconfig                     | 14 ++++++++++++++
+ arch/arm64/kernel/cpu_errata.c         |  8 ++++++++
+ 3 files changed, 23 insertions(+)
+
+diff --git a/Documentation/arm64/silicon-errata.txt b/Documentation/arm64/silicon-errata.txt
+index 4da60b463995..0d870d934528 100644
+--- a/Documentation/arm64/silicon-errata.txt
++++ b/Documentation/arm64/silicon-errata.txt
+@@ -58,5 +58,6 @@ stable kernels.
+ | Cavium         | ThunderX ITS    | #22375, #24313  | CAVIUM_ERRATUM_22375    |
+ | Cavium         | ThunderX ITS    | #23144          | CAVIUM_ERRATUM_23144    |
+ | Cavium         | ThunderX GICv3  | #23154          | CAVIUM_ERRATUM_23154    |
++| Cavium         | ThunderX Core   | #26026          | CAVIUM_ERRATUM_26026    |
+ | Cavium         | ThunderX Core   | #27456          | CAVIUM_ERRATUM_27456    |
+ | Cavium         | ThunderX SMMUv2 | #27704          | N/A		       |
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 5a0a691d4220..8cbd9043ec6f 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -457,6 +457,20 @@ config CAVIUM_ERRATUM_23154
  
-Karl
+ 	  If unsure, say Y.
+ 
++config CAVIUM_ERRATUM_26026
++	bool "Cavium erratum 26026: STX may return wrong status value"
++	default y
++	help
++	  STX may return a wrong status value if the store was
++	  successful. This may happen on ThunderX T88 pass 1.x cpus if
++	  a broadcast TLBI is executed on another cpu in parallel to
++	  an STX. As a result atomic or non-blocking implementations
++	  can behave incorrectly. Use IPIs that call local TLBIs on
++	  other cpus to avoid this.
++	  Applies to ThunderX T88 pass 1.x cpus.
++
++	  If unsure, say Y.
++
+ config CAVIUM_ERRATUM_27456
+ 	bool "Cavium erratum 27456: Broadcast TLBI instructions may cause icache corruption"
+ 	default y
+diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
+index af716b65110d..1e1753a6408e 100644
+--- a/arch/arm64/kernel/cpu_errata.c
++++ b/arch/arm64/kernel/cpu_errata.c
+@@ -90,6 +90,14 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
+ 		MIDR_RANGE(MIDR_THUNDERX, 0x00, 0x01),
+ 	},
+ #endif
++#ifdef CONFIG_CAVIUM_ERRATUM_26026
++	{
++	/* Cavium ThunderX, pass 1.x */
++		.desc = "Cavium erratum 26026",
++		.capability = ARM64_HAS_NO_BCAST_TLBI,
++		MIDR_RANGE(MIDR_THUNDERX, 0x00, 0x01),
++	},
++#endif
+ #ifdef CONFIG_CAVIUM_ERRATUM_27456
+ 	{
+ 	/* Cavium ThunderX, T88 pass 1.x - 2.1 */
+-- 
+2.7.0.rc3
