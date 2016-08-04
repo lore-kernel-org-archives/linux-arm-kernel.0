@@ -1,79 +1,198 @@
-From: lina.iyer@linaro.org (Lina Iyer)
-Date: Thu, 4 Aug 2016 09:08:54 -0600
-Subject: [PATCH v2 01/14] PM / Domains: Allow domain power states to be
- read from DT
-In-Reply-To: <20160804132407.GA1732@brendan-thinkstation>
-References: <1469829385-11511-1-git-send-email-lina.iyer@linaro.org>
- <1469829385-11511-2-git-send-email-lina.iyer@linaro.org>
- <20160804132407.GA1732@brendan-thinkstation>
-Message-ID: <20160804150854.GB1207@linaro.org>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Thu, 4 Aug 2016 11:02:26 -0400 (EDT)
+Subject: [PATCH v5] usb: ohci-at91: Forcibly suspend ports while USB
+ suspend
+In-Reply-To: <1470284612-3336-1-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <Pine.LNX.4.44L0.1608041048460.1387-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 04 2016 at 07:24 -0600, Brendan Jackman wrote:
->Hi Lina,
->
->Couple of nitpicks here:
->
->On Fri, Jul 29, 2016 at 03:56:12PM -0600, Lina Iyer wrote:
->> From: Axel Haslam <ahaslam+renesas@baylibre.com>
->>
->> This patch allows domains to define idle states in the DT. SoC's can
->> define domain idle states in DT using the "power-states" property of the
->> domain provider. Calling of_pm_genpd_init() will  read the idle states
->> and initialize the genpd for the domain.
->>
->
->The commit message got out of sync here, the idle states property is not
->"power-states" but "domain-idle-states" now.
->
-Ah, yes. Will amend the comit text.
->> In addition to the entry and exit latency for idle state, also add
->> residency and state-param properties. A domain idling in a state is only
->> power effecient if it stays idle for a certain period in that state. The
->> residency provides this minimum time for the idle state to provide power
->> benefits. The state-param is a state specific u32 value that the
->> platform may use for that idle state.
->>
->
->And "state-param" isn't used any more, since the patchset switched to using
->arm,idle-state.
->
-Ok.
+On Thu, 4 Aug 2016, Wenyou Yang wrote:
 
->> [snip]
->> +int pm_genpd_of_parse_power_states(struct generic_pm_domain *genpd)
->> +{
->> +	struct device_node *np;
->> +	int i, err = 0;
->> +
->> +	for (i = 0; i < GENPD_MAX_NUM_STATES; i++) {
->> +		np = of_parse_phandle(genpd->of_node, "domain-idle-states", i);
->> +		if (!np)
->> +			break;
->> +
->> +		err = genpd_of_get_power_state(&genpd->states[i], np);
->> +		if (err) {
->> +			pr_err
->> +			    ("Parsing idle state node %s failed with err %d\n",
->> +			     np->full_name, err);
->> +			err = -EINVAL;
->
->I guess there should be an of_node_put here.
->
-Right. Will add it in.
+> The usb controller does not managed correctly the suspend mode for
+> the ehci. In echi mode, there is no way to have utmi_suspend_o_n[1]
+> suspend without any device connected to it. This is why this specific
+> control is added to fix this issue. The suspend mode works in ohci
+> mode.
 
-Thanks,
-Lina
+Why are you talking about EHCI mode?  This patch is only for the 
+ohci-at91 driver.
 
->> +			break;
->> +		}
->> +		of_node_put(np);
->> +	}
->> +
->> +	if (err)
->> +		return err;
->> +
->> +	genpd->state_count = i;
->> +	return 0;
->> +}
+> This specific control is by setting the SUSPEND_A/B/C fields of
+> SFR_OHCIICR(OHCI Interrupt Configuration Register) in the SFR
+> while OHCI USB suspend.
+> 
+> This setting operation must be done before the USB clock disabled,
+> clear them after the USB clock enabled.
+> 
+> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+> Reviewed-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+I don't know if this is any better than before!  See the comments 
+below.
+
+> ---
+> 
+> Changes in v5:
+>  - Use the USB_PORT_FEAT_SUSPEND subcase of the SetPortFeature case
+>    to take care it.
+>  - Update the commit log.
+> 
+> Changes in v4:
+>  - To check whether the SFR node with "atmel,sama5d2-sfr" compatible
+>    is present or not to decide if this feature is applied or not
+>    when USB OHCI suspend/resume, instead of new compatible.
+>  - Drop the compatible "atmel,sama5d2-ohci".
+>  - Drop [PATCH 2/2] ARM: at91/dt: sama5d2: Use new compatible for
+>    ohci node.
+>  - Drop include/soc/at91/at91_sfr.h, move the macro definitions to
+>    atmel-sfr.h which already exists.
+>  - Change the defines to align the exists.
+> 
+> Changes in v3:
+>  - Change the compatible description for more precise.
+> 
+> Changes in v2:
+>  - Add compatible to support forcibly suspend the ports.
+>  - Add soc/at91/at91_sfr.h to accommodate the defines.
+>  - Add error checking for .sfr_regmap.
+>  - Remove unnecessary regmap_read() statement.
+
+
+> @@ -282,6 +301,28 @@ static int ohci_at91_hub_status_data(struct usb_hcd *hcd, char *buf)
+>  	return length;
+>  }
+>  
+> +static int ohci_at91_port_ctrl(struct regmap *regmap, u16 port, u8 set)
+> +{
+> +	u32 regval;
+> +	int ret;
+> +
+> +	if (!regmap)
+> +		return 0;
+> +
+> +	ret = regmap_read(regmap, AT91_SFR_OHCIICR, &regval);
+> +	if (ret)
+> +		return ret;
+> +
+> +	if (set)
+> +		regval |= AT91_OHCIICR_SUSPEND(port);
+> +	else
+> +		regval &= ~AT91_OHCIICR_SUSPEND(port);
+
+In the earlier versions of this patch, you did not use the port number.  
+Why has this changed?
+
+How many ports does this controller have?
+
+> +
+> +	regmap_write(regmap, AT91_SFR_OHCIICR, regval);
+> +
+> +	return 0;
+> +}
+> +
+>  /*
+>   * Look at the control requests to the root hub and see if we need to override.
+>   */
+> @@ -289,6 +330,7 @@ static int ohci_at91_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
+>  				 u16 wIndex, char *buf, u16 wLength)
+>  {
+>  	struct at91_usbh_data *pdata = dev_get_platdata(hcd->self.controller);
+> +	struct ohci_at91_priv *ohci_at91 = hcd_to_ohci_at91_priv(hcd);
+>  	struct usb_hub_descriptor *desc;
+>  	int ret = -EINVAL;
+>  	u32 *data = (u32 *)buf;
+> @@ -301,7 +343,8 @@ static int ohci_at91_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
+>  
+>  	switch (typeReq) {
+>  	case SetPortFeature:
+> -		if (wValue == USB_PORT_FEAT_POWER) {
+> +		switch (wValue) {
+> +		case USB_PORT_FEAT_POWER:
+>  			dev_dbg(hcd->self.controller, "SetPortFeat: POWER\n");
+>  			if (valid_port(wIndex)) {
+>  				ohci_at91_usb_set_power(pdata, wIndex, 1);
+> @@ -309,6 +352,11 @@ static int ohci_at91_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
+>  			}
+>  
+>  			goto out;
+> +
+> +		case USB_PORT_FEAT_SUSPEND:
+> +			dev_dbg(hcd->self.controller, "SetPortFeat: SUSPEND\n");
+> +			ohci_at91_port_ctrl(ohci_at91->sfr_regmap, wIndex, 1);
+> +			break;
+>  		}
+>  		break;
+>  
+> @@ -342,6 +390,12 @@ static int ohci_at91_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
+>  				ohci_at91_usb_set_power(pdata, wIndex, 0);
+>  				return 0;
+>  			}
+> +			break;
+> +
+> +		case USB_PORT_FEAT_SUSPEND:
+> +			dev_dbg(hcd->self.controller, "ClearPortFeature: SUSPEND\n");
+> +			ohci_at91_port_ctrl(ohci_at91->sfr_regmap, wIndex, 0);
+> +			break;
+>  		}
+>  		break;
+>  	}
+
+Note that after all this, the code goes ahead to call 
+ohci_bub_control().
+
+> @@ -587,7 +641,8 @@ ohci_hcd_at91_drv_suspend(struct device *dev)
+>  	struct usb_hcd	*hcd = dev_get_drvdata(dev);
+>  	struct ohci_hcd	*ohci = hcd_to_ohci(hcd);
+>  	struct ohci_at91_priv *ohci_at91 = hcd_to_ohci_at91_priv(hcd);
+> -	int		ret;
+> +	u16 i;
+> +	int ret;
+>  
+>  	/*
+>  	 * Disable wakeup if we are going to sleep with slow clock mode
+> @@ -599,6 +654,11 @@ ohci_hcd_at91_drv_suspend(struct device *dev)
+>  	if (ohci_at91->wakeup)
+>  		enable_irq_wake(hcd->irq);
+>  
+> +	for (i = 0; i < ohci->num_ports; i++) {
+> +		ohci_at91_hub_control(hcd, SetPortFeature,
+> +				      USB_PORT_FEAT_SUSPEND, (i + 1), NULL, 0);
+> +	}
+> +
+>  	ret = ohci_suspend(hcd, ohci_at91->wakeup);
+
+Do you really want to call ohci_hub_control() for ports that don't have 
+a device attached?
+
+>  	if (ret) {
+>  		if (ohci_at91->wakeup)
+> @@ -630,7 +690,9 @@ static int __maybe_unused
+>  ohci_hcd_at91_drv_resume(struct device *dev)
+>  {
+>  	struct usb_hcd	*hcd = dev_get_drvdata(dev);
+> +	struct ohci_hcd	*ohci = hcd_to_ohci(hcd);
+>  	struct ohci_at91_priv *ohci_at91 = hcd_to_ohci_at91_priv(hcd);
+> +	u16 i;
+>  
+>  	if (ohci_at91->wakeup)
+>  		disable_irq_wake(hcd->irq);
+> @@ -638,6 +700,12 @@ ohci_hcd_at91_drv_resume(struct device *dev)
+>  	at91_start_clock(ohci_at91);
+>  
+>  	ohci_resume(hcd, false);
+> +
+> +	for (i = 0; i < ohci->num_ports; i++) {
+> +		ohci_at91_hub_control(hcd, ClearPortFeature,
+> +				      USB_PORT_FEAT_SUSPEND, i + 1, NULL, 0);
+> +	}
+
+Have you thought about how this will interact with runtime PM?
+
+If you intend to do this only for system suspend and not for runtime 
+suspend, why not set all the suspend bits for all the ports in the 
+OHCIICR register at once, in a single write, like you were doing 
+before?
+
+Alan Stern
