@@ -1,129 +1,119 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Thu, 4 Aug 2016 12:08:39 -0400
-Subject: [PATCH] dmaengine: qcom_hidma: release the descriptor before the
- callback
-In-Reply-To: <20160804153835.GY1041@n2100.armlinux.org.uk>
-References: <1468465076-27324-1-git-send-email-okaya@codeaurora.org>
- <ccffcabf-1448-57a1-d18b-715cfd46e906@codeaurora.org>
- <20160724062425.GW9681@localhost>
- <971733d9-fd18-2a1b-07c0-349b47747d49@codeaurora.org>
- <20160804125525.GF9681@localhost>
- <71a15611-645f-7523-1c26-14b420aff667@codeaurora.org>
- <20160804144003.GV1041@n2100.armlinux.org.uk>
- <cff588a1-d85f-3d2c-ef61-1674d0d3ca92@codeaurora.org>
- <20160804153835.GY1041@n2100.armlinux.org.uk>
-Message-ID: <32e4f4c5-81d1-4a84-69af-e1b05d564bd7@codeaurora.org>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Thu, 4 Aug 2016 17:11:23 +0100
+Subject: [PATCH 2/2] coresight: fix handling of ETM trace register access
+ via sysfs
+In-Reply-To: <CANLsYkyX--cokkFOQHDxyw1NeT1kPkkpCjHoyJrKpfYATGpuSg@mail.gmail.com>
+References: <1470240752-17331-1-git-send-email-sudeep.holla@arm.com>
+ <1470240752-17331-2-git-send-email-sudeep.holla@arm.com>
+ <CANLsYkyX--cokkFOQHDxyw1NeT1kPkkpCjHoyJrKpfYATGpuSg@mail.gmail.com>
+Message-ID: <ca19d0fc-8c88-9dfa-7c9a-3ba0c3d75a25@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/4/2016 11:38 AM, Russell King - ARM Linux wrote:
-> On Thu, Aug 04, 2016 at 11:27:46AM -0400, Sinan Kaya wrote:
->> On 8/4/2016 10:40 AM, Russell King - ARM Linux wrote:
->>> On Thu, Aug 04, 2016 at 10:17:24AM -0400, Sinan Kaya wrote:
->>>> Thanks for describing this. I was confused about DMA_SUCCESS and DMA_COMPLETE.
->>>> I now understand that tx_success API just returns information that the request
->>>> was executed whether the result is error or not. This makes sense now.
->>>>
->>>> However, if the txn is failure; then we should never call the client callback
->>>> since DMA engine cannot provide such feedback to the client without Dave's patch.
->>>> You are saying that the calling the callback is optional.
->>>>
->>>> Then, the callback cannot be optional in the error case for old behavior.
->>>>
->>>> How does the client know if memcpy executed or not? The client got its callback
->>>> and tx_status is also DMA_COMPLETE.
->>>
->>> If an error occurred, then dma_async_is_tx_complete() is supposed to
->>> return DMA_ERROR.  It's up to the DMA engine driver to ensure that
->>> this happens if it has error detection abilities.
->>>
+
+
+On 04/08/16 17:02, Mathieu Poirier wrote:
+> On 3 August 2016 at 10:12, Sudeep Holla <sudeep.holla@arm.com> wrote:
+>> The ETM registers are classified into 2 categories: trace and management.
+>> The core power domain contains most of the trace unit logic including
+>> all(except TRCOSLAR and TRCOSLSR) the trace registers. The debug power
+>> domain contains the external debugger interface including all management
+>> registers.
 >>
->> Well, that's not what I'm getting from Vinod and also from the current usage
->> in most of the drivers that I looked.
+>> This patch adds coresight unit specific function coresight_simple_func
+>> which can be used for ETM trace registers by providing a ETM specific
+>> read function which does smp cross call to ensure the trace core is
+>> powered up before the register is accessed.
 >>
->> The current drivers implement tx_status as follows.
+>> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+>> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+>> ---
+>>  drivers/hwtracing/coresight/coresight-etb10.c      |  2 +-
+>>  .../hwtracing/coresight/coresight-etm3x-sysfs.c    |  2 +-
+>>  .../hwtracing/coresight/coresight-etm4x-sysfs.c    | 58 ++++++++++++++++------
+>>  drivers/hwtracing/coresight/coresight-etm4x.h      |  1 +
+>>  drivers/hwtracing/coresight/coresight-priv.h       |  9 +++-
+>>  drivers/hwtracing/coresight/coresight-stm.c        |  2 +-
+>>  drivers/hwtracing/coresight/coresight-tmc.c        |  2 +-
+>>  7 files changed, 54 insertions(+), 22 deletions(-)
 >>
->> static enum dma_status xyz_tx_status(struct dma_chan *chan,
->> 	dma_cookie_t cookie, struct dma_tx_state *state) 
->> {
->> ...
->> 	ret = dma_cookie_status(&c->vc.chan, cookie, state);
->> 	if (ret == DMA_COMPLETE)
->> 		return ret; 
->> ...
->> }
-> 
+>> Hi Mathieu,
+>>
+>> I think the latest release of the firmware(inparticular SCP v1.16.0) for
+>> Juno fixes the issue you had previously encountered. However there's a
+>> pending issue with A53 ETM management register access when it's powered
+>> down.
+>>
+>> I don't think Juno platform should block these changes as ETMv4
+>> specification is clear on the power management and register access
+>> perspective.
+>>
+>> Regards,
+>> Sudeep
+>>
+>> diff --git a/drivers/hwtracing/coresight/coresight-etb10.c b/drivers/hwtracing/coresight/coresight-etb10.c
+>> index 8a4927ca9181..d7325c6534ad 100644
+>> --- a/drivers/hwtracing/coresight/coresight-etb10.c
+>> +++ b/drivers/hwtracing/coresight/coresight-etb10.c
+>> @@ -559,7 +559,7 @@ static const struct file_operations etb_fops = {
+>>  };
+>>
+>>  #define coresight_etb10_simple_func(name, offset)                       \
+>> -       coresight_simple_func(struct etb_drvdata, name, offset)
+>> +       coresight_simple_func(struct etb_drvdata, NULL, name, offset)
+>>
+>>  coresight_etb10_simple_func(rdp, ETB_RAM_DEPTH_REG);
+>>  coresight_etb10_simple_func(sts, ETB_STATUS_REG);
+>> diff --git a/drivers/hwtracing/coresight/coresight-etm3x-sysfs.c b/drivers/hwtracing/coresight/coresight-etm3x-sysfs.c
+>> index 02d4b629891f..4856c8098416 100644
+>> --- a/drivers/hwtracing/coresight/coresight-etm3x-sysfs.c
+>> +++ b/drivers/hwtracing/coresight/coresight-etm3x-sysfs.c
+>> @@ -1222,7 +1222,7 @@ static struct attribute *coresight_etm_attrs[] = {
+>>  };
+>>
+>>  #define coresight_etm3x_simple_func(name, offset)                      \
+>> -       coresight_simple_func(struct etm_drvdata, name, offset)
+>> +       coresight_simple_func(struct etm_drvdata, NULL, name, offset)
+>>
+>>  coresight_etm3x_simple_func(etmccr, ETMCCR);
+>>  coresight_etm3x_simple_func(etmccer, ETMCCER);
+>> diff --git a/drivers/hwtracing/coresight/coresight-etm4x-sysfs.c b/drivers/hwtracing/coresight/coresight-etm4x-sysfs.c
+>> index 7c84308c5564..2390ee43e3d9 100644
+>> --- a/drivers/hwtracing/coresight/coresight-etm4x-sysfs.c
+>> +++ b/drivers/hwtracing/coresight/coresight-etm4x-sysfs.c
+>> @@ -2039,15 +2039,38 @@ static struct attribute *coresight_etmv4_attrs[] = {
+>>         NULL,
+>>  };
+>>
+>> +struct etm_reg {
+>> +       void __iomem *addr;
+>> +       u32 data;
+>> +};
+>> +
 
-I have patiently looked at all dma_cookie_status calls from LXR.
-I have not seen a single one implementing what you are suggesting.
-I can't believe that there is no driver that does error checking.
+And this is just declaration, so it's static implicitly unless someone
+includes this .c file :)
 
-Feel free to correct me if you have a good example I could use as
-a reference. 
+[...]
 
-> And... how many of those drivers detect an error occuring in the DMA?
-> If they don't detect an error during DMA, I'm curious what would you
-> expect the above to look like.
+>>
+>>  static struct attribute *coresight_etmv4_trcidr_attrs[] = {
+>>         &dev_attr_trcidr0.attr,
+>> diff --git a/drivers/hwtracing/coresight/coresight-etm4x.h b/drivers/hwtracing/coresight/coresight-etm4x.h
+>> index 2629954429a1..ba4dd2e820ea 100644
+>> --- a/drivers/hwtracing/coresight/coresight-etm4x.h
+>> +++ b/drivers/hwtracing/coresight/coresight-etm4x.h
+>> @@ -185,6 +185,7 @@
+>>
+>>  /* PowerDown Control Register bits */
+>>  #define TRCPDCR_PU                     BIT(3)
+>> +#define TRCPDSR_POWER                  BIT(0)
+>
+> I forgot - this isn't referenced anywhere.
+>
 
-I have this function that returns the real status of the transaction.
-
-enum dma_status hidma_ll_status(struct hidma_lldev *llhndl, u32 tre_ch); 
-
-I can do another look up here. 
-
-> 
->> I also made the argument that the driver should not call dma_cookie_complete
->> for failure cases and somehow return an error for transactions that failed. 
-> 
-> You can't omit individual dma_cookie_complete() calls like that (I think
-> you have little understanding how the cookie system works.)
-> 
-> The cookies consist of continuous pool of numbers.  Each transaction
-> gets allocated a cookie which is incremented from the previous
-> transaction.  Any transaction can be identified as complete or pending
-> depending on whether the cookie value that it has is earlier or later
-> than the current completion cookie value.
-> 
-> What this means is if you try to do this:
-> 
-> - transaction 1 completes successfully, call dma_cookie_complete()
-> - transaction 2 completes with an error, omit dma_cookie_complete()
-> - transaction 3 completes successfully, call dma_cookie_complete()
-> 
-> The effect at the end of that sequence will be as if transaction 2 had
-> called dma_cookie_complete() - because the completed cookie value will
-> now be ahead of transaction 2's cookie.
-> 
-> So, playing bakes with dma_cookie_complete() really won't work.  Please
-> forget this idea.  dma_cookie_complete() merely indicates whether the
-> transaction completed or is still in progress.  It's got nothing to do
-> with error status.
-
-Fair enough. All the cookie business seemed very convoluted to me when
-I tried to understand how it works. I relied on what other drivers are
-doing instead.
-
-> 
-> What you instead need to do is to find some way to record in your
-> driver that transaction 2 failed, and when dma_cookie_status() says
-> that a transaction has DMA_COMPLETE status, you need to look up to
-> see whether it failed.
-> 
-
-I already have this information available. I just need confirmation from
-Vinod that this is the right way to do it in terms of DMA engine API.
-
-The other way is I can feed this information to what Dave just introduced
-as part of the callback mechanism and not touch this.
-
-The main discussion here is that 
-
-"tx_status does not indicate whether the final transaction is successful or
-not" whether the driver has the capability to determine error or not.
-
-It is an API question not implementation question.
+Right will remove it, added it while I was experimenting things out.
 
 -- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Regards,
+Sudeep
