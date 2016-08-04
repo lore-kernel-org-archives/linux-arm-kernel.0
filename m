@@ -1,55 +1,85 @@
-From: brendan.jackman@arm.com (Brendan Jackman)
-Date: Thu, 4 Aug 2016 16:29:00 +0100
-Subject: [PATCH v2 02/14] dt/bindings: update binding for PM domain idle
- states
-In-Reply-To: <1469829385-11511-3-git-send-email-lina.iyer@linaro.org>
-References: <1469829385-11511-1-git-send-email-lina.iyer@linaro.org>
- <1469829385-11511-3-git-send-email-lina.iyer@linaro.org>
-Message-ID: <20160804152900.GC1732@brendan-thinkstation>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Thu, 4 Aug 2016 16:38:37 +0100
+Subject: [PATCH 1/8] ARM: assembler: introduce adr_l, ldr_l and str_l
+ macros
+In-Reply-To: <CAKv+Gu85A12DYh3B9zAPOrNfozgv_Vw+RtSa90rLRn0jdhh5Mg@mail.gmail.com>
+References: <20160803180934.GK1041@n2100.armlinux.org.uk>
+ <CAKv+Gu9Wyiu38J=K00WKXSeFoDF2vS-3TJAvbz9Yo616GBXSwQ@mail.gmail.com>
+ <20160804093851.GD7147@e103592.cambridge.arm.com>
+ <CAKv+Gu8_5-VcBxnjLrJxgKcJfVFb785qvVzbB6kryqhhkCfQbA@mail.gmail.com>
+ <20160804110832.GF7147@e103592.cambridge.arm.com>
+ <CAKv+Gu_JVX3erz6N64EGfu38TDi6PHsQVGY=nkfu7kF-8Hq=6Q@mail.gmail.com>
+ <20160804113018.GH7147@e103592.cambridge.arm.com>
+ <CAKv+Gu_r4Rx=pvZWNaE1f-_QDiwyn62uS+MzPyNUqndE5jCS2Q@mail.gmail.com>
+ <20160804133134.GJ7147@e103592.cambridge.arm.com>
+ <CAKv+Gu85A12DYh3B9zAPOrNfozgv_Vw+RtSa90rLRn0jdhh5Mg@mail.gmail.com>
+Message-ID: <20160804153837.GK7147@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lina,
+On Thu, Aug 04, 2016 at 03:46:53PM +0200, Ard Biesheuvel wrote:
+> On 4 August 2016 at 15:31, Dave Martin <Dave.Martin@arm.com> wrote:
+> > On Thu, Aug 04, 2016 at 01:34:03PM +0200, Ard Biesheuvel wrote:
+> >> On 4 August 2016 at 13:30, Dave Martin <Dave.Martin@arm.com> wrote:
+> >> > On Thu, Aug 04, 2016 at 01:10:55PM +0200, Ard Biesheuvel wrote:
 
-Sorry, forgot to mention this in my other email:
+[...]
 
-On Fri, Jul 29, 2016 at 03:56:13PM -0600, Lina Iyer wrote:
->
-> +Example 3:
-> +
-> +	pm-domains {
-> +		a57_pd: a57_pd@ {
-> +			/* will have a57 platform ARM_PD_METHOD_OF_DECLARE*/
-> +			compatible = "arm,pd","arm,cortex-a57";
-> +			#power-domain-cells = <0>;
-> +			idle-states = <&CLUSTER_SLEEP_0>;
-> +		};
-> +
-> +		a53_pd: a53_pd@ {
-> +			/* will have a a53 platform ARM_PD_METHOD_OF_DECLARE*/
-> +			compatible = "arm,pd","arm,cortex-a53";
-> +			#power-domain-cells = <0>;
-> +			idle-states = <&CLUSTER_SLEEP_0>, <&CLUSTER_SLEEP_1>;
-> +		};
-> +
-> +		CLUSTER_SLEEP_0: idle-state at 0 {
-> +			compatible = "arm,idle-state";
-> +			entry-latency-us = <1000>;
-> +			exit-latency-us = <2000>;
-> +			residency-us = <10000>;
+> >> >> Yes, but how is LD going to perform the arithmetic involved in
+> >
+> > [...]
+> >
+> >> >> handling these relocations? That's is the more interesting part, and
+> >> >> that is not implemented either in binutils < 2.18
+> >> >
+> >> > What arithmetic?
+> >> >
+> >>
+> >> The arithmetic involved in populating the immediate fields of these
+> >> instructions based on the actual offset between the Place and the
+> >> Symbol in the final image.
+> >
+> > <digression>
+> >
+> > Just for interest...
+> >
+> >
+> > For the linker this is just ordinary relocation processing -- there's
+> > nothing unusual going on, except that neither GCC nor gas usually
+> > emit these particular insn relocs automatically.
+> >
+> 
+> There is no such thing as 'ordinary' relocation processing. Each
 
-Existing bindings for CPU idle states use "min-residency-us" instead of
-"residency-us" here.
+"Ordinary" in the sense that the linker should cope with any standard
+reloc that it might receive, but...
 
-> +		};
-> +
-> +		CLUSTER_SLEEP_1: idle-state at 1 {
-> +			compatible = "arm,idle-state";
-> +			entry-latency-us = <5000>;
-> +			exit-latency-us = <5000>;
-> +			residency-us = <100000>;
-> +		};
-> +	};
+> relocation type requires its own specific handling, and pre-2.18 LD
+> simply does not come equipped with the routines to perform the
+> calculations that the ARM/ELF spec defines for these particular
+> relocation types. Whether GAS or any other assembler can produce them
+> is irrelevant, my claim is that pre-2.18 LD does not know how to
+> /consume/ them.
 
-Regards,
-Brendan
+you seem to be right about this.
+
+There are some obsolete R_ARM_ALU_PCREL_* relocs which presumably are
+the OABI equivalents.
+
+However, ld does no overflow checking for them, silently fails to
+handle signed offsets, and also splat the target symbol address over
+the affected instruction instead of writing the carefully modified
+instruction there.  This has apparently been the behaviour ever since
+those relocs were implemented in 2004 (2.16).
+
+So I'm guessing nobody ever really used these :/
+
+The .reloc pseudo-op didn't exist before 2.18 either.
+
+Which just about wraps this one up.
+
+
+Serves me right for attempting to guess the history ;)
+
+Cheers
+---Dave
