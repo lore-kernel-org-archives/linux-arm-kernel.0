@@ -1,69 +1,193 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu,  4 Aug 2016 13:40:36 +0200
-Subject: [PULL 8/8] arm64: KVM: Set cpsr before spsr on fault injection
-In-Reply-To: <1470310836-10371-1-git-send-email-christoffer.dall@linaro.org>
-References: <1470310836-10371-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1470310836-10371-9-git-send-email-christoffer.dall@linaro.org>
+From: appana.durga.rao@xilinx.com (Kedareswara rao Appana)
+Date: Thu, 4 Aug 2016 17:43:09 +0530
+Subject: [RFC PATCH v3 2/2] net: phy: Add gmiitorgmii converter support
+In-Reply-To: <1470312789-28275-1-git-send-email-appanad@xilinx.com>
+References: <1470312789-28275-1-git-send-email-appanad@xilinx.com>
+Message-ID: <1470312789-28275-2-git-send-email-appanad@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Andrew Jones <drjones@redhat.com>
+This patch adds support for gmiitorgmii converter.
 
-We need to set cpsr before determining the spsr bank, as the bank
-depends on the target exception level of the injection, not the
-current mode of the vcpu. Normally this is one in the same (EL1),
-but not when we manage to trap an EL0 fault. It still doesn't really
-matter for the 64-bit EL0 case though, as vcpu_spsr() unconditionally
-uses the EL1 bank for that. However the 32-bit EL0 case gets fun, as
-that path will lead to the BUG() in vcpu_spsr32().
+The GMII to RGMII IP core provides the Reduced Gigabit Media
+Independent Interface (RGMII) between Ethernet physical media
+Devices and the Gigabit Ethernet controller. This core can
+Switch dynamically between the three different speed modes of
+Operation by configuring the converter register through mdio write.
 
-This patch fixes the assignment order and also modifies some white
-space in order to better group pairs of lines that have strict order.
+MDIO interface is used to set operating speed of Ethernet MAC.
 
-Cc: stable at vger.kernel.org # v4.5
-Signed-off-by: Andrew Jones <drjones@redhat.com>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
 ---
- arch/arm64/kvm/inject_fault.c | 12 +++++-------
- 1 file changed, 5 insertions(+), 7 deletions(-)
+Thanks a lot Andrew for your inputs.
+Changes for v3:
+--> Updated the driver as suggested by Andrew.
+Changes for v2:
+--> Passed struct xphy pointer directly to the fix_mac_speed
+API as suggested by the Florian.
+--> Added checks for the phy-node fail case as suggested
+by the Florian
 
-diff --git a/arch/arm64/kvm/inject_fault.c b/arch/arm64/kvm/inject_fault.c
-index e9e0e6d..898c0e6 100644
---- a/arch/arm64/kvm/inject_fault.c
-+++ b/arch/arm64/kvm/inject_fault.c
-@@ -132,16 +132,14 @@ static u64 get_except_vector(struct kvm_vcpu *vcpu, enum exception_type type)
- static void inject_abt64(struct kvm_vcpu *vcpu, bool is_iabt, unsigned long addr)
- {
- 	unsigned long cpsr = *vcpu_cpsr(vcpu);
--	bool is_aarch32;
-+	bool is_aarch32 = vcpu_mode_is_32bit(vcpu);
- 	u32 esr = 0;
+ drivers/net/phy/Kconfig             |   8 +++
+ drivers/net/phy/Makefile            |   1 +
+ drivers/net/phy/xilinx_gmii2rgmii.c | 121 ++++++++++++++++++++++++++++++++++++
+ 3 files changed, 130 insertions(+)
+ create mode 100644 drivers/net/phy/xilinx_gmii2rgmii.c
+
+diff --git a/drivers/net/phy/Kconfig b/drivers/net/phy/Kconfig
+index 6dad9a9..eec31a3 100644
+--- a/drivers/net/phy/Kconfig
++++ b/drivers/net/phy/Kconfig
+@@ -271,6 +271,14 @@ config MDIO_BCM_IPROC
+ 	  This module provides a driver for the MDIO busses found in the
+ 	  Broadcom iProc SoC's.
  
--	is_aarch32 = vcpu_mode_is_32bit(vcpu);
--
--	*vcpu_spsr(vcpu) = cpsr;
- 	*vcpu_elr_el1(vcpu) = *vcpu_pc(vcpu);
--
- 	*vcpu_pc(vcpu) = get_except_vector(vcpu, except_type_sync);
++config XILINX_GMII2RGMII
++       tristate "Xilinx GMII2RGMII converter driver"
++       default y
++       ---help---
++         This driver support xilinx GMII to RGMII IP core it provides
++         the Reduced Gigabit Media Independent Interface(RGMII) between
++         Ethernet physical media devices and the Gigabit Ethernet controller.
 +
- 	*vcpu_cpsr(vcpu) = PSTATE_FAULT_BITS_64;
-+	*vcpu_spsr(vcpu) = cpsr;
+ endif # PHYLIB
  
- 	vcpu_sys_reg(vcpu, FAR_EL1) = addr;
- 
-@@ -172,11 +170,11 @@ static void inject_undef64(struct kvm_vcpu *vcpu)
- 	unsigned long cpsr = *vcpu_cpsr(vcpu);
- 	u32 esr = (ESR_ELx_EC_UNKNOWN << ESR_ELx_EC_SHIFT);
- 
--	*vcpu_spsr(vcpu) = cpsr;
- 	*vcpu_elr_el1(vcpu) = *vcpu_pc(vcpu);
--
- 	*vcpu_pc(vcpu) = get_except_vector(vcpu, except_type_sync);
+ config MICREL_KS8995MA
+diff --git a/drivers/net/phy/Makefile b/drivers/net/phy/Makefile
+index fcdbb92..8650067 100644
+--- a/drivers/net/phy/Makefile
++++ b/drivers/net/phy/Makefile
+@@ -44,3 +44,4 @@ obj-$(CONFIG_MDIO_MOXART)	+= mdio-moxart.o
+ obj-$(CONFIG_MDIO_BCM_UNIMAC)	+= mdio-bcm-unimac.o
+ obj-$(CONFIG_MICROCHIP_PHY)	+= microchip.o
+ obj-$(CONFIG_MDIO_BCM_IPROC)	+= mdio-bcm-iproc.o
++obj-$(CONFIG_XILINX_GMII2RGMII) += xilinx_gmii2rgmii.o
+diff --git a/drivers/net/phy/xilinx_gmii2rgmii.c b/drivers/net/phy/xilinx_gmii2rgmii.c
+new file mode 100644
+index 0000000..56a655a9
+--- /dev/null
++++ b/drivers/net/phy/xilinx_gmii2rgmii.c
+@@ -0,0 +1,121 @@
++/* Xilinx GMII2RGMII Converter driver
++ *
++ * Copyright (C) 2016 Xilinx, Inc.
++ *
++ * Author: Kedareswara rao Appana <appanad@xilinx.com>
++ *
++ * Description:
++ * This driver is developed for Xilinx GMII2RGMII Converter
++ *
++ * This program is free software: you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation, either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++#include <linux/module.h>
++#include <linux/kernel.h>
++#include <linux/mii.h>
++#include <linux/mdio.h>
++#include <linux/phy.h>
++#include <linux/of_mdio.h>
 +
- 	*vcpu_cpsr(vcpu) = PSTATE_FAULT_BITS_64;
-+	*vcpu_spsr(vcpu) = cpsr;
- 
- 	/*
- 	 * Build an unknown exception, depending on the instruction
++#define XILINX_GMII2RGMII_REG	0x10
++
++struct gmii2rgmii {
++	struct phy_device *phy_dev;
++	struct phy_driver *phy_drv;
++	struct phy_driver conv_phy_drv;
++	int addr;
++};
++
++static int xgmiitorgmii_read_status(struct phy_device *phydev)
++{
++	struct gmii2rgmii *priv = (struct gmii2rgmii *)phydev->priv;
++	u16 val = 0;
++
++	priv->phy_drv->read_status(phydev);
++
++	val = mdiobus_read(phydev->mdio.bus, priv->addr, XILINX_GMII2RGMII_REG);
++
++	switch (phydev->speed) {
++	case SPEED_1000:
++		val |= BMCR_SPEED1000;
++	case SPEED_100:
++		val |= BMCR_SPEED100;
++	}
++
++	mdiobus_write(phydev->mdio.bus, priv->addr, XILINX_GMII2RGMII_REG, val);
++
++	return 0;
++}
++
++int xgmiitorgmii_probe(struct mdio_device *mdiodev)
++{
++	struct device *dev = &mdiodev->dev;
++	struct device_node *np = dev->of_node, *phy_node;
++	struct gmii2rgmii *priv;
++	int ret;
++
++	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
++	if (!priv)
++		return -ENOMEM;
++
++	phy_node = of_parse_phandle(np, "phy-handle", 0);
++	if (IS_ERR(phy_node)) {
++		dev_err(dev, "Couldn't parse phy-handle\n");
++		ret = -ENODEV;
++		goto out;
++	}
++
++	priv->phy_dev = of_phy_find_device(phy_node);
++	if (!priv->phy_dev) {
++		ret = -EPROBE_DEFER;
++		dev_info(dev, "Couldn't find phydev\n");
++		goto out;
++	}
++
++	priv->addr = mdiodev->addr;
++	priv->phy_drv = priv->phy_dev->drv;
++	memcpy(&priv->conv_phy_drv, priv->phy_dev->drv,
++	       sizeof(struct phy_driver));
++	priv->conv_phy_drv.read_status = xgmiitorgmii_read_status;
++	priv->phy_dev->priv = priv;
++	priv->phy_dev->drv = &priv->conv_phy_drv;
++
++	return 0;
++out:
++	return ret;
++}
++
++static const struct of_device_id xgmiitorgmii_of_match[] = {
++	{ .compatible = "xilinx,gmiitorgmii" },
++};
++MODULE_DEVICE_TABLE(of, xgmiitorgmii_of_match);
++
++static struct mdio_driver xgmiitorgmii_driver = {
++	.probe	= xgmiitorgmii_probe,
++	.mdiodrv.driver = {
++		.name = "xgmiitorgmii",
++		.of_match_table = xgmiitorgmii_of_match,
++	},
++};
++
++static int __init xgmiitorgmii_init(void)
++{
++	return mdio_driver_register(&xgmiitorgmii_driver);
++}
++module_init(xgmiitorgmii_init);
++
++static void __exit xgmiitorgmii_cleanup(void)
++{
++	mdio_driver_unregister(&xgmiitorgmii_driver);
++}
++module_exit(xgmiitorgmii_cleanup);
++
++MODULE_DESCRIPTION("Xilinx GMII2RGMII converter driver");
++MODULE_LICENSE("GPL");
 -- 
-1.9.1
+2.1.2
