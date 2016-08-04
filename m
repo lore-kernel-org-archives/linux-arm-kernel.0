@@ -1,171 +1,115 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Thu, 4 Aug 2016 13:28:44 +0300
-Subject: [PATCHv3 09/11] crypto: omap-aes: Add fallback support
-In-Reply-To: <1470306526-27219-1-git-send-email-t-kristo@ti.com>
-References: <1470306526-27219-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1470306526-27219-10-git-send-email-t-kristo@ti.com>
+From: bp@suse.de (Borislav Petkov)
+Date: Thu, 4 Aug 2016 12:30:28 +0200
+Subject: [PATCH v12] acpi, apei, arm64: APEI initial support for aarch64.
+In-Reply-To: <20160804094838.GB8093@nazgul.tnic>
+References: <1469782664-12611-1-git-send-email-fu.wei@linaro.org>
+ <20160804094838.GB8093@nazgul.tnic>
+Message-ID: <20160804103028.GA8152@nazgul.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lokesh Vutla <lokeshvutla@ti.com>
+Tomasz's linaro address bounces, adding one I've found on lkml to CC
+instead.
 
-As setting up the DMA operations is quite costly, add software fallback
-support for requests smaller than 200 bytes. This change gives some 10%
-extra performance in ipsec use case.
+On Thu, Aug 04, 2016 at 11:48:38AM +0200, Borislav Petkov wrote:
+> On Fri, Jul 29, 2016 at 04:57:44PM +0800, fu.wei at linaro.org wrote:
+> > From: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+> > 
+> > This commit provides APEI arch-specific bits for aarch64
+> > 
+> > Meanwhile,
+> > (1)add a new subfunction "hest_ia32_init" for
+> > "acpi_disable_cmcff" which is used by IA-32 Architecture
+> > Corrected Machine Check (CMC).
+> > (2)move HEST type (ACPI_HEST_TYPE_IA32_CORRECTED_CHECK) checking to
+> > a generic place.
+> > (3)select HAVE_ACPI_APEI when EFI and ACPI is set on ARM64,
+> > because arch_apei_get_mem_attribute is using efi_mem_attributes on ARM64.
+> > 
+> > [Fu Wei: improve && upstream]
+> > 
+> > Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+> > Tested-by: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
+> > Signed-off-by: Fu Wei <fu.wei@linaro.org>
+> > Acked-by: Hanjun Guo <hanjun.guo@linaro.org>
+> > Tested-by: Tyler Baicar <tbaicar@codeaurora.org>
+> > Acked-by: Will Deacon <will.deacon@arm.com>
+> > ---
+> 
+> ...
+> 
+> > @@ -110,8 +111,21 @@ static inline const char *acpi_get_enable_method(int cpu)
+> >  }
+> >  
+> >  #ifdef	CONFIG_ACPI_APEI
+> > +#define acpi_disable_cmcff 1
+> 
+> What does that mean? ARM doesn't have firmware-first mode?
+> 
+> A piece of comment please.
+> 
+> >  pgprot_t arch_apei_get_mem_attribute(phys_addr_t addr);
+> > -#endif
+> > +
+> > +/*
+> > + * Despite its name, this function must still broadcast the TLB
+> > + * invalidation in order to ensure other CPUs don't up with junk
+> 						      ^
+> 						     end
+> 
+> > + * entries as a result of speculation. Unusually, its also called in
+> > + * IRQ context (ghes_iounmap_irq) so if we ever need to use IPIs for
+> > + * TLB broadcasting, then we're in trouble here.
+> > + */
+> > +static inline void arch_apei_flush_tlb_one(unsigned long addr)
+> > +{
+> > +	flush_tlb_kernel_range(addr, addr + PAGE_SIZE);
+> > +}
+> > +#endif /* CONFIG_ACPI_APEI */
+> >  
+> >  #ifdef CONFIG_ACPI_NUMA
+> >  int arm64_acpi_numa_init(void);
+> > diff --git a/arch/x86/kernel/acpi/apei.c b/arch/x86/kernel/acpi/apei.c
+> > index c280df6..ea3046e 100644
+> > --- a/arch/x86/kernel/acpi/apei.c
+> > +++ b/arch/x86/kernel/acpi/apei.c
+> 
+> ...
+> 
+> > diff --git a/drivers/acpi/apei/hest.c b/drivers/acpi/apei/hest.c
+> > index 20b3fcf..792a0d9 100644
+> > --- a/drivers/acpi/apei/hest.c
+> > +++ b/drivers/acpi/apei/hest.c
+> > @@ -232,8 +243,9 @@ void __init acpi_hest_init(void)
+> >  		goto err;
+> >  	}
+> >  
+> > -	if (!acpi_disable_cmcff)
+> > -		apei_hest_parse(hest_parse_cmc, NULL);
+> > +	rc = hest_ia32_init();
+> 
+> Why do you need a separate hest_ia32_init() here?
+> 
+> You can do
+> 
+> 	rc = apei_hest_parse(hest_parse_cmc, NULL);
+> 
+> directly here AFAICT.
+> 
+> > +	if (rc)
+> > +		goto err;
+> >  
+> >  	if (!ghes_disable) {
+> >  		rc = apei_hest_parse(hest_parse_ghes_count, &ghes_count);
+> > -- 
+> > 2.5.5
+> > 
 
-Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
-[t-kristo at ti.com: udpated against latest upstream, to use skcipher mainly]
-Signed-off-by: Tero Kristo <t-kristo@ti.com>
----
- drivers/crypto/Kconfig    |  3 +++
- drivers/crypto/omap-aes.c | 53 +++++++++++++++++++++++++++++++++++++++++++----
- 2 files changed, 52 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/crypto/Kconfig b/drivers/crypto/Kconfig
-index 1af94e2..19ee6ee 100644
---- a/drivers/crypto/Kconfig
-+++ b/drivers/crypto/Kconfig
-@@ -318,6 +318,9 @@ config CRYPTO_DEV_OMAP_AES
- 	select CRYPTO_AES
- 	select CRYPTO_BLKCIPHER
- 	select CRYPTO_ENGINE
-+	select CRYPTO_CBC
-+	select CRYPTO_ECB
-+	select CRYPTO_CTR
- 	help
- 	  OMAP processors have AES module accelerator. Select this if you
- 	  want to use the OMAP module for AES algorithms.
-diff --git a/drivers/crypto/omap-aes.c b/drivers/crypto/omap-aes.c
-index 3cf7b8f..6ba4f70 100644
---- a/drivers/crypto/omap-aes.c
-+++ b/drivers/crypto/omap-aes.c
-@@ -35,7 +35,7 @@
- #include <linux/interrupt.h>
- #include <crypto/scatterwalk.h>
- #include <crypto/aes.h>
--#include <crypto/algapi.h>
-+#include <crypto/internal/skcipher.h>
- 
- #define DST_MAXBURST			4
- #define DMA_MIN				(DST_MAXBURST * sizeof(u32))
-@@ -105,6 +105,7 @@ struct omap_aes_ctx {
- 	int		keylen;
- 	u32		key[AES_KEYSIZE_256 / sizeof(u32)];
- 	unsigned long	flags;
-+	struct crypto_skcipher	*fallback;
- };
- 
- struct omap_aes_reqctx {
-@@ -701,11 +702,29 @@ static int omap_aes_crypt(struct ablkcipher_request *req, unsigned long mode)
- 			crypto_ablkcipher_reqtfm(req));
- 	struct omap_aes_reqctx *rctx = ablkcipher_request_ctx(req);
- 	struct omap_aes_dev *dd;
-+	int ret;
- 
- 	pr_debug("nbytes: %d, enc: %d, cbc: %d\n", req->nbytes,
- 		  !!(mode & FLAGS_ENCRYPT),
- 		  !!(mode & FLAGS_CBC));
- 
-+	if (req->nbytes < 200) {
-+		SKCIPHER_REQUEST_ON_STACK(subreq, ctx->fallback);
-+
-+		skcipher_request_set_tfm(subreq, ctx->fallback);
-+		skcipher_request_set_callback(subreq, req->base.flags, NULL,
-+					      NULL);
-+		skcipher_request_set_crypt(subreq, req->src, req->dst,
-+					   req->nbytes, req->info);
-+
-+		if (mode & FLAGS_ENCRYPT)
-+			ret = crypto_skcipher_encrypt(subreq);
-+		else
-+			ret = crypto_skcipher_decrypt(subreq);
-+
-+		skcipher_request_zero(subreq);
-+		return ret;
-+	}
- 	dd = omap_aes_find_dev(ctx);
- 	if (!dd)
- 		return -ENODEV;
-@@ -721,6 +740,7 @@ static int omap_aes_setkey(struct crypto_ablkcipher *tfm, const u8 *key,
- 			   unsigned int keylen)
- {
- 	struct omap_aes_ctx *ctx = crypto_ablkcipher_ctx(tfm);
-+	int ret;
- 
- 	if (keylen != AES_KEYSIZE_128 && keylen != AES_KEYSIZE_192 &&
- 		   keylen != AES_KEYSIZE_256)
-@@ -731,6 +751,14 @@ static int omap_aes_setkey(struct crypto_ablkcipher *tfm, const u8 *key,
- 	memcpy(ctx->key, key, keylen);
- 	ctx->keylen = keylen;
- 
-+	crypto_skcipher_clear_flags(ctx->fallback, CRYPTO_TFM_REQ_MASK);
-+	crypto_skcipher_set_flags(ctx->fallback, tfm->base.crt_flags &
-+						 CRYPTO_TFM_REQ_MASK);
-+
-+	ret = crypto_skcipher_setkey(ctx->fallback, key, keylen);
-+	if (!ret)
-+		return 0;
-+
- 	return 0;
- }
- 
-@@ -766,6 +794,17 @@ static int omap_aes_ctr_decrypt(struct ablkcipher_request *req)
- 
- static int omap_aes_cra_init(struct crypto_tfm *tfm)
- {
-+	const char *name = crypto_tfm_alg_name(tfm);
-+	const u32 flags = CRYPTO_ALG_ASYNC | CRYPTO_ALG_NEED_FALLBACK;
-+	struct omap_aes_ctx *ctx = crypto_tfm_ctx(tfm);
-+	struct crypto_skcipher *blk;
-+
-+	blk = crypto_alloc_skcipher(name, 0, flags);
-+	if (IS_ERR(blk))
-+		return PTR_ERR(blk);
-+
-+	ctx->fallback = blk;
-+
- 	tfm->crt_ablkcipher.reqsize = sizeof(struct omap_aes_reqctx);
- 
- 	return 0;
-@@ -773,6 +812,12 @@ static int omap_aes_cra_init(struct crypto_tfm *tfm)
- 
- static void omap_aes_cra_exit(struct crypto_tfm *tfm)
- {
-+	struct omap_aes_ctx *ctx = crypto_tfm_ctx(tfm);
-+
-+	if (ctx->fallback)
-+		crypto_free_skcipher(ctx->fallback);
-+
-+	ctx->fallback = NULL;
- }
- 
- /* ********************** ALGS ************************************ */
-@@ -784,7 +829,7 @@ static struct crypto_alg algs_ecb_cbc[] = {
- 	.cra_priority		= 300,
- 	.cra_flags		= CRYPTO_ALG_TYPE_ABLKCIPHER |
- 				  CRYPTO_ALG_KERN_DRIVER_ONLY |
--				  CRYPTO_ALG_ASYNC,
-+				  CRYPTO_ALG_ASYNC | CRYPTO_ALG_NEED_FALLBACK,
- 	.cra_blocksize		= AES_BLOCK_SIZE,
- 	.cra_ctxsize		= sizeof(struct omap_aes_ctx),
- 	.cra_alignmask		= 0,
-@@ -806,7 +851,7 @@ static struct crypto_alg algs_ecb_cbc[] = {
- 	.cra_priority		= 300,
- 	.cra_flags		= CRYPTO_ALG_TYPE_ABLKCIPHER |
- 				  CRYPTO_ALG_KERN_DRIVER_ONLY |
--				  CRYPTO_ALG_ASYNC,
-+				  CRYPTO_ALG_ASYNC | CRYPTO_ALG_NEED_FALLBACK,
- 	.cra_blocksize		= AES_BLOCK_SIZE,
- 	.cra_ctxsize		= sizeof(struct omap_aes_ctx),
- 	.cra_alignmask		= 0,
-@@ -832,7 +877,7 @@ static struct crypto_alg algs_ctr[] = {
- 	.cra_priority		= 300,
- 	.cra_flags		= CRYPTO_ALG_TYPE_ABLKCIPHER |
- 				  CRYPTO_ALG_KERN_DRIVER_ONLY |
--				  CRYPTO_ALG_ASYNC,
-+				  CRYPTO_ALG_ASYNC | CRYPTO_ALG_NEED_FALLBACK,
- 	.cra_blocksize		= AES_BLOCK_SIZE,
- 	.cra_ctxsize		= sizeof(struct omap_aes_ctx),
- 	.cra_alignmask		= 0,
 -- 
-1.9.1
+Regards/Gruss,
+    Boris.
+
+ECO tip #101: Trim your mails when you reply.
+
+SUSE Linux GmbH, GF: Felix Imend?rffer, Jane Smithard, Graham Norton, HRB 21284 (AG N?rnberg)
+--
