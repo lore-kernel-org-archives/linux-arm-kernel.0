@@ -1,89 +1,258 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 4 Aug 2016 13:49:15 +0530
-Subject: Support for configurable PCIe endpoint
-In-Reply-To: <2795776.a946dnWVV6@wuerfel>
-References: <57A18927.9070003@ti.com> <2795776.a946dnWVV6@wuerfel>
-Message-ID: <57A2FA83.3090100@ti.com>
+From: quentin.schulz@free-electrons.com (Quentin Schulz)
+Date: Thu, 4 Aug 2016 10:41:00 +0200
+Subject: [PATCH v3 4/4] iio: adc: add support for Allwinner SoCs ADC
+In-Reply-To: <20160729071230.GB6215@lukather>
+References: <1469519027-11387-1-git-send-email-quentin.schulz@free-electrons.com>
+ <1469519027-11387-5-git-send-email-quentin.schulz@free-electrons.com>
+ <20160729071230.GB6215@lukather>
+Message-ID: <bccb6739-4804-8c71-a120-2cb8672fb57e@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Hi Maxime,
 
-On Wednesday 03 August 2016 01:12 PM, Arnd Bergmann wrote:
-> On Wednesday, August 3, 2016 11:33:19 AM CEST Kishon Vijay Abraham I wrote:
->> Hi,
->>
->> The PCIe controller present in TI's DRA7 SoC is capable of operating either in
->> Root Complex mode or Endpoint mode. (It uses Synopsys Designware Core).I'd
->> assume most of the PCIe controllers on other platforms that use Designware core
->> should also be capable to operate in endpoint mode. But linux kernel right now
->> supports only RC mode.
->>
->> PCIe endpoint support discussion came up briefly before [1] but it was felt the
->> practical use case will find firmware more suitable and endpoint support in
->> kernel can be used only for validation or demo.
->>
->> Validation or demo is itself a valid use case in my opinion (consider something
->> similar to gadget zero for USB). There can be other use cases as well. The RC
->> can use the SoC with EP mode support as an accelerator to accomplish specific
->> task. Here RC gives data to the EP. The EP processes the data. The processing
->> can be done either in ARM itself or it can use other hardware accelerators
->> (like DSP, IVA-HD etc..) present in the EP system. If HW accelerator is used,
->> the linux kernel running in ARM can be used to accomplish other tasks. Once EP
->> mode support is added, I think more use cases will be added.
->>
->> From the high level this should look _similar_ to the gadget framework of USB.
->> One difference from USB would be this should allow HW components (like DSP, PRU
->> etc.. and maybe even some peripheral) in the EP system to be used by RC system.
+On 29/07/2016 09:12, Maxime Ripard wrote:
+> On Tue, Jul 26, 2016 at 09:43:47AM +0200, Quentin Schulz wrote:
+[...]
+>> +static int sunxi_gpadc_adc_read(struct iio_dev *indio_dev, int channel,
+>> +				int *val)
+>> +{
+>> +	struct sunxi_gpadc_dev *info = iio_priv(indio_dev);
+>> +	int ret = 0;
+>> +
+>> +	pm_runtime_get_sync(indio_dev->dev.parent);
+>> +	mutex_lock(&info->mutex);
+>> +
+>> +	reinit_completion(&info->completion);
+>> +	regmap_write(info->regmap, SUNXI_GPADC_TP_CTRL1,
+>> +		     info->soc_specific->tp_mode_en |
+>> +		     info->soc_specific->tp_adc_select |
+>> +		     info->soc_specific->adc_chan_select(channel));
+>> +	regmap_write(info->regmap, SUNXI_GPADC_TP_INT_FIFOC,
+>> +		     SUNXI_GPADC_TP_INT_FIFOC_TP_FIFO_TRIG_LEVEL(1) |
+>> +		     SUNXI_GPADC_TP_INT_FIFOC_TP_FIFO_FLUSH);
+>> +	enable_irq(info->fifo_data_irq);
+>> +
+>> +	if (!wait_for_completion_timeout(&info->completion,
+>> +					 msecs_to_jiffies(100))) {
+>> +		ret = -ETIMEDOUT;
+>> +		goto out;
+>> +	}
+>> +
+>> +	*val = info->adc_data;
+>> +
+>> +out:
+>> +	disable_irq(info->fifo_data_irq);
+>> +	mutex_unlock(&info->mutex);
+>> +	pm_runtime_mark_last_busy(indio_dev->dev.parent);
+>> +	pm_runtime_put_autosuspend(indio_dev->dev.parent);
+>> +
+>> +	return ret;
+>> +}
+>> +
+>> +static int sunxi_gpadc_temp_read(struct iio_dev *indio_dev, int *val)
+>> +{
+>> +	struct sunxi_gpadc_dev *info = iio_priv(indio_dev);
+>> +	int ret = 0;
+>> +
+>> +	pm_runtime_get_sync(indio_dev->dev.parent);
+>> +	mutex_lock(&info->mutex);
+>> +
+>> +	reinit_completion(&info->completion);
+>> +
+>> +	regmap_write(info->regmap, SUNXI_GPADC_TP_INT_FIFOC,
+>> +		     SUNXI_GPADC_TP_INT_FIFOC_TP_FIFO_TRIG_LEVEL(1) |
+>> +		     SUNXI_GPADC_TP_INT_FIFOC_TP_FIFO_FLUSH);
+>> +	/*
+>> +	 * The temperature sensor returns valid data only when the ADC operates
+>> +	 * in touchscreen mode.
+>> +	 */
+>> +	regmap_write(info->regmap, SUNXI_GPADC_TP_CTRL1,
+>> +		     info->soc_specific->tp_mode_en);
+>> +	enable_irq(info->temp_data_irq);
+>> +
+>> +	if (!wait_for_completion_timeout(&info->completion,
+>> +					 msecs_to_jiffies(100))) {
+>> +		ret = -ETIMEDOUT;
+>> +		goto out;
+>> +	}
+>> +
+>> +	*val = info->temp_data;
+>> +
+>> +out:
+>> +	disable_irq(info->temp_data_irq);
+>> +	mutex_unlock(&info->mutex);
+>> +	pm_runtime_mark_last_busy(indio_dev->dev.parent);
+>> +	pm_runtime_put_autosuspend(indio_dev->dev.parent);
+>> +
+>> +	return ret;
+>> +}
 > 
-> (Adding Jon Mason)
-> 
-> We have the drivers/ntb framework, which in theory should be able to handle
-> this, but in practice is only used for a very small number of bridge
-> implementations, and is also limited in the way it can be configured
-> (compared to USB gadget)
-> 
->> So these are the high-level steps that I thought would be needed to add EP
->> support in linux.
->> *) move pcie-designware.c out of drivers/pci/host (maybe create a
->> drivers/pci/designware/ folder?). All users of pcie-designware.c should be
->> moved here.
->> This is in preparation for adding EP mode support to designware.
-> 
-> A lot of the other drivers in drivers/pci/host support endpoint mode too,
-> I don't think moving them all elsewhere is helpful or necessary here.
+> This looks like the exact same function than above, can't that be
+> factored (for example by passing the interrupt number as argument, and
+> giving it a way to know if it's going to be used for the ADC or
+> temperature as an argument?)
 
-having drivers that support endpoint in *host* directory might be misleading IMO.
-> 
->> *) Add library functions in pcie-designware.c specific to EP mode like
->> initializing general ecam registers, BAR registers etc.. These functions should
->> be invoked from a *function* driver (function driver should determine the use
->> of a particular EP).
->>
->> *) Add a sample *function* driver that can be used just for validation. This
->> function driver will invoke the previously added functions in PCIe controller
->> to initialize ecam, BAR etc.. This will invoke the PCIe controller functions
->> through *ep-core* layer. That way the same function driver can be made to work
->> with different PCIe controllers. (A PCIe driver corresponding to this function
->> driver should also be implemented in RC side)
->>
->> *) Add *ep-core* layer to bind the function driver to the controller driver and
->> using which the function driver will invoke controller driver callbacks (to
->> initialize ecam, BAR registers etc..)
-> 
-> I think we should first have a rough idea what the framework should look like,
-> and how it handles having multiple hardware implementation and multiple
-> protocol implementations, before we modify a particular driver.
-> 
-> So this step here should come a bit earlier than the others.
+Yes it can. I could use the interrupt number to know in which mode to
+operate since each interrupt is only activated in one mode (temperature
+or ADC).
 
-Okay. That makes sense to me as well.
+[...]
+>> +static int sunxi_gpadc_runtime_suspend(struct device *dev)
+>> +{
+>> +	struct sunxi_gpadc_dev *info = iio_priv(dev_get_drvdata(dev));
+>> +
+>> +	mutex_lock(&info->mutex);
+>> +
+>> +	/* Disable the ADC on IP */
+>> +	regmap_write(info->regmap, SUNXI_GPADC_TP_CTRL1, 0);
+>> +	/* Disable temperature sensor on IP */
+>> +	regmap_write(info->regmap, SUNXI_GPADC_TP_TPR, 0);
+>> +
+>> +	mutex_unlock(&info->mutex);
 > 
->> *) Modify platform driver to support EP mode (in my case pci-dra7xx.c).
->>
->> *) dt binding specific to EP mode should be created.
-> 
-> Right.
+> Having some comments somewhere about what this mutex protects would be
+> great (just like checkpatch tells you about).
 
-Thanks
-Kishon
+ACK.
+
+> However, I'm not sure this is even possible. Isn't the point of the
+> runtime_pm precisely to not be called while you're using the device?
+
+I agree on the principle but I am using runtime_pm functions (I am
+mainly talking about the pm_runtime_put function) when probing or
+removing the driver. Let's say we remove the mutex locks in runtime_pm
+functions, what will happen if we are reading raw values from the ADC
+when removing the ADC driver for example?
+
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +static int sunxi_gpadc_runtime_resume(struct device *dev)
+>> +{
+>> +	struct sunxi_gpadc_dev *info = iio_priv(dev_get_drvdata(dev));
+>> +
+>> +	mutex_lock(&info->mutex);
+>> +
+>> +	/* clkin = 6MHz */
+>> +	regmap_write(info->regmap, SUNXI_GPADC_TP_CTRL0,
+>> +		     SUNXI_GPADC_TP_CTRL0_ADC_CLK_DIVIDER(2) |
+>> +		     SUNXI_GPADC_TP_CTRL0_FS_DIV(7) |
+>> +		     SUNXI_GPADC_TP_CTRL0_T_ACQ(63));
+>> +	regmap_write(info->regmap, SUNXI_GPADC_TP_CTRL1,
+>> +		     info->soc_specific->tp_mode_en);
+>> +	regmap_write(info->regmap, SUNXI_GPADC_TP_CTRL3,
+>> +		     SUNXI_GPADC_TP_CTRL3_FILTER_EN |
+>> +		     SUNXI_GPADC_TP_CTRL3_FILTER_TYPE(1));
+>> +	/* period = SUNXI_GPADC_TP_TPR_TEMP_PERIOD * 256 * 16 / clkin; ~1.3s */
+>> +	regmap_write(info->regmap, SUNXI_GPADC_TP_TPR,
+>> +		     SUNXI_GPADC_TP_TPR_TEMP_ENABLE |
+>> +		     SUNXI_GPADC_TP_TPR_TEMP_PERIOD(1953));
+>> +
+>> +	mutex_unlock(&info->mutex);
+>> +
+>> +	return 0;
+>> +}
+[...]
+>> +	info->soc_specific = (struct sunxi_gpadc_soc_specific *)platform_get_device_id(pdev)->driver_data;
+> 
+> I'm not sure that cast is necessary (and you can probably shorten that
+> structure name).
+
+GCC warns about implicit pointer to integer cast in that case. ACK for
+structure name.
+
+[...]
+>> +
+>> +	irq = platform_get_irq_byname(pdev, "TEMP_DATA_PENDING");
+>> +	if (irq < 0) {
+>> +		dev_err(&pdev->dev,
+>> +			"no TEMP_DATA_PENDING interrupt registered\n");
+>> +		ret = irq;
+>> +		goto err;
+>> +	}
+>> +
+>> +	irq = regmap_irq_get_virq(sunxi_gpadc_mfd_dev->regmap_irqc, irq);
+>> +	ret = devm_request_any_context_irq(&pdev->dev, irq,
+>> +					   sunxi_gpadc_temp_data_irq_handler, 0,
+>> +					   "temp_data", info);
+>> +	if (ret < 0) {
+>> +		dev_err(&pdev->dev,
+>> +			"could not request TEMP_DATA_PENDING interrupt: %d\n",
+>> +			ret);
+>> +		goto err;
+>> +	}
+>> +
+>> +	disable_irq(irq);
+>> +	info->temp_data_irq = irq;
+>> +	atomic_set(&info->ignore_temp_data_irq, 0);
+>> +
+>> +	irq = platform_get_irq_byname(pdev, "FIFO_DATA_PENDING");
+>> +	if (irq < 0) {
+>> +		dev_err(&pdev->dev,
+>> +			"no FIFO_DATA_PENDING interrupt registered\n");
+>> +		ret = irq;
+>> +		goto err;
+>> +	}
+>> +
+>> +	irq = regmap_irq_get_virq(sunxi_gpadc_mfd_dev->regmap_irqc, irq);
+>> +	ret = devm_request_any_context_irq(&pdev->dev, irq,
+>> +					   sunxi_gpadc_fifo_data_irq_handler, 0,
+>> +					   "fifo_data", info);
+>> +	if (ret < 0) {
+>> +		dev_err(&pdev->dev,
+>> +			"could not request FIFO_DATA_PENDING interrupt: %d\n",
+>> +			ret);
+>> +		goto err;
+>> +	}
+>> +
+>> +	disable_irq(irq);
+>> +	info->fifo_data_irq = irq;
+>> +	atomic_set(&info->ignore_fifo_data_irq, 0);
+> 
+> These two blocks to handle the IRQs look very similar, you porbably
+> want to factor them.
+
+ACK.
+
+[...]
+>> +
+>> +err:
+>> +	pm_runtime_put(&pdev->dev);
+> 
+> You're never disabling it?
+
+ACK.
+
+>> +	/* Disable all hardware interrupts */
+>> +	regmap_write(info->regmap, SUNXI_GPADC_TP_INT_FIFOC, 0);
+> 
+> This looks like the wrong place to do that. You'll disable the
+> interrupts of all the devices of the MFD, which is probbaly not what
+> you want to do (and if you do, you want to do it in the MFD driver).
+
+Yes but all subdrivers of the MFD are using IIO channels from the ADC
+driver so anyway they would not work at all.
+
+[...]
+>> +static const struct platform_device_id sunxi_gpadc_id[] = {
+>> +	{ "sun4i-a10-gpadc-iio", (kernel_ulong_t)&sun4i_gpadc_soc_specific },
+>> +	{ "sun5i-a13-gpadc-iio", (kernel_ulong_t)&sun5i_gpadc_soc_specific },
+>> +	{ "sun6i-a31-gpadc-iio", (kernel_ulong_t)&sun6i_gpadc_soc_specific },
+> 
+> kernel_ulong_t ? that's weird.
+
+That's the type of the data field of platform_device_id
+(http://lxr.free-electrons.com/source/include/linux/mod_devicetable.h#L498).
+Otherwise, GCC warns with implicit pointer to integer cast.
+
+Quentin
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160804/3afad6e2/attachment.sig>
