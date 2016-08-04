@@ -1,237 +1,70 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Thu, 4 Aug 2016 13:51:37 +0100
-Subject: [PATCH] KVM: arm/arm64: initialize new VGIC even without host GIC
-In-Reply-To: <20160804112450.GC8211@lvm>
-References: <20160802143445.14005-1-andre.przywara@arm.com>
- <20160804112450.GC8211@lvm>
-Message-ID: <dda85147-d7a9-73b2-15bb-8de53782d1af@arm.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Thu, 4 Aug 2016 13:55:45 +0100
+Subject: [PATCH 1/8] ARM: assembler: introduce adr_l, ldr_l and str_l
+ macros
+In-Reply-To: <20160804121619.GS1041@n2100.armlinux.org.uk>
+References: <1470238730-30038-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1470238730-30038-2-git-send-email-ard.biesheuvel@linaro.org>
+ <20160803164940.GC7147@e103592.cambridge.arm.com>
+ <CAKv+Gu_3YKfdCyMuTdrk+t16qQOuMiSqWEHf-h1K2ajM5s1rxw@mail.gmail.com>
+ <20160804094451.GE7147@e103592.cambridge.arm.com>
+ <CAKv+Gu-T9+fhvRk-RroDqr7QvQ24cUTuONL9uT-Ws24n_nHrCw@mail.gmail.com>
+ <20160804112229.GG7147@e103592.cambridge.arm.com>
+ <20160804121619.GS1041@n2100.armlinux.org.uk>
+Message-ID: <20160804125544.GI7147@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 04/08/16 12:24, Christoffer Dall wrote:
-> On Tue, Aug 02, 2016 at 03:34:45PM +0100, Andre Przywara wrote:
->> The new VGIC code is always in the VCPU entry/exit path, even when the
->> actual GIC hardware initialization found the VGIC unusable (due to
->> non-aligned base addresses or a missing maintenance interrupt, for
->> instance).
->> Since in this case the VGIC structures aren't initialized properly, the
->> host kernel crashes on a NULL pointer dereference.
->> Initialize each VCPU's ap_list even with the VGIC unavailable, so the
->> VGIC code now just iterates an empty list in that case and no longer
->> crashes the kernel.
->> Also take care of the arch timer (which becomes unusable as well without
->> a VGIC) by using a static key to prevent arch timer code to run in the
->> hot path.
->> Much of the code was inspired by Marc Zyngier.
->>
->> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
->> Reported-by: Stefan Agner <stefan@agner.ch>
->> ---
->> Hi Stefan, Drew,
->>
->> can you test this on your systems which showed the issue?
->>
->> Cheers,
->> Andre.
->>
->>  arch/arm/kvm/arm.c            | 14 ++++++++++----
->>  include/kvm/arm_arch_timer.h  |  2 ++
->>  virt/kvm/arm/arch_timer.c     | 11 +++++++++++
->>  virt/kvm/arm/vgic/vgic-init.c |  9 ++++-----
->>  4 files changed, 27 insertions(+), 9 deletions(-)
->>
->> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
->> index f1bde7c..cef35ce 100644
->> --- a/arch/arm/kvm/arm.c
->> +++ b/arch/arm/kvm/arm.c
->> @@ -294,7 +294,8 @@ int kvm_arch_vcpu_init(struct kvm_vcpu *vcpu)
->>  	bitmap_zero(vcpu->arch.features, KVM_VCPU_MAX_FEATURES);
->>  
->>  	/* Set up the timer */
->> -	kvm_timer_vcpu_init(vcpu);
->> +	if (vgic_present)
->> +		kvm_timer_vcpu_init(vcpu);
->>  
->>  	kvm_arm_reset_debug_ptr(vcpu);
->>  
->> @@ -1208,6 +1209,7 @@ static int init_subsystems(void)
->>  		break;
->>  	case -ENODEV:
->>  	case -ENXIO:
->> +		kvm_err("No useable vgic detected\n");
->>  		vgic_present = false;
->>  		err = 0;
->>  		break;
->> @@ -1218,9 +1220,13 @@ static int init_subsystems(void)
->>  	/*
->>  	 * Init HYP architected timer support
->>  	 */
->> -	err = kvm_timer_hyp_init();
->> -	if (err)
->> -		goto out;
->> +	if (vgic_present) {
->> +		err = kvm_timer_hyp_init();
->> +		if (err)
->> +			goto out;
->> +	} else {
->> +		static_branch_enable(&kvm_arch_timer_disabled);
->> +	}
->>  
->>  	kvm_perf_init();
->>  	kvm_coproc_table_init();
->> diff --git a/include/kvm/arm_arch_timer.h b/include/kvm/arm_arch_timer.h
->> index dda39d8..64f361f 100644
->> --- a/include/kvm/arm_arch_timer.h
->> +++ b/include/kvm/arm_arch_timer.h
->> @@ -23,6 +23,8 @@
->>  #include <linux/hrtimer.h>
->>  #include <linux/workqueue.h>
->>  
->> +extern struct static_key_false kvm_arch_timer_disabled;
->> +
->>  struct arch_timer_kvm {
->>  	/* Virtual offset */
->>  	cycle_t			cntvoff;
->> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
->> index 4fde8c7..71fb04c 100644
->> --- a/virt/kvm/arm/arch_timer.c
->> +++ b/virt/kvm/arm/arch_timer.c
->> @@ -34,6 +34,8 @@ static struct timecounter *timecounter;
->>  static struct workqueue_struct *wqueue;
->>  static unsigned int host_vtimer_irq;
->>  
->> +DEFINE_STATIC_KEY_FALSE(kvm_arch_timer_disabled);
->> +
->>  void kvm_timer_vcpu_put(struct kvm_vcpu *vcpu)
->>  {
->>  	vcpu->arch.timer_cpu.active_cleared_last = false;
->> @@ -41,6 +43,9 @@ void kvm_timer_vcpu_put(struct kvm_vcpu *vcpu)
->>  
->>  static cycle_t kvm_phys_timer_read(void)
->>  {
->> +	if (static_branch_unlikely(&kvm_arch_timer_disabled))
->> +		return 0;
->> +
->>  	return timecounter->cc->read(timecounter->cc);
->>  }
->>  
->> @@ -104,6 +109,9 @@ static u64 kvm_timer_compute_delta(struct kvm_vcpu *vcpu)
->>  {
->>  	cycle_t cval, now;
->>  
->> +	if (static_branch_unlikely(&kvm_arch_timer_disabled))
->> +		return 0;
->> +
->>  	cval = vcpu->arch.timer_cpu.cntv_cval;
->>  	now = kvm_phys_timer_read() - vcpu->kvm->arch.timer.cntvoff;
->>  
->> @@ -148,6 +156,9 @@ static bool kvm_timer_irq_can_fire(struct kvm_vcpu *vcpu)
->>  {
->>  	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
->>  
->> +	if (static_branch_unlikely(&kvm_arch_timer_disabled))
->> +		return false;
->> +
->>  	return !(timer->cntv_ctl & ARCH_TIMER_CTRL_IT_MASK) &&
->>  		(timer->cntv_ctl & ARCH_TIMER_CTRL_ENABLE);
->>  }
+On Thu, Aug 04, 2016 at 01:16:19PM +0100, Russell King - ARM Linux wrote:
+> On Thu, Aug 04, 2016 at 12:22:29PM +0100, Dave Martin wrote:
+> > The more conventional literal-.long approach could still be macro-ised
+> > along the same lines, which might make the affected code more readable,
+> > but the idiom you'd be replacing is well-understood and not very common.
 > 
-> why do we have these hooks fairly deep into the arch timer static
-> functions?
+> I don't see how it could be.  You can't efficiently place the literal
+> data alongside the instructions dealing with it.
 > 
-> I would think that it makes more sense to catch stuff in the early entry
-> points to the timer logic, which would be:
+> The only alternative is to use ldr rd, =foo, but that gets very stupid
+> when you want to calculate the relative offset, and you end up with
+> something like this for every relative load:
 > 
->   kvm_timer_should_fire
->   kvm_timer_schedule
->   kvm_timer_unschedule
->   kvm_arm_timer_set_reg
->   kvm_arm_timer_get_reg
+> 	ldr rd, =.
+> 	sub rd, rd, #. - 4
+> 	ldr r1, =foo
+> 	add r1, r1, rd
+
+In theory, it ought to be possible to combine the two approaches:
+
+	ldr	rd, =foo - (1f + 8)	@ or =foo - (. + 12)
+1:	add	rd, pc, rd
+
+But gas doesn't like the argument of ldr= to require a reloc (though it
+would work perfectly well).
+
+
+A similar effect to automatic literal pool placement can be achieved by
+means of subsections:
+
+	.subsection 1
+	.align 2
+0:	.long	foo - (1f + 8)
+	.previous
+
+	ldr	rd, 0b
+1:	add	r0, pc, r0
+
+... though this also has some shortcomings (including that .ltorg
+won't flush these literals, and that subsections are a rarely used
+assembler feature and will likely confuse people).
+
+> As I've already said, I prefer the existing solution.  It works, it's
+> been known to work for the last 22 years.
 > 
-> Also, most of these don't seem to be in a general critical path, so I'm
-> not really sure why we're using static branches here?
+> If it isn't broken, don't try to fix it.
 
-To be honest I am not of fan of those sprinkled static branches either.
-They should be fairly cheap, though, as they are a NOP normally and
-AFAICS we need at least one anyway, so adding some more users didn't
-seem overly problematic to me.
-In a previous version I got along without most of those, by just letting
-timecounter always point to something legal, thus avoiding all but one
-explicit "vgic/arch_timer enabled" check at all.
-I fixed this up after some comments from Marc, but agree that now it's
-not nice.
+Indeed... the case for the change isn't very compelling -- just nice
+to have if it could be done without any unfortunate side-effects
+(which looks unlikely right now).
 
-But see below for a possible better solution.
-
->> diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
->> index 2c7f0d5..b92133c 100644
->> --- a/virt/kvm/arm/vgic/vgic-init.c
->> +++ b/virt/kvm/arm/vgic/vgic-init.c
->> @@ -56,6 +56,10 @@ void kvm_vgic_early_init(struct kvm *kvm)
->>  
->>  void kvm_vgic_vcpu_early_init(struct kvm_vcpu *vcpu)
->>  {
->> +	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
->> +
->> +	INIT_LIST_HEAD(&vgic_cpu->ap_list_head);
->> +	spin_lock_init(&vgic_cpu->ap_list_lock);
->>  }
-> 
-> there are two pieces of comments above that needs to be tweaked now (or
-> just remove the remaining function and comment)
-
-TBH hooking into here was an easy solution, which I chose to allow
-fixing this easily, for instance for a 4.7 stable fix.
-
-Somehow I feel this is an abuse and we can find another solution.
-What about explicit "disable arch timer/vgic" function(s), which could
-set this list and spin_lock up, also make sure timecounter in
-arch_timer.c points to something and toggle the static branch.
-Then we would use something like:
-	if (vgic_present)
-		kvm_timer_hyp_init();
-	else
-		kvm_disable_arch_timer();
-
-and similar for the VGIC.
-
-Does that sound useful or are we going totally off the tracks with this?
-
->>  
->>  /* CREATION */
->> @@ -392,11 +396,6 @@ int kvm_vgic_hyp_init(void)
->>  	if (!gic_kvm_info)
->>  		return -ENODEV;
->>  
->> -	if (!gic_kvm_info->maint_irq) {
->> -		kvm_err("No vgic maintenance irq\n");
->> -		return -ENXIO;
->> -	}
->> -
-> 
-> I don't understand why we can remove this chunk?
-
-This was in Marc's version of the fix originally and I didn't dare to
-question this ;-)
-Originally I was under the impression that we are reporting this
-condition in the host GIC driver already, but checking back this doesn't
-seem to be the case. In fact we just seem to report the unusable VGIC,
-without any further rationale.
-
-So if Marc agrees, should we remove this hunk and keep the message?
-
-Cheers,
-Andre.
-
->>  	switch (gic_kvm_info->type) {
->>  	case GIC_V2:
->>  		ret = vgic_v2_probe(gic_kvm_info);
->> -- 
->> 2.9.0
->>
-> 
-> Thanks,
-> -Christoffer
-> 
+Cheers
+---Dave
