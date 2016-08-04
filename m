@@ -1,74 +1,90 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 4 Aug 2016 09:17:04 +0200
-Subject: [PATCH 0/8] ARM: clean up PC-relative arithmetic
-In-Reply-To: <20160803181739.GL1041@n2100.armlinux.org.uk>
+Date: Thu, 4 Aug 2016 09:40:31 +0200
+Subject: [PATCH 1/8] ARM: assembler: introduce adr_l,
+ ldr_l and str_l macros
+In-Reply-To: <20160803164940.GC7147@e103592.cambridge.arm.com>
 References: <1470238730-30038-1-git-send-email-ard.biesheuvel@linaro.org>
- <20160803181739.GL1041@n2100.armlinux.org.uk>
-Message-ID: <CAKv+Gu-+ib-XuQfg8ZL4D7nSk5YRSYaCQyf+UdZPmg+5CxPmJw@mail.gmail.com>
+ <1470238730-30038-2-git-send-email-ard.biesheuvel@linaro.org>
+ <20160803164940.GC7147@e103592.cambridge.arm.com>
+Message-ID: <CAKv+Gu_3YKfdCyMuTdrk+t16qQOuMiSqWEHf-h1K2ajM5s1rxw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3 August 2016 at 20:17, Russell King - ARM Linux
-<linux@armlinux.org.uk> wrote:
-> On Wed, Aug 03, 2016 at 05:38:42PM +0200, Ard Biesheuvel wrote:
->> There are various places in the ARM kernel where the following pattern
->> is used to create a PC-relative reference that is valid even before the
->> MMU is on:
+On 3 August 2016 at 18:49, Dave Martin <Dave.Martin@arm.com> wrote:
+> On Wed, Aug 03, 2016 at 05:38:43PM +0200, Ard Biesheuvel wrote:
+>> Like arm64, ARM supports position independent code sequences that
+>> produce symbol references with a greater reach than the ordinary
+>> adr/ldr instructions.
 >>
->>      adr    rX, 1f
->>      ldr    rY, [rX]
->>      add    rX, rX, rY
->>      ...
->>   1: .long  <symbol> - .
+>> Introduce adr_l, that takes the address of a symbol in a PC relative
+>> manner, and ldr_l/str_l that perform a 32-bit loads/stores from a
+>> PC-relative offset.
 >>
->> or
->>      adr    rX, 1f
->>      ldmia  rX, {rY .. rY+n}
->>      sub    rX, rX, rY
->>      add    rY+1, rY+1, rX
->>      add    rY+2, rY+2, rX
->>      ...
->>   1: .long  .
->>      .long  <symbolY>
->>      .long  <symbolY+1>
->>      ...
+>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> ---
+>>  arch/arm/include/asm/assembler.h | 59 ++++++++++++++++++++
+>>  1 file changed, 59 insertions(+)
 >>
->> Both cases can be greatly simplified by letting the linker do the
->> calculations for us. This series implements adr_l, ldr_l and str_l
->> macros, and uses them to simplify a couple of instances of the above
->> patterns.
+>> diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
+>> index 4eaea2173bf8..e1450889f96b 100644
+>> --- a/arch/arm/include/asm/assembler.h
+>> +++ b/arch/arm/include/asm/assembler.h
+>> @@ -512,4 +512,63 @@ THUMB(   orr     \reg , \reg , #PSR_T_BIT        )
+>>  #endif
+>>       .endm
+>>
+>> +/*
+>> + * Pseudo-ops for PC-relative adr/ldr/str <reg>, <symbol> operations
+>> + */
+>> +
+>> +     /*
+>> +      * @dst: destination register
+>> +      * @sym: name of the symbol
+>> +      */
+>> +     .macro  adr_l, dst, sym
+>> +#ifdef CONFIG_THUMB2_KERNEL
+>> +     movw    \dst, #:lower16:(\sym) - (. + 12)
+>> +     movt    \dst, #:upper16:(\sym) - (. + 8)
+>> +     add     \dst, \dst, pc
 >
-> I don't buy that argument, sorry, and the argument is actually wrong.
-> No, we're _not_ letting the linker do the calculations for us, we're
-> letting the linker do _some_ of the calculation, but not all.
->
-> What you're replacing the above with is stuff like (I guess, because
-> I've no idea what this :pc_g0: notation is):
->
->         add     rX, pc, #(sym - . - 8) & 0xff
->         add     rX, rX, #(sym - . - 4) & 0xff00
->         add     rX, rX, #(sym - .) & 0xff0000
->
-> which I think is a more complex (and less obvious) way to calculate it.
-> It's also buggy when we end up with a relative offset greater than 16MB,
-> which we have in multi-zImage kernels.
->
-
-Even if you think this is a more complex way to calculate it, at least
-it is encapsulated in a single macro instead of having similar but not
-identical open coded instances all over the place.
-
-As for the range: the ldr/str variants have 28 bits of range (2x
-scaled 8 bit immediate for the adds and a single unscaled 12 bit
-immediate for the ldr/str). The adr variant has 26 bits (3x scaled
-immediate counting from bit 2) range for word aligned symbols, which
-gives us +/- 64 MB, which should be plenty. The only pathological
-outlier is allyesconfig, but that uses Thumb2 anyway.
-
-The relocations documented here
-http://infocenter.arm.com/help/topic/com.arm.doc.ihi0044f/IHI0044F_aaelf.pdf
-
-> So no, I don't like this at all
+> pc always reads as the address of that add plus 4, right?  I remember
+> some special case where it gets rounded down to a 4-byte boundary, but
+> IIRC that only applies to certain ldr ..., [pc, ...] forms.
 >
 
-Noted
+The 4-byte rounding occurs when the linker (or the linux module
+loader) encounters a bl instruction in Thumb that needs to be fixed up
+to blx if the target is ARM.
+
+>> +#else
+>> +     add     \dst, pc, #:pc_g0_nc:(\sym) - 8
+>> +     add     \dst, \dst, #:pc_g1_nc:(\sym) - 4
+>> +     add     \dst, \dst, #:pc_g2:(\sym)
+>
+> Whoah.  I've never seen this syntax before...  does this work for any
+> named reloc, or just for certain blessed relocs?  (I'm also _assuming_
+> the assembler support for this functionality is ancient -- if not,
+> there may be toolchain compatibility issues.)
+>
+> Based on my understanding of how these relocs work, this should do the
+> right thing, though.
+>
+>
+> Second question: for arm, this reduces the range addressable to
+> pc +/- 26-bit offset (24-bit if sym is not word aligned, but that
+> probably never happens).
+>
+> I can't remember the de facto limit on the size of vmlinux for arm --
+> are you sure this extra limitation won't break some cases of huge
+> initramfs where adr_l gets used for cross-section references?
+>
+
+Yes, that seems a valid concern. We have +/- 64 MB for the adr_l
+variant (as you say, for word aligned symbols), but this may be
+insufficient. The ldr/str variants don't have the same limitation.
+
+> (For Thumb2, :lower16:/:upper16: give a full 32-bit range, so no problem
+> there -- sad that this isn't available before ARMv7).
+>
+
+Indeed.
