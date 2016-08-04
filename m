@@ -1,59 +1,60 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 4 Aug 2016 21:26:46 +0100
-Subject: [PATCH 2/2] regmap: debugfs: Add support for dumping write only
- device registers
-In-Reply-To: <1470322558-7501-3-git-send-email-cristian.birsan@microchip.com>
-References: <1470322558-7501-1-git-send-email-cristian.birsan@microchip.com>
- <1470322558-7501-3-git-send-email-cristian.birsan@microchip.com>
-Message-ID: <20160804202646.GH10383@sirena.org.uk>
+From: kbeldan@baylibre.com (Karl Beldan)
+Date: Thu, 4 Aug 2016 20:53:05 +0000
+Subject: [PATCH] ARM: dts: da850: Adjust the pinctrl muxing for the NAND
+ on CS3
+In-Reply-To: <CAJaRCXMBi-UQaXkGNaSaKjb6eqoJwhcc9Py8vFEWpVKSn5g5bQ@mail.gmail.com>
+References: <20160803170627.1773-1-kbeldan@baylibre.com>
+ <CAJaRCXMBi-UQaXkGNaSaKjb6eqoJwhcc9Py8vFEWpVKSn5g5bQ@mail.gmail.com>
+Message-ID: <20160804205305.GA15013@gobelin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 04, 2016 at 05:55:58PM +0300, Cristian Birsan wrote:
-> Add support for dumping write only device registers in debugfs. This is
-> useful for audio codecs that have write only registers (like WM8731).
-> The logic that decides if a value can be printed is moved to
-> regmap_printable() function to allow for easier future updates.
-
-Please check your CC list when sending things upstream - try to ensure
-that people you're sending patches to are relevant to the patch.
-Maintainers often get lots of mail and having to sort out mail that's
-not really relevant to them can make it easier for relevant mail to get
-missed.
-
-> +static bool regmap_printable(struct regmap *map, unsigned int reg)
-> +{
-> +	if (regmap_precious(map, reg))
-> +		return false;
-> +
-> +	if (!regmap_readable(map, reg) && !regmap_cached(map, reg))
-> +		return false;
-> +
-> +	return true;
-> +}
-
-This only has one user...
-
->  	for (i = start_reg; i <= to; i += map->reg_stride) {
-> -		if (!regmap_readable(map, i))
-> +		if (!regmap_readable(map, i) && !regmap_cached(map, i))
->  			continue;
->  
-
-...though it could have more.
-
-> -			ret = regmap_read(map, i, &val);
-> +			if (regmap_readable(map, i))
-> +				ret = regmap_read(map, i, &val);
-> +			else
-> +				ret = regcache_read(map, i, &val);
-> +
-
-I don't understand this change, a read will go to cache anyway.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160804/d65aa7b6/attachment.sig>
+On Thu, Aug 04, 2016 at 08:42:19PM +0000, Karl Beldan wrote:
+> 2016-08-03 17:06 GMT+00:00 Karl Beldan <kbeldan@baylibre.com>:
+> 
+> > - Adjust the settings to also allow driving EMA_D[8..15] for 16bits
+> >   NANDs. These are shared with GPIO3[0..7] which have no in-tree user.
+> > - Remove the useless CS4 setting
+> >
+> > Cc: Kevin Hilman <khilman@baylibre.com>
+> > Signed-off-by: Karl Beldan <kbeldan@baylibre.com>
+> > ---
+> >  arch/arm/boot/dts/da850.dtsi | 12 ++++++++----
+> >  1 file changed, 8 insertions(+), 4 deletions(-)
+> >
+> > diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
+> > index 3a00978..ae5dc18 100644
+> > --- a/arch/arm/boot/dts/da850.dtsi
+> > +++ b/arch/arm/boot/dts/da850.dtsi
+> > @@ -43,16 +43,20 @@
+> >
+> >                         nand_cs3_pins: pinmux_nand_pins {
+> >                                 pinctrl-single,bits = <
+> > -                                       /* EMA_OE, EMA_WE */
+> > -                                       0x1c 0x00110000  0x00ff0000
+> > -                                       /* EMA_CS[4],EMA_CS[3]*/
+> > -                                       0x1c 0x00000110  0x00000ff0
+> > +                                       /* EMA_OE, EMA_WE, EMA_CS[3] */
+> > +                                       0x1c 0x00110010  0x00ff00f0
+> >                                         /*
+> >                                          * EMA_D[0], EMA_D[1], EMA_D[2],
+> >                                          * EMA_D[3], EMA_D[4], EMA_D[5],
+> >                                          * EMA_D[6], EMA_D[7]
+> >                                          */
+> >                                         0x24 0x11111111  0xffffffff
+> > +                                       /*
+> > +                                        * EMA_D[8],  EMA_D[9],  EMA_D[10],
+> > +                                        * EMA_D[11], EMA_D[12], EMA_D[13],
+> > +                                        * EMA_D[14], EMA_D[15]
+> > +                                        */
+> > +                                       0x20 0x11111111  0xffffffff
+> >                                         /* EMA_A[1], EMA_A[2] */
+> >                                         0x30 0x01100000  0x0ff00000
+> >                                 >;
+> > --
+> > 2.9.0.rc1
+> >
+Please discard this one I think it is better that I make groups for the
+NAND.
+ 
+Karl
