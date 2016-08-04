@@ -1,82 +1,79 @@
 From: lina.iyer@linaro.org (Lina Iyer)
-Date: Thu, 4 Aug 2016 09:06:24 -0600
-Subject: [PATCH v2 06/14] PM / cpu_domains: Setup PM domains for
- CPUs/clusters
-In-Reply-To: <20160804101515.GA29537@brendan-thinkstation>
+Date: Thu, 4 Aug 2016 09:08:54 -0600
+Subject: [PATCH v2 01/14] PM / Domains: Allow domain power states to be
+ read from DT
+In-Reply-To: <20160804132407.GA1732@brendan-thinkstation>
 References: <1469829385-11511-1-git-send-email-lina.iyer@linaro.org>
- <1469829385-11511-7-git-send-email-lina.iyer@linaro.org>
- <20160804101515.GA29537@brendan-thinkstation>
-Message-ID: <20160804150624.GA1207@linaro.org>
+ <1469829385-11511-2-git-send-email-lina.iyer@linaro.org>
+ <20160804132407.GA1732@brendan-thinkstation>
+Message-ID: <20160804150854.GB1207@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 04 2016 at 04:15 -0600, Brendan Jackman wrote:
+On Thu, Aug 04 2016 at 07:24 -0600, Brendan Jackman wrote:
 >Hi Lina,
 >
->On Fri, Jul 29, 2016 at 03:56:17PM -0600, Lina Iyer wrote:
->> +static struct generic_pm_domain *of_get_cpu_domain(struct device_node *dn,
->> +		const struct cpu_pd_ops *ops, int cpu)
+>Couple of nitpicks here:
+>
+>On Fri, Jul 29, 2016 at 03:56:12PM -0600, Lina Iyer wrote:
+>> From: Axel Haslam <ahaslam+renesas@baylibre.com>
+>>
+>> This patch allows domains to define idle states in the DT. SoC's can
+>> define domain idle states in DT using the "power-states" property of the
+>> domain provider. Calling of_pm_genpd_init() will  read the idle states
+>> and initialize the genpd for the domain.
+>>
+>
+>The commit message got out of sync here, the idle states property is not
+>"power-states" but "domain-idle-states" now.
+>
+Ah, yes. Will amend the comit text.
+>> In addition to the entry and exit latency for idle state, also add
+>> residency and state-param properties. A domain idling in a state is only
+>> power effecient if it stays idle for a certain period in that state. The
+>> residency provides this minimum time for the idle state to provide power
+>> benefits. The state-param is a state specific u32 value that the
+>> platform may use for that idle state.
+>>
+>
+>And "state-param" isn't used any more, since the patchset switched to using
+>arm,idle-state.
+>
+Ok.
+
+>> [snip]
+>> +int pm_genpd_of_parse_power_states(struct generic_pm_domain *genpd)
 >> +{
->> +	struct of_phandle_args args;
->> +	struct generic_pm_domain *genpd, *parent;
->> +	struct cpu_pm_domain *cpu_pd, *parent_cpu_pd;
->> +	int ret;
+>> +	struct device_node *np;
+>> +	int i, err = 0;
 >> +
->> +	/* Do we have this domain? If not, create the domain */
->> +	args.np = dn;
->> +	args.args_count = 0;
+>> +	for (i = 0; i < GENPD_MAX_NUM_STATES; i++) {
+>> +		np = of_parse_phandle(genpd->of_node, "domain-idle-states", i);
+>> +		if (!np)
+>> +			break;
 >> +
->> +	genpd = of_genpd_get_from_provider(&args);
->> +	if (!IS_ERR(genpd))
->> +		return genpd;
->> +
->> +	genpd = of_init_cpu_pm_domain(dn, ops);
->> +	if (IS_ERR(genpd))
->> +		return genpd;
->> +
->> +	/* Is there a domain provider for this domain? */
->> +	ret = of_parse_phandle_with_args(dn, "power-domains",
->> +			"#power-domain-cells", 0, &args);
->> +	if (ret < 0)
->> +		goto skip_parent;
->> +
->> +	/* Find its parent and attach this domain to it, recursively */
->> +	parent = of_get_cpu_domain(args.np, ops, cpu);
->> +	if (IS_ERR(parent))
->> +		goto skip_parent;
->> +
->> +	ret = pm_genpd_add_subdomain(genpd, parent);
+>> +		err = genpd_of_get_power_state(&genpd->states[i], np);
+>> +		if (err) {
+>> +			pr_err
+>> +			    ("Parsing idle state node %s failed with err %d\n",
+>> +			     np->full_name, err);
+>> +			err = -EINVAL;
 >
->Looks like the arguments are the wrong way around here, it should be:
+>I guess there should be an of_node_put here.
 >
->	ret = pm_genpd_add_subdomain(parent, genpd);
->
-Right. Thanks, will fix.
+Right. Will add it in.
 
 Thanks,
 Lina
 
->> +	if (ret) {
->> +		pr_err("%s: Unable to add sub-domain (%s)\n err: %d",
->> +				__func__, genpd->name, ret);
->> +		return ERR_PTR(ret);
+>> +			break;
+>> +		}
+>> +		of_node_put(np);
 >> +	}
 >> +
->> +	/*
->> +	 * Reference parent domain for easy access.
->> +	 * Note: We could be attached to a domain that is not a
->> +	 * CPU PM domain in that case don't reference the parent.
->> +	 */
->> +	cpu_pd = to_cpu_pd(genpd);
->> +	parent_cpu_pd = to_cpu_pd(parent);
+>> +	if (err)
+>> +		return err;
 >> +
->> +	if (cpu_pd && parent_cpu_pd)
->> +		cpu_pd->parent = parent_cpu_pd;
->> +
->> +skip_parent:
->> +	of_node_put(dn);
->> +	return genpd;
+>> +	genpd->state_count = i;
+>> +	return 0;
 >> +}
->
->Cheers,
->Brendan
