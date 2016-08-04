@@ -1,87 +1,99 @@
-From: Wenyou.Yang@atmel.com (Yang, Wenyou)
-Date: Thu, 4 Aug 2016 03:39:53 +0000
-Subject: [PATCH] usb: ohci-at91: Suspend the ports while USB suspending
-In-Reply-To: <Pine.LNX.4.44L0.1605121359120.5957-100000@netrider.rowland.org>
-References: <1463015134-32364-1-git-send-email-wenyou.yang@atmel.com>,
- <Pine.LNX.4.44L0.1605121359120.5957-100000@netrider.rowland.org>
-Message-ID: <B256D81BAE5131468A838E5D7A243641018CCD040F@penmbx01>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Wed, 3 Aug 2016 20:42:08 -0700
+Subject: [RFC PATCH v2 1/4] Documentation: DT: net: Add Xilinx gmiitorgmii
+ converter device tree binding documentation
+In-Reply-To: <20160727080526.GH11538@lunn.ch>
+References: <1467623084-15471-1-git-send-email-appanad@xilinx.com>
+ <1467623084-15471-2-git-send-email-appanad@xilinx.com>
+ <20160704140458.GC3282@lunn.ch>
+ <03CA77BA8AF6F1469AEDFBDA1322A7B74A193913@XAP-PVEXMBX02.xlnx.xilinx.com>
+ <20160706142121.GI19800@lunn.ch>
+ <03CA77BA8AF6F1469AEDFBDA1322A7B74A19393B@XAP-PVEXMBX02.xlnx.xilinx.com>
+ <C246CAC1457055469EF09E3A7AC4E11A4A5C2387@XAP-PVEXMBX01.xlnx.xilinx.com>
+ <20160727080526.GH11538@lunn.ch>
+Message-ID: <971c966a-5335-310b-0a1a-3f1b7ee2f841@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alan,
-________________________________________
-From: Alan Stern [stern at rowland.harvard.edu]
-Sent: Friday, May 13, 2016 2:11
-To: Yang, Wenyou
-Cc: Greg Kroah-Hartman; Ferre, Nicolas; linux-usb at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-Subject: Re: [PATCH] usb: ohci-at91: Suspend the ports while USB suspending
+On 27/07/2016 01:05, Andrew Lunn wrote:
+> Hi Appana
+> 
+> Here is roughly what i was thinking:
+> 
+> struct priv {
+>        phy_device *master;
+>        phy_device *slave;
+>        struct phy_driver *slave_drv;
+> };
+> 
+> phy_status_clone(phy_device *master, phy_device *slave)
+> {
+> 	master->speed = slave->speed;
+> 	master->duplex = slave->duplex;
+> 	master->pause = slave->pause;
+> }
+> 
+> read_status(struct phy_device *phydev)
+> {
+> 	struct priv *priv = phydev->priv;
+> 
+> 	/* Get the status from the slave, and duplicate in into the
+> 	 * master */
+> 	 slave_drv->read_status(priv->slave);
+> 	 phy_status_clone(priv->master, priv->slave);
+> 
+> 	 /* Update the gmiitorgmii with the current link parameters */
+> 	 update_link(master);
+> }
+> 
+> config_init(struct phy_device *phydev)
+> {
+> 	struct priv *priv = phydev->priv;
+> 
+> 	/* Configure the slave, and duplicate in into the master */
+> 	slave_drv->config_init(priv->slave);
+> 	phy_status_clone(priv->master, priv->slave);
+> }
+> 
+> struct phy_driver master_drv = {
+>        .read_status = read_status,
+>        .config_init = config_init,
+>        .soft_reset  = ...
+>        .suspend = ...
+> };
+> 
+> probe(mdio_device *mdio)
+> {
+> 	struct priv *priv = devm_alloc();
+> 
+> 	/* Use the phy-handle property to find the slave phy */
+> 	node_phy = of_parse_phandle(mdio->of_node, "phy", 0);
+> 	priv->slave = of_phy_find_device(node_phy);
+> 
+> 	/* Create the master phy on the control address. Use the phy
+> 	   ID from the slave. */
+> 	priv->master = phy_device_create(mdio->bus, mdio->addr,
+> 	  				 phy->slave->phy_id,
+> 					 phy->slave->is_c45,
+> 					 phy->slave->c45_ids);
+> 
+> 	slave_dev_drv = phydev->mdio.dev.driver;
+> 	priv->slave_drv = to_phy_driver(slave_dev_drv);
+> 	priv->master->mdio.dev.driver = master_drv;
 
-On Thu, 12 May 2016, Wenyou Yang wrote:
+The key here is really that except for the phy_driver::read_status
+callback, we want to defer every operation to the slave (full MDIO
+register range compatible) PHY.
 
-> In order to get lower consumption, as a workaround, suspend
-> the USB PORTA/B/C via set the SUSPEND_A/B/C bits of OHCI Interrupt
-> Configuration Register while OHCI USB suspending.
+> }
+> 
+> It would however be nice to only have one phydev structure, so you are
+> not copying status and settings backwards and forwards from one to the
+> other all the time, and need a wrapper for every function in
+> phy_driver. Studying the structures a bit, that might be possible. You
+> would then only need to wrap the read_status(), so that when the link
+> speed/duplex changes, you can configure the converter as appropriate.
 
-What does this mean?  What does suspending a port do?  Is it the same
-as a normal USB port suspend?
-
-If it is the same, why doesn't the USB_PORT_FEAT_SUSPEND subcase of the
-SetPortFeature case in ohci_hub_control() already take care of this?
-
-Yes, you are right. 
-
-We can use  the USB_PORT_FEAT_SUSPEND subcase of the
-SetPortFeature case to take care this.
-
-I will send a new patch, please help review it. Thanks a lot.
-
-> This suspend operation must be done before stopping the USB clock,
-> resume after the USB clock enabled.
->
-> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-> ---
-
-> @@ -132,6 +135,17 @@ static void at91_stop_hc(struct platform_device *pdev)
->
->  /*-------------------------------------------------------------------------*/
->
-> +struct regmap *at91_dt_syscon_sfr(void)
-> +{
-> +     struct regmap *regmap;
-> +
-> +     regmap = syscon_regmap_lookup_by_compatible("atmel,sama5d2-sfr");
-> +     if (IS_ERR(regmap))
-> +             return NULL;
-
-If you get an error, the regmap pointer is set to NULL...
-
-> @@ -197,6 +211,8 @@ static int usb_hcd_at91_probe(const struct hc_driver *driver,
->               goto err;
->       }
->
-> +     ohci_at91->sfr_regmap = at91_dt_syscon_sfr();
-
-With no other error checking...
-
-> +
->       board = hcd->self.controller->platform_data;
->       ohci = hcd_to_ohci(hcd);
->       ohci->num_ports = board->ports;
-
-> +static int ohci_at91_port_ctrl(struct regmap *regmap, bool enable)
-> +{
-> +     u32 regval;
-> +     int ret;
-> +
-> +     if (IS_ERR(regmap))
-> +             return PTR_ERR(regmap);
-> +
-> +     ret = regmap_read(regmap, SFR_OHCIICR, &regval);
-
-And now what happens if regmap is NULL?  Hint: It won't be pretty...
-
-Alan Stern
-
-
-Best Regards,
-Wenyou Yang
+Agreed.
+--
+Florian
