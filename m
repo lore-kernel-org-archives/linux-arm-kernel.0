@@ -1,49 +1,47 @@
 From: jaz@semihalf.com (Grzegorz Jaszczyk)
-Date: Thu,  4 Aug 2016 12:14:17 +0200
-Subject: [PATCH v2 14/17] ARM: dts: mvebu: armada-398: update the dtsi about
- missing interfaces
+Date: Thu,  4 Aug 2016 12:14:18 +0200
+Subject: [PATCH v2 15/17] ARM: dts: mvebu: armada-398-db: enable supported usb
+ interfaces
 In-Reply-To: <1470305660-6601-1-git-send-email-jaz@semihalf.com>
 References: <1470305660-6601-1-git-send-email-jaz@semihalf.com>
-Message-ID: <1470305660-6601-15-git-send-email-jaz@semihalf.com>
+Message-ID: <1470305660-6601-16-git-send-email-jaz@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Beside interfaces described in the armada-39x.dtsi and armada-395.dtsi, the
-Armada 398 SoC family supports 2 additional SATA port (2 ports in one unit)
+The Marvell Armada 398 Development board contains both USB2.0 and USB3.0
+ports, which can be handled by existing drivers.
 
 Signed-off-by: Grzegorz Jaszczyk <jaz@semihalf.com>
 Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- arch/arm/boot/dts/armada-398.dtsi | 10 +++++++++-
- 1 file changed, 9 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/armada-398-db.dts | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/arch/arm/boot/dts/armada-398.dtsi b/arch/arm/boot/dts/armada-398.dtsi
-index fdc2591..234a998 100644
---- a/arch/arm/boot/dts/armada-398.dtsi
-+++ b/arch/arm/boot/dts/armada-398.dtsi
-@@ -44,7 +44,7 @@
-  *     OTHER DEALINGS IN THE SOFTWARE.
-  */
+diff --git a/arch/arm/boot/dts/armada-398-db.dts b/arch/arm/boot/dts/armada-398-db.dts
+index 788c3ba..969b49f 100644
+--- a/arch/arm/boot/dts/armada-398-db.dts
++++ b/arch/arm/boot/dts/armada-398-db.dts
+@@ -108,6 +108,10 @@
+ 				status = "okay";
+ 			};
  
--#include "armada-39x.dtsi"
-+#include "armada-395.dtsi"
- 
- / {
- 	compatible = "marvell,armada398", "marvell,armada390";
-@@ -55,6 +55,14 @@
- 				compatible = "marvell,mv88f6928-pinctrl";
- 				reg = <0x18000 0x20>;
++			usb at 58000 {
++				status = "okay";
++			};
++
+ 			flash at d0000 {
+ 				status = "okay";
+ 				pinctrl-0 = <&nand_pins>;
+@@ -132,6 +136,10 @@
+ 					reg = <0x1000000 0x3f000000>;
+ 				};
  			};
 +
-+			sata at e0000 {
-+				compatible = "marvell,armada-380-ahci";
-+				reg = <0xe0000 0x2000>;
-+				interrupts = <GIC_SPI 28 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&gateclk 30>;
-+				status = "disabled";
++			usb3 at f8000 {
++				status = "okay";
 +			};
  		};
- 	};
- };
+ 
+ 		pcie-controller {
 -- 
 1.8.3.1
