@@ -1,37 +1,35 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Thu, 4 Aug 2016 10:38:51 +0100
-Subject: [PATCH 1/8] ARM: assembler: introduce adr_l, ldr_l and str_l
- macros
-In-Reply-To: <CAKv+Gu9Wyiu38J=K00WKXSeFoDF2vS-3TJAvbz9Yo616GBXSwQ@mail.gmail.com>
-References: <1470238730-30038-1-git-send-email-ard.biesheuvel@linaro.org>
- <1470238730-30038-2-git-send-email-ard.biesheuvel@linaro.org>
- <20160803180934.GK1041@n2100.armlinux.org.uk>
- <CAKv+Gu9Wyiu38J=K00WKXSeFoDF2vS-3TJAvbz9Yo616GBXSwQ@mail.gmail.com>
-Message-ID: <20160804093851.GD7147@e103592.cambridge.arm.com>
+From: mbrugger@suse.com (Matthias Brugger)
+Date: Thu,  4 Aug 2016 11:15:17 +0200
+Subject: [PATCH 4/4] arm64: hibernate: Check for broadcast TLBI support
+In-Reply-To: <1470302117-32296-1-git-send-email-mbrugger@suse.com>
+References: <1470302117-32296-1-git-send-email-mbrugger@suse.com>
+Message-ID: <1470302117-32296-5-git-send-email-mbrugger@suse.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 04, 2016 at 09:40:50AM +0200, Ard Biesheuvel wrote:
-> On 3 August 2016 at 20:09, Russell King - ARM Linux
-> <linux@armlinux.org.uk> wrote:
-> > On Wed, Aug 03, 2016 at 05:38:43PM +0200, Ard Biesheuvel wrote:
-> >> +     add     \dst, pc, #:pc_g0_nc:(\sym) - 8
-> >> +     add     \dst, \dst, #:pc_g1_nc:(\sym) - 4
-> >> +     add     \dst, \dst, #:pc_g2:(\sym)
-> >
-> > What's this :pc_g0_nc: stuff?  What binutils versions is it supported
-> > in?  It doesn't appear documented in gas 2.23.91, so I don't think we
-> > can use it.
-> >
-> 
-> binutils 2.18 and up
+Hibernation makes use of broadcast TLBI. Error out
+early when this is not supported by the hardware.
 
-I think this was contemporary with GCC 4.<some middling version>, which
-may be newer than the minimimum compiler we require for the kernel,
-particular for earlier arch versions.
+Signed-off-by: Matthias Brugger <mbrugger@suse.com>
+---
+ arch/arm64/kernel/hibernate.c | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-Using .reloc probably allows the same thing to be done in a more
-backwards-compatible way.
-
-Cheers
----Dave
+diff --git a/arch/arm64/kernel/hibernate.c b/arch/arm64/kernel/hibernate.c
+index 21ab5df..7269642 100644
+--- a/arch/arm64/kernel/hibernate.c
++++ b/arch/arm64/kernel/hibernate.c
+@@ -481,6 +481,11 @@ static int check_boot_cpu_online_pm_callback(struct notifier_block *nb,
+ 
+ static int __init check_boot_cpu_online_init(void)
+ {
++	if (cpus_have_cap(ARM64_HAS_NO_BCAST_TLBI)) {
++		pr_err("Can't hibernate: missing broadcast TLBI support.\n");
++		return -EINVAL;
++	}
++
+ 	/*
+ 	 * Set this pm_notifier callback with a lower priority than
+ 	 * cpu_hotplug_pm_callback, so that cpu_hotplug_pm_callback will be
+-- 
+2.6.6
