@@ -1,109 +1,122 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Thu,  4 Aug 2016 10:53:20 -0600
-Subject: [PATCH V4 2/6] perf: Passing struct perf_event to function setup_aux()
+Date: Thu,  4 Aug 2016 10:53:19 -0600
+Subject: [PATCH V4 1/6] perf/core: Adding PMU driver specific configuration
 In-Reply-To: <1470329604-14356-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1470329604-14356-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1470329604-14356-3-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1470329604-14356-2-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some information, like driver specific configuration, is found
-in the hw_perf_event  structure.  As such pass a 'struct perf_event'
-to function setup_aux() rather than just the CPU number so that
-individual drivers can make the right configuration when setting
-up a session.
+This patch somewhat mimics the work done on address filters to
+add the infrastructure needed to pass PMU specific HW
+configuration to the driver before a session starts.
 
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-Cc: Alexander Shishkin <alexander.shishkin@linux.intel.com>
 ---
- arch/x86/events/intel/bts.c                      | 4 +++-
- arch/x86/events/intel/pt.c                       | 5 +++--
- drivers/hwtracing/coresight/coresight-etm-perf.c | 4 ++--
- include/linux/perf_event.h                       | 2 +-
- kernel/events/ring_buffer.c                      | 2 +-
- 5 files changed, 10 insertions(+), 7 deletions(-)
+ include/linux/perf_event.h            |  9 +++++++++
+ include/uapi/linux/perf_event.h       |  1 +
+ kernel/events/core.c                  | 16 ++++++++++++++++
+ tools/include/uapi/linux/perf_event.h |  1 +
+ 4 files changed, 27 insertions(+)
 
-diff --git a/arch/x86/events/intel/bts.c b/arch/x86/events/intel/bts.c
-index 0a6e393a2e62..98155c2dfcce 100644
---- a/arch/x86/events/intel/bts.c
-+++ b/arch/x86/events/intel/bts.c
-@@ -68,8 +68,10 @@ static size_t buf_size(struct page *page)
- }
- 
- static void *
--bts_buffer_setup_aux(int cpu, void **pages, int nr_pages, bool overwrite)
-+bts_buffer_setup_aux(struct perf_event *event, void **pages,
-+		     int nr_pages, bool overwrite)
- {
-+	int cpu = event->cpu;
- 	struct bts_buffer *buf;
- 	struct page *page;
- 	int node = (cpu == -1) ? cpu : cpu_to_node(cpu);
-diff --git a/arch/x86/events/intel/pt.c b/arch/x86/events/intel/pt.c
-index 04bb5fb5a8d7..5178c5de0b19 100644
---- a/arch/x86/events/intel/pt.c
-+++ b/arch/x86/events/intel/pt.c
-@@ -1003,10 +1003,11 @@ static int pt_buffer_init_topa(struct pt_buffer *buf, unsigned long nr_pages,
-  * Return:	Our private PT buffer structure.
-  */
- static void *
--pt_buffer_setup_aux(int cpu, void **pages, int nr_pages, bool snapshot)
-+pt_buffer_setup_aux(struct perf_event *event, void **pages,
-+		    int nr_pages, bool snapshot)
- {
- 	struct pt_buffer *buf;
--	int node, ret;
-+	int node, ret, cpu = event->cpu;
- 
- 	if (!nr_pages)
- 		return NULL;
-diff --git a/drivers/hwtracing/coresight/coresight-etm-perf.c b/drivers/hwtracing/coresight/coresight-etm-perf.c
-index 755125f7917f..f4174f36c5a0 100644
---- a/drivers/hwtracing/coresight/coresight-etm-perf.c
-+++ b/drivers/hwtracing/coresight/coresight-etm-perf.c
-@@ -155,7 +155,7 @@ static void etm_free_aux(void *data)
- 	schedule_work(&event_data->work);
- }
- 
--static void *etm_setup_aux(int event_cpu, void **pages,
-+static void *etm_setup_aux(struct perf_event *event, void **pages,
- 			   int nr_pages, bool overwrite)
- {
- 	int cpu;
-@@ -163,7 +163,7 @@ static void *etm_setup_aux(int event_cpu, void **pages,
- 	struct coresight_device *sink;
- 	struct etm_event_data *event_data = NULL;
- 
--	event_data = alloc_event_data(event_cpu);
-+	event_data = alloc_event_data(event->cpu);
- 	if (!event_data)
- 		return NULL;
- 
 diff --git a/include/linux/perf_event.h b/include/linux/perf_event.h
-index 59d61a12cf9d..5275b6594989 100644
+index 7921f4f20a58..59d61a12cf9d 100644
 --- a/include/linux/perf_event.h
 +++ b/include/linux/perf_event.h
-@@ -407,7 +407,7 @@ struct pmu {
- 	/*
- 	 * Set up pmu-private data structures for an AUX area
+@@ -168,6 +168,9 @@ struct hw_perf_event {
+ 	/* Last sync'ed generation of filters */
+ 	unsigned long			addr_filters_gen;
+ 
++	/* HW specific configuration */
++	void				*drv_configs;
++
+ /*
+  * hw_perf_event::state flags; used to track the PERF_EF_* state.
+  */
+@@ -442,6 +445,12 @@ struct pmu {
+ 	 * Filter events for PMU-specific reasons.
  	 */
--	void *(*setup_aux)		(int cpu, void **pages,
-+	void *(*setup_aux)		(struct perf_event *event, void **pages,
- 					 int nr_pages, bool overwrite);
- 					/* optional */
+ 	int (*filter_match)		(struct perf_event *event); /* optional */
++
++	/*
++	 * PMU driver specific configuration.
++	 */
++	int (*set_drv_configs)		(struct perf_event *event,
++					 void __user *arg); /* optional */
+ };
  
-diff --git a/kernel/events/ring_buffer.c b/kernel/events/ring_buffer.c
-index ae9b90dc9a5a..56aba90af437 100644
---- a/kernel/events/ring_buffer.c
-+++ b/kernel/events/ring_buffer.c
-@@ -616,7 +616,7 @@ int rb_alloc_aux(struct ring_buffer *rb, struct perf_event *event,
- 			goto out;
+ /**
+diff --git a/include/uapi/linux/perf_event.h b/include/uapi/linux/perf_event.h
+index c66a485a24ac..90fbc5fd3925 100644
+--- a/include/uapi/linux/perf_event.h
++++ b/include/uapi/linux/perf_event.h
+@@ -407,6 +407,7 @@ struct perf_event_attr {
+ #define PERF_EVENT_IOC_ID		_IOR('$', 7, __u64 *)
+ #define PERF_EVENT_IOC_SET_BPF		_IOW('$', 8, __u32)
+ #define PERF_EVENT_IOC_PAUSE_OUTPUT	_IOW('$', 9, __u32)
++#define PERF_EVENT_IOC_SET_DRV_CONFIGS	_IOW('$', 10, char *)
+ 
+ enum perf_event_ioc_flags {
+ 	PERF_IOC_FLAG_GROUP		= 1U << 0,
+diff --git a/kernel/events/core.c b/kernel/events/core.c
+index 79dae188a987..9208e6ec036f 100644
+--- a/kernel/events/core.c
++++ b/kernel/events/core.c
+@@ -4457,6 +4457,8 @@ static int perf_event_set_output(struct perf_event *event,
+ 				 struct perf_event *output_event);
+ static int perf_event_set_filter(struct perf_event *event, void __user *arg);
+ static int perf_event_set_bpf_prog(struct perf_event *event, u32 prog_fd);
++static int perf_event_set_drv_configs(struct perf_event *event,
++				      void __user *arg);
+ 
+ static long _perf_ioctl(struct perf_event *event, unsigned int cmd, unsigned long arg)
+ {
+@@ -4526,6 +4528,10 @@ static long _perf_ioctl(struct perf_event *event, unsigned int cmd, unsigned lon
+ 		rcu_read_unlock();
+ 		return 0;
  	}
++
++	case PERF_EVENT_IOC_SET_DRV_CONFIGS:
++		return perf_event_set_drv_configs(event, (void __user *)arg);
++
+ 	default:
+ 		return -ENOTTY;
+ 	}
+@@ -4558,6 +4564,7 @@ static long perf_compat_ioctl(struct file *file, unsigned int cmd,
+ 	switch (_IOC_NR(cmd)) {
+ 	case _IOC_NR(PERF_EVENT_IOC_SET_FILTER):
+ 	case _IOC_NR(PERF_EVENT_IOC_ID):
++	case _IOC_NR(PERF_EVENT_IOC_SET_DRV_CONFIGS):
+ 		/* Fix up pointer size (usually 4 -> 8 in 32-on-64-bit case */
+ 		if (_IOC_SIZE(cmd) == sizeof(compat_uptr_t)) {
+ 			cmd &= ~IOCSIZE_MASK;
+@@ -7633,6 +7640,15 @@ void perf_bp_event(struct perf_event *bp, void *data)
+ }
+ #endif
  
--	rb->aux_priv = event->pmu->setup_aux(event->cpu, rb->aux_pages, nr_pages,
-+	rb->aux_priv = event->pmu->setup_aux(event, rb->aux_pages, nr_pages,
- 					     overwrite);
- 	if (!rb->aux_priv)
- 		goto out;
++static int perf_event_set_drv_configs(struct perf_event *event,
++				  void __user *arg)
++{
++	if (!event->pmu->set_drv_configs)
++		return -EINVAL;
++
++	return event->pmu->set_drv_configs(event, arg);
++}
++
+ /*
+  * Allocate a new address filter
+  */
+diff --git a/tools/include/uapi/linux/perf_event.h b/tools/include/uapi/linux/perf_event.h
+index c66a485a24ac..90fbc5fd3925 100644
+--- a/tools/include/uapi/linux/perf_event.h
++++ b/tools/include/uapi/linux/perf_event.h
+@@ -407,6 +407,7 @@ struct perf_event_attr {
+ #define PERF_EVENT_IOC_ID		_IOR('$', 7, __u64 *)
+ #define PERF_EVENT_IOC_SET_BPF		_IOW('$', 8, __u32)
+ #define PERF_EVENT_IOC_PAUSE_OUTPUT	_IOW('$', 9, __u32)
++#define PERF_EVENT_IOC_SET_DRV_CONFIGS	_IOW('$', 10, char *)
+ 
+ enum perf_event_ioc_flags {
+ 	PERF_IOC_FLAG_GROUP		= 1U << 0,
 -- 
 2.7.4
