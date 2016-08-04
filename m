@@ -1,63 +1,107 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu,  4 Aug 2016 10:21:52 +0100
-Subject: [PATCH 8/9] remoteproc: core: Skip resource table integrity checks if
- there are amendments
+Date: Thu,  4 Aug 2016 10:21:51 +0100
+Subject: [PATCH 7/9] remoteproc: core: Add function to over-ride current
+ resource table
 In-Reply-To: <20160804092153.23032-1-lee.jones@linaro.org>
 References: <20160804092153.23032-1-lee.jones@linaro.org>
-Message-ID: <20160804092153.23032-9-lee.jones@linaro.org>
+Message-ID: <20160804092153.23032-8-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is little point wasting CPU cycles completing integrity checking
-(i.e. ensuring nothing has changed) on the resource table if we *know*
-that it will be changed (by us).  In this patch we skip resource table
-integrity checks if a platform-specific remoteproc driver has requested
-an amendment or an appended entry.
+Most of the new resource table handling function are now in place, so
+it's time to put it all together.  Once new resource table information
+has been requested, the structures will be held in a holding pen until
+boot-time.  During boot-time rproc_apply_resource_overrides() will be
+invoked which in turn will pull the new information out of the holding
+pen and edit the table accordingly.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/remoteproc/remoteproc_core.c | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+ drivers/remoteproc/remoteproc_core.c | 65 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 65 insertions(+)
 
 diff --git a/drivers/remoteproc/remoteproc_core.c b/drivers/remoteproc/remoteproc_core.c
-index 6b4e29a..9a077e4 100644
+index 111350e..6b4e29a 100644
 --- a/drivers/remoteproc/remoteproc_core.c
 +++ b/drivers/remoteproc/remoteproc_core.c
-@@ -1126,6 +1126,10 @@ static int rproc_fw_boot(struct rproc *rproc, const struct firmware *fw)
- 	rproc->bootaddr = rproc_get_boot_addr(rproc, fw);
- 	ret = -EINVAL;
+@@ -1035,6 +1035,65 @@ rproc_add_resource_table_entry(struct rproc *rproc,
+ 	return table;
+ }
  
-+	/* If we've overridden the resource table, we know it's changed. */
-+	if (!list_empty(&rproc->override_resources))
-+		goto skip_table_check;
++static struct resource_table*
++rproc_apply_resource_overrides(struct rproc *rproc,
++			       struct resource_table **orig_table,
++			       int *tablesz)
++{
++	struct rproc_request_resource *resource;
++	struct resource_table *table = *orig_table;
++	int size = *tablesz;
 +
- 	/* look for the resource table */
- 	table = rproc_find_rsc_table(rproc, fw, &tablesz);
- 	if (!table) {
-@@ -1139,6 +1143,8 @@ static int rproc_fw_boot(struct rproc *rproc, const struct firmware *fw)
- 		goto clean_up;
- 	}
++	if (!table && size != 0) {
++		dev_err(&rproc->dev, "No table present but table size is set\n");
++		return ERR_PTR(-EINVAL);
++	}
++
++	mutex_lock(&rproc->lock);
++
++	rproc_dump_resource_table(rproc, table, size);
++
++	if (!table) {
++		size = sizeof(*table);
++		table = devm_kzalloc(&rproc->dev, size, GFP_KERNEL);
++		if (!table) {
++			table = ERR_PTR(-ENOMEM);
++			goto out;
++		}
++		table->ver = 1;
++	}
++
++	list_for_each_entry(resource, &rproc->override_resources, node) {
++		int updated = 0;
++
++		/* If we already have a table, update it with the new values. */
++		updated = rproc_update_resource_table_entry(rproc, resource,
++							    table, size);
++		if (updated < 0) {
++			table = ERR_PTR(updated);
++			goto out;
++		}
++		if (updated)
++			continue;
++
++		/* Didn't find matching resource entry -- creating a new one. */
++		table = rproc_add_resource_table_entry(rproc, resource,
++						       table, &size);
++		if (IS_ERR(table))
++			goto out;
++
++		*orig_table = table;
++	}
++
++	rproc_dump_resource_table(rproc, table, size);
++
++	*tablesz = size;
++
++ out:
++	mutex_unlock(&rproc->lock);
++	return table;
++}
++
+ /*
+  * take a firmware and boot a remote processor with it.
+  */
+@@ -1153,6 +1212,12 @@ static void rproc_fw_config_virtio(const struct firmware *fw, void *context)
+ 	if (!table)
+ 		goto out;
  
-+ skip_table_check:
++	if (!list_empty(&rproc->override_resources)) {
++		table = rproc_apply_resource_overrides(rproc, &table, &tablesz);
++		if (IS_ERR(table))
++			goto out;
++	}
 +
- 	/* handle fw resources which are required to boot rproc */
- 	ret = rproc_handle_resources(rproc, tablesz, rproc_loading_handlers);
- 	if (ret) {
-@@ -1216,10 +1222,15 @@ static void rproc_fw_config_virtio(const struct firmware *fw, void *context)
- 		table = rproc_apply_resource_overrides(rproc, &table, &tablesz);
- 		if (IS_ERR(table))
- 			goto out;
-+
-+		/* No point checking table if we know it *has* changed */
-+		goto skip_table_check;
- 	}
- 
  	rproc->table_csum = crc32(0, table, tablesz);
  
-+ skip_table_check:
-+
  	/*
- 	 * Create a copy of the resource table. When a virtio device starts
- 	 * and calls vring_new_virtqueue() the address of the allocated vring
 -- 
 2.9.0
