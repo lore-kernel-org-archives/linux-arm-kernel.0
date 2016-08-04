@@ -1,118 +1,90 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Thu, 4 Aug 2016 13:28:42 +0300
-Subject: [PATCHv3 07/11] crypto: omap-aes: use runtime_pm autosuspend for
- clock handling
+Date: Thu, 4 Aug 2016 13:28:41 +0300
+Subject: [PATCHv3 06/11] crypto: omap-des: Fix support for unequal lengths
 In-Reply-To: <1470306526-27219-1-git-send-email-t-kristo@ti.com>
 References: <1470306526-27219-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1470306526-27219-8-git-send-email-t-kristo@ti.com>
+Message-ID: <1470306526-27219-7-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Calling runtime PM API at the cra_init/exit is bad for power management
-purposes, as the lifetime for a CRA can be very long. Instead, use
-pm_runtime autosuspend approach for handling the device clocks. Clocks
-are enabled when they are actually required, and autosuspend disables
-these if they have not been used for a sufficiently long time period.
-By default, the timeout value is 1 second.
+From: Lokesh Vutla <a0131933@ti.com>
 
+For cases where total length of an input SGs is not same as
+length of the input data for encryption, omap-des driver
+crashes. This happens in the case when IPsec is trying to use
+omap-des driver.
+
+To avoid this, we copy all the pages from the input SG list
+into a contiguous buffer and prepare a single element SG list
+for this buffer with length as the total bytes to crypt, which is
+similar thing that is done in case of unaligned lengths.
+
+Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+Tested-by: Aparna Balasubramanian <aparnab@ti.com>
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- drivers/crypto/omap-aes.c | 43 ++++++++++++++++---------------------------
- 1 file changed, 16 insertions(+), 27 deletions(-)
+ drivers/crypto/omap-des.c | 27 +++++++++++++++++----------
+ 1 file changed, 17 insertions(+), 10 deletions(-)
 
-diff --git a/drivers/crypto/omap-aes.c b/drivers/crypto/omap-aes.c
-index 4ab53a6..f443042 100644
---- a/drivers/crypto/omap-aes.c
-+++ b/drivers/crypto/omap-aes.c
-@@ -85,6 +85,8 @@
- #define AES_REG_IRQ_DATA_OUT           BIT(2)
- #define DEFAULT_TIMEOUT		(5*HZ)
+diff --git a/drivers/crypto/omap-des.c b/drivers/crypto/omap-des.c
+index 5691434..d0b59f6 100644
+--- a/drivers/crypto/omap-des.c
++++ b/drivers/crypto/omap-des.c
+@@ -521,29 +521,36 @@ static int omap_des_crypt_dma_stop(struct omap_des_dev *dd)
+ 	return 0;
+ }
  
-+#define DEFAULT_AUTOSUSPEND_DELAY	1000
-+
- #define FLAGS_MODE_MASK		0x000f
- #define FLAGS_ENCRYPT		BIT(0)
- #define FLAGS_CBC		BIT(1)
-@@ -238,11 +240,19 @@ static void omap_aes_write_n(struct omap_aes_dev *dd, u32 offset,
- 
- static int omap_aes_hw_init(struct omap_aes_dev *dd)
+-static int omap_des_copy_needed(struct scatterlist *sg)
++static int omap_des_copy_needed(struct scatterlist *sg, int total)
  {
-+	int err;
++	int len = 0;
 +
- 	if (!(dd->flags & FLAGS_INIT)) {
- 		dd->flags |= FLAGS_INIT;
- 		dd->err = 0;
++	if (!IS_ALIGNED(total, DES_BLOCK_SIZE))
++		return -1;
++
+ 	while (sg) {
+ 		if (!IS_ALIGNED(sg->offset, 4))
+ 			return -1;
+ 		if (!IS_ALIGNED(sg->length, DES_BLOCK_SIZE))
+ 			return -1;
++
++		len += sg->length;
+ 		sg = sg_next(sg);
  	}
- 
-+	err = pm_runtime_get_sync(dd->dev);
-+	if (err < 0) {
-+		dev_err(dd->dev, "failed to get sync: %d\n", err);
-+		return err;
-+	}
++
++	if (len != total)
++		return -1;
 +
  	return 0;
  }
  
-@@ -520,6 +530,9 @@ static void omap_aes_finish_req(struct omap_aes_dev *dd, int err)
- 	pr_debug("err: %d\n", err);
- 
- 	crypto_finalize_request(dd->engine, req, err);
-+
-+	pm_runtime_mark_last_busy(dd->dev);
-+	pm_runtime_put_autosuspend(dd->dev);
- }
- 
- static int omap_aes_crypt_dma_stop(struct omap_aes_dev *dd)
-@@ -761,23 +774,6 @@ static int omap_aes_ctr_decrypt(struct ablkcipher_request *req)
- 
- static int omap_aes_cra_init(struct crypto_tfm *tfm)
+ static int omap_des_copy_sgs(struct omap_des_dev *dd)
  {
--	struct omap_aes_dev *dd = NULL;
--	int err;
+ 	void *buf_in, *buf_out;
+-	int pages;
 -
--	/* Find AES device, currently picks the first device */
--	spin_lock_bh(&list_lock);
--	list_for_each_entry(dd, &dev_list, list) {
--		break;
--	}
--	spin_unlock_bh(&list_lock);
+-	pages = dd->total >> PAGE_SHIFT;
 -
--	err = pm_runtime_get_sync(dd->dev);
--	if (err < 0) {
--		dev_err(dd->dev, "%s: failed to get_sync(%d)\n",
--			__func__, err);
--		return err;
--	}
--
- 	tfm->crt_ablkcipher.reqsize = sizeof(struct omap_aes_reqctx);
+-	if (dd->total & (PAGE_SIZE-1))
+-		pages++;
++	int pages, total;
  
- 	return 0;
-@@ -785,16 +781,6 @@ static int omap_aes_cra_init(struct crypto_tfm *tfm)
+-	BUG_ON(!pages);
++	total = ALIGN(dd->total, DES_BLOCK_SIZE);
++	pages = get_order(total);
  
- static void omap_aes_cra_exit(struct crypto_tfm *tfm)
- {
--	struct omap_aes_dev *dd = NULL;
--
--	/* Find AES device, currently picks the first device */
--	spin_lock_bh(&list_lock);
--	list_for_each_entry(dd, &dev_list, list) {
--		break;
--	}
--	spin_unlock_bh(&list_lock);
--
--	pm_runtime_put_sync(dd->dev);
- }
+ 	buf_in = (void *)__get_free_pages(GFP_ATOMIC, pages);
+ 	buf_out = (void *)__get_free_pages(GFP_ATOMIC, pages);
+@@ -605,8 +612,8 @@ static int omap_des_prepare_req(struct crypto_engine *engine,
+ 	if (dd->out_sg_len < 0)
+ 		return dd->out_sg_len;
  
- /* ********************** ALGS ************************************ */
-@@ -1140,6 +1126,9 @@ static int omap_aes_probe(struct platform_device *pdev)
- 	}
- 	dd->phys_base = res.start;
- 
-+	pm_runtime_use_autosuspend(dev);
-+	pm_runtime_set_autosuspend_delay(dev, DEFAULT_AUTOSUSPEND_DELAY);
-+
- 	pm_runtime_enable(dev);
- 	err = pm_runtime_get_sync(dev);
- 	if (err < 0) {
+-	if (omap_des_copy_needed(dd->in_sg) ||
+-	    omap_des_copy_needed(dd->out_sg)) {
++	if (omap_des_copy_needed(dd->in_sg, dd->total) ||
++	    omap_des_copy_needed(dd->out_sg, dd->total)) {
+ 		if (omap_des_copy_sgs(dd))
+ 			pr_err("Failed to copy SGs for unaligned cases\n");
+ 		dd->sgs_copied = 1;
 -- 
 1.9.1
