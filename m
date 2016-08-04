@@ -1,75 +1,192 @@
-From: brendan.jackman@arm.com (Brendan Jackman)
-Date: Thu, 4 Aug 2016 11:15:15 +0100
-Subject: [PATCH v2 06/14] PM / cpu_domains: Setup PM domains for
- CPUs/clusters
-In-Reply-To: <1469829385-11511-7-git-send-email-lina.iyer@linaro.org>
-References: <1469829385-11511-1-git-send-email-lina.iyer@linaro.org>
- <1469829385-11511-7-git-send-email-lina.iyer@linaro.org>
-Message-ID: <20160804101515.GA29537@brendan-thinkstation>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Thu, 4 Aug 2016 11:17:47 +0100
+Subject: [PATCH] KVM: arm64: ITS: move ITS registration into first VCPU run
+In-Reply-To: <8ef91ad8-d597-bcb7-db46-2a7194f79f32@redhat.com>
+References: <20160803145745.7556-1-andre.przywara@arm.com>
+ <8ef91ad8-d597-bcb7-db46-2a7194f79f32@redhat.com>
+Message-ID: <894b8d50-f073-1835-372f-1d90856cc8f5@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lina,
+Hi Eric,
 
-On Fri, Jul 29, 2016 at 03:56:17PM -0600, Lina Iyer wrote:
-> +static struct generic_pm_domain *of_get_cpu_domain(struct device_node *dn,
-> +		const struct cpu_pd_ops *ops, int cpu)
-> +{
-> +	struct of_phandle_args args;
-> +	struct generic_pm_domain *genpd, *parent;
-> +	struct cpu_pm_domain *cpu_pd, *parent_cpu_pd;
-> +	int ret;
-> +
-> +	/* Do we have this domain? If not, create the domain */
-> +	args.np = dn;
-> +	args.args_count = 0;
-> +
-> +	genpd = of_genpd_get_from_provider(&args);
-> +	if (!IS_ERR(genpd))
-> +		return genpd;
-> +
-> +	genpd = of_init_cpu_pm_domain(dn, ops);
-> +	if (IS_ERR(genpd))
-> +		return genpd;
-> +
-> +	/* Is there a domain provider for this domain? */
-> +	ret = of_parse_phandle_with_args(dn, "power-domains",
-> +			"#power-domain-cells", 0, &args);
-> +	if (ret < 0)
-> +		goto skip_parent;
-> +
-> +	/* Find its parent and attach this domain to it, recursively */
-> +	parent = of_get_cpu_domain(args.np, ops, cpu);
-> +	if (IS_ERR(parent))
-> +		goto skip_parent;
-> +
-> +	ret = pm_genpd_add_subdomain(genpd, parent);
+On 04/08/16 11:11, Auger Eric wrote:
+> Hi Andre,
+> 
+> On 03/08/2016 16:57, Andre Przywara wrote:
+>> Currently we register ITS devices upon userland issuing the CTRL_INIT
+>> ioctl to mark initialization of the ITS as done.
+>> This deviates from the initialization sequence of the existing GIC
+>> devices and does not play well with the way QEMU handles things.
+>> To be more in line with what we are used to, register the ITS(es) just
+>> before the first VCPU is about to run, so in the map_resources() call.
+>> This involves iterating through the list of KVM devices and handle each
+>> ITS that we find.
+>>
+>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+>> ---
+>> Hi,
+>>
+>> this is based upon next-20160728 plus Christoffer's kvm_device locking
+>> fix from today. Please let me know what tree I should base upon and I
+>> will rebase.
+>> Eric, Christoffer: does that do what you expect? Can QEMU live with that?
+>>
+>> Cheers,
+>> Andre.
+>>
+>>  virt/kvm/arm/vgic/vgic-its.c | 56 ++++++++++++++++++++++++++++++++++++--------
+>>  virt/kvm/arm/vgic/vgic-v3.c  |  6 +++++
+>>  virt/kvm/arm/vgic/vgic.h     |  6 +++++
+>>  3 files changed, 58 insertions(+), 10 deletions(-)
+>>
+>> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+>> index 07411cf..e677a60 100644
+>> --- a/virt/kvm/arm/vgic/vgic-its.c
+>> +++ b/virt/kvm/arm/vgic/vgic-its.c
+>> @@ -1288,13 +1288,13 @@ void vgic_enable_lpis(struct kvm_vcpu *vcpu)
+>>  		its_sync_lpi_pending_table(vcpu);
+>>  }
+>>  
+>> -static int vgic_its_init_its(struct kvm *kvm, struct vgic_its *its)
+>> +static int vgic_register_its_iodev(struct kvm *kvm, struct vgic_its *its)
+>>  {
+>>  	struct vgic_io_device *iodev = &its->iodev;
+>>  	int ret;
+>>  
+>> -	if (its->initialized)
+>> -		return 0;
+>> +	if (!its->initialized)
+>> +		return -EBUSY;
+>>  
+>>  	if (IS_VGIC_ADDR_UNDEF(its->vgic_its_base))
+>>  		return -ENXIO;
+>> @@ -1311,9 +1311,6 @@ static int vgic_its_init_its(struct kvm *kvm, struct vgic_its *its)
+>>  				      KVM_VGIC_V3_ITS_SIZE, &iodev->dev);
+>>  	mutex_unlock(&kvm->slots_lock);
+>>  
+>> -	if (!ret)
+>> -		its->initialized = true;
+>> -
+>>  	return ret;
+>>  }
+>>  
+>> @@ -1435,9 +1432,6 @@ static int vgic_its_set_attr(struct kvm_device *dev,
+>>  		if (type != KVM_VGIC_ITS_ADDR_TYPE)
+>>  			return -ENODEV;
+>>  
+>> -		if (its->initialized)
+>> -			return -EBUSY;
+>> -
+>>  		if (copy_from_user(&addr, uaddr, sizeof(addr)))
+>>  			return -EFAULT;
+>>  
+>> @@ -1453,7 +1447,9 @@ static int vgic_its_set_attr(struct kvm_device *dev,
+>>  	case KVM_DEV_ARM_VGIC_GRP_CTRL:
+>>  		switch (attr->attr) {
+>>  		case KVM_DEV_ARM_VGIC_CTRL_INIT:
+>> -			return vgic_its_init_its(dev->kvm, its);
+>> +			its->initialized = true;
+>> +
+>> +			return 0;
+>>  		}
+>>  		break;
+>>  	}
+>> @@ -1498,3 +1494,43 @@ int kvm_vgic_register_its_device(void)
+>>  	return kvm_register_device_ops(&kvm_arm_vgic_its_ops,
+>>  				       KVM_DEV_TYPE_ARM_VGIC_ITS);
+>>  }
+>> +
+>> +/*
+>> + * Registers all ITSes with the kvm_io_bus framework.
+>> + * To follow the existing VGIC initialization sequence, this has to be
+>> + * done as late as possible, just before the first VCPU runs.
+>> + */
+>> +int vgic_register_its_iodevs(struct kvm *kvm)
+>> +{
+>> +	struct kvm_device *dev;
+>> +	int ret = 0;
+>> +
+>> +	mutex_lock(&kvm->devices_lock);
+>> +
+>> +	list_for_each_entry(dev, &kvm->devices, vm_node) {
+>> +		if (dev->ops != &kvm_arm_vgic_its_ops)
+>> +			continue;
+>> +
+>> +		ret = vgic_register_its_iodev(kvm, dev->private);
+>> +		if (ret)
+>> +			break;
+>> +	}
+>> +
+>> +	if (ret) {
+>> +		/* Iterate backwards to roll back previous registrations. */
+>> +		for (dev = list_prev_entry(dev, vm_node);
+>> +		     &dev->vm_node != &kvm->devices;
+>> +		     dev = list_prev_entry(dev, vm_node)) {
+>> +			struct vgic_its *its = dev->private;
+>> +
+>> +			if (dev->ops != &kvm_arm_vgic_its_ops)
+>> +				continue;
+>> +
+>> +			kvm_io_bus_unregister_dev(kvm, KVM_MMIO_BUS,
+>> +						  &its->iodev.dev);
+>> +		}
+>> +	}
+>> +
+>> +	mutex_unlock(&kvm->devices_lock);
+>> +	return ret;
+>> +}
+>> diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
+>> index 0506543..f0d9b2b 100644
+>> --- a/virt/kvm/arm/vgic/vgic-v3.c
+>> +++ b/virt/kvm/arm/vgic/vgic-v3.c
+>> @@ -289,6 +289,12 @@ int vgic_v3_map_resources(struct kvm *kvm)
+>>  		goto out;
+>>  	}
+>>  
+> don't you need to check vgic_has_its() first
 
-Looks like the arguments are the wrong way around here, it should be:
-
-	ret = pm_genpd_add_subdomain(parent, genpd);
-
-> +	if (ret) {
-> +		pr_err("%s: Unable to add sub-domain (%s)\n err: %d",
-> +				__func__, genpd->name, ret);
-> +		return ERR_PTR(ret);
-> +	}
-> +
-> +	/*
-> +	 * Reference parent domain for easy access.
-> +	 * Note: We could be attached to a domain that is not a
-> +	 * CPU PM domain in that case don't reference the parent.
-> +	 */
-> +	cpu_pd = to_cpu_pd(genpd);
-> +	parent_cpu_pd = to_cpu_pd(parent);
-> +
-> +	if (cpu_pd && parent_cpu_pd)
-> +		cpu_pd->parent = parent_cpu_pd;
-> +
-> +skip_parent:
-> +	of_node_put(dn);
-> +	return genpd;
-> +}
+I guess it's nice to do so, though technically it's not necessary, since
+we won't find any KVM devices which use the ITS ops if no ITS has been
+created.
+But since I respin this one anyway...
 
 Cheers,
-Brendan
+Andre.
+
+> Eric
+>> +	ret = vgic_register_its_iodevs(kvm);
+>> +	if (ret) {
+>> +		kvm_err("Unable to register VGIC ITS MMIO regions\n");
+>> +		goto out;
+>> +	}
+>> +
+>>  	dist->ready = true;
+>>  
+>>  out:
+>> diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
+>> index 1d8e21d..6c4625c 100644
+>> --- a/virt/kvm/arm/vgic/vgic.h
+>> +++ b/virt/kvm/arm/vgic/vgic.h
+>> @@ -84,6 +84,7 @@ void vgic_v3_enable(struct kvm_vcpu *vcpu);
+>>  int vgic_v3_probe(const struct gic_kvm_info *info);
+>>  int vgic_v3_map_resources(struct kvm *kvm);
+>>  int vgic_register_redist_iodevs(struct kvm *kvm, gpa_t dist_base_address);
+>> +int vgic_register_its_iodevs(struct kvm *kvm);
+>>  bool vgic_has_its(struct kvm *kvm);
+>>  int kvm_vgic_register_its_device(void);
+>>  void vgic_enable_lpis(struct kvm_vcpu *vcpu);
+>> @@ -140,6 +141,11 @@ static inline int vgic_register_redist_iodevs(struct kvm *kvm,
+>>  	return -ENODEV;
+>>  }
+>>  
+>> +static inline int vgic_register_its_iodevs(struct kvm *kvm)
+>> +{
+>> +	return -ENODEV;
+>> +}
+>> +
+>>  static inline bool vgic_has_its(struct kvm *kvm)
+>>  {
+>>  	return false;
+>>
+> 
