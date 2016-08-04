@@ -1,76 +1,67 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Thu, 4 Aug 2016 12:42:23 +0200
-Subject: [PATCH v2 7/7] drm/mediatek: Fix mtk_atomic_complete for
- runtime_pm
-In-Reply-To: <1470279597-60453-8-git-send-email-bibby.hsieh@mediatek.com>
-References: <1470279597-60453-1-git-send-email-bibby.hsieh@mediatek.com>
- <1470279597-60453-8-git-send-email-bibby.hsieh@mediatek.com>
-Message-ID: <20160804104222.GE6232@phenom.ffwll.local>
+From: eballetbo@gmail.com (Enric Balletbo Serra)
+Date: Thu, 4 Aug 2016 12:35:59 +0200
+Subject: [PATCH 2/2 v16] drm/bridge: Add I2C based driver for ps8640 bridge
+In-Reply-To: <CAKMK7uEkUOq1CB3tj_1Qx50fBpw9B39+c3asX6MPNexT=dv9fA@mail.gmail.com>
+References: <1464861445-11086-1-git-send-email-jitao.shi@mediatek.com>
+ <1464861445-11086-2-git-send-email-jitao.shi@mediatek.com>
+ <CACvgo53002XCPLufbJHQLC1uL1nNS7_0gh=napedetmvT6FoSw@mail.gmail.com>
+ <CAGS+omDsDS5tx=+Efq8LWNd3-asU4r2h=-AE6vdKgfG-p6vdAA@mail.gmail.com>
+ <CAKMK7uEkUOq1CB3tj_1Qx50fBpw9B39+c3asX6MPNexT=dv9fA@mail.gmail.com>
+Message-ID: <CAFqH_53PgPs3_h7XNFEu4u0W6GW7vyWCNFf2vq8Yn7sH2LbFwA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 04, 2016 at 10:59:57AM +0800, Bibby Hsieh wrote:
-> To properly implement atomic w/ runtime pm, we move
-> drm_atomic_helper_commit_modeset_enables() above
-> drm_atomic_helper_commit_planes() to ensure CRTCs are enabled before
-> modifying plane registers, and set active_only to true to filter out
-> plane update notifications when the CRTC is disabled.
-> 
-> According to the document from linux kernel:
-> Set the active_only parameters to true in order not to receive plane
-> update notifications related to a disabled CRTC. This avoids the need
-> to manually ignore plane updates in driver code when the driver and/or
-> hardware can't or just don't need to deal with updates on disabled
-> CRTCs, for example when supporting runtime PM.
-> 
-> Signed-off-by: Bibby Hsieh <bibby.hsieh@mediatek.com>
-> Signed-off-by: Daniel Kurtz <djkurtz@chromium.org>
+2016-07-12 12:13 GMT+02:00 Daniel Vetter <daniel@ffwll.ch>:
+> On Wed, Jun 29, 2016 at 6:31 AM, Daniel Kurtz <djkurtz@chromium.org> wrote:
+>> On Fri, Jun 17, 2016 at 3:14 AM, Emil Velikov <emil.l.velikov@gmail.com> wrote:
+>>>> +static ssize_t ps8640_update_fw_store(struct device *dev,
+>>>> +                                     struct device_attribute *attr,
+>>>> +                                     const char *buf, size_t count)
+>>>> +{
+>>>> +       struct i2c_client *client = to_i2c_client(dev);
+>>>> +       struct ps8640 *ps_bridge = i2c_get_clientdata(client);
+>>>> +       const struct firmware *fw;
+>>>> +       int error;
+>>>> +
+>>>> +       error = request_firmware(&fw, PS_FW_NAME, dev);
+>>> Can the device operate without a firmware ? If not, why is the
+>>> firmware loaded so later/after user interaction (via sysfs) ? I don't
+>>> recall any other driver in DRM to use such an approach.
+>>
+>> The PS8640 has internal flash, so it should always already have a
+>> working firmware.
+>> This sysfs interface is useful for user space initiated field firmware updates.
+>
+> Might be better to just do a request_firmware on driver load, and
+> simply proceed if it's not there. Adding a sysfs interface (which is
+> abi) seems way too much overkill for this imo. If you want to upgrade
+> the firmware you can then just drop it into the right directory, with
+> no further interaction needed.
 
-btw if you want to clean up some more code, would be neat to switch
-mediatek to the generic nonblocking support in the atomic helpers instead
-of rolling your own.
--Daniel
+IMHO I'm not sure if for this use case request_firmware on driver load
+is a good idea. Flash the non-volatile internal chip can be a slow
+operation and if you forget to remove the firmware after drop it into
+the right directory apart from slow down the driver probe you can
+damage the chip depending on the write endurance of the chip.
 
-> ---
->  drivers/gpu/drm/mediatek/mtk_drm_drv.c |   17 ++++++++++++++++-
->  1 file changed, 16 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.c b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-> index b1223d5..507392a 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-> +++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-> @@ -61,10 +61,25 @@ static void mtk_atomic_complete(struct mtk_drm_private *private,
->  
->  	mtk_atomic_wait_for_fences(state);
->  
-> +	/*
-> +	 * Mediatek drm supports runtime PM, so plane registers cannot be
-> +	 * written when their crtc is disabled.
-> +	 *
-> +	 * The comment for drm_atomic_helper_commit states:
-> +	 *     For drivers supporting runtime PM the recommended sequence is
-> +	 *
-> +	 *     drm_atomic_helper_commit_modeset_disables(dev, state);
-> +	 *     drm_atomic_helper_commit_modeset_enables(dev, state);
-> +	 *     drm_atomic_helper_commit_planes(dev, state, true);
-> +	 *
-> +	 * See the kerneldoc entries for these three functions for more details.
-> +	 */
->  	drm_atomic_helper_commit_modeset_disables(drm, state);
-> -	drm_atomic_helper_commit_planes(drm, state, false);
->  	drm_atomic_helper_commit_modeset_enables(drm, state);
-> +	drm_atomic_helper_commit_planes(drm, state, true);
-> +
->  	drm_atomic_helper_wait_for_vblanks(drm, state);
-> +
->  	drm_atomic_helper_cleanup_planes(drm, state);
->  	drm_atomic_state_free(state);
->  }
-> -- 
-> 1.7.9.5
-> 
+This sysfs interface is used on other subsystems when there is a
+non-volatile memory, as example you can see at [1], [2]. Unfortunately
+not all are using the same sysfs interface and maybe this should be
+standardized (maybe it's an opportunity to define it)
 
--- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-http://blog.ffwll.ch
+Regards,
+ Enric
+
+[1] http://lxr.free-electrons.com/source/drivers/input/touchscreen/wdt87xx_i2c.c#L922
+[2] http://lxr.free-electrons.com/source/drivers/scsi/pm8001/pm8001_ctl.c#L732
+
+
+> -Daniel
+> --
+> Daniel Vetter
+> Software Engineer, Intel Corporation
+> +41 (0) 79 365 57 48 - http://blog.ffwll.ch
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
