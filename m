@@ -1,128 +1,95 @@
 From: anurupvasu@gmail.com (Anurup M)
-Date: Thu,  4 Aug 2016 05:07:05 -0400
-Subject: [RFC PATCH v1 01/10] Documentation: arm64: Add Hisilicon HiP05/06/07
- Sysctrl and Djtag dts bindings
+Date: Thu,  4 Aug 2016 05:07:07 -0400
+Subject: [RFC PATCH v1 03/10] arm64:perf: Add Documentaion for HIP05 PMU event
+ counting. 1. Documentaion for perf usage and PMU events.
 In-Reply-To: <1470301634-79736-1-git-send-email-anurup.m@huawei.com>
 References: <1470301634-79736-1-git-send-email-anurup.m@huawei.com>
-Message-ID: <1470301634-79736-2-git-send-email-anurup.m@huawei.com>
+Message-ID: <1470301634-79736-4-git-send-email-anurup.m@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tan Xiaojun <tanxiaojun@huawei.com>
-
-First, add Hisilicon HiP05/06/07 CPU and ALGSUB system controller dts
-bindings. Then, add Hisilicon Djtag dts binding.
-
-Signed-off-by: Tan Xiaojun <tanxiaojun@huawei.com>
 Signed-off-by: Anurup M <anurup.m@huawei.com>
+Signed-off-by: Shaokun Zhang <zhangshaokun@hisilicon.com>
 ---
- .../bindings/arm/hisilicon/hisilicon.txt           | 97 ++++++++++++++++++++++
- 1 file changed, 97 insertions(+)
+ Documentation/perf/hip05-pmu.txt | 70 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 70 insertions(+)
+ create mode 100644 Documentation/perf/hip05-pmu.txt
 
-diff --git a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
-index 83fe816..67256e7 100644
---- a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
-+++ b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
-@@ -249,3 +249,100 @@ Required Properties:
-   [1]: bootwrapper size
-   [2]: relocation physical address
-   [3]: relocation size
+diff --git a/Documentation/perf/hip05-pmu.txt b/Documentation/perf/hip05-pmu.txt
+new file mode 100644
+index 0000000..fd9ca26
+--- /dev/null
++++ b/Documentation/perf/hip05-pmu.txt
+@@ -0,0 +1,70 @@
++Hisilicon Hip05 SoC PMU (Performance Monitoring Unit)
++=====================================================
++The Hisilicon Hip05 chip consists of varous independent system device PMU's
++such as L3 cache (LLC) and Miscellaneous Nodes(MN). These PMU devices are
++independent and have hardware logic to gather statistics and performance
++information.
 +
-+-----------------------------------------------------------------------
-+Hisilicon HiP05 CPU system controller
-+Required properties:
-+- compatible : "hisilicon,hip05-sysctrl", "syscon", "simple-mfd";
-+- reg : Register address and size
-+- djtag :
-+  - compatible : "hisilicon,hip05-cpu-djtag-v1"
-+  - syscon : which sysctrl node
++Hip05 is encapsulated by multiple CPU and IO die's. The CPU die is called as
++Super CPU cluster (SCCL) which includes 16 cpu-cores. Every SCCL is further
++grouped as CPU clusters (CCL) which includes 4 cpu-cores each.
++Each SCCL has 1 L3 cache and 1 MN units.
 +
-+Hisilicon HiP06 CPU system controller
-+Required properties:
-+- compatible : "hisilicon,hip06-sysctrl", "syscon", "simple-mfd";
-+- reg : Register address and size
-+- djtag :
-+  - compatible : "hisilicon,hip06-cpu-djtag-v1"
-+  - syscon : which sysctrl node
++The L3 cache (LLC) is shared by all CPU cores in a CPU die. The LLC has four
++banks (or instances). Each bank or instance of LLC has Eight 32-bit counter
++registers to count the 22 different statistics events. These events are very
++useful for debugging. The LLC support overflow interrupt for its 8 counter
++registers.
 +
-+Hisilicon HiP07 CPU system controller
-+Required properties:
-+- compatible : "hisilicon,hip07-sysctrl", "syscon", "simple-mfd";
-+- reg : Register address and size
-+- djtag :
-+  - compatible : "hisilicon,hip07-cpu-djtag-v2"
-+  - syscon : which sysctrl node
++The MN module is also shared by all CPU cores in a CPU die. It receives
++barriers and DVM(Distributed Virtual Memory) messages from cpu or smmu, and
++perform the required actions and return response messages. These events are
++very useful for debugging. The MN has total 9 statistics events and support
++four 32-bit counter registers. The MN support overflow interrupt for its 4
++counter registers.
 +
-+The Hisilicon HiP05/06/07 CPU system controller is in CPU die of SoC. It is
-+used to control system operation mode, control system operating status and
-+manage some important components (such as clock, reset, soft reset, secure
-+debugger, etc.). We can also configure some functions of the peripheral
-+devices and query their status by it.
++There is no memory mapping for L3 cache and MN. It can be accessed by using
++the Hisilicon djtag interface. The Djtag in a SCCL is an independent module
++which connects with some modules in the SoC by Debug Bus.
 +
-+The Hisilicon Djtag in CPU die is an independent component which connects with
-+some other components in the SoC by Debug Bus. This driver can be configured
-+to access the registers of connecting components (like L3 cache) during real
-+time debugging by sysctrl.
++HIP05 PMU driver
++----------------
++The HIP05 PMU driver shall register perf PMU drivers for L3 cache and MN.
++The available events and configuration options shall be described in the sysfs.
++The "perf list" shall list the available events from sysfs.
++eg. hip05_l3c/read_allocate,cpu_die=?,bank=?/ [kernel PMU event]
 +
-+Example:
-+	/* for Hisilicon HiP05 sysctrl */
-+	hip05-sysctrl: hip05-sysctrl at 80010000 {
-+		compatible = "hisilicon,hip05-sysctrl", "syscon", "simple-mfd";
-+		reg = <0x80010000 0x10000>;
++The event code contains the information about the cpudie, module, banks and
++the event code.
++These are represented in Perf event attributes as
++	i) event 0-11
++		The event code will be represented using the LSB 12 bits.
++	ii) bank 12-15
++		The Banks or no of instances are with 4 bits. For PMU which
++		have only single instance, this field will be ignored. For L3
++		Cache, this will identify the bank. The 0xf value shall sum the
++		count in all available banks.
++	iii) cpu_cluster 16-19
++		This identfies the CPU cluster (CCL) which share this PMU. For
++		L3 Cache, MN, DDRC etc. which are shared for a SCCL, this field
++		will be	ignored. For modules shared by a CPU cluster this can
++		represent the cluster ID. This filed is reserved and unused now.
++	iv) cpu_die 20-23
++		This identfies the supper CPU cluster (SCCL) which share this
++		PMU. For L3 Cache, MN, DDRC etc. which are shared for a SCCL
++		this field represent the CPU die ID or (SCCL ID).
 +
-+		djtag0: djtag at 0 {
-+		       compatible = "hisilicon,hip05-cpu-djtag-v1";
-+		       syscon = <&hip05-sysctrl>;
-+		};
-+	};
++Example usage of perf:
++$# perf list
++hisi_l3c/read_allocate,cpu_die=?,bank=?/ [kernel PMU event]
++hisi_l3c/read_hit,cpu_die=?,bank=?/ [kernel PMU event]
++hisi_l3c/write_hit,cpu_die=?,bank=?/ [kernel PMU event]
++-------------------------------------------------------
++-------------------------------------------------------
 +
-+	/* for Hisilicon HiP05 L3 cache maybe set like below */
-+	l3c0: l3c {
-+		compatible = "hisilicon,hip05-l3c";
-+		djtag = <&djtag0>;
-+	};
++$# perf stat -a -e hisi_l3c/read_allocate,cpu_die=0x2,bank=0xf/ sleep 5
 +
-+-----------------------------------------------------------------------
-+Hisilicon HiP05 ALGSUB system controller
-+Required properties:
-+- compatible : "hisilicon,hip05-alg-sysctrl", "syscon", "simple-mfd";
-+- reg : Register address and size
-+- djtag :
-+  - compatible : "hisilicon,hip05-io-djtag-v1"
-+  - syscon : which sysctrl node
++$# perf stat -C 0 -A -e hisi_l3c/read_allocate,cpu_die=0x2,bank=0xf/ ls -l
 +
-+Hisilicon HiP06 ALGSUB system controller
-+Required properties:
-+- compatible : "hisilicon,hip06-alg-sysctrl", "syscon", "simple-mfd";
-+- reg : Register address and size
-+- djtag :
-+  - compatible : "hisilicon,hip06-io-djtag-v2"
-+  - syscon : which sysctrl node
-+
-+Hisilicon HiP07 ALGSUB system controller
-+Required properties:
-+- compatible : "hisilicon,hip07-alg-sysctrl", "syscon", "simple-mfd";
-+- reg : Register address and size
-+- djtag :
-+  - compatible : "hisilicon,hip07-io-djtag-v2"
-+  - syscon : which sysctrl node
-+
-+The Hisilicon HiP05/06/07 ALGSUB system controller is in IO die of SoC. It
-+has a similar function as the Hisilicon HiP05/06/07 CPU system controller
-+in CPU die and it manage different components, like RSA, etc.
-+
-+The Hisilicon Djtag in IO die has a similar function as the one in CPU die.
-+
-+Example:
-+	/* for Hisilicon HiP05 alg subctrl */
-+	hip05-alg-sysctrl: hip05-alg-sysctrl at d0000000 {
-+		compatible = "hisilicon,hip05-alg-sysctrl", "syscon", "simple-mfd";
-+		reg = <0xd0000000 0x10000>;
-+
-+		djtag0: djtag at 0 {
-+		       compatible = "hisilicon,hip05-io-djtag-v1";
-+		       syscon = <&hip05-alg-sysctrl>;
-+		};
-+	};
++The current driver doesnot support sampling. so "perf record" is unsupported.
++Also attach to a task is unsupported as the events are all uncore.
 -- 
 2.1.4
