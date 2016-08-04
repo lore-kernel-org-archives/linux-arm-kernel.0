@@ -1,98 +1,84 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Fri, 05 Aug 2016 00:42:08 +0200
-Subject: [PATCH v4 2/7] clk: rockchip: add new clock-type for the ddrclk
-In-Reply-To: <2163567.7aYA2GN16A@diego>
-References: <1469779021-10426-1-git-send-email-hl@rock-chips.com>
- <1469779021-10426-3-git-send-email-hl@rock-chips.com>
- <2163567.7aYA2GN16A@diego>
-Message-ID: <9078133.mu38cJQ6PH@phil>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Thu, 04 Aug 2016 15:58:55 -0700
+Subject: [PATCH v2 1/2] ARM64: dts: meson-gxbb: add MMC support
+In-Reply-To: <20160804181556.GA13000@rob-hp-laptop> (Rob Herring's message of
+ "Thu, 4 Aug 2016 13:15:56 -0500")
+References: <20160803231843.23012-1-khilman@baylibre.com>
+ <20160804181556.GA13000@rob-hp-laptop>
+Message-ID: <m2oa58nntc.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 4. August 2016, 22:23:05 schrieb Heiko St?bner:
-> Hi Lin,
-> 
-> Am Freitag, 29. Juli 2016, 15:56:56 schrieb Lin Huang:
-> > On new rockchip platform(rk3399 etc), there have dcf controller to
-> > do ddr frequency scaling, and this controller will implement in
-> > arm-trust-firmware. We add a special clock-type to handle that.
-> > 
-> > Signed-off-by: Lin Huang <hl@rock-chips.com>
-> 
-> please also include the ARM people from last time in your list.
-> The arm_smccc_smc calls look correct on first glance, but there is only
-> one other example in the kernel [0] outside psci that is using it, so I'd
-> like some confirmation that we're doing the right thing :-)
-> 
-> 
-> [0]
-> http://lxr.free-electrons.com/source/arch/arm/mach-artpec/board-artpec6.c
-> #L55
-> > diff --git a/drivers/clk/rockchip/clk.h b/drivers/clk/rockchip/clk.h
-> > index bac775d..2e3bccf 100644
-> > --- a/drivers/clk/rockchip/clk.h
-> > +++ b/drivers/clk/rockchip/clk.h
-> > @@ -281,6 +281,13 @@ struct clk *rockchip_clk_register_mmc(const char
-> > *name, const char *const *parent_names, u8 num_parents,
-> > 
-> >  				void __iomem *reg, int shift);
-> > 
-> > +struct clk *rockchip_clk_register_ddrclk(const char *name, int flags,
-> > +			const char *const *parent_names, u8 num_parents,
-> > +			int mux_offset, int mux_shift, int mux_width,
-> > +			int mux_flag, int div_shift, int div_width,
-> > +			int div_flag, void __iomem *reg_base,
-> > +			spinlock_t *lock);
-> > +
-> > 
-> >  #define ROCKCHIP_INVERTER_HIWORD_MASK	BIT(0)
-> >  
-> >  struct clk *rockchip_clk_register_inverter(const char *name,
-> > 
-> > @@ -299,6 +306,7 @@ enum rockchip_clk_branch_type {
-> > 
-> >  	branch_mmc,
-> >  	branch_inverter,
-> >  	branch_factor,
-> > 
-> > +	branch_ddrc,
-> > 
-> >  };
-> >  
-> >  struct rockchip_clk_branch {
-> > 
-> > @@ -488,6 +496,25 @@ struct rockchip_clk_branch {
-> > 
-> >  		.child		= ch,				\
-> >  	
-> >  	}
-> > 
-> > +#define COMPOSITE_DDRC(_id, cname, pnames, f, mo, ms, mw, mf,	\
-> > +			 ds, dw, df)				\
-> > +	{							\
-> > +		.id		= _id,				\
-> > +		.branch_type	= branch_ddrc,			\
-> > +		.name		= cname,			\
-> > +		.parent_names	= pnames,			\
-> > +		.num_parents	= ARRAY_SIZE(pnames),		\
-> > +		.flags		= f,				\
-> > +		.muxdiv_offset	= mo,				\
-> > +		.mux_shift	= ms,				\
-> > +		.mux_width	= mw,				\
-> > +		.mux_flags	= mf,				\
-> > +		.div_shift	= ds,				\
-> > +		.div_width	= dw,				\
-> > +		.div_flags	= df,				\
-> 
-> you don't need (nor use) div and mux flags here, please use one flag
-> param like the inverter type does and maybe directly add a flag like
-> 	ROCKCHIP_DDRCLK_SIP
-> for this type.
-> 
-> Background being, that the ddr clock mechanism is essentially the same
-> on all socs and only the method to change the rate varies
-> (sip on rk3399, scpi on rk3368, something sram-based on rk3288 and before)
-> so in the future, this driver should hopefully be able to carry all those
-> different methods.
+Hi Rob,
 
-and maybe name it COMPOSITE_DDRCLK(...)
+Rob Herring <robh@kernel.org> writes:
+
+> On Wed, Aug 03, 2016 at 04:18:42PM -0700, Kevin Hilman wrote:
+>> Add binding and basic support for the SD/eMMC controller on Amlogic
+>> S905/GXBB devices.
+>> 
+>> Signed-off-by: Kevin Hilman <khilman@baylibre.com>
+
+[...]
+
+>> +	mmc_iv: gpio-regulator {
+>> +		compatible = "regulator-gpio";
+>> +
+>> +		regulator-name = "mmc-gpio-supply";
+>> +		regulator-min-microvolt = <1800000>;
+>> +		regulator-max-microvolt = <3300000>;
+>> +
+>> +		gpios = <&gpio_ao GPIOAO_3 GPIO_ACTIVE_HIGH>;
+>> +		gpio-states = <0 1>;
+>> +
+>> +		/*
+>> +		 * Based on ODROID-C2 schematics:
+>> +		 * signal name: IO_TF_3V3N_1V8, GPIOAO bit 3
+>> +		 */
+>> +		states = <3300000 0
+>> +			  1800000 1>;
+>
+> There are multiple things wrong in this node based on the regulator-gpio 
+> documentation.
+
+I see I got the property name wrong, and the number of elements wrong,
+and this fixes those issues:
+
+-               gpio-states = <0 1>;
++               gpios-states = <0>;
+
+By "multiple", did you mean more than those 2?  If so, I'm not seeing
+what else is wrong.
+
+[...]
+
+>> +	mmc_iv: gpio-regulator {
+>> +		compatible = "regulator-gpio";
+>> +
+>> +		regulator-name = "mmc-gpio-supply";
+>> +		regulator-min-microvolt = <1800000>;
+>> +		regulator-max-microvolt = <3300000>;
+>> +
+>> +		gpios = <&gpio_ao GPIOAO_5 GPIO_ACTIVE_HIGH>;
+>> +		gpio-states = <0 1>;
+>> +
+>> +		/* Based on P200 schematics, signal CARD_1.8V/3.3V_CTR */
+>> +		states = <1800000 0
+>> +			  3300000 1>;
+>> +	};
+>> +
+>> +	vddio_boot: regulator {
+> [...]
+>> +	vcc_3v3: regulator {
+>
+> This won't even compile as you have the same node name twice.
+
+Oops, it's wrong indeed, but in fact, it does compile, otherwise I
+would've caught that..  Even if I remove the labels, it still compiles.
+Interesting.
+
+Anyways, I'll make those unique node-names in the next spin.
+
+Thanks for the review,
+
+Kevin
