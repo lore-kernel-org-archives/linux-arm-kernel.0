@@ -1,213 +1,196 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Thu,  4 Aug 2016 17:22:26 +0100
-Subject: [PATCH v2 2/2] coresight: fix handling of ETM trace register access
- via sysfs
-In-Reply-To: <1470240752-17331-2-git-send-email-sudeep.holla@arm.com>
-References: <1470240752-17331-2-git-send-email-sudeep.holla@arm.com>
-Message-ID: <1470327746-21904-1-git-send-email-sudeep.holla@arm.com>
+From: lina.iyer@linaro.org (Lina Iyer)
+Date: Thu, 4 Aug 2016 10:28:44 -0600
+Subject: [PATCH v2 02/14] dt/bindings: update binding for PM domain idle
+ states
+In-Reply-To: <20160804152453.GB1732@brendan-thinkstation>
+References: <1469829385-11511-1-git-send-email-lina.iyer@linaro.org>
+ <1469829385-11511-3-git-send-email-lina.iyer@linaro.org>
+ <20160804152453.GB1732@brendan-thinkstation>
+Message-ID: <20160804162844.GC1207@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ETM registers are classified into 2 categories: trace and management.
-The core power domain contains most of the trace unit logic including
-all(except TRCOSLAR and TRCOSLSR) the trace registers. The debug power
-domain contains the external debugger interface including all management
-registers.
+Hi Brenden,
 
-This patch adds coresight unit specific function coresight_simple_func
-which can be used for ETM trace registers by providing a ETM specific
-read function which does smp cross call to ensure the trace core is
-powered up before the register is accessed.
+On Thu, Aug 04 2016 at 09:24 -0600, Brendan Jackman wrote:
+>Hi Lina,
+>
+>These bindings are the reason for my interest in this patchset; I'm hoping to be
+>able to do some work based on them in order to generically describe the cost of
+>idle states for use in the Energy Aware Scheduling (EAS)[1] energy model.
+>
+I think that's a fair idea - idle states accounting their own cost.
 
-Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
----
- drivers/hwtracing/coresight/coresight-etb10.c      |  2 +-
- .../hwtracing/coresight/coresight-etm3x-sysfs.c    |  2 +-
- .../hwtracing/coresight/coresight-etm4x-sysfs.c    | 62 ++++++++++++++++------
- drivers/hwtracing/coresight/coresight-priv.h       |  9 +++-
- drivers/hwtracing/coresight/coresight-stm.c        |  2 +-
- drivers/hwtracing/coresight/coresight-tmc.c        |  2 +-
- 6 files changed, 57 insertions(+), 22 deletions(-)
+>Mark Rutland expressed concern [2] in the thread for the previous version of
+>this patchset that there are now two possible locations for the list of idle
+>states; that hasn't been addressed. My own instinct is that this is OK: in the
+>real world, power domain (e.g. cluster) idle states are a property of the power
+>domain and not of the CPU it contains - the DT should reflect this.
+>
+Absolutely.
 
-Changes v1->v2:
-	- s/etmv4_reg/etmv4_reg/
-	- s/etmv4_chk_trace_reg_access/etmv4_cross_read/
-	- s/coresight_etm4x_trace_reg_func/coresight_etm4x_cross_read/
-	- Removed stale macro defination
-	- Added a comment mentioning that the smp cross reading of the
-	  trace registers guarantees the core power domain is enabled.
+>However, since there are existing platform DTs with cluster-level suspend states
+>(which are platform-coordinated rather than OS-initiated) in cpu-idle-states, do
+>we have a backwards-compatibility issue? e.g. say we have a platform with a DT
+>like this:
+>
+Your concern is very valid and this is the exactly the difference
+between Platform coordinated (PC) mode and OS-Initiated (OSI) mode. In
+PC, the domain state is an extension of the CPU state and rightful place
+for that is the cpu-idle-states property. Just like the example you
+have.
 
-diff --git a/drivers/hwtracing/coresight/coresight-etb10.c b/drivers/hwtracing/coresight/coresight-etb10.c
-index 8a4927ca9181..d7325c6534ad 100644
---- a/drivers/hwtracing/coresight/coresight-etb10.c
-+++ b/drivers/hwtracing/coresight/coresight-etb10.c
-@@ -559,7 +559,7 @@ static const struct file_operations etb_fops = {
- };
+>	cpu at 0 {
+>		/*...*/
+>		cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
+>	};
+>
+>	idle-states {
+>		CPU_SLEEP: cpu-sleep {
+>			/*...*/
+>		};
+>		CLUSTER_SLEEP: cluster-sleep {
+>			/*...*/
+>		};
+>	};
+>
+>and in order to enable OS-initiated cluster suspend it changes to this:
+>
+Platforms that have OSI will have this format you mention below. If the
+platform supports the OSI it will respond to the PSCI_FEATURES and
+PSCI_SET_SUSPEND mode (patch 10 of this series). If the OSI mode is
+available snd if the DT has the domains defined for the CPU, then the
+OSI mode is chosen otherwise, it reverts to using PC mode. This code
+snippet from my patches does exactly that -
 
- #define coresight_etb10_simple_func(name, offset)                       \
--	coresight_simple_func(struct etb_drvdata, name, offset)
-+	coresight_simple_func(struct etb_drvdata, NULL, name, offset)
+if (psci_has_osi_pd) {
+        int ret;
+        const struct cpu_pd_ops psci_pd_ops = {
+                .populate_state_data = psci_pd_populate_state_data,
+                .power_off = psci_pd_power_off,
+        };
 
- coresight_etb10_simple_func(rdp, ETB_RAM_DEPTH_REG);
- coresight_etb10_simple_func(sts, ETB_STATUS_REG);
-diff --git a/drivers/hwtracing/coresight/coresight-etm3x-sysfs.c b/drivers/hwtracing/coresight/coresight-etm3x-sysfs.c
-index 02d4b629891f..4856c8098416 100644
---- a/drivers/hwtracing/coresight/coresight-etm3x-sysfs.c
-+++ b/drivers/hwtracing/coresight/coresight-etm3x-sysfs.c
-@@ -1222,7 +1222,7 @@ static struct attribute *coresight_etm_attrs[] = {
- };
+        ret = of_setup_cpu_pd_single(cpu, &psci_pd_ops);
+        if (!ret)
+                ret = psci_set_suspend_mode_osi(true);
+        if (ret)
+                pr_warn("CPU%d: Error setting PSCI OSI mode\n", cpu);
+}
 
- #define coresight_etm3x_simple_func(name, offset)			\
--	coresight_simple_func(struct etm_drvdata, name, offset)
-+	coresight_simple_func(struct etm_drvdata, NULL, name, offset)
+>	cpu at 0 {
+>		/*...*/
+>		cpu-idle-states = <&CPU_SLEEP>;
+>		power-domains = <CPU_PD>;
+>	};
+>
+>	idle-states {
+>		CPU_SLEEP: cpu-sleep {
+>			/*...*/
+>		};
+>	};
+>
+>	/*... elsewhere ... */
+>
+>	CLUSTER_SLEEP: cluster-sleep {
+>		/*...*/
+>	};
+>
+>	CPU_PD {
+>	/*...*/
+>		idle-states = <&CLUSTER_SLEEP>;
+>	};
+>
+>Then old kernels which don't have CPU PM Domains will lose the ability to
+>suspend clusters. I've phrased this as a question because I'm not clear on what
+>we require in terms of backwards/forwards compatibility with DTs - excuse my
+>ignorance. What are your thoughts on this?
+>
+So, if the DT has only support for cluster modes in cpu-idle-states and
+not the OSI specific representation, then it would continue to use only
+PC mode to power down the cluster, even though the firmware may have
+been updated to support OSI.
 
- coresight_etm3x_simple_func(etmccr, ETMCCR);
- coresight_etm3x_simple_func(etmccer, ETMCCER);
-diff --git a/drivers/hwtracing/coresight/coresight-etm4x-sysfs.c b/drivers/hwtracing/coresight/coresight-etm4x-sysfs.c
-index 7c84308c5564..fd7ff613db17 100644
---- a/drivers/hwtracing/coresight/coresight-etm4x-sysfs.c
-+++ b/drivers/hwtracing/coresight/coresight-etm4x-sysfs.c
-@@ -2039,15 +2039,42 @@ static struct attribute *coresight_etmv4_attrs[] = {
- 	NULL,
- };
+That means, all the existing platforms will continue to work the way
+they do even with these patches in place.
 
-+struct etmv4_reg {
-+	void __iomem *addr;
-+	u32 data;
-+};
-+
-+static void do_smp_cross_read(void *data)
-+{
-+	struct etmv4_reg *reg = data;
-+
-+	reg->data = readl_relaxed(reg->addr);
-+}
-+
-+static u32 etmv4_cross_read(const struct device *dev, u32 offset)
-+{
-+	struct etmv4_drvdata *drvdata = dev_get_drvdata(dev);
-+	struct etmv4_reg reg;
-+
-+	reg.addr = drvdata->base + offset;
-+	/*
-+	 * smp cross call ensures the CPU will be powered up before
-+	 * accessing the ETMv4 trace core registers
-+	 */
-+	smp_call_function_single(drvdata->cpu, do_smp_cross_read, &reg, 1);
-+	return reg.data;
-+}
-+
- #define coresight_etm4x_simple_func(name, offset)			\
--	coresight_simple_func(struct etmv4_drvdata, name, offset)
-+	coresight_simple_func(struct etmv4_drvdata, NULL, name, offset)
-+
-+#define coresight_etm4x_cross_read(name, offset)			\
-+	coresight_simple_func(struct etmv4_drvdata, etmv4_cross_read,	\
-+			      name, offset)
+Moreover, the way the PSCI state ids are for PC and OS intiated fall in
+line with how we represent in the DT. PC cluster states are represented
+in the original format and the OSI follow the extended state format. The
+composite is made by an OR of the CPU state and the cluster idle state.
 
--coresight_etm4x_simple_func(trcoslsr, TRCOSLSR);
- coresight_etm4x_simple_func(trcpdcr, TRCPDCR);
- coresight_etm4x_simple_func(trcpdsr, TRCPDSR);
- coresight_etm4x_simple_func(trclsr, TRCLSR);
--coresight_etm4x_simple_func(trcconfig, TRCCONFIGR);
--coresight_etm4x_simple_func(trctraceid, TRCTRACEIDR);
- coresight_etm4x_simple_func(trcauthstatus, TRCAUTHSTATUS);
- coresight_etm4x_simple_func(trcdevid, TRCDEVID);
- coresight_etm4x_simple_func(trcdevtype, TRCDEVTYPE);
-@@ -2055,6 +2082,9 @@ coresight_etm4x_simple_func(trcpidr0, TRCPIDR0);
- coresight_etm4x_simple_func(trcpidr1, TRCPIDR1);
- coresight_etm4x_simple_func(trcpidr2, TRCPIDR2);
- coresight_etm4x_simple_func(trcpidr3, TRCPIDR3);
-+coresight_etm4x_cross_read(trcoslsr, TRCOSLSR);
-+coresight_etm4x_cross_read(trcconfig, TRCCONFIGR);
-+coresight_etm4x_cross_read(trctraceid, TRCTRACEIDR);
+>A couple of notes:
+>
+>On Fri, Jul 29, 2016 at 03:56:13PM -0600, Lina Iyer wrote:
+>> +Example 3:
+>> +
+>> +	pm-domains {
+>> +		a57_pd: a57_pd@ {
+>> +			/* will have a57 platform ARM_PD_METHOD_OF_DECLARE*/
+>> +			compatible = "arm,pd","arm,cortex-a57";
+>> +			#power-domain-cells = <0>;
+>> +			idle-states = <&CLUSTER_SLEEP_0>;
+>> +		};
+>> +
+>> +		a53_pd: a53_pd@ {
+>> +			/* will have a a53 platform ARM_PD_METHOD_OF_DECLARE*/
+>> +			compatible = "arm,pd","arm,cortex-a53";
+>> +			#power-domain-cells = <0>;
+>> +			idle-states = <&CLUSTER_SLEEP_0>, <&CLUSTER_SLEEP_1>;
+>> +		};
+>> +
+>> +		CLUSTER_SLEEP_0: idle-state at 0 {
+>> +			compatible = "arm,idle-state";
+>> +			entry-latency-us = <1000>;
+>> +			exit-latency-us = <2000>;
+>> +			residency-us = <10000>;
+>> +		};
+>> +
+>> +		CLUSTER_SLEEP_1: idle-state at 1 {
+>> +			compatible = "arm,idle-state";
+>> +			entry-latency-us = <5000>;
+>> +			exit-latency-us = <5000>;
+>> +			residency-us = <100000>;
+>> +		};
+>
+>I'm confused about the location of the idle state nodes. In this example,
+>they're under the pm-domains node which seems wrong to me. In your later patch
+>for msm8916.dsti they come under cpu-domain-states. I'm inexperienced here so
+>please excuse me again if I'm being ignorant.
+>
+Valid question. These patches are intended to support CPU domains that
+are controlled by Linux (ARM v7 style) and the PSCI way as well. The
+example here is for a ARM v7 style domain where the domain controller
+code exists in Linux.
 
- static struct attribute *coresight_etmv4_mgmt_attrs[] = {
- 	&dev_attr_trcoslsr.attr,
-@@ -2073,19 +2103,19 @@ static struct attribute *coresight_etmv4_mgmt_attrs[] = {
- 	NULL,
- };
+The way my patches evolve the kernel is build up a generic CPU PM
+domains framework and then PSCI firmware becomes a driver for platforms
+that support OSI and the DT has domain definitions.
 
--coresight_etm4x_simple_func(trcidr0, TRCIDR0);
--coresight_etm4x_simple_func(trcidr1, TRCIDR1);
--coresight_etm4x_simple_func(trcidr2, TRCIDR2);
--coresight_etm4x_simple_func(trcidr3, TRCIDR3);
--coresight_etm4x_simple_func(trcidr4, TRCIDR4);
--coresight_etm4x_simple_func(trcidr5, TRCIDR5);
-+coresight_etm4x_cross_read(trcidr0, TRCIDR0);
-+coresight_etm4x_cross_read(trcidr1, TRCIDR1);
-+coresight_etm4x_cross_read(trcidr2, TRCIDR2);
-+coresight_etm4x_cross_read(trcidr3, TRCIDR3);
-+coresight_etm4x_cross_read(trcidr4, TRCIDR4);
-+coresight_etm4x_cross_read(trcidr5, TRCIDR5);
- /* trcidr[6,7] are reserved */
--coresight_etm4x_simple_func(trcidr8, TRCIDR8);
--coresight_etm4x_simple_func(trcidr9, TRCIDR9);
--coresight_etm4x_simple_func(trcidr10, TRCIDR10);
--coresight_etm4x_simple_func(trcidr11, TRCIDR11);
--coresight_etm4x_simple_func(trcidr12, TRCIDR12);
--coresight_etm4x_simple_func(trcidr13, TRCIDR13);
-+coresight_etm4x_cross_read(trcidr8, TRCIDR8);
-+coresight_etm4x_cross_read(trcidr9, TRCIDR9);
-+coresight_etm4x_cross_read(trcidr10, TRCIDR10);
-+coresight_etm4x_cross_read(trcidr11, TRCIDR11);
-+coresight_etm4x_cross_read(trcidr12, TRCIDR12);
-+coresight_etm4x_cross_read(trcidr13, TRCIDR13);
+Your confusion should be resolved, if you look at the broader scope of
+the CPU domain - domains that may be controlled in Linux and domains
+outside Linux.
 
- static struct attribute *coresight_etmv4_trcidr_attrs[] = {
- 	&dev_attr_trcidr0.attr,
-diff --git a/drivers/hwtracing/coresight/coresight-priv.h b/drivers/hwtracing/coresight/coresight-priv.h
-index decfd52b5dc3..39841d1f58e0 100644
---- a/drivers/hwtracing/coresight/coresight-priv.h
-+++ b/drivers/hwtracing/coresight/coresight-priv.h
-@@ -38,14 +38,19 @@
- #define ETM_MODE_EXCL_KERN	BIT(30)
- #define ETM_MODE_EXCL_USER	BIT(31)
+>idle-states.txt (to which this file refers) says that idle state nodes must come
+>under /cpus/idle-states. I don't think power domain idle states belong there, so
+>the documentation should be updated to reflect that.
+>
+Absolutely right. This should be fixed.
 
--#define coresight_simple_func(type, name, offset)			\
-+typedef u32 (*coresight_read_fn)(const struct device *, u32 offset);
-+#define coresight_simple_func(type, func, name, offset)			\
- static ssize_t name##_show(struct device *_dev,				\
- 			   struct device_attribute *attr, char *buf)	\
- {									\
- 	type *drvdata = dev_get_drvdata(_dev->parent);			\
-+	coresight_read_fn fn = func;					\
- 	u32 val;							\
- 	pm_runtime_get_sync(_dev->parent);				\
--	val = readl_relaxed(drvdata->base + offset);			\
-+	if (fn)								\
-+		val = fn(_dev->parent, offset);				\
-+	else								\
-+		val = readl_relaxed(drvdata->base + offset);		\
- 	pm_runtime_put_sync(_dev->parent);				\
- 	return scnprintf(buf, PAGE_SIZE, "0x%x\n", val);		\
- }									\
-diff --git a/drivers/hwtracing/coresight/coresight-stm.c b/drivers/hwtracing/coresight/coresight-stm.c
-index 819629aed2f7..7949f0f6744a 100644
---- a/drivers/hwtracing/coresight/coresight-stm.c
-+++ b/drivers/hwtracing/coresight/coresight-stm.c
-@@ -635,7 +635,7 @@ static ssize_t traceid_store(struct device *dev,
- static DEVICE_ATTR_RW(traceid);
+>> +	};
+>> +
+>> +
+>>  The nodes above define two power controllers: 'parent' and 'child'.
+>>  Domains created by the 'child' power controller are subdomains of '0' power
+>>  domain provided by the 'parent' power controller.
+>
+>This block refers to Example 2 - the hunk you added should be below.
+>
+OK. Thanks.
 
- #define coresight_stm_simple_func(name, offset)	\
--	coresight_simple_func(struct stm_drvdata, name, offset)
-+	coresight_simple_func(struct stm_drvdata, NULL, name, offset)
+-- Lina
 
- coresight_stm_simple_func(tcsr, STMTCSR);
- coresight_stm_simple_func(tsfreqr, STMTSFREQR);
-diff --git a/drivers/hwtracing/coresight/coresight-tmc.c b/drivers/hwtracing/coresight/coresight-tmc.c
-index 4cbcaf93c9d9..a4748630f5d6 100644
---- a/drivers/hwtracing/coresight/coresight-tmc.c
-+++ b/drivers/hwtracing/coresight/coresight-tmc.c
-@@ -218,7 +218,7 @@ static enum tmc_mem_intf_width tmc_get_memwidth(u32 devid)
- }
-
- #define coresight_tmc_simple_func(name, offset)			\
--	coresight_simple_func(struct tmc_drvdata, name, offset)
-+	coresight_simple_func(struct tmc_drvdata, NULL, name, offset)
-
- coresight_tmc_simple_func(rsz, TMC_RSZ);
- coresight_tmc_simple_func(sts, TMC_STS);
---
-2.7.4
+>[1] https://lwn.net/Articles/650426/
+>[2] https://patchwork.kernel.org/patch/9193651/
+>
+>Regards,
+>Brendan
