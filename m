@@ -1,144 +1,294 @@
-From: brendan.jackman@arm.com (Brendan Jackman)
-Date: Thu, 4 Aug 2016 19:15:00 +0100
-Subject: [PATCH v2 02/14] dt/bindings: update binding for PM domain idle
- states
-In-Reply-To: <20160804162844.GC1207@linaro.org>
-References: <1469829385-11511-1-git-send-email-lina.iyer@linaro.org>
- <1469829385-11511-3-git-send-email-lina.iyer@linaro.org>
- <20160804152453.GB1732@brendan-thinkstation>
- <20160804162844.GC1207@linaro.org>
-Message-ID: <20160804181500.GE1732@brendan-thinkstation>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 4 Aug 2016 13:15:56 -0500
+Subject: [PATCH v2 1/2] ARM64: dts: meson-gxbb: add MMC support
+In-Reply-To: <20160803231843.23012-1-khilman@baylibre.com>
+References: <20160803231843.23012-1-khilman@baylibre.com>
+Message-ID: <20160804181556.GA13000@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 04, 2016 at 10:28:44AM -0600, Lina Iyer wrote:
-> Hi Brenden,
->
-> On Thu, Aug 04 2016 at 09:24 -0600, Brendan Jackman wrote:
-> >Hi Lina,
-> >
-> >These bindings are the reason for my interest in this patchset; I'm hoping to be
-> >able to do some work based on them in order to generically describe the cost of
-> >idle states for use in the Energy Aware Scheduling (EAS)[1] energy model.
-> >
-> I think that's a fair idea - idle states accounting their own cost.
->
-> >Mark Rutland expressed concern [2] in the thread for the previous version of
-> >this patchset that there are now two possible locations for the list of idle
-> >states; that hasn't been addressed. My own instinct is that this is OK: in the
-> >real world, power domain (e.g. cluster) idle states are a property of the power
-> >domain and not of the CPU it contains - the DT should reflect this.
-> >
-> Absolutely.
->
-> >However, since there are existing platform DTs with cluster-level suspend states
-> >(which are platform-coordinated rather than OS-initiated) in cpu-idle-states, do
-> >we have a backwards-compatibility issue? e.g. say we have a platform with a DT
-> >like this:
-> >
-> Your concern is very valid and this is the exactly the difference
-> between Platform coordinated (PC) mode and OS-Initiated (OSI) mode. In
-> PC, the domain state is an extension of the CPU state and rightful place
-> for that is the cpu-idle-states property. Just like the example you
-> have.
->
-> >	cpu at 0 {
-> >		/*...*/
-> >		cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
-> >	};
-> >
-> >	idle-states {
-> >		CPU_SLEEP: cpu-sleep {
-> >			/*...*/
-> >		};
-> >		CLUSTER_SLEEP: cluster-sleep {
-> >			/*...*/
-> >		};
-> >	};
-> >
-> >and in order to enable OS-initiated cluster suspend it changes to this:
-> >
-> Platforms that have OSI will have this format you mention below. If the
-> platform supports the OSI it will respond to the PSCI_FEATURES and
-> PSCI_SET_SUSPEND mode (patch 10 of this series). If the OSI mode is
-> available snd if the DT has the domains defined for the CPU, then the
-> OSI mode is chosen otherwise, it reverts to using PC mode. This code
-> snippet from my patches does exactly that -
->
-> if (psci_has_osi_pd) {
->        int ret;
->        const struct cpu_pd_ops psci_pd_ops = {
->                .populate_state_data = psci_pd_populate_state_data,
->                .power_off = psci_pd_power_off,
->        };
->
->        ret = of_setup_cpu_pd_single(cpu, &psci_pd_ops);
->        if (!ret)
->                ret = psci_set_suspend_mode_osi(true);
->        if (ret)
->                pr_warn("CPU%d: Error setting PSCI OSI mode\n", cpu);
-> }
->
-> >	cpu at 0 {
-> >		/*...*/
-> >		cpu-idle-states = <&CPU_SLEEP>;
-> >		power-domains = <CPU_PD>;
-> >	};
-> >
-> >	idle-states {
-> >		CPU_SLEEP: cpu-sleep {
-> >			/*...*/
-> >		};
-> >	};
-> >
-> >	/*... elsewhere ... */
-> >
-> >	CLUSTER_SLEEP: cluster-sleep {
-> >		/*...*/
-> >	};
-> >
-> >	CPU_PD {
-> >	/*...*/
-> >		idle-states = <&CLUSTER_SLEEP>;
-> >	};
-> >
-> >Then old kernels which don't have CPU PM Domains will lose the ability to
-> >suspend clusters. I've phrased this as a question because I'm not clear on what
-> >we require in terms of backwards/forwards compatibility with DTs - excuse my
-> >ignorance. What are your thoughts on this?
-> >
-> So, if the DT has only support for cluster modes in cpu-idle-states and
-> not the OSI specific representation, then it would continue to use only
-> PC mode to power down the cluster, even though the firmware may have
-> been updated to support OSI.
->
-> That means, all the existing platforms will continue to work the way
-> they do even with these patches in place.
->
-> Moreover, the way the PSCI state ids are for PC and OS intiated fall in
-> line with how we represent in the DT. PC cluster states are represented
-> in the original format and the OSI follow the extended state format. The
-> composite is made by an OR of the CPU state and the cluster idle state.
->
+On Wed, Aug 03, 2016 at 04:18:42PM -0700, Kevin Hilman wrote:
+> Add binding and basic support for the SD/eMMC controller on Amlogic
+> S905/GXBB devices.
+> 
+> Signed-off-by: Kevin Hilman <khilman@baylibre.com>
+> ---
+>  .../devicetree/bindings/mmc/amlogic,meson-gxbb.txt | 29 +++++++++
+>  .../arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts | 74 ++++++++++++++++++++++
+>  arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi   | 71 +++++++++++++++++++++
+>  arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi        | 36 ++++++++++-
+>  4 files changed, 209 insertions(+), 1 deletion(-)
+>  create mode 100644 Documentation/devicetree/bindings/mmc/amlogic,meson-gxbb.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/mmc/amlogic,meson-gxbb.txt b/Documentation/devicetree/bindings/mmc/amlogic,meson-gxbb.txt
+> new file mode 100644
+> index 000000000000..2bfdf47018c5
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mmc/amlogic,meson-gxbb.txt
+> @@ -0,0 +1,29 @@
+> +Amlogic SD / eMMC controller for S905/GXBB family SoCs
+> +
+> +The MMC 5.1 compliant host controller on Amlogic provides the
+> +interface for SD, eMMC and SDIO devices.
+> +
+> +This file documents the properties in addition to those available in
+> +the MMC core bindings, documented by mmc.txt.
+> +
+> +Required properties:
+> +- compatible : contains "amlogic,meson-gxbb"
+> +- clocks     : A list of phandle + clock-specifier pairs for the clocks listed in clock-names.
+> +- clock-names: Should contain the following:
+> +	"core" - Main peripheral bus clock
+> +	"clkin0" - Parent clock of internal mux
+> +	"clkin1" - Other parent clock of internal mux
+> +  The driver has an interal mux clock which switches between clkin0 and clkin1 depending on the
+> +  clock rate requested by the MMC core.
+> +
+> +Example:
+> +
+> +	sd_emmc_a: mmc at 70000 {
+> +        	compatible = "amlogic,meson-gxbb-mmc";
+> +		reg = <0x0 0x70000 0x0 0x2000>;
+> +                interrupts = < GIC_SPI 216 IRQ_TYPE_EDGE_RISING>;
+> +		clocks = <&clkc CLKID_SD_EMMC_A>, <&xtal>, <&clkc CLKID_FCLK_DIV2>;
+> +		clock-names = "core", "clkin0", "clkin1";
+> +		pinctrl-0 = <&emmc_pins>;
+> +	};
+> +
+> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
+> index 90a84c514d3d..f41d8fe5c706 100644
+> --- a/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
+> +++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
+> @@ -73,6 +73,45 @@
+>  			default-state = "off";
+>  		};
+>  	};
+> +
+> +	mmc_iv: gpio-regulator {
+> +		compatible = "regulator-gpio";
+> +
+> +		regulator-name = "mmc-gpio-supply";
+> +		regulator-min-microvolt = <1800000>;
+> +		regulator-max-microvolt = <3300000>;
+> +
+> +		gpios = <&gpio_ao GPIOAO_3 GPIO_ACTIVE_HIGH>;
+> +		gpio-states = <0 1>;
+> +
+> +		/*
+> +		 * Based on ODROID-C2 schematics:
+> +		 * signal name: IO_TF_3V3N_1V8, GPIOAO bit 3
+> +		 */
+> +		states = <3300000 0
+> +			  1800000 1>;
 
-OK, this makes sense - I understand that these patches will not affect the
-behaviour if the DT stays the same. My question, though is what happens when a
-new DT with the new OSI structure is given to an older kernel without these
-patches applied.
+There are multiple things wrong in this node based on the regulator-gpio 
+documentation.
 
-Example: right now we support PC cluster suspend on the Juno platform (see
-juno*.dts). Let's say Juno's firmware comes to support OSI suspend and we want
-to use that in Linux. We apply these patches then update the .dts, adding a CPU
-power domain tree, removing CLUSTER_SLEEP_0 from cpu-idle-states and adding it
-to the relevant power domain node's idle-states. Now we have OSI suspend on
-Juno. But then if we take our new DTB and feed it to a v4.7 kernel it will not
-be able to enter CLUSTER_SLEEP_0 because it is not in cpu-idle-states. Before we
-modified the DTB, v4.7 kernels were capable of entering CLUSTER_SLEEP_0 in PC
-mode.
+> +	};
+> +
+> +	vcc1v8: regulator {
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "VCC1V8";
+> +		regulator-min-microvolt = <1800000>;
+> +		regulator-max-microvolt = <1800000>;
+> +		regulator-always-on;
+> +	};
+> +
+> +	vcc3v3: regulator {
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "VCC3V3";
+> +		regulator-min-microvolt = <3300000>;
+> +		regulator-max-microvolt = <3300000>;
+> +		regulator-always-on;
+> +	};
+> +
+> +	emmc_pwrseq: emmc-pwrseq {
+> +		compatible = "mmc-pwrseq-emmc";
+> +		reset-gpios = <&gpio BOOT_9 GPIO_ACTIVE_LOW>;
+> +	};
+>  };
+>  
+>  &uart_AO {
+> @@ -87,3 +126,38 @@
+>  	pinctrl-names = "default";
+>  };
+>  
+> +&sd_emmc_b {
+> +	status = "okay";
+> +	pinctrl-0 = <&sdcard_pins>;
+> +	pinctrl-names = "default";
+> +
+> +	bus-width = <4>;
+> +	cap-sd-highspeed;
+> +	max-frequency = <100000000>;
+> +
+> +	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_HIGH>;
+> +	cd-inverted;
+> +
+> +	vmmc-supply = <&mmc_iv>;
+> +	voltage-ranges = <1800 3300>;
+> +};
+> +
+> +&sd_emmc_c {
+> +	status = "okay";
+> +	pinctrl-0 = <&emmc_pins>;
+> +	pinctrl-names = "default";
+> +
+> +	bus-width = <8>;
+> +	cap-sd-highspeed;
+> +	max-frequency = <200000000>;
+> +	non-removable;
+> +	disable-wp;
+> +	cap-mmc-highspeed;
+> +	mmc-ddr-1_8v;
+> +	mmc-hs200-1_8v;
+> +
+> +	mmc-pwrseq = <&emmc_pwrseq>;
+> +	voltage-ranges = <1800 3300>;
+> +	vmmc-supply = <&vcc3v3>;
+> +	vmmcq-sumpply = <&vcc1v8>;
+> +};
+> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi
+> index f4f30f674b4c..77698815943a 100644
+> --- a/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi
+> +++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi
+> @@ -57,6 +57,42 @@
+>  		device_type = "memory";
+>  		reg = <0x0 0x0 0x0 0x40000000>;
+>  	};
+> +
+> +	mmc_iv: gpio-regulator {
+> +		compatible = "regulator-gpio";
+> +
+> +		regulator-name = "mmc-gpio-supply";
+> +		regulator-min-microvolt = <1800000>;
+> +		regulator-max-microvolt = <3300000>;
+> +
+> +		gpios = <&gpio_ao GPIOAO_5 GPIO_ACTIVE_HIGH>;
+> +		gpio-states = <0 1>;
+> +
+> +		/* Based on P200 schematics, signal CARD_1.8V/3.3V_CTR */
+> +		states = <1800000 0
+> +			  3300000 1>;
+> +	};
+> +
+> +	vddio_boot: regulator {
+[...]
+> +	vcc_3v3: regulator {
 
-Does that make sense - do we expect newer DTBs to be compatible with older
-kernels, and if so how can we add OSI support to existing platforms without
-breaking older kernels?
+This won't even compile as you have the same node name twice.
 
-Thanks,
-Brendan
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "VCC_3V3";
+> +		regulator-min-microvolt = <3300000>;
+> +		regulator-max-microvolt = <3300000>;
+> +		regulator-always-on;
+> +	};
+> +
+> +	emmc_pwrseq: emmc-pwrseq {
+> +		compatible = "mmc-pwrseq-emmc";
+> +		reset-gpios = <&gpio BOOT_9 GPIO_ACTIVE_LOW>;
+> +	};
+>  };
+>  
+>  /* This UART is brought out to the DB9 connector */
+> @@ -72,3 +108,38 @@
+>  	pinctrl-names = "default";
+>  };
+>  
+> +&sd_emmc_b {
+> +	status = "okay";
+> +	pinctrl-0 = <&sdcard_pins>;
+> +	pinctrl-names = "default";
+> +
+> +	bus-width = <4>;
+> +	cap-sd-highspeed;
+> +	max-frequency = <100000000>;
+> +
+> +	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_HIGH>;
+> +	cd-inverted;
+> +
+> +	voltage-ranges = <1800 3300>;
+> +	vmmc-supply = <&mmc_iv>;
+> +};
+> +
+> +&sd_emmc_c {
+> +	status = "okay";
+> +	pinctrl-0 = <&emmc_pins>;
+> +	pinctrl-names = "default";
+> +
+> +	bus-width = <8>;
+> +	cap-sd-highspeed;
+> +	cap-mmc-highspeed;
+> +	max-frequency = <200000000>;
+> +	non-removable;
+> +	disable-wp;
+> +	mmc-ddr-1_8v;
+> +	mmc-hs200-1_8v;
+> +
+> +	mmc-pwrseq = <&emmc_pwrseq>;
+> +	voltage-ranges = <1800 3300>;
+> +	vmmc-supply = <&vcc_3v3>;
+> +	vmmcq-sumpply = <&vddio_boot>;
+> +};
+> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+> index 35c8b2beb05c..2c200f96467c 100644
+> --- a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+> +++ b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+> @@ -247,7 +247,8 @@
+>  					mux {
+>  						groups = "emmc_nand_d07",
+>  						       "emmc_cmd",
+> -						       "emmc_clk";
+> +						       "emmc_clk",
+> +						       "emmc_ds";
+>  						function = "emmc";
+>  					};
+>  				};
+> @@ -330,6 +331,39 @@
+>  			#address-cells = <2>;
+>  			#size-cells = <2>;
+>  			ranges = <0x0 0x0 0x0 0xd0000000 0x0 0x200000>;
+> +
+> +			sd_emmc_a: mmc at 70000 {
+> +				compatible = "amlogic,meson-gxbb-mmc";
+> +				reg = <0x0 0x70000 0x0 0x2000>;
+> +				interrupts = <GIC_SPI 216 IRQ_TYPE_EDGE_RISING>;
+> +				clocks = <&clkc CLKID_SD_EMMC_A>,
+> +					 <&xtal>,
+> +					 <&clkc CLKID_FCLK_DIV2>;
+> +				clock-names = "core", "clkin0", "clkin1";
+> +				status = "disabled";
+> +			};
+> +
+> +			sd_emmc_b: mmc at 72000 {
+> +				compatible = "amlogic,meson-gxbb-mmc";
+> +				reg = <0x0 0x72000 0x0 0x2000>;
+> +				interrupts = <GIC_SPI 217 IRQ_TYPE_EDGE_RISING>;
+> +				clocks = <&clkc CLKID_SD_EMMC_B>,
+> +					 <&xtal>,
+> +					 <&clkc CLKID_FCLK_DIV2>;
+> +				clock-names = "core", "clkin0", "clkin1";
+> +				status = "disabled";
+> +			};
+> +
+> +			sd_emmc_c: mmc at 74000 {
+> +				compatible = "amlogic,meson-gxbb-mmc";
+> +				reg = <0x0 0x74000 0x0 0x2000>;
+> +				interrupts = <GIC_SPI 218 IRQ_TYPE_EDGE_RISING>;
+> +				clocks = <&clkc CLKID_SD_EMMC_C>,
+> +					 <&xtal>,
+> +					 <&clkc CLKID_FCLK_DIV2>;
+> +				clock-names = "core", "clkin0", "clkin1";
+> +				status = "disabled";
+> +			};
+>  		};
+>  
+>  		ethmac: ethernet at c9410000 {
+> -- 
+> 2.9.0
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
