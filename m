@@ -1,22 +1,23 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Thu, 4 Aug 2016 19:19:03 +0200
-Subject: [PATCH V3 2/6] perf: Passing struct perf_event to function
- setup_aux()
-In-Reply-To: <1469742143-22245-3-git-send-email-mathieu.poirier@linaro.org>
-References: <1469742143-22245-1-git-send-email-mathieu.poirier@linaro.org>
- <1469742143-22245-3-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <20160804171903.GV6862@twins.programming.kicks-ass.net>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 4 Aug 2016 12:26:36 -0500
+Subject: [PATCH 1/3] Documentation: dt: socfpga: Add Arria10 SD-MMC EDAC
+ binding
+In-Reply-To: <1470153381-20517-2-git-send-email-tthayer@opensource.altera.com>
+References: <1470153381-20517-1-git-send-email-tthayer@opensource.altera.com>
+ <1470153381-20517-2-git-send-email-tthayer@opensource.altera.com>
+Message-ID: <20160804172636.GA22478@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 28, 2016 at 03:42:19PM -0600, Mathieu Poirier wrote:
-> Some information, like driver specific configuration, is found
-> in the hw_perf_event  structure.  As such pass a 'struct perf_event'
-> to function setup_aux() rather than just the CPU number so that
-> individual drivers can make the right configuration when setting
-> up a session.
+On Tue, Aug 02, 2016 at 10:56:19AM -0500, tthayer at opensource.altera.com wrote:
+> From: Thor Thayer <tthayer@opensource.altera.com>
 > 
-> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-> Cc: Alexander Shishkin <alexander.shishkin@linux.intel.com>
+> Add the device tree bindings needed to support the Altera SD-MMC
+> FIFO buffers EDAC on the Arria10 chip.
+> 
+> Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
+> ---
+>  .../bindings/arm/altera/socfpga-eccmgr.txt         |   19 +++++++++++++++++++
+>  1 file changed, 19 insertions(+)
 
-Yeah, no objection to this.
+Acked-by: Rob Herring <robh@kernel.org>
