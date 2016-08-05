@@ -1,61 +1,87 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 5 Aug 2016 13:52:05 +0100
-Subject: [PATCH v6 18/18] remoteproc: core: Retry
- rproc_fw_config_virtio() if !rproc->table_ptr
-In-Reply-To: <1467795276-21725-19-git-send-email-peter.griffin@linaro.org>
-References: <1467795276-21725-1-git-send-email-peter.griffin@linaro.org>
- <1467795276-21725-19-git-send-email-peter.griffin@linaro.org>
-Message-ID: <20160805125205.GY5243@dell>
+From: julia.lawall@lip6.fr (Julia Lawall)
+Date: Fri, 5 Aug 2016 14:59:22 +0200 (CEST)
+Subject: [PATCH 10/11] soc: ti: knav_qmss_queue: use of_property_read_bool
+In-Reply-To: <c010a500-87ce-19ad-0109-f57eba3c6981@arm.com>
+References: <1470387411-15879-1-git-send-email-Julia.Lawall@lip6.fr>
+ <1470387411-15879-11-git-send-email-Julia.Lawall@lip6.fr>
+ <c010a500-87ce-19ad-0109-f57eba3c6981@arm.com>
+Message-ID: <alpine.DEB.2.10.1608051456170.2999@hadrien>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 06 Jul 2016, Peter Griffin wrote:
 
-> When rproc drivers are built-in the async firmware load done by rproc_add()
-> can fail due to the firmware not being present. Subsqeuent calls to
-> rproc_fw_boot() then fail, even though by this point firmware has been
-> successfully obtained.
-> 
-> This patch changes the behaviour to re-execute rproc_fw_config_virtio()
-> in rproc_fw_boot() if it has previously failed, and we are sure it is
-> now available.
-> 
-> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
-> ---
->  drivers/remoteproc/remoteproc_core.c     | 25 +++++++++++++++++++------
->  drivers/remoteproc/remoteproc_internal.h |  3 +++
->  2 files changed, 22 insertions(+), 6 deletions(-)
-> 
-> diff --git a/drivers/remoteproc/remoteproc_core.c b/drivers/remoteproc/remoteproc_core.c
-> index db3958b..749f261 100644
-> --- a/drivers/remoteproc/remoteproc_core.c
-> +++ b/drivers/remoteproc/remoteproc_core.c
-> @@ -801,8 +801,12 @@ static int rproc_fw_boot(struct rproc *rproc, const struct firmware *fw)
->  	struct resource_table *table, *loaded_table;
->  	int ret, tablesz;
->  
-> +	/*
-> +	 * This can happen when built-in if initial async fw load fails.
-> +	 * However we now have firmware available so retry.
-> +	 */
->  	if (!rproc->table_ptr)
-> -		return -ENOMEM;
-> +		rproc_fw_config_virtio(fw, rproc);
 
-It's probably better to "hold that thought" on this patch, since we're
-going to make resource tables optional.  I'm keen to tackle this
-issue, but need to work a few other things before doing so.
+On Fri, 5 Aug 2016, Robin Murphy wrote:
 
-Current task list:
- - Amend/supply new resource table from platform-specific drivers
- - Make resource tables optional
- - Obtain firmwares from the root file system
- - Lots more here including; co-proc DT support, co-proc console, etc
+> Hi Julia,
+>
+> On 05/08/16 09:56, Julia Lawall wrote:
+> > Use of_property_read_bool to check for the existence of a property.
+>
+> This caught my eye since Rob told me off for doing the same recently[1].
+>
+> > The semantic patch that makes this change is as follows:
+> > (http://coccinelle.lip6.fr/)
+> >
+> > // <smpl>
+> > @@
+> > expression e1,e2;
+> > statement S2,S1;
+> > @@
+> > -       if (of_get_property(e1,e2,NULL))
+> > +       if (of_property_read_bool(e1,e2))
+> >         S1 else S2
+> > // </smpl>
+> >
+> > Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
+> >
+> > ---
+> >  drivers/soc/ti/knav_qmss_queue.c |    2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> >
+> > diff --git a/drivers/soc/ti/knav_qmss_queue.c b/drivers/soc/ti/knav_qmss_queue.c
+> > index b73e353..56b5d7c 100644
+> > --- a/drivers/soc/ti/knav_qmss_queue.c
+> > +++ b/drivers/soc/ti/knav_qmss_queue.c
+> > @@ -1240,7 +1240,7 @@ static int knav_setup_queue_range(struct knav_device *kdev,
+> >  	if (of_get_property(node, "qalloc-by-id", NULL))
+>
+> According to the binding, "qalloc-by-id" _is_ a boolean property, so
+> this one really does deserve to be of_property_read_bool()...
+>
+> >  		range->flags |= RANGE_RESERVED;
+> >
+> > -	if (of_get_property(node, "accumulator", NULL)) {
+> > +	if (of_property_read_bool(node, "accumulator")) {
+>
+> ...whereas "accumulator" must have a value, so this isn't technically
+> appropriate. In general, most of these "if the property exists, read the
+> property and do stuff" checks are probably a sign of code that could be
+> simplified by refactoring the "do stuff" step to just specifically
+> handle the "read the property" step returning -EINVAL when it's not present.
 
-[...]
+Thanks for the very helpful feedback.  I will rethink the patch set in
+light of this information.
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+julia
+
+> Robin.
+>
+> [1]:https://www.mail-archive.com/iommu at lists.linux-foundation.org/msg13375.html
+>
+> >  		ret = knav_init_acc_range(kdev, node, range);
+> >  		if (ret < 0) {
+> >  			devm_kfree(dev, range);
+> >
+> >
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> >
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe kernel-janitors" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
