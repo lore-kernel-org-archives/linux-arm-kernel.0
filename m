@@ -1,53 +1,36 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri,  5 Aug 2016 16:55:21 +0200
-Subject: [PATCH 4/4] arm64: dts: marvell: describe the PIC and PMU on Armada
- 7K/8K
-In-Reply-To: <1470408921-447-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1470408921-447-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1470408921-447-5-git-send-email-thomas.petazzoni@free-electrons.com>
+From: kbeldan@baylibre.com (Karl Beldan)
+Date: Fri,  5 Aug 2016 14:59:42 +0000
+Subject: [PATCH v3 0/3] Support for the LCDK
+In-Reply-To: <20160804144332.4841-1-kbeldan@baylibre.com>
+References: <20160804144332.4841-1-kbeldan@baylibre.com>
+Message-ID: <20160805145945.24315-1-kbeldan@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds the necessary Device Tree description for the PIC
-interrupt controller and the PMU available in the Marvell Armada 7K and
-Armada 8K SoCs.
+This depends on "ARM: dts: da850: Add missing pin muxing for the UARTs".
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- arch/arm64/boot/dts/marvell/armada-ap806.dtsi | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+Changes from v1:
+ - s/omapl138/da850/
+ - Remove earlycon from bootargs
+ - Remove console=ttyS2,115200n8 from bootargs (workaround for preferred console)
+ - Add patches for CONFIG_SMSC_PHY=y and CONFIG_RTC_DRV_OMAP=m
 
-diff --git a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
-index eab1a42..e70b996 100644
---- a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
-+++ b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
-@@ -128,6 +128,12 @@
- 					     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_EDGE_RISING)>;
- 			};
- 
-+			pmu {
-+				compatible = "arm,cortex-a72-pmu";
-+				interrupt-parent = <&pic>;
-+				interrupts = <17>;
-+			};
-+
- 			odmi: odmi at 300000 {
- 				compatible = "marvell,odmi-controller";
- 				interrupt-controller;
-@@ -140,6 +146,14 @@
- 				marvell,spi-base = <128>, <136>, <144>, <152>;
- 			};
- 
-+			pic: interrupt-controller at 3f0100 {
-+				compatible = "marvell,armada-8k-pic";
-+				reg = <0x3f0100 0x10>;
-+				#interrupt-cells = <1>;
-+				interrupt-controller;
-+				interrupts = <GIC_PPI 15 IRQ_TYPE_LEVEL_HIGH>;
-+			};
-+
- 			xor at 400000 {
- 				compatible = "marvell,armada-7k-xor", "marvell,xor-v2";
- 				reg = <0x400000 0x1000>,
+Changes from v2:
+ - Remove references to C6748: replace 'L138/C6748 Dev Kit (LCDK)' with 'LCDK'
+ - Change license from 'GPLv2 or later' to 'GPLv2'
+
+Karl Beldan (3):
+  ARM: dts: da850: Add basic DTS for the LCDK
+  ARM: davinci_all_defconfig: enable RTC driver as module
+  ARM: davinci_all_defconfig: enable SMSC ethernet PHY
+
+ Documentation/devicetree/bindings/arm/davinci.txt |  4 ++
+ arch/arm/boot/dts/Makefile                        |  1 +
+ arch/arm/boot/dts/da850-lcdk.dts                  | 70 +++++++++++++++++++++++
+ arch/arm/configs/davinci_all_defconfig            |  2 +
+ arch/arm/mach-davinci/da8xx-dt.c                  |  1 +
+ 5 files changed, 78 insertions(+)
+ create mode 100644 arch/arm/boot/dts/da850-lcdk.dts
+
 -- 
-2.7.4
+2.9.0.rc1
