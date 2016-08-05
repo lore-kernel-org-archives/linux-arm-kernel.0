@@ -1,13 +1,13 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri,  5 Aug 2016 10:38:37 +0200
-Subject: [PATCH 1/2] ARM: dts: MSM8064 remove flags from SPMI/MPP IRQs
+Date: Fri,  5 Aug 2016 10:38:38 +0200
+Subject: [PATCH 2/2] ARM: dts: MSM8660 remove flags from SPMI/MPP IRQs
 In-Reply-To: <1470386318-17694-1-git-send-email-linus.walleij@linaro.org>
 References: <1470386318-17694-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <1470386318-17694-2-git-send-email-linus.walleij@linaro.org>
+Message-ID: <1470386318-17694-3-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Qualcomm PMIC GPIO and MPP lines are problematic: the
+The Qualcomm SPMI GPIO and MPP lines are problematic: the
 are fetched from the main MFD driver with platform_get_irq()
 which means that at this point they will all be assigned the
 flags set up for the interrupts in the device tree.
@@ -38,9 +38,15 @@ files already do.
 Switched to using the symbolic name IRQ_TYPE_NONE so that
 we get this more readable.
 
-Cc: stable at vger.kernel.org
-Fixes: bce360469676 ("ARM: dts: apq8064: add pm8921 mpp support")
-Fixes: 874443fe9e33 ("ARM: dts: apq8064: Add pm8921 mfd and its gpio node")
+This misconfiguration was caused by a copy/pasting the
+APQ8064 set-up, the latter has been fixed in a separate
+patch.
+
+Tested with one of the SPMI GPIOs: after this I can
+successfully request one of these GPIOs as falling edge
+from the device tree.
+
+Fixes: 0840ea9e4457 ("ARM: dts: add GPIO and MPP to MSM8660 PMIC")
 Cc: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 Cc: Stephen Boyd <sboyd@codeaurora.org>
 Cc: Bj?rn Andersson <bjorn.andersson@linaro.org>
@@ -49,29 +55,25 @@ Cc: John Stultz <john.stultz@linaro.org>
 Cc: Andy Gross <andy.gross@linaro.org>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
-I vaguely remember John having problems with interrupts
-on the Nexus 7 that could be related to this so involving
-him on these patches.
----
- arch/arm/boot/dts/qcom-apq8064.dtsi | 76 +++++++++++++++++++++++++++----------
- 1 file changed, 57 insertions(+), 19 deletions(-)
+ arch/arm/boot/dts/qcom-msm8660.dtsi | 75 ++++++++++++++++++++++++++++---------
+ 1 file changed, 57 insertions(+), 18 deletions(-)
 
-diff --git a/arch/arm/boot/dts/qcom-apq8064.dtsi b/arch/arm/boot/dts/qcom-apq8064.dtsi
-index 74a9b6c394f5..9dc83b09d987 100644
---- a/arch/arm/boot/dts/qcom-apq8064.dtsi
-+++ b/arch/arm/boot/dts/qcom-apq8064.dtsi
-@@ -5,6 +5,7 @@
- #include <dt-bindings/reset/qcom,gcc-msm8960.h>
- #include <dt-bindings/clock/qcom,mmcc-msm8960.h>
- #include <dt-bindings/soc/qcom,gsbi.h>
+diff --git a/arch/arm/boot/dts/qcom-msm8660.dtsi b/arch/arm/boot/dts/qcom-msm8660.dtsi
+index acbe71febe13..8c65e0d82559 100644
+--- a/arch/arm/boot/dts/qcom-msm8660.dtsi
++++ b/arch/arm/boot/dts/qcom-msm8660.dtsi
+@@ -2,6 +2,7 @@
+ 
+ /include/ "skeleton.dtsi"
+ 
 +#include <dt-bindings/interrupt-controller/irq.h>
  #include <dt-bindings/interrupt-controller/arm-gic.h>
- / {
- 	model = "Qualcomm APQ8064";
-@@ -559,22 +560,50 @@
- 					compatible = "qcom,pm8921-gpio",
+ #include <dt-bindings/clock/qcom,gcc-msm8660.h>
+ #include <dt-bindings/soc/qcom,gsbi.h>
+@@ -159,21 +160,50 @@
  						     "qcom,ssbi-gpio";
  					reg = <0x150>;
+ 					interrupt-parent = <&pmicintc>;
 -					interrupts = <192 1>, <193 1>, <194 1>,
 -						     <195 1>, <196 1>, <197 1>,
 -						     <198 1>, <199 1>, <200 1>,
@@ -87,7 +89,6 @@ index 74a9b6c394f5..9dc83b09d987 100644
 -						     <228 1>, <229 1>, <230 1>,
 -						     <231 1>, <232 1>, <233 1>,
 -						     <234 1>, <235 1>;
--
 +					interrupts = <192 IRQ_TYPE_NONE>,
 +						     <193 IRQ_TYPE_NONE>,
 +						     <194 IRQ_TYPE_NONE>,
@@ -135,9 +136,9 @@ index 74a9b6c394f5..9dc83b09d987 100644
  					gpio-controller;
  					#gpio-cells = <2>;
  
-@@ -587,9 +616,18 @@
- 					gpio-controller;
+@@ -187,9 +217,18 @@
  					#gpio-cells = <2>;
+ 					interrupt-parent = <&pmicintc>;
  					interrupts =
 -					<128 1>, <129 1>, <130 1>, <131 1>,
 -					<132 1>, <133 1>, <134 1>, <135 1>,
@@ -156,6 +157,6 @@ index 74a9b6c394f5..9dc83b09d987 100644
 +					<139 IRQ_TYPE_NONE>;
  				};
  
- 				rtc at 11d {
+ 				pwrkey at 1c {
 -- 
 2.7.4
