@@ -1,66 +1,59 @@
-From: frank.wang@rock-chips.com (Frank Wang)
-Date: Fri, 5 Aug 2016 16:34:42 +0800
-Subject: [PATCH v3 2/7] clk: rockchip: rk3399: export 480M_SRC clock id
- for usbphy0/usbphy1
-In-Reply-To: <1918977.W0kRfKbZsD@diego>
-References: <1470122401-31934-1-git-send-email-zhengxing@rock-chips.com>
- <1470122401-31934-3-git-send-email-zhengxing@rock-chips.com>
- <1918977.W0kRfKbZsD@diego>
-Message-ID: <cba79ba6-7f41-5398-389c-7fd3fe5e0089@rock-chips.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri,  5 Aug 2016 10:38:36 +0200
+Subject: [PATCH 0/2] Fix Qualcomm 8064/8660 interrupt flags
+Message-ID: <1470386318-17694-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko,
+This came out after some frustration with trying to flag a PM8058
+interrupt line on the APQ8060 (MSM8660) to trigger on falling
+edges. It was conflicting badly with predefined contradictory
+flags in the device tree for the entire GPIO block. The same
+seems to hold for the MPP GPIO IRQs.
 
-On 2016/8/5 3:10, Heiko St?bner wrote:
-> Hi Xing,
->
-> Am Dienstag, 2. August 2016, 15:19:56 schrieb Xing Zheng:
->> Export these source clocks for usbphy.
->>
->> Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
-> can you please provide a rationale why you need manual control over that
-> intermediate clock?
+This was caused by copy/pasting the solution from APQ8064 and
+I suspect the problem is seen there too whenever someon tries to
+use an interrupt on any other edge than rising (e.g. falling or
+both edges).
 
-Well, From below graph, you can see that 'clk_usbphyX_480m' is generated 
-from usb2phy, and 'clk_usbphy_480m' which select from 
-clk_usbphyX_480m_src via a gate (G13[12])  provided 480M clock to other 
-modules.
+These two patches should probably go in as fixes to make it
+possible to use these interrupts properly.
 
-   xin24m
-       |__ clk_usb2phy0_ref
-       |                 |__ clk_usbphy0_480m
-       |                                   |__clk_usbphy0_480m_src
-       | |__clk_usbphy_480m
-       |         |__ ... ...
-       |__ clk_usb2phy1_ref
-                          |__ clk_usbphy1_480m
-                                          |__clk_usbphy1_480m_src
+This is not the only problem with the SPMI/MPP GPIO IRQs. The
+most glaring problem is the numbering of the IRQ lines in the
+device tree: if you want to request a GPIO from the GPIO or
+MPP block on the PMIC, you have to do something like this:
 
-> The two usbphys seem to use the  clk_usb2phyX_ref clocks, generate the 480m
-> clocks, but do not seem to need the clk_usbphyX_480m_src gates.
+mpu3050 at 68 {
+    compatible = "invn,mpu3050";
+    reg = <0x68>;
+    /*
+     * GPIO17 has interrupt 208 on the
+     * PM8058.
+     */
+    interrupt-parent = <&pm8058_gpio>;
+    interrupts = <208 IRQ_TYPE_EDGE_FALLING>;
+...
 
-Yeah, they used to be. However, the story went something like this,
+I.e. we're not using the local IRQ HW number (17) instead the
+PM-global hw number 208. This is because the GPIO subdriver
+does not implement its own irqdomain, and I suspect this
+should be fixed by using the hierarchical irqdomain to work
+properly.
 
-Some PM suspend process related ehci/ohci controller are base on 480m 
-clocks, unfortunately, usb2-phy suspended earlier than ehci/ohci 
-(usb2-phy will be auto suspended if no devices plug-in), and the 
-clk-480m provided by it was disabled if no module used. As a result, the 
-PM suspend process was blocked when it run into ehci/ohci module.
+This patch set does not fix the latter issue, but I want to
+highlight it in the current context. My recommendation is for
+nodes using these interrupts to refer directly to the PMIC
+node for the time being, as the number on the GPIO/MPP nodes
+is kind of skewed.
 
-Hence, we are planing to refer clk_usbphyX_480m_src into each ehci/ohci 
-driver. Maybe you will challenge why not refer clk_usbphy_480m directly? 
-because there are two ehci/ohci connected in the different usb2phy, and 
-only one clk_usbphy_480m clock was selected in clock tree.
+Linus Walleij (2):
+  ARM: dts: MSM8064 remove flags from SPMI/MPP IRQs
+  ARM: dts: MSM8660 remove flags from SPMI/MPP IRQs
 
-BR.
-Frank
+ arch/arm/boot/dts/qcom-apq8064.dtsi | 76 +++++++++++++++++++++++++++----------
+ arch/arm/boot/dts/qcom-msm8660.dtsi | 75 +++++++++++++++++++++++++++---------
+ 2 files changed, 114 insertions(+), 37 deletions(-)
 
-> The clk_usbphyX_480m_src clocks on the other hand only lead to the
-> clk_usbphy_480m mux, so I'd like some explanation on what you want to achieve
-> here :-)
->
->
-> Thanks
-> Heiko
->
+-- 
+2.7.4
