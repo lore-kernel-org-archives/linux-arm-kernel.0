@@ -1,63 +1,45 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 05 Aug 2016 17:50:10 +0200
-Subject: Why do we need reset_control_get_optional() ?
-In-Reply-To: <1469703649.12835.34.camel@pengutronix.de>
-References: <CAK7LNAQnitMMp5wMXXvVeS-UFF=Fo9m=M1hL=5f4=RF8JYCnGg@mail.gmail.com>
- <CAK7LNAQ0nCQymq+M+FTUXoK7yBj_5CJp9nqDjO3u5wcnckXtmw@mail.gmail.com>
- <1469703649.12835.34.camel@pengutronix.de>
-Message-ID: <1859714.7lR6dsl2IG@wuerfel>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Fri, 5 Aug 2016 17:53:44 +0200
+Subject: [PATCH V3 1/6] perf/core: Adding PMU driver specific configuration
+In-Reply-To: <CANLsYkzK+mNRYiGn0SLQ5kA0+xxi6OGVbNL4F3LLRBTgSkssxQ@mail.gmail.com>
+References: <1469742143-22245-1-git-send-email-mathieu.poirier@linaro.org>
+ <1469742143-22245-2-git-send-email-mathieu.poirier@linaro.org>
+ <20160804165821.GT6862@twins.programming.kicks-ass.net>
+ <CANLsYkzK+mNRYiGn0SLQ5kA0+xxi6OGVbNL4F3LLRBTgSkssxQ@mail.gmail.com>
+Message-ID: <20160805155344.GV6879@twins.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, July 28, 2016 1:00:49 PM CEST Philipp Zabel wrote:
-> Am Donnerstag, den 28.07.2016, 19:52 +0900 schrieb Masahiro Yamada:
+On Fri, Aug 05, 2016 at 09:35:05AM -0600, Mathieu Poirier wrote:
+> On 4 August 2016 at 10:58, Peter Zijlstra <peterz@infradead.org> wrote:
+> > On Thu, Jul 28, 2016 at 03:42:18PM -0600, Mathieu Poirier wrote:
+> >> This patch somewhat mimics the work done on address filters to
+> >> add the infrastructure needed to pass PMU specific HW
+> >> configuration to the driver before a session starts.
+> >>
+> >> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+> >
+> >> diff --git a/include/uapi/linux/perf_event.h b/include/uapi/linux/perf_event.h
+> >> index c66a485a24ac..90fbc5fd3925 100644
+> >> --- a/include/uapi/linux/perf_event.h
+> >> +++ b/include/uapi/linux/perf_event.h
+> >> @@ -407,6 +407,7 @@ struct perf_event_attr {
+> >>  #define PERF_EVENT_IOC_ID            _IOR('$', 7, __u64 *)
+> >>  #define PERF_EVENT_IOC_SET_BPF               _IOW('$', 8, __u32)
+> >>  #define PERF_EVENT_IOC_PAUSE_OUTPUT  _IOW('$', 9, __u32)
+> >> +#define PERF_EVENT_IOC_SET_DRV_CONFIGS       _IOW('$', 10, char *)
+> >
+> > Please also do a manpages patch.
+> 
+> Patch 3/6 in this set documents the new option
+> (tools/perf/Documentation/perf-record.tx).  Is this what you were
+> looking for?  If not please expand on the information you want to see
+> added add and where.
 
-> > > In my experimental patch, I make the _optional functions
-> > > return NULL if no "resets" property is provided but return
-> > > an error if there are reset lines but the subsystem is
-> > > disabled, i.e. an optional reset must be used if it's in the
-> > > DT, but can be ignored otherwise.
-> > 
-> > I do not like this idea.
-> > 
-> > reset_control_get() (or variants) should not return NULL, it is ambiguous.
-> > It should return ERR_PTR(-ENOENT) if no "resets" property.
-> > 
-> > I only want two types for functions that return a pointer.
-> > 
-> > [1] return a valid pointer on success, or return NULL on failure
-> >     (for example, kmalloc())
-> > [2] return a valid pointer on success, or return error pointer on failure
-> >    (many of _register() functions)
-> > 
-> > Mixing [1] and [2] will be a mess.
+Since you add an IOCTL (with preferably more structure than present in
+this patch, see the other email) this needs to be documented in the
+syscall manpage.
 
-Ah, right. I was thinking only of the case where the reset subsystem
-is completely disabled here, so returning NULL could be considered
-a valid return code that can in turn be passed into the other
-functions.
+  http://git.kernel.org/cgit/docs/man-pages/man-pages.git/tree/man2/perf_event_open.2
 
-However, I agree that returning NULL as a valid result from
-..._get_optional() would be bad style, so let's drop my idea
-there.
-
-> I too would prefer to keep that as-is. The reset_control_get_optional
-> stub could return -ENOENT if there is no resets device tree property.
-
-Now I'm also confused about what we really need
-reset_control_get_optional() for, and which error codes the callers
-are supposed to check.
-
-This is the matrix I think you mean for _get_optional:
-
-CONFIG_RESET_CONTROLLER=y, dt entry present: valid pointer (or other error)
-CONFIG_RESET_CONTROLLER=n, dt entry present: -EOPNOTSUPP
-CONFIG_RESET_CONTROLLER=y, dt entry missing: -ENOENT
-CONFIG_RESET_CONTROLLER=n, dt entry missing: -ENOENT
-
-Is this what you had in mind? If so, what is the value of the
-added runtime warning for reset_control_get? Any caller of that
-function would already check for errors, the only difference
-I see is that callers of _optional can ignore -ENOENT.
-
-	Arnd
+  http://www.man7.org/linux/man-pages/man2/perf_event_open.2.html
