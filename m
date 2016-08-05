@@ -1,73 +1,38 @@
 From: stephen.boyd@linaro.org (Stephen Boyd)
-Date: Fri, 05 Aug 2016 14:40:00 -0700
-Subject: [PATCH v2 03/22] usb: ulpi: Support device discovery via device
- properties
-In-Reply-To: <20160718022355.GA8568@rob-hp-laptop>
+Date: Fri, 05 Aug 2016 14:41:37 -0700
+Subject: [PATCH v2 04/22] usb: chipidea: Only read/write OTGSC from one
+ place
+In-Reply-To: <20160708091456.GC20485@shlinux2>
 References: <20160707222114.1673-1-stephen.boyd@linaro.org>
- <20160707222114.1673-4-stephen.boyd@linaro.org>
- <20160718022355.GA8568@rob-hp-laptop>
-Message-ID: <147043320014.26915.7483025835695600714@sboyd-linaro>
+ <20160707222114.1673-5-stephen.boyd@linaro.org>
+ <20160708091456.GC20485@shlinux2>
+Message-ID: <147043329762.26915.1413688974325107381@sboyd-linaro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Rob Herring (2016-07-17 19:23:55)
-> On Thu, Jul 07, 2016 at 03:20:54PM -0700, Stephen Boyd wrote:
-> > +-------
-> > +
-> > +usb {
-> > +     compatible = "vendor,usb-controller";
-> > +
-> > +     ulpi {
-> > +             phy {
-> > +                     compatible = "vendor,phy";
-> > +                     ulpi-vendor = /bits/ 16 <0x1d6b>;
-> > +                     ulpi-product = /bits/ 16 <0x0002>;
-> > +             };
-> > +     };
+Quoting Peter Chen (2016-07-08 02:14:57)
+> On Thu, Jul 07, 2016 at 03:20:55PM -0700, Stephen Boyd wrote:
+> > diff --git a/drivers/usb/chipidea/otg.c b/drivers/usb/chipidea/otg.c
+> > index 03b6743461d1..a6fc60934297 100644
+> > --- a/drivers/usb/chipidea/otg.c
+> > +++ b/drivers/usb/chipidea/otg.c
+> > @@ -104,7 +104,31 @@ void ci_handle_vbus_change(struct ci_hdrc *ci)
+> >               usb_gadget_vbus_disconnect(&ci->gadget);
+> >  }
+> >  
+> > -#define CI_VBUS_STABLE_TIMEOUT_MS 5000
+> > +/**
+> > + * When we switch to device mode, the vbus value should be lower
+> > + * than OTGSC_BSV before connecting to host.
+> > + *
+> > + * @ci: the controller
+> > + *
+> > + * This function returns an error code if timeout
+> > + */
+> > +static int hw_wait_otgsc_bsv(struct ci_hdrc *ci)
 > 
-> I'm still having concerns about describing both phys and devices. If I 
-> have a controller with 2 ports and 2 devices attached, I'd have 
-> something like this under the USB controller:
-> 
-> ulpi {
->         phy at 1 {
->         };
->         phy at 2 {
->         };
-> };
-
-My understanding is there would only be one status="ok" node on the ULPI
-bus for the single phy that a usb controller would have. At the least,
-the kernel's ULPI layer only seems to support one ULPI phy for a
-controller right now. So even if there are two ports, it doesn't mean
-there are two phys.
-
-> 
-> dev at 1 {
-> ...
-> };
-> 
-> dev at 2 {
-> ...
-> };
-> 
-> 
-> That doesn't seem the best, but I don't have a better suggestion. Maybe 
-> the device nodes need to go under the phy nodes?
+> I think the function name should reflect "we wait for vbus lower than bsv"
+> Care to change one?
 > 
 
-What if we moved the dev at 1 and dev at 2 to another sub node like "ports" or
-"usb-devices"? Legacy code can support having those devices directly
-underneath the usb controller, but future users would always need to put
-them in a different sub-node so that we can easily differentiate the
-different busses that a usb controller node may support?
-
-I'm not sure I see any need to relate the phy to the ports that are on
-the controller, but if that is needed then perhaps you're right and we
-should move the ports underneath the phy. USB core could be modified to
-go through the legacy path or through the phy, if it even exists, to
-find ports.
-
-Do we typically do this for other phy designs like sata or pci? The phy
-always seemed like a parallel thing to the logical bus that the phy is
-used for.
+Sure, something like hw_wait_vbus_lower_bsv()?
