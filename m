@@ -1,83 +1,46 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Thu, 04 Aug 2016 17:25:23 -0700
-Subject: [PATCH] ARM: dts: da850: Add basic DTS for the L138/C6748 Dev Kit
-In-Reply-To: <20160804200522.GB15878@gobelin> (Karl Beldan's message of "Thu,
- 4 Aug 2016 20:05:22 +0000")
-References: <20160804144332.4841-1-kbeldan@baylibre.com>
- <m2popopcqu.fsf@baylibre.com> <20160804200522.GB15878@gobelin>
-Message-ID: <m28twcnjt8.fsf@baylibre.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 4 Aug 2016 17:57:48 -0700
+Subject: [PATCH 2/3] regulator: qcom_smd: Fix voltage ranges for pma8084
+ ftsmps and pldo
+In-Reply-To: <20160711223827.GA6053@hector.attlocal.net>
+References: <20160711215009.4519-1-sboyd@codeaurora.org>
+ <20160711215009.4519-3-sboyd@codeaurora.org>
+ <20160711223827.GA6053@hector.attlocal.net>
+Message-ID: <20160805005748.GC15690@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Karl Beldan <kbeldan@baylibre.com> writes:
+On 07/11, Andy Gross wrote:
+> On Mon, Jul 11, 2016 at 02:50:08PM -0700, Stephen Boyd wrote:
+> > The voltage ranges listed here are wrong. The pma8084 pldo
+> > supports three different overlapping voltage ranges with
+> > differing step sizes and the pma8084 ftsmps supports two. These
+> > ranges can be seen in the "native" spmi regulator driver
+> > (qcom_spmi-regulator.c) at pldo_ranges[] and ftsmps_ranges[]
+> > respectively. Port these ranges over to the RPM SMD regulator
+> > driver so that we list the appropriate set of supported voltages
+> > on these types of regulators.
+> > 
+> > Cc: Andy Gross <andy.gross@linaro.org>
+> > Cc: Bjorn Andersson <bjorn.andersson@linaro.org>
+> > Fixes: ee01d0c91ef1 ("regulator: qcom-smd: Add support for PMA8084")
+> > Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> 
+> <snip>
+> 
+> >  static const struct regulator_desc pma8084_pldo = {
+> >  	.linear_ranges = (struct regulator_linear_range[]) {
+> > -		REGULATOR_LINEAR_RANGE(750000,  0,  30, 25000),
+> > -		REGULATOR_LINEAR_RANGE(1500000, 31, 99, 50000),
+> > +		REGULATOR_LINEAR_RANGE( 750000,  0,  63, 12500),
+> 
+> It was my understanding that the PMOS ldos only support 25mV and 50mV
+> incremements.
+> 
 
-> On Thu, Aug 04, 2016 at 12:15:05PM -0700, Kevin Hilman wrote:
->> + Sekhar
->> 
->> Hi Karl,
->> 
->> Karl Beldan <kbeldan@baylibre.com> writes:
->> 
->> > The LCDK is the successor to the late Hawkboard and has the same machine
->> > number.
->> 
->> Machine number is only relevant for legacy (non-DT) boot and this is DT
->> boot, so the machine number bit really relevant for this changelog.
->> 
-> Hi Kevin,
->
-> It was purely informative.
->
->> BTW, have you tried legacy boot on LCDK with board-omapl138-hawk.c?  I
->> assume it mostly works?
->>
-> Yes.
->
->> > Among the differences are the flash (16bits vs 8bits) and some pins
->> > (MMC, LEDs, buttons, some external connectors), however the main
->> > components remain the same (eth. PHY, Audio Codec, Video decoder and
->> > DAC) except for the main PMIC, different and hard-wired on the LCDK (the
->> > LDOs and DCDCs are always ON).
->> > A DT-only boot with this addition gives functional uart, reboot via
->> > watchdog, rtc, ethernet and MMC (I added the CD gpio for the MMC
->> > although davinci_mmc doesn't call yet the mmc core OF facilities).
->> >
->> > Signed-off-by: Karl Beldan <kbeldan@baylibre.com>
->> 
->> Tested with v4.7 on my LCDK board.
->> 
->> Tested-by: Kevin Hilman <khilman@baylibre.com>
->> 
->> Note that I also needed CONFIG_RTC_DRV_OMAP=m enabled in
->> davinci_all_defconfig for the RTC driver. Could you add a patch for that
->> to this series as well?
->> 
-> No problem. BTW do you also consider CONFIG_ items not arch specific
-> (like CONFIG_NET_VENDOR_SMSC) ?
+Unfortunately that isn't true. It also supports 12.5mV steps for
+the lower voltage ranges.
 
-Do you mean for davinci_all_config?  Yes.
-
->
->> Also, plese Cc the co-maintainer Sekhar Nori (now Cc'd) on all future
->> davinci patches.
->> 
-> Sure.
->
->> > ---
->> >  Documentation/devicetree/bindings/arm/davinci.txt |  4 ++
->> >  arch/arm/boot/dts/Makefile                        |  1 +
->> >  arch/arm/boot/dts/omapl138-lcdk.dts               | 71 +++++++++++++++++++++++
->> 
->> I think this should be called da850-lcdk.dts.
->> 
->> The OMAP prefix in the DT directory is just going to cause confusion,
->> and the other DTs using this same SoC are already called da850.
->> 
-> That's what I thought too, mainline U-Boot is using omapl138_lcdk but
-> yes da850 is less confusing given the code already present (downside is
-> when you search for da850 on the net there's nothing).
-
-OK, let's stick with da850 for the DT names.  The other help texts
-already list all the names da850/omapl138/am18x so we should be fine.
-
-Kevin
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
