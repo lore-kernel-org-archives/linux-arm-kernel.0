@@ -1,65 +1,63 @@
-From: appana.durga.rao@xilinx.com (Appana Durga Kedareswara Rao)
-Date: Fri, 5 Aug 2016 06:48:51 +0000
-Subject: [RFC PATCH v3 1/2] Documentation: DT: net: Add Xilinx
- gmiitorgmii converter device tree binding documentation
-In-Reply-To: <20160804182515.GA19890@rob-hp-laptop>
-References: <1470312789-28275-1-git-send-email-appanad@xilinx.com>
- <20160804182515.GA19890@rob-hp-laptop>
-Message-ID: <C246CAC1457055469EF09E3A7AC4E11A4A5DD373@XAP-PVEXMBX01.xlnx.xilinx.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 5 Aug 2016 08:58:45 +0200
+Subject: serial: imx: regression triggered by newly introduced DSR irq
+ handling
+In-Reply-To: <1470350663.26773.41.camel@googlemail.com>
+References: <1458825865-7434-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <1458825865-7434-7-git-send-email-u.kleine-koenig@pengutronix.de>
+ <1470350663.26773.41.camel@googlemail.com>
+Message-ID: <20160805065845.GI17874@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+Hello Christoph,
 
-	Thanks for the review...
+Cc += Shawn, Fabio
 
-<Snip>
-
-> > +XILINX GMIITORGMII Converter Driver Device Tree Bindings
-> > +--------------------------------------------------------
-> > +
-> > +The Gigabit Media Independent Interface (GMII) to Reduced Gigabit
-> > +Media Independent Interface (RGMII) core provides the RGMII between
-> > +RGMII-compliant Ethernet physical media devices (PHY) and the Gigabit
-> Ethernet controller.
-> > +This core can be used in all three modes of operation(10/100/1000 Mb/s).
-> > +The Management Data Input/Output (MDIO) interface is used to
-> > +configure the Speed of operation. This core can switch dynamically
-> > +between the three Different speed modes by configuring the conveter
-> register through mdio write.
-> > +
-> > +The MDIO is a bus to which the PHY devices are connected.  For each
-> > +device that exists on this bus, a child node should be created.  See
-> > +the definition of the PHY node in booting-without-of.txt for an
-> > +example of how to define a PHY.
-> > +
-> > +Required properties:
-> > +  - compatible : Should be "xilinx,gmiitorgmii"
+On Fri, Aug 05, 2016 at 12:44:23AM +0200, Christoph Fritz wrote:
+> here on a imx6sx board newly introduced DSR-irq-handling breaks serial
+> console and network support.
 > 
-> Perhaps xilinx,gmii-to-rgmii.
-
-Sure...
-
+> Reverting commit 27e16501052e5341934d3 "serial: imx: implement DSR irq
+> handling for DTE mode" fixes the issue.
 > 
-> This needs some sort of version information in the compatible string.
-
-Sure will fix in the next version...
-
+> The underlying cause is the RMII network configuration where register
+> bit SION in IOMUXC_SW_MUX_CTL_PAD_ENET1_TX_CLK is necessary. But this
+> also falsely feeds signal UART1_DTR_B and triggers DSR irq...
 > 
-> > +  - reg : The ID number for the phy, usually a small integer
-> > +
-> > +Example:
-> > +	mdio {
-> > +                #address-cells = <1>;
-> > +                #size-cells = <0>;
-> > +		ethernet-phy at 0 {
-> > +			......
-> > +		};
-> > +                gmii_to_rgmii: gmii_to_rgmii at 8 {
-> 
-> Don't use underscores in node names.
+> Can we revert this commit or add a quirk for RMII-SION configs or make
+> this optional by a device tree option?
 
-Ok will fix in the next version...
+Hmm, MX6SX_PAD_ENET1_TX_CLK__ENET1_TX_CLK in
+arch/arm/boot/dts/imx6sx-pinfunc.h doesn't have SION set.
 
-Regards,
-Kedar.
+I remember there were issues around eth and SION on i.MX6DL, but don't
+know the details. A quick net research found
+https://community.nxp.com/thread/359531 which has: "Set the SION bit.
+Note that this is not required because the funtion setting controls the
+signal path, but it is good practice as it reminds the user that the
+clock needs to fed back into the Ethernet MAC.". Sounds like dangerous
+smattering and a wrong expectation about "users".
+
+https://community.nxp.com/thread/376821 is from someone who has the same
+problem(?) on i.MX6SX, but no solution yet.
+
+Does that mean MX6SX_PAD_ENET1_TX_CLK__ENET1_TX_CLK always needs the
+SION bit set? Even if not, I'd like to have that documented there,
+similar to da4fa6fa8016 ("ARM: imx25-pinfunc: document SION being
+important for MX25_PAD_SD1_CMD__SD1_CMD").
+
+Once this is done (and still an issue) I'd suggest to standardize a dt
+property
+
+	disable-dsr;
+
+(and the same for the other handshaking lines) and support th{is,ese} in
+the imx uart driver. Reverting 27e16501052e IMO isn't a sensible option.
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
