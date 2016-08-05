@@ -1,38 +1,65 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 4 Aug 2016 17:58:26 -0700
-Subject: [PATCH 1/3] regulator: qcom_smd: Fix voltage ranges for pm8x41
-In-Reply-To: <20160711224845.GC6053@hector.attlocal.net>
-References: <20160711215009.4519-1-sboyd@codeaurora.org>
- <20160711215009.4519-2-sboyd@codeaurora.org>
- <20160711224845.GC6053@hector.attlocal.net>
-Message-ID: <20160805005826.GD15690@codeaurora.org>
+From: zhengxing@rock-chips.com (Xing Zheng)
+Date: Fri, 05 Aug 2016 10:26:57 +0800
+Subject: [PATCH v3 7/7] clk: rockchip: rk3399: Add support frac mode
+ frequencies
+In-Reply-To: <12790025.3tRiQgk9GG@diego>
+References: <1470122401-31934-1-git-send-email-zhengxing@rock-chips.com>
+ <1470122579-32083-1-git-send-email-zhengxing@rock-chips.com>
+ <12790025.3tRiQgk9GG@diego>
+Message-ID: <57A3F971.6000009@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/11, Andy Gross wrote:
-> On Mon, Jul 11, 2016 at 02:50:07PM -0700, Stephen Boyd wrote:
-> 
-> >  static const struct regulator_desc pm8941_pldo = {
-> >  	.linear_ranges = (struct regulator_linear_range[]) {
-> > -		REGULATOR_LINEAR_RANGE( 750000,  0,  30, 25000),
-> > -		REGULATOR_LINEAR_RANGE(1500000, 31, 99, 50000),
-> > +		REGULATOR_LINEAR_RANGE( 750000,  0,  63, 12500),
-> > +		REGULATOR_LINEAR_RANGE(1550000, 64, 126, 25000),
-> > +		REGULATOR_LINEAR_RANGE(3100000, 127, 163, 50000),
-> >  	},
-> > -	.n_linear_ranges = 2,
-> > -	.n_voltages = 100,
-> > +	.n_linear_ranges = 3,
-> > +	.n_voltages = 164,
-> >  	.ops = &rpm_smps_ldo_ops,
-> >  };
-> 
-> Still a little confused on if the 12.5mV is allowed on pmos ldo.  It seems like the
-> nmos has 1 range of 5mV steps.  The PMOS has 2 ranges, using 25mV and 50mV
-> 
+Hi Heiko,
 
-The values I've put in these patches are the correct ranges.
+On 2016?08?05? 03:19, Heiko St?bner wrote:
+> Hi Xing,
+>
+> Am Dienstag, 2. August 2016, 15:22:59 schrieb Xing Zheng:
+>> We need to support various display resolutions for external
+>> display devices like HDMI/DP, the frac mode can help us to
+>> acquire almost any frequencies, and need higher VCOs to reduce
+>> clock jitters.
+>>
+>> Signed-off-by: Xing Zheng<zhengxing@rock-chips.com>
+> why does this need to be a separate rate array and cannot live in the general
+> pll rate array?
+>
+> The plls are general purpose, so we shouldn't limit them arbitarily.
+Yes, I understand your mean. :-)
+>
+> I currently only see some frequencies (594MHz, 297MHz, 54MHz) that are present
+> in both arrays but have different settings. As your patch description says
+> that these settings reduce clock jitter, wouldn't the general frequencies also
+> profit from merging these new values into the general rate array?
+>
+>
+and here are some of our ideas:
+
+"WIth the frac mode and higher VCO to reduce clock jitters" that 
+suggestion is from IC designer.
+There are many and various kinds resolution and needed frequencies for 
+external disaplay devices. For example, the DP needs:
+3840x2160 533250KHz
+3840x2160 297000KHz
+3840x2160 296703KHz
+2560x1440 241500KHz
+1920x1080 148500KHz
+1920x1080 148352KHz
+1680x1050 146250KHz
+1600x900 108000KHz
+1280x1024 135000KHz
+1280x1024 108000KHz
+... and so on
+
+There some frequencies must be allocated with frac mode. We separate 
+these frequencies that are only used for display (VPLL) from the general 
+rate table, and put them to be classified into a frac mode table, we can 
+reduce the frequency of the query time, the two rate tables will not 
+interfere with each other. Because other PLLs don't need to assgin these 
+various frequencies with frac mode.
+
+Thanks
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+- Xing Zheng
