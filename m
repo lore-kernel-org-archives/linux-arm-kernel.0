@@ -1,74 +1,83 @@
-From: kbeldan@baylibre.com (Karl Beldan)
-Date: Thu, 4 Aug 2016 23:43:49 +0000
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Thu, 04 Aug 2016 17:25:23 -0700
 Subject: [PATCH] ARM: dts: da850: Add basic DTS for the L138/C6748 Dev Kit
-In-Reply-To: <CAL_Jsq+3eWgcYc=wpgVCadSFQUyE+WLfA3kTb10AuoZfiKsKog@mail.gmail.com>
+In-Reply-To: <20160804200522.GB15878@gobelin> (Karl Beldan's message of "Thu,
+ 4 Aug 2016 20:05:22 +0000")
 References: <20160804144332.4841-1-kbeldan@baylibre.com>
- <20160804182902.GA22499@rob-hp-laptop>
- <20160804210326.GE15013@gobelin>
- <CAL_Jsq+3eWgcYc=wpgVCadSFQUyE+WLfA3kTb10AuoZfiKsKog@mail.gmail.com>
-Message-ID: <20160804234349.GA4391@gobelin>
+ <m2popopcqu.fsf@baylibre.com> <20160804200522.GB15878@gobelin>
+Message-ID: <m28twcnjt8.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 04, 2016 at 04:13:10PM -0500, Rob Herring wrote:
-> +Peter H
-> 
-> On Thu, Aug 4, 2016 at 4:03 PM, Karl Beldan <kbeldan@baylibre.com> wrote:
-> > On Thu, Aug 04, 2016 at 01:29:02PM -0500, Rob Herring wrote:
-> >> On Thu, Aug 04, 2016 at 02:43:32PM +0000, Karl Beldan wrote:
-> >> > The LCDK is the successor to the late Hawkboard and has the same machine
-> >> > number.
-> >> > Among the differences are the flash (16bits vs 8bits) and some pins
-> >> > (MMC, LEDs, buttons, some external connectors), however the main
-> >> > components remain the same (eth. PHY, Audio Codec, Video decoder and
-> >> > DAC) except for the main PMIC, different and hard-wired on the LCDK (the
-> >> > LDOs and DCDCs are always ON).
-> >> > A DT-only boot with this addition gives functional uart, reboot via
-> >> > watchdog, rtc, ethernet and MMC (I added the CD gpio for the MMC
-> >> > although davinci_mmc doesn't call yet the mmc core OF facilities).
-> 
-> [...]
-> 
-> >> > +   aliases {
-> >> > +           serial2 = &serial2;
-> >> > +   };
-> >> > +
-> >> > +   chosen {
-> >> > +           bootargs = "console=ttyS2,115200n8 earlycon";
-> >>
-> >> You don't need console with stdout-path set. And really, earlycon should
-> >> not be the default.
-> >>
-> > Ok for earlycon.
-> >
-> > For the console, I thought likewise .. until I _struggled_ to understand
-> > why the console was disappearing under my feet.
-> > It seemed even stranger when I started looking at the codepath because
-> > drivers/of/base.c would properly add_preferred_console as expected after
-> > the corresponding UART was added. But the reality was there, without it
-> > the console was not like stdout-path.
-> > Among the commits that could instill doubt as to whether stdout-path
-> > rules is f64255b5072d:
-> > "The assumption that at least 1 preferred console will be registered
-> > when the stdout-path property is set is invalid, which can result in
-> > _no_ consoles.", though it didn't answer my question.
-> > I started looking whether tty0 was not getting in the way and in the end
-> > I came up with setting console.
-> > But you seem affirmative.
-> 
-> There have been some issues in this area, but I thought they were in
-> conjunction with earlycon and solved now. This is a fairly common
-> review request for dts files, so I'm surprised if it doesn't work
-> right. Maybe having tty0 or not has some influence. Or people just
-> accept review comments without testing or caring...
-> 
-I can assure you I tested without early{con,printk} ;).
+Karl Beldan <kbeldan@baylibre.com> writes:
 
-Now I have just rechecked the codepaths and something caught my
-attention in kernel/printk/printk.c:__add_preferred_console(): if
-console_cmdline is empty selected_console gets unconditionally set to
-zero ! Knowing this I confirmed by replacing with idx (works), and also
-by using ttyS0 (i.e. alias serial0 = &uart2) (works), this would not
-affect DTs using serial0. It's late here so I'll stop there.
- 
-Karl
+> On Thu, Aug 04, 2016 at 12:15:05PM -0700, Kevin Hilman wrote:
+>> + Sekhar
+>> 
+>> Hi Karl,
+>> 
+>> Karl Beldan <kbeldan@baylibre.com> writes:
+>> 
+>> > The LCDK is the successor to the late Hawkboard and has the same machine
+>> > number.
+>> 
+>> Machine number is only relevant for legacy (non-DT) boot and this is DT
+>> boot, so the machine number bit really relevant for this changelog.
+>> 
+> Hi Kevin,
+>
+> It was purely informative.
+>
+>> BTW, have you tried legacy boot on LCDK with board-omapl138-hawk.c?  I
+>> assume it mostly works?
+>>
+> Yes.
+>
+>> > Among the differences are the flash (16bits vs 8bits) and some pins
+>> > (MMC, LEDs, buttons, some external connectors), however the main
+>> > components remain the same (eth. PHY, Audio Codec, Video decoder and
+>> > DAC) except for the main PMIC, different and hard-wired on the LCDK (the
+>> > LDOs and DCDCs are always ON).
+>> > A DT-only boot with this addition gives functional uart, reboot via
+>> > watchdog, rtc, ethernet and MMC (I added the CD gpio for the MMC
+>> > although davinci_mmc doesn't call yet the mmc core OF facilities).
+>> >
+>> > Signed-off-by: Karl Beldan <kbeldan@baylibre.com>
+>> 
+>> Tested with v4.7 on my LCDK board.
+>> 
+>> Tested-by: Kevin Hilman <khilman@baylibre.com>
+>> 
+>> Note that I also needed CONFIG_RTC_DRV_OMAP=m enabled in
+>> davinci_all_defconfig for the RTC driver. Could you add a patch for that
+>> to this series as well?
+>> 
+> No problem. BTW do you also consider CONFIG_ items not arch specific
+> (like CONFIG_NET_VENDOR_SMSC) ?
+
+Do you mean for davinci_all_config?  Yes.
+
+>
+>> Also, plese Cc the co-maintainer Sekhar Nori (now Cc'd) on all future
+>> davinci patches.
+>> 
+> Sure.
+>
+>> > ---
+>> >  Documentation/devicetree/bindings/arm/davinci.txt |  4 ++
+>> >  arch/arm/boot/dts/Makefile                        |  1 +
+>> >  arch/arm/boot/dts/omapl138-lcdk.dts               | 71 +++++++++++++++++++++++
+>> 
+>> I think this should be called da850-lcdk.dts.
+>> 
+>> The OMAP prefix in the DT directory is just going to cause confusion,
+>> and the other DTs using this same SoC are already called da850.
+>> 
+> That's what I thought too, mainline U-Boot is using omapl138_lcdk but
+> yes da850 is less confusing given the code already present (downside is
+> when you search for da850 on the net there's nothing).
+
+OK, let's stick with da850 for the DT names.  The other help texts
+already list all the names da850/omapl138/am18x so we should be fine.
+
+Kevin
