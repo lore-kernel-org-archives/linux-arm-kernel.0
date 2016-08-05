@@ -1,33 +1,42 @@
-From: kbeldan@baylibre.com (Karl Beldan)
-Date: Fri,  5 Aug 2016 20:29:51 +0000
-Subject: [PATCH v4 3/3] ARM: davinci_all_defconfig: enable SMSC ethernet PHY
-In-Reply-To: <20160805202951.2848-1-kbeldan@baylibre.com>
-References: <20160804144332.4841-1-kbeldan@baylibre.com>
- <20160805202951.2848-1-kbeldan@baylibre.com>
-Message-ID: <20160805202951.2848-4-kbeldan@baylibre.com>
+From: bauerman@linux.vnet.ibm.com (Thiago Jung Bauermann)
+Date: Fri, 05 Aug 2016 17:46:43 -0300
+Subject: [PATCH v2 3/3] kexec: extend kexec_file_load system call
+In-Reply-To: <1469579069-28472-1-git-send-email-bauerman@linux.vnet.ibm.com>
+References: <20160712014201.11456-4-takahiro.akashi@linaro.org>
+ <1469579069-28472-1-git-send-email-bauerman@linux.vnet.ibm.com>
+Message-ID: <1988385.QMVjiCbb5e@hactar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The LCDK embeds a LAN8710.
+Hi,
 
-Cc: Sekhar Nori <nsekhar@ti.com>
-Cc: Kevin Hilman <khilman@baylibre.com>
-Signed-off-by: Karl Beldan <kbeldan@baylibre.com>
----
- arch/arm/configs/davinci_all_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+Am Dienstag, 26 Juli 2016, 21:24:29 schrieb Thiago Jung Bauermann:
+> Notes:
+>     This is a new version of the last patch in this series which adds
+>     a function where each architecture can verify if the DTB is safe
+>     to load:
+> 
+>     int __weak arch_kexec_verify_buffer(enum kexec_file_type type,
+>                                         const void *buf,
+>                                         unsigned long size)
+>     {
+>             return -EINVAL;
+>     }
+> 
+>     I will then provide an implementation in my powerpc patch series
+>     which checks that the DTB only contains nodes and properties from a
+>     whitelist. arch_kexec_kernel_image_load will copy these properties
+>     to the device tree blob the kernel was booted with (and perform
+>     other changes such as setting /chosen/bootargs, of course).
 
-diff --git a/arch/arm/configs/davinci_all_defconfig b/arch/arm/configs/davinci_all_defconfig
-index cc3e702..d037d3d 100644
---- a/arch/arm/configs/davinci_all_defconfig
-+++ b/arch/arm/configs/davinci_all_defconfig
-@@ -88,6 +88,7 @@ CONFIG_BLK_DEV_SD=m
- CONFIG_NETDEVICES=y
- CONFIG_TUN=m
- CONFIG_LXT_PHY=y
-+CONFIG_SMSC_PHY=y
- CONFIG_LSI_ET1011C_PHY=y
- CONFIG_NET_ETHERNET=y
- CONFIG_MII=y
+Is this approach ok? If so, I'll post a patch next week adding an 
+arch_kexec_verify_buffer hook for powerpc to enforce the whitelist, and also 
+a new version of the patches implementing kexec_file_load for powerpc on top 
+of this series.
+
+Eric, does this address your concerns?
+
 -- 
-2.9.2
+[]'s
+Thiago Jung Bauermann
+IBM Linux Technology Center
