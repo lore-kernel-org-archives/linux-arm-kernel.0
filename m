@@ -1,62 +1,113 @@
-From: stephen.boyd@linaro.org (Stephen Boyd)
-Date: Fri, 05 Aug 2016 14:53:56 -0700
-Subject: [PATCH v2 08/22] usb: chipidea: Remove locking in ci_udc_start()
-In-Reply-To: <20160708094528.GF20485@shlinux2>
-References: <20160707222114.1673-1-stephen.boyd@linaro.org>
- <20160707222114.1673-9-stephen.boyd@linaro.org>
- <20160708094528.GF20485@shlinux2>
-Message-ID: <147043403652.26915.10865210145828633146@sboyd-linaro>
+From: paul.gortmaker@windriver.com (Paul Gortmaker)
+Date: Fri, 5 Aug 2016 19:00:13 -0400
+Subject: [PATCH 2/4] irqchip: irq-mvebu-pic: new driver for Marvell Armada
+ 7K/8K PIC
+In-Reply-To: <1470408921-447-3-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1470408921-447-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1470408921-447-3-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <CAP=VYLqoubxSMcJJLSqfGUPVfyggMYwpS1aVRmWri+AQvgHt5g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Peter Chen (2016-07-08 02:45:28)
-> On Thu, Jul 07, 2016 at 03:20:59PM -0700, Stephen Boyd wrote:
-> > We don't call hw_device_reset() with the ci->lock held, so it
-> > doesn't seem like this lock here is protecting anything. Let's
-> > just remove it. This allows us to call sleeping functions like
-> > phy_init() from within the CI_HDRC_CONTROLLER_RESET_EVENT hook.
-> > 
-> > Cc: Peter Chen <peter.chen@nxp.com>
-> > Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> > Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
-> > ---
-> >  drivers/usb/chipidea/udc.c | 3 ---
-> >  1 file changed, 3 deletions(-)
-> > 
-> > diff --git a/drivers/usb/chipidea/udc.c b/drivers/usb/chipidea/udc.c
-> > index 065f5d97aa67..f16be4710cdb 100644
-> > --- a/drivers/usb/chipidea/udc.c
-> > +++ b/drivers/usb/chipidea/udc.c
-> > @@ -1719,7 +1719,6 @@ static int ci_udc_start(struct usb_gadget *gadget,
-> >                        struct usb_gadget_driver *driver)
-> >  {
-> >       struct ci_hdrc *ci = container_of(gadget, struct ci_hdrc, gadget);
-> > -     unsigned long flags;
-> >       int retval = -ENOMEM;
-> >  
-> >       if (driver->disconnect == NULL)
-> > @@ -1746,7 +1745,6 @@ static int ci_udc_start(struct usb_gadget *gadget,
-> >  
-> >       pm_runtime_get_sync(&ci->gadget.dev);
-> >       if (ci->vbus_active) {
-> > -             spin_lock_irqsave(&ci->lock, flags);
-> >               hw_device_reset(ci);
-> >       } else {
-> >               usb_udc_vbus_handler(&ci->gadget, false);
-> > @@ -1755,7 +1753,6 @@ static int ci_udc_start(struct usb_gadget *gadget,
-> >       }
-> >  
-> >       retval = hw_device_state(ci, ci->ep0out->qh.dma);
-> > -     spin_unlock_irqrestore(&ci->lock, flags);
-> >       if (retval)
-> >               pm_runtime_put_sync(&ci->gadget.dev);
-> >  
-> 
-> The main purpose for this is disabling interrupt when reset controller,
-> in case the unexpected interrupts occur.
-> 
-> You can move this between hw_device_state.
-> 
+On Fri, Aug 5, 2016 at 10:55 AM, Thomas Petazzoni
+<thomas.petazzoni@free-electrons.com> wrote:
+> The Marvell Armada 7K/8K integrates a secondary interrupt controller
+> very originally named "PIC". It is connected to the main GIC via a
+> PPI. Amongst other things, this PIC is used for the ARM PMU.
+>
+> This commit adds a simple irqchip driver for this interrupt
+> controller. Since this interrupt controller is not needed early at boot
+> time, we make the driver a proper platform driver rather than use the
+> IRQCHIP_DECLARE() mechanism.
+>
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> ---
+>  drivers/irqchip/Kconfig         |   3 +
+>  drivers/irqchip/Makefile        |   1 +
+>  drivers/irqchip/irq-mvebu-pic.c | 195 ++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 199 insertions(+)
+>  create mode 100644 drivers/irqchip/irq-mvebu-pic.c
+>
+> diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
+> index fa33c50..a6f90c5 100644
+> --- a/drivers/irqchip/Kconfig
+> +++ b/drivers/irqchip/Kconfig
+> @@ -246,6 +246,9 @@ config MVEBU_ODMI
+>         bool
+>         select GENERIC_MSI_IRQ_DOMAIN
+>
+> +config MVEBU_PIC
+> +       bool
 
-Ok, but we don't hold the ci->lock in ci_udc_vbus_session(). Is that a
-bug as well?
+Please switch to a builtin registration call, and remove module.h and
+all the MODULE_<xyz> references since this is a bool and not a
+tristate Kconfig.
+
+Thanks,
+Paul.
+--
+
+> +
+>  config LS_SCFG_MSI
+>         def_bool y if SOC_LS1021A || ARCH_LAYERSCAPE
+>         depends on PCI && PCI_MSI
+> diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
+> index 38853a1..024a78d 100644
+> --- a/drivers/irqchip/Makefile
+> +++ b/drivers/irqchip/Makefile
+> @@ -67,5 +67,6 @@ obj-$(CONFIG_INGENIC_IRQ)             += irq-ingenic.o
+>  obj-$(CONFIG_IMX_GPCV2)                        += irq-imx-gpcv2.o
+>  obj-$(CONFIG_PIC32_EVIC)               += irq-pic32-evic.o
+>  obj-$(CONFIG_MVEBU_ODMI)               += irq-mvebu-odmi.o
+> +obj-$(CONFIG_MVEBU_PIC)                        += irq-mvebu-pic.o
+>  obj-$(CONFIG_LS_SCFG_MSI)              += irq-ls-scfg-msi.o
+>  obj-$(CONFIG_EZNPS_GIC)                        += irq-eznps.o
+> diff --git a/drivers/irqchip/irq-mvebu-pic.c b/drivers/irqchip/irq-mvebu-pic.c
+> new file mode 100644
+> index 0000000..4a3aa7f
+> --- /dev/null
+> +++ b/drivers/irqchip/irq-mvebu-pic.c
+> @@ -0,0 +1,195 @@
+> +/*
+> + * Copyright (C) 2016 Marvell
+> + *
+> + * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> + *
+> + * This file is licensed under the terms of the GNU General Public
+> + * License version 2.  This program is licensed "as is" without any
+> + * warranty of any kind, whether express or implied.
+> + */
+> +
+> +#include <linux/interrupt.h>
+> +#include <linux/io.h>
+> +#include <linux/irq.h>
+> +#include <linux/irqchip.h>
+> +#include <linux/irqchip/chained_irq.h>
+> +#include <linux/irqdomain.h>
+> +#include <linux/module.h>
+
+[...]
+
+> +static const struct of_device_id mvebu_pic_of_match[] = {
+> +       { .compatible = "marvell,armada-8k-pic", },
+> +       {},
+> +};
+> +MODULE_DEVICE_TABLE(of, mvebu_pic_of_match);
+> +
+> +static struct platform_driver mvebu_pic_driver = {
+> +       .probe  = mvebu_pic_probe,
+> +       .remove = mvebu_pic_remove,
+> +       .driver = {
+> +               .name = "mvebu-pic",
+> +               .of_match_table = mvebu_pic_of_match,
+> +       },
+> +};
+> +module_platform_driver(mvebu_pic_driver);
+> +
+> +MODULE_AUTHOR("Thomas Petazzoni <thomas.petazzoni@free-electrons.com>");
+> +MODULE_LICENSE("GPL v2");
+> +MODULE_ALIAS("platform:mvebu_pic");
+> +
+> --
+> 2.7.4
+>
