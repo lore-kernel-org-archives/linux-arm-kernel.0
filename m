@@ -1,133 +1,92 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 5 Aug 2016 14:39:55 +0100
-Subject: [PATCH 1/1] Add PPD device tree
-In-Reply-To: <1470403887-15190-1-git-send-email-fabien.lahoudere@collabora.co.uk>
-References: <1470403887-15190-1-git-send-email-fabien.lahoudere@collabora.co.uk>
-Message-ID: <20160805133954.GC25152@leverpostej>
+From: tomeu@tomeuvizoso.net (Tomeu Vizoso)
+Date: Fri, 5 Aug 2016 15:48:19 +0200
+Subject: [PATCH v4 0/7] rk3399 support ddr frequency scaling
+In-Reply-To: <1469779021-10426-1-git-send-email-hl@rock-chips.com>
+References: <1469779021-10426-1-git-send-email-hl@rock-chips.com>
+Message-ID: <CAAObsKBpWUP0rd2TgGE7y-foQFwHq0+2jEZzkS_Ks3SSTJiazg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 05, 2016 at 03:31:25PM +0200, Fabien Lahoudere wrote:
-> +/*
-> + * Hardware uses CKO2 at 24MHz at several places. Set the parent clock of
-> + * CKO2 to OSC.
-> + */
-> +#define CKO2_CONFIGURATION \
-> +	clock-frequency = <24000000>; \
-> +	clocks = <&clks IMX5_CLK_CKO2>; \
-> +	assigned-clocks = <&clks IMX5_CLK_CKO2_SEL>, <&clks IMX5_CLK_OSC>; \
-> +	assigned-clock-parents = <&clks IMX5_CLK_OSC>
+On 29 July 2016 at 09:56, Lin Huang <hl@rock-chips.com> wrote:
+> rk3399 platform have dfi controller can monitor ddr load,
+> and dcf controller to handle ddr register so we can get the
+> right ddr frequency and make ddr controller happy work(which
+> will implement in bl31). So we do ddr frequency scaling with
+> following flow:
+>
+>              kernel                                bl31
+>
+>         monitor ddr load
+>                 |
+>                 |
+>         get_target_rate
+>                 |
+>                 |           pass rate to bl31
+>         clk_set_rate(ddr) --------------------->run dcf flow
+>                 |                                   |
+>                 |                                   |
+>         wait dcf interrupt<-------------------trigger dcf interrupt
+>                 |
+>                 |
+>               return
 
-This makes the DT harder to read.
+Hi Lin,
 
-Please place these explicitly where used.
+can you confirm that the hardware isn't capable of raising interrupts
+when programmable load thresholds are trespassed? From reading the
+TRM, looks like it should be possible.
 
-> +
-> +/ {
-> +	model = "Freescale i.MX53 CPUV0 PPD rev6";
-> +	compatible = "fsl,imx53-ppd", "fsl,imx53";
-> +
-> +	aliases {
-> +		spi0 = &cspi;
-> +		spi1 = &ecspi1;
-> +		spi2 = &ecspi2;
-> +	};
-> +
-> +	chosen {
-> +		stdout-path = &uart1;
-> +	};
-
-It would be good if you could also define the rate, using an alias if
-necessary.
-
-> +
-> +	memory {
-> +		reg = <0x70000000 0x20000000>,
-> +		      <0xb0000000 0x20000000>;
-> +	};
-> +
-> +	clocks {
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +
-> +		cko2_11M: sgtl_clock_cko2 {
-> +			compatible = "fixed-clock";
-> +			#clock-cells = <0>;
-> +			clock-frequency = <11289600>;
-> +		};
-> +	};
-
-Get rid of the clocks node, and place the clock directly under the root
-node.
-
-> +
-> +	regulators {
-> +		compatible = "simple-bus";
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +
-> +		reg_sgtl5k: regulator at 0 {
-> +			compatible = "regulator-fixed";
-> +			reg = <0>;
-> +			regulator-name = "reg-sgtl5k";
-> +			regulator-min-microvolt = <3300000>;
-> +			regulator-max-microvolt = <3300000>;
-> +			regulator-always-on;
-> +		};
-
-Likewise for these. Get rid of the regulators container node and place
-these directly under the root node.
-
-Please don't make fake up reg and unit-address values. Just suffix the
-node name, e.g. regulator-sgtl5k.
-
-> +&ecspi1 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_ecspi1>;
-> +	fsl,spi-num-chipselects = <4>;
-> +	/* Fake this GPIO, this has special handling in userspace. */
-
-NAK. The DT should reflect reality, and should not be specific to a
-given userspace.
-
-> +	cs-gpios = <&gpio5 1 GPIO_ACTIVE_LOW
-> +		    &gpio4 10 GPIO_ACTIVE_LOW
-> +		    &gpio4 11 GPIO_ACTIVE_LOW
-> +		    &gpio4 12 GPIO_ACTIVE_LOW>;
-> +	status = "okay";
-> +
-> +	spidev0: spi at 0 {
-> +		compatible = "spidev";
-> +		reg = <0>;
-> +		spi-max-frequency = <1000000>;
-> +		status = "okay";
-> +	};
-> +
-> +	spidev1: spi at 1 {
-> +		compatible = "spidev";
-> +		reg = <1>;
-> +		spi-max-frequency = <1000000>;
-> +		status = "okay";
-> +	};
-> +
-> +	spidev2: spi at 2 {
-> +		compatible = "spidev";
-> +		reg = <2>;
-> +		spi-max-frequency = <1000000>;
-> +		status = "okay";
-> +	};
-> +
-> +	spidev3: spi at 3 {
-> +		compatible = "spidev";
-> +		reg = <3>;
-> +		spi-max-frequency = <1000000>;
-> +		status = "okay";
-> +	};
-> +};
-
-What are these SPI devices?
-
-Please fully describe them, with a complete compatible list.
+Or is there any reason to merge now a driver that polls for load stats?
 
 Thanks,
-Mark.
+
+Tomeu
+
+> Lin Huang (6):
+>   clk: rockchip: add new clock-type for the ddrclk
+>   clk: rockchip: rk3399: add SCLK_DDRCLK ID for ddrc
+>   clk: rockchip: rk3399: add ddrc clock support
+>   PM / devfreq: event: support rockchip dfi controller
+>   PM / devfreq: rockchip: add devfreq driver for rk3399 dmc
+>   drm/rockchip: Add dmc notifier in vop driver
+>
+>
+> Heiko St?bner (1):
+>   clk: rockchip: add clock flag parameter when register pll
+>
+> Lin Huang (6):
+>   clk: rockchip: add new clock-type for the ddrclk
+>   clk: rockchip: rk3399: add SCLK_DDRCLK ID for ddrc
+>   clk: rockchip: rk3399: add ddrc clock support
+>   PM / devfreq: event: support rockchip dfi controller
+>   PM / devfreq: rockchip: add devfreq driver for rk3399 dmc
+>   drm/rockchip: Add dmc notifier in vop driver
+>
+>  drivers/clk/rockchip/Makefile               |   1 +
+>  drivers/clk/rockchip/clk-ddr.c              | 146 +++++++++
+>  drivers/clk/rockchip/clk-pll.c              |   4 +-
+>  drivers/clk/rockchip/clk-rk3399.c           |  19 ++
+>  drivers/clk/rockchip/clk.c                  |  11 +-
+>  drivers/clk/rockchip/clk.h                  |  29 +-
+>  drivers/devfreq/Kconfig                     |   1 +
+>  drivers/devfreq/Makefile                    |   1 +
+>  drivers/devfreq/event/Kconfig               |   7 +
+>  drivers/devfreq/event/Makefile              |   1 +
+>  drivers/devfreq/event/rockchip-dfi.c        | 253 +++++++++++++++
+>  drivers/devfreq/rockchip/Kconfig            |   8 +
+>  drivers/devfreq/rockchip/Makefile           |   1 +
+>  drivers/devfreq/rockchip/rk3399_dmc.c       | 473 ++++++++++++++++++++++++++++
+>  drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 124 +++++++-
+>  include/dt-bindings/clock/rk3399-cru.h      |   1 +
+>  include/soc/rockchip/rockchip_sip.h         |  27 ++
+>  17 files changed, 1098 insertions(+), 9 deletions(-)
+>  create mode 100644 drivers/clk/rockchip/clk-ddr.c
+>  create mode 100644 drivers/devfreq/event/rockchip-dfi.c
+>  create mode 100644 drivers/devfreq/rockchip/Kconfig
+>  create mode 100644 drivers/devfreq/rockchip/Makefile
+>  create mode 100644 drivers/devfreq/rockchip/rk3399_dmc.c
+>  create mode 100644 include/soc/rockchip/rockchip_sip.h
+>
+> --
+> 1.9.1
+>
