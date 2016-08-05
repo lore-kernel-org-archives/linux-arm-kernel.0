@@ -1,53 +1,89 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Fri, 5 Aug 2016 10:35:17 +0800
-Subject: [PATCH] arm64: Add workaround for Cavium erratum 26026
-In-Reply-To: <20160804205707.GJ2151@rric.localdomain>
-Message-ID: <201608051040.1WVSAIMI%fengguang.wu@intel.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 4 Aug 2016 21:45:05 -0500
+Subject: [PATCH v2 1/2] ARM64: dts: meson-gxbb: add MMC support
+In-Reply-To: <m2oa58nntc.fsf@baylibre.com>
+References: <20160803231843.23012-1-khilman@baylibre.com>
+ <20160804181556.GA13000@rob-hp-laptop>
+ <m2oa58nntc.fsf@baylibre.com>
+Message-ID: <CAL_JsqK18UPAUFCqfN7TJqz4AoLBbNA7fOgeQXqPES06fuhgFQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robert,
++dtc list
 
-[auto build test ERROR on arm64/for-next/core]
-[also build test ERROR on v4.7 next-20160804]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+On Thu, Aug 4, 2016 at 5:58 PM, Kevin Hilman <khilman@baylibre.com> wrote:
+> Hi Rob,
+>
+> Rob Herring <robh@kernel.org> writes:
+>
+>> On Wed, Aug 03, 2016 at 04:18:42PM -0700, Kevin Hilman wrote:
+>>> Add binding and basic support for the SD/eMMC controller on Amlogic
+>>> S905/GXBB devices.
+>>>
+>>> Signed-off-by: Kevin Hilman <khilman@baylibre.com>
+>
+> [...]
+>
+>>> +    mmc_iv: gpio-regulator {
+>>> +            compatible = "regulator-gpio";
+>>> +
+>>> +            regulator-name = "mmc-gpio-supply";
+>>> +            regulator-min-microvolt = <1800000>;
+>>> +            regulator-max-microvolt = <3300000>;
+>>> +
+>>> +            gpios = <&gpio_ao GPIOAO_3 GPIO_ACTIVE_HIGH>;
+>>> +            gpio-states = <0 1>;
+>>> +
+>>> +            /*
+>>> +             * Based on ODROID-C2 schematics:
+>>> +             * signal name: IO_TF_3V3N_1V8, GPIOAO bit 3
+>>> +             */
+>>> +            states = <3300000 0
+>>> +                      1800000 1>;
+>>
+>> There are multiple things wrong in this node based on the regulator-gpio
+>> documentation.
+>
+> I see I got the property name wrong, and the number of elements wrong,
+> and this fixes those issues:
+>
+> -               gpio-states = <0 1>;
+> +               gpios-states = <0>;
+>
+> By "multiple", did you mean more than those 2?  If so, I'm not seeing
+> what else is wrong.
 
-url:    https://github.com/0day-ci/linux/commits/Robert-Richter/arm64-Add-workaround-for-Cavium-erratum-26026/20160805-083523
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git for-next/core
-config: arm64-defconfig (attached as .config)
-compiler: aarch64-linux-gnu-gcc (Debian 5.4.0-6) 5.4.0 20160609
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm64 
+I was thinking it needed an enable-gpio property, but now I see that
+is separate from "gpios".
 
-All errors (new ones prefixed by >>):
+> [...]
+>
+>>> +    mmc_iv: gpio-regulator {
+>>> +            compatible = "regulator-gpio";
+>>> +
+>>> +            regulator-name = "mmc-gpio-supply";
+>>> +            regulator-min-microvolt = <1800000>;
+>>> +            regulator-max-microvolt = <3300000>;
+>>> +
+>>> +            gpios = <&gpio_ao GPIOAO_5 GPIO_ACTIVE_HIGH>;
+>>> +            gpio-states = <0 1>;
+>>> +
+>>> +            /* Based on P200 schematics, signal CARD_1.8V/3.3V_CTR */
+>>> +            states = <1800000 0
+>>> +                      3300000 1>;
+>>> +    };
+>>> +
+>>> +    vddio_boot: regulator {
+>> [...]
+>>> +    vcc_3v3: regulator {
+>>
+>> This won't even compile as you have the same node name twice.
+>
+> Oops, it's wrong indeed, but in fact, it does compile, otherwise I
+> would've caught that..  Even if I remove the labels, it still compiles.
+> Interesting.
 
->> arch/arm64/kernel/cpu_errata.c:99:17: error: 'ARM64_HAS_NO_BCAST_TLBI' undeclared here (not in a function)
-      .capability = ARM64_HAS_NO_BCAST_TLBI,
-                    ^
+Humm, news to me. I will have to do some testing unless the dtc folks
+have any insight.
 
-vim +/ARM64_HAS_NO_BCAST_TLBI +99 arch/arm64/kernel/cpu_errata.c
-
-    93		},
-    94	#endif
-    95	#ifdef CONFIG_CAVIUM_ERRATUM_26026
-    96		{
-    97		/* Cavium ThunderX, pass 1.x */
-    98			.desc = "Cavium erratum 26026",
-  > 99			.capability = ARM64_HAS_NO_BCAST_TLBI,
-   100			MIDR_RANGE(MIDR_THUNDERX, 0x00, 0x01),
-   101		},
-   102	#endif
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 28771 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160805/ce08aa2c/attachment-0001.obj>
+Rob
