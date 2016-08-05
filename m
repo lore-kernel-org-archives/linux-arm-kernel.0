@@ -1,32 +1,43 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Fri, 05 Aug 2016 11:06:28 +0200
-Subject: [PATCH v3] reset: uniphier: add reset controller driver for
- UniPhier SoCs
-In-Reply-To: <1470111510-21247-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1470111510-21247-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <1470387988.3141.21.camel@pengutronix.de>
+From: Julia.Lawall@lip6.fr (Julia Lawall)
+Date: Fri,  5 Aug 2016 10:56:50 +0200
+Subject: [PATCH 10/11] soc: ti: knav_qmss_queue: use of_property_read_bool
+In-Reply-To: <1470387411-15879-1-git-send-email-Julia.Lawall@lip6.fr>
+References: <1470387411-15879-1-git-send-email-Julia.Lawall@lip6.fr>
+Message-ID: <1470387411-15879-11-git-send-email-Julia.Lawall@lip6.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, den 02.08.2016, 13:18 +0900 schrieb Masahiro Yamada:
-> This is the initial commit for UniPhier reset controller driver.
-> 
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-[...]
-> --- a/drivers/reset/Makefile
-> +++ b/drivers/reset/Makefile
-> @@ -7,6 +7,7 @@ obj-$(CONFIG_ARCH_MESON) += reset-meson.o
->  obj-$(CONFIG_ARCH_SUNXI) += reset-sunxi.o
->  obj-$(CONFIG_ARCH_STI) += sti/
->  obj-$(CONFIG_ARCH_HISI) += hisilicon/
-> +obj-$(CONFIG_RESET_UNIPHIER) += reset-uniphier.o
->  obj-$(CONFIG_ARCH_ZYNQ) += reset-zynq.o
->  obj-$(CONFIG_ATH79) += reset-ath79.o
->  obj-$(CONFIG_RESET_OXNAS) += reset-oxnas.o
+Use of_property_read_bool to check for the existence of a property.
 
-Thank you, I have applied this patch with one small change: The Makefile
-change is moved after TI_SYSCON_RESET, like you did in the Kconfig, to
-keep the non-arch symbols in alphabetic order.
+The semantic patch that makes this change is as follows:
+(http://coccinelle.lip6.fr/)
 
-regards
-Philipp
+// <smpl>
+@@
+expression e1,e2;
+statement S2,S1;
+@@
+-       if (of_get_property(e1,e2,NULL))
++       if (of_property_read_bool(e1,e2))
+        S1 else S2
+// </smpl>
+
+Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
+
+---
+ drivers/soc/ti/knav_qmss_queue.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/soc/ti/knav_qmss_queue.c b/drivers/soc/ti/knav_qmss_queue.c
+index b73e353..56b5d7c 100644
+--- a/drivers/soc/ti/knav_qmss_queue.c
++++ b/drivers/soc/ti/knav_qmss_queue.c
+@@ -1240,7 +1240,7 @@ static int knav_setup_queue_range(struct knav_device *kdev,
+ 	if (of_get_property(node, "qalloc-by-id", NULL))
+ 		range->flags |= RANGE_RESERVED;
+ 
+-	if (of_get_property(node, "accumulator", NULL)) {
++	if (of_property_read_bool(node, "accumulator")) {
+ 		ret = knav_init_acc_range(kdev, node, range);
+ 		if (ret < 0) {
+ 			devm_kfree(dev, range);
