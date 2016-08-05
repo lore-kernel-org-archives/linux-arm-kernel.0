@@ -1,41 +1,64 @@
-From: sre@kernel.org (Sebastian Reichel)
-Date: Fri, 5 Aug 2016 19:45:57 +0200
-Subject: [PATCH 0/2] Drop last two remaining omap3 legacy board files
-In-Reply-To: <1465987689-14812-1-git-send-email-tony@atomide.com>
-References: <1465987689-14812-1-git-send-email-tony@atomide.com>
-Message-ID: <20160805174557.GA27448@earth>
+From: john.stultz@linaro.org (John Stultz)
+Date: Fri, 5 Aug 2016 10:56:43 -0700
+Subject: [PATCH 1/2] ARM: dts: MSM8064 remove flags from SPMI/MPP IRQs
+In-Reply-To: <1470386318-17694-2-git-send-email-linus.walleij@linaro.org>
+References: <1470386318-17694-1-git-send-email-linus.walleij@linaro.org>
+ <1470386318-17694-2-git-send-email-linus.walleij@linaro.org>
+Message-ID: <CALAqxLVY4DbfEnd3oJ1ZHeEjnTe=NN8R0YBFwpDP=8dGJQw2RQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
-
-On Wed, Jun 15, 2016 at 03:48:07AM -0700, Tony Lindgren wrote:
-> Here are two patches to drop the last remaining omap3 legacy boot
-> files. We have device tree based booting working for these boards,
-> and the legacy booting has been mostly kept around to validate
-> against regressions.
-> 
-> Let's not touch the rest of the platform init code until around
-> v4.9 so we can revert these two patches if needed.
+On Fri, Aug 5, 2016 at 1:38 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> The Qualcomm PMIC GPIO and MPP lines are problematic: the
+> are fetched from the main MFD driver with platform_get_irq()
+> which means that at this point they will all be assigned the
+> flags set up for the interrupts in the device tree.
 >
-> Cheers,
-> 
-> Tony
-> 
-> Tony Lindgren (2):
->   ARM: OMAP2+: Drop legacy board file for n900
->   ARM: OMAP2+: Drop legacy board file for LDP
+> That is problematic since these are flagged as rising edge
+> and an this point the interrupt descriptor is assigned a
+> rising edge, while the only thing the GPIO/MPP drivers really
+> do is issue irq_get_irqchip_state() on the line to read it
+> out and to provide a .to_irq() helper for *other* IRQ
+> consumers.
+>
+> If another device tree node tries to flag the same IRQ
+> for use as something else than rising edge, the kernel
+> irqdomain core will protest like this:
+>
+>   type mismatch, failed to map hwirq-NN for <FOO>!
+>
+> Which is what happens when the device tree defines two
+> contradictory flags for the same interrupt line.
+>
+> To work around this and alleviate the problem, assign 0
+> as flag for the interrupts taken by the PM GPIO and MPP
+> drivers. This will lead to the flag being unset, and a
+> second consumer requesting rising, falling, both or level
+> interrupts will be respected. This is what the qcom-pm*.dtsi
+> files already do.
+>
+> Switched to using the symbolic name IRQ_TYPE_NONE so that
+> we get this more readable.
+>
+> Cc: stable at vger.kernel.org
+> Fixes: bce360469676 ("ARM: dts: apq8064: add pm8921 mpp support")
+> Fixes: 874443fe9e33 ("ARM: dts: apq8064: Add pm8921 mfd and its gpio node")
+> Cc: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+> Cc: Stephen Boyd <sboyd@codeaurora.org>
+> Cc: Bj?rn Andersson <bjorn.andersson@linaro.org>
+> Cc: Ivan T. Ivanov <ivan.ivanov@linaro.org>
+> Cc: John Stultz <john.stultz@linaro.org>
+> Cc: Andy Gross <andy.gross@linaro.org>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> I vaguely remember John having problems with interrupts
+> on the Nexus 7 that could be related to this so involving
+> him on these patches.
 
-I wonder what happened to these patches. I see, that you have a
-omap-for-v4.8/legacy branch, which contains them. But as far as I
-can see its not in linux-next and it was not included in the ARM
-pull request.
+Yea. Thanks for including me. Unfortunately these patches don't
+resolve the problem I'm seeing (I still don't get any interrupts from
+the volume/power buttons), and I still have to revert "irqdomain:
+Don't set type when mapping an IRQ" to get things working.
 
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160805/333d6a68/attachment.sig>
+thanks
+-john
