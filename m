@@ -1,46 +1,57 @@
-From: jolsa@redhat.com (Jiri Olsa)
-Date: Fri, 5 Aug 2016 12:32:46 +0200
-Subject: [PATCH V4 4/6] perf tools: pushing driver configuration down to
- the kernel
-In-Reply-To: <1470329604-14356-5-git-send-email-mathieu.poirier@linaro.org>
-References: <1470329604-14356-1-git-send-email-mathieu.poirier@linaro.org>
- <1470329604-14356-5-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <20160805103246.GC12528@krava>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Fri, 05 Aug 2016 13:02:48 +0200
+Subject: [PATCH] clk: rockchip: mark rk3399 hdcp_noc and pclk_vio_grf as
+ critical
+In-Reply-To: <1470209784-2665-1-git-send-email-zyw@rock-chips.com>
+References: <1470209784-2665-1-git-send-email-zyw@rock-chips.com>
+Message-ID: <4055149.Zs66lEhv2I@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 04, 2016 at 10:53:22AM -0600, Mathieu Poirier wrote:
+Hi Chris,
 
-SNIP
+Am Mittwoch, 3. August 2016, 15:36:24 schrieb Chris Zhong:
+> The Type-C DP need these clocks: aclk_hdcp_noc, hclk_hdcp_noc,
+> pclk_hdcp_noc, pclk_vio_grf. Mark them as critical to avoid someone
+> close them.
+> 
+> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
+> 
+> ---
+> 
+>  drivers/clk/rockchip/clk-rk3399.c | 4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/drivers/clk/rockchip/clk-rk3399.c
+> b/drivers/clk/rockchip/clk-rk3399.c index 78e51cb..6c8ed25 100644
+> --- a/drivers/clk/rockchip/clk-rk3399.c
+> +++ b/drivers/clk/rockchip/clk-rk3399.c
+> @@ -1466,6 +1466,9 @@ static struct rockchip_clk_branch
+> rk3399_clk_pmu_branches[] __initdata = {
+> 
+>  static const char *const rk3399_cru_critical_clocks[] __initconst = {
+>  	"aclk_cci_pre",
+> +	"aclk_hdcp_noc",
+> +	"hclk_hdcp_noc",
+> +	"pclk_hdcp_noc",
+>  	"pclk_perilp0",
+>  	"pclk_perilp0",
+>  	"hclk_perilp0",
 
-> diff --git a/tools/perf/builtin-top.c b/tools/perf/builtin-top.c
-> index 418ed94756d3..df74bdbb7524 100644
-> --- a/tools/perf/builtin-top.c
-> +++ b/tools/perf/builtin-top.c
-> @@ -940,6 +940,10 @@ static int callchain_param__setup_sample_type(struct callchain_param *callchain)
->  
->  static int __cmd_top(struct perf_top *top)
->  {
-> +	char msg[512];
-> +	struct perf_evsel *pos;
-> +	struct perf_evsel_config_term *err_term;
-> +	struct perf_evlist *evlist = top->evlist;
->  	struct record_opts *opts = &top->record_opts;
->  	pthread_t thread;
->  	int ret;
-> @@ -976,6 +980,13 @@ static int __cmd_top(struct perf_top *top)
->  	if (ret)
->  		goto out_delete;
->  
-> +	if (perf_evlist__apply_drv_configs(evlist, &pos, &err_term)) {
-> +		error("failed to set config \"%s\" on event %s with %d (%s)\n",
-> +			err_term->val.drv_cfg, perf_evsel__name(pos), errno,
-> +			strerror_r(errno, msg, sizeof(msg)));
+ok, we have marked all other noc (interconnect) clocks as critical, so this 
+looks good.
 
-hum ret is 0 in here..
+> @@ -1485,6 +1488,7 @@ static const char *const rk3399_cru_critical_clocks[]
+> __initconst = { "gpll_hclk_perilp1_src",
+>  	"gpll_aclk_perilp0_src",
+>  	"gpll_aclk_perihp_src",
+> +	"pclk_vio_grf",
 
-> +		goto out_delete;
-> +	}
+I don't necessarily agree with this one. It seems for the analogix-dp the 
+preferred way is to have the driver handle its needed clock, see
+	"[PATCH v1 6/6] drm/rockchip: dw_hdmi: introduce the pclk for grf" [0]
 
-thanks,
-jirka
+
+Heiko
+
+[0] https://patchwork.kernel.org/patch/9223331/
