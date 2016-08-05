@@ -1,52 +1,89 @@
-From: wangkefeng.wang@huawei.com (Kefeng Wang)
-Date: Fri, 5 Aug 2016 14:03:55 +0800
-Subject: [PATCH] arm64: Support hard limit of cpu count by nr_cpus
-Message-ID: <1470377035-1591-1-git-send-email-wangkefeng.wang@huawei.com>
+From: Wenyou.Yang@microchip.com (Wenyou.Yang at microchip.com)
+Date: Fri, 5 Aug 2016 06:18:11 +0000
+Subject: [PATCH v1] net: phy: micrel: Add specific suspend
+In-Reply-To: <11f70064-11d6-47b9-6ec1-83b7b0dc5419@gmail.com>
+References: <1470270095-13131-1-git-send-email-wenyou.yang@atmel.com>
+ <11f70064-11d6-47b9-6ec1-83b7b0dc5419@gmail.com>
+Message-ID: <F9F4555C4E01D7469D37975B62D0EFBB393CF0@CHN-SV-EXMX07.mchp-main.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the hard limit of cpu count by nr_cpus on arm64.
-The code is borrowed from MIPS.
+Hi Florian,
 
-Reported-by: Shiyuan Hu <hushiyuan@huawei.com>
-Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
----
- arch/arm64/kernel/setup.c | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+> -----Original Message-----
+> From: Florian Fainelli [mailto:f.fainelli at gmail.com]
+> Sent: 2016?8?4? 11:33
+> To: Wenyou Yang <wenyou.yang@atmel.com>
+> Cc: netdev at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org; Alexandre Belloni <alexandre.belloni@free-
+> electrons.com>; Nicolas Ferre <nicolas.ferre@atmel.com>; Andrew Lunn
+> <andrew@lunn.ch>
+> Subject: Re: [PATCH v1] net: phy: micrel: Add specific suspend
+> 
+> On 03/08/2016 17:21, Wenyou Yang wrote:
+> > Disable all interrupts when suspend, they will be enabled when resume.
+> > Otherwise, the suspend/resume process will be blocked occasionally.
+> 
+> This seems like something fairly generic actually, we could imagine having the
+> core library do something like this:
+> 
+> - if interrupts are valid and enabled for the PHY, call
+> phydrv->config_intr() with PHY_INTERRUPT_DISABLED
+> - call genphy_suspend
 
-diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-index 536dce2..597b777 100644
---- a/arch/arm64/kernel/setup.c
-+++ b/arch/arm64/kernel/setup.c
-@@ -224,6 +224,21 @@ static void __init request_standard_resources(void)
- 
- u64 __cpu_logical_map[NR_CPUS] = { [0 ... NR_CPUS-1] = INVALID_HWID };
- 
-+static void __init prefill_possible_map(void)
-+{
-+	int i, possible = num_possible_cpus();
-+
-+	if (possible > nr_cpu_ids)
-+		possible = nr_cpu_ids;
-+
-+	for (i = 0; i < possible; i++)
-+		set_cpu_possible(i, true);
-+	for (; i < NR_CPUS; i++)
-+		set_cpu_possible(i, false);
-+
-+	nr_cpu_ids = possible;
-+}
-+
- void __init setup_arch(char **cmdline_p)
- {
- 	pr_info("Boot CPU: AArch64 Processor [%08x]\n", read_cpuid_id());
-@@ -285,6 +300,7 @@ void __init setup_arch(char **cmdline_p)
- 	cpu_read_bootcpu_ops();
- 	smp_init_cpus();
- 	smp_build_mpidr_hash();
-+	prefill_possible_map();
- 
- #ifdef CONFIG_VT
- #if defined(CONFIG_VGA_CONSOLE)
--- 
-1.7.12.4
+Accepted. I will send a new version.
+
+> 
+> Of course if none of this fits the generic model, the PHY driver can still provide a
+> suspend callback. Might be worth auditing other drivers for that pattern and look at
+> those that need specific handling like keeping specific interrupt sources active for
+> e.g: wake-on-LAN.
+> 
+> >
+> > Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+> > Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> > ---
+> >
+> >  drivers/net/phy/micrel.c | 19 ++++++++++++++++++-
+> >  1 file changed, 18 insertions(+), 1 deletion(-)
+> >
+> > diff --git a/drivers/net/phy/micrel.c b/drivers/net/phy/micrel.c index
+> > 5a8fefc..8cb778a 100644
+> > --- a/drivers/net/phy/micrel.c
+> > +++ b/drivers/net/phy/micrel.c
+> > @@ -647,6 +647,23 @@ static void kszphy_get_stats(struct phy_device
+> *phydev,
+> >  		data[i] = kszphy_get_stat(phydev, i);  }
+> >
+> > +int kszphy_suspend(struct phy_device *phydev) {
+> > +	int value;
+> > +
+> > +	mutex_lock(&phydev->lock);
+> > +
+> > +	/* disable interrupts */
+> > +	phy_write(phydev, MII_KSZPHY_INTCS, 0x0);
+> > +
+> > +	value = phy_read(phydev, MII_BMCR);
+> > +	phy_write(phydev, MII_BMCR, value | BMCR_PDOWN);
+> > +
+> > +	mutex_unlock(&phydev->lock);
+> > +
+> > +	return 0;
+> > +}
+> > +
+> >  static int kszphy_resume(struct phy_device *phydev)  {
+> >  	int value;
+> > @@ -870,7 +887,7 @@ static struct phy_driver ksphy_driver[] = {
+> >  	.get_sset_count = kszphy_get_sset_count,
+> >  	.get_strings	= kszphy_get_strings,
+> >  	.get_stats	= kszphy_get_stats,
+> > -	.suspend	= genphy_suspend,
+> > +	.suspend	= kszphy_suspend,
+> >  	.resume		= kszphy_resume,
+> >  }, {
+> >  	.phy_id		= PHY_ID_KSZ8061,
+> >
+
+
+Best Regards,
+Wenyou Yang
