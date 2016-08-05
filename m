@@ -1,38 +1,46 @@
-From: pali.rohar@gmail.com (Pali =?utf-8?B?Um9ow6Fy?=)
-Date: Fri, 5 Aug 2016 12:30:51 +0200
-Subject: [PATCHv6] support for AD5820 camera auto-focus coil
-In-Reply-To: <20160805102611.GA13116@amd>
-References: <20160517181927.GA28741@amd> <20160521054336.GA27123@amd>
- <573FFF51.1000004@gmail.com> <20160521105607.GA20071@amd>
- <574049EF.2090208@gmail.com> <20160524090433.GA1277@amd>
- <20160524091746.GA14536@amd>
- <20160525212659.GK26360@valkosipuli.retiisi.org.uk>
- <20160527205140.GA26767@amd> <20160805102611.GA13116@amd>
-Message-ID: <20160805103051.GP30047@pali>
+From: jolsa@redhat.com (Jiri Olsa)
+Date: Fri, 5 Aug 2016 12:32:46 +0200
+Subject: [PATCH V4 4/6] perf tools: pushing driver configuration down to
+ the kernel
+In-Reply-To: <1470329604-14356-5-git-send-email-mathieu.poirier@linaro.org>
+References: <1470329604-14356-1-git-send-email-mathieu.poirier@linaro.org>
+ <1470329604-14356-5-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <20160805103246.GC12528@krava>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 05 August 2016 12:26:11 Pavel Machek wrote:
-> 
-> This adds support for AD5820 autofocus coil, found for example in
-> Nokia N900 smartphone.
-> 
-> Signed-off-by: Pavel Machek <pavel@ucw.cz>
+On Thu, Aug 04, 2016 at 10:53:22AM -0600, Mathieu Poirier wrote:
 
-Acked-by: Pali Roh?r <pali.rohar@gmail.com>
+SNIP
 
-> ---
-> v2: simple cleanups, fix error paths, simplify probe
-> v3: more cleanups, remove printk, add include
-> v4: remove header file.
-> v5: switch to devm_ , style cleanups, fixes
-> v6: remove new userspace APIs.
-> 
-> Can we finally get the patch in, please?
+> diff --git a/tools/perf/builtin-top.c b/tools/perf/builtin-top.c
+> index 418ed94756d3..df74bdbb7524 100644
+> --- a/tools/perf/builtin-top.c
+> +++ b/tools/perf/builtin-top.c
+> @@ -940,6 +940,10 @@ static int callchain_param__setup_sample_type(struct callchain_param *callchain)
+>  
+>  static int __cmd_top(struct perf_top *top)
+>  {
+> +	char msg[512];
+> +	struct perf_evsel *pos;
+> +	struct perf_evsel_config_term *err_term;
+> +	struct perf_evlist *evlist = top->evlist;
+>  	struct record_opts *opts = &top->record_opts;
+>  	pthread_t thread;
+>  	int ret;
+> @@ -976,6 +980,13 @@ static int __cmd_top(struct perf_top *top)
+>  	if (ret)
+>  		goto out_delete;
+>  
+> +	if (perf_evlist__apply_drv_configs(evlist, &pos, &err_term)) {
+> +		error("failed to set config \"%s\" on event %s with %d (%s)\n",
+> +			err_term->val.drv_cfg, perf_evsel__name(pos), errno,
+> +			strerror_r(errno, msg, sizeof(msg)));
 
-This patch is on ML for months or years, right?
-Please merge it...
+hum ret is 0 in here..
 
--- 
-Pali Roh?r
-pali.rohar at gmail.com
+> +		goto out_delete;
+> +	}
+
+thanks,
+jirka
