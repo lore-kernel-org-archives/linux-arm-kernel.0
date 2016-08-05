@@ -1,59 +1,161 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri,  5 Aug 2016 10:38:36 +0200
-Subject: [PATCH 0/2] Fix Qualcomm 8064/8660 interrupt flags
-Message-ID: <1470386318-17694-1-git-send-email-linus.walleij@linaro.org>
+Date: Fri,  5 Aug 2016 10:38:37 +0200
+Subject: [PATCH 1/2] ARM: dts: MSM8064 remove flags from SPMI/MPP IRQs
+In-Reply-To: <1470386318-17694-1-git-send-email-linus.walleij@linaro.org>
+References: <1470386318-17694-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <1470386318-17694-2-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This came out after some frustration with trying to flag a PM8058
-interrupt line on the APQ8060 (MSM8660) to trigger on falling
-edges. It was conflicting badly with predefined contradictory
-flags in the device tree for the entire GPIO block. The same
-seems to hold for the MPP GPIO IRQs.
+The Qualcomm PMIC GPIO and MPP lines are problematic: the
+are fetched from the main MFD driver with platform_get_irq()
+which means that at this point they will all be assigned the
+flags set up for the interrupts in the device tree.
 
-This was caused by copy/pasting the solution from APQ8064 and
-I suspect the problem is seen there too whenever someon tries to
-use an interrupt on any other edge than rising (e.g. falling or
-both edges).
+That is problematic since these are flagged as rising edge
+and an this point the interrupt descriptor is assigned a
+rising edge, while the only thing the GPIO/MPP drivers really
+do is issue irq_get_irqchip_state() on the line to read it
+out and to provide a .to_irq() helper for *other* IRQ
+consumers.
 
-These two patches should probably go in as fixes to make it
-possible to use these interrupts properly.
+If another device tree node tries to flag the same IRQ
+for use as something else than rising edge, the kernel
+irqdomain core will protest like this:
 
-This is not the only problem with the SPMI/MPP GPIO IRQs. The
-most glaring problem is the numbering of the IRQ lines in the
-device tree: if you want to request a GPIO from the GPIO or
-MPP block on the PMIC, you have to do something like this:
+  type mismatch, failed to map hwirq-NN for <FOO>!
 
-mpu3050 at 68 {
-    compatible = "invn,mpu3050";
-    reg = <0x68>;
-    /*
-     * GPIO17 has interrupt 208 on the
-     * PM8058.
-     */
-    interrupt-parent = <&pm8058_gpio>;
-    interrupts = <208 IRQ_TYPE_EDGE_FALLING>;
-...
+Which is what happens when the device tree defines two
+contradictory flags for the same interrupt line.
 
-I.e. we're not using the local IRQ HW number (17) instead the
-PM-global hw number 208. This is because the GPIO subdriver
-does not implement its own irqdomain, and I suspect this
-should be fixed by using the hierarchical irqdomain to work
-properly.
+To work around this and alleviate the problem, assign 0
+as flag for the interrupts taken by the PM GPIO and MPP
+drivers. This will lead to the flag being unset, and a
+second consumer requesting rising, falling, both or level
+interrupts will be respected. This is what the qcom-pm*.dtsi
+files already do.
 
-This patch set does not fix the latter issue, but I want to
-highlight it in the current context. My recommendation is for
-nodes using these interrupts to refer directly to the PMIC
-node for the time being, as the number on the GPIO/MPP nodes
-is kind of skewed.
+Switched to using the symbolic name IRQ_TYPE_NONE so that
+we get this more readable.
 
-Linus Walleij (2):
-  ARM: dts: MSM8064 remove flags from SPMI/MPP IRQs
-  ARM: dts: MSM8660 remove flags from SPMI/MPP IRQs
-
+Cc: stable at vger.kernel.org
+Fixes: bce360469676 ("ARM: dts: apq8064: add pm8921 mpp support")
+Fixes: 874443fe9e33 ("ARM: dts: apq8064: Add pm8921 mfd and its gpio node")
+Cc: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+Cc: Stephen Boyd <sboyd@codeaurora.org>
+Cc: Bj?rn Andersson <bjorn.andersson@linaro.org>
+Cc: Ivan T. Ivanov <ivan.ivanov@linaro.org>
+Cc: John Stultz <john.stultz@linaro.org>
+Cc: Andy Gross <andy.gross@linaro.org>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+I vaguely remember John having problems with interrupts
+on the Nexus 7 that could be related to this so involving
+him on these patches.
+---
  arch/arm/boot/dts/qcom-apq8064.dtsi | 76 +++++++++++++++++++++++++++----------
- arch/arm/boot/dts/qcom-msm8660.dtsi | 75 +++++++++++++++++++++++++++---------
- 2 files changed, 114 insertions(+), 37 deletions(-)
+ 1 file changed, 57 insertions(+), 19 deletions(-)
 
+diff --git a/arch/arm/boot/dts/qcom-apq8064.dtsi b/arch/arm/boot/dts/qcom-apq8064.dtsi
+index 74a9b6c394f5..9dc83b09d987 100644
+--- a/arch/arm/boot/dts/qcom-apq8064.dtsi
++++ b/arch/arm/boot/dts/qcom-apq8064.dtsi
+@@ -5,6 +5,7 @@
+ #include <dt-bindings/reset/qcom,gcc-msm8960.h>
+ #include <dt-bindings/clock/qcom,mmcc-msm8960.h>
+ #include <dt-bindings/soc/qcom,gsbi.h>
++#include <dt-bindings/interrupt-controller/irq.h>
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
+ / {
+ 	model = "Qualcomm APQ8064";
+@@ -559,22 +560,50 @@
+ 					compatible = "qcom,pm8921-gpio",
+ 						     "qcom,ssbi-gpio";
+ 					reg = <0x150>;
+-					interrupts = <192 1>, <193 1>, <194 1>,
+-						     <195 1>, <196 1>, <197 1>,
+-						     <198 1>, <199 1>, <200 1>,
+-						     <201 1>, <202 1>, <203 1>,
+-						     <204 1>, <205 1>, <206 1>,
+-						     <207 1>, <208 1>, <209 1>,
+-						     <210 1>, <211 1>, <212 1>,
+-						     <213 1>, <214 1>, <215 1>,
+-						     <216 1>, <217 1>, <218 1>,
+-						     <219 1>, <220 1>, <221 1>,
+-						     <222 1>, <223 1>, <224 1>,
+-						     <225 1>, <226 1>, <227 1>,
+-						     <228 1>, <229 1>, <230 1>,
+-						     <231 1>, <232 1>, <233 1>,
+-						     <234 1>, <235 1>;
+-
++					interrupts = <192 IRQ_TYPE_NONE>,
++						     <193 IRQ_TYPE_NONE>,
++						     <194 IRQ_TYPE_NONE>,
++						     <195 IRQ_TYPE_NONE>,
++						     <196 IRQ_TYPE_NONE>,
++						     <197 IRQ_TYPE_NONE>,
++						     <198 IRQ_TYPE_NONE>,
++						     <199 IRQ_TYPE_NONE>,
++						     <200 IRQ_TYPE_NONE>,
++						     <201 IRQ_TYPE_NONE>,
++						     <202 IRQ_TYPE_NONE>,
++						     <203 IRQ_TYPE_NONE>,
++						     <204 IRQ_TYPE_NONE>,
++						     <205 IRQ_TYPE_NONE>,
++						     <206 IRQ_TYPE_NONE>,
++						     <207 IRQ_TYPE_NONE>,
++						     <208 IRQ_TYPE_NONE>,
++						     <209 IRQ_TYPE_NONE>,
++						     <210 IRQ_TYPE_NONE>,
++						     <211 IRQ_TYPE_NONE>,
++						     <212 IRQ_TYPE_NONE>,
++						     <213 IRQ_TYPE_NONE>,
++						     <214 IRQ_TYPE_NONE>,
++						     <215 IRQ_TYPE_NONE>,
++						     <216 IRQ_TYPE_NONE>,
++						     <217 IRQ_TYPE_NONE>,
++						     <218 IRQ_TYPE_NONE>,
++						     <219 IRQ_TYPE_NONE>,
++						     <220 IRQ_TYPE_NONE>,
++						     <221 IRQ_TYPE_NONE>,
++						     <222 IRQ_TYPE_NONE>,
++						     <223 IRQ_TYPE_NONE>,
++						     <224 IRQ_TYPE_NONE>,
++						     <225 IRQ_TYPE_NONE>,
++						     <226 IRQ_TYPE_NONE>,
++						     <227 IRQ_TYPE_NONE>,
++						     <228 IRQ_TYPE_NONE>,
++						     <229 IRQ_TYPE_NONE>,
++						     <230 IRQ_TYPE_NONE>,
++						     <231 IRQ_TYPE_NONE>,
++						     <232 IRQ_TYPE_NONE>,
++						     <233 IRQ_TYPE_NONE>,
++						     <234 IRQ_TYPE_NONE>,
++						     <235 IRQ_TYPE_NONE>;
+ 					gpio-controller;
+ 					#gpio-cells = <2>;
+ 
+@@ -587,9 +616,18 @@
+ 					gpio-controller;
+ 					#gpio-cells = <2>;
+ 					interrupts =
+-					<128 1>, <129 1>, <130 1>, <131 1>,
+-					<132 1>, <133 1>, <134 1>, <135 1>,
+-					<136 1>, <137 1>, <138 1>, <139 1>;
++					<128 IRQ_TYPE_NONE>,
++					<129 IRQ_TYPE_NONE>,
++					<130 IRQ_TYPE_NONE>,
++					<131 IRQ_TYPE_NONE>,
++					<132 IRQ_TYPE_NONE>,
++					<133 IRQ_TYPE_NONE>,
++					<134 IRQ_TYPE_NONE>,
++					<135 IRQ_TYPE_NONE>,
++					<136 IRQ_TYPE_NONE>,
++					<137 IRQ_TYPE_NONE>,
++					<138 IRQ_TYPE_NONE>,
++					<139 IRQ_TYPE_NONE>;
+ 				};
+ 
+ 				rtc at 11d {
 -- 
 2.7.4
