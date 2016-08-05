@@ -1,30 +1,52 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 5 Aug 2016 08:40:36 +0100
-Subject: [PATCH 3/3] mfd: db8500-prcmu: Example using new
- OF_MFD_CELL/MFD_CELL_BASIC MACROs
-In-Reply-To: <CACRpkdb_r8nJU4jFnfu_x7XqAh=1g7J09sn-sCivPpHAimfBgA@mail.gmail.com>
-References: <20160713112651.14539-1-lee.jones@linaro.org>
- <20160713112651.14539-4-lee.jones@linaro.org>
- <CACRpkdb_r8nJU4jFnfu_x7XqAh=1g7J09sn-sCivPpHAimfBgA@mail.gmail.com>
-Message-ID: <20160805074036.GK5243@dell>
+Date: Fri, 5 Aug 2016 08:46:22 +0100
+Subject: [PATCH 1/4] mfd: axp20x: add adc volatile ranges for axp22x
+In-Reply-To: <20160701092926.32005-1-icenowy@aosc.xyz>
+References: <20160701092926.32005-1-icenowy@aosc.xyz>
+Message-ID: <20160805074622.GL5243@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 04 Aug 2016, Linus Walleij wrote:
+On Fri, 01 Jul 2016, Icenowy Zheng wrote:
 
-> On Wed, Jul 13, 2016 at 1:26 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> AXP22x has also some different register map than axp20x, they're also
+> added here.
 > 
-> > ... with and without 'resources'.
-> >
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> 
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> 
-> I'm not 100% sure what is going on but the result sure looks
-> neat and I'll be happy to test the result and complain if anything
-> breaks ;)
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+> ---
+>  drivers/mfd/axp20x.c       | 1 +
+>  include/linux/mfd/axp20x.h | 4 ++++
+>  2 files changed, 5 insertions(+)
 
-:)
+Applied, thanks.
+
+> diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
+> index d62209d..cee5288 100644
+> --- a/drivers/mfd/axp20x.c
+> +++ b/drivers/mfd/axp20x.c
+> @@ -96,6 +96,7 @@ static const struct regmap_range axp22x_volatile_ranges[] = {
+>  	regmap_reg_range(AXP20X_PWR_INPUT_STATUS, AXP20X_PWR_OP_MODE),
+>  	regmap_reg_range(AXP20X_IRQ1_EN, AXP20X_IRQ5_STATE),
+>  	regmap_reg_range(AXP22X_GPIO_STATE, AXP22X_GPIO_STATE),
+> +	regmap_reg_range(AXP22X_PMIC_ADC_H, AXP20X_IPSOUT_V_HIGH_L),
+>  	regmap_reg_range(AXP20X_FG_RES, AXP20X_FG_RES),
+>  };
+>  
+> diff --git a/include/linux/mfd/axp20x.h b/include/linux/mfd/axp20x.h
+> index 0be4982..ad3d9c7 100644
+> --- a/include/linux/mfd/axp20x.h
+> +++ b/include/linux/mfd/axp20x.h
+> @@ -201,6 +201,10 @@ enum {
+>  #define AXP20X_OCV_MAX			0xf
+>  
+>  /* AXP22X specific registers */
+> +#define AXP22X_PMIC_ADC_H		0x56
+> +#define AXP22X_PMIC_ADC_L		0x57
+> +#define AXP22X_TS_ADC_H			0x58
+> +#define AXP22X_TS_ADC_L			0x59
+>  #define AXP22X_BATLOW_THRES1		0xe6
+>  
+>  /* AXP288 specific registers */
 
 -- 
 Lee Jones
