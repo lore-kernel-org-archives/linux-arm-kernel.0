@@ -1,103 +1,69 @@
-From: linux@rempel-privat.de (Oleksij Rempel)
-Date: Fri,  5 Aug 2016 10:06:44 +0200
-Subject: [PATCH v2] arm: dts: sun7i-a20-bananapi: name the GPIO lines
-In-Reply-To: <CACRpkdYnK=7C=F5hZUo-nYv6Z+Pb+eT7vm1e4hL8N-QgJnuLfg@mail.gmail.com>
-References: <CACRpkdYnK=7C=F5hZUo-nYv6Z+Pb+eT7vm1e4hL8N-QgJnuLfg@mail.gmail.com>
-Message-ID: <1470384404-6796-1-git-send-email-linux@rempel-privat.de>
+From: patrice.chotard@st.com (Patrice Chotard)
+Date: Fri, 5 Aug 2016 10:11:03 +0200
+Subject: [RESEND PATCH v2 00/13] Clock improvement for video playback
+In-Reply-To: <1466068833-5055-1-git-send-email-gabriel.fernandez@linaro.org>
+References: <1466068833-5055-1-git-send-email-gabriel.fernandez@linaro.org>
+Message-ID: <b6389057-0c53-7095-81a3-617aff678e28@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This names the GPIO lines on the Banana Pi board in accordance with
-the A20_Banana_Pi v1.4 Specification.
+Hi Mike
 
-This will make these line names reflect through to userspace
-so that they can easily be identified and used with the new
-character device ABI.
+I believe that you and Gabriel found an agreement to include this series in v4.8
 
-Some care has been taken to name all lines, not just those used
-by the external connectors, also lines that are muxed into some
-other function than GPIO: these are named "[FOO]" so that users
-can see with lsgpio what all lines are used for.
+Unfortunately it seems it's not the case, for which reason ?
 
-Ps: most of the text was taken from Linus Wallej patch.
+Thanks
 
-Cc: devicetree at vger.kernel.org
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: Chen-Yu Tsai <wens@csie.org>
-Signed-off-by: Oleksij Rempel <linux@rempel-privat.de>
----
- arch/arm/boot/dts/sun7i-a20-bananapi.dts | 58 ++++++++++++++++++++++++++++++++
- 1 file changed, 58 insertions(+)
+Patrice
 
-diff --git a/arch/arm/boot/dts/sun7i-a20-bananapi.dts b/arch/arm/boot/dts/sun7i-a20-bananapi.dts
-index 67c8a76..81ecb89 100644
---- a/arch/arm/boot/dts/sun7i-a20-bananapi.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-bananapi.dts
-@@ -178,6 +178,64 @@
- };
- 
- &pio {
-+	/*
-+	 * Legend: proper name = the GPIO line is used as GPIO
-+	 *         NC = not connected (not routed from the SoC)
-+	 *         "[PER]" = pin is muxed for peripheral (not GPIO)
-+	 *         "" = no idea, schematic doesn't say, could be
-+	 *              unrouted (not connected to any external pin)
-+	 */
-+	gpio-line-names =
-+		/* PA */
-+		"[ERXD3]", "[ERXD2]", "[ERXD1]", "[ERXD0]", "[ETXD3]",
-+			"[ETXD2]", "[ETXD1]", "[ETXD0]",
-+		"[ERXCK]", "[ERXERR]", "[ERXDV]", "[EMDC]", "[EMDIO]",
-+			"[ETXEN]", "[ETXCK]", "[ECRS]",
-+		"[ECOL]", "[ETXERR]", "", "", "", "", "", "",
-+		"", "", "", "", "", "", "", "",
-+		/* PB */
-+		"[PMU-SCK]", "[PMU-SDA]", "", "", "", "NC", "NC", "NC",
-+		"NC", "USB0-DRV", "NC", "NC", "NC", "NC", "", "",
-+		"", "", "", "", "[SCL]", "[SDA]", "", "",
-+		"", "", "", "", "", "", "", "",
-+		/* PC */
-+		"", "", "", "", "", "", "", "",
-+		"", "", "", "", "", "", "", "",
-+		"", "", "", "", "", "", "", "",
-+		"", "", "", "", "", "", "", "",
-+		/* PD */
-+		"", "", "", "", "", "", "", "",
-+		"", "", "", "", "", "", "", "",
-+		"", "", "", "", "", "", "", "",
-+		"", "", "", "", "", "", "", "",
-+		/* PE */
-+		"", "", "", "", "", "", "", "",
-+		"", "", "", "", "", "", "", "",
-+		"", "", "", "", "", "", "", "",
-+		"", "", "", "", "", "", "", "",
-+		/* PF */
-+		"[SD0-D1]", "[SD0-D0]", "[SD0-CLK]", "[SD0-CMD]", "[SD0-D3]",
-+			"[SD0-D2]", "", "",
-+		"", "", "", "", "", "", "", "",
-+		"", "", "", "", "", "", "", "",
-+		"", "", "", "", "", "", "", "",
-+		/* PG */
-+		"", "", "", "", "", "", "", "",
-+		"", "", "", "", "", "", "", "",
-+		"", "", "", "", "", "", "", "",
-+		"", "", "", "", "", "", "", "",
-+		/* PH */
-+		"TXD0", "RXD0", "IO-1", "IO-8", "USB0-IDDET", "IO-7", "", "",
-+		"", "", "SD0-DET", "", "", "", "", "",
-+		"NC", "", "", "", "IO-4", "IO-5", "NC", "EMAC-PWR-EN",
-+		"LED1", "NC", "NC", "NC", "", "", "", "",
-+		/* PI */
-+		"", "", "", "[IO-GCLK]", "NC", "NC", "NC", "NC",
-+		"NC", "NC", "[SPI-CE0]", "[SPI-CLK]", "[SPI-MOSI]",
-+			"[SPI-MISO]", "[SPI-CE1]", "NC",
-+		"IO-6", "IO-3", "IO-2", "IO-0", "", "", "", "",
-+		"", "", "", "", "", "", "", "";
-+
- 	usb0_id_detect_pin: usb0_id_detect_pin at 0 {
- 		allwinner,pins = "PH4";
- 		allwinner,function = "gpio_in";
--- 
-2.7.4
+
+
+On 06/16/2016 11:20 AM, Gabriel Fernandez wrote:
+> v2:
+>   - Simpliflication of clock binding
+>     remark from Rob https://lkml.org/lkml/2016/5/25/492
+>   - Suppression of stih415-416 support for the clocks (in order
+> 	to help simplification of clock binding)
+>     (others patchs for the machine and drivers will come)
+>
+> This serie allows to increase video resolutions and make audio
+> adjustment during a video playback.
+>
+> Gabriel Fernandez (13):
+>   drivers: clk: st: Remove stih415-416 clock support
+>   drivers: clk: st: Simplify clock binding of STiH4xx platforms
+>   drivers: clk: st: Add fs660c32 synthesizer algorithm
+>   drivers: clk: st: Add clock propagation for audio clocks
+>   drivers: clk: st: Handle clk synchronous mode for video clocks
+>   ARM: DT: STiH407: Enable clock propagation for audio clocks
+>   ARM: DT: STiH410: Enable clock propagation for audio clocks
+>   ARM: DT: STiH418: Enable clock propagation for audio clocks
+>   ARM: DT: STiH407: Enable synchronous clock mode for video clocks
+>   ARM: DT: STiH410: Enable synchronous clock mode for video clocks
+>   ARM: DT: STiH418: Enable synchronous clock mode for video clocks
+>   ARM: DT: STi: STiH407: clock configuration to address 720p and 1080p
+>   ARM: DT: STi: STiH410: clock configuration to address 720p and 1080p
+>
+>  .../bindings/clock/st/st,clkgen-divmux.txt         |  49 --
+>  .../devicetree/bindings/clock/st/st,clkgen-mux.txt |  20 +-
+>  .../devicetree/bindings/clock/st/st,clkgen-pll.txt |  35 +-
+>  .../bindings/clock/st/st,clkgen-prediv.txt         |  36 -
+>  .../devicetree/bindings/clock/st/st,clkgen-vcc.txt |  61 --
+>  .../devicetree/bindings/clock/st/st,clkgen.txt     |  54 +-
+>  .../devicetree/bindings/clock/st/st,flexgen.txt    |   4 +
+>  .../devicetree/bindings/clock/st/st,quadfs.txt     |  31 +-
+>  arch/arm/boot/dts/stih407-clock.dtsi               |   4 +-
+>  arch/arm/boot/dts/stih407.dtsi                     |  16 +-
+>  arch/arm/boot/dts/stih410-clock.dtsi               |   4 +-
+>  arch/arm/boot/dts/stih410.dtsi                     |  16 +-
+>  arch/arm/boot/dts/stih418-clock.dtsi               |   4 +-
+>  drivers/clk/st/clk-flexgen.c                       |  61 +-
+>  drivers/clk/st/clkgen-fsyn.c                       | 481 ++++---------
+>  drivers/clk/st/clkgen-mux.c                        | 748 +--------------------
+>  drivers/clk/st/clkgen-pll.c                        | 470 +------------
+>  17 files changed, 297 insertions(+), 1797 deletions(-)
+>  delete mode 100644 Documentation/devicetree/bindings/clock/st/st,clkgen-divmux.txt
+>  delete mode 100644 Documentation/devicetree/bindings/clock/st/st,clkgen-prediv.txt
+>  delete mode 100644 Documentation/devicetree/bindings/clock/st/st,clkgen-vcc.txt
+>
