@@ -1,66 +1,35 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 5 Aug 2016 16:27:03 +0000
-Subject: [PATCH 2/4] irqchip: irq-mvebu-pic: new driver for Marvell
- Armada 7K/8K PIC
-In-Reply-To: <20160805175812.55162108@free-electrons.com>
-References: <1470408921-447-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1470408921-447-3-git-send-email-thomas.petazzoni@free-electrons.com>
- <20160805153113.GW4541@io.lakedaemon.net>
- <20160805175812.55162108@free-electrons.com>
-Message-ID: <20160805162703.GZ4541@io.lakedaemon.net>
+From: ddaney@caviumnetworks.com (David Daney)
+Date: Fri, 5 Aug 2016 09:37:39 -0700
+Subject: [PATCH] arm64: Add workaround for Cavium erratum 26026
+In-Reply-To: <20160805070030.GQ22012@rric.localdomain>
+References: <1470302117-32296-1-git-send-email-mbrugger@suse.com>
+ <20160804205707.GJ2151@rric.localdomain> <57A3B660.4040309@gmail.com>
+ <20160805070030.GQ22012@rric.localdomain>
+Message-ID: <57A4C0D3.2060408@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+On 08/05/2016 12:00 AM, Robert Richter wrote:
+> On 04.08.16 14:40:48, David Daney wrote:
+>> On 08/04/2016 01:57 PM, Robert Richter wrote:
+>>> The patch below is on top of Matthias' patch series:
+>>>
+>>>   arm64: Implement IPI based TLB invalidation
+>>>
+>>> The series is used to enable a workaround for Cavium ThunderX pass 1.x
+>>> systems.
+>>
+>>
+>> Where are the rest of the patches in the series?  I would have expected
+>> something like "[PATCH 1/X] arm64:..." with X being greater than one.
+>
+> You are cc'ed here too:
+>
+>   https://lkml.org/lkml/2016/8/4/101
+>
 
-On Fri, Aug 05, 2016 at 05:58:12PM +0200, Thomas Petazzoni wrote:
-> On Fri, 5 Aug 2016 15:31:13 +0000, Jason Cooper wrote:
-> 
-> > > +config MVEBU_PIC
-> > > +	bool  
-> > 
-> > tri-state?  Is there anything else attached to the PIC besides the PMU?
-> 
-> tri-state would be fine I believe, it's indeed a secondary interrupt
-> controller, not essential for booting the platform.
-> 
-> But then I probably need to rework PATCH 3/4 and not have it
-> unconditionally selected by the platform Kconfig option, right?
+OK, I got confused by the fact that this patch was retroactively added 
+to the patch set and was missing the sequence numbering.
 
-meh.  I have no preference either way.  It's what works best for your
-platform.  I've just seen one or two people on a tear lately regarding
-module.h/MODULE_* and being boolean.  I figured I'd address it while I
-was here. :-)
-
-> Regarding what else is attached to the PIC, I have no idea, I don't
-> have this information.
-
-Ok, then which ever way you go is fine by me.
-
-> > > +static const struct of_device_id mvebu_pic_of_match[] = {
-> > > +	{ .compatible = "marvell,armada-8k-pic", },  
-> > 
-> > You mention 7k in $subject, should you use that here as the youngest
-> > compatible SoC generation?
-> 
-> There isn't anything youngest or oldest between 7K and 8K, they both
-> got released at the same time. They are really the same family of SoCs,
-> the 7K having only one CP110, the 8K having two of them, which provides
-> more I/Os.
-> 
-> For several other IPs, we're using armada-8k as the compatible string:
-> 
->  * marvell,armada8k-pcie
->  * marvell,armada-8k-xhci
-
-Ok, sure.  That was just a nit.  I know human nature, despite logic,
-will assume 8k is newer that 7k, like SSLv3 being better than TLS v1.x
-because the number is bigger. :-/
-
-Consistency is better at this point.
-
-The rest of it looks fine.
-
-thx,
-
-Jason.
+> -Robert
+>
