@@ -1,29 +1,32 @@
-From: robert.richter@cavium.com (Robert Richter)
-Date: Fri, 5 Aug 2016 09:00:30 +0200
-Subject: [PATCH] arm64: Add workaround for Cavium erratum 26026
-In-Reply-To: <57A3B660.4040309@gmail.com>
-References: <1470302117-32296-1-git-send-email-mbrugger@suse.com>
- <20160804205707.GJ2151@rric.localdomain>
- <57A3B660.4040309@gmail.com>
-Message-ID: <20160805070030.GQ22012@rric.localdomain>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Fri,  5 Aug 2016 09:24:30 +0200
+Subject: [PATCH 0/1] input: touchscreen: Remove duplicate ft6236 driver
+Message-ID: <1470381871-4086-1-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04.08.16 14:40:48, David Daney wrote:
-> On 08/04/2016 01:57 PM, Robert Richter wrote:
-> >The patch below is on top of Matthias' patch series:
-> >
-> >  arm64: Implement IPI based TLB invalidation
-> >
-> >The series is used to enable a workaround for Cavium ThunderX pass 1.x
-> >systems.
-> 
-> 
-> Where are the rest of the patches in the series?  I would have expected
-> something like "[PATCH 1/X] arm64:..." with X being greater than one.
+<resend with Noralf's email address fixed>
 
-You are cc'ed here too:
+Hi All,
 
- https://lkml.org/lkml/2016/8/4/101
+December 19th 2015 I noticed that a new ft6236 driver had been added to
+the kernel, and that it was in essence just a re-implementation of the
+M09 protocol from the edt-ft5x06 driver, IOW it contains 100% duplicate
+code. I asked the submitter and authors of the new ft6236 driver to test
+there devices with the edt-ft5x06 driver instead, but I got no reply.
 
--Robert
+January 26th 2016 I asked the submitter and authors of the new ft6236
+driver to test with the edt-ft5x06 driver again, but again got no reply.
+
+Note: this is likely due to my having made an error in Noralf's email
+address with those 2 mails (sorry), so it would be good to give Noralf
+some time to reply now before applying this.
+
+Given the lack of response from the submitter / authors of the ft6236
+driver I believe it is best to just remove it. I've double checked and
+the edt-ft5x06 driver is 100% compatible both wrt wire protocol usage,
+as wrt to the reset gpio usage (and the gpio name in dt).
+
+Regards,
+
+Hans
