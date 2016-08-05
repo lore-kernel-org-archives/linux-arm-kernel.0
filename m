@@ -1,63 +1,29 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 5 Aug 2016 08:58:45 +0200
-Subject: serial: imx: regression triggered by newly introduced DSR irq
- handling
-In-Reply-To: <1470350663.26773.41.camel@googlemail.com>
-References: <1458825865-7434-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <1458825865-7434-7-git-send-email-u.kleine-koenig@pengutronix.de>
- <1470350663.26773.41.camel@googlemail.com>
-Message-ID: <20160805065845.GI17874@pengutronix.de>
+From: robert.richter@cavium.com (Robert Richter)
+Date: Fri, 5 Aug 2016 09:00:30 +0200
+Subject: [PATCH] arm64: Add workaround for Cavium erratum 26026
+In-Reply-To: <57A3B660.4040309@gmail.com>
+References: <1470302117-32296-1-git-send-email-mbrugger@suse.com>
+ <20160804205707.GJ2151@rric.localdomain>
+ <57A3B660.4040309@gmail.com>
+Message-ID: <20160805070030.GQ22012@rric.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Christoph,
-
-Cc += Shawn, Fabio
-
-On Fri, Aug 05, 2016 at 12:44:23AM +0200, Christoph Fritz wrote:
-> here on a imx6sx board newly introduced DSR-irq-handling breaks serial
-> console and network support.
+On 04.08.16 14:40:48, David Daney wrote:
+> On 08/04/2016 01:57 PM, Robert Richter wrote:
+> >The patch below is on top of Matthias' patch series:
+> >
+> >  arm64: Implement IPI based TLB invalidation
+> >
+> >The series is used to enable a workaround for Cavium ThunderX pass 1.x
+> >systems.
 > 
-> Reverting commit 27e16501052e5341934d3 "serial: imx: implement DSR irq
-> handling for DTE mode" fixes the issue.
 > 
-> The underlying cause is the RMII network configuration where register
-> bit SION in IOMUXC_SW_MUX_CTL_PAD_ENET1_TX_CLK is necessary. But this
-> also falsely feeds signal UART1_DTR_B and triggers DSR irq...
-> 
-> Can we revert this commit or add a quirk for RMII-SION configs or make
-> this optional by a device tree option?
+> Where are the rest of the patches in the series?  I would have expected
+> something like "[PATCH 1/X] arm64:..." with X being greater than one.
 
-Hmm, MX6SX_PAD_ENET1_TX_CLK__ENET1_TX_CLK in
-arch/arm/boot/dts/imx6sx-pinfunc.h doesn't have SION set.
+You are cc'ed here too:
 
-I remember there were issues around eth and SION on i.MX6DL, but don't
-know the details. A quick net research found
-https://community.nxp.com/thread/359531 which has: "Set the SION bit.
-Note that this is not required because the funtion setting controls the
-signal path, but it is good practice as it reminds the user that the
-clock needs to fed back into the Ethernet MAC.". Sounds like dangerous
-smattering and a wrong expectation about "users".
+ https://lkml.org/lkml/2016/8/4/101
 
-https://community.nxp.com/thread/376821 is from someone who has the same
-problem(?) on i.MX6SX, but no solution yet.
-
-Does that mean MX6SX_PAD_ENET1_TX_CLK__ENET1_TX_CLK always needs the
-SION bit set? Even if not, I'd like to have that documented there,
-similar to da4fa6fa8016 ("ARM: imx25-pinfunc: document SION being
-important for MX25_PAD_SD1_CMD__SD1_CMD").
-
-Once this is done (and still an issue) I'd suggest to standardize a dt
-property
-
-	disable-dsr;
-
-(and the same for the other handshaking lines) and support th{is,ese} in
-the imx uart driver. Reverting 27e16501052e IMO isn't a sensible option.
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-Robert
