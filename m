@@ -1,35 +1,41 @@
-From: ddaney@caviumnetworks.com (David Daney)
-Date: Fri, 5 Aug 2016 09:37:39 -0700
-Subject: [PATCH] arm64: Add workaround for Cavium erratum 26026
-In-Reply-To: <20160805070030.GQ22012@rric.localdomain>
-References: <1470302117-32296-1-git-send-email-mbrugger@suse.com>
- <20160804205707.GJ2151@rric.localdomain> <57A3B660.4040309@gmail.com>
- <20160805070030.GQ22012@rric.localdomain>
-Message-ID: <57A4C0D3.2060408@caviumnetworks.com>
+From: sre@kernel.org (Sebastian Reichel)
+Date: Fri, 5 Aug 2016 19:45:57 +0200
+Subject: [PATCH 0/2] Drop last two remaining omap3 legacy board files
+In-Reply-To: <1465987689-14812-1-git-send-email-tony@atomide.com>
+References: <1465987689-14812-1-git-send-email-tony@atomide.com>
+Message-ID: <20160805174557.GA27448@earth>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/05/2016 12:00 AM, Robert Richter wrote:
-> On 04.08.16 14:40:48, David Daney wrote:
->> On 08/04/2016 01:57 PM, Robert Richter wrote:
->>> The patch below is on top of Matthias' patch series:
->>>
->>>   arm64: Implement IPI based TLB invalidation
->>>
->>> The series is used to enable a workaround for Cavium ThunderX pass 1.x
->>> systems.
->>
->>
->> Where are the rest of the patches in the series?  I would have expected
->> something like "[PATCH 1/X] arm64:..." with X being greater than one.
->
-> You are cc'ed here too:
->
->   https://lkml.org/lkml/2016/8/4/101
->
+Hi Tony,
 
-OK, I got confused by the fact that this patch was retroactively added 
-to the patch set and was missing the sequence numbering.
-
-> -Robert
+On Wed, Jun 15, 2016 at 03:48:07AM -0700, Tony Lindgren wrote:
+> Here are two patches to drop the last remaining omap3 legacy boot
+> files. We have device tree based booting working for these boards,
+> and the legacy booting has been mostly kept around to validate
+> against regressions.
+> 
+> Let's not touch the rest of the platform init code until around
+> v4.9 so we can revert these two patches if needed.
 >
+> Cheers,
+> 
+> Tony
+> 
+> Tony Lindgren (2):
+>   ARM: OMAP2+: Drop legacy board file for n900
+>   ARM: OMAP2+: Drop legacy board file for LDP
+
+I wonder what happened to these patches. I see, that you have a
+omap-for-v4.8/legacy branch, which contains them. But as far as I
+can see its not in linux-next and it was not included in the ARM
+pull request.
+
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160805/333d6a68/attachment.sig>
