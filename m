@@ -1,9 +1,9 @@
 From: linux@rempel-privat.de (Oleksij Rempel)
-Date: Fri,  5 Aug 2016 10:05:12 +0200
-Subject: [PATCH] arm: dts: sun7i-a20-bananapi: name the GPIO lines
+Date: Fri,  5 Aug 2016 10:06:44 +0200
+Subject: [PATCH v2] arm: dts: sun7i-a20-bananapi: name the GPIO lines
 In-Reply-To: <CACRpkdYnK=7C=F5hZUo-nYv6Z+Pb+eT7vm1e4hL8N-QgJnuLfg@mail.gmail.com>
 References: <CACRpkdYnK=7C=F5hZUo-nYv6Z+Pb+eT7vm1e4hL8N-QgJnuLfg@mail.gmail.com>
-Message-ID: <1470384312-6604-1-git-send-email-linux@rempel-privat.de>
+Message-ID: <1470384404-6796-1-git-send-email-linux@rempel-privat.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -19,7 +19,7 @@ by the external connectors, also lines that are muxed into some
 other function than GPIO: these are named "[FOO]" so that users
 can see with lsgpio what all lines are used for.
 
-Ps: most of the text was taken from Linux Wallej patch.
+Ps: most of the text was taken from Linus Wallej patch.
 
 Cc: devicetree at vger.kernel.org
 Cc: Linus Walleij <linus.walleij@linaro.org>
