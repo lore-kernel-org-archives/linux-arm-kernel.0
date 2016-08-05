@@ -1,34 +1,32 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Fri, 5 Aug 2016 19:30:11 +0530
-Subject: [PATCH] ARM: dts: da850: Add basic DTS for the L138/C6748 Dev Kit
-In-Reply-To: <m2popopcqu.fsf@baylibre.com>
+From: kbeldan@baylibre.com (Karl Beldan)
+Date: Fri,  5 Aug 2016 14:12:26 +0000
+Subject: [PATCH v2 0/3] Support for the L138/C6748 Dev Kit (LCDK)
+In-Reply-To: <20160804144332.4841-1-kbeldan@baylibre.com>
 References: <20160804144332.4841-1-kbeldan@baylibre.com>
- <m2popopcqu.fsf@baylibre.com>
-Message-ID: <57A49BEB.7070503@ti.com>
+Message-ID: <20160805141229.20784-1-kbeldan@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 05 August 2016 12:45 AM, Kevin Hilman wrote:
->>  Documentation/devicetree/bindings/arm/davinci.txt |  4 ++
->>  arch/arm/boot/dts/Makefile                        |  1 +
->>  arch/arm/boot/dts/omapl138-lcdk.dts               | 71 +++++++++++++++++++++++
-> 
-> I think this should be called da850-lcdk.dts.
-> 
-> The OMAP prefix in the DT directory is just going to cause confusion,
-> and the other DTs using this same SoC are already called da850.
-> 
-> Sekhar do you have any opinion here?
+This depends on "ARM: dts: da850: Add missing pin muxing for the UARTs".
 
-Prefer using da850 in file names and in code. The explanatory or help
-text can contain rest of the part names.
+Changes from v1:
+ - s/omapl138/da850/
+ - Remove earlycon from bootargs
+ - Remove console=ttyS2,115200n8 from bootargs (workaround for preferred console)
+ - Add patches for CONFIG_SMSC_PHY=y and CONFIG_RTC_DRV_OMAP=m
 
-For file names or code catering both to da850 and da830, da8xx should be
-used.
+Karl Beldan (3):
+  ARM: dts: da850: Add basic DTS for the L138/C6748 Dev Kit
+  ARM: davinci_all_defconfig: enable RTC driver as module
+  ARM: davinci_all_defconfig: enable SMSC ethernet PHY
 
-I know documentation for da850 and da830 is not public, but thats what
-the parts first came out as, and we want to be consistent with existing
-code.
+ Documentation/devicetree/bindings/arm/davinci.txt |  4 ++
+ arch/arm/boot/dts/Makefile                        |  1 +
+ arch/arm/boot/dts/da850-lcdk.dts                  | 70 +++++++++++++++++++++++
+ arch/arm/configs/davinci_all_defconfig            |  2 +
+ arch/arm/mach-davinci/da8xx-dt.c                  |  1 +
+ 5 files changed, 78 insertions(+)
+ create mode 100644 arch/arm/boot/dts/da850-lcdk.dts
 
-Regards,
-Sekhar
+-- 
+2.9.0.rc1
