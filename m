@@ -1,221 +1,63 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 5 Aug 2016 13:57:35 +0200
-Subject: [RFC PATCH 5/8] PM / Domains: Verify the PM domain is present
- when adding a provider
-In-Reply-To: <1457090634-14785-6-git-send-email-jonathanh@nvidia.com>
-References: <1457090634-14785-1-git-send-email-jonathanh@nvidia.com>
- <1457090634-14785-6-git-send-email-jonathanh@nvidia.com>
-Message-ID: <CAPDyKFqFePGHMPM9UEJKNwh2jOCA2vCWAy6yzJCWunURxEsqYQ@mail.gmail.com>
+From: chf.fritz@googlemail.com (Christoph Fritz)
+Date: Fri, 05 Aug 2016 14:03:35 +0200
+Subject: serial: imx: regression triggered by newly introduced DSR irq
+ handling
+In-Reply-To: <20160805065845.GI17874@pengutronix.de>
+References: <1458825865-7434-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <1458825865-7434-7-git-send-email-u.kleine-koenig@pengutronix.de>
+ <1470350663.26773.41.camel@googlemail.com>
+ <20160805065845.GI17874@pengutronix.de>
+Message-ID: <1470398615.1936.22.camel@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4 March 2016 at 12:23, Jon Hunter <jonathanh@nvidia.com> wrote:
-> When a PM domain provider is added, there is currently no way to tell if
-> the PM domain is actually present in the system. Naturally, the PM domain
-> provider should not be registered if the PM domain has not been added.
-> Nonetheless, to verify that the PM domain associated with a provider is
-> present, store the 'provider_data' in the PM domain structure when adding
-> the provider and make sure that the PM domain is found the list of PM
-> domains registered.
->
-> The of_genpd_add_provider_simple() and of_genpd_add_provider_onecell()
-> functions have been updated to store the 'provider_data' by default to
-> avoid having to modify all the current PM domain provider
-> implementations.
->
-> By doing this, we can also verify that the provider has been removed
-> from the list of providers before removing a PM domain.
->
-> Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
-> ---
->  drivers/base/power/domain.c | 74 +++++++++++++++++++++++++++++++++++++++++++--
->  include/linux/pm_domain.h   | 13 +++++---
->  2 files changed, 79 insertions(+), 8 deletions(-)
->
-> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
-> index c2ba1d6dbad3..72055fef6256 100644
-> --- a/drivers/base/power/domain.c
-> +++ b/drivers/base/power/domain.c
-> @@ -1570,6 +1570,24 @@ static LIST_HEAD(of_genpd_providers);
->  static DEFINE_MUTEX(of_genpd_mutex);
->
->  /**
-> + * pm_genpd_provider_present - Check if the provider's PM domain is present.
-> + * @data: Provider data associated with the PM domain.
-> + */
-> +static bool pm_genpd_provider_present(void *data)
+On Fri, 2016-08-05 at 08:58 +0200, Uwe Kleine-K?nig wrote:
+> On Fri, Aug 05, 2016 at 12:44:23AM +0200, Christoph Fritz wrote:
+> > here on a imx6sx board newly introduced DSR-irq-handling breaks serial
+> > console and network support.
+> > 
+> > Reverting commit 27e16501052e5341934d3 "serial: imx: implement DSR irq
+> > handling for DTE mode" fixes the issue.
+> > 
+> > The underlying cause is the RMII network configuration where register
+> > bit SION in IOMUXC_SW_MUX_CTL_PAD_ENET1_TX_CLK is necessary. But this
+> > also falsely feeds signal UART1_DTR_B and triggers DSR irq...
+> > 
+> > Can we revert this commit or add a quirk for RMII-SION configs or make
+> > this optional by a device tree option?
+> 
+> Hmm, MX6SX_PAD_ENET1_TX_CLK__ENET1_TX_CLK in
+> arch/arm/boot/dts/imx6sx-pinfunc.h doesn't have SION set.
+> 
+> I remember there were issues around eth and SION on i.MX6DL, but don't
+> know the details. A quick net research found
+> https://community.nxp.com/thread/359531 which has: "Set the SION bit.
+> Note that this is not required because the funtion setting controls the
+> signal path, but it is good practice as it reminds the user that the
+> clock needs to fed back into the Ethernet MAC.". Sounds like dangerous
+> smattering and a wrong expectation about "users".
+> 
+> https://community.nxp.com/thread/376821 is from someone who has the same
+> problem(?) on i.MX6SX, but no solution yet.
+> 
+> Does that mean MX6SX_PAD_ENET1_TX_CLK__ENET1_TX_CLK always needs the
+> SION bit set?
 
-Please rename to genpd_provider_present().
+SION is necessary for pinconfig MX6SX_PAD_ENET1_TX_CLK__ENET1_REF_CLK1
+if bit 17 in IOMUXC_GPR_GPR1 is set and bit 13 not.
 
-> +{
-> +       struct generic_pm_domain *gpd;
-> +
-> +       if (!data)
-> +               return false;
-> +
-> +       list_for_each_entry(gpd, &gpd_list, gpd_list_node)
-> +               if (gpd->provider_data == data)
-> +                       return true;
-> +
-> +       return false;
-> +}
-> +
-> +/**
->   * __of_genpd_xlate_simple() - Xlate function for direct node-domain mapping
->   * @genpdspec: OF phandle args to map into a PM domain
->   * @data: xlate function private data - pointer to struct generic_pm_domain
-> @@ -1625,9 +1643,15 @@ EXPORT_SYMBOL_GPL(__of_genpd_xlate_onecell);
->   * @np: Device node pointer associated with the PM domain provider.
->   * @xlate: Callback for decoding PM domain from phandle arguments.
->   * @data: Context pointer for @xlate callback.
-> + *
-> + * The PM domain assocaited with the provider must have the
-> + * 'provider_data' member of the PM domain structure populated with the
-> + * same data pointer passed to this function. This is used to verify
-> + * that the PM domain associated with the provider is present in the
-> + * list of registered PM domains.
->   */
-> -int __of_genpd_add_provider(struct device_node *np, genpd_xlate_t xlate,
-> -                       void *data)
-> +static int __of_genpd_add_provider(struct device_node *np, genpd_xlate_t xlate,
-> +                                  void *data)
+So that ref_enetpll1 provides a clock not only for the external PHY but
+also for the internal controller.
 
-Please rename to genpd_add_provider().
+Using SION is a quirk here, because the silicon doesn't feed the clock
+back to the internal controller automatically.
 
->  {
->         struct of_genpd_provider *cp;
->
-> @@ -1635,6 +1659,13 @@ int __of_genpd_add_provider(struct device_node *np, genpd_xlate_t xlate,
->         if (!cp)
->                 return -ENOMEM;
->
-> +       mutex_lock(&gpd_list_lock);
-> +
-> +       if (!pm_genpd_provider_present(data)) {
-> +               mutex_unlock(&gpd_list_lock);
-> +               return -EINVAL;
-> +       }
-> +
->         cp->node = of_node_get(np);
->         cp->data = data;
->         cp->xlate = xlate;
-> @@ -1642,11 +1673,48 @@ int __of_genpd_add_provider(struct device_node *np, genpd_xlate_t xlate,
->         mutex_lock(&of_genpd_mutex);
->         list_add(&cp->link, &of_genpd_providers);
->         mutex_unlock(&of_genpd_mutex);
-> +       mutex_unlock(&gpd_list_lock);
->         pr_debug("Added domain provider from %s\n", np->full_name);
->
->         return 0;
->  }
-> -EXPORT_SYMBOL_GPL(__of_genpd_add_provider);
+On the other hand, NXP could argue: You need to add a wire on your PCB
+between ENET1_REF_CLK1 and ENET1_TX_CLK -- but referring to the
+datasheet ENET1_TX_CLK isn't used in RMII config...
 
-I agree that it makes sense to remove this API and to turn the
-function into becoming static. Although perhaps you should do that as
-a clean up patch that comes prior $subject patch instead!?
+So if Fabio or Shawn agrees with my assumption above, I'll add something
+like 27e16501052e5341934d3 "serial: imx: implement DSR irq
+handling for DTE mode".
 
-The clean up also includes the exporting of the
-of_genpd_add_provider_onecell() and the of_genpd_add_provider_simple()
-APIs.
-
-... and while you do these cleanups, you could also remove the
-exported functions __of_genpd_xlate_simple() and
-__of_genpd_xlate_onecell() as those should be internal to genpd.
-
-> +
-> +/**
-> + * of_genpd_add_provider_simple() - Register a simple PM domain provider
-> + * @np: Device node pointer associated with the PM domain provider.
-> + * @genpd: Pointer to PM domain associated with the PM domain provider.
-> + */
-> +int of_genpd_add_provider_simple(struct device_node *np,
-> +                                struct generic_pm_domain *genpd)
-> +{
-> +       if (!np || !genpd)
-> +               return -EINVAL;
-> +
-> +       genpd->provider_data = genpd;
-> +
-> +       return __of_genpd_add_provider(np, __of_genpd_xlate_simple, genpd);
-> +}
-> +EXPORT_SYMBOL_GPL(of_genpd_add_provider_simple);
-> +
-> +/**
-> + * of_genpd_add_provider_onecell() - Register a onecell PM domain provider
-> + * @np: Device node pointer associated with the PM domain provider.
-> + * @data: Pointer to the data associated with the PM domain provider.
-> + */
-> +int of_genpd_add_provider_onecell(struct device_node *np,
-> +                                 struct genpd_onecell_data *data)
-> +{
-> +       unsigned int i;
-> +
-> +       if (!np || !data)
-> +               return -EINVAL;
-> +
-> +       for (i = 0; i < data->num_domains; i++)
-> +               data->domains[i]->provider_data = data;
-> +
-> +       return __of_genpd_add_provider(np, __of_genpd_xlate_onecell, data);
-> +}
-> +EXPORT_SYMBOL_GPL(of_genpd_add_provider_onecell);
->
->  /**
->   * of_genpd_del_provider() - Remove a previously registered PM domain provider
-> diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
-> index 510512d5390e..bed84413546f 100644
-> --- a/include/linux/pm_domain.h
-> +++ b/include/linux/pm_domain.h
-> @@ -53,6 +53,7 @@ struct generic_pm_domain {
->         struct mutex lock;
->         struct dev_power_governor *gov;
->         struct work_struct power_off_work;
-> +       void *provider_data;
-
-As per comment on patch 6/8. Couldn't we store the provider's device
-node here instead?
-
->         const char *name;
->         atomic_t sd_count;      /* Number of subdomains with power "on" */
->         enum gpd_status status; /* Current state of the domain */
-> @@ -193,8 +194,10 @@ typedef struct generic_pm_domain *(*genpd_xlate_t)(struct of_phandle_args *args,
->                                                 void *data);
->
->  #ifdef CONFIG_PM_GENERIC_DOMAINS_OF
-> -int __of_genpd_add_provider(struct device_node *np, genpd_xlate_t xlate,
-> -                       void *data);
-> +int of_genpd_add_provider_simple(struct device_node *np,
-> +                                struct generic_pm_domain *genpd);
-> +int of_genpd_add_provider_onecell(struct device_node *np,
-> +                                 struct genpd_onecell_data *data);
->  void of_genpd_del_provider(struct device_node *np);
->  struct generic_pm_domain *__of_genpd_xlate_simple(
->                                         struct of_phandle_args *genpdspec,
-> @@ -235,18 +238,18 @@ static inline int genpd_dev_pm_attach(struct device *dev)
->  {
->         return -ENODEV;
->  }
-> -#endif /* CONFIG_PM_GENERIC_DOMAINS_OF */
->
->  static inline int of_genpd_add_provider_simple(struct device_node *np,
->                                         struct generic_pm_domain *genpd)
->  {
-> -       return __of_genpd_add_provider(np, __of_genpd_xlate_simple, genpd);
-> +       return -ENOTSUPP;
->  }
->  static inline int of_genpd_add_provider_onecell(struct device_node *np,
->                                         struct genpd_onecell_data *data)
->  {
-> -       return __of_genpd_add_provider(np, __of_genpd_xlate_onecell, data);
-> +       return -ENOTSUPP;
->  }
-> +#endif /* CONFIG_PM_GENERIC_DOMAINS_OF */
->
->  #ifdef CONFIG_PM
->  extern int dev_pm_domain_attach(struct device *dev, bool power_on);
-> --
-> 2.1.4
->
-
-Kind regards
-Uffe
+Okay?
