@@ -1,33 +1,56 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Fri, 5 Aug 2016 17:54:42 +0200
-Subject: [PATCH V3 1/6] perf/core: Adding PMU driver specific configuration
-In-Reply-To: <CANLsYkwNwtYHZ+BLt7iuB919zbCUUs2thfkU-bMH-+e5eMxAxg@mail.gmail.com>
-References: <1469742143-22245-1-git-send-email-mathieu.poirier@linaro.org>
- <1469742143-22245-2-git-send-email-mathieu.poirier@linaro.org>
- <20160804165951.GU6862@twins.programming.kicks-ass.net>
- <CANLsYkwNwtYHZ+BLt7iuB919zbCUUs2thfkU-bMH-+e5eMxAxg@mail.gmail.com>
-Message-ID: <20160805155442.GW6879@twins.programming.kicks-ass.net>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri, 5 Aug 2016 17:58:12 +0200
+Subject: [PATCH 2/4] irqchip: irq-mvebu-pic: new driver for Marvell
+ Armada 7K/8K PIC
+In-Reply-To: <20160805153113.GW4541@io.lakedaemon.net>
+References: <1470408921-447-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1470408921-447-3-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20160805153113.GW4541@io.lakedaemon.net>
+Message-ID: <20160805175812.55162108@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 05, 2016 at 09:41:15AM -0600, Mathieu Poirier wrote:
-> On 4 August 2016 at 10:59, Peter Zijlstra <peterz@infradead.org> wrote:
-> > On Thu, Jul 28, 2016 at 03:42:18PM -0600, Mathieu Poirier wrote:
-> >> This patch somewhat mimics the work done on address filters to
-> >> add the infrastructure needed to pass PMU specific HW
-> >> configuration to the driver before a session starts.
-> >
-> > I'm thinking we want to specify a syntax and validate the string matches
-> > the syntax in the generic code.
-> 
-> The syntax is checked in the lexer making sure that nothing other than
-> @cfg or @cfg=config is sent to the kernel.  From there validation is
-> done in the PMU driver that implements the set_drv_configs()
-> interface.
-> 
-> I am not sure to get you point here - can I ask you to provide more details?
+Hello,
 
-What keeps random userspace from sending malformed strings in? There's
-more userspace than just the perf tool.
+Thanks for the quick feedback!
 
-The kernel needs to validate structure.
+On Fri, 5 Aug 2016 15:31:13 +0000, Jason Cooper wrote:
+
+> > +config MVEBU_PIC
+> > +	bool  
+> 
+> tri-state?  Is there anything else attached to the PIC besides the PMU?
+
+tri-state would be fine I believe, it's indeed a secondary interrupt
+controller, not essential for booting the platform.
+
+But then I probably need to rework PATCH 3/4 and not have it
+unconditionally selected by the platform Kconfig option, right?
+
+Regarding what else is attached to the PIC, I have no idea, I don't
+have this information.
+
+> > +static const struct of_device_id mvebu_pic_of_match[] = {
+> > +	{ .compatible = "marvell,armada-8k-pic", },  
+> 
+> You mention 7k in $subject, should you use that here as the youngest
+> compatible SoC generation?
+
+There isn't anything youngest or oldest between 7K and 8K, they both
+got released at the same time. They are really the same family of SoCs,
+the 7K having only one CP110, the 8K having two of them, which provides
+more I/Os.
+
+For several other IPs, we're using armada-8k as the compatible string:
+
+ * marvell,armada8k-pcie
+ * marvell,armada-8k-xhci
+
+(Yes you will already notice how consistent we are in the naming of the
+compatible string :-/).
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
