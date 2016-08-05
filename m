@@ -1,34 +1,62 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sat, 06 Aug 2016 00:52:39 +0300
-Subject: [PATCH] ARM: dts: r8a7792: fix misindented line
-In-Reply-To: <1618499.8bcj8adpVO@wasted.cogentembedded.com>
-References: <1618499.8bcj8adpVO@wasted.cogentembedded.com>
-Message-ID: <4152284.qHAgBjWaW0@wasted.cogentembedded.com>
+From: stephen.boyd@linaro.org (Stephen Boyd)
+Date: Fri, 05 Aug 2016 14:53:56 -0700
+Subject: [PATCH v2 08/22] usb: chipidea: Remove locking in ci_udc_start()
+In-Reply-To: <20160708094528.GF20485@shlinux2>
+References: <20160707222114.1673-1-stephen.boyd@linaro.org>
+ <20160707222114.1673-9-stephen.boyd@linaro.org>
+ <20160708094528.GF20485@shlinux2>
+Message-ID: <147043403652.26915.10865210145828633146@sboyd-linaro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 2a0900655d5e (ARM: dts: r8a7792: add I2C support) had a wrongly
-indented line at the end of the "aliases" subnode -- fix it.
+Quoting Peter Chen (2016-07-08 02:45:28)
+> On Thu, Jul 07, 2016 at 03:20:59PM -0700, Stephen Boyd wrote:
+> > We don't call hw_device_reset() with the ci->lock held, so it
+> > doesn't seem like this lock here is protecting anything. Let's
+> > just remove it. This allows us to call sleeping functions like
+> > phy_init() from within the CI_HDRC_CONTROLLER_RESET_EVENT hook.
+> > 
+> > Cc: Peter Chen <peter.chen@nxp.com>
+> > Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> > Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
+> > ---
+> >  drivers/usb/chipidea/udc.c | 3 ---
+> >  1 file changed, 3 deletions(-)
+> > 
+> > diff --git a/drivers/usb/chipidea/udc.c b/drivers/usb/chipidea/udc.c
+> > index 065f5d97aa67..f16be4710cdb 100644
+> > --- a/drivers/usb/chipidea/udc.c
+> > +++ b/drivers/usb/chipidea/udc.c
+> > @@ -1719,7 +1719,6 @@ static int ci_udc_start(struct usb_gadget *gadget,
+> >                        struct usb_gadget_driver *driver)
+> >  {
+> >       struct ci_hdrc *ci = container_of(gadget, struct ci_hdrc, gadget);
+> > -     unsigned long flags;
+> >       int retval = -ENOMEM;
+> >  
+> >       if (driver->disconnect == NULL)
+> > @@ -1746,7 +1745,6 @@ static int ci_udc_start(struct usb_gadget *gadget,
+> >  
+> >       pm_runtime_get_sync(&ci->gadget.dev);
+> >       if (ci->vbus_active) {
+> > -             spin_lock_irqsave(&ci->lock, flags);
+> >               hw_device_reset(ci);
+> >       } else {
+> >               usb_udc_vbus_handler(&ci->gadget, false);
+> > @@ -1755,7 +1753,6 @@ static int ci_udc_start(struct usb_gadget *gadget,
+> >       }
+> >  
+> >       retval = hw_device_state(ci, ci->ep0out->qh.dma);
+> > -     spin_unlock_irqrestore(&ci->lock, flags);
+> >       if (retval)
+> >               pm_runtime_put_sync(&ci->gadget.dev);
+> >  
+> 
+> The main purpose for this is disabling interrupt when reset controller,
+> in case the unexpected interrupts occur.
+> 
+> You can move this between hw_device_state.
+> 
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-
----
-This patch is against the 'renesas-devel-20160725-v4.7-rc7' tag of Simon
-Horman's 'renesas.git' repo.
-
- arch/arm/boot/dts/r8a7792.dtsi |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-Index: renesas/arch/arm/boot/dts/r8a7792.dtsi
-===================================================================
---- renesas.orig/arch/arm/boot/dts/r8a7792.dtsi
-+++ renesas/arch/arm/boot/dts/r8a7792.dtsi
-@@ -31,7 +31,7 @@
- 		vin3 = &vin3;
- 		vin4 = &vin4;
- 		vin5 = &vin5;
--};
-+	};
- 
- 	cpus {
- 		#address-cells = <1>;
+Ok, but we don't hold the ci->lock in ci_udc_vbus_session(). Is that a
+bug as well?
