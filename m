@@ -1,15 +1,15 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Fri, 05 Aug 2016 13:09:21 +0100
-Subject: Applied "regulator: qcom_smd: Fix voltage ranges for pma8084 ftsmps
- and pldo" to the regulator tree
-In-Reply-To: <20160711215009.4519-3-sboyd@codeaurora.org>
-Message-ID: <E1bVdwH-0002jg-Cz@debutante>
+Date: Fri, 05 Aug 2016 13:09:24 +0100
+Subject: Applied "regulator: qcom_smd: Fix voltage ranges for pm8x41" to the
+ regulator tree
+In-Reply-To: <20160711215009.4519-2-sboyd@codeaurora.org>
+Message-ID: <E1bVdwK-0002kb-B3@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The patch
 
-   regulator: qcom_smd: Fix voltage ranges for pma8084 ftsmps and pldo
+   regulator: qcom_smd: Fix voltage ranges for pm8x41
 
 has been applied to the regulator tree at
 
@@ -34,35 +34,35 @@ to this mail.
 Thanks,
 Mark
 
->From c488f0071eacd10a290df4fb34bbdeb4eb8e7888 Mon Sep 17 00:00:00 2001
+>From 290284776bb281759b11faa287b8abccaf74bfcb Mon Sep 17 00:00:00 2001
 From: Stephen Boyd <sboyd@codeaurora.org>
-Date: Mon, 11 Jul 2016 14:50:08 -0700
-Subject: [PATCH] regulator: qcom_smd: Fix voltage ranges for pma8084 ftsmps
- and pldo
+Date: Mon, 11 Jul 2016 14:50:07 -0700
+Subject: [PATCH] regulator: qcom_smd: Fix voltage ranges for pm8x41
 
-The voltage ranges listed here are wrong. The pma8084 pldo
-supports three different overlapping voltage ranges with
-differing step sizes and the pma8084 ftsmps supports two. These
-ranges can be seen in the "native" spmi regulator driver
-(qcom_spmi-regulator.c) at pldo_ranges[] and ftsmps_ranges[]
-respectively. Port these ranges over to the RPM SMD regulator
-driver so that we list the appropriate set of supported voltages
-on these types of regulators.
+The voltage ranges listed here are wrong. The correct ranges can
+be seen in the "native" spmi regulator driver
+qcom_spmi-regulator.c at pldo_ranges[], ftsmps_ranges[] and
+boost_ranges[] for the pldo, ftsmps, and boost type regulators.
+Port these ranges over to the RPM SMD regulator driver so that we
+list the appropriate set of supported voltages on pldos.
 
-Fixes: ee01d0c91ef1 ("regulator: qcom-smd: Add support for PMA8084")
+Doing this allows us to specify a voltage like 3075000 for l24,
+whereas before that wasn't a supported voltage.
+
+Fixes: da65e367b67e ("regulator: Regulator driver for the Qualcomm RPM")
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 Reviewed-by: Andy Gross <andy.gross@linaro.org>
 Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- drivers/regulator/qcom_smd-regulator.c | 13 +++++++------
- 1 file changed, 7 insertions(+), 6 deletions(-)
+ drivers/regulator/qcom_smd-regulator.c | 17 +++++++++--------
+ 1 file changed, 9 insertions(+), 8 deletions(-)
 
 diff --git a/drivers/regulator/qcom_smd-regulator.c b/drivers/regulator/qcom_smd-regulator.c
-index 47cd28e960db..8ed46a9a55c8 100644
+index 5022fa8d10c6..47cd28e960db 100644
 --- a/drivers/regulator/qcom_smd-regulator.c
 +++ b/drivers/regulator/qcom_smd-regulator.c
-@@ -178,20 +178,21 @@ static const struct regulator_desc pma8084_hfsmps = {
- static const struct regulator_desc pma8084_ftsmps = {
+@@ -221,29 +221,30 @@ static const struct regulator_desc pm8x41_hfsmps = {
+ static const struct regulator_desc pm8841_ftsmps = {
  	.linear_ranges = (struct regulator_linear_range[]) {
  		REGULATOR_LINEAR_RANGE(350000,  0, 184, 5000),
 -		REGULATOR_LINEAR_RANGE(700000, 185, 339, 10000),
@@ -74,9 +74,20 @@ index 47cd28e960db..8ed46a9a55c8 100644
  	.ops = &rpm_smps_ldo_ops,
  };
  
- static const struct regulator_desc pma8084_pldo = {
+ static const struct regulator_desc pm8941_boost = {
  	.linear_ranges = (struct regulator_linear_range[]) {
--		REGULATOR_LINEAR_RANGE(750000,  0,  30, 25000),
+-		REGULATOR_LINEAR_RANGE(4000000, 0, 15, 100000),
++		REGULATOR_LINEAR_RANGE(4000000, 0, 30, 50000),
+ 	},
+ 	.n_linear_ranges = 1,
+-	.n_voltages = 16,
++	.n_voltages = 31,
+ 	.ops = &rpm_smps_ldo_ops,
+ };
+ 
+ static const struct regulator_desc pm8941_pldo = {
+ 	.linear_ranges = (struct regulator_linear_range[]) {
+-		REGULATOR_LINEAR_RANGE( 750000,  0,  30, 25000),
 -		REGULATOR_LINEAR_RANGE(1500000, 31, 99, 50000),
 +		REGULATOR_LINEAR_RANGE( 750000,  0,  63, 12500),
 +		REGULATOR_LINEAR_RANGE(1550000, 64, 126, 25000),
