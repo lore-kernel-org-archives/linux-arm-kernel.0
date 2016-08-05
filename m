@@ -1,69 +1,75 @@
-From: patrice.chotard@st.com (Patrice Chotard)
-Date: Fri, 5 Aug 2016 10:11:03 +0200
-Subject: [RESEND PATCH v2 00/13] Clock improvement for video playback
-In-Reply-To: <1466068833-5055-1-git-send-email-gabriel.fernandez@linaro.org>
-References: <1466068833-5055-1-git-send-email-gabriel.fernandez@linaro.org>
-Message-ID: <b6389057-0c53-7095-81a3-617aff678e28@st.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 5 Aug 2016 10:26:34 +0200
+Subject: [PATCH 2/2] regmap: debugfs: Add support for dumping write only
+ device registers
+In-Reply-To: <20160804202646.GH10383@sirena.org.uk>
+References: <1470322558-7501-1-git-send-email-cristian.birsan@microchip.com>
+ <1470322558-7501-3-git-send-email-cristian.birsan@microchip.com>
+ <20160804202646.GH10383@sirena.org.uk>
+Message-ID: <3e42070f-a480-dbf4-1a97-b7172bebb1cc@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike
+Le 04/08/2016 ? 22:26, Mark Brown a ?crit :
+> On Thu, Aug 04, 2016 at 05:55:58PM +0300, Cristian Birsan wrote:
+>> Add support for dumping write only device registers in debugfs. This is
+>> useful for audio codecs that have write only registers (like WM8731).
+>> The logic that decides if a value can be printed is moved to
+>> regmap_printable() function to allow for easier future updates.
+> 
+> Please check your CC list when sending things upstream - try to ensure
+> that people you're sending patches to are relevant to the patch.
+> Maintainers often get lots of mail and having to sort out mail that's
+> not really relevant to them can make it easier for relevant mail to get
+> missed.
 
-I believe that you and Gabriel found an agreement to include this series in v4.8
+Mark,
 
-Unfortunately it seems it's not the case, for which reason ?
-
-Thanks
-
-Patrice
-
+Just FYI, I gave Cristian the CC list he could use: In fact the Atmel /
+Microchip / Free-Electons people are in the list because we are all
+working together on the AT91 platforms now. And these platforms use the
+audio codec Cristian is working on.
 
 
-On 06/16/2016 11:20 AM, Gabriel Fernandez wrote:
-> v2:
->   - Simpliflication of clock binding
->     remark from Rob https://lkml.org/lkml/2016/5/25/492
->   - Suppression of stih415-416 support for the clocks (in order
-> 	to help simplification of clock binding)
->     (others patchs for the machine and drivers will come)
->
-> This serie allows to increase video resolutions and make audio
-> adjustment during a video playback.
->
-> Gabriel Fernandez (13):
->   drivers: clk: st: Remove stih415-416 clock support
->   drivers: clk: st: Simplify clock binding of STiH4xx platforms
->   drivers: clk: st: Add fs660c32 synthesizer algorithm
->   drivers: clk: st: Add clock propagation for audio clocks
->   drivers: clk: st: Handle clk synchronous mode for video clocks
->   ARM: DT: STiH407: Enable clock propagation for audio clocks
->   ARM: DT: STiH410: Enable clock propagation for audio clocks
->   ARM: DT: STiH418: Enable clock propagation for audio clocks
->   ARM: DT: STiH407: Enable synchronous clock mode for video clocks
->   ARM: DT: STiH410: Enable synchronous clock mode for video clocks
->   ARM: DT: STiH418: Enable synchronous clock mode for video clocks
->   ARM: DT: STi: STiH407: clock configuration to address 720p and 1080p
->   ARM: DT: STi: STiH410: clock configuration to address 720p and 1080p
->
->  .../bindings/clock/st/st,clkgen-divmux.txt         |  49 --
->  .../devicetree/bindings/clock/st/st,clkgen-mux.txt |  20 +-
->  .../devicetree/bindings/clock/st/st,clkgen-pll.txt |  35 +-
->  .../bindings/clock/st/st,clkgen-prediv.txt         |  36 -
->  .../devicetree/bindings/clock/st/st,clkgen-vcc.txt |  61 --
->  .../devicetree/bindings/clock/st/st,clkgen.txt     |  54 +-
->  .../devicetree/bindings/clock/st/st,flexgen.txt    |   4 +
->  .../devicetree/bindings/clock/st/st,quadfs.txt     |  31 +-
->  arch/arm/boot/dts/stih407-clock.dtsi               |   4 +-
->  arch/arm/boot/dts/stih407.dtsi                     |  16 +-
->  arch/arm/boot/dts/stih410-clock.dtsi               |   4 +-
->  arch/arm/boot/dts/stih410.dtsi                     |  16 +-
->  arch/arm/boot/dts/stih418-clock.dtsi               |   4 +-
->  drivers/clk/st/clk-flexgen.c                       |  61 +-
->  drivers/clk/st/clkgen-fsyn.c                       | 481 ++++---------
->  drivers/clk/st/clkgen-mux.c                        | 748 +--------------------
->  drivers/clk/st/clkgen-pll.c                        | 470 +------------
->  17 files changed, 297 insertions(+), 1797 deletions(-)
->  delete mode 100644 Documentation/devicetree/bindings/clock/st/st,clkgen-divmux.txt
->  delete mode 100644 Documentation/devicetree/bindings/clock/st/st,clkgen-prediv.txt
->  delete mode 100644 Documentation/devicetree/bindings/clock/st/st,clkgen-vcc.txt
->
+>> +static bool regmap_printable(struct regmap *map, unsigned int reg)
+>> +{
+>> +	if (regmap_precious(map, reg))
+>> +		return false;
+>> +
+>> +	if (!regmap_readable(map, reg) && !regmap_cached(map, reg))
+>> +		return false;
+>> +
+>> +	return true;
+>> +}
+> 
+> This only has one user...
+> 
+>>  	for (i = start_reg; i <= to; i += map->reg_stride) {
+>> -		if (!regmap_readable(map, i))
+>> +		if (!regmap_readable(map, i) && !regmap_cached(map, i))
+>>  			continue;
+>>  
+> 
+> ...though it could have more.
+> 
+>> -			ret = regmap_read(map, i, &val);
+>> +			if (regmap_readable(map, i))
+>> +				ret = regmap_read(map, i, &val);
+>> +			else
+>> +				ret = regcache_read(map, i, &val);
+>> +
+> 
+> I don't understand this change, a read will go to cache anyway.
+> 
+
+
+-- 
+Nicolas Ferre
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160805/b0d40700/attachment.sig>
