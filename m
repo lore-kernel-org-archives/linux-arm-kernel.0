@@ -1,57 +1,51 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Fri, 05 Aug 2016 13:02:48 +0200
-Subject: [PATCH] clk: rockchip: mark rk3399 hdcp_noc and pclk_vio_grf as
- critical
-In-Reply-To: <1470209784-2665-1-git-send-email-zyw@rock-chips.com>
-References: <1470209784-2665-1-git-send-email-zyw@rock-chips.com>
-Message-ID: <4055149.Zs66lEhv2I@diego>
+From: julia.lawall@lip6.fr (Julia Lawall)
+Date: Fri, 5 Aug 2016 13:26:11 +0200 (CEST)
+Subject: [PATCH 03/11 v2] pinctrl: nomadik: use of_property_read_bool
+In-Reply-To: <1470387411-15879-4-git-send-email-Julia.Lawall@lip6.fr>
+References: <1470387411-15879-1-git-send-email-Julia.Lawall@lip6.fr>
+ <1470387411-15879-4-git-send-email-Julia.Lawall@lip6.fr>
+Message-ID: <alpine.DEB.2.10.1608051325350.2999@hadrien>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chris,
+Use of_property_read_bool to check for the existence of a property.
 
-Am Mittwoch, 3. August 2016, 15:36:24 schrieb Chris Zhong:
-> The Type-C DP need these clocks: aclk_hdcp_noc, hclk_hdcp_noc,
-> pclk_hdcp_noc, pclk_vio_grf. Mark them as critical to avoid someone
-> close them.
-> 
-> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
-> 
-> ---
-> 
->  drivers/clk/rockchip/clk-rk3399.c | 4 ++++
->  1 file changed, 4 insertions(+)
-> 
-> diff --git a/drivers/clk/rockchip/clk-rk3399.c
-> b/drivers/clk/rockchip/clk-rk3399.c index 78e51cb..6c8ed25 100644
-> --- a/drivers/clk/rockchip/clk-rk3399.c
-> +++ b/drivers/clk/rockchip/clk-rk3399.c
-> @@ -1466,6 +1466,9 @@ static struct rockchip_clk_branch
-> rk3399_clk_pmu_branches[] __initdata = {
-> 
->  static const char *const rk3399_cru_critical_clocks[] __initconst = {
->  	"aclk_cci_pre",
-> +	"aclk_hdcp_noc",
-> +	"hclk_hdcp_noc",
-> +	"pclk_hdcp_noc",
->  	"pclk_perilp0",
->  	"pclk_perilp0",
->  	"hclk_perilp0",
+The semantic patch that makes this change is as follows:
+(http://coccinelle.lip6.fr/)
 
-ok, we have marked all other noc (interconnect) clocks as critical, so this 
-looks good.
+// <smpl>
+@@
+expression e1,e2,x;
+@@
+-	if (of_get_property(e1,e2,NULL))
+-		x = true;
+-	else
+-		x = false;
++	x = of_property_read_bool(e1,e2);
+// </smpl>
 
-> @@ -1485,6 +1488,7 @@ static const char *const rk3399_cru_critical_clocks[]
-> __initconst = { "gpll_hclk_perilp1_src",
->  	"gpll_aclk_perilp0_src",
->  	"gpll_aclk_perihp_src",
-> +	"pclk_vio_grf",
+Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
 
-I don't necessarily agree with this one. It seems for the analogix-dp the 
-preferred way is to have the driver handle its needed clock, see
-	"[PATCH v1 6/6] drm/rockchip: dw_hdmi: introduce the pclk for grf" [0]
+---
+v2: special case for propagating true and false
 
+ drivers/pinctrl/nomadik/pinctrl-nomadik.c |    6 ++----
+ 1 file changed, 2 insertions(+), 4 deletions(-)
 
-Heiko
+diff --git a/drivers/pinctrl/nomadik/pinctrl-nomadik.c b/drivers/pinctrl/nomadik/pinctrl-nomadik.c
+index 35f6218..6f2e1da 100644
+--- a/drivers/pinctrl/nomadik/pinctrl-nomadik.c
++++ b/drivers/pinctrl/nomadik/pinctrl-nomadik.c
+@@ -1110,10 +1110,8 @@ static int nmk_gpio_probe(struct platform_device *dev)
+ 		return PTR_ERR(nmk_chip);
+ 	}
 
-[0] https://patchwork.kernel.org/patch/9223331/
+-	if (of_get_property(np, "st,supports-sleepmode", NULL))
+-		supports_sleepmode = true;
+-	else
+-		supports_sleepmode = false;
++	supports_sleepmode =
++		of_property_read_bool(np, "st,supports-sleepmode");
+
+ 	/* Correct platform device ID */
+ 	dev->id = nmk_chip->bank;
