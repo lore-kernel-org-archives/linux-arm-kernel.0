@@ -1,102 +1,29 @@
-From: nleeder@codeaurora.org (Neil Leeder)
-Date: Fri, 5 Aug 2016 14:53:47 -0400
-Subject: [PATCH v2 1/2] soc: qcom: provide mechanism for drivers to access
- L2 registers
-In-Reply-To: <20160805100018.GA25152@leverpostej>
-References: <1470345071-9455-1-git-send-email-nleeder@codeaurora.org>
- <1470345071-9455-2-git-send-email-nleeder@codeaurora.org>
- <20160805100018.GA25152@leverpostej>
-Message-ID: <b7c298cc-cc7d-c021-95f7-2df6003f212c@codeaurora.org>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Fri, 5 Aug 2016 21:51:31 +0200
+Subject: [RFC] User-defined leds
+In-Reply-To: <DB74DD94-7737-4F06-BD35-D698A65E30AD@holtmann.org>
+References: <57965C15.1070705@lechnology.com>
+ <DB74DD94-7737-4F06-BD35-D698A65E30AD@holtmann.org>
+Message-ID: <20160805195130.GA26694@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi!
 
-On 8/5/2016 06:00 AM, Mark Rutland wrote:
-> On Thu, Aug 04, 2016 at 05:11:10PM -0400, Neil Leeder wrote:
->> L2 registers are accessed using a select register and data
->> register pair. To prevent multiple concurrent writes to the
->> select register by independent drivers, the write to the
->> select register and the associated access of the data register
->> are protected with a lock. All drivers accessing the L2
->> registers use the set and get functions provided by
->> l2-accessors to ensure correct reads and writes to L2 registers.
+> > short version: I have a use case for leds where I want to be able to use the triggers in the leds subsystem without having a physical hardware led.
+> > 
+> > long version: I am working on a program to make one embedded system (http://fatcatlab.com/product/evb/) compatible with another (http://mindstorms.lego.com). One has physical red/green LEDs, that use the gpio leds driver to control them. The other system does not have physical leds. However, it does have a color screen. So, my idea is
+> > to create virtual LEDs on the screen that emulate the physical LEDs on the other device.
+> > 
+> > I would like to make a userspace program that works the same on both devices. If the leds were simple on-off, then it would of course be simpler to make the virtual leds completely in userspace. However, we are currently using other triggers (disk activity/heatbeat/etc.) with the leds. I would like for the virtual LEDs to be able to use these triggers as well.
 > 
-> As of this series, this is only used by the PMU driver. Which other
-> drivers do you plan to use this for?
-> 
-> If there's nothing else planned at the moment, it would be nicer to fold
-> these into the PMU driver.
+> this is funny since I have just written a ledsim.c using debugfs to emulate a LED and read out its state via a simple cat command. I found that useful for testing triggers in the Bluetooth subsystem and see if they behave correctly without bothering to run this on real hardware.
 > 
 
-I see a couple of other drivers on codeaurora.org using it: the
-Error Reporting (ERP) driver and an adaptive clock generator. 
-I'd guess they'll be submitted to LKML but they're not mine so I don't
-know when.
+Could the device tree be used to bind LED driver to otherwise unused
+gpio?
 
-As the purpose of this is to be the common interface for multiple drivers
-to stop them walking over each other, I think it makes sense to keep
-it separate.
-
-> [...]
-> 
->> +config QCOM_L2_ACCESSORS
->> +	bool "Qualcomm Technologies L2-cache accessors"
->> +	depends on ARCH_QCOM && ARM64
->> +	help
->> +	  Say y here to enable support for the Qualcomm Technologies
->> +	  L2 accessors.
->> +	  Provides support for accessing registers in the L2 cache
->> +	  for Qualcomm Technologies chips.
-> 
-> Which chips have this?
-
-Qualcomm Technologies ARM64 chips, so currently QDF24xx family and 
-anything Kryo based. I'd assume any future chip families as well.
-Given the 'depends on' line, I wasn't sure there was any benefit
-to essentially duplicating that in the help text.
-
-> 
-> Have drivers select this as necessary. There's no reason for this to be
-> used-selectable given this is trivial common infrastructure.
-
-OK, I'll fix that
-
-> 
-> [...]
-> 
->> +#include <linux/spinlock.h>
->> +#include <linux/export.h>
->> +#include <linux/soc/qcom/l2-accessors.h>
->> +#include <asm/cputype.h>
->> +#include <asm/sysreg.h>
-> 
-> Nit: please sort these alphabetically.
-
-OK
-
-> 
-> [...]
-> 
->> +EXPORT_SYMBOL(set_l2_indirect_reg);
-> 
-> The PMU driver isn't a module, so this doesn't need to be exported.
-> Until there's a modular user, please get rid of EXPORT_SYMBOL.
-> 
->> +EXPORT_SYMBOL(get_l2_indirect_reg);
-> 
-> Likewise.
-
-OK to both of these.
-
-> 
-> Thanks,
-> Mark.
-> 
-
-Thank you for the comments.
-Neil
-
+								Pavel
 -- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project.
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
