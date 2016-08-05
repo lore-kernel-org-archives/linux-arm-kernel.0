@@ -1,41 +1,52 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri,  5 Aug 2016 16:55:17 +0200
-Subject: [PATCH 0/4] arm64: marvell: add support for the PIC and PMU
-Message-ID: <1470408921-447-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Fri,  5 Aug 2016 16:55:18 +0200
+Subject: [PATCH 1/4] dt-bindings: interrupt-controller: add DT binding for
+ Marvell 7K/8K PIC
+In-Reply-To: <1470408921-447-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1470408921-447-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1470408921-447-2-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+This commit adds the Device Tree binding description for the PIC
+interrupt controller available in the ARM64 Marvell Armada 7K/8K SoCs.
 
-This small patch series intends to add support for the PMU of the
-Cortex-A72 cores found in the Marvell Armada 7K/8K SoCs.
-
-However, the interrupt of the PMU is not directly connected to the
-GIC, but goes through a secondary interrupt controller called the
-PIC. Therefore, this series starts by adding a small driver for this
-interrupt controller, before enabling the PIC and the PMU in the
-Device Tree.
-
-Thanks!
-
-Thomas
-
-Thomas Petazzoni (4):
-  dt-bindings: interrupt-controller: add DT binding for Marvell 7K/8K
-    PIC
-  irqchip: irq-mvebu-pic: new driver for Marvell Armada 7K/8K PIC
-  arm64: marvell: enable the Marvell PIC driver
-  arm64: dts: marvell: describe the PIC and PMU on Armada 7K/8K
-
- .../interrupt-controller/marvell,armada-8k-pic.txt |  25 +++
- arch/arm64/Kconfig.platforms                       |   1 +
- arch/arm64/boot/dts/marvell/armada-ap806.dtsi      |  14 ++
- drivers/irqchip/Kconfig                            |   3 +
- drivers/irqchip/Makefile                           |   1 +
- drivers/irqchip/irq-mvebu-pic.c                    | 195 +++++++++++++++++++++
- 6 files changed, 239 insertions(+)
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ .../interrupt-controller/marvell,armada-8k-pic.txt | 25 ++++++++++++++++++++++
+ 1 file changed, 25 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/marvell,armada-8k-pic.txt
- create mode 100644 drivers/irqchip/irq-mvebu-pic.c
 
+diff --git a/Documentation/devicetree/bindings/interrupt-controller/marvell,armada-8k-pic.txt b/Documentation/devicetree/bindings/interrupt-controller/marvell,armada-8k-pic.txt
+new file mode 100644
+index 0000000..86a7b4c
+--- /dev/null
++++ b/Documentation/devicetree/bindings/interrupt-controller/marvell,armada-8k-pic.txt
+@@ -0,0 +1,25 @@
++Marvell Armada 7K/8K PIC Interrupt controller
++---------------------------------------------
++
++This is the Device Tree binding for the PIC, a secondary interrupt
++controller available on the Marvell Armada 7K/8K ARM64 SoCs, and
++typically connected to the GIC as the primary interrupt controller.
++
++Required properties:
++- compatible: should be "marvell,armada-8k-pic"
++- interrupt-controller: identifies the node as an interrupt controller
++- #interrupt-cells: the number of cells to define interrupts on this
++  controller. Should be 1
++- reg: the register area for the PIC interrupt controller
++- interrupts: the interrupt to the primary interrupt controller,
++  typically the GIC
++
++Example:
++
++	pic: interrupt-controller at 3f0100 {
++		compatible = "marvell,armada-8k-pic";
++		reg = <0x3f0100 0x10>;
++		#interrupt-cells = <1>;
++		interrupt-controller;
++		interrupts = <GIC_PPI 15 IRQ_TYPE_LEVEL_HIGH>;
++	};
 -- 
 2.7.4
