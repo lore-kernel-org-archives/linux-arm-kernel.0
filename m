@@ -1,55 +1,103 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 5 Aug 2016 08:46:22 +0100
-Subject: [PATCH 1/4] mfd: axp20x: add adc volatile ranges for axp22x
-In-Reply-To: <20160701092926.32005-1-icenowy@aosc.xyz>
-References: <20160701092926.32005-1-icenowy@aosc.xyz>
-Message-ID: <20160805074622.GL5243@dell>
+From: linux@rempel-privat.de (Oleksij Rempel)
+Date: Fri,  5 Aug 2016 10:05:12 +0200
+Subject: [PATCH] arm: dts: sun7i-a20-bananapi: name the GPIO lines
+In-Reply-To: <CACRpkdYnK=7C=F5hZUo-nYv6Z+Pb+eT7vm1e4hL8N-QgJnuLfg@mail.gmail.com>
+References: <CACRpkdYnK=7C=F5hZUo-nYv6Z+Pb+eT7vm1e4hL8N-QgJnuLfg@mail.gmail.com>
+Message-ID: <1470384312-6604-1-git-send-email-linux@rempel-privat.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 01 Jul 2016, Icenowy Zheng wrote:
+This names the GPIO lines on the Banana Pi board in accordance with
+the A20_Banana_Pi v1.4 Specification.
 
-> AXP22x has also some different register map than axp20x, they're also
-> added here.
-> 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
-> ---
->  drivers/mfd/axp20x.c       | 1 +
->  include/linux/mfd/axp20x.h | 4 ++++
->  2 files changed, 5 insertions(+)
+This will make these line names reflect through to userspace
+so that they can easily be identified and used with the new
+character device ABI.
 
-Applied, thanks.
+Some care has been taken to name all lines, not just those used
+by the external connectors, also lines that are muxed into some
+other function than GPIO: these are named "[FOO]" so that users
+can see with lsgpio what all lines are used for.
 
-> diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
-> index d62209d..cee5288 100644
-> --- a/drivers/mfd/axp20x.c
-> +++ b/drivers/mfd/axp20x.c
-> @@ -96,6 +96,7 @@ static const struct regmap_range axp22x_volatile_ranges[] = {
->  	regmap_reg_range(AXP20X_PWR_INPUT_STATUS, AXP20X_PWR_OP_MODE),
->  	regmap_reg_range(AXP20X_IRQ1_EN, AXP20X_IRQ5_STATE),
->  	regmap_reg_range(AXP22X_GPIO_STATE, AXP22X_GPIO_STATE),
-> +	regmap_reg_range(AXP22X_PMIC_ADC_H, AXP20X_IPSOUT_V_HIGH_L),
->  	regmap_reg_range(AXP20X_FG_RES, AXP20X_FG_RES),
->  };
->  
-> diff --git a/include/linux/mfd/axp20x.h b/include/linux/mfd/axp20x.h
-> index 0be4982..ad3d9c7 100644
-> --- a/include/linux/mfd/axp20x.h
-> +++ b/include/linux/mfd/axp20x.h
-> @@ -201,6 +201,10 @@ enum {
->  #define AXP20X_OCV_MAX			0xf
->  
->  /* AXP22X specific registers */
-> +#define AXP22X_PMIC_ADC_H		0x56
-> +#define AXP22X_PMIC_ADC_L		0x57
-> +#define AXP22X_TS_ADC_H			0x58
-> +#define AXP22X_TS_ADC_L			0x59
->  #define AXP22X_BATLOW_THRES1		0xe6
->  
->  /* AXP288 specific registers */
+Ps: most of the text was taken from Linux Wallej patch.
 
+Cc: devicetree at vger.kernel.org
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: Chen-Yu Tsai <wens@csie.org>
+Signed-off-by: Oleksij Rempel <linux@rempel-privat.de>
+---
+ arch/arm/boot/dts/sun7i-a20-bananapi.dts | 58 ++++++++++++++++++++++++++++++++
+ 1 file changed, 58 insertions(+)
+
+diff --git a/arch/arm/boot/dts/sun7i-a20-bananapi.dts b/arch/arm/boot/dts/sun7i-a20-bananapi.dts
+index 67c8a76..81ecb89 100644
+--- a/arch/arm/boot/dts/sun7i-a20-bananapi.dts
++++ b/arch/arm/boot/dts/sun7i-a20-bananapi.dts
+@@ -178,6 +178,64 @@
+ };
+ 
+ &pio {
++	/*
++	 * Legend: proper name = the GPIO line is used as GPIO
++	 *         NC = not connected (not routed from the SoC)
++	 *         "[PER]" = pin is muxed for peripheral (not GPIO)
++	 *         "" = no idea, schematic doesn't say, could be
++	 *              unrouted (not connected to any external pin)
++	 */
++	gpio-line-names =
++		/* PA */
++		"[ERXD3]", "[ERXD2]", "[ERXD1]", "[ERXD0]", "[ETXD3]",
++			"[ETXD2]", "[ETXD1]", "[ETXD0]",
++		"[ERXCK]", "[ERXERR]", "[ERXDV]", "[EMDC]", "[EMDIO]",
++			"[ETXEN]", "[ETXCK]", "[ECRS]",
++		"[ECOL]", "[ETXERR]", "", "", "", "", "", "",
++		"", "", "", "", "", "", "", "",
++		/* PB */
++		"[PMU-SCK]", "[PMU-SDA]", "", "", "", "NC", "NC", "NC",
++		"NC", "USB0-DRV", "NC", "NC", "NC", "NC", "", "",
++		"", "", "", "", "[SCL]", "[SDA]", "", "",
++		"", "", "", "", "", "", "", "",
++		/* PC */
++		"", "", "", "", "", "", "", "",
++		"", "", "", "", "", "", "", "",
++		"", "", "", "", "", "", "", "",
++		"", "", "", "", "", "", "", "",
++		/* PD */
++		"", "", "", "", "", "", "", "",
++		"", "", "", "", "", "", "", "",
++		"", "", "", "", "", "", "", "",
++		"", "", "", "", "", "", "", "",
++		/* PE */
++		"", "", "", "", "", "", "", "",
++		"", "", "", "", "", "", "", "",
++		"", "", "", "", "", "", "", "",
++		"", "", "", "", "", "", "", "",
++		/* PF */
++		"[SD0-D1]", "[SD0-D0]", "[SD0-CLK]", "[SD0-CMD]", "[SD0-D3]",
++			"[SD0-D2]", "", "",
++		"", "", "", "", "", "", "", "",
++		"", "", "", "", "", "", "", "",
++		"", "", "", "", "", "", "", "",
++		/* PG */
++		"", "", "", "", "", "", "", "",
++		"", "", "", "", "", "", "", "",
++		"", "", "", "", "", "", "", "",
++		"", "", "", "", "", "", "", "",
++		/* PH */
++		"TXD0", "RXD0", "IO-1", "IO-8", "USB0-IDDET", "IO-7", "", "",
++		"", "", "SD0-DET", "", "", "", "", "",
++		"NC", "", "", "", "IO-4", "IO-5", "NC", "EMAC-PWR-EN",
++		"LED1", "NC", "NC", "NC", "", "", "", "",
++		/* PI */
++		"", "", "", "[IO-GCLK]", "NC", "NC", "NC", "NC",
++		"NC", "NC", "[SPI-CE0]", "[SPI-CLK]", "[SPI-MOSI]",
++			"[SPI-MISO]", "[SPI-CE1]", "NC",
++		"IO-6", "IO-3", "IO-2", "IO-0", "", "", "", "",
++		"", "", "", "", "", "", "", "";
++
+ 	usb0_id_detect_pin: usb0_id_detect_pin at 0 {
+ 		allwinner,pins = "PH4";
+ 		allwinner,function = "gpio_in";
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+2.7.4
