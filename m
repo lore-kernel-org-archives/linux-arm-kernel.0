@@ -1,36 +1,33 @@
 From: kbeldan@baylibre.com (Karl Beldan)
-Date: Fri,  5 Aug 2016 14:59:42 +0000
-Subject: [PATCH v3 0/3] Support for the LCDK
-In-Reply-To: <20160804144332.4841-1-kbeldan@baylibre.com>
+Date: Fri,  5 Aug 2016 14:59:45 +0000
+Subject: [PATCH v3 3/3] ARM: davinci_all_defconfig: enable SMSC ethernet PHY
+In-Reply-To: <20160805145945.24315-1-kbeldan@baylibre.com>
 References: <20160804144332.4841-1-kbeldan@baylibre.com>
-Message-ID: <20160805145945.24315-1-kbeldan@baylibre.com>
+ <20160805145945.24315-1-kbeldan@baylibre.com>
+Message-ID: <20160805145945.24315-4-kbeldan@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This depends on "ARM: dts: da850: Add missing pin muxing for the UARTs".
+The LCDK embeds a LAN8710.
 
-Changes from v1:
- - s/omapl138/da850/
- - Remove earlycon from bootargs
- - Remove console=ttyS2,115200n8 from bootargs (workaround for preferred console)
- - Add patches for CONFIG_SMSC_PHY=y and CONFIG_RTC_DRV_OMAP=m
+Cc: Sekhar Nori <nsekhar@ti.com>
+Cc: Kevin Hilman <khilman@baylibre.com>
+Signed-off-by: Karl Beldan <kbeldan@baylibre.com>
+---
+ arch/arm/configs/davinci_all_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-Changes from v2:
- - Remove references to C6748: replace 'L138/C6748 Dev Kit (LCDK)' with 'LCDK'
- - Change license from 'GPLv2 or later' to 'GPLv2'
-
-Karl Beldan (3):
-  ARM: dts: da850: Add basic DTS for the LCDK
-  ARM: davinci_all_defconfig: enable RTC driver as module
-  ARM: davinci_all_defconfig: enable SMSC ethernet PHY
-
- Documentation/devicetree/bindings/arm/davinci.txt |  4 ++
- arch/arm/boot/dts/Makefile                        |  1 +
- arch/arm/boot/dts/da850-lcdk.dts                  | 70 +++++++++++++++++++++++
- arch/arm/configs/davinci_all_defconfig            |  2 +
- arch/arm/mach-davinci/da8xx-dt.c                  |  1 +
- 5 files changed, 78 insertions(+)
- create mode 100644 arch/arm/boot/dts/da850-lcdk.dts
-
+diff --git a/arch/arm/configs/davinci_all_defconfig b/arch/arm/configs/davinci_all_defconfig
+index cc3e702..d037d3d 100644
+--- a/arch/arm/configs/davinci_all_defconfig
++++ b/arch/arm/configs/davinci_all_defconfig
+@@ -88,6 +88,7 @@ CONFIG_BLK_DEV_SD=m
+ CONFIG_NETDEVICES=y
+ CONFIG_TUN=m
+ CONFIG_LXT_PHY=y
++CONFIG_SMSC_PHY=y
+ CONFIG_LSI_ET1011C_PHY=y
+ CONFIG_NET_ETHERNET=y
+ CONFIG_MII=y
 -- 
 2.9.0.rc1
