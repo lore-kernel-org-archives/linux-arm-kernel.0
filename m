@@ -1,45 +1,62 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Fri, 5 Aug 2016 09:44:11 -0600
-Subject: [PATCH V4 6/6] coresight: etm-perf: incorporating sink definition
- from cmd line
-In-Reply-To: <2b1836a4-00be-b6d5-02d4-38d23b3451ad@arm.com>
-References: <1470329604-14356-1-git-send-email-mathieu.poirier@linaro.org>
- <1470329604-14356-7-git-send-email-mathieu.poirier@linaro.org>
- <2b1836a4-00be-b6d5-02d4-38d23b3451ad@arm.com>
-Message-ID: <CANLsYkzg+27wxvGvtTVpim3MGwxifcJ09XkBpyUJpQSRCxR9yQ@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 5 Aug 2016 16:48:47 +0100
+Subject: [GIT PULL] arm64: fixes for -rc1
+Message-ID: <20160805154847.GD13272@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5 August 2016 at 03:32, Suzuki K Poulose <Suzuki.Poulose@arm.com> wrote:
-> On 04/08/16 17:53, Mathieu Poirier wrote:
->>
->> Now that PMU specific configuration is available as part of the event,
->> lookup the sink identified by users from the perf command line and build
->> a path from source to sink.
->>
->> With this functionality it is no longer required to select a sink in a
->> separate step (from sysFS) before a perf trace session can be started.
->>
->> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
->
->
->
->> +static const match_table_t drv_cfg_tokens = {
->> +       {ETM_TOKEN_SINK_CPU, "sink=cpu%d:%s"},
->> +       {ETM_TOKEN_SINK, "sink=%s"},
->> +       {ETM_TOKEN_ERR, NULL},
->> +};
->> +
->
->
-> Is the above format documented somewhere for the perf users ? If not could
-> we please
-> add it ?
->
+Hi Linus,
 
-Yes definitely.  I will document everything once I am done with
-upstreaming the feature.  That way we go over the process only once.
+Please pull these arm64 fixes for -rc1. The branch is based on the
+for-next/core tag you pulled from Catalin last week. He's on holiday
+once again, so I'm handling the fixes until he's back.
 
-> Thanks
-> Suzuki
->
+Details in the tag.
+
+Cheers,
+
+Will
+
+--->8
+
+The following changes since commit fd6380b75065fd2ff51b5f7cbbe6be77d71ea9c7:
+
+  arm64: arm: Fix-up the removal of the arm64 regs_query_register_name() prototype (2016-07-27 08:15:42 +0100)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git tags/arm64-fixes
+
+for you to fetch changes up to 747a70e60b7234e8fd9c35dd2f2db10ac1db231d:
+
+  arm64: Fix copy-on-write referencing in HugeTLB (2016-08-04 13:41:18 +0100)
+
+----------------------------------------------------------------
+arm64 fixes:
+
+- Fix HugeTLB leak due to CoW and PTE_RDONLY mismatch
+- Avoid accessing unmapped FDT fields when checking validity
+- Correctly account for vDSO AUX entry in ARCH_DLINFO
+- Fix kallsyms with absolute expressions in linker script
+- Kill unnecessary symbol-based relocs in vmlinux
+
+----------------------------------------------------------------
+Ard Biesheuvel (3):
+      arm64: vmlinux.lds: make __rela_offset and __dynsym_offset ABSOLUTE
+      arm64: relocatable: suppress R_AARCH64_ABS64 relocations in vmlinux
+      arm64: mm: avoid fdt_check_header() before the FDT is fully mapped
+
+James Hogan (1):
+      arm64: Define AT_VECTOR_SIZE_ARCH for ARCH_DLINFO
+
+Steve Capper (1):
+      arm64: Fix copy-on-write referencing in HugeTLB
+
+ arch/arm64/Makefile                  |  2 +-
+ arch/arm64/include/asm/elf.h         |  1 +
+ arch/arm64/include/asm/pgtable.h     | 17 +++++++++++++++++
+ arch/arm64/include/uapi/asm/auxvec.h |  2 ++
+ arch/arm64/kernel/head.S             | 21 +++------------------
+ arch/arm64/kernel/vmlinux.lds.S      | 13 ++-----------
+ arch/arm64/mm/mmu.c                  |  8 ++++----
+ 7 files changed, 30 insertions(+), 34 deletions(-)
