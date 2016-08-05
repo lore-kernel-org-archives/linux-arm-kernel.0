@@ -1,56 +1,56 @@
 From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 05 Aug 2016 21:25:47 +0300
-Subject: [PATCH 1/2] ARM: dts: r8a7792: add DU clocks
+Date: Fri, 05 Aug 2016 21:26:25 +0300
+Subject: [PATCH 2/2] ARM: dts: r8a7792: add DU support
 In-Reply-To: <4031442.KeMCTMarLN@wasted.cogentembedded.com>
 References: <4031442.KeMCTMarLN@wasted.cogentembedded.com>
-Message-ID: <2482521.XCJrVWGkiq@wasted.cogentembedded.com>
+Message-ID: <6004610.AeQmi3OHEL@wasted.cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Describe the DU0/1 clocks and their parent, ZX clock in the R8A7792 device
-tree.
+Define the generic R8A7792 part of the DU device node.
 
 Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
 ---
- arch/arm/boot/dts/r8a7792.dtsi |   13 +++++++++++--
- 1 file changed, 11 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/r8a7792.dtsi |   28 ++++++++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
 
 Index: renesas/arch/arm/boot/dts/r8a7792.dtsi
 ===================================================================
 --- renesas.orig/arch/arm/boot/dts/r8a7792.dtsi
 +++ renesas/arch/arm/boot/dts/r8a7792.dtsi
-@@ -660,6 +660,13 @@
- 			clock-div = <2>;
- 			clock-mult = <1>;
+@@ -556,6 +556,34 @@
+ 			status = "disabled";
  		};
-+		zx_clk: zx {
-+			compatible = "fixed-factor-clock";
-+			clocks = <&cpg_clocks R8A7792_CLK_PLL1>;
-+			#clock-cells = <0>;
-+			clock-div = <3>;
-+			clock-mult = <1>;
+ 
++		du: display at feb00000 {
++			compatible = "renesas,du-r8a7792";
++			reg = <0 0xfeb00000 0 0x40000>;
++			reg-names = "du";
++			interrupts = <GIC_SPI 256 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 268 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&mstp7_clks R8A7792_CLK_DU0>,
++				 <&mstp7_clks R8A7792_CLK_DU1>;
++			clock-names = "du.0", "du.1";
++			status = "disabled";
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				port at 0 {
++					reg = <0>;
++					du_out_rgb0: endpoint {
++					};
++				};
++				port at 1 {
++					reg = <1>;
++					du_out_rgb1: endpoint {
++					};
++				};
++			};
 +		};
- 		zs_clk: zs {
- 			compatible = "fixed-factor-clock";
- 			clocks = <&cpg_clocks R8A7792_CLK_PLL1>;
-@@ -761,15 +768,17 @@
- 				     "renesas,cpg-mstp-clocks";
- 			reg = <0 0xe615014c 0 4>, <0 0xe61501c4 0 4>;
- 			clocks = <&zs_clk>, <&zs_clk>, <&p_clk>, <&p_clk>,
--				 <&p_clk>, <&p_clk>;
-+				 <&p_clk>, <&p_clk>, <&zx_clk>, <&zx_clk>;
- 			#clock-cells = <1>;
- 			clock-indices = <
- 				R8A7792_CLK_HSCIF1 R8A7792_CLK_HSCIF0
- 				R8A7792_CLK_SCIF3 R8A7792_CLK_SCIF2
- 				R8A7792_CLK_SCIF1 R8A7792_CLK_SCIF0
-+				R8A7792_CLK_DU1 R8A7792_CLK_DU0
- 			>;
- 			clock-output-names = "hscif1", "hscif0", "scif3",
--					     "scif2", "scif1", "scif0";
-+					     "scif2", "scif1", "scif0",
-+					     "du1", "du0";
- 		};
- 		mstp8_clks: mstp8_clks at e6150990 {
- 			compatible = "renesas,r8a7792-mstp-clocks",
++
+ 		can0: can at e6e80000 {
+ 			compatible = "renesas,can-r8a7792",
+ 				     "renesas,rcar-gen2-can";
