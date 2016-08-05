@@ -1,34 +1,47 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Fri, 5 Aug 2016 10:32:59 +0100
-Subject: [PATCH V4 6/6] coresight: etm-perf: incorporating sink definition
- from cmd line
-In-Reply-To: <1470329604-14356-7-git-send-email-mathieu.poirier@linaro.org>
-References: <1470329604-14356-1-git-send-email-mathieu.poirier@linaro.org>
- <1470329604-14356-7-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <2b1836a4-00be-b6d5-02d4-38d23b3451ad@arm.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Fri, 05 Aug 2016 11:33:10 +0200
+Subject: [PATCH 1/1] imx53.dtsi: Add IPU nodes for csi
+In-Reply-To: <1470318452-31391-1-git-send-email-fabien.lahoudere@collabora.co.uk>
+References: <CAOMZO5BoRsrHv-+5c9bAXO2NCya8sPqmmpy9DOfav6NvQ+VMLQ@mail.gmail.com>
+ <1470318452-31391-1-git-send-email-fabien.lahoudere@collabora.co.uk>
+Message-ID: <1470389590.3141.22.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/08/16 17:53, Mathieu Poirier wrote:
-> Now that PMU specific configuration is available as part of the event,
-> lookup the sink identified by users from the perf command line and build
-> a path from source to sink.
->
-> With this functionality it is no longer required to select a sink in a
-> separate step (from sysFS) before a perf trace session can be started.
->
-> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-
-
-> +static const match_table_t drv_cfg_tokens = {
-> +	{ETM_TOKEN_SINK_CPU, "sink=cpu%d:%s"},
-> +	{ETM_TOKEN_SINK, "sink=%s"},
-> +	{ETM_TOKEN_ERR, NULL},
-> +};
+Am Donnerstag, den 04.08.2016, 15:47 +0200 schrieb Fabien Lahoudere:
+> We have the following messages that tell csi devices are not used:
+> imx-ipuv3 18000000.ipu: no port at 0 node in /soc/ipu at 18000000, not using CSI0
+> imx-ipuv3 18000000.ipu: no port at 1 node in /soc/ipu at 18000000, not using CSI1
+> 
+> So we add them in the common device tree to make CSI ports available on
+> imx53 boards.
+> 
+> Signed-off-by: Fabien Lahoudere <fabien.lahoudere@collabora.co.uk>
+> ---
+>  arch/arm/boot/dts/imx53.dtsi | 8 ++++++++
+>  1 file changed, 8 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
+> index c1bc97c..0777b41 100644
+> --- a/arch/arm/boot/dts/imx53.dtsi
+> +++ b/arch/arm/boot/dts/imx53.dtsi
+> @@ -136,6 +136,14 @@
+>  			clock-names = "bus", "di0", "di1";
+>  			resets = <&src 2>;
+>  
+> +			ipu_csi0: port at 0 {
+> +				reg = <0>;
+> +			};
 > +
+> +			ipu_csi1: port at 1 {
+> +				reg = <1>;
+> +			};
+> +
+>  			ipu_di0: port at 2 {
+>  				#address-cells = <1>;
+>  				#size-cells = <0>;
 
-Is the above format documented somewhere for the perf users ? If not could we please
-add it ?
+Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
 
-Thanks
-Suzuki
+regards
+Philipp
