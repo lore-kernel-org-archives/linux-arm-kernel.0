@@ -1,81 +1,66 @@
 From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Sat, 6 Aug 2016 15:15:17 +0200 (CEST)
-Subject: [PATCH v3] input: touchscreen: Remove duplicate ft6236 driver
-In-Reply-To: <424ae37d-6ca9-a950-551a-7643cee726d0@redhat.com>
-References: <1470381871-4086-1-git-send-email-hdegoede@redhat.com>
- <1470381871-4086-2-git-send-email-hdegoede@redhat.com>
- <72101a2a-ccf0-b0bc-3859-50a43f990027@i2se.com>
- <20160806022243.GB20562@dtor-ws>
- <424ae37d-6ca9-a950-551a-7643cee726d0@redhat.com>
-Message-ID: <2036456363.114390.752d0f22-93a7-46e8-bb14-c884787aaea3.open-xchange@email.1und1.de>
+Date: Sat, 6 Aug 2016 15:48:06 +0200 (CEST)
+Subject: [PATCH RFC 0/3] mmc: mxs-mmc: Implement DDR support
+In-Reply-To: <ef08cd86-8366-31b3-1f05-d0c7251cded6@denx.de>
+References: <1470488140-10104-1-git-send-email-stefan.wahren@i2se.com>
+ <ef08cd86-8366-31b3-1f05-d0c7251cded6@denx.de>
+Message-ID: <299761257.114585.752d0f22-93a7-46e8-bb14-c884787aaea3.open-xchange@email.1und1.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Marek,
 
-> Hans de Goede <hdegoede@redhat.com> hat am 6. August 2016 um 12:00
-> geschrieben:
+> Marek Vasut <marex@denx.de> hat am 6. August 2016 um 15:10 geschrieben:
 > 
 > 
-> Hi,
+> On 08/06/2016 02:55 PM, Stefan Wahren wrote:
+> > Based on these discussions: [1], [2] this patch series implements
+> > DDR support for the MXS MMC host driver. This feature has never been
+> > ported from the vendor kernel.
+> > 
+> > It has been tested on a i.MX28 board with eMMC which is currently
+> > not in mainline (Duckbill 2).
+> > 
+> > * without DDR support
+> > dd if=/dev/zero of=test bs=8k count=10000
+> > 81920000 bytes (82 MB) copied, 14.3321 s, 5.7 MB/s
+> > 
+> > * with DDR support:
+> > dd if=/dev/zero of=test bs=8k count=10000
+> > 81920000 bytes (82 MB) copied, 13.4781 s, 6.1 MB/s
 > 
-> On 06-08-16 04:22, Dmitry Torokhov wrote:
-> > On Fri, Aug 05, 2016 at 05:07:20PM +0200, Stefan Wahren wrote:
-> >> Hi Hans,
-> >>
-> >> Am 05.08.2016 um 09:24 schrieb Hans de Goede:
-> >>> The new(ish) ft6236 simply re-implements the M09 protocol of the
-> >>> (much) older edt-ft5x06.c driver.
-> >>>
-> >>> This commit removes this duplicate driver and adds the i2c ids and
-> >>> dt compatible string to the edt-ft5x06.c driver to keep compatibility.
-> >>
-> >> i think only remove of the driver is incorrect here.
-> >>
-> >> Since there are two similar but still different DT bindings
-> >>
-> >> Documentation/devicetree/bindings/input/touchscreen/edt-ft5x06.txt
-> >>
-> >> Documentation/devicetree/bindings/input/touchscreen/focaltech-ft6236.txt
-> >>
-> >> the DT handling of edt-ft5x06.c needs to be extended and then
-> >> finally driver and binding could be removed.
-> >
-> > I believe Hans made sure edt-ft5x06.c can handle focaltech-ft6236
-> > bindings. Do you see a discrepancy?
-> 
-> Correct I've double checked that both the i2c protocol and the
-> reset gpio binding are compatible. Devices using the focaltech-ft6236.txt
-> binding should work fine with the edt-ft5x06.c driver.
+> Not much of a speedup, how so ?
 
-i missed the point about touchscreen_parse_properties() and it's properties.
-Sorry for the noise. Everything okay.
+i agree. Unfortunately i never had the time for a deeper analysis, but i noticed
+big write performance differences between the vendor kernel 2.6.35 and current
+mainline kernel in case of writing 100 MB directly to an eMMC partition (factor
+2). Implementation of DDR mode was the lower fruit.
+
+I've the suspicion that is related to the usage of DMA engine. Maybe the
+overhead for AC/BC commands is to big. In the Freescale kernel is an
+optimization [1].
+
+[1] -
+http://git.freescale.com/git/cgit.cgi/imx/linux-2.6-imx.git/commit/?h=imx_2.6.35_maintain&id=b09358887fb4b67f6d497fac8cc48475c8bd292d
 
 > 
-> Now if someone can test and confirm that on actual hardware that would be
-> great...
-> 
-> And we probably want to remove
-> Documentation/devicetree/bindings/input/touchscreen/focaltech-ft6236.txt
-> and instead add the compatible string that defines to
-> Documentation/devicetree/bindings/input/touchscreen/edt-ft5x06.txt
-> 
-
-That would be great.
-
-Stefan
-
-> I can whip up a patch for that, but as said some testing on actual
-> hw would be good, preferably before I write said patch.
-> 
-> Regards,
-> 
-> Hans
+> > [1] - http://www.spinics.net/lists/linux-mmc/msg32285.html
+> > [2] - http://www.spinics.net/lists/linux-mmc/msg34418.html
+> > 
+> > Stefan Wahren (3):
+> >   DT: bindings: mmc: Add property for 3.3V only support
+> >   mmc: core: add new cap for 3.3V only DDR MMCs
+> >   mmc: mxs-mmc: Implement DDR support
+> > 
+> >  Documentation/devicetree/bindings/mmc/mmc.txt |    7 +++++--
+> >  drivers/mmc/core/host.c                       |    2 ++
+> >  drivers/mmc/core/mmc.c                        |    6 ++++++
+> >  drivers/mmc/host/mxs-mmc.c                    |   22 ++++++++++++++++++++++
+> >  include/linux/mmc/host.h                      |    1 +
+> >  5 files changed, 36 insertions(+), 2 deletions(-)
+> > 
 > 
 > 
-> 
-> 
-> 
-> p.s.
-> 
-> (the v3 in the subject is bogus my bad)
+> -- 
+> Best regards,
+> Marek Vasut
