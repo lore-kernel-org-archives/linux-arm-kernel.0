@@ -1,79 +1,81 @@
-From: marex@denx.de (Marek Vasut)
-Date: Sat, 6 Aug 2016 15:14:54 +0200
-Subject: [PATCH RFC 2/3] mmc: core: add new cap for 3.3V only DDR MMCs
-In-Reply-To: <1470488140-10104-3-git-send-email-stefan.wahren@i2se.com>
-References: <1470488140-10104-1-git-send-email-stefan.wahren@i2se.com>
- <1470488140-10104-3-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <0e38d62a-b3d0-30ca-fca9-bb740ae54d0a@denx.de>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Sat, 6 Aug 2016 15:15:17 +0200 (CEST)
+Subject: [PATCH v3] input: touchscreen: Remove duplicate ft6236 driver
+In-Reply-To: <424ae37d-6ca9-a950-551a-7643cee726d0@redhat.com>
+References: <1470381871-4086-1-git-send-email-hdegoede@redhat.com>
+ <1470381871-4086-2-git-send-email-hdegoede@redhat.com>
+ <72101a2a-ccf0-b0bc-3859-50a43f990027@i2se.com>
+ <20160806022243.GB20562@dtor-ws>
+ <424ae37d-6ca9-a950-551a-7643cee726d0@redhat.com>
+Message-ID: <2036456363.114390.752d0f22-93a7-46e8-bb14-c884787aaea3.open-xchange@email.1und1.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/06/2016 02:55 PM, Stefan Wahren wrote:
-> This patch based on the work of Fabio Estevam:
-> "[PATCH v2] mmc: core: Do not set mmc voltage to 1.8V when
-> 'no-1-8-v' is present"
-> 
-> It adds the support for 3.3V only DDR MMC hosts.
+Hi,
 
-Do such cards even exist ? Do you have a link where I can find some ?
+> Hans de Goede <hdegoede@redhat.com> hat am 6. August 2016 um 12:00
+> geschrieben:
+> 
+> 
+> Hi,
+> 
+> On 06-08-16 04:22, Dmitry Torokhov wrote:
+> > On Fri, Aug 05, 2016 at 05:07:20PM +0200, Stefan Wahren wrote:
+> >> Hi Hans,
+> >>
+> >> Am 05.08.2016 um 09:24 schrieb Hans de Goede:
+> >>> The new(ish) ft6236 simply re-implements the M09 protocol of the
+> >>> (much) older edt-ft5x06.c driver.
+> >>>
+> >>> This commit removes this duplicate driver and adds the i2c ids and
+> >>> dt compatible string to the edt-ft5x06.c driver to keep compatibility.
+> >>
+> >> i think only remove of the driver is incorrect here.
+> >>
+> >> Since there are two similar but still different DT bindings
+> >>
+> >> Documentation/devicetree/bindings/input/touchscreen/edt-ft5x06.txt
+> >>
+> >> Documentation/devicetree/bindings/input/touchscreen/focaltech-ft6236.txt
+> >>
+> >> the DT handling of edt-ft5x06.c needs to be extended and then
+> >> finally driver and binding could be removed.
+> >
+> > I believe Hans made sure edt-ft5x06.c can handle focaltech-ft6236
+> > bindings. Do you see a discrepancy?
+> 
+> Correct I've double checked that both the i2c protocol and the
+> reset gpio binding are compatible. Devices using the focaltech-ft6236.txt
+> binding should work fine with the edt-ft5x06.c driver.
 
-> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
-> ---
->  drivers/mmc/core/host.c  |    2 ++
->  drivers/mmc/core/mmc.c   |    6 ++++++
->  include/linux/mmc/host.h |    1 +
->  3 files changed, 9 insertions(+)
+i missed the point about touchscreen_parse_properties() and it's properties.
+Sorry for the noise. Everything okay.
+
 > 
-> Changes to Fabio's patch:
-> - rebase to current linux-next
-> - rename DT property to mmc-ddr-3_3v
-> - use EXT_CSD_CARD_TYPE_DDR_52 instead of new define
+> Now if someone can test and confirm that on actual hardware that would be
+> great...
 > 
-> diff --git a/drivers/mmc/core/host.c b/drivers/mmc/core/host.c
-> index 98f25ff..4c971de 100644
-> --- a/drivers/mmc/core/host.c
-> +++ b/drivers/mmc/core/host.c
-> @@ -301,6 +301,8 @@ int mmc_of_parse(struct mmc_host *host)
->  	if (of_property_read_bool(np, "wakeup-source") ||
->  	    of_property_read_bool(np, "enable-sdio-wakeup")) /* legacy */
->  		host->pm_caps |= MMC_PM_WAKE_SDIO_IRQ;
-> +	if (of_property_read_bool(np, "mmc-ddr-3_3v"))
-> +		host->caps2 |= MMC_CAP2_3_3V_ONLY_DDR;
->  	if (of_property_read_bool(np, "mmc-ddr-1_8v"))
->  		host->caps |= MMC_CAP_1_8V_DDR;
->  	if (of_property_read_bool(np, "mmc-ddr-1_2v"))
-> diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
-> index f2d185c..8a933d5 100644
-> --- a/drivers/mmc/core/mmc.c
-> +++ b/drivers/mmc/core/mmc.c
-> @@ -210,6 +210,12 @@ static void mmc_select_card_type(struct mmc_card *card)
->  		avail_type |= EXT_CSD_CARD_TYPE_HS_52;
->  	}
->  
-> +	if (caps2 & MMC_CAP2_3_3V_ONLY_DDR &&
-> +	    card_type & EXT_CSD_CARD_TYPE_DDR_1_8V) {
-> +		hs_max_dtr = MMC_HIGH_DDR_MAX_DTR;
-> +		avail_type |= EXT_CSD_CARD_TYPE_DDR_52;
-> +	}
-> +
->  	if (caps & MMC_CAP_1_8V_DDR &&
->  	    card_type & EXT_CSD_CARD_TYPE_DDR_1_8V) {
->  		hs_max_dtr = MMC_HIGH_DDR_MAX_DTR;
-> diff --git a/include/linux/mmc/host.h b/include/linux/mmc/host.h
-> index aa4bfbf..db0775d 100644
-> --- a/include/linux/mmc/host.h
-> +++ b/include/linux/mmc/host.h
-> @@ -311,6 +311,7 @@ struct mmc_host {
->  #define MMC_CAP2_HS400_ES	(1 << 20)	/* Host supports enhanced strobe */
->  #define MMC_CAP2_NO_SD		(1 << 21)	/* Do not send SD commands during initialization */
->  #define MMC_CAP2_NO_MMC		(1 << 22)	/* Do not send (e)MMC commands during initialization */
-> +#define MMC_CAP2_3_3V_ONLY_DDR	(1 << 23)	/* Only supports 3.3V DDR */
->  
->  	mmc_pm_flag_t		pm_caps;	/* supported pm features */
->  
+> And we probably want to remove
+> Documentation/devicetree/bindings/input/touchscreen/focaltech-ft6236.txt
+> and instead add the compatible string that defines to
+> Documentation/devicetree/bindings/input/touchscreen/edt-ft5x06.txt
 > 
 
+That would be great.
 
--- 
-Best regards,
-Marek Vasut
+Stefan
+
+> I can whip up a patch for that, but as said some testing on actual
+> hw would be good, preferably before I write said patch.
+> 
+> Regards,
+> 
+> Hans
+> 
+> 
+> 
+> 
+> 
+> p.s.
+> 
+> (the v3 in the subject is bogus my bad)
