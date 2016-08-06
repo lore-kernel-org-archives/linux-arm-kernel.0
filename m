@@ -1,65 +1,65 @@
-From: hzpeterchen@gmail.com (Peter Chen)
-Date: Sat, 6 Aug 2016 15:59:25 +0800
-Subject: [PATCH v2 06/22] usb: chipidea: Add platform flag for wrapper
- phy management
-In-Reply-To: <147043356053.26915.10086819023294264100@sboyd-linaro>
-References: <20160707222114.1673-1-stephen.boyd@linaro.org>
- <20160707222114.1673-7-stephen.boyd@linaro.org>
- <20160708092535.GD20485@shlinux2>
- <147043356053.26915.10086819023294264100@sboyd-linaro>
-Message-ID: <20160806075925.GC12298@shlinux2>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Sat, 6 Aug 2016 12:00:39 +0200
+Subject: [PATCH v3] input: touchscreen: Remove duplicate ft6236 driver
+In-Reply-To: <20160806022243.GB20562@dtor-ws>
+References: <1470381871-4086-1-git-send-email-hdegoede@redhat.com>
+ <1470381871-4086-2-git-send-email-hdegoede@redhat.com>
+ <72101a2a-ccf0-b0bc-3859-50a43f990027@i2se.com>
+ <20160806022243.GB20562@dtor-ws>
+Message-ID: <424ae37d-6ca9-a950-551a-7643cee726d0@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 05, 2016 at 02:46:00PM -0700, Stephen Boyd wrote:
-> Quoting Peter Chen (2016-07-08 02:25:35)
-> > On Thu, Jul 07, 2016 at 03:20:57PM -0700, Stephen Boyd wrote:
-> > > The ULPI phy on qcom platforms needs to be initialized and
-> > > powered on after a USB reset and before we toggle the run/stop
-> > > bit. Otherwise, the phy locks up and doesn't work properly.
-> > > Therefore, add a flag to skip any phy power management in the
-> > > core layer, leaving it up to the glue driver to manage.
-> > > 
-> > > Cc: Peter Chen <peter.chen@nxp.com>
-> > > Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> > > Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
-> > > ---
-> > >  drivers/usb/chipidea/core.c  | 6 ++++++
-> > >  include/linux/usb/chipidea.h | 1 +
-> > >  2 files changed, 7 insertions(+)
-> > > 
-> > > diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
-> > > index 01390e02ee53..532085a096d9 100644
-> > > --- a/drivers/usb/chipidea/core.c
-> > > +++ b/drivers/usb/chipidea/core.c
-> > > @@ -361,6 +361,9 @@ static int _ci_usb_phy_init(struct ci_hdrc *ci)
-> > >   */
-> > >  static void ci_usb_phy_exit(struct ci_hdrc *ci)
-> > >  {
-> > > +     if (ci->platdata->flags & CI_HDRC_OVERRIDE_PHY_CONTROL)
-> > > +             return;
-> > > +
-> > >       if (ci->phy) {
-> > >               phy_power_off(ci->phy);
-> > >               phy_exit(ci->phy);
-> > > @@ -379,6 +382,9 @@ static int ci_usb_phy_init(struct ci_hdrc *ci)
-> > >  {
-> > >       int ret;
-> > >  
-> > > +     if (ci->platdata->flags & CI_HDRC_OVERRIDE_PHY_CONTROL)
-> > > +             return 0;
-> > > +
-> > 
-> > How you handle the code for PHY getting at probe?
-> > 
-> 
-> Which probe? Glue layer probe? In my case I'm not using the phy until
-> the RESET/STOPPED event so I just rely on the chipidea core to get the
-> phy and then control the phy manually in the glue layer.
+Hi,
 
-I have no idea about it after reading your patch 10/22.
+On 06-08-16 04:22, Dmitry Torokhov wrote:
+> On Fri, Aug 05, 2016 at 05:07:20PM +0200, Stefan Wahren wrote:
+>> Hi Hans,
+>>
+>> Am 05.08.2016 um 09:24 schrieb Hans de Goede:
+>>> The new(ish) ft6236 simply re-implements the M09 protocol of the
+>>> (much) older edt-ft5x06.c driver.
+>>>
+>>> This commit removes this duplicate driver and adds the i2c ids and
+>>> dt compatible string to the edt-ft5x06.c driver to keep compatibility.
+>>
+>> i think only remove of the driver is incorrect here.
+>>
+>> Since there are two similar but still different DT bindings
+>>
+>> Documentation/devicetree/bindings/input/touchscreen/edt-ft5x06.txt
+>>
+>> Documentation/devicetree/bindings/input/touchscreen/focaltech-ft6236.txt
+>>
+>> the DT handling of edt-ft5x06.c needs to be extended and then
+>> finally driver and binding could be removed.
+>
+> I believe Hans made sure edt-ft5x06.c can handle focaltech-ft6236
+> bindings. Do you see a discrepancy?
 
--- 
+Correct I've double checked that both the i2c protocol and the
+reset gpio binding are compatible. Devices using the focaltech-ft6236.txt
+binding should work fine with the edt-ft5x06.c driver.
 
-Best Regards,
-Peter Chen
+Now if someone can test and confirm that on actual hardware that would be
+great...
+
+And we probably want to remove
+Documentation/devicetree/bindings/input/touchscreen/focaltech-ft6236.txt
+and instead add the compatible string that defines to
+Documentation/devicetree/bindings/input/touchscreen/edt-ft5x06.txt
+
+I can whip up a patch for that, but as said some testing on actual
+hw would be good, preferably before I write said patch.
+
+Regards,
+
+Hans
+
+
+
+
+
+p.s.
+
+(the v3 in the subject is bogus my bad)
