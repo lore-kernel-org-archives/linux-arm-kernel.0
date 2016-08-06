@@ -1,96 +1,86 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Sat, 6 Aug 2016 16:18:25 +0200 (CEST)
-Subject: [PATCH RFC 2/3] mmc: core: add new cap for 3.3V only DDR MMCs
-In-Reply-To: <0e38d62a-b3d0-30ca-fca9-bb740ae54d0a@denx.de>
-References: <1470488140-10104-1-git-send-email-stefan.wahren@i2se.com>
- <1470488140-10104-3-git-send-email-stefan.wahren@i2se.com>
- <0e38d62a-b3d0-30ca-fca9-bb740ae54d0a@denx.de>
-Message-ID: <16443443.114784.752d0f22-93a7-46e8-bb14-c884787aaea3.open-xchange@email.1und1.de>
+From: jagannadh.teki@gmail.com (Jagan Teki)
+Date: Sat, 6 Aug 2016 19:57:27 +0530
+Subject: [PATCH v2 6/9] mtd: spi-nor: Support R/W for S25FS-S family flash
+In-Reply-To: <1461307192-866-6-git-send-email-B56489@freescale.com>
+References: <1461307192-866-1-git-send-email-B56489@freescale.com>
+ <1461307192-866-6-git-send-email-B56489@freescale.com>
+Message-ID: <CAD6G_RQGMV5zxuC9dNa3TYa-Zxv4drDB7K1PpNdfzauBCeVmdA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
+On 22 April 2016 at 12:09, Yunhui Cui <B56489@freescale.com> wrote:
+> From: Yunhui Cui <yunhui.cui@nxp.com>
+>
+> With the physical sectors combination, S25FS-S family flash
+> requires some special operations for read/write functions.
+>
+> Signed-off-by: Yunhui Cui <yunhui.cui@nxp.com>
+> ---
+>  drivers/mtd/spi-nor/spi-nor.c | 59 +++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 59 insertions(+)
+>
+> diff --git a/drivers/mtd/spi-nor/spi-nor.c b/drivers/mtd/spi-nor/spi-nor.c
+> index 157841d..91ee920 100644
+> --- a/drivers/mtd/spi-nor/spi-nor.c
+> +++ b/drivers/mtd/spi-nor/spi-nor.c
+> @@ -39,6 +39,10 @@
+>
+>  #define SPI_NOR_MAX_ID_LEN     6
+>  #define SPI_NOR_MAX_ADDR_WIDTH 4
+> +/* Added for S25FS-S family flash */
+> +#define SPINOR_CONFIG_REG3_OFFSET      0x800004
+> +#define CR3V_4KB_ERASE_UNABLE  0x8
+> +#define SPINOR_S25FS_FAMILY_ID 0x81
+>
+>  struct flash_info {
+>         char            *name;
+> @@ -78,6 +82,7 @@ struct flash_info {
+>  };
+>
+>  #define JEDEC_MFR(info)        ((info)->id[0])
+> +#define EXT_ID(info)   ((info)->id[5])
 
-> Marek Vasut <marex@denx.de> hat am 6. August 2016 um 15:14 geschrieben:
-> 
-> 
-> On 08/06/2016 02:55 PM, Stefan Wahren wrote:
-> > This patch based on the work of Fabio Estevam:
-> > "[PATCH v2] mmc: core: Do not set mmc voltage to 1.8V when
-> > 'no-1-8-v' is present"
-> > 
-> > It adds the support for 3.3V only DDR MMC hosts.
-> 
-> Do such cards even exist ? Do you have a link where I can find some ?
+I don't think 5th only the ext and usually last 3 bytes are called as
+ext_jedec if the id length is 6 bytes.
 
-i never said anything about SD cards. I mean eMMC modules which usually have 8
-data pins like this one [1].
+>
+>  static const struct flash_info *spi_nor_match_id(const char *name);
+>
+> @@ -881,6 +886,7 @@ static const struct flash_info spi_nor_ids[] = {
+>          */
+>         { "s25sl032p",  INFO(0x010215, 0x4d00,  64 * 1024,  64, SPI_NOR_DUAL_READ | SPI_NOR_QUAD_READ) },
+>         { "s25sl064p",  INFO(0x010216, 0x4d00,  64 * 1024, 128, SPI_NOR_DUAL_READ | SPI_NOR_QUAD_READ) },
+> +       { "s25fs256s1", INFO6(0x010219, 0x4d0181, 64 * 1024, 512, 0)},
+>         { "s25fl256s0", INFO(0x010219, 0x4d00, 256 * 1024, 128, 0) },
+>         { "s25fl256s1", INFO(0x010219, 0x4d01,  64 * 1024, 512, SPI_NOR_DUAL_READ | SPI_NOR_QUAD_READ) },
+>         { "s25fl512s",  INFO(0x010220, 0x4d00, 256 * 1024, 256, SPI_NOR_DUAL_READ | SPI_NOR_QUAD_READ) },
+> @@ -1018,6 +1024,53 @@ static const struct flash_info *spi_nor_read_id(struct spi_nor *nor)
+>         return ERR_PTR(-ENODEV);
+>  }
+>
+> +/*
+> + * The S25FS-S family physical sectors may be configured as a
+> + * hybrid combination of eight 4-kB parameter sectors
+> + * at the top or bottom of the address space with all
+> + * but one of the remaining sectors being uniform size.
+> + * The Parameter Sector Erase commands (20h or 21h) must
+> + * be used to erase the 4-kB parameter sectors individually.
+> + * The Sector (uniform sector) Erase commands (D8h or DCh)
+> + * must be used to erase any of the remaining
+> + * sectors, including the portion of highest or lowest address
+> + * sector that is not overlaid by the parameter sectors.
+> + * The uniform sector erase command has no effect on parameter sectors.
+> + */
+> +static int spansion_s25fs_disable_4kb_erase(struct spi_nor *nor)
+> +{
+> +       struct fsl_qspi *q;
+> +       u32 cr3v_addr  = SPINOR_CONFIG_REG3_OFFSET;
+> +       u8 cr3v = 0x0;
+> +       int ret = 0x0;
+> +
+> +       q = nor->priv;
 
-Please don't blame me if it's not compatible to i.MX28. It's only an example.
+Why this q?
 
-[1] -
-http://datasheet.octopart.com/THGBM3G4D1FBAIGH2H-Toshiba-datasheet-20748880.pdf
-
-> 
-> > Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
-> > ---
-> >  drivers/mmc/core/host.c  |    2 ++
-> >  drivers/mmc/core/mmc.c   |    6 ++++++
-> >  include/linux/mmc/host.h |    1 +
-> >  3 files changed, 9 insertions(+)
-> > 
-> > Changes to Fabio's patch:
-> > - rebase to current linux-next
-> > - rename DT property to mmc-ddr-3_3v
-> > - use EXT_CSD_CARD_TYPE_DDR_52 instead of new define
-> > 
-> > diff --git a/drivers/mmc/core/host.c b/drivers/mmc/core/host.c
-> > index 98f25ff..4c971de 100644
-> > --- a/drivers/mmc/core/host.c
-> > +++ b/drivers/mmc/core/host.c
-> > @@ -301,6 +301,8 @@ int mmc_of_parse(struct mmc_host *host)
-> >  	if (of_property_read_bool(np, "wakeup-source") ||
-> >  	    of_property_read_bool(np, "enable-sdio-wakeup")) /* legacy */
-> >  		host->pm_caps |= MMC_PM_WAKE_SDIO_IRQ;
-> > +	if (of_property_read_bool(np, "mmc-ddr-3_3v"))
-> > +		host->caps2 |= MMC_CAP2_3_3V_ONLY_DDR;
-> >  	if (of_property_read_bool(np, "mmc-ddr-1_8v"))
-> >  		host->caps |= MMC_CAP_1_8V_DDR;
-> >  	if (of_property_read_bool(np, "mmc-ddr-1_2v"))
-> > diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
-> > index f2d185c..8a933d5 100644
-> > --- a/drivers/mmc/core/mmc.c
-> > +++ b/drivers/mmc/core/mmc.c
-> > @@ -210,6 +210,12 @@ static void mmc_select_card_type(struct mmc_card *card)
-> >  		avail_type |= EXT_CSD_CARD_TYPE_HS_52;
-> >  	}
-> >  
-> > +	if (caps2 & MMC_CAP2_3_3V_ONLY_DDR &&
-> > +	    card_type & EXT_CSD_CARD_TYPE_DDR_1_8V) {
-> > +		hs_max_dtr = MMC_HIGH_DDR_MAX_DTR;
-> > +		avail_type |= EXT_CSD_CARD_TYPE_DDR_52;
-> > +	}
-> > +
-> >  	if (caps & MMC_CAP_1_8V_DDR &&
-> >  	    card_type & EXT_CSD_CARD_TYPE_DDR_1_8V) {
-> >  		hs_max_dtr = MMC_HIGH_DDR_MAX_DTR;
-> > diff --git a/include/linux/mmc/host.h b/include/linux/mmc/host.h
-> > index aa4bfbf..db0775d 100644
-> > --- a/include/linux/mmc/host.h
-> > +++ b/include/linux/mmc/host.h
-> > @@ -311,6 +311,7 @@ struct mmc_host {
-> >  #define MMC_CAP2_HS400_ES	(1 << 20)	/* Host supports enhanced strobe */
-> >  #define MMC_CAP2_NO_SD		(1 << 21)	/* Do not send SD commands during
-> > initialization */
-> >  #define MMC_CAP2_NO_MMC		(1 << 22)	/* Do not send (e)MMC commands during
-> > initialization */
-> > +#define MMC_CAP2_3_3V_ONLY_DDR	(1 << 23)	/* Only supports 3.3V DDR */
-> >  
-> >  	mmc_pm_flag_t		pm_caps;	/* supported pm features */
-> >  
-> > 
-> 
-> 
-> -- 
-> Best regards,
-> Marek Vasut
+-- 
+Jagan.
