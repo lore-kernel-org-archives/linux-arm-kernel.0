@@ -1,70 +1,63 @@
 From: hzpeterchen@gmail.com (Peter Chen)
-Date: Sat, 6 Aug 2016 15:54:35 +0800
-Subject: [PATCH v2 08/22] usb: chipidea: Remove locking in ci_udc_start()
-In-Reply-To: <147043403652.26915.10865210145828633146@sboyd-linaro>
+Date: Sat, 6 Aug 2016 15:59:25 +0800
+Subject: [PATCH v2 06/22] usb: chipidea: Add platform flag for wrapper
+ phy management
+In-Reply-To: <147043356053.26915.10086819023294264100@sboyd-linaro>
 References: <20160707222114.1673-1-stephen.boyd@linaro.org>
- <20160707222114.1673-9-stephen.boyd@linaro.org>
- <20160708094528.GF20485@shlinux2>
- <147043403652.26915.10865210145828633146@sboyd-linaro>
-Message-ID: <20160806075435.GB12298@shlinux2>
+ <20160707222114.1673-7-stephen.boyd@linaro.org>
+ <20160708092535.GD20485@shlinux2>
+ <147043356053.26915.10086819023294264100@sboyd-linaro>
+Message-ID: <20160806075925.GC12298@shlinux2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 05, 2016 at 02:53:56PM -0700, Stephen Boyd wrote:
-> Quoting Peter Chen (2016-07-08 02:45:28)
-> > On Thu, Jul 07, 2016 at 03:20:59PM -0700, Stephen Boyd wrote:
-> > > We don't call hw_device_reset() with the ci->lock held, so it
-> > > doesn't seem like this lock here is protecting anything. Let's
-> > > just remove it. This allows us to call sleeping functions like
-> > > phy_init() from within the CI_HDRC_CONTROLLER_RESET_EVENT hook.
+On Fri, Aug 05, 2016 at 02:46:00PM -0700, Stephen Boyd wrote:
+> Quoting Peter Chen (2016-07-08 02:25:35)
+> > On Thu, Jul 07, 2016 at 03:20:57PM -0700, Stephen Boyd wrote:
+> > > The ULPI phy on qcom platforms needs to be initialized and
+> > > powered on after a USB reset and before we toggle the run/stop
+> > > bit. Otherwise, the phy locks up and doesn't work properly.
+> > > Therefore, add a flag to skip any phy power management in the
+> > > core layer, leaving it up to the glue driver to manage.
 > > > 
 > > > Cc: Peter Chen <peter.chen@nxp.com>
 > > > Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 > > > Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
 > > > ---
-> > >  drivers/usb/chipidea/udc.c | 3 ---
-> > >  1 file changed, 3 deletions(-)
+> > >  drivers/usb/chipidea/core.c  | 6 ++++++
+> > >  include/linux/usb/chipidea.h | 1 +
+> > >  2 files changed, 7 insertions(+)
 > > > 
-> > > diff --git a/drivers/usb/chipidea/udc.c b/drivers/usb/chipidea/udc.c
-> > > index 065f5d97aa67..f16be4710cdb 100644
-> > > --- a/drivers/usb/chipidea/udc.c
-> > > +++ b/drivers/usb/chipidea/udc.c
-> > > @@ -1719,7 +1719,6 @@ static int ci_udc_start(struct usb_gadget *gadget,
-> > >                        struct usb_gadget_driver *driver)
+> > > diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
+> > > index 01390e02ee53..532085a096d9 100644
+> > > --- a/drivers/usb/chipidea/core.c
+> > > +++ b/drivers/usb/chipidea/core.c
+> > > @@ -361,6 +361,9 @@ static int _ci_usb_phy_init(struct ci_hdrc *ci)
+> > >   */
+> > >  static void ci_usb_phy_exit(struct ci_hdrc *ci)
 > > >  {
-> > >       struct ci_hdrc *ci = container_of(gadget, struct ci_hdrc, gadget);
-> > > -     unsigned long flags;
-> > >       int retval = -ENOMEM;
+> > > +     if (ci->platdata->flags & CI_HDRC_OVERRIDE_PHY_CONTROL)
+> > > +             return;
+> > > +
+> > >       if (ci->phy) {
+> > >               phy_power_off(ci->phy);
+> > >               phy_exit(ci->phy);
+> > > @@ -379,6 +382,9 @@ static int ci_usb_phy_init(struct ci_hdrc *ci)
+> > >  {
+> > >       int ret;
 > > >  
-> > >       if (driver->disconnect == NULL)
-> > > @@ -1746,7 +1745,6 @@ static int ci_udc_start(struct usb_gadget *gadget,
-> > >  
-> > >       pm_runtime_get_sync(&ci->gadget.dev);
-> > >       if (ci->vbus_active) {
-> > > -             spin_lock_irqsave(&ci->lock, flags);
-> > >               hw_device_reset(ci);
-> > >       } else {
-> > >               usb_udc_vbus_handler(&ci->gadget, false);
-> > > @@ -1755,7 +1753,6 @@ static int ci_udc_start(struct usb_gadget *gadget,
-> > >       }
-> > >  
-> > >       retval = hw_device_state(ci, ci->ep0out->qh.dma);
-> > > -     spin_unlock_irqrestore(&ci->lock, flags);
-> > >       if (retval)
-> > >               pm_runtime_put_sync(&ci->gadget.dev);
-> > >  
+> > > +     if (ci->platdata->flags & CI_HDRC_OVERRIDE_PHY_CONTROL)
+> > > +             return 0;
+> > > +
 > > 
-> > The main purpose for this is disabling interrupt when reset controller,
-> > in case the unexpected interrupts occur.
-> > 
-> > You can move this between hw_device_state.
+> > How you handle the code for PHY getting at probe?
 > > 
 > 
-> Ok, but we don't hold the ci->lock in ci_udc_vbus_session(). Is that a
-> bug as well?
+> Which probe? Glue layer probe? In my case I'm not using the phy until
+> the RESET/STOPPED event so I just rely on the chipidea core to get the
+> phy and then control the phy manually in the glue layer.
 
-I agree with your patch. In fact, during the reset controller, the
-interrupt has not been enabled, it should no unexpected interrupt.
+I have no idea about it after reading your patch 10/22.
 
 -- 
 
