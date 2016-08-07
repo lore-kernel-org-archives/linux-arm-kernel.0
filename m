@@ -1,243 +1,220 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Sun, 7 Aug 2016 16:08:02 +0200
-Subject: [PATCH v12 0/8] KVM PCIe/MSI passthrough on ARM/ARM64: kernel
- part 3/3: vfio changes
-In-Reply-To: <HE1PR04MB13217B0A44D140CC54901EDCFF180@HE1PR04MB1321.eurprd04.prod.outlook.com>
-References: <1470159012-7110-1-git-send-email-eric.auger@redhat.com>
- <HE1PR04MB13217B0A44D140CC54901EDCFF180@HE1PR04MB1321.eurprd04.prod.outlook.com>
-Message-ID: <c0b84785-9160-f58e-a1b7-ea1b0c511cc9@redhat.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Sun,  7 Aug 2016 16:16:44 +0200
+Subject: [PATCH v2] ARM: dts: sun8i: Add dts file for the Orange Pi Lite SBC
+Message-ID: <1470579404-28081-1-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Diana,
+The Orange Pi Lite SBC is a small H3 based SBC, with 512MB RAM,
+micro-sd slot, HDMI out, 2 USB-A connectors, 1 micro-USB connector,
+sdio attached rtl8189ftv wifi and an ir receiver.
 
-On 05/08/2016 16:46, Diana Madalina Craciun wrote:
-> Hi Eric,
-> 
-> I have tested these patches in a VFIO PCI scenario (using the ITS
-> emulation) on a NXP LS2080 board. It worked fine with one e1000 card
-> assigned to the guest. However, when I tried to assign two cards to the
-> guest I got a crash. I narrowed down the problem to this code:
-> 
-> drivers/vfio/vfio_iommu_type1.c, vfio_iommu_type1_attach_group function
-> 
->    /*
->      * Try to match an existing compatible domain.  We don't want to
->      * preclude an IOMMU driver supporting multiple bus_types and being
->      * able to include different bus_types in the same IOMMU domain, so
->      * we test whether the domains use the same iommu_ops rather than
->      * testing if they're on the same bus_type.
->      */
->     list_for_each_entry(d, &iommu->domain_list, next) {
->         if (d->domain->ops == domain->domain->ops &&
->             d->prot == domain->prot) {
->             iommu_detach_group(domain->domain, iommu_group);
->             if (!iommu_attach_group(d->domain, iommu_group)) {
->                 list_add(&group->next, &d->group_list);
->                 iommu_domain_free(domain->domain);
->                 kfree(domain);
->                 mutex_unlock(&iommu->lock);
->                 return 0;
->             }
-> 
->             ret = iommu_attach_group(domain->domain, iommu_group);
->             if (ret)
->                 goto out_domain;
->         }
->     }
-> 
-> The iommu_domain_free function eventually calls iommu_put_dma_cookie
-> which calls put_iova_domain. This function (put_iova_domain) tries to
-> acquire some spinlocks which were not yet initialized. They will be
-> initialized later when the first DMA mapping will be performed. Because
-> the spinlock was not yet initialized, it crashes when attempting to
-> acquire it.
-> 
-> With the following fix I was able to successfully assign two cards to
-> the guest:
-> 
-> diff --git a/drivers/iommu/iova.c b/drivers/iommu/iova.c
-> index ba764a0..b43e34f 100644
-> --- a/drivers/iommu/iova.c
-> +++ b/drivers/iommu/iova.c
-> @@ -457,6 +457,9 @@ void put_iova_domain(struct iova_domain *iovad)
->         struct rb_node *node;
->         unsigned long flags;
->  
-> +       if (!iovad->start_pfn)
-> +               return;
-> +
->         free_iova_rcaches(iovad);
->         spin_lock_irqsave(&iovad->iova_rbtree_lock, flags);
->         node = rb_first(&iovad->rbroot);
-> 
-> However, I am not sure if this is the right fix.
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+Changes in v2:
+-Fix the wifi ethernet alias to be ethernet0 as the comment says, rather
+ then ethernet1 (copy and paste error).
+---
+ arch/arm/boot/dts/Makefile                   |   1 +
+ arch/arm/boot/dts/sun8i-h3-orangepi-lite.dts | 178 +++++++++++++++++++++++++++
+ 2 files changed, 179 insertions(+)
+ create mode 100644 arch/arm/boot/dts/sun8i-h3-orangepi-lite.dts
 
-Thanks for testing. Sorry for the time you spent narrowing the above
-issue. The problem is known and fixed by Robin's patch sent on iommu
-list. The patch can be found on my branch - similar fix as the one you
-did ;-) -:
-
-iommu/dma: Don't put uninitialised IOVA domains
-
-Thanks!
-
-Eric
-> 
-> Thanks,
-> 
-> Diana
-> 
-> 
-> On 08/02/2016 08:30 PM, Eric Auger wrote:
->> This series allows the user-space to register a reserved IOVA domain.
->> This completes the kernel integration of the whole functionality on top
->> of the 2 previous parts (v11).
->>
->> We reuse the VFIO DMA MAP ioctl with a new flag to bridge to the
->> msi-iommu API. The need for provisioning such MSI IOVA range is reported
->> through capability chain, using VFIO_IOMMU_TYPE1_INFO_CAP_MSI_GEOMETRY.
->>
->> vfio_iommu_type1 checks if the MSI mapping is safe when attaching the
->> vfio group to the container (allow_unsafe_interrupts modality). This is
->> done in a very coarse way, looking at all the registered doorbells and
->> returning assignment is safe wrt IRQ if all the doorbells are safe.
->>
->> More details & context can be found at:
->> http://www.linaro.org/blog/core-dump/kvm-pciemsi-passthrough-armarm64/
->>
->> Best Regards
->>
->> Eric
->>
->> Testing:
->> - functional on ARM64 AMD Overdrive HW (single GICv2m frame) with
->>   Intel I350T2 (SR-IOV capable, igb/igbvf) and Intel 82574L (e1000e)
->> - functional on Cavium ThunderX (ARM GICv3 ITS) with Intel 82574L (e1000e)
->>
->> References:
->> [1] [RFC 0/2] VFIO: Add virtual MSI doorbell support
->>     (https://lkml.org/lkml/2015/7/24/135)
->> [2] [RFC PATCH 0/6] vfio: Add interface to map MSI pages
->>     (https://lists.cs.columbia.edu/pipermail/kvmarm/2015-September/016607.html)
->> [3] [PATCH v2 0/3] Introduce MSI hardware mapping for VFIO
->>     (http://permalink.gmane.org/gmane.comp.emulators.kvm.arm.devel/3858)
->>
->> Git: complete series available at
->> https://github.com/eauger/linux/tree/v4.7-rc7-passthrough-v12
->> previous: https://github.com/eauger/linux/tree/v4.7-rc7-passthrough-v11
->>
->> the above branch includes a temporary patch to work around a ThunderX pci
->> bus reset crash (which I think unrelated to this series):
->> "vfio: pci: HACK! workaround thunderx pci_try_reset_bus crash"
->> Do not take this one for other platforms.
->>
->> History:
->> v11 -> v12:
->> - no functional change. Only adapt to renamings done in PART II
->>
->> v10 -> v11:
->> no change to this series, just incremented for consistency
->>
->> v9 -> v10:
->> Took into account Alex' comments:
->> - split "vfio/type1: vfio_find_dma accepting a type argument" into 2 patches
->> - properly implement replay of MSI DMA slots (by setting the aperture on the
->>   new domain); fixes the assignment of several devices
->> - rework user api for vfio_iommu_type1_info capability chains (cap_offset
->>   at the end of the struct and fix padding issues)
->> - VFIO_IOVA_RESERVED renamed into VFIO_IOVA_MSI_RESERVED
->> - explicit dma->type setting to VFIO_IOVA_USER
->>
->> v8 -> v9:
->> - report MSI geometry through capability chain (last patch only);
->>   with the current limitation that an arbitrary number of 16 page
->>   requirement is reported. To be improved later on.
->>
->>
->> v7 -> v8:
->> - use renamed msi-iommu API
->> - VFIO only responsible for setting the IOVA aperture
->> - use new DOMAIN_ATTR_MSI_GEOMETRY iommu domain attribute
->>
->> v6 -> v7:
->> - vfio_find_dma now accepts a dma_type argument.
->> - should have recovered the capability to unmap the whole user IOVA range
->> - remove computation of nb IOVA pages -> will post a separate RFC for that
->>   while respinning the QEMU part
->>
->> RFC v5 -> patch v6:
->> - split to ease the review process
->>
->> RFC v4 -> RFC v5:
->> - take into account Thomas' comments on MSI related patches
->>   - split "msi: IOMMU map the doorbell address when needed"
->>   - increase readability and add comments
->>   - fix style issues
->>  - split "iommu: Add DOMAIN_ATTR_MSI_MAPPING attribute"
->>  - platform ITS now advertises IOMMU_CAP_INTR_REMAP
->>  - fix compilation issue with CONFIG_IOMMU API unset
->>  - arm-smmu-v3 now advertises DOMAIN_ATTR_MSI_MAPPING
->>
->> RFC v3 -> v4:
->> - Move doorbell mapping/unmapping in msi.c
->> - fix ref count issue on set_affinity: in case of a change in the address
->>   the previous address is decremented
->> - doorbell map/unmap now is done on msi composition. Should allow the use
->>   case for platform MSI controllers
->> - create dma-reserved-iommu.h/c exposing/implementing a new API dedicated
->>   to reserved IOVA management (looking like dma-iommu glue)
->> - series reordering to ease the review:
->>   - first part is related to IOMMU
->>   - second related to MSI sub-system
->>   - third related to VFIO (except arm-smmu IOMMU_CAP_INTR_REMAP removal)
->> - expose the number of requested IOVA pages through VFIO_IOMMU_GET_INFO
->>   [this partially addresses Marc's comments on iommu_get/put_single_reserved
->>    size/alignment problematic - which I did not ignore - but I don't know
->>    how much I can do at the moment]
->>
->> RFC v2 -> RFC v3:
->> - should fix wrong handling of some CONFIG combinations:
->>   CONFIG_IOVA, CONFIG_IOMMU_API, CONFIG_PCI_MSI_IRQ_DOMAIN
->> - fix MSI_FLAG_IRQ_REMAPPING setting in GICv3 ITS (although not tested)
->>
->> PATCH v1 -> RFC v2:
->> - reverted to RFC since it looks more reasonable ;-) the code is split
->>   between VFIO, IOMMU, MSI controller and I am not sure I did the right
->>   choices. Also API need to be further discussed.
->> - iova API usage in arm-smmu.c.
->> - MSI controller natively programs the MSI addr with either the PA or IOVA.
->>   This is not done anymore in vfio-pci driver as suggested by Alex.
->> - check irq remapping capability of the group
->>
->> RFC v1 [2] -> PATCH v1:
->> - use the existing dma map/unmap ioctl interface with a flag to register a
->>   reserved IOVA range. Use the legacy Rb to store this special vfio_dma.
->> - a single reserved IOVA contiguous region now is allowed
->> - use of an RB tree indexed by PA to store allocated reserved slots
->> - use of a vfio_domain iova_domain to manage iova allocation within the
->>   window provided by the userspace
->> - vfio alloc_map/unmap_free take a vfio_group handle
->> - vfio_group handle is cached in vfio_pci_device
->> - add ref counting to bindings
->> - user modality enabled at the end of the series
->>
->>
->> Eric Auger (8):
->>   vfio: introduce a vfio_dma type field
->>   vfio/type1: vfio_find_dma accepting a type argument
->>   vfio/type1: implement recursive vfio_find_dma_from_node
->>   vfio/type1: handle unmap/unpin and replay for VFIO_IOVA_RESERVED slots
->>   vfio: allow reserved msi iova registration
->>   vfio/type1: check doorbell safety
->>   iommu/arm-smmu: do not advertise IOMMU_CAP_INTR_REMAP
->>   vfio/type1: return MSI geometry through VFIO_IOMMU_GET_INFO capability
->>     chains
->>
->>  drivers/iommu/arm-smmu-v3.c     |   3 +-
->>  drivers/iommu/arm-smmu.c        |   3 +-
->>  drivers/vfio/vfio_iommu_type1.c | 246 +++++++++++++++++++++++++++++++++++++---
->>  include/uapi/linux/vfio.h       |  42 ++++++-
->>  4 files changed, 276 insertions(+), 18 deletions(-)
->>
-> 
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 678abe8..3b280f4 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -767,6 +767,7 @@ dtb-$(CONFIG_MACH_SUN8I) += \
+ 	sun8i-a83t-allwinner-h8homlet-v2.dtb \
+ 	sun8i-a83t-cubietruck-plus.dtb \
+ 	sun8i-h3-orangepi-2.dtb \
++	sun8i-h3-orangepi-lite.dtb \
+ 	sun8i-h3-orangepi-one.dtb \
+ 	sun8i-h3-orangepi-pc.dtb \
+ 	sun8i-h3-orangepi-pc-plus.dtb \
+diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-lite.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-lite.dts
+new file mode 100644
+index 0000000..1550fee
+--- /dev/null
++++ b/arch/arm/boot/dts/sun8i-h3-orangepi-lite.dts
+@@ -0,0 +1,178 @@
++/*
++ * Copyright (C) 2016 Hans de Goede <hdegoede@redhat.com>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++/dts-v1/;
++#include "sun8i-h3.dtsi"
++#include "sunxi-common-regulators.dtsi"
++
++#include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/input/input.h>
++#include <dt-bindings/pinctrl/sun4i-a10.h>
++
++/ {
++	model = "Xunlong Orange Pi Lite";
++	compatible = "xunlong,orangepi-lite", "allwinner,sun8i-h3";
++
++	aliases {
++		/* The H3 emac is not used so the wifi is ethernet0 */
++		ethernet0 = &rtl8189ftv;
++		serial0 = &uart0;
++	};
++
++	chosen {
++		stdout-path = "serial0:115200n8";
++	};
++
++	leds {
++		compatible = "gpio-leds";
++		pinctrl-names = "default";
++		pinctrl-0 = <&leds_opc>, <&leds_r_opc>;
++
++		pwr_led {
++			label = "orangepi:green:pwr";
++			gpios = <&r_pio 0 10 GPIO_ACTIVE_HIGH>;
++			default-state = "on";
++		};
++
++		status_led {
++			label = "orangepi:red:status";
++			gpios = <&pio 0 15 GPIO_ACTIVE_HIGH>;
++		};
++	};
++
++	r_gpio_keys {
++		compatible = "gpio-keys";
++		pinctrl-names = "default";
++		pinctrl-0 = <&sw_r_opc>;
++
++		sw4 {
++			label = "sw4";
++			linux,code = <BTN_0>;
++			gpios = <&r_pio 0 3 GPIO_ACTIVE_LOW>;
++		};
++	};
++};
++
++&ehci1 {
++	status = "okay";
++};
++
++&ehci2 {
++	status = "okay";
++};
++
++&ir {
++	pinctrl-names = "default";
++	pinctrl-0 = <&ir_pins_a>;
++	status = "okay";
++};
++
++&mmc0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin>;
++	vmmc-supply = <&reg_vcc3v3>;
++	bus-width = <4>;
++	cd-gpios = <&pio 5 6 GPIO_ACTIVE_HIGH>; /* PF6 */
++	cd-inverted;
++	status = "okay";
++};
++
++&mmc1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc1_pins_a>;
++	vmmc-supply = <&reg_vcc3v3>;
++	bus-width = <4>;
++	non-removable;
++	status = "okay";
++
++	/*
++	 * Explicitly define the sdio device, so that we can add an ethernet
++	 * alias for it (which e.g. makes u-boot set a mac-address).
++	 */
++	rtl8189ftv: sdio_wifi at 1 {
++		reg = <1>;
++	};
++};
++
++&ohci1 {
++	status = "okay";
++};
++
++&ohci2 {
++	status = "okay";
++};
++
++&pio {
++	leds_opc: led_pins at 0 {
++		allwinner,pins = "PA15";
++		allwinner,function = "gpio_out";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++	};
++};
++
++&r_pio {
++	leds_r_opc: led_pins at 0 {
++		allwinner,pins = "PL10";
++		allwinner,function = "gpio_out";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++	};
++
++	sw_r_opc: key_pins at 0 {
++		allwinner,pins = "PL3";
++		allwinner,function = "gpio_in";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++	};
++};
++
++&uart0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart0_pins_a>;
++	status = "okay";
++};
++
++&usbphy {
++	/* USB VBUS is always on */
++	status = "okay";
++};
+-- 
+2.7.4
