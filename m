@@ -1,43 +1,77 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sun,  7 Aug 2016 21:01:48 +0200
-Subject: [PATCH] dmaengine: pxa_dma: fix hotchain corner case
-Message-ID: <1470596509-1726-1-git-send-email-robert.jarzmik@free.fr>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Sun,  7 Aug 2016 21:02:38 +0200
+Subject: [PATCH resend] mmc: pwrseq-simple: Add an optional post-power-on-delay
+In-Reply-To: <1470596558-23195-1-git-send-email-hdegoede@redhat.com>
+References: <1470596558-23195-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <1470596558-23195-2-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the case where a descriptor is chained on a running channel, and as
-explained in the comment in the code 10 lines above, the success of the
-chaining is ensured either if :
- - the DMA is still running
- - or if the chained transfer is completed
+Some devices need a while to boot their firmware after providing clks /
+de-asserting resets before they are ready to receive sdio commands.
 
-Unfortunately the transfer completness test was done on the descriptor
-to which the transfer was chained, and not the transfer being chained at
-the end, ie. hot-chained.
+This commits adds a post-power-on-delay-ms devicetree property to
+mmc-pwrseq-simple for use with such devices.
 
-This corner case is extremely hard to trigger, as usually the DMA chain
-is still running, and the first case takes care of returning success of
-the hot-chaining. It was seen by hot-chaining several "small transfers"
-to a running "big transfer", not in a real-life usecase but by testing
-the robustness of the driver.
-
-Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
- drivers/dma/pxa_dma.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ Documentation/devicetree/bindings/mmc/mmc-pwrseq-simple.txt | 2 ++
+ drivers/mmc/core/pwrseq_simple.c                            | 9 +++++++++
+ 2 files changed, 11 insertions(+)
 
-diff --git a/drivers/dma/pxa_dma.c b/drivers/dma/pxa_dma.c
-index e756a30ccba2..64758daa9eee 100644
---- a/drivers/dma/pxa_dma.c
-+++ b/drivers/dma/pxa_dma.c
-@@ -635,7 +635,7 @@ static bool pxad_try_hotchain(struct virt_dma_chan *vc,
- 		vd_last_issued = list_entry(vc->desc_issued.prev,
- 					    struct virt_dma_desc, node);
- 		pxad_desc_chain(vd_last_issued, vd);
--		if (is_chan_running(chan) || is_desc_completed(vd_last_issued))
-+		if (is_chan_running(chan) || is_desc_completed(vd))
- 			return true;
+diff --git a/Documentation/devicetree/bindings/mmc/mmc-pwrseq-simple.txt b/Documentation/devicetree/bindings/mmc/mmc-pwrseq-simple.txt
+index ce0e767..e254368 100644
+--- a/Documentation/devicetree/bindings/mmc/mmc-pwrseq-simple.txt
++++ b/Documentation/devicetree/bindings/mmc/mmc-pwrseq-simple.txt
+@@ -16,6 +16,8 @@ Optional properties:
+   See ../clocks/clock-bindings.txt for details.
+ - clock-names : Must include the following entry:
+   "ext_clock" (External clock provided to the card).
++- post-power-on-delay-ms : Delay in ms after powering the card and
++	de-asserting the reset-gpios (if any)
+ 
+ Example:
+ 
+diff --git a/drivers/mmc/core/pwrseq_simple.c b/drivers/mmc/core/pwrseq_simple.c
+index 450d907..1304160 100644
+--- a/drivers/mmc/core/pwrseq_simple.c
++++ b/drivers/mmc/core/pwrseq_simple.c
+@@ -16,6 +16,8 @@
+ #include <linux/device.h>
+ #include <linux/err.h>
+ #include <linux/gpio/consumer.h>
++#include <linux/delay.h>
++#include <linux/property.h>
+ 
+ #include <linux/mmc/host.h>
+ 
+@@ -24,6 +26,7 @@
+ struct mmc_pwrseq_simple {
+ 	struct mmc_pwrseq pwrseq;
+ 	bool clk_enabled;
++	u32 post_power_on_delay_ms;
+ 	struct clk *ext_clk;
+ 	struct gpio_descs *reset_gpios;
+ };
+@@ -64,6 +67,9 @@ static void mmc_pwrseq_simple_post_power_on(struct mmc_host *host)
+ 	struct mmc_pwrseq_simple *pwrseq = to_pwrseq_simple(host->pwrseq);
+ 
+ 	mmc_pwrseq_simple_set_gpios_value(pwrseq, 0);
++
++	if (pwrseq->post_power_on_delay_ms)
++		msleep(pwrseq->post_power_on_delay_ms);
+ }
+ 
+ static void mmc_pwrseq_simple_power_off(struct mmc_host *host)
+@@ -111,6 +117,9 @@ static int mmc_pwrseq_simple_probe(struct platform_device *pdev)
+ 		return PTR_ERR(pwrseq->reset_gpios);
  	}
  
++	device_property_read_u32(dev, "post-power-on-delay-ms",
++				 &pwrseq->post_power_on_delay_ms);
++
+ 	pwrseq->pwrseq.dev = dev;
+ 	pwrseq->pwrseq.ops = &mmc_pwrseq_simple_ops;
+ 	pwrseq->pwrseq.owner = THIS_MODULE;
 -- 
-2.1.4
+2.7.4
