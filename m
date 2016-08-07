@@ -1,51 +1,23 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Sun, 07 Aug 2016 16:44:58 +0200
-Subject: [PATCH] ARM: dts: add rk3288-firefly-reload
-In-Reply-To: <413ebccd-e8d6-1401-3065-f9a63b4d66e6@rock-chips.com>
-References: <1549971.ctkvOGm2xW@diego> <2868781.4x2gJCRbLH@diego>
- <413ebccd-e8d6-1401-3065-f9a63b4d66e6@rock-chips.com>
-Message-ID: <1815189.oGy6GHMbyM@phil>
+From: calvin.wise@travispetelle.com (FedEx International Economy)
+Date: Sun, 7 Aug 2016 14:34:34 +0000
+Subject: Problems with item delivery, n.00557824
+Message-ID: <4f57afcd92df747d2aeaa1b003a778fb@travispetelle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+Dear Customer,
 
-Am Sonntag, 7. August 2016, 11:40:21 schrieb Shawn Lin:
-> On 2016/7/19 3:46, Heiko St?bner wrote:
-> > Am Montag, 18. Juli 2016, 23:32:32 schrieb Randy Li:
-> >> The Firefly RK3288 Reload is a combination Firefly rk3288 core board
-> >> with the Reload baseboard. Add a dtsi for the Firefly rk3288 core
-> >> which can be included into the dts for the various baseboards
-> >> in the future and dts for Reload base board.
-> >> 
-> >> Currently supported are serial console, wired networking, eMMC and
-> >> SD storage, SPFIF, IR receiver, LEDs, SDIO wifi and USB. But only
-> >> the OTG could work on the host mode now, the other USB host can't
-> >> work now, additional patches are required.
-> >> 
-> >> Signed-off-by: Randy Li <ayaka@soulik.info>
-> >> Acked-by: Rob Herring <robh@kernel.org>
-> > 
-> > applied [0], after some minor reordering - please double check.
-> > 
-> > Also, while the branch is named 4.8 this will only go into 4.9, as the
-> > merge- window supposedly opens on the weekend.
-> 
-> Sorry for the noise here:), but I find there is some mmc stuff
-> which confuse me. Maybe Randy could elaborate more?
-> 
-> Your sdmmc claims to support UHS-I mode like sd-uhs-sdr104, etc, which
-> will ask dw_mmc to switch vqmmc from 3V3 to 1V8 after sending CMD11.
-> 
-> But the vqmmc is vccio_sd which is fixed as 3V3? :)
+We could not deliver your item.
+Shipment Label is attached to email.
 
-so far we have only been able to achieve UHS speeds on devices based on the 
-rk808 pmic (I had sucess on veyron and popmetal). The act8846-based boards 
-seem to have some issue when trying to do the switch to 1.8V, resulting in 
-mmc errors and the mmc-core switching back to 3.3V.
+Thanks and best regards,
+Calvin Wise,
+Station Agent.
 
-I think this might be caused by a bug in the act8846 driver or some dts 
-mistake. But so far nobody had the time and enthusiasm to investigate :-)
-
-
-Heiko
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 00557824.zip
+Type: application/zip
+Size: 11373 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160807/de870846/attachment-0001.zip>
