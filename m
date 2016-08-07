@@ -1,25 +1,33 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Sun,  7 Aug 2016 21:02:37 +0200
-Subject: [PATCH resend 0/1] mmc: pwrseq-simple: Add an optional
- post-power-on-delay
-Message-ID: <1470596558-23195-1-git-send-email-hdegoede@redhat.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sun, 07 Aug 2016 21:59:13 +0200
+Subject: [PATCH 2/2] dt: bindings: Add binding for ESP8089 wifi chips
+In-Reply-To: <1470596269-20572-2-git-send-email-hdegoede@redhat.com>
+References: <1470596269-20572-1-git-send-email-hdegoede@redhat.com>
+ <1470596269-20572-2-git-send-email-hdegoede@redhat.com>
+Message-ID: <2936779.FAiO1bqUWV@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ulf, Rob,
+On Sunday, August 7, 2016 8:57:49 PM CEST Hans de Goede wrote:
+> +Espressif ESP8089 wireless SDIO devices
+> +
+> +This node provides properties for controlling the ESP8089 wireless device.
+> +The node is expected to be specified as a child node to the SDIO controller
+> +that connects the device to the system.
+> +
+> +Required properties:
+> +
+> + - compatible : Should be "esp,esp8089".
 
-Here is a resend of a patch from me from a couple of weeks ago.
+I think it would be good to standardize a compatible string for sdio
+like we have it for other discoverable buses, based on the
+vendor/device ID (or whatever this uses), using something like
 
-There was some discussion about this back then, but if I understood
-correctly, the end-conclusion was that Rob was ok with this change
-(with the caveat that we should not add 6 more confgurable delays
-at other points to the -simple binding later).
+compatible = "sdio1234,5678", "esp,esp8089";
 
-Rob have I understood that correctly, if so can we please have your
-ack for the dt bits of this ?
+> +Optional properties:
+> + - esp,crystal_26M_en: Integer value for the crystal_26M_en firmware parameter
 
-Ulf can you review and if ok merge this once we've Rob's ack ?
+better use '-' instead of '_' for property names.
 
-Thanks & Regards,
-
-Hans
+	Arnd
