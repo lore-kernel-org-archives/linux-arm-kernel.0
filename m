@@ -1,23 +1,29 @@
-From: calvin.wise@travispetelle.com (FedEx International Economy)
-Date: Sun, 7 Aug 2016 14:34:34 +0000
-Subject: Problems with item delivery, n.00557824
-Message-ID: <4f57afcd92df747d2aeaa1b003a778fb@travispetelle.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Sun,  7 Aug 2016 20:57:48 +0200
+Subject: [PATCH 1/2] dt: bindings: Add vendor prefix for Espressif System
+Message-ID: <1470596269-20572-1-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Customer,
+Espressif is a manufacturer of various wifi and bt chips, add a vendor
+prefix for use with bindings for these chips.
 
-We could not deliver your item.
-Shipment Label is attached to email.
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+ Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-Thanks and best regards,
-Calvin Wise,
-Station Agent.
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 00557824.zip
-Type: application/zip
-Size: 11373 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160807/de870846/attachment-0001.zip>
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index d2bce22..d83a2da 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -88,6 +88,7 @@ energymicro	Silicon Laboratories (formerly Energy Micro AS)
+ epcos	EPCOS AG
+ epfl	Ecole Polytechnique F?d?rale de Lausanne
+ epson	Seiko Epson Corp.
++esp	Espressif System
+ est	ESTeem Wireless Modems
+ ettus	NI Ettus Research
+ eukrea  Eukr?a Electromatique
+-- 
+2.7.4
