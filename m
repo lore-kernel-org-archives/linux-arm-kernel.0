@@ -1,68 +1,51 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Sun, 7 Aug 2016 16:25:20 +0200
-Subject: [PATCH 1/4] ARM: dts: sun8i: Extend Orange Pi PC dt to also
- handle the PC Plus
-In-Reply-To: <f71f9d2b-00d4-27b8-1535-1ddc58f04ca3@redhat.com>
-References: <1468095718-18515-1-git-send-email-hdegoede@redhat.com>
- <20160713084505.GE4761@lukather>
- <bce2b340-a930-8771-4560-dc61bf5828d5@redhat.com>
- <20160725064033.GA7419@lukather>
- <74d3b5eb-601a-cc1d-a44e-fea2895fd8b2@redhat.com>
- <20160728181757.GD6682@lukather>
- <f71f9d2b-00d4-27b8-1535-1ddc58f04ca3@redhat.com>
-Message-ID: <b6636083-917e-cc3a-9107-401fbd483fb7@redhat.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Sun, 07 Aug 2016 16:44:58 +0200
+Subject: [PATCH] ARM: dts: add rk3288-firefly-reload
+In-Reply-To: <413ebccd-e8d6-1401-3065-f9a63b4d66e6@rock-chips.com>
+References: <1549971.ctkvOGm2xW@diego> <2868781.4x2gJCRbLH@diego>
+ <413ebccd-e8d6-1401-3065-f9a63b4d66e6@rock-chips.com>
+Message-ID: <1815189.oGy6GHMbyM@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Shawn,
 
-On 28-07-16 22:36, Hans de Goede wrote:
-> Hi,
->
-> On 28-07-16 20:17, Maxime Ripard wrote:
->> Hi Hans,
->>
->> On Tue, Jul 26, 2016 at 11:07:23PM +0200, Hans de Goede wrote:
->>>>>> Nothing prevents you from including the orange pi pc dts, from the
->>>>>> orange pi plus dts.
->>>>>>
->>>>>> It prevents the duplication you were trying to avoid, and it doesn't
->>>>>> create all those spurious errors and devices.
->>>>>
->>>>> That would solve the copy paste problem on the kernel side, but that
->>>>> would still mean adding a new u-boot defconfig for this, which means that
->>>>> all the distro's which ship with prebuild u-boot binaries need to build
->>>>> for yet another board, something which I would like to avoid.
->>>>
->>>> Still, registering devices that are not present on the board is not an
->>>> option.
->>>
->>> Ok, new version send.
->>>
->>> What about the other 3 patches in this series ?
->>
->> I guess the same comment applies for patch 2.
->
-> The difference is that there really is no harm at all from
-> enabling the extra usb controllers used on the plus 2e
-> on the plus and plus 2 as well, no errors, no nothing, they
-> just sit their as usb controllers without an usb device plugged
-> in. But if you insist I can do a separate dts + u-boot defconfig
-> for the plus 2e as well (but I would rather not).
+Am Sonntag, 7. August 2016, 11:40:21 schrieb Shawn Lin:
+> On 2016/7/19 3:46, Heiko St?bner wrote:
+> > Am Montag, 18. Juli 2016, 23:32:32 schrieb Randy Li:
+> >> The Firefly RK3288 Reload is a combination Firefly rk3288 core board
+> >> with the Reload baseboard. Add a dtsi for the Firefly rk3288 core
+> >> which can be included into the dts for the various baseboards
+> >> in the future and dts for Reload base board.
+> >> 
+> >> Currently supported are serial console, wired networking, eMMC and
+> >> SD storage, SPFIF, IR receiver, LEDs, SDIO wifi and USB. But only
+> >> the OTG could work on the host mode now, the other USB host can't
+> >> work now, additional patches are required.
+> >> 
+> >> Signed-off-by: Randy Li <ayaka@soulik.info>
+> >> Acked-by: Rob Herring <robh@kernel.org>
+> > 
+> > applied [0], after some minor reordering - please double check.
+> > 
+> > Also, while the branch is named 4.8 this will only go into 4.9, as the
+> > merge- window supposedly opens on the weekend.
+> 
+> Sorry for the noise here:), but I find there is some mmc stuff
+> which confuse me. Maybe Randy could elaborate more?
+> 
+> Your sdmmc claims to support UHS-I mode like sd-uhs-sdr104, etc, which
+> will ask dw_mmc to switch vqmmc from 3V3 to 1V8 after sending CMD11.
+> 
+> But the vqmmc is vccio_sd which is fixed as 3V3? :)
 
-Ping, what is the verdict on this, are you ok with the patch or
-do you want me to create a separate dts file for the Orange Pi
-Plus 2E, note that doing so is going to be highly confusing to
-users, there are 3 plus boards:
+so far we have only been able to achieve UHS speeds on devices based on the 
+rk808 pmic (I had sucess on veyron and popmetal). The act8846-based boards 
+seem to have some issue when trying to do the switch to 1.8V, resulting in 
+mmc errors and the mmc-core switching back to 3.3V.
 
-Orange Pi Plus
-Orange Pi Plus 2   (same as the original plus but with 2G RAM, uses same u-boot defconfig / dts file)
-Orange Pi Plus 2E  (drops the USB-hub instead using all 3 host controllers)
+I think this might be caused by a bug in the act8846 driver or some dts 
+mistake. But so far nobody had the time and enthusiasm to investigate :-)
 
-So if you insist on a separate dts for the 2E, we get a case where
-the user with the "2" needs to guess which config to use, sure we
-can document this, but who is going to read the docs ?
 
-Regards,
-
-Hans
+Heiko
