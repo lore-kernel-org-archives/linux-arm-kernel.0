@@ -1,74 +1,56 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Sun,  7 Aug 2016 20:57:49 +0200
-Subject: [PATCH 2/2] dt: bindings: Add binding for ESP8089 wifi chips
-In-Reply-To: <1470596269-20572-1-git-send-email-hdegoede@redhat.com>
-References: <1470596269-20572-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1470596269-20572-2-git-send-email-hdegoede@redhat.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Sun,  7 Aug 2016 21:01:49 +0200
+Subject: [PATCH] dmaengine: pxa_dma: fix debug message
+In-Reply-To: <1470596509-1726-1-git-send-email-robert.jarzmik@free.fr>
+References: <1470596509-1726-1-git-send-email-robert.jarzmik@free.fr>
+Message-ID: <1470596509-1726-2-git-send-email-robert.jarzmik@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ESP8089 chips can mostly be enumerated via their sdio interface,
-but they are clocked by an external crystal which may differ from one
-board to the other.
+In a very tight timeframe, the debug message in the transfer completion
+handler can be misleading, as the completion test report can change just
+after the message, and the code flow cannot be deduced from the debug
+message.
 
-This commit adds a binding for the sdio child node for these chips,
-allowing to specify the external crystal type (for now, this binding
-could be be extended with e.g. OOB irq support later).
+This is just a cleanup to make debugging easier.
 
-The Android driver for this chip uses a text file with key,value pairs
-which gets loaded as firmware to pass this info to the firmware.
-The "esp,crystal_26M_en" name is chosen to match the crystal_26M_en
-key-name in that text file.
-
-Note that at this point there only is an out of tree driver for this
-hardware, there is no clear timeline / path for merging this. Still
-I believe it would be good to specify the binding for this in tree
-now, so that any future migration to an in tree driver will not cause
-compatiblity issues.
-
-Cc: Icenowy Zheng <icenowy@aosc.xyz>
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
 ---
- .../bindings/net/wireless/esp,esp8089.txt          | 31 ++++++++++++++++++++++
- 1 file changed, 31 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/net/wireless/esp,esp8089.txt
+ drivers/dma/pxa_dma.c | 9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/net/wireless/esp,esp8089.txt b/Documentation/devicetree/bindings/net/wireless/esp,esp8089.txt
-new file mode 100644
-index 0000000..898a149
---- /dev/null
-+++ b/Documentation/devicetree/bindings/net/wireless/esp,esp8089.txt
-@@ -0,0 +1,31 @@
-+Espressif ESP8089 wireless SDIO devices
-+
-+This node provides properties for controlling the ESP8089 wireless device.
-+The node is expected to be specified as a child node to the SDIO controller
-+that connects the device to the system.
-+
-+Required properties:
-+
-+ - compatible : Should be "esp,esp8089".
-+
-+Optional properties:
-+ - esp,crystal_26M_en: Integer value for the crystal_26M_en firmware parameter
-+
-+Example:
-+
-+&mmc1 {
-+	#address-cells = <1>;
-+	#size-cells = <0>;
-+
-+	vmmc-supply = <&reg_dldo1>;
-+	mmc-pwrseq = <&wifi_pwrseq>;
-+	bus-width = <4>;
-+	non-removable;
-+	status = "okay";
-+
-+	esp8089: sdio_wifi at 1 {
-+		compatible = "esp,esp8089";
-+		reg = <1>;
-+		esp,crystal_26M_en = <2>;
-+	};
-+};
+diff --git a/drivers/dma/pxa_dma.c b/drivers/dma/pxa_dma.c
+index 64758daa9eee..b7414c5c9932 100644
+--- a/drivers/dma/pxa_dma.c
++++ b/drivers/dma/pxa_dma.c
+@@ -668,6 +668,7 @@ static irqreturn_t pxad_chan_handler(int irq, void *dev_id)
+ 	struct virt_dma_desc *vd, *tmp;
+ 	unsigned int dcsr;
+ 	unsigned long flags;
++	bool vd_completed;
+ 	dma_cookie_t last_started = 0;
+ 
+ 	BUG_ON(!chan);
+@@ -678,15 +679,17 @@ static irqreturn_t pxad_chan_handler(int irq, void *dev_id)
+ 
+ 	spin_lock_irqsave(&chan->vc.lock, flags);
+ 	list_for_each_entry_safe(vd, tmp, &chan->vc.desc_issued, node) {
++		vd_completed = is_desc_completed(vd);
+ 		dev_dbg(&chan->vc.chan.dev->device,
+-			"%s(): checking txd %p[%x]: completed=%d\n",
+-			__func__, vd, vd->tx.cookie, is_desc_completed(vd));
++			"%s(): checking txd %p[%x]: completed=%d dcsr=0x%x\n",
++			__func__, vd, vd->tx.cookie, vd_completed,
++			dcsr);
+ 		last_started = vd->tx.cookie;
+ 		if (to_pxad_sw_desc(vd)->cyclic) {
+ 			vchan_cyclic_callback(vd);
+ 			break;
+ 		}
+-		if (is_desc_completed(vd)) {
++		if (vd_completed) {
+ 			list_del(&vd->node);
+ 			vchan_cookie_complete(vd);
+ 		} else {
 -- 
-2.7.4
+2.1.4
