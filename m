@@ -1,118 +1,129 @@
-From: shawn.lin@rock-chips.com (Shawn Lin)
-Date: Sun, 7 Aug 2016 10:07:00 +0800
-Subject: [PATCH RFC 2/3] mmc: core: add new cap for 3.3V only DDR MMCs
-In-Reply-To: <16443443.114784.752d0f22-93a7-46e8-bb14-c884787aaea3.open-xchange@email.1und1.de>
-References: <1470488140-10104-1-git-send-email-stefan.wahren@i2se.com>
- <1470488140-10104-3-git-send-email-stefan.wahren@i2se.com>
- <0e38d62a-b3d0-30ca-fca9-bb740ae54d0a@denx.de>
- <16443443.114784.752d0f22-93a7-46e8-bb14-c884787aaea3.open-xchange@email.1und1.de>
-Message-ID: <7284d9a4-164d-dd2d-b9a0-dd1de6c76274@rock-chips.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Sat, 06 Aug 2016 19:54:03 -0700
+Subject: [PATCH v2 02/10] mfd: stmpe: Add reset support for all STMPE
+ variant
+In-Reply-To: <1461845589-4826-3-git-send-email-patrice.chotard@st.com>
+References: <1461845589-4826-1-git-send-email-patrice.chotard@st.com>
+ <1461845589-4826-3-git-send-email-patrice.chotard@st.com>
+Message-ID: <8798334c6e5272a08ed665f7fc649fd1@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2016/8/6 22:18, Stefan Wahren ??:
-> Hi Marek,
->
->> Marek Vasut <marex@denx.de> hat am 6. August 2016 um 15:14 geschrieben:
->>
->>
->> On 08/06/2016 02:55 PM, Stefan Wahren wrote:
->>> This patch based on the work of Fabio Estevam:
->>> "[PATCH v2] mmc: core: Do not set mmc voltage to 1.8V when
->>> 'no-1-8-v' is present"
->>>
->>> It adds the support for 3.3V only DDR MMC hosts.
->>
->> Do such cards even exist ? Do you have a link where I can find some ?
->
-> i never said anything about SD cards. I mean eMMC modules which usually have 8
-> data pins like this one [1].
->
-> Please don't blame me if it's not compatible to i.MX28. It's only an example.
->
-> [1] -
-> http://datasheet.octopart.com/THGBM3G4D1FBAIGH2H-Toshiba-datasheet-20748880.pdf
+On 2016-04-28 05:13, patrice.chotard at st.com wrote:
+> From: Patrice Chotard <patrice.chotard@st.com>
+> 
+> Reset was only implemented for STMPE1801 variant despite
+> all variant have a SOFT_RESET bit.
+> 
+> For STMPE2401/2403/801/1601/1801 SOFT_RESET bit is bit 7
+> of SYS_CTRL register.
+> For STMPE610/811 (which have the same variant id) SOFT_RESET
+> bit is bit 1 of SYS_CTRL register.
+> 
+> Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> Acked-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  drivers/mfd/stmpe.c | 23 +++++++++++++++--------
+>  drivers/mfd/stmpe.h |  7 +++++--
+>  2 files changed, 20 insertions(+), 10 deletions(-)
+> 
+> diff --git a/drivers/mfd/stmpe.c b/drivers/mfd/stmpe.c
+> index c553b73..af682d0 100644
+> --- a/drivers/mfd/stmpe.c
+> +++ b/drivers/mfd/stmpe.c
+> @@ -735,13 +735,22 @@ static int stmpe1801_enable(struct stmpe *stmpe,
+> unsigned int blocks,
+>  				enable ? mask : 0);
+>  }
+>  
+> -static int stmpe1801_reset(struct stmpe *stmpe)
+> +static int stmpe_reset(struct stmpe *stmpe)
+>  {
+> +	u16 id_val = stmpe->variant->id_val;
+>  	unsigned long timeout;
+>  	int ret = 0;
+> +	u8 reset_bit;
+> +
+> +	if (id_val == STMPE811_ID)
+> +		/* STMPE801 and STMPE610 use bit 1 of SYS_CTRL register */
+> +		reset_bit = STMPE811_SYS_CTRL_RESET;
+> +	else
+> +		/* all other STMPE variant use bit 7 of SYS_CTRL register */
+> +		reset_bit = STMPE_SYS_CTRL_RESET;
 
+Wouldn't it be nicer to have this in struct stmpe_variant_info like
+id_mask...?
 
-I download the datasheet you mentioned, and I explicitly see it
-describe 1V8 everywhere, especially for the section of "ELECTRICAL
-CHARACTERISTICS".
+--
+Stefan
 
-I never see one eMMC claiming DDR52 capability but doesn't support 1V8
-so far. Could you kindly share me the part number of the eMMC you are
-using? :)
-
->
->>
->>> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
->>> ---
->>>  drivers/mmc/core/host.c  |    2 ++
->>>  drivers/mmc/core/mmc.c   |    6 ++++++
->>>  include/linux/mmc/host.h |    1 +
->>>  3 files changed, 9 insertions(+)
->>>
->>> Changes to Fabio's patch:
->>> - rebase to current linux-next
->>> - rename DT property to mmc-ddr-3_3v
->>> - use EXT_CSD_CARD_TYPE_DDR_52 instead of new define
->>>
->>> diff --git a/drivers/mmc/core/host.c b/drivers/mmc/core/host.c
->>> index 98f25ff..4c971de 100644
->>> --- a/drivers/mmc/core/host.c
->>> +++ b/drivers/mmc/core/host.c
->>> @@ -301,6 +301,8 @@ int mmc_of_parse(struct mmc_host *host)
->>>  	if (of_property_read_bool(np, "wakeup-source") ||
->>>  	    of_property_read_bool(np, "enable-sdio-wakeup")) /* legacy */
->>>  		host->pm_caps |= MMC_PM_WAKE_SDIO_IRQ;
->>> +	if (of_property_read_bool(np, "mmc-ddr-3_3v"))
->>> +		host->caps2 |= MMC_CAP2_3_3V_ONLY_DDR;
->>>  	if (of_property_read_bool(np, "mmc-ddr-1_8v"))
->>>  		host->caps |= MMC_CAP_1_8V_DDR;
->>>  	if (of_property_read_bool(np, "mmc-ddr-1_2v"))
->>> diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
->>> index f2d185c..8a933d5 100644
->>> --- a/drivers/mmc/core/mmc.c
->>> +++ b/drivers/mmc/core/mmc.c
->>> @@ -210,6 +210,12 @@ static void mmc_select_card_type(struct mmc_card *card)
->>>  		avail_type |= EXT_CSD_CARD_TYPE_HS_52;
->>>  	}
->>>
->>> +	if (caps2 & MMC_CAP2_3_3V_ONLY_DDR &&
->>> +	    card_type & EXT_CSD_CARD_TYPE_DDR_1_8V) {
->>> +		hs_max_dtr = MMC_HIGH_DDR_MAX_DTR;
->>> +		avail_type |= EXT_CSD_CARD_TYPE_DDR_52;
->>> +	}
->>> +
->>>  	if (caps & MMC_CAP_1_8V_DDR &&
->>>  	    card_type & EXT_CSD_CARD_TYPE_DDR_1_8V) {
->>>  		hs_max_dtr = MMC_HIGH_DDR_MAX_DTR;
->>> diff --git a/include/linux/mmc/host.h b/include/linux/mmc/host.h
->>> index aa4bfbf..db0775d 100644
->>> --- a/include/linux/mmc/host.h
->>> +++ b/include/linux/mmc/host.h
->>> @@ -311,6 +311,7 @@ struct mmc_host {
->>>  #define MMC_CAP2_HS400_ES	(1 << 20)	/* Host supports enhanced strobe */
->>>  #define MMC_CAP2_NO_SD		(1 << 21)	/* Do not send SD commands during
->>> initialization */
->>>  #define MMC_CAP2_NO_MMC		(1 << 22)	/* Do not send (e)MMC commands during
->>> initialization */
->>> +#define MMC_CAP2_3_3V_ONLY_DDR	(1 << 23)	/* Only supports 3.3V DDR */
->>>
->>>  	mmc_pm_flag_t		pm_caps;	/* supported pm features */
->>>
->>>
->>
->>
->> --
->> Best regards,
->> Marek Vasut
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->
-
-
--- 
-Best Regards
-Shawn Lin
+>  
+>  	ret = __stmpe_set_bits(stmpe, stmpe->regs[STMPE_IDX_SYS_CTRL],
+> -		STMPE1801_MSK_SYS_CTRL_RESET, STMPE1801_MSK_SYS_CTRL_RESET);
+> +			       reset_bit, reset_bit);
+>  	if (ret < 0)
+>  		return ret;
+>  
+> @@ -750,7 +759,7 @@ static int stmpe1801_reset(struct stmpe *stmpe)
+>  		ret = __stmpe_reg_read(stmpe, stmpe->regs[STMPE_IDX_SYS_CTRL]);
+>  		if (ret < 0)
+>  			return ret;
+> -		if (!(ret & STMPE1801_MSK_SYS_CTRL_RESET))
+> +		if (!(ret & reset_bit))
+>  			return 0;
+>  		usleep_range(100, 200);
+>  	}
+> @@ -1074,11 +1083,9 @@ static int stmpe_chip_init(struct stmpe *stmpe)
+>  	if (ret)
+>  		return ret;
+>  
+> -	if (id == STMPE1801_ID)	{
+> -		ret =  stmpe1801_reset(stmpe);
+> -		if (ret < 0)
+> -			return ret;
+> -	}
+> +	ret =  stmpe_reset(stmpe);
+> +	if (ret < 0)
+> +		return ret;
+>  
+>  	if (stmpe->irq >= 0) {
+>  		if (id == STMPE801_ID)
+> diff --git a/drivers/mfd/stmpe.h b/drivers/mfd/stmpe.h
+> index 406f9f2..4ae343d 100644
+> --- a/drivers/mfd/stmpe.h
+> +++ b/drivers/mfd/stmpe.h
+> @@ -104,6 +104,8 @@ int stmpe_remove(struct stmpe *stmpe);
+>  #define STMPE_ICR_LSB_EDGE	(1 << 1)
+>  #define STMPE_ICR_LSB_GIM	(1 << 0)
+>  
+> +#define STMPE_SYS_CTRL_RESET	(1 << 7)
+> +
+>  /*
+>   * STMPE801
+>   */
+> @@ -126,6 +128,7 @@ int stmpe_remove(struct stmpe *stmpe);
+>  /*
+>   * STMPE811
+>   */
+> +#define STMPE811_ID			0x0811
+>  
+>  #define STMPE811_IRQ_TOUCH_DET		0
+>  #define STMPE811_IRQ_FIFO_TH		1
+> @@ -155,6 +158,8 @@ int stmpe_remove(struct stmpe *stmpe);
+>  #define STMPE811_REG_GPIO_FE		0x16
+>  #define STMPE811_REG_GPIO_AF		0x17
+>  
+> +#define STMPE811_SYS_CTRL_RESET		(1 << 1)
+> +
+>  #define STMPE811_SYS_CTRL2_ADC_OFF	(1 << 0)
+>  #define STMPE811_SYS_CTRL2_TSC_OFF	(1 << 1)
+>  #define STMPE811_SYS_CTRL2_GPIO_OFF	(1 << 2)
+> @@ -244,8 +249,6 @@ int stmpe_remove(struct stmpe *stmpe);
+>  #define STMPE1801_REG_GPIO_PULL_UP_MID		0x23
+>  #define STMPE1801_REG_GPIO_PULL_UP_HIGH		0x24
+>  
+> -#define STMPE1801_MSK_SYS_CTRL_RESET		(1 << 7)
+> -
+>  #define STMPE1801_MSK_INT_EN_KPC		(1 << 1)
+>  #define STMPE1801_MSK_INT_EN_GPIO		(1 << 3)
