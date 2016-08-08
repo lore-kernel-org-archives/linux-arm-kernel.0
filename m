@@ -1,110 +1,108 @@
 From: sricharan@codeaurora.org (Sricharan R)
-Date: Tue,  9 Aug 2016 04:19:09 +0530
-Subject: [PATCH 7/8] iommu: of: Handle IOMMU lookup failure with deferred
- probing or error
+Date: Tue,  9 Aug 2016 04:19:07 +0530
+Subject: [PATCH 5/8] drivers: platform: Configure dma operations at probe time
 In-Reply-To: <1470696550-3416-1-git-send-email-sricharan@codeaurora.org>
 References: <1470696550-3416-1-git-send-email-sricharan@codeaurora.org>
-Message-ID: <1470696550-3416-8-git-send-email-sricharan@codeaurora.org>
+Message-ID: <1470696550-3416-6-git-send-email-sricharan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Configuring DMA ops at probe time will allow deferring device probe when
+the IOMMU isn't available yet.
 
-Failures to look up an IOMMU when parsing the DT iommus property need to
-be handled separately from the .of_xlate() failures to support deferred
-probing.
-
-The lack of a registered IOMMU can be caused by the lack of a driver for
-the IOMMU, the IOMMU device probe not having been performed yet, having
-been deferred, or having failed.
-
-The first case occurs when the device tree describes the bus master and
-IOMMU topology correctly but no device driver exists for the IOMMU yet
-or the device driver has not been compiled in. Return NULL, the caller
-will configure the device without an IOMMU.
-
-The second and third cases are handled by deferring the probe of the bus
-master device which will eventually get reprobed after the IOMMU.
-
-The last case is currently handled by deferring the probe of the bus
-master device as well. A mechanism to either configure the bus master
-device without an IOMMU or to fail the bus master device probe depending
-on whether the IOMMU is optional or mandatory would be a good
-enhancement.
-
-Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Signed-off-by: Sricharan R <sricharan@codeaurora.org>
 ---
- drivers/iommu/of_iommu.c | 21 +++++++++++++++++----
- drivers/of/device.c      |  2 ++
- 2 files changed, 19 insertions(+), 4 deletions(-)
+ drivers/base/dd.c           | 11 +++++++++++
+ drivers/base/dma-mapping.c  | 11 +++++++++++
+ include/linux/dma-mapping.h |  3 +++
+ 3 files changed, 25 insertions(+)
 
-diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
-index 4c4219d..3994cf5 100644
---- a/drivers/iommu/of_iommu.c
-+++ b/drivers/iommu/of_iommu.c
-@@ -149,7 +149,7 @@ const struct iommu_ops *of_iommu_configure(struct device *dev,
- {
- 	struct of_phandle_args iommu_spec;
- 	struct device_node *np = NULL;
--	struct iommu_ops *ops = NULL;
-+	const struct iommu_ops *ops = NULL;
- 	int idx = 0;
+diff --git a/drivers/base/dd.c b/drivers/base/dd.c
+index 16688f5..b9978af 100644
+--- a/drivers/base/dd.c
++++ b/drivers/base/dd.c
+@@ -19,6 +19,7 @@
  
- 	if (dev_is_pci(dev)) {
-@@ -189,8 +189,21 @@ const struct iommu_ops *of_iommu_configure(struct device *dev,
- 		np = iommu_spec.np;
- 		ops = of_iommu_get_ops(np);
+ #include <linux/device.h>
+ #include <linux/delay.h>
++#include <linux/dma-mapping.h>
+ #include <linux/module.h>
+ #include <linux/kthread.h>
+ #include <linux/wait.h>
+@@ -353,6 +354,10 @@ static int really_probe(struct device *dev, struct device_driver *drv)
+ 	if (ret)
+ 		goto pinctrl_bind_failed;
  
--		if (!ops || !ops->of_xlate || ops->of_xlate(dev, &iommu_spec))
-+		if (!ops) {
-+			const struct of_device_id *oid;
++	ret = dma_configure_ops(dev);
++	if (ret)
++		goto dma_failed;
 +
-+			oid = of_match_node(&__iommu_of_table, np);
-+			ops = oid ? ERR_PTR(-EPROBE_DEFER) : NULL;
- 			goto err_put_node;
-+		}
-+
-+		if (!ops->of_xlate || ops->of_xlate(dev, &iommu_spec)) {
-+			ops = NULL;
-+			goto err_put_node;
-+		}
-+
-+		if (ops->add_device)
-+			ops = ops->add_device(dev) ? ops : NULL;
+ 	if (driver_sysfs_add(dev)) {
+ 		printk(KERN_ERR "%s: driver_sysfs_add(%s) failed\n",
+ 			__func__, dev_name(dev));
+@@ -394,7 +399,10 @@ static int really_probe(struct device *dev, struct device_driver *drv)
+ 		 drv->bus->name, __func__, dev_name(dev), drv->name);
+ 	goto done;
  
- 		of_node_put(np);
- 		idx++;
-@@ -200,7 +213,7 @@ const struct iommu_ops *of_iommu_configure(struct device *dev,
++
+ probe_failed:
++	dma_deconfigure(dev);
++dma_failed:
+ 	if (dev->bus)
+ 		blocking_notifier_call_chain(&dev->bus->p->bus_notifier,
+ 					     BUS_NOTIFY_DRIVER_NOT_BOUND, dev);
+@@ -780,6 +788,9 @@ static void __device_release_driver(struct device *dev)
+ 			dev->bus->remove(dev);
+ 		else if (drv->remove)
+ 			drv->remove(dev);
++
++		dma_deconfigure(dev);
++
+ 		devres_release_all(dev);
+ 		dev->driver = NULL;
+ 		dev_set_drvdata(dev, NULL);
+diff --git a/drivers/base/dma-mapping.c b/drivers/base/dma-mapping.c
+index d799662..ccc1c6e 100644
+--- a/drivers/base/dma-mapping.c
++++ b/drivers/base/dma-mapping.c
+@@ -10,6 +10,7 @@
+ #include <linux/dma-mapping.h>
+ #include <linux/export.h>
+ #include <linux/gfp.h>
++#include <linux/of_device.h>
+ #include <linux/slab.h>
+ #include <linux/vmalloc.h>
  
- err_put_node:
- 	of_node_put(np);
--	return NULL;
-+	return ops;
+@@ -166,6 +167,16 @@ void dmam_free_noncoherent(struct device *dev, size_t size, void *vaddr,
  }
+ EXPORT_SYMBOL(dmam_free_noncoherent);
  
- void __init of_iommu_init(void)
-@@ -211,7 +224,7 @@ void __init of_iommu_init(void)
- 	for_each_matching_node_and_match(np, matches, &match) {
- 		const of_iommu_init_fn init_fn = match->data;
++int dma_configure_ops(struct device *dev)
++{
++	return of_dma_configure_ops(dev, dev->of_node);
++}
++
++void dma_deconfigure(struct device *dev)
++{
++	of_dma_deconfigure(dev);
++}
++
+ #ifdef CONFIG_HAVE_GENERIC_DMA_COHERENT
  
--		if (init_fn(np))
-+		if (init_fn && init_fn(np))
- 			pr_err("Failed to initialise IOMMU %s\n",
- 				of_node_full_name(np));
- 	}
-diff --git a/drivers/of/device.c b/drivers/of/device.c
-index e1fad50..92e02dc 100644
---- a/drivers/of/device.c
-+++ b/drivers/of/device.c
-@@ -149,6 +149,8 @@ int of_dma_configure_ops(struct device *dev, struct device_node *np)
- 		coherent ? " " : " not ");
+ static void dmam_coherent_decl_release(struct device *dev, void *res)
+diff --git a/include/linux/dma-mapping.h b/include/linux/dma-mapping.h
+index 71c1b21..a49aac9 100644
+--- a/include/linux/dma-mapping.h
++++ b/include/linux/dma-mapping.h
+@@ -613,6 +613,9 @@ dma_mark_declared_memory_occupied(struct device *dev,
+ }
+ #endif /* CONFIG_HAVE_GENERIC_DMA_COHERENT */
  
- 	iommu = of_iommu_configure(dev, np);
-+	if (IS_ERR(iommu))
-+		return PTR_ERR(iommu);
- 	dev_dbg(dev, "device is%sbehind an iommu\n",
- 		iommu ? " " : " not ");
- 
++int dma_configure_ops(struct device *dev);
++void dma_deconfigure(struct device *dev);
++
+ /*
+  * Managed DMA API
+  */
 -- 
 QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
