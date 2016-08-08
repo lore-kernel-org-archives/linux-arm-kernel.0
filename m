@@ -1,52 +1,108 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 8 Aug 2016 16:40:29 +0800
-Subject: [PATCH] ARM: dts: imx: ventana: add RS485 txen gpio support
-In-Reply-To: <1467207504-5218-1-git-send-email-tharvey@gateworks.com>
-References: <1467207504-5218-1-git-send-email-tharvey@gateworks.com>
-Message-ID: <20160808084029.GE4678@tiger>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Mon, 8 Aug 2016 14:21:55 +0530
+Subject: [PATCH] dmaengine: qcom_hidma: release the descriptor before the
+ callback
+In-Reply-To: <71a15611-645f-7523-1c26-14b420aff667@codeaurora.org>
+References: <1468465076-27324-1-git-send-email-okaya@codeaurora.org>
+ <ccffcabf-1448-57a1-d18b-715cfd46e906@codeaurora.org>
+ <20160724062425.GW9681@localhost>
+ <971733d9-fd18-2a1b-07c0-349b47747d49@codeaurora.org>
+ <20160804125525.GF9681@localhost>
+ <71a15611-645f-7523-1c26-14b420aff667@codeaurora.org>
+Message-ID: <20160808085155.GX9681@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 29, 2016 at 06:38:24AM -0700, Tim Harvey wrote:
-> The GW54xx, GW53xx, and GW52xx all have an RS485 transceiver that uses an
-> IMX GPIO for the TX enable of the transceiver. Declare this properly.
+On Thu, Aug 04, 2016 at 10:17:24AM -0400, Sinan Kaya wrote:
+> On 8/4/2016 8:55 AM, Vinod Koul wrote:
+> > Dmaengine tells transaction is complete. It does not say if the txn is
+> > success or failure. It can transfer data and not say if data was
+> > correct. A successful transaction implies data integrity as well, which
+> > dmaengine can't provide.
 > 
-> Signed-off-by: Tim Harvey <tharvey@gateworks.com>
-> ---
->  arch/arm/boot/dts/imx6qdl-gw52xx.dtsi | 3 +++
->  arch/arm/boot/dts/imx6qdl-gw53xx.dtsi | 3 +++
->  arch/arm/boot/dts/imx6qdl-gw54xx.dtsi | 3 +++
->  3 files changed, 9 insertions(+)
+> Thanks for describing this. I was confused about DMA_SUCCESS and DMA_COMPLETE.
+> I now understand that tx_success API just returns information that the request
+> was executed whether the result is error or not. This makes sense now.
 > 
-> diff --git a/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
-> index 8bf1020..25ed57d 100644
-> --- a/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
-> @@ -315,6 +315,8 @@
->  &uart1 {
->  	pinctrl-names = "default";
->  	pinctrl-0 = <&pinctrl_uart1>;
-> +	fsl,uart-has-rtscts;
+> However, if the txn is failure; then we should never call the client callback
+> since DMA engine cannot provide such feedback to the client without Dave's patch.
+> You are saying that the calling the callback is optional.
 
-This vendor specific property is deprecated.  Please use generic
-uart-has-rtscts instead.
+Yes callback is optional, *BUT* not for driver. If a user has set a
+callback, you _have_ to invoke it. That is the expectation from user and
+you cannot selectively choose!
 
-> +	rts-gpio = <&gpio7 1 GPIO_ACTIVE_HIGH>;
+When I say callback is optional, it means only from caller PoV, not from
+dmanegine driver. Caller may not have set it!
 
-I cannot find this property in any bindings doc.  What I found is
-rts-gpios in bindings/serial/serial.txt.  Also, I'm not sure how this
-property is supported by IMX driver.
+> Then, the callback cannot be optional in the error case for old behavior.
+> 
+> How does the client know if memcpy executed or not? The client got its callback
+> and tx_status is also DMA_COMPLETE.
 
-Shawn
+So cookie status should be checked after callback. We can also report
+DMA_ERROR if you can detect one. Some hardware can do that (not very
+common though), but even if you report DMA_COMPLETE, that never implies
+success for transaction.
 
->  	status = "okay";
->  };
->  
-> @@ -493,6 +495,7 @@
->  			fsl,pins = <
->  				MX6QDL_PAD_SD3_DAT7__UART1_TX_DATA	0x1b0b1
->  				MX6QDL_PAD_SD3_DAT6__UART1_RX_DATA	0x1b0b1
-> +				MX6QDL_PAD_SD3_DAT4__GPIO7_IO01		0x4001b0b1 /* TEN */
->  			>;
->  		};
->  
+> Is the client supposed to do a memcmp ? (BTW, it doesn't make sense).
+
+If someone really want to check data, then yes. But I don't really see
+the point in that. Users would anyone complain the bad data and you fix
+the bug :)
+
+> 
+> 
+> >> In my opinion, the new behavior is correct. Calling dma_cookie_complete(desc) all the time
+> >> > is not. Do you agree?
+> >> > 
+> >> > If yes, I can divide this patch into two. One to correct the ordering. Another one
+> >> > for behavioral change.
+> > See above..
+> > 
+> > A callback or tx_status will only tell you the txn is completed. That is
+> > why we have DMA_COMPLETE and not DMA_SUCCESS.
+> > 
+> 
+> Still calling the callback and returning DMA_COMPLETE isn't right. There is no indication
+> of an actual DMA error. The transaction is complete but data integrity failed.
+
+Yes that is the idea..
+
+You are telling client, a transaction has been completed from controller
+side. Is the data transfer and integrity is guaranteed, we cannot know..
+
+Data integrity is a function of many other factors, some of which are
+not in control of dmaengine. So it cannot guarantee success.
+
+Even the controllers which can report errors, can do that only from
+dmaengine PoV, not really from system PoV.
+
+
+> 
+> > So current order seems fine to me!
+> 
+> I posted v2 of this patch without introducing the behavior change leaving the behavior discussion
+> out for another patch. The current code will not call the callback if error was observed.
+
+That's not right, as explained above.
+
+> This patch is needed to fix a race condition as the commit message describes.
+> The callback is called before returning the descriptor back to free pool. 
+> 
+> If the client calls free resources, the descriptor that was not returned to free pool gets lost due
+> to race condition.
+
+Hmmm, if you have txn's pending and client wants to free up, shouldn't
+the pending txn's be cleaned up? Sound like a different bug to me..
+
+So if I submit 5 txn's and now want to freeup, will you still leak
+descriptors? Doesn't sound as right behaviour to me.
+
+> I'll refactor the code after Dave's change for passing the error code while calling the
+> callback. That will be a different patch anyhow.
+
+Yes the error reporting is different
+
+-- 
+~Vinod
