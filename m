@@ -1,193 +1,56 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon,  8 Aug 2016 23:24:05 +0200
-Subject: [PATCH 4/4] ARM: dts: add SMSC ethernet on the APQ8060 Dragonboard
-In-Reply-To: <1470691445-27571-1-git-send-email-linus.walleij@linaro.org>
-References: <1470691445-27571-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <1470691445-27571-5-git-send-email-linus.walleij@linaro.org>
+From: shuahkh@osg.samsung.com (Shuah Khan)
+Date: Mon, 8 Aug 2016 15:30:08 -0600
+Subject: [PATCH] exynos-drm: Fix unsupported GEM memory type error message
+ to be clear
+In-Reply-To: <20160808165657.GB5959@kozik-book>
+References: <1470448206-16538-1-git-send-email-shuahkh@osg.samsung.com>
+ <20160808165657.GB5959@kozik-book>
+Message-ID: <57A8F9E0.5000804@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SMSC9112 ethernet controller is connected to chip select 2
-on the EBI2 bus on the APQ8060 Dragonboard. We set this up by
-activating EBI2, creating a chipselect entry as a subnode, and then
-putting the ethernet controller in a subnode of the chipselect.
+On 08/08/2016 10:56 AM, Krzysztof Kozlowski wrote:
+> On Fri, Aug 05, 2016 at 07:50:06PM -0600, Shuah Khan wrote:
+>> Fix unsupported GEM memory type error message to include the memory type
+>> information.
+>>
+>> Signed-off-by: Shuah Khan <shuahkh@osg.samsung.com>
+>> ---
+>>  drivers/gpu/drm/exynos/exynos_drm_fb.c | 4 ++--
+>>  1 file changed, 2 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/gpu/drm/exynos/exynos_drm_fb.c b/drivers/gpu/drm/exynos/exynos_drm_fb.c
+>> index e016640..c9315df 100644
+>> --- a/drivers/gpu/drm/exynos/exynos_drm_fb.c
+>> +++ b/drivers/gpu/drm/exynos/exynos_drm_fb.c
+>> @@ -55,11 +55,11 @@ static int check_fb_gem_memory_type(struct drm_device *drm_dev,
+>>  	flags = exynos_gem->flags;
+>>  
+>>  	/*
+>> -	 * without iommu support, not support physically non-continuous memory
+>> +	 * without iommu support, not support physically non-contiguous memory
+> 
+> While at it, how about changing entire sentence to something in English? :)
 
-After the chipselect is configured, the SMSC device will be
-instantiated.
+Yes I can do that. Will send v2 :)
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/boot/dts/qcom-apq8060-dragonboard.dts | 130 +++++++++++++++++++++++++
- 1 file changed, 130 insertions(+)
-
-diff --git a/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts b/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts
-index 0abc93e5bb00..3604608afe1e 100644
---- a/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts
-+++ b/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts
-@@ -51,6 +51,29 @@
- 			regulator-boot-on;
- 		};
- 
-+		/* GPIO controlled ethernet power regulator */
-+		dragon_veth: xc622a331mrg {
-+			compatible = "regulator-fixed";
-+			regulator-name = "XC6222A331MR-G";
-+			regulator-min-microvolt = <3300000>;
-+			regulator-max-microvolt = <3300000>;
-+			vin-supply = <&vph>;
-+			gpio = <&pm8058_gpio 40 GPIO_ACTIVE_HIGH>;
-+			enable-active-high;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&dragon_veth_gpios>;
-+			regulator-always-on;
-+		};
-+
-+		/* VDDvario fixed regulator */
-+		dragon_vario: nds332p {
-+			compatible = "regulator-fixed";
-+			regulator-name = "NDS332P";
-+			regulator-min-microvolt = <1800000>;
-+			regulator-max-microvolt = <1800000>;
-+			vin-supply = <&pm8058_s3>;
-+		};
-+
- 		/* This is a levelshifter for SDCC5 */
- 		dragon_vio_txb: txb0104rgyr {
- 			compatible = "regulator-fixed";
-@@ -167,6 +190,41 @@
- 					bias-pull-up;
- 				};
- 			};
-+
-+			dragon_ebi2_pins: ebi2 {
-+				/*
-+				 * Pins used by EBI2 on the Dragonboard, actually only
-+				 * only CS2 is used by a real peripheral. CS0 is just
-+				 * routed to a test point.
-+				 */
-+				mux0 {
-+					/*
-+					 * Pins used by EBI2 on the Dragonboard, actually only
-+					 * only CS2 is used by a real peripheral. CS0 is just
-+					 * routed to a test point.
-+					 */
-+					pins =
-+					    /* "gpio39", CS1A_N this is not good to mux */
-+					    "gpio40", /* CS2A_N */
-+					    "gpio134"; /* CS0_N testpoint TP29 */
-+					function = "ebi2cs";
-+				};
-+				mux1 {
-+					pins =
-+					    /* EBI2_ADDR_7 downto EBI2_ADDR_0 address bus */
-+					    "gpio123", "gpio124", "gpio125", "gpio126",
-+					    "gpio127", "gpio128", "gpio129", "gpio130",
-+					    /* EBI2_DATA_15 downto EBI2_DATA_0 data bus */
-+					    "gpio135", "gpio136", "gpio137", "gpio138",
-+					    "gpio139", "gpio140", "gpio141", "gpio142",
-+					    "gpio143", "gpio144", "gpio145", "gpio146",
-+					    "gpio147", "gpio148", "gpio149", "gpio150",
-+					    "gpio151", /* EBI2_OE_N */
-+					    "gpio153", /* EBI2_ADV */
-+					    "gpio157"; /* EBI2_WE_N */
-+					function = "ebi2";
-+				};
-+			};
- 		};
- 
- 		qcom,ssbi at 500000 {
-@@ -201,6 +259,15 @@
- 				};
- 
- 				gpio at 150 {
-+					dragon_ethernet_gpios: ethernet-gpios {
-+						pinconf {
-+							pins = "gpio7";
-+							function = "normal";
-+							input-enable;
-+							bias-disable;
-+							power-source = <PM8058_GPIO_S3>;
-+						};
-+					};
- 					dragon_bmp085_gpios: bmp085-gpios {
- 						pinconf {
- 							pins = "gpio16";
-@@ -238,6 +305,15 @@
- 							power-source = <PM8058_GPIO_S3>;
- 						};
- 					};
-+					dragon_veth_gpios: veth-gpios {
-+						pinconf {
-+							pins = "gpio40";
-+							function = "normal";
-+							bias-disable;
-+							drive-push-pull;
-+							// power-source = <PM8058_GPIO_S3>;
-+						};
-+					};
- 				};
- 			};
- 		};
-@@ -283,6 +359,60 @@
- 			};
- 		};
- 
-+		ebi2 at 1a100000 {
-+			/* The EBI2 will instantiate first, then populate its children */
-+			status = "ok";
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&dragon_ebi2_pins>;
-+
-+			cs2 at 1b800000 {
-+				chipselect = <2>;
-+				#address-cells = <1>;
-+				#size-cells = <1>;
-+				ranges;
-+				/*
-+				 * SLOW chipselect config
-+				 * Delay 9 cycles (140ns at 64MHz) between SMSC LAN9221
-+				 * Ethernet controller reads and writes.
-+				 */
-+				xmem-recovery-cycles = <0>;
-+				xmem-write-hold-cycles = <3>;
-+				xmem-write-delta-cycles = <31>;
-+				xmem-read-delta-cycles = <28>;
-+				xmem-write-wait-cycles = <9>;
-+				xmem-read-wait-cycles = <9>;
-+
-+				/*
-+				 * An on-board SMSC LAN9221 chip for "debug ethernet",
-+				 * which is actually just an ordinary ethernet on the
-+				 * EBI2. This has a 25MHz chrystal next to it, so no
-+				 * clocking is needed.
-+				 */
-+				ethernet-ebi2 at 1b800000 {
-+					compatible = "smsc,lan9221", "smsc,lan9115";
-+					reg = <0x1b800000 0x100>;
-+					/*
-+					 * GPIO7 has interrupt 198 on the PM8058
-+					 * The second interrupt is the PME interrupt
-+					 * for network wakeup, connected to the TLMM.
-+					 */
-+					interrupts-extended = <&pmicintc 198 IRQ_TYPE_EDGE_FALLING>,
-+							    <&tlmm 29 IRQ_TYPE_EDGE_RISING>;
-+					reset-gpios = <&tlmm 30 GPIO_ACTIVE_LOW>;
-+					vdd33a-supply = <&dragon_veth>;
-+					vddvario-supply = <&dragon_vario>;
-+					pinctrl-names = "default";
-+					pinctrl-0 = <&dragon_ethernet_gpios>;
-+					phy-mode = "mii";
-+					reg-io-width = <2>;
-+					smsc,force-external-phy;
-+					/* IRQ on edge falling = active low */
-+					smsc,irq-active-low;
-+					smsc,irq-push-pull;
-+				};
-+			};
-+		};
-+
- 		rpm at 104000 {
- 			/*
- 			 * Set up of the PMIC RPM regulators for this board
--- 
-2.7.4
+> 
+> Best regards,
+> Krzysztof
+> 
+>>  	 * for framebuffer.
+>>  	 */
+>>  	if (IS_NONCONTIG_BUFFER(flags)) {
+>> -		DRM_ERROR("cannot use this gem memory type for fb.\n");
+>> +		DRM_ERROR("Non-continguous GEM memory is not supported.\n");
+>>  		return -EINVAL;
+>>  	}
+>>  
+>> -- 
+>> 2.7.4
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
