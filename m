@@ -1,114 +1,54 @@
 From: thunder.leizhen@huawei.com (Zhen Lei)
-Date: Mon, 8 Aug 2016 17:18:14 +0800
-Subject: [PATCH v5 09/14] arm64/numa: support HAVE_SETUP_PER_CPU_AREA
-In-Reply-To: <1470647899-6324-1-git-send-email-thunder.leizhen@huawei.com>
-References: <1470647899-6324-1-git-send-email-thunder.leizhen@huawei.com>
-Message-ID: <1470647899-6324-10-git-send-email-thunder.leizhen@huawei.com>
+Date: Mon, 8 Aug 2016 17:18:05 +0800
+Subject: [PATCH v5 00/14] fix some type infos and bugs for arm64/of numa
+Message-ID: <1470647899-6324-1-git-send-email-thunder.leizhen@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To make each percpu area allocated from its local numa node. Without this
-patch, all percpu areas will be allocated from the node which cpu0 belongs
-to.
+v4 -> v5:
+This version has no code changes, just add "Acked-by: Rob Herring <robh@kernel.org>"
+into patches 1, 2, 4, 6, 7, 13, 14. Because these patches rely on some acpi numa
+patches, and the latter had not been upstreamed in 4.7, but upstreamed in 4.8-rc1,
+so I resend my patches again.
 
-Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
----
- arch/arm64/Kconfig   |  8 ++++++++
- arch/arm64/mm/numa.c | 56 ++++++++++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 64 insertions(+)
+v3 -> v4:
+1. Packed three patches of Kefeng Wang, patch6-8.
+2. Add 6 new patches(9-15) to enhance the numa on arm64.
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 76747d9..05c1bf1 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -573,6 +573,14 @@ config USE_PERCPU_NUMA_NODE_ID
- 	def_bool y
- 	depends on NUMA
+v2 -> v3:
+1. Adjust patch2 and patch5 according to Matthias Brugger's advice, to make the
+   patches looks more well. The final code have no change. 
 
-+config HAVE_SETUP_PER_CPU_AREA
-+	def_bool y
-+	depends on NUMA
-+
-+config NEED_PER_CPU_EMBED_FIRST_CHUNK
-+	def_bool y
-+	depends on NUMA
-+
- source kernel/Kconfig.preempt
- source kernel/Kconfig.hz
+v1 -> v2:
+1. Base on https://lkml.org/lkml/2016/5/24/679
+2. Rewrote of_numa_parse_memory_nodes according to Rob Herring's advice. So that it looks more clear.
+3. Rewrote patch 5 because some scenes were not considered before.
 
-diff --git a/arch/arm64/mm/numa.c b/arch/arm64/mm/numa.c
-index 8be5ba3..99401aa 100644
---- a/arch/arm64/mm/numa.c
-+++ b/arch/arm64/mm/numa.c
-@@ -25,6 +25,8 @@
- #include <linux/module.h>
- #include <linux/of.h>
+Kefeng Wang (3):
+  of_numa: Use of_get_next_parent to simplify code
+  of_numa: Use pr_fmt()
+  arm64: numa: Use pr_fmt()
 
-+#include <asm/sections.h>
-+
- struct pglist_data *node_data[MAX_NUMNODES] __read_mostly;
- EXPORT_SYMBOL(node_data);
- nodemask_t numa_nodes_parsed __initdata;
-@@ -129,6 +131,60 @@ void __init early_map_cpu_to_node(unsigned int cpu, int nid)
- 	cpu_to_node_map[cpu] = nid;
- }
+Zhen Lei (11):
+  of/numa: remove a duplicated pr_debug information
+  of/numa: fix a memory@ node can only contains one memory block
+  arm64/numa: add nid check for memory block
+  of/numa: remove a duplicated warning
+  arm64/numa: avoid inconsistent information to be printed
+  arm64/numa: support HAVE_SETUP_PER_CPU_AREA
+  arm64/numa: define numa_distance as array to simplify code
+  arm64/numa: support HAVE_MEMORYLESS_NODES
+  arm64/numa: remove some useless code
+  of/numa: remove the constraint on the distances of node pairs
+  Documentation: remove the constraint on the distances of node pairs
 
-+#ifdef CONFIG_HAVE_SETUP_PER_CPU_AREA
-+unsigned long __per_cpu_offset[NR_CPUS] __read_mostly;
-+EXPORT_SYMBOL(__per_cpu_offset);
-+
-+static int __init early_cpu_to_node(int cpu)
-+{
-+	return cpu_to_node_map[cpu];
-+}
-+
-+static int __init pcpu_cpu_distance(unsigned int from, unsigned int to)
-+{
-+	if (early_cpu_to_node(from) == early_cpu_to_node(to))
-+		return LOCAL_DISTANCE;
-+	else
-+		return REMOTE_DISTANCE;
-+}
-+
-+static void * __init pcpu_fc_alloc(unsigned int cpu, size_t size,
-+				       size_t align)
-+{
-+	int nid = early_cpu_to_node(cpu);
-+
-+	return  memblock_virt_alloc_try_nid(size, align,
-+			__pa(MAX_DMA_ADDRESS), MEMBLOCK_ALLOC_ACCESSIBLE, nid);
-+}
-+
-+static void __init pcpu_fc_free(void *ptr, size_t size)
-+{
-+	memblock_free_early(__pa(ptr), size);
-+}
-+
-+void __init setup_per_cpu_areas(void)
-+{
-+	unsigned long delta;
-+	unsigned int cpu;
-+	int rc;
-+
-+	/*
-+	 * Always reserve area for module percpu variables.  That's
-+	 * what the legacy allocator did.
-+	 */
-+	rc = pcpu_embed_first_chunk(PERCPU_MODULE_RESERVE,
-+				    PERCPU_DYNAMIC_RESERVE, PAGE_SIZE,
-+				    pcpu_cpu_distance,
-+				    pcpu_fc_alloc, pcpu_fc_free);
-+	if (rc < 0)
-+		panic("Failed to initialize percpu areas.");
-+
-+	delta = (unsigned long)pcpu_base_addr - (unsigned long)__per_cpu_start;
-+	for_each_possible_cpu(cpu)
-+		__per_cpu_offset[cpu] = delta + pcpu_unit_offsets[cpu];
-+}
-+#endif
-+
- /**
-  * numa_add_memblk - Set node id to memblk
-  * @nid: NUMA node ID of the new memblk
+ Documentation/devicetree/bindings/numa.txt |   1 -
+ arch/arm64/Kconfig                         |  12 ++
+ arch/arm64/include/asm/numa.h              |   1 -
+ arch/arm64/kernel/smp.c                    |   1 +
+ arch/arm64/mm/numa.c                       | 228 ++++++++++++++++-------------
+ drivers/of/of_numa.c                       |  87 +++++------
+ 6 files changed, 180 insertions(+), 150 deletions(-)
+
 --
 2.5.0
