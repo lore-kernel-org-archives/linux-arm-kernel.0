@@ -1,46 +1,59 @@
-From: wpdster@gmail.com (Patrick Doyle)
-Date: Mon, 8 Aug 2016 15:56:49 -0400
-Subject: How does the kernel assign ttySn to UARTs?
-Message-ID: <CAF_dkJD5MEfNzrRqM3H_LkOmXC3XYjUYLe2=ZtzCjAS1A2TDmg@mail.gmail.com>
+From: nleeder@codeaurora.org (Neil Leeder)
+Date: Mon, 8 Aug 2016 15:57:30 -0400
+Subject: [PATCH v2 2/2] soc: qcom: add l2 cache perf events driver
+In-Reply-To: <CAP=VYLo5pBHd1=K78jMvg7XkT6Bn4NP9m+1K34dGyJ0ZRugwkw@mail.gmail.com>
+References: <1470345071-9455-1-git-send-email-nleeder@codeaurora.org>
+ <1470345071-9455-3-git-send-email-nleeder@codeaurora.org>
+ <CAP=VYLo5pBHd1=K78jMvg7XkT6Bn4NP9m+1K34dGyJ0ZRugwkw@mail.gmail.com>
+Message-ID: <be10b1fc-fc2c-ccf6-5b0a-7cafc477ad07@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I am playing the the device tree for my (Atmel, SAMA5D2x) device and
-find myself confused by the assignment of ttySn devices to UARTs and
-FLEXCOM devices.
 
-I started off assuming that the
 
-    alias {
-        serial0 = &uart2;
-    };
+On 8/5/2016 07:15 PM, Paul Gortmaker wrote:
+> On Thu, Aug 4, 2016 at 5:11 PM, Neil Leeder <nleeder@codeaurora.org> wrote:
+>> Adds perf events support for L2 cache PMU.
+>>
+>> The L2 cache PMU driver is named 'l2cache_0' and can be used
+>> with perf events to profile L2 events such as cache hits
+>> and misses.
+>>
+>> Signed-off-by: Neil Leeder <nleeder@codeaurora.org>
+>> ---
+>>  drivers/soc/qcom/Kconfig               |  10 +
+>>  drivers/soc/qcom/Makefile              |   1 +
+>>  drivers/soc/qcom/perf_event_l2.c       | 839 +++++++++++++++++++++++++++++++++
+>>  include/linux/soc/qcom/perf_event_l2.h |  81 ++++
+>>  4 files changed, 931 insertions(+)
+>>  create mode 100644 drivers/soc/qcom/perf_event_l2.c
+>>  create mode 100644 include/linux/soc/qcom/perf_event_l2.h
+>>
+>> diff --git a/drivers/soc/qcom/Kconfig b/drivers/soc/qcom/Kconfig
+>> index 21ec616..0b5ddb9 100644
+>> --- a/drivers/soc/qcom/Kconfig
+>> +++ b/drivers/soc/qcom/Kconfig
+>> @@ -19,6 +19,16 @@ config QCOM_L2_ACCESSORS
+>>           Provides support for accessing registers in the L2 cache
+>>           for Qualcomm Technologies chips.
+>>
+>> +config QCOM_PERF_EVENTS_L2
+>> +       bool "Qualcomm Technologies L2-cache perf events"
+> 
+> Since this is a bool, you shouldn't need module.h in your driver or
+> any MODULE_<xyz> tags (if there are any).
+> 
+> Thanks,
+> Paul.
+> --
 
-stanza I put in my device tree resulted in ttyS0 being aliased to
-uart2 (serial at f8024000).  But when I attempted to change the alias to
-uart5 (the label for UART defined in flexcom at fc018000) I was surprised
-and confused by the fact that the console continued to spew forth on
-UART2.
+You're right - I'll clean up the include list and sort it alphabetically
+while I'm at it.
 
-So I tried removing the "alias" stanza from the device tree.  The
-console still showed up on UART2.
+Thanks,
+Neil
 
-I wondered if it might have something to do with the order that
-devices show up in the device tree, so I swapped UART2 & UART3, but
-the console still showed up on UART2.
-
-Just to make sure I wasn't losing my mind, I decided to comment UART2
-out completely... and then the console showed up on FLEXCOM4.  Not
-UART3, but FLEXCOM4!
-
-Now I'm really confused.  Now it is time to ask the experts.
-
-FWIW, my kernel command line contains "console=ttyS0", while my device
-tree enables UART2, UART3, and FLEXCOM4 (which us configured as a
-UART).  Nowhere do I enable UART0, so I am also confused has to how
-/dev/ttyS0 gets mapped to UART2 or FLEXCOM4.
-
-Would any experts out there care to point me in the direction of some clues?
-
-Thanks.
-
---wpd
+-- 
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
