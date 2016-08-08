@@ -1,25 +1,18 @@
 From: john.stultz@linaro.org (John Stultz)
-Date: Mon,  8 Aug 2016 16:03:45 -0700
-Subject: [RFC][PATCH 3/4] arm64: dts: hikey: Add hikey support for
- syscon-reboot-mode
+Date: Mon,  8 Aug 2016 16:03:46 -0700
+Subject: [RFC][PATCH 4/4] arm64: dts: hikey: Add pstore support for HiKey
 In-Reply-To: <1470697426-16426-1-git-send-email-john.stultz@linaro.org>
 References: <1470697426-16426-1-git-send-email-john.stultz@linaro.org>
-Message-ID: <1470697426-16426-3-git-send-email-john.stultz@linaro.org>
+Message-ID: <1470697426-16426-4-git-send-email-john.stultz@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support to hikey dts for the syscon-reboot-mode driver.
+This patch reserves some memory in the DTS and sets up a
+pstore device tree node to enable pstore support on HiKey.
 
-After trying an approach using a sram driver and node, a number
-of issues cropped up which would make it so we would be
-duplicating a lot of extra syscon infrastructure in order to
-support mfds on sram. After talking with Bjorn, using the
-syscon driver for this seems like an better choice.
-
-Cc: Andy Yan <andy.yan@rock-chips.com>
-Cc: Bjorn Andersson <bjorn.andersson@linaro.org>
-Cc: Haojian Zhuang <haojian.zhuang@linaro.org>
+Cc: Kees Cook <keescook@chromium.org>
 Cc: Guodong Xu <guodong.xu@linaro.org>
+Cc: Haojian Zhuang <haojian.zhuang@linaro.org>
 Cc: Wei Xu <xuwei5@hisilicon.com>
 Cc: Rob Herring <robh+dt@kernel.org>
 Cc: Mark Rutland <mark.rutland@arm.com>
@@ -29,48 +22,43 @@ Cc: linux-arm-kernel at lists.infradead.org
 Cc: devicetree at vger.kernel.org
 Signed-off-by: John Stultz <john.stultz@linaro.org>
 ---
- arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts | 18 +++++++++++++++++-
- 1 file changed, 17 insertions(+), 1 deletion(-)
+ arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts | 17 ++++++++++++++++-
+ 1 file changed, 16 insertions(+), 1 deletion(-)
 
 diff --git a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
-index 8597e9b..b2683e4 100644
+index b2683e4..9140306 100644
 --- a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
 +++ b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
-@@ -29,6 +29,7 @@
- 	 * Reserve below regions from memory node:
- 	 *
- 	 *  0x05e0,0000 - 0x05ef,ffff: MCU firmware runtime using
-+	 *  0x05f0,1000 - 0x05f0,1fff: Reboot reason
+@@ -32,6 +32,7 @@
+ 	 *  0x05f0,1000 - 0x05f0,1fff: Reboot reason
  	 *  0x06df,f000 - 0x06df,ffff: Mailbox message data
  	 *  0x0740,f000 - 0x0740,ffff: MCU firmware section
++	 *  0x21f0,0000 - 0x21ff,ffff: pstore/ramoops buffer
  	 *  0x3e00,0000 - 0x3fff,ffff: OP-TEE
-@@ -36,11 +37,26 @@
+ 	 */
  	memory at 0 {
- 		device_type = "memory";
- 		reg = <0x00000000 0x00000000 0x00000000 0x05e00000>,
--		      <0x00000000 0x05f00000 0x00000000 0x00eff000>,
-+		      <0x00000000 0x05f00000 0x00000000 0x00001000>,
-+		      <0x00000000 0x05f02000 0x00000000 0x00efd000>,
+@@ -40,7 +41,21 @@
+ 		      <0x00000000 0x05f00000 0x00000000 0x00001000>,
+ 		      <0x00000000 0x05f02000 0x00000000 0x00efd000>,
  		      <0x00000000 0x06e00000 0x00000000 0x0060f000>,
- 		      <0x00000000 0x07410000 0x00000000 0x36bf0000>;
- 	};
- 
-+	reboot-mode-syscon at 5f01000 {
-+		compatible = "syscon", "simple-mfd";
-+		reg = <0x0 0x05f01000 0x0 0x00001000>;
-+
-+		reboot-mode at 0 {
-+			compatible = "syscon-reboot-mode";
-+			offset = <0x0>;
-+
-+			mode-normal	= <0x77665501>;
-+			mode-bootloader	= <0x77665500>;
-+			mode-recovery	= <0x77665502>;
-+		};
+-		      <0x00000000 0x07410000 0x00000000 0x36bf0000>;
++		      <0x00000000 0x07410000 0x00000000 0x1aaf0000>,
++		      <0x00000000 0x22000000 0x00000000 0x1c000000>;
 +	};
 +
- 	soc {
- 		spi0: spi at f7106000 {
- 			status = "ok";
++	pstore: pstore at 0x21f00000 {
++		no-map;
++		reg = <0x0 0x21f00000 0x0 0x00100000>;  /* pstore buffer */
++	};
++
++	ramoops {
++		compatible = "ramoops";
++		memory-region = <&pstore>;
++		record-size	= <0x0 0x00020000>;
++		console-size	= <0x0 0x00020000>;
++		ftrace-size	= <0x0 0x00020000>;
+ 	};
+ 
+ 	reboot-mode-syscon at 5f01000 {
 -- 
 1.9.1
