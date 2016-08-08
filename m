@@ -1,161 +1,435 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon,  8 Aug 2016 23:24:02 +0200
-Subject: [PATCH 1/4] soc: qcom: add an EBI2 device tree bindings
+Date: Mon,  8 Aug 2016 23:24:03 +0200
+Subject: [PATCH 2/4] soc: qcom: add EBI2 driver
 In-Reply-To: <1470691445-27571-1-git-send-email-linus.walleij@linaro.org>
 References: <1470691445-27571-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <1470691445-27571-2-git-send-email-linus.walleij@linaro.org>
+Message-ID: <1470691445-27571-3-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds device tree bindings for the External Bus Interface 2, EBI2
-to the Qualcomm SoC drivers.
+This adds a driver for the Qualcomm External Bus Interface EBI2
+found in the MSM8660 and APQ8060 SoCs (at least).
 
-Cc: devicetree at vger.kernel.org
+This was tested with the SMSC9112 ethernet on the APQ8060
+Dragonboard sitting on top of the SLOW CS2.
+
+Some of my understanding if very vague and based on guesses and
+extrapolations: the documentation in APQ8060 Qualcomm Application
+Processor User Guide 80-N7150-14 Rev. A describes select features but
+does not document the register bit fields.
+
+However I had to do something like this to provide a serious driver,
+I have marked the guesses with /* GUESS */
+
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- .../devicetree/bindings/soc/qcom/qcom,ebi2.txt     | 134 +++++++++++++++++++++
- 1 file changed, 134 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/soc/qcom/qcom,ebi2.txt
+ drivers/soc/qcom/Kconfig  |   8 +
+ drivers/soc/qcom/Makefile |   1 +
+ drivers/soc/qcom/ebi2.c   | 371 ++++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 380 insertions(+)
+ create mode 100644 drivers/soc/qcom/ebi2.c
 
-diff --git a/Documentation/devicetree/bindings/soc/qcom/qcom,ebi2.txt b/Documentation/devicetree/bindings/soc/qcom/qcom,ebi2.txt
+diff --git a/drivers/soc/qcom/Kconfig b/drivers/soc/qcom/Kconfig
+index 461b387d03cc..1f56baa30807 100644
+--- a/drivers/soc/qcom/Kconfig
++++ b/drivers/soc/qcom/Kconfig
+@@ -76,3 +76,11 @@ config QCOM_WCNSS_CTRL
+ 	help
+ 	  Client driver for the WCNSS_CTRL SMD channel, used to download nv
+ 	  firmware to a newly booted WCNSS chip.
++
++config QCOM_EBI2
++	bool "Qualcomm External Bus Interface 2 (EBI2)"
++	default y if ARCH_MSM8X60
++	help
++	  Say y here to enable support for the Qualcomm External Bus
++	  Interface 2, which can be used to connect things like NAND Flash,
++	  SRAM, ethernet adapters, FPGAs and LCD displays.
+diff --git a/drivers/soc/qcom/Makefile b/drivers/soc/qcom/Makefile
+index fdd664edf0bd..8d5a8d738d0a 100644
+--- a/drivers/soc/qcom/Makefile
++++ b/drivers/soc/qcom/Makefile
+@@ -7,3 +7,4 @@ obj-$(CONFIG_QCOM_SMEM_STATE) += smem_state.o
+ obj-$(CONFIG_QCOM_SMP2P)	+= smp2p.o
+ obj-$(CONFIG_QCOM_SMSM)	+= smsm.o
+ obj-$(CONFIG_QCOM_WCNSS_CTRL) += wcnss_ctrl.o
++obj-$(CONFIG_QCOM_EBI2)	+= ebi2.o
+diff --git a/drivers/soc/qcom/ebi2.c b/drivers/soc/qcom/ebi2.c
 new file mode 100644
-index 000000000000..b848a60352ca
+index 000000000000..f90c5d13fb5a
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/soc/qcom/qcom,ebi2.txt
-@@ -0,0 +1,134 @@
-+Qualcomm External Bus Interface 2 (EBI2)
++++ b/drivers/soc/qcom/ebi2.c
+@@ -0,0 +1,371 @@
++/*
++ * Qualcomm External Bus Interface 2 (EBI2) driver
++ * an older version of the Qualcomm Parallel Interface Controller (QPIC)
++ *
++ * Copyright (C) 2016 Linaro Ltd.
++ *
++ * Author: Linus Walleij <linus.walleij@linaro.org>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2, as
++ * published by the Free Software Foundation.
++ *
++ * See the device tree bindings for this block for more details on the
++ * hardware.
++ */
 +
-+The EBI2 contains two peripheral blocks: XMEM and LCDC. The XMEM handles any
-+external memory (such as NAND or other memory-mapped peripherals) whereas
-+LCDC handles LCD displays.
++#include <linux/clk.h>
++#include <linux/err.h>
++#include <linux/io.h>
++#include <linux/of.h>
++#include <linux/of_platform.h>
++#include <linux/init.h>
++#include <linux/io.h>
++#include <linux/slab.h>
++#include <linux/platform_device.h>
++#include <linux/bitops.h>
 +
-+As it says it connects devices to an external bus interface, meaning address
-+lines (up to 9 address lines so can only address 1KiB external memory space),
-+data lines (16 bits), OE (output enable), ADV (address valid, used on some
-+NOR flash memories), WE (write enable). This on top of 6 different chip selects
-+(CS0 thru CS5) so that in theory 6 different devices can be connected.
++/* Guessed bit placement CS2 and CS3 are certain */
++/* What about CS1A, CS1B, CS2A, CS2B? */
++#define EBI2_CS0_ENABLE BIT(2) /* GUESS */
++#define EBI2_CS1_ENABLE BIT(3) /* GUESS */
++#define EBI2_CS2_ENABLE BIT(4)
++#define EBI2_CS3_ENABLE BIT(5)
++#define EBI2_CS4_ENABLE BIT(6) /* GUESS */
++#define EBI2_CS5_ENABLE BIT(7) /* GUESS */
++#define EBI2_CSN_MASK BIT(2)|BIT(3)|BIT(4)|BIT(5)|BIT(6)|BIT(7)
 +
-+Apparently this bus is clocked at 64MHz. It has dedicated pins on the package
-+and the bus can only come out on these pins, however if some of the pins are
-+unused they can be left unconnected or remuxed to be used as GPIO or in some
-+cases other orthogonal functions as well.
++#define EBI2_XMEM_CFG 0x0000 /* Power management etc */
 +
-+Also CS1 and CS2 has -A and -B signals. Why they have that is unclear to me.
++/*
++ * SLOW CSn CFG
++ *
++ * Bits 31-28: RECOVERY recovery cycles (0 = 1, 1 = 2 etc) this is the time the
++ *             memory continues to drive the data bus after OE is de-asserted.
++ *             Inserted when reading one CS and switching to another CS or read
++ *             followed by write on the same CS. Valid values 0 thru 15.
++ * Bits 27-24: WR_HOLD write hold cycles, these are extra cycles inserted after
++ *             every write minimum 1. The data out is driven from the time WE is
++ *             asserted until CS is asserted. With a hold of 1, the CS stays
++ *             active for 1 extra cycle etc. Valid values 0 thru 15.
++ * Bits 23-16: WR_DELTA initial latency for write cycles inserted for the first
++ *             write to a page or burst memory
++ * Bits 15-8:  RD_DELTA initial latency for read cycles inserted for the first
++ *             read to a page or burst memory
++ * Bits 7-4:   WR_WAIT number of wait cycles for every write access, 0=1 cycle
++ *             so 1 thru 16 cycles.
++ * Bits 3-0:   RD_WAIT number of wait cycles for every read access, 0=1 cycle
++ *             so 1 thru 16 cycles.
++ */
++#define EBI2_XMEM_CS0_SLOW_CFG 0x0008 /* GUESS */
++#define EBI2_XMEM_CS1_SLOW_CFG 0x000C /* GUESS */
++#define EBI2_XMEM_CS2_SLOW_CFG 0x0010
++#define EBI2_XMEM_CS3_SLOW_CFG 0x0014
++#define EBI2_XMEM_CS4_SLOW_CFG 0x0018 /* GUESS */
++#define EBI2_XMEM_CS5_SLOW_CFG 0x001C /* GUESS */
 +
-+The chip selects have the following memory range assignments. This region of
-+memory is referred to as "Chip Peripheral SS FPB0" and is 168MB big.
++#define EBI2_XMEM_RECOVERY_SHIFT	28
++#define EBI2_XMEM_WR_HOLD_SHIFT		24
++#define EBI2_XMEM_WR_DELTA_SHIFT	16
++#define EBI2_XMEM_RD_DELTA_SHIFT	8
++#define EBI2_XMEM_WR_WAIT_SHIFT		4
++#define EBI2_XMEM_RD_WAIT_SHIFT		0
 +
-+Chip Select                     Physical address base
-+CS0 GPIO134                     0x1a800000-0x1b000000 (8MB)
-+CS1 GPIO39 (A) / GPIO123 (B)    0x1b000000-0x1b800000 (8MB)
-+CS2 GPIO40 (A) / GPIO124 (B)    0x1b800000-0x1c000000 (8MB)
-+CS3 GPIO133                     0x1d000000-0x25000000 (128 MB)
-+CS4 GPIO132                     0x1c800000-0x1d000000 (8MB)
-+CS5 GPIO131                     0x1c000000-0x1c800000 (8MB)
++/*
++ * FAST CSn CFG
++ * Bits 31-28: ?
++ * Bits 27-24: RD_HOLD: the length in cycles of the first segment of a read
++ *             transfer. For a single read trandfer this will be the time
++ *             from CS assertion to OE assertion.
++ * Bits 18-24: ?
++ * Bits 17-16: ADV_OE_RECOVERY, the number of cycles elapsed before an OE
++ *             assertion, with respect to the cycle where ADV is asserted.
++ *             2 means 2 cycles between ADV and OE. Values 0, 1, 2 or 3.
++ * Bits 5:     ADDR_HOLD_ENA, The address is held for an extra cycle to meet
++ *             hold time requirements with ADV assertion.
++ *
++ * The manual mentions "write precharge cycles" and "precharge cycles".
++ * We have not been able to figure out which bit fields these correspond to
++ * in the hardware, or what valid values exist. The current hypothesis is that
++ * this is something just used on the FAST chip selects. There is also a "byte
++ * device enable" flag somewhere for 8bit memories.
++ */
++#define EBI2_XMEM_CS0_FAST_CFG 0x0028 /* GUESS */
++#define EBI2_XMEM_CS1_FAST_CFG 0x002C /* GUESS */
++#define EBI2_XMEM_CS2_FAST_CFG 0x0030 /* GUESS */
++#define EBI2_XMEM_CS3_FAST_CFG 0x0034
++#define EBI2_XMEM_CS4_FAST_CFG 0x0038 /* GUESS */
++#define EBI2_XMEM_CS5_FAST_CFG 0x003C /* GUESS */
 +
-+The APQ8060 Qualcomm Application Processor User Guide, 80-N7150-14 Rev. A,
-+August 6, 2012 contains some incomplete documentation of the EBI2.
++#define EBI2_XMEM_RD_HOLD_SHIFT		24
++#define EBI2_XMEM_ADV_OE_RECOVERY_SHIFT	16
++#define EBI2_XMEM_ADDR_HOLD_ENA_SHIFT	5
 +
-+FIXME: the manual mentions "write precharge cycles" and "precharge cycles".
-+We have not been able to figure out which bit fields these correspond to
-+in the hardware, or what valid values exist. The current hypothesis is that
-+this is something just used on the FAST chip selects and that the SLOW
-+chip selects are understood fully. There is also a "byte device enable"
-+flag somewhere for 8bit memories.
-+
-+FIXME: The chipselects have SLOW and FAST configuration registers. It's a bit
-+unclear what this means, if they are mutually exclusive or can be used
-+together, or if some chip selects are hardwired to be FAST and others are SLOW
-+by design.
-+
-+The XMEM registers are totally undocumented but could be partially decoded
-+because the Cypress AN49576 Antioch Westbridge apparently has suspiciously
-+similar register layout, see: http://www.cypress.com/file/105771/download
-+
-+Required properties:
-+- compatible: should be "qcom,ebi2"
-+- #address-cells: shoule be <1>
-+- #size-cells: should be <1>
-+- ranges: boolean should be present
-+- reg: two ranges of registers: EBI2 config and XMEM config areas
-+- reg-names: should be "ebi2", "xmem"
-+- clocks: two clocks, EBI_2X and EBI
-+- clock-names: shoule be "ebi2x", "ebi2"
-+
-+Optional subnodes:
-+- Nodes inside the EBI2 will be considered chipselect nodes. For each
-+  chipselect under the EBI2 node you should have the following required
-+  properties:
-+
-+Required subnode properties:
-+- chipselect: <N> where N is the chipselect configured in this node
-+- address-cells: should be <1>
-+- size-cells: should be <1>
-+- ranges: bool should be present
-+
-+Optional subnode properties for SLOW chip selects:
-+- xmem-recovery-cycles: recovery cycles is the time the memory continues to
-+  drive the data bus after OE is de-asserted, in order to avoid contention on
-+  the data bus. They are inserted when reading one CS and switching to another
-+  CS or read followed by write on the same CS. Valid values 0 thru 15. Minimum
-+  value is actually 1, so a value of 0 will still yield 1 recovery cycle.
-+- xmem-write-hold-cycles: write hold cycles, these are extra cycles inserted
-+  after every write minimum 1. The data out is driven from the time WE is
-+  asserted until CS is asserted. With a hold of 1 (value = 0), the CS stays
-+  active for 1 extra cycle etc. Valid values 0 thru 15.
-+- xmem-write-delta-cycles: initial latency for write cycles inserted for the
-+  first write to a page or burst memory. Valid values 0 thru 255.
-+- xmem-read-delta-cycles: initial latency for read cycles inserted for the
-+  first read to a page or burst memory. Valid values 0 thru 255.
-+- xmem-write-wait-cycles: number of wait cycles for every write access, 0=1
-+  cycle. Valid values 0 thru 15.
-+- xmem-read-wait-cycles: number of wait cycles for every read access, 0=1
-+  cycle. Valid values 0 thru 15.
-+
-+Optional subnode properties for FAST chip selects:
-+- xmem-address-hold-enable: this is a boolean property stating that we shall
-+  holde the address for an extra cycle to meet hold time requirements with ADV
-+  assertion.
-+- xmem-adv-to-oe-recovery-cycles: the number of cycles elapsed before an OE
-+  assertion, with respect to the cycle where ADV (address valid) is asserted.
-+  2 means 2 cycles between ADV and OE. Valid values 0, 1, 2 or 3.
-+- xmem-read-hold-cycles: the length in cycles of the first segment of a read
-+  transfer. For a single read trandfer this will be the time from CS assertion
-+  to OE assertion. Valid values 0 thru 15.
-+
-+Example:
-+
-+ebi2 at 1a100000 {
-+	compatible = "qcom,ebi2";
-+	#address-cells = <1>;
-+	#size-cells = <1>;
-+	ranges;
-+	reg = <0x1a100000 0x1000>, <0x1a110000 0x1000>;
-+	reg-names = "ebi2", "xmem";
-+	clocks = <&gcc EBI2_2X_CLK>, <&gcc EBI2_CLK>;
-+	clock-names = "ebi2x", "ebi2";
-+	/* Make sure to set up the pin control for the EBI2 */
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&foo_ebi2_pins>;
-+
-+	cs2 at 1b800000 {
-+		chipselect = <2>;
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+		xmem-recovery-cycles = <0>;
-+		xmem-write-hold-cycles = <3>;
-+		xmem-write-delta-cycles = <31>;
-+		xmem-read-delta-cycles = <28>;
-+		xmem-write-wait-cycles = <9>;
-+		xmem-read-wait-cycles = <9>;
-+
-+		foo-ebi2 at 1b800000 {
-+			compatible = "foo";
-+			reg = <0x1b800000 0x100>;
-+			(...)
-+		};
-+	};
++/**
++ * struct cs_data - struct with info on a chipselect setting
++ * @enable_mask: mask to enable the chipselect in the EBI2 config
++ * @slow_cfg0: offset to XMEMC slow CS config
++ * @fast_cfg1: offset to XMEMC fast CS config
++ */
++struct cs_data {
++	u32 enable_mask;
++	u16 slow_cfg;
++	u16 fast_cfg;
 +};
++
++static const struct cs_data cs_info[] = {
++	{
++		/* CS0 */
++		.enable_mask = EBI2_CS0_ENABLE,
++		.slow_cfg = EBI2_XMEM_CS0_SLOW_CFG,
++		.fast_cfg = EBI2_XMEM_CS0_FAST_CFG,
++	},
++	{
++		/* CS1 */
++		.enable_mask = EBI2_CS1_ENABLE,
++		.slow_cfg = EBI2_XMEM_CS1_SLOW_CFG,
++		.fast_cfg = EBI2_XMEM_CS1_FAST_CFG,
++	},
++	{
++		/* CS2 */
++		.enable_mask = EBI2_CS2_ENABLE,
++		.slow_cfg = EBI2_XMEM_CS2_SLOW_CFG,
++		.fast_cfg = EBI2_XMEM_CS2_FAST_CFG,
++	},
++	{
++		/* CS3 */
++		.enable_mask = EBI2_CS3_ENABLE,
++		.slow_cfg = EBI2_XMEM_CS3_SLOW_CFG,
++		.fast_cfg = EBI2_XMEM_CS3_FAST_CFG,
++	},
++	{
++		/* CS4 */
++		.enable_mask = EBI2_CS4_ENABLE,
++		.slow_cfg = EBI2_XMEM_CS4_SLOW_CFG,
++		.fast_cfg = EBI2_XMEM_CS4_FAST_CFG,
++	},
++	{
++		/* CS5 */
++		.enable_mask = EBI2_CS5_ENABLE,
++		.slow_cfg = EBI2_XMEM_CS5_SLOW_CFG,
++		.fast_cfg = EBI2_XMEM_CS5_FAST_CFG,
++	},
++};
++
++/**
++ * struct ebi2_xmem_prop - describes an XMEM config property
++ * @prop: the device tree binding name
++ * @max: maximum value for the property
++ * @slowreg: true if this property is in the SLOW CS config register
++ * else it is assumed to be in the FAST config register
++ * @shift: the bit field start in the SLOW or FAST register for this
++ * property
++ */
++struct ebi2_xmem_prop {
++	const char *prop;
++	u32 max;
++	bool slowreg;
++	u16 shift;
++};
++
++static const struct ebi2_xmem_prop xmem_props[] = {
++	{
++		.prop = "xmem-recovery-cycles",
++		.max = 15,
++		.slowreg = true,
++		.shift = EBI2_XMEM_RECOVERY_SHIFT,
++	},
++	{
++		.prop = "xmem-write-hold-cycles",
++		.max = 15,
++		.slowreg = true,
++		.shift = EBI2_XMEM_WR_HOLD_SHIFT,
++	},
++	{
++		.prop = "xmem-write-delta-cycles",
++		.max = 255,
++		.slowreg = true,
++		.shift = EBI2_XMEM_WR_DELTA_SHIFT,
++	},
++	{
++		.prop = "xmem-read-delta-cycles",
++		.max = 255,
++		.slowreg = true,
++		.shift = EBI2_XMEM_RD_DELTA_SHIFT,
++	},
++	{
++		.prop = "xmem-write-wait-cycles",
++		.max = 15,
++		.slowreg = true,
++		.shift = EBI2_XMEM_WR_WAIT_SHIFT,
++	},
++	{
++		.prop = "xmem-read-wait-cycles",
++		.max = 15,
++		.slowreg = true,
++		.shift = EBI2_XMEM_RD_WAIT_SHIFT,
++	},
++	{
++		.prop = "xmem-address-hold-enable",
++		.max = 1, /* boolean prop */
++		.slowreg = false,
++		.shift = EBI2_XMEM_ADDR_HOLD_ENA_SHIFT,
++	},
++	{
++		.prop = "xmem-adv-to-oe-recovery-cycles",
++		.max = 3,
++		.slowreg = false,
++		.shift = EBI2_XMEM_ADV_OE_RECOVERY_SHIFT,
++	},
++	{
++		.prop = "xmem-read-hold-cycles",
++		.max = 15,
++		.slowreg = false,
++		.shift = EBI2_XMEM_RD_HOLD_SHIFT,
++	},
++};
++
++static int qcom_ebi2_probe(struct platform_device *pdev)
++{
++	struct device_node *np = pdev->dev.of_node;
++	struct device_node *cs;
++	struct device *dev = &pdev->dev;
++	struct resource *res;
++	void __iomem *ebi2_base;
++	void __iomem *ebi2_xmem;
++	int ret;
++	struct clk *clk;
++	u32 val;
++	u32 csval;
++
++	clk = devm_clk_get(dev, "ebi2x");
++	if (IS_ERR(clk)) {
++		dev_err(dev, "could not get EBI2X clk (%li)\n", PTR_ERR(clk));
++		return PTR_ERR(clk);
++	}
++
++	ret = clk_prepare_enable(clk);
++	if (ret) {
++		dev_err(dev, "could not enable EBI2X clk (%d)\n", ret);
++		return ret;
++	}
++
++	clk = devm_clk_get(dev, "ebi2");
++	if (IS_ERR(clk)) {
++		dev_err(dev, "could not get EBI2 clk\n");
++		return PTR_ERR(clk);
++	}
++
++	ret = clk_prepare_enable(clk);
++	if (ret) {
++		dev_err(dev, "could not enable EBI2 clk\n");
++		return ret;
++	}
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	ebi2_base = devm_ioremap_resource(dev, res);
++	if (IS_ERR(ebi2_base))
++		return PTR_ERR(ebi2_base);
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
++	ebi2_xmem = devm_ioremap_resource(dev, res);
++	if (IS_ERR(ebi2_xmem))
++		return PTR_ERR(ebi2_xmem);
++
++	/* Allegedly this turns the power save mode off */
++	writel_relaxed(0UL, ebi2_xmem + EBI2_XMEM_CFG);
++
++	/* Disable all chipselects */
++	csval = readl_relaxed(ebi2_base);
++	csval &= ~EBI2_CSN_MASK;
++	writel_relaxed(csval, ebi2_base);
++
++	/* Walk over the child nodes, one for each chip select */
++	for_each_available_child_of_node(np, cs) {
++		const struct cs_data *csd;
++		u32 slowcfg, fastcfg;
++		u32 csindex;
++		int i;
++
++		ret = of_property_read_u32(cs, "chipselect", &csindex);
++		if (ret)
++			/* Invalid node or whatever */
++			continue;
++		if (csindex > 5) {
++			dev_err(dev,
++				"invalid chipselect %u, we only support 0-5\n",
++				csindex);
++			continue;
++		}
++		csd = &cs_info[csindex];
++		csval |= csd->enable_mask;
++		writel_relaxed(csval, ebi2_base);
++		dev_info(dev, "enabled CS%u\n", csindex);
++
++		/* Next set up the XMEMC */
++		slowcfg = 0;
++		fastcfg = 0;
++
++		for (i = 0; i < ARRAY_SIZE(xmem_props); i++) {
++			const struct ebi2_xmem_prop *xp = &xmem_props[i];
++
++			/* First check boolean props */
++			if (xp->max == 1) {
++				if (of_property_read_bool(cs, xp->prop)) {
++					if (xp->slowreg)
++						slowcfg |= BIT(xp->shift);
++					else
++						fastcfg |= BIT(xp->shift);
++					dev_info(dev, "set %s flag\n", xp->prop);
++				}
++				continue;
++			}
++
++			ret = of_property_read_u32(cs, xp->prop, &val);
++			if (ret)
++				continue;
++
++			/* We're dealing with an u32 */
++			if (val > xp->max) {
++				dev_err(dev,
++					"too high value for %s: %u, capped at %u\n",
++					xp->prop, val, xp->max);
++				val = xp->max;
++			}
++			if (xp->slowreg)
++				slowcfg |= (val << xp->shift);
++			else
++				fastcfg |= (val << xp->shift);
++			dev_info(dev, "set %s to %u\n", xp->prop, val);
++		}
++
++		dev_info(dev, "CS%u: SLOW CFG 0x%08x, FAST CFG 0x%08x\n",
++			 csindex, slowcfg, fastcfg);
++
++		if (slowcfg)
++			writel_relaxed(slowcfg, ebi2_xmem + csd->slow_cfg);
++		if (fastcfg)
++			writel_relaxed(fastcfg, ebi2_xmem + csd->fast_cfg);
++
++		/* Now the CS is online: time to populate the children */
++		ret = of_platform_default_populate(cs, NULL, dev);
++		if (ret)
++			dev_err(dev, "failed to populate CS%u\n", val);
++	}
++
++	return 0;
++}
++
++static const struct of_device_id qcom_ebi2_of_match[] = {
++	{ .compatible = "qcom,ebi2", },
++	{ }
++};
++
++static struct platform_driver qcom_ebi2_driver = {
++	.probe = qcom_ebi2_probe,
++	.driver = {
++		.name = "qcom-ebi2",
++		.of_match_table = qcom_ebi2_of_match,
++	},
++};
++builtin_platform_driver(qcom_ebi2_driver);
 -- 
 2.7.4
