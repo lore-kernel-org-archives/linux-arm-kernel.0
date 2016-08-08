@@ -1,47 +1,52 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Mon, 08 Aug 2016 22:35:29 +0200
-Subject: [PATCH 1/3] net: stmmac: dwmac-rk: add rk3366 & rk3399-specific
- data
-In-Reply-To: <1467802291-6487-2-git-send-email-roger.chen@rock-chips.com>
-References: <1467802291-6487-1-git-send-email-roger.chen@rock-chips.com>
- <1467802291-6487-2-git-send-email-roger.chen@rock-chips.com>
-Message-ID: <3635712.eAtD6Fn9AW@diego>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Tue, 9 Aug 2016 04:37:26 +0800
+Subject: [stericsson:earlydebug 1/1] init/main.c:491: undefined reference to
+ `printascii'
+Message-ID: <201608090423.CO80OEEQ%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Roger,
+tree:   https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git earlydebug
+head:   be0c05be25fea7ef592e5c4c613bc1489b012d65
+commit: be0c05be25fea7ef592e5c4c613bc1489b012d65 [1/1] uglyhack printascii
+config: arm-omap2plus_defconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 5.4.0-6) 5.4.0 20160609
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout be0c05be25fea7ef592e5c4c613bc1489b012d65
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
-Am Mittwoch, 6. Juli 2016, 18:51:29 schrieb Roger Chen:
-> Add constants and callback functions for the dwmac on rk3368 socs.
-> As can be seen, the base structure is the same, only registers and
-> the bits in them moved slightly.
-> 
-> Signed-off-by: Roger Chen <roger.chen@rock-chips.com>
-> ---
->  .../devicetree/bindings/net/rockchip-dwmac.txt     |   3 +-
->  drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c     | 226
-> +++++++++++++++++++++ 2 files changed, 228 insertions(+), 1 deletion(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/net/rockchip-dwmac.txt
-> b/Documentation/devicetree/bindings/net/rockchip-dwmac.txt index
-> 93eac7c..8c066e6 100644
-> --- a/Documentation/devicetree/bindings/net/rockchip-dwmac.txt
-> +++ b/Documentation/devicetree/bindings/net/rockchip-dwmac.txt
-> @@ -3,7 +3,8 @@ Rockchip SoC RK3288 10/100/1000 Ethernet driver(GMAC)
->  The device node has following properties.
-> 
->  Required properties:
-> - - compatible: Can be one of "rockchip,rk3288-gmac", "rockchip,rk3368-gmac"
-> + - compatible: Can be one of "rockchip,rk3288-gmac",
-> "rockchip,rk3366-gmac", +                            
-> "rockchip,rk3368-gmac", "rockchip,rk3399-gmac" - reg: addresses and length
-> of the register sets for the device. - interrupts: Should contain the GMAC
-> interrupts.
->   - interrupt-names: Should contain the interrupt names "macirq".
+All errors (new ones prefixed by >>):
 
-this doesn't apply against 4.8-rc1 anymore, can you please rebase and resend 
-the series?
+   init/built-in.o: In function `start_kernel':
+>> init/main.c:491: undefined reference to `printascii'
+>> init/built-in.o:(.debug_addr+0x154): undefined reference to `printascii'
+   kernel/built-in.o: In function `vprintk_emit':
+>> kernel/printk/printk.c:1823: undefined reference to `printascii'
+>> kernel/built-in.o:(.debug_addr+0x29bc4): undefined reference to `printascii'
 
+vim +491 init/main.c
 
-Thanks
-Heiko
+   485		smp_setup_processor_id();
+   486		debug_objects_early_init();
+   487	
+   488	#ifdef CONFIG_ARM
+   489		{
+   490		  extern void printascii(char *);
+ > 491		  printascii("start_kernel\n");
+   492		}
+   493	#endif
+   494		/*
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 28189 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160809/4ccba68b/attachment-0001.obj>
