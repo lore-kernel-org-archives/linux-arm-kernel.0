@@ -1,130 +1,37 @@
-From: peter.chen@nxp.com (Peter Chen)
-Date: Mon, 8 Aug 2016 15:49:54 +0800
-Subject: [PATCH 1/1] irqchip: irq-gic: forward SGI to itself for cortex-a7
- single core
-Message-ID: <1470642594-30455-1-git-send-email-peter.chen@nxp.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Mon, 8 Aug 2016 13:44:15 +0530
+Subject: [PATCH 10/10] dmaengine: qcom_hidma: add MSI support for
+ interrupts
+In-Reply-To: <497ddb6c-0233-657f-72c6-b844b798ff11@codeaurora.org>
+References: <1468867177-15007-1-git-send-email-okaya@codeaurora.org>
+ <1468867177-15007-11-git-send-email-okaya@codeaurora.org>
+ <20160724064256.GA9681@localhost>
+ <e6560c8b-e18e-9e32-5b51-c1c12d8551ce@codeaurora.org>
+ <20160804124641.GE9681@localhost>
+ <497ddb6c-0233-657f-72c6-b844b798ff11@codeaurora.org>
+Message-ID: <20160808081415.GV9681@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to Cortex-A7 MPCore TRM, ch8.3.1, Distributor register summary,
-GICD_ITARGETSRn:
+On Thu, Aug 04, 2016 at 09:59:43AM -0400, Sinan Kaya wrote:
+> On 8/4/2016 8:46 AM, Vinod Koul wrote:
+> >> > Yes, I do have a new device ID for platforms with MSI capability. 
+> >> > 
+> >> > Which new binding are you referring to?
+> > If you have "QCOM8062" why do you need DT to tell hidma-1.1 ?
+> 
+> Unfortunately, DT cannot do a binding with the ACPI names. Similarly, ACPI
+> cannot do a binding with the DT name. 
+> 
+> The structure of binding name is also subject to different kind of rules
+> for DT and ACPI.
+> 
+> This driver supports both device tree and ACPI. That's why, two different
+> names are required.
 
-	The register that contains the SGI and PPI interrupts is
-       	read-only and the value is implementation defined. For
-       	Cortex-A7 configurations with only one processor, these
-       	registers are RAZ/WI.
+Hmmm, wasn't the who get_property stuff supposed to make properties work on
+both ACPi & DT. I am not sure though about the current state of affairs on
+that.
 
-So, the GICD_ITARGETSR[0..7] is read-only, and the value is 0 for
-cortex-a7 single core platform if the SoC is cortex-a7 mpcore version.
-So the cupmask from gic_get_cpumask is 0.
-
-At ARM Generic Interrupt Controller Architecture version 2.0,
-ch4.3.15 Software Generated Interrupt Register, GICD_SGIR,
-The distributor will process the requested SGI according to
-register TargetListFilter and CPUTargetList. At current gic code,
-it takes TargetListFilter as 0b00, and forward the interrupt to
-cpumask (variable map at gic_raise_softirq) getting from gic_get_cpumask.
-but cpumask is 0 according to above explanation for cortex-a7 single core
-platform, so, both TargetListFilter and CPUTargetList are 0, and the
-distributor does not forward the interrupt to any CPU interface according
-to gic documentation, then the SGI can't be occurred.
-
-We have found this problem at nxp imx6ul platform, which is a cortex-a7
-single core platform, the irq work (triggered by SGI at ARM) can't be
-occurred which is needed for cpufreq, then the system has failed to boot
-and reboot [1].
-
-In this commit, we set TargetListFilter as 0b10 to fix this problem, it
-forwards the interrupt only to CPU0 and only cortex-a7 single core platform
-uses this setting currently.
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-May/
-    430545.html
-
-Cc: Russell King <linux@armlinux.org.uk>
-Cc: Shawn Guo <shawnguo@kernel.org>
-Cc: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
-Cc: Jason Liu <jason.hui.liu@nxp.com>
-Cc: Anson Huang <anson.huang@nxp.com>
-Cc: Frank Li <frank.li@nxp.com>
-Cc: Fabio Estevam <fabio.estevam@nxp.com>
-Cc: Ping Bai <ping.bai@nxp.com>
-
-Signed-off-by: Peter Chen <peter.chen@nxp.com>
----
- drivers/irqchip/irq-gic.c | 39 ++++++++++++++++++++++++++++++++++++---
- 1 file changed, 36 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-index c2cab57..625ae6d 100644
---- a/drivers/irqchip/irq-gic.c
-+++ b/drivers/irqchip/irq-gic.c
-@@ -764,6 +764,23 @@ static int gic_pm_init(struct gic_chip_data *gic)
- #endif
- 
- #ifdef CONFIG_SMP
-+static void gic_raise_softirq_itself(const struct cpumask *mask,
-+				     unsigned int irq)
-+{
-+	unsigned long flags;
-+
-+	raw_spin_lock_irqsave(&irq_controller_lock, flags);
-+
-+	/*
-+	 * Forward the interrupt only to the CPU interface of the processor
-+	 * that requested the interrupt.
-+	 */
-+	writel_relaxed(0x2000000 | irq, gic_data_dist_base(&gic_data[0])
-+					+ GIC_DIST_SOFTINT);
-+
-+	raw_spin_unlock_irqrestore(&irq_controller_lock, flags);
-+}
-+
- static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
- {
- 	int cpu;
-@@ -1162,9 +1179,6 @@ static int __init __gic_init_bases(struct gic_chip_data *gic,
- 		 */
- 		for (i = 0; i < NR_GIC_CPU_IF; i++)
- 			gic_cpu_map[i] = 0xff;
--#ifdef CONFIG_SMP
--		set_smp_cross_call(gic_raise_softirq);
--#endif
- 		cpuhp_setup_state_nocalls(CPUHP_AP_IRQ_GIC_STARTING,
- 					  "AP_IRQ_GIC_STARTING",
- 					  gic_starting_cpu, NULL);
-@@ -1336,6 +1350,16 @@ static void __init gic_of_setup_kvm_info(struct device_node *node)
- 	gic_set_kvm_info(&gic_v2_kvm_info);
- }
- 
-+static bool __init gic_is_a7_singlecore(struct gic_chip_data *gic,
-+					struct device_node *node)
-+{
-+	if (!of_device_is_compatible(node, "arm,cortex-a7-gic"))
-+		return false;
-+
-+	return !(readl_relaxed(gic_data_dist_base(gic) + GIC_DIST_CTR) & 0xe0);
-+
-+}
-+
- int __init
- gic_of_init(struct device_node *node, struct device_node *parent)
- {
-@@ -1367,6 +1391,15 @@ gic_of_init(struct device_node *node, struct device_node *parent)
- 		return ret;
- 	}
- 
-+	if (gic == &gic_data[0]) {
-+#ifdef CONFIG_SMP
-+		if (gic_is_a7_singlecore(gic, node))
-+			set_smp_cross_call(gic_raise_softirq_itself);
-+		else
-+			set_smp_cross_call(gic_raise_softirq);
-+#endif
-+	}
-+
- 	if (!gic_cnt) {
- 		gic_init_physaddr(node);
- 		gic_of_setup_kvm_info(node);
 -- 
-1.9.1
+~Vinod
