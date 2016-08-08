@@ -1,73 +1,52 @@
 From: thunder.leizhen@huawei.com (Zhen Lei)
-Date: Mon, 8 Aug 2016 17:18:18 +0800
-Subject: [PATCH v5 13/14] of/numa: remove the constraint on the distances of
- node pairs
+Date: Mon, 8 Aug 2016 17:18:17 +0800
+Subject: [PATCH v5 12/14] arm64/numa: remove some useless code
 In-Reply-To: <1470647899-6324-1-git-send-email-thunder.leizhen@huawei.com>
 References: <1470647899-6324-1-git-send-email-thunder.leizhen@huawei.com>
-Message-ID: <1470647899-6324-14-git-send-email-thunder.leizhen@huawei.com>
+Message-ID: <1470647899-6324-13-git-send-email-thunder.leizhen@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-At present, the distances must equal in both direction for each node
-pairs. For example: the distance of node B->A must the same to A->B.
-But we really don't have to do this.
-
-End up fill default distances as below:
-1. If both direction specified, keep no change.
-2. If only one direction specified, assign it to the other direction.
-3. If none of the two direction specified, both are assigned to
-   REMOTE_DISTANCE.
+1. Currently only cpu0 set on cpu_possible_mask and percpu areas have not
+   been initialized.
+2. No reason to limit cpu0 must belongs to node0.
 
 Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
-Acked-by: Rob Herring <robh@kernel.org>
 ---
- drivers/of/of_numa.c | 22 +++++++++++++++++-----
- 1 file changed, 17 insertions(+), 5 deletions(-)
+ arch/arm64/mm/numa.c | 8 --------
+ 1 file changed, 8 deletions(-)
 
-diff --git a/drivers/of/of_numa.c b/drivers/of/of_numa.c
-index 019738f..ce782f9 100644
---- a/drivers/of/of_numa.c
-+++ b/drivers/of/of_numa.c
-@@ -122,15 +122,25 @@ static int __init of_numa_parse_distance_map_v1(struct device_node *map)
- 		numa_set_distance(nodea, nodeb, distance);
- 		pr_debug("distance[node%d -> node%d] = %d\n",
- 			 nodea, nodeb, distance);
--
--		/* Set default distance of node B->A same as A->B */
--		if (nodeb > nodea)
--			numa_set_distance(nodeb, nodea, distance);
+diff --git a/arch/arm64/mm/numa.c b/arch/arm64/mm/numa.c
+index d73b0a0..92b1692 100644
+--- a/arch/arm64/mm/numa.c
++++ b/arch/arm64/mm/numa.c
+@@ -93,7 +93,6 @@ void numa_clear_node(unsigned int cpu)
+  */
+ static void __init setup_node_to_cpumask_map(void)
+ {
+-	unsigned int cpu;
+ 	int node;
+
+ 	/* setup nr_node_ids if not done yet */
+@@ -106,9 +105,6 @@ static void __init setup_node_to_cpumask_map(void)
+ 		cpumask_clear(node_to_cpumask_map[node]);
  	}
 
- 	return 0;
- }
-
-+static void __init fill_default_distances(void)
-+{
-+	int i, j;
-+
-+	for (i = 0; i < nr_node_ids; i++)
-+		for (j = 0; j < nr_node_ids; j++)
-+			if (i == j)
-+				numa_set_distance(i, j, LOCAL_DISTANCE);
-+			else if (!node_distance(i, j))
-+				numa_set_distance(i, j,
-+				    node_distance(j, i) ? : REMOTE_DISTANCE);
-+
-+}
-+
- static int __init of_numa_parse_distance_map(void)
- {
- 	int ret = 0;
-@@ -140,8 +150,10 @@ static int __init of_numa_parse_distance_map(void)
- 				     "numa-distance-map-v1");
- 	if (np)
- 		ret = of_numa_parse_distance_map_v1(np);
+-	for_each_possible_cpu(cpu)
+-		set_cpu_numa_node(cpu, NUMA_NO_NODE);
 -
- 	of_node_put(np);
-+
-+	fill_default_distances();
-+
- 	return ret;
+ 	/* cpumask_of_node() will now work */
+ 	pr_debug("Node to cpumask map for %d nodes\n", nr_node_ids);
+ }
+@@ -379,10 +375,6 @@ static int __init numa_init(int (*init_func)(void))
+
+ 	setup_node_to_cpumask_map();
+
+-	/* init boot processor */
+-	cpu_to_node_map[0] = 0;
+-	map_cpu_to_node(0, 0);
+-
+ 	return 0;
  }
 
 --
