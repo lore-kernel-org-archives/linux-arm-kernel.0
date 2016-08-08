@@ -1,100 +1,130 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Mon, 8 Aug 2016 09:34:06 +0200
-Subject: [PATCH 2/2] dt: bindings: Add binding for ESP8089 wifi chips
-In-Reply-To: <1971470623776@web13m.yandex.ru>
-References: <1470596269-20572-1-git-send-email-hdegoede@redhat.com>
- <1470596269-20572-2-git-send-email-hdegoede@redhat.com>
- <1971470623776@web13m.yandex.ru>
-Message-ID: <9518a338-f1f5-848c-ce17-85ec1ebaa213@redhat.com>
+From: peter.chen@nxp.com (Peter Chen)
+Date: Mon, 8 Aug 2016 15:49:54 +0800
+Subject: [PATCH 1/1] irqchip: irq-gic: forward SGI to itself for cortex-a7
+ single core
+Message-ID: <1470642594-30455-1-git-send-email-peter.chen@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+According to Cortex-A7 MPCore TRM, ch8.3.1, Distributor register summary,
+GICD_ITARGETSRn:
 
-On 08-08-16 04:36, Icenowy Zheng wrote:
->
->
-> 08.08.2016, 02:58, "Hans de Goede" <hdegoede@redhat.com>:
->> The ESP8089 chips can mostly be enumerated via their sdio interface,
->> but they are clocked by an external crystal which may differ from one
->> board to the other.
->>
->> This commit adds a binding for the sdio child node for these chips,
->> allowing to specify the external crystal type (for now, this binding
->> could be be extended with e.g. OOB irq support later).
->>
->> The Android driver for this chip uses a text file with key,value pairs
->> which gets loaded as firmware to pass this info to the firmware.
->> The "esp,crystal_26M_en" name is chosen to match the crystal_26M_en
->> key-name in that text file.
->>
->> Note that at this point there only is an out of tree driver for this
->> hardware, there is no clear timeline / path for merging this. Still
->> I believe it would be good to specify the binding for this in tree
->> now, so that any future migration to an in tree driver will not cause
->> compatiblity issues.
->>
->> Cc: Icenowy Zheng <icenowy@aosc.xyz>
->> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->> ---
->>  .../bindings/net/wireless/esp,esp8089.txt | 31 ++++++++++++++++++++++
->>  1 file changed, 31 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/net/wireless/esp,esp8089.txt
->>
->> diff --git a/Documentation/devicetree/bindings/net/wireless/esp,esp8089.txt b/Documentation/devicetree/bindings/net/wireless/esp,esp8089.txt
->> new file mode 100644
->> index 0000000..898a149
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/net/wireless/esp,esp8089.txt
->> @@ -0,0 +1,31 @@
->> +Espressif ESP8089 wireless SDIO devices
->> +
->> +This node provides properties for controlling the ESP8089 wireless device.
->> +The node is expected to be specified as a child node to the SDIO controller
->> +that connects the device to the system.
->> +
->> +Required properties:
->> +
->> + - compatible : Should be "esp,esp8089".
-> There's also esp8266. (And the difference of 8089 and 8266 is mainly the difference of crystal frequency... 26MHz for 8266, 40MHz for 8089)
-> So maybe it should be the difference of dt compatible?
+	The register that contains the SGI and PPI interrupts is
+       	read-only and the value is implementation defined. For
+       	Cortex-A7 configurations with only one processor, these
+       	registers are RAZ/WI.
 
-2 of my tablets (both Polaroid ones) use a value of 2 (rather
-then 0 or 1) for crystal_26M_en and using a different value
-does not work. Another generic q8 form-factor tablet I've with
-an a23 needs crystal_26M_en=1. In all these tablets the chip is
-clearly marked esp8089, so the crystal_26M_en setting seems to
-not be related to the chip model and deriving this from the
-compatible string seems like a bad idea to me.
+So, the GICD_ITARGETSR[0..7] is read-only, and the value is 0 for
+cortex-a7 single core platform if the SoC is cortex-a7 mpcore version.
+So the cupmask from gic_get_cpumask is 0.
 
-Regards,
+At ARM Generic Interrupt Controller Architecture version 2.0,
+ch4.3.15 Software Generated Interrupt Register, GICD_SGIR,
+The distributor will process the requested SGI according to
+register TargetListFilter and CPUTargetList. At current gic code,
+it takes TargetListFilter as 0b00, and forward the interrupt to
+cpumask (variable map at gic_raise_softirq) getting from gic_get_cpumask.
+but cpumask is 0 according to above explanation for cortex-a7 single core
+platform, so, both TargetListFilter and CPUTargetList are 0, and the
+distributor does not forward the interrupt to any CPU interface according
+to gic documentation, then the SGI can't be occurred.
 
-Hans
+We have found this problem at nxp imx6ul platform, which is a cortex-a7
+single core platform, the irq work (triggered by SGI at ARM) can't be
+occurred which is needed for cpufreq, then the system has failed to boot
+and reboot [1].
 
+In this commit, we set TargetListFilter as 0b10 to fix this problem, it
+forwards the interrupt only to CPU0 and only cortex-a7 single core platform
+uses this setting currently.
 
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-May/
+    430545.html
 
+Cc: Russell King <linux@armlinux.org.uk>
+Cc: Shawn Guo <shawnguo@kernel.org>
+Cc: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+Cc: Jason Liu <jason.hui.liu@nxp.com>
+Cc: Anson Huang <anson.huang@nxp.com>
+Cc: Frank Li <frank.li@nxp.com>
+Cc: Fabio Estevam <fabio.estevam@nxp.com>
+Cc: Ping Bai <ping.bai@nxp.com>
 
->> +
->> +Optional properties:
->> + - esp,crystal_26M_en: Integer value for the crystal_26M_en firmware parameter
->> +
->> +Example:
->> +
->> +&mmc1 {
->> + #address-cells = <1>;
->> + #size-cells = <0>;
->> +
->> + vmmc-supply = <&reg_dldo1>;
->> + mmc-pwrseq = <&wifi_pwrseq>;
->> + bus-width = <4>;
->> + non-removable;
->> + status = "okay";
->> +
->> + esp8089: sdio_wifi at 1 {
->> + compatible = "esp,esp8089";
->> + reg = <1>;
->> + esp,crystal_26M_en = <2>;
->> + };
->> +};
->> --
->> 2.7.4
+Signed-off-by: Peter Chen <peter.chen@nxp.com>
+---
+ drivers/irqchip/irq-gic.c | 39 ++++++++++++++++++++++++++++++++++++---
+ 1 file changed, 36 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+index c2cab57..625ae6d 100644
+--- a/drivers/irqchip/irq-gic.c
++++ b/drivers/irqchip/irq-gic.c
+@@ -764,6 +764,23 @@ static int gic_pm_init(struct gic_chip_data *gic)
+ #endif
+ 
+ #ifdef CONFIG_SMP
++static void gic_raise_softirq_itself(const struct cpumask *mask,
++				     unsigned int irq)
++{
++	unsigned long flags;
++
++	raw_spin_lock_irqsave(&irq_controller_lock, flags);
++
++	/*
++	 * Forward the interrupt only to the CPU interface of the processor
++	 * that requested the interrupt.
++	 */
++	writel_relaxed(0x2000000 | irq, gic_data_dist_base(&gic_data[0])
++					+ GIC_DIST_SOFTINT);
++
++	raw_spin_unlock_irqrestore(&irq_controller_lock, flags);
++}
++
+ static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
+ {
+ 	int cpu;
+@@ -1162,9 +1179,6 @@ static int __init __gic_init_bases(struct gic_chip_data *gic,
+ 		 */
+ 		for (i = 0; i < NR_GIC_CPU_IF; i++)
+ 			gic_cpu_map[i] = 0xff;
+-#ifdef CONFIG_SMP
+-		set_smp_cross_call(gic_raise_softirq);
+-#endif
+ 		cpuhp_setup_state_nocalls(CPUHP_AP_IRQ_GIC_STARTING,
+ 					  "AP_IRQ_GIC_STARTING",
+ 					  gic_starting_cpu, NULL);
+@@ -1336,6 +1350,16 @@ static void __init gic_of_setup_kvm_info(struct device_node *node)
+ 	gic_set_kvm_info(&gic_v2_kvm_info);
+ }
+ 
++static bool __init gic_is_a7_singlecore(struct gic_chip_data *gic,
++					struct device_node *node)
++{
++	if (!of_device_is_compatible(node, "arm,cortex-a7-gic"))
++		return false;
++
++	return !(readl_relaxed(gic_data_dist_base(gic) + GIC_DIST_CTR) & 0xe0);
++
++}
++
+ int __init
+ gic_of_init(struct device_node *node, struct device_node *parent)
+ {
+@@ -1367,6 +1391,15 @@ gic_of_init(struct device_node *node, struct device_node *parent)
+ 		return ret;
+ 	}
+ 
++	if (gic == &gic_data[0]) {
++#ifdef CONFIG_SMP
++		if (gic_is_a7_singlecore(gic, node))
++			set_smp_cross_call(gic_raise_softirq_itself);
++		else
++			set_smp_cross_call(gic_raise_softirq);
++#endif
++	}
++
+ 	if (!gic_cnt) {
+ 		gic_init_physaddr(node);
+ 		gic_of_setup_kvm_info(node);
+-- 
+1.9.1
