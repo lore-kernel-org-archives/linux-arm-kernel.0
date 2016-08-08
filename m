@@ -1,16 +1,18 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Mon, 8 Aug 2016 11:56:19 +0200
+From: Songjun.Wu@microchip.com (Wu, Songjun)
+Date: Mon, 8 Aug 2016 18:02:10 +0800
 Subject: [PATCH v8 1/2] [media] atmel-isc: add the Image Sensor Controller
  code
 In-Reply-To: <07cf3e49-da67-74d7-528c-618fe94a15ff@xs4all.nl>
 References: <1470211686-2198-1-git-send-email-songjun.wu@microchip.com>
  <1470211686-2198-2-git-send-email-songjun.wu@microchip.com>
  <07cf3e49-da67-74d7-528c-618fe94a15ff@xs4all.nl>
-Message-ID: <240d957c-6738-bab5-824a-1e6a0ddb12ad@xs4all.nl>
+Message-ID: <78d8056d-6203-e3dc-c4a0-b2ee05d254d4@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/08/2016 11:37 AM, Hans Verkuil wrote:
+
+
+On 8/8/2016 17:37, Hans Verkuil wrote:
 > On 08/03/2016 10:08 AM, Songjun Wu wrote:
 >> Add driver for the Image Sensor Controller. It manages
 >> incoming data from a parallel based CMOS/CCD sensor.
@@ -86,24 +88,29 @@ On 08/08/2016 11:37 AM, Hans Verkuil wrote:
 >>  create mode 100644 drivers/media/platform/atmel/atmel-isc-regs.h
 >>  create mode 100644 drivers/media/platform/atmel/atmel-isc.c
 >>
-> 
+>
 > <snip>
-> 
+>
 >> diff --git a/drivers/media/platform/atmel/atmel-isc.c b/drivers/media/platform/atmel/atmel-isc.c
 >> new file mode 100644
 >> index 0000000..d99d4a5
 >> --- /dev/null
 >> +++ b/drivers/media/platform/atmel/atmel-isc.c
-> 
+>
 > <snip>
-> 
+>
 >> +static int isc_set_default_fmt(struct isc_device *isc)
 >> +{
 >> +	u32 index = isc->num_user_formats - 1;
-> 
+>
 > Why pick the last format? Strictly speaking it doesn't matter, but in practice
 > the most common formats tend to be at the beginning of the format list.
-> 
+>
+Accept, thank you.
+The raw format is listed on the beginning, in order to select non-raw 
+format, the last format is picked. But it's not very important, it's 
+better to use the beginning of the format list.
+
 >> +	struct v4l2_format f = {
 >> +		.type = V4L2_BUF_TYPE_VIDEO_CAPTURE,
 >> +		.fmt.pix = {
@@ -138,24 +145,18 @@ On 08/08/2016 11:37 AM, Hans Verkuil wrote:
 >> +		goto unlock;
 >> +
 >> +	ret = isc_set_default_fmt(isc);
-> 
+>
 > This doesn't belong here, this needs to be done in isc_async_complete().
-> 
+>
 > Having the code here means that every time you open the device, the format
 > changes back to the default. That's not what you want.
+>
+Only on the first open, the default format will be set. If it's done in 
+isc_async_complete(), there is a problem, the sensor is powered off, the 
+default format maybe not be set successfully, because in some sensor 
+drivers, calling set_fmt will set the register directly.
 
-Actually, you do need to set the format here since here is where you turn on
-the sensor power, but it should be the current format, not the default format.
-
-And in isc_set_default_fmt I recommend that you call the try fmt of the subdev
-in order to let the subdev adjust the proposed default format. The 'try' doesn't
-need to power on the sensor.
-
-> 
 >> +	if (ret)
-
-You also need to power off the sd on error!
-
 >> +		goto unlock;
 >> +
 >> +unlock:
@@ -163,8 +164,89 @@ You also need to power off the sd on error!
 >> +	return ret;
 >> +}
 >> +
-> 
+>
+> <snip>
+>
+>> +static int isc_async_complete(struct v4l2_async_notifier *notifier)
+>> +{
+>> +	struct isc_device *isc = container_of(notifier->v4l2_dev,
+>> +					      struct isc_device, v4l2_dev);
+>> +	struct isc_subdev_entity *sd_entity;
+>> +	struct video_device *vdev = &isc->video_dev;
+>> +	struct vb2_queue *q = &isc->vb2_vidq;
+>> +	int ret;
+>> +
+>> +	isc->current_subdev = container_of(notifier,
+>> +					   struct isc_subdev_entity, notifier);
+>> +	sd_entity = isc->current_subdev;
+>> +
+>> +	mutex_init(&isc->lock);
+>> +	init_completion(&isc->comp);
+>> +
+>> +	/* Initialize videobuf2 queue */
+>> +	q->type			= V4L2_BUF_TYPE_VIDEO_CAPTURE;
+>> +	q->io_modes		= VB2_MMAP | VB2_DMABUF | VB2_READ;
+>> +	q->drv_priv		= isc;
+>> +	q->buf_struct_size	= sizeof(struct isc_buffer);
+>> +	q->ops			= &isc_vb2_ops;
+>> +	q->mem_ops		= &vb2_dma_contig_memops;
+>> +	q->timestamp_flags	= V4L2_BUF_FLAG_TIMESTAMP_MONOTONIC;
+>> +	q->lock			= &isc->lock;
+>> +	q->min_buffers_needed	= 1;
+>> +	q->dev			= isc->dev;
+>> +
+>> +	ret = vb2_queue_init(q);
+>> +	if (ret < 0) {
+>> +		v4l2_err(&isc->v4l2_dev,
+>> +			 "vb2_queue_init() failed: %d\n", ret);
+>> +		return ret;
+>> +	}
+>> +
+>> +	/* Init video dma queues */
+>> +	INIT_LIST_HEAD(&isc->dma_queue);
+>> +	spin_lock_init(&isc->dma_queue_lock);
+>> +
+>> +	/* Register video device */
+>> +	strlcpy(vdev->name, ATMEL_ISC_NAME, sizeof(vdev->name));
+>> +	vdev->release		= video_device_release_empty;
+>> +	vdev->fops		= &isc_fops;
+>> +	vdev->ioctl_ops		= &isc_ioctl_ops;
+>> +	vdev->v4l2_dev		= &isc->v4l2_dev;
+>> +	vdev->vfl_dir		= VFL_DIR_RX;
+>> +	vdev->queue		= q;
+>> +	vdev->lock		= &isc->lock;
+>> +	vdev->ctrl_handler	= isc->current_subdev->sd->ctrl_handler;
+>> +	vdev->device_caps	= V4L2_CAP_STREAMING | V4L2_CAP_VIDEO_CAPTURE;
+>> +	video_set_drvdata(vdev, isc);
+>> +
+>> +	ret = video_register_device(vdev, VFL_TYPE_GRABBER, -1);
+>> +	if (ret < 0) {
+>> +		v4l2_err(&isc->v4l2_dev,
+>> +			 "video_register_device failed: %d\n", ret);
+>> +		return ret;
+>> +	}
+>
+> This should be done last. Once the device is registered apps can use it, so
+> everything should be configured.
+>
+Accept, thank you.
 
-Regards,
-
-	Hans
+>> +
+>> +	sd_entity->config = v4l2_subdev_alloc_pad_config(sd_entity->sd);
+>> +	if (sd_entity->config == NULL)
+>> +		return -ENOMEM;
+>> +
+>> +	ret = isc_formats_init(isc);
+>> +	if (ret < 0) {
+>> +		v4l2_err(&isc->v4l2_dev,
+>> +			 "Init format failed: %d\n", ret);
+>> +		return ret;
+>> +	}
+>> +
+>> +	return 0;
+>> +}
+>
+> Regards,
+>
+> 	Hans
+>
