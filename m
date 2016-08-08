@@ -1,17 +1,16 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 8 Aug 2016 15:16:59 +0200
-Subject: [PATCH 1/2] ARM: dts: r8a7792: add DU clocks
-In-Reply-To: <2482521.XCJrVWGkiq@wasted.cogentembedded.com>
+Date: Mon, 8 Aug 2016 15:18:46 +0200
+Subject: [PATCH 2/2] ARM: dts: r8a7792: add DU support
+In-Reply-To: <6004610.AeQmi3OHEL@wasted.cogentembedded.com>
 References: <4031442.KeMCTMarLN@wasted.cogentembedded.com>
- <2482521.XCJrVWGkiq@wasted.cogentembedded.com>
-Message-ID: <CAMuHMdXWRUEYE0DYZPmZGtWboGRiF9d77m6U4tYxC7k+oryf-A@mail.gmail.com>
+ <6004610.AeQmi3OHEL@wasted.cogentembedded.com>
+Message-ID: <CAMuHMdUob6ion=ZQPu5rwhQMHu31ydAFQZ-onEDwf+SvP4uRmg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 5, 2016 at 8:25 PM, Sergei Shtylyov
+On Fri, Aug 5, 2016 at 8:26 PM, Sergei Shtylyov
 <sergei.shtylyov@cogentembedded.com> wrote:
-> Describe the DU0/1 clocks and their parent, ZX clock in the R8A7792 device
-> tree.
+> Define the generic R8A7792 part of the DU device node.
 >
 > Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
