@@ -1,16 +1,16 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 8 Aug 2016 14:46:28 +0200
-Subject: [PATCH 2/2] ARM: dts: r8a7792: add VIN support
-In-Reply-To: <2505176.7Q9RZuLBta@wasted.cogentembedded.com>
-References: <17288006.ERHB6654v5@wasted.cogentembedded.com>
- <2505176.7Q9RZuLBta@wasted.cogentembedded.com>
-Message-ID: <CAMuHMdUyvSo87SA9+VibqkLZ7uWBi1Xj0roEL=V8dk1STO9Ymg@mail.gmail.com>
+Date: Mon, 8 Aug 2016 14:49:03 +0200
+Subject: [PATCH 1/2] ARM: dts: r8a7792: add I2C clocks
+In-Reply-To: <1841031.5KOUl1WdV5@wasted.cogentembedded.com>
+References: <1618499.8bcj8adpVO@wasted.cogentembedded.com>
+ <1841031.5KOUl1WdV5@wasted.cogentembedded.com>
+Message-ID: <CAMuHMdXQjFvPEp8AasLu86J3inm6Z4vb-yp5NOaOxtCHi8Uzrw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 23, 2016 at 9:17 PM, Sergei Shtylyov
+On Sat, Jul 23, 2016 at 8:48 PM, Sergei Shtylyov
 <sergei.shtylyov@cogentembedded.com> wrote:
-> Define the generic R8A7792 parts of the VIN[0-5] device nodes.
+> Describe the I2C[0-5] clocks in the R8A7792 device tree.
 >
 > Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
