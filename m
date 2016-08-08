@@ -1,34 +1,49 @@
-From: thunder.leizhen@huawei.com (Zhen Lei)
-Date: Mon, 8 Aug 2016 17:18:08 +0800
-Subject: [PATCH v5 03/14] arm64/numa: add nid check for memory block
-In-Reply-To: <1470647899-6324-1-git-send-email-thunder.leizhen@huawei.com>
-References: <1470647899-6324-1-git-send-email-thunder.leizhen@huawei.com>
-Message-ID: <1470647899-6324-4-git-send-email-thunder.leizhen@huawei.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 08 Aug 2016 11:24:23 +0200
+Subject: [PATCH 2/2] dt: bindings: Add binding for ESP8089 wifi chips
+In-Reply-To: <CAGb2v67+QrOxPd4KeLb9F67A0mSaBqn14PynzCyK=ovRnKA6EQ@mail.gmail.com>
+References: <1470596269-20572-1-git-send-email-hdegoede@redhat.com>
+ <2936779.FAiO1bqUWV@wuerfel>
+ <CAGb2v67+QrOxPd4KeLb9F67A0mSaBqn14PynzCyK=ovRnKA6EQ@mail.gmail.com>
+Message-ID: <52721384.ieJe1WiAoe@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the same tactic to cpu and numa-distance nodes.
+On Monday, August 8, 2016 11:59:25 AM CEST Chen-Yu Tsai wrote:
+> Hi Arnd,
+> 
+> On Mon, Aug 8, 2016 at 3:59 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Sunday, August 7, 2016 8:57:49 PM CEST Hans de Goede wrote:
+> >> +Espressif ESP8089 wireless SDIO devices
+> >> +
+> >> +This node provides properties for controlling the ESP8089 wireless device.
+> >> +The node is expected to be specified as a child node to the SDIO controller
+> >> +that connects the device to the system.
+> >> +
+> >> +Required properties:
+> >> +
+> >> + - compatible : Should be "esp,esp8089".
+> >
+> > I think it would be good to standardize a compatible string for sdio
+> > like we have it for other discoverable buses, based on the
+> > vendor/device ID (or whatever this uses), using something like
+> >
+> > compatible = "sdio1234,5678", "esp,esp8089";
+> 
+> Is there a central repository for SDIO vendor/device IDs similar to
+> PCI or USB IDs?
 
-Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
----
- arch/arm64/mm/numa.c | 5 +++++
- 1 file changed, 5 insertions(+)
+No idea. I believe the existing repositories for PCI and USB are not
+public either, there is just the information at http://pcidatabase.com/,
+http://pci-ids.ucw.cz/ or http://www.linux-usb.org/usb.ids that
+are maintained by volunteers and that are not authoritarive.
 
-diff --git a/arch/arm64/mm/numa.c b/arch/arm64/mm/numa.c
-index c7fe3ec..2601660 100644
---- a/arch/arm64/mm/numa.c
-+++ b/arch/arm64/mm/numa.c
-@@ -141,6 +141,11 @@ int __init numa_add_memblk(int nid, u64 start, u64 end)
- {
- 	int ret;
+I found one list at https://github.com/systemd/systemd/blob/master/hwdb/sdio.ids
+but it's probably very incomplete.
 
-+	if (nid >= MAX_NUMNODES) {
-+		pr_warn("NUMA: Node id %u exceeds maximum value\n", nid);
-+		return -EINVAL;
-+	}
-+
- 	ret = memblock_set_node(start, (end - start), &memblock.memory, nid);
- 	if (ret < 0) {
- 		pr_err("NUMA: memblock [0x%llx - 0x%llx] failed to add on node %d\n",
---
-2.5.0
+> The vendor ID Espressif uses is 0x6666, which seems kind of bogus to me.
+
+It probably is, but that's not important as long as nothing else uses
+that ID.
+
+	Arnd
