@@ -1,29 +1,74 @@
 From: stephen.boyd@linaro.org (Stephen Boyd)
-Date: Mon, 08 Aug 2016 16:46:21 -0700
-Subject: [PATCH v2 06/22] usb: chipidea: Add platform flag for wrapper phy
- management
-In-Reply-To: <20160806075925.GC12298@shlinux2>
+Date: Mon, 08 Aug 2016 16:47:54 -0700
+Subject: [PATCH v2 08/22] usb: chipidea: Remove locking in ci_udc_start()
+In-Reply-To: <20160806075435.GB12298@shlinux2>
 References: <20160707222114.1673-1-stephen.boyd@linaro.org>
- <20160707222114.1673-7-stephen.boyd@linaro.org>
- <20160708092535.GD20485@shlinux2>
- <147043356053.26915.10086819023294264100@sboyd-linaro>
- <20160806075925.GC12298@shlinux2>
-Message-ID: <147069998158.10825.8595816732650723884@sboyd-linaro>
+ <20160707222114.1673-9-stephen.boyd@linaro.org>
+ <20160708094528.GF20485@shlinux2>
+ <147043403652.26915.10865210145828633146@sboyd-linaro>
+ <20160806075435.GB12298@shlinux2>
+Message-ID: <147070007426.10825.11324896309403492272@sboyd-linaro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Peter Chen (2016-08-06 00:59:25)
-> On Fri, Aug 05, 2016 at 02:46:00PM -0700, Stephen Boyd wrote:
-> > Quoting Peter Chen (2016-07-08 02:25:35)
+Quoting Peter Chen (2016-08-06 00:54:35)
+> On Fri, Aug 05, 2016 at 02:53:56PM -0700, Stephen Boyd wrote:
+> > Quoting Peter Chen (2016-07-08 02:45:28)
+> > > On Thu, Jul 07, 2016 at 03:20:59PM -0700, Stephen Boyd wrote:
+> > > > We don't call hw_device_reset() with the ci->lock held, so it
+> > > > doesn't seem like this lock here is protecting anything. Let's
+> > > > just remove it. This allows us to call sleeping functions like
+> > > > phy_init() from within the CI_HDRC_CONTROLLER_RESET_EVENT hook.
+> > > > 
+> > > > Cc: Peter Chen <peter.chen@nxp.com>
+> > > > Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> > > > Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
+> > > > ---
+> > > >  drivers/usb/chipidea/udc.c | 3 ---
+> > > >  1 file changed, 3 deletions(-)
+> > > > 
+> > > > diff --git a/drivers/usb/chipidea/udc.c b/drivers/usb/chipidea/udc.c
+> > > > index 065f5d97aa67..f16be4710cdb 100644
+> > > > --- a/drivers/usb/chipidea/udc.c
+> > > > +++ b/drivers/usb/chipidea/udc.c
+> > > > @@ -1719,7 +1719,6 @@ static int ci_udc_start(struct usb_gadget *gadget,
+> > > >                        struct usb_gadget_driver *driver)
+> > > >  {
+> > > >       struct ci_hdrc *ci = container_of(gadget, struct ci_hdrc, gadget);
+> > > > -     unsigned long flags;
+> > > >       int retval = -ENOMEM;
+> > > >  
+> > > >       if (driver->disconnect == NULL)
+> > > > @@ -1746,7 +1745,6 @@ static int ci_udc_start(struct usb_gadget *gadget,
+> > > >  
+> > > >       pm_runtime_get_sync(&ci->gadget.dev);
+> > > >       if (ci->vbus_active) {
+> > > > -             spin_lock_irqsave(&ci->lock, flags);
+> > > >               hw_device_reset(ci);
+> > > >       } else {
+> > > >               usb_udc_vbus_handler(&ci->gadget, false);
+> > > > @@ -1755,7 +1753,6 @@ static int ci_udc_start(struct usb_gadget *gadget,
+> > > >       }
+> > > >  
+> > > >       retval = hw_device_state(ci, ci->ep0out->qh.dma);
+> > > > -     spin_unlock_irqrestore(&ci->lock, flags);
+> > > >       if (retval)
+> > > >               pm_runtime_put_sync(&ci->gadget.dev);
+> > > >  
 > > > 
-> > > How you handle the code for PHY getting at probe?
+> > > The main purpose for this is disabling interrupt when reset controller,
+> > > in case the unexpected interrupts occur.
+> > > 
+> > > You can move this between hw_device_state.
 > > > 
 > > 
-> > Which probe? Glue layer probe? In my case I'm not using the phy until
-> > the RESET/STOPPED event so I just rely on the chipidea core to get the
-> > phy and then control the phy manually in the glue layer.
+> > Ok, but we don't hold the ci->lock in ci_udc_vbus_session(). Is that a
+> > bug as well?
 > 
-> I have no idea about it after reading your patch 10/22.
+> I agree with your patch. In fact, during the reset controller, the
+> interrupt has not been enabled, it should no unexpected interrupt.
 > 
 
-Sorry, you lost me now. What is the question?
+So then we can leave this patch as is? It still isn't clear to me what
+sequence of events that would cause a problem if we don't hold the
+ci->lock around hw_device_state().
