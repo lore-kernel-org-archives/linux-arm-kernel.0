@@ -1,49 +1,69 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 08 Aug 2016 11:24:23 +0200
-Subject: [PATCH 2/2] dt: bindings: Add binding for ESP8089 wifi chips
-In-Reply-To: <CAGb2v67+QrOxPd4KeLb9F67A0mSaBqn14PynzCyK=ovRnKA6EQ@mail.gmail.com>
-References: <1470596269-20572-1-git-send-email-hdegoede@redhat.com>
- <2936779.FAiO1bqUWV@wuerfel>
- <CAGb2v67+QrOxPd4KeLb9F67A0mSaBqn14PynzCyK=ovRnKA6EQ@mail.gmail.com>
-Message-ID: <52721384.ieJe1WiAoe@wuerfel>
+From: fabien.lahoudere@collabora.co.uk (Fabien Lahoudere)
+Date: Mon,  8 Aug 2016 11:29:26 +0200
+Subject: [PATCH 2/2] imx53.dtsi : Add DMA configuration for UART
+In-Reply-To: <1470648566-11698-1-git-send-email-fabien.lahoudere@collabora.co.uk>
+References: <CAOMZO5DAAU0jUpd2xwgTwL9Y1Bhido35fxvhQ9HGZRXbRnB2Gg@mail.gmail.com>
+ <1470648566-11698-1-git-send-email-fabien.lahoudere@collabora.co.uk>
+Message-ID: <1470648566-11698-2-git-send-email-fabien.lahoudere@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, August 8, 2016 11:59:25 AM CEST Chen-Yu Tsai wrote:
-> Hi Arnd,
-> 
-> On Mon, Aug 8, 2016 at 3:59 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Sunday, August 7, 2016 8:57:49 PM CEST Hans de Goede wrote:
-> >> +Espressif ESP8089 wireless SDIO devices
-> >> +
-> >> +This node provides properties for controlling the ESP8089 wireless device.
-> >> +The node is expected to be specified as a child node to the SDIO controller
-> >> +that connects the device to the system.
-> >> +
-> >> +Required properties:
-> >> +
-> >> + - compatible : Should be "esp,esp8089".
-> >
-> > I think it would be good to standardize a compatible string for sdio
-> > like we have it for other discoverable buses, based on the
-> > vendor/device ID (or whatever this uses), using something like
-> >
-> > compatible = "sdio1234,5678", "esp,esp8089";
-> 
-> Is there a central repository for SDIO vendor/device IDs similar to
-> PCI or USB IDs?
+In order to use sdma with UART, we need to add DMA configuration
+in device tree.
 
-No idea. I believe the existing repositories for PCI and USB are not
-public either, there is just the information at http://pcidatabase.com/,
-http://pci-ids.ucw.cz/ or http://www.linux-usb.org/usb.ids that
-are maintained by volunteers and that are not authoritarive.
+Signed-off-by: Fabien Lahoudere <fabien.lahoudere@collabora.co.uk>
+---
+ arch/arm/boot/dts/imx53.dtsi | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-I found one list at https://github.com/systemd/systemd/blob/master/hwdb/sdio.ids
-but it's probably very incomplete.
-
-> The vendor ID Espressif uses is 0x6666, which seems kind of bogus to me.
-
-It probably is, but that's not important as long as nothing else uses
-that ID.
-
-	Arnd
+diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
+index cd17037..c1bc97c 100644
+--- a/arch/arm/boot/dts/imx53.dtsi
++++ b/arch/arm/boot/dts/imx53.dtsi
+@@ -217,6 +217,8 @@
+ 					clocks = <&clks IMX5_CLK_UART3_IPG_GATE>,
+ 					         <&clks IMX5_CLK_UART3_PER_GATE>;
+ 					clock-names = "ipg", "per";
++					dmas = <&sdma 42 4 0>, <&sdma 43 4 0>;
++					dma-names = "rx", "tx";
+ 					status = "disabled";
+ 				};
+ 
+@@ -498,6 +500,8 @@
+ 				clocks = <&clks IMX5_CLK_UART1_IPG_GATE>,
+ 				         <&clks IMX5_CLK_UART1_PER_GATE>;
+ 				clock-names = "ipg", "per";
++				dmas = <&sdma 18 4 0>, <&sdma 19 4 0>;
++				dma-names = "rx", "tx";
+ 				status = "disabled";
+ 			};
+ 
+@@ -508,6 +512,8 @@
+ 				clocks = <&clks IMX5_CLK_UART2_IPG_GATE>,
+ 				         <&clks IMX5_CLK_UART2_PER_GATE>;
+ 				clock-names = "ipg", "per";
++				dmas = <&sdma 12 4 0>, <&sdma 13 4 0>;
++				dma-names = "rx", "tx";
+ 				status = "disabled";
+ 			};
+ 
+@@ -591,6 +597,8 @@
+ 				clocks = <&clks IMX5_CLK_UART4_IPG_GATE>,
+ 				         <&clks IMX5_CLK_UART4_PER_GATE>;
+ 				clock-names = "ipg", "per";
++				dmas = <&sdma 2 4 0>, <&sdma 3 4 0>;
++				dma-names = "rx", "tx";
+ 				status = "disabled";
+ 			};
+ 		};
+@@ -621,6 +629,8 @@
+ 				clocks = <&clks IMX5_CLK_UART5_IPG_GATE>,
+ 				         <&clks IMX5_CLK_UART5_PER_GATE>;
+ 				clock-names = "ipg", "per";
++				dmas = <&sdma 16 4 0>, <&sdma 17 4 0>;
++				dma-names = "rx", "tx";
+ 				status = "disabled";
+ 			};
+ 
+-- 
+2.7.4
