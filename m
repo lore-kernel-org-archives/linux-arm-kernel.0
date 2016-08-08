@@ -1,57 +1,85 @@
 From: sricharan@codeaurora.org (Sricharan R)
-Date: Tue,  9 Aug 2016 04:19:03 +0530
-Subject: [PATCH 1/8] arm: dma-mapping: Don't override dma_ops in
- arch_setup_dma_ops()
+Date: Tue,  9 Aug 2016 04:19:05 +0530
+Subject: [PATCH 3/8] of: dma: Make of_dma_deconfigure() public
 In-Reply-To: <1470696550-3416-1-git-send-email-sricharan@codeaurora.org>
 References: <1470696550-3416-1-git-send-email-sricharan@codeaurora.org>
-Message-ID: <1470696550-3416-2-git-send-email-sricharan@codeaurora.org>
+Message-ID: <1470696550-3416-4-git-send-email-sricharan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-The arch_setup_dma_ops() function is in charge of setting dma_ops with a
-call to set_dma_ops(). set_dma_ops() is also called from
-
-- highbank and mvebu bus notifiers
-- dmabounce (to be replaced with swiotlb)
-- arm_iommu_attach_device
-
-(arm_iommu_attach_device is itself called from IOMMU and bus master
-device drivers)
-
-To allow the arch_setup_dma_ops() call to be moved from device add time
-to device probe time we must ensure that dma_ops already setup by any of
-the above callers will not be overridden.
-
-Aftering replacing dmabounce with swiotlb, converting IOMMU drivers to
-of_xlate and taking care of highbank and mvebu, the workaround should be
-removed.
+As part of moving DMA initializing to probe time the
+of_dma_deconfigure() function will need to be called from different
+source files. Make it public and move it to drivers/of/device.c where
+the of_dma_configure() function is.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 ---
- arch/arm/mm/dma-mapping.c | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ drivers/of/device.c       | 12 ++++++++++++
+ drivers/of/platform.c     |  5 -----
+ include/linux/of_device.h |  3 +++
+ 3 files changed, 15 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index ff7ed56..4686d66 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -2259,6 +2259,15 @@ void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
- 	struct dma_map_ops *dma_ops;
+diff --git a/drivers/of/device.c b/drivers/of/device.c
+index d9898d9..1c843e2 100644
+--- a/drivers/of/device.c
++++ b/drivers/of/device.c
+@@ -136,6 +136,18 @@ void of_dma_configure(struct device *dev, struct device_node *np)
+ }
+ EXPORT_SYMBOL_GPL(of_dma_configure);
  
- 	dev->archdata.dma_coherent = coherent;
++/**
++ * of_dma_deconfigure - Clean up DMA configuration
++ * @dev:	Device for which to clean up DMA configuration
++ *
++ * Clean up all configuration performed by of_dma_configure_ops() and free all
++ * resources that have been allocated.
++ */
++void of_dma_deconfigure(struct device *dev)
++{
++	arch_teardown_dma_ops(dev);
++}
 +
-+	/*
-+	 * Don't override the dma_ops if they have already been set. Ideally
-+	 * this should be the only location where dma_ops are set, remove this
-+	 * check when all other callers of set_dma_ops will have disappeared.
-+	 */
-+	if (dev->archdata.dma_ops)
-+		return;
-+
- 	if (arm_setup_iommu_dma_ops(dev, dma_base, size, iommu))
- 		dma_ops = arm_get_iommu_dma_map_ops(coherent);
- 	else
+ int of_device_register(struct platform_device *pdev)
+ {
+ 	device_initialize(&pdev->dev);
+diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+index 16e8daf..b6d6b41 100644
+--- a/drivers/of/platform.c
++++ b/drivers/of/platform.c
+@@ -151,11 +151,6 @@ struct platform_device *of_device_alloc(struct device_node *np,
+ }
+ EXPORT_SYMBOL(of_device_alloc);
+ 
+-static void of_dma_deconfigure(struct device *dev)
+-{
+-	arch_teardown_dma_ops(dev);
+-}
+-
+ /**
+  * of_platform_device_create_pdata - Alloc, initialize and register an of_device
+  * @np: pointer to node to create device for
+diff --git a/include/linux/of_device.h b/include/linux/of_device.h
+index cc7dd687..d20a31a 100644
+--- a/include/linux/of_device.h
++++ b/include/linux/of_device.h
+@@ -56,6 +56,7 @@ static inline struct device_node *of_cpu_device_node_get(int cpu)
+ }
+ 
+ void of_dma_configure(struct device *dev, struct device_node *np);
++void of_dma_deconfigure(struct device *dev);
+ #else /* CONFIG_OF */
+ 
+ static inline int of_driver_match_device(struct device *dev,
+@@ -100,6 +101,8 @@ static inline struct device_node *of_cpu_device_node_get(int cpu)
+ }
+ static inline void of_dma_configure(struct device *dev, struct device_node *np)
+ {}
++static inline void of_dma_deconfigure(struct device *dev)
++{}
+ #endif /* CONFIG_OF */
+ 
+ #endif /* _LINUX_OF_DEVICE_H */
 -- 
 QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
