@@ -1,46 +1,57 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 08 Aug 2016 17:28:31 +0200
-Subject: [PATCH] arm64: defconfig: enable xhci-platform
-In-Reply-To: <1468929871-20523-1-git-send-email-thomas.petazzoni@free-electrons.com>
- (Thomas Petazzoni's message of "Tue, 19 Jul 2016 14:04:31 +0200")
-References: <1468929871-20523-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <87h9avuvog.fsf@free-electrons.com>
+Date: Mon, 08 Aug 2016 17:30:07 +0200
+Subject: [PATCH 0/2] arm64: marvell: add support for the slave CP in
+ Armada 8K
+In-Reply-To: <1469716556-15299-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ (Thomas Petazzoni's message of "Thu, 28 Jul 2016 16:35:54 +0200")
+References: <1469716556-15299-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <87d1ljuvls.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Thomas,
  
- On Tue, Jul 19 2016, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
+ On Thu, Jul 28 2016, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
 
-> Some ARM64 platforms (for example the Marvell Armada 7K/8K) use the
-> generic XHCI platform driver, so it makes sense to enable
-> CONFIG_USB_XHCI_PLATFORM=y in the defconfig to support XHCI on such
-> platforms.
+> Hello,
 >
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> The following set of two patches add support for the slave CP HW block
+> found in the Armada 8K SoCs. As a reminder:
+>
+>  - Armada 7K is an SoC with one AP and one CP. The AP is the part that
+>    contains the CPU, cache and a few basic I/Os. The CP is the part
+>    that contains most interesting I/Os (PCIe, SATA, USB, Ethernet,
+>    etc.)
+>
+>  - Armada 8K is an SoC with one AP and two CPs.
+>
+> This set of patches add support for the second CP found in Armada 8K,
+> also called the "slave CP110".
 
-Applied on mvebu/defconfig64
+Both patches applied on mvebu/dt64
 
 Thanks,
 
 Gregory
 
-> ---
->  arch/arm64/configs/defconfig | 1 +
->  1 file changed, 1 insertion(+)
 >
-> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-> index fd2d74d..2bcd502 100644
-> --- a/arch/arm64/configs/defconfig
-> +++ b/arch/arm64/configs/defconfig
-> @@ -225,6 +225,7 @@ CONFIG_SND_SOC_AK4613=y
->  CONFIG_USB=y
->  CONFIG_USB_OTG=y
->  CONFIG_USB_XHCI_HCD=y
-> +CONFIG_USB_XHCI_PLATFORM=y
->  CONFIG_USB_XHCI_RCAR=y
->  CONFIG_USB_EHCI_HCD=y
->  CONFIG_USB_EHCI_MSM=y
+> Thanks,
+>
+> Thomas
+>
+> Thomas Petazzoni (2):
+>   arm64: dts: marvell: add description for the slave CP110 in Armada 8K
+>   arm64: dts: marvell: add description for the Armada 8040 dev board
+>
+>  arch/arm64/boot/dts/marvell/Makefile               |   1 +
+>  arch/arm64/boot/dts/marvell/armada-8020.dtsi       |   1 +
+>  .../{armada-8020.dtsi => armada-8040-db.dts}       | 109 ++++++++-
+>  arch/arm64/boot/dts/marvell/armada-8040.dtsi       |   1 +
+>  .../arm64/boot/dts/marvell/armada-cp110-slave.dtsi | 246 +++++++++++++++++++++
+>  5 files changed, 351 insertions(+), 7 deletions(-)
+>  copy arch/arm64/boot/dts/marvell/{armada-8020.dtsi => armada-8040-db.dts} (55%)
+>  create mode 100644 arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+>
 > -- 
 > 2.7.4
 >
