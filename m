@@ -1,68 +1,64 @@
 From: cristian.birsan@microchip.com (Cristian Birsan)
-Date: Mon, 8 Aug 2016 18:44:21 +0300
-Subject: [PATCH v2 1/2] regmap: Add a function to check if a regmap register
- is cached
+Date: Mon, 8 Aug 2016 18:44:22 +0300
+Subject: [PATCH v2 2/2] regmap: debugfs: Add support for dumping write only
+ device registers
 In-Reply-To: <1470671062-25479-1-git-send-email-cristian.birsan@microchip.com>
 References: <20160804154814.GA10383@sirena.org.uk>
  <1470671062-25479-1-git-send-email-cristian.birsan@microchip.com>
-Message-ID: <1470671062-25479-2-git-send-email-cristian.birsan@microchip.com>
+Message-ID: <1470671062-25479-3-git-send-email-cristian.birsan@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a function to check if a regmap register is cached. This will be used
-in debugfs to dump the cached values of write only registers.
+Add support for dumping write only device registers in debugfs. This is
+useful for audio codecs that have write only registers (like WM8731).
+The logic that decides if a value can be printed is moved to
+regmap_printable() function to allow for easier future updates.
 
 Signed-off-by: Cristian Birsan <cristian.birsan@microchip.com>
 ---
- drivers/base/regmap/internal.h |  1 +
- drivers/base/regmap/regmap.c   | 23 +++++++++++++++++++++++
- 2 files changed, 24 insertions(+)
+ drivers/base/regmap/regmap-debugfs.c | 16 +++++++++++++---
+ 1 file changed, 13 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/base/regmap/internal.h b/drivers/base/regmap/internal.h
-index a038033..f4be4c1 100644
---- a/drivers/base/regmap/internal.h
-+++ b/drivers/base/regmap/internal.h
-@@ -173,6 +173,7 @@ struct regcache_ops {
- 	int (*drop)(struct regmap *map, unsigned int min, unsigned int max);
- };
- 
-+bool regmap_cached(struct regmap *map, unsigned int reg);
- bool regmap_writeable(struct regmap *map, unsigned int reg);
- bool regmap_readable(struct regmap *map, unsigned int reg);
- bool regmap_volatile(struct regmap *map, unsigned int reg);
-diff --git a/drivers/base/regmap/regmap.c b/drivers/base/regmap/regmap.c
-index 51fa7d6..1f011f9 100644
---- a/drivers/base/regmap/regmap.c
-+++ b/drivers/base/regmap/regmap.c
-@@ -93,6 +93,29 @@ bool regmap_writeable(struct regmap *map, unsigned int reg)
- 	return true;
+diff --git a/drivers/base/regmap/regmap-debugfs.c b/drivers/base/regmap/regmap-debugfs.c
+index 1ee3d40..36ce351 100644
+--- a/drivers/base/regmap/regmap-debugfs.c
++++ b/drivers/base/regmap/regmap-debugfs.c
+@@ -77,6 +77,17 @@ static void regmap_debugfs_free_dump_cache(struct regmap *map)
+ 	}
  }
  
-+bool regmap_cached(struct regmap *map, unsigned int reg)
++static bool regmap_printable(struct regmap *map, unsigned int reg)
 +{
-+	int ret;
-+	unsigned int val;
-+
-+	if (map->cache == REGCACHE_NONE)
++	if (regmap_precious(map, reg))
 +		return false;
 +
-+	if (!map->cache_ops)
-+		return false;
-+
-+	if (map->max_register && reg > map->max_register)
-+		return false;
-+
-+	map->lock(map->lock_arg);
-+	ret = regcache_read(map, reg, &val);
-+	map->unlock(map->lock_arg);
-+	if (ret)
++	if (!regmap_readable(map, reg) && !regmap_cached(map, reg))
 +		return false;
 +
 +	return true;
 +}
 +
- bool regmap_readable(struct regmap *map, unsigned int reg)
- {
- 	if (!map->reg_read)
+ /*
+  * Work out where the start offset maps into register numbers, bearing
+  * in mind that we suppress hidden registers.
+@@ -105,8 +116,7 @@ static unsigned int regmap_debugfs_get_dump_start(struct regmap *map,
+ 	if (list_empty(&map->debugfs_off_cache)) {
+ 		for (; i <= map->max_register; i += map->reg_stride) {
+ 			/* Skip unprinted registers, closing off cache entry */
+-			if (!regmap_readable(map, i) ||
+-			    regmap_precious(map, i)) {
++			if (!regmap_printable(map, i)) {
+ 				if (c) {
+ 					c->max = p - 1;
+ 					c->max_reg = i - map->reg_stride;
+@@ -204,7 +214,7 @@ static ssize_t regmap_read_debugfs(struct regmap *map, unsigned int from,
+ 	start_reg = regmap_debugfs_get_dump_start(map, from, *ppos, &p);
+ 
+ 	for (i = start_reg; i <= to; i += map->reg_stride) {
+-		if (!regmap_readable(map, i))
++		if (!regmap_readable(map, i) && !regmap_cached(map, i))
+ 			continue;
+ 
+ 		if (regmap_precious(map, i))
 -- 
 1.9.1
