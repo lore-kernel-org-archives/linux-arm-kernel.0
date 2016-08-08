@@ -1,58 +1,69 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Mon,  8 Aug 2016 21:43:12 +0200
-Subject: [PATCH 2/8] ARM: dts: sun8i: Add dt node for rtl8703as wifi chip on
- ga10h
+Date: Mon,  8 Aug 2016 21:43:13 +0200
+Subject: [PATCH 3/8] ARM: dts: sun8i: reference-design-tablet: Add gsl1680
+ touchscreen node
 In-Reply-To: <1470685398-14568-1-git-send-email-hdegoede@redhat.com>
 References: <1470685398-14568-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1470685398-14568-2-git-send-email-hdegoede@redhat.com>
+Message-ID: <1470685398-14568-3-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ga10h tablet has a rtl8703as wifi chip, add a dt node describing it.
+Almost all sun8i tablets use a gsl1680 touchscreen controller, so add
+a node describing it to reference-design-tablet.dtsi.
 
-This enables usage of wifi on this tablet (together with the out of
-tree rtl8732bs driver).
+Almost all, but not all, so mark it as disabled by default (dts files
+will also need to supply a firmware-name and resolution info).
 
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
- arch/arm/boot/dts/sun8i-a33-ga10h-v1.1.dts | 18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
+ .../boot/dts/sun8i-reference-design-tablet.dtsi    | 28 ++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun8i-a33-ga10h-v1.1.dts b/arch/arm/boot/dts/sun8i-a33-ga10h-v1.1.dts
-index 6566032..de6269d 100644
---- a/arch/arm/boot/dts/sun8i-a33-ga10h-v1.1.dts
-+++ b/arch/arm/boot/dts/sun8i-a33-ga10h-v1.1.dts
-@@ -47,6 +47,11 @@
- / {
- 	model = "Allwinner GA10H Quad Core Tablet (v1.1)";
- 	compatible = "allwinner,ga10h-v1.1", "allwinner,sun8i-a33";
-+
-+	aliases {
-+		/* Make u-boot set mac-address for rtl8703as (no eeprom) */
-+		ethernet0 = &rtl8703as;
-+	};
- };
- 
- &ehci0 {
-@@ -62,6 +67,19 @@
+diff --git a/arch/arm/boot/dts/sun8i-reference-design-tablet.dtsi b/arch/arm/boot/dts/sun8i-reference-design-tablet.dtsi
+index 9d90361..f29897c 100644
+--- a/arch/arm/boot/dts/sun8i-reference-design-tablet.dtsi
++++ b/arch/arm/boot/dts/sun8i-reference-design-tablet.dtsi
+@@ -63,6 +63,27 @@
  	};
  };
  
-+&mmc1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc1_pins_a>;
-+	vmmc-supply = <&reg_dldo1>;
-+	bus-width = <4>;
-+	non-removable;
-+	status = "okay";
++&i2c0 {
++	/*
++	 * The gsl1680 is rated at 400KHz and it will not work reliable at
++	 * 100KHz, this has been confirmed on multiple different q8 tablets.
++	 * The gsl1680 is the only device on this bus.
++	 */
++	clock-frequency = <400000>;
 +
-+	rtl8703as: sdio_wifi at 1 {
-+		reg = <1>;
++	gsl1680: touchscreen at 40 {
++		compatible = "silead,gsl1680";
++		reg = <0x40>;
++		interrupt-parent = <&pio>;
++		interrupts = <1 5 IRQ_TYPE_EDGE_FALLING>; /* PB5 */
++		pinctrl-names = "default";
++		pinctrl-0 = <&ts_power_pin>;
++		power-gpios = <&pio 7 1 GPIO_ACTIVE_HIGH>; /* PH1 */
++		/* Most tablets use this touchscreen, but not all */
++		status = "disabled";
 +	};
 +};
 +
- &ohci0 {
- 	status = "okay";
- };
+ &mmc0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin>;
+@@ -88,6 +109,13 @@
+ 		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
+ 	};
+ 
++	ts_power_pin: ts_power_pin at 0 {
++		allwinner,pins = "PH1";
++		allwinner,function = "gpio_out";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++	};
++
+ 	usb0_id_detect_pin: usb0_id_detect_pin at 0 {
+ 		allwinner,pins = "PH8";
+ 		allwinner,function = "gpio_in";
 -- 
 2.7.4
