@@ -1,80 +1,75 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Mon, 08 Aug 2016 18:39:36 +0200
-Subject: Why do we need reset_control_get_optional() ?
-In-Reply-To: <1859714.7lR6dsl2IG@wuerfel>
-References: <CAK7LNAQnitMMp5wMXXvVeS-UFF=Fo9m=M1hL=5f4=RF8JYCnGg@mail.gmail.com>
- <CAK7LNAQ0nCQymq+M+FTUXoK7yBj_5CJp9nqDjO3u5wcnckXtmw@mail.gmail.com>
- <1469703649.12835.34.camel@pengutronix.de> <1859714.7lR6dsl2IG@wuerfel>
-Message-ID: <1470674376.2497.49.camel@pengutronix.de>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 8 Aug 2016 17:48:28 +0100
+Subject: [PATCH v7 4/4] nmi_backtrace: generate one-line reports for idle
+ cpus
+In-Reply-To: <1470672218-16059-5-git-send-email-cmetcalf@mellanox.com>
+References: <1470672218-16059-1-git-send-email-cmetcalf@mellanox.com>
+ <1470672218-16059-5-git-send-email-cmetcalf@mellanox.com>
+Message-ID: <20160808164828.GH12649@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, den 05.08.2016, 17:50 +0200 schrieb Arnd Bergmann:
-> On Thursday, July 28, 2016 1:00:49 PM CEST Philipp Zabel wrote:
-> > Am Donnerstag, den 28.07.2016, 19:52 +0900 schrieb Masahiro Yamada:
-> 
-> > > > In my experimental patch, I make the _optional functions
-> > > > return NULL if no "resets" property is provided but return
-> > > > an error if there are reset lines but the subsystem is
-> > > > disabled, i.e. an optional reset must be used if it's in the
-> > > > DT, but can be ignored otherwise.
-> > > 
-> > > I do not like this idea.
-> > > 
-> > > reset_control_get() (or variants) should not return NULL, it is ambiguous.
-> > > It should return ERR_PTR(-ENOENT) if no "resets" property.
-> > > 
-> > > I only want two types for functions that return a pointer.
-> > > 
-> > > [1] return a valid pointer on success, or return NULL on failure
-> > >     (for example, kmalloc())
-> > > [2] return a valid pointer on success, or return error pointer on failure
-> > >    (many of _register() functions)
-> > > 
-> > > Mixing [1] and [2] will be a mess.
-> 
-> Ah, right. I was thinking only of the case where the reset subsystem
-> is completely disabled here, so returning NULL could be considered
-> a valid return code that can in turn be passed into the other
-> functions.
-> 
-> However, I agree that returning NULL as a valid result from
-> ..._get_optional() would be bad style, so let's drop my idea
-> there.
-> 
-> > I too would prefer to keep that as-is. The reset_control_get_optional
-> > stub could return -ENOENT if there is no resets device tree property.
-> 
-> Now I'm also confused about what we really need
-> reset_control_get_optional() for, and which error codes the callers
-> are supposed to check.
-> 
-> This is the matrix I think you mean for _get_optional:
-> 
-[...]
-> CONFIG_RESET_CONTROLLER=n, dt entry present: -EOPNOTSUPP
-> CONFIG_RESET_CONTROLLER=n, dt entry missing: -ENOENT
+Hi,
 
-^^ I didn't consider this distiction.
+[adding Lorenzo]
 
-> Is this what you had in mind? If so, what is the value of the
-> added runtime warning for reset_control_get? Any caller of that
-> function would already check for errors, the only difference
-> I see is that callers of _optional can ignore -ENOENT.
+On Mon, Aug 08, 2016 at 12:03:38PM -0400, Chris Metcalf wrote:
+> When doing an nmi backtrace of many cores, most of which are idle,
+> the output is a little overwhelming and very uninformative.  Suppress
+> messages for cpus that are idling when they are interrupted and just
+> emit one line, "NMI backtrace for N skipped: idling at pc 0xNNN".
+> 
+> We do this by grouping all the cpuidle code together into a new
+> .cpuidle.text section, and then checking the address of the
+> interrupted PC to see if it lies within that section.
+> 
+> This commit suitably tags x86, arm64, and tile idle routines,
+> and only adds in the minimal framework for other architectures.
 
-My initial motivation was to make it as hard as possible to misconfigure
-the kernel, which is why I initially didn't want stubs for the
-non-optional variant. Of course that would cause build failures and/or
-reduced compile test coverage, so we added the stubs and the warning to
-make it obvious when a misconfigured kernel is running: on a kernel with
-RESET_CONTROLLER=n drivers that use reset_control_get are expected to
-build, but they are not expected to work. I suppose the same is the case
-for _optional, if the dt entry is present, so maybe we should drop
-reset_control_get_optional and add always a warning in case of
--EOPNOTSUPP.
-I don't want all drivers to have to differentiate between -EOPNOTSUPP
-and -ENOENT error codes, only current reset_control_get_optional users
-have to do that.
+> diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
+> index 659963d40bb4..fe7f93b7b11b 100644
+> --- a/arch/arm64/kernel/vmlinux.lds.S
+> +++ b/arch/arm64/kernel/vmlinux.lds.S
+> @@ -122,6 +122,7 @@ SECTIONS
+>  			ENTRY_TEXT
+>  			TEXT_TEXT
+>  			SCHED_TEXT
+> +			CPUIDLE_TEXT
+>  			LOCK_TEXT
+>  			KPROBES_TEXT
+>  			HYPERVISOR_TEXT
+> diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+> index 5bb61de23201..64f088ca3192 100644
+> --- a/arch/arm64/mm/proc.S
+> +++ b/arch/arm64/mm/proc.S
+> @@ -48,11 +48,13 @@
+>   *
+>   *	Idle the processor (wait for interrupt).
+>   */
+> +	.pushsection ".cpuidle.text","ax"
+>  ENTRY(cpu_do_idle)
+>  	dsb	sy				// WFI may enter a low-power mode
+>  	wfi
+>  	ret
+>  ENDPROC(cpu_do_idle)
+> +	.popsection
 
-regards
-Philipp
+>From a quick scan it looks like we only call this with interrupts
+disabled, and we have no NMI. So shouldn't we be annotating
+arch_cpu_idle(), which calls this and subsequently enables interrupts?
+
+I'm also not sure what you need to do for PSCI, which is the preferred
+(FW-backed) idle mechanism for arm64. The infrastrucure for that is
+spread over a few files:
+
+  arch/arm64/kernel/sleep.S
+  arch/arm64/kernel/smccc-call.S
+  arch/arm64/kernel/suspend.c
+  drivers/cpuidle/cpuidle-arm.c
+  drivers/firmware/psci.c
+
+I'm not sure where we'd be an an interruptible state, and therefore I'm
+not immediately sure what we should annotate.
+
+Thanks,
+Mark.
