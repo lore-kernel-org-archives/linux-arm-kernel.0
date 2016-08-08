@@ -1,38 +1,35 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Mon, 8 Aug 2016 20:15:27 +0200
-Subject: [PATCH v4 3/7] clk: sunxi: add generic multi-parent bus clock
- gates driver
-In-Reply-To: <20160808172149.30861-4-andre.przywara@arm.com>
-References: <20160808172149.30861-1-andre.przywara@arm.com>
- <20160808172149.30861-4-andre.przywara@arm.com>
-Message-ID: <20160808201527.62ec34beb19b86dcfd3dbf03@free.fr>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Mon, 8 Aug 2016 21:54:54 +0300
+Subject: [PATCH v3 0/6] Add R8A7794/SILK sound DT support
+In-Reply-To: <20160808105901.GH17838@verge.net.au>
+References: <3910788.ckTpUWEs6B@wasted.cogentembedded.com>
+ <87y44l2uy1.wl%kuninori.morimoto.gx@renesas.com>
+ <20160808105901.GH17838@verge.net.au>
+Message-ID: <f2d0ede3-6776-6c50-cdbc-2825295182ce@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon,  8 Aug 2016 18:21:45 +0100
-Andre Przywara <andre.przywara@arm.com> wrote:
+On 08/08/2016 01:59 PM, Simon Horman wrote:
 
-> The Allwinner H3 SoC introduced bus clock gates with potentially
-> different parents per clock gate register. The H3 driver chose to
-> hardcode the actual parent clock relation in the code.
-> Add a new driver (which has the potential to drive the H3 and also
-> the simple clock gates as well) which uses the power of DT to describe
-> this relationship in an elegant and flexible way.
-> Using one subnode for every parent clock we get away with a single
-> DT compatible match, which can be used as a fallback value in the
-> actual DTs without the need to add specific compatible strings to the
-> code.  This avoids adding a new driver or function for every new SoC.
+>>>    Here's the set of 6 patches against Simon Horman's 'renesas.git' repo,
+>>> 'renesas-devel-20160725-v4.7-rc7' tag. I'm adding the sound device tree support
+>>> for the R8A7794 SoC based SILK board.
+>>>
+>>> [1/6] ARM: dts: r8a7794: add audio clocks
+>>> [2/6] ARM: dts: r8a7794: add MSTP5 clocks
+>>> [3/6] ARM: dts: r8a7794: add MSTP10 clocks
+>>> [4/6] ARM: dts: r8a7794: add Audio-DMAC support
+>>> [5/6] ARM: dts: r8a7794: add sound support
+>>> [6/6] ARM: dts: silk: add sound support
+>>
+>> For all patches
+>>
+>> Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+>
+> Thanks, I have queued these up.
 
-The 'parent's of the bus gates are of no interest.
-They are supposed to be (no clear documentation) apb1, apb2, ahb1 and
-ahb2, but, as you well noticed in the patch 5/7, these clocks are fixed
-and have no gate. Some of them are parents of real clocks, but they
-don't bring anything to the bus gates of the other clocks.
+    Great, TY!
+    However, I noticed that the the latest devel tag is said to be still based 
+on v4.7-rc7 while in practice it's based on v4.8-rc1...
 
-As I wrote previously, the simplest is to ungate/gate the clocks in
-both the bus and clock registers on clk_prepare/unprepare.
-Then, your 'multi-bus-gates' would be simply a generic 'multi-gates'.
-
--- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+MBR, Sergei
