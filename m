@@ -1,52 +1,71 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 08 Aug 2016 23:39:38 +0200
-Subject: Why do we need reset_control_get_optional() ?
-In-Reply-To: <1470674376.2497.49.camel@pengutronix.de>
-References: <CAK7LNAQnitMMp5wMXXvVeS-UFF=Fo9m=M1hL=5f4=RF8JYCnGg@mail.gmail.com>
- <1859714.7lR6dsl2IG@wuerfel> <1470674376.2497.49.camel@pengutronix.de>
-Message-ID: <8414390.v8zIvdprGF@wuerfel>
+From: geoff@infradead.org (Geoff Levand)
+Date: Mon, 08 Aug 2016 22:19:33 +0000
+Subject: [PATCH v3 3/3] arm64: Add support for binary image files
+In-Reply-To: <cover.1470693832.git.geoff@infradead.org>
+References: <cover.1470693832.git.geoff@infradead.org>
+Message-ID: <726816b353ad67c222d135117145dd03663bb863.1470693832.git.geoff@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, August 8, 2016 6:39:36 PM CEST Philipp Zabel wrote:
-> > Now I'm also confused about what we really need
-> > reset_control_get_optional() for, and which error codes the callers
-> > are supposed to check.
-> > 
-> > This is the matrix I think you mean for _get_optional:
-> > 
-> [...]
-> > CONFIG_RESET_CONTROLLER=n, dt entry present: -EOPNOTSUPP
-> > CONFIG_RESET_CONTROLLER=n, dt entry missing: -ENOENT
-> 
-> ^^ I didn't consider this distiction.
-> 
-> > Is this what you had in mind? If so, what is the value of the
-> > added runtime warning for reset_control_get? Any caller of that
-> > function would already check for errors, the only difference
-> > I see is that callers of _optional can ignore -ENOENT.
-> 
-> My initial motivation was to make it as hard as possible to misconfigure
-> the kernel, which is why I initially didn't want stubs for the
-> non-optional variant. Of course that would cause build failures and/or
-> reduced compile test coverage, so we added the stubs and the warning to
-> make it obvious when a misconfigured kernel is running: on a kernel with
-> RESET_CONTROLLER=n drivers that use reset_control_get are expected to
-> build, but they are not expected to work. I suppose the same is the case
-> for _optional, if the dt entry is present, so maybe we should drop
-> reset_control_get_optional and add always a warning in case of
-> -EOPNOTSUPP.
-> I don't want all drivers to have to differentiate between -EOPNOTSUPP
-> and -ENOENT error codes, only current reset_control_get_optional users
-> have to do that.
+From: Pratyush Anand <panand@redhat.com>
 
-In almost all cases, I think drivers that require the reset line
-wouldn't even check the failure code but just pass it down to
-the caller (usually platform_device_probe()), so the really don't
-need to care.
+Signed-off-by: Pratyush Anand <panand@redhat.com>
+[Reworked and cleaned up]
+Signed-off-by: Geoff Levand <geoff@infradead.org>
+---
+ kexec/arch/arm64/kexec-image-arm64.c | 31 +++++++++++++++++++++++++------
+ 1 file changed, 25 insertions(+), 6 deletions(-)
 
-Some drivers might want to handle -EPROBE_DEFER (by not warning
-about it before returning from probe), and -ENOENT can be handled
-in a similar way (by continuing instead of failing).
-
-	Arnd
+diff --git a/kexec/arch/arm64/kexec-image-arm64.c b/kexec/arch/arm64/kexec-image-arm64.c
+index 84386f7..cad7c73 100644
+--- a/kexec/arch/arm64/kexec-image-arm64.c
++++ b/kexec/arch/arm64/kexec-image-arm64.c
+@@ -24,21 +24,40 @@ int image_arm64_probe(const char *kernel_buf, off_t kernel_size)
+ 		return -1;
+ 	}
+ 
+-	fprintf(stderr, "kexec: ARM64 binary image files are currently NOT SUPPORTED.\n");
+-
+-	return -1;
++	return 0;
+ }
+ 
+ int image_arm64_load(int argc, char **argv, const char *kernel_buf,
+ 	off_t kernel_size, struct kexec_info *info)
+ {
+-	return -EFAILED;
++	const struct arm64_image_header *h;
++	unsigned long image_base;
++
++	h = (const struct arm64_image_header *)(kernel_buf);
++
++	if (arm64_process_image_header(h))
++		return -EINVAL;
++
++	dbgprintf("%s: text_offset:   %016lx\n", __func__,
++		arm64_mem.text_offset);
++	dbgprintf("%s: image_size:    %016lx\n", __func__,
++		arm64_mem.image_size);
++	dbgprintf("%s: phys_offset:   %016lx\n", __func__,
++		arm64_mem.phys_offset);
++	dbgprintf("%s: PE format:     %s\n", __func__,
++		(arm64_header_check_pe_sig(h) ? "yes" : "no"));
++
++	image_base = get_phys_offset() + arm64_mem.text_offset;
++	
++	add_segment_phys_virt(info, kernel_buf, kernel_size, image_base,
++		arm64_mem.image_size, 0);
++
++	return arm64_load_other_segments(info, image_base);
+ }
+ 
+ void image_arm64_usage(void)
+ {
+ 	printf(
+ "     An ARM64 binary image, compressed or not, big or little endian.\n"
+-"     Typically an Image, Image.gz or Image.lzma file.\n"
+-"     This file type is currently NOT SUPPORTED.\n\n");
++"     Typically an Image, Image.gz or Image.lzma file.\n\n");
+ }
+-- 
+2.5.0
