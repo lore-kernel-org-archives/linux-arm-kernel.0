@@ -1,142 +1,80 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Mon,  8 Aug 2016 17:29:28 +0100
-Subject: [PATCH v3] KVM: arm64: ITS: return 1 on successful MSI injection
-Message-ID: <20160808162928.26441-1-andre.przywara@arm.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Mon, 08 Aug 2016 18:39:36 +0200
+Subject: Why do we need reset_control_get_optional() ?
+In-Reply-To: <1859714.7lR6dsl2IG@wuerfel>
+References: <CAK7LNAQnitMMp5wMXXvVeS-UFF=Fo9m=M1hL=5f4=RF8JYCnGg@mail.gmail.com>
+ <CAK7LNAQ0nCQymq+M+FTUXoK7yBj_5CJp9nqDjO3u5wcnckXtmw@mail.gmail.com>
+ <1469703649.12835.34.camel@pengutronix.de> <1859714.7lR6dsl2IG@wuerfel>
+Message-ID: <1470674376.2497.49.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to the KVM API documentation a successful MSI injection
-should return a value > 0 on success.
-Return possible errors in vgic_its_trigger_msi() and report a
-successful injection back to userland, while also reporting the
-case where the MSI could not be delivered due to the guest not
-having the LPI mapped, for instance.
+Am Freitag, den 05.08.2016, 17:50 +0200 schrieb Arnd Bergmann:
+> On Thursday, July 28, 2016 1:00:49 PM CEST Philipp Zabel wrote:
+> > Am Donnerstag, den 28.07.2016, 19:52 +0900 schrieb Masahiro Yamada:
+> 
+> > > > In my experimental patch, I make the _optional functions
+> > > > return NULL if no "resets" property is provided but return
+> > > > an error if there are reset lines but the subsystem is
+> > > > disabled, i.e. an optional reset must be used if it's in the
+> > > > DT, but can be ignored otherwise.
+> > > 
+> > > I do not like this idea.
+> > > 
+> > > reset_control_get() (or variants) should not return NULL, it is ambiguous.
+> > > It should return ERR_PTR(-ENOENT) if no "resets" property.
+> > > 
+> > > I only want two types for functions that return a pointer.
+> > > 
+> > > [1] return a valid pointer on success, or return NULL on failure
+> > >     (for example, kmalloc())
+> > > [2] return a valid pointer on success, or return error pointer on failure
+> > >    (many of _register() functions)
+> > > 
+> > > Mixing [1] and [2] will be a mess.
+> 
+> Ah, right. I was thinking only of the case where the reset subsystem
+> is completely disabled here, so returning NULL could be considered
+> a valid return code that can in turn be passed into the other
+> functions.
+> 
+> However, I agree that returning NULL as a valid result from
+> ..._get_optional() would be bad style, so let's drop my idea
+> there.
+> 
+> > I too would prefer to keep that as-is. The reset_control_get_optional
+> > stub could return -ENOENT if there is no resets device tree property.
+> 
+> Now I'm also confused about what we really need
+> reset_control_get_optional() for, and which error codes the callers
+> are supposed to check.
+> 
+> This is the matrix I think you mean for _get_optional:
+> 
+[...]
+> CONFIG_RESET_CONTROLLER=n, dt entry present: -EOPNOTSUPP
+> CONFIG_RESET_CONTROLLER=n, dt entry missing: -ENOENT
 
-Signed-off-by: Andre Przywara <andre.przywara@arm.com>
----
-Changelog v2 .. v3:
-- return Linux errors to userland
+^^ I didn't consider this distiction.
 
-Changelog v1 .. v2:
-- properly detect unmapped LPIs and report this to userland
+> Is this what you had in mind? If so, what is the value of the
+> added runtime warning for reset_control_get? Any caller of that
+> function would already check for errors, the only difference
+> I see is that callers of _optional can ignore -ENOENT.
 
- include/linux/irqchip/arm-gic-v3.h |  1 +
- virt/kvm/arm/vgic/vgic-its.c       | 56 +++++++++++++++++++++++++-------------
- 2 files changed, 38 insertions(+), 19 deletions(-)
+My initial motivation was to make it as hard as possible to misconfigure
+the kernel, which is why I initially didn't want stubs for the
+non-optional variant. Of course that would cause build failures and/or
+reduced compile test coverage, so we added the stubs and the warning to
+make it obvious when a misconfigured kernel is running: on a kernel with
+RESET_CONTROLLER=n drivers that use reset_control_get are expected to
+build, but they are not expected to work. I suppose the same is the case
+for _optional, if the dt entry is present, so maybe we should drop
+reset_control_get_optional and add always a warning in case of
+-EOPNOTSUPP.
+I don't want all drivers to have to differentiate between -EOPNOTSUPP
+and -ENOENT error codes, only current reset_control_get_optional users
+have to do that.
 
-diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
-index 56b0b7e..99ac022 100644
---- a/include/linux/irqchip/arm-gic-v3.h
-+++ b/include/linux/irqchip/arm-gic-v3.h
-@@ -337,6 +337,7 @@
-  */
- #define E_ITS_MOVI_UNMAPPED_INTERRUPT		0x010107
- #define E_ITS_MOVI_UNMAPPED_COLLECTION		0x010109
-+#define E_ITS_INT_UNMAPPED_INTERRUPT		0x010307
- #define E_ITS_CLEAR_UNMAPPED_INTERRUPT		0x010507
- #define E_ITS_MAPD_DEVICE_OOR			0x010801
- #define E_ITS_MAPC_PROCNUM_OOR			0x010902
-diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-index 7180994..3c029cd 100644
---- a/virt/kvm/arm/vgic/vgic-its.c
-+++ b/virt/kvm/arm/vgic/vgic-its.c
-@@ -441,39 +441,48 @@ static unsigned long vgic_mmio_read_its_idregs(struct kvm *kvm,
-  * Find the target VCPU and the LPI number for a given devid/eventid pair
-  * and make this IRQ pending, possibly injecting it.
-  * Must be called with the its_lock mutex held.
-+ * Returns 0 on success, a positive error value for any ITS mapping
-+ * related errors and negative error values for generic errors.
-  */
--static void vgic_its_trigger_msi(struct kvm *kvm, struct vgic_its *its,
--				 u32 devid, u32 eventid)
-+static int vgic_its_trigger_msi(struct kvm *kvm, struct vgic_its *its,
-+				u32 devid, u32 eventid)
- {
-+	struct kvm_vcpu *vcpu;
- 	struct its_itte *itte;
- 
- 	if (!its->enabled)
--		return;
-+		return -EBUSY;
- 
- 	itte = find_itte(its, devid, eventid);
--	/* Triggering an unmapped IRQ gets silently dropped. */
--	if (itte && its_is_collection_mapped(itte->collection)) {
--		struct kvm_vcpu *vcpu;
--
--		vcpu = kvm_get_vcpu(kvm, itte->collection->target_addr);
--		if (vcpu && vcpu->arch.vgic_cpu.lpis_enabled) {
--			spin_lock(&itte->irq->irq_lock);
--			itte->irq->pending = true;
--			vgic_queue_irq_unlock(kvm, itte->irq);
--		}
--	}
-+	if (!itte || !its_is_collection_mapped(itte->collection))
-+		return E_ITS_INT_UNMAPPED_INTERRUPT;
-+
-+	vcpu = kvm_get_vcpu(kvm, itte->collection->target_addr);
-+	if (!vcpu)
-+		return E_ITS_INT_UNMAPPED_INTERRUPT;
-+
-+	if (!vcpu->arch.vgic_cpu.lpis_enabled)
-+		return -EBUSY;
-+
-+	spin_lock(&itte->irq->irq_lock);
-+	itte->irq->pending = true;
-+	vgic_queue_irq_unlock(kvm, itte->irq);
-+
-+	return 0;
- }
- 
- /*
-  * Queries the KVM IO bus framework to get the ITS pointer from the given
-  * doorbell address.
-  * We then call vgic_its_trigger_msi() with the decoded data.
-+ * According to the KVM_SIGNAL_MSI API description returns 1 on success.
-  */
- int vgic_its_inject_msi(struct kvm *kvm, struct kvm_msi *msi)
- {
- 	u64 address;
- 	struct kvm_io_device *kvm_io_dev;
- 	struct vgic_io_device *iodev;
-+	int ret;
- 
- 	if (!vgic_has_its(kvm))
- 		return -ENODEV;
-@@ -490,10 +499,21 @@ int vgic_its_inject_msi(struct kvm *kvm, struct kvm_msi *msi)
- 	iodev = container_of(kvm_io_dev, struct vgic_io_device, dev);
- 
- 	mutex_lock(&iodev->its->its_lock);
--	vgic_its_trigger_msi(kvm, iodev->its, msi->devid, msi->data);
-+	ret = vgic_its_trigger_msi(kvm, iodev->its, msi->devid, msi->data);
- 	mutex_unlock(&iodev->its->its_lock);
- 
--	return 0;
-+	if (ret < 0)
-+		return ret;
-+
-+	/*
-+	 * KVM_SIGNAL_MSI demands a return value > 0 for success and 0
-+	 * if the guest has blocked the MSI. So we map any LPI mapping
-+	 * related error to that.
-+	 */
-+	if (ret)
-+		return 0;
-+	else
-+		return 1;
- }
- 
- /* Requires the its_lock to be held. */
-@@ -981,9 +1001,7 @@ static int vgic_its_cmd_handle_int(struct kvm *kvm, struct vgic_its *its,
- 	u32 msi_data = its_cmd_get_id(its_cmd);
- 	u64 msi_devid = its_cmd_get_deviceid(its_cmd);
- 
--	vgic_its_trigger_msi(kvm, its, msi_devid, msi_data);
--
--	return 0;
-+	return vgic_its_trigger_msi(kvm, its, msi_devid, msi_data);
- }
- 
- /*
--- 
-2.9.0
+regards
+Philipp
