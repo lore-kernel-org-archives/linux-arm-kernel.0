@@ -1,68 +1,48 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 08 Aug 2016 17:05:50 +0200
-Subject: [GIT PULL] ARM: mvebu: dt-late for v4.8
-In-Reply-To: <87popznp93.fsf@free-electrons.com> (Gregory CLEMENT's message of
- "Wed, 27 Jul 2016 16:12:56 +0200")
-References: <87popznp93.fsf@free-electrons.com>
-Message-ID: <87lh07uwq9.fsf@free-electrons.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Mon, 8 Aug 2016 16:09:17 +0100
+Subject: [PATCH 5/6] ARM: tegra: Add Tegra20 GMI support
+In-Reply-To: <1470512452-8322-6-git-send-email-mirza.krak@gmail.com>
+References: <1470512452-8322-1-git-send-email-mirza.krak@gmail.com>
+ <1470512452-8322-6-git-send-email-mirza.krak@gmail.com>
+Message-ID: <af24f4d2-b8bf-993a-13f3-54dade1ebeb7@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
- 
- On Wed, Jul 27 2016, Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
-
-> Hi,
->
-> Here is a late pull request for a device tree fix on mvebu for v4.8.
->
-> If it is too late to have it for v4.8-rc1, I will send it again as fix
-> for v4.8-rc2.
-
-So it was too late. Then I will do a pull request for the fix this week with
-this patch.
-
-Gregory
 
 
->
-> Thanks,
->
-> Gregory
->
-> The following changes since commit d261861ab52623e34a25fe6ae76714456edda033:
->
->   ARM: dts: armada-388-clearfog: remove duplicate mdio entry (2016-07-11 18:05:48 +0200)
->
-> are available in the git repository at:
->
->   git://git.infradead.org/linux-mvebu.git tags/mvebu-dt-late-4.8
->
-> for you to fetch changes up to 1f5b6fd2942ca2a063655fbeea5a922bc08f9e21:
->
->   ARM: dts: armada388-clearfog: number LAN ports properly (2016-07-27 15:12:02 +0200)
->
-> ----------------------------------------------------------------
-> Late mvebu dt for v4.8
->
-> The commit correct the led name on the clearfog board and should be
-> applied as soon as possible to avoid spread the port renumbering over
-> a large range of kernels.
->
-> ----------------------------------------------------------------
-> Russell King (1):
->       ARM: dts: armada388-clearfog: number LAN ports properly
->
->  arch/arm/boot/dts/armada-388-clearfog.dts | 8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+On 06/08/16 20:40, Mirza Krak wrote:
+> From: Mirza Krak <mirza.krak@gmail.com>
+> 
+> Add a device node for the GMI controller found on Tegra20.
+> 
+> Signed-off-by: Mirza Krak <mirza.krak@gmail.com>
+> ---
+>  arch/arm/boot/dts/tegra20.dtsi | 11 +++++++++++
+>  1 file changed, 11 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/tegra20.dtsi b/arch/arm/boot/dts/tegra20.dtsi
+> index 2207c08..9b97863 100644
+> --- a/arch/arm/boot/dts/tegra20.dtsi
+> +++ b/arch/arm/boot/dts/tegra20.dtsi
+> @@ -376,6 +376,17 @@
+>  		status = "disabled";
+>  	};
+>  
+> +
+> +	gmi at 70009000 {
+> +		compatible = "nvidia,tegra20-gmi";
+> +		reg = <70009000 0x1000>;
+> +		clocks = <&tegra_car TEGRA20_CLK_NOR>;
+> +		clock-names = "gmi";
+> +		resets = < &tegra_car 42>;
+> +		reset-names = "gmi";
+> +		status = "disabled";
+> +	};
+
+#address-cells, #size-cells and ranges appears to be missing.
+
+Cheers
+Jon
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+nvpublic
