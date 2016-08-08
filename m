@@ -1,37 +1,52 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 08 Aug 2016 23:34:31 +0200
-Subject: [PATCH 2/4] soc: qcom: add EBI2 driver
-In-Reply-To: <1470691445-27571-3-git-send-email-linus.walleij@linaro.org>
-References: <1470691445-27571-1-git-send-email-linus.walleij@linaro.org>
- <1470691445-27571-3-git-send-email-linus.walleij@linaro.org>
-Message-ID: <4682049.SjGsnbmFIW@wuerfel>
+Date: Mon, 08 Aug 2016 23:39:38 +0200
+Subject: Why do we need reset_control_get_optional() ?
+In-Reply-To: <1470674376.2497.49.camel@pengutronix.de>
+References: <CAK7LNAQnitMMp5wMXXvVeS-UFF=Fo9m=M1hL=5f4=RF8JYCnGg@mail.gmail.com>
+ <1859714.7lR6dsl2IG@wuerfel> <1470674376.2497.49.camel@pengutronix.de>
+Message-ID: <8414390.v8zIvdprGF@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, August 8, 2016 11:24:03 PM CEST Linus Walleij wrote:
-> This adds a driver for the Qualcomm External Bus Interface EBI2
-> found in the MSM8660 and APQ8060 SoCs (at least).
+On Monday, August 8, 2016 6:39:36 PM CEST Philipp Zabel wrote:
+> > Now I'm also confused about what we really need
+> > reset_control_get_optional() for, and which error codes the callers
+> > are supposed to check.
+> > 
+> > This is the matrix I think you mean for _get_optional:
+> > 
+> [...]
+> > CONFIG_RESET_CONTROLLER=n, dt entry present: -EOPNOTSUPP
+> > CONFIG_RESET_CONTROLLER=n, dt entry missing: -ENOENT
 > 
-> This was tested with the SMSC9112 ethernet on the APQ8060
-> Dragonboard sitting on top of the SLOW CS2.
+> ^^ I didn't consider this distiction.
 > 
-> Some of my understanding if very vague and based on guesses and
-> extrapolations: the documentation in APQ8060 Qualcomm Application
-> Processor User Guide 80-N7150-14 Rev. A describes select features but
-> does not document the register bit fields.
+> > Is this what you had in mind? If so, what is the value of the
+> > added runtime warning for reset_control_get? Any caller of that
+> > function would already check for errors, the only difference
+> > I see is that callers of _optional can ignore -ENOENT.
 > 
-> However I had to do something like this to provide a serious driver,
-> I have marked the guesses with /* GUESS */
-> 
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
->  drivers/soc/qcom/Kconfig  |   8 +
->  drivers/soc/qcom/Makefile |   1 +
->  drivers/soc/qcom/ebi2.c   | 371 ++++++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 380 insertions(+)
->  create mode 100644 drivers/soc/qcom/ebi2.c
-> 
+> My initial motivation was to make it as hard as possible to misconfigure
+> the kernel, which is why I initially didn't want stubs for the
+> non-optional variant. Of course that would cause build failures and/or
+> reduced compile test coverage, so we added the stubs and the warning to
+> make it obvious when a misconfigured kernel is running: on a kernel with
+> RESET_CONTROLLER=n drivers that use reset_control_get are expected to
+> build, but they are not expected to work. I suppose the same is the case
+> for _optional, if the dt entry is present, so maybe we should drop
+> reset_control_get_optional and add always a warning in case of
+> -EOPNOTSUPP.
+> I don't want all drivers to have to differentiate between -EOPNOTSUPP
+> and -ENOENT error codes, only current reset_control_get_optional users
+> have to do that.
 
-This should probably live in drivers/memory, or possibly drivers/bus.
+In almost all cases, I think drivers that require the reset line
+wouldn't even check the failure code but just pass it down to
+the caller (usually platform_device_probe()), so the really don't
+need to care.
+
+Some drivers might want to handle -EPROBE_DEFER (by not warning
+about it before returning from probe), and -ENOENT can be handled
+in a similar way (by continuing instead of failing).
 
 	Arnd
