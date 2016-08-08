@@ -1,76 +1,45 @@
 From: thunder.leizhen@huawei.com (Zhen Lei)
-Date: Mon, 8 Aug 2016 17:18:07 +0800
-Subject: [PATCH v5 02/14] of/numa: fix a memory@ node can only contains one
- memory block
+Date: Mon, 8 Aug 2016 17:18:11 +0800
+Subject: [PATCH v5 06/14] of_numa: Use of_get_next_parent to simplify code
 In-Reply-To: <1470647899-6324-1-git-send-email-thunder.leizhen@huawei.com>
 References: <1470647899-6324-1-git-send-email-thunder.leizhen@huawei.com>
-Message-ID: <1470647899-6324-3-git-send-email-thunder.leizhen@huawei.com>
+Message-ID: <1470647899-6324-7-git-send-email-thunder.leizhen@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For a normal memory@ devicetree node, its reg property can contains more
-memory blocks.
+From: Kefeng Wang <wangkefeng.wang@huawei.com>
 
-Because we don't known how many memory blocks maybe contained, so we try
-from index=0, increase 1 until error returned(the end).
+Use of_get_next_parent() instead of open-code.
 
-Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
+Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
 Acked-by: Rob Herring <robh@kernel.org>
 ---
- drivers/of/of_numa.c | 29 ++++++++++-------------------
- 1 file changed, 10 insertions(+), 19 deletions(-)
+ drivers/of/of_numa.c | 6 +-----
+ 1 file changed, 1 insertion(+), 5 deletions(-)
 
 diff --git a/drivers/of/of_numa.c b/drivers/of/of_numa.c
-index fb71b4e..7b3fbdc 100644
+index 3157130..ed7bd22 100644
 --- a/drivers/of/of_numa.c
 +++ b/drivers/of/of_numa.c
-@@ -63,13 +63,9 @@ static int __init of_numa_parse_memory_nodes(void)
- 	struct device_node *np = NULL;
- 	struct resource rsrc;
- 	u32 nid;
--	int r = 0;
+@@ -153,8 +153,6 @@ int of_node_to_nid(struct device_node *device)
+ 	np = of_node_get(device);
+
+ 	while (np) {
+-		struct device_node *parent;
 -
--	for (;;) {
--		np = of_find_node_by_type(np, "memory");
--		if (!np)
--			break;
-+	int i, r;
-
-+	for_each_node_by_type(np, "memory") {
  		r = of_property_read_u32(np, "numa-node-id", &nid);
- 		if (r == -EINVAL)
- 			/*
-@@ -78,23 +74,18 @@ static int __init of_numa_parse_memory_nodes(void)
- 			 * "numa-node-id" property
- 			 */
- 			continue;
--		else if (r)
--			/* some other error */
--			break;
+ 		/*
+ 		 * -EINVAL indicates the property was not found, and
+@@ -165,9 +163,7 @@ int of_node_to_nid(struct device_node *device)
+ 		if (r != -EINVAL)
+ 			break;
 
--		r = of_address_to_resource(np, 0, &rsrc);
--		if (r) {
--			pr_err("NUMA: bad reg property in memory node\n");
--			break;
--		}
-+		for (i = 0; !r && !of_address_to_resource(np, i, &rsrc); i++)
-+			r = numa_add_memblk(nid, rsrc.start, rsrc.end + 1);
-
--		r = numa_add_memblk(nid, rsrc.start, rsrc.end + 1);
--		if (r)
--			break;
-+		if (!i || r) {
-+			of_node_put(np);
-+			pr_err("NUMA: bad property in memory node\n");
-+			return r ? : -EINVAL;
-+		}
+-		parent = of_get_parent(np);
+-		of_node_put(np);
+-		np = parent;
++		np = of_get_next_parent(np);
  	}
--	of_node_put(np);
-
--	return r;
-+	return 0;
- }
-
- static int __init of_numa_parse_distance_map_v1(struct device_node *map)
+ 	if (np && r)
+ 		pr_warn("NUMA: Invalid \"numa-node-id\" property in node %s\n",
 --
 2.5.0
