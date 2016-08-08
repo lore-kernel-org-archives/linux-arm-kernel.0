@@ -1,36 +1,51 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 8 Aug 2016 19:51:46 +0200
-Subject: [PATCH v2] arm: dts: sun7i-a20-bananapi: name the GPIO lines
-In-Reply-To: <1470384404-6796-1-git-send-email-linux@rempel-privat.de>
-References: <CACRpkdYnK=7C=F5hZUo-nYv6Z+Pb+eT7vm1e4hL8N-QgJnuLfg@mail.gmail.com>
- <1470384404-6796-1-git-send-email-linux@rempel-privat.de>
-Message-ID: <CACRpkdZn7-SL5kmGn7Pysz=QiQFBEm8+c6bw=hE5F0CV4ct0RQ@mail.gmail.com>
+From: anshexp@gmail.com (Anshuman Gupta)
+Date: Mon, 8 Aug 2016 23:26:13 +0530
+Subject: 1 of 705 Linux 4.7.0 on freescale imx6 quad udoo board.
+Message-ID: <CADo9au1MD=H_1Jn+d0j8+O8gRChAtmp1uZ=fgKEpS+z+w94RLA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 5, 2016 at 10:06 AM, Oleksij Rempel <linux@rempel-privat.de> wrote:
+I am trying to boot the udoo (freescale imx6 quad) with vanilla linux
+kernel 4.7.0 with  ubuntu  file system.
 
-> This names the GPIO lines on the Banana Pi board in accordance with
-> the A20_Banana_Pi v1.4 Specification.
->
-> This will make these line names reflect through to userspace
-> so that they can easily be identified and used with the new
-> character device ABI.
->
-> Some care has been taken to name all lines, not just those used
-> by the external connectors, also lines that are muxed into some
-> other function than GPIO: these are named "[FOO]" so that users
-> can see with lsgpio what all lines are used for.
->
-> Ps: most of the text was taken from Linus Wallej patch.
->
-> Cc: devicetree at vger.kernel.org
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: Chen-Yu Tsai <wens@csie.org>
-> Signed-off-by: Oleksij Rempel <linux@rempel-privat.de>
+I am trying a root over nfs , kernel boots successfully and  `root
+file system mounted
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+but the shell is not launching it seems it has locked up somewhere ,
+console just get hang.
 
-Yours,
-Linus Walleij
+whether it is a issue with init/file system or kernel.
+
+Any help or point to debug this further will  be highly appreciated.
+
+Sorry if this is wrong mailing  list to post this query , if it is
+please tell me the right mailing list.
+
+Below here it is the log snippet
+
+-------------------------------------------------------------------------------------------------------------
+[    4.606736] Sending DHCP requests .., OK
+[    7.216728] IP-Config: Got DHCP answer from 192.168.1.1, my address is 192.16
+8.1.38
+[    7.224527] IP-Config: Complete:
+[    7.227791]      device=eth0, hwaddr=00:01:02:b4:36:56, ipaddr=192.168.1.38,
+mask=255.255.255.0, gw=192.168.1.1
+[    7.237896]      host=192.168.1.38, domain=, nis-domain=(none)
+[    7.243735]      bootserver=0.0.0.0, rootserver=192.168.1.36, rootpath=     n
+ameserver0=192.168.1.1
+[    7.252847] vddpu: disabling
+[    7.255739] usb_h1_vbus: disabling
+[    7.259166] lcd_panel: disabling
+[    7.262608] ALSA device list:
+[    7.265583]   No soundcards found.
+[    7.308990] VFS: Mounted root (nfs filesystem) readonly on device 0:12.
+[    7.316079] devtmpfs: mounted
+[    7.319969] Freeing unused kernel memory: 1024K (80a00000 - 80b00000)
+[    7.362780] random: fast init done
+[    9.010585] init: mounted-proc main process (129) terminated with status 1
+---------------------------------------------------------------------------------------------------------------
+
+
+Thanks in Advanced
+
+Anshuman
