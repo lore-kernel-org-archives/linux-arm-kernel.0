@@ -1,68 +1,64 @@
-From: wangkefeng.wang@huawei.com (Kefeng Wang)
-Date: Mon, 8 Aug 2016 13:29:50 +0800
-Subject: [PATCH] arm64: Support hard limit of cpu count by nr_cpus
-In-Reply-To: <02d77415-9eb0-92f4-7cb6-9b941cda9a4d@arm.com>
-References: <1470377035-1591-1-git-send-email-wangkefeng.wang@huawei.com>
- <20160805083238.GA13272@arm.com>
- <e2f3ee03-24e7-fd28-4172-ff0c87f9f539@huawei.com>
- <02d77415-9eb0-92f4-7cb6-9b941cda9a4d@arm.com>
-Message-ID: <f0f9af57-4150-dce7-5bb7-aa7fcfe77aee@huawei.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Mon, 8 Aug 2016 11:12:26 +0530
+Subject: [PATCH v2 6/6] dmaengine: omap-dma: Support for LinkedList
+ transfer of slave_sg
+In-Reply-To: <20160720085032.2955-7-peter.ujfalusi@ti.com>
+References: <20160720085032.2955-1-peter.ujfalusi@ti.com>
+ <20160720085032.2955-7-peter.ujfalusi@ti.com>
+Message-ID: <20160808054226.GR9681@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 2016/8/5 18:19, Suzuki K Poulose wrote:
-> On 05/08/16 10:58, Kefeng Wang wrote:
->>
->>
->> On 2016/8/5 16:32, Will Deacon wrote:
->>> On Fri, Aug 05, 2016 at 02:03:55PM +0800, Kefeng Wang wrote:
->>>> Enable the hard limit of cpu count by nr_cpus on arm64.
->>>> The code is borrowed from MIPS.
->>>>
-[...]
+On Wed, Jul 20, 2016 at 11:50:32AM +0300, Peter Ujfalusi wrote:
+> sDMA in OMAP3630 or newer SoC have support for LinkedList transfer. When
+> LinkedList or Descriptor load feature is present we can create the
+> descriptors for each and program sDMA to walk through the list of
+> descriptors instead of the current way of sDMA stop, sDMA reconfiguration
+> and sDMA start after each SG transfer.
+> By using LinkedList transfer in sDMA the number of DMA interrupts will
+> decrease dramatically.
+> Booting up the board with filesystem on SD card for example:
+> W/o LinkedList support:
+>  27:       4436          0     WUGEN  13 Level     omap-dma-engine
 > 
-> Or is this even better ?
-
-Agree, and let's show a better warning.
-
+> Same board/filesystem with this patch:
+>  27:       1027          0     WUGEN  13 Level     omap-dma-engine
 > 
-> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-> index 490db85..dbd6a5e 100644
-> --- a/arch/arm64/kernel/smp.c
-> +++ b/arch/arm64/kernel/smp.c
-> @@ -659,9 +659,9 @@ void __init smp_init_cpus(void)
->                 acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_INTERRUPT,
->                                       acpi_parse_gic_cpu_interface, 0);
+> Or copying files from SD card to eMCC:
+> 2.1G    /usr/
+> 232001
+> 
+> W/o LinkedList we see ~761069 DMA interrupts.
+> With LinkedList support it is down to ~269314 DMA interrupts.
+> 
+> With the decreased DMA interrupt number the CPU load is dropping
+> significantly as well.
+
+Interesting, I would have counted the throughput of DMA by using time for
+transfer and not really interrupts and CPU load. With LL mode, you get a
+big performance boost due to starting next transaction by hardware without
+waiting for CPU intervention and yes side effect is lesser interrupts and
+load :)
+
+> @@ -743,6 +863,7 @@ static struct dma_async_tx_descriptor *omap_dma_prep_slave_sg(
+>  	struct omap_desc *d;
+>  	dma_addr_t dev_addr;
+>  	unsigned i, es, en, frame_bytes;
+> +	bool ll_failed = false;
+>  	u32 burst;
 >  
-> -       if (cpu_count > NR_CPUS)
-> +       if (cpu_count > nr_cpu_ids)
->                 pr_warn("no. of cores (%d) greater than configured maximum of %d - clipping\n",
+>  	if (dir == DMA_DEV_TO_MEM) {
+> @@ -818,16 +939,47 @@ static struct dma_async_tx_descriptor *omap_dma_prep_slave_sg(
+>  	 */
+>  	en = burst;
+>  	frame_bytes = es_bytes[es] * en;
+> +
+> +	if (sglen >= 2)
+> +		d->using_ll = od->ll123_supported;
 
-  change to 	  pr_warn("%d cores exceeds configured maximum of %d - clipping\n",
+No upperbound on length? Does the hardware support any lengths?
 
-Thanks,
-Kefeng
 
-> -                       cpu_count, NR_CPUS);
-> +                       cpu_count, nr_cpu_ids);
->  
->         if (!bootcpu_valid) {
->                 pr_err("missing boot CPU MPIDR, not enabling secondaries\n");
-> @@ -675,7 +675,7 @@ void __init smp_init_cpus(void)
->          * with entries in cpu_logical_map while initializing the cpus.
->          * If the cpu set-up fails, invalidate the cpu_logical_map entry.
->          */
-> -       for (i = 1; i < NR_CPUS; i++) {
-> +       for (i = 1; i < nr_cpu_ids; i++) {
->                 if (cpu_logical_map(i) != INVALID_HWID) {
->                         if (smp_cpu_setup(i))
->                                 cpu_logical_map(i) = INVALID_HWID;
-> 
-> 
-> Cheers
-> Suzuki
-> 
-> .
-> 
+
+-- 
+~Vinod
