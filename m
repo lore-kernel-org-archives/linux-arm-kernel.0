@@ -1,45 +1,52 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 8 Aug 2016 15:08:03 +0800
-Subject: [PATCH v2 2/2] ARM: dts: imx53: add support for USB armory board
-In-Reply-To: <20160628125444.16531-3-andrej@inversepath.com>
-References: <20160628125444.16531-1-andrej@inversepath.com>
- <20160628125444.16531-3-andrej@inversepath.com>
-Message-ID: <20160808070803.GB4678@tiger>
+From: kid.jin@hisilicon.com (Jinguojun)
+Date: Mon, 8 Aug 2016 15:10:31 +0800
+Subject: [PATCH V4]mmc: dw_mmc-k3: UHS-SD card for Hisilicon Hikey
+In-Reply-To: <1470276973-41683-1-git-send-email-kid.jin@hisilicon.com>
+References: <1470276973-41683-1-git-send-email-kid.jin@hisilicon.com>
+Message-ID: <74c80b1c-5570-0ee0-4132-ff703d8d5eb4@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-One more comment below.
+Hi,maintainers
 
-On Tue, Jun 28, 2016 at 02:54:44PM +0200, andrej at inversepath.com wrote:
-> +&iomuxc {
-> +	pinctrl_esdhc1: esdhc1grp {
-> +		fsl,pins = <
-> +			MX53_PAD_SD1_DATA0__ESDHC1_DAT0		0x1d5
-> +			MX53_PAD_SD1_DATA1__ESDHC1_DAT1		0x1d5
-> +			MX53_PAD_SD1_DATA2__ESDHC1_DAT2		0x1d5
-> +			MX53_PAD_SD1_DATA3__ESDHC1_DAT3		0x1d5
-> +			MX53_PAD_SD1_CMD__ESDHC1_CMD		0x1d5
-> +			MX53_PAD_SD1_CLK__ESDHC1_CLK		0x1d5
-> +		>;
-> +	};
+Pls help to review code,this is the newest patch after your advise
+
+Thx
+On 2016/8/4 10:16, Jin Guojun wrote:
+> mmc: dw_mmc-k3: Hisilicon Hikey have no tuning function in 
+> dw_mmc-k3.c,so we must do the tuning function stub when we init UHS card.
+> 
+> V1:add .prepare_command in dw_mmc.c
+> V2:delete .prepare_command, add err = 0 in dw_mci_execute_tuning
+> V3:delete err = 0 in dw_mci_execute_tuning,add .execute_tuning in 
+> dw_mmc-k3.c
+> V4:add "linux-mmc at vger.kernel.org", patch version, Changelog, etc..
+> 
+> Signed-off-by: Jin Guojun <kid.jin@hisilicon.com>
+> ---
+>  drivers/mmc/host/dw_mmc-k3.c | 6 ++++++
+>  1 file changed, 6 insertions(+)
+> 
+> diff --git a/drivers/mmc/host/dw_mmc-k3.c b/drivers/mmc/host/dw_mmc-k3.c
+> index 8e9d886..6247894 100644
+> --- a/drivers/mmc/host/dw_mmc-k3.c
+> +++ b/drivers/mmc/host/dw_mmc-k3.c
+> @@ -131,11 +131,17 @@ static void dw_mci_hi6220_set_ios(struct dw_mci *host, struct mmc_ios *ios)
+>  	host->bus_hz = clk_get_rate(host->biu_clk);
+>  }
+>  
+> +static int dw_mci_hi6220_execute_tuning(struct dw_mci_slot *slot, u32 opcode)
+> +{
+> +	return 0;
+> +}
 > +
-> +	pinctrl_i2c1_pmic: i2c1grp_pmic {
-> +		fsl,pins = <
-> +			MX53_PAD_EIM_D21__I2C1_SCL	0x0
-> +			MX53_PAD_EIM_D28__I2C1_SDA	0x0
-
-Please use a proper pin configuration value rather than 0x0.
-
-> +		>;
-> +	};
-> +
-> +	pinctrl_led: led {
-> +		fsl,pins = <
-> +			MX53_PAD_DISP0_DAT6__GPIO4_27 0x0
-
-Ditto.
-
-Shawn
-
-> +		>;
-> +	};
+>  static const struct dw_mci_drv_data hi6220_data = {
+>  	.caps			= dw_mci_hi6220_caps,
+>  	.switch_voltage		= dw_mci_hi6220_switch_voltage,
+>  	.set_ios		= dw_mci_hi6220_set_ios,
+>  	.parse_dt		= dw_mci_hi6220_parse_dt,
+> +	.execute_tuning		= dw_mci_hi6220_execute_tuning,
+>  };
+>  
+>  static const struct of_device_id dw_mci_k3_match[] = {
+> 
