@@ -1,28 +1,90 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 8 Aug 2016 15:03:04 +0200
-Subject: [PATCH v4 2/6] ARM: dts: r8a7794: add MSTP5 clocks
-In-Reply-To: <3560619.yXVhzgu5Aq@wasted.cogentembedded.com>
-References: <3910788.ckTpUWEs6B@wasted.cogentembedded.com>
- <3560619.yXVhzgu5Aq@wasted.cogentembedded.com>
-Message-ID: <CAMuHMdXy6RUL5=ps9kcY9t3opFj2okTDeu_j7qmc22DcE8gukw@mail.gmail.com>
+From: appana.durga.rao@xilinx.com (Appana Durga Kedareswara Rao)
+Date: Mon, 8 Aug 2016 13:05:40 +0000
+Subject: [RFC PATCH v4 1/2] Documentation: DT: net: Add Xilinx
+ gmiitorgmii converter device tree binding documentation
+In-Reply-To: <b3813524-7531-d294-1def-628b0a28f6bb@xilinx.com>
+References: <1470640505-8279-1-git-send-email-appanad@xilinx.com>
+ <b3813524-7531-d294-1def-628b0a28f6bb@xilinx.com>
+Message-ID: <C246CAC1457055469EF09E3A7AC4E11A4A5DF3AF@XAP-PVEXMBX01.xlnx.xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 27, 2016 at 10:59 PM, Sergei Shtylyov
-<sergei.shtylyov@cogentembedded.com> wrote:
-> Add some MSTP5 clocks to the R8A7794 device tree.
->
-> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Hi Michal,
 
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> On 8.8.2016 09:15, Kedareswara rao Appana wrote:
+> > Device-tree binding documentation for xilinx gmiitorgmii converter.
+> >
+> > Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
+> > ---
+> > Changes for v4:
+> > --> Modified compatible as suggested by Rob.
+> > --> Removed underscores from the converter node name as suggested by Rob.
+> > Changes for v3:
+> > --> None.
+> > Changes for v2:
+> > --> New patch.
+> >
+> >  .../devicetree/bindings/net/xilinx_gmii2rgmii.txt  | 38
+> > ++++++++++++++++++++++
+> >  1 file changed, 38 insertions(+)
+> >  create mode 100644
+> > Documentation/devicetree/bindings/net/xilinx_gmii2rgmii.txt
+> >
+> > diff --git
+> > a/Documentation/devicetree/bindings/net/xilinx_gmii2rgmii.txt
+> > b/Documentation/devicetree/bindings/net/xilinx_gmii2rgmii.txt
+> > new file mode 100644
+> > index 0000000..453680d
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/net/xilinx_gmii2rgmii.txt
+> > @@ -0,0 +1,38 @@
+> > +XILINX GMIITORGMII Converter Driver Device Tree Bindings
+> > +--------------------------------------------------------
+> > +
+> > +The Gigabit Media Independent Interface (GMII) to Reduced Gigabit
+> > +Media Independent Interface (RGMII) core provides the RGMII between
+> > +RGMII-compliant Ethernet physical media devices (PHY) and the Gigabit
+> Ethernet controller.
+> > +This core can be used in all three modes of operation(10/100/1000 Mb/s).
+> > +The Management Data Input/Output (MDIO) interface is used to
+> > +configure the Speed of operation. This core can switch dynamically
+> > +between the three Different speed modes by configuring the conveter
+> register through mdio write.
+> > +
+> > +The MDIO is a bus to which the PHY devices are connected.  For each
+> > +device that exists on this bus, a child node should be created.  See
+> > +the definition of the PHY node in booting-without-of.txt for an
+> > +example of how to define a PHY.
+> > +
+> > +This converter sits between the MAC and the external phy.
+> > +MAC <==> GMII2RGMII <==> RGMII_PHY
+> > +
+> > +Required properties:
+> > +  - compatible : Should be "xlnx,gmii-to-rgmii-1.0"
+> > +  - reg : The ID number for the phy, usually a small integer
+> > +  - phy-handle: Should point to the external phy device.
+> > +		See ethernet.txt file in the same directory.
+> > +
+> > +Example:
+> > +	mdio {
+> > +                #address-cells = <1>;
+> > +                #size-cells = <0>;
+> > +		phy: ethernet-phy at 0 {
+> > +			......
+> > +		};
+> > +                gmiitorgmii: gmiitorgmii at 8 {
+> > +                        compatible = "xlnx,gmii-to-rgmii-1.0";
+> > +                        reg = <8>;
+> > +			phy-handle = <&phy>;
+> > +                };
+> 
+> Indentation in this example is quite weird. You are mixing tabs and spaces.
 
-Gr{oetje,eeting}s,
+Sure will fix in the next version...
 
-                        Geert
+Regards,
+Kedar.
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+> 
+> Thanks,
+> Michal
