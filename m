@@ -1,76 +1,124 @@
 From: cmetcalf@mellanox.com (Chris Metcalf)
-Date: Mon,  8 Aug 2016 12:03:36 -0400
-Subject: [PATCH v7 2/4] nmi_backtrace: do a local dump_stack() instead of a
- self-NMI
-In-Reply-To: <1470672218-16059-1-git-send-email-cmetcalf@mellanox.com>
-References: <1470672218-16059-1-git-send-email-cmetcalf@mellanox.com>
-Message-ID: <1470672218-16059-3-git-send-email-cmetcalf@mellanox.com>
+Date: Mon,  8 Aug 2016 12:03:34 -0400
+Subject: [PATCH v7 0/4] improvements to the nmi_backtrace code
+Message-ID: <1470672218-16059-1-git-send-email-cmetcalf@mellanox.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently on arm there is code that checks whether it should call
-dump_stack() explicitly, to avoid trying to raise an NMI when the
-current context is not preemptible by the backtrace IPI.  Similarly,
-the forthcoming arch/tile support uses an IPI mechanism that does
-not support generating an NMI to self.
+This is a rebase of the v6 series onto v4.8-rc1, plus some changes
+from Petr Mladek's review this morning.
 
-Accordingly, move the code that guards this case into the generic
-mechanism, and invoke it unconditionally whenever we want a
-backtrace of the current cpu.  It seems plausible that in all cases,
-dump_stack() will generate better information than generating a
-stack from the NMI handler.  The register state will be missing,
-but that state is likely not particularly helpful in any case.
+>From the version 1 cover letter:
 
-Or, if we think it is helpful, we should be capturing and emitting
-the current register state in all cases when regs == NULL is passed
-to nmi_cpu_backtrace().
+  This patch series modifies the trigger_xxx_backtrace() NMI-based
+  remote backtracing code to make it more flexible, and makes a few
+  small improvements along the way.
 
-Signed-off-by: Chris Metcalf <cmetcalf@mellanox.com>
-Acked-by: Aaron Tomlin <atomlin@redhat.com>
----
- arch/arm/kernel/smp.c | 9 ---------
- lib/nmi_backtrace.c   | 9 +++++++++
- 2 files changed, 9 insertions(+), 9 deletions(-)
+  The motivation comes from the task isolation code, where there are
+  scenarios where we want to be able to diagnose a case where some cpu
+  is about to interrupt a task-isolated cpu.  It can be helpful to
+  see both where the interrupting cpu is, and also an approximation
+  of where the cpu that is being interrupted is.  The nmi_backtrace
+  framework allows us to discover the stack of the interrupted cpu.
 
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index 732583dcb8f8..157c991f8de2 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -748,15 +748,6 @@ core_initcall(register_cpufreq_notifier);
- 
- static void raise_nmi(cpumask_t *mask)
- {
--	/*
--	 * Generate the backtrace directly if we are running in a calling
--	 * context that is not preemptible by the backtrace IPI. Note
--	 * that nmi_cpu_backtrace() automatically removes the current cpu
--	 * from mask.
--	 */
--	if (cpumask_test_cpu(smp_processor_id(), mask) && irqs_disabled())
--		nmi_cpu_backtrace(NULL);
--
- 	smp_cross_call(mask, IPI_CPU_BACKTRACE);
- }
- 
-diff --git a/lib/nmi_backtrace.c b/lib/nmi_backtrace.c
-index 5448d6621102..2933f0680174 100644
---- a/lib/nmi_backtrace.c
-+++ b/lib/nmi_backtrace.c
-@@ -49,6 +49,15 @@ void nmi_trigger_cpumask_backtrace(bool include_self,
- 	if (!include_self)
- 		cpumask_clear_cpu(this_cpu, to_cpumask(backtrace_mask));
- 
-+	/*
-+	 * Don't try to send an NMI to this cpu; it may work on some
-+	 * architectures, but on others it may not, and we'll get
-+	 * information at least as useful just by doing a dump_stack() here.
-+	 * Note that nmi_cpu_backtrace(NULL) will clear the cpu bit.
-+	 */
-+	if (cpumask_test_cpu(this_cpu, to_cpumask(backtrace_mask)))
-+		nmi_cpu_backtrace(NULL);
-+
- 	if (!cpumask_empty(to_cpumask(backtrace_mask))) {
- 		pr_info("Sending NMI from CPU %d to CPUs %*pbl:\n",
- 			this_cpu, nr_cpumask_bits, to_cpumask(backtrace_mask));
+I've tested that the change works as desired on tile, and build-tested
+x86, arm64, and arm.  For x86 and arm64 I confirmed that the generic
+cpuidle stuff as well as the architecture-specific routines are in the
+new cpuidle section.  For arm I just build-tested it and made sure the
+generic cpuidle routines were in the new cpuidle section, but I didn't
+attempt to tease apart the tangle of platform-specific idle routines
+that arm has and tag them with __cpuidle.  That might be more usefully
+done by someone with arm platform experience in a follow-up patch.
+
+I have also pushed it up to kernel.org to pull if that's easier:
+
+git://git.kernel.org/pub/scm/linux/kernel/git/cmetcalf/linux-tile.git nmi-backtrace
+
+v7: Rebased to kernel v4.8-r1
+    Retained the "include_self" bool to avoid cpumask allocation [Petr]
+    Switched to using "cpumask_of" to avoid cpumask allocation [Petr]
+
+v6: Rebased to kernel v4.7-rc7
+
+v5: Add CPUIDLE_TEXT to the new arch/arm/kernel/vmlinux-xip.lds.S
+    https://lkml.kernel.org/g/1459877208-15119-1-git-send-email-cmetcalf at mellanox.com
+
+v4: Added some more __cpuidle functions (PeterZ, Rafael Wysocki)
+    Rebased to kernel v4.6-rc1
+    https://lkml.kernel.org/g/1459358170-27745-1-git-send-email-cmetcalf at mellanox.com
+
+v3: Various improvements to the set of __cpuidle functions;
+    Add back in a missing section accidentally removed in modpost.c (PeterZ)
+    https://lkml.kernel.org/r/1458667179-19630-1-git-send-email-cmetcalf at mellanox.com
+
+v2: Switch to using __cpuidle tagging, switch S-O-B to Mellanox
+    https://lkml.kernel.org/r/1458147733-29338-1-git-send-email-cmetcalf at mellanox.com
+
+Chris Metcalf (4):
+  nmi_backtrace: add more trigger_*_cpu_backtrace() methods
+  nmi_backtrace: do a local dump_stack() instead of a self-NMI
+  arch/tile: adopt the new nmi_backtrace framework
+  nmi_backtrace: generate one-line reports for idle cpus
+
+ arch/alpha/kernel/vmlinux.lds.S      |  1 +
+ arch/arc/kernel/vmlinux.lds.S        |  1 +
+ arch/arm/include/asm/irq.h           |  5 ++-
+ arch/arm/kernel/smp.c                | 13 +------
+ arch/arm/kernel/vmlinux-xip.lds.S    |  1 +
+ arch/arm/kernel/vmlinux.lds.S        |  1 +
+ arch/arm64/kernel/vmlinux.lds.S      |  1 +
+ arch/arm64/mm/proc.S                 |  2 +
+ arch/avr32/kernel/vmlinux.lds.S      |  1 +
+ arch/blackfin/kernel/vmlinux.lds.S   |  1 +
+ arch/c6x/kernel/vmlinux.lds.S        |  1 +
+ arch/cris/kernel/vmlinux.lds.S       |  1 +
+ arch/frv/kernel/vmlinux.lds.S        |  1 +
+ arch/h8300/kernel/vmlinux.lds.S      |  1 +
+ arch/hexagon/kernel/vmlinux.lds.S    |  1 +
+ arch/ia64/kernel/vmlinux.lds.S       |  1 +
+ arch/m32r/kernel/vmlinux.lds.S       |  1 +
+ arch/m68k/kernel/vmlinux-nommu.lds   |  1 +
+ arch/m68k/kernel/vmlinux-std.lds     |  1 +
+ arch/m68k/kernel/vmlinux-sun3.lds    |  1 +
+ arch/metag/kernel/vmlinux.lds.S      |  1 +
+ arch/microblaze/kernel/vmlinux.lds.S |  1 +
+ arch/mips/kernel/vmlinux.lds.S       |  1 +
+ arch/mn10300/kernel/vmlinux.lds.S    |  1 +
+ arch/nios2/kernel/vmlinux.lds.S      |  1 +
+ arch/openrisc/kernel/vmlinux.lds.S   |  1 +
+ arch/parisc/kernel/vmlinux.lds.S     |  1 +
+ arch/powerpc/kernel/vmlinux.lds.S    |  1 +
+ arch/s390/kernel/vmlinux.lds.S       |  1 +
+ arch/score/kernel/vmlinux.lds.S      |  1 +
+ arch/sh/kernel/vmlinux.lds.S         |  1 +
+ arch/sparc/kernel/vmlinux.lds.S      |  1 +
+ arch/tile/include/asm/irq.h          |  5 ++-
+ arch/tile/kernel/entry.S             |  2 +-
+ arch/tile/kernel/pmc.c               |  3 --
+ arch/tile/kernel/process.c           | 73 +++++++++---------------------------
+ arch/tile/kernel/traps.c             |  7 +++-
+ arch/tile/kernel/vmlinux.lds.S       |  1 +
+ arch/um/kernel/dyn.lds.S             |  1 +
+ arch/um/kernel/uml.lds.S             |  1 +
+ arch/unicore32/kernel/vmlinux.lds.S  |  1 +
+ arch/x86/include/asm/irq.h           |  5 ++-
+ arch/x86/kernel/acpi/cstate.c        |  2 +-
+ arch/x86/kernel/apic/hw_nmi.c        |  7 ++--
+ arch/x86/kernel/process.c            |  4 +-
+ arch/x86/kernel/vmlinux.lds.S        |  1 +
+ arch/xtensa/kernel/vmlinux.lds.S     |  3 ++
+ drivers/acpi/processor_idle.c        |  5 ++-
+ drivers/cpuidle/driver.c             |  5 ++-
+ drivers/idle/intel_idle.c            |  4 +-
+ include/asm-generic/vmlinux.lds.h    |  6 +++
+ include/linux/cpu.h                  |  5 +++
+ include/linux/nmi.h                  | 49 +++++++++++++++++-------
+ kernel/sched/idle.c                  | 13 ++++++-
+ lib/nmi_backtrace.c                  | 38 +++++++++++++------
+ scripts/mod/modpost.c                |  2 +-
+ scripts/recordmcount.c               |  1 +
+ scripts/recordmcount.pl              |  1 +
+ 58 files changed, 176 insertions(+), 118 deletions(-)
+
 -- 
 2.7.2
