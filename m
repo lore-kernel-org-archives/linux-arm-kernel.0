@@ -1,85 +1,157 @@
 From: tn@semihalf.com (Tomasz Nowicki)
-Date: Mon,  8 Aug 2016 15:05:37 +0200
-Subject: [RFC PATCH V5 1/5] PCI: Embed pci_ecam_ops in pci_config_window
- structure
+Date: Mon,  8 Aug 2016 15:05:38 +0200
+Subject: [RFC PATCH V5 2/5] PCI/ACPI: Move ACPI ECAM mapping to generic MCFG
+ driver
 In-Reply-To: <1470661541-26270-1-git-send-email-tn@semihalf.com>
 References: <1470661541-26270-1-git-send-email-tn@semihalf.com>
-Message-ID: <1470661541-26270-2-git-send-email-tn@semihalf.com>
+Message-ID: <1470661541-26270-3-git-send-email-tn@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-pci_config_window keeps pointer to pci_ecam_ops and every time
-we want to deallocate pci_config_window (pci_ecam_free()) we need to make
-sure to free pci_ecam_ops in case it was dynamically allocated prior to
-pci_ecam_create() call.
+pci_acpi_setup_ecam_mapping() is not really ARM64 specific so move it out
+of arch/arm64/ directory. In preparation for adding MCFG quirk handling
+extend pci_acpi_setup_ecam_mapping() functionality to accept custom
+PCI config accessors (function's argument).
 
-To avoid that extra effort, embed pci_ecam_ops in pci_config_window,
-instead of just a pointer.
+For ARM64 ACPI based PCI host controller we still use pci_generic_ecam_ops.
 
 Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
-To: Jayachandran C <jchandra@broadcom.com>
 ---
- arch/arm64/kernel/pci.c  | 2 +-
- drivers/pci/ecam.c       | 6 +++---
- include/linux/pci-ecam.h | 2 +-
- 3 files changed, 5 insertions(+), 5 deletions(-)
+ arch/arm64/kernel/pci.c  | 41 ++---------------------------------------
+ drivers/acpi/pci_mcfg.c  | 40 ++++++++++++++++++++++++++++++++++++++++
+ include/linux/pci-acpi.h |  3 +++
+ 3 files changed, 45 insertions(+), 39 deletions(-)
 
 diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
-index acf3872..981e828 100644
+index 981e828..2e7bed4 100644
 --- a/arch/arm64/kernel/pci.c
 +++ b/arch/arm64/kernel/pci.c
-@@ -183,7 +183,7 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
- 		return NULL;
- 	}
- 
--	acpi_pci_root_ops.pci_ops = &ri->cfg->ops->pci_ops;
-+	acpi_pci_root_ops.pci_ops = &ri->cfg->ops.pci_ops;
- 	bus = acpi_pci_root_create(root, &acpi_pci_root_ops, &ri->common,
- 				   ri->cfg);
- 	if (!bus)
-diff --git a/drivers/pci/ecam.c b/drivers/pci/ecam.c
-index 43ed08d..24242f0 100644
---- a/drivers/pci/ecam.c
-+++ b/drivers/pci/ecam.c
-@@ -52,7 +52,7 @@ struct pci_config_window *pci_ecam_create(struct device *dev,
- 		return ERR_PTR(-ENOMEM);
- 
- 	cfg->parent = dev;
--	cfg->ops = ops;
-+	cfg->ops = *ops;
- 	cfg->busr.start = busr->start;
- 	cfg->busr.end = busr->end;
- 	cfg->busr.flags = IORESOURCE_BUS;
-@@ -138,7 +138,7 @@ void __iomem *pci_ecam_map_bus(struct pci_bus *bus, unsigned int devfn,
- 			       int where)
- {
- 	struct pci_config_window *cfg = bus->sysdata;
--	unsigned int devfn_shift = cfg->ops->bus_shift - 8;
-+	unsigned int devfn_shift = cfg->ops.bus_shift - 8;
- 	unsigned int busn = bus->number;
- 	void __iomem *base;
- 
-@@ -149,7 +149,7 @@ void __iomem *pci_ecam_map_bus(struct pci_bus *bus, unsigned int devfn,
- 	if (per_bus_mapping)
- 		base = cfg->winp[busn];
- 	else
--		base = cfg->win + (busn << cfg->ops->bus_shift);
-+		base = cfg->win + (busn << cfg->ops.bus_shift);
- 	return base + (devfn << devfn_shift) + where;
+@@ -114,44 +114,6 @@ int pcibios_root_bridge_prepare(struct pci_host_bridge *bridge)
+ 	return 0;
  }
  
-diff --git a/include/linux/pci-ecam.h b/include/linux/pci-ecam.h
-index 7adad20..0ce2920 100644
---- a/include/linux/pci-ecam.h
-+++ b/include/linux/pci-ecam.h
-@@ -39,7 +39,7 @@ struct pci_config_window {
- 	struct resource			res;
- 	struct resource			busr;
- 	void				*priv;
--	struct pci_ecam_ops		*ops;
-+	struct pci_ecam_ops		ops;
- 	union {
- 		void __iomem		*win;	/* 64-bit single mapping */
- 		void __iomem		**winp; /* 32-bit per-bus mapping */
+-/*
+- * Lookup the bus range for the domain in MCFG, and set up config space
+- * mapping.
+- */
+-static struct pci_config_window *
+-pci_acpi_setup_ecam_mapping(struct acpi_pci_root *root)
+-{
+-	struct resource *bus_res = &root->secondary;
+-	u16 seg = root->segment;
+-	struct pci_config_window *cfg;
+-	struct resource cfgres;
+-	unsigned int bsz;
+-
+-	/* Use address from _CBA if present, otherwise lookup MCFG */
+-	if (!root->mcfg_addr)
+-		root->mcfg_addr = pci_mcfg_lookup(seg, bus_res);
+-
+-	if (!root->mcfg_addr) {
+-		dev_err(&root->device->dev, "%04x:%pR ECAM region not found\n",
+-			seg, bus_res);
+-		return NULL;
+-	}
+-
+-	bsz = 1 << pci_generic_ecam_ops.bus_shift;
+-	cfgres.start = root->mcfg_addr + bus_res->start * bsz;
+-	cfgres.end = cfgres.start + resource_size(bus_res) * bsz - 1;
+-	cfgres.flags = IORESOURCE_MEM;
+-	cfg = pci_ecam_create(&root->device->dev, &cfgres, bus_res,
+-			      &pci_generic_ecam_ops);
+-	if (IS_ERR(cfg)) {
+-		dev_err(&root->device->dev, "%04x:%pR error %ld mapping ECAM\n",
+-			seg, bus_res, PTR_ERR(cfg));
+-		return NULL;
+-	}
+-
+-	return cfg;
+-}
+-
+ /* release_info: free resources allocated by init_info */
+ static void pci_acpi_generic_release_info(struct acpi_pci_root_info *ci)
+ {
+@@ -177,7 +139,8 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
+ 	if (!ri)
+ 		return NULL;
+ 
+-	ri->cfg = pci_acpi_setup_ecam_mapping(root);
++	ri->cfg = pci_acpi_setup_ecam_mapping(root,
++					      &pci_generic_ecam_ops.pci_ops);
+ 	if (!ri->cfg) {
+ 		kfree(ri);
+ 		return NULL;
+diff --git a/drivers/acpi/pci_mcfg.c b/drivers/acpi/pci_mcfg.c
+index b5b376e..331b560 100644
+--- a/drivers/acpi/pci_mcfg.c
++++ b/drivers/acpi/pci_mcfg.c
+@@ -22,6 +22,7 @@
+ #include <linux/kernel.h>
+ #include <linux/pci.h>
+ #include <linux/pci-acpi.h>
++#include <linux/pci-ecam.h>
+ 
+ /* Structure to hold entries from the MCFG table */
+ struct mcfg_entry {
+@@ -52,6 +53,45 @@ phys_addr_t pci_mcfg_lookup(u16 seg, struct resource *bus_res)
+ 	return 0;
+ }
+ 
++/*
++ * Lookup the bus range for the domain in MCFG, and set up config space
++ * mapping.
++ */
++struct pci_config_window *
++pci_acpi_setup_ecam_mapping(struct acpi_pci_root *root, struct pci_ops *ops)
++{
++	struct resource *bus_res = &root->secondary;
++	u16 seg = root->segment;
++	struct pci_config_window *cfg;
++	struct resource cfgres;
++	struct pci_ecam_ops ecam_ops = {
++			.bus_shift = 20,
++			.pci_ops = *ops,
++	};
++
++	/* Use address from _CBA if present, otherwise lookup MCFG */
++	if (!root->mcfg_addr)
++		root->mcfg_addr = pci_mcfg_lookup(seg, bus_res);
++
++	if (!root->mcfg_addr) {
++		dev_err(&root->device->dev, "%04x:%pR ECAM region not found\n",
++			seg, bus_res);
++		return NULL;
++	}
++
++	cfgres.start = root->mcfg_addr + (bus_res->start << 20);
++	cfgres.end = cfgres.start + (resource_size(bus_res) << 20) - 1;
++	cfgres.flags = IORESOURCE_MEM;
++	cfg = pci_ecam_create(&root->device->dev, &cfgres, bus_res, &ecam_ops);
++	if (IS_ERR(cfg)) {
++		dev_err(&root->device->dev, "%04x:%pR error %ld mapping ECAM\n",
++			seg, bus_res, PTR_ERR(cfg));
++		return NULL;
++	}
++
++	return cfg;
++}
++
+ static __init int pci_mcfg_parse(struct acpi_table_header *header)
+ {
+ 	struct acpi_table_mcfg *mcfg;
+diff --git a/include/linux/pci-acpi.h b/include/linux/pci-acpi.h
+index 7d63a66..e9bfe00 100644
+--- a/include/linux/pci-acpi.h
++++ b/include/linux/pci-acpi.h
+@@ -26,6 +26,9 @@ extern phys_addr_t acpi_pci_root_get_mcfg_addr(acpi_handle handle);
+ 
+ extern phys_addr_t pci_mcfg_lookup(u16 domain, struct resource *bus_res);
+ 
++extern struct pci_config_window *
++pci_acpi_setup_ecam_mapping(struct acpi_pci_root *root, struct pci_ops *ops);
++
+ static inline acpi_handle acpi_find_root_bridge_handle(struct pci_dev *pdev)
+ {
+ 	struct pci_bus *pbus = pdev->bus;
 -- 
 1.9.1
