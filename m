@@ -1,193 +1,109 @@
-From: tn@semihalf.com (Tomasz Nowicki)
-Date: Mon,  8 Aug 2016 15:05:41 +0200
-Subject: [RFC PATCH V5 5/5] PCI: thunder-pem: Support quirky configuration
- space access for ACPI based PCI host controller
-In-Reply-To: <1470661541-26270-1-git-send-email-tn@semihalf.com>
-References: <1470661541-26270-1-git-send-email-tn@semihalf.com>
-Message-ID: <1470661541-26270-6-git-send-email-tn@semihalf.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 8 Aug 2016 14:07:54 +0100
+Subject: [PATCH 1/1] irqchip: irq-gic: forward SGI to itself for
+ cortex-a7 single core
+In-Reply-To: <HE1PR04MB1450C6BE844A31C95CEE3BE18B1B0@HE1PR04MB1450.eurprd04.prod.outlook.com>
+References: <1470642594-30455-1-git-send-email-peter.chen@nxp.com>
+ <20160808105026.GA12649@leverpostej>
+ <HE1PR04MB1450C6BE844A31C95CEE3BE18B1B0@HE1PR04MB1450.eurprd04.prod.outlook.com>
+Message-ID: <20160808130754.GB12649@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add infrastructure to support ThunderX PEM specific PCI configuration space
-access for ACPI based PCI host controller. This involves:
-1. New initialization call thunder_pem_cfg_init() to create configuration
-space mapping based on hardcoded range addresses
-2. thunder_pem_init() ACPI extension to obtain hardcoded addresses for
-PEM specific register ranges
-3. New quirk entry (for common quirk array) which identifies platform and
-calls thunder_pem_cfg_init() from [1]
+On Mon, Aug 08, 2016 at 12:00:35PM +0000, Peter Chen wrote:
+>  
+> >
+> >On Mon, Aug 08, 2016 at 03:49:54PM +0800, Peter Chen wrote:
+> >> According to Cortex-A7 MPCore TRM, ch8.3.1, Distributor register
+> >> summary,
+> >> GICD_ITARGETSRn:
+> >>
+> >> 	The register that contains the SGI and PPI interrupts is
+> >>        	read-only and the value is implementation defined. For
+> >>        	Cortex-A7 configurations with only one processor, these
+> >>        	registers are RAZ/WI.
+> >>
+> >> So, the GICD_ITARGETSR[0..7] is read-only, and the value is 0 for
+> >> cortex-a7 single core platform if the SoC is cortex-a7 mpcore version.
+> >> So the cupmask from gic_get_cpumask is 0.
+> >>
+> >> At ARM Generic Interrupt Controller Architecture version 2.0,
+> >> ch4.3.15 Software Generated Interrupt Register, GICD_SGIR, The
+> >> distributor will process the requested SGI according to register
+> >> TargetListFilter and CPUTargetList. At current gic code, it takes
+> >> TargetListFilter as 0b00, and forward the interrupt to cpumask
+> >> (variable map at gic_raise_softirq) getting from gic_get_cpumask.
+> >> but cpumask is 0 according to above explanation for cortex-a7 single
+> >> core platform, so, both TargetListFilter and CPUTargetList are 0, and
+> >> the distributor does not forward the interrupt to any CPU interface
+> >> according to gic documentation, then the SGI can't be occurred.
+> >>
+> >> We have found this problem at nxp imx6ul platform, which is a
+> >> cortex-a7 single core platform, the irq work (triggered by SGI at ARM)
+> >> can't be occurred which is needed for cpufreq, then the system has
+> >> failed to boot and reboot [1].
+> >>
+> >> In this commit, we set TargetListFilter as 0b10 to fix this problem,
+> >> it forwards the interrupt only to CPU0 and only cortex-a7 single core
+> >> platform uses this setting currently.
+> >
+> >This is a generic property of the GIC architecture in UP systems, and is not specific
+> >to Cortex-A7. So checking for Cortex-A7 specifically doesn't solve the problem.
+> 
+> It is a SMP system, the is_smp returns true due to MPIDR is 0x80000000. This
+> platform is MPcore, just the cpu number is one.
 
-Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
----
- drivers/pci/host/mcfg-quirks.c     |  7 +++
- drivers/pci/host/mcfg-quirks.h     |  4 ++
- drivers/pci/host/pci-thunder-pem.c | 96 ++++++++++++++++++++++++++++++++------
- 3 files changed, 94 insertions(+), 13 deletions(-)
+Apologies, I see the distinction now. The CPU claims to have the
+multiprocessing extensions, and to be part of a multiprocessor system
+(despite the latter not being the case). The GIC is not a multiprocessor
+implementation as defined in the GIC architecture.
 
-diff --git a/drivers/pci/host/mcfg-quirks.c b/drivers/pci/host/mcfg-quirks.c
-index aa9907b..2993a72 100644
---- a/drivers/pci/host/mcfg-quirks.c
-+++ b/drivers/pci/host/mcfg-quirks.c
-@@ -44,6 +44,13 @@ struct pci_cfg_fixup {
- 
- static struct pci_cfg_fixup mcfg_quirks[] __initconst = {
- /*	{ OEM_ID, OEM_TABLE_ID, REV, DOMAIN, BUS_RANGE, pci_ops, init_hook }, */
-+#ifdef CONFIG_PCI_HOST_THUNDER_PEM
-+	/* Pass2.0 */
-+	{ "CAVIUM", "THUNDERX", 1, MCFG_DOM_RANGE(4, 9), MCFG_BUS_ANY, NULL,
-+	  thunder_pem_cfg_init },
-+	{ "CAVIUM", "THUNDERX", 1, MCFG_DOM_RANGE(14, 19), MCFG_BUS_ANY, NULL,
-+	  thunder_pem_cfg_init },
-+#endif
- };
- 
- static bool pci_mcfg_fixup_match(struct pci_cfg_fixup *f,
-diff --git a/drivers/pci/host/mcfg-quirks.h b/drivers/pci/host/mcfg-quirks.h
-index 45cbd16..411c667 100644
---- a/drivers/pci/host/mcfg-quirks.h
-+++ b/drivers/pci/host/mcfg-quirks.h
-@@ -16,5 +16,9 @@
- #define __MCFG_QUIRKS_H__
- 
- /* MCFG quirks initialize call list */
-+#ifdef CONFIG_PCI_HOST_THUNDER_PEM
-+struct pci_config_window *
-+thunder_pem_cfg_init(struct acpi_pci_root *root, struct pci_ops *ops);
-+#endif
- 
- #endif /* __MCFG_QUIRKS_H__ */
-diff --git a/drivers/pci/host/pci-thunder-pem.c b/drivers/pci/host/pci-thunder-pem.c
-index 6abaf80..3f06e49 100644
---- a/drivers/pci/host/pci-thunder-pem.c
-+++ b/drivers/pci/host/pci-thunder-pem.c
-@@ -18,9 +18,12 @@
- #include <linux/init.h>
- #include <linux/of_address.h>
- #include <linux/of_pci.h>
-+#include <linux/pci-acpi.h>
- #include <linux/pci-ecam.h>
- #include <linux/platform_device.h>
- 
-+#include "mcfg-quirks.h"
-+
- #define PEM_CFG_WR 0x28
- #define PEM_CFG_RD 0x30
- 
-@@ -284,6 +287,37 @@ static int thunder_pem_config_write(struct pci_bus *bus, unsigned int devfn,
- 	return pci_generic_config_write(bus, devfn, where, size, val);
- }
- 
-+#ifdef CONFIG_ACPI
-+
-+static struct resource thunder_pem_reg_res[] = {
-+	[4] = DEFINE_RES_MEM(0x87e0c0000000UL, SZ_16M),
-+	[5] = DEFINE_RES_MEM(0x87e0c1000000UL, SZ_16M),
-+	[6] = DEFINE_RES_MEM(0x87e0c2000000UL, SZ_16M),
-+	[7] = DEFINE_RES_MEM(0x87e0c3000000UL, SZ_16M),
-+	[8] = DEFINE_RES_MEM(0x87e0c4000000UL, SZ_16M),
-+	[9] = DEFINE_RES_MEM(0x87e0c5000000UL, SZ_16M),
-+	[14] = DEFINE_RES_MEM(0x97e0c0000000UL, SZ_16M),
-+	[15] = DEFINE_RES_MEM(0x97e0c1000000UL, SZ_16M),
-+	[16] = DEFINE_RES_MEM(0x97e0c2000000UL, SZ_16M),
-+	[17] = DEFINE_RES_MEM(0x97e0c3000000UL, SZ_16M),
-+	[18] = DEFINE_RES_MEM(0x97e0c4000000UL, SZ_16M),
-+	[19] = DEFINE_RES_MEM(0x97e0c5000000UL, SZ_16M),
-+};
-+
-+static struct resource *thunder_pem_acpi_res(struct pci_config_window *cfg)
-+{
-+	struct acpi_device *adev = to_acpi_device(cfg->parent);
-+	struct acpi_pci_root *root = acpi_driver_data(adev);
-+
-+	return &thunder_pem_reg_res[root->segment];
-+}
-+#else
-+static struct resource *thunder_pem_acpi_res(struct pci_config_window *cfg)
-+{
-+	return NULL;
-+}
-+#endif
-+
- static int thunder_pem_init(struct pci_config_window *cfg)
- {
- 	struct device *dev = cfg->parent;
-@@ -292,24 +326,24 @@ static int thunder_pem_init(struct pci_config_window *cfg)
- 	struct thunder_pem_pci *pem_pci;
- 	struct platform_device *pdev;
- 
--	/* Only OF support for now */
--	if (!dev->of_node)
--		return -EINVAL;
--
- 	pem_pci = devm_kzalloc(dev, sizeof(*pem_pci), GFP_KERNEL);
- 	if (!pem_pci)
- 		return -ENOMEM;
- 
--	pdev = to_platform_device(dev);
--
--	/*
--	 * The second register range is the PEM bridge to the PCIe
--	 * bus.  It has a different config access method than those
--	 * devices behind the bridge.
--	 */
--	res_pem = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-+	if (acpi_disabled) {
-+		pdev = to_platform_device(dev);
-+
-+		/*
-+		 * The second register range is the PEM bridge to the PCIe
-+		 * bus.  It has a different config access method than those
-+		 * devices behind the bridge.
-+		 */
-+		res_pem = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-+	} else {
-+		res_pem = thunder_pem_acpi_res(cfg);
-+	}
- 	if (!res_pem) {
--		dev_err(dev, "missing \"reg[1]\"property\n");
-+		dev_err(dev, "missing configuration region\n");
- 		return -EINVAL;
- 	}
- 
-@@ -360,3 +394,39 @@ static struct platform_driver thunder_pem_driver = {
- 	.probe = thunder_pem_probe,
- };
- builtin_platform_driver(thunder_pem_driver);
-+
-+#ifdef CONFIG_ACPI
-+
-+static struct resource thunder_pem_cfg_res[] = {
-+	[4] = DEFINE_RES_MEM(0x88001f000000UL, 0x39 * SZ_16M),
-+	[5] = DEFINE_RES_MEM(0x884057000000UL, 0x39 * SZ_16M),
-+	[6] = DEFINE_RES_MEM(0x88808f000000UL, 0x39 * SZ_16M),
-+	[7] = DEFINE_RES_MEM(0x89001f000000UL, 0x39 * SZ_16M),
-+	[8] = DEFINE_RES_MEM(0x894057000000UL, 0x39 * SZ_16M),
-+	[9] = DEFINE_RES_MEM(0x89808f000000UL, 0x39 * SZ_16M),
-+	[14] = DEFINE_RES_MEM(0x98001f000000UL, 0x39 * SZ_16M),
-+	[15] = DEFINE_RES_MEM(0x984057000000UL, 0x39 * SZ_16M),
-+	[16] = DEFINE_RES_MEM(0x98808f000000UL, 0x39 * SZ_16M),
-+	[17] = DEFINE_RES_MEM(0x99001f000000UL, 0x39 * SZ_16M),
-+	[18] = DEFINE_RES_MEM(0x994057000000UL, 0x39 * SZ_16M),
-+	[19] = DEFINE_RES_MEM(0x99808f000000UL, 0x39 * SZ_16M),
-+};
-+
-+struct pci_config_window *
-+thunder_pem_cfg_init(struct acpi_pci_root *root, struct pci_ops *ops)
-+{
-+	struct resource *bus_res = &root->secondary;
-+	u16 seg = root->segment;
-+	struct pci_config_window *cfg;
-+
-+	cfg = pci_ecam_create(&root->device->dev, &thunder_pem_cfg_res[seg],
-+			      bus_res, &pci_thunder_pem_ops);
-+	if (IS_ERR(cfg)) {
-+		dev_err(&root->device->dev, "%04x:%pR error %ld mapping ECAM\n",
-+			seg, bus_res, PTR_ERR(cfg));
-+		return NULL;
-+	}
-+
-+	return cfg;
-+}
-+#endif
--- 
-1.9.1
+> Current kernel considers the hardware is IPI capable if is_smp is true, see
+> arch_irq_work_has_interrupt().  I think I should add additional condition
+> is_smp == true.
+
+I see that for arm64 we have:
+
+static inline bool arch_irq_work_has_interrupt(void)
+{
+	return !!__smp_cross_call;
+}
+
+Could we do similarly for ARM, and ony register gic_raise_softirq if
+we have non-zero SGI targets?
+
+If I've understood correctly, that would make things behave as they do
+for UP on you system.
+
+> >As Russell pointed out in [2], this is a generic infrastructure problem, and there are
+> >other systems where HW might not have a self-IPI.
+> 
+> If the HW is UP, it is no problem. The irq work will not trigger IPI.
+> 
+> > I note that core code already
+> >handles that in some cases, e.g. in generic_exec_single where we just disable
+> >interrupts and run the work locally rather than sending a self-IPI.
+> >
+> >How/where exactly is this self-IPI raised? Can we follow the example of
+> >generic_exec_single there?
+> 
+> In my case, the cpufreq uses irq work, irq work tries to trigger IPI. See
+> sugov_update_commit-> irq_work_queue.
+> 
+> imx6ul is MPcore system, just single core. If ARM considers MPcore
+> system has IPI capabilities, and documentation is correct, then it is 
+> probably gic code's issue.
+
+If self-IPI is necessary, then this would be up to the GIC code to
+solve.
+
+For that case, it would be nicer if we could detect whether this was
+necessary based on the GIC registers alone. That way we handle the
+various ways this can be integrated, aren't totally relient on the DT,
+work in VMs, etc.
+
+Thanks,
+Mark.
+
+> >[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-May/430545.html
+> >[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-May/430849.html
