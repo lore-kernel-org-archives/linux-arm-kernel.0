@@ -1,114 +1,65 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 08 Aug 2016 17:03:34 +0200
-Subject: [PATCH v2 00/17] ARM: mvebu: misc Armada 38x/39x DT and v7
- defconfig improvements
-In-Reply-To: <1470305660-6601-1-git-send-email-jaz@semihalf.com> (Grzegorz
- Jaszczyk's message of "Thu, 4 Aug 2016 12:14:03 +0200")
-References: <1470305660-6601-1-git-send-email-jaz@semihalf.com>
-Message-ID: <87popjuwu1.fsf@free-electrons.com>
+Date: Mon, 08 Aug 2016 17:05:50 +0200
+Subject: [GIT PULL] ARM: mvebu: dt-late for v4.8
+In-Reply-To: <87popznp93.fsf@free-electrons.com> (Gregory CLEMENT's message of
+ "Wed, 27 Jul 2016 16:12:56 +0200")
+References: <87popznp93.fsf@free-electrons.com>
+Message-ID: <87lh07uwq9.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Grzegorz,
+Hi,
  
- On Thu, Aug 04 2016, Grzegorz Jaszczyk <jaz@semihalf.com> wrote:
+ On Wed, Jul 27 2016, Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
 
-> Hello,
+> Hi,
 >
-> This is the second version of patch-set which enables some commonly used
-> features in mvebu_v7_defconfig and updates old or introduces new dts/dtsi
-> related to Armada 38x and Armada 39x SoC family. All comments from
-> v1 are included, more details in a changelog below.
+> Here is a late pull request for a device tree fix on mvebu for v4.8.
 >
-> Any comments or remarks would be welcome.
+> If it is too late to have it for v4.8-rc1, I will send it again as fix
+> for v4.8-rc2.
 
-All the patches are applied on the mvbeu branches:
-The first 2 on mvebu/defconfig and all the other on mvebu/dt
-
-Thanks,
+So it was too late. Then I will do a pull request for the fix this week with
+this patch.
 
 Gregory
 
 
 >
-> Best regards,
-> Grzegorz
+> Thanks,
 >
-> Changelog:
-> v1 -> v2
+> Gregory
 >
-> - Add at least one line of commit log entry for those patches, which
-> contained only commit title.
+> The following changes since commit d261861ab52623e34a25fe6ae76714456edda033:
 >
-> Suggested by Andrew Lunn and Gregory Clement.
+>   ARM: dts: armada-388-clearfog: remove duplicate mdio entry (2016-07-11 18:05:48 +0200)
 >
-> - Drop patch "ARM: mvebu: enable E1000E in mvebu_v7_defconfig", since it
-> enables PCIe card which is not a part of the SoC.
+> are available in the git repository at:
 >
-> Suggested by Russell King and Thomas Petazzoni.
+>   git://git.infradead.org/linux-mvebu.git tags/mvebu-dt-late-4.8
 >
-> - Change dts prefixes in commit title from "ARM: mvebu: <board_name>" to
-> "ARM: dts: mvebu: <board_name>"
+> for you to fetch changes up to 1f5b6fd2942ca2a063655fbeea5a922bc08f9e21:
 >
-> Suggested by Gregory Clement.
+>   ARM: dts: armada388-clearfog: number LAN ports properly (2016-07-27 15:12:02 +0200)
 >
-> - Add nodes describing the eeproms connected to I2C buses in
-> armada-390-db.dts and armada-395-gp.dts. Also add information about
-> connectors used and described in mentioned dts's.
+> ----------------------------------------------------------------
+> Late mvebu dt for v4.8
 >
-> Suggested by Gregory Clement.
+> The commit correct the led name on the clearfog board and should be
+> applied as soon as possible to avoid spread the port renumbering over
+> a large range of kernels.
 >
-> - Improve devicetree bindings about required property for Marvell Armada 39x
-> family: Armada 398 based boards should have only "marvell,armada398" and not
-> "marvell,armada395".
+> ----------------------------------------------------------------
+> Russell King (1):
+>       ARM: dts: armada388-clearfog: number LAN ports properly
 >
-> Suggested by Rob Herring.
+>  arch/arm/boot/dts/armada-388-clearfog.dts | 8 ++++----
+>  1 file changed, 4 insertions(+), 4 deletions(-)
 >
-> Grzegorz Jaszczyk (17):
->   ARM: mvebu: enable MTD command line partition table in
->     mvebu_v7_defconfig
->   ARM: mvebu: enable UBI and UBIFS in mvebu_v7_defconfig
->   ARM: dts: mvebu: a385-db-ap: enable USB (orion-ehci) port
->   ARM: dts: mvebu: a385-db-ap: add default partition description for
->     NAND
->   ARM: dts: mvebu: armada-390: add missing compatibility string and
->     bracket
->   ARM: dts: mvebu: armada-39x: update the SDHCI node on Armada 39x
->   ARM: dts: mvebu: armada-39x: enable PMU, CA9 SoC Controller and
->     Coherency fabric
->   ARM: dts: mvebu: armada-39x: enable the thermal sensor in Armada-39x
->     SoCs
->   ARM: dts: mvebu: armada-39x: enable watchdog for all Armada-39x SoCs
->   ARM: dts: mvebu: armada-39x: add missing nodes describing GPIO's
->   ARM: dts: mvebu: armada-39x: add missing nodes describing USB2.0 and
->     USB3.0
->   ARM: dts: mvebu: armada-39x: enable rtc for all Armada-39x SoCs
->   ARM: dts: mvebu: armada-395: add support for the Armada 395 SoC family
->   ARM: dts: mvebu: armada-398: update the dtsi about missing interfaces
->   ARM: dts: mvebu: armada-398-db: enable supported usb interfaces
->   ARM: dts: mvebu: armada-390-db: add support for the Armada 390 DB
->     board
->   ARM: dts: mvebu: armada-395-gp: add support for the Armada 395 GP
->     Board
->
->  .../devicetree/bindings/arm/marvell/armada-39x.txt |  15 +-
->  arch/arm/boot/dts/armada-385-db-ap.dts             |  30 +++-
->  arch/arm/boot/dts/armada-390-db.dts                | 175 +++++++++++++++++++++
->  arch/arm/boot/dts/armada-390.dtsi                  |   3 +
->  arch/arm/boot/dts/armada-395-gp.dts                | 163 +++++++++++++++++++
->  arch/arm/boot/dts/armada-395.dtsi                  |  76 +++++++++
->  arch/arm/boot/dts/armada-398-db.dts                |   8 +
->  arch/arm/boot/dts/armada-398.dtsi                  |  10 +-
->  arch/arm/boot/dts/armada-39x.dtsi                  |  94 ++++++++++-
->  arch/arm/configs/mvebu_v7_defconfig                |   3 +
->  10 files changed, 570 insertions(+), 7 deletions(-)
->  create mode 100644 arch/arm/boot/dts/armada-390-db.dts
->  create mode 100644 arch/arm/boot/dts/armada-395-gp.dts
->  create mode 100644 arch/arm/boot/dts/armada-395.dtsi
->
-> -- 
-> 1.8.3.1
->
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
 -- 
 Gregory Clement, Free Electrons
