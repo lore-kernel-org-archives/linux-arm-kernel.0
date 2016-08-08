@@ -1,39 +1,51 @@
-From: alexander.stein@systec-electronic.com (Alexander Stein)
-Date: Mon, 08 Aug 2016 10:57:04 +0200
-Subject: [Patch v3 10/11] driver/edac/layerscape_edac: Add Layerscape EDAC
- support
-In-Reply-To: <1470351518-22404-11-git-send-email-york.sun@nxp.com>
-References: <1470351518-22404-1-git-send-email-york.sun@nxp.com>
- <1470351518-22404-11-git-send-email-york.sun@nxp.com>
-Message-ID: <19101224.m7ryErTDyD@ws-stein>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Mon, 8 Aug 2016 14:38:52 +0530
+Subject: [PATCH] dmaengine: qcom_hidma: release the descriptor before the
+ callback
+In-Reply-To: <32339445-5a1c-5a3e-cd07-d64e35dce2c4@metafoo.de>
+References: <1468465076-27324-1-git-send-email-okaya@codeaurora.org>
+ <ccffcabf-1448-57a1-d18b-715cfd46e906@codeaurora.org>
+ <20160724062425.GW9681@localhost>
+ <971733d9-fd18-2a1b-07c0-349b47747d49@codeaurora.org>
+ <20160804125525.GF9681@localhost>
+ <71a15611-645f-7523-1c26-14b420aff667@codeaurora.org>
+ <20160804144003.GV1041@n2100.armlinux.org.uk>
+ <cff588a1-d85f-3d2c-ef61-1674d0d3ca92@codeaurora.org>
+ <20160804153835.GY1041@n2100.armlinux.org.uk>
+ <32339445-5a1c-5a3e-cd07-d64e35dce2c4@metafoo.de>
+Message-ID: <20160808090852.GZ9681@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 04 August 2016 15:58:35, York Sun wrote:
-> Add DDR EDAC for ARM-based compatible controllers. Both big-endian
-> and little-endian are supported.
+On Thu, Aug 04, 2016 at 05:59:30PM +0200, Lars-Peter Clausen wrote:
+> On 08/04/2016 05:38 PM, Russell King - ARM Linux wrote:
+> [...]
+> > What you instead need to do is to find some way to record in your
+> > driver that transaction 2 failed, and when dma_cookie_status() says
+> > that a transaction has DMA_COMPLETE status, you need to look up to
+> > see whether it failed.
 > 
-> Signed-off-by: York Sun <york.sun@nxp.com>
-> 
-> ---
-> Change log
->   v3: no change
->   v2: Create new driver using shared DDR object
-> 
->  arch/arm64/Kconfig.platforms           |  1 +
->  arch/{arm => arm64}/include/asm/edac.h | 21 +++++------
->  arch/arm64/include/asm/irq.h           |  4 ++
->  drivers/edac/Kconfig                   |  7 ++++
->  drivers/edac/Makefile                  |  3 ++
->  drivers/edac/fsl_ddr_edac.c            |  1 +
->  drivers/edac/layerscape_edac.c         | 67
-> ++++++++++++++++++++++++++++++++++ 7 files changed, 92 insertions(+), 12
-> deletions(-)
->  copy arch/{arm => arm64}/include/asm/edac.h (79%)
->  create mode 100644 drivers/edac/layerscape_edac.c
+> In my opinion this is where the current API is broken by design. For each
+> transfer that fails you need to store the cookie associated with that
+> transfer in some kind of lookup table. Since there is no lifetime associated
+> with a cookie entries in this table would need to be retained forever and it
+> will grow unbound.
 
-This only adds EDAC support for ARM64. What would be necessary for ARM 
-support, e.g. LS1021A?
+And how many drivers can report errors? And how many drivers can guarantee
+DMA_COMPLETE implies transaction was succesful.
 
-Best regards,
-Alexander
+> Ideally we'd mark error reporting through this interface as deprecated and
+> discourage new users of the interface. As far as I can see most of the few
+> drivers that do return DMA_ERROR get it wrong anyway, e.g. return it
+> unconditionally for all cookies when an error occurred for any of them.
+
+Error reporting is quite tricky as detection is a problem. So yes if you
+can do so, it is highly encouraged to report using new interface which is
+better than client checking after callback.
+
+Btw what is the behaviour after error? I would think that client will see an
+error and report to upper layer while initiaite closure of transaction. So
+does driver need to keep the state for a longer time :-)
+
+-- 
+~Vinod
