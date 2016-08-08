@@ -1,52 +1,68 @@
-From: okaya@codeaurora.org (okaya at codeaurora.org)
-Date: Mon, 08 Aug 2016 08:10:51 -0400
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Mon, 8 Aug 2016 14:25:28 +0200
 Subject: [PATCH] dmaengine: qcom_hidma: release the descriptor before the
  callback
-In-Reply-To: <20160808085155.GX9681@localhost>
+In-Reply-To: <20160808090852.GZ9681@localhost>
 References: <1468465076-27324-1-git-send-email-okaya@codeaurora.org>
  <ccffcabf-1448-57a1-d18b-715cfd46e906@codeaurora.org>
  <20160724062425.GW9681@localhost>
  <971733d9-fd18-2a1b-07c0-349b47747d49@codeaurora.org>
  <20160804125525.GF9681@localhost>
  <71a15611-645f-7523-1c26-14b420aff667@codeaurora.org>
- <20160808085155.GX9681@localhost>
-Message-ID: <001a1ffff4ea639cb94d0dfbcb3e14d1@codeaurora.org>
+ <20160804144003.GV1041@n2100.armlinux.org.uk>
+ <cff588a1-d85f-3d2c-ef61-1674d0d3ca92@codeaurora.org>
+ <20160804153835.GY1041@n2100.armlinux.org.uk>
+ <32339445-5a1c-5a3e-cd07-d64e35dce2c4@metafoo.de>
+ <20160808090852.GZ9681@localhost>
+Message-ID: <2fce2512-853e-c8e6-05d5-4c9088ef7d83@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016-08-08 04:51, Vinod Koul wrote:
+On 08/08/2016 11:08 AM, Vinod Koul wrote:
+> On Thu, Aug 04, 2016 at 05:59:30PM +0200, Lars-Peter Clausen wrote:
+>> On 08/04/2016 05:38 PM, Russell King - ARM Linux wrote:
+>> [...]
+>>> What you instead need to do is to find some way to record in your
+>>> driver that transaction 2 failed, and when dma_cookie_status() says
+>>> that a transaction has DMA_COMPLETE status, you need to look up to
+>>> see whether it failed.
+>>
+>> In my opinion this is where the current API is broken by design. For each
+>> transfer that fails you need to store the cookie associated with that
+>> transfer in some kind of lookup table. Since there is no lifetime associated
+>> with a cookie entries in this table would need to be retained forever and it
+>> will grow unbound.
 > 
->> This patch is needed to fix a race condition as the commit message 
->> describes.
->> The callback is called before returning the descriptor back to free 
->> pool.
->> 
->> If the client calls free resources, the descriptor that was not 
->> returned to free pool gets lost due
->> to race condition.
+> And how many drivers can report errors? And how many drivers can guarantee
+> DMA_COMPLETE implies transaction was succesful.
+
+The former just a handful, the later hopefully all.
+
 > 
-> Hmmm, if you have txn's pending and client wants to free up, shouldn't
-> the pending txn's be cleaned up? Sound like a different bug to me..
+>> Ideally we'd mark error reporting through this interface as deprecated and
+>> discourage new users of the interface. As far as I can see most of the few
+>> drivers that do return DMA_ERROR get it wrong anyway, e.g. return it
+>> unconditionally for all cookies when an error occurred for any of them.
 > 
-> So if I submit 5 txn's and now want to freeup, will you still leak
-> descriptors? Doesn't sound as right behaviour to me.
+> Error reporting is quite tricky as detection is a problem. So yes if you
+> can do so, it is highly encouraged to report using new interface which is
+> better than client checking after callback.
 > 
+> Btw what is the behaviour after error? I would think that client will see an
+> error and report to upper layer while initiaite closure of transaction. So
+> does driver need to keep the state for a longer time :-)
 
-If free is called from the callback, current code will leak the current 
-descriptor where free was called. It will release the other 4.
+The problem is that this is not really clearly defined.
 
-Because of ordering problem, descriptor is not in the active, pending or 
-free pool.
+1) What should be done when multiple descriptors are queued and an error is
+encountered on one of them. Should the descriptors that are after the one in
+the queue that caused the error be discarded or should they be executed as
+normal?
 
-I check pending txn by looking at active and queued lists when free is 
-called.
+2) How long does a error result need to be retained. Can it be discarded
+when the terminate_all() is called, or can it be discarded when the next
+issue_pending() is called or should it be retained forever?
 
-After the callback, I put the descriptor back to free pool. At this 
-moment, it is already too late.
-
-
->> I'll refactor the code after Dave's change for passing the error code 
->> while calling the
->> callback. That will be a different patch anyhow.
-> 
-> Yes the error reporting is different
+Unless we can clearly define the semantics of error reporting it is very
+difficult for drivers to use it. Which is probably one of the reasons why
+there are only very few DMAengine consumers that do actual error checking.
