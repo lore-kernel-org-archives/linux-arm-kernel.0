@@ -1,74 +1,27 @@
-From: peter.chen@nxp.com (Peter Chen)
-Date: Mon, 8 Aug 2016 16:52:11 +0800
-Subject: [PATCH v5 6/6] ARM: dts: imx6qdl-udoo.dtsi: fix onboard USB HUB
- property
-In-Reply-To: <1470646331-23227-1-git-send-email-peter.chen@nxp.com>
-References: <1470646331-23227-1-git-send-email-peter.chen@nxp.com>
-Message-ID: <1470646331-23227-7-git-send-email-peter.chen@nxp.com>
+From: rabin@rab.in (Rabin Vincent)
+Date: Mon, 8 Aug 2016 11:08:57 +0200
+Subject: debug tip after earlycon is closed?
+In-Reply-To: <20160728122022.GZ1041@n2100.armlinux.org.uk>
+References: <CAK7LNASrqbt+RzD64zcAMjmBjJqa2sc2UG+mnEX8npZ9DBJodQ@mail.gmail.com>
+ <3860396.RT1mlU0LAT@wuerfel>
+ <CAK7LNARtm_2uT3nbga4X0dMYs9jhKa8a2FTGJrYbVRg8P3vHQw@mail.gmail.com>
+ <7034241.kLArk8ex69@wuerfel>
+ <20160728122022.GZ1041@n2100.armlinux.org.uk>
+Message-ID: <20160808090857.GA20832@lnxartpec.se.axis.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current dts describes USB HUB's property at USB controller's
-entry, it is improper. The USB HUB should be the child node
-under USB controller, and power sequence properties are under
-it.
+On Thu, Jul 28, 2016 at 01:20:22PM +0100, Russell King - ARM Linux wrote:
+> To me, what this means is that the DT parsing of linux,stdout is
+> broken - while it may look nice from a design point of view, the
+> design is wrong and fails to take account of non-UART consoles in
+> the system.
 
-Signed-off-by: Peter Chen <peter.chen@nxp.com>
----
- arch/arm/boot/dts/imx6qdl-udoo.dtsi | 26 +++++++++++++-------------
- 1 file changed, 13 insertions(+), 13 deletions(-)
+Note that the brokeness you describe also leads to stdout-path being
+unable to put the console on any serial port but the first, as reported
+here:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2015-February/323811.html
 
-diff --git a/arch/arm/boot/dts/imx6qdl-udoo.dtsi b/arch/arm/boot/dts/imx6qdl-udoo.dtsi
-index 3bee2f9..f29a72c2f 100644
---- a/arch/arm/boot/dts/imx6qdl-udoo.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-udoo.dtsi
-@@ -9,6 +9,8 @@
-  *
-  */
- 
-+#include <dt-bindings/gpio/gpio.h>
-+
- / {
- 	aliases {
- 		backlight = &backlight;
-@@ -58,17 +60,6 @@
- 		#address-cells = <1>;
- 		#size-cells = <0>;
- 
--		reg_usb_h1_vbus: regulator at 0 {
--			compatible = "regulator-fixed";
--			reg = <0>;
--			regulator-name = "usb_h1_vbus";
--			regulator-min-microvolt = <5000000>;
--			regulator-max-microvolt = <5000000>;
--			enable-active-high;
--			startup-delay-us = <2>; /* USB2415 requires a POR of 1 us minimum */
--			gpio = <&gpio7 12 0>;
--		};
--
- 		reg_panel: regulator at 1 {
- 			compatible = "regulator-fixed";
- 			reg = <1>;
-@@ -259,9 +250,18 @@
- &usbh1 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_usbh>;
--	vbus-supply = <&reg_usb_h1_vbus>;
--	clocks = <&clks IMX6QDL_CLK_CKO>;
- 	status = "okay";
-+
-+	#address-cells = <1>;
-+	#size-cells = <0>;
-+	usb2415: hub at 1 {
-+		compatible = "usb424,2514";
-+		reg = <1>;
-+
-+		clocks = <&clks IMX6QDL_CLK_CKO>;
-+		reset-gpios = <&gpio7 12 GPIO_ACTIVE_LOW>;
-+		reset-duration-us = <3000>;
-+	};
- };
- 
- &usdhc3 {
--- 
-1.9.1
+It always puts the console on the first serial port if CONFIG_VT_CONSOLE
+is not enabled, even if the stdout-path property requests a different
+serial port.
