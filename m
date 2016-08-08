@@ -1,54 +1,39 @@
 From: thunder.leizhen@huawei.com (Zhen Lei)
-Date: Mon, 8 Aug 2016 17:18:05 +0800
-Subject: [PATCH v5 00/14] fix some type infos and bugs for arm64/of numa
-Message-ID: <1470647899-6324-1-git-send-email-thunder.leizhen@huawei.com>
+Date: Mon, 8 Aug 2016 17:18:09 +0800
+Subject: [PATCH v5 04/14] of/numa: remove a duplicated warning
+In-Reply-To: <1470647899-6324-1-git-send-email-thunder.leizhen@huawei.com>
+References: <1470647899-6324-1-git-send-email-thunder.leizhen@huawei.com>
+Message-ID: <1470647899-6324-5-git-send-email-thunder.leizhen@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-v4 -> v5:
-This version has no code changes, just add "Acked-by: Rob Herring <robh@kernel.org>"
-into patches 1, 2, 4, 6, 7, 13, 14. Because these patches rely on some acpi numa
-patches, and the latter had not been upstreamed in 4.7, but upstreamed in 4.8-rc1,
-so I resend my patches again.
+This warning has been printed in of_numa_parse_cpu_nodes before.
 
-v3 -> v4:
-1. Packed three patches of Kefeng Wang, patch6-8.
-2. Add 6 new patches(9-15) to enhance the numa on arm64.
+Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
+Acked-by: Rob Herring <robh@kernel.org>
+---
+ drivers/of/of_numa.c | 9 ++-------
+ 1 file changed, 2 insertions(+), 7 deletions(-)
 
-v2 -> v3:
-1. Adjust patch2 and patch5 according to Matthias Brugger's advice, to make the
-   patches looks more well. The final code have no change. 
+diff --git a/drivers/of/of_numa.c b/drivers/of/of_numa.c
+index 7b3fbdc..3157130 100644
+--- a/drivers/of/of_numa.c
++++ b/drivers/of/of_numa.c
+@@ -174,13 +174,8 @@ int of_node_to_nid(struct device_node *device)
+ 			np->name);
+ 	of_node_put(np);
 
-v1 -> v2:
-1. Base on https://lkml.org/lkml/2016/5/24/679
-2. Rewrote of_numa_parse_memory_nodes according to Rob Herring's advice. So that it looks more clear.
-3. Rewrote patch 5 because some scenes were not considered before.
+-	if (!r) {
+-		if (nid >= MAX_NUMNODES)
+-			pr_warn("NUMA: Node id %u exceeds maximum value\n",
+-				nid);
+-		else
+-			return nid;
+-	}
++	if (!r)
++		return nid;
 
-Kefeng Wang (3):
-  of_numa: Use of_get_next_parent to simplify code
-  of_numa: Use pr_fmt()
-  arm64: numa: Use pr_fmt()
-
-Zhen Lei (11):
-  of/numa: remove a duplicated pr_debug information
-  of/numa: fix a memory@ node can only contains one memory block
-  arm64/numa: add nid check for memory block
-  of/numa: remove a duplicated warning
-  arm64/numa: avoid inconsistent information to be printed
-  arm64/numa: support HAVE_SETUP_PER_CPU_AREA
-  arm64/numa: define numa_distance as array to simplify code
-  arm64/numa: support HAVE_MEMORYLESS_NODES
-  arm64/numa: remove some useless code
-  of/numa: remove the constraint on the distances of node pairs
-  Documentation: remove the constraint on the distances of node pairs
-
- Documentation/devicetree/bindings/numa.txt |   1 -
- arch/arm64/Kconfig                         |  12 ++
- arch/arm64/include/asm/numa.h              |   1 -
- arch/arm64/kernel/smp.c                    |   1 +
- arch/arm64/mm/numa.c                       | 228 ++++++++++++++++-------------
- drivers/of/of_numa.c                       |  87 +++++------
- 6 files changed, 180 insertions(+), 150 deletions(-)
-
+ 	return NUMA_NO_NODE;
+ }
 --
 2.5.0
