@@ -1,37 +1,45 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Tue, 9 Aug 2016 04:41:52 +0800
-Subject: [stericsson:earlydebug 1/1] init_task.c:undefined reference to
- `printascii'
-Message-ID: <201608090449.QX1Sd29G%fengguang.wu@intel.com>
+From: moritz.fischer@ettus.com (Moritz Fischer)
+Date: Mon, 8 Aug 2016 13:44:59 -0700
+Subject: [PATCH v18 6/6] ARM: socfpga: fpga bridge driver support
+In-Reply-To: <alpine.DEB.2.02.1608081416110.11063@linuxheads99>
+References: <20160712193645.9098-1-atull@opensource.altera.com>
+ <20160712193645.9098-7-atull@opensource.altera.com>
+ <CAP=VYLo2jtp57kQe5671xM=4o_ZAU6XG_W1MXU8aPv4Ws7kkDA@mail.gmail.com>
+ <alpine.DEB.2.02.1608081416110.11063@linuxheads99>
+Message-ID: <CAAtXAHev2Dytadp-_Hs0agcSXUTyrFhJQxHcsFd7faOReHzr9Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git earlydebug
-head:   be0c05be25fea7ef592e5c4c613bc1489b012d65
-commit: be0c05be25fea7ef592e5c4c613bc1489b012d65 [1/1] uglyhack printascii
-config: arm-imx_v6_v7_defconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 5.4.0-6) 5.4.0 20160609
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        git checkout be0c05be25fea7ef592e5c4c613bc1489b012d65
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
+Hi Alan,
 
-All errors (new ones prefixed by >>):
+On Mon, Aug 8, 2016 at 12:18 PM, atull <atull@opensource.altera.com> wrote:
 
-   init/built-in.o: In function `start_kernel':
->> init_task.c:(.init.text+0x644): undefined reference to `printascii'
-   kernel/built-in.o: In function `vprintk_emit':
->> memremap.c:(.text+0x58a48): undefined reference to `printascii'
+>> Please don't use module.h in drivers controlled by a bool
+>> Kconfig setting.
+>>
+>> THanks,
+>> Paul.
+>>
+>
+> Thanks for the feedback.  Can you provide an example of what you
+> would consider to be proper usage in the kernel?
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 30174 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160809/27f0995e/attachment-0001.obj>
+
+I think Paul is suggesting to use
+
+static int __init alt_fpga_bridge_init(void)
+{
+        platform_driver_register(&alt_fpga_bridge_driver);
+}
+
+device_initcall(alt_fpga_bridge_init);
+
+or better:
+
+builtin_platform_driver(&alt_fpga_bridge_driver);
+
+Like for example in: drivers/cpuidle/cpuidle-mvebu-v7.c
+
+Cheers,
+
+Moritz
