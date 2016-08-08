@@ -1,41 +1,51 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Mon,  8 Aug 2016 18:21:43 +0100
-Subject: [PATCH v4 1/7] arm64: sunxi: Kconfig: add essential pinctrl driver
+Date: Mon,  8 Aug 2016 18:21:44 +0100
+Subject: [PATCH v4 2/7] DT: clk: sunxi: add binding doc for the
+ multi-bus-gates clock
 In-Reply-To: <20160808172149.30861-1-andre.przywara@arm.com>
 References: <20160808172149.30861-1-andre.przywara@arm.com>
-Message-ID: <20160808172149.30861-2-andre.przywara@arm.com>
+Message-ID: <20160808172149.30861-3-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The pinctrl driver is essential for the Allwinner SoCs to work.
-Add the driver's config symbol to the Kconfig entry to always compile
-it in. We can't use the arm approach to make the _driver's_ Kconfig
-symbol def_bool, because we lack the MACH_* symbols in arm64.
-That line was in the original pinctrl driver patch, but got removed
-to avoid the dependency on the Kconfig patch [1].
-Also add the general PINCTRL symbol, which isn't selected automatically
-for the same reason.
+Recent Allwinner SoCs introduced a bus gates clock which can have
+different parents for individual gates, even within a single register.
+For the time being we encoded this relation in the driver.
+This commit specifies a new binding which allows to encode this in
+the DT by using a child node for each parent clock used. This allows
+to specify any kind of relation efficiently and also keeps the very
+same kernel driver for all SoCs at the same time.
 
-Reported-by: Jeroen Dekien <dekien@gmail.com>
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-
-[1]: http://lists.infradead.org/pipermail/linux-arm-kernel/2016-March/414086.html
+Acked-by: Rob Herring <robh@kernel.org>
 ---
- arch/arm64/Kconfig.platforms | 2 ++
- 1 file changed, 2 insertions(+)
+ Documentation/devicetree/bindings/clock/sunxi.txt | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
-index bb2616b..e3dc1a4 100644
---- a/arch/arm64/Kconfig.platforms
-+++ b/arch/arm64/Kconfig.platforms
-@@ -3,6 +3,8 @@ menu "Platform selection"
- config ARCH_SUNXI
- 	bool "Allwinner sunxi 64-bit SoC Family"
- 	select GENERIC_IRQ_CHIP
-+	select PINCTRL
-+	select PINCTRL_SUN50I_A64
- 	help
- 	  This enables support for Allwinner sunxi based SoCs like the A64.
+diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
+index 8f7619d..7d4197e 100644
+--- a/Documentation/devicetree/bindings/clock/sunxi.txt
++++ b/Documentation/devicetree/bindings/clock/sunxi.txt
+@@ -87,6 +87,8 @@ Required properties:
+ 	"allwinner,sun9i-a80-usb-phy-clk" - for usb phy gates + resets on A80
+ 	"allwinner,sun4i-a10-ve-clk" - for the Video Engine clock
+ 	"allwinner,sun6i-a31-display-clk" - for the display clocks
++	"allwinner,sunxi-multi-bus-gates-clk" - for the multi-parent bus gates
++	"allwinner,sun50i-a64-bus-gates-clk" - for the bus gates on A64
  
+ Required properties for all clocks:
+ - reg : shall be the control register address for the clock.
+@@ -127,6 +129,11 @@ For "allwinner,sun6i-a31-pll6-clk", there are 2 outputs. The first output
+ is the normal PLL6 output, or "pll6". The second output is rate doubled
+ PLL6, or "pll6x2".
+ 
++The "allwinner,sunxi-multi-bus-gates-clk" holds the actual clocks in
++child nodes, where each one specifies the parent clock that the particular
++gates are depending from. The child nodes each follow the common clock
++binding as described in this document.
++
+ The "allwinner,*-mmc-clk" clocks have three different outputs: the
+ main clock, with the ID 0, and the output and sample clocks, with the
+ IDs 1 and 2, respectively.
 -- 
 2.9.0
