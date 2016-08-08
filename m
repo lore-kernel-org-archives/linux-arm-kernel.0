@@ -1,212 +1,77 @@
-From: pmladek@suse.com (Petr Mladek)
-Date: Mon, 8 Aug 2016 15:57:11 +0200
-Subject: [PATCH v6 1/4] nmi_backtrace: add more trigger_*_cpu_backtrace()
- methods
-In-Reply-To: <1468529432-28026-2-git-send-email-cmetcalf@mellanox.com>
-References: <1468529432-28026-1-git-send-email-cmetcalf@mellanox.com>
- <1468529432-28026-2-git-send-email-cmetcalf@mellanox.com>
-Message-ID: <20160808135711.GA13300@pathway.suse.cz>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Mon, 8 Aug 2016 16:58:15 +0300
+Subject: [PATCH v2 6/6] dmaengine: omap-dma: Support for LinkedList
+ transfer of slave_sg
+In-Reply-To: <20160808054226.GR9681@localhost>
+References: <20160720085032.2955-1-peter.ujfalusi@ti.com>
+ <20160720085032.2955-7-peter.ujfalusi@ti.com>
+ <20160808054226.GR9681@localhost>
+Message-ID: <76993999-9638-7c46-a85a-e2ed2ef1b8a0@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu 2016-07-14 16:50:29, Chris Metcalf wrote:
-> Currently you can only request a backtrace of either all cpus, or
-> all cpus but yourself.  It can also be helpful to request a remote
-> backtrace of a single cpu, and since we want that, the logical
-> extension is to support a cpumask as the underlying primitive.
+On 08/08/16 08:42, Vinod Koul wrote:
+> On Wed, Jul 20, 2016 at 11:50:32AM +0300, Peter Ujfalusi wrote:
+>> sDMA in OMAP3630 or newer SoC have support for LinkedList transfer. When
+>> LinkedList or Descriptor load feature is present we can create the
+>> descriptors for each and program sDMA to walk through the list of
+>> descriptors instead of the current way of sDMA stop, sDMA reconfiguration
+>> and sDMA start after each SG transfer.
+>> By using LinkedList transfer in sDMA the number of DMA interrupts will
+>> decrease dramatically.
+>> Booting up the board with filesystem on SD card for example:
+>> W/o LinkedList support:
+>>  27:       4436          0     WUGEN  13 Level     omap-dma-engine
+>>
+>> Same board/filesystem with this patch:
+>>  27:       1027          0     WUGEN  13 Level     omap-dma-engine
+>>
+>> Or copying files from SD card to eMCC:
+>> 2.1G    /usr/
+>> 232001
+>>
+>> W/o LinkedList we see ~761069 DMA interrupts.
+>> With LinkedList support it is down to ~269314 DMA interrupts.
+>>
+>> With the decreased DMA interrupt number the CPU load is dropping
+>> significantly as well.
 > 
-> This change modifies the existing lib/nmi_backtrace.c code to take
-> a cpumask as its basic primitive, and modifies the linux/nmi.h code
-> to use either the old "all/all_but_self" arch methods, or the new
-> "cpumask" method, depending on which is available.
+> Interesting, I would have counted the throughput of DMA by using time for
+> transfer and not really interrupts and CPU load. With LL mode, you get a
+> big performance boost due to starting next transaction by hardware without
+> waiting for CPU intervention and yes side effect is lesser interrupts and
+> load :)
 
-> --- a/include/linux/nmi.h
-> +++ b/include/linux/nmi.h
-> @@ -31,38 +31,75 @@ static inline void hardlockup_detector_disable(void) {}
->  #endif
->  
->  /*
-> - * Create trigger_all_cpu_backtrace() out of the arch-provided
-> - * base function. Return whether such support was available,
-> + * Create trigger_all_cpu_backtrace() etc out of the arch-provided
-> + * base function(s). Return whether such support was available,
->   * to allow calling code to fall back to some other mechanism:
->   */
-> -#ifdef arch_trigger_all_cpu_backtrace
->  static inline bool trigger_all_cpu_backtrace(void)
->  {
-> +#if defined(arch_trigger_all_cpu_backtrace)
->  	arch_trigger_all_cpu_backtrace(true);
-> -
->  	return true;
-> +#elif defined(arch_trigger_cpumask_backtrace)
-> +	arch_trigger_cpumask_backtrace(cpu_online_mask);
-> +	return true;
-> +#else
-> +	return false;
-> +#endif
->  }
-> +
->  static inline bool trigger_allbutself_cpu_backtrace(void)
->  {
-> +#if defined(arch_trigger_all_cpu_backtrace)
->  	arch_trigger_all_cpu_backtrace(false);
->  	return true;
-> -}
-> -
-> -/* generic implementation */
-> -void nmi_trigger_all_cpu_backtrace(bool include_self,
-> -				   void (*raise)(cpumask_t *mask));
-> -bool nmi_cpu_backtrace(struct pt_regs *regs);
-> +#elif defined(arch_trigger_cpumask_backtrace)
-> +	cpumask_var_t mask;
-> +	int cpu = get_cpu();
->  
-> +	if (!alloc_cpumask_var(&mask, GFP_KERNEL))
-> +		return false;
+I did throughput test as well, it was slightly faster, but not the boost I was
+hoping for.
+The copy of the /usr (2.1G) - 5 runs average:
+w/o linked list: 7:30 mins
+with this patch: 7:23 mins
 
-I tested this patch by the following change:
+The limiting factor here is the SD card I have used. But the board was way
+more responsible during heavy I/O tasks, like running 'emerge --sync' I can
+still use the board.
 
-diff --git a/drivers/tty/sysrq.c b/drivers/tty/sysrq.c
-index 52bbd27e93ae..404a32699554 100644
---- a/drivers/tty/sysrq.c
-+++ b/drivers/tty/sysrq.c
-@@ -242,6 +242,7 @@ static void sysrq_handle_showallcpus(int key)
- 	 * backtrace printing did not succeed or the
- 	 * architecture has no support for it:
- 	 */
-+	printk("-----------  All CPUs: ---------------------\n");
- 	if (!trigger_all_cpu_backtrace()) {
- 		struct pt_regs *regs = get_irq_regs();
- 
-@@ -251,6 +252,10 @@ static void sysrq_handle_showallcpus(int key)
- 		}
- 		schedule_work(&sysrq_showallcpus);
- 	}
-+	printk("-----------  All but itself: ---------------------\n");
-+	trigger_allbutself_cpu_backtrace();
-+	printk("-----------  Only two: ---------------------\n");
-+	trigger_single_cpu_backtrace(2);
- }
- 
- static struct sysrq_key_op sysrq_showallcpus_op = {
+>> @@ -743,6 +863,7 @@ static struct dma_async_tx_descriptor *omap_dma_prep_slave_sg(
+>>  	struct omap_desc *d;
+>>  	dma_addr_t dev_addr;
+>>  	unsigned i, es, en, frame_bytes;
+>> +	bool ll_failed = false;
+>>  	u32 burst;
+>>  
+>>  	if (dir == DMA_DEV_TO_MEM) {
+>> @@ -818,16 +939,47 @@ static struct dma_async_tx_descriptor *omap_dma_prep_slave_sg(
+>>  	 */
+>>  	en = burst;
+>>  	frame_bytes = es_bytes[es] * en;
+>> +
+>> +	if (sglen >= 2)
+>> +		d->using_ll = od->ll123_supported;
+> 
+> No upperbound on length? Does the hardware support any lengths?
 
+No, we don't have upper limit, we can link as many sg as we could allocate
+from the pool.
 
-Then I triggered this function using
-
-  echo l >/proc/sysrq-trigger
-
-
-and got
-
-[  270.791328] -----------  All but itself: ---------------------
-
-[  270.791331] ===============================
-[  270.791331] [ INFO: suspicious RCU usage. ]
-[  270.791333] 4.8.0-rc1-4-default+ #3086 Not tainted
-[  270.791333] -------------------------------
-[  270.791335] ./include/linux/rcupdate.h:556 Illegal context switch in RCU read-side critical section!
-[  270.791339] 
-               other info that might help us debug this:
-
-[  270.791340] 
-               rcu_scheduler_active = 1, debug_locks = 0
-[  270.791341] 2 locks held by bash/3720:
-[  270.791347]  #0:  (sb_writers#5){.+.+.+}, at: [<ffffffff8122c9e1>] __sb_start_write+0xd1/0xf0
-[  270.791351]  #1:  (rcu_read_lock){......}, at: [<ffffffff8152d8a5>] __handle_sysrq+0x5/0x220
-[  270.791352] 
-               stack backtrace:
-[  270.791354] CPU: 3 PID: 3720 Comm: bash Not tainted 4.8.0-rc1-4-default+ #3086
-[  270.791355] Hardware name: Bochs Bochs, BIOS Bochs 01/01/2011
-[  270.791359]  0000000000000000 ffff88013688fc58 ffffffff8143ddac ffff880135748600
-[  270.791362]  0000000000000001 ffff88013688fc88 ffffffff810c9727 ffff88013fd98c00
-[  270.791365]  0000000000018c00 00000000024000c0 0000000000000000 ffff88013688fce0
-[  270.791366] Call Trace:
-[  270.791369]  [<ffffffff8143ddac>] dump_stack+0x85/0xc9
-[  270.791372]  [<ffffffff810c9727>] lockdep_rcu_suspicious+0xe7/0x120
-[  270.791374]  [<ffffffff81951beb>] __schedule+0x4eb/0x820
-[  270.791377]  [<ffffffff819521b7>] preempt_schedule_common+0x18/0x31
-[  270.791379]  [<ffffffff819521ec>] _cond_resched+0x1c/0x30
-[  270.791382]  [<ffffffff81201164>] kmem_cache_alloc_node_trace+0x224/0x340
-[  270.791385]  [<ffffffff812012f1>] __kmalloc_node+0x31/0x40
-[  270.791388]  [<ffffffff8143db64>] alloc_cpumask_var_node+0x24/0x30
-[  270.791391]  [<ffffffff8143db9e>] alloc_cpumask_var+0xe/0x10
-[  270.791393]  [<ffffffff8152d64b>] sysrq_handle_showallcpus+0x4b/0xd0
-[  270.791395]  [<ffffffff8152d9d6>] __handle_sysrq+0x136/0x220
-[  270.791398]  [<ffffffff8152d8a5>] ? __handle_sysrq+0x5/0x220
-[  270.791401]  [<ffffffff8152dee6>] write_sysrq_trigger+0x46/0x60
-[  270.791403]  [<ffffffff8129cc1d>] proc_reg_write+0x3d/0x70
-[  270.791406]  [<ffffffff810e770f>] ? rcu_sync_lockdep_assert+0x2f/0x60
-[  270.791408]  [<ffffffff81229028>] __vfs_write+0x28/0x120
-[  270.791411]  [<ffffffff810c6e59>] ? percpu_down_read+0x49/0x80
-[  270.791412]  [<ffffffff8122c9e1>] ? __sb_start_write+0xd1/0xf0
-[  270.791414]  [<ffffffff8122c9e1>] ? __sb_start_write+0xd1/0xf0
-[  270.791416]  [<ffffffff81229722>] vfs_write+0xb2/0x1b0
-[  270.791419]  [<ffffffff810ca5f9>] ? trace_hardirqs_on_caller+0xf9/0x1c0
-[  270.791423]  [<ffffffff8122aa79>] SyS_write+0x49/0xa0
-[  270.791427]  [<ffffffff8195867c>] entry_SYSCALL_64_fastpath+0x1f/0xbd
-[  270.791502] Sending NMI from CPU 3 to CPUs 0-2:
-
-
-I guess that you allocate the mask because you do not want
-to have the mask twice on the stack.
-
-Hmm, people might want to call this function in different context
-and also when the system is somehow borked. Having huge variables
-on stack might be dangerous but allocation is dangerous as well.
-I think that we should not combine both dangers here.
-
-I would try using local variable. If it causes problems, we could
-always add some more complexity to avoid copying the mask later.
-
-
-> +	cpumask_copy(mask, cpu_online_mask);
-> +	cpumask_clear_cpu(cpu, mask);
-> +	arch_trigger_cpumask_backtrace(mask);
-> +	put_cpu();
-> +	free_cpumask_var(mask);
-> +	return true;
-
-Also this looks too much code for an inlined function.
-It is rather slow and there is not a big gain. I would move
-the definition to lib/nmi_backtrace.c.
-
->  #else
-> -static inline bool trigger_all_cpu_backtrace(void)
-> -{
->  	return false;
-> +#endif
->  }
-> -static inline bool trigger_allbutself_cpu_backtrace(void)
-> +
-> +static inline bool trigger_cpumask_backtrace(struct cpumask *mask)
->  {
-> +#if defined(arch_trigger_cpumask_backtrace)
-> +	arch_trigger_cpumask_backtrace(mask);
-> +	return true;
-> +#else
->  	return false;
-> +#endif
->  }
-> +
-> +static inline bool trigger_single_cpu_backtrace(int cpu)
-> +{
-> +#if defined(arch_trigger_cpumask_backtrace)
-> +	cpumask_var_t mask;
-> +
-> +	if (!zalloc_cpumask_var(&mask, GFP_KERNEL))
-> +		return false;
-> +	cpumask_set_cpu(cpu, mask);
-> +	arch_trigger_cpumask_backtrace(mask);
-> +	free_cpumask_var(mask);
-
-I would avoid the allocation here as well. Also I would move
-this into lib/nmi_backtrace.c.
-
-
-Best Regards,
-Petr
-
-PS: I am sorry for sending this so late in the game. I was
-curious why the patch had not been upstream yet and. I made
-a closer look to give a Reviewed-by tag...
+-- 
+P?ter
