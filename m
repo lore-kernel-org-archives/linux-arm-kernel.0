@@ -1,38 +1,50 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Mon,  8 Aug 2016 21:43:18 +0200
-Subject: [PATCH 8/8] ARM: dts: sun8i: Add touchscreen node for sun8i-a33-ga10h
-In-Reply-To: <1470685398-14568-1-git-send-email-hdegoede@redhat.com>
-References: <1470685398-14568-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1470685398-14568-8-git-send-email-hdegoede@redhat.com>
+From: msalter@redhat.com (Mark Salter)
+Date: Mon, 08 Aug 2016 15:44:05 -0400
+Subject: [RFC PATCH V5 0/5] ECAM quirks handling for ARM64 platforms
+In-Reply-To: <1470661541-26270-1-git-send-email-tn@semihalf.com>
+References: <1470661541-26270-1-git-send-email-tn@semihalf.com>
+Message-ID: <1470685445.3551.37.camel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ga10h tablet has a gsl3675 touchscreen, add a dt node describing it.
+On Mon, 2016-08-08 at 15:05 +0200, Tomasz Nowicki wrote:
+> Quirk handling relies on an idea of matching MCFG OEM ID, TABLE ID and
+> revision (the ones from standard header of MCFG table).
+> 
+> Static array is used to keep quirk entries. Each entry consists of
+> mentioned MCFG IDs along with custom pci_ops structure and initialization call.
+> 
+> As an example, the last patch presents quirk handling mechanism usage for
+> ThunderX PEM driver.
+> 
+> v4 -> v5
+> - rebase against v4.8-rc1
+> - rework to exact MCFG OEM ID, TABLE ID, rev match
+> ? - use memcmp instead of strncmp
+> ? - no substring match
+> - fix typos and dmesg message
+> 
+> Tomasz Nowicki (5):
+> ? PCI: Embed pci_ecam_ops in pci_config_window structure
+> ? PCI/ACPI: Move ACPI ECAM mapping to generic MCFG driver
+> ? PCI: Check platform specific ECAM quirks
+> ? ARM64/PCI: Start using quirks handling for ACPI based PCI host
+> ????controller
+> ? PCI: thunder-pem: Support quirky configuration space access for ACPI
+> ????based PCI host controller
+> 
+> ?arch/arm64/kernel/pci.c????????????| 42 +----------------
+> ?drivers/acpi/pci_mcfg.c????????????| 40 ++++++++++++++++
+> ?drivers/pci/ecam.c?????????????????|??6 +--
+> ?drivers/pci/host/Makefile??????????|??1 +
+> ?drivers/pci/host/mcfg-quirks.c?????| 93 ++++++++++++++++++++++++++++++++++++
+> ?drivers/pci/host/mcfg-quirks.h?????| 24 ++++++++++
+> ?drivers/pci/host/pci-thunder-pem.c | 96 ++++++++++++++++++++++++++++++++------
+> ?include/linux/pci-acpi.h???????????|??5 ++
+> ?include/linux/pci-ecam.h???????????|??2 +-
+> ?9 files changed, 252 insertions(+), 57 deletions(-)
+> ?create mode 100644 drivers/pci/host/mcfg-quirks.c
+> ?create mode 100644 drivers/pci/host/mcfg-quirks.h
+> 
 
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
- arch/arm/boot/dts/sun8i-a33-ga10h-v1.1.dts | 9 +++++++++
- 1 file changed, 9 insertions(+)
-
-diff --git a/arch/arm/boot/dts/sun8i-a33-ga10h-v1.1.dts b/arch/arm/boot/dts/sun8i-a33-ga10h-v1.1.dts
-index de6269d..2fea1af 100644
---- a/arch/arm/boot/dts/sun8i-a33-ga10h-v1.1.dts
-+++ b/arch/arm/boot/dts/sun8i-a33-ga10h-v1.1.dts
-@@ -58,6 +58,15 @@
- 	status = "okay";
- };
- 
-+&gsl1680 {
-+	compatible = "silead,gsl3675";
-+	touchscreen-fw-name = "silead/gsl3675-ga10h.fw";
-+	touchscreen-size-x = <1630>;
-+	touchscreen-size-y = <990>;
-+	touchscreen-inverted-y;
-+	status = "okay";
-+};
-+
- &lradc {
- 	button at 600 {
- 		label = "Back";
--- 
-2.7.4
+Tested-by: Mark Salter <msalter@redhat.com>
