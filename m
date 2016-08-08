@@ -1,60 +1,43 @@
-From: gg@slimlogic.co.uk (Graeme Gregory)
-Date: Mon, 8 Aug 2016 16:13:12 +0100
-Subject: [RFC PATCH V5 0/5] ECAM quirks handling for ARM64 platforms
-In-Reply-To: <1470661541-26270-1-git-send-email-tn@semihalf.com>
-References: <1470661541-26270-1-git-send-email-tn@semihalf.com>
-Message-ID: <20160808151312.GG18515@xora-haswell.xora.org.uk>
+From: york.sun@nxp.com (york sun)
+Date: Mon, 8 Aug 2016 15:16:53 +0000
+Subject: [Patch v3 10/11] driver/edac/layerscape_edac: Add Layerscape EDAC
+ support
+References: <1470351518-22404-1-git-send-email-york.sun@nxp.com>
+ <1470351518-22404-11-git-send-email-york.sun@nxp.com>
+ <19101224.m7ryErTDyD@ws-stein>
+Message-ID: <AM4PR0401MB173245DF98E6A42A05DB4B299A1B0@AM4PR0401MB1732.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 08, 2016 at 03:05:36PM +0200, Tomasz Nowicki wrote:
-> Quirk handling relies on an idea of matching MCFG OEM ID, TABLE ID and
-> revision (the ones from standard header of MCFG table).
-> 
-> Static array is used to keep quirk entries. Each entry consists of
-> mentioned MCFG IDs along with custom pci_ops structure and initialization call.
-> 
-> As an example, the last patch presents quirk handling mechanism usage for
-> ThunderX PEM driver.
-> 
+On 08/08/2016 01:57 AM, Alexander Stein wrote:
+> On Thursday 04 August 2016 15:58:35, York Sun wrote:
+>> Add DDR EDAC for ARM-based compatible controllers. Both big-endian
+>> and little-endian are supported.
+>>
+>> Signed-off-by: York Sun <york.sun@nxp.com>
+>>
+>> ---
+>> Change log
+>>   v3: no change
+>>   v2: Create new driver using shared DDR object
+>>
+>>  arch/arm64/Kconfig.platforms           |  1 +
+>>  arch/{arm => arm64}/include/asm/edac.h | 21 +++++------
+>>  arch/arm64/include/asm/irq.h           |  4 ++
+>>  drivers/edac/Kconfig                   |  7 ++++
+>>  drivers/edac/Makefile                  |  3 ++
+>>  drivers/edac/fsl_ddr_edac.c            |  1 +
+>>  drivers/edac/layerscape_edac.c         | 67
+>> ++++++++++++++++++++++++++++++++++ 7 files changed, 92 insertions(+), 12
+>> deletions(-)
+>>  copy arch/{arm => arm64}/include/asm/edac.h (79%)
+>>  create mode 100644 drivers/edac/layerscape_edac.c
+>
+> This only adds EDAC support for ARM64. What would be necessary for ARM
+> support, e.g. LS1021A?
+>
 
-Series looks good to me.
+It should be just one step away. I haven't got a chance to verify/debug 
+it on LS1021A.
 
-Reviewed-by: Graeme Gregory <graeme.gregory@linaro.org>
-
-> v4 -> v5
-> - rebase against v4.8-rc1
-> - rework to exact MCFG OEM ID, TABLE ID, rev match
->   - use memcmp instead of strncmp
->   - no substring match
-> - fix typos and dmesg message
-> 
-> Tomasz Nowicki (5):
->   PCI: Embed pci_ecam_ops in pci_config_window structure
->   PCI/ACPI: Move ACPI ECAM mapping to generic MCFG driver
->   PCI: Check platform specific ECAM quirks
->   ARM64/PCI: Start using quirks handling for ACPI based PCI host
->     controller
->   PCI: thunder-pem: Support quirky configuration space access for ACPI
->     based PCI host controller
-> 
->  arch/arm64/kernel/pci.c            | 42 +----------------
->  drivers/acpi/pci_mcfg.c            | 40 ++++++++++++++++
->  drivers/pci/ecam.c                 |  6 +--
->  drivers/pci/host/Makefile          |  1 +
->  drivers/pci/host/mcfg-quirks.c     | 93 ++++++++++++++++++++++++++++++++++++
->  drivers/pci/host/mcfg-quirks.h     | 24 ++++++++++
->  drivers/pci/host/pci-thunder-pem.c | 96 ++++++++++++++++++++++++++++++++------
->  include/linux/pci-acpi.h           |  5 ++
->  include/linux/pci-ecam.h           |  2 +-
->  9 files changed, 252 insertions(+), 57 deletions(-)
->  create mode 100644 drivers/pci/host/mcfg-quirks.c
->  create mode 100644 drivers/pci/host/mcfg-quirks.h
-> 
-> -- 
-> 1.9.1
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+York
