@@ -1,193 +1,130 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Mon,  8 Aug 2016 21:55:39 +0200
-Subject: [PATCH resend] phy-sun4i-usb: Add support for peripheral-only mode
-In-Reply-To: <1470686139-19893-1-git-send-email-hdegoede@redhat.com>
-References: <1470686139-19893-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1470686139-19893-2-git-send-email-hdegoede@redhat.com>
+From: york.sun@nxp.com (york sun)
+Date: Mon, 8 Aug 2016 19:56:04 +0000
+Subject: [Patch v3 10/11] driver/edac/layerscape_edac: Add Layerscape EDAC
+ support
+References: <1470351518-22404-1-git-send-email-york.sun@nxp.com>
+ <1470351518-22404-11-git-send-email-york.sun@nxp.com>
+ <20160808190652.6456fae0@arm.com>
+Message-ID: <AM4PR0401MB17322F172D369D841F820C029A1B0@AM4PR0401MB1732.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the new of_usb_get_dr_mode_by_phy() function to get the dr_mode
-from the musb controller node instead of assuming that having an id_det
-gpio means otg mode, and not having one means host mode.
+On 08/08/2016 11:07 AM, Marc Zyngier wrote:
+> On Thu, 4 Aug 2016 15:58:35 -0700
+> York Sun <york.sun@nxp.com> wrote:
+>
+>> Add DDR EDAC for ARM-based compatible controllers. Both big-endian
+>> and little-endian are supported.
+>>
+>> Signed-off-by: York Sun <york.sun@nxp.com>
+>>
+>> ---
+>> Change log
+>>   v3: no change
+>>   v2: Create new driver using shared DDR object
+>>
+>>  arch/arm64/Kconfig.platforms           |  1 +
+>>  arch/{arm => arm64}/include/asm/edac.h | 21 +++++------
+>>  arch/arm64/include/asm/irq.h           |  4 ++
+>>  drivers/edac/Kconfig                   |  7 ++++
+>>  drivers/edac/Makefile                  |  3 ++
+>>  drivers/edac/fsl_ddr_edac.c            |  1 +
+>>  drivers/edac/layerscape_edac.c         | 67 ++++++++++++++++++++++++++++++++++
+>>  7 files changed, 92 insertions(+), 12 deletions(-)
+>>  copy arch/{arm => arm64}/include/asm/edac.h (79%)
+>>  create mode 100644 drivers/edac/layerscape_edac.c
+>>
+>> diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
+>> index 7ef1d05..185a215 100644
+>> --- a/arch/arm64/Kconfig.platforms
+>> +++ b/arch/arm64/Kconfig.platforms
+>> @@ -41,6 +41,7 @@ config ARCH_EXYNOS
+>>
+>>  config ARCH_LAYERSCAPE
+>>  	bool "ARMv8 based Freescale Layerscape SoC family"
+>> +	select EDAC_SUPPORT
+>>  	help
+>>  	  This enables support for the Freescale Layerscape SoC family.
+>>
+>> diff --git a/arch/arm/include/asm/edac.h b/arch/arm64/include/asm/edac.h
+>> similarity index 79%
+>> copy from arch/arm/include/asm/edac.h
+>> copy to arch/arm64/include/asm/edac.h
+>> index 5189fa8..36a226c 100644
+>> --- a/arch/arm/include/asm/edac.h
+>> +++ b/arch/arm64/include/asm/edac.h
+>> @@ -18,16 +18,15 @@
+>>  #define ASM_EDAC_H
+>>  /*
+>>   * ECC atomic, DMA, SMP and interrupt safe scrub function.
+>> - * Implements the per arch edac_atomic_scrub() that EDAC use for software
+>> + * Implements the per arch atomic_scrub() that EDAC use for software
+>>   * ECC scrubbing.  It reads memory and then writes back the original
+>>   * value, allowing the hardware to detect and correct memory errors.
+>>   */
+>> -
+>> -static inline void edac_atomic_scrub(void *va, u32 size)
+>> +static inline void atomic_scrub(void *va, u32 size)
+>>  {
+>> -#if __LINUX_ARM_ARCH__ >= 6
+>> -	unsigned int *virt_addr = va;
+>> -	unsigned int temp, temp2;
+>> +	unsigned long *virt_addr = va;
+>> +	unsigned long temp;
+>> +	unsigned int temp2;
+>>  	unsigned int i;
+>>
+>>  	for (i = 0; i < size / sizeof(*virt_addr); i++, virt_addr++) {
+>> @@ -35,15 +34,13 @@ static inline void edac_atomic_scrub(void *va, u32 size)
+>>  		 * so we are interrupt, DMA and SMP safe.
+>>  		 */
+>>  		__asm__ __volatile__("\n"
+>> -			"1:	ldrex	%0, [%2]\n"
+>> -			"	strex	%1, %0, [%2]\n"
+>> -			"	teq	%1, #0\n"
+>> -			"	bne	1b\n"
+>> +			"1:	ldxr	%0, [%2]\n"
+>> +			"	stxr	%w1, %0, [%2]\n"
+>> +			"	cbnz	%w1, 1b\n"
+>
+> Hiding architecture code in a driver, are we? Hmmm.
 
-Implement peripheral-only mode by adding a sun4i_usb_phy0_get_id_det
-helper which looks at the dr_mode, always registering our extcon and
-always monitoring vbus.
+This adds atomic_scrub() for arm64. Arm already has this function. Are 
+you suggesting to separate this part as an individual patch?
+>
+> Also, how can this be safe if you have non cache-coherent DMA going on?
 
-If dr_mode is not specified in the dts, do not register phy0 as we then
-do not know how to treat it. This is actually a good thing as this means
-we will not be registering phy0 on devices where the otg controller is
-not enabled in the devicetree.
+I am clueless on this topic. What's your suggestion.
 
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-Acked-by: Kishon Vijay Abraham I <kishon@ti.com>
----
-Changes in v2:
--Adjust for of_usb_get_dr_mode_by_phy now taking an args0 parameter
-Changes in v3:
--Only toggle the phy vbus-det bit on id-change on systems without vbus-det
- when in otg mode
-Changes in v4:
--No changes
-Changes in v5:
--Added Kishon's Acked-by
-Changes in v6:
--Rebase on top of latest linux-phy/next
----
- drivers/phy/phy-sun4i-usb.c | 68 ++++++++++++++++++++++++++++++---------------
- 1 file changed, 46 insertions(+), 22 deletions(-)
+>
+>>  			: "=&r"(temp), "=&r"(temp2)
+>>  			: "r"(virt_addr)
+>> -			: "cc");
+>> +			: "memory");
+>>  	}
+>> -#endif
+>>  }
+>>
+>>  #endif
+>> diff --git a/arch/arm64/include/asm/irq.h b/arch/arm64/include/asm/irq.h
+>> index b77197d..d09c008 100644
+>> --- a/arch/arm64/include/asm/irq.h
+>> +++ b/arch/arm64/include/asm/irq.h
+>> @@ -11,6 +11,10 @@
+>>  #include <asm-generic/irq.h>
+>>  #include <asm/thread_info.h>
+>>
+>> +#ifndef NO_IRQ
+>> +#define NO_IRQ	((unsigned int)(-1))
+>> +#endif
+>
+> NAK.
+>
+> NO_IRQ shouldn't exist at all, and if it had to exist, it would have
+> the value 0. This really is a leftover of a distant past that has no
+> real relevance on recent architectures.
+>
 
-diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
-index 0a45bc6..8c7eb33 100644
---- a/drivers/phy/phy-sun4i-usb.c
-+++ b/drivers/phy/phy-sun4i-usb.c
-@@ -40,6 +40,7 @@
- #include <linux/power_supply.h>
- #include <linux/regulator/consumer.h>
- #include <linux/reset.h>
-+#include <linux/usb/of.h>
- #include <linux/workqueue.h>
- 
- #define REG_ISCR			0x00
-@@ -110,6 +111,7 @@ struct sun4i_usb_phy_cfg {
- struct sun4i_usb_phy_data {
- 	void __iomem *base;
- 	const struct sun4i_usb_phy_cfg *cfg;
-+	enum usb_dr_mode dr_mode;
- 	struct mutex mutex;
- 	struct sun4i_usb_phy {
- 		struct phy *phy;
-@@ -120,6 +122,7 @@ struct sun4i_usb_phy_data {
- 		bool regulator_on;
- 		int index;
- 	} phys[MAX_PHYS];
-+	int first_phy;
- 	/* phy0 / otg related variables */
- 	struct extcon_dev *extcon;
- 	bool phy0_init;
-@@ -285,16 +288,10 @@ static int sun4i_usb_phy_init(struct phy *_phy)
- 		sun4i_usb_phy0_update_iscr(_phy, 0, ISCR_DPDM_PULLUP_EN);
- 		sun4i_usb_phy0_update_iscr(_phy, 0, ISCR_ID_PULLUP_EN);
- 
--		if (data->id_det_gpio) {
--			/* OTG mode, force ISCR and cable state updates */
--			data->id_det = -1;
--			data->vbus_det = -1;
--			queue_delayed_work(system_wq, &data->detect, 0);
--		} else {
--			/* Host only mode */
--			sun4i_usb_phy0_set_id_detect(_phy, 0);
--			sun4i_usb_phy0_set_vbus_detect(_phy, 1);
--		}
-+		/* Force ISCR and cable state updates */
-+		data->id_det = -1;
-+		data->vbus_det = -1;
-+		queue_delayed_work(system_wq, &data->detect, 0);
- 	}
- 
- 	return 0;
-@@ -319,6 +316,19 @@ static int sun4i_usb_phy_exit(struct phy *_phy)
- 	return 0;
- }
- 
-+static int sun4i_usb_phy0_get_id_det(struct sun4i_usb_phy_data *data)
-+{
-+	switch (data->dr_mode) {
-+	case USB_DR_MODE_OTG:
-+		return gpiod_get_value_cansleep(data->id_det_gpio);
-+	case USB_DR_MODE_HOST:
-+		return 0;
-+	case USB_DR_MODE_PERIPHERAL:
-+	default:
-+		return 1;
-+	}
-+}
-+
- static int sun4i_usb_phy0_get_vbus_det(struct sun4i_usb_phy_data *data)
- {
- 	if (data->vbus_det_gpio)
-@@ -432,7 +442,10 @@ static void sun4i_usb_phy0_id_vbus_det_scan(struct work_struct *work)
- 	struct phy *phy0 = data->phys[0].phy;
- 	int id_det, vbus_det, id_notify = 0, vbus_notify = 0;
- 
--	id_det = gpiod_get_value_cansleep(data->id_det_gpio);
-+	if (phy0 == NULL)
-+		return;
-+
-+	id_det = sun4i_usb_phy0_get_id_det(data);
- 	vbus_det = sun4i_usb_phy0_get_vbus_det(data);
- 
- 	mutex_lock(&phy0->mutex);
-@@ -448,7 +461,8 @@ static void sun4i_usb_phy0_id_vbus_det_scan(struct work_struct *work)
- 		 * without vbus detection report vbus low for long enough for
- 		 * the musb-ip to end the current device session.
- 		 */
--		if (!sun4i_usb_phy0_have_vbus_det(data) && id_det == 0) {
-+		if (data->dr_mode == USB_DR_MODE_OTG &&
-+		    !sun4i_usb_phy0_have_vbus_det(data) && id_det == 0) {
- 			sun4i_usb_phy0_set_vbus_detect(phy0, 0);
- 			msleep(200);
- 			sun4i_usb_phy0_set_vbus_detect(phy0, 1);
-@@ -474,7 +488,8 @@ static void sun4i_usb_phy0_id_vbus_det_scan(struct work_struct *work)
- 		 * without vbus detection report vbus low for long enough to
- 		 * the musb-ip to end the current host session.
- 		 */
--		if (!sun4i_usb_phy0_have_vbus_det(data) && id_det == 1) {
-+		if (data->dr_mode == USB_DR_MODE_OTG &&
-+		    !sun4i_usb_phy0_have_vbus_det(data) && id_det == 1) {
- 			mutex_lock(&phy0->mutex);
- 			sun4i_usb_phy0_set_vbus_detect(phy0, 0);
- 			msleep(1000);
-@@ -519,7 +534,8 @@ static struct phy *sun4i_usb_phy_xlate(struct device *dev,
- {
- 	struct sun4i_usb_phy_data *data = dev_get_drvdata(dev);
- 
--	if (args->args[0] >= data->cfg->num_phys)
-+	if (args->args[0] < data->first_phy ||
-+	    args->args[0] >= data->cfg->num_phys)
- 		return ERR_PTR(-ENODEV);
- 
- 	return data->phys[args->args[0]].phy;
-@@ -593,13 +609,17 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
- 			return -EPROBE_DEFER;
- 	}
- 
--	/* vbus_det without id_det makes no sense, and is not supported */
--	if (sun4i_usb_phy0_have_vbus_det(data) && !data->id_det_gpio) {
--		dev_err(dev, "usb0_id_det missing or invalid\n");
--		return -ENODEV;
--	}
--
--	if (data->id_det_gpio) {
-+	data->dr_mode = of_usb_get_dr_mode_by_phy(np, 0);
-+	switch (data->dr_mode) {
-+	case USB_DR_MODE_OTG:
-+		/* otg without id_det makes no sense, and is not supported */
-+		if (!data->id_det_gpio) {
-+			dev_err(dev, "usb0_id_det missing or invalid\n");
-+			return -ENODEV;
-+		}
-+		/* fall through */
-+	case USB_DR_MODE_HOST:
-+	case USB_DR_MODE_PERIPHERAL:
- 		data->extcon = devm_extcon_dev_allocate(dev,
- 							sun4i_usb_phy0_cable);
- 		if (IS_ERR(data->extcon))
-@@ -610,9 +630,13 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
- 			dev_err(dev, "failed to register extcon: %d\n", ret);
- 			return ret;
- 		}
-+		break;
-+	default:
-+		dev_info(dev, "dr_mode unknown, not registering usb phy0\n");
-+		data->first_phy = 1;
- 	}
- 
--	for (i = 0; i < data->cfg->num_phys; i++) {
-+	for (i = data->first_phy; i < data->cfg->num_phys; i++) {
- 		struct sun4i_usb_phy *phy = data->phys + i;
- 		char name[16];
- 
--- 
-2.7.4
+OK. I will drop the NO_IRQ in the driver.
+
+York
