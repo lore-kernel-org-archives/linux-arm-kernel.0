@@ -1,80 +1,129 @@
 From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Mon, 8 Aug 2016 18:05:00 +0800
-Subject: [PATCH v6 1/6] ARM: at91: sama5: Add a new DT_MACHINE for SAMA5D2
+Date: Mon, 8 Aug 2016 18:05:01 +0800
+Subject: [PATCH v6 2/6] ARM: at91: pm: Create a procedure for the ULP0 mode
 In-Reply-To: <1470650705-31418-1-git-send-email-wenyou.yang@atmel.com>
 References: <1470650705-31418-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <1470650705-31418-2-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <1470650705-31418-3-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To support the SAMA5D2 specific pm_init function, add a new
-DT_MACHINE for SAMA5D2.
+To make the code more legible and prepare to add the ULP1 mode
+support in the future, create a separate procedure for the ULP0 mode.
 
 Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
 
-Changes in v6: None
+Changes in v6:
+ - Add Acked-by tag.
+
 Changes in v5: None
 Changes in v4: None
 Changes in v3: None
 Changes in v2: None
 
- arch/arm/mach-at91/sama5.c | 25 +++++++++++++++++++++++--
- 1 file changed, 23 insertions(+), 2 deletions(-)
+ arch/arm/mach-at91/pm_suspend.S | 65 +++++++++++++++++++++++++----------------
+ 1 file changed, 40 insertions(+), 25 deletions(-)
 
-diff --git a/arch/arm/mach-at91/sama5.c b/arch/arm/mach-at91/sama5.c
-index 922b85f..2debfe2 100644
---- a/arch/arm/mach-at91/sama5.c
-+++ b/arch/arm/mach-at91/sama5.c
-@@ -59,7 +59,7 @@ static const struct at91_soc sama5_socs[] = {
- 	{ /* sentinel */ },
- };
+diff --git a/arch/arm/mach-at91/pm_suspend.S b/arch/arm/mach-at91/pm_suspend.S
+index a25defd..5fcffdc 100644
+--- a/arch/arm/mach-at91/pm_suspend.S
++++ b/arch/arm/mach-at91/pm_suspend.S
+@@ -107,7 +107,7 @@ ENTRY(at91_pm_suspend_in_sram)
  
--static void __init sama5_dt_device_init(void)
-+static void __init sama5_common_init(void)
- {
- 	struct soc_device *soc;
- 	struct device *soc_dev = NULL;
-@@ -69,6 +69,11 @@ static void __init sama5_dt_device_init(void)
- 		soc_dev = soc_device_to_device(soc);
+ 	ldr	r0, .pm_mode
+ 	tst	r0, #AT91_PM_SLOW_CLOCK
+-	beq	skip_disable_main_clock
++	beq	standby_mode
  
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, soc_dev);
-+}
-+
-+static void __init sama5_dt_device_init(void)
-+{
-+	sama5_common_init();
- 	sama5_pm_init();
- }
+ 	ldr	pmc, .pmc_base
  
-@@ -84,7 +89,6 @@ DT_MACHINE_START(sama5_dt, "Atmel SAMA5")
- MACHINE_END
+@@ -131,32 +131,13 @@ ENTRY(at91_pm_suspend_in_sram)
+ 	orr	tmp1, tmp1, #(1 << 29)		/* bit 29 always set */
+ 	str	tmp1, [pmc, #AT91_CKGR_PLLAR]
  
- static const char *const sama5_alt_dt_board_compat[] __initconst = {
--	"atmel,sama5d2",
- 	"atmel,sama5d4",
- 	NULL
- };
-@@ -95,3 +99,20 @@ DT_MACHINE_START(sama5_alt_dt, "Atmel SAMA5")
- 	.dt_compat	= sama5_alt_dt_board_compat,
- 	.l2c_aux_mask	= ~0UL,
- MACHINE_END
+-	/* Turn off the main oscillator */
+-	ldr	tmp1, [pmc, #AT91_CKGR_MOR]
+-	bic	tmp1, tmp1, #AT91_PMC_MOSCEN
+-	orr	tmp1, tmp1, #AT91_PMC_KEY
+-	str	tmp1, [pmc, #AT91_CKGR_MOR]
+-
+-skip_disable_main_clock:
+-	ldr	pmc, .pmc_base
+-
+-	/* Wait for interrupt */
+-	at91_cpu_idle
+-
+-	ldr	r0, .pm_mode
+-	tst	r0, #AT91_PM_SLOW_CLOCK
+-	beq	skip_enable_main_clock
++ulp0_mode:
++	bl	at91_pm_ulp0_mode
++	b	ulp_exit
+ 
++ulp_exit:
+ 	ldr	pmc, .pmc_base
+ 
+-	/* Turn on the main oscillator */
+-	ldr	tmp1, [pmc, #AT91_CKGR_MOR]
+-	orr	tmp1, tmp1, #AT91_PMC_MOSCEN
+-	orr	tmp1, tmp1, #AT91_PMC_KEY
+-	str	tmp1, [pmc, #AT91_CKGR_MOR]
+-
+-	wait_moscrdy
+-
+ 	/* Restore PLLA setting */
+ 	ldr	tmp1, .saved_pllar
+ 	str	tmp1, [pmc, #AT91_CKGR_PLLAR]
+@@ -177,7 +158,15 @@ skip_disable_main_clock:
+ 
+ 	wait_mckrdy
+ 
+-skip_enable_main_clock:
++	b	pm_exit
 +
-+static void __init sama5d2_dt_device_init(void)
-+{
-+	sama5_common_init();
-+}
++standby_mode:
++	ldr	pmc, .pmc_base
 +
-+static const char *const sama5d2_dt_board_compat[] __initconst = {
-+	"atmel,sama5d2",
-+	NULL
-+};
++	/* Wait for interrupt */
++	at91_cpu_idle
 +
-+DT_MACHINE_START(sama5d2_dt, "Atmel SAMA5")
-+	/* Maintainer: Atmel */
-+	.init_machine	= sama5d2_dt_device_init,
-+	.dt_compat	= sama5d2_dt_board_compat,
-+	.l2c_aux_mask	= ~0UL,
-+MACHINE_END
++pm_exit:
+ 	/* Exit the self-refresh mode */
+ 	mov	r0, #SRAMC_SELF_FRESH_EXIT
+ 	bl	at91_sramc_self_refresh
+@@ -311,6 +300,32 @@ exit_sramc_sf:
+ 	mov	pc, lr
+ ENDPROC(at91_sramc_self_refresh)
+ 
++/*
++ * void at91_pm_ulp0_mode(void)
++ */
++ENTRY(at91_pm_ulp0_mode)
++	ldr	pmc, .pmc_base
++
++	/* Turn off the crystal oscillator */
++	ldr	tmp1, [pmc, #AT91_CKGR_MOR]
++	bic	tmp1, tmp1, #AT91_PMC_MOSCEN
++	orr	tmp1, tmp1, #AT91_PMC_KEY
++	str	tmp1, [pmc, #AT91_CKGR_MOR]
++
++	/* Wait for interrupt */
++	at91_cpu_idle
++
++	/* Turn on the crystal oscillator */
++	ldr	tmp1, [pmc, #AT91_CKGR_MOR]
++	orr	tmp1, tmp1, #AT91_PMC_MOSCEN
++	orr	tmp1, tmp1, #AT91_PMC_KEY
++	str	tmp1, [pmc, #AT91_CKGR_MOR]
++
++	wait_moscrdy
++
++	mov	pc, lr
++ENDPROC(at91_pm_ulp0_mode)
++
+ .pmc_base:
+ 	.word 0
+ .sramc_base:
 -- 
 2.7.4
