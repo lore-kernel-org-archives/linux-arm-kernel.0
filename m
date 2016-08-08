@@ -1,54 +1,28 @@
-From: tn@semihalf.com (Tomasz Nowicki)
-Date: Mon, 8 Aug 2016 15:02:34 +0200
-Subject: [RFC PATCH V5 0/5] ECAM quirks handling for ARM64 platforms
-In-Reply-To: <1470661002-26213-1-git-send-email-tn@semihalf.com>
-References: <1470661002-26213-1-git-send-email-tn@semihalf.com>
-Message-ID: <04b8a971-d637-69e5-8a4c-432c7010c3c3@semihalf.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 8 Aug 2016 15:03:04 +0200
+Subject: [PATCH v4 2/6] ARM: dts: r8a7794: add MSTP5 clocks
+In-Reply-To: <3560619.yXVhzgu5Aq@wasted.cogentembedded.com>
+References: <3910788.ckTpUWEs6B@wasted.cogentembedded.com>
+ <3560619.yXVhzgu5Aq@wasted.cogentembedded.com>
+Message-ID: <CAMuHMdXy6RUL5=ps9kcY9t3opFj2okTDeu_j7qmc22DcE8gukw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Please disregard this series since I missed ACPI mailing list on CC. 
-Sorry for noise.
+On Wed, Jul 27, 2016 at 10:59 PM, Sergei Shtylyov
+<sergei.shtylyov@cogentembedded.com> wrote:
+> Add some MSTP5 clocks to the R8A7794 device tree.
+>
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Regards,
-Tomasz
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-On 08.08.2016 14:56, Tomasz Nowicki wrote:
-> Quirk handling relies on an idea of matching MCFG OEM ID, TABLE ID and
-> revision (the ones from standard header of MCFG table).
->
-> Static array is used to keep quirk entries. Each entry consists of
-> mentioned MCFG IDs along with custom pci_ops structure and initialization call.
->
-> As an example, the last patch presents quirk handling mechanism usage for
-> ThunderX PEM driver.
->
-> v4 -> v5
-> - rebase against v4.8-rc1
-> - rework to exact MCFG OEM ID, TABLE ID, rev match
->   - use memcmp instead of strncmp
->   - no substring match
-> - fix typos and dmesg message
->
-> Tomasz Nowicki (5):
->   PCI: Embed pci_ecam_ops in pci_config_window structure
->   PCI/ACPI: Move ACPI ECAM mapping to generic MCFG driver
->   PCI: Check platform specific ECAM quirks
->   ARM64/PCI: Start using quirks handling for ACPI based PCI host
->     controller
->   PCI: thunder-pem: Support quirky configuration space access for ACPI
->     based PCI host controller
->
->  arch/arm64/kernel/pci.c            | 42 +----------------
->  drivers/acpi/pci_mcfg.c            | 40 ++++++++++++++++
->  drivers/pci/ecam.c                 |  6 +--
->  drivers/pci/host/Makefile          |  1 +
->  drivers/pci/host/mcfg-quirks.c     | 93 ++++++++++++++++++++++++++++++++++++
->  drivers/pci/host/mcfg-quirks.h     | 24 ++++++++++
->  drivers/pci/host/pci-thunder-pem.c | 96 ++++++++++++++++++++++++++++++++------
->  include/linux/pci-acpi.h           |  5 ++
->  include/linux/pci-ecam.h           |  2 +-
->  9 files changed, 252 insertions(+), 57 deletions(-)
->  create mode 100644 drivers/pci/host/mcfg-quirks.c
->  create mode 100644 drivers/pci/host/mcfg-quirks.h
->
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
