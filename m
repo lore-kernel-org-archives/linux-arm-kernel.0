@@ -1,66 +1,155 @@
-From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Mon, 8 Aug 2016 14:08:49 +0800
-Subject: [PATCH v4 7/7] doc: bindings: act8945a-charger: Update properties
-In-Reply-To: <1470636529-16387-1-git-send-email-wenyou.yang@atmel.com>
-References: <1470636529-16387-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <1470636529-16387-8-git-send-email-wenyou.yang@atmel.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 8 Aug 2016 14:59:26 +0800
+Subject: [PATCH v2 2/2] ARM: dts: imx53: add support for USB armory board
+In-Reply-To: <20160628125444.16531-3-andrej@inversepath.com>
+References: <20160628125444.16531-1-andrej@inversepath.com>
+ <20160628125444.16531-3-andrej@inversepath.com>
+Message-ID: <20160808065926.GA4678@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Due the driver improvements, update the properties,
- - Remove "active-semi,check-battery-temperature" property.
- - Add the properties, "active-semi,irq_gpio"
-   and "active-semi,lbo-gpios".
+On Tue, Jun 28, 2016 at 02:54:44PM +0200, andrej at inversepath.com wrote:
+> +&iomuxc {
+> +	pinctrl_esdhc1: esdhc1grp {
+> +		fsl,pins = <
+> +			MX53_PAD_SD1_DATA0__ESDHC1_DAT0		0x1d5
+> +			MX53_PAD_SD1_DATA1__ESDHC1_DAT1		0x1d5
+> +			MX53_PAD_SD1_DATA2__ESDHC1_DAT2		0x1d5
+> +			MX53_PAD_SD1_DATA3__ESDHC1_DAT3		0x1d5
+> +			MX53_PAD_SD1_CMD__ESDHC1_CMD		0x1d5
+> +			MX53_PAD_SD1_CLK__ESDHC1_CLK		0x1d5
+> +		>;
+> +	};
+> +
+> +	pinctrl_i2c1_pmic: i2c1grp_pmic {
 
-Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
----
+I think the following naming is good enough.
 
-Changes in v4:
- - Update the doc/binding for using "interrupts" property.
+	pinctrl_i2c1: i2c1grp {
 
-Changes in v3: None
-Changes in v2: None
+> +		fsl,pins = <
+> +			MX53_PAD_EIM_D21__I2C1_SCL	0x0
+> +			MX53_PAD_EIM_D28__I2C1_SDA	0x0
+> +		>;
+> +	};
+> +
+> +	pinctrl_led: led {
 
- .../devicetree/bindings/power/act8945a-charger.txt       | 16 +++++++++++++---
- 1 file changed, 13 insertions(+), 3 deletions(-)
+For naming consistency, "ledgrp" should be a better node name.
 
-diff --git a/Documentation/devicetree/bindings/power/act8945a-charger.txt b/Documentation/devicetree/bindings/power/act8945a-charger.txt
-index bea254c..f9866c4 100644
---- a/Documentation/devicetree/bindings/power/act8945a-charger.txt
-+++ b/Documentation/devicetree/bindings/power/act8945a-charger.txt
-@@ -4,10 +4,15 @@ Required properties:
-  - compatible: "active-semi,act8945a", please refer to ../mfd/act8945a.txt.
-  - active-semi,chglev-gpios: charge current level phandle with args
-    as described in ../gpio/gpio.txt.
-+ - active-semi,lbo-gpios: specify the low battery voltage detect phandle
-+   with args as as described in ../gpio/gpio.txt.
-+ - interrupts: <a b> where a is the interrupt number and b is a
-+   field that represents an encoding of the sense and level
-+   information for the interrupt.
-+ - interrupt-parent: the phandle for the interrupt controller that
-+   services interrupts for this device.
- 
- Optional properties:
-- - active-semi,check-battery-temperature: boolean to check the battery
--   temperature or not.
-  - active-semi,input-voltage-threshold-microvolt: unit: mV;
-    Specifies the charger's input over-voltage threshold value;
-    The value can be: 6600, 7000, 7500, 8000; default: 6600
-@@ -27,9 +32,14 @@ Example:
- 		status = "okay";
- 
- 		pinctrl-names = "default";
--		pinctrl-0 = <&pinctrl_charger_chglev>;
-+		pinctrl-0 = <&pinctrl_charger_chglev &pinctrl_charger_lbo &pinctrl_charger_irq>;
-+
- 		active-semi,chglev-gpios = <&pioA 12 GPIO_ACTIVE_HIGH>;
-+		active-semi,lbo-gpios = <&pioA 72 GPIO_ACTIVE_LOW>;
- 		active-semi,input-voltage-threshold-microvolt = <6600>;
- 		active-semi,precondition-timeout = <40>;
- 		active-semi,total-timeout = <3>;
-+		interrupt-parent = <&pioA>;
-+		interrupts = <45 GPIO_ACTIVE_LOW>;
-+
- 	};
--- 
-2.7.4
+> +		fsl,pins = <
+> +			MX53_PAD_DISP0_DAT6__GPIO4_27 0x0
+> +		>;
+> +	};
+> +
+> +	/*
+> +	 * UART mode pin header configration
+> +	 * 3 - GPIO5[26], pull-down 100K
+> +	 * 4 - GPIO5[27], pull-down 100K
+> +	 * 5 - TX, pull-up 100K
+> +	 * 6 - RX, pull-up 100K
+> +	 * 7 - GPIO5[30], pull-down 100K
+> +	 */
+> +	pinctrl_uart1: uart1grp {
+> +		fsl,pins = <
+> +			MX53_PAD_CSI0_DAT8__GPIO5_26		0xc0
+> +			MX53_PAD_CSI0_DAT9__GPIO5_27		0xc0
+> +			MX53_PAD_CSI0_DAT10__UART1_TXD_MUX	0x1e4
+> +			MX53_PAD_CSI0_DAT11__UART1_RXD_MUX	0x1e4
+> +			MX53_PAD_CSI0_DAT12__GPIO5_30		0xc0
+> +		>;
+> +	};
+> +};
+> +
+> +&i2c1 {
+> +	pinctrl-0 = <&pinctrl_i2c1_pmic>;
+> +	status = "okay";
+> +
+> +	ltc3589: pmic at 34 {
+> +		compatible = "lltc,ltc3589-2";
+> +		reg = <0x34>;
+> +
+> +		regulators {
+> +			sw1_reg: sw1 {
+> +				regulator-min-microvolt = <591930>;
+> +				regulator-max-microvolt = <1224671>;
+> +				lltc,fb-voltage-divider = <100000 158000>;
+> +				regulator-ramp-delay = <7000>;
+> +				regulator-boot-on;
+> +				regulator-always-on;
+> +			};
+> +
+> +			sw2_reg: sw2 {
+> +				regulator-min-microvolt = <704123>;
+> +				regulator-max-microvolt = <1456803>;
+> +				lltc,fb-voltage-divider = <180000 191000>;
+> +				regulator-ramp-delay = <7000>;
+> +				regulator-boot-on;
+> +				regulator-always-on;
+> +			};
+> +
+> +			sw3_reg: sw3 {
+> +				regulator-min-microvolt = <1341250>;
+> +				regulator-max-microvolt = <2775000>;
+> +				lltc,fb-voltage-divider = <270000 100000>;
+> +				regulator-ramp-delay = <7000>;
+> +				regulator-boot-on;
+> +				regulator-always-on;
+> +			};
+> +
+> +			bb_out_reg: bb-out {
+> +				regulator-min-microvolt = <3387341>;
+> +				regulator-max-microvolt = <3387341>;
+> +				lltc,fb-voltage-divider = <511000 158000>;
+> +				regulator-boot-on;
+> +				regulator-always-on;
+> +			};
+
+Have a new line between nodes.
+
+Shawn
+
+> +			ldo1_reg: ldo1 {
+> +				regulator-min-microvolt = <1306329>;
+> +				regulator-max-microvolt = <1306329>;
+> +				lltc,fb-voltage-divider = <100000 158000>;
+> +				regulator-boot-on;
+> +				regulator-always-on;
+> +			};
+> +
+> +			ldo2_reg: ldo2 {
+> +				regulator-min-microvolt = <704123>;
+> +				regulator-max-microvolt = <1456806>;
+> +				lltc,fb-voltage-divider = <180000 191000>;
+> +				regulator-ramp-delay = <7000>;
+> +				regulator-boot-on;
+> +				regulator-always-on;
+> +			};
+> +
+> +			ldo3_reg: ldo3 {
+> +				regulator-min-microvolt = <2800000>;
+> +				regulator-max-microvolt = <2800000>;
+> +				regulator-boot-on;
+> +			};
+> +
+> +			ldo4_reg: ldo4 {
+> +				regulator-min-microvolt = <1200000>;
+> +				regulator-max-microvolt = <3200000>;
+> +			};
+> +		};
+> +	};
+> +};
+> +
+> +&uart1 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_uart1>;
+> +	status = "okay";
+> +};
+> +
+> +&usbotg {
+> +	dr_mode = "peripheral";
+> +	status = "okay";
+> +};
+> -- 
+> 2.9.0
+> 
