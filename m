@@ -1,47 +1,18 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 8 Aug 2016 11:59:25 +0800
-Subject: [PATCH 2/2] dt: bindings: Add binding for ESP8089 wifi chips
-In-Reply-To: <2936779.FAiO1bqUWV@wuerfel>
-References: <1470596269-20572-1-git-send-email-hdegoede@redhat.com>
- <1470596269-20572-2-git-send-email-hdegoede@redhat.com>
- <2936779.FAiO1bqUWV@wuerfel>
-Message-ID: <CAGb2v67+QrOxPd4KeLb9F67A0mSaBqn14PynzCyK=ovRnKA6EQ@mail.gmail.com>
+Date: Mon, 8 Aug 2016 12:07:35 +0800
+Subject: [PATCH v2] ARM: dts: sun8i: Add dts file for the Orange Pi Lite
+ SBC
+In-Reply-To: <1470579404-28081-1-git-send-email-hdegoede@redhat.com>
+References: <1470579404-28081-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <CAGb2v66Z6cadcQnH0m1rK0uHs6n24E5OoLBbOmBmAD01DENkWA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On Sun, Aug 7, 2016 at 10:16 PM, Hans de Goede <hdegoede@redhat.com> wrote:
+> The Orange Pi Lite SBC is a small H3 based SBC, with 512MB RAM,
+> micro-sd slot, HDMI out, 2 USB-A connectors, 1 micro-USB connector,
+> sdio attached rtl8189ftv wifi and an ir receiver.
+>
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 
-On Mon, Aug 8, 2016 at 3:59 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Sunday, August 7, 2016 8:57:49 PM CEST Hans de Goede wrote:
->> +Espressif ESP8089 wireless SDIO devices
->> +
->> +This node provides properties for controlling the ESP8089 wireless device.
->> +The node is expected to be specified as a child node to the SDIO controller
->> +that connects the device to the system.
->> +
->> +Required properties:
->> +
->> + - compatible : Should be "esp,esp8089".
->
-> I think it would be good to standardize a compatible string for sdio
-> like we have it for other discoverable buses, based on the
-> vendor/device ID (or whatever this uses), using something like
->
-> compatible = "sdio1234,5678", "esp,esp8089";
-
-Is there a central repository for SDIO vendor/device IDs similar to
-PCI or USB IDs?
-
-The vendor ID Espressif uses is 0x6666, which seems kind of bogus to me.
-
-ChenYu
-
->
->> +Optional properties:
->> + - esp,crystal_26M_en: Integer value for the crystal_26M_en firmware parameter
->
-> better use '-' instead of '_' for property names.
->
->         Arnd
->
->
+Acked-by: Chen-Yu Tsai <wens@csie.org>
