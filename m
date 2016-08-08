@@ -1,139 +1,68 @@
-From: hzpeterchen@gmail.com (Peter Chen)
-Date: Mon, 8 Aug 2016 09:57:22 +0800
-Subject: [PATCH v4 0/6] power: add power sequence library
-In-Reply-To: <d7c11574a1218263c02b117d79b59601@naiandei.net>
-References: <1470108652-16812-1-git-send-email-peter.chen@nxp.com>
- <d7c11574a1218263c02b117d79b59601@naiandei.net>
-Message-ID: <20160808015722.GA17680@shlinux2>
+From: shawn.lin@rock-chips.com (Shawn Lin)
+Date: Mon, 8 Aug 2016 10:29:52 +0800
+Subject: [PATCH] ARM: dts: add rk3288-firefly-reload
+In-Reply-To: <1815189.oGy6GHMbyM@phil>
+References: <1549971.ctkvOGm2xW@diego> <2868781.4x2gJCRbLH@diego>
+ <413ebccd-e8d6-1401-3065-f9a63b4d66e6@rock-chips.com>
+ <1815189.oGy6GHMbyM@phil>
+Message-ID: <bd51b3c3-b312-babb-b57d-7e6e5a8ee948@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 06, 2016 at 02:00:08PM +0200, Oscar wrote:
-> El 2016-08-02 05:30, Peter Chen escribi?:
-> >Hi all,
-> >
-> >This is a follow-up for my last power sequence framework patch set
-> >[1].
-> >According to Rob Herring and Ulf Hansson's comments[2], I use a
-> >generic
-> >power sequence library for parsing the power sequence elements on DT,
-> >and implement generic power sequence on library. The host driver
-> >can allocate power sequence instance, and calls pwrseq APIs
-> >accordingly.
-> >
-> >In future, if there are special power sequence requirements, the
-> >special
-> >power sequence library can be created.
-> >
-> >This patch set is tested on i.mx6 sabresx evk using a dts change,
-> >I use
-> >two hot-plug devices to simulate this use case, the related binding
-> >change is updated at patch [1/6], The udoo board changes were tested
-> >using my last power sequence patch set.[3]
-> >
-> >Except for hard-wired MMC and USB devices, I find the USB ULPI PHY
-> >also
-> >need to power on itself before it can be found by ULPI bus.
-> >
-> >[1] http://www.spinics.net/lists/linux-usb/msg142755.html
-> >[2] http://www.spinics.net/lists/linux-usb/msg143106.html
-> >[3] http://www.spinics.net/lists/linux-usb/msg142815.html
-> >
-> >Changes for v4:
-> >- Create the patch on next-20160722
-> >- Fix the of_node is not NULL after chipidea driver is unbinded
-> >[Patch 5/6]
-> >- Using more friendly wait method for reset gpio [Patch 2/6]
-> >- Support multiple input clocks [Patch 2/6]
-> >- Add Rob Herring's ack for DT changes
-> >- Add Joshua Clayton's Tested-by
-> >
-> >Changes for v3:
-> >- Delete "power-sequence" property at binding-doc, and change
-> >related code
-> >  at both library and user code.
-> >- Change binding-doc example node name with Rob's comments
-> >- of_get_named_gpio_flags only gets the gpio, but without setting
-> >gpio flags,
-> >  add additional code request gpio with proper gpio flags
-> >- Add Philipp Zabel's Ack and MAINTAINER's entry
-> >
-> >Changes for v2:
-> >- Delete "pwrseq" prefix and clock-names for properties at dt binding
-> >- Should use structure not but its pointer for kzalloc
-> >- Since chipidea core has no of_node, let core's of_node equals glue
-> >  layer's at core's probe
-> >
-> >Peter Chen (6):
-> >  binding-doc: power: pwrseq-generic: add binding doc for generic
-> >power
-> >    sequence library
-> >  power: add power sequence library
-> >  binding-doc: usb: usb-device: add optional properties for power
-> >    sequence
-> >  usb: core: add power sequence handling for USB devices
-> >  usb: chipidea: let chipidea core device of_node equal's glue layer
-> >    device of_node
-> >  ARM: dts: imx6qdl-udoo.dtsi: fix onboard USB HUB property
-> >
-> 
-> Hi Peter,
-> 
-> I tried the last version on my udoo board but I got these compile
-> errors:
-> 
-> [21330s] ERROR: "pwrseq_get" [drivers/usb/core/usbcore.ko] undefined!
-> [21330s] ERROR: "pwrseq_free" [drivers/usb/core/usbcore.ko] undefined!
-> [21330s] ERROR: "pwrseq_put" [drivers/usb/core/usbcore.ko] undefined!
-> [21330s] ERROR: "pwrseq_off" [drivers/usb/core/usbcore.ko] undefined!
-> [21330s] ERROR: "pwrseq_on" [drivers/usb/core/usbcore.ko] undefined!
-> 
-> Will you do another version?
-> 
+? 2016/8/7 22:44, Heiko Stuebner ??:
+> Hi Shawn,
+>
+> Am Sonntag, 7. August 2016, 11:40:21 schrieb Shawn Lin:
+>> On 2016/7/19 3:46, Heiko St?bner wrote:
+>>> Am Montag, 18. Juli 2016, 23:32:32 schrieb Randy Li:
+>>>> The Firefly RK3288 Reload is a combination Firefly rk3288 core board
+>>>> with the Reload baseboard. Add a dtsi for the Firefly rk3288 core
+>>>> which can be included into the dts for the various baseboards
+>>>> in the future and dts for Reload base board.
+>>>>
+>>>> Currently supported are serial console, wired networking, eMMC and
+>>>> SD storage, SPFIF, IR receiver, LEDs, SDIO wifi and USB. But only
+>>>> the OTG could work on the host mode now, the other USB host can't
+>>>> work now, additional patches are required.
+>>>>
+>>>> Signed-off-by: Randy Li <ayaka@soulik.info>
+>>>> Acked-by: Rob Herring <robh@kernel.org>
+>>>
+>>> applied [0], after some minor reordering - please double check.
+>>>
+>>> Also, while the branch is named 4.8 this will only go into 4.9, as the
+>>> merge- window supposedly opens on the weekend.
+>>
+>> Sorry for the noise here:), but I find there is some mmc stuff
+>> which confuse me. Maybe Randy could elaborate more?
+>>
+>> Your sdmmc claims to support UHS-I mode like sd-uhs-sdr104, etc, which
+>> will ask dw_mmc to switch vqmmc from 3V3 to 1V8 after sending CMD11.
+>>
+>> But the vqmmc is vccio_sd which is fixed as 3V3? :)
+>
+> so far we have only been able to achieve UHS speeds on devices based on the
+> rk808 pmic (I had sucess on veyron and popmetal). The act8846-based boards
+> seem to have some issue when trying to do the switch to 1.8V, resulting in
+> mmc errors and the mmc-core switching back to 3.3V.
 
-Thanks, I forgot to export above symbols, I will fix it at next
-version. Below fix should work for you, I have tested.
+Interesting.... I will have a look at it this weekend with Randy face 2
+face....
 
-diff --git a/drivers/power/pwrseq/core.c b/drivers/power/pwrseq/core.c
-index 60f1e4e..6861a21 100644
---- a/drivers/power/pwrseq/core.c
-+++ b/drivers/power/pwrseq/core.c
-@@ -29,6 +29,7 @@ int pwrseq_get(struct device_node *np, struct pwrseq *p)
- 
- 	return -ENOTSUPP;
- }
-+EXPORT_SYMBOL(pwrseq_get);
- 
- int pwrseq_on(struct device_node *np, struct pwrseq *p)
- {
-@@ -37,24 +38,28 @@ int pwrseq_on(struct device_node *np, struct pwrseq *p)
- 
- 	return -ENOTSUPP;
- }
-+EXPORT_SYMBOL(pwrseq_on);
- 
- void pwrseq_off(struct pwrseq *p)
- {
- 	if (p && p->off)
- 		p->off(p);
- }
-+EXPORT_SYMBOL(pwrseq_off);
- 
- void pwrseq_put(struct pwrseq *p)
- {
- 	if (p && p->put)
- 		p->put(p);
- }
-+EXPORT_SYMBOL(pwrseq_put);
- 
- void pwrseq_free(struct pwrseq *p)
- {
- 	if (p && p->free)
- 		p->free(p);
- }
-+EXPORT_SYMBOL(pwrseq_free);
+>
+> I think this might be caused by a bug in the act8846 driver or some dts
+> mistake. But so far nobody had the time and enthusiasm to investigate :-)
+>
+>
+> Heiko
+>
+> _______________________________________________
+> Linux-rockchip mailing list
+> Linux-rockchip at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-rockchip
+>
+
 
 -- 
-
-Best Regards,
-Peter Chen
+Best Regards
+Shawn Lin
