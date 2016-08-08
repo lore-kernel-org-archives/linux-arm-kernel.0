@@ -1,30 +1,113 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 8 Aug 2016 12:59:01 +0200
-Subject: [PATCH v3 0/6] Add R8A7794/SILK sound DT support
-In-Reply-To: <87y44l2uy1.wl%kuninori.morimoto.gx@renesas.com>
-References: <3910788.ckTpUWEs6B@wasted.cogentembedded.com>
- <87y44l2uy1.wl%kuninori.morimoto.gx@renesas.com>
-Message-ID: <20160808105901.GH17838@verge.net.au>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Mon, 8 Aug 2016 12:00:50 +0100
+Subject: [PATCH v2 1/3] KVM: arm64: vgic-its: Handle errors from
+ vgic_add_lpi
+In-Reply-To: <20160803161325.14933-2-christoffer.dall@linaro.org>
+References: <20160803161325.14933-1-christoffer.dall@linaro.org>
+ <20160803161325.14933-2-christoffer.dall@linaro.org>
+Message-ID: <cd0efae8-4584-bc57-705e-f0c0087020b2@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 28, 2016 at 11:47:58PM +0000, Kuninori Morimoto wrote:
-> 
-> Hi
-> 
-> >    Here's the set of 6 patches against Simon Horman's 'renesas.git' repo,
-> > 'renesas-devel-20160725-v4.7-rc7' tag. I'm adding the sound device tree support
-> > for the R8A7794 SoC based SILK board.
-> > 
-> > [1/6] ARM: dts: r8a7794: add audio clocks
-> > [2/6] ARM: dts: r8a7794: add MSTP5 clocks
-> > [3/6] ARM: dts: r8a7794: add MSTP10 clocks
-> > [4/6] ARM: dts: r8a7794: add Audio-DMAC support
-> > [5/6] ARM: dts: r8a7794: add sound support
-> > [6/6] ARM: dts: silk: add sound support
-> 
-> For all patches
-> 
-> Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Hi,
 
-Thanks, I have queued these up.
+On 03/08/16 17:13, Christoffer Dall wrote:
+> During low memory conditions, we could be dereferencing a NULL pointer
+> when vgic_add_lpi fails to allocate memory.
+> 
+> Consider for example this call sequence:
+> 
+>   vgic_its_cmd_handle_mapi
+>       itte->irq = vgic_add_lpi(kvm, lpi_nr);
+
+Ouch! Thanks for catching this unhandled error return!
+
+>           update_lpi_config(kvm, itte->irq, NULL);
+>               ret = kvm_read_guest(kvm, propbase + irq->intid
+> 	                                             ^^^^
+> 						     kaboom?
+> 
+> Instead, return an error pointer from vgic_add_lpi and check the return
+> value from its single caller.
+> 
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> ---
+> Changes since v1:
+>  - Don't errornously get an extra kref refernce for the struct vgic_irq
+>  - Don't rework the entire error handling of the function, but follow
+>    what Marc suggested he prefers based on his fixup patch.
+>  virt/kvm/arm/vgic/vgic-its.c | 18 ++++++++++++++----
+>  1 file changed, 14 insertions(+), 4 deletions(-)
+> 
+> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+> index 07411cf..424f7a5 100644
+> --- a/virt/kvm/arm/vgic/vgic-its.c
+> +++ b/virt/kvm/arm/vgic/vgic-its.c
+> @@ -51,7 +51,7 @@ static struct vgic_irq *vgic_add_lpi(struct kvm *kvm, u32 intid)
+>  
+>  	irq = kzalloc(sizeof(struct vgic_irq), GFP_KERNEL);
+>  	if (!irq)
+> -		return NULL;
+> +		return ERR_PTR(-ENOMEM);
+>  
+>  	INIT_LIST_HEAD(&irq->lpi_list);
+>  	INIT_LIST_HEAD(&irq->ap_list);
+> @@ -693,10 +693,11 @@ static int vgic_its_cmd_handle_mapi(struct kvm *kvm, struct vgic_its *its,
+>  	u32 device_id = its_cmd_get_deviceid(its_cmd);
+>  	u32 event_id = its_cmd_get_id(its_cmd);
+>  	u32 coll_id = its_cmd_get_collection(its_cmd);
+> -	struct its_itte *itte;
+> +	struct its_itte *itte, *new_itte = NULL;
+>  	struct its_device *device;
+>  	struct its_collection *collection, *new_coll = NULL;
+>  	int lpi_nr;
+> +	struct vgic_irq *irq;
+>  
+>  	device = find_its_device(its, device_id);
+>  	if (!device)
+> @@ -720,7 +721,7 @@ static int vgic_its_cmd_handle_mapi(struct kvm *kvm, struct vgic_its *its,
+>  
+>  	itte = find_itte(its, device_id, event_id);
+>  	if (!itte) {
+> -		itte = kzalloc(sizeof(struct its_itte), GFP_KERNEL);
+> +		new_itte = itte = kzalloc(sizeof(struct its_itte), GFP_KERNEL);
+
+Nit: Aren't double assignments frowned upon in the kernel?
+
+>  		if (!itte) {
+>  			if (new_coll)
+>  				vgic_its_free_collection(its, coll_id);
+> @@ -733,7 +734,16 @@ static int vgic_its_cmd_handle_mapi(struct kvm *kvm, struct vgic_its *its,
+>  
+>  	itte->collection = collection;
+>  	itte->lpi = lpi_nr;
+> -	itte->irq = vgic_add_lpi(kvm, lpi_nr);
+> +
+> +	irq = vgic_add_lpi(kvm, lpi_nr);
+> +	if (IS_ERR(irq)) {
+> +		if (new_coll)
+> +			vgic_its_free_collection(its, coll_id);
+> +		kfree(new_itte);
+
+But at this point we already have added that ITTE to the
+device->itt_head, haven't we?
+Since we hold the its_lock, would a simple:
+
+		if (new_itte) {
+			list_del(&itte->itte_list);
+			kfree(new_itte);
+		}
+
+suffice to fix this?
+
+> +		return PTR_ERR(irq);
+> +	}
+> +	itte->irq = irq;
+> +
+>  	update_affinity_itte(kvm, itte);
+>  
+>  	/*
+> 
+
+Cheers,
+Andre.
