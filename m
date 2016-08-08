@@ -1,183 +1,45 @@
-From: Songjun.Wu@microchip.com (Wu, Songjun)
-Date: Mon, 8 Aug 2016 18:11:24 +0800
-Subject: [PATCH v8 1/2] [media] atmel-isc: add the Image Sensor Controller
- code
-In-Reply-To: <240d957c-6738-bab5-824a-1e6a0ddb12ad@xs4all.nl>
-References: <1470211686-2198-1-git-send-email-songjun.wu@microchip.com>
- <1470211686-2198-2-git-send-email-songjun.wu@microchip.com>
- <07cf3e49-da67-74d7-528c-618fe94a15ff@xs4all.nl>
- <240d957c-6738-bab5-824a-1e6a0ddb12ad@xs4all.nl>
-Message-ID: <91b2a3b4-44d5-4f67-96e4-e361088fad54@microchip.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon,  8 Aug 2016 11:12:07 +0100
+Subject: [PATCH] arm64: hibernate: reduce TLB maintenance scope
+Message-ID: <1470651127-18386-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+In break_before_make_ttbr_switch we perform broadcast TLB maintenance
+for the inner shareable domain, and use a DSB ISH to complete this.
+However, at the point we execute this, secondary CPUs are either
+physically offline, or executing code outside of the kernel. Upon
+entering the kernel, secondary CPUs will invalidate their TLBs before
+enabling their MMUs.
 
+Thus we do not need to invalidate TLBs of other CPUs, and as with
+idmap_cpu_replace_ttbr1 we can reduce the scope of maintenance to the
+TLBs of the local CPU. This keeps our TLB maintenance code consistent,
+and is a minor optimisation.
 
-On 8/8/2016 17:56, Hans Verkuil wrote:
-> On 08/08/2016 11:37 AM, Hans Verkuil wrote:
->> On 08/03/2016 10:08 AM, Songjun Wu wrote:
->>> Add driver for the Image Sensor Controller. It manages
->>> incoming data from a parallel based CMOS/CCD sensor.
->>> It has an internal image processor, also integrates a
->>> triple channel direct memory access controller master
->>> interface.
->>>
->>> Signed-off-by: Songjun Wu <songjun.wu@microchip.com>
->>> ---
->>>
->>> Changes in v8:
->>> - Power on the sensor on the first open in function
->>>   'isc_open'.
->>> - Power off the sensor on the last release in function
->>>   'isc_release'.
->>> - Remove the switch of the pipeline.
->>>
->>> Changes in v7:
->>> - Add enum_framesizes and enum_frameintervals.
->>> - Call s_stream(0) when stream start fail.
->>> - Fill the device_caps field of struct video_device
->>>   with V4L2_CAP_STREAMING and V4L2_CAP_VIDEO_CAPTURE.
->>> - Initialize the dev of struct vb2_queue.
->>> - Set field to FIELD_NONE if the pix field is not supported.
->>> - Return the result directly when call g/s_parm of subdev.
->>>
->>> Changes in v6: None
->>> Changes in v5:
->>> - Modify the macro definition and the related code.
->>>
->>> Changes in v4:
->>> - Modify the isc clock code since the dt is changed.
->>>
->>> Changes in v3:
->>> - Add pm runtime feature.
->>> - Modify the isc clock code since the dt is changed.
->>>
->>> Changes in v2:
->>> - Add "depends on COMMON_CLK" and "VIDEO_V4L2_SUBDEV_API"
->>>   in Kconfig file.
->>> - Correct typos and coding style according to Laurent's remarks
->>> - Delete the loop while in 'isc_clk_enable' function.
->>> - Replace 'hsync_active', 'vsync_active' and 'pclk_sample'
->>>   with 'pfe_cfg0' in struct isc_subdev_entity.
->>> - Add the code to support VIDIOC_CREATE_BUFS in
->>>   'isc_queue_setup' function.
->>> - Invoke isc_config to configure register in
->>>   'isc_start_streaming' function.
->>> - Add the struct completion 'comp' to synchronize with
->>>   the frame end interrupt in 'isc_stop_streaming' function.
->>> - Check the return value of the clk_prepare_enable
->>>   in 'isc_open' function.
->>> - Set the default format in 'isc_open' function.
->>> - Add an exit condition in the loop while in 'isc_config'.
->>> - Delete the hardware setup operation in 'isc_set_format'.
->>> - Refuse format modification during streaming
->>>   in 'isc_s_fmt_vid_cap' function.
->>> - Invoke v4l2_subdev_alloc_pad_config to allocate and
->>>   initialize the pad config in 'isc_async_complete' function.
->>> - Remove the '.owner  = THIS_MODULE,' in atmel_isc_driver.
->>> - Replace the module_platform_driver_probe() with
->>>   module_platform_driver().
->>>
->>>  drivers/media/platform/Kconfig                |    1 +
->>>  drivers/media/platform/Makefile               |    2 +
->>>  drivers/media/platform/atmel/Kconfig          |    9 +
->>>  drivers/media/platform/atmel/Makefile         |    1 +
->>>  drivers/media/platform/atmel/atmel-isc-regs.h |  165 +++
->>>  drivers/media/platform/atmel/atmel-isc.c      | 1503 +++++++++++++++++++++++++
->>>  6 files changed, 1681 insertions(+)
->>>  create mode 100644 drivers/media/platform/atmel/Kconfig
->>>  create mode 100644 drivers/media/platform/atmel/Makefile
->>>  create mode 100644 drivers/media/platform/atmel/atmel-isc-regs.h
->>>  create mode 100644 drivers/media/platform/atmel/atmel-isc.c
->>>
->>
->> <snip>
->>
->>> diff --git a/drivers/media/platform/atmel/atmel-isc.c b/drivers/media/platform/atmel/atmel-isc.c
->>> new file mode 100644
->>> index 0000000..d99d4a5
->>> --- /dev/null
->>> +++ b/drivers/media/platform/atmel/atmel-isc.c
->>
->> <snip>
->>
->>> +static int isc_set_default_fmt(struct isc_device *isc)
->>> +{
->>> +	u32 index = isc->num_user_formats - 1;
->>
->> Why pick the last format? Strictly speaking it doesn't matter, but in practice
->> the most common formats tend to be at the beginning of the format list.
->>
->>> +	struct v4l2_format f = {
->>> +		.type = V4L2_BUF_TYPE_VIDEO_CAPTURE,
->>> +		.fmt.pix = {
->>> +			.width		= VGA_WIDTH,
->>> +			.height		= VGA_HEIGHT,
->>> +			.field		= V4L2_FIELD_NONE,
->>> +			.pixelformat	= isc->user_formats[index]->fourcc,
->>> +		},
->>> +	};
->>> +
->>> +	return isc_set_fmt(isc, &f);
->>> +}
->>> +
->>> +static int isc_open(struct file *file)
->>> +{
->>> +	struct isc_device *isc = video_drvdata(file);
->>> +	struct v4l2_subdev *sd = isc->current_subdev->sd;
->>> +	int ret;
->>> +
->>> +	if (mutex_lock_interruptible(&isc->lock))
->>> +		return -ERESTARTSYS;
->>> +
->>> +	ret = v4l2_fh_open(file);
->>> +	if (ret < 0)
->>> +		goto unlock;
->>> +
->>> +	if (!v4l2_fh_is_singular_file(file))
->>> +		goto unlock;
->>> +
->>> +	ret = v4l2_subdev_call(sd, core, s_power, 1);
->>> +	if (ret < 0 && ret != -ENOIOCTLCMD)
->>> +		goto unlock;
->>> +
->>> +	ret = isc_set_default_fmt(isc);
->>
->> This doesn't belong here, this needs to be done in isc_async_complete().
->>
->> Having the code here means that every time you open the device, the format
->> changes back to the default. That's not what you want.
->
-> Actually, you do need to set the format here since here is where you turn on
-> the sensor power, but it should be the current format, not the default format.
->
-> And in isc_set_default_fmt I recommend that you call the try fmt of the subdev
-> in order to let the subdev adjust the proposed default format. The 'try' doesn't
-> need to power on the sensor.
->
-Accept, thank you.
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: James Morse <james.morse@arm.com>
+Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/kernel/hibernate-asm.S | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-My purpose is to set a default format, if the default format is not set, 
-there will be a fail case when tested by v4l2-tool. I will try to modify 
-the code and test again.
-
->>
->>> +	if (ret)
->
-> You also need to power off the sd on error!
->
-Accept, thank you.
-
->>> +		goto unlock;
->>> +
->>> +unlock:
->>> +	mutex_unlock(&isc->lock);
->>> +	return ret;
->>> +}
->>> +
->>
->
-> Regards,
->
-> 	Hans
->
+diff --git a/arch/arm64/kernel/hibernate-asm.S b/arch/arm64/kernel/hibernate-asm.S
+index 46f29b6..7734f3e 100644
+--- a/arch/arm64/kernel/hibernate-asm.S
++++ b/arch/arm64/kernel/hibernate-asm.S
+@@ -36,8 +36,8 @@
+ .macro break_before_make_ttbr_switch zero_page, page_table
+ 	msr	ttbr1_el1, \zero_page
+ 	isb
+-	tlbi	vmalle1is
+-	dsb	ish
++	tlbi	vmalle1
++	dsb	nsh
+ 	msr	ttbr1_el1, \page_table
+ 	isb
+ .endm
+-- 
+1.9.1
