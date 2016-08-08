@@ -1,40 +1,72 @@
 From: anup.patel@broadcom.com (Anup Patel)
-Date: Mon,  8 Aug 2016 11:22:34 +0530
-Subject: [PATCH RESEND v2 5/8] Documentation: Update documentation for
- UIO_MEM_PHYS_CACHE and UIO_MEM_DEVICE
+Date: Mon,  8 Aug 2016 11:22:35 +0530
+Subject: [PATCH RESEND v2 6/8] uio: UIO_IRQ_NONE is a valid option for
+ uioinfo->irq
 In-Reply-To: <1470635557-13416-1-git-send-email-anup.patel@broadcom.com>
 References: <1470635557-13416-1-git-send-email-anup.patel@broadcom.com>
-Message-ID: <1470635557-13416-6-git-send-email-anup.patel@broadcom.com>
+Message-ID: <1470635557-13416-7-git-send-email-anup.patel@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ankit Jindal <thatsjindal@gmail.com>
+From: Jan Viktorin <viktorin@rehivetech.com>
 
-This patch updates UIO documentation for new mem region
-types UIO_MEM_PHYS_CACHE and UIO_MEM_DEVICE.
+We can simplify handling of platform_get_irq into one place as it is
+acceptable to see UIO_IRQ_NONE instead of a valid IRQ number. Some
+devices don't have or don't need any interrupt to be handled. The
+same change has been already done for uio_pdrv_genirq.
 
-Signed-off-by: Ankit Jindal <thatsjindal@gmail.com>
-Signed-off-by: Anup Patel <anup.patel@broadcom.com>
+Signed-off-by: Jan Viktorin <viktorin@rehivetech.com>
 ---
- Documentation/DocBook/uio-howto.tmpl | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
+ drivers/uio/uio_dmem_genirq.c | 17 ++++++-----------
+ 1 file changed, 6 insertions(+), 11 deletions(-)
 
-diff --git a/Documentation/DocBook/uio-howto.tmpl b/Documentation/DocBook/uio-howto.tmpl
-index cd0e452..de9dafe 100644
---- a/Documentation/DocBook/uio-howto.tmpl
-+++ b/Documentation/DocBook/uio-howto.tmpl
-@@ -529,8 +529,10 @@ the memory region, it will show up in the corresponding sysfs node.
- <varname>int memtype</varname>: Required if the mapping is used. Set this to
- <varname>UIO_MEM_PHYS</varname> if you you have physical memory on your
- card to be mapped. Use <varname>UIO_MEM_LOGICAL</varname> for logical
--memory (e.g. allocated with <function>kmalloc()</function>). There's also
--<varname>UIO_MEM_VIRTUAL</varname> for virtual memory.
-+memory (e.g. allocated with <function>kmalloc()</function>). There are also
-+<varname>UIO_MEM_VIRTUAL</varname> for virtual memory,
-+<varname>UIO_MEM_PHYS_CACHE</varname> for cacheable physical memory and,
-+<varname>UIO_MEM_DEVICE</varname> for memory mapped device registers.
- </para></listitem>
+diff --git a/drivers/uio/uio_dmem_genirq.c b/drivers/uio/uio_dmem_genirq.c
+index e1134a4..a4d6d81 100644
+--- a/drivers/uio/uio_dmem_genirq.c
++++ b/drivers/uio/uio_dmem_genirq.c
+@@ -154,8 +154,6 @@ static int uio_dmem_genirq_probe(struct platform_device *pdev)
+ 	int i;
  
- <listitem><para>
+ 	if (pdev->dev.of_node) {
+-		int irq;
+-
+ 		/* alloc uioinfo for one device */
+ 		uioinfo = kzalloc(sizeof(*uioinfo), GFP_KERNEL);
+ 		if (!uioinfo) {
+@@ -165,13 +163,6 @@ static int uio_dmem_genirq_probe(struct platform_device *pdev)
+ 		}
+ 		uioinfo->name = pdev->dev.of_node->name;
+ 		uioinfo->version = "devicetree";
+-
+-		/* Multiple IRQs are not supported */
+-		irq = platform_get_irq(pdev, 0);
+-		if (irq == -ENXIO)
+-			uioinfo->irq = UIO_IRQ_NONE;
+-		else
+-			uioinfo->irq = irq;
+ 	}
+ 
+ 	if (!uioinfo || !uioinfo->name || !uioinfo->version) {
+@@ -200,14 +191,18 @@ static int uio_dmem_genirq_probe(struct platform_device *pdev)
+ 	priv->pdev = pdev;
+ 	mutex_init(&priv->alloc_lock);
+ 
++	/* Multiple IRQs are not supported */
+ 	if (!uioinfo->irq) {
+ 		ret = platform_get_irq(pdev, 0);
+-		if (ret < 0) {
++		uioinfo->irq = ret;
++		if (ret == -ENXIO && pdev->dev.of_node)
++			uioinfo->irq = UIO_IRQ_NONE;
++		else if (ret < 0) {
+ 			dev_err(&pdev->dev, "failed to get IRQ\n");
+ 			goto bad1;
+ 		}
+-		uioinfo->irq = ret;
+ 	}
++
+ 	uiomem = &uioinfo->mem[0];
+ 
+ 	for (i = 0; i < pdev->num_resources; ++i) {
 -- 
 1.9.1
