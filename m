@@ -1,77 +1,22 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Mon, 8 Aug 2016 16:58:15 +0300
-Subject: [PATCH v2 6/6] dmaengine: omap-dma: Support for LinkedList
- transfer of slave_sg
-In-Reply-To: <20160808054226.GR9681@localhost>
-References: <20160720085032.2955-1-peter.ujfalusi@ti.com>
- <20160720085032.2955-7-peter.ujfalusi@ti.com>
- <20160808054226.GR9681@localhost>
-Message-ID: <76993999-9638-7c46-a85a-e2ed2ef1b8a0@ti.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 8 Aug 2016 21:58:59 +0800
+Subject: [PATCH 1/3] ARM: dts: imx6sx-sabreauto: Fix misspelled property
+In-Reply-To: <1467691450-22975-2-git-send-email-afaerber@suse.de>
+References: <1467691450-22975-1-git-send-email-afaerber@suse.de>
+ <1467691450-22975-2-git-send-email-afaerber@suse.de>
+Message-ID: <20160808135859.GG4678@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/08/16 08:42, Vinod Koul wrote:
-> On Wed, Jul 20, 2016 at 11:50:32AM +0300, Peter Ujfalusi wrote:
->> sDMA in OMAP3630 or newer SoC have support for LinkedList transfer. When
->> LinkedList or Descriptor load feature is present we can create the
->> descriptors for each and program sDMA to walk through the list of
->> descriptors instead of the current way of sDMA stop, sDMA reconfiguration
->> and sDMA start after each SG transfer.
->> By using LinkedList transfer in sDMA the number of DMA interrupts will
->> decrease dramatically.
->> Booting up the board with filesystem on SD card for example:
->> W/o LinkedList support:
->>  27:       4436          0     WUGEN  13 Level     omap-dma-engine
->>
->> Same board/filesystem with this patch:
->>  27:       1027          0     WUGEN  13 Level     omap-dma-engine
->>
->> Or copying files from SD card to eMCC:
->> 2.1G    /usr/
->> 232001
->>
->> W/o LinkedList we see ~761069 DMA interrupts.
->> With LinkedList support it is down to ~269314 DMA interrupts.
->>
->> With the decreased DMA interrupt number the CPU load is dropping
->> significantly as well.
+On Tue, Jul 05, 2016 at 06:04:08AM +0200, Andreas F?rber wrote:
+> In commit 99fc5ba0bfb6 ("ARM: dts: imx6sx: add i.mx6sx sabreauto board
+> support") it should've been enable-sdio-wakeup (not -wakup). But that is
+> now considered a legacy name for wakeup-source, so directly use the new
+> name instead, as done in commit 26cefdd15db1 for the other occurrence.
 > 
-> Interesting, I would have counted the throughput of DMA by using time for
-> transfer and not really interrupts and CPU load. With LL mode, you get a
-> big performance boost due to starting next transaction by hardware without
-> waiting for CPU intervention and yes side effect is lesser interrupts and
-> load :)
+> Fixes: 26cefdd15db1 ("ARM: dts: imx: replace legacy wakeup property with 'wakeup-source'")
+> Cc: Sudeep Holla <sudeep.holla@arm.com>
+> Cc: Shawn Guo <shawnguo@kernel.org>
+> Signed-off-by: Andreas F?rber <afaerber@suse.de>
 
-I did throughput test as well, it was slightly faster, but not the boost I was
-hoping for.
-The copy of the /usr (2.1G) - 5 runs average:
-w/o linked list: 7:30 mins
-with this patch: 7:23 mins
-
-The limiting factor here is the SD card I have used. But the board was way
-more responsible during heavy I/O tasks, like running 'emerge --sync' I can
-still use the board.
-
->> @@ -743,6 +863,7 @@ static struct dma_async_tx_descriptor *omap_dma_prep_slave_sg(
->>  	struct omap_desc *d;
->>  	dma_addr_t dev_addr;
->>  	unsigned i, es, en, frame_bytes;
->> +	bool ll_failed = false;
->>  	u32 burst;
->>  
->>  	if (dir == DMA_DEV_TO_MEM) {
->> @@ -818,16 +939,47 @@ static struct dma_async_tx_descriptor *omap_dma_prep_slave_sg(
->>  	 */
->>  	en = burst;
->>  	frame_bytes = es_bytes[es] * en;
->> +
->> +	if (sglen >= 2)
->> +		d->using_ll = od->ll123_supported;
-> 
-> No upperbound on length? Does the hardware support any lengths?
-
-No, we don't have upper limit, we can link as many sg as we could allocate
-from the pool.
-
--- 
-P?ter
+Applied, thanks.
