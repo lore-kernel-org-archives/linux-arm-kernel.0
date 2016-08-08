@@ -1,273 +1,212 @@
-From: tthayer@opensource.altera.com (Thor Thayer)
-Date: Mon, 8 Aug 2016 09:01:23 -0500
-Subject: [PATCH 2/3] EDAC, altera: Add Arria10 SD-MMC EDAC support
-In-Reply-To: <20160808133615.GA29563@nazgul.tnic>
-References: <1470153381-20517-1-git-send-email-tthayer@opensource.altera.com>
- <1470153381-20517-3-git-send-email-tthayer@opensource.altera.com>
- <20160808133615.GA29563@nazgul.tnic>
-Message-ID: <4d2b4046-c53c-d2bd-a2b9-dc703202d593@opensource.altera.com>
+From: pmladek@suse.com (Petr Mladek)
+Date: Mon, 8 Aug 2016 15:57:11 +0200
+Subject: [PATCH v6 1/4] nmi_backtrace: add more trigger_*_cpu_backtrace()
+ methods
+In-Reply-To: <1468529432-28026-2-git-send-email-cmetcalf@mellanox.com>
+References: <1468529432-28026-1-git-send-email-cmetcalf@mellanox.com>
+ <1468529432-28026-2-git-send-email-cmetcalf@mellanox.com>
+Message-ID: <20160808135711.GA13300@pathway.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu 2016-07-14 16:50:29, Chris Metcalf wrote:
+> Currently you can only request a backtrace of either all cpus, or
+> all cpus but yourself.  It can also be helpful to request a remote
+> backtrace of a single cpu, and since we want that, the logical
+> extension is to support a cpumask as the underlying primitive.
+> 
+> This change modifies the existing lib/nmi_backtrace.c code to take
+> a cpumask as its basic primitive, and modifies the linux/nmi.h code
+> to use either the old "all/all_but_self" arch methods, or the new
+> "cpumask" method, depending on which is available.
+
+> --- a/include/linux/nmi.h
+> +++ b/include/linux/nmi.h
+> @@ -31,38 +31,75 @@ static inline void hardlockup_detector_disable(void) {}
+>  #endif
+>  
+>  /*
+> - * Create trigger_all_cpu_backtrace() out of the arch-provided
+> - * base function. Return whether such support was available,
+> + * Create trigger_all_cpu_backtrace() etc out of the arch-provided
+> + * base function(s). Return whether such support was available,
+>   * to allow calling code to fall back to some other mechanism:
+>   */
+> -#ifdef arch_trigger_all_cpu_backtrace
+>  static inline bool trigger_all_cpu_backtrace(void)
+>  {
+> +#if defined(arch_trigger_all_cpu_backtrace)
+>  	arch_trigger_all_cpu_backtrace(true);
+> -
+>  	return true;
+> +#elif defined(arch_trigger_cpumask_backtrace)
+> +	arch_trigger_cpumask_backtrace(cpu_online_mask);
+> +	return true;
+> +#else
+> +	return false;
+> +#endif
+>  }
+> +
+>  static inline bool trigger_allbutself_cpu_backtrace(void)
+>  {
+> +#if defined(arch_trigger_all_cpu_backtrace)
+>  	arch_trigger_all_cpu_backtrace(false);
+>  	return true;
+> -}
+> -
+> -/* generic implementation */
+> -void nmi_trigger_all_cpu_backtrace(bool include_self,
+> -				   void (*raise)(cpumask_t *mask));
+> -bool nmi_cpu_backtrace(struct pt_regs *regs);
+> +#elif defined(arch_trigger_cpumask_backtrace)
+> +	cpumask_var_t mask;
+> +	int cpu = get_cpu();
+>  
+> +	if (!alloc_cpumask_var(&mask, GFP_KERNEL))
+> +		return false;
+
+I tested this patch by the following change:
+
+diff --git a/drivers/tty/sysrq.c b/drivers/tty/sysrq.c
+index 52bbd27e93ae..404a32699554 100644
+--- a/drivers/tty/sysrq.c
++++ b/drivers/tty/sysrq.c
+@@ -242,6 +242,7 @@ static void sysrq_handle_showallcpus(int key)
+ 	 * backtrace printing did not succeed or the
+ 	 * architecture has no support for it:
+ 	 */
++	printk("-----------  All CPUs: ---------------------\n");
+ 	if (!trigger_all_cpu_backtrace()) {
+ 		struct pt_regs *regs = get_irq_regs();
+ 
+@@ -251,6 +252,10 @@ static void sysrq_handle_showallcpus(int key)
+ 		}
+ 		schedule_work(&sysrq_showallcpus);
+ 	}
++	printk("-----------  All but itself: ---------------------\n");
++	trigger_allbutself_cpu_backtrace();
++	printk("-----------  Only two: ---------------------\n");
++	trigger_single_cpu_backtrace(2);
+ }
+ 
+ static struct sysrq_key_op sysrq_showallcpus_op = {
 
 
-On 08/08/2016 08:36 AM, Borislav Petkov wrote:
-> On Tue, Aug 02, 2016 at 10:56:20AM -0500, tthayer at opensource.altera.com wrote:
->> From: Thor Thayer <tthayer@opensource.altera.com>
->>
->> Add Altera Arria10 SD-MMC FIFO memory EDAC support. The SD-MMC
->> is a dual port RAM implementation which is different than any
->> of the other peripherals and therefore requires additional code.
->>
->> Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
->> ---
->>  drivers/edac/Kconfig       |    7 ++
->>  drivers/edac/altera_edac.c |  188 +++++++++++++++++++++++++++++++++++++++++++-
->>  drivers/edac/altera_edac.h |    5 ++
->>  3 files changed, 199 insertions(+), 1 deletion(-)
->>
->> diff --git a/drivers/edac/Kconfig b/drivers/edac/Kconfig
->> index 72752f4..394cd16 100644
->> --- a/drivers/edac/Kconfig
->> +++ b/drivers/edac/Kconfig
->> @@ -426,6 +426,13 @@ config EDAC_ALTERA_QSPI
->>  	  Support for error detection and correction on the
->>  	  Altera QSPI FIFO Memory for Altera SoCs.
->>
->> +config EDAC_ALTERA_SDMMC
->> +	bool "Altera SDMMC FIFO ECC"
->> +	depends on EDAC_ALTERA=y && MMC_DW
->> +	help
->> +	  Support for error detection and correction on the
->> +	  Altera SDMMC FIFO Memory for Altera SoCs.
->> +
->>  config EDAC_SYNOPSYS
->>  	tristate "Synopsys DDR Memory Controller"
->>  	depends on EDAC_MM_EDAC && ARCH_ZYNQ
->> diff --git a/drivers/edac/altera_edac.c b/drivers/edac/altera_edac.c
->> index 28247f8..8b5177e 100644
->> --- a/drivers/edac/altera_edac.c
->> +++ b/drivers/edac/altera_edac.c
->> @@ -1393,6 +1393,188 @@ early_initcall(socfpga_init_qspi_ecc);
->>
->>  #endif	/* CONFIG_EDAC_ALTERA_QSPI */
->>
->> +/********************* SDMMC Device Functions **********************/
->> +
->> +#ifdef CONFIG_EDAC_ALTERA_SDMMC
->> +
->> +static const struct edac_device_prv_data a10_sdmmceccb_data;
->> +static int altr_portb_setup(struct altr_edac_device_dev *device)
->> +{
->> +	struct edac_device_ctl_info *dci;
->> +	struct altr_edac_device_dev *altdev;
->> +	char *ecc_name = "sdmmcb-ecc";
->> +	int edac_idx, rc;
->> +	struct device_node *np;
->> +	const struct edac_device_prv_data *prv = &a10_sdmmceccb_data;
->> +
->> +	rc = altr_check_ecc_deps(device);
->> +	if (rc)
->> +		return rc;
->> +
->> +	/* Create the PortB EDAC device */
->> +	edac_idx = edac_device_alloc_index();
->> +	dci = edac_device_alloc_ctl_info(sizeof(*altdev), ecc_name, 1,
->> +					 ecc_name, 1, 0, NULL, 0, edac_idx);
->> +	if (!dci) {
->> +		edac_printk(KERN_ERR, EDAC_DEVICE,
->> +			    "%s: Unable to allocate PortB EDAC device\n",
->> +			    ecc_name);
->> +		return -ENOMEM;
->> +	}
->> +
->> +	/* Initialize the PortB EDAC device structure from PortA structure */
->> +	altdev = dci->pvt_info;
->> +	*altdev = *device;
->> +
->> +	if (!devres_open_group(&altdev->ddev, altr_portb_setup, GFP_KERNEL))
->> +		return -ENOMEM;
->> +
->> +	/* Update PortB specific values */
->> +	altdev->edac_dev_name = ecc_name;
->> +	altdev->edac_idx = edac_idx;
->> +	altdev->edac_dev = dci;
->> +	altdev->data = prv;
->> +	dci->dev = &altdev->ddev;
->> +	dci->ctl_name = "Altera ECC Manager";
->> +	dci->mod_name = ecc_name;
->> +	dci->dev_name = ecc_name;
->> +
->> +	/* Find the SD/MMC device tree Node then update the IRQs for PortB */
->> +	np = of_find_compatible_node(NULL, NULL, "altr,socfpga-sdmmc-ecc");
->
-> So why aren't you doing this thing first in the function so that...
->
->> +	if (!np) {
->> +		rc = -ENODEV;
->> +		goto err_release_group_1;
->
-> ... you can save yourself the unwind work in err_release_group_1?
->
-> In general, make sure you're doing all the work of poking at the
-> hardware so that you make sure you have the right resources *before* you
-> go and allocate and init stuff here.
->
-> Should make the error paths simpler and the function body smaller.
->
+Then I triggered this function using
 
-Argh. Missed that. The rest of the IRQ queries require the DCI 
-allocation so the functions below will need to unwind but yes, the 
-of_find_compatible_node should move. Thanks!
+  echo l >/proc/sysrq-trigger
 
->> +	}
->> +
->> +	altdev->sb_irq = irq_of_parse_and_map(np, 2);
->> +	if (!altdev->sb_irq) {
->> +		edac_printk(KERN_ERR, EDAC_DEVICE, "Error PortB SBIRQ alloc\n");
->> +		rc = -ENODEV;
->> +		goto err_release_group_1;
->> +	}
->> +	rc = devm_request_irq(&altdev->ddev, altdev->sb_irq,
->> +			      prv->ecc_irq_handler,
->> +			      IRQF_SHARED, ecc_name, altdev);
->> +	if (rc) {
->> +		edac_printk(KERN_ERR, EDAC_DEVICE, "PortB SBERR IRQ error\n");
->> +		goto err_release_group_1;
->> +	}
->> +
->> +	altdev->db_irq = irq_of_parse_and_map(np, 3);
->> +	if (!altdev->db_irq) {
->> +		edac_printk(KERN_ERR, EDAC_DEVICE, "Error PortB DBIRQ alloc\n");
->> +		rc = -ENODEV;
->> +		goto err_release_group_1;
->> +	}
->> +	rc = devm_request_irq(&altdev->ddev, altdev->db_irq,
->> +			      prv->ecc_irq_handler,
->> +			      IRQF_SHARED, ecc_name, altdev);
->> +	if (rc) {
->> +		edac_printk(KERN_ERR, EDAC_DEVICE, "PortB DBERR IRQ error\n");
->> +		goto err_release_group_1;
->> +	}
->> +
->> +	rc = edac_device_add_device(dci);
->> +	if (rc) {
->> +		edac_printk(KERN_ERR, EDAC_DEVICE,
->> +			    "edac_device_add_device portB failed\n");
->> +		rc = -ENOMEM;
->> +		goto err_release_group_1;
->> +	}
->> +	altr_create_edacdev_dbgfs(dci, prv);
->> +
->> +	list_add(&altdev->next, &altdev->edac->a10_ecc_devices);
->> +
->> +	devres_remove_group(&altdev->ddev, altr_portb_setup);
->> +
->> +	return 0;
->> +
->> +err_release_group_1:
->> +	edac_device_free_ctl_info(dci);
->> +	devres_release_group(&altdev->ddev, altr_portb_setup);
->> +	edac_printk(KERN_ERR, EDAC_DEVICE,
->> +		    "%s:Error setting up EDAC device: %d\n", ecc_name, rc);
->> +	return rc;
->> +}
->> +
->> +static irqreturn_t  altr_edac_a10_ecc_irq_portb(int irq, void *dev_id)
->> +{
->> +	struct altr_edac_device_dev *ad = dev_id;
->> +	void __iomem  *base = ad->base;
->> +	const struct edac_device_prv_data *priv = ad->data;
->> +
->> +	if (irq == ad->sb_irq) {
->> +		writel(priv->ce_clear_mask,
->> +		       base + ALTR_A10_ECC_INTSTAT_OFST);
->> +		edac_device_handle_ce(ad->edac_dev, 0, 0, ad->edac_dev_name);
->> +		return IRQ_HANDLED;
->> +	} else if (irq == ad->db_irq) {
->> +		writel(priv->ue_clear_mask,
->> +		       base + ALTR_A10_ECC_INTSTAT_OFST);
->> +		edac_device_handle_ue(ad->edac_dev, 0, 0, ad->edac_dev_name);
->> +		return IRQ_HANDLED;
->> +	}
->> +
->> +	WARN_ON(1);
->
-> WARN(1, "Strange IRQ%d on Port B...
->
-> or something like that which is more informative.
->
 
-Yes, Good point, I will fix this.
+and got
 
->> +
->> +	return IRQ_NONE;
->> +}
->> +
->> +static const struct edac_device_prv_data a10_sdmmcecca_data = {
->> +	.setup = altr_portb_setup,
->> +	.ce_clear_mask = ALTR_A10_ECC_SERRPENA,
->> +	.ue_clear_mask = ALTR_A10_ECC_DERRPENA,
->> +	.dbgfs_name = "altr_trigger",
->> +	.ecc_enable_mask = ALTR_A10_COMMON_ECC_EN_CTL,
->> +	.ecc_en_ofst = ALTR_A10_ECC_CTRL_OFST,
->> +	.ce_set_mask = ALTR_A10_ECC_SERRPENA,
->> +	.ue_set_mask = ALTR_A10_ECC_DERRPENA,
->> +	.set_err_ofst = ALTR_A10_ECC_INTTEST_OFST,
->> +	.ecc_irq_handler = altr_edac_a10_ecc_irq,
->> +	.inject_fops = &altr_edac_a10_device_inject_fops,
->> +};
->> +
->> +static const struct edac_device_prv_data a10_sdmmceccb_data = {
->> +	.setup = altr_portb_setup,
->> +	.ce_clear_mask = ALTR_A10_ECC_SERRPENB,
->> +	.ue_clear_mask = ALTR_A10_ECC_DERRPENB,
->> +	.dbgfs_name = "altr_trigger",
->> +	.ecc_enable_mask = ALTR_A10_COMMON_ECC_EN_CTL,
->> +	.ecc_en_ofst = ALTR_A10_ECC_CTRL_OFST,
->> +	.ce_set_mask = ALTR_A10_ECC_TSERRB,
->> +	.ue_set_mask = ALTR_A10_ECC_TDERRB,
->> +	.set_err_ofst = ALTR_A10_ECC_INTTEST_OFST,
->> +	.ecc_irq_handler = altr_edac_a10_ecc_irq_portb,
->> +	.inject_fops = &altr_edac_a10_device_inject_fops,
->> +};
->> +
->> +static int __init socfpga_init_sdmmc_ecc(void)
->> +{
->> +	int rc = -ENODEV;
->> +	struct device_node *child = of_find_compatible_node(NULL, NULL,
->> +						"altr,socfpga-sdmmc-ecc");
->> +	if (!child) {
->> +		edac_printk(KERN_ERR, EDAC_DEVICE, "SDMMC node not found\n");
->
-> Are you sure you want to issue this error each time the driver loads? Is
-> that even an error condition?
->
-I see your point. I will change this to a KERN_WARNING so there is some 
-indication why the SDMMC wasn't initialized if SDMMC is enabled in Kconfig.
+[  270.791328] -----------  All but itself: ---------------------
 
-I will make the changes and re-submit. Thanks for reviewing!
+[  270.791331] ===============================
+[  270.791331] [ INFO: suspicious RCU usage. ]
+[  270.791333] 4.8.0-rc1-4-default+ #3086 Not tainted
+[  270.791333] -------------------------------
+[  270.791335] ./include/linux/rcupdate.h:556 Illegal context switch in RCU read-side critical section!
+[  270.791339] 
+               other info that might help us debug this:
 
->> +		return -ENODEV;
->> +	}
->> +
->> +	if (!of_device_is_available(child))
->> +		goto exit;
->> +
->> +	if (validate_parent_available(child))
->> +		goto exit;
->> +
->> +	rc = altr_init_a10_ecc_block(child, ALTR_A10_SDMMC_IRQ_MASK,
->> +				     a10_sdmmcecca_data.ecc_enable_mask, 1);
->> +exit:
->> +	of_node_put(child);
->> +	return rc;
->> +}
->> +
->> +early_initcall(socfpga_init_sdmmc_ecc);
->> +
->> +#endif	/* CONFIG_EDAC_ALTERA_SDMMC */
->> +
->>  /********************* Arria10 EDAC Device Functions *************************/
->>  static const struct of_device_id altr_edac_a10_device_of_match[] = {
->>  #ifdef CONFIG_EDAC_ALTERA_L2C
+[  270.791340] 
+               rcu_scheduler_active = 1, debug_locks = 0
+[  270.791341] 2 locks held by bash/3720:
+[  270.791347]  #0:  (sb_writers#5){.+.+.+}, at: [<ffffffff8122c9e1>] __sb_start_write+0xd1/0xf0
+[  270.791351]  #1:  (rcu_read_lock){......}, at: [<ffffffff8152d8a5>] __handle_sysrq+0x5/0x220
+[  270.791352] 
+               stack backtrace:
+[  270.791354] CPU: 3 PID: 3720 Comm: bash Not tainted 4.8.0-rc1-4-default+ #3086
+[  270.791355] Hardware name: Bochs Bochs, BIOS Bochs 01/01/2011
+[  270.791359]  0000000000000000 ffff88013688fc58 ffffffff8143ddac ffff880135748600
+[  270.791362]  0000000000000001 ffff88013688fc88 ffffffff810c9727 ffff88013fd98c00
+[  270.791365]  0000000000018c00 00000000024000c0 0000000000000000 ffff88013688fce0
+[  270.791366] Call Trace:
+[  270.791369]  [<ffffffff8143ddac>] dump_stack+0x85/0xc9
+[  270.791372]  [<ffffffff810c9727>] lockdep_rcu_suspicious+0xe7/0x120
+[  270.791374]  [<ffffffff81951beb>] __schedule+0x4eb/0x820
+[  270.791377]  [<ffffffff819521b7>] preempt_schedule_common+0x18/0x31
+[  270.791379]  [<ffffffff819521ec>] _cond_resched+0x1c/0x30
+[  270.791382]  [<ffffffff81201164>] kmem_cache_alloc_node_trace+0x224/0x340
+[  270.791385]  [<ffffffff812012f1>] __kmalloc_node+0x31/0x40
+[  270.791388]  [<ffffffff8143db64>] alloc_cpumask_var_node+0x24/0x30
+[  270.791391]  [<ffffffff8143db9e>] alloc_cpumask_var+0xe/0x10
+[  270.791393]  [<ffffffff8152d64b>] sysrq_handle_showallcpus+0x4b/0xd0
+[  270.791395]  [<ffffffff8152d9d6>] __handle_sysrq+0x136/0x220
+[  270.791398]  [<ffffffff8152d8a5>] ? __handle_sysrq+0x5/0x220
+[  270.791401]  [<ffffffff8152dee6>] write_sysrq_trigger+0x46/0x60
+[  270.791403]  [<ffffffff8129cc1d>] proc_reg_write+0x3d/0x70
+[  270.791406]  [<ffffffff810e770f>] ? rcu_sync_lockdep_assert+0x2f/0x60
+[  270.791408]  [<ffffffff81229028>] __vfs_write+0x28/0x120
+[  270.791411]  [<ffffffff810c6e59>] ? percpu_down_read+0x49/0x80
+[  270.791412]  [<ffffffff8122c9e1>] ? __sb_start_write+0xd1/0xf0
+[  270.791414]  [<ffffffff8122c9e1>] ? __sb_start_write+0xd1/0xf0
+[  270.791416]  [<ffffffff81229722>] vfs_write+0xb2/0x1b0
+[  270.791419]  [<ffffffff810ca5f9>] ? trace_hardirqs_on_caller+0xf9/0x1c0
+[  270.791423]  [<ffffffff8122aa79>] SyS_write+0x49/0xa0
+[  270.791427]  [<ffffffff8195867c>] entry_SYSCALL_64_fastpath+0x1f/0xbd
+[  270.791502] Sending NMI from CPU 3 to CPUs 0-2:
+
+
+I guess that you allocate the mask because you do not want
+to have the mask twice on the stack.
+
+Hmm, people might want to call this function in different context
+and also when the system is somehow borked. Having huge variables
+on stack might be dangerous but allocation is dangerous as well.
+I think that we should not combine both dangers here.
+
+I would try using local variable. If it causes problems, we could
+always add some more complexity to avoid copying the mask later.
+
+
+> +	cpumask_copy(mask, cpu_online_mask);
+> +	cpumask_clear_cpu(cpu, mask);
+> +	arch_trigger_cpumask_backtrace(mask);
+> +	put_cpu();
+> +	free_cpumask_var(mask);
+> +	return true;
+
+Also this looks too much code for an inlined function.
+It is rather slow and there is not a big gain. I would move
+the definition to lib/nmi_backtrace.c.
+
+>  #else
+> -static inline bool trigger_all_cpu_backtrace(void)
+> -{
+>  	return false;
+> +#endif
+>  }
+> -static inline bool trigger_allbutself_cpu_backtrace(void)
+> +
+> +static inline bool trigger_cpumask_backtrace(struct cpumask *mask)
+>  {
+> +#if defined(arch_trigger_cpumask_backtrace)
+> +	arch_trigger_cpumask_backtrace(mask);
+> +	return true;
+> +#else
+>  	return false;
+> +#endif
+>  }
+> +
+> +static inline bool trigger_single_cpu_backtrace(int cpu)
+> +{
+> +#if defined(arch_trigger_cpumask_backtrace)
+> +	cpumask_var_t mask;
+> +
+> +	if (!zalloc_cpumask_var(&mask, GFP_KERNEL))
+> +		return false;
+> +	cpumask_set_cpu(cpu, mask);
+> +	arch_trigger_cpumask_backtrace(mask);
+> +	free_cpumask_var(mask);
+
+I would avoid the allocation here as well. Also I would move
+this into lib/nmi_backtrace.c.
+
+
+Best Regards,
+Petr
+
+PS: I am sorry for sending this so late in the game. I was
+curious why the patch had not been upstream yet and. I made
+a closer look to give a Reviewed-by tag...
