@@ -1,51 +1,41 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Mon, 8 Aug 2016 18:56:57 +0200
-Subject: [PATCH] exynos-drm: Fix unsupported GEM memory type error
- message to be clear
-In-Reply-To: <1470448206-16538-1-git-send-email-shuahkh@osg.samsung.com>
-References: <1470448206-16538-1-git-send-email-shuahkh@osg.samsung.com>
-Message-ID: <20160808165657.GB5959@kozik-book>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Mon,  8 Aug 2016 18:21:43 +0100
+Subject: [PATCH v4 1/7] arm64: sunxi: Kconfig: add essential pinctrl driver
+In-Reply-To: <20160808172149.30861-1-andre.przywara@arm.com>
+References: <20160808172149.30861-1-andre.przywara@arm.com>
+Message-ID: <20160808172149.30861-2-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 05, 2016 at 07:50:06PM -0600, Shuah Khan wrote:
-> Fix unsupported GEM memory type error message to include the memory type
-> information.
-> 
-> Signed-off-by: Shuah Khan <shuahkh@osg.samsung.com>
-> ---
->  drivers/gpu/drm/exynos/exynos_drm_fb.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/exynos/exynos_drm_fb.c b/drivers/gpu/drm/exynos/exynos_drm_fb.c
-> index e016640..c9315df 100644
-> --- a/drivers/gpu/drm/exynos/exynos_drm_fb.c
-> +++ b/drivers/gpu/drm/exynos/exynos_drm_fb.c
-> @@ -55,11 +55,11 @@ static int check_fb_gem_memory_type(struct drm_device *drm_dev,
->  	flags = exynos_gem->flags;
->  
->  	/*
-> -	 * without iommu support, not support physically non-continuous memory
-> +	 * without iommu support, not support physically non-contiguous memory
+The pinctrl driver is essential for the Allwinner SoCs to work.
+Add the driver's config symbol to the Kconfig entry to always compile
+it in. We can't use the arm approach to make the _driver's_ Kconfig
+symbol def_bool, because we lack the MACH_* symbols in arm64.
+That line was in the original pinctrl driver patch, but got removed
+to avoid the dependency on the Kconfig patch [1].
+Also add the general PINCTRL symbol, which isn't selected automatically
+for the same reason.
 
-While at it, how about changing entire sentence to something in English? :)
+Reported-by: Jeroen Dekien <dekien@gmail.com>
+Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 
-Best regards,
-Krzysztof
+[1]: http://lists.infradead.org/pipermail/linux-arm-kernel/2016-March/414086.html
+---
+ arch/arm64/Kconfig.platforms | 2 ++
+ 1 file changed, 2 insertions(+)
 
->  	 * for framebuffer.
->  	 */
->  	if (IS_NONCONTIG_BUFFER(flags)) {
-> -		DRM_ERROR("cannot use this gem memory type for fb.\n");
-> +		DRM_ERROR("Non-continguous GEM memory is not supported.\n");
->  		return -EINVAL;
->  	}
->  
-> -- 
-> 2.7.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
+index bb2616b..e3dc1a4 100644
+--- a/arch/arm64/Kconfig.platforms
++++ b/arch/arm64/Kconfig.platforms
+@@ -3,6 +3,8 @@ menu "Platform selection"
+ config ARCH_SUNXI
+ 	bool "Allwinner sunxi 64-bit SoC Family"
+ 	select GENERIC_IRQ_CHIP
++	select PINCTRL
++	select PINCTRL_SUN50I_A64
+ 	help
+ 	  This enables support for Allwinner sunxi based SoCs like the A64.
+ 
+-- 
+2.9.0
