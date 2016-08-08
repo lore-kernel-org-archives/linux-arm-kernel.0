@@ -1,108 +1,55 @@
 From: sricharan@codeaurora.org (Sricharan R)
-Date: Tue,  9 Aug 2016 04:19:07 +0530
-Subject: [PATCH 5/8] drivers: platform: Configure dma operations at probe time
+Date: Tue,  9 Aug 2016 04:19:10 +0530
+Subject: [PATCH 8/8] drivers: iommu: arm-smmu: Set iommu_ops in probe
 In-Reply-To: <1470696550-3416-1-git-send-email-sricharan@codeaurora.org>
 References: <1470696550-3416-1-git-send-email-sricharan@codeaurora.org>
-Message-ID: <1470696550-3416-6-git-send-email-sricharan@codeaurora.org>
+Message-ID: <1470696550-3416-9-git-send-email-sricharan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Configuring DMA ops at probe time will allow deferring device probe when
-the IOMMU isn't available yet.
+iommu_ops should be set after the iommu is probed.
+This ensures that the iommu is really ready when master's
+iommu ops are set during their probe or else deferred.
 
 Signed-off-by: Sricharan R <sricharan@codeaurora.org>
 ---
- drivers/base/dd.c           | 11 +++++++++++
- drivers/base/dma-mapping.c  | 11 +++++++++++
- include/linux/dma-mapping.h |  3 +++
- 3 files changed, 25 insertions(+)
+ drivers/iommu/arm-smmu.c | 17 ++---------------
+ 1 file changed, 2 insertions(+), 15 deletions(-)
 
-diff --git a/drivers/base/dd.c b/drivers/base/dd.c
-index 16688f5..b9978af 100644
---- a/drivers/base/dd.c
-+++ b/drivers/base/dd.c
-@@ -19,6 +19,7 @@
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index 5f12005..5e11bae 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -2071,6 +2071,7 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
+ 	if (of_property_read_bool(dev->of_node, "mmu-masters"))
+ 		arm_smmu_probe_mmu_masters(smmu);
+ 	arm_smmu_device_reset(smmu);
++	of_iommu_set_ops(dev->of_node, &arm_smmu_ops);
+ 	return 0;
  
- #include <linux/device.h>
- #include <linux/delay.h>
-+#include <linux/dma-mapping.h>
- #include <linux/module.h>
- #include <linux/kthread.h>
- #include <linux/wait.h>
-@@ -353,6 +354,10 @@ static int really_probe(struct device *dev, struct device_driver *drv)
- 	if (ret)
- 		goto pinctrl_bind_failed;
+ out_free_irqs:
+@@ -2160,21 +2161,7 @@ module_exit(arm_smmu_exit);
  
-+	ret = dma_configure_ops(dev);
-+	if (ret)
-+		goto dma_failed;
-+
- 	if (driver_sysfs_add(dev)) {
- 		printk(KERN_ERR "%s: driver_sysfs_add(%s) failed\n",
- 			__func__, dev_name(dev));
-@@ -394,7 +399,10 @@ static int really_probe(struct device *dev, struct device_driver *drv)
- 		 drv->bus->name, __func__, dev_name(dev), drv->name);
- 	goto done;
- 
-+
- probe_failed:
-+	dma_deconfigure(dev);
-+dma_failed:
- 	if (dev->bus)
- 		blocking_notifier_call_chain(&dev->bus->p->bus_notifier,
- 					     BUS_NOTIFY_DRIVER_NOT_BOUND, dev);
-@@ -780,6 +788,9 @@ static void __device_release_driver(struct device *dev)
- 			dev->bus->remove(dev);
- 		else if (drv->remove)
- 			drv->remove(dev);
-+
-+		dma_deconfigure(dev);
-+
- 		devres_release_all(dev);
- 		dev->driver = NULL;
- 		dev_set_drvdata(dev, NULL);
-diff --git a/drivers/base/dma-mapping.c b/drivers/base/dma-mapping.c
-index d799662..ccc1c6e 100644
---- a/drivers/base/dma-mapping.c
-+++ b/drivers/base/dma-mapping.c
-@@ -10,6 +10,7 @@
- #include <linux/dma-mapping.h>
- #include <linux/export.h>
- #include <linux/gfp.h>
-+#include <linux/of_device.h>
- #include <linux/slab.h>
- #include <linux/vmalloc.h>
- 
-@@ -166,6 +167,16 @@ void dmam_free_noncoherent(struct device *dev, size_t size, void *vaddr,
+ static int __init arm_smmu_of_init(struct device_node *np)
+ {
+-	struct arm_smmu_device *smmu;
+-	struct platform_device *pdev;
+-	int ret = arm_smmu_init();
+-
+-	if (ret)
+-		return ret;
+-
+-	pdev = of_platform_device_create(np, NULL, platform_bus_type.dev_root);
+-	if (!pdev)
+-		return -ENODEV;
+-
+-	smmu = platform_get_drvdata(pdev);
+-	of_iommu_set_ops(np, &arm_smmu_ops);
+-
+-	return 0;
++	return arm_smmu_init();
  }
- EXPORT_SYMBOL(dmam_free_noncoherent);
- 
-+int dma_configure_ops(struct device *dev)
-+{
-+	return of_dma_configure_ops(dev, dev->of_node);
-+}
-+
-+void dma_deconfigure(struct device *dev)
-+{
-+	of_dma_deconfigure(dev);
-+}
-+
- #ifdef CONFIG_HAVE_GENERIC_DMA_COHERENT
- 
- static void dmam_coherent_decl_release(struct device *dev, void *res)
-diff --git a/include/linux/dma-mapping.h b/include/linux/dma-mapping.h
-index 71c1b21..a49aac9 100644
---- a/include/linux/dma-mapping.h
-+++ b/include/linux/dma-mapping.h
-@@ -613,6 +613,9 @@ dma_mark_declared_memory_occupied(struct device *dev,
- }
- #endif /* CONFIG_HAVE_GENERIC_DMA_COHERENT */
- 
-+int dma_configure_ops(struct device *dev);
-+void dma_deconfigure(struct device *dev);
-+
- /*
-  * Managed DMA API
-  */
+ IOMMU_OF_DECLARE(arm_smmuv1, "arm,smmu-v1", arm_smmu_of_init);
+ IOMMU_OF_DECLARE(arm_smmuv2, "arm,smmu-v2", arm_smmu_of_init);
 -- 
 QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
