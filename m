@@ -1,63 +1,187 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 08 Aug 2016 17:30:07 +0200
-Subject: [PATCH 0/2] arm64: marvell: add support for the slave CP in
- Armada 8K
-In-Reply-To: <1469716556-15299-1-git-send-email-thomas.petazzoni@free-electrons.com>
- (Thomas Petazzoni's message of "Thu, 28 Jul 2016 16:35:54 +0200")
-References: <1469716556-15299-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <87d1ljuvls.fsf@free-electrons.com>
+From: msalter@redhat.com (Mark Salter)
+Date: Mon, 08 Aug 2016 11:34:37 -0400
+Subject: [RFC PATCH V5 3/5] PCI: Check platform specific ECAM quirks
+In-Reply-To: <1470661541-26270-4-git-send-email-tn@semihalf.com>
+References: <1470661541-26270-1-git-send-email-tn@semihalf.com>
+ <1470661541-26270-4-git-send-email-tn@semihalf.com>
+Message-ID: <1470670477.3551.35.camel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
- 
- On Thu, Jul 28 2016, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
+On Mon, 2016-08-08 at 15:05 +0200, Tomasz Nowicki wrote:
+> Some platforms may not be fully compliant with generic set of PCI config
+> accessors. For these cases we implement the way to overwrite accessors
+> set. Algorithm traverses available quirk list (static array),
+> matches against <oem_id, oem_table_id, rev, domain, bus number range> and
+> returns pci_config_window structure with fancy PCI config ops.
+> oem_id, oem_table_id and rev come from MCFG table standard header.
+> 
+> It is possible to define custom init call which is responsible for
+> setting up PCI configuration access accordingly to quirk requirements.
+> If custom init call is not defined, use standard pci_acpi_setup_ecam_mapping().
+> 
+> pci_generic_ecam_ops will be used for platforms free from quirks.
+> 
+> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+> Signed-off-by: Dongdong Liu <liudongdong3@huawei.com>
+> Signed-off-by: Christopher Covington <cov@codeaurora.org>
+> ---
+> ?drivers/pci/host/Makefile??????|??1 +
+> ?drivers/pci/host/mcfg-quirks.c | 86 ++++++++++++++++++++++++++++++++++++++++++
+> ?drivers/pci/host/mcfg-quirks.h | 20 ++++++++++
+> ?include/linux/pci-acpi.h???????|??2 +
+> ?4 files changed, 109 insertions(+)
+> ?create mode 100644 drivers/pci/host/mcfg-quirks.c
+> ?create mode 100644 drivers/pci/host/mcfg-quirks.h
+> 
+> diff --git a/drivers/pci/host/Makefile b/drivers/pci/host/Makefile
+> index 8843410..500cf78 100644
+> --- a/drivers/pci/host/Makefile
+> +++ b/drivers/pci/host/Makefile
+> @@ -31,3 +31,4 @@ obj-$(CONFIG_PCI_HOST_THUNDER_ECAM) += pci-thunder-ecam.o
+> ?obj-$(CONFIG_PCI_HOST_THUNDER_PEM) += pci-thunder-pem.o
+> ?obj-$(CONFIG_PCIE_ARMADA_8K) += pcie-armada8k.o
+> ?obj-$(CONFIG_PCIE_ARTPEC6) += pcie-artpec6.o
+> +obj-$(CONFIG_ACPI_MCFG) += mcfg-quirks.o
+> diff --git a/drivers/pci/host/mcfg-quirks.c b/drivers/pci/host/mcfg-quirks.c
+> new file mode 100644
+> index 0000000..aa9907b
+> --- /dev/null
+> +++ b/drivers/pci/host/mcfg-quirks.c
+> @@ -0,0 +1,86 @@
+> +/*
+> + * Copyright (C) 2016 Semihalf
+> + *	Author: Tomasz Nowicki <tn@semihalf.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License, version 2, as
+> + * published by the Free Software Foundation (the "GPL").
+> + *
+> + * This program is distributed in the hope that it will be useful, but
+> + * WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.??See the GNU
+> + * General Public License version 2 (GPLv2) for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * version 2 (GPLv2) along with this source code.
+> + */
+> +
+> +#include <linux/kernel.h>
+> +#include <linux/ioport.h>
+> +#include <linux/pci.h>
+> +#include <linux/pci-acpi.h>
+> +#include <linux/pci-ecam.h>
+> +
+> +#include "mcfg-quirks.h"
+> +
+> +struct pci_cfg_fixup {
+> +	char oem_id[ACPI_OEM_ID_SIZE + 1];
+> +	char oem_table_id[ACPI_OEM_TABLE_ID_SIZE + 1];
+> +	u32 oem_revision;
+> +	struct resource domain_range;
+> +	struct resource bus_range;
+> +	struct pci_ops *ops;
+> +	struct pci_config_window *(*init)(struct acpi_pci_root *root,
+> +					??struct pci_ops *ops);
+> +};
+> +
+> +#define MCFG_DOM_RANGE(start, end)	DEFINE_RES_NAMED((start),	\
+> +						((end) - (start) + 1), NULL, 0)
+> +#define MCFG_DOM_ANY			MCFG_DOM_RANGE(0x0, 0xffff)
+> +#define MCFG_BUS_RANGE(start, end)	DEFINE_RES_NAMED((start),	\
+> +						((end) - (start) + 1),	\
+> +						NULL, IORESOURCE_BUS)
+> +#define MCFG_BUS_ANY			MCFG_BUS_RANGE(0x0, 0xff)
+> +
+> +static struct pci_cfg_fixup mcfg_quirks[] __initconst = {
+? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?^^^^^^^^^^^^^^
 
-> Hello,
->
-> The following set of two patches add support for the slave CP HW block
-> found in the Armada 8K SoCs. As a reminder:
->
->  - Armada 7K is an SoC with one AP and one CP. The AP is the part that
->    contains the CPU, cache and a few basic I/Os. The CP is the part
->    that contains most interesting I/Os (PCIe, SATA, USB, Ethernet,
->    etc.)
->
->  - Armada 8K is an SoC with one AP and two CPs.
->
-> This set of patches add support for the second CP found in Armada 8K,
-> also called the "slave CP110".
+I get section warnings because pci_cfg_fixup_match() is not
+an init function.
 
-Both patches applied on mvebu/dt64
+WARNING: vmlinux.o(.text+0x3f6c74): Section mismatch in reference from the function pci_mcfg_match_quirks() to the variable .init.rodata:$d
+The function pci_mcfg_match_quirks() references
+the variable __initconst $d.
+This is often because pci_mcfg_match_quirks lacks a __initconst?
+annotation or the annotation of $d is wrong.
 
-Thanks,
-
-Gregory
-
->
-> Thanks,
->
-> Thomas
->
-> Thomas Petazzoni (2):
->   arm64: dts: marvell: add description for the slave CP110 in Armada 8K
->   arm64: dts: marvell: add description for the Armada 8040 dev board
->
->  arch/arm64/boot/dts/marvell/Makefile               |   1 +
->  arch/arm64/boot/dts/marvell/armada-8020.dtsi       |   1 +
->  .../{armada-8020.dtsi => armada-8040-db.dts}       | 109 ++++++++-
->  arch/arm64/boot/dts/marvell/armada-8040.dtsi       |   1 +
->  .../arm64/boot/dts/marvell/armada-cp110-slave.dtsi | 246 +++++++++++++++++++++
->  5 files changed, 351 insertions(+), 7 deletions(-)
->  copy arch/arm64/boot/dts/marvell/{armada-8020.dtsi => armada-8040-db.dts} (55%)
->  create mode 100644 arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
->
-> -- 
-> 2.7.4
->
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+> +/*	{ OEM_ID, OEM_TABLE_ID, REV, DOMAIN, BUS_RANGE, pci_ops, init_hook }, */
+> +};
+> +
+> +static bool pci_mcfg_fixup_match(struct pci_cfg_fixup *f,
+> +				?struct acpi_table_header *mcfg_header)
+> +{
+> +	return (!memcmp(f->oem_id, mcfg_header->oem_id, ACPI_OEM_ID_SIZE) &&
+> +		!memcmp(f->oem_table_id, mcfg_header->oem_table_id,
+> +			ACPI_OEM_TABLE_ID_SIZE) &&
+> +		f->oem_revision == mcfg_header->oem_revision);
+> +}
+> +
+> +struct pci_config_window *pci_mcfg_match_quirks(struct acpi_pci_root *root)
+> +{
+> +	struct resource dom_res = MCFG_DOM_RANGE(root->segment, root->segment);
+> +	struct resource *bus_res = &root->secondary;
+> +	struct pci_cfg_fixup *f = mcfg_quirks;
+> +	struct acpi_table_header *mcfg_header;
+> +	acpi_status status;
+> +	int i;
+> +
+> +	status = acpi_get_table(ACPI_SIG_MCFG, 0, &mcfg_header);
+> +	if (ACPI_FAILURE(status))
+> +		return NULL;
+> +
+> +	/*
+> +	?* First match against PCI topology <domain:bus> then use OEM ID, OEM
+> +	?* table ID, and OEM revision from MCFG table standard header.
+> +	?*/
+> +	for (i = 0; i < ARRAY_SIZE(mcfg_quirks); i++, f++) {
+> +		if (resource_contains(&f->domain_range, &dom_res) &&
+> +		????resource_contains(&f->bus_range, bus_res) &&
+> +		????pci_mcfg_fixup_match(f, mcfg_header)) {
+> +			dev_info(&root->device->dev, "Applying PCI MCFG quirks for %s %s rev: %d\n",
+> +				?f->oem_id, f->oem_table_id, f->oem_revision);
+> +			return f->init ? f->init(root, f->ops) :
+> +				pci_acpi_setup_ecam_mapping(root, f->ops);
+> +		}
+> +	}
+> +	return pci_acpi_setup_ecam_mapping(root, &pci_generic_ecam_ops.pci_ops);
+> +}
+> diff --git a/drivers/pci/host/mcfg-quirks.h b/drivers/pci/host/mcfg-quirks.h
+> new file mode 100644
+> index 0000000..45cbd16
+> --- /dev/null
+> +++ b/drivers/pci/host/mcfg-quirks.h
+> @@ -0,0 +1,20 @@
+> +/*
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License, version 2, as
+> + * published by the Free Software Foundation (the "GPL").
+> + *
+> + * This program is distributed in the hope that it will be useful, but
+> + * WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.??See the GNU
+> + * General Public License version 2 (GPLv2) for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * version 2 (GPLv2) along with this source code.
+> + */
+> +
+> +#ifndef __MCFG_QUIRKS_H__
+> +#define __MCFG_QUIRKS_H__
+> +
+> +/* MCFG quirks initialize call list */
+> +
+> +#endif /* __MCFG_QUIRKS_H__ */
+> diff --git a/include/linux/pci-acpi.h b/include/linux/pci-acpi.h
+> index e9bfe00..28cdce4 100644
+> --- a/include/linux/pci-acpi.h
+> +++ b/include/linux/pci-acpi.h
+> @@ -25,6 +25,8 @@ static inline acpi_status pci_acpi_remove_pm_notifier(struct acpi_device *dev)
+> ?extern phys_addr_t acpi_pci_root_get_mcfg_addr(acpi_handle handle);
+> ?
+> ?extern phys_addr_t pci_mcfg_lookup(u16 domain, struct resource *bus_res);
+> +extern struct pci_config_window *
+> +pci_mcfg_match_quirks(struct acpi_pci_root *root);
+> ?
+> ?extern struct pci_config_window *
+> ?pci_acpi_setup_ecam_mapping(struct acpi_pci_root *root, struct pci_ops *ops);
