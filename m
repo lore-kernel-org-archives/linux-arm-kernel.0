@@ -1,60 +1,51 @@
-From: wangkefeng.wang@huawei.com (Kefeng Wang)
-Date: Mon, 8 Aug 2016 19:28:03 +0800
-Subject: [PATCH v2] arm64: Support hard limit of cpu count by nr_cpus
-In-Reply-To: <06f0b566-3482-0223-ce22-ef7532414c7f@arm.com>
-References: <02d77415-9eb0-92f4-7cb6-9b941cda9a4d@arm.com>
- <1470636316-24552-1-git-send-email-wangkefeng.wang@huawei.com>
- <06f0b566-3482-0223-ce22-ef7532414c7f@arm.com>
-Message-ID: <b8afb29f-d831-ef99-bf11-af1a9d439879@huawei.com>
+From: okaya@codeaurora.org (okaya at codeaurora.org)
+Date: Mon, 08 Aug 2016 07:48:13 -0400
+Subject: [PATCH 10/10] dmaengine: qcom_hidma: add MSI support for
+ interrupts
+In-Reply-To: <20160808081415.GV9681@localhost>
+References: <1468867177-15007-1-git-send-email-okaya@codeaurora.org>
+ <1468867177-15007-11-git-send-email-okaya@codeaurora.org>
+ <20160724064256.GA9681@localhost>
+ <e6560c8b-e18e-9e32-5b51-c1c12d8551ce@codeaurora.org>
+ <20160804124641.GE9681@localhost>
+ <497ddb6c-0233-657f-72c6-b844b798ff11@codeaurora.org>
+ <20160808081415.GV9681@localhost>
+Message-ID: <7b7153195677daafda84cbf1eddd47f9@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 2016-08-08 04:14, Vinod Koul wrote:
+> On Thu, Aug 04, 2016 at 09:59:43AM -0400, Sinan Kaya wrote:
+>> On 8/4/2016 8:46 AM, Vinod Koul wrote:
+>> >> > Yes, I do have a new device ID for platforms with MSI capability.
+>> >> >
+>> >> > Which new binding are you referring to?
+>> > If you have "QCOM8062" why do you need DT to tell hidma-1.1 ?
+>> 
+>> Unfortunately, DT cannot do a binding with the ACPI names. Similarly, 
+>> ACPI
+>> cannot do a binding with the DT name.
+>> 
+>> The structure of binding name is also subject to different kind of 
+>> rules
+>> for DT and ACPI.
+>> 
+>> This driver supports both device tree and ACPI. That's why, two 
+>> different
+>> names are required.
+> 
+> Hmmm, wasn't the who get_property stuff supposed to make properties 
+> work on
+> both ACPi & DT. I am not sure though about the current state of affairs 
+> on
+> that.
 
 
-On 2016/8/8 18:50, Suzuki K Poulose wrote:
-> On 08/08/16 07:05, Kefeng Wang wrote:
->> Enable the hard limit of cpu count by set boot options nr_cpus=x
->> on arm64, and show a better warning when cpu number exceeds the limit.
->>
->> Reported-by: Shiyuan Hu <hushiyuan@huawei.com>
->> Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
->> ---
->>
->> Changed since v1:
->> - clip cpu number in smp_init_cpus suggested-by Will and Suzuki, and update
->>   the warning.
->>
->>  arch/arm64/kernel/smp.c | 8 ++++----
->>  1 file changed, 4 insertions(+), 4 deletions(-)
->>
->> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
->> index 76a6d92..cbfc31c 100644
->> --- a/arch/arm64/kernel/smp.c
->> +++ b/arch/arm64/kernel/smp.c
->> @@ -661,9 +661,9 @@ void __init smp_init_cpus(void)
->>          acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_INTERRUPT,
->>                        acpi_parse_gic_cpu_interface, 0);
->>
->> -    if (cpu_count > NR_CPUS)
->> -        pr_warn("no. of cores (%d) greater than configured maximum of %d - clipping\n",
->> -            cpu_count, NR_CPUS);
->> +    if (cpu_count > nr_cpu_ids)
->> +        pr_warn("%d cores exceeds configured maximum of %d - clipping\n",
->> +            cpu_count, nr_cpu_ids);
-> 
-> I think we should leave the message as it was, and is better than what you have
-> changed it to.
+Get property works. It is able to abstract device driver properties. A 
+driver doesn't need to know whether it is coming from acpi dsd or of.
 
-The old message is OF only and the old logic shows message when the first cpu number greater than NR_CPUS.
-But now the cpu_count is the total cpu counts(get from DT or ACPI), so I change the message.
+However, no such mechanism exists for driver names due to nature of 
+different naming requirements.
 
-
-> 
-> 
-> With that change,
-> 
-> Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> 
-> 
-> .
-> 
+Of has its own match table and acpi has its own. Acpi also has 
+ridiculous 8 character name limitation.
