@@ -1,44 +1,39 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon,  8 Aug 2016 15:33:53 +0200
-Subject: [PATCH v2 4/4] clocksource: timer-atmel-pit: simplify IRQ handler
+Date: Mon,  8 Aug 2016 15:33:50 +0200
+Subject: [PATCH v2 1/4] clocksource: timer-atmel-pit: enable mck
 In-Reply-To: <1470663233-15118-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1470663233-15118-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1470663233-15118-5-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1470663233-15118-2-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Because the PIT is also a proper clocksource, the timekeeping code  is
-already able to handle lost ticks.
+mck is needed to get the PIT working. Explicitly prepare_enable it instead
+of assuming it is enabled.
 
-Reported-by: Thomas Gleixner <tglx@linutronix.de>
+This solves an issue where the system is freezing when the ETM/ETB drivers
+are enabled.
+
+Reported-by: Olivier Schonken <olivier.schonken@gmail.com>
+Reviewed-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- drivers/clocksource/timer-atmel-pit.c | 11 +++--------
- 1 file changed, 3 insertions(+), 8 deletions(-)
+ drivers/clocksource/timer-atmel-pit.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
 diff --git a/drivers/clocksource/timer-atmel-pit.c b/drivers/clocksource/timer-atmel-pit.c
-index af657fdce665..c5f3291328bd 100644
+index 1ffac0cb0cb7..db839fc99a8e 100644
 --- a/drivers/clocksource/timer-atmel-pit.c
 +++ b/drivers/clocksource/timer-atmel-pit.c
-@@ -152,15 +152,10 @@ static irqreturn_t at91sam926x_pit_interrupt(int irq, void *dev_id)
- 	/* The PIT interrupt may be disabled, and is shared */
- 	if (clockevent_state_periodic(&data->clkevt) &&
- 	    (pit_read(data->base, AT91_PIT_SR) & AT91_PIT_PITS)) {
--		unsigned nr_ticks;
--
- 		/* Get number of ticks performed before irq, and ack it */
--		nr_ticks = PIT_PICNT(pit_read(data->base, AT91_PIT_PIVR));
--		do {
--			data->cnt += data->cycle;
--			data->clkevt.event_handler(&data->clkevt);
--			nr_ticks--;
--		} while (nr_ticks);
-+		data->cnt += data->cycle * PIT_PICNT(pit_read(data->base,
-+							      AT91_PIT_PIVR));
-+		data->clkevt.event_handler(&data->clkevt);
- 
- 		return IRQ_HANDLED;
+@@ -261,6 +261,9 @@ static int __init at91sam926x_pit_dt_init(struct device_node *node)
+ 		return PTR_ERR(data->mck);
  	}
+ 
++	if (clk_prepare_enable(data->mck))
++		panic(pr_fmt("Unable to enable mck\n"));
++
+ 	/* Get the interrupts property */
+ 	data->irq = irq_of_parse_and_map(node, 0);
+ 	if (!data->irq) {
 -- 
 2.8.1
