@@ -1,64 +1,74 @@
-From: cristian.birsan@microchip.com (Cristian Birsan)
-Date: Mon, 8 Aug 2016 18:44:22 +0300
-Subject: [PATCH v2 2/2] regmap: debugfs: Add support for dumping write only
- device registers
-In-Reply-To: <1470671062-25479-1-git-send-email-cristian.birsan@microchip.com>
-References: <20160804154814.GA10383@sirena.org.uk>
- <1470671062-25479-1-git-send-email-cristian.birsan@microchip.com>
-Message-ID: <1470671062-25479-3-git-send-email-cristian.birsan@microchip.com>
+From: cmetcalf@mellanox.com (Chris Metcalf)
+Date: Mon, 8 Aug 2016 11:49:57 -0400
+Subject: [PATCH v6 1/4] nmi_backtrace: add more trigger_*_cpu_backtrace()
+ methods
+In-Reply-To: <20160808135711.GA13300@pathway.suse.cz>
+References: <1468529432-28026-1-git-send-email-cmetcalf@mellanox.com>
+ <1468529432-28026-2-git-send-email-cmetcalf@mellanox.com>
+ <20160808135711.GA13300@pathway.suse.cz>
+Message-ID: <d023a7b0-d3e0-4318-3a62-d0b2da99d2e4@mellanox.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for dumping write only device registers in debugfs. This is
-useful for audio codecs that have write only registers (like WM8731).
-The logic that decides if a value can be printed is moved to
-regmap_printable() function to allow for easier future updates.
+On 8/8/2016 9:57 AM, Petr Mladek wrote:
+> On Thu 2016-07-14 16:50:29, Chris Metcalf wrote:
+>> Currently you can only request a backtrace of either all cpus, or
+>> all cpus but yourself.  It can also be helpful to request a remote
+>> backtrace of a single cpu, and since we want that, the logical
+>> extension is to support a cpumask as the underlying primitive.
+>>
+>> This change modifies the existing lib/nmi_backtrace.c code to take
+>> a cpumask as its basic primitive, and modifies the linux/nmi.h code
+>> to use either the old "all/all_but_self" arch methods, or the new
+>> "cpumask" method, depending on which is available.
+> I triggered this function using
+>    echo l >/proc/sysrq-trigger
+>
+>
+> and got
+>
+> [  270.791328] -----------  All but itself: ---------------------
+>
+> [  270.791331] ===============================
+> [  270.791331] [ INFO: suspicious RCU usage. ]
+> [  270.791333] 4.8.0-rc1-4-default+ #3086 Not tainted
+> [  270.791333] -------------------------------
+> [  270.791335] ./include/linux/rcupdate.h:556 Illegal context switch in RCU read-side critical section!
 
-Signed-off-by: Cristian Birsan <cristian.birsan@microchip.com>
----
- drivers/base/regmap/regmap-debugfs.c | 16 +++++++++++++---
- 1 file changed, 13 insertions(+), 3 deletions(-)
+Ah hah, you tested this with CPUMASK_OFFSTACK, which I didn't.
+That explains why you got RCU kmalloc warnings.
 
-diff --git a/drivers/base/regmap/regmap-debugfs.c b/drivers/base/regmap/regmap-debugfs.c
-index 1ee3d40..36ce351 100644
---- a/drivers/base/regmap/regmap-debugfs.c
-+++ b/drivers/base/regmap/regmap-debugfs.c
-@@ -77,6 +77,17 @@ static void regmap_debugfs_free_dump_cache(struct regmap *map)
- 	}
- }
- 
-+static bool regmap_printable(struct regmap *map, unsigned int reg)
-+{
-+	if (regmap_precious(map, reg))
-+		return false;
-+
-+	if (!regmap_readable(map, reg) && !regmap_cached(map, reg))
-+		return false;
-+
-+	return true;
-+}
-+
- /*
-  * Work out where the start offset maps into register numbers, bearing
-  * in mind that we suppress hidden registers.
-@@ -105,8 +116,7 @@ static unsigned int regmap_debugfs_get_dump_start(struct regmap *map,
- 	if (list_empty(&map->debugfs_off_cache)) {
- 		for (; i <= map->max_register; i += map->reg_stride) {
- 			/* Skip unprinted registers, closing off cache entry */
--			if (!regmap_readable(map, i) ||
--			    regmap_precious(map, i)) {
-+			if (!regmap_printable(map, i)) {
- 				if (c) {
- 					c->max = p - 1;
- 					c->max_reg = i - map->reg_stride;
-@@ -204,7 +214,7 @@ static ssize_t regmap_read_debugfs(struct regmap *map, unsigned int from,
- 	start_reg = regmap_debugfs_get_dump_start(map, from, *ppos, &p);
- 
- 	for (i = start_reg; i <= to; i += map->reg_stride) {
--		if (!regmap_readable(map, i))
-+		if (!regmap_readable(map, i) && !regmap_cached(map, i))
- 			continue;
- 
- 		if (regmap_precious(map, i))
+>> +	cpumask_copy(mask, cpu_online_mask);
+>> +	cpumask_clear_cpu(cpu, mask);
+>> +	arch_trigger_cpumask_backtrace(mask);
+>> +	put_cpu();
+>> +	free_cpumask_var(mask);
+>> +	return true;
+> Also this looks too much code for an inlined function.
+> It is rather slow and there is not a big gain. I would move
+> the definition to lib/nmi_backtrace.c.
+
+After some thought, I ended up just removing both cpumask allocation
+sites.  For the allbutself() case, I just re-introduced the "include_self"
+boolean that the code used to have.  If it is false when we get into the inner
+nmi_trigger_cpumask_backtrace(), I just clear the cpu bit of the current
+cpu.  It requires passing a funny boolean around with the mask, but the
+alternative (if we don't want to allocate a mask on this path) is to
+break apart the nmi_trigger_cpumask_backtrace() function so we can
+piggy-back on its locking and its cpumask and set up the cpumask the
+way we want, which I think is too much added ugliness.
+
+For the trigger_single_cpu_backtrace() case, I remembered that there was
+a cpumask_of() function that we can use that is fast and doesn't allocate,
+even with CPUMASK_OFFSTACK, so I just used that instead.
+
+> PS: I am sorry for sending this so late in the game. I was
+> curious why the patch had not been upstream yet and. I made
+> a closer look to give a Reviewed-by tag...
+
+No worries - even a late review is much better than none!  I'll
+send v7 shortly and please do let me know if it works for you.
+
 -- 
-1.9.1
+Chris Metcalf, Mellanox Technologies
+http://www.mellanox.com
