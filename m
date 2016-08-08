@@ -1,119 +1,170 @@
-From: frank.wang@rock-chips.com (Frank Wang)
-Date: Mon, 8 Aug 2016 17:55:10 +0800
-Subject: [PATCH v3 2/7] clk: rockchip: rk3399: export 480M_SRC clock id
- for usbphy0/usbphy1
-In-Reply-To: <1570410.dThJclhmJd@diego>
-References: <1470122401-31934-1-git-send-email-zhengxing@rock-chips.com>
- <1918977.W0kRfKbZsD@diego>
- <cba79ba6-7f41-5398-389c-7fd3fe5e0089@rock-chips.com>
- <1570410.dThJclhmJd@diego>
-Message-ID: <f9312de8-7f7c-b6e1-0eec-ac78813cc2b0@rock-chips.com>
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Mon, 8 Aug 2016 11:56:19 +0200
+Subject: [PATCH v8 1/2] [media] atmel-isc: add the Image Sensor Controller
+ code
+In-Reply-To: <07cf3e49-da67-74d7-528c-618fe94a15ff@xs4all.nl>
+References: <1470211686-2198-1-git-send-email-songjun.wu@microchip.com>
+ <1470211686-2198-2-git-send-email-songjun.wu@microchip.com>
+ <07cf3e49-da67-74d7-528c-618fe94a15ff@xs4all.nl>
+Message-ID: <240d957c-6738-bab5-824a-1e6a0ddb12ad@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko,
-
-On 2016/8/6 0:05, Heiko St?bner wrote:
-> Hi Frank,
->
-> Am Freitag, 5. August 2016, 16:34:42 schrieb Frank Wang:
->> On 2016/8/5 3:10, Heiko St?bner wrote:
->>> Am Dienstag, 2. August 2016, 15:19:56 schrieb Xing Zheng:
->>>> Export these source clocks for usbphy.
->>>>
->>>> Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
->>> can you please provide a rationale why you need manual control over that
->>> intermediate clock?
->> Well, From below graph, you can see that 'clk_usbphyX_480m' is generated
->> from usb2phy, and 'clk_usbphy_480m' which select from
->> clk_usbphyX_480m_src via a gate (G13[12])  provided 480M clock to other
->> modules.
+On 08/08/2016 11:37 AM, Hans Verkuil wrote:
+> On 08/03/2016 10:08 AM, Songjun Wu wrote:
+>> Add driver for the Image Sensor Controller. It manages
+>> incoming data from a parallel based CMOS/CCD sensor.
+>> It has an internal image processor, also integrates a
+>> triple channel direct memory access controller master
+>> interface.
 >>
->>     xin24m
->>       |__ clk_usb2phy0_ref
->>       |     |
->>       |     |__ clk_usbphy0_480m
->>       |           |
->>       |           |__clk_usbphy0_480m_src
->>       |                |
->>       |                |__clk_usbphy_480m
->>       |                     |__ ... ...
->>       |
->>       |__ clk_usb2phy1_ref
->>             |
->>             |__ clk_usbphy1_480m
->>                   |
->>                   |__clk_usbphy1_480m_src
->>> The two usbphys seem to use the  clk_usb2phyX_ref clocks, generate the
->>> 480m
->>> clocks, but do not seem to need the clk_usbphyX_480m_src gates.
->> Yeah, they used to be. However, the story went something like this,
+>> Signed-off-by: Songjun Wu <songjun.wu@microchip.com>
+>> ---
 >>
->> Some PM suspend process related ehci/ohci controller are base on 480m
->> clocks, unfortunately, usb2-phy suspended earlier than ehci/ohci
->> (usb2-phy will be auto suspended if no devices plug-in), and the
->> clk-480m provided by it was disabled if no module used. As a result, the
->> PM suspend process was blocked when it run into ehci/ohci module.
-> ah, so the ehci controller needs that 480m clock as well? Do you happen to
-> have example patches for the ehci/ohci side already? I'd like to peak at what
-> you mean with "some PM suspend process related" things.
+>> Changes in v8:
+>> - Power on the sensor on the first open in function
+>>   'isc_open'.
+>> - Power off the sensor on the last release in function
+>>   'isc_release'.
+>> - Remove the switch of the pipeline.
+>>
+>> Changes in v7:
+>> - Add enum_framesizes and enum_frameintervals.
+>> - Call s_stream(0) when stream start fail.
+>> - Fill the device_caps field of struct video_device
+>>   with V4L2_CAP_STREAMING and V4L2_CAP_VIDEO_CAPTURE.
+>> - Initialize the dev of struct vb2_queue.
+>> - Set field to FIELD_NONE if the pix field is not supported.
+>> - Return the result directly when call g/s_parm of subdev.
+>>
+>> Changes in v6: None
+>> Changes in v5:
+>> - Modify the macro definition and the related code.
+>>
+>> Changes in v4:
+>> - Modify the isc clock code since the dt is changed.
+>>
+>> Changes in v3:
+>> - Add pm runtime feature.
+>> - Modify the isc clock code since the dt is changed.
+>>
+>> Changes in v2:
+>> - Add "depends on COMMON_CLK" and "VIDEO_V4L2_SUBDEV_API"
+>>   in Kconfig file.
+>> - Correct typos and coding style according to Laurent's remarks
+>> - Delete the loop while in 'isc_clk_enable' function.
+>> - Replace 'hsync_active', 'vsync_active' and 'pclk_sample'
+>>   with 'pfe_cfg0' in struct isc_subdev_entity.
+>> - Add the code to support VIDIOC_CREATE_BUFS in
+>>   'isc_queue_setup' function.
+>> - Invoke isc_config to configure register in
+>>   'isc_start_streaming' function.
+>> - Add the struct completion 'comp' to synchronize with
+>>   the frame end interrupt in 'isc_stop_streaming' function.
+>> - Check the return value of the clk_prepare_enable
+>>   in 'isc_open' function.
+>> - Set the default format in 'isc_open' function.
+>> - Add an exit condition in the loop while in 'isc_config'.
+>> - Delete the hardware setup operation in 'isc_set_format'.
+>> - Refuse format modification during streaming
+>>   in 'isc_s_fmt_vid_cap' function.
+>> - Invoke v4l2_subdev_alloc_pad_config to allocate and
+>>   initialize the pad config in 'isc_async_complete' function.
+>> - Remove the '.owner  = THIS_MODULE,' in atmel_isc_driver.
+>> - Replace the module_platform_driver_probe() with
+>>   module_platform_driver().
+>>
+>>  drivers/media/platform/Kconfig                |    1 +
+>>  drivers/media/platform/Makefile               |    2 +
+>>  drivers/media/platform/atmel/Kconfig          |    9 +
+>>  drivers/media/platform/atmel/Makefile         |    1 +
+>>  drivers/media/platform/atmel/atmel-isc-regs.h |  165 +++
+>>  drivers/media/platform/atmel/atmel-isc.c      | 1503 +++++++++++++++++++++++++
+>>  6 files changed, 1681 insertions(+)
+>>  create mode 100644 drivers/media/platform/atmel/Kconfig
+>>  create mode 100644 drivers/media/platform/atmel/Makefile
+>>  create mode 100644 drivers/media/platform/atmel/atmel-isc-regs.h
+>>  create mode 100644 drivers/media/platform/atmel/atmel-isc.c
+>>
+> 
+> <snip>
+> 
+>> diff --git a/drivers/media/platform/atmel/atmel-isc.c b/drivers/media/platform/atmel/atmel-isc.c
+>> new file mode 100644
+>> index 0000000..d99d4a5
+>> --- /dev/null
+>> +++ b/drivers/media/platform/atmel/atmel-isc.c
+> 
+> <snip>
+> 
+>> +static int isc_set_default_fmt(struct isc_device *isc)
+>> +{
+>> +	u32 index = isc->num_user_formats - 1;
+> 
+> Why pick the last format? Strictly speaking it doesn't matter, but in practice
+> the most common formats tend to be at the beginning of the format list.
+> 
+>> +	struct v4l2_format f = {
+>> +		.type = V4L2_BUF_TYPE_VIDEO_CAPTURE,
+>> +		.fmt.pix = {
+>> +			.width		= VGA_WIDTH,
+>> +			.height		= VGA_HEIGHT,
+>> +			.field		= V4L2_FIELD_NONE,
+>> +			.pixelformat	= isc->user_formats[index]->fourcc,
+>> +		},
+>> +	};
+>> +
+>> +	return isc_set_fmt(isc, &f);
+>> +}
+>> +
+>> +static int isc_open(struct file *file)
+>> +{
+>> +	struct isc_device *isc = video_drvdata(file);
+>> +	struct v4l2_subdev *sd = isc->current_subdev->sd;
+>> +	int ret;
+>> +
+>> +	if (mutex_lock_interruptible(&isc->lock))
+>> +		return -ERESTARTSYS;
+>> +
+>> +	ret = v4l2_fh_open(file);
+>> +	if (ret < 0)
+>> +		goto unlock;
+>> +
+>> +	if (!v4l2_fh_is_singular_file(file))
+>> +		goto unlock;
+>> +
+>> +	ret = v4l2_subdev_call(sd, core, s_power, 1);
+>> +	if (ret < 0 && ret != -ENOIOCTLCMD)
+>> +		goto unlock;
+>> +
+>> +	ret = isc_set_default_fmt(isc);
+> 
+> This doesn't belong here, this needs to be done in isc_async_complete().
+> 
+> Having the code here means that every time you open the device, the format
+> changes back to the default. That's not what you want.
 
-Actually, no patches for it, I just make below steps manually :-).
-1. set two usb2-phy into suspend mode.
-2. disable 480m clock on each usb2-phy (assume only usb2-phy used it).
-3. press power button let system into PM suspend.
+Actually, you do need to set the format here since here is where you turn on
+the sensor power, but it should be the current format, not the default format.
 
-Then, the kernel will be blocked and you can see the following log from 
-console.
-... ....
-[  123.763848] calling  usb6+ @ 166, parent: xhci-hcd.0.auto
-[  123.764503] call usb6+ returned 0 after 163 usecs
-[  123.765106] calling  usb5+ @ 166, parent: xhci-hcd.0.auto
-[  123.765719] call usb5+ returned 0 after 121 usecs
-[  123.766294] calling  usb4+ @ 166, parent: fe3e0000.usb
-[  123.766917] calling  usb3+ @ 55, parent: fe3a0000.usb
+And in isc_set_default_fmt I recommend that you call the try fmt of the subdev
+in order to let the subdev adjust the proposed default format. The 'try' doesn't
+need to power on the sensor.
 
->
-> Depending on what is actually needed, you could also pull the usbphy out of
-> autosuspend in a pm-prepare callback of the phy driver itself ... see
-> http://lxr.free-electrons.com/source/include/linux/pm.h#L86
->
-> Like
-> - in the .prepare callback make sure to unsuspend the phy
->    and deactivate the autosuspend
-> - ehci/ohci will poweroff the phy in it s suspend callback (already does that)
+> 
+>> +	if (ret)
 
-Hmm, do you remember that we have previously discussed there are some 
-oddities in ehci/ohci driver? phy_power_on() gets called twice at 
-ehci/ohci driver probe time, one is at pdata->power_on(); another is at 
-usb_add_hcd(), then the power_count of phy increases to 2,  but 
-phy_power_off() is just invoked one time when ehci/ohci goes to PM 
-suspend, so phy->ops->power_off is never be invoked.
+You also need to power off the sd on error!
 
-In this way,  the usb-phy maybe never go to suspend.
+>> +		goto unlock;
+>> +
+>> +unlock:
+>> +	mutex_unlock(&isc->lock);
+>> +	return ret;
+>> +}
+>> +
+> 
 
-> - suspend -> resume
-> - ehci/ohci will poweron the phy
-> - in the phy's .complete callback you can reactivate the autosuspend timer
->
-> Because it looks more like you actually need the phy and not the clock alone.
-> So it would be nicer to use mechanisms already in place instead of creating
-> new dependencies.
->
+Regards,
 
-Theoretically, phy_init() will be invoked when ehci/ohci power on, and 
-the sm_work will be reactivated (have already implemented) in 
-phy->ops->init, but unfortunately, the same issue as phy_power_on() 
-mentioned above, it never run there too .
-
->> Hence, we are planing to refer clk_usbphyX_480m_src into each ehci/ohci
->> driver. Maybe you will challenge why not refer clk_usbphy_480m directly?
->> because there are two ehci/ohci connected in the different usb2phy, and
->> only one clk_usbphy_480m clock was selected in clock tree.
-> Nope, no argument from me as I fully understand that each phy provides its own
-> 480m clock :-) .
->
->
-> Heiko
->
->
+	Hans
