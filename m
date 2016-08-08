@@ -1,22 +1,62 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 8 Aug 2016 21:58:59 +0800
-Subject: [PATCH 1/3] ARM: dts: imx6sx-sabreauto: Fix misspelled property
-In-Reply-To: <1467691450-22975-2-git-send-email-afaerber@suse.de>
-References: <1467691450-22975-1-git-send-email-afaerber@suse.de>
- <1467691450-22975-2-git-send-email-afaerber@suse.de>
-Message-ID: <20160808135859.GG4678@tiger>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 8 Aug 2016 14:59:16 +0100
+Subject: [PATCH 1/1] irqchip: irq-gic: forward SGI to itself for
+ cortex-a7 single core
+In-Reply-To: <20160808134842.GE12649@leverpostej>
+References: <1470642594-30455-1-git-send-email-peter.chen@nxp.com>
+ <20160808105026.GA12649@leverpostej>
+ <HE1PR04MB1450C6BE844A31C95CEE3BE18B1B0@HE1PR04MB1450.eurprd04.prod.outlook.com>
+ <20160808130754.GB12649@leverpostej>
+ <20160808132847.GB17680@shlinux2>
+ <20160808134842.GE12649@leverpostej>
+Message-ID: <20160808145916.0924e868@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 05, 2016 at 06:04:08AM +0200, Andreas F?rber wrote:
-> In commit 99fc5ba0bfb6 ("ARM: dts: imx6sx: add i.mx6sx sabreauto board
-> support") it should've been enable-sdio-wakeup (not -wakup). But that is
-> now considered a legacy name for wakeup-source, so directly use the new
-> name instead, as done in commit 26cefdd15db1 for the other occurrence.
-> 
-> Fixes: 26cefdd15db1 ("ARM: dts: imx: replace legacy wakeup property with 'wakeup-source'")
-> Cc: Sudeep Holla <sudeep.holla@arm.com>
-> Cc: Shawn Guo <shawnguo@kernel.org>
-> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+On Mon, 8 Aug 2016 14:48:42 +0100
+Mark Rutland <mark.rutland@arm.com> wrote:
 
-Applied, thanks.
+> On Mon, Aug 08, 2016 at 09:28:47PM +0800, Peter Chen wrote:
+> > On Mon, Aug 08, 2016 at 02:07:54PM +0100, Mark Rutland wrote:  
+> > > I see that for arm64 we have:
+> > > 
+> > > static inline bool arch_irq_work_has_interrupt(void)
+> > > {
+> > > 	return !!__smp_cross_call;
+> > > }
+> > > 
+> > > Could we do similarly for ARM, and ony register gic_raise_softirq if
+> > > we have non-zero SGI targets?
+> > > 
+> > > If I've understood correctly, that would make things behave as they do
+> > > for UP on you system.  
+> 
+> [...]
+> 
+> > > If self-IPI is necessary, then this would be up to the GIC code to
+> > > solve.
+> > > 
+> > > For that case, it would be nicer if we could detect whether this was
+> > > necessary based on the GIC registers alone. That way we handle the
+> > > various ways this can be integrated, aren't totally relient on the DT,
+> > > work in VMs, etc.  
+> > 
+> > How we can detect IPI capabilities based on GIC register?  
+> 
+> Check the mask associated with SGIs, as we do for gic_get_cpumask(). If
+> this is zero, we have a non-multiprocessor GIC (or one that's otherwise
+> broken), and can't do SGI in the usual way.
+> 
+> However, it only makes sense to do this if self-IPI is truly a
+> necessity. Given there are other interrupt controllers that can't do
+> self-IPI, avoiding self-IPI in general would be a better strategy,
+> avoiding churn in each and every driver...
+
+Indeed. And I won't take such a patch until all other avenues have been
+explored, including fixing core code if required...
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny.
