@@ -1,68 +1,80 @@
-From: shawn.lin@rock-chips.com (Shawn Lin)
-Date: Mon, 8 Aug 2016 10:29:52 +0800
-Subject: [PATCH] ARM: dts: add rk3288-firefly-reload
-In-Reply-To: <1815189.oGy6GHMbyM@phil>
-References: <1549971.ctkvOGm2xW@diego> <2868781.4x2gJCRbLH@diego>
- <413ebccd-e8d6-1401-3065-f9a63b4d66e6@rock-chips.com>
- <1815189.oGy6GHMbyM@phil>
-Message-ID: <bd51b3c3-b312-babb-b57d-7e6e5a8ee948@rock-chips.com>
+From: icenowy@aosc.xyz (Icenowy Zheng)
+Date: Mon, 08 Aug 2016 10:36:16 +0800
+Subject: [PATCH 2/2] dt: bindings: Add binding for ESP8089 wifi chips
+In-Reply-To: <1470596269-20572-2-git-send-email-hdegoede@redhat.com>
+References: <1470596269-20572-1-git-send-email-hdegoede@redhat.com>
+ <1470596269-20572-2-git-send-email-hdegoede@redhat.com>
+Message-ID: <1971470623776@web13m.yandex.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2016/8/7 22:44, Heiko Stuebner ??:
-> Hi Shawn,
->
-> Am Sonntag, 7. August 2016, 11:40:21 schrieb Shawn Lin:
->> On 2016/7/19 3:46, Heiko St?bner wrote:
->>> Am Montag, 18. Juli 2016, 23:32:32 schrieb Randy Li:
->>>> The Firefly RK3288 Reload is a combination Firefly rk3288 core board
->>>> with the Reload baseboard. Add a dtsi for the Firefly rk3288 core
->>>> which can be included into the dts for the various baseboards
->>>> in the future and dts for Reload base board.
->>>>
->>>> Currently supported are serial console, wired networking, eMMC and
->>>> SD storage, SPFIF, IR receiver, LEDs, SDIO wifi and USB. But only
->>>> the OTG could work on the host mode now, the other USB host can't
->>>> work now, additional patches are required.
->>>>
->>>> Signed-off-by: Randy Li <ayaka@soulik.info>
->>>> Acked-by: Rob Herring <robh@kernel.org>
->>>
->>> applied [0], after some minor reordering - please double check.
->>>
->>> Also, while the branch is named 4.8 this will only go into 4.9, as the
->>> merge- window supposedly opens on the weekend.
->>
->> Sorry for the noise here:), but I find there is some mmc stuff
->> which confuse me. Maybe Randy could elaborate more?
->>
->> Your sdmmc claims to support UHS-I mode like sd-uhs-sdr104, etc, which
->> will ask dw_mmc to switch vqmmc from 3V3 to 1V8 after sending CMD11.
->>
->> But the vqmmc is vccio_sd which is fixed as 3V3? :)
->
-> so far we have only been able to achieve UHS speeds on devices based on the
-> rk808 pmic (I had sucess on veyron and popmetal). The act8846-based boards
-> seem to have some issue when trying to do the switch to 1.8V, resulting in
-> mmc errors and the mmc-core switching back to 3.3V.
-
-Interesting.... I will have a look at it this weekend with Randy face 2
-face....
-
->
-> I think this might be caused by a bug in the act8846 driver or some dts
-> mistake. But so far nobody had the time and enthusiasm to investigate :-)
->
->
-> Heiko
->
-> _______________________________________________
-> Linux-rockchip mailing list
-> Linux-rockchip at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-rockchip
->
 
 
--- 
-Best Regards
-Shawn Lin
+08.08.2016, 02:58, "Hans de Goede" <hdegoede@redhat.com>:
+> The ESP8089 chips can mostly be enumerated via their sdio interface,
+> but they are clocked by an external crystal which may differ from one
+> board to the other.
+>
+> This commit adds a binding for the sdio child node for these chips,
+> allowing to specify the external crystal type (for now, this binding
+> could be be extended with e.g. OOB irq support later).
+>
+> The Android driver for this chip uses a text file with key,value pairs
+> which gets loaded as firmware to pass this info to the firmware.
+> The "esp,crystal_26M_en" name is chosen to match the crystal_26M_en
+> key-name in that text file.
+>
+> Note that at this point there only is an out of tree driver for this
+> hardware, there is no clear timeline / path for merging this. Still
+> I believe it would be good to specify the binding for this in tree
+> now, so that any future migration to an in tree driver will not cause
+> compatiblity issues.
+>
+> Cc: Icenowy Zheng <icenowy@aosc.xyz>
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> ---
+> ?.../bindings/net/wireless/esp,esp8089.txt | 31 ++++++++++++++++++++++
+> ?1 file changed, 31 insertions(+)
+> ?create mode 100644 Documentation/devicetree/bindings/net/wireless/esp,esp8089.txt
+>
+> diff --git a/Documentation/devicetree/bindings/net/wireless/esp,esp8089.txt b/Documentation/devicetree/bindings/net/wireless/esp,esp8089.txt
+> new file mode 100644
+> index 0000000..898a149
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/net/wireless/esp,esp8089.txt
+> @@ -0,0 +1,31 @@
+> +Espressif ESP8089 wireless SDIO devices
+> +
+> +This node provides properties for controlling the ESP8089 wireless device.
+> +The node is expected to be specified as a child node to the SDIO controller
+> +that connects the device to the system.
+> +
+> +Required properties:
+> +
+> + - compatible : Should be "esp,esp8089".
+There's also esp8266. (And the difference of 8089 and 8266 is mainly the difference of crystal frequency... 26MHz for 8266, 40MHz for 8089)
+So maybe it should be the difference of dt compatible?
+> +
+> +Optional properties:
+> + - esp,crystal_26M_en: Integer value for the crystal_26M_en firmware parameter
+> +
+> +Example:
+> +
+> +&mmc1 {
+> + #address-cells = <1>;
+> + #size-cells = <0>;
+> +
+> + vmmc-supply = <&reg_dldo1>;
+> + mmc-pwrseq = <&wifi_pwrseq>;
+> + bus-width = <4>;
+> + non-removable;
+> + status = "okay";
+> +
+> + esp8089: sdio_wifi at 1 {
+> + compatible = "esp,esp8089";
+> + reg = <1>;
+> + esp,crystal_26M_en = <2>;
+> + };
+> +};
+> --
+> 2.7.4
