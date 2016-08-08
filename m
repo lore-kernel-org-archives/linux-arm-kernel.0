@@ -1,82 +1,51 @@
-From: Wenyou.Yang@microchip.com (Wenyou.Yang at microchip.com)
-Date: Mon, 8 Aug 2016 06:05:09 +0000
-Subject: [PATCH v3 7/7] doc: bindings: act8945a-charger: Update properties
-In-Reply-To: <20160729214020.GA18140@rob-hp-laptop>
-References: <1469755528-8413-1-git-send-email-wenyou.yang@atmel.com>
- <1469755528-8413-8-git-send-email-wenyou.yang@atmel.com>
- <20160729214020.GA18140@rob-hp-laptop>
-Message-ID: <F9F4555C4E01D7469D37975B62D0EFBB395A8A@CHN-SV-EXMX07.mchp-main.com>
+From: wangkefeng.wang@huawei.com (Kefeng Wang)
+Date: Mon, 8 Aug 2016 14:05:16 +0800
+Subject: [PATCH v2] arm64: Support hard limit of cpu count by nr_cpus
+In-Reply-To: <02d77415-9eb0-92f4-7cb6-9b941cda9a4d@arm.com>
+References: <02d77415-9eb0-92f4-7cb6-9b941cda9a4d@arm.com>
+Message-ID: <1470636316-24552-1-git-send-email-wangkefeng.wang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+Enable the hard limit of cpu count by set boot options nr_cpus=x
+on arm64, and show a better warning when cpu number exceeds the limit.
 
-> -----Original Message-----
-> From: Rob Herring [mailto:robh at kernel.org]
-> Sent: 2016?7?30? 5:40
-> To: Wenyou Yang <wenyou.yang@atmel.com>
-> Cc: Sebastian Reichel <sre@kernel.org>; Dmitry Eremin-Solenikov
-> <dbaryshkov@gmail.com>; David Woodhouse <dwmw2@infradead.org>; Pawel
-> Moll <pawel.moll@arm.com>; Mark Brown <broonie@kernel.org>; Ian Campbell
-> <ijc+devicetree@hellion.org.uk>; Kumar Gala <galak@codeaurora.org>; linux-
-> kernel at vger.kernel.org; devicetree at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org; Nicolas Ferre <nicolas.ferre@atmel.com>; linux-
-> pm at vger.kernel.org
-> Subject: Re: [PATCH v3 7/7] doc: bindings: act8945a-charger: Update properties
-> 
-> On Fri, Jul 29, 2016 at 09:25:28AM +0800, Wenyou Yang wrote:
-> > Due the driver improvements, update the properties,
-> >  - Remove "active-semi,check-battery-temperature" property.
-> >  - Add the properties, "active-semi,irq_gpio"
-> >    and "active-semi,lbo-gpios".
-> >
-> > Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-> > ---
-> >
-> > Changes in v3: None
-> > Changes in v2: None
-> >
-> >  Documentation/devicetree/bindings/power/act8945a-charger.txt | 6 ++++--
-> >  1 file changed, 4 insertions(+), 2 deletions(-)
-> >
-> > diff --git a/Documentation/devicetree/bindings/power/act8945a-charger.txt
-> b/Documentation/devicetree/bindings/power/act8945a-charger.txt
-> > index bea254c..d7cf05b 100644
-> > --- a/Documentation/devicetree/bindings/power/act8945a-charger.txt
-> > +++ b/Documentation/devicetree/bindings/power/act8945a-charger.txt
-> > @@ -4,10 +4,12 @@ Required properties:
-> >   - compatible: "active-semi,act8945a", please refer to ../mfd/act8945a.txt.
-> >   - active-semi,chglev-gpios: charge current level phandle with args
-> >     as described in ../gpio/gpio.txt.
-> > + - active-semi,irq_gpios: specify the charger interrupt input phanle
-> > +   with args as as described in ../gpio/gpio.txt.
-> 
-> As I said in v2, this should be an interrupt property instead.
+Reported-by: Shiyuan Hu <hushiyuan@huawei.com>
+Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
+---
 
-Sorry for forgetting to change.
+Changed since v1:
+- clip cpu number in smp_init_cpus suggested-by Will and Suzuki, and update
+  the warning.
 
-Accepted, will be in next version. Thanks.
+ arch/arm64/kernel/smp.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-> 
-> > + - active-semi,lbo-gpios: specify the low battery voltage detect phandle
-> > +   with args as as described in ../gpio/gpio.txt.
-> 
-> Maybe this one too.
-
-The capacity level function need to read this pin level, so this one should not
-use "interrupts" property.
-
-> 
-> >
-> >  Optional properties:
-> > - - active-semi,check-battery-temperature: boolean to check the battery
-> > -   temperature or not.
-> >   - active-semi,input-voltage-threshold-microvolt: unit: mV;
-> >     Specifies the charger's input over-voltage threshold value;
-> >     The value can be: 6600, 7000, 7500, 8000; default: 6600
-> > --
-> > 2.7.4
-> >
-
-Best Regards,
-Wenyou Yang
+diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+index 76a6d92..cbfc31c 100644
+--- a/arch/arm64/kernel/smp.c
++++ b/arch/arm64/kernel/smp.c
+@@ -661,9 +661,9 @@ void __init smp_init_cpus(void)
+ 		acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_INTERRUPT,
+ 				      acpi_parse_gic_cpu_interface, 0);
+ 
+-	if (cpu_count > NR_CPUS)
+-		pr_warn("no. of cores (%d) greater than configured maximum of %d - clipping\n",
+-			cpu_count, NR_CPUS);
++	if (cpu_count > nr_cpu_ids)
++		pr_warn("%d cores exceeds configured maximum of %d - clipping\n",
++			cpu_count, nr_cpu_ids);
+ 
+ 	if (!bootcpu_valid) {
+ 		pr_err("missing boot CPU MPIDR, not enabling secondaries\n");
+@@ -677,7 +677,7 @@ void __init smp_init_cpus(void)
+ 	 * with entries in cpu_logical_map while initializing the cpus.
+ 	 * If the cpu set-up fails, invalidate the cpu_logical_map entry.
+ 	 */
+-	for (i = 1; i < NR_CPUS; i++) {
++	for (i = 1; i < nr_cpu_ids; i++) {
+ 		if (cpu_logical_map(i) != INVALID_HWID) {
+ 			if (smp_cpu_setup(i))
+ 				cpu_logical_map(i) = INVALID_HWID;
+-- 
+1.7.12.4
