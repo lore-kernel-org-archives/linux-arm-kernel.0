@@ -1,61 +1,31 @@
-From: frowand.list@gmail.com (Frank Rowand)
-Date: Mon, 8 Aug 2016 14:03:39 -0700
-Subject: How does the kernel assign ttySn to UARTs?
-In-Reply-To: <CAF_dkJD5MEfNzrRqM3H_LkOmXC3XYjUYLe2=ZtzCjAS1A2TDmg@mail.gmail.com>
-References: <CAF_dkJD5MEfNzrRqM3H_LkOmXC3XYjUYLe2=ZtzCjAS1A2TDmg@mail.gmail.com>
-Message-ID: <57A8F3AB.70306@gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon,  8 Aug 2016 23:24:01 +0200
+Subject: [PATCH 0/4] Qualcomm MSM8660/APQ8060 EBI2 and ethernet support
+Message-ID: <1470691445-27571-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/08/16 12:56, Patrick Doyle wrote:
-> I am playing the the device tree for my (Atmel, SAMA5D2x) device and
-> find myself confused by the assignment of ttySn devices to UARTs and
-> FLEXCOM devices.
-> 
-> I started off assuming that the
-> 
->     alias {
->         serial0 = &uart2;
->     };
-> 
-> stanza I put in my device tree resulted in ttyS0 being aliased to
-> uart2 (serial at f8024000).  But when I attempted to change the alias to
-> uart5 (the label for UART defined in flexcom at fc018000) I was surprised
-> and confused by the fact that the console continued to spew forth on
-> UART2.
-> 
-> So I tried removing the "alias" stanza from the device tree.  The
-> console still showed up on UART2.
-> 
-> I wondered if it might have something to do with the order that
-> devices show up in the device tree, so I swapped UART2 & UART3, but
-> the console still showed up on UART2.
-> 
-> Just to make sure I wasn't losing my mind, I decided to comment UART2
-> out completely... and then the console showed up on FLEXCOM4.  Not
-> UART3, but FLEXCOM4!
-> 
-> Now I'm really confused.  Now it is time to ask the experts.
-> 
-> FWIW, my kernel command line contains "console=ttyS0", while my device
-> tree enables UART2, UART3, and FLEXCOM4 (which us configured as a
-> UART).  Nowhere do I enable UART0, so I am also confused has to how
-> /dev/ttyS0 gets mapped to UART2 or FLEXCOM4.
-> 
-> Would any experts out there care to point me in the direction of some clues?
+This is basically a resend of the earlier patches, restricted to
+the ARM SoC parts. (drivers/soc usually merge through ARM SoC).
 
-Try stdout-path in the device tree chosen node.
-See Documentation/devicetree/bindings/chosen.txt
+Mark, how do you want to proceed? Are you queueing all of these
+for v4.9?
 
-I'm not sure whether "console=ttyS0" will conflict with stdout-path.
+Linus Walleij (4):
+  soc: qcom: add an EBI2 device tree bindings
+  soc: qcom: add EBI2 driver
+  ARM: dts: add EBI2 to the Qualcomm MSM8660 DTSI
+  ARM: dts: add SMSC ethernet on the APQ8060 Dragonboard
 
-> 
-> Thanks.
-> 
-> --wpd
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+ .../devicetree/bindings/soc/qcom/qcom,ebi2.txt     | 134 ++++++++
+ arch/arm/boot/dts/qcom-apq8060-dragonboard.dts     | 130 ++++++++
+ arch/arm/boot/dts/qcom-msm8660.dtsi                |  12 +
+ drivers/soc/qcom/Kconfig                           |   8 +
+ drivers/soc/qcom/Makefile                          |   1 +
+ drivers/soc/qcom/ebi2.c                            | 371 +++++++++++++++++++++
+ 6 files changed, 656 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/soc/qcom/qcom,ebi2.txt
+ create mode 100644 drivers/soc/qcom/ebi2.c
+
+-- 
+2.7.4
