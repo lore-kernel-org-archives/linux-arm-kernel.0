@@ -1,61 +1,37 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 10 Aug 2016 08:37:04 -0300
-Subject: [PATCH] clk: imx7d: do not set the parent of
- IMX7D_ENET_AXI_ROOT_SRC
-In-Reply-To: <1468590782-8436-1-git-send-email-fabio.estevam@nxp.com>
-References: <1468590782-8436-1-git-send-email-fabio.estevam@nxp.com>
-Message-ID: <CAOMZO5BjdhCDNU-Vr7OT81ag0LqgFQ3+oP1D_o0FUOZVafneqQ@mail.gmail.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Mon, 8 Aug 2016 23:40:16 +0200
+Subject: [PATCHv6] support for AD5820 camera auto-focus coil
+In-Reply-To: <20160810073403.GB30047@pali>
+References: <573FFF51.1000004@gmail.com> <20160521105607.GA20071@amd>
+ <574049EF.2090208@gmail.com> <20160524090433.GA1277@amd>
+ <20160524091746.GA14536@amd>
+ <20160525212659.GK26360@valkosipuli.retiisi.org.uk>
+ <20160527205140.GA26767@amd> <20160805102611.GA13116@amd>
+ <20160808080955.GA3182@valkosipuli.retiisi.org.uk>
+ <20160810073403.GB30047@pali>
+Message-ID: <20160808214015.GA2946@xo-6d-61-c0.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+On Wed 2016-08-10 09:34:03, Pali Roh?r wrote:
+> On Monday 08 August 2016 11:09:56 Sakari Ailus wrote:
+> > On Fri, Aug 05, 2016 at 12:26:11PM +0200, Pavel Machek wrote:
+> > > 
+> > > This adds support for AD5820 autofocus coil, found for example in
+> > > Nokia N900 smartphone.
+> > 
+> > Thanks, Pavel!
+> > 
+> > Let's use V4L2_CID_FOCUS_ABSOLUTE, as is in the patch. If we get something
+> > better in the future, we'll switch to that then.
+> 
+> Ok, and what with AD5820_RAMP_TIME and AD5820_RAMP_MODE?
 
-On Fri, Jul 15, 2016 at 10:53 AM, Fabio Estevam <fabio.estevam@nxp.com> wrote:
-> Booting the kernel on a imx7s-warp leads to several warnings like these:
->
-> [    0.000000] ------------[ cut here ]------------
-> [    0.000000] WARNING: CPU: 0 PID: 0 at kernel/locking/lockdep.c:3536 lock_release+0x2f8/0x330
-> [    0.000000] releasing a pinned lock
->
-> [    0.000000] ------------[ cut here ]------------
-> [    0.000000] WARNING: CPU: 0 PID: 0 at kernel/locking/lockdep.c:2722 trace_hardirqs_on_caller+0x1ac/0x1f4
-> [    0.000000] DEBUG_LOCKS_WARN_ON(unlikely(early_boot_irqs_disabled))
->
-> [    0.000000] ---[ end trace cb88537fdc8fa201 ]---
-> [    0.000000] bad: scheduling from the idle thread!
-> [    0.000000] CPU: 0 PID: 0 Comm: swapper/0 Tainted: G        W       4.7.0-rc7-next-20160715 #404
->
-> [    0.000000] ------------[ cut here ]------------
-> [    0.000000] WARNING: CPU: 0 PID: 0 at kernel/time/sched_clock.c:179 sched_clock_register+0x44/0x1f8
-> [    0.000000] Modules linked in:
->
-> [    0.000591] ------------[ cut here ]------------
-> [    0.000610] WARNING: CPU: 0 PID: 0 at kernel/time/sched_clock.c:179 sched_clock_register+0x44/0x1f8
->
-> [    0.002084] ------------[ cut here ]------------
-> [    0.002104] WARNING: CPU: 0 PID: 0 at init/main.c:576 start_kernel+0x258/0x3b0
-> [    0.002114] Interrupts were enabled early
->
->
-> This fix is along the same lines as 5e33ebff7edd ("clk: imx7d: do not
-> set parent of ethernet time/ref clocks") and the explanation from that
-> commit is:
->
-> "The reason for the warning is that setting the parent enables the ENET
->  PLL since we are using CLK_OPS_PARENT_ENABLE. Enabling the ENET PLL can
->  cause clk_pllv3_wait_lock to sleep. See also:
->  commit fc8726a2c021 ("clk: core: support clocks which requires parents
->  enable (part 2)")."
->
-> imx7s-warp does not even use the FEC interface, so we should not really
-> configure the parent of IMX7D_ENET_AXI_ROOT_SRC in the common MX7 clock
-> driver code.
->
-> The dts file should use the assigned-clocks/assigned-clock-parents method,
-> so simply remove the configuration of IMX7D_ENET_AXI_ROOT_SRC parent.
->
-> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+Lets forget about those for now. I'll wait till current support works in the
+Linus' tree, then I can write the docs and re-add the ioctls.
 
-Do you think this one could be applied to 4.8-rc?
-
-Thanks
+Best regards,
+									Pavel
+ 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
