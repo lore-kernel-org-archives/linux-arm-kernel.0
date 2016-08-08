@@ -1,94 +1,65 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Mon,  8 Aug 2016 19:37:59 +0200
-Subject: [PATCH] dt: bindings: Remove focaltech,ft6236 binding
-Message-ID: <1470677879-5907-1-git-send-email-hdegoede@redhat.com>
+From: labbott@redhat.com (Laura Abbott)
+Date: Mon,  8 Aug 2016 10:49:32 -0700
+Subject: [RFCv2][PATCH 0/5] Cleanup Ion mapping/caching
+Message-ID: <1470678577-14010-1-git-send-email-labbott@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The focaltech ft6236 are i2c protocol compatible with other chips supported
-by the edt,ft5x06 driver. The duplicate ft6236 driver has already been
-removed from the kernel.
 
-This commit removes the duplicate binding to match, adding its compatible
-string to the edt,ft5x06 binding.
+Hi,
 
-This commit also adds the standard touchscreen properties as optional
-properties to the edt,ft5x06 binding, these were documented in the
-focaltech,ft6236 binding but missing from the edt,ft5x06 doc.
+This is v2 on the attempt to remove misuse of the cache APIs from Ion. The
+previous version[1] attempted to pull the cache APIs into Ion. This was
+indicated as the wrong approach and real APIs should be created instead.
 
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
- .../bindings/input/touchscreen/edt-ft5x06.txt      |  8 +++++
- .../input/touchscreen/focaltech-ft6236.txt         | 35 ----------------------
- 2 files changed, 8 insertions(+), 35 deletions(-)
- delete mode 100644 Documentation/devicetree/bindings/input/touchscreen/focaltech-ft6236.txt
+The APIs created are kernel_force_cache_clean and kernel_force_cache_invalidate.
+They force a clean and invalidate of the cache, respectively. The aim was to
+take the semantics of dma_sync and turn them into something that isn't
+dma_sync. This series includes a nominal implementation for arm/arm64, mostly
+for demonstration purposes.
 
-diff --git a/Documentation/devicetree/bindings/input/touchscreen/edt-ft5x06.txt b/Documentation/devicetree/bindings/input/touchscreen/edt-ft5x06.txt
-index f99528d..6db2210 100644
---- a/Documentation/devicetree/bindings/input/touchscreen/edt-ft5x06.txt
-+++ b/Documentation/devicetree/bindings/input/touchscreen/edt-ft5x06.txt
-@@ -19,6 +19,7 @@ Required properties:
-            or:  "edt,edt-ft5306"
-            or:  "edt,edt-ft5406"
-            or:  "edt,edt-ft5506"
-+           or:  "focaltech,ft6236"
- 
-  - reg:         I2C slave address of the chip (0x38)
-  - interrupt-parent: a phandle pointing to the interrupt controller
-@@ -43,6 +44,13 @@ Optional properties:
- 
-  - offset:      allows setting the edge compensation in the range from
-                 0 to 31.
-+ - touchscreen-size-x	   : See touchscreen.txt
-+ - touchscreen-size-y	   : See touchscreen.txt
-+ - touchscreen-fuzz-x      : See touchscreen.txt
-+ - touchscreen-fuzz-y      : See touchscreen.txt
-+ - touchscreen-inverted-x  : See touchscreen.txt
-+ - touchscreen-inverted-y  : See touchscreen.txt
-+ - touchscreen-swapped-x-y : See touchscreen.txt
- 
- Example:
- 	polytouch: edt-ft5x06 at 38 {
-diff --git a/Documentation/devicetree/bindings/input/touchscreen/focaltech-ft6236.txt b/Documentation/devicetree/bindings/input/touchscreen/focaltech-ft6236.txt
-deleted file mode 100644
-index 777521d..0000000
---- a/Documentation/devicetree/bindings/input/touchscreen/focaltech-ft6236.txt
-+++ /dev/null
-@@ -1,35 +0,0 @@
--* FocalTech FT6236 I2C touchscreen controller
--
--Required properties:
-- - compatible		  : "focaltech,ft6236"
-- - reg			  : I2C slave address of the chip (0x38)
-- - interrupt-parent	  : a phandle pointing to the interrupt controller
--			    serving the interrupt for this chip
-- - interrupts		  : interrupt specification for the touch controller
--			    interrupt
-- - reset-gpios		  : GPIO specification for the RSTN input
-- - touchscreen-size-x	  : horizontal resolution of touchscreen (in pixels)
-- - touchscreen-size-y	  : vertical resolution of touchscreen (in pixels)
--
--Optional properties:
-- - touchscreen-fuzz-x	  : horizontal noise value of the absolute input
--			    device (in pixels)
-- - touchscreen-fuzz-y	  : vertical noise value of the absolute input
--			    device (in pixels)
-- - touchscreen-inverted-x : X axis is inverted (boolean)
-- - touchscreen-inverted-y : Y axis is inverted (boolean)
-- - touchscreen-swapped-x-y: X and Y axis are swapped (boolean)
--			    Swapping is done after inverting the axis
--
--Example:
--
--	ft6x06 at 38 {
--		compatible = "focaltech,ft6236";
--		reg = <0x38>;
--		interrupt-parent = <&gpio>;
--		interrupts = <23 2>;
--		touchscreen-size-x = <320>;
--		touchscreen-size-y = <480>;
--		touchscreen-inverted-x;
--		touchscreen-swapped-x-y;
--	};
+I did review before writing this of whether Ion could just use the DMA mapping
+APIs to acheive the necessary coherency. The conclusion I came to was that
+trying to force the Ion code into the DMA model would create more problem than
+it solved since there wasn't anything like DMA going on. Similarly, none of
+the existing cache APIs did exactly what was needed either. The closest matches
+were designed for file cache pages and not drivers.
+
+The series includes conversion of Ion to the new APIs. There are a few other
+drivers which are calling either arch specific APIs or flush_dcache_page
+that could be converted as well. The i915 driver could potentially be converted
+with the addition of an x86 implementation.
+
+Feedback appreciated as always.
+
+Thanks,
+Laura
+
+[1] https://lkml.kernel.org/g/<1464205684-5587-1-git-send-email-labbott@redhat.com>
+
+Laura Abbott (5):
+  Documentation: Introduce kernel_force_cache_* APIs
+  arm: Implement ARCH_HAS_FORCE_CACHE
+  arm64: Implement ARCH_HAS_FORCE_CACHE
+  staging: android: ion: Convert to the kernel_force_cache APIs
+  staging: ion: Add support for syncing with DMA_BUF_IOCTL_SYNC
+
+ Documentation/cachetlb.txt                      |  18 +++-
+ arch/arm/include/asm/cacheflush.h               |   4 +
+ arch/arm/mm/dma-mapping.c                       | 119 ------------------------
+ arch/arm/mm/flush.c                             | 115 +++++++++++++++++++++++
+ arch/arm/mm/mm.h                                |   8 ++
+ arch/arm64/include/asm/cacheflush.h             |   5 +
+ arch/arm64/mm/flush.c                           |  11 +++
+ drivers/staging/android/ion/ion.c               |  53 +++++++----
+ drivers/staging/android/ion/ion_carveout_heap.c |   8 +-
+ drivers/staging/android/ion/ion_chunk_heap.c    |  12 ++-
+ drivers/staging/android/ion/ion_page_pool.c     |   6 +-
+ drivers/staging/android/ion/ion_priv.h          |  11 ---
+ drivers/staging/android/ion/ion_system_heap.c   |   6 +-
+ include/linux/cacheflush.h                      |  11 +++
+ 14 files changed, 225 insertions(+), 162 deletions(-)
+ create mode 100644 include/linux/cacheflush.h
+
 -- 
 2.7.4
