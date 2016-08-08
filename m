@@ -1,70 +1,55 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Mon, 8 Aug 2016 11:19:43 +0530
-Subject: [PATCH v5 5/6] dmaengine: pl330: Make sure microcode is privileged
-In-Reply-To: <20160727234208.2101-6-mitchelh@codeaurora.org>
-References: <20160727234208.2101-1-mitchelh@codeaurora.org>
- <20160727234208.2101-6-mitchelh@codeaurora.org>
-Message-ID: <20160808054943.GT9681@localhost>
+From: anup.patel@broadcom.com (Anup Patel)
+Date: Mon,  8 Aug 2016 11:22:29 +0530
+Subject: [PATCH RESEND v2 0/8] Cache-coherent DMA access using UIO
+Message-ID: <1470635557-13416-1-git-send-email-anup.patel@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 27, 2016 at 04:42:07PM -0700, Mitchel Humpherys wrote:
-> The PL330 performs privileged instruction fetches.  This can result in
-> SMMU permission faults on SMMUs that implement the ARMv8 VMSA, which
+The goal of this patchset is to improve UIO framework and UIO dmem
+driver to allow cache-coherent DMA accesses from user-space.
 
-Lot of acronyms with no explanation whatsoever
+This patchset is based on two previous patchsets:
+1) [PATCH v5 0/6] UIO driver for APM X-Gene QMTM
+(Refer, http://www.spinics.net/lists/devicetree/msg58244.html)
+2) [PATCH 0/4] Fix and extend uio_dmem_genirq
+(Refer, https://lkml.org/lkml/2016/5/17/141)
 
-> specifies that mappings that are writeable at one execution level shall
-> not be executable at any higher-privileged level.  Fix this by using the
-> DMA_ATTR_PRIVILEGED attribute, which will ensure that the microcode
-> IOMMU mapping is only accessible to the privileged level.
+We have adopted only patch0-3 of patchset1 which was abandoned
+long time back. We have taken care of last few unaddressed comments
+on these patches.
 
-And I get satndalone patch with no context for the series!
+The patchset2 is quite recent has been adopted entirely. We have
+taken care review comments on these patches too.
 
-> 
-> Cc: Dan Williams <dan.j.williams@intel.com>
-> Cc: Vinod Koul <vinod.koul@intel.com>
-> Reviewed-by: Robin Murphy <robin.murphy@arm.com>
-> Tested-by: Robin Murphy <robin.murphy@arm.com>
-> Signed-off-by: Mitchel Humpherys <mitchelh@codeaurora.org>
-> ---
-> 
-> Notes:
->     v3..v4
->     
->       - Reworked against the new dma attrs format.
-> 
->  drivers/dma/pl330.c | 6 ++++--
->  1 file changed, 4 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
-> index 4fc3ffbd5ca0..8cd624fc3760 100644
-> --- a/drivers/dma/pl330.c
-> +++ b/drivers/dma/pl330.c
-> @@ -1854,14 +1854,16 @@ static int dmac_alloc_resources(struct pl330_dmac *pl330)
->  {
->  	int chans = pl330->pcfg.num_chan;
->  	int ret;
-> +	unsigned long dma_attrs = DMA_ATTR_PRIVILEGED;
->  
->  	/*
->  	 * Alloc MicroCode buffer for 'chans' Channel threads.
->  	 * A channel's buffer offset is (Channel_Id * MCODE_BUFF_PERCHAN)
->  	 */
-> -	pl330->mcode_cpu = dma_alloc_coherent(pl330->ddma.dev,
-> +	pl330->mcode_cpu = dma_alloc_attrs(pl330->ddma.dev,
->  				chans * pl330->mcbufsz,
-> -				&pl330->mcode_bus, GFP_KERNEL);
-> +				&pl330->mcode_bus, GFP_KERNEL,
-> +				dma_attrs);
->  	if (!pl330->mcode_cpu) {
->  		dev_err(pl330->ddma.dev, "%s:%d Can't allocate memory!\n",
->  			__func__, __LINE__);
-> -- 
-> Qualcomm Innovation Center, Inc.
-> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-> a Linux Foundation Collaborative Project
-> 
+This patchset is based on v4.7-rc7 tag and it is available in uio-v2
+branch of https://github.com/Broadcom/arm64-linux.git
+
+Changes since v1:
+ - Make patch5 as first patch1 and mark it for linux-stable
+ - Check return value of dma_set_coherent_mask()
+ - Get UIO dmem dynamic region details as module parameter instead
+   of getting it from DT node
+
+Ankit Jindal (3):
+  uio: code style cleanup
+  uio: Add new UIO_MEM_PHYS_CACHE type for mem regions
+  Documentation: Update documentation for UIO_MEM_PHYS_CACHE and
+    UIO_MEM_DEVICE
+
+Anup Patel (2):
+  uio: Add new UIO_MEM_DEVICE type for mem regions
+  uio: Use new memtypes in uio_dmem_genirq
+
+Jan Viktorin (3):
+  uio: fix dmem_region_start computation
+  uio: UIO_IRQ_NONE is a valid option for uioinfo->irq
+  uio: bind uio_dmem_genirq via OF
+
+ Documentation/DocBook/uio-howto.tmpl |   6 +-
+ drivers/uio/uio.c                    |  32 ++++--
+ drivers/uio/uio_dmem_genirq.c        | 190 +++++++++++++++++++++++++++--------
+ include/linux/uio_driver.h           |  10 +-
+ 4 files changed, 182 insertions(+), 56 deletions(-)
 
 -- 
-~Vinod
+1.9.1
