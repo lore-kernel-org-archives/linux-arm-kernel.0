@@ -1,45 +1,60 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Mon, 8 Aug 2016 16:09:24 +0100
-Subject: [PATCH 4/6] ARM: tegra: Add Tegra30 GMI support
-In-Reply-To: <1470512452-8322-5-git-send-email-mirza.krak@gmail.com>
-References: <1470512452-8322-1-git-send-email-mirza.krak@gmail.com>
- <1470512452-8322-5-git-send-email-mirza.krak@gmail.com>
-Message-ID: <ca971719-f73f-fc22-5b39-57d2636b55a1@nvidia.com>
+From: gg@slimlogic.co.uk (Graeme Gregory)
+Date: Mon, 8 Aug 2016 16:13:12 +0100
+Subject: [RFC PATCH V5 0/5] ECAM quirks handling for ARM64 platforms
+In-Reply-To: <1470661541-26270-1-git-send-email-tn@semihalf.com>
+References: <1470661541-26270-1-git-send-email-tn@semihalf.com>
+Message-ID: <20160808151312.GG18515@xora-haswell.xora.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 06/08/16 20:40, Mirza Krak wrote:
-> From: Mirza Krak <mirza.krak@gmail.com>
+On Mon, Aug 08, 2016 at 03:05:36PM +0200, Tomasz Nowicki wrote:
+> Quirk handling relies on an idea of matching MCFG OEM ID, TABLE ID and
+> revision (the ones from standard header of MCFG table).
 > 
-> Add a device node for the GMI controller found on Tegra30.
+> Static array is used to keep quirk entries. Each entry consists of
+> mentioned MCFG IDs along with custom pci_ops structure and initialization call.
 > 
-> Signed-off-by: Mirza Krak <mirza.krak@gmail.com>
-> ---
->  arch/arm/boot/dts/tegra30.dtsi | 10 ++++++++++
->  1 file changed, 10 insertions(+)
+> As an example, the last patch presents quirk handling mechanism usage for
+> ThunderX PEM driver.
 > 
-> diff --git a/arch/arm/boot/dts/tegra30.dtsi b/arch/arm/boot/dts/tegra30.dtsi
-> index 5030065..5fd4d29 100644
-> --- a/arch/arm/boot/dts/tegra30.dtsi
-> +++ b/arch/arm/boot/dts/tegra30.dtsi
-> @@ -439,6 +439,16 @@
->  		status = "disabled";
->  	};
->  
-> +	gmi at 70009000 {
-> +		compatible = "nvidia,tegra30-gmi";
-> +		reg = <0x70009000 0x1000>;
-> +		clocks = <&tegra_car TEGRA30_CLK_NOR>;
-> +		clock-names = "gmi";
-> +		resets = <&tegra_car 42>;
-> +		reset-names = "gmi";
-> +		status = "disabled";
 
-#address-cells, #size-cells and ranges appears to be missing.
+Series looks good to me.
 
-Cheers
-Jon
+Reviewed-by: Graeme Gregory <graeme.gregory@linaro.org>
 
--- 
-nvpublic
+> v4 -> v5
+> - rebase against v4.8-rc1
+> - rework to exact MCFG OEM ID, TABLE ID, rev match
+>   - use memcmp instead of strncmp
+>   - no substring match
+> - fix typos and dmesg message
+> 
+> Tomasz Nowicki (5):
+>   PCI: Embed pci_ecam_ops in pci_config_window structure
+>   PCI/ACPI: Move ACPI ECAM mapping to generic MCFG driver
+>   PCI: Check platform specific ECAM quirks
+>   ARM64/PCI: Start using quirks handling for ACPI based PCI host
+>     controller
+>   PCI: thunder-pem: Support quirky configuration space access for ACPI
+>     based PCI host controller
+> 
+>  arch/arm64/kernel/pci.c            | 42 +----------------
+>  drivers/acpi/pci_mcfg.c            | 40 ++++++++++++++++
+>  drivers/pci/ecam.c                 |  6 +--
+>  drivers/pci/host/Makefile          |  1 +
+>  drivers/pci/host/mcfg-quirks.c     | 93 ++++++++++++++++++++++++++++++++++++
+>  drivers/pci/host/mcfg-quirks.h     | 24 ++++++++++
+>  drivers/pci/host/pci-thunder-pem.c | 96 ++++++++++++++++++++++++++++++++------
+>  include/linux/pci-acpi.h           |  5 ++
+>  include/linux/pci-ecam.h           |  2 +-
+>  9 files changed, 252 insertions(+), 57 deletions(-)
+>  create mode 100644 drivers/pci/host/mcfg-quirks.c
+>  create mode 100644 drivers/pci/host/mcfg-quirks.h
+> 
+> -- 
+> 1.9.1
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
