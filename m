@@ -1,193 +1,113 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Mon, 8 Aug 2016 15:44:31 +0100
-Subject: [PATCH 3/6] dt/bindings: Add bindings for Tegra GMI controller
-In-Reply-To: <1470512452-8322-4-git-send-email-mirza.krak@gmail.com>
-References: <1470512452-8322-1-git-send-email-mirza.krak@gmail.com>
- <1470512452-8322-4-git-send-email-mirza.krak@gmail.com>
-Message-ID: <901be576-a810-c630-9b83-de922e945df0@nvidia.com>
+From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
+Date: Mon, 8 Aug 2016 17:00:41 +0200
+Subject: [PATCH 3/3] ARM: dts: imx6sx-udoo-neo: Add SD
+In-Reply-To: <20160808141248.GI4678@tiger>
+References: <1467691450-22975-1-git-send-email-afaerber@suse.de>
+ <1467691450-22975-4-git-send-email-afaerber@suse.de>
+ <20160808141248.GI4678@tiger>
+Message-ID: <16912a4e-88c8-b11a-16bb-927ee6bf1775@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 06/08/16 20:40, Mirza Krak wrote:
-> From: Mirza Krak <mirza.krak@gmail.com>
+Am 08.08.2016 um 16:12 schrieb Shawn Guo:
+> On Tue, Jul 05, 2016 at 06:04:10AM +0200, Andreas F?rber wrote:
+>> Enable the SDHC node and model the SDIO_PWR GPIO as a regulator.
+>> Use the SD card as default trigger for the red LED.
+>>
+>> Cc: Ettore Chimenti <ettore.chimenti@udoo.org>
+>> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+>> ---
+>>  
+>>
+>>  arch/arm/boot/dts/imx6sx-udoo-neo.dtsi | 34 ++++++++++++++++++++++++++++++++++
+>>  1 file changed, 34 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/imx6sx-udoo-neo.dtsi b/arch/arm/boot/dts/imx6sx-udoo-neo.dtsi
+>> index e074409644d8..85f5e8606dab 100644
+>> --- a/arch/arm/boot/dts/imx6sx-udoo-neo.dtsi
+>> +++ b/arch/arm/boot/dts/imx6sx-udoo-neo.dtsi
+>> @@ -56,6 +56,7 @@
+>>  			label = "udoo-neo:red:mmc";
+>>  			gpios = <&gpio6 0 GPIO_ACTIVE_HIGH>;
+>>  			default-state = "off";
+>> +			linux,default-trigger = "mmc0";
+>>  		};
+>>  
+>>  		orange {
+>> @@ -64,6 +65,17 @@
+>>  			default-state = "keep";
+>>  		};
+>>  	};
+>> +
+>> +	sdio_pwr_reg: sd-gpio-regulator {
+>> +		compatible = "regulator-fixed";
+>> +		gpio = <&gpio6 1 GPIO_ACTIVE_HIGH>;
+>> +		enable-active-high;
+>> +		regulator-name = "SDIO_PWR";
+>> +		regulator-min-microvolt = <3300000>;
+>> +		regulator-max-microvolt = <3300000>;
+>> +		regulator-boot-on;
+>> +		regulator-always-on;
+>> +	};
 > 
-> Document the devicetree bindings for the Generic Memory Interface (GMI)
-> bus driver found on Tegra SOCs.
-> 
-> Signed-off-by: Mirza Krak <mirza.krak@gmail.com>
-> ---
->  .../devicetree/bindings/bus/nvidia,tegra20-gmi.txt | 99 ++++++++++++++++++++++
->  1 file changed, 99 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/bus/nvidia,tegra20-gmi.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/bus/nvidia,tegra20-gmi.txt b/Documentation/devicetree/bindings/bus/nvidia,tegra20-gmi.txt
-> new file mode 100644
-> index 0000000..046846e
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/bus/nvidia,tegra20-gmi.txt
-> @@ -0,0 +1,99 @@
-> +Device tree bindings for NVIDIA Tegra Generic Memory Interface bus
-> +
-> +The Generic Memory Interface bus enables memory transfers between internal and
-> +external memory. Can be used to attach various high speed devices such as
-> +synchronous/asynchronous NOR, FPGA, UARTS and more.
-> +
-> +The actual devices are instantiated from the child nodes of a GMI node.
-> +
-> +Required properties:
-> +  - compatible : Should contain one of the following:
-> +        For Tegra20 must contain "nvidia,tegra20-gmi".
-> +        For Tegra30 must contain "nvidia,tegra30-gmi".
-> + - reg: Should contain GMI controller registers location and length.
-> + - clocks: Must contain an entry for each entry in clock-names.
-> + - clock-names: Must include the following entries: "gmi"
-> + - resets : Must contain an entry for each entry in reset-names.
-> + - reset-names : Must include the following entries: "gmi"
-> + - #address-cells: The number of cells used to represent physical base
-> +   addresses in the GMI address space.
-> + - #size-cells: The number of cells used to represent the size of an address
-> +   range in the GMI address space.
-> + - ranges: Mapping of the GMI address space to the CPU address space.
-> +
-> +Note that the GMI controller does not have any internal chip-select address
-> +decoding and if you want to access multiple devices external chip-select
-> +decoding must be provided. Furthermore, if you do have external logic to
+> Is it correct to model SDIO power control GPIO as a boot-on and
+> always-on fixed regulator?  It will be powered-on even when SDIO driver
+> is not enabled or loaded.
 
-The above is not 100% accurate. I would say that because there is no
-chip-select address decoding, chip-selects either need to be managed via
-software or by employing external chip-select decoding logic.
+AFAIR the issue was that the driver does not use any -supply properties
+where we could hook this regulator up for enabling. So modeling it as an
+always-on regulator seemed like the only way to ensure it gets enabled
+without relying on the bootloader?
 
-> +support multiple devices this would assume that the devices use the same
-> +timing and so are probably the same type. It also assumes that they can fit in
-> +the 256MB address range.
+Note that the board boots U-Boot from SD, so it is somewhat likely that
+the rootfs will be on SD, too.
 
-Again this is only true for the case where you have external chip-select
-decoding logic, but would not be the case if software were to manage the
-chip-selects.
+Do you spot anything missing or wrong on the SD node below that would
+explain the reliability issues described in the cover letter?
 
-> +
-> +Optional properties:
-> +
-> + - nvidia,snor-data-width-32bit: Use 32bit data-bus, default is 16bit.
-> + - nvidia,snor-mux-mode: Enable address/data MUX mode.
-> + - nvidia,snor-rdy-active-before-data: Assert RDY signal one cycle before data.
-> +   If omitted it will be asserted with data.
-> + - nvidia,snor-rdy-inv: RDY signal is active high
-> + - nvidia,snor-adv-inv: ADV signal is active high
-> + - nvidia,snor-oe-inv: WE/OE signal is active high
-> + - nvidia,snor-cs-inv: CS signal is active high
-> + - nvidia,snor-cs-select: CS output pin configuration. Default is CS0
+Regards,
+Andreas
 
-Nit ... I think "nvidia,snor-cs" is sufficient for the name. But I am
-not sure if we even need this. See below.
+P.S. Thanks for picking up 1/3 - was waiting on that for preparing a v2.
 
-> + 	<0> : CS0
-> +	<1> : CS1
-> +	<2> : CS2
-> +	<3> : CS3
-> +	<4> : CS4
-> +	<5> : CS5
-> +	<6> : CS6
-> +	<7> : CS7
-> +
-> +  Note that there is some special handling for the timing values.
-> +  From Tegra TRM:
-> +  Programming 0 means 1 clock cycle: actual cycle = programmed cycle + 1
-> +
-> + - nvidia,snor-muxed-width: Number of cycles MUX address/data asserted on the
-> +   bus. Valid values are 0-15, default is 1
-> + - nvidia,snor-hold-width: Number of cycles CE stays asserted after the
-> +   de-assertion of WR_N (in case of SLAVE/MASTER Request) or OE_N
-> +   (in case of MASTER Request). Valid values are 0-15, default is 1
-> + - nvidia,snor-adv-width: Number of cycles during which ADV stays asserted.
-> +   Valid values are 0-15, default is 1.
-> + - nvidia,snor-ce-width: Number of cycles before CE is asserted.
-> +   Valid values are 0-255, default is 4
-
-ce-width only occupies a 4-bit field and so the max is 15.
-
-> + - nvidia,snor-we-width: Number of cycles during which WE stays asserted.
-> +   Valid values are 0-15, default is 1
-> + - nvidia,snor-oe-width: Number of cycles during which OE stays asserted.
-> +   Valid values are 0-255, default is 1
-> + - nvidia,snor-wait-width: Number of cycles before READY is asserted.
-> +   Valid values are 0-255, default is 3
-> +
-> +Example with two SJA1000 CAN controllers connected to the GMI bus:
-> +
-> +  gmi at 70090000 {
-> +    #address-cells = <1>;
-> +    #size-cells = <1>;
-
-I think 0 for size makes sense. I know that caused you problems before,
-but I am wondering if ...
-
-> +    ranges;
-
-... ranges is needed here? If we do have it, I am wondering if it should
-be a single entry for the chip-select that is being used. For now we
-could only support a ranges with one entry.
-
-	#address-cells = <1>;
-	#size-cells = <1>;
-	ranges = <4 0x48000000 0x00040000>;
-
-> +    nvidia,snor-mux-mode;
-> +    nvidia,snor-adv-inv;
-> +    nvidia,snor-cs-select = <4>;
-
-I would have expected these under bus at X node as they are specific to the
-GMI CS.
-
-I would also expect that the actual chip-select number is encoded in the
-reg property.
-
-> +
-> +    bus at 0,0 {
-
-bus at 4
-
-No mention of this bus node in the above documentation.
-
-> +      compatible = "simple-bus";
-> +      reg = <0 0>;
-
-reg = <4>;
-
-We should look up the chip-select from the reg property.
-
-> +      ranges;
-> +
-> +      #address-cells = <1>;
-> +      #size-cells = <1>;
-> +
-> +      can at 48000000 {
-> +        reg = <0x48000000 0x100>;
-> +        ...
-> +      };
-> +
-> +      can at 48040000 {
-> +        reg = <0x48040000 0x100>;
-> +        ...
-> +      };
-
-If we use ranges we could have ...
-
-	can at 0 {
-		reg = <0x0 0x100>;
-		...
-	};
-
-	can at 40000 {
-		reg = <0x40000 0x100>;
-		...
-	};
-
-Nit ... please use tabs for spacing as we do in the dtsi/dts files.
-
-Cheers
-Jon
+>>  };
+>>  
+>>  &cpu0 {
+>> @@ -230,6 +242,17 @@
+>>  				<MX6SX_PAD_CSI_DATA06__UART6_RTS_B	0x1b0b1>,
+>>  				<MX6SX_PAD_CSI_DATA07__UART6_CTS_B	0x1b0b1>;
+>>  		};
+>> +
+>> +		pinctrl_usdhc2: usdhc2grp {
+>> +			fsl,pins =
+>> +				<MX6SX_PAD_SD2_CMD__USDHC2_CMD		0x17059>,
+>> +				<MX6SX_PAD_SD2_CLK__USDHC2_CLK		0x10059>,
+>> +				<MX6SX_PAD_SD2_DATA0__USDHC2_DATA0	0x17059>,
+>> +				<MX6SX_PAD_SD2_DATA1__USDHC2_DATA1	0x17059>,
+>> +				<MX6SX_PAD_SD2_DATA2__USDHC2_DATA2	0x17059>,
+>> +				<MX6SX_PAD_SD2_DATA3__USDHC2_DATA3	0x17059>,
+>> +				<MX6SX_PAD_SD1_DATA0__GPIO6_IO_2	0x17059>; /* CD */
+>> +		};
+>>  	};
+>>  };
+>>  
+>> @@ -259,3 +282,14 @@
+>>  	uart-has-rtscts;
+>>  	status = "disabled";
+>>  };
+>> +
+>> +&usdhc2 {
+>> +	pinctrl-names = "default";
+>> +	pinctrl-0 = <&pinctrl_usdhc2>;
+>> +	bus-width = <4>;
+>> +	cd-gpios = <&gpio6 2 GPIO_ACTIVE_LOW>;
+>> +	no-1-8-v;
+>> +	keep-power-in-suspend;
+>> +	wakeup-source;
+>> +	status = "okay";
+>> +};
 
 -- 
-nvpublic
+SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Felix Imend?rffer, Jane Smithard, Graham Norton
+HRB 21284 (AG N?rnberg)
