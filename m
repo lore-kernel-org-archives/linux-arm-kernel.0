@@ -1,10 +1,10 @@
 From: jonathanh@nvidia.com (Jon Hunter)
-Date: Mon, 8 Aug 2016 14:47:51 +0100
-Subject: [PATCH 6/6] bus: Add support for Tegra Generic Memory Interface
-In-Reply-To: <1470512452-8322-7-git-send-email-mirza.krak@gmail.com>
+Date: Mon, 8 Aug 2016 15:44:31 +0100
+Subject: [PATCH 3/6] dt/bindings: Add bindings for Tegra GMI controller
+In-Reply-To: <1470512452-8322-4-git-send-email-mirza.krak@gmail.com>
 References: <1470512452-8322-1-git-send-email-mirza.krak@gmail.com>
- <1470512452-8322-7-git-send-email-mirza.krak@gmail.com>
-Message-ID: <fae8dbaf-53e9-dcfe-f755-32f7b28f4c9f@nvidia.com>
+ <1470512452-8322-4-git-send-email-mirza.krak@gmail.com>
+Message-ID: <901be576-a810-c630-9b83-de922e945df0@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,303 +12,179 @@ List-Id: linux-arm-kernel.lists.infradead.org
 On 06/08/16 20:40, Mirza Krak wrote:
 > From: Mirza Krak <mirza.krak@gmail.com>
 > 
-> The Generic Memory Interface bus can be used to connect high-speed
-> devices such as NOR flash, FPGAs, DSPs...
+> Document the devicetree bindings for the Generic Memory Interface (GMI)
+> bus driver found on Tegra SOCs.
 > 
 > Signed-off-by: Mirza Krak <mirza.krak@gmail.com>
 > ---
->  drivers/bus/Kconfig     |   7 ++
->  drivers/bus/Makefile    |   1 +
->  drivers/bus/tegra-gmi.c | 224 ++++++++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 232 insertions(+)
->  create mode 100644 drivers/bus/tegra-gmi.c
+>  .../devicetree/bindings/bus/nvidia,tegra20-gmi.txt | 99 ++++++++++++++++++++++
+>  1 file changed, 99 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/bus/nvidia,tegra20-gmi.txt
 > 
-> diff --git a/drivers/bus/Kconfig b/drivers/bus/Kconfig
-> index 3b205e2..88bbf2c 100644
-> --- a/drivers/bus/Kconfig
-> +++ b/drivers/bus/Kconfig
-> @@ -145,6 +145,13 @@ config TEGRA_ACONNECT
->  	  Driver for the Tegra ACONNECT bus which is used to interface with
->  	  the devices inside the Audio Processing Engine (APE) for Tegra210.
->  
-> +config TEGRA_GMI
-> +	tristate "Tegra Generic Memory Interface bus driver"
-> +		depends on ARCH_TEGRA
-> +		help
-> +			Driver for the Tegra Generic Memory Interface bus which can be used
-> +			to attach devices such as NOR, UART, FPGA and more.
-> +
->  config UNIPHIER_SYSTEM_BUS
->  	tristate "UniPhier System Bus driver"
->  	depends on ARCH_UNIPHIER && OF
-> diff --git a/drivers/bus/Makefile b/drivers/bus/Makefile
-> index ac84cc4..34e2bab 100644
-> --- a/drivers/bus/Makefile
-> +++ b/drivers/bus/Makefile
-> @@ -18,5 +18,6 @@ obj-$(CONFIG_OMAP_OCP2SCP)	+= omap-ocp2scp.o
->  obj-$(CONFIG_SUNXI_RSB)		+= sunxi-rsb.o
->  obj-$(CONFIG_SIMPLE_PM_BUS)	+= simple-pm-bus.o
->  obj-$(CONFIG_TEGRA_ACONNECT)	+= tegra-aconnect.o
-> +obj-$(CONFIG_TEGRA_GMI)		+= tegra-gmi.o
->  obj-$(CONFIG_UNIPHIER_SYSTEM_BUS)	+= uniphier-system-bus.o
->  obj-$(CONFIG_VEXPRESS_CONFIG)	+= vexpress-config.o
-> diff --git a/drivers/bus/tegra-gmi.c b/drivers/bus/tegra-gmi.c
+> diff --git a/Documentation/devicetree/bindings/bus/nvidia,tegra20-gmi.txt b/Documentation/devicetree/bindings/bus/nvidia,tegra20-gmi.txt
 > new file mode 100644
-> index 0000000..7a45442
+> index 0000000..046846e
 > --- /dev/null
-> +++ b/drivers/bus/tegra-gmi.c
-> @@ -0,0 +1,224 @@
-> +/*
-> + * Driver for NVIDIA Generic Memory Interface
-> + *
-> + * Copyright (C) 2016 Host Mobility AB. All rights reserved.
-> + *
-> + * This file is licensed under the terms of the GNU General Public
-> + * License version 2. This program is licensed "as is" without any
-> + * warranty of any kind, whether express or implied.
-> + */
-> +#include <linux/clk.h>
-> +#include <linux/delay.h>
-> +#include <linux/io.h>
-> +#include <linux/module.h>
-> +#include <linux/of_device.h>
-> +#include <linux/reset.h>
+> +++ b/Documentation/devicetree/bindings/bus/nvidia,tegra20-gmi.txt
+> @@ -0,0 +1,99 @@
+> +Device tree bindings for NVIDIA Tegra Generic Memory Interface bus
 > +
-> +#define TEGRA_GMI_CONFIG			0x00
-> +#define TEGRA_GMI_CONFIG_GO			BIT(31)
-> +#define TEGRA_GMI_BUS_WIDTH_32BIT	BIT(30)
-> +#define TEGRA_GMI_MUX_MODE			BIT(28)
-> +#define TEGRA_GMI_RDY_BEFORE_DATA	BIT(24)
-> +#define TEGRA_GMI_RDY_ACTIVE_HIGH	BIT(23)
-> +#define TEGRA_GMI_ADV_ACTIVE_HIGH	BIT(22)
-> +#define TEGRA_GMI_OE_ACTIVE_HIGH	BIT(21)
-> +#define TEGRA_GMI_CS_ACTIVE_HIGH	BIT(20)
-> +#define TEGRA_GMI_CS_SELECT(x)		((x & 0x7) << 4)
+> +The Generic Memory Interface bus enables memory transfers between internal and
+> +external memory. Can be used to attach various high speed devices such as
+> +synchronous/asynchronous NOR, FPGA, UARTS and more.
 > +
-> +#define TEGRA_GMI_TIMING0			0x10
-> +#define TEGRA_GMI_MUXED_WIDTH(x)	((x & 0xf) << 12)
-> +#define TEGRA_GMI_HOLD_WIDTH(x)		((x & 0xf) << 8)
-> +#define TEGRA_GMI_ADV_WIDTH(x)		((x & 0xf) << 4)
-> +#define TEGRA_GMI_CE_WIDTH(x)		(x & 0xf)
+> +The actual devices are instantiated from the child nodes of a GMI node.
 > +
-> +#define TEGRA_GMI_TIMING1			0x14
-> +#define TEGRA_GMI_WE_WIDTH(x)		((x & 0xff) << 16)
-> +#define TEGRA_GMI_OE_WIDTH(x)		((x & 0xff) << 8)
-> +#define TEGRA_GMI_WAIT_WIDTH(x)		(x & 0xff)
+> +Required properties:
+> +  - compatible : Should contain one of the following:
+> +        For Tegra20 must contain "nvidia,tegra20-gmi".
+> +        For Tegra30 must contain "nvidia,tegra30-gmi".
+> + - reg: Should contain GMI controller registers location and length.
+> + - clocks: Must contain an entry for each entry in clock-names.
+> + - clock-names: Must include the following entries: "gmi"
+> + - resets : Must contain an entry for each entry in reset-names.
+> + - reset-names : Must include the following entries: "gmi"
+> + - #address-cells: The number of cells used to represent physical base
+> +   addresses in the GMI address space.
+> + - #size-cells: The number of cells used to represent the size of an address
+> +   range in the GMI address space.
+> + - ranges: Mapping of the GMI address space to the CPU address space.
 > +
-> +struct tegra_gmi_priv {
-> +	void __iomem *base;
-> +
-> +	u32 snor_config;
-> +	u32 snor_timing0;
-> +	u32 snor_timing1;
-> +
-> +	struct clk *clk;
-> +};
-> +
-> +static void tegra_gmi_init(struct device *dev, struct tegra_gmi_priv *priv)
-> +{
-> +	writel(priv->snor_timing0, priv->base + TEGRA_GMI_TIMING0);
-> +	writel(priv->snor_timing1, priv->base + TEGRA_GMI_TIMING1);
-> +
-> +	priv->snor_config |= TEGRA_GMI_CONFIG_GO;
-> +	writel(priv->snor_config, priv->base + TEGRA_GMI_CONFIG);
-> +}
-> +
-> +static int tegra_gmi_parse_dt(struct device *dev, struct tegra_gmi_priv *priv)
-> +{
-> +	struct device_node *of_node = dev->of_node;
-> +	u32 property;
-> +
-> +	/* configuration */
-> +
-> +	if (of_property_read_bool(of_node, "nvidia,snor-data-width-32bit"))
-> +		priv->snor_config |= TEGRA_GMI_BUS_WIDTH_32BIT;
-> +
-> +	if (of_property_read_bool(of_node, "nvidia,snor-mux-mode"))
-> +		priv->snor_config |= TEGRA_GMI_MUX_MODE;
-> +
-> +	if (of_property_read_bool(of_node, "nvidia,snor-rdy-active-before-data"))
+> +Note that the GMI controller does not have any internal chip-select address
+> +decoding and if you want to access multiple devices external chip-select
+> +decoding must be provided. Furthermore, if you do have external logic to
 
-Line is over 80 characters.
+The above is not 100% accurate. I would say that because there is no
+chip-select address decoding, chip-selects either need to be managed via
+software or by employing external chip-select decoding logic.
 
-> +		priv->snor_config |= TEGRA_GMI_RDY_BEFORE_DATA;
-> +
-> +	if (of_property_read_bool(of_node, "nvidia,snor-rdy-inv"))
-> +		priv->snor_config |= TEGRA_GMI_RDY_ACTIVE_HIGH;
-> +
-> +	if (of_property_read_bool(of_node, "nvidia,snor-adv-inv"))
-> +		priv->snor_config |= TEGRA_GMI_ADV_ACTIVE_HIGH;
-> +
-> +	if (of_property_read_bool(of_node, "nvidia,snor-oe-inv"))
-> +		priv->snor_config |= TEGRA_GMI_OE_ACTIVE_HIGH;
-> +
-> +	if (of_property_read_bool(of_node, "nvidia,snor-cs-inv"))
-> +		priv->snor_config |= TEGRA_GMI_CS_ACTIVE_HIGH;
-> +
-> +	if (!of_property_read_u32(of_node, "nvidia,snor-cs-select", &property))
-> +		priv->snor_config |= TEGRA_GMI_CS_SELECT(property);
-> +
-> +	/* Timing, the default values that are provided are reset values */
-> +
-> +	if (!of_property_read_u32(of_node, "nvidia,snor-muxed-width", &property))
+> +support multiple devices this would assume that the devices use the same
+> +timing and so are probably the same type. It also assumes that they can fit in
+> +the 256MB address range.
 
-Line is over 80 characters.
-
-> +		priv->snor_timing0 |= TEGRA_GMI_MUXED_WIDTH(property);
-> +	else
-> +		priv->snor_timing0 |= TEGRA_GMI_MUXED_WIDTH(1);
-> +
-> +	if (!of_property_read_u32(of_node, "nvidia,snor-hold-width", &property))
-> +		priv->snor_timing0 |= TEGRA_GMI_HOLD_WIDTH(property);
-> +	else
-> +		priv->snor_timing0 |= TEGRA_GMI_HOLD_WIDTH(1);
-> +
-> +	if (!of_property_read_u32(of_node, "nvidia,snor-adv-width", &property))
-> +		priv->snor_timing0 |= TEGRA_GMI_ADV_WIDTH(property);
-> +	else
-> +		priv->snor_timing0 |= TEGRA_GMI_ADV_WIDTH(1);
-> +
-> +	if (!of_property_read_u32(of_node, "nvidia,snor-ce-width", &property))
-> +		priv->snor_timing0 |= TEGRA_GMI_CE_WIDTH(property);
-> +	else
-> +		priv->snor_timing0 |= TEGRA_GMI_CE_WIDTH(4);
-> +
-> +	if (!of_property_read_u32(of_node, "nvidia,snor-we-width", &property))
-> +		priv->snor_timing1 |= TEGRA_GMI_WE_WIDTH(property);
-> +	else
-> +		priv->snor_timing1 |= TEGRA_GMI_WE_WIDTH(1);
-> +
-> +	if (!of_property_read_u32(of_node, "nvidia,snor-oe-width", &property))
-> +		priv->snor_timing1 |= TEGRA_GMI_OE_WIDTH(property);
-> +	else
-> +		priv->snor_timing1 |= TEGRA_GMI_OE_WIDTH(1);
-> +
-> +	if (!of_property_read_u32(of_node, "nvidia,snor-wait-width", &property))
-> +		priv->snor_timing1 |= TEGRA_GMI_WAIT_WIDTH(property);
-> +	else
-> +		priv->snor_timing1 |= TEGRA_GMI_WAIT_WIDTH(3);
-> +
-> +	return of_platform_default_populate(of_node, NULL, dev);
-
-Seems odd to do this here. Why not as the last thing in probe once the
-GMI has been setup correctly?
-
-> +}
-> +
-> +static int tegra_gmi_probe(struct platform_device *pdev)
-> +{
-> +	struct resource *res;
-> +	struct clk *clk;
-> +	struct device *dev = &pdev->dev;
-> +	struct reset_control *rst;
-> +	struct tegra_gmi_priv *priv;
-> +	void __iomem *base;
-> +	int ret;
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	base = devm_ioremap_resource(dev, res);
-> +	if (IS_ERR(base))
-> +		return PTR_ERR(base);
-> +
-> +	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
-> +	if (!priv)
-> +		return -ENOMEM;
-> +
-> +	priv->base = base;
-
-If you allocate the memory first, you can get rid of this extra base
-variable.
-
-> +	clk = devm_clk_get(dev, "gmi");
-> +	if (IS_ERR(clk)) {
-> +		dev_err(dev, "can not get clock\n");
-> +		return PTR_ERR(clk);
-> +	}
-> +
-> +	priv->clk = clk;
-
-Why not set priv->clk directly from calling devm_clk_get? Then you don't
-this extra clk variable.
+Again this is only true for the case where you have external chip-select
+decoding logic, but would not be the case if software were to manage the
+chip-selects.
 
 > +
-> +	rst = devm_reset_control_get(dev, "gmi");
-> +	if (IS_ERR(rst)) {
-> +		dev_err(dev, "can not get reset\n");
-> +		return PTR_ERR(rst);
-> +	}
+> +Optional properties:
 > +
-> +	ret = tegra_gmi_parse_dt(dev, priv);
-> +	if (ret) {
-> +		dev_err(dev, "fail to create devices.\n");
-> +		return ret;
-> +	}
-> +
-> +	ret = clk_prepare_enable(clk);
-> +	if (ret) {
-> +		dev_err(dev, "fail to enable clock.\n");
-> +		return ret;
-> +	}
-> +
-> +	reset_control_assert(rst);
-> +	udelay(2);
-> +	reset_control_deassert(rst);
-> +
-> +	tegra_gmi_init(dev, priv);
-> +
-> +	dev_set_drvdata(dev, priv);
-> +
-> +	return 0;
-> +}
-> +
-> +static int tegra_gmi_remove(struct platform_device *pdev)
-> +{
-> +	struct device *dev = &pdev->dev;
+> + - nvidia,snor-data-width-32bit: Use 32bit data-bus, default is 16bit.
+> + - nvidia,snor-mux-mode: Enable address/data MUX mode.
+> + - nvidia,snor-rdy-active-before-data: Assert RDY signal one cycle before data.
+> +   If omitted it will be asserted with data.
+> + - nvidia,snor-rdy-inv: RDY signal is active high
+> + - nvidia,snor-adv-inv: ADV signal is active high
+> + - nvidia,snor-oe-inv: WE/OE signal is active high
+> + - nvidia,snor-cs-inv: CS signal is active high
+> + - nvidia,snor-cs-select: CS output pin configuration. Default is CS0
 
-Do you really need this dev variable?
+Nit ... I think "nvidia,snor-cs" is sufficient for the name. But I am
+not sure if we even need this. See below.
 
-> +	struct tegra_gmi_priv *priv = dev_get_drvdata(dev);
-> +	void __iomem *base = priv->base;
+> + 	<0> : CS0
+> +	<1> : CS1
+> +	<2> : CS2
+> +	<3> : CS3
+> +	<4> : CS4
+> +	<5> : CS5
+> +	<6> : CS6
+> +	<7> : CS7
+> +
+> +  Note that there is some special handling for the timing values.
+> +  From Tegra TRM:
+> +  Programming 0 means 1 clock cycle: actual cycle = programmed cycle + 1
+> +
+> + - nvidia,snor-muxed-width: Number of cycles MUX address/data asserted on the
+> +   bus. Valid values are 0-15, default is 1
+> + - nvidia,snor-hold-width: Number of cycles CE stays asserted after the
+> +   de-assertion of WR_N (in case of SLAVE/MASTER Request) or OE_N
+> +   (in case of MASTER Request). Valid values are 0-15, default is 1
+> + - nvidia,snor-adv-width: Number of cycles during which ADV stays asserted.
+> +   Valid values are 0-15, default is 1.
+> + - nvidia,snor-ce-width: Number of cycles before CE is asserted.
+> +   Valid values are 0-255, default is 4
 
-Do you really need this base variable?
+ce-width only occupies a 4-bit field and so the max is 15.
 
-> +	u32 config;
+> + - nvidia,snor-we-width: Number of cycles during which WE stays asserted.
+> +   Valid values are 0-15, default is 1
+> + - nvidia,snor-oe-width: Number of cycles during which OE stays asserted.
+> +   Valid values are 0-255, default is 1
+> + - nvidia,snor-wait-width: Number of cycles before READY is asserted.
+> +   Valid values are 0-255, default is 3
 > +
-> +	of_platform_depopulate(dev);
+> +Example with two SJA1000 CAN controllers connected to the GMI bus:
 > +
-> +	config = readl(base + TEGRA_GMI_CONFIG);
-> +	config &= ~TEGRA_GMI_CONFIG_GO;
-> +	writel(config, base + TEGRA_GMI_CONFIG);
-> +
-> +	clk_disable_unprepare(priv->clk);
+> +  gmi at 70090000 {
+> +    #address-cells = <1>;
+> +    #size-cells = <1>;
 
-What about asserting the reset?
+I think 0 for size makes sense. I know that caused you problems before,
+but I am wondering if ...
+
+> +    ranges;
+
+... ranges is needed here? If we do have it, I am wondering if it should
+be a single entry for the chip-select that is being used. For now we
+could only support a ranges with one entry.
+
+	#address-cells = <1>;
+	#size-cells = <1>;
+	ranges = <4 0x48000000 0x00040000>;
+
+> +    nvidia,snor-mux-mode;
+> +    nvidia,snor-adv-inv;
+> +    nvidia,snor-cs-select = <4>;
+
+I would have expected these under bus at X node as they are specific to the
+GMI CS.
+
+I would also expect that the actual chip-select number is encoded in the
+reg property.
 
 > +
-> +	return 0;
-> +}
+> +    bus at 0,0 {
+
+bus at 4
+
+No mention of this bus node in the above documentation.
+
+> +      compatible = "simple-bus";
+> +      reg = <0 0>;
+
+reg = <4>;
+
+We should look up the chip-select from the reg property.
+
+> +      ranges;
 > +
-> +static const struct of_device_id tegra_gmi_id_table[] = {
-> +	{ .compatible = "nvidia,tegra20-gmi", },
-> +	{ .compatible = "nvidia,tegra30-gmi", },
-> +	{ }
-> +};
-> +MODULE_DEVICE_TABLE(of, tegra_gmi_id_table);
+> +      #address-cells = <1>;
+> +      #size-cells = <1>;
 > +
-> +static struct platform_driver tegra_gmi_driver = {
-> +	.probe = tegra_gmi_probe,
-> +	.remove = tegra_gmi_remove,
-> +	.driver = {
-> +		.name		= "tegra-gmi",
-> +		.of_match_table	= tegra_gmi_id_table,
-> +	},
-> +};
-> +module_platform_driver(tegra_gmi_driver);
+> +      can at 48000000 {
+> +        reg = <0x48000000 0x100>;
+> +        ...
+> +      };
 > +
-> +MODULE_AUTHOR("Mirza Krak <mirza.krak@gmail.com");
-> +MODULE_DESCRIPTION("NVIDIA Tegra GMI Bus Driver");
-> +MODULE_LICENSE("GPL v2");
-> 
+> +      can at 48040000 {
+> +        reg = <0x48040000 0x100>;
+> +        ...
+> +      };
+
+If we use ranges we could have ...
+
+	can at 0 {
+		reg = <0x0 0x100>;
+		...
+	};
+
+	can at 40000 {
+		reg = <0x40000 0x100>;
+		...
+	};
+
+Nit ... please use tabs for spacing as we do in the dtsi/dts files.
 
 Cheers
 Jon
