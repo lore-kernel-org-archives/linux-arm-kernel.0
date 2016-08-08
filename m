@@ -1,108 +1,122 @@
 From: vinod.koul@intel.com (Vinod Koul)
-Date: Mon, 8 Aug 2016 14:21:55 +0530
+Date: Mon, 8 Aug 2016 14:32:03 +0530
 Subject: [PATCH] dmaengine: qcom_hidma: release the descriptor before the
  callback
-In-Reply-To: <71a15611-645f-7523-1c26-14b420aff667@codeaurora.org>
+In-Reply-To: <cff588a1-d85f-3d2c-ef61-1674d0d3ca92@codeaurora.org>
 References: <1468465076-27324-1-git-send-email-okaya@codeaurora.org>
  <ccffcabf-1448-57a1-d18b-715cfd46e906@codeaurora.org>
  <20160724062425.GW9681@localhost>
  <971733d9-fd18-2a1b-07c0-349b47747d49@codeaurora.org>
  <20160804125525.GF9681@localhost>
  <71a15611-645f-7523-1c26-14b420aff667@codeaurora.org>
-Message-ID: <20160808085155.GX9681@localhost>
+ <20160804144003.GV1041@n2100.armlinux.org.uk>
+ <cff588a1-d85f-3d2c-ef61-1674d0d3ca92@codeaurora.org>
+Message-ID: <20160808090203.GY9681@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 04, 2016 at 10:17:24AM -0400, Sinan Kaya wrote:
-> On 8/4/2016 8:55 AM, Vinod Koul wrote:
-> > Dmaengine tells transaction is complete. It does not say if the txn is
-> > success or failure. It can transfer data and not say if data was
-> > correct. A successful transaction implies data integrity as well, which
-> > dmaengine can't provide.
-> 
-> Thanks for describing this. I was confused about DMA_SUCCESS and DMA_COMPLETE.
-> I now understand that tx_success API just returns information that the request
-> was executed whether the result is error or not. This makes sense now.
-> 
-> However, if the txn is failure; then we should never call the client callback
-> since DMA engine cannot provide such feedback to the client without Dave's patch.
-> You are saying that the calling the callback is optional.
-
-Yes callback is optional, *BUT* not for driver. If a user has set a
-callback, you _have_ to invoke it. That is the expectation from user and
-you cannot selectively choose!
-
-When I say callback is optional, it means only from caller PoV, not from
-dmanegine driver. Caller may not have set it!
-
-> Then, the callback cannot be optional in the error case for old behavior.
-> 
-> How does the client know if memcpy executed or not? The client got its callback
-> and tx_status is also DMA_COMPLETE.
-
-So cookie status should be checked after callback. We can also report
-DMA_ERROR if you can detect one. Some hardware can do that (not very
-common though), but even if you report DMA_COMPLETE, that never implies
-success for transaction.
-
-> Is the client supposed to do a memcmp ? (BTW, it doesn't make sense).
-
-If someone really want to check data, then yes. But I don't really see
-the point in that. Users would anyone complain the bad data and you fix
-the bug :)
-
-> 
-> 
-> >> In my opinion, the new behavior is correct. Calling dma_cookie_complete(desc) all the time
-> >> > is not. Do you agree?
-> >> > 
-> >> > If yes, I can divide this patch into two. One to correct the ordering. Another one
-> >> > for behavioral change.
-> > See above..
+On Thu, Aug 04, 2016 at 11:27:46AM -0400, Sinan Kaya wrote:
+> On 8/4/2016 10:40 AM, Russell King - ARM Linux wrote:
+> > On Thu, Aug 04, 2016 at 10:17:24AM -0400, Sinan Kaya wrote:
+> >> On 8/4/2016 8:55 AM, Vinod Koul wrote:
+> >>> Dmaengine tells transaction is complete. It does not say if the txn is
+> >>> success or failure. It can transfer data and not say if data was
+> >>> correct. A successful transaction implies data integrity as well, which
+> >>> dmaengine can't provide.
+> >>
+> >> Thanks for describing this. I was confused about DMA_SUCCESS and DMA_COMPLETE.
+> >> I now understand that tx_success API just returns information that the request
+> >> was executed whether the result is error or not. This makes sense now.
+> >>
+> >> However, if the txn is failure; then we should never call the client callback
+> >> since DMA engine cannot provide such feedback to the client without Dave's patch.
+> >> You are saying that the calling the callback is optional.
+> >>
+> >> Then, the callback cannot be optional in the error case for old behavior.
+> >>
+> >> How does the client know if memcpy executed or not? The client got its callback
+> >> and tx_status is also DMA_COMPLETE.
 > > 
-> > A callback or tx_status will only tell you the txn is completed. That is
-> > why we have DMA_COMPLETE and not DMA_SUCCESS.
+> > If an error occurred, then dma_async_is_tx_complete() is supposed to
+> > return DMA_ERROR.  It's up to the DMA engine driver to ensure that
+> > this happens if it has error detection abilities.
 > > 
 > 
-> Still calling the callback and returning DMA_COMPLETE isn't right. There is no indication
-> of an actual DMA error. The transaction is complete but data integrity failed.
+> Well, that's not what I'm getting from Vinod and also from the current usage
+> in most of the drivers that I looked.
 
-Yes that is the idea..
-
-You are telling client, a transaction has been completed from controller
-side. Is the data transfer and integrity is guaranteed, we cannot know..
-
-Data integrity is a function of many other factors, some of which are
-not in control of dmaengine. So it cannot guarantee success.
-
-Even the controllers which can report errors, can do that only from
-dmaengine PoV, not really from system PoV.
-
+Sorry but, you are not interpreting it correctly. Me and Russell are saying the
+same thing!
 
 > 
-> > So current order seems fine to me!
+> The current drivers implement tx_status as follows.
 > 
-> I posted v2 of this patch without introducing the behavior change leaving the behavior discussion
-> out for another patch. The current code will not call the callback if error was observed.
-
-That's not right, as explained above.
-
-> This patch is needed to fix a race condition as the commit message describes.
-> The callback is called before returning the descriptor back to free pool. 
+> static enum dma_status xyz_tx_status(struct dma_chan *chan,
+> 	dma_cookie_t cookie, struct dma_tx_state *state) 
+> {
+> ...
+> 	ret = dma_cookie_status(&c->vc.chan, cookie, state);
+> 	if (ret == DMA_COMPLETE)
+> 		return ret; 
+> ...
+> }
 > 
-> If the client calls free resources, the descriptor that was not returned to free pool gets lost due
-> to race condition.
+> What Vinod is telling me that I need to set the cookie to complete 
+> whether the transaction is successful or not if the request was accepted
+> by HW. xyz_tx_status is just an indication that the transaction was accepted
+> by HW. An error can happen as a result of transaction execution.
 
-Hmmm, if you have txn's pending and client wants to free up, shouldn't
-the pending txn's be cleaned up? Sound like a different bug to me..
+Nope, if the txn is completed you mark it complete. If you can detect error
+(can you??) then you can report DMA_ERROR.
 
-So if I submit 5 txn's and now want to freeup, will you still leak
-descriptors? Doesn't sound as right behaviour to me.
+In that latter case do not use dma_async_is_complete() to check. You would
+need to store and report that cookie 'x' failed which you report status in
+.tx_statis()
 
-> I'll refactor the code after Dave's change for passing the error code while calling the
-> callback. That will be a different patch anyhow.
+> 
+> If I call dma_cookie_complete for all transactions regardless of transaction
+> success or not, then the xyz_tx_status returns DMA_COMPLETE. 
 
-Yes the error reporting is different
+Again that is based on your implementation.
+
+> This also matches what Vinod is saying. The transaction is complete but
+> it may not be success. I'm saying that if we follow this scheme, then
+> we should not call the callback.
+
+That is not in driver's control. If the callback is set, you have to call
+it. Client may choose to not set it.
+
+> I also made the argument that the driver should not call dma_cookie_complete
+> for failure cases and somehow return an error for transactions that failed. 
+> This is your suggestion.
+> 
+> I don't think it matches Vinod's expectation.
+
+It does!
+
+> > Most of the helpers in drivers/dma/dmaengine.h are there to _assist_
+> > the driver writer - they can't do magic.  dma_cookie_status() will
+> > return from the point of view of the generic DMA code what the status
+> > of a particular cookie is, and the cookie state.  It doesn't take
+> > care of whether a particular transaction associated with a cookie
+> > failed or not - that's up to the driver.
+> > 
+> > So, if dma_cookie_status() says that a cookie has DMA_COMPLETED
+> > status, and the DMA engine is able to detect errors on individual
+> > transfers, then the driver needs to do further status lookup to
+> > determine whether the particular transaction referred to by the
+> > cookie did fail, and modify the returned status appropriately.
+> > 
+> > If dma_cookie_status() says that the cookie is DMA_IN_PROGRESS,
+> > then the driver is expected to calculate and report the residue
+> > (the remaining number of bytes) of the referred to transaction.
+> > 
+> 
+> This part is fine. I'm worried about transactions that are failing.
+
+And you issue is complete orthogonal to this debate. I am not saying we
+should not discuss this, but you fix would be entirely different here (going
+by data you have provided till now)
 
 -- 
 ~Vinod
