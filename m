@@ -1,47 +1,85 @@
 From: tn@semihalf.com (Tomasz Nowicki)
-Date: Mon,  8 Aug 2016 15:05:36 +0200
-Subject: [RFC PATCH V5 0/5] ECAM quirks handling for ARM64 platforms
-Message-ID: <1470661541-26270-1-git-send-email-tn@semihalf.com>
+Date: Mon,  8 Aug 2016 15:05:37 +0200
+Subject: [RFC PATCH V5 1/5] PCI: Embed pci_ecam_ops in pci_config_window
+ structure
+In-Reply-To: <1470661541-26270-1-git-send-email-tn@semihalf.com>
+References: <1470661541-26270-1-git-send-email-tn@semihalf.com>
+Message-ID: <1470661541-26270-2-git-send-email-tn@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quirk handling relies on an idea of matching MCFG OEM ID, TABLE ID and
-revision (the ones from standard header of MCFG table).
+pci_config_window keeps pointer to pci_ecam_ops and every time
+we want to deallocate pci_config_window (pci_ecam_free()) we need to make
+sure to free pci_ecam_ops in case it was dynamically allocated prior to
+pci_ecam_create() call.
 
-Static array is used to keep quirk entries. Each entry consists of
-mentioned MCFG IDs along with custom pci_ops structure and initialization call.
+To avoid that extra effort, embed pci_ecam_ops in pci_config_window,
+instead of just a pointer.
 
-As an example, the last patch presents quirk handling mechanism usage for
-ThunderX PEM driver.
+Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+To: Jayachandran C <jchandra@broadcom.com>
+---
+ arch/arm64/kernel/pci.c  | 2 +-
+ drivers/pci/ecam.c       | 6 +++---
+ include/linux/pci-ecam.h | 2 +-
+ 3 files changed, 5 insertions(+), 5 deletions(-)
 
-v4 -> v5
-- rebase against v4.8-rc1
-- rework to exact MCFG OEM ID, TABLE ID, rev match
-  - use memcmp instead of strncmp
-  - no substring match
-- fix typos and dmesg message
-
-Tomasz Nowicki (5):
-  PCI: Embed pci_ecam_ops in pci_config_window structure
-  PCI/ACPI: Move ACPI ECAM mapping to generic MCFG driver
-  PCI: Check platform specific ECAM quirks
-  ARM64/PCI: Start using quirks handling for ACPI based PCI host
-    controller
-  PCI: thunder-pem: Support quirky configuration space access for ACPI
-    based PCI host controller
-
- arch/arm64/kernel/pci.c            | 42 +----------------
- drivers/acpi/pci_mcfg.c            | 40 ++++++++++++++++
- drivers/pci/ecam.c                 |  6 +--
- drivers/pci/host/Makefile          |  1 +
- drivers/pci/host/mcfg-quirks.c     | 93 ++++++++++++++++++++++++++++++++++++
- drivers/pci/host/mcfg-quirks.h     | 24 ++++++++++
- drivers/pci/host/pci-thunder-pem.c | 96 ++++++++++++++++++++++++++++++++------
- include/linux/pci-acpi.h           |  5 ++
- include/linux/pci-ecam.h           |  2 +-
- 9 files changed, 252 insertions(+), 57 deletions(-)
- create mode 100644 drivers/pci/host/mcfg-quirks.c
- create mode 100644 drivers/pci/host/mcfg-quirks.h
-
+diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
+index acf3872..981e828 100644
+--- a/arch/arm64/kernel/pci.c
++++ b/arch/arm64/kernel/pci.c
+@@ -183,7 +183,7 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
+ 		return NULL;
+ 	}
+ 
+-	acpi_pci_root_ops.pci_ops = &ri->cfg->ops->pci_ops;
++	acpi_pci_root_ops.pci_ops = &ri->cfg->ops.pci_ops;
+ 	bus = acpi_pci_root_create(root, &acpi_pci_root_ops, &ri->common,
+ 				   ri->cfg);
+ 	if (!bus)
+diff --git a/drivers/pci/ecam.c b/drivers/pci/ecam.c
+index 43ed08d..24242f0 100644
+--- a/drivers/pci/ecam.c
++++ b/drivers/pci/ecam.c
+@@ -52,7 +52,7 @@ struct pci_config_window *pci_ecam_create(struct device *dev,
+ 		return ERR_PTR(-ENOMEM);
+ 
+ 	cfg->parent = dev;
+-	cfg->ops = ops;
++	cfg->ops = *ops;
+ 	cfg->busr.start = busr->start;
+ 	cfg->busr.end = busr->end;
+ 	cfg->busr.flags = IORESOURCE_BUS;
+@@ -138,7 +138,7 @@ void __iomem *pci_ecam_map_bus(struct pci_bus *bus, unsigned int devfn,
+ 			       int where)
+ {
+ 	struct pci_config_window *cfg = bus->sysdata;
+-	unsigned int devfn_shift = cfg->ops->bus_shift - 8;
++	unsigned int devfn_shift = cfg->ops.bus_shift - 8;
+ 	unsigned int busn = bus->number;
+ 	void __iomem *base;
+ 
+@@ -149,7 +149,7 @@ void __iomem *pci_ecam_map_bus(struct pci_bus *bus, unsigned int devfn,
+ 	if (per_bus_mapping)
+ 		base = cfg->winp[busn];
+ 	else
+-		base = cfg->win + (busn << cfg->ops->bus_shift);
++		base = cfg->win + (busn << cfg->ops.bus_shift);
+ 	return base + (devfn << devfn_shift) + where;
+ }
+ 
+diff --git a/include/linux/pci-ecam.h b/include/linux/pci-ecam.h
+index 7adad20..0ce2920 100644
+--- a/include/linux/pci-ecam.h
++++ b/include/linux/pci-ecam.h
+@@ -39,7 +39,7 @@ struct pci_config_window {
+ 	struct resource			res;
+ 	struct resource			busr;
+ 	void				*priv;
+-	struct pci_ecam_ops		*ops;
++	struct pci_ecam_ops		ops;
+ 	union {
+ 		void __iomem		*win;	/* 64-bit single mapping */
+ 		void __iomem		**winp; /* 32-bit per-bus mapping */
 -- 
 1.9.1
