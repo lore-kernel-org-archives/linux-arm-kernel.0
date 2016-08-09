@@ -1,114 +1,66 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue,  9 Aug 2016 16:51:07 +0100
-Subject: [PATCH] drivers/perf: arm_pmu: fix legacy affinity-less DT support
-Message-ID: <1470757867-13554-1-git-send-email-mark.rutland@arm.com>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Tue, 9 Aug 2016 23:54:38 +0800
+Subject: [rjarzmik:work/v4l2 5/14]
+ drivers/media/platform/soc_camera/pxa_camera.c:742:18: error: initialization
+ from incompatible pointer type
+Message-ID: <201608092336.xjDWSTeR%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 19a469a58720ea96 ("drivers/perf: arm-pmu: Handle per-interrupt
-affinity mask") relies on using_spi being valid, but this is only
-initialised correctly in the presence of an interrupt-affinity property,
-which legacy DTBs do not have.
+tree:   https://github.com/rjarzmik/linux work/v4l2
+head:   1646e167bd7bc014ad5c385e6a3be70d6670bbf9
+commit: cce767df8b5328262c87e23ca7a5d74c17bcdad0 [5/14] media: platform: pxa_camera: convert to vb2
+config: arm-pxa_defconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 5.4.0-6) 5.4.0 20160609
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout cce767df8b5328262c87e23ca7a5d74c17bcdad0
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
-In the absence of an interrupt-affinity property, using_spi is always
-false (regardless of whether SPIs are actually used), so we call
-irq_get_percpu_devid_partition(irq). This returns -EINVAL, and we give
-up, passing on this return value.
+Note: the rjarzmik/work/v4l2 HEAD 1646e167bd7bc014ad5c385e6a3be70d6670bbf9 builds fine.
+      It only hurts bisectibility.
 
-The code which determines using_spi also verifies that we do not have
-mixed SPI/PPI interrupts. Even in the absence of an interrupt-affinity
-property we do not support mixed SPI/PPI cases, so pull the validation
-logic above the main loop, ensuring that using_spi is always valid.
+All error/warnings (new ones prefixed by >>):
 
-At the same time, have the error message to give the path of the PMU
-node, rather than a CPU node, as the mismatch is a property of the
-entire set of PMU interrupts rather than a particular CPU associated
-with it.
+>> drivers/media/platform/soc_camera/pxa_camera.c:742:18: error: initialization from incompatible pointer type [-Werror=incompatible-pointer-types]
+     .queue_setup  = pxac_vb2_queue_setup,
+                     ^
+   drivers/media/platform/soc_camera/pxa_camera.c:742:18: note: (near initialization for 'pxac_vb2_ops.queue_setup')
+   drivers/media/platform/soc_camera/pxa_camera.c: In function 'pxa_camera_probe':
+>> drivers/media/platform/soc_camera/pxa_camera.c:1653:21: error: implicit declaration of function 'vb2_dma_sg_init_ctx' [-Werror=implicit-function-declaration]
+     pcdev->alloc_ctx = vb2_dma_sg_init_ctx(&pdev->dev);
+                        ^
+>> drivers/media/platform/soc_camera/pxa_camera.c:1653:19: warning: assignment makes pointer from integer without a cast [-Wint-conversion]
+     pcdev->alloc_ctx = vb2_dma_sg_init_ctx(&pdev->dev);
+                      ^
+   drivers/media/platform/soc_camera/pxa_camera.c: In function 'pxa_camera_remove':
+>> drivers/media/platform/soc_camera/pxa_camera.c:1793:2: error: implicit declaration of function 'vb2_dma_sg_cleanup_ctx' [-Werror=implicit-function-declaration]
+     vb2_dma_sg_cleanup_ctx(pcdev->alloc_ctx);
+     ^
+   cc1: some warnings being treated as errors
 
-Fixes: 19a469a58720ea96 ("drivers/perf: arm-pmu: Handle per-interrupt affinity mask")
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Reported-by: Geert Uytterhoeven <geert@linux-m68k.org>
-Reported-by: Robin Murphy <robin.murphy@arm.com>
-Tested-by: Robin Murphy <robin.murphy@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
+vim +742 drivers/media/platform/soc_camera/pxa_camera.c
+
+   736	static void pxac_vb2_stop_streaming(struct vb2_queue *vq)
+   737	{
+   738		vb2_wait_for_all_buffers(vq);
+   739	}
+   740	
+   741	static struct vb2_ops pxac_vb2_ops = {
+ > 742		.queue_setup		= pxac_vb2_queue_setup,
+   743		.buf_init		= pxac_vb2_init,
+   744		.buf_prepare		= pxac_vb2_prepare,
+   745		.buf_queue		= pxac_vb2_queue,
+
 ---
- drivers/perf/arm_pmu.c | 37 ++++++++++++++++++++-----------------
- 1 file changed, 20 insertions(+), 17 deletions(-)
-
-It's been pointed out to me that Marc send a patch a while ago [1] fixing the
-same issue, but for some reason that didn't get queued.
-
-This patch had the added benefit of ensuring we always avoid mismatched SPI/PPI
-mixes, but otherwise either patch should avoid the issue.
-
-Mark.
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-July/444404.html
-
-diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
-index 6ccb994..7d3c690 100644
---- a/drivers/perf/arm_pmu.c
-+++ b/drivers/perf/arm_pmu.c
-@@ -900,38 +900,41 @@ static int probe_current_pmu(struct arm_pmu *pmu,
- 
- static int of_pmu_irq_cfg(struct arm_pmu *pmu)
- {
--	int *irqs, i = 0;
-+	int *irqs, i;
- 	bool using_spi = false;
- 	struct platform_device *pdev = pmu->plat_device;
- 
-+	/* Check the IRQ type and prohibit a mix of PPIs and SPIs */
-+	for (i = 0; i < pdev->num_resources; i++) {
-+		int irq = platform_get_irq(pdev, i);
-+		if (irq >= 0) {
-+			bool spi = !irq_is_percpu(irq);
-+
-+			if (i > 0 && spi != using_spi) {
-+				pr_err("PPI/SPI IRQ type mismatch for %s!\n",
-+					of_node_full_name(pdev->dev.of_node));
-+				return -EINVAL;
-+			}
-+
-+			using_spi = spi;
-+		}
-+	}
-+
- 	irqs = kcalloc(pdev->num_resources, sizeof(*irqs), GFP_KERNEL);
- 	if (!irqs)
- 		return -ENOMEM;
- 
-+	i = 0;
-+
- 	do {
- 		struct device_node *dn;
--		int cpu, irq;
-+		int cpu;
- 
- 		/* See if we have an affinity entry */
- 		dn = of_parse_phandle(pdev->dev.of_node, "interrupt-affinity", i);
- 		if (!dn)
- 			break;
- 
--		/* Check the IRQ type and prohibit a mix of PPIs and SPIs */
--		irq = platform_get_irq(pdev, i);
--		if (irq >= 0) {
--			bool spi = !irq_is_percpu(irq);
--
--			if (i > 0 && spi != using_spi) {
--				pr_err("PPI/SPI IRQ type mismatch for %s!\n",
--					dn->name);
--				kfree(irqs);
--				return -EINVAL;
--			}
--
--			using_spi = spi;
--		}
--
- 		/* Now look up the logical CPU number */
- 		for_each_possible_cpu(cpu) {
- 			struct device_node *cpu_dn;
--- 
-1.9.1
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 29839 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160809/06f49dc8/attachment-0001.obj>
