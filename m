@@ -1,72 +1,32 @@
-From: hzpeterchen@gmail.com (Peter Chen)
-Date: Tue, 9 Aug 2016 16:59:04 +0800
-Subject: [RESEND PATCH] usb: hub: change CLEAR_FEATURE to SET_FEATURE
-In-Reply-To: <20160809082555.GA17073@kroah.com>
-References: <1470713487-7596-1-git-send-email-yonglong.wu@mediatek.com>
- <CAL411-pcupjH7xBH9rR8hs5_EGDidcO3JFkRtE4ENpgq7qvmcQ@mail.gmail.com>
- <1470730076.4647.10.camel@mhfsdcap03> <20160809082555.GA17073@kroah.com>
-Message-ID: <CAL411-oJrAjT012=ohS4_5155xckx35NiVGF-gqNkWW2OHYc_Q@mail.gmail.com>
+From: romain.perier@free-electrons.com (Romain Perier)
+Date: Tue,  9 Aug 2016 11:03:13 +0200
+Subject: [PATCH 0/7] Various fixes for the cesa driver
+Message-ID: <1470733400-23621-1-git-send-email-romain.perier@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 9, 2016 at 4:25 PM, Greg Kroah-Hartman
-<gregkh@linuxfoundation.org> wrote:
-> On Tue, Aug 09, 2016 at 04:07:56PM +0800, yonglong.wu wrote:
->> Hi,
->> On Tue, 2016-08-09 at 14:29 +0800, Peter Chen wrote:
->>
->>     On Tue, Aug 9, 2016 at 11:31 AM, Yonglong Wu <yonglong.wu@mediatek.com> wrote:
->>     > From: Yonglong Wu <yonglong.wu@mediatek.com>
->>     >
->>     > According to USB30 specification, the Function Remote Wakeup field can be
->>     > modified by the SetFeature() requests. SetFeature() is recommended to use.
->>     >
->>     > Signed-off-by: Yonglong Wu <yonglong.wu@mediatek.com>
->>     > ---
->>     >  drivers/usb/core/hub.c |    2 +-
->>     >  1 file changed, 1 insertion(+), 1 deletion(-)
->>     >
->>     > diff --git a/drivers/usb/core/hub.c b/drivers/usb/core/hub.c
->>     > index bee1351..a6f5095 100644
->>     > --- a/drivers/usb/core/hub.c
->>     > +++ b/drivers/usb/core/hub.c
->>     > @@ -3111,7 +3111,7 @@ static int usb_disable_remote_wakeup(struct usb_device *udev)
->>     >                                 USB_CTRL_SET_TIMEOUT);
->>     >         else
->>     >                 return usb_control_msg(udev, usb_sndctrlpipe(udev, 0),
->>     > -                               USB_REQ_CLEAR_FEATURE, USB_RECIP_INTERFACE,
->>     > +                               USB_REQ_SET_FEATURE, USB_RECIP_INTERFACE,
->>     >                                 USB_INTRF_FUNC_SUSPEND, 0, NULL, 0,
->>     >                                 USB_CTRL_SET_TIMEOUT);
->>     >  }
->>     > --
->>     > 1.7.9.5
->>     >
->>
->>     This requirement is so strange, would you please list the detail
->>     chapter at specification.
->>
->>
->> In USB20 specification, describes in chapter 9.4.5: The Remote Wakeup field can
->> be modified by the SetFeature() and ClearFeature() requests using the
->> DEVICE_REMOTE_WAKEUP feature selector.
->>
->> In USB30 specification, also describes in chapter 9.4.5: The Function Remote
->> Wakeup field can be modified by the SetFeature() requests using the
->> FUNCTION_SUSPEND feature selector.
->>
->> In USB30 specification only mentioned SetFeature().
->
+This patches series contains various fixes for ahash requests, dma
+operations and an important fixe in the core of the driver (cesa.c). It
+also includes some code cleanups.
 
-Thanks for your information, you may add chapter 9.4.9 Set Feature reference,
-It describes Function Remote Wake Enabled/Disabled at suspend options, then
-the reader can know we can use SET_FEATURE to disable function remote wakeup.
+Romain Perier (3):
+  crypto: marvell - Update transformation context for each dequeued req
+  crypto: marvell - Don't overwrite default creq->state during
+    initialization
+  crypto: marvell - Don't hardcode block size in mv_cesa_ahash_cache_req
 
-Peter
+Thomas Petazzoni (4):
+  crypto: marvell: be explicit about destination in mv_cesa_dma_add_op()
+  crypto: marvell: remove unused parameter in
+    mv_cesa_ahash_dma_add_cache()
+  crypto: marvell: turn mv_cesa_ahash_init() into a function returning
+    void
+  crypto: marvell: make mv_cesa_ahash_cache_req() return bool
 
-> Can you put this information in the changelog text when you resend this
-> again?
->
-> thanks,
->
-> greg k-h
+ drivers/crypto/marvell/cesa.c |  1 +
+ drivers/crypto/marvell/hash.c | 44 +++++++++++++++++++++----------------------
+ drivers/crypto/marvell/tdma.c |  1 +
+ 3 files changed, 23 insertions(+), 23 deletions(-)
+
+-- 
+2.8.1
