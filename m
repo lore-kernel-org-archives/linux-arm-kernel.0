@@ -1,50 +1,43 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Tue,  9 Aug 2016 12:29:20 +0200
-Subject: [RFC PATCH v3 6/8] dt-bindings: arm: Update arm,
- scpi bindings with Meson GXBB SCPI
+Date: Tue,  9 Aug 2016 12:29:17 +0200
+Subject: [RFC PATCH v3 3/8] scpi: Add vendor_send_message to enable access to
+ vendor commands
 In-Reply-To: <1470738562-20026-1-git-send-email-narmstrong@baylibre.com>
 References: <1470738562-20026-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1470738562-20026-7-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1470738562-20026-4-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Adds an optional vendor_send_message to the scpi to enable sending
+vendor platform specific commands to the SCP firmware.
+
 Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 ---
- Documentation/devicetree/bindings/arm/arm,scpi.txt | 8 +++++---
- 1 file changed, 5 insertions(+), 3 deletions(-)
+ include/linux/scpi_protocol.h | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/arm,scpi.txt b/Documentation/devicetree/bindings/arm/arm,scpi.txt
-index faa4b44..04bc171 100644
---- a/Documentation/devicetree/bindings/arm/arm,scpi.txt
-+++ b/Documentation/devicetree/bindings/arm/arm,scpi.txt
-@@ -7,7 +7,7 @@ by Linux to initiate various system control and power operations.
+diff --git a/include/linux/scpi_protocol.h b/include/linux/scpi_protocol.h
+index 8e21e3a..dd5d81d 100644
+--- a/include/linux/scpi_protocol.h
++++ b/include/linux/scpi_protocol.h
+@@ -58,6 +58,8 @@ struct scpi_sensor_info {
+  *	OPP is an index to the list return by @dvfs_get_info
+  * @dvfs_get_info: returns the DVFS capabilities of the given power
+  *	domain. It includes the OPP list and the latency information
++ * @vendor_send_message: vendor specific message sending, arg can specify
++ *	a scpi implementation specific argument
+  */
+ struct scpi_ops {
+ 	u32 (*get_version)(void);
+@@ -72,6 +74,9 @@ struct scpi_ops {
+ 	int (*sensor_get_value)(u16, u64 *);
+ 	int (*device_get_power_state)(u16);
+ 	int (*device_set_power_state)(u16, u8);
++	int (*vendor_send_message)(u8 cmd, unsigned long arg,
++				   void *tx_buf, unsigned int tx_len,
++				   void *rx_buf, unsigned int rx_len);
+ };
  
- Required properties:
- 
--- compatible : should be "arm,scpi"
-+- compatible : should be "arm,scpi" or "amlogic,meson-gxbb-scpi"
- - mboxes: List of phandle and mailbox channel specifiers
- 	  All the channels reserved by remote SCP firmware for use by
- 	  SCPI message protocol should be specified in any order
-@@ -60,7 +60,8 @@ A small area of SRAM is reserved for SCPI communication between application
- processors and SCP.
- 
- Required properties:
--- compatible : should be "arm,juno-sram-ns" for Non-secure SRAM on Juno
-+- compatible : should be "arm,juno-sram-ns" for Non-secure SRAM on Juno,
-+		or "amlogic,meson-gxbb-sram" for Amlogic GXBB SoC.
- 
- The rest of the properties should follow the generic mmio-sram description
- found in ../../sram/sram.txt
-@@ -70,7 +71,8 @@ Each sub-node represents the reserved area for SCPI.
- Required sub-node properties:
- - reg : The base offset and size of the reserved area with the SRAM
- - compatible : should be "arm,juno-scp-shmem" for Non-secure SRAM based
--	       shared memory on Juno platforms
-+	       shared memory on Juno platforms or
-+	       "amlogic,meson-gxbb-scp-shmem" for Amlogic GXBB SoC.
- 
- Sensor bindings for the sensors based on SCPI Message Protocol
- --------------------------------------------------------------
+ #if IS_REACHABLE(CONFIG_SCPI_FW)
 -- 
 2.7.0
