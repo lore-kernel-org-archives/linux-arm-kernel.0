@@ -1,36 +1,53 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Tue, 09 Aug 2016 12:58:49 +0200
-Subject: [PATCH] ARM: dts: add rk3288-firefly-reload
-In-Reply-To: <C2BE77CA-A59B-4128-8802-E3E36FACDABA@rock-chips.com>
-References: <1549971.ctkvOGm2xW@diego>
- <CAFLEztTROearSEcgzV3EVHFcRcMQpLhAQ6BXP-dDyRDAWybaxg@mail.gmail.com>
- <C2BE77CA-A59B-4128-8802-E3E36FACDABA@rock-chips.com>
-Message-ID: <13761657.UM4fvlJBBq@diego>
+From: vijay.kilari@gmail.com (vijay.kilari at gmail.com)
+Date: Tue,  9 Aug 2016 16:28:42 +0530
+Subject: [RFC PATCH v2 0/4] arm/arm64: vgic-new: Implement API for vGICv3 live
+ migration
+Message-ID: <1470740326-27751-1-git-send-email-vijay.kilari@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, 9. August 2016, 18:06:33 schrieb Randy Li:
-> ??? iPad ??
-> 
-> > ?? <jacobchen110@gmail.com> ? 2016?8?9? ??6:02 ???
-> > 
-> > well?it has already been added....
-> > 
-> > The root cause is not act8846. Firefly have a bug with sdmmc and it
-> > seems they didn't fix it in firefly-reload.
-> > 
-> > http://bbs.t-firefly.com/forum.php?mod=viewthread&tid=256
+From: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
 
-Thanks Jacob for pointing out this issue - I was always wondering why it 
-wasn't working :-) .
+This patchset adds API for saving and restoring
+of VGICv3 registers to support live migration with new vgic feature.
+This API definition is as per version of VGICv3 specification
+http://lists.infradead.org/pipermail/linux-arm-kernel/2016-July/445611.html
 
+To test live migration with QEMU, use below patch series
+https://lists.gnu.org/archive/html/qemu-devel/2016-08/msg01444.html
 
-> Yes, Jacob is right. Those high speed options need the voltage down to 1.8v.
-> They should be removed.
+The patch 3 & 4 are picked from the Pavel's previous implementation.
+http://www.spinics.net/lists/kvm/msg122040.html
 
-Randy, can you provide a follow-up patch that removes these excess properties 
-please?
+v1 => v2:
+ - The init sequence change patch is no more required.
+   Fixed in patch 2 by using static vgic_io_dev regions structure instead
+   of using dynamic allocation pointer.
+ - Updated commit message of patch 4.
+ - Dropped usage of union to manage 32-bit and 64-bit access in patch 1.
+   Used local variable for 32-bit access.
+ - Updated macro __ARM64_SYS_REG and ARM64_SYS_REG in 
+   arch/arm64/include/uapi/asm/kvm.h as per qemu requirements.
 
+Vijaya Kumar K (4):
+  arm/arm64: vgic-new: Introduce 64-bit reg access support
+  arm/arm64: vgic-new: Add distributor and redistributor access
+  arm/arm64: vgic-new: Introduce find_reg_by_id()
+  arm/arm64: vgic-new: Implement VGICv3 CPU interface access
 
-Thanks
-Heiko
+ arch/arm64/include/uapi/asm/kvm.h   |  18 ++-
+ arch/arm64/kvm/Makefile             |   1 +
+ arch/arm64/kvm/sys_regs.c           |  22 ++--
+ arch/arm64/kvm/sys_regs.h           |   4 +
+ include/linux/irqchip/arm-gic-v3.h  |   4 +
+ virt/kvm/arm/vgic/vgic-kvm-device.c | 138 +++++++++++++++++++---
+ virt/kvm/arm/vgic/vgic-mmio-v2.c    |   4 +-
+ virt/kvm/arm/vgic/vgic-mmio-v3.c    | 119 +++++++++++++++++++
+ virt/kvm/arm/vgic/vgic-mmio.c       |   2 +-
+ virt/kvm/arm/vgic/vgic-sys-reg-v3.c | 225 ++++++++++++++++++++++++++++++++++++
+ virt/kvm/arm/vgic/vgic.h            |  14 +++
+ 11 files changed, 525 insertions(+), 26 deletions(-)
+ create mode 100644 virt/kvm/arm/vgic/vgic-sys-reg-v3.c
+
+-- 
+1.9.1
