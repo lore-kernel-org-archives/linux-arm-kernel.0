@@ -1,76 +1,32 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue,  9 Aug 2016 14:19:04 +0200
-Subject: [PATCH 2/2] ARM: dts: alt: add MMCIF support
-In-Reply-To: <1470745144-5394-1-git-send-email-horms+renesas@verge.net.au>
-References: <1470745144-5394-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1470745144-5394-3-git-send-email-horms+renesas@verge.net.au>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 9 Aug 2016 14:32:31 +0200
+Subject: [PATCH 0/2] Add R8A7792 DU support
+In-Reply-To: <4a413062-d7f4-166a-f915-01803bddf441@cogentembedded.com>
+References: <4031442.KeMCTMarLN@wasted.cogentembedded.com>
+ <4a413062-d7f4-166a-f915-01803bddf441@cogentembedded.com>
+Message-ID: <20160809123228.GA5878@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define the Alt board dependent part of the MMCIF device node.
+On Fri, Aug 05, 2016 at 09:28:59PM +0300, Sergei Shtylyov wrote:
+> On 08/05/2016 09:24 PM, Sergei Shtylyov wrote:
+> 
+> >   Here's the set of 2 patches against Simon Horman's 'renesas.git' repo,
+> >'renesas-devel-20160725-v4.7-rc7' tag. We're adding the R8A7792 DU clocks and
+> >device nodes. They have been tested on the Blanche board -- I'm not posting the
+> >Blanche patch only because it also has some strange interaction with the
+> >Ethernet chip, so that NFS root can't work anymore...
+> 
+>    Forgot to mention that the patch #2 depends on the R8A7792 DU driver
+> patch posted last night.
 
-Like the Silk the board has eMMC chip along with the  necessary voltage
-regulator (note that the Vcc/Vccq regulator is dummy -- it's required by
-the MMCIF driver but doesn't actually exist on the board).
+Thanks.
 
-Based on work for the Silk board by Vladimir Barinov and Sergei Shtylyov.
+The driver changes look line an incremental update to what is already done
+for other R-Car Gen2 SoCs. And I am assuming that applying these patches
+without the driver change is harmless - the driver just won't be
+initialised until both the driver and DTS changes are present.
 
-Cc: Vladimir Barinov <vladimir.barinov@cogentembedded.com>.
-Cc: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/boot/dts/r8a7794-alt.dts | 25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
-
-diff --git a/arch/arm/boot/dts/r8a7794-alt.dts b/arch/arm/boot/dts/r8a7794-alt.dts
-index fe7c128cc965..8d1b35afaf82 100644
---- a/arch/arm/boot/dts/r8a7794-alt.dts
-+++ b/arch/arm/boot/dts/r8a7794-alt.dts
-@@ -30,6 +30,15 @@
- 		reg = <0 0x40000000 0 0x40000000>;
- 	};
- 
-+	d3_3v: regulator-d3-3v {
-+		compatible = "regulator-fixed";
-+		regulator-name = "D3.3V";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		regulator-boot-on;
-+		regulator-always-on;
-+	};
-+
- 	vcc_sdhi0: regulator-vcc-sdhi0 {
- 		compatible = "regulator-fixed";
- 
-@@ -190,6 +199,11 @@
- 		function = "vin0";
- 	};
- 
-+	mmcif0_pins: mmcif0 {
-+		groups = "mmc_data8", "mmc_ctrl";
-+		function = "mmc";
-+	};
-+
- 	sdhi0_pins: sd0 {
- 		groups = "sdhi0_data4", "sdhi0_ctrl";
- 		function = "sdhi0";
-@@ -228,6 +242,17 @@
- 	};
- };
- 
-+&mmcif0 {
-+	pinctrl-0 = <&mmcif0_pins>;
-+	pinctrl-names = "default";
-+
-+	vmmc-supply = <&d3_3v>;
-+	vqmmc-supply = <&d3_3v>;
-+	bus-width = <8>;
-+	non-removable;
-+	status = "okay";
-+};
-+
- &sdhi0 {
- 	pinctrl-0 = <&sdhi0_pins>;
- 	pinctrl-names = "default";
--- 
-2.7.0.rc3.207.g0ac5344
+With the above reasoning I have queued up these patches with Geert's
+reviewed-by tag. Please let me know if that is not desirable for some
+reason.
