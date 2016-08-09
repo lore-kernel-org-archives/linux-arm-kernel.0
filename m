@@ -1,152 +1,166 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Tue, 9 Aug 2016 09:53:52 +0200
-Subject: [PATCH v3] KVM: arm64: ITS: return 1 on successful MSI injection
-In-Reply-To: <20160808162928.26441-1-andre.przywara@arm.com>
-References: <20160808162928.26441-1-andre.przywara@arm.com>
-Message-ID: <18399259-06a7-1b5d-2322-cfa7767d4bbc@redhat.com>
+From: punnaiah.choudary.kalluri@xilinx.com (Punnaiah Choudary Kalluri)
+Date: Tue, 9 Aug 2016 08:07:35 +0000
+Subject: [RFC PATCH v4 2/2] net: phy: Add gmiitorgmii converter support
+In-Reply-To: <1470640505-8279-2-git-send-email-appanad@xilinx.com>
+References: <1470640505-8279-1-git-send-email-appanad@xilinx.com>
+ <1470640505-8279-2-git-send-email-appanad@xilinx.com>
+Message-ID: <03CA77BA8AF6F1469AEDFBDA1322A7B74A1C3E6C@XAP-PVEXMBX02.xlnx.xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andre,
-On 08/08/2016 18:29, Andre Przywara wrote:
-> According to the KVM API documentation a successful MSI injection
-> should return a value > 0 on success.
-> Return possible errors in vgic_its_trigger_msi() and report a
-> successful injection back to userland, while also reporting the
-> case where the MSI could not be delivered due to the guest not
-> having the LPI mapped, for instance.
+Hi Kedar,
+
+> -----Original Message-----
+> From: Kedareswara rao Appana [mailto:appana.durga.rao at xilinx.com]
+> Sent: Monday, August 08, 2016 12:45 PM
+> To: robh+dt at kernel.org; mark.rutland at arm.com; Michal Simek
+> <michals@xilinx.com>; Soren Brinkmann <sorenb@xilinx.com>; Appana
+> Durga Kedareswara Rao <appanad@xilinx.com>; f.fainelli at gmail.com;
+> andrew at lunn.ch; Punnaiah Choudary Kalluri <punnaia@xilinx.com>;
+> Anirudha Sarangi <anirudh@xilinx.com>
+> Cc: devicetree at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
+> kernel at vger.kernel.org; netdev at vger.kernel.org
+> Subject: [RFC PATCH v4 2/2] net: phy: Add gmiitorgmii converter support
 > 
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> This patch adds support for gmiitorgmii converter.
+> 
+> The GMII to RGMII IP core provides the Reduced Gigabit Media
+> Independent Interface (RGMII) between Ethernet physical media
+> Devices and the Gigabit Ethernet controller. This core can
+> Switch dynamically between the three different speed modes of
+> Operation by configuring the converter register through mdio write.
+> 
+> MDIO interface is used to set operating speed of Ethernet MAC.
+> 
+> Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
 > ---
-> Changelog v2 .. v3:
-> - return Linux errors to userland
+> Thanks a lot Andrew for your inputs.
+> Changes for v4:
+> --> Updated phydev speed for all 3 speeds as suggested by zhuyj.
+> Changes for v3:
+> --> Updated the driver as suggested by Andrew.
+> Changes for v2:
+> --> Passed struct xphy pointer directly to the fix_mac_speed
+> API as suggested by the Florian.
+> --> Added checks for the phy-node fail case as suggested
+> by the Florian
 > 
-> Changelog v1 .. v2:
-> - properly detect unmapped LPIs and report this to userland
-> 
->  include/linux/irqchip/arm-gic-v3.h |  1 +
->  virt/kvm/arm/vgic/vgic-its.c       | 56 +++++++++++++++++++++++++-------------
->  2 files changed, 38 insertions(+), 19 deletions(-)
-> 
-> diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
-> index 56b0b7e..99ac022 100644
-> --- a/include/linux/irqchip/arm-gic-v3.h
-> +++ b/include/linux/irqchip/arm-gic-v3.h
-> @@ -337,6 +337,7 @@
->   */
->  #define E_ITS_MOVI_UNMAPPED_INTERRUPT		0x010107
->  #define E_ITS_MOVI_UNMAPPED_COLLECTION		0x010109
-> +#define E_ITS_INT_UNMAPPED_INTERRUPT		0x010307
->  #define E_ITS_CLEAR_UNMAPPED_INTERRUPT		0x010507
->  #define E_ITS_MAPD_DEVICE_OOR			0x010801
->  #define E_ITS_MAPC_PROCNUM_OOR			0x010902
-> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-> index 7180994..3c029cd 100644
-> --- a/virt/kvm/arm/vgic/vgic-its.c
-> +++ b/virt/kvm/arm/vgic/vgic-its.c
-> @@ -441,39 +441,48 @@ static unsigned long vgic_mmio_read_its_idregs(struct kvm *kvm,
->   * Find the target VCPU and the LPI number for a given devid/eventid pair
->   * and make this IRQ pending, possibly injecting it.
->   * Must be called with the its_lock mutex held.
-> + * Returns 0 on success, a positive error value for any ITS mapping
-> + * related errors and negative error values for generic errors.
->   */
-> -static void vgic_its_trigger_msi(struct kvm *kvm, struct vgic_its *its,
-> -				 u32 devid, u32 eventid)
-> +static int vgic_its_trigger_msi(struct kvm *kvm, struct vgic_its *its,
-> +				u32 devid, u32 eventid)
->  {
-> +	struct kvm_vcpu *vcpu;
->  	struct its_itte *itte;
->  
->  	if (!its->enabled)
-> -		return;
-> +		return -EBUSY;
->  
->  	itte = find_itte(its, devid, eventid);
-> -	/* Triggering an unmapped IRQ gets silently dropped. */
-> -	if (itte && its_is_collection_mapped(itte->collection)) {
-> -		struct kvm_vcpu *vcpu;
-> -
-> -		vcpu = kvm_get_vcpu(kvm, itte->collection->target_addr);
-> -		if (vcpu && vcpu->arch.vgic_cpu.lpis_enabled) {
-> -			spin_lock(&itte->irq->irq_lock);
-> -			itte->irq->pending = true;
-> -			vgic_queue_irq_unlock(kvm, itte->irq);
-> -		}
-> -	}
-> +	if (!itte || !its_is_collection_mapped(itte->collection))
-> +		return E_ITS_INT_UNMAPPED_INTERRUPT;
 > +
-> +	vcpu = kvm_get_vcpu(kvm, itte->collection->target_addr);
-> +	if (!vcpu)
-> +		return E_ITS_INT_UNMAPPED_INTERRUPT;
+> +#define XILINX_GMII2RGMII_REG	0x10
+> +#define BMCR_SPEED10		0x00
+
+Move this macro to mii.h
+
 > +
-> +	if (!vcpu->arch.vgic_cpu.lpis_enabled)
-> +		return -EBUSY;
+> +struct gmii2rgmii {
+> +	struct phy_device *phy_dev;
+> +	struct phy_driver *phy_drv;
+> +	struct phy_driver conv_phy_drv;
+> +	int addr;
+> +};
 > +
-> +	spin_lock(&itte->irq->irq_lock);
-> +	itte->irq->pending = true;
-> +	vgic_queue_irq_unlock(kvm, itte->irq);
+> +static int xgmiitorgmii_read_status(struct phy_device *phydev)
+> +{
+> +	struct gmii2rgmii *priv = (struct gmii2rgmii *)phydev->priv;
+> +	u16 val = 0;
+> +
+> +	priv->phy_drv->read_status(phydev);
+> +
+> +	val = mdiobus_read(phydev->mdio.bus, priv->addr,
+> XILINX_GMII2RGMII_REG);
+> +
+
+    Since its read and then modify, you should mask the speed field
+With zero and then write new value.
+           
+
+> +	switch (phydev->speed) {
+> +	case SPEED_1000:
+> +		val |= BMCR_SPEED1000;
+> +	case SPEED_100:
+> +		val |= BMCR_SPEED100;
+> +	case SPEED_10:
+> +		val |= BMCR_SPEED10;
+> +	}
+> +
+> +	mdiobus_write(phydev->mdio.bus, priv->addr,
+> XILINX_GMII2RGMII_REG, val);
 > +
 > +	return 0;
->  }
->  
->  /*
->   * Queries the KVM IO bus framework to get the ITS pointer from the given
->   * doorbell address.
->   * We then call vgic_its_trigger_msi() with the decoded data.
-> + * According to the KVM_SIGNAL_MSI API description returns 1 on success.
->   */
->  int vgic_its_inject_msi(struct kvm *kvm, struct kvm_msi *msi)
->  {
->  	u64 address;
->  	struct kvm_io_device *kvm_io_dev;
->  	struct vgic_io_device *iodev;
-> +	int ret;
->  
->  	if (!vgic_has_its(kvm))
->  		return -ENODEV;
-> @@ -490,10 +499,21 @@ int vgic_its_inject_msi(struct kvm *kvm, struct kvm_msi *msi)
->  	iodev = container_of(kvm_io_dev, struct vgic_io_device, dev);
->  
->  	mutex_lock(&iodev->its->its_lock);
-> -	vgic_its_trigger_msi(kvm, iodev->its, msi->devid, msi->data);
-> +	ret = vgic_its_trigger_msi(kvm, iodev->its, msi->devid, msi->data);
->  	mutex_unlock(&iodev->its->its_lock);
->  
-> -	return 0;
-> +	if (ret < 0)
-> +		return ret;
+> +}
 > +
-> +	/*
-> +	 * KVM_SIGNAL_MSI demands a return value > 0 for success and 0
-> +	 * if the guest has blocked the MSI. So we map any LPI mapping
-> +	 * related error to that.
-> +	 */
-> +	if (ret)
-> +		return 0;
-> +	else
-> +		return 1;
->  }
->  
->  /* Requires the its_lock to be held. */
-> @@ -981,9 +1001,7 @@ static int vgic_its_cmd_handle_int(struct kvm *kvm, struct vgic_its *its,
->  	u32 msi_data = its_cmd_get_id(its_cmd);
->  	u64 msi_devid = its_cmd_get_deviceid(its_cmd);
->  
-> -	vgic_its_trigger_msi(kvm, its, msi_devid, msi_data);
-> -
-> -	return 0;
-> +	return vgic_its_trigger_msi(kvm, its, msi_devid, msi_data);
->  }
->  
->  /*
-> 
-Looks good to me
+> +int xgmiitorgmii_probe(struct mdio_device *mdiodev)
+> +{
+> +	struct device *dev = &mdiodev->dev;
+> +	struct device_node *np = dev->of_node, *phy_node;
+> +	struct gmii2rgmii *priv;
+> +	int ret;
+> +
+> +	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
+> +	if (!priv)
+> +		return -ENOMEM;
+> +
+> +	phy_node = of_parse_phandle(np, "phy-handle", 0);
+> +	if (IS_ERR(phy_node)) {
+> +		dev_err(dev, "Couldn't parse phy-handle\n");
+> +		ret = -ENODEV;
+> +		goto out;
+> +	}
+> +
+> +	priv->phy_dev = of_phy_find_device(phy_node);
+> +	if (!priv->phy_dev) {
+> +		ret = -EPROBE_DEFER;
+> +		dev_info(dev, "Couldn't find phydev\n");
+> +		goto out;
+> +	}
+> +
+> +	priv->addr = mdiodev->addr;
+> +	priv->phy_drv = priv->phy_dev->drv;
+> +	memcpy(&priv->conv_phy_drv, priv->phy_dev->drv,
+> +	       sizeof(struct phy_driver));
+> +	priv->conv_phy_drv.read_status = xgmiitorgmii_read_status;
+> +	priv->phy_dev->priv = priv;
+> +	priv->phy_dev->drv = &priv->conv_phy_drv;
+> +
+> +	return 0;
+> +out:
+> +	return ret;
 
-Reviewed-by: Eric Auger <eric.auger@redhat.com>
+Since there is no resource cleaning here, you could consider
+Return from this function in above conditions and avoid goto here.
 
-Cheers
+Regards,
+Punnaiah
 
-Eric
+> +}
+> +
+> +static const struct of_device_id xgmiitorgmii_of_match[] = {
+> +	{ .compatible = "xlnx,gmii-to-rgmii-1.0" },
+> +	{},
+> +};
+> +MODULE_DEVICE_TABLE(of, xgmiitorgmii_of_match);
+> +
+> +static struct mdio_driver xgmiitorgmii_driver = {
+> +	.probe	= xgmiitorgmii_probe,
+> +	.mdiodrv.driver = {
+> +		.name = "xgmiitorgmii",
+> +		.of_match_table = xgmiitorgmii_of_match,
+> +	},
+> +};
+> +
+> +static int __init xgmiitorgmii_init(void)
+> +{
+> +	return mdio_driver_register(&xgmiitorgmii_driver);
+> +}
+> +module_init(xgmiitorgmii_init);
+> +
+> +static void __exit xgmiitorgmii_cleanup(void)
+> +{
+> +	mdio_driver_unregister(&xgmiitorgmii_driver);
+> +}
+> +module_exit(xgmiitorgmii_cleanup);
+> +
+> +MODULE_DESCRIPTION("Xilinx GMII2RGMII converter driver");
+> +MODULE_LICENSE("GPL");
+> --
+> 2.1.2
