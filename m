@@ -1,43 +1,39 @@
 From: romain.perier@free-electrons.com (Romain Perier)
-Date: Tue,  9 Aug 2016 11:03:15 +0200
-Subject: [PATCH 2/7] crypto: marvell: remove unused parameter in
- mv_cesa_ahash_dma_add_cache()
+Date: Tue,  9 Aug 2016 11:03:14 +0200
+Subject: [PATCH 1/7] crypto: marvell: be explicit about destination in
+ mv_cesa_dma_add_op()
 In-Reply-To: <1470733400-23621-1-git-send-email-romain.perier@free-electrons.com>
 References: <1470733400-23621-1-git-send-email-romain.perier@free-electrons.com>
-Message-ID: <1470733400-23621-3-git-send-email-romain.perier@free-electrons.com>
+Message-ID: <1470733400-23621-2-git-send-email-romain.perier@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
-The dma_iter parameter of mv_cesa_ahash_dma_add_cache() is never used,
-so get rid of it.
+The mv_cesa_dma_add_op() function builds a mv_cesa_tdma_desc structure
+to copy the operation description to the SRAM, but doesn't explicitly
+initialize the destination of the copy. It works fine because the
+operatin description must be copied at the beginning of the SRAM, and
+the mv_cesa_tdma_desc structure is initialized to zero when
+allocated. However, it is somewhat confusing to not have a destination
+defined.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- drivers/crypto/marvell/hash.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+ drivers/crypto/marvell/tdma.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/crypto/marvell/hash.c b/drivers/crypto/marvell/hash.c
-index 82e0f4e6..0d7f5f9 100644
---- a/drivers/crypto/marvell/hash.c
-+++ b/drivers/crypto/marvell/hash.c
-@@ -455,7 +455,6 @@ mv_cesa_dma_add_frag(struct mv_cesa_tdma_chain *chain,
+diff --git a/drivers/crypto/marvell/tdma.c b/drivers/crypto/marvell/tdma.c
+index 86a065b..9fd7a5f 100644
+--- a/drivers/crypto/marvell/tdma.c
++++ b/drivers/crypto/marvell/tdma.c
+@@ -261,6 +261,7 @@ struct mv_cesa_op_ctx *mv_cesa_dma_add_op(struct mv_cesa_tdma_chain *chain,
+ 	tdma->op = op;
+ 	tdma->byte_cnt = cpu_to_le32(size | BIT(31));
+ 	tdma->src = cpu_to_le32(dma_handle);
++	tdma->dst = CESA_SA_CFG_SRAM_OFFSET;
+ 	tdma->flags = CESA_TDMA_DST_IN_SRAM | CESA_TDMA_OP;
  
- static int
- mv_cesa_ahash_dma_add_cache(struct mv_cesa_tdma_chain *chain,
--			    struct mv_cesa_ahash_dma_iter *dma_iter,
- 			    struct mv_cesa_ahash_req *creq,
- 			    gfp_t flags)
- {
-@@ -586,7 +585,7 @@ static int mv_cesa_ahash_dma_req_init(struct ahash_request *req)
- 	 * Add the cache (left-over data from a previous block) first.
- 	 * This will never overflow the SRAM size.
- 	 */
--	ret = mv_cesa_ahash_dma_add_cache(&basereq->chain, &iter, creq, flags);
-+	ret = mv_cesa_ahash_dma_add_cache(&basereq->chain, creq, flags);
- 	if (ret)
- 		goto err_free_tdma;
- 
+ 	return op;
 -- 
 2.8.1
