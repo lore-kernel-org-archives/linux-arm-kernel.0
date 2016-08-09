@@ -1,135 +1,85 @@
-From: labbott@redhat.com (Laura Abbott)
-Date: Mon,  8 Aug 2016 17:35:34 -0700
-Subject: [PATCHv4] arm64: Handle el1 synchronous instruction aborts cleanly
-Message-ID: <1470702934-21226-1-git-send-email-labbott@redhat.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Mon, 8 Aug 2016 17:36:06 -0700
+Subject: [RFC][PATCH 4/4 v2] arm64: dts: hikey: Add pstore support for
+ HiKey
+In-Reply-To: <1470700120-26510-1-git-send-email-john.stultz@linaro.org>
+References: <CAGXu5j+UHuTDT=_DXcKHdxM0CWAp7kkwYiDSenbqk7Ub7yXX6w@mail.gmail.com>
+ <1470700120-26510-1-git-send-email-john.stultz@linaro.org>
+Message-ID: <CAGXu5jLSxyPJU8Xe8Cx==WB=5OwHqbDSe-zUE4GxpDMbCOG6zg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Executing from a non-executable area gives an ugly message:
+On Mon, Aug 8, 2016 at 4:48 PM, John Stultz <john.stultz@linaro.org> wrote:
+> This patch reserves some memory in the DTS and sets up a
+> pstore device tree node to enable pstore support on HiKey.
+>
+> Cc: Kees Cook <keescook@chromium.org>
+> Cc: Guodong Xu <guodong.xu@linaro.org>
+> Cc: Haojian Zhuang <haojian.zhuang@linaro.org>
+> Cc: Wei Xu <xuwei5@hisilicon.com>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: devicetree at vger.kernel.org
+> Signed-off-by: John Stultz <john.stultz@linaro.org>
 
-lkdtm: Performing direct entry EXEC_RODATA
-lkdtm: attempting ok execution at ffff0000084c0e08
-lkdtm: attempting bad execution at ffff000008880700
-Bad mode in Synchronous Abort handler detected on CPU2, code 0x8400000e -- IABT (current EL)
-CPU: 2 PID: 998 Comm: sh Not tainted 4.7.0-rc2+ #13
-Hardware name: linux,dummy-virt (DT)
-task: ffff800077e35780 ti: ffff800077970000 task.ti: ffff800077970000
-PC is at lkdtm_rodata_do_nothing+0x0/0x8
-LR is at execute_location+0x74/0x88
+This looks right to me. :)
 
-The 'IABT (current EL)' indicates the error but it's a bit cryptic
-without knowledge of the ARM ARM. There is also no indication of the
-specific address which triggered the fault. The increase in kernel
-page permissions makes hitting this case more likely as well.
-Handling the case in the vectors gives a much more familiar looking
-error message:
+Reviewed-by: Kees Cook <keescook@chromium.org>
 
-lkdtm: Performing direct entry EXEC_RODATA
-lkdtm: attempting ok execution at ffff0000084c0840
-lkdtm: attempting bad execution at ffff000008880680
-Unable to handle kernel paging request at virtual address ffff000008880680
-pgd = ffff8000089b2000
-[ffff000008880680] *pgd=00000000489b4003, *pud=0000000048904003, *pmd=0000000000000000
-Internal error: Oops: 8400000e [#1] PREEMPT SMP
-Modules linked in:
-CPU: 1 PID: 997 Comm: sh Not tainted 4.7.0-rc1+ #24
-Hardware name: linux,dummy-virt (DT)
-task: ffff800077f9f080 ti: ffff800008a1c000 task.ti: ffff800008a1c000
-PC is at lkdtm_rodata_do_nothing+0x0/0x8
-LR is at execute_location+0x74/0x88
+> ---
+> v2: Quick rework to update to new ramoops format.
+>
+>  arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts | 19 ++++++++++++++++++-
+>  1 file changed, 18 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+> index b2683e4..748d0dc 100644
+> --- a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+> +++ b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+> @@ -32,6 +32,7 @@
+>          *  0x05f0,1000 - 0x05f0,1fff: Reboot reason
+>          *  0x06df,f000 - 0x06df,ffff: Mailbox message data
+>          *  0x0740,f000 - 0x0740,ffff: MCU firmware section
+> +        *  0x21f0,0000 - 0x21ff,ffff: pstore/ramoops buffer
+>          *  0x3e00,0000 - 0x3fff,ffff: OP-TEE
+>          */
+>         memory at 0 {
+> @@ -40,9 +41,25 @@
+>                       <0x00000000 0x05f00000 0x00000000 0x00001000>,
+>                       <0x00000000 0x05f02000 0x00000000 0x00efd000>,
+>                       <0x00000000 0x06e00000 0x00000000 0x0060f000>,
+> -                     <0x00000000 0x07410000 0x00000000 0x36bf0000>;
+> +                     <0x00000000 0x07410000 0x00000000 0x1aaf0000>,
+> +                     <0x00000000 0x22000000 0x00000000 0x1c000000>;
+>         };
+>
+> +       reserved-memory {
+> +               #address-cells = <2>;
+> +               #size-cells = <2>;
+> +               ranges;
+> +
+> +               ramoops at 0x21f00000 {
+> +                       compatible = "ramoops";
+> +                       reg = <0x0 0x21f00000 0x0 0x00100000>;
+> +                       record-size     = <0x00020000>;
+> +                       console-size    = <0x00020000>;
+> +                       ftrace-size     = <0x00020000>;
+> +               };
+> +       };
+> +
+> +
+>         reboot-mode-syscon at 5f01000 {
+>                 compatible = "syscon", "simple-mfd";
+>                 reg = <0x0 0x05f01000 0x0 0x00001000>;
+> --
+> 1.9.1
+>
 
-Signed-off-by: Laura Abbott <labbott@redhat.com>
-Acked-by: Mark Rutland <mark.rutland@arm.com>
----
-v4: Rebased to master, extra error message to indicate execution of userspace
-memory
----
- arch/arm64/kernel/entry.S | 18 ++++++++++++++++++
- arch/arm64/mm/fault.c     | 14 ++++++++++++--
- 2 files changed, 30 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index 96e4a2b..bdfadef 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -353,6 +353,8 @@ el1_sync:
- 	lsr	x24, x1, #ESR_ELx_EC_SHIFT	// exception class
- 	cmp	x24, #ESR_ELx_EC_DABT_CUR	// data abort in EL1
- 	b.eq	el1_da
-+	cmp	x24, #ESR_ELx_EC_IABT_CUR	// instruction abort in EL1
-+	b.eq	el1_ia
- 	cmp	x24, #ESR_ELx_EC_SYS64		// configurable trap
- 	b.eq	el1_undef
- 	cmp	x24, #ESR_ELx_EC_SP_ALIGN	// stack alignment exception
-@@ -364,6 +366,22 @@ el1_sync:
- 	cmp	x24, #ESR_ELx_EC_BREAKPT_CUR	// debug exception in EL1
- 	b.ge	el1_dbg
- 	b	el1_inv
-+el1_ia:
-+	/*
-+	 * Instruction abort handling
-+	 */
-+	mrs	x0, far_el1
-+	enable_dbg
-+	// re-enable interrupts if they were enabled in the aborted context
-+	tbnz	x23, #7, 1f			// PSR_I_BIT
-+	enable_irq
-+1:
-+	mov	x2, sp				// struct pt_regs
-+	bl	do_mem_abort
-+
-+	// disable interrupts before pulling preserved data off the stack
-+	disable_irq
-+	kernel_exit 1
- el1_da:
- 	/*
- 	 * Data abort handling
-diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-index c8beaa0..05d2bd7 100644
---- a/arch/arm64/mm/fault.c
-+++ b/arch/arm64/mm/fault.c
-@@ -153,6 +153,11 @@ int ptep_set_access_flags(struct vm_area_struct *vma,
- }
- #endif
- 
-+static bool is_el1_instruction_abort(unsigned int esr)
-+{
-+	return ESR_ELx_EC(esr) == ESR_ELx_EC_IABT_CUR;
-+}
-+
- /*
-  * The kernel tried to access some page that wasn't present.
-  */
-@@ -161,8 +166,9 @@ static void __do_kernel_fault(struct mm_struct *mm, unsigned long addr,
- {
- 	/*
- 	 * Are we prepared to handle this kernel fault?
-+	 * We are almost certainly not prepared to handle instruction faults.
- 	 */
--	if (fixup_exception(regs))
-+	if (!is_el1_instruction_abort(esr) && fixup_exception(regs))
- 		return;
- 
- 	/*
-@@ -267,7 +273,8 @@ static inline bool is_permission_fault(unsigned int esr)
- 	unsigned int ec       = ESR_ELx_EC(esr);
- 	unsigned int fsc_type = esr & ESR_ELx_FSC_TYPE;
- 
--	return (ec == ESR_ELx_EC_DABT_CUR && fsc_type == ESR_ELx_FSC_PERM);
-+	return (ec == ESR_ELx_EC_DABT_CUR && fsc_type == ESR_ELx_FSC_PERM) ||
-+	       (ec == ESR_ELx_EC_IABT_CUR && fsc_type == ESR_ELx_FSC_PERM);
- }
- 
- static bool is_el0_instruction_abort(unsigned int esr)
-@@ -312,6 +319,9 @@ static int __kprobes do_page_fault(unsigned long addr, unsigned int esr,
- 		if (regs->orig_addr_limit == KERNEL_DS)
- 			die("Accessing user space memory with fs=KERNEL_DS", regs, esr);
- 
-+		if (is_el1_instruction_abort(esr))
-+			die("Attempting to execute userspace memory", regs, esr);
-+
- 		if (!search_exception_tables(regs->pc))
- 			die("Accessing user space memory outside uaccess.h routines", regs, esr);
- 	}
+
 -- 
-2.7.4
+Kees Cook
+Nexus Security
