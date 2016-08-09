@@ -1,43 +1,22 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Tue, 9 Aug 2016 16:39:15 +0200
-Subject: [PATCH] i2c: don't print error when adding adapter fails
-In-Reply-To: <32d25618-83f6-b876-07b0-adb988516173@roeck-us.net>
-References: <1470742581-12971-1-git-send-email-wsa-dev@sang-engineering.com>
- <1470742581-12971-2-git-send-email-wsa-dev@sang-engineering.com>
- <32d25618-83f6-b876-07b0-adb988516173@roeck-us.net>
-Message-ID: <20160809143915.GB1666@katana>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 9 Aug 2016 16:43:51 +0200
+Subject: [PATCH v3] KVM: arm64: ITS: return 1 on successful MSI injection
+In-Reply-To: <20160808162928.26441-1-andre.przywara@arm.com>
+References: <20160808162928.26441-1-andre.przywara@arm.com>
+Message-ID: <20160809144351.GH9175@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-> >@@ -550,15 +550,10 @@ static int uniphier_fi2c_probe(struct platform_device *pdev)
-> > 	}
-> >
-> > 	ret = i2c_add_adapter(&priv->adap);
-> >-	if (ret) {
-> >-		dev_err(dev, "failed to add I2C adapter\n");
-> >-		goto err;
-> >-	}
-> >-
-> >-err:
-> > 	if (ret)
-> > 		clk_disable_unprepare(priv->clk);
-> >
-> >+ err:
+On Mon, Aug 08, 2016 at 05:29:28PM +0100, Andre Przywara wrote:
+> According to the KVM API documentation a successful MSI injection
+> should return a value > 0 on success.
+> Return possible errors in vgic_its_trigger_msi() and report a
+> successful injection back to userland, while also reporting the
+> case where the MSI could not be delivered due to the guest not
+> having the LPI mapped, for instance.
 > 
-> You sure about that one ? It leaves the clock enabled in some of the error paths.
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 
-Uh, ehrm, where is the brown paper bag? Thanks, Guenter!
+Applied.  Thanks!
 
-> Note: I dropped all individuals from Cc:; my mailer refused to accept the reply because there
-> were too many.
-
-Yes, the disadvantage of not breaking out.
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160809/67eee6cf/attachment.sig>
+-Christoffer
