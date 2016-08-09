@@ -1,73 +1,40 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Tue, 9 Aug 2016 10:40:49 -0700
-Subject: [PATCH 8/9] remoteproc: core: Skip resource table integrity
- checks if there are amendments
-In-Reply-To: <20160804092153.23032-9-lee.jones@linaro.org>
-References: <20160804092153.23032-1-lee.jones@linaro.org>
- <20160804092153.23032-9-lee.jones@linaro.org>
-Message-ID: <20160809174049.GE26240@tuxbot>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 9 Aug 2016 18:51:58 +0100
+Subject: [PATCH] arm64: suspend: avoid potential TLB conflict
+In-Reply-To: <57AA0401.1020809@arm.com>
+References: <1470651050-18291-1-git-send-email-mark.rutland@arm.com>
+ <57AA0401.1020809@arm.com>
+Message-ID: <20160809175157.GC13591@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu 04 Aug 02:21 PDT 2016, Lee Jones wrote:
-
-> There is little point wasting CPU cycles completing integrity checking
-> (i.e. ensuring nothing has changed) on the resource table if we *know*
-> that it will be changed (by us).  In this patch we skip resource table
-> integrity checks if a platform-specific remoteproc driver has requested
-> an amendment or an appended entry.
+On Tue, Aug 09, 2016 at 05:25:37PM +0100, James Morse wrote:
+> > @@ -217,12 +218,16 @@ static int create_safe_exec_page(void *src_start, size_t length,
+> >  	set_pte(pte, __pte(virt_to_phys((void *)dst) |
+> >  			 pgprot_val(PAGE_KERNEL_EXEC)));
+> >  
+> > -	/* Load our new page tables */
+> > -	asm volatile("msr	ttbr0_el1, %0;"
+> > -		     "isb;"
+> > -		     "tlbi	vmalle1is;"
+> > -		     "dsb	ish;"
+> > -		     "isb" : : "r"(virt_to_phys(pgd)));
+> > +	/*
+> > +	 * Load our new page tables. TTBR0 currently points to the zero page,
 > 
+> fe12c00d21bb ("PM / hibernate: Introduce test_resume mode for hibernation") came
+> in with the merge window, this does a suspend followed by a resume with the user
+> page tables still loaded in ttbr0_el1.
 
-If we apply the auto-boot series first, I believe this dance goes away.
+Hmmm... given that, it looks like if we bail out in swsusp_arch_resume()
+after the call to create_safe_exec_page(), we may return to userspace
+with a corrupted TTBR0.
 
-Regards,
-Bjorn
+We probably need to defer the call to create_safe_exec_page() after the
+other potential failure sites so as to avoid that.
 
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
->  drivers/remoteproc/remoteproc_core.c | 11 +++++++++++
->  1 file changed, 11 insertions(+)
-> 
-> diff --git a/drivers/remoteproc/remoteproc_core.c b/drivers/remoteproc/remoteproc_core.c
-> index 6b4e29a..9a077e4 100644
-> --- a/drivers/remoteproc/remoteproc_core.c
-> +++ b/drivers/remoteproc/remoteproc_core.c
-> @@ -1126,6 +1126,10 @@ static int rproc_fw_boot(struct rproc *rproc, const struct firmware *fw)
->  	rproc->bootaddr = rproc_get_boot_addr(rproc, fw);
->  	ret = -EINVAL;
->  
-> +	/* If we've overridden the resource table, we know it's changed. */
-> +	if (!list_empty(&rproc->override_resources))
-> +		goto skip_table_check;
-> +
->  	/* look for the resource table */
->  	table = rproc_find_rsc_table(rproc, fw, &tablesz);
->  	if (!table) {
-> @@ -1139,6 +1143,8 @@ static int rproc_fw_boot(struct rproc *rproc, const struct firmware *fw)
->  		goto clean_up;
->  	}
->  
-> + skip_table_check:
-> +
->  	/* handle fw resources which are required to boot rproc */
->  	ret = rproc_handle_resources(rproc, tablesz, rproc_loading_handlers);
->  	if (ret) {
-> @@ -1216,10 +1222,15 @@ static void rproc_fw_config_virtio(const struct firmware *fw, void *context)
->  		table = rproc_apply_resource_overrides(rproc, &table, &tablesz);
->  		if (IS_ERR(table))
->  			goto out;
-> +
-> +		/* No point checking table if we know it *has* changed */
-> +		goto skip_table_check;
->  	}
->  
->  	rproc->table_csum = crc32(0, table, tablesz);
->  
-> + skip_table_check:
-> +
->  	/*
->  	 * Create a copy of the resource table. When a virtio device starts
->  	 * and calls vring_new_virtqueue() the address of the allocated vring
-> -- 
-> 2.9.0
-> 
+Looking around it's not clear to me how/where the get_safe_page()
+allocations are cleaned up when a failure occurs.
+
+Thanks,
+Mark.
