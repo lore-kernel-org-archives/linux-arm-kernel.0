@@ -1,17 +1,40 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 9 Aug 2016 22:52:33 +0800
-Subject: [PATCH v2 1/4] ARM: i.MX: Remove i.MX1 Armadeus APF9328 board
- support
-In-Reply-To: <1470459386-5197-1-git-send-email-shc_work@mail.ru>
-References: <1470459386-5197-1-git-send-email-shc_work@mail.ru>
-Message-ID: <20160809145233.GA16562@tiger>
+From: wpdster@gmail.com (Patrick Doyle)
+Date: Tue, 9 Aug 2016 10:55:36 -0400
+Subject: How does the kernel assign ttySn to UARTs?
+In-Reply-To: <CAF_dkJD5MEfNzrRqM3H_LkOmXC3XYjUYLe2=ZtzCjAS1A2TDmg@mail.gmail.com>
+References: <CAF_dkJD5MEfNzrRqM3H_LkOmXC3XYjUYLe2=ZtzCjAS1A2TDmg@mail.gmail.com>
+Message-ID: <CAF_dkJDk0F+rDBs3=LxM_YWYE6AzwRMkSie-ZQabWYRws-fOsg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 06, 2016 at 07:56:23AM +0300, Alexander Shiyan wrote:
-> mach-apf9328.c can be replaced with devicetree equivalent: imx1-apf9328.dts,
-> so remove the board file.
-> 
-> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+On Mon, Aug 8, 2016 at 3:56 PM, Patrick Doyle <wpdster@gmail.com> wrote:
+> Would any experts out there care to point me in the direction of some clues?
 
-Applied all, thanks.
+
+Thank you Frank for your response... I found some clues on my own.
+The biggest clue was that I spelled "aliases" incorrectly (having
+spelled it "alias" instead of "aliases").
+
+I found my second clue when I found that the Atmel supplied .dtsi file
+also defined some aliases for the serial ports.  (And they managed to
+spell "aliases" correctly).
+
+And I found my final clue right where I should have started looking...
+in the source.  I looked in the Atmel serial driver and saw how it
+assigned serial port numbers first by any aliases if they were
+defined, and then sequentially.  So, I now have:
+
+    aliases {
+        serial0 = &uart2; /* UART2 <=> /dev/ttyS0 (connected to
+mobility board) */
+        serial1 = &uart5; /* FLEXCOM4 <=> /dev/ttyS1 (console) */
+        serial2 = &uart3; /* UART2 <=> /dev/ttyS2 */
+    };
+
+
+which works the want it to, and, more importantly, I understand why it
+works that way :-)
+
+Thanks for playing.
+
+--wpd
