@@ -1,26 +1,44 @@
-From: randy.li@rock-chips.com (Randy Li)
+From: herbert@gondor.apana.org.au (Herbert Xu)
 Date: Tue, 9 Aug 2016 18:06:33 +0800
-Subject: [PATCH] ARM: dts: add rk3288-firefly-reload
-In-Reply-To: <CAFLEztTROearSEcgzV3EVHFcRcMQpLhAQ6BXP-dDyRDAWybaxg@mail.gmail.com>
-References: <1549971.ctkvOGm2xW@diego> <2868781.4x2gJCRbLH@diego>
- <413ebccd-e8d6-1401-3065-f9a63b4d66e6@rock-chips.com>
- <1815189.oGy6GHMbyM@phil>
- <CAFLEztQ1pa-CCbC8c8+VJ_kg8RyPOb-UHZiKBZffKEw9zyx9Zg@mail.gmail.com>
- <CAFLEztTROearSEcgzV3EVHFcRcMQpLhAQ6BXP-dDyRDAWybaxg@mail.gmail.com>
-Message-ID: <C2BE77CA-A59B-4128-8802-E3E36FACDABA@rock-chips.com>
+Subject: [PATCHv3 03/11] crypto: omap-sham: implement context
+ export/import APIs
+In-Reply-To: <1470306526-27219-4-git-send-email-t-kristo@ti.com>
+References: <1470306526-27219-1-git-send-email-t-kristo@ti.com>
+ <1470306526-27219-4-git-send-email-t-kristo@ti.com>
+Message-ID: <20160809100633.GA6751@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-??? iPad ??
-
-> ?? <jacobchen110@gmail.com> ? 2016?8?9? ??6:02 ???
+On Thu, Aug 04, 2016 at 01:28:38PM +0300, Tero Kristo wrote:
+> Context export/import are now required for ahash algorithms due to
+> required support in algif_hash. Implement these for OMAP SHA driver,
+> saving and restoring the internal state of the driver.
 > 
-> well?it has already been added....
+> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+> ---
+>  drivers/crypto/omap-sham.c | 31 +++++++++++++++++++++++++++++--
+>  1 file changed, 29 insertions(+), 2 deletions(-)
 > 
-> The root cause is not act8846. Firefly have a bug with sdmmc and it
-> seems they didn't fix it in firefly-reload.
-> 
-> http://bbs.t-firefly.com/forum.php?mod=viewthread&tid=256
-Yes, Jacob is right. Those high speed options need the voltage down to 1.8v. They should be removed.
+> diff --git a/drivers/crypto/omap-sham.c b/drivers/crypto/omap-sham.c
+> index 6e53944..aa71e61 100644
+> --- a/drivers/crypto/omap-sham.c
+> +++ b/drivers/crypto/omap-sham.c
+> @@ -1379,6 +1379,27 @@ exit_unlock:
+>  	return ret;
+>  }
+>  
+> +static int omap_sham_export(struct ahash_request *req, void *out)
+> +{
+> +	struct omap_sham_reqctx *rctx = ahash_request_ctx(req);
+> +
+> +	while (omap_sham_flush(req) == -EINPROGRESS)
+> +		msleep(10);
+
+Do we really need this? You must not call export until the previous
+operation has completed.
+
+Cheers,
+-- 
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
