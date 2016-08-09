@@ -1,35 +1,146 @@
 From: kbeldan@baylibre.com (Karl Beldan)
-Date: Tue,  9 Aug 2016 17:15:15 +0000
-Subject: [PATCH 1/4] memory: ti-aemif: Get a named clock rather than an
- unnamed one
+Date: Tue,  9 Aug 2016 17:15:17 +0000
+Subject: [PATCH 3/4] ARM: dts: da850-lcdk: Add NAND to DT
 In-Reply-To: <20160809171518.22690-1-kbeldan@baylibre.com>
 References: <20160809171518.22690-1-kbeldan@baylibre.com>
-Message-ID: <20160809171518.22690-2-kbeldan@baylibre.com>
+Message-ID: <20160809171518.22690-4-kbeldan@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Many davinci boards (da830 and da850 families) don't have their clocks
-in DT yet and won't be successful in getting an unnamed aemif clock.
-Also the sole current users of ti-aemif (keystone boards) use 'aemif' as
-their aemif device clock clock-name and should remain unaffected.
+This adds DT support for the NAND connected to the SoC AEMIF.
+The parameters (timings, ecc) are the same as what the board ships with
+(default AEMIF timings, 1bit ECC) and improvements will be handled in
+due course.
+This passed elementary tests hashing a 20MB file on top of ubifs on my
+LCDK.
 
 Signed-off-by: Karl Beldan <kbeldan@baylibre.com>
 ---
- drivers/memory/ti-aemif.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/da850-lcdk.dts | 108 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 108 insertions(+)
 
-diff --git a/drivers/memory/ti-aemif.c b/drivers/memory/ti-aemif.c
-index a579a0f..c251fc8 100644
---- a/drivers/memory/ti-aemif.c
-+++ b/drivers/memory/ti-aemif.c
-@@ -345,7 +345,7 @@ static int aemif_probe(struct platform_device *pdev)
+diff --git a/arch/arm/boot/dts/da850-lcdk.dts b/arch/arm/boot/dts/da850-lcdk.dts
+index dbcca0b..033380b 100644
+--- a/arch/arm/boot/dts/da850-lcdk.dts
++++ b/arch/arm/boot/dts/da850-lcdk.dts
+@@ -27,6 +27,27 @@
  
- 	platform_set_drvdata(pdev, aemif);
+ &pmx_core {
+ 	status = "okay";
++
++	nand_pins: nand_pins {
++		pinctrl-single,bits = <
++			/* EMA_WAIT[0], EMA_OE, EMA_WE, EMA_CS[3] */
++			0x1c 0x10110010  0xf0ff00f0
++			/*
++			 * EMA_D[0], EMA_D[1], EMA_D[2],
++			 * EMA_D[3], EMA_D[4], EMA_D[5],
++			 * EMA_D[6], EMA_D[7]
++			 */
++			0x24 0x11111111  0xffffffff
++			/*
++			 * EMA_D[8],  EMA_D[9],  EMA_D[10],
++			 * EMA_D[11], EMA_D[12], EMA_D[13],
++			 * EMA_D[14], EMA_D[15]
++			 */
++			0x20 0x11111111  0xffffffff
++			/* EMA_A[1], EMA_A[2] */
++			0x30 0x01100000  0x0ff00000
++		>;
++	};
+ };
  
--	aemif->clk = devm_clk_get(dev, NULL);
-+	aemif->clk = devm_clk_get(dev, "aemif");
- 	if (IS_ERR(aemif->clk)) {
- 		dev_err(dev, "cannot get clock 'aemif'\n");
- 		return PTR_ERR(aemif->clk);
+ &serial2 {
+@@ -68,3 +89,90 @@
+ 	cd-gpios = <&gpio 64 GPIO_ACTIVE_HIGH>;
+ 	status = "okay";
+ };
++
++&aemif {
++	pinctrl-names = "default";
++	pinctrl-0 = <&nand_pins>;
++	status = "ok";
++	cs2 {
++		#address-cells = <2>;
++		#size-cells = <1>;
++		clock-ranges;
++		ranges;
++
++		ti,cs-chipselect = <2>;
++
++		nand at 2000000,0 {
++			compatible = "ti,davinci-nand";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			reg = <0 0x02000000 0x02000000
++			       1 0x00000000 0x00008000>;
++
++			ti,davinci-chipselect = <1>;
++			ti,davinci-mask-ale = <0>;
++			ti,davinci-mask-cle = <0>;
++			ti,davinci-mask-chipsel = <0>;
++
++			/*
++			 * nand_ecc_strength_good will emit a warning
++			 * but the LCDK ships with these settings [1].
++			 * Also HW 4bits ECC with 16bits NAND seems to
++			 * require some attention.
++			 *
++			 * ATM nand_davinci_probe handling of nand-ecc-*
++			 * is broken, e.g.
++			 * chip.ecc.strength = pdata->ecc_bits occurs after
++			 * scan_ident(), otherwise I would have used:
++			 * 	nand-ecc-mode = "hw";
++			 * 	nand-ecc-strength = <1>;
++			 * 	nand-ecc-step-size = <512>;
++			 */
++			ti,davinci-ecc-mode = "hw";
++			ti,davinci-ecc-bits = <1>;
++
++			nand-bus-width= <16>;
++			nand-on-flash-bbt;
++
++			/*
++			 * LCDK original partitions:
++			 * 0x000000000000-0x000000020000 : "u-boot env"
++			 * 0x000000020000-0x0000000a0000 : "u-boot"
++			 * 0x0000000a0000-0x0000002a0000 : "kernel"
++			 * 0x0000002a0000-0x000020000000 : "filesystem"
++			 *
++			 * The 1st NAND block being guaranted to be valid w/o ECC (> 1k cycles),
++			 * it makes a perfect candidate as an SPL for the BootROM to jump to.
++			 * However the OMAP-L132/L138 Bootloader doc SPRAB41E reads:
++			 * "To boot from NAND Flash, the AIS should be written to NAND block 1
++			 * (NAND block 0 is not used by default)", which matches the LCDK
++			 * original partitioning.
++			 * Also, the LCDK ships with only the u-boot partition provisioned and
++			 * boots on it in its default configuration while using the MMC for the
++			 * kernel and rootfs, so preserve that one as is for now.
++			 * [1]: Ensuring for example that U-Boot LCDK SPL can handle it properly
++			 * and a proper boot chain ROM->SPL->U-Boot->Linux wrt ECC, would allow
++			 * for a better partitioning.
++			 */
++			partitions {
++				compatible = "fixed-partitions";
++				#address-cells = <1>;
++				#size-cells = <1>;
++
++				partition at 0 {
++					label = "u-boot env";
++					reg = <0 0x020000>;
++				};
++				partition at 0x020000 {
++					/* The LCDK defaults to booting from this partition */
++					label = "u-boot";
++					reg = <0x020000 0x080000>;
++				};
++				partition at 0x0a0000 {
++					label = "space";
++					reg = <0x0a0000 0>;
++				};
++			};
++		};
++	};
++};
 -- 
 2.9.2
