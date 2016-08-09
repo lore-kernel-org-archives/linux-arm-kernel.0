@@ -1,139 +1,91 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Tue, 9 Aug 2016 21:18:41 +0800
-Subject: Applied "regmap: debugfs: Add support for dumping write only
- device registers" to the regmap tree
-In-Reply-To: <E1bX6OV-0003hs-C1@debutante>
-Message-ID: <201608092110.TpRzOy7C%fengguang.wu@intel.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 9 Aug 2016 14:24:31 +0100
+Subject: [PATCHv4] arm64: Handle el1 synchronous instruction aborts cleanly
+In-Reply-To: <1470702934-21226-1-git-send-email-labbott@redhat.com>
+References: <1470702934-21226-1-git-send-email-labbott@redhat.com>
+Message-ID: <20160809132431.GK27508@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+On Mon, Aug 08, 2016 at 05:35:34PM -0700, Laura Abbott wrote:
+> Executing from a non-executable area gives an ugly message:
+> 
+> lkdtm: Performing direct entry EXEC_RODATA
+> lkdtm: attempting ok execution at ffff0000084c0e08
+> lkdtm: attempting bad execution at ffff000008880700
+> Bad mode in Synchronous Abort handler detected on CPU2, code 0x8400000e -- IABT (current EL)
+> CPU: 2 PID: 998 Comm: sh Not tainted 4.7.0-rc2+ #13
+> Hardware name: linux,dummy-virt (DT)
+> task: ffff800077e35780 ti: ffff800077970000 task.ti: ffff800077970000
+> PC is at lkdtm_rodata_do_nothing+0x0/0x8
+> LR is at execute_location+0x74/0x88
+> 
+> The 'IABT (current EL)' indicates the error but it's a bit cryptic
+> without knowledge of the ARM ARM. There is also no indication of the
+> specific address which triggered the fault. The increase in kernel
+> page permissions makes hitting this case more likely as well.
+> Handling the case in the vectors gives a much more familiar looking
+> error message:
+> 
+> lkdtm: Performing direct entry EXEC_RODATA
+> lkdtm: attempting ok execution at ffff0000084c0840
+> lkdtm: attempting bad execution at ffff000008880680
+> Unable to handle kernel paging request at virtual address ffff000008880680
+> pgd = ffff8000089b2000
+> [ffff000008880680] *pgd=00000000489b4003, *pud=0000000048904003, *pmd=0000000000000000
+> Internal error: Oops: 8400000e [#1] PREEMPT SMP
+> Modules linked in:
+> CPU: 1 PID: 997 Comm: sh Not tainted 4.7.0-rc1+ #24
+> Hardware name: linux,dummy-virt (DT)
+> task: ffff800077f9f080 ti: ffff800008a1c000 task.ti: ffff800008a1c000
+> PC is at lkdtm_rodata_do_nothing+0x0/0x8
+> LR is at execute_location+0x74/0x88
+> 
+> Signed-off-by: Laura Abbott <labbott@redhat.com>
+> Acked-by: Mark Rutland <mark.rutland@arm.com>
+> ---
+> v4: Rebased to master, extra error message to indicate execution of userspace
+> memory
+> ---
+>  arch/arm64/kernel/entry.S | 18 ++++++++++++++++++
+>  arch/arm64/mm/fault.c     | 14 ++++++++++++--
+>  2 files changed, 30 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+> index 96e4a2b..bdfadef 100644
+> --- a/arch/arm64/kernel/entry.S
+> +++ b/arch/arm64/kernel/entry.S
+> @@ -353,6 +353,8 @@ el1_sync:
+>  	lsr	x24, x1, #ESR_ELx_EC_SHIFT	// exception class
+>  	cmp	x24, #ESR_ELx_EC_DABT_CUR	// data abort in EL1
+>  	b.eq	el1_da
+> +	cmp	x24, #ESR_ELx_EC_IABT_CUR	// instruction abort in EL1
+> +	b.eq	el1_ia
+>  	cmp	x24, #ESR_ELx_EC_SYS64		// configurable trap
+>  	b.eq	el1_undef
+>  	cmp	x24, #ESR_ELx_EC_SP_ALIGN	// stack alignment exception
+> @@ -364,6 +366,22 @@ el1_sync:
+>  	cmp	x24, #ESR_ELx_EC_BREAKPT_CUR	// debug exception in EL1
+>  	b.ge	el1_dbg
+>  	b	el1_inv
+> +el1_ia:
+> +	/*
+> +	 * Instruction abort handling
+> +	 */
+> +	mrs	x0, far_el1
+> +	enable_dbg
+> +	// re-enable interrupts if they were enabled in the aborted context
+> +	tbnz	x23, #7, 1f			// PSR_I_BIT
+> +	enable_irq
+> +1:
+> +	mov	x2, sp				// struct pt_regs
+> +	bl	do_mem_abort
+> +
+> +	// disable interrupts before pulling preserved data off the stack
+> +	disable_irq
+> +	kernel_exit 1
 
-[auto build test WARNING on regmap/for-next]
-[also build test WARNING on v4.8-rc1 next-20160809]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+This looks identical to the el1_da code immediately below. Can we not
+just have a fallthrough?
 
-url:    https://github.com/0day-ci/linux/commits/Mark-Brown/Applied-regmap-debugfs-Add-support-for-dumping-write-only-device-registers-to-the-regmap-tree/20160809-205351
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/regmap.git for-next
-config: x86_64-randconfig-x019-201632 (attached as .config)
-compiler: gcc-6 (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        # save the attached .config to linux build tree
-        make ARCH=x86_64 
-
-All warnings (new ones prefixed by >>):
-
-   In file included from include/asm-generic/bug.h:4:0,
-                    from arch/x86/include/asm/bug.h:35,
-                    from include/linux/bug.h:4,
-                    from include/linux/mmdebug.h:4,
-                    from include/linux/gfp.h:4,
-                    from include/linux/slab.h:14,
-                    from drivers/base/regmap/regmap-debugfs.c:13:
-   drivers/base/regmap/regmap-debugfs.c: In function 'regmap_printable':
-   drivers/base/regmap/regmap-debugfs.c:85:37: error: implicit declaration of function 'regmap_cached' [-Werror=implicit-function-declaration]
-     if (!regmap_readable(map, reg) && !regmap_cached(map, reg))
-                                        ^
-   include/linux/compiler.h:151:30: note: in definition of macro '__trace_if'
-     if (__builtin_constant_p(!!(cond)) ? !!(cond) :   \
-                                 ^~~~
->> drivers/base/regmap/regmap-debugfs.c:85:2: note: in expansion of macro 'if'
-     if (!regmap_readable(map, reg) && !regmap_cached(map, reg))
-     ^~
-   cc1: some warnings being treated as errors
-
-vim +/if +85 drivers/base/regmap/regmap-debugfs.c
-
-     7	 *
-     8	 * This program is free software; you can redistribute it and/or modify
-     9	 * it under the terms of the GNU General Public License version 2 as
-    10	 * published by the Free Software Foundation.
-    11	 */
-    12	
-  > 13	#include <linux/slab.h>
-    14	#include <linux/mutex.h>
-    15	#include <linux/debugfs.h>
-    16	#include <linux/uaccess.h>
-    17	#include <linux/device.h>
-    18	#include <linux/list.h>
-    19	
-    20	#include "internal.h"
-    21	
-    22	struct regmap_debugfs_node {
-    23		struct regmap *map;
-    24		const char *name;
-    25		struct list_head link;
-    26	};
-    27	
-    28	static struct dentry *regmap_debugfs_root;
-    29	static LIST_HEAD(regmap_debugfs_early_list);
-    30	static DEFINE_MUTEX(regmap_debugfs_early_lock);
-    31	
-    32	/* Calculate the length of a fixed format  */
-    33	static size_t regmap_calc_reg_len(int max_val)
-    34	{
-    35		return snprintf(NULL, 0, "%x", max_val);
-    36	}
-    37	
-    38	static ssize_t regmap_name_read_file(struct file *file,
-    39					     char __user *user_buf, size_t count,
-    40					     loff_t *ppos)
-    41	{
-    42		struct regmap *map = file->private_data;
-    43		int ret;
-    44		char *buf;
-    45	
-    46		buf = kmalloc(PAGE_SIZE, GFP_KERNEL);
-    47		if (!buf)
-    48			return -ENOMEM;
-    49	
-    50		ret = snprintf(buf, PAGE_SIZE, "%s\n", map->dev->driver->name);
-    51		if (ret < 0) {
-    52			kfree(buf);
-    53			return ret;
-    54		}
-    55	
-    56		ret = simple_read_from_buffer(user_buf, count, ppos, buf, ret);
-    57		kfree(buf);
-    58		return ret;
-    59	}
-    60	
-    61	static const struct file_operations regmap_name_fops = {
-    62		.open = simple_open,
-    63		.read = regmap_name_read_file,
-    64		.llseek = default_llseek,
-    65	};
-    66	
-    67	static void regmap_debugfs_free_dump_cache(struct regmap *map)
-    68	{
-    69		struct regmap_debugfs_off_cache *c;
-    70	
-    71		while (!list_empty(&map->debugfs_off_cache)) {
-    72			c = list_first_entry(&map->debugfs_off_cache,
-    73					     struct regmap_debugfs_off_cache,
-    74					     list);
-    75			list_del(&c->list);
-    76			kfree(c);
-    77		}
-    78	}
-    79	
-    80	static bool regmap_printable(struct regmap *map, unsigned int reg)
-    81	{
-    82		if (regmap_precious(map, reg))
-    83			return false;
-    84	
-  > 85		if (!regmap_readable(map, reg) && !regmap_cached(map, reg))
-    86			return false;
-    87	
-    88		return true;
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 25983 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160809/88e78350/attachment-0001.obj>
+Will
