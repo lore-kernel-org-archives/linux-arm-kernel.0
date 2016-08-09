@@ -1,97 +1,88 @@
 From: vijay.kilari@gmail.com (vijay.kilari at gmail.com)
-Date: Tue,  9 Aug 2016 16:28:43 +0530
-Subject: [RFC PATCH v2 1/4] arm/arm64: vgic-new: Introduce 64-bit reg access
- support
+Date: Tue,  9 Aug 2016 16:28:45 +0530
+Subject: [RFC PATCH v2 3/4] arm/arm64: vgic-new: Introduce find_reg_by_id()
 In-Reply-To: <1470740326-27751-1-git-send-email-vijay.kilari@gmail.com>
 References: <1470740326-27751-1-git-send-email-vijay.kilari@gmail.com>
-Message-ID: <1470740326-27751-2-git-send-email-vijay.kilari@gmail.com>
+Message-ID: <1470740326-27751-4-git-send-email-vijay.kilari@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
 
-vgic_attr_regs_access() handles only 32-bit register
-value. Pass u64 as parameter and locally handle 32-bit
-reads and writes depending on attribute group.
+In order to implement vGICv3 CPU interface access, we will need to perform
+table lookup of system registers. We would need both index_to_params() and
+find_reg() exported for that purpose, but instead we export a single
+function which combines them both.
 
+Signed-off-by: Pavel Fedin <p.fedin@samsung.com>
+Reviewed-by: Andre Przywara <andre.przywara@arm.com>
 Signed-off-by: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
 ---
- virt/kvm/arm/vgic/vgic-kvm-device.c | 26 +++++++++++++++++++-------
- 1 file changed, 19 insertions(+), 7 deletions(-)
+ arch/arm64/kvm/sys_regs.c | 22 +++++++++++++++-------
+ arch/arm64/kvm/sys_regs.h |  4 ++++
+ 2 files changed, 19 insertions(+), 7 deletions(-)
 
-diff --git a/virt/kvm/arm/vgic/vgic-kvm-device.c b/virt/kvm/arm/vgic/vgic-kvm-device.c
-index 0130c4b..06de322 100644
---- a/virt/kvm/arm/vgic/vgic-kvm-device.c
-+++ b/virt/kvm/arm/vgic/vgic-kvm-device.c
-@@ -236,12 +236,13 @@ void kvm_register_vgic_device(unsigned long type)
-  */
- static int vgic_attr_regs_access(struct kvm_device *dev,
- 				 struct kvm_device_attr *attr,
--				 u32 *reg, bool is_write)
-+				 u64 *reg, bool is_write)
- {
- 	gpa_t addr;
- 	int cpuid, ret, c;
- 	struct kvm_vcpu *vcpu, *tmp_vcpu;
- 	int vcpu_lock_idx = -1;
-+	u32 tmp32;
- 
- 	cpuid = (attr->attr & KVM_DEV_ARM_VGIC_CPUID_MASK) >>
- 		 KVM_DEV_ARM_VGIC_CPUID_SHIFT;
-@@ -272,12 +273,19 @@ static int vgic_attr_regs_access(struct kvm_device *dev,
- 		vcpu_lock_idx = c;
+diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+index a57d650..16c33ca 100644
+--- a/arch/arm64/kvm/sys_regs.c
++++ b/arch/arm64/kvm/sys_regs.c
+@@ -1802,6 +1802,17 @@ static bool index_to_params(u64 id, struct sys_reg_params *params)
  	}
+ }
  
-+	if (is_write)
-+		tmp32 = *reg;
++const struct sys_reg_desc *find_reg_by_id(u64 id,
++					  struct sys_reg_params *params,
++					  const struct sys_reg_desc table[],
++					  unsigned int num)
++{
++	if (!index_to_params(id, params))
++		return NULL;
 +
- 	switch (attr->group) {
- 	case KVM_DEV_ARM_VGIC_GRP_CPU_REGS:
--		ret = vgic_v2_cpuif_uaccess(vcpu, is_write, addr, reg);
-+		ret = vgic_v2_cpuif_uaccess(vcpu, is_write, addr, &tmp32);
-+		if (!is_write)
-+			*reg = tmp32;
- 		break;
- 	case KVM_DEV_ARM_VGIC_GRP_DIST_REGS:
--		ret = vgic_v2_dist_uaccess(vcpu, is_write, addr, reg);
-+		ret = vgic_v2_dist_uaccess(vcpu, is_write, addr, &tmp32);
-+		if (!is_write)
-+			*reg = tmp32;
- 		break;
- 	default:
- 		ret = -EINVAL;
-@@ -309,11 +317,13 @@ static int vgic_v2_set_attr(struct kvm_device *dev,
- 	case KVM_DEV_ARM_VGIC_GRP_DIST_REGS:
- 	case KVM_DEV_ARM_VGIC_GRP_CPU_REGS: {
- 		u32 __user *uaddr = (u32 __user *)(long)attr->addr;
--		u32 reg;
-+		u32 tmp32;
-+		u64 reg;
++	return find_reg(params, table, num);
++}
++
+ /* Decode an index value, and find the sys_reg_desc entry. */
+ static const struct sys_reg_desc *index_to_sys_reg_desc(struct kvm_vcpu *vcpu,
+ 						    u64 id)
+@@ -1929,10 +1940,8 @@ static int get_invariant_sys_reg(u64 id, void __user *uaddr)
+ 	struct sys_reg_params params;
+ 	const struct sys_reg_desc *r;
  
--		if (get_user(reg, uaddr))
-+		if (get_user(tmp32, uaddr))
- 			return -EFAULT;
+-	if (!index_to_params(id, &params))
+-		return -ENOENT;
+-
+-	r = find_reg(&params, invariant_sys_regs, ARRAY_SIZE(invariant_sys_regs));
++	r = find_reg_by_id(id, &params, invariant_sys_regs,
++			   ARRAY_SIZE(invariant_sys_regs));
+ 	if (!r)
+ 		return -ENOENT;
  
-+		reg = tmp32;
- 		return vgic_attr_regs_access(dev, attr, &reg, true);
- 	}
- 	}
-@@ -334,12 +344,14 @@ static int vgic_v2_get_attr(struct kvm_device *dev,
- 	case KVM_DEV_ARM_VGIC_GRP_DIST_REGS:
- 	case KVM_DEV_ARM_VGIC_GRP_CPU_REGS: {
- 		u32 __user *uaddr = (u32 __user *)(long)attr->addr;
--		u32 reg = 0;
-+		u32 tmp32;
-+		u64 reg;
+@@ -1946,9 +1955,8 @@ static int set_invariant_sys_reg(u64 id, void __user *uaddr)
+ 	int err;
+ 	u64 val = 0; /* Make sure high bits are 0 for 32-bit regs */
  
- 		ret = vgic_attr_regs_access(dev, attr, &reg, false);
- 		if (ret)
- 			return ret;
--		return put_user(reg, uaddr);
-+		tmp32 = reg;
-+		return put_user(tmp32, uaddr);
- 	}
- 	}
+-	if (!index_to_params(id, &params))
+-		return -ENOENT;
+-	r = find_reg(&params, invariant_sys_regs, ARRAY_SIZE(invariant_sys_regs));
++	r = find_reg_by_id(id, &params, invariant_sys_regs,
++			   ARRAY_SIZE(invariant_sys_regs));
+ 	if (!r)
+ 		return -ENOENT;
  
+diff --git a/arch/arm64/kvm/sys_regs.h b/arch/arm64/kvm/sys_regs.h
+index dbbb01c..9c6ffd0 100644
+--- a/arch/arm64/kvm/sys_regs.h
++++ b/arch/arm64/kvm/sys_regs.h
+@@ -136,6 +136,10 @@ static inline int cmp_sys_reg(const struct sys_reg_desc *i1,
+ 	return i1->Op2 - i2->Op2;
+ }
+ 
++const struct sys_reg_desc *find_reg_by_id(u64 id,
++					  struct sys_reg_params *params,
++					  const struct sys_reg_desc table[],
++					  unsigned int num);
+ 
+ #define Op0(_x) 	.Op0 = _x
+ #define Op1(_x) 	.Op1 = _x
 -- 
 1.9.1
