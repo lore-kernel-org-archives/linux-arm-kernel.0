@@ -1,32 +1,135 @@
-From: mka@chromium.org (Matthias Kaehlcke)
-Date: Mon, 8 Aug 2016 17:25:01 -0700
-Subject: [PATCH v5 2/6] power: add power sequence library
-In-Reply-To: <1470646331-23227-3-git-send-email-peter.chen@nxp.com>
-References: <1470646331-23227-1-git-send-email-peter.chen@nxp.com>
- <1470646331-23227-3-git-send-email-peter.chen@nxp.com>
-Message-ID: <20160809002501.GA125064@google.com>
+From: labbott@redhat.com (Laura Abbott)
+Date: Mon,  8 Aug 2016 17:35:34 -0700
+Subject: [PATCHv4] arm64: Handle el1 synchronous instruction aborts cleanly
+Message-ID: <1470702934-21226-1-git-send-email-labbott@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-El Mon, Aug 08, 2016 at 04:52:07PM +0800 Peter Chen ha dit:
+Executing from a non-executable area gives an ugly message:
 
-> We have an well-known problem that the device needs to do some power
-> sequence before it can be recognized by related host, the typical
-> example like hard-wired mmc devices and usb devices.
-> 
-> This power sequence is hard to be described at device tree and handled by
-> related host driver, so we have created a common power sequence
-> library to cover this requirement. The core code has supplied
-> some common helpers for host driver, and individual power sequence
-> libraries handle kinds of power sequence for devices.
-> 
-> pwrseq_generic is intended for general purpose of power sequence, which
-> handles gpios and clocks currently, and can cover regulator and pinctrl
-> in future. The host driver calls pwrseq_alloc_generic to create
-> an generic pwrseq instance.
-> 
-> Signed-off-by: Peter Chen <peter.chen@nxp.com>
-> Tested-by Joshua Clayton <stillcompiling@gmail.com>
+lkdtm: Performing direct entry EXEC_RODATA
+lkdtm: attempting ok execution at ffff0000084c0e08
+lkdtm: attempting bad execution at ffff000008880700
+Bad mode in Synchronous Abort handler detected on CPU2, code 0x8400000e -- IABT (current EL)
+CPU: 2 PID: 998 Comm: sh Not tainted 4.7.0-rc2+ #13
+Hardware name: linux,dummy-virt (DT)
+task: ffff800077e35780 ti: ffff800077970000 task.ti: ffff800077970000
+PC is at lkdtm_rodata_do_nothing+0x0/0x8
+LR is at execute_location+0x74/0x88
 
-Reviewed-by: Matthias Kaehlcke <mka@chromium.org>
-Tested-by: Matthias Kaehlcke <mka@chromium.org>
+The 'IABT (current EL)' indicates the error but it's a bit cryptic
+without knowledge of the ARM ARM. There is also no indication of the
+specific address which triggered the fault. The increase in kernel
+page permissions makes hitting this case more likely as well.
+Handling the case in the vectors gives a much more familiar looking
+error message:
+
+lkdtm: Performing direct entry EXEC_RODATA
+lkdtm: attempting ok execution at ffff0000084c0840
+lkdtm: attempting bad execution at ffff000008880680
+Unable to handle kernel paging request at virtual address ffff000008880680
+pgd = ffff8000089b2000
+[ffff000008880680] *pgd=00000000489b4003, *pud=0000000048904003, *pmd=0000000000000000
+Internal error: Oops: 8400000e [#1] PREEMPT SMP
+Modules linked in:
+CPU: 1 PID: 997 Comm: sh Not tainted 4.7.0-rc1+ #24
+Hardware name: linux,dummy-virt (DT)
+task: ffff800077f9f080 ti: ffff800008a1c000 task.ti: ffff800008a1c000
+PC is at lkdtm_rodata_do_nothing+0x0/0x8
+LR is at execute_location+0x74/0x88
+
+Signed-off-by: Laura Abbott <labbott@redhat.com>
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+---
+v4: Rebased to master, extra error message to indicate execution of userspace
+memory
+---
+ arch/arm64/kernel/entry.S | 18 ++++++++++++++++++
+ arch/arm64/mm/fault.c     | 14 ++++++++++++--
+ 2 files changed, 30 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index 96e4a2b..bdfadef 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -353,6 +353,8 @@ el1_sync:
+ 	lsr	x24, x1, #ESR_ELx_EC_SHIFT	// exception class
+ 	cmp	x24, #ESR_ELx_EC_DABT_CUR	// data abort in EL1
+ 	b.eq	el1_da
++	cmp	x24, #ESR_ELx_EC_IABT_CUR	// instruction abort in EL1
++	b.eq	el1_ia
+ 	cmp	x24, #ESR_ELx_EC_SYS64		// configurable trap
+ 	b.eq	el1_undef
+ 	cmp	x24, #ESR_ELx_EC_SP_ALIGN	// stack alignment exception
+@@ -364,6 +366,22 @@ el1_sync:
+ 	cmp	x24, #ESR_ELx_EC_BREAKPT_CUR	// debug exception in EL1
+ 	b.ge	el1_dbg
+ 	b	el1_inv
++el1_ia:
++	/*
++	 * Instruction abort handling
++	 */
++	mrs	x0, far_el1
++	enable_dbg
++	// re-enable interrupts if they were enabled in the aborted context
++	tbnz	x23, #7, 1f			// PSR_I_BIT
++	enable_irq
++1:
++	mov	x2, sp				// struct pt_regs
++	bl	do_mem_abort
++
++	// disable interrupts before pulling preserved data off the stack
++	disable_irq
++	kernel_exit 1
+ el1_da:
+ 	/*
+ 	 * Data abort handling
+diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+index c8beaa0..05d2bd7 100644
+--- a/arch/arm64/mm/fault.c
++++ b/arch/arm64/mm/fault.c
+@@ -153,6 +153,11 @@ int ptep_set_access_flags(struct vm_area_struct *vma,
+ }
+ #endif
+ 
++static bool is_el1_instruction_abort(unsigned int esr)
++{
++	return ESR_ELx_EC(esr) == ESR_ELx_EC_IABT_CUR;
++}
++
+ /*
+  * The kernel tried to access some page that wasn't present.
+  */
+@@ -161,8 +166,9 @@ static void __do_kernel_fault(struct mm_struct *mm, unsigned long addr,
+ {
+ 	/*
+ 	 * Are we prepared to handle this kernel fault?
++	 * We are almost certainly not prepared to handle instruction faults.
+ 	 */
+-	if (fixup_exception(regs))
++	if (!is_el1_instruction_abort(esr) && fixup_exception(regs))
+ 		return;
+ 
+ 	/*
+@@ -267,7 +273,8 @@ static inline bool is_permission_fault(unsigned int esr)
+ 	unsigned int ec       = ESR_ELx_EC(esr);
+ 	unsigned int fsc_type = esr & ESR_ELx_FSC_TYPE;
+ 
+-	return (ec == ESR_ELx_EC_DABT_CUR && fsc_type == ESR_ELx_FSC_PERM);
++	return (ec == ESR_ELx_EC_DABT_CUR && fsc_type == ESR_ELx_FSC_PERM) ||
++	       (ec == ESR_ELx_EC_IABT_CUR && fsc_type == ESR_ELx_FSC_PERM);
+ }
+ 
+ static bool is_el0_instruction_abort(unsigned int esr)
+@@ -312,6 +319,9 @@ static int __kprobes do_page_fault(unsigned long addr, unsigned int esr,
+ 		if (regs->orig_addr_limit == KERNEL_DS)
+ 			die("Accessing user space memory with fs=KERNEL_DS", regs, esr);
+ 
++		if (is_el1_instruction_abort(esr))
++			die("Attempting to execute userspace memory", regs, esr);
++
+ 		if (!search_exception_tables(regs->pc))
+ 			die("Accessing user space memory outside uaccess.h routines", regs, esr);
+ 	}
+-- 
+2.7.4
