@@ -1,15 +1,15 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Tue, 09 Aug 2016 13:44:31 +0100
-Subject: Applied "regmap: debugfs: Add support for dumping write only device
- registers" to the regmap tree
-In-Reply-To: <1470671062-25479-3-git-send-email-cristian.birsan@microchip.com>
-Message-ID: <E1bX6OV-0003hs-C1@debutante>
+Date: Tue, 09 Aug 2016 13:44:34 +0100
+Subject: Applied "regmap: Add a function to check if a regmap register is
+ cached" to the regmap tree
+In-Reply-To: <1470671062-25479-2-git-send-email-cristian.birsan@microchip.com>
+Message-ID: <E1bX6OY-0003is-9X@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The patch
 
-   regmap: debugfs: Add support for dumping write only device registers
+   regmap: Add a function to check if a regmap register is cached
 
 has been applied to the regmap tree at
 
@@ -34,63 +34,67 @@ to this mail.
 Thanks,
 Mark
 
->From 359a2f17604e2c1c8938be2bba32a8cef9cf6303 Mon Sep 17 00:00:00 2001
+>From 1ea975cf1ef57b1e44c0aec4820f60bb3b60904b Mon Sep 17 00:00:00 2001
 From: Cristian Birsan <cristian.birsan@microchip.com>
-Date: Mon, 8 Aug 2016 18:44:22 +0300
-Subject: [PATCH] regmap: debugfs: Add support for dumping write only device
- registers
+Date: Mon, 8 Aug 2016 18:44:21 +0300
+Subject: [PATCH] regmap: Add a function to check if a regmap register is
+ cached
 
-Add support for dumping write only device registers in debugfs. This is
-useful for audio codecs that have write only registers (like WM8731).
-The logic that decides if a value can be printed is moved to
-regmap_printable() function to allow for easier future updates.
+Add a function to check if a regmap register is cached. This will be used
+in debugfs to dump the cached values of write only registers.
 
 Signed-off-by: Cristian Birsan <cristian.birsan@microchip.com>
 Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- drivers/base/regmap/regmap-debugfs.c | 16 +++++++++++++---
- 1 file changed, 13 insertions(+), 3 deletions(-)
+ drivers/base/regmap/internal.h |  1 +
+ drivers/base/regmap/regmap.c   | 23 +++++++++++++++++++++++
+ 2 files changed, 24 insertions(+)
 
-diff --git a/drivers/base/regmap/regmap-debugfs.c b/drivers/base/regmap/regmap-debugfs.c
-index 1ee3d40861c7..36ce3511c733 100644
---- a/drivers/base/regmap/regmap-debugfs.c
-+++ b/drivers/base/regmap/regmap-debugfs.c
-@@ -77,6 +77,17 @@ static void regmap_debugfs_free_dump_cache(struct regmap *map)
- 	}
+diff --git a/drivers/base/regmap/internal.h b/drivers/base/regmap/internal.h
+index a0380338946a..f4be4c19bb17 100644
+--- a/drivers/base/regmap/internal.h
++++ b/drivers/base/regmap/internal.h
+@@ -173,6 +173,7 @@ struct regcache_ops {
+ 	int (*drop)(struct regmap *map, unsigned int min, unsigned int max);
+ };
+ 
++bool regmap_cached(struct regmap *map, unsigned int reg);
+ bool regmap_writeable(struct regmap *map, unsigned int reg);
+ bool regmap_readable(struct regmap *map, unsigned int reg);
+ bool regmap_volatile(struct regmap *map, unsigned int reg);
+diff --git a/drivers/base/regmap/regmap.c b/drivers/base/regmap/regmap.c
+index 51fa7d66a393..1f011f9d6dcb 100644
+--- a/drivers/base/regmap/regmap.c
++++ b/drivers/base/regmap/regmap.c
+@@ -93,6 +93,29 @@ bool regmap_writeable(struct regmap *map, unsigned int reg)
+ 	return true;
  }
  
-+static bool regmap_printable(struct regmap *map, unsigned int reg)
++bool regmap_cached(struct regmap *map, unsigned int reg)
 +{
-+	if (regmap_precious(map, reg))
++	int ret;
++	unsigned int val;
++
++	if (map->cache == REGCACHE_NONE)
 +		return false;
 +
-+	if (!regmap_readable(map, reg) && !regmap_cached(map, reg))
++	if (!map->cache_ops)
++		return false;
++
++	if (map->max_register && reg > map->max_register)
++		return false;
++
++	map->lock(map->lock_arg);
++	ret = regcache_read(map, reg, &val);
++	map->unlock(map->lock_arg);
++	if (ret)
 +		return false;
 +
 +	return true;
 +}
 +
- /*
-  * Work out where the start offset maps into register numbers, bearing
-  * in mind that we suppress hidden registers.
-@@ -105,8 +116,7 @@ static unsigned int regmap_debugfs_get_dump_start(struct regmap *map,
- 	if (list_empty(&map->debugfs_off_cache)) {
- 		for (; i <= map->max_register; i += map->reg_stride) {
- 			/* Skip unprinted registers, closing off cache entry */
--			if (!regmap_readable(map, i) ||
--			    regmap_precious(map, i)) {
-+			if (!regmap_printable(map, i)) {
- 				if (c) {
- 					c->max = p - 1;
- 					c->max_reg = i - map->reg_stride;
-@@ -204,7 +214,7 @@ static ssize_t regmap_read_debugfs(struct regmap *map, unsigned int from,
- 	start_reg = regmap_debugfs_get_dump_start(map, from, *ppos, &p);
- 
- 	for (i = start_reg; i <= to; i += map->reg_stride) {
--		if (!regmap_readable(map, i))
-+		if (!regmap_readable(map, i) && !regmap_cached(map, i))
- 			continue;
- 
- 		if (regmap_precious(map, i))
+ bool regmap_readable(struct regmap *map, unsigned int reg)
+ {
+ 	if (!map->reg_read)
 -- 
 2.8.1
