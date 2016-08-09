@@ -1,70 +1,64 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 9 Aug 2016 18:23:08 +0100
-Subject: [PATCH v15 04/10] arm64: Kprobes with single stepping support
-In-Reply-To: <57A89731.20709@linaro.org>
-References: <57924104.1080202@linaro.org>
- <20160725171350.GE2423@e104818-lin.cambridge.arm.com>
- <57969234.1070201@linaro.org>
- <22b277ba-6812-a0dd-9e8e-c29bdb3aa672@linaro.org>
- <57993211.1040600@linaro.org>
- <20160728144053.GA26510@e104818-lin.cambridge.arm.com>
- <360d582b-5401-7126-ef40-bd78369c0a34@linaro.org>
- <57A2C8DF.7050401@linaro.org>
- <74b8c503-b6df-dcb1-c278-d49850fe3715@linaro.org>
- <57A89731.20709@linaro.org>
-Message-ID: <20160809172308.GD15447@e104818-lin.cambridge.arm.com>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Tue, 9 Aug 2016 19:27:07 +0200
+Subject: [linux-sunxi] Re: [PATCH v4 3/7] clk: sunxi: add generic
+ multi-parent bus clock gates driver
+In-Reply-To: <CAGb2v64CnRJyQih=DMZ4wfMPjdYNHwm2TxqNjaALsQ+m7bwsbg@mail.gmail.com>
+References: <20160808172149.30861-1-andre.przywara@arm.com>
+ <20160808172149.30861-4-andre.przywara@arm.com>
+ <20160808201527.62ec34beb19b86dcfd3dbf03@free.fr>
+ <CAGb2v64CnRJyQih=DMZ4wfMPjdYNHwm2TxqNjaALsQ+m7bwsbg@mail.gmail.com>
+Message-ID: <20160809192707.ecb29cd176c29232e1086c82@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 08, 2016 at 10:29:05AM -0400, David Long wrote:
-> On 08/08/2016 07:13 AM, Daniel Thompson wrote:
-> >On 04/08/16 05:47, David Long wrote:
-> >>From b451caa1adaf1d03e08a44b5dad3fca31cebd97a Mon Sep 17 00:00:00 2001
-> >>From: "David A. Long" <dave.long@linaro.org>
-> >>Date: Thu, 4 Aug 2016 00:35:33 -0400
-> >>Subject: [PATCH] arm64: Remove stack duplicating code from jprobes
-> >>
-> >>Because the arm64 calling standard allows stacked function arguments
-> >>to be
-> >>anywhere in the stack frame, do not attempt to duplicate the stack
-> >>frame for
-> >>jprobes handler functions.
-> >>
-> >>Signed-off-by: David A. Long <dave.long@linaro.org>
-> >>---
-> >> Documentation/kprobes.txt          |  7 +++++++
-> >> arch/arm64/include/asm/kprobes.h   |  2 --
-> >> arch/arm64/kernel/probes/kprobes.c | 31 +++++--------------------------
-> >> 3 files changed, 12 insertions(+), 28 deletions(-)
-> >>
-> >>diff --git a/Documentation/kprobes.txt b/Documentation/kprobes.txt
-> >>index 1f9b3e2..bd01839 100644
-> >>--- a/Documentation/kprobes.txt
-> >>+++ b/Documentation/kprobes.txt
-> >>@@ -103,6 +103,13 @@ Note that the probed function's args may be
-> >>passed on the stack
-> >> or in registers.  The jprobe will work in either case, so long as the
-> >> handler's prototype matches that of the probed function.
-> >>
-> >>+Note that in some architectures (e.g.: arm64) the stack copy is not
-> >
-> >Could sparc64 be added to this list?
-> >
-> >   For the sparc folks who are new to the thread, we've previously
-> >   established that the sparc64 ABI passes large structures by
-> >   allocating them from the caller's stack frame and passing a pointer
-> >   to the stack frame (i.e. arguments may not be at top of the stack).
-> >   We also noticed that sparc code does not save/restore anything from
-> >   the stack.
-> 
-> I was reluctant to do that in the context of late changes to v4.8 for arm64
-> but now that any changes for this are going in as a new patch it would
-> indeed be useful to get involvement from sparc maintainers.
+On Tue, 9 Aug 2016 18:02:47 +0800
+Chen-Yu Tsai <wens@csie.org> wrote:
 
-I'm happy to take the arm64 patch for 4.8 as it's mainly a clean-up.
-Whether you can mention sparc64 as well, it depends on the sparc
-maintainers. You can either cc them or send the series as two patches,
-one for documentation and the other for arm64.
+> > The 'parent's of the bus gates are of no interest.
+> > They are supposed to be (no clear documentation) apb1, apb2, ahb1 and
+> > ahb2, but, as you well noticed in the patch 5/7, these clocks are fixed
+> > and have no gate. Some of them are parents of real clocks, but they
+> > don't bring anything to the bus gates of the other clocks.
+> 
+> Yes they are. Some devices, such as UARTs and I2C controllers, need
+> to get the clock rate of the gate and calculate the proper internal
+> divider.
+
+You are right, the clocks of some subsystems have only a gate, but
+these are exceptions.
+
+Look at an ordinary clock, say the mmc0 of the H3.
+There is a "bus" gate (see below) in the CCU register 0x60, bit 8, and
+the "clock" gate in the CCU register 0x88, bit 31.
+
+The 'simple-gates' says that the "bus gate" is child of ahb1 (in all
+sunxi versions, the one prior to 'simple-gate', in the 'simple-gate',
+in 'sunxi-ng', and now in Andr?'s patch).
+
+But, where do you see a hardware relation between the mmc0 clock and
+the ahb1 clock?
+
+> > As I wrote previously, the simplest is to ungate/gate the clocks in
+> > both the bus and clock registers on clk_prepare/unprepare.
+> > Then, your 'multi-bus-gates' would be simply a generic 'multi-gates'.
+> 
+> This is somewhat misleading. What "clock" registers are you referring
+> to? There are no "bus" registers. The reason we call them "bus clock
+> gates" is because they are mashed together, instead of having clearly
+> separated registers for each AHB/APB bus.
+> 
+> And if you want just a generic clock gates driver, we already have
+> the "simple-gates" driver.
+
+Maybe I used the wrong words.
+
+The "clock" register is the one which defines the parameters of the
+clock (parents, mul/div factors, gate). For the H3 mmc0, it is the
+CCU register 0x60.
+
+The "bus" register is one of the so-called "Bus Clock Gating Register"s.
+For the H3 mmc0, it is the CCU register 0x88.	
 
 -- 
-Catalin
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
