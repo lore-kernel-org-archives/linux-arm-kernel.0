@@ -1,65 +1,70 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 9 Aug 2016 17:49:53 +0100
-Subject: [PATCH] arm64: suspend: avoid potential TLB conflict
-In-Reply-To: <57AA0401.1020809@arm.com>
-References: <1470651050-18291-1-git-send-email-mark.rutland@arm.com>
- <57AA0401.1020809@arm.com>
-Message-ID: <20160809164953.GA13591@leverpostej>
+Date: Tue, 9 Aug 2016 17:51:36 +0100
+Subject: [PATCH] drivers/perf: arm_pmu: fix legacy affinity-less DT support
+In-Reply-To: <20160809164839.GN27508@arm.com>
+References: <1470757867-13554-1-git-send-email-mark.rutland@arm.com>
+ <20160809164839.GN27508@arm.com>
+Message-ID: <20160809165136.GB13591@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 09, 2016 at 05:25:37PM +0100, James Morse wrote:
-> Hi Mark,
+On Tue, Aug 09, 2016 at 05:48:40PM +0100, Will Deacon wrote:
+> On Tue, Aug 09, 2016 at 04:51:07PM +0100, Mark Rutland wrote:
+> > Commit 19a469a58720ea96 ("drivers/perf: arm-pmu: Handle per-interrupt
+> > affinity mask") relies on using_spi being valid, but this is only
+> > initialised correctly in the presence of an interrupt-affinity property,
+> > which legacy DTBs do not have.
+> > 
+> > In the absence of an interrupt-affinity property, using_spi is always
+> > false (regardless of whether SPIs are actually used), so we call
+> > irq_get_percpu_devid_partition(irq). This returns -EINVAL, and we give
+> > up, passing on this return value.
+> > 
+> > The code which determines using_spi also verifies that we do not have
+> > mixed SPI/PPI interrupts. Even in the absence of an interrupt-affinity
+> > property we do not support mixed SPI/PPI cases, so pull the validation
+> > logic above the main loop, ensuring that using_spi is always valid.
+> > 
+> > At the same time, have the error message to give the path of the PMU
+> > node, rather than a CPU node, as the mismatch is a property of the
+> > entire set of PMU interrupts rather than a particular CPU associated
+> > with it.
+> > 
+> > Fixes: 19a469a58720ea96 ("drivers/perf: arm-pmu: Handle per-interrupt affinity mask")
+> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> > Reported-by: Geert Uytterhoeven <geert@linux-m68k.org>
+> > Reported-by: Robin Murphy <robin.murphy@arm.com>
+> > Tested-by: Robin Murphy <robin.murphy@arm.com>
+> > Cc: Catalin Marinas <catalin.marinas@arm.com>
+> > Cc: Marc Zyngier <marc.zyngier@arm.com>
+> > Cc: Will Deacon <will.deacon@arm.com>
+> > ---
+> >  drivers/perf/arm_pmu.c | 37 ++++++++++++++++++++-----------------
+> >  1 file changed, 20 insertions(+), 17 deletions(-)
+> > 
+> > It's been pointed out to me that Marc send a patch a while ago [1] fixing the
+> > same issue, but for some reason that didn't get queued.
+> > 
+> > This patch had the added benefit of ensuring we always avoid mismatched SPI/PPI
+> > mixes, but otherwise either patch should avoid the issue.
 > 
-> ~s/suspend/hibernate/ in the subject?
-
-Ah, yes. I'll fix that up.
-
-> >  /*
-> > @@ -217,12 +218,16 @@ static int create_safe_exec_page(void *src_start, size_t length,
-> >  	set_pte(pte, __pte(virt_to_phys((void *)dst) |
-> >  			 pgprot_val(PAGE_KERNEL_EXEC)));
-> >  
-> > -	/* Load our new page tables */
-> > -	asm volatile("msr	ttbr0_el1, %0;"
-> > -		     "isb;"
-> > -		     "tlbi	vmalle1is;"
-> > -		     "dsb	ish;"
-> > -		     "isb" : : "r"(virt_to_phys(pgd)));
-> > +	/*
-> > +	 * Load our new page tables. TTBR0 currently points to the zero page,
+> I'm a little uneasy with that change, since we now go ahead and check all
+> of the IRQ resources, regardless of the interrupt-affinity property. This
+> could result in us failing the probe, where we could previously have done
+> the right thing.
 > 
-> fe12c00d21bb ("PM / hibernate: Introduce test_resume mode for hibernation") came
-> in with the merge window, this does a suspend followed by a resume with the user
-> page tables still loaded in ttbr0_el1.
-> 
-> So now we need to call cpu_set_reserved_ttbr0() in here to make this true/safe.
+> For now, I think I'll stick with Marc's patch (that somehow slipped through
+> the woodwork), but maybe we should consider removing the SPI/PPI sanity
+> checking altogether. At some point we have to rely on the DT being correct,
+> and I don't think we do anything disastrout if there is a mismatch in
+> interrupt types.
 
-Thanks for the heads-up!
+Sure thing. From a quick scan it looks like we'd safely bail out at the
+point we try to request the IRQ (i.e. when we set up the first event).
 
->From a quick look, that sounds like the right thing to do.
+FWIW, for Marc's patch, assuming you haven't queued it yet:
 
-> > +	 * and the TLBs should be free of global entries, but may contain stale
-> > +	 * ASID-tagged entries (e.g. from the EFI runtime services). A strict
-> > +	 * BBM approach requires that we destroy these before installing
-> > +	 * overlapping global mappings.
-> > +	 */
-> > +	local_flush_tlb_all();
-> > +	write_sysreg(virt_to_phys(pgd), ttbr0_el1);
-> > +	isb();
-> >  
-> >  	*phys_dst_addr = virt_to_phys((void *)dst);
-> 
-> and it even looks better!
-> 
-> If you think they're useful:
-> Tested-by: James Morse <james.morse@arm.com>
-> Acked-by: James Morse <james.morse@arm.com>
-
-Cheers!
-
-I assume those apply with the addition of cpu_set_reserved_ttbr0(),
-which I'll fold into v2 along with them.
+Acked-by: Mark Rutland <mark.rutland@arm.com>
 
 Thanks,
 Mark.
