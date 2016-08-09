@@ -1,53 +1,59 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Tue,  9 Aug 2016 12:29:16 +0200
-Subject: [RFC PATCH v3 2/8] firmware: scpi: Switch arm_scpi to use new registry
-In-Reply-To: <1470738562-20026-1-git-send-email-narmstrong@baylibre.com>
-References: <1470738562-20026-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1470738562-20026-3-git-send-email-narmstrong@baylibre.com>
+Date: Tue,  9 Aug 2016 12:29:14 +0200
+Subject: [RFC PATCH v3 0/8] scpi: Add SCPI registry to handle legacy protocol
+Message-ID: <1470738562-20026-1-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
----
- drivers/firmware/arm_scpi.c | 12 ++++--------
- 1 file changed, 4 insertions(+), 8 deletions(-)
+This patchset aims to support the legacy SCPI firmware implementation that was
+delivered as early technology preview for the JUNO platform.
 
-diff --git a/drivers/firmware/arm_scpi.c b/drivers/firmware/arm_scpi.c
-index 4388937..c6d6528 100644
---- a/drivers/firmware/arm_scpi.c
-+++ b/drivers/firmware/arm_scpi.c
-@@ -162,7 +162,6 @@ struct scpi_drvinfo {
- 	u32 firmware_version;
- 	int num_chans;
- 	atomic_t next_chan;
--	struct scpi_ops *scpi_ops;
- 	struct scpi_chan *channels;
- 	struct scpi_dvfs_info *dvfs[MAX_DVFS_DOMAINS];
- };
-@@ -580,12 +579,6 @@ static struct scpi_ops scpi_ops = {
- 	.device_set_power_state = scpi_device_set_power_state,
- };
- 
--struct scpi_ops *get_scpi_ops(void)
--{
--	return scpi_info ? scpi_info->scpi_ops : NULL;
--}
--EXPORT_SYMBOL_GPL(get_scpi_ops);
--
- static int scpi_init_versions(struct scpi_drvinfo *info)
- {
- 	int ret;
-@@ -769,7 +762,10 @@ err:
- 		  FW_REV_MAJOR(scpi_info->firmware_version),
- 		  FW_REV_MINOR(scpi_info->firmware_version),
- 		  FW_REV_PATCH(scpi_info->firmware_version));
--	scpi_info->scpi_ops = &scpi_ops;
-+
-+	ret = devm_scpi_ops_register(dev, &scpi_ops);
-+	if (ret)
-+		return ret;
- 
- 	ret = sysfs_create_groups(&dev->kobj, versions_groups);
- 	if (ret)
+Finally a stable, maintained and public implementation for the SCPI protocol
+has been upstreamed part of the JUNO support and it is the recommended way
+of implementing SCP communication on ARMv8 platforms.
+
+The Amlogic GXBB platform is using this legacy protocol, as the RK3368 & RK3399
+platforms. Only the GXBB example is provided here, but it's unclear if other
+Amlogic ARMv8 based SoCs uses this legacy procotol.
+
+In order to support the legacy protocol :
+ - Move the scpi_get_ops to a thin registry layer
+ - Change the arm_scpi.c to use the registry layer
+ - Add a separate config option to build the registry layer
+ - Add the legacy SCPI driver based on the new implementation
+ - For example, add the Amlogic GXBB MHU and SCPI DT cpufreq & sensors nodes
+
+Changes since RFC v2 at https://lkml.org/lkml/2016/6/21/324 :
+ - Moved MHU to a separate patchset posted at http://lkml.kernel.org/r/1470732737-18391-1-git-send-email-narmstrong at baylibre.com
+ - Added a vendor send_message callback into scpi_ops to implement vendor commands
+ - Implement EXT commands on arm scpi as vendor send_command
+ - Added Rockchip variant mailbox handling
+
+Initial RFC discution tread can be found at https://lkml.org/lkml/2016/5/26/111
+
+@Sudeep: I know you wished I merged the legacy into the arm_scpi, but can you take a look at the vendor extension and how I implemented the rockchip mailbox handling ?
+
+Neil Armstrong (8):
+  firmware: Add a SCPI registry to handle multiple implementations
+  firmware: scpi: Switch arm_scpi to use new registry
+  scpi: Add vendor_send_message to enable access to vendor commands
+  firmware: arm_scpi: Enable vendor_send_message as ext commands
+  firmware: Add legacy SCPI protocol driver
+  dt-bindings: arm: Update arm,scpi bindings with Meson GXBB SCPI
+  ARM64: dts: meson-gxbb: Add SRAM node
+  ARM64: dts: meson-gxbb: Add SCPI with cpufreq & sensors Nodes
+
+ Documentation/devicetree/bindings/arm/arm,scpi.txt |   8 +-
+ arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi        |  45 ++
+ drivers/firmware/Kconfig                           |  24 +
+ drivers/firmware/Makefile                          |   2 +
+ drivers/firmware/arm_scpi.c                        |  40 +-
+ drivers/firmware/legacy_scpi.c                     | 710 +++++++++++++++++++++
+ drivers/firmware/scpi.c                            |  94 +++
+ include/linux/scpi_protocol.h                      |  20 +-
+ 8 files changed, 928 insertions(+), 15 deletions(-)
+ create mode 100644 drivers/firmware/legacy_scpi.c
+ create mode 100644 drivers/firmware/scpi.c
+
 -- 
 2.7.0
