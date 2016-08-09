@@ -1,48 +1,44 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Tue, 09 Aug 2016 20:47:47 +0200
-Subject: [GIT PULL] pxa fixes for v4.8
-Message-ID: <87fuqdvkx8.fsf@belgarion.home>
+From: oleg@redhat.com (Oleg Nesterov)
+Date: Tue, 9 Aug 2016 20:49:44 +0200
+Subject: [PATCH 5/5] arm64: Add uprobe support
+In-Reply-To: <abaac6ebaa5dd63889803ec568663bc8c8c65b02.1470114993.git.panand@redhat.com>
+References: <cover.1470114993.git.panand@redhat.com>
+ <abaac6ebaa5dd63889803ec568663bc8c8c65b02.1470114993.git.panand@redhat.com>
+Message-ID: <20160809184943.GA17112@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 08/02, Pratyush Anand wrote:
+>
+> This patch adds support for uprobe on ARM64 architecture.
 
-Hello Arnd, Kevin, Olof,
+I know nothing about ARM, so I can't actually review this change.
+But it looks good to me ;)
 
-Please consider this pull request for pxa fixes for 4.8, made of 2 trivial
-fixes. It's pretty unconventional, as I missed the 4.8-rc1 merge window, but
-these are only 2 includes modifications, and it loosens the bond on gpio API for
-future module.h include removal.
+Just one note,
 
-Let me know if you judge that safe enough as I did to let that in a -rc cycle.
+> +int arch_uprobe_pre_xol(struct arch_uprobe *auprobe, struct pt_regs *regs)
+> +{
+> +	struct uprobe_task *utask = current->utask;
+> +
+> +	/* saved fault code is restored in post_xol */
+> +	utask->autask.saved_fault_code = current->thread.fault_code;
+> +
+> +	/* An invalid fault code between pre/post xol event */
+> +	current->thread.fault_code = UPROBE_INV_FAULT_CODE;
+> +
+> +	/* Instruction point to execute ol */
+> +	instruction_pointer_set(regs, utask->xol_vaddr);
+> +
+> +	user_enable_single_step(current);
 
-The following changes since commit 29b4817d4018df78086157ea3a55c1d9424a7cfc:
+I don't think we want user_{enable,disable{_single_step in the long term,
+please look at 9bd1190a11c9d2 "uprobes/x86: Do not (ab)use TIF_SINGLESTEP
+/user_*_single_step() for single-stepping". it seems that ARM64 sets/clears
+TIF_SINGLESTEP. You can also lool at saved_tf logic, probably ARM64 needs
+the same.
 
-  Linux 4.8-rc1 (2016-08-07 18:18:00 -0700)
+However, I agree we can do this later and initial version can use these
+ptrace helpers.
 
-are available in the git repository at:
-
-  https://github.com/rjarzmik/linux.git tags/pxa-fixes-v4.8
-
-for you to fetch changes up to a3c747b96df66a7eb810fef45f3b9e65614712d9:
-
-  ARM: pxa: add module.h for corgi symbol_get/symbol_put usage (2016-08-09 08:19:06 +0200)
-
-----------------------------------------------------------------
-This is the pxa changes for v4.8 cycle.
-
-This is a tiny fix couple to enable changes in includes in
-gpio API without breaking pxa boards.
-
-----------------------------------------------------------------
-Paul Gortmaker (2):
-      ARM: pxa: add module.h for spitz symbol_get/symbol_put usage
-      ARM: pxa: add module.h for corgi symbol_get/symbol_put usage
-
- arch/arm/mach-pxa/corgi.c | 1 +
- arch/arm/mach-pxa/spitz.c | 1 +
- 2 files changed, 2 insertions(+)
-
-Cheers.
-
--- 
-Robert
+Oleg.
