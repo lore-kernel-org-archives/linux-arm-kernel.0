@@ -1,60 +1,86 @@
-From: robert.richter@cavium.com (Robert Richter)
-Date: Tue, 9 Aug 2016 12:29:26 +0200
-Subject: [RFC PATCH V5 0/5] ECAM quirks handling for ARM64 platforms
-In-Reply-To: <1470661541-26270-1-git-send-email-tn@semihalf.com>
-References: <1470661541-26270-1-git-send-email-tn@semihalf.com>
-Message-ID: <20160809102926.GT22012@rric.localdomain>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 9 Aug 2016 11:37:08 +0100
+Subject: [PATCH v7 4/4] nmi_backtrace: generate one-line reports for idle
+ cpus
+In-Reply-To: <20160808164828.GH12649@leverpostej>
+References: <1470672218-16059-1-git-send-email-cmetcalf@mellanox.com>
+ <1470672218-16059-5-git-send-email-cmetcalf@mellanox.com>
+ <20160808164828.GH12649@leverpostej>
+Message-ID: <20160809103708.GC23769@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08.08.16 15:05:36, Tomasz Nowicki wrote:
-> Quirk handling relies on an idea of matching MCFG OEM ID, TABLE ID and
-> revision (the ones from standard header of MCFG table).
+On Mon, Aug 08, 2016 at 05:48:28PM +0100, Mark Rutland wrote:
+> Hi,
 > 
-> Static array is used to keep quirk entries. Each entry consists of
-> mentioned MCFG IDs along with custom pci_ops structure and initialization call.
+> [adding Lorenzo]
 > 
-> As an example, the last patch presents quirk handling mechanism usage for
-> ThunderX PEM driver.
+> On Mon, Aug 08, 2016 at 12:03:38PM -0400, Chris Metcalf wrote:
+> > When doing an nmi backtrace of many cores, most of which are idle,
+> > the output is a little overwhelming and very uninformative.  Suppress
+> > messages for cpus that are idling when they are interrupted and just
+> > emit one line, "NMI backtrace for N skipped: idling at pc 0xNNN".
+> > 
+> > We do this by grouping all the cpuidle code together into a new
+> > .cpuidle.text section, and then checking the address of the
+> > interrupted PC to see if it lies within that section.
+> > 
+> > This commit suitably tags x86, arm64, and tile idle routines,
+> > and only adds in the minimal framework for other architectures.
 > 
-> v4 -> v5
-> - rebase against v4.8-rc1
-> - rework to exact MCFG OEM ID, TABLE ID, rev match
->   - use memcmp instead of strncmp
->   - no substring match
-> - fix typos and dmesg message
+> > diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
+> > index 659963d40bb4..fe7f93b7b11b 100644
+> > --- a/arch/arm64/kernel/vmlinux.lds.S
+> > +++ b/arch/arm64/kernel/vmlinux.lds.S
+> > @@ -122,6 +122,7 @@ SECTIONS
+> >  			ENTRY_TEXT
+> >  			TEXT_TEXT
+> >  			SCHED_TEXT
+> > +			CPUIDLE_TEXT
+> >  			LOCK_TEXT
+> >  			KPROBES_TEXT
+> >  			HYPERVISOR_TEXT
+> > diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+> > index 5bb61de23201..64f088ca3192 100644
+> > --- a/arch/arm64/mm/proc.S
+> > +++ b/arch/arm64/mm/proc.S
+> > @@ -48,11 +48,13 @@
+> >   *
+> >   *	Idle the processor (wait for interrupt).
+> >   */
+> > +	.pushsection ".cpuidle.text","ax"
+> >  ENTRY(cpu_do_idle)
+> >  	dsb	sy				// WFI may enter a low-power mode
+> >  	wfi
+> >  	ret
+> >  ENDPROC(cpu_do_idle)
+> > +	.popsection
 > 
-> Tomasz Nowicki (5):
->   PCI: Embed pci_ecam_ops in pci_config_window structure
->   PCI/ACPI: Move ACPI ECAM mapping to generic MCFG driver
->   PCI: Check platform specific ECAM quirks
->   ARM64/PCI: Start using quirks handling for ACPI based PCI host
->     controller
->   PCI: thunder-pem: Support quirky configuration space access for ACPI
->     based PCI host controller
+> From a quick scan it looks like we only call this with interrupts
+> disabled, and we have no NMI. So shouldn't we be annotating
+> arch_cpu_idle(), which calls this and subsequently enables interrupts?
 > 
->  arch/arm64/kernel/pci.c            | 42 +----------------
->  drivers/acpi/pci_mcfg.c            | 40 ++++++++++++++++
->  drivers/pci/ecam.c                 |  6 +--
->  drivers/pci/host/Makefile          |  1 +
->  drivers/pci/host/mcfg-quirks.c     | 93 ++++++++++++++++++++++++++++++++++++
->  drivers/pci/host/mcfg-quirks.h     | 24 ++++++++++
->  drivers/pci/host/pci-thunder-pem.c | 96 ++++++++++++++++++++++++++++++++------
->  include/linux/pci-acpi.h           |  5 ++
->  include/linux/pci-ecam.h           |  2 +-
->  9 files changed, 252 insertions(+), 57 deletions(-)
->  create mode 100644 drivers/pci/host/mcfg-quirks.c
->  create mode 100644 drivers/pci/host/mcfg-quirks.h
+> I'm also not sure what you need to do for PSCI, which is the preferred
+> (FW-backed) idle mechanism for arm64. The infrastrucure for that is
+> spread over a few files:
+> 
+>   arch/arm64/kernel/sleep.S
+>   arch/arm64/kernel/smccc-call.S
+>   arch/arm64/kernel/suspend.c
+>   drivers/cpuidle/cpuidle-arm.c
+>   drivers/firmware/psci.c
+> 
+> I'm not sure where we'd be an an interruptible state, and therefore I'm
+> not immediately sure what we should annotate.
 
-For the whole series
+I am probably missing something here, but let me add that I am not
+sure I understand how this patch can be used on ARM/ARM64 systems
+so ARM platform idle back-end code annotation is basically useless
+given that it is code that can't be preempted anyway (and even if
+it could PC range check can even fail given that we may execute some
+code with MMU off so out of physical addresses).
 
-Reviewed-by: Robert Richter <rrichter@cavium.com>
-Tested-by: Robert Richter <rrichter@cavium.com>
+What's the purpose of this cpu idle tracking ? Can't it be implemented
+in a simpler way (ie RCU API) ?
 
-Test included:
-
- [PATCH V7 0/8] Introduce ACPI world to ITS irqchip
-
-Thanks Tomasz,
-
--Robert
+Lorenzo
