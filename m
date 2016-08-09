@@ -1,38 +1,95 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Tue, 9 Aug 2016 23:46:44 +0200
-Subject: [PATCH 0/3] ARM: dts: pinctrl-imx: some cleanups and fixes
-In-Reply-To: <20160809030927.GJ4678@tiger>
-References: <1467749993-14533-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <20160809030927.GJ4678@tiger>
-Message-ID: <1be29ac5-8be8-35aa-d3ca-2b5795be2e0e@suse.de>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Tue, 9 Aug 2016 14:50:09 -0700
+Subject: [RFC PATCH v5 2/3] Documentation: DT: net: Add Xilinx gmiitorgmii
+ converter device tree binding documentation
+In-Reply-To: <1470735283-23611-3-git-send-email-appanad@xilinx.com>
+References: <1470735283-23611-1-git-send-email-appanad@xilinx.com>
+ <1470735283-23611-3-git-send-email-appanad@xilinx.com>
+Message-ID: <638248c5-1747-0a7d-58e6-27b7646c4f6d@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 09.08.2016 um 05:09 schrieb Shawn Guo:
-> On Tue, Jul 05, 2016 at 10:19:50PM +0200, Uwe Kleine-K?nig wrote:
->> Hello,
->>
->> when I asked Andreas F?rber to drop the function device nodes in his
->> patch that added support for the Udoo Neo boards, he rightfully said:
->> "OK, will do. Adopted from imx6sx-sdb.dtsi and imx6sx-sabreauto.dts -
->> please update the existing files to be like you expect new ones to be.".
->> This is done in patch 1. While the short stat for this patch is
->>
->> 	87 files changed, 7717 insertions(+), 7899 deletions(-)
+On 08/09/2016 02:34 AM, Kedareswara rao Appana wrote:
+> Device-tree binding documentation for xilinx gmiitorgmii converter.
 > 
-> I do not feel this is really necessary.  People should always refer to
-> the latest dts addition as example.
+> Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
+> ---
+> Changes for v5:
+> ---> Fixed Indentation in the example as suggested by Michal.
+> Changes for v4:
+> --> Modified compatible as suggested by Rob.
+> --> Removed underscores from the converter node name as suggested by Rob.
+> Changes for v3:
+> --> None.
+> Changes for v2:
+> --> New patch.
+> 
+>  .../devicetree/bindings/net/xilinx_gmii2rgmii.txt  | 38 ++++++++++++++++++++++
+>  1 file changed, 38 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/net/xilinx_gmii2rgmii.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/net/xilinx_gmii2rgmii.txt b/Documentation/devicetree/bindings/net/xilinx_gmii2rgmii.txt
+> new file mode 100644
+> index 0000000..5f48793
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/net/xilinx_gmii2rgmii.txt
+> @@ -0,0 +1,38 @@
+> +XILINX GMIITORGMII Converter Driver Device Tree Bindings
+> +--------------------------------------------------------
+> +
+> +The Gigabit Media Independent Interface (GMII) to Reduced Gigabit Media
+> +Independent Interface (RGMII) core provides the RGMII between RGMII-compliant
+> +Ethernet physical media devices (PHY) and the Gigabit Ethernet controller.
+> +This core can be used in all three modes of operation(10/100/1000 Mb/s).
+> +The Management Data Input/Output (MDIO) interface is used to configure the
+> +Speed of operation. This core can switch dynamically between the three
+> +Different speed modes by configuring the conveter register through mdio write.
+> +
+> +The MDIO is a bus to which the PHY devices are connected.  For each
+> +device that exists on this bus, a child node should be created.  See
+> +the definition of the PHY node in booting-without-of.txt for an example
+> +of how to define a PHY.
 
-The problem is that it's not obvious what "the latest dts addition" is.
-When I add an i.MX6 SoloX I compared other sx files but not all imx or
-random other .dts files.
+I would skip this paragraph which does not really help with
+understanding, and just refer to
+Documentation/devicetree/bindings/net/phy.txt for examples.
 
-Sorry for not testing this earlier, Uwe, I did receive the full patch.
 
-Regards,
-Andreas
+> +
+> +This converter sits between the ethernet MAC and the external phy.
+> +MAC <==> GMII2RGMII <==> RGMII_PHY
+> +
+> +Required properties:
+> +- compatible	: Should be "xlnx,gmii-to-rgmii-1.0"
+> +- reg		: The ID number for the phy, usually a small integer
+
+You would want specify that "reg" property needs to match the one of the
+PHY (specified via phy-handle) you are converting to/from for this
+"proxy" piece of hardware to work.
+
+If these two have the same "reg" value, is not that going to lead to
+duplicate MDIO devices created on the bus, this may work, based on
+probing ordering, but seems unusual, you don't really need the "reg"
+property here it seems?
+
+> +- phy-handle	: Should point to the external phy device.
+> +		  See ethernet.txt file in the same directory.
+> +
+> +Example:
+> +	mdio {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		phy: ethernet-phy at 0 {
+> +			......
+> +		};
+> +		gmiitorgmii: gmiitorgmii at 8 {
+> +			compatible = "xlnx,gmii-to-rgmii-1.0";
+> +			reg = <8>;
+> +			phy-handle = <&phy>;
+> +		};
+> +	};
+> 
+
 
 -- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-HRB 21284 (AG N?rnberg)
+Florian
