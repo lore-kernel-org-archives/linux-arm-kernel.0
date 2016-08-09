@@ -1,40 +1,57 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Tue,  9 Aug 2016 16:18:52 +0200
-Subject: [PATCH 2/2] ARM: imx6: mark GPC node as not populated after irq init
- to probe pm domain driver
-In-Reply-To: <1470752332-14185-1-git-send-email-p.zabel@pengutronix.de>
-References: <1470752332-14185-1-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <1470752332-14185-2-git-send-email-p.zabel@pengutronix.de>
+From: dhdang@apm.com (Duc Dang)
+Date: Tue, 9 Aug 2016 07:20:04 -0700
+Subject: [RFC PATCH V5 0/5] ECAM quirks handling for ARM64 platforms
+In-Reply-To: <1470661541-26270-1-git-send-email-tn@semihalf.com>
+References: <1470661541-26270-1-git-send-email-tn@semihalf.com>
+Message-ID: <CADaLNDnabEFArcepRCjLyWt=nWdzTzWLLAkwP+G=T+79WU9ZgQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since IRQCHIP_DECLARE now flags the GPC node as already populated, the
-GPC power domain driver is never probed unless we clear the flag again.
+On Mon, Aug 8, 2016 at 6:05 AM, Tomasz Nowicki <tn@semihalf.com> wrote:
+> Quirk handling relies on an idea of matching MCFG OEM ID, TABLE ID and
+> revision (the ones from standard header of MCFG table).
+>
+> Static array is used to keep quirk entries. Each entry consists of
+> mentioned MCFG IDs along with custom pci_ops structure and initialization call.
+>
+> As an example, the last patch presents quirk handling mechanism usage for
+> ThunderX PEM driver.
 
-Fixes: 15cc2ed6dcf9 ("of/irq: Mark initialised interrupt controllers as populated")
-Suggested-by: Rob Herring <robh@kernel.org>
-Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-Cc: Jon Hunter <jonathanh@nvidia.com>
----
- arch/arm/mach-imx/gpc.c | 6 ++++++
- 1 file changed, 6 insertions(+)
+Tested on X-Gene with X-Gene Ecam quirk and the PCIe ports work fine
+with this patch set.
 
-diff --git a/arch/arm/mach-imx/gpc.c b/arch/arm/mach-imx/gpc.c
-index fd87205..0df062d 100644
---- a/arch/arm/mach-imx/gpc.c
-+++ b/arch/arm/mach-imx/gpc.c
-@@ -271,6 +271,12 @@ static int __init imx_gpc_init(struct device_node *node,
- 	for (i = 0; i < IMR_NUM; i++)
- 		writel_relaxed(~0, gpc_base + GPC_IMR1 + i * 4);
- 
-+	/*
-+	 * Clear the OF_POPULATED flag set in of_irq_init so that
-+	 * later the GPC power domain driver will not be skipped.
-+	 */
-+	of_node_clear_flag(node, OF_POPULATED);
-+
- 	return 0;
- }
- IRQCHIP_DECLARE(imx_gpc, "fsl,imx6q-gpc", imx_gpc_init);
--- 
-2.8.1
+>
+> v4 -> v5
+> - rebase against v4.8-rc1
+> - rework to exact MCFG OEM ID, TABLE ID, rev match
+>   - use memcmp instead of strncmp
+>   - no substring match
+> - fix typos and dmesg message
+>
+> Tomasz Nowicki (5):
+>   PCI: Embed pci_ecam_ops in pci_config_window structure
+>   PCI/ACPI: Move ACPI ECAM mapping to generic MCFG driver
+>   PCI: Check platform specific ECAM quirks
+>   ARM64/PCI: Start using quirks handling for ACPI based PCI host
+>     controller
+>   PCI: thunder-pem: Support quirky configuration space access for ACPI
+>     based PCI host controller
+>
+>  arch/arm64/kernel/pci.c            | 42 +----------------
+>  drivers/acpi/pci_mcfg.c            | 40 ++++++++++++++++
+>  drivers/pci/ecam.c                 |  6 +--
+>  drivers/pci/host/Makefile          |  1 +
+>  drivers/pci/host/mcfg-quirks.c     | 93 ++++++++++++++++++++++++++++++++++++
+>  drivers/pci/host/mcfg-quirks.h     | 24 ++++++++++
+>  drivers/pci/host/pci-thunder-pem.c | 96 ++++++++++++++++++++++++++++++++------
+>  include/linux/pci-acpi.h           |  5 ++
+>  include/linux/pci-ecam.h           |  2 +-
+>  9 files changed, 252 insertions(+), 57 deletions(-)
+>  create mode 100644 drivers/pci/host/mcfg-quirks.c
+>  create mode 100644 drivers/pci/host/mcfg-quirks.h
+>
+> --
+> 1.9.1
+>
+Regards,
+Duc Dang.
