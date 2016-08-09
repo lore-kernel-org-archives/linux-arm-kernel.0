@@ -1,66 +1,149 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 9 Aug 2016 19:12:43 +0100
-Subject: [PATCH 1/9] remoteproc: core: Ensure error message is clear
-In-Reply-To: <20160809172825.GB26240@tuxbot>
-References: <20160804092153.23032-1-lee.jones@linaro.org>
- <20160804092153.23032-2-lee.jones@linaro.org>
- <20160809172825.GB26240@tuxbot>
-Message-ID: <20160809181243.GC1581@dell>
+From: fu.wei@linaro.org (Fu Wei)
+Date: Wed, 10 Aug 2016 02:12:03 +0800
+Subject: [PATCH v9 0/9] acpi, clocksource: add GTDT driver and GTDT
+ support in arm_arch_timer
+In-Reply-To: <7c11cca2-1eaa-a4fb-a44b-cdb36ea99ae9@semihalf.com>
+References: <1469460427-8643-1-git-send-email-fu.wei@linaro.org>
+ <7c11cca2-1eaa-a4fb-a44b-cdb36ea99ae9@semihalf.com>
+Message-ID: <CADyBb7vG=3XdosfugybfMatb8YK2wqf5PKeW5b-tQZY4WXPCHA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 09 Aug 2016, Bjorn Andersson wrote:
+Hi Tomasz
 
-> On Thu 04 Aug 02:21 PDT 2016, Lee Jones wrote:
-> 
-> > Before this patch, the dma_alloc_coherent() failure path printed out:
-> > 
-> >   "dma_alloc_coherent err: 16760832"
-> > 
-> > ... alluding to the Linux error code being 16760832, but seeing as
-> > Linux error codes are all negative, this looks like a signed/unsigned
-> > issue.  In fact, the message is trying to print the length of the
-> > requested memory region.  Let's clear that up.
-> > 
-> > While we're at it, let's standardise the way 'len' is printed.  In
-> > all other locations 'len' is in hex prefixed by a '0x' for clarity.
-> > 
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> 
-> Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+On 9 August 2016 at 19:03, Tomasz Nowicki <tn@semihalf.com> wrote:
+> Hi Fu,
+>
+> Are you planing to respin the series based on v4.8-rc1 ? My IORT patches
+> depend on this series since they will end up in the same drivers/acpi/arm64/
+>
+> I think patches are in good shape so we need to enquire who is going to pull
+> it in ?
 
-Again, this can just be applied.
+the latest v10 patchset can apply on  v4.8-rc1:
+https://lkml.org/lkml/2016/7/26/215
 
-> > ---
-> >  drivers/remoteproc/remoteproc_core.c | 5 +++--
-> >  1 file changed, 3 insertions(+), 2 deletions(-)
-> > 
-> > diff --git a/drivers/remoteproc/remoteproc_core.c b/drivers/remoteproc/remoteproc_core.c
-> > index aea29a75c..3566dc9 100644
-> > --- a/drivers/remoteproc/remoteproc_core.c
-> > +++ b/drivers/remoteproc/remoteproc_core.c
-> > @@ -581,7 +581,7 @@ static int rproc_handle_carveout(struct rproc *rproc,
-> >  		return -EINVAL;
-> >  	}
-> >  
-> > -	dev_dbg(dev, "carveout rsc: da %x, pa %x, len %x, flags %x\n",
-> > +	dev_dbg(dev, "carveout rsc: da %x, pa %x, len 0x%x, flags %x\n",
-> >  			rsc->da, rsc->pa, rsc->len, rsc->flags);
-> >  
-> >  	carveout = kzalloc(sizeof(*carveout), GFP_KERNEL);
-> > @@ -590,7 +590,8 @@ static int rproc_handle_carveout(struct rproc *rproc,
-> >  
-> >  	va = dma_alloc_coherent(dev->parent, rsc->len, &dma, GFP_KERNEL);
-> >  	if (!va) {
-> > -		dev_err(dev->parent, "dma_alloc_coherent err: %d\n", rsc->len);
-> > +		dev_err(dev->parent,
-> > +			"failed to allocate dma memory: len 0x%x\n", rsc->len);
-> >  		ret = -ENOMEM;
-> >  		goto free_carv;
-> >  	}
+>
+> Thanks,
+> Tomasz
+>
+>
+> On 25.07.2016 17:26, fu.wei at linaro.org wrote:
+>>
+>> From: Fu Wei <fu.wei@linaro.org>
+>>
+>> This patchset:
+>>     (1)Preparation for adding GTDT support in arm_arch_timer:
+>>         1. Move some enums and marcos to header file;
+>>         2. Add a new enum for spi type;
+>>         3. Improve printk relevant code;
+>>         4. use readq to get 64-bit CNTVCT.
+>>
+>>     (2)Introduce ACPI GTDT parser: drivers/acpi/arm64/acpi_gtdt.c
+>>     Parse all kinds of timer in GTDT table of ACPI:arch timer,
+>>     memory-mapped timer and SBSA Generic Watchdog timer.
+>>     This driver can help to simplify all the relevant timer drivers,
+>>     and separate all the ACPI GTDT knowledge from them.
+>>
+>>     (3)Simplify ACPI code for arm_arch_timer
+>>
+>>     (4)Add GTDT support for ARM memory-mapped timer
+>>
+>> This patchset has been tested on the following platforms:
+>>     (1)ARM Foundation v8 model
+>>
+>> Changelog:
+>> V9: https://lkml.org/lkml/2016/7/25/
+>>     Improve pr_err message in acpi gtdt driver.
+>>     Update Commit message for 7/9
+>>     shorten the irq mapping function name
+>>     Improve GTDT driver for memory-mapped timer
+>>
+>> v8: https://lkml.org/lkml/2016/7/19/660
+>>     Improve "pr_fmt(fmt)" definition: add "ACPI" in front of "GTDT",
+>>     and also improve printk message.
+>>     Simplify is_timer_block and is_watchdog.
+>>     Merge acpi_gtdt_desc_init and gtdt_arch_timer_init into
+>> acpi_gtdt_init();
+>>     Delete __init in include/linux/acpi.h for GTDT API
+>>     Make ARM64 select GTDT.
+>>     Delete "#include <linux/module.h>" from acpi_gtdt.c
+>>     Simplify GT block parse code.
+>>
+>> v7: https://lkml.org/lkml/2016/7/13/769
+>>     Move the GTDT driver to drivers/acpi/arm64
+>>     Add add the ARM64-specific ACPI Support maintainers in MAINTAINERS
+>>     Merge 3 patches of GTDT parser driver.
+>>     Fix the for_each_platform_timer bug.
+>>
+>> v6: https://lkml.org/lkml/2016/6/29/580
+>>     split the GTDT driver to 4 parts: basic, arch_timer, memory-mapped
+>> timer,
+>>     and SBSA Generic Watchdog timer
+>>     Improve driver by suggestions and example code from Daniel Lezcano
+>>
+>> v5: https://lkml.org/lkml/2016/5/24/356
+>>     Sorting out all patches, simplify the API of GTDT driver:
+>>     GTDT driver just fills the data struct for arm_arch_timer driver.
+>>
+>> v4: https://lists.linaro.org/pipermail/linaro-acpi/2016-March/006667.html
+>>     Delete the kvm relevant patches
+>>     Separate two patches for sorting out the code for arm_arch_timer.
+>>     Improve irq info export code to allow missing irq info in GTDT table.
+>>
+>> v3: https://lkml.org/lkml/2016/2/1/658
+>>     Improve GTDT driver code:
+>>       (1)improve pr_* by defining pr_fmt(fmt)
+>>       (2)simplify gtdt_sbsa_gwdt_init
+>>       (3)improve gtdt_arch_timer_data_init, if table is NULL, it will try
+>>       to get GTDT table.
+>>     Move enum ppi_nr to arm_arch_timer.h, and add enum spi_nr.
+>>     Add arm_arch_timer get ppi from DT and GTDT support for kvm.
+>>
+>> v2: https://lkml.org/lkml/2015/12/2/10
+>>     Rebase to latest kernel version(4.4-rc3).
+>>     Fix the bug about the config problem,
+>>     use CONFIG_ACPI_GTDT instead of CONFIG_ACPI in arm_arch_timer.c
+>>
+>> v1: The first upstreaming version: https://lkml.org/lkml/2015/10/28/553
+>>
+>> Fu Wei (9):
+>>   clocksource/drivers/arm_arch_timer: Move enums and defines to header
+>>     file
+>>   clocksource/drivers/arm_arch_timer: Add a new enum for spi type
+>>   clocksource/drivers/arm_arch_timer: Improve printk relevant code
+>>   clocksource/drivers/arm_arch_timer: use readq to get 64-bit CNTVCT
+>>   acpi/arm64: Add GTDT table parse driver
+>>   clocksource/drivers/arm_arch_timer: Simplify ACPI support code.
+>>   acpi/arm64: Add memory-mapped timer support in GTDT driver
+>>   clocksource/drivers/arm_arch_timer: Add GTDT support for memory-mapped
+>>     timer
+>>   acpi/arm64: Add SBSA Generic Watchdog support in GTDT driver
+>>
+>>  arch/arm64/Kconfig                   |   1 +
+>>  drivers/acpi/Kconfig                 |   5 +
+>>  drivers/acpi/Makefile                |   1 +
+>>  drivers/acpi/arm64/Kconfig           |   5 +
+>>  drivers/acpi/arm64/Makefile          |   1 +
+>>  drivers/acpi/arm64/acpi_gtdt.c       | 309
+>> +++++++++++++++++++++++++++++++++++
+>>  drivers/clocksource/Kconfig          |   2 +-
+>>  drivers/clocksource/arm_arch_timer.c | 233 +++++++++++++++++---------
+>>  drivers/watchdog/Kconfig             |   1 +
+>>  include/clocksource/arm_arch_timer.h |  32 ++++
+>>  include/linux/acpi.h                 |   7 +
+>>  11 files changed, 519 insertions(+), 78 deletions(-)
+>>  create mode 100644 drivers/acpi/arm64/Kconfig
+>>  create mode 100644 drivers/acpi/arm64/Makefile
+>>  create mode 100644 drivers/acpi/arm64/acpi_gtdt.c
+>>
+>
+
+
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Best regards,
+
+Fu Wei
+Software Engineer
+Red Hat
