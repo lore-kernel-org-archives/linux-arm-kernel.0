@@ -1,37 +1,23 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Tue, 9 Aug 2016 14:37:05 +0100
-Subject: [PATCH 6/6] bus: Add support for Tegra Generic Memory Interface
-In-Reply-To: <CALw8SCWjs2TnwFcTY=iXv_eskpKaKpvUmoXnTgtpoL8w9neD=w@mail.gmail.com>
-References: <1470512452-8322-1-git-send-email-mirza.krak@gmail.com>
- <1470512452-8322-7-git-send-email-mirza.krak@gmail.com>
- <fae8dbaf-53e9-dcfe-f755-32f7b28f4c9f@nvidia.com>
- <CALw8SCWjs2TnwFcTY=iXv_eskpKaKpvUmoXnTgtpoL8w9neD=w@mail.gmail.com>
-Message-ID: <c6c6d000-d0d4-ac9f-e19e-0d2a513cd3e8@nvidia.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Tue, 9 Aug 2016 21:38:05 +0800
+Subject: [PATCH 1/1] imx53.dtsi: Add IPU nodes for csi
+In-Reply-To: <1470318452-31391-1-git-send-email-fabien.lahoudere@collabora.co.uk>
+References: <CAOMZO5BoRsrHv-+5c9bAXO2NCya8sPqmmpy9DOfav6NvQ+VMLQ@mail.gmail.com>
+ <1470318452-31391-1-git-send-email-fabien.lahoudere@collabora.co.uk>
+Message-ID: <20160809133805.GW4678@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 09/08/16 08:21, Mirza Krak wrote:
-> 2016-08-08 15:47 GMT+02:00 Jon Hunter <jonathanh@nvidia.com>:
-
-...
-
->>> +     return of_platform_default_populate(of_node, NULL, dev);
->>
->> Seems odd to do this here. Why not as the last thing in probe once the
->> GMI has been setup correctly?
+On Thu, Aug 04, 2016 at 03:47:32PM +0200, Fabien Lahoudere wrote:
+> We have the following messages that tell csi devices are not used:
+> imx-ipuv3 18000000.ipu: no port at 0 node in /soc/ipu at 18000000, not using CSI0
+> imx-ipuv3 18000000.ipu: no port at 1 node in /soc/ipu at 18000000, not using CSI1
 > 
-> It is done here mostly to avoid clean up in probe. I could move it out
-> of tegra_gmi_parse_dt and put it right after that call but still
-> before clk enable? Is that less odd?
+> So we add them in the common device tree to make CSI ports available on
+> imx53 boards.
+> 
+> Signed-off-by: Fabien Lahoudere <fabien.lahoudere@collabora.co.uk>
 
-I would have thought that clocks should be enabled and resets
-de-asserted before we even attempt to populate any children. Hence, I
-would do this last. Yes that will require some clean-up in probe if this
-does fail but seems safest.
+Updated subject 'ARM: dts: imx53: ...', and applied patch.
 
-Cheers
-Jon
-
--- 
-nvpublic
+Shawn
