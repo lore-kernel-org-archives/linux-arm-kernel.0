@@ -1,97 +1,60 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 09 Aug 2016 17:06:51 +0200
-Subject: "Failed to create /dev/root: -14" after commit e6978e4bf1 ("ARM:
- save and reset the address limit when entering an exception")
-In-Reply-To: <20160804100748.GP1041@n2100.armlinux.org.uk> (Russell King's
- message of "Thu, 4 Aug 2016 11:07:48 +0100")
-References: <57A15C41.6000804@roeck-us.net>
- <20160803083822.GI1041@n2100.armlinux.org.uk>
- <57A20896.30300@roeck-us.net>
- <20160804100748.GP1041@n2100.armlinux.org.uk>
-Message-ID: <87eg5y3rsk.fsf@free-electrons.com>
+From: lucile.quirion@savoirfairelinux.com (Lucile Quirion)
+Date: Tue,  9 Aug 2016 11:15:42 -0400
+Subject: [PATCH v3 0/2] Add board support for TS-4900
+Message-ID: <1470755744-7837-1-git-send-email-lucile.quirion@savoirfairelinux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell King,
- 
- On jeu., ao?t 04 2016, Russell King - ARM Linux <linux@armlinux.org.uk> wrote:
+This patch serie adds support for TS-4900 System on Module (SoM). This board,
+manufactured by Technologic Systems, is based on an i.MX6.
 
-> On Wed, Aug 03, 2016 at 08:07:02AM -0700, Guenter Roeck wrote:
->> On 08/03/2016 01:38 AM, Russell King - ARM Linux wrote:
->> >On Tue, Aug 02, 2016 at 07:51:45PM -0700, Guenter Roeck wrote:
->> >>Hi,
->> >>
->> >>I see the following crash when running a qemu arm 'kzm' runtime test with
->> >>the current mainline.
->> >>...
->> >>Failed to create /dev/root: -14
->> >>
->> >>[ followed by panic ]
->> >>
->> >>A complete log file is at [1].
->> >
->> >I think it's because of those undefined instructions you're hitting
->> >with the hw-breakpoint code... can you try the patch below please?
->> >
->> >  arch/arm/kernel/entry-armv.S | 1 +
->> >  1 file changed, 1 insertion(+)
->> >
->> >diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
->> >index bc5f50799d75..9f157e7c51e7 100644
->> >--- a/arch/arm/kernel/entry-armv.S
->> >+++ b/arch/arm/kernel/entry-armv.S
->> >@@ -295,6 +295,7 @@ __und_svc_fault:
->> >  	bl	__und_fault
->> >
->> >  __und_svc_finish:
->> >+	get_thread_info tsk
->> >  	ldr	r5, [sp, #S_PSR]		@ Get SVC cpsr
->> >  	svc_exit r5				@ return from exception
->> >   UNWIND(.fnend		)
->> >
->> 
->> Yes, that fixes the problem.
->> 
->> Assuming you'll create a patch:
->> 
->> Tested-by: Guenter Roeck <linux@roeck-us.net>
->> 
->> Does that need to be addressed in qemu, or is it a Linux bug ?
->
-> It's a Linux bug provoked by qemu not implementing the hardware
-> breakpoints.  Well worth fixing in Linux.
+The i.MX6 exists in 2 flavours: single/dualcore or quadcore. I've added TS-4900
+device tree files for both flavour of the i.MX6.
 
-The Armada XP base platform were hit by the same bug as we can see on
-kernlci:
-https://storage.kernelci.org/mainline/v4.8-rc1/arm-mvebu_v7_defconfig/lab-baylibre-seattle/boot-armada-xp-openblocks-ax3-4.html
+The current device tree does NOT include the FPGA's GPIOs, the FPGA's UARTs
+or the wireless chip.
 
-Your patch solves the issue too.
+I'd like your input about this problem:
 
-Will you push this patch for v4.8-rc2 ?
+The TS-4900 can be mounted on several carrier boards providing additional
+peripheral connectors (e.g. TS-TPC-8390). A final device tree would include the
+dtsi defining the carrier board's peripherals.
 
-Also I wonder if it is something expected to have this issue on a "real"
-hardware.
+Should there be a dts file per SoM and carrier board combination ?
 
-You can also add my:
-Tested-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+There is a already a total of 30 combinations on Technologic's website:
+https://www.embeddedarm.com/products/category/modular-embedded-systems
 
-Thanks,
+Changes in v2:
+ - fix copyright notices
+ - re-license dts files with Technologic Systems's agreement
+ - reorder 'status' priority
+ - remove 'regulator-always-on'
 
-Gregory
+Changes in v3:
+ - remove unused #include from dts files
+ - use generic node names (flash, rtc, gpio)
+ - remove the flash partition table
+ - use consistent naming across pinctrl configuration
+ - do not configure reserved pad settings for RGMII
+ - remove duplicated pin setting MX6QDL_PAD_ENET_REF_CLK__ENET_TX_CLK
+ - use uart-has-rtscts instead of fsl,uart-has-rtscts
+ - remove fsl,wp-controller property from the eMMC node
 
->
-> -- 
-> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-> FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-> according to speedtest.net.
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+Lucile Quirion (2):
+  of: documentation: add bindings documentation for TS-4900
+  ARM: dts: TS-4900: add basic device tree
+
+ .../devicetree/bindings/arm/technologic.txt        |   6 +
+ arch/arm/boot/dts/Makefile                         |   2 +
+ arch/arm/boot/dts/imx6dl-ts4900.dts                |  49 +++
+ arch/arm/boot/dts/imx6q-ts4900.dts                 |  53 +++
+ arch/arm/boot/dts/imx6qdl-ts4900.dtsi              | 481 +++++++++++++++++++++
+ 5 files changed, 591 insertions(+)
+ create mode 100644 arch/arm/boot/dts/imx6dl-ts4900.dts
+ create mode 100644 arch/arm/boot/dts/imx6q-ts4900.dts
+ create mode 100644 arch/arm/boot/dts/imx6qdl-ts4900.dtsi
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+2.5.5
