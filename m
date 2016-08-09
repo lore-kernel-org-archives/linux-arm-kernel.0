@@ -1,66 +1,61 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Tue, 9 Aug 2016 23:54:38 +0800
-Subject: [rjarzmik:work/v4l2 5/14]
- drivers/media/platform/soc_camera/pxa_camera.c:742:18: error: initialization
- from incompatible pointer type
-Message-ID: <201608092336.xjDWSTeR%fengguang.wu@intel.com>
+From: paul.gortmaker@windriver.com (Paul Gortmaker)
+Date: Tue, 9 Aug 2016 12:00:39 -0400
+Subject: [PATCH v18 6/6] ARM: socfpga: fpga bridge driver support
+In-Reply-To: <CAAtXAHev2Dytadp-_Hs0agcSXUTyrFhJQxHcsFd7faOReHzr9Q@mail.gmail.com>
+References: <20160712193645.9098-1-atull@opensource.altera.com>
+ <20160712193645.9098-7-atull@opensource.altera.com>
+ <CAP=VYLo2jtp57kQe5671xM=4o_ZAU6XG_W1MXU8aPv4Ws7kkDA@mail.gmail.com>
+ <alpine.DEB.2.02.1608081416110.11063@linuxheads99>
+ <CAAtXAHev2Dytadp-_Hs0agcSXUTyrFhJQxHcsFd7faOReHzr9Q@mail.gmail.com>
+Message-ID: <20160809160039.GX29630@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://github.com/rjarzmik/linux work/v4l2
-head:   1646e167bd7bc014ad5c385e6a3be70d6670bbf9
-commit: cce767df8b5328262c87e23ca7a5d74c17bcdad0 [5/14] media: platform: pxa_camera: convert to vb2
-config: arm-pxa_defconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 5.4.0-6) 5.4.0 20160609
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        git checkout cce767df8b5328262c87e23ca7a5d74c17bcdad0
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
+[Re: [PATCH v18 6/6] ARM: socfpga: fpga bridge driver support] On 08/08/2016 (Mon 13:44) Moritz Fischer wrote:
 
-Note: the rjarzmik/work/v4l2 HEAD 1646e167bd7bc014ad5c385e6a3be70d6670bbf9 builds fine.
-      It only hurts bisectibility.
+> Hi Alan,
+> 
+> On Mon, Aug 8, 2016 at 12:18 PM, atull <atull@opensource.altera.com> wrote:
+> 
+> >> Please don't use module.h in drivers controlled by a bool
+> >> Kconfig setting.
+> >>
+> >> THanks,
+> >> Paul.
+> >>
+> >
+> > Thanks for the feedback.  Can you provide an example of what you
+> > would consider to be proper usage in the kernel?
+> 
+> 
+> I think Paul is suggesting to use
+> 
+> static int __init alt_fpga_bridge_init(void)
+> {
+>         platform_driver_register(&alt_fpga_bridge_driver);
+> }
+> 
+> device_initcall(alt_fpga_bridge_init);
+> 
+> or better:
+> 
+> builtin_platform_driver(&alt_fpga_bridge_driver);
+> 
+> Like for example in: drivers/cpuidle/cpuidle-mvebu-v7.c
 
-All error/warnings (new ones prefixed by >>):
+Yes, pretty much that -- if you have a bool Kconfig, you should be using
+builtin registration functions, and have no need for module.h or
+anything MODULE_<xyz> or any module_init/module_exit calls.
 
->> drivers/media/platform/soc_camera/pxa_camera.c:742:18: error: initialization from incompatible pointer type [-Werror=incompatible-pointer-types]
-     .queue_setup  = pxac_vb2_queue_setup,
-                     ^
-   drivers/media/platform/soc_camera/pxa_camera.c:742:18: note: (near initialization for 'pxac_vb2_ops.queue_setup')
-   drivers/media/platform/soc_camera/pxa_camera.c: In function 'pxa_camera_probe':
->> drivers/media/platform/soc_camera/pxa_camera.c:1653:21: error: implicit declaration of function 'vb2_dma_sg_init_ctx' [-Werror=implicit-function-declaration]
-     pcdev->alloc_ctx = vb2_dma_sg_init_ctx(&pdev->dev);
-                        ^
->> drivers/media/platform/soc_camera/pxa_camera.c:1653:19: warning: assignment makes pointer from integer without a cast [-Wint-conversion]
-     pcdev->alloc_ctx = vb2_dma_sg_init_ctx(&pdev->dev);
-                      ^
-   drivers/media/platform/soc_camera/pxa_camera.c: In function 'pxa_camera_remove':
->> drivers/media/platform/soc_camera/pxa_camera.c:1793:2: error: implicit declaration of function 'vb2_dma_sg_cleanup_ctx' [-Werror=implicit-function-declaration]
-     vb2_dma_sg_cleanup_ctx(pcdev->alloc_ctx);
-     ^
-   cc1: some warnings being treated as errors
+An empty file containing nothing but #include <linux/module.h> will
+cause cpp to emit about 750k of goop, so we really should only be using
+it for drivers that are genuinely modular; i.e. tristate Kconfig.
 
-vim +742 drivers/media/platform/soc_camera/pxa_camera.c
+Thanks,
+Paul.
+--
 
-   736	static void pxac_vb2_stop_streaming(struct vb2_queue *vq)
-   737	{
-   738		vb2_wait_for_all_buffers(vq);
-   739	}
-   740	
-   741	static struct vb2_ops pxac_vb2_ops = {
- > 742		.queue_setup		= pxac_vb2_queue_setup,
-   743		.buf_init		= pxac_vb2_init,
-   744		.buf_prepare		= pxac_vb2_prepare,
-   745		.buf_queue		= pxac_vb2_queue,
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 29839 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160809/06f49dc8/attachment-0001.obj>
+> 
+> Cheers,
+> 
+> Moritz
