@@ -1,80 +1,33 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 9 Aug 2016 13:56:36 +0200
-Subject: [PATCH 3/3] KVM: arm64: vgic-its: Make updates to
- propbaser/pendbaser atomic
-In-Reply-To: <35bd94e0-949f-d1bd-9014-1cd6bfb9e5ab@arm.com>
-References: <20160803161325.14933-1-christoffer.dall@linaro.org>
- <20160803161325.14933-4-christoffer.dall@linaro.org>
- <28496b0a-6ca3-4cba-ca53-d97aabfe9280@arm.com>
- <20160809103012.GD9175@cbox>
- <35bd94e0-949f-d1bd-9014-1cd6bfb9e5ab@arm.com>
-Message-ID: <20160809115636.GF9175@cbox>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 9 Aug 2016 17:29:05 +0530
+Subject: [PATCH v4 0/3] Support for the LCDK
+In-Reply-To: <20160805202951.2848-1-kbeldan@baylibre.com>
+References: <20160804144332.4841-1-kbeldan@baylibre.com>
+ <20160805202951.2848-1-kbeldan@baylibre.com>
+Message-ID: <57A9C589.3010600@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 09, 2016 at 12:19:53PM +0100, Andre Przywara wrote:
-> Hi,
+On Saturday 06 August 2016 01:59 AM, Karl Beldan wrote:
+> This depends on "ARM: dts: da850: Add missing pin muxing for the UARTs".
 > 
-> On 09/08/16 11:30, Christoffer Dall wrote:
-> > On Mon, Aug 08, 2016 at 02:30:38PM +0100, Andre Przywara wrote:
-> >> Hi,
-> >>
-> >> On 03/08/16 17:13, Christoffer Dall wrote:
-> >>> There are two problems with the current implementation of the MMIO
-> >>> handlers for the propbaser and pendbaser:
-> >>>
-> >>> First, the write to the value itself is not guaranteed to be an atomic
-> >>> 64-bit write so two concurrent writes to the structure field could be
-> >>> intermixed.
-> >>>
-> >>> Second, because we do a read-modify-update operation without any
-> >>> synchronization, if we have two 32-bit accesses to separate parts of the
-> >>> register, we can loose one of them.
-> >>
-> >> I am still not 100% convinced that this is necessary, but leave it up to
-> >> the judgement of you senior guys.
-> > 
-> > ok, consider this case:
-> > 
-> >     reg = 0x55555555 55555555;
-> > 
-> >     CPU 0                CPU 1
-> >     -----                -----
-> >     tmp = reg;
-> >                          tmp = reg;
-> >     tmp[63:32] = ~0;
-> >                          tmp[31:0] = 0;
-> >     reg = tmp;
-> >                          reg = tmp;
-> > 
-> >     print("reg is %x", reg);
-> >       /* reg is 0x55555555 00000000 */
-> > 
-> > which is weird, because I think in hardware you'll get:
-> >     0xffffffff 00000000
-> > 
-> > no matter how you order the two 32-bit updates.
-> > 
-> > That is, unless the architecture tells us that you could observe the
-> > above behavior.
+> Changes from v1:
+>  - s/omapl138/da850/
+>  - Remove earlycon from bootargs
+>  - Remove console=ttyS2,115200n8 from bootargs (workaround for preferred console)
+>  - Add patches for CONFIG_SMSC_PHY=y and CONFIG_RTC_DRV_OMAP=m
 > 
-> OK, I can see that this case is indeed broken. I was just wondering how
-> much software can expect if it allows unsynchronized accesses from
-> different CPUs to such a 64-bit register - even if it is for separate
-> halves of that register. I'd expect (guest) software to take a lock if
-> it can't atomically update prop/pendbaser and there are other agents
-> possibly chiming in.
-> And I hope we sanitize them enough now to avoid any bad things to happen
-> in the kernel ;-)
+> Changes from v2:
+>  - [1] Remove references to C6748: replace 'L138/C6748 Dev Kit (LCDK)' with 'LCDK'
+>  - Change license from 'GPLv2 or later' to 'GPLv2'
 > 
-I don't think it's 100% unreasonable to potentially imagine independent
-updates of parts of the register when the spec explicitly says this is
-allowed.
+> Changes from v3:
+>  - revert v2 [1]
 
-I agree, that it would be a curious guest (and I raised this point once
-already), but I think relying on this is a terrible approach to
-emulating hardware and without any comment or anything in the kernel
-saying 'this is safe and reasonable because of so and so' it just looks
-too dodgy for me to live with.
+Series applied and boot tested on my LCDK.
 
--Christoffer
+For future, when posting a new version, please send as an independent
+series and not reply to the very first posting.
+
+Thanks,
+Sekhar
