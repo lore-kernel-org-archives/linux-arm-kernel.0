@@ -1,88 +1,113 @@
-From: tharvey@gateworks.com (Tim Harvey)
-Date: Tue,  9 Aug 2016 12:18:49 -0700
-Subject: [PATCH v2] ARM: dts: imx: ventana: add RS485 txen gpio support
-In-Reply-To: <1467207504-5218-1-git-send-email-tharvey@gateworks.com>
-References: <1467207504-5218-1-git-send-email-tharvey@gateworks.com>
-Message-ID: <1470770329-25395-1-git-send-email-tharvey@gateworks.com>
+From: cmetcalf@mellanox.com (Chris Metcalf)
+Date: Tue,  9 Aug 2016 16:29:49 -0400
+Subject: [PATCH v14 07/14] arm64: factor work_pending state machine to C
+In-Reply-To: <1470774596-17341-1-git-send-email-cmetcalf@mellanox.com>
+References: <1470774596-17341-1-git-send-email-cmetcalf@mellanox.com>
+Message-ID: <1470774596-17341-8-git-send-email-cmetcalf@mellanox.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Tim Harvey <tharvey@gateworks.com>
----
-v2:
- - replace remove vendor specific property with generic property
- - replace rts-gpio with rts-gpios to match devicetree binding documentation
-   (although both suffixes are supported)
+Currently ret_fast_syscall, work_pending, and ret_to_user form an ad-hoc
+state machine that can be difficult to reason about due to duplicated
+code and a large number of branch targets.
 
-Signed-off-by: Tim Harvey <tharvey@gateworks.com>
----
- arch/arm/boot/dts/imx6qdl-gw52xx.dtsi | 3 +++
- arch/arm/boot/dts/imx6qdl-gw53xx.dtsi | 3 +++
- arch/arm/boot/dts/imx6qdl-gw54xx.dtsi | 3 +++
- 3 files changed, 9 insertions(+)
+This patch factors the common logic out into the existing
+do_notify_resume function, converting the code to C in the process,
+making the code more legible.
 
-diff --git a/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
-index 208e3c2..a7100f9 100644
---- a/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
-@@ -315,6 +315,8 @@
- &uart1 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_uart1>;
-+	uart-has-rtscts;
-+	rts-gpios = <&gpio7 1 GPIO_ACTIVE_HIGH>;
- 	status = "okay";
- };
+This patch tries to closely mirror the existing behaviour while using
+the usual C control flow primitives. As local_irq_{disable,enable} may
+be instrumented, we balance exception entry (where we will almost most
+likely enable IRQs) with a call to trace_hardirqs_on just before the
+return to userspace.
+
+Signed-off-by: Chris Metcalf <cmetcalf@mellanox.com>
+---
+(Note: Will Deacon has said he will look at queueing this separately for 4.9)
+
+ arch/arm64/kernel/entry.S  | 12 ++++--------
+ arch/arm64/kernel/signal.c | 36 ++++++++++++++++++++++++++----------
+ 2 files changed, 30 insertions(+), 18 deletions(-)
+
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index 96e4a2b64cc1..4af25bb7f116 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -700,18 +700,13 @@ ret_fast_syscall_trace:
+  * Ok, we need to do extra processing, enter the slow path.
+  */
+ work_pending:
+-	tbnz	x1, #TIF_NEED_RESCHED, work_resched
+-	/* TIF_SIGPENDING, TIF_NOTIFY_RESUME or TIF_FOREIGN_FPSTATE case */
+ 	mov	x0, sp				// 'regs'
+-	enable_irq				// enable interrupts for do_notify_resume()
+ 	bl	do_notify_resume
+-	b	ret_to_user
+-work_resched:
+ #ifdef CONFIG_TRACE_IRQFLAGS
+-	bl	trace_hardirqs_off		// the IRQs are off here, inform the tracing code
++	bl	trace_hardirqs_on		// enabled while in userspace
+ #endif
+-	bl	schedule
+-
++	ldr	x1, [tsk, #TI_FLAGS]		// re-check for single-step
++	b	finish_ret_to_user
+ /*
+  * "slow" syscall return path.
+  */
+@@ -720,6 +715,7 @@ ret_to_user:
+ 	ldr	x1, [tsk, #TI_FLAGS]
+ 	and	x2, x1, #_TIF_WORK_MASK
+ 	cbnz	x2, work_pending
++finish_ret_to_user:
+ 	enable_step_tsk x1, x2
+ 	kernel_exit 0
+ ENDPROC(ret_to_user)
+diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
+index a8eafdbc7cb8..404dd67080b9 100644
+--- a/arch/arm64/kernel/signal.c
++++ b/arch/arm64/kernel/signal.c
+@@ -402,15 +402,31 @@ static void do_signal(struct pt_regs *regs)
+ asmlinkage void do_notify_resume(struct pt_regs *regs,
+ 				 unsigned int thread_flags)
+ {
+-	if (thread_flags & _TIF_SIGPENDING)
+-		do_signal(regs);
+-
+-	if (thread_flags & _TIF_NOTIFY_RESUME) {
+-		clear_thread_flag(TIF_NOTIFY_RESUME);
+-		tracehook_notify_resume(regs);
+-	}
+-
+-	if (thread_flags & _TIF_FOREIGN_FPSTATE)
+-		fpsimd_restore_current_state();
++	/*
++	 * The assembly code enters us with IRQs off, but it hasn't
++	 * informed the tracing code of that for efficiency reasons.
++	 * Update the trace code with the current status.
++	 */
++	trace_hardirqs_off();
++	do {
++		if (thread_flags & _TIF_NEED_RESCHED) {
++			schedule();
++		} else {
++			local_irq_enable();
++
++			if (thread_flags & _TIF_SIGPENDING)
++				do_signal(regs);
++
++			if (thread_flags & _TIF_NOTIFY_RESUME) {
++				clear_thread_flag(TIF_NOTIFY_RESUME);
++				tracehook_notify_resume(regs);
++			}
++
++			if (thread_flags & _TIF_FOREIGN_FPSTATE)
++				fpsimd_restore_current_state();
++		}
  
-@@ -493,6 +495,7 @@
- 			fsl,pins = <
- 				MX6QDL_PAD_SD3_DAT7__UART1_TX_DATA	0x1b0b1
- 				MX6QDL_PAD_SD3_DAT6__UART1_RX_DATA	0x1b0b1
-+				MX6QDL_PAD_SD3_DAT4__GPIO7_IO01		0x4001b0b1 /* TEN */
- 			>;
- 		};
- 
-diff --git a/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi
-index 35b9e80..8953eba 100644
---- a/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi
-@@ -312,6 +312,8 @@
- &uart1 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_uart1>;
-+	uart-has-rtscts;
-+	rts-gpios = <&gpio7 1 GPIO_ACTIVE_HIGH>;
- 	status = "okay";
- };
- 
-@@ -482,6 +484,7 @@
- 			fsl,pins = <
- 				MX6QDL_PAD_SD3_DAT7__UART1_TX_DATA	0x1b0b1
- 				MX6QDL_PAD_SD3_DAT6__UART1_RX_DATA	0x1b0b1
-+				MX6QDL_PAD_SD3_DAT4__GPIO7_IO01		0x4001b0b1 /* TEN */
- 			>;
- 		};
- 
-diff --git a/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
-index 5f8f1ea..6ac41c7 100644
---- a/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
-@@ -414,6 +414,8 @@
- &uart1 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_uart1>;
-+	uart-has-rtscts;
-+	rts-gpios = <&gpio7 1 GPIO_ACTIVE_HIGH>;
- 	status = "okay";
- };
- 
-@@ -603,6 +605,7 @@
- 			fsl,pins = <
- 				MX6QDL_PAD_SD3_DAT7__UART1_TX_DATA	0x1b0b1
- 				MX6QDL_PAD_SD3_DAT6__UART1_RX_DATA	0x1b0b1
-+				MX6QDL_PAD_SD3_DAT4__GPIO7_IO01		0x4001b0b1 /* TEN */
- 			>;
- 		};
- 
++		local_irq_disable();
++		thread_flags = READ_ONCE(current_thread_info()->flags);
++	} while (thread_flags & _TIF_WORK_MASK);
+ }
 -- 
-1.9.1
+2.7.2
