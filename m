@@ -1,11 +1,12 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 9 Aug 2016 19:10:56 +0100
-Subject: [PATCH 3/9] remoteproc: core: Remove pointless OOM print
-In-Reply-To: <20160809173653.GD26240@tuxbot>
+Date: Tue, 9 Aug 2016 19:12:18 +0100
+Subject: [PATCH 2/9] remoteproc: core: Trivial: Improve error checking,
+ spelling and debug prints
+In-Reply-To: <20160809173225.GC26240@tuxbot>
 References: <20160804092153.23032-1-lee.jones@linaro.org>
- <20160804092153.23032-4-lee.jones@linaro.org>
- <20160809173653.GD26240@tuxbot>
-Message-ID: <20160809181056.GA1581@dell>
+ <20160804092153.23032-3-lee.jones@linaro.org>
+ <20160809173225.GC26240@tuxbot>
+Message-ID: <20160809181218.GB1581@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,35 +14,69 @@ On Tue, 09 Aug 2016, Bjorn Andersson wrote:
 
 > On Thu 04 Aug 02:21 PDT 2016, Lee Jones wrote:
 > 
-> > These types of error prints are superfluous.  The system will
-> > pick up on OOM issues and let the user know.
+> > Trivial patch to clean up a couple of minor misgivings.
 > > 
 > > Signed-off-by: Lee Jones <lee.jones@linaro.org>
 > 
 > Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
 
-This doesn't rely on anything else, so you can just take it.
+You can just take it.
 
-> Although, I think we should drop the "mapping" object. We have all the
-> information in the carveout object to reverse the mapping at cleanup.
+> Although as I hope to stack this series ontop of the auto-boot there
+> will be some minor conflicts here.
 
-Let's fix it for now, then work on 'nice to have's in a subsequent set.
+Sure, but they should be trivial to fix.
+
+Or, just take this patch, since it is independent of the set.
+
 > > ---
-> >  drivers/remoteproc/remoteproc_core.c | 1 -
-> >  1 file changed, 1 deletion(-)
+> >  drivers/remoteproc/remoteproc_core.c | 12 ++++++------
+> >  1 file changed, 6 insertions(+), 6 deletions(-)
 > > 
 > > diff --git a/drivers/remoteproc/remoteproc_core.c b/drivers/remoteproc/remoteproc_core.c
-> > index 5654a81..4914482 100644
+> > index 3566dc9..5654a81 100644
 > > --- a/drivers/remoteproc/remoteproc_core.c
 > > +++ b/drivers/remoteproc/remoteproc_core.c
-> > @@ -619,7 +619,6 @@ static int rproc_handle_carveout(struct rproc *rproc,
-> >  	if (rproc->domain) {
-> >  		mapping = kzalloc(sizeof(*mapping), GFP_KERNEL);
-> >  		if (!mapping) {
-> > -			dev_err(dev, "kzalloc mapping failed\n");
-> >  			ret = -ENOMEM;
-> >  			goto dma_free;
-> >  		}
+> > @@ -457,8 +457,8 @@ static int rproc_handle_trace(struct rproc *rproc, struct fw_rsc_trace *rsc,
+> >  
+> >  	rproc->num_traces++;
+> >  
+> > -	dev_dbg(dev, "%s added: va %p, da 0x%x, len 0x%x\n", name, ptr,
+> > -						rsc->da, rsc->len);
+> > +	dev_dbg(dev, "%s added: va %p, da 0x%x, len 0x%x\n",
+> > +		name, ptr, rsc->da, rsc->len);
+> >  
+> >  	return 0;
+> >  }
+> > @@ -581,8 +581,8 @@ static int rproc_handle_carveout(struct rproc *rproc,
+> >  		return -EINVAL;
+> >  	}
+> >  
+> > -	dev_dbg(dev, "carveout rsc: da %x, pa %x, len 0x%x, flags %x\n",
+> > -			rsc->da, rsc->pa, rsc->len, rsc->flags);
+> > +	dev_dbg(dev, "carveout rsc: name: %s, da %x, pa %x, len 0x%x, flags %x\n",
+> > +		rsc->name, rsc->da, rsc->pa, rsc->len, rsc->flags);
+> >  
+> >  	carveout = kzalloc(sizeof(*carveout), GFP_KERNEL);
+> >  	if (!carveout)
+> > @@ -700,7 +700,7 @@ static rproc_handle_resource_t rproc_loading_handlers[RSC_LAST] = {
+> >  	[RSC_CARVEOUT] = (rproc_handle_resource_t)rproc_handle_carveout,
+> >  	[RSC_DEVMEM] = (rproc_handle_resource_t)rproc_handle_devmem,
+> >  	[RSC_TRACE] = (rproc_handle_resource_t)rproc_handle_trace,
+> > -	[RSC_VDEV] = NULL, /* VDEVs were handled upon registrarion */
+> > +	[RSC_VDEV] = NULL, /* VDEVs were handled upon registration */
+> >  };
+> >  
+> >  static rproc_handle_resource_t rproc_vdev_handler[RSC_LAST] = {
+> > @@ -918,7 +918,7 @@ static void rproc_fw_config_virtio(const struct firmware *fw, void *context)
+> >  	 * Create a copy of the resource table. When a virtio device starts
+> >  	 * and calls vring_new_virtqueue() the address of the allocated vring
+> >  	 * will be stored in the cached_table. Before the device is started,
+> > -	 * cached_table will be copied into devic memory.
+> > +	 * cached_table will be copied into device memory.
+> >  	 */
+> >  	rproc->cached_table = kmemdup(table, tablesz, GFP_KERNEL);
+> >  	if (!rproc->cached_table)
 
 -- 
 Lee Jones
