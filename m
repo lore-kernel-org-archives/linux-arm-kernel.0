@@ -1,71 +1,50 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Tue, 9 Aug 2016 15:14:27 +0100
-Subject: Tegra baseline test results for v4.8-rc1
-Message-ID: <6f1baf82-11c8-9c60-a52e-83cec7df03a5@nvidia.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Tue,  9 Aug 2016 16:18:51 +0200
+Subject: [PATCH 1/2] of/irq: Mark interrupt controllers as populated before
+ initialisation
+Message-ID: <1470752332-14185-1-git-send-email-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here are some basic Tegra test results for Linux v4.8-rc1.
-Logs and other details at:
+That way the init callback may clear the flag again, in case of drivers
+split between early irq chip and a normal platform driver.
 
-    https://nvtb.github.io//linux/test_v4.8-rc1/20160807183103/
+Fixes: 15cc2ed6dcf9 ("of/irq: Mark initialised interrupt controllers as populated")
+Suggested-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+Cc: Jon Hunter <jonathanh@nvidia.com>
+---
+ drivers/of/irq.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-
-Test summary
-------------
-
-Build: zImage:
-    Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
-
-Build: Image:
-    Pass: ( 1/ 1): defconfig
-
-Boot to userspace: defconfig:
-    Pass: ( 4/ 4): qemu-vexpress64, tegra132-norrin,
-		   tegra210-p2371-0000, tegra210-smaug
-
-Boot to userspace: multi_v7_defconfig:
-    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
-
-Boot to userspace: tegra_defconfig:
-    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
-
-PM: System suspend: multi_v7_defconfig:
-    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
-
-PM: System suspend: tegra_defconfig:
-    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
-
-
-vmlinux object size
-(delta in bytes from test_v4.7 (523d939ef98fd712632d93a5a2b588e477a7565e)):
-   text     data      bss    total  kernel
-+698018  +144600    +9592  +852210  defconfig
-+133651  -519960      -88  -386397  multi_v7_defconfig
- +81268  -406304       +8  -325028  tegra_defconfig
-
-
-Boot-time memory difference
-(delta in bytes from test_v4.7 (523d939ef98fd712632d93a5a2b588e477a7565e))
-    avail    rsrvd     high    freed                board              kconfig                  dtb
-        .        .        .        .      qemu-vexpress64            defconfig           __internal
-     -20k      20k        .        . tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
-     -16k      16k        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
-     -20k      20k        .        .  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
-     -16k      16k        .        .  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
-     -20k      20k        .        .    tegra124-nyan-big   multi_v7_defconfig    tegra124-nyan-big
-        .        .        .        .    tegra124-nyan-big      tegra_defconfig    tegra124-nyan-big
-        .        .        .        .      tegra132-norrin            defconfig      tegra132-norrin
-     -12k      12k        .        .    tegra20-trimslice   multi_v7_defconfig    tegra20-trimslice
-      -8k       8k        .        .    tegra20-trimslice      tegra_defconfig    tegra20-trimslice
-        .        .        .        .  tegra210-p2371-0000            defconfig  tegra210-p2371-0000
-        .        .        .        .       tegra210-smaug            defconfig       tegra210-smaug
-     -20k      20k        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
-     -16k      16k        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
-
---
-nvpublic
+diff --git a/drivers/of/irq.c b/drivers/of/irq.c
+index 89a71c6..a2e68f7 100644
+--- a/drivers/of/irq.c
++++ b/drivers/of/irq.c
+@@ -544,12 +544,15 @@ void __init of_irq_init(const struct of_device_id *matches)
+ 
+ 			list_del(&desc->list);
+ 
++			of_node_set_flag(desc->dev, OF_POPULATED);
++
+ 			pr_debug("of_irq_init: init %s (%p), parent %p\n",
+ 				 desc->dev->full_name,
+ 				 desc->dev, desc->interrupt_parent);
+ 			ret = desc->irq_init_cb(desc->dev,
+ 						desc->interrupt_parent);
+ 			if (ret) {
++				of_node_clear_flag(desc->dev, OF_POPULATED);
+ 				kfree(desc);
+ 				continue;
+ 			}
+@@ -559,8 +562,6 @@ void __init of_irq_init(const struct of_device_id *matches)
+ 			 * its children can get processed in a subsequent pass.
+ 			 */
+ 			list_add_tail(&desc->list, &intc_parent_list);
+-
+-			of_node_set_flag(desc->dev, OF_POPULATED);
+ 		}
+ 
+ 		/* Get the next pending parent that might have children */
+-- 
+2.8.1
