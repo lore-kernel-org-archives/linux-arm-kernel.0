@@ -1,60 +1,92 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 9 Aug 2016 17:48:40 +0100
-Subject: [PATCH] drivers/perf: arm_pmu: fix legacy affinity-less DT support
-In-Reply-To: <1470757867-13554-1-git-send-email-mark.rutland@arm.com>
-References: <1470757867-13554-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <20160809164839.GN27508@arm.com>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Tue, 9 Aug 2016 11:48:38 -0500
+Subject: [PATCH] OF: mark released devices as no longer populated
+In-Reply-To: <E1bX3Pw-00088i-KU@rmk-PC.armlinux.org.uk>
+References: <E1bX3Pw-00088i-KU@rmk-PC.armlinux.org.uk>
+Message-ID: <CAL_Jsq+pDeL1_=p06ynrV4CK+h8-Yx_KDbH-W=d-aSdARe3ZHw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 09, 2016 at 04:51:07PM +0100, Mark Rutland wrote:
-> Commit 19a469a58720ea96 ("drivers/perf: arm-pmu: Handle per-interrupt
-> affinity mask") relies on using_spi being valid, but this is only
-> initialised correctly in the presence of an interrupt-affinity property,
-> which legacy DTBs do not have.
-> 
-> In the absence of an interrupt-affinity property, using_spi is always
-> false (regardless of whether SPIs are actually used), so we call
-> irq_get_percpu_devid_partition(irq). This returns -EINVAL, and we give
-> up, passing on this return value.
-> 
-> The code which determines using_spi also verifies that we do not have
-> mixed SPI/PPI interrupts. Even in the absence of an interrupt-affinity
-> property we do not support mixed SPI/PPI cases, so pull the validation
-> logic above the main loop, ensuring that using_spi is always valid.
-> 
-> At the same time, have the error message to give the path of the PMU
-> node, rather than a CPU node, as the mismatch is a property of the
-> entire set of PMU interrupts rather than a particular CPU associated
-> with it.
-> 
-> Fixes: 19a469a58720ea96 ("drivers/perf: arm-pmu: Handle per-interrupt affinity mask")
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Reported-by: Geert Uytterhoeven <geert@linux-m68k.org>
-> Reported-by: Robin Murphy <robin.murphy@arm.com>
-> Tested-by: Robin Murphy <robin.murphy@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
+On Tue, Aug 9, 2016 at 4:33 AM, Russell King <rmk+kernel@armlinux.org.uk> wrote:
+> When a Linux device is released and cleaned up, we left the OF device
+> node marked as populated.  This causes the Freescale CAAM driver
+> (drivers/crypto/caam) problems when the module is removed and re-
+> inserted:
+>
+> JR0 Platform device creation error
+> JR0 Platform device creation error
+> caam 2100000.caam: no queues configured, terminating
+> caam: probe of 2100000.caam failed with error -12
+>
+> The reason is that CAAM creates platform devices for each job ring:
+>
+>         for_each_available_child_of_node(nprop, np)
+>                 if (of_device_is_compatible(np, "fsl,sec-v4.0-job-ring") ||
+>                     of_device_is_compatible(np, "fsl,sec4.0-job-ring")) {
+>                         ctrlpriv->jrpdev[ring] =
+>                                 of_platform_device_create(np, NULL, dev);
+>
+> which sets OF_POPULATED on the device node, but then it cleans these
+> up:
+>
+>         /* Remove platform devices for JobRs */
+>         for (ring = 0; ring < ctrlpriv->total_jobrs; ring++) {
+>                 if (ctrlpriv->jrpdev[ring])
+>                         of_device_unregister(ctrlpriv->jrpdev[ring]);
+
+This looks a bit asymmetrical to me with a of_platform_device_* call
+and a of_device_* call.
+
+I think you could use of_platform_{de}populate here instead. That
+would simplify things in the driver a bit too as you wouldn't need to
+store jrpdev. It wouldn't work if there are other child nodes with
+compatible strings which you don't want devices created.
+
+>         }
+>
+> which leaves OF_POPULATED set.
+>
+> Arrange for platform devices with a device node to clear the
+> OF_POPULATED bit when they are released.
+>
+> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 > ---
->  drivers/perf/arm_pmu.c | 37 ++++++++++++++++++++-----------------
->  1 file changed, 20 insertions(+), 17 deletions(-)
-> 
-> It's been pointed out to me that Marc send a patch a while ago [1] fixing the
-> same issue, but for some reason that didn't get queued.
-> 
-> This patch had the added benefit of ensuring we always avoid mismatched SPI/PPI
-> mixes, but otherwise either patch should avoid the issue.
+> Please check this carefully - it may have issues where an of_node
+> pointer is copied from one platform device to another, but IMHO
+> doing that is itself buggy behaviour.
 
-I'm a little uneasy with that change, since we now go ahead and check all
-of the IRQ resources, regardless of the interrupt-affinity property. This
-could result in us failing the probe, where we could previously have done
-the right thing.
+Agreed, that is wrong.
 
-For now, I think I'll stick with Marc's patch (that somehow slipped through
-the woodwork), but maybe we should consider removing the SPI/PPI sanity
-checking altogether. At some point we have to rely on the DT being correct,
-and I don't think we do anything disastrout if there is a mismatch in
-interrupt types.
+>
+> Resending due to wrong list address, sorry.
+>
+>  include/linux/of_device.h | 1 +
+>  1 file changed, 1 insertion(+)
+>
+> diff --git a/include/linux/of_device.h b/include/linux/of_device.h
+> index cc7dd687a89d..7a8362d0c6d2 100644
+> --- a/include/linux/of_device.h
+> +++ b/include/linux/of_device.h
+> @@ -43,6 +43,7 @@ extern int of_device_uevent_modalias(struct device *dev, struct kobj_uevent_env
+>
+>  static inline void of_device_node_put(struct device *dev)
+>  {
+> +       of_node_clear_flag(dev->of_node, OF_POPULATED);
 
-Will
+This would result in clearing the flag twice in the
+of_platform_populate/of_platform_depopulate case. It would do the same
+for other bus types like i2c as well. That doesn't really hurt
+anything that I can think of, but just not the best implementation. I
+think adding a of_platform_device_unregister() call that wraps
+of_platform_device_destroy would be more balanced.
+
+I looked thru all the callers of of_platform_device_create. The only
+other ones affected by this are:
+
+drivers/macintosh/ams/ams-core.c
+drivers/macintosh/therm_adt746x.c
+drivers/macintosh/therm_windtunnel.c
+
+The others either have no remove path or a buggy remove path.
+
+Rob
