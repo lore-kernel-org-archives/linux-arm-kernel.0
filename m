@@ -1,648 +1,127 @@
-From: lucile.quirion@savoirfairelinux.com (Lucile Quirion)
-Date: Tue,  9 Aug 2016 11:15:44 -0400
-Subject: [PATCH v3 2/2] ARM: dts: TS-4900: add basic device tree
-In-Reply-To: <1470755744-7837-1-git-send-email-lucile.quirion@savoirfairelinux.com>
-References: <1470755744-7837-1-git-send-email-lucile.quirion@savoirfairelinux.com>
-Message-ID: <1470755744-7837-3-git-send-email-lucile.quirion@savoirfairelinux.com>
+From: york.sun@nxp.com (york sun)
+Date: Tue, 9 Aug 2016 15:27:33 +0000
+Subject: [Patch v3 10/11] driver/edac/layerscape_edac: Add Layerscape EDAC
+ support
+References: <1470351518-22404-1-git-send-email-york.sun@nxp.com>
+ <1470351518-22404-11-git-send-email-york.sun@nxp.com>
+ <20160808190652.6456fae0@arm.com>
+ <AM4PR0401MB17322F172D369D841F820C029A1B0@AM4PR0401MB1732.eurprd04.prod.outlook.com>
+ <20160809111241.GH27508@arm.com>
+Message-ID: <AM4PR0401MB1732E37CB496CCB3075DF2429A1C0@AM4PR0401MB1732.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These device trees add support for TS-4900 by Technologic Systems.
+On 08/09/2016 04:12 AM, Will Deacon wrote:
+> On Mon, Aug 08, 2016 at 07:56:04PM +0000, york sun wrote:
+>> On 08/08/2016 11:07 AM, Marc Zyngier wrote:
+>>> On Thu, 4 Aug 2016 15:58:35 -0700
+>>> York Sun <york.sun@nxp.com> wrote:
+>>>
+>>>> Add DDR EDAC for ARM-based compatible controllers. Both big-endian
+>>>> and little-endian are supported.
+>>>>
+>>>> Signed-off-by: York Sun <york.sun@nxp.com>
+>>>>
+>>>> ---
+>>>> Change log
+>>>>   v3: no change
+>>>>   v2: Create new driver using shared DDR object
+>>>>
+>>>>  arch/arm64/Kconfig.platforms           |  1 +
+>>>>  arch/{arm => arm64}/include/asm/edac.h | 21 +++++------
+>>>>  arch/arm64/include/asm/irq.h           |  4 ++
+>>>>  drivers/edac/Kconfig                   |  7 ++++
+>>>>  drivers/edac/Makefile                  |  3 ++
+>>>>  drivers/edac/fsl_ddr_edac.c            |  1 +
+>>>>  drivers/edac/layerscape_edac.c         | 67 ++++++++++++++++++++++++++++++++++
+>>>>  7 files changed, 92 insertions(+), 12 deletions(-)
+>>>>  copy arch/{arm => arm64}/include/asm/edac.h (79%)
+>>>>  create mode 100644 drivers/edac/layerscape_edac.c
+>>>>
+>>>> diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
+>>>> index 7ef1d05..185a215 100644
+>>>> --- a/arch/arm64/Kconfig.platforms
+>>>> +++ b/arch/arm64/Kconfig.platforms
+>>>> @@ -41,6 +41,7 @@ config ARCH_EXYNOS
+>>>>
+>>>>  config ARCH_LAYERSCAPE
+>>>>  	bool "ARMv8 based Freescale Layerscape SoC family"
+>>>> +	select EDAC_SUPPORT
+>>>>  	help
+>>>>  	  This enables support for the Freescale Layerscape SoC family.
+>>>>
+>>>> diff --git a/arch/arm/include/asm/edac.h b/arch/arm64/include/asm/edac.h
+>>>> similarity index 79%
+>>>> copy from arch/arm/include/asm/edac.h
+>>>> copy to arch/arm64/include/asm/edac.h
+>>>> index 5189fa8..36a226c 100644
+>>>> --- a/arch/arm/include/asm/edac.h
+>>>> +++ b/arch/arm64/include/asm/edac.h
+>>>> @@ -18,16 +18,15 @@
+>>>>  #define ASM_EDAC_H
+>>>>  /*
+>>>>   * ECC atomic, DMA, SMP and interrupt safe scrub function.
+>>>> - * Implements the per arch edac_atomic_scrub() that EDAC use for software
+>>>> + * Implements the per arch atomic_scrub() that EDAC use for software
+>>>>   * ECC scrubbing.  It reads memory and then writes back the original
+>>>>   * value, allowing the hardware to detect and correct memory errors.
+>>>>   */
+>>>> -
+>>>> -static inline void edac_atomic_scrub(void *va, u32 size)
+>>>> +static inline void atomic_scrub(void *va, u32 size)
+>>>>  {
+>>>> -#if __LINUX_ARM_ARCH__ >= 6
+>>>> -	unsigned int *virt_addr = va;
+>>>> -	unsigned int temp, temp2;
+>>>> +	unsigned long *virt_addr = va;
+>>>> +	unsigned long temp;
+>>>> +	unsigned int temp2;
+>>>>  	unsigned int i;
+>>>>
+>>>>  	for (i = 0; i < size / sizeof(*virt_addr); i++, virt_addr++) {
+>>>> @@ -35,15 +34,13 @@ static inline void edac_atomic_scrub(void *va, u32 size)
+>>>>  		 * so we are interrupt, DMA and SMP safe.
+>>>>  		 */
+>>>>  		__asm__ __volatile__("\n"
+>>>> -			"1:	ldrex	%0, [%2]\n"
+>>>> -			"	strex	%1, %0, [%2]\n"
+>>>> -			"	teq	%1, #0\n"
+>>>> -			"	bne	1b\n"
+>>>> +			"1:	ldxr	%0, [%2]\n"
+>>>> +			"	stxr	%w1, %0, [%2]\n"
+>>>> +			"	cbnz	%w1, 1b\n"
+>>>
+>>> Hiding architecture code in a driver, are we? Hmmm.
+>>
+>> This adds atomic_scrub() for arm64. Arm already has this function. Are
+>> you suggesting to separate this part as an individual patch?
+>>>
+>>> Also, how can this be safe if you have non cache-coherent DMA going on?
+>>
+>> I am clueless on this topic. What's your suggestion.
+>
+> We've discussed this in the past for ARMv7 and the bottom line is that
+> it's not safe to scrub memory backing non-coherent DMA buffers. You will
+> likely end up with data corruption if you do that.
+>
+> The two options are:
+>
+>   (1) Restrict scrubbing to non-DMA memory, or
+>   (2) Only enable scrubbing if the system is completely cache-coherent
+>
+> The problem with (1) is that we can't detect that, particularly when
+> the streaming DMA API is in use.
+>
+> The problem with (2) is that you can have a coherent system that decides
+> dynamically to drop in and out of coherency as a result of, e.g. PCI
+> NoSnoop transactions.
+>
 
-More details here:
-   http://wiki.embeddedarm.com/wiki/TS-4900
+Good information! I realize I added this code on an older kernel and 
+rebased to the latest one. This code is actually not needed, as long as 
+CONFIG_EDAC_ATOMIC_SCRUB.
 
-Signed-off-by: Lucile Quirion <lucile.quirion@savoirfairelinux.com>
----
- arch/arm/boot/dts/Makefile            |   2 +
- arch/arm/boot/dts/imx6dl-ts4900.dts   |  49 ++++
- arch/arm/boot/dts/imx6q-ts4900.dts    |  53 ++++
- arch/arm/boot/dts/imx6qdl-ts4900.dtsi | 481 ++++++++++++++++++++++++++++++++++
- 4 files changed, 585 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx6dl-ts4900.dts
- create mode 100644 arch/arm/boot/dts/imx6q-ts4900.dts
- create mode 100644 arch/arm/boot/dts/imx6qdl-ts4900.dtsi
+You said this has been discussed for ARMv7, what was the conclusion? I 
+see edac_atomic_scrub() is still used for ARM.
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index faacd52..c29ab2d 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -339,6 +339,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
- 	imx6dl-sabreauto.dtb \
- 	imx6dl-sabrelite.dtb \
- 	imx6dl-sabresd.dtb \
-+	imx6dl-ts4900.dtb \
- 	imx6dl-tx6dl-comtft.dtb \
- 	imx6dl-tx6s-8034.dtb \
- 	imx6dl-tx6s-8035.dtb \
-@@ -382,6 +383,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
- 	imx6q-sabresd.dtb \
- 	imx6q-sbc6x.dtb \
- 	imx6q-tbs2910.dtb \
-+	imx6q-ts4900.dtb \
- 	imx6q-tx6q-1010.dtb \
- 	imx6q-tx6q-1010-comtft.dtb \
- 	imx6q-tx6q-1020.dtb \
-diff --git a/arch/arm/boot/dts/imx6dl-ts4900.dts b/arch/arm/boot/dts/imx6dl-ts4900.dts
-new file mode 100644
-index 0000000..85eddeb
---- /dev/null
-+++ b/arch/arm/boot/dts/imx6dl-ts4900.dts
-@@ -0,0 +1,49 @@
-+/*
-+ * Copyright 2015 Technologic Systems
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License
-+ *     version 2 as published by the Free Software Foundation.
-+ *
-+ *     This file is distributed in the hope that it will be useful
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+#include "imx6dl.dtsi"
-+#include "imx6qdl-ts4900.dtsi"
-+
-+/ {
-+	model = "Technologic Systems i.MX6 Solo/DualLite TS-4900 (Default Device Tree)";
-+	compatible = "technologic,imx6dl-ts4900", "fsl,imx6dl";
-+};
-diff --git a/arch/arm/boot/dts/imx6q-ts4900.dts b/arch/arm/boot/dts/imx6q-ts4900.dts
-new file mode 100644
-index 0000000..9b81ebc
---- /dev/null
-+++ b/arch/arm/boot/dts/imx6q-ts4900.dts
-@@ -0,0 +1,53 @@
-+/*
-+ * Copyright 2015 Technologic Systems
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License
-+ *     version 2 as published by the Free Software Foundation.
-+ *
-+ *     This file is distributed in the hope that it will be useful
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+#include "imx6q.dtsi"
-+#include "imx6qdl-ts4900.dtsi"
-+
-+/ {
-+	model = "Technologic Systems i.MX6 Quad TS-4900 (Default Device Tree)";
-+	compatible = "technologic,imx6q-ts4900", "fsl,imx6q";
-+};
-+
-+&sata {
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/imx6qdl-ts4900.dtsi b/arch/arm/boot/dts/imx6qdl-ts4900.dtsi
-new file mode 100644
-index 0000000..5c26b26
---- /dev/null
-+++ b/arch/arm/boot/dts/imx6qdl-ts4900.dtsi
-@@ -0,0 +1,481 @@
-+/*
-+ * Copyright 2015 Technologic Systems
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License
-+ *     version 2 as published by the Free Software Foundation.
-+ *
-+ *     This file is distributed in the hope that it will be useful
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+#include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/interrupt-controller/irq.h>
-+
-+/ {
-+	aliases {
-+		ethernet0 = &fec;
-+	};
-+
-+	leds {
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_leds1>;
-+		compatible = "gpio-leds";
-+
-+		green-led {
-+			label = "green-led";
-+			gpios = <&gpio2 24 GPIO_ACTIVE_LOW>;
-+			default-state = "on";
-+		};
-+
-+		red-led {
-+			label = "red-led";
-+			gpios = <&gpio1 2 GPIO_ACTIVE_LOW>;
-+			default-state = "off";
-+		};
-+	};
-+
-+	reg_3p3v: regulator-3p3v {
-+		compatible = "regulator-fixed";
-+		regulator-name = "3p3v";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+	};
-+
-+	reg_usb_otg_vbus: regulator-usb-otg-vbus {
-+		compatible = "regulator-fixed";
-+		regulator-name = "usb_otg_vbus";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		gpio = <&gpio3 22 GPIO_ACTIVE_HIGH>;
-+		enable-active-high;
-+	};
-+};
-+
-+&can1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_flexcan1>;
-+	status = "okay";
-+};
-+
-+&can2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_flexcan2>;
-+	status = "okay";
-+};
-+
-+&ecspi1 {
-+	fsl,spi-num-chipselects = <1>;
-+	cs-gpios = <&gpio3 19 GPIO_ACTIVE_HIGH>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_ecspi1>;
-+	status = "okay";
-+
-+	n25q064: flash at 0 {
-+		compatible = "micron,n25q064", "jedec,spi-nor";
-+		reg = <0>;
-+		spi-max-frequency = <20000000>;
-+	};
-+};
-+
-+&ecspi2 {
-+	fsl,spi-num-chipselects = <1>;
-+	cs-gpios = <&gpio6 2 GPIO_ACTIVE_HIGH>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_ecspi2>;
-+	status = "okay";
-+};
-+
-+&fec {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_enet>;
-+	phy-mode = "rgmii";
-+	status = "okay";
-+};
-+
-+&i2c1 {
-+	clock-frequency = <100000>;
-+	pinctrl-names = "default", "gpio";
-+	pinctrl-0 = <&pinctrl_i2c1>;
-+	pinctrl-1 = <&pinctrl_i2c1_gpio>;
-+	scl-gpios = <&gpio3 21 GPIO_ACTIVE_HIGH>;
-+	sda-gpios = <&gpio3 28 GPIO_ACTIVE_HIGH>;
-+	status = "okay";
-+
-+	isl12022: rtc at 6f {
-+		compatible = "isil,isl12022";
-+		reg = <0x6f>;
-+	};
-+
-+	gpio8: gpio at 28 {
-+		compatible = "technologic,ts4900-gpio";
-+		reg = <0x28>;
-+		#gpio-cells = <2>;
-+		gpio-controller;
-+		ngpio = <32>;
-+	};
-+};
-+
-+&i2c2 {
-+	clock-frequency = <100000>;
-+	pinctrl-names = "default", "gpio";
-+	pinctrl-0 = <&pinctrl_i2c2>;
-+	pinctrl-1 = <&pinctrl_i2c2_gpio>;
-+	scl-gpios = <&gpio4 12 GPIO_ACTIVE_HIGH>;
-+	sda-gpios = <&gpio4 13 GPIO_ACTIVE_HIGH>;
-+	status = "okay";
-+};
-+
-+&iomuxc {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_hog>;
-+
-+	pinctrl_ecspi1: ecspi1grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_EIM_D17__ECSPI1_MISO		0x100b1
-+			MX6QDL_PAD_EIM_D18__ECSPI1_MOSI		0x100b1
-+			MX6QDL_PAD_EIM_D16__ECSPI1_SCLK		0x100b1
-+			MX6QDL_PAD_EIM_D19__GPIO3_IO19		0x100b1 /* Onboard flash CS1# */
-+		>;
-+	};
-+
-+	pinctrl_ecspi2: ecspi2grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_CSI0_DAT8__ECSPI2_SCLK	0x100b1
-+			MX6QDL_PAD_CSI0_DAT9__ECSPI2_MOSI	0x100b1
-+			MX6QDL_PAD_CSI0_DAT10__ECSPI2_MISO	0x100b1
-+			MX6QDL_PAD_CSI0_DAT11__GPIO5_IO29	0x100b1 /* Offboard CS0# */
-+			MX6QDL_PAD_CSI0_DAT16__GPIO6_IO02	0x100b1 /* FPGA CS1# */
-+			MX6QDL_PAD_CSI0_VSYNC__GPIO5_IO21	0x1b0b1 /* FPGA_RESET# */
-+			MX6QDL_PAD_CSI0_DATA_EN__GPIO5_IO20	0x1b0b1 /* FPGA_DONE */
-+			MX6QDL_PAD_GPIO_3__XTALOSC_REF_CLK_24M	0x10    /* FPGA 24MHZ */
-+			MX6QDL_PAD_GPIO_4__GPIO1_IO04		0x1b0b1 /* FPGA_IRQ */
-+		>;
-+	};
-+
-+	pinctrl_enet: enetgrp {
-+		fsl,pins = <
-+			MX6QDL_PAD_ENET_MDIO__ENET_MDIO		0x1b0b0
-+			MX6QDL_PAD_ENET_MDC__ENET_MDC		0x1b0b0
-+			MX6QDL_PAD_RGMII_TXC__RGMII_TXC		0x1b030
-+			MX6QDL_PAD_RGMII_TD0__RGMII_TD0		0x1b030
-+			MX6QDL_PAD_RGMII_TD1__RGMII_TD1		0x1b030
-+			MX6QDL_PAD_RGMII_TD2__RGMII_TD2		0x1b030
-+			MX6QDL_PAD_RGMII_TD3__RGMII_TD3		0x1b030
-+			MX6QDL_PAD_RGMII_TX_CTL__RGMII_TX_CTL	0x1b030
-+			MX6QDL_PAD_RGMII_RXC__RGMII_RXC		0x1b030
-+			MX6QDL_PAD_RGMII_RD0__RGMII_RD0		0x1b030
-+			MX6QDL_PAD_RGMII_RD1__RGMII_RD1		0x1b030
-+			MX6QDL_PAD_RGMII_RD2__RGMII_RD2		0x1b030
-+			MX6QDL_PAD_RGMII_RD3__RGMII_RD3		0x1b030
-+			MX6QDL_PAD_RGMII_RX_CTL__RGMII_RX_CTL	0x1b030
-+			MX6QDL_PAD_ENET_REF_CLK__ENET_TX_CLK	0x4001b0a8
-+			MX6QDL_PAD_ENET_TX_EN__GPIO1_IO28	0x1b0b1
-+			MX6QDL_PAD_DI0_PIN4__GPIO4_IO20		0x1b0b1 /* ETH_PHY_RESET */
-+		>;
-+	};
-+
-+	pinctrl_flexcan1: flexcan1grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_KEY_ROW2__FLEXCAN1_RX	0x1b0b1
-+			MX6QDL_PAD_KEY_COL2__FLEXCAN1_TX	0x1b0b1
-+		>;
-+	};
-+
-+	pinctrl_flexcan2: flexcan2grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_KEY_COL4__FLEXCAN2_TX	0x1b0b1
-+			MX6QDL_PAD_KEY_ROW4__FLEXCAN2_RX	0x1b0b1
-+		>;
-+	};
-+
-+	pinctrl_hog: hoggrp {
-+		fsl,pins = <
-+			MX6QDL_PAD_EIM_A17__GPIO2_IO21		0x1b0b1 /* OFF_BD_RESET# */
-+			MX6QDL_PAD_EIM_A16__GPIO2_IO22		0x1b0b1 /* EN_USB_5V# */
-+			MX6QDL_PAD_EIM_A19__GPIO2_IO19		0x1b0b1 /* EN_LCD_3.3V */
-+			MX6QDL_PAD_GPIO_0__CCM_CLKO1		0x130b0 /* Audio CLK */
-+			MX6QDL_PAD_GPIO_5__GPIO1_IO05		0x1b0b1 /* DIO_1 */
-+			MX6QDL_PAD_GPIO_6__GPIO1_IO06		0x1b0b1 /* DIO_2 */
-+			MX6QDL_PAD_GPIO_9__GPIO1_IO09		0x1b0b1 /* DIO_3 */
-+			MX6QDL_PAD_GPIO_16__GPIO7_IO11		0x1b0b1 /* DIO_4 */
-+			MX6QDL_PAD_GPIO_17__GPIO7_IO12		0x1b0b1 /* DIO_5 */
-+			MX6QDL_PAD_GPIO_19__GPIO4_IO05		0x1b0b1 /* DIO_7 */
-+			MX6QDL_PAD_CSI0_MCLK__GPIO5_IO19	0x1b0b1 /* DIO_8 */
-+			MX6QDL_PAD_CSI0_PIXCLK__GPIO5_IO18	0x1b0b1 /* DIO_9 */
-+			MX6QDL_PAD_CSI0_DAT12__GPIO5_IO30	0x1b0b1 /* DIO_0 */
-+			MX6QDL_PAD_CSI0_DAT13__GPIO5_IO31	0x1b0b1 /* DIO_6 */
-+			MX6QDL_PAD_CSI0_DAT17__GPIO6_IO03	0x1b0b1 /* CPU_DIO_A */
-+			MX6QDL_PAD_SD4_DAT7__GPIO2_IO15		0x1b0b1 /* DIO_2 */
-+			MX6QDL_PAD_SD3_RST__GPIO7_IO08		0x1b0b1 /* CPU_DIO_B */
-+			MX6QDL_PAD_EIM_LBA__GPIO2_IO27		0x1b0b1 /* BUS_ALE# */
-+			MX6QDL_PAD_EIM_OE__GPIO2_IO25		0x1b0b1 /* DIO_15 */
-+			MX6QDL_PAD_EIM_RW__GPIO2_IO26		0x1b0b1 /* BUS_DIR */
-+			MX6QDL_PAD_EIM_CS0__GPIO2_IO23		0x1b0b1 /* BUS_CS# */
-+			MX6QDL_PAD_EIM_A18__GPIO2_IO20		0x1b0b1 /* DIO_14 */
-+			MX6QDL_PAD_EIM_A20__GPIO2_IO18		0x1b0b1 /* DIO_16 */
-+			MX6QDL_PAD_EIM_A21__GPIO2_IO17		0x1b0b1 /* DIO_12 */
-+			MX6QDL_PAD_EIM_A22__GPIO2_IO16		0x1b0b1 /* DIO_18 */
-+			MX6QDL_PAD_EIM_A23__GPIO6_IO06		0x1b0b1 /* DIO_19 */
-+			MX6QDL_PAD_EIM_A24__GPIO5_IO04		0x1b0b1 /* DIO_20 */
-+			MX6QDL_PAD_EIM_D31__GPIO3_IO31		0x1b0b1 /* BUS_BHE# */
-+			MX6QDL_PAD_EIM_BCLK__GPIO6_IO31		0x1b0b1 /* DIO_13 */
-+			MX6QDL_PAD_EIM_WAIT__GPIO5_IO00		0x1b0b1 /* EIM_WAIT# */
-+			MX6QDL_PAD_EIM_EB1__GPIO2_IO29		0x1b0b1 /* DIO_10 */
-+			MX6QDL_PAD_EIM_DA0__GPIO3_IO00		0x1b0b1 /* MUX_AD_00 */
-+			MX6QDL_PAD_EIM_DA1__GPIO3_IO01		0x1b0b1 /* MUX_AD_01 */
-+			MX6QDL_PAD_EIM_DA2__GPIO3_IO02		0x1b0b1 /* MUX_AD_02 */
-+			MX6QDL_PAD_EIM_DA3__GPIO3_IO03		0x1b0b1 /* MUX_AD_03 */
-+			MX6QDL_PAD_EIM_DA4__GPIO3_IO04		0x1b0b1 /* MUX_AD_04 */
-+			MX6QDL_PAD_EIM_DA5__GPIO3_IO05		0x1b0b1 /* MUX_AD_05 */
-+			MX6QDL_PAD_EIM_DA6__GPIO3_IO06		0x1b0b1 /* MUX_AD_06 */
-+			MX6QDL_PAD_EIM_DA7__GPIO3_IO07		0x1b0b1 /* MUX_AD_07 */
-+			MX6QDL_PAD_EIM_DA8__GPIO3_IO08		0x1b0b1 /* MUX_AD_08 */
-+			MX6QDL_PAD_EIM_DA9__GPIO3_IO09		0x1b0b1 /* MUX_AD_09 */
-+			MX6QDL_PAD_EIM_DA10__GPIO3_IO10		0x1b0b1 /* MUX_AD_10 */
-+			MX6QDL_PAD_EIM_DA11__GPIO3_IO11		0x1b0b1 /* MUX_AD_11 */
-+			MX6QDL_PAD_EIM_DA12__GPIO3_IO12		0x1b0b1 /* MUX_AD_12 */
-+			MX6QDL_PAD_EIM_DA13__GPIO3_IO13		0x1b0b1 /* MUX_AD_13 */
-+			MX6QDL_PAD_EIM_DA14__GPIO3_IO14		0x1b0b1 /* MUX_AD_14 */
-+			MX6QDL_PAD_EIM_DA15__GPIO3_IO15		0x1b0b1 /* MUX_AD_15 */
-+			MX6QDL_PAD_DI0_DISP_CLK__GPIO4_IO16	0x1b0b1 /* LCD_CLK */
-+			MX6QDL_PAD_DI0_PIN15__GPIO4_IO17	0x1b0b1 /* DE */
-+			MX6QDL_PAD_DI0_PIN2__GPIO4_IO18		0x1b0b1 /* Hsync */
-+			MX6QDL_PAD_DI0_PIN3__GPIO4_IO19		0x1b0b1 /* Vsync */
-+			MX6QDL_PAD_DISP0_DAT0__GPIO4_IO21	0x1b0b1
-+			MX6QDL_PAD_DISP0_DAT1__GPIO4_IO22	0x1b0b1
-+			MX6QDL_PAD_DISP0_DAT2__GPIO4_IO23	0x1b0b1
-+			MX6QDL_PAD_DISP0_DAT3__GPIO4_IO24	0x1b0b1
-+			MX6QDL_PAD_DISP0_DAT4__GPIO4_IO25	0x1b0b1
-+			MX6QDL_PAD_DISP0_DAT5__GPIO4_IO26	0x1b0b1
-+			MX6QDL_PAD_DISP0_DAT6__GPIO4_IO27	0x1b0b1
-+			MX6QDL_PAD_DISP0_DAT7__GPIO4_IO28	0x1b0b1
-+			MX6QDL_PAD_DISP0_DAT8__GPIO4_IO29	0x1b0b1
-+			MX6QDL_PAD_DISP0_DAT9__GPIO4_IO30	0x1b0b1
-+			MX6QDL_PAD_DISP0_DAT10__GPIO4_IO31	0x1b0b1
-+			MX6QDL_PAD_DISP0_DAT11__GPIO5_IO05	0x1b0b1
-+			MX6QDL_PAD_DISP0_DAT12__GPIO5_IO06	0x1b0b1
-+			MX6QDL_PAD_DISP0_DAT13__GPIO5_IO07	0x1b0b1
-+			MX6QDL_PAD_DISP0_DAT14__GPIO5_IO08	0x1b0b1
-+			MX6QDL_PAD_DISP0_DAT15__GPIO5_IO09	0x1b0b1
-+			MX6QDL_PAD_DISP0_DAT16__GPIO5_IO10	0x1b0b1
-+			MX6QDL_PAD_DISP0_DAT17__GPIO5_IO11	0x1b0b1
-+			MX6QDL_PAD_DISP0_DAT18__GPIO5_IO12	0x1b0b1
-+			MX6QDL_PAD_DISP0_DAT19__GPIO5_IO13	0x1b0b1
-+			MX6QDL_PAD_DISP0_DAT20__GPIO5_IO14	0x1b0b1
-+			MX6QDL_PAD_DISP0_DAT21__GPIO5_IO15	0x1b0b1
-+			MX6QDL_PAD_DISP0_DAT22__GPIO5_IO16	0x1b0b1
-+			MX6QDL_PAD_DISP0_DAT23__GPIO5_IO17	0x1b0b1
-+		>;
-+	};
-+
-+	pinctrl_i2c1: i2c1grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_EIM_D21__I2C1_SCL		0x4001b8b1
-+			MX6QDL_PAD_EIM_D28__I2C1_SDA		0x4001b8b1
-+		>;
-+	};
-+
-+	pinctrl_i2c1_gpio: i2c1gpiogrp {
-+		fsl,pins = <
-+			MX6QDL_PAD_EIM_D21__GPIO3_IO21		0x4001b8b1
-+			MX6QDL_PAD_EIM_D28__GPIO3_IO28		0x4001b8b1
-+		>;
-+	};
-+
-+	pinctrl_i2c2: i2c2grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_KEY_COL3__I2C2_SCL		0x4001b8b1
-+			MX6QDL_PAD_KEY_ROW3__I2C2_SDA		0x4001b8b1
-+		>;
-+	};
-+
-+	pinctrl_i2c2_gpio: i2c2gpiogrp {
-+		fsl,pins = <
-+			MX6QDL_PAD_KEY_COL3__GPIO4_IO12		0x4001b8b1
-+			MX6QDL_PAD_KEY_ROW3__GPIO4_IO13		0x4001b8b1
-+		>;
-+	};
-+
-+	pinctrl_leds1: leds1grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_GPIO_2__GPIO1_IO02		0x1b0b1 /* RED_LED# */
-+			MX6QDL_PAD_EIM_CS1__GPIO2_IO24		0x1b0b1 /* GREEN_LED# */
-+		>;
-+	};
-+
-+	pinctrl_uart1: uart1grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_SD3_DAT7__UART1_TX_DATA	0x1b0b1
-+			MX6QDL_PAD_SD3_DAT6__UART1_RX_DATA	0x1b0b1
-+		>;
-+	};
-+
-+	pinctrl_uart2: uart2grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_GPIO_7__UART2_TX_DATA	0x1b0b1
-+			MX6QDL_PAD_GPIO_8__UART2_RX_DATA	0x1b0b1
-+			MX6QDL_PAD_SD4_DAT6__UART2_CTS_B	0x1b0b1
-+			MX6QDL_PAD_SD4_DAT5__UART2_RTS_B	0x1b0b1
-+		>;
-+	};
-+
-+	pinctrl_uart3: uart3grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_EIM_D24__UART3_TX_DATA	0x1b0b1
-+			MX6QDL_PAD_EIM_D25__UART3_RX_DATA	0x1b0b1
-+		>;
-+	};
-+
-+	pinctrl_uart4: uart4grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_KEY_COL0__UART4_TX_DATA	0x1b0b1
-+			MX6QDL_PAD_KEY_ROW0__UART4_RX_DATA	0x1b0b1
-+		>;
-+	};
-+
-+	pinctrl_uart5: uart5grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_KEY_COL1__UART5_TX_DATA	0x1b0b1
-+			MX6QDL_PAD_KEY_ROW1__UART5_RX_DATA	0x1b0b1
-+		>;
-+	};
-+
-+	pinctrl_usbotg: usbotggrp {
-+		fsl,pins = <
-+			MX6QDL_PAD_GPIO_1__USB_OTG_ID		0x17059
-+		>;
-+	};
-+
-+	pinctrl_usdhc1: usdhc1grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_SD1_CMD__SD1_CMD		0x17059
-+			MX6QDL_PAD_SD1_CLK__SD1_CLK		0x10059
-+			MX6QDL_PAD_SD1_DAT0__SD1_DATA0		0x17059
-+			MX6QDL_PAD_SD1_DAT1__SD1_DATA1		0x17059
-+			MX6QDL_PAD_SD1_DAT2__SD1_DATA2		0x17059
-+			MX6QDL_PAD_SD1_DAT3__SD1_DATA3		0x17059
-+			MX6QDL_PAD_ENET_RXD1__GPIO1_IO26	0x17059 /* WIFI IRQ */
-+		>;
-+	};
-+
-+	pinctrl_usdhc2: usdhc2grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_SD2_CMD__SD2_CMD		0x17059
-+			MX6QDL_PAD_SD2_CLK__SD2_CLK		0x10059
-+			MX6QDL_PAD_SD2_DAT0__SD2_DATA0		0x17059
-+			MX6QDL_PAD_SD2_DAT1__SD2_DATA1		0x17059
-+			MX6QDL_PAD_SD2_DAT2__SD2_DATA2		0x17059
-+			MX6QDL_PAD_SD2_DAT3__SD2_DATA3		0x17059
-+			MX6QDL_PAD_EIM_EB0__GPIO2_IO28		0x1b0b1 /* EN_SD_POWER# */
-+		>;
-+	};
-+
-+	pinctrl_usdhc3: usdhc3grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_SD3_CMD__SD3_CMD		0x17059
-+			MX6QDL_PAD_SD3_CLK__SD3_CLK		0x10059
-+			MX6QDL_PAD_SD3_DAT0__SD3_DATA0		0x17059
-+			MX6QDL_PAD_SD3_DAT1__SD3_DATA1		0x17059
-+			MX6QDL_PAD_SD3_DAT2__SD3_DATA2		0x17059
-+			MX6QDL_PAD_SD3_DAT3__SD3_DATA3		0x17059
-+		>;
-+	};
-+};
-+
-+&pcie {
-+	status = "okay";
-+};
-+
-+&uart1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart1>;
-+	status = "okay";
-+};
-+
-+&uart2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart2>;
-+	uart-has-rtscts;
-+	status = "okay";
-+};
-+
-+&uart3 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart3>;
-+	status = "okay";
-+};
-+
-+&uart4 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart4>;
-+	status = "okay";
-+};
-+
-+&uart5 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart5>;
-+	status = "okay";
-+};
-+
-+&usbh1 {
-+	status = "okay";
-+};
-+
-+&usbotg {
-+	vbus-supply = <&reg_usb_otg_vbus>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_usbotg>;
-+	disable-over-current;
-+	status = "okay";
-+};
-+
-+/* SD */
-+&usdhc2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_usdhc2>;
-+	vmmc-supply = <&reg_3p3v>;
-+	bus-width = <4>;
-+	fsl,wp-controller;
-+	status = "okay";
-+};
-+
-+/* eMMC */
-+&usdhc3 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_usdhc3>;
-+	vmmc-supply = <&reg_3p3v>;
-+	bus-width = <4>;
-+	non-removable;
-+	status = "okay";
-+};
--- 
-2.5.5
+York
