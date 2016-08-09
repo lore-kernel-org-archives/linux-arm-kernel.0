@@ -1,261 +1,176 @@
-From: guohanjun@huawei.com (Hanjun Guo)
-Date: Tue, 9 Aug 2016 15:06:03 +0800
-Subject: [RFC PATCH 07/10] ACPI: irq: introduce interrupt producer
-In-Reply-To: <1470726366-40809-1-git-send-email-guohanjun@huawei.com>
-References: <1470726366-40809-1-git-send-email-guohanjun@huawei.com>
-Message-ID: <1470726366-40809-8-git-send-email-guohanjun@huawei.com>
+From: hzpeterchen@gmail.com (Peter Chen)
+Date: Tue, 9 Aug 2016 15:18:21 +0800
+Subject: [PATCH 1/1] irqchip: irq-gic: forward SGI to itself for
+ cortex-a7 single core
+In-Reply-To: <20160809075930.529f98ca@arm.com>
+References: <20160808105026.GA12649@leverpostej>
+ <HE1PR04MB1450C6BE844A31C95CEE3BE18B1B0@HE1PR04MB1450.eurprd04.prod.outlook.com>
+ <20160808130754.GB12649@leverpostej>
+ <20160808132847.GB17680@shlinux2>
+ <20160808134842.GE12649@leverpostej>
+ <20160808145916.0924e868@arm.com> <20160809034613.GB31105@shlinux2>
+ <20160809063401.3117dc94@arm.com> <20160809055701.GC31105@shlinux2>
+ <20160809075930.529f98ca@arm.com>
+Message-ID: <20160809071821.GD31105@shlinux2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Hanjun Guo <hanjun.guo@linaro.org>
+On Tue, Aug 09, 2016 at 07:59:30AM +0100, Marc Zyngier wrote:
+> On Tue, 9 Aug 2016 13:57:01 +0800
+> Peter Chen <hzpeterchen@gmail.com> wrote:
+> 
+> > On Tue, Aug 09, 2016 at 06:34:01AM +0100, Marc Zyngier wrote:
+> > > On Tue, 9 Aug 2016 11:46:13 +0800
+> > > Peter Chen <hzpeterchen@gmail.com> wrote:
+> > >   
+> > > > On Mon, Aug 08, 2016 at 02:59:16PM +0100, Marc Zyngier wrote:  
+> > > > > On Mon, 8 Aug 2016 14:48:42 +0100
+> > > > > Mark Rutland <mark.rutland@arm.com> wrote:
+> > > > >     
+> > > > > > On Mon, Aug 08, 2016 at 09:28:47PM +0800, Peter Chen wrote:    
+> > > > > > > On Mon, Aug 08, 2016 at 02:07:54PM +0100, Mark Rutland wrote:      
+> > > > > > > > I see that for arm64 we have:
+> > > > > > > > 
+> > > > > > > > static inline bool arch_irq_work_has_interrupt(void)
+> > > > > > > > {
+> > > > > > > > 	return !!__smp_cross_call;
+> > > > > > > > }
+> > > > > > > > 
+> > > > > > > > Could we do similarly for ARM, and ony register gic_raise_softirq if
+> > > > > > > > we have non-zero SGI targets?
+> > > > > > > > 
+> > > > > > > > If I've understood correctly, that would make things behave as they do
+> > > > > > > > for UP on you system.      
+> > > > > > 
+> > > > > > [...]
+> > > > > >     
+> > > > > > > > If self-IPI is necessary, then this would be up to the GIC code to
+> > > > > > > > solve.
+> > > > > > > > 
+> > > > > > > > For that case, it would be nicer if we could detect whether this was
+> > > > > > > > necessary based on the GIC registers alone. That way we handle the
+> > > > > > > > various ways this can be integrated, aren't totally relient on the DT,
+> > > > > > > > work in VMs, etc.      
+> > > > > > > 
+> > > > > > > How we can detect IPI capabilities based on GIC register?      
+> > > > > > 
+> > > > > > Check the mask associated with SGIs, as we do for gic_get_cpumask(). If
+> > > > > > this is zero, we have a non-multiprocessor GIC (or one that's otherwise
+> > > > > > broken), and can't do SGI in the usual way.
+> > > > > > 
+> > > > > > However, it only makes sense to do this if self-IPI is truly a
+> > > > > > necessity. Given there are other interrupt controllers that can't do
+> > > > > > self-IPI, avoiding self-IPI in general would be a better strategy,
+> > > > > > avoiding churn in each and every driver...    
+> > > > > 
+> > > > > Indeed. And I won't take such a patch until all other avenues have been
+> > > > > explored, including fixing core code if required...
+> > > > >     
+> > > > 
+> > > > Ok, it seems both you and Mark agree with disable IPI for GIC who has only
+> > > > self-IPI capability (GICD_ITARGETSR0 to GICD_ITARGETSR7 are all
+> > > > zero), right?  
+> > > 
+> > > Not necessarily. This can be seen a latency improvement, compared to
+> > > the timer method which should be the fallback.
+> > >   
+> > 
+> > Why? Your below patch (I tried too) just fixes NULL pointer issue for
+> 
+> And that's the first issue to solve.
+> 
+> > without define smp_cross_call function. But imx6ul is a SMP platform
+> 
+> It is *not* an SMP platform. It may have a SMP-capable core, but that's
+> about it.
+> 
 
-In ACPI 6.1 spec, section 19.6.62, Interrupt Resource Descriptor Macro,
+Well. That's what I thought at the beginning, but the kernel
+takes it is. At __fixup_smp (arch/arm/kernel/head.S), it only checks
+MPIDR, for MPcore, it is 0x80000000, it means it is Multiprocessing
+Extensions and Processor is part of a multiprocessor system.
 
-Interrupt (ResourceUsage, EdgeLevel, ActiveLevel, Shared,
-ResourceSourceIndex, ResourceSource, DescriptorName)
-{ InterruptList } => Buffer
+>From my point, single-core in multiprocessor system is different
+with uniprocessor system. The first one can execute SMP instruction, but
+can't for latter.
 
-For the arguement ResourceUsage and DescriptorName, which means:
+> > (all imx6/7 uses the same configuration with both CONFIG_SMP and
+> >  CONFIG_SMP_ON_UP are defined), it still defines smp_cross_call.
+> > We still need the changes at gic code.
+> 
+> That's a different story. You could simply not register the cross-call
+> on your UP system, and it would just work.
+> 
 
-ResourceUsage describes whether the device consumes the specified
-interrupt ( ResourceConsumer ) or produces it for use by a child
-device ( ResourceProducer ).
-If nothing is specified, then ResourceConsumer is assumed.
+Again, it is taken as SMP by kernel, and run SMP instructions, the
+kernel does not do fixup symbol for it.
 
-DescriptorName evaluates to a name string which refers to the
-entire resource descriptor.
+> > Besides, if the hardware has IPI capability, but we just disable it
+> > to align with UP platforms, is it reasonable?
+> 
+> Again: having a self-IPI on UP is an optimization. Nothing more.
+> 
+> Now, coming back to your original idea, I'm aiming towards something
+> like this:
+> 
 
-So it can be used for devices connecting to a specific interrupt
-prodcucer instead of the main interrupt controller in MADT. In the
-real world, we have irqchip such as mbi-gen which connecting to
-a group of wired interrupts and then issue msi to the ITS, devices
-connecting to such interrupt controller fit this scope.
+Your below patch can work (tested), but why not registering an self-IPI
+smp_cross_call function for single core, it can avoid judging in code
+for each IPI calls.
 
-For now the irq for ACPI only pointer to the main interrupt
-controller's irqdomain, for devices not connecting to those
-irqdomains, which need to present its irq parent, we can use
-following ASL code to represent it:
+Peter
+> From ad5c001cb1359799831bbb69f8582cb41dda4248 Mon Sep 17 00:00:00 2001
+> From: Marc Zyngier <marc.zyngier@arm.com>
+> Date: Tue, 9 Aug 2016 07:50:44 +0100
+> Subject: [PATCH] irqchip/gic: Allow self-SGIs for SMP on UP configurations
+> 
+> On systems where a single CPU is present, the GIC may not support
+> having SGIs delivered to a target list. In that case, we use the
+> self-SGI mechanism to allow the interrupt to be delivered locally.
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  drivers/irqchip/irq-gic.c | 8 ++++++++
+>  1 file changed, 8 insertions(+)
+> 
+> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+> index c2cab57..415aa1e 100644
+> --- a/drivers/irqchip/irq-gic.c
+> +++ b/drivers/irqchip/irq-gic.c
+> @@ -771,6 +771,13 @@ static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
+>  
+>  	raw_spin_lock_irqsave(&irq_controller_lock, flags);
+>  
+> +	if (unlikely(nr_cpu_ids == 1)) {
+> +		/* Only one CPU? let's do a self-IPI... */
+> +		writel_relaxed(2 << 24 | irq,
+> +			       gic_data_dist_base(&gic_data[0]) + GIC_DIST_SOFTINT);
+> +		goto out;
+> +	}
+> +
+>  	/* Convert our logical CPU mask into a physical one. */
+>  	for_each_cpu(cpu, mask)
+>  		map |= gic_cpu_map[cpu];
+> @@ -784,6 +791,7 @@ static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
+>  	/* this always happens on GIC0 */
+>  	writel_relaxed(map << 16 | irq, gic_data_dist_base(&gic_data[0]) + GIC_DIST_SOFTINT);
+>  
+> +out:
+>  	raw_spin_unlock_irqrestore(&irq_controller_lock, flags);
+>  }
+>  #endif
+> -- 
+> 2.8.1
+> 
+> Does it work for you?
+> 
+> Thanks,
+> 
+> 	M.
+> -- 
+> Jazz is not dead. It just smells funny.
 
-Interrupt(ResourceConsumer,..., "\_SB.IRQP") {12,14,....}
-
-then we can parse the interrupt producer with the full
-path name "\_SB.IRQP".
-
-In order to do that, we introduce a pointer interrupt_producer
-in struct acpi_device, and fill it when scanning irq resources
-for acpi device if it specifies the interrupt producer.
-
-But for now when parsing the resources for acpi devices, we don't
-pass the acpi device for acpi_walk_resoures() in drivers/acpi/resource.c,
-so introduce a adev in struct res_proc_context to pass it as a context
-to scan the interrupt resources, then finally pass to acpi_register_gsi()
-to find its interrupt producer to get the virq from diffrent domains.
-
-With steps above ready, rework acpi_register_gsi() to get other
-interrupt producer if devices not connecting to main interrupt
-controller.
-
-Since we often pass NULL to acpi_register_gsi() and there is no interrupt
-producer for devices connect to gicd on ARM or io-apic on X86, so it will
-use the default irqdomain for those deivces and no functional changes to
-those devices.
-
-Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
----
- drivers/acpi/gsi.c      | 10 ++++--
- drivers/acpi/resource.c | 85 ++++++++++++++++++++++++++++++++++---------------
- include/acpi/acpi_bus.h |  1 +
- 3 files changed, 68 insertions(+), 28 deletions(-)
-
-diff --git a/drivers/acpi/gsi.c b/drivers/acpi/gsi.c
-index ee9e0f2..29ee547 100644
---- a/drivers/acpi/gsi.c
-+++ b/drivers/acpi/gsi.c
-@@ -55,13 +55,19 @@ int acpi_register_gsi(struct device *dev, u32 gsi, int trigger,
- 		      int polarity)
- {
- 	struct irq_fwspec fwspec;
-+	struct acpi_device *adev = dev ? to_acpi_device(dev) : NULL;
- 
--	if (WARN_ON(!acpi_gsi_domain_id)) {
-+	if (adev && &adev->fwnode && adev->interrupt_producer)
-+		/* devices in DSDT connecting to spefic interrupt producer */
-+		fwspec.fwnode = adev->interrupt_producer;
-+	else if (acpi_gsi_domain_id)
-+		/* devices connecting to gicd in default */
-+		fwspec.fwnode = acpi_gsi_domain_id;
-+	else {
- 		pr_warn("GSI: No registered irqchip, giving up\n");
- 		return -EINVAL;
- 	}
- 
--	fwspec.fwnode = acpi_gsi_domain_id;
- 	fwspec.param[0] = gsi;
- 	fwspec.param[1] = acpi_dev_get_irq_type(trigger, polarity);
- 	fwspec.param_count = 2;
-diff --git a/drivers/acpi/resource.c b/drivers/acpi/resource.c
-index 56241eb..f1371cf 100644
---- a/drivers/acpi/resource.c
-+++ b/drivers/acpi/resource.c
-@@ -381,7 +381,7 @@ static void acpi_dev_irqresource_disabled(struct resource *res, u32 gsi)
- 	res->flags = IORESOURCE_IRQ | IORESOURCE_DISABLED | IORESOURCE_UNSET;
- }
- 
--static void acpi_dev_get_irqresource(struct resource *res, u32 gsi,
-+static void acpi_dev_get_irqresource(struct acpi_device *adev, struct resource *res, u32 gsi,
- 				     u8 triggering, u8 polarity, u8 shareable,
- 				     bool legacy)
- {
-@@ -415,7 +415,7 @@ static void acpi_dev_get_irqresource(struct resource *res, u32 gsi,
- 	}
- 
- 	res->flags = acpi_dev_irq_flags(triggering, polarity, shareable);
--	irq = acpi_register_gsi(NULL, gsi, triggering, polarity);
-+	irq = acpi_register_gsi(&adev->dev, gsi, triggering, polarity);
- 	if (irq >= 0) {
- 		res->start = irq;
- 		res->end = irq;
-@@ -424,27 +424,9 @@ static void acpi_dev_get_irqresource(struct resource *res, u32 gsi,
- 	}
- }
- 
--/**
-- * acpi_dev_resource_interrupt - Extract ACPI interrupt resource information.
-- * @ares: Input ACPI resource object.
-- * @index: Index into the array of GSIs represented by the resource.
-- * @res: Output generic resource object.
-- *
-- * Check if the given ACPI resource object represents an interrupt resource
-- * and @index does not exceed the resource's interrupt count (true is returned
-- * in that case regardless of the results of the other checks)).  If that's the
-- * case, register the GSI corresponding to @index from the array of interrupts
-- * represented by the resource and populate the generic resource object pointed
-- * to by @res accordingly.  If the registration of the GSI is not successful,
-- * IORESOURCE_DISABLED will be set it that object's flags.
-- *
-- * Return:
-- * 1) false with res->flags setting to zero: not the expected resource type
-- * 2) false with IORESOURCE_DISABLED in res->flags: valid unassigned resource
-- * 3) true: valid assigned resource
-- */
--bool acpi_dev_resource_interrupt(struct acpi_resource *ares, int index,
--				 struct resource *res)
-+static bool __acpi_dev_resource_interrupt(struct acpi_device *adev,
-+					  struct acpi_resource *ares, int index,
-+					  struct resource *res)
- {
- 	struct acpi_resource_irq *irq;
- 	struct acpi_resource_extended_irq *ext_irq;
-@@ -460,7 +442,7 @@ bool acpi_dev_resource_interrupt(struct acpi_resource *ares, int index,
- 			acpi_dev_irqresource_disabled(res, 0);
- 			return false;
- 		}
--		acpi_dev_get_irqresource(res, irq->interrupts[index],
-+		acpi_dev_get_irqresource(adev, res, irq->interrupts[index],
- 					 irq->triggering, irq->polarity,
- 					 irq->sharable, true);
- 		break;
-@@ -470,7 +452,31 @@ bool acpi_dev_resource_interrupt(struct acpi_resource *ares, int index,
- 			acpi_dev_irqresource_disabled(res, 0);
- 			return false;
- 		}
--		acpi_dev_get_irqresource(res, ext_irq->interrupts[index],
-+
-+		/*
-+		 * It's a interrupt consumer device and connecting to specfic
-+		 * interrupt controller. For now, we only support connecting
-+		 * interrupts to one irq controller for a single device
-+		 */
-+		if (ext_irq->producer_consumer == ACPI_CONSUMER
-+		    && ext_irq->resource_source.string_length != 0
-+		    && !adev->interrupt_producer) {
-+			acpi_status status;
-+			acpi_handle handle;
-+			struct acpi_device *device;
-+
-+			status = acpi_get_handle(NULL, ext_irq->resource_source.string_ptr, &handle);
-+			if (ACPI_FAILURE(status))
-+				return false;
-+
-+			device = acpi_bus_get_acpi_device(handle);
-+			if (!device)
-+				return false;
-+
-+			adev->interrupt_producer = &device->fwnode;
-+		}
-+
-+		acpi_dev_get_irqresource(adev, res, ext_irq->interrupts[index],
- 					 ext_irq->triggering, ext_irq->polarity,
- 					 ext_irq->sharable, false);
- 		break;
-@@ -481,6 +487,31 @@ bool acpi_dev_resource_interrupt(struct acpi_resource *ares, int index,
- 
- 	return true;
- }
-+
-+/**
-+ * acpi_dev_resource_interrupt - Extract ACPI interrupt resource information.
-+ * @ares: Input ACPI resource object.
-+ * @index: Index into the array of GSIs represented by the resource.
-+ * @res: Output generic resource object.
-+ *
-+ * Check if the given ACPI resource object represents an interrupt resource
-+ * and @index does not exceed the resource's interrupt count (true is returned
-+ * in that case regardless of the results of the other checks)).  If that's the
-+ * case, register the GSI corresponding to @index from the array of interrupts
-+ * represented by the resource and populate the generic resource object pointed
-+ * to by @res accordingly.  If the registration of the GSI is not successful,
-+ * IORESOURCE_DISABLED will be set it that object's flags.
-+ *
-+ * Return:
-+ * 1) false with res->flags setting to zero: not the expected resource type
-+ * 2) false with IORESOURCE_DISABLED in res->flags: valid unassigned resource
-+ * 3) true: valid assigned resource
-+ */
-+bool acpi_dev_resource_interrupt(struct acpi_resource *ares, int index,
-+				 struct resource *res)
-+{
-+	return __acpi_dev_resource_interrupt(NULL, ares, index, res);
-+}
- EXPORT_SYMBOL_GPL(acpi_dev_resource_interrupt);
- 
- /**
-@@ -499,6 +530,7 @@ struct res_proc_context {
- 	void *preproc_data;
- 	int count;
- 	int error;
-+	struct acpi_device *adev;
- };
- 
- static acpi_status acpi_dev_new_resource_entry(struct resource_win *win,
-@@ -546,7 +578,7 @@ static acpi_status acpi_dev_process_resource(struct acpi_resource *ares,
- 	    || acpi_dev_resource_ext_address_space(ares, &win))
- 		return acpi_dev_new_resource_entry(&win, c);
- 
--	for (i = 0; acpi_dev_resource_interrupt(ares, i, res); i++) {
-+	for (i = 0; __acpi_dev_resource_interrupt(c->adev, ares, i, res); i++) {
- 		acpi_status status;
- 
- 		status = acpi_dev_new_resource_entry(&win, c);
-@@ -599,6 +631,7 @@ int acpi_dev_get_resources(struct acpi_device *adev, struct list_head *list,
- 	c.preproc_data = preproc_data;
- 	c.count = 0;
- 	c.error = 0;
-+	c.adev = adev;
- 	status = acpi_walk_resources(adev->handle, METHOD_NAME__CRS,
- 				     acpi_dev_process_resource, &c);
- 	if (ACPI_FAILURE(status)) {
-diff --git a/include/acpi/acpi_bus.h b/include/acpi/acpi_bus.h
-index c1a524d..62c24d1 100644
---- a/include/acpi/acpi_bus.h
-+++ b/include/acpi/acpi_bus.h
-@@ -355,6 +355,7 @@ struct acpi_device {
- 	int device_type;
- 	acpi_handle handle;		/* no handle for fixed hardware */
- 	struct fwnode_handle fwnode;
-+	struct fwnode_handle *interrupt_producer;
- 	struct acpi_device *parent;
- 	struct list_head children;
- 	struct list_head node;
 -- 
-1.7.12.4
+
+Best Regards,
+Peter Chen
