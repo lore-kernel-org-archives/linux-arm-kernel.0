@@ -1,82 +1,42 @@
 From: romain.perier@free-electrons.com (Romain Perier)
-Date: Tue,  9 Aug 2016 11:03:19 +0200
-Subject: [PATCH 6/7] crypto: marvell - Don't overwrite default creq->state
- during initialization
+Date: Tue,  9 Aug 2016 11:03:18 +0200
+Subject: [PATCH 5/7] crypto: marvell - Update transformation context for each
+ dequeued req
 In-Reply-To: <1470733400-23621-1-git-send-email-romain.perier@free-electrons.com>
 References: <1470733400-23621-1-git-send-email-romain.perier@free-electrons.com>
-Message-ID: <1470733400-23621-7-git-send-email-romain.perier@free-electrons.com>
+Message-ID: <1470733400-23621-6-git-send-email-romain.perier@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, in mv_cesa_{md5,sha1,sha256}_init creq->state is initialized
-before the call to mv_cesa_ahash_init. This is wrong because this
-function fills creq with zero by using memset, so its 'state' that
-contains the default DIGEST is overwritten. This commit fixes the issue
-by initializing creq->state just after the call to mv_cesa_ahash_init.
+So far, sub part of mv_cesa_int was responsible of dequeuing complete
+requests, then call the 'cleanup' operation on these reqs and call the
+crypto api callback 'complete'. The problem is that the transformation
+context 'ctx' is retrieved only once before the while loop. Which means
+that the wrong 'cleanup' operation might be called on the wrong type of
+cesa requests, it can lead to memory corruptions with this message:
 
-Fixes: commit b0ef51067cb4 ("crypto: marvell/cesa - initialize hash...")
+marvell-cesa f1090000.crypto: dma_pool_free cesa_padding, 5a5a5a5a/5a5a5a5a (bad dma)
+
+This commit fixes the issue, by updating the transformation context for
+each dequeued cesa request.
+
+Fixes: commit 85030c5168f1 ("crypto: marvell - Add support for chai...")
 Signed-off-by: Romain Perier <romain.perier@free-electrons.com>
 ---
- drivers/crypto/marvell/hash.c | 15 +++++++++------
- 1 file changed, 9 insertions(+), 6 deletions(-)
+ drivers/crypto/marvell/cesa.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/crypto/marvell/hash.c b/drivers/crypto/marvell/hash.c
-index cf8063d..44a8abe 100644
---- a/drivers/crypto/marvell/hash.c
-+++ b/drivers/crypto/marvell/hash.c
-@@ -800,13 +800,14 @@ static int mv_cesa_md5_init(struct ahash_request *req)
- 	struct mv_cesa_op_ctx tmpl = { };
+diff --git a/drivers/crypto/marvell/cesa.c b/drivers/crypto/marvell/cesa.c
+index d64af86..37dadb2 100644
+--- a/drivers/crypto/marvell/cesa.c
++++ b/drivers/crypto/marvell/cesa.c
+@@ -166,6 +166,7 @@ static irqreturn_t mv_cesa_int(int irq, void *priv)
+ 			if (!req)
+ 				break;
  
- 	mv_cesa_set_op_cfg(&tmpl, CESA_SA_DESC_CFG_MACM_MD5);
-+
-+	mv_cesa_ahash_init(req, &tmpl, true);
-+
- 	creq->state[0] = MD5_H0;
- 	creq->state[1] = MD5_H1;
- 	creq->state[2] = MD5_H2;
- 	creq->state[3] = MD5_H3;
- 
--	mv_cesa_ahash_init(req, &tmpl, true);
--
- 	return 0;
- }
- 
-@@ -868,14 +869,15 @@ static int mv_cesa_sha1_init(struct ahash_request *req)
- 	struct mv_cesa_op_ctx tmpl = { };
- 
- 	mv_cesa_set_op_cfg(&tmpl, CESA_SA_DESC_CFG_MACM_SHA1);
-+
-+	mv_cesa_ahash_init(req, &tmpl, false);
-+
- 	creq->state[0] = SHA1_H0;
- 	creq->state[1] = SHA1_H1;
- 	creq->state[2] = SHA1_H2;
- 	creq->state[3] = SHA1_H3;
- 	creq->state[4] = SHA1_H4;
- 
--	mv_cesa_ahash_init(req, &tmpl, false);
--
- 	return 0;
- }
- 
-@@ -937,6 +939,9 @@ static int mv_cesa_sha256_init(struct ahash_request *req)
- 	struct mv_cesa_op_ctx tmpl = { };
- 
- 	mv_cesa_set_op_cfg(&tmpl, CESA_SA_DESC_CFG_MACM_SHA256);
-+
-+	mv_cesa_ahash_init(req, &tmpl, false);
-+
- 	creq->state[0] = SHA256_H0;
- 	creq->state[1] = SHA256_H1;
- 	creq->state[2] = SHA256_H2;
-@@ -946,8 +951,6 @@ static int mv_cesa_sha256_init(struct ahash_request *req)
- 	creq->state[6] = SHA256_H6;
- 	creq->state[7] = SHA256_H7;
- 
--	mv_cesa_ahash_init(req, &tmpl, false);
--
- 	return 0;
- }
- 
++			ctx = crypto_tfm_ctx(req->tfm);
+ 			mv_cesa_complete_req(ctx, req, 0);
+ 		}
+ 	}
 -- 
 2.8.1
