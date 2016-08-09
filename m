@@ -1,40 +1,48 @@
-From: juri.lelli@arm.com (Juri Lelli)
-Date: Tue, 9 Aug 2016 11:08:57 +0100
-Subject: [PATCH v6 0/8] CPUs capacity information for heterogeneous systems
-In-Reply-To: <20160808164937.GH6879@twins.programming.kicks-ass.net>
-References: <1468932048-31635-1-git-send-email-juri.lelli@arm.com>
- <20160808164937.GH6879@twins.programming.kicks-ass.net>
-Message-ID: <20160809100857.GB23236@e106622-lin>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 9 Aug 2016 11:08:49 +0100
+Subject: [PATCH 1/1] irqchip: irq-gic: forward SGI to itself for cortex-a7
+ single core
+In-Reply-To: <20160809093942.GA10803@shlinux2>
+References: <20160808130754.GB12649@leverpostej>
+ <20160808132847.GB17680@shlinux2> <20160808134842.GE12649@leverpostej>
+ <20160808145916.0924e868@arm.com> <20160809034613.GB31105@shlinux2>
+ <20160809063401.3117dc94@arm.com> <20160809055701.GC31105@shlinux2>
+ <20160809075930.529f98ca@arm.com> <20160809071821.GD31105@shlinux2>
+ <57A99A4A.6010301@arm.com> <20160809093942.GA10803@shlinux2>
+Message-ID: <57A9ABB1.6060109@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 08/08/16 18:49, Peter Zijlstra wrote:
-> On Tue, Jul 19, 2016 at 01:40:40PM +0100, Juri Lelli wrote:
-> > Patches high level description:
-> > 
-> >  o 01/08 introduces documentation for the new optional DT binding
-> >  o [02-06]/08 add cpu-capacity attribute to TC2, Juno and Juno r2 DTs and
-> >    provide parsing of such information at boot time
-> >  o [07-08]/08 introduce sysfs attribute
-> > 
+On 09/08/16 10:39, Peter Chen wrote:
 > 
-> So generally ok with me;
+> Your patch can work for my case. Below is objdump for gic_raise_softirq,
+> the code with your patch seems have more instructions.
 
-Thanks for reviewing.
+Well, I've added code to the function, so that's hardly surprising. The
+important thing is that the hot path is kept relatively fast.
 
-> there does seem to be an unfortunate
-> duplication of code between arm and arm64 but other than that it looks
-> fine.
 > 
+> - With your patch:
+> 00000c44 <gic_raise_softirq>:
+>      c44:	e1a0c00d 	mov	ip, sp
+>      c48:	e92ddbf0 	push	{r4, r5, r6, r7, r8, r9, fp, ip, lr, pc}
+>      c4c:	e24cb004 	sub	fp, ip, #4
+>      c50:	e59f908c 	ldr	r9, [pc, #140]	; ce4 <gic_raise_softirq+0xa0>
+>      c54:	e1a06000 	mov	r6, r0
+>      c58:	e1a07001 	mov	r7, r1
+>      c5c:	e5993000 	ldr	r3, [r9]
+>      c60:	e3530001 	cmp	r3, #1
+>      c64:	0a000019 	beq	cd0 <gic_raise_softirq+0x8c>
 
-Yes, I know. I'm failing to see how we can cleanly remove that
-duplication, though (sysfs interface and callback functions being good
-candidates for a common place).
+So the overhead is two loads, one comparison and a branch. Can you
+actually measure the difference? If you can, I'd like to see some cycle
+numbers, not just instruction counts. If you can consistently measure
+something that is not just noise, we can then turn this into a static key.
 
-Anyone any ideas?
+I bet you won't see anything.
 
-Best,
+Thanks,
 
-- Juri
+	M.
+-- 
+Jazz is not dead. It just smells funny...
