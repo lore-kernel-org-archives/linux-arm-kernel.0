@@ -1,104 +1,45 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Tue,  9 Aug 2016 12:53:02 +0100
-Subject: [RFC PATCH 4/5] arm64: dts: sunxi: add SCPI driven clocks and nodes
- for A64 MMC
-In-Reply-To: <20160809115303.17032-1-andre.przywara@arm.com>
-References: <20160809115303.17032-1-andre.przywara@arm.com>
-Message-ID: <20160809115303.17032-5-andre.przywara@arm.com>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Tue, 9 Aug 2016 12:52:54 +0100
+Subject: [RFC PATCH v2 0/4] arm/arm64: vgic-new: Implement API for vGICv3
+ live migration
+In-Reply-To: <1470740326-27751-1-git-send-email-vijay.kilari@gmail.com>
+References: <1470740326-27751-1-git-send-email-vijay.kilari@gmail.com>
+Message-ID: <CAFEAcA-z+iM+=p0riWreJCewPPxw9wtHgg+_4MDtxV=ccwe-tg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The MMC controllers in the Allwinner A64 SoC are somewhat compatible
-with the versions used in other Allwinner SoCs.
-Tell Linux about the three MMC clocks that the firmware implements and
-add nodes to represent the MMC controllers.
-The actual hardware is capable of new transfer modes, which the driver
-does not fully support yet, also the clock part has changed, but it
-works like this at least for SD card accesses.
+On 9 August 2016 at 11:58,  <vijay.kilari@gmail.com> wrote:
+> From: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
+>
+> This patchset adds API for saving and restoring
+> of VGICv3 registers to support live migration with new vgic feature.
+> This API definition is as per version of VGICv3 specification
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2016-July/445611.html
+>
+> To test live migration with QEMU, use below patch series
+> https://lists.gnu.org/archive/html/qemu-devel/2016-08/msg01444.html
+>
+> The patch 3 & 4 are picked from the Pavel's previous implementation.
+> http://www.spinics.net/lists/kvm/msg122040.html
+>
+> v1 => v2:
+>  - The init sequence change patch is no more required.
+>    Fixed in patch 2 by using static vgic_io_dev regions structure instead
+>    of using dynamic allocation pointer.
+>  - Updated commit message of patch 4.
+>  - Dropped usage of union to manage 32-bit and 64-bit access in patch 1.
+>    Used local variable for 32-bit access.
+>  - Updated macro __ARM64_SYS_REG and ARM64_SYS_REG in
+>    arch/arm64/include/uapi/asm/kvm.h as per qemu requirements.
 
-Signed-off-by: Andre Przywara <andre.przywara@arm.com>
----
- arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 61 +++++++++++++++++++++++++++
- 1 file changed, 61 insertions(+)
+I only scanned briefly through this patchset, but I didn't
+see any code implementing:
+ * KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO
+ * the different behaviour for accesses to GICD_STATUSR, GICR_STATUSR,
+   GICD_ISPENDR, GICR_ISPENDR0, GICD_ICPENDR, and GICR_ICPENDR0, which
+   don't act the same via this API as for a guest access to the register
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-index 9fc540e..0f6044b 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-@@ -157,6 +157,19 @@
- 		compatible = "arm,scpi";
- 		mboxes = <&mailbox 0>;
- 		shmem = <&cpu_scp_mem>;
-+
-+		clocks {
-+			compatible = "arm,scpi-clocks";
-+
-+			scpi_clk: scpi_clocks {
-+				compatible = "arm,scpi-variable-clocks";
-+				#clock-cells = <1>;
-+				clock-indices = <0>, <1>,
-+						<2>;
-+				clock-output-names = "mmc0_clk", "mmc1_clk",
-+						     "mmc2_clk";
-+			};
-+		};
- 	};
- 
- 	soc {
-@@ -165,6 +178,54 @@
- 		#size-cells = <1>;
- 		ranges;
- 
-+		mmc0: mmc at 1c0f000 {
-+			compatible = "allwinner,sun50i-a64-mmc",
-+				     "allwinner,sun5i-a13-mmc";
-+			reg = <0x01c0f000 0x1000>;
-+			clocks = <&bus_gates 8>, <&scpi_clk 0>,
-+				 <&scpi_clk 0>, <&scpi_clk 0>;
-+			clock-names = "ahb", "mmc",
-+				      "output", "sample";
-+			resets = <&ahb_rst 8>;
-+			reset-names = "ahb";
-+			interrupts = <GIC_SPI 60 IRQ_TYPE_LEVEL_HIGH>;
-+			status = "disabled";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+		};
-+
-+		mmc1: mmc at 1c10000 {
-+			compatible = "allwinner,sun50i-a64-mmc",
-+				     "allwinner,sun5i-a13-mmc";
-+			reg = <0x01c10000 0x1000>;
-+			clocks = <&bus_gates 9>, <&scpi_clk 1>,
-+				 <&scpi_clk 1>, <&scpi_clk 1>;
-+			clock-names = "ahb", "mmc",
-+				      "output", "sample";
-+			resets = <&ahb_rst 9>;
-+			reset-names = "ahb";
-+			interrupts = <GIC_SPI 61 IRQ_TYPE_LEVEL_HIGH>;
-+			status = "disabled";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+		};
-+
-+		mmc2: mmc at 1c11000 {
-+			compatible = "allwinner,sun50i-a64-mmc",
-+				     "allwinner,sun5i-a13-mmc";
-+			reg = <0x01c11000 0x1000>;
-+			clocks = <&bus_gates 10>, <&scpi_clk 2>,
-+				 <&scpi_clk 2>, <&scpi_clk 2>;
-+			clock-names = "ahb", "mmc",
-+				      "output", "sample";
-+			resets = <&ahb_rst 10>;
-+			reset-names = "ahb";
-+			interrupts = <GIC_SPI 62 IRQ_TYPE_LEVEL_HIGH>;
-+			status = "disabled";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+		};
-+
- 		pio: pinctrl at 1c20800 {
- 			compatible = "allwinner,sun50i-a64-pinctrl";
- 			reg = <0x01c20800 0x400>;
--- 
-2.9.0
+Did I miss something?
+
+thanks
+-- PMM
