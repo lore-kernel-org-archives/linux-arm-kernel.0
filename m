@@ -1,26 +1,44 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 9 Aug 2016 12:35:55 -0500
-Subject: [PATCH 2/2] ARM: imx6: mark GPC node as not populated after irq
- init to probe pm domain driver
-In-Reply-To: <1470752332-14185-2-git-send-email-p.zabel@pengutronix.de>
-References: <1470752332-14185-1-git-send-email-p.zabel@pengutronix.de>
- <1470752332-14185-2-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <20160809173555.GB11738@rob-hp-laptop>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Tue, 9 Aug 2016 10:36:53 -0700
+Subject: [PATCH 3/9] remoteproc: core: Remove pointless OOM print
+In-Reply-To: <20160804092153.23032-4-lee.jones@linaro.org>
+References: <20160804092153.23032-1-lee.jones@linaro.org>
+ <20160804092153.23032-4-lee.jones@linaro.org>
+Message-ID: <20160809173653.GD26240@tuxbot>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 09, 2016 at 04:18:52PM +0200, Philipp Zabel wrote:
-> Since IRQCHIP_DECLARE now flags the GPC node as already populated, the
-> GPC power domain driver is never probed unless we clear the flag again.
+On Thu 04 Aug 02:21 PDT 2016, Lee Jones wrote:
+
+> These types of error prints are superfluous.  The system will
+> pick up on OOM issues and let the user know.
 > 
-> Fixes: 15cc2ed6dcf9 ("of/irq: Mark initialised interrupt controllers as populated")
-> Suggested-by: Rob Herring <robh@kernel.org>
-> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-> Cc: Jon Hunter <jonathanh@nvidia.com>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+
+Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+
+Although, I think we should drop the "mapping" object. We have all the
+information in the carveout object to reverse the mapping at cleanup.
+
+Regards,
+Bjorn
+
 > ---
->  arch/arm/mach-imx/gpc.c | 6 ++++++
->  1 file changed, 6 insertions(+)
-
-I've applied both patches.
-
-Rob
+>  drivers/remoteproc/remoteproc_core.c | 1 -
+>  1 file changed, 1 deletion(-)
+> 
+> diff --git a/drivers/remoteproc/remoteproc_core.c b/drivers/remoteproc/remoteproc_core.c
+> index 5654a81..4914482 100644
+> --- a/drivers/remoteproc/remoteproc_core.c
+> +++ b/drivers/remoteproc/remoteproc_core.c
+> @@ -619,7 +619,6 @@ static int rproc_handle_carveout(struct rproc *rproc,
+>  	if (rproc->domain) {
+>  		mapping = kzalloc(sizeof(*mapping), GFP_KERNEL);
+>  		if (!mapping) {
+> -			dev_err(dev, "kzalloc mapping failed\n");
+>  			ret = -ENOMEM;
+>  			goto dma_free;
+>  		}
+> -- 
+> 2.9.0
+> 
