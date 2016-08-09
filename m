@@ -1,165 +1,230 @@
-From: guohanjun@huawei.com (Hanjun Guo)
-Date: Tue, 9 Aug 2016 15:06:06 +0800
-Subject: [RFC PATCH 10/10] irqchip: mbigen: Add ACPI support
-In-Reply-To: <1470726366-40809-1-git-send-email-guohanjun@huawei.com>
-References: <1470726366-40809-1-git-send-email-guohanjun@huawei.com>
-Message-ID: <1470726366-40809-11-git-send-email-guohanjun@huawei.com>
+From: mirza.krak@gmail.com (Mirza Krak)
+Date: Tue, 9 Aug 2016 09:21:54 +0200
+Subject: [PATCH 6/6] bus: Add support for Tegra Generic Memory Interface
+In-Reply-To: <fae8dbaf-53e9-dcfe-f755-32f7b28f4c9f@nvidia.com>
+References: <1470512452-8322-1-git-send-email-mirza.krak@gmail.com>
+ <1470512452-8322-7-git-send-email-mirza.krak@gmail.com>
+ <fae8dbaf-53e9-dcfe-f755-32f7b28f4c9f@nvidia.com>
+Message-ID: <CALw8SCWjs2TnwFcTY=iXv_eskpKaKpvUmoXnTgtpoL8w9neD=w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Hanjun Guo <hanjun.guo@linaro.org>
+2016-08-08 15:47 GMT+02:00 Jon Hunter <jonathanh@nvidia.com>:
+>
+> On 06/08/16 20:40, Mirza Krak wrote:
+>> From: Mirza Krak <mirza.krak@gmail.com>
+>>
+>> The Generic Memory Interface bus can be used to connect high-speed
+>> devices such as NOR flash, FPGAs, DSPs...
+>>
+>> Signed-off-by: Mirza Krak <mirza.krak@gmail.com>
+>> ---
+>>  drivers/bus/Kconfig     |   7 ++
+>>  drivers/bus/Makefile    |   1 +
+>>  drivers/bus/tegra-gmi.c | 224 ++++++++++++++++++++++++++++++++++++++++++++++++
+>>  3 files changed, 232 insertions(+)
+>>  create mode 100644 drivers/bus/tegra-gmi.c
+>>
 
-With the preparation of platform msi support and interrupt producer
-in DSDT, we can add mbigen ACPI support now.
+<--snip-->
 
-We are using _PRS methd to indicate number of irq pins instead
-of num_pins in DT.
+>> +
+>> +static int tegra_gmi_parse_dt(struct device *dev, struct tegra_gmi_priv *priv)
+>> +{
+>> +     struct device_node *of_node = dev->of_node;
+>> +     u32 property;
+>> +
+>> +     /* configuration */
+>> +
+>> +     if (of_property_read_bool(of_node, "nvidia,snor-data-width-32bit"))
+>> +             priv->snor_config |= TEGRA_GMI_BUS_WIDTH_32BIT;
+>> +
+>> +     if (of_property_read_bool(of_node, "nvidia,snor-mux-mode"))
+>> +             priv->snor_config |= TEGRA_GMI_MUX_MODE;
+>> +
+>> +     if (of_property_read_bool(of_node, "nvidia,snor-rdy-active-before-data"))
+>
+> Line is over 80 characters.
 
-For mbi-gen,
-    Device(MBI0) {
-          Name(_HID, "HISI0152")
-          Name(_UID, Zero)
-          Name(_CRS, ResourceTemplate() {
-                  Memory32Fixed(ReadWrite, 0xa0080000, 0x10000)
-          })
+Yes, indeed it is.
 
-          Name (_PRS, ResourceTemplate() {
-		  Interrupt(ResourceProducer,...) {12,14,....}
-          })
-    }
+I ran checkpatch on everything and did get warnings about it being over
+80 characters. But scratched my head a bit of why it complained because
+it was not over 80 characters in my editor.
 
-For devices,
+But now I know why. My tab size was set to 4, and then it is not over 80 :).
+>
+>> +             priv->snor_config |= TEGRA_GMI_RDY_BEFORE_DATA;
+>> +
+>> +     if (of_property_read_bool(of_node, "nvidia,snor-rdy-inv"))
+>> +             priv->snor_config |= TEGRA_GMI_RDY_ACTIVE_HIGH;
+>> +
+>> +     if (of_property_read_bool(of_node, "nvidia,snor-adv-inv"))
+>> +             priv->snor_config |= TEGRA_GMI_ADV_ACTIVE_HIGH;
+>> +
+>> +     if (of_property_read_bool(of_node, "nvidia,snor-oe-inv"))
+>> +             priv->snor_config |= TEGRA_GMI_OE_ACTIVE_HIGH;
+>> +
+>> +     if (of_property_read_bool(of_node, "nvidia,snor-cs-inv"))
+>> +             priv->snor_config |= TEGRA_GMI_CS_ACTIVE_HIGH;
+>> +
+>> +     if (!of_property_read_u32(of_node, "nvidia,snor-cs-select", &property))
+>> +             priv->snor_config |= TEGRA_GMI_CS_SELECT(property);
+>> +
+>> +     /* Timing, the default values that are provided are reset values */
+>> +
+>> +     if (!of_property_read_u32(of_node, "nvidia,snor-muxed-width", &property))
+>
+> Line is over 80 characters.
 
-   Device(COM0) {
-          Name(_HID, "ACPIIDxx")
-          Name(_UID, Zero)
-          Name(_CRS, ResourceTemplate() {
-                 Memory32Fixed(ReadWrite, 0xb0030000, 0x10000)
-		 Interrupt(ResourceConsumer,..., "\_SB.MBI0") {12}
-          })
-    }
+ACK.
 
-With the helpe of platform msi and interrupt producer, then devices
-will get the virq from mbi-gen's irqdomain.
+>
+>> +             priv->snor_timing0 |= TEGRA_GMI_MUXED_WIDTH(property);
+>> +     else
+>> +             priv->snor_timing0 |= TEGRA_GMI_MUXED_WIDTH(1);
+>> +
+>> +     if (!of_property_read_u32(of_node, "nvidia,snor-hold-width", &property))
+>> +             priv->snor_timing0 |= TEGRA_GMI_HOLD_WIDTH(property);
+>> +     else
+>> +             priv->snor_timing0 |= TEGRA_GMI_HOLD_WIDTH(1);
+>> +
+>> +     if (!of_property_read_u32(of_node, "nvidia,snor-adv-width", &property))
+>> +             priv->snor_timing0 |= TEGRA_GMI_ADV_WIDTH(property);
+>> +     else
+>> +             priv->snor_timing0 |= TEGRA_GMI_ADV_WIDTH(1);
+>> +
+>> +     if (!of_property_read_u32(of_node, "nvidia,snor-ce-width", &property))
+>> +             priv->snor_timing0 |= TEGRA_GMI_CE_WIDTH(property);
+>> +     else
+>> +             priv->snor_timing0 |= TEGRA_GMI_CE_WIDTH(4);
+>> +
+>> +     if (!of_property_read_u32(of_node, "nvidia,snor-we-width", &property))
+>> +             priv->snor_timing1 |= TEGRA_GMI_WE_WIDTH(property);
+>> +     else
+>> +             priv->snor_timing1 |= TEGRA_GMI_WE_WIDTH(1);
+>> +
+>> +     if (!of_property_read_u32(of_node, "nvidia,snor-oe-width", &property))
+>> +             priv->snor_timing1 |= TEGRA_GMI_OE_WIDTH(property);
+>> +     else
+>> +             priv->snor_timing1 |= TEGRA_GMI_OE_WIDTH(1);
+>> +
+>> +     if (!of_property_read_u32(of_node, "nvidia,snor-wait-width", &property))
+>> +             priv->snor_timing1 |= TEGRA_GMI_WAIT_WIDTH(property);
+>> +     else
+>> +             priv->snor_timing1 |= TEGRA_GMI_WAIT_WIDTH(3);
+>> +
+>> +     return of_platform_default_populate(of_node, NULL, dev);
+>
+> Seems odd to do this here. Why not as the last thing in probe once the
+> GMI has been setup correctly?
 
-Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
----
- drivers/irqchip/irq-mbigen.c | 70 ++++++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 67 insertions(+), 3 deletions(-)
+It is done here mostly to avoid clean up in probe. I could move it out
+of tegra_gmi_parse_dt and put it right after that call but still
+before clk enable? Is that less odd?
 
-diff --git a/drivers/irqchip/irq-mbigen.c b/drivers/irqchip/irq-mbigen.c
-index 9484ea0..80d6842 100644
---- a/drivers/irqchip/irq-mbigen.c
-+++ b/drivers/irqchip/irq-mbigen.c
-@@ -16,6 +16,7 @@
-  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
- 
-+#include <linux/acpi.h>
- #include <linux/interrupt.h>
- #include <linux/irqchip.h>
- #include <linux/module.h>
-@@ -180,7 +181,7 @@ static int mbigen_domain_translate(struct irq_domain *d,
- 				    unsigned long *hwirq,
- 				    unsigned int *type)
- {
--	if (is_of_node(fwspec->fwnode)) {
-+	if (is_of_node(fwspec->fwnode) || is_acpi_device_node(fwspec->fwnode)) {
- 		if (fwspec->param_count != 2)
- 			return -EINVAL;
- 
-@@ -271,6 +272,54 @@ static int mbigen_of_create_domain(struct platform_device *pdev,
- 	return 0;
- }
- 
-+#ifdef CONFIG_ACPI
-+static acpi_status mbigen_acpi_process_resource(struct acpi_resource *ares,
-+					     void *context)
-+{
-+	struct acpi_resource_extended_irq *ext_irq;
-+	u32 *num_irqs = context;
-+
-+	switch (ares->type) {
-+	case ACPI_RESOURCE_TYPE_EXTENDED_IRQ:
-+		ext_irq = &ares->data.extended_irq;
-+		*num_irqs = ext_irq->interrupt_count;
-+		break;
-+	default:
-+		break;
-+	}
-+
-+	return AE_OK;
-+}
-+
-+static int mbigen_acpi_create_domain(struct platform_device *pdev,
-+				     struct mbigen_device *mgn_chip)
-+{
-+	struct irq_domain *domain;
-+	u32 num_msis = 0;
-+	acpi_status status;
-+
-+	status = acpi_walk_resources(ACPI_HANDLE(&pdev->dev), METHOD_NAME__PRS,
-+				     mbigen_acpi_process_resource, &num_msis);
-+        if (ACPI_FAILURE(status) || num_msis == 0)
-+		return -EINVAL;
-+
-+	domain = platform_msi_create_device_domain(&pdev->dev, num_msis,
-+						   mbigen_write_msg,
-+						   &mbigen_domain_ops,
-+						   mgn_chip);
-+	if (!domain)
-+		return -ENOMEM;
-+
-+	return 0;
-+}
-+#else
-+static int mbigen_acpi_create_domain(struct platform_device *pdev,
-+				     struct mbigen_device *mgn_chip)
-+{
-+	return -ENODEV;
-+}
-+#endif
-+
- static int mbigen_device_probe(struct platform_device *pdev)
- {
- 	struct mbigen_device *mgn_chip;
-@@ -288,9 +337,17 @@ static int mbigen_device_probe(struct platform_device *pdev)
- 	if (IS_ERR(mgn_chip->base))
- 		return PTR_ERR(mgn_chip->base);
- 
--	err = mbigen_of_create_domain(pdev, mgn_chip);
--	if (err)
-+	if (IS_ENABLED(CONFIG_OF) && pdev->dev.of_node)
-+		err = mbigen_of_create_domain(pdev, mgn_chip);
-+	else if (ACPI_COMPANION(&pdev->dev))
-+		err = mbigen_acpi_create_domain(pdev, mgn_chip);
-+	else
-+		err = -EINVAL;
-+
-+	if (err) {
-+		dev_err(&pdev->dev, "Failed to create mbi-gen@%p irqdomain", mgn_chip->base);
- 		return err;
-+	}
- 
- 	platform_set_drvdata(pdev, mgn_chip);
- 	return 0;
-@@ -302,10 +359,17 @@ static const struct of_device_id mbigen_of_match[] = {
- };
- MODULE_DEVICE_TABLE(of, mbigen_of_match);
- 
-+static const struct acpi_device_id mbigen_acpi_match[] = {
-+        { "HISI0152", 0 },
-+	{}
-+};
-+MODULE_DEVICE_TABLE(acpi, mbigen_acpi_match);
-+
- static struct platform_driver mbigen_platform_driver = {
- 	.driver = {
- 		.name		= "Hisilicon MBIGEN-V2",
- 		.of_match_table	= mbigen_of_match,
-+		.acpi_match_table = ACPI_PTR(mbigen_acpi_match),
- 	},
- 	.probe			= mbigen_device_probe,
- };
--- 
-1.7.12.4
+>
+>> +}
+>> +
+>> +static int tegra_gmi_probe(struct platform_device *pdev)
+>> +{
+>> +     struct resource *res;
+>> +     struct clk *clk;
+>> +     struct device *dev = &pdev->dev;
+>> +     struct reset_control *rst;
+>> +     struct tegra_gmi_priv *priv;
+>> +     void __iomem *base;
+>> +     int ret;
+>> +
+>> +     res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>> +     base = devm_ioremap_resource(dev, res);
+>> +     if (IS_ERR(base))
+>> +             return PTR_ERR(base);
+>> +
+>> +     priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
+>> +     if (!priv)
+>> +             return -ENOMEM;
+>> +
+>> +     priv->base = base;
+>
+> If you allocate the memory first, you can get rid of this extra base
+> variable.
+
+ACK.
+
+>
+>> +     clk = devm_clk_get(dev, "gmi");
+>> +     if (IS_ERR(clk)) {
+>> +             dev_err(dev, "can not get clock\n");
+>> +             return PTR_ERR(clk);
+>> +     }
+>> +
+>> +     priv->clk = clk;
+>
+> Why not set priv->clk directly from calling devm_clk_get? Then you don't
+> this extra clk variable.
+
+ACK.
+>
+>> +
+>> +     rst = devm_reset_control_get(dev, "gmi");
+>> +     if (IS_ERR(rst)) {
+>> +             dev_err(dev, "can not get reset\n");
+>> +             return PTR_ERR(rst);
+>> +     }
+>> +
+>> +     ret = tegra_gmi_parse_dt(dev, priv);
+>> +     if (ret) {
+>> +             dev_err(dev, "fail to create devices.\n");
+>> +             return ret;
+>> +     }
+>> +
+>> +     ret = clk_prepare_enable(clk);
+>> +     if (ret) {
+>> +             dev_err(dev, "fail to enable clock.\n");
+>> +             return ret;
+>> +     }
+>> +
+>> +     reset_control_assert(rst);
+>> +     udelay(2);
+>> +     reset_control_deassert(rst);
+>> +
+>> +     tegra_gmi_init(dev, priv);
+>> +
+>> +     dev_set_drvdata(dev, priv);
+>> +
+>> +     return 0;
+>> +}
+>> +
+>> +static int tegra_gmi_remove(struct platform_device *pdev)
+>> +{
+>> +     struct device *dev = &pdev->dev;
+>
+> Do you really need this dev variable?
+
+Not really.
+
+>
+>> +     struct tegra_gmi_priv *priv = dev_get_drvdata(dev);
+>> +     void __iomem *base = priv->base;
+>
+> Do you really need this base variable?
+
+Not really,
+>
+>> +     u32 config;
+>> +
+>> +     of_platform_depopulate(dev);
+>> +
+>> +     config = readl(base + TEGRA_GMI_CONFIG);
+>> +     config &= ~TEGRA_GMI_CONFIG_GO;
+>> +     writel(config, base + TEGRA_GMI_CONFIG);
+>> +
+>> +     clk_disable_unprepare(priv->clk);
+>
+> What about asserting the reset?
+
+ACK, will add that.
+
+Best Regards
+Mirza
