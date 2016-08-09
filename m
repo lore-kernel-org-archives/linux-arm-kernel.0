@@ -1,100 +1,131 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 09 Aug 2016 13:44:34 +0100
-Subject: Applied "regmap: Add a function to check if a regmap register is
- cached" to the regmap tree
-In-Reply-To: <1470671062-25479-2-git-send-email-cristian.birsan@microchip.com>
-Message-ID: <E1bX6OY-0003is-9X@debutante>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 9 Aug 2016 13:46:31 +0100
+Subject: [PATCH 7/9] remoteproc: core: Add function to over-ride current
+ resource table
+In-Reply-To: <57A88D65.3060104@st.com>
+References: <20160804092153.23032-1-lee.jones@linaro.org>
+ <20160804092153.23032-8-lee.jones@linaro.org>
+ <57A88D65.3060104@st.com>
+Message-ID: <20160809124631.GB5243@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch
+On Mon, 08 Aug 2016, loic pallardy wrote:
 
-   regmap: Add a function to check if a regmap register is cached
+> Hi Lee
+> 
+> On 08/04/2016 11:21 AM, Lee Jones wrote:
+> > Most of the new resource table handling function are now in place, so
+> > it's time to put it all together.  Once new resource table information
+> > has been requested, the structures will be held in a holding pen until
+> > boot-time.  During boot-time rproc_apply_resource_overrides() will be
+> > invoked which in turn will pull the new information out of the holding
+> > pen and edit the table accordingly.
+> > 
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> > ---
+> >   drivers/remoteproc/remoteproc_core.c | 65 ++++++++++++++++++++++++++++++++++++
+> >   1 file changed, 65 insertions(+)
+> > 
+> > diff --git a/drivers/remoteproc/remoteproc_core.c b/drivers/remoteproc/remoteproc_core.c
+> > index 111350e..6b4e29a 100644
+> > --- a/drivers/remoteproc/remoteproc_core.c
+> > +++ b/drivers/remoteproc/remoteproc_core.c
+> > @@ -1035,6 +1035,65 @@ rproc_add_resource_table_entry(struct rproc *rproc,
+> >   	return table;
+> >   }
+> > 
+> > +static struct resource_table*
+> > +rproc_apply_resource_overrides(struct rproc *rproc,
+> > +			       struct resource_table **orig_table,
+> > +			       int *tablesz)
+> > +{
+> > +	struct rproc_request_resource *resource;
+> > +	struct resource_table *table = *orig_table;
+> > +	int size = *tablesz;
+> > +
+> > +	if (!table && size != 0) {
+> > +		dev_err(&rproc->dev, "No table present but table size is set\n");
+> > +		return ERR_PTR(-EINVAL);
+> > +	}
+> > +
+> > +	mutex_lock(&rproc->lock);
+> > +
+> > +	rproc_dump_resource_table(rproc, table, size);
+> It will be good to find a way to not dump resource table if debug is not
+> activated. For the same reason as you mentioned in your patch 8, resource
+> table parsing will waste CPUS cycles.
 
-has been applied to the regmap tree at
++1
 
-   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/regmap.git 
+I've been meaning to fix this, thanks.
 
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
+> > +
+> > +	if (!table) {
+> > +		size = sizeof(*table);
+> > +		table = devm_kzalloc(&rproc->dev, size, GFP_KERNEL);
+> > +		if (!table) {
+> > +			table = ERR_PTR(-ENOMEM);
+> > +			goto out;
+> > +		}
+> > +		table->ver = 1;
+> > +	}
+> > +
+> > +	list_for_each_entry(resource, &rproc->override_resources, node) {
+> > +		int updated = 0;
+> > +
+> > +		/* If we already have a table, update it with the new values. */
+> > +		updated = rproc_update_resource_table_entry(rproc, resource,
+> > +							    table, size);
+> > +		if (updated < 0) {
+> > +			table = ERR_PTR(updated);
+> > +			goto out;
+> > +		}
+> > +		if (updated)
+> > +			continue;
+> > +
+> > +		/* Didn't find matching resource entry -- creating a new one. */
+> > +		table = rproc_add_resource_table_entry(rproc, resource,
+> > +						       table, &size);
+> > +		if (IS_ERR(table))
+> > +			goto out;
+> > +
+> > +		*orig_table = table;
+> > +	}
+> > +
+> > +	rproc_dump_resource_table(rproc, table, size);
+> ditto
 
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
+Ditto
 
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
+> > +
+> > +	*tablesz = size;
+> > +
+> > + out:
+> > +	mutex_unlock(&rproc->lock);
+> > +	return table;
+> > +}
+> > +
+> >   /*
+> >    * take a firmware and boot a remote processor with it.
+> >    */
+> > @@ -1153,6 +1212,12 @@ static void rproc_fw_config_virtio(const struct firmware *fw, void *context)
+> >   	if (!table)
+> >   		goto out;
+> > 
+> > +	if (!list_empty(&rproc->override_resources)) {
+> > +		table = rproc_apply_resource_overrides(rproc, &table, &tablesz);
+> > +		if (IS_ERR(table))
+> > +			goto out;
+> > +	}
+> > +
+> >   	rproc->table_csum = crc32(0, table, tablesz);
+> > 
+> >   	/*
+> > 
 
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
-
-Thanks,
-Mark
-
->From 1ea975cf1ef57b1e44c0aec4820f60bb3b60904b Mon Sep 17 00:00:00 2001
-From: Cristian Birsan <cristian.birsan@microchip.com>
-Date: Mon, 8 Aug 2016 18:44:21 +0300
-Subject: [PATCH] regmap: Add a function to check if a regmap register is
- cached
-
-Add a function to check if a regmap register is cached. This will be used
-in debugfs to dump the cached values of write only registers.
-
-Signed-off-by: Cristian Birsan <cristian.birsan@microchip.com>
-Signed-off-by: Mark Brown <broonie@kernel.org>
----
- drivers/base/regmap/internal.h |  1 +
- drivers/base/regmap/regmap.c   | 23 +++++++++++++++++++++++
- 2 files changed, 24 insertions(+)
-
-diff --git a/drivers/base/regmap/internal.h b/drivers/base/regmap/internal.h
-index a0380338946a..f4be4c19bb17 100644
---- a/drivers/base/regmap/internal.h
-+++ b/drivers/base/regmap/internal.h
-@@ -173,6 +173,7 @@ struct regcache_ops {
- 	int (*drop)(struct regmap *map, unsigned int min, unsigned int max);
- };
- 
-+bool regmap_cached(struct regmap *map, unsigned int reg);
- bool regmap_writeable(struct regmap *map, unsigned int reg);
- bool regmap_readable(struct regmap *map, unsigned int reg);
- bool regmap_volatile(struct regmap *map, unsigned int reg);
-diff --git a/drivers/base/regmap/regmap.c b/drivers/base/regmap/regmap.c
-index 51fa7d66a393..1f011f9d6dcb 100644
---- a/drivers/base/regmap/regmap.c
-+++ b/drivers/base/regmap/regmap.c
-@@ -93,6 +93,29 @@ bool regmap_writeable(struct regmap *map, unsigned int reg)
- 	return true;
- }
- 
-+bool regmap_cached(struct regmap *map, unsigned int reg)
-+{
-+	int ret;
-+	unsigned int val;
-+
-+	if (map->cache == REGCACHE_NONE)
-+		return false;
-+
-+	if (!map->cache_ops)
-+		return false;
-+
-+	if (map->max_register && reg > map->max_register)
-+		return false;
-+
-+	map->lock(map->lock_arg);
-+	ret = regcache_read(map, reg, &val);
-+	map->unlock(map->lock_arg);
-+	if (ret)
-+		return false;
-+
-+	return true;
-+}
-+
- bool regmap_readable(struct regmap *map, unsigned int reg)
- {
- 	if (!map->reg_read)
 -- 
-2.8.1
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
