@@ -1,84 +1,37 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 9 Aug 2016 12:20:19 +0200
-Subject: [PATCH 2/3] KVM: arm64: vgic-its: Plug race in vgic_put_irq
-In-Reply-To: <ff8d6b98-a013-5292-af35-8fd97ec54700@arm.com>
-References: <20160803161325.14933-1-christoffer.dall@linaro.org>
- <20160803161325.14933-3-christoffer.dall@linaro.org>
- <ff8d6b98-a013-5292-af35-8fd97ec54700@arm.com>
-Message-ID: <20160809102019.GC9175@cbox>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 9 Aug 2016 11:21:32 +0100
+Subject: [PATCH]: arm64: factor work_pending state machine to C
+In-Reply-To: <b2af2833-3e4f-10a9-f568-9f19efc9186f@mellanox.com>
+References: <1459877922-15512-1-git-send-email-cmetcalf@mellanox.com>
+ <1459877922-15512-13-git-send-email-cmetcalf@mellanox.com>
+ <e19d6de0-c754-d53b-3420-16d460a4cb33@mellanox.com>
+ <20160708154901.GF6493@arm.com> <20160711114237.GE17735@arm.com>
+ <20160711121953.GH31221@leverpostej>
+ <b2af2833-3e4f-10a9-f568-9f19efc9186f@mellanox.com>
+Message-ID: <20160809102131.GD27508@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 08, 2016 at 12:20:14PM +0100, Andre Przywara wrote:
-> Hi,
+On Fri, Jul 29, 2016 at 02:16:07PM -0400, Chris Metcalf wrote:
+> On 7/11/2016 8:19 AM, Mark Rutland wrote:
+> >On Mon, Jul 11, 2016 at 12:42:37PM +0100, Will Deacon wrote:
+> >>On Fri, Jul 08, 2016 at 04:49:01PM +0100, Will Deacon wrote:
+> >>>On Fri, Jul 08, 2016 at 11:43:50AM -0400, Chris Metcalf wrote:
+> >>>>I am hopeful that this patch [1] can be picked up for the 4.8 merge window
+> >>>>in the arm64 tree.  As I mentioned in my last patch series that included
+> >>>>this patch [2], I'm hopeful that this version addresses the performance
+> >>>>issues that were seen with Mark's original patch.  This version tests the
+> >>>>TIF flags prior to calling out to the loop in C code.
+> >>>I still need to get round to measuring that again. This might also
+> >>>conflict with a late fix I just sent for 4.7.
+> >>FWIW, I've failed to measure any performance overhead from this change,
+> >>so it certainly looks better thsn Mark's original patch from that angle.
+> >FWIW, likewise, with perf bench sched atop of v4.7-rc6.
 > 
-> On 03/08/16 17:13, Christoffer Dall wrote:
-> > Right now the following sequence of events can happen:
-> > 
-> >   1. Thread X calls vgic_put_irq
-> >   2. Thread Y calls vgic_add_lpi
-> >   3. Thread Y gets lpi_list_lock
-> >   4. Thread X drops the ref count to 0 and blocks on lpi_list_lock
-> >   5. Thread Y finds the irq via the lpi_list_lock, raises the ref
-> >      count to 1, and release the lpi_list_lock.
-> >   6. Thread X proceeds and frees the irq.
-> > 
-> > Avoid this by holding the spinlock around the kref_put.
-> > 
-> > Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> > ---
-> >  virt/kvm/arm/vgic/vgic.c | 20 ++++++++++----------
-> >  1 file changed, 10 insertions(+), 10 deletions(-)
-> > 
-> > diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
-> > index e7aeac7..fb8c0ab 100644
-> > --- a/virt/kvm/arm/vgic/vgic.c
-> > +++ b/virt/kvm/arm/vgic/vgic.c
-> > @@ -117,22 +117,22 @@ static void vgic_irq_release(struct kref *ref)
-> >  
-> >  void vgic_put_irq(struct kvm *kvm, struct vgic_irq *irq)
-> >  {
-> > -	struct vgic_dist *dist;
-> > +	struct vgic_dist *dist = &kvm->arch.vgic;
-> >  
-> >  	if (irq->intid < VGIC_MIN_LPI)
-> >  		return;
-> >  
-> > -	if (!kref_put(&irq->refcount, vgic_irq_release))
-> > -		return;
-> > -
-> > -	dist = &kvm->arch.vgic;
-> > -
-> >  	spin_lock(&dist->lpi_list_lock);
-> > -	list_del(&irq->lpi_list);
-> > -	dist->lpi_list_count--;
-> > -	spin_unlock(&dist->lpi_list_lock);
-> > +	if (!kref_put(&irq->refcount, vgic_irq_release)) {
-> > +		spin_unlock(&dist->lpi_list_lock);
-> > +		return;
-> > +	} else {
-> 
-> Just a nit, I guess, but we don't need this "else" since the if-branch
-> always returns?
-> 
+> I don't see this commit pushed up as part of what's in 4.8 so far. Any chance
+> it's going to go in later in the merge window?  I'm just hoping to trim down the
+> task-isolation series by being able to drop this patch from its next iteration... :-)
 
-correct, I can change that.
+I'll queue it up for 4.9, once I've had a closer look.
 
-> > +		list_del(&irq->lpi_list);
-> > +		dist->lpi_list_count--;
-> > +		spin_unlock(&dist->lpi_list_lock);
-> >  
-> > -	kfree(irq);
-> > +		kfree(irq);
-> > +	}
-> >  }
-> >  
-> >  /**
-> > 
-> 
-> Otherwise:
-> 
-> Reviewed-by: Andre Przywara <andre.przywara@arm.com>
-> 
-Thanks.
--Christoffer
+Will
