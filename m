@@ -1,50 +1,48 @@
-From: juri.lelli@arm.com (Juri Lelli)
-Date: Tue, 9 Aug 2016 10:42:38 +0100
-Subject: [PATCH v6 4/8] arm64: parse cpu capacity-dmips-mhz from DT
-In-Reply-To: <1468932048-31635-5-git-send-email-juri.lelli@arm.com>
-References: <1468932048-31635-1-git-send-email-juri.lelli@arm.com>
- <1468932048-31635-5-git-send-email-juri.lelli@arm.com>
-Message-ID: <20160809094238.GA23236@e106622-lin>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 9 Aug 2016 11:48:16 +0200
+Subject: [PATCH 0/7] Various fixes for the cesa driver
+In-Reply-To: <1470733400-23621-1-git-send-email-romain.perier@free-electrons.com>
+References: <1470733400-23621-1-git-send-email-romain.perier@free-electrons.com>
+Message-ID: <20160809114816.08b4150c@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello,
 
-this patch needs the fix below, since platforms can boot without a
-cpu-map.
+Is it normal that Herbert, as the crypto maintainer, is not Cc'ed on
+those patches?
 
-On 19/07/16 13:40, Juri Lelli wrote:
-[...]
-> @@ -185,6 +328,8 @@ static int __init parse_dt_topology(void)
->  	if (ret != 0)
->  		goto out_map;
->  
-> +	normalize_cpu_capacity();
-> +
->  	/*
->  	 * Check that all cores are in the topology; the SMP code will
->  	 * only mark cores described in the DT as possible.
-> -- 
+On Tue,  9 Aug 2016 11:03:13 +0200, Romain Perier wrote:
+> This patches series contains various fixes for ahash requests, dma
+> operations and an important fixe in the core of the driver (cesa.c). It
+> also includes some code cleanups.
+> 
+> Romain Perier (3):
+>   crypto: marvell - Update transformation context for each dequeued req
+>   crypto: marvell - Don't overwrite default creq->state during
+>     initialization
 
---->8---
- arch/arm64/kernel/topology.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+I think those two patches should have come first in the series, to make
+it clear that they are the two fixes that are important to merge for
+the 4.8 release cycle.
 
-diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
-index 56bbd6d41daf..288f511a5f29 100644
---- a/arch/arm64/kernel/topology.c
-+++ b/arch/arm64/kernel/topology.c
-@@ -394,8 +394,10 @@ static int __init parse_dt_topology(void)
- 	 * cluster with restricted subnodes.
- 	 */
- 	map = of_get_child_by_name(cn, "cpu-map");
--	if (!map)
-+	if (!map) {
-+		cap_parsing_failed = true;
- 		goto out;
-+	}
- 
- 	ret = parse_cluster(map, 0);
- 	if (ret != 0)
+>   crypto: marvell - Don't hardcode block size in mv_cesa_ahash_cache_req
+> 
+> Thomas Petazzoni (4):
+>   crypto: marvell: be explicit about destination in mv_cesa_dma_add_op()
+>   crypto: marvell: remove unused parameter in
+>     mv_cesa_ahash_dma_add_cache()
+>   crypto: marvell: turn mv_cesa_ahash_init() into a function returning
+>     void
+>   crypto: marvell: make mv_cesa_ahash_cache_req() return bool
+
+Those 5 other patches (the four from me and the last one from you) are
+more cleanups/improvements, which can wait the 4.9 release cycle.
+
+Best regards,
+
+Thomas
 -- 
-2.7.0
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
