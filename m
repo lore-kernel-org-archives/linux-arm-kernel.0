@@ -1,80 +1,96 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Tue, 9 Aug 2016 09:12:08 -0700
-Subject: "Failed to create /dev/root: -14" after commit e6978e4bf1 ("ARM:
- save and reset the address limit when entering an exception")
-In-Reply-To: <87eg5y3rsk.fsf@free-electrons.com>
-References: <57A15C41.6000804@roeck-us.net>
- <20160803083822.GI1041@n2100.armlinux.org.uk>
- <57A20896.30300@roeck-us.net>
- <20160804100748.GP1041@n2100.armlinux.org.uk>
- <87eg5y3rsk.fsf@free-electrons.com>
-Message-ID: <20160809161208.GA11747@roeck-us.net>
+From: Julia.Lawall@lip6.fr (Julia Lawall)
+Date: Tue,  9 Aug 2016 18:03:55 +0200
+Subject: [PATCH] [media] mtk-vcodec: constify venc_common_if structures
+Message-ID: <1470758635-13193-1-git-send-email-Julia.Lawall@lip6.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 09, 2016 at 05:06:51PM +0200, Gregory CLEMENT wrote:
-> Hi Russell King,
->  
->  On jeu., ao?t 04 2016, Russell King - ARM Linux <linux@armlinux.org.uk> wrote:
-> 
-> > On Wed, Aug 03, 2016 at 08:07:02AM -0700, Guenter Roeck wrote:
-> >> On 08/03/2016 01:38 AM, Russell King - ARM Linux wrote:
-> >> >On Tue, Aug 02, 2016 at 07:51:45PM -0700, Guenter Roeck wrote:
-> >> >>Hi,
-> >> >>
-> >> >>I see the following crash when running a qemu arm 'kzm' runtime test with
-> >> >>the current mainline.
-> >> >>...
-> >> >>Failed to create /dev/root: -14
-> >> >>
-> >> >>[ followed by panic ]
-> >> >>
-> >> >>A complete log file is at [1].
-> >> >
-> >> >I think it's because of those undefined instructions you're hitting
-> >> >with the hw-breakpoint code... can you try the patch below please?
-> >> >
-> >> >  arch/arm/kernel/entry-armv.S | 1 +
-> >> >  1 file changed, 1 insertion(+)
-> >> >
-> >> >diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
-> >> >index bc5f50799d75..9f157e7c51e7 100644
-> >> >--- a/arch/arm/kernel/entry-armv.S
-> >> >+++ b/arch/arm/kernel/entry-armv.S
-> >> >@@ -295,6 +295,7 @@ __und_svc_fault:
-> >> >  	bl	__und_fault
-> >> >
-> >> >  __und_svc_finish:
-> >> >+	get_thread_info tsk
-> >> >  	ldr	r5, [sp, #S_PSR]		@ Get SVC cpsr
-> >> >  	svc_exit r5				@ return from exception
-> >> >   UNWIND(.fnend		)
-> >> >
-> >> 
-> >> Yes, that fixes the problem.
-> >> 
-> >> Assuming you'll create a patch:
-> >> 
-> >> Tested-by: Guenter Roeck <linux@roeck-us.net>
-> >> 
-> >> Does that need to be addressed in qemu, or is it a Linux bug ?
-> >
-> > It's a Linux bug provoked by qemu not implementing the hardware
-> > breakpoints.  Well worth fixing in Linux.
-> 
-> The Armada XP base platform were hit by the same bug as we can see on
-> kernlci:
-> https://storage.kernelci.org/mainline/v4.8-rc1/arm-mvebu_v7_defconfig/lab-baylibre-seattle/boot-armada-xp-openblocks-ax3-4.html
-> 
-> Your patch solves the issue too.
-> 
-> Will you push this patch for v4.8-rc2 ?
-> 
-> Also I wonder if it is something expected to have this issue on a "real"
-> hardware.
-> 
+The venc_common_if structures are never modified, so declare them as const.
 
-It would be expected if hardware breakpoint implementation is optional
-and not all real CPUs implement it.
+Done with the help of Coccinelle.
 
-Guenter
+Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
+
+---
+ drivers/media/platform/mtk-vcodec/mtk_vcodec_drv.h    |    2 +-
+ drivers/media/platform/mtk-vcodec/venc/venc_h264_if.c |    6 +++---
+ drivers/media/platform/mtk-vcodec/venc/venc_vp8_if.c  |    6 +++---
+ drivers/media/platform/mtk-vcodec/venc_drv_if.c       |    4 ++--
+ 4 files changed, 9 insertions(+), 9 deletions(-)
+
+diff --git a/drivers/media/platform/mtk-vcodec/mtk_vcodec_drv.h b/drivers/media/platform/mtk-vcodec/mtk_vcodec_drv.h
+index 94f0a42..b0cb3ed 100644
+--- a/drivers/media/platform/mtk-vcodec/mtk_vcodec_drv.h
++++ b/drivers/media/platform/mtk-vcodec/mtk_vcodec_drv.h
+@@ -240,7 +240,7 @@ struct mtk_vcodec_ctx {
+ 	enum mtk_encode_param param_change;
+ 	struct mtk_enc_params enc_params;
+ 
+-	struct venc_common_if *enc_if;
++	const struct venc_common_if *enc_if;
+ 	unsigned long drv_handle;
+ 
+ 	int int_cond;
+diff --git a/drivers/media/platform/mtk-vcodec/venc/venc_h264_if.c b/drivers/media/platform/mtk-vcodec/venc/venc_h264_if.c
+index 9a60052..532cd36 100644
+--- a/drivers/media/platform/mtk-vcodec/venc/venc_h264_if.c
++++ b/drivers/media/platform/mtk-vcodec/venc/venc_h264_if.c
+@@ -664,16 +664,16 @@ static int h264_enc_deinit(unsigned long handle)
+ 	return ret;
+ }
+ 
+-static struct venc_common_if venc_h264_if = {
++static const struct venc_common_if venc_h264_if = {
+ 	h264_enc_init,
+ 	h264_enc_encode,
+ 	h264_enc_set_param,
+ 	h264_enc_deinit,
+ };
+ 
+-struct venc_common_if *get_h264_enc_comm_if(void);
++const struct venc_common_if *get_h264_enc_comm_if(void);
+ 
+-struct venc_common_if *get_h264_enc_comm_if(void)
++const struct venc_common_if *get_h264_enc_comm_if(void)
+ {
+ 	return &venc_h264_if;
+ }
+diff --git a/drivers/media/platform/mtk-vcodec/venc/venc_vp8_if.c b/drivers/media/platform/mtk-vcodec/venc/venc_vp8_if.c
+index 60bbcd2..bdf6780 100644
+--- a/drivers/media/platform/mtk-vcodec/venc/venc_vp8_if.c
++++ b/drivers/media/platform/mtk-vcodec/venc/venc_vp8_if.c
+@@ -471,16 +471,16 @@ static int vp8_enc_deinit(unsigned long handle)
+ 	return ret;
+ }
+ 
+-static struct venc_common_if venc_vp8_if = {
++static const struct venc_common_if venc_vp8_if = {
+ 	vp8_enc_init,
+ 	vp8_enc_encode,
+ 	vp8_enc_set_param,
+ 	vp8_enc_deinit,
+ };
+ 
+-struct venc_common_if *get_vp8_enc_comm_if(void);
++const struct venc_common_if *get_vp8_enc_comm_if(void);
+ 
+-struct venc_common_if *get_vp8_enc_comm_if(void)
++const struct venc_common_if *get_vp8_enc_comm_if(void)
+ {
+ 	return &venc_vp8_if;
+ }
+diff --git a/drivers/media/platform/mtk-vcodec/venc_drv_if.c b/drivers/media/platform/mtk-vcodec/venc_drv_if.c
+index c4c83e7..d02d5f1 100644
+--- a/drivers/media/platform/mtk-vcodec/venc_drv_if.c
++++ b/drivers/media/platform/mtk-vcodec/venc_drv_if.c
+@@ -26,8 +26,8 @@
+ #include "mtk_vcodec_enc_pm.h"
+ #include "mtk_vpu.h"
+ 
+-struct venc_common_if *get_h264_enc_comm_if(void);
+-struct venc_common_if *get_vp8_enc_comm_if(void);
++const struct venc_common_if *get_h264_enc_comm_if(void);
++const struct venc_common_if *get_vp8_enc_comm_if(void);
+ 
+ int venc_if_init(struct mtk_vcodec_ctx *ctx, unsigned int fourcc)
+ {
