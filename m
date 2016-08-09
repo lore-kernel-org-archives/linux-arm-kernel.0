@@ -1,84 +1,31 @@
-From: stillcompiling@gmail.com (Joshua Clayton)
-Date: Tue, 9 Aug 2016 16:33:35 -0700
-Subject: [PATCH v5 6/6] ARM: dts: imx6qdl-udoo.dtsi: fix onboard USB HUB
- property
-In-Reply-To: <1470646331-23227-7-git-send-email-peter.chen@nxp.com>
-References: <1470646331-23227-1-git-send-email-peter.chen@nxp.com>
- <1470646331-23227-7-git-send-email-peter.chen@nxp.com>
-Message-ID: <57AA684F.4020004@gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 9 Aug 2016 18:55:37 -0500
+Subject: [PATCH v3 02/15] dt/bindings: Update binding for PM domain idle
+ states
+In-Reply-To: <1470351902-43103-3-git-send-email-lina.iyer@linaro.org>
+References: <1470351902-43103-1-git-send-email-lina.iyer@linaro.org>
+ <1470351902-43103-3-git-send-email-lina.iyer@linaro.org>
+Message-ID: <20160809235537.GA28122@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
+On Thu, Aug 04, 2016 at 05:04:49PM -0600, Lina Iyer wrote:
+> From: Axel Haslam <ahaslam+renesas@baylibre.com>
+> 
+> Update DT bindings to describe idle states of PM domains.
+> 
+> Cc: <devicetree@vger.kernel.org>
+> Signed-off-by: Marc Titinger <mtitinger+renesas@baylibre.com>
+> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+> [Lina: Added state properties, removed state names, wakeup-latency,
+> added of_pm_genpd_init() API, pruned commit text]
+> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+> [Ulf: Moved around code to make it compile properly, rebased on top of multiple state support]
 
-On 08/08/2016 01:52 AM, Peter Chen wrote:
-> The current dts describes USB HUB's property at USB controller's
-> entry, it is improper. The USB HUB should be the child node
-> under USB controller, and power sequence properties are under
-> it.
->
-> Signed-off-by: Peter Chen <peter.chen@nxp.com>
+This change doesn't make sense given this is just a binding doc.
+
 > ---
->  arch/arm/boot/dts/imx6qdl-udoo.dtsi | 26 +++++++++++++-------------
->  1 file changed, 13 insertions(+), 13 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/imx6qdl-udoo.dtsi b/arch/arm/boot/dts/imx6qdl-udoo.dtsi
-> index 3bee2f9..f29a72c2f 100644
-> --- a/arch/arm/boot/dts/imx6qdl-udoo.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl-udoo.dtsi
-> @@ -9,6 +9,8 @@
->   *
->   */
->  
-> +#include <dt-bindings/gpio/gpio.h>
-> +
->  / {
->  	aliases {
->  		backlight = &backlight;
-> @@ -58,17 +60,6 @@
->  		#address-cells = <1>;
->  		#size-cells = <0>;
->  
-> -		reg_usb_h1_vbus: regulator at 0 {
-> -			compatible = "regulator-fixed";
-> -			reg = <0>;
-> -			regulator-name = "usb_h1_vbus";
-> -			regulator-min-microvolt = <5000000>;
-> -			regulator-max-microvolt = <5000000>;
-> -			enable-active-high;
-> -			startup-delay-us = <2>; /* USB2415 requires a POR of 1 us minimum */
-> -			gpio = <&gpio7 12 0>;
-> -		};
-> -
->  		reg_panel: regulator at 1 {
->  			compatible = "regulator-fixed";
->  			reg = <1>;
-> @@ -259,9 +250,18 @@
->  &usbh1 {
->  	pinctrl-names = "default";
->  	pinctrl-0 = <&pinctrl_usbh>;
-> -	vbus-supply = <&reg_usb_h1_vbus>;
-> -	clocks = <&clks IMX6QDL_CLK_CKO>;
->  	status = "okay";
-> +
-> +	#address-cells = <1>;
-> +	#size-cells = <0>;
-Assuming they are needed,
-#address-cells and #size-cells should go in imx6qdl.dtsi,
-rather than in board dts files, shouldn't they?
-> +	usb2415: hub at 1 {
-> +		compatible = "usb424,2514";
-> +		reg = <1>;
-Does <reg>  have any effect?
-I couldn't find any reference to it in the patches.
-(so apologies if it is in core code)
-Does it matter? Would it be possible to connect
-more than one hub to the same usb phy?
-> +
-> +		clocks = <&clks IMX6QDL_CLK_CKO>;
-> +		reset-gpios = <&gpio7 12 GPIO_ACTIVE_LOW>;
-> +		reset-duration-us = <3000>;
-> +	};
->  };
->  
->  &usdhc3 {
+>  .../devicetree/bindings/power/power_domain.txt     | 57 ++++++++++++++++++++++
+>  1 file changed, 57 insertions(+)
+
+Acked-by: Rob Herring <robh@kernel.org>
