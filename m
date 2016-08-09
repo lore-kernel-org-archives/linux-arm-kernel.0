@@ -1,44 +1,45 @@
-From: oleg@redhat.com (Oleg Nesterov)
-Date: Tue, 9 Aug 2016 20:49:44 +0200
-Subject: [PATCH 5/5] arm64: Add uprobe support
-In-Reply-To: <abaac6ebaa5dd63889803ec568663bc8c8c65b02.1470114993.git.panand@redhat.com>
-References: <cover.1470114993.git.panand@redhat.com>
- <abaac6ebaa5dd63889803ec568663bc8c8c65b02.1470114993.git.panand@redhat.com>
-Message-ID: <20160809184943.GA17112@redhat.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Tue, 09 Aug 2016 20:52:17 +0200
+Subject: [PATCH v4] ARM: pxa: fix GPIO double shifts
+In-Reply-To: <1470088892-31373-1-git-send-email-robert.jarzmik@free.fr>
+ (Robert Jarzmik's message of "Tue, 2 Aug 2016 00:01:32 +0200")
+References: <1470088892-31373-1-git-send-email-robert.jarzmik@free.fr>
+Message-ID: <878tw5vkpq.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/02, Pratyush Anand wrote:
+Robert Jarzmik <robert.jarzmik@free.fr> writes:
+
+> The commit 9bf448c66d4b ("ARM: pxa: use generic gpio operation instead of
+> gpio register") from Oct 17, 2011, leads to the following static checker
+> warning:
+>   arch/arm/mach-pxa/spitz_pm.c:172 spitz_charger_wakeup()
+>   warn: double left shift '!gpio_get_value(SPITZ_GPIO_KEY_INT)
+>         << (1 << ((SPITZ_GPIO_KEY_INT) & 31))'
 >
-> This patch adds support for uprobe on ARM64 architecture.
+> As Dan reported, the value is shifted three times :
+>  - once by gpio_get_value(), which returns either 0 or BIT(gpio)
+>  - once by the shift operation '<<'
+>  - a last time by GPIO_bit(gpio) which is BIT(gpio)
+>
+> Therefore the calculation lead to a chained or operator of :
+>  - (1 << gpio) << (1 << gpio) = (2^gpio)^gpio = 2 ^ (gpio * gpio)
+>
+> It is be sheer luck the former statement works, only because each gpio
+> used is strictly smaller than 6, and therefore 2^(gpio^2) never
+> overflows a 32 bits value, and because it is used as a boolean value to
+> check a gpio activation.
+>
+> As the xxx_charger_wakeup() functions are used as a true/false detection
+> mechanism, take that opportunity to change their prototypes from integer
+> return value to boolean one.
+>
+> Fixes: 9bf448c66d4b ("ARM: pxa: use generic gpio operation instead of
+> gpio register")
+> Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
+> Cc: Joe Perches <joe@perches.com>
+> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+Queued into pxa/for-next.
 
-I know nothing about ARM, so I can't actually review this change.
-But it looks good to me ;)
-
-Just one note,
-
-> +int arch_uprobe_pre_xol(struct arch_uprobe *auprobe, struct pt_regs *regs)
-> +{
-> +	struct uprobe_task *utask = current->utask;
-> +
-> +	/* saved fault code is restored in post_xol */
-> +	utask->autask.saved_fault_code = current->thread.fault_code;
-> +
-> +	/* An invalid fault code between pre/post xol event */
-> +	current->thread.fault_code = UPROBE_INV_FAULT_CODE;
-> +
-> +	/* Instruction point to execute ol */
-> +	instruction_pointer_set(regs, utask->xol_vaddr);
-> +
-> +	user_enable_single_step(current);
-
-I don't think we want user_{enable,disable{_single_step in the long term,
-please look at 9bd1190a11c9d2 "uprobes/x86: Do not (ab)use TIF_SINGLESTEP
-/user_*_single_step() for single-stepping". it seems that ARM64 sets/clears
-TIF_SINGLESTEP. You can also lool at saved_tf logic, probably ARM64 needs
-the same.
-
-However, I agree we can do this later and initial version can use these
-ptrace helpers.
-
-Oleg.
+--
+Robert
