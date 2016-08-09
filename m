@@ -1,67 +1,55 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Mon, 8 Aug 2016 19:15:51 -0700
-Subject: Build and qemu test results for v4.8-rc1
-Message-ID: <a8f84377-a3f6-109e-99c3-a5f2fc798178@roeck-us.net>
+From: wangkefeng.wang@huawei.com (Kefeng Wang)
+Date: Tue, 9 Aug 2016 10:30:49 +0800
+Subject: [PATCH v3] arm64: Support hard limit of cpu count by nr_cpus
+In-Reply-To: <9b1b28bb-3102-d6f1-2989-ae764d340527@arm.com>
+References: <9b1b28bb-3102-d6f1-2989-ae764d340527@arm.com>
+Message-ID: <1470709849-22859-1-git-send-email-wangkefeng.wang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Build results:
-	total: 148 pass: 142 fail: 6
-Failed builds:
-	h8300:allnoconfig
-	h8300:edosk2674_defconfig
-	h8300:h8300h-sim_defconfig
-	h8300:h8s-sim_defconfig
-	unicore32:defconfig
-	unicore32:allnoconfig
+Enable the hard limit of cpu count by set boot options nr_cpus=x
+on arm64, and make a minor change about message when total number
+of cpu exceeds the limit.
 
-Qemu test results:
-	total: 107 pass: 104 fail: 3
-Failed tests:
-	arm:kzm:imx_v6_v7_defconfig
-	powerpc:nosmp:ppc64_e5500_defconfig
-	powerpc:smp:ppc64_e5500_defconfig
-
-===
-h8300:
-
-arch/h8300/include/asm/io.h:9:15: error: unknown type name ?u8?
-arch/h8300/include/asm/io.h:9:58: error: expected ?;?, ?,? or ?)? before ?*? token
-[and many more similar errors]
-
-Fixed with [1]
-
+Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+Reported-by: Shiyuan Hu <hushiyuan@huawei.com>
+Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
 ---
-unicore32:
 
-mm/gup.c: In function ?check_vma_flags?:
-mm/gup.c:458: error: too many arguments to function ?arch_vma_access_permitted?
-mm/gup.c: In function ?vma_permits_fault?:
-gup.c:642: error: too many arguments to function ?arch_vma_access_permitted?
+Change since v2:
+- change the warning message suggested-by Suzuki, and Suzuki's reviewed-by 
+Change since v1:
+- clip cpu number in smp_init_cpus suggested-by Will and Suzuki, and update
+  the warning.
 
-Fixed with [2]
+ arch/arm64/kernel/smp.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
----
-qemu arm:kzm:imx_v6_v7_defconfig:
-
-Failed to create /dev/root: -14
-...
-Kernel panic - not syncing: VFS: Unable to mount root fs on unknown-block(0,0)
-
-See [3]
-
----
-qemu powerpc:nosmp:qemu_ppc64_e5500_defconfig:
-qemu powerpc:smp:qemu_ppc64_e5500_defconfig:
-
-./arch/powerpc/include/asm/cputhreads.h: In function 'get_tensr':
-./arch/powerpc/include/asm/cputhreads.h:101:2: error: implicit declaration of function 'cpu_has_feature'
-
-Fixed with [4]
-
-
----
-[1] https://patchwork.kernel.org/patch/9166177/
-[2] https://patchwork.kernel.org/patch/8631791/
-[3] https://lkml.org/lkml/2016/8/2/2085
-[4] https://patchwork.kernel.org/patch/9266131/
+diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+index 76a6d92..d93d433 100644
+--- a/arch/arm64/kernel/smp.c
++++ b/arch/arm64/kernel/smp.c
+@@ -661,9 +661,9 @@ void __init smp_init_cpus(void)
+ 		acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_INTERRUPT,
+ 				      acpi_parse_gic_cpu_interface, 0);
+ 
+-	if (cpu_count > NR_CPUS)
+-		pr_warn("no. of cores (%d) greater than configured maximum of %d - clipping\n",
+-			cpu_count, NR_CPUS);
++	if (cpu_count > nr_cpu_ids)
++		pr_warn("Number of cores (%d) exceeds configured maximum of %d - clipping\n",
++			cpu_count, nr_cpu_ids);
+ 
+ 	if (!bootcpu_valid) {
+ 		pr_err("missing boot CPU MPIDR, not enabling secondaries\n");
+@@ -677,7 +677,7 @@ void __init smp_init_cpus(void)
+ 	 * with entries in cpu_logical_map while initializing the cpus.
+ 	 * If the cpu set-up fails, invalidate the cpu_logical_map entry.
+ 	 */
+-	for (i = 1; i < NR_CPUS; i++) {
++	for (i = 1; i < nr_cpu_ids; i++) {
+ 		if (cpu_logical_map(i) != INVALID_HWID) {
+ 			if (smp_cpu_setup(i))
+ 				cpu_logical_map(i) = INVALID_HWID;
+-- 
+1.7.12.4
