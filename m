@@ -1,97 +1,173 @@
-From: mirza.krak@gmail.com (Mirza Krak)
-Date: Tue, 9 Aug 2016 22:48:00 +0200
-Subject: [PATCH 3/6] dt/bindings: Add bindings for Tegra GMI controller
-In-Reply-To: <5e0402db-10ce-75eb-cf95-d9e2d26e3efe@nvidia.com>
-References: <1470512452-8322-1-git-send-email-mirza.krak@gmail.com>
- <1470512452-8322-4-git-send-email-mirza.krak@gmail.com>
- <901be576-a810-c630-9b83-de922e945df0@nvidia.com>
- <CALw8SCV61w6BgtBb8pY4czeB4yFmbtLmB2MuyrvGcvepmRpeBQ@mail.gmail.com>
- <5e0402db-10ce-75eb-cf95-d9e2d26e3efe@nvidia.com>
-Message-ID: <CALw8SCVrQeZLQjkapLjk9Me=AVU4kbtOskem8jeEeYDK5tznGg@mail.gmail.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Tue, 9 Aug 2016 14:29:10 -0700
+Subject: [RFC PATCH v5 3/3] net: phy: Add gmiitorgmii converter support
+In-Reply-To: <1470735283-23611-4-git-send-email-appanad@xilinx.com>
+References: <1470735283-23611-1-git-send-email-appanad@xilinx.com>
+ <1470735283-23611-4-git-send-email-appanad@xilinx.com>
+Message-ID: <8919e4fe-69c5-9b16-cc37-e423b757609c@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-08-09 15:34 GMT+02:00 Jon Hunter <jonathanh@nvidia.com>:
->
-> On 09/08/16 09:40, Mirza Krak wrote:
->> 2016-08-08 16:44 GMT+02:00 Jon Hunter <jonathanh@nvidia.com>:
->>>
->>> On 06/08/16 20:40, Mirza Krak wrote:
->>>> From: Mirza Krak <mirza.krak@gmail.com>
->>>>
+On 08/09/2016 02:34 AM, Kedareswara rao Appana wrote:
+> This patch adds support for gmiitorgmii converter.
+> 
+> The GMII to RGMII IP core provides the Reduced Gigabit Media
+> Independent Interface (RGMII) between Ethernet physical media
+> Devices and the Gigabit Ethernet controller. This core can
+> Switch dynamically between the three different speed modes of
+> Operation by configuring the converter register through mdio write.
+> 
+> MDIO interface is used to set operating speed of Ethernet MAC.
+> 
+> This converter sits between the MAC and the external phy
+> MAC <==> GMII2RGMII <==> RGMII_PHY
 
-<--snip-->
+This looks good, just a few things, see below:
 
->>>> + - nvidia,snor-we-width: Number of cycles during which WE stays asserted.
->>>> +   Valid values are 0-15, default is 1
->>>> + - nvidia,snor-oe-width: Number of cycles during which OE stays asserted.
->>>> +   Valid values are 0-255, default is 1
->>>> + - nvidia,snor-wait-width: Number of cycles before READY is asserted.
->>>> +   Valid values are 0-255, default is 3
->>>> +
->>>> +Example with two SJA1000 CAN controllers connected to the GMI bus:
->>>> +
->>>> +  gmi at 70090000 {
->>>> +    #address-cells = <1>;
->>>> +    #size-cells = <1>;
->>>
->>> I think 0 for size makes sense. I know that caused you problems before,
->>> but I am wondering if ...
->>>
->>>> +    ranges;
->>>
->>> ... ranges is needed here? If we do have it, I am wondering if it should
->>> be a single entry for the chip-select that is being used. For now we
->>> could only support a ranges with one entry.
->>>
->>>         #address-cells = <1>;
->>>         #size-cells = <1>;
->>>         ranges = <4 0x48000000 0x00040000>;
->>
->> I prefer if we have "ranges" with one single entry, and warn if user enters
->> multiple for now, like we discussed earlier. Should have really done it in
->> this series.
->
-> I think I do as well.
->
->>>
->>>> +    nvidia,snor-mux-mode;
->>>> +    nvidia,snor-adv-inv;
->>>> +    nvidia,snor-cs-select = <4>;
->>>
->>> I would have expected these under bus at X node as they are specific to the
->>> GMI CS.
->>
->> Yes, that is true.
->>
->>>
->>> I would also expect that the actual chip-select number is encoded in the
->>> reg property.
->>>
->>>> +
->>>> +    bus at 0,0 {
->>>
->>> bus at 4
->>
->> ACK.
->>
->>>
->>> No mention of this bus node in the above documentation.
->>
->> I was hesitant documenting it since I am not sure if we really need it
->> in a generic case? It does make sense in my
->> specific case. But what would it look like if we could maintain CS in software.
->>
->> Do you then have a bus node per CS? I am guessing not. Is it enough to
->> document it in my "example brief"?
->
-> I see what you mean. May be it is fine to document with the examples
-> below how child devices should be populated. You should also state that
-> currently the GMI only supports one child device currently for the
-> chip-select that is being used.
+> 
+> Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
+> ---
+> Thanks a lot Andrew for your inputs.
+> Changes for v5:
+> --> Fixed return values in the probe as suggested by punnaiah.
+> --> Added a mask for the converter speed as suggested by punnaiah.
+> Changes for v4:
+> --> Updated phydev speed for all 3 speeds as suggested by zhuyj.
+> Changes for v3:
+> --> Updated the driver as suggested by Andrew.
+> Changes for v2:
+> --> Passed struct xphy pointer directly to the fix_mac_speed
+> API as suggested by the Florian.
+> --> Added checks for the phy-node fail case as suggested
+> by the Florian
+> 
+>  drivers/net/phy/Kconfig             |   8 +++
+>  drivers/net/phy/Makefile            |   1 +
+>  drivers/net/phy/xilinx_gmii2rgmii.c | 121 ++++++++++++++++++++++++++++++++++++
+>  3 files changed, 130 insertions(+)
+>  create mode 100644 drivers/net/phy/xilinx_gmii2rgmii.c
+> 
+> diff --git a/drivers/net/phy/Kconfig b/drivers/net/phy/Kconfig
+> index 1b534ea..c79f347 100644
+> --- a/drivers/net/phy/Kconfig
+> +++ b/drivers/net/phy/Kconfig
+> @@ -312,6 +312,14 @@ config MICROSEMI_PHY
+>      ---help---
+>        Currently supports the VSC8531 and VSC8541 PHYs
+>  
+> +config XILINX_GMII2RGMII
+> +       tristate "Xilinx GMII2RGMII converter driver"
+> +       default y
 
-Should I really need to state that? Is it not always the case, that
-you have one child device per chip-select?
+Don't force that, or at least make the default based on the potential
+users/drivers here.
 
-Best Regards
-Mirza
+> +       ---help---
+> +         This driver support xilinx GMII to RGMII IP core it provides
+> +         the Reduced Gigabit Media Independent Interface(RGMII) between
+> +         Ethernet physical media devices and the Gigabit Ethernet controller.
+> +
+>  endif # PHYLIB
+>  
+>  config MICREL_KS8995MA
+> diff --git a/drivers/net/phy/Makefile b/drivers/net/phy/Makefile
+> index a713bd4..73d65ce 100644
+> --- a/drivers/net/phy/Makefile
+> +++ b/drivers/net/phy/Makefile
+> @@ -50,3 +50,4 @@ obj-$(CONFIG_MDIO_BCM_IPROC)	+= mdio-bcm-iproc.o
+>  obj-$(CONFIG_INTEL_XWAY_PHY)	+= intel-xway.o
+>  obj-$(CONFIG_MDIO_HISI_FEMAC)	+= mdio-hisi-femac.o
+>  obj-$(CONFIG_MDIO_XGENE)	+= mdio-xgene.o
+> +obj-$(CONFIG_XILINX_GMII2RGMII) += xilinx_gmii2rgmii.o
+> diff --git a/drivers/net/phy/xilinx_gmii2rgmii.c b/drivers/net/phy/xilinx_gmii2rgmii.c
+> new file mode 100644
+> index 0000000..1456e27
+> --- /dev/null
+> +++ b/drivers/net/phy/xilinx_gmii2rgmii.c
+> @@ -0,0 +1,121 @@
+> +/* Xilinx GMII2RGMII Converter driver
+> + *
+> + * Copyright (C) 2016 Xilinx, Inc.
+> + *
+> + * Author: Kedareswara rao Appana <appanad@xilinx.com>
+> + *
+> + * Description:
+> + * This driver is developed for Xilinx GMII2RGMII Converter
+> + *
+> + * This program is free software: you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation, either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +#include <linux/module.h>
+> +#include <linux/kernel.h>
+> +#include <linux/mii.h>
+> +#include <linux/mdio.h>
+> +#include <linux/phy.h>
+> +#include <linux/of_mdio.h>
+> +
+> +#define XILINX_GMII2RGMII_REG		0x10
+> +#define XILINX_GMII2RGMII_SPEED_MASK	0x2040
+
+BMCR_SPEED1000 | BMCR_SPEED100 would be clearer here.
+
+> +
+> +struct gmii2rgmii {
+> +	struct phy_device *phy_dev;
+> +	struct phy_driver *phy_drv;
+> +	struct phy_driver conv_phy_drv;
+> +	int addr;
+> +};
+> +
+> +static int xgmiitorgmii_read_status(struct phy_device *phydev)
+> +{
+> +	struct gmii2rgmii *priv = (struct gmii2rgmii *)phydev->priv;
+
+Casting is not required here, priv is void *.
+
+> +	u16 val = 0;
+> +
+> +	priv->phy_drv->read_status(phydev);
+> +
+> +	val = mdiobus_read(phydev->mdio.bus, priv->addr, XILINX_GMII2RGMII_REG);
+> +	val &= XILINX_GMII2RGMII_SPEED_MASK;
+> +
+> +	switch (phydev->speed) {
+> +	case SPEED_1000:
+> +		val |= BMCR_SPEED1000;
+
+Is the fall through really intentional here? See genphy_setup_forced()
+for instance.
+
+> +	case SPEED_100:
+> +		val |= BMCR_SPEED100;
+> +	case SPEED_10:
+> +		val |= BMCR_SPEED10;
+> +	}
+> +
+> +	mdiobus_write(phydev->mdio.bus, priv->addr, XILINX_GMII2RGMII_REG, val);
+> +
+> +	return 0;
+> +}
+[snip]
+
+> +static int __init xgmiitorgmii_init(void)
+> +{
+> +	return mdio_driver_register(&xgmiitorgmii_driver);
+> +}
+> +module_init(xgmiitorgmii_init);
+> +
+> +static void __exit xgmiitorgmii_cleanup(void)
+> +{
+> +	mdio_driver_unregister(&xgmiitorgmii_driver);
+> +}
+> +module_exit(xgmiitorgmii_cleanup);
+
+mdio_module_driver() does eliminate a bit of this boilerplate code.
+-- 
+Florian
