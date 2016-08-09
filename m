@@ -1,235 +1,60 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 9 Aug 2016 12:51:09 +0100
-Subject: [PATCH v3] arm64: mm: convert __dma_* routines to use start, size
-In-Reply-To: <1470099050-25407-1-git-send-email-kwangwoo.lee@sk.com>
-References: <1470099050-25407-1-git-send-email-kwangwoo.lee@sk.com>
-Message-ID: <80a4602f-8105-fe2e-0f52-ee23f2c0b2e4@arm.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Tue,  9 Aug 2016 12:53:01 +0100
+Subject: [RFC PATCH 3/5] arm64: dts: sunxi: add SCPI node to sun50i-a64.dtsi
+In-Reply-To: <20160809115303.17032-1-andre.przywara@arm.com>
+References: <20160809115303.17032-1-andre.przywara@arm.com>
+Message-ID: <20160809115303.17032-4-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/08/16 01:50, Kwangwoo Lee wrote:
-> __dma_* routines have been converted to use start and size instread of
-> start and end addresses. The patch was origianlly for adding
-> __clean_dcache_area_poc() which will be used in pmem driver to clean
-> dcache to the PoC(Point of Coherency) in arch_wb_cache_pmem().
-> 
-> The functionality of __clean_dcache_area_poc()  was equivalent to
-> __dma_clean_range(). The difference was __dma_clean_range() uses the end
-> address, but __clean_dcache_area_poc() uses the size to clean.
-> 
-> Thus, __clean_dcache_area_poc() has been revised with a fallthrough
-> function of __dma_clean_range() after the change that __dma_* routines
-> use start and size instead of using start and end.
-> 
-> As a consequence of using start and size, the name of __dma_* routines
-> has also been altered following the terminology below:
->     area: takes a start and size
->     range: takes a start and end
+Support for variable frequency clocks is implemented in ARM Trusted
+Firmware, which sits in SRAM and waits for SCPI requests.
+Add the respective SMC mailbox node and a 512-byte chunk of SRAM to
+allow SCPI calls to be handled by the firmware.
 
-This looks pretty nice and tidy now; I don't see anything obviously
-wrong, and comparing before-and-after disassemblies shows essentially
-nothing more than the movement of some add instructions as expected, so:
+Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+---
+ arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 26 ++++++++++++++++++++++++++
+ 1 file changed, 26 insertions(+)
 
-Reviewed-by: Robin Murphy <robin.murphy@arm.com>
-
-> Signed-off-by: Kwangwoo Lee <kwangwoo.lee@sk.com>
-> ---
-> v3)
-> clean up in __dma_clean_area() based on 823066d9edcd dcache_by_line_op fix
-> 
-> v2)
-> change the names of __dma_* rountines to use area instead of range
-> fix to use __dma_flush_area() in dma-mapping.c
-> 
-> v1)
-> change __dma_* routines to use start, size
-> add __clean_dcache_area_poc() as a fallthrough of __dma_clean_range()
-> 
->  arch/arm64/include/asm/cacheflush.h |  3 +-
->  arch/arm64/mm/cache.S               | 82 ++++++++++++++++++-------------------
->  arch/arm64/mm/dma-mapping.c         |  6 +--
->  3 files changed, 44 insertions(+), 47 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/cacheflush.h b/arch/arm64/include/asm/cacheflush.h
-> index c64268d..2e5fb97 100644
-> --- a/arch/arm64/include/asm/cacheflush.h
-> +++ b/arch/arm64/include/asm/cacheflush.h
-> @@ -68,6 +68,7 @@
->  extern void flush_cache_range(struct vm_area_struct *vma, unsigned long start, unsigned long end);
->  extern void flush_icache_range(unsigned long start, unsigned long end);
->  extern void __flush_dcache_area(void *addr, size_t len);
-> +extern void __clean_dcache_area_poc(void *addr, size_t len);
->  extern void __clean_dcache_area_pou(void *addr, size_t len);
->  extern long __flush_cache_user_range(unsigned long start, unsigned long end);
->  
-> @@ -85,7 +86,7 @@ static inline void flush_cache_page(struct vm_area_struct *vma,
->   */
->  extern void __dma_map_area(const void *, size_t, int);
->  extern void __dma_unmap_area(const void *, size_t, int);
-> -extern void __dma_flush_range(const void *, const void *);
-> +extern void __dma_flush_area(const void *, size_t);
->  
->  /*
->   * Copy user data from/to a page which is mapped into a different
-> diff --git a/arch/arm64/mm/cache.S b/arch/arm64/mm/cache.S
-> index 07d7352..58b5a90 100644
-> --- a/arch/arm64/mm/cache.S
-> +++ b/arch/arm64/mm/cache.S
-> @@ -105,19 +105,20 @@ ENTRY(__clean_dcache_area_pou)
->  ENDPROC(__clean_dcache_area_pou)
->  
->  /*
-> - *	__inval_cache_range(start, end)
-> - *	- start   - start address of region
-> - *	- end     - end address of region
-> + *	__dma_inv_area(start, size)
-> + *	- start   - virtual start address of region
-> + *	- size    - size in question
->   */
-> -ENTRY(__inval_cache_range)
-> +__dma_inv_area:
-> +	add	x1, x1, x0
->  	/* FALLTHROUGH */
->  
->  /*
-> - *	__dma_inv_range(start, end)
-> - *	- start   - virtual start address of region
-> - *	- end     - virtual end address of region
-> + *	__inval_cache_range(start, end)
-> + *	- start   - start address of region
-> + *	- end     - end address of region
->   */
-> -__dma_inv_range:
-> +ENTRY(__inval_cache_range)
->  	dcache_line_size x2, x3
->  	sub	x3, x2, #1
->  	tst	x1, x3				// end cache line aligned?
-> @@ -136,46 +137,43 @@ __dma_inv_range:
->  	dsb	sy
->  	ret
->  ENDPIPROC(__inval_cache_range)
-> -ENDPROC(__dma_inv_range)
-> +ENDPROC(__dma_inv_area)
-> +
-> +/*
-> + *	__clean_dcache_area_poc(kaddr, size)
-> + *
-> + * 	Ensure that any D-cache lines for the interval [kaddr, kaddr+size)
-> + * 	are cleaned to the PoC.
-> + *
-> + *	- kaddr   - kernel address
-> + *	- size    - size in question
-> + */
-> +ENTRY(__clean_dcache_area_poc)
-> +	/* FALLTHROUGH */
->  
->  /*
-> - *	__dma_clean_range(start, end)
-> + *	__dma_clean_area(start, size)
->   *	- start   - virtual start address of region
-> - *	- end     - virtual end address of region
-> + *	- size    - size in question
->   */
-> -__dma_clean_range:
-> -	dcache_line_size x2, x3
-> -	sub	x3, x2, #1
-> -	bic	x0, x0, x3
-> -1:
-> -alternative_if_not ARM64_WORKAROUND_CLEAN_CACHE
-> -	dc	cvac, x0
-> -alternative_else
-> -	dc	civac, x0
-> -alternative_endif
-> -	add	x0, x0, x2
-> -	cmp	x0, x1
-> -	b.lo	1b
-> -	dsb	sy
-> +__dma_clean_area:
-> +	dcache_by_line_op cvac, sy, x0, x1, x2, x3
->  	ret
-> -ENDPROC(__dma_clean_range)
-> +ENDPIPROC(__clean_dcache_area_poc)
-> +ENDPROC(__dma_clean_area)
->  
->  /*
-> - *	__dma_flush_range(start, end)
-> + *	__dma_flush_area(start, size)
-> + *
-> + *	clean & invalidate D / U line
-> + *
->   *	- start   - virtual start address of region
-> - *	- end     - virtual end address of region
-> + *	- size    - size in question
->   */
-> -ENTRY(__dma_flush_range)
-> -	dcache_line_size x2, x3
-> -	sub	x3, x2, #1
-> -	bic	x0, x0, x3
-> -1:	dc	civac, x0			// clean & invalidate D / U line
-> -	add	x0, x0, x2
-> -	cmp	x0, x1
-> -	b.lo	1b
-> -	dsb	sy
-> +ENTRY(__dma_flush_area)
-> +	dcache_by_line_op civac, sy, x0, x1, x2, x3
->  	ret
-> -ENDPIPROC(__dma_flush_range)
-> +ENDPIPROC(__dma_flush_area)
->  
->  /*
->   *	__dma_map_area(start, size, dir)
-> @@ -184,10 +182,9 @@ ENDPIPROC(__dma_flush_range)
->   *	- dir	- DMA direction
->   */
->  ENTRY(__dma_map_area)
-> -	add	x1, x1, x0
->  	cmp	w2, #DMA_FROM_DEVICE
-> -	b.eq	__dma_inv_range
-> -	b	__dma_clean_range
-> +	b.eq	__dma_inv_area
-> +	b	__dma_clean_area
->  ENDPIPROC(__dma_map_area)
->  
->  /*
-> @@ -197,8 +194,7 @@ ENDPIPROC(__dma_map_area)
->   *	- dir	- DMA direction
->   */
->  ENTRY(__dma_unmap_area)
-> -	add	x1, x1, x0
->  	cmp	w2, #DMA_TO_DEVICE
-> -	b.ne	__dma_inv_range
-> +	b.ne	__dma_inv_area
->  	ret
->  ENDPIPROC(__dma_unmap_area)
-> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
-> index f6c55af..88922e8 100644
-> --- a/arch/arm64/mm/dma-mapping.c
-> +++ b/arch/arm64/mm/dma-mapping.c
-> @@ -168,7 +168,7 @@ static void *__dma_alloc(struct device *dev, size_t size,
->  		return ptr;
->  
->  	/* remove any dirty cache lines on the kernel alias */
-> -	__dma_flush_range(ptr, ptr + size);
-> +	__dma_flush_area(ptr, size);
->  
->  	/* create a coherent mapping */
->  	page = virt_to_page(ptr);
-> @@ -387,7 +387,7 @@ static int __init atomic_pool_init(void)
->  		void *page_addr = page_address(page);
->  
->  		memset(page_addr, 0, atomic_pool_size);
-> -		__dma_flush_range(page_addr, page_addr + atomic_pool_size);
-> +		__dma_flush_area(page_addr, atomic_pool_size);
->  
->  		atomic_pool = gen_pool_create(PAGE_SHIFT, -1);
->  		if (!atomic_pool)
-> @@ -548,7 +548,7 @@ fs_initcall(dma_debug_do_init);
->  /* Thankfully, all cache ops are by VA so we can ignore phys here */
->  static void flush_page(struct device *dev, const void *virt, phys_addr_t phys)
->  {
-> -	__dma_flush_range(virt, virt + PAGE_SIZE);
-> +	__dma_flush_area(virt, PAGE_SIZE);
->  }
->  
->  static void *__iommu_alloc_attrs(struct device *dev, size_t size,
-> 
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+index 70d0382..9fc540e 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+@@ -131,8 +131,34 @@
+ 			(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
+ 	};
+ 
++	mailbox: mbox at 0 {
++		compatible = "arm,smc-mbox";
++		#mbox-cells = <1>;
++		identifiers = <0x82000001>;
++	};
++
++	sram: sram at 18000{
++		compatible = "mmio-sram";
++		reg = <0x10000 0x8000>;
++
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges = <0 0x10000 0x8000>;
++
++		cpu_scp_mem: scp-shmem at 7e00 {
++			compatible = "mmio-sram";
++			reg = <0x7e00 0x200>;
++		};
++	};
++
+ 	/include/ "sun50i-a64-clocks.dtsi"
+ 
++	scpi {
++		compatible = "arm,scpi";
++		mboxes = <&mailbox 0>;
++		shmem = <&cpu_scp_mem>;
++	};
++
+ 	soc {
+ 		compatible = "simple-bus";
+ 		#address-cells = <1>;
+-- 
+2.9.0
