@@ -1,176 +1,169 @@
-From: hzpeterchen@gmail.com (Peter Chen)
-Date: Tue, 9 Aug 2016 15:18:21 +0800
-Subject: [PATCH 1/1] irqchip: irq-gic: forward SGI to itself for
- cortex-a7 single core
-In-Reply-To: <20160809075930.529f98ca@arm.com>
-References: <20160808105026.GA12649@leverpostej>
- <HE1PR04MB1450C6BE844A31C95CEE3BE18B1B0@HE1PR04MB1450.eurprd04.prod.outlook.com>
- <20160808130754.GB12649@leverpostej>
- <20160808132847.GB17680@shlinux2>
- <20160808134842.GE12649@leverpostej>
- <20160808145916.0924e868@arm.com> <20160809034613.GB31105@shlinux2>
- <20160809063401.3117dc94@arm.com> <20160809055701.GC31105@shlinux2>
- <20160809075930.529f98ca@arm.com>
-Message-ID: <20160809071821.GD31105@shlinux2>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Tue, 9 Aug 2016 09:49:07 +0200
+Subject: [PATCH v2] KVM: arm64: ITS: move ITS registration into first VCPU
+ run
+In-Reply-To: <20160808154543.23463-1-andre.przywara@arm.com>
+References: <20160808154543.23463-1-andre.przywara@arm.com>
+Message-ID: <1d5b1c34-9baa-8bf7-f7c2-fe1c3c9c999b@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 09, 2016 at 07:59:30AM +0100, Marc Zyngier wrote:
-> On Tue, 9 Aug 2016 13:57:01 +0800
-> Peter Chen <hzpeterchen@gmail.com> wrote:
-> 
-> > On Tue, Aug 09, 2016 at 06:34:01AM +0100, Marc Zyngier wrote:
-> > > On Tue, 9 Aug 2016 11:46:13 +0800
-> > > Peter Chen <hzpeterchen@gmail.com> wrote:
-> > >   
-> > > > On Mon, Aug 08, 2016 at 02:59:16PM +0100, Marc Zyngier wrote:  
-> > > > > On Mon, 8 Aug 2016 14:48:42 +0100
-> > > > > Mark Rutland <mark.rutland@arm.com> wrote:
-> > > > >     
-> > > > > > On Mon, Aug 08, 2016 at 09:28:47PM +0800, Peter Chen wrote:    
-> > > > > > > On Mon, Aug 08, 2016 at 02:07:54PM +0100, Mark Rutland wrote:      
-> > > > > > > > I see that for arm64 we have:
-> > > > > > > > 
-> > > > > > > > static inline bool arch_irq_work_has_interrupt(void)
-> > > > > > > > {
-> > > > > > > > 	return !!__smp_cross_call;
-> > > > > > > > }
-> > > > > > > > 
-> > > > > > > > Could we do similarly for ARM, and ony register gic_raise_softirq if
-> > > > > > > > we have non-zero SGI targets?
-> > > > > > > > 
-> > > > > > > > If I've understood correctly, that would make things behave as they do
-> > > > > > > > for UP on you system.      
-> > > > > > 
-> > > > > > [...]
-> > > > > >     
-> > > > > > > > If self-IPI is necessary, then this would be up to the GIC code to
-> > > > > > > > solve.
-> > > > > > > > 
-> > > > > > > > For that case, it would be nicer if we could detect whether this was
-> > > > > > > > necessary based on the GIC registers alone. That way we handle the
-> > > > > > > > various ways this can be integrated, aren't totally relient on the DT,
-> > > > > > > > work in VMs, etc.      
-> > > > > > > 
-> > > > > > > How we can detect IPI capabilities based on GIC register?      
-> > > > > > 
-> > > > > > Check the mask associated with SGIs, as we do for gic_get_cpumask(). If
-> > > > > > this is zero, we have a non-multiprocessor GIC (or one that's otherwise
-> > > > > > broken), and can't do SGI in the usual way.
-> > > > > > 
-> > > > > > However, it only makes sense to do this if self-IPI is truly a
-> > > > > > necessity. Given there are other interrupt controllers that can't do
-> > > > > > self-IPI, avoiding self-IPI in general would be a better strategy,
-> > > > > > avoiding churn in each and every driver...    
-> > > > > 
-> > > > > Indeed. And I won't take such a patch until all other avenues have been
-> > > > > explored, including fixing core code if required...
-> > > > >     
-> > > > 
-> > > > Ok, it seems both you and Mark agree with disable IPI for GIC who has only
-> > > > self-IPI capability (GICD_ITARGETSR0 to GICD_ITARGETSR7 are all
-> > > > zero), right?  
-> > > 
-> > > Not necessarily. This can be seen a latency improvement, compared to
-> > > the timer method which should be the fallback.
-> > >   
-> > 
-> > Why? Your below patch (I tried too) just fixes NULL pointer issue for
-> 
-> And that's the first issue to solve.
-> 
-> > without define smp_cross_call function. But imx6ul is a SMP platform
-> 
-> It is *not* an SMP platform. It may have a SMP-capable core, but that's
-> about it.
-> 
 
-Well. That's what I thought at the beginning, but the kernel
-takes it is. At __fixup_smp (arch/arm/kernel/head.S), it only checks
-MPIDR, for MPcore, it is 0x80000000, it means it is Multiprocessing
-Extensions and Processor is part of a multiprocessor system.
-
->From my point, single-core in multiprocessor system is different
-with uniprocessor system. The first one can execute SMP instruction, but
-can't for latter.
-
-> > (all imx6/7 uses the same configuration with both CONFIG_SMP and
-> >  CONFIG_SMP_ON_UP are defined), it still defines smp_cross_call.
-> > We still need the changes at gic code.
+Hi Andre,
+On 08/08/2016 17:45, Andre Przywara wrote:
+> Currently we register an ITS device upon userland issuing the CTLR_INIT
+> ioctl to mark initialization of the ITS as done.
+> This deviates from the initialization sequence of the existing GIC
+> devices and does not play well with the way QEMU handles things.
+> To be more in line with what we are used to, register the ITS(es) just
+> before the first VCPU is about to run, so in the map_resources() call.
+> This involves iterating through the list of KVM devices and map each
+> ITS that we find.
 > 
-> That's a different story. You could simply not register the cross-call
-> on your UP system, and it would just work.
-> 
-
-Again, it is taken as SMP by kernel, and run SMP instructions, the
-kernel does not do fixup symbol for it.
-
-> > Besides, if the hardware has IPI capability, but we just disable it
-> > to align with UP platforms, is it reasonable?
-> 
-> Again: having a self-IPI on UP is an optimization. Nothing more.
-> 
-> Now, coming back to your original idea, I'm aiming towards something
-> like this:
-> 
-
-Your below patch can work (tested), but why not registering an self-IPI
-smp_cross_call function for single core, it can avoid judging in code
-for each IPI calls.
-
-Peter
-> From ad5c001cb1359799831bbb69f8582cb41dda4248 Mon Sep 17 00:00:00 2001
-> From: Marc Zyngier <marc.zyngier@arm.com>
-> Date: Tue, 9 Aug 2016 07:50:44 +0100
-> Subject: [PATCH] irqchip/gic: Allow self-SGIs for SMP on UP configurations
-> 
-> On systems where a single CPU is present, the GIC may not support
-> having SGIs delivered to a target list. In that case, we use the
-> self-SGI mechanism to allow the interrupt to be delivered locally.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 > ---
->  drivers/irqchip/irq-gic.c | 8 ++++++++
->  1 file changed, 8 insertions(+)
+> Changelog v1 .. v2:
+> - remove not yet upstreamed locking
+> - remove pointless de-registration on rollback
 > 
-> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-> index c2cab57..415aa1e 100644
-> --- a/drivers/irqchip/irq-gic.c
-> +++ b/drivers/irqchip/irq-gic.c
-> @@ -771,6 +771,13 @@ static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
+>  virt/kvm/arm/vgic/vgic-its.c | 43 +++++++++++++++++++++++++++++++++----------
+>  virt/kvm/arm/vgic/vgic-v3.c  |  8 ++++++++
+>  virt/kvm/arm/vgic/vgic.h     |  6 ++++++
+>  3 files changed, 47 insertions(+), 10 deletions(-)
+> 
+> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+> index 07411cf..7180994 100644
+> --- a/virt/kvm/arm/vgic/vgic-its.c
+> +++ b/virt/kvm/arm/vgic/vgic-its.c
+> @@ -1288,13 +1288,13 @@ void vgic_enable_lpis(struct kvm_vcpu *vcpu)
+>  		its_sync_lpi_pending_table(vcpu);
+>  }
 >  
->  	raw_spin_lock_irqsave(&irq_controller_lock, flags);
+> -static int vgic_its_init_its(struct kvm *kvm, struct vgic_its *its)
+> +static int vgic_register_its_iodev(struct kvm *kvm, struct vgic_its *its)
+>  {
+>  	struct vgic_io_device *iodev = &its->iodev;
+>  	int ret;
 >  
-> +	if (unlikely(nr_cpu_ids == 1)) {
-> +		/* Only one CPU? let's do a self-IPI... */
-> +		writel_relaxed(2 << 24 | irq,
-> +			       gic_data_dist_base(&gic_data[0]) + GIC_DIST_SOFTINT);
-> +		goto out;
+> -	if (its->initialized)
+> -		return 0;
+> +	if (!its->initialized)
+> +		return -EBUSY;
+>  
+>  	if (IS_VGIC_ADDR_UNDEF(its->vgic_its_base))
+>  		return -ENXIO;
+> @@ -1311,9 +1311,6 @@ static int vgic_its_init_its(struct kvm *kvm, struct vgic_its *its)
+>  				      KVM_VGIC_V3_ITS_SIZE, &iodev->dev);
+>  	mutex_unlock(&kvm->slots_lock);
+>  
+> -	if (!ret)
+> -		its->initialized = true;
+> -
+>  	return ret;
+>  }
+>  
+> @@ -1435,9 +1432,6 @@ static int vgic_its_set_attr(struct kvm_device *dev,
+>  		if (type != KVM_VGIC_ITS_ADDR_TYPE)
+>  			return -ENODEV;
+>  
+> -		if (its->initialized)
+> -			return -EBUSY;
+> -
+>  		if (copy_from_user(&addr, uaddr, sizeof(addr)))
+>  			return -EFAULT;
+>  
+> @@ -1453,7 +1447,9 @@ static int vgic_its_set_attr(struct kvm_device *dev,
+>  	case KVM_DEV_ARM_VGIC_GRP_CTRL:
+>  		switch (attr->attr) {
+>  		case KVM_DEV_ARM_VGIC_CTRL_INIT:
+> -			return vgic_its_init_its(dev->kvm, its);
+> +			its->initialized = true;
+> +
+> +			return 0;
+>  		}
+>  		break;
+>  	}
+> @@ -1498,3 +1494,30 @@ int kvm_vgic_register_its_device(void)
+>  	return kvm_register_device_ops(&kvm_arm_vgic_its_ops,
+>  				       KVM_DEV_TYPE_ARM_VGIC_ITS);
+>  }
+> +
+> +/*
+> + * Registers all ITSes with the kvm_io_bus framework.
+> + * To follow the existing VGIC initialization sequence, this has to be
+> + * done as late as possible, just before the first VCPU runs.
+> + */
+> +int vgic_register_its_iodevs(struct kvm *kvm)
+> +{
+> +	struct kvm_device *dev;
+> +	int ret = 0;
+> +
+> +	list_for_each_entry(dev, &kvm->devices, vm_node) {
+> +		if (dev->ops != &kvm_arm_vgic_its_ops)
+> +			continue;
+> +
+> +		ret = vgic_register_its_iodev(kvm, dev->private);
+> +		if (ret)
+> +			return ret;
+> +		/*
+> +		 * We don't need to care about tearing down previously
+> +		 * registered ITSes, as the kvm_io_bus framework removes
+> +		 * them for us if the VM gets destroyed.
+> +		 */
 > +	}
 > +
->  	/* Convert our logical CPU mask into a physical one. */
->  	for_each_cpu(cpu, mask)
->  		map |= gic_cpu_map[cpu];
-> @@ -784,6 +791,7 @@ static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
->  	/* this always happens on GIC0 */
->  	writel_relaxed(map << 16 | irq, gic_data_dist_base(&gic_data[0]) + GIC_DIST_SOFTINT);
+> +	return ret;
+> +}
+> diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
+> index 0506543..9f0dae3 100644
+> --- a/virt/kvm/arm/vgic/vgic-v3.c
+> +++ b/virt/kvm/arm/vgic/vgic-v3.c
+> @@ -289,6 +289,14 @@ int vgic_v3_map_resources(struct kvm *kvm)
+>  		goto out;
+>  	}
 >  
-> +out:
->  	raw_spin_unlock_irqrestore(&irq_controller_lock, flags);
+> +	if (vgic_has_its(kvm)) {
+> +		ret = vgic_register_its_iodevs(kvm);
+> +		if (ret) {
+> +			kvm_err("Unable to register VGIC ITS MMIO regions\n");
+> +			goto out;
+> +		}
+> +	}
+> +
+>  	dist->ready = true;
+>  
+>  out:
+> diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
+> index 1d8e21d..6c4625c 100644
+> --- a/virt/kvm/arm/vgic/vgic.h
+> +++ b/virt/kvm/arm/vgic/vgic.h
+> @@ -84,6 +84,7 @@ void vgic_v3_enable(struct kvm_vcpu *vcpu);
+>  int vgic_v3_probe(const struct gic_kvm_info *info);
+>  int vgic_v3_map_resources(struct kvm *kvm);
+>  int vgic_register_redist_iodevs(struct kvm *kvm, gpa_t dist_base_address);
+> +int vgic_register_its_iodevs(struct kvm *kvm);
+>  bool vgic_has_its(struct kvm *kvm);
+>  int kvm_vgic_register_its_device(void);
+>  void vgic_enable_lpis(struct kvm_vcpu *vcpu);
+> @@ -140,6 +141,11 @@ static inline int vgic_register_redist_iodevs(struct kvm *kvm,
+>  	return -ENODEV;
 >  }
->  #endif
-> -- 
-> 2.8.1
+>  
+> +static inline int vgic_register_its_iodevs(struct kvm *kvm)
+> +{
+> +	return -ENODEV;
+> +}
+> +
+>  static inline bool vgic_has_its(struct kvm *kvm)
+>  {
+>  	return false;
 > 
-> Does it work for you?
-> 
-> Thanks,
-> 
-> 	M.
-> -- 
-> Jazz is not dead. It just smells funny.
 
--- 
+Reviewed-by: Eric Auger <eric.auger@redhat.com>
+Tested-by: Eric Auger <eric.auger@redhat.com>
 
-Best Regards,
-Peter Chen
+Tested on Cavium with QEMU (with accordingly modified init sequence)
+
+Cheers
+
+Eric
