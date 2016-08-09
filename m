@@ -1,19 +1,37 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 9 Aug 2016 21:35:32 +0800
-Subject: [PATCH v2 2/2] imx53.dtsi : Add DMA configuration for UART
-In-Reply-To: <1470306157-11181-2-git-send-email-fabien.lahoudere@collabora.co.uk>
-References: <CAOMZO5BoRsrHv-+5c9bAXO2NCya8sPqmmpy9DOfav6NvQ+VMLQ@mail.gmail.com>
- <1470306157-11181-1-git-send-email-fabien.lahoudere@collabora.co.uk>
- <1470306157-11181-2-git-send-email-fabien.lahoudere@collabora.co.uk>
-Message-ID: <20160809133532.GV4678@tiger>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Tue, 9 Aug 2016 14:37:05 +0100
+Subject: [PATCH 6/6] bus: Add support for Tegra Generic Memory Interface
+In-Reply-To: <CALw8SCWjs2TnwFcTY=iXv_eskpKaKpvUmoXnTgtpoL8w9neD=w@mail.gmail.com>
+References: <1470512452-8322-1-git-send-email-mirza.krak@gmail.com>
+ <1470512452-8322-7-git-send-email-mirza.krak@gmail.com>
+ <fae8dbaf-53e9-dcfe-f755-32f7b28f4c9f@nvidia.com>
+ <CALw8SCWjs2TnwFcTY=iXv_eskpKaKpvUmoXnTgtpoL8w9neD=w@mail.gmail.com>
+Message-ID: <c6c6d000-d0d4-ac9f-e19e-0d2a513cd3e8@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 04, 2016 at 12:22:37PM +0200, Fabien Lahoudere wrote:
-> In order to use sdma with UART, we need to add DMA configuration in device tree.
+
+On 09/08/16 08:21, Mirza Krak wrote:
+> 2016-08-08 15:47 GMT+02:00 Jon Hunter <jonathanh@nvidia.com>:
+
+...
+
+>>> +     return of_platform_default_populate(of_node, NULL, dev);
+>>
+>> Seems odd to do this here. Why not as the last thing in probe once the
+>> GMI has been setup correctly?
 > 
-> Signed-off-by: Fabien Lahoudere <fabien.lahoudere@collabora.co.uk>
+> It is done here mostly to avoid clean up in probe. I could move it out
+> of tegra_gmi_parse_dt and put it right after that call but still
+> before clk enable? Is that less odd?
 
-Changed subject prefix to 'ARM: dts: imx53: ', and applied patch.
+I would have thought that clocks should be enabled and resets
+de-asserted before we even attempt to populate any children. Hence, I
+would do this last. Yes that will require some clean-up in probe if this
+does fail but seems safest.
 
-Shawn
+Cheers
+Jon
+
+-- 
+nvpublic
