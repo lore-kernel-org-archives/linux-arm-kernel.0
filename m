@@ -1,37 +1,31 @@
-From: peter.chen@nxp.com (Peter Chen)
-Date: Tue, 9 Aug 2016 16:24:43 +0800
-Subject: [PATCH 1/1] ARM: mach-imx: pm-imx6: add missing
- BM_CLPCR_BYP_MMDC_CH0_LPM_HS setting for imx6ul
-Message-ID: <1470731083-26213-1-git-send-email-peter.chen@nxp.com>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Tue, 9 Aug 2016 10:39:43 +0200
+Subject: [PATCH 1/3] dt/bindings: arm-pl330: add description of
+ arm,pl330-periph-burst
+In-Reply-To: <ea3572fa-4bff-87db-d5ad-f406809f8296@rock-chips.com>
+References: <1470365602-32586-1-git-send-email-shawn.lin@rock-chips.com>
+ <1470365602-32586-2-git-send-email-shawn.lin@rock-chips.com>
+ <20160805033410.GJ9681@localhost>
+ <ea3572fa-4bff-87db-d5ad-f406809f8296@rock-chips.com>
+Message-ID: <0df0ab4f-0032-6487-2c30-b1ccd7d9ae62@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is a missing BM_CLPCR_BYP_MMDC_CH0_LPM_HS setting for imx6ul,
-without it, the "standby" mode can't work well, the system can't be
-resumed.
+On 08/05/2016 09:25 AM, Shawn Lin wrote:
+> Hi Vinod,
+> 
+> ? 2016/8/5 11:34, Vinod Koul ??:
+>> On Fri, Aug 05, 2016 at 10:53:20AM +0800, Shawn Lin wrote:
+>>> This patch adds the "arm,pl330-periph-burst" for arm-pl330 to
+>>> support busrt mode.
+>>
+>> why should this be DT property. Only reason I can think of if some hw
+>> versions support this and some won't.
+> 
+> yes, if we want to support burst mode, both of the master(pl330) and
+> client(several peripherals) should implement it, otherwise it will
+> be broken when enabling.
 
-With this commit, the "standby" mode works well.
-
-Cc: Anson Huang <anson.huang@nxp.com>
-Cc: <stable@vger.kernel.org>
-Fixes: ee4a5f838c84 ("ARM: imx: add suspend/resume support for i.mx6ul")
-Signed-off-by: Peter Chen <peter.chen@nxp.com>
----
- arch/arm/mach-imx/pm-imx6.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/mach-imx/pm-imx6.c b/arch/arm/mach-imx/pm-imx6.c
-index 58924b3..67bab74 100644
---- a/arch/arm/mach-imx/pm-imx6.c
-+++ b/arch/arm/mach-imx/pm-imx6.c
-@@ -295,7 +295,7 @@ int imx6_set_lpm(enum mxc_cpu_pwr_mode mode)
- 		val &= ~BM_CLPCR_SBYOS;
- 		if (cpu_is_imx6sl())
- 			val |= BM_CLPCR_BYPASS_PMIC_READY;
--		if (cpu_is_imx6sl() || cpu_is_imx6sx())
-+		if (cpu_is_imx6sl() || cpu_is_imx6sx() || cpu_is_imx6ul())
- 			val |= BM_CLPCR_BYP_MMDC_CH0_LPM_HS;
- 		else
- 			val |= BM_CLPCR_BYP_MMDC_CH1_LPM_HS;
--- 
-1.9.1
+As you said, it is up to the consumer peripheral whether it supports BURST,
+SINGLE or both. So this is a per client property, but you specify this as a
+a global property on the producer side.
