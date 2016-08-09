@@ -1,26 +1,53 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Tue, 9 Aug 2016 15:59:28 +0200
-Subject: [PATCH V2] usb: ehci-platform: use helper variables in probe
- function
-In-Reply-To: <1468559156-17270-1-git-send-email-zajec5@gmail.com>
-References: <1468398548-5050-1-git-send-email-zajec5@gmail.com>
- <1468559156-17270-1-git-send-email-zajec5@gmail.com>
-Message-ID: <20160809135928.GB3021@kroah.com>
+From: minghsiu.tsai@mediatek.com (Minghsiu Tsai)
+Date: Tue, 9 Aug 2016 21:58:54 +0800
+Subject: [PATCH v3 1/4] VPU: mediatek: Add mdp support
+In-Reply-To: <1470751137-12403-1-git-send-email-minghsiu.tsai@mediatek.com>
+References: <1470751137-12403-1-git-send-email-minghsiu.tsai@mediatek.com>
+Message-ID: <1470751137-12403-2-git-send-email-minghsiu.tsai@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 15, 2016 at 07:05:56AM +0200, Rafa? Mi?ecki wrote:
-> Probing function was using &dev->dev and dev->dev.of_node over 20 times
-> so I believe it made sense to use helper variables for both of them.
-> To avoid some uncommon variable name for struct device I first replaced
-> existing dev variable with pdev.
-> 
-> Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
-> Acked-by: Alan Stern <stern@rowland.harvard.edu>
-> ---
-> V2: Use 2 extra tabs after line break to match one of already used
->     coding styles.
+VPU driver add mdp support
 
-Same comment here, unnecessary churn, sorry.
+Signed-off-by: Minghsiu Tsai <minghsiu.tsai@mediatek.com>
+---
+ drivers/media/platform/mtk-vpu/mtk_vpu.h |    5 +++++
+ 1 file changed, 5 insertions(+)
 
-greg k-h
+diff --git a/drivers/media/platform/mtk-vpu/mtk_vpu.h b/drivers/media/platform/mtk-vpu/mtk_vpu.h
+index f457479..291ae46 100644
+--- a/drivers/media/platform/mtk-vpu/mtk_vpu.h
++++ b/drivers/media/platform/mtk-vpu/mtk_vpu.h
+@@ -53,6 +53,8 @@ typedef void (*ipi_handler_t) (void *data,
+ 			 handle H264 video encoder job, and vice versa.
+  * @IPI_VENC_VP8:	 The interrupt fro vpu is to notify kernel to
+ 			 handle VP8 video encoder job,, and vice versa.
++ * @IPI_MDP:		 The interrupt from vpu is to notify kernel to
++			 handle MDP (Media Data Path) job, and vice versa.
+  * @IPI_MAX:		 The maximum IPI number
+  */
+ 
+@@ -63,6 +65,7 @@ enum ipi_id {
+ 	IPI_VDEC_VP9,
+ 	IPI_VENC_H264,
+ 	IPI_VENC_VP8,
++	IPI_MDP,
+ 	IPI_MAX,
+ };
+ 
+@@ -71,11 +74,13 @@ enum ipi_id {
+  *
+  * @VPU_RST_ENC: encoder reset id
+  * @VPU_RST_DEC: decoder reset id
++ * @VPU_RST_MDP: MDP (Media Data Path) reset id
+  * @VPU_RST_MAX: maximum reset id
+  */
+ enum rst_id {
+ 	VPU_RST_ENC,
+ 	VPU_RST_DEC,
++	VPU_RST_MDP,
+ 	VPU_RST_MAX,
+ };
+ 
+-- 
+1.7.9.5
