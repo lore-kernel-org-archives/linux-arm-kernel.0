@@ -1,77 +1,35 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 9 Aug 2016 16:44:17 +0800
-Subject: [PATCH] ARM: no need to select SMP_ON_UP explicitly
-In-Reply-To: <1469199369-25746-1-git-send-email-vladimir.murzin@arm.com>
-References: <1469199369-25746-1-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <20160809084416.GS4678@tiger>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Tue,  9 Aug 2016 10:52:14 +0200
+Subject: [PATCH 0/3] Add Platform MHU mailbox driver for Amlogic GXBB
+Message-ID: <1470732737-18391-1-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 22, 2016 at 03:56:09PM +0100, Vladimir Murzin wrote:
-> SMP_ON_UP is already defaulted to "y" and has all dependencies expressed
-> - no need to select it per platform level
-> 
-> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
-> ---
-> 
-> This time sent to LAKML
-> 
->  arch/arm/mach-imx/Kconfig      |    3 ---
->  arch/arm/mach-realview/Kconfig |    1 -
+In order to support Mailbox links for the Amlogic GXBB SoC, add a generic
+platform MHU driver based on arm_mhu.c.
 
-I cannot take mach-realview changes.  I think you need to ether split
-the changes, or ask arm-soc folks to apply.  In case of the latter, here
-is my ACK:
+This patchset follows a RFC thread along the GXBB SCPI support at :
+http://lkml.kernel.org/r/1466503374-28841-1-git-send-email-narmstrong at baylibre.com
+And specific MHU discussions at :
+http://lkml.kernel.org/r/CABb+yY3HqJG2+GMWCWF9PomxobrwWGZ=TZe5NvXPcHMDdLhkcQ at mail.gmail.com
 
-Acked-by: Shawn Guo <shawnguo@kernel.org>
+Changes since RFC v2 :
+ - Rename to platform_mhu
+ - Sync all link functions with arm_mhu
 
->  2 files changed, 4 deletions(-)
-> 
-> diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-> index dd905b9..cfb1120 100644
-> --- a/arch/arm/mach-imx/Kconfig
-> +++ b/arch/arm/mach-imx/Kconfig
-> @@ -92,7 +92,6 @@ config SOC_IMX31
->  	select CPU_V6
->  	select IMX_HAVE_PLATFORM_MXC_RNGA
->  	select MXC_AVIC
-> -	select SMP_ON_UP if SMP
->  
->  config SOC_IMX35
->  	bool
-> @@ -100,7 +99,6 @@ config SOC_IMX35
->  	select HAVE_EPIT
->  	select MXC_AVIC
->  	select PINCTRL_IMX35
-> -	select SMP_ON_UP if SMP
->  
->  if ARCH_MULTI_V4T
->  
-> @@ -589,7 +587,6 @@ config SOC_VF610
->  	select ARM_GIC if ARCH_MULTI_V7
->  	select PINCTRL_VF610
->  	select PL310_ERRATA_769419 if CACHE_L2X0
-> -	select SMP_ON_UP if SMP
->  
->  	help
->  	  This enables support for Freescale Vybrid VF610 processor.
-> diff --git a/arch/arm/mach-realview/Kconfig b/arch/arm/mach-realview/Kconfig
-> index 70ab4a2..739800e 100644
-> --- a/arch/arm/mach-realview/Kconfig
-> +++ b/arch/arm/mach-realview/Kconfig
-> @@ -24,7 +24,6 @@ config REALVIEW_DT
->  	select POWER_RESET
->  	select POWER_RESET_VERSATILE
->  	select POWER_SUPPLY
-> -	select SMP_ON_UP if SMP
->  	select SOC_REALVIEW
->  	select USE_OF
->  	help
-> -- 
-> 1.7.9.5
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Neil Armstrong (3):
+  mailbox: Add Platform Message-Handling-Unit variant driver
+  dt-bindings: mailbox: Add Amlogic Meson MHU Bindings
+  ARM64: dts: meson-gxbb: Add Meson MHU Node
+
+ .../devicetree/bindings/mailbox/meson-mhu.txt      |  33 ++++
+ arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi        |   8 +
+ drivers/mailbox/Kconfig                            |  10 +
+ drivers/mailbox/Makefile                           |   2 +
+ drivers/mailbox/platform_mhu.c                     | 203 +++++++++++++++++++++
+ 5 files changed, 256 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mailbox/meson-mhu.txt
+ create mode 100644 drivers/mailbox/platform_mhu.c
+
+-- 
+2.7.0
