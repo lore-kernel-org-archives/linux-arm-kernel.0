@@ -1,30 +1,56 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Tue, 9 Aug 2016 11:19:18 +0200 (CEST)
-Subject: [PATCH v12 02/11] genirq/msi: msi_compose wrapper
-In-Reply-To: <1470158617-7022-3-git-send-email-eric.auger@redhat.com>
-References: <1470158617-7022-1-git-send-email-eric.auger@redhat.com>
- <1470158617-7022-3-git-send-email-eric.auger@redhat.com>
-Message-ID: <alpine.DEB.2.20.1608091117250.5388@nanos>
+From: liudongdong3@huawei.com (Dongdong Liu)
+Date: Tue, 9 Aug 2016 17:20:42 +0800
+Subject: [RFC PATCH V5 0/5] ECAM quirks handling for ARM64 platforms
+In-Reply-To: <1470661541-26270-1-git-send-email-tn@semihalf.com>
+References: <1470661541-26270-1-git-send-email-tn@semihalf.com>
+Message-ID: <57A9A06A.30907@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2 Aug 2016, Eric Auger wrote:
 
-> Currently the MSI message is composed by directly calling
-> irq_chip_compose_msi_msg and erased by setting the memory to zero.
-> 
-> On some platforms, we will need to complexify this composition to
-> properly handle MSI emission through IOMMU. Also we will need to track
-> when the MSI message is erased.
+? 2016/8/8 21:05, Tomasz Nowicki ??:
+> Quirk handling relies on an idea of matching MCFG OEM ID, TABLE ID and
+> revision (the ones from standard header of MCFG table).
+>
+> Static array is used to keep quirk entries. Each entry consists of
+> mentioned MCFG IDs along with custom pci_ops structure and initialization call.
+>
+> As an example, the last patch presents quirk handling mechanism usage for
+> ThunderX PEM driver.
+>
+> v4 -> v5
+> - rebase against v4.8-rc1
+> - rework to exact MCFG OEM ID, TABLE ID, rev match
+>    - use memcmp instead of strncmp
+>    - no substring match
+> - fix typos and dmesg message
+>
+> Tomasz Nowicki (5):
+>    PCI: Embed pci_ecam_ops in pci_config_window structure
+>    PCI/ACPI: Move ACPI ECAM mapping to generic MCFG driver
+>    PCI: Check platform specific ECAM quirks
+>    ARM64/PCI: Start using quirks handling for ACPI based PCI host
+>      controller
+>    PCI: thunder-pem: Support quirky configuration space access for ACPI
+>      based PCI host controller
+>
+>   arch/arm64/kernel/pci.c            | 42 +----------------
+>   drivers/acpi/pci_mcfg.c            | 40 ++++++++++++++++
+>   drivers/pci/ecam.c                 |  6 +--
+>   drivers/pci/host/Makefile          |  1 +
+>   drivers/pci/host/mcfg-quirks.c     | 93 ++++++++++++++++++++++++++++++++++++
+>   drivers/pci/host/mcfg-quirks.h     | 24 ++++++++++
+>   drivers/pci/host/pci-thunder-pem.c | 96 ++++++++++++++++++++++++++++++++------
+>   include/linux/pci-acpi.h           |  5 ++
+>   include/linux/pci-ecam.h           |  2 +-
+>   9 files changed, 252 insertions(+), 57 deletions(-)
+>   create mode 100644 drivers/pci/host/mcfg-quirks.c
+>   create mode 100644 drivers/pci/host/mcfg-quirks.h
+>
 
-I just can't find how you do that. After applying the series the
+Based on the patchset, tested on HiSilicon D03 board with intel 82599 net card. It worked OK.
 
-> +	if (erase)
-> +		memset(msg, 0, sizeof(*msg));
+Tested-by: Dongdong Liu <liudongdong3@huawei.com>
 
-branch is still just a memset(). The wrapper is fine for the compose side, but
-having the extra argument just to wrap the memset() for no gain is silly.
-
-Thanks,
-
-	tglx
+Thanks
+Dongdong
