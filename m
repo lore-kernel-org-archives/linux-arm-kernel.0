@@ -1,32 +1,44 @@
 From: romain.perier@free-electrons.com (Romain Perier)
-Date: Tue,  9 Aug 2016 11:03:13 +0200
-Subject: [PATCH 0/7] Various fixes for the cesa driver
-Message-ID: <1470733400-23621-1-git-send-email-romain.perier@free-electrons.com>
+Date: Tue,  9 Aug 2016 11:03:16 +0200
+Subject: [PATCH 3/7] crypto: marvell: turn mv_cesa_ahash_init() into a
+ function returning void
+In-Reply-To: <1470733400-23621-1-git-send-email-romain.perier@free-electrons.com>
+References: <1470733400-23621-1-git-send-email-romain.perier@free-electrons.com>
+Message-ID: <1470733400-23621-4-git-send-email-romain.perier@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patches series contains various fixes for ahash requests, dma
-operations and an important fixe in the core of the driver (cesa.c). It
-also includes some code cleanups.
+From: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
-Romain Perier (3):
-  crypto: marvell - Update transformation context for each dequeued req
-  crypto: marvell - Don't overwrite default creq->state during
-    initialization
-  crypto: marvell - Don't hardcode block size in mv_cesa_ahash_cache_req
+The mv_cesa_ahash_init() function always returns 0, and the return
+value is anyway never checked. Turn it into a function returning void.
 
-Thomas Petazzoni (4):
-  crypto: marvell: be explicit about destination in mv_cesa_dma_add_op()
-  crypto: marvell: remove unused parameter in
-    mv_cesa_ahash_dma_add_cache()
-  crypto: marvell: turn mv_cesa_ahash_init() into a function returning
-    void
-  crypto: marvell: make mv_cesa_ahash_cache_req() return bool
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ drivers/crypto/marvell/hash.c | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
 
- drivers/crypto/marvell/cesa.c |  1 +
- drivers/crypto/marvell/hash.c | 44 +++++++++++++++++++++----------------------
- drivers/crypto/marvell/tdma.c |  1 +
- 3 files changed, 23 insertions(+), 23 deletions(-)
-
+diff --git a/drivers/crypto/marvell/hash.c b/drivers/crypto/marvell/hash.c
+index 0d7f5f9..7291664 100644
+--- a/drivers/crypto/marvell/hash.c
++++ b/drivers/crypto/marvell/hash.c
+@@ -374,7 +374,7 @@ static const struct mv_cesa_req_ops mv_cesa_ahash_req_ops = {
+ 	.complete = mv_cesa_ahash_complete,
+ };
+ 
+-static int mv_cesa_ahash_init(struct ahash_request *req,
++static void mv_cesa_ahash_init(struct ahash_request *req,
+ 			      struct mv_cesa_op_ctx *tmpl, bool algo_le)
+ {
+ 	struct mv_cesa_ahash_req *creq = ahash_request_ctx(req);
+@@ -390,8 +390,6 @@ static int mv_cesa_ahash_init(struct ahash_request *req,
+ 	creq->op_tmpl = *tmpl;
+ 	creq->len = 0;
+ 	creq->algo_le = algo_le;
+-
+-	return 0;
+ }
+ 
+ static inline int mv_cesa_ahash_cra_init(struct crypto_tfm *tfm)
 -- 
 2.8.1
