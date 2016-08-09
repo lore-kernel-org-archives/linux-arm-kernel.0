@@ -1,32 +1,17 @@
-From: yonglong.wu@mediatek.com (Yonglong Wu)
-Date: Tue, 9 Aug 2016 11:31:27 +0800
-Subject: [RESEND PATCH] usb: hub: change CLEAR_FEATURE to SET_FEATURE
-Message-ID: <1470713487-7596-1-git-send-email-yonglong.wu@mediatek.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Tue, 9 Aug 2016 11:41:08 +0800
+Subject: [PATCH] ARM: dts: imx6qdl: don't configure reserved pad settings
+In-Reply-To: <1468012974-27180-1-git-send-email-uwe@kleine-koenig.org>
+References: <1468012974-27180-1-git-send-email-uwe@kleine-koenig.org>
+Message-ID: <20160809034107.GL4678@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Yonglong Wu <yonglong.wu@mediatek.com>
+On Fri, Jul 08, 2016 at 11:22:54PM +0200, Uwe Kleine-K?nig wrote:
+> Several dts files set a bit in the SPEED field for pads
+> RGMII_{R,T}{XC,D0,D1,D2,D3,X_CTL}, but that doesn't exist. Writing there
+> doesn't have an effect and the bit reads as zero.
+> 
+> Signed-off-by: Uwe Kleine-K?nig <uwe@kleine-koenig.org>
 
-According to USB30 specification, the Function Remote Wakeup field can be
-modified by the SetFeature() requests. SetFeature() is recommended to use.
-
-Signed-off-by: Yonglong Wu <yonglong.wu@mediatek.com>
----
- drivers/usb/core/hub.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/usb/core/hub.c b/drivers/usb/core/hub.c
-index bee1351..a6f5095 100644
---- a/drivers/usb/core/hub.c
-+++ b/drivers/usb/core/hub.c
-@@ -3111,7 +3111,7 @@ static int usb_disable_remote_wakeup(struct usb_device *udev)
- 				USB_CTRL_SET_TIMEOUT);
- 	else
- 		return usb_control_msg(udev, usb_sndctrlpipe(udev, 0),
--				USB_REQ_CLEAR_FEATURE, USB_RECIP_INTERFACE,
-+				USB_REQ_SET_FEATURE, USB_RECIP_INTERFACE,
- 				USB_INTRF_FUNC_SUSPEND,	0, NULL, 0,
- 				USB_CTRL_SET_TIMEOUT);
- }
--- 
-1.7.9.5
+Applied, thanks.
