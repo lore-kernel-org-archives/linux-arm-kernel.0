@@ -1,40 +1,97 @@
-From: wpdster@gmail.com (Patrick Doyle)
-Date: Tue, 9 Aug 2016 10:55:36 -0400
-Subject: How does the kernel assign ttySn to UARTs?
-In-Reply-To: <CAF_dkJD5MEfNzrRqM3H_LkOmXC3XYjUYLe2=ZtzCjAS1A2TDmg@mail.gmail.com>
-References: <CAF_dkJD5MEfNzrRqM3H_LkOmXC3XYjUYLe2=ZtzCjAS1A2TDmg@mail.gmail.com>
-Message-ID: <CAF_dkJDk0F+rDBs3=LxM_YWYE6AzwRMkSie-ZQabWYRws-fOsg@mail.gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 09 Aug 2016 17:06:51 +0200
+Subject: "Failed to create /dev/root: -14" after commit e6978e4bf1 ("ARM:
+ save and reset the address limit when entering an exception")
+In-Reply-To: <20160804100748.GP1041@n2100.armlinux.org.uk> (Russell King's
+ message of "Thu, 4 Aug 2016 11:07:48 +0100")
+References: <57A15C41.6000804@roeck-us.net>
+ <20160803083822.GI1041@n2100.armlinux.org.uk>
+ <57A20896.30300@roeck-us.net>
+ <20160804100748.GP1041@n2100.armlinux.org.uk>
+Message-ID: <87eg5y3rsk.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 8, 2016 at 3:56 PM, Patrick Doyle <wpdster@gmail.com> wrote:
-> Would any experts out there care to point me in the direction of some clues?
+Hi Russell King,
+ 
+ On jeu., ao?t 04 2016, Russell King - ARM Linux <linux@armlinux.org.uk> wrote:
 
+> On Wed, Aug 03, 2016 at 08:07:02AM -0700, Guenter Roeck wrote:
+>> On 08/03/2016 01:38 AM, Russell King - ARM Linux wrote:
+>> >On Tue, Aug 02, 2016 at 07:51:45PM -0700, Guenter Roeck wrote:
+>> >>Hi,
+>> >>
+>> >>I see the following crash when running a qemu arm 'kzm' runtime test with
+>> >>the current mainline.
+>> >>...
+>> >>Failed to create /dev/root: -14
+>> >>
+>> >>[ followed by panic ]
+>> >>
+>> >>A complete log file is at [1].
+>> >
+>> >I think it's because of those undefined instructions you're hitting
+>> >with the hw-breakpoint code... can you try the patch below please?
+>> >
+>> >  arch/arm/kernel/entry-armv.S | 1 +
+>> >  1 file changed, 1 insertion(+)
+>> >
+>> >diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
+>> >index bc5f50799d75..9f157e7c51e7 100644
+>> >--- a/arch/arm/kernel/entry-armv.S
+>> >+++ b/arch/arm/kernel/entry-armv.S
+>> >@@ -295,6 +295,7 @@ __und_svc_fault:
+>> >  	bl	__und_fault
+>> >
+>> >  __und_svc_finish:
+>> >+	get_thread_info tsk
+>> >  	ldr	r5, [sp, #S_PSR]		@ Get SVC cpsr
+>> >  	svc_exit r5				@ return from exception
+>> >   UNWIND(.fnend		)
+>> >
+>> 
+>> Yes, that fixes the problem.
+>> 
+>> Assuming you'll create a patch:
+>> 
+>> Tested-by: Guenter Roeck <linux@roeck-us.net>
+>> 
+>> Does that need to be addressed in qemu, or is it a Linux bug ?
+>
+> It's a Linux bug provoked by qemu not implementing the hardware
+> breakpoints.  Well worth fixing in Linux.
 
-Thank you Frank for your response... I found some clues on my own.
-The biggest clue was that I spelled "aliases" incorrectly (having
-spelled it "alias" instead of "aliases").
+The Armada XP base platform were hit by the same bug as we can see on
+kernlci:
+https://storage.kernelci.org/mainline/v4.8-rc1/arm-mvebu_v7_defconfig/lab-baylibre-seattle/boot-armada-xp-openblocks-ax3-4.html
 
-I found my second clue when I found that the Atmel supplied .dtsi file
-also defined some aliases for the serial ports.  (And they managed to
-spell "aliases" correctly).
+Your patch solves the issue too.
 
-And I found my final clue right where I should have started looking...
-in the source.  I looked in the Atmel serial driver and saw how it
-assigned serial port numbers first by any aliases if they were
-defined, and then sequentially.  So, I now have:
+Will you push this patch for v4.8-rc2 ?
 
-    aliases {
-        serial0 = &uart2; /* UART2 <=> /dev/ttyS0 (connected to
-mobility board) */
-        serial1 = &uart5; /* FLEXCOM4 <=> /dev/ttyS1 (console) */
-        serial2 = &uart3; /* UART2 <=> /dev/ttyS2 */
-    };
+Also I wonder if it is something expected to have this issue on a "real"
+hardware.
 
+You can also add my:
+Tested-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-which works the want it to, and, more importantly, I understand why it
-works that way :-)
+Thanks,
 
-Thanks for playing.
+Gregory
 
---wpd
+>
+> -- 
+> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+> FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+> according to speedtest.net.
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
