@@ -1,12 +1,11 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 9 Aug 2016 19:12:18 +0100
-Subject: [PATCH 2/9] remoteproc: core: Trivial: Improve error checking,
- spelling and debug prints
-In-Reply-To: <20160809173225.GC26240@tuxbot>
+Date: Tue, 9 Aug 2016 19:12:43 +0100
+Subject: [PATCH 1/9] remoteproc: core: Ensure error message is clear
+In-Reply-To: <20160809172825.GB26240@tuxbot>
 References: <20160804092153.23032-1-lee.jones@linaro.org>
- <20160804092153.23032-3-lee.jones@linaro.org>
- <20160809173225.GC26240@tuxbot>
-Message-ID: <20160809181218.GB1581@dell>
+ <20160804092153.23032-2-lee.jones@linaro.org>
+ <20160809172825.GB26240@tuxbot>
+Message-ID: <20160809181243.GC1581@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,69 +13,51 @@ On Tue, 09 Aug 2016, Bjorn Andersson wrote:
 
 > On Thu 04 Aug 02:21 PDT 2016, Lee Jones wrote:
 > 
-> > Trivial patch to clean up a couple of minor misgivings.
+> > Before this patch, the dma_alloc_coherent() failure path printed out:
+> > 
+> >   "dma_alloc_coherent err: 16760832"
+> > 
+> > ... alluding to the Linux error code being 16760832, but seeing as
+> > Linux error codes are all negative, this looks like a signed/unsigned
+> > issue.  In fact, the message is trying to print the length of the
+> > requested memory region.  Let's clear that up.
+> > 
+> > While we're at it, let's standardise the way 'len' is printed.  In
+> > all other locations 'len' is in hex prefixed by a '0x' for clarity.
 > > 
 > > Signed-off-by: Lee Jones <lee.jones@linaro.org>
 > 
 > Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
 
-You can just take it.
-
-> Although as I hope to stack this series ontop of the auto-boot there
-> will be some minor conflicts here.
-
-Sure, but they should be trivial to fix.
-
-Or, just take this patch, since it is independent of the set.
+Again, this can just be applied.
 
 > > ---
-> >  drivers/remoteproc/remoteproc_core.c | 12 ++++++------
-> >  1 file changed, 6 insertions(+), 6 deletions(-)
+> >  drivers/remoteproc/remoteproc_core.c | 5 +++--
+> >  1 file changed, 3 insertions(+), 2 deletions(-)
 > > 
 > > diff --git a/drivers/remoteproc/remoteproc_core.c b/drivers/remoteproc/remoteproc_core.c
-> > index 3566dc9..5654a81 100644
+> > index aea29a75c..3566dc9 100644
 > > --- a/drivers/remoteproc/remoteproc_core.c
 > > +++ b/drivers/remoteproc/remoteproc_core.c
-> > @@ -457,8 +457,8 @@ static int rproc_handle_trace(struct rproc *rproc, struct fw_rsc_trace *rsc,
-> >  
-> >  	rproc->num_traces++;
-> >  
-> > -	dev_dbg(dev, "%s added: va %p, da 0x%x, len 0x%x\n", name, ptr,
-> > -						rsc->da, rsc->len);
-> > +	dev_dbg(dev, "%s added: va %p, da 0x%x, len 0x%x\n",
-> > +		name, ptr, rsc->da, rsc->len);
-> >  
-> >  	return 0;
-> >  }
-> > @@ -581,8 +581,8 @@ static int rproc_handle_carveout(struct rproc *rproc,
+> > @@ -581,7 +581,7 @@ static int rproc_handle_carveout(struct rproc *rproc,
 > >  		return -EINVAL;
 > >  	}
 > >  
-> > -	dev_dbg(dev, "carveout rsc: da %x, pa %x, len 0x%x, flags %x\n",
-> > -			rsc->da, rsc->pa, rsc->len, rsc->flags);
-> > +	dev_dbg(dev, "carveout rsc: name: %s, da %x, pa %x, len 0x%x, flags %x\n",
-> > +		rsc->name, rsc->da, rsc->pa, rsc->len, rsc->flags);
+> > -	dev_dbg(dev, "carveout rsc: da %x, pa %x, len %x, flags %x\n",
+> > +	dev_dbg(dev, "carveout rsc: da %x, pa %x, len 0x%x, flags %x\n",
+> >  			rsc->da, rsc->pa, rsc->len, rsc->flags);
 > >  
 > >  	carveout = kzalloc(sizeof(*carveout), GFP_KERNEL);
-> >  	if (!carveout)
-> > @@ -700,7 +700,7 @@ static rproc_handle_resource_t rproc_loading_handlers[RSC_LAST] = {
-> >  	[RSC_CARVEOUT] = (rproc_handle_resource_t)rproc_handle_carveout,
-> >  	[RSC_DEVMEM] = (rproc_handle_resource_t)rproc_handle_devmem,
-> >  	[RSC_TRACE] = (rproc_handle_resource_t)rproc_handle_trace,
-> > -	[RSC_VDEV] = NULL, /* VDEVs were handled upon registrarion */
-> > +	[RSC_VDEV] = NULL, /* VDEVs were handled upon registration */
-> >  };
+> > @@ -590,7 +590,8 @@ static int rproc_handle_carveout(struct rproc *rproc,
 > >  
-> >  static rproc_handle_resource_t rproc_vdev_handler[RSC_LAST] = {
-> > @@ -918,7 +918,7 @@ static void rproc_fw_config_virtio(const struct firmware *fw, void *context)
-> >  	 * Create a copy of the resource table. When a virtio device starts
-> >  	 * and calls vring_new_virtqueue() the address of the allocated vring
-> >  	 * will be stored in the cached_table. Before the device is started,
-> > -	 * cached_table will be copied into devic memory.
-> > +	 * cached_table will be copied into device memory.
-> >  	 */
-> >  	rproc->cached_table = kmemdup(table, tablesz, GFP_KERNEL);
-> >  	if (!rproc->cached_table)
+> >  	va = dma_alloc_coherent(dev->parent, rsc->len, &dma, GFP_KERNEL);
+> >  	if (!va) {
+> > -		dev_err(dev->parent, "dma_alloc_coherent err: %d\n", rsc->len);
+> > +		dev_err(dev->parent,
+> > +			"failed to allocate dma memory: len 0x%x\n", rsc->len);
+> >  		ret = -ENOMEM;
+> >  		goto free_carv;
+> >  	}
 
 -- 
 Lee Jones
