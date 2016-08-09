@@ -1,77 +1,235 @@
-From: wsa-dev@sang-engineering.com (Wolfram Sang)
-Date: Tue,  9 Aug 2016 13:36:16 +0200
-Subject: [PATCH] i2c: don't print error when adding adapter fails
-Message-ID: <1470742581-12971-1-git-send-email-wsa-dev@sang-engineering.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 9 Aug 2016 12:51:09 +0100
+Subject: [PATCH v3] arm64: mm: convert __dma_* routines to use start, size
+In-Reply-To: <1470099050-25407-1-git-send-email-kwangwoo.lee@sk.com>
+References: <1470099050-25407-1-git-send-email-kwangwoo.lee@sk.com>
+Message-ID: <80a4602f-8105-fe2e-0f52-ee23f2c0b2e4@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since v4.8-rc1, the I2C core will print detailed information when adding an I2C
-adapter fails. So, drivers can skip this now.
+On 02/08/16 01:50, Kwangwoo Lee wrote:
+> __dma_* routines have been converted to use start and size instread of
+> start and end addresses. The patch was origianlly for adding
+> __clean_dcache_area_poc() which will be used in pmem driver to clean
+> dcache to the PoC(Point of Coherency) in arch_wb_cache_pmem().
+> 
+> The functionality of __clean_dcache_area_poc()  was equivalent to
+> __dma_clean_range(). The difference was __dma_clean_range() uses the end
+> address, but __clean_dcache_area_poc() uses the size to clean.
+> 
+> Thus, __clean_dcache_area_poc() has been revised with a fallthrough
+> function of __dma_clean_range() after the change that __dma_* routines
+> use start and size instead of using start and end.
+> 
+> As a consequence of using start and size, the name of __dma_* routines
+> has also been altered following the terminology below:
+>     area: takes a start and size
+>     range: takes a start and end
 
-I am still undecided if I apply this as a single patch or break it out. But for
-reviewing, avoiding the patch bomb is probably a good thing.
+This looks pretty nice and tidy now; I don't see anything obviously
+wrong, and comparing before-and-after disassemblies shows essentially
+nothing more than the movement of some add instructions as expected, so:
 
-Should go via subsystem tree, I'd think.
+Reviewed-by: Robin Murphy <robin.murphy@arm.com>
 
-Wolfram Sang (1):
-  i2c: don't print error when adding adapter fails
-
- drivers/i2c/busses/i2c-amd756.c         | 5 +----
- drivers/i2c/busses/i2c-at91.c           | 2 --
- drivers/i2c/busses/i2c-axxia.c          | 8 +-------
- drivers/i2c/busses/i2c-bcm-iproc.c      | 8 +-------
- drivers/i2c/busses/i2c-bcm-kona.c       | 4 +---
- drivers/i2c/busses/i2c-bfin-twi.c       | 4 +---
- drivers/i2c/busses/i2c-brcmstb.c        | 4 +---
- drivers/i2c/busses/i2c-cadence.c        | 4 +---
- drivers/i2c/busses/i2c-cpm.c            | 4 +---
- drivers/i2c/busses/i2c-cros-ec-tunnel.c | 4 +---
- drivers/i2c/busses/i2c-davinci.c        | 4 +---
- drivers/i2c/busses/i2c-diolan-u2c.c     | 4 +---
- drivers/i2c/busses/i2c-dln2.c           | 4 +---
- drivers/i2c/busses/i2c-efm32.c          | 1 -
- drivers/i2c/busses/i2c-exynos5.c        | 4 +---
- drivers/i2c/busses/i2c-hix5hd2.c        | 4 +---
- drivers/i2c/busses/i2c-i801.c           | 1 -
- drivers/i2c/busses/i2c-ibm_iic.c        | 4 +---
- drivers/i2c/busses/i2c-img-scb.c        | 4 +---
- drivers/i2c/busses/i2c-imx.c            | 4 +---
- drivers/i2c/busses/i2c-isch.c           | 4 +---
- drivers/i2c/busses/i2c-ismt.c           | 4 +---
- drivers/i2c/busses/i2c-jz4780.c         | 4 +---
- drivers/i2c/busses/i2c-lpc2k.c          | 4 +---
- drivers/i2c/busses/i2c-meson.c          | 1 -
- drivers/i2c/busses/i2c-mpc.c            | 4 +---
- drivers/i2c/busses/i2c-mt65xx.c         | 4 +---
- drivers/i2c/busses/i2c-mxs.c            | 1 -
- drivers/i2c/busses/i2c-nforce2.c        | 1 -
- drivers/i2c/busses/i2c-nomadik.c        | 4 +---
- drivers/i2c/busses/i2c-ocores.c         | 4 +---
- drivers/i2c/busses/i2c-octeon.c         | 4 +---
- drivers/i2c/busses/i2c-omap.c           | 4 +---
- drivers/i2c/busses/i2c-piix4.c          | 1 -
- drivers/i2c/busses/i2c-pmcmsp.c         | 4 +---
- drivers/i2c/busses/i2c-pnx.c            | 4 +---
- drivers/i2c/busses/i2c-puv3.c           | 5 +----
- drivers/i2c/busses/i2c-pxa.c            | 4 +---
- drivers/i2c/busses/i2c-rcar.c           | 4 +---
- drivers/i2c/busses/i2c-riic.c           | 4 +---
- drivers/i2c/busses/i2c-rk3x.c           | 4 +---
- drivers/i2c/busses/i2c-s3c2410.c        | 1 -
- drivers/i2c/busses/i2c-sh7760.c         | 4 +---
- drivers/i2c/busses/i2c-sh_mobile.c      | 1 -
- drivers/i2c/busses/i2c-sirf.c           | 4 +---
- drivers/i2c/busses/i2c-st.c             | 4 +---
- drivers/i2c/busses/i2c-stu300.c         | 5 +----
- drivers/i2c/busses/i2c-tegra.c          | 4 +---
- drivers/i2c/busses/i2c-uniphier-f.c     | 7 +------
- drivers/i2c/busses/i2c-uniphier.c       | 7 +------
- drivers/i2c/busses/i2c-wmt.c            | 4 +---
- drivers/i2c/busses/i2c-xgene-slimpro.c  | 1 -
- drivers/i2c/busses/i2c-xiic.c           | 1 -
- drivers/i2c/busses/i2c-xlp9xx.c         | 4 +---
- drivers/i2c/busses/i2c-xlr.c            | 4 +---
- 55 files changed, 44 insertions(+), 161 deletions(-)
-
--- 
-2.8.1
+> Signed-off-by: Kwangwoo Lee <kwangwoo.lee@sk.com>
+> ---
+> v3)
+> clean up in __dma_clean_area() based on 823066d9edcd dcache_by_line_op fix
+> 
+> v2)
+> change the names of __dma_* rountines to use area instead of range
+> fix to use __dma_flush_area() in dma-mapping.c
+> 
+> v1)
+> change __dma_* routines to use start, size
+> add __clean_dcache_area_poc() as a fallthrough of __dma_clean_range()
+> 
+>  arch/arm64/include/asm/cacheflush.h |  3 +-
+>  arch/arm64/mm/cache.S               | 82 ++++++++++++++++++-------------------
+>  arch/arm64/mm/dma-mapping.c         |  6 +--
+>  3 files changed, 44 insertions(+), 47 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/cacheflush.h b/arch/arm64/include/asm/cacheflush.h
+> index c64268d..2e5fb97 100644
+> --- a/arch/arm64/include/asm/cacheflush.h
+> +++ b/arch/arm64/include/asm/cacheflush.h
+> @@ -68,6 +68,7 @@
+>  extern void flush_cache_range(struct vm_area_struct *vma, unsigned long start, unsigned long end);
+>  extern void flush_icache_range(unsigned long start, unsigned long end);
+>  extern void __flush_dcache_area(void *addr, size_t len);
+> +extern void __clean_dcache_area_poc(void *addr, size_t len);
+>  extern void __clean_dcache_area_pou(void *addr, size_t len);
+>  extern long __flush_cache_user_range(unsigned long start, unsigned long end);
+>  
+> @@ -85,7 +86,7 @@ static inline void flush_cache_page(struct vm_area_struct *vma,
+>   */
+>  extern void __dma_map_area(const void *, size_t, int);
+>  extern void __dma_unmap_area(const void *, size_t, int);
+> -extern void __dma_flush_range(const void *, const void *);
+> +extern void __dma_flush_area(const void *, size_t);
+>  
+>  /*
+>   * Copy user data from/to a page which is mapped into a different
+> diff --git a/arch/arm64/mm/cache.S b/arch/arm64/mm/cache.S
+> index 07d7352..58b5a90 100644
+> --- a/arch/arm64/mm/cache.S
+> +++ b/arch/arm64/mm/cache.S
+> @@ -105,19 +105,20 @@ ENTRY(__clean_dcache_area_pou)
+>  ENDPROC(__clean_dcache_area_pou)
+>  
+>  /*
+> - *	__inval_cache_range(start, end)
+> - *	- start   - start address of region
+> - *	- end     - end address of region
+> + *	__dma_inv_area(start, size)
+> + *	- start   - virtual start address of region
+> + *	- size    - size in question
+>   */
+> -ENTRY(__inval_cache_range)
+> +__dma_inv_area:
+> +	add	x1, x1, x0
+>  	/* FALLTHROUGH */
+>  
+>  /*
+> - *	__dma_inv_range(start, end)
+> - *	- start   - virtual start address of region
+> - *	- end     - virtual end address of region
+> + *	__inval_cache_range(start, end)
+> + *	- start   - start address of region
+> + *	- end     - end address of region
+>   */
+> -__dma_inv_range:
+> +ENTRY(__inval_cache_range)
+>  	dcache_line_size x2, x3
+>  	sub	x3, x2, #1
+>  	tst	x1, x3				// end cache line aligned?
+> @@ -136,46 +137,43 @@ __dma_inv_range:
+>  	dsb	sy
+>  	ret
+>  ENDPIPROC(__inval_cache_range)
+> -ENDPROC(__dma_inv_range)
+> +ENDPROC(__dma_inv_area)
+> +
+> +/*
+> + *	__clean_dcache_area_poc(kaddr, size)
+> + *
+> + * 	Ensure that any D-cache lines for the interval [kaddr, kaddr+size)
+> + * 	are cleaned to the PoC.
+> + *
+> + *	- kaddr   - kernel address
+> + *	- size    - size in question
+> + */
+> +ENTRY(__clean_dcache_area_poc)
+> +	/* FALLTHROUGH */
+>  
+>  /*
+> - *	__dma_clean_range(start, end)
+> + *	__dma_clean_area(start, size)
+>   *	- start   - virtual start address of region
+> - *	- end     - virtual end address of region
+> + *	- size    - size in question
+>   */
+> -__dma_clean_range:
+> -	dcache_line_size x2, x3
+> -	sub	x3, x2, #1
+> -	bic	x0, x0, x3
+> -1:
+> -alternative_if_not ARM64_WORKAROUND_CLEAN_CACHE
+> -	dc	cvac, x0
+> -alternative_else
+> -	dc	civac, x0
+> -alternative_endif
+> -	add	x0, x0, x2
+> -	cmp	x0, x1
+> -	b.lo	1b
+> -	dsb	sy
+> +__dma_clean_area:
+> +	dcache_by_line_op cvac, sy, x0, x1, x2, x3
+>  	ret
+> -ENDPROC(__dma_clean_range)
+> +ENDPIPROC(__clean_dcache_area_poc)
+> +ENDPROC(__dma_clean_area)
+>  
+>  /*
+> - *	__dma_flush_range(start, end)
+> + *	__dma_flush_area(start, size)
+> + *
+> + *	clean & invalidate D / U line
+> + *
+>   *	- start   - virtual start address of region
+> - *	- end     - virtual end address of region
+> + *	- size    - size in question
+>   */
+> -ENTRY(__dma_flush_range)
+> -	dcache_line_size x2, x3
+> -	sub	x3, x2, #1
+> -	bic	x0, x0, x3
+> -1:	dc	civac, x0			// clean & invalidate D / U line
+> -	add	x0, x0, x2
+> -	cmp	x0, x1
+> -	b.lo	1b
+> -	dsb	sy
+> +ENTRY(__dma_flush_area)
+> +	dcache_by_line_op civac, sy, x0, x1, x2, x3
+>  	ret
+> -ENDPIPROC(__dma_flush_range)
+> +ENDPIPROC(__dma_flush_area)
+>  
+>  /*
+>   *	__dma_map_area(start, size, dir)
+> @@ -184,10 +182,9 @@ ENDPIPROC(__dma_flush_range)
+>   *	- dir	- DMA direction
+>   */
+>  ENTRY(__dma_map_area)
+> -	add	x1, x1, x0
+>  	cmp	w2, #DMA_FROM_DEVICE
+> -	b.eq	__dma_inv_range
+> -	b	__dma_clean_range
+> +	b.eq	__dma_inv_area
+> +	b	__dma_clean_area
+>  ENDPIPROC(__dma_map_area)
+>  
+>  /*
+> @@ -197,8 +194,7 @@ ENDPIPROC(__dma_map_area)
+>   *	- dir	- DMA direction
+>   */
+>  ENTRY(__dma_unmap_area)
+> -	add	x1, x1, x0
+>  	cmp	w2, #DMA_TO_DEVICE
+> -	b.ne	__dma_inv_range
+> +	b.ne	__dma_inv_area
+>  	ret
+>  ENDPIPROC(__dma_unmap_area)
+> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+> index f6c55af..88922e8 100644
+> --- a/arch/arm64/mm/dma-mapping.c
+> +++ b/arch/arm64/mm/dma-mapping.c
+> @@ -168,7 +168,7 @@ static void *__dma_alloc(struct device *dev, size_t size,
+>  		return ptr;
+>  
+>  	/* remove any dirty cache lines on the kernel alias */
+> -	__dma_flush_range(ptr, ptr + size);
+> +	__dma_flush_area(ptr, size);
+>  
+>  	/* create a coherent mapping */
+>  	page = virt_to_page(ptr);
+> @@ -387,7 +387,7 @@ static int __init atomic_pool_init(void)
+>  		void *page_addr = page_address(page);
+>  
+>  		memset(page_addr, 0, atomic_pool_size);
+> -		__dma_flush_range(page_addr, page_addr + atomic_pool_size);
+> +		__dma_flush_area(page_addr, atomic_pool_size);
+>  
+>  		atomic_pool = gen_pool_create(PAGE_SHIFT, -1);
+>  		if (!atomic_pool)
+> @@ -548,7 +548,7 @@ fs_initcall(dma_debug_do_init);
+>  /* Thankfully, all cache ops are by VA so we can ignore phys here */
+>  static void flush_page(struct device *dev, const void *virt, phys_addr_t phys)
+>  {
+> -	__dma_flush_range(virt, virt + PAGE_SIZE);
+> +	__dma_flush_area(virt, PAGE_SIZE);
+>  }
+>  
+>  static void *__iommu_alloc_attrs(struct device *dev, size_t size,
+> 
