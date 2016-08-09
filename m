@@ -1,52 +1,50 @@
-From: zyw@rock-chips.com (Chris Zhong)
-Date: Tue,  9 Aug 2016 11:02:33 -0700
-Subject: [v2 PATCH] clk: rockchip: mark rk3399 hdcp_noc and vio_noc as critical
-Message-ID: <1470765753-11619-1-git-send-email-zyw@rock-chips.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 9 Aug 2016 19:10:56 +0100
+Subject: [PATCH 3/9] remoteproc: core: Remove pointless OOM print
+In-Reply-To: <20160809173653.GD26240@tuxbot>
+References: <20160804092153.23032-1-lee.jones@linaro.org>
+ <20160804092153.23032-4-lee.jones@linaro.org>
+ <20160809173653.GD26240@tuxbot>
+Message-ID: <20160809181056.GA1581@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix incorrect rk3399 aclk_vio gating bit, it should be 0, not 10. With
-this modification, the aclk_vio_noc should be put into critical list,
-since it is required by VOP.
-And the Type-C DP need these clocks: aclk_hdcp_noc, hclk_hdcp_noc,
-pclk_hdcp_noc. Mark them as critical to avoid someone close them.
+On Tue, 09 Aug 2016, Bjorn Andersson wrote:
 
-Signed-off-by: Chris Zhong <zyw@rock-chips.com>
----
+> On Thu 04 Aug 02:21 PDT 2016, Lee Jones wrote:
+> 
+> > These types of error prints are superfluous.  The system will
+> > pick up on OOM issues and let the user know.
+> > 
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> 
+> Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
 
- drivers/clk/rockchip/clk-rk3399.c | 6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
+This doesn't rely on anything else, so you can just take it.
 
-diff --git a/drivers/clk/rockchip/clk-rk3399.c b/drivers/clk/rockchip/clk-rk3399.c
-index b173711a..676b017 100644
---- a/drivers/clk/rockchip/clk-rk3399.c
-+++ b/drivers/clk/rockchip/clk-rk3399.c
-@@ -1073,7 +1073,7 @@ static struct rockchip_clk_branch rk3399_clk_branches[] __initdata = {
- 	/* vio */
- 	COMPOSITE(ACLK_VIO, "aclk_vio", mux_pll_src_cpll_gpll_ppll_p, CLK_IGNORE_UNUSED,
- 			RK3399_CLKSEL_CON(42), 6, 2, MFLAGS, 0, 5, DFLAGS,
--			RK3399_CLKGATE_CON(11), 10, GFLAGS),
-+			RK3399_CLKGATE_CON(11), 0, GFLAGS),
- 	COMPOSITE_NOMUX(PCLK_VIO, "pclk_vio", "aclk_vio", 0,
- 			RK3399_CLKSEL_CON(43), 0, 5, DFLAGS,
- 			RK3399_CLKGATE_CON(11), 1, GFLAGS),
-@@ -1470,6 +1470,9 @@ static const char *const rk3399_cru_critical_clocks[] __initconst = {
- 	"aclk_cci_pre",
- 	"aclk_gic",
- 	"aclk_gic_noc",
-+	"aclk_hdcp_noc",
-+	"hclk_hdcp_noc",
-+	"pclk_hdcp_noc",
- 	"pclk_perilp0",
- 	"pclk_perilp0",
- 	"hclk_perilp0",
-@@ -1489,6 +1492,7 @@ static const char *const rk3399_cru_critical_clocks[] __initconst = {
- 	"gpll_hclk_perilp1_src",
- 	"gpll_aclk_perilp0_src",
- 	"gpll_aclk_perihp_src",
-+	"aclk_vio_noc",
- };
- 
- static const char *const rk3399_pmucru_critical_clocks[] __initconst = {
+> Although, I think we should drop the "mapping" object. We have all the
+> information in the carveout object to reverse the mapping at cleanup.
+
+Let's fix it for now, then work on 'nice to have's in a subsequent set.
+> > ---
+> >  drivers/remoteproc/remoteproc_core.c | 1 -
+> >  1 file changed, 1 deletion(-)
+> > 
+> > diff --git a/drivers/remoteproc/remoteproc_core.c b/drivers/remoteproc/remoteproc_core.c
+> > index 5654a81..4914482 100644
+> > --- a/drivers/remoteproc/remoteproc_core.c
+> > +++ b/drivers/remoteproc/remoteproc_core.c
+> > @@ -619,7 +619,6 @@ static int rproc_handle_carveout(struct rproc *rproc,
+> >  	if (rproc->domain) {
+> >  		mapping = kzalloc(sizeof(*mapping), GFP_KERNEL);
+> >  		if (!mapping) {
+> > -			dev_err(dev, "kzalloc mapping failed\n");
+> >  			ret = -ENOMEM;
+> >  			goto dma_free;
+> >  		}
+
 -- 
-1.9.1
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
