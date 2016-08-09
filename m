@@ -1,273 +1,150 @@
 From: zhang.chunyan@linaro.org (Chunyan Zhang)
-Date: Tue,  9 Aug 2016 14:32:39 +0800
-Subject: [PATCH V3 1/3] tracing: add a possibility of exporting function trace
- to other places instead of ring buffer only
+Date: Tue,  9 Aug 2016 14:32:40 +0800
+Subject: [PATCH V3 2/3] stm class: ftrace: Add ftrace-export-over-stm driver
 In-Reply-To: <1470724361-10663-1-git-send-email-zhang.chunyan@linaro.org>
 References: <1470724361-10663-1-git-send-email-zhang.chunyan@linaro.org>
-Message-ID: <1470724361-10663-2-git-send-email-zhang.chunyan@linaro.org>
+Message-ID: <1470724361-10663-3-git-send-email-zhang.chunyan@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently ring buffer is the only output of Function traces, this patch
-added trace_export concept which would process the traces and export
-traces to a registered destination which can be ring buffer or some other
-storage, in this way if we want Function traces to be sent to other
-destination rather than ring buffer only, we just need to register a new
-trace_export and implement its own .commit() callback or just use
-'trace_generic_commit()' which this patch also added and hooks up its
-own .write() functio for writing traces to the storage.
-
-Currently, only Function trace (TRACE_FN) is supported.
+This patch adds a driver that models itself as an stm_source and
+registers itself as a trace_export.  Once the stm and stm_source
+have been linked via sysfs, everything that is passed to the
+interface from Ftrace subsystem will endup in the STM trace engine.
 
 Signed-off-by: Chunyan Zhang <zhang.chunyan@linaro.org>
 ---
- include/linux/trace.h |  31 +++++++++++++
- kernel/trace/trace.c  | 124 +++++++++++++++++++++++++++++++++++++++++++++++++-
- kernel/trace/trace.h  |  31 +++++++++++++
- 3 files changed, 185 insertions(+), 1 deletion(-)
- create mode 100644 include/linux/trace.h
+ drivers/hwtracing/stm/Kconfig  | 11 ++++++
+ drivers/hwtracing/stm/Makefile |  2 +
+ drivers/hwtracing/stm/ftrace.c | 87 ++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 100 insertions(+)
+ create mode 100644 drivers/hwtracing/stm/ftrace.c
 
-diff --git a/include/linux/trace.h b/include/linux/trace.h
+diff --git a/drivers/hwtracing/stm/Kconfig b/drivers/hwtracing/stm/Kconfig
+index 847a39b..b34ea96 100644
+--- a/drivers/hwtracing/stm/Kconfig
++++ b/drivers/hwtracing/stm/Kconfig
+@@ -39,4 +39,15 @@ config STM_SOURCE_HEARTBEAT
+ 	  If you want to send heartbeat messages over STM devices,
+ 	  say Y.
+ 
++config STM_SOURCE_FTRACE
++	tristate "Copy the output from kernel Ftrace to STM engine"
++	depends on TRACING
++	help
++	  This option can be used to copy the output from kernel Ftrace
++	  to STM engine. Enabling this option will introduce a slight
++	  timing effect.
++
++	  If you want to send kernel Ftrace messages over STM devices,
++	  say Y.
++
+ endif
+diff --git a/drivers/hwtracing/stm/Makefile b/drivers/hwtracing/stm/Makefile
+index a9ce3d4..3abd84c 100644
+--- a/drivers/hwtracing/stm/Makefile
++++ b/drivers/hwtracing/stm/Makefile
+@@ -6,6 +6,8 @@ obj-$(CONFIG_STM_DUMMY)	+= dummy_stm.o
+ 
+ obj-$(CONFIG_STM_SOURCE_CONSOLE)	+= stm_console.o
+ obj-$(CONFIG_STM_SOURCE_HEARTBEAT)	+= stm_heartbeat.o
++obj-$(CONFIG_STM_SOURCE_FTRACE)		+= stm_ftrace.o
+ 
+ stm_console-y		:= console.o
+ stm_heartbeat-y		:= heartbeat.o
++stm_ftrace-y		:= ftrace.o
+diff --git a/drivers/hwtracing/stm/ftrace.c b/drivers/hwtracing/stm/ftrace.c
 new file mode 100644
-index 0000000..bc7f503
+index 0000000..1101f46
 --- /dev/null
-+++ b/include/linux/trace.h
-@@ -0,0 +1,31 @@
-+#ifndef _LINUX_TRACE_H
-+#define _LINUX_TRACE_H
-+
-+#include <linux/ring_buffer.h>
-+struct trace_array;
-+
-+#ifdef CONFIG_TRACING
++++ b/drivers/hwtracing/stm/ftrace.c
+@@ -0,0 +1,87 @@
 +/*
-+ * The trace export - an export of function traces.  Every ftrace_ops
-+ * has at least one export which would output function traces to ring
-+ * buffer.
++ * Simple kernel driver to link kernel Ftrace and an STM device
++ * Copyright (c) 2016, Linaro Ltd.
 + *
-+ * tr		- the trace_array this export belongs to
-+ * commit	- commit the traces to ring buffer and/or some other places
-+ * write	- copy traces which have been delt with ->commit() to
-+ *		  the destination
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
 + */
-+struct trace_export {
-+	char name[16];
-+	struct trace_export	*next;
-+	struct trace_array	*tr;
-+	void (*commit)(struct trace_array *, struct ring_buffer_event *);
-+	void (*write)(const char *, unsigned int);
-+};
 +
-+int register_trace_export(struct trace_export *export);
-+int unregister_trace_export(struct trace_export *export);
-+
-+#endif	/* CONFIG_TRACING */
-+
-+#endif	/* _LINUX_TRACE_H */
-diff --git a/kernel/trace/trace.c b/kernel/trace/trace.c
-index dade4c9..67ae581 100644
---- a/kernel/trace/trace.c
-+++ b/kernel/trace/trace.c
-@@ -40,6 +40,7 @@
- #include <linux/poll.h>
- #include <linux/nmi.h>
- #include <linux/fs.h>
++#include <linux/module.h>
++#include <linux/stm.h>
 +#include <linux/trace.h>
- #include <linux/sched/rt.h>
- 
- #include "trace.h"
-@@ -2128,6 +2129,127 @@ void trace_buffer_unlock_commit_regs(struct trace_array *tr,
- 	ftrace_trace_userstack(buffer, flags, pc);
- }
- 
-+static inline void
-+trace_generic_commit(struct trace_array *tr,
-+	       struct ring_buffer_event *event)
-+{
-+	struct trace_entry *entry;
-+	struct trace_export *export = tr->export;
-+	unsigned int size = 0;
 +
-+	entry = ring_buffer_event_data(event);
++#define STM_FTRACE_NR_CHANNELS 1
++#define STM_FTRACE_CHAN 0
 +
-+	trace_entry_size(size, entry->type);
-+	if (!size)
-+		return;
++static int stm_ftrace_link(struct stm_source_data *data);
++static void stm_ftrace_unlink(struct stm_source_data *data);
 +
-+	if (export->write)
-+		export->write((char *)entry, size);
-+}
-+
-+static inline void
-+trace_rb_commit(struct trace_array *tr,
-+	       struct ring_buffer_event *event)
-+{
-+	__buffer_unlock_commit(tr->trace_buffer.buffer, event);
-+}
-+
-+static DEFINE_MUTEX(trace_export_lock);
-+
-+static struct trace_export trace_export_rb __read_mostly = {
-+	.name		= "rb",
-+	.commit	= trace_rb_commit,
-+	.next		= NULL,
++static struct stm_ftrace {
++	struct stm_source_data	data;
++	struct trace_export	ftrace;
++} stm_ftrace = {
++	.data	= {
++		.name		= "ftrace",
++		.nr_chans	= STM_FTRACE_NR_CHANNELS,
++		.link		= stm_ftrace_link,
++		.unlink		= stm_ftrace_unlink,
++	},
 +};
-+static struct trace_export *trace_fn_exports __read_mostly = &trace_export_rb;
 +
-+inline void
-+trace_function_exports(struct trace_array *tr,
-+		       struct ring_buffer_event *event)
++/**
++ * stm_ftrace_write() - write data to STM via 'stm_ftrace' source
++ * @buf:	buffer containing the data packet
++ * @len:	length of the data packet
++ */
++static void notrace
++stm_ftrace_write(const char *buf, unsigned int len)
 +{
-+	struct trace_export *export;
-+
-+	mutex_lock(&trace_export_lock);
-+
-+	for (export = trace_fn_exports; export && export->commit;
-+	     export = export->next) {
-+		tr->export = export;
-+		export->commit(tr, event);
-+	}
-+
-+	mutex_unlock(&trace_export_lock);
++	stm_source_write(&stm_ftrace.data, STM_FTRACE_CHAN, buf, len);
 +}
 +
-+static void add_trace_fn_export(struct trace_export **list,
-+			  struct trace_export *export)
++static int stm_ftrace_link(struct stm_source_data *data)
 +{
-+	export->next = *list;
-+	/*
-+	 * We are entering export into the list but another
-+	 * CPU might be walking that list. We need to make sure
-+	 * the export->next pointer is valid before another CPU sees
-+	 * the export pointer included into the list.
-+	 */
-+	rcu_assign_pointer(*list, export);
++	struct stm_ftrace *sf = container_of(data, struct stm_ftrace, data);
 +
++	strcpy(sf->ftrace.name, "stm_ftrace");
++	sf->ftrace.write = stm_ftrace_write;
++	sf->ftrace.next = NULL;
++
++	return register_trace_export(&sf->ftrace);
 +}
 +
-+static int rm_trace_fn_export(struct trace_export **list,
-+			  struct trace_export *export)
++static void stm_ftrace_unlink(struct stm_source_data *data)
 +{
-+	struct trace_export **p;
++	struct stm_ftrace *sc = container_of(data, struct stm_ftrace, data);
 +
-+	for (p = list; *p != &trace_export_rb; p = &(*p)->next)
-+		if (*p == export)
-+			break;
-+
-+	if (*p != export)
-+		return -1;
-+
-+	*p = (*p)->next;
-+
-+	return 0;
++	unregister_trace_export(&sc->ftrace);
 +}
 +
-+int register_trace_export(struct trace_export *export)
-+{
-+	if (!export->write) {
-+		pr_warn("trace_export must have the write() call back.\n");
-+		return -1;
-+	}
-+
-+	mutex_lock(&trace_export_lock);
-+
-+	export->tr = trace_fn_exports->tr;
-+	export->commit = trace_generic_commit;
-+
-+	add_trace_fn_export(&trace_fn_exports, export);
-+
-+	mutex_unlock(&trace_export_lock);
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(register_trace_export);
-+
-+int unregister_trace_export(struct trace_export *export)
++static int __init stm_ftrace_init(void)
 +{
 +	int ret;
 +
-+	if (!export->name) {
-+		pr_warn("trace_export must have a name.\n");
-+		return -1;
-+	}
-+
-+	mutex_lock(&trace_export_lock);
-+
-+	ret = rm_trace_fn_export(&trace_fn_exports, export);
-+
-+	mutex_unlock(&trace_export_lock);
++	ret = stm_source_register_device(NULL, &stm_ftrace.data);
++	if (ret)
++		pr_err("Failed to register stm_source - ftrace.\n");
 +
 +	return ret;
 +}
-+EXPORT_SYMBOL_GPL(unregister_trace_export);
 +
- void
- trace_function(struct trace_array *tr,
- 	       unsigned long ip, unsigned long parent_ip, unsigned long flags,
-@@ -2147,7 +2269,7 @@ trace_function(struct trace_array *tr,
- 	entry->parent_ip		= parent_ip;
- 
- 	if (!call_filter_check_discard(call, entry, buffer, event))
--		__buffer_unlock_commit(buffer, event);
-+		trace_function_exports(tr, event);
- }
- 
- #ifdef CONFIG_STACKTRACE
-diff --git a/kernel/trace/trace.h b/kernel/trace/trace.h
-index f783df4..a40f07c 100644
---- a/kernel/trace/trace.h
-+++ b/kernel/trace/trace.h
-@@ -260,6 +260,7 @@ struct trace_array {
- 	/* function tracing enabled */
- 	int			function_enabled;
- #endif
-+	struct trace_export	*export;
- };
- 
- enum {
-@@ -301,6 +302,13 @@ static inline struct trace_array *top_trace_array(void)
- 		break;					\
- 	}
- 
-+#undef IF_SIZE
-+#define IF_SIZE(size, var, etype, id)		\
-+		if (var == id) {		\
-+			size = (sizeof(etype));	\
-+			break;			\
-+		}
++static void __exit stm_ftrace_exit(void)
++{
++	stm_source_unregister_device(&stm_ftrace.data);
++}
 +
- /* Will cause compile errors if type is not found. */
- extern void __ftrace_bad_type(void);
- 
-@@ -339,6 +347,29 @@ extern void __ftrace_bad_type(void);
- 	} while (0)
- 
- /*
-+ * The trace_entry_size return the size of specific trace type
-+ *
-+ * IF_SIZE(size, var);
-+ *
-+ * Where "var" is just the given trace type.
-+ */
-+#define trace_entry_size(size, var)					\
-+	do {								\
-+		IF_SIZE(size, var, struct ftrace_entry, TRACE_FN);	\
-+		IF_SIZE(size, var, struct stack_entry, TRACE_STACK);	\
-+		IF_SIZE(size, var, struct userstack_entry,		\
-+			TRACE_USER_STACK);				\
-+		IF_SIZE(size, var, struct print_entry, TRACE_PRINT);	\
-+		IF_SIZE(size, var, struct bprint_entry, TRACE_BPRINT);	\
-+		IF_SIZE(size, var, struct bputs_entry, TRACE_BPUTS);	\
-+		IF_SIZE(size, var, struct trace_branch, TRACE_BRANCH);	\
-+		IF_SIZE(size, var, struct ftrace_graph_ent_entry,	\
-+			TRACE_GRAPH_ENT);				\
-+		IF_SIZE(size, var, struct ftrace_graph_ret_entry,	\
-+			TRACE_GRAPH_RET);				\
-+	} while (0)
++module_init(stm_ftrace_init);
++module_exit(stm_ftrace_exit);
 +
-+/*
-  * An option specific to a tracer. This is a boolean value.
-  * The bit is the bit index that sets its value on the
-  * flags value in struct tracer_flags.
++MODULE_LICENSE("GPL v2");
++MODULE_DESCRIPTION("stm_ftrace driver");
++MODULE_AUTHOR("Chunyan Zhang <zhang.chunyan@linaro.org>");
 -- 
 2.7.4
