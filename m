@@ -1,40 +1,52 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 9 Aug 2016 18:51:58 +0100
-Subject: [PATCH] arm64: suspend: avoid potential TLB conflict
-In-Reply-To: <57AA0401.1020809@arm.com>
-References: <1470651050-18291-1-git-send-email-mark.rutland@arm.com>
- <57AA0401.1020809@arm.com>
-Message-ID: <20160809175157.GC13591@leverpostej>
+From: zyw@rock-chips.com (Chris Zhong)
+Date: Tue,  9 Aug 2016 11:02:33 -0700
+Subject: [v2 PATCH] clk: rockchip: mark rk3399 hdcp_noc and vio_noc as critical
+Message-ID: <1470765753-11619-1-git-send-email-zyw@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 09, 2016 at 05:25:37PM +0100, James Morse wrote:
-> > @@ -217,12 +218,16 @@ static int create_safe_exec_page(void *src_start, size_t length,
-> >  	set_pte(pte, __pte(virt_to_phys((void *)dst) |
-> >  			 pgprot_val(PAGE_KERNEL_EXEC)));
-> >  
-> > -	/* Load our new page tables */
-> > -	asm volatile("msr	ttbr0_el1, %0;"
-> > -		     "isb;"
-> > -		     "tlbi	vmalle1is;"
-> > -		     "dsb	ish;"
-> > -		     "isb" : : "r"(virt_to_phys(pgd)));
-> > +	/*
-> > +	 * Load our new page tables. TTBR0 currently points to the zero page,
-> 
-> fe12c00d21bb ("PM / hibernate: Introduce test_resume mode for hibernation") came
-> in with the merge window, this does a suspend followed by a resume with the user
-> page tables still loaded in ttbr0_el1.
+Fix incorrect rk3399 aclk_vio gating bit, it should be 0, not 10. With
+this modification, the aclk_vio_noc should be put into critical list,
+since it is required by VOP.
+And the Type-C DP need these clocks: aclk_hdcp_noc, hclk_hdcp_noc,
+pclk_hdcp_noc. Mark them as critical to avoid someone close them.
 
-Hmmm... given that, it looks like if we bail out in swsusp_arch_resume()
-after the call to create_safe_exec_page(), we may return to userspace
-with a corrupted TTBR0.
+Signed-off-by: Chris Zhong <zyw@rock-chips.com>
+---
 
-We probably need to defer the call to create_safe_exec_page() after the
-other potential failure sites so as to avoid that.
+ drivers/clk/rockchip/clk-rk3399.c | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
 
-Looking around it's not clear to me how/where the get_safe_page()
-allocations are cleaned up when a failure occurs.
-
-Thanks,
-Mark.
+diff --git a/drivers/clk/rockchip/clk-rk3399.c b/drivers/clk/rockchip/clk-rk3399.c
+index b173711a..676b017 100644
+--- a/drivers/clk/rockchip/clk-rk3399.c
++++ b/drivers/clk/rockchip/clk-rk3399.c
+@@ -1073,7 +1073,7 @@ static struct rockchip_clk_branch rk3399_clk_branches[] __initdata = {
+ 	/* vio */
+ 	COMPOSITE(ACLK_VIO, "aclk_vio", mux_pll_src_cpll_gpll_ppll_p, CLK_IGNORE_UNUSED,
+ 			RK3399_CLKSEL_CON(42), 6, 2, MFLAGS, 0, 5, DFLAGS,
+-			RK3399_CLKGATE_CON(11), 10, GFLAGS),
++			RK3399_CLKGATE_CON(11), 0, GFLAGS),
+ 	COMPOSITE_NOMUX(PCLK_VIO, "pclk_vio", "aclk_vio", 0,
+ 			RK3399_CLKSEL_CON(43), 0, 5, DFLAGS,
+ 			RK3399_CLKGATE_CON(11), 1, GFLAGS),
+@@ -1470,6 +1470,9 @@ static const char *const rk3399_cru_critical_clocks[] __initconst = {
+ 	"aclk_cci_pre",
+ 	"aclk_gic",
+ 	"aclk_gic_noc",
++	"aclk_hdcp_noc",
++	"hclk_hdcp_noc",
++	"pclk_hdcp_noc",
+ 	"pclk_perilp0",
+ 	"pclk_perilp0",
+ 	"hclk_perilp0",
+@@ -1489,6 +1492,7 @@ static const char *const rk3399_cru_critical_clocks[] __initconst = {
+ 	"gpll_hclk_perilp1_src",
+ 	"gpll_aclk_perilp0_src",
+ 	"gpll_aclk_perihp_src",
++	"aclk_vio_noc",
+ };
+ 
+ static const char *const rk3399_pmucru_critical_clocks[] __initconst = {
+-- 
+1.9.1
