@@ -1,101 +1,38 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Tue, 9 Aug 2016 14:04:34 +0100
-Subject: [PATCH v2 3/3] KVM: arm64: vgic-its: Make updates to
- propbaser/pendbaser atomic
-In-Reply-To: <20160809111606.28744-4-christoffer.dall@linaro.org>
-References: <20160809111606.28744-1-christoffer.dall@linaro.org>
- <20160809111606.28744-4-christoffer.dall@linaro.org>
-Message-ID: <8d71a333-9a67-5e3b-8ee4-22728591da41@arm.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 9 Aug 2016 10:03:31 -0300
+Subject: [PATCH 1/1] irqchip: irq-gic: forward SGI to itself for cortex-a7
+ single core
+In-Reply-To: <57A99A4A.6010301@arm.com>
+References: <20160808105026.GA12649@leverpostej>
+ <HE1PR04MB1450C6BE844A31C95CEE3BE18B1B0@HE1PR04MB1450.eurprd04.prod.outlook.com>
+ <20160808130754.GB12649@leverpostej> <20160808132847.GB17680@shlinux2>
+ <20160808134842.GE12649@leverpostej> <20160808145916.0924e868@arm.com>
+ <20160809034613.GB31105@shlinux2> <20160809063401.3117dc94@arm.com>
+ <20160809055701.GC31105@shlinux2> <20160809075930.529f98ca@arm.com>
+ <20160809071821.GD31105@shlinux2> <57A99A4A.6010301@arm.com>
+Message-ID: <CAOMZO5D0Yt9Y-hy2YzTpOr40J=4++r+8LU3ezmsB+1FBFQw1Mg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Marc,
 
-On 09/08/16 12:16, Christoffer Dall wrote:
-> There are two problems with the current implementation of the MMIO
-> handlers for the propbaser and pendbaser:
-> 
-> First, the write to the value itself is not guaranteed to be an atomic
-> 64-bit write so two concurrent writes to the structure field could be
-> intermixed.
-> 
-> Second, because we do a read-modify-update operation without any
-> synchronization, if we have two 32-bit accesses to separate parts of the
-> register, we can loose one of them.
-> 
-> By using the atomic cmpxchg64 we should cover both issues above.
+On Tue, Aug 9, 2016 at 5:54 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
 
-This is really a neat solution. The actual implementation of cmpxchg64
-is really hard to chase in the code, but given that the prototype is
-(ptr, old, new) and it complies with the usual compare-exchange
-semantics this looks good to me.
+> From 23ba8b645d219e333a10224d74fb5d8d75d67de2 Mon Sep 17 00:00:00 2001
+> From: Marc Zyngier <marc.zyngier@arm.com>
+> Date: Tue, 9 Aug 2016 07:50:44 +0100
+> Subject: [PATCH] irqchip/gic: Allow self-SGIs for SMP on UP configurations
+>
+> On systems where a single CPU is present, the GIC may not support
+> having SGIs delivered to a target list. In that case, we use the
+> self-SGI mechanism to allow the interrupt to be delivered locally.
+>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+This fixes the halt after running 'reboot' on mx6ul, thanks:
 
-Reviewed-by: Andre Przywara <andre.przywara@arm.com>
+Tested-by: Fabio Estevam <fabio.estevam@nxp.com>
 
-Cheers,
-Andre.
+Please also Cc stable when you submit this formally.
 
-> ---
-> 
-> Notes:
->     Changes since v1:
->      - Use atomic cmpxchg64 instead of taking a lock
-> 
->  virt/kvm/arm/vgic/vgic-mmio-v3.c | 24 ++++++++++++++----------
->  1 file changed, 14 insertions(+), 10 deletions(-)
-> 
-> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-> index ff668e0..a50d5ba 100644
-> --- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
-> +++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-> @@ -306,16 +306,18 @@ static void vgic_mmio_write_propbase(struct kvm_vcpu *vcpu,
->  {
->  	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
->  	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
-> -	u64 propbaser = dist->propbaser;
-> +	u64 old_propbaser, propbaser;
->  
->  	/* Storing a value with LPIs already enabled is undefined */
->  	if (vgic_cpu->lpis_enabled)
->  		return;
->  
-> -	propbaser = update_64bit_reg(propbaser, addr & 4, len, val);
-> -	propbaser = vgic_sanitise_propbaser(propbaser);
-> -
-> -	dist->propbaser = propbaser;
-> +	do {
-> +		old_propbaser = dist->propbaser;
-> +		propbaser = old_propbaser;
-> +		propbaser = update_64bit_reg(propbaser, addr & 4, len, val);
-> +		propbaser = vgic_sanitise_propbaser(propbaser);
-> +	} while (cmpxchg64(&dist->propbaser, old_propbaser, propbaser));
->  }
->  
->  static unsigned long vgic_mmio_read_pendbase(struct kvm_vcpu *vcpu,
-> @@ -331,16 +333,18 @@ static void vgic_mmio_write_pendbase(struct kvm_vcpu *vcpu,
->  				     unsigned long val)
->  {
->  	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
-> -	u64 pendbaser = vgic_cpu->pendbaser;
-> +	u64 old_pendbaser, pendbaser;
->  
->  	/* Storing a value with LPIs already enabled is undefined */
->  	if (vgic_cpu->lpis_enabled)
->  		return;
->  
-> -	pendbaser = update_64bit_reg(pendbaser, addr & 4, len, val);
-> -	pendbaser = vgic_sanitise_pendbaser(pendbaser);
-> -
-> -	vgic_cpu->pendbaser = pendbaser;
-> +	do {
-> +		old_pendbaser = vgic_cpu->pendbaser;
-> +		pendbaser = old_pendbaser;
-> +		pendbaser = update_64bit_reg(pendbaser, addr & 4, len, val);
-> +		pendbaser = vgic_sanitise_pendbaser(pendbaser);
-> +	} while (cmpxchg64(&vgic_cpu->pendbaser, old_pendbaser, pendbaser));
->  }
->  
->  /*
-> 
+Thanks
