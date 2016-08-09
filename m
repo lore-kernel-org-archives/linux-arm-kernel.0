@@ -1,113 +1,126 @@
-From: zhang.chunyan@linaro.org (Chunyan Zhang)
-Date: Tue,  9 Aug 2016 14:32:41 +0800
-Subject: [PATCH V3 3/3] stm: Mark the functions of writing buffer with notrace
-In-Reply-To: <1470724361-10663-1-git-send-email-zhang.chunyan@linaro.org>
-References: <1470724361-10663-1-git-send-email-zhang.chunyan@linaro.org>
-Message-ID: <1470724361-10663-4-git-send-email-zhang.chunyan@linaro.org>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Tue, 9 Aug 2016 08:52:21 +0200
+Subject: [PATCH v12 09/11] genirq/msi: Introduce msi_desc flags
+In-Reply-To: <1470158617-7022-10-git-send-email-eric.auger@redhat.com>
+References: <1470158617-7022-1-git-send-email-eric.auger@redhat.com>
+ <1470158617-7022-10-git-send-email-eric.auger@redhat.com>
+Message-ID: <ae002707-4bdf-1f58-1723-600748119167@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If CONFIG_STM_FTRACE is selected, Function trace data can be writen
-to sink via STM, all functions that related to writing data packets
-to STM should be marked 'notrace' to avoid being traced by Ftrace,
-otherwise the program would stall into an endless loop.
+Hi,
 
-Signed-off-by: Chunyan Zhang <zhang.chunyan@linaro.org>
-Acked-by: Steven Rostedt <rostedt@goodmis.org>
----
- drivers/hwtracing/coresight/coresight-stm.c |  2 +-
- drivers/hwtracing/intel_th/sth.c            | 11 +++++++----
- drivers/hwtracing/stm/core.c                |  7 ++++---
- drivers/hwtracing/stm/dummy_stm.c           |  2 +-
- include/linux/stm.h                         |  4 ++--
- 5 files changed, 15 insertions(+), 11 deletions(-)
+On 02/08/2016 19:23, Eric Auger wrote:
+> This new flags member is meant to store additional information about
+> the msi descriptor, starting with allocation status information.
+> 
+> MSI_DESC_FLAG_ALLOCATED bit tells the associated base IRQ is allocated.
+> This information is currently used at deallocation time. We also
+> introduce MSI_DESC_FLAG_FUNCTIONAL telling the MSIs are functional.
+> 
+> For the time being ALLOCATED and FUNCTIONAL are set at the same time
+> but this is going to change in subsequent patch. Indeed in some situations
+> some additional tasks need to be carried out for the MSI to be functional.
+> For instance the MSI doorbell may need to be mapped in an IOMMU.
+> 
+> FUNCTIONAL value already gets used when enumerating the usable MSIs in
+> msix_capability_init.
+> 
+> Signed-off-by: Eric Auger <eric.auger@redhat.com>
+> 
+> ---
+> 
+> v12: new
+> ---
+>  drivers/pci/msi.c   |  2 +-
+>  include/linux/msi.h | 14 ++++++++++++++
+>  kernel/irq/msi.c    |  7 ++++++-
+>  3 files changed, 21 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
+> index a080f44..d7733ea 100644
+> --- a/drivers/pci/msi.c
+> +++ b/drivers/pci/msi.c
+> @@ -793,7 +793,7 @@ out_avail:
+>  		int avail = 0;
+>  
+>  		for_each_pci_msi_entry(entry, dev) {
+> -			if (entry->irq != 0)
+> +			if (entry->flags & MSI_DESC_FLAG_FUNCTIONAL)
+>  				avail++;
+>  		}
+>  		if (avail != 0)
+> diff --git a/include/linux/msi.h b/include/linux/msi.h
+> index 8b425c6..18f894f 100644
+> --- a/include/linux/msi.h
+> +++ b/include/linux/msi.h
+> @@ -47,6 +47,7 @@ struct fsl_mc_msi_desc {
+>   * @nvec_used:	The number of vectors used
+>   * @dev:	Pointer to the device which uses this descriptor
+>   * @msg:	The last set MSI message cached for reuse
+> + * @flags:	flags to describe the MSI descriptor status or features
+>   *
+>   * @masked:	[PCI MSI/X] Mask bits
+>   * @is_msix:	[PCI MSI/X] True if MSI-X
+> @@ -67,6 +68,7 @@ struct msi_desc {
+>  	unsigned int			nvec_used;
+>  	struct device			*dev;
+>  	struct msi_msg			msg;
+> +	u32						flags;
+I will fix this bad alignment on next version
 
-diff --git a/drivers/hwtracing/coresight/coresight-stm.c b/drivers/hwtracing/coresight/coresight-stm.c
-index 73be58a..345c81e 100644
---- a/drivers/hwtracing/coresight/coresight-stm.c
-+++ b/drivers/hwtracing/coresight/coresight-stm.c
-@@ -386,7 +386,7 @@ static long stm_generic_set_options(struct stm_data *stm_data,
- 	return 0;
- }
- 
--static ssize_t stm_generic_packet(struct stm_data *stm_data,
-+static ssize_t notrace stm_generic_packet(struct stm_data *stm_data,
- 				  unsigned int master,
- 				  unsigned int channel,
- 				  unsigned int packet,
-diff --git a/drivers/hwtracing/intel_th/sth.c b/drivers/hwtracing/intel_th/sth.c
-index e1aee61..b034446 100644
---- a/drivers/hwtracing/intel_th/sth.c
-+++ b/drivers/hwtracing/intel_th/sth.c
-@@ -67,10 +67,13 @@ static void sth_iowrite(void __iomem *dest, const unsigned char *payload,
- 	}
- }
- 
--static ssize_t sth_stm_packet(struct stm_data *stm_data, unsigned int master,
--			      unsigned int channel, unsigned int packet,
--			      unsigned int flags, unsigned int size,
--			      const unsigned char *payload)
-+static ssize_t notrace sth_stm_packet(struct stm_data *stm_data,
-+				      unsigned int master,
-+				      unsigned int channel,
-+				      unsigned int packet,
-+				      unsigned int flags,
-+				      unsigned int size,
-+				      const unsigned char *payload)
- {
- 	struct sth_device *sth = container_of(stm_data, struct sth_device, stm);
- 	struct intel_th_channel __iomem *out =
-diff --git a/drivers/hwtracing/stm/core.c b/drivers/hwtracing/stm/core.c
-index 51f81d6..37d3bcb 100644
---- a/drivers/hwtracing/stm/core.c
-+++ b/drivers/hwtracing/stm/core.c
-@@ -425,7 +425,7 @@ static int stm_file_assign(struct stm_file *stmf, char *id, unsigned int width)
- 	return ret;
- }
- 
--static ssize_t stm_write(struct stm_data *data, unsigned int master,
-+static ssize_t notrace stm_write(struct stm_data *data, unsigned int master,
- 			  unsigned int channel, const char *buf, size_t count)
- {
- 	unsigned int flags = STP_PACKET_TIMESTAMPED;
-@@ -1121,8 +1121,9 @@ void stm_source_unregister_device(struct stm_source_data *data)
- }
- EXPORT_SYMBOL_GPL(stm_source_unregister_device);
- 
--int stm_source_write(struct stm_source_data *data, unsigned int chan,
--		     const char *buf, size_t count)
-+int notrace stm_source_write(struct stm_source_data *data,
-+			     unsigned int chan,
-+			     const char *buf, size_t count)
- {
- 	struct stm_source_device *src = data->src;
- 	struct stm_device *stm;
-diff --git a/drivers/hwtracing/stm/dummy_stm.c b/drivers/hwtracing/stm/dummy_stm.c
-index a86612d..c5f94ca 100644
---- a/drivers/hwtracing/stm/dummy_stm.c
-+++ b/drivers/hwtracing/stm/dummy_stm.c
-@@ -21,7 +21,7 @@
- #include <linux/slab.h>
- #include <linux/stm.h>
- 
--static ssize_t
-+static ssize_t notrace
- dummy_stm_packet(struct stm_data *stm_data, unsigned int master,
- 		 unsigned int channel, unsigned int packet, unsigned int flags,
- 		 unsigned int size, const unsigned char *payload)
-diff --git a/include/linux/stm.h b/include/linux/stm.h
-index 8369d8a..210ff22 100644
---- a/include/linux/stm.h
-+++ b/include/linux/stm.h
-@@ -133,7 +133,7 @@ int stm_source_register_device(struct device *parent,
- 			       struct stm_source_data *data);
- void stm_source_unregister_device(struct stm_source_data *data);
- 
--int stm_source_write(struct stm_source_data *data, unsigned int chan,
--		     const char *buf, size_t count);
-+int notrace stm_source_write(struct stm_source_data *data, unsigned int chan,
-+			     const char *buf, size_t count);
- 
- #endif /* _STM_H_ */
--- 
-2.7.4
+>  
+>  	union {
+>  		/* PCI MSI/X specific data */
+> @@ -99,6 +101,18 @@ struct msi_desc {
+>  	};
+>  };
+>  
+> +/* Flags for msi_desc */
+> +enum {
+> +	/* the base IRQ is allocated */
+> +	MSI_DESC_FLAG_ALLOCATED	=	(1 << 0),
+> +	/**
+> +	 * the MSI is functional; in some cases the fact the base IRQ is
+> +	 * allocated is not sufficient for the MSIs to be functional: for
+> +	 * example the MSI doorbell(s) may need to be IOMMU mapped.
+> +	 */
+> +	MSI_DESC_FLAG_FUNCTIONAL =	(1 << 1),
+> +};
+> +
+>  /* Helpers to hide struct msi_desc implementation details */
+>  #define msi_desc_to_dev(desc)		((desc)->dev)
+>  #define dev_to_msi_list(dev)		(&(dev)->msi_list)
+> diff --git a/kernel/irq/msi.c b/kernel/irq/msi.c
+> index 72bf4d6..9b93766 100644
+> --- a/kernel/irq/msi.c
+> +++ b/kernel/irq/msi.c
+> @@ -361,6 +361,9 @@ int msi_domain_alloc_irqs(struct irq_domain *domain, struct device *dev,
+>  			return ret;
+>  		}
+>  
+> +		desc->flags |= MSI_DESC_FLAG_ALLOCATED;
+> +		desc->flags |= MSI_DESC_FLAG_FUNCTIONAL;
+> +
+>  		for (i = 0; i < desc->nvec_used; i++)
+>  			irq_set_msi_desc_off(virq, i, desc);
+>  	}
+> @@ -395,9 +398,11 @@ void msi_domain_free_irqs(struct irq_domain *domain, struct device *dev)
+>  		 * enough that there is no IRQ associated to this
+>  		 * entry. If that's the case, don't do anything.
+>  		 */
+> -		if (desc->irq) {
+> +		if (desc->flags & MSI_DESC_FLAG_ALLOCATED) {
+>  			irq_domain_free_irqs(desc->irq, desc->nvec_used);
+>  			desc->irq = 0;
+> +			desc->flags &= ~MSI_DESC_FLAG_ALLOCATED;
+> +			desc->flags &= ~MSI_DESC_FLAG_FUNCTIONAL;
+Also I will combine those settings
+
+Thanks
+
+Eric
+>  		}
+>  	}
+>  }
+> 
