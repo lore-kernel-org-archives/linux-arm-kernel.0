@@ -1,56 +1,55 @@
-From: liudongdong3@huawei.com (Dongdong Liu)
-Date: Tue, 9 Aug 2016 17:20:42 +0800
-Subject: [RFC PATCH V5 0/5] ECAM quirks handling for ARM64 platforms
-In-Reply-To: <1470661541-26270-1-git-send-email-tn@semihalf.com>
-References: <1470661541-26270-1-git-send-email-tn@semihalf.com>
-Message-ID: <57A9A06A.30907@huawei.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue,  9 Aug 2016 10:25:07 +0100
+Subject: [PATCH] MAINTAINERS: add ARM ARCHITECTED TIMER entry
+Message-ID: <1470734707-1763-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The ARM architected timer driver falls under the drivers/clocksource/
+catch-all in MAINTAINERS, and get_maintainers.pl doesn't suggest a
+number of people who should be Cc'd.
 
-? 2016/8/8 21:05, Tomasz Nowicki ??:
-> Quirk handling relies on an idea of matching MCFG OEM ID, TABLE ID and
-> revision (the ones from standard header of MCFG table).
->
-> Static array is used to keep quirk entries. Each entry consists of
-> mentioned MCFG IDs along with custom pci_ops structure and initialization call.
->
-> As an example, the last patch presents quirk handling mechanism usage for
-> ThunderX PEM driver.
->
-> v4 -> v5
-> - rebase against v4.8-rc1
-> - rework to exact MCFG OEM ID, TABLE ID, rev match
->    - use memcmp instead of strncmp
->    - no substring match
-> - fix typos and dmesg message
->
-> Tomasz Nowicki (5):
->    PCI: Embed pci_ecam_ops in pci_config_window structure
->    PCI/ACPI: Move ACPI ECAM mapping to generic MCFG driver
->    PCI: Check platform specific ECAM quirks
->    ARM64/PCI: Start using quirks handling for ACPI based PCI host
->      controller
->    PCI: thunder-pem: Support quirky configuration space access for ACPI
->      based PCI host controller
->
->   arch/arm64/kernel/pci.c            | 42 +----------------
->   drivers/acpi/pci_mcfg.c            | 40 ++++++++++++++++
->   drivers/pci/ecam.c                 |  6 +--
->   drivers/pci/host/Makefile          |  1 +
->   drivers/pci/host/mcfg-quirks.c     | 93 ++++++++++++++++++++++++++++++++++++
->   drivers/pci/host/mcfg-quirks.h     | 24 ++++++++++
->   drivers/pci/host/pci-thunder-pem.c | 96 ++++++++++++++++++++++++++++++++------
->   include/linux/pci-acpi.h           |  5 ++
->   include/linux/pci-ecam.h           |  2 +-
->   9 files changed, 252 insertions(+), 57 deletions(-)
->   create mode 100644 drivers/pci/host/mcfg-quirks.c
->   create mode 100644 drivers/pci/host/mcfg-quirks.h
->
+The ARM architected timer is a core component of ARMv7+VE and ARMv8, and
+is critical to the correct operation of both architecture ports (and
+their respective KVM code), and patches to it should have review by
+knowledgeable interested parties.
 
-Based on the patchset, tested on HiSilicon D03 board with intel 82599 net card. It worked OK.
+This patch adds a MAINTAINERS entry for the driver and its low-level
+arch components, such that get_maintainer.pl will always include
+relevant interested parties for modifications to the driver. For the
+timebeing, this means myself and Marc Zyngier.
 
-Tested-by: Dongdong Liu <liudongdong3@huawei.com>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.or
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+---
+ MAINTAINERS | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-Thanks
-Dongdong
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 20bb1d0..85450ba 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -881,6 +881,15 @@ S:	Supported
+ F:	drivers/gpu/drm/arc/
+ F:	Documentation/devicetree/bindings/display/snps,arcpgu.txt
+ 
++ARM ARCHITECTED TIMER DRIVER
++M:	Mark Rutland <mark.rutland@arm.com>
++M:	Marc Zyngier <marc.zyngier@arm.com>
++L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
++S:	Maintained
++F:	arch/arm/include/asm/arch_timer.h
++F:	arch/arm64/include/asm/arch_timer.h
++F:	drivers/clocksource/arm_arch_timer.c
++
+ ARM HDLCD DRM DRIVER
+ M:	Liviu Dudau <liviu.dudau@arm.com>
+ S:	Supported
+-- 
+1.9.1
