@@ -1,35 +1,265 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Tue,  9 Aug 2016 10:52:17 +0200
-Subject: [PATCH 3/3] ARM64: dts: meson-gxbb: Add Meson MHU Node
+Date: Tue,  9 Aug 2016 10:52:15 +0200
+Subject: [PATCH 1/3] mailbox: Add Platform Message-Handling-Unit variant driver
 In-Reply-To: <1470732737-18391-1-git-send-email-narmstrong@baylibre.com>
 References: <1470732737-18391-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1470732737-18391-4-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1470732737-18391-2-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Add Message-Handling-Unit driver for platform variants as mailbox controller.
+Actually, only the Amlogic Meson GXBB SoC MHU is supported.
+
 Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 ---
- arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ drivers/mailbox/Kconfig        |  10 ++
+ drivers/mailbox/Makefile       |   2 +
+ drivers/mailbox/platform_mhu.c | 203 +++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 215 insertions(+)
+ create mode 100644 drivers/mailbox/platform_mhu.c
 
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-index e502c24..dfd2ff7 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-@@ -321,6 +321,14 @@
- 				#clock-cells = <1>;
- 				reg = <0x0 0x0 0x0 0x3db>;
- 			};
-+
-+			mailbox: mailbox at 400 {
-+				compatible = "amlogic,meson-gxbb-mhu";
-+				reg = <0 0x400 0 0x4c>;
-+				interrupts = <0 209 IRQ_TYPE_EDGE_RISING>,
-+					     <0 210 IRQ_TYPE_EDGE_RISING>;
-+				#mbox-cells = <1>;
-+			};
- 		};
+diff --git a/drivers/mailbox/Kconfig b/drivers/mailbox/Kconfig
+index 97c3729..4cc93c6 100644
+--- a/drivers/mailbox/Kconfig
++++ b/drivers/mailbox/Kconfig
+@@ -15,6 +15,16 @@ config ARM_MHU
+ 	  The controller has 3 mailbox channels, the last of which can be
+ 	  used in Secure mode only.
  
- 		apb: apb at d0000000 {
++config PLATFORM_MHU
++	tristate "Platform MHU Mailbox"
++	depends on OF
++	depends on HAS_IOMEM
++	help
++	  Say Y here if you want to build a platform specific variant MHU
++	  controller driver.
++	  The controller has a maximum of 3 mailbox channels, the last of
++	  which can be used in Secure mode only.
++
+ config PL320_MBOX
+ 	bool "ARM PL320 Mailbox"
+ 	depends on ARM_AMBA
+diff --git a/drivers/mailbox/Makefile b/drivers/mailbox/Makefile
+index 66c38e3..ace6fed 100644
+--- a/drivers/mailbox/Makefile
++++ b/drivers/mailbox/Makefile
+@@ -6,6 +6,8 @@ obj-$(CONFIG_MAILBOX_TEST)	+= mailbox-test.o
+ 
+ obj-$(CONFIG_ARM_MHU)	+= arm_mhu.o
+ 
++obj-$(CONFIG_PLATFORM_MHU)	+= platform_mhu.o
++
+ obj-$(CONFIG_PL320_MBOX)	+= pl320-ipc.o
+ 
+ obj-$(CONFIG_OMAP2PLUS_MBOX)	+= omap-mailbox.o
+diff --git a/drivers/mailbox/platform_mhu.c b/drivers/mailbox/platform_mhu.c
+new file mode 100644
+index 0000000..d657a50
+--- /dev/null
++++ b/drivers/mailbox/platform_mhu.c
+@@ -0,0 +1,203 @@
++/*
++ * Copyright (C) 2016 BayLibre SAS.
++ * Author: Neil Armstrong <narmstrong@baylibre.com>
++ * Heavily based on arm_mhu.c from :
++ * Copyright (C) 2013-2015 Fujitsu Semiconductor Ltd.
++ * Copyright (C) 2015 Linaro Ltd.
++ * Author: Jassi Brar <jaswinder.singh@linaro.org>
++ *
++ * This program is free software: you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation, version 2 of the License.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/interrupt.h>
++#include <linux/spinlock.h>
++#include <linux/mutex.h>
++#include <linux/delay.h>
++#include <linux/slab.h>
++#include <linux/err.h>
++#include <linux/io.h>
++#include <linux/module.h>
++#include <linux/platform_device.h>
++#include <linux/mailbox_controller.h>
++
++#define INTR_SET_OFS	0x0
++#define INTR_STAT_OFS	0x4
++#define INTR_CLR_OFS	0x8
++
++#define MHU_LP_OFFSET	0x10
++#define MHU_HP_OFFSET	0x1c
++
++#define TX_REG_OFFSET	0x24
++
++#define MHU_CHANS	2
++
++struct platform_mhu_link {
++	unsigned int irq;
++	void __iomem *tx_reg;
++	void __iomem *rx_reg;
++};
++
++struct platform_mhu {
++	void __iomem *base;
++	struct platform_mhu_link mlink[MHU_CHANS];
++	struct mbox_chan chan[MHU_CHANS];
++	struct mbox_controller mbox;
++};
++
++static irqreturn_t platform_mhu_rx_interrupt(int irq, void *p)
++{
++	struct mbox_chan *chan = p;
++	struct platform_mhu_link *mlink = chan->con_priv;
++	u32 val;
++
++	val = readl_relaxed(mlink->rx_reg + INTR_STAT_OFS);
++	if (!val)
++		return IRQ_NONE;
++
++	mbox_chan_received_data(chan, (void *)&val);
++
++	writel_relaxed(val, mlink->rx_reg + INTR_CLR_OFS);
++
++	return IRQ_HANDLED;
++}
++
++static bool platform_mhu_last_tx_done(struct mbox_chan *chan)
++{
++	struct platform_mhu_link *mlink = chan->con_priv;
++	u32 val = readl_relaxed(mlink->tx_reg + INTR_STAT_OFS);
++
++	return (val == 0);
++}
++
++static int platform_mhu_send_data(struct mbox_chan *chan, void *data)
++{
++	struct platform_mhu_link *mlink = chan->con_priv;
++	u32 *arg = data;
++
++	writel_relaxed(*arg, mlink->tx_reg + INTR_SET_OFS);
++
++	return 0;
++}
++
++static int platform_mhu_startup(struct mbox_chan *chan)
++{
++	struct platform_mhu_link *mlink = chan->con_priv;
++	u32 val;
++	int ret;
++
++	val = readl_relaxed(mlink->tx_reg + INTR_STAT_OFS);
++	writel_relaxed(val, mlink->tx_reg + INTR_CLR_OFS);
++
++	ret = request_irq(mlink->irq, platform_mhu_rx_interrupt,
++			  IRQF_SHARED, "platform_mhu_link", chan);
++	if (ret) {
++		dev_err(chan->mbox->dev,
++			"Unable to acquire IRQ %d\n", mlink->irq);
++		return ret;
++	}
++
++	return 0;
++}
++
++static void platform_mhu_shutdown(struct mbox_chan *chan)
++{
++	struct platform_mhu_link *mlink = chan->con_priv;
++
++	free_irq(mlink->irq, chan);
++}
++
++static const struct mbox_chan_ops platform_mhu_ops = {
++	.send_data = platform_mhu_send_data,
++	.startup = platform_mhu_startup,
++	.shutdown = platform_mhu_shutdown,
++	.last_tx_done = platform_mhu_last_tx_done,
++};
++
++static int platform_mhu_probe(struct platform_device *pdev)
++{
++	int i, err;
++	struct platform_mhu *mhu;
++	struct device *dev = &pdev->dev;
++	struct resource *res;
++	int platform_mhu_reg[MHU_CHANS] = {MHU_LP_OFFSET, MHU_HP_OFFSET};
++
++	/* Allocate memory for device */
++	mhu = devm_kzalloc(dev, sizeof(*mhu), GFP_KERNEL);
++	if (!mhu)
++		return -ENOMEM;
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	mhu->base = devm_ioremap_resource(dev, res);
++	if (IS_ERR(mhu->base)) {
++		dev_err(dev, "ioremap failed\n");
++		return PTR_ERR(mhu->base);
++	}
++
++	for (i = 0; i < MHU_CHANS; i++) {
++		mhu->chan[i].con_priv = &mhu->mlink[i];
++		mhu->mlink[i].irq = platform_get_irq(pdev, i);
++		if (mhu->mlink[i].irq < 0) {
++			dev_err(dev, "failed to get irq%d\n", i);
++			return mhu->mlink[i].irq;
++		}
++		mhu->mlink[i].rx_reg = mhu->base + platform_mhu_reg[i];
++		mhu->mlink[i].tx_reg = mhu->mlink[i].rx_reg + TX_REG_OFFSET;
++	}
++
++	mhu->mbox.dev = dev;
++	mhu->mbox.chans = &mhu->chan[0];
++	mhu->mbox.num_chans = MHU_CHANS;
++	mhu->mbox.ops = &platform_mhu_ops;
++	mhu->mbox.txdone_irq = false;
++	mhu->mbox.txdone_poll = true;
++	mhu->mbox.txpoll_period = 1;
++
++	platform_set_drvdata(pdev, mhu);
++
++	err = mbox_controller_register(&mhu->mbox);
++	if (err) {
++		dev_err(dev, "Failed to register mailboxes %d\n", err);
++		return err;
++	}
++
++	dev_info(dev, "Platform MHU Mailbox registered\n");
++	return 0;
++}
++
++static int platform_mhu_remove(struct platform_device *pdev)
++{
++	struct platform_mhu *mhu = platform_get_drvdata(pdev);
++
++	mbox_controller_unregister(&mhu->mbox);
++
++	return 0;
++}
++
++static const struct of_device_id platform_mhu_dt_ids[] = {
++	{ .compatible = "amlogic,meson-gxbb-mhu", },
++	{ /* sentinel */ },
++};
++MODULE_DEVICE_TABLE(of, platform_mhu_dt_ids);
++
++static struct platform_driver platform_mhu_driver = {
++	.probe	= platform_mhu_probe,
++	.remove	= platform_mhu_remove,
++	.driver = {
++		.name = "platform-mhu",
++		.of_match_table	= platform_mhu_dt_ids,
++	},
++};
++
++module_platform_driver(platform_mhu_driver);
++
++MODULE_LICENSE("GPL v2");
++MODULE_ALIAS("platform:platform-mhu");
++MODULE_DESCRIPTION("Platform MHU Driver");
++MODULE_AUTHOR("Neil Armstrong <narmstrong@baylibre.com>");
 -- 
 2.7.0
