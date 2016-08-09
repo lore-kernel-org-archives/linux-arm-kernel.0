@@ -1,96 +1,104 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Tue,  9 Aug 2016 12:53:03 +0100
-Subject: [RFC PATCH 5/5] arm64: dts: sunxi: add MMC nodes to Pine64 and
- BPi-M64 .dts
+Date: Tue,  9 Aug 2016 12:53:02 +0100
+Subject: [RFC PATCH 4/5] arm64: dts: sunxi: add SCPI driven clocks and nodes
+ for A64 MMC
 In-Reply-To: <20160809115303.17032-1-andre.przywara@arm.com>
 References: <20160809115303.17032-1-andre.przywara@arm.com>
-Message-ID: <20160809115303.17032-6-andre.przywara@arm.com>
+Message-ID: <20160809115303.17032-5-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Those two boards connect a microSD card slot to the MMC0 controller.
-Add the dummy regulator and enable MMC0 to allow accessing the SD card.
-
-The BananaPi M64 has an on-board eMMC chip connected to the MMC2
-controller, but the existing MMC driver does not support this properly
-yet, so keep this one disabled for now.
+The MMC controllers in the Allwinner A64 SoC are somewhat compatible
+with the versions used in other Allwinner SoCs.
+Tell Linux about the three MMC clocks that the firmware implements and
+add nodes to represent the MMC controllers.
+The actual hardware is capable of new transfer modes, which the driver
+does not fully support yet, also the clock part has changed, but it
+works like this at least for SD card accesses.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
- .../boot/dts/allwinner/sun50i-a64-bananapi-m64.dts | 29 ++++++++++++++++++++++
- .../arm64/boot/dts/allwinner/sun50i-a64-pine64.dts | 20 +++++++++++++++
- 2 files changed, 49 insertions(+)
+ arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 61 +++++++++++++++++++++++++++
+ 1 file changed, 61 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
-index bc0ed4c..f98c351 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
-@@ -59,6 +59,35 @@
- 	aliases {
- 		serial0 = &uart0;
- 	};
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+index 9fc540e..0f6044b 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+@@ -157,6 +157,19 @@
+ 		compatible = "arm,scpi";
+ 		mboxes = <&mailbox 0>;
+ 		shmem = <&cpu_scp_mem>;
 +
-+	soc {
-+		reg_vcc3v3: vcc3v3 {
-+			compatible = "regulator-fixed";
-+			regulator-name = "vcc3v3";
-+			regulator-min-microvolt = <3300000>;
-+			regulator-max-microvolt = <3300000>;
++		clocks {
++			compatible = "arm,scpi-clocks";
++
++			scpi_clk: scpi_clocks {
++				compatible = "arm,scpi-variable-clocks";
++				#clock-cells = <1>;
++				clock-indices = <0>, <1>,
++						<2>;
++				clock-output-names = "mmc0_clk", "mmc1_clk",
++						     "mmc2_clk";
++			};
 +		};
-+	};
-+};
-+
-+&mmc0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc0_pins>, <&mmc0_default_cd_pin>;
-+	bus-width = <4>;
-+	vmmc-supply = <&reg_vcc3v3>;
-+	cd-gpios = <&pio 5 6 0>;
-+	cd-inverted;
-+	disable-wp;
-+	status = "okay";
-+};
-+
-+&mmc2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc2_pins>;
-+	bus-width = <8>;
-+	vmmc-supply = <&reg_vcc3v3>;
-+	non-removable;
-+	status = "disabled";
- };
- 
- &uart0 {
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
-index 077a56f..a3957ca 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
-@@ -59,6 +59,26 @@
- 	aliases {
- 		serial0 = &uart0;
  	};
-+
-+	soc {
-+		reg_vcc3v3: vcc3v3 {
-+			compatible = "regulator-fixed";
-+			regulator-name = "vcc3v3";
-+			regulator-min-microvolt = <3300000>;
-+			regulator-max-microvolt = <3300000>;
-+		};
-+	};
-+};
-+
-+&mmc0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc0_pins>, <&mmc0_default_cd_pin>;
-+	bus-width = <4>;
-+	vmmc-supply = <&reg_vcc3v3>;
-+	cd-gpios = <&pio 5 6 0>;
-+	cd-inverted;
-+	disable-wp;
-+	status = "okay";
- };
  
- &uart0 {
+ 	soc {
+@@ -165,6 +178,54 @@
+ 		#size-cells = <1>;
+ 		ranges;
+ 
++		mmc0: mmc at 1c0f000 {
++			compatible = "allwinner,sun50i-a64-mmc",
++				     "allwinner,sun5i-a13-mmc";
++			reg = <0x01c0f000 0x1000>;
++			clocks = <&bus_gates 8>, <&scpi_clk 0>,
++				 <&scpi_clk 0>, <&scpi_clk 0>;
++			clock-names = "ahb", "mmc",
++				      "output", "sample";
++			resets = <&ahb_rst 8>;
++			reset-names = "ahb";
++			interrupts = <GIC_SPI 60 IRQ_TYPE_LEVEL_HIGH>;
++			status = "disabled";
++			#address-cells = <1>;
++			#size-cells = <0>;
++		};
++
++		mmc1: mmc at 1c10000 {
++			compatible = "allwinner,sun50i-a64-mmc",
++				     "allwinner,sun5i-a13-mmc";
++			reg = <0x01c10000 0x1000>;
++			clocks = <&bus_gates 9>, <&scpi_clk 1>,
++				 <&scpi_clk 1>, <&scpi_clk 1>;
++			clock-names = "ahb", "mmc",
++				      "output", "sample";
++			resets = <&ahb_rst 9>;
++			reset-names = "ahb";
++			interrupts = <GIC_SPI 61 IRQ_TYPE_LEVEL_HIGH>;
++			status = "disabled";
++			#address-cells = <1>;
++			#size-cells = <0>;
++		};
++
++		mmc2: mmc at 1c11000 {
++			compatible = "allwinner,sun50i-a64-mmc",
++				     "allwinner,sun5i-a13-mmc";
++			reg = <0x01c11000 0x1000>;
++			clocks = <&bus_gates 10>, <&scpi_clk 2>,
++				 <&scpi_clk 2>, <&scpi_clk 2>;
++			clock-names = "ahb", "mmc",
++				      "output", "sample";
++			resets = <&ahb_rst 10>;
++			reset-names = "ahb";
++			interrupts = <GIC_SPI 62 IRQ_TYPE_LEVEL_HIGH>;
++			status = "disabled";
++			#address-cells = <1>;
++			#size-cells = <0>;
++		};
++
+ 		pio: pinctrl at 1c20800 {
+ 			compatible = "allwinner,sun50i-a64-pinctrl";
+ 			reg = <0x01c20800 0x400>;
 -- 
 2.9.0
