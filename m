@@ -1,28 +1,64 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 9 Aug 2016 11:21:53 +0800
-Subject: [PATCH v3 0/3] Complete ZTE PL011 device support
-In-Reply-To: <20160718133516.GG1041@n2100.armlinux.org.uk>
-References: <1467968441-4056-1-git-send-email-shawn.guo@linaro.org>
- <20160714132620.GB4382@tiger>
- <20160718133516.GG1041@n2100.armlinux.org.uk>
-Message-ID: <20160809032153.GK4678@tiger>
+From: hzpeterchen@gmail.com (Peter Chen)
+Date: Tue, 9 Aug 2016 11:16:54 +0800
+Subject: [PATCH 1/1] irqchip: irq-gic: forward SGI to itself for
+ cortex-a7 single core
+In-Reply-To: <20160808143935.2d946210@arm.com>
+References: <1470642594-30455-1-git-send-email-peter.chen@nxp.com>
+ <20160808143935.2d946210@arm.com>
+Message-ID: <20160809031654.GA31105@shlinux2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 18, 2016 at 02:35:16PM +0100, Russell King - ARM Linux wrote:
-> On Thu, Jul 14, 2016 at 09:26:20PM +0800, Shawn Guo wrote:
-> > Most of the changes of patch #3 are yours, so presumably you are fine
-> > with it.  What about #1 and #2?  May I have your ACK on them, so that I
-> > can ask Greg to pick up the series?  Thanks.
+On Mon, Aug 08, 2016 at 02:39:35PM +0100, Marc Zyngier wrote:
+> On Mon, 8 Aug 2016 15:49:54 +0800
+> Peter Chen <peter.chen@nxp.com> wrote:
 > 
-> Yes, the three patches look fine.  For the first two:
+> +Tony
 > 
-> Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
+> > According to Cortex-A7 MPCore TRM, ch8.3.1, Distributor register summary,
+> > GICD_ITARGETSRn:
+> > 
+> > 	The register that contains the SGI and PPI interrupts is
+> >        	read-only and the value is implementation defined. For
+> >        	Cortex-A7 configurations with only one processor, these
+> >        	registers are RAZ/WI.
+> > 
+> > So, the GICD_ITARGETSR[0..7] is read-only, and the value is 0 for
+> > cortex-a7 single core platform if the SoC is cortex-a7 mpcore version.
+> > So the cupmask from gic_get_cpumask is 0.
+> > 
+> > At ARM Generic Interrupt Controller Architecture version 2.0,
+> > ch4.3.15 Software Generated Interrupt Register, GICD_SGIR,
+> > The distributor will process the requested SGI according to
+> > register TargetListFilter and CPUTargetList. At current gic code,
+> > it takes TargetListFilter as 0b00, and forward the interrupt to
+> > cpumask (variable map at gic_raise_softirq) getting from gic_get_cpumask.
+> > but cpumask is 0 according to above explanation for cortex-a7 single core
+> > platform, so, both TargetListFilter and CPUTargetList are 0, and the
+> > distributor does not forward the interrupt to any CPU interface according
+> > to gic documentation, then the SGI can't be occurred.
+> > 
+> > We have found this problem at nxp imx6ul platform, which is a cortex-a7
+> > single core platform, the irq work (triggered by SGI at ARM) can't be
+> > occurred which is needed for cpufreq, then the system has failed to boot
+> > and reboot [1].
+> 
+> I'm really not keep on this, as even if we paper over the problem for
+> platforms using a GIC, we still leave behind all the platform that are
+> not capable of self-IPI (which is the vast majority of ARM UP systems).
+> 
 
-Hi Greg,
+This is a SMP system, not UP system, just cpu number is one.
+Current problem is if we support self-IPI for SMP system, when the GIC
+in this system doesn't have distribute interrupt capability.
 
-The series missed 4.8 merge window.  Since v4.8-rc1 is out there, can
-you please queue the it up for the next?  The series can still apply
-on v4.8-rc1 cleanly.  Thanks.
+> Can you please provide a backtrace of the failing use case? Have you
+> tried this patch [1], which did solve the issue for OMAP?
 
-Shawn
+This patch is for Feb, 2016, and I use the next-20160722, the related code
+is at my kernel (although some other code at context is different).
+
+-- 
+
+Best Regards,
+Peter Chen
