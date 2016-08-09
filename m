@@ -1,59 +1,26 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue,  9 Aug 2016 11:03:56 +0100
-Subject: [PATCH RESEND] MAINTAINERS: add ARM ARCHITECTED TIMER entry
-Message-ID: <1470737036-2082-1-git-send-email-mark.rutland@arm.com>
+From: randy.li@rock-chips.com (Randy Li)
+Date: Tue, 9 Aug 2016 18:06:33 +0800
+Subject: [PATCH] ARM: dts: add rk3288-firefly-reload
+In-Reply-To: <CAFLEztTROearSEcgzV3EVHFcRcMQpLhAQ6BXP-dDyRDAWybaxg@mail.gmail.com>
+References: <1549971.ctkvOGm2xW@diego> <2868781.4x2gJCRbLH@diego>
+ <413ebccd-e8d6-1401-3065-f9a63b4d66e6@rock-chips.com>
+ <1815189.oGy6GHMbyM@phil>
+ <CAFLEztQ1pa-CCbC8c8+VJ_kg8RyPOb-UHZiKBZffKEw9zyx9Zg@mail.gmail.com>
+ <CAFLEztTROearSEcgzV3EVHFcRcMQpLhAQ6BXP-dDyRDAWybaxg@mail.gmail.com>
+Message-ID: <C2BE77CA-A59B-4128-8802-E3E36FACDABA@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ARM architected timer driver falls under the drivers/clocksource/
-catch-all in MAINTAINERS, and get_maintainers.pl doesn't suggest a
-number of people who should be Cc'd.
 
-The ARM architected timer is a core component of ARMv7+VE and ARMv8, and
-is critical to the correct operation of both architecture ports (and
-their respective KVM code), and patches to it should have review by
-knowledgeable interested parties.
 
-This patch adds a MAINTAINERS entry for the driver and its low-level
-arch components, such that get_maintainer.pl will always include
-relevant interested parties for modifications to the driver. For the
-timebeing, this means myself and Marc Zyngier.
+??? iPad ??
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
----
- MAINTAINERS | 9 +++++++++
- 1 file changed, 9 insertions(+)
-
-Apologies for the resend; I typo'd vger.kernel.org.
-
-Mark.
-
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 20bb1d0..85450ba 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -881,6 +881,15 @@ S:	Supported
- F:	drivers/gpu/drm/arc/
- F:	Documentation/devicetree/bindings/display/snps,arcpgu.txt
- 
-+ARM ARCHITECTED TIMER DRIVER
-+M:	Mark Rutland <mark.rutland@arm.com>
-+M:	Marc Zyngier <marc.zyngier@arm.com>
-+L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-+S:	Maintained
-+F:	arch/arm/include/asm/arch_timer.h
-+F:	arch/arm64/include/asm/arch_timer.h
-+F:	drivers/clocksource/arm_arch_timer.c
-+
- ARM HDLCD DRM DRIVER
- M:	Liviu Dudau <liviu.dudau@arm.com>
- S:	Supported
--- 
-1.9.1
+> ?? <jacobchen110@gmail.com> ? 2016?8?9? ??6:02 ???
+> 
+> well?it has already been added....
+> 
+> The root cause is not act8846. Firefly have a bug with sdmmc and it
+> seems they didn't fix it in firefly-reload.
+> 
+> http://bbs.t-firefly.com/forum.php?mod=viewthread&tid=256
+Yes, Jacob is right. Those high speed options need the voltage down to 1.8v. They should be removed.
