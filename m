@@ -1,126 +1,81 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Tue, 9 Aug 2016 08:52:21 +0200
-Subject: [PATCH v12 09/11] genirq/msi: Introduce msi_desc flags
-In-Reply-To: <1470158617-7022-10-git-send-email-eric.auger@redhat.com>
-References: <1470158617-7022-1-git-send-email-eric.auger@redhat.com>
- <1470158617-7022-10-git-send-email-eric.auger@redhat.com>
-Message-ID: <ae002707-4bdf-1f58-1723-600748119167@redhat.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Tue, 9 Aug 2016 14:53:06 +0800
+Subject: [PATCH] ARM: dts: imx6ul-pico-hobbit: Add Wifi support
+In-Reply-To: <1468859110-5686-1-git-send-email-vanessa.maegima@nxp.com>
+References: <1468859110-5686-1-git-send-email-vanessa.maegima@nxp.com>
+Message-ID: <20160809065306.GQ4678@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 02/08/2016 19:23, Eric Auger wrote:
-> This new flags member is meant to store additional information about
-> the msi descriptor, starting with allocation status information.
+On Mon, Jul 18, 2016 at 01:25:10PM -0300, Vanessa Maegima wrote:
+> imx6ul-pico-hobbit has a bcm4343 wifi chip connected to usdhc2 port.
 > 
-> MSI_DESC_FLAG_ALLOCATED bit tells the associated base IRQ is allocated.
-> This information is currently used at deallocation time. We also
-> introduce MSI_DESC_FLAG_FUNCTIONAL telling the MSIs are functional.
+> Add support for it.
 > 
-> For the time being ALLOCATED and FUNCTIONAL are set at the same time
-> but this is going to change in subsequent patch. Indeed in some situations
-> some additional tasks need to be carried out for the MSI to be functional.
-> For instance the MSI doorbell may need to be mapped in an IOMMU.
-> 
-> FUNCTIONAL value already gets used when enumerating the usable MSIs in
-> msix_capability_init.
-> 
-> Signed-off-by: Eric Auger <eric.auger@redhat.com>
-> 
+> Signed-off-by: Vanessa Maegima <vanessa.maegima@nxp.com>
 > ---
+>  arch/arm/boot/dts/imx6ul-pico-hobbit.dts | 21 +++++++++++++++++++++
+>  1 file changed, 21 insertions(+)
 > 
-> v12: new
-> ---
->  drivers/pci/msi.c   |  2 +-
->  include/linux/msi.h | 14 ++++++++++++++
->  kernel/irq/msi.c    |  7 ++++++-
->  3 files changed, 21 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
-> index a080f44..d7733ea 100644
-> --- a/drivers/pci/msi.c
-> +++ b/drivers/pci/msi.c
-> @@ -793,7 +793,7 @@ out_avail:
->  		int avail = 0;
->  
->  		for_each_pci_msi_entry(entry, dev) {
-> -			if (entry->irq != 0)
-> +			if (entry->flags & MSI_DESC_FLAG_FUNCTIONAL)
->  				avail++;
->  		}
->  		if (avail != 0)
-> diff --git a/include/linux/msi.h b/include/linux/msi.h
-> index 8b425c6..18f894f 100644
-> --- a/include/linux/msi.h
-> +++ b/include/linux/msi.h
-> @@ -47,6 +47,7 @@ struct fsl_mc_msi_desc {
->   * @nvec_used:	The number of vectors used
->   * @dev:	Pointer to the device which uses this descriptor
->   * @msg:	The last set MSI message cached for reuse
-> + * @flags:	flags to describe the MSI descriptor status or features
->   *
->   * @masked:	[PCI MSI/X] Mask bits
->   * @is_msix:	[PCI MSI/X] True if MSI-X
-> @@ -67,6 +68,7 @@ struct msi_desc {
->  	unsigned int			nvec_used;
->  	struct device			*dev;
->  	struct msi_msg			msg;
-> +	u32						flags;
-I will fix this bad alignment on next version
-
->  
->  	union {
->  		/* PCI MSI/X specific data */
-> @@ -99,6 +101,18 @@ struct msi_desc {
+> diff --git a/arch/arm/boot/dts/imx6ul-pico-hobbit.dts b/arch/arm/boot/dts/imx6ul-pico-hobbit.dts
+> index 8ce1fec..89f8bf8 100644
+> --- a/arch/arm/boot/dts/imx6ul-pico-hobbit.dts
+> +++ b/arch/arm/boot/dts/imx6ul-pico-hobbit.dts
+> @@ -100,6 +100,18 @@
+>  		gpio = <&gpio1 6 0>;
 >  	};
+>  
+> +	reg_brcm: brcm-reg {
+
+For fixed regulator, we name the node like below:
+
+	reg_brcm: regulator-brcm {
+
+I fixed it up and applied patch.
+
+Shawn
+
+> +		compatible = "regulator-fixed";
+> +		enable-active-high;
+> +		gpio = <&gpio4 8 GPIO_ACTIVE_HIGH>;
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&pinctrl_brcm_reg>;
+> +		regulator-name = "brcm_reg";
+> +		regulator-min-microvolt = <3300000>;
+> +		regulator-max-microvolt = <3300000>;
+> +		startup-delay-us = <200000>;
+> +	};
+> +
+>  	sound {
+>  		compatible = "fsl,imx-audio-sgtl5000";
+>  		model = "imx6ul-sgtl5000";
+> @@ -325,12 +337,21 @@
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&pinctrl_usdhc2>;
+>  	no-1-8-v;
+> +	non-removable;
+>  	keep-power-in-suspend;
+>  	wakeup-source;
+> +	vmmc-supply = <&reg_brcm>;
+>  	status = "okay";
 >  };
 >  
-> +/* Flags for msi_desc */
-> +enum {
-> +	/* the base IRQ is allocated */
-> +	MSI_DESC_FLAG_ALLOCATED	=	(1 << 0),
-> +	/**
-> +	 * the MSI is functional; in some cases the fact the base IRQ is
-> +	 * allocated is not sufficient for the MSIs to be functional: for
-> +	 * example the MSI doorbell(s) may need to be IOMMU mapped.
-> +	 */
-> +	MSI_DESC_FLAG_FUNCTIONAL =	(1 << 1),
-> +};
+>  &iomuxc {
+> +	pinctrl_brcm_reg: brcmreggrp {
+> +		fsl,pins = <
+> +			MX6UL_PAD_NAND_DATA06__GPIO4_IO08	0x10b0	/* WL_REG_ON */
+> +			MX6UL_PAD_NAND_DATA04__GPIO4_IO06	0x10b0	/* WL_HOST_WAKE */
+> +		>;
+> +	};
 > +
->  /* Helpers to hide struct msi_desc implementation details */
->  #define msi_desc_to_dev(desc)		((desc)->dev)
->  #define dev_to_msi_list(dev)		(&(dev)->msi_list)
-> diff --git a/kernel/irq/msi.c b/kernel/irq/msi.c
-> index 72bf4d6..9b93766 100644
-> --- a/kernel/irq/msi.c
-> +++ b/kernel/irq/msi.c
-> @@ -361,6 +361,9 @@ int msi_domain_alloc_irqs(struct irq_domain *domain, struct device *dev,
->  			return ret;
->  		}
->  
-> +		desc->flags |= MSI_DESC_FLAG_ALLOCATED;
-> +		desc->flags |= MSI_DESC_FLAG_FUNCTIONAL;
-> +
->  		for (i = 0; i < desc->nvec_used; i++)
->  			irq_set_msi_desc_off(virq, i, desc);
->  	}
-> @@ -395,9 +398,11 @@ void msi_domain_free_irqs(struct irq_domain *domain, struct device *dev)
->  		 * enough that there is no IRQ associated to this
->  		 * entry. If that's the case, don't do anything.
->  		 */
-> -		if (desc->irq) {
-> +		if (desc->flags & MSI_DESC_FLAG_ALLOCATED) {
->  			irq_domain_free_irqs(desc->irq, desc->nvec_used);
->  			desc->irq = 0;
-> +			desc->flags &= ~MSI_DESC_FLAG_ALLOCATED;
-> +			desc->flags &= ~MSI_DESC_FLAG_FUNCTIONAL;
-Also I will combine those settings
-
-Thanks
-
-Eric
->  		}
->  	}
->  }
+>  	pinctrl_enet2: enet2grp {
+>  		fsl,pins = <
+>  			MX6UL_PAD_ENET1_TX_DATA1__ENET2_MDIO	0x1b0b0
+> -- 
+> 2.7.4
 > 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
