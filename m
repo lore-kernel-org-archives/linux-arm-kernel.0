@@ -1,20 +1,27 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 9 Aug 2016 17:52:16 +0100
-Subject: [PATCH] drivers/perf: arm_pmu: fix legacy affinity-less DT support
-In-Reply-To: <20160809164839.GN27508@arm.com>
-References: <1470757867-13554-1-git-send-email-mark.rutland@arm.com>
- <20160809164839.GN27508@arm.com>
-Message-ID: <20160809165216.GO27508@arm.com>
+From: kbeldan@baylibre.com (Karl Beldan)
+Date: Tue,  9 Aug 2016 17:15:14 +0000
+Subject: [PATCH 0/4] Add DT support for NAND to LCDK
+Message-ID: <20160809171518.22690-1-kbeldan@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 09, 2016 at 05:48:39PM +0100, Will Deacon wrote:
-> On Tue, Aug 09, 2016 at 04:51:07PM +0100, Mark Rutland wrote:
-> For now, I think I'll stick with Marc's patch (that somehow slipped through
-> the woodwork), but maybe we should consider removing the SPI/PPI sanity
-> checking altogether. At some point we have to rely on the DT being correct,
-> and I don't think we do anything disastrout if there is a mismatch in
-                                        ^^^^^
-Oh dear, mind on other things.
+Hi,
 
-Will
+This does not use the same way the current da8xx boards do, instead
+it is using the more generic and DT friendly memory driver ti-aemif.
+I can do the same for the da850-evm and retire the dts nandcs3 instances.
+
+Karl Beldan (4):
+  memory: ti-aemif: Get a named clock rather than an unnamed one
+  ARM: dts: da850: Add an aemif node
+  ARM: dts: da850-lcdk: Add NAND to DT
+  ARM: davinci_all_defconfig: Enable AEMIF as a module
+
+ arch/arm/boot/dts/da850-lcdk.dts       | 108 +++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/da850.dtsi           |  10 +++
+ arch/arm/configs/davinci_all_defconfig |   2 +
+ drivers/memory/ti-aemif.c              |   2 +-
+ 4 files changed, 121 insertions(+), 1 deletion(-)
+
+-- 
+2.9.2
