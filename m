@@ -1,83 +1,88 @@
-From: peter.chen@nxp.com (Peter Chen)
-Date: Tue, 9 Aug 2016 00:42:07 +0000
-Subject: [PATCH v2 08/22] usb: chipidea: Remove locking in ci_udc_start()
-In-Reply-To: <147070007426.10825.11324896309403492272@sboyd-linaro>
-References: <20160707222114.1673-1-stephen.boyd@linaro.org>
- <20160707222114.1673-9-stephen.boyd@linaro.org>
- <20160708094528.GF20485@shlinux2>
- <147043403652.26915.10865210145828633146@sboyd-linaro>
- <20160806075435.GB12298@shlinux2>
- <147070007426.10825.11324896309403492272@sboyd-linaro>
-Message-ID: <VI1PR04MB1455B5AF1542F631C84F54F28B1C0@VI1PR04MB1455.eurprd04.prod.outlook.com>
+From: wangkefeng.wang@huawei.com (Kefeng Wang)
+Date: Tue, 9 Aug 2016 09:15:32 +0800
+Subject: [PATCH v2] arm64: Support hard limit of cpu count by nr_cpus
+In-Reply-To: <9b1b28bb-3102-d6f1-2989-ae764d340527@arm.com>
+References: <02d77415-9eb0-92f4-7cb6-9b941cda9a4d@arm.com>
+ <1470636316-24552-1-git-send-email-wangkefeng.wang@huawei.com>
+ <06f0b566-3482-0223-ce22-ef7532414c7f@arm.com>
+ <b8afb29f-d831-ef99-bf11-af1a9d439879@huawei.com>
+ <9b1b28bb-3102-d6f1-2989-ae764d340527@arm.com>
+Message-ID: <88238118-00f2-49bf-d405-2a251fe3ad60@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->Quoting Peter Chen (2016-08-06 00:54:35)
->> On Fri, Aug 05, 2016 at 02:53:56PM -0700, Stephen Boyd wrote:
->> > Quoting Peter Chen (2016-07-08 02:45:28)
->> > > On Thu, Jul 07, 2016 at 03:20:59PM -0700, Stephen Boyd wrote:
->> > > > We don't call hw_device_reset() with the ci->lock held, so it
->> > > > doesn't seem like this lock here is protecting anything. Let's
->> > > > just remove it. This allows us to call sleeping functions like
->> > > > phy_init() from within the CI_HDRC_CONTROLLER_RESET_EVENT hook.
->> > > >
->> > > > Cc: Peter Chen <peter.chen@nxp.com>
->> > > > Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
->> > > > Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
->> > > > ---
->> > > >  drivers/usb/chipidea/udc.c | 3 ---
->> > > >  1 file changed, 3 deletions(-)
->> > > >
->> > > > diff --git a/drivers/usb/chipidea/udc.c
->> > > > b/drivers/usb/chipidea/udc.c index 065f5d97aa67..f16be4710cdb
->> > > > 100644
->> > > > --- a/drivers/usb/chipidea/udc.c
->> > > > +++ b/drivers/usb/chipidea/udc.c
->> > > > @@ -1719,7 +1719,6 @@ static int ci_udc_start(struct usb_gadget *gadget,
->> > > >                        struct usb_gadget_driver *driver)  {
->> > > >       struct ci_hdrc *ci = container_of(gadget, struct ci_hdrc, gadget);
->> > > > -     unsigned long flags;
->> > > >       int retval = -ENOMEM;
->> > > >
->> > > >       if (driver->disconnect == NULL) @@ -1746,7 +1745,6 @@
->> > > > static int ci_udc_start(struct usb_gadget *gadget,
->> > > >
->> > > >       pm_runtime_get_sync(&ci->gadget.dev);
->> > > >       if (ci->vbus_active) {
->> > > > -             spin_lock_irqsave(&ci->lock, flags);
->> > > >               hw_device_reset(ci);
->> > > >       } else {
->> > > >               usb_udc_vbus_handler(&ci->gadget, false); @@
->> > > > -1755,7 +1753,6 @@ static int ci_udc_start(struct usb_gadget *gadget,
->> > > >       }
->> > > >
->> > > >       retval = hw_device_state(ci, ci->ep0out->qh.dma);
->> > > > -     spin_unlock_irqrestore(&ci->lock, flags);
->> > > >       if (retval)
->> > > >               pm_runtime_put_sync(&ci->gadget.dev);
->> > > >
->> > >
->> > > The main purpose for this is disabling interrupt when reset
->> > > controller, in case the unexpected interrupts occur.
->> > >
->> > > You can move this between hw_device_state.
->> > >
->> >
->> > Ok, but we don't hold the ci->lock in ci_udc_vbus_session(). Is that
->> > a bug as well?
+
+
+On 2016/8/8 20:52, Suzuki K Poulose wrote:
+> On 08/08/16 12:28, Kefeng Wang wrote:
 >>
->> I agree with your patch. In fact, during the reset controller, the
->> interrupt has not been enabled, it should no unexpected interrupt.
 >>
->
->So then we can leave this patch as is? It still isn't clear to me what sequence of
->events that would cause a problem if we don't hold the
->ci->lock around hw_device_state().
+>> On 2016/8/8 18:50, Suzuki K Poulose wrote:
+>>> On 08/08/16 07:05, Kefeng Wang wrote:
+>>>> Enable the hard limit of cpu count by set boot options nr_cpus=x
+>>>> on arm64, and show a better warning when cpu number exceeds the limit.
+>>>>
+>>>> Reported-by: Shiyuan Hu <hushiyuan@huawei.com>
+>>>> Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
+>>>> ---
+>>>>
+>>>> Changed since v1:
+>>>> - clip cpu number in smp_init_cpus suggested-by Will and Suzuki, and update
+>>>>   the warning.
+>>>>
+>>>>  arch/arm64/kernel/smp.c | 8 ++++----
+>>>>  1 file changed, 4 insertions(+), 4 deletions(-)
+>>>>
+>>>> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+>>>> index 76a6d92..cbfc31c 100644
+>>>> --- a/arch/arm64/kernel/smp.c
+>>>> +++ b/arch/arm64/kernel/smp.c
+>>>> @@ -661,9 +661,9 @@ void __init smp_init_cpus(void)
+>>>>          acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_INTERRUPT,
+>>>>                        acpi_parse_gic_cpu_interface, 0);
+>>>>
+>>>> -    if (cpu_count > NR_CPUS)
+>>>> -        pr_warn("no. of cores (%d) greater than configured maximum of %d - clipping\n",
+>>>> -            cpu_count, NR_CPUS);
+>>>> +    if (cpu_count > nr_cpu_ids)
+>>>> +        pr_warn("%d cores exceeds configured maximum of %d - clipping\n",
+>>>> +            cpu_count, nr_cpu_ids);
+>>>
+>>> I think we should leave the message as it was, and is better than what you have
+>>> changed it to.
+>>
+>> The old message is OF only and the old logic shows message when the first cpu number greater than NR_CPUS.
+> 
+> I think you misunderstood "of" (as in plain english) with OF (as in Open Firmware). To avoid
+> the confusion, how about making it :
+> 
+> "Number of cores (%d) exceeds configured maximum of %d - clipping\n" ?
 
-Yes. I am ok with this patch.  After thinking more, it is safe to be without lock.
-And we have this unlock code in nxp internal tree, and without any problems
-during 1-2 years.
+Er, I do misunderstood it, my bad, will use this one, thanks :)
 
-Acked-by: Peter Chen <peter.chen@nxp.com>
-
-Peter
+Kefeng
+> 
+> Certainly a message like :
+> 
+> "5 cores exceeds configured maximum of %d..." doesn't look nice.
+> 
+> 
+> Suzuki
+> 
+>> But now the cpu_count is the total cpu counts(get from DT or ACPI), so I change the message.
+>>
+>>
+>>>
+>>>
+>>> With that change,
+>>>
+>>> Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+>>>
+>>>
+>>> .
+>>>
+>>
+> 
+> 
+> .
+> 
