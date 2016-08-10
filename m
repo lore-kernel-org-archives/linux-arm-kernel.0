@@ -1,60 +1,73 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 10 Aug 2016 16:39:37 -0500
-Subject: [PATCH RFC 1/3] DT: bindings: mmc: Add property for 3.3V only
- support
-In-Reply-To: <853617027.179290.63a6f478-ad48-40c8-82ca-760dd1afc040.open-xchange@email.1und1.de>
-References: <1470488140-10104-1-git-send-email-stefan.wahren@i2se.com>
- <1470488140-10104-2-git-send-email-stefan.wahren@i2se.com>
- <20160810184451.GA13473@rob-hp-laptop>
- <853617027.179290.63a6f478-ad48-40c8-82ca-760dd1afc040.open-xchange@email.1und1.de>
-Message-ID: <CAL_JsqJ09hXYrp_pgAw9FXrBv+=grkm_zip6qB9XefujPECTxQ@mail.gmail.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Wed, 10 Aug 2016 14:40:11 -0700
+Subject: [PATCH 2/2] arm: apply more __ro_after_init
+In-Reply-To: <2760702.46Rp2Juk5b@wuerfel>
+References: <1464979224-2085-1-git-send-email-keescook@chromium.org>
+ <20160810094339.GK1041@n2100.armlinux.org.uk>
+ <CAGXu5j+9saxwnKTK_vdnLCuXdbvUqQWXkbxOu8QrzB9SHmQGYA@mail.gmail.com>
+ <2760702.46Rp2Juk5b@wuerfel>
+Message-ID: <CAGXu5jLstVv7+QHJe7pGdHkd9beSyqXq2N7G9xX-frmFjeGuiA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 10, 2016 at 3:27 PM, Stefan Wahren <stefan.wahren@i2se.com> wrote:
-> Hi,
->
->> Rob Herring <robh@kernel.org> hat am 10. August 2016 um 20:44 geschrieben:
+On Wed, Aug 10, 2016 at 12:41 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Wednesday, August 10, 2016 11:32:07 AM CEST Kees Cook wrote:
+>> On Wed, Aug 10, 2016 at 2:43 AM, Russell King - ARM Linux
+>> <linux@armlinux.org.uk> wrote:
+>> > On Fri, Jun 03, 2016 at 11:40:24AM -0700, Kees Cook wrote:
+>> >> @@ -1309,16 +1309,11 @@ void __init arm_mm_memblock_reserve(void)
+>> >>   * Any other function or debugging method which may touch any device _will_
+>> >>   * crash the kernel.
+>> >>   */
+>> >> +static char vectors[PAGE_SIZE * 2] __ro_after_init __aligned(PAGE_SIZE);
+>> >>  static void __init devicemaps_init(const struct machine_desc *mdesc)
+>> >>  {
+>> >>       struct map_desc map;
+>> >>       unsigned long addr;
+>> >> -     void *vectors;
+>> >> -
+>> >> -     /*
+>> >> -      * Allocate the vector page early.
+>> >> -      */
+>> >> -     vectors = early_alloc(PAGE_SIZE * 2);
+>> >
+>> > This one is not appropriate.  We _do_ write to these pages after init
+>> > for FIQ handler updates.  See set_fiq_handler().
 >>
->>
->> On Sat, Aug 06, 2016 at 12:55:38PM +0000, Stefan Wahren wrote:
->> > Currently there is no proper way to define that a MMC host supports
->> > only 3.3V. The property no-1-8-v is broken and has different meanings
->> > for different sdhci variants. So add a new property for 3.3V only
->> > support and mark no-1-8-v as deprecated.
->>
->> Why is it broken?
+>> Ah, interesting. I guess none of that hardware is being tested on
+>> linux-next.
 >
-> i want to quote Ulf Hansson here [1]:
+> Right. The OMAP1 Amstrad Delta is a somewhat obscure machine, and that
+> would be the most likely candidate to run into this.
 >
->   The problem with the "no-1-8-v" binding is that it's describing what
->   the hardware *can't* do. It thus becomes easy to abuse it.
+> RiscPC also has FIQ support, but I have not heard of anyone other
+> than Russell still using one with a modern kernel, and I doubt he
+> tests linux-next on it.
+>
+> The s3c24xx and imx machines that could use FIQ probably don't
+> use it in practice, last time I checked, I didn't see any DTS file
+> or platform data definition in the kernel that activated that
+> code path.
+>
+>> I'll drop that chunk and resubmit.
+>
+> Good enough for now, but it may be worth revisiting this, as the
+> vector page might be a good target for an attack if you have a
+> way to overwrite a few bytes in the kernel.
+>
+> Note that there are two mappings for the pages, and as Russell
+> mentioned, the TLS emulation writes to the other one that is
+> at a fixed virtual address.
+>
+> It might be better to start by making the fixed mapping readonly,
+> as KASLR doesn't protect that one at all, and change the TLS
+> code accordingly.
 
-Sounds like a quirk which is perfectly normal for a property. I'd
-agree it should be what the h/w *can* do if h/w didn't have capability
-bit that does that.
+That sounds good (anyone want to work on this?). Does arm64 need a
+similar vector page protection?
 
->   I suggest we stop using it, we should mark it deprecated.
->
-> [1] - http://www.spinics.net/lists/linux-mmc/msg34604.html
->
->> How would I override a controller saying 1.8V is
->> supported and it is not?
->
-> Sorry, i'm not sure that i understand your question. In case a board or a MMC
-> controller doesn't support 1.8V, it usually supports only 3.3V which is the
-> intension of this patch.
+-Kees
 
-Some controllers have capability bits saying what voltages they
-support, right? And those bits can be wrong (unless firmware sets them
-I'd expect that is the common case) which as I read it is what
-"no-1-8-v" was for. So with the "mmc-ddr-*v" properties, what does not
-present mean and how do they relate to controller capability bits? I
-assume they would override the controller bits, but you can only
-override the capability bit not set case. I would think the property
-not present means use the capability bit, not that that voltage is not
-supported. I think you probably need tri-state properties here where
-value 1 means supported, 0 means not supported, and not present means
-use capability bit (or other method).
-
-Rob
+-- 
+Kees Cook
+Nexus Security
