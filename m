@@ -1,31 +1,45 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed, 10 Aug 2016 16:33:52 +0100
-Subject: [PATCH v6 3/8] arm, dts: add TC2 cpu capacity-dmips-mhz
- information
-In-Reply-To: <1468932048-31635-4-git-send-email-juri.lelli@arm.com>
-References: <1468932048-31635-1-git-send-email-juri.lelli@arm.com>
- <1468932048-31635-4-git-send-email-juri.lelli@arm.com>
-Message-ID: <7ac935dc-9f8b-8af0-e67b-ef1c469d76f1@arm.com>
+From: patrice.chotard@st.com (patrice.chotard at st.com)
+Date: Wed, 10 Aug 2016 17:37:30 +0200
+Subject: [PATCH 2/2] ARM: dts: STiH407-family: Add ports-implemented property
+ in sata nodes
+In-Reply-To: <1470843450-20068-1-git-send-email-patrice.chotard@st.com>
+References: <1470843450-20068-1-git-send-email-patrice.chotard@st.com>
+Message-ID: <1470843450-20068-3-git-send-email-patrice.chotard@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Juri,
+From: Patrice Chotard <patrice.chotard@st.com>
 
-On 19/07/16 13:40, Juri Lelli wrote:
-> Add TC2 cpu capacity binding information.
->
+Despite ST AHCI version = 1.3, reading HOST_PORTS_IMPL
+returns 0. So force HOST_PORTS_IMPL to 1 by using
+ports-implemented DT property.
 
-If you repost it,
+Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
+---
+ arch/arm/boot/dts/stih407-family.dtsi | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-s/binding//
-
-> Cc: Liviu Dudau <liviu.dudau@arm.com>
-> Cc: Sudeep Holla <sudeep.holla@arm.com>
-
-Acked-by: Sudeep Holla <sudeep.holla@arm.com>
-(assuming you take it via some other tree, let us know if it's
-  OK to merge the DTS separately and you want us to pick them)
-
+diff --git a/arch/arm/boot/dts/stih407-family.dtsi b/arch/arm/boot/dts/stih407-family.dtsi
+index d294e82..36d40f0 100644
+--- a/arch/arm/boot/dts/stih407-family.dtsi
++++ b/arch/arm/boot/dts/stih407-family.dtsi
+@@ -608,6 +608,8 @@
+ 			clock-names = "ahci_clk";
+ 			clocks = <&clk_s_c0_flexgen CLK_ICN_REG>;
+ 
++			ports-implemented = <0x1>;
++
+ 			status = "disabled";
+ 		};
+ 
+@@ -631,6 +633,8 @@
+ 			clock-names = "ahci_clk";
+ 			clocks = <&clk_s_c0_flexgen CLK_ICN_REG>;
+ 
++			ports-implemented = <0x1>;
++
+ 			status = "disabled";
+ 		};
+ 
 -- 
-Regards,
-Sudeep
+1.9.1
