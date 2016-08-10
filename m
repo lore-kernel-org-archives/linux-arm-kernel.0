@@ -1,30 +1,53 @@
 From: jszhang@marvell.com (Jisheng Zhang)
-Date: Wed, 10 Aug 2016 13:31:17 +0800
-Subject: [PATCH v2 0/2] PCI: designware: let dw_pcie_link_up() beware of LTSSM
- training bit
-Message-ID: <1470807079-366-1-git-send-email-jszhang@marvell.com>
+Date: Wed, 10 Aug 2016 13:31:18 +0800
+Subject: [PATCH v2 1/2] PCI: designware: mv parameters for wait for link into
+ pcie-designware.c
+In-Reply-To: <1470807079-366-1-git-send-email-jszhang@marvell.com>
+References: <1470807079-366-1-git-send-email-jszhang@marvell.com>
+Message-ID: <1470807079-366-2-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-patch1 is a trivial clean up: move the parameters for wait for link
-into the core pcie-designware.c
+These parameters are only used in the core pcie-designware.c, let's
+move them to the core driver.
 
-Since link may be UP but still in link training, if so, we can't think
-the link is up and operating correctly. So patch2 teaches
-dw_pcie_link_up() beware of the PCIE_PHY_DEBUG_R1_LINK_IN_TRAINING bit.
+Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+---
+ drivers/pci/host/pcie-designware.c | 5 +++++
+ drivers/pci/host/pcie-designware.h | 5 -----
+ 2 files changed, 5 insertions(+), 5 deletions(-)
 
-Since v1:
-  - add Joao's Ack
-  - rebased on v4.8-rc1
-
-Jisheng Zhang (2):
-  PCI: designware: mv parameters for wait for link into
-    pcie-designware.c
-  PCI: designware: let dw_pcie_link_up() beware of LTSSM training bit
-
- drivers/pci/host/pcie-designware.c | 11 +++++++++--
- drivers/pci/host/pcie-designware.h |  5 -----
- 2 files changed, 9 insertions(+), 7 deletions(-)
-
+diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
+index 12afce1..24a16dd 100644
+--- a/drivers/pci/host/pcie-designware.c
++++ b/drivers/pci/host/pcie-designware.c
+@@ -75,6 +75,11 @@
+ #define PCIE_PHY_DEBUG_R1		(PLR_OFFSET + 0x2c)
+ #define PCIE_PHY_DEBUG_R1_LINK_UP	0x00000010
+ 
++/* Parameters for the waiting for link up routine */
++#define LINK_WAIT_MAX_RETRIES		10
++#define LINK_WAIT_USLEEP_MIN		90000
++#define LINK_WAIT_USLEEP_MAX		100000
++
+ static struct pci_ops dw_pcie_ops;
+ 
+ int dw_pcie_cfg_read(void __iomem *addr, int size, u32 *val)
+diff --git a/drivers/pci/host/pcie-designware.h b/drivers/pci/host/pcie-designware.h
+index f437f9b..384e79b 100644
+--- a/drivers/pci/host/pcie-designware.h
++++ b/drivers/pci/host/pcie-designware.h
+@@ -22,11 +22,6 @@
+ #define MAX_MSI_IRQS			32
+ #define MAX_MSI_CTRLS			(MAX_MSI_IRQS / 32)
+ 
+-/* Parameters for the waiting for link up routine */
+-#define LINK_WAIT_MAX_RETRIES		10
+-#define LINK_WAIT_USLEEP_MIN		90000
+-#define LINK_WAIT_USLEEP_MAX		100000
+-
+ struct pcie_port {
+ 	struct device		*dev;
+ 	u8			root_bus_nr;
 -- 
 2.8.1
