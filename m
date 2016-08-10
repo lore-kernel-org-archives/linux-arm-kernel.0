@@ -1,30 +1,30 @@
-From: patrice.chotard@st.com (Patrice Chotard)
-Date: Wed, 10 Aug 2016 08:50:31 +0200
-Subject: [STLinux Kernel] [PATCH] i2c: don't print error when adding
- adapter fails
-In-Reply-To: <1470742581-12971-1-git-send-email-wsa-dev@sang-engineering.com>
-References: <1470742581-12971-1-git-send-email-wsa-dev@sang-engineering.com>
-Message-ID: <dda2b522-0257-17c7-1332-cbc026b74603@st.com>
+From: finley.xiao@rock-chips.com (Finlye Xiao)
+Date: Wed, 10 Aug 2016 14:50:39 +0800
+Subject: [PATCH v1 0/4] nvmem: rockchip-efuse: support more rockchip SoCs
+Message-ID: <1470811843-42668-1-git-send-email-finley.xiao@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/09/2016 01:36 PM, Wolfram Sang wrote:
-> Since v4.8-rc1, the I2C core will print detailed information when adding an I2C
-> adapter fails. So, drivers can skip this now.
->
-> I am still undecided if I apply this as a single patch or break it out. But for
-> reviewing, avoiding the patch bomb is probably a good thing.
->
-> Should go via subsystem tree, I'd think.
->
-> Wolfram Sang (1):
->   i2c: don't print error when adding adapter fails
->
->  drivers/i2c/busses/i2c-st.c             | 4 +---
->
+From: Finley Xiao <finley.xiao@rock-chips.com>
 
-For i2c-st.c
+As the timing and organization of efuse may be different
+between rockchip SoCs, so their read function mya be different.
+We add different device tree compatible string for rockchip SoCs
+to match their own read function.
 
-Acked-by: Patrice Chotard <patrice.chotard@st.com>
+Finley Xiao (4):
+  nvmem: rockchip-efuse: update compatible strings for Rockchip efuse
+  ARM: dts: rockchip: update compatible strings for Rockchip efuse
+  arm64: dts: rockchip: add efuse0 device node for rk3399
+  nvmem: rockchip-efuse: add rk3399-efuse support
 
-Thanks
+ .../devicetree/bindings/nvmem/rockchip-efuse.txt   |   8 +-
+ arch/arm/boot/dts/rk3066a.dtsi                     |   2 +-
+ arch/arm/boot/dts/rk3188.dtsi                      |   2 +-
+ arch/arm/boot/dts/rk3288.dtsi                      |   2 +-
+ arch/arm64/boot/dts/rockchip/rk3399.dtsi           |  29 +++++
+ drivers/nvmem/rockchip-efuse.c                     | 132 +++++++++++++++++----
+ 6 files changed, 150 insertions(+), 25 deletions(-)
+
+-- 
+1.9.1
