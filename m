@@ -1,106 +1,46 @@
 From: tiffany.lin@mediatek.com (Tiffany Lin)
-Date: Wed, 10 Aug 2016 22:48:49 +0800
-Subject: [PATCH v4 4/9] dt-bindings: Add a binding for Mediatek Video Decoder
-In-Reply-To: <1470840534-4788-4-git-send-email-tiffany.lin@mediatek.com>
+Date: Wed, 10 Aug 2016 22:48:47 +0800
+Subject: [PATCH v4 2/9] v4l: add Mediatek compressed video block format
+In-Reply-To: <1470840534-4788-2-git-send-email-tiffany.lin@mediatek.com>
 References: <1470840534-4788-1-git-send-email-tiffany.lin@mediatek.com>
  <1470840534-4788-2-git-send-email-tiffany.lin@mediatek.com>
- <1470840534-4788-3-git-send-email-tiffany.lin@mediatek.com>
- <1470840534-4788-4-git-send-email-tiffany.lin@mediatek.com>
-Message-ID: <1470840534-4788-5-git-send-email-tiffany.lin@mediatek.com>
+Message-ID: <1470840534-4788-3-git-send-email-tiffany.lin@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a DT binding documentation of Video Decoder for the
-MT8173 SoC from Mediatek.
+Add V4L2_PIX_FMT_MT21C format used on MT8173 driver.
+It is compressed format and need MT8173 MDP driver to transfer to other
+standard format.
 
 Signed-off-by: Tiffany Lin <tiffany.lin@mediatek.com>
-Acked-by: Rob Herring <rob@kernel.org>
 ---
- .../devicetree/bindings/media/mediatek-vcodec.txt  |   57 ++++++++++++++++++--
- 1 file changed, 53 insertions(+), 4 deletions(-)
+ drivers/media/v4l2-core/v4l2-ioctl.c |    1 +
+ include/uapi/linux/videodev2.h       |    1 +
+ 2 files changed, 2 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/media/mediatek-vcodec.txt b/Documentation/devicetree/bindings/media/mediatek-vcodec.txt
-index 59a47a5..46c15c5 100644
---- a/Documentation/devicetree/bindings/media/mediatek-vcodec.txt
-+++ b/Documentation/devicetree/bindings/media/mediatek-vcodec.txt
-@@ -1,25 +1,74 @@
- Mediatek Video Codec
+diff --git a/drivers/media/v4l2-core/v4l2-ioctl.c b/drivers/media/v4l2-core/v4l2-ioctl.c
+index 51a0fa1..d4ee0b8 100644
+--- a/drivers/media/v4l2-core/v4l2-ioctl.c
++++ b/drivers/media/v4l2-core/v4l2-ioctl.c
+@@ -1282,6 +1282,7 @@ static void v4l_fill_fmtdesc(struct v4l2_fmtdesc *fmt)
+ 		case V4L2_PIX_FMT_JPGL:		descr = "JPEG Lite"; break;
+ 		case V4L2_PIX_FMT_SE401:	descr = "GSPCA SE401"; break;
+ 		case V4L2_PIX_FMT_S5C_UYVY_JPG:	descr = "S5C73MX interleaved UYVY/JPEG"; break;
++		case V4L2_PIX_FMT_MT21C:	descr = "Mediatek Compressed Format"; break;
+ 		default:
+ 			WARN(1, "Unknown pixelformat 0x%08x\n", fmt->pixelformat);
+ 			if (fmt->description[0])
+diff --git a/include/uapi/linux/videodev2.h b/include/uapi/linux/videodev2.h
+index 724f43e..36210db 100644
+--- a/include/uapi/linux/videodev2.h
++++ b/include/uapi/linux/videodev2.h
+@@ -627,6 +627,7 @@ struct v4l2_pix_format {
+ #define V4L2_PIX_FMT_Y8I      v4l2_fourcc('Y', '8', 'I', ' ') /* Greyscale 8-bit L/R interleaved */
+ #define V4L2_PIX_FMT_Y12I     v4l2_fourcc('Y', '1', '2', 'I') /* Greyscale 12-bit L/R interleaved */
+ #define V4L2_PIX_FMT_Z16      v4l2_fourcc('Z', '1', '6', ' ') /* Depth data 16-bit */
++#define V4L2_PIX_FMT_MT21C    v4l2_fourcc('M', 'T', '2', '1') /* Mediatek compressed block mode  */
  
- Mediatek Video Codec is the video codec hw present in Mediatek SoCs which
--supports high resolution encoding functionalities.
-+supports high resolution encoding and decoding functionalities.
- 
- Required properties:
- - compatible : "mediatek,mt8173-vcodec-enc" for encoder
-+  "mediatek,mt8173-vcodec-dec" for decoder.
- - reg : Physical base address of the video codec registers and length of
-   memory mapped region.
- - interrupts : interrupt number to the cpu.
- - mediatek,larb : must contain the local arbiters in the current Socs.
- - clocks : list of clock specifiers, corresponding to entries in
-   the clock-names property.
--- clock-names: encoder must contain "venc_sel_src", "venc_sel",
--- "venc_lt_sel_src", "venc_lt_sel".
-+- clock-names: encoder must contain "venc_sel_src", "venc_sel",,
-+  "venc_lt_sel_src", "venc_lt_sel", decoder must contain "vcodecpll",
-+  "univpll_d2", "clk_cci400_sel", "vdec_sel", "vdecpll", "vencpll",
-+  "venc_lt_sel", "vdec_bus_clk_src".
- - iommus : should point to the respective IOMMU block with master port as
-   argument, see Documentation/devicetree/bindings/iommu/mediatek,iommu.txt
-   for details.
- - mediatek,vpu : the node of video processor unit
- 
-+
- Example:
--vcodec_enc: vcodec at 0x18002000 {
-+
-+vcodec_dec: vcodec at 16000000 {
-+    compatible = "mediatek,mt8173-vcodec-dec";
-+    reg = <0 0x16000000 0 0x100>,   /*VDEC_SYS*/
-+          <0 0x16020000 0 0x1000>,  /*VDEC_MISC*/
-+          <0 0x16021000 0 0x800>,   /*VDEC_LD*/
-+          <0 0x16021800 0 0x800>,   /*VDEC_TOP*/
-+          <0 0x16022000 0 0x1000>,  /*VDEC_CM*/
-+          <0 0x16023000 0 0x1000>,  /*VDEC_AD*/
-+          <0 0x16024000 0 0x1000>,  /*VDEC_AV*/
-+          <0 0x16025000 0 0x1000>,  /*VDEC_PP*/
-+          <0 0x16026800 0 0x800>,   /*VP8_VD*/
-+          <0 0x16027000 0 0x800>,   /*VP6_VD*/
-+          <0 0x16027800 0 0x800>,   /*VP8_VL*/
-+          <0 0x16028400 0 0x400>;   /*VP9_VD*/
-+    interrupts = <GIC_SPI 204 IRQ_TYPE_LEVEL_LOW>;
-+    mediatek,larb = <&larb1>;
-+    iommus = <&iommu M4U_PORT_HW_VDEC_MC_EXT>,
-+             <&iommu M4U_PORT_HW_VDEC_PP_EXT>,
-+             <&iommu M4U_PORT_HW_VDEC_AVC_MV_EXT>,
-+             <&iommu M4U_PORT_HW_VDEC_PRED_RD_EXT>,
-+             <&iommu M4U_PORT_HW_VDEC_PRED_WR_EXT>,
-+             <&iommu M4U_PORT_HW_VDEC_UFO_EXT>,
-+             <&iommu M4U_PORT_HW_VDEC_VLD_EXT>,
-+             <&iommu M4U_PORT_HW_VDEC_VLD2_EXT>;
-+    mediatek,vpu = <&vpu>;
-+    power-domains = <&scpsys MT8173_POWER_DOMAIN_VDEC>;
-+    clocks = <&apmixedsys CLK_APMIXED_VCODECPLL>,
-+             <&topckgen CLK_TOP_UNIVPLL_D2>,
-+             <&topckgen CLK_TOP_CCI400_SEL>,
-+             <&topckgen CLK_TOP_VDEC_SEL>,
-+             <&topckgen CLK_TOP_VCODECPLL>,
-+             <&apmixedsys CLK_APMIXED_VENCPLL>,
-+             <&topckgen CLK_TOP_VENC_LT_SEL>,
-+             <&topckgen CLK_TOP_VCODECPLL_370P5>;
-+    clock-names = "vcodecpll",
-+                  "univpll_d2",
-+                  "clk_cci400_sel",
-+                  "vdec_sel",
-+                  "vdecpll",
-+                  "vencpll",
-+                  "venc_lt_sel",
-+                  "vdec_bus_clk_src";
-+  };
-+
-+  vcodec_enc: vcodec at 0x18002000 {
-     compatible = "mediatek,mt8173-vcodec-enc";
-     reg = <0 0x18002000 0 0x1000>,    /*VENC_SYS*/
-           <0 0x19002000 0 0x1000>;    /*VENC_LT_SYS*/
+ /* SDR formats - used only for Software Defined Radio devices */
+ #define V4L2_SDR_FMT_CU8          v4l2_fourcc('C', 'U', '0', '8') /* IQ u8 */
 -- 
 1.7.9.5
