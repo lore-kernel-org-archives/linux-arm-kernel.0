@@ -1,45 +1,28 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 10 Aug 2016 15:14:27 +0200
-Subject: [PATCH v2] clocksource/drivers/time-armada-370-xp: Fix the clock
- reference
-Message-ID: <1470834867-25932-1-git-send-email-gregory.clement@free-electrons.com>
+From: niklas.soderlund+renesas@ragnatech.se (=?UTF-8?q?Niklas=20S=C3=B6derlund?=)
+Date: Wed, 10 Aug 2016 15:17:56 +0200
+Subject: [PATCH] ARM: shmobile: defconfig: Enable CONFIG_CGROUPS
+Message-ID: <20160810131756.27705-1-niklas.soderlund+renesas@ragnatech.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-While converting the init function to return an error, the wrong clock
-was get. This lead to wrong clock rate and slow down the kernel. For
-example, before the patch a typical boot was around 15s after it was 1
-minute slower.
+Enable support for CONFIG_CGROUPS in shmobile_defconfig.
 
-Fixes: 12549e27c63c ("clocksource/drivers/time-armada-370-xp: Convert init function to return error")
-
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Signed-off-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
 ---
-Changelog:
+ arch/arm/configs/shmobile_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-v1 -> v2
-Move the of_clk_get_by_name out of the declaration as sugested by
-Thomas Petazzoni.
-
- drivers/clocksource/time-armada-370-xp.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/clocksource/time-armada-370-xp.c b/drivers/clocksource/time-armada-370-xp.c
-index 719b478d136e..376ed13fe739 100644
---- a/drivers/clocksource/time-armada-370-xp.c
-+++ b/drivers/clocksource/time-armada-370-xp.c
-@@ -335,10 +335,10 @@ static int __init armada_370_xp_timer_common_init(struct device_node *np)
- 
- static int __init armada_xp_timer_init(struct device_node *np)
- {
--	struct clk *clk = of_clk_get_by_name(np, "fixed");
-+	struct clk *clk;
- 	int ret;
- 
--	clk = of_clk_get(np, 0);
-+	clk = of_clk_get_by_name(np, "fixed");
- 	if (IS_ERR(clk)) {
- 		pr_err("Failed to get clock");
- 		return PTR_ERR(clk);
+diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
+index baa07a4..1b0f8ae 100644
+--- a/arch/arm/configs/shmobile_defconfig
++++ b/arch/arm/configs/shmobile_defconfig
+@@ -2,6 +2,7 @@ CONFIG_SYSVIPC=y
+ CONFIG_NO_HZ=y
+ CONFIG_IKCONFIG=y
+ CONFIG_IKCONFIG_PROC=y
++CONFIG_CGROUPS=y
+ CONFIG_BLK_DEV_INITRD=y
+ CONFIG_CC_OPTIMIZE_FOR_SIZE=y
+ CONFIG_SYSCTL_SYSCALL=y
 -- 
-2.8.1
+2.9.2
