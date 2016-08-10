@@ -1,33 +1,42 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Wed, 10 Aug 2016 16:49:57 +0800
-Subject: [PATCH] ARM: cpuidle: declare cpuidle_ops __read_mostly
-Message-ID: <1470818997-808-1-git-send-email-jszhang@marvell.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 10 Aug 2016 10:55:21 +0200
+Subject: [PATCH] ARM: no need to select SMP_ON_UP explicitly
+In-Reply-To: <57AAE5D7.2080009@arm.com>
+References: <1469199369-25746-1-git-send-email-vladimir.murzin@arm.com>
+ <20160809084416.GS4678@tiger> <57AAE5D7.2080009@arm.com>
+Message-ID: <6326645.Nr2CxIomnL@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-cpuidle_ops is initialized once by arm_cpuidle_read_ops() during
-initialization, and thereafter is mostly read in arm_cpuidle_suspend()
+On Wednesday, August 10, 2016 9:29:11 AM CEST Vladimir Murzin wrote:
+> On 09/08/16 09:44, Shawn Guo wrote:
+> > On Fri, Jul 22, 2016 at 03:56:09PM +0100, Vladimir Murzin wrote:
+> >> SMP_ON_UP is already defaulted to "y" and has all dependencies expressed
+> >> - no need to select it per platform level
+> >>
+> >> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+> >> ---
+> >>
+> >> This time sent to LAKML
+> >>
+> >>  arch/arm/mach-imx/Kconfig      |    3 ---
+> >>  arch/arm/mach-realview/Kconfig |    1 -
+> > 
+> > I cannot take mach-realview changes.  I think you need to ether split
+> > the changes, or ask arm-soc folks to apply.  In case of the latter, here
+> > is my ACK:
+> > 
+> > Acked-by: Shawn Guo <shawnguo@kernel.org>
+> 
+> Thanks!
+> 
+> RealView is not mentioned under MAINTAINERS, so it'd be easier if
+> arm-soc team pick this patch.
+> 
+> Arnd, what is your preference?
 
-The fact that it is mostly read and not written to makes it candidates
-for __read_mostly declarations.
+Linus Walleij is the person that has sent most patches for realview,
+so I'll let him decide. We can pick it up directly, or he can
+aggregate it with other patches that he might have.
 
-Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
----
- arch/arm/kernel/cpuidle.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/kernel/cpuidle.c b/arch/arm/kernel/cpuidle.c
-index 7dccc96..762e0929 100644
---- a/arch/arm/kernel/cpuidle.c
-+++ b/arch/arm/kernel/cpuidle.c
-@@ -19,7 +19,7 @@ extern struct of_cpuidle_method __cpuidle_method_of_table[];
- static const struct of_cpuidle_method __cpuidle_method_of_table_sentinel
- 	__used __section(__cpuidle_method_of_table_end);
- 
--static struct cpuidle_ops cpuidle_ops[NR_CPUS];
-+static struct cpuidle_ops cpuidle_ops[NR_CPUS] __read_mostly;
- 
- /**
-  * arm_cpuidle_simple_enter() - a wrapper to cpu_do_idle()
--- 
-2.8.1
+	Arnd
