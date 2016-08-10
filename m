@@ -1,128 +1,51 @@
-From: pbonzini@redhat.com (Paolo Bonzini)
-Date: Wed, 10 Aug 2016 15:10:51 +0200
-Subject: [PATCH] KVM: arm64: vgic-its: Grab kvm->lock when reading
- kvm->devices
-In-Reply-To: <20160810103914.30322-1-christoffer.dall@linaro.org>
-References: <20160808154543.23463-1-andre.przywara@arm.com>
- <20160810103914.30322-1-christoffer.dall@linaro.org>
-Message-ID: <d02583ed-d396-4431-ba91-903d04843fb3@redhat.com>
+From: patrice.chotard@st.com (patrice.chotard at st.com)
+Date: Wed, 10 Aug 2016 15:13:00 +0200
+Subject: [PATCH 3/4] ARM: dts: STiH418-B2199: Update gpio specifier
+In-Reply-To: <1470834781-23232-1-git-send-email-patrice.chotard@st.com>
+References: <1470834781-23232-1-git-send-email-patrice.chotard@st.com>
+Message-ID: <1470834781-23232-4-git-send-email-patrice.chotard@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Patrice Chotard <patrice.chotard@st.com>
 
+- Remove useless gpio-cells
+- Update second parameter by using GPIO_ACTIVE_HIGH/LOW
+  instead of hardcoded value
 
-On 10/08/2016 12:39, Christoffer Dall wrote:
-> Since we are about to synchronize all accesses to kvm->devices using the
-> kvm->lock mutex, we should hold this mutex while iterating over the list
-> of devices in the ITS code.
-> 
-> Also move the vgic_register_its_iodev function to where it's called and
-> rename it to register_its_iodev to avoid having two almost identially
-> named functions.
-> 
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> ---
->  virt/kvm/arm/vgic/vgic-its.c | 64 +++++++++++++++++++++++---------------------
->  1 file changed, 34 insertions(+), 30 deletions(-)
-> 
-> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-> index 1cf9f59..4e76877 100644
-> --- a/virt/kvm/arm/vgic/vgic-its.c
-> +++ b/virt/kvm/arm/vgic/vgic-its.c
-> @@ -1319,32 +1319,6 @@ void vgic_enable_lpis(struct kvm_vcpu *vcpu)
->  		its_sync_lpi_pending_table(vcpu);
->  }
->  
-> -static int vgic_register_its_iodev(struct kvm *kvm, struct vgic_its *its)
-> -{
-> -	struct vgic_io_device *iodev = &its->iodev;
-> -	int ret;
-> -
-> -	if (!its->initialized)
-> -		return -EBUSY;
-> -
-> -	if (IS_VGIC_ADDR_UNDEF(its->vgic_its_base))
-> -		return -ENXIO;
-> -
-> -	iodev->regions = its_registers;
-> -	iodev->nr_regions = ARRAY_SIZE(its_registers);
-> -	kvm_iodevice_init(&iodev->dev, &kvm_io_gic_ops);
-> -
-> -	iodev->base_addr = its->vgic_its_base;
-> -	iodev->iodev_type = IODEV_ITS;
-> -	iodev->its = its;
-> -	mutex_lock(&kvm->slots_lock);
-> -	ret = kvm_io_bus_register_dev(kvm, KVM_MMIO_BUS, iodev->base_addr,
-> -				      KVM_VGIC_V3_ITS_SIZE, &iodev->dev);
-> -	mutex_unlock(&kvm->slots_lock);
-> -
-> -	return ret;
-> -}
-> -
->  #define INITIAL_BASER_VALUE						  \
->  	(GIC_BASER_CACHEABILITY(GITS_BASER, INNER, RaWb)		| \
->  	 GIC_BASER_CACHEABILITY(GITS_BASER, OUTER, SameAsInner)		| \
-> @@ -1526,6 +1500,32 @@ int kvm_vgic_register_its_device(void)
->  				       KVM_DEV_TYPE_ARM_VGIC_ITS);
->  }
->  
-> +static int register_its_iodev(struct kvm *kvm, struct vgic_its *its)
-> +{
-> +	struct vgic_io_device *iodev = &its->iodev;
-> +	int ret;
-> +
-> +	if (!its->initialized)
-> +		return -EBUSY;
-> +
-> +	if (IS_VGIC_ADDR_UNDEF(its->vgic_its_base))
-> +		return -ENXIO;
-> +
-> +	iodev->regions = its_registers;
-> +	iodev->nr_regions = ARRAY_SIZE(its_registers);
-> +	kvm_iodevice_init(&iodev->dev, &kvm_io_gic_ops);
-> +
-> +	iodev->base_addr = its->vgic_its_base;
-> +	iodev->iodev_type = IODEV_ITS;
-> +	iodev->its = its;
-> +	mutex_lock(&kvm->slots_lock);
-> +	ret = kvm_io_bus_register_dev(kvm, KVM_MMIO_BUS, iodev->base_addr,
-> +				      KVM_VGIC_V3_ITS_SIZE, &iodev->dev);
-> +	mutex_unlock(&kvm->slots_lock);
-> +
-> +	return ret;
-> +}
-> +
->  /*
->   * Registers all ITSes with the kvm_io_bus framework.
->   * To follow the existing VGIC initialization sequence, this has to be
-> @@ -1536,19 +1536,23 @@ int vgic_register_its_iodevs(struct kvm *kvm)
->  	struct kvm_device *dev;
->  	int ret = 0;
->  
-> +	mutex_lock(&kvm->lock);
->  	list_for_each_entry(dev, &kvm->devices, vm_node) {
->  		if (dev->ops != &kvm_arm_vgic_its_ops)
->  			continue;
->  
-> -		ret = vgic_register_its_iodev(kvm, dev->private);
-> +		ret = register_its_iodev(kvm, dev->private);
->  		if (ret)
-> -			return ret;
-> +			goto out;
-> +
->  		/*
->  		 * We don't need to care about tearing down previously
-> -		 * registered ITSes, as the kvm_io_bus framework removes
-> -		 * them for us if the VM gets destroyed.
-> +		 * registered ITSes on error, as the kvm_io_bus framework
-> +		 * removes them for us if the VM gets destroyed.
->  		 */
->  	}
->  
-> +out:
-> +	mutex_unlock(&kvm->lock);
->  	return ret;
->  }
-> 
+Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
+---
+ arch/arm/boot/dts/stih418-b2199.dts | 7 +++----
+ 1 file changed, 3 insertions(+), 4 deletions(-)
 
-Reviewed-by: Paolo Bonzini <pbonzini@redhat.com>
+diff --git a/arch/arm/boot/dts/stih418-b2199.dts b/arch/arm/boot/dts/stih418-b2199.dts
+index 772d2bb..24e98a9 100644
+--- a/arch/arm/boot/dts/stih418-b2199.dts
++++ b/arch/arm/boot/dts/stih418-b2199.dts
+@@ -8,6 +8,7 @@
+  */
+ /dts-v1/;
+ #include "stih418.dtsi"
++#include <dt-bindings/gpio/gpio.h>
+ / {
+ 	model = "STiH418 B2199";
+ 	compatible = "st,stih418-b2199", "st,stih418";
+@@ -35,14 +36,12 @@
+ 		leds {
+ 			compatible = "gpio-leds";
+ 			red {
+-				#gpio-cells = <2>;
+ 				label = "Front Panel LED";
+-				gpios = <&pio4 1 0>;
++				gpios = <&pio4 1 GPIO_ACTIVE_HIGH>;
+ 				linux,default-trigger = "heartbeat";
+ 			};
+ 			green {
+-				#gpio-cells = <2>;
+-				gpios = <&pio1 3 0>;
++				gpios = <&pio1 3 GPIO_ACTIVE_HIGH>;
+ 				default-state = "off";
+ 			};
+ 		};
+-- 
+1.9.1
