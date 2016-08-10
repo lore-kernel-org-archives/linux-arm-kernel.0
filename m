@@ -1,103 +1,143 @@
 From: niklas.soderlund+renesas@ragnatech.se (=?UTF-8?q?Niklas=20S=C3=B6derlund?=)
-Date: Wed, 10 Aug 2016 13:22:16 +0200
-Subject: [PATCHv9 3/6] dma-mapping: add dma_{map,unmap}_resource
+Date: Wed, 10 Aug 2016 13:22:15 +0200
+Subject: [PATCHv9 2/6] dma-debug: add support for resource mappings
 In-Reply-To: <20160810112219.17964-1-niklas.soderlund+renesas@ragnatech.se>
 References: <20160810112219.17964-1-niklas.soderlund+renesas@ragnatech.se>
-Message-ID: <20160810112219.17964-4-niklas.soderlund+renesas@ragnatech.se>
+Message-ID: <20160810112219.17964-3-niklas.soderlund+renesas@ragnatech.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Map/Unmap a device MMIO resource from a physical address. If no dma_map_ops
-method is available the operation is a no-op.
+A MMIO mapped resource can not be represented by a struct page so a new
+debug type is needed to handle this. This patch add such type and
+functionality to add/remove entries and how to translate them to a
+physical address.
 
 Signed-off-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
 ---
- Documentation/DMA-API.txt   | 22 +++++++++++++++++-----
- include/linux/dma-mapping.h | 36 ++++++++++++++++++++++++++++++++++++
- 2 files changed, 53 insertions(+), 5 deletions(-)
+ include/linux/dma-debug.h | 19 +++++++++++++++++
+ lib/dma-debug.c           | 52 +++++++++++++++++++++++++++++++++++++++++++++--
+ 2 files changed, 69 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/DMA-API.txt b/Documentation/DMA-API.txt
-index 1d26eeb6..6b20128 100644
---- a/Documentation/DMA-API.txt
-+++ b/Documentation/DMA-API.txt
-@@ -277,14 +277,26 @@ and <size> parameters are provided to do partial page mapping, it is
- recommended that you never use these unless you really know what the
- cache width is.
+diff --git a/include/linux/dma-debug.h b/include/linux/dma-debug.h
+index fe8cb61..c7d844f 100644
+--- a/include/linux/dma-debug.h
++++ b/include/linux/dma-debug.h
+@@ -56,6 +56,13 @@ extern void debug_dma_alloc_coherent(struct device *dev, size_t size,
+ extern void debug_dma_free_coherent(struct device *dev, size_t size,
+ 				    void *virt, dma_addr_t addr);
  
-+dma_addr_t
-+dma_map_resource(struct device *dev, phys_addr_t phys_addr, size_t size,
-+		 enum dma_data_direction dir, unsigned long attrs)
++extern void debug_dma_map_resource(struct device *dev, phys_addr_t addr,
++				   size_t size, int direction,
++				   dma_addr_t dma_addr);
 +
-+void
-+dma_unmap_resource(struct device *dev, dma_addr_t addr, size_t size,
-+		   enum dma_data_direction dir, unsigned long attrs)
++extern void debug_dma_unmap_resource(struct device *dev, dma_addr_t dma_addr,
++				     size_t size, int direction);
 +
-+API for mapping and unmapping for MMIO resources. All the notes and
-+warnings for the other mapping APIs apply here. The API should only be
-+used to map device MMIO resources, mapping of RAM is not permitted.
-+
- int
- dma_mapping_error(struct device *dev, dma_addr_t dma_addr)
- 
--In some circumstances dma_map_single() and dma_map_page() will fail to create
--a mapping. A driver can check for these errors by testing the returned
--DMA address with dma_mapping_error(). A non-zero return value means the mapping
--could not be created and the driver should take appropriate action (e.g.
--reduce current DMA mapping usage or delay and try again later).
-+In some circumstances dma_map_single(), dma_map_page() and dma_map_resource()
-+will fail to create a mapping. A driver can check for these errors by testing
-+the returned DMA address with dma_mapping_error(). A non-zero return value
-+means the mapping could not be created and the driver should take appropriate
-+action (e.g. reduce current DMA mapping usage or delay and try again later).
- 
- 	int
- 	dma_map_sg(struct device *dev, struct scatterlist *sg,
-diff --git a/include/linux/dma-mapping.h b/include/linux/dma-mapping.h
-index e3bd27f..9a07882 100644
---- a/include/linux/dma-mapping.h
-+++ b/include/linux/dma-mapping.h
-@@ -264,6 +264,42 @@ static inline void dma_unmap_page(struct device *dev, dma_addr_t addr,
- 	debug_dma_unmap_page(dev, addr, size, dir, false);
+ extern void debug_dma_sync_single_for_cpu(struct device *dev,
+ 					  dma_addr_t dma_handle, size_t size,
+ 					  int direction);
+@@ -141,6 +148,18 @@ static inline void debug_dma_free_coherent(struct device *dev, size_t size,
+ {
  }
  
-+static inline dma_addr_t dma_map_resource(struct device *dev,
-+					  phys_addr_t phys_addr,
-+					  size_t size,
-+					  enum dma_data_direction dir,
-+					  unsigned long attrs)
++static inline void debug_dma_map_resource(struct device *dev, phys_addr_t addr,
++					  size_t size, int direction,
++					  dma_addr_t dma_addr)
 +{
-+	struct dma_map_ops *ops = get_dma_ops(dev);
-+	unsigned long pfn = __phys_to_pfn(phys_addr);
-+	dma_addr_t addr;
-+
-+	BUG_ON(!valid_dma_direction(dir));
-+
-+	/* Don't allow RAM to be mapped */
-+	BUG_ON(pfn_valid(pfn));
-+
-+	addr = phys_addr;
-+	if (ops->map_resource)
-+		addr = ops->map_resource(dev, phys_addr, size, dir, attrs);
-+
-+	debug_dma_map_resource(dev, phys_addr, size, dir, addr);
-+
-+	return addr;
 +}
 +
-+static inline void dma_unmap_resource(struct device *dev, dma_addr_t addr,
-+				      size_t size, enum dma_data_direction dir,
-+				      unsigned long attrs)
++static inline void debug_dma_unmap_resource(struct device *dev,
++					    dma_addr_t dma_addr, size_t size,
++					    int direction)
 +{
-+	struct dma_map_ops *ops = get_dma_ops(dev);
-+
-+	BUG_ON(!valid_dma_direction(dir));
-+	if (ops->unmap_resource)
-+		ops->unmap_resource(dev, addr, size, dir, attrs);
-+	debug_dma_unmap_resource(dev, addr, size, dir);
 +}
 +
- static inline void dma_sync_single_for_cpu(struct device *dev, dma_addr_t addr,
- 					   size_t size,
- 					   enum dma_data_direction dir)
+ static inline void debug_dma_sync_single_for_cpu(struct device *dev,
+ 						 dma_addr_t dma_handle,
+ 						 size_t size, int direction)
+diff --git a/lib/dma-debug.c b/lib/dma-debug.c
+index fcfa193..2ba086b 100644
+--- a/lib/dma-debug.c
++++ b/lib/dma-debug.c
+@@ -43,6 +43,7 @@ enum {
+ 	dma_debug_page,
+ 	dma_debug_sg,
+ 	dma_debug_coherent,
++	dma_debug_resource,
+ };
+ 
+ enum map_err_types {
+@@ -150,8 +151,9 @@ static const char *const maperr2str[] = {
+ 	[MAP_ERR_CHECKED] = "dma map error checked",
+ };
+ 
+-static const char *type2name[4] = { "single", "page",
+-				    "scather-gather", "coherent" };
++static const char *type2name[5] = { "single", "page",
++				    "scather-gather", "coherent",
++				    "resource" };
+ 
+ static const char *dir2name[4] = { "DMA_BIDIRECTIONAL", "DMA_TO_DEVICE",
+ 				   "DMA_FROM_DEVICE", "DMA_NONE" };
+@@ -399,6 +401,9 @@ static void hash_bucket_del(struct dma_debug_entry *entry)
+ 
+ static unsigned long long phys_addr(struct dma_debug_entry *entry)
+ {
++	if (entry->type == dma_debug_resource)
++		return __pfn_to_phys(entry->pfn) + entry->offset;
++
+ 	return page_to_phys(pfn_to_page(entry->pfn)) + entry->offset;
+ }
+ 
+@@ -1495,6 +1500,49 @@ void debug_dma_free_coherent(struct device *dev, size_t size,
+ }
+ EXPORT_SYMBOL(debug_dma_free_coherent);
+ 
++void debug_dma_map_resource(struct device *dev, phys_addr_t addr, size_t size,
++			    int direction, dma_addr_t dma_addr)
++{
++	struct dma_debug_entry *entry;
++
++	if (unlikely(dma_debug_disabled()))
++		return;
++
++	entry = dma_entry_alloc();
++	if (!entry)
++		return;
++
++	entry->type		= dma_debug_resource;
++	entry->dev		= dev;
++	entry->pfn		= __phys_to_pfn(addr);
++	entry->offset		= offset_in_page(addr);
++	entry->size		= size;
++	entry->dev_addr		= dma_addr;
++	entry->direction	= direction;
++	entry->map_err_type	= MAP_ERR_NOT_CHECKED;
++
++	add_dma_entry(entry);
++}
++EXPORT_SYMBOL(debug_dma_map_resource);
++
++void debug_dma_unmap_resource(struct device *dev, dma_addr_t dma_addr,
++			      size_t size, int direction)
++{
++	struct dma_debug_entry ref = {
++		.type           = dma_debug_resource,
++		.dev            = dev,
++		.dev_addr       = dma_addr,
++		.size           = size,
++		.direction      = direction,
++	};
++
++	if (unlikely(dma_debug_disabled()))
++		return;
++
++	check_unmap(&ref);
++}
++EXPORT_SYMBOL(debug_dma_unmap_resource);
++
+ void debug_dma_sync_single_for_cpu(struct device *dev, dma_addr_t dma_handle,
+ 				   size_t size, int direction)
+ {
 -- 
 2.9.2
