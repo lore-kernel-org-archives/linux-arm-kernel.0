@@ -1,312 +1,60 @@
-From: zhang.chunyan@linaro.org (Chunyan Zhang)
-Date: Wed, 10 Aug 2016 11:19:43 +0800
-Subject: [PATCH V3 1/3] tracing: add a possibility of exporting function
- trace to other places instead of ring buffer only
-In-Reply-To: <20160809113524.55512385@gandalf.local.home>
-References: <1470724361-10663-1-git-send-email-zhang.chunyan@linaro.org>
- <1470724361-10663-2-git-send-email-zhang.chunyan@linaro.org>
- <20160809113524.55512385@gandalf.local.home>
-Message-ID: <CAG2=9p8FOEcEi3opWPfBcx_5Av9bDY+04Z5QQPQGskXAm3sjxg@mail.gmail.com>
+From: hzpeterchen@gmail.com (Peter Chen)
+Date: Wed, 10 Aug 2016 11:11:46 +0800
+Subject: [PATCH v5 5/6] usb: chipidea: let chipidea core device of_node
+ equal's glue layer device of_node
+In-Reply-To: <147078813636.20133.1120685098868481913@sboyd-linaro>
+References: <1470646331-23227-1-git-send-email-peter.chen@nxp.com>
+ <1470646331-23227-6-git-send-email-peter.chen@nxp.com>
+ <147078813636.20133.1120685098868481913@sboyd-linaro>
+Message-ID: <20160810031146.GE1879@shlinux2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 9, 2016 at 11:35 PM, Steven Rostedt <rostedt@goodmis.org> wrote:
-> On Tue,  9 Aug 2016 14:32:39 +0800
-> Chunyan Zhang <zhang.chunyan@linaro.org> wrote:
->
->> Currently ring buffer is the only output of Function traces, this patch
->> added trace_export concept which would process the traces and export
->> traces to a registered destination which can be ring buffer or some other
->> storage, in this way if we want Function traces to be sent to other
->> destination rather than ring buffer only, we just need to register a new
->> trace_export and implement its own .commit() callback or just use
->> 'trace_generic_commit()' which this patch also added and hooks up its
->> own .write() functio for writing traces to the storage.
->>
->> Currently, only Function trace (TRACE_FN) is supported.
->>
->> Signed-off-by: Chunyan Zhang <zhang.chunyan@linaro.org>
->> ---
->>  include/linux/trace.h |  31 +++++++++++++
->>  kernel/trace/trace.c  | 124 +++++++++++++++++++++++++++++++++++++++++++++++++-
->>  kernel/trace/trace.h  |  31 +++++++++++++
->>  3 files changed, 185 insertions(+), 1 deletion(-)
->>  create mode 100644 include/linux/trace.h
->>
->> diff --git a/include/linux/trace.h b/include/linux/trace.h
->> new file mode 100644
->> index 0000000..bc7f503
->> --- /dev/null
->> +++ b/include/linux/trace.h
->> @@ -0,0 +1,31 @@
->> +#ifndef _LINUX_TRACE_H
->> +#define _LINUX_TRACE_H
->> +
->> +#include <linux/ring_buffer.h>
->> +struct trace_array;
->> +
->> +#ifdef CONFIG_TRACING
->> +/*
->> + * The trace export - an export of function traces.  Every ftrace_ops
->> + * has at least one export which would output function traces to ring
->> + * buffer.
->> + *
->> + * tr                - the trace_array this export belongs to
->> + * commit    - commit the traces to ring buffer and/or some other places
->> + * write     - copy traces which have been delt with ->commit() to
->> + *             the destination
->> + */
->> +struct trace_export {
->> +     char name[16];
->> +     struct trace_export     *next;
->
-> Should document above name and next. What's name used for? Is it
+On Tue, Aug 09, 2016 at 05:15:36PM -0700, Stephen Boyd wrote:
+> Quoting Peter Chen (2016-08-08 01:52:10)
+> > From: Peter Chen <peter.chen@freescale.com>
+> > 
+> > At device tree, we have no device node for chipidea core,
+> > the glue layer's node is the parent node for host and udc
+> > device. But in related driver, the parent device is chipidea
+> > core. So, in order to let the common driver get parent's node,
+> > we let the core's device node equals glue layer device node.
+> > 
+> > Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> > Tested-by: Maciej S. Szmigiero <mail@maciej.szmigiero.name>
+> > Tested-by Joshua Clayton <stillcompiling@gmail.com>
+> > ---
+> >  drivers/usb/chipidea/core.c | 11 +++++++++++
+> >  1 file changed, 11 insertions(+)
+> > 
+> > diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
+> > index 69426e6..b189dc7 100644
+> > --- a/drivers/usb/chipidea/core.c
+> > +++ b/drivers/usb/chipidea/core.c
+> > @@ -954,6 +954,15 @@ static int ci_hdrc_probe(struct platform_device *pdev)
+> >                 dev_err(dev, "unable to init phy: %d\n", ret);
+> >                 return ret;
+> >         }
+> > +       /*
+> > +        * At device tree, we have no device node for chipidea core,
+> > +        * the glue layer's node is the parent node for host and udc
+> > +        * device. But in related driver, the parent device is chipidea
+> > +        * core. So, in order to let the common driver get parent's node,
+> > +        * we let the core's device node equals glue layer's node.
+> > +        */
+> > +       if (dev->parent && dev->parent->of_node)
+> > +               dev->of_node = dev->parent->of_node;
+> 
+> Can this be done earlier? Perhaps after hw_device_init() in this probe
+> routine? That would allow me to remove the awkward parent searching in
+> my ULPI DT awareness patch.
 
-Sure, I will document them in the next revision.
+The reason why I locate it there is to avoid "goto label" for error
+path during PHY's get and initialization operation.
 
-Speaking to the 'name' here... I just think it will probably be useful
-in the future, for example, if we need an userspace interface for
-users to decide which trace_export should be used.
+Ok, to simplify your work, I will change it at next version.
 
-> visible to userspace? Add "next" just to be consistent as that's pretty
-> obvious what it is for.
->
->> +     struct trace_array      *tr;
->> +     void (*commit)(struct trace_array *, struct ring_buffer_event *);
->> +     void (*write)(const char *, unsigned int);
->> +};
->> +
->> +int register_trace_export(struct trace_export *export);
->> +int unregister_trace_export(struct trace_export *export);
->> +
->> +#endif       /* CONFIG_TRACING */
->> +
->> +#endif       /* _LINUX_TRACE_H */
->> diff --git a/kernel/trace/trace.c b/kernel/trace/trace.c
->> index dade4c9..67ae581 100644
->> --- a/kernel/trace/trace.c
->> +++ b/kernel/trace/trace.c
->> @@ -40,6 +40,7 @@
->>  #include <linux/poll.h>
->>  #include <linux/nmi.h>
->>  #include <linux/fs.h>
->> +#include <linux/trace.h>
->>  #include <linux/sched/rt.h>
->>
->>  #include "trace.h"
->> @@ -2128,6 +2129,127 @@ void trace_buffer_unlock_commit_regs(struct trace_array *tr,
->>       ftrace_trace_userstack(buffer, flags, pc);
->>  }
->>
->> +static inline void
->> +trace_generic_commit(struct trace_array *tr,
->> +            struct ring_buffer_event *event)
->> +{
->> +     struct trace_entry *entry;
->> +     struct trace_export *export = tr->export;
->> +     unsigned int size = 0;
->> +
->> +     entry = ring_buffer_event_data(event);
->> +
->> +     trace_entry_size(size, entry->type);
->> +     if (!size)
->> +             return;
->> +
->> +     if (export->write)
->> +             export->write((char *)entry, size);
->> +}
->> +
->> +static inline void
->> +trace_rb_commit(struct trace_array *tr,
->> +            struct ring_buffer_event *event)
->> +{
->> +     __buffer_unlock_commit(tr->trace_buffer.buffer, event);
->> +}
->> +
->> +static DEFINE_MUTEX(trace_export_lock);
->> +
->> +static struct trace_export trace_export_rb __read_mostly = {
->> +     .name           = "rb",
->> +     .commit = trace_rb_commit,
->> +     .next           = NULL,
->> +};
->> +static struct trace_export *trace_fn_exports __read_mostly = &trace_export_rb;
->> +
->> +inline void
->> +trace_function_exports(struct trace_array *tr,
->> +                    struct ring_buffer_event *event)
->> +{
->> +     struct trace_export *export;
->> +
->> +     mutex_lock(&trace_export_lock);
->
-> Wait! Are you calling a mutex from the function tracer? This will blow
-> up easily. The function callbacks must be totally lockless!
+-- 
 
-Okay, I just wanted to protect the list from being changed while being used.
-What do you think if I change to make adding/removing trace exports
-from the list are only permitted when the trace isn't enabled?
-
->
->> +
->> +     for (export = trace_fn_exports; export && export->commit;
->> +          export = export->next) {
->> +             tr->export = export;
->> +             export->commit(tr, event);
->> +     }
->> +
->> +     mutex_unlock(&trace_export_lock);
->> +}
->> +
->> +static void add_trace_fn_export(struct trace_export **list,
->> +                       struct trace_export *export)
->> +{
->> +     export->next = *list;
->> +     /*
->> +      * We are entering export into the list but another
->> +      * CPU might be walking that list. We need to make sure
->> +      * the export->next pointer is valid before another CPU sees
->> +      * the export pointer included into the list.
->> +      */
->> +     rcu_assign_pointer(*list, export);
->> +
->> +}
->> +
->> +static int rm_trace_fn_export(struct trace_export **list,
->> +                       struct trace_export *export)
->> +{
->> +     struct trace_export **p;
->> +
->> +     for (p = list; *p != &trace_export_rb; p = &(*p)->next)
->> +             if (*p == export)
->> +                     break;
->> +
->> +     if (*p != export)
->> +             return -1;
->> +
->> +     *p = (*p)->next;
->> +
->> +     return 0;
->> +}
->> +
->> +int register_trace_export(struct trace_export *export)
->> +{
->> +     if (!export->write) {
->> +             pr_warn("trace_export must have the write() call back.\n");
->> +             return -1;
->> +     }
->> +
->> +     mutex_lock(&trace_export_lock);
->> +
->> +     export->tr = trace_fn_exports->tr;
->> +     export->commit = trace_generic_commit;
->> +
->> +     add_trace_fn_export(&trace_fn_exports, export);
->> +
->> +     mutex_unlock(&trace_export_lock);
->> +
->> +     return 0;
->> +}
->> +EXPORT_SYMBOL_GPL(register_trace_export);
->> +
->> +int unregister_trace_export(struct trace_export *export)
->> +{
->> +     int ret;
->> +
->> +     if (!export->name) {
->
-> Why this check? Perhaps you want this in the register code?
-
-Sorry this was my mistake.  Will move this to the register code if you
-think 'name' is worth keeping.
-
-Thanks for your comments,
-Chunyan
-
->
-> -- Steve
->
->
->> +             pr_warn("trace_export must have a name.\n");
->> +             return -1;
->> +     }
->> +
->> +     mutex_lock(&trace_export_lock);
->> +
->> +     ret = rm_trace_fn_export(&trace_fn_exports, export);
->> +
->> +     mutex_unlock(&trace_export_lock);
->> +
->> +     return ret;
->> +}
->> +EXPORT_SYMBOL_GPL(unregister_trace_export);
->> +
->>  void
->>  trace_function(struct trace_array *tr,
->>              unsigned long ip, unsigned long parent_ip, unsigned long flags,
->> @@ -2147,7 +2269,7 @@ trace_function(struct trace_array *tr,
->>       entry->parent_ip                = parent_ip;
->>
->>       if (!call_filter_check_discard(call, entry, buffer, event))
->> -             __buffer_unlock_commit(buffer, event);
->> +             trace_function_exports(tr, event);
->>  }
->>
->>  #ifdef CONFIG_STACKTRACE
->> diff --git a/kernel/trace/trace.h b/kernel/trace/trace.h
->> index f783df4..a40f07c 100644
->> --- a/kernel/trace/trace.h
->> +++ b/kernel/trace/trace.h
->> @@ -260,6 +260,7 @@ struct trace_array {
->>       /* function tracing enabled */
->>       int                     function_enabled;
->>  #endif
->> +     struct trace_export     *export;
->>  };
->>
->>  enum {
->> @@ -301,6 +302,13 @@ static inline struct trace_array *top_trace_array(void)
->>               break;                                  \
->>       }
->>
->> +#undef IF_SIZE
->> +#define IF_SIZE(size, var, etype, id)                \
->> +             if (var == id) {                \
->> +                     size = (sizeof(etype)); \
->> +                     break;                  \
->> +             }
->> +
->>  /* Will cause compile errors if type is not found. */
->>  extern void __ftrace_bad_type(void);
->>
->> @@ -339,6 +347,29 @@ extern void __ftrace_bad_type(void);
->>       } while (0)
->>
->>  /*
->> + * The trace_entry_size return the size of specific trace type
->> + *
->> + * IF_SIZE(size, var);
->> + *
->> + * Where "var" is just the given trace type.
->> + */
->> +#define trace_entry_size(size, var)                                  \
->> +     do {                                                            \
->> +             IF_SIZE(size, var, struct ftrace_entry, TRACE_FN);      \
->> +             IF_SIZE(size, var, struct stack_entry, TRACE_STACK);    \
->> +             IF_SIZE(size, var, struct userstack_entry,              \
->> +                     TRACE_USER_STACK);                              \
->> +             IF_SIZE(size, var, struct print_entry, TRACE_PRINT);    \
->> +             IF_SIZE(size, var, struct bprint_entry, TRACE_BPRINT);  \
->> +             IF_SIZE(size, var, struct bputs_entry, TRACE_BPUTS);    \
->> +             IF_SIZE(size, var, struct trace_branch, TRACE_BRANCH);  \
->> +             IF_SIZE(size, var, struct ftrace_graph_ent_entry,       \
->> +                     TRACE_GRAPH_ENT);                               \
->> +             IF_SIZE(size, var, struct ftrace_graph_ret_entry,       \
->> +                     TRACE_GRAPH_RET);                               \
->> +     } while (0)
->> +
->> +/*
->>   * An option specific to a tracer. This is a boolean value.
->>   * The bit is the bit index that sets its value on the
->>   * flags value in struct tracer_flags.
->
+Best Regards,
+Peter Chen
