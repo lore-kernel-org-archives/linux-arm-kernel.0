@@ -1,31 +1,34 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 9 Aug 2016 18:55:37 -0500
-Subject: [PATCH v3 02/15] dt/bindings: Update binding for PM domain idle
- states
-In-Reply-To: <1470351902-43103-3-git-send-email-lina.iyer@linaro.org>
-References: <1470351902-43103-1-git-send-email-lina.iyer@linaro.org>
- <1470351902-43103-3-git-send-email-lina.iyer@linaro.org>
-Message-ID: <20160809235537.GA28122@rob-hp-laptop>
+From: labbott@redhat.com (Laura Abbott)
+Date: Tue, 9 Aug 2016 17:13:04 -0700
+Subject: [RFCv2][PATCH 2/5] arm: Implement ARCH_HAS_FORCE_CACHE
+In-Reply-To: <afd22029-c60c-1c15-3293-4011b085e07e@gmail.com>
+References: <1470678577-14010-1-git-send-email-labbott@redhat.com>
+ <1470678577-14010-3-git-send-email-labbott@redhat.com>
+ <afd22029-c60c-1c15-3293-4011b085e07e@gmail.com>
+Message-ID: <dd9519ce-cd4f-4007-a88a-f184407ca565@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 04, 2016 at 05:04:49PM -0600, Lina Iyer wrote:
-> From: Axel Haslam <ahaslam+renesas@baylibre.com>
-> 
-> Update DT bindings to describe idle states of PM domains.
-> 
-> Cc: <devicetree@vger.kernel.org>
-> Signed-off-by: Marc Titinger <mtitinger+renesas@baylibre.com>
-> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
-> [Lina: Added state properties, removed state names, wakeup-latency,
-> added of_pm_genpd_init() API, pruned commit text]
-> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-> [Ulf: Moved around code to make it compile properly, rebased on top of multiple state support]
+On 08/09/2016 02:56 PM, Florian Fainelli wrote:
+> On 08/08/2016 10:49 AM, Laura Abbott wrote:
+>> arm may need the kernel_force_cache APIs to guarantee data consistency.
+>> Implement versions of these APIs based on the DMA APIs.
+>>
+>> Signed-off-by: Laura Abbott <labbott@redhat.com>
+>> ---
+>>  arch/arm/include/asm/cacheflush.h |   4 ++
+>>  arch/arm/mm/dma-mapping.c         | 119 --------------------------------------
+>>  arch/arm/mm/flush.c               | 115 ++++++++++++++++++++++++++++++++++++
+>
+> Why is the code moved between dma-mapping.c and flush.c? It was not
+> obvious while looking at these patches why this is needed.
+>
 
-This change doesn't make sense given this is just a binding doc.
+I wanted to use the cache flushing routines from dma-mapping.c and
+it seemed better to pull them out vs. trying to put more generic
+cache flushing code in dma-mapping.c. flush.c seemed like an
+appropriate place although I forgot about the dependency on CONFIG_MMU.
+It can certainly remain in dma-mapping.c if deemed appropriate.
 
-> ---
->  .../devicetree/bindings/power/power_domain.txt     | 57 ++++++++++++++++++++++
->  1 file changed, 57 insertions(+)
-
-Acked-by: Rob Herring <robh@kernel.org>
+Thanks,
+Laura
