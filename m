@@ -1,124 +1,79 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 10 Aug 2016 18:03:20 +0530
-Subject: [RFT RESEND PATCH v3 3/3] ARM: select PCI_DOMAINS config from
- ARCH_MULTIPLATFORM
-In-Reply-To: <1470832400-11929-1-git-send-email-kishon@ti.com>
-References: <1470832400-11929-1-git-send-email-kishon@ti.com>
-Message-ID: <1470832400-11929-4-git-send-email-kishon@ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 10 Aug 2016 14:40:25 +0200
+Subject: [PATCH 0/5] RealView boardfile removal
+Message-ID: <1470832830-10274-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PCI_DOMAINS config should be selected for any SoCs
-having more than a single PCIe controller. Without PCI_DOMAINS
-config, only one PCIe controller gets registered.
+This is a repost of the earlier posted RealView boardfile
+removal patchset: now that Tomi has merged the CLCD patches
+this can be merged, ridding the world from another ton of
+boardfiles, with all RealView variants booting just as nicely
+as before.
 
-Select PCI_DOMAINS in ARCH_MULTIPLATFORM if PCI is selected, since
-it doesn't harm even if a platform has a single PCIe port.
-Also remove PCI_DOMAINS being selected from other platform
-specific configs.
+Vladimir's patch and some new patches on top are added to
+reduce the Kconfig mess, looking for ACKs from MTD and
+irqchips to merge that. Will send a pull request after some
+ACK grace time.
 
-Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
----
- arch/arm/Kconfig               |    1 +
- arch/arm/mach-axxia/Kconfig    |    1 -
- arch/arm/mach-cns3xxx/Kconfig  |    1 -
- arch/arm/mach-exynos/Kconfig   |    1 -
- arch/arm/mach-imx/Kconfig      |    2 --
- arch/arm/mach-keystone/Kconfig |    1 -
- arch/arm/mach-shmobile/Kconfig |    1 -
- 7 files changed, 1 insertion(+), 7 deletions(-)
+Linus Walleij (4):
+  ARM: realview: delete the RealView board files
+  ARM: realview: reduce the RealView Kconfig
+  ARM: realview: cut board options from defconfig
+  ARM: realview: imply device tree boot
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index a9c4e48..fb1b867 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -337,6 +337,7 @@ config ARCH_MULTIPLATFORM
- 	select GENERIC_CLOCKEVENTS
- 	select MIGHT_HAVE_PCI
- 	select MULTI_IRQ_HANDLER
-+	select PCI_DOMAINS if PCI
- 	select SPARSE_IRQ
- 	select USE_OF
- 
-diff --git a/arch/arm/mach-axxia/Kconfig b/arch/arm/mach-axxia/Kconfig
-index ee2e131..fe627cb 100644
---- a/arch/arm/mach-axxia/Kconfig
-+++ b/arch/arm/mach-axxia/Kconfig
-@@ -7,7 +7,6 @@ config ARCH_AXXIA
- 	select ARM_TIMER_SP804
- 	select HAVE_ARM_ARCH_TIMER
- 	select MFD_SYSCON
--	select PCI_DOMAINS if PCI
- 	select ZONE_DMA
- 	help
- 	  This enables support for the LSI Axxia devices.
-diff --git a/arch/arm/mach-cns3xxx/Kconfig b/arch/arm/mach-cns3xxx/Kconfig
-index eb14a0f..5fd836b 100644
---- a/arch/arm/mach-cns3xxx/Kconfig
-+++ b/arch/arm/mach-cns3xxx/Kconfig
-@@ -2,7 +2,6 @@ menuconfig ARCH_CNS3XXX
- 	bool "Cavium Networks CNS3XXX family"
- 	depends on ARCH_MULTI_V6
- 	select ARM_GIC
--	select PCI_DOMAINS if PCI
- 	help
- 	  Support for Cavium Networks CNS3XXX platform.
- 
-diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
-index ee8a99c..18f0c85 100644
---- a/arch/arm/mach-exynos/Kconfig
-+++ b/arch/arm/mach-exynos/Kconfig
-@@ -126,7 +126,6 @@ config SOC_EXYNOS5440
- 	select ARCH_DMA_ADDR_T_64BIT if ARM_LPAE
- 	select HAVE_ARM_ARCH_TIMER
- 	select AUTO_ZRELADDR
--	select PCI_DOMAINS if PCI
- 	select PINCTRL_EXYNOS5440
- 	select PM_OPP
- 	help
-diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index ee9a318..757cd11 100644
---- a/arch/arm/mach-imx/Kconfig
-+++ b/arch/arm/mach-imx/Kconfig
-@@ -523,7 +523,6 @@ config SOC_IMX6Q
- 	select ARM_ERRATA_764369 if SMP
- 	select HAVE_ARM_SCU if SMP
- 	select HAVE_ARM_TWD
--	select PCI_DOMAINS if PCI
- 	select PINCTRL_IMX6Q
- 	select SOC_IMX6
- 
-@@ -569,7 +568,6 @@ config SOC_LS1021A
- 	bool "Freescale LS1021A support"
- 	select ARM_GIC
- 	select HAVE_ARM_ARCH_TIMER
--	select PCI_DOMAINS if PCI
- 	select ZONE_DMA if ARM_LPAE
- 	help
- 	  This enables support for Freescale LS1021A processor.
-diff --git a/arch/arm/mach-keystone/Kconfig b/arch/arm/mach-keystone/Kconfig
-index 1507287..24bd64d 100644
---- a/arch/arm/mach-keystone/Kconfig
-+++ b/arch/arm/mach-keystone/Kconfig
-@@ -8,7 +8,6 @@ config ARCH_KEYSTONE
- 	select COMMON_CLK_KEYSTONE
- 	select ARCH_SUPPORTS_BIG_ENDIAN
- 	select ZONE_DMA if ARM_LPAE
--	select PCI_DOMAINS if PCI
- 	select PINCTRL
- 	help
- 	  Support for boards based on the Texas Instruments Keystone family of
-diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-index 4a48c9f..09817ba 100644
---- a/arch/arm/mach-shmobile/Kconfig
-+++ b/arch/arm/mach-shmobile/Kconfig
-@@ -22,7 +22,6 @@ config ARCH_RCAR_GEN2
- 	select PM_GENERIC_DOMAINS
- 	select RENESAS_IRQC
- 	select SYS_SUPPORTS_SH_CMT
--	select PCI_DOMAINS if PCI
- 
- config ARCH_RMOBILE
- 	bool
+Vladimir Murzin (1):
+  ARM: realview: no need to select SMP_ON_UP explicitly
+
+ arch/arm/configs/realview_defconfig      |  11 -
+ arch/arm/mach-realview/Kconfig           | 145 +--------
+ arch/arm/mach-realview/Makefile          |  12 +-
+ arch/arm/mach-realview/board-eb.h        |  94 ------
+ arch/arm/mach-realview/board-pb1176.h    |  81 -----
+ arch/arm/mach-realview/board-pb11mp.h    |  96 ------
+ arch/arm/mach-realview/board-pba8.h      |  71 -----
+ arch/arm/mach-realview/board-pbx.h       | 106 -------
+ arch/arm/mach-realview/core.c            | 404 -------------------------
+ arch/arm/mach-realview/core.h            |  58 ----
+ arch/arm/mach-realview/hardware.h        |  40 ---
+ arch/arm/mach-realview/hotplug.h         |   1 +
+ arch/arm/mach-realview/irqs-eb.h         | 114 -------
+ arch/arm/mach-realview/irqs-pb1176.h     |  77 -----
+ arch/arm/mach-realview/irqs-pb11mp.h     |  97 ------
+ arch/arm/mach-realview/irqs-pba8.h       |  71 -----
+ arch/arm/mach-realview/irqs-pbx.h        |  87 ------
+ arch/arm/mach-realview/platform.h        | 247 ----------------
+ arch/arm/mach-realview/platsmp-dt.c      |   3 +-
+ arch/arm/mach-realview/platsmp.c         |  86 ------
+ arch/arm/mach-realview/realview_eb.c     | 492 -------------------------------
+ arch/arm/mach-realview/realview_pb1176.c | 395 -------------------------
+ arch/arm/mach-realview/realview_pb11mp.c | 385 ------------------------
+ arch/arm/mach-realview/realview_pba8.c   | 307 -------------------
+ arch/arm/mach-realview/realview_pbx.c    | 402 -------------------------
+ drivers/irqchip/Makefile                 |   2 +-
+ drivers/mtd/maps/Kconfig                 |   2 +-
+ 27 files changed, 18 insertions(+), 3868 deletions(-)
+ delete mode 100644 arch/arm/mach-realview/board-eb.h
+ delete mode 100644 arch/arm/mach-realview/board-pb1176.h
+ delete mode 100644 arch/arm/mach-realview/board-pb11mp.h
+ delete mode 100644 arch/arm/mach-realview/board-pba8.h
+ delete mode 100644 arch/arm/mach-realview/board-pbx.h
+ delete mode 100644 arch/arm/mach-realview/core.c
+ delete mode 100644 arch/arm/mach-realview/core.h
+ delete mode 100644 arch/arm/mach-realview/hardware.h
+ create mode 100644 arch/arm/mach-realview/hotplug.h
+ delete mode 100644 arch/arm/mach-realview/irqs-eb.h
+ delete mode 100644 arch/arm/mach-realview/irqs-pb1176.h
+ delete mode 100644 arch/arm/mach-realview/irqs-pb11mp.h
+ delete mode 100644 arch/arm/mach-realview/irqs-pba8.h
+ delete mode 100644 arch/arm/mach-realview/irqs-pbx.h
+ delete mode 100644 arch/arm/mach-realview/platform.h
+ delete mode 100644 arch/arm/mach-realview/platsmp.c
+ delete mode 100644 arch/arm/mach-realview/realview_eb.c
+ delete mode 100644 arch/arm/mach-realview/realview_pb1176.c
+ delete mode 100644 arch/arm/mach-realview/realview_pb11mp.c
+ delete mode 100644 arch/arm/mach-realview/realview_pba8.c
+ delete mode 100644 arch/arm/mach-realview/realview_pbx.c
+
 -- 
-1.7.9.5
+2.7.4
