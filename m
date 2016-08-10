@@ -1,151 +1,134 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed, 10 Aug 2016 16:24:38 +0200
-Subject: [PATCH v2 1/2] mtd: brcmnand: iProc big endian and ONFI support
-In-Reply-To: <1469051631-7896-2-git-send-email-ray.jui@broadcom.com>
-References: <1469051631-7896-1-git-send-email-ray.jui@broadcom.com>
- <1469051631-7896-2-git-send-email-ray.jui@broadcom.com>
-Message-ID: <20160810162438.4c6cffd3@bbrezillon>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 10 Aug 2016 16:34:29 +0200
+Subject: [PATCH] KVM: arm64: vgic-its: Grab kvm->lock when reading
+ kvm->devices
+In-Reply-To: <d02583ed-d396-4431-ba91-903d04843fb3@redhat.com>
+References: <20160808154543.23463-1-andre.przywara@arm.com>
+ <20160810103914.30322-1-christoffer.dall@linaro.org>
+ <d02583ed-d396-4431-ba91-903d04843fb3@redhat.com>
+Message-ID: <20160810143429.GA11515@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 20 Jul 2016 14:53:50 -0700
-Ray Jui <ray.jui@broadcom.com> wrote:
-
-> This patch adds big endian and ONFI support for various iProc based
-> SoCs that use the core brcmstb NAND controller
-
-Brian, Kamal, can you review this patch?
-
+On Wed, Aug 10, 2016 at 03:10:51PM +0200, Paolo Bonzini wrote:
 > 
-> This patch was originally implemented by Prafulla Kota
-> <prafulla.kota@broadcom.com> and fully tested on iProc based NS2 SVK
 > 
-> Signed-off-by: Prafulla Kota <prafulla.kota@broadcom.com>
-> Signed-off-by: Ray Jui <ray.jui@broadcom.com>
-> ---
->  drivers/mtd/nand/brcmnand/brcmnand.c   | 12 ++++++------
->  drivers/mtd/nand/brcmnand/brcmnand.h   | 13 ++++++++-----
->  drivers/mtd/nand/brcmnand/iproc_nand.c | 18 ++++++++++++++----
->  3 files changed, 28 insertions(+), 15 deletions(-)
+> On 10/08/2016 12:39, Christoffer Dall wrote:
+> > Since we are about to synchronize all accesses to kvm->devices using the
+> > kvm->lock mutex, we should hold this mutex while iterating over the list
+> > of devices in the ITS code.
+> > 
+> > Also move the vgic_register_its_iodev function to where it's called and
+> > rename it to register_its_iodev to avoid having two almost identially
+> > named functions.
+> > 
+> > Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> > ---
+> >  virt/kvm/arm/vgic/vgic-its.c | 64 +++++++++++++++++++++++---------------------
+> >  1 file changed, 34 insertions(+), 30 deletions(-)
+> > 
+> > diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+> > index 1cf9f59..4e76877 100644
+> > --- a/virt/kvm/arm/vgic/vgic-its.c
+> > +++ b/virt/kvm/arm/vgic/vgic-its.c
+> > @@ -1319,32 +1319,6 @@ void vgic_enable_lpis(struct kvm_vcpu *vcpu)
+> >  		its_sync_lpi_pending_table(vcpu);
+> >  }
+> >  
+> > -static int vgic_register_its_iodev(struct kvm *kvm, struct vgic_its *its)
+> > -{
+> > -	struct vgic_io_device *iodev = &its->iodev;
+> > -	int ret;
+> > -
+> > -	if (!its->initialized)
+> > -		return -EBUSY;
+> > -
+> > -	if (IS_VGIC_ADDR_UNDEF(its->vgic_its_base))
+> > -		return -ENXIO;
+> > -
+> > -	iodev->regions = its_registers;
+> > -	iodev->nr_regions = ARRAY_SIZE(its_registers);
+> > -	kvm_iodevice_init(&iodev->dev, &kvm_io_gic_ops);
+> > -
+> > -	iodev->base_addr = its->vgic_its_base;
+> > -	iodev->iodev_type = IODEV_ITS;
+> > -	iodev->its = its;
+> > -	mutex_lock(&kvm->slots_lock);
+> > -	ret = kvm_io_bus_register_dev(kvm, KVM_MMIO_BUS, iodev->base_addr,
+> > -				      KVM_VGIC_V3_ITS_SIZE, &iodev->dev);
+> > -	mutex_unlock(&kvm->slots_lock);
+> > -
+> > -	return ret;
+> > -}
+> > -
+> >  #define INITIAL_BASER_VALUE						  \
+> >  	(GIC_BASER_CACHEABILITY(GITS_BASER, INNER, RaWb)		| \
+> >  	 GIC_BASER_CACHEABILITY(GITS_BASER, OUTER, SameAsInner)		| \
+> > @@ -1526,6 +1500,32 @@ int kvm_vgic_register_its_device(void)
+> >  				       KVM_DEV_TYPE_ARM_VGIC_ITS);
+> >  }
+> >  
+> > +static int register_its_iodev(struct kvm *kvm, struct vgic_its *its)
+> > +{
+> > +	struct vgic_io_device *iodev = &its->iodev;
+> > +	int ret;
+> > +
+> > +	if (!its->initialized)
+> > +		return -EBUSY;
+> > +
+> > +	if (IS_VGIC_ADDR_UNDEF(its->vgic_its_base))
+> > +		return -ENXIO;
+> > +
+> > +	iodev->regions = its_registers;
+> > +	iodev->nr_regions = ARRAY_SIZE(its_registers);
+> > +	kvm_iodevice_init(&iodev->dev, &kvm_io_gic_ops);
+> > +
+> > +	iodev->base_addr = its->vgic_its_base;
+> > +	iodev->iodev_type = IODEV_ITS;
+> > +	iodev->its = its;
+> > +	mutex_lock(&kvm->slots_lock);
+> > +	ret = kvm_io_bus_register_dev(kvm, KVM_MMIO_BUS, iodev->base_addr,
+> > +				      KVM_VGIC_V3_ITS_SIZE, &iodev->dev);
+> > +	mutex_unlock(&kvm->slots_lock);
+> > +
+> > +	return ret;
+> > +}
+> > +
+> >  /*
+> >   * Registers all ITSes with the kvm_io_bus framework.
+> >   * To follow the existing VGIC initialization sequence, this has to be
+> > @@ -1536,19 +1536,23 @@ int vgic_register_its_iodevs(struct kvm *kvm)
+> >  	struct kvm_device *dev;
+> >  	int ret = 0;
+> >  
+> > +	mutex_lock(&kvm->lock);
+> >  	list_for_each_entry(dev, &kvm->devices, vm_node) {
+> >  		if (dev->ops != &kvm_arm_vgic_its_ops)
+> >  			continue;
+> >  
+> > -		ret = vgic_register_its_iodev(kvm, dev->private);
+> > +		ret = register_its_iodev(kvm, dev->private);
+> >  		if (ret)
+> > -			return ret;
+> > +			goto out;
+> > +
+> >  		/*
+> >  		 * We don't need to care about tearing down previously
+> > -		 * registered ITSes, as the kvm_io_bus framework removes
+> > -		 * them for us if the VM gets destroyed.
+> > +		 * registered ITSes on error, as the kvm_io_bus framework
+> > +		 * removes them for us if the VM gets destroyed.
+> >  		 */
+> >  	}
+> >  
+> > +out:
+> > +	mutex_unlock(&kvm->lock);
+> >  	return ret;
+> >  }
+> > 
 > 
-> diff --git a/drivers/mtd/nand/brcmnand/brcmnand.c b/drivers/mtd/nand/brcmnand/brcmnand.c
-> index b76ad7c..12a1585 100644
-> --- a/drivers/mtd/nand/brcmnand/brcmnand.c
-> +++ b/drivers/mtd/nand/brcmnand/brcmnand.c
-> @@ -1279,7 +1279,7 @@ static void brcmnand_cmdfunc(struct mtd_info *mtd, unsigned command,
->  		u32 *flash_cache = (u32 *)ctrl->flash_cache;
->  		int i;
->  
-> -		brcmnand_soc_data_bus_prepare(ctrl->soc);
-> +		brcmnand_soc_data_bus_prepare(ctrl->soc, true);
->  
->  		/*
->  		 * Must cache the FLASH_CACHE now, since changes in
-> @@ -1292,7 +1292,7 @@ static void brcmnand_cmdfunc(struct mtd_info *mtd, unsigned command,
->  			 */
->  			flash_cache[i] = be32_to_cpu(brcmnand_read_fc(ctrl, i));
->  
-> -		brcmnand_soc_data_bus_unprepare(ctrl->soc);
-> +		brcmnand_soc_data_bus_unprepare(ctrl->soc, true);
->  
->  		/* Cleanup from HW quirk: restore SECTOR_SIZE_1K */
->  		if (host->hwcfg.sector_size_1k)
-> @@ -1508,12 +1508,12 @@ static int brcmnand_read_by_pio(struct mtd_info *mtd, struct nand_chip *chip,
->  		brcmnand_waitfunc(mtd, chip);
->  
->  		if (likely(buf)) {
-> -			brcmnand_soc_data_bus_prepare(ctrl->soc);
-> +			brcmnand_soc_data_bus_prepare(ctrl->soc, false);
->  
->  			for (j = 0; j < FC_WORDS; j++, buf++)
->  				*buf = brcmnand_read_fc(ctrl, j);
->  
-> -			brcmnand_soc_data_bus_unprepare(ctrl->soc);
-> +			brcmnand_soc_data_bus_unprepare(ctrl->soc, false);
->  		}
->  
->  		if (oob)
-> @@ -1678,12 +1678,12 @@ static int brcmnand_write(struct mtd_info *mtd, struct nand_chip *chip,
->  		(void)brcmnand_read_reg(ctrl, BRCMNAND_CMD_ADDRESS);
->  
->  		if (buf) {
-> -			brcmnand_soc_data_bus_prepare(ctrl->soc);
-> +			brcmnand_soc_data_bus_prepare(ctrl->soc, false);
->  
->  			for (j = 0; j < FC_WORDS; j++, buf++)
->  				brcmnand_write_fc(ctrl, j, *buf);
->  
-> -			brcmnand_soc_data_bus_unprepare(ctrl->soc);
-> +			brcmnand_soc_data_bus_unprepare(ctrl->soc, false);
->  		} else if (oob) {
->  			for (j = 0; j < FC_WORDS; j++)
->  				brcmnand_write_fc(ctrl, j, 0xffffffff);
-> diff --git a/drivers/mtd/nand/brcmnand/brcmnand.h b/drivers/mtd/nand/brcmnand/brcmnand.h
-> index ef5eabb..5c44cd4 100644
-> --- a/drivers/mtd/nand/brcmnand/brcmnand.h
-> +++ b/drivers/mtd/nand/brcmnand/brcmnand.h
-> @@ -23,19 +23,22 @@ struct dev_pm_ops;
->  struct brcmnand_soc {
->  	bool (*ctlrdy_ack)(struct brcmnand_soc *soc);
->  	void (*ctlrdy_set_enabled)(struct brcmnand_soc *soc, bool en);
-> -	void (*prepare_data_bus)(struct brcmnand_soc *soc, bool prepare);
-> +	void (*prepare_data_bus)(struct brcmnand_soc *soc, bool prepare,
-> +				 bool is_param);
->  };
->  
-> -static inline void brcmnand_soc_data_bus_prepare(struct brcmnand_soc *soc)
-> +static inline void brcmnand_soc_data_bus_prepare(struct brcmnand_soc *soc,
-> +						 bool is_param)
->  {
->  	if (soc && soc->prepare_data_bus)
-> -		soc->prepare_data_bus(soc, true);
-> +		soc->prepare_data_bus(soc, true, is_param);
->  }
->  
-> -static inline void brcmnand_soc_data_bus_unprepare(struct brcmnand_soc *soc)
-> +static inline void brcmnand_soc_data_bus_unprepare(struct brcmnand_soc *soc,
-> +						   bool is_param)
->  {
->  	if (soc && soc->prepare_data_bus)
-> -		soc->prepare_data_bus(soc, false);
-> +		soc->prepare_data_bus(soc, false, is_param);
->  }
->  
->  static inline u32 brcmnand_readl(void __iomem *addr)
-> diff --git a/drivers/mtd/nand/brcmnand/iproc_nand.c b/drivers/mtd/nand/brcmnand/iproc_nand.c
-> index 585596c..4c6ae11 100644
-> --- a/drivers/mtd/nand/brcmnand/iproc_nand.c
-> +++ b/drivers/mtd/nand/brcmnand/iproc_nand.c
-> @@ -74,7 +74,8 @@ static void iproc_nand_intc_set(struct brcmnand_soc *soc, bool en)
->  	spin_unlock_irqrestore(&priv->idm_lock, flags);
->  }
->  
-> -static void iproc_nand_apb_access(struct brcmnand_soc *soc, bool prepare)
-> +static void iproc_nand_apb_access(struct brcmnand_soc *soc, bool prepare,
-> +				  bool is_param)
->  {
->  	struct iproc_nand_soc *priv =
->  			container_of(soc, struct iproc_nand_soc, soc);
-> @@ -86,10 +87,19 @@ static void iproc_nand_apb_access(struct brcmnand_soc *soc, bool prepare)
->  
->  	val = brcmnand_readl(mmio);
->  
-> -	if (prepare)
-> -		val |= IPROC_NAND_APB_LE_MODE;
-> -	else
-> +	/*
-> +	 * In the case of BE or when dealing with NAND data, alway configure
-> +	 * the APB bus to LE mode before accessing the FIFO and back to BE mode
-> +	 * after the access is done
-> +	 */
-> +	if (IS_ENABLED(CONFIG_CPU_BIG_ENDIAN) || !is_param) {
-> +		if (prepare)
-> +			val |= IPROC_NAND_APB_LE_MODE;
-> +		else
-> +			val &= ~IPROC_NAND_APB_LE_MODE;
-> +	} else { /* when in LE accessing the parameter page, keep APB in BE */
->  		val &= ~IPROC_NAND_APB_LE_MODE;
-> +	}
->  
->  	brcmnand_writel(val, mmio);
->  
+> Reviewed-by: Paolo Bonzini <pbonzini@redhat.com>
+
+Thanks Paolo!
+
+-Christoffer
