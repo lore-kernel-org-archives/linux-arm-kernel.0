@@ -1,200 +1,67 @@
 From: sunil.kovvuri@gmail.com (sunil.kovvuri at gmail.com)
-Date: Wed, 10 Aug 2016 12:12:41 +0530
-Subject: [PATCH 09/21] net: thunderx: Add QSGMII interface type support
+Date: Wed, 10 Aug 2016 12:12:46 +0530
+Subject: [PATCH 14/21] net: thunderx: Use skb_add_rx_frag() for split buffer
+ Rx pkts
 In-Reply-To: <1470811373-28277-1-git-send-email-sunil.kovvuri@gmail.com>
 References: <1470811373-28277-1-git-send-email-sunil.kovvuri@gmail.com>
-Message-ID: <1470811373-28277-10-git-send-email-sunil.kovvuri@gmail.com>
+Message-ID: <1470811373-28277-15-git-send-email-sunil.kovvuri@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sunil Goutham <sgoutham@cavium.com>
 
-This patch adds support for QSGMII interface type to
-the BGX driver. This type of interface is supported by
-81xx SOC.
+Instead of a round about way of converting buffers to SKBs and
+combining them into a frag list, use standard skb_add_rx_frag()
+API to merge page fragments. This code is useful when incoming
+packets are of size more than RCV_FRAG_LEN which is currently
+set to 2048bytes.
 
 Signed-off-by: Sunil Goutham <sgoutham@cavium.com>
 ---
- drivers/net/ethernet/cavium/thunder/thunder_bgx.c | 65 ++++++++++++++++++-----
- drivers/net/ethernet/cavium/thunder/thunder_bgx.h |  1 +
- 2 files changed, 54 insertions(+), 12 deletions(-)
+ drivers/net/ethernet/cavium/thunder/nicvf_queues.c | 24 ++++++----------------
+ 1 file changed, 6 insertions(+), 18 deletions(-)
 
-diff --git a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
-index 9c3c273..0bf8d24 100644
---- a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
-+++ b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
-@@ -379,8 +379,9 @@ void bgx_lmac_internal_loopback(int node, int bgx_idx,
- }
- EXPORT_SYMBOL(bgx_lmac_internal_loopback);
+diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_queues.c b/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
+index ca223aa..ed2fe72 100644
+--- a/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
++++ b/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
+@@ -1184,8 +1184,8 @@ struct sk_buff *nicvf_get_rcv_skb(struct nicvf *nic, struct cqe_rx_t *cqe_rx)
+ 	int frag;
+ 	int payload_len = 0;
+ 	struct sk_buff *skb = NULL;
+-	struct sk_buff *skb_frag = NULL;
+-	struct sk_buff *prev_frag = NULL;
++	struct page *page;
++	int offset;
+ 	u16 *rb_lens = NULL;
+ 	u64 *rb_ptrs = NULL;
  
--static int bgx_lmac_sgmii_init(struct bgx *bgx, int lmacid)
-+static int bgx_lmac_sgmii_init(struct bgx *bgx, struct lmac *lmac)
- {
-+	int lmacid = lmac->lmacid;
- 	u64 cfg;
- 
- 	bgx_reg_modify(bgx, lmacid, BGX_GMP_GMI_TXX_THRESH, 0x30);
-@@ -409,6 +410,14 @@ static int bgx_lmac_sgmii_init(struct bgx *bgx, int lmacid)
- 	cfg |= (PCS_MRX_CTL_RST_AN | PCS_MRX_CTL_AN_EN);
- 	bgx_reg_write(bgx, lmacid, BGX_GMP_PCS_MRX_CTL, cfg);
- 
-+	if (lmac->lmac_type == BGX_MODE_QSGMII) {
-+		/* Disable disparity check for QSGMII */
-+		cfg = bgx_reg_read(bgx, lmacid, BGX_GMP_PCS_MISCX_CTL);
-+		cfg &= ~PCS_MISC_CTL_DISP_EN;
-+		bgx_reg_write(bgx, lmacid, BGX_GMP_PCS_MISCX_CTL, cfg);
-+		return 0;
-+	}
-+
- 	if (bgx_poll_reg(bgx, lmacid, BGX_GMP_PCS_MRX_STATUS,
- 			 PCS_MRX_STATUS_AN_CPT, false)) {
- 		dev_err(&bgx->pdev->dev, "BGX AN_CPT not completed\n");
-@@ -650,6 +659,14 @@ static void bgx_poll_for_link(struct work_struct *work)
- 	queue_delayed_work(lmac->check_link, &lmac->dwork, HZ * 2);
- }
- 
-+static int phy_interface_mode(u8 lmac_type)
-+{
-+	if (lmac_type == BGX_MODE_QSGMII)
-+		return PHY_INTERFACE_MODE_QSGMII;
-+
-+	return PHY_INTERFACE_MODE_SGMII;
-+}
-+
- static int bgx_lmac_enable(struct bgx *bgx, u8 lmacid)
- {
- 	struct lmac *lmac;
-@@ -658,9 +675,10 @@ static int bgx_lmac_enable(struct bgx *bgx, u8 lmacid)
- 	lmac = &bgx->lmac[lmacid];
- 	lmac->bgx = bgx;
- 
--	if (lmac->lmac_type == BGX_MODE_SGMII) {
-+	if ((lmac->lmac_type == BGX_MODE_SGMII) ||
-+	    (lmac->lmac_type == BGX_MODE_QSGMII)) {
- 		lmac->is_sgmii = 1;
--		if (bgx_lmac_sgmii_init(bgx, lmacid))
-+		if (bgx_lmac_sgmii_init(bgx, lmac))
- 			return -1;
- 	} else {
- 		lmac->is_sgmii = 0;
-@@ -697,7 +715,7 @@ static int bgx_lmac_enable(struct bgx *bgx, u8 lmacid)
- 
- 		if (phy_connect_direct(&lmac->netdev, lmac->phydev,
- 				       bgx_lmac_handler,
--				       PHY_INTERFACE_MODE_SGMII))
-+				       phy_interface_mode(lmac->lmac_type)))
- 			return -ENODEV;
- 
- 		phy_start_aneg(lmac->phydev);
-@@ -799,6 +817,11 @@ static void bgx_init_hw(struct bgx *bgx)
- 		bgx_reg_write(bgx, 0, BGX_CMR_RX_STREERING + (i * 8), 0x00);
- }
- 
-+static u8 bgx_get_lane2sds_cfg(struct bgx *bgx, struct lmac *lmac)
-+{
-+	return (u8)(bgx_reg_read(bgx, lmac->lmacid, BGX_CMRX_CFG) & 0xFF);
-+}
-+
- static void bgx_print_qlm_mode(struct bgx *bgx, u8 lmacid)
- {
- 	struct device *dev = &bgx->pdev->dev;
-@@ -838,12 +861,22 @@ static void bgx_print_qlm_mode(struct bgx *bgx, u8 lmacid)
- 		else
- 			dev_info(dev, "%s: 40G_KR4\n", (char *)str);
- 		break;
--	default:
--		dev_info(dev, "%s: INVALID\n", (char *)str);
-+	case BGX_MODE_QSGMII:
-+		if ((lmacid == 0) &&
-+		    (bgx_get_lane2sds_cfg(bgx, lmac) != lmacid))
-+			return;
-+		if ((lmacid == 2) &&
-+		    (bgx_get_lane2sds_cfg(bgx, lmac) == lmacid))
-+			return;
-+		dev_info(dev, "%s: QSGMII\n", (char *)str);
-+		break;
-+	case BGX_MODE_INVALID:
-+		/* Nothing to do */
-+		break;
- 	}
- }
- 
--static void lmac_set_lane2sds(struct lmac *lmac)
-+static void lmac_set_lane2sds(struct bgx *bgx, struct lmac *lmac)
- {
- 	switch (lmac->lmac_type) {
- 	case BGX_MODE_SGMII:
-@@ -857,6 +890,14 @@ static void lmac_set_lane2sds(struct lmac *lmac)
- 	case BGX_MODE_RXAUI:
- 		lmac->lane_to_sds = (lmac->lmacid) ? 0xE : 0x4;
- 		break;
-+	case BGX_MODE_QSGMII:
-+		/* There is no way to determine if DLM0/2 is QSGMII or
-+		 * DLM1/3 is configured to QSGMII as bootloader will
-+		 * configure all LMACs, so take whatever is configured
-+		 * by low level firmware.
-+		 */
-+		lmac->lane_to_sds = bgx_get_lane2sds_cfg(bgx, lmac);
-+		break;
- 	default:
- 		lmac->lane_to_sds = 0;
- 		break;
-@@ -882,7 +923,7 @@ static void bgx_set_lmac_config(struct bgx *bgx, u8 idx)
- 		lmac->use_training =
- 			bgx_reg_read(bgx, 0, BGX_SPUX_BR_PMD_CRTL) &
- 				SPU_PMD_CRTL_TRAIN_EN;
--		lmac_set_lane2sds(lmac);
-+		lmac_set_lane2sds(bgx, lmac);
- 		return;
- 	}
- 
-@@ -901,7 +942,7 @@ static void bgx_set_lmac_config(struct bgx *bgx, u8 idx)
- 		lmac->use_training =
- 			bgx_reg_read(bgx, idx, BGX_SPUX_BR_PMD_CRTL) &
- 				SPU_PMD_CRTL_TRAIN_EN;
--		lmac_set_lane2sds(lmac);
-+		lmac_set_lane2sds(bgx, lmac);
- 
- 		/* Set LMAC type of other lmac on same DLM i.e LMAC 1/3 */
- 		olmac = &bgx->lmac[idx + 1];
-@@ -909,7 +950,7 @@ static void bgx_set_lmac_config(struct bgx *bgx, u8 idx)
- 		olmac->use_training =
- 		bgx_reg_read(bgx, idx + 1, BGX_SPUX_BR_PMD_CRTL) &
- 			SPU_PMD_CRTL_TRAIN_EN;
--		lmac_set_lane2sds(olmac);
-+		lmac_set_lane2sds(bgx, olmac);
- 	}
- }
- 
-@@ -920,7 +961,7 @@ static bool is_dlm0_in_bgx_mode(struct bgx *bgx)
- 	if (!bgx->is_81xx)
- 		return true;
- 
--	lmac = &bgx->lmac[1];
-+	lmac = &bgx->lmac[0];
- 	if (lmac->lmac_type == BGX_MODE_INVALID)
- 		return false;
- 
-@@ -946,7 +987,7 @@ static void bgx_get_qlm_mode(struct bgx *bgx)
- 	if (bgx->lmac_count > MAX_LMAC_PER_BGX)
- 		bgx->lmac_count = MAX_LMAC_PER_BGX;
- 
--	for (idx = 0; idx < bgx->lmac_count; idx++)
-+	for (idx = 0; idx < MAX_LMAC_PER_BGX; idx++)
- 		bgx_set_lmac_config(bgx, idx);
- 
- 	if (!bgx->is_81xx) {
-diff --git a/drivers/net/ethernet/cavium/thunder/thunder_bgx.h b/drivers/net/ethernet/cavium/thunder/thunder_bgx.h
-index 38e9fb4..0705863 100644
---- a/drivers/net/ethernet/cavium/thunder/thunder_bgx.h
-+++ b/drivers/net/ethernet/cavium/thunder/thunder_bgx.h
-@@ -146,6 +146,7 @@
- #define BGX_GMP_PCS_ANX_AN_RESULTS	0x30020
- #define BGX_GMP_PCS_SGM_AN_ADV		0x30068
- #define BGX_GMP_PCS_MISCX_CTL		0x30078
-+#define  PCS_MISC_CTL_DISP_EN			BIT_ULL(13)
- #define  PCS_MISC_CTL_GMX_ENO			BIT_ULL(11)
- #define  PCS_MISC_CTL_SAMP_PT_MASK	0x7Full
- #define BGX_GMP_GMI_PRTX_CFG		0x38020
+@@ -1218,22 +1218,10 @@ struct sk_buff *nicvf_get_rcv_skb(struct nicvf *nic, struct cqe_rx_t *cqe_rx)
+ 			skb_put(skb, payload_len);
+ 		} else {
+ 			/* Add fragments */
+-			skb_frag = nicvf_rb_ptr_to_skb(nic, *rb_ptrs,
+-						       payload_len);
+-			if (!skb_frag) {
+-				dev_kfree_skb(skb);
+-				return NULL;
+-			}
+-
+-			if (!skb_shinfo(skb)->frag_list)
+-				skb_shinfo(skb)->frag_list = skb_frag;
+-			else
+-				prev_frag->next = skb_frag;
+-
+-			prev_frag = skb_frag;
+-			skb->len += payload_len;
+-			skb->data_len += payload_len;
+-			skb_frag->len = payload_len;
++			page = virt_to_page(phys_to_virt(*rb_ptrs));
++			offset = phys_to_virt(*rb_ptrs) - page_address(page);
++			skb_add_rx_frag(skb, skb_shinfo(skb)->nr_frags, page,
++					offset, payload_len, RCV_FRAG_LEN);
+ 		}
+ 		/* Next buffer pointer */
+ 		rb_ptrs++;
 -- 
 2.7.4
