@@ -1,77 +1,152 @@
 From: patrice.chotard@st.com (patrice.chotard at st.com)
-Date: Wed, 10 Aug 2016 09:39:05 +0200
-Subject: [RESEND v2 00/10] STMPE fixes/rework and add STMPE1600 support
-Message-ID: <1470814755-19447-1-git-send-email-patrice.chotard@st.com>
+Date: Wed, 10 Aug 2016 09:39:08 +0200
+Subject: [RESEND v2 03/10] gpio: stmpe: fix edge and rising/falling edge
+ detection
+In-Reply-To: <1470814755-19447-1-git-send-email-patrice.chotard@st.com>
+References: <1470814755-19447-1-git-send-email-patrice.chotard@st.com>
+Message-ID: <1470814755-19447-4-git-send-email-patrice.chotard@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Patrice Chotard <patrice.chotard@st.com>
 
-This series cleans and fixes some bugs in MFD/GPIO STMPE drivers and prepare
- the ground to add new STMPE1600 support.
+By cross-checking STMPE 610/801/811/1601/2401/2403 datasheets,
+it appears that edge detection and rising/falling edge detection
+is not supported by all STMPE variant:
 
-STMPE1600 datasheet is available here : 
-http://www2.st.com/content/st_com/en/products/interfaces-and-transceivers/
-i-o-expanders-and-level-translators/i-o-expanders/stmpe1600.html
+           GPIO              GPIO
+      Edge detection     rising/falling
+                         edge detection
+ 610 |      X        |         X       |
+ 801 |               |                 |
+ 811 |      X        |         X       |
+1600 |               |                 |
+1601 |      X        |         X       |
+1801 |               |         X       |
+2401 |      X        |         X       |
+2403 |      X        |         X       |
 
-Only STMPE1600 has been tested on STM32 platform. As i have no board with
-others STMPE variant(STMPE610/STMPE801/STMPE811/STMPE1601/STMPE1801/STMPE2401
-and STMPE2403), i put in CC boards's maintainers which are using others STMPE variant.
+Rework stmpe_dbg_show_one() and stmpe_gpio_irq to correctly
+take these cases into account.
 
-If they can kindly check that no regression has been introduce by this series
-:
+Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
+Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ drivers/gpio/gpio-stmpe.c | 85 +++++++++++++++++++++++++++++++++--------------
+ 1 file changed, 60 insertions(+), 25 deletions(-)
 
-For ARM/FREESCALE IMX / MXC ARM ARCHITECTURE:
-	_ Shawn Guo <shawnguo@kernel.org>
-	_ Sascha Hauer <kernel@pengutronix.de>
-
-For ARM/SOCFPGA ARCHITECTURE
-	_ Dinh Nguyen <dinguyen@opensource.altera.com>
-
-For SPEAR PLATFORM SUPPORT
-	_ Viresh Kumar <vireshk@kernel.org>
-	_ Shiraz Hashim <shiraz.linux.kernel@gmail.com>
-
-For Apalis/Colibri board SUPPORT
-	_ marcel.ziswiler at toradex.com
-	_ stefan at agner.ch
-	_ dev at lynxeye.de
-	_ Thierry Reding <thierry.reding@gmail.com>
-	_ Alexandre Courbot <gnurou@gmail.com>
-
-For ARM/Ux500 ARM ARCHITECTURE
-	_ Linus Walleij <linus.walleij@linaro.org>
-
-resend v2: 
-	_ add Linus Walleij and Lee Jones's acked-by/reviewed-by
-
-v1 => v2:
-	_ update Cc list
-	_ fix kbuild test robot warnings on original patch 3
-	_ split patch 6 to extract usage of generic bitmask name
-	_ split patch 6 and 7 and introduce a new way to access registers
-	  for both mfd/stmpe and gpio/gpio-stmpe drivers.
-	_ remove patch 8
-
-Patrice Chotard (10):
-  mfd: stmpe: Add STMPE_IDX_SYS_CTRL/2 enum
-  mfd: stmpe: Add reset support for all STMPE variant
-  gpio: stmpe: fix edge and rising/falling edge detection
-  gpio: stmpe: write int status register only when needed
-  mfd: stmpe: use generic bit mask name
-  mfd: stmpe: rework registers access
-  gpio: stmpe: rework registers access
-  Documentation: dt: add stmpe1600 compatible string to stmpe mfd
-  mfd: Add STMPE1600 support
-  gpio: stmpe: Add STMPE1600 support
-
- Documentation/devicetree/bindings/mfd/stmpe.txt |   2 +-
- drivers/gpio/gpio-stmpe.c                       | 167 +++++++++++++++++-------
- drivers/mfd/stmpe-i2c.c                         |   2 +
- drivers/mfd/stmpe.c                             | 161 +++++++++++++++++++----
- drivers/mfd/stmpe.h                             |  85 ++++++++++--
- include/linux/mfd/stmpe.h                       |  21 +++
- 6 files changed, 352 insertions(+), 86 deletions(-)
-
+diff --git a/drivers/gpio/gpio-stmpe.c b/drivers/gpio/gpio-stmpe.c
+index 5197edf..bfc918c 100644
+--- a/drivers/gpio/gpio-stmpe.c
++++ b/drivers/gpio/gpio-stmpe.c
+@@ -231,39 +231,74 @@ static void stmpe_dbg_show_one(struct seq_file *s,
+ 			   gpio, label ?: "(none)",
+ 			   val ? "hi" : "lo");
+ 	} else {
+-		u8 edge_det_reg = stmpe->regs[STMPE_IDX_GPEDR_MSB] + num_banks - 1 - (offset / 8);
+-		u8 rise_reg = stmpe->regs[STMPE_IDX_GPRER_LSB] - (offset / 8);
+-		u8 fall_reg = stmpe->regs[STMPE_IDX_GPFER_LSB] - (offset / 8);
+-		u8 irqen_reg = stmpe->regs[STMPE_IDX_IEGPIOR_LSB] - (offset / 8);
+-		bool edge_det;
+-		bool rise;
+-		bool fall;
++		u8 edge_det_reg;
++		u8 rise_reg;
++		u8 fall_reg;
++		u8 irqen_reg;
++
++		char *edge_det_values[] = {"edge-inactive",
++					   "edge-asserted",
++					   "not-supported"};
++		char *rise_values[] = {"no-rising-edge-detection",
++				       "rising-edge-detection",
++				       "not-supported"};
++		char *fall_values[] = {"no-falling-edge-detection",
++				       "falling-edge-detection",
++				       "not-supported"};
++		#define NOT_SUPPORTED_IDX 2
++		u8 edge_det = NOT_SUPPORTED_IDX;
++		u8 rise = NOT_SUPPORTED_IDX;
++		u8 fall = NOT_SUPPORTED_IDX;
+ 		bool irqen;
+ 
+-		ret = stmpe_reg_read(stmpe, edge_det_reg);
+-		if (ret < 0)
+-			return;
+-		edge_det = !!(ret & mask);
+-		ret = stmpe_reg_read(stmpe, rise_reg);
+-		if (ret < 0)
++		switch (stmpe->partnum) {
++		case STMPE610:
++		case STMPE811:
++		case STMPE1601:
++		case STMPE2401:
++		case STMPE2403:
++			edge_det_reg = stmpe->regs[STMPE_IDX_GPEDR_MSB] +
++				       num_banks - 1 - (offset / 8);
++			ret = stmpe_reg_read(stmpe, edge_det_reg);
++			if (ret < 0)
++				return;
++			edge_det = !!(ret & mask);
++
++		case STMPE1801:
++			rise_reg = stmpe->regs[STMPE_IDX_GPRER_LSB] -
++				   (offset / 8);
++			fall_reg = stmpe->regs[STMPE_IDX_GPFER_LSB] -
++				   (offset / 8);
++			ret = stmpe_reg_read(stmpe, rise_reg);
++			if (ret < 0)
++				return;
++			rise = !!(ret & mask);
++			ret = stmpe_reg_read(stmpe, fall_reg);
++			if (ret < 0)
++				return;
++			fall = !!(ret & mask);
++
++		case STMPE801:
++			irqen_reg = stmpe->regs[STMPE_IDX_IEGPIOR_LSB] -
++				    (offset / 8);
++			break;
++
++		default:
+ 			return;
+-		rise = !!(ret & mask);
+-		ret = stmpe_reg_read(stmpe, fall_reg);
+-		if (ret < 0)
+-			return;
+-		fall = !!(ret & mask);
++		}
++
+ 		ret = stmpe_reg_read(stmpe, irqen_reg);
+ 		if (ret < 0)
+ 			return;
+ 		irqen = !!(ret & mask);
+ 
+-		seq_printf(s, " gpio-%-3d (%-20.20s) in  %s %s %s%s%s",
++		seq_printf(s, " gpio-%-3d (%-20.20s) in  %s %13s %13s %25s %25s",
+ 			   gpio, label ?: "(none)",
+ 			   val ? "hi" : "lo",
+-			   edge_det ? "edge-asserted" : "edge-inactive",
+-			   irqen ? "IRQ-enabled" : "",
+-			   rise ? " rising-edge-detection" : "",
+-			   fall ? " falling-edge-detection" : "");
++			   edge_det_values[edge_det],
++			   irqen ? "IRQ-enabled" : "IRQ-disabled",
++			   rise_values[rise],
++			   fall_values[fall]);
+ 	}
+ }
+ 
+@@ -322,8 +357,8 @@ static irqreturn_t stmpe_gpio_irq(int irq, void *dev)
+ 
+ 		stmpe_reg_write(stmpe, statmsbreg + i, status[i]);
+ 
+-		/* Edge detect register is not present on 801 */
+-		if (stmpe->partnum != STMPE801)
++		/* Edge detect register is not present on 801 and 1801 */
++		if (stmpe->partnum != STMPE801 || stmpe->partnum != STMPE1801)
+ 			stmpe_reg_write(stmpe, stmpe->regs[STMPE_IDX_GPEDR_MSB]
+ 					+ i, status[i]);
+ 	}
 -- 
 1.9.1
