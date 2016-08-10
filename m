@@ -1,37 +1,50 @@
-From: guohanjun@huawei.com (Hanjun Guo)
-Date: Wed, 10 Aug 2016 10:12:43 +0800
-Subject: [PATCH v5 03/14] arm64/numa: add nid check for memory block
-In-Reply-To: <1470647899-6324-4-git-send-email-thunder.leizhen@huawei.com>
-References: <1470647899-6324-1-git-send-email-thunder.leizhen@huawei.com>
- <1470647899-6324-4-git-send-email-thunder.leizhen@huawei.com>
-Message-ID: <57AA8D9B.7010102@huawei.com>
+From: kwangwoo.lee@sk.com (kwangwoo.lee at sk.com)
+Date: Wed, 10 Aug 2016 02:14:30 +0000
+Subject: [PATCH v3] arm64: mm: convert __dma_* routines to use start, size
+In-Reply-To: <80a4602f-8105-fe2e-0f52-ee23f2c0b2e4@arm.com>
+References: <1470099050-25407-1-git-send-email-kwangwoo.lee@sk.com>
+ <80a4602f-8105-fe2e-0f52-ee23f2c0b2e4@arm.com>
+Message-ID: <86c4d03a1bf84da6a460fa2cc1455032@nmail01.hynixad.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016/8/8 17:18, Zhen Lei wrote:
-> Use the same tactic to cpu and numa-distance nodes.
->
-> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
-> ---
->  arch/arm64/mm/numa.c | 5 +++++
->  1 file changed, 5 insertions(+)
->
-> diff --git a/arch/arm64/mm/numa.c b/arch/arm64/mm/numa.c
-> index c7fe3ec..2601660 100644
-> --- a/arch/arm64/mm/numa.c
-> +++ b/arch/arm64/mm/numa.c
-> @@ -141,6 +141,11 @@ int __init numa_add_memblk(int nid, u64 start, u64 end)
->  {
->  	int ret;
->
-> +	if (nid >= MAX_NUMNODES) {
-> +		pr_warn("NUMA: Node id %u exceeds maximum value\n", nid);
-> +		return -EINVAL;
-> +	}
+Hi Robin,
 
-I think this check should be added to of_numa_parse_memory_nodes(), which before
-the numa_add_memblk() called, it's the same logic in of_numa_parse_cpu_nodes() and
-the node id is checked before calling numa_add_memblk() in ACPI.
+> -----Original Message-----
+> From: Robin Murphy [mailto:robin.murphy at arm.com]
+> Sent: Tuesday, August 09, 2016 8:51 PM
+> To: ???(LEE KWANGWOO) MS SW; Russell King - ARM Linux; Catalin Marinas; Will Deacon; Mark Rutland;
+> linux-arm-kernel at lists.infradead.org
+> Cc: ???(CHUNG WOO SUK) MS SW; ???(KIM HYUNCHUL) MS SW; linux-kernel at vger.kernel.org
+> Subject: Re: [PATCH v3] arm64: mm: convert __dma_* routines to use start, size
+> 
+> On 02/08/16 01:50, Kwangwoo Lee wrote:
+> > __dma_* routines have been converted to use start and size instread of
+> > start and end addresses. The patch was origianlly for adding
+> > __clean_dcache_area_poc() which will be used in pmem driver to clean
+> > dcache to the PoC(Point of Coherency) in arch_wb_cache_pmem().
+> >
+> > The functionality of __clean_dcache_area_poc()  was equivalent to
+> > __dma_clean_range(). The difference was __dma_clean_range() uses the end
+> > address, but __clean_dcache_area_poc() uses the size to clean.
+> >
+> > Thus, __clean_dcache_area_poc() has been revised with a fallthrough
+> > function of __dma_clean_range() after the change that __dma_* routines
+> > use start and size instead of using start and end.
+> >
+> > As a consequence of using start and size, the name of __dma_* routines
+> > has also been altered following the terminology below:
+> >     area: takes a start and size
+> >     range: takes a start and end
+> 
+> This looks pretty nice and tidy now; I don't see anything obviously
+> wrong, and comparing before-and-after disassemblies shows essentially
+> nothing more than the movement of some add instructions as expected, so:
+> 
+> Reviewed-by: Robin Murphy <robin.murphy@arm.com>
 
-Thanks
-Hanjun
+Thank you very much for your review!
+I'm going to add Reviewed-by: and Cc: lines and send it again. Thanks!
+
+Best Regards,
+Kwangwoo Lee
