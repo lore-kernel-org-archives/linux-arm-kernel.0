@@ -1,77 +1,24 @@
-From: fu.wei@linaro.org (Fu Wei)
-Date: Wed, 10 Aug 2016 21:05:27 +0800
-Subject: [PATCH v12] acpi, apei, arm64: APEI initial support for aarch64.
-In-Reply-To: <20160810111005.GD16664@nazgul.tnic>
-References: <1469782664-12611-1-git-send-email-fu.wei@linaro.org>
- <20160804094838.GB8093@nazgul.tnic>
- <CADyBb7ujfaXPP_CUB66_E53fY9MeEbt6EhOaCzf+hoDCGYD+dw@mail.gmail.com>
- <20160810104513.GB16664@nazgul.tnic>
- <CADyBb7uW2-jh8UBLXZ03p1y9SMP7M3z6eULwV2DYhWXEqTm2Rw@mail.gmail.com>
- <20160810111005.GD16664@nazgul.tnic>
-Message-ID: <CADyBb7vPhbhGZU+UB7JcP_okA0XV+-yPZe0ass67TZWBMpNRBA@mail.gmail.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 10 Aug 2016 15:08:05 +0200
+Subject: [RFT RESEND PATCH v3 2/3] ARM: Fix *MIGHT_HAVE_PCI* config from
+ being selected redundantly
+In-Reply-To: <1470832400-11929-3-git-send-email-kishon@ti.com>
+References: <1470832400-11929-1-git-send-email-kishon@ti.com>
+ <1470832400-11929-3-git-send-email-kishon@ti.com>
+Message-ID: <e2e7e471-190d-a685-e496-1ab3e1d3a333@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Borislav,
+On 08/10/2016 02:33 PM, Kishon Vijay Abraham I wrote:
+> *MIGHT_HAVE_PCI* config is already selected in ARCH_MULTIPLATFORM.
+> Fix it from getting redundantly selected in all
 
-On 10 August 2016 at 19:10, Borislav Petkov <bp@suse.de> wrote:
-> On Wed, Aug 10, 2016 at 07:01:05PM +0800, Fu Wei wrote:
->> - if (!acpi_disable_cmcff)
->> - apei_hest_parse(hest_parse_cmc, NULL);
->> + rc =apei_hest_parse(hest_parse_cmc, NULL);
->> + if (rc)
->> + goto err;
->>
->>   if (!ghes_disable) {
->>   rc = apei_hest_parse(hest_parse_ghes_count, &ghes_count);
->>
->> Do you have other suggestion? then I can post v14 to fix it :-)
->
-> Nah, looks good :)
->
-> Let's keep it simple and add more involved handling when it is really
-> needed. Thanks!
+I don't like the "fix" here and in subject. There is no error, no
+warning, no issue to be fixed. Fix might be a candidate to backport
+(stable, vendor etc) but this just removes something which is not needed.
 
-Thanks for your help, this have been fixed in v14(just posted).
+With the change in subject, for exynos:
+Acked-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
->
-> Btw, that comment:
->
-> +/*
-> + * acpi_disable_cmcff is used in drivers/acpi/apei/hest.c for disabling
-> + * IA-32 Architecture Corrected Machine Checkx(cmc) FIRMWARE_FIRST mode by
-> + * boot parameter(acpi=nocmcff). But we don't have this IA-32 specific
-> + * feature on ARM64, this definition is only for compatibility.
-> + */
-> +#define acpi_disable_cmcff 1
->
-> looks ok, except the small typo:
->
-> Architecture Corrected Machine Checkx(cmc)
->                                     ^
-> Make that
->
-> "IA-32 Architecture Corrected Machine Check (CMC) Firmware-First mode"
-
-Done! Thanks :-)
-
->
-> Thanks.
->
-> --
-> Regards/Gruss,
->     Boris.
->
-> ECO tip #101: Trim your mails when you reply.
->
-> SUSE Linux GmbH, GF: Felix Imend?rffer, Jane Smithard, Graham Norton, HRB 21284 (AG N?rnberg)
-> --
-
-
-
--- 
 Best regards,
-
-Fu Wei
-Software Engineer
-Red Hat
+Krzysztof
