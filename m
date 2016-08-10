@@ -1,49 +1,151 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Wed, 10 Aug 2016 16:19:46 +0200
-Subject: [PATCH -next] dmaengine: at_xdmac: fix to pass correct device
- identity to free_irq()
-In-Reply-To: <1470799029-2613-1-git-send-email-weiyj.lk@gmail.com>
-References: <1470799029-2613-1-git-send-email-weiyj.lk@gmail.com>
-Message-ID: <20160810141946.GB3674@odux.rfo.atmel.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Wed, 10 Aug 2016 16:24:38 +0200
+Subject: [PATCH v2 1/2] mtd: brcmnand: iProc big endian and ONFI support
+In-Reply-To: <1469051631-7896-2-git-send-email-ray.jui@broadcom.com>
+References: <1469051631-7896-1-git-send-email-ray.jui@broadcom.com>
+ <1469051631-7896-2-git-send-email-ray.jui@broadcom.com>
+Message-ID: <20160810162438.4c6cffd3@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 10, 2016 at 03:17:09AM +0000, Wei Yongjun wrote:
-> free_irq() expects the same device identity that was passed to
-> corresponding request_irq(), otherwise the IRQ is not freed.
+On Wed, 20 Jul 2016 14:53:50 -0700
+Ray Jui <ray.jui@broadcom.com> wrote:
+
+> This patch adds big endian and ONFI support for various iProc based
+> SoCs that use the core brcmstb NAND controller
+
+Brian, Kamal, can you review this patch?
+
 > 
-> Fixes: e1f7c9eee707 ("dmaengine: at_xdmac: creation of the atmel
-> eXtended DMA Controller driver")
-> Signed-off-by: Wei Yongjun <weiyj.lk@gmail.com>
-
-Acked-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-
-Thanks
-
+> This patch was originally implemented by Prafulla Kota
+> <prafulla.kota@broadcom.com> and fully tested on iProc based NS2 SVK
+> 
+> Signed-off-by: Prafulla Kota <prafulla.kota@broadcom.com>
+> Signed-off-by: Ray Jui <ray.jui@broadcom.com>
 > ---
->  drivers/dma/at_xdmac.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+>  drivers/mtd/nand/brcmnand/brcmnand.c   | 12 ++++++------
+>  drivers/mtd/nand/brcmnand/brcmnand.h   | 13 ++++++++-----
+>  drivers/mtd/nand/brcmnand/iproc_nand.c | 18 ++++++++++++++----
+>  3 files changed, 28 insertions(+), 15 deletions(-)
 > 
-> diff --git a/drivers/dma/at_xdmac.c b/drivers/dma/at_xdmac.c
-> index 2badc57..b7d7f2d 100644
-> --- a/drivers/dma/at_xdmac.c
-> +++ b/drivers/dma/at_xdmac.c
-> @@ -2067,7 +2067,7 @@ err_dma_unregister:
->  err_clk_disable:
->  	clk_disable_unprepare(atxdmac->clk);
->  err_free_irq:
-> -	free_irq(atxdmac->irq, atxdmac->dma.dev);
-> +	free_irq(atxdmac->irq, atxdmac);
->  	return ret;
+> diff --git a/drivers/mtd/nand/brcmnand/brcmnand.c b/drivers/mtd/nand/brcmnand/brcmnand.c
+> index b76ad7c..12a1585 100644
+> --- a/drivers/mtd/nand/brcmnand/brcmnand.c
+> +++ b/drivers/mtd/nand/brcmnand/brcmnand.c
+> @@ -1279,7 +1279,7 @@ static void brcmnand_cmdfunc(struct mtd_info *mtd, unsigned command,
+>  		u32 *flash_cache = (u32 *)ctrl->flash_cache;
+>  		int i;
+>  
+> -		brcmnand_soc_data_bus_prepare(ctrl->soc);
+> +		brcmnand_soc_data_bus_prepare(ctrl->soc, true);
+>  
+>  		/*
+>  		 * Must cache the FLASH_CACHE now, since changes in
+> @@ -1292,7 +1292,7 @@ static void brcmnand_cmdfunc(struct mtd_info *mtd, unsigned command,
+>  			 */
+>  			flash_cache[i] = be32_to_cpu(brcmnand_read_fc(ctrl, i));
+>  
+> -		brcmnand_soc_data_bus_unprepare(ctrl->soc);
+> +		brcmnand_soc_data_bus_unprepare(ctrl->soc, true);
+>  
+>  		/* Cleanup from HW quirk: restore SECTOR_SIZE_1K */
+>  		if (host->hwcfg.sector_size_1k)
+> @@ -1508,12 +1508,12 @@ static int brcmnand_read_by_pio(struct mtd_info *mtd, struct nand_chip *chip,
+>  		brcmnand_waitfunc(mtd, chip);
+>  
+>  		if (likely(buf)) {
+> -			brcmnand_soc_data_bus_prepare(ctrl->soc);
+> +			brcmnand_soc_data_bus_prepare(ctrl->soc, false);
+>  
+>  			for (j = 0; j < FC_WORDS; j++, buf++)
+>  				*buf = brcmnand_read_fc(ctrl, j);
+>  
+> -			brcmnand_soc_data_bus_unprepare(ctrl->soc);
+> +			brcmnand_soc_data_bus_unprepare(ctrl->soc, false);
+>  		}
+>  
+>  		if (oob)
+> @@ -1678,12 +1678,12 @@ static int brcmnand_write(struct mtd_info *mtd, struct nand_chip *chip,
+>  		(void)brcmnand_read_reg(ctrl, BRCMNAND_CMD_ADDRESS);
+>  
+>  		if (buf) {
+> -			brcmnand_soc_data_bus_prepare(ctrl->soc);
+> +			brcmnand_soc_data_bus_prepare(ctrl->soc, false);
+>  
+>  			for (j = 0; j < FC_WORDS; j++, buf++)
+>  				brcmnand_write_fc(ctrl, j, *buf);
+>  
+> -			brcmnand_soc_data_bus_unprepare(ctrl->soc);
+> +			brcmnand_soc_data_bus_unprepare(ctrl->soc, false);
+>  		} else if (oob) {
+>  			for (j = 0; j < FC_WORDS; j++)
+>  				brcmnand_write_fc(ctrl, j, 0xffffffff);
+> diff --git a/drivers/mtd/nand/brcmnand/brcmnand.h b/drivers/mtd/nand/brcmnand/brcmnand.h
+> index ef5eabb..5c44cd4 100644
+> --- a/drivers/mtd/nand/brcmnand/brcmnand.h
+> +++ b/drivers/mtd/nand/brcmnand/brcmnand.h
+> @@ -23,19 +23,22 @@ struct dev_pm_ops;
+>  struct brcmnand_soc {
+>  	bool (*ctlrdy_ack)(struct brcmnand_soc *soc);
+>  	void (*ctlrdy_set_enabled)(struct brcmnand_soc *soc, bool en);
+> -	void (*prepare_data_bus)(struct brcmnand_soc *soc, bool prepare);
+> +	void (*prepare_data_bus)(struct brcmnand_soc *soc, bool prepare,
+> +				 bool is_param);
+>  };
+>  
+> -static inline void brcmnand_soc_data_bus_prepare(struct brcmnand_soc *soc)
+> +static inline void brcmnand_soc_data_bus_prepare(struct brcmnand_soc *soc,
+> +						 bool is_param)
+>  {
+>  	if (soc && soc->prepare_data_bus)
+> -		soc->prepare_data_bus(soc, true);
+> +		soc->prepare_data_bus(soc, true, is_param);
 >  }
 >  
-> @@ -2081,7 +2081,7 @@ static int at_xdmac_remove(struct platform_device *pdev)
->  	dma_async_device_unregister(&atxdmac->dma);
->  	clk_disable_unprepare(atxdmac->clk);
+> -static inline void brcmnand_soc_data_bus_unprepare(struct brcmnand_soc *soc)
+> +static inline void brcmnand_soc_data_bus_unprepare(struct brcmnand_soc *soc,
+> +						   bool is_param)
+>  {
+>  	if (soc && soc->prepare_data_bus)
+> -		soc->prepare_data_bus(soc, false);
+> +		soc->prepare_data_bus(soc, false, is_param);
+>  }
 >  
-> -	free_irq(atxdmac->irq, atxdmac->dma.dev);
-> +	free_irq(atxdmac->irq, atxdmac);
+>  static inline u32 brcmnand_readl(void __iomem *addr)
+> diff --git a/drivers/mtd/nand/brcmnand/iproc_nand.c b/drivers/mtd/nand/brcmnand/iproc_nand.c
+> index 585596c..4c6ae11 100644
+> --- a/drivers/mtd/nand/brcmnand/iproc_nand.c
+> +++ b/drivers/mtd/nand/brcmnand/iproc_nand.c
+> @@ -74,7 +74,8 @@ static void iproc_nand_intc_set(struct brcmnand_soc *soc, bool en)
+>  	spin_unlock_irqrestore(&priv->idm_lock, flags);
+>  }
 >  
->  	for (i = 0; i < atxdmac->dma.chancnt; i++) {
->  		struct at_xdmac_chan *atchan = &atxdmac->chan[i];
-> 
+> -static void iproc_nand_apb_access(struct brcmnand_soc *soc, bool prepare)
+> +static void iproc_nand_apb_access(struct brcmnand_soc *soc, bool prepare,
+> +				  bool is_param)
+>  {
+>  	struct iproc_nand_soc *priv =
+>  			container_of(soc, struct iproc_nand_soc, soc);
+> @@ -86,10 +87,19 @@ static void iproc_nand_apb_access(struct brcmnand_soc *soc, bool prepare)
+>  
+>  	val = brcmnand_readl(mmio);
+>  
+> -	if (prepare)
+> -		val |= IPROC_NAND_APB_LE_MODE;
+> -	else
+> +	/*
+> +	 * In the case of BE or when dealing with NAND data, alway configure
+> +	 * the APB bus to LE mode before accessing the FIFO and back to BE mode
+> +	 * after the access is done
+> +	 */
+> +	if (IS_ENABLED(CONFIG_CPU_BIG_ENDIAN) || !is_param) {
+> +		if (prepare)
+> +			val |= IPROC_NAND_APB_LE_MODE;
+> +		else
+> +			val &= ~IPROC_NAND_APB_LE_MODE;
+> +	} else { /* when in LE accessing the parameter page, keep APB in BE */
+>  		val &= ~IPROC_NAND_APB_LE_MODE;
+> +	}
+>  
+>  	brcmnand_writel(val, mmio);
+>  
