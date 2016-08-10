@@ -1,48 +1,77 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 10 Aug 2016 12:49:14 +0200
-Subject: [PATCH] ARM: cpuidle: declare cpuidle_ops __read_mostly
-In-Reply-To: <20160810175403.53e218cf@xhacker>
-References: <1470818997-808-1-git-send-email-jszhang@marvell.com>
- <20160810175403.53e218cf@xhacker>
-Message-ID: <2742913.yoAdrazplg@wuerfel>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 10 Aug 2016 11:51:26 +0100
+Subject: [PATCH] arm64: qcom: dts: Fix broken interrupt trigger settings
+Message-ID: <1470826286-19913-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, August 10, 2016 5:54:03 PM CEST Jisheng Zhang wrote:
-> On Wed, 10 Aug 2016 16:49:57 +0800 Jisheng Zhang wrote:
-> 
-> > cpuidle_ops is initialized once by arm_cpuidle_read_ops() during
-> > initialization, and thereafter is mostly read in arm_cpuidle_suspend()
-> > 
-> > The fact that it is mostly read and not written to makes it candidates
-> > for __read_mostly declarations.
-> > 
-> > Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
-> > ---
-> >  arch/arm/kernel/cpuidle.c | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > 
-> > diff --git a/arch/arm/kernel/cpuidle.c b/arch/arm/kernel/cpuidle.c
-> > index 7dccc96..762e0929 100644
-> > --- a/arch/arm/kernel/cpuidle.c
-> > +++ b/arch/arm/kernel/cpuidle.c
-> > @@ -19,7 +19,7 @@ extern struct of_cpuidle_method __cpuidle_method_of_table[];
-> >  static const struct of_cpuidle_method __cpuidle_method_of_table_sentinel
-> >       __used __section(__cpuidle_method_of_table_end);
-> >  
-> > -static struct cpuidle_ops cpuidle_ops[NR_CPUS];
-> > +static struct cpuidle_ops cpuidle_ops[NR_CPUS] __read_mostly;
-> 
-> 
-> oops, I just found that "arm: apply more __ro_after_init" from Kees
-> marked cpuidle_ops as __ro_after_init, that also meet my need, so
-> let's drop my patch.
-> 
-> 
+When a device uses the GIC as its interrupt controller and generates
+SPIs, only the values 1 (edge rising) and 4 (level high) are legal.
 
-Ok, just saw this reply and that matches up with what I just
-wrote as well.
+Anything else is just plain wrong (can't be programmed into the HW),
+and leads to aborted driver probes (USB doesn't work with 4.8-rc1
+on a Dragonboard 410C).
 
-Thanks,
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+I've guessed the trigger settings, so someone please verify them.
 
-	Arnd
+ arch/arm64/boot/dts/qcom/msm8916.dtsi | 8 ++++----
+ arch/arm64/boot/dts/qcom/msm8996.dtsi | 2 +-
+ 2 files changed, 5 insertions(+), 5 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
+index 11bdc24..45427834 100644
+--- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
++++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
+@@ -483,7 +483,7 @@
+ 			compatible = "qcom,ci-hdrc";
+ 			reg = <0x78d9000 0x400>;
+ 			dr_mode = "peripheral";
+-			interrupts = <GIC_SPI 134 IRQ_TYPE_NONE>;
++			interrupts = <GIC_SPI 134 IRQ_TYPE_EDGE_RISING>;
+ 			usb-phy = <&usb_otg>;
+ 			status = "disabled";
+ 		};
+@@ -491,7 +491,7 @@
+ 		usb_host: ehci at 78d9000 {
+ 			compatible = "qcom,ehci-host";
+ 			reg = <0x78d9000 0x400>;
+-			interrupts = <GIC_SPI 134 IRQ_TYPE_NONE>;
++			interrupts = <GIC_SPI 134 IRQ_TYPE_EDGE_RISING>;
+ 			usb-phy = <&usb_otg>;
+ 			status = "disabled";
+ 		};
+@@ -499,7 +499,7 @@
+ 		usb_otg: phy at 78d9000 {
+ 			compatible = "qcom,usb-otg-snps";
+ 			reg = <0x78d9000 0x400>;
+-			interrupts = <GIC_SPI 134 IRQ_TYPE_EDGE_BOTH>,
++			interrupts = <GIC_SPI 134 IRQ_TYPE_EDGE_RISING>,
+ 				     <GIC_SPI 140 IRQ_TYPE_EDGE_RISING>;
+ 
+ 			qcom,vdd-levels = <500000 1000000 1320000>;
+@@ -594,7 +594,7 @@
+ 			      <0x200a000 0x002100>;
+ 			reg-names = "core", "chnls", "obsrvr", "intr", "cnfg";
+ 			interrupt-names = "periph_irq";
+-			interrupts = <GIC_SPI 190 IRQ_TYPE_NONE>;
++			interrupts = <GIC_SPI 190 IRQ_TYPE_LEVEL_HIGH>;
+ 			qcom,ee = <0>;
+ 			qcom,channel = <0>;
+ 			#address-cells = <2>;
+diff --git a/arch/arm64/boot/dts/qcom/msm8996.dtsi b/arch/arm64/boot/dts/qcom/msm8996.dtsi
+index 55ec3e8..69ed6e1 100644
+--- a/arch/arm64/boot/dts/qcom/msm8996.dtsi
++++ b/arch/arm64/boot/dts/qcom/msm8996.dtsi
+@@ -339,7 +339,7 @@
+ 			      <0x400a000 0x002100>;
+ 			reg-names = "core", "chnls", "obsrvr", "intr", "cnfg";
+ 			interrupt-names = "periph_irq";
+-			interrupts = <GIC_SPI 326 IRQ_TYPE_NONE>;
++			interrupts = <GIC_SPI 326 IRQ_TYPE_LEVEL_HIGH>;
+ 			qcom,ee = <0>;
+ 			qcom,channel = <0>;
+ 			#address-cells = <2>;
+-- 
+2.1.4
