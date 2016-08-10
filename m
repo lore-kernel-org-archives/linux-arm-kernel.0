@@ -1,24 +1,128 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 10 Aug 2016 15:08:05 +0200
-Subject: [RFT RESEND PATCH v3 2/3] ARM: Fix *MIGHT_HAVE_PCI* config from
- being selected redundantly
-In-Reply-To: <1470832400-11929-3-git-send-email-kishon@ti.com>
-References: <1470832400-11929-1-git-send-email-kishon@ti.com>
- <1470832400-11929-3-git-send-email-kishon@ti.com>
-Message-ID: <e2e7e471-190d-a685-e496-1ab3e1d3a333@samsung.com>
+From: pbonzini@redhat.com (Paolo Bonzini)
+Date: Wed, 10 Aug 2016 15:10:51 +0200
+Subject: [PATCH] KVM: arm64: vgic-its: Grab kvm->lock when reading
+ kvm->devices
+In-Reply-To: <20160810103914.30322-1-christoffer.dall@linaro.org>
+References: <20160808154543.23463-1-andre.przywara@arm.com>
+ <20160810103914.30322-1-christoffer.dall@linaro.org>
+Message-ID: <d02583ed-d396-4431-ba91-903d04843fb3@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/10/2016 02:33 PM, Kishon Vijay Abraham I wrote:
-> *MIGHT_HAVE_PCI* config is already selected in ARCH_MULTIPLATFORM.
-> Fix it from getting redundantly selected in all
 
-I don't like the "fix" here and in subject. There is no error, no
-warning, no issue to be fixed. Fix might be a candidate to backport
-(stable, vendor etc) but this just removes something which is not needed.
 
-With the change in subject, for exynos:
-Acked-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+On 10/08/2016 12:39, Christoffer Dall wrote:
+> Since we are about to synchronize all accesses to kvm->devices using the
+> kvm->lock mutex, we should hold this mutex while iterating over the list
+> of devices in the ITS code.
+> 
+> Also move the vgic_register_its_iodev function to where it's called and
+> rename it to register_its_iodev to avoid having two almost identially
+> named functions.
+> 
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> ---
+>  virt/kvm/arm/vgic/vgic-its.c | 64 +++++++++++++++++++++++---------------------
+>  1 file changed, 34 insertions(+), 30 deletions(-)
+> 
+> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+> index 1cf9f59..4e76877 100644
+> --- a/virt/kvm/arm/vgic/vgic-its.c
+> +++ b/virt/kvm/arm/vgic/vgic-its.c
+> @@ -1319,32 +1319,6 @@ void vgic_enable_lpis(struct kvm_vcpu *vcpu)
+>  		its_sync_lpi_pending_table(vcpu);
+>  }
+>  
+> -static int vgic_register_its_iodev(struct kvm *kvm, struct vgic_its *its)
+> -{
+> -	struct vgic_io_device *iodev = &its->iodev;
+> -	int ret;
+> -
+> -	if (!its->initialized)
+> -		return -EBUSY;
+> -
+> -	if (IS_VGIC_ADDR_UNDEF(its->vgic_its_base))
+> -		return -ENXIO;
+> -
+> -	iodev->regions = its_registers;
+> -	iodev->nr_regions = ARRAY_SIZE(its_registers);
+> -	kvm_iodevice_init(&iodev->dev, &kvm_io_gic_ops);
+> -
+> -	iodev->base_addr = its->vgic_its_base;
+> -	iodev->iodev_type = IODEV_ITS;
+> -	iodev->its = its;
+> -	mutex_lock(&kvm->slots_lock);
+> -	ret = kvm_io_bus_register_dev(kvm, KVM_MMIO_BUS, iodev->base_addr,
+> -				      KVM_VGIC_V3_ITS_SIZE, &iodev->dev);
+> -	mutex_unlock(&kvm->slots_lock);
+> -
+> -	return ret;
+> -}
+> -
+>  #define INITIAL_BASER_VALUE						  \
+>  	(GIC_BASER_CACHEABILITY(GITS_BASER, INNER, RaWb)		| \
+>  	 GIC_BASER_CACHEABILITY(GITS_BASER, OUTER, SameAsInner)		| \
+> @@ -1526,6 +1500,32 @@ int kvm_vgic_register_its_device(void)
+>  				       KVM_DEV_TYPE_ARM_VGIC_ITS);
+>  }
+>  
+> +static int register_its_iodev(struct kvm *kvm, struct vgic_its *its)
+> +{
+> +	struct vgic_io_device *iodev = &its->iodev;
+> +	int ret;
+> +
+> +	if (!its->initialized)
+> +		return -EBUSY;
+> +
+> +	if (IS_VGIC_ADDR_UNDEF(its->vgic_its_base))
+> +		return -ENXIO;
+> +
+> +	iodev->regions = its_registers;
+> +	iodev->nr_regions = ARRAY_SIZE(its_registers);
+> +	kvm_iodevice_init(&iodev->dev, &kvm_io_gic_ops);
+> +
+> +	iodev->base_addr = its->vgic_its_base;
+> +	iodev->iodev_type = IODEV_ITS;
+> +	iodev->its = its;
+> +	mutex_lock(&kvm->slots_lock);
+> +	ret = kvm_io_bus_register_dev(kvm, KVM_MMIO_BUS, iodev->base_addr,
+> +				      KVM_VGIC_V3_ITS_SIZE, &iodev->dev);
+> +	mutex_unlock(&kvm->slots_lock);
+> +
+> +	return ret;
+> +}
+> +
+>  /*
+>   * Registers all ITSes with the kvm_io_bus framework.
+>   * To follow the existing VGIC initialization sequence, this has to be
+> @@ -1536,19 +1536,23 @@ int vgic_register_its_iodevs(struct kvm *kvm)
+>  	struct kvm_device *dev;
+>  	int ret = 0;
+>  
+> +	mutex_lock(&kvm->lock);
+>  	list_for_each_entry(dev, &kvm->devices, vm_node) {
+>  		if (dev->ops != &kvm_arm_vgic_its_ops)
+>  			continue;
+>  
+> -		ret = vgic_register_its_iodev(kvm, dev->private);
+> +		ret = register_its_iodev(kvm, dev->private);
+>  		if (ret)
+> -			return ret;
+> +			goto out;
+> +
+>  		/*
+>  		 * We don't need to care about tearing down previously
+> -		 * registered ITSes, as the kvm_io_bus framework removes
+> -		 * them for us if the VM gets destroyed.
+> +		 * registered ITSes on error, as the kvm_io_bus framework
+> +		 * removes them for us if the VM gets destroyed.
+>  		 */
+>  	}
+>  
+> +out:
+> +	mutex_unlock(&kvm->lock);
+>  	return ret;
+>  }
+> 
 
-Best regards,
-Krzysztof
+Reviewed-by: Paolo Bonzini <pbonzini@redhat.com>
