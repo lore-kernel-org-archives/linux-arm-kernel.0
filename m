@@ -1,55 +1,33 @@
 From: kbeldan@baylibre.com (Karl Beldan)
-Date: Wed, 10 Aug 2016 11:00:29 +0000
-Subject: [PATCH v2 1/4] ARM: davinci: da8xx-dt: Add ti-aemif lookup for clock
- matching
+Date: Wed, 10 Aug 2016 11:00:30 +0000
+Subject: [PATCH v2 2/4] ARM: davinci_all_defconfig: Enable AEMIF as a module
 In-Reply-To: <20160810110032.29295-1-kbeldan@baylibre.com>
 References: <20160810110032.29295-1-kbeldan@baylibre.com>
-Message-ID: <20160810110032.29295-2-kbeldan@baylibre.com>
+Message-ID: <20160810110032.29295-3-kbeldan@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Many davinci boards (da830 and da850 families) don't have their clocks
-in DT yet and won't be successful in getting an unnamed aemif clock
-without explicitly registering them via clk_lookups, failing the
-ti-aemif memory driver probe.
-
-The current aemif lookup entry resolving to the same clock:
-    'CLK(NULL,               "aemif",        &aemif_clk)'
-remains, as it is currently used (davinci_nand is getting a named clock
-"aemif").
-
-This change will allow to switch from the mach-davinci aemif code to
-the ti-aemif memory driver.
+This enables the use of the memory/ti-aemif.c driver.
+ATM most davinci boards use the mach-davinci aemif code which gets in
+the way of genericity and proper DT boot.
 
 Signed-off-by: Karl Beldan <kbeldan@baylibre.com>
 ---
- arch/arm/mach-davinci/da850.c    | 1 +
- arch/arm/mach-davinci/da8xx-dt.c | 1 +
- 2 files changed, 2 insertions(+)
+ arch/arm/configs/davinci_all_defconfig | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
-index 2398862..3477d30 100644
---- a/arch/arm/mach-davinci/da850.c
-+++ b/arch/arm/mach-davinci/da850.c
-@@ -485,6 +485,7 @@ static struct clk_lookup da850_clks[] = {
- 	CLK("da8xx_lcdc.0",	"fck",		&lcdc_clk),
- 	CLK("da830-mmc.0",	NULL,		&mmcsd0_clk),
- 	CLK("da830-mmc.1",	NULL,		&mmcsd1_clk),
-+	CLK("ti-aemif",		NULL,		&aemif_clk),
- 	CLK(NULL,		"aemif",	&aemif_clk),
- 	CLK(NULL,		"usb11",	&usb11_clk),
- 	CLK(NULL,		"usb20",	&usb20_clk),
-diff --git a/arch/arm/mach-davinci/da8xx-dt.c b/arch/arm/mach-davinci/da8xx-dt.c
-index ca99711..c9f7e92 100644
---- a/arch/arm/mach-davinci/da8xx-dt.c
-+++ b/arch/arm/mach-davinci/da8xx-dt.c
-@@ -37,6 +37,7 @@ static struct of_dev_auxdata da850_auxdata_lookup[] __initdata = {
- 	OF_DEV_AUXDATA("ti,davinci-dm6467-emac", 0x01e20000, "davinci_emac.1",
- 		       NULL),
- 	OF_DEV_AUXDATA("ti,da830-mcasp-audio", 0x01d00000, "davinci-mcasp.0", NULL),
-+	OF_DEV_AUXDATA("ti,da850-aemif", 0x68000000, "ti-aemif", NULL),
- 	{}
- };
- 
+diff --git a/arch/arm/configs/davinci_all_defconfig b/arch/arm/configs/davinci_all_defconfig
+index d037d3d..2802897 100644
+--- a/arch/arm/configs/davinci_all_defconfig
++++ b/arch/arm/configs/davinci_all_defconfig
+@@ -192,6 +192,8 @@ CONFIG_RTC_CLASS=y
+ CONFIG_RTC_DRV_OMAP=m
+ CONFIG_DMADEVICES=y
+ CONFIG_TI_EDMA=y
++CONFIG_MEMORY=y
++CONFIG_TI_AEMIF=m
+ CONFIG_EXT2_FS=y
+ CONFIG_EXT3_FS=y
+ CONFIG_XFS_FS=m
 -- 
 2.9.2
