@@ -1,42 +1,41 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Wed, 10 Aug 2016 13:15:39 +0300
-Subject: [PATCH 0/6] CLCD support for Nomadik and Versatile series
-In-Reply-To: <CACRpkdY6FDisofanQX9oiXMr2otoBsYKsx+fTs-EkV2F-004Eg@mail.gmail.com>
-References: <1466069778-16087-1-git-send-email-linus.walleij@linaro.org>
- <CACRpkdY6FDisofanQX9oiXMr2otoBsYKsx+fTs-EkV2F-004Eg@mail.gmail.com>
-Message-ID: <e706d8a8-8321-562f-7084-b60d637f53c3@ti.com>
+From: pmeerw@pmeerw.net (Peter Meerwald)
+Date: Wed, 10 Aug 2016 12:14:22 +0200
+Subject: [PATCH] sound: soc: atmel: Don't unconditionally reset SSC on stream
+ startup
+Message-ID: <20160810101422.2086-1-pmeerw@pmeerw.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Christoph Huber <c.huber@bct-electronic.com>
 
+commit cbaadf0f90d6 (ASoC: atmel_ssc_dai: refactor the startup and shutdown)
+refactored code such that the SSC is reset on every startup;
+this breaks duplex audio (e.g. first start audio playback, then start record,
+causing the playback to stop/hang)
 
-On 04/07/16 15:41, Linus Walleij wrote:
-> Hi Tomi,
-> 
-> On Thu, Jun 16, 2016 at 11:36 AM, Linus Walleij
-> <linus.walleij@linaro.org> wrote:
-> 
->> This is a rebase and repost of my earlier "uncontroversial"
->> series of patches to CLCD, which excludes the part where
->> we deal with the Versatile autodetected displays. This makes
->> it possible to handle Nomadik graphics and RealView with just
->> device tree while keeping the Versatile specialties on hold.
->>
->> We got an earlier nod from Tomi on this series:
->> http://marc.info/?l=linux-fbdev&m=145733624305361&w=2
-> 
-> Is there any chance that we can progress with this series
-> for the v4.8 kernel?
+Signed-off-by: Christoph Huber <c.huber@bct-electronic.com>
+Signed-off-by: Peter Meerwald-Stadler <p.meerwald@bct-electronic.com>
+Cc: Songjun Wu <songjun.wu@microchip.com>
+Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ sound/soc/atmel/atmel_ssc_dai.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-Sorry, I was out the whole July. I've queued this for v4.9, should be in
-linux-next in a few days.
-
- Tomi
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160810/66e4ecc4/attachment.sig>
+diff --git a/sound/soc/atmel/atmel_ssc_dai.c b/sound/soc/atmel/atmel_ssc_dai.c
+index 841d059..b3e9f0c 100644
+--- a/sound/soc/atmel/atmel_ssc_dai.c
++++ b/sound/soc/atmel/atmel_ssc_dai.c
+@@ -298,8 +298,9 @@ static int atmel_ssc_startup(struct snd_pcm_substream *substream,
+ 	clk_enable(ssc_p->ssc->clk);
+ 	ssc_p->mck_rate = clk_get_rate(ssc_p->ssc->clk);
+ 
+-	/* Reset the SSC to keep it at a clean status */
+-	ssc_writel(ssc_p->ssc->regs, CR, SSC_BIT(CR_SWRST));
++	/* Reset the SSC if it is not initialized to keep it at a clean status */
++	if(!ssc_p->initialized)
++		ssc_writel(ssc_p->ssc->regs, CR, SSC_BIT(CR_SWRST));
+ 
+ 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
+ 		dir = 0;
+-- 
+2.1.4
