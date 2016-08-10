@@ -1,100 +1,152 @@
-From: hzpeterchen@gmail.com (Peter Chen)
-Date: Wed, 10 Aug 2016 17:19:30 +0800
-Subject: [PATCH v5 5/6] usb: chipidea: let chipidea core device of_node
- equal's glue layer device of_node
-In-Reply-To: <AM4PR04MB2130F9E9E9E304D47C44AC46891D0@AM4PR04MB2130.eurprd04.prod.outlook.com>
-References: <1470646331-23227-1-git-send-email-peter.chen@nxp.com>
- <1470646331-23227-6-git-send-email-peter.chen@nxp.com>
- <147078813636.20133.1120685098868481913@sboyd-linaro>
- <20160810031146.GE1879@shlinux2>
- <AM4PR04MB2130F9E9E9E304D47C44AC46891D0@AM4PR04MB2130.eurprd04.prod.outlook.com>
-Message-ID: <20160810091930.GB30158@shlinux2>
+From: kbeldan@baylibre.com (Karl Beldan)
+Date: Wed, 10 Aug 2016 09:29:46 +0000
+Subject: [PATCH 3/4] ARM: dts: da850-lcdk: Add NAND to DT
+In-Reply-To: <20160809171518.22690-4-kbeldan@baylibre.com>
+References: <20160809171518.22690-1-kbeldan@baylibre.com>
+ <20160809171518.22690-4-kbeldan@baylibre.com>
+Message-ID: <20160810092946.GG16481@gobelin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 10, 2016 at 09:00:15AM +0000, Jun Li wrote:
-> Hi, Peter
+On Tue, Aug 09, 2016 at 05:15:17PM +0000, Karl Beldan wrote:
+> This adds DT support for the NAND connected to the SoC AEMIF.
+> The parameters (timings, ecc) are the same as what the board ships with
+> (default AEMIF timings, 1bit ECC) and improvements will be handled in
+> due course.
+> This passed elementary tests hashing a 20MB file on top of ubifs on my
+> LCDK.
 > 
-> > -----Original Message-----
-> > From: linux-usb-owner at vger.kernel.org [mailto:linux-usb-
-> > owner at vger.kernel.org] On Behalf Of Peter Chen
-> > Sent: Wednesday, August 10, 2016 11:12 AM
-> > To: Stephen Boyd <stephen.boyd@linaro.org>
-> > Cc: Peter Chen <peter.chen@nxp.com>; gregkh at linuxfoundation.org;
-> > stern at rowland.harvard.edu; ulf.hansson at linaro.org; broonie at kernel.org;
-> > sre at kernel.org; robh+dt at kernel.org; shawnguo at kernel.org;
-> > dbaryshkov at gmail.com; dwmw3 at infradead.org; k.kozlowski at samsung.com; linux-
-> > arm-kernel at lists.infradead.org; p.zabel at pengutronix.de;
-> > devicetree at vger.kernel.org; pawel.moll at arm.com; mark.rutland at arm.com;
-> > linux-usb at vger.kernel.org; arnd at arndb.de; s.hauer at pengutronix.de;
-> > mail at maciej.szmigiero.name; troy.kisky at boundarydevices.com;
-> > festevam at gmail.com; oscar at naiandei.net; linux-pm at vger.kernel.org;
-> > stillcompiling at gmail.com; linux-kernel at vger.kernel.org; mka at chromium.org;
-> > Peter Chen <peter.chen@freescale.com>
-> > Subject: Re: [PATCH v5 5/6] usb: chipidea: let chipidea core device
-> > of_node equal's glue layer device of_node
-> > 
-> > On Tue, Aug 09, 2016 at 05:15:36PM -0700, Stephen Boyd wrote:
-> > > Quoting Peter Chen (2016-08-08 01:52:10)
-> > > > From: Peter Chen <peter.chen@freescale.com>
-> > > >
-> > > > At device tree, we have no device node for chipidea core, the glue
-> > > > layer's node is the parent node for host and udc device. But in
-> > > > related driver, the parent device is chipidea core. So, in order to
-> > > > let the common driver get parent's node, we let the core's device
-> > > > node equals glue layer device node.
-> > > >
-> > > > Signed-off-by: Peter Chen <peter.chen@freescale.com>
-> > > > Tested-by: Maciej S. Szmigiero <mail@maciej.szmigiero.name>
-> > > > Tested-by Joshua Clayton <stillcompiling@gmail.com>
-> > > > ---
-> > > >  drivers/usb/chipidea/core.c | 11 +++++++++++
-> > > >  1 file changed, 11 insertions(+)
-> > > >
-> > > > diff --git a/drivers/usb/chipidea/core.c
-> > > > b/drivers/usb/chipidea/core.c index 69426e6..b189dc7 100644
-> > > > --- a/drivers/usb/chipidea/core.c
-> > > > +++ b/drivers/usb/chipidea/core.c
-> > > > @@ -954,6 +954,15 @@ static int ci_hdrc_probe(struct platform_device
-> > *pdev)
-> > > >                 dev_err(dev, "unable to init phy: %d\n", ret);
-> > > >                 return ret;
-> > > >         }
-> > > > +       /*
-> > > > +        * At device tree, we have no device node for chipidea core,
-> > > > +        * the glue layer's node is the parent node for host and udc
-> > > > +        * device. But in related driver, the parent device is
-> > chipidea
-> > > > +        * core. So, in order to let the common driver get parent's
-> > node,
-> > > > +        * we let the core's device node equals glue layer's node.
-> > > > +        */
-> > > > +       if (dev->parent && dev->parent->of_node)
-> > > > +               dev->of_node = dev->parent->of_node;
-> > >
-> > > Can this be done earlier? Perhaps after hw_device_init() in this probe
-> > > routine? That would allow me to remove the awkward parent searching in
-> > > my ULPI DT awareness patch.
-> > 
-> > The reason why I locate it there is to avoid "goto label" for error path
-> > during PHY's get and initialization operation.
-> > 
-> > Ok, to simplify your work, I will change it at next version.
+> Signed-off-by: Karl Beldan <kbeldan@baylibre.com>
+> ---
+>  arch/arm/boot/dts/da850-lcdk.dts | 108 +++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 108 insertions(+)
 > 
-> As iommu need this to be done even more earlier, will you consider to
-> put it before adding the core's platform device?
+> diff --git a/arch/arm/boot/dts/da850-lcdk.dts b/arch/arm/boot/dts/da850-lcdk.dts
+> index dbcca0b..033380b 100644
+> --- a/arch/arm/boot/dts/da850-lcdk.dts
+> +++ b/arch/arm/boot/dts/da850-lcdk.dts
+> @@ -27,6 +27,27 @@
+>  
+>  &pmx_core {
+>  	status = "okay";
+> +
+> +	nand_pins: nand_pins {
+> +		pinctrl-single,bits = <
+> +			/* EMA_WAIT[0], EMA_OE, EMA_WE, EMA_CS[3] */
+> +			0x1c 0x10110010  0xf0ff00f0
+> +			/*
+> +			 * EMA_D[0], EMA_D[1], EMA_D[2],
+> +			 * EMA_D[3], EMA_D[4], EMA_D[5],
+> +			 * EMA_D[6], EMA_D[7]
+> +			 */
+> +			0x24 0x11111111  0xffffffff
+> +			/*
+> +			 * EMA_D[8],  EMA_D[9],  EMA_D[10],
+> +			 * EMA_D[11], EMA_D[12], EMA_D[13],
+> +			 * EMA_D[14], EMA_D[15]
+> +			 */
+> +			0x20 0x11111111  0xffffffff
+> +			/* EMA_A[1], EMA_A[2] */
+> +			0x30 0x01100000  0x0ff00000
+> +		>;
+> +	};
+>  };
+>  
+>  &serial2 {
+> @@ -68,3 +89,90 @@
+>  	cd-gpios = <&gpio 64 GPIO_ACTIVE_HIGH>;
+>  	status = "okay";
+>  };
+> +
+> +&aemif {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&nand_pins>;
+> +	status = "ok";
+> +	cs2 {
+Typo, should be cs3.
+ 
+Karl
+> +		#address-cells = <2>;
+> +		#size-cells = <1>;
+> +		clock-ranges;
+> +		ranges;
+> +
+> +		ti,cs-chipselect = <2>;
+> +
+> +		nand at 2000000,0 {
+> +			compatible = "ti,davinci-nand";
+> +			#address-cells = <1>;
+> +			#size-cells = <1>;
+> +			reg = <0 0x02000000 0x02000000
+> +			       1 0x00000000 0x00008000>;
+> +
+> +			ti,davinci-chipselect = <1>;
+> +			ti,davinci-mask-ale = <0>;
+> +			ti,davinci-mask-cle = <0>;
+> +			ti,davinci-mask-chipsel = <0>;
+> +
+> +			/*
+> +			 * nand_ecc_strength_good will emit a warning
+> +			 * but the LCDK ships with these settings [1].
+> +			 * Also HW 4bits ECC with 16bits NAND seems to
+> +			 * require some attention.
+> +			 *
+> +			 * ATM nand_davinci_probe handling of nand-ecc-*
+> +			 * is broken, e.g.
+> +			 * chip.ecc.strength = pdata->ecc_bits occurs after
+> +			 * scan_ident(), otherwise I would have used:
+> +			 * 	nand-ecc-mode = "hw";
+> +			 * 	nand-ecc-strength = <1>;
+> +			 * 	nand-ecc-step-size = <512>;
+> +			 */
+> +			ti,davinci-ecc-mode = "hw";
+> +			ti,davinci-ecc-bits = <1>;
+> +
+> +			nand-bus-width= <16>;
+> +			nand-on-flash-bbt;
+> +
+> +			/*
+> +			 * LCDK original partitions:
+> +			 * 0x000000000000-0x000000020000 : "u-boot env"
+> +			 * 0x000000020000-0x0000000a0000 : "u-boot"
+> +			 * 0x0000000a0000-0x0000002a0000 : "kernel"
+> +			 * 0x0000002a0000-0x000020000000 : "filesystem"
+> +			 *
+> +			 * The 1st NAND block being guaranted to be valid w/o ECC (> 1k cycles),
+> +			 * it makes a perfect candidate as an SPL for the BootROM to jump to.
+> +			 * However the OMAP-L132/L138 Bootloader doc SPRAB41E reads:
+> +			 * "To boot from NAND Flash, the AIS should be written to NAND block 1
+> +			 * (NAND block 0 is not used by default)", which matches the LCDK
+> +			 * original partitioning.
+> +			 * Also, the LCDK ships with only the u-boot partition provisioned and
+> +			 * boots on it in its default configuration while using the MMC for the
+> +			 * kernel and rootfs, so preserve that one as is for now.
+> +			 * [1]: Ensuring for example that U-Boot LCDK SPL can handle it properly
+> +			 * and a proper boot chain ROM->SPL->U-Boot->Linux wrt ECC, would allow
+> +			 * for a better partitioning.
+> +			 */
+> +			partitions {
+> +				compatible = "fixed-partitions";
+> +				#address-cells = <1>;
+> +				#size-cells = <1>;
+> +
+> +				partition at 0 {
+> +					label = "u-boot env";
+> +					reg = <0 0x020000>;
+> +				};
+> +				partition at 0x020000 {
+> +					/* The LCDK defaults to booting from this partition */
+> +					label = "u-boot";
+> +					reg = <0x020000 0x080000>;
+> +				};
+> +				partition at 0x0a0000 {
+> +					label = "space";
+> +					reg = <0x0a0000 0>;
+> +				};
+> +			};
+> +		};
+> +	};
+> +};
+> -- 
+> 2.9.2
 > 
-
-I can't do it, it will introduce another issue that the pinctrl has
-already requested by parents. The warning is similar like below, but
-occurs at the probe.
-
-http://lkml.iu.edu/hypermail/linux/kernel/1607.2/03150.html
-
-I will see how iommu support can be added for platform devices which
-are created by runtime (like chipidea core device).
-
--- 
-
-Best Regards,
-Peter Chen
