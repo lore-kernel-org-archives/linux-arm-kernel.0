@@ -1,31 +1,41 @@
 From: vinod.koul@intel.com (Vinod Koul)
-Date: Wed, 10 Aug 2016 23:02:36 +0530
-Subject: [PATCH v2 0/6] dmaengine:omap-dma: Linked List transfer for
- slave_sg
-In-Reply-To: <20160720085032.2955-1-peter.ujfalusi@ti.com>
-References: <20160720085032.2955-1-peter.ujfalusi@ti.com>
-Message-ID: <20160810173235.GI9681@localhost>
+Date: Wed, 10 Aug 2016 23:07:10 +0530
+Subject: [PATCHv9 0/6] dmaengine: rcar-dmac: add iommu support for slave
+ transfers
+In-Reply-To: <20160810112219.17964-1-niklas.soderlund+renesas@ragnatech.se>
+References: <20160810112219.17964-1-niklas.soderlund+renesas@ragnatech.se>
+Message-ID: <20160810173710.GK9681@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 20, 2016 at 11:50:26AM +0300, Peter Ujfalusi wrote:
+On Wed, Aug 10, 2016 at 01:22:13PM +0200, Niklas S?derlund wrote:
 > Hi,
 > 
-> Changes since v1:
-> - dropped the patch changing the sequence of vchan_cookie_complete and
->   omap_dma_start_sg in omap_dma_callback
-> - Use appropriate macros to find omap_chan and omap_desc in patch 6
-> - Use per-device pool instead of per-channel pools.
+> This series tries to solve the problem with DMA with device registers
+> (MMIO registers) that are behind an IOMMU for the rcar-dmac driver. A
+> recent patch '9575632 (dmaengine: make slave address physical)'
+> clarifies that DMA slave address provided by clients is the physical
+> address. This puts the task of mapping the DMA slave address from a
+> phys_addr_t to a dma_addr_t on the DMA engine.
 > 
-> The following series with the final patch will add support for sDMA Linked List
-> transfer support.
-> Linked List is supported by sDMA in OMAP3630+ (OMAP4/5, dra7 family).
-> If the descriptor load feature is present we can create the descriptors for each
-> SG beforehand and let sDMA to walk them through.
-> This way the number of sDMA interrupts the kernel need to handle will drop
-> dramatically.
+> Without an IOMMU this is easy since the phys_addr_t and dma_addr_t are
+> the same and no special care is needed. However if you have a IOMMU you
+> need to map the DMA slave phys_addr_t to a dma_addr_t using something
+> like this.
+> 
+> This series is based on top of v4.8-rc1. And I'm hoping to be able to collect a
+> Ack from Russell King on patch 4/6 that adds the ARM specific part and then be
+> able to take the whole series through the dmaengine tree. If this is not the
+> best route I'm more then happy to do it another way.
+> 
+> It's tested on a Koelsch with CONFIG_IPMMU_VMSA and by enabling the
+> ipmmu_ds node in r8a7791.dtsi. I verified operation by interacting with
+> /dev/mmcblk1, i2c and the serial console which are devices behind the
+> iommu.
 
-Applied all, thanks
+As I said in last one, the dmaengine parts look fine to me. But to go thru
+dmaengine tree I would need ACK on non dmaengine patches.
+
 
 -- 
 ~Vinod
