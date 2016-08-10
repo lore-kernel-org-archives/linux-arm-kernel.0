@@ -1,48 +1,50 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 10 Aug 2016 14:25:02 +0200
-Subject: [PATCH] ARM: no need to select SMP_ON_UP explicitly
-In-Reply-To: <6326645.Nr2CxIomnL@wuerfel>
-References: <1469199369-25746-1-git-send-email-vladimir.murzin@arm.com>
- <20160809084416.GS4678@tiger> <57AAE5D7.2080009@arm.com>
- <6326645.Nr2CxIomnL@wuerfel>
-Message-ID: <CACRpkdb1rJ0fVDFU6uJ3fscCG4ZGQXoC713uKLMcWiBc56Ht_Q@mail.gmail.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Wed, 10 Aug 2016 17:59:54 +0530
+Subject: [PATCH v3 0/3] ARM: cleanup PCI specific configs
+Message-ID: <1470832197-11767-1-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 10, 2016 at 10:55 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Wednesday, August 10, 2016 9:29:11 AM CEST Vladimir Murzin wrote:
->> On 09/08/16 09:44, Shawn Guo wrote:
->> > On Fri, Jul 22, 2016 at 03:56:09PM +0100, Vladimir Murzin wrote:
->> >> SMP_ON_UP is already defaulted to "y" and has all dependencies expressed
->> >> - no need to select it per platform level
->> >>
->> >> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
->> >> ---
->> >>
->> >> This time sent to LAKML
->> >>
->> >>  arch/arm/mach-imx/Kconfig      |    3 ---
->> >>  arch/arm/mach-realview/Kconfig |    1 -
->> >
->> > I cannot take mach-realview changes.  I think you need to ether split
->> > the changes, or ask arm-soc folks to apply.  In case of the latter, here
->> > is my ACK:
->> >
->> > Acked-by: Shawn Guo <shawnguo@kernel.org>
->>
->> Thanks!
->>
->> RealView is not mentioned under MAINTAINERS, so it'd be easier if
->> arm-soc team pick this patch.
->>
->> Arnd, what is your preference?
->
-> Linus Walleij is the person that has sent most patches for realview,
-> so I'll let him decide. We can pick it up directly, or he can
-> aggregate it with other patches that he might have.
+This series was initially sent to add support for two PCIe
+ports in dra7. This included selecting PCI_DOMAINS config
+in SOC_DRA7XX.
 
-I have queued this with a bunch of other RealView clean-ups and board
-file removal patches and will send a pull request for it shortly.
+However from the review, PCI_DOMAINS can instead be selected
+from ARCH_MULTIPLATFORM. This is fixed in this series along
+with removing PCI_DOMAINS from other configs.
 
-Yours,
-Linus Walleij
+Since this series was initially sent to add support for
+two PCIe ports in dra7, it has been tested to see if there
+are regressions with 1 PCIe port. Though testing of 2 PCIe ports
+is not done while sending this patch series, it has been verified
+before in few of the customer boards.
+
+Changes from v2:
+*) v2 removed MIGHT_HAVE_PCI from platforms that are not
+   ARCH_MULTIPLATFORM. Fixed it in this version
+
+Changes from v1:
+*) select PCI_DOMAINS config from ARCH_MULTIPLATFORM
+*) Fix *MIGHT_HAVE_PCI* config from being selected redundantly
+
+Kishon Vijay Abraham I (3):
+  ARM: dts: DRA7: Add "linux,pci-domain" property for pci dt nodes
+  ARM: Fix *MIGHT_HAVE_PCI* config from being selected redundantly
+  ARM: select PCI_DOMAINS config from ARCH_MULTIPLATFORM
+
+ arch/arm/Kconfig                 |    1 +
+ arch/arm/boot/dts/dra7.dtsi      |    2 ++
+ arch/arm/mach-at91/Kconfig       |    1 -
+ arch/arm/mach-axxia/Kconfig      |    2 --
+ arch/arm/mach-cns3xxx/Kconfig    |    1 -
+ arch/arm/mach-exynos/Kconfig     |    2 --
+ arch/arm/mach-imx/Kconfig        |    2 --
+ arch/arm/mach-integrator/Kconfig |    1 -
+ arch/arm/mach-keystone/Kconfig   |    2 --
+ arch/arm/mach-shmobile/Kconfig   |    1 -
+ arch/arm/mach-spear/Kconfig      |    1 -
+ arch/arm/mach-versatile/Kconfig  |    1 -
+ 12 files changed, 3 insertions(+), 14 deletions(-)
+
+-- 
+1.7.9.5
