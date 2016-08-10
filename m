@@ -1,67 +1,57 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 10 Aug 2016 10:52:12 +0200
-Subject: [PATCH] ARM: defconfig: update the Integrator defconfig
-Message-ID: <1470819132-27804-1-git-send-email-linus.walleij@linaro.org>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Wed, 10 Aug 2016 10:52:54 +0200
+Subject: [PATCH] ARM: Add missing newline terminators to kernel messages
+Message-ID: <1470819174-9543-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Integrators defconfig have changed due to changes in
-Kconfig for the CPU types, they use the physmap OF NOR
-driver and syscon for LEDs.
-
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
-ARM SoC folks: please apply this directly to wherever
-defconfig updates go.
----
- arch/arm/configs/integrator_defconfig | 13 +++----------
- 1 file changed, 3 insertions(+), 10 deletions(-)
+Before commit 874f9c7da9a4acbc ("printk: create pr_<level> functions"),
+pr_*() calls without a trailing newline characters would be printed with
+a newline character appended, both on the console and in the output of
+the dmesg command.
 
-diff --git a/arch/arm/configs/integrator_defconfig b/arch/arm/configs/integrator_defconfig
-index 71f14675d009..869faae67201 100644
---- a/arch/arm/configs/integrator_defconfig
-+++ b/arch/arm/configs/integrator_defconfig
-@@ -13,15 +13,8 @@ CONFIG_ARCH_MULTI_V5=y
- # CONFIG_ARCH_MULTI_V7 is not set
- CONFIG_ARCH_INTEGRATOR=y
- CONFIG_ARCH_INTEGRATOR_AP=y
--CONFIG_ARCH_INTEGRATOR_CP=y
- CONFIG_INTEGRATOR_IMPD1=y
--CONFIG_CPU_ARM720T=y
--CONFIG_CPU_ARM920T=y
--CONFIG_CPU_ARM922T=y
--CONFIG_CPU_ARM926T=y
--CONFIG_CPU_ARM1020=y
--CONFIG_CPU_ARM1022=y
--CONFIG_CPU_ARM1026=y
-+CONFIG_ARCH_INTEGRATOR_CP=y
- CONFIG_PCI=y
- CONFIG_PREEMPT=y
- CONFIG_AEABI=y
-@@ -33,7 +26,6 @@ CONFIG_CPU_FREQ=y
- CONFIG_CPU_FREQ_GOV_POWERSAVE=y
- CONFIG_CPU_FREQ_GOV_USERSPACE=y
- CONFIG_CPU_FREQ_GOV_ONDEMAND=y
--CONFIG_FPE_NWFPE=y
- CONFIG_NET=y
- CONFIG_PACKET=y
- CONFIG_UNIX=y
-@@ -51,7 +43,7 @@ CONFIG_MTD_CFI=y
- CONFIG_MTD_CFI_ADV_OPTIONS=y
- CONFIG_MTD_CFI_INTELEXT=y
- CONFIG_MTD_PHYSMAP=y
--CONFIG_PROC_DEVICETREE=y
-+CONFIG_MTD_PHYSMAP_OF=y
- CONFIG_BLK_DEV_LOOP=y
- CONFIG_BLK_DEV_RAM=y
- CONFIG_BLK_DEV_RAM_SIZE=8192
-@@ -71,6 +63,7 @@ CONFIG_MMC=y
- CONFIG_MMC_ARMMMCI=y
- CONFIG_NEW_LEDS=y
- CONFIG_LEDS_CLASS=y
-+CONFIG_LEDS_SYSCON=y
- CONFIG_LEDS_TRIGGERS=y
- CONFIG_LEDS_TRIGGER_HEARTBEAT=y
- CONFIG_LEDS_TRIGGER_CPU=y
+After that commit, no new line character is appended, and the output of
+the next pr_*() call of the same type may be appended, like in:
+
+    - Truncating RAM at 0x0000000040000000-0x00000000c0000000 to -0x0000000070000000
+    - Ignoring RAM at 0x0000000200000000-0x0000000240000000 (!CONFIG_HIGHMEM)
+    + Truncating RAM at 0x0000000040000000-0x00000000c0000000 to -0x0000000070000000Ignoring RAM at 0x0000000200000000-0x0000000240000000 (!CONFIG_HIGHMEM)
+
+While this commit has been reverted in commit a0cba2179ea4c182 ("Revert
+"printk: create pr_<level> functions""), it's still good practice to
+terminate kernel messages with newlines.
+---
+ arch/arm/kernel/atags_proc.c | 2 +-
+ arch/arm/mm/mmu.c            | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/kernel/atags_proc.c b/arch/arm/kernel/atags_proc.c
+index 5a3379055f553167..d7af7b84a4ca32c5 100644
+--- a/arch/arm/kernel/atags_proc.c
++++ b/arch/arm/kernel/atags_proc.c
+@@ -41,7 +41,7 @@ static int __init init_atags_procfs(void)
+ 	size_t size;
+ 
+ 	if (tag->hdr.tag != ATAG_CORE) {
+-		pr_info("No ATAGs?");
++		pr_info("No ATAGs?\n");
+ 		return -EINVAL;
+ 	}
+ 
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index 62f4d01941f718bf..dd3d184337d525ff 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -1183,7 +1183,7 @@ void __init sanity_check_meminfo(void)
+ 			if (reg->size > size_limit) {
+ 				phys_addr_t overlap_size = reg->size - size_limit;
+ 
+-				pr_notice("Truncating RAM at %pa-%pa to -%pa",
++				pr_notice("Truncating RAM at %pa-%pa to -%pa\n",
+ 					  &block_start, &block_end, &vmalloc_limit);
+ 				memblock_remove(vmalloc_limit, overlap_size);
+ 				block_end = vmalloc_limit;
 -- 
-2.7.4
+1.9.1
