@@ -1,41 +1,36 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Wed, 10 Aug 2016 23:07:10 +0530
-Subject: [PATCHv9 0/6] dmaengine: rcar-dmac: add iommu support for slave
- transfers
-In-Reply-To: <20160810112219.17964-1-niklas.soderlund+renesas@ragnatech.se>
-References: <20160810112219.17964-1-niklas.soderlund+renesas@ragnatech.se>
-Message-ID: <20160810173710.GK9681@localhost>
+From: shuahkh@osg.samsung.com (Shuah Khan)
+Date: Wed, 10 Aug 2016 11:30:36 -0600
+Subject: [PATCH] exynos-drm: Fix error messages to print flags and size
+Message-ID: <1470850236-9101-1-git-send-email-shuahkh@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 10, 2016 at 01:22:13PM +0200, Niklas S?derlund wrote:
-> Hi,
-> 
-> This series tries to solve the problem with DMA with device registers
-> (MMIO registers) that are behind an IOMMU for the rcar-dmac driver. A
-> recent patch '9575632 (dmaengine: make slave address physical)'
-> clarifies that DMA slave address provided by clients is the physical
-> address. This puts the task of mapping the DMA slave address from a
-> phys_addr_t to a dma_addr_t on the DMA engine.
-> 
-> Without an IOMMU this is easy since the phys_addr_t and dma_addr_t are
-> the same and no special care is needed. However if you have a IOMMU you
-> need to map the DMA slave phys_addr_t to a dma_addr_t using something
-> like this.
-> 
-> This series is based on top of v4.8-rc1. And I'm hoping to be able to collect a
-> Ack from Russell King on patch 4/6 that adds the ARM specific part and then be
-> able to take the whole series through the dmaengine tree. If this is not the
-> best route I'm more then happy to do it another way.
-> 
-> It's tested on a Koelsch with CONFIG_IPMMU_VMSA and by enabling the
-> ipmmu_ds node in r8a7791.dtsi. I verified operation by interacting with
-> /dev/mmcblk1, i2c and the serial console which are devices behind the
-> iommu.
+Fix exynos_drm_gem_create() error messages to include flags and size when
+flags and size are invalid.
 
-As I said in last one, the dmaengine parts look fine to me. But to go thru
-dmaengine tree I would need ACK on non dmaengine patches.
+Signed-off-by: Shuah Khan <shuahkh@osg.samsung.com>
+---
+ drivers/gpu/drm/exynos/exynos_drm_gem.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-
+diff --git a/drivers/gpu/drm/exynos/exynos_drm_gem.c b/drivers/gpu/drm/exynos/exynos_drm_gem.c
+index cdf9f1a..4c4cb0e 100644
+--- a/drivers/gpu/drm/exynos/exynos_drm_gem.c
++++ b/drivers/gpu/drm/exynos/exynos_drm_gem.c
+@@ -231,12 +231,12 @@ struct exynos_drm_gem *exynos_drm_gem_create(struct drm_device *dev,
+ 	int ret;
+ 
+ 	if (flags & ~(EXYNOS_BO_MASK)) {
+-		DRM_ERROR("invalid flags.\n");
++		DRM_ERROR("invalid GEM buffer flags: %u\n", flags);
+ 		return ERR_PTR(-EINVAL);
+ 	}
+ 
+ 	if (!size) {
+-		DRM_ERROR("invalid size.\n");
++		DRM_ERROR("invalid GEM buffer size: %lu\n", size);
+ 		return ERR_PTR(-EINVAL);
+ 	}
+ 
 -- 
-~Vinod
+2.7.4
