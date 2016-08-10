@@ -1,87 +1,45 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 10 Aug 2016 16:57:02 -0500
-Subject: [RFC PATCH 2/5] DT: mailbox: add binding doc for the ARM SMC
- mailbox
-In-Reply-To: <20160809115303.17032-3-andre.przywara@arm.com>
-References: <20160809115303.17032-1-andre.przywara@arm.com>
- <20160809115303.17032-3-andre.przywara@arm.com>
-Message-ID: <20160810215702.GA16450@rob-hp-laptop>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 10 Aug 2016 23:54:11 +0200
+Subject: [PATCH 5/9] drm/mediatek: add ARM_SMCCC dependency
+In-Reply-To: <20160810215424.1926658-1-arnd@arndb.de>
+References: <20160810215424.1926658-1-arnd@arndb.de>
+Message-ID: <20160810215424.1926658-6-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 09, 2016 at 12:53:00PM +0100, Andre Przywara wrote:
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> ---
->  .../devicetree/bindings/mailbox/arm-smc.txt        | 53 ++++++++++++++++++++++
->  1 file changed, 53 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mailbox/arm-smc.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/mailbox/arm-smc.txt b/Documentation/devicetree/bindings/mailbox/arm-smc.txt
-> new file mode 100644
-> index 0000000..9919a12
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mailbox/arm-smc.txt
-> @@ -0,0 +1,53 @@
-> +ARM SMC Mailbox Driver
-> +======================
-> +
-> +This mailbox driver uses the ARM smc (secure monitor call) instruction to
-> +trigger a mailbox-connected activity in firmware running on the very same
-> +core as the caller. By nature this operation is synchronous and this
-> +driver provides no way for asynchronous messages to be delivered the other
-> +way round, from firmware to the OS. However the value of r0/w0 the firmware
-> +returns after the smc call is delivered as a received message to the
-> +mailbox framework, so a synchronous communication can be established.
+ARM SMCCC is only set for ARMv7 and ARMv8 CPUs, but we currently
+allow the driver to be build for older architecture levels as
+well, which results in a link failure:
 
-Clever
+drivers/gpu/built-in.o: In function `mtk_hdmi_hw_make_reg_writable':
+:(.text+0x1e737c): undefined reference to `arm_smccc_smc'
 
-> +
-> +One usecase of this mailbox is the SCP interface, which uses shared memory
-> +to transfer commands and parameters and mailboxes to trigger a function
-> +call. This driver allows SoC without a separate management processor (or
-> +when such a processor is not available or used) to use this standardized
-> +interface anyway.
-> +
-> +The driver requires no special hardware, any core which supports the SMC
-> +instruction can be used. This requires firmware in monitor mode/EL3 to
-> +handle the mailbox message.
-> +
-> +Mailbox Device Node:
-> +====================
-> +
-> +Required properties:
-> +--------------------
-> +- compatible:		Shall be "arm,smc-mbox"
-> +- #mbox-cells		Shall be 1 - the index of the channel needed.
-> +- identifiers		An array of 32-bit values specifying the function
+This adds a Kconfig dependency. The patch applies on my two
+previous fixes that are not yet applied, so please apply all
+three to get randconfig builds to work correctly.
 
-Minimally, needs 'arm' prefix. 'identifiers' is pretty vague. Perhaps 
-'arm,smc-func-ids' to say exactly what they are.
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: 8f83f26891e1 ("drm/mediatek: Add HDMI support")
+Reviewed-by: Matthias Brugger <matthias.bgg@gmail.com>
+---
+Sent first on June 27 when it first broke in linux-next.
+Two other dependencies were already missing, so I'm sending
+all three patches again now.
+---
+ drivers/gpu/drm/mediatek/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-> +			IDs used by each mailbox channel. Those function IDs
-> +			follow the ARM SMC calling convention standard [1].
-> +			There is one identifier per channel and the number
-> +			of supported channels is determined by the length
-> +			of this array.
-> +
-> +Example:
-> +--------
-> +
-> +	mailbox: smc_mbox {
-> +		#mbox-cells = <1>;
-> +		compatible = "arm,smc-mbox";
-> +		identifiers = <0x82000001 0x82000002>;
-> +	};
-> +
-> +	scpi {
-> +		compatible = "arm,scpi";
-> +		mboxes = <&mailbox 0>;
-> +		shmem = <&cpu_scp_shmem>;
-> +	};
-> +
-> +
-> +[1]
-> +http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.den0028a/index.html
-> -- 
-> 2.9.0
-> 
+diff --git a/drivers/gpu/drm/mediatek/Kconfig b/drivers/gpu/drm/mediatek/Kconfig
+index 96ebf8bb6024..294de4549922 100644
+--- a/drivers/gpu/drm/mediatek/Kconfig
++++ b/drivers/gpu/drm/mediatek/Kconfig
+@@ -3,6 +3,7 @@ config DRM_MEDIATEK
+ 	depends on DRM
+ 	depends on ARCH_MEDIATEK || (ARM && COMPILE_TEST)
+ 	depends on COMMON_CLK
++	depends on HAVE_ARM_SMCCC
+ 	depends on OF
+ 	select DRM_GEM_CMA_HELPER
+ 	select DRM_KMS_HELPER
+-- 
+2.9.0
