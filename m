@@ -1,33 +1,126 @@
 From: kbeldan@baylibre.com (Karl Beldan)
-Date: Wed, 10 Aug 2016 11:00:30 +0000
-Subject: [PATCH v2 2/4] ARM: davinci_all_defconfig: Enable AEMIF as a module
+Date: Wed, 10 Aug 2016 11:00:31 +0000
+Subject: [PATCH v2 3/4] ARM: dts: da850,
+ da850-evm: Add an aemif node and use it for the NAND
 In-Reply-To: <20160810110032.29295-1-kbeldan@baylibre.com>
 References: <20160810110032.29295-1-kbeldan@baylibre.com>
-Message-ID: <20160810110032.29295-3-kbeldan@baylibre.com>
+Message-ID: <20160810110032.29295-4-kbeldan@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This enables the use of the memory/ti-aemif.c driver.
-ATM most davinci boards use the mach-davinci aemif code which gets in
-the way of genericity and proper DT boot.
+Currently the davinci da8xx boards use the mach-davinci aemif code.
+Instantiating an aemif node into the DT allows to use the ti-aemif
+memory driver and is another step to better DT support.
+This change adds an aemif node in the dtsi while retiring the nand_cs3
+node. The NAND is now instantiated in the dts as a subnode of the aemif
+one along with its pins.
 
 Signed-off-by: Karl Beldan <kbeldan@baylibre.com>
 ---
- arch/arm/configs/davinci_all_defconfig | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/boot/dts/da850-evm.dts | 49 ++++++++++++++++++++++++++++++++++++-----
+ arch/arm/boot/dts/da850.dtsi    | 19 +++++++---------
+ 2 files changed, 52 insertions(+), 16 deletions(-)
 
-diff --git a/arch/arm/configs/davinci_all_defconfig b/arch/arm/configs/davinci_all_defconfig
-index d037d3d..2802897 100644
---- a/arch/arm/configs/davinci_all_defconfig
-+++ b/arch/arm/configs/davinci_all_defconfig
-@@ -192,6 +192,8 @@ CONFIG_RTC_CLASS=y
- CONFIG_RTC_DRV_OMAP=m
- CONFIG_DMADEVICES=y
- CONFIG_TI_EDMA=y
-+CONFIG_MEMORY=y
-+CONFIG_TI_AEMIF=m
- CONFIG_EXT2_FS=y
- CONFIG_EXT3_FS=y
- CONFIG_XFS_FS=m
+diff --git a/arch/arm/boot/dts/da850-evm.dts b/arch/arm/boot/dts/da850-evm.dts
+index 1a15db8..eedcc59 100644
+--- a/arch/arm/boot/dts/da850-evm.dts
++++ b/arch/arm/boot/dts/da850-evm.dts
+@@ -29,6 +29,20 @@
+ 					0x04 0x00011000 0x000ff000
+ 				>;
+ 			};
++			nand_pins: nand_pins {
++				pinctrl-single,bits = <
++					/* EMA_WAIT[0], EMA_OE, EMA_WE, EMA_CS[4], EMA_CS[3] */
++					0x1c 0x10110110  0xf0ff0ff0
++					/*
++					 * EMA_D[0], EMA_D[1], EMA_D[2],
++					 * EMA_D[3], EMA_D[4], EMA_D[5],
++					 * EMA_D[6], EMA_D[7]
++					 */
++					0x24 0x11111111  0xffffffff
++					/* EMA_A[1], EMA_A[2] */
++					0x30 0x01100000  0x0ff00000
++				>;
++			};
+ 		};
+ 		serial0: serial at 42000 {
+ 			status = "okay";
+@@ -131,11 +145,6 @@
+ 			status = "okay";
+ 		};
+ 	};
+-	nand_cs3 at 62000000 {
+-		status = "okay";
+-		pinctrl-names = "default";
+-		pinctrl-0 = <&nand_cs3_pins>;
+-	};
+ 	vbat: fixedregulator at 0 {
+ 		compatible = "regulator-fixed";
+ 		regulator-name = "vbat";
+@@ -250,3 +259,33 @@
+ &edma1 {
+ 	ti,edma-reserved-slot-ranges = <32 90>;
+ };
++
++&aemif {
++	pinctrl-names = "default";
++	pinctrl-0 = <&nand_pins>;
++	status = "ok";
++	cs3 {
++		#address-cells = <2>;
++		#size-cells = <1>;
++		clock-ranges;
++		ranges;
++
++		ti,cs-chipselect = <3>;
++
++		nand at 2000000,0 {
++			compatible = "ti,davinci-nand";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			reg = <0 0x02000000 0x02000000
++			       1 0x00000000 0x00008000>;
++
++			ti,davinci-chipselect = <1>;
++			ti,davinci-mask-ale = <0>;
++			ti,davinci-mask-cle = <0>;
++			ti,davinci-mask-chipsel = <0>;
++			ti,davinci-ecc-mode = "hw";
++			ti,davinci-ecc-bits = <4>;
++			ti,davinci-nand-use-bbt;
++		};
++	};
++};
+diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
+index bc10e7e..e73fd64 100644
+--- a/arch/arm/boot/dts/da850.dtsi
++++ b/arch/arm/boot/dts/da850.dtsi
+@@ -411,17 +411,14 @@
+ 			dma-names = "tx", "rx";
+ 		};
+ 	};
+-	nand_cs3 at 62000000 {
+-		compatible = "ti,davinci-nand";
+-		reg = <0x62000000 0x807ff
+-		       0x68000000 0x8000>;
+-		ti,davinci-chipselect = <1>;
+-		ti,davinci-mask-ale = <0>;
+-		ti,davinci-mask-cle = <0>;
+-		ti,davinci-mask-chipsel = <0>;
+-		ti,davinci-ecc-mode = "hw";
+-		ti,davinci-ecc-bits = <4>;
+-		ti,davinci-nand-use-bbt;
++	aemif: aemif at 68000000 {
++		compatible = "ti,da850-aemif";
++		#address-cells = <2>;
++		#size-cells = <1>;
++
++		reg = <0x68000000 0x00008000>;
++		ranges = <0 0 0x60000000 0x08000000
++			  1 0 0x68000000 0x00008000>;
+ 		status = "disabled";
+ 	};
+ };
 -- 
 2.9.2
