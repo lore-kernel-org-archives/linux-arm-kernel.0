@@ -1,29 +1,124 @@
-From: peter.chen@nxp.com (Peter Chen)
-Date: Wed, 10 Aug 2016 01:24:30 +0000
-Subject: [PATCH 1/1] ARM: mach-imx: pm-imx6: add missing
- BM_CLPCR_BYP_MMDC_CH0_LPM_HS setting for imx6ul
-In-Reply-To: <CAOMZO5AEHQjzP7=pTK3b2J+BSzcdXm=7aPNuv_sf0_8j8EAyJg@mail.gmail.com>
-References: <1470731083-26213-1-git-send-email-peter.chen@nxp.com>
- <CAOMZO5AEHQjzP7=pTK3b2J+BSzcdXm=7aPNuv_sf0_8j8EAyJg@mail.gmail.com>
-Message-ID: <HE1PR04MB1450F448E7C5FC7F3575694A8B1D0@HE1PR04MB1450.eurprd04.prod.outlook.com>
+From: labbott@redhat.com (Laura Abbott)
+Date: Tue,  9 Aug 2016 18:25:26 -0700
+Subject: [PATCHv5] arm64: Handle el1 synchronous instruction aborts cleanly
+Message-ID: <1470792326-565-1-git-send-email-labbott@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+
+Executing from a non-executable area gives an ugly message:
+
+lkdtm: Performing direct entry EXEC_RODATA
+lkdtm: attempting ok execution at ffff0000084c0e08
+lkdtm: attempting bad execution at ffff000008880700
+Bad mode in Synchronous Abort handler detected on CPU2, code 0x8400000e -- IABT (current EL)
+CPU: 2 PID: 998 Comm: sh Not tainted 4.7.0-rc2+ #13
+Hardware name: linux,dummy-virt (DT)
+task: ffff800077e35780 ti: ffff800077970000 task.ti: ffff800077970000
+PC is at lkdtm_rodata_do_nothing+0x0/0x8
+LR is at execute_location+0x74/0x88
+
+The 'IABT (current EL)' indicates the error but it's a bit cryptic
+without knowledge of the ARM ARM. There is also no indication of the
+specific address which triggered the fault. The increase in kernel
+page permissions makes hitting this case more likely as well.
+Handling the case in the vectors gives a much more familiar looking
+error message:
+
+lkdtm: Performing direct entry EXEC_RODATA
+lkdtm: attempting ok execution at ffff0000084c0840
+lkdtm: attempting bad execution at ffff000008880680
+Unable to handle kernel paging request at virtual address ffff000008880680
+pgd = ffff8000089b2000
+[ffff000008880680] *pgd=00000000489b4003, *pud=0000000048904003, *pmd=0000000000000000
+Internal error: Oops: 8400000e [#1] PREEMPT SMP
+Modules linked in:
+CPU: 1 PID: 997 Comm: sh Not tainted 4.7.0-rc1+ #24
+Hardware name: linux,dummy-virt (DT)
+task: ffff800077f9f080 ti: ffff800008a1c000 task.ti: ffff800008a1c000
+PC is at lkdtm_rodata_do_nothing+0x0/0x8
+LR is at execute_location+0x74/0x88
+
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Laura Abbott <labbott@redhat.com>
+---
+v5: Fall through to data abort case since the code is now the same
+---
+ arch/arm64/kernel/entry.S |  7 +++++++
+ arch/arm64/mm/fault.c     | 14 ++++++++++++--
+ 2 files changed, 19 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index 96e4a2b..441420c 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -353,6 +353,8 @@ el1_sync:
+ 	lsr	x24, x1, #ESR_ELx_EC_SHIFT	// exception class
+ 	cmp	x24, #ESR_ELx_EC_DABT_CUR	// data abort in EL1
+ 	b.eq	el1_da
++	cmp	x24, #ESR_ELx_EC_IABT_CUR	// instruction abort in EL1
++	b.eq	el1_ia
+ 	cmp	x24, #ESR_ELx_EC_SYS64		// configurable trap
+ 	b.eq	el1_undef
+ 	cmp	x24, #ESR_ELx_EC_SP_ALIGN	// stack alignment exception
+@@ -364,6 +366,11 @@ el1_sync:
+ 	cmp	x24, #ESR_ELx_EC_BREAKPT_CUR	// debug exception in EL1
+ 	b.ge	el1_dbg
+ 	b	el1_inv
++
++el1_ia:
++	/*
++	 * Fall through to the Data abort case
++	 */
+ el1_da:
+ 	/*
+ 	 * Data abort handling
+diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+index c8beaa0..05d2bd7 100644
+--- a/arch/arm64/mm/fault.c
++++ b/arch/arm64/mm/fault.c
+@@ -153,6 +153,11 @@ int ptep_set_access_flags(struct vm_area_struct *vma,
+ }
+ #endif
  
->
->On Tue, Aug 9, 2016 at 5:24 AM, Peter Chen <peter.chen@nxp.com> wrote:
->> There is a missing BM_CLPCR_BYP_MMDC_CH0_LPM_HS setting for imx6ul,
->> without it, the "standby" mode can't work well, the system can't be
->> resumed.
->>
->> With this commit, the "standby" mode works well.
->
->Have you tested 'echo mem > /sys/power/state' as well?
->
->On my tests it does a reboot rather than going to suspend.
->
-
-It is another issue, current both 6sx and 6ul can't work for mem mode.
-But I just can't wake up system, reboot is not observed.
-
-Peter
++static bool is_el1_instruction_abort(unsigned int esr)
++{
++	return ESR_ELx_EC(esr) == ESR_ELx_EC_IABT_CUR;
++}
++
+ /*
+  * The kernel tried to access some page that wasn't present.
+  */
+@@ -161,8 +166,9 @@ static void __do_kernel_fault(struct mm_struct *mm, unsigned long addr,
+ {
+ 	/*
+ 	 * Are we prepared to handle this kernel fault?
++	 * We are almost certainly not prepared to handle instruction faults.
+ 	 */
+-	if (fixup_exception(regs))
++	if (!is_el1_instruction_abort(esr) && fixup_exception(regs))
+ 		return;
+ 
+ 	/*
+@@ -267,7 +273,8 @@ static inline bool is_permission_fault(unsigned int esr)
+ 	unsigned int ec       = ESR_ELx_EC(esr);
+ 	unsigned int fsc_type = esr & ESR_ELx_FSC_TYPE;
+ 
+-	return (ec == ESR_ELx_EC_DABT_CUR && fsc_type == ESR_ELx_FSC_PERM);
++	return (ec == ESR_ELx_EC_DABT_CUR && fsc_type == ESR_ELx_FSC_PERM) ||
++	       (ec == ESR_ELx_EC_IABT_CUR && fsc_type == ESR_ELx_FSC_PERM);
+ }
+ 
+ static bool is_el0_instruction_abort(unsigned int esr)
+@@ -312,6 +319,9 @@ static int __kprobes do_page_fault(unsigned long addr, unsigned int esr,
+ 		if (regs->orig_addr_limit == KERNEL_DS)
+ 			die("Accessing user space memory with fs=KERNEL_DS", regs, esr);
+ 
++		if (is_el1_instruction_abort(esr))
++			die("Attempting to execute userspace memory", regs, esr);
++
+ 		if (!search_exception_tables(regs->pc))
+ 			die("Accessing user space memory outside uaccess.h routines", regs, esr);
+ 	}
+-- 
+2.7.4
