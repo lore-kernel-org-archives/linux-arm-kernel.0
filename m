@@ -1,47 +1,48 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 10 Aug 2016 12:47:21 +0200
+Date: Wed, 10 Aug 2016 12:49:14 +0200
 Subject: [PATCH] ARM: cpuidle: declare cpuidle_ops __read_mostly
-In-Reply-To: <20160810171926.44557e35@xhacker>
+In-Reply-To: <20160810175403.53e218cf@xhacker>
 References: <1470818997-808-1-git-send-email-jszhang@marvell.com>
- <2118361.tr3K3hSZxF@wuerfel> <20160810171926.44557e35@xhacker>
-Message-ID: <8191851.HcPOqTYLq8@wuerfel>
+ <20160810175403.53e218cf@xhacker>
+Message-ID: <2742913.yoAdrazplg@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, August 10, 2016 5:19:26 PM CEST Jisheng Zhang wrote:
-> Dear Arnd,
+On Wednesday, August 10, 2016 5:54:03 PM CEST Jisheng Zhang wrote:
+> On Wed, 10 Aug 2016 16:49:57 +0800 Jisheng Zhang wrote:
 > 
-> On Wed, 10 Aug 2016 10:57:57 +0200 Arnd Bergmann wrote:
-> 
-> > On Wednesday, August 10, 2016 4:49:57 PM CEST Jisheng Zhang wrote:
-> > > diff --git a/arch/arm/kernel/cpuidle.c b/arch/arm/kernel/cpuidle.c
-> > > index 7dccc96..762e0929 100644
-> > > --- a/arch/arm/kernel/cpuidle.c
-> > > +++ b/arch/arm/kernel/cpuidle.c
-> > > @@ -19,7 +19,7 @@ extern struct of_cpuidle_method __cpuidle_method_of_table[];
-> > >  static const struct of_cpuidle_method __cpuidle_method_of_table_sentinel
-> > >         __used __section(__cpuidle_method_of_table_end);
-> > >  
-> > > -static struct cpuidle_ops cpuidle_ops[NR_CPUS];
-> > > +static struct cpuidle_ops cpuidle_ops[NR_CPUS] __read_mostly;  
+> > cpuidle_ops is initialized once by arm_cpuidle_read_ops() during
+> > initialization, and thereafter is mostly read in arm_cpuidle_suspend()
 > > 
-> > Should this perhaps be percpu data instead?
+> > The fact that it is mostly read and not written to makes it candidates
+> > for __read_mostly declarations.
 > > 
+> > Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+> > ---
+> >  arch/arm/kernel/cpuidle.c | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > 
+> > diff --git a/arch/arm/kernel/cpuidle.c b/arch/arm/kernel/cpuidle.c
+> > index 7dccc96..762e0929 100644
+> > --- a/arch/arm/kernel/cpuidle.c
+> > +++ b/arch/arm/kernel/cpuidle.c
+> > @@ -19,7 +19,7 @@ extern struct of_cpuidle_method __cpuidle_method_of_table[];
+> >  static const struct of_cpuidle_method __cpuidle_method_of_table_sentinel
+> >       __used __section(__cpuidle_method_of_table_end);
+> >  
+> > -static struct cpuidle_ops cpuidle_ops[NR_CPUS];
+> > +static struct cpuidle_ops cpuidle_ops[NR_CPUS] __read_mostly;
 > 
-> Per my understanding, percpu is used for those vars with normal read/write
-> frequency, while the cpuidle_ops is read mostly, so IMHO, __read_mostly
-> is suitable, what do you think?
+> 
+> oops, I just found that "arm: apply more __ro_after_init" from Kees
+> marked cpuidle_ops as __ro_after_init, that also meet my need, so
+> let's drop my patch.
+> 
+> 
 
-You are right, __read_mostly is better than the normal .data section here,
-but percpu is also better than .data because it saves a little memory
-on machines that have few present CPUs than CONFIG_NR_CPUS.
+Ok, just saw this reply and that matches up with what I just
+wrote as well.
 
-So both have their advantages, we just need to pick a preference.
-
-Actually __ro_after_init would be even better than __read_mostly here
-I think, as this is only updated in an __init function. I guess
-using that would have the added security advantage of preventing
-an attacker from writing to the function pointers when they
-find a way to overflow an access in the percpu data section.
+Thanks,
 
 	Arnd
