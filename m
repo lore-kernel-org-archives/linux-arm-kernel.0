@@ -1,30 +1,37 @@
 From: guohanjun@huawei.com (Hanjun Guo)
-Date: Wed, 10 Aug 2016 09:56:49 +0800
-Subject: [PATCH v5 00/14] fix some type infos and bugs for arm64/of numa
-In-Reply-To: <1470647899-6324-1-git-send-email-thunder.leizhen@huawei.com>
+Date: Wed, 10 Aug 2016 10:12:43 +0800
+Subject: [PATCH v5 03/14] arm64/numa: add nid check for memory block
+In-Reply-To: <1470647899-6324-4-git-send-email-thunder.leizhen@huawei.com>
 References: <1470647899-6324-1-git-send-email-thunder.leizhen@huawei.com>
-Message-ID: <57AA89E1.6050103@huawei.com>
+ <1470647899-6324-4-git-send-email-thunder.leizhen@huawei.com>
+Message-ID: <57AA8D9B.7010102@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Zhen,
-
 On 2016/8/8 17:18, Zhen Lei wrote:
-> v4 -> v5:
-> This version has no code changes, just add "Acked-by: Rob Herring <robh@kernel.org>"
-> into patches 1, 2, 4, 6, 7, 13, 14. Because these patches rely on some acpi numa
-> patches, and the latter had not been upstreamed in 4.7, but upstreamed in 4.8-rc1,
-> so I resend my patches again.
+> Use the same tactic to cpu and numa-distance nodes.
+>
+> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
+> ---
+>  arch/arm64/mm/numa.c | 5 +++++
+>  1 file changed, 5 insertions(+)
+>
+> diff --git a/arch/arm64/mm/numa.c b/arch/arm64/mm/numa.c
+> index c7fe3ec..2601660 100644
+> --- a/arch/arm64/mm/numa.c
+> +++ b/arch/arm64/mm/numa.c
+> @@ -141,6 +141,11 @@ int __init numa_add_memblk(int nid, u64 start, u64 end)
+>  {
+>  	int ret;
+>
+> +	if (nid >= MAX_NUMNODES) {
+> +		pr_warn("NUMA: Node id %u exceeds maximum value\n", nid);
+> +		return -EINVAL;
+> +	}
 
-I think we need to mention this patch set is rebased on top of 4,8-rc1, and
-
- - patch 1~5 are fixes which are targeting for 4.8.
-
- - patch 6~14 are cleanups and new features, which are targeting for 4.9, in detail,
-   - patch 6~8 are cleanups
-   - patch 9~14 are new features adding per cpu area and memory less node support.
-
-Catalin, do you think Zhen needs to separate this patch set into two and then resend?
+I think this check should be added to of_numa_parse_memory_nodes(), which before
+the numa_add_memblk() called, it's the same logic in of_numa_parse_cpu_nodes() and
+the node id is checked before calling numa_add_memblk() in ACPI.
 
 Thanks
 Hanjun
