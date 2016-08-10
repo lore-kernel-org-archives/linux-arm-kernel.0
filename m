@@ -1,145 +1,63 @@
-From: kbeldan@baylibre.com (Karl Beldan)
-Date: Wed, 10 Aug 2016 11:00:32 +0000
-Subject: [PATCH v2 4/4] ARM: dts: da850-lcdk: Add NAND to DT
-In-Reply-To: <20160810110032.29295-1-kbeldan@baylibre.com>
-References: <20160810110032.29295-1-kbeldan@baylibre.com>
-Message-ID: <20160810110032.29295-5-kbeldan@baylibre.com>
+From: fu.wei@linaro.org (Fu Wei)
+Date: Wed, 10 Aug 2016 19:01:05 +0800
+Subject: [PATCH v12] acpi, apei, arm64: APEI initial support for aarch64.
+In-Reply-To: <20160810104513.GB16664@nazgul.tnic>
+References: <1469782664-12611-1-git-send-email-fu.wei@linaro.org>
+ <20160804094838.GB8093@nazgul.tnic>
+ <CADyBb7ujfaXPP_CUB66_E53fY9MeEbt6EhOaCzf+hoDCGYD+dw@mail.gmail.com>
+ <20160810104513.GB16664@nazgul.tnic>
+Message-ID: <CADyBb7uW2-jh8UBLXZ03p1y9SMP7M3z6eULwV2DYhWXEqTm2Rw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds DT support for the NAND connected to the SoC AEMIF.
-The parameters (timings, ecc) are the same as what the board ships with
-(default AEMIF timings, 1bit ECC) and improvements will be handled in
-due course.
-This passed elementary tests hashing a 20MB file on top of ubifs on my
-LCDK.
+Hi Borislav,
 
-Signed-off-by: Karl Beldan <kbeldan@baylibre.com>
----
- arch/arm/boot/dts/da850-lcdk.dts | 107 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 107 insertions(+)
+On 10 August 2016 at 18:45, Borislav Petkov <bp@suse.de> wrote:
+> On Wed, Aug 10, 2016 at 06:40:53PM +0800, Fu Wei wrote:
+>> But the reason for a  separate hest_ia32_init() is:
+>> For now(ACPI 6.1), we have three IA-32 Architecture-specific error
+>> source structures, maybe we will parse them later.
+>> So I made this hest_ia32_init() for all these structures. maybe we can do :
+>
+> So I'd make it as simple as possible now and cross that bridge only when
+> we get there, i.e., only when you are adding support for those and not
+> earlier.
+>
 
-diff --git a/arch/arm/boot/dts/da850-lcdk.dts b/arch/arm/boot/dts/da850-lcdk.dts
-index dbcca0b..a3f9845 100644
---- a/arch/arm/boot/dts/da850-lcdk.dts
-+++ b/arch/arm/boot/dts/da850-lcdk.dts
-@@ -27,6 +27,27 @@
- 
- &pmx_core {
- 	status = "okay";
-+
-+	nand_pins: nand_pins {
-+		pinctrl-single,bits = <
-+			/* EMA_WAIT[0], EMA_OE, EMA_WE, EMA_CS[3] */
-+			0x1c 0x10110010  0xf0ff00f0
-+			/*
-+			 * EMA_D[0], EMA_D[1], EMA_D[2],
-+			 * EMA_D[3], EMA_D[4], EMA_D[5],
-+			 * EMA_D[6], EMA_D[7]
-+			 */
-+			0x24 0x11111111  0xffffffff
-+			/*
-+			 * EMA_D[8],  EMA_D[9],  EMA_D[10],
-+			 * EMA_D[11], EMA_D[12], EMA_D[13],
-+			 * EMA_D[14], EMA_D[15]
-+			 */
-+			0x20 0x11111111  0xffffffff
-+			/* EMA_A[1], EMA_A[2] */
-+			0x30 0x01100000  0x0ff00000
-+		>;
-+	};
- };
- 
- &serial2 {
-@@ -68,3 +89,89 @@
- 	cd-gpios = <&gpio 64 GPIO_ACTIVE_HIGH>;
- 	status = "okay";
- };
-+
-+&aemif {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&nand_pins>;
-+	status = "ok";
-+	cs3 {
-+		#address-cells = <2>;
-+		#size-cells = <1>;
-+		clock-ranges;
-+		ranges;
-+
-+		ti,cs-chipselect = <3>;
-+
-+		nand at 2000000,0 {
-+			compatible = "ti,davinci-nand";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			reg = <0 0x02000000 0x02000000
-+			       1 0x00000000 0x00008000>;
-+
-+			ti,davinci-chipselect = <1>;
-+			ti,davinci-mask-ale = <0>;
-+			ti,davinci-mask-cle = <0>;
-+			ti,davinci-mask-chipsel = <0>;
-+
-+			/*
-+			 * nand_ecc_strength_good will emit a warning
-+			 * but the LCDK ships with these settings [1].
-+			 * Also HW 4bits ECC with 16bits NAND seems to
-+			 * require some attention.
-+			 *
-+			 * ATM nand_davinci_probe handling of nand-ecc-*
-+			 * is broken, e.g.
-+			 * chip.ecc.strength = pdata->ecc_bits occurs after
-+			 * scan_ident(), otherwise I would have used:
-+			 * 	nand-ecc-mode = "hw";
-+			 * 	nand-ecc-strength = <1>;
-+			 * 	nand-ecc-step-size = <512>;
-+			 */
-+			ti,davinci-nand-buswidth = <16>;
-+			ti,davinci-ecc-mode = "hw";
-+			ti,davinci-ecc-bits = <1>;
-+			ti,davinci-nand-use-bbt;
-+
-+			/*
-+			 * LCDK original partitions:
-+			 * 0x000000000000-0x000000020000 : "u-boot env"
-+			 * 0x000000020000-0x0000000a0000 : "u-boot"
-+			 * 0x0000000a0000-0x0000002a0000 : "kernel"
-+			 * 0x0000002a0000-0x000020000000 : "filesystem"
-+			 *
-+			 * The 1st NAND block being guaranted to be valid w/o ECC (> 1k cycles),
-+			 * it makes a perfect candidate as an SPL for the BootROM to jump to.
-+			 * However the OMAP-L132/L138 Bootloader doc SPRAB41E reads:
-+			 * "To boot from NAND Flash, the AIS should be written to NAND block 1
-+			 * (NAND block 0 is not used by default)", which matches the LCDK
-+			 * original partitioning.
-+			 * Also, the LCDK ships with only the u-boot partition provisioned and
-+			 * boots on it in its default configuration while using the MMC for the
-+			 * kernel and rootfs, so preserve that one as is for now.
-+			 * [1]: Ensuring for example that U-Boot LCDK SPL can handle it properly
-+			 * and a proper boot chain ROM->SPL->U-Boot->Linux wrt ECC, would allow
-+			 * for a better partitioning.
-+			 */
-+			partitions {
-+				compatible = "fixed-partitions";
-+				#address-cells = <1>;
-+				#size-cells = <1>;
-+
-+				partition at 0 {
-+					label = "u-boot env";
-+					reg = <0 0x020000>;
-+				};
-+				partition at 0x020000 {
-+					/* The LCDK defaults to booting from this partition */
-+					label = "u-boot";
-+					reg = <0x020000 0x080000>;
-+				};
-+				partition at 0x0a0000 {
-+					label = "space";
-+					reg = <0x0a0000 0>;
-+				};
-+			};
-+		};
-+	};
-+};
+OK, got your point.
+Sorry for sending v13 before checking this with you.
+
+so I will do :
+
+@@ -232,8 +243,9 @@ void __init acpi_hest_init(void)
+  goto err;
+  }
+
+- if (!acpi_disable_cmcff)
+- apei_hest_parse(hest_parse_cmc, NULL);
++ rc =apei_hest_parse(hest_parse_cmc, NULL);
++ if (rc)
++ goto err;
+
+  if (!ghes_disable) {
+  rc = apei_hest_parse(hest_parse_ghes_count, &ghes_count);
+
+Do you have other suggestion? then I can post v14 to fix it :-)
+
+> --
+> Regards/Gruss,
+>     Boris.
+>
+> ECO tip #101: Trim your mails when you reply.
+>
+> SUSE Linux GmbH, GF: Felix Imend?rffer, Jane Smithard, Graham Norton, HRB 21284 (AG N?rnberg)
+> --
+
+
+
 -- 
-2.9.2
+Best regards,
+
+Fu Wei
+Software Engineer
+Red Hat
