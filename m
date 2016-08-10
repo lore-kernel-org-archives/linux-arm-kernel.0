@@ -1,154 +1,53 @@
-From: lina.iyer@linaro.org (Lina Iyer)
-Date: Wed, 10 Aug 2016 10:40:34 -0600
-Subject: [PATCH v3 02/15] dt/bindings: Update binding for PM domain idle
- states
-In-Reply-To: <99e35b6c-6698-6d27-f4d7-fa032796869e@arm.com>
-References: <1470351902-43103-1-git-send-email-lina.iyer@linaro.org>
- <1470351902-43103-3-git-send-email-lina.iyer@linaro.org>
- <99e35b6c-6698-6d27-f4d7-fa032796869e@arm.com>
-Message-ID: <20160810164034.GA1401@linaro.org>
+From: patrice.chotard@st.com (Patrice Chotard)
+Date: Wed, 10 Aug 2016 18:49:25 +0200
+Subject: [GIT PULL] STi defconfig updates for v4.9
+Message-ID: <e0cf33d1-0d96-9eed-1155-c9dc7f4de1b8@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sudeep,
+Hi Olof, Arnd and Kevin,
 
-On Wed, Aug 10 2016 at 09:15 -0600, Sudeep Holla wrote:
->Hi Lina,
->
->I have few concerns mainly due to the lack of description and not the 
->binding per say.
->
->On 05/08/16 00:04, Lina Iyer wrote:
->>From: Axel Haslam <ahaslam+renesas@baylibre.com>
->>
->>Update DT bindings to describe idle states of PM domains.
->>
->>Cc: <devicetree@vger.kernel.org>
->>Signed-off-by: Marc Titinger <mtitinger+renesas@baylibre.com>
->>Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
->>[Lina: Added state properties, removed state names, wakeup-latency,
->>added of_pm_genpd_init() API, pruned commit text]
->>Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
->>[Ulf: Moved around code to make it compile properly, rebased on top of multiple state support]
->>---
->> .../devicetree/bindings/power/power_domain.txt     | 57 ++++++++++++++++++++++
->> 1 file changed, 57 insertions(+)
->>
->>diff --git a/Documentation/devicetree/bindings/power/power_domain.txt b/Documentation/devicetree/bindings/power/power_domain.txt
->>index 025b5e7..4960486 100644
->>--- a/Documentation/devicetree/bindings/power/power_domain.txt
->>+++ b/Documentation/devicetree/bindings/power/power_domain.txt
->>@@ -29,6 +29,10 @@ Optional properties:
->>    specified by this binding. More details about power domain specifier are
->>    available in the next section.
->>
->>+- domain-idle-states : A phandle of an idle-state that shall be soaked into a
->>+                generic domain power state. The idle state definitions are
->>+                compatible with arm,idle-state specified in [1].
->>+
->
->So I assume these can be used for the genpd states. Either we rename 
->it domain-power-states or make it clear that these domain-idle-states 
->can also represent the power-states for normal devices.
->
-These are the domains' idle states. These states are only used when the
-domain goes into idle, not when the domain is active. These are not
-power states that the domain can operate on either. Hence the idle-state
-moniker.
-Also, the bindings to describe the state are the same as arm,idle-state.
-It made sense to call these domain idle states instead of
-domain-power-states.
+Please consider this first round of STi DT updates for v4.9:
 
->> Example:
->>
->> 	power: power-controller at 12340000 {
->>@@ -59,6 +63,57 @@ The nodes above define two power controllers: 'parent' and 'child'.
->> Domains created by the 'child' power controller are subdomains of '0' power
->> domain provided by the 'parent' power controller.
->>
->>+Example 3: ARM v7 style CPU PM domains (Linux domain controller)
->>+
->>+	cpus {
->>+		#address-cells = <1>;
->>+		#size-cells = <0>;
->>+
->>+		CPU0: cpu at 0 {
->>+			device_type = "cpu";
->>+			compatible = "arm,cortex-a7", "arm,armv7";
->>+			reg = <0x0>;
->>+			power-domains = <&a7_pd>;
->
->This example doesn't consider how do we deal with the presence off
->cpu-idle-states property in CPU nodes.
->
-I can amend the example. But to answer your underlying question, they
-will exist as separate properties.
 
->IMO we need move even the cpu/core level idle states into its own power
->domain. It also helps to solve other usecases like PMU, debug/coresight
->devices attached to the core power domain(in most of the cases) while
->they may be in separate PD like PMUs on OMAP. That will help OS whether
->to save/restore the states on idle-entry.
->
-This idea was brought up by Kevin earlier in the discussions, but we
-shelved it for a later date.
+The following changes since commit 29b4817d4018df78086157ea3a55c1d9424a7cfc:
 
->In [PATCH v3 15/15] ARM64: dts: Define CPU power domain for MSM8916, the
->idle-states are split across the cpu cpu-idle-states and pd
->domain-idle-states property. That looks like a really mess to me.
->
-It is pretty clear that CPUs cannot not define the domain idle states.
-Domains define their own idle states. Just as you mention above. CPU is
-just a single component in its domain. There may be other devices like
-PMUs, Coresights etc that also may have a say in the idle state the
-domain may be put in, when the devices are idle. As such, adding domain
-idle states to the CPU's idle state property is not appropriate.
+  Linux 4.8-rc1 (2016-08-07 18:18:00 -0700)
 
-Our kernel has runtime PM for devices and then there is CPUidle, both
-are diverging without one knowing about the other. We have to start
-unifying them inorder to have better holistic power management in the
-SoC. To that regard, we have to start imagining CPUs as just another
-device, albeit a special device. But for our purposes in determining
-domain idle state, it will just be a device attached to the domain.
+are available in the git repository at:
 
->We need to have all the idle state information at one place and in this
->case PD seems more appropriate instead of splitting them across.
->
-That approach isn't correct. Where will we put the idle states of other
-devices that are also part of the domain? We are thinking about a model,
-where every device defines its own idle states and we define
-relationships between those idle states and their parents' idle states.
-Ofcourse, devices don't have idle states today, but that is something we
-have been pondering over.
+  git://git.kernel.org/pub/scm/linux/kernel/git/pchotard/sti.git tags/sti-dt-for-v4.9-1
 
->We can also keep the code clean and not break compatibility. Whenever
->both PD and CPU contains idle-states, PD must take precedence.
->
-Why?
-The CPU and PD states are orthogonal. While the PD state is dependent on
-the CPU state, the latter is not true. Devices determine their own
-states. Based on the individual device states, we then determine the
-state of the parent and bubble up on the hierarchy.
+for you to fetch changes up to 7aff2168d65e84c4a5178a32ae4e8d474eff2090:
 
->Also these needs to be documented clearly in the binding.
->
->>+		};
->>+
->>+		CPU1: cpu at 1 {
->>+			device_type = "cpu";
->>+			compatible = "arm,cortex-a15", "arm,armv7";
->>+			reg = <0x0>;
->>+			power-domains = <&a15_pd>;
->>+		};
->>+	};
->>+
->>+	pm-domains {
->>+		a15_pd: a15_pd {
->>+			/* will have A15 platform ARM_PD_METHOD_OF_DECLARE*/
->
->the above comment make no sense in the binding document, remove it
->
-Yup. Will remove.
+  ARM: dts: STi: Introduce B2260 board (2016-08-10 18:23:29 +0200)
 
-Thanks,
-Lina
+----------------------------------------------------------------
+
+STi dts fixes and new STi 96board support:
+
+Add thermal node for STiH407 family boards
+Add specific nodes for STMicroelectronics 96Board
+Add new B2260 STi board file = 96Board
+Fix ahci issue on STiH407 family
+Fix debugfs/pinctrl kernel warning
+
+----------------------------------------------------------------
+Patrice Chotard (7):
+      ARM: dts: STiH407: Move pio20 node to fix kernel warning
+      ARM: dts: STiH410: Add thermal node
+      ARM: dts: STiH407-pinctrl: Add i2c2_alt2_1 node
+      ARM: dts: STiH407: Move non-removable property to board file
+      ARM: dts: STiH407-pinctrl: Add pinctrl_rgmii1_mdio_1 node
+      ARM: dts: STiH407-family: Add ports-implemented property in sata nodes
+      ARM: dts: STi: Introduce B2260 board
+
+ arch/arm/boot/dts/Makefile             |   1 +
+ arch/arm/boot/dts/stih407-family.dtsi  |   5 +-
+ arch/arm/boot/dts/stih407-pinctrl.dtsi |  31 ++++--
+ arch/arm/boot/dts/stih410-b2260.dts    | 190 +++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/stih410.dtsi         |   8 ++
+ arch/arm/boot/dts/stih418-b2199.dts    |   1 +
+ arch/arm/boot/dts/stihxxx-b2120.dtsi   |   1 +
+ 7 files changed, 227 insertions(+), 10 deletions(-)
+ create mode 100644 arch/arm/boot/dts/stih410-b2260.dts
