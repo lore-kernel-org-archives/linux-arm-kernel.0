@@ -1,69 +1,136 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 10 Aug 2016 17:23:23 +0530
-Subject: [PATCH 3/4] ARM: dts: da850-lcdk: Add NAND to DT
-In-Reply-To: <20160810111944.GA31616@gobelin>
-References: <20160809171518.22690-1-kbeldan@baylibre.com>
- <20160809171518.22690-4-kbeldan@baylibre.com> <57AAE67D.4000404@ti.com>
- <20160810090417.GE16481@gobelin> <57AAF472.7000804@ti.com>
- <20160810111944.GA31616@gobelin>
-Message-ID: <57AB15B3.1050907@ti.com>
+From: yong.mao@mediatek.com (Yong Mao)
+Date: Wed, 10 Aug 2016 19:59:38 +0800
+Subject: [PATCH] mmc: mediatek: Fix CMD6 timeout issue
+Message-ID: <1470830378-12155-1-git-send-email-yong.mao@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 10 August 2016 04:49 PM, Karl Beldan wrote:
-> On Wed, Aug 10, 2016 at 03:01:30PM +0530, Sekhar Nori wrote:
->> On Wednesday 10 August 2016 02:34 PM, Karl Beldan wrote:
->>> On Wed, Aug 10, 2016 at 02:01:57PM +0530, Sekhar Nori wrote:
->>>> On Tuesday 09 August 2016 10:45 PM, Karl Beldan wrote:
->>>>> This adds DT support for the NAND connected to the SoC AEMIF.
->>>>> The parameters (timings, ecc) are the same as what the board ships with
->>>>> (default AEMIF timings, 1bit ECC) and improvements will be handled in
->>>>> due course.
->>>>
->>>> I disagree that we need to be compatible to the software that ships with
->>>> the board. Thats software was last updated 3 years ago. Instead I would
->>>> concern with what the hardware supports. So, if the hardware can support
->>>> 4-bit ECC, I would use that.
->>>>
->>> I am not saying we _need_ to be compatible.
->>
->> Alright then, please drop references to what software the board ships
->> with in the commit message and in the patch itself.
->>
-> 
-> I hadn't seen this comment before sending v2.
-> 
->>>
->>>> If driver is broken for 4-bit ECC, please fix that up first.
->>>>
->>> Since this issue is completely separate from my DT improvements
->>> I'll stick to resubmitting the series, applying my LCDK changes to the
->>> EVM too, besides you'll be able to compare the behavior without ECC
->>> discrepancies.
->>> I took note that you are likely to not apply without the ECC fix.
->>
->> Yeah, I would not like to apply with 1-bit ECC now and then change to
->> 4-bit ECC soon after.
->>
-> 
-> Both mityomapl138 from mainline and hawkboard from TI's BSP release
-> include the comment:
-> - "4 bit mode is not supported with 16 bit NAND"
-> It is not clear whether they imply that the HW has issues or if it's SW
+From: yong mao <yong.mao@mediatek.com>
 
-At least the TRM says "The EMIFA supports 4-bit ECC on 8-bit/16-bit NAND
-Flash.". And then the TRM goes on to describe how 4-bit ECC is supposed
-to work for 16-bit NAND. I could not find any errata related to this in
-the errata document.
+When init EMMC, after switch to HS400, will issue
+CMD6 to change ext_csd, if first CMD6 got CRC
+error, the repeat CMD6 may get timeout, that's
+because SDCBSY was cleared by msdc_reset_hw()
 
-> only, but 4-bits ECC is a different matter and I hope you'll integrate
-> the current changes prior to tackling it.
+In this case, need check MSDC_PS to wait EMMC
+changes to transfer state
 
-Lets apply everything together. This is a new feature, not a bug fix.
-There is no need to rush it. Also, for the NAND part on LCDK, per the
-micron datasheet, minimum of 4-bit ECC is needed.
+Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
+Signed-off-by: Yong Mao <yong.mao@mediatek.com>
+---
+ drivers/mmc/host/mtk-sd.c | 78 +++++++++++++++++++++++++++++++----------------
+ 1 file changed, 52 insertions(+), 26 deletions(-)
 
-I will take a look at other patches in this series.
-
-Regards,
-Sekhar
+diff --git a/drivers/mmc/host/mtk-sd.c b/drivers/mmc/host/mtk-sd.c
+index 84e9afc..d52563d 100644
+--- a/drivers/mmc/host/mtk-sd.c
++++ b/drivers/mmc/host/mtk-sd.c
+@@ -826,6 +826,15 @@ static bool msdc_cmd_done(struct msdc_host *host, int events,
+ 	return true;
+ }
+ 
++static int msdc_card_busy(struct mmc_host *mmc)
++{
++	struct msdc_host *host = mmc_priv(mmc);
++	u32 status = readl(host->base + MSDC_PS);
++
++	/* check if data0 is low */
++	return !(status & BIT(16));
++}
++
+ /* It is the core layer's responsibility to ensure card status
+  * is correct before issue a request. but host design do below
+  * checks recommended.
+@@ -835,10 +844,20 @@ static inline bool msdc_cmd_is_ready(struct msdc_host *host,
+ {
+ 	/* The max busy time we can endure is 20ms */
+ 	unsigned long tmo = jiffies + msecs_to_jiffies(20);
++	u32 count = 0;
++
++	if (in_interrupt()) {
++		while ((readl(host->base + SDC_STS) & SDC_STS_CMDBUSY) &&
++		       (count < 1000)) {
++			udelay(1);
++			count++;
++		}
++	} else {
++		while ((readl(host->base + SDC_STS) & SDC_STS_CMDBUSY) &&
++		       time_before(jiffies, tmo))
++			cpu_relax();
++	}
+ 
+-	while ((readl(host->base + SDC_STS) & SDC_STS_CMDBUSY) &&
+-			time_before(jiffies, tmo))
+-		cpu_relax();
+ 	if (readl(host->base + SDC_STS) & SDC_STS_CMDBUSY) {
+ 		dev_err(host->dev, "CMD bus busy detected\n");
+ 		host->error |= REQ_CMD_BUSY;
+@@ -846,17 +865,36 @@ static inline bool msdc_cmd_is_ready(struct msdc_host *host,
+ 		return false;
+ 	}
+ 
+-	if (mmc_resp_type(cmd) == MMC_RSP_R1B || cmd->data) {
+-		tmo = jiffies + msecs_to_jiffies(20);
+-		/* R1B or with data, should check SDCBUSY */
+-		while ((readl(host->base + SDC_STS) & SDC_STS_SDCBUSY) &&
+-				time_before(jiffies, tmo))
+-			cpu_relax();
+-		if (readl(host->base + SDC_STS) & SDC_STS_SDCBUSY) {
+-			dev_err(host->dev, "Controller busy detected\n");
+-			host->error |= REQ_CMD_BUSY;
+-			msdc_cmd_done(host, MSDC_INT_CMDTMO, mrq, cmd);
+-			return false;
++	if (cmd->opcode != MMC_SEND_STATUS) {
++		count = 0;
++		/* Consider that CMD6 crc error before card was init done,
++		 * mmc_retune() will return directly as host->card is null.
++		 * and CMD6 will retry 3 times, must ensure card is in transfer
++		 * state when retry.
++		 */
++		tmo = jiffies + msecs_to_jiffies(60 * 1000);
++		while (1) {
++			if (msdc_card_busy(host->mmc)) {
++				if (in_interrupt()) {
++					udelay(1);
++					count++;
++				} else {
++					msleep_interruptible(10);
++				}
++			} else {
++				break;
++			}
++			/* Timeout if the device never
++			 * leaves the program state.
++			 */
++			if (count > 1000 || time_after(jiffies, tmo)) {
++				pr_err("%s: Card stuck in
++					 programming state! %s\n",
++				       mmc_hostname(host->mmc), __func__);
++				host->error |= REQ_CMD_BUSY;
++				msdc_cmd_done(host, MSDC_INT_CMDTMO, mrq, cmd);
++				return false;
++			}
+ 		}
+ 	}
+ 	return true;
+@@ -1070,18 +1108,6 @@ static int msdc_ops_switch_volt(struct mmc_host *mmc, struct mmc_ios *ios)
+ 	return ret;
+ }
+ 
+-static int msdc_card_busy(struct mmc_host *mmc)
+-{
+-	struct msdc_host *host = mmc_priv(mmc);
+-	u32 status = readl(host->base + MSDC_PS);
+-
+-	/* check if any pin between dat[0:3] is low */
+-	if (((status >> 16) & 0xf) != 0xf)
+-		return 1;
+-
+-	return 0;
+-}
+-
+ static void msdc_request_timeout(struct work_struct *work)
+ {
+ 	struct msdc_host *host = container_of(work, struct msdc_host,
+-- 
+1.8.1.1.dirty
