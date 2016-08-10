@@ -1,71 +1,77 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 10 Aug 2016 15:05:06 +0200
-Subject: [PATCH] clocksource/drivers/time-armada-370-xp: Fix the clock
- reference
-In-Reply-To: <20160810140652.2d59e12b@free-electrons.com> (Thomas Petazzoni's
- message of "Wed, 10 Aug 2016 14:06:52 +0200")
-References: <1470816548-8750-1-git-send-email-gregory.clement@free-electrons.com>
- <20160810140652.2d59e12b@free-electrons.com>
-Message-ID: <87twes3hbx.fsf@free-electrons.com>
+From: fu.wei@linaro.org (Fu Wei)
+Date: Wed, 10 Aug 2016 21:05:27 +0800
+Subject: [PATCH v12] acpi, apei, arm64: APEI initial support for aarch64.
+In-Reply-To: <20160810111005.GD16664@nazgul.tnic>
+References: <1469782664-12611-1-git-send-email-fu.wei@linaro.org>
+ <20160804094838.GB8093@nazgul.tnic>
+ <CADyBb7ujfaXPP_CUB66_E53fY9MeEbt6EhOaCzf+hoDCGYD+dw@mail.gmail.com>
+ <20160810104513.GB16664@nazgul.tnic>
+ <CADyBb7uW2-jh8UBLXZ03p1y9SMP7M3z6eULwV2DYhWXEqTm2Rw@mail.gmail.com>
+ <20160810111005.GD16664@nazgul.tnic>
+Message-ID: <CADyBb7vPhbhGZU+UB7JcP_okA0XV+-yPZe0ass67TZWBMpNRBA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
- 
- On mer., ao?t 10 2016, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
+Hi Borislav,
 
-> Hello,
+On 10 August 2016 at 19:10, Borislav Petkov <bp@suse.de> wrote:
+> On Wed, Aug 10, 2016 at 07:01:05PM +0800, Fu Wei wrote:
+>> - if (!acpi_disable_cmcff)
+>> - apei_hest_parse(hest_parse_cmc, NULL);
+>> + rc =apei_hest_parse(hest_parse_cmc, NULL);
+>> + if (rc)
+>> + goto err;
+>>
+>>   if (!ghes_disable) {
+>>   rc = apei_hest_parse(hest_parse_ghes_count, &ghes_count);
+>>
+>> Do you have other suggestion? then I can post v14 to fix it :-)
 >
-> On Wed, 10 Aug 2016 10:09:08 +0200, Gregory CLEMENT wrote:
->> While converting the init function to return an error, the wrong clock
->> was get. This lead to wrong clock rate and slow down the kernel. For
->> example, before the patch a typical boot was around 15s after it was 1
->> minute slower.
->> 
->> Fixes: 12549e27c63c ("clocksource/drivers/time-armada-370-xp: Convert init function to return error")
->> 
->> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
->> ---
->>  drivers/clocksource/time-armada-370-xp.c | 1 -
->>  1 file changed, 1 deletion(-)
->> 
->> diff --git a/drivers/clocksource/time-armada-370-xp.c b/drivers/clocksource/time-armada-370-xp.c
->> index 719b478d136e..3c39e6f45971 100644
->> --- a/drivers/clocksource/time-armada-370-xp.c
->> +++ b/drivers/clocksource/time-armada-370-xp.c
->> @@ -338,7 +338,6 @@ static int __init armada_xp_timer_init(struct device_node *np)
->>  	struct clk *clk = of_clk_get_by_name(np, "fixed");
->>  	int ret;
->>  
->> -	clk = of_clk_get(np, 0);
+> Nah, looks good :)
 >
-> I think to avoid this mistake, we should rewrite the code as:
->
-> 	struct *clk;
-> 	int ret;
->
-> 	clk = of_clk_get_by_name(np, "fixed");
-> 	if (IS_ERR(clk)) {
-> 		...
-> 	
->
+> Let's keep it simple and add more involved handling when it is really
+> needed. Thanks!
 
-OK I can do it. it will be alos more coherent with the other _init
-function.
+Thanks for your help, this have been fixed in v14(just posted).
 
-Gregory
-
-> Indeed, I find confusing a block that starts with error checking, and
-> it's probably what lead to this of_clk_get() being added here.
 >
-> Thomas
-> -- 
-> Thomas Petazzoni, CTO, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
+> Btw, that comment:
+>
+> +/*
+> + * acpi_disable_cmcff is used in drivers/acpi/apei/hest.c for disabling
+> + * IA-32 Architecture Corrected Machine Checkx(cmc) FIRMWARE_FIRST mode by
+> + * boot parameter(acpi=nocmcff). But we don't have this IA-32 specific
+> + * feature on ARM64, this definition is only for compatibility.
+> + */
+> +#define acpi_disable_cmcff 1
+>
+> looks ok, except the small typo:
+>
+> Architecture Corrected Machine Checkx(cmc)
+>                                     ^
+> Make that
+>
+> "IA-32 Architecture Corrected Machine Check (CMC) Firmware-First mode"
+
+Done! Thanks :-)
+
+>
+> Thanks.
+>
+> --
+> Regards/Gruss,
+>     Boris.
+>
+> ECO tip #101: Trim your mails when you reply.
+>
+> SUSE Linux GmbH, GF: Felix Imend?rffer, Jane Smithard, Graham Norton, HRB 21284 (AG N?rnberg)
+> --
+
+
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Best regards,
+
+Fu Wei
+Software Engineer
+Red Hat
