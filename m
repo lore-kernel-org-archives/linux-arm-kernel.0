@@ -1,122 +1,38 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 10 Aug 2016 12:39:14 +0200
-Subject: [PATCH] KVM: arm64: vgic-its: Grab kvm->lock when reading kvm->devices
-In-Reply-To: <20160808154543.23463-1-andre.przywara@arm.com>
-References: <20160808154543.23463-1-andre.przywara@arm.com>
-Message-ID: <20160810103914.30322-1-christoffer.dall@linaro.org>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Wed, 10 Aug 2016 13:40:13 +0300
+Subject: [PATCH] video: s3c2410fb: Register cpufreq notifier only on
+ S3C24xx
+In-Reply-To: <1467031945-10486-1-git-send-email-k.kozlowski@samsung.com>
+References: <1467031945-10486-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <48c0efad-875e-0a38-240f-d36e1c7f8d66@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since we are about to synchronize all accesses to kvm->devices using the
-kvm->lock mutex, we should hold this mutex while iterating over the list
-of devices in the ITS code.
 
-Also move the vgic_register_its_iodev function to where it's called and
-rename it to register_its_iodev to avoid having two almost identially
-named functions.
 
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
----
- virt/kvm/arm/vgic/vgic-its.c | 64 +++++++++++++++++++++++---------------------
- 1 file changed, 34 insertions(+), 30 deletions(-)
+On 27/06/16 15:52, Krzysztof Kozlowski wrote:
+> The driver registered for CPU frequency transitions to recalculate its
+> clock when ARM clock frequency changes (ratio between frequencies of
+> ARM's parent clock (fclk) and clock for peripherals remains fixed).
+> 
+> This is needed only on S3C24xx platform when cpufreq driver is enabled
+> so limit the ifdef to respective cpufreq Kconfig.
+> 
+> Suggested-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> ---
+>  drivers/video/fbdev/s3c2410fb.c | 2 +-
+>  drivers/video/fbdev/s3c2410fb.h | 2 +-
+>  2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-index 1cf9f59..4e76877 100644
---- a/virt/kvm/arm/vgic/vgic-its.c
-+++ b/virt/kvm/arm/vgic/vgic-its.c
-@@ -1319,32 +1319,6 @@ void vgic_enable_lpis(struct kvm_vcpu *vcpu)
- 		its_sync_lpi_pending_table(vcpu);
- }
- 
--static int vgic_register_its_iodev(struct kvm *kvm, struct vgic_its *its)
--{
--	struct vgic_io_device *iodev = &its->iodev;
--	int ret;
--
--	if (!its->initialized)
--		return -EBUSY;
--
--	if (IS_VGIC_ADDR_UNDEF(its->vgic_its_base))
--		return -ENXIO;
--
--	iodev->regions = its_registers;
--	iodev->nr_regions = ARRAY_SIZE(its_registers);
--	kvm_iodevice_init(&iodev->dev, &kvm_io_gic_ops);
--
--	iodev->base_addr = its->vgic_its_base;
--	iodev->iodev_type = IODEV_ITS;
--	iodev->its = its;
--	mutex_lock(&kvm->slots_lock);
--	ret = kvm_io_bus_register_dev(kvm, KVM_MMIO_BUS, iodev->base_addr,
--				      KVM_VGIC_V3_ITS_SIZE, &iodev->dev);
--	mutex_unlock(&kvm->slots_lock);
--
--	return ret;
--}
--
- #define INITIAL_BASER_VALUE						  \
- 	(GIC_BASER_CACHEABILITY(GITS_BASER, INNER, RaWb)		| \
- 	 GIC_BASER_CACHEABILITY(GITS_BASER, OUTER, SameAsInner)		| \
-@@ -1526,6 +1500,32 @@ int kvm_vgic_register_its_device(void)
- 				       KVM_DEV_TYPE_ARM_VGIC_ITS);
- }
- 
-+static int register_its_iodev(struct kvm *kvm, struct vgic_its *its)
-+{
-+	struct vgic_io_device *iodev = &its->iodev;
-+	int ret;
-+
-+	if (!its->initialized)
-+		return -EBUSY;
-+
-+	if (IS_VGIC_ADDR_UNDEF(its->vgic_its_base))
-+		return -ENXIO;
-+
-+	iodev->regions = its_registers;
-+	iodev->nr_regions = ARRAY_SIZE(its_registers);
-+	kvm_iodevice_init(&iodev->dev, &kvm_io_gic_ops);
-+
-+	iodev->base_addr = its->vgic_its_base;
-+	iodev->iodev_type = IODEV_ITS;
-+	iodev->its = its;
-+	mutex_lock(&kvm->slots_lock);
-+	ret = kvm_io_bus_register_dev(kvm, KVM_MMIO_BUS, iodev->base_addr,
-+				      KVM_VGIC_V3_ITS_SIZE, &iodev->dev);
-+	mutex_unlock(&kvm->slots_lock);
-+
-+	return ret;
-+}
-+
- /*
-  * Registers all ITSes with the kvm_io_bus framework.
-  * To follow the existing VGIC initialization sequence, this has to be
-@@ -1536,19 +1536,23 @@ int vgic_register_its_iodevs(struct kvm *kvm)
- 	struct kvm_device *dev;
- 	int ret = 0;
- 
-+	mutex_lock(&kvm->lock);
- 	list_for_each_entry(dev, &kvm->devices, vm_node) {
- 		if (dev->ops != &kvm_arm_vgic_its_ops)
- 			continue;
- 
--		ret = vgic_register_its_iodev(kvm, dev->private);
-+		ret = register_its_iodev(kvm, dev->private);
- 		if (ret)
--			return ret;
-+			goto out;
-+
- 		/*
- 		 * We don't need to care about tearing down previously
--		 * registered ITSes, as the kvm_io_bus framework removes
--		 * them for us if the VM gets destroyed.
-+		 * registered ITSes on error, as the kvm_io_bus framework
-+		 * removes them for us if the VM gets destroyed.
- 		 */
- 	}
- 
-+out:
-+	mutex_unlock(&kvm->lock);
- 	return ret;
- }
--- 
-2.9.0
+Thanks, queued for v4.9.
+
+ Tomi
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160810/8d0941c3/attachment-0001.sig>
