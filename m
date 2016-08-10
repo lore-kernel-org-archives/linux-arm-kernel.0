@@ -1,82 +1,69 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Wed, 10 Aug 2016 22:53:10 +0530
-Subject: [PATCH] dmaengine: qcom_hidma: release the descriptor before the
- callback
-In-Reply-To: <2fce2512-853e-c8e6-05d5-4c9088ef7d83@metafoo.de>
-References: <20160724062425.GW9681@localhost>
- <971733d9-fd18-2a1b-07c0-349b47747d49@codeaurora.org>
- <20160804125525.GF9681@localhost>
- <71a15611-645f-7523-1c26-14b420aff667@codeaurora.org>
- <20160804144003.GV1041@n2100.armlinux.org.uk>
- <cff588a1-d85f-3d2c-ef61-1674d0d3ca92@codeaurora.org>
- <20160804153835.GY1041@n2100.armlinux.org.uk>
- <32339445-5a1c-5a3e-cd07-d64e35dce2c4@metafoo.de>
- <20160808090852.GZ9681@localhost>
- <2fce2512-853e-c8e6-05d5-4c9088ef7d83@metafoo.de>
-Message-ID: <20160810172310.GG9681@localhost>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Wed, 10 Aug 2016 10:15:46 -0700
+Subject: [PATCH 2/2] remoteproc: core: Rework obtaining a rproc from a DT
+ phandle
+In-Reply-To: <20160719154905.23344-2-lee.jones@linaro.org>
+References: <20160719154905.23344-1-lee.jones@linaro.org>
+ <20160719154905.23344-2-lee.jones@linaro.org>
+Message-ID: <20160810171546.GN26240@tuxbot>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 08, 2016 at 02:25:28PM +0200, Lars-Peter Clausen wrote:
-> On 08/08/2016 11:08 AM, Vinod Koul wrote:
-> > On Thu, Aug 04, 2016 at 05:59:30PM +0200, Lars-Peter Clausen wrote:
-> >> On 08/04/2016 05:38 PM, Russell King - ARM Linux wrote:
-> >> [...]
-> >>> What you instead need to do is to find some way to record in your
-> >>> driver that transaction 2 failed, and when dma_cookie_status() says
-> >>> that a transaction has DMA_COMPLETE status, you need to look up to
-> >>> see whether it failed.
-> >>
-> >> In my opinion this is where the current API is broken by design. For each
-> >> transfer that fails you need to store the cookie associated with that
-> >> transfer in some kind of lookup table. Since there is no lifetime associated
-> >> with a cookie entries in this table would need to be retained forever and it
-> >> will grow unbound.
-> > 
-> > And how many drivers can report errors? And how many drivers can guarantee
-> > DMA_COMPLETE implies transaction was succesful.
+On Tue 19 Jul 08:49 PDT 2016, Lee Jones wrote:
+
+> In this patch we;
+>  - Use a subsystem generic phandle to obtain an rproc
+>    - We have to support TI's bespoke version for the time being
+>  - Convert wkup_m3_ipc driver to new API
+>  - Rename the call to be more like other, similar OF calls
+>  - Move feature-not-enabled inline stub to the headers
+>  - Strip out duplicate code by calling into of_get_rproc_by_index()
 > 
-> The former just a handful, the later hopefully all.
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  drivers/remoteproc/remoteproc_core.c | 41 ++++++++----------------------------
+>  drivers/soc/ti/wkup_m3_ipc.c         | 14 +++---------
+>  include/linux/remoteproc.h           |  4 ++--
+>  3 files changed, 14 insertions(+), 45 deletions(-)
 > 
-> > 
-> >> Ideally we'd mark error reporting through this interface as deprecated and
-> >> discourage new users of the interface. As far as I can see most of the few
-> >> drivers that do return DMA_ERROR get it wrong anyway, e.g. return it
-> >> unconditionally for all cookies when an error occurred for any of them.
-> > 
-> > Error reporting is quite tricky as detection is a problem. So yes if you
-> > can do so, it is highly encouraged to report using new interface which is
-> > better than client checking after callback.
-> > 
-> > Btw what is the behaviour after error? I would think that client will see an
-> > error and report to upper layer while initiaite closure of transaction. So
-> > does driver need to keep the state for a longer time :-)
-> 
-> The problem is that this is not really clearly defined.
-> 
-> 1) What should be done when multiple descriptors are queued and an error is
-> encountered on one of them. Should the descriptors that are after the one in
-> the queue that caused the error be discarded or should they be executed as
-> normal?
+[..]
+> diff --git a/drivers/soc/ti/wkup_m3_ipc.c b/drivers/soc/ti/wkup_m3_ipc.c
+> index 8823cc8..15481f3 100644
+> --- a/drivers/soc/ti/wkup_m3_ipc.c
+> +++ b/drivers/soc/ti/wkup_m3_ipc.c
+> @@ -385,7 +385,6 @@ static int wkup_m3_ipc_probe(struct platform_device *pdev)
+>  {
+>  	struct device *dev = &pdev->dev;
+>  	int irq, ret;
+> -	phandle rproc_phandle;
+>  	struct rproc *m3_rproc;
+>  	struct resource *res;
+>  	struct task_struct *task;
+> @@ -430,16 +429,9 @@ static int wkup_m3_ipc_probe(struct platform_device *pdev)
+>  		return PTR_ERR(m3_ipc->mbox);
+>  	}
+>  
+> -	if (of_property_read_u32(dev->of_node, "ti,rproc", &rproc_phandle)) {
+> -		dev_err(&pdev->dev, "could not get rproc phandle\n");
+> -		ret = -ENODEV;
+> -		goto err_free_mbox;
+> -	}
+> -
+> -	m3_rproc = rproc_get_by_phandle(rproc_phandle);
+> -	if (!m3_rproc) {
+> -		dev_err(&pdev->dev, "could not get rproc handle\n");
+> -		ret = -EPROBE_DEFER;
+> +	m3_rproc = of_get_rproc_by_phandle(dev->of_node);
+> +	if (IS_ERR(m3_rproc)) {
+> +		ret = PTR_ERR(m3_rproc);
+>  		goto err_free_mbox;
+>  	}
+>  
 
-That is client's call.
+Santosh, do you have any objections to me merging this?
 
-But a reasonable way would be for client to propagate those errors up, so it
-can terminate.
+of_get_rproc_by_phandle() will fall back and attempt to acquire the
+handle from ti,rproc if the generic "rprocs" property doesn't exist.
 
-> 2) How long does a error result need to be retained. Can it be discarded
-> when the terminate_all() is called, or can it be discarded when the next
-> issue_pending() is called or should it be retained forever?
-
-Uptill next terminate_all()
-
-> Unless we can clearly define the semantics of error reporting it is very
-> difficult for drivers to use it. Which is probably one of the reasons why
-> there are only very few DMAengine consumers that do actual error checking.
-
-Yes agreed, but most reasonable behaviour is to terminate. Also I would
-expect the error reporting to be done thru new API and explcitly told that
-we found error (if we can).
-
--  
-~Vinod
+Regards,
+Bjorn
