@@ -1,57 +1,33 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Wed, 10 Aug 2016 10:52:54 +0200
-Subject: [PATCH] ARM: Add missing newline terminators to kernel messages
-Message-ID: <1470819174-9543-1-git-send-email-geert+renesas@glider.be>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Wed, 10 Aug 2016 16:49:57 +0800
+Subject: [PATCH] ARM: cpuidle: declare cpuidle_ops __read_mostly
+Message-ID: <1470818997-808-1-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+cpuidle_ops is initialized once by arm_cpuidle_read_ops() during
+initialization, and thereafter is mostly read in arm_cpuidle_suspend()
+
+The fact that it is mostly read and not written to makes it candidates
+for __read_mostly declarations.
+
+Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
 ---
-Before commit 874f9c7da9a4acbc ("printk: create pr_<level> functions"),
-pr_*() calls without a trailing newline characters would be printed with
-a newline character appended, both on the console and in the output of
-the dmesg command.
+ arch/arm/kernel/cpuidle.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-After that commit, no new line character is appended, and the output of
-the next pr_*() call of the same type may be appended, like in:
-
-    - Truncating RAM at 0x0000000040000000-0x00000000c0000000 to -0x0000000070000000
-    - Ignoring RAM at 0x0000000200000000-0x0000000240000000 (!CONFIG_HIGHMEM)
-    + Truncating RAM at 0x0000000040000000-0x00000000c0000000 to -0x0000000070000000Ignoring RAM at 0x0000000200000000-0x0000000240000000 (!CONFIG_HIGHMEM)
-
-While this commit has been reverted in commit a0cba2179ea4c182 ("Revert
-"printk: create pr_<level> functions""), it's still good practice to
-terminate kernel messages with newlines.
----
- arch/arm/kernel/atags_proc.c | 2 +-
- arch/arm/mm/mmu.c            | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/kernel/atags_proc.c b/arch/arm/kernel/atags_proc.c
-index 5a3379055f553167..d7af7b84a4ca32c5 100644
---- a/arch/arm/kernel/atags_proc.c
-+++ b/arch/arm/kernel/atags_proc.c
-@@ -41,7 +41,7 @@ static int __init init_atags_procfs(void)
- 	size_t size;
+diff --git a/arch/arm/kernel/cpuidle.c b/arch/arm/kernel/cpuidle.c
+index 7dccc96..762e0929 100644
+--- a/arch/arm/kernel/cpuidle.c
++++ b/arch/arm/kernel/cpuidle.c
+@@ -19,7 +19,7 @@ extern struct of_cpuidle_method __cpuidle_method_of_table[];
+ static const struct of_cpuidle_method __cpuidle_method_of_table_sentinel
+ 	__used __section(__cpuidle_method_of_table_end);
  
- 	if (tag->hdr.tag != ATAG_CORE) {
--		pr_info("No ATAGs?");
-+		pr_info("No ATAGs?\n");
- 		return -EINVAL;
- 	}
+-static struct cpuidle_ops cpuidle_ops[NR_CPUS];
++static struct cpuidle_ops cpuidle_ops[NR_CPUS] __read_mostly;
  
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index 62f4d01941f718bf..dd3d184337d525ff 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -1183,7 +1183,7 @@ void __init sanity_check_meminfo(void)
- 			if (reg->size > size_limit) {
- 				phys_addr_t overlap_size = reg->size - size_limit;
- 
--				pr_notice("Truncating RAM at %pa-%pa to -%pa",
-+				pr_notice("Truncating RAM at %pa-%pa to -%pa\n",
- 					  &block_start, &block_end, &vmalloc_limit);
- 				memblock_remove(vmalloc_limit, overlap_size);
- 				block_end = vmalloc_limit;
+ /**
+  * arm_cpuidle_simple_enter() - a wrapper to cpu_do_idle()
 -- 
-1.9.1
+2.8.1
