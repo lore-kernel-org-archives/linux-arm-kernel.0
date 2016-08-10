@@ -1,68 +1,30 @@
-From: sunil.kovvuri@gmail.com (sunil.kovvuri at gmail.com)
-Date: Wed, 10 Aug 2016 12:12:53 +0530
-Subject: [PATCH 21/21] net: thunderx: Don't set RX_PACKET_DIS while
- initializing
-In-Reply-To: <1470811373-28277-1-git-send-email-sunil.kovvuri@gmail.com>
-References: <1470811373-28277-1-git-send-email-sunil.kovvuri@gmail.com>
-Message-ID: <1470811373-28277-22-git-send-email-sunil.kovvuri@gmail.com>
+From: patrice.chotard@st.com (Patrice Chotard)
+Date: Wed, 10 Aug 2016 08:50:31 +0200
+Subject: [STLinux Kernel] [PATCH] i2c: don't print error when adding
+ adapter fails
+In-Reply-To: <1470742581-12971-1-git-send-email-wsa-dev@sang-engineering.com>
+References: <1470742581-12971-1-git-send-email-wsa-dev@sang-engineering.com>
+Message-ID: <dda2b522-0257-17c7-1332-cbc026b74603@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sunil Goutham <sgoutham@cavium.com>
+On 08/09/2016 01:36 PM, Wolfram Sang wrote:
+> Since v4.8-rc1, the I2C core will print detailed information when adding an I2C
+> adapter fails. So, drivers can skip this now.
+>
+> I am still undecided if I apply this as a single patch or break it out. But for
+> reviewing, avoiding the patch bomb is probably a good thing.
+>
+> Should go via subsystem tree, I'd think.
+>
+> Wolfram Sang (1):
+>   i2c: don't print error when adding adapter fails
+>
+>  drivers/i2c/busses/i2c-st.c             | 4 +---
+>
 
-Setting BGXX_SPUX_MISC_CONTROL::RX_PACKET_DIS is not needed as
-packet reception is anyway disabled by BGXX_CMRX_CONFIG::DATA_PKT_RX_EN.
-Also setting RX_PACKET_DIS causes a bogus remote fault condition
-which delays link detection.
+For i2c-st.c
 
-Signed-off-by: Sunil Goutham <sgoutham@cavium.com>
----
- drivers/net/ethernet/cavium/thunder/thunder_bgx.c | 18 +++++++-----------
- 1 file changed, 7 insertions(+), 11 deletions(-)
+Acked-by: Patrice Chotard <patrice.chotard@st.com>
 
-diff --git a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
-index ca58d7f..8bbaedb 100644
---- a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
-+++ b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
-@@ -459,12 +459,14 @@ static int bgx_lmac_xaui_init(struct bgx *bgx, struct lmac *lmac)
- 
- 	bgx_reg_modify(bgx, lmacid, BGX_SPUX_CONTROL1, SPU_CTL_LOW_POWER);
- 	/* Set interleaved running disparity for RXAUI */
--	if (lmac->lmac_type != BGX_MODE_RXAUI)
--		bgx_reg_modify(bgx, lmacid,
--			       BGX_SPUX_MISC_CONTROL, SPU_MISC_CTL_RX_DIS);
--	else
-+	if (lmac->lmac_type == BGX_MODE_RXAUI)
- 		bgx_reg_modify(bgx, lmacid, BGX_SPUX_MISC_CONTROL,
--			       SPU_MISC_CTL_RX_DIS | SPU_MISC_CTL_INTLV_RDISP);
-+			       SPU_MISC_CTL_INTLV_RDISP);
-+
-+	/* Clear receive packet disable */
-+	cfg = bgx_reg_read(bgx, lmacid, BGX_SPUX_MISC_CONTROL);
-+	cfg &= ~SPU_MISC_CTL_RX_DIS;
-+	bgx_reg_write(bgx, lmacid, BGX_SPUX_MISC_CONTROL, cfg);
- 
- 	/* clear all interrupts */
- 	cfg = bgx_reg_read(bgx, lmacid, BGX_SMUX_RX_INT);
-@@ -537,7 +539,6 @@ static int bgx_xaui_check_link(struct lmac *lmac)
- 	int lmac_type = lmac->lmac_type;
- 	u64 cfg;
- 
--	bgx_reg_modify(bgx, lmacid, BGX_SPUX_MISC_CONTROL, SPU_MISC_CTL_RX_DIS);
- 	if (lmac->use_training) {
- 		cfg = bgx_reg_read(bgx, lmacid, BGX_SPUX_INT);
- 		if (!(cfg & (1ull << 13))) {
-@@ -607,11 +608,6 @@ static int bgx_xaui_check_link(struct lmac *lmac)
- 		return -1;
- 	}
- 
--	/* Clear receive packet disable */
--	cfg = bgx_reg_read(bgx, lmacid, BGX_SPUX_MISC_CONTROL);
--	cfg &= ~SPU_MISC_CTL_RX_DIS;
--	bgx_reg_write(bgx, lmacid, BGX_SPUX_MISC_CONTROL, cfg);
--
- 	/* Check for MAC RX faults */
- 	cfg = bgx_reg_read(bgx, lmacid, BGX_SMUX_RX_CTL);
- 	/* 0 - Link is okay, 1 - Local fault, 2 - Remote fault */
--- 
-2.7.4
+Thanks
