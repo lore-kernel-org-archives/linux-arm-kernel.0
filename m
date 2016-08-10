@@ -1,70 +1,61 @@
-From: j-keerthy@ti.com (Keerthy)
-Date: Wed, 10 Aug 2016 18:24:01 +0530
-Subject: [PATCH v7 0/5] mfd: tps65218: Clean ups 
-Message-ID: <1470833641-29546-1-git-send-email-j-keerthy@ti.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Wed, 10 Aug 2016 13:56:06 +0100
+Subject: [PATCH] ARM: no need to select SMP_ON_UP explicitly
+In-Reply-To: <CACRpkdb1rJ0fVDFU6uJ3fscCG4ZGQXoC713uKLMcWiBc56Ht_Q@mail.gmail.com>
+References: <1469199369-25746-1-git-send-email-vladimir.murzin@arm.com>
+ <20160809084416.GS4678@tiger> <57AAE5D7.2080009@arm.com>
+ <6326645.Nr2CxIomnL@wuerfel>
+ <CACRpkdb1rJ0fVDFU6uJ3fscCG4ZGQXoC713uKLMcWiBc56Ht_Q@mail.gmail.com>
+Message-ID: <57AB2466.9080404@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The series cleans up mainly the regulator driver and implements
-the device tree parsing using the regulator framework. Removes
-all the redundant compatibles for the individual regulators.
-Adds platform_device_id table for the gpio and power button modules.
+On 10/08/16 13:25, Linus Walleij wrote:
+> On Wed, Aug 10, 2016 at 10:55 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> On Wednesday, August 10, 2016 9:29:11 AM CEST Vladimir Murzin wrote:
+>>> On 09/08/16 09:44, Shawn Guo wrote:
+>>>> On Fri, Jul 22, 2016 at 03:56:09PM +0100, Vladimir Murzin wrote:
+>>>>> SMP_ON_UP is already defaulted to "y" and has all dependencies expressed
+>>>>> - no need to select it per platform level
+>>>>>
+>>>>> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+>>>>> ---
+>>>>>
+>>>>> This time sent to LAKML
+>>>>>
+>>>>>  arch/arm/mach-imx/Kconfig      |    3 ---
+>>>>>  arch/arm/mach-realview/Kconfig |    1 -
+>>>>
+>>>> I cannot take mach-realview changes.  I think you need to ether split
+>>>> the changes, or ask arm-soc folks to apply.  In case of the latter, here
+>>>> is my ACK:
+>>>>
+>>>> Acked-by: Shawn Guo <shawnguo@kernel.org>
+>>>
+>>> Thanks!
+>>>
+>>> RealView is not mentioned under MAINTAINERS, so it'd be easier if
+>>> arm-soc team pick this patch.
+>>>
+>>> Arnd, what is your preference?
+>>
+>> Linus Walleij is the person that has sent most patches for realview,
+>> so I'll let him decide. We can pick it up directly, or he can
+>> aggregate it with other patches that he might have.
+> 
+> I have queued this with a bunch of other RealView clean-ups and board
+> file removal patches and will send a pull request for it shortly.
 
-One of the patch removes redundant read wrapper and makes
-use of regmap_read wherever necessary.
+Thanks!
 
-The series is checked for all the regulator registrations on
-am437x-gp-evm.
+Shawn, since Linus picked up realview part only do you want me resubmit
+remaining imx part?
 
-Boot log: http://pastebin.ubuntu.com/22905402/
+Cheers
+Vladimir
 
-The series is based on linux-next on top of series titled:
-[PATCH v3 0/2] regulator: Enable suspend configuration
-
-Do not have the link of the above series available at the moment.
-
-Changes in v7:
-
-Rebasing to latest next branch. GPIO patch of this series
-pushed to linux-next by Linus. Hence posting the remaining
-patches with respective Acks from the domain Maintainers.
-
-Changes in v6:
-
-Rebased regulator/mfd clean up patches against linux-next +
-https://lkml.org/lkml/2016/6/24/122 series.
-
-Changes in v5:
-
-Rebased regulator clean up patch against linux-next.
-
-Changes in v4:
-
-For gpio-tps65218 reatined the compatible table.
-Fixed missing ';' in the power button patch.
-Fixed comments on the Documentation patch.
-Split the Device Tree patches to a separate series.
-
-Changes in v3:
-
-Missed making corresponding changes in the power button and gpio
-drivers. Added couple of patches to fix them to use mfd_cell way
-of parsing.
-
-Keerthy (5):
-  mfd: tps65218: Remove redundant read wrapper
-  Documentation: regulator: tps65218: Update examples
-  input: tps65218-pwrbutton: Add platform_device_id table
-  mfd: tps65218: Use mfd_add_devices instead of of_platform_populate
-  regulator: tps65218: Remove all the compatibles
-
- .../devicetree/bindings/regulator/tps65218.txt     |  87 +++++++++---
- drivers/gpio/gpio-tps65218.c                       |   3 +-
- drivers/input/misc/tps65218-pwrbutton.c            |  10 +-
- drivers/mfd/tps65218.c                             |  34 ++---
- drivers/regulator/tps65218-regulator.c             | 153 ++++++++-------------
- include/linux/mfd/tps65218.h                       |   3 +-
- 6 files changed, 158 insertions(+), 132 deletions(-)
-
--- 
-1.9.1
+> 
+> Yours,
+> Linus Walleij
+> 
+> 
