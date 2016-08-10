@@ -1,34 +1,48 @@
-From: labbott@redhat.com (Laura Abbott)
-Date: Tue, 9 Aug 2016 17:13:04 -0700
-Subject: [RFCv2][PATCH 2/5] arm: Implement ARCH_HAS_FORCE_CACHE
-In-Reply-To: <afd22029-c60c-1c15-3293-4011b085e07e@gmail.com>
-References: <1470678577-14010-1-git-send-email-labbott@redhat.com>
- <1470678577-14010-3-git-send-email-labbott@redhat.com>
- <afd22029-c60c-1c15-3293-4011b085e07e@gmail.com>
-Message-ID: <dd9519ce-cd4f-4007-a88a-f184407ca565@redhat.com>
+From: stephen.boyd@linaro.org (Stephen Boyd)
+Date: Tue, 09 Aug 2016 17:15:36 -0700
+Subject: [PATCH v5 5/6] usb: chipidea: let chipidea core device of_node
+ equal's glue layer device of_node
+In-Reply-To: <1470646331-23227-6-git-send-email-peter.chen@nxp.com>
+References: <1470646331-23227-1-git-send-email-peter.chen@nxp.com>
+ <1470646331-23227-6-git-send-email-peter.chen@nxp.com>
+Message-ID: <147078813636.20133.1120685098868481913@sboyd-linaro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/09/2016 02:56 PM, Florian Fainelli wrote:
-> On 08/08/2016 10:49 AM, Laura Abbott wrote:
->> arm may need the kernel_force_cache APIs to guarantee data consistency.
->> Implement versions of these APIs based on the DMA APIs.
->>
->> Signed-off-by: Laura Abbott <labbott@redhat.com>
->> ---
->>  arch/arm/include/asm/cacheflush.h |   4 ++
->>  arch/arm/mm/dma-mapping.c         | 119 --------------------------------------
->>  arch/arm/mm/flush.c               | 115 ++++++++++++++++++++++++++++++++++++
->
-> Why is the code moved between dma-mapping.c and flush.c? It was not
-> obvious while looking at these patches why this is needed.
->
+Quoting Peter Chen (2016-08-08 01:52:10)
+> From: Peter Chen <peter.chen@freescale.com>
+> 
+> At device tree, we have no device node for chipidea core,
+> the glue layer's node is the parent node for host and udc
+> device. But in related driver, the parent device is chipidea
+> core. So, in order to let the common driver get parent's node,
+> we let the core's device node equals glue layer device node.
+> 
+> Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> Tested-by: Maciej S. Szmigiero <mail@maciej.szmigiero.name>
+> Tested-by Joshua Clayton <stillcompiling@gmail.com>
+> ---
+>  drivers/usb/chipidea/core.c | 11 +++++++++++
+>  1 file changed, 11 insertions(+)
+> 
+> diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
+> index 69426e6..b189dc7 100644
+> --- a/drivers/usb/chipidea/core.c
+> +++ b/drivers/usb/chipidea/core.c
+> @@ -954,6 +954,15 @@ static int ci_hdrc_probe(struct platform_device *pdev)
+>                 dev_err(dev, "unable to init phy: %d\n", ret);
+>                 return ret;
+>         }
+> +       /*
+> +        * At device tree, we have no device node for chipidea core,
+> +        * the glue layer's node is the parent node for host and udc
+> +        * device. But in related driver, the parent device is chipidea
+> +        * core. So, in order to let the common driver get parent's node,
+> +        * we let the core's device node equals glue layer's node.
+> +        */
+> +       if (dev->parent && dev->parent->of_node)
+> +               dev->of_node = dev->parent->of_node;
 
-I wanted to use the cache flushing routines from dma-mapping.c and
-it seemed better to pull them out vs. trying to put more generic
-cache flushing code in dma-mapping.c. flush.c seemed like an
-appropriate place although I forgot about the dependency on CONFIG_MMU.
-It can certainly remain in dma-mapping.c if deemed appropriate.
-
-Thanks,
-Laura
+Can this be done earlier? Perhaps after hw_device_init() in this probe
+routine? That would allow me to remove the awkward parent searching in
+my ULPI DT awareness patch.
