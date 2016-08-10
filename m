@@ -1,51 +1,65 @@
-From: kbeldan@baylibre.com (Karl Beldan)
-Date: Wed, 10 Aug 2016 08:01:34 +0000
-Subject: [PATCH 2/4] ARM: dts: da850: Add an aemif node
-In-Reply-To: <57AADC63.90405@ti.com>
-References: <20160809171518.22690-1-kbeldan@baylibre.com>
- <20160809171518.22690-3-kbeldan@baylibre.com>
- <57AADC63.90405@ti.com>
-Message-ID: <20160810080134.GA16481@gobelin>
+From: panand@redhat.com (Pratyush Anand)
+Date: Wed, 10 Aug 2016 13:31:14 +0530
+Subject: [PATCH 3/4] arm64: kprobes: WARN if attempting to step with
+ PSTATE.D=1
+In-Reply-To: <20160809124832.GI27508@arm.com>
+References: <1468937260-23988-1-git-send-email-will.deacon@arm.com>
+ <1468937260-23988-3-git-send-email-will.deacon@arm.com>
+ <CAHB_Guonf6qc-yCr2oKDZgX+5q7qXJpSpLU3qafChrBkBqk7FA@mail.gmail.com>
+ <20160809124832.GI27508@arm.com>
+Message-ID: <20160810080114.GB27500@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 10, 2016 at 01:18:51PM +0530, Sekhar Nori wrote:
-> On Tuesday 09 August 2016 10:45 PM, Karl Beldan wrote:
-> > Currently the davinci da8xx boards use the mach-davinci aemif code.
-> > Instantiating an aemif node into the DT allows to use the ti-aemif
-> > memory driver and is another step to better DT support.
-> > Also it will allow to properly pass the emif timings via DT.
+Hi Will,
+
+Thanks for the reply.
+
+On 09/08/2016:01:48:32 PM, Will Deacon wrote:
+> On Wed, Aug 03, 2016 at 05:52:55PM +0530, Pratyush Anand wrote:
+> > Hi Will,
 > > 
-> > Signed-off-by: Karl Beldan <kbeldan@baylibre.com>
-> > ---
-> >  arch/arm/boot/dts/da850.dtsi | 10 ++++++++++
-> >  1 file changed, 10 insertions(+)
+> > Its already in torvalds/linux.git: master now. I have some related
+> > queries, so thought to discuss it here.
 > > 
-> > diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
-> > index bc10e7e..f62928c 100644
-> > --- a/arch/arm/boot/dts/da850.dtsi
-> > +++ b/arch/arm/boot/dts/da850.dtsi
-> > @@ -411,6 +411,16 @@
-> >  			dma-names = "tx", "rx";
-> >  		};
-> >  	};
-> > +	aemif: aemif at 68000000 {
-> > +		compatible = "ti,da850-aemif";
-> > +		#address-cells = <2>;
-> > +		#size-cells = <1>;
-> > +
-> > +		reg = <0x68000000 0x00008000>;
-> > +		ranges = <0 0 0x60000000 0x08000000
-> > +			  1 0 0x68000000 0x00008000>;
-> > +		status = "disabled";
-> > +	};
-> >  	nand_cs3 at 62000000 {
-> >  		compatible = "ti,davinci-nand";
-> >  		reg = <0x62000000 0x807ff
+> > On Tue, Jul 19, 2016 at 7:37 PM, Will Deacon <will.deacon@arm.com> wrote:
+> > > Stepping with PSTATE.D=1 is bad news. The step won't generate a debug
+> > > exception and we'll likely walk off into random data structures. This
+> > > should never happen, but when it does, it's a PITA to debug. Add a
+> > 
+> > But it happens in many know scenarios, like:
+> > 
+> > 1) We are executing a WARN_ON(), which will call `BRK  BUG_BRK_IMM`.
+> > It prints warning messages through breakpoint handler. Now, suppose we
+> > have a kprobe instrumented at a print function branch, say
+> > print_worker_info(), we will land into
+> > kprobe_handler()->setup_singlestep() with D-bit set. In this case if
+> > we do not clear it, then we receive undefined exception before we
+> > could get single step exception.
+> > 
+> > 2) Similarly, if we instrument kprobe at uprobe_breakpoint_handler()
+> > (code not yet in upstream),  we land into similar situation which
+> > leads to infinite "Unexpected kernel single-step exception at EL1".
+> > 
+> > So, why can't we clear PSR_D_BIT in setup_singlestep unconditionally?
+> > I found that both of the above issue is resolved by doing that.
 > 
-> The nand node should be part of aemif node like it is done for keystone
-> boards.
+> I think that will work, but the advantage of the WARN_ON is that it can
+> highlight cases where kprobes have been placed on the debug exception
+> path, which is generally a Bad Idea as it can result in infinite recursion
+> loops.
+
+It might result in infinite recursion if we place kprobe at a function which is
+called from kprobe breakpoint/single step handler. However, it should still be
+OK if kprobe is placed in other debug exception path.
+Other arches like x86 allows that, so I think we will have to support as well.
 > 
-Hmm, this is exactly what I have done.
- 
-Karl
+> I know that __kprobes is supposed to deal with this, but in reality that's
+> all a best guess and looks to be incomplete. If we can do a better job
+> of annotating the debug exception path, I'd be up for unconditional
+> clearing of PSR_D_BIT in the target when returning.
+
+OK, so I will send a patch for review with proper comment logs for debug
+exception path.
+
+~Pratyush
