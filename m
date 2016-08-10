@@ -1,76 +1,170 @@
-From: kbeldan@baylibre.com (Karl Beldan)
-Date: Wed, 10 Aug 2016 08:26:31 +0000
-Subject: [PATCH 2/4] ARM: dts: da850: Add an aemif node
-In-Reply-To: <57AAE1D1.5080000@ti.com>
-References: <20160809171518.22690-1-kbeldan@baylibre.com>
- <20160809171518.22690-3-kbeldan@baylibre.com>
- <57AADC63.90405@ti.com> <57AADF7B.1070102@ti.com>
- <20160810080713.GB16481@gobelin> <57AAE1D1.5080000@ti.com>
-Message-ID: <20160810082631.GC16481@gobelin>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 10 Aug 2016 09:28:49 +0100
+Subject: [RESEND v2 01/10] mfd: stmpe: Add STMPE_IDX_SYS_CTRL/2 enum
+In-Reply-To: <1470814755-19447-2-git-send-email-patrice.chotard@st.com>
+References: <1470814755-19447-1-git-send-email-patrice.chotard@st.com>
+ <1470814755-19447-2-git-send-email-patrice.chotard@st.com>
+Message-ID: <20160810082849.GG1581@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 10, 2016 at 01:42:01PM +0530, Sekhar Nori wrote:
-> On Wednesday 10 August 2016 01:37 PM, Karl Beldan wrote:
-> > On Wed, Aug 10, 2016 at 01:32:03PM +0530, Sekhar Nori wrote:
-> >> On Wednesday 10 August 2016 01:18 PM, Sekhar Nori wrote:
-> >>> On Tuesday 09 August 2016 10:45 PM, Karl Beldan wrote:
-> >>>> Currently the davinci da8xx boards use the mach-davinci aemif code.
-> >>>> Instantiating an aemif node into the DT allows to use the ti-aemif
-> >>>> memory driver and is another step to better DT support.
-> >>>> Also it will allow to properly pass the emif timings via DT.
-> >>>>
-> >>>> Signed-off-by: Karl Beldan <kbeldan@baylibre.com>
-> >>>> ---
-> >>>>  arch/arm/boot/dts/da850.dtsi | 10 ++++++++++
-> >>>>  1 file changed, 10 insertions(+)
-> >>>>
-> >>>> diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
-> >>>> index bc10e7e..f62928c 100644
-> >>>> --- a/arch/arm/boot/dts/da850.dtsi
-> >>>> +++ b/arch/arm/boot/dts/da850.dtsi
-> >>>> @@ -411,6 +411,16 @@
-> >>>>  			dma-names = "tx", "rx";
-> >>>>  		};
-> >>>>  	};
-> >>>> +	aemif: aemif at 68000000 {
-> >>>> +		compatible = "ti,da850-aemif";
-> >>>> +		#address-cells = <2>;
-> >>>> +		#size-cells = <1>;
-> >>>> +
-> >>>> +		reg = <0x68000000 0x00008000>;
-> >>>> +		ranges = <0 0 0x60000000 0x08000000
-> >>>> +			  1 0 0x68000000 0x00008000>;
-> >>>> +		status = "disabled";
-> >>>> +	};
-> >>>>  	nand_cs3 at 62000000 {
-> >>>>  		compatible = "ti,davinci-nand";
-> >>>>  		reg = <0x62000000 0x807ff
-> >>>
-> >>> The nand node should be part of aemif node like it is done for keystone
-> >>> boards.
-> >>
-> >> Actually, can you move the nand node out of da850.dtsi completely. Its
-> >> much better to keep da850.dtsi restricted to soc-internal devices and
-> >> keep the board level devices like NAND flash in <board>.dts file.
-> >>
-> >> Similarly, can you move the NAND pinmux definitions too to the
-> >> da850-evm.dts file?
-> >>
-> >> There is advantage in keeping common pinmux definitions in da850.dtsi so
-> >> each board doe not have to repeat them. But AEMIF is an exception as its
-> >> usage can really be varied (NAND, NOR, SRAM, other). Plus, different
-> >> boards are likely to use different chip selects so coming up with some
-> >> pinmux definitions which will be reused widely is really unlikely.
-> >>
-> > This is exactly what I just did for the LCDK.
-> > If everybody is happy with it I will do the same for the evm as I put it
-> > in the cover letter.
+On Wed, 10 Aug 2016, patrice.chotard at st.com wrote:
+
+> From: Patrice Chotard <patrice.chotard@st.com>
 > 
-> Yes please. We dont want duplication of data between da850.dtsi and
-> da850-lcdk.dts files.
+> As STMPE1801/1601/24xx has a SYS_CTRL register and
+> STMPE1601/2403 has even a SYS_CTRL2 register, add
+> STMPE_IDX_SYS_CTRL/2 and update driver code accordingly
 > 
-Then I'll wait for this series to be applied and then apply my changes
-to the EVM while retiring the nand_cs3 together.
- 
-Karl
+> This update prepares the ground for not yet supported STMPE1600
+> which share similar REG_SYS_CTRL register.
+> 
+> Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> Acked-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  drivers/mfd/stmpe.c       | 21 ++++++++++++++-------
+>  drivers/mfd/stmpe.h       |  2 ++
+>  include/linux/mfd/stmpe.h |  2 ++
+>  3 files changed, 18 insertions(+), 7 deletions(-)
+
+Applied, thanks.
+
+> diff --git a/drivers/mfd/stmpe.c b/drivers/mfd/stmpe.c
+> index fb8f9e8..c553b73 100644
+> --- a/drivers/mfd/stmpe.c
+> +++ b/drivers/mfd/stmpe.c
+> @@ -448,6 +448,8 @@ static const struct mfd_cell stmpe_ts_cell = {
+>  
+>  static const u8 stmpe811_regs[] = {
+>  	[STMPE_IDX_CHIP_ID]	= STMPE811_REG_CHIP_ID,
+> +	[STMPE_IDX_SYS_CTRL]	= STMPE811_REG_SYS_CTRL,
+> +	[STMPE_IDX_SYS_CTRL2]	= STMPE811_REG_SYS_CTRL2,
+>  	[STMPE_IDX_ICR_LSB]	= STMPE811_REG_INT_CTRL,
+>  	[STMPE_IDX_IER_LSB]	= STMPE811_REG_INT_EN,
+>  	[STMPE_IDX_ISR_MSB]	= STMPE811_REG_INT_STA,
+> @@ -490,7 +492,7 @@ static int stmpe811_enable(struct stmpe *stmpe, unsigned int blocks,
+>  	if (blocks & STMPE_BLOCK_TOUCHSCREEN)
+>  		mask |= STMPE811_SYS_CTRL2_TSC_OFF;
+>  
+> -	return __stmpe_set_bits(stmpe, STMPE811_REG_SYS_CTRL2, mask,
+> +	return __stmpe_set_bits(stmpe, stmpe->regs[STMPE_IDX_SYS_CTRL2], mask,
+>  				enable ? 0 : mask);
+>  }
+>  
+> @@ -535,6 +537,8 @@ static struct stmpe_variant_info stmpe610 = {
+>  
+>  static const u8 stmpe1601_regs[] = {
+>  	[STMPE_IDX_CHIP_ID]	= STMPE1601_REG_CHIP_ID,
+> +	[STMPE_IDX_SYS_CTRL]	= STMPE1601_REG_SYS_CTRL,
+> +	[STMPE_IDX_SYS_CTRL2]	= STMPE1601_REG_SYS_CTRL2,
+>  	[STMPE_IDX_ICR_LSB]	= STMPE1601_REG_ICR_LSB,
+>  	[STMPE_IDX_IER_LSB]	= STMPE1601_REG_IER_LSB,
+>  	[STMPE_IDX_ISR_MSB]	= STMPE1601_REG_ISR_MSB,
+> @@ -619,13 +623,13 @@ static int stmpe1601_autosleep(struct stmpe *stmpe,
+>  		return timeout;
+>  	}
+>  
+> -	ret = __stmpe_set_bits(stmpe, STMPE1601_REG_SYS_CTRL2,
+> +	ret = __stmpe_set_bits(stmpe, stmpe->regs[STMPE_IDX_SYS_CTRL2],
+>  			STMPE1601_AUTOSLEEP_TIMEOUT_MASK,
+>  			timeout);
+>  	if (ret < 0)
+>  		return ret;
+>  
+> -	return __stmpe_set_bits(stmpe, STMPE1601_REG_SYS_CTRL2,
+> +	return __stmpe_set_bits(stmpe, stmpe->regs[STMPE_IDX_SYS_CTRL2],
+>  			STPME1601_AUTOSLEEP_ENABLE,
+>  			STPME1601_AUTOSLEEP_ENABLE);
+>  }
+> @@ -650,7 +654,7 @@ static int stmpe1601_enable(struct stmpe *stmpe, unsigned int blocks,
+>  	else
+>  		mask &= ~STMPE1601_SYS_CTRL_ENABLE_SPWM;
+>  
+> -	return __stmpe_set_bits(stmpe, STMPE1601_REG_SYS_CTRL, mask,
+> +	return __stmpe_set_bits(stmpe, stmpe->regs[STMPE_IDX_SYS_CTRL], mask,
+>  				enable ? mask : 0);
+>  }
+>  
+> @@ -689,6 +693,7 @@ static struct stmpe_variant_info stmpe1601 = {
+>   */
+>  static const u8 stmpe1801_regs[] = {
+>  	[STMPE_IDX_CHIP_ID]	= STMPE1801_REG_CHIP_ID,
+> +	[STMPE_IDX_SYS_CTRL]	= STMPE1801_REG_SYS_CTRL,
+>  	[STMPE_IDX_ICR_LSB]	= STMPE1801_REG_INT_CTRL_LOW,
+>  	[STMPE_IDX_IER_LSB]	= STMPE1801_REG_INT_EN_MASK_LOW,
+>  	[STMPE_IDX_ISR_LSB]	= STMPE1801_REG_INT_STA_LOW,
+> @@ -735,14 +740,14 @@ static int stmpe1801_reset(struct stmpe *stmpe)
+>  	unsigned long timeout;
+>  	int ret = 0;
+>  
+> -	ret = __stmpe_set_bits(stmpe, STMPE1801_REG_SYS_CTRL,
+> +	ret = __stmpe_set_bits(stmpe, stmpe->regs[STMPE_IDX_SYS_CTRL],
+>  		STMPE1801_MSK_SYS_CTRL_RESET, STMPE1801_MSK_SYS_CTRL_RESET);
+>  	if (ret < 0)
+>  		return ret;
+>  
+>  	timeout = jiffies + msecs_to_jiffies(100);
+>  	while (time_before(jiffies, timeout)) {
+> -		ret = __stmpe_reg_read(stmpe, STMPE1801_REG_SYS_CTRL);
+> +		ret = __stmpe_reg_read(stmpe, stmpe->regs[STMPE_IDX_SYS_CTRL]);
+>  		if (ret < 0)
+>  			return ret;
+>  		if (!(ret & STMPE1801_MSK_SYS_CTRL_RESET))
+> @@ -773,6 +778,8 @@ static struct stmpe_variant_info stmpe1801 = {
+>  
+>  static const u8 stmpe24xx_regs[] = {
+>  	[STMPE_IDX_CHIP_ID]	= STMPE24XX_REG_CHIP_ID,
+> +	[STMPE_IDX_SYS_CTRL]	= STMPE24XX_REG_SYS_CTRL,
+> +	[STMPE_IDX_SYS_CTRL2]	= STMPE24XX_REG_SYS_CTRL2,
+>  	[STMPE_IDX_ICR_LSB]	= STMPE24XX_REG_ICR_LSB,
+>  	[STMPE_IDX_IER_LSB]	= STMPE24XX_REG_IER_LSB,
+>  	[STMPE_IDX_ISR_MSB]	= STMPE24XX_REG_ISR_MSB,
+> @@ -819,7 +826,7 @@ static int stmpe24xx_enable(struct stmpe *stmpe, unsigned int blocks,
+>  	if (blocks & STMPE_BLOCK_KEYPAD)
+>  		mask |= STMPE24XX_SYS_CTRL_ENABLE_KPC;
+>  
+> -	return __stmpe_set_bits(stmpe, STMPE24XX_REG_SYS_CTRL, mask,
+> +	return __stmpe_set_bits(stmpe, stmpe->regs[STMPE_IDX_SYS_CTRL], mask,
+>  				enable ? mask : 0);
+>  }
+>  
+> diff --git a/drivers/mfd/stmpe.h b/drivers/mfd/stmpe.h
+> index 84adb46..406f9f2 100644
+> --- a/drivers/mfd/stmpe.h
+> +++ b/drivers/mfd/stmpe.h
+> @@ -138,6 +138,7 @@ int stmpe_remove(struct stmpe *stmpe);
+>  #define STMPE811_NR_INTERNAL_IRQS	8
+>  
+>  #define STMPE811_REG_CHIP_ID		0x00
+> +#define STMPE811_REG_SYS_CTRL		0x03
+>  #define STMPE811_REG_SYS_CTRL2		0x04
+>  #define STMPE811_REG_SPI_CFG		0x08
+>  #define STMPE811_REG_INT_CTRL		0x09
+> @@ -264,6 +265,7 @@ int stmpe_remove(struct stmpe *stmpe);
+>  #define STMPE24XX_NR_INTERNAL_IRQS	9
+>  
+>  #define STMPE24XX_REG_SYS_CTRL		0x02
+> +#define STMPE24XX_REG_SYS_CTRL2		0x03
+>  #define STMPE24XX_REG_ICR_LSB		0x11
+>  #define STMPE24XX_REG_IER_LSB		0x13
+>  #define STMPE24XX_REG_ISR_MSB		0x14
+> diff --git a/include/linux/mfd/stmpe.h b/include/linux/mfd/stmpe.h
+> index cb83883..6c6690f 100644
+> --- a/include/linux/mfd/stmpe.h
+> +++ b/include/linux/mfd/stmpe.h
+> @@ -39,6 +39,8 @@ enum stmpe_partnum {
+>   */
+>  enum {
+>  	STMPE_IDX_CHIP_ID,
+> +	STMPE_IDX_SYS_CTRL,
+> +	STMPE_IDX_SYS_CTRL2,
+>  	STMPE_IDX_ICR_LSB,
+>  	STMPE_IDX_IER_LSB,
+>  	STMPE_IDX_ISR_LSB,
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
