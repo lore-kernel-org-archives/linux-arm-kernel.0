@@ -1,55 +1,35 @@
 From: jszhang@marvell.com (Jisheng Zhang)
-Date: Wed, 10 Aug 2016 15:19:16 +0800
-Subject: [PATCH 0/3] arm64: put objects into proper sections
-Message-ID: <1470813559-2917-1-git-send-email-jszhang@marvell.com>
+Date: Wed, 10 Aug 2016 15:19:19 +0800
+Subject: [PATCH 3/3] arm64: kernel: declare cpu_ops __read_mostly
+In-Reply-To: <1470813559-2917-1-git-send-email-jszhang@marvell.com>
+References: <1470813559-2917-1-git-send-email-jszhang@marvell.com>
+Message-ID: <1470813559-2917-4-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series tries to put objects into proper sections to avoid
-pontential unnecessary DDR traffics:
+cpu_ops is initialized once by cpu_read_ops(), and thereafter is mostly
+read in hot path, such as arm_cpuidle_suspend().
 
-patch1 puts alloc_vectors_page() into .init section. This is a clean up
-patch.
+The fact that it is mostly read and not written to makes it candidates
+for __read_mostly declarations.
 
-patch2 puts vdso_pages, vdso_spec and vectors_page into read_mostly
-section, since they are read mostly in hot path.
+Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+---
+ arch/arm64/kernel/cpu_ops.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-patch3 puts cpu_ops into read_mostly section, since it's read mostly
-int hot path such as arm_cpuidle_suspend().
-
-
-Before this series:
-
-ffff000008d660f0 b undef_lock
-ffff000008d660f8 b vectors_page
-ffff000008d66100 b vdso_pages
-ffff000008d66108 b vdso_spec
-ffff000008d66148 B cpu_ops
-ffff000008d66348 b patch_lock
-
-After this series:
-
-ffff000008ca5b08 D static_key_initialized
-ffff000008ca5b10 d vectors_page
-ffff000008ca5b18 d vdso_pages
-ffff000008ca5b20 d vdso_spec
-ffff000008ca5b60 D cpu_ops
-ffff000008ca5d60 D elf_hwcap
-ffff000008ca5d68 D compat_elf_hwcap
-ffff000008ca5d6c D compat_elf_hwcap2
-
-Although there's no obvious issue with current code, because undef_lock and
-patch_lock is rarely used, but the situation may change in the future, so
-let's move them into proper sections now.
-
-Jisheng Zhang (3):
-  arm64: vdso: add __init section marker to alloc_vectors_page
-  arm64: vdso: put read only/mostly objects into proper sections
-  arm64: kernel: declare cpu_ops __read_mostly
-
- arch/arm64/kernel/cpu_ops.c |  2 +-
- arch/arm64/kernel/vdso.c    | 31 +++++++++++++++----------------
- 2 files changed, 16 insertions(+), 17 deletions(-)
-
+diff --git a/arch/arm64/kernel/cpu_ops.c b/arch/arm64/kernel/cpu_ops.c
+index c7cfb8f..c1e4802 100644
+--- a/arch/arm64/kernel/cpu_ops.c
++++ b/arch/arm64/kernel/cpu_ops.c
+@@ -28,7 +28,7 @@ extern const struct cpu_operations smp_spin_table_ops;
+ extern const struct cpu_operations acpi_parking_protocol_ops;
+ extern const struct cpu_operations cpu_psci_ops;
+ 
+-const struct cpu_operations *cpu_ops[NR_CPUS];
++const struct cpu_operations *cpu_ops[NR_CPUS] __read_mostly;
+ 
+ static const struct cpu_operations *dt_supported_cpu_ops[] __initconst = {
+ 	&smp_spin_table_ops,
 -- 
 2.8.1
