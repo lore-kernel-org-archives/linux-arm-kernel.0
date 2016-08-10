@@ -1,34 +1,72 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 10 Aug 2016 10:09:08 +0200
-Subject: [PATCH] clocksource/drivers/time-armada-370-xp: Fix the clock
- reference
-Message-ID: <1470816548-8750-1-git-send-email-gregory.clement@free-electrons.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Wed, 10 Aug 2016 13:42:01 +0530
+Subject: [PATCH 2/4] ARM: dts: da850: Add an aemif node
+In-Reply-To: <20160810080713.GB16481@gobelin>
+References: <20160809171518.22690-1-kbeldan@baylibre.com>
+ <20160809171518.22690-3-kbeldan@baylibre.com> <57AADC63.90405@ti.com>
+ <57AADF7B.1070102@ti.com> <20160810080713.GB16481@gobelin>
+Message-ID: <57AAE1D1.5080000@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-While converting the init function to return an error, the wrong clock
-was get. This lead to wrong clock rate and slow down the kernel. For
-example, before the patch a typical boot was around 15s after it was 1
-minute slower.
+On Wednesday 10 August 2016 01:37 PM, Karl Beldan wrote:
+> On Wed, Aug 10, 2016 at 01:32:03PM +0530, Sekhar Nori wrote:
+>> On Wednesday 10 August 2016 01:18 PM, Sekhar Nori wrote:
+>>> On Tuesday 09 August 2016 10:45 PM, Karl Beldan wrote:
+>>>> Currently the davinci da8xx boards use the mach-davinci aemif code.
+>>>> Instantiating an aemif node into the DT allows to use the ti-aemif
+>>>> memory driver and is another step to better DT support.
+>>>> Also it will allow to properly pass the emif timings via DT.
+>>>>
+>>>> Signed-off-by: Karl Beldan <kbeldan@baylibre.com>
+>>>> ---
+>>>>  arch/arm/boot/dts/da850.dtsi | 10 ++++++++++
+>>>>  1 file changed, 10 insertions(+)
+>>>>
+>>>> diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
+>>>> index bc10e7e..f62928c 100644
+>>>> --- a/arch/arm/boot/dts/da850.dtsi
+>>>> +++ b/arch/arm/boot/dts/da850.dtsi
+>>>> @@ -411,6 +411,16 @@
+>>>>  			dma-names = "tx", "rx";
+>>>>  		};
+>>>>  	};
+>>>> +	aemif: aemif at 68000000 {
+>>>> +		compatible = "ti,da850-aemif";
+>>>> +		#address-cells = <2>;
+>>>> +		#size-cells = <1>;
+>>>> +
+>>>> +		reg = <0x68000000 0x00008000>;
+>>>> +		ranges = <0 0 0x60000000 0x08000000
+>>>> +			  1 0 0x68000000 0x00008000>;
+>>>> +		status = "disabled";
+>>>> +	};
+>>>>  	nand_cs3 at 62000000 {
+>>>>  		compatible = "ti,davinci-nand";
+>>>>  		reg = <0x62000000 0x807ff
+>>>
+>>> The nand node should be part of aemif node like it is done for keystone
+>>> boards.
+>>
+>> Actually, can you move the nand node out of da850.dtsi completely. Its
+>> much better to keep da850.dtsi restricted to soc-internal devices and
+>> keep the board level devices like NAND flash in <board>.dts file.
+>>
+>> Similarly, can you move the NAND pinmux definitions too to the
+>> da850-evm.dts file?
+>>
+>> There is advantage in keeping common pinmux definitions in da850.dtsi so
+>> each board doe not have to repeat them. But AEMIF is an exception as its
+>> usage can really be varied (NAND, NOR, SRAM, other). Plus, different
+>> boards are likely to use different chip selects so coming up with some
+>> pinmux definitions which will be reused widely is really unlikely.
+>>
+> This is exactly what I just did for the LCDK.
+> If everybody is happy with it I will do the same for the evm as I put it
+> in the cover letter.
 
-Fixes: 12549e27c63c ("clocksource/drivers/time-armada-370-xp: Convert init function to return error")
+Yes please. We dont want duplication of data between da850.dtsi and
+da850-lcdk.dts files.
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- drivers/clocksource/time-armada-370-xp.c | 1 -
- 1 file changed, 1 deletion(-)
-
-diff --git a/drivers/clocksource/time-armada-370-xp.c b/drivers/clocksource/time-armada-370-xp.c
-index 719b478d136e..3c39e6f45971 100644
---- a/drivers/clocksource/time-armada-370-xp.c
-+++ b/drivers/clocksource/time-armada-370-xp.c
-@@ -338,7 +338,6 @@ static int __init armada_xp_timer_init(struct device_node *np)
- 	struct clk *clk = of_clk_get_by_name(np, "fixed");
- 	int ret;
- 
--	clk = of_clk_get(np, 0);
- 	if (IS_ERR(clk)) {
- 		pr_err("Failed to get clock");
- 		return PTR_ERR(clk);
--- 
-2.8.1
+Thanks,
+Sekhar
