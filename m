@@ -1,65 +1,26 @@
-From: wangkefeng.wang@huawei.com (Kefeng Wang)
-Date: Wed, 10 Aug 2016 20:59:16 +0800
-Subject: [PATCH 2/2] arm: perf: Use the builtin_platform_driver
-In-Reply-To: <1470833956-5619-1-git-send-email-wangkefeng.wang@huawei.com>
-References: <1470833956-5619-1-git-send-email-wangkefeng.wang@huawei.com>
-Message-ID: <1470833956-5619-2-git-send-email-wangkefeng.wang@huawei.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 10 Aug 2016 15:02:05 +0200
+Subject: [PATCH 0244/1285] Replace numeric parameter like 0444 with macro
+In-Reply-To: <20160802105246.30008-1-baolex.ni@intel.com>
+References: <20160802105246.30008-1-baolex.ni@intel.com>
+Message-ID: <CACRpkdZsgSfL9rwe-vU5S6nNy0weD3O3PZymUZQsvJhQTSjf=w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the builtin_platform_driver() to simplify code.
+On Tue, Aug 2, 2016 at 12:52 PM, Baole Ni <baolex.ni@intel.com> wrote:
 
-Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
----
- arch/arm/kernel/perf_event_v6.c     | 6 +-----
- arch/arm/kernel/perf_event_v7.c     | 6 +-----
- arch/arm/kernel/perf_event_xscale.c | 6 +-----
- 3 files changed, 3 insertions(+), 15 deletions(-)
+> I find that the developers often just specified the numeric value
+> when calling a macro which is defined with a parameter for access permission.
+> As we know, these numeric value for access permission have had the corresponding macro,
+> and that using macro can improve the robustness and readability of the code,
+> thus, I suggest replacing the numeric parameter with the macro.
+>
+> Signed-off-by: Chuansheng Liu <chuansheng.liu@intel.com>
+> Signed-off-by: Baole Ni <baolex.ni@intel.com>
 
-diff --git a/arch/arm/kernel/perf_event_v6.c b/arch/arm/kernel/perf_event_v6.c
-index 09413e7..96b7a47 100644
---- a/arch/arm/kernel/perf_event_v6.c
-+++ b/arch/arm/kernel/perf_event_v6.c
-@@ -581,9 +581,5 @@ static struct platform_driver armv6_pmu_driver = {
- 	.probe		= armv6_pmu_device_probe,
- };
- 
--static int __init register_armv6_pmu_driver(void)
--{
--	return platform_driver_register(&armv6_pmu_driver);
--}
--device_initcall(register_armv6_pmu_driver);
-+builtin_platform_driver(armv6_pmu_driver);
- #endif	/* CONFIG_CPU_V6 || CONFIG_CPU_V6K */
-diff --git a/arch/arm/kernel/perf_event_v7.c b/arch/arm/kernel/perf_event_v7.c
-index 1506385..166e98d 100644
---- a/arch/arm/kernel/perf_event_v7.c
-+++ b/arch/arm/kernel/perf_event_v7.c
-@@ -2025,9 +2025,5 @@ static struct platform_driver armv7_pmu_driver = {
- 	.probe		= armv7_pmu_device_probe,
- };
- 
--static int __init register_armv7_pmu_driver(void)
--{
--	return platform_driver_register(&armv7_pmu_driver);
--}
--device_initcall(register_armv7_pmu_driver);
-+builtin_platform_driver(armv7_pmu_driver);
- #endif	/* CONFIG_CPU_V7 */
-diff --git a/arch/arm/kernel/perf_event_xscale.c b/arch/arm/kernel/perf_event_xscale.c
-index aa0499e..0e51f5e 100644
---- a/arch/arm/kernel/perf_event_xscale.c
-+++ b/arch/arm/kernel/perf_event_xscale.c
-@@ -767,9 +767,5 @@ static struct platform_driver xscale_pmu_driver = {
- 	.probe		= xscale_pmu_device_probe,
- };
- 
--static int __init register_xscale_pmu_driver(void)
--{
--	return platform_driver_register(&xscale_pmu_driver);
--}
--device_initcall(register_xscale_pmu_driver);
-+builtin_platform_driver(xscale_pmu_driver);
- #endif	/* CONFIG_CPU_XSCALE */
--- 
-1.7.12.4
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+
+I assume Wolfram will merge this.
+
+Yours,
+Linus Walleij
