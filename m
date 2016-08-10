@@ -1,44 +1,41 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 10 Aug 2016 11:46:05 +0200
-Subject: [PATCH] ARM: exynos_defconfig: Enable bus frequency scaling with
- DEVFREQ/DEVFREQ-Event
-In-Reply-To: <1468546426-4482-1-git-send-email-cw00.choi@samsung.com>
-References: <1468546426-4482-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <baa00991-8894-7879-1075-28437139c61a@samsung.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Wed, 10 Aug 2016 17:54:03 +0800
+Subject: [PATCH] ARM: cpuidle: declare cpuidle_ops __read_mostly
+In-Reply-To: <1470818997-808-1-git-send-email-jszhang@marvell.com>
+References: <1470818997-808-1-git-send-email-jszhang@marvell.com>
+Message-ID: <20160810175403.53e218cf@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/15/2016 03:33 AM, Chanwoo Choi wrote:
-> This patch enables the bus frequency scaling driver with DEVFREQ and
-> DEVFREQ-Event framework. This patches already was merged for Odroid-U3/XU3
-> ,Trats2 and Rinato/Monk boards.
+
+On Wed, 10 Aug 2016 16:49:57 +0800 Jisheng Zhang wrote:
+
+> cpuidle_ops is initialized once by arm_cpuidle_read_ops() during
+> initialization, and thereafter is mostly read in arm_cpuidle_suspend()
 > 
-> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+> The fact that it is mostly read and not written to makes it candidates
+> for __read_mostly declarations.
+> 
+> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
 > ---
->  arch/arm/configs/exynos_defconfig | 10 ++++++++++
->  1 file changed, 10 insertions(+)
+>  arch/arm/kernel/cpuidle.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
-> index a5aa44c56bfe..37052b115a40 100644
-> --- a/arch/arm/configs/exynos_defconfig
-> +++ b/arch/arm/configs/exynos_defconfig
-> @@ -219,6 +219,16 @@ CONFIG_CROS_EC_CHARDEV=y
->  CONFIG_COMMON_CLK_MAX77686=y
->  CONFIG_COMMON_CLK_MAX77802=y
->  CONFIG_COMMON_CLK_S2MPS11=y
-> +CONFIG_PM_DEVFREQ=y
-> +CONFIG_DEVFREQ_GOV_SIMPLE_ONDEMAND=y
-> +CONFIG_DEVFREQ_GOV_PERFORMANCE=y
-> +CONFIG_DEVFREQ_GOV_POWERSAVE=y
-> +CONFIG_DEVFREQ_GOV_USERSPACE=y
-> +CONFIG_DEVFREQ_GOV_PASSIVE=y
-> +CONFIG_ARM_EXYNOS_BUS_DEVFREQ=y
-> +CONFIG_PM_DEVFREQ_EVENT=y
-> +CONFIG_DEVFREQ_EVENT_EXYNOS_NOCP=y
-> +CONFIG_DEVFREQ_EVENT_EXYNOS_PPMU=y
+> diff --git a/arch/arm/kernel/cpuidle.c b/arch/arm/kernel/cpuidle.c
+> index 7dccc96..762e0929 100644
+> --- a/arch/arm/kernel/cpuidle.c
+> +++ b/arch/arm/kernel/cpuidle.c
+> @@ -19,7 +19,7 @@ extern struct of_cpuidle_method __cpuidle_method_of_table[];
+>  static const struct of_cpuidle_method __cpuidle_method_of_table_sentinel
+>  	__used __section(__cpuidle_method_of_table_end);
+>  
+> -static struct cpuidle_ops cpuidle_ops[NR_CPUS];
+> +static struct cpuidle_ops cpuidle_ops[NR_CPUS] __read_mostly;
 
-Applied with small changes in commit message and removal of symbols
-already selected (defconfig).
 
-Best regards,
-Krzysztof
+oops, I just found that "arm: apply more __ro_after_init" from Kees
+marked cpuidle_ops as __ro_after_init, that also meet my need, so
+let's drop my patch.
+
+Thanks,
+Jisheng
