@@ -1,66 +1,55 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Wed, 10 Aug 2016 19:06:44 +0800
-Subject: [PATCH] ARM: cpuidle: declare cpuidle_ops __read_mostly
-In-Reply-To: <8191851.HcPOqTYLq8@wuerfel>
-References: <1470818997-808-1-git-send-email-jszhang@marvell.com>
- <2118361.tr3K3hSZxF@wuerfel>	<20160810171926.44557e35@xhacker>
- <8191851.HcPOqTYLq8@wuerfel>
-Message-ID: <20160810190644.68966492@xhacker>
+From: kbeldan@baylibre.com (Karl Beldan)
+Date: Wed, 10 Aug 2016 11:19:44 +0000
+Subject: [PATCH 3/4] ARM: dts: da850-lcdk: Add NAND to DT
+In-Reply-To: <57AAF472.7000804@ti.com>
+References: <20160809171518.22690-1-kbeldan@baylibre.com>
+ <20160809171518.22690-4-kbeldan@baylibre.com>
+ <57AAE67D.4000404@ti.com> <20160810090417.GE16481@gobelin>
+ <57AAF472.7000804@ti.com>
+Message-ID: <20160810111944.GA31616@gobelin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Arnd,
+On Wed, Aug 10, 2016 at 03:01:30PM +0530, Sekhar Nori wrote:
+> On Wednesday 10 August 2016 02:34 PM, Karl Beldan wrote:
+> > On Wed, Aug 10, 2016 at 02:01:57PM +0530, Sekhar Nori wrote:
+> >> On Tuesday 09 August 2016 10:45 PM, Karl Beldan wrote:
+> >>> This adds DT support for the NAND connected to the SoC AEMIF.
+> >>> The parameters (timings, ecc) are the same as what the board ships with
+> >>> (default AEMIF timings, 1bit ECC) and improvements will be handled in
+> >>> due course.
+> >>
+> >> I disagree that we need to be compatible to the software that ships with
+> >> the board. Thats software was last updated 3 years ago. Instead I would
+> >> concern with what the hardware supports. So, if the hardware can support
+> >> 4-bit ECC, I would use that.
+> >>
+> > I am not saying we _need_ to be compatible.
+> 
+> Alright then, please drop references to what software the board ships
+> with in the commit message and in the patch itself.
+> 
 
-On Wed, 10 Aug 2016 12:47:21 +0200 Arnd Bergmann wrote:
+I hadn't seen this comment before sending v2.
 
-> On Wednesday, August 10, 2016 5:19:26 PM CEST Jisheng Zhang wrote:
-> > Dear Arnd,
 > > 
-> > On Wed, 10 Aug 2016 10:57:57 +0200 Arnd Bergmann wrote:
-> >   
-> > > On Wednesday, August 10, 2016 4:49:57 PM CEST Jisheng Zhang wrote:  
-> > > > diff --git a/arch/arm/kernel/cpuidle.c b/arch/arm/kernel/cpuidle.c
-> > > > index 7dccc96..762e0929 100644
-> > > > --- a/arch/arm/kernel/cpuidle.c
-> > > > +++ b/arch/arm/kernel/cpuidle.c
-> > > > @@ -19,7 +19,7 @@ extern struct of_cpuidle_method __cpuidle_method_of_table[];
-> > > >  static const struct of_cpuidle_method __cpuidle_method_of_table_sentinel
-> > > >         __used __section(__cpuidle_method_of_table_end);
-> > > >  
-> > > > -static struct cpuidle_ops cpuidle_ops[NR_CPUS];
-> > > > +static struct cpuidle_ops cpuidle_ops[NR_CPUS] __read_mostly;    
-> > > 
-> > > Should this perhaps be percpu data instead?
-> > >   
-> > 
-> > Per my understanding, percpu is used for those vars with normal read/write
-> > frequency, while the cpuidle_ops is read mostly, so IMHO, __read_mostly
-> > is suitable, what do you think?  
+> >> If driver is broken for 4-bit ECC, please fix that up first.
+> >>
+> > Since this issue is completely separate from my DT improvements
+> > I'll stick to resubmitting the series, applying my LCDK changes to the
+> > EVM too, besides you'll be able to compare the behavior without ECC
+> > discrepancies.
+> > I took note that you are likely to not apply without the ECC fix.
 > 
-> You are right, __read_mostly is better than the normal .data section here,
-> but percpu is also better than .data because it saves a little memory
-> on machines that have few present CPUs than CONFIG_NR_CPUS.
-> 
-> So both have their advantages, we just need to pick a preference.
-> 
-> Actually __ro_after_init would be even better than __read_mostly here
-> I think, as this is only updated in an __init function. I guess
-> using that would have the added security advantage of preventing
-> an attacker from writing to the function pointers when they
-> find a way to overflow an access in the percpu data section.
+> Yeah, I would not like to apply with 1-bit ECC now and then change to
+> 4-bit ECC soon after.
 > 
 
-Got it, thanks for the detailed explanations. 
-
-And I think the answer to questions:
-
-http://lists.infradead.org/pipermail/linux-arm-kernel/2016-August/448057.html
-
-and
-
-http://lists.infradead.org/pipermail/linux-arm-kernel/2016-August/448059.html
-
-are both "yes"
-
-Thanks,
-Jisheng
+Both mityomapl138 from mainline and hawkboard from TI's BSP release
+include the comment:
+- "4 bit mode is not supported with 16 bit NAND"
+It is not clear whether they imply that the HW has issues or if it's SW
+only, but 4-bits ECC is a different matter and I hope you'll integrate
+the current changes prior to tackling it.
+ 
+Karl
