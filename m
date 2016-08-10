@@ -1,114 +1,61 @@
-From: niklas.soderlund+renesas@ragnatech.se (=?UTF-8?q?Niklas=20S=C3=B6derlund?=)
-Date: Wed, 10 Aug 2016 13:22:18 +0200
-Subject: [PATCHv9 5/6] dmaengine: rcar-dmac: group slave configuration
-In-Reply-To: <20160810112219.17964-1-niklas.soderlund+renesas@ragnatech.se>
-References: <20160810112219.17964-1-niklas.soderlund+renesas@ragnatech.se>
-Message-ID: <20160810112219.17964-6-niklas.soderlund+renesas@ragnatech.se>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 10 Aug 2016 08:37:04 -0300
+Subject: [PATCH] clk: imx7d: do not set the parent of
+ IMX7D_ENET_AXI_ROOT_SRC
+In-Reply-To: <1468590782-8436-1-git-send-email-fabio.estevam@nxp.com>
+References: <1468590782-8436-1-git-send-email-fabio.estevam@nxp.com>
+Message-ID: <CAOMZO5BjdhCDNU-Vr7OT81ag0LqgFQ3+oP1D_o0FUOZVafneqQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Group slave address and transfer size in own structs for source and
-destination. This is in preparation for hooking up the dma-mapping API
-to the slave addresses.
+Hi Mike,
 
-Signed-off-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
-Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
----
- drivers/dma/sh/rcar-dmac.c | 38 ++++++++++++++++++++++----------------
- 1 file changed, 22 insertions(+), 16 deletions(-)
+On Fri, Jul 15, 2016 at 10:53 AM, Fabio Estevam <fabio.estevam@nxp.com> wrote:
+> Booting the kernel on a imx7s-warp leads to several warnings like these:
+>
+> [    0.000000] ------------[ cut here ]------------
+> [    0.000000] WARNING: CPU: 0 PID: 0 at kernel/locking/lockdep.c:3536 lock_release+0x2f8/0x330
+> [    0.000000] releasing a pinned lock
+>
+> [    0.000000] ------------[ cut here ]------------
+> [    0.000000] WARNING: CPU: 0 PID: 0 at kernel/locking/lockdep.c:2722 trace_hardirqs_on_caller+0x1ac/0x1f4
+> [    0.000000] DEBUG_LOCKS_WARN_ON(unlikely(early_boot_irqs_disabled))
+>
+> [    0.000000] ---[ end trace cb88537fdc8fa201 ]---
+> [    0.000000] bad: scheduling from the idle thread!
+> [    0.000000] CPU: 0 PID: 0 Comm: swapper/0 Tainted: G        W       4.7.0-rc7-next-20160715 #404
+>
+> [    0.000000] ------------[ cut here ]------------
+> [    0.000000] WARNING: CPU: 0 PID: 0 at kernel/time/sched_clock.c:179 sched_clock_register+0x44/0x1f8
+> [    0.000000] Modules linked in:
+>
+> [    0.000591] ------------[ cut here ]------------
+> [    0.000610] WARNING: CPU: 0 PID: 0 at kernel/time/sched_clock.c:179 sched_clock_register+0x44/0x1f8
+>
+> [    0.002084] ------------[ cut here ]------------
+> [    0.002104] WARNING: CPU: 0 PID: 0 at init/main.c:576 start_kernel+0x258/0x3b0
+> [    0.002114] Interrupts were enabled early
+>
+>
+> This fix is along the same lines as 5e33ebff7edd ("clk: imx7d: do not
+> set parent of ethernet time/ref clocks") and the explanation from that
+> commit is:
+>
+> "The reason for the warning is that setting the parent enables the ENET
+>  PLL since we are using CLK_OPS_PARENT_ENABLE. Enabling the ENET PLL can
+>  cause clk_pllv3_wait_lock to sleep. See also:
+>  commit fc8726a2c021 ("clk: core: support clocks which requires parents
+>  enable (part 2)")."
+>
+> imx7s-warp does not even use the FEC interface, so we should not really
+> configure the parent of IMX7D_ENET_AXI_ROOT_SRC in the common MX7 clock
+> driver code.
+>
+> The dts file should use the assigned-clocks/assigned-clock-parents method,
+> so simply remove the configuration of IMX7D_ENET_AXI_ROOT_SRC parent.
+>
+> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 
-diff --git a/drivers/dma/sh/rcar-dmac.c b/drivers/dma/sh/rcar-dmac.c
-index 0dd9538..cf983a9 100644
---- a/drivers/dma/sh/rcar-dmac.c
-+++ b/drivers/dma/sh/rcar-dmac.c
-@@ -118,14 +118,22 @@ struct rcar_dmac_desc_page {
- 	sizeof(struct rcar_dmac_xfer_chunk))
- 
- /*
-+ * struct rcar_dmac_chan_slave - Slave configuration
-+ * @slave_addr: slave memory address
-+ * @xfer_size: size (in bytes) of hardware transfers
-+ */
-+struct rcar_dmac_chan_slave {
-+	phys_addr_t slave_addr;
-+	unsigned int xfer_size;
-+};
-+
-+/*
-  * struct rcar_dmac_chan - R-Car Gen2 DMA Controller Channel
-  * @chan: base DMA channel object
-  * @iomem: channel I/O memory base
-  * @index: index of this channel in the controller
-- * @src_xfer_size: size (in bytes) of hardware transfers on the source side
-- * @dst_xfer_size: size (in bytes) of hardware transfers on the destination side
-- * @src_slave_addr: slave source memory address
-- * @dst_slave_addr: slave destination memory address
-+ * @src: slave memory address and size on the source side
-+ * @dst: slave memory address and size on the destination side
-  * @mid_rid: hardware MID/RID for the DMA client using this channel
-  * @lock: protects the channel CHCR register and the desc members
-  * @desc.free: list of free descriptors
-@@ -142,10 +150,8 @@ struct rcar_dmac_chan {
- 	void __iomem *iomem;
- 	unsigned int index;
- 
--	unsigned int src_xfer_size;
--	unsigned int dst_xfer_size;
--	dma_addr_t src_slave_addr;
--	dma_addr_t dst_slave_addr;
-+	struct rcar_dmac_chan_slave src;
-+	struct rcar_dmac_chan_slave dst;
- 	int mid_rid;
- 
- 	spinlock_t lock;
-@@ -793,13 +799,13 @@ static void rcar_dmac_chan_configure_desc(struct rcar_dmac_chan *chan,
- 	case DMA_DEV_TO_MEM:
- 		chcr = RCAR_DMACHCR_DM_INC | RCAR_DMACHCR_SM_FIXED
- 		     | RCAR_DMACHCR_RS_DMARS;
--		xfer_size = chan->src_xfer_size;
-+		xfer_size = chan->src.xfer_size;
- 		break;
- 
- 	case DMA_MEM_TO_DEV:
- 		chcr = RCAR_DMACHCR_DM_FIXED | RCAR_DMACHCR_SM_INC
- 		     | RCAR_DMACHCR_RS_DMARS;
--		xfer_size = chan->dst_xfer_size;
-+		xfer_size = chan->dst.xfer_size;
- 		break;
- 
- 	case DMA_MEM_TO_MEM:
-@@ -1040,7 +1046,7 @@ rcar_dmac_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
- 	}
- 
- 	dev_addr = dir == DMA_DEV_TO_MEM
--		 ? rchan->src_slave_addr : rchan->dst_slave_addr;
-+		 ? rchan->src.slave_addr : rchan->dst.slave_addr;
- 	return rcar_dmac_chan_prep_sg(rchan, sgl, sg_len, dev_addr,
- 				      dir, flags, false);
- }
-@@ -1095,7 +1101,7 @@ rcar_dmac_prep_dma_cyclic(struct dma_chan *chan, dma_addr_t buf_addr,
- 	}
- 
- 	dev_addr = dir == DMA_DEV_TO_MEM
--		 ? rchan->src_slave_addr : rchan->dst_slave_addr;
-+		 ? rchan->src.slave_addr : rchan->dst.slave_addr;
- 	desc = rcar_dmac_chan_prep_sg(rchan, sgl, sg_len, dev_addr,
- 				      dir, flags, true);
- 
-@@ -1112,10 +1118,10 @@ static int rcar_dmac_device_config(struct dma_chan *chan,
- 	 * We could lock this, but you shouldn't be configuring the
- 	 * channel, while using it...
- 	 */
--	rchan->src_slave_addr = cfg->src_addr;
--	rchan->dst_slave_addr = cfg->dst_addr;
--	rchan->src_xfer_size = cfg->src_addr_width;
--	rchan->dst_xfer_size = cfg->dst_addr_width;
-+	rchan->src.slave_addr = cfg->src_addr;
-+	rchan->dst.slave_addr = cfg->dst_addr;
-+	rchan->src.xfer_size = cfg->src_addr_width;
-+	rchan->dst.xfer_size = cfg->dst_addr_width;
- 
- 	return 0;
- }
--- 
-2.9.2
+Do you think this one could be applied to 4.8-rc?
+
+Thanks
