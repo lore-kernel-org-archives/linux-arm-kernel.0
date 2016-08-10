@@ -1,27 +1,27 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 10 Aug 2016 22:51:23 +0200
-Subject: [PATCH 2/2] arm64: Kconfig: select HISILICON_IRQ_MBIGEN only if
- PCI is selected
-In-Reply-To: <1470234574-19027-2-git-send-email-sudeep.holla@arm.com>
-References: <1470234574-19027-1-git-send-email-sudeep.holla@arm.com>
- <1470234574-19027-2-git-send-email-sudeep.holla@arm.com>
-Message-ID: <2649669.8tFZ3PUETd@wuerfel>
+Date: Wed, 10 Aug 2016 22:52:13 +0200
+Subject: [Urgent PATCH] arm64: dts: uniphier: fix IRQ trigger type of
+ ARMv8 timer
+In-Reply-To: <1470039140-3801-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1470039140-3801-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <1769666.3m3onKVFl3@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, August 3, 2016 3:29:34 PM CEST Sudeep Holla wrote:
-> Even when PCI is disabled, ARCH_HISI selects HISILICON_IRQ_MBIGEN
-> triggerring the following config warning:
+On Monday, August 1, 2016 5:12:20 PM CEST Masahiro Yamada wrote:
+> Since commit 1e2a7d78499e ("irqdomain: Don't set type when mapping
+> an IRQ"), the interrupt type is strictly checked.  Without this
+> patch, this board would not boot any more.
 > 
-> warning: (ARM64 && HISILICON_IRQ_MBIGEN) selects ARM_GIC_V3_ITS which
->         has unmet direct dependencies (PCI && PCI_MSI)
+> Documentation/devicetree/bindings/interrupt-controller/arm,gic-v3.txt
+> says that the 3rd cell should be either 1 (edge) or 4 (level)
+> depending on the trigger type.  As the CA72 Generic Timer provides
+> active-low interrupts, the value of the 3rd cell should be 4.
 > 
-> This patch makes selection of HISILICON_IRQ_MBIGEN conditional on PCI.
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> Suggested-by: Marc Zyngier <marc.zyngier@arm.com>
+> 
 
-I think strictly speaking HISILICON_IRQ_MBIGEN should work without PCI,
-but that is only a theoretical setup, and the patch seems to be the
-simplest way to avoid the warning.
-
-Applied both patches to fixes, sorry for the delay.
+I've added it to the fixes branch now, sorry for the delay.
 
 	Arnd
