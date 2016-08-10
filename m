@@ -1,67 +1,33 @@
-From: kbeldan@baylibre.com (Karl Beldan)
-Date: Wed, 10 Aug 2016 08:07:13 +0000
-Subject: [PATCH 2/4] ARM: dts: da850: Add an aemif node
-In-Reply-To: <57AADF7B.1070102@ti.com>
-References: <20160809171518.22690-1-kbeldan@baylibre.com>
- <20160809171518.22690-3-kbeldan@baylibre.com>
- <57AADC63.90405@ti.com> <57AADF7B.1070102@ti.com>
-Message-ID: <20160810080713.GB16481@gobelin>
+From: yizhouzhou@ict.ac.cn (yizhouzhou at ict.ac.cn)
+Date: Wed, 10 Aug 2016 16:08:22 +0800
+Subject: [PATCH 1/1] xilinx: check return value of class_create
+Message-ID: <1470816502-16802-1-git-send-email-yizhouzhou@ict.ac.cn>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 10, 2016 at 01:32:03PM +0530, Sekhar Nori wrote:
-> On Wednesday 10 August 2016 01:18 PM, Sekhar Nori wrote:
-> > On Tuesday 09 August 2016 10:45 PM, Karl Beldan wrote:
-> >> Currently the davinci da8xx boards use the mach-davinci aemif code.
-> >> Instantiating an aemif node into the DT allows to use the ti-aemif
-> >> memory driver and is another step to better DT support.
-> >> Also it will allow to properly pass the emif timings via DT.
-> >>
-> >> Signed-off-by: Karl Beldan <kbeldan@baylibre.com>
-> >> ---
-> >>  arch/arm/boot/dts/da850.dtsi | 10 ++++++++++
-> >>  1 file changed, 10 insertions(+)
-> >>
-> >> diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
-> >> index bc10e7e..f62928c 100644
-> >> --- a/arch/arm/boot/dts/da850.dtsi
-> >> +++ b/arch/arm/boot/dts/da850.dtsi
-> >> @@ -411,6 +411,16 @@
-> >>  			dma-names = "tx", "rx";
-> >>  		};
-> >>  	};
-> >> +	aemif: aemif at 68000000 {
-> >> +		compatible = "ti,da850-aemif";
-> >> +		#address-cells = <2>;
-> >> +		#size-cells = <1>;
-> >> +
-> >> +		reg = <0x68000000 0x00008000>;
-> >> +		ranges = <0 0 0x60000000 0x08000000
-> >> +			  1 0 0x68000000 0x00008000>;
-> >> +		status = "disabled";
-> >> +	};
-> >>  	nand_cs3 at 62000000 {
-> >>  		compatible = "ti,davinci-nand";
-> >>  		reg = <0x62000000 0x807ff
-> > 
-> > The nand node should be part of aemif node like it is done for keystone
-> > boards.
-> 
-> Actually, can you move the nand node out of da850.dtsi completely. Its
-> much better to keep da850.dtsi restricted to soc-internal devices and
-> keep the board level devices like NAND flash in <board>.dts file.
-> 
-> Similarly, can you move the NAND pinmux definitions too to the
-> da850-evm.dts file?
-> 
-> There is advantage in keeping common pinmux definitions in da850.dtsi so
-> each board doe not have to repeat them. But AEMIF is an exception as its
-> usage can really be varied (NAND, NOR, SRAM, other). Plus, different
-> boards are likely to use different chip selects so coming up with some
-> pinmux definitions which will be reused widely is really unlikely.
-> 
-This is exactly what I just did for the LCDK.
-If everybody is happy with it I will do the same for the evm as I put it
-in the cover letter.
+From: Zhouyi Zhou <yizhouzhou@ict.ac.cn>
+
+	 return value of class_create should be considered in
+module init function.
+
+Signed-off-by: Zhouyi Zhou <zhouzhouyi@gmail.com>
+---
+ drivers/char/xilinx_hwicap/xilinx_hwicap.c | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/drivers/char/xilinx_hwicap/xilinx_hwicap.c b/drivers/char/xilinx_hwicap/xilinx_hwicap.c
+index c07dfe5..3877b46 100644
+--- a/drivers/char/xilinx_hwicap/xilinx_hwicap.c
++++ b/drivers/char/xilinx_hwicap/xilinx_hwicap.c
+@@ -854,6 +854,9 @@ static int __init hwicap_module_init(void)
+ 	int retval;
  
-Karl
+ 	icap_class = class_create(THIS_MODULE, "xilinx_config");
++	if (IS_ERR(icap_class))
++		return PTR_ERR(icap_class);
++
+ 	mutex_init(&icap_sem);
+ 
+ 	devt = MKDEV(XHWICAP_MAJOR, XHWICAP_MINOR);
+-- 
+1.9.1
