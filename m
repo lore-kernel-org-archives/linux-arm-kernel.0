@@ -1,40 +1,30 @@
-From: shuahkh@osg.samsung.com (Shuah Khan)
-Date: Wed, 10 Aug 2016 17:05:02 -0600
-Subject: [PATCH] exynos-drm: Fix display manager failing to start without
- IOMMU problem
-In-Reply-To: <57ABB1ED.1080301@samsung.com>
-References: <CGME20160810214111epcas1p4dd2a581353b550a1992fc7695e846da7@epcas1p4.samsung.com>
- <1470850251-9150-1-git-send-email-shuahkh@osg.samsung.com>
- <57ABB1ED.1080301@samsung.com>
-Message-ID: <57ABB31E.1070802@osg.samsung.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 11 Aug 2016 00:06:45 +0100
+Subject: [PATCH 2/2] arm: apply more __ro_after_init
+In-Reply-To: <2760702.46Rp2Juk5b@wuerfel>
+References: <1464979224-2085-1-git-send-email-keescook@chromium.org>
+ <20160810094339.GK1041@n2100.armlinux.org.uk>
+ <CAGXu5j+9saxwnKTK_vdnLCuXdbvUqQWXkbxOu8QrzB9SHmQGYA@mail.gmail.com>
+ <2760702.46Rp2Juk5b@wuerfel>
+Message-ID: <20160810230645.GP1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/10/2016 04:59 PM, Inki Dae wrote:
-> Hi Shuah,
-> 
-> 2016? 08? 11? 02:30? Shuah Khan ?(?) ? ?:
->> Fix exynos_drm_gem_create_ioctl() attempts to allocate non-contiguous GEM
->> memory without IOMMU. In this case, there is no point in attempting to
-> 
-> DRM gem can be used for Non-DRM drivers such as GPU, V4L2 based Multimedia device and other DMA devices.
-> Even though IOMMU support is disabled, other framework based DMA drivers can use IOMMU - i.e., GPU driver -
-> and they can use non-contiguous GEM buffer through UMM. (DMABUF) 
-> 
-> So GEM allocation type is not dependent on IOMMU.
+On Wed, Aug 10, 2016 at 09:41:23PM +0200, Arnd Bergmann wrote:
+> It might be better to start by making the fixed mapping readonly,
+> as KASLR doesn't protect that one at all, and change the TLS
+> code accordingly.
 
-Hi Inki,
+I think that's impossible, because we gave userspace permission to
+read 0xffff0ff0 directly without using __kuser_get_tls.  You're
+talking about potentially breaking userspace.
 
-I am seeing the following failure without IOMMU and light dm fails
-to start:
+If you disable kuser helpers, then the page becomes read-only and
+invisible to userspace anyway.  So, everything is being done there
+which can be done - if you have kuser helpers enabled, then you
+lose some opportunities for these security improvements.
 
-[drm:exynos_drm_framebuffer_init] *ERROR* Non-continguous GEM memory is not supported.
-
-The change I made fixed that problem and light dm starts without IOMMU.
-Is there a better way to fix this problem? Currently without IOMMU,
-light dm doesn't start.
-
-This is on linux_next
-
-thanks,
--- Shuah
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
