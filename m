@@ -1,272 +1,116 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Wed, 10 Aug 2016 14:07:39 +0900
-Subject: [PATCH v5 8/8] drm/rockchip: Add dmc notifier in vop driver
-In-Reply-To: <1470799604-12877-9-git-send-email-hl@rock-chips.com>
-References: <1470799604-12877-1-git-send-email-hl@rock-chips.com>
- <CGME20160810033621epcas1p26873372f80ae42734717547aa86c64de@epcas1p2.samsung.com>
- <1470799604-12877-9-git-send-email-hl@rock-chips.com>
-Message-ID: <57AAB69B.2000102@samsung.com>
+From: appana.durga.rao@xilinx.com (Appana Durga Kedareswara Rao)
+Date: Wed, 10 Aug 2016 05:27:45 +0000
+Subject: [RFC PATCH v5 3/3] net: phy: Add gmiitorgmii converter support
+In-Reply-To: <8919e4fe-69c5-9b16-cc37-e423b757609c@gmail.com>
+References: <1470735283-23611-1-git-send-email-appanad@xilinx.com>
+ <1470735283-23611-4-git-send-email-appanad@xilinx.com>
+ <8919e4fe-69c5-9b16-cc37-e423b757609c@gmail.com>
+Message-ID: <C246CAC1457055469EF09E3A7AC4E11A4A5E0D49@XAP-PVEXMBX01.xlnx.xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lin,
+Hi Florian,
 
-Looks good to me about the devfreq/devfreq-event usage.
+	Thanks for the review...
 
-[Usage of the devfreq/devfreq-event APIs]
-Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
+> >
+> > This converter sits between the MAC and the external phy MAC <==>
+> > GMII2RGMII <==> RGMII_PHY
+> 
+> This looks good, just a few things, see below:
+
+Thanks...
+
+> > +config XILINX_GMII2RGMII
+> > +       tristate "Xilinx GMII2RGMII converter driver"
+> > +       default y
+> 
+> Don't force that, or at least make the default based on the potential
+> users/drivers here.
+
+Ok sure will fix in the next version...
+
+> 
+> > +       ---help---
+> > +         This driver support xilinx GMII to RGMII IP core it provides
+> > +         the Reduced Gigabit Media Independent Interface(RGMII) between
+> > +         Ethernet physical media devices and the Gigabit Ethernet controller.
+> > +
+> >  endif # PHYLIB
+
+<snip>
+
+> > +#define XILINX_GMII2RGMII_REG		0x10
+> > +#define XILINX_GMII2RGMII_SPEED_MASK	0x2040
+> 
+> BMCR_SPEED1000 | BMCR_SPEED100 would be clearer here.
+
+Sure will fix...
+
+> 
+> > +
+> > +struct gmii2rgmii {
+> > +	struct phy_device *phy_dev;
+> > +	struct phy_driver *phy_drv;
+> > +	struct phy_driver conv_phy_drv;
+> > +	int addr;
+> > +};
+> > +
+> > +static int xgmiitorgmii_read_status(struct phy_device *phydev) {
+> > +	struct gmii2rgmii *priv = (struct gmii2rgmii *)phydev->priv;
+> 
+> Casting is not required here, priv is void *.
+
+Ok will remove...
+
+> 
+> > +	u16 val = 0;
+> > +
+> > +	priv->phy_drv->read_status(phydev);
+> > +
+> > +	val = mdiobus_read(phydev->mdio.bus, priv->addr,
+> XILINX_GMII2RGMII_REG);
+> > +	val &= XILINX_GMII2RGMII_SPEED_MASK;
+> > +
+> > +	switch (phydev->speed) {
+> > +	case SPEED_1000:
+> > +		val |= BMCR_SPEED1000;
+> 
+> Is the fall through really intentional here? See genphy_setup_forced() for
+> instance.
+
+Ok will fix...
+
+> 
+> > +	case SPEED_100:
+> > +		val |= BMCR_SPEED100;
+> > +	case SPEED_10:
+> > +		val |= BMCR_SPEED10;
+> > +	}
+> > +
+> > +	mdiobus_write(phydev->mdio.bus, priv->addr,
+> XILINX_GMII2RGMII_REG,
+> > +val);
+> > +
+> > +	return 0;
+> > +}
+> [snip]
+> 
+> > +static int __init xgmiitorgmii_init(void) {
+> > +	return mdio_driver_register(&xgmiitorgmii_driver);
+> > +}
+> > +module_init(xgmiitorgmii_init);
+> > +
+> > +static void __exit xgmiitorgmii_cleanup(void) {
+> > +	mdio_driver_unregister(&xgmiitorgmii_driver);
+> > +}
+> > +module_exit(xgmiitorgmii_cleanup);
+> 
+> mdio_module_driver() does eliminate a bit of this boilerplate code.
+
+Sure will fix in the next version...
 
 Regards,
-Chanwoo Choi
-
-On 2016? 08? 10? 12:26, Lin Huang wrote:
-> when in ddr frequency scaling process, vop can not do
-> enable or disable operation, since dcf will base on vop vblank
-> time to do frequency scaling and need to get vop irq if there
-> have vop enabled. So need register to devfreq notifier, and we can
-> get the dmc status. Also, when there have two vop enabled, we need
-> to disable dmc, since dcf only base on one vop vblank time, so the
-> other panel will flicker when do ddr frequency scaling.
-> 
-> Signed-off-by: Lin Huang <hl@rock-chips.com>
-> ---
-> Changes in v5:
-> - improve some nits
-> 
-> Changes in v4:
-> - register notifier to devfreq_register_notifier
-> - use DEVFREQ_PRECHANGE and DEVFREQ_POSTCHANGE to get dmc status
-> - when two vop enable, disable dmc
-> - when two vop back to one vop, enable dmc
-> 
-> Changes in v3:
-> - when do vop eanble/disable, dmc will wait until it finish
-> 
-> Changes in v2:
-> - None
-> 
-> Changes in v1:
-> - use wait_event instead usleep
-> 
->  drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 128 +++++++++++++++++++++++++++-
->  1 file changed, 125 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-> index 31744fe..7ce3890 100644
-> --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-> @@ -12,6 +12,8 @@
->   * GNU General Public License for more details.
->   */
->  
-> +#include <linux/devfreq.h>
-> +#include <linux/devfreq-event.h>
->  #include <drm/drm.h>
->  #include <drm/drmP.h>
->  #include <drm/drm_atomic.h>
-> @@ -118,6 +120,13 @@ struct vop {
->  
->  	const struct vop_data *data;
->  
-> +	struct devfreq *devfreq;
-> +	struct devfreq_event_dev *devfreq_event_dev;
-> +	struct notifier_block dmc_nb;
-> +	int dmc_in_process;
-> +	int vop_switch_status;
-> +	wait_queue_head_t wait_dmc_queue;
-> +	wait_queue_head_t wait_vop_switch_queue;
->  	uint32_t *regsbak;
->  	void __iomem *regs;
->  
-> @@ -428,21 +437,59 @@ static void vop_dsp_hold_valid_irq_disable(struct vop *vop)
->  	spin_unlock_irqrestore(&vop->irq_lock, flags);
->  }
->  
-> +static int dmc_notify(struct notifier_block *nb, unsigned long event,
-> +		      void *data)
-> +{
-> +	struct vop *vop = container_of(nb, struct vop, dmc_nb);
-> +
-> +	if (event == DEVFREQ_PRECHANGE) {
-> +		/*
-> +		 * check if vop in enable or disable process,
-> +		 * if yes, wait until it finishes, use 200ms as
-> +		 * timeout.
-> +		 */
-> +		if (!wait_event_timeout(vop->wait_vop_switch_queue,
-> +					!vop->vop_switch_status, HZ / 5))
-> +			dev_warn(vop->dev,
-> +				 "Timeout waiting for vop swtich status\n");
-> +		vop->dmc_in_process = 1;
-> +	} else if (event == DEVFREQ_POSTCHANGE) {
-> +		vop->dmc_in_process = 0;
-> +		wake_up(&vop->wait_dmc_queue);
-> +	}
-> +
-> +	return NOTIFY_OK;
-> +}
-> +
->  static void vop_enable(struct drm_crtc *crtc)
->  {
->  	struct vop *vop = to_vop(crtc);
-> +	int num_enabled_crtc = 0;
->  	int ret;
->  
-> +	if (vop->is_enabled)
-> +		return;
-> +
-> +	/*
-> +	 * if in dmc scaling frequency process, wait until it finishes
-> +	 * use 100ms as timeout time.
-> +	 */
-> +	if (!wait_event_timeout(vop->wait_dmc_queue,
-> +				!vop->dmc_in_process, HZ / 5))
-> +		dev_warn(vop->dev,
-> +			 "Timeout waiting for dmc when vop enable\n");
-> +
-> +	vop->vop_switch_status = 1;
->  	ret = pm_runtime_get_sync(vop->dev);
->  	if (ret < 0) {
->  		dev_err(vop->dev, "failed to get pm runtime: %d\n", ret);
-> -		return;
-> +		goto err;
->  	}
->  
->  	ret = clk_enable(vop->hclk);
->  	if (ret < 0) {
->  		dev_err(vop->dev, "failed to enable hclk - %d\n", ret);
-> -		return;
-> +		goto err;
->  	}
->  
->  	ret = clk_enable(vop->dclk);
-> @@ -456,7 +503,6 @@ static void vop_enable(struct drm_crtc *crtc)
->  		dev_err(vop->dev, "failed to enable aclk - %d\n", ret);
->  		goto err_disable_dclk;
->  	}
-> -
->  	/*
->  	 * Slave iommu shares power, irq and clock with vop.  It was associated
->  	 * automatically with this master device via common driver code.
-> @@ -485,6 +531,21 @@ static void vop_enable(struct drm_crtc *crtc)
->  
->  	drm_crtc_vblank_on(crtc);
->  
-> +	vop->vop_switch_status = 0;
-> +	wake_up(&vop->wait_vop_switch_queue);
-> +
-> +	/* check how many vop we use now */
-> +	drm_for_each_crtc(crtc, vop->drm_dev) {
-> +		if (crtc->state->enable)
-> +			num_enabled_crtc++;
-> +	}
-> +
-> +	/* if enable two vop, need to disable dmc */
-> +	if ((num_enabled_crtc > 1) && vop->devfreq) {
-> +		if (vop->devfreq_event_dev)
-> +			devfreq_event_disable_edev(vop->devfreq_event_dev);
-> +		devfreq_suspend_device(vop->devfreq);
-> +	}
->  	return;
->  
->  err_disable_aclk:
-> @@ -493,16 +554,32 @@ err_disable_dclk:
->  	clk_disable(vop->dclk);
->  err_disable_hclk:
->  	clk_disable(vop->hclk);
-> +err:
-> +	vop->vop_switch_status = 0;
-> +	wake_up(&vop->wait_vop_switch_queue);
-> +	return;
->  }
->  
->  static void vop_crtc_disable(struct drm_crtc *crtc)
->  {
->  	struct vop *vop = to_vop(crtc);
-> +	int num_enabled_crtc = 0;
->  	int i;
->  
->  	WARN_ON(vop->event);
->  
->  	/*
-> +	 * if in dmc scaling frequency process, wait until it finish
-> +	 * use 100ms as timeout time.
-> +	 */
-> +	if (!wait_event_timeout(vop->wait_dmc_queue,
-> +				!vop->dmc_in_process, HZ / 5))
-> +		dev_warn(vop->dev,
-> +			 "Timeout waiting for dmc when vop disable\n");
-> +
-> +	vop->vop_switch_status = 1;
-> +
-> +	/*
->  	 * We need to make sure that all windows are disabled before we
->  	 * disable that crtc. Otherwise we might try to scan from a destroyed
->  	 * buffer later.
-> @@ -559,6 +636,25 @@ static void vop_crtc_disable(struct drm_crtc *crtc)
->  
->  		crtc->state->event = NULL;
->  	}
-> +
-> +	vop->vop_switch_status = 0;
-> +	wake_up(&vop->wait_vop_switch_queue);
-> +
-> +	/* check how many vop use now */
-> +	drm_for_each_crtc(crtc, vop->drm_dev) {
-> +		if (crtc->state->enable)
-> +			num_enabled_crtc++;
-> +	}
-> +
-> +	/*
-> +	 * if num_enabled_crtc = 1 now, it means 2 vop enabled
-> +	 * change to 1 vop enabled  need to enable dmc again.
-> +	 */
-> +	if ((num_enabled_crtc == 1) && vop->devfreq) {
-> +		if (vop->devfreq_event_dev)
-> +			devfreq_event_enable_edev(vop->devfreq_event_dev);
-> +		devfreq_resume_device(vop->devfreq);
-> +	}
->  }
->  
->  static void vop_plane_destroy(struct drm_plane *plane)
-> @@ -1406,6 +1502,8 @@ static int vop_bind(struct device *dev, struct device *master, void *data)
->  	struct drm_device *drm_dev = data;
->  	struct vop *vop;
->  	struct resource *res;
-> +	struct devfreq *devfreq;
-> +	struct devfreq_event_dev *event_dev;
->  	size_t alloc_size;
->  	int ret, irq;
->  
-> @@ -1467,6 +1565,30 @@ static int vop_bind(struct device *dev, struct device *master, void *data)
->  		return ret;
->  
->  	pm_runtime_enable(&pdev->dev);
-> +
-> +	vop->psr_enabled = false;
-> +	INIT_DELAYED_WORK(&vop->psr_work, vop_psr_work);
-> +
-> +	init_waitqueue_head(&vop->wait_vop_switch_queue);
-> +	vop->vop_switch_status = 0;
-> +	init_waitqueue_head(&vop->wait_dmc_queue);
-> +	vop->dmc_in_process = 0;
-> +
-> +	devfreq = devfreq_get_devfreq_by_phandle(dev, 0);
-> +	if (IS_ERR(devfreq))
-> +		goto out;
-> +
-> +	vop->devfreq = devfreq;
-> +	vop->dmc_nb.notifier_call = dmc_notify;
-> +	devfreq_register_notifier(vop->devfreq, &vop->dmc_nb,
-> +				  DEVFREQ_TRANSITION_NOTIFIER);
-> +
-> +	event_dev = devfreq_event_get_edev_by_phandle(vop->devfreq->dev.parent,
-> +						      0);
-> +	if (IS_ERR(event_dev))
-> +		goto out;
-> +	vop->devfreq_event_dev = event_dev;
-> +out:
->  	return 0;
->  }
->  
-> 
+Kedar.
+> --
+> Florian
