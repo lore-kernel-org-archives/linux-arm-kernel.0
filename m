@@ -1,29 +1,47 @@
-From: bp@suse.de (Borislav Petkov)
-Date: Wed, 10 Aug 2016 12:45:13 +0200
-Subject: [PATCH v12] acpi, apei, arm64: APEI initial support for aarch64.
-In-Reply-To: <CADyBb7ujfaXPP_CUB66_E53fY9MeEbt6EhOaCzf+hoDCGYD+dw@mail.gmail.com>
-References: <1469782664-12611-1-git-send-email-fu.wei@linaro.org>
- <20160804094838.GB8093@nazgul.tnic>
- <CADyBb7ujfaXPP_CUB66_E53fY9MeEbt6EhOaCzf+hoDCGYD+dw@mail.gmail.com>
-Message-ID: <20160810104513.GB16664@nazgul.tnic>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 10 Aug 2016 12:47:21 +0200
+Subject: [PATCH] ARM: cpuidle: declare cpuidle_ops __read_mostly
+In-Reply-To: <20160810171926.44557e35@xhacker>
+References: <1470818997-808-1-git-send-email-jszhang@marvell.com>
+ <2118361.tr3K3hSZxF@wuerfel> <20160810171926.44557e35@xhacker>
+Message-ID: <8191851.HcPOqTYLq8@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 10, 2016 at 06:40:53PM +0800, Fu Wei wrote:
-> But the reason for a  separate hest_ia32_init() is:
-> For now(ACPI 6.1), we have three IA-32 Architecture-specific error
-> source structures, maybe we will parse them later.
-> So I made this hest_ia32_init() for all these structures. maybe we can do :
+On Wednesday, August 10, 2016 5:19:26 PM CEST Jisheng Zhang wrote:
+> Dear Arnd,
+> 
+> On Wed, 10 Aug 2016 10:57:57 +0200 Arnd Bergmann wrote:
+> 
+> > On Wednesday, August 10, 2016 4:49:57 PM CEST Jisheng Zhang wrote:
+> > > diff --git a/arch/arm/kernel/cpuidle.c b/arch/arm/kernel/cpuidle.c
+> > > index 7dccc96..762e0929 100644
+> > > --- a/arch/arm/kernel/cpuidle.c
+> > > +++ b/arch/arm/kernel/cpuidle.c
+> > > @@ -19,7 +19,7 @@ extern struct of_cpuidle_method __cpuidle_method_of_table[];
+> > >  static const struct of_cpuidle_method __cpuidle_method_of_table_sentinel
+> > >         __used __section(__cpuidle_method_of_table_end);
+> > >  
+> > > -static struct cpuidle_ops cpuidle_ops[NR_CPUS];
+> > > +static struct cpuidle_ops cpuidle_ops[NR_CPUS] __read_mostly;  
+> > 
+> > Should this perhaps be percpu data instead?
+> > 
+> 
+> Per my understanding, percpu is used for those vars with normal read/write
+> frequency, while the cpuidle_ops is read mostly, so IMHO, __read_mostly
+> is suitable, what do you think?
 
-So I'd make it as simple as possible now and cross that bridge only when
-we get there, i.e., only when you are adding support for those and not
-earlier.
+You are right, __read_mostly is better than the normal .data section here,
+but percpu is also better than .data because it saves a little memory
+on machines that have few present CPUs than CONFIG_NR_CPUS.
 
--- 
-Regards/Gruss,
-    Boris.
+So both have their advantages, we just need to pick a preference.
 
-ECO tip #101: Trim your mails when you reply.
+Actually __ro_after_init would be even better than __read_mostly here
+I think, as this is only updated in an __init function. I guess
+using that would have the added security advantage of preventing
+an attacker from writing to the function pointers when they
+find a way to overflow an access in the percpu data section.
 
-SUSE Linux GmbH, GF: Felix Imend?rffer, Jane Smithard, Graham Norton, HRB 21284 (AG N?rnberg)
---
+	Arnd
