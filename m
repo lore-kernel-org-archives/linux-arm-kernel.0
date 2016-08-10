@@ -1,177 +1,183 @@
-From: yt.shen@mediatek.com (YT Shen)
-Date: Wed, 10 Aug 2016 14:59:33 +0800
-Subject: [PATCH v6 06/10] drm/mediatek: add dsi interrupt control
-In-Reply-To: <1470392666.16554.61.camel@mtksdaap41>
-References: <1470308844-20895-1-git-send-email-yt.shen@mediatek.com>
- <1470308844-20895-7-git-send-email-yt.shen@mediatek.com>
- <1470392666.16554.61.camel@mtksdaap41>
-Message-ID: <1470812373.27526.1.camel@mtksdaap41>
+From: Songjun.Wu@microchip.com (Wu, Songjun)
+Date: Wed, 10 Aug 2016 15:14:43 +0800
+Subject: [PATCH v8 1/2] [media] atmel-isc: add the Image Sensor Controller
+ code
+In-Reply-To: <85f42659-d54f-a841-fa7c-7fc7d6ddb96b@xs4all.nl>
+References: <1470211686-2198-1-git-send-email-songjun.wu@microchip.com>
+ <1470211686-2198-2-git-send-email-songjun.wu@microchip.com>
+ <07cf3e49-da67-74d7-528c-618fe94a15ff@xs4all.nl>
+ <240d957c-6738-bab5-824a-1e6a0ddb12ad@xs4all.nl>
+ <d200c6d3-80d4-e81e-e7c3-e5716e47ceb8@microchip.com>
+ <85f42659-d54f-a841-fa7c-7fc7d6ddb96b@xs4all.nl>
+Message-ID: <24516b2e-e165-da81-cd2c-600c35b31f69@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi CK,
 
-On Fri, 2016-08-05 at 18:24 +0800, CK Hu wrote:
-> Hi, YT:
-> 
-> On Thu, 2016-08-04 at 19:07 +0800, YT Shen wrote:
-> > From: shaoming chen <shaoming.chen@mediatek.com>
-> > 
-> > add dsi interrupt control
-> > 
-> > Signed-off-by: shaoming chen <shaoming.chen@mediatek.com>
-> > ---
-> >  drivers/gpu/drm/mediatek/mtk_dsi.c |   76 ++++++++++++++++++++++++++++++++++++
-> >  1 file changed, 76 insertions(+)
-> > 
-> > diff --git a/drivers/gpu/drm/mediatek/mtk_dsi.c b/drivers/gpu/drm/mediatek/mtk_dsi.c
-> > index a9cf5a1..eea6192 100644
-> > --- a/drivers/gpu/drm/mediatek/mtk_dsi.c
-> > +++ b/drivers/gpu/drm/mediatek/mtk_dsi.c
-> > @@ -18,6 +18,7 @@
-> >  #include <drm/drm_panel.h>
-> >  #include <linux/clk.h>
-> >  #include <linux/component.h>
-> > +#include <linux/irq.h>
-> >  #include <linux/of.h>
-> >  #include <linux/of_platform.h>
-> >  #include <linux/of_graph.h>
-> > @@ -29,6 +30,17 @@
-> >  
-> >  #define DSI_START		0x00
-> >  
-> > +#define DSI_INTEN		0x08
-> > +
-> > +#define DSI_INTSTA		0x0c
-> > +#define LPRX_RD_RDY_INT_FLAG		BIT(0)
-> > +#define CMD_DONE_INT_FLAG		BIT(1)
-> > +#define TE_RDY_INT_FLAG			BIT(2)
-> > +#define VM_DONE_INT_FLAG		BIT(3)
-> > +#define EXT_TE_RDY_INT_FLAG		BIT(4)
-> > +#define DSI_INT_ALL_BITS		0x1f
-> > +#define DSI_BUSY			BIT(31)
-> > +
-> >  #define DSI_CON_CTRL		0x10
-> >  #define DSI_RESET			BIT(0)
-> >  #define DSI_EN				BIT(1)
-> > @@ -71,6 +83,9 @@
-> >  
-> >  #define DSI_HSTX_CKL_WC		0x64
-> >  
-> > +#define DSI_RACK		0x84
-> > +#define RACK				BIT(0)
-> > +
-> >  #define DSI_PHY_LCCON		0x104
-> >  #define LC_HS_TX_EN			BIT(0)
-> >  #define LC_ULPM_EN			BIT(1)
-> > @@ -131,8 +146,11 @@ struct mtk_dsi {
-> >  	struct videomode vm;
-> >  	int refcount;
-> >  	bool enabled;
-> > +	int irq_data;
-> 
-> u32 irq_data;
-Will do.
 
-Regards,
-yt.shen
-> 
-> >  };
-> >  
-> > +static wait_queue_head_t _dsi_irq_wait_queue;
-> > +
-> >  static inline struct mtk_dsi *encoder_to_dsi(struct drm_encoder *e)
-> >  {
-> >  	return container_of(e, struct mtk_dsi, encoder);
-> > @@ -437,6 +455,43 @@ static void mtk_dsi_start(struct mtk_dsi *dsi)
-> >  	writel(1, dsi->regs + DSI_START);
-> >  }
-> >  
-> > +static void mtk_dsi_set_interrupt_enable(struct mtk_dsi *dsi)
-> > +{
-> > +	u32 inten = DSI_INT_ALL_BITS;
-> > +
-> > +	if (dsi->mode_flags & MIPI_DSI_MODE_VIDEO)
-> > +		inten &= ~(TE_RDY_INT_FLAG | EXT_TE_RDY_INT_FLAG);
-> > +
-> > +	writel(inten, dsi->regs + DSI_INTEN);
-> > +}
-> > +
-> > +static void mtk_dsi_irq_wakeup(struct mtk_dsi *dsi, u32 irq_bit)
-> > +{
-> > +	dsi->irq_data |= irq_bit;
-> > +}
-> > +
-> > +static irqreturn_t mtk_dsi_irq(int irq, void *dev_id)
-> > +{
-> > +	struct mtk_dsi *dsi = dev_id;
-> > +	u32 status, tmp;
-> > +	u32 flag = LPRX_RD_RDY_INT_FLAG | CMD_DONE_INT_FLAG | VM_DONE_INT_FLAG;
-> > +
-> > +	status = readl(dsi->regs + DSI_INTSTA);
-> > +
-> > +	if (status & flag) {
-> > +		do {
-> > +			mtk_dsi_mask(dsi, DSI_RACK, RACK, RACK);
-> > +			tmp = readl(dsi->regs + DSI_INTSTA);
-> > +		} while (tmp & DSI_BUSY);
-> > +
-> > +		mtk_dsi_mask(dsi, DSI_INTSTA, status & flag, 0);
-> > +		mtk_dsi_irq_wakeup(dsi, status & flag);
-> > +		wake_up_interruptible(&_dsi_irq_wait_queue);
-> > +	}
-> > +
-> > +	return IRQ_HANDLED;
-> > +}
-> > +
-> >  static void mtk_dsi_poweroff(struct mtk_dsi *dsi)
-> >  {
-> >  	if (WARN_ON(dsi->refcount == 0))
-> > @@ -485,6 +540,7 @@ static void mtk_output_dsi_enable(struct mtk_dsi *dsi)
-> >  
-> >  	mtk_dsi_ps_control_vact(dsi);
-> >  	mtk_dsi_config_vdo_timing(dsi);
-> > +	mtk_dsi_set_interrupt_enable(dsi);
-> >  
-> >  	mtk_dsi_set_mode(dsi);
-> >  	mtk_dsi_clk_hs_mode(dsi, 1);
-> > @@ -804,6 +860,7 @@ static int mtk_dsi_probe(struct platform_device *pdev)
-> >  	struct device *dev = &pdev->dev;
-> >  	struct device_node *remote_node, *endpoint;
-> >  	struct resource *regs;
-> > +	int irq_num;
-> >  	int comp_id;
-> >  	int ret;
-> >  
-> > @@ -880,8 +937,27 @@ static int mtk_dsi_probe(struct platform_device *pdev)
-> >  		return ret;
-> >  	}
-> >  
-> > +	irq_num = platform_get_irq(pdev, 0);
-> > +	if (irq_num < 0) {
-> > +		dev_err(&pdev->dev, "failed to request dsi irq resource\n");
-> > +		return -EPROBE_DEFER;
-> > +	}
-> > +
-> > +	irq_set_status_flags(irq_num, IRQ_TYPE_LEVEL_LOW);
-> > +	ret = devm_request_irq(&pdev->dev, irq_num, mtk_dsi_irq,
-> > +			       IRQF_TRIGGER_LOW, dev_name(&pdev->dev), dsi);
-> > +	if (ret) {
-> > +		dev_err(&pdev->dev, "failed to request mediatek dsi irq\n");
-> > +		return -EPROBE_DEFER;
-> > +	}
-> > +
-> > +	dsi->irq_data = 0;
-> > +	dev_info(dev, "dsi irq num is 0x%x\n", irq_num);
-> > +
-> >  	platform_set_drvdata(pdev, dsi);
-> >  
-> > +	init_waitqueue_head(&_dsi_irq_wait_queue);
-> > +
-> >  	return component_add(&pdev->dev, &mtk_dsi_component_ops);
-> >  }
-> >  
-> 
+On 8/10/2016 15:12, Hans Verkuil wrote:
+> On 08/10/2016 07:36 AM, Wu, Songjun wrote:
+>>
+>>
+>> On 8/8/2016 17:56, Hans Verkuil wrote:
+>>> On 08/08/2016 11:37 AM, Hans Verkuil wrote:
+>>>> On 08/03/2016 10:08 AM, Songjun Wu wrote:
+>>>>> Add driver for the Image Sensor Controller. It manages
+>>>>> incoming data from a parallel based CMOS/CCD sensor.
+>>>>> It has an internal image processor, also integrates a
+>>>>> triple channel direct memory access controller master
+>>>>> interface.
+>>>>>
+>>>>> Signed-off-by: Songjun Wu <songjun.wu@microchip.com>
+>>>>> ---
+>>>>>
+>>>>> Changes in v8:
+>>>>> - Power on the sensor on the first open in function
+>>>>>   'isc_open'.
+>>>>> - Power off the sensor on the last release in function
+>>>>>   'isc_release'.
+>>>>> - Remove the switch of the pipeline.
+>>>>>
+>>>>> Changes in v7:
+>>>>> - Add enum_framesizes and enum_frameintervals.
+>>>>> - Call s_stream(0) when stream start fail.
+>>>>> - Fill the device_caps field of struct video_device
+>>>>>   with V4L2_CAP_STREAMING and V4L2_CAP_VIDEO_CAPTURE.
+>>>>> - Initialize the dev of struct vb2_queue.
+>>>>> - Set field to FIELD_NONE if the pix field is not supported.
+>>>>> - Return the result directly when call g/s_parm of subdev.
+>>>>>
+>>>>> Changes in v6: None
+>>>>> Changes in v5:
+>>>>> - Modify the macro definition and the related code.
+>>>>>
+>>>>> Changes in v4:
+>>>>> - Modify the isc clock code since the dt is changed.
+>>>>>
+>>>>> Changes in v3:
+>>>>> - Add pm runtime feature.
+>>>>> - Modify the isc clock code since the dt is changed.
+>>>>>
+>>>>> Changes in v2:
+>>>>> - Add "depends on COMMON_CLK" and "VIDEO_V4L2_SUBDEV_API"
+>>>>>   in Kconfig file.
+>>>>> - Correct typos and coding style according to Laurent's remarks
+>>>>> - Delete the loop while in 'isc_clk_enable' function.
+>>>>> - Replace 'hsync_active', 'vsync_active' and 'pclk_sample'
+>>>>>   with 'pfe_cfg0' in struct isc_subdev_entity.
+>>>>> - Add the code to support VIDIOC_CREATE_BUFS in
+>>>>>   'isc_queue_setup' function.
+>>>>> - Invoke isc_config to configure register in
+>>>>>   'isc_start_streaming' function.
+>>>>> - Add the struct completion 'comp' to synchronize with
+>>>>>   the frame end interrupt in 'isc_stop_streaming' function.
+>>>>> - Check the return value of the clk_prepare_enable
+>>>>>   in 'isc_open' function.
+>>>>> - Set the default format in 'isc_open' function.
+>>>>> - Add an exit condition in the loop while in 'isc_config'.
+>>>>> - Delete the hardware setup operation in 'isc_set_format'.
+>>>>> - Refuse format modification during streaming
+>>>>>   in 'isc_s_fmt_vid_cap' function.
+>>>>> - Invoke v4l2_subdev_alloc_pad_config to allocate and
+>>>>>   initialize the pad config in 'isc_async_complete' function.
+>>>>> - Remove the '.owner  = THIS_MODULE,' in atmel_isc_driver.
+>>>>> - Replace the module_platform_driver_probe() with
+>>>>>   module_platform_driver().
+>>>>>
+>>>>>  drivers/media/platform/Kconfig                |    1 +
+>>>>>  drivers/media/platform/Makefile               |    2 +
+>>>>>  drivers/media/platform/atmel/Kconfig          |    9 +
+>>>>>  drivers/media/platform/atmel/Makefile         |    1 +
+>>>>>  drivers/media/platform/atmel/atmel-isc-regs.h |  165 +++
+>>>>>  drivers/media/platform/atmel/atmel-isc.c      | 1503 +++++++++++++++++++++++++
+>>>>>  6 files changed, 1681 insertions(+)
+>>>>>  create mode 100644 drivers/media/platform/atmel/Kconfig
+>>>>>  create mode 100644 drivers/media/platform/atmel/Makefile
+>>>>>  create mode 100644 drivers/media/platform/atmel/atmel-isc-regs.h
+>>>>>  create mode 100644 drivers/media/platform/atmel/atmel-isc.c
+>>>>>
+>>>>
+>>>> <snip>
+>>>>
+>>>>> diff --git a/drivers/media/platform/atmel/atmel-isc.c b/drivers/media/platform/atmel/atmel-isc.c
+>>>>> new file mode 100644
+>>>>> index 0000000..d99d4a5
+>>>>> --- /dev/null
+>>>>> +++ b/drivers/media/platform/atmel/atmel-isc.c
+>>>>
+>>>> <snip>
+>>>>
+>>>>> +static int isc_set_default_fmt(struct isc_device *isc)
+>>>>> +{
+>>>>> +	u32 index = isc->num_user_formats - 1;
+>>>>
+>>>> Why pick the last format? Strictly speaking it doesn't matter, but in practice
+>>>> the most common formats tend to be at the beginning of the format list.
+>>>>
+>>>>> +	struct v4l2_format f = {
+>>>>> +		.type = V4L2_BUF_TYPE_VIDEO_CAPTURE,
+>>>>> +		.fmt.pix = {
+>>>>> +			.width		= VGA_WIDTH,
+>>>>> +			.height		= VGA_HEIGHT,
+>>>>> +			.field		= V4L2_FIELD_NONE,
+>>>>> +			.pixelformat	= isc->user_formats[index]->fourcc,
+>>>>> +		},
+>>>>> +	};
+>>>>> +
+>>>>> +	return isc_set_fmt(isc, &f);
+>>>>> +}
+>>>>> +
+>>>>> +static int isc_open(struct file *file)
+>>>>> +{
+>>>>> +	struct isc_device *isc = video_drvdata(file);
+>>>>> +	struct v4l2_subdev *sd = isc->current_subdev->sd;
+>>>>> +	int ret;
+>>>>> +
+>>>>> +	if (mutex_lock_interruptible(&isc->lock))
+>>>>> +		return -ERESTARTSYS;
+>>>>> +
+>>>>> +	ret = v4l2_fh_open(file);
+>>>>> +	if (ret < 0)
+>>>>> +		goto unlock;
+>>>>> +
+>>>>> +	if (!v4l2_fh_is_singular_file(file))
+>>>>> +		goto unlock;
+>>>>> +
+>>>>> +	ret = v4l2_subdev_call(sd, core, s_power, 1);
+>>>>> +	if (ret < 0 && ret != -ENOIOCTLCMD)
+>>>>> +		goto unlock;
+>>>>> +
+>>>>> +	ret = isc_set_default_fmt(isc);
+>>>>
+>>>> This doesn't belong here, this needs to be done in isc_async_complete().
+>>>>
+>>>> Having the code here means that every time you open the device, the format
+>>>> changes back to the default. That's not what you want.
+>>>
+>>> Actually, you do need to set the format here since here is where you turn on
+>>> the sensor power, but it should be the current format, not the default format.
+>>>
+>>> And in isc_set_default_fmt I recommend that you call the try fmt of the subdev
+>>> in order to let the subdev adjust the proposed default format. The 'try' doesn't
+>>> need to power on the sensor.
+>>>
+>> I replace the 'set fmt' with 'try fmt', then test with v4l2-compliance,
+>> but there are tree fail cases. I think it's reasonable that setting a
+>> default fmt on the first open. When app open the device on the first
+>> open, it should set a fmt, or the default fmt will be set.
+>
+> It's not reasonable :-). In V4L2 all format (or any other for that matter) settings
+> are persistent.
+>
+> Anyway, take a look at my atmel-isi driver:
+>
+> https://git.linuxtv.org/hverkuil/media_tree.git/tree/drivers/media/platform/atmel-isi.c?h=sama5d3
+>
+> There I use try_fmt as well, and that passes the compliance test just fine.
+>
+Thank you, I will try again.
+
 > Regards,
-> CK
-> 
+>
+> 	Hans
+>
