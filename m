@@ -1,42 +1,79 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 10 Aug 2016 17:54:32 -0300
-Subject: serial: imx: regression triggered by newly introduced DSR irq
- handling
-In-Reply-To: <1470398615.1936.22.camel@googlemail.com>
-References: <1458825865-7434-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <1458825865-7434-7-git-send-email-u.kleine-koenig@pengutronix.de>
- <1470350663.26773.41.camel@googlemail.com>
- <20160805065845.GI17874@pengutronix.de>
- <1470398615.1936.22.camel@googlemail.com>
-Message-ID: <CAOMZO5BQQemrKFjejUxQpW+d=BGn_b+d_sbr9Untu8iO3dOVvw@mail.gmail.com>
+From: s-anna@ti.com (Suman Anna)
+Date: Wed, 10 Aug 2016 16:04:04 -0500
+Subject: [PATCH 1/2] remoteproc: core: Add rproc OF look-up functions
+In-Reply-To: <20160810204049.GV26240@tuxbot>
+References: <20160719154905.23344-1-lee.jones@linaro.org>
+ <20160810174049.GO26240@tuxbot> <7650e5fa-f52c-1ab5-e197-8630fd7d0322@ti.com>
+ <20160810204049.GV26240@tuxbot>
+Message-ID: <f9641050-0a3f-11de-fa69-e587034e0527@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoph,
+On 08/10/2016 03:40 PM, Bjorn Andersson wrote:
+> On Wed 10 Aug 12:37 PDT 2016, Suman Anna wrote:
+> 
+>> Hi Lee, Bjorn,
+>>
+>> On 08/10/2016 12:40 PM, Bjorn Andersson wrote:
+>>> On Tue 19 Jul 08:49 PDT 2016, Lee Jones wrote:
+>>>
+>>>> - of_rproc_by_index(): look-up and obtain a reference to a rproc
+>>>>                        using the DT phandle "rprocs" and a index.
+>>>>
+>>>> - of_rproc_by_name():  lookup and obtain a reference to a rproc
+>>>>                        using the DT phandle "rprocs" and "rproc-names".
+>>>>
+>>>> Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
+>>>> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+>>>> ---
+>>>
+>>> I'm happy with this, so I whipped up a binding document describing our
+>>> two new properties. Waiting for an opinion on that before I merge this.
+>>
+>> Yeah, I like the two new API too, I have just about run into the need
+>> for the same on my product trees. We can probably make it less
+>> complicated than what the current series is. The wkup_m3_ipc usage was
+>> before there was any standardization on the property names, so we went
+>> with a ti, prefixed property specific to the wkup_m3_ipc node and a
+>> general API that is agnostic of property name. We don't have all the
+>> pieces for PM on AM335x/AM437x SoCs on upstream kernel yet, so we should
+>> be able to switch over to using the new property as we cannot achieve
+>> the desired functionality even though we can boot the wkup_m3.
+>>
+> 
+> Glad to hear you're onboard with dropping the old property name, even if
+> it's later.
+> 
+>> Here's what I propose:
+>> 1. Let's not burden the new of_get_rproc_by_index() API with having to
+>> fall-back and look for ti,rprocs. The rproc_get_by_phandle() core logic
+>> of looking up against the rproc list is self-contained, and the API
+>> usage is limited to just the wkup_m3_ipc driver at the moment.
+>> 2. Keep the rproc_get_by_phandle API as is but mark it as deprecated.
+>> IMHO, the rename of this API to of_get_rproc_by_phandle() in Patch 2 but
+>> using a device node pointer as input argument doesn't add any value.
+>> 3. Provide a fallback in wkup_m3_ipc driver to look for both rprocs and
+>> ti,rproc property, while switching over the node to use rprocs property.
+>> 4. We can get rid of the rproc_get_by_phandle() API after the
+>> wkup_m3_ipc transition is done to use of_get_rproc_by_index() API.
+>>
+> 
+> I don't fancy the idea of leaving the kernel builds with a deprecation
+> warning for some time and I don't feel the cost of carrying those 2
+> extra statements is a bigger issue than keeping a deprecated API around.
+> And it will be less than the dance we have to do in wkup_m3_ipc.
+> 
+> So I think that we should merge these patches and if it can be concluded
+> that we don't need backwards compatibility with the old DT property we
+> can drop the inner conditional in the API.
 
-On Fri, Aug 5, 2016 at 9:03 AM, Christoph Fritz
-<chf.fritz@googlemail.com> wrote:
+Yeah, I am fine with dropping the inner ti,rproc processing in the new
+of_rproc_get_by_index() API and keeping it clean. What's not clear to me
+is why we would still need a get_by_phandle API alongside the two new
+API once the wkup_m3_ipc is converted to the new API? Or is it just to
+clean up the consumer interface? If latter, I will fixup the wkup_m3_ipc
+driver without the need for remoteproc core changes, and switch over to
+the new API.
 
-> SION is necessary for pinconfig MX6SX_PAD_ENET1_TX_CLK__ENET1_REF_CLK1
-> if bit 17 in IOMUXC_GPR_GPR1 is set and bit 13 not.
->
-> So that ref_enetpll1 provides a clock not only for the external PHY but
-> also for the internal controller.
->
-> Using SION is a quirk here, because the silicon doesn't feed the clock
-> back to the internal controller automatically.
->
-> On the other hand, NXP could argue: You need to add a wire on your PCB
-> between ENET1_REF_CLK1 and ENET1_TX_CLK -- but referring to the
-> datasheet ENET1_TX_CLK isn't used in RMII config...
->
-> So if Fabio or Shawn agrees with my assumption above, I'll add something
-> like 27e16501052e5341934d3 "serial: imx: implement DSR irq
-> handling for DTE mode".
->
-> Okay?
-
-Could you please post your suggestion as a patch or RFC so that we can
-understand what your proposal is?
-
-Thanks
+regards
+Suman
