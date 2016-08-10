@@ -1,41 +1,44 @@
-From: jamienstar@163.com (Jamie Huang)
-Date: Wed, 10 Aug 2016 15:24:56 +0800
-Subject: About the accuracy of delay loop
-Message-ID: <20160810152456.41f6e727@JAMIE>
+From: kbeldan@baylibre.com (Karl Beldan)
+Date: Wed, 10 Aug 2016 07:27:44 +0000
+Subject: [PATCH 1/4] memory: ti-aemif: Get a named clock rather than an
+ unnamed one
+In-Reply-To: <20160810070019.GA14114@gobelin>
+References: <20160809171518.22690-1-kbeldan@baylibre.com>
+ <20160809171518.22690-2-kbeldan@baylibre.com>
+ <20160810070019.GA14114@gobelin>
+Message-ID: <20160810072744.GA24903@gobelin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Hi, all.
-	I have a question about the commit
-	d0a533b18235d36206b9b422efadb7cee444dfdb ARM: 7452/1: delay:
-allow timer-based delay implementation to be selected.
-
-	Recently, I found the BogoMIPS info of kernel start-up log is
-	not correct.The correct info is as follows:
-
-	Calibrating delay loop... 719.25 BogoMIPS (lpj=3596288)
-
-	But, after the patch above, the info changed as follows:
-
-	Calibrating delay loop... 478.41 BogoMIPS (lpj=2392064)
-
-	I find the difference from assembly code.
-	Before the patch:
-	  __delay(loops_per_jiffy);
-             c002bcf0:       e50b3034   str r3, [fp, #-52]  ; 0x34
-             c002bcf4:       e50b2030   str r2, [fp, #-48]  ; 0x30
-             c002bcf8:       eb06ddd8   bl c01e3460 <__delay>
-
-	After the patch:
-          __delay(loops_per_jiffy);
-             c04add08:       e5932000   ldr r2, [r3]
-             c04add0c:       e50b105c   str r1, [fp, #-92]  ; 0x5c
-             c04add10:       e50b3060   str r3, [fp, #-96]  ; 0x60
-             c04add14:       e50bc064   str ip, [fp, #-100] ; 0x64
-             c04add18:       e12fff32   blx r2
-
- 	There are two additional instructions, and these will
- 	influence calibration of delay loop. I also worry that this
- 	new implementation will influence the accuracy of udelay. Does
- 	any one know this problem?
+On Wed, Aug 10, 2016 at 07:00:20AM +0000, Karl Beldan wrote:
+> On Tue, Aug 09, 2016 at 05:15:15PM +0000, Karl Beldan wrote:
+> > Many davinci boards (da830 and da850 families) don't have their clocks
+> > in DT yet and won't be successful in getting an unnamed aemif clock.
+> > Also the sole current users of ti-aemif (keystone boards) use 'aemif' as
+> > their aemif device clock clock-name and should remain unaffected.
+> > 
+> > Signed-off-by: Karl Beldan <kbeldan@baylibre.com>
+> > ---
+> >  drivers/memory/ti-aemif.c | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > 
+> > diff --git a/drivers/memory/ti-aemif.c b/drivers/memory/ti-aemif.c
+> > index a579a0f..c251fc8 100644
+> > --- a/drivers/memory/ti-aemif.c
+> > +++ b/drivers/memory/ti-aemif.c
+> > @@ -345,7 +345,7 @@ static int aemif_probe(struct platform_device *pdev)
+> >  
+> >  	platform_set_drvdata(pdev, aemif);
+> >  
+> > -	aemif->clk = devm_clk_get(dev, NULL);
+> > +	aemif->clk = devm_clk_get(dev, "aemif");
+> 
+> Looking further it seems to me that the struct clk_lookup da850_clks
+> registered by davinci_clk_init() should be enough to clk_get() unnamed
+> clocks using only the dev name. I look into what's going on but it
+> would make this patch unnecessary.
+>  
+Ok, just saw what's happening, this patch is unnecessary, v2 will
+follow.
+ 
+Karl
