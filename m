@@ -1,65 +1,53 @@
 From: jszhang@marvell.com (Jisheng Zhang)
-Date: Wed, 10 Aug 2016 18:05:32 +0800
-Subject: [PATCH 0/3] arm64: put objects into proper sections
-In-Reply-To: <1470813559-2917-1-git-send-email-jszhang@marvell.com>
-References: <1470813559-2917-1-git-send-email-jszhang@marvell.com>
-Message-ID: <20160810180532.30156168@xhacker>
+Date: Wed, 10 Aug 2016 18:07:02 +0800
+Subject: [PATCH v2 1/2] PCI: designware: mv parameters for wait for link into
+ pcie-designware.c
+In-Reply-To: <1470823623-1360-1-git-send-email-jszhang@marvell.com>
+References: <1470823623-1360-1-git-send-email-jszhang@marvell.com>
+Message-ID: <1470823623-1360-2-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ Kees,
+These parameters are only used in the core pcie-designware.c, let's
+move them to the core driver.
 
-On Wed, 10 Aug 2016 15:19:16 +0800 Jisheng Zhang wrote:
+Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+---
+ drivers/pci/host/pcie-designware.c | 5 +++++
+ drivers/pci/host/pcie-designware.h | 5 -----
+ 2 files changed, 5 insertions(+), 5 deletions(-)
 
-> This series tries to put objects into proper sections to avoid
-> pontential unnecessary DDR traffics:
-> 
-> patch1 puts alloc_vectors_page() into .init section. This is a clean up
-> patch.
-> 
-> patch2 puts vdso_pages, vdso_spec and vectors_page into read_mostly
-> section, since they are read mostly in hot path.
-> 
-> patch3 puts cpu_ops into read_mostly section, since it's read mostly
-> int hot path such as arm_cpuidle_suspend().
-
-Is it better to mark them as __ro_after_init, suggestions are appreciated.
-
-Thanks,
-Jisheng
-
-> 
-> 
-> Before this series:
-> 
-> ffff000008d660f0 b undef_lock
-> ffff000008d660f8 b vectors_page
-> ffff000008d66100 b vdso_pages
-> ffff000008d66108 b vdso_spec
-> ffff000008d66148 B cpu_ops
-> ffff000008d66348 b patch_lock
-> 
-> After this series:
-> 
-> ffff000008ca5b08 D static_key_initialized
-> ffff000008ca5b10 d vectors_page
-> ffff000008ca5b18 d vdso_pages
-> ffff000008ca5b20 d vdso_spec
-> ffff000008ca5b60 D cpu_ops
-> ffff000008ca5d60 D elf_hwcap
-> ffff000008ca5d68 D compat_elf_hwcap
-> ffff000008ca5d6c D compat_elf_hwcap2
-> 
-> Although there's no obvious issue with current code, because undef_lock and
-> patch_lock is rarely used, but the situation may change in the future, so
-> let's move them into proper sections now.
-> 
-> Jisheng Zhang (3):
->   arm64: vdso: add __init section marker to alloc_vectors_page
->   arm64: vdso: put read only/mostly objects into proper sections
->   arm64: kernel: declare cpu_ops __read_mostly
-> 
->  arch/arm64/kernel/cpu_ops.c |  2 +-
->  arch/arm64/kernel/vdso.c    | 31 +++++++++++++++----------------
->  2 files changed, 16 insertions(+), 17 deletions(-)
-> 
+diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
+index 12afce1..24a16dd 100644
+--- a/drivers/pci/host/pcie-designware.c
++++ b/drivers/pci/host/pcie-designware.c
+@@ -75,6 +75,11 @@
+ #define PCIE_PHY_DEBUG_R1		(PLR_OFFSET + 0x2c)
+ #define PCIE_PHY_DEBUG_R1_LINK_UP	0x00000010
+ 
++/* Parameters for the waiting for link up routine */
++#define LINK_WAIT_MAX_RETRIES		10
++#define LINK_WAIT_USLEEP_MIN		90000
++#define LINK_WAIT_USLEEP_MAX		100000
++
+ static struct pci_ops dw_pcie_ops;
+ 
+ int dw_pcie_cfg_read(void __iomem *addr, int size, u32 *val)
+diff --git a/drivers/pci/host/pcie-designware.h b/drivers/pci/host/pcie-designware.h
+index f437f9b..384e79b 100644
+--- a/drivers/pci/host/pcie-designware.h
++++ b/drivers/pci/host/pcie-designware.h
+@@ -22,11 +22,6 @@
+ #define MAX_MSI_IRQS			32
+ #define MAX_MSI_CTRLS			(MAX_MSI_IRQS / 32)
+ 
+-/* Parameters for the waiting for link up routine */
+-#define LINK_WAIT_MAX_RETRIES		10
+-#define LINK_WAIT_USLEEP_MIN		90000
+-#define LINK_WAIT_USLEEP_MAX		100000
+-
+ struct pcie_port {
+ 	struct device		*dev;
+ 	u8			root_bus_nr;
+-- 
+2.8.1
