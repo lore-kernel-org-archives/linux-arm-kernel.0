@@ -1,72 +1,60 @@
-From: fabio.estevam@nxp.com (Fabio Estevam)
-Date: Wed, 10 Aug 2016 13:00:27 -0300
-Subject: [PATCH 1/2] ARM: dts: imx7s: Add SAI nodes
-Message-ID: <1470844828-12848-1-git-send-email-fabio.estevam@nxp.com>
+From: juri.lelli@arm.com (Juri Lelli)
+Date: Wed, 10 Aug 2016 17:06:34 +0100
+Subject: [PATCH v6 3/8] arm, dts: add TC2 cpu capacity-dmips-mhz
+ information
+In-Reply-To: <08d9e2ff-3c66-5129-1c82-df314e2204db@arm.com>
+References: <1468932048-31635-1-git-send-email-juri.lelli@arm.com>
+ <1468932048-31635-4-git-send-email-juri.lelli@arm.com>
+ <7ac935dc-9f8b-8af0-e67b-ef1c469d76f1@arm.com>
+ <20160810154324.GJ3540@e106622-lin>
+ <08d9e2ff-3c66-5129-1c82-df314e2204db@arm.com>
+Message-ID: <20160810160634.GL3540@e106622-lin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the three SAI ports nodes.
+On 10/08/16 16:52, Sudeep Holla wrote:
+> 
+> 
+> On 10/08/16 16:43, Juri Lelli wrote:
+> >Hi,
+> >
+> >On 10/08/16 16:33, Sudeep Holla wrote:
+> >>Hi Juri,
+> >>
+> >>On 19/07/16 13:40, Juri Lelli wrote:
+> >>>Add TC2 cpu capacity binding information.
+> >>>
+> >>
+> >>If you repost it,
+> >>
+> >>s/binding//
+> >>
+> >
+> >Yes, I think I'll need to repost, squashing the arm64 fix in the
+> >appropriate patch. Thanks.
+> >
+> >>>Cc: Liviu Dudau <liviu.dudau@arm.com>
+> >>>Cc: Sudeep Holla <sudeep.holla@arm.com>
+> >>
+> >>Acked-by: Sudeep Holla <sudeep.holla@arm.com>
+> >
+> >Thanks!
+> >
+> >>(assuming you take it via some other tree, let us know if it's
+> >> OK to merge the DTS separately and you want us to pick them)
+> >>
+> >
+> >As per off-line discussion with Russell, binding doc and arm bits should
+> >go via his patch system. While arm64 bits could go separately via aarch64.
+> >
+> >Does this make sense?
+> 
+> Yes, we can pick up the juno and tc2 dts changes and send it via
+> arm-soc.
 
-Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
----
- arch/arm/boot/dts/imx7s.dtsi | 45 ++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 45 insertions(+)
+If this works better for you it is fine by me! I'll only use Russell's
+system for docs and arm parsing/sysfs implementation then.
 
-diff --git a/arch/arm/boot/dts/imx7s.dtsi b/arch/arm/boot/dts/imx7s.dtsi
-index 1e90bdb..29246302 100644
---- a/arch/arm/boot/dts/imx7s.dtsi
-+++ b/arch/arm/boot/dts/imx7s.dtsi
-@@ -723,6 +723,51 @@
- 				status = "disabled";
- 			};
- 
-+			sai1: sai at 308a0000 {
-+				#sound-dai-cells = <0>;
-+				compatible = "fsl,imx7d-sai", "fsl,imx6sx-sai";
-+				reg = <0x308a0000 0x10000>;
-+				interrupts = <GIC_SPI 95 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks IMX7D_SAI1_IPG_CLK>,
-+					 <&clks IMX7D_SAI1_ROOT_CLK>,
-+					 <&clks IMX7D_CLK_DUMMY>,
-+					 <&clks IMX7D_CLK_DUMMY>;
-+				clock-names = "bus", "mclk1", "mclk2", "mclk3";
-+				dma-names = "rx", "tx";
-+				dmas = <&sdma 8 24 0>, <&sdma 9 24 0>;
-+				status = "disabled";
-+			};
-+
-+			sai2: sai at 308b0000 {
-+				#sound-dai-cells = <0>;
-+				compatible = "fsl,imx7d-sai", "fsl,imx6sx-sai";
-+				reg = <0x308b0000 0x10000>;
-+				interrupts = <GIC_SPI 96 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks IMX7D_SAI2_IPG_CLK>,
-+					 <&clks IMX7D_SAI2_ROOT_CLK>,
-+					 <&clks IMX7D_CLK_DUMMY>,
-+					 <&clks IMX7D_CLK_DUMMY>;
-+				clock-names = "bus", "mclk1", "mclk2", "mclk3";
-+				dma-names = "rx", "tx";
-+				dmas = <&sdma 10 24 0>, <&sdma 11 24 0>;
-+				status = "disabled";
-+			};
-+
-+			sai3: sai at 308c0000 {
-+				#sound-dai-cells = <0>;
-+				compatible = "fsl,imx7d-sai", "fsl,imx6sx-sai";
-+				reg = <0x308c0000 0x10000>;
-+				interrupts = <GIC_SPI 50 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks IMX7D_SAI3_IPG_CLK>,
-+					 <&clks IMX7D_SAI3_ROOT_CLK>,
-+					 <&clks IMX7D_CLK_DUMMY>,
-+					 <&clks IMX7D_CLK_DUMMY>;
-+				clock-names = "bus", "mclk1", "mclk2", "mclk3";
-+				dma-names = "rx", "tx";
-+				dmas = <&sdma 12 24 0>, <&sdma 13 24 0>;
-+				status = "disabled";
-+			};
-+
- 			flexcan1: can at 30a00000 {
- 				compatible = "fsl,imx7d-flexcan", "fsl,imx6q-flexcan";
- 				reg = <0x30a00000 0x10000>;
--- 
-1.9.1
+Thanks,
+
+- Juri
