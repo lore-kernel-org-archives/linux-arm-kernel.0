@@ -1,100 +1,123 @@
-From: labbott@redhat.com (Laura Abbott)
-Date: Tue, 9 Aug 2016 18:13:59 -0700
-Subject: [PATCHv4] arm64: Handle el1 synchronous instruction aborts cleanly
-In-Reply-To: <20160809132431.GK27508@arm.com>
-References: <1470702934-21226-1-git-send-email-labbott@redhat.com>
- <20160809132431.GK27508@arm.com>
-Message-ID: <fd031c14-9ab1-aa89-b383-3fd8618392d2@redhat.com>
+From: shankerd@codeaurora.org (Shanker Donthineni)
+Date: Tue,  9 Aug 2016 20:15:36 -0500
+Subject: [PATCH] arm64: KVM: Save two instructions in __guest_enter()
+Message-ID: <1470791736-13949-1-git-send-email-shankerd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/09/2016 06:24 AM, Will Deacon wrote:
-> On Mon, Aug 08, 2016 at 05:35:34PM -0700, Laura Abbott wrote:
->> Executing from a non-executable area gives an ugly message:
->>
->> lkdtm: Performing direct entry EXEC_RODATA
->> lkdtm: attempting ok execution at ffff0000084c0e08
->> lkdtm: attempting bad execution at ffff000008880700
->> Bad mode in Synchronous Abort handler detected on CPU2, code 0x8400000e -- IABT (current EL)
->> CPU: 2 PID: 998 Comm: sh Not tainted 4.7.0-rc2+ #13
->> Hardware name: linux,dummy-virt (DT)
->> task: ffff800077e35780 ti: ffff800077970000 task.ti: ffff800077970000
->> PC is at lkdtm_rodata_do_nothing+0x0/0x8
->> LR is at execute_location+0x74/0x88
->>
->> The 'IABT (current EL)' indicates the error but it's a bit cryptic
->> without knowledge of the ARM ARM. There is also no indication of the
->> specific address which triggered the fault. The increase in kernel
->> page permissions makes hitting this case more likely as well.
->> Handling the case in the vectors gives a much more familiar looking
->> error message:
->>
->> lkdtm: Performing direct entry EXEC_RODATA
->> lkdtm: attempting ok execution at ffff0000084c0840
->> lkdtm: attempting bad execution at ffff000008880680
->> Unable to handle kernel paging request at virtual address ffff000008880680
->> pgd = ffff8000089b2000
->> [ffff000008880680] *pgd=00000000489b4003, *pud=0000000048904003, *pmd=0000000000000000
->> Internal error: Oops: 8400000e [#1] PREEMPT SMP
->> Modules linked in:
->> CPU: 1 PID: 997 Comm: sh Not tainted 4.7.0-rc1+ #24
->> Hardware name: linux,dummy-virt (DT)
->> task: ffff800077f9f080 ti: ffff800008a1c000 task.ti: ffff800008a1c000
->> PC is at lkdtm_rodata_do_nothing+0x0/0x8
->> LR is at execute_location+0x74/0x88
->>
->> Signed-off-by: Laura Abbott <labbott@redhat.com>
->> Acked-by: Mark Rutland <mark.rutland@arm.com>
->> ---
->> v4: Rebased to master, extra error message to indicate execution of userspace
->> memory
->> ---
->>  arch/arm64/kernel/entry.S | 18 ++++++++++++++++++
->>  arch/arm64/mm/fault.c     | 14 ++++++++++++--
->>  2 files changed, 30 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
->> index 96e4a2b..bdfadef 100644
->> --- a/arch/arm64/kernel/entry.S
->> +++ b/arch/arm64/kernel/entry.S
->> @@ -353,6 +353,8 @@ el1_sync:
->>  	lsr	x24, x1, #ESR_ELx_EC_SHIFT	// exception class
->>  	cmp	x24, #ESR_ELx_EC_DABT_CUR	// data abort in EL1
->>  	b.eq	el1_da
->> +	cmp	x24, #ESR_ELx_EC_IABT_CUR	// instruction abort in EL1
->> +	b.eq	el1_ia
->>  	cmp	x24, #ESR_ELx_EC_SYS64		// configurable trap
->>  	b.eq	el1_undef
->>  	cmp	x24, #ESR_ELx_EC_SP_ALIGN	// stack alignment exception
->> @@ -364,6 +366,22 @@ el1_sync:
->>  	cmp	x24, #ESR_ELx_EC_BREAKPT_CUR	// debug exception in EL1
->>  	b.ge	el1_dbg
->>  	b	el1_inv
->> +el1_ia:
->> +	/*
->> +	 * Instruction abort handling
->> +	 */
->> +	mrs	x0, far_el1
->> +	enable_dbg
->> +	// re-enable interrupts if they were enabled in the aborted context
->> +	tbnz	x23, #7, 1f			// PSR_I_BIT
->> +	enable_irq
->> +1:
->> +	mov	x2, sp				// struct pt_regs
->> +	bl	do_mem_abort
->> +
->> +	// disable interrupts before pulling preserved data off the stack
->> +	disable_irq
->> +	kernel_exit 1
->
-> This looks identical to the el1_da code immediately below. Can we not
-> just have a fallthrough?
->
-> Will
->
+We are doing an unnecessary stack push/pop operation when restoring
+the guest registers x0-x18 in __guest_enter(). This patch saves the
+two instructions by using x18 as a base register. No need to store
+the vcpu context pointer in stack because it is redundant and not
+being used anywhere, the same information is available in tpidr_el2.
 
-Yes, good point. It made sense to have the separate code when there was
-a flag.
+Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
+---
+ arch/arm64/kvm/hyp/entry.S | 66 ++++++++++++++++++++++------------------------
+ 1 file changed, 32 insertions(+), 34 deletions(-)
 
-Thanks,
-Laura
+diff --git a/arch/arm64/kvm/hyp/entry.S b/arch/arm64/kvm/hyp/entry.S
+index ce9e5e5..d2e09a1 100644
+--- a/arch/arm64/kvm/hyp/entry.S
++++ b/arch/arm64/kvm/hyp/entry.S
+@@ -55,37 +55,32 @@
+  */
+ ENTRY(__guest_enter)
+ 	// x0: vcpu
+-	// x1: host/guest context
+-	// x2-x18: clobbered by macros
++	// x1: host context
++	// x2-x17: clobbered by macros
++	// x18: guest context
+ 
+ 	// Store the host regs
+ 	save_callee_saved_regs x1
+ 
+-	// Preserve vcpu & host_ctxt for use at exit time
+-	stp	x0, x1, [sp, #-16]!
++	// Preserve the host_ctxt for use at exit time
++	str	x1, [sp, #-16]!
+ 
+-	add	x1, x0, #VCPU_CONTEXT
++	add	x18, x0, #VCPU_CONTEXT
+ 
+-	// Prepare x0-x1 for later restore by pushing them onto the stack
+-	ldp	x2, x3, [x1, #CPU_XREG_OFFSET(0)]
+-	stp	x2, x3, [sp, #-16]!
++	// Restore guest regs x19-x29, lr
++	restore_callee_saved_regs x18
+ 
+-	// x2-x18
+-	ldp	x2, x3,   [x1, #CPU_XREG_OFFSET(2)]
+-	ldp	x4, x5,   [x1, #CPU_XREG_OFFSET(4)]
+-	ldp	x6, x7,   [x1, #CPU_XREG_OFFSET(6)]
+-	ldp	x8, x9,   [x1, #CPU_XREG_OFFSET(8)]
+-	ldp	x10, x11, [x1, #CPU_XREG_OFFSET(10)]
+-	ldp	x12, x13, [x1, #CPU_XREG_OFFSET(12)]
+-	ldp	x14, x15, [x1, #CPU_XREG_OFFSET(14)]
+-	ldp	x16, x17, [x1, #CPU_XREG_OFFSET(16)]
+-	ldr	x18,      [x1, #CPU_XREG_OFFSET(18)]
+-
+-	// x19-x29, lr
+-	restore_callee_saved_regs x1
+-
+-	// Last bits of the 64bit state
+-	ldp	x0, x1, [sp], #16
++	// Restore guest regs x0-x18
++	ldp	x0, x1,   [x18, #CPU_XREG_OFFSET(0)]
++	ldp	x2, x3,   [x18, #CPU_XREG_OFFSET(2)]
++	ldp	x4, x5,   [x18, #CPU_XREG_OFFSET(4)]
++	ldp	x6, x7,   [x18, #CPU_XREG_OFFSET(6)]
++	ldp	x8, x9,   [x18, #CPU_XREG_OFFSET(8)]
++	ldp	x10, x11, [x18, #CPU_XREG_OFFSET(10)]
++	ldp	x12, x13, [x18, #CPU_XREG_OFFSET(12)]
++	ldp	x14, x15, [x18, #CPU_XREG_OFFSET(14)]
++	ldp	x16, x17, [x18, #CPU_XREG_OFFSET(16)]
++	ldr	x18,      [x18, #CPU_XREG_OFFSET(18)]
+ 
+ 	// Do not touch any register after this!
+ 	eret
+@@ -100,6 +95,16 @@ ENTRY(__guest_exit)
+ 
+ 	add	x2, x0, #VCPU_CONTEXT
+ 
++	// Store the guest regs x19-x29, lr
++	save_callee_saved_regs x2
++
++	// Retrieve the guest regs x0-x3 from the stack
++	ldp	x21, x22, [sp], #16	// x2, x3
++	ldp	x19, x20, [sp], #16	// x0, x1
++
++	// Store the guest regs x0-x18
++	stp	x19, x20, [x2, #CPU_XREG_OFFSET(0)]
++	stp	x21, x22, [x2, #CPU_XREG_OFFSET(2)]
+ 	stp	x4, x5,   [x2, #CPU_XREG_OFFSET(4)]
+ 	stp	x6, x7,   [x2, #CPU_XREG_OFFSET(6)]
+ 	stp	x8, x9,   [x2, #CPU_XREG_OFFSET(8)]
+@@ -109,20 +114,13 @@ ENTRY(__guest_exit)
+ 	stp	x16, x17, [x2, #CPU_XREG_OFFSET(16)]
+ 	str	x18,      [x2, #CPU_XREG_OFFSET(18)]
+ 
+-	ldp	x6, x7, [sp], #16	// x2, x3
+-	ldp	x4, x5, [sp], #16	// x0, x1
++	// Restore the host_ctxt from the stack
++	ldr	x2, [sp], #16
+ 
+-	stp	x4, x5, [x2, #CPU_XREG_OFFSET(0)]
+-	stp	x6, x7, [x2, #CPU_XREG_OFFSET(2)]
+-
+-	save_callee_saved_regs x2
+-
+-	// Restore vcpu & host_ctxt from the stack
+-	// (preserving return code in x1)
+-	ldp	x0, x2, [sp], #16
+ 	// Now restore the host regs
+ 	restore_callee_saved_regs x2
+ 
++	// Preserving return code (x1)
+ 	mov	x0, x1
+ 	ret
+ ENDPROC(__guest_exit)
+-- 
+Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
