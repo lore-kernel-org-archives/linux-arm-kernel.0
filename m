@@ -1,43 +1,35 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Wed, 10 Aug 2016 17:09:47 +0800
-Subject: [PATCH] ARM: VDSO: put read only/mostly objects into proper sections
-Message-ID: <1470820187-1032-1-git-send-email-jszhang@marvell.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Wed, 10 Aug 2016 11:23:03 +0200
+Subject: [PATCH] ARM: S3C24XX: Add dma_mask assignments for DMA devices
+In-Reply-To: <1470304572-14937-1-git-send-email-s.nawrocki@samsung.com>
+References: <1470304572-14937-1-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <CAJKOXPfGceFUtb4Z+E4MSCWNfgtd08U=L+avvXvxNw9X_OkKOQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-vdso_data_mapping is never modified, so mark it as const.
+On Thu, Aug 4, 2016 at 11:56 AM, Sylwester Nawrocki
+<s.nawrocki@samsung.com> wrote:
+> The dma_mask assignments seem to be missed during refactoring
+> of arch/arm/mach-s3c24xx. Add them to avoid DMA allocation
+> failures. Without this patch sound is broken on s3c24xx
+> with errors reported like:
+>
+> s3c24xx-dma s3c2410-dma.0: coherent DMA mask is unset
+> ALSA pcmC0D0p,0:: cannot preallocate for size 524288
+> s3c24xx-iis s3c24xx-iis: Failed to get DMA channel capabilities,
+> falling back to period counting: -6
+> s3c24xx-dma s3c2410-dma.0: coherent DMA mask is unset
+> ...
+> ALSA pcmC0D0c,0:: cannot preallocate for size 524288
+> s3c24xx-iis s3c24xx-iis: Failed to get DMA channel capabilities,
+> falling back to period counting: -6
+>
+> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> ---
+>  arch/arm/mach-s3c24xx/common.c | 20 +++++++++++++++-----
+>  1 file changed, 15 insertions(+), 5 deletions(-)
 
-vdso_data_page and vdso_text_mapping are initialized by vdso_init(),
-thereafter are mostly read during vdso special mapping handling.
+Thanks, applied.
 
-The fact that they are mostly read and not written to makes them
-candidates for __read_mostly declarations.
-
-Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
----
- arch/arm/kernel/vdso.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/kernel/vdso.c b/arch/arm/kernel/vdso.c
-index 994e971..c946092 100644
---- a/arch/arm/kernel/vdso.c
-+++ b/arch/arm/kernel/vdso.c
-@@ -47,13 +47,13 @@ unsigned int vdso_total_pages __read_mostly;
- static union vdso_data_store vdso_data_store __page_aligned_data;
- static struct vdso_data *vdso_data = &vdso_data_store.data;
- 
--static struct page *vdso_data_page;
--static struct vm_special_mapping vdso_data_mapping = {
-+static struct page *vdso_data_page __read_mostly;
-+static const struct vm_special_mapping vdso_data_mapping = {
- 	.name = "[vvar]",
- 	.pages = &vdso_data_page,
- };
- 
--static struct vm_special_mapping vdso_text_mapping = {
-+static struct vm_special_mapping vdso_text_mapping __read_mostly = {
- 	.name = "[vdso]",
- };
- 
--- 
-2.8.1
+BR,
+Krzysztof
