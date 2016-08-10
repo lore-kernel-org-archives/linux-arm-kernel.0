@@ -1,41 +1,122 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Wed, 10 Aug 2016 13:29:32 +0300
-Subject: [PATCH 2/3] video: fbdev: imxfb: enable lcd regulator in .probe
-In-Reply-To: <20160727195700.GE5629@pengutronix.de>
-References: <1457380425-20244-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <1457380425-20244-3-git-send-email-u.kleine-koenig@pengutronix.de>
- <56E2AA80.4050908@ti.com> <20160420191727.GS29108@pengutronix.de>
- <20160705100902.GM16643@pengutronix.de>
- <20160727195700.GE5629@pengutronix.de>
-Message-ID: <bdcfe5b1-3d95-03a3-728b-a80f86c95932@ti.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 10 Aug 2016 12:39:14 +0200
+Subject: [PATCH] KVM: arm64: vgic-its: Grab kvm->lock when reading kvm->devices
+In-Reply-To: <20160808154543.23463-1-andre.przywara@arm.com>
+References: <20160808154543.23463-1-andre.przywara@arm.com>
+Message-ID: <20160810103914.30322-1-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Since we are about to synchronize all accesses to kvm->devices using the
+kvm->lock mutex, we should hold this mutex while iterating over the list
+of devices in the ITS code.
 
+Also move the vgic_register_its_iodev function to where it's called and
+rename it to register_its_iodev to avoid having two almost identially
+named functions.
 
-On 27/07/16 22:57, Uwe Kleine-K?nig wrote:
-> Hello,
-> 
-> On Tue, Jul 05, 2016 at 12:09:02PM +0200, Uwe Kleine-K?nig wrote:
->> To reach my goal to keep the display on (showing whatever the bootloader
->> initialized the display with) until the application starts caring for
->> the display some driver must enable the regulator. The only candidates
->> are the lcd driver (i.e. the patch under discussion) or some mechanism
->> in the fb core. As there doesn't seem to be code in the core (and the
->> core is dead?) what do you suggest me to do?
-> 
-> Unfortunately I didn't get an answer here. Do you still have this mail
-> on your radar?
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+---
+ virt/kvm/arm/vgic/vgic-its.c | 64 +++++++++++++++++++++++---------------------
+ 1 file changed, 34 insertions(+), 30 deletions(-)
 
-Can you resend the series? And I think I had comments about the third
-patch, to which I don't see any reply.
-
- Tomi
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160810/c27be42b/attachment.sig>
+diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+index 1cf9f59..4e76877 100644
+--- a/virt/kvm/arm/vgic/vgic-its.c
++++ b/virt/kvm/arm/vgic/vgic-its.c
+@@ -1319,32 +1319,6 @@ void vgic_enable_lpis(struct kvm_vcpu *vcpu)
+ 		its_sync_lpi_pending_table(vcpu);
+ }
+ 
+-static int vgic_register_its_iodev(struct kvm *kvm, struct vgic_its *its)
+-{
+-	struct vgic_io_device *iodev = &its->iodev;
+-	int ret;
+-
+-	if (!its->initialized)
+-		return -EBUSY;
+-
+-	if (IS_VGIC_ADDR_UNDEF(its->vgic_its_base))
+-		return -ENXIO;
+-
+-	iodev->regions = its_registers;
+-	iodev->nr_regions = ARRAY_SIZE(its_registers);
+-	kvm_iodevice_init(&iodev->dev, &kvm_io_gic_ops);
+-
+-	iodev->base_addr = its->vgic_its_base;
+-	iodev->iodev_type = IODEV_ITS;
+-	iodev->its = its;
+-	mutex_lock(&kvm->slots_lock);
+-	ret = kvm_io_bus_register_dev(kvm, KVM_MMIO_BUS, iodev->base_addr,
+-				      KVM_VGIC_V3_ITS_SIZE, &iodev->dev);
+-	mutex_unlock(&kvm->slots_lock);
+-
+-	return ret;
+-}
+-
+ #define INITIAL_BASER_VALUE						  \
+ 	(GIC_BASER_CACHEABILITY(GITS_BASER, INNER, RaWb)		| \
+ 	 GIC_BASER_CACHEABILITY(GITS_BASER, OUTER, SameAsInner)		| \
+@@ -1526,6 +1500,32 @@ int kvm_vgic_register_its_device(void)
+ 				       KVM_DEV_TYPE_ARM_VGIC_ITS);
+ }
+ 
++static int register_its_iodev(struct kvm *kvm, struct vgic_its *its)
++{
++	struct vgic_io_device *iodev = &its->iodev;
++	int ret;
++
++	if (!its->initialized)
++		return -EBUSY;
++
++	if (IS_VGIC_ADDR_UNDEF(its->vgic_its_base))
++		return -ENXIO;
++
++	iodev->regions = its_registers;
++	iodev->nr_regions = ARRAY_SIZE(its_registers);
++	kvm_iodevice_init(&iodev->dev, &kvm_io_gic_ops);
++
++	iodev->base_addr = its->vgic_its_base;
++	iodev->iodev_type = IODEV_ITS;
++	iodev->its = its;
++	mutex_lock(&kvm->slots_lock);
++	ret = kvm_io_bus_register_dev(kvm, KVM_MMIO_BUS, iodev->base_addr,
++				      KVM_VGIC_V3_ITS_SIZE, &iodev->dev);
++	mutex_unlock(&kvm->slots_lock);
++
++	return ret;
++}
++
+ /*
+  * Registers all ITSes with the kvm_io_bus framework.
+  * To follow the existing VGIC initialization sequence, this has to be
+@@ -1536,19 +1536,23 @@ int vgic_register_its_iodevs(struct kvm *kvm)
+ 	struct kvm_device *dev;
+ 	int ret = 0;
+ 
++	mutex_lock(&kvm->lock);
+ 	list_for_each_entry(dev, &kvm->devices, vm_node) {
+ 		if (dev->ops != &kvm_arm_vgic_its_ops)
+ 			continue;
+ 
+-		ret = vgic_register_its_iodev(kvm, dev->private);
++		ret = register_its_iodev(kvm, dev->private);
+ 		if (ret)
+-			return ret;
++			goto out;
++
+ 		/*
+ 		 * We don't need to care about tearing down previously
+-		 * registered ITSes, as the kvm_io_bus framework removes
+-		 * them for us if the VM gets destroyed.
++		 * registered ITSes on error, as the kvm_io_bus framework
++		 * removes them for us if the VM gets destroyed.
+ 		 */
+ 	}
+ 
++out:
++	mutex_unlock(&kvm->lock);
+ 	return ret;
+ }
+-- 
+2.9.0
