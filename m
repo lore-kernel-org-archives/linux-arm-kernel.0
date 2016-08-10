@@ -1,76 +1,54 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 10 Aug 2016 23:54:06 +0200
-Subject: [PATCH 0/9] v4.8 build regressions
-Message-ID: <20160810215424.1926658-1-arnd@arndb.de>
+Date: Wed, 10 Aug 2016 23:54:09 +0200
+Subject: [PATCH 3/9] drm/mediatek: add COMMON_CLK dependency
+In-Reply-To: <20160810215424.1926658-1-arnd@arndb.de>
+References: <20160810215424.1926658-1-arnd@arndb.de>
+Message-ID: <20160810215424.1926658-4-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a set of patches to address build warnings and errors that have
-come up in linux-4.8 but that worked fine in v4.7. I've added the
-tinyconfig warning patch in there as well, which is not a regression
-but is something that shows up in the kernelci.org build bots.
-The other patches address issues that either came up in kernelci.org
-or in my randconfig test setup.
+On kernel builds without COMMON_CLK, the newly added mediatek drm
+driver fails to build:
 
-I have three more fixes queued up in arm-soc/fixes that I plan
-to send as a pull request for -rc2 along with the other bugfixes.
+drivers/gpu/drm/mediatek/mtk_mipi_tx.c:130:16: error: field 'pll_hw' has incomplete type
+  struct clk_hw pll_hw;
+                ^~~~~~
+In file included from ../include/linux/clk.h:16:0,
+                 from ../drivers/gpu/drm/mediatek/mtk_mipi_tx.c:14:
+drivers/gpu/drm/mediatek/mtk_mipi_tx.c: In function 'mtk_mipi_tx_from_clk_hw':
+include/linux/kernel.h:831:48: error: initialization from incompatible pointer type [-Werror=incompatible-pointer-types]
+  const typeof( ((type *)0)->member ) *__mptr = (ptr); \
+                                                ^
+/drivers/gpu/drm/mediatek/mtk_mipi_tx.c:136:9: note: in expansion of macro 'container_of'
+  return container_of(hw, struct mtk_mipi_tx, pll_hw);
+         ^~~~~~~~~~~~
+drivers/gpu/drm/mediatek/mtk_mipi_tx.c: At top level:
+drivers/gpu/drm/mediatek/mtk_mipi_tx.c:302:21: error: variable 'mtk_mipi_tx_pll_ops' has initializer but incomplete type
+ static const struct clk_ops mtk_mipi_tx_pll_ops = {
 
-All patches have been posted before, but for some reason or another
-failed to make it into the merge window. I have updated the ones
-that were waiting for a new version from me now, the others are
-sent without modifications.
+This adds the required Kconfig dependency.
 
-Hopefully we can get them all merged into v4.8. Please pick up
-patches from the middle of the series if appropriate.
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
+Link: https://patchwork.kernel.org/patch/9069061/
+---
+I originally sent this on May 11 2016 after the driver was added with this
+bug, but my fix never made it in.
+---
+ drivers/gpu/drm/mediatek/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-	Arnd
-
-Arnd Bergmann (7):
-  kconfig: tinyconfig: provide whole choice blocks to avoid warnings
-  dsa: mv88e6xxx: hide unused functions
-  drm/mediatek: add COMMON_CLK dependency
-  drm/mediatek: add CONFIG_OF dependency
-  drm/mediatek: add ARM_SMCCC dependency
-  clocksource: kona: fix get_counter error handling
-  8250/fintek: rename IRQ_MODE macro
-
-Geert Uytterhoeven (1):
-  test/hash: Fix warning in two-dimensional array init
-
-George Spelvin (1):
-  test/hash: Fix warning in preprocessor symbol evaluation
-
- arch/x86/configs/tiny.config          |  2 ++
- drivers/clocksource/bcm_kona_timer.c  | 16 ++++++++++------
- drivers/gpu/drm/mediatek/Kconfig      |  3 +++
- drivers/net/dsa/mv88e6xxx/chip.c      |  2 ++
- drivers/tty/serial/8250/8250_fintek.c |  4 ++--
- kernel/configs/tiny.config            |  8 ++++++++
- lib/test_hash.c                       |  8 ++++----
- 7 files changed, 31 insertions(+), 12 deletions(-)
-
+diff --git a/drivers/gpu/drm/mediatek/Kconfig b/drivers/gpu/drm/mediatek/Kconfig
+index 23ac8041c562..5c2163737691 100644
+--- a/drivers/gpu/drm/mediatek/Kconfig
++++ b/drivers/gpu/drm/mediatek/Kconfig
+@@ -2,6 +2,7 @@ config DRM_MEDIATEK
+ 	tristate "DRM Support for Mediatek SoCs"
+ 	depends on DRM
+ 	depends on ARCH_MEDIATEK || (ARM && COMPILE_TEST)
++	depends on COMMON_CLK
+ 	select DRM_GEM_CMA_HELPER
+ 	select DRM_KMS_HELPER
+ 	select DRM_MIPI_DSI
 -- 
 2.9.0
-
-Cc: Andrew Lunn <andrew@lunn.ch>
-Cc: Andrew Morton <akpm@linux-foundation.org>
-Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-Cc: David Airlie <airlied@linux.ie>
-Cc: dri-devel at lists.freedesktop.org
-Cc: Geert Uytterhoeven <geert@linux-m68k.org>
-Cc: George Spelvin <linux@sciencehorizons.net>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: Jiri Slaby <jslaby@suse.com>
-Cc: Ji-Ze Hong (Peter Hong) <hpeter+linux_kernel@gmail.com>
-Cc: Josh Triplett <josh@joshtriplett.org>
-Cc: kernel-build-reports at lists.linaro.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
-Cc: Masahiro Yamada <yamada.masahiro@socionext.com>
-Cc: Matthias Brugger <matthias.bgg@gmail.com>
-Cc: netdev at vger.kernel.org
-Cc: Philipp Zabel <p.zabel@pengutronix.de>
-Cc: Ricardo Ribalda Delgado <ricardo.ribalda@gmail.com>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Vivien Didelot <vivien.didelot@savoirfairelinux.com>
-Cc: x86 at kernel.org
