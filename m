@@ -1,92 +1,81 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Wed, 10 Aug 2016 09:29:11 +0100
-Subject: [PATCH] ARM: no need to select SMP_ON_UP explicitly
-In-Reply-To: <20160809084416.GS4678@tiger>
-References: <1469199369-25746-1-git-send-email-vladimir.murzin@arm.com>
- <20160809084416.GS4678@tiger>
-Message-ID: <57AAE5D7.2080009@arm.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Wed, 10 Aug 2016 13:59:26 +0530
+Subject: [PATCH 2/4] ARM: dts: da850: Add an aemif node
+In-Reply-To: <20160810082631.GC16481@gobelin>
+References: <20160809171518.22690-1-kbeldan@baylibre.com>
+ <20160809171518.22690-3-kbeldan@baylibre.com> <57AADC63.90405@ti.com>
+ <57AADF7B.1070102@ti.com> <20160810080713.GB16481@gobelin>
+ <57AAE1D1.5080000@ti.com> <20160810082631.GC16481@gobelin>
+Message-ID: <57AAE5E6.8090304@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/08/16 09:44, Shawn Guo wrote:
-> On Fri, Jul 22, 2016 at 03:56:09PM +0100, Vladimir Murzin wrote:
->> SMP_ON_UP is already defaulted to "y" and has all dependencies expressed
->> - no need to select it per platform level
+On Wednesday 10 August 2016 01:56 PM, Karl Beldan wrote:
+> On Wed, Aug 10, 2016 at 01:42:01PM +0530, Sekhar Nori wrote:
+>> On Wednesday 10 August 2016 01:37 PM, Karl Beldan wrote:
+>>> On Wed, Aug 10, 2016 at 01:32:03PM +0530, Sekhar Nori wrote:
+>>>> On Wednesday 10 August 2016 01:18 PM, Sekhar Nori wrote:
+>>>>> On Tuesday 09 August 2016 10:45 PM, Karl Beldan wrote:
+>>>>>> Currently the davinci da8xx boards use the mach-davinci aemif code.
+>>>>>> Instantiating an aemif node into the DT allows to use the ti-aemif
+>>>>>> memory driver and is another step to better DT support.
+>>>>>> Also it will allow to properly pass the emif timings via DT.
+>>>>>>
+>>>>>> Signed-off-by: Karl Beldan <kbeldan@baylibre.com>
+>>>>>> ---
+>>>>>>  arch/arm/boot/dts/da850.dtsi | 10 ++++++++++
+>>>>>>  1 file changed, 10 insertions(+)
+>>>>>>
+>>>>>> diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
+>>>>>> index bc10e7e..f62928c 100644
+>>>>>> --- a/arch/arm/boot/dts/da850.dtsi
+>>>>>> +++ b/arch/arm/boot/dts/da850.dtsi
+>>>>>> @@ -411,6 +411,16 @@
+>>>>>>  			dma-names = "tx", "rx";
+>>>>>>  		};
+>>>>>>  	};
+>>>>>> +	aemif: aemif at 68000000 {
+>>>>>> +		compatible = "ti,da850-aemif";
+>>>>>> +		#address-cells = <2>;
+>>>>>> +		#size-cells = <1>;
+>>>>>> +
+>>>>>> +		reg = <0x68000000 0x00008000>;
+>>>>>> +		ranges = <0 0 0x60000000 0x08000000
+>>>>>> +			  1 0 0x68000000 0x00008000>;
+>>>>>> +		status = "disabled";
+>>>>>> +	};
+>>>>>>  	nand_cs3 at 62000000 {
+>>>>>>  		compatible = "ti,davinci-nand";
+>>>>>>  		reg = <0x62000000 0x807ff
+>>>>>
+>>>>> The nand node should be part of aemif node like it is done for keystone
+>>>>> boards.
+>>>>
+>>>> Actually, can you move the nand node out of da850.dtsi completely. Its
+>>>> much better to keep da850.dtsi restricted to soc-internal devices and
+>>>> keep the board level devices like NAND flash in <board>.dts file.
+>>>>
+>>>> Similarly, can you move the NAND pinmux definitions too to the
+>>>> da850-evm.dts file?
+>>>>
+>>>> There is advantage in keeping common pinmux definitions in da850.dtsi so
+>>>> each board doe not have to repeat them. But AEMIF is an exception as its
+>>>> usage can really be varied (NAND, NOR, SRAM, other). Plus, different
+>>>> boards are likely to use different chip selects so coming up with some
+>>>> pinmux definitions which will be reused widely is really unlikely.
+>>>>
+>>> This is exactly what I just did for the LCDK.
+>>> If everybody is happy with it I will do the same for the evm as I put it
+>>> in the cover letter.
 >>
->> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
->> ---
+>> Yes please. We dont want duplication of data between da850.dtsi and
+>> da850-lcdk.dts files.
 >>
->> This time sent to LAKML
->>
->>  arch/arm/mach-imx/Kconfig      |    3 ---
->>  arch/arm/mach-realview/Kconfig |    1 -
-> 
-> I cannot take mach-realview changes.  I think you need to ether split
-> the changes, or ask arm-soc folks to apply.  In case of the latter, here
-> is my ACK:
-> 
-> Acked-by: Shawn Guo <shawnguo@kernel.org>
+> Then I'll wait for this series to be applied and then apply my changes
+> to the EVM while retiring the nand_cs3 together.
 
-Thanks!
+No, I prefer the fixup happens first. In the same series, you can first
+fixup existing EVM and then add LCDK support.
 
-RealView is not mentioned under MAINTAINERS, so it'd be easier if
-arm-soc team pick this patch.
-
-Arnd, what is your preference?
-
-Cheers
-Vladimir
-
-> 
->>  2 files changed, 4 deletions(-)
->>
->> diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
->> index dd905b9..cfb1120 100644
->> --- a/arch/arm/mach-imx/Kconfig
->> +++ b/arch/arm/mach-imx/Kconfig
->> @@ -92,7 +92,6 @@ config SOC_IMX31
->>  	select CPU_V6
->>  	select IMX_HAVE_PLATFORM_MXC_RNGA
->>  	select MXC_AVIC
->> -	select SMP_ON_UP if SMP
->>  
->>  config SOC_IMX35
->>  	bool
->> @@ -100,7 +99,6 @@ config SOC_IMX35
->>  	select HAVE_EPIT
->>  	select MXC_AVIC
->>  	select PINCTRL_IMX35
->> -	select SMP_ON_UP if SMP
->>  
->>  if ARCH_MULTI_V4T
->>  
->> @@ -589,7 +587,6 @@ config SOC_VF610
->>  	select ARM_GIC if ARCH_MULTI_V7
->>  	select PINCTRL_VF610
->>  	select PL310_ERRATA_769419 if CACHE_L2X0
->> -	select SMP_ON_UP if SMP
->>  
->>  	help
->>  	  This enables support for Freescale Vybrid VF610 processor.
->> diff --git a/arch/arm/mach-realview/Kconfig b/arch/arm/mach-realview/Kconfig
->> index 70ab4a2..739800e 100644
->> --- a/arch/arm/mach-realview/Kconfig
->> +++ b/arch/arm/mach-realview/Kconfig
->> @@ -24,7 +24,6 @@ config REALVIEW_DT
->>  	select POWER_RESET
->>  	select POWER_RESET_VERSATILE
->>  	select POWER_SUPPLY
->> -	select SMP_ON_UP if SMP
->>  	select SOC_REALVIEW
->>  	select USE_OF
->>  	help
->> -- 
->> 1.7.9.5
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
-> 
+Regards,
+Sekhar
