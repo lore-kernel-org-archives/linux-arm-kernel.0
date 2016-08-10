@@ -1,50 +1,45 @@
-From: patrice.chotard@st.com (patrice.chotard at st.com)
-Date: Wed, 10 Aug 2016 15:13:01 +0200
-Subject: [PATCH 4/4] ARM: dts: STiH41x-b2020: Update gpio specifier
-In-Reply-To: <1470834781-23232-1-git-send-email-patrice.chotard@st.com>
-References: <1470834781-23232-1-git-send-email-patrice.chotard@st.com>
-Message-ID: <1470834781-23232-5-git-send-email-patrice.chotard@st.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 10 Aug 2016 15:14:27 +0200
+Subject: [PATCH v2] clocksource/drivers/time-armada-370-xp: Fix the clock
+ reference
+Message-ID: <1470834867-25932-1-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Patrice Chotard <patrice.chotard@st.com>
+While converting the init function to return an error, the wrong clock
+was get. This lead to wrong clock rate and slow down the kernel. For
+example, before the patch a typical boot was around 15s after it was 1
+minute slower.
 
-- Remove useless gpio-cells
-- Update second parameter by using GPIO_ACTIVE_HIGH/LOW
-  instead of hardcoded value
+Fixes: 12549e27c63c ("clocksource/drivers/time-armada-370-xp: Convert init function to return error")
 
-Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- arch/arm/boot/dts/stih41x-b2020.dtsi | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+Changelog:
 
-diff --git a/arch/arm/boot/dts/stih41x-b2020.dtsi b/arch/arm/boot/dts/stih41x-b2020.dtsi
-index 487d7d8..322e0e9 100644
---- a/arch/arm/boot/dts/stih41x-b2020.dtsi
-+++ b/arch/arm/boot/dts/stih41x-b2020.dtsi
-@@ -7,6 +7,7 @@
-  * publishhed by the Free Software Foundation.
-  */
- #include "stih41x-b2020x.dtsi"
-+#include <dt-bindings/gpio/gpio.h>
- / {
- 	memory{
- 		device_type = "memory";
-@@ -30,13 +31,12 @@
- 		leds {
- 			compatible	= "gpio-leds";
- 			red {
--				#gpio-cells = <1>;
- 				label	= "Front Panel LED";
--				gpios	= <&pio4 1>;
-+				gpios	= <&pio4 1 GPIO_ACTIVE_HIGH>;
- 				linux,default-trigger	= "heartbeat";
- 			};
- 			green {
--				gpios	= <&pio4 7>;
-+				gpios	= <&pio4 7 GPIO_ACTIVE_HIGH>;
- 				default-state = "off";
- 			};
- 		};
+v1 -> v2
+Move the of_clk_get_by_name out of the declaration as sugested by
+Thomas Petazzoni.
+
+ drivers/clocksource/time-armada-370-xp.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/clocksource/time-armada-370-xp.c b/drivers/clocksource/time-armada-370-xp.c
+index 719b478d136e..376ed13fe739 100644
+--- a/drivers/clocksource/time-armada-370-xp.c
++++ b/drivers/clocksource/time-armada-370-xp.c
+@@ -335,10 +335,10 @@ static int __init armada_370_xp_timer_common_init(struct device_node *np)
+ 
+ static int __init armada_xp_timer_init(struct device_node *np)
+ {
+-	struct clk *clk = of_clk_get_by_name(np, "fixed");
++	struct clk *clk;
+ 	int ret;
+ 
+-	clk = of_clk_get(np, 0);
++	clk = of_clk_get_by_name(np, "fixed");
+ 	if (IS_ERR(clk)) {
+ 		pr_err("Failed to get clock");
+ 		return PTR_ERR(clk);
 -- 
-1.9.1
+2.8.1
