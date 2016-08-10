@@ -1,90 +1,166 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Wed, 10 Aug 2016 17:07:13 -0600
-Subject: [PATCH V3 1/6] perf/core: Adding PMU driver specific configuration
-In-Reply-To: <20160805155344.GV6879@twins.programming.kicks-ass.net>
-References: <1469742143-22245-1-git-send-email-mathieu.poirier@linaro.org>
- <1469742143-22245-2-git-send-email-mathieu.poirier@linaro.org>
- <20160804165821.GT6862@twins.programming.kicks-ass.net>
- <CANLsYkzK+mNRYiGn0SLQ5kA0+xxi6OGVbNL4F3LLRBTgSkssxQ@mail.gmail.com>
- <20160805155344.GV6879@twins.programming.kicks-ass.net>
-Message-ID: <CANLsYkwz1aCmsBbtZXQK3_B-T6cVBP1UYV9cqbKiNSmdrhUuFQ@mail.gmail.com>
+From: andre.przywara@arm.com (=?UTF-8?Q?Andr=c3=a9_Przywara?=)
+Date: Thu, 11 Aug 2016 00:18:56 +0100
+Subject: [RFC PATCH 0/5] Allwinner MMC firmware clocks implementation
+In-Reply-To: <1272941470841835@web22g.yandex.ru>
+References: <20160809115303.17032-1-andre.przywara@arm.com>
+ <1272941470841835@web22g.yandex.ru>
+Message-ID: <4d91dd8a-76a2-817f-01b6-db43e6f72cd0@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5 August 2016 at 09:53, Peter Zijlstra <peterz@infradead.org> wrote:
-> On Fri, Aug 05, 2016 at 09:35:05AM -0600, Mathieu Poirier wrote:
->> On 4 August 2016 at 10:58, Peter Zijlstra <peterz@infradead.org> wrote:
->> > On Thu, Jul 28, 2016 at 03:42:18PM -0600, Mathieu Poirier wrote:
->> >> This patch somewhat mimics the work done on address filters to
->> >> add the infrastructure needed to pass PMU specific HW
->> >> configuration to the driver before a session starts.
->> >>
->> >> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
->> >
->> >> diff --git a/include/uapi/linux/perf_event.h b/include/uapi/linux/perf_event.h
->> >> index c66a485a24ac..90fbc5fd3925 100644
->> >> --- a/include/uapi/linux/perf_event.h
->> >> +++ b/include/uapi/linux/perf_event.h
->> >> @@ -407,6 +407,7 @@ struct perf_event_attr {
->> >>  #define PERF_EVENT_IOC_ID            _IOR('$', 7, __u64 *)
->> >>  #define PERF_EVENT_IOC_SET_BPF               _IOW('$', 8, __u32)
->> >>  #define PERF_EVENT_IOC_PAUSE_OUTPUT  _IOW('$', 9, __u32)
->> >> +#define PERF_EVENT_IOC_SET_DRV_CONFIGS       _IOW('$', 10, char *)
->> >
->> > Please also do a manpages patch.
+On 10/08/16 16:10, Icenowy Zheng wrote:
+> 
+> 
+> 09.08.2016, 19:57, "Andre Przywara" <andre.przywara@arm.com>:
+>> Hi,
 >>
->> Patch 3/6 in this set documents the new option
->> (tools/perf/Documentation/perf-record.tx).  Is this what you were
->> looking for?  If not please expand on the information you want to see
->> added add and where.
->
-> Since you add an IOCTL (with preferably more structure than present in
-> this patch, see the other email) this needs to be documented in the
-> syscall manpage.
->
->   http://git.kernel.org/cgit/docs/man-pages/man-pages.git/tree/man2/perf_event_open.2
->
->   http://www.man7.org/linux/man-pages/man2/perf_event_open.2.html
+>> this is a proof-of-concept series to demonstrate the usage of firmware
+>> driven clocks using the SCPI protocol for Allwinner SoCs.
+>> This aims to replace the tricky and highly SoC specific clocks drivers
+>> that every new Allwinner SoC seems to require.
+>> The idea is to abstract the internal clock specific code by the rather
+>> generic SCPI interface, which support programming and reading clock
+>> frequencies in an SoC agnostic manner. The actual clock access can be
+>> put in firmware, which is by definition SoC specific and thus can
+>> be easier and much quicker adapted to support a new SoC.
+>> The SCPI interface requires a mailbox and a shared memory region to
+>> send commands and receive results.
+>>
+>> This series introduces a new mailbox driver, which uses smc instructions
+>> to trigger a mailbox. This allows the SCPI handlers to live as a runtime
+>> service component in the existing ARM Trusted Firmware port. Beside
+>> being able to easily add those handlers to the existing firmware code
+>> this approach has the advantage of avoiding building, maintaining and
+>> loading yet another firmware component. The management processor on the
+>> A64 uses an OpenRISC core, which requires a not fully upstream supported
+>> toolchain. Also this core can remain free to other tasks, like offloading
+>> of realtime-sensitive tasks.
+> 
+> Here's a problem...
+> 
+> Although SCPI is a standard, SMC mailbox and ATF clock id is not.
+> 
+> And there's currently no generic clock framework in ATF...
 
-After a little bit of digging around I understand that manpages have
-to be written _after_ the new ioctl call has been added - at least
-that's what I deduce when looking at what Vince Weaver did for the BPF
-support:
+And I don't see why there is a need for that.
+More below.
 
-commit b0f7b411bed0505937f0f51d6499d0c6c56f4b8c
-Author: Vince Weaver <vincent.weaver@maine.edu>
-Date:   Thu Jul 23 13:10:21 2015 -0400
+> 
+>> A future implementation may later revisit this decision, adding a proper
+>> mailbox driver and implement the SCPI handler on the OpenRISC core, the
+>> only change needed would be to swap the mailbox node in the DT then.
+>>
+>> Another added value is that SCPI brings us sensors and regulators
+>> support, using this very same interface. All that's needed is to add
+>> some firmware code to read the THS register or poke the AXP, for
+>> instance (which ATF does already anyway) and advertise those via a DT
+>> node. There would be no Linux changes needed for that.
+>>
+>> As an example this series adds MMC support on top of the basic support
+>> bit posted recently [1].
+>> We use the existing sunxi MMC driver for the purpose of this series,
+>> although it is known to not fully support the new MMC controller in the
+>> A64 chip. I found the support sufficient enough to drive SD cards, though.
+>>
+>> Patch 1/5 introduces the SMC mailbox driver, while patch 2/5 adds the
+>> associated DT binding documentation. Patch 3/5 adds the basic SCPI nodes
+>> to the SoC .dtsi, which patch 4/5 complements with the MMC nodes,
+>> referencing the new firmware clocks.
+>> The final patch 5/5 enables the SD card for the two boards which we
+>> currently support.
+>>
+>> This series goes on top of the v4 A64 support series [1], which itself
+>> is based on v4.8-rc1.
+>> It allows booting and running a userland from a micro SD card on both
+>> the Pine64 and the BananaPi M64 board.
+>> The matching firmware implementation can be found in the allwinner-scpi
+>> branch here [2]. The clock code in there is probably pretty stupid, but
+>> works and is good enough to at least serve as a proof-of-concept for this
+>> new clock approach.
+>>
+>> Please have a look and give comments, I am particularily interested in
+>> how you like this idea. One motiviation is to save the kernel from
+>> endless variations of clock driver code, also to be able to support
+>> newer SoCs much easier without having to submit and maintain tedious
+>> clock patches.
+>>
+>> Cheers,
+>> Andre.
+>>
+>> [1]: http://lists.infradead.org/pipermail/linux-arm-kernel/2016-August/447512.html
+>> [2]: https://github.com/apritzel/arm-trusted-firmware/commits/allwinner-scpi
+> 
+> The code seems to be difficult to extend...
 
-    perf_event_open.2: 4.1 PERF_EVENT_IOC_SET_BPF support
+This is just proof of concept code hacked together mostly in one night.
+I just didn't want to delay this any more and so followed "Release
+early, release often" here.
+Once I add a second clock, I will probably rework it anyway.
 
-    This manpage patch relates to the addition of the
-    PERF_EVENT_IOC_SET_BPF ioctl in the following commit:
+> I hope you can make the SMC mailbox a standard interface,
 
-        commit 2541517c32be2531e0da59dfd7efc1ce844644f5
-        Author: Alexei Starovoitov <ast@plumgrid.com>
+I don't know if it needs to be some kind of "standard interface". We
+follow the ARM SMC Calling Convention on one end and plug to the
+existing Linux mailbox framework (which SCPI depends on) on the other,
+advertising this via DT.
+So all we need to take care of is upstreaming this.
 
-        tracing, perf: Implement BPF programs attached to kprobes
+> and add a common
+> clock controlling system in the ATF...
 
-        Signed-off-by: Alexei Starovoitov <ast@plumgrid.com>
-        Reviewed-by: Steven Rostedt <rostedt@goodmis.org>
-        Reviewed-by: Masami Hiramatsu <masami.hiramatsu.pt@hitachi.com>
-        Cc: Andrew Morton <akpm@linux-foundation.org>
-        Cc: Arnaldo Carvalho de Melo <acme@infradead.org>
-        Cc: Arnaldo Carvalho de Melo <acme@redhat.com>
-        Cc: Daniel Borkmann <daniel@iogearbox.net>
-        Cc: David S. Miller <davem@davemloft.net>
-        Cc: Jiri Olsa <jolsa@redhat.com>
-        Cc: Linus Torvalds <torvalds@linux-foundation.org>
-        Cc: Namhyung Kim <namhyung@kernel.org>
-        Cc: Peter Zijlstra <a.p.zijlstra@chello.nl>
-        Cc: Peter Zijlstra <peterz@infradead.org>
-        Link: http://lkml.kernel.org/r/1427312966-8434-4-git-send-email-ast at plumgrid.com
-        Signed-off-by: Ingo Molnar <mingo@kernel.org>
+Why is this needed? For now this is just another vendor specified SMC
+call, advertised via DT. Other SoC vendors have those already in
+upstream ATF (Mediatek, Rockchip).
+If we confine these clock setups to one particular platform (or even
+SoC), the code can be quite simple.
 
-    Signed-off-by: Vince Weaver <vincent.weaver@maine.edu>
-    Signed-off-by: Michael Kerrisk <mtk.manpages@gmail.com>
+> (And maybe add A64 as part of the reference implemention)
 
-Am I correct here or you want to proceed differently?
+Possibly, but right now I don't see a need for a bullet-proof and
+upstream-accepted framework implementation - as long as we comply with a
+standard interface like SCPI. Actually we can swap the implementation at
+any time, as long as we stay standards compliant.
+As mentioned above, this particular ATF implementation was more meant as
+a proof of concept.
 
-Thanks for the guidance,
-Mathieu
+> (but I think it may be to difficult to you to make standards and change
+> reference implemention...)
+
+I don't have the impression that ATF is reluctant to those changes.
+And which standards would I need to "make"? SCPI is already out there,
+and adding platform specific code is normal and expected for a firmware
+implementation. There is an extra design document [1] which describes
+how to add vendor specific smc calls:
+https://github.com/ARM-software/arm-trusted-firmware/blob/master/docs/rt-svc-writers-guide.md
+
+Cheers,
+Andre.
+
+> 
+>>
+>> Andre Przywara (5):
+>>   mailbox: introduce ARM SMC based mailbox
+>>   DT: mailbox: add binding doc for the ARM SMC mailbox
+>>   arm64: dts: sunxi: add SCPI node to sun50i-a64.dtsi
+>>   arm64: dts: sunxi: add SCPI driven clocks and nodes for A64 MMC
+>>   arm64: dts: sunxi: add MMC nodes to Pine64 and BPi-M64 .dts
+>>
+>>  .../devicetree/bindings/mailbox/arm-smc.txt | 53 ++++++++
+>>  .../boot/dts/allwinner/sun50i-a64-bananapi-m64.dts | 29 +++++
+>>  .../arm64/boot/dts/allwinner/sun50i-a64-pine64.dts | 20 +++
+>>  arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 87 +++++++++++++
+>>  drivers/mailbox/Kconfig | 8 ++
+>>  drivers/mailbox/Makefile | 2 +
+>>  drivers/mailbox/smc-mailbox.c | 135 +++++++++++++++++++++
+>>  7 files changed, 334 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/mailbox/arm-smc.txt
+>>  create mode 100644 drivers/mailbox/smc-mailbox.c
+>>
+>> --
+>> 2.9.0
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
