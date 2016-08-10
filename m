@@ -1,100 +1,70 @@
 From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Wed, 10 Aug 2016 13:31:27 -0700
-Subject: [PATCH 2/2] remoteproc: core: Rework obtaining a rproc from a DT
- phandle
-In-Reply-To: <06677af9-e994-6bb4-98b0-c0434340b092@oracle.com>
+Date: Wed, 10 Aug 2016 13:40:49 -0700
+Subject: [PATCH 1/2] remoteproc: core: Add rproc OF look-up functions
+In-Reply-To: <7650e5fa-f52c-1ab5-e197-8630fd7d0322@ti.com>
 References: <20160719154905.23344-1-lee.jones@linaro.org>
- <20160719154905.23344-2-lee.jones@linaro.org>
- <20160810171546.GN26240@tuxbot>
- <06677af9-e994-6bb4-98b0-c0434340b092@oracle.com>
-Message-ID: <20160810203127.GU26240@tuxbot>
+ <20160810174049.GO26240@tuxbot>
+ <7650e5fa-f52c-1ab5-e197-8630fd7d0322@ti.com>
+Message-ID: <20160810204049.GV26240@tuxbot>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 10 Aug 11:27 PDT 2016, Santosh Shilimkar wrote:
+On Wed 10 Aug 12:37 PDT 2016, Suman Anna wrote:
 
-> +Suman,
+> Hi Lee, Bjorn,
 > 
-> On 8/10/2016 10:15 AM, Bjorn Andersson wrote:
-> >On Tue 19 Jul 08:49 PDT 2016, Lee Jones wrote:
-> >
-> >>In this patch we;
-> >> - Use a subsystem generic phandle to obtain an rproc
-> >>   - We have to support TI's bespoke version for the time being
-> >> - Convert wkup_m3_ipc driver to new API
-> >> - Rename the call to be more like other, similar OF calls
-> >> - Move feature-not-enabled inline stub to the headers
-> >> - Strip out duplicate code by calling into of_get_rproc_by_index()
+> On 08/10/2016 12:40 PM, Bjorn Andersson wrote:
+> > On Tue 19 Jul 08:49 PDT 2016, Lee Jones wrote:
+> > 
+> >> - of_rproc_by_index(): look-up and obtain a reference to a rproc
+> >>                        using the DT phandle "rprocs" and a index.
 > >>
-> >>Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> >>---
-> >> drivers/remoteproc/remoteproc_core.c | 41 ++++++++----------------------------
-> >> drivers/soc/ti/wkup_m3_ipc.c         | 14 +++---------
-> >> include/linux/remoteproc.h           |  4 ++--
-> >> 3 files changed, 14 insertions(+), 45 deletions(-)
+> >> - of_rproc_by_name():  lookup and obtain a reference to a rproc
+> >>                        using the DT phandle "rprocs" and "rproc-names".
 > >>
-> >[..]
-> >>diff --git a/drivers/soc/ti/wkup_m3_ipc.c b/drivers/soc/ti/wkup_m3_ipc.c
-> >>index 8823cc8..15481f3 100644
-> >>--- a/drivers/soc/ti/wkup_m3_ipc.c
-> >>+++ b/drivers/soc/ti/wkup_m3_ipc.c
-> >>@@ -385,7 +385,6 @@ static int wkup_m3_ipc_probe(struct platform_device *pdev)
-> >> {
-> >> 	struct device *dev = &pdev->dev;
-> >> 	int irq, ret;
-> >>-	phandle rproc_phandle;
-> >> 	struct rproc *m3_rproc;
-> >> 	struct resource *res;
-> >> 	struct task_struct *task;
-> >>@@ -430,16 +429,9 @@ static int wkup_m3_ipc_probe(struct platform_device *pdev)
-> >> 		return PTR_ERR(m3_ipc->mbox);
-> >> 	}
-> >>
-> >>-	if (of_property_read_u32(dev->of_node, "ti,rproc", &rproc_phandle)) {
-> >>-		dev_err(&pdev->dev, "could not get rproc phandle\n");
-> >>-		ret = -ENODEV;
-> >>-		goto err_free_mbox;
-> >>-	}
-> >>-
-> >>-	m3_rproc = rproc_get_by_phandle(rproc_phandle);
-> >>-	if (!m3_rproc) {
-> >>-		dev_err(&pdev->dev, "could not get rproc handle\n");
-> >>-		ret = -EPROBE_DEFER;
-> >>+	m3_rproc = of_get_rproc_by_phandle(dev->of_node);
-> >>+	if (IS_ERR(m3_rproc)) {
-> >>+		ret = PTR_ERR(m3_rproc);
-> >> 		goto err_free_mbox;
-> >> 	}
-> >>
-> >
-> >Santosh, do you have any objections to me merging this?
-> >
-> This looks ok to me but I have not been merdging the remote
-> proc code. Looping Suman who IIRC, was looking at it along
-> with Ohad.
+> >> Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
+> >> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> >> ---
+> > 
+> > I'm happy with this, so I whipped up a binding document describing our
+> > two new properties. Waiting for an opinion on that before I merge this.
+> 
+> Yeah, I like the two new API too, I have just about run into the need
+> for the same on my product trees. We can probably make it less
+> complicated than what the current series is. The wkup_m3_ipc usage was
+> before there was any standardization on the property names, so we went
+> with a ti, prefixed property specific to the wkup_m3_ipc node and a
+> general API that is agnostic of property name. We don't have all the
+> pieces for PM on AM335x/AM437x SoCs on upstream kernel yet, so we should
+> be able to switch over to using the new property as we cannot achieve
+> the desired functionality even though we can boot the wkup_m3.
 > 
 
-I presumed this was tied to the drivers/remoteproc/wkup_m3_rproc.c,
-which sits in mainline.
+Glad to hear you're onboard with dropping the old property name, even if
+it's later.
 
-I'm co-maintaining remoteproc and we saw a few upcoming callers to the
-get_by_phandle(), so Lee proposed this patchset to clean up the consumer
-interface and standardize the DT properties.
-
-So I'm okay with Lee's patches, but just wanted to check with you before
-merging it, as this change touches your tree as well.
-
-> >of_get_rproc_by_phandle() will fall back and attempt to acquire the
-> >handle from ti,rproc if the generic "rprocs" property doesn't exist.
-> >
-> 
-> Suman,
-> Can you please check this series and see if you can line this up ?
-> Am not sure if Ohad still maintaining it.
+> Here's what I propose:
+> 1. Let's not burden the new of_get_rproc_by_index() API with having to
+> fall-back and look for ti,rprocs. The rproc_get_by_phandle() core logic
+> of looking up against the rproc list is self-contained, and the API
+> usage is limited to just the wkup_m3_ipc driver at the moment.
+> 2. Keep the rproc_get_by_phandle API as is but mark it as deprecated.
+> IMHO, the rename of this API to of_get_rproc_by_phandle() in Patch 2 but
+> using a device node pointer as input argument doesn't add any value.
+> 3. Provide a fallback in wkup_m3_ipc driver to look for both rprocs and
+> ti,rproc property, while switching over the node to use rprocs property.
+> 4. We can get rid of the rproc_get_by_phandle() API after the
+> wkup_m3_ipc transition is done to use of_get_rproc_by_index() API.
 > 
 
-If we haven't merged the whole thing I would be glad if we can change it
-so that we don't have to maintain support for the "ti,rproc" property...
+I don't fancy the idea of leaving the kernel builds with a deprecation
+warning for some time and I don't feel the cost of carrying those 2
+extra statements is a bigger issue than keeping a deprecated API around.
+And it will be less than the dance we have to do in wkup_m3_ipc.
+
+So I think that we should merge these patches and if it can be concluded
+that we don't need backwards compatibility with the old DT property we
+can drop the inner conditional in the API.
 
 Regards,
 Bjorn
