@@ -1,46 +1,110 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 10 Aug 2016 11:12:53 +0100
-Subject: [PATCH 2/2] arm: apply more __ro_after_init
-In-Reply-To: <2342289.4RWg0SWI3A@wuerfel>
-References: <1464979224-2085-1-git-send-email-keescook@chromium.org>
- <1464979224-2085-3-git-send-email-keescook@chromium.org>
- <20160810094339.GK1041@n2100.armlinux.org.uk>
- <2342289.4RWg0SWI3A@wuerfel>
-Message-ID: <20160810101253.GL1041@n2100.armlinux.org.uk>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Wed, 10 Aug 2016 11:13:36 +0100
+Subject: [PATCH 3/6] dt/bindings: Add bindings for Tegra GMI controller
+In-Reply-To: <d72d3f8f-6987-3623-077f-14485679e321@nvidia.com>
+References: <1470512452-8322-1-git-send-email-mirza.krak@gmail.com>
+ <1470512452-8322-4-git-send-email-mirza.krak@gmail.com>
+ <901be576-a810-c630-9b83-de922e945df0@nvidia.com>
+ <CALw8SCV61w6BgtBb8pY4czeB4yFmbtLmB2MuyrvGcvepmRpeBQ@mail.gmail.com>
+ <5e0402db-10ce-75eb-cf95-d9e2d26e3efe@nvidia.com>
+ <CALw8SCVrQeZLQjkapLjk9Me=AVU4kbtOskem8jeEeYDK5tznGg@mail.gmail.com>
+ <d72d3f8f-6987-3623-077f-14485679e321@nvidia.com>
+Message-ID: <4c8dcec7-0833-af3a-d8c1-106d0ad43007@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 10, 2016 at 12:00:53PM +0200, Arnd Bergmann wrote:
-> On Wednesday, August 10, 2016 10:43:39 AM CEST Russell King - ARM Linux wrote:
-> > On Fri, Jun 03, 2016 at 11:40:24AM -0700, Kees Cook wrote:
-> > > @@ -1309,16 +1309,11 @@ void __init arm_mm_memblock_reserve(void)
-> > >   * Any other function or debugging method which may touch any device _will_
-> > >   * crash the kernel.
-> > >   */
-> > > +static char vectors[PAGE_SIZE * 2] __ro_after_init __aligned(PAGE_SIZE);
-> > >  static void __init devicemaps_init(const struct machine_desc *mdesc)
-> > >  {
-> > >       struct map_desc map;
-> > >       unsigned long addr;
-> > > -     void *vectors;
-> > > -
-> > > -     /*
-> > > -      * Allocate the vector page early.
-> > > -      */
-> > > -     vectors = early_alloc(PAGE_SIZE * 2);
-> > 
-> > This one is not appropriate.  We _do_ write to these pages after init
-> > for FIQ handler updates.  See set_fiq_handler().
-> 
-> Is that the only thing that modifies the page? If we think this is a
-> valuable change, we could make it depend on the absence of FIQ
-> support, as very few platforms (rpc, omap1, s3c24xx and possibly
-> imx) seem to even use it.
 
-There's the TLS emulation too, but that writes via the vectors mapping
-at 0xffff0ff0.
+On 10/08/16 09:45, Jon Hunter wrote:
+> 
+> On 09/08/16 21:48, Mirza Krak wrote:
+>> 2016-08-09 15:34 GMT+02:00 Jon Hunter <jonathanh@nvidia.com>:
+>>>
+>>> On 09/08/16 09:40, Mirza Krak wrote:
+>>>> 2016-08-08 16:44 GMT+02:00 Jon Hunter <jonathanh@nvidia.com>:
+>>>>>
+>>>>> On 06/08/16 20:40, Mirza Krak wrote:
+>>>>>> From: Mirza Krak <mirza.krak@gmail.com>
+>>>>>>
+>>
+>> <--snip-->
+>>
+>>>>>> + - nvidia,snor-we-width: Number of cycles during which WE stays asserted.
+>>>>>> +   Valid values are 0-15, default is 1
+>>>>>> + - nvidia,snor-oe-width: Number of cycles during which OE stays asserted.
+>>>>>> +   Valid values are 0-255, default is 1
+>>>>>> + - nvidia,snor-wait-width: Number of cycles before READY is asserted.
+>>>>>> +   Valid values are 0-255, default is 3
+>>>>>> +
+>>>>>> +Example with two SJA1000 CAN controllers connected to the GMI bus:
+>>>>>> +
+>>>>>> +  gmi at 70090000 {
+>>>>>> +    #address-cells = <1>;
+>>>>>> +    #size-cells = <1>;
+>>>>>
+>>>>> I think 0 for size makes sense. I know that caused you problems before,
+>>>>> but I am wondering if ...
+>>>>>
+>>>>>> +    ranges;
+>>>>>
+>>>>> ... ranges is needed here? If we do have it, I am wondering if it should
+>>>>> be a single entry for the chip-select that is being used. For now we
+>>>>> could only support a ranges with one entry.
+>>>>>
+>>>>>         #address-cells = <1>;
+>>>>>         #size-cells = <1>;
+>>>>>         ranges = <4 0x48000000 0x00040000>;
+>>>>
+>>>> I prefer if we have "ranges" with one single entry, and warn if user enters
+>>>> multiple for now, like we discussed earlier. Should have really done it in
+>>>> this series.
+>>>
+>>> I think I do as well.
+>>>
+>>>>>
+>>>>>> +    nvidia,snor-mux-mode;
+>>>>>> +    nvidia,snor-adv-inv;
+>>>>>> +    nvidia,snor-cs-select = <4>;
+>>>>>
+>>>>> I would have expected these under bus at X node as they are specific to the
+>>>>> GMI CS.
+>>>>
+>>>> Yes, that is true.
+>>>>
+>>>>>
+>>>>> I would also expect that the actual chip-select number is encoded in the
+>>>>> reg property.
+>>>>>
+>>>>>> +
+>>>>>> +    bus at 0,0 {
+>>>>>
+>>>>> bus at 4
+>>>>
+>>>> ACK.
+>>>>
+>>>>>
+>>>>> No mention of this bus node in the above documentation.
+>>>>
+>>>> I was hesitant documenting it since I am not sure if we really need it
+>>>> in a generic case? It does make sense in my
+>>>> specific case. But what would it look like if we could maintain CS in software.
+>>>>
+>>>> Do you then have a bus node per CS? I am guessing not. Is it enough to
+>>>> document it in my "example brief"?
+>>>
+>>> I see what you mean. May be it is fine to document with the examples
+>>> below how child devices should be populated. You should also state that
+>>> currently the GMI only supports one child device currently for the
+>>> chip-select that is being used.
+>>
+>> Should I really need to state that? Is it not always the case, that
+>> you have one child device per chip-select?
+> 
+> I think so. Remember it is one child device for the GMI, however, that
+> child device could still have one than one child device (per you example
+
+s/one than one/more than one
+
+Jon
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+nvpublic
