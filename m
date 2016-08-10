@@ -1,145 +1,54 @@
-From: lina.iyer@linaro.org (Lina Iyer)
-Date: Wed, 10 Aug 2016 11:35:43 -0600
-Subject: [PATCH v3 15/15] ARM64: dts: Define CPU power domain for MSM8916
-In-Reply-To: <aae203cd-35ee-958f-bc59-b9d53c32aeb2@arm.com>
-References: <1470351902-43103-1-git-send-email-lina.iyer@linaro.org>
- <1470351902-43103-16-git-send-email-lina.iyer@linaro.org>
- <aae203cd-35ee-958f-bc59-b9d53c32aeb2@arm.com>
-Message-ID: <20160810173543.GB1401@linaro.org>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Wed, 10 Aug 2016 13:37:53 -0400
+Subject: [PATCH v2] exynos-drm: Fix unsupported GEM memory type error
+ message to be clear
+In-Reply-To: <1470700100-13306-1-git-send-email-shuahkh@osg.samsung.com>
+References: <1470700100-13306-1-git-send-email-shuahkh@osg.samsung.com>
+Message-ID: <a111b98f-0596-79bf-77e2-be9a95875369@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 10 2016 at 09:27 -0600, Sudeep Holla wrote:
->
->
->On 05/08/16 00:05, Lina Iyer wrote:
->>Define power domain and the power states for the domain as defined by
->>the PSCI firmware.
->
->>The 8916 firmware supports OS initiated method of
->>powering off the CPU clusters.
->
->How is that related to the this DTS change, more details below ?
->
->>
->>Cc: <devicetree@vger.kernel.org>
->>Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
->>---
->> arch/arm64/boot/dts/qcom/msm8916.dtsi | 27 +++++++++++++++++++++++++++
->> 1 file changed, 27 insertions(+)
->>
->>diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
->>index 3029773..eb0aaed 100644
->>--- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
->>+++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
->>@@ -64,6 +64,7 @@
->> 			next-level-cache = <&L2_0>;
->> 			enable-method = "psci";
->> 			cpu-idle-states = <&CPU_SPC>;
->>+			power-domains = <&CPU_PD>;
->
->This is really messy. We need to have idle state information at one 
->place. I prefer to have a hierarchal representation of power-domains
->for CPU with idle-states at each level.
->
->> 		};
-I see where are going with that. We need to then isolate idle states
-from all devices (including CPU) and put them under the umberella of the
-domain/parent idle states.
+Hello Shuah,
 
-We also need to remember that domain idle states are not just for CPU
-domains. There are generic PM domains that also define their idle
-states. For some, that hierarchy may not make sense. So forcing it on
-all domains is not correct as well.
+On 08/08/2016 07:48 PM, Shuah Khan wrote:
+> Fix unsupported GEM memory type error message to include the memory type
+> information.
+> 
+> Signed-off-by: Shuah Khan <shuahkh@osg.samsung.com>
+> ---
+> Changes since v1:
+> -- Comment changed to read clearly
+> 
+>  drivers/gpu/drm/exynos/exynos_drm_fb.c | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/exynos/exynos_drm_fb.c b/drivers/gpu/drm/exynos/exynos_drm_fb.c
+> index e016640..40ce841 100644
+> --- a/drivers/gpu/drm/exynos/exynos_drm_fb.c
+> +++ b/drivers/gpu/drm/exynos/exynos_drm_fb.c
+> @@ -55,11 +55,11 @@ static int check_fb_gem_memory_type(struct drm_device *drm_dev,
+>  	flags = exynos_gem->flags;
+>  
+>  	/*
+> -	 * without iommu support, not support physically non-continuous memory
+> -	 * for framebuffer.
+> +	 * Physically non-contiguous memory type for framebuffer is not
+> +	 * supported without IOMMU.
+>  	 */
+>  	if (IS_NONCONTIG_BUFFER(flags)) {
+> -		DRM_ERROR("cannot use this gem memory type for fb.\n");
+> +		DRM_ERROR("Non-contiguous GEM memory is not supported.\n");
+>  		return -EINVAL;
+>  	}
+>  
+> 
 
->>
->> 		CPU1: cpu at 1 {
->>@@ -73,6 +74,7 @@
->> 			next-level-cache = <&L2_0>;
->> 			enable-method = "psci";
->> 			cpu-idle-states = <&CPU_SPC>;
->>+			power-domains = <&CPU_PD>;
->> 		};
->>
->> 		CPU2: cpu at 2 {
->>@@ -82,6 +84,7 @@
->> 			next-level-cache = <&L2_0>;
->> 			enable-method = "psci";
->> 			cpu-idle-states = <&CPU_SPC>;
->>+			power-domains = <&CPU_PD>;
->> 		};
->>
->> 		CPU3: cpu at 3 {
->>@@ -91,6 +94,7 @@
->> 			next-level-cache = <&L2_0>;
->> 			enable-method = "psci";
->> 			cpu-idle-states = <&CPU_SPC>;
->>+			power-domains = <&CPU_PD>;
->> 		};
->>
->> 		L2_0: l2-cache {
->>@@ -113,6 +117,29 @@
->> 	psci {
->> 		compatible = "arm,psci-1.0";
->> 		method = "smc";
->
->Why is it inside PSCI node ? I don't see a need for that.
->If it needs to be here, then amend the binding document.
->
-It is described in patch 13/15.
+Patch looks good to me.
 
-It is inside PSCI node, because PSCI has the domain controller.
+Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
 
->>+
->>+		CPU_PD: cpu-pd at 0 {
->>+			#power-domain-cells = <0>;
->>+			domain-idle-states = <&CLUSTER_RET>, <&CLUSTER_PWR_DWN>;
->>+		};
->>+
->>+		domain-states {
->>+			CLUSTER_RET: domain_ret {
->>+				compatible = "arm,idle-state";
->>+				arm,psci-suspend-param = <0x1000010>;
->>+				entry-latency-us = <500>;
->>+				exit-latency-us = <500>;
->>+				min-residency-us = <2000>;
->>+			};
->>+
->>+			CLUSTER_PWR_DWN: domain_gdhs {
->>+				compatible = "arm,idle-state";
->>+				arm,psci-suspend-param = <0x1000030>;
->>+				entry-latency-us = <2000>;
->>+				exit-latency-us = <2000>;
->>+				min-residency-us = <6000>;
->>+			};
->>+		};
->
->So how do you collapse these states into the cpu level states ?
-Why do you have to collapse?
-
->We should be able to cope up with platform co-ordinated mode of idle.
->For me, this binding and the representation here is designed only to
->address OS co-ordinated mode of idle support but it should be other way
->around. Design the bindings that can cater any mode (platform and OS
->co-ordinated)
-As explained to Brendan on the version2 of the series, OSI and PC are
-orthagonal to each other. The idle state definition in the devicetree
-exactly matches the unique approaches of these 2 modes.
-
-In platform coordinated, the CPU determines the idle state of the domain
-and selects the state, hence it makes sense to extend the
-cpu-idle-states to cover those domain states.
-
-In OSI, the CPUs only determine their idle states. When they are done
-with their idle state, they bubble up and let the domain choose its idle
-state and therefore the domain-idle-states is part of the domain
-controller.
-
-With this addition platform coordinated representation is not broken. If
-your SoC supports both platform and os modes, then you can specify the
-idle states of both of them in the DT. The clause in firmware/psci.c
-will however, choose OSI if its available. I am not sure we want to
-dynamically switch betweeen OSI and PC at runtime.
-
-Thanks,
-Lina
+Best regards,
+-- 
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
