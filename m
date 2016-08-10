@@ -1,201 +1,136 @@
 From: patrice.chotard@st.com (patrice.chotard at st.com)
-Date: Wed, 10 Aug 2016 09:39:14 +0200
-Subject: [RESEND v2 09/10] mfd: Add STMPE1600 support
+Date: Wed, 10 Aug 2016 09:39:15 +0200
+Subject: [RESEND v2 10/10] gpio: stmpe: Add STMPE1600 support
 In-Reply-To: <1470814755-19447-1-git-send-email-patrice.chotard@st.com>
 References: <1470814755-19447-1-git-send-email-patrice.chotard@st.com>
-Message-ID: <1470814755-19447-10-git-send-email-patrice.chotard@st.com>
+Message-ID: <1470814755-19447-11-git-send-email-patrice.chotard@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Patrice Chotard <patrice.chotard@st.com>
 
-STMPE1600 is a 16-bit port expander.
-Datasheet is available here :
-http://www2.st.com/content/st_com/en/products/interfaces-and-transceivers/
-i-o-expanders-and-level-translators/i-o-expanders/stmpe1600.html
+The particularities of this variant are:
+- GPIO_XXX_LSB and GPIO_XXX_MSB memory locations are inverted compared
+  to other variants.
+- There is no Edge detection, Rising Edge and Falling Edge registers.
+- IRQ flags are cleared when read, no need to write in Status register.
 
 Signed-off-by: Amelie DELAUNAY <amelie.delaunay@st.com>
 Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-Acked-by: Lee Jones <lee.jones@linaro.org>
+Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- drivers/mfd/stmpe-i2c.c   |  2 ++
- drivers/mfd/stmpe.c       | 65 +++++++++++++++++++++++++++++++++++++++++++----
- drivers/mfd/stmpe.h       | 21 +++++++++++++++
- include/linux/mfd/stmpe.h |  1 +
- 4 files changed, 84 insertions(+), 5 deletions(-)
+ drivers/gpio/gpio-stmpe.c | 48 +++++++++++++++++++++++++++++++++++++----------
+ 1 file changed, 38 insertions(+), 10 deletions(-)
 
-diff --git a/drivers/mfd/stmpe-i2c.c b/drivers/mfd/stmpe-i2c.c
-index c3f4aab..863c39a 100644
---- a/drivers/mfd/stmpe-i2c.c
-+++ b/drivers/mfd/stmpe-i2c.c
-@@ -57,6 +57,7 @@ static const struct of_device_id stmpe_of_match[] = {
- 	{ .compatible = "st,stmpe610", .data = (void *)STMPE610, },
- 	{ .compatible = "st,stmpe801", .data = (void *)STMPE801, },
- 	{ .compatible = "st,stmpe811", .data = (void *)STMPE811, },
-+	{ .compatible = "st,stmpe1600", .data = (void *)STMPE1600, },
- 	{ .compatible = "st,stmpe1601", .data = (void *)STMPE1601, },
- 	{ .compatible = "st,stmpe1801", .data = (void *)STMPE1801, },
- 	{ .compatible = "st,stmpe2401", .data = (void *)STMPE2401, },
-@@ -101,6 +102,7 @@ static const struct i2c_device_id stmpe_i2c_id[] = {
- 	{ "stmpe610", STMPE610 },
- 	{ "stmpe801", STMPE801 },
- 	{ "stmpe811", STMPE811 },
-+	{ "stmpe1600", STMPE1600 },
- 	{ "stmpe1601", STMPE1601 },
- 	{ "stmpe1801", STMPE1801 },
- 	{ "stmpe2401", STMPE2401 },
-diff --git a/drivers/mfd/stmpe.c b/drivers/mfd/stmpe.c
-index a060809..3a65331 100644
---- a/drivers/mfd/stmpe.c
-+++ b/drivers/mfd/stmpe.c
-@@ -532,6 +532,59 @@ static struct stmpe_variant_info stmpe610 = {
- };
+diff --git a/drivers/gpio/gpio-stmpe.c b/drivers/gpio/gpio-stmpe.c
+index 6d6d76a..32c5a72 100644
+--- a/drivers/gpio/gpio-stmpe.c
++++ b/drivers/gpio/gpio-stmpe.c
+@@ -128,8 +128,9 @@ static int stmpe_gpio_irq_set_type(struct irq_data *d, unsigned int type)
+ 	if (type & IRQ_TYPE_LEVEL_LOW || type & IRQ_TYPE_LEVEL_HIGH)
+ 		return -EINVAL;
  
- /*
-+ * STMPE1600
-+ * Compared to all others STMPE variant, LSB and MSB regs are located in this
-+ * order :	LSB   addr
-+ *		MSB   addr + 1
-+ * As there is only 2 * 8bits registers for GPMR/GPSR/IEGPIOPR, CSB index is MSB registers
-+ */
-+
-+static const u8 stmpe1600_regs[] = {
-+	[STMPE_IDX_CHIP_ID]	= STMPE1600_REG_CHIP_ID,
-+	[STMPE_IDX_SYS_CTRL]	= STMPE1600_REG_SYS_CTRL,
-+	[STMPE_IDX_ICR_LSB]	= STMPE1600_REG_SYS_CTRL,
-+	[STMPE_IDX_GPMR_LSB]	= STMPE1600_REG_GPMR_LSB,
-+	[STMPE_IDX_GPMR_CSB]	= STMPE1600_REG_GPMR_MSB,
-+	[STMPE_IDX_GPSR_LSB]	= STMPE1600_REG_GPSR_LSB,
-+	[STMPE_IDX_GPSR_CSB]	= STMPE1600_REG_GPSR_MSB,
-+	[STMPE_IDX_GPDR_LSB]	= STMPE1600_REG_GPDR_LSB,
-+	[STMPE_IDX_GPDR_CSB]	= STMPE1600_REG_GPDR_MSB,
-+	[STMPE_IDX_IEGPIOR_LSB]	= STMPE1600_REG_IEGPIOR_LSB,
-+	[STMPE_IDX_IEGPIOR_CSB]	= STMPE1600_REG_IEGPIOR_MSB,
-+	[STMPE_IDX_ISGPIOR_LSB]	= STMPE1600_REG_ISGPIOR_LSB,
-+};
-+
-+static struct stmpe_variant_block stmpe1600_blocks[] = {
-+	{
-+		.cell	= &stmpe_gpio_cell,
-+		.irq	= 0,
-+		.block	= STMPE_BLOCK_GPIO,
-+	},
-+};
-+
-+static int stmpe1600_enable(struct stmpe *stmpe, unsigned int blocks,
-+			   bool enable)
-+{
-+	if (blocks & STMPE_BLOCK_GPIO)
-+		return 0;
-+	else
-+		return -EINVAL;
-+}
-+
-+static struct stmpe_variant_info stmpe1600 = {
-+	.name		= "stmpe1600",
-+	.id_val		= STMPE1600_ID,
-+	.id_mask	= 0xffff,
-+	.num_gpios	= 16,
-+	.af_bits	= 0,
-+	.regs		= stmpe1600_regs,
-+	.blocks		= stmpe1600_blocks,
-+	.num_blocks	= ARRAY_SIZE(stmpe1600_blocks),
-+	.num_irqs	= STMPE1600_NR_INTERNAL_IRQS,
-+	.enable		= stmpe1600_enable,
-+};
-+
-+/*
-  * STMPE1601
-  */
+-	/* STMPE801 doesn't have RE and FE registers */
+-	if (stmpe_gpio->stmpe->partnum == STMPE801)
++	/* STMPE801 and STMPE 1600 don't have RE and FE registers */
++	if (stmpe_gpio->stmpe->partnum == STMPE801 ||
++	    stmpe_gpio->stmpe->partnum == STMPE1600)
+ 		return 0;
  
-@@ -928,6 +981,7 @@ static struct stmpe_variant_info *stmpe_variant_info[STMPE_NBR_PARTS] = {
- 	[STMPE610]	= &stmpe610,
- 	[STMPE801]	= &stmpe801,
- 	[STMPE811]	= &stmpe811,
-+	[STMPE1600]	= &stmpe1600,
- 	[STMPE1601]	= &stmpe1601,
- 	[STMPE1801]	= &stmpe1801,
- 	[STMPE2401]	= &stmpe2401,
-@@ -954,7 +1008,8 @@ static irqreturn_t stmpe_irq(int irq, void *data)
+ 	if (type & IRQ_TYPE_EDGE_RISING)
+@@ -173,9 +174,10 @@ static void stmpe_gpio_irq_sync_unlock(struct irq_data *d)
+ 	int i, j;
+ 
+ 	for (i = 0; i < CACHE_NR_REGS; i++) {
+-		/* STMPE801 doesn't have RE and FE registers */
+-		if ((stmpe->partnum == STMPE801) &&
+-				(i != REG_IE))
++		/* STMPE801 and STMPE1600 don't have RE and FE registers */
++		if ((stmpe->partnum == STMPE801 ||
++		     stmpe->partnum == STMPE1600) &&
++		     (i != REG_IE))
+ 			continue;
+ 
+ 		for (j = 0; j < num_banks; j++) {
+@@ -208,11 +210,21 @@ static void stmpe_gpio_irq_unmask(struct irq_data *d)
+ {
+ 	struct gpio_chip *gc = irq_data_get_irq_chip_data(d);
+ 	struct stmpe_gpio *stmpe_gpio = gpiochip_get_data(gc);
++	struct stmpe *stmpe = stmpe_gpio->stmpe;
+ 	int offset = d->hwirq;
+ 	int regoffset = offset / 8;
+ 	int mask = 1 << (offset % 8);
+ 
+ 	stmpe_gpio->regs[REG_IE][regoffset] |= mask;
++
++	/*
++	 * STMPE1600 workaround: to be able to get IRQ from pins,
++	 * a read must be done on GPMR register, or a write in
++	 * GPSR or GPCR registers
++	 */
++	if (stmpe->partnum == STMPE1600)
++		stmpe_reg_read(stmpe,
++			       stmpe->regs[STMPE_IDX_GPMR_LSB + regoffset]);
+ }
+ 
+ static void stmpe_dbg_show_one(struct seq_file *s,
+@@ -285,6 +297,7 @@ static void stmpe_dbg_show_one(struct seq_file *s,
+ 			fall = !!(ret & mask);
+ 
+ 		case STMPE801:
++		case STMPE1600:
+ 			irqen_reg = stmpe->regs[STMPE_IDX_IEGPIOR_LSB + bank];
+ 			break;
+ 
+@@ -331,18 +344,32 @@ static irqreturn_t stmpe_gpio_irq(int irq, void *dev)
+ {
+ 	struct stmpe_gpio *stmpe_gpio = dev;
+ 	struct stmpe *stmpe = stmpe_gpio->stmpe;
+-	u8 statmsbreg = stmpe->regs[STMPE_IDX_ISGPIOR_MSB];
++	u8 statmsbreg;
+ 	int num_banks = DIV_ROUND_UP(stmpe->num_gpios, 8);
+ 	u8 status[num_banks];
  	int ret;
  	int i;
  
--	if (variant->id_val == STMPE801_ID) {
-+	if (variant->id_val == STMPE801_ID ||
-+	    variant->id_val == STMPE1600_ID) {
- 		int base = irq_create_mapping(stmpe->domain, 0);
- 
- 		handle_nested_irq(base);
-@@ -1128,13 +1183,13 @@ static int stmpe_chip_init(struct stmpe *stmpe)
- 		return ret;
- 
- 	if (stmpe->irq >= 0) {
--		if (id == STMPE801_ID)
-+		if (id == STMPE801_ID || id == STMPE1600_ID)
- 			icr = STMPE_SYS_CTRL_INT_EN;
- 		else
- 			icr = STMPE_ICR_LSB_GIM;
- 
--		/* STMPE801 doesn't support Edge interrupts */
--		if (id != STMPE801_ID) {
-+		/* STMPE801 and STMPE1600 don't support Edge interrupts */
-+		if (id != STMPE801_ID && id != STMPE1600_ID) {
- 			if (irq_trigger == IRQF_TRIGGER_FALLING ||
- 					irq_trigger == IRQF_TRIGGER_RISING)
- 				icr |= STMPE_ICR_LSB_EDGE;
-@@ -1142,7 +1197,7 @@ static int stmpe_chip_init(struct stmpe *stmpe)
- 
- 		if (irq_trigger == IRQF_TRIGGER_RISING ||
- 				irq_trigger == IRQF_TRIGGER_HIGH) {
--			if (id == STMPE801_ID)
-+			if (id == STMPE801_ID || id == STMPE1600_ID)
- 				icr |= STMPE_SYS_CTRL_INT_HI;
- 			else
- 				icr |= STMPE_ICR_LSB_HIGH;
-diff --git a/drivers/mfd/stmpe.h b/drivers/mfd/stmpe.h
-index f127342..f7efdd8 100644
---- a/drivers/mfd/stmpe.h
-+++ b/drivers/mfd/stmpe.h
-@@ -164,6 +164,27 @@ int stmpe_remove(struct stmpe *stmpe);
- #define STMPE811_SYS_CTRL2_TS_OFF	(1 << 3)
- 
- /*
-+ * STMPE1600
-+ */
-+#define STMPE1600_ID			0x0016
-+#define STMPE1600_NR_INTERNAL_IRQS	16
++	/*
++	 * the stmpe_block_read() call below, imposes to set statmsbreg
++	 * with the register located at the lowest address. As STMPE1600
++	 * variant is the only one which respect registers address's order
++	 * (LSB regs located at lowest address than MSB ones) whereas all
++	 * the others have a registers layout with MSB located before the
++	 * LSB regs.
++	 */
++	if (stmpe->partnum == STMPE1600)
++		statmsbreg = stmpe->regs[STMPE_IDX_ISGPIOR_LSB];
++	else
++		statmsbreg = stmpe->regs[STMPE_IDX_ISGPIOR_MSB];
 +
-+#define STMPE1600_REG_CHIP_ID		0x00
-+#define STMPE1600_REG_SYS_CTRL		0x03
-+#define STMPE1600_REG_IEGPIOR_LSB	0x08
-+#define STMPE1600_REG_IEGPIOR_MSB	0x09
-+#define STMPE1600_REG_ISGPIOR_LSB	0x0A
-+#define STMPE1600_REG_ISGPIOR_MSB	0x0B
-+#define STMPE1600_REG_GPMR_LSB		0x10
-+#define STMPE1600_REG_GPMR_MSB		0x11
-+#define STMPE1600_REG_GPSR_LSB		0x12
-+#define STMPE1600_REG_GPSR_MSB		0x13
-+#define STMPE1600_REG_GPDR_LSB		0x14
-+#define STMPE1600_REG_GPDR_MSB		0x15
-+#define STMPE1600_REG_GPPIR_LSB		0x16
-+#define STMPE1600_REG_GPPIR_MSB		0x17
-+
-+/*
-  * STMPE1601
-  */
+ 	ret = stmpe_block_read(stmpe, statmsbreg, num_banks, status);
+ 	if (ret < 0)
+ 		return IRQ_NONE;
  
-diff --git a/include/linux/mfd/stmpe.h b/include/linux/mfd/stmpe.h
-index 3dced4a..0170bd6 100644
---- a/include/linux/mfd/stmpe.h
-+++ b/include/linux/mfd/stmpe.h
-@@ -26,6 +26,7 @@ enum stmpe_partnum {
- 	STMPE610,
- 	STMPE801,
- 	STMPE811,
-+	STMPE1600,
- 	STMPE1601,
- 	STMPE1801,
- 	STMPE2401,
+ 	for (i = 0; i < num_banks; i++) {
+-		int bank = num_banks - i - 1;
++		int bank = (stmpe_gpio->stmpe->partnum == STMPE1600) ? i :
++			   num_banks - i - 1;
+ 		unsigned int enabled = stmpe_gpio->regs[REG_IE][bank];
+ 		unsigned int stat = status[i];
+ 
+@@ -362,10 +389,11 @@ static irqreturn_t stmpe_gpio_irq(int irq, void *dev)
+ 
+ 		/*
+ 		 * interrupt status register write has no effect on
+-		 * 801 and 1801, bits are cleared when read.
+-		 * Edge detect register is not present on 801 and 1801
++		 * 801/1801/1600, bits are cleared when read.
++		 * Edge detect register is not present on 801/1600/1801
+ 		 */
+-		if (stmpe->partnum != STMPE801 || stmpe->partnum != STMPE1801) {
++		if (stmpe->partnum != STMPE801 || stmpe->partnum != STMPE1600 ||
++		    stmpe->partnum != STMPE1801) {
+ 			stmpe_reg_write(stmpe, statmsbreg + i, status[i]);
+ 			stmpe_reg_write(stmpe,
+ 					stmpe->regs[STMPE_IDX_GPEDR_LSB + i],
 -- 
 1.9.1
