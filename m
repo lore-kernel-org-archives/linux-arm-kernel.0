@@ -1,87 +1,97 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 10 Aug 2016 14:09:22 -0700
-Subject: [PATCH v9 01/10] clk: fix initial state of critical clock's
- parents
-In-Reply-To: <1470721183.8551.6.camel@mtksdaap41>
-References: <1466581229-2342-1-git-send-email-erin.lo@mediatek.com>
- <1466581229-2342-2-git-send-email-erin.lo@mediatek.com>
- <20160702012140.GB17071@codeaurora.org>
- <1467604308.26485.4.camel@mtksdaap41>
- <146802073038.73491.6675612765998057903@resonance>
- <1468225452.31247.7.camel@mtksdaap41>
- <1470203182.17063.3.camel@mtksdaap41>
- <1470721183.8551.6.camel@mtksdaap41>
-Message-ID: <20160810210922.GD2996@codeaurora.org>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Wed, 10 Aug 2016 14:19:47 -0700
+Subject: [PATCH 1/2] remoteproc: core: Add rproc OF look-up functions
+In-Reply-To: <f9641050-0a3f-11de-fa69-e587034e0527@ti.com>
+References: <20160719154905.23344-1-lee.jones@linaro.org>
+ <20160810174049.GO26240@tuxbot>
+ <7650e5fa-f52c-1ab5-e197-8630fd7d0322@ti.com>
+ <20160810204049.GV26240@tuxbot>
+ <f9641050-0a3f-11de-fa69-e587034e0527@ti.com>
+Message-ID: <20160810211947.GW26240@tuxbot>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(Including lists)
+On Wed 10 Aug 14:04 PDT 2016, Suman Anna wrote:
 
-On 08/09, James Liao wrote:
-> On Wed, 2016-08-03 at 13:46 +0800, James Liao wrote:
->>
->> Hi Mike,
->>
->> Do you have new patches to fix new clock parents? If not, I think we can
->> use my patch first. Is it okay?
->>
->
-> Hi Stephen,
->
-> Do you have comments for the bug fixing? I prefer to use my patch (clk:
-> fix initial state of critical clock's parents). How do you think?
->
+> On 08/10/2016 03:40 PM, Bjorn Andersson wrote:
+> > On Wed 10 Aug 12:37 PDT 2016, Suman Anna wrote:
+> > 
+> >> Hi Lee, Bjorn,
+> >>
+> >> On 08/10/2016 12:40 PM, Bjorn Andersson wrote:
+> >>> On Tue 19 Jul 08:49 PDT 2016, Lee Jones wrote:
+> >>>
+> >>>> - of_rproc_by_index(): look-up and obtain a reference to a rproc
+> >>>>                        using the DT phandle "rprocs" and a index.
+> >>>>
+> >>>> - of_rproc_by_name():  lookup and obtain a reference to a rproc
+> >>>>                        using the DT phandle "rprocs" and "rproc-names".
+> >>>>
+> >>>> Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
+> >>>> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> >>>> ---
+> >>>
+> >>> I'm happy with this, so I whipped up a binding document describing our
+> >>> two new properties. Waiting for an opinion on that before I merge this.
+> >>
+> >> Yeah, I like the two new API too, I have just about run into the need
+> >> for the same on my product trees. We can probably make it less
+> >> complicated than what the current series is. The wkup_m3_ipc usage was
+> >> before there was any standardization on the property names, so we went
+> >> with a ti, prefixed property specific to the wkup_m3_ipc node and a
+> >> general API that is agnostic of property name. We don't have all the
+> >> pieces for PM on AM335x/AM437x SoCs on upstream kernel yet, so we should
+> >> be able to switch over to using the new property as we cannot achieve
+> >> the desired functionality even though we can boot the wkup_m3.
+> >>
+> > 
+> > Glad to hear you're onboard with dropping the old property name, even if
+> > it's later.
+> > 
+> >> Here's what I propose:
+> >> 1. Let's not burden the new of_get_rproc_by_index() API with having to
+> >> fall-back and look for ti,rprocs. The rproc_get_by_phandle() core logic
+> >> of looking up against the rproc list is self-contained, and the API
+> >> usage is limited to just the wkup_m3_ipc driver at the moment.
+> >> 2. Keep the rproc_get_by_phandle API as is but mark it as deprecated.
+> >> IMHO, the rename of this API to of_get_rproc_by_phandle() in Patch 2 but
+> >> using a device node pointer as input argument doesn't add any value.
+> >> 3. Provide a fallback in wkup_m3_ipc driver to look for both rprocs and
+> >> ti,rproc property, while switching over the node to use rprocs property.
+> >> 4. We can get rid of the rproc_get_by_phandle() API after the
+> >> wkup_m3_ipc transition is done to use of_get_rproc_by_index() API.
+> >>
+> > 
+> > I don't fancy the idea of leaving the kernel builds with a deprecation
+> > warning for some time and I don't feel the cost of carrying those 2
+> > extra statements is a bigger issue than keeping a deprecated API around.
+> > And it will be less than the dance we have to do in wkup_m3_ipc.
+> > 
+> > So I think that we should merge these patches and if it can be concluded
+> > that we don't need backwards compatibility with the old DT property we
+> > can drop the inner conditional in the API.
+> 
+> Yeah, I am fine with dropping the inner ti,rproc processing in the new
+> of_rproc_get_by_index() API and keeping it clean. What's not clear to me
+> is why we would still need a get_by_phandle API alongside the two new
+> API once the wkup_m3_ipc is converted to the new API?  Or is it just to
+> clean up the consumer interface? If latter, I will fixup the wkup_m3_ipc
+> driver without the need for remoteproc core changes, and switch over to
+> the new API.
+> 
 
-How about we recalc accuracies and rates in addition to the patch
-from Mike? That will fix everything?
+of_get_rproc_by_phandle() is just a convenience for not having to get by
+index 0, as most drivers is only having one rproc.
 
----8<----
-From: Michael Turquette <mturquette@baylibre.com>
-Subject: [PATCH] clk: migrate ref counts when orphans are reunited
+As far as cleaning up wkup_m3_ipc, patch 2 does that and cleans out the
+old implementation and with that wkup_m3_ipc is moved to the new API.
 
-It's always nice to see families reunited, and this is equally true when
-talking about parent clocks and their children. However, if the orphan
-clk had a positive prepare_count or enable_count, then we would not
-migrate those counts up the parent chain correctly.
 
-This has manifested with the recent critical clocks feature, which often
-enables clocks very early, before their parents have been registered.
+So the only issue is that the wkup_m3_ipc DT binding states that the
+property should be named "ti,rproc" and as such someone has to send a
+patch to that and make an argument that we don't have to maintain
+backwards compatibility. But as this is used in am33xx.dtsi and
+am4372.dtsi that might be too late?
 
-Fixed by replacing the call to clk_core_reparent with calls to
-__clk_set_parent_{before,after}.
-
-Cc: James Liao <jamesjj.liao@mediatek.com>
-Cc: Erin Lo <erin.lo@mediatek.com>
-Signed-off-by: Michael Turquette <mturquette@baylibre.com>
-[sboyd at codeaurora.org: Recalc accuracies and rates too]
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- drivers/clk/clk.c | 12 ++++++++++--
- 1 file changed, 10 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index 820a939fb6bb..dc3fff2bf839 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -2449,8 +2449,16 @@ static int __clk_core_init(struct clk_core *core)
- 	hlist_for_each_entry_safe(orphan, tmp2, &clk_orphan_list, child_node) {
- 		struct clk_core *parent = __clk_init_parent(orphan);
- 
--		if (parent)
--			clk_core_reparent(orphan, parent);
-+		/*
-+		 * we could call __clk_set_parent, but that would result in a
-+		 * reducant call to the .set_rate op, if it exists
-+		 */
-+		if (parent) {
-+			__clk_set_parent_before(orphan, parent);
-+			__clk_set_parent_after(orphan, parent, NULL);
-+			__clk_recalc_accuracies(orphan);
-+			__clk_recalc_rates(orphan, 0);
-+		}
- 	}
- 
- 	/*
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Regards,
+Bjorn
