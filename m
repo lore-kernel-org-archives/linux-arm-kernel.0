@@ -1,62 +1,103 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 10 Aug 2016 14:02:17 +0200
-Subject: [PATCH] ARM: dts: realview: Fix PBX-A9 cache description
-Message-ID: <1470830537-12307-1-git-send-email-linus.walleij@linaro.org>
+From: mhiramat@kernel.org (Masami Hiramatsu)
+Date: Wed, 10 Aug 2016 21:04:01 +0900
+Subject: [PATCH 3/4] arm64: kprobes: WARN if attempting to step with
+ PSTATE.D=1
+In-Reply-To: <20160810080114.GB27500@localhost.localdomain>
+References: <1468937260-23988-1-git-send-email-will.deacon@arm.com>
+ <1468937260-23988-3-git-send-email-will.deacon@arm.com>
+ <CAHB_Guonf6qc-yCr2oKDZgX+5q7qXJpSpLU3qafChrBkBqk7FA@mail.gmail.com>
+ <20160809124832.GI27508@arm.com>
+ <20160810080114.GB27500@localhost.localdomain>
+Message-ID: <20160810210401.e2bb53d1c9def874ba270f16@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Robin Murphy <robin.murphy@arm.com>
+On Wed, 10 Aug 2016 13:31:14 +0530
+Pratyush Anand <panand@redhat.com> wrote:
 
-Clearly QEMU is very permissive in how its PL310 model may be set up,
-but the real hardware turns out to be far more particular about things
-actually being correct. Fix up the DT description so that the real
-thing actually boots:
+> Hi Will,
+> 
+> Thanks for the reply.
+> 
+> On 09/08/2016:01:48:32 PM, Will Deacon wrote:
+> > On Wed, Aug 03, 2016 at 05:52:55PM +0530, Pratyush Anand wrote:
+> > > Hi Will,
+> > > 
+> > > Its already in torvalds/linux.git: master now. I have some related
+> > > queries, so thought to discuss it here.
+> > > 
+> > > On Tue, Jul 19, 2016 at 7:37 PM, Will Deacon <will.deacon@arm.com> wrote:
+> > > > Stepping with PSTATE.D=1 is bad news. The step won't generate a debug
+> > > > exception and we'll likely walk off into random data structures. This
+> > > > should never happen, but when it does, it's a PITA to debug. Add a
+> > > 
+> > > But it happens in many know scenarios, like:
+> > > 
+> > > 1) We are executing a WARN_ON(), which will call `BRK  BUG_BRK_IMM`.
+> > > It prints warning messages through breakpoint handler. Now, suppose we
+> > > have a kprobe instrumented at a print function branch, say
+> > > print_worker_info(), we will land into
+> > > kprobe_handler()->setup_singlestep() with D-bit set. In this case if
+> > > we do not clear it, then we receive undefined exception before we
+> > > could get single step exception.
 
-- The arm,data-latency and arm,tag-latency properties need 3 cells to
-  be valid, otherwise we end up retaining the default 8-cycle latencies
-  which leads pretty quickly to lockup.
-- The arm,dirty-latency property is only relevant to L210/L220, so get
-  rid of it.
-- The cache geometry override also leads to lockup and/or general
-  misbehaviour. Irritatingly, the manual doesn't state the actual PL310
-  configuration, but based on the boardfile code and poking registers
-  from the Boot Monitor, it would seem to be 8 sets of 16KB ways.
+If the D-bit means debug trap flag for single-stepping, we need to store
+the flag in kprobe_ctlblk so that we can restore the previous state
+in post_kprobe handler.
+And also, if we found the kprobes in such state, we should skip it so that
+not involving any other functions, and if possible disable it forcibly if
+it is really dangerous.
 
-With that, we can successfully boot to enjoy the fun of mismatched FPUs...
+> > > 
+> > > 2) Similarly, if we instrument kprobe at uprobe_breakpoint_handler()
+> > > (code not yet in upstream),  we land into similar situation which
+> > > leads to infinite "Unexpected kernel single-step exception at EL1".
 
-Cc: stable at vger.kernel.org
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-Tested-by: Mark Rutland <mark.rutland@arm.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-ARM SoC folks: please apply this directly for fixes. I had
-queued it for worries of clashing with other updates, but I think
-it will be fine, and it needs to go in for v4.8.
----
- arch/arm/boot/dts/arm-realview-pbx-a9.dts | 9 ++++-----
- 1 file changed, 4 insertions(+), 5 deletions(-)
+It should be marked by NOKPROBE_SYMBOL.
 
-diff --git a/arch/arm/boot/dts/arm-realview-pbx-a9.dts b/arch/arm/boot/dts/arm-realview-pbx-a9.dts
-index db808f92dd79..90d00b407f85 100644
---- a/arch/arm/boot/dts/arm-realview-pbx-a9.dts
-+++ b/arch/arm/boot/dts/arm-realview-pbx-a9.dts
-@@ -70,13 +70,12 @@
- 		 * associativity as these may be erroneously set
- 		 * up by boot loader(s).
- 		 */
--		cache-size = <1048576>; // 1MB
--		cache-sets = <4096>;
-+		cache-size = <131072>; // 128KB
-+		cache-sets = <512>;
- 		cache-line-size = <32>;
- 		arm,parity-disable;
--		arm,tag-latency = <1>;
--		arm,data-latency = <1 1>;
--		arm,dirty-latency = <1>;
-+		arm,tag-latency = <1 1 1>;
-+		arm,data-latency = <1 1 1>;
- 	};
- 
- 	scu: scu at 1f000000 {
+> > > 
+> > > So, why can't we clear PSR_D_BIT in setup_singlestep unconditionally?
+> > > I found that both of the above issue is resolved by doing that.
+> > 
+> > I think that will work, but the advantage of the WARN_ON is that it can
+> > highlight cases where kprobes have been placed on the debug exception
+> > path, which is generally a Bad Idea as it can result in infinite recursion
+> > loops.
+> 
+> It might result in infinite recursion if we place kprobe at a function which is
+> called from kprobe breakpoint/single step handler.
+
+For those functions we have to mark as blacklist by NOPROBE_SYMBOL() macro.
+
+> However, it should still be
+> OK if kprobe is placed in other debug exception path.
+
+It depends on the architecture kprobe implementation, if we can not separate
+the debug exception path to the kprobe at very last part of the path, we
+can not probe that. So I recommend you to check it is kprobe or not at first.
+
+> Other arches like x86 allows that, so I think we will have to support as well.
+
+Yes, actually on x86, we hook kprobes directly in do_int3.
+
+> > 
+> > I know that __kprobes is supposed to deal with this, but in reality that's
+> > all a best guess and looks to be incomplete. If we can do a better job
+> > of annotating the debug exception path, I'd be up for unconditional
+> > clearing of PSR_D_BIT in the target when returning.
+> 
+> OK, so I will send a patch for review with proper comment logs for debug
+> exception path.
+
+Could you also test it by using ftrace kprobe-trace interface and if you find
+any place where can cause infinit recursion, please put the function in blacklist.
+
+Thank you,
+
+
+> 
+> ~Pratyush
+
+
 -- 
-2.7.4
+Masami Hiramatsu <mhiramat@kernel.org>
