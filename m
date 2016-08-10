@@ -1,33 +1,34 @@
-From: yizhouzhou@ict.ac.cn (yizhouzhou at ict.ac.cn)
-Date: Wed, 10 Aug 2016 16:08:22 +0800
-Subject: [PATCH 1/1] xilinx: check return value of class_create
-Message-ID: <1470816502-16802-1-git-send-email-yizhouzhou@ict.ac.cn>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 10 Aug 2016 10:09:08 +0200
+Subject: [PATCH] clocksource/drivers/time-armada-370-xp: Fix the clock
+ reference
+Message-ID: <1470816548-8750-1-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Zhouyi Zhou <yizhouzhou@ict.ac.cn>
+While converting the init function to return an error, the wrong clock
+was get. This lead to wrong clock rate and slow down the kernel. For
+example, before the patch a typical boot was around 15s after it was 1
+minute slower.
 
-	 return value of class_create should be considered in
-module init function.
+Fixes: 12549e27c63c ("clocksource/drivers/time-armada-370-xp: Convert init function to return error")
 
-Signed-off-by: Zhouyi Zhou <zhouzhouyi@gmail.com>
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- drivers/char/xilinx_hwicap/xilinx_hwicap.c | 3 +++
- 1 file changed, 3 insertions(+)
+ drivers/clocksource/time-armada-370-xp.c | 1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/drivers/char/xilinx_hwicap/xilinx_hwicap.c b/drivers/char/xilinx_hwicap/xilinx_hwicap.c
-index c07dfe5..3877b46 100644
---- a/drivers/char/xilinx_hwicap/xilinx_hwicap.c
-+++ b/drivers/char/xilinx_hwicap/xilinx_hwicap.c
-@@ -854,6 +854,9 @@ static int __init hwicap_module_init(void)
- 	int retval;
+diff --git a/drivers/clocksource/time-armada-370-xp.c b/drivers/clocksource/time-armada-370-xp.c
+index 719b478d136e..3c39e6f45971 100644
+--- a/drivers/clocksource/time-armada-370-xp.c
++++ b/drivers/clocksource/time-armada-370-xp.c
+@@ -338,7 +338,6 @@ static int __init armada_xp_timer_init(struct device_node *np)
+ 	struct clk *clk = of_clk_get_by_name(np, "fixed");
+ 	int ret;
  
- 	icap_class = class_create(THIS_MODULE, "xilinx_config");
-+	if (IS_ERR(icap_class))
-+		return PTR_ERR(icap_class);
-+
- 	mutex_init(&icap_sem);
- 
- 	devt = MKDEV(XHWICAP_MAJOR, XHWICAP_MINOR);
+-	clk = of_clk_get(np, 0);
+ 	if (IS_ERR(clk)) {
+ 		pr_err("Failed to get clock");
+ 		return PTR_ERR(clk);
 -- 
-1.9.1
+2.8.1
