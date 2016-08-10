@@ -1,81 +1,252 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 10 Aug 2016 13:59:26 +0530
-Subject: [PATCH 2/4] ARM: dts: da850: Add an aemif node
-In-Reply-To: <20160810082631.GC16481@gobelin>
-References: <20160809171518.22690-1-kbeldan@baylibre.com>
- <20160809171518.22690-3-kbeldan@baylibre.com> <57AADC63.90405@ti.com>
- <57AADF7B.1070102@ti.com> <20160810080713.GB16481@gobelin>
- <57AAE1D1.5080000@ti.com> <20160810082631.GC16481@gobelin>
-Message-ID: <57AAE5E6.8090304@ti.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Wed, 10 Aug 2016 10:30:07 +0200
+Subject: [PATCH v1 4/4] nvmem: rockchip-efuse: add rk3399-efuse support
+In-Reply-To: <1470811843-42668-5-git-send-email-finley.xiao@rock-chips.com>
+References: <1470811843-42668-1-git-send-email-finley.xiao@rock-chips.com>
+ <1470811843-42668-5-git-send-email-finley.xiao@rock-chips.com>
+Message-ID: <9095543.Jj9CjkY9P4@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 10 August 2016 01:56 PM, Karl Beldan wrote:
-> On Wed, Aug 10, 2016 at 01:42:01PM +0530, Sekhar Nori wrote:
->> On Wednesday 10 August 2016 01:37 PM, Karl Beldan wrote:
->>> On Wed, Aug 10, 2016 at 01:32:03PM +0530, Sekhar Nori wrote:
->>>> On Wednesday 10 August 2016 01:18 PM, Sekhar Nori wrote:
->>>>> On Tuesday 09 August 2016 10:45 PM, Karl Beldan wrote:
->>>>>> Currently the davinci da8xx boards use the mach-davinci aemif code.
->>>>>> Instantiating an aemif node into the DT allows to use the ti-aemif
->>>>>> memory driver and is another step to better DT support.
->>>>>> Also it will allow to properly pass the emif timings via DT.
->>>>>>
->>>>>> Signed-off-by: Karl Beldan <kbeldan@baylibre.com>
->>>>>> ---
->>>>>>  arch/arm/boot/dts/da850.dtsi | 10 ++++++++++
->>>>>>  1 file changed, 10 insertions(+)
->>>>>>
->>>>>> diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
->>>>>> index bc10e7e..f62928c 100644
->>>>>> --- a/arch/arm/boot/dts/da850.dtsi
->>>>>> +++ b/arch/arm/boot/dts/da850.dtsi
->>>>>> @@ -411,6 +411,16 @@
->>>>>>  			dma-names = "tx", "rx";
->>>>>>  		};
->>>>>>  	};
->>>>>> +	aemif: aemif at 68000000 {
->>>>>> +		compatible = "ti,da850-aemif";
->>>>>> +		#address-cells = <2>;
->>>>>> +		#size-cells = <1>;
->>>>>> +
->>>>>> +		reg = <0x68000000 0x00008000>;
->>>>>> +		ranges = <0 0 0x60000000 0x08000000
->>>>>> +			  1 0 0x68000000 0x00008000>;
->>>>>> +		status = "disabled";
->>>>>> +	};
->>>>>>  	nand_cs3 at 62000000 {
->>>>>>  		compatible = "ti,davinci-nand";
->>>>>>  		reg = <0x62000000 0x807ff
->>>>>
->>>>> The nand node should be part of aemif node like it is done for keystone
->>>>> boards.
->>>>
->>>> Actually, can you move the nand node out of da850.dtsi completely. Its
->>>> much better to keep da850.dtsi restricted to soc-internal devices and
->>>> keep the board level devices like NAND flash in <board>.dts file.
->>>>
->>>> Similarly, can you move the NAND pinmux definitions too to the
->>>> da850-evm.dts file?
->>>>
->>>> There is advantage in keeping common pinmux definitions in da850.dtsi so
->>>> each board doe not have to repeat them. But AEMIF is an exception as its
->>>> usage can really be varied (NAND, NOR, SRAM, other). Plus, different
->>>> boards are likely to use different chip selects so coming up with some
->>>> pinmux definitions which will be reused widely is really unlikely.
->>>>
->>> This is exactly what I just did for the LCDK.
->>> If everybody is happy with it I will do the same for the evm as I put it
->>> in the cover letter.
->>
->> Yes please. We dont want duplication of data between da850.dtsi and
->> da850-lcdk.dts files.
->>
-> Then I'll wait for this series to be applied and then apply my changes
-> to the EVM while retiring the nand_cs3 together.
+Hi Finley,
 
-No, I prefer the fixup happens first. In the same series, you can first
-fixup existing EVM and then add LCDK support.
+Am Mittwoch, 10. August 2016, 14:50:43 schrieb Finlye Xiao:
+> From: Finley Xiao <finley.xiao@rock-chips.com>
+> 
+> 1) the efuse timing of rk3399 is different from earlier SoCs.
+> 2) rk3399-efuse is organized as 32bits by 32 one-time programmable
+> electrical fuses, the efuse of earlier SoCs is organized as 32bits
+> by 8 one-time programmable electrical fuses with random access interface.
+> 
+> This patch adds a new read function for rk3399-efuse.
+> 
+> Signed-off-by: Finley Xiao <finley.xiao@rock-chips.com>
+> ---
+>  drivers/nvmem/rockchip-efuse.c | 132
+> ++++++++++++++++++++++++++++++++++------- 1 file changed, 112
+> insertions(+), 20 deletions(-)
+> 
+> diff --git a/drivers/nvmem/rockchip-efuse.c b/drivers/nvmem/rockchip-efuse.c
+> index 4d3f391..58fee00b 100644
+> --- a/drivers/nvmem/rockchip-efuse.c
+> +++ b/drivers/nvmem/rockchip-efuse.c
+> @@ -22,17 +22,28 @@
+>  #include <linux/nvmem-provider.h>
+>  #include <linux/slab.h>
+>  #include <linux/of.h>
+> +#include <linux/of_platform.h>
+>  #include <linux/platform_device.h>
+> 
+> -#define EFUSE_A_SHIFT			6
+> -#define EFUSE_A_MASK			0x3ff
+> -#define EFUSE_PGENB			BIT(3)
+> -#define EFUSE_LOAD			BIT(2)
+> -#define EFUSE_STROBE			BIT(1)
+> -#define EFUSE_CSB			BIT(0)
+> -
+> -#define REG_EFUSE_CTRL			0x0000
+> -#define REG_EFUSE_DOUT			0x0004
+> +#define RK3288_A_SHIFT		6
+> +#define RK3288_A_MASK		0x3ff
+> +#define RK3288_PGENB		BIT(3)
+> +#define RK3288_LOAD			BIT(2)
+> +#define RK3288_STROBE		BIT(1)
+> +#define RK3288_CSB			BIT(0)
+> +
+> +#define RK3399_A_SHIFT		16
+> +#define RK3399_A_MASK		0x3ff
+> +#define RK3399_NBYTES		4
+> +#define RK3399_STROBSFTSEL	BIT(9)
+> +#define RK3399_PD			BIT(5)
+> +#define RK3399_PGENB		BIT(3)
+> +#define RK3399_LOAD			BIT(2)
+> +#define RK3399_STROBE		BIT(1)
+> +#define RK3399_CSB			BIT(0)
+> +
+> +#define REG_EFUSE_CTRL		0x0000
+> +#define REG_EFUSE_DOUT		0x0004
+> 
+>  struct rockchip_efuse_chip {
+>  	struct device *dev;
+> @@ -40,8 +51,8 @@ struct rockchip_efuse_chip {
+>  	struct clk *clk;
+>  };
+> 
+> -static int rockchip_efuse_read(void *context, unsigned int offset,
+> -			       void *val, size_t bytes)
+> +static int rockchip_rk3288_efuse_read(void *context, unsigned int offset,
+> +				      void *val, size_t bytes)
+>  {
+>  	struct rockchip_efuse_chip *efuse = context;
+>  	u8 *buf = val;
+> @@ -53,27 +64,78 @@ static int rockchip_efuse_read(void *context, unsigned
+> int offset, return ret;
+>  	}
+> 
+> -	writel(EFUSE_LOAD | EFUSE_PGENB, efuse->base + REG_EFUSE_CTRL);
+> +	writel(RK3288_LOAD | RK3288_PGENB, efuse->base + REG_EFUSE_CTRL);
+>  	udelay(1);
+>  	while (bytes--) {
+>  		writel(readl(efuse->base + REG_EFUSE_CTRL) &
+> -			     (~(EFUSE_A_MASK << EFUSE_A_SHIFT)),
+> +			     (~(RK3288_A_MASK << RK3288_A_SHIFT)),
+>  			     efuse->base + REG_EFUSE_CTRL);
+>  		writel(readl(efuse->base + REG_EFUSE_CTRL) |
+> -			     ((offset++ & EFUSE_A_MASK) << EFUSE_A_SHIFT),
+> +			     ((offset++ & RK3288_A_MASK) << RK3288_A_SHIFT),
+>  			     efuse->base + REG_EFUSE_CTRL);
+>  		udelay(1);
+>  		writel(readl(efuse->base + REG_EFUSE_CTRL) |
+> -			     EFUSE_STROBE, efuse->base + REG_EFUSE_CTRL);
+> +			     RK3288_STROBE, efuse->base + REG_EFUSE_CTRL);
+>  		udelay(1);
+>  		*buf++ = readb(efuse->base + REG_EFUSE_DOUT);
+>  		writel(readl(efuse->base + REG_EFUSE_CTRL) &
+> -		     (~EFUSE_STROBE), efuse->base + REG_EFUSE_CTRL);
+> +		     (~RK3288_STROBE), efuse->base + REG_EFUSE_CTRL);
+>  		udelay(1);
+>  	}
+> 
+>  	/* Switch to standby mode */
+> -	writel(EFUSE_PGENB | EFUSE_CSB, efuse->base + REG_EFUSE_CTRL);
+> +	writel(RK3288_PGENB | RK3288_CSB, efuse->base + REG_EFUSE_CTRL);
+> +
+> +	clk_disable_unprepare(efuse->clk);
+> +
+> +	return 0;
+> +}
+> +
+> +static int rockchip_rk3399_efuse_read(void *context, unsigned int offset,
+> +				      void *val, size_t bytes)
+> +{
+> +	struct rockchip_efuse_chip *efuse = context;
+> +	unsigned int addr_start, addr_end, addr_offset, addr_len;
+> +	unsigned int out_value;
+> +	unsigned char *buf;
+> +	int ret, i = 0;
+> +
+> +	ret = clk_prepare_enable(efuse->clk);
+> +	if (ret < 0) {
+> +		dev_err(efuse->dev, "failed to prepare/enable efuse clk\n");
+> +		return ret;
+> +	}
+> +
+> +	addr_start = rounddown(offset, RK3399_NBYTES) / RK3399_NBYTES;
+> +	addr_end = roundup(offset + bytes, RK3399_NBYTES) / RK3399_NBYTES;
+> +	addr_offset = offset % RK3399_NBYTES;
+> +	addr_len = addr_end - addr_start;
+> +
+> +	buf = kzalloc(sizeof(*buf) * addr_len * RK3399_NBYTES, GFP_KERNEL);
 
-Regards,
-Sekhar
+if (!buf)
+	return -ENOMEM;
+
+> +
+> +	writel(RK3399_LOAD | RK3399_PGENB | RK3399_STROBSFTSEL,
+> +	       efuse->base + REG_EFUSE_CTRL);
+> +	udelay(1);
+> +	while (addr_len--) {
+> +		writel(readl(efuse->base + REG_EFUSE_CTRL) | RK3399_STROBE |
+> +			((addr_start++ & RK3399_A_MASK) << RK3399_A_SHIFT),
+> +			efuse->base + REG_EFUSE_CTRL);
+> +		udelay(1);
+> +		out_value = readl(efuse->base + REG_EFUSE_DOUT);
+> +		writel(readl(efuse->base + REG_EFUSE_CTRL) & (~RK3399_STROBE),
+> +		       efuse->base + REG_EFUSE_CTRL);
+> +		udelay(1);
+> +
+> +		memcpy(&buf[i], &out_value, RK3399_NBYTES);
+> +		i += RK3399_NBYTES;
+> +	}
+> +
+> +	/* Switch to standby mode */
+> +	writel(RK3399_PD | RK3399_CSB, efuse->base + REG_EFUSE_CTRL);
+> +
+> +	memcpy(val, buf + addr_offset, bytes);
+> +
+> +	kfree(buf);
+> 
+>  	clk_disable_unprepare(efuse->clk);
+> 
+> @@ -89,7 +151,22 @@ static struct nvmem_config econfig = {
+>  };
+> 
+>  static const struct of_device_id rockchip_efuse_match[] = {
+> -	{ .compatible = "rockchip,rockchip-efuse", },
+
+same comment as in patch1, please keep the rockchip,rockchip-efuse around
+
+	/* deprecated but kept around for dts binding compatibility */
+	{
+		.compatible = "rockchip,rockchip-efuse",
+		.data = (void *)&rockchip_rk3288_efuse_read,
+	},
+
+as the old compatible was released in multiple kernel releases and the 
+devicetree API is supposed to be (mostly) stable.
+
+
+> +	{
+> +		.compatible = "rockchip,rk3066a-efuse",
+> +		.data = (void *)&rockchip_rk3288_efuse_read,
+> +	},
+> +	{
+> +		.compatible = "rockchip,rk3188-efuse",
+> +		.data = (void *)&rockchip_rk3288_efuse_read,
+> +	},
+> +	{
+> +		.compatible = "rockchip,rk3288-efuse",
+> +		.data = (void *)&rockchip_rk3288_efuse_read,
+> +	},
+> +	{
+> +		.compatible = "rockchip,rk3399-efuse",
+> +		.data = (void *)&rockchip_rk3399_efuse_read,
+> +	},
+>  	{ /* sentinel */},
+>  };
+>  MODULE_DEVICE_TABLE(of, rockchip_efuse_match);
+> @@ -99,6 +176,14 @@ static int rockchip_efuse_probe(struct platform_device
+> *pdev) struct resource *res;
+>  	struct nvmem_device *nvmem;
+>  	struct rockchip_efuse_chip *efuse;
+> +	const struct of_device_id *match;
+> +	struct device *dev = &pdev->dev;
+> +
+> +	match = of_match_device(dev->driver->of_match_table, dev);
+> +	if (!match || !match->data) {
+> +		dev_err(dev, "failed to get match data\n");
+> +		return -EINVAL;
+> +	}
+> 
+>  	efuse = devm_kzalloc(&pdev->dev, sizeof(struct rockchip_efuse_chip),
+>  			     GFP_KERNEL);
+> @@ -116,7 +201,7 @@ static int rockchip_efuse_probe(struct platform_device
+> *pdev)
+> 
+>  	efuse->dev = &pdev->dev;
+>  	econfig.size = resource_size(res);
+> -	econfig.reg_read = rockchip_efuse_read;
+> +	econfig.reg_read = match->data;
+>  	econfig.priv = efuse;
+>  	econfig.dev = efuse->dev;
+>  	nvmem = nvmem_register(&econfig);
+> @@ -144,6 +229,13 @@ static struct platform_driver rockchip_efuse_driver = {
+> },
+>  };
+> 
+> -module_platform_driver(rockchip_efuse_driver);
+> +static int __init rockchip_efuse_module_init(void)
+> +{
+> +	return platform_driver_probe(&rockchip_efuse_driver,
+> +				     rockchip_efuse_probe);
+> +}
+> +
+> +subsys_initcall(rockchip_efuse_module_init);
+> +
+
+that looks like an unrelated change. Why are you converting to a 
+subsys_initcall? Deferred probe for the efuses should take care of any 
+ordering issues already.
+
+
+Heiko
