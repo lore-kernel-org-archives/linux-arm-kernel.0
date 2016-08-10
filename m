@@ -1,97 +1,116 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Wed, 10 Aug 2016 14:19:47 -0700
-Subject: [PATCH 1/2] remoteproc: core: Add rproc OF look-up functions
-In-Reply-To: <f9641050-0a3f-11de-fa69-e587034e0527@ti.com>
-References: <20160719154905.23344-1-lee.jones@linaro.org>
- <20160810174049.GO26240@tuxbot>
- <7650e5fa-f52c-1ab5-e197-8630fd7d0322@ti.com>
- <20160810204049.GV26240@tuxbot>
- <f9641050-0a3f-11de-fa69-e587034e0527@ti.com>
-Message-ID: <20160810211947.GW26240@tuxbot>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Wed, 10 Aug 2016 23:32:24 +0200
+Subject: [PATCH] ARM: dts: add pxa25x .dtsi file
+Message-ID: <1470864744-16344-1-git-send-email-robert.jarzmik@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 10 Aug 14:04 PDT 2016, Suman Anna wrote:
+This file describes pxa25x SoCs. Not all devices are listed yet, only
+the subset which was already tested with a lubbock board.
 
-> On 08/10/2016 03:40 PM, Bjorn Andersson wrote:
-> > On Wed 10 Aug 12:37 PDT 2016, Suman Anna wrote:
-> > 
-> >> Hi Lee, Bjorn,
-> >>
-> >> On 08/10/2016 12:40 PM, Bjorn Andersson wrote:
-> >>> On Tue 19 Jul 08:49 PDT 2016, Lee Jones wrote:
-> >>>
-> >>>> - of_rproc_by_index(): look-up and obtain a reference to a rproc
-> >>>>                        using the DT phandle "rprocs" and a index.
-> >>>>
-> >>>> - of_rproc_by_name():  lookup and obtain a reference to a rproc
-> >>>>                        using the DT phandle "rprocs" and "rproc-names".
-> >>>>
-> >>>> Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
-> >>>> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> >>>> ---
-> >>>
-> >>> I'm happy with this, so I whipped up a binding document describing our
-> >>> two new properties. Waiting for an opinion on that before I merge this.
-> >>
-> >> Yeah, I like the two new API too, I have just about run into the need
-> >> for the same on my product trees. We can probably make it less
-> >> complicated than what the current series is. The wkup_m3_ipc usage was
-> >> before there was any standardization on the property names, so we went
-> >> with a ti, prefixed property specific to the wkup_m3_ipc node and a
-> >> general API that is agnostic of property name. We don't have all the
-> >> pieces for PM on AM335x/AM437x SoCs on upstream kernel yet, so we should
-> >> be able to switch over to using the new property as we cannot achieve
-> >> the desired functionality even though we can boot the wkup_m3.
-> >>
-> > 
-> > Glad to hear you're onboard with dropping the old property name, even if
-> > it's later.
-> > 
-> >> Here's what I propose:
-> >> 1. Let's not burden the new of_get_rproc_by_index() API with having to
-> >> fall-back and look for ti,rprocs. The rproc_get_by_phandle() core logic
-> >> of looking up against the rproc list is self-contained, and the API
-> >> usage is limited to just the wkup_m3_ipc driver at the moment.
-> >> 2. Keep the rproc_get_by_phandle API as is but mark it as deprecated.
-> >> IMHO, the rename of this API to of_get_rproc_by_phandle() in Patch 2 but
-> >> using a device node pointer as input argument doesn't add any value.
-> >> 3. Provide a fallback in wkup_m3_ipc driver to look for both rprocs and
-> >> ti,rproc property, while switching over the node to use rprocs property.
-> >> 4. We can get rid of the rproc_get_by_phandle() API after the
-> >> wkup_m3_ipc transition is done to use of_get_rproc_by_index() API.
-> >>
-> > 
-> > I don't fancy the idea of leaving the kernel builds with a deprecation
-> > warning for some time and I don't feel the cost of carrying those 2
-> > extra statements is a bigger issue than keeping a deprecated API around.
-> > And it will be less than the dance we have to do in wkup_m3_ipc.
-> > 
-> > So I think that we should merge these patches and if it can be concluded
-> > that we don't need backwards compatibility with the old DT property we
-> > can drop the inner conditional in the API.
-> 
-> Yeah, I am fine with dropping the inner ti,rproc processing in the new
-> of_rproc_get_by_index() API and keeping it clean. What's not clear to me
-> is why we would still need a get_by_phandle API alongside the two new
-> API once the wkup_m3_ipc is converted to the new API?  Or is it just to
-> clean up the consumer interface? If latter, I will fixup the wkup_m3_ipc
-> driver without the need for remoteproc core changes, and switch over to
-> the new API.
-> 
+Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+---
+ arch/arm/boot/dts/pxa25x.dtsi | 92 +++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 92 insertions(+)
+ create mode 100644 arch/arm/boot/dts/pxa25x.dtsi
 
-of_get_rproc_by_phandle() is just a convenience for not having to get by
-index 0, as most drivers is only having one rproc.
-
-As far as cleaning up wkup_m3_ipc, patch 2 does that and cleans out the
-old implementation and with that wkup_m3_ipc is moved to the new API.
-
-
-So the only issue is that the wkup_m3_ipc DT binding states that the
-property should be named "ti,rproc" and as such someone has to send a
-patch to that and make an argument that we don't have to maintain
-backwards compatibility. But as this is used in am33xx.dtsi and
-am4372.dtsi that might be too late?
-
-Regards,
-Bjorn
+diff --git a/arch/arm/boot/dts/pxa25x.dtsi b/arch/arm/boot/dts/pxa25x.dtsi
+new file mode 100644
+index 000000000000..0d1e012178c4
+--- /dev/null
++++ b/arch/arm/boot/dts/pxa25x.dtsi
+@@ -0,0 +1,92 @@
++/*
++ * Copyright (C) 2016 Robert Jarzmik <robert.jarzmik@free.fr>
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++#include "pxa2xx.dtsi"
++#include "dt-bindings/clock/pxa-clock.h"
++
++/ {
++	model = "Marvell PXA25x family SoC";
++	compatible = "marvell,pxa250";
++
++	clocks {
++	       /*
++		* The muxing of external clocks/internal dividers for osc* clock
++		* sources has been hidden under the carpet by now.
++		*/
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
++
++		clks: pxa2xx_clks at 41300004 {
++			compatible = "marvell,pxa250-core-clocks";
++			#clock-cells = <1>;
++			status = "okay";
++		};
++
++		/* timer oscillator */
++		clktimer: oscillator {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency  = <3686400>;
++			clock-output-names = "ostimer";
++		};
++	};
++
++	pxabus {
++		pdma: dma-controller at 40000000 {
++			compatible = "marvell,pdma-1.0";
++			reg = <0x40000000 0x10000>;
++			interrupts = <25>;
++			#dma-channels = <16>;
++			#dma-cells = <2>;
++			#dma-requests = <40>;
++			status = "okay";
++		};
++
++		pxairq: interrupt-controller at 40d00000 {
++			marvell,intc-priority;
++			marvell,intc-nr-irqs = <32>;
++		};
++
++		pinctrl: pinctrl at 40e00000 {
++			reg = <0x40e00054 0x20 0x40e0000c 0xc 0x40e0010c 4
++			       0x40f00020 0x10>;
++			compatible = "marvell,pxa25x-pinctrl";
++		};
++
++		gpio: gpio at 40e00000 {
++			compatible = "intel,pxa25x-gpio";
++			gpio-ranges = <&pinctrl 0 0 84>;
++			clocks = <&clks CLK_NONE>;
++		};
++
++		pwm0: pwm at 40b00000 {
++			compatible = "marvell,pxa250-pwm";
++			reg = <0x40b00000 0x10>;
++			#pwm-cells = <1>;
++			clocks = <&clks CLK_PWM0>;
++		};
++
++		pwm1: pwm at 40b00010 {
++			compatible = "marvell,pxa250-pwm";
++			reg = <0x40b00010 0x10>;
++			#pwm-cells = <1>;
++			clocks = <&clks CLK_PWM1>;
++		};
++	};
++
++	timer at 40a00000 {
++		compatible = "marvell,pxa-timer";
++		reg = <0x40a00000 0x20>;
++		interrupts = <26>;
++		clocks = <&clktimer>;
++		status = "okay";
++	};
++};
+-- 
+2.1.4
