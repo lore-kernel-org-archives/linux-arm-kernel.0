@@ -1,42 +1,41 @@
-From: kbeldan@baylibre.com (Karl Beldan)
-Date: Wed, 10 Aug 2016 09:04:17 +0000
-Subject: [PATCH 3/4] ARM: dts: da850-lcdk: Add NAND to DT
-In-Reply-To: <57AAE67D.4000404@ti.com>
-References: <20160809171518.22690-1-kbeldan@baylibre.com>
- <20160809171518.22690-4-kbeldan@baylibre.com>
- <57AAE67D.4000404@ti.com>
-Message-ID: <20160810090417.GE16481@gobelin>
+From: lkp@intel.com (kbuild test robot)
+Date: Wed, 10 Aug 2016 17:05:48 +0800
+Subject: [PATCH v5 7/8] PM / devfreq: rockchip: add devfreq driver for
+ rk3399 dmc
+In-Reply-To: <1470799604-12877-8-git-send-email-hl@rock-chips.com>
+Message-ID: <201608101714.xER6hTQw%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 10, 2016 at 02:01:57PM +0530, Sekhar Nori wrote:
-> On Tuesday 09 August 2016 10:45 PM, Karl Beldan wrote:
-> > This adds DT support for the NAND connected to the SoC AEMIF.
-> > The parameters (timings, ecc) are the same as what the board ships with
-> > (default AEMIF timings, 1bit ECC) and improvements will be handled in
-> > due course.
-> 
-> I disagree that we need to be compatible to the software that ships with
-> the board. Thats software was last updated 3 years ago. Instead I would
-> concern with what the hardware supports. So, if the hardware can support
-> 4-bit ECC, I would use that.
-> 
-I am not saying we _need_ to be compatible.
+Hi Lin,
 
-> If driver is broken for 4-bit ECC, please fix that up first.
-> 
-Since this issue is completely separate from my DT improvements
-I'll stick to resubmitting the series, applying my LCDK changes to the
-EVM too, besides you'll be able to compare the behavior without ECC
-discrepancies.
-I took note that you are likely to not apply without the ECC fix.
- 
-Karl
+[auto build test ERROR on v4.8-rc1]
+[also build test ERROR on next-20160809]
+[cannot apply to rockchip/for-next devfreq/for-rafael linux/master]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-> > This passed elementary tests hashing a 20MB file on top of ubifs on my
-> > LCDK.
-> > 
-> > Signed-off-by: Karl Beldan <kbeldan@baylibre.com>
-> 
-> Thanks,
-> Sekhar
+url:    https://github.com/0day-ci/linux/commits/Lin-Huang/rk3399-support-ddr-frequency-scaling/20160810-114433
+config: i386-allyesconfig (attached as .config)
+compiler: gcc-6 (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=i386 
+
+All errors (new ones prefixed by >>):
+
+   drivers/built-in.o: In function `rk3399_dmc_irq':
+>> rk3399_dmc.c:(.text+0x27e5a15): undefined reference to `arm_smccc_smc'
+   drivers/built-in.o: In function `rk3399_dmcfreq_probe':
+   rk3399_dmc.c:(.text+0x27e62a7): undefined reference to `arm_smccc_smc'
+   rk3399_dmc.c:(.text+0x27e6332): undefined reference to `arm_smccc_smc'
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 55145 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160810/1be91221/attachment-0001.obj>
