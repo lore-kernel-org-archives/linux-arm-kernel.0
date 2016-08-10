@@ -1,42 +1,24 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 10 Aug 2016 10:55:21 +0200
-Subject: [PATCH] ARM: no need to select SMP_ON_UP explicitly
-In-Reply-To: <57AAE5D7.2080009@arm.com>
-References: <1469199369-25746-1-git-send-email-vladimir.murzin@arm.com>
- <20160809084416.GS4678@tiger> <57AAE5D7.2080009@arm.com>
-Message-ID: <6326645.Nr2CxIomnL@wuerfel>
+Date: Wed, 10 Aug 2016 10:57:57 +0200
+Subject: [PATCH] ARM: cpuidle: declare cpuidle_ops __read_mostly
+In-Reply-To: <1470818997-808-1-git-send-email-jszhang@marvell.com>
+References: <1470818997-808-1-git-send-email-jszhang@marvell.com>
+Message-ID: <2118361.tr3K3hSZxF@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, August 10, 2016 9:29:11 AM CEST Vladimir Murzin wrote:
-> On 09/08/16 09:44, Shawn Guo wrote:
-> > On Fri, Jul 22, 2016 at 03:56:09PM +0100, Vladimir Murzin wrote:
-> >> SMP_ON_UP is already defaulted to "y" and has all dependencies expressed
-> >> - no need to select it per platform level
-> >>
-> >> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
-> >> ---
-> >>
-> >> This time sent to LAKML
-> >>
-> >>  arch/arm/mach-imx/Kconfig      |    3 ---
-> >>  arch/arm/mach-realview/Kconfig |    1 -
-> > 
-> > I cannot take mach-realview changes.  I think you need to ether split
-> > the changes, or ask arm-soc folks to apply.  In case of the latter, here
-> > is my ACK:
-> > 
-> > Acked-by: Shawn Guo <shawnguo@kernel.org>
-> 
-> Thanks!
-> 
-> RealView is not mentioned under MAINTAINERS, so it'd be easier if
-> arm-soc team pick this patch.
-> 
-> Arnd, what is your preference?
+On Wednesday, August 10, 2016 4:49:57 PM CEST Jisheng Zhang wrote:
+> diff --git a/arch/arm/kernel/cpuidle.c b/arch/arm/kernel/cpuidle.c
+> index 7dccc96..762e0929 100644
+> --- a/arch/arm/kernel/cpuidle.c
+> +++ b/arch/arm/kernel/cpuidle.c
+> @@ -19,7 +19,7 @@ extern struct of_cpuidle_method __cpuidle_method_of_table[];
+>  static const struct of_cpuidle_method __cpuidle_method_of_table_sentinel
+>         __used __section(__cpuidle_method_of_table_end);
+>  
+> -static struct cpuidle_ops cpuidle_ops[NR_CPUS];
+> +static struct cpuidle_ops cpuidle_ops[NR_CPUS] __read_mostly;
 
-Linus Walleij is the person that has sent most patches for realview,
-so I'll let him decide. We can pick it up directly, or he can
-aggregate it with other patches that he might have.
+Should this perhaps be percpu data instead?
 
 	Arnd
