@@ -1,24 +1,39 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 10 Aug 2016 16:02:26 +0200
-Subject: [[PATCH v2] 05/11] ARM: EXYNOS: Enable ARCH_SUPPORTS_BIG_ENDIAN
- explicitly
-In-Reply-To: <1466504432-24187-6-git-send-email-ben.dooks@codethink.co.uk>
-References: <1466504432-24187-1-git-send-email-ben.dooks@codethink.co.uk>
- <1466504432-24187-6-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <7a289a51-52de-59a1-f147-2d01900f5fed@samsung.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 10 Aug 2016 22:04:23 +0800
+Subject: [PATCH -next] ASoC: sun4i-codec: Fix error return code in
+ sun4i_codec_probe()
+In-Reply-To: <1470836554-11569-1-git-send-email-weiyj.lk@gmail.com>
+References: <1470836554-11569-1-git-send-email-weiyj.lk@gmail.com>
+Message-ID: <CAGb2v67cVXWtM=AzeFcftnajSs=+C6F12P_EvnXHB=oKsAm5Cw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/21/2016 12:20 PM, Ben Dooks wrote:
-> Now the initial fixes have the big-endian code working on EXYNOS, make sure
-> we explicitly mark our arch as being big endian capable.
-> 
-> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+On Wed, Aug 10, 2016 at 9:42 PM, Wei Yongjun <weiyj.lk@gmail.com> wrote:
+> Fix to return error code -ENOMEM instead of 0 when create card
+> failed, as done elsewhere in this function.
+>
+> Fixes: 45fb6b6f2aa3 ("ASoC: sunxi: add support for the on-chip
+> codec on early Allwinner SoCs")
+> Signed-off-by: Wei Yongjun <weiyj.lk@gmail.com>
 > ---
->  arch/arm/mach-exynos/Kconfig | 1 +
+>  sound/soc/sunxi/sun4i-codec.c | 1 +
 >  1 file changed, 1 insertion(+)
+>
+> diff --git a/sound/soc/sunxi/sun4i-codec.c b/sound/soc/sunxi/sun4i-codec.c
+> index 0e19c50..e741659 100644
+> --- a/sound/soc/sunxi/sun4i-codec.c
+> +++ b/sound/soc/sunxi/sun4i-codec.c
+> @@ -846,6 +846,7 @@ static int sun4i_codec_probe(struct platform_device *pdev)
+>         card = sun4i_codec_create_card(&pdev->dev);
+>         if (!card) {
+>                 dev_err(&pdev->dev, "Failed to create our card\n");
+> +               ret = -ENOMEM;
+>                 goto err_unregister_codec;
+>         }
+>
 
-Thanks, applied.
+This works, though it might be better to fix the create_card function and
+any custom functions called in there to pass back a proper error value.
 
-Best regards,
-Krzysztof
+Regards
+ChenYu
