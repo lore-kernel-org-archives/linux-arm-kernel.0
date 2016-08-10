@@ -1,38 +1,55 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 10 Aug 2016 12:00:53 +0200
-Subject: [PATCH 2/2] arm: apply more __ro_after_init
-In-Reply-To: <20160810094339.GK1041@n2100.armlinux.org.uk>
-References: <1464979224-2085-1-git-send-email-keescook@chromium.org>
- <1464979224-2085-3-git-send-email-keescook@chromium.org>
- <20160810094339.GK1041@n2100.armlinux.org.uk>
-Message-ID: <2342289.4RWg0SWI3A@wuerfel>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Wed, 10 Aug 2016 17:59:58 +0800
+Subject: [PATCH] ARM: VDSO: put read only/mostly objects into proper
+ sections
+In-Reply-To: <1470820187-1032-1-git-send-email-jszhang@marvell.com>
+References: <1470820187-1032-1-git-send-email-jszhang@marvell.com>
+Message-ID: <20160810175958.4dcfc5e3@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, August 10, 2016 10:43:39 AM CEST Russell King - ARM Linux wrote:
-> On Fri, Jun 03, 2016 at 11:40:24AM -0700, Kees Cook wrote:
-> > @@ -1309,16 +1309,11 @@ void __init arm_mm_memblock_reserve(void)
-> >   * Any other function or debugging method which may touch any device _will_
-> >   * crash the kernel.
-> >   */
-> > +static char vectors[PAGE_SIZE * 2] __ro_after_init __aligned(PAGE_SIZE);
-> >  static void __init devicemaps_init(const struct machine_desc *mdesc)
-> >  {
-> >       struct map_desc map;
-> >       unsigned long addr;
-> > -     void *vectors;
-> > -
-> > -     /*
-> > -      * Allocate the vector page early.
-> > -      */
-> > -     vectors = early_alloc(PAGE_SIZE * 2);
++ Kees
+
+On Wed, 10 Aug 2016 17:09:47 +0800 wrote:
+
+> vdso_data_mapping is never modified, so mark it as const.
 > 
-> This one is not appropriate.  We _do_ write to these pages after init
-> for FIQ handler updates.  See set_fiq_handler().
+> vdso_data_page and vdso_text_mapping are initialized by vdso_init(),
+> thereafter are mostly read during vdso special mapping handling.
+> 
+> The fact that they are mostly read and not written to makes them
+> candidates for __read_mostly declarations.
 
-Is that the only thing that modifies the page? If we think this is a
-valuable change, we could make it depend on the absence of FIQ
-support, as very few platforms (rpc, omap1, s3c24xx and possibly
-imx) seem to even use it.
+Inspired by Kees's "arm: apply more __ro_after_init", is it better
+to mark these vars as __ro_after_init?
 
-	Arnd
+Thanks,
+Jisheng
+
+> 
+> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+> ---
+>  arch/arm/kernel/vdso.c | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/kernel/vdso.c b/arch/arm/kernel/vdso.c
+> index 994e971..c946092 100644
+> --- a/arch/arm/kernel/vdso.c
+> +++ b/arch/arm/kernel/vdso.c
+> @@ -47,13 +47,13 @@ unsigned int vdso_total_pages __read_mostly;
+>  static union vdso_data_store vdso_data_store __page_aligned_data;
+>  static struct vdso_data *vdso_data = &vdso_data_store.data;
+>  
+> -static struct page *vdso_data_page;
+> -static struct vm_special_mapping vdso_data_mapping = {
+> +static struct page *vdso_data_page __read_mostly;
+> +static const struct vm_special_mapping vdso_data_mapping = {
+>  	.name = "[vvar]",
+>  	.pages = &vdso_data_page,
+>  };
+>  
+> -static struct vm_special_mapping vdso_text_mapping = {
+> +static struct vm_special_mapping vdso_text_mapping __read_mostly = {
+>  	.name = "[vdso]",
+>  };
+>  
