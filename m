@@ -1,34 +1,44 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 10 Aug 2016 10:43:39 +0100
-Subject: [PATCH 2/2] arm: apply more __ro_after_init
-In-Reply-To: <1464979224-2085-3-git-send-email-keescook@chromium.org>
-References: <1464979224-2085-1-git-send-email-keescook@chromium.org>
- <1464979224-2085-3-git-send-email-keescook@chromium.org>
-Message-ID: <20160810094339.GK1041@n2100.armlinux.org.uk>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 10 Aug 2016 11:46:05 +0200
+Subject: [PATCH] ARM: exynos_defconfig: Enable bus frequency scaling with
+ DEVFREQ/DEVFREQ-Event
+In-Reply-To: <1468546426-4482-1-git-send-email-cw00.choi@samsung.com>
+References: <1468546426-4482-1-git-send-email-cw00.choi@samsung.com>
+Message-ID: <baa00991-8894-7879-1075-28437139c61a@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 03, 2016 at 11:40:24AM -0700, Kees Cook wrote:
-> @@ -1309,16 +1309,11 @@ void __init arm_mm_memblock_reserve(void)
->   * Any other function or debugging method which may touch any device _will_
->   * crash the kernel.
->   */
-> +static char vectors[PAGE_SIZE * 2] __ro_after_init __aligned(PAGE_SIZE);
->  static void __init devicemaps_init(const struct machine_desc *mdesc)
->  {
->  	struct map_desc map;
->  	unsigned long addr;
-> -	void *vectors;
-> -
-> -	/*
-> -	 * Allocate the vector page early.
-> -	 */
-> -	vectors = early_alloc(PAGE_SIZE * 2);
+On 07/15/2016 03:33 AM, Chanwoo Choi wrote:
+> This patch enables the bus frequency scaling driver with DEVFREQ and
+> DEVFREQ-Event framework. This patches already was merged for Odroid-U3/XU3
+> ,Trats2 and Rinato/Monk boards.
+> 
+> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+> ---
+>  arch/arm/configs/exynos_defconfig | 10 ++++++++++
+>  1 file changed, 10 insertions(+)
+> 
+> diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
+> index a5aa44c56bfe..37052b115a40 100644
+> --- a/arch/arm/configs/exynos_defconfig
+> +++ b/arch/arm/configs/exynos_defconfig
+> @@ -219,6 +219,16 @@ CONFIG_CROS_EC_CHARDEV=y
+>  CONFIG_COMMON_CLK_MAX77686=y
+>  CONFIG_COMMON_CLK_MAX77802=y
+>  CONFIG_COMMON_CLK_S2MPS11=y
+> +CONFIG_PM_DEVFREQ=y
+> +CONFIG_DEVFREQ_GOV_SIMPLE_ONDEMAND=y
+> +CONFIG_DEVFREQ_GOV_PERFORMANCE=y
+> +CONFIG_DEVFREQ_GOV_POWERSAVE=y
+> +CONFIG_DEVFREQ_GOV_USERSPACE=y
+> +CONFIG_DEVFREQ_GOV_PASSIVE=y
+> +CONFIG_ARM_EXYNOS_BUS_DEVFREQ=y
+> +CONFIG_PM_DEVFREQ_EVENT=y
+> +CONFIG_DEVFREQ_EVENT_EXYNOS_NOCP=y
+> +CONFIG_DEVFREQ_EVENT_EXYNOS_PPMU=y
 
-This one is not appropriate.  We _do_ write to these pages after init
-for FIQ handler updates.  See set_fiq_handler().
+Applied with small changes in commit message and removal of symbols
+already selected (defconfig).
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Best regards,
+Krzysztof
