@@ -1,212 +1,85 @@
 From: sunil.kovvuri@gmail.com (sunil.kovvuri at gmail.com)
-Date: Wed, 10 Aug 2016 12:12:43 +0530
-Subject: [PATCH 11/21] net: thunderx: Add support for 16 LMACs of 83xx
+Date: Wed, 10 Aug 2016 12:12:51 +0530
+Subject: [PATCH 19/21] net: thunderx: Configure tunnelling protocol parsing
 In-Reply-To: <1470811373-28277-1-git-send-email-sunil.kovvuri@gmail.com>
 References: <1470811373-28277-1-git-send-email-sunil.kovvuri@gmail.com>
-Message-ID: <1470811373-28277-12-git-send-email-sunil.kovvuri@gmail.com>
+Message-ID: <1470811373-28277-20-git-send-email-sunil.kovvuri@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sunil Goutham <sgoutham@cavium.com>
+From: Zyta Szpak <zr@semihalf.com>
 
-83xx will have 4 BGX blocks i.e 16 LMACs, to avoid changing
-the same with every platform, nicpf struct elements which
-track LMAC related info are now allocated runtime based
-on platform's max possible BGX count.
+This patch enables parsing of inner layers for tunnelled packets.
 
-Also fixed configuring min packet size for all LMAC's
-supported on a platform.
-
+Signed-off-by: Zyta Szpak <zr@semihalf.com>
 Signed-off-by: Sunil Goutham <sgoutham@cavium.com>
 ---
- drivers/net/ethernet/cavium/thunder/nic_main.c    | 73 ++++++++++++++++++-----
- drivers/net/ethernet/cavium/thunder/thunder_bgx.h |  2 -
- 2 files changed, 59 insertions(+), 16 deletions(-)
+ drivers/net/ethernet/cavium/thunder/nic_main.c | 21 +++++++++++++++++++++
+ drivers/net/ethernet/cavium/thunder/nic_reg.h  | 13 +++++++++++++
+ 2 files changed, 34 insertions(+)
 
 diff --git a/drivers/net/ethernet/cavium/thunder/nic_main.c b/drivers/net/ethernet/cavium/thunder/nic_main.c
-index 91c575d..8ed8ecd 100644
+index 167291b..25618d2 100644
 --- a/drivers/net/ethernet/cavium/thunder/nic_main.c
 +++ b/drivers/net/ethernet/cavium/thunder/nic_main.c
-@@ -53,12 +53,12 @@ struct nicpf {
- #define	NIC_SET_VF_LMAC_MAP(bgx, lmac)	(((bgx & 0xF) << 4) | (lmac & 0xF))
- #define	NIC_GET_BGX_FROM_VF_LMAC_MAP(map)	((map >> 4) & 0xF)
- #define	NIC_GET_LMAC_FROM_VF_LMAC_MAP(map)	(map & 0xF)
--	u8			vf_lmac_map[MAX_LMAC];
-+	u8			*vf_lmac_map;
- 	struct delayed_work     dwork;
- 	struct workqueue_struct *check_link;
--	u8			link[MAX_LMAC];
--	u8			duplex[MAX_LMAC];
--	u32			speed[MAX_LMAC];
-+	u8			*link;
-+	u8			*duplex;
-+	u32			*speed;
- 	u16			cpi_base[MAX_NUM_VFS_SUPPORTED];
- 	u16			rssi_base[MAX_NUM_VFS_SUPPORTED];
- 	bool			mbx_lock[MAX_NUM_VFS_SUPPORTED];
-@@ -185,7 +185,7 @@ static void nic_mbx_send_ready(struct nicpf *nic, int vf)
- 	mbx.nic_cfg.sqs_mode = (vf >= nic->num_vf_en) ? true : false;
- 	mbx.nic_cfg.node_id = nic->node;
- 
--	mbx.nic_cfg.loopback_supported = vf < MAX_LMAC;
-+	mbx.nic_cfg.loopback_supported = vf < nic->num_vf_en;
- 
- 	nic_send_msg_to_vf(nic, vf, &mbx);
+@@ -835,6 +835,25 @@ static int nic_reset_stat_counters(struct nicpf *nic,
+ 	return 0;
  }
-@@ -278,14 +278,22 @@ static int nic_update_hw_frs(struct nicpf *nic, int new_frs, int vf)
- /* Set minimum transmit packet size */
- static void nic_set_tx_pkt_pad(struct nicpf *nic, int size)
- {
--	int lmac;
-+	int lmac, max_lmac;
-+	u16 sdevid;
- 	u64 lmac_cfg;
  
- 	/* Max value that can be set is 60 */
- 	if (size > 60)
- 		size = 60;
- 
--	for (lmac = 0; lmac < (MAX_BGX_PER_CN88XX * MAX_LMAC_PER_BGX); lmac++) {
-+	pci_read_config_word(nic->pdev, PCI_SUBSYSTEM_ID, &sdevid);
-+	/* 81xx's RGX has only one LMAC */
-+	if (sdevid == PCI_SUBSYS_DEVID_81XX_NIC_PF)
-+		max_lmac = ((nic->hw->bgx_cnt - 1) * MAX_LMAC_PER_BGX) + 1;
-+	else
-+		max_lmac = nic->hw->bgx_cnt * MAX_LMAC_PER_BGX;
++static void nic_enable_tunnel_parsing(struct nicpf *nic, int vf)
++{
++	u64 prot_def = (IPV6_PROT << 32) | (IPV4_PROT << 16) | ET_PROT;
++	u64 vxlan_prot_def = (IPV6_PROT_DEF << 32) |
++			      (IPV4_PROT_DEF) << 16 | ET_PROT_DEF;
 +
-+	for (lmac = 0; lmac < max_lmac; lmac++) {
- 		lmac_cfg = nic_reg_read(nic, NIC_PF_LMAC_0_7_CFG | (lmac << 3));
- 		lmac_cfg &= ~(0xF << 2);
- 		lmac_cfg |= ((size / 4) << 2);
-@@ -336,8 +344,17 @@ static void nic_set_lmac_vf_mapping(struct nicpf *nic)
- 	}
- }
- 
--static void nic_get_hw_info(struct nicpf *nic)
-+static void nic_free_lmacmem(struct nicpf *nic)
- {
-+	kfree(nic->vf_lmac_map);
-+	kfree(nic->link);
-+	kfree(nic->duplex);
-+	kfree(nic->speed);
++	/* Configure tunnel parsing parameters */
++	nic_reg_write(nic, NIC_PF_RX_GENEVE_DEF,
++		      (1ULL << 63 | UDP_GENEVE_PORT_NUM));
++	nic_reg_write(nic, NIC_PF_RX_GENEVE_PROT_DEF,
++		      ((7ULL << 61) | prot_def));
++	nic_reg_write(nic, NIC_PF_RX_NVGRE_PROT_DEF,
++		      ((7ULL << 61) | prot_def));
++	nic_reg_write(nic, NIC_PF_RX_VXLAN_DEF_0_1,
++		      ((1ULL << 63) | UDP_VXLAN_PORT_NUM));
++	nic_reg_write(nic, NIC_PF_RX_VXLAN_PROT_DEF,
++		      ((0xfULL << 60) | vxlan_prot_def));
 +}
 +
-+static int nic_get_hw_info(struct nicpf *nic)
-+{
-+	u8 max_lmac;
- 	u16 sdevid;
- 	struct hw_info *hw = nic->hw;
- 
-@@ -385,18 +402,40 @@ static void nic_get_hw_info(struct nicpf *nic)
+ static void nic_enable_vf(struct nicpf *nic, int vf, bool enable)
+ {
+ 	int bgx, lmac;
+@@ -908,6 +927,8 @@ static void nic_handle_mbx_intr(struct nicpf *nic, int vf)
+ 		 */
+ 		if (pass2_silicon(nic->pdev))
+ 			nic_reg_write(nic, NIC_PF_RX_CFG, 0x01);
++		if (!pass1_silicon(nic->pdev))
++			nic_enable_tunnel_parsing(nic, vf);
  		break;
- 	}
- 	hw->tl4_cnt = MAX_QUEUES_PER_QSET * pci_sriov_get_totalvfs(nic->pdev);
-+
-+	/* Allocate memory for LMAC tracking elements */
-+	max_lmac = hw->bgx_cnt * MAX_LMAC_PER_BGX;
-+	nic->vf_lmac_map = kmalloc_array(max_lmac, sizeof(u8), GFP_KERNEL);
-+	if (!nic->vf_lmac_map)
-+		goto error;
-+	nic->link = kmalloc_array(max_lmac, sizeof(u8), GFP_KERNEL);
-+	if (!nic->link)
-+		goto error;
-+	nic->duplex = kmalloc_array(max_lmac, sizeof(u8), GFP_KERNEL);
-+	if (!nic->duplex)
-+		goto error;
-+	nic->speed = kmalloc_array(max_lmac, sizeof(u32), GFP_KERNEL);
-+	if (!nic->speed)
-+		goto error;
-+	return 0;
-+
-+error:
-+	nic_free_lmacmem(nic);
-+	return -ENOMEM;
- }
- 
- #define BGX0_BLOCK 8
- #define BGX1_BLOCK 9
- 
--static void nic_init_hw(struct nicpf *nic)
-+static int nic_init_hw(struct nicpf *nic)
- {
--	int i;
-+	int i, err;
- 	u64 cqm_cfg;
- 
- 	/* Get HW capability info */
--	nic_get_hw_info(nic);
-+	err = nic_get_hw_info(nic);
-+	if (err)
-+		return err;
- 
- 	/* Enable NIC HW block */
- 	nic_reg_write(nic, NIC_PF_CFG, 0x3);
-@@ -442,6 +481,8 @@ static void nic_init_hw(struct nicpf *nic)
- 	cqm_cfg = nic_reg_read(nic, NIC_PF_CQM_CFG);
- 	if (cqm_cfg < NICPF_CQM_MIN_DROP_LEVEL)
- 		nic_reg_write(nic, NIC_PF_CQM_CFG, NICPF_CQM_MIN_DROP_LEVEL);
-+
-+	return 0;
- }
- 
- /* Channel parse index configuration */
-@@ -741,7 +782,7 @@ static int nic_config_loopback(struct nicpf *nic, struct set_loopback *lbk)
- {
- 	int bgx_idx, lmac_idx;
- 
--	if (lbk->vf_id > MAX_LMAC)
-+	if (lbk->vf_id >= nic->num_vf_en)
- 		return -1;
- 
- 	bgx_idx = NIC_GET_BGX_FROM_VF_LMAC_MAP(nic->vf_lmac_map[lbk->vf_id]);
-@@ -795,7 +836,7 @@ static void nic_handle_mbx_intr(struct nicpf *nic, int vf)
- 	switch (mbx.msg.msg) {
- 	case NIC_MBOX_MSG_READY:
- 		nic_mbx_send_ready(nic, vf);
--		if (vf < MAX_LMAC) {
-+		if (vf < nic->num_vf_en) {
- 			nic->link[vf] = 0;
- 			nic->duplex[vf] = 0;
- 			nic->speed[vf] = 0;
-@@ -1191,7 +1232,9 @@ static int nic_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
- 	nic->node = nic_get_node_id(pdev);
- 
- 	/* Initialize hardware */
--	nic_init_hw(nic);
-+	err = nic_init_hw(nic);
-+	if (err)
-+		goto err_release_regions;
- 
- 	nic_set_lmac_vf_mapping(nic);
- 
-@@ -1226,6 +1269,7 @@ err_unregister_interrupts:
- err_release_regions:
- 	pci_release_regions(pdev);
- err_disable_device:
-+	nic_free_lmacmem(nic);
- 	devm_kfree(dev, nic->hw);
- 	devm_kfree(dev, nic);
- 	pci_disable_device(pdev);
-@@ -1249,6 +1293,7 @@ static void nic_remove(struct pci_dev *pdev)
- 	nic_unregister_interrupts(nic);
- 	pci_release_regions(pdev);
- 
-+	nic_free_lmacmem(nic);
- 	devm_kfree(&pdev->dev, nic->hw);
- 	devm_kfree(&pdev->dev, nic);
- 
-diff --git a/drivers/net/ethernet/cavium/thunder/thunder_bgx.h b/drivers/net/ethernet/cavium/thunder/thunder_bgx.h
-index 6225ff4..c7d7cc67 100644
---- a/drivers/net/ethernet/cavium/thunder/thunder_bgx.h
-+++ b/drivers/net/ethernet/cavium/thunder/thunder_bgx.h
-@@ -29,8 +29,6 @@
- 
- #define    MAX_DMAC_PER_LMAC_TNS_BYPASS_MODE	2
- 
--#define    MAX_LMAC	(MAX_BGX_PER_CN88XX * MAX_LMAC_PER_BGX)
--
- /* Registers */
- #define BGX_CMRX_CFG			0x00
- #define  CMR_PKT_TX_EN				BIT_ULL(13)
+ 	case NIC_MBOX_MSG_RQ_BP_CFG:
+ 		reg_addr = NIC_PF_QSET_0_127_RQ_0_7_BP_CFG |
+diff --git a/drivers/net/ethernet/cavium/thunder/nic_reg.h b/drivers/net/ethernet/cavium/thunder/nic_reg.h
+index b4a7953..db9c632 100644
+--- a/drivers/net/ethernet/cavium/thunder/nic_reg.h
++++ b/drivers/net/ethernet/cavium/thunder/nic_reg.h
+@@ -36,6 +36,19 @@
+ #define   NIC_PF_MAILBOX_ENA_W1C		(0x0450)
+ #define   NIC_PF_MAILBOX_ENA_W1S		(0x0470)
+ #define   NIC_PF_RX_ETYPE_0_7			(0x0500)
++#define   NIC_PF_RX_GENEVE_DEF			(0x0580)
++#define    UDP_GENEVE_PORT_NUM				0x17C1ULL
++#define   NIC_PF_RX_GENEVE_PROT_DEF		(0x0588)
++#define    IPV6_PROT					0x86DDULL
++#define    IPV4_PROT					0x800ULL
++#define    ET_PROT					0x6558ULL
++#define   NIC_PF_RX_NVGRE_PROT_DEF		(0x0598)
++#define   NIC_PF_RX_VXLAN_DEF_0_1		(0x05A0)
++#define    UDP_VXLAN_PORT_NUM				0x12B5
++#define   NIC_PF_RX_VXLAN_PROT_DEF		(0x05B0)
++#define    IPV6_PROT_DEF				0x2ULL
++#define    IPV4_PROT_DEF				0x1ULL
++#define    ET_PROT_DEF					0x3ULL
+ #define   NIC_PF_RX_CFG				(0x05D0)
+ #define   NIC_PF_PKIND_0_15_CFG			(0x0600)
+ #define   NIC_PF_ECC0_FLIP0			(0x1000)
 -- 
 2.7.4
