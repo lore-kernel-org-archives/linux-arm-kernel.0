@@ -1,65 +1,24 @@
 From: groeck@google.com (Guenter Roeck)
-Date: Wed, 10 Aug 2016 15:14:06 -0700
-Subject: [v2 PATCH] clk: rockchip: mark rk3399 hdcp_noc and vio_noc as
- critical
-In-Reply-To: <1470765753-11619-1-git-send-email-zyw@rock-chips.com>
-References: <1470765753-11619-1-git-send-email-zyw@rock-chips.com>
-Message-ID: <CABXOdTeDYzOpNxkyScf3WvvFynyTZbKrVdVFzMobMaPAp=f5jw@mail.gmail.com>
+Date: Wed, 10 Aug 2016 15:19:41 -0700
+Subject: [v10 PATCH 2/5] phy: Add USB Type-C PHY driver for rk3399
+In-Reply-To: <1470785557-21974-3-git-send-email-zyw@rock-chips.com>
+References: <1470785557-21974-1-git-send-email-zyw@rock-chips.com>
+ <1470785557-21974-3-git-send-email-zyw@rock-chips.com>
+Message-ID: <CABXOdTd_HVqQ2Hx5_TFpM3xhnMXz3JpaXG8QHkv6wAzUCtYp8Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 9, 2016 at 11:02 AM, Chris Zhong <zyw@rock-chips.com> wrote:
-> Fix incorrect rk3399 aclk_vio gating bit, it should be 0, not 10. With
-> this modification, the aclk_vio_noc should be put into critical list,
-> since it is required by VOP.
-> And the Type-C DP need these clocks: aclk_hdcp_noc, hclk_hdcp_noc,
-> pclk_hdcp_noc. Mark them as critical to avoid someone close them.
+On Tue, Aug 9, 2016 at 4:32 PM, Chris Zhong <zyw@rock-chips.com> wrote:
+> Add a PHY provider driver for the rk3399 SoC Type-c PHY. The USB
+> Type-C PHY is designed to support the USB3 and DP applications. The
+> PHY basically has two main components: USB3 and DisplyPort. USB3
+> operates in SuperSpeed mode and the DP can operate at RBR, HBR and
+> HBR2 data rates. Hence, create 2 PHY deivces, the phy[0] for DP,
+> and phy[1] for USB3.
 >
 > Signed-off-by: Chris Zhong <zyw@rock-chips.com>
-> ---
+> Signed-off-by: Kever Yang <kever.yang@rock-chips.com>
 >
->  drivers/clk/rockchip/clk-rk3399.c | 6 +++++-
->  1 file changed, 5 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/clk/rockchip/clk-rk3399.c b/drivers/clk/rockchip/clk-rk3399.c
-> index b173711a..676b017 100644
-> --- a/drivers/clk/rockchip/clk-rk3399.c
-> +++ b/drivers/clk/rockchip/clk-rk3399.c
-> @@ -1073,7 +1073,7 @@ static struct rockchip_clk_branch rk3399_clk_branches[] __initdata = {
->         /* vio */
->         COMPOSITE(ACLK_VIO, "aclk_vio", mux_pll_src_cpll_gpll_ppll_p, CLK_IGNORE_UNUSED,
->                         RK3399_CLKSEL_CON(42), 6, 2, MFLAGS, 0, 5, DFLAGS,
-> -                       RK3399_CLKGATE_CON(11), 10, GFLAGS),
-> +                       RK3399_CLKGATE_CON(11), 0, GFLAGS),
->         COMPOSITE_NOMUX(PCLK_VIO, "pclk_vio", "aclk_vio", 0,
->                         RK3399_CLKSEL_CON(43), 0, 5, DFLAGS,
->                         RK3399_CLKGATE_CON(11), 1, GFLAGS),
-> @@ -1470,6 +1470,9 @@ static const char *const rk3399_cru_critical_clocks[] __initconst = {
->         "aclk_cci_pre",
->         "aclk_gic",
->         "aclk_gic_noc",
-> +       "aclk_hdcp_noc",
-> +       "hclk_hdcp_noc",
-> +       "pclk_hdcp_noc",
->         "pclk_perilp0",
->         "pclk_perilp0",
->         "hclk_perilp0",
-> @@ -1489,6 +1492,7 @@ static const char *const rk3399_cru_critical_clocks[] __initconst = {
->         "gpll_hclk_perilp1_src",
->         "gpll_aclk_perilp0_src",
->         "gpll_aclk_perihp_src",
-> +       "aclk_vio_noc",
-
-I think there was a previous comment suggesting that this clock should
-be handled differently. Has this been resolved ?
-
-Otherwise
 
 Reviewed-by: Guenter Roeck <groeck@chromium.org>
-
->  };
->
->  static const char *const rk3399_pmucru_critical_clocks[] __initconst = {
-> --
-> 1.9.1
->
+Tested-by: Guenter Roeck <groeck@chromium.org>
