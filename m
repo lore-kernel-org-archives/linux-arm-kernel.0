@@ -1,83 +1,29 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Wed, 10 Aug 2016 18:34:22 -0500
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 11 Aug 2016 00:43:25 +0100
 Subject: "Failed to create /dev/root: -14" after commit e6978e4bf1 ("ARM:
  save and reset the address limit when entering an exception")
-In-Reply-To: <87eg5y3rsk.fsf@free-electrons.com>
+In-Reply-To: <CAOi56cUMzOVzcOOwW433YH1hsyiSTHofgQP5a1ghaTu94fL01w@mail.gmail.com>
 References: <57A15C41.6000804@roeck-us.net>
  <20160803083822.GI1041@n2100.armlinux.org.uk>
- <57A20896.30300@roeck-us.net> <20160804100748.GP1041@n2100.armlinux.org.uk>
+ <57A20896.30300@roeck-us.net>
+ <20160804100748.GP1041@n2100.armlinux.org.uk>
  <87eg5y3rsk.fsf@free-electrons.com>
-Message-ID: <CAOi56cUMzOVzcOOwW433YH1hsyiSTHofgQP5a1ghaTu94fL01w@mail.gmail.com>
+ <CAOi56cUMzOVzcOOwW433YH1hsyiSTHofgQP5a1ghaTu94fL01w@mail.gmail.com>
+Message-ID: <20160810234325.GR1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 9, 2016 at 10:06 AM, Gregory CLEMENT
-<gregory.clement@free-electrons.com> wrote:
-> Hi Russell King,
->
->  On jeu., ao?t 04 2016, Russell King - ARM Linux <linux@armlinux.org.uk> wrote:
->
->> On Wed, Aug 03, 2016 at 08:07:02AM -0700, Guenter Roeck wrote:
->>> On 08/03/2016 01:38 AM, Russell King - ARM Linux wrote:
->>> >On Tue, Aug 02, 2016 at 07:51:45PM -0700, Guenter Roeck wrote:
->>> >>Hi,
->>> >>
->>> >>I see the following crash when running a qemu arm 'kzm' runtime test with
->>> >>the current mainline.
->>> >>...
->>> >>Failed to create /dev/root: -14
->>> >>
->>> >>[ followed by panic ]
->>> >>
->>> >>A complete log file is at [1].
->>> >
->>> >I think it's because of those undefined instructions you're hitting
->>> >with the hw-breakpoint code... can you try the patch below please?
->>> >
->>> >  arch/arm/kernel/entry-armv.S | 1 +
->>> >  1 file changed, 1 insertion(+)
->>> >
->>> >diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
->>> >index bc5f50799d75..9f157e7c51e7 100644
->>> >--- a/arch/arm/kernel/entry-armv.S
->>> >+++ b/arch/arm/kernel/entry-armv.S
->>> >@@ -295,6 +295,7 @@ __und_svc_fault:
->>> >    bl      __und_fault
->>> >
->>> >  __und_svc_finish:
->>> >+   get_thread_info tsk
->>> >    ldr     r5, [sp, #S_PSR]                @ Get SVC cpsr
->>> >    svc_exit r5                             @ return from exception
->>> >   UNWIND(.fnend            )
->>> >
->>>
->>> Yes, that fixes the problem.
->>>
->>> Assuming you'll create a patch:
->>>
->>> Tested-by: Guenter Roeck <linux@roeck-us.net>
->>>
->>> Does that need to be addressed in qemu, or is it a Linux bug ?
->>
->> It's a Linux bug provoked by qemu not implementing the hardware
->> breakpoints.  Well worth fixing in Linux.
->
-> The Armada XP base platform were hit by the same bug as we can see on
-> kernlci:
-> https://storage.kernelci.org/mainline/v4.8-rc1/arm-mvebu_v7_defconfig/lab-baylibre-seattle/boot-armada-xp-openblocks-ax3-4.html
->
-> Your patch solves the issue too.
->
-> Will you push this patch for v4.8-rc2 ?
->
-> Also I wonder if it is something expected to have this issue on a "real"
-> hardware.
->
-> You can also add my:
-> Tested-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+On Wed, Aug 10, 2016 at 06:34:22PM -0500, Kevin Hilman wrote:
+> I also tested this fixes the boot issue on Armada XP.
+> 
+> Tested-by: Kevin Hilman <khilman@baylibre.com>
 
-I also tested this fixes the boot issue on Armada XP.
+It should be in the current linux-next.  I'll send them on in the
+usual way over the weekend for -rc2, with your ack for this one.
 
-Tested-by: Kevin Hilman <khilman@baylibre.com>
+Thanks.
 
-Kevin
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
