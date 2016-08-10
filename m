@@ -1,29 +1,29 @@
-From: weiyj.lk@gmail.com (Wei Yongjun)
-Date: Wed, 10 Aug 2016 13:42:34 +0000
-Subject: [PATCH -next] ASoC: sun4i-codec: Fix error return code in
- sun4i_codec_probe()
-Message-ID: <1470836554-11569-1-git-send-email-weiyj.lk@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 10 Aug 2016 15:45:30 +0200
+Subject: [PATCH 0244/1285] Replace numeric parameter like 0444 with macro
+In-Reply-To: <CACRpkdZsgSfL9rwe-vU5S6nNy0weD3O3PZymUZQsvJhQTSjf=w@mail.gmail.com>
+References: <20160802105246.30008-1-baolex.ni@intel.com>
+ <CACRpkdZsgSfL9rwe-vU5S6nNy0weD3O3PZymUZQsvJhQTSjf=w@mail.gmail.com>
+Message-ID: <5052478.g1CZhtD17T@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix to return error code -ENOMEM instead of 0 when create card
-failed, as done elsewhere in this function.
+On Wednesday, August 10, 2016 3:02:05 PM CEST Linus Walleij wrote:
+> On Tue, Aug 2, 2016 at 12:52 PM, Baole Ni <baolex.ni@intel.com> wrote:
+> 
+> > I find that the developers often just specified the numeric value
+> > when calling a macro which is defined with a parameter for access permission.
+> > As we know, these numeric value for access permission have had the corresponding macro,
+> > and that using macro can improve the robustness and readability of the code,
+> > thus, I suggest replacing the numeric parameter with the macro.
+> >
+> > Signed-off-by: Chuansheng Liu <chuansheng.liu@intel.com>
+> > Signed-off-by: Baole Ni <baolex.ni@intel.com>
+> 
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> 
+> I assume Wolfram will merge this.
 
-Fixes: 45fb6b6f2aa3 ("ASoC: sunxi: add support for the on-chip
-codec on early Allwinner SoCs")
-Signed-off-by: Wei Yongjun <weiyj.lk@gmail.com>
----
- sound/soc/sunxi/sun4i-codec.c | 1 +
- 1 file changed, 1 insertion(+)
+I assume not, see http://lwn.net/Articles/696227/
 
-diff --git a/sound/soc/sunxi/sun4i-codec.c b/sound/soc/sunxi/sun4i-codec.c
-index 0e19c50..e741659 100644
---- a/sound/soc/sunxi/sun4i-codec.c
-+++ b/sound/soc/sunxi/sun4i-codec.c
-@@ -846,6 +846,7 @@ static int sun4i_codec_probe(struct platform_device *pdev)
- 	card = sun4i_codec_create_card(&pdev->dev);
- 	if (!card) {
- 		dev_err(&pdev->dev, "Failed to create our card\n");
-+		ret = -ENOMEM;
- 		goto err_unregister_codec;
- 	}
+	Arnd
