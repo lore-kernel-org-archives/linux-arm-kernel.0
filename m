@@ -1,80 +1,39 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 10 Aug 2016 09:29:33 +0100
-Subject: [RESEND v2 05/10] mfd: stmpe: use generic bit mask name
-In-Reply-To: <1470814755-19447-6-git-send-email-patrice.chotard@st.com>
-References: <1470814755-19447-1-git-send-email-patrice.chotard@st.com>
- <1470814755-19447-6-git-send-email-patrice.chotard@st.com>
-Message-ID: <20160810082933.GK1581@dell>
+From: panand@redhat.com (Pratyush Anand)
+Date: Wed, 10 Aug 2016 13:58:08 +0530
+Subject: Query about ARM64 virt_to_phys and vice versa implementation
+Message-ID: <20160810082808.GA24137@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 10 Aug 2016, patrice.chotard at st.com wrote:
+Hi,
 
-> From: Patrice Chotard <patrice.chotard@st.com>
-> 
-> In order to prepare the ground to STMPE1600,
-> as STMPE1600's SYS_CTRL register has the same layout as
-> STMPE801 variant, unify STMPExxx_REG_SYS_CTRL_RESET/INT_EN/INT_HI
-> bit masks to more generic STMPE_SYS_CTRL_RESET/INT_EN/INT_HI
-> 
-> Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
-> Acked-by: Lee Jones <lee.jones@linaro.org>
-> ---
->  drivers/mfd/stmpe.c | 4 ++--
->  drivers/mfd/stmpe.h | 6 ++----
->  2 files changed, 4 insertions(+), 6 deletions(-)
+Would like to discuss virt_to_phys() and phys_to_virt() conversion in latest
+kernel. I can see that if VA < PAGE_OFFSET, then we just subtract kimage_voffset
+from VA and we get the PA. However, there is no such condition for
+phys_to_virt(). phys_to_virt is always done by (PA - PHYS_OFFSET + PAGE_OFFSET).
+So, how does phys_to_virt() work for all the cases? I must be missing something.
 
-Applied, thanks.
+-- I am using a platform with VA bits = 42.
+   Therefore PAGE_OFFSET on my platform is 0xfffffe0000000000
+   PHYS_OFFSET is 0x8000000000
+   kimage_voffset is 0xfffffb8006000000
 
-> diff --git a/drivers/mfd/stmpe.c b/drivers/mfd/stmpe.c
-> index af682d0..2556463 100644
-> --- a/drivers/mfd/stmpe.c
-> +++ b/drivers/mfd/stmpe.c
-> @@ -1089,7 +1089,7 @@ static int stmpe_chip_init(struct stmpe *stmpe)
->  
->  	if (stmpe->irq >= 0) {
->  		if (id == STMPE801_ID)
-> -			icr = STMPE801_REG_SYS_CTRL_INT_EN;
-> +			icr = STMPE_SYS_CTRL_INT_EN;
->  		else
->  			icr = STMPE_ICR_LSB_GIM;
->  
-> @@ -1103,7 +1103,7 @@ static int stmpe_chip_init(struct stmpe *stmpe)
->  		if (irq_trigger == IRQF_TRIGGER_RISING ||
->  				irq_trigger == IRQF_TRIGGER_HIGH) {
->  			if (id == STMPE801_ID)
-> -				icr |= STMPE801_REG_SYS_CTRL_INT_HI;
-> +				icr |= STMPE_SYS_CTRL_INT_HI;
->  			else
->  				icr |= STMPE_ICR_LSB_HIGH;
->  		}
-> diff --git a/drivers/mfd/stmpe.h b/drivers/mfd/stmpe.h
-> index 4ae343d..4ba1123 100644
-> --- a/drivers/mfd/stmpe.h
-> +++ b/drivers/mfd/stmpe.h
-> @@ -105,6 +105,8 @@ int stmpe_remove(struct stmpe *stmpe);
->  #define STMPE_ICR_LSB_GIM	(1 << 0)
->  
->  #define STMPE_SYS_CTRL_RESET	(1 << 7)
-> +#define STMPE_SYS_CTRL_INT_EN	(1 << 2)
-> +#define STMPE_SYS_CTRL_INT_HI	(1 << 0)
->  
->  /*
->   * STMPE801
-> @@ -121,10 +123,6 @@ int stmpe_remove(struct stmpe *stmpe);
->  #define STMPE801_REG_GPIO_SET_PIN	0x11
->  #define STMPE801_REG_GPIO_DIR		0x12
->  
-> -#define STMPE801_REG_SYS_CTRL_RESET	(1 << 7)
-> -#define STMPE801_REG_SYS_CTRL_INT_EN	(1 << 2)
-> -#define STMPE801_REG_SYS_CTRL_INT_HI	(1 << 0)
-> -
->  /*
->   * STMPE811
->   */
+Now lets find physical address of log_buf:
+# cat /proc/kallsyms | grep -w "d log_buf"
+fffffc0008ca6b40 d log_buf
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Since VA < PAGE_OFFSET (fffffc0008ca6b40 < fffffe0000000000)
+Therefore as per definition of virt_to_phys() from asm/memory.h:
+PA = VA - kimage_voffset = fffffc0008ca6b40 - fffffb8006000000 = 8002CA6B40
+
+Now convert PA=8002CA6B40 to VA.
+VA = PA - PHYS_OFFSET + PAGE_OFFSET = 8002CA6B40 - 8000000000 + fffffe0000000000
+= fffffe0002CA6B40 which not equal to fffffc0008ca6b40.
+
+So, do we have dual mapping for all physical addresses? If not, how does it
+work? What I am missing. 
+
+If its dual mapping, then probably we will need to fix couple of things in
+kexec-tools.
+
+~Pratyush
