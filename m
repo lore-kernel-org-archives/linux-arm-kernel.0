@@ -1,73 +1,48 @@
 From: appana.durga.rao@xilinx.com (Kedareswara rao Appana)
-Date: Wed, 10 Aug 2016 11:20:07 +0530
-Subject: [PATCH v6 2/3] Documentation: DT: net: Add Xilinx gmiitorgmii
- converter device tree binding documentation
-In-Reply-To: <1470808208-32133-1-git-send-email-appanad@xilinx.com>
-References: <1470808208-32133-1-git-send-email-appanad@xilinx.com>
-Message-ID: <1470808208-32133-3-git-send-email-appanad@xilinx.com>
+Date: Wed, 10 Aug 2016 11:20:05 +0530
+Subject: [PATCH v6 0/3] net: phy: Add xilinx gmiitorgmii converter support
+Message-ID: <1470808208-32133-1-git-send-email-appanad@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Device-tree binding documentation for xilinx gmiitorgmii converter.
+The Gigabit Media Independent Interface (GMII) to Reduced Gigabit Media
+Independent Interface (RGMII) core provides the RGMII between RGMII-compliant
+Ethernet physical media devices (PHY) and the Gigabit Ethernet controller.
+This core can be used in all three modes of operation(10/100/1000 Mb/s).
+The Management Data Input/Output (MDIO) interface is used to configure the
+Speed of operation. This core can switch dynamically between the three
+Different speed modes by configuring the conveter register through mdio write.
 
-Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
----
-Changes for v6:
----> Removed mdio description as suggested by Florian.
-Changes for v5:
----> Fixed Indentation in the example as suggested by Michal.
-Changes for v4:
---> Modified compatible as suggested by Rob.
---> Removed underscores from the converter node name as suggested by Rob.
-Changes for v3:
---> None.
-Changes for v2:
---> New patch
+The conveter sits b/w the MAC and external phy like below
 
- .../devicetree/bindings/net/xilinx_gmii2rgmii.txt  | 35 ++++++++++++++++++++++
- 1 file changed, 35 insertions(+)
+MACB <==> GMII2RGMII <==> RGMII_PHY
+
+        MDIO    <========> GMII2RGMII
+MCAB <=======>
+                <========> RGMII
+
+Using MAC MDIO bus we can access both the converter and the external PHY.
+We need to program the line speed of the converter during run time based
+On the external phy negotiated speed.
+
+This patch series does the below
+---> Add mask for Control register 10Mbps speed.
+---> Add support for xilinx gmiitorgmii converter.
+
+Kedareswara rao Appana (3):
+  net: Add mask for Control register 10Mbps speed
+  Documentation: DT: net: Add Xilinx gmiitorgmii converter device tree
+    binding documentation
+  net: phy: Add gmiitorgmii converter support
+
+ .../devicetree/bindings/net/xilinx_gmii2rgmii.txt  |  35 +++++++
+ drivers/net/phy/Kconfig                            |   7 ++
+ drivers/net/phy/Makefile                           |   1 +
+ drivers/net/phy/xilinx_gmii2rgmii.c                | 109 +++++++++++++++++++++
+ include/uapi/linux/mii.h                           |   1 +
+ 5 files changed, 153 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/net/xilinx_gmii2rgmii.txt
+ create mode 100644 drivers/net/phy/xilinx_gmii2rgmii.c
 
-diff --git a/Documentation/devicetree/bindings/net/xilinx_gmii2rgmii.txt b/Documentation/devicetree/bindings/net/xilinx_gmii2rgmii.txt
-new file mode 100644
-index 0000000..038dda4
---- /dev/null
-+++ b/Documentation/devicetree/bindings/net/xilinx_gmii2rgmii.txt
-@@ -0,0 +1,35 @@
-+XILINX GMIITORGMII Converter Driver Device Tree Bindings
-+--------------------------------------------------------
-+
-+The Gigabit Media Independent Interface (GMII) to Reduced Gigabit Media
-+Independent Interface (RGMII) core provides the RGMII between RGMII-compliant
-+Ethernet physical media devices (PHY) and the Gigabit Ethernet controller.
-+This core can be used in all three modes of operation(10/100/1000 Mb/s).
-+The Management Data Input/Output (MDIO) interface is used to configure the
-+Speed of operation. This core can switch dynamically between the three
-+Different speed modes by configuring the conveter register through mdio write.
-+
-+This converter sits between the ethernet MAC and the external phy.
-+MAC <==> GMII2RGMII <==> RGMII_PHY
-+
-+For more details about mdio please refer phy.txt file in the same directory.
-+
-+Required properties:
-+- compatible	: Should be "xlnx,gmii-to-rgmii-1.0"
-+- reg		: The ID number for the phy, usually a small integer
-+- phy-handle	: Should point to the external phy device.
-+		  See ethernet.txt file in the same directory.
-+
-+Example:
-+	mdio {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		phy: ethernet-phy at 0 {
-+			......
-+		};
-+		gmiitorgmii: gmiitorgmii at 8 {
-+			compatible = "xlnx,gmii-to-rgmii-1.0";
-+			reg = <8>;
-+			phy-handle = <&phy>;
-+		};
-+	};
 -- 
 2.1.2
