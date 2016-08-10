@@ -1,107 +1,49 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Wed, 10 Aug 2016 09:45:06 +0100
-Subject: [PATCH 3/6] dt/bindings: Add bindings for Tegra GMI controller
-In-Reply-To: <CALw8SCVrQeZLQjkapLjk9Me=AVU4kbtOskem8jeEeYDK5tznGg@mail.gmail.com>
-References: <1470512452-8322-1-git-send-email-mirza.krak@gmail.com>
- <1470512452-8322-4-git-send-email-mirza.krak@gmail.com>
- <901be576-a810-c630-9b83-de922e945df0@nvidia.com>
- <CALw8SCV61w6BgtBb8pY4czeB4yFmbtLmB2MuyrvGcvepmRpeBQ@mail.gmail.com>
- <5e0402db-10ce-75eb-cf95-d9e2d26e3efe@nvidia.com>
- <CALw8SCVrQeZLQjkapLjk9Me=AVU4kbtOskem8jeEeYDK5tznGg@mail.gmail.com>
-Message-ID: <d72d3f8f-6987-3623-077f-14485679e321@nvidia.com>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Wed, 10 Aug 2016 10:48:02 +0200
+Subject: [PATCH v12 02/11] genirq/msi: msi_compose wrapper
+In-Reply-To: <alpine.DEB.2.20.1608091117250.5388@nanos>
+References: <1470158617-7022-1-git-send-email-eric.auger@redhat.com>
+ <1470158617-7022-3-git-send-email-eric.auger@redhat.com>
+ <alpine.DEB.2.20.1608091117250.5388@nanos>
+Message-ID: <bc3270b2-340b-9396-0722-2c2097f7fae4@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Thomas,
 
-On 09/08/16 21:48, Mirza Krak wrote:
-> 2016-08-09 15:34 GMT+02:00 Jon Hunter <jonathanh@nvidia.com>:
->>
->> On 09/08/16 09:40, Mirza Krak wrote:
->>> 2016-08-08 16:44 GMT+02:00 Jon Hunter <jonathanh@nvidia.com>:
->>>>
->>>> On 06/08/16 20:40, Mirza Krak wrote:
->>>>> From: Mirza Krak <mirza.krak@gmail.com>
->>>>>
+On 09/08/2016 11:19, Thomas Gleixner wrote:
+> On Tue, 2 Aug 2016, Eric Auger wrote:
 > 
-> <--snip-->
+>> Currently the MSI message is composed by directly calling
+>> irq_chip_compose_msi_msg and erased by setting the memory to zero.
+>>
+>> On some platforms, we will need to complexify this composition to
+>> properly handle MSI emission through IOMMU. Also we will need to track
+>> when the MSI message is erased.
 > 
->>>>> + - nvidia,snor-we-width: Number of cycles during which WE stays asserted.
->>>>> +   Valid values are 0-15, default is 1
->>>>> + - nvidia,snor-oe-width: Number of cycles during which OE stays asserted.
->>>>> +   Valid values are 0-255, default is 1
->>>>> + - nvidia,snor-wait-width: Number of cycles before READY is asserted.
->>>>> +   Valid values are 0-255, default is 3
->>>>> +
->>>>> +Example with two SJA1000 CAN controllers connected to the GMI bus:
->>>>> +
->>>>> +  gmi at 70090000 {
->>>>> +    #address-cells = <1>;
->>>>> +    #size-cells = <1>;
->>>>
->>>> I think 0 for size makes sense. I know that caused you problems before,
->>>> but I am wondering if ...
->>>>
->>>>> +    ranges;
->>>>
->>>> ... ranges is needed here? If we do have it, I am wondering if it should
->>>> be a single entry for the chip-select that is being used. For now we
->>>> could only support a ranges with one entry.
->>>>
->>>>         #address-cells = <1>;
->>>>         #size-cells = <1>;
->>>>         ranges = <4 0x48000000 0x00040000>;
->>>
->>> I prefer if we have "ranges" with one single entry, and warn if user enters
->>> multiple for now, like we discussed earlier. Should have really done it in
->>> this series.
->>
->> I think I do as well.
->>
->>>>
->>>>> +    nvidia,snor-mux-mode;
->>>>> +    nvidia,snor-adv-inv;
->>>>> +    nvidia,snor-cs-select = <4>;
->>>>
->>>> I would have expected these under bus at X node as they are specific to the
->>>> GMI CS.
->>>
->>> Yes, that is true.
->>>
->>>>
->>>> I would also expect that the actual chip-select number is encoded in the
->>>> reg property.
->>>>
->>>>> +
->>>>> +    bus at 0,0 {
->>>>
->>>> bus at 4
->>>
->>> ACK.
->>>
->>>>
->>>> No mention of this bus node in the above documentation.
->>>
->>> I was hesitant documenting it since I am not sure if we really need it
->>> in a generic case? It does make sense in my
->>> specific case. But what would it look like if we could maintain CS in software.
->>>
->>> Do you then have a bus node per CS? I am guessing not. Is it enough to
->>> document it in my "example brief"?
->>
->> I see what you mean. May be it is fine to document with the examples
->> below how child devices should be populated. You should also state that
->> currently the GMI only supports one child device currently for the
->> chip-select that is being used.
+> I just can't find how you do that. After applying the series the
 > 
-> Should I really need to state that? Is it not always the case, that
-> you have one child device per chip-select?
+>> +	if (erase)
+>> +		memset(msg, 0, sizeof(*msg));
+> 
+> branch is still just a memset(). The wrapper is fine for the compose side, but
+> having the extra argument just to wrap the memset() for no gain is silly.
 
-I think so. Remember it is one child device for the GMI, however, that
-child device could still have one than one child device (per you example
-with two CANs). The GMI child represents the active chip-select and we
-only currently support one with this driver.
+Yes you're right: this was true in the first releases of the series
+where the iommu mapping/unmapping were done at composition & erase time.
+Now the mapping/unmapping is done on msi_domain_alloc/free_irqs, this is
+not mandated anymore. I will keep the wrapper for the compose side and
+remove the rest + update the commit message accordingly.
 
-Jon
+Thank you for your time.
 
--- 
-nvpublic
+Eric
+> 
+> Thanks,
+> 
+> 	tglx
+> --
+> To unsubscribe from this list: send the line "unsubscribe kvm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
