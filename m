@@ -1,116 +1,67 @@
-From: guodong.xu@linaro.org (Guodong Xu)
-Date: Wed, 10 Aug 2016 16:03:48 +0800
-Subject: [PATCH v4 2/2] mmc: dw_mmc: add reset support to dwmmc host controller
-In-Reply-To: <1470816228-8874-1-git-send-email-guodong.xu@linaro.org>
-References: <1470816228-8874-1-git-send-email-guodong.xu@linaro.org>
-Message-ID: <1470816228-8874-3-git-send-email-guodong.xu@linaro.org>
+From: kbeldan@baylibre.com (Karl Beldan)
+Date: Wed, 10 Aug 2016 08:07:13 +0000
+Subject: [PATCH 2/4] ARM: dts: da850: Add an aemif node
+In-Reply-To: <57AADF7B.1070102@ti.com>
+References: <20160809171518.22690-1-kbeldan@baylibre.com>
+ <20160809171518.22690-3-kbeldan@baylibre.com>
+ <57AADC63.90405@ti.com> <57AADF7B.1070102@ti.com>
+Message-ID: <20160810080713.GB16481@gobelin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dwmmc host controller may in unknown state when entering kernel boot. One
-example is when booting from eMMC, bootloader need initialize MMC host
-controller into some state so it can read. In order to make sure MMC host
-controller in a clean initial state, this reset support is added.
-
-With this patch, a 'resets' property can be added into dw_mmc device
-tree node. The hardware logic is: dwmmc host controller IP receives a reset
-signal from a 'reset provider' (eg. power management unit). The 'resets'
-property points to this reset signal. So, during dwmmc driver probe,
-it can use this signal to reset itself.
-
-Refer to [1] for more information.
-
-[1] Documentation/devicetree/bindings/reset/reset.txt
-
-Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
-Signed-off-by: Xinwei Kong <kong.kongxinwei@hisilicon.com>
-Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
----
- drivers/mmc/host/dw_mmc.c  | 23 ++++++++++++++++++++++-
- include/linux/mmc/dw_mmc.h |  2 ++
- 2 files changed, 24 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
-index 32380d5..481d441 100644
---- a/drivers/mmc/host/dw_mmc.c
-+++ b/drivers/mmc/host/dw_mmc.c
-@@ -2915,6 +2915,13 @@ static struct dw_mci_board *dw_mci_parse_dt(struct dw_mci *host)
- 	if (!pdata)
- 		return ERR_PTR(-ENOMEM);
+On Wed, Aug 10, 2016 at 01:32:03PM +0530, Sekhar Nori wrote:
+> On Wednesday 10 August 2016 01:18 PM, Sekhar Nori wrote:
+> > On Tuesday 09 August 2016 10:45 PM, Karl Beldan wrote:
+> >> Currently the davinci da8xx boards use the mach-davinci aemif code.
+> >> Instantiating an aemif node into the DT allows to use the ti-aemif
+> >> memory driver and is another step to better DT support.
+> >> Also it will allow to properly pass the emif timings via DT.
+> >>
+> >> Signed-off-by: Karl Beldan <kbeldan@baylibre.com>
+> >> ---
+> >>  arch/arm/boot/dts/da850.dtsi | 10 ++++++++++
+> >>  1 file changed, 10 insertions(+)
+> >>
+> >> diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
+> >> index bc10e7e..f62928c 100644
+> >> --- a/arch/arm/boot/dts/da850.dtsi
+> >> +++ b/arch/arm/boot/dts/da850.dtsi
+> >> @@ -411,6 +411,16 @@
+> >>  			dma-names = "tx", "rx";
+> >>  		};
+> >>  	};
+> >> +	aemif: aemif at 68000000 {
+> >> +		compatible = "ti,da850-aemif";
+> >> +		#address-cells = <2>;
+> >> +		#size-cells = <1>;
+> >> +
+> >> +		reg = <0x68000000 0x00008000>;
+> >> +		ranges = <0 0 0x60000000 0x08000000
+> >> +			  1 0 0x68000000 0x00008000>;
+> >> +		status = "disabled";
+> >> +	};
+> >>  	nand_cs3 at 62000000 {
+> >>  		compatible = "ti,davinci-nand";
+> >>  		reg = <0x62000000 0x807ff
+> > 
+> > The nand node should be part of aemif node like it is done for keystone
+> > boards.
+> 
+> Actually, can you move the nand node out of da850.dtsi completely. Its
+> much better to keep da850.dtsi restricted to soc-internal devices and
+> keep the board level devices like NAND flash in <board>.dts file.
+> 
+> Similarly, can you move the NAND pinmux definitions too to the
+> da850-evm.dts file?
+> 
+> There is advantage in keeping common pinmux definitions in da850.dtsi so
+> each board doe not have to repeat them. But AEMIF is an exception as its
+> usage can really be varied (NAND, NOR, SRAM, other). Plus, different
+> boards are likely to use different chip selects so coming up with some
+> pinmux definitions which will be reused widely is really unlikely.
+> 
+This is exactly what I just did for the LCDK.
+If everybody is happy with it I will do the same for the evm as I put it
+in the cover letter.
  
-+	/* find reset controller when exist */
-+	pdata->rstc = devm_reset_control_get_optional(dev, NULL);
-+	if (IS_ERR(pdata->rstc)) {
-+		if (PTR_ERR(pdata->rstc) == -EPROBE_DEFER)
-+			return ERR_PTR(-EPROBE_DEFER);
-+	}
-+
- 	/* find out number of slots supported */
- 	of_property_read_u32(np, "num-slots", &pdata->num_slots);
- 
-@@ -2986,7 +2993,9 @@ int dw_mci_probe(struct dw_mci *host)
- 
- 	if (!host->pdata) {
- 		host->pdata = dw_mci_parse_dt(host);
--		if (IS_ERR(host->pdata)) {
-+		if (PTR_ERR(host->pdata) == -EPROBE_DEFER) {
-+			return -EPROBE_DEFER;
-+		} else if (IS_ERR(host->pdata)) {
- 			dev_err(host->dev, "platform data not available\n");
- 			return -EINVAL;
- 		}
-@@ -3040,6 +3049,12 @@ int dw_mci_probe(struct dw_mci *host)
- 		}
- 	}
- 
-+	if (!IS_ERR(host->pdata->rstc)) {
-+		reset_control_assert(host->pdata->rstc);
-+		usleep_range(10, 50);
-+		reset_control_deassert(host->pdata->rstc);
-+	}
-+
- 	setup_timer(&host->cmd11_timer,
- 		    dw_mci_cmd11_timer, (unsigned long)host);
- 
-@@ -3189,6 +3204,9 @@ err_dmaunmap:
- 	if (host->use_dma && host->dma_ops->exit)
- 		host->dma_ops->exit(host);
- 
-+	if (!IS_ERR(host->pdata->rstc))
-+		reset_control_assert(host->pdata->rstc);
-+
- err_clk_ciu:
- 	if (!IS_ERR(host->ciu_clk))
- 		clk_disable_unprepare(host->ciu_clk);
-@@ -3221,6 +3239,9 @@ void dw_mci_remove(struct dw_mci *host)
- 	if (host->use_dma && host->dma_ops->exit)
- 		host->dma_ops->exit(host);
- 
-+	if (!IS_ERR(host->pdata->rstc))
-+		reset_control_assert(host->pdata->rstc);
-+
- 	if (!IS_ERR(host->ciu_clk))
- 		clk_disable_unprepare(host->ciu_clk);
- 
-diff --git a/include/linux/mmc/dw_mmc.h b/include/linux/mmc/dw_mmc.h
-index 83b0edfc..f5af2bd 100644
---- a/include/linux/mmc/dw_mmc.h
-+++ b/include/linux/mmc/dw_mmc.h
-@@ -17,6 +17,7 @@
- #include <linux/scatterlist.h>
- #include <linux/mmc/core.h>
- #include <linux/dmaengine.h>
-+#include <linux/reset.h>
- 
- #define MAX_MCI_SLOTS	2
- 
-@@ -259,6 +260,7 @@ struct dw_mci_board {
- 	/* delay in mS before detecting cards after interrupt */
- 	u32 detect_delay_ms;
- 
-+	struct reset_control *rstc;
- 	struct dw_mci_dma_ops *dma_ops;
- 	struct dma_pdata *data;
- };
--- 
-1.9.1
+Karl
