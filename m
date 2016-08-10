@@ -1,24 +1,44 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 10 Aug 2016 10:57:57 +0200
-Subject: [PATCH] ARM: cpuidle: declare cpuidle_ops __read_mostly
-In-Reply-To: <1470818997-808-1-git-send-email-jszhang@marvell.com>
-References: <1470818997-808-1-git-send-email-jszhang@marvell.com>
-Message-ID: <2118361.tr3K3hSZxF@wuerfel>
+From: clabbe.montjoie@gmail.com (LABBE Corentin)
+Date: Wed, 10 Aug 2016 10:58:23 +0200
+Subject: [linux-sunxi] [RFC PATCH 1/5] mailbox: introduce ARM SMC based
+ mailbox
+In-Reply-To: <20160809115303.17032-2-andre.przywara@arm.com>
+References: <20160809115303.17032-1-andre.przywara@arm.com>
+ <20160809115303.17032-2-andre.przywara@arm.com>
+Message-ID: <20160810085823.GA21702@Red>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, August 10, 2016 4:49:57 PM CEST Jisheng Zhang wrote:
-> diff --git a/arch/arm/kernel/cpuidle.c b/arch/arm/kernel/cpuidle.c
-> index 7dccc96..762e0929 100644
-> --- a/arch/arm/kernel/cpuidle.c
-> +++ b/arch/arm/kernel/cpuidle.c
-> @@ -19,7 +19,7 @@ extern struct of_cpuidle_method __cpuidle_method_of_table[];
->  static const struct of_cpuidle_method __cpuidle_method_of_table_sentinel
->         __used __section(__cpuidle_method_of_table_end);
->  
-> -static struct cpuidle_ops cpuidle_ops[NR_CPUS];
-> +static struct cpuidle_ops cpuidle_ops[NR_CPUS] __read_mostly;
+Hello
 
-Should this perhaps be percpu data instead?
+Just a minor comment below
 
-	Arnd
+> +static int smc_mbox_probe(struct platform_device *pdev)
+> +{
+> +	struct device *dev = &pdev->dev;
+> +	struct mbox_controller *mbox;
+> +	int ret = 0;
+> +	int i;
+> +
+> +	ret = of_property_count_elems_of_size(dev->of_node, "identifiers",
+> +					      sizeof(u32));
+> +	if (ret < 0)
+> +		return ret;
+> +
+> +	mbox = devm_kzalloc(dev, sizeof(*mbox), GFP_KERNEL);
+> +	if (mbox == NULL)
+> +		return -ENOMEM;
+
+checkpatch prefer !mbox
+
+> +
+> +	mbox->num_chans = ret;
+> +	mbox->chans = devm_kmalloc_array(dev, mbox->num_chans,
+> +					 sizeof(*mbox->chans),
+> +					 GFP_KERNEL | __GFP_ZERO);
+
+devm_kcalloc seems to do the same
+
+Regards
+
+LABBE Corentin
