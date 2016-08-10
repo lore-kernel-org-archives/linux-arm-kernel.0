@@ -1,26 +1,35 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Wed, 10 Aug 2016 11:23:16 +0200
-Subject: [PATCH] ARM: S3C24XX: Add missing DMA device for Mini2440 board
-In-Reply-To: <1470305291-15054-1-git-send-email-s.nawrocki@samsung.com>
-References: <1470305291-15054-1-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <CAJKOXPejFjBODNMZJWuskm8uK4M4ZmxJEw6wczVLNEnsWF5YHQ@mail.gmail.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Wed, 10 Aug 2016 17:19:26 +0800
+Subject: [PATCH] ARM: cpuidle: declare cpuidle_ops __read_mostly
+In-Reply-To: <2118361.tr3K3hSZxF@wuerfel>
+References: <1470818997-808-1-git-send-email-jszhang@marvell.com>
+ <2118361.tr3K3hSZxF@wuerfel>
+Message-ID: <20160810171926.44557e35@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 4, 2016 at 12:08 PM, Sylwester Nawrocki
-<s.nawrocki@samsung.com> wrote:
-> Addition of s3c2440_device_dma was missed during conversion
-> from the Samsung legacy to the regular DMa API.
-> Add it so any devices using DMA, e.g I2S controller can
-> work properly.
->
-> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> ---
->  arch/arm/mach-s3c24xx/mach-mini2440.c | 1 +
->  1 file changed, 1 insertion(+)
->
+Dear Arnd,
 
-Thanks, applied.
+On Wed, 10 Aug 2016 10:57:57 +0200 Arnd Bergmann wrote:
 
-BR,
-Krzysztof
+> On Wednesday, August 10, 2016 4:49:57 PM CEST Jisheng Zhang wrote:
+> > diff --git a/arch/arm/kernel/cpuidle.c b/arch/arm/kernel/cpuidle.c
+> > index 7dccc96..762e0929 100644
+> > --- a/arch/arm/kernel/cpuidle.c
+> > +++ b/arch/arm/kernel/cpuidle.c
+> > @@ -19,7 +19,7 @@ extern struct of_cpuidle_method __cpuidle_method_of_table[];
+> >  static const struct of_cpuidle_method __cpuidle_method_of_table_sentinel
+> >         __used __section(__cpuidle_method_of_table_end);
+> >  
+> > -static struct cpuidle_ops cpuidle_ops[NR_CPUS];
+> > +static struct cpuidle_ops cpuidle_ops[NR_CPUS] __read_mostly;  
+> 
+> Should this perhaps be percpu data instead?
+> 
+
+Per my understanding, percpu is used for those vars with normal read/write
+frequency, while the cpuidle_ops is read mostly, so IMHO, __read_mostly
+is suitable, what do you think?
+
+Thanks,
+Jisheng
