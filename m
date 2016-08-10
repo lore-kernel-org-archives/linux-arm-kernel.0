@@ -1,58 +1,66 @@
-From: bp@suse.de (Borislav Petkov)
-Date: Wed, 10 Aug 2016 13:10:05 +0200
-Subject: [PATCH v12] acpi, apei, arm64: APEI initial support for aarch64.
-In-Reply-To: <CADyBb7uW2-jh8UBLXZ03p1y9SMP7M3z6eULwV2DYhWXEqTm2Rw@mail.gmail.com>
-References: <1469782664-12611-1-git-send-email-fu.wei@linaro.org>
- <20160804094838.GB8093@nazgul.tnic>
- <CADyBb7ujfaXPP_CUB66_E53fY9MeEbt6EhOaCzf+hoDCGYD+dw@mail.gmail.com>
- <20160810104513.GB16664@nazgul.tnic>
- <CADyBb7uW2-jh8UBLXZ03p1y9SMP7M3z6eULwV2DYhWXEqTm2Rw@mail.gmail.com>
-Message-ID: <20160810111005.GD16664@nazgul.tnic>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Wed, 10 Aug 2016 19:06:44 +0800
+Subject: [PATCH] ARM: cpuidle: declare cpuidle_ops __read_mostly
+In-Reply-To: <8191851.HcPOqTYLq8@wuerfel>
+References: <1470818997-808-1-git-send-email-jszhang@marvell.com>
+ <2118361.tr3K3hSZxF@wuerfel>	<20160810171926.44557e35@xhacker>
+ <8191851.HcPOqTYLq8@wuerfel>
+Message-ID: <20160810190644.68966492@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 10, 2016 at 07:01:05PM +0800, Fu Wei wrote:
-> - if (!acpi_disable_cmcff)
-> - apei_hest_parse(hest_parse_cmc, NULL);
-> + rc =apei_hest_parse(hest_parse_cmc, NULL);
-> + if (rc)
-> + goto err;
+Dear Arnd,
+
+On Wed, 10 Aug 2016 12:47:21 +0200 Arnd Bergmann wrote:
+
+> On Wednesday, August 10, 2016 5:19:26 PM CEST Jisheng Zhang wrote:
+> > Dear Arnd,
+> > 
+> > On Wed, 10 Aug 2016 10:57:57 +0200 Arnd Bergmann wrote:
+> >   
+> > > On Wednesday, August 10, 2016 4:49:57 PM CEST Jisheng Zhang wrote:  
+> > > > diff --git a/arch/arm/kernel/cpuidle.c b/arch/arm/kernel/cpuidle.c
+> > > > index 7dccc96..762e0929 100644
+> > > > --- a/arch/arm/kernel/cpuidle.c
+> > > > +++ b/arch/arm/kernel/cpuidle.c
+> > > > @@ -19,7 +19,7 @@ extern struct of_cpuidle_method __cpuidle_method_of_table[];
+> > > >  static const struct of_cpuidle_method __cpuidle_method_of_table_sentinel
+> > > >         __used __section(__cpuidle_method_of_table_end);
+> > > >  
+> > > > -static struct cpuidle_ops cpuidle_ops[NR_CPUS];
+> > > > +static struct cpuidle_ops cpuidle_ops[NR_CPUS] __read_mostly;    
+> > > 
+> > > Should this perhaps be percpu data instead?
+> > >   
+> > 
+> > Per my understanding, percpu is used for those vars with normal read/write
+> > frequency, while the cpuidle_ops is read mostly, so IMHO, __read_mostly
+> > is suitable, what do you think?  
 > 
->   if (!ghes_disable) {
->   rc = apei_hest_parse(hest_parse_ghes_count, &ghes_count);
+> You are right, __read_mostly is better than the normal .data section here,
+> but percpu is also better than .data because it saves a little memory
+> on machines that have few present CPUs than CONFIG_NR_CPUS.
 > 
-> Do you have other suggestion? then I can post v14 to fix it :-)
+> So both have their advantages, we just need to pick a preference.
+> 
+> Actually __ro_after_init would be even better than __read_mostly here
+> I think, as this is only updated in an __init function. I guess
+> using that would have the added security advantage of preventing
+> an attacker from writing to the function pointers when they
+> find a way to overflow an access in the percpu data section.
+> 
 
-Nah, looks good :)
+Got it, thanks for the detailed explanations. 
 
-Let's keep it simple and add more involved handling when it is really
-needed. Thanks!
+And I think the answer to questions:
 
-Btw, that comment:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2016-August/448057.html
 
-+/*
-+ * acpi_disable_cmcff is used in drivers/acpi/apei/hest.c for disabling
-+ * IA-32 Architecture Corrected Machine Checkx(cmc) FIRMWARE_FIRST mode by
-+ * boot parameter(acpi=nocmcff). But we don't have this IA-32 specific
-+ * feature on ARM64, this definition is only for compatibility.
-+ */
-+#define acpi_disable_cmcff 1
+and
 
-looks ok, except the small typo:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2016-August/448059.html
 
-Architecture Corrected Machine Checkx(cmc)
-				    ^
-Make that
+are both "yes"
 
-"IA-32 Architecture Corrected Machine Check (CMC) Firmware-First mode"
-
-Thanks.
-
--- 
-Regards/Gruss,
-    Boris.
-
-ECO tip #101: Trim your mails when you reply.
-
-SUSE Linux GmbH, GF: Felix Imend?rffer, Jane Smithard, Graham Norton, HRB 21284 (AG N?rnberg)
---
+Thanks,
+Jisheng
