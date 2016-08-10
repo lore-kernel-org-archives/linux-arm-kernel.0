@@ -1,70 +1,76 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Wed, 10 Aug 2016 13:40:49 -0700
-Subject: [PATCH 1/2] remoteproc: core: Add rproc OF look-up functions
-In-Reply-To: <7650e5fa-f52c-1ab5-e197-8630fd7d0322@ti.com>
-References: <20160719154905.23344-1-lee.jones@linaro.org>
- <20160810174049.GO26240@tuxbot>
- <7650e5fa-f52c-1ab5-e197-8630fd7d0322@ti.com>
-Message-ID: <20160810204049.GV26240@tuxbot>
+From: dave.long@linaro.org (David Long)
+Date: Wed, 10 Aug 2016 16:41:58 -0400
+Subject: [PATCH v15 04/10] arm64: Kprobes with single stepping support
+In-Reply-To: <20160809172308.GD15447@e104818-lin.cambridge.arm.com>
+References: <57924104.1080202@linaro.org>
+ <20160725171350.GE2423@e104818-lin.cambridge.arm.com>
+ <57969234.1070201@linaro.org>
+ <22b277ba-6812-a0dd-9e8e-c29bdb3aa672@linaro.org>
+ <57993211.1040600@linaro.org>
+ <20160728144053.GA26510@e104818-lin.cambridge.arm.com>
+ <360d582b-5401-7126-ef40-bd78369c0a34@linaro.org>
+ <57A2C8DF.7050401@linaro.org>
+ <74b8c503-b6df-dcb1-c278-d49850fe3715@linaro.org> <57A89731.20709@linaro.org>
+ <20160809172308.GD15447@e104818-lin.cambridge.arm.com>
+Message-ID: <57AB9196.1080005@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 10 Aug 12:37 PDT 2016, Suman Anna wrote:
+On 08/09/2016 01:23 PM, Catalin Marinas wrote:
+> On Mon, Aug 08, 2016 at 10:29:05AM -0400, David Long wrote:
+>> On 08/08/2016 07:13 AM, Daniel Thompson wrote:
+>>> On 04/08/16 05:47, David Long wrote:
+>>> >From b451caa1adaf1d03e08a44b5dad3fca31cebd97a Mon Sep 17 00:00:00 2001
+>>>> From: "David A. Long" <dave.long@linaro.org>
+>>>> Date: Thu, 4 Aug 2016 00:35:33 -0400
+>>>> Subject: [PATCH] arm64: Remove stack duplicating code from jprobes
+>>>>
+>>>> Because the arm64 calling standard allows stacked function arguments
+>>>> to be
+>>>> anywhere in the stack frame, do not attempt to duplicate the stack
+>>>> frame for
+>>>> jprobes handler functions.
+>>>>
+>>>> Signed-off-by: David A. Long <dave.long@linaro.org>
+>>>> ---
+>>>> Documentation/kprobes.txt          |  7 +++++++
+>>>> arch/arm64/include/asm/kprobes.h   |  2 --
+>>>> arch/arm64/kernel/probes/kprobes.c | 31 +++++--------------------------
+>>>> 3 files changed, 12 insertions(+), 28 deletions(-)
+>>>>
+>>>> diff --git a/Documentation/kprobes.txt b/Documentation/kprobes.txt
+>>>> index 1f9b3e2..bd01839 100644
+>>>> --- a/Documentation/kprobes.txt
+>>>> +++ b/Documentation/kprobes.txt
+>>>> @@ -103,6 +103,13 @@ Note that the probed function's args may be
+>>>> passed on the stack
+>>>> or in registers.  The jprobe will work in either case, so long as the
+>>>> handler's prototype matches that of the probed function.
+>>>>
+>>>> +Note that in some architectures (e.g.: arm64) the stack copy is not
+>>>
+>>> Could sparc64 be added to this list?
+>>>
+>>>    For the sparc folks who are new to the thread, we've previously
+>>>    established that the sparc64 ABI passes large structures by
+>>>    allocating them from the caller's stack frame and passing a pointer
+>>>    to the stack frame (i.e. arguments may not be at top of the stack).
+>>>    We also noticed that sparc code does not save/restore anything from
+>>>    the stack.
+>>
+>> I was reluctant to do that in the context of late changes to v4.8 for arm64
+>> but now that any changes for this are going in as a new patch it would
+>> indeed be useful to get involvement from sparc maintainers.
+>
+> I'm happy to take the arm64 patch for 4.8 as it's mainly a clean-up.
+> Whether you can mention sparc64 as well, it depends on the sparc
+> maintainers. You can either cc them or send the series as two patches,
+> one for documentation and the other for arm64.
+>
 
-> Hi Lee, Bjorn,
-> 
-> On 08/10/2016 12:40 PM, Bjorn Andersson wrote:
-> > On Tue 19 Jul 08:49 PDT 2016, Lee Jones wrote:
-> > 
-> >> - of_rproc_by_index(): look-up and obtain a reference to a rproc
-> >>                        using the DT phandle "rprocs" and a index.
-> >>
-> >> - of_rproc_by_name():  lookup and obtain a reference to a rproc
-> >>                        using the DT phandle "rprocs" and "rproc-names".
-> >>
-> >> Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
-> >> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> >> ---
-> > 
-> > I'm happy with this, so I whipped up a binding document describing our
-> > two new properties. Waiting for an opinion on that before I merge this.
-> 
-> Yeah, I like the two new API too, I have just about run into the need
-> for the same on my product trees. We can probably make it less
-> complicated than what the current series is. The wkup_m3_ipc usage was
-> before there was any standardization on the property names, so we went
-> with a ti, prefixed property specific to the wkup_m3_ipc node and a
-> general API that is agnostic of property name. We don't have all the
-> pieces for PM on AM335x/AM437x SoCs on upstream kernel yet, so we should
-> be able to switch over to using the new property as we cannot achieve
-> the desired functionality even though we can boot the wkup_m3.
-> 
+I didn't think that was going to be possible after v4.8-rc1.  I have 
+separated the documentation and code changes.  I will send out the new 
+code-only patch (otherwise unchanged in content) momentarily.
 
-Glad to hear you're onboard with dropping the old property name, even if
-it's later.
-
-> Here's what I propose:
-> 1. Let's not burden the new of_get_rproc_by_index() API with having to
-> fall-back and look for ti,rprocs. The rproc_get_by_phandle() core logic
-> of looking up against the rproc list is self-contained, and the API
-> usage is limited to just the wkup_m3_ipc driver at the moment.
-> 2. Keep the rproc_get_by_phandle API as is but mark it as deprecated.
-> IMHO, the rename of this API to of_get_rproc_by_phandle() in Patch 2 but
-> using a device node pointer as input argument doesn't add any value.
-> 3. Provide a fallback in wkup_m3_ipc driver to look for both rprocs and
-> ti,rproc property, while switching over the node to use rprocs property.
-> 4. We can get rid of the rproc_get_by_phandle() API after the
-> wkup_m3_ipc transition is done to use of_get_rproc_by_index() API.
-> 
-
-I don't fancy the idea of leaving the kernel builds with a deprecation
-warning for some time and I don't feel the cost of carrying those 2
-extra statements is a bigger issue than keeping a deprecated API around.
-And it will be less than the dance we have to do in wkup_m3_ipc.
-
-So I think that we should merge these patches and if it can be concluded
-that we don't need backwards compatibility with the old DT property we
-can drop the inner conditional in the API.
-
-Regards,
-Bjorn
+Thanks,
+-dl
