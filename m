@@ -1,36 +1,69 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Mon, 8 Aug 2016 23:41:32 +0200
-Subject: [PATCHv6] support for AD5820 camera auto-focus coil
-In-Reply-To: <20160808080955.GA3182@valkosipuli.retiisi.org.uk>
-References: <20160521054336.GA27123@amd> <573FFF51.1000004@gmail.com>
- <20160521105607.GA20071@amd> <574049EF.2090208@gmail.com>
- <20160524090433.GA1277@amd> <20160524091746.GA14536@amd>
- <20160525212659.GK26360@valkosipuli.retiisi.org.uk>
- <20160527205140.GA26767@amd> <20160805102611.GA13116@amd>
- <20160808080955.GA3182@valkosipuli.retiisi.org.uk>
-Message-ID: <20160808214132.GB2946@xo-6d-61-c0.localdomain>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Wed, 10 Aug 2016 17:23:23 +0530
+Subject: [PATCH 3/4] ARM: dts: da850-lcdk: Add NAND to DT
+In-Reply-To: <20160810111944.GA31616@gobelin>
+References: <20160809171518.22690-1-kbeldan@baylibre.com>
+ <20160809171518.22690-4-kbeldan@baylibre.com> <57AAE67D.4000404@ti.com>
+ <20160810090417.GE16481@gobelin> <57AAF472.7000804@ti.com>
+ <20160810111944.GA31616@gobelin>
+Message-ID: <57AB15B3.1050907@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon 2016-08-08 11:09:56, Sakari Ailus wrote:
-> On Fri, Aug 05, 2016 at 12:26:11PM +0200, Pavel Machek wrote:
-> > 
-> > This adds support for AD5820 autofocus coil, found for example in
-> > Nokia N900 smartphone.
+On Wednesday 10 August 2016 04:49 PM, Karl Beldan wrote:
+> On Wed, Aug 10, 2016 at 03:01:30PM +0530, Sekhar Nori wrote:
+>> On Wednesday 10 August 2016 02:34 PM, Karl Beldan wrote:
+>>> On Wed, Aug 10, 2016 at 02:01:57PM +0530, Sekhar Nori wrote:
+>>>> On Tuesday 09 August 2016 10:45 PM, Karl Beldan wrote:
+>>>>> This adds DT support for the NAND connected to the SoC AEMIF.
+>>>>> The parameters (timings, ecc) are the same as what the board ships with
+>>>>> (default AEMIF timings, 1bit ECC) and improvements will be handled in
+>>>>> due course.
+>>>>
+>>>> I disagree that we need to be compatible to the software that ships with
+>>>> the board. Thats software was last updated 3 years ago. Instead I would
+>>>> concern with what the hardware supports. So, if the hardware can support
+>>>> 4-bit ECC, I would use that.
+>>>>
+>>> I am not saying we _need_ to be compatible.
+>>
+>> Alright then, please drop references to what software the board ships
+>> with in the commit message and in the patch itself.
+>>
 > 
-> Thanks, Pavel!
+> I hadn't seen this comment before sending v2.
 > 
-> Let's use V4L2_CID_FOCUS_ABSOLUTE, as is in the patch. If we get something
-> better in the future, we'll switch to that then.
+>>>
+>>>> If driver is broken for 4-bit ECC, please fix that up first.
+>>>>
+>>> Since this issue is completely separate from my DT improvements
+>>> I'll stick to resubmitting the series, applying my LCDK changes to the
+>>> EVM too, besides you'll be able to compare the behavior without ECC
+>>> discrepancies.
+>>> I took note that you are likely to not apply without the ECC fix.
+>>
+>> Yeah, I would not like to apply with 1-bit ECC now and then change to
+>> 4-bit ECC soon after.
+>>
 > 
-> I've applied this to ad5820 branch in my tree.
+> Both mityomapl138 from mainline and hawkboard from TI's BSP release
+> include the comment:
+> - "4 bit mode is not supported with 16 bit NAND"
+> It is not clear whether they imply that the HW has issues or if it's SW
 
-Thanks. If I understands things correctly, both DTS patch and this patch are
-waiting in your tree, so we should be good to go for 4.9 (unless some unexpected
-problems surface)?
+At least the TRM says "The EMIFA supports 4-bit ECC on 8-bit/16-bit NAND
+Flash.". And then the TRM goes on to describe how 4-bit ECC is supposed
+to work for 16-bit NAND. I could not find any errata related to this in
+the errata document.
 
-Best regards,
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+> only, but 4-bits ECC is a different matter and I hope you'll integrate
+> the current changes prior to tackling it.
+
+Lets apply everything together. This is a new feature, not a bug fix.
+There is no need to rush it. Also, for the NAND part on LCDK, per the
+micron datasheet, minimum of 4-bit ECC is needed.
+
+I will take a look at other patches in this series.
+
+Regards,
+Sekhar
