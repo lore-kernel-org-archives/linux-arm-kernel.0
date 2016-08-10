@@ -1,71 +1,77 @@
 From: patrice.chotard@st.com (patrice.chotard at st.com)
-Date: Wed, 10 Aug 2016 09:39:10 +0200
-Subject: [RESEND v2 05/10] mfd: stmpe: use generic bit mask name
-In-Reply-To: <1470814755-19447-1-git-send-email-patrice.chotard@st.com>
-References: <1470814755-19447-1-git-send-email-patrice.chotard@st.com>
-Message-ID: <1470814755-19447-6-git-send-email-patrice.chotard@st.com>
+Date: Wed, 10 Aug 2016 09:39:05 +0200
+Subject: [RESEND v2 00/10] STMPE fixes/rework and add STMPE1600 support
+Message-ID: <1470814755-19447-1-git-send-email-patrice.chotard@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Patrice Chotard <patrice.chotard@st.com>
 
-In order to prepare the ground to STMPE1600,
-as STMPE1600's SYS_CTRL register has the same layout as
-STMPE801 variant, unify STMPExxx_REG_SYS_CTRL_RESET/INT_EN/INT_HI
-bit masks to more generic STMPE_SYS_CTRL_RESET/INT_EN/INT_HI
+This series cleans and fixes some bugs in MFD/GPIO STMPE drivers and prepare
+ the ground to add new STMPE1600 support.
 
-Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
-Acked-by: Lee Jones <lee.jones@linaro.org>
----
- drivers/mfd/stmpe.c | 4 ++--
- drivers/mfd/stmpe.h | 6 ++----
- 2 files changed, 4 insertions(+), 6 deletions(-)
+STMPE1600 datasheet is available here : 
+http://www2.st.com/content/st_com/en/products/interfaces-and-transceivers/
+i-o-expanders-and-level-translators/i-o-expanders/stmpe1600.html
 
-diff --git a/drivers/mfd/stmpe.c b/drivers/mfd/stmpe.c
-index af682d0..2556463 100644
---- a/drivers/mfd/stmpe.c
-+++ b/drivers/mfd/stmpe.c
-@@ -1089,7 +1089,7 @@ static int stmpe_chip_init(struct stmpe *stmpe)
- 
- 	if (stmpe->irq >= 0) {
- 		if (id == STMPE801_ID)
--			icr = STMPE801_REG_SYS_CTRL_INT_EN;
-+			icr = STMPE_SYS_CTRL_INT_EN;
- 		else
- 			icr = STMPE_ICR_LSB_GIM;
- 
-@@ -1103,7 +1103,7 @@ static int stmpe_chip_init(struct stmpe *stmpe)
- 		if (irq_trigger == IRQF_TRIGGER_RISING ||
- 				irq_trigger == IRQF_TRIGGER_HIGH) {
- 			if (id == STMPE801_ID)
--				icr |= STMPE801_REG_SYS_CTRL_INT_HI;
-+				icr |= STMPE_SYS_CTRL_INT_HI;
- 			else
- 				icr |= STMPE_ICR_LSB_HIGH;
- 		}
-diff --git a/drivers/mfd/stmpe.h b/drivers/mfd/stmpe.h
-index 4ae343d..4ba1123 100644
---- a/drivers/mfd/stmpe.h
-+++ b/drivers/mfd/stmpe.h
-@@ -105,6 +105,8 @@ int stmpe_remove(struct stmpe *stmpe);
- #define STMPE_ICR_LSB_GIM	(1 << 0)
- 
- #define STMPE_SYS_CTRL_RESET	(1 << 7)
-+#define STMPE_SYS_CTRL_INT_EN	(1 << 2)
-+#define STMPE_SYS_CTRL_INT_HI	(1 << 0)
- 
- /*
-  * STMPE801
-@@ -121,10 +123,6 @@ int stmpe_remove(struct stmpe *stmpe);
- #define STMPE801_REG_GPIO_SET_PIN	0x11
- #define STMPE801_REG_GPIO_DIR		0x12
- 
--#define STMPE801_REG_SYS_CTRL_RESET	(1 << 7)
--#define STMPE801_REG_SYS_CTRL_INT_EN	(1 << 2)
--#define STMPE801_REG_SYS_CTRL_INT_HI	(1 << 0)
--
- /*
-  * STMPE811
-  */
+Only STMPE1600 has been tested on STM32 platform. As i have no board with
+others STMPE variant(STMPE610/STMPE801/STMPE811/STMPE1601/STMPE1801/STMPE2401
+and STMPE2403), i put in CC boards's maintainers which are using others STMPE variant.
+
+If they can kindly check that no regression has been introduce by this series
+:
+
+For ARM/FREESCALE IMX / MXC ARM ARCHITECTURE:
+	_ Shawn Guo <shawnguo@kernel.org>
+	_ Sascha Hauer <kernel@pengutronix.de>
+
+For ARM/SOCFPGA ARCHITECTURE
+	_ Dinh Nguyen <dinguyen@opensource.altera.com>
+
+For SPEAR PLATFORM SUPPORT
+	_ Viresh Kumar <vireshk@kernel.org>
+	_ Shiraz Hashim <shiraz.linux.kernel@gmail.com>
+
+For Apalis/Colibri board SUPPORT
+	_ marcel.ziswiler at toradex.com
+	_ stefan at agner.ch
+	_ dev at lynxeye.de
+	_ Thierry Reding <thierry.reding@gmail.com>
+	_ Alexandre Courbot <gnurou@gmail.com>
+
+For ARM/Ux500 ARM ARCHITECTURE
+	_ Linus Walleij <linus.walleij@linaro.org>
+
+resend v2: 
+	_ add Linus Walleij and Lee Jones's acked-by/reviewed-by
+
+v1 => v2:
+	_ update Cc list
+	_ fix kbuild test robot warnings on original patch 3
+	_ split patch 6 to extract usage of generic bitmask name
+	_ split patch 6 and 7 and introduce a new way to access registers
+	  for both mfd/stmpe and gpio/gpio-stmpe drivers.
+	_ remove patch 8
+
+Patrice Chotard (10):
+  mfd: stmpe: Add STMPE_IDX_SYS_CTRL/2 enum
+  mfd: stmpe: Add reset support for all STMPE variant
+  gpio: stmpe: fix edge and rising/falling edge detection
+  gpio: stmpe: write int status register only when needed
+  mfd: stmpe: use generic bit mask name
+  mfd: stmpe: rework registers access
+  gpio: stmpe: rework registers access
+  Documentation: dt: add stmpe1600 compatible string to stmpe mfd
+  mfd: Add STMPE1600 support
+  gpio: stmpe: Add STMPE1600 support
+
+ Documentation/devicetree/bindings/mfd/stmpe.txt |   2 +-
+ drivers/gpio/gpio-stmpe.c                       | 167 +++++++++++++++++-------
+ drivers/mfd/stmpe-i2c.c                         |   2 +
+ drivers/mfd/stmpe.c                             | 161 +++++++++++++++++++----
+ drivers/mfd/stmpe.h                             |  85 ++++++++++--
+ include/linux/mfd/stmpe.h                       |  21 +++
+ 6 files changed, 352 insertions(+), 86 deletions(-)
+
 -- 
 1.9.1
