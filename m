@@ -1,61 +1,30 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Wed, 10 Aug 2016 13:56:06 +0100
-Subject: [PATCH] ARM: no need to select SMP_ON_UP explicitly
-In-Reply-To: <CACRpkdb1rJ0fVDFU6uJ3fscCG4ZGQXoC713uKLMcWiBc56Ht_Q@mail.gmail.com>
-References: <1469199369-25746-1-git-send-email-vladimir.murzin@arm.com>
- <20160809084416.GS4678@tiger> <57AAE5D7.2080009@arm.com>
- <6326645.Nr2CxIomnL@wuerfel>
- <CACRpkdb1rJ0fVDFU6uJ3fscCG4ZGQXoC713uKLMcWiBc56Ht_Q@mail.gmail.com>
-Message-ID: <57AB2466.9080404@arm.com>
+From: wangkefeng.wang@huawei.com (Kefeng Wang)
+Date: Wed, 10 Aug 2016 20:59:15 +0800
+Subject: [PATCH 1/2] arm64: perf: Use the builtin_platform_driver
+Message-ID: <1470833956-5619-1-git-send-email-wangkefeng.wang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/08/16 13:25, Linus Walleij wrote:
-> On Wed, Aug 10, 2016 at 10:55 AM, Arnd Bergmann <arnd@arndb.de> wrote:
->> On Wednesday, August 10, 2016 9:29:11 AM CEST Vladimir Murzin wrote:
->>> On 09/08/16 09:44, Shawn Guo wrote:
->>>> On Fri, Jul 22, 2016 at 03:56:09PM +0100, Vladimir Murzin wrote:
->>>>> SMP_ON_UP is already defaulted to "y" and has all dependencies expressed
->>>>> - no need to select it per platform level
->>>>>
->>>>> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
->>>>> ---
->>>>>
->>>>> This time sent to LAKML
->>>>>
->>>>>  arch/arm/mach-imx/Kconfig      |    3 ---
->>>>>  arch/arm/mach-realview/Kconfig |    1 -
->>>>
->>>> I cannot take mach-realview changes.  I think you need to ether split
->>>> the changes, or ask arm-soc folks to apply.  In case of the latter, here
->>>> is my ACK:
->>>>
->>>> Acked-by: Shawn Guo <shawnguo@kernel.org>
->>>
->>> Thanks!
->>>
->>> RealView is not mentioned under MAINTAINERS, so it'd be easier if
->>> arm-soc team pick this patch.
->>>
->>> Arnd, what is your preference?
->>
->> Linus Walleij is the person that has sent most patches for realview,
->> so I'll let him decide. We can pick it up directly, or he can
->> aggregate it with other patches that he might have.
-> 
-> I have queued this with a bunch of other RealView clean-ups and board
-> file removal patches and will send a pull request for it shortly.
+Use the builtin_platform_driver() to simplify code.
 
-Thanks!
+Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
+---
+ arch/arm64/kernel/perf_event.c | 6 +-----
+ 1 file changed, 1 insertion(+), 5 deletions(-)
 
-Shawn, since Linus picked up realview part only do you want me resubmit
-remaining imx part?
-
-Cheers
-Vladimir
-
-> 
-> Yours,
-> Linus Walleij
-> 
-> 
+diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
+index 838ccf1..ea64f01 100644
+--- a/arch/arm64/kernel/perf_event.c
++++ b/arch/arm64/kernel/perf_event.c
+@@ -1057,8 +1057,4 @@ static struct platform_driver armv8_pmu_driver = {
+ 	.probe		= armv8_pmu_device_probe,
+ };
+ 
+-static int __init register_armv8_pmu_driver(void)
+-{
+-	return platform_driver_register(&armv8_pmu_driver);
+-}
+-device_initcall(register_armv8_pmu_driver);
++builtin_platform_driver(armv8_pmu_driver);
+-- 
+1.7.12.4
