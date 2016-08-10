@@ -1,183 +1,154 @@
-From: james.morse@arm.com (James Morse)
-Date: Wed, 10 Aug 2016 17:38:05 +0100
-Subject: [PATCH v24 5/9] arm64: kdump: add kdump support
-In-Reply-To: <20160809015615.28527-3-takahiro.akashi@linaro.org>
-References: <20160809015248.28414-2-takahiro.akashi@linaro.org>
- <20160809015615.28527-1-takahiro.akashi@linaro.org>
- <20160809015615.28527-3-takahiro.akashi@linaro.org>
-Message-ID: <57AB586D.3080900@arm.com>
+From: lina.iyer@linaro.org (Lina Iyer)
+Date: Wed, 10 Aug 2016 10:40:34 -0600
+Subject: [PATCH v3 02/15] dt/bindings: Update binding for PM domain idle
+ states
+In-Reply-To: <99e35b6c-6698-6d27-f4d7-fa032796869e@arm.com>
+References: <1470351902-43103-1-git-send-email-lina.iyer@linaro.org>
+ <1470351902-43103-3-git-send-email-lina.iyer@linaro.org>
+ <99e35b6c-6698-6d27-f4d7-fa032796869e@arm.com>
+Message-ID: <20160810164034.GA1401@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Akashi,
+Hi Sudeep,
 
-On 09/08/16 02:56, AKASHI Takahiro wrote:
-> On crash dump kernel, all the information about primary kernel's system
-> memory (core image) is available in elf core header.
-> The primary kernel will set aside this header with reserve_elfcorehdr()
-> at boot time and inform crash dump kernel of its location via a new
-> device-tree property, "linux,elfcorehdr".
-> 
-> Please note that all other architectures use traditional "elfcorehdr="
-> kernel parameter for this purpose.
-> 
-> Then crash dump kernel will access the primary kernel's memory with
-> copy_oldmem_page(), which reads one page by ioremap'ing it since it does
-> not reside in linear mapping on crash dump kernel.
-> 
-> We also need our own elfcorehdr_read() here since the header is placed
-> within crash dump kernel's usable memory.
+On Wed, Aug 10 2016 at 09:15 -0600, Sudeep Holla wrote:
+>Hi Lina,
+>
+>I have few concerns mainly due to the lack of description and not the 
+>binding per say.
+>
+>On 05/08/16 00:04, Lina Iyer wrote:
+>>From: Axel Haslam <ahaslam+renesas@baylibre.com>
+>>
+>>Update DT bindings to describe idle states of PM domains.
+>>
+>>Cc: <devicetree@vger.kernel.org>
+>>Signed-off-by: Marc Titinger <mtitinger+renesas@baylibre.com>
+>>Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+>>[Lina: Added state properties, removed state names, wakeup-latency,
+>>added of_pm_genpd_init() API, pruned commit text]
+>>Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+>>[Ulf: Moved around code to make it compile properly, rebased on top of multiple state support]
+>>---
+>> .../devicetree/bindings/power/power_domain.txt     | 57 ++++++++++++++++++++++
+>> 1 file changed, 57 insertions(+)
+>>
+>>diff --git a/Documentation/devicetree/bindings/power/power_domain.txt b/Documentation/devicetree/bindings/power/power_domain.txt
+>>index 025b5e7..4960486 100644
+>>--- a/Documentation/devicetree/bindings/power/power_domain.txt
+>>+++ b/Documentation/devicetree/bindings/power/power_domain.txt
+>>@@ -29,6 +29,10 @@ Optional properties:
+>>    specified by this binding. More details about power domain specifier are
+>>    available in the next section.
+>>
+>>+- domain-idle-states : A phandle of an idle-state that shall be soaked into a
+>>+                generic domain power state. The idle state definitions are
+>>+                compatible with arm,idle-state specified in [1].
+>>+
+>
+>So I assume these can be used for the genpd states. Either we rename 
+>it domain-power-states or make it clear that these domain-idle-states 
+>can also represent the power-states for normal devices.
+>
+These are the domains' idle states. These states are only used when the
+domain goes into idle, not when the domain is active. These are not
+power states that the domain can operate on either. Hence the idle-state
+moniker.
+Also, the bindings to describe the state are the same as arm,idle-state.
+It made sense to call these domain idle states instead of
+domain-power-states.
 
-On Seattle when I panic and boot the kdump kernel, I am unable to read the
-/proc/vmcore file. Instead I get:
-nanook at frikadeller:~$ sudo cp /proc/vmcore /
-[  174.393875] Unhandled fault: synchronous external abort (0x96000210) at
-0xffffff80096b6000
-[  174.402158] Internal error: : 96000210 [#1] PREEMPT SMP
-[  174.407370] Modules linked in:
-[  174.410417] CPU: 6 PID: 2059 Comm: cp Tainted: G S      W I     4.8.0-rc1+ #4708
-[  174.417799] Hardware name: AMD Overdrive/Supercharger/Default string, BIOS
-ROD1002C 04/08/2016
-[  174.426396] task: ffffffc0fdec5780 task.stack: ffffffc0f34bc000
-[  174.432313] PC is at __arch_copy_to_user+0x180/0x280
-[  174.437274] LR is at copy_oldmem_page+0xac/0xf0
-[  174.441791] pc : [<ffffff800835e080>] lr : [<ffffff8008095b9c>] pstate: 20000145
-[  174.449173] sp : ffffffc0f34bfc90
-[  174.452474] x29: ffffffc0f34bfc90 x28: 0000000000000000
-[  174.457776] x27: 0000000008000000 x26: 000000000000d000
-[  174.463077] x25: 0000000000000001 x24: ffffff8008eb5000
-[  174.468378] x23: 0000000000000000 x22: ffffff80096b6000
-[  174.473679] x21: 0000000000000001 x20: 0000000030127000
-[  174.478979] x19: 0000000000001000 x18: 0000007ff7085d60
-[  174.484279] x17: 0000000000429358 x16: ffffff80081d9e88
-[  174.489579] x15: 0000007fae377590 x14: 0000000000000000
-[  174.494880] x13: 0000000000000000 x12: ffffff8008dd1000
-[  174.500180] x11: ffffff80096b6fff x10: ffffff80096b6fff
-[  174.505480] x9 : 0000000040000000 x8 : ffffff8008db6000
-[  174.510781] x7 : ffffff80096b7000 x6 : 0000000030127000
-[  174.516082] x5 : 0000000030128000 x4 : 0000000000000000
-[  174.521382] x3 : 00e8000000000713 x2 : 0000000000000f80
-[  174.526682] x1 : ffffff80096b6000 x0 : 0000000030127000
-[  174.531982]
-[  174.533461] Process cp (pid: 2059, stack limit = 0xffffffc0f34bc020)
+>> Example:
+>>
+>> 	power: power-controller at 12340000 {
+>>@@ -59,6 +63,57 @@ The nodes above define two power controllers: 'parent' and 'child'.
+>> Domains created by the 'child' power controller are subdomains of '0' power
+>> domain provided by the 'parent' power controller.
+>>
+>>+Example 3: ARM v7 style CPU PM domains (Linux domain controller)
+>>+
+>>+	cpus {
+>>+		#address-cells = <1>;
+>>+		#size-cells = <0>;
+>>+
+>>+		CPU0: cpu at 0 {
+>>+			device_type = "cpu";
+>>+			compatible = "arm,cortex-a7", "arm,armv7";
+>>+			reg = <0x0>;
+>>+			power-domains = <&a7_pd>;
+>
+>This example doesn't consider how do we deal with the presence off
+>cpu-idle-states property in CPU nodes.
+>
+I can amend the example. But to answer your underlying question, they
+will exist as separate properties.
 
-[  174.848448] [<ffffff800835e080>] __arch_copy_to_user+0x180/0x280
-[  174.854448] [<ffffff8008245f34>] read_from_oldmem.part.4+0xb4/0xf4
-[  174.860615] [<ffffff8008246074>] read_vmcore+0x100/0x22c
-[  174.865919] [<ffffff8008239378>] proc_reg_read+0x64/0x90
-[  174.871223] [<ffffff80081d7da8>] __vfs_read+0x28/0x108
-[  174.876348] [<ffffff80081d8ae4>] vfs_read+0x84/0x144
-[  174.881301] [<ffffff80081d9ecc>] SyS_read+0x44/0xa0
-[  174.886167] [<ffffff8008082ef0>] el0_svc_naked+0x24/0x28
-[  174.891466] Code: 00000000 00000000 00000000 00000000 (a8c12027)
-[  174.897562] ---[ end trace 00801b2e35b0cd1f ]---
+>IMO we need move even the cpu/core level idle states into its own power
+>domain. It also helps to solve other usecases like PMU, debug/coresight
+>devices attached to the core power domain(in most of the cases) while
+>they may be in separate PD like PMUs on OMAP. That will help OS whether
+>to save/restore the states on idle-entry.
+>
+This idea was brought up by Kevin earlier in the discussions, but we
+shelved it for a later date.
 
+>In [PATCH v3 15/15] ARM64: dts: Define CPU power domain for MSM8916, the
+>idle-states are split across the cpu cpu-idle-states and pd
+>domain-idle-states property. That looks like a really mess to me.
+>
+It is pretty clear that CPUs cannot not define the domain idle states.
+Domains define their own idle states. Just as you mention above. CPU is
+just a single component in its domain. There may be other devices like
+PMUs, Coresights etc that also may have a say in the idle state the
+domain may be put in, when the devices are idle. As such, adding domain
+idle states to the CPU's idle state property is not appropriate.
 
-The offending call is:
-> copy_oldmem_page(0x8000000, 0x00000000385f8000, 0x1000, 0, 1)
+Our kernel has runtime PM for devices and then there is CPUidle, both
+are diverging without one knowing about the other. We have to start
+unifying them inorder to have better holistic power management in the
+SoC. To that regard, we have to start imagining CPUs as just another
+device, albeit a special device. But for our purposes in determining
+domain idle state, it will just be a device attached to the domain.
 
-This is trying to access the bottom page of memory. From the efi memory map:
-> efi:   0x008000000000-0x008001e7ffff [Runtime Data       |RUN|  |WB|WT|WC|UC]*
-> efi:   0x008001e80000-0x008001ffffff [Conventional Memory|   |  |WB|WT|WC|UC]
+>We need to have all the idle state information at one place and in this
+>case PD seems more appropriate instead of splitting them across.
+>
+That approach isn't correct. Where will we put the idle states of other
+devices that are also part of the domain? We are thinking about a model,
+where every device defines its own idle states and we define
+relationships between those idle states and their parents' idle states.
+Ofcourse, devices don't have idle states today, but that is something we
+have been pondering over.
 
-This page is 'Runtime Data', and marked as nomap by both the original and kdump
-kernels, but copy_oldmem_page() doesn't know this.
+>We can also keep the code clean and not break compatibility. Whenever
+>both PD and CPU contains idle-states, PD must take precedence.
+>
+Why?
+The CPU and PD states are orthogonal. While the PD state is dependent on
+the CPU state, the latter is not true. Devices determine their own
+states. Based on the individual device states, we then determine the
+state of the parent and bubble up on the hierarchy.
 
-In this case because we have already parsed the efi memory map again in the
-kdump kernel and re-marked these regions as nomap, the below hunk fixes the
-problem for me:
-=========================%<=========================
-diff --git a/arch/arm64/kernel/crash_dump.c b/arch/arm64/kernel/crash_dump.c
-index 2dc54d129be1..784d4c30b534 100644
---- a/arch/arm64/kernel/crash_dump.c
-+++ b/arch/arm64/kernel/crash_dump.c
-@@ -37,6 +37,11 @@ ssize_t copy_oldmem_page(unsigned long pfn, char *buf,
-        if (!csize)
-                return 0;
-
-+       if (memblock_is_memory(pfn << PAGE_SHIFT) &&
-+           !memblock_is_map_memory(pfn << PAGE_SHIFT))
-+               /* skip this nomap memory region, reserved by firmware */
-+               return 0;
-+
-        vaddr = ioremap_cache(__pfn_to_phys(pfn), PAGE_SIZE);
-        if (!vaddr)
-                return -ENOMEM;
-=========================%<=========================
-
-With this I can copy the vmcore file, and feed it to crash to read dmesg, task
-list etc...
-
-This could be a deeper/wider issue, but I can't see any other users of
-memblock_mark_nomap().
-Do you think depending on this this 're-learning' is robust enough, or should
-the nomap ranges be described in the vmcoreinfo elf notes?
-
+>Also these needs to be documented clearly in the binding.
+>
+>>+		};
+>>+
+>>+		CPU1: cpu at 1 {
+>>+			device_type = "cpu";
+>>+			compatible = "arm,cortex-a15", "arm,armv7";
+>>+			reg = <0x0>;
+>>+			power-domains = <&a15_pd>;
+>>+		};
+>>+	};
+>>+
+>>+	pm-domains {
+>>+		a15_pd: a15_pd {
+>>+			/* will have A15 platform ARM_PD_METHOD_OF_DECLARE*/
+>
+>the above comment make no sense in the binding document, remove it
+>
+Yup. Will remove.
 
 Thanks,
-
-James
-
-
-> diff --git a/arch/arm64/kernel/crash_dump.c b/arch/arm64/kernel/crash_dump.c
-> new file mode 100644
-> index 0000000..2dc54d1
-> --- /dev/null
-> +++ b/arch/arm64/kernel/crash_dump.c
-> @@ -0,0 +1,71 @@
-> +/*
-> + * Routines for doing kexec-based kdump
-> + *
-> + * Copyright (C) 2014 Linaro Limited
-> + * Author: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#include <linux/crash_dump.h>
-> +#include <linux/errno.h>
-> +#include <linux/io.h>
-> +#include <linux/memblock.h>
-> +#include <linux/uaccess.h>
-> +#include <asm/memory.h>
-> +
-> +/**
-> + * copy_oldmem_page() - copy one page from old kernel memory
-> + * @pfn: page frame number to be copied
-> + * @buf: buffer where the copied page is placed
-> + * @csize: number of bytes to copy
-> + * @offset: offset in bytes into the page
-> + * @userbuf: if set, @buf is in a user address space
-> + *
-> + * This function copies one page from old kernel memory into buffer pointed by
-> + * @buf. If @buf is in userspace, set @userbuf to %1. Returns number of bytes
-> + * copied or negative error in case of failure.
-> + */
-> +ssize_t copy_oldmem_page(unsigned long pfn, char *buf,
-> +			 size_t csize, unsigned long offset,
-> +			 int userbuf)
-> +{
-> +	void *vaddr;
-> +
-> +	if (!csize)
-> +		return 0;
-> +
-> +	vaddr = ioremap_cache(__pfn_to_phys(pfn), PAGE_SIZE);
-> +	if (!vaddr)
-> +		return -ENOMEM;
-> +
-> +	if (userbuf) {
-> +		if (copy_to_user(buf, vaddr + offset, csize)) {
-> +			iounmap(vaddr);
-> +			return -EFAULT;
-> +		}
-> +	} else {
-> +		memcpy(buf, vaddr + offset, csize);
-> +	}
-> +
-> +	iounmap(vaddr);
-> +
-> +	return csize;
-> +}
+Lina
