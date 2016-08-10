@@ -1,28 +1,24 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Wed, 10 Aug 2016 15:58:51 +0200
-Subject: [PATCH 0244/1285] Replace numeric parameter like 0444 with macro
-In-Reply-To: <5052478.g1CZhtD17T@wuerfel>
-References: <20160802105246.30008-1-baolex.ni@intel.com>
- <CACRpkdZsgSfL9rwe-vU5S6nNy0weD3O3PZymUZQsvJhQTSjf=w@mail.gmail.com>
- <5052478.g1CZhtD17T@wuerfel>
-Message-ID: <20160810135851.GA1607@katana>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 10 Aug 2016 16:02:26 +0200
+Subject: [[PATCH v2] 05/11] ARM: EXYNOS: Enable ARCH_SUPPORTS_BIG_ENDIAN
+ explicitly
+In-Reply-To: <1466504432-24187-6-git-send-email-ben.dooks@codethink.co.uk>
+References: <1466504432-24187-1-git-send-email-ben.dooks@codethink.co.uk>
+ <1466504432-24187-6-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <7a289a51-52de-59a1-f147-2d01900f5fed@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-> > I assume Wolfram will merge this.
+On 06/21/2016 12:20 PM, Ben Dooks wrote:
+> Now the initial fixes have the big-endian code working on EXYNOS, make sure
+> we explicitly mark our arch as being big endian capable.
 > 
-> I assume not, see http://lwn.net/Articles/696227/
+> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+> ---
+>  arch/arm/mach-exynos/Kconfig | 1 +
+>  1 file changed, 1 insertion(+)
 
-Thanks for the pointer. I missed the discussion but came up with the
-same conclusions: a) octals are easier to read and b) original author
-should have asked if this change was feasible before posting 1285
-patches :(
+Thanks, applied.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160810/3b814757/attachment.sig>
+Best regards,
+Krzysztof
