@@ -1,33 +1,43 @@
-From: fabf@skynet.be (Fabian Frederick)
-Date: Thu, 11 Aug 2016 20:01:01 +0200
-Subject: [PATCH 1/1 linux-next] ARM: multi_v7_defconfig: update XILINX_VDMA
-Message-ID: <1470938461-15792-1-git-send-email-fabf@skynet.be>
+From: aaro.koskinen@iki.fi (Aaro Koskinen)
+Date: Thu, 11 Aug 2016 21:04:14 +0300
+Subject: [BISECTED, REGRESSION] v4.7: Display lost on Kirkwood/OpenRD
+ Client
+In-Reply-To: <87inv73hyf.fsf@free-electrons.com>
+References: <20160810215858.GA10648@raspberrypi.musicnaut.iki.fi>
+ <87inv73hyf.fsf@free-electrons.com>
+Message-ID: <20160811180414.GB10648@raspberrypi.musicnaut.iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit fde57a7c4474
-("dmaengine: xilinx: Rename driver and config")
+Hi,
 
-renamed config XILINX_VDMA to config XILINX_DMA
-Update defconfig accordingly.
+On Thu, Aug 11, 2016 at 09:03:52AM +0200, Gregory CLEMENT wrote:
+>  On mer., ao?t 10 2016, Aaro Koskinen <aaro.koskinen@iki.fi> wrote:
+> > When upgrading from v4.6 --> v4.7, I lost the display/framebuffer on
+> > OpenRD-Client (the only pcie device on the board).
+> >
+> > Bisection points to:
+> >
+> > eb13cf8345e94a02e9872ca3e909596a5ddb5f90 is the first bad commit
+> 
+> Could you try this patch:
 
-Signed-off-by: Fabian Frederick <fabf@skynet.be>
----
- arch/arm/configs/multi_v7_defconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+That works, thanks!
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 7db8dce..d3ef852 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -784,7 +784,7 @@ CONFIG_MXS_DMA=y
- CONFIG_DMA_BCM2835=y
- CONFIG_DMA_OMAP=y
- CONFIG_QCOM_BAM_DMA=y
--CONFIG_XILINX_VDMA=y
-+CONFIG_XILINX_DMA=y
- CONFIG_DMA_SUN6I=y
- CONFIG_STAGING=y
- CONFIG_SENSORS_ISL29018=y
--- 
-2.8.1
+A.
+
+> diff --git a/arch/arm/boot/dts/kirkwood-openrd.dtsi b/arch/arm/boot/dts/kirkwood-openrd.dtsi
+> index e4ecab112601..7175511a92da 100644
+> --- a/arch/arm/boot/dts/kirkwood-openrd.dtsi
+> +++ b/arch/arm/boot/dts/kirkwood-openrd.dtsi
+> @@ -116,6 +116,10 @@
+>         };
+>  };
+>  
+> +&pciec {
+> +       status = "okay";
+> +};
+> +
+>  &pcie0 {
+>         status = "okay";
+>  };
