@@ -1,55 +1,77 @@
-From: duwe@lst.de (Torsten Duwe)
-Date: Thu, 11 Aug 2016 18:34:51 +0200 (CEST)
-Subject: [PATCH v3 0/2] arm64 live patching
-Message-ID: <20160811163451.D455C68C43@newverein.lst.de>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 11 Aug 2016 11:35:45 -0500
+Subject: [PATCH 1/2] dt: bindings: Add vendor prefix for Espressif System
+In-Reply-To: <3516eadd-e987-1747-5813-de51b77fd73e@redhat.com>
+References: <1470596269-20572-1-git-send-email-hdegoede@redhat.com>
+ <20160810184845.GA17829@rob-hp-laptop>
+ <2b43330e-369d-7473-8b73-429f0f0b73ce@redhat.com>
+ <CAL_Jsq+uy-P54enk5Zho=nRab4PMEbqyBTEWiE0yhWWVoFTmwQ@mail.gmail.com>
+ <3516eadd-e987-1747-5813-de51b77fd73e@redhat.com>
+Message-ID: <CAL_JsqKLLotHErrfMs-oPvt7GgG1txQtAayjmp4zpCHEMktE_Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Aug 11, 2016 at 10:08 AM, Hans de Goede <hdegoede@redhat.com> wrote:
+> Hi,
+>
+> On 11-08-16 15:31, Rob Herring wrote:
+>>
+>> On Thu, Aug 11, 2016 at 4:15 AM, Hans de Goede <hdegoede@redhat.com>
+>> wrote:
+>>>
+>>> Hi Rob,
+>>>
+>>>
+>>> On 10-08-16 20:48, Rob Herring wrote:
+>>>>
+>>>>
+>>>> On Sun, Aug 07, 2016 at 08:57:48PM +0200, Hans de Goede wrote:
+>>>>>
+>>>>>
+>>>>> Espressif is a manufacturer of various wifi and bt chips, add a vendor
+>>>>> prefix for use with bindings for these chips.
+>>>>>
+>>>>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>>>>> ---
+>>>>>  Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+>>>>>  1 file changed, 1 insertion(+)
+>>>>
+>>>>
+>>>>
+>>>> Acked-by: Rob Herring <robh@kernel.org>
+>>>
+>>>
+>>>
+>>> Thank you for all the reviews.
+>>>
+>>> What about: "[PATCH 2/2] dt: bindings: Add binding for ESP8089 wifi
+>>> chips" ?
+>>> there were some remarks, but I believe that those have been addressed
+>>> (by answering the remarks, not with a new version), so a review of that
+>>> one would be appreciated too.
+>>
+>>
+>> What about Arnd's comment "better use '-' instead of '_' for property
+>> names."
+>
+>
+> Ah yes, I forgot about that comment. As explained in the commit msg
+> I named the dt property to be the same as the keyword used in the
+> ini-like config file android uses for this (the android driver loads a
+> file with board specific esp8089 config like the crystal-type from
+> /lib/firmware).
+>
+> And that file does use '_'. I want to keep the names the same as that
+> seems the sensible thing to do, but if there is a great preference for
+> '-' in dt I can do a v2 with that changed.
 
-V3, including suggestions from the replies and 2 fixes.
+I could see wanting to use the same string in the driver for a small
+size savings, but I'd assume a mainline driver would do away with the
+firmware text file and only use DT? Also, do you expect lots more
+properties? Maintaining the exact string would be more worthwhile if
+there are lots of properties.
 
-Reminder: make sure you have a prolog-pad gcc, and this in your
-top level Makefile:
+I plan to make '_' cause warnings with dtc which is why we don't want
+to add more.
 
-ifdef CONFIG_LIVEPATCH
-KBUILD_CFLAGS	+= $(call cc-option,-fno-ipa-ra)
-endif
-
-Tested with v4.8-rc1 + gcc-6.1
-
-Changes since v2:
-  * Do not skip initial NOP conversion for CC_USING_PROLOG_PAD,
-    in other words: don't introduce new #ifdefs into generic code.
-    (as requested by Steven Rostedt after my intermediate suggestion)
-    Instead, check in arm64 whether a call to mcount is to be NOPed,
-    and be strict again about the expected "old" instructions.
-  * issue a warning should the compiler not know about -fprolog-pad=
-    (as suggested by Josh Poimboeuf)
-    Only strip the compiler flag proper, not the cpp flag, for critical
-    files.
-  * fix thinko / bummer in live patch return address change detection.
-    Skip the graph caller if the addresses are _not_ equal!
-
-Changes since v1:
-  * instead of a comment "should be CC_USING_PROLOG_PAD":
-    do it. CC_FLAGS_FTRACE holds it now, and the IPA
-    disabler has become a separate issue (see above).
-
-Torsten Duwe (2):
-  arm64: implement FTRACE_WITH_REGS
-  arm64: implement live patching
-
- arch/arm64/Kconfig                 |   4 ++
- arch/arm64/Makefile                |   9 ++++
- arch/arm64/include/asm/ftrace.h    |   8 +++
- arch/arm64/include/asm/livepatch.h |  37 ++++++++++++++
- arch/arm64/kernel/Makefile         |   6 +--
- arch/arm64/kernel/entry-ftrace.S   | 102 +++++++++++++++++++++++++++++++++++++
- arch/arm64/kernel/ftrace.c         |  45 ++++++++++++++--
- include/asm-generic/vmlinux.lds.h  |   2 +-
- include/linux/compiler.h           |   4 ++
- 9 files changed, 209 insertions(+), 8 deletions(-)
- create mode 100644 arch/arm64/include/asm/livepatch.h
-
--- 
-2.6.2
+Rob
