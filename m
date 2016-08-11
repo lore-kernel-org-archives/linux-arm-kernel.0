@@ -1,45 +1,95 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Fri, 12 Aug 2016 03:32:44 +0800
-Subject: [PATCH v3 1/2] arm64: implement FTRACE_WITH_REGS
-In-Reply-To: <20160811163635.277C868C43@newverein.lst.de>
-Message-ID: <201608120337.ncJVDfVQ%fengguang.wu@intel.com>
+From: bdegraaf@codeaurora.org (bdegraaf at codeaurora.org)
+Date: Thu, 11 Aug 2016 15:39:11 -0400
+Subject: [RFC] arm64: Enforce gettimeofday vdso structure read ordering
+In-Reply-To: <20160811155409.GE8232@arm.com>
+References: <20160811153744.3212-1-cov@codeaurora.org>
+ <20160811155409.GE8232@arm.com>
+Message-ID: <8375bf253e2f9034e5c5943e68876935@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Torsten,
+Sorry, this is my first go at proper email etiquette. I think I've got 
+it now.
 
-[auto build test ERROR on arm64/for-next/core]
-[also build test ERROR on v4.8-rc1 next-20160811]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+------------------------------------------------------------------------------
+"Can you explain the problem that you're fixing here, please?"
+------------------------------------------------------------------------------
+Since your question included only the vdso_data structure itself and the
+vdso.c file changes, I'm assuming that's what you meant by "here."
+I moved tb_seq_count to the start of the vdso_data structure because of 
+the
+nature of the ldar/strl instructions, which do not support offsets.
+This avoided the extra math to locate the structure offset, while at the 
+same
+time using the same base pointer for the structure.  ia64 does something
+similar and also puts this as the first field.  I moved the use_syscall
+field up next to it just to keep most elements aligned according to 
+their
+width. That "use_syscall" is the first element used in the logic was an
+additional reason I decided to move that one in particular.
 
-url:    https://github.com/0day-ci/linux/commits/Torsten-Duwe/arm64-live-patching/20160812-004131
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git for-next/core
-config: arm64-allmodconfig (attached as .config)
-compiler: aarch64-linux-gnu-gcc (Debian 5.4.0-6) 5.4.0 20160609
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm64 
+--- a/arch/arm64/include/asm/vdso_datapage.h
++++ b/arch/arm64/include/asm/vdso_datapage.h
+@@ -21,6 +21,8 @@
+  #ifndef __ASSEMBLY__
 
-All errors (new ones prefixed by >>):
+  struct vdso_data {
++    __u32 tb_seq_count;    /* Timebase sequence counter */
++    __u32 use_syscall;
+      __u64 cs_cycle_last;    /* Timebase at clocksource init */
+      __u64 raw_time_sec;    /* Raw time */
+      __u64 raw_time_nsec;
+@@ -30,14 +32,12 @@ struct vdso_data {
+      __u64 xtime_coarse_nsec;
+      __u64 wtm_clock_sec;    /* Wall to monotonic time */
+      __u64 wtm_clock_nsec;
+-    __u32 tb_seq_count;    /* Timebase sequence counter */
+      /* cs_* members must be adjacent and in this order (ldp accesses) 
+*/
+      __u32 cs_mono_mult;    /* NTP-adjusted clocksource multiplier */
+      __u32 cs_shift;        /* Clocksource shift (mono = raw) */
+      __u32 cs_raw_mult;    /* Raw clocksource multiplier */
+      __u32 tz_minuteswest;    /* Whacky timezone stuff */
+      __u32 tz_dsttime;
+-    __u32 use_syscall;
+  };
 
-   arch/arm64/Makefile:61: Cannot use CONFIG_DYNAMIC_FTRACE_WITH_REGS: -fprolog-pad not supported by compiler
-   Makefile:687: Cannot use CONFIG_KCOV: -fsanitize-coverage=trace-pc is not supported by compiler
->> aarch64-linux-gnu-gcc: error: unrecognized command line option '-fprolog-pad=2'
-   make[2]: *** [kernel/bounds.s] Error 1
-   make[2]: Target '__build' not remade because of errors.
-   make[1]: *** [prepare0] Error 2
-   make[1]: Target 'prepare' not remade because of errors.
-   make: *** [sub-make] Error 2
+----------------------------------------------------------------------------
+As to vdso.c, I changed the instructions used to access tb_seq_count 
+(both
+in vdso.c and the gettimeofday.S file) to the load-acquire/store-release
+instructions because those instructions seem to be designed for this
+particular scenario: their "one-way" barriers enforce the order we need,
+on top of eliminating the explicit barriers.
+----------------------------------------------------------------------------
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 50394 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160812/b30b9cda/attachment-0001.obj>
+--- a/arch/arm64/kernel/vdso.c
++++ b/arch/arm64/kernel/vdso.c
+@@ -201,10 +201,12 @@ up_fail:
+   */
+  void update_vsyscall(struct timekeeper *tk)
+  {
++    register u32 tmp;
+      u32 use_syscall = strcmp(tk->tkr_mono.clock->name, 
+"arch_sys_counter");
+
+-    ++vdso_data->tb_seq_count;
+-    smp_wmb();
++    tmp = smp_load_acquire(&vdso_data->tb_seq_count);
++    ++tmp;
++    smp_store_release(&vdso_data->tb_seq_count, tmp);
+
+"This looks busted -- the writes to vdso_data can be reordered before 
+the
+update of tb_seq_count.
+
+/confused
+
+Will"
+
+--------------------------------------------------------------------------
+
+Hopefully, this more detailed explanation helps make things clearer.
+
+Thank you,
+Brent
