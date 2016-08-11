@@ -1,45 +1,29 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Thu, 11 Aug 2016 15:16:50 -0700
-Subject: [PATCH 2/2] arm: apply more __ro_after_init
-In-Reply-To: <2188666.QKZtt2vNXZ@wuerfel>
-References: <1464979224-2085-1-git-send-email-keescook@chromium.org>
- <2760702.46Rp2Juk5b@wuerfel> <20160810230645.GP1041@n2100.armlinux.org.uk>
- <2188666.QKZtt2vNXZ@wuerfel>
-Message-ID: <CAGXu5j+RA+fepUEXoqXEBmyhBokQxv0csO=VuzFpHd4Fk4dH4A@mail.gmail.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Fri, 12 Aug 2016 00:17:15 +0200
+Subject: [v2 PATCH] clk: rockchip: mark rk3399 hdcp_noc and vio_noc as
+ critical
+In-Reply-To: <1470765753-11619-1-git-send-email-zyw@rock-chips.com>
+References: <1470765753-11619-1-git-send-email-zyw@rock-chips.com>
+Message-ID: <1721159.V5xB9fz0jT@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 11, 2016 at 8:54 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Thursday, August 11, 2016 12:06:45 AM CEST Russell King - ARM Linux wrote:
->> On Wed, Aug 10, 2016 at 09:41:23PM +0200, Arnd Bergmann wrote:
->> > It might be better to start by making the fixed mapping readonly,
->> > as KASLR doesn't protect that one at all, and change the TLS
->> > code accordingly.
->>
->> I think that's impossible, because we gave userspace permission to
->> read 0xffff0ff0 directly without using __kuser_get_tls.  You're
->> talking about potentially breaking userspace.
->>
->> If you disable kuser helpers, then the page becomes read-only and
->> invisible to userspace anyway.  So, everything is being done there
->> which can be done - if you have kuser helpers enabled, then you
->> lose some opportunities for these security improvements.
->
-> What I meant was writing to the page through the linear mapping
-> rather than the virtual mapping at 0xffff0000 so we can leave that
-> one read-only (I did not consider whether that might cause cache
-> aliasing problems when reading from the other address).
->
-> Your other point is more important though: if one really cares
-> about optimizing security here, they probably should disable
-> kuser helpers completely anyway.
->
-> Kees, is that something you have on your radar already?
+Am Dienstag, 9. August 2016, 11:02:33 schrieb Chris Zhong:
+> Fix incorrect rk3399 aclk_vio gating bit, it should be 0, not 10. With
+> this modification, the aclk_vio_noc should be put into critical list,
+> since it is required by VOP.
+> And the Type-C DP need these clocks: aclk_hdcp_noc, hclk_hdcp_noc,
+> pclk_hdcp_noc. Mark them as critical to avoid someone close them.
+> 
+> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
 
-It wasn't no. I will add it. :)
+I've split that patch in two and applied them there:
+https://git.kernel.org/cgit/linux/kernel/git/mmind/linux-rockchip.git/commit/?h=v4.8-clk/fixes&id=a3f457d9636b3f5ae4fc6502cb0c95f60f5e342b
+(gate-bit-fix)
+https://git.kernel.org/cgit/linux/kernel/git/mmind/linux-rockchip.git/commit/?h=v4.9-clk/next&id=54479449c801e46ee2b6ba08e2f19cd810f74f94
+(critical clocks)
 
--Kees
+with the provided Reviewed-bys.
 
--- 
-Kees Cook
-Nexus Security
+
+Heiko
