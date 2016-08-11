@@ -1,104 +1,32 @@
 From: thunder.leizhen@huawei.com (Zhen Lei)
-Date: Thu, 11 Aug 2016 17:33:41 +0800
-Subject: [PATCH v6 07/14] of_numa: Use pr_fmt()
+Date: Thu, 11 Aug 2016 17:33:48 +0800
+Subject: [PATCH v6 14/14] Documentation: remove the constraint on the
+ distances of node pairs
 In-Reply-To: <1470908028-8596-1-git-send-email-thunder.leizhen@huawei.com>
 References: <1470908028-8596-1-git-send-email-thunder.leizhen@huawei.com>
-Message-ID: <1470908028-8596-8-git-send-email-thunder.leizhen@huawei.com>
+Message-ID: <1470908028-8596-15-git-send-email-thunder.leizhen@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kefeng Wang <wangkefeng.wang@huawei.com>
+Update documentation. This limit is unneccessary.
 
-Use pr_fmt to prefix kernel output.
-
-Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
+Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
 Acked-by: Rob Herring <robh@kernel.org>
 ---
- drivers/of/of_numa.c | 21 +++++++++++----------
- 1 file changed, 11 insertions(+), 10 deletions(-)
+ Documentation/devicetree/bindings/numa.txt | 1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/drivers/of/of_numa.c b/drivers/of/of_numa.c
-index ed103e6..1234b4a 100644
---- a/drivers/of/of_numa.c
-+++ b/drivers/of/of_numa.c
-@@ -16,6 +16,8 @@
-  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
+diff --git a/Documentation/devicetree/bindings/numa.txt b/Documentation/devicetree/bindings/numa.txt
+index 21b3505..c0ea4a7 100644
+--- a/Documentation/devicetree/bindings/numa.txt
++++ b/Documentation/devicetree/bindings/numa.txt
+@@ -48,7 +48,6 @@ distance (memory latency) between all numa nodes.
 
-+#define pr_fmt(fmt) "OF: NUMA: " fmt
-+
- #include <linux/of.h>
- #include <linux/of_address.h>
- #include <linux/nodemask.h>
-@@ -49,10 +51,9 @@ static void __init of_numa_parse_cpu_nodes(void)
- 		if (r)
- 			continue;
-
--		pr_debug("NUMA: CPU on %u\n", nid);
-+		pr_debug("CPU on %u\n", nid);
- 		if (nid >= MAX_NUMNODES)
--			pr_warn("NUMA: Node id %u exceeds maximum value\n",
--				nid);
-+			pr_warn("Node id %u exceeds maximum value\n", nid);
- 		else
- 			node_set(nid, numa_nodes_parsed);
- 	}
-@@ -76,7 +77,7 @@ static int __init of_numa_parse_memory_nodes(void)
- 			continue;
-
- 		if (nid >= MAX_NUMNODES) {
--			pr_warn("NUMA: Node id %u exceeds maximum value\n", nid);
-+			pr_warn("Node id %u exceeds maximum value\n", nid);
- 			return -EINVAL;
- 		}
-
-@@ -85,7 +86,7 @@ static int __init of_numa_parse_memory_nodes(void)
-
- 		if (!i || r) {
- 			of_node_put(np);
--			pr_err("NUMA: bad property in memory node\n");
-+			pr_err("bad property in memory node\n");
- 			return r ? : -EINVAL;
- 		}
- 	}
-@@ -99,17 +100,17 @@ static int __init of_numa_parse_distance_map_v1(struct device_node *map)
- 	int entry_count;
- 	int i;
-
--	pr_info("NUMA: parsing numa-distance-map-v1\n");
-+	pr_info("parsing numa-distance-map-v1\n");
-
- 	matrix = of_get_property(map, "distance-matrix", NULL);
- 	if (!matrix) {
--		pr_err("NUMA: No distance-matrix property in distance-map\n");
-+		pr_err("No distance-matrix property in distance-map\n");
- 		return -EINVAL;
- 	}
-
- 	entry_count = of_property_count_u32_elems(map, "distance-matrix");
- 	if (entry_count <= 0) {
--		pr_err("NUMA: Invalid distance-matrix\n");
-+		pr_err("Invalid distance-matrix\n");
- 		return -EINVAL;
- 	}
-
-@@ -124,7 +125,7 @@ static int __init of_numa_parse_distance_map_v1(struct device_node *map)
- 		matrix++;
-
- 		numa_set_distance(nodea, nodeb, distance);
--		pr_debug("NUMA:  distance[node%d -> node%d] = %d\n",
-+		pr_debug("distance[node%d -> node%d] = %d\n",
- 			 nodea, nodeb, distance);
-
- 		/* Set default distance of node B->A same as A->B */
-@@ -171,7 +172,7 @@ int of_node_to_nid(struct device_node *device)
- 		np = of_get_next_parent(np);
- 	}
- 	if (np && r)
--		pr_warn("NUMA: Invalid \"numa-node-id\" property in node %s\n",
-+		pr_warn("Invalid \"numa-node-id\" property in node %s\n",
- 			np->name);
- 	of_node_put(np);
-
+   Note:
+ 	1. Each entry represents distance from first node to second node.
+-	The distances are equal in either direction.
+ 	2. The distance from a node to self (local distance) is represented
+ 	with value 10 and all internode distance should be represented with
+ 	a value greater than 10.
 --
 2.5.0
