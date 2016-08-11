@@ -1,47 +1,45 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Thu, 11 Aug 2016 12:19:11 -0700
-Subject: [PATCH 1/9] remoteproc: core: Ensure error message is clear
-In-Reply-To: <20160811073657.GB1715@dell>
-References: <20160804092153.23032-1-lee.jones@linaro.org>
- <20160804092153.23032-2-lee.jones@linaro.org>
- <20160809172825.GB26240@tuxbot> <20160809181243.GC1581@dell>
- <68ec0dd7-676d-47a9-19ba-9dcfc9569902@ti.com>
- <20160811073657.GB1715@dell>
-Message-ID: <20160811191911.GB26240@tuxbot>
+From: lkp@intel.com (kbuild test robot)
+Date: Fri, 12 Aug 2016 03:32:44 +0800
+Subject: [PATCH v3 1/2] arm64: implement FTRACE_WITH_REGS
+In-Reply-To: <20160811163635.277C868C43@newverein.lst.de>
+Message-ID: <201608120337.ncJVDfVQ%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu 11 Aug 00:36 PDT 2016, Lee Jones wrote:
+Hi Torsten,
 
-> On Wed, 10 Aug 2016, Suman Anna wrote:
-> 
-> > On 08/09/2016 01:12 PM, Lee Jones wrote:
-> > > On Tue, 09 Aug 2016, Bjorn Andersson wrote:
-> > > 
-> > >> On Thu 04 Aug 02:21 PDT 2016, Lee Jones wrote:
-[..]
-> > >>> -	dev_dbg(dev, "carveout rsc: da %x, pa %x, len %x, flags %x\n",
-> > >>> +	dev_dbg(dev, "carveout rsc: da %x, pa %x, len 0x%x, flags %x\n",
-> > >>>  			rsc->da, rsc->pa, rsc->len, rsc->flags);
-> > 
-> > If you are modifying this trace, it's better to following the leading 0x
-> > convention on all arguments rather than just the length.
-> 
-> I'd be concerned if anyone thought it a good idea to print out memory
-> addresses !0x.  The length is the only parameter there which could
-> (and has) cause confusion.
-> 
-> However, the fix-up is trivial, so I'm happy to oblige.  I'll leave
-> the final decision to Bjorn and fix-up if he sees it necessary.
-> 
+[auto build test ERROR on arm64/for-next/core]
+[also build test ERROR on v4.8-rc1 next-20160811]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-I applied this patch yesterday, I see both changes here related to the
-issue presented (confusing printing of len) so I'm fine with not
-touching the other parts.
+url:    https://github.com/0day-ci/linux/commits/Torsten-Duwe/arm64-live-patching/20160812-004131
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git for-next/core
+config: arm64-allmodconfig (attached as .config)
+compiler: aarch64-linux-gnu-gcc (Debian 5.4.0-6) 5.4.0 20160609
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm64 
 
-That said, there are a few other format strings in this driver that
-would benefit from some love as well, several cases where we should use
-%pK or %pad rather than using %llx and a cast to unsigned long long.
+All errors (new ones prefixed by >>):
 
-Regards,
-Bjorn
+   arch/arm64/Makefile:61: Cannot use CONFIG_DYNAMIC_FTRACE_WITH_REGS: -fprolog-pad not supported by compiler
+   Makefile:687: Cannot use CONFIG_KCOV: -fsanitize-coverage=trace-pc is not supported by compiler
+>> aarch64-linux-gnu-gcc: error: unrecognized command line option '-fprolog-pad=2'
+   make[2]: *** [kernel/bounds.s] Error 1
+   make[2]: Target '__build' not remade because of errors.
+   make[1]: *** [prepare0] Error 2
+   make[1]: Target 'prepare' not remade because of errors.
+   make: *** [sub-make] Error 2
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 50394 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160812/b30b9cda/attachment-0001.obj>
