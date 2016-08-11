@@ -1,58 +1,64 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Thu, 11 Aug 2016 10:51:50 +0200
-Subject: [PATCH v2 0/7] drm/mediatek: cleaning up and refine
-In-Reply-To: <1470900806.2493.21.camel@pengutronix.de>
-References: <1470279597-60453-1-git-send-email-bibby.hsieh@mediatek.com>
- <1470900806.2493.21.camel@pengutronix.de>
-Message-ID: <20160811085150.GJ6232@phenom.ffwll.local>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 11 Aug 2016 10:53:01 +0200
+Subject: [PATCH 05/19] arm64: rename COMPAT to AARCH32_EL0 in Kconfig
+In-Reply-To: <57AC2AA5.1030808@huawei.com>
+References: <1466207668-10549-1-git-send-email-ynorov@caviumnetworks.com>
+ <1466207668-10549-6-git-send-email-ynorov@caviumnetworks.com>
+ <57AC2AA5.1030808@huawei.com>
+Message-ID: <3043310.yXUR8Er0VK@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 11, 2016 at 09:33:26AM +0200, Philipp Zabel wrote:
-> Am Donnerstag, den 04.08.2016, 10:59 +0800 schrieb Bibby Hsieh:
-> > These patches based on 4.7-rc1 to clean up unused function
-> > & variable and use drm core function instead.
-> > 
-> > The following patches are needed to cleanly apply on top of v4.7-rc1:
-> >  - https://patchwork.kernel.org/patch/8044001/
-> >    (drm: Deal with rotation in drm_plane_helper_check_update())
-> >  - https://patchwork.kernel.org/patch/9248373/
-> >    (drm: Warn about negative sizes when calculating scale factor)
-> >  - https://patchwork.kernel.org/patch/9248371/
-> >    (drm: Store clipped src/dst coordinatee in drm_plane_state)
-> >  - https://patchwork.kernel.org/patch/9248363/
-> >    (drm/plane-helper: Add drm_plane_helper_check_state())
-> >  - https://patchwork.kernel.org/patch/9248361/
-> >    (drm/mediatek: Use drm_plane_helper_check_state())
-> > 
-> > Bibby Hsieh (2):
-> >   drm/mediatek: Use drm_atomic destroy_state helpers
-> >   drm/mediatek: Fix mtk_atomic_complete for runtime_pm
-> > 
-> > Daniel Kurtz (5):
-> >   drm/mediatek: Remove mtk_drm_crtc_check_flush
-> >   drm/mediatek: plane: Remove plane zpos/index
-> >   drm/mediatek: Remove mtk_drm_plane
-> 
-> I have picked up patches 1-5, but not patches 6-7:
-> 
-> >   drm/mediatek: plane: Merge mtk_plane_enable into
-> >     mtk_plane_atomic_update
-> >   drm/mediatek: plane: Use FB's format's cpp to compute x offset
-> 
-> These two don't apply. Could you please rebase them onto
-> git.pengutronix.de/git/pza/linux.git mediatek-drm/next
+On Thursday, August 11, 2016 3:35:01 PM CEST Zhangjian (Bamvor) wrote:
+> On 2016/6/18 7:54, Yury Norov wrote:
+> > From: Andrew Pinski <apinski@cavium.com>
+> >
+> > In this patchset  ILP32 ABI support is added. Additionally to AARCH32,
+> > which is binary-compatible with ARM, ILP32 is (mostly) ABI-compatible.
+> >
+> >  From now, AARCH32_EL0 (former COMPAT) config option means the support of
+> > AARCH32 userspace, ARM64_ILP32 - support of ILP32 ABI (see next patches),
+> > and COMPAT indicates that one of them, or both, is enabled.
+> >
+> > Where needed, CONFIG_COMPAT is changed over to use CONFIG_AARCH32_EL0 instead
+> >
+> > Reviewed-by: David Daney <ddaney@caviumnetworks.com>
+> > Signed-off-by: Andrew Pinski <Andrew.Pinski@caviumnetworks.com>
+> > Signed-off-by: Philipp Tomsich <philipp.tomsich@theobroma-systems.com>
+> > Signed-off-by: Christoph Muellner <christoph.muellner@theobroma-systems.com>
+> > Signed-off-by: Bamvor Jian Zhang <bamvor.zhangjian@linaro.org>
+> > Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
+> ...
+> > diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
+> > index c173d32..af200a8 100644
+> > --- a/arch/arm64/kernel/cpuinfo.c
+> > +++ b/arch/arm64/kernel/cpuinfo.c
+> > @@ -134,15 +134,17 @@ static int c_show(struct seq_file *m, void *v)
+> >   		 */
+> >   		seq_puts(m, "Features\t:");
+> >   		if (compat) {
+> > -#ifdef CONFIG_COMPAT
+> > -			for (j = 0; compat_hwcap_str[j]; j++)
+> > -				if (compat_elf_hwcap & (1 << j))
+> > -					seq_printf(m, " %s", compat_hwcap_str[j]);
+> > -
+> > -			for (j = 0; compat_hwcap2_str[j]; j++)
+> > -				if (compat_elf_hwcap2 & (1 << j))
+> > -					seq_printf(m, " %s", compat_hwcap2_str[j]);
+> > -#endif /* CONFIG_COMPAT */
+> > +#ifdef CONFIG_AARCH32_EL0
+> I saw that compat_hwcap_str and compat_hwcap2_str is defined when
+> "CONFIG_COMPAT" is true. Why we only change it to CONFIG_AARCH32_EL0
+> in c show()?
+> > +			if (personality(current->personality) == PER_LINUX32) {
+> And "compat" is "personality(current->personality) == PER_LINUX32;",
+> it seems that there is no need to add this twice.
 
-Note that I think most of them are already in drm-misc, and that branch is
-non-rebasing.
--Daniel
+I think it would be best to remove the #ifdef here completely,
+the PER_LINUX32 concept is not strictly tied to the emulation
+of ARM binaries, it literally just changes the output of
+/proc/cpuinfo and 'uname', and you can have ARM binaries with
+PER_LINUX (using the arm64 uname) just like you can have
+arm64 binaries running with PER_LINUX32.
 
-> 
-> regards
-> Philipp
-> 
-
--- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-http://blog.ffwll.ch
+	Arnd
