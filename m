@@ -1,36 +1,87 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 11 Aug 2016 14:11:04 +0100
-Subject: [PATCHv2 0/2] arm64: hibernate: a couple of fixes
-Message-ID: <1470921066-27421-1-git-send-email-mark.rutland@arm.com>
+Date: Thu, 11 Aug 2016 14:11:05 +0100
+Subject: [PATCHv2 1/2] arm64: hibernate: avoid potential TLB conflict
+In-Reply-To: <1470921066-27421-1-git-send-email-mark.rutland@arm.com>
+References: <1470921066-27421-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <1470921066-27421-2-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+In create_safe_exec_page we install a set of global mappings in TTBR0,
+then subsequently invalidate TLBs. While TTBR0 points at the zero page,
+and the TLBs should be free of stale global entries, we may have stale
+ASID-tagged entries (e.g. from the EFI runtime services mappings) for
+the same VAs. Per the ARM ARM these ASID-tagged entries may conflict
+with newly-allocated global entries, and we must follow a
+Break-Before-Make approach to avoid issues resulting from this.
 
-These patches fix a couple of issues I spotted in the arm64 hibernate code.
+This patch reworks create_safe_exec_page to invalidate TLBs while the
+zero page is still in place, ensuring that there are no potential
+conflicts when the new TTBR0 value is installed. As a single CPU is
+online while this code executes, we do not need to perform broadcast TLB
+maintenance, and can call local_flush_tlb_all(), which also subsumes
+some barriers. The remaining assembly is converted to use write_sysreg()
+and isb().
 
-Patch 1 addresses potential Break-Before-Make violations, and patch 2 addresses
-failure cases where TTBR0 may be left pointing at memory which has been freed.
+Other than this, we safely manipulate TTBRs in the hibernate dance. The
+code we install as part of the new TTBR0 mapping (the hibernated
+kernel's swsusp_arch_suspend_exit) installs a zero page into TTBR1,
+invalidates TLBs, then installs its preferred value. Upon being restored
+to the middle of swsusp_arch_suspend, the new image will call
+__cpu_suspend_exit, which will call cpu_uninstall_idmap, installing the
+zero page in TTBR0 and invalidating all TLB entries.
 
-I've given the kernel a go with these patches applied, and I do not see any
-regressions in hibernation functionality.
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Acked-by: James Morse <james.morse@arm.com>
+Tested-by: James Morse <james.morse@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Fixes: 82869ac57b5d3b55 ("arm64: kernel: Add support for hibernate/suspend-to-disk")
+---
+ arch/arm64/kernel/hibernate.c | 23 +++++++++++++++++------
+ 1 file changed, 17 insertions(+), 6 deletions(-)
 
-Thanks,
-Mark.
-
-Since v1 [1]:
-* s/suspend/hibernate/ in patch 1 title
-* Use cpu_set_reserved_ttbr0() to safely handle userspace hibernation testing
-* Add patch to safely handle allocation failures
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-August/447392.html
-
-Mark Rutland (2):
-  arm64: hibernate: avoid potential TLB conflict
-  arm64: hibernate: handle allocation failures
-
- arch/arm64/kernel/hibernate.c | 82 ++++++++++++++++++++++++++-----------------
- 1 file changed, 49 insertions(+), 33 deletions(-)
-
+diff --git a/arch/arm64/kernel/hibernate.c b/arch/arm64/kernel/hibernate.c
+index 21ab5df..b2e7de8 100644
+--- a/arch/arm64/kernel/hibernate.c
++++ b/arch/arm64/kernel/hibernate.c
+@@ -35,6 +35,7 @@
+ #include <asm/sections.h>
+ #include <asm/smp.h>
+ #include <asm/suspend.h>
++#include <asm/sysreg.h>
+ #include <asm/virt.h>
+ 
+ /*
+@@ -217,12 +218,22 @@ static int create_safe_exec_page(void *src_start, size_t length,
+ 	set_pte(pte, __pte(virt_to_phys((void *)dst) |
+ 			 pgprot_val(PAGE_KERNEL_EXEC)));
+ 
+-	/* Load our new page tables */
+-	asm volatile("msr	ttbr0_el1, %0;"
+-		     "isb;"
+-		     "tlbi	vmalle1is;"
+-		     "dsb	ish;"
+-		     "isb" : : "r"(virt_to_phys(pgd)));
++	/*
++	 * Load our new page tables. A strict BBM approach requires that we
++	 * ensure that TLBs are free of any entries that may overlap with the
++	 * global mappings we are about to install.
++	 *
++	 * For a real hibernate/resume cycle TTBR0 currently points to a zero
++	 * page, but TLBs may contain stale ASID-tagged entries (e.g. for EFI
++	 * runtime services), while for a userspace-driven test_resume cycle it
++	 * points to userspace page tables (and we must point it at a zero page
++	 * ourselves). Elsewhere we only (un)install the idmap with preemption
++	 * disabled, so T0SZ should be as required regardless.
++	 */
++	cpu_set_reserved_ttbr0();
++	local_flush_tlb_all();
++	write_sysreg(virt_to_phys(pgd), ttbr0_el1);
++	isb();
+ 
+ 	*phys_dst_addr = virt_to_phys((void *)dst);
+ 
 -- 
 1.9.1
