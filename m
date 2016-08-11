@@ -1,64 +1,45 @@
 From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Thu, 11 Aug 2016 09:32:59 +0200
-Subject: [PATCH v4 3/4] drm/mediatek: Add gamma correction.
-In-Reply-To: <1469672575-5847-4-git-send-email-bibby.hsieh@mediatek.com>
-References: <1469672575-5847-1-git-send-email-bibby.hsieh@mediatek.com>
- <1469672575-5847-4-git-send-email-bibby.hsieh@mediatek.com>
-Message-ID: <1470900779.2493.20.camel@pengutronix.de>
+Date: Thu, 11 Aug 2016 09:33:26 +0200
+Subject: [PATCH v2 0/7] drm/mediatek: cleaning up and refine
+In-Reply-To: <1470279597-60453-1-git-send-email-bibby.hsieh@mediatek.com>
+References: <1470279597-60453-1-git-send-email-bibby.hsieh@mediatek.com>
+Message-ID: <1470900806.2493.21.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, den 28.07.2016, 10:22 +0800 schrieb Bibby Hsieh:
-> Add gamma set function to correct brightness values.
-> It applies arbitrary mapping curve to compensate the
-> incorrect transfer function of the panel.
+Am Donnerstag, den 04.08.2016, 10:59 +0800 schrieb Bibby Hsieh:
+> These patches based on 4.7-rc1 to clean up unused function
+> & variable and use drm core function instead.
 > 
-> Signed-off-by: Bibby Hsieh <bibby.hsieh@mediatek.com>
-> ---
->  drivers/gpu/drm/mediatek/mtk_drm_crtc.c     |    8 ++++++-
->  drivers/gpu/drm/mediatek/mtk_drm_crtc.h     |    1 +
->  drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c |   31 +++++++++++++++++++++++++++
->  drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h |   10 +++++++++
->  4 files changed, 49 insertions(+), 1 deletion(-)
+> The following patches are needed to cleanly apply on top of v4.7-rc1:
+>  - https://patchwork.kernel.org/patch/8044001/
+>    (drm: Deal with rotation in drm_plane_helper_check_update())
+>  - https://patchwork.kernel.org/patch/9248373/
+>    (drm: Warn about negative sizes when calculating scale factor)
+>  - https://patchwork.kernel.org/patch/9248371/
+>    (drm: Store clipped src/dst coordinatee in drm_plane_state)
+>  - https://patchwork.kernel.org/patch/9248363/
+>    (drm/plane-helper: Add drm_plane_helper_check_state())
+>  - https://patchwork.kernel.org/patch/9248361/
+>    (drm/mediatek: Use drm_plane_helper_check_state())
 > 
-> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_crtc.c b/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
-> index 24aa3ba..cbb460a5 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
-> +++ b/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
-> @@ -409,6 +409,9 @@ static void mtk_drm_crtc_atomic_flush(struct drm_crtc *crtc,
->  	}
->  	if (pending_planes)
->  		mtk_crtc->pending_planes = true;
-> +	if (crtc->state->color_mgmt_changed)
-> +		for (i = 0; i < mtk_crtc->ddp_comp_nr; i++)
-> +			mtk_ddp_gamma_set(mtk_crtc->ddp_comp[i], crtc->state);
->  }
->  
->  static const struct drm_crtc_funcs mtk_crtc_funcs = {
-> @@ -418,6 +421,7 @@ static const struct drm_crtc_funcs mtk_crtc_funcs = {
->  	.reset			= mtk_drm_crtc_reset,
->  	.atomic_duplicate_state	= mtk_drm_crtc_duplicate_state,
->  	.atomic_destroy_state	= mtk_drm_crtc_destroy_state,
-> +	.gamma_set		= drm_atomic_helper_legacy_gamma_set,
->  };
->  
->  static const struct drm_crtc_helper_funcs mtk_crtc_helper_funcs = {
-> @@ -568,7 +572,9 @@ int mtk_drm_crtc_create(struct drm_device *drm_dev,
->  				&mtk_crtc->planes[1].base, pipe);
->  	if (ret < 0)
->  		goto unprepare;
-> -
-> +	drm_mode_crtc_set_gamma_size(&mtk_crtc->base, MTK_LUT_SIZE);
-> +	drm_helper_crtc_enable_color_mgmt(&mtk_crtc->base, MTK_LUT_SIZE,
-> +					  MTK_LUT_SIZE);
+> Bibby Hsieh (2):
+>   drm/mediatek: Use drm_atomic destroy_state helpers
+>   drm/mediatek: Fix mtk_atomic_complete for runtime_pm
+> 
+> Daniel Kurtz (5):
+>   drm/mediatek: Remove mtk_drm_crtc_check_flush
+>   drm/mediatek: plane: Remove plane zpos/index
+>   drm/mediatek: Remove mtk_drm_plane
 
-I have applied all four patches and rebased onto v4.8-rc1, replacing
-drm_helper_crtc_enable_color_mgmt with:
+I have picked up patches 1-5, but not patches 6-7:
 
-	drm_crtc_enable_color_mgmt(&mtk_crtc->base, MTK_LUT_SIZE,
-				   true, MTK_LUT_SIZE);
+>   drm/mediatek: plane: Merge mtk_plane_enable into
+>     mtk_plane_atomic_update
+>   drm/mediatek: plane: Use FB's format's cpp to compute x offset
 
-(See https://patchwork.kernel.org/patch/9160987/)
+These two don't apply. Could you please rebase them onto
+git.pengutronix.de/git/pza/linux.git mediatek-drm/next
 
 regards
 Philipp
