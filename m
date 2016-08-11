@@ -1,44 +1,32 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Thu, 11 Aug 2016 11:40:56 -0700
-Subject: [PATCH 2/2] remoteproc: core: Rework obtaining a rproc from a DT
- phandle
-In-Reply-To: <20160719154905.23344-2-lee.jones@linaro.org>
-References: <20160719154905.23344-1-lee.jones@linaro.org>
- <20160719154905.23344-2-lee.jones@linaro.org>
-Message-ID: <20160811184056.GZ26240@tuxbot>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 11 Aug 2016 13:44:37 -0500
+Subject: [PATCH 1/2] dt: bindings: Add vendor prefix for Espressif System
+In-Reply-To: <28c04b6d-c2a4-ac64-2dd8-b8a944b54b1b@redhat.com>
+References: <1470596269-20572-1-git-send-email-hdegoede@redhat.com>
+ <20160810184845.GA17829@rob-hp-laptop>
+ <2b43330e-369d-7473-8b73-429f0f0b73ce@redhat.com>
+ <CAL_Jsq+uy-P54enk5Zho=nRab4PMEbqyBTEWiE0yhWWVoFTmwQ@mail.gmail.com>
+ <3516eadd-e987-1747-5813-de51b77fd73e@redhat.com>
+ <CAL_JsqKLLotHErrfMs-oPvt7GgG1txQtAayjmp4zpCHEMktE_Q@mail.gmail.com>
+ <28c04b6d-c2a4-ac64-2dd8-b8a944b54b1b@redhat.com>
+Message-ID: <CAL_JsqLeitBkBbCKV7OSbc8==goqqAa1SN_y=7=zEp_zqkm5yw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue 19 Jul 08:49 PDT 2016, Lee Jones wrote:
+On Thu, Aug 11, 2016 at 12:28 PM, Hans de Goede <hdegoede@redhat.com> wrote:
+> Hi,
+>
+> On 11-08-16 18:35, Rob Herring wrote:
+>
+> <snip>
+>
+>> I plan to make '_' cause warnings with dtc which is why we don't want
+>> to add more.
+>
+>
+> Offtopic question: does this only apply to property names, or
+> also to node names ?
 
-> diff --git a/drivers/remoteproc/remoteproc_core.c b/drivers/remoteproc/remoteproc_core.c
-[..]
-> -struct rproc *rproc_get_by_phandle(phandle phandle)
-> +struct rproc *of_get_rproc_by_phandle(struct device_node *np)
->  {
-> -	return NULL;
-> +	return of_get_rproc_by_index(np, 0);
+Both.
 
-I agree with Suman, that this should be moved to the static inline
-function in remoteproc.h
-
-Giving it some more thought, based on the naming discussion, I think
-this should be called "of_get_rproc()". Better keep the "default
-accessor" short and simple and the _by_phandle() is confusing.
-
->  }
-> +EXPORT_SYMBOL(of_get_rproc_by_phandle);
->  #endif
-> -EXPORT_SYMBOL(rproc_get_by_phandle);
-[..]
-> diff --git a/include/linux/remoteproc.h b/include/linux/remoteproc.h
-[..]
->  static inline
-> -struct rproc *rproc_get_by_phandle(phandle phandle)
-> +struct rproc *of_get_rproc_by_phandle(struct device_node *np)
->  {
->  	return NULL;
->  }
-
-Regards,
-Bjorn
+Rob
