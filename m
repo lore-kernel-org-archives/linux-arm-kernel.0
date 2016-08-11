@@ -1,221 +1,163 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Thu, 11 Aug 2016 10:21:04 -0600
-Subject: [PATCH V5 9/9] coresight: etm-perf: incorporating sink definition
- from cmd line
-In-Reply-To: <1470932464-726-1-git-send-email-mathieu.poirier@linaro.org>
-References: <1470932464-726-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1470932464-726-10-git-send-email-mathieu.poirier@linaro.org>
+From: s-anna@ti.com (Suman Anna)
+Date: Thu, 11 Aug 2016 11:23:30 -0500
+Subject: [PATCH 1/2] remoteproc: core: Add rproc OF look-up functions
+In-Reply-To: <05d4c9c1-79ea-bde3-e5e5-d26e6b07c916@ti.com>
+References: <20160719154905.23344-1-lee.jones@linaro.org>
+ <20160810174049.GO26240@tuxbot> <7650e5fa-f52c-1ab5-e197-8630fd7d0322@ti.com>
+ <20160810204049.GV26240@tuxbot> <f9641050-0a3f-11de-fa69-e587034e0527@ti.com>
+ <20160810211947.GW26240@tuxbot> <b1a01567-7a5d-20de-a2b5-b673b9ce67ec@ti.com>
+ <20160811073122.GA1715@dell> <05d4c9c1-79ea-bde3-e5e5-d26e6b07c916@ti.com>
+Message-ID: <b1b2a510-e0cb-5d8f-9f44-48c9dd747d4d@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that PMU specific configuration is available as part of the event,
-lookup the sink identified by users from the perf command line and build
-a path from source to sink.
+On 08/11/2016 11:04 AM, Suman Anna wrote:
+> Hi Lee,
+> 
+> On 08/11/2016 02:31 AM, Lee Jones wrote:
+>> On Wed, 10 Aug 2016, Suman Anna wrote:
+>>
+>>> On 08/10/2016 04:19 PM, Bjorn Andersson wrote:
+>>>> On Wed 10 Aug 14:04 PDT 2016, Suman Anna wrote:
+>>>>
+>>>>> On 08/10/2016 03:40 PM, Bjorn Andersson wrote:
+>>>>>> On Wed 10 Aug 12:37 PDT 2016, Suman Anna wrote:
+>>>>>>
+>>>>>>> Hi Lee, Bjorn,
+>>>>>>>
+>>>>>>> On 08/10/2016 12:40 PM, Bjorn Andersson wrote:
+>>>>>>>> On Tue 19 Jul 08:49 PDT 2016, Lee Jones wrote:
+>>>>>>>>
+>>>>>>>>> - of_rproc_by_index(): look-up and obtain a reference to a rproc
+>>>>>>>>>                        using the DT phandle "rprocs" and a index.
+>>>>>>>>>
+>>>>>>>>> - of_rproc_by_name():  lookup and obtain a reference to a rproc
+>>>>>>>>>                        using the DT phandle "rprocs" and "rproc-names".
+>>>>>>>>>
+>>>>>>>>> Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
+>>>>>>>>> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+>>>>>>>>> ---
+>>>>>>>>
+>>>>>>>> I'm happy with this, so I whipped up a binding document describing our
+>>>>>>>> two new properties. Waiting for an opinion on that before I merge this.
+>>>>>>>
+>>>>>>> Yeah, I like the two new API too, I have just about run into the need
+>>>>>>> for the same on my product trees. We can probably make it less
+>>>>>>> complicated than what the current series is. The wkup_m3_ipc usage was
+>>>>>>> before there was any standardization on the property names, so we went
+>>>>>>> with a ti, prefixed property specific to the wkup_m3_ipc node and a
+>>>>>>> general API that is agnostic of property name. We don't have all the
+>>>>>>> pieces for PM on AM335x/AM437x SoCs on upstream kernel yet, so we should
+>>>>>>> be able to switch over to using the new property as we cannot achieve
+>>>>>>> the desired functionality even though we can boot the wkup_m3.
+>>>>>>>
+>>>>>>
+>>>>>> Glad to hear you're onboard with dropping the old property name, even if
+>>>>>> it's later.
+>>>>>>
+>>>>>>> Here's what I propose:
+>>>>>>> 1. Let's not burden the new of_get_rproc_by_index() API with having to
+>>>>>>> fall-back and look for ti,rprocs. The rproc_get_by_phandle() core logic
+>>>>>>> of looking up against the rproc list is self-contained, and the API
+>>>>>>> usage is limited to just the wkup_m3_ipc driver at the moment.
+>>>>>>> 2. Keep the rproc_get_by_phandle API as is but mark it as deprecated.
+>>>>>>> IMHO, the rename of this API to of_get_rproc_by_phandle() in Patch 2 but
+>>>>>>> using a device node pointer as input argument doesn't add any value.
+>>>>>>> 3. Provide a fallback in wkup_m3_ipc driver to look for both rprocs and
+>>>>>>> ti,rproc property, while switching over the node to use rprocs property.
+>>>>>>> 4. We can get rid of the rproc_get_by_phandle() API after the
+>>>>>>> wkup_m3_ipc transition is done to use of_get_rproc_by_index() API.
+>>>>>>>
+>>>>>>
+>>>>>> I don't fancy the idea of leaving the kernel builds with a deprecation
+>>>>>> warning for some time and I don't feel the cost of carrying those 2
+>>>>>> extra statements is a bigger issue than keeping a deprecated API around.
+>>>>>> And it will be less than the dance we have to do in wkup_m3_ipc.
+>>>>>>
+>>>>>> So I think that we should merge these patches and if it can be concluded
+>>>>>> that we don't need backwards compatibility with the old DT property we
+>>>>>> can drop the inner conditional in the API.
+>>>>>
+>>>>> Yeah, I am fine with dropping the inner ti,rproc processing in the new
+>>>>> of_rproc_get_by_index() API and keeping it clean. What's not clear to me
+>>>>> is why we would still need a get_by_phandle API alongside the two new
+>>>>> API once the wkup_m3_ipc is converted to the new API?  Or is it just to
+>>>>> clean up the consumer interface? If latter, I will fixup the wkup_m3_ipc
+>>>>> driver without the need for remoteproc core changes, and switch over to
+>>>>> the new API.
+>>>>>
+>>>>
+>>>> of_get_rproc_by_phandle() is just a convenience for not having to get by
+>>>> index 0, as most drivers is only having one rproc.
+>>>
+>>> OK, then better to name this as simply of_rproc_get(), the _by_phandle()
+>>> does not match up with the other two of_get_rproc_xxx API.
+>>
+>> I'm not opposed to changing the call to of_rproc_get().  
 
-With this functionality it is no longer required to select a sink in a
-separate step (from sysFS) before a perf trace session can be started.
+Also, since this is gonna be a simple helper, can we make this a static
+inline and move to the remoteproc.h header file.
 
-Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
----
- drivers/hwtracing/coresight/coresight-etm-perf.c | 139 ++++++++++++++++++++++-
- 1 file changed, 138 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/hwtracing/coresight/coresight-etm-perf.c b/drivers/hwtracing/coresight/coresight-etm-perf.c
-index f8c7a8733b23..eab038805cbe 100644
---- a/drivers/hwtracing/coresight/coresight-etm-perf.c
-+++ b/drivers/hwtracing/coresight/coresight-etm-perf.c
-@@ -22,6 +22,7 @@
- #include <linux/list.h>
- #include <linux/mm.h>
- #include <linux/init.h>
-+#include <linux/parser.h>
- #include <linux/perf_event.h>
- #include <linux/slab.h>
- #include <linux/types.h>
-@@ -71,11 +72,25 @@ static const struct attribute_group *etm_pmu_attr_groups[] = {
- 
- static void etm_event_read(struct perf_event *event) {}
- 
-+static void etm_event_destroy(struct perf_event *event)
-+{
-+	void *sink;
-+
-+	sink = perf_event_drv_configs_set(event, NULL);
-+	kfree(sink);
-+}
-+
- static int etm_event_init(struct perf_event *event)
- {
-+	struct hw_perf_event *hw_event = &event->hw;
-+
- 	if (event->attr.type != etm_pmu.type)
- 		return -ENOENT;
- 
-+	event->destroy = etm_event_destroy;
-+	raw_spin_lock_init(&hw_event->drv_configs_lock);
-+	hw_event->drv_configs = NULL;
-+
- 	return 0;
- }
- 
-@@ -159,6 +174,7 @@ static void *etm_setup_aux(struct perf_event *event, void **pages,
- 			   int nr_pages, bool overwrite)
- {
- 	int cpu;
-+	char *cmdl_sink;
- 	cpumask_t *mask;
- 	struct coresight_device *sink;
- 	struct etm_event_data *event_data = NULL;
-@@ -171,6 +187,14 @@ static void *etm_setup_aux(struct perf_event *event, void **pages,
- 
- 	mask = &event_data->mask;
- 
-+	/*
-+	 * If a sink was specified from the perf cmdline it will be part of
-+	 * the event's drv_configs.
-+	 */
-+	cmdl_sink = (char *)perf_event_drv_configs_get(event);
-+	if (IS_ERR(cmdl_sink))
-+		cmdl_sink = NULL;
-+
- 	/* Setup the path for each CPU in a trace session */
- 	for_each_cpu(cpu, mask) {
- 		struct coresight_device *csdev;
-@@ -184,7 +208,7 @@ static void *etm_setup_aux(struct perf_event *event, void **pages,
- 		 * list of devices from source to sink that can be
- 		 * referenced later when the path is actually needed.
- 		 */
--		event_data->path[cpu] = coresight_build_path(csdev, NULL);
-+		event_data->path[cpu] = coresight_build_path(csdev, cmdl_sink);
- 		if (!event_data->path[cpu])
- 			goto err;
- 	}
-@@ -342,6 +366,118 @@ static void etm_event_del(struct perf_event *event, int mode)
- 	etm_event_stop(event, PERF_EF_UPDATE);
- }
- 
-+enum {
-+	ETM_TOKEN_SINK_CPU,
-+	ETM_TOKEN_SINK,
-+	ETM_TOKEN_ERR,
-+};
-+
-+static const match_table_t drv_cfg_tokens = {
-+	{ETM_TOKEN_SINK_CPU, "sink=cpu%d:%s"},
-+	{ETM_TOKEN_SINK, "sink=%s"},
-+	{ETM_TOKEN_ERR, NULL},
-+};
-+
-+/**
-+ * etm_parse_drv_configs - parse configuration string
-+ *
-+ * Returns: ERR_PTR() upon error,  NULL if the config string CPU is different
-+ *	    from the event's CPU and the address of a valid string if one has
-+ *	    been found.
-+ */
-+static char *etm_parse_drv_configs(int event_cpu, char *config_str)
-+{
-+	char *sink = NULL, *config = config_str;
-+	int cpu, token;
-+	substring_t args[MAX_OPT_ARGS];
-+
-+	/* See above declared @drv_cfg_tokens for the usable formats */
-+	token = match_token(config, drv_cfg_tokens, args);
-+	switch (token) {
-+	case ETM_TOKEN_SINK:
-+		/* Simply return the sink that was specified */
-+		sink = match_strdup(&args[0]);
-+		break;
-+	case ETM_TOKEN_SINK_CPU:
-+		/*
-+		 * We have a sink and a CPU, so we need to make sure the
-+		 * given CPU matches the event's CPU.  If not this sink is
-+		 * destined to another tracer.  This isn't an error hence not
-+		 * setting @ret.
-+		 */
-+
-+		/* Get the cpu */
-+		if (match_int(&args[0], &cpu)) {
-+			sink = ERR_PTR(-EINVAL);
-+			goto out;
-+		}
-+
-+		/* This sink configuration is meant for another CPU */
-+		if (event_cpu != cpu)
-+			goto out;
-+
-+		sink = match_strdup(&args[1]);
-+		break;
-+	default:
-+		sink = ERR_PTR(-EINVAL);
-+	}
-+
-+out:
-+	return sink;
-+}
-+
-+static int
-+etm_set_drv_configs(struct perf_event *event,
-+		    struct list_head *drv_configs)
-+{
-+	char *config, *sink;
-+	int len;
-+	struct perf_drv_config *drv_config;
-+	void *old_sink;
-+
-+	list_for_each_entry(drv_config, drv_configs, entry) {
-+		/* ETM HW configuration needs a sink specification */
-+		if (!drv_config->option)
-+			return -EINVAL;
-+
-+		len = strlen(drv_config->config) + strlen("=") +
-+		      strlen(drv_config->option) + 1;
-+
-+		config = kmalloc(len, GFP_KERNEL);
-+		if (!config)
-+			return -ENOMEM;
-+
-+		/* Reconstruct user configuration */
-+		snprintf(config, len, "%s=%s",
-+			 drv_config->config, drv_config->option);
-+
-+		sink = etm_parse_drv_configs(event->cpu, config);
-+		kfree(config);
-+
-+		/* No need to continue if the parse encountered and error */
-+		if (IS_ERR(sink))
-+			return PTR_ERR(sink);
-+
-+		/* A valid sink was found */
-+		if (sink)
-+			goto found;
-+	}
-+
-+	/*
-+	 * A sink wasn't found, which isn't automatically an error.  Other
-+	 * options on the cmd line may still need to be parsed.
-+	 */
-+	return 0;
-+
-+found:
-+	/* Record the sink that was found */
-+	old_sink = perf_event_drv_configs_set(event, sink);
-+	/* And get rid of whatever we had before */
-+	kfree(old_sink);
-+
-+	return 0;
-+}
-+
- int etm_perf_symlink(struct coresight_device *csdev, bool link)
- {
- 	char entry[sizeof("cpu9999999")];
-@@ -383,6 +519,7 @@ static int __init etm_perf_init(void)
- 	etm_pmu.stop		= etm_event_stop;
- 	etm_pmu.add		= etm_event_add;
- 	etm_pmu.del		= etm_event_del;
-+	etm_pmu.set_drv_configs	= etm_set_drv_configs;
- 
- 	ret = perf_pmu_register(&etm_pmu, CORESIGHT_ETM_PMU_NAME, -1);
- 	if (ret == 0)
--- 
-2.7.4
+However, I'm
+>> not sure what you mean about it not matching the other OF functions.
+> 
+> The _by_name and _by_index API take in a name and index arguments, and
+> the rproc_get_by_phandle took in a phandle argument, the modified name
+> in patch 2 retains the by_phandle but without any corresponding
+> argument. That's what I meant by mismatch.
+> 
+>> The nomenclature should be the same of_get_rproc_*(), no?
+>>
+>>> Suggest also a rename from of_get_rproc_xxx to of_rproc_get_xxx like in
+>>> other subsystems.
+>>
+>> This suggestion does the opposite and does not fit in with the
+>> majority of the of_* calls scattered around in other subsystems:
+>>
+>> of_get_drm
+>> of_get_coresight
+>> of_get_fb
+>> of_get_i2c
+>> of_get_regulator
+>> of_get_gpio
+>> of_get_mac
+>> of_get_display
+>> of_get_videomode
+>>
+>> Vs
+>>
+>> of_irq_get
+>> of_reset_get
+>> of_graph_get
+>> of_msi_get
+>> of_usb_get
+>> of_genpd_get
+>>
+>> These guys have both oddly.
+>>
+>> of_get_dma, of_dma_get
+>> of_get_pci, of_pci_get
+>> of_get_phy, of_phy_get
+> 
+> Hmm, looks like there are all sorts of combinations with some like
+> <subsys>_of_get_xxx. I did search using get_name and get_index, and
+> nothing popped up differently. The ones that typical rproc drivers deal
+> with are clk, reset, irq which follow the latter convention. Given that
+> the previous API within remoteproc used to be rproc_get,
+> rproc_get_by_name (these were dropped sometime back) and
+> rproc_get_by_phandle, I still like of_rproc_get_by_index,
+> of_rproc_get_by_name, of_rproc_get and then the counter part is the
+> regular rproc_put().
+> 
+> This patch also needs one correction, the inner loop string check should
+> be ti,rproc and not ti,rprocs.
+> 
+> regards
+> Suman
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-remoteproc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
