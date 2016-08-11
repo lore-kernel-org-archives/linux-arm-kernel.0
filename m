@@ -1,29 +1,25 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 11 Aug 2016 10:19:32 +0200
-Subject: [PATCH] pinctrl: qcom: Add generic ssbi and spmi GPIO/MPP bindings
-In-Reply-To: <20160711190109.16758-1-sboyd@codeaurora.org>
-References: <20160711190109.16758-1-sboyd@codeaurora.org>
-Message-ID: <CACRpkdazPheA1s2FX2ugEyCFmrKiq36QEmEuCGJRt-vQTFWFVw@mail.gmail.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Thu, 11 Aug 2016 10:19:42 +0200
+Subject: [PATCH v2 3/4] arm64: dts: rockchip: add efuse0 device node for
+ rk3399
+In-Reply-To: <1470878029-11878-4-git-send-email-finley.xiao@rock-chips.com>
+References: <1470878029-11878-1-git-send-email-finley.xiao@rock-chips.com>
+ <1470878029-11878-4-git-send-email-finley.xiao@rock-chips.com>
+Message-ID: <1508482.TbGnezVHUZ@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 11, 2016 at 9:01 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+Am Donnerstag, 11. August 2016, 09:13:48 schrieb Finlye Xiao:
+> From: Finley Xiao <finley.xiao@rock-chips.com>
+> 
+> Add a efuse0 node in the device tree for the ARM64 rk3399 SoC.
+> 
+> Signed-off-by: Finley Xiao <finley.xiao@rock-chips.com>
 
-> The drivers don't really need to know which PMIC they're for, so
-> make a generic binding for them. This alleviates us from updating
-> the drivers every time a new PMIC comes out. It's still
-> recommended that we update the binding with new PMIC models and
-> always specify the specific model for the MPPs and gpios before
-> the generic compatible string in devicetree, but this at least
-> cuts down on adding more and more compatible strings to the
-> drivers until we actually need them.
->
-> Cc: <devicetree@vger.kernel.org>
-> Acked-by: "Ivan T. Ivanov" <iivanov.xz@gmail.com>
-> Reviewed-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+this patch adds a node for a new compatible, so to limit conflicts in the 
+somewhat high-traffic rk3399, I'd like to pick this patch up myself once the 
+others are deemed suitable.
 
-Patch applied with Rob's ACK.
 
-Yours,
-Linus Walleij
+Thanks
+Heiko
