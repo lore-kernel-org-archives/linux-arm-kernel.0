@@ -1,114 +1,29 @@
-From: duwe@lst.de (Torsten Duwe)
-Date: Thu, 11 Aug 2016 18:36:40 +0200 (CEST)
-Subject: [PATCH v3 2/2] arm64: implement live patching
-In-Reply-To: <20160811163451.D455C68C43@newverein.lst.de>
-References: <20160811163451.D455C68C43@newverein.lst.de>
-Message-ID: <20160811163640.4CE7F68C44@newverein.lst.de>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 11 Aug 2016 17:39:19 +0100
+Subject: [PATCH 1/1] arm64: Remove stack duplicating code from jprobes
+In-Reply-To: <1470861891-13315-1-git-send-email-dave.long@linaro.org>
+References: <1470861891-13315-1-git-send-email-dave.long@linaro.org>
+Message-ID: <20160811163919.GE18366@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-straightforward on top of FTRACE_WITH_REGS.
+On Wed, Aug 10, 2016 at 04:44:51PM -0400, David Long wrote:
+> From: "David A. Long" <dave.long@linaro.org>
+> 
+> Because the arm64 calling standard allows stacked function arguments to be
+> anywhere in the stack frame, do not attempt to duplicate the stack frame for
+> jprobes handler functions.
+> 
+> Documenation changes to describe this issue have been broken out into a
+> separate patch in order to simultaneously address them in other
+> architecture(s).
+> 
+> Signed-off-by: David A. Long <dave.long@linaro.org>
+> Acked-by: Masami Hiramatsu <mhiramat@kernel.org>
 
-Signed-off-by: Torsten Duwe <duwe@suse.de>
----
- arch/arm64/Kconfig                 |  3 +++
- arch/arm64/include/asm/livepatch.h | 37 +++++++++++++++++++++++++++++++++++++
- arch/arm64/kernel/entry-ftrace.S   | 13 +++++++++++++
- 3 files changed, 53 insertions(+)
- create mode 100644 arch/arm64/include/asm/livepatch.h
+Applied to arm64 fixes/core with Marc's ack and the spelling corrected.
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 36a0e26..3aae199 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -80,6 +80,7 @@ config ARM64
- 	select HAVE_GENERIC_DMA_COHERENT
- 	select HAVE_HW_BREAKPOINT if PERF_EVENTS
- 	select HAVE_IRQ_TIME_ACCOUNTING
-+	select HAVE_LIVEPATCH
- 	select HAVE_MEMBLOCK
- 	select HAVE_MEMBLOCK_NODE_MAP if NUMA
- 	select HAVE_PATA_PLATFORM
-@@ -1042,4 +1043,6 @@ if CRYPTO
- source "arch/arm64/crypto/Kconfig"
- endif
- 
-+source "kernel/livepatch/Kconfig"
-+
- source "lib/Kconfig"
-diff --git a/arch/arm64/include/asm/livepatch.h b/arch/arm64/include/asm/livepatch.h
-new file mode 100644
-index 0000000..6b9a3d1
---- /dev/null
-+++ b/arch/arm64/include/asm/livepatch.h
-@@ -0,0 +1,37 @@
-+/*
-+ * livepatch.h - arm64-specific Kernel Live Patching Core
-+ *
-+ * Copyright (C) 2016 SUSE
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * as published by the Free Software Foundation; either version 2
-+ * of the License, or (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, see <http://www.gnu.org/licenses/>.
-+ */
-+#ifndef _ASM_ARM64_LIVEPATCH_H
-+#define _ASM_ARM64_LIVEPATCH_H
-+
-+#include <linux/module.h>
-+#include <linux/ftrace.h>
-+
-+#ifdef CONFIG_LIVEPATCH
-+static inline int klp_check_compiler_support(void)
-+{
-+	return 0;
-+}
-+
-+static inline void klp_arch_set_pc(struct pt_regs *regs, unsigned long ip)
-+{
-+	regs->pc = ip;
-+}
-+#endif /* CONFIG_LIVEPATCH */
-+
-+#endif /* _ASM_ARM64_LIVEPATCH_H */
-diff --git a/arch/arm64/kernel/entry-ftrace.S b/arch/arm64/kernel/entry-ftrace.S
-index 3ebe791..2108f0e 100644
---- a/arch/arm64/kernel/entry-ftrace.S
-+++ b/arch/arm64/kernel/entry-ftrace.S
-@@ -204,6 +204,9 @@ ENTRY(ftrace_caller)
- 	str	x9, [sp, #S_LR]
- 	/* The program counter just after the ftrace call site */
- 	str	lr, [sp, #S_PC]
-+#if defined(CONFIG_LIVEPATCH) && defined(CONFIG_FUNCTION_GRAPH_TRACER)
-+	mov	x19,lr          /* remember old return address */
-+#endif
- 	/* The stack pointer as it was on ftrace_caller entry... */
- 	add	x29, sp, #S_FRAME_SIZE+16	/* ...is also our new FP */
- 	str	x29, [sp, #S_SP]
-@@ -219,6 +222,16 @@ ftrace_call:
- 
- 	bl	ftrace_stub
- 
-+#if defined(CONFIG_LIVEPATCH) && defined(CONFIG_FUNCTION_GRAPH_TRACER)
-+	/* Is the trace function a live patcher an has messed with
-+	 * the return address?
-+	*/
-+	ldr	x9, [sp, #S_PC]
-+	cmp	x9, x19		/* compare with the value we remembered */
-+	/* to not call graph tracer's "call" mechanism twice! */
-+	b.ne	ftrace_regs_return
-+#endif
-+
- #ifdef CONFIG_FUNCTION_GRAPH_TRACER
- 	.global ftrace_graph_call
- ftrace_graph_call:			// ftrace_graph_caller();
+Thanks.
+
 -- 
-2.6.2
+Catalin
