@@ -1,28 +1,30 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Thu, 11 Aug 2016 10:21:56 +0200
-Subject: [PATCH v2 4/4] nvmem: rockchip-efuse: add rk3399-efuse support
-In-Reply-To: <1470878029-11878-5-git-send-email-finley.xiao@rock-chips.com>
-References: <1470878029-11878-1-git-send-email-finley.xiao@rock-chips.com>
- <1470878029-11878-5-git-send-email-finley.xiao@rock-chips.com>
-Message-ID: <2505532.cfPLbvGbN0@diego>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 11 Aug 2016 10:28:34 +0200
+Subject: [PATCH v2 1/4] gpio: Add AXP209 GPIO driver
+In-Reply-To: <20160720141139.25098-2-maxime.ripard@free-electrons.com>
+References: <20160720141139.25098-1-maxime.ripard@free-electrons.com>
+ <20160720141139.25098-2-maxime.ripard@free-electrons.com>
+Message-ID: <CACRpkdaHbE1ZZ-f_1xqTwReyLbUZuS+VyLgGSp4hE8CrX3tu=g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 11. August 2016, 09:13:49 schrieb Finlye Xiao:
-> From: Finley Xiao <finley.xiao@rock-chips.com>
-> 
-> 1) the efuse timing of rk3399 is different from earlier SoCs.
-> 2) rk3399-efuse is organized as 32bits by 32 one-time programmable
-> electrical fuses, the efuse of earlier SoCs is organized as 32bits
-> by 8 one-time programmable electrical fuses with random access interface.
-> 
-> This patch adds a new read function for rk3399-efuse.
-> 
-> Signed-off-by: Finley Xiao <finley.xiao@rock-chips.com>
+On Wed, Jul 20, 2016 at 4:11 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
 
-looks good now to me
-Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+> The AXP209 PMIC has a bunch of GPIOs accessible, that are usually used to
+> control LEDs or backlight.
+>
+> Add a driver for them
+>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Acked-by: Rob Herring <robh@kernel.org>
 
+Patch applied, it's clean and simple. I would suggest the
+following immediate improvement (send separate patch):
 
-Thanks for fixing
-Heiko
+Add a .get_direction() callback, I have started to push this
+for new driver as it gives better userspace experience
+and overall better control of stuff.
+
+Yours,
+Linus Walleij
