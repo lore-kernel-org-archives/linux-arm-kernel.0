@@ -1,45 +1,82 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Thu, 11 Aug 2016 09:33:26 +0200
-Subject: [PATCH v2 0/7] drm/mediatek: cleaning up and refine
-In-Reply-To: <1470279597-60453-1-git-send-email-bibby.hsieh@mediatek.com>
-References: <1470279597-60453-1-git-send-email-bibby.hsieh@mediatek.com>
-Message-ID: <1470900806.2493.21.camel@pengutronix.de>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 11 Aug 2016 08:36:57 +0100
+Subject: [PATCH 1/9] remoteproc: core: Ensure error message is clear
+In-Reply-To: <68ec0dd7-676d-47a9-19ba-9dcfc9569902@ti.com>
+References: <20160804092153.23032-1-lee.jones@linaro.org>
+ <20160804092153.23032-2-lee.jones@linaro.org>
+ <20160809172825.GB26240@tuxbot> <20160809181243.GC1581@dell>
+ <68ec0dd7-676d-47a9-19ba-9dcfc9569902@ti.com>
+Message-ID: <20160811073657.GB1715@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, den 04.08.2016, 10:59 +0800 schrieb Bibby Hsieh:
-> These patches based on 4.7-rc1 to clean up unused function
-> & variable and use drm core function instead.
+On Wed, 10 Aug 2016, Suman Anna wrote:
+
+> On 08/09/2016 01:12 PM, Lee Jones wrote:
+> > On Tue, 09 Aug 2016, Bjorn Andersson wrote:
+> > 
+> >> On Thu 04 Aug 02:21 PDT 2016, Lee Jones wrote:
+> >>
+> >>> Before this patch, the dma_alloc_coherent() failure path printed out:
+> >>>
+> >>>   "dma_alloc_coherent err: 16760832"
+> >>>
+> >>> ... alluding to the Linux error code being 16760832, but seeing as
+> >>> Linux error codes are all negative, this looks like a signed/unsigned
+> >>> issue.  In fact, the message is trying to print the length of the
+> >>> requested memory region.  Let's clear that up.
+> >>>
+> >>> While we're at it, let's standardise the way 'len' is printed.  In
+> >>> all other locations 'len' is in hex prefixed by a '0x' for clarity.
+> >>>
+> >>> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> >>
+> >> Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+> > 
+> > Again, this can just be applied.
+> > 
+> >>> ---
+> >>>  drivers/remoteproc/remoteproc_core.c | 5 +++--
+> >>>  1 file changed, 3 insertions(+), 2 deletions(-)
+> >>>
+> >>> diff --git a/drivers/remoteproc/remoteproc_core.c b/drivers/remoteproc/remoteproc_core.c
+> >>> index aea29a75c..3566dc9 100644
+> >>> --- a/drivers/remoteproc/remoteproc_core.c
+> >>> +++ b/drivers/remoteproc/remoteproc_core.c
+> >>> @@ -581,7 +581,7 @@ static int rproc_handle_carveout(struct rproc *rproc,
+> >>>  		return -EINVAL;
+> >>>  	}
+> >>>  
+> >>> -	dev_dbg(dev, "carveout rsc: da %x, pa %x, len %x, flags %x\n",
+> >>> +	dev_dbg(dev, "carveout rsc: da %x, pa %x, len 0x%x, flags %x\n",
+> >>>  			rsc->da, rsc->pa, rsc->len, rsc->flags);
 > 
-> The following patches are needed to cleanly apply on top of v4.7-rc1:
->  - https://patchwork.kernel.org/patch/8044001/
->    (drm: Deal with rotation in drm_plane_helper_check_update())
->  - https://patchwork.kernel.org/patch/9248373/
->    (drm: Warn about negative sizes when calculating scale factor)
->  - https://patchwork.kernel.org/patch/9248371/
->    (drm: Store clipped src/dst coordinatee in drm_plane_state)
->  - https://patchwork.kernel.org/patch/9248363/
->    (drm/plane-helper: Add drm_plane_helper_check_state())
->  - https://patchwork.kernel.org/patch/9248361/
->    (drm/mediatek: Use drm_plane_helper_check_state())
+> If you are modifying this trace, it's better to following the leading 0x
+> convention on all arguments rather than just the length.
+
+I'd be concerned if anyone thought it a good idea to print out memory
+addresses !0x.  The length is the only parameter there which could
+(and has) cause confusion.
+
+However, the fix-up is trivial, so I'm happy to oblige.  I'll leave
+the final decision to Bjorn and fix-up if he sees it necessary.
+
+> >>>  	carveout = kzalloc(sizeof(*carveout), GFP_KERNEL);
+> >>> @@ -590,7 +590,8 @@ static int rproc_handle_carveout(struct rproc *rproc,
+> >>>  
+> >>>  	va = dma_alloc_coherent(dev->parent, rsc->len, &dma, GFP_KERNEL);
+> >>>  	if (!va) {
+> >>> -		dev_err(dev->parent, "dma_alloc_coherent err: %d\n", rsc->len);
+> >>> +		dev_err(dev->parent,
+> >>> +			"failed to allocate dma memory: len 0x%x\n", rsc->len);
+> >>>  		ret = -ENOMEM;
+> >>>  		goto free_carv;
+> >>>  	}
+> > 
 > 
-> Bibby Hsieh (2):
->   drm/mediatek: Use drm_atomic destroy_state helpers
->   drm/mediatek: Fix mtk_atomic_complete for runtime_pm
-> 
-> Daniel Kurtz (5):
->   drm/mediatek: Remove mtk_drm_crtc_check_flush
->   drm/mediatek: plane: Remove plane zpos/index
->   drm/mediatek: Remove mtk_drm_plane
 
-I have picked up patches 1-5, but not patches 6-7:
-
->   drm/mediatek: plane: Merge mtk_plane_enable into
->     mtk_plane_atomic_update
->   drm/mediatek: plane: Use FB's format's cpp to compute x offset
-
-These two don't apply. Could you please rebase them onto
-git.pengutronix.de/git/pza/linux.git mediatek-drm/next
-
-regards
-Philipp
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
