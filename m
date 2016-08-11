@@ -1,36 +1,64 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 11 Aug 2016 09:32:23 +0200
-Subject: [GIT PULL] ARM: mvebu: fixes for v4.8 (#1)
-Message-ID: <87h9ar3gmw.fsf@free-electrons.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Thu, 11 Aug 2016 09:32:59 +0200
+Subject: [PATCH v4 3/4] drm/mediatek: Add gamma correction.
+In-Reply-To: <1469672575-5847-4-git-send-email-bibby.hsieh@mediatek.com>
+References: <1469672575-5847-1-git-send-email-bibby.hsieh@mediatek.com>
+ <1469672575-5847-4-git-send-email-bibby.hsieh@mediatek.com>
+Message-ID: <1470900779.2493.20.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Am Donnerstag, den 28.07.2016, 10:22 +0800 schrieb Bibby Hsieh:
+> Add gamma set function to correct brightness values.
+> It applies arbitrary mapping curve to compensate the
+> incorrect transfer function of the panel.
+> 
+> Signed-off-by: Bibby Hsieh <bibby.hsieh@mediatek.com>
+> ---
+>  drivers/gpu/drm/mediatek/mtk_drm_crtc.c     |    8 ++++++-
+>  drivers/gpu/drm/mediatek/mtk_drm_crtc.h     |    1 +
+>  drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c |   31 +++++++++++++++++++++++++++
+>  drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h |   10 +++++++++
+>  4 files changed, 49 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_crtc.c b/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
+> index 24aa3ba..cbb460a5 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
+> +++ b/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
+> @@ -409,6 +409,9 @@ static void mtk_drm_crtc_atomic_flush(struct drm_crtc *crtc,
+>  	}
+>  	if (pending_planes)
+>  		mtk_crtc->pending_planes = true;
+> +	if (crtc->state->color_mgmt_changed)
+> +		for (i = 0; i < mtk_crtc->ddp_comp_nr; i++)
+> +			mtk_ddp_gamma_set(mtk_crtc->ddp_comp[i], crtc->state);
+>  }
+>  
+>  static const struct drm_crtc_funcs mtk_crtc_funcs = {
+> @@ -418,6 +421,7 @@ static const struct drm_crtc_funcs mtk_crtc_funcs = {
+>  	.reset			= mtk_drm_crtc_reset,
+>  	.atomic_duplicate_state	= mtk_drm_crtc_duplicate_state,
+>  	.atomic_destroy_state	= mtk_drm_crtc_destroy_state,
+> +	.gamma_set		= drm_atomic_helper_legacy_gamma_set,
+>  };
+>  
+>  static const struct drm_crtc_helper_funcs mtk_crtc_helper_funcs = {
+> @@ -568,7 +572,9 @@ int mtk_drm_crtc_create(struct drm_device *drm_dev,
+>  				&mtk_crtc->planes[1].base, pipe);
+>  	if (ret < 0)
+>  		goto unprepare;
+> -
+> +	drm_mode_crtc_set_gamma_size(&mtk_crtc->base, MTK_LUT_SIZE);
+> +	drm_helper_crtc_enable_color_mgmt(&mtk_crtc->base, MTK_LUT_SIZE,
+> +					  MTK_LUT_SIZE);
 
-Here is the first pull request for fixes for mvebu for v4.8.
+I have applied all four patches and rebased onto v4.8-rc1, replacing
+drm_helper_crtc_enable_color_mgmt with:
 
-Gregory
+	drm_crtc_enable_color_mgmt(&mtk_crtc->base, MTK_LUT_SIZE,
+				   true, MTK_LUT_SIZE);
 
-The following changes since commit 29b4817d4018df78086157ea3a55c1d9424a7cfc:
+(See https://patchwork.kernel.org/patch/9160987/)
 
-  Linux 4.8-rc1 (2016-08-07 18:18:00 -0700)
-
-are available in the git repository at:
-
-  git://git.infradead.org/linux-mvebu.git tags/mvebu-fixes-4.8-1
-
-for you to fetch changes up to d9fd3c918114cfd3995947339549c7341181efb0:
-
-  ARM: dts: armada-388-clearfog: number LAN ports properly (2016-08-08 13:20:24 +0200)
-
-----------------------------------------------------------------
-mvebu fixes for 4.8 (part 1)
-
-Fix lan numbering for the Armada 388 clearfog board
-
-----------------------------------------------------------------
-Russell King (1):
-      ARM: dts: armada-388-clearfog: number LAN ports properly
-
- arch/arm/boot/dts/armada-388-clearfog.dts | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+regards
+Philipp
