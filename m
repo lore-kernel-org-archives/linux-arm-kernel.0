@@ -1,150 +1,114 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Thu, 11 Aug 2016 11:04:44 -0500
-Subject: [PATCH 1/2] remoteproc: core: Add rproc OF look-up functions
-In-Reply-To: <20160811073122.GA1715@dell>
-References: <20160719154905.23344-1-lee.jones@linaro.org>
- <20160810174049.GO26240@tuxbot> <7650e5fa-f52c-1ab5-e197-8630fd7d0322@ti.com>
- <20160810204049.GV26240@tuxbot> <f9641050-0a3f-11de-fa69-e587034e0527@ti.com>
- <20160810211947.GW26240@tuxbot> <b1a01567-7a5d-20de-a2b5-b673b9ce67ec@ti.com>
- <20160811073122.GA1715@dell>
-Message-ID: <05d4c9c1-79ea-bde3-e5e5-d26e6b07c916@ti.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Thu, 11 Aug 2016 18:15:31 +0200
+Subject: [PATCH 1/3] mailbox: Add Platform Message-Handling-Unit variant
+ driver
+In-Reply-To: <1470732737-18391-2-git-send-email-narmstrong@baylibre.com>
+References: <1470732737-18391-1-git-send-email-narmstrong@baylibre.com>
+ <1470732737-18391-2-git-send-email-narmstrong@baylibre.com>
+Message-ID: <c21f4740-47bb-8c4b-f18e-8db801ee7fc3@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
+On 08/09/2016 10:52 AM, Neil Armstrong wrote:
+> Add Message-Handling-Unit driver for platform variants as mailbox controller.
+> Actually, only the Amlogic Meson GXBB SoC MHU is supported.
+> 
+> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+> ---
+>  drivers/mailbox/Kconfig        |  10 ++
+>  drivers/mailbox/Makefile       |   2 +
+>  drivers/mailbox/platform_mhu.c | 203 +++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 215 insertions(+)
+>  create mode 100644 drivers/mailbox/platform_mhu.c
+> 
+> diff --git a/drivers/mailbox/Kconfig b/drivers/mailbox/Kconfig
+> index 97c3729..4cc93c6 100644
+> --- a/drivers/mailbox/Kconfig
+> +++ b/drivers/mailbox/Kconfig
+> @@ -15,6 +15,16 @@ config ARM_MHU
+>  	  The controller has 3 mailbox channels, the last of which can be
+>  	  used in Secure mode only.
+>  
+> +config PLATFORM_MHU
+> +	tristate "Platform MHU Mailbox"
+> +	depends on OF
+> +	depends on HAS_IOMEM
+> +	help
+> +	  Say Y here if you want to build a platform specific variant MHU
+> +	  controller driver.
+> +	  The controller has a maximum of 3 mailbox channels, the last of
+> +	  which can be used in Secure mode only.
+> +
+>  config PL320_MBOX
+>  	bool "ARM PL320 Mailbox"
+>  	depends on ARM_AMBA
+> diff --git a/drivers/mailbox/Makefile b/drivers/mailbox/Makefile
+> index 66c38e3..ace6fed 100644
+> --- a/drivers/mailbox/Makefile
+> +++ b/drivers/mailbox/Makefile
+> @@ -6,6 +6,8 @@ obj-$(CONFIG_MAILBOX_TEST)	+= mailbox-test.o
+>  
+>  obj-$(CONFIG_ARM_MHU)	+= arm_mhu.o
+>  
+> +obj-$(CONFIG_PLATFORM_MHU)	+= platform_mhu.o
+> +
+>  obj-$(CONFIG_PL320_MBOX)	+= pl320-ipc.o
+>  
+>  obj-$(CONFIG_OMAP2PLUS_MBOX)	+= omap-mailbox.o
+> diff --git a/drivers/mailbox/platform_mhu.c b/drivers/mailbox/platform_mhu.c
+> new file mode 100644
+> index 0000000..d657a50
+> --- /dev/null
+> +++ b/drivers/mailbox/platform_mhu.c
+> @@ -0,0 +1,203 @@
+> +/*
+> + * Copyright (C) 2016 BayLibre SAS.
+> + * Author: Neil Armstrong <narmstrong@baylibre.com>
+> + * Heavily based on arm_mhu.c from :
+> + * Copyright (C) 2013-2015 Fujitsu Semiconductor Ltd.
+> + * Copyright (C) 2015 Linaro Ltd.
+> + * Author: Jassi Brar <jaswinder.singh@linaro.org>
+> + *
+> + * This program is free software: you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation, version 2 of the License.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include <linux/interrupt.h>
+> +#include <linux/spinlock.h>
+> +#include <linux/mutex.h>
+> +#include <linux/delay.h>
+> +#include <linux/slab.h>
+> +#include <linux/err.h>
+> +#include <linux/io.h>
+> +#include <linux/module.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/mailbox_controller.h>
+> +
+> +#define INTR_SET_OFS	0x0
+> +#define INTR_STAT_OFS	0x4
+> +#define INTR_CLR_OFS	0x8
+> +
+> +#define MHU_LP_OFFSET	0x10
+> +#define MHU_HP_OFFSET	0x1c
+> +
+> +#define TX_REG_OFFSET	0x24
+> +
+> +#define MHU_CHANS	2
+> +
+> +struct platform_mhu_link {
+> +	unsigned int irq;
 
-On 08/11/2016 02:31 AM, Lee Jones wrote:
-> On Wed, 10 Aug 2016, Suman Anna wrote:
-> 
->> On 08/10/2016 04:19 PM, Bjorn Andersson wrote:
->>> On Wed 10 Aug 14:04 PDT 2016, Suman Anna wrote:
->>>
->>>> On 08/10/2016 03:40 PM, Bjorn Andersson wrote:
->>>>> On Wed 10 Aug 12:37 PDT 2016, Suman Anna wrote:
->>>>>
->>>>>> Hi Lee, Bjorn,
->>>>>>
->>>>>> On 08/10/2016 12:40 PM, Bjorn Andersson wrote:
->>>>>>> On Tue 19 Jul 08:49 PDT 2016, Lee Jones wrote:
->>>>>>>
->>>>>>>> - of_rproc_by_index(): look-up and obtain a reference to a rproc
->>>>>>>>                        using the DT phandle "rprocs" and a index.
->>>>>>>>
->>>>>>>> - of_rproc_by_name():  lookup and obtain a reference to a rproc
->>>>>>>>                        using the DT phandle "rprocs" and "rproc-names".
->>>>>>>>
->>>>>>>> Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
->>>>>>>> Signed-off-by: Lee Jones <lee.jones@linaro.org>
->>>>>>>> ---
->>>>>>>
->>>>>>> I'm happy with this, so I whipped up a binding document describing our
->>>>>>> two new properties. Waiting for an opinion on that before I merge this.
->>>>>>
->>>>>> Yeah, I like the two new API too, I have just about run into the need
->>>>>> for the same on my product trees. We can probably make it less
->>>>>> complicated than what the current series is. The wkup_m3_ipc usage was
->>>>>> before there was any standardization on the property names, so we went
->>>>>> with a ti, prefixed property specific to the wkup_m3_ipc node and a
->>>>>> general API that is agnostic of property name. We don't have all the
->>>>>> pieces for PM on AM335x/AM437x SoCs on upstream kernel yet, so we should
->>>>>> be able to switch over to using the new property as we cannot achieve
->>>>>> the desired functionality even though we can boot the wkup_m3.
->>>>>>
->>>>>
->>>>> Glad to hear you're onboard with dropping the old property name, even if
->>>>> it's later.
->>>>>
->>>>>> Here's what I propose:
->>>>>> 1. Let's not burden the new of_get_rproc_by_index() API with having to
->>>>>> fall-back and look for ti,rprocs. The rproc_get_by_phandle() core logic
->>>>>> of looking up against the rproc list is self-contained, and the API
->>>>>> usage is limited to just the wkup_m3_ipc driver at the moment.
->>>>>> 2. Keep the rproc_get_by_phandle API as is but mark it as deprecated.
->>>>>> IMHO, the rename of this API to of_get_rproc_by_phandle() in Patch 2 but
->>>>>> using a device node pointer as input argument doesn't add any value.
->>>>>> 3. Provide a fallback in wkup_m3_ipc driver to look for both rprocs and
->>>>>> ti,rproc property, while switching over the node to use rprocs property.
->>>>>> 4. We can get rid of the rproc_get_by_phandle() API after the
->>>>>> wkup_m3_ipc transition is done to use of_get_rproc_by_index() API.
->>>>>>
->>>>>
->>>>> I don't fancy the idea of leaving the kernel builds with a deprecation
->>>>> warning for some time and I don't feel the cost of carrying those 2
->>>>> extra statements is a bigger issue than keeping a deprecated API around.
->>>>> And it will be less than the dance we have to do in wkup_m3_ipc.
->>>>>
->>>>> So I think that we should merge these patches and if it can be concluded
->>>>> that we don't need backwards compatibility with the old DT property we
->>>>> can drop the inner conditional in the API.
->>>>
->>>> Yeah, I am fine with dropping the inner ti,rproc processing in the new
->>>> of_rproc_get_by_index() API and keeping it clean. What's not clear to me
->>>> is why we would still need a get_by_phandle API alongside the two new
->>>> API once the wkup_m3_ipc is converted to the new API?  Or is it just to
->>>> clean up the consumer interface? If latter, I will fixup the wkup_m3_ipc
->>>> driver without the need for remoteproc core changes, and switch over to
->>>> the new API.
->>>>
->>>
->>> of_get_rproc_by_phandle() is just a convenience for not having to get by
->>> index 0, as most drivers is only having one rproc.
->>
->> OK, then better to name this as simply of_rproc_get(), the _by_phandle()
->> does not match up with the other two of_get_rproc_xxx API.
-> 
-> I'm not opposed to changing the call to of_rproc_get().  However, I'm
-> not sure what you mean about it not matching the other OF functions.
+This should be a signed integer.... I will repost.
 
-The _by_name and _by_index API take in a name and index arguments, and
-the rproc_get_by_phandle took in a phandle argument, the modified name
-in patch 2 retains the by_phandle but without any corresponding
-argument. That's what I meant by mismatch.
+> +	void __iomem *tx_reg;
+> +	void __iomem *rx_reg;
+> +};
+> +
 
-> The nomenclature should be the same of_get_rproc_*(), no?
-> 
->> Suggest also a rename from of_get_rproc_xxx to of_rproc_get_xxx like in
->> other subsystems.
-> 
-> This suggestion does the opposite and does not fit in with the
-> majority of the of_* calls scattered around in other subsystems:
-> 
-> of_get_drm
-> of_get_coresight
-> of_get_fb
-> of_get_i2c
-> of_get_regulator
-> of_get_gpio
-> of_get_mac
-> of_get_display
-> of_get_videomode
-> 
-> Vs
-> 
-> of_irq_get
-> of_reset_get
-> of_graph_get
-> of_msi_get
-> of_usb_get
-> of_genpd_get
-> 
-> These guys have both oddly.
-> 
-> of_get_dma, of_dma_get
-> of_get_pci, of_pci_get
-> of_get_phy, of_phy_get
-
-Hmm, looks like there are all sorts of combinations with some like
-<subsys>_of_get_xxx. I did search using get_name and get_index, and
-nothing popped up differently. The ones that typical rproc drivers deal
-with are clk, reset, irq which follow the latter convention. Given that
-the previous API within remoteproc used to be rproc_get,
-rproc_get_by_name (these were dropped sometime back) and
-rproc_get_by_phandle, I still like of_rproc_get_by_index,
-of_rproc_get_by_name, of_rproc_get and then the counter part is the
-regular rproc_put().
-
-This patch also needs one correction, the inner loop string check should
-be ti,rproc and not ti,rprocs.
-
-regards
-Suman
+[...]
