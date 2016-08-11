@@ -1,95 +1,59 @@
-From: vijay.kilari@gmail.com (Vijay Kilari)
-Date: Thu, 11 Aug 2016 10:59:52 +0530
-Subject: [RFC PATCH v2 0/4] arm/arm64: vgic-new: Implement API for vGICv3
- live migration
-In-Reply-To: <CAFEAcA-z+iM+=p0riWreJCewPPxw9wtHgg+_4MDtxV=ccwe-tg@mail.gmail.com>
-References: <1470740326-27751-1-git-send-email-vijay.kilari@gmail.com>
- <CAFEAcA-z+iM+=p0riWreJCewPPxw9wtHgg+_4MDtxV=ccwe-tg@mail.gmail.com>
-Message-ID: <CALicx6sdGgkf_neZ_F0OUu3cg36VBoWT581HAG=v2FecN6omJA@mail.gmail.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Thu, 11 Aug 2016 08:38:54 +0200
+Subject: [PATCH 0/9] v4.8 build regressions
+In-Reply-To: <20160810215424.1926658-1-arnd@arndb.de>
+References: <20160810215424.1926658-1-arnd@arndb.de>
+Message-ID: <1470897534.2493.8.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 9, 2016 at 5:22 PM, Peter Maydell <peter.maydell@linaro.org> wrote:
-> On 9 August 2016 at 11:58,  <vijay.kilari@gmail.com> wrote:
->> From: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
->>
->> This patchset adds API for saving and restoring
->> of VGICv3 registers to support live migration with new vgic feature.
->> This API definition is as per version of VGICv3 specification
->> http://lists.infradead.org/pipermail/linux-arm-kernel/2016-July/445611.html
->>
->> To test live migration with QEMU, use below patch series
->> https://lists.gnu.org/archive/html/qemu-devel/2016-08/msg01444.html
->>
->> The patch 3 & 4 are picked from the Pavel's previous implementation.
->> http://www.spinics.net/lists/kvm/msg122040.html
->>
->> v1 => v2:
->>  - The init sequence change patch is no more required.
->>    Fixed in patch 2 by using static vgic_io_dev regions structure instead
->>    of using dynamic allocation pointer.
->>  - Updated commit message of patch 4.
->>  - Dropped usage of union to manage 32-bit and 64-bit access in patch 1.
->>    Used local variable for 32-bit access.
->>  - Updated macro __ARM64_SYS_REG and ARM64_SYS_REG in
->>    arch/arm64/include/uapi/asm/kvm.h as per qemu requirements.
->
-> I only scanned briefly through this patchset, but I didn't
-> see any code implementing:
->  * KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO
+Am Mittwoch, den 10.08.2016, 23:54 +0200 schrieb Arnd Bergmann:
+> This is a set of patches to address build warnings and errors that have
+> come up in linux-4.8 but that worked fine in v4.7. I've added the
+> tinyconfig warning patch in there as well, which is not a regression
+> but is something that shows up in the kernelci.org build bots.
+> The other patches address issues that either came up in kernelci.org
+> or in my randconfig test setup.
+> 
+> I have three more fixes queued up in arm-soc/fixes that I plan
+> to send as a pull request for -rc2 along with the other bugfixes.
+> 
+> All patches have been posted before, but for some reason or another
+> failed to make it into the merge window. I have updated the ones
+> that were waiting for a new version from me now, the others are
+> sent without modifications.
+> 
+> Hopefully we can get them all merged into v4.8. Please pick up
+> patches from the middle of the series if appropriate.
+> 
+> 	Arnd
+> 
+> Arnd Bergmann (7):
+>   kconfig: tinyconfig: provide whole choice blocks to avoid warnings
+>   dsa: mv88e6xxx: hide unused functions
+>   drm/mediatek: add COMMON_CLK dependency
+>   drm/mediatek: add CONFIG_OF dependency
+>   drm/mediatek: add ARM_SMCCC dependency
 
-If irq->pending is updated by kernel based on irq->line_level when interrupt
-is asserted by device or guest. Do we still need to extract
-irq->line_level using
-this ioctl and while writing back GIC{D|R}_ISPENDR with line_level
-+(OR) GIC{D|R}_ISPENDR?
+I have picked up the three drm/mediatek patches.
 
->  * the different behaviour for accesses to GICD_STATUSR, GICR_STATUSR,
+regards
+Philipp
 
-QEMU is saving and restoring this register, but kernel implementation
-is missing. Kernel is silently returning zero. So could not catch. I
-will fix it.
-
-However, Specification says as below for STATUSR.
-
-"    The GICD_STATUSR and GICR_STATUSR registers are architecturally
-defined such
-     that a write of a clear bit has no effect, whereas a write with a set bit
-     clears that value.  To allow userspace to freely set the values
-of these two
-     registers, setting the attributes with the register offsets for these two
-     registers simply sets the non-reserved bits to the value written."
-
-Question is during restore, the set bit will clear the value STATUSR.
-So it will reset the STATUSR after migrating the VM.
-
->    GICD_ISPENDR, GICR_ISPENDR0, GICD_ICPENDR, and GICR_ICPENDR0, which
->    don't act the same via this API as for a guest access to the register
->
-> Did I miss something?
-
-In kernel (as shown in below code snippet),
- GICD_ISPENDR, GICR_ISPENDR0, GICD_ICPENDR, and GICR_ICPENDR0
-all register access using KVM_DEV_ARM_VGIC_GRP_{RE|DIST}_REGS ioctl
-is accessing irq->pending state.
-
-unsigned long vgic_mmio_read_pending(struct kvm_vcpu *vcpu,
-                                     gpa_t addr, unsigned int len)
-{
-        u32 intid = VGIC_ADDR_TO_INTID(addr, 1);
-        u32 value = 0;
-        int i;
-
-        /* Loop over all IRQs affected by this read */
-        for (i = 0; i < len * 8; i++) {
-                struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
-
-                if (irq->pending)
-                        value |= (1U << i);
-        }
-
-  ...
-}
->
-> thanks
-> -- PMM
+>   clocksource: kona: fix get_counter error handling
+>   8250/fintek: rename IRQ_MODE macro
+> 
+> Geert Uytterhoeven (1):
+>   test/hash: Fix warning in two-dimensional array init
+> 
+> George Spelvin (1):
+>   test/hash: Fix warning in preprocessor symbol evaluation
+> 
+>  arch/x86/configs/tiny.config          |  2 ++
+>  drivers/clocksource/bcm_kona_timer.c  | 16 ++++++++++------
+>  drivers/gpu/drm/mediatek/Kconfig      |  3 +++
+>  drivers/net/dsa/mv88e6xxx/chip.c      |  2 ++
+>  drivers/tty/serial/8250/8250_fintek.c |  4 ++--
+>  kernel/configs/tiny.config            |  8 ++++++++
+>  lib/test_hash.c                       |  8 ++++----
+>  7 files changed, 31 insertions(+), 12 deletions(-)
