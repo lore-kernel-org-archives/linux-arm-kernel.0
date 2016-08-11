@@ -1,62 +1,78 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Thu, 11 Aug 2016 13:20:36 -0700
-Subject: [PATCH 6/9] remoteproc: core: Add function to append a new
- resource table entry
-In-Reply-To: <57AC2E64.9010209@st.com>
-References: <20160804092153.23032-1-lee.jones@linaro.org>
- <20160804092153.23032-7-lee.jones@linaro.org>
- <57AC2E64.9010209@st.com>
-Message-ID: <20160811202036.GC26240@tuxbot>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 11 Aug 2016 22:26:26 +0200
+Subject: [PATCH 1/5] arm/defconfigs: Remove CONFIG_IPV6_PRIVACY
+In-Reply-To: <20160811170035.GD7296@nazgul.tnic>
+References: <1459338168-29334-1-git-send-email-bp@alien8.de>
+ <571752E8.2040103@mleia.com> <20160811170035.GD7296@nazgul.tnic>
+Message-ID: <4958578.R1lMSWqhcA@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu 11 Aug 00:51 PDT 2016, loic pallardy wrote:
-
-> Hi Lee,
+On Thursday, August 11, 2016 7:00:35 PM CEST Borislav Petkov wrote:
+> On Wed, Apr 20, 2016 at 12:59:04PM +0300, Vladimir Zapolskiy wrote:
+> > Probably you may do something similar for S3C24xx and send the change
+> > to Samsung maintainers.
 > 
+> How does that look like?
 
-Loic, please don't top-post.
+I'd prefer not to do it mechanically, please check the things that
+changed to see if they made sense.
 
-> I just tested your series and found issue with append mechanism.
-> There is no problem to add resources when working on Linux side, but the
-> resource table is growing and when copying it at loaded location (ie
-> overwriting existing prebuilt resource table of firmware), you have an
-> overflow corrupting part of firmware code.
-> 
+> diff --git a/arch/arm/configs/s3c2410_defconfig b/arch/arm/configs/s3c2410_defconfig
+> index b3ade552a2a5..7339d6f5d71b 100644
+> --- a/arch/arm/configs/s3c2410_defconfig
+> +++ b/arch/arm/configs/s3c2410_defconfig
+> @@ -1,4 +1,3 @@
+> -CONFIG_EXPERIMENTAL=y
+>  CONFIG_SYSVIPC=y
+>  CONFIG_IKCONFIG=m
+>  CONFIG_IKCONFIG_PROC=y
+> @@ -12,9 +11,6 @@ CONFIG_PARTITION_ADVANCED=y
+>  CONFIG_BSD_DISKLABEL=y
+>  CONFIG_SOLARIS_X86_PARTITION=y
+>  CONFIG_ARCH_S3C24XX=y
+> -CONFIG_S3C_BOOT_ERROR_RESET=y
 
-Suman brought up the same concern. For one it shows that we must check
-the size of the .resource_table to know if we can fit an expanded table
-before installing it.
+The option is gone, that is fine.
 
-> Moreover firmware code is in general tuned to a feature set. Resource table
-> is created according to supported features. In most of the cases, new
-> resource won't be handled by firmware.
-> 
+> -CONFIG_S3C_ADC=y
 
-For the case behind this implementation, where you have resource
-information from e.g. DT and build up a resource table (to be installed)
-from that, how would you deal with this? Would you build your firmware
-with room for some amount of resources?
+This one moved around, better not mix that with the other changes.
 
+> -CONFIG_S3C24XX_PWM=y
 
+Two boards select this, and are apparently enabled by default.
+Why? Could we remove the 'select' and leave this line?
 
-As my (not the maintainer-me) need for this is purely on the Linux side
-I originally envisioned something where we during firmware load parse
-the resource_table into some Linux side data structures; we would allow
-for these to be merged with additional data or new ones added and Linux
-would handle these.
+> @@ -38,20 +34,18 @@ CONFIG_MACH_AT2440EVB=y
+>  CONFIG_MACH_MINI2440=y
+>  CONFIG_MACH_NEXCODER_2440=y
+>  CONFIG_MACH_OSIRIS=y
+> -CONFIG_MACH_OSIRIS_DVS=m
 
-At the end we would have modified the referenced resource_table (through
-references as it isn't the primary data structure) and could copy this.
-
-Or alternatively, in the case you described with an empty start and
-resources only from DT, we could have a resource-table-installer that
-would make up a resource table from these Linux-side lists of resources.
+Why remove this? Is TPS65010 disabled now? Maybe its dependencies
+need to be updated.
 
 
-This path would solve the case that we would not automatically grow the
-table with new resources, but for the case where we generate a resource
-table at the end we would still have the same issues to conclude on.
+>  CONFIG_FPE_NWFPE=y
+>  CONFIG_FPE_NWFPE_XP=y
+> -CONFIG_BINFMT_AOUT=y
+>  CONFIG_APM_EMULATION=m
+>  CONFIG_NET=y
+>  CONFIG_PACKET=y
 
-Regards,
-Bjorn
+This was removed in v3.11, but a lot of defconfigs still
+try to enable it. Maybe do them all at once?
+
+> @@ -67,7 +61,6 @@ CONFIG_NET_IPIP=m
+>  CONFIG_INET_AH=m
+>  CONFIG_INET_ESP=m
+>  CONFIG_INET_IPCOMP=m
+> -# CONFIG_INET_LRO is not set
+>  CONFIG_TCP_CONG_ADVANCED=y
+>  CONFIG_TCP_CONG_HSTCP=m
+>  CONFIG_TCP_CONG_HYBLA=m
+
+Same thing, removed in v4.6, but still referenced in 199 files.
+
+	Arnd
