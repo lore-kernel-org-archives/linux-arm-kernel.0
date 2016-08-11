@@ -1,163 +1,128 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Thu, 11 Aug 2016 11:23:30 -0500
-Subject: [PATCH 1/2] remoteproc: core: Add rproc OF look-up functions
-In-Reply-To: <05d4c9c1-79ea-bde3-e5e5-d26e6b07c916@ti.com>
-References: <20160719154905.23344-1-lee.jones@linaro.org>
- <20160810174049.GO26240@tuxbot> <7650e5fa-f52c-1ab5-e197-8630fd7d0322@ti.com>
- <20160810204049.GV26240@tuxbot> <f9641050-0a3f-11de-fa69-e587034e0527@ti.com>
- <20160810211947.GW26240@tuxbot> <b1a01567-7a5d-20de-a2b5-b673b9ce67ec@ti.com>
- <20160811073122.GA1715@dell> <05d4c9c1-79ea-bde3-e5e5-d26e6b07c916@ti.com>
-Message-ID: <b1b2a510-e0cb-5d8f-9f44-48c9dd747d4d@ti.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Thu, 11 Aug 2016 19:25:44 +0300
+Subject: Kernel NFS boot failure
+In-Reply-To: <c234fc25-ef5b-eecc-450f-34d01410f9de@ti.com>
+References: <674e6841-d2c5-ccae-6633-a699e848e6d2@ti.com>
+ <57A1DE28.7020604@arm.com> <c234fc25-ef5b-eecc-450f-34d01410f9de@ti.com>
+Message-ID: <a094b3c3-0441-4e7f-7e51-f6ee5d6bb2f1@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/11/2016 11:04 AM, Suman Anna wrote:
-> Hi Lee,
+On 08/03/2016 06:04 PM, Grygorii Strashko wrote:
+> Hi Vladimir,
 > 
-> On 08/11/2016 02:31 AM, Lee Jones wrote:
->> On Wed, 10 Aug 2016, Suman Anna wrote:
->>
->>> On 08/10/2016 04:19 PM, Bjorn Andersson wrote:
->>>> On Wed 10 Aug 14:04 PDT 2016, Suman Anna wrote:
->>>>
->>>>> On 08/10/2016 03:40 PM, Bjorn Andersson wrote:
->>>>>> On Wed 10 Aug 12:37 PDT 2016, Suman Anna wrote:
->>>>>>
->>>>>>> Hi Lee, Bjorn,
->>>>>>>
->>>>>>> On 08/10/2016 12:40 PM, Bjorn Andersson wrote:
->>>>>>>> On Tue 19 Jul 08:49 PDT 2016, Lee Jones wrote:
->>>>>>>>
->>>>>>>>> - of_rproc_by_index(): look-up and obtain a reference to a rproc
->>>>>>>>>                        using the DT phandle "rprocs" and a index.
->>>>>>>>>
->>>>>>>>> - of_rproc_by_name():  lookup and obtain a reference to a rproc
->>>>>>>>>                        using the DT phandle "rprocs" and "rproc-names".
->>>>>>>>>
->>>>>>>>> Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
->>>>>>>>> Signed-off-by: Lee Jones <lee.jones@linaro.org>
->>>>>>>>> ---
->>>>>>>>
->>>>>>>> I'm happy with this, so I whipped up a binding document describing our
->>>>>>>> two new properties. Waiting for an opinion on that before I merge this.
->>>>>>>
->>>>>>> Yeah, I like the two new API too, I have just about run into the need
->>>>>>> for the same on my product trees. We can probably make it less
->>>>>>> complicated than what the current series is. The wkup_m3_ipc usage was
->>>>>>> before there was any standardization on the property names, so we went
->>>>>>> with a ti, prefixed property specific to the wkup_m3_ipc node and a
->>>>>>> general API that is agnostic of property name. We don't have all the
->>>>>>> pieces for PM on AM335x/AM437x SoCs on upstream kernel yet, so we should
->>>>>>> be able to switch over to using the new property as we cannot achieve
->>>>>>> the desired functionality even though we can boot the wkup_m3.
->>>>>>>
->>>>>>
->>>>>> Glad to hear you're onboard with dropping the old property name, even if
->>>>>> it's later.
->>>>>>
->>>>>>> Here's what I propose:
->>>>>>> 1. Let's not burden the new of_get_rproc_by_index() API with having to
->>>>>>> fall-back and look for ti,rprocs. The rproc_get_by_phandle() core logic
->>>>>>> of looking up against the rproc list is self-contained, and the API
->>>>>>> usage is limited to just the wkup_m3_ipc driver at the moment.
->>>>>>> 2. Keep the rproc_get_by_phandle API as is but mark it as deprecated.
->>>>>>> IMHO, the rename of this API to of_get_rproc_by_phandle() in Patch 2 but
->>>>>>> using a device node pointer as input argument doesn't add any value.
->>>>>>> 3. Provide a fallback in wkup_m3_ipc driver to look for both rprocs and
->>>>>>> ti,rproc property, while switching over the node to use rprocs property.
->>>>>>> 4. We can get rid of the rproc_get_by_phandle() API after the
->>>>>>> wkup_m3_ipc transition is done to use of_get_rproc_by_index() API.
->>>>>>>
->>>>>>
->>>>>> I don't fancy the idea of leaving the kernel builds with a deprecation
->>>>>> warning for some time and I don't feel the cost of carrying those 2
->>>>>> extra statements is a bigger issue than keeping a deprecated API around.
->>>>>> And it will be less than the dance we have to do in wkup_m3_ipc.
->>>>>>
->>>>>> So I think that we should merge these patches and if it can be concluded
->>>>>> that we don't need backwards compatibility with the old DT property we
->>>>>> can drop the inner conditional in the API.
->>>>>
->>>>> Yeah, I am fine with dropping the inner ti,rproc processing in the new
->>>>> of_rproc_get_by_index() API and keeping it clean. What's not clear to me
->>>>> is why we would still need a get_by_phandle API alongside the two new
->>>>> API once the wkup_m3_ipc is converted to the new API?  Or is it just to
->>>>> clean up the consumer interface? If latter, I will fixup the wkup_m3_ipc
->>>>> driver without the need for remoteproc core changes, and switch over to
->>>>> the new API.
->>>>>
->>>>
->>>> of_get_rproc_by_phandle() is just a convenience for not having to get by
->>>> index 0, as most drivers is only having one rproc.
+> On 08/03/2016 03:06 PM, Vladimir Murzin wrote:
+>> On 03/08/16 12:41, Grygorii Strashko wrote:
+>>> We observe Kernel boot failure while running NFS boot stress test (1000 iterations):
+>>> - Linux version 4.7.0 
+> 
+> I'd like to pay your attention that this issue also reproducible with
+> Kernel 4.7.0!
+> The same can be seen from the log I've provided in first e-mail:
+> [    0.000000] Linux version 4.7.0 (lcpdbld at dflsdit-build06.dal.design.ti.com) (gcc version 4.9.3 20150413 (prerelease) (Linaro GCC 4.9-2015.05) ) #1 SMP Fri Jul 29 17:41:27 CDT 2016
+> 
+> 
+> I've not run the test with current master at it's not been tagged yet.
+
+Still in progress. rc1 unstable on my platforms due to other issues :(
+
+> 
+>>> - am335x-evm (TI AM335x EVM)
+>>> - failure rate 10-20 times per test.
+>>> Originally this issue was reproduced using TI Kernel 4.4
+>>> ( git://git.ti.com/ti-linux-kernel/ti-linux-kernel.git, branch: ti-linux-4.4.y)
+>>> on both am335x-evm and am57xx-beagle-x15(am57xx-evm) platforms.
+>>> This issues has not been reproduced with TI Kernel 4.1 before.
 >>>
->>> OK, then better to name this as simply of_rproc_get(), the _by_phandle()
->>> does not match up with the other two of_get_rproc_xxx API.
+>>> The SysRq shows that system stuck in nfs_fs_mount()
+>>>
+>>> [  207.904632] [<c07ab34c>] (schedule) from [<c0783554>] (rpc_wait_bit_killable+0x2c/0xd8)
+>>> [  207.912996] [<c0783554>] (rpc_wait_bit_killable) from [<c07ab7f0>] (__wait_on_bit+0x84/0xc0)
+>>> [  207.921812] [<c07ab7f0>] (__wait_on_bit) from [<c07ab890>] (out_of_line_wait_on_bit+0x64/0x70)
+>>> [  207.930810] [<c07ab890>] (out_of_line_wait_on_bit) from [<c07843f4>] (__rpc_execute+0x18c/0x544)
+>>> [  207.939988] [<c07843f4>] (__rpc_execute) from [<c0779f24>] (rpc_run_task+0x13c/0x158)
+>>> [  207.948166] [<c0779f24>] (rpc_run_task) from [<c0779f84>] (rpc_call_sync+0x44/0xc4)
+>>> [  207.956163] [<c0779f84>] (rpc_call_sync) from [<c077a04c>] (rpc_ping+0x48/0x68)
+>>> [  207.963796] [<c077a04c>] (rpc_ping) from [<c077a158>] (rpc_create_xprt+0xec/0x164)
+>>> [  207.971702] [<c077a158>] (rpc_create_xprt) from [<c077a2c0>] (rpc_create+0xf0/0x1a0)
+>>> [  207.979794] [<c077a2c0>] (rpc_create) from [<c0393088>] (nfs_create_rpc_client+0xd4/0xec)
+>>> [  207.988338] [<c0393088>] (nfs_create_rpc_client) from [<c0394d10>] (nfs_init_client+0x20/0x78)
+>>> [  207.997332] [<c0394d10>] (nfs_init_client) from [<c03949d4>] (nfs_create_server+0xa0/0x3bc)
+>>> [  208.006057] [<c03949d4>] (nfs_create_server) from [<c03b197c>] (nfs3_create_server+0x8/0x20)
+>>> [  208.014879] [<c03b197c>] (nfs3_create_server) from [<c03a34c4>] (nfs_try_mount+0xc4/0x1f0)
+>>> [  208.023513] [<c03a34c4>] (nfs_try_mount) from [<c03a2c48>] (nfs_fs_mount+0x290/0x910)
+>>> [  208.031702] [<c03a2c48>] (nfs_fs_mount) from [<c0294d24>] (mount_fs+0x44/0x168)
+>>>
+>>> Has anyone else seen this issue?
+>>>
+>>> I'd be appreciated for any help or advice related to this issue?
 >>
->> I'm not opposed to changing the call to of_rproc_get().  
+>> I did not look at details, but because it is 4.4 and __wait_on_bit
+>> showed up you might want to look at [1]
+>>
+>> [1] https://lkml.org/lkml/2015/11/20/472
+> 
+> Thanks. I'll take a look.
+> 
 
-Also, since this is gonna be a simple helper, can we make this a static
-inline and move to the remoteproc.h header file.
+I've checked this thread and all three commits mentioned there are present in K4.4
+>=3.17
+commit 743162013d40  sched: Remove proliferation of wait_on_bit() action functions
+>=4.4
+commit 68985633bccb  sched/wait: Fix signal handling in bit wait helpers
+>=4.4
+commit dfd01f026058  sched/wait: Fix the signal handling fix
 
 
-However, I'm
->> not sure what you mean about it not matching the other OF functions.
-> 
-> The _by_name and _by_index API take in a name and index arguments, and
-> the rproc_get_by_phandle took in a phandle argument, the modified name
-> in patch 2 retains the by_phandle but without any corresponding
-> argument. That's what I meant by mismatch.
-> 
->> The nomenclature should be the same of_get_rproc_*(), no?
->>
->>> Suggest also a rename from of_get_rproc_xxx to of_rproc_get_xxx like in
->>> other subsystems.
->>
->> This suggestion does the opposite and does not fit in with the
->> majority of the of_* calls scattered around in other subsystems:
->>
->> of_get_drm
->> of_get_coresight
->> of_get_fb
->> of_get_i2c
->> of_get_regulator
->> of_get_gpio
->> of_get_mac
->> of_get_display
->> of_get_videomode
->>
->> Vs
->>
->> of_irq_get
->> of_reset_get
->> of_graph_get
->> of_msi_get
->> of_usb_get
->> of_genpd_get
->>
->> These guys have both oddly.
->>
->> of_get_dma, of_dma_get
->> of_get_pci, of_pci_get
->> of_get_phy, of_phy_get
-> 
-> Hmm, looks like there are all sorts of combinations with some like
-> <subsys>_of_get_xxx. I did search using get_name and get_index, and
-> nothing popped up differently. The ones that typical rproc drivers deal
-> with are clk, reset, irq which follow the latter convention. Given that
-> the previous API within remoteproc used to be rproc_get,
-> rproc_get_by_name (these were dropped sometime back) and
-> rproc_get_by_phandle, I still like of_rproc_get_by_index,
-> of_rproc_get_by_name, of_rproc_get and then the counter part is the
-> regular rproc_put().
-> 
-> This patch also needs one correction, the inner loop string check should
-> be ti,rproc and not ti,rprocs.
-> 
-> regards
-> Suman
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-remoteproc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+Also, It seems first patch, probably, has copy-past error.
+I'm not sure and it may be that patch is correct :)
+Any way, It doesn't help with this issue if I use wait_on_bit_lock_io in nfs_page_group_lock().
+
+743162013d40 ("sched: Remove proliferation of wait_on_bit() action functions")
+-- does:
+
+diff --git a/fs/nfs/pagelist.c b/fs/nfs/pagelist.c
+index b6ee3a6..6104d35 100644
+--- a/fs/nfs/pagelist.c
++++ b/fs/nfs/pagelist.c
+@@ -138,12 +138,6 @@ nfs_iocounter_wait(struct nfs_io_counter *c)
+        return __nfs_iocounter_wait(c);
+ }
+ 
+-static int nfs_wait_bit_uninterruptible(void *word)
+-{
+-       io_schedule();
+-       return 0;
+-}
+-
+ /*
+  * nfs_page_group_lock - lock the head of the page group
+  * @req - request in group that is to be locked
+@@ -158,7 +152,6 @@ nfs_page_group_lock(struct nfs_page *req)
+        WARN_ON_ONCE(head != head->wb_head);
+ 
+        wait_on_bit_lock(&head->wb_flags, PG_HEADLOCK,
+-                       nfs_wait_bit_uninterruptible,
+
+[GS] But it seems should be wait_on_bit_lock_io() <----
+
+                        TASK_UNINTERRUPTIBLE);
+ }
+ 
+@@ -425,9 +418,8 @@ void nfs_release_request(struct nfs_page *req)
+ int
+ nfs_wait_on_request(struct nfs_page *req)
+ {
+-       return wait_on_bit(&req->wb_flags, PG_BUSY,
+-                       nfs_wait_bit_uninterruptible,
+-                       TASK_UNINTERRUPTIBLE);
++       return wait_on_bit_io(&req->wb_flags, PG_BUSY,
++                             TASK_UNINTERRUPTIBLE);
+ }
+
+
+
+
+-- 
+regards,
+-grygorii
