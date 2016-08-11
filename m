@@ -1,37 +1,80 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 11 Aug 2016 09:32:20 +0100
-Subject: [PATCH] drm/bridge: dw-hdmi: fix hdmi display lost
-In-Reply-To: <1470902043-23384-1-git-send-email-mark.yao@rock-chips.com>
-References: <1470902043-23384-1-git-send-email-mark.yao@rock-chips.com>
-Message-ID: <20160811083220.GS1041@n2100.armlinux.org.uk>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Thu, 11 Aug 2016 10:35:53 +0200
+Subject: [RFC PATCH v3 0/8] scpi: Add SCPI registry to handle legacy
+ protocol
+In-Reply-To: <d7f260f8-5e1a-a16a-fed9-2f6d8aa8f28f@rock-chips.com>
+References: <1470738562-20026-1-git-send-email-narmstrong@baylibre.com>
+ <d7f260f8-5e1a-a16a-fed9-2f6d8aa8f28f@rock-chips.com>
+Message-ID: <c5b3fcb1-368c-5be6-fe71-1f2d444b83e0@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 11, 2016 at 03:54:03PM +0800, Mark Yao wrote:
-> hdmi->disabled maybe not match to the real hardware status.
+Hi Frank,
+
+On 08/10/2016 12:19 PM, Frank Wang wrote:
+> Hi Neil,
 > 
-> ->dw_hdmi_bridge_enable()
->   hdmi->disabled = false;
-> -->dw_hdmi_update_power()
->    if (hdmi->rxsense)
->        force = DRM_FORCE_ON;
->    else
->        force = DRM_FORCE_OFF;
+> On 2016/8/9 18:29, Neil Armstrong wrote:
+
+[...]
+
+>>
+>> Changes since RFC v2 at https://lkml.org/lkml/2016/6/21/324 :
+>>   - Moved MHU to a separate patchset posted at
+>> http://lkml.kernel.org/r/1470732737-18391-1-git-send-email-narmstrong at baylib
+>> re.com
+>>   - Added a vendor send_message callback into scpi_ops to implement vendor
+>> commands
+>>   - Implement EXT commands on arm scpi as vendor send_command
+>>   - Added Rockchip variant mailbox handling
 > 
-> hdmi->rxsense maybe false on bridge enable path, then hdmi->disabled
-> is false, but actually hardware is power off, they are not match.
+> Two questions,
+> 
+> 1. For legacy_scpi, I saw you have implemented .vendor_send_message api, however, it seems that does not distinguish standard and extended command, so it may be misleading if the vendor send out a non-standard command from their own driver module.
 
-... which is correct.  If rxsense is false, it means there is nothing
-plugged in, so we don't power the hardware up until something _is_
-plugged in.
+Actually, the vendor_send_message is for non-standard command, and since it's vendor code is should be specific to the platform and won't have any effect on other platforms.
+DDR and other rockchip specific command shoudl go through this API.
+The legacy_scpi code does not distinguish standard and extended command since nothing was made into the protocol for this.
 
-When something is plugged in, we get the HPD and RXSENSE events, which
-will cause dw_hdmi_update_power() to be called.
+> 
+> 2. For arm_scpi, it have already distinguished standard and extended command, but unfortunately, there was no rockchip_scpi_xfer structure something like in legacy_scpi driver, so if some vendor (just like Rockchip :-)) wanna switch the driver from legacy_scpi to arm_scpi, maybe this is a bit problem, how do you think?
 
-hdmi->disabled is merely a bit mask of things that would cause us to
-want to avoid powering the hardware up when rxsense becomes true.
+Yes, it could be added the same way it was added to legacy_scpi, Sudeep made the assumption it would work with any mailbox controller, but since the mailbox framework does not make any assumption about the data type between the controller and the client, such adaptation is necessary.
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Neil
+> 
+> BR.
+> Frank
+> 
+>> Initial RFC discution tread can be found at
+>> https://lkml.org/lkml/2016/5/26/111
+>>
+>> @Sudeep: I know you wished I merged the legacy into the arm_scpi, but can
+>> you take a look at the vendor extension and how I implemented the rockchip
+>> mailbox handling ?
+>>
+>> Neil Armstrong (8):
+>>    firmware: Add a SCPI registry to handle multiple implementations
+>>    firmware: scpi: Switch arm_scpi to use new registry
+>>    scpi: Add vendor_send_message to enable access to vendor commands
+>>    firmware: arm_scpi: Enable vendor_send_message as ext commands
+>>    firmware: Add legacy SCPI protocol driver
+>>    dt-bindings: arm: Update arm,scpi bindings with Meson GXBB SCPI
+>>    ARM64: dts: meson-gxbb: Add SRAM node
+>>    ARM64: dts: meson-gxbb: Add SCPI with cpufreq & sensors Nodes
+>>
+>>   Documentation/devicetree/bindings/arm/arm,scpi.txt |   8 +-
+>>   arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi        |  45 ++
+>>   drivers/firmware/Kconfig                           |  24 +
+>>   drivers/firmware/Makefile                          |   2 +
+>>   drivers/firmware/arm_scpi.c                        |  40 +-
+>>   drivers/firmware/legacy_scpi.c                     | 710
+>> +++++++++++++++++++++
+>>   drivers/firmware/scpi.c                            |  94 +++
+>>   include/linux/scpi_protocol.h                      |  20 +-
+>>   8 files changed, 928 insertions(+), 15 deletions(-)
+>>   create mode 100644 drivers/firmware/legacy_scpi.c
+>>   create mode 100644 drivers/firmware/scpi.c
+>>
+> 
+> 
