@@ -1,44 +1,104 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 11 Aug 2016 10:50:41 +0100
-Subject: [PATCH 1/3] arm-ccn: fix PMU interrupt flags
+Date: Thu, 11 Aug 2016 10:50:42 +0100
+Subject: [PATCH 2/3] arm-ccn: fix hrtimer registration
 In-Reply-To: <1470909043-7663-1-git-send-email-mark.rutland@arm.com>
 References: <1470909043-7663-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1470909043-7663-2-git-send-email-mark.rutland@arm.com>
+Message-ID: <1470909043-7663-3-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently the IRQ core is permitted to make the CCN PMU IRQ handler
-threaded, and will allow userspace to change the CPU affinity of the
-interrupt behind our back. Both of these could violate our
-synchronisation requirements with the core perf code, which relies upon
-strict CPU affinity and disabling of interrupts to guarantee mutual
-exclusion in some cases.
+The CCN PMU driver has a single hrtimer, used to simulate a periodic
+interrupt on systems where the overflow interrupt is not possible to
+use. The hrtimer is started when any event is started, and cancelled when
+any event is stopped. Thus, stopping a single event is sufficient to
+disable to hrtimer, and overflows (of other events) may be lost.
 
-As with the CPU PMU drivers, we should request the interrupt with
-IRQF_NOBALANCING and IRQF_NO_THREAD, to avoid these issues.
+To avoid this, this patch reworks the hrtimer start/cancel to only occur
+when the first event is added to a PMU, and the last event removed,
+making use of the existing bitmap counting active events.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Acked-by: Pawel Moll <pawel.moll@arm.com>
-Reviewed-by: Will Deacon <will.deacon@arm.com>
+Cc: Pawel Moll <pawel.moll@arm.com>
 ---
- drivers/bus/arm-ccn.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+ drivers/bus/arm-ccn.c | 33 +++++++++++++++++++++------------
+ 1 file changed, 21 insertions(+), 12 deletions(-)
 
 diff --git a/drivers/bus/arm-ccn.c b/drivers/bus/arm-ccn.c
-index cbb2771..28b1d66 100644
+index 28b1d66..e07cd51b 100644
 --- a/drivers/bus/arm-ccn.c
 +++ b/drivers/bus/arm-ccn.c
-@@ -1475,8 +1475,9 @@ static int arm_ccn_probe(struct platform_device *pdev)
- 		/* Can set 'disable' bits, so can acknowledge interrupts */
- 		writel(CCN_MN_ERRINT_STATUS__PMU_EVENTS__ENABLE,
- 				ccn->base + CCN_MN_ERRINT_STATUS);
--		err = devm_request_irq(ccn->dev, irq, arm_ccn_irq_handler, 0,
--				dev_name(ccn->dev), ccn);
-+		err = devm_request_irq(ccn->dev, irq, arm_ccn_irq_handler,
-+				       IRQF_NOBALANCING | IRQF_NO_THREAD,
-+				       dev_name(ccn->dev), ccn);
- 		if (err)
- 			return err;
+@@ -921,15 +921,6 @@ static void arm_ccn_pmu_event_start(struct perf_event *event, int flags)
+ 			arm_ccn_pmu_read_counter(ccn, hw->idx));
+ 	hw->state = 0;
  
+-	/*
+-	 * Pin the timer, so that the overflows are handled by the chosen
+-	 * event->cpu (this is the same one as presented in "cpumask"
+-	 * attribute).
+-	 */
+-	if (!ccn->irq)
+-		hrtimer_start(&ccn->dt.hrtimer, arm_ccn_pmu_timer_period(),
+-				HRTIMER_MODE_REL_PINNED);
+-
+ 	/* Set the DT bus input, engaging the counter */
+ 	arm_ccn_pmu_xp_dt_config(event, 1);
+ }
+@@ -943,9 +934,6 @@ static void arm_ccn_pmu_event_stop(struct perf_event *event, int flags)
+ 	/* Disable counting, setting the DT bus to pass-through mode */
+ 	arm_ccn_pmu_xp_dt_config(event, 0);
+ 
+-	if (!ccn->irq)
+-		hrtimer_cancel(&ccn->dt.hrtimer);
+-
+ 	/* Let the DT bus drain */
+ 	timeout = arm_ccn_pmu_read_counter(ccn, CCN_IDX_PMU_CYCLE_COUNTER) +
+ 			ccn->num_xps;
+@@ -1103,15 +1091,31 @@ static void arm_ccn_pmu_event_config(struct perf_event *event)
+ 	spin_unlock(&ccn->dt.config_lock);
+ }
+ 
++static int arm_ccn_pmu_active_counters(struct arm_ccn *ccn)
++{
++	return bitmap_weight(ccn->dt.pmu_counters_mask,
++			     CCN_NUM_PMU_EVENT_COUNTERS + 1);
++}
++
+ static int arm_ccn_pmu_event_add(struct perf_event *event, int flags)
+ {
+ 	int err;
+ 	struct hw_perf_event *hw = &event->hw;
++	struct arm_ccn *ccn = pmu_to_arm_ccn(event->pmu);
+ 
+ 	err = arm_ccn_pmu_event_alloc(event);
+ 	if (err)
+ 		return err;
+ 
++	/*
++	 * Pin the timer, so that the overflows are handled by the chosen
++	 * event->cpu (this is the same one as presented in "cpumask"
++	 * attribute).
++	 */
++	if (!ccn->irq && arm_ccn_pmu_active_counters(ccn) == 1)
++		hrtimer_start(&ccn->dt.hrtimer, arm_ccn_pmu_timer_period(),
++			      HRTIMER_MODE_REL_PINNED);
++
+ 	arm_ccn_pmu_event_config(event);
+ 
+ 	hw->state = PERF_HES_STOPPED;
+@@ -1124,9 +1128,14 @@ static int arm_ccn_pmu_event_add(struct perf_event *event, int flags)
+ 
+ static void arm_ccn_pmu_event_del(struct perf_event *event, int flags)
+ {
++	struct arm_ccn *ccn = pmu_to_arm_ccn(event->pmu);
++
+ 	arm_ccn_pmu_event_stop(event, PERF_EF_UPDATE);
+ 
+ 	arm_ccn_pmu_event_release(event);
++
++	if (!ccn->irq && arm_ccn_pmu_active_counters(ccn) == 0)
++		hrtimer_cancel(&ccn->dt.hrtimer);
+ }
+ 
+ static void arm_ccn_pmu_event_read(struct perf_event *event)
 -- 
 1.9.1
