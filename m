@@ -1,79 +1,92 @@
-From: panand@redhat.com (Pratyush Anand)
-Date: Thu, 11 Aug 2016 15:33:10 +0530
-Subject: [PATCH v24 5/9] arm64: kdump: add kdump support
-In-Reply-To: <20160810181827.GC24137@localhost.localdomain>
-References: <20160809015248.28414-2-takahiro.akashi@linaro.org>
- <20160809015615.28527-1-takahiro.akashi@linaro.org>
- <20160809015615.28527-3-takahiro.akashi@linaro.org>
- <57AB586D.3080900@arm.com>
- <20160810181827.GC24137@localhost.localdomain>
-Message-ID: <20160811100310.GA29357@localhost.localdomain>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Thu, 11 Aug 2016 12:06:30 +0200
+Subject: [PATCH V8 0/8] Introduce ACPI world to ITS irqchip
+Message-ID: <1470909998-16710-1-git-send-email-tn@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/08/2016:11:48:27 PM, Pratyush Anand wrote:
-> On 10/08/2016:05:38:05 PM, James Morse wrote:
-> > =========================%<=========================
-> > diff --git a/arch/arm64/kernel/crash_dump.c b/arch/arm64/kernel/crash_dump.c
-> > index 2dc54d129be1..784d4c30b534 100644
-> > --- a/arch/arm64/kernel/crash_dump.c
-> > +++ b/arch/arm64/kernel/crash_dump.c
-> > @@ -37,6 +37,11 @@ ssize_t copy_oldmem_page(unsigned long pfn, char *buf,
-> >         if (!csize)
-> >                 return 0;
-> > 
-> > +       if (memblock_is_memory(pfn << PAGE_SHIFT) &&
-> > +           !memblock_is_map_memory(pfn << PAGE_SHIFT))
-> > +               /* skip this nomap memory region, reserved by firmware */
-> > +               return 0;
+The series builds the PCI/MSI domain stack based on initial IORT driver
+which is added in first place. As a reference please see IORT spec:
+http://infocenter.arm.com/help/topic/com.arm.doc.den0049b/DEN0049B_IO_Remapping_Table.pdf
 
-This should return 0 or -EINVAL? because, its caller does not care properly
-about 0 return value (when csize is non-zero). So either we need to return
--EINVAL or we need to fix it's caller so that pread() would know that required
-number of data were not read.
+Tested on Cavium ThunderX server and Qualcomm Technologies server platform QDF2XXX.
+The patches can be found here:
+https://github.com/semihalf-nowicki-tomasz/linux.git (its-acpi-v8)
 
-> > +
-> >         vaddr = ioremap_cache(__pfn_to_phys(pfn), PAGE_SIZE);
-> >         if (!vaddr)
-> >                 return -ENOMEM;
-> > =========================%<=========================
-> 
-> In any case kernel must not panic, so I think we must have above hunk. However,
-> we also need to look into kexec-tools that why it is asking kernel to copy those
-> unneeded chunks.
-> 
-> I will test tomorrow with above hunk.
+v7 -> v8
+- rebased against v4.8-rc1
+- move IORT support under new drivers/acpi/arm64 directory
+- memory leak fix for iort_match_node_callback()
+- iort_node_map_rid() algorithm improvements
+- fix RID match check in iort_id_map()
+- fix typos and white spaces
 
-After that hunk it did not crash but vmcore-dmesg fails with following message:
-"No program header covering vaddr 0x401ff0found kexec bug?"
+v6 -> v7
+- rebased against irq/irqchip-4.8
+- improvements for IORT ID mapping
+- call IORT init call from acpi_init() instead of arch_initcall()
+- split IORT driver in to two parts: core and ITS/MSI
 
-It happened because vmcore-dmesg is sending wrong offset to the pread(), and so
-it did not crash after the above kernel hunk but it still read garbage wrong
-log_buf virtual address pointer.
+v5 -> v6
+- added locking mechanism for IORT list with domain token
+- IORT function name improvements
+- extended IORT RID mapping helper
+- reworked IORT to be more SMMU friendly
+- IORT functions which map RID and find corresponding domain are not
+  PCI specific any more (struct pci_dev -> struct device)
+- bug fixes
 
-vmcore-dmesg is sending wrong offset because page_offset(vp_offset) calculation
-is not perfect for my case, explained here [1].
+v4 -> v5
+- rebased against v4.7-rc1
+- drop generic layer and call IORT functions directly
+- improve resource abstraction and string formatting
 
-So, if I correct page_offset(vp_offset) (as arm64_mem.page_offset = ehdr.e_entry
-- "kernel Code Start PA" + phys_offset), then vmcore-dmesg and vmcore copy
-worked fine, however if I use makedumpfile to copy(compressed) data from
-/proc/vmcore then it still generates "synchronous external abort". I think, it
-generated because it would have found garbage data in EFI memory region. My
-/proc/iomem shows following:
+v3 -> v4
+- rebased against v4.5
+- add ACPI support for IRQ domain handling on a per-device basis
+- reorder domain setup step
+- improve error handling
+- code style improvements
 
-8000000000-8001e7ffff : System RAM
-8001e80000-83ff17ffff : System RAM
-  8002080000-8002b3ffff : Kernel code
-  8002c40000-800348ffff : Kernel data
-  807fe00000-80ffdfffff : Crash kernel
-83ff180000-83ff1cffff : System RAM
-83ff1d0000-83ff21ffff : System RAM
-83ff220000-83ffe4ffff : System RAM
-83ffe50000-83ffffffff : System RAM
+v2 -> v3
+- rebased on top of 4.4
+- fixes and improvements for redistributor init via GICC structures
+- fixes as per kbuild reports
 
-If I clip all the region before "kernel code" and provide that clipped
-input to kexec-tools then everything works fine.
+v1 -> v2
+- rebased on top of 4.4-rc4
+- use pci_msi_domain_get_msi_rid for requester ID to device ID translation
 
-~Pratyush
+Tomasz Nowicki (8):
+  ACPI: I/O Remapping Table (IORT) initial support
+  ACPI: Add new IORT functions to support MSI domain handling
+  PCI/MSI: Setup MSI domain on a per-device basis using IORT ACPI table
+  irqchip/gicv3-its: Cleanup for ITS domain initialization
+  irqchip/gicv3-its: Refactor ITS DT init code to prepare for ACPI
+  irqchip/gicv3-its: Probe ITS in the ACPI way
+  irqchip/gicv3-its: Factor out PCI-MSI part that might be reused for
+    ACPI
+  irqchip/gicv3-its: Use MADT ITS subtable to do PCI/MSI domain
+    initialization
 
-[1] http://lists.infradead.org/pipermail/kexec/2016-August/016834.html
+ drivers/acpi/Kconfig                     |   5 +
+ drivers/acpi/Makefile                    |   2 +
+ drivers/acpi/arm64/Kconfig               |   6 +
+ drivers/acpi/arm64/Makefile              |   1 +
+ drivers/acpi/arm64/iort.c                | 387 +++++++++++++++++++++++++++++++
+ drivers/acpi/bus.c                       |   2 +
+ drivers/irqchip/Kconfig                  |   1 +
+ drivers/irqchip/irq-gic-v3-its-pci-msi.c |  88 +++++--
+ drivers/irqchip/irq-gic-v3-its.c         | 169 ++++++++++----
+ drivers/irqchip/irq-gic-v3.c             |   7 +-
+ drivers/pci/msi.c                        |  11 +-
+ include/linux/iort.h                     |  41 ++++
+ include/linux/irqchip/arm-gic-v3.h       |   4 +-
+ 13 files changed, 654 insertions(+), 70 deletions(-)
+ create mode 100644 drivers/acpi/arm64/Kconfig
+ create mode 100644 drivers/acpi/arm64/Makefile
+ create mode 100644 drivers/acpi/arm64/iort.c
+ create mode 100644 include/linux/iort.h
+
+-- 
+1.9.1
