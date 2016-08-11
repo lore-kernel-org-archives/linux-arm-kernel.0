@@ -1,29 +1,44 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 11 Aug 2016 10:50:40 +0100
-Subject: [PATCH 0/3] arm-ccn: fixes
-Message-ID: <1470909043-7663-1-git-send-email-mark.rutland@arm.com>
+Date: Thu, 11 Aug 2016 10:50:41 +0100
+Subject: [PATCH 1/3] arm-ccn: fix PMU interrupt flags
+In-Reply-To: <1470909043-7663-1-git-send-email-mark.rutland@arm.com>
+References: <1470909043-7663-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <1470909043-7663-2-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pawel,
+Currently the IRQ core is permitted to make the CCN PMU IRQ handler
+threaded, and will allow userspace to change the CPU affinity of the
+interrupt behind our back. Both of these could violate our
+synchronisation requirements with the core perf code, which relies upon
+strict CPU affinity and disabling of interrupts to guarantee mutual
+exclusion in some cases.
 
-These patches fix a few issues I spotted in the ARM CCN driver.
+As with the CPU PMU drivers, we should request the interrupt with
+IRQF_NOBALANCING and IRQF_NO_THREAD, to avoid these issues.
 
-I'd previously sent the first patch on its own, but as it wasn't picked up I've
-rolled it up with the new patches.
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Acked-by: Pawel Moll <pawel.moll@arm.com>
+Reviewed-by: Will Deacon <will.deacon@arm.com>
+---
+ drivers/bus/arm-ccn.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-I'm hoping that you will queue these with any other CCN driver updates. ;)
-
-Thanks,
-Mark.
-
-Mark Rutland (3):
-  arm-ccn: fix PMU interrupt flags
-  arm-ccn: fix hrtimer registration
-  arm-ccn: make event groups reliable
-
- drivers/bus/arm-ccn.c | 67 +++++++++++++++++++++++++++++++++------------------
- 1 file changed, 44 insertions(+), 23 deletions(-)
-
+diff --git a/drivers/bus/arm-ccn.c b/drivers/bus/arm-ccn.c
+index cbb2771..28b1d66 100644
+--- a/drivers/bus/arm-ccn.c
++++ b/drivers/bus/arm-ccn.c
+@@ -1475,8 +1475,9 @@ static int arm_ccn_probe(struct platform_device *pdev)
+ 		/* Can set 'disable' bits, so can acknowledge interrupts */
+ 		writel(CCN_MN_ERRINT_STATUS__PMU_EVENTS__ENABLE,
+ 				ccn->base + CCN_MN_ERRINT_STATUS);
+-		err = devm_request_irq(ccn->dev, irq, arm_ccn_irq_handler, 0,
+-				dev_name(ccn->dev), ccn);
++		err = devm_request_irq(ccn->dev, irq, arm_ccn_irq_handler,
++				       IRQF_NOBALANCING | IRQF_NO_THREAD,
++				       dev_name(ccn->dev), ccn);
+ 		if (err)
+ 			return err;
+ 
 -- 
 1.9.1
