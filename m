@@ -1,77 +1,48 @@
-From: stillcompiling@gmail.com (Joshua Clayton)
-Date: Thu, 11 Aug 2016 09:40:32 -0700
-Subject: [PATCH 3/3] ARM: dts: imx6q-evi: Fix onboard hub reset line
-In-Reply-To: <1470933632-22133-1-git-send-email-stillcompiling@gmail.com>
-References: <20160810030254.GD1879@shlinux2>
- <1470933632-22133-1-git-send-email-stillcompiling@gmail.com>
-Message-ID: <1470933632-22133-4-git-send-email-stillcompiling@gmail.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 11 Aug 2016 17:44:05 +0100
+Subject: [PATCH 1/2] iommu/io-pgtable-arm-v7s: Fix attributes when splitting
+ blocks
+Message-ID: <e1733d2c426f73441abc12a386d23ab2546c536a.1470933167.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Previously the onboard hub was made to work by treating its
-reset gpio as a regulator enable.
-Get rid of that kludge now that pwseq has added reset gpio support
-Move pin muxing the hub reset pin into the usbh1 group
+Due to the attribute bits being all over the place in the different
+types of short-descriptor PTEs, when remapping an existing entry, e.g.
+splitting a section into pages, we take the approach of decomposing
+the PTE attributes back to the IOMMU API flags to start from scratch.
 
-Signed-off-by: Joshua Clayton <stillcompiling@gmail.com>
+On inspection, though, the existing code seems to have got the read-only
+bit backwards and ignored the XN bit. How embarrassing...
+
+Fortunately the primary user so far, the Mediatek IOMMU, both never
+splits blocks (because it only serves non-overlapping DMA API calls) and
+also ignores permissions anyway, but let's put things right before any
+future users trip up.
+
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 ---
- arch/arm/boot/dts/imx6q-evi.dts | 25 +++++++------------------
- 1 file changed, 7 insertions(+), 18 deletions(-)
+ drivers/iommu/io-pgtable-arm-v7s.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/imx6q-evi.dts b/arch/arm/boot/dts/imx6q-evi.dts
-index 4fa5601..49c6f61 100644
---- a/arch/arm/boot/dts/imx6q-evi.dts
-+++ b/arch/arm/boot/dts/imx6q-evi.dts
-@@ -54,18 +54,6 @@
- 		reg = <0x10000000 0x40000000>;
- 	};
+diff --git a/drivers/iommu/io-pgtable-arm-v7s.c b/drivers/iommu/io-pgtable-arm-v7s.c
+index 8c6139986d7d..def8ca1c982d 100644
+--- a/drivers/iommu/io-pgtable-arm-v7s.c
++++ b/drivers/iommu/io-pgtable-arm-v7s.c
+@@ -286,12 +286,14 @@ static int arm_v7s_pte_to_prot(arm_v7s_iopte pte, int lvl)
+ 	int prot = IOMMU_READ;
+ 	arm_v7s_iopte attr = pte >> ARM_V7S_ATTR_SHIFT(lvl);
  
--	reg_usbh1_vbus: regulator-usbhubreset {
--		compatible = "regulator-fixed";
--		regulator-name = "usbh1_vbus";
--		regulator-min-microvolt = <5000000>;
--		regulator-max-microvolt = <5000000>;
--		enable-active-high;
--		startup-delay-us = <2>;
--		pinctrl-names = "default";
--		pinctrl-0 = <&pinctrl_usbh1_hubreset>;
--		gpio = <&gpio7 12 GPIO_ACTIVE_HIGH>;
--	};
--
- 	reg_usb_otg_vbus: regulator-usbotgvbus {
- 		compatible = "regulator-fixed";
- 		regulator-name = "usb_otg_vbus";
-@@ -204,12 +192,18 @@
- };
+-	if (attr & ARM_V7S_PTE_AP_RDONLY)
++	if (!(attr & ARM_V7S_PTE_AP_RDONLY))
+ 		prot |= IOMMU_WRITE;
+ 	if ((attr & (ARM_V7S_TEX_MASK << ARM_V7S_TEX_SHIFT)) == 0)
+ 		prot |= IOMMU_MMIO;
+ 	else if (pte & ARM_V7S_ATTR_C)
+ 		prot |= IOMMU_CACHE;
++	if (pte & ARM_V7S_ATTR_XN(lvl))
++		prot |= IOMMU_NOEXEC;
  
- &usbh1 {
--	vbus-supply = <&reg_usbh1_vbus>;
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_usbh1>;
- 	dr_mode = "host";
- 	disable-over-current;
- 	status = "okay";
-+
-+	usb2415host: hub at 1 {
-+		compatible = "usb424,2513";
-+		reg = <1>;
-+		reset-gpios = <&gpio7 12 GPIO_ACTIVE_LOW>;
-+		reset-duration-us = <3000>;
-+	};
- };
- 
- &usbotg {
-@@ -467,11 +461,6 @@
- 			MX6QDL_PAD_GPIO_3__USB_H1_OC 0x1b0b0
- 			/* usbh1_b OC */
- 			MX6QDL_PAD_GPIO_0__GPIO1_IO00 0x1b0b0
--		>;
--	};
--
--	pinctrl_usbh1_hubreset: usbh1hubresetgrp {
--		fsl,pins = <
- 			MX6QDL_PAD_GPIO_17__GPIO7_IO12 0x1b0b0
- 		>;
- 	};
+ 	return prot;
+ }
 -- 
-2.7.4
+2.8.1.dirty
