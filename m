@@ -1,116 +1,184 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 11 Aug 2016 12:25:53 +0300
-Subject: [PATCH] ARM: dts: am335x-wega: Add audio support
-In-Reply-To: <1470841935-14190-1-git-send-email-s.mueller-klieser@phytec.de>
-References: <1470841935-14190-1-git-send-email-s.mueller-klieser@phytec.de>
-Message-ID: <7109f6e5-e7fd-4b60-98b7-85b9d78ef690@ti.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Thu, 11 Aug 2016 10:30:57 +0100
+Subject: [PATCH v3 15/15] ARM64: dts: Define CPU power domain for MSM8916
+In-Reply-To: <20160810173543.GB1401@linaro.org>
+References: <1470351902-43103-1-git-send-email-lina.iyer@linaro.org>
+ <1470351902-43103-16-git-send-email-lina.iyer@linaro.org>
+ <aae203cd-35ee-958f-bc59-b9d53c32aeb2@arm.com>
+ <20160810173543.GB1401@linaro.org>
+Message-ID: <3307b0e2-5ad3-8e56-05e6-ed0297a0b8ce@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/10/16 18:12, Stefan M?ller-Klieser wrote:
-> The wega board has a TLV320AIC3007 connected via McASP0. In the default
-> configuration, no external crystal is mounted. We run a system clock of
-> 25 MHz, so we use the audio codec PLL for audio clock generation.
 
-It is great that the "ti,da830-evm-audio" works for you. I hope I will have
-time soon to work on the McASP driver's CCF support in the near future.
 
-Reviewed-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+On 10/08/16 18:35, Lina Iyer wrote:
+> On Wed, Aug 10 2016 at 09:27 -0600, Sudeep Holla wrote:
+>>
+>>
+>> On 05/08/16 00:05, Lina Iyer wrote:
+>>> Define power domain and the power states for the domain as defined by
+>>> the PSCI firmware.
+>>
+>>> The 8916 firmware supports OS initiated method of
+>>> powering off the CPU clusters.
+>>
+>> How is that related to the this DTS change, more details below ?
+>>
+>>>
+>>> Cc: <devicetree@vger.kernel.org>
+>>> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+>>> ---
+>>> arch/arm64/boot/dts/qcom/msm8916.dtsi | 27 +++++++++++++++++++++++++++
+>>> 1 file changed, 27 insertions(+)
+>>>
+>>> diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi
+>>> b/arch/arm64/boot/dts/qcom/msm8916.dtsi
+>>> index 3029773..eb0aaed 100644
+>>> --- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
+>>> +++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
+>>> @@ -64,6 +64,7 @@
+>>>             next-level-cache = <&L2_0>;
+>>>             enable-method = "psci";
+>>>             cpu-idle-states = <&CPU_SPC>;
+>>> +            power-domains = <&CPU_PD>;
+>>
+>> This is really messy. We need to have idle state information at one
+>> place. I prefer to have a hierarchal representation of power-domains
+>> for CPU with idle-states at each level.
+>>
+>>>         };
+> I see where are going with that. We need to then isolate idle states
+> from all devices (including CPU) and put them under the umberella of the
+> domain/parent idle states.
+>
+> We also need to remember that domain idle states are not just for CPU
+> domains. There are generic PM domains that also define their idle
+> states. For some, that hierarchy may not make sense. So forcing it on
+> all domains is not correct as well.
+>
 
-> Signed-off-by: Stefan M?ller-Klieser <s.mueller-klieser@phytec.de>
-> ---
->  arch/arm/boot/dts/am335x-wega.dtsi | 62 ++++++++++++++++++++++++++++++++++++++
->  1 file changed, 62 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/am335x-wega.dtsi b/arch/arm/boot/dts/am335x-wega.dtsi
-> index 282f6d4..7f5f8ed 100644
-> --- a/arch/arm/boot/dts/am335x-wega.dtsi
-> +++ b/arch/arm/boot/dts/am335x-wega.dtsi
-> @@ -11,6 +11,10 @@
->  	model = "Phytec AM335x phyBOARD-WEGA";
->  	compatible = "phytec,am335x-wega", "phytec,am335x-phycore-som", "ti,am33xx";
->  
-> +	sound: sound_iface {
-> +		compatible = "ti,da830-evm-audio";
-> +	};
-> +
->  	regulators {
->  		compatible = "simple-bus";
->  
-> @@ -24,6 +28,58 @@
->  	};
->  };
->  
-> +/* Audio */
-> +&am33xx_pinmux {
-> +	mcasp0_pins: pinmux_mcasp0 {
-> +		pinctrl-single,pins = <
-> +			AM33XX_IOPAD(0x9AC, PIN_OUTPUT_PULLDOWN | MUX_MODE0) /* mcasp0_ahclkx.mcasp0_ahclkx */
-> +			AM33XX_IOPAD(0x990, PIN_INPUT_PULLDOWN | MUX_MODE0)  /* mcasp0_aclkx.mcasp0_aclkx */
-> +			AM33XX_IOPAD(0x994, PIN_INPUT_PULLDOWN | MUX_MODE0)  /* mcasp0_fsx.mcasp0_fsx */
-> +			AM33XX_IOPAD(0x998, PIN_INPUT_PULLDOWN | MUX_MODE0)  /* mcasp0_axr0.mcasp0_axr0 */
-> +			AM33XX_IOPAD(0x9A8, PIN_OUTPUT_PULLDOWN | MUX_MODE0) /* mcasp0_axr1.mcasp0_axr1 */
-> +		>;
-> +	};
-> +};
-> +
-> +&i2c0 {
-> +	tlv320aic3007: tlv320aic3007 at 18 {
-> +		compatible = "ti,tlv320aic3007";
-> +		reg = <0x18>;
-> +		AVDD-supply = <&vcc3v3>;
-> +		IOVDD-supply = <&vcc3v3>;
-> +		DRVDD-supply = <&vcc3v3>;
-> +		DVDD-supply = <&vdig1_reg>;
-> +		status = "okay";
-> +	};
-> +};
-> +
-> +&mcasp0 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&mcasp0_pins>;
-> +	op-mode = <0>; /* DAVINCI_MCASP_IIS_MODE */
-> +	tdm-slots = <2>;
-> +	serial-dir = <
-> +		2 1 0 0 /* # 0: INACTIVE, 1: TX, 2: RX */
-> +	>;
-> +	tx-num-evt = <16>;
-> +	rt-num-evt = <16>;
-> +	status = "okay";
-> +};
-> +
-> +&sound {
-> +	ti,model = "AM335x-Wega";
-> +	ti,audio-codec = <&tlv320aic3007>;
-> +	ti,mcasp-controller = <&mcasp0>;
-> +	ti,audio-routing =
-> +		"Line Out",		"LLOUT",
-> +		"Line Out",		"RLOUT",
-> +		"LINE1L",		"Line In",
-> +		"LINE1R",		"Line In";
-> +	clocks = <&mcasp0_fck>;
-> +	clock-names = "mclk";
-> +	status = "okay";
-> +};
-> +
->  /* CAN Busses */
->  &am33xx_pinmux {
->  	dcan1_pins: pinmux_dcan1 {
-> @@ -99,6 +155,12 @@
->  	status = "okay";
->  };
->  
-> +/* Power */
-> +&vdig1_reg {
-> +	regulator-boot-on;
-> +	regulator-always-on;
-> +};
-> +
->  /* UARTs */
->  &am33xx_pinmux {
->  	uart0_pins: pinmux_uart0 {
-> 
+Yes again I absolutely agree with that. But just represent the hierarchy
+present in the hardware in the DT. If it doesn't exist in the hardware
+for some device, then it won't be represented.
 
+>>>
+>>>         CPU1: cpu at 1 {
+>>> @@ -73,6 +74,7 @@
+>>>             next-level-cache = <&L2_0>;
+>>>             enable-method = "psci";
+>>>             cpu-idle-states = <&CPU_SPC>;
+>>> +            power-domains = <&CPU_PD>;
+>>>         };
+>>>
+>>>         CPU2: cpu at 2 {
+>>> @@ -82,6 +84,7 @@
+>>>             next-level-cache = <&L2_0>;
+>>>             enable-method = "psci";
+>>>             cpu-idle-states = <&CPU_SPC>;
+>>> +            power-domains = <&CPU_PD>;
+>>>         };
+>>>
+>>>         CPU3: cpu at 3 {
+>>> @@ -91,6 +94,7 @@
+>>>             next-level-cache = <&L2_0>;
+>>>             enable-method = "psci";
+>>>             cpu-idle-states = <&CPU_SPC>;
+>>> +            power-domains = <&CPU_PD>;
+>>>         };
+>>>
+>>>         L2_0: l2-cache {
+>>> @@ -113,6 +117,29 @@
+>>>     psci {
+>>>         compatible = "arm,psci-1.0";
+>>>         method = "smc";
+>>
+>> Why is it inside PSCI node ? I don't see a need for that.
+>> If it needs to be here, then amend the binding document.
+>>
+> It is described in patch 13/15.
+>
+> It is inside PSCI node, because PSCI has the domain controller.
+>
+
+OK, I haven't gone through all the patches, I was just interested in
+the binding. Sorry for that.
+
+>>> +
+>>> +        CPU_PD: cpu-pd at 0 {
+>>> +            #power-domain-cells = <0>;
+>>> +            domain-idle-states = <&CLUSTER_RET>, <&CLUSTER_PWR_DWN>;
+>>> +        };
+>>> +
+>>> +        domain-states {
+>>> +            CLUSTER_RET: domain_ret {
+>>> +                compatible = "arm,idle-state";
+>>> +                arm,psci-suspend-param = <0x1000010>;
+>>> +                entry-latency-us = <500>;
+>>> +                exit-latency-us = <500>;
+>>> +                min-residency-us = <2000>;
+>>> +            };
+>>> +
+>>> +            CLUSTER_PWR_DWN: domain_gdhs {
+>>> +                compatible = "arm,idle-state";
+>>> +                arm,psci-suspend-param = <0x1000030>;
+>>> +                entry-latency-us = <2000>;
+>>> +                exit-latency-us = <2000>;
+>>> +                min-residency-us = <6000>;
+>>> +            };
+>>> +        };
+>>
+>> So how do you collapse these states into the cpu level states ?
+> Why do you have to collapse?
+>
+
+To deal with platform co-ordinated mode of cpu idle support. I think I
+gave an example in the other email.
+
+>> We should be able to cope up with platform co-ordinated mode of idle.
+>> For me, this binding and the representation here is designed only to
+>> address OS co-ordinated mode of idle support but it should be other way
+>> around. Design the bindings that can cater any mode (platform and OS
+>> co-ordinated)
+> As explained to Brendan on the version2 of the series, OSI and PC are
+> orthagonal to each other. The idle state definition in the devicetree
+> exactly matches the unique approaches of these 2 modes.
+>
+
+We don't design bindings that depend on the software approaches or
+configurations. It should represent the hardware.
+
+> In platform coordinated, the CPU determines the idle state of the domain
+> and selects the state, hence it makes sense to extend the
+> cpu-idle-states to cover those domain states.
+>
+
+So, are you saying that old bindings are for platform co-ordinated mode
+and these new ones are for OS co-ordinated mode. Make it clear in the
+binding document and get explicit approval from the DT maintainers for
+that. I really don't like that approach.
+
+> In OSI, the CPUs only determine their idle states. When they are done
+> with their idle state, they bubble up and let the domain choose its idle
+> state and therefore the domain-idle-states is part of the domain
+> controller.
+>
+
+I understand that, but I don't like the approach taken to define the DT
+bindings. DT should have one or the other form and any mode can be used
+as long as firmware is queried and put into appropriate mode of operation.
+
+> With this addition platform coordinated representation is not broken. If
+> your SoC supports both platform and os modes, then you can specify the
+> idle states of both of them in the DT. The clause in firmware/psci.c
+> will however, choose OSI if its available. I am not sure we want to
+> dynamically switch betweeen OSI and PC at runtime.
+>
+
+How ? cpu-idle-states in CPU node can't have both:
+1. just it's idles states, and
+2. complete list of flattened idle states as it' is present today.
 
 -- 
-P?ter
+Regards,
+Sudeep
