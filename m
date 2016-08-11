@@ -1,46 +1,43 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 11 Aug 2016 08:31:20 -0500
-Subject: [PATCH 1/2] dt: bindings: Add vendor prefix for Espressif System
-In-Reply-To: <2b43330e-369d-7473-8b73-429f0f0b73ce@redhat.com>
-References: <1470596269-20572-1-git-send-email-hdegoede@redhat.com>
- <20160810184845.GA17829@rob-hp-laptop>
- <2b43330e-369d-7473-8b73-429f0f0b73ce@redhat.com>
-Message-ID: <CAL_Jsq+uy-P54enk5Zho=nRab4PMEbqyBTEWiE0yhWWVoFTmwQ@mail.gmail.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Thu, 11 Aug 2016 21:36:45 +0800
+Subject: [PATCH v2 0/4] arm64: put objects into proper sections
+Message-ID: <1470922609-754-1-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 11, 2016 at 4:15 AM, Hans de Goede <hdegoede@redhat.com> wrote:
-> Hi Rob,
->
->
-> On 10-08-16 20:48, Rob Herring wrote:
->>
->> On Sun, Aug 07, 2016 at 08:57:48PM +0200, Hans de Goede wrote:
->>>
->>> Espressif is a manufacturer of various wifi and bt chips, add a vendor
->>> prefix for use with bindings for these chips.
->>>
->>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->>> ---
->>>  Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
->>>  1 file changed, 1 insertion(+)
->>
->>
->> Acked-by: Rob Herring <robh@kernel.org>
->
->
-> Thank you for all the reviews.
->
-> What about: "[PATCH 2/2] dt: bindings: Add binding for ESP8089 wifi chips" ?
-> there were some remarks, but I believe that those have been addressed
-> (by answering the remarks, not with a new version), so a review of that
-> one would be appreciated too.
+This series tries to put objects into proper sections.
 
-What about Arnd's comment "better use '-' instead of '_' for property names."
+patch1 puts alloc_vectors_page() into .init section. This is a clean up
+patch.
+patch2 constify vm_special_mapping used for aarch32 vectors page.
+patch3 fix the incorrect placement of __initdata and __read_mostly
+patch4 apply __ro_after_init to some objects
 
-> Also who should merge this series, Ulf because it is mmc related,
-> or the dt-maintainers since it contains only bindings patches ?
+Previously I only want to mark vdso_pages, vdso_spec, vectors_page and
+cpu_ops as __read_mostly for performance reason. Then inspired by
+Kees's patch[1], I think __ro_after_init is better.
 
-I can take it.
+[1] http://www.spinics.net/lists/arm-kernel/msg523188.html
 
-Rob
+Changes since v1:
+  - use __ro_after_init instead of __read_mostly
+  - find more objects to be suitable for __ro_after_init
+  - add one more patch to fix the incorrect placement of __initdata and
+    __read_mostly
+
+Jisheng Zhang (4):
+  arm64: vdso: add __init section marker to alloc_vectors_page
+  arm64: vdso: constify vm_special_mapping used for aarch32 vectors page
+  arm64: kaslr: Fix incorrect placement of __initdata and __read_mostly
+  arm64: apply __ro_after_init to some objects
+
+ arch/arm64/kernel/cpu_ops.c |  2 +-
+ arch/arm64/kernel/kaslr.c   |  4 ++--
+ arch/arm64/kernel/vdso.c    | 31 +++++++++++++++----------------
+ arch/arm64/mm/dma-mapping.c |  2 +-
+ arch/arm64/mm/init.c        |  4 ++--
+ arch/arm64/mm/mmu.c         |  2 +-
+ 6 files changed, 22 insertions(+), 23 deletions(-)
+
+-- 
+2.8.1
