@@ -1,137 +1,61 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Thu, 11 Aug 2016 10:45:21 +0800
-Subject: [RFC PATCH 4/5] arm64: dts: sunxi: add SCPI driven clocks and
- nodes for A64 MMC
-In-Reply-To: <205c8041-9294-449d-b918-f6f5757b90b3@arm.com>
-References: <20160809115303.17032-1-andre.przywara@arm.com>
- <20160809115303.17032-5-andre.przywara@arm.com>
- <1241311470841308@web22g.yandex.ru>
- <205c8041-9294-449d-b918-f6f5757b90b3@arm.com>
-Message-ID: <192221470883521@web10g.yandex.ru>
+From: lkp@intel.com (kbuild test robot)
+Date: Thu, 11 Aug 2016 10:45:41 +0800
+Subject: [PATCH 11/21] net: thunderx: Add support for 16 LMACs of 83xx
+In-Reply-To: <1470811373-28277-12-git-send-email-sunil.kovvuri@gmail.com>
+Message-ID: <201608111032.1Q3MCxhS%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Sunil,
 
+[auto build test ERROR on net-next/master]
+[also build test ERROR on v4.8-rc1 next-20160809]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-11.08.2016, 07:20, "Andr? Przywara" <andre.przywara@arm.com>:
-> On 10/08/16 16:01, Icenowy Zheng wrote:
->
-> Hi,
->
->> ?09.08.2016, 19:58, "Andre Przywara" <andre.przywara@arm.com>:
->>> ??The MMC controllers in the Allwinner A64 SoC are somewhat compatible
->>> ??with the versions used in other Allwinner SoCs.
->>> ??Tell Linux about the three MMC clocks that the firmware implements and
->>> ??add nodes to represent the MMC controllers.
->>> ??The actual hardware is capable of new transfer modes, which the driver
->>> ??does not fully support yet, also the clock part has changed, but it
->>> ??works like this at least for SD card accesses.
->>>
->>> ??Signed-off-by: Andre Przywara <andre.przywara@arm.com>
->>> ??---
->>> ???arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 61 +++++++++++++++++++++++++++
->>> ???1 file changed, 61 insertions(+)
->>>
->>> ??diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
->>> ??index 9fc540e..0f6044b 100644
->>> ??--- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
->>> ??+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
->>> ??@@ -157,6 +157,19 @@
->>> ???????????????????compatible = "arm,scpi";
->>> ???????????????????mboxes = <&mailbox 0>;
->>> ???????????????????shmem = <&cpu_scp_mem>;
->>> ??+
->>> ??+ clocks {
->>> ??+ compatible = "arm,scpi-clocks";
->>> ??+
->>> ??+ scpi_clk: scpi_clocks {
->>> ??+ compatible = "arm,scpi-variable-clocks";
->>> ??+ #clock-cells = <1>;
->>> ??+ clock-indices = <0>, <1>,
->>
->> ?I found a problem of the "standardize" process.
->> ?There cannot be an authority to keep the clock ID standardized, in both
->
-> Why would this need to be standardized? All we would need to take care
-> of is matching firmware and DT. Ideally firmware generates (or provides)
-> that part of the DT, so it just puts in the bits and IDs it actually
-> implements.
-> Actually I am more for exploiting the "name" field for a clock that SCPI
-> provides. It allows clocks to be identified without knowing any ID in
-> advance, up to the point where we have something like "Ethernet" as a
-> clock identifier. I wonder if Linux could make use of that somehow.
-Using names is a good idea. 
->
-> Cheers,
-> Andre
->
->>> ??+ <2>;
->>> ??+ clock-output-names = "mmc0_clk", "mmc1_clk",
->>> ??+ "mmc2_clk";
->>> ??+ };
->>> ??+ };
->>> ???????????};
->>>
->>> ???????????soc {
->>> ??@@ -165,6 +178,54 @@
->>> ???????????????????#size-cells = <1>;
->>> ???????????????????ranges;
->>>
->>> ??+ mmc0: mmc at 1c0f000 {
->>> ??+ compatible = "allwinner,sun50i-a64-mmc",
->>> ??+ "allwinner,sun5i-a13-mmc";
->>> ??+ reg = <0x01c0f000 0x1000>;
->>> ??+ clocks = <&bus_gates 8>, <&scpi_clk 0>,
->>> ??+ <&scpi_clk 0>, <&scpi_clk 0>;
->>> ??+ clock-names = "ahb", "mmc",
->>> ??+ "output", "sample";
->>> ??+ resets = <&ahb_rst 8>;
->>> ??+ reset-names = "ahb";
->>> ??+ interrupts = <GIC_SPI 60 IRQ_TYPE_LEVEL_HIGH>;
->>> ??+ status = "disabled";
->>> ??+ #address-cells = <1>;
->>> ??+ #size-cells = <0>;
->>> ??+ };
->>> ??+
->>> ??+ mmc1: mmc at 1c10000 {
->>> ??+ compatible = "allwinner,sun50i-a64-mmc",
->>> ??+ "allwinner,sun5i-a13-mmc";
->>> ??+ reg = <0x01c10000 0x1000>;
->>> ??+ clocks = <&bus_gates 9>, <&scpi_clk 1>,
->>> ??+ <&scpi_clk 1>, <&scpi_clk 1>;
->>> ??+ clock-names = "ahb", "mmc",
->>> ??+ "output", "sample";
->>> ??+ resets = <&ahb_rst 9>;
->>> ??+ reset-names = "ahb";
->>> ??+ interrupts = <GIC_SPI 61 IRQ_TYPE_LEVEL_HIGH>;
->>> ??+ status = "disabled";
->>> ??+ #address-cells = <1>;
->>> ??+ #size-cells = <0>;
->>> ??+ };
->>> ??+
->>> ??+ mmc2: mmc at 1c11000 {
->>> ??+ compatible = "allwinner,sun50i-a64-mmc",
->>> ??+ "allwinner,sun5i-a13-mmc";
->>> ??+ reg = <0x01c11000 0x1000>;
->>> ??+ clocks = <&bus_gates 10>, <&scpi_clk 2>,
->>> ??+ <&scpi_clk 2>, <&scpi_clk 2>;
->>> ??+ clock-names = "ahb", "mmc",
->>> ??+ "output", "sample";
->>> ??+ resets = <&ahb_rst 10>;
->>> ??+ reset-names = "ahb";
->>> ??+ interrupts = <GIC_SPI 62 IRQ_TYPE_LEVEL_HIGH>;
->>> ??+ status = "disabled";
->>> ??+ #address-cells = <1>;
->>> ??+ #size-cells = <0>;
->>> ??+ };
->>> ??+
->>> ???????????????????pio: pinctrl at 1c20800 {
->>> ???????????????????????????compatible = "allwinner,sun50i-a64-pinctrl";
->>> ???????????????????????????reg = <0x01c20800 0x400>;
->>> ??--
->>> ??2.9.0
->>>
->>> ??_______________________________________________
->>> ??linux-arm-kernel mailing list
->>> ??linux-arm-kernel at lists.infradead.org
->>> ??http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+url:    https://github.com/0day-ci/linux/commits/sunil-kovvuri-gmail-com/net-thunderx-Support-for-newer-chips-and-miscellaneous-patches/20160811-051837
+config: x86_64-allmodconfig (attached as .config)
+compiler: gcc-6 (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=x86_64 
+
+Note: the linux-review/sunil-kovvuri-gmail-com/net-thunderx-Support-for-newer-chips-and-miscellaneous-patches/20160811-051837 HEAD 5dcb590bc5f427045688ce0ace2e3d39d22e979f builds fine.
+      It only hurts bisectibility.
+
+All errors (new ones prefixed by >>):
+
+   drivers/net/ethernet/cavium/thunder/nic_main.c: In function 'nic_mbx_send_ready':
+>> drivers/net/ethernet/cavium/thunder/nic_main.c:177:11: error: 'MAX_LMAC' undeclared (first use in this function)
+     if (vf < MAX_LMAC) {
+              ^~~~~~~~
+   drivers/net/ethernet/cavium/thunder/nic_main.c:177:11: note: each undeclared identifier is reported only once for each function it appears in
+
+vim +/MAX_LMAC +177 drivers/net/ethernet/cavium/thunder/nic_main.c
+
+4863dea3 Sunil Goutham 2015-05-26  171  
+4863dea3 Sunil Goutham 2015-05-26  172  	mbx.nic_cfg.msg = NIC_MBOX_MSG_READY;
+4863dea3 Sunil Goutham 2015-05-26  173  	mbx.nic_cfg.vf_id = vf;
+4863dea3 Sunil Goutham 2015-05-26  174  
+4863dea3 Sunil Goutham 2015-05-26  175  	mbx.nic_cfg.tns_mode = NIC_TNS_BYPASS_MODE;
+4863dea3 Sunil Goutham 2015-05-26  176  
+92dc8769 Sunil Goutham 2015-08-30 @177  	if (vf < MAX_LMAC) {
+4863dea3 Sunil Goutham 2015-05-26  178  		bgx_idx = NIC_GET_BGX_FROM_VF_LMAC_MAP(nic->vf_lmac_map[vf]);
+4863dea3 Sunil Goutham 2015-05-26  179  		lmac = NIC_GET_LMAC_FROM_VF_LMAC_MAP(nic->vf_lmac_map[vf]);
+4863dea3 Sunil Goutham 2015-05-26  180  
+
+:::::: The code at line 177 was first introduced by commit
+:::::: 92dc87697e6a71675a9e9eec04ebecd8cf4837a3 net: thunderx: Support for upto 96 queues for a VF
+
+:::::: TO: Sunil Goutham <sgoutham@cavium.com>
+:::::: CC: David S. Miller <davem@davemloft.net>
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 55455 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160811/73cb69bf/attachment-0001.obj>
