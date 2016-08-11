@@ -1,45 +1,25 @@
 From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Thu, 11 Aug 2016 10:12:44 +0200
-Subject: [PATCH 1/3] net: stmmac: dwmac-rk: add rk3366 & rk3399 specific
- data
-In-Reply-To: <1470900288-10109-2-git-send-email-roger.chen@rock-chips.com>
-References: <1470900288-10109-1-git-send-email-roger.chen@rock-chips.com>
- <1470900288-10109-2-git-send-email-roger.chen@rock-chips.com>
-Message-ID: <1799606.7CVTQCi7m5@diego>
+Date: Thu, 11 Aug 2016 10:14:03 +0200
+Subject: [PATCH v2 1/4] nvmem: rockchip-efuse: update compatible strings
+ for Rockchip efuse
+In-Reply-To: <1470878029-11878-2-git-send-email-finley.xiao@rock-chips.com>
+References: <1470878029-11878-1-git-send-email-finley.xiao@rock-chips.com>
+ <1470878029-11878-2-git-send-email-finley.xiao@rock-chips.com>
+Message-ID: <21647624.nrv841C5QK@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Roger,
-
-Am Donnerstag, 11. August 2016, 15:24:46 schrieb Roger Chen:
-> Add constants and callback functions for the dwmac on rk3228/rk3229 socs.
-> As can be seen, the base structure is the same, only registers and the
-> bits in them moved slightly.
+Am Donnerstag, 11. August 2016, 09:13:46 schrieb Finlye Xiao:
+> From: Finley Xiao <finley.xiao@rock-chips.com>
 > 
-> Signed-off-by: Roger Chen <roger.chen@rock-chips.com>
-> ---
->  .../devicetree/bindings/net/rockchip-dwmac.txt     |   4 +-
->  drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c     | 226
-> +++++++++++++++++++++ 2 files changed, 228 insertions(+), 2 deletions(-)
+> Rk3399-efuse is organized as 32bits by 32 one-time programmable electrical
+> fuses. The efuse of earlier SoCs are organized as 32bits by 8 one-time
+> programmable electrical fuses with random access interface.
 > 
-> diff --git a/Documentation/devicetree/bindings/net/rockchip-dwmac.txt
-> b/Documentation/devicetree/bindings/net/rockchip-dwmac.txt index
-> cccd945..8c066e6 100644
-> --- a/Documentation/devicetree/bindings/net/rockchip-dwmac.txt
-> +++ b/Documentation/devicetree/bindings/net/rockchip-dwmac.txt
-> @@ -3,8 +3,8 @@ Rockchip SoC RK3288 10/100/1000 Ethernet driver(GMAC)
->  The device node has following properties.
+> Add different device tree compatible string for different SoCs to be able
+> to differentiate between the two. The old binding is of course preserved,
+> though deprecated.
 > 
->  Required properties:
-> - - compatible: Can be one of "rockchip,rk3228-gmac",
-> "rockchip,rk3288-gmac", -                            
-> "rockchip,rk3368-gmac"
-> + - compatible: Can be one of "rockchip,rk3288-gmac",
+> Signed-off-by: Finley Xiao <finley.xiao@rock-chips.com>
 
-you're dropping the rk3228 here.
-
-Otherwise looks fine, so with the compatible list fixed you can add my
 Reviewed-by: Heiko Stuebner <heiko@sntech.de>
-
-
-Heiko
