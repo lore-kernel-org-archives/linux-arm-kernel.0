@@ -1,56 +1,36 @@
-From: roger.chen@rock-chips.com (Roger Chen)
-Date: Thu, 11 Aug 2016 15:24:48 +0800
-Subject: [PATCH 3/3] arm64: dts: rockchip: add GMAC dt nodes for RK3399 evb
-In-Reply-To: <1470900288-10109-1-git-send-email-roger.chen@rock-chips.com>
-References: <1470900288-10109-1-git-send-email-roger.chen@rock-chips.com>
-Message-ID: <1470900288-10109-4-git-send-email-roger.chen@rock-chips.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 11 Aug 2016 09:32:23 +0200
+Subject: [GIT PULL] ARM: mvebu: fixes for v4.8 (#1)
+Message-ID: <87h9ar3gmw.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add ethernet GMAC dt nodes for RK3399 evaluation board.
+Hi,
 
-Signed-off-by: Roger Chen <roger.chen@rock-chips.com>
----
- arch/arm64/boot/dts/rockchip/rk3399-evb.dts | 23 +++++++++++++++++++++++
- 1 file changed, 23 insertions(+)
+Here is the first pull request for fixes for mvebu for v4.8.
 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399-evb.dts b/arch/arm64/boot/dts/rockchip/rk3399-evb.dts
-index d33aa06..5a076e0 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399-evb.dts
-+++ b/arch/arm64/boot/dts/rockchip/rk3399-evb.dts
-@@ -69,6 +69,13 @@
- 		regulator-max-microvolt = <3300000>;
- 	};
- 
-+	clkin_gmac: external-gmac-clock {
-+		compatible = "fixed-clock";
-+		clock-frequency = <125000000>;
-+		clock-output-names = "clkin_gmac";
-+		#clock-cells = <0>;
-+	};
-+
- 	vcc_phy: vcc-phy-regulator {
- 		compatible = "regulator-fixed";
- 		regulator-name = "vcc_phy";
-@@ -134,3 +141,19 @@
- 		};
- 	};
- };
-+
-+&gmac {
-+	phy-supply = <&vcc_phy>;
-+	phy-mode = "rgmii";
-+	clock_in_out = "input";
-+	snps,reset-gpio = <&gpio3 15 GPIO_ACTIVE_LOW>;
-+	snps,reset-active-low;
-+	snps,reset-delays-us = <0 10000 50000>;
-+	assigned-clocks = <&cru SCLK_RMII_SRC>;
-+	assigned-clock-parents = <&clkin_gmac>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&rgmii_pins>;
-+	tx_delay = <0x28>;
-+	rx_delay = <0x11>;
-+	status = "okay";
-+};
--- 
-1.9.1
+Gregory
+
+The following changes since commit 29b4817d4018df78086157ea3a55c1d9424a7cfc:
+
+  Linux 4.8-rc1 (2016-08-07 18:18:00 -0700)
+
+are available in the git repository at:
+
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-fixes-4.8-1
+
+for you to fetch changes up to d9fd3c918114cfd3995947339549c7341181efb0:
+
+  ARM: dts: armada-388-clearfog: number LAN ports properly (2016-08-08 13:20:24 +0200)
+
+----------------------------------------------------------------
+mvebu fixes for 4.8 (part 1)
+
+Fix lan numbering for the Armada 388 clearfog board
+
+----------------------------------------------------------------
+Russell King (1):
+      ARM: dts: armada-388-clearfog: number LAN ports properly
+
+ arch/arm/boot/dts/armada-388-clearfog.dts | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
