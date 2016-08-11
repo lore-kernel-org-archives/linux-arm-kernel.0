@@ -1,36 +1,79 @@
-From: vince@deater.net (Vince Weaver)
-Date: Wed, 10 Aug 2016 23:27:58 -0400 (EDT)
-Subject: [PATCH V3 1/6] perf/core: Adding PMU driver specific configuration
-In-Reply-To: <CANLsYkwz1aCmsBbtZXQK3_B-T6cVBP1UYV9cqbKiNSmdrhUuFQ@mail.gmail.com>
-References: <1469742143-22245-1-git-send-email-mathieu.poirier@linaro.org>
- <1469742143-22245-2-git-send-email-mathieu.poirier@linaro.org>
- <20160804165821.GT6862@twins.programming.kicks-ass.net>
- <CANLsYkzK+mNRYiGn0SLQ5kA0+xxi6OGVbNL4F3LLRBTgSkssxQ@mail.gmail.com>
- <20160805155344.GV6879@twins.programming.kicks-ass.net>
- <CANLsYkwz1aCmsBbtZXQK3_B-T6cVBP1UYV9cqbKiNSmdrhUuFQ@mail.gmail.com>
-Message-ID: <alpine.DEB.2.11.1608102321150.8355@pianoman.cluster.toy>
+From: anup.patel@broadcom.com (Anup Patel)
+Date: Thu, 11 Aug 2016 09:30:19 +0530
+Subject: [PATCH RESEND v2 0/8] Cache-coherent DMA access using UIO
+In-Reply-To: <1983237.mRdWv2BGBr@wuerfel>
+References: <1470635557-13416-1-git-send-email-anup.patel@broadcom.com>
+ <1983237.mRdWv2BGBr@wuerfel>
+Message-ID: <CAALAos9eT4N-RM6-gswKcSTJK7tirFeVAxrzGsNbYOyuL4M83Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 10 Aug 2016, Mathieu Poirier wrote:
-> 
-> After a little bit of digging around I understand that manpages have
-> to be written _after_ the new ioctl call has been added - at least
-> that's what I deduce when looking at what Vince Weaver did for the BPF
-> support:
+Hi Arnd,
 
-The manpage patch doesn't get applied until a feature hits a release 
-kernel (because sometimes features are backed out at the last minute).
+On Wed, Aug 10, 2016 at 9:25 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Monday, August 8, 2016 11:22:29 AM CEST Anup Patel wrote:
+>> The goal of this patchset is to improve UIO framework and UIO dmem
+>> driver to allow cache-coherent DMA accesses from user-space.
+>>
+>> This patchset is based on two previous patchsets:
+>> 1) [PATCH v5 0/6] UIO driver for APM X-Gene QMTM
+>> (Refer, http://www.spinics.net/lists/devicetree/msg58244.html)
+>> 2) [PATCH 0/4] Fix and extend uio_dmem_genirq
+>> (Refer, https://lkml.org/lkml/2016/5/17/141)
+>>
+>> We have adopted only patch0-3 of patchset1 which was abandoned
+>> long time back. We have taken care of last few unaddressed comments
+>> on these patches.
+>>
+>> The patchset2 is quite recent has been adopted entirely. We have
+>> taken care review comments on these patches too.
+>>
+>> This patchset is based on v4.7-rc7 tag and it is available in uio-v2
+>> branch of https://github.com/Broadcom/arm64-linux.git
+>
+>
+> UIO devices are generally meant to be things that do not
+> perform DMA and that don't screw up the rest of the system
+> when misused. A device that is able to access any physical
+> memory doesn't belong into this category. The way that
+> uio_dmem_genirq.c gets around this is by requiring the device
+> to be created by some code that sets up a separate IOMMU
+> domain first, but the DT probing here doesn't do that.
+> Note that IOMMU domains typically use 32-bit addressing,
+> so the entire "dma_mask from property" dance isn't even
+> required.
 
-It is good to have a manpage update ready at the time of your initial 
-patch submission though for a variety of reasons
+IMHO, UIO devices are meant for things that are not behind
+any IOMMU hardware.
 
-1. It helps the patch reviewers see what ABI change is being proposed
-2. It is better to catch mistakes in the ABI early rather than trying
-	to fix them after it's hit a released kernel and it's too late
-3. By the time the kernel is released, you might have forgotten details
-	about the change, or moved on to other things, and then it's up
-	to me to try to figure out the purpose of the change and
-	unfortunately this isn't always obvious from the git commit logs.
+Yes, any mis-programming in user space using UIO can
+potentially screw-up the rest of the system but this is
+generally a known/assumed fact for people who are using UIO.
 
-Vince
+>
+> Also, this seems to duplicate a lot of the work that
+> went into "vfio". Can you explain why we need another way
+> of doing the same thing here?
+
+We can only use "vfio" for devices that are behind some
+kind of IOMMU (Right??). For devices not having IOMMU
+support will have to use UIO for user space access.
+
+Particularly, there are lot of FPGA-based solutions and legacy
+hardware which do not have IOMMU support (devices on
+FPGA or specific devices).
+
+In our use case, we have some FPGA-based device which
+does not have IOMMU support and we are accessing this
+FPGA-based device from user-space.
+
+This patchset only tries to extend "uio" and "uio_dmem_genirq".
+There is no intention of duplicating what has been already
+done for "vfio".
+
+I do agree that "vfio" should eventually become defacto method
+of accessing devices in user space but that requires devices to
+always have IOMMU support.
+
+Regards,
+Anup
