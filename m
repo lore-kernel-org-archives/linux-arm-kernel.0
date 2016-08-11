@@ -1,25 +1,22 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Thu, 11 Aug 2016 10:19:42 +0200
-Subject: [PATCH v2 3/4] arm64: dts: rockchip: add efuse0 device node for
- rk3399
-In-Reply-To: <1470878029-11878-4-git-send-email-finley.xiao@rock-chips.com>
-References: <1470878029-11878-1-git-send-email-finley.xiao@rock-chips.com>
- <1470878029-11878-4-git-send-email-finley.xiao@rock-chips.com>
-Message-ID: <1508482.TbGnezVHUZ@diego>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 11 Aug 2016 10:21:53 +0200
+Subject: [PATCH -next] ARM: ux500: remove duplicated include from
+ cpu-db8500.c
+In-Reply-To: <1468927629-32715-1-git-send-email-weiyj_lk@163.com>
+References: <1468927629-32715-1-git-send-email-weiyj_lk@163.com>
+Message-ID: <CACRpkdb57FdXwYh4aBkaac+XtV5Yn-rvGyz1aXpN9MvcVQwn1Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 11. August 2016, 09:13:48 schrieb Finlye Xiao:
-> From: Finley Xiao <finley.xiao@rock-chips.com>
-> 
-> Add a efuse0 node in the device tree for the ARM64 rk3399 SoC.
-> 
-> Signed-off-by: Finley Xiao <finley.xiao@rock-chips.com>
+On Tue, Jul 19, 2016 at 1:27 PM, Wei Yongjun <weiyj_lk@163.com> wrote:
 
-this patch adds a node for a new compatible, so to limit conflicts in the 
-somewhat high-traffic rk3399, I'd like to pick this patch up myself once the 
-others are deemed suitable.
+> From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+>
+> Remove duplicated include.
+>
+> Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 
+Patch applied.
 
-Thanks
-Heiko
+Yours,
+Linus Walleij
