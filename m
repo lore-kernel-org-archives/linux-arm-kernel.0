@@ -1,114 +1,126 @@
-From: thunder.leizhen@huawei.com (Zhen Lei)
-Date: Thu, 11 Aug 2016 17:33:43 +0800
-Subject: [PATCH v6 09/14] arm64/numa: support HAVE_SETUP_PER_CPU_AREA
-In-Reply-To: <1470908028-8596-1-git-send-email-thunder.leizhen@huawei.com>
-References: <1470908028-8596-1-git-send-email-thunder.leizhen@huawei.com>
-Message-ID: <1470908028-8596-10-git-send-email-thunder.leizhen@huawei.com>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Thu, 11 Aug 2016 11:37:41 +0200
+Subject: [PATCH v10 0/8] acpi, clocksource: add GTDT driver and GTDT
+ support in arm_arch_timer
+In-Reply-To: <1469535565-20924-1-git-send-email-fu.wei@linaro.org>
+References: <1469535565-20924-1-git-send-email-fu.wei@linaro.org>
+Message-ID: <0befd611-91a7-88e9-1686-82929c1745e8@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To make each percpu area allocated from its local numa node. Without this
-patch, all percpu areas will be allocated from the node which cpu0 belongs
-to.
+Hi Fu,
 
-Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
----
- arch/arm64/Kconfig   |  8 ++++++++
- arch/arm64/mm/numa.c | 56 ++++++++++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 64 insertions(+)
+Do you mind if I send IORT series where new drivers/acpi/arm64 directory 
+would be introduced in first place ? This means your GTDT set would 
+depend on IORT.
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index bc3f00f..2815af6 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -603,6 +603,14 @@ config USE_PERCPU_NUMA_NODE_ID
- 	def_bool y
- 	depends on NUMA
+Thanks,
+Tomasz
 
-+config HAVE_SETUP_PER_CPU_AREA
-+	def_bool y
-+	depends on NUMA
-+
-+config NEED_PER_CPU_EMBED_FIRST_CHUNK
-+	def_bool y
-+	depends on NUMA
-+
- source kernel/Kconfig.preempt
- source kernel/Kconfig.hz
-
-diff --git a/arch/arm64/mm/numa.c b/arch/arm64/mm/numa.c
-index 0a159d3..69aacf4 100644
---- a/arch/arm64/mm/numa.c
-+++ b/arch/arm64/mm/numa.c
-@@ -25,6 +25,8 @@
- #include <linux/module.h>
- #include <linux/of.h>
-
-+#include <asm/sections.h>
-+
- struct pglist_data *node_data[MAX_NUMNODES] __read_mostly;
- EXPORT_SYMBOL(node_data);
- nodemask_t numa_nodes_parsed __initdata;
-@@ -129,6 +131,60 @@ void __init early_map_cpu_to_node(unsigned int cpu, int nid)
- 	cpu_to_node_map[cpu] = nid;
- }
-
-+#ifdef CONFIG_HAVE_SETUP_PER_CPU_AREA
-+unsigned long __per_cpu_offset[NR_CPUS] __read_mostly;
-+EXPORT_SYMBOL(__per_cpu_offset);
-+
-+static int __init early_cpu_to_node(int cpu)
-+{
-+	return cpu_to_node_map[cpu];
-+}
-+
-+static int __init pcpu_cpu_distance(unsigned int from, unsigned int to)
-+{
-+	if (early_cpu_to_node(from) == early_cpu_to_node(to))
-+		return LOCAL_DISTANCE;
-+	else
-+		return REMOTE_DISTANCE;
-+}
-+
-+static void * __init pcpu_fc_alloc(unsigned int cpu, size_t size,
-+				       size_t align)
-+{
-+	int nid = early_cpu_to_node(cpu);
-+
-+	return  memblock_virt_alloc_try_nid(size, align,
-+			__pa(MAX_DMA_ADDRESS), MEMBLOCK_ALLOC_ACCESSIBLE, nid);
-+}
-+
-+static void __init pcpu_fc_free(void *ptr, size_t size)
-+{
-+	memblock_free_early(__pa(ptr), size);
-+}
-+
-+void __init setup_per_cpu_areas(void)
-+{
-+	unsigned long delta;
-+	unsigned int cpu;
-+	int rc;
-+
-+	/*
-+	 * Always reserve area for module percpu variables.  That's
-+	 * what the legacy allocator did.
-+	 */
-+	rc = pcpu_embed_first_chunk(PERCPU_MODULE_RESERVE,
-+				    PERCPU_DYNAMIC_RESERVE, PAGE_SIZE,
-+				    pcpu_cpu_distance,
-+				    pcpu_fc_alloc, pcpu_fc_free);
-+	if (rc < 0)
-+		panic("Failed to initialize percpu areas.");
-+
-+	delta = (unsigned long)pcpu_base_addr - (unsigned long)__per_cpu_start;
-+	for_each_possible_cpu(cpu)
-+		__per_cpu_offset[cpu] = delta + pcpu_unit_offsets[cpu];
-+}
-+#endif
-+
- /**
-  * numa_add_memblk - Set node id to memblk
-  * @nid: NUMA node ID of the new memblk
---
-2.5.0
+On 26.07.2016 14:19, fu.wei at linaro.org wrote:
+> From: Fu Wei <fu.wei@linaro.org>
+>
+> This patchset:
+>     (1)Preparation for adding GTDT support in arm_arch_timer:
+>         1. Move some enums and marcos to header file;
+>         2. Add a new enum for spi type;
+>         3. Improve printk relevant code.
+>
+>     (2)Introduce ACPI GTDT parser: drivers/acpi/arm64/acpi_gtdt.c
+>     Parse all kinds of timer in GTDT table of ACPI:arch timer,
+>     memory-mapped timer and SBSA Generic Watchdog timer.
+>     This driver can help to simplify all the relevant timer drivers,
+>     and separate all the ACPI GTDT knowledge from them.
+>
+>     (3)Simplify ACPI code for arm_arch_timer
+>
+>     (4)Add GTDT support for ARM memory-mapped timer
+>
+> This patchset has been tested on the following platforms:
+>     (1)ARM Foundation v8 model
+>
+> Changelog:
+> V10: https://lkml.org/lkml/2016/7/26/
+>      Drop the "readq" patch.
+>      Rebase to latest Linux 4.7.
+>
+> V9: https://lkml.org/lkml/2016/7/25/345
+>     Improve pr_err message in acpi gtdt driver.
+>     Update Commit message for 7/9
+>     shorten the irq mapping function name
+>     Improve GTDT driver for memory-mapped timer
+>
+> v8: https://lkml.org/lkml/2016/7/19/660
+>     Improve "pr_fmt(fmt)" definition: add "ACPI" in front of "GTDT",
+>     and also improve printk message.
+>     Simplify is_timer_block and is_watchdog.
+>     Merge acpi_gtdt_desc_init and gtdt_arch_timer_init into acpi_gtdt_init();
+>     Delete __init in include/linux/acpi.h for GTDT API
+>     Make ARM64 select GTDT.
+>     Delete "#include <linux/module.h>" from acpi_gtdt.c
+>     Simplify GT block parse code.
+>
+> v7: https://lkml.org/lkml/2016/7/13/769
+>     Move the GTDT driver to drivers/acpi/arm64
+>     Add add the ARM64-specific ACPI Support maintainers in MAINTAINERS
+>     Merge 3 patches of GTDT parser driver.
+>     Fix the for_each_platform_timer bug.
+>
+> v6: https://lkml.org/lkml/2016/6/29/580
+>     split the GTDT driver to 4 parts: basic, arch_timer, memory-mapped timer,
+>     and SBSA Generic Watchdog timer
+>     Improve driver by suggestions and example code from Daniel Lezcano
+>
+> v5: https://lkml.org/lkml/2016/5/24/356
+>     Sorting out all patches, simplify the API of GTDT driver:
+>     GTDT driver just fills the data struct for arm_arch_timer driver.
+>
+> v4: https://lists.linaro.org/pipermail/linaro-acpi/2016-March/006667.html
+>     Delete the kvm relevant patches
+>     Separate two patches for sorting out the code for arm_arch_timer.
+>     Improve irq info export code to allow missing irq info in GTDT table.
+>
+> v3: https://lkml.org/lkml/2016/2/1/658
+>     Improve GTDT driver code:
+>       (1)improve pr_* by defining pr_fmt(fmt)
+>       (2)simplify gtdt_sbsa_gwdt_init
+>       (3)improve gtdt_arch_timer_data_init, if table is NULL, it will try
+>       to get GTDT table.
+>     Move enum ppi_nr to arm_arch_timer.h, and add enum spi_nr.
+>     Add arm_arch_timer get ppi from DT and GTDT support for kvm.
+>
+> v2: https://lkml.org/lkml/2015/12/2/10
+>     Rebase to latest kernel version(4.4-rc3).
+>     Fix the bug about the config problem,
+>     use CONFIG_ACPI_GTDT instead of CONFIG_ACPI in arm_arch_timer.c
+>
+> v1: The first upstreaming version: https://lkml.org/lkml/2015/10/28/553
+>
+> Fu Wei (8):
+>   clocksource/drivers/arm_arch_timer: Move enums and defines to header
+>     file
+>   clocksource/drivers/arm_arch_timer: Add a new enum for spi type
+>   clocksource/drivers/arm_arch_timer: Improve printk relevant code
+>   acpi/arm64: Add GTDT table parse driver
+>   clocksource/drivers/arm_arch_timer: Simplify ACPI support code.
+>   acpi/arm64: Add memory-mapped timer support in GTDT driver
+>   clocksource/drivers/arm_arch_timer: Add GTDT support for memory-mapped
+>     timer
+>   acpi/arm64: Add SBSA Generic Watchdog support in GTDT driver
+>
+>  arch/arm64/Kconfig                   |   1 +
+>  drivers/acpi/Kconfig                 |   5 +
+>  drivers/acpi/Makefile                |   1 +
+>  drivers/acpi/arm64/Kconfig           |   5 +
+>  drivers/acpi/arm64/Makefile          |   1 +
+>  drivers/acpi/arm64/acpi_gtdt.c       | 309 +++++++++++++++++++++++++++++++++++
+>  drivers/clocksource/Kconfig          |   2 +-
+>  drivers/clocksource/arm_arch_timer.c | 225 +++++++++++++++++--------
+>  drivers/watchdog/Kconfig             |   1 +
+>  include/clocksource/arm_arch_timer.h |  32 ++++
+>  include/linux/acpi.h                 |   7 +
+>  11 files changed, 518 insertions(+), 71 deletions(-)
+>  create mode 100644 drivers/acpi/arm64/Kconfig
+>  create mode 100644 drivers/acpi/arm64/Makefile
+>  create mode 100644 drivers/acpi/arm64/acpi_gtdt.c
+>
