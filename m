@@ -1,110 +1,170 @@
-From: pmladek@suse.com (Petr Mladek)
-Date: Thu, 11 Aug 2016 17:25:38 +0200
-Subject: [PATCH v7 4/4] nmi_backtrace: generate one-line reports for idle
- cpus
-In-Reply-To: <feaaca8f-cc09-5847-ea3f-d27052704d9b@mellanox.com>
-References: <1470672218-16059-1-git-send-email-cmetcalf@mellanox.com>
- <1470672218-16059-5-git-send-email-cmetcalf@mellanox.com>
- <20160809124325.GG13300@pathway.suse.cz>
- <feaaca8f-cc09-5847-ea3f-d27052704d9b@mellanox.com>
-Message-ID: <20160811152538.GH13300@pathway.suse.cz>
+From: aleksey.makarov@linaro.org (Aleksey Makarov)
+Date: Thu, 11 Aug 2016 18:31:37 +0300
+Subject: [PATCH v9 0/4] ACPI: parse the SPCR table
+Message-ID: <20160811153152.755-1-aleksey.makarov@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue 2016-08-09 12:43:58, Chris Metcalf wrote:
-> On 8/9/2016 8:43 AM, Petr Mladek wrote:
-> >On Mon 2016-08-08 12:03:38, Chris Metcalf wrote:
-> >>When doing an nmi backtrace of many cores, most of which are idle,
-> >>the output is a little overwhelming and very uninformative.  Suppress
-> >>messages for cpus that are idling when they are interrupted and just
-> >>emit one line, "NMI backtrace for N skipped: idling at pc 0xNNN".
-> >Hmm, I do not see this message even though the CPU is in the idle state:
-> >
-> >[ 7918.884535] CPU: 3 PID: 0 Comm: swapper/3 Not tainted 4.8.0-rc1-4-default+ #3088
-> >[ 7918.884538] Hardware name: Bochs Bochs, BIOS Bochs 01/01/2011
-> >[ 7918.884539] task: ffff88013a594380 task.stack: ffff88013a598000
-> >[ 7918.884541] RIP: 0010:[<ffffffff81050bc6>]  [<ffffffff81050bc6>] native_safe_halt+0x6/0x10
-> >[ 7918.884543] RSP: 0018:ffff88013a59bea8  EFLAGS: 00000206
-> >[ 7918.884544] RAX: ffff88013a594380 RBX: 0000000000000003 RCX: 0000000000000000
-> >[ 7918.884546] RDX: ffff88013a594380 RSI: 0000000000000001 RDI: ffff88013a594380
-> >[ 7918.884548] RBP: ffff88013a59bea8 R08: 0000000000000000 R09: 0000000000000000
-> >[ 7918.884550] R10: 0000000000000001 R11: 0000000000000001 R12: 0000000000000003
-> >[ 7918.884551] R13: 0000000000000000 R14: ffff88013a598000 R15: ffff88013a598000
-> >[ 7918.884553] FS:  0000000000000000(0000) GS:ffff88013fd80000(0000) knlGS:0000000000000000
-> >[ 7918.884554] CS:  0010 DS: 0000 ES: 0000 CR0: 0000000080050033
-> >[ 7918.884556] CR2: 00007f8afc65e000 CR3: 00000001383b8000 CR4: 00000000000006e0
-> >[ 7918.884557] Stack:
-> >[ 7918.884559]  ffff88013a59bec8 ffffffff819573d3 0000000000000003 0000000000000000
-> >[ 7918.884561]  ffff88013a59bed8 ffffffff8102628f ffff88013a59bee8 ffffffff819579ea
-> >[ 7918.884562]  ffff88013a59bf30 ffffffff810bfe1a ffff88013a598000 ffff88013a598000
-> >[ 7918.884563] Call Trace:
-> >[ 7918.884565]  [<ffffffff819573d3>] default_idle+0x23/0x170
-> >[ 7918.884566]  [<ffffffff8102628f>] arch_cpu_idle+0xf/0x20
-> >[ 7918.884568]  [<ffffffff819579ea>] default_idle_call+0x2a/0x50
-> >[ 7918.884570]  [<ffffffff810bfe1a>] cpu_startup_entry+0x16a/0x260
-> >[ 7918.884571]  [<ffffffff8103faf6>] start_secondary+0xf6/0x100
-> >[ 7918.884573] Code: 00 00 00 00 00 55 48 89 e5 fa 5d c3 66 0f 1f 84 00 00 00 00 00 55 48 89 e5 fb 5d c3 66 0f 1f 84 00 00 00 00 00 55 48 89 e5 fb f4 <5d> c3 0f 1f 84 00 00 00 00 00 55
-> >  48 89 e5 f4 5d c3 66 0f 1f 84
-> >
-> >Note that I test it in a virtual machine using qemu.
-> >
-> >The strange thing is that I do not see .cpuidle.text section in
-> >the vmlinux binary. But it is possible that I have misunderstood
-> >the concept.
-> 
-> The .cpuidle.text sections are merged into the final kernel's overall
-> text segment.  What you should see is something like this in the "nm -n"
-> output from the built vmlinux:
-> 
-> [...]
-> ffffffff81922aa8 T __cpuidle_text_start
-> ffffffff81922ab0 T default_idle
-> ffffffff81922b90 t mwait_idle
-> ffffffff81922d20 T acpi_processor_ffh_cstate_enter
-> ffffffff81922df0 T default_idle_call
-> ffffffff81922e30 t cpu_idle_poll
-> ffffffff81922f50 t intel_idle
-> ffffffff81923085 t acpi_idle_do_entry
-> ffffffff819230d0 t poll_idle
-> ffffffff81923143 T __cpuidle_text_end
-> [...]
-> 
-> In other words, all the cpuidle functions grouped together and bracketed by
-> the __cpuidle_text_{start,end} symbols.
-> 
-> Perhaps you were running with a kernel that didn't have the actual patch 4/4
-> applied, but just the earlier patches?  Or perhaps your host Linux has been
-> patched, but not the guest Linux running in qemu?  Or perhaps you are
-> ending up doing an NMI backtrace on the host kernel, not the guest?
+'ARM Server Base Boot Requirements' [1] mentions SPCR (Serial Port Console
+Redirection Table) [2] as a mandatory ACPI table that specifies the
+configuration of serial console.
 
-Hmm, the problem is that native_safe_halt() is called from default_idle()
-here. The function is marked as inline but the compiler did not inline
-it.
+Move "earlycon" early_param handling to earlycon.c to parse this option once
 
-It helped me to put native_safe_halt() into the __cpuidle_text section:
+Parse SPCR table, setup earlycon and register specified console.
 
-diff --git a/arch/x86/include/asm/irqflags.h b/arch/x86/include/asm/irqflags.h
-index b77f5edb03b0..e31d50acd491 100644
---- a/arch/x86/include/asm/irqflags.h
-+++ b/arch/x86/include/asm/irqflags.h
-@@ -44,7 +44,7 @@ static inline void native_irq_enable(void)
- 	asm volatile("sti": : :"memory");
- }
- 
--static inline void native_safe_halt(void)
-+static inline __attribute__((__section__(".cpuidle.text"))) void native_safe_halt(void)
- {
- 	asm volatile("sti; hlt": : :"memory");
- }
+Enable parsing this table on ARM64.  Earlycon should be set up as early as
+possible.  ACPI boot tables are mapped in
+arch/arm64/kernel/acpi.c:acpi_boot_table_init() called from setup_arch() and
+that's where we parse spcr.  So it has to be opted-in per-arch. When
+ACPI_SPCR_TABLE is defined initialization of DT earlycon is deferred until the
+DT/ACPI decision is done.
 
+Implement console_match() for pl011.
 
-I did not use __cpuidle macro because I was not able to include
-linux/cpu.h into that header.
+Based on the work by Leif Lindholm [3]
+Thanks to Peter Hurley for explaining how this should work.
 
-I wonder if it would be possible to detect the idle thread an other
-way. For example, I wonder if it would be enough to check for the
-PID 0.
+Should be applied to v4.8-rc1
+Tested on QEMU and ThunderX.
+SPCR support is included in QEMU's ARM64 mach-virt since 2.4 release.
 
+v9:
+- rebase to v4.8-rc1
+- fix compilation for !CONFIG_SERIAL_EARLYCON case
+- add Acked-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com> for ACPI part
+- move constant check out of loop (Yury Norov)
+- add '\n' to info message
 
-Best Regards,
-Petr
+v8:
+- rebase to next-20160520
+- remove the patch "ACPICA: Headers: Add new constants for the DBG2 ACPI table"
+  as it have got to linux-next
+- add Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>, Reviewed-by:
+  Peter Hurley <peter@hurleysoftware.com> (but see below)
+- fix the patch "serial: pl011: add console matching function".  The patch by
+  Christopher Covington [4] specifies that SBSA uart does 32-bit access to
+  registers and this breaks the match function.  In this series the function
+  was changed to match when SPCR specifies both mmio32 and mmio access.
+  I removed Acked-by: Greg from this patch because of these changes.
+
+v7:
+https://lkml.kernel.org/g/1459431629-27934-1-git-send-email-aleksey.makarov at linaro.org
+- add Acked-by: Rob Herring for "of/serial: move earlycon early_param handling
+  to serial"
+- call DT earlycon initialization from the arch ACPI code, not from parse_spcr()
+  (Rafael J. Wysocki)
+- fix a few minor issues (Rafael J. Wysocki)
+
+v6:
+https://lkml.kernel.org/g/1458823925-19560-1-git-send-email-aleksey.makarov at linaro.org
+- add documentation for parse_spcr() functioin (Yury Norov)
+- don't initialize err variable (Yury Norov)
+- add __initdata for the earlycon_init_is_deferred flag variable
+- rename the function exported in "of/serial: move earlycon early_param handling
+  to serial" to avoid clash with the function from arch/microblaze/kernel/prom.c
+- defer initialization of DT earlycon until DT/ACPI decision is made
+  (Rob Herring, Peter Hurley)
+- use snprintf instead of sprintf (Andy Shevchenko)
+- drop patch that adds EARLYCON_DECLARE for pl011 as EARLYCON_DECLARE is
+  equivalent to OF_EARLYCON_DECLARE for 4.6+ (Peter Hurley).  This means that
+  SPCR earlycon will not work on the kernels before 4.6
+
+v5:
+https://lkml.kernel.org/g/1458643595-14719-1-git-send-email-aleksey.makarov at linaro.org
+- drop patch "serial: pl011: use ACPI SPCR to setup 32-bit access" because
+  it is ugly. Also because Christopher Covington came with a better solution [4]
+- remove error message when the table is not provided by ACPI (Andy Shevchenko)
+- rewrite spcr.c following the suggestions by Peter Hurley
+- add console_match() for pl011 in a separate patch
+- add EARLYCON_DECLARE for pl011 in a separate patch
+- add patch "of/serial: move earlycon early_param handling to serial" from
+  the GDB2 series
+
+v4:
+https://lkml.kernel.org/g/1456747355-15692-1-git-send-email-aleksey.makarov at linaro.org
+- drop patch "ACPI: change __init to __ref for early_acpi_os_unmap_memory()"
+  ACPI developers work on a new API and asked not to do that.
+  Instead, use acpi_get_table_with_size()/early_acpi_os_unmap_memory() once
+  and cache the result. (Lv Zheng)
+- fix some style issues (Yury Norov)
+
+v3:
+https://lkml.kernel.org/g/1455559532-8305-1-git-send-email-aleksey.makarov at linaro.org
+
+Greg Kroah-Hartman did not like v2 so I have rewritten this patchset:
+
+- drop acpi_match() member of struct console
+- drop implementations of this member for pl011 and 8250
+- drop the patch that renames some vars in printk.c as it is not needed anymore
+- drop patch that introduces system wide acpi_table_parse2().
+  Instead introduce a custom acpi_table_parse_spcr() in spcr.c
+
+Instead of introducing a new match_acpi() member of struct console,
+this patchset introduces a new function acpi_console_check().
+This function is called when a new uart is registered at serial_core.c
+the same way OF code checks for console.  If the registered uart is the
+console specified by SPCR table, this function calls add_preferred_console()
+
+The restrictions of this approach are:
+
+- only serial consoles can be set up
+- only consoles specified by the memory/io address can be set up
+  (SPCR can specify devices by PCI id/PCI address)
+
+v2:
+https://lkml.kernel.org/g/1455299022-11641-1-git-send-email-aleksey.makarov at linaro.org
+- don't use SPCR if user specified console in command line
+- fix initialization order of newcon->index = 0
+- rename some variables at printk.c (Joe Perches, Peter Hurley)
+- enable ACPI_SPCR_TABLE in a separate patch (Andy Shevchenko)
+- remove the retry loop for console registering (Peter Hurley).
+  Instead, obtain SPCR with acpi_get_table().  That works after
+  call to acpi_early_init() i. e. in any *_initcall()
+- describe design decision behind introducing acpi_match() (Peter Hurley)
+- fix compilation for x86 + ACPI (Graeme Gregory)
+- introduce DBG2 constants in a separate patch (Andy Shevchenko)
+- fix a typo in DBG2 constants (Andy Shevchenko)
+- add ACPI_DBG2_ARM_SBSA_32BIT constant (Christopher Covington)
+- add support for ACPI_DBG2_ARM_SBSA_* consoles (Christopher Covington)
+- add documentation for functions
+- add a patch that uses SPCR to find if SBSA serial driver should use 32-bit
+  accessor functions (Christopher Covington)
+- change __init to __ref for early_acpi_os_unmap_memory() in a separate patch
+- introduce acpi_table_parse2() in a separate patch
+- fix fetching the SPCR table early (Mark Salter)
+- add a patch from Mark Salter that introduces support for matching 8250-based
+  consoles
+
+v1:
+https://lkml.kernel.org/g/1453722324-22407-1-git-send-email-aleksey.makarov at linaro.org
+
+[1] http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.den0044a/index.html
+[2] https://msdn.microsoft.com/en-us/library/windows/hardware/dn639132(v=vs.85).aspx
+[3] https://lkml.kernel.org/g/1441716217-23786-1-git-send-email-leif.lindholm at linaro.org
+[4] https://lkml.kernel.org/g/1457415800-8799-1-git-send-email-cov at codeaurora.org
+
+Aleksey Makarov (3):
+  ACPI: parse SPCR and enable matching console
+  ARM64: ACPI: enable ACPI_SPCR_TABLE
+  serial: pl011: add console matching function
+
+Leif Lindholm (1):
+  of/serial: move earlycon early_param handling to serial
+
+ arch/arm64/Kconfig              |   1 +
+ arch/arm64/kernel/acpi.c        |  11 +++-
+ drivers/acpi/Kconfig            |   3 ++
+ drivers/acpi/Makefile           |   1 +
+ drivers/acpi/spcr.c             | 111 ++++++++++++++++++++++++++++++++++++++++
+ drivers/of/fdt.c                |  11 +---
+ drivers/tty/serial/amba-pl011.c |  56 ++++++++++++++++++++
+ drivers/tty/serial/earlycon.c   |  19 ++++++-
+ include/linux/acpi.h            |   6 +++
+ include/linux/of_fdt.h          |   2 +
+ include/linux/serial_core.h     |   9 +++-
+ 11 files changed, 216 insertions(+), 14 deletions(-)
+ create mode 100644 drivers/acpi/spcr.c
+
+-- 
+2.9.2
