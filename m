@@ -1,76 +1,78 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Thu, 11 Aug 2016 11:25:30 +0900
-Subject: [Urgent PATCH] arm64: dts: uniphier: fix IRQ trigger type of
- ARMv8 timer
-In-Reply-To: <CAK7LNAQo6Si9q0FQw=3i67yGO1JYuDxHBB=xsLZOj8S-TBG_Rg@mail.gmail.com>
-References: <1470039140-3801-1-git-send-email-yamada.masahiro@socionext.com>
- <579F05E1.9020300@arm.com>
- <CAK7LNAQo6Si9q0FQw=3i67yGO1JYuDxHBB=xsLZOj8S-TBG_Rg@mail.gmail.com>
-Message-ID: <CAK7LNAT5D0HmvpVPnX1oFw=KJSOavVjXT6ECHBuTOhNaKpdQLg@mail.gmail.com>
+From: zhengxing@rock-chips.com (Xing Zheng)
+Date: Thu, 11 Aug 2016 10:31:05 +0800
+Subject: [v2 PATCH] clk: rockchip: mark rk3399 hdcp_noc and vio_noc as
+ critical
+In-Reply-To: <CABXOdTeDYzOpNxkyScf3WvvFynyTZbKrVdVFzMobMaPAp=f5jw@mail.gmail.com>
+References: <1470765753-11619-1-git-send-email-zyw@rock-chips.com>
+ <CABXOdTeDYzOpNxkyScf3WvvFynyTZbKrVdVFzMobMaPAp=f5jw@mail.gmail.com>
+Message-ID: <57ABE369.6070800@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Chris,
 
-2016-08-01 17:26 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
-> Hi Marc,
->
-> 2016-08-01 17:18 GMT+09:00 Marc Zyngier <marc.zyngier@arm.com>:
->> Please keep me cc-ed on this.
->
-> Sorry, I automate patch-posting, but scripts/get_maintainer.pl
-> did not pick you up.  Also, I forgot to cc you explicitly.
->
->
->> On 01/08/16 09:12, Masahiro Yamada wrote:
->>> Since commit 1e2a7d78499e ("irqdomain: Don't set type when mapping
->>> an IRQ"), the interrupt type is strictly checked.  Without this
->>> patch, this board would not boot any more.
->>>
->>> Documentation/devicetree/bindings/interrupt-controller/arm,gic-v3.txt
->>> says that the 3rd cell should be either 1 (edge) or 4 (level)
->>> depending on the trigger type.  As the CA72 Generic Timer provides
->>> active-low interrupts, the value of the 3rd cell should be 4.
->>>
->>> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
->>> Suggested-by: Marc Zyngier <marc.zyngier@arm.com>
->>> ---
->>> Arnd, Olof,
->>>
->>> I guess you are about to send pull-reqs for v4.8 cycle.
->>> Could you include this one in them?
->>> After IRQ updates for 4.8 were merged, my board would not
->>> boot at all.  I consulted experts and looks like my DT
->>> was wrong.
->>>
->>> I could do this after -rc1 is out because it is apparently a
->>> bug fix, but in that case the for-next branch in ASOC will be
->>> broken for me, which would make bisect-ability difficult for me.
+On 2016?08?11? 06:14, Guenter Roeck wrote:
+> On Tue, Aug 9, 2016 at 11:02 AM, Chris Zhong <zyw@rock-chips.com> wrote:
+>> Fix incorrect rk3399 aclk_vio gating bit, it should be 0, not 10. With
+>> this modification, the aclk_vio_noc should be put into critical list,
+>> since it is required by VOP.
+>> And the Type-C DP need these clocks: aclk_hdcp_noc, hclk_hdcp_noc,
+>> pclk_hdcp_noc. Mark them as critical to avoid someone close them.
 >>
->> I have a patch that addresses all platforms in one go (there is really
->> no point in fixing one at a time for a bug that is so widespread).
+>> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
+>> ---
 >>
->> I'll repost it later today.
+>>   drivers/clk/rockchip/clk-rk3399.c | 6 +++++-
+>>   1 file changed, 5 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/clk/rockchip/clk-rk3399.c b/drivers/clk/rockchip/clk-rk3399.c
+>> index b173711a..676b017 100644
+>> --- a/drivers/clk/rockchip/clk-rk3399.c
+>> +++ b/drivers/clk/rockchip/clk-rk3399.c
+>> @@ -1073,7 +1073,7 @@ static struct rockchip_clk_branch rk3399_clk_branches[] __initdata = {
+>>          /* vio */
+>>          COMPOSITE(ACLK_VIO, "aclk_vio", mux_pll_src_cpll_gpll_ppll_p, CLK_IGNORE_UNUSED,
+>>                          RK3399_CLKSEL_CON(42), 6, 2, MFLAGS, 0, 5, DFLAGS,
+>> -                       RK3399_CLKGATE_CON(11), 10, GFLAGS),
+>> +                       RK3399_CLKGATE_CON(11), 0, GFLAGS),
+Sorry to broken copy&paste, thanks to fix the incorrect bit.
+
+Reviewed-by: Xing Zheng <zhengxing@rock-chips.com>
+
+Thanks.
+>>          COMPOSITE_NOMUX(PCLK_VIO, "pclk_vio", "aclk_vio", 0,
+>>                          RK3399_CLKSEL_CON(43), 0, 5, DFLAGS,
+>>                          RK3399_CLKGATE_CON(11), 1, GFLAGS),
+>> @@ -1470,6 +1470,9 @@ static const char *const rk3399_cru_critical_clocks[] __initconst = {
+>>          "aclk_cci_pre",
+>>          "aclk_gic",
+>>          "aclk_gic_noc",
+>> +       "aclk_hdcp_noc",
+>> +       "hclk_hdcp_noc",
+>> +       "pclk_hdcp_noc",
+>>          "pclk_perilp0",
+>>          "pclk_perilp0",
+>>          "hclk_perilp0",
+>> @@ -1489,6 +1492,7 @@ static const char *const rk3399_cru_critical_clocks[] __initconst = {
+>>          "gpll_hclk_perilp1_src",
+>>          "gpll_aclk_perilp0_src",
+>>          "gpll_aclk_perihp_src",
+>> +       "aclk_vio_noc",
+> I think there was a previous comment suggesting that this clock should
+> be handled differently. Has this been resolved ?
+>
+> Otherwise
+>
+> Reviewed-by: Guenter Roeck <groeck@chromium.org>
+>
+>>   };
+>>
+>>   static const char *const rk3399_pmucru_critical_clocks[] __initconst = {
+>> --
+>> 1.9.1
 >>
 >
-> That'll be fine.
-> Thank you!
 >
->
-> Arnd, Olof:
-> Please disregard this one.
->
-
-Oh Dear.
-Did you apply this one?
-
-This was replaced with Marc'one:
-https://patchwork.kernel.org/patch/9254183/
-
-
-Is it too late?
-
 
 -- 
-Best Regards
-Masahiro Yamada
+- Xing Zheng
