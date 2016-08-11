@@ -1,113 +1,108 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Thu, 11 Aug 2016 08:45:44 +0100
-Subject: [RFC PATCH v2 0/4] arm/arm64: vgic-new: Implement API for vGICv3
- live migration
-In-Reply-To: <CALicx6sdGgkf_neZ_F0OUu3cg36VBoWT581HAG=v2FecN6omJA@mail.gmail.com>
-References: <1470740326-27751-1-git-send-email-vijay.kilari@gmail.com>
- <CAFEAcA-z+iM+=p0riWreJCewPPxw9wtHgg+_4MDtxV=ccwe-tg@mail.gmail.com>
- <CALicx6sdGgkf_neZ_F0OUu3cg36VBoWT581HAG=v2FecN6omJA@mail.gmail.com>
-Message-ID: <CAFEAcA-eAHaZio6xWtyDEDAGynXMEsAMBHMnPWx_B1DTQ+qGNQ@mail.gmail.com>
+From: loic.pallardy@st.com (loic pallardy)
+Date: Thu, 11 Aug 2016 09:51:00 +0200
+Subject: [PATCH 6/9] remoteproc: core: Add function to append a new
+ resource table entry
+In-Reply-To: <20160804092153.23032-7-lee.jones@linaro.org>
+References: <20160804092153.23032-1-lee.jones@linaro.org>
+ <20160804092153.23032-7-lee.jones@linaro.org>
+Message-ID: <57AC2E64.9010209@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 August 2016 at 06:29, Vijay Kilari <vijay.kilari@gmail.com> wrote:
-> On Tue, Aug 9, 2016 at 5:22 PM, Peter Maydell <peter.maydell@linaro.org> wrote:
->> On 9 August 2016 at 11:58,  <vijay.kilari@gmail.com> wrote:
->>> From: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
->>>
->>> This patchset adds API for saving and restoring
->>> of VGICv3 registers to support live migration with new vgic feature.
->>> This API definition is as per version of VGICv3 specification
->>> http://lists.infradead.org/pipermail/linux-arm-kernel/2016-July/445611.html
->>>
->>> To test live migration with QEMU, use below patch series
->>> https://lists.gnu.org/archive/html/qemu-devel/2016-08/msg01444.html
->>>
->>> The patch 3 & 4 are picked from the Pavel's previous implementation.
->>> http://www.spinics.net/lists/kvm/msg122040.html
->>>
->>> v1 => v2:
->>>  - The init sequence change patch is no more required.
->>>    Fixed in patch 2 by using static vgic_io_dev regions structure instead
->>>    of using dynamic allocation pointer.
->>>  - Updated commit message of patch 4.
->>>  - Dropped usage of union to manage 32-bit and 64-bit access in patch 1.
->>>    Used local variable for 32-bit access.
->>>  - Updated macro __ARM64_SYS_REG and ARM64_SYS_REG in
->>>    arch/arm64/include/uapi/asm/kvm.h as per qemu requirements.
->>
->> I only scanned briefly through this patchset, but I didn't
->> see any code implementing:
->>  * KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO
->
-> If irq->pending is updated by kernel based on irq->line_level when interrupt
-> is asserted by device or guest. Do we still need to extract
-> irq->line_level using
-> this ioctl and while writing back GIC{D|R}_ISPENDR with line_level
-> +(OR) GIC{D|R}_ISPENDR?
+Hi Lee,
 
-The level and the pending status are different things;
-the API docs have an explanation of this. The API access
-to the ISPENDR registers should return only the pending
-latch status (which is not the same as what these registers
-return if you read them from the guest).
+I just tested your series and found issue with append mechanism.
+There is no problem to add resources when working on Linux side, but the 
+resource table is growing and when copying it at loaded location (ie 
+overwriting existing prebuilt resource table of firmware), you have an 
+overflow corrupting part of firmware code.
 
->>  * the different behaviour for accesses to GICD_STATUSR, GICR_STATUSR,
->
-> QEMU is saving and restoring this register, but kernel implementation
-> is missing. Kernel is silently returning zero. So could not catch. I
-> will fix it.
->
-> However, Specification says as below for STATUSR.
->
-> "    The GICD_STATUSR and GICR_STATUSR registers are architecturally
-> defined such
->      that a write of a clear bit has no effect, whereas a write with a set bit
->      clears that value.  To allow userspace to freely set the values
-> of these two
->      registers, setting the attributes with the register offsets for these two
->      registers simply sets the non-reserved bits to the value written."
->
-> Question is during restore, the set bit will clear the value STATUSR.
-> So it will reset the STATUSR after migrating the VM.
+Moreover firmware code is in general tuned to a feature set. Resource 
+table is created according to supported features. In most of the cases, 
+new resource won't be handled by firmware.
 
-The text you quote above says that setting the attribute via
-the API "sets the non-reserved bits to the value written".
-This is the point -- it does not have the write-1-to-clear
-behaviour that a guest access to the register does.
+Regards,
+Loic
 
->>    GICD_ISPENDR, GICR_ISPENDR0, GICD_ICPENDR, and GICR_ICPENDR0, which
->>    don't act the same via this API as for a guest access to the register
->>
->> Did I miss something?
->
-> In kernel (as shown in below code snippet),
->  GICD_ISPENDR, GICR_ISPENDR0, GICD_ICPENDR, and GICR_ICPENDR0
-> all register access using KVM_DEV_ARM_VGIC_GRP_{RE|DIST}_REGS ioctl
-> is accessing irq->pending state.
->
-> unsigned long vgic_mmio_read_pending(struct kvm_vcpu *vcpu,
->                                      gpa_t addr, unsigned int len)
-> {
->         u32 intid = VGIC_ADDR_TO_INTID(addr, 1);
->         u32 value = 0;
->         int i;
->
->         /* Loop over all IRQs affected by this read */
->         for (i = 0; i < len * 8; i++) {
->                 struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
->
->                 if (irq->pending)
->                         value |= (1U << i);
->         }
->
->   ...
-> }
 
-This is the code for handling a guest access to this register.
-The behaviour for access from userspace via this API has
-to be different, and therefore it must not use this code.
-The API doc specifies how it must differ.
-
-thanks
--- PMM
+On 08/04/2016 11:21 AM, Lee Jones wrote:
+> A new function now exists to pull in and amend and existing resource
+> table entry.  But what if we wish to provide a new resource?  This
+> function provides functionality to append a brand new resource entry
+> onto the resource table.  All complexity related to shuffling parts
+> of the table around, providing new offsets and incriminating number
+> of entries in the resource table's top-level header is taken care of
+> here.
+>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>   drivers/remoteproc/remoteproc_core.c | 55 ++++++++++++++++++++++++++++++++++++
+>   1 file changed, 55 insertions(+)
+>
+> diff --git a/drivers/remoteproc/remoteproc_core.c b/drivers/remoteproc/remoteproc_core.c
+> index 3318ebd..111350e 100644
+> --- a/drivers/remoteproc/remoteproc_core.c
+> +++ b/drivers/remoteproc/remoteproc_core.c
+> @@ -980,6 +980,61 @@ static int rproc_update_resource_table_entry(struct rproc *rproc,
+>   	return !updated;
+>   }
+>
+> +static struct resource_table*
+> +rproc_add_resource_table_entry(struct rproc *rproc,
+> +			       struct rproc_request_resource *request,
+> +			       struct resource_table *old_table, int *tablesz)
+> +{
+> +	struct resource_table *table;
+> +	struct fw_rsc_hdr h;
+> +	void *new_rsc_loc;
+> +	void *fw_header_loc;
+> +	void *start_of_rscs;
+> +	int new_rsc_offset;
+> +	int size = *tablesz;
+> +	int i;
+> +
+> +	h.type = request->type;
+> +
+> +	new_rsc_offset = size;
+> +
+> +	/*
+> +	 * Allocate another contiguous chunk of memory, large enough to
+> +	 * contain the new, expanded resource table.
+> +	 *
+> +	 * The +4 is for the extra offset[] element in the top level header
+> +	 */
+> +	size += sizeof(struct fw_rsc_hdr) + request->size + 4;
+> +	table = devm_kmemdup(&rproc->dev, old_table, size, GFP_KERNEL);
+> +	if (!table)
+> +		return ERR_PTR(-ENOMEM);
+> +
+> +	/* Shunt table by 4 Bytes to account for the extra offset[] element */
+> +	start_of_rscs = (void *)table + table->offset[0];
+> +	memmove(start_of_rscs + 4,
+> +		start_of_rscs, new_rsc_offset - table->offset[0]);
+> +	new_rsc_offset += 4;
+> +
+> +	/* Update existing resource entry's offsets */
+> +	for (i = 0; i < table->num; i++)
+> +		table->offset[i] += 4;
+> +
+> +	/* Update the top level 'resource table' header */
+> +	table->offset[table->num] = new_rsc_offset;
+> +	table->num++;
+> +
+> +	/* Copy new firmware header into table */
+> +	fw_header_loc = (void *)table + new_rsc_offset;
+> +	memcpy(fw_header_loc, &h, sizeof(h));
+> +
+> +	/* Copy new resource entry into table */
+> +	new_rsc_loc = (void *)fw_header_loc + sizeof(h);
+> +	memcpy(new_rsc_loc, request->resource, request->size);
+> +
+> +	*tablesz = size;
+> +	return table;
+> +}
+> +
+>   /*
+>    * take a firmware and boot a remote processor with it.
+>    */
+>
