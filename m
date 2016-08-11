@@ -1,80 +1,64 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 11 Aug 2016 16:05:56 +0100
-Subject: [PATCH v2 4/4] arm64: apply __ro_after_init to some objects
-In-Reply-To: <1470922609-754-5-git-send-email-jszhang@marvell.com>
-References: <1470922609-754-1-git-send-email-jszhang@marvell.com>
- <1470922609-754-5-git-send-email-jszhang@marvell.com>
-Message-ID: <20160811150555.GD3805@leverpostej>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Thu, 11 Aug 2016 17:08:44 +0200
+Subject: [PATCH 1/2] dt: bindings: Add vendor prefix for Espressif System
+In-Reply-To: <CAL_Jsq+uy-P54enk5Zho=nRab4PMEbqyBTEWiE0yhWWVoFTmwQ@mail.gmail.com>
+References: <1470596269-20572-1-git-send-email-hdegoede@redhat.com>
+ <20160810184845.GA17829@rob-hp-laptop>
+ <2b43330e-369d-7473-8b73-429f0f0b73ce@redhat.com>
+ <CAL_Jsq+uy-P54enk5Zho=nRab4PMEbqyBTEWiE0yhWWVoFTmwQ@mail.gmail.com>
+Message-ID: <3516eadd-e987-1747-5813-de51b77fd73e@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Thu, Aug 11, 2016 at 09:36:49PM +0800, Jisheng Zhang wrote:
-> These objects are set during initialization, thereafter are read only.
-> 
-> Previously I only want to mark vdso_pages, vdso_spec, vectors_page and
-> cpu_ops as __read_mostly from performance point of view. Then inspired
-> by Kees's patch[1] to apply more __ro_after_init for arm, I think it's
-> better to mark them as __ro_after_init. What's more, I find some more
-> objects are also read only after init. So apply __ro_after_init to all
-> of them.
-> 
-> This patch also removes global vdso_pagelist and tries to clean up
-> vdso_spec[] assignment code.
-> 
-> [1] http://www.spinics.net/lists/arm-kernel/msg523188.html
-> 
-> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
-> ---
->  arch/arm64/kernel/cpu_ops.c |  2 +-
->  arch/arm64/kernel/kaslr.c   |  2 +-
->  arch/arm64/kernel/vdso.c    | 27 +++++++++++++--------------
->  arch/arm64/mm/dma-mapping.c |  2 +-
->  arch/arm64/mm/init.c        |  4 ++--
->  arch/arm64/mm/mmu.c         |  2 +-
->  6 files changed, 19 insertions(+), 20 deletions(-)
-> 
-> diff --git a/arch/arm64/kernel/cpu_ops.c b/arch/arm64/kernel/cpu_ops.c
-> index c7cfb8f..6d32d1a 100644
-> --- a/arch/arm64/kernel/cpu_ops.c
-> +++ b/arch/arm64/kernel/cpu_ops.c
-> @@ -28,7 +28,7 @@ extern const struct cpu_operations smp_spin_table_ops;
->  extern const struct cpu_operations acpi_parking_protocol_ops;
->  extern const struct cpu_operations cpu_psci_ops;
->  
-> -const struct cpu_operations *cpu_ops[NR_CPUS];
-> +const struct cpu_operations *cpu_ops[NR_CPUS] __ro_after_init;
+On 11-08-16 15:31, Rob Herring wrote:
+> On Thu, Aug 11, 2016 at 4:15 AM, Hans de Goede <hdegoede@redhat.com> wrote:
+>> Hi Rob,
+>>
+>>
+>> On 10-08-16 20:48, Rob Herring wrote:
+>>>
+>>> On Sun, Aug 07, 2016 at 08:57:48PM +0200, Hans de Goede wrote:
+>>>>
+>>>> Espressif is a manufacturer of various wifi and bt chips, add a vendor
+>>>> prefix for use with bindings for these chips.
+>>>>
+>>>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>>>> ---
+>>>>  Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+>>>>  1 file changed, 1 insertion(+)
+>>>
+>>>
+>>> Acked-by: Rob Herring <robh@kernel.org>
+>>
+>>
+>> Thank you for all the reviews.
+>>
+>> What about: "[PATCH 2/2] dt: bindings: Add binding for ESP8089 wifi chips" ?
+>> there were some remarks, but I believe that those have been addressed
+>> (by answering the remarks, not with a new version), so a review of that
+>> one would be appreciated too.
+>
+> What about Arnd's comment "better use '-' instead of '_' for property names."
 
-It looks like we need to include <linux/cache.h> for __ro_after_init.
-While we seem to get that via some transitive include, that's not
-guaranteed to remain the case, and it's not something we should rely
-upon.
+Ah yes, I forgot about that comment. As explained in the commit msg
+I named the dt property to be the same as the keyword used in the
+ini-like config file android uses for this (the android driver loads a
+file with board specific esp8089 config like the crystal-type from
+/lib/firmware).
 
-Please explicitly include <linux/cache.h> when __ro_after_init is added.
+And that file does use '_'. I want to keep the names the same as that
+seems the sensible thing to do, but if there is a great preference for
+'-' in dt I can do a v2 with that changed.
 
-> -	/* Populate the special mapping structures */
-> -	vdso_spec[0] = (struct vm_special_mapping) {
-> -		.name	= "[vvar]",
-> -		.pages	= vdso_pagelist,
-> -	};
-> -
-> -	vdso_spec[1] = (struct vm_special_mapping) {
-> -		.name	= "[vdso]",
-> -		.pages	= &vdso_pagelist[1],
-> -	};
-> +	vdso_spec[0].pages = vdso_pagelist;
-> +	vdso_spec[1].pages = &vdso_pagelist[1];
+>> Also who should merge this series, Ulf because it is mmc related,
+>> or the dt-maintainers since it contains only bindings patches ?
+>
+> I can take it.
 
-While the original code was also this way, could we please make these a
-little more consistent? e.g.
+Great, thanks.
 
-	vdso_spec[0].pages = &vdso_pagelist[0];
-	vdso_spec[1].pages = &vdso_pagelist[1];
+Regards,
 
-That way it raises few false alarms for anyone looking at the code.
-
-Otherwise, this patch looks largely fine.
-
-Thanks,
-Mark.
+Hans
