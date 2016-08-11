@@ -1,52 +1,46 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 11 Aug 2016 11:58:48 +0100
-Subject: [PATCH v10 0/8] acpi, clocksource: add GTDT driver and GTDT
- support in arm_arch_timer
-In-Reply-To: <CADyBb7tZDT2LMGnsWW_orR37dsfseijLEjzn59rLW9tbbxKVPQ@mail.gmail.com>
-References: <1469535565-20924-1-git-send-email-fu.wei@linaro.org>
- <0befd611-91a7-88e9-1686-82929c1745e8@semihalf.com>
- <510fa357-a729-4ce1-7c10-4cef06feb7b7@linaro.org>
- <CADyBb7tZDT2LMGnsWW_orR37dsfseijLEjzn59rLW9tbbxKVPQ@mail.gmail.com>
-Message-ID: <20160811105848.GA25680@red-moon>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 11 Aug 2016 12:01:43 +0100
+Subject: [PATCH] arm64: suspend: avoid potential TLB conflict
+In-Reply-To: <57AAF666.2030501@arm.com>
+References: <1470651050-18291-1-git-send-email-mark.rutland@arm.com>
+ <57AA0401.1020809@arm.com> <20160809175157.GC13591@leverpostej>
+ <57AAF666.2030501@arm.com>
+Message-ID: <20160811110143.GB3805@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 11, 2016 at 06:22:03PM +0800, Fu Wei wrote:
-> Hi Hanjun, Tomasz,
+On Wed, Aug 10, 2016 at 10:39:50AM +0100, James Morse wrote:
+> Hi Mark,
 > 
-> On 11 August 2016 at 18:15, Hanjun Guo <hanjun.guo@linaro.org> wrote:
-> > Hi,
-> >
-> > On 2016/8/11 17:37, Tomasz Nowicki wrote:
-> >>
-> >> Hi Fu,
-> >>
-> >> Do you mind if I send IORT series where new drivers/acpi/arm64 directory
-> >> would be introduced in first place ? This means your GTDT set would
-> >> depend on IORT.
-> >
-> >
-> > I think it's reasonable as the IORT for ITS is the key device enablement
-> > for PCI MSI. I talked to Fuwei offline and he is fine with it.
+> On 09/08/16 18:51, Mark Rutland wrote:
+> > On Tue, Aug 09, 2016 at 05:25:37PM +0100, James Morse wrote:
+> >> fe12c00d21bb ("PM / hibernate: Introduce test_resume mode for hibernation") came
+> >> in with the merge window, this does a suspend followed by a resume with the user
+> >> page tables still loaded in ttbr0_el1.
+> > 
+> > Hmmm... given that, it looks like if we bail out in swsusp_arch_resume()
+> > after the call to create_safe_exec_page(), we may return to userspace
+> > with a corrupted TTBR0.
 > 
-> That's no problem at all, will do.
+> Ah, didn't spot that.
 > 
-> Can I do this:
-> (1)apply Tomasz's v8 patchset on the master branch of upstream kernel
-> (2)rebase my v10 on the top of Tomasz's v8
-> (3)git format-patch as v11, repost it
+> > We probably need to defer the call to create_safe_exec_page() after the
+> > other potential failure sites so as to avoid that.
+> > 
+> > Looking around it's not clear to me how/where the get_safe_page()
+> > allocations are cleaned up when a failure occurs.
 > 
-> Is that OK for everyone? :-)
+> Its dealt with by the core code: they get added to to one of
+> kernel/power/snapshot.c's plethora of bitmaps, and freed via
+> free_basic_memory_bitmaps() -> memory_bm_free() -> free_list_of_pages() ->
+> free_image_page().
+> 
+> It looks like pages allocated by get_safe_page() are on the 'forbidden_pages_map'.
 
-I do not think you need a v11 just to remove the drivers/acpi/arm64
-directory creation, you need to get Daniel/Thomas review/ack on
-the respective patches though, I do not see the point of churning
-out another series just because drivers/acpi/arm64 is now created
-in the IORT patch series. If v10 is ok you will rebase it on top of
-Tomasz's series and mention the dependency in the respective pull
-request.
+Thanks for the pointer!
 
-If there is need for a v11 following Daniel/Thomas review yes,
-you can proceed as above.
+Given that, it looks like a simple reshuffling of swsusp_arch_resume is
+all that's necessary. I'll spin that along with v2 of this patch.
 
-Lorenzo
+Thanks,
+Mark.
