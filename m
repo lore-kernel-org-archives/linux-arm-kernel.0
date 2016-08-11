@@ -1,70 +1,69 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 11 Aug 2016 15:28:42 -0700
-Subject: [PATCH] clk: imx7d: do not set the parent of
- IMX7D_ENET_AXI_ROOT_SRC
-In-Reply-To: <CAOMZO5BjdhCDNU-Vr7OT81ag0LqgFQ3+oP1D_o0FUOZVafneqQ@mail.gmail.com>
-References: <1468590782-8436-1-git-send-email-fabio.estevam@nxp.com>
- <CAOMZO5BjdhCDNU-Vr7OT81ag0LqgFQ3+oP1D_o0FUOZVafneqQ@mail.gmail.com>
-Message-ID: <20160811222842.GM2996@codeaurora.org>
+From: bauerman@linux.vnet.ibm.com (Thiago Jung Bauermann)
+Date: Thu, 11 Aug 2016 20:03:56 -0300
+Subject: [PATCH v2 0/2] extend kexec_file_load system call
+Message-ID: <1470956638-3589-1-git-send-email-bauerman@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/10, Fabio Estevam wrote:
-> Hi Mike,
-> 
-> On Fri, Jul 15, 2016 at 10:53 AM, Fabio Estevam <fabio.estevam@nxp.com> wrote:
-> > Booting the kernel on a imx7s-warp leads to several warnings like these:
-> >
-> > [    0.000000] ------------[ cut here ]------------
-> > [    0.000000] WARNING: CPU: 0 PID: 0 at kernel/locking/lockdep.c:3536 lock_release+0x2f8/0x330
-> > [    0.000000] releasing a pinned lock
-> >
-> > [    0.000000] ------------[ cut here ]------------
-> > [    0.000000] WARNING: CPU: 0 PID: 0 at kernel/locking/lockdep.c:2722 trace_hardirqs_on_caller+0x1ac/0x1f4
-> > [    0.000000] DEBUG_LOCKS_WARN_ON(unlikely(early_boot_irqs_disabled))
-> >
-> > [    0.000000] ---[ end trace cb88537fdc8fa201 ]---
-> > [    0.000000] bad: scheduling from the idle thread!
-> > [    0.000000] CPU: 0 PID: 0 Comm: swapper/0 Tainted: G        W       4.7.0-rc7-next-20160715 #404
-> >
-> > [    0.000000] ------------[ cut here ]------------
-> > [    0.000000] WARNING: CPU: 0 PID: 0 at kernel/time/sched_clock.c:179 sched_clock_register+0x44/0x1f8
-> > [    0.000000] Modules linked in:
-> >
-> > [    0.000591] ------------[ cut here ]------------
-> > [    0.000610] WARNING: CPU: 0 PID: 0 at kernel/time/sched_clock.c:179 sched_clock_register+0x44/0x1f8
-> >
-> > [    0.002084] ------------[ cut here ]------------
-> > [    0.002104] WARNING: CPU: 0 PID: 0 at init/main.c:576 start_kernel+0x258/0x3b0
-> > [    0.002114] Interrupts were enabled early
-> >
-> >
-> > This fix is along the same lines as 5e33ebff7edd ("clk: imx7d: do not
-> > set parent of ethernet time/ref clocks") and the explanation from that
-> > commit is:
-> >
-> > "The reason for the warning is that setting the parent enables the ENET
-> >  PLL since we are using CLK_OPS_PARENT_ENABLE. Enabling the ENET PLL can
-> >  cause clk_pllv3_wait_lock to sleep. See also:
-> >  commit fc8726a2c021 ("clk: core: support clocks which requires parents
-> >  enable (part 2)")."
-> >
-> > imx7s-warp does not even use the FEC interface, so we should not really
-> > configure the parent of IMX7D_ENET_AXI_ROOT_SRC in the common MX7 clock
-> > driver code.
-> >
-> > The dts file should use the assigned-clocks/assigned-clock-parents method,
-> > so simply remove the configuration of IMX7D_ENET_AXI_ROOT_SRC parent.
-> >
-> > Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
-> 
-> Do you think this one could be applied to 4.8-rc?
->
+This patch series is from AKASHI Takahiro. I will use it in my next
+version of the kexec_file_load implementation for powerpc, so I am
+rebasing it on top of v4.8-rc1.
 
-Is there a "Fixes:" tag that can be applied here? Does this
-depend on some sort of DTS changes to add assigned clocks and
-parents?
+I dropped the patch which adds __NR_kexec_file_load to
+<asm-generic/unistd.h> for simplicity, since the powerpc patches already
+add it to powerpc's <asm/unistd.h>. I don't know which approach is
+better.
+
+The first patch in this series is unchanged from v1.
+
+The second patch is the same one I posted on July 26th. It has the
+following changes from v1:
+
+- Added the arch_kexec_verify_buffer hook, where each architecture can
+  verify if the DTB is safe to load.
+- Renamed KEXEC_FILE_TYPE_DTB to KEXEC_FILE_TYPE_PARTIAL_DTB.
+- Limited max number of fds to KEXEC_SEGMENT_MAX.
+- Changed to use fixed size buffer for fdset instead of allocating it.
+- Changed to return -EINVAL if an unknown file type is found in fdset.
+
+I am also posting a new version of the kexec_file_load syscall
+implementation for powerpc which uses the arch_kexec_verify_buffer hook
+to enforce a whitelist of nodes and properties that userspace can pass to
+the next kernel, as suggested by Michael Ellerman.
+
+You can find it in a new patch in the powerpc series called
+"powerpc: Allow userspace to set device tree properties in kexec_file_load"
+
+Original cover letter:
+
+Device tree blob must be passed to a second kernel on DTB-capable
+archs, like powerpc and arm64, but the current kernel interface
+lacks this support.
+
+This patch extends kexec_file_load system call by adding an extra
+argument to this syscall so that an arbitrary number of file descriptors
+can be handed out from user space to the kernel.
+
+See the background [1].
+
+Please note that the new interface looks quite similar to the current
+system call, but that it won't always mean that it provides the "binary
+compatibility."
+
+[1] http://lists.infradead.org/pipermail/kexec/2016-June/016276.html
+
+AKASHI Takahiro (1):
+  kexec: add dtb info to struct kimage
+
+Thiago Jung Bauermann (1):
+  kexec: extend kexec_file_load system call
+
+ include/linux/fs.h         |  1 +
+ include/linux/kexec.h      | 10 ++++--
+ include/linux/syscalls.h   |  4 ++-
+ include/uapi/linux/kexec.h | 22 ++++++++++++
+ kernel/kexec_file.c        | 86 ++++++++++++++++++++++++++++++++++++++++++----
+ 5 files changed, 114 insertions(+), 9 deletions(-)
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+1.9.1
