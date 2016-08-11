@@ -1,29 +1,131 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 11 Aug 2016 17:39:19 +0100
-Subject: [PATCH 1/1] arm64: Remove stack duplicating code from jprobes
-In-Reply-To: <1470861891-13315-1-git-send-email-dave.long@linaro.org>
-References: <1470861891-13315-1-git-send-email-dave.long@linaro.org>
-Message-ID: <20160811163919.GE18366@e104818-lin.cambridge.arm.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Thu, 11 Aug 2016 17:39:54 +0100
+Subject: [RFC PATCH 6/8] PM / Domains: Remove a provider by referencing
+ the data pointer
+In-Reply-To: <CAPDyKFovC07Z9y-4RQ4MKGtjJx5w1D8er3Fv-8HF2qyTKgVViQ@mail.gmail.com>
+References: <1457090634-14785-1-git-send-email-jonathanh@nvidia.com>
+ <1457090634-14785-7-git-send-email-jonathanh@nvidia.com>
+ <CAPDyKFpLcnLvQmpQgzhOExq67XrbaW9Nf1Gk2Y+CND8dn_cmyA@mail.gmail.com>
+ <5769455C.9010809@nvidia.com>
+ <CAPDyKFovC07Z9y-4RQ4MKGtjJx5w1D8er3Fv-8HF2qyTKgVViQ@mail.gmail.com>
+Message-ID: <18ad702c-83fe-fd6d-89ae-57e6f2715860@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 10, 2016 at 04:44:51PM -0400, David Long wrote:
-> From: "David A. Long" <dave.long@linaro.org>
-> 
-> Because the arm64 calling standard allows stacked function arguments to be
-> anywhere in the stack frame, do not attempt to duplicate the stack frame for
-> jprobes handler functions.
-> 
-> Documenation changes to describe this issue have been broken out into a
-> separate patch in order to simultaneously address them in other
-> architecture(s).
-> 
-> Signed-off-by: David A. Long <dave.long@linaro.org>
-> Acked-by: Masami Hiramatsu <mhiramat@kernel.org>
 
-Applied to arm64 fixes/core with Marc's ack and the spelling corrected.
+On 05/08/16 12:55, Ulf Hansson wrote:
+> On 21 June 2016 at 15:47, Jon Hunter <jonathanh@nvidia.com> wrote:
+>>
+>> On 15/06/16 15:38, Ulf Hansson wrote:
+>>> On 4 March 2016 at 12:23, Jon Hunter <jonathanh@nvidia.com> wrote:
+>>>> To remove a PM domain from the system, it is necessary to ensure
+>>>> that any PM domain providers associated with the PM domain have
+>>>> been removed. Otherwise it could be possible to obtain a pointer
+>>>> to a PM domain structure that has been removed.
+>>>>
+>>>> PM domains now have a reference to the pointer for the PM domain
+>>>> provider's data variable. Add a function so that a PM domain can
+>>>> remove a PM domain provider by referencing the data pointer.
+> 
+> 
+>>>>
+>>>> Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
+>>>> ---
+>>>>  drivers/base/power/domain.c | 24 ++++++++++++++++++++++++
+>>>>  include/linux/pm_domain.h   |  2 ++
+>>>>  2 files changed, 26 insertions(+)
+>>>>
+>>>> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+>>>> index 72055fef6256..438885f2455f 100644
+>>>> --- a/drivers/base/power/domain.c
+>>>> +++ b/drivers/base/power/domain.c
+>>>> @@ -1738,6 +1738,30 @@ void of_genpd_del_provider(struct device_node *np)
+>>>>  EXPORT_SYMBOL_GPL(of_genpd_del_provider);
+>>>>
+>>>>  /**
+>>>> + * of_genpd_del_provider_by_data() - Remove a registered PM domain provider
+>>>> + * @data: Pointer to the data associated with the PM domain provider
+>>>> + *
+>>>> + * Look up a PM domain provider based upon a pointer to it's data and
+>>>> + * remove the PM domain provider from the list of providers.
+>>>> + */
+>>>> +void of_genpd_del_provider_by_data(void *data)
+>>>> +{
+>>>> +       struct of_genpd_provider *c, *cp;
+>>>> +
+>>>> +       mutex_lock(&of_genpd_mutex);
+>>>> +       list_for_each_entry_safe(cp, c, &of_genpd_providers, link) {
+>>>> +               if (cp->data == data) {
+>>>> +                       list_del(&cp->link);
+>>>> +                       of_node_put(cp->node);
+>>>> +                       kfree(cp);
+>>>> +                       break;
+>>>> +               }
+>>>> +       }
+>>>> +       mutex_unlock(&of_genpd_mutex);
+>>>> +}
+>>>> +EXPORT_SYMBOL_GPL(of_genpd_del_provider_by_data);
+>>>> +
+>>>> +/**
+>>>>   * of_genpd_get_from_provider() - Look-up PM domain
+>>>>   * @genpdspec: OF phandle args to use for look-up
+>>>>   *
+>>>> diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
+>>>> index bed84413546f..7b7921a65cb0 100644
+>>>> --- a/include/linux/pm_domain.h
+>>>> +++ b/include/linux/pm_domain.h
+>>>> @@ -199,6 +199,7 @@ int of_genpd_add_provider_simple(struct device_node *np,
+>>>>  int of_genpd_add_provider_onecell(struct device_node *np,
+>>>>                                   struct genpd_onecell_data *data);
+>>>>  void of_genpd_del_provider(struct device_node *np);
+>>>
+>>> There's currently only one user of of_genpd_del_provider().
+>>>
+>>> Could this patch just convert that user to the new API, so we don't
+>>> need to keep both the legacy and new one?
+>>>
+>>> I guess we could then just stick to the name "of_genpd_del_provider()".
+>>
+>> I had a look at this and to do that we would end up with
+>> of_genpd_del_provider(struct device_node *np, void *data) where the user
+>> should only pass one of the arguments. It seems a bit odd. However,
+>> unless I have forgotten something, I wonder if we should just make
+>> of_genpd_del_provider_by_name() a local function and not export this at
+>> all? It seems more natural for users to delete a provider by the
+>> device_node than by name rather than the data argument.
+>>
+>> The only problem I see with making of_genpd_del_provider_by_name() local
+>> is that I need to add a prototype for the function at the top of the
+>> domain.c source file so that it builds because __pm_genpd_remove() is
+>> defined above it. Yes I could move __pm_genpd_remove() to the bottom of
+>> the file but then it is not located next to pm_genpd_init() which seems odd.
+>>
+>> Let me know what you think.
+> 
+> Sorry for delay! I have now looked into this in more detail.
 
-Thanks.
+No problem. Thanks!
+
+> When an genpd provider is added today, it's supposed to get a
+> corresponding *unique* OF device node associated with it, right!?
+> 
+> If we store this OF device node from the provider in the struct
+> generic_pm_domain, instead of the "provider_data pointer", we wouldn't
+> need to the add of_genpd_del_provider_by_data() at all. Because we can
+> use the currently available of_genpd_del_provider(), right!?
+> 
+> Or what am I missing? :-)
+
+No that would work as well. I guess I was trying to make it non-DT
+specific. However, for now it can be to simplify matters and it could
+always be extended later if necessary.
+
+I am also thinking about making pm_genpd_remove_tail()
+of_genpd_remove_tail() as it seems silly to have both a struct device
+pointer and a struct device_node pointer stored for the provider.
+
+Cheers
+Jon
 
 -- 
-Catalin
+nvpublic
