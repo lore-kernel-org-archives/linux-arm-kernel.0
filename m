@@ -1,24 +1,42 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 11 Aug 2016 16:09:29 +0200
-Subject: [PATCH 4/4] ARM: dts: STiH41x-b2020: Update gpio specifier
-In-Reply-To: <1470834781-23232-5-git-send-email-patrice.chotard@st.com>
-References: <1470834781-23232-1-git-send-email-patrice.chotard@st.com>
- <1470834781-23232-5-git-send-email-patrice.chotard@st.com>
-Message-ID: <CACRpkdYKtYTsFnMh67ggtF1Ej51hNXD8Jkax=J96+fEhZeYzhw@mail.gmail.com>
+From: weiyj.lk@gmail.com (Wei Yongjun)
+Date: Thu, 11 Aug 2016 22:15:27 +0800
+Subject: [PATCH -next] ASoC: sun4i-codec: Fix error return code in
+ sun4i_codec_probe()
+In-Reply-To: <CAGb2v67cVXWtM=AzeFcftnajSs=+C6F12P_EvnXHB=oKsAm5Cw@mail.gmail.com>
+References: <1470836554-11569-1-git-send-email-weiyj.lk@gmail.com>
+ <CAGb2v67cVXWtM=AzeFcftnajSs=+C6F12P_EvnXHB=oKsAm5Cw@mail.gmail.com>
+Message-ID: <d48eceb4-c26d-3b3c-8577-1ba19a04b040@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 10, 2016 at 3:13 PM,  <patrice.chotard@st.com> wrote:
+Hi
 
-> From: Patrice Chotard <patrice.chotard@st.com>
+On 08/10/2016 10:04 PM, Chen-Yu Tsai wrote:
+> On Wed, Aug 10, 2016 at 9:42 PM, Wei Yongjun <weiyj.lk@gmail.com> wrote:
+>> Fix to return error code -ENOMEM instead of 0 when create card
+>> failed, as done elsewhere in this function.
+>>
+>> Fixes: 45fb6b6f2aa3 ("ASoC: sunxi: add support for the on-chip
+>> codec on early Allwinner SoCs")
+>> Signed-off-by: Wei Yongjun <weiyj.lk@gmail.com>
+>> ---
+>>  sound/soc/sunxi/sun4i-codec.c | 1 +
+>>  1 file changed, 1 insertion(+)
+>>
+>> diff --git a/sound/soc/sunxi/sun4i-codec.c b/sound/soc/sunxi/sun4i-codec.c
+>> index 0e19c50..e741659 100644
+>> --- a/sound/soc/sunxi/sun4i-codec.c
+>> +++ b/sound/soc/sunxi/sun4i-codec.c
+>> @@ -846,6 +846,7 @@ static int sun4i_codec_probe(struct platform_device *pdev)
+>>         card = sun4i_codec_create_card(&pdev->dev);
+>>         if (!card) {
+>>                 dev_err(&pdev->dev, "Failed to create our card\n");
+>> +               ret = -ENOMEM;
+>>                 goto err_unregister_codec;
+>>         }
+>>
+> This works, though it might be better to fix the create_card function and
+> any custom functions called in there to pass back a proper error value.
 >
-> - Remove useless gpio-cells
-> - Update second parameter by using GPIO_ACTIVE_HIGH/LOW
->   instead of hardcoded value
->
-> Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
-
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-
-Yours,
-Linus Walleij
+Since sun4i_codec_create_card() can only failed when kmalloc() return NULL, so
+still need to change sun4i_codec_create_card()?
